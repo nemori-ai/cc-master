@@ -11,9 +11,14 @@ for t in tests/hooks/test_*.sh; do
 done
 
 echo "== node tests (linter + assets + content) =="
-# node --test discovers *.test.mjs recursively under the given dirs
-if ls tests/linter/*.test.mjs tests/assets/*.test.mjs tests/content/*.test.mjs >/dev/null 2>&1; then
-  node --test tests/linter/ tests/assets/ tests/content/ || fail=1
+# Node 22+ treats `--test` path args as test files/globs, NOT discovery dirs (a bare dir is
+# read as a module to execute and errors). So enumerate explicit test files via find — this
+# is version-stable (Node 18-26) and avoids the "all three dirs must exist" fragility of a
+# multi-glob `ls`. Our paths contain no spaces, so the unquoted expansion is intentional.
+node_tests=$(find tests -name '*.test.mjs' 2>/dev/null | sort)
+if [ -n "$node_tests" ]; then
+  # shellcheck disable=SC2086
+  node --test $node_tests || fail=1
 fi
 
 [ "$fail" -eq 0 ] && echo "ALL TESTS PASSED" || { echo "TESTS FAILED"; exit 1; }

@@ -1,0 +1,16 @@
+{
+  "schema": "cc-master/v1",
+  "goal": "Migrate user_cognition's 9 domains to the new CognitionRecord schema",
+  "owner": { "active": true, "session_id": "abc123", "heartbeat": "2026-06-05T12:30Z" },
+  "git": { "worktree": "/repo/.worktrees/cog-migrate", "branch": "feat/cog-migrate" },
+  "wip_limit": 4,
+  "tasks": [
+    { "id": "T0", "status": "done", "deps": [], "artifact": "commit a1b2c3", "verified": true },
+    { "id": "T1", "status": "in_flight", "deps": ["T0"], "mechanism": "sub-agent", "handle": "bg-7a", "dispatched_at": "12:18Z" },
+    { "id": "T3", "status": "ready", "deps": ["T0"] },
+    { "id": "T9", "status": "blocked", "deps": ["T1"], "blocked_on": "T1" },
+    { "id": "D1", "status": "blocked", "deps": [], "blocked_on": "user", "title": "Split the PR into two?" },
+    { "id": "F1", "status": "ready", "deps": [], "kind": "fill-work", "justification": "produces-reusable-artifact", "title": "Pre-draft the PR description skeleton" }
+  ],
+  "log": []
+}
