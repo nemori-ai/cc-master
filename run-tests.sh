@@ -10,7 +10,7 @@ for t in tests/hooks/test_*.sh; do
   bash "$t" || fail=1
 done
 
-echo "== node tests (linter + assets + content) =="
+echo "== node tests (content) =="
 # Node 22+ treats `--test` path args as test files/globs, NOT discovery dirs (a bare dir is
 # read as a module to execute and errors). So enumerate explicit test files via find — this
 # is version-stable (Node 18-26) and avoids the "all three dirs must exist" fragility of a

@@ -1520,7 +1520,7 @@ test('every SKILL.md has YAML frontmatter with name + description', () => {
   const skillDirs = readdirSync(join(ROOT, 'skills'));
   for (const d of skillDirs) {
     const md = read(`skills/${d}/SKILL.md`);
-    assert.match(md, /^---\n[\s\S]*?\nname:\s*\S+/m, `${d}/SKILL.md has name`);
+    assert.match(md, /^---\n[\s\S]*?^name:\s*\S+/m, `${d}/SKILL.md has name`);  // ^name: (m-flag): name: may sit directly under --- with no blank line
     assert.match(md, /\ndescription:\s*\S+/m, `${d}/SKILL.md has description`);
   }
 });
