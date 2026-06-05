@@ -4,11 +4,18 @@
 
 **Goal:** Build `cc-master`, a ship-anywhere Claude Code plugin that turns any main-session agent into a long-horizon (>24h) "master orchestrator": it picks the right dynamic-workflow paradigm and writes stable/parallel scripts, and it productively advances the main thread (dispatch background work + use idle windows with 主观能动性) while surviving repeated context compaction and cross-session resume.
 
-**Architecture:** A self-contained plugin directory (`.claude-plugin/plugin.json` + `commands/` + `skills/` + `hooks/`) backed by a cwd-keyed `board.json` orchestration archive. Three hooks (UserPromptSubmit/Stop/SessionStart) are always-on but **self-gate** on a marker file, so they no-op until the bootstrap command activates a board. Two skills carry the depth: **Skill A** (`orchestrating-to-completion`) is the orchestration soul (philosophy + decision program + dispatch framework); **Skill B** (`authoring-workflows`) is the workflow-writing manual with a **runnable linter** + templates + examples. The only "real programs" (the 3 hook shell scripts + the linter) get genuine TDD; markdown content is verified by structural-invariant tests and by linting every bundled `.js`.
+**Architecture:** A self-contained plugin directory (`.claude-plugin/plugin.json` + `commands/` + `skills/` + `hooks/`) backed by a cwd-keyed `board.json` orchestration archive. Three hooks (UserPromptSubmit/Stop/SessionStart) are always-on but **self-gate** on a marker file, so they no-op until the bootstrap command activates a board. Two skills carry the depth: **Skill A** (`orchestrating-to-completion`) is the orchestration soul (philosophy + decision program + dispatch framework); **Skill B** (`authoring-workflows`) is the workflow-writing manual (templates + examples + the harness-contract it teaches). The only "real programs" (the 3 hook shell scripts) get genuine TDD; markdown content is verified by structural-invariant tests. *(See the post-build amendment below: the originally-planned runnable linter was removed.)*
 
-**Tech Stack:** Markdown (commands/skills/references), POSIX `bash` (hooks, jq-free for portability), Node ≥18 ESM (`validate-workflow.mjs` linter + `node --test` test runner), JSON (plugin.json, hooks.json, board schema). Zero runtime third-party dependencies.
+**Tech Stack:** Markdown (commands/skills/references), POSIX `bash` (hooks, jq-free for portability), Node ≥18 ESM (`node --test` test runner), JSON (plugin.json, hooks.json, board schema). Zero runtime third-party dependencies.
 
 ---
+
+> **POST-BUILD AMENDMENT (2026-06-05, dogfood).** The runnable linter (Phase 2 + the bundled-asset
+> lint gate in Task 3.1) was **removed** after the build. The Claude Code harness validates workflows
+> authoritatively (`meta` at launch; determinism / caps / escape at runtime), so a standalone static
+> linter is a redundant, drift-prone heuristic reimplementation — it even false-positived on a doc
+> comment during this very build. Skill B now teaches the harness contract instead (see `docs/spec.md`
+> §9 and the skill's `SKILL.md` §3). Phase 2 and the lint-gate steps below are kept as historical record.
 
 ## Shared Constants & Conventions (pin these FIRST — every component references them)
 

@@ -126,5 +126,7 @@ cache key.
 The first statement must be `export const meta = { ... }`, a **pure literal**
 (no identifiers, calls, template literals, or spreads). Required keys: `name`
 (string), `description` (string). `phases: [{ title }]` is conventional and its
-titles should match your `phase()` / `opts.phase` strings. The linter
-(`scripts/validate-workflow.mjs`) enforces all of this.
+titles should match your `phase()` / `opts.phase` strings. The **harness
+enforces all of this** — `meta` (pure literal + required keys) is validated at
+launch; determinism / caps / escape-hatch violations throw at runtime. There is
+no separate linter — the runtime is the authoritative check.

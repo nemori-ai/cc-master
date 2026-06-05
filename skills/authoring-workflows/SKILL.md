@@ -1,6 +1,6 @@
 ---
 name: authoring-workflows
-description: Use when writing a Claude Code dynamic-workflow script — picks the right paradigm (fan-out/pipeline/loop), validates the script with a runnable linter before running, and points to mechanism/patterns/api references plus templates and examples.
+description: Use when writing a Claude Code dynamic-workflow script — picks the right paradigm (fan-out/pipeline/loop), writes to the runtime's own validation contract (the harness is the authoritative checker), and points to mechanism/patterns/api references plus templates and examples.
 ---
 
 # Authoring dynamic workflows
@@ -8,8 +8,9 @@ description: Use when writing a Claude Code dynamic-workflow script — picks th
 A dynamic workflow moves the "what runs next" decision out of the LLM and into a
 deterministic JavaScript script that a runtime executes in the background. Use
 this skill when you are about to write one. The discipline here is small: **be
-honest about whether you need a workflow, pick the paradigm by its shape, and let
-a runnable linter — not prose self-checking — be the gate before you launch.**
+honest about whether you need a workflow, pick the paradigm by its shape, and
+write to the runtime's own validation contract — the harness is the authoritative
+gate, so you don't reimplement it.**
 
 ## 1. The honest test — do you even need a workflow?
 
@@ -51,28 +52,34 @@ Pick by the **shape** of the work, not by taste. (Full semantics in
 > early-exit, "compare against all others"). "Cleaner code" is not a reason — the
 > barrier's latency is real. See the smell-test in `references/mechanism.md` §3.
 
-## 3. Author flow — draft, then validate before launching
+## 3. Author flow — draft to the harness contract, then launch
 
 1. **Draft** from a skeleton in `assets/templates/` (or a full composition in
    `assets/examples/`). Fill in the real prompts, schemas, and work-list. Keep
    `meta` a pure literal with `name` + `description` as the first statement.
-2. **Validate with the runnable linter — this is the gate, not prose
-   self-checking.** Run:
+2. **Write to the harness's validation contract.** The runtime is the
+   authoritative checker — there is **no separate linter to run, and you should
+   not reimplement one**. The contract:
+   - `meta` is the first statement and a pure literal (`name` + `description`
+     required) — the harness validates this **at launch**.
+   - no `Date.now()` / `Math.random()` / arg-less `new Date()` — the harness
+     **throws on these at runtime** (they break resume).
+   - no `require` / node-builtin imports / `process.*` — the sandbox rejects them.
+   - `parallel()` takes thunks (`() => ...`), not bare promises (a bare promise
+     executes eagerly and loses the barrier).
+   - stay under the caps (16 concurrent / 1,000 total / 4,096 per call / 512 KB).
 
-   ```sh
-   node scripts/validate-workflow.mjs <your-script.js>
-   ```
+   See `references/mechanism.md` for what each constraint means and why.
+3. **Launch.** If the harness rejects the script or throws, its error is
+   authoritative — read it, fix per `references/mechanism.md`, relaunch.
 
-   It deterministically checks meta-first / pure-literal meta, the determinism三禁
-   (`Date.now` / `Math.random` / arg-less `new Date()`), escape hatches
-   (`require` / node-builtin imports / `process.*`), and that `parallel()` is
-   given thunks, not bare promises. **Fix every ERROR before launching** — exit
-   code `0` is clean, `1` means at least one ERROR. A workflow that fails the
-   linter will not resume correctly and may not run at all.
-3. **Launch** only after the linter is clean.
-
-This mirrors the orchestration principle "trust only deterministic endpoint
-verification, not prose self-check": the linter is the endpoint check.
+> **Why no linter?** The runtime already validates `meta` (at launch) and
+> determinism / caps / escape (at runtime), authoritatively. A separate static
+> linter would only be a drift-prone heuristic re-implementation of the harness's
+> own checks — worse than the real thing. So this skill teaches you the contract
+> instead of shipping a second validator. (The orchestration principle "trust the
+> deterministic endpoint, not prose self-check" is satisfied by the harness — it
+> *is* the endpoint.)
 
 ## 4. Reference index — read before you guess
 
@@ -95,5 +102,5 @@ verification, not prose self-check": the linter is the endpoint check.
   (review-adversarial-verify, design-judge-panel, research-multimodal-sweep,
   migrate-discover-transform-verify).
 
-Every bundled `.js` is itself kept linter-clean, so any template or example is a
-known-good starting point.
+Every bundled template and example is written to the harness contract, so any one
+of them is a known-good starting point.
