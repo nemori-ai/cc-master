@@ -24,8 +24,8 @@ make_project() { local d; d="$(mktemp -d "${TMPDIR:-/tmp}/.tmp-ccm.XXXXXX")"; ec
 
 # run_hook SCRIPT STDIN_JSON PROJECT_DIR -> sets HOOK_OUT / HOOK_RC
 run_hook() {
-  HOOK_OUT="$(CLAUDE_PROJECT_DIR="$3" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
-             printf '%s' "$2" | bash "$PLUGIN_ROOT/$1" 2>/dev/null)"; HOOK_RC=$?
+  HOOK_OUT="$(printf '%s' "$2" | CLAUDE_PROJECT_DIR="$3" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+             bash "$PLUGIN_ROOT/$1" 2>/dev/null)"; HOOK_RC=$?
 }
 
 finish() { echo "passed=$PASS failed=$FAILED"; [ "$FAILED" -eq 0 ] || exit 1; }

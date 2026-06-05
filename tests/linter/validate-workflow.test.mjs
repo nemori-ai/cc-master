@@ -41,3 +41,7 @@ for (const [f, re] of CASES) {
   });
 }
 test('good-full passes', () => assert.equal(lint(fix('good-full.js')).code, 0));
+// Regression: forbidden patterns (Date.now/require/parallel([...])) inside COMMENTS must not
+// be flagged — the linter blanks comments before pattern-scanning.
+test('good-commented passes (forbidden patterns in comments are ignored)', () =>
+  assert.equal(lint(fix('good-commented.js')).code, 0));

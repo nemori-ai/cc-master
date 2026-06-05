@@ -14,6 +14,15 @@ const lineOf = (src, idx) => src.slice(0, idx).split('\n').length;
 
 const src = readFileSync(file, 'utf8');
 
+// Blank comments (block + line) before pattern-scanning the determinism / escape-hatch /
+// parallel-thunk rules, so an explanatory comment like `// use parallel([...])` or
+// `// never call Date.now()` is NOT a false positive. Comment characters become spaces (so
+// byte offsets — and thus lineOf — stay accurate) and newlines are preserved (so line counts
+// stay accurate). The `(?<!:)` guard keeps `https://...` inside a string from being eaten.
+const scanSrc = src
+  .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+  .replace(/(?<!:)\/\/[^\n]*/g, (m) => ' '.repeat(m.length));
+
 // rule: size
 if (statSync(file).size > MAX_BYTES) add('ERROR', 1, 'size', `file exceeds ${MAX_BYTES} bytes`);
 
@@ -42,16 +51,16 @@ for (const key of ['name', 'description']) {
 const DET = [[/\bDate\.now\s*\(/, 'Date.now()'], [/\bMath\.random\s*\(/, 'Math.random()'],
              [/\bnew\s+Date\s*\(\s*\)/, 'arg-less new Date()']];
 for (const [re, name] of DET) {
-  const m = src.match(re);
-  if (m) add('ERROR', lineOf(src, m.index), 'determinism', `non-deterministic ${name} breaks resume`);
+  const m = scanSrc.match(re);
+  if (m) add('ERROR', lineOf(scanSrc, m.index), 'determinism', `non-deterministic ${name} breaks resume`);
 }
 
 // rule: escape hatches
 const ESC = [[/\brequire\s*\(/, 'require()'], [/\bfrom\s+['"`](?:node:)?(?:fs|child_process|os|process)['"`]/, 'node-builtin import'],
              [/\bprocess\.(?!argv\b)/, 'process.* access']];
 for (const [re, name] of ESC) {
-  const m = src.match(re);
-  if (m) add('ERROR', lineOf(src, m.index), 'escape-hatch', `disallowed ${name} (scripts run sandboxed)`);
+  const m = scanSrc.match(re);
+  if (m) add('ERROR', lineOf(scanSrc, m.index), 'escape-hatch', `disallowed ${name} (scripts run sandboxed)`);
 }
 
 // rule: meta pure-literal — the meta block must not contain bare identifiers as values,
@@ -73,10 +82,10 @@ if (metaBlock) {
 // rule: parallel-thunk — parallel( must be followed by an array of thunks, not bare promises
 const parRe = /\bparallel\s*\(\s*\[([^\]]*)\]/g;
 let pm;
-while ((pm = parRe.exec(src))) {
+while ((pm = parRe.exec(scanSrc))) {
   const inner = pm[1].trim();
   if (inner && !/=>|\bfunction\b/.test(inner)) {
-    add('ERROR', lineOf(src, pm.index), 'parallel-thunk', 'parallel() needs thunks (() => ...), not bare promises');
+    add('ERROR', lineOf(scanSrc, pm.index), 'parallel-thunk', 'parallel() needs thunks (() => ...), not bare promises');
   }
 }
 
