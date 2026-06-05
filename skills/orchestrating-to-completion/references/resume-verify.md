@@ -50,6 +50,13 @@ correctness must live at the endpoint.
   correct; you still read the diff.
 - **A null / empty review counts as NOT passed** — an empty or absent review is never silent
   approval. This is the silent-pass-through guard.
+- **Verify by *running* on real inputs, not by paper-reading.** A surprising share of real
+  defects are regex / shell / boundary bugs that look correct on the page and only surface on
+  real data or in the real environment — e.g. a `grep -c` that yields `"0\n0"` on zero matches,
+  a shell pipe whose env-var assignment scopes to the wrong side, a frontmatter regex that
+  assumes a blank line that isn't there. An LLM second-opinion *read* catches **contract**
+  violations; only an actual *run* catches **runtime** crashes. Do both — read the diff **and**
+  execute the gate against a real fixture.
 
 Verification is the validation step of the resume cache (§1): only an artifact that exists
 **and** passes this endpoint check is treated as done.

@@ -89,3 +89,21 @@ with admission control:
   workflows all return at once.
 - **Concurrency cap = min** of: CPU/IO, model budget, rate limit, context-return budget, and
   synthesis load.
+
+---
+
+## Dispatch hygiene — mechanics that bite the moment you run real parallel work
+
+- **Absolute paths to the work target — never inherit cwd.** The orchestrator's cwd is often
+  *not* the repo the work lands in (you may be driving from a different worktree or a parent
+  directory). Every dispatched agent's prompt must give **absolute paths** to the target and
+  tell it not to rely on inherited cwd — otherwise files land in the wrong tree.
+- **Single-committer: leaves write + self-test, the orchestrator commits.** Parallel agents
+  that each `git commit` race the git index. Instruct each leaf to **write its files and run
+  its tests to prove green, but never commit**; the orchestrator verifies at the endpoint and
+  commits in dependency order. (The end-to-end argument again — commit integrity belongs at the
+  orchestrator endpoint, not the leaf. See `resume-verify.md`.)
+- **Serialize writers to a shared mutable file across waves.** If several tasks append to the
+  same file (a shared test file, a registry), two of them in the *same* wave will clobber each
+  other. Put those writers in **different waves** so at most one touches the file at a time —
+  the orchestrator absorbs this coordination cost so the leaves stay independent and disjoint.
