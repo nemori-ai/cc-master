@@ -1,6 +1,6 @@
 ---
 name: authoring-workflows
-description: Use when writing a Claude Code dynamic-workflow script — picks the right paradigm (fan-out/pipeline/loop), writes to the runtime's own validation contract (the harness is the authoritative checker), and points to mechanism/patterns/api references plus templates and examples.
+description: Use whenever you are about to call the Workflow tool or author/debug a Claude Code dynamic-workflow script — even if you think you already know the API. Picks the right paradigm (fan-out/pipeline/loop), writes to the runtime's own validation contract (the harness is the authoritative checker), and points to mechanism/patterns/api references plus templates and examples. The engine has non-obvious determinism and resume rules; consult this before guessing rather than after a failed run.
 ---
 
 # Authoring dynamic workflows
