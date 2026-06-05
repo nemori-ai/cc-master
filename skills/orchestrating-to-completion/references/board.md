@@ -9,11 +9,17 @@ context, and it cannot read the built-in `Task` tool).
 
 ## Key decisions
 
-- **Name**: `board`. **Single source of truth.** **cwd/worktree-keyed** (so it survives
-  shutdown-and-reopen — `session_id` changes on a plain reopen, cwd does not). Gitignored fixed
-  path: `.claude/cc-master/board.json`.
-- **Storage = mutable snapshot `board.json`**: each turn, `Write` the whole file (the narrow
-  waist is small, so an edit can't corrupt it); generate the markdown view on demand.
+- **Name**: `board`. **Single source of truth.** **Configurable home + one uniquely-named
+  board file per orchestration.** The home is `$CC_MASTER_HOME` if set, else
+  `${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/cc-master/` — a user storage preference, no longer a
+  hardcoded path. Each orchestration gets its own time-sortable file
+  `<UTC-timestamp>-<pid>.board.json` (e.g. `20260605T101821Z-54324.board.json`), so multiple
+  concurrent orchestrations never collide. The bootstrap (UserPromptSubmit) hook creates the
+  file and injects its exact path; **you own which board is yours** — after compaction,
+  re-discover it by listing the home and matching the `goal`. Gitignored.
+- **Storage = mutable snapshot (one named board file per orchestration)**: each turn, `Write`
+  the whole file (the narrow waist is small, so an edit can't corrupt it); generate the
+  markdown view on demand.
 
 ---
 
@@ -63,8 +69,8 @@ however the task needs.
 ## Single source of truth
 
 The built-in `Task*` tools are at most an in-session draft mirror — **non-authoritative**. Only
-`board.json` is the save file that a power-cut, a shutdown, and a hook all recognize. When the
-two disagree, `board.json` wins.
+your board file in the home is the save file that a power-cut, a shutdown, and a hook all
+recognize. When the two disagree, the board file wins.
 
 ---
 

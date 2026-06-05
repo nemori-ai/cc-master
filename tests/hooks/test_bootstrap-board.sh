@@ -1,34 +1,37 @@
 #!/usr/bin/env bash
 . "$(dirname "$0")/helpers.sh"
 
-# Case A: prompt contains the command-name sentinel → board + marker created, context injected, rc 0
+count_boards() { ls "$1"/*.board.json 2>/dev/null | wc -l | tr -d ' '; }
+
+# Case A: command-name sentinel → exactly one board in the default home, path + role injected
 P="$(make_project)"
 run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"/cc-master:as-master-orchestrator migrate the thing"}' "$P"
 assert_eq 0 "$HOOK_RC" "bootstrap exits 0"
-assert_file "$P/.claude/cc-master/board.json" "board created"
-assert_file "$P/.claude/cc-master/active" "marker created"
-assert_contains "$HOOK_OUT" "board" "injects context mentioning board"
+assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "exactly one board created in default home"
+assert_contains "$HOOK_OUT" ".board.json" "injects the board path"
+assert_contains "$HOOK_OUT" "orchestrator" "injects the orchestrator role"
 rm -rf "$P"
 
-# Case B: prompt contains the body sentinel (expanded-body case) → also fires
+# Case B: body sentinel (expanded-body case) → also creates a board
 P="$(make_project)"
 run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"...\n<!-- cc-master:bootstrap:v1 -->\n..."}' "$P"
-assert_file "$P/.claude/cc-master/board.json" "board created via body sentinel"
+assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "board created via body sentinel"
 rm -rf "$P"
 
-# Case C: unrelated prompt → no board, no marker, rc 0 (silent no-op)
+# Case C: unrelated prompt → no board, rc 0 (silent no-op)
 P="$(make_project)"
 run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"what files changed today?"}' "$P"
 assert_eq 0 "$HOOK_RC" "no-op exits 0"
-assert_no_file "$P/.claude/cc-master/board.json" "no board for unrelated prompt"
+assert_eq 0 "$(count_boards "$P/.claude/cc-master")" "no board for unrelated prompt"
 rm -rf "$P"
 
-# Case D: already-active board is NOT clobbered (idempotent)
-P="$(make_project)"; mkdir -p "$P/.claude/cc-master"
-printf '{"schema":"cc-master/v1","goal":"EXISTING","owner":{"active":true},"tasks":[{"id":"T0","status":"ready","deps":[]}]}' > "$P/.claude/cc-master/board.json"
-touch "$P/.claude/cc-master/active"
-run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"/cc-master:as-master-orchestrator again"}' "$P"
-assert_contains "$(cat "$P/.claude/cc-master/board.json")" "EXISTING" "existing board preserved"
-rm -rf "$P"
+# Case D: CC_MASTER_HOME override → board lands in the custom home, NOT the project default
+P="$(make_project)"; H="$(make_project)"
+HOOK_OUT="$(printf '%s' '{"prompt":"/cc-master:as-master-orchestrator x"}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$H" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+assert_eq 1 "$(count_boards "$H")" "board created in CC_MASTER_HOME"
+assert_eq 0 "$(count_boards "$P/.claude/cc-master")" "nothing in project default when home overridden"
+rm -rf "$P" "$H"
 
 finish

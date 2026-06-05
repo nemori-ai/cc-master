@@ -2,7 +2,7 @@
 description: Render a cc-master board summary — progress, blockers, critical path, decisions awaiting the user.
 ---
 
-Read `.claude/cc-master/board.json` and render a concise status report:
+Read your orchestration board and render a concise status report. Boards live in the cc-master home (`$CC_MASTER_HOME`, else `<project>/.claude/cc-master/`), named `<timestamp>-<pid>.board.json`; read the active one (`owner.active: true`) for the task at hand. Report from it:
 
 - **Progress**: done / total tasks; list any `done` tasks with their `artifact`.
 - **In flight**: each `in_flight` task with its `mechanism`, `handle`, and `dispatched_at`; flag any past the p95 duration for its kind as a hedge candidate.

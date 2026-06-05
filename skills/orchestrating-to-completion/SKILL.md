@@ -1,6 +1,6 @@
 ---
 name: orchestrating-to-completion
-description: Use when running a long-horizon (>24h) goal as a master orchestrator — decompose into a dependency DAG, dispatch background work across shell/sub-agent/workflow, keep the main thread productive in waiting windows, verify at endpoints, and survive compaction via a cwd-keyed board.
+description: Use when running a long-horizon (>24h) goal as a master orchestrator — decompose into a dependency DAG, dispatch background work across shell/sub-agent/workflow, keep the main thread productive in waiting windows, verify at endpoints, and survive compaction via a per-orchestration board file in the configurable cc-master home.
 ---
 
 # Orchestrating to Completion
@@ -103,16 +103,21 @@ The board is the orchestrator's persistent save file for a long task — a statu
 dependency graph. It is both ① the memory that survives compaction and ② the only window a
 hook (a shell, blind to agent context and to the built-in `Task` tool) can read.
 
-- **Path**: gitignored fixed path `.claude/cc-master/board.json` (cwd/worktree-keyed, so it
-  survives shutdown-and-reopen — `session_id` changes on a plain reopen, cwd does not).
-- **Single source of truth**: `board.json` is authoritative. The built-in `Task*` tools are
-  at most a non-authoritative in-session draft mirror.
+- **Home + per-orchestration board files**: boards live in the configurable home —
+  `$CC_MASTER_HOME` if set, else `${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/cc-master/` (a user
+  storage preference, no longer a hardcoded path). Each orchestration gets its own
+  uniquely-named, time-sortable file `<UTC-timestamp>-<pid>.board.json`, so concurrent
+  orchestrations never collide. The bootstrap hook creates the file and injects its exact
+  path. **You own which board is yours** — after compaction, re-discover it by listing the
+  home and matching the `goal`.
+- **Single source of truth**: your board file is authoritative. The built-in `Task*` tools
+  are at most a non-authoritative in-session draft mirror.
 - **Narrow waist** (only the hook-dependent contract is pinned; everything else is
   agent-shaped): pinned top-level fields `schema`, `goal`, `owner`(-lease){active,
   session_id, heartbeat}, `git`{worktree, branch}, plus `tasks[{ id, status, deps }]`.
 - **Status enum** (each routes differently in the DAG): `ready / in_flight /
   blocked(blocked_on:"user"|"<taskid>") / done / escalated / failed / stale / uncertain`.
-- **Snapshot storage**: each turn, `Write` the whole `board.json` (it is small, so a whole-
+- **Snapshot storage**: each turn, `Write` the whole board file (it is small, so a whole-
   file write doesn't corrupt). Markdown views are generated on demand.
 - **Flush discipline**: flush at decision-program step 7 (and optionally on PreCompact).
 - **Supersession** is an explicit board status (a node re-altituded or invalidated by an
@@ -128,6 +133,6 @@ Full protocol: **`references/board.md`**.
 |---|---|
 | `references/decomposition.md` | Turning a goal into a dependency DAG: CPM forward/backward pass, ES/EF/LS/LF + float, critical path, parallelism T₁/T∞, granularity, per-node contracts. |
 | `references/dispatch.md` | Choosing a background mechanism and orchestrating parallelism: the three mechanisms (shell / sub-agent / workflow), intra-vs-inter workflow, re-altitude via escalation, admission control. |
-| `references/board.md` | The full board protocol: narrow-waist schema, status enum routing, flexible edges, snapshot, cwd-keying, flush discipline, single source of truth, supersession, the log segment. |
+| `references/board.md` | The full board protocol: narrow-waist schema, status enum routing, flexible edges, snapshot, the configurable home + per-orchestration board files (owner.active = "active"), flush discipline, single source of truth, supersession, the log segment. |
 | `references/async-hitl.md` | Async completion + human-in-the-loop: in-flight p95 tracking and hedging, integrate-on-notification, the HITL model (user as async worker), front-of-house ∥ background. |
 | `references/resume-verify.md` | Cheap resume + endpoint verification: content-hash action keys, dependency pinning / stale detection, independent endpoint verification, loop convergence. |

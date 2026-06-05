@@ -8,7 +8,7 @@ You are being initialized as a **master orchestrator** for a long-horizon goal:
 
 **$ARGUMENTS**
 
-A board has been (or will be) created at `.claude/cc-master/board.json` by the bootstrap hook. Do this now, in order:
+A fresh orchestration board was created in your cc-master home by the bootstrap hook, which injected its **exact path into your context above** — that file is **your** board for this task. (Boards live in `$CC_MASTER_HOME`, else `<project>/.claude/cc-master/`, and are named `<timestamp>-<pid>.board.json`, so concurrent orchestrations never collide.) Do this now, in order:
 
 1. **Invoke the `orchestrating-to-completion` skill** — it carries your identity, the seven lenses, the red lines, the decision program, and the board protocol. Internalize it before acting.
 2. **Decompose the goal into a dependency DAG** and write it into the board's `tasks[]` (each task: `id`, `status`, `deps`, plus a `title`). Set `owner.session_id` and `git` from your environment, and fill `goal`.

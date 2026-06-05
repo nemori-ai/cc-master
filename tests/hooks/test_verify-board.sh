@@ -1,42 +1,57 @@
 #!/usr/bin/env bash
 . "$(dirname "$0")/helpers.sh"
-mkboard() { mkdir -p "$1/.claude/cc-master"; printf '%s' "$3" > "$1/.claude/cc-master/board.json"; [ "$2" = active ] && touch "$1/.claude/cc-master/active" || true; }
 
-# Case A: no marker → silent allow (exit 0, no block)
-P="$(make_project)"
-run_hook "hooks/scripts/verify-board.sh" '{}' "$P"
-assert_eq 0 "$HOOK_RC" "no marker → rc 0"
-assert_not_contains "$HOOK_OUT" "block" "no marker → no block"
-rm -rf "$P"
+# mkactive HOME NAME JSON — drop a board file into the home
+mkactive() { mkdir -p "$1"; printf '%s' "$3" > "$1/$2.board.json"; }
+# run_stop HOME — run the Stop hook against a home dir; sets HOOK_OUT / HOOK_RC
+run_stop() {
+  HOOK_OUT="$(CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
+             bash "$PLUGIN_ROOT/hooks/scripts/verify-board.sh" </dev/null 2>/dev/null)"; HOOK_RC=$?
+}
 
-# Case B: active but board missing → hard block (bootstrap backstop)
-P="$(make_project)"; mkdir -p "$P/.claude/cc-master"; touch "$P/.claude/cc-master/active"
-run_hook "hooks/scripts/verify-board.sh" '{}' "$P"
-assert_contains "$HOOK_OUT" "block" "missing board → block"
-rm -rf "$P"
+# Case A: no active board (empty home) → allow, no block
+H="$(make_project)"
+run_stop "$H"
+assert_eq 0 "$HOOK_RC" "empty home → rc 0"
+assert_not_contains "$HOOK_OUT" "block" "empty home → no block"
+rm -rf "$H"
 
-# Case B2: active, board exists but tasks empty → hard block (regression: the grep -c "0\n0" bug)
-P="$(make_project)"
-mkboard "$P" active '{"schema":"cc-master/v1","goal":"x","tasks":[]}'
-run_hook "hooks/scripts/verify-board.sh" '{}' "$P"
-assert_contains "$HOOK_OUT" "block" "empty-tasks board → block"
-rm -rf "$P"
+# Case B: an active board with 0 tasks → hard block (bootstrap backstop)
+H="$(make_project)"
+mkactive "$H" "20260101T000000Z-1" '{"schema":"cc-master/v1","goal":"g","owner":{"active":true},"tasks":[]}'
+run_stop "$H"
+assert_contains "$HOOK_OUT" "block" "empty active board → block"
+rm -rf "$H"
 
-# Case C: active, valid board with a ready task → ALLOW (idle-stop avoidance is soft
-# decision-program discipline, NOT a hook block — only the bootstrap backstop hard-blocks)
-P="$(make_project)"
-mkboard "$P" active '{"schema":"cc-master/v1","tasks":[{"id":"T1","status":"ready","deps":[]}]}'
-run_hook "hooks/scripts/verify-board.sh" '{}' "$P"
-assert_eq 0 "$HOOK_RC" "ready task + valid board → rc 0"
-assert_not_contains "$HOOK_OUT" "\"block\"" "ready task → no hook block (soft, decision program)"
-rm -rf "$P"
+# Case C: an active board WITH a ready task → ALLOW (ready-stop is soft, not a hook block)
+H="$(make_project)"
+mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_stop "$H"
+assert_eq 0 "$HOOK_RC" "ready task → rc 0"
+assert_not_contains "$HOOK_OUT" "\"block\"" "ready task → no block"
+rm -rf "$H"
 
-# Case D: active, all tasks in_flight/blocked → allow (legitimate waiting)
-P="$(make_project)"
-mkboard "$P" active '{"schema":"cc-master/v1","tasks":[{"id":"T1","status":"in_flight","deps":[]},{"id":"T2","status":"blocked","deps":["T1"]}]}'
-run_hook "hooks/scripts/verify-board.sh" '{}' "$P"
-assert_eq 0 "$HOOK_RC" "all-waiting → rc 0"
-assert_not_contains "$HOOK_OUT" "\"block\"" "all-waiting → no block"
-rm -rf "$P"
+# Case D: active board with in_flight tasks → allow (legitimate waiting)
+H="$(make_project)"
+mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+run_stop "$H"
+assert_not_contains "$HOOK_OUT" "block" "all-waiting → no block"
+rm -rf "$H"
+
+# Case E: an ARCHIVED board (owner.active:false) with 0 tasks → ignored → allow
+H="$(make_project)"
+mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":false},"tasks":[]}'
+run_stop "$H"
+assert_eq 0 "$HOOK_RC" "archived empty board → rc 0"
+assert_not_contains "$HOOK_OUT" "block" "archived board ignored → no block"
+rm -rf "$H"
+
+# Case F: two active boards — one filled, one empty → still blocks (any empty active blocks)
+H="$(make_project)"
+mkactive "$H" "filled" '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+mkactive "$H" "empty"  '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[]}'
+run_stop "$H"
+assert_contains "$HOOK_OUT" "block" "an empty active board among others → block"
+rm -rf "$H"
 
 finish

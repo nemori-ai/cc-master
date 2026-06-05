@@ -1,35 +1,35 @@
 #!/usr/bin/env bash
-# Stop hook — the bootstrap backstop, and nothing else. It hard-blocks ONLY when the board is
-# active (marker present) but missing or has zero tasks, i.e. the agent tried to end before
-# decomposing the goal into a DAG. This is the plugin's ONLY hard block. Every other state
-# (ready / in_flight / blocked / done) is ALLOWED to stop — "don't idle-stop while actionable
-# work remains" is SOFT decision-program discipline (Skill A), not a hook block, per the design
-# rule "hooks 软推, except the bootstrap guarantee".
+# Stop hook — the bootstrap backstop, and nothing else. It hard-blocks ONLY when the home holds an
+# ACTIVE board (a *.board.json with owner.active:true) that has zero tasks — i.e. a bootstrap that
+# was never filled with a DAG. This is the plugin's ONLY hard block. Every other state allows the
+# stop; "don't idle-stop while actionable work remains" is soft decision-program discipline
+# (Skill A), since a Stop hook cannot soft-nudge (only block or allow). It operates on the HOME
+# directory and never binds to a specific session/board — the agent owns which board is its own.
 set -uo pipefail
 cat >/dev/null  # drain stdin
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-BOARD_DIR="$PROJECT_DIR/.claude/cc-master"
-MARKER="$BOARD_DIR/active"
-BOARD="$BOARD_DIR/board.json"
+HOME_DIR="${CC_MASTER_HOME:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/cc-master}"
 
-[ -f "$MARKER" ] || exit 0   # self-gate: plugin dormant
+active_found=0
+empty_active=0
+for b in "$HOME_DIR"/*.board.json; do
+  [ -e "$b" ] || continue                                                       # no boards → unexpanded glob
+  grep -qE '"active"[[:space:]]*:[[:space:]]*true' "$b" 2>/dev/null || continue  # archived → ignore
+  active_found=1
+  # Count task objects by their "id" key (robust vs the word "status" appearing in log/note text).
+  # Keep the fallback OUTSIDE the substitution: grep -c prints "0" AND exits 1 on zero matches, so
+  # a `|| echo 0` inside $(...) would append a second "0" → "0\n0" → integer test crash.
+  tc="$(grep -cE '"id"[[:space:]]*:' "$b" 2>/dev/null)" || tc=0
+  [ "$tc" -eq 0 ] && empty_active=1
+done
 
-# Count task objects by their "id" key. Robust against the words "status"/etc. appearing in the
-# board's log/note text: a bare quoted "id": key only appears once per task ("session_id" and
-# friends do not match). Keep the `|| fallback` OUTSIDE $(...): `grep -c` prints "0" AND exits 1
-# on zero matches, so a `|| echo 0` *inside* the substitution appends a second "0" -> "0\n0" ->
-# the integer test errors and the backstop silently fails. (Both hazards caught by dogfood review.)
-task_count=0
-if [ -f "$BOARD" ]; then
-  task_count="$(grep -cE '"id"[[:space:]]*:' "$BOARD" 2>/dev/null)" || task_count=0
-fi
+[ "$active_found" -eq 0 ] && exit 0   # no active orchestration → dormant → allow stop
 
-if [ ! -f "$BOARD" ] || [ "$task_count" -eq 0 ]; then
-  reason='cc-master board is active but has no tasks. Decompose the goal into a dependency DAG and write tasks[] into .claude/cc-master/board.json before ending.'
+if [ "$empty_active" -eq 1 ]; then
+  reason='cc-master: an active board in your home has no tasks. Decompose the goal into a dependency DAG and write tasks[] into it (or archive it with /cc-master:stop) before ending.'
   esc="$(printf '%s' "$reason" | sed 's/\\/\\\\/g; s/"/\\"/g; s/^/"/; s/$/"/')"
   printf '{"decision":"block","reason":%s}\n' "$esc"
   exit 0
 fi
 
-exit 0   # board has tasks -> allow stop (idle-stop avoidance is soft, lives in the decision program)
+exit 0   # active board(s) all carry tasks → allow stop (idle-stop avoidance is soft, in the decision program)
