@@ -6,3 +6,5 @@ tests/**/.tmp-*/
 *.swp
 # never commit a real runtime board into the plugin repo
 .claude/cc-master/
+# working plans + build board — not version-controlled
+design_docs/plans/

@@ -31,5 +31,5 @@ It deliberately does **not** use **agent-teams** or **scheduled routines**: neit
 
 ## Learn more
 
-- [`docs/spec.md`](docs/spec.md) — the full specification.
-- [`docs/research/`](docs/research/) — the research behind the dynamic-workflow paradigms.
+- [`design_docs/spec.md`](design_docs/spec.md) — the full specification.
+- [`design_docs/research/`](design_docs/research/) — the research behind the dynamic-workflow paradigms.

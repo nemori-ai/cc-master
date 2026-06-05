@@ -4,7 +4,7 @@
 > classes of mistake: (1) guessing whether code runs in parallel, and (2)
 > believing reverse-engineering folklore that the live tool contract has since
 > revised. Adapted from research report 1
-> (`docs/research/01-claude-code-dynamic-workflow-mechanism.md`).
+> (`design_docs/research/01-claude-code-dynamic-workflow-mechanism.md`).
 
 ## 0. The one distinction that governs everything: contract vs internals
 
