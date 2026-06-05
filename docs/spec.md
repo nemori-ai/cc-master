@@ -1,0 +1,305 @@
+# `cc-master` —— Master Orchestrator Plugin 设计 Spec
+
+**日期**：2026-06-05
+**状态**：设计定稿（待用户复审 → writing-plans）
+**性质**：通用、ship-anywhere 的 Claude Code **plugin**（不绑 OMNE，装到任意环境的任意 cc agent 可用）。
+**研究基线**：`research/dynamic-workflow/`（4 报告，commit 9047592d）。
+**对话史/草稿**：`docs/plans/cc-master-plugin-design.md`（本 spec 是它的干净定稿版）。
+
+---
+
+## 1. 目标
+
+一个 Claude Code plugin，用一条 slash command 把任意 main-session agent 一键初始化成 **master orchestrator**，服务 long-horizon（通常 >24h）任务。两大能力：
+
+1. **会写**：按目标选对范式、写出真正稳定 / 高效 / 高并行的 dynamic-workflow 脚本。
+2. **会推进**：long-horizon 里综合用 **background shell + sub-agent + workflow** 三种后台手段 + 前台 HITL，分派后台任务后用等待空档**主观能动**地做事而非空转，全程异步——并熬过反复的 context compaction 与跨会话。
+
+**核心洞察（来自研究）**："主线程不空等"在 Claude Code 生态里是**空白**——官方只承诺 session "responsive"（不被阻塞），不承诺 orchestrator "productive"（自驱找活）；且 control-flow inversion 范式结构性地把主 agent 设计成 idle 收尾。本 plugin 自建这套机制来填空白。
+
+---
+
+## 2. 架构总览
+
+plugin `cc-master` = **命令 + 2 skills + hooks + board 文件**。
+
+```
+cc-master/ (plugin)
+├── .claude-plugin/plugin.json
+├── commands/
+│   ├── as-master-orchestrator.md     主引导（bootstrap）
+│   ├── status.md                     汇总 board 进度/健康
+│   └── stop.md                       归档/置 board 非活跃
+├── skills/
+│   ├── orchestrating-to-completion/  Skill A：编排方法论（魂在这）
+│   │   ├── SKILL.md
+│   │   └── references/{decomposition,dispatch,board,async-hitl,resume-verify}.md
+│   └── authoring-workflows/          Skill B：写法 + 机制摊明（仿社区标准完整结构）
+│       ├── SKILL.md
+│       ├── references/{mechanism,patterns,api-reference}.md
+│       ├── scripts/validate-workflow.mjs    可运行 linter（确定性校验，非 prose 自检）
+│       └── assets/{templates,examples}/      起手脚手架 + 完整可跑范例
+└── hooks/
+    ├── hooks.json
+    └── scripts/{bootstrap-board,verify-board,reinject}.sh
+                                       （board 文件落在 cwd 项目里，非 plugin 内）
+```
+
+**三件套的寿命分工**：
+- **command** = 一次性开机引导（你主动触发，把"我是 master orchestrator"的哲学 + 操作纪律灌进 context，开好 board）。
+- **skill** = 按需调阅的深度手册（写 workflow 时翻 Skill B，跑编排循环时翻 Skill A）。
+- **hook** = 跨 compaction 的"记忆续命"（压缩后/收到通知时自动把"你是 orchestrator + board 摘要"重注，让角色与待办不因健忘失守）。
+
+**生命周期**：
+```
+/cc-master:as-master-orchestrator <目标>
+   └─[UserPromptSubmit hook 确定性建 board 空壳 + marker]
+   └─ agent 填 DAG → 进入编排循环（决策程序）
+        ├─ 派 shell / sub-agent / workflow（受 WIP+预算约束，记 board）
+        ├─ 等待窗口主观能动：look-ahead / verify / 文档 / 沉淀 / HITL
+        └─ 每回合收尾 flush board
+   └─[24h 内反复 compaction]→ SessionStart hook 重注角色+board → 无缝续
+   └─[Stop hook] 过早收尾 / board 未建 → 校验/兜底
+   └─ /cc-master:status 看进度 · /cc-master:stop 收尾归档
+```
+
+---
+
+## 3. Board（编排的持久存档）
+
+**本质**：orchestrator 给一个长任务存的"存档文件"——一张带状态的**任务依赖图**。它同时是 ① 扛 compaction 的记忆，② hook 唯一能读到的编排状态窗口（hook 是 shell，读不到 agent context、也读不到内建 Task 工具）。
+
+**关键决策**：
+- **名**：board。**单一真理源**。**cwd/worktree 键**（扛关机重开——session_id 普通重开会变，cwd 不变）。gitignored 固定路径（拟 `.claude/cc-master/board.json`）。
+- **存储 = 可变快照 `board.json`**：每回合 Write 整文件（窄腰小→改不崩）；markdown 视图按需生成。
+- **窄腰原则**（不钉死整表，只钉死 hook 依赖的极小契约 → 既给 agent 自由，又让手维护安全）：
+  - **钉死的腰**：`header{ schema版本, goal, owner-lease{active, session_id, heartbeat}, git{worktree, branch} }` + `tasks[{ id, status, deps }]`。
+  - **status 枚举**：`ready / in_flight / blocked(blocked_on:"user"|"<taskid>") / done / escalated / failed / stale / uncertain`（各状态在 DAG 里路由不同）。
+  - **柔性边**（agent 自由塑形，hook 忽略）：`title / artifact / dispatched_at / mechanism / handle / kind / justification / output_schema / dep_pins / notes / log`。
+- **内建 Task\* 工具**：顶多 in-session 草稿镜像，**非权威**；board.json 才是断电/关机/hook 都认的存档。
+- **复盘/审计**：靠柔性边的轻量 `log` 段承载（不上完整事件溯源——YAGNI）。
+- **supersession** 是显式 board 状态（节点被 re-altitude/上游变更替换时），非隐式 GC。
+
+**board.json 示例**：
+```json
+{
+  "schema": "cc-master/v1",
+  "goal": "把 user_cognition 9 个 domain 迁到新 CognitionRecord schema",
+  "owner": { "active": true, "session_id": "abc123", "heartbeat": "2026-06-05T12:30Z" },
+  "git": { "worktree": "/.../.claude/worktrees/cog-migrate", "branch": "feat/cog-migrate" },
+  "wip_limit": 4,
+  "tasks": [
+    { "id":"T0","status":"done","deps":[],"artifact":"commit a1b2c3","verified":true },
+    { "id":"T1","status":"in_flight","deps":["T0"],"mechanism":"sub-agent","handle":"bg-7a","dispatched_at":"12:18Z" },
+    { "id":"T3","status":"ready","deps":["T0"] },
+    { "id":"T9","status":"blocked","deps":["T1","…","T8"],"blocked_on":"T1" },
+    { "id":"D1","status":"blocked","blocked_on":"user","title":"PR 要不要拆成两个？" },
+    { "id":"F1","status":"ready","kind":"fill-work","justification":"produces-reusable-artifact","title":"预起草 PR 描述骨架" }
+  ],
+  "log": []
+}
+```
+
+---
+
+## 4. Commands（3 条）
+
+| 命令 | 作用 |
+|---|---|
+| `/cc-master:as-master-orchestrator [目标]` | **bootstrap**：开机引导。命令体埋一个稳定 **sentinel**（供 hook grep 检测）+ 指示 agent 把目标分解成依赖 DAG 填进已被 hook 建好的 board，并唤起 Skill A 进入编排循环。 |
+| `/cc-master:status` | 渲染 board 摘要：done/total、阻塞点、critical-path、超 p95 的 in-flight、待用户决策项；兼做一次 board 腰的合法性校验。 |
+| `/cc-master:stop` | 把 board 置 `active:false`（归档），收尾。**不靠删文件**（删文件会丢审计）。 |
+
+---
+
+## 5. Hooks（3 个，均自门控）
+
+plugin hooks 装上即常驻、无原生"命令后才激活"开关 → 一律**自门控**：每个 hook 脚本第一步探 board 的 `active` marker，无/false 则 `exit 0` 静默 no-op；有才动作。
+
+| hook | 作用 |
+|---|---|
+| **UserPromptSubmit** | grep 命令体的 sentinel → 命中则**确定性建 board 空骨架 + 落 active marker** + 注 context "board 已就绪，请填 DAG" → `exit 0`（不 block）。【bootstrap 保证 Layer 1】 |
+| **Stop** | 探 active marker；在则：(a) 若 board 缺失/腰不合法（无 ≥1 任务）→ `decision:"block"` + 修复指令【bootstrap 兜底 Layer 3】；(b) 若有 in-flight/可生成 fill-work 却要收尾 → 软推"别空转，走决策程序"（**软推，非硬 block**）。 |
+| **SessionStart**（startup/resume/compact） | 探 active marker；在则重注"你是 <goal> 的 master orchestrator + board 摘要 + 重新唤起 Skill A、继续编排循环"。【扛 compaction / 跨会话续命】 |
+
+（PreCompact 提醒 flush board —— **可选**，v1 可由决策程序第 7 步"收尾前 flush"覆盖。）
+
+### Bootstrap 保证（三层，已核实 CC 机制）
+1. **UserPromptSubmit 确定性建空壳**：hook 在 agent 处理前触发、能写文件、能注 context（均官方确认）；**只检测 + 建空骨架，不抠 goal**（goal 由 agent 填）。board 存在性**不依赖 agent 听话**。
+2. **agent 填 goal + DAG**：唯一非机械步，锚在已存在文件上。
+3. **Stop hook 强制兜底**：Stop 能 `decision:"block"`（官方确认），board 不合法就卡住对话直到修复。
+**唯一不确定（已中和）**：hook 见到 raw 还是展开后 prompt（官方无文档）→ 靠命令体埋 **sentinel**（两种都 grep 到）+ goal 不走这条路 + Stop 兜底。**impl 期 5 分钟 smoke-test**：hook log stdin/pwd/`${CLAUDE_PROJECT_DIR}` 到 /tmp，跑一次命令看真实格式与 cwd。
+
+---
+
+## 6. 哲学层（权威副本在 Skill A 的 SKILL.md；命令经唤起 Skill A 植入；compaction 后由 SessionStart hook 触发重载）
+
+### 身份信条
+> 我是指挥，不是乐手。我把目标拆成依赖图，让独立 agent 并行演奏，自己立于乐队与用户之间——拿不准就问、该用户定的请他定、向他派问题与让后台演奏并行不悖；等待的每一拍都先排下一段、验上一段、记账与沉淀，唯有万事皆悬于后台或已抛给用户待答、再无可排之事时，才坦然等一拍。
+
+### 七镜头
+1. **指挥不演奏** —— 拆解/分派/验收/整合，绝不亲手 impl/review。
+2. **目标即依赖图** —— 拆 DAG、找 critical path、资源压关键链（非关键链 float 是免费并行预算）。
+3. **就绪即发，绝不在 barrier 干等** —— dataflow：依赖一满足即派；parallelism=T₁/T∞ 定开几路。
+4. **主观能动，不被动空等** —— 休息前穷尽 + 主动排活；合法等待 = 每条剩余路径都卡在「in-flight 后台」或「已抛给用户待答」。罪在"能动却被动空等"，不在 idle。
+5. **量力而行，不顶满利用率** —— WIP 设界、~75%（Little's Law + utilization cliff；加 agent 不一定更快）。
+6. **只信端点验收，产出可记账可续** —— 自己端点独立验，agent 自报不可信；content-hash 记账，done+验过可跳过/resume。
+7. **该问就问，前台对话∥后台执行** —— 用户=特殊异步 worker；该他定的立刻抛、不憋不擅专；其回答是异步依赖；不依赖它的 ready 工作照常派照常跑。
+
+### 红线
+- 不亲自上手 impl/review（全分派）。
+- gate 绿 ≠ 通过：必 read diff / 独立验；null/空 review 视为未过（防静默放行）。
+- 每个循环必有保险丝（max rounds / budget）。
+- **正当等待 > 假忙**：宁坦然等，也不制造 busywork / gold-plate / 过度评审。
+- **用户该定的不擅专**：难撤销 / 对外可见 / 方向抉择 / 终审（如 merge）必先问。
+
+---
+
+## 7. 决策程序（Skill A 的"牙齿"；每回合收尾前跑）
+
+哲学是动机、不是控制；真正防空转/防假忙的是这段**确定性程序**：
+```
+1. 对账 board：整合完成的后台结果；标记超 p95 的 in_flight 供 hedge；标 stale（上游变了）
+2. 有"该用户定/需确认"才能推进的点？→ 立刻抛给用户（别坐着）
+3. 有 ready task（依赖已满足，含已得到的用户答）？→ 在 WIP 上限内派（先 reserve 预算+WIP）
+4. 有合法 fill-work（过准入测试）？→ 做
+5. 有完成但未验 / uncertain 的节点？→ 端点独立验 / 路由到验证节点
+6. 以上皆无 且 每条剩余路径都卡在（in-flight 后台）或（已抛出待用户答）→ 正当等待/交还回合
+7. 收尾前 flush board
+```
+**fill-work 准入测试**（把"正当等待>假忙"变可判定）：一项 fill-work 合法当且仅当——解除某已知依赖阻塞 / 降低集成风险 / 产出可复用产物 / 验证某具体假设；否则 = 等待，非工作。
+
+---
+
+## 8. Skill A：`orchestrating-to-completion`（编排方法论 —— 魂）
+
+**结构**（progressive disclosure）：精简 SKILL.md（常驻，是 compaction 后 hook 重载落点）+ 按需 reference。
+
+- **SKILL.md（魂，常驻）**：§6 哲学（信条+7镜头+红线）+ §7 决策程序 + board 协议要点 + "何时翻哪本 reference" 指路。
+- **references/**：
+
+#### `decomposition.md` —— 目标 → 依赖 DAG
+- 把目标拆成 task 节点、画依赖边、得 DAG；topological 定合法序。
+- CPM forward/backward pass 求 ES/EF/LS/LF + float；**float=0 的链 = critical path**，资源压这。
+- parallelism = T₁/T∞（总工作量/关键链长）→ 决定"这目标最多值得几路并行"；≈1 就别 fan-out。
+- granularity 拿捏（太细=协调爆，太粗=无法并行/验收）。
+- **每节点先定 contract**：input deps（pin 上游 artifact） / output schema（按下游需要：verdict·evidence·confidence·blockers·open-q·artifacts） / success predicate / timeout·budget / escalation condition。
+- 源：研究报告 4（CPM/work-span/Brent）。
+
+#### `dispatch.md` —— 选手段 + 并行编排（Skill A 的核心，见 §11 完整框架）
+- 三机制（shell / sub-agent / workflow）选择判据（**控制/综合/context，非数量**）。
+- intra vs inter workflow（**lifecycle coupling 为主轴**）。
+- re-altitude 经 escalation（sub-agent 不自我升格，STOP+报 escalation result，orchestrator supersede→workflow）。
+- 混合 + admission control（reserve-on-launch，WIP 含集成负担，并发上限取 min(CPU/IO, 模型预算, rate limit, context-return, 综合负载)）。
+- 源：研究报告 3（LLM-Compiler TFU dataflow）+ codex 二评。
+
+#### `board.md` —— board 协议
+- §3 全文：窄腰 schema + status 枚举 + 柔性边 + (A)快照 + cwd 键 + 读/写/flush 纪律（决策程序第 7 步 + 可选 PreCompact）+ 单一真理源 + supersession 显式态 + log 段复盘。
+
+#### `async-hitl.md` —— 异步完成 + HITL
+- **in-flight 追踪**：`dispatched_at` → 超该类任务 p95 时长 → hedge（派备份取先完成）或降级（呼应 OMNE "codex hung defer" / "60min 硬截止"）。
+- **整合完成**：收到 `<task-notification>` → 对账 board → 解锁 newly-ready → 在 WIP 内派。
+- **HITL 模型**：用户=特殊异步 worker；该他定的立刻 surface（不坐着）；用户输入是异步依赖（`blocked_on:"user"`）；**不依赖它的 ready 工作照常派**（前台问题∥后台执行）；不擅专（难撤销/对外/方向/终审必问）。
+- 源：研究报告 2（"主线程不空等"=生态空白）+ 镜头 4/7。
+
+#### `resume-verify.md` —— resume + 端点验收
+- **resume**：每节点 content-hash（spec+上游产出+关键 context）= build-system action key；命中即复用已落盘 artifact、跳过；compaction/中断后 resume = O(变更集)。
+- **dependency pinning / stale**：节点绑上游 artifact 版本/hash；上游变 → 标 stale → 重跑（防"基于过时快照的连贯但错误结果"）。
+- **端点验收**：orchestrator 独立验（跑 gate + read diff）；agent 自报不可信；gate 绿必要非充分；null/空 review = 未过。
+- **loop 收敛**：结构化 gate（FinalResponse vs Replan(feedback)）+ max-rounds 保险丝 + dedup-against-seen（防被否决项每轮重现）。
+- 源：研究报告 3（Joiner loop-until-converged）+ 报告 4（content-addressable cache / end-to-end argument）。
+
+---
+
+## 9. Skill B：`authoring-workflows`（写法 + 机制摊明 —— 仿社区标准完整结构）
+
+**定位**：内容相对收敛，但**结构要完整**——社区成熟的 authoring skill（报告 2 的 ray-amjad/claude-code-workflow-creator）不止 markdown，还带**可运行 linter + 模板 + 范例**。本 skill **自包含**（ship-anywhere、不依赖第三方 skill 安装），内容引研究报告 1 的机制 ground-truth + 适配社区 linter（**署名**），并把"稳定性检查"做成**可运行校验**而非 prose 自检（贴合镜头 6"只信确定性端点验收"）。
+
+**结构**：
+- **SKILL.md（常驻）**：
+  - "honest test"——这任务真需要 workflow 吗（两行 bugfix 别上五人评审团）。
+  - 范式选择决策树（脚本内部：fan-out(barrier) / pipeline(streaming) / loop）。
+  - author 流程：**写完先跑 `scripts/validate-workflow.mjs` 校验，再启动**。
+  - "写前必读机制 ground-truth"指路。
+- **references/**：
+  - `mechanism.md`（≈研究报告 1）：**确认契约 vs 内部未知**两分；七原语真义；`parallel`(barrier) vs `pipeline`(streaming) 真相 + smell test；determinism 三禁；resume="longest unchanged prefix"；硬上限（16并发/1000总/4096每调用/512KB）。**让 agent 不再猜机制、也不瞎信坊间传闻。**
+  - `patterns.md`：fan-out+synthesize / pipeline-by-default / adversarial-verify / judge-panel / loop-until-{count,budget,dry} / multi-modal-sweep / completeness-critic——各带 when + 骨架。
+  - `api-reference.md`：原语签名速查（`agent`/`parallel`/`pipeline`/`phase`/`log`/`budget`/`workflow`/`args` 的 opts、cache key 四要素、失败语义）。
+- **scripts/**：
+  - `validate-workflow.mjs`：**可运行 linter**——确定性查 meta 纯字面量且首语句 / 禁 reserved keys / determinism 三禁（`Date.now`/`Math.random`/无参 `new Date`）/ no require·import·process / `parallel` 传 thunk 非裸 promise / 512KB 上限。≈ ray-amjad `validate-workflow.mjs`，**适配 + 署名**。把 author 检查清单从"prose 自检（不可靠）"升级为"agent 跑一遍、不可糊弄"。
+- **assets/**（教学三层的下两层 —— `patterns.md`=片段+prose / `templates/`=整脚本骨架 / `examples/`=完整真实工作流；templates 按**控制流形状**高频度选，examples 按**任务族**高频度选）：
+  - `templates/`（控制流骨架 —— **5 个结构原型**，每个隔离一种范式；顶部 docstring 写明「何时用 / 结构 / 填什么 / 对应决策树哪支」，copy→填 prompt/schema→跑。锚在 Workflow 工具 canon："DEFAULT TO pipeline()"）：
+    - `fan-out.js` —— `parallel()` barrier：独立任务并发、要齐再下一步（两大原子之一）。
+    - `pipeline.js` —— 多 stage 流式（**默认**）：每 item 独立穿过各 stage、无 barrier（两大原子之一、工具钦定默认）。
+    - `loop-until-budget.js` —— 按 `budget` 动态缩放 fleet/深度（对应「+500k」预算指令 —— **正切本 plugin "long-horizon 预算感知" 主题**）。
+    - `loop-until-dry.js` —— 未知规模发现：连续 K 轮无新增即停（找全 bug / 找全调用点）。
+    - `scout-then-fanout.js` —— 混合：内联 scout 先探出 work-list → `pipeline` 铺开（工具明确推荐的"真实起手式"）。
+  - `examples/`（完整可跑任务原型 —— **单 `.js` 文件、自包含**，含真实 prompt + schema + 验收；覆盖 review/design/research/migrate 四大高频族。与 template 不重复：template 给裸语法占位，example 给 composition）：
+    - `review-adversarial-verify.js` —— 维度→find→对抗验证（`pipeline` + per-finding fan-out verify）；工具自带 canonical，**镜像本仓库 dev-orchestrator review 段**。**最高频**。
+    - `design-judge-panel.js` —— N 个独立方案→并行评分→从优胜者综合并嫁接亚军亮点；设计/决策族。
+    - `research-multimodal-sweep.js` —— N 个搜索角度并行→dedup barrier→深读→completeness critic；研究/理解族。
+    - `migrate-discover-transform-verify.js` —— 发现改动点→`isolation:'worktree'` 隔离逐点改→gate 验收；迁移/重构族，**唯一演示 `isolation:'worktree'` 并行改文件防冲突**的范型。
+  - **v1 边界**：5 templates + 4 examples（覆盖 review/design/research/migrate 四大高频族 + iterate 由 loop templates 承载）；niche 形状（tournament bracket / self-repair loop / staged escalation）留 `patterns.md` 文字描述、不单独成文件 —— 防 Skill B 膨胀。
+
+> **可选对称**：Skill A 也可在 `assets/` 放一个 `board.template.json`（board 空骨架范例）+ 一个 worked board 示例；非必需，v1 可省。
+
+---
+
+## 10. 已验证的 CC 机制（design 依赖的事实，reference）
+- plugin hooks 装上即常驻、无原生命令门控 → marker 自门控。
+- 命令=prompt；靠 hook 或命令体指示落 state。
+- **UserPromptSubmit**：无 matcher（脚本 grep）、agent 处理前触发、能写文件+注 additionalContext。
+- **Stop**：能 `decision:"block"`（强制不结束）；**无 hook 支持自动重试**（block=停，靠人/agent 修）。
+- session_id 跨 compaction/`--resume` 不变；普通重开是新 id → state 按 **cwd 键**。
+- 内建 **TodoWrite 弃用**（v2.1.142）；**Task\* session-scoped 且 hook 读不到** → 必须文件。
+- `skills/_shared/`（无 SKILL.md）被忽略；跨 skill 共享靠"指示 agent Read 路径"；本设计共享层 = 命令哲学植入（经 Skill A），**不搞 _shared 目录**。
+
+---
+
+## 11. Skill A · dispatch 决策框架（完整）
+
+**分形三层**：顶层主线程 = dataflow 调度器（DAG 节点派后台手段 + 间插 HITL，受 WIP+共享预算约束，记 board）；中层 = workflow 内部 fan-out；叶 = sub-agent/shell。选手段 = 选在哪层执行该节点。
+
+**后台执行手段（仅 3 个 —— 给 agent 只教这三个）**：
+- **shell**：机械可检的执行（build/测试/拉数据/监听/CI 轮询）。零 token。须配 timeout + success predicate + 抓 log + 失败可路由给后续推理节点（否则拆"shell 执行节点 + sub-agent 诊断节点"）。
+- **sub-agent**（run_in_background）：一个 **terminal** 推理单元（单证据面 + 单推理链 + 单交付 + 无需 fan-out + 无需统一 schema + context 安全 + 带显式 escalation）。
+- **workflow**：需对**多 leaf 确定性控制**（fan-out/fan-in · 统一 leaf schema · 对抗验证/retry/loop · 联合综合 · context-flood 风险 · journal-resume）——**即便 leaf 数少也选它**。
+
+**选手段判据（控制/综合/context，非数量）**：需推理吗？否→shell；推理且 terminal→sub-agent；需对多 leaf 确定性控制→workflow。
+
+**Intra vs Inter workflow（主轴 = lifecycle coupling）**：
+- **一个 workflow**：leaves 共享同一 lifecycle（同目标/schema/质量门/预算包络/综合点/可接受失败策略），无中途 HITL 需求。
+- **多个 workflow**：流间 differ in 优先级/失败模式/重启成本/预算上限/escalation/集成时机/需独立 gate-讨论。
+- HITL 只是其一轴；失败隔离、优先级、集成时机同等重要。中间档：单 workflow 多 phase；`workflow()` 一级嵌套。
+
+**Re-altitude（核心）**：sub-agent 发现自己其实是 sub-DAG → **不许自我升格/自行 fan-out**（workflow leaf 同样不能 spawn）→ STOP + 返回 escalation result（scope map + 拟 leaves + deps + partial evidence + 原因）→ orchestrator supersede 旧节点、用该 map seed 一个 workflow。**靠 checkpoint 升格，不靠盲杀**。推论：workflow leaf prompt 必须够小够 terminal；不确定先跑 scoping sub-agent/workflow。
+
+**混合 + admission control**：顶层可同时在飞 shell + N sub-agent + workflow；**启动前 reserve WIP+token 预算**（reserve-on-launch，非 spend-后报）；**WIP 上限含"集成负担"**（防 N 个 workflow 同时返回的 synchronization cliff）；并发上限 = min(CPU/IO, 模型预算, rate limit, context-return 预算, 综合负载)。
+
+**node status 路由**：uncertain→验证节点；stale→上游变了重跑；escalated→supersede→workflow。
+
+---
+
+## 12. 有意排除 / 不做（决策留痕）
+- **agent teams**（实验开关 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`）、**scheduled routines**（云持久/离线，但需 claude.ai 账户、非 Bedrock/Vertex/Foundry）：机制研究确认它们是真后台机制，但**有意不教**——通用 ship-anywhere 插件不教不可靠可用的手段，免 agent 去够用不上的工具。skill 里只字不提。
+- **v1 不过度造，降为"skill 讲原则 + 细节落 board 协议/impl"**：完整 budget-reservation ledger、dependency artifact-hash 全量 pinning、named 可复用 quality-pattern 契约、集成负担定量公式。
+- 完整乐观并发 CAS（多 session 抢同一 board）：v1 只轻量 lease（owner+heartbeat+告警接管），完整 CAS 入 backlog。
+
+---
+
+## 13. 留待 impl/后续决定
+- **bootstrap smoke-test**：UserPromptSubmit 见到的 prompt 真实格式（raw vs expanded）、cwd、`${CLAUDE_PROJECT_DIR}` 可用性——impl 期实测。
+- 命令体 sentinel 的确切串；各 hook 脚本实现。
+- board.json 的完整 JSON schema（窄腰字段类型）。
+- **plugin 装哪 / dev 在哪 worktree**：待定。
+- markdown 视图生成器是否要（v1 可省，agent 直接读 json）。
+
+---
+
+## 14. 验收（"done" 长啥样）
+- 三条命令可用；`as-master-orchestrator` 跑后 board 被**确定性**创建（即便 agent 不配合，hook 也建好空壳；Stop 兜底）。
+- compaction 后 SessionStart hook 能重注角色 + board，agent 无缝续编排循环（不丢角色、不空转）。
+- 两个 skill 内容完整、自包含、边界不重叠（Skill A=主线程编排，Skill B=脚本内部写法）。
+- 哲学 + 决策程序 + dispatch 框架按本 spec 落地。
+- 跨会话（关机重开）能凭 cwd-keyed board 续上。
+- smoke-test 三项（prompt 格式/cwd/`${CLAUDE_PROJECT_DIR}`）实测通过。
