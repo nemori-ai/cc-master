@@ -266,7 +266,7 @@ single-artifact convergence — *not* for multi-finding discovery.
 expensive model/approach when the cheap stage fails or returns low confidence.
 A `pipeline()` whose stage 1 is a cheap pass and stage 2 is conditional — stage 2
 short-circuits (returns the stage-1 result unchanged) when stage 1 already cleared
-a confidence threshold, and only spawns the expensive `agent({ model: ... })` when
+a confidence threshold, and only spawns the expensive `agent('escalate: ' + item, { model: ... })` when
 it didn't. Use it to spend the strong model only where the weak model struggled,
 rather than uniformly. Beware: `model` is part of the cache key (`api-reference.md`),
 so the escalation branch reruns live on resume if you change the model choice.

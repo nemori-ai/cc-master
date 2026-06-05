@@ -108,8 +108,8 @@ hook (a shell, blind to agent context and to the built-in `Task` tool) can read.
 - **Single source of truth**: `board.json` is authoritative. The built-in `Task*` tools are
   at most a non-authoritative in-session draft mirror.
 - **Narrow waist** (only the hook-dependent contract is pinned; everything else is
-  agent-shaped): pinned `header { schema, goal, owner-lease{active, session_id, heartbeat},
-  git{worktree, branch} }` + `tasks[{ id, status, deps }]`.
+  agent-shaped): pinned top-level fields `schema`, `goal`, `owner`(-lease){active,
+  session_id, heartbeat}, `git`{worktree, branch}, plus `tasks[{ id, status, deps }]`.
 - **Status enum** (each routes differently in the DAG): `ready / in_flight /
   blocked(blocked_on:"user"|"<taskid>") / done / escalated / failed / stale / uncertain`.
 - **Snapshot storage**: each turn, `Write` the whole `board.json` (it is small, so a whole-

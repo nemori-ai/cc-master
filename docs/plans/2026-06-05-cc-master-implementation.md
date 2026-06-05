@@ -72,7 +72,6 @@ cc-master/                                   (git root = plugin root; ~/.claude/
 │       │   ├── mechanism.md                 confirmed-contract vs unknowns; 7 primitives; parallel(barrier) vs pipeline(stream); determinism; caps
 │       │   ├── patterns.md                  fan-out/pipeline/adversarial-verify/judge-panel/loop-*/multimodal/completeness — when + skeleton
 │       │   └── api-reference.md             primitive signatures + opts + cache-key + failure semantics
-│       ├── scripts/validate-workflow.mjs    RUNNABLE linter (deterministic checks)
 │       └── assets/
 │           ├── templates/                   5 control-flow skeletons (placeholder prompts)
 │           │   ├── fan-out.js
@@ -97,10 +96,6 @@ cc-master/                                   (git root = plugin root; ~/.claude/
 │   │   ├── test_bootstrap-board.sh
 │   │   ├── test_verify-board.sh
 │   │   └── test_reinject.sh
-│   ├── linter/
-│   │   ├── validate-workflow.test.mjs       good/bad fixtures → pass/fail + messages
-│   │   └── fixtures/{good-*.js,bad-*.js}
-│   ├── assets/lint-all-bundled.test.mjs     every template+example passes the linter
 │   └── content/structure.test.mjs           plugin.json/hooks.json valid; SKILL.md frontmatter; sentinel consistency
 └── docs/   (already populated: research/, spec.md, design-notes.md, plans/<this file>)
 ```

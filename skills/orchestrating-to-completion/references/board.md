@@ -25,7 +25,7 @@ gives the agent freedom while keeping hand-maintenance safe.
 ### The pinned waist
 
 ```
-header { schema, goal, owner { active, session_id, heartbeat }, git { worktree, branch } }
+top-level: schema, goal, owner { active, session_id, heartbeat }, git { worktree, branch }
 tasks[ { id, status, deps } ]
 ```
 

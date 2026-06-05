@@ -11,7 +11,7 @@ const scout = await agent('TODO: enumerate the work items as a JSON list', {
   phase: 'Scout',
   schema: { type: 'object', properties: { items: { type: 'array', items: { type: 'string' } } }, required: ['items'] },
 })
-const out = await pipeline(scout.items ?? [],
+const out = await pipeline(scout?.items ?? [],
   (it) => agent(`TODO: process ${it}`, { phase: 'Process' }),
 )
 return out.filter(Boolean)

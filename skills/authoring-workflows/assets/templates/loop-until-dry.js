@@ -11,7 +11,7 @@ const seen = new Set(), all = []
 let dry = 0
 while (dry < DRY_LIMIT) {
   const r = await agent('TODO: find items not yet in the seen set', { phase: 'Discover', schema: { type: 'object', properties: { items: { type: 'array', items: { type: 'string' } } }, required: ['items'] } })
-  const fresh = (r.items ?? []).filter((x) => !seen.has(x))
+  const fresh = (r?.items ?? []).filter((x) => !seen.has(x))
   if (fresh.length === 0) { dry++; continue }
   dry = 0
   fresh.forEach((x) => { seen.add(x); all.push(x) })

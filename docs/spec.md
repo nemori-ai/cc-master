@@ -72,7 +72,7 @@ cc-master/ (plugin)
 - **名**：board。**单一真理源**。**cwd/worktree 键**（扛关机重开——session_id 普通重开会变，cwd 不变）。gitignored 固定路径（拟 `.claude/cc-master/board.json`）。
 - **存储 = 可变快照 `board.json`**：每回合 Write 整文件（窄腰小→改不崩）；markdown 视图按需生成。
 - **窄腰原则**（不钉死整表，只钉死 hook 依赖的极小契约 → 既给 agent 自由，又让手维护安全）：
-  - **钉死的腰**：`header{ schema版本, goal, owner-lease{active, session_id, heartbeat}, git{worktree, branch} }` + `tasks[{ id, status, deps }]`。
+  - **钉死的腰**（**扁平顶层字段，非 `header{}` 子对象**——对齐 board.json 实际布局，别让 agent 凭空造个 `header` key）：顶层 `schema` / `goal` / `owner-lease{active, session_id, heartbeat}` / `git{worktree, branch}` + `tasks[{ id, status, deps }]`。
   - **status 枚举**：`ready / in_flight / blocked(blocked_on:"user"|"<taskid>") / done / escalated / failed / stale / uncertain`（各状态在 DAG 里路由不同）。
   - **柔性边**（agent 自由塑形，hook 忽略）：`title / artifact / dispatched_at / mechanism / handle / kind / justification / output_schema / dep_pins / notes / log`。
 - **内建 Task\* 工具**：顶多 in-session 草稿镜像，**非权威**；board.json 才是断电/关机/hook 都认的存档。
@@ -111,14 +111,14 @@ cc-master/ (plugin)
 
 ---
 
-## 5. Hooks（3 个，均自门控）
+## 5. Hooks（3 个，门控激活）
 
-plugin hooks 装上即常驻、无原生"命令后才激活"开关 → 一律**自门控**：每个 hook 脚本第一步探 board 的 `active` marker，无/false 则 `exit 0` 静默 no-op；有才动作。
+plugin hooks 装上即常驻、无原生"命令后才激活"开关 → 靠**门控**收敛激活：**Stop / SessionStart 自门控于 `active` marker**（第一步探 marker，无/false 则 `exit 0` 静默 no-op；有才动作）；**UserPromptSubmit 不门控于 marker**（它正是*创建* marker 的那个 hook）——改门控于命令体 sentinel（命中才动作）。
 
 | hook | 作用 |
 |---|---|
 | **UserPromptSubmit** | grep 命令体的 sentinel → 命中则**确定性建 board 空骨架 + 落 active marker** + 注 context "board 已就绪，请填 DAG" → `exit 0`（不 block）。【bootstrap 保证 Layer 1】 |
-| **Stop** | 探 active marker；在则：(a) 若 board 缺失/腰不合法（无 ≥1 任务）→ `decision:"block"` + 修复指令【bootstrap 兜底 Layer 3】；(b) 若有 in-flight/可生成 fill-work 却要收尾 → 软推"别空转，走决策程序"（**软推，非硬 block**）。 |
+| **Stop** | 自门控于 marker；在则：board 缺失/腰不合法（无 ≥1 任务）→ `decision:"block"` + 修复指令【bootstrap 兜底 Layer 3，**全插件唯一硬 block**】。其余状态（ready/in_flight/blocked/done）一律放行——"别放着 ready 活空转"是**决策程序的软纪律**（Skill A），不在 hook 里硬拦（Stop 机制只能 block 或放行、且放行时 stdout 不进 agent context，无法做真正的"软推"；放在 hook 里只会变成误伤合法让渡的硬 block）。 |
 | **SessionStart**（startup/resume/compact） | 探 active marker；在则重注"你是 <goal> 的 master orchestrator + board 摘要 + 重新唤起 Skill A、继续编排循环"。【扛 compaction / 跨会话续命】 |
 
 （PreCompact 提醒 flush board —— **可选**，v1 可由决策程序第 7 步"收尾前 flush"覆盖。）

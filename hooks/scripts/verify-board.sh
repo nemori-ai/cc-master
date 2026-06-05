@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Stop hook: backstop the bootstrap guarantee and nudge against abandoning actionable work.
-# Soft by design: the ONLY hard block is "board missing/invalid right after bootstrap".
-# Legitimate waiting (all tasks in_flight/blocked) is NEVER blocked (镜头4).
+# Stop hook — the bootstrap backstop, and nothing else. It hard-blocks ONLY when the board is
+# active (marker present) but missing or has zero tasks, i.e. the agent tried to end before
+# decomposing the goal into a DAG. This is the plugin's ONLY hard block. Every other state
+# (ready / in_flight / blocked / done) is ALLOWED to stop — "don't idle-stop while actionable
+# work remains" is SOFT decision-program discipline (Skill A), not a hook block, per the design
+# rule "hooks 软推, except the bootstrap guarantee".
 set -uo pipefail
 cat >/dev/null  # drain stdin
 
@@ -12,21 +15,21 @@ BOARD="$BOARD_DIR/board.json"
 
 [ -f "$MARKER" ] || exit 0   # self-gate: plugin dormant
 
-emit_block() { # $1 reason
-  printf '{"decision":"block","reason":%s}\n' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | sed 's/^/"/; s/$/"/')"
-  exit 0
-}
-
-# Bootstrap backstop: active marker but no board, or a board with zero tasks → hard block.
+# Count task objects by their "id" key. Robust against the words "status"/etc. appearing in the
+# board's log/note text: a bare quoted "id": key only appears once per task ("session_id" and
+# friends do not match). Keep the `|| fallback` OUTSIDE $(...): `grep -c` prints "0" AND exits 1
+# on zero matches, so a `|| echo 0` *inside* the substitution appends a second "0" -> "0\n0" ->
+# the integer test errors and the backstop silently fails. (Both hazards caught by dogfood review.)
 task_count=0
-[ -f "$BOARD" ] && task_count="$(grep -cE '"status"[[:space:]]*:' "$BOARD" 2>/dev/null || echo 0)"
+if [ -f "$BOARD" ]; then
+  task_count="$(grep -cE '"id"[[:space:]]*:' "$BOARD" 2>/dev/null)" || task_count=0
+fi
+
 if [ ! -f "$BOARD" ] || [ "$task_count" -eq 0 ]; then
-  emit_block 'cc-master board is active but has no tasks. Decompose the goal into a dependency DAG and write tasks[] into .claude/cc-master/board.json before ending.'
+  reason='cc-master board is active but has no tasks. Decompose the goal into a dependency DAG and write tasks[] into .claude/cc-master/board.json before ending.'
+  esc="$(printf '%s' "$reason" | sed 's/\\/\\\\/g; s/"/\\"/g; s/^/"/; s/$/"/')"
+  printf '{"decision":"block","reason":%s}\n' "$esc"
+  exit 0
 fi
 
-# Permissive nudge: a ready (actionable, un-dispatched) task remains.
-if grep -qE '"status"[[:space:]]*:[[:space:]]*"ready"' "$BOARD" 2>/dev/null; then
-  emit_block 'You still have ready (actionable) tasks on the board. Run the decision program: dispatch them within the WIP limit, surface any user-decisions, or pick legitimate fill-work. If you have genuinely confirmed every remaining path is waiting on in-flight work or the user, end again to proceed.'
-fi
-
-exit 0   # all remaining work is in_flight/blocked/done → legitimate waiting, allow stop
+exit 0   # board has tasks -> allow stop (idle-stop avoidance is soft, lives in the decision program)

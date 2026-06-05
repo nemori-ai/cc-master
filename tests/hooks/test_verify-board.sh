@@ -15,12 +15,20 @@ run_hook "hooks/scripts/verify-board.sh" '{}' "$P"
 assert_contains "$HOOK_OUT" "block" "missing board → block"
 rm -rf "$P"
 
-# Case C: active, board has a ready task → permissive nudge block
+# Case B2: active, board exists but tasks empty → hard block (regression: the grep -c "0\n0" bug)
+P="$(make_project)"
+mkboard "$P" active '{"schema":"cc-master/v1","goal":"x","tasks":[]}'
+run_hook "hooks/scripts/verify-board.sh" '{}' "$P"
+assert_contains "$HOOK_OUT" "block" "empty-tasks board → block"
+rm -rf "$P"
+
+# Case C: active, valid board with a ready task → ALLOW (idle-stop avoidance is soft
+# decision-program discipline, NOT a hook block — only the bootstrap backstop hard-blocks)
 P="$(make_project)"
 mkboard "$P" active '{"schema":"cc-master/v1","tasks":[{"id":"T1","status":"ready","deps":[]}]}'
 run_hook "hooks/scripts/verify-board.sh" '{}' "$P"
-assert_contains "$HOOK_OUT" "block" "ready task → nudge block"
-assert_contains "$HOOK_OUT" "decision" "nudge emits decision json"
+assert_eq 0 "$HOOK_RC" "ready task + valid board → rc 0"
+assert_not_contains "$HOOK_OUT" "\"block\"" "ready task → no hook block (soft, decision program)"
 rm -rf "$P"
 
 # Case D: active, all tasks in_flight/blocked → allow (legitimate waiting)
