@@ -60,11 +60,6 @@ The top-level skeleton is dataflow DAG *scheduling*; a `pipeline()` is its degen
 case when the items happen to be uniform. Reaching for fan-out on a serial critical chain is the
 classic mis-apply — when T₁/T∞ ≈ 1, don't fan out at all.
 
-> The `/goal` integration is this same idea once more: "legitimate waiting" (every remaining
-> path blocked on background or surfaced to the user) is exactly the TFU's **ready-set-is-empty**
-> state. A phase `/goal` just turns that dataflow termination condition into an
-> independently-enforced gate instead of a self-policed one.
-
 ---
 
 ## Background execution mechanisms — there are exactly three
@@ -83,7 +78,7 @@ purposes.)
   fan-in · a unified leaf schema · adversarial verification / retry / loop · joint synthesis ·
   context-flood risk · journal-resume) — **choose it even when the leaf count is small**.
 
-### Waiting on external state — background shell, not `/loop`
+### Waiting on external state — with a background shell
 
 cc-master is event-driven: when a background job finishes, the harness wakes the main thread
 and re-enters — so it never needs a timer to poll. For state the harness *cannot* track for you
@@ -94,11 +89,8 @@ its own predicate and rides the completion notification back in:
 until <external state ready>; do sleep 60; done   # run_in_background → harness notifies on exit, re-enters
 ```
 
-**Do not reach for `/loop` or `ScheduleWakeup` for this.** The reason is ship-anywhere: the
-dynamic self-paced mode (`ScheduleWakeup`) is unsupported on Bedrock / Vertex / Foundry, and
-fixed-interval `/loop` rides cron and **expires after 7 days**. The background-shell form is
-more event-driven and fully ship-anywhere — dissolving the need back into an existing building
-block rather than introducing a new mechanism.
+This is event-driven and ship-anywhere — it reuses an existing building block (a background
+shell + the completion notification) rather than introducing a separate timer mechanism.
 
 ---
 
