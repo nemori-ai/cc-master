@@ -99,10 +99,14 @@ fake-busy is this **deterministic program** — run it at the close of every tur
    to a verification node
 6. None of the above AND every remaining path is blocked on (an in-flight background task)
    or (already surfaced, awaiting a user answer) → legitimately wait / yield the turn
-   ↳ State it out loud: the native `/goal` evaluator reads only the conversation, never the
-     filesystem. So write this step-6 conclusion + the phase's acceptance evidence
-     **explicitly into the conversation** (and onto the board) — otherwise the evaluator
-     cannot tell legitimate waiting from a premature stop and will keep kicking you back.
+   ↳ State it out loud as a **step-6 ledger**: the native `/goal` evaluator reads only the
+     conversation, never the filesystem, and can't tell a real ledger from a confident
+     assertion unless it is structured. Each turn, write the conclusion + acceptance evidence
+     **explicitly into the conversation** (and onto the board) in a fixed shape — one line per
+     still-open path, `<task-id> · <status> · <blocker | evidence>`, then a verdict line
+     (`phase end-state met` / `legitimate waiting: every path blocked or surfaced` / `still
+     working`). Without this ledger the OR branch can't fire and the evaluator keeps kicking
+     you back.
 7. Flush the board before ending (the `phase` edge included)
 ```
 

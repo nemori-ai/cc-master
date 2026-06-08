@@ -76,7 +76,10 @@ phase: { current, goal_condition, task_ids }
 
 - `current` — a short name/label for the phase being sprinted.
 - `goal_condition` — the verbatim phase `/goal` condition (soul formula: «business end-state
-  reached» OR «legitimate waiting entered»), so it can be re-set if lost.
+  reached» OR «legitimate waiting entered»), so it can be re-set if lost. Keep it **plain text
+  with no literal `"` or `}`** — `reinject` extracts it with pure-bash sed (ship-anywhere, no
+  jq/node), which cannot un-escape; quote any tool/test/path names with backticks or single
+  quotes instead.
 - `task_ids` — the task ids this phase spans.
 
 How it supports reinject across compaction: `/goal` stays active across compaction (only

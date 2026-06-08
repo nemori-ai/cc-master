@@ -138,3 +138,15 @@ plugin `cc-master` = **命令 + 2 skills + hooks + board 文件**。通用、shi
 **两个 Stop hook 相容（locked）**：会话里同时存在 cc-master `verify-board.sh`（仅"空 active board"时硬 block）与 `/goal` 内部 Stop 评估（阶段 goal 未达成且未进正当等待时令 agent 续 turn），方向相容、不冲突——空 board 时根本不会有 goal（goal 是 agent 填完 DAG、进入自驱区段后才设的），board 非空时 `verify-board` 放行、由 `/goal` 接管"该不该停"。**[待实测]** 多 Stop hook 合并/执行顺序（impl 期 smoke-test 验证；若任一 block 即 block 则并存安全）。
 
 **`/goal` 只能 best-effort（贯穿全节，再强调）**：hook/plugin 不能编程式设 `/goal`（LLM 中介，只能由 agent 主动敲命令）→ `/goal` 这层只能是 **best-effort 增强，不进确定性兜底**；cc-master 的 bootstrap 三层兜底 + `verify-board` 硬 block 仍是确定性骨架。goal 是增益非依赖：agent 不设 goal 时，原决策程序软纪律 + `verify-board` 兜底仍在，功能不退化。
+
+## 14. 二审（对抗验证）发现与修复（2026-06-08）
+
+> 落地后两路独立二审（codex 独立诊断 + 对抗 reviewer）**双签**命中同一组 `reinject` 健壮性 BLOCKER——正是我和落地 sub-agent 同源盲区漏掉的。处置如下（详见整合设计文档 §7/§9 与 commit 历史）。
+
+- **BLOCKER A/B（已修，TDD）**：`reinject.sh` 原用全文件 sed 提取 `"current"`/`"goal_condition"` → ① 杂散同名键（task/log）凭空捏造假阶段；② 单行贪婪 / 多行 `head -1` 取错值；③ 转义引号处静默截断、据残缺条件重设 `/goal`。**修法（守 ship-anywhere 纯 bash）**：`tr` 压平 board + sed 锚出 `"phase":{...}` 对象、只在其内提取（根治 ①②+多行）；转义截断 ③ 靠 `board.md` 约定 `goal_condition` 用纯文本、不含裸 `"`/`}` 兜底。补红测试 Case G/H/I（先暴露后修复）。
+- **C（已修）**：多 active board × `/goal` 每会话唯一 → `reinject` 文案改单数绑定 + `async-hitl.md` 明确"阶段 goal 只服务当前主攻 board，第二个 `/goal` 会静默覆盖"。
+- **D（文档澄清；反驳 reviewer 定性）**：段中突发 HITL **不是 bug**——`surface ≠ stop`，先榨干不依赖该答案的 ready 活、OR 逃生口在无活时自然放行（镜头 4+7 的理想执行）；`async-hitl.md` 补此情形（含"决策大到要重画计划则收窄 phase"的旁支）。
+- **F（采纳轻量版）**：step-6 自查给出**结构化 ledger 格式**（`<task-id> · <status> · <blocker|evidence>` + 终判行），让 OR 逃生口可被评估器机械判定，而非靠自信断言。
+
+### Backlog（本次有意不修，留痕）
+- **verify-board 跨 session 误伤**（codex SHOULD-FIX 3）：`verify-board.sh` 检查 home 内**任意** active 空 board 即 block，不绑 session——无关并发 session 的空 board 会误伤当前 Stop。这是**既有设计缺陷、非本次整合引入**（`verify-board.sh` 本次未改），故记 backlog 不在本次展开。候选解法：board 加 `session_id`、verify-board 按当前 session 过滤；或绑 `goal` 匹配。与既有"完整乐观并发 CAS（多 session 抢同一 board）"backlog 项同源。

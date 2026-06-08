@@ -102,3 +102,20 @@ sprint to the finish without trapping the agent. The scoping rule:
     self-driving stretch begins), so when `verify-board` would block there is no goal; when a
     goal is live the board is non-empty and `verify-board` passes, leaving `/goal` to arbitrate
     whether to stop.
+
+- **Emergent mid-phase HITL — surface ≠ stop.** A user-decision can surface *inside* a phase,
+  not at a pre-planned `blocked_on:"user"` boundary. This is not a trap. Surface it immediately
+  and keep driving the ready work that does not depend on the answer (front-of-house ∥
+  background). The phase `/goal` correctly keeps the turn going *while other paths are still
+  live* — that is the float being drained, not idle-spinning. Once those paths drain and the
+  emergent question is all that remains, "every remaining path blocked/surfaced" holds and the
+  OR branch releases you to stop and wait. Surfacing early **and** draining the float first *is*
+  the intended behavior. (If the emergent decision is big enough to redraw the plan, narrow the
+  phase: clear the current goal, mark a fresh `blocked_on:"user"` boundary, and re-phase after
+  the answer.)
+
+- **Multiple active boards × one `/goal`.** The home can hold several concurrent active boards,
+  but `/goal` is **one-per-session**. A phase `/goal` therefore serves only the **one board you
+  are actively driving right now** — never try to hold a goal per board (a second `/goal`
+  silently overwrites the first). `reinject` may list a phase per active board; treat all but
+  your current one as context, and set/re-set the goal for the current board only.
