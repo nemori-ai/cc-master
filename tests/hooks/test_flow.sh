@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Integration: the three hooks must agree on the home + naming convention. bootstrap creates a
-# board; reinject finds it; stop backstops it while empty and allows it once filled; archiving
-# (owner.active:false) makes both go dormant.
+# board; reinject finds it; stop backstops it while empty, forces a self-check handshake once
+# filled, then allows; archiving (owner.active:false) makes both go dormant.
 . "$(dirname "$0")/helpers.sh"
 
 H="$(make_project)"
@@ -23,10 +23,13 @@ assert_contains "$OUT" "orchestrator" "reinject re-anchors the role"
 OUT="$(env "${ENV[@]}" bash "$PLUGIN_ROOT/hooks/scripts/verify-board.sh" </dev/null 2>/dev/null)"
 assert_contains "$OUT" "block" "stop blocks the unfilled bootstrap board"
 
-# 4. fill the board with a task → stop now allows
+# 4. fill the board with an in_flight task → completion state. The goal-hook forces ONE self-check
+#    handshake: the first Stop blocks (self-check), the second Stop allows.
 printf '%s' '{"schema":"cc-master/v1","goal":"demo goal","owner":{"active":true},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$BOARD"
 OUT="$(env "${ENV[@]}" bash "$PLUGIN_ROOT/hooks/scripts/verify-board.sh" </dev/null 2>/dev/null)"
-assert_not_contains "$OUT" "block" "stop allows once the board has tasks"
+assert_contains "$OUT" "block" "stop forces a self-check on the first completion-state Stop"
+OUT="$(env "${ENV[@]}" bash "$PLUGIN_ROOT/hooks/scripts/verify-board.sh" </dev/null 2>/dev/null)"
+assert_not_contains "$OUT" "block" "stop allows after the self-check handshake"
 
 # 5. archive (owner.active:false) → reinject goes dormant
 printf '%s' '{"schema":"cc-master/v1","goal":"demo goal","owner":{"active":false},"tasks":[{"id":"T1","status":"done","deps":[]}]}' > "$BOARD"
