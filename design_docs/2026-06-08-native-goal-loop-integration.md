@@ -5,6 +5,8 @@
 **性质**：在既有 cc-master plugin 之上的增量整合设计——**复用 Claude Code 原生机制,不重造轮子**。
 **关联**：现有 `design_docs/spec.md`（plugin 主 spec）；本设计是对其 §5(hooks)/§7(决策程序)/§12(有意排除) 的增量修订。
 
+> ⚠ **/goal 集成方案已被 goal-hook 取代**（agent 无法自设 native `/goal`；改由 verify-board 升级为确定性 Stop-hook 自检闸）——见 `design_docs/2026-06-08-goal-hook-design.md` 与 `dogfood-findings.md` #2。本文档保留作历史留痕。
+
 ---
 
 ## 1. 动机

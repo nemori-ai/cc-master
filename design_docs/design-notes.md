@@ -2,6 +2,8 @@
 
 > **状态**：设计阶段（brainstorming）进行中。本文件是 compaction/跨会话的**恢复锚点**——下方均为已与用户对齐的 **locked** 决策。**未完**：两个 skill 的具体内容设计正在讨论。
 > **关联**：研究基线 `research/dynamic-workflow/`（4 报告，已 commit 9047592d）；本设计在 worktree `research-dynamic-workflow` 分支。
+>
+> ⚠ **/goal 集成方案已被 goal-hook 取代**（agent 无法自设 native `/goal`；改由 verify-board 升级为确定性 Stop-hook 自检闸）——见 `design_docs/2026-06-08-goal-hook-design.md` 与 `dogfood-findings.md` #2。
 
 ## 0. 目标
 一个 Claude Code **plugin**，把任意 main-session agent 一键初始化成"master orchestrator"，服务 long-horizon（24h+）任务。两大能力：

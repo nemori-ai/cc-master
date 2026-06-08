@@ -7,6 +7,8 @@
 **对话史/草稿**：`docs/plans/cc-master-plugin-design.md`（本 spec 是它的干净定稿版）。
 **2026-06-08 增补**：原生 `/goal`·`/loop` 整合（分阶段叠加 `/goal`、后台 shell 消解 `/loop`）—— 详见 `design_docs/2026-06-08-native-goal-loop-integration.md`，本 spec 的 §3/§5/§10/§12 已据此增量修订。
 
+> ⚠ **/goal 集成方案已被 goal-hook 取代**（agent 无法自设 native `/goal`；改由 verify-board 升级为确定性 Stop-hook 自检闸）——见 `design_docs/2026-06-08-goal-hook-design.md` 与 `dogfood-findings.md` #2。
+
 ---
 
 ## 1. 目标
