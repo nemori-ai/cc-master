@@ -4,6 +4,7 @@
   "owner": { "active": true, "session_id": "", "heartbeat": "" },
   "git": { "worktree": "", "branch": "" },
   "wip_limit": 4,
+  "phase": { "current": "", "goal_condition": "", "task_ids": [] },
   "tasks": [],
   "log": []
 }

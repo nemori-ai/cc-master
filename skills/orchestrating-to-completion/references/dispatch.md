@@ -18,6 +18,55 @@ a node executes:
 
 ---
 
+## Dataflow at two scales — why the altitudes are self-similar
+
+The three altitudes are not three ideas — they are **one dataflow idea (dispatch-when-ready,
+never block at a barrier) appearing at two scales**. Internalizing this is what lets you carry
+the same instinct into an unfamiliar situation instead of matching it against a rule list.
+
+The academic root is the LLM-Compiler **Task Fetching Unit** (report 3): a dependency is
+dispatched the instant its inputs are ready; nothing already-runnable waits on something
+not-yet-ready, and the planner streams the graph so plan and execute overlap. cc-master runs
+that same algorithm at two scales:
+
+- **Macro (main thread) — dataflow as an internalized *mindset*.** The decision program *is* a
+  hand-run TFU: reconcile the board (the observation blackboard) → dispatch ready tasks
+  (fetch-when-ready) → fill-work in the gaps (planner/executor overlap) → verify at the endpoint
+  (the Joiner gate) → wait only when the ready set is empty. There is **no `pipeline()`
+  primitive here** — the main-thread DAG is dynamic, heterogeneous, and has a human in it, so no
+  compile-time script can express it. Dataflow lives as discipline (lenses 3 & 4), not as code.
+- **Micro (inside a workflow) — dataflow as an explicit *primitive*.** Here `pipeline()` is real
+  code: deterministic, journaled, resumable. But rigid — once a workflow starts its structure is
+  fixed, with no mid-run input (`authoring-workflows/references/mechanism.md` §7).
+
+**The cut between the two scales is the cut by dynamism.** Work that must adapt mid-run — react
+to an external completion, re-altitude an escalation, absorb a HITL answer — belongs at the
+macro scale (board + decision program, LLM in the loop). Work fixable at compile time — uniform
+items streaming through fixed stages — belongs in a `pipeline()`. This is the LLM-Compiler split
+*"the LLM emits the graph, code schedules it"* scaled up from one agent task to a whole
+long-horizon orchestration: the main-thread LLM does the dynamic planning (emit + replan), the
+workflow script does the deterministic scheduling. Self-similar — one scale nested in the other.
+
+**The caveat that stops you over-applying it.** `pipeline()` optimizes *throughput* (many like
+items through fixed stages); a single long-horizon goal is a *heterogeneous DAG* whose governing
+tool is the **critical path** (CPM / work-span), not pipeline throughput. So pipeline
+parallelism is a **constituent** of cc-master, not its top-level skeleton:
+
+- the **critical chain** sets the makespan — pipelining can't help a serial dependency;
+- only the **non-critical float** is the free parallel budget a pipeline / fan-out fills;
+- **batches of like subtasks** (migrate N files, review N findings) are its home turf.
+
+The top-level skeleton is dataflow DAG *scheduling*; a `pipeline()` is its degenerate special
+case when the items happen to be uniform. Reaching for fan-out on a serial critical chain is the
+classic mis-apply — when T₁/T∞ ≈ 1, don't fan out at all.
+
+> The `/goal` integration is this same idea once more: "legitimate waiting" (every remaining
+> path blocked on background or surfaced to the user) is exactly the TFU's **ready-set-is-empty**
+> state. A phase `/goal` just turns that dataflow termination condition into an
+> independently-enforced gate instead of a self-policed one.
+
+---
+
 ## Background execution mechanisms — there are exactly three
 
 Teach the agent only these three. (No other background mechanisms exist for this plugin's
@@ -33,6 +82,23 @@ purposes.)
 - **workflow** — when you need **deterministic control over multiple leaves** (fan-out /
   fan-in · a unified leaf schema · adversarial verification / retry / loop · joint synthesis ·
   context-flood risk · journal-resume) — **choose it even when the leaf count is small**.
+
+### Waiting on external state — background shell, not `/loop`
+
+cc-master is event-driven: when a background job finishes, the harness wakes the main thread
+and re-enters — so it never needs a timer to poll. For state the harness *cannot* track for you
+(CI status, a remote queue, an approval timeout), wait on it with a background shell that polls
+its own predicate and rides the completion notification back in:
+
+```bash
+until <external state ready>; do sleep 60; done   # run_in_background → harness notifies on exit, re-enters
+```
+
+**Do not reach for `/loop` or `ScheduleWakeup` for this.** The reason is ship-anywhere: the
+dynamic self-paced mode (`ScheduleWakeup`) is unsupported on Bedrock / Vertex / Foundry, and
+fixed-interval `/loop` rides cron and **expires after 7 days**. The background-shell form is
+more event-driven and fully ship-anywhere — dissolving the need back into an existing building
+block rather than introducing a new mechanism.
 
 ---
 
