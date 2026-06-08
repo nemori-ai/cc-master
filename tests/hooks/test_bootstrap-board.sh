@@ -34,4 +34,30 @@ assert_eq 1 "$(count_boards "$H")" "board created in CC_MASTER_HOME"
 assert_eq 0 "$(count_boards "$P/.claude/cc-master")" "nothing in project default when home overridden"
 rm -rf "$P" "$H"
 
+# Case E (Finding #15): notification-style prompt that merely MENTIONS the command name (the string
+# appears mid-text in a result/walkthrough, prompt value starts with <task-notification>) → must NOT
+# build a board. Raw command detection gates on the command name being the PREFIX of the prompt value,
+# not on a bare substring anywhere in the stdin.
+P="$(make_project)"
+run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"<task-notification>sub-agent finished; its walkthrough mentions /cc-master:as-master-orchestrator as the entry point</task-notification>"}' "$P"
+assert_eq 0 "$HOOK_RC" "notification-style mention exits 0 (no-op)"
+assert_eq 0 "$(count_boards "$P/.claude/cc-master")" "no board for a prompt that merely mentions the command name"
+rm -rf "$P"
+
+# Case F (Finding #15): raw command — prompt value STARTS WITH the command name (optionally with
+# leading whitespace) → must build a board.
+P="$(make_project)"
+run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"  /cc-master:as-master-orchestrator <goal>"}' "$P"
+assert_eq 0 "$HOOK_RC" "raw command exits 0"
+assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "board created for a raw command prompt (leading whitespace allowed)"
+rm -rf "$P"
+
+# Case G (Finding #15): expanded-body — prompt carries the bootstrap marker comment (only ever present
+# in the expanded command body, never in a mention) → must build a board via the gate marker backup.
+P="$(make_project)"
+run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"...\n<!-- cc-master:bootstrap:v1 -->\nYou are being initialized as a master orchestrator..."}' "$P"
+assert_eq 0 "$HOOK_RC" "expanded-body exits 0"
+assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "board created via expanded-body marker"
+rm -rf "$P"
+
 finish

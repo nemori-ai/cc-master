@@ -2,14 +2,34 @@
 # UserPromptSubmit hook: when the as-master-orchestrator command is invoked, deterministically
 # create a NEW uniquely-named board in the configurable home, then inject its path + the
 # orchestrator role so the agent knows which board is its own. This hook does NOT self-gate on a
-# marker (it is the activator) — it gates on the dual sentinel (command name OR body comment, so
-# it fires whether UserPromptSubmit sees the raw command or the expanded command body).
+# marker (it is the activator) — it gates on a TIGHTENED dual sentinel so that text which merely
+# *mentions* the command name (a task-notification, a sub-agent result, a user discussing the
+# command) no longer false-triggers an empty board (Finding #15):
+#   1. raw command  — the prompt field VALUE starts with /cc-master:as-master-orchestrator
+#                     (leading whitespace tolerated); a mid-text mention does not qualify.
+#   2. expanded body— stdin carries the cc-master:bootstrap:v1 marker, an HTML comment that only
+#                     ever appears in the expanded command body, never in a mention. Kept as a
+#                     safety backup in case UserPromptSubmit sees the expanded body, not the raw cmd.
+# Pure bash extraction of the JSON prompt field — no jq/node (ship-anywhere).
 set -uo pipefail
 
 stdin="$(cat)"
-case "$stdin" in
-  *cc-master:as-master-orchestrator*|*"cc-master:bootstrap:v1"*) : ;;
-  *) exit 0 ;;   # unrelated prompt → silent no-op
+
+# Extract the value of the top-level "prompt" string field. Grab everything after `"prompt":"` up to
+# the next unescaped double-quote. This is a best-effort extraction sufficient to test a prefix; if
+# no prompt field is present, `prompt` stays empty and the prefix test simply fails.
+prompt="${stdin#*\"prompt\":\"}"          # drop everything up to & including  "prompt":"
+[ "$prompt" = "$stdin" ] && prompt=""     # no "prompt": field at all → empty
+prompt="${prompt%%\"*}"                    # drop from the first " onward → the raw field value
+trimmed="${prompt#"${prompt%%[![:space:]]*}"}"   # strip leading whitespace
+
+case "$trimmed" in
+  /cc-master:as-master-orchestrator*) : ;;        # raw command: name is the prompt PREFIX
+  *)
+    case "$stdin" in
+      *"cc-master:bootstrap:v1"*) : ;;            # expanded-body marker backup
+      *) exit 0 ;;                                # unrelated / mere mention → silent no-op
+    esac ;;
 esac
 
 # Home is configurable (storage preference); default to the project's .claude/cc-master.
@@ -25,7 +45,7 @@ BOARD="$HOME_DIR/$(date -u +%Y%m%dT%H%M%SZ)-$$.board.json"
 if [ -f "$TEMPLATE" ]; then
   cp "$TEMPLATE" "$BOARD"
 else
-  printf '{"schema":"cc-master/v1","goal":"","owner":{"active":true,"session_id":"","heartbeat":""},"git":{"worktree":"","branch":""},"wip_limit":4,"phase":{"current":"","goal_condition":"","task_ids":[]},"tasks":[],"log":[]}\n' > "$BOARD"
+  printf '{"schema":"cc-master/v1","goal":"","owner":{"active":true,"session_id":"","heartbeat":""},"git":{"worktree":"","branch":""},"wip_limit":4,"tasks":[],"log":[]}\n' > "$BOARD"
 fi
 
 ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. Decompose the goal into a dependency DAG and write tasks[] into that board file, set goal/owner/git, then invoke the orchestrating-to-completion skill and run the decision program."
