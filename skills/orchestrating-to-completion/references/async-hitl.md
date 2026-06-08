@@ -58,3 +58,47 @@ not poll; the notification drives reconciliation, and reconciliation drives the 
 
 Front-of-house dialogue ∥ background execution is the whole point: asking the user a question
 and letting the background play are never mutually exclusive.
+
+---
+
+## Phased self-driving with native `/goal`
+
+The native `/goal` mechanism keeps auto-continuing the turn while its condition is unmet. Used
+end-to-end it would lock out HITL; scoped per phase it becomes a starting gun that drives each
+sprint to the finish without trapping the agent. The scoping rule:
+
+- **One goal's lifecycle = one no-HITL self-driving stretch.** A phase boundary is a HITL
+  point is the goal's clear point. This meshes with the DAG: each `blocked_on:"user"` node
+  already slices the graph into self-driving stretches.
+  - *Inside a phase* (up to the next HITL boundary) = pure self-drive — hold a phase goal so
+    the agent grinds to the end instead of dropping it half-way.
+  - *At the boundary* = HITL point = the phase goal is met and cleared = the agent stops
+    normally and asks the user.
+  - User answers → enter the next stretch → set the next phase goal, with awareness.
+
+- **The soul formula.** A phase `/goal`'s condition = «the phase's business end-state is
+  reached» OR «the phase has entered legitimate waiting» — i.e. decision-program step 6: every
+  remaining path is blocked on an in-flight background task or has been surfaced to the user
+  for an answer (HITL is a subset of legitimate waiting). Three effects in one:
+  - **No premature quitting** — phase unfinished, ready work or unverified nodes still on the
+    board → neither branch holds → the independent evaluator kicks the agent back to work.
+    This is the hard "no idle slacking" that `verify-board.sh` wants but the Stop path can't
+    deliver.
+  - **Never trapped at HITL** — hit a point only the user can decide → falls into legitimate
+    waiting (awaiting a user answer) → released to stop and ask.
+  - **Never trapped on background waits** — every path blocked on in-flight background → falls
+    into legitimate waiting (awaiting background) → released to yield calmly.
+
+  Because the evaluator reads only the conversation (never the filesystem), the OR branch fires
+  only if the step-6 self-check + the phase's acceptance evidence are written out loud — set
+  that as the configured prerequisite each turn.
+
+- **Two Stop hooks, compatible.** The session runs cc-master's `verify-board` Stop hook
+  alongside `/goal`'s internal Stop evaluation, and they point the same way:
+  - `verify-board` blocks **only** on an empty active board, otherwise it passes.
+  - `/goal` continues the turn while the phase goal is unmet **and** legitimate waiting has not
+    been entered.
+  - No clash: an empty board never has a goal (a goal is set only after the DAG is filled and a
+    self-driving stretch begins), so when `verify-board` would block there is no goal; when a
+    goal is live the board is non-empty and `verify-board` passes, leaving `/goal` to arbitrate
+    whether to stop.

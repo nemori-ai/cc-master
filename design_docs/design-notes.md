@@ -113,3 +113,28 @@ plugin `cc-master` = **命令 + 2 skills + hooks + board 文件**。通用、shi
 **node status（扩 board 窄腰）**：`ready / in_flight / blocked(blocked_on:user|<task>) / done / escalated / failed / stale / uncertain` —— 各状态在 DAG 里路由不同（uncertain→验证节点；stale→上游变了重跑；escalated→supersede→workflow）。output schema + dep-pins 放柔性边（hook 不读）。
 
 **v1 不过度造、降为"skill 讲原则 + 细节落 board 协议/impl"**：完整 budget-reservation ledger · dependency artifact-hash 全量 pinning · named 可复用 quality-pattern 契约 · 集成负担定量公式。
+
+## 13. 原生 `/goal`·`/loop` 整合（2026-06-08 增补；与 spec §3/§5/§10/§12 呼应）
+
+> **关联设计文档**：`design_docs/2026-06-08-native-goal-loop-integration.md`（整合设计定稿，含调研事实基线 [确证]/[待实测]、风险缓解、验收）。本节只记关键决策链，细节去那看。
+> **起因**：原研究基线评估过 `/loop`（决定用 board 任务循环替代）、明确排除过 agent-teams / scheduled routines，**唯独漏评了原生 `/goal`**。本次正面补评——`/goal` 与 cc-master 高度同构，值得整合而非平行重造。
+
+**整合力度 = 主动叠加（locked）**：cc-master 确定性骨架（3 hooks + board + bootstrap 三层兜底）**一根不动**；在其上**主动**叠加 `/goal`（bootstrap 即引导 agent 敲命令），`/loop` 用已有积木消解。既充分利用原生，又不破坏确定性保证。
+
+**`/goal` = 分阶段自驱发令枪（locked）**：`/goal` 有致命副作用——只要 goal 活着 agent 就被自动续 turn、停不下来问用户；一个"端到端全程 goal"会把第 7 镜头（该问就问、前台∥后台）和整个 HITL 模型架空。解法是给 goal 找对粒度：**一个 goal 的生命周期 = 一段「无需 HITL 的自驱区段」**。这与 cc-master 的 DAG 天然咬合——`blocked_on:"user"` 决策节点本就把 DAG 切成若干自驱区段：阶段内（到下一 HITL 边界前）挂阶段 goal、逼 agent 啃到底；阶段边界 = HITL 点 = goal 已达成并清除 = 正常停下来问用户；用户答完 → 进下一区段 → agent 有感知地再设下一个阶段 goal。goal 从"全程枷锁"降级为"分段冲刺发令枪"，HITL 在段缝里得以呼吸。
+
+**灵魂公式（核心机制，locked）**：阶段 goal 的完成条件统一收敛为——
+
+> **阶段 `/goal` 条件 = 「本阶段业务终态达成」 ∨ 「本阶段已进入正当等待」**（决策程序第 6 步判据：所有剩余路径都阻塞在 in-flight 后台任务、或已抛给用户待答；HITL 是正当等待的子集）。
+
+一箭三雕：① **防过早收工**——阶段没干完、还有 ready 活却想停 → 两分支皆不满足 → 独立裁判把 agent 踹回去干（这正是 `verify-board.sh` 软纪律想要、Stop 机制做不到的"硬防 idle 偷懒"）；② **不困死 HITL**——撞必须用户拍板的点 → 落入"正当等待(待用户答)" → 放行停下来问；③ **不困死后台等待**——所有路径都在等 in-flight 后台 → 落入"正当等待(等后台)" → 放行安心 yield。净效果：把第 4 镜头"罪在能动却被动空等，不在 idle"——全套体系最难自律的一条——从软纪律升级为独立模型执行的硬约束。**配套前提**：agent 每回合收尾跑决策程序时，把第 6 步自查结论 + 阶段验收证据**显式写进对话**（评估器只读对话、读不到文件），裁判才有据可判"正当等待 vs 偷停"。
+
+**逃生口 = 正当等待（locked）**：灵魂公式的 ∨ 右支即逃生口，复用决策程序第 6 步的"正当等待"判据，HITL 是其子集——这保证 goal 永不与 cc-master 的 HITL/后台等待模型打架。**goal 不锚 board 镜像**：评估器读不到文件，若锚"board 全 done"会沦为橡皮图章 + 逼 agent 刷屏；改锚"业务终态 ∨ 正当等待"，证据须呈现在对话。
+
+**跨 compaction 的阶段感知（locked）**：`/goal` 跨 compaction 保持活跃（仅跨 `--resume` 重置 timer）——即便 agent 压缩后忘了身份，挂着的阶段 goal 仍逼它啃当前段，**goal 反替 cc-master 扛了一道 compaction**。为让 agent 认回"我在冲哪段"，board 柔性边新增 `phase` 段（`current` + 阶段 goal 条件原文 + 本阶段 task 范围）；`reinject.sh` 重注时带出，提醒 agent 认回阶段、核对 goal 是否还挂着，goal 丢了则按 board 记录条件重设（hook 读不到 goal 状态，只能提醒 agent 自核）。这是 cc-master "board 扛 compaction"既有套路的自然延伸。
+
+**`/loop` = 后台 shell 消解（locked）**：cc-master 是事件驱动（后台一完成 harness 自动唤醒重入），不需定时轮询。`/loop` 唯一真场景（等 harness 追踪不到的外部状态：CI / 远程队列 / 审批超时）用已有"后台 shell"机制吃掉：`until <外部状态就绪>; do sleep 60; done` 丢进 `run_in_background`，完成后 harness 通知重入。更贴事件驱动、完全 ship-anywhere——连 `/loop`/`ScheduleWakeup` 都不引入（它们 Bedrock/Vertex/Foundry 不支持动态自步调、会话 7 天过期，撞 ship-anywhere 硬约束）。把需求消解回已有积木，真正兑现"不重造轮子"。
+
+**两个 Stop hook 相容（locked）**：会话里同时存在 cc-master `verify-board.sh`（仅"空 active board"时硬 block）与 `/goal` 内部 Stop 评估（阶段 goal 未达成且未进正当等待时令 agent 续 turn），方向相容、不冲突——空 board 时根本不会有 goal（goal 是 agent 填完 DAG、进入自驱区段后才设的），board 非空时 `verify-board` 放行、由 `/goal` 接管"该不该停"。**[待实测]** 多 Stop hook 合并/执行顺序（impl 期 smoke-test 验证；若任一 block 即 block 则并存安全）。
+
+**`/goal` 只能 best-effort（贯穿全节，再强调）**：hook/plugin 不能编程式设 `/goal`（LLM 中介，只能由 agent 主动敲命令）→ `/goal` 这层只能是 **best-effort 增强，不进确定性兜底**；cc-master 的 bootstrap 三层兜底 + `verify-board` 硬 block 仍是确定性骨架。goal 是增益非依赖：agent 不设 goal 时，原决策程序软纪律 + `verify-board` 兜底仍在，功能不退化。

@@ -34,6 +34,23 @@ purposes.)
   fan-in · a unified leaf schema · adversarial verification / retry / loop · joint synthesis ·
   context-flood risk · journal-resume) — **choose it even when the leaf count is small**.
 
+### Waiting on external state — background shell, not `/loop`
+
+cc-master is event-driven: when a background job finishes, the harness wakes the main thread
+and re-enters — so it never needs a timer to poll. For state the harness *cannot* track for you
+(CI status, a remote queue, an approval timeout), wait on it with a background shell that polls
+its own predicate and rides the completion notification back in:
+
+```bash
+until <external state ready>; do sleep 60; done   # run_in_background → harness notifies on exit, re-enters
+```
+
+**Do not reach for `/loop` or `ScheduleWakeup` for this.** The reason is ship-anywhere: the
+dynamic self-paced mode (`ScheduleWakeup`) is unsupported on Bedrock / Vertex / Foundry, and
+fixed-interval `/loop` rides cron and **expires after 7 days**. The background-shell form is
+more event-driven and fully ship-anywhere — dissolving the need back into an existing building
+block rather than introducing a new mechanism.
+
 ---
 
 ## Selection criteria — control / synthesis / context, NOT count

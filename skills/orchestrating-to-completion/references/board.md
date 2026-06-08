@@ -58,11 +58,33 @@ tasks[ { id, status, deps } ]
 ### The flexible edges (agent-shaped freely, hook-ignored)
 
 `title / artifact / dispatched_at / mechanism / handle / kind / justification / output_schema /
-dep_pins / notes / log` — plus the example fields `verified`, `blocked_on`, and the top-level
-`wip_limit`.
+dep_pins / notes / log / phase` — plus the example fields `verified`, `blocked_on`, and the
+top-level `wip_limit`.
 
 The hook ignores everything outside the pinned waist, so the agent can shape the flexible edges
 however the task needs.
+
+### The `phase` edge — cross-compaction phase awareness
+
+A top-level `phase` segment records the active **no-HITL self-driving phase** — the stretch of
+the DAG up to the next `blocked_on:"user"` boundary, which is the natural scope for a native
+`/goal` (see `async-hitl.md`).
+
+```
+phase: { current, goal_condition, task_ids }
+```
+
+- `current` — a short name/label for the phase being sprinted.
+- `goal_condition` — the verbatim phase `/goal` condition (soul formula: «business end-state
+  reached» OR «legitimate waiting entered»), so it can be re-set if lost.
+- `task_ids` — the task ids this phase spans.
+
+How it supports reinject across compaction: `/goal` stays active across compaction (only
+`--resume` resets its timers), but a hook is a shell and cannot read goal state. So `reinject`
+carries the `phase` edge back out — letting the agent recognize which phase it is sprinting,
+re-confirm the goal is still attached, and re-set it from `goal_condition` if it was dropped.
+This is the same "the board carries the agent through compaction" pattern extended to phase
+awareness.
 
 ---
 

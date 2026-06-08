@@ -67,6 +67,14 @@ an answer, and there is nothing left to schedule, do you calmly wait one beat.)
   gold-plate, or over-review.
 - **Don't overreach on what the user must decide**: anything irreversible / outward-facing /
   directional / final-approval (such as merge) must be asked first.
+- **`/goal` is the starting gun for a sprint, not a leg-iron for the whole race**: a native
+  `/goal` keeps auto-continuing the turn while it is unmet, so an end-to-end goal would lock
+  out HITL (lens 7). Only ever set a **per-phase** goal scoped to one no-HITL self-driving
+  stretch, and every phase goal's condition **must carry a legitimate-waiting escape hatch**
+  (see below) — otherwise it traps the agent at a user-decision or background-wait point.
+  `/goal` is a **best-effort** enhancement (a hook cannot set a goal — only the agent can);
+  it **never replaces** cc-master's deterministic fallback (bootstrap's three-layer guard +
+  `verify-board`'s hard block).
 
 ---
 
@@ -82,18 +90,35 @@ fake-busy is this **deterministic program** — run it at the close of every tur
    the user immediately (don't sit on it)
 3. Any ready task (dependencies satisfied, including answers the user has given)? → dispatch
    within the WIP cap (reserve budget + WIP first)
+   ↳ Phase awareness: before dispatching into a fresh stretch, identify the current
+     **no-HITL self-driving phase** (the run of nodes up to the next `blocked_on:"user"`
+     boundary) and, at the phase's start, proactively set a phase `/goal` (soul formula
+     below, escape hatch included). Record the phase on the board's `phase` edge.
 4. Any legitimate fill-work (passes the admission test)? → do it
 5. Any node done-but-unverified / uncertain? → verify independently at the endpoint / route
    to a verification node
 6. None of the above AND every remaining path is blocked on (an in-flight background task)
    or (already surfaced, awaiting a user answer) → legitimately wait / yield the turn
-7. Flush the board before ending
+   ↳ State it out loud: the native `/goal` evaluator reads only the conversation, never the
+     filesystem. So write this step-6 conclusion + the phase's acceptance evidence
+     **explicitly into the conversation** (and onto the board) — otherwise the evaluator
+     cannot tell legitimate waiting from a premature stop and will keep kicking you back.
+7. Flush the board before ending (the `phase` edge included)
 ```
 
 **Fill-work admission test** (makes "legitimate waiting > fake-busy" decidable): a piece of
 fill-work is legitimate **if and only if** it — unblocks a known dependency / lowers
 integration risk / produces a reusable artifact / verifies a specific hypothesis.
 Otherwise it is *waiting, not work*.
+
+**The phase `/goal` soul formula** (what to set at step 3's phase start). A phase `/goal`'s
+condition = «the phase's business end-state is reached» OR «the phase has entered legitimate
+waiting» — i.e. decision-program step 6: every remaining path is blocked on an in-flight
+background task or has been surfaced to the user for an answer (HITL is a subset of
+legitimate waiting). The first branch stops premature quitting; the OR branch is the escape
+hatch that keeps the goal from trapping the agent at a HITL or background-wait point. The
+evaluator only sees what you put in the conversation, so the step-6 self-check and acceptance
+evidence (per step 6 above) are the configured prerequisite for the OR branch to fire.
 
 ---
 
@@ -122,6 +147,12 @@ hook (a shell, blind to agent context and to the built-in `Task` tool) can read.
 - **Flush discipline**: flush at decision-program step 7 (and optionally on PreCompact).
 - **Supersession** is an explicit board status (a node re-altituded or invalidated by an
   upstream change), not implicit GC.
+- **`phase` flexible edge** (new): a top-level `phase` { current, goal_condition, task_ids }
+  records the active no-HITL self-driving phase. After compaction, `reinject` carries it out
+  so you recognize which phase you're sprinting and can re-set the `/goal` from
+  `goal_condition` if it was lost. Note `/goal` itself **stays active across compaction**
+  (only `--resume` resets its timers), so it shoulders one compaction on cc-master's behalf —
+  but a hook can't read goal state, so the `phase` edge is what lets you self-verify it.
 
 Full protocol: **`references/board.md`**.
 

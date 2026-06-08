@@ -40,4 +40,26 @@ assert_contains "$HOOK_OUT" "TASK ALPHA" "lists first active goal"
 assert_contains "$HOOK_OUT" "TASK BETA" "lists second active goal"
 rm -rf "$H"
 
+# Case E: an active board carrying a phase (current + goal_condition) → re-injects the phase so the
+# agent re-recognises which self-driving segment it is in, re-checks whether the /goal is still
+# attached, and re-sets it from the board record if it was dropped (the hook cannot read goal state).
+H="$(make_project)"
+mkactive "$H" "20260101T000000Z-1" '{"schema":"cc-master/v1","goal":"SHIP AUTH","owner":{"active":true},"phase":{"current":"MIGRATING AUTH MODULE","goal_condition":"auth tests green OR all paths blocked on background/user","task_ids":["T1","T2"]},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+run_ss "$H"
+assert_contains "$HOOK_OUT" "MIGRATING AUTH MODULE" "re-injects the phase.current text"
+assert_contains "$HOOK_OUT" "auth tests green OR all paths blocked on background/user" "re-injects the phase.goal_condition text"
+assert_contains "$HOOK_OUT" "phase" "mentions re-recognising the phase"
+assert_contains "$HOOK_OUT" "/goal" "tells the agent to re-check the phase /goal"
+assert_contains "$HOOK_OUT" "re-set" "tells the agent to re-set the goal from the board if dropped"
+rm -rf "$H"
+
+# Case F: backward compat — an active board with NO phase field → behaves exactly as before
+# (goal/role/board all re-injected, but no phase reminder leaks in).
+H="$(make_project)"
+mkactive "$H" "20260101T000000Z-2" '{"schema":"cc-master/v1","goal":"NO PHASE HERE","owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_ss "$H"
+assert_contains "$HOOK_OUT" "NO PHASE HERE" "still re-injects the goal when no phase"
+assert_not_contains "$HOOK_OUT" "Current phase" "no phase reminder when board has no phase"
+rm -rf "$H"
+
 finish
