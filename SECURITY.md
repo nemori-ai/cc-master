@@ -1,0 +1,41 @@
+# Security Policy
+
+cc-master is a Claude Code plugin. Installing it grants it a real trust surface
+in your environment, so please read this before reporting.
+
+## Trust surface
+
+- **Hooks run shell on your machine.** cc-master ships `bash` hooks
+  (`UserPromptSubmit`, `SessionStart`, `Stop`) that execute locally on every
+  matching event. They are intentionally pure bash (no `jq`/`node`), but they
+  still read your project directory and write to the cc-master home
+  (`$CC_MASTER_HOME`, else `<project>/.claude/cc-master/`).
+- **The plugin injects context into the agent.** Commands and hooks add text to
+  the model's context (role priming, board path, re-injection after compaction).
+  Treat any plugin that can shape agent context as part of your trust boundary.
+
+Review the hook scripts under `hooks/scripts/` before installing if you run in a
+sensitive environment.
+
+## Reporting a vulnerability
+
+**Do not open a public issue for security reports.**
+
+Report privately via GitHub's
+[private vulnerability reporting](https://github.com/nemori-ai/cc-master/security/advisories/new)
+(Security → Report a vulnerability). If that is unavailable, email the
+maintainer at `qiwei.pan@shanda.com` with a clear description and reproduction
+steps.
+
+Please give us a reasonable window to investigate and ship a fix before any
+public disclosure. We will acknowledge your report and keep you updated on
+progress.
+
+## Supported versions
+
+cc-master is pre-1.0; only the latest released version receives security fixes.
+
+| Version | Supported |
+| ------- | --------- |
+| 0.1.x   | Yes       |
+| < 0.1.0 | No        |

@@ -2,15 +2,28 @@
 
 > 中文版见 [README_zh.md](README_zh.md)。
 
-A ship-anywhere Claude Code plugin that turns any main-session agent into a long-horizon **master orchestrator**.
+**Hand Claude Code a goal too big for one session — and let it conduct itself to the finish.**
 
-Point it at a goal that spans more than 24 hours of work. It picks the right dynamic-workflow paradigm, writes stable parallel scripts, and keeps the main thread *productively* advancing — dispatching background work and using idle windows with initiative — all while surviving repeated context compaction and cross-session resume.
+cc-master is a ship-anywhere Claude Code plugin that turns any main-session agent into a long-horizon **master orchestrator**. Point it at work that spans more than a day: it decomposes the goal into a dependency graph, dispatches background work in parallel, keeps the main thread *productively* advancing in every idle window, and — the hard part — survives repeated context compaction and resumes across sessions without forgetting who it is or what's left.
+
+```
+/cc-master:as-master-orchestrator <a goal worth >24h of work>
+```
+
+That one command bootstraps a persistent board and makes the session the orchestrator. Sixty seconds from clone to running.
 
 ---
 
-## Why it exists: three paradigms, side by side
+## The painful gap it fills
 
-Dynamic workflows (shipped with Opus 4.8) gave Claude Code real parallelism. But for a *long-horizon* goal, two gaps remain: the official model only promises the main session stays **responsive** (not blocked), never that the orchestrator stays **productive** (self-driving); and nothing carries your role and progress across compaction. cc-master fills exactly that gap.
+Dynamic workflows (shipped with Opus 4.8) gave Claude Code real parallelism — fan out hundreds of agents from one script. But for a *long-horizon* goal, two gaps remain:
+
+1. The official model only promises the main session stays **responsive** (not blocked). It never promises the orchestrator stays **productive** — self-driving, finding the next move, verifying the last one.
+2. Nothing carries your **role and progress across compaction**. One context wipe and the orchestrator forgets it was orchestrating.
+
+cc-master fills exactly that gap. It doesn't replace dynamic workflows — it *wraps* them. The workflow runtime is just one of the three background mechanisms it conducts.
+
+### Three paradigms, side by side
 
 Here is the same long goal — *"migrate 9 domains to a new schema"* — run three ways:
 
@@ -58,20 +71,66 @@ flowchart LR
 | **Cross-session resume** | No | Same-session only | Yes — re-discovered from the board file |
 | **Endpoint verification** | Ad hoc | Inside the script | Orchestrator verifies independently |
 
-cc-master doesn't replace dynamic workflows — it *wraps* them. The workflow runtime is one of the three background mechanisms it conducts.
-
 ---
 
 ## Install
 
+Two supported ways to run cc-master. Pick by how you work.
+
+### A. `--plugin-dir` — recommended (dev / dogfood)
+
+Point Claude Code straight at a live clone. Edits to the repo take effect on the next session — **no cache, no copy step**. This is how the maintainers run it.
+
 ```bash
 git clone https://github.com/nemori-ai/cc-master.git
-ln -s "$(pwd)/cc-master" ~/.claude/plugins/cc-master
+cd cc-master
+claude --plugin-dir .          # this session loads the plugin from the live repo
 ```
 
-Then restart Claude Code (or run `/reload-plugins`) so the plugin is discovered.
+`claude --plugin-dir /abs/path/to/cc-master` works from anywhere, so you can dogfood cc-master while inside *another* project.
 
-## Usage
+### B. Marketplace + `enabledPlugins` (team / stable)
+
+Add the marketplace, then enable the plugin in your settings. This is the right choice for sharing one pinned version across a team. **Trade-off:** enabled plugins are copied into Claude Code's plugin cache, so live edits to your clone do **not** take effect — you must `claude plugin update` to pick up changes.
+
+```bash
+# add this repo as a marketplace (URL, path, or GitHub repo all work)
+claude plugin marketplace add nemori-ai/cc-master
+claude plugin install cc-master@cc-master
+```
+
+Or enable it declaratively in settings. The `enabledPlugins` value is an **object** keyed by `<plugin>@<marketplace>` (not an array):
+
+```jsonc
+// ~/.claude/settings.json
+{
+  "enabledPlugins": {
+    "cc-master@cc-master": true
+  }
+}
+```
+
+> Quick rule: iterating on the plugin → `--plugin-dir` (live). Pinning a version for a team → marketplace + `enabledPlugins` (cached).
+
+Both install paths require **Node 22+** and **bash** — nothing else.
+
+---
+
+## Quickstart
+
+Once loaded, hand it a goal big enough to be worth it (think >24h of work, many independent units):
+
+```
+/cc-master:as-master-orchestrator <goal>
+```
+
+That one command does three things, deterministically:
+
+1. A hook **bootstraps a board** — a persistent, status-bearing task dependency graph — and injects its exact path plus the "you are the master orchestrator" role.
+2. The agent **fills in the goal and the DAG**, anchored on the file that already exists.
+3. From there the orchestrator **dispatches background work as dependencies clear** and keeps advancing the main thread until everything is done, verified, or waiting on you.
+
+The full command set:
 
 ```
 /cc-master:as-master-orchestrator <goal>   # bootstrap a board and become the orchestrator
@@ -79,7 +138,11 @@ Then restart Claude Code (or run `/reload-plugins`) so the plugin is discovered.
 /cc-master:stop                            # archive the board and stand down (board is kept, not deleted)
 ```
 
-Kick off `as-master-orchestrator` with a goal big enough to be worth it (think >24h of work, many independent units). The orchestrator decomposes it into a dependency graph, dispatches background work as dependencies clear, and keeps advancing the main thread until everything is done, verified, or waiting on you.
+---
+
+## Demo
+
+End-to-end walkthroughs and runnable sample goals are coming to [`examples/`](examples/). _(Placeholder — to be filled in.)_
 
 ---
 
@@ -89,7 +152,9 @@ The plugin is **commands + 2 skills + hooks + a board file**, and each piece has
 
 ```
 cc-master/
-├── .claude-plugin/plugin.json          manifest
+├── .claude-plugin/
+│   ├── plugin.json                     manifest
+│   └── marketplace.json                marketplace entry (install path B)
 ├── commands/
 │   ├── as-master-orchestrator.md       bootstrap — become the orchestrator
 │   ├── status.md                       summarize board progress / health
@@ -98,16 +163,12 @@ cc-master/
 │   ├── orchestrating-to-completion/    Skill A — the orchestration method (the soul)
 │   └── authoring-workflows/            Skill B — how to write workflow scripts
 └── hooks/
-    └── scripts/{bootstrap-board, verify-board, reinject}.sh
+    └── scripts/{bootstrap-board, reinject, verify-board}.sh
 ```
 
 - **Commands** are one-shot ignition — you trigger them; they inject the "I am the master orchestrator" philosophy and operating discipline, and open the board.
 - **Skills** are the on-demand deep manuals — Skill A when you run the orchestration loop, Skill B when you write a workflow script.
-- **Hooks** are the memory that survives compaction — after a context wipe (or on notification), they re-inject "you are the orchestrator + here is your board" so the role and the to-do list don't get forgotten.
-
-### The board
-
-The board is the orchestrator's **persistent save file** for a long task — a status-bearing task dependency graph. It is both the memory that survives compaction *and* the only window a hook (a shell, blind to agent context) can read. Boards live in a configurable home — `$CC_MASTER_HOME` if set, else `<project>/.claude/cc-master/` — and each orchestration gets its own time-sortable file, so concurrent runs never collide. It is the single source of truth (the built-in `Task*` tools are at most a non-authoritative draft mirror), and it's gitignored.
+- **Hooks** are the memory that survives compaction — after a context wipe (or on resume) they re-inject "you are the orchestrator + here is your board" so the role and the to-do list don't get forgotten.
 
 ### The three background mechanisms it teaches
 
@@ -119,27 +180,27 @@ cc-master coaches the orchestrator to advance the main thread using three reliab
 
 It deliberately does **not** use **agent-teams** or **scheduled routines**: neither is reliably ship-anywhere (one is behind an experimental flag, the other needs a claude.ai account and isn't available on Bedrock/Vertex/Foundry), so they are out of scope by design.
 
-### Bootstrap, guaranteed in three layers
+### Bootstrap and completion, guaranteed by hooks
 
-Board existence does not depend on the agent cooperating:
+The board never depends on the agent cooperating, and the orchestrator can't quietly quit early:
 
 1. **`UserPromptSubmit`** detects the command's sentinel → deterministically creates an empty board skeleton + injects its exact path and the orchestrator role.
-2. **The agent** fills in the goal + DAG — the one non-mechanical step, anchored on a file that already exists.
-3. **`Stop`** self-gates on the home: if an active board has zero tasks, it `block`s and demands a fix. (`SessionStart` is what re-injects role + board after every compaction and on resume.)
+2. **`SessionStart`** (`startup | resume | compact`) re-injects role + board after every compaction and on resume.
+3. **`Stop`** runs a pure-bash gate: it reads *this session's* active board (filtered by `owner.session_id`, so concurrent orchestrations never interfere). An empty board, or one with `ready`/`uncertain` work left, **blocks** the stop. When the board looks done, the hook forces a one-time **self-check against the goal** before releasing — and a fuse (5 consecutive blocks) prevents a misjudgment from ever wedging the agent. The hook writes its state to a sidecar file; it never touches the board, which stays the agent's single source of truth.
 
 ---
 
-## Contributing & tests
+## The board
 
-The test suite covers the hook scripts (bash) and the content contract (Node's built-in test runner — board schema, skill/command structure):
+The board is the orchestrator's **persistent save file** for a long task — a status-bearing task dependency graph. It is both the memory that survives compaction *and* the only window a hook (a shell, blind to agent context) can read. Boards live in a configurable home — `$CC_MASTER_HOME` if set, else `<project>/.claude/cc-master/` — and each orchestration gets its own time-sortable file, so concurrent runs never collide. It is the single source of truth (the built-in `Task*` tools are at most a non-authoritative draft mirror), and it's gitignored.
 
-```bash
-./run-tests.sh
-```
+The board has a **narrow waist**: a small, fixed set of fields the hooks depend on (`owner.session_id`, task `status` values, `active`). Everything else is flexible. Keeping that waist stable is the load-bearing contract between the bash hooks and the agent.
 
-Requires Node 22+ and bash. The harness itself is the authoritative validator for workflow scripts, so there is intentionally **no** separate workflow linter to maintain — see [`skills/authoring-workflows/SKILL.md`](skills/authoring-workflows/SKILL.md) §3 for the reasoning.
+---
 
-When contributing: keep the board's **narrow waist** (the small set of hook-dependent fields) stable, keep the two skills self-contained and non-overlapping (Skill A = main-thread orchestration, Skill B = inside-the-script authoring), and run the suite before opening a PR.
+## Contributing
+
+The dev loop is one clone and two gates — `./run-tests.sh` (hook tests + content contract) and `claude plugin validate .`. The design invariants (pure-bash hooks, stable board waist, two non-overlapping skills, the conductor-never-plays-an-instrument red line, ship-anywhere) are spelled out in [CONTRIBUTING.md](CONTRIBUTING.md). Read it before opening a PR.
 
 ---
 
@@ -153,14 +214,9 @@ This plugin stands on the shoulders of the people who mapped this terrain first:
 - The community pattern libraries we distilled into Skill B's catalog — [alexop.dev](https://alexop.dev/posts/claude-code-workflows-deterministic-orchestration/), [claudefa.st](https://claudefa.st/blog/guide/development/dynamic-workflows), and Anthropic's [*A harness for every task*](https://claude.com/blog/a-harness-for-every-task-dynamic-workflows-in-claude-code).
 - **[barkain/claude-code-workflow-orchestration](https://github.com/barkain/claude-code-workflow-orchestration)** — its *soft-enforcement* nudges ("don't let the main agent do the work by hand") are structurally kin to cc-master's red line that the conductor never plays an instrument.
 
-The research that grounds the design is in [`design_docs/research/`](design_docs/research/).
+The research that grounds the design is in [`design_docs/research/`](design_docs/research/), and the full specification is in [`design_docs/spec.md`](design_docs/spec.md).
 
 ---
-
-## Learn more
-
-- [`design_docs/spec.md`](design_docs/spec.md) — the full specification.
-- [`design_docs/research/`](design_docs/research/) — the four reports behind the dynamic-workflow paradigms (mechanism, community, LLM-Compiler lineage, async-parallel methodology).
 
 ## License
 
