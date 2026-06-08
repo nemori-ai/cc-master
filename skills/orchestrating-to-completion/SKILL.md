@@ -110,6 +110,12 @@ fake-busy is this **deterministic program** — run it at the close of every tur
 7. Flush the board before ending (the `phase` edge included)
 ```
 
+**The decision program is a hand-run dataflow scheduler — a TFU.** Dispatch-when-ready, overlap
+the waits, stop only when the ready set is empty: the same dataflow idea `pipeline()` runs as
+code inside a workflow, here internalized as discipline because the main-thread DAG is dynamic
+and has a human in it. The two-scale, self-similar picture — and when *not* to pipeline — is in
+`references/dispatch.md` ("Dataflow at two scales").
+
 **Fill-work admission test** (makes "legitimate waiting > fake-busy" decidable): a piece of
 fill-work is legitimate **if and only if** it — unblocks a known dependency / lowers
 integration risk / produces a reusable artifact / verifies a specific hypothesis.
