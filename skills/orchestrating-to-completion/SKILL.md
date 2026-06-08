@@ -59,7 +59,9 @@ an answer, and there is nothing left to schedule, do you calmly wait one beat.)
 
 ## Red lines
 
-- Never implement or review by hand — dispatch everything.
+- Never implement or review by hand — dispatch everything. (One exception: a micro-fixup that
+  endpoint verification *itself* exposes — when T∞≈T₁ and dispatching costs more than it saves —
+  the orchestrator may close it out directly.)
 - **Gate-green ≠ passed**: you must read the diff / verify independently; a null or empty
   review counts as *not passed* (guard against silent pass-through).
 - Every loop must have a fuse (max rounds / budget).
@@ -82,6 +84,9 @@ fake-busy is this **deterministic program** — run it at the close of every tur
    the user immediately (don't sit on it)
 3. Any ready task (dependencies satisfied, including answers the user has given)? → dispatch
    within the WIP cap (reserve budget + WIP first)
+   ↳ This holds even mid-HITL: ready work that does not depend on the pending question
+     dispatches in parallel — don't let a dense front-of-house dialogue (e.g. a design Q&A)
+     serialize independent goals.
 4. Any legitimate fill-work (passes the admission test)? → do it
 5. Any node done-but-unverified / uncertain? → verify independently at the endpoint / route
    to a verification node
