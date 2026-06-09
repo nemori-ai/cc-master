@@ -33,6 +33,7 @@
 | 19 | codex 自审(新 reviewer 首跑)逮到 #16 修复的首行内联残漏(测试+自读都漏) | ✅ 机制验证(正向)+ 残漏已修 | codex needs-attention→TDD 收口(Case E3 + standalone 精确匹配),passed=21。reviewer 交付物活证据 / GTM 素材 |
 | 20 | codex-review.sh 非功能:codex exec review 禁止自定义 PROMPT 与 --base/--uncommitted 同用,P2 只 bash -n 没真跑漏检 | should-fix(deliverable 可用性) | ✅ 已修(去自定义 PROMPT,靠 AGENTS.md 供约定);教训:带外脚本 V 端点必须真跑一次 |
 | 21 | codex 功能 review 再逮两条:(A) goal-hook fingerprint 只哈希 status 多重集→身份变不重握(P4 缺口)(B) codex-review.sh 未强制 read-only,用户 danger-full-access 配置下 reviewer 可写仓库(P2 缺口) | ✅ 机制验证(正向)+ 2 should-fix 已修 | A:fingerprint→id+status+blocked_on(Case Q,passed=37);B:加 -c sandbox_mode=read-only。一程逮 #19/#20/#21 |
+| 22 | codex 第4次再逮两条:(C) #21 的 fingerprint 扫全 board、把 log 等 flexible 字段也算→违反 narrow-waist(D) track-b 文档 codex 配对指向不工作的调用(审 diff 非 transcript + #20 互斥) | ✅ 机制验证(正向)+ 2 should-fix 已修 | C:fingerprint scope 到含 deps 的 task 行(Case R,passed=38);D:改 plain codex exec grade transcript。一程共逮 6 条→fuse 停自动循环 |
 
 > 基线健康(无问题留痕):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
@@ -365,3 +366,21 @@
     Case Q(status 互换→重握,passed=37);`fp_of` helper 同步镜像。Finding #18 的"同状态不重问"不回归(同状态→同指纹)。
   - (B) `codex-review.sh` 加 `-c sandbox_mode='"read-only"'` **强制只读**,不继承用户配置。
 - **严重度 / 来源**:✅ 机制验证(正向)+ 2 should-fix 已修 / 一手(codex 第三次真跑,脚本修好后首次功能性输出)。
+
+## Finding #22 — codex 第 4 次(收敛确认)再逮两条:fingerprint 越界读 task waist + Track B 文档指向不工作的 codex 调用 ✅正向
+
+- **现象**:codex 第 4 次真跑(审已修 #21 的状态)again **needs-attention 两条**:
+  - **(C) `verify-board.sh` fingerprint 越界**:#21 把 fingerprint 从 status-only 扩成 id+status+blocked_on 时**扫全 board**,
+    会把 `log` 等 flexible 字段里的 `"id"/"status"/"blocked_on"` 也算进 → 违反 **narrow-waist 红线**(hook 只该读 task waist);
+    追加 log 可能伪装成"状态变"→ 徒增 self-check + stop-block streak。
+  - **(D) `track-b-benchmark.md` codex 配对指向不工作的调用**:让用户跑 `codex-review.sh`(审 repo **diff** 非 transcript)
+    或 `codex exec review "<prompt>" --base main`(正是 #20 的 PROMPT+scope 互斥)→ Track B 拿不到宣称的独立 **transcript** 裁决。
+- **根因**:(C) 我修 #21 时"修一处带出一处"(扩 grep 范围顺带纳入 flexible 字段);(D) 文档沿用了 codex-review.sh 的 diff-review
+  形态,但 Track B 要 grade 的是 **transcript**,工具用错(应 plain `codex exec` + transcript 走 stdin)。
+- **影响**:都 should-fix。(C) 违反 narrow-waist 红线(虽 valid-JSON 转义下当前多为 latent);(D) 让 eval Track B 的 codex 配对实操不通。
+- **处置**:(C) `status_fingerprint()` scope 到含 `"deps"` 的 **task 行**(flexible 字段无 deps);加 `test_verify-board.sh` Case R
+  (log 用 id/status 当 key 不改 fp,passed=38)+ `fp_of` helper 同步。(D) 文档改用 plain `codex exec`(transcript 走 stdin、
+  grading 指令作 prompt、`-c sandbox_mode='"read-only"'`),不用 `codex exec review`。
+- **收口决定(fuse)**:codex 一程(4 次真跑)共逮 **6 条真 bug**(#19 / #20 / #21A / #21B / #22C / #22D),**全部收口**;
+  按预设 fuse **停掉自动 codex 循环**(不再自动再跑,避免无限逼近;如需再验可手动 `bash scripts/codex-review.sh --base main`)。
+- **严重度 / 来源**:✅ 机制验证(正向)+ 2 should-fix 已修 / 一手(codex 第 4 次)。

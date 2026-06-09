@@ -75,7 +75,7 @@ rm -rf "$H"
 # fp_of BOARD — compute the completion-state fingerprint of a board exactly as the hook does
 # (id+status+blocked_on triples, file order, no sort), so tests can seed the sidecar's
 # last_handshook_fp field deterministically. MUST mirror status_fingerprint() in verify-board.sh.
-fp_of() { grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' "$1" 2>/dev/null | cksum | awk '{print $1}'; }
+fp_of() { grep '"deps"' "$1" 2>/dev/null | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | cksum | awk '{print $1}'; }
 
 # Case H (NEW): completion state (in_flight/blocked/done), no sidecar mark → BLOCK with self-check
 #                checklist, AND sidecar's last_handshook_fp set to the current fingerprint.
@@ -134,6 +134,16 @@ printf '0 %s\n' "$(fp_of "$H/b1.board.json")" > "$H/.$SID.stopcheck"   # seed: t
 mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"blocked\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "status swap (same multiset, different identity) → re-handshake block (codex catch #21)"
+rm -rf "$H"
+
+# Case R (codex review catch, Finding #22): fingerprint is scoped to TASK rows (lines carrying
+#  `"deps"`). A multi-line board whose flexible `log` entries use id/status as keys must NOT affect
+#  the fingerprint — only the task waist counts (narrow-waist contract). Two boards with identical
+#  tasks but different log id/status → SAME fingerprint.
+H="$(make_project)"
+printf '%s\n' '{"owner":{"active":true,"session_id":"s"},' '"tasks":[ {"id":"T1","status":"done","deps":[]} ],' '"log":[ {"id":"L1","status":"alpha"} ]}' > "$H/a.board.json"
+printf '%s\n' '{"owner":{"active":true,"session_id":"s"},' '"tasks":[ {"id":"T1","status":"done","deps":[]} ],' '"log":[ {"id":"L9","status":"omega"} ]}' > "$H/b.board.json"
+assert_eq "$(fp_of "$H/a.board.json")" "$(fp_of "$H/b.board.json")" "fingerprint scoped to task rows — log id/status does not change fp (codex catch #22)"
 rm -rf "$H"
 
 # ─── SESSION FILTERING (Finding #4) ───────────────────────────────────────────────────────────────

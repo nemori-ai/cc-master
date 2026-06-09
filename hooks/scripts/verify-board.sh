@@ -76,11 +76,15 @@ done
 # Fingerprint of THIS session's matched boards' completion state (pure bash, no jq). cksum over the
 # per-task id+status+blocked_on triples IN FILE ORDER (NOT sorted) → the digest binds each id to its
 # status, so swapping two tasks' statuses or changing a task's blocked_on yields a DIFFERENT
-# fingerprint and re-forces the self-check (codex review catch, Finding #21). Status-multiset-only
-# hashing missed those identity-preserving changes. Used as the handshake key.
+# fingerprint and re-forces the self-check (Finding #21). Status-multiset-only hashing missed those.
+# SCOPING (Finding #22, codex review catch): only TASK rows are fingerprinted — we first select lines
+# carrying `"deps"` (every task in the pinned waist has deps; flexible fields like `log` entries do
+# not), so audit-log prose or other non-task fields can never look like a changed completion state.
+# (Assumes one task object per line, as written by the snapshot Write and the board template.)
 status_fingerprint() {
   printf '%s' "$matched_boards" | while IFS= read -r bp; do
-    [ -n "$bp" ] && grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' "$bp" 2>/dev/null
+    [ -n "$bp" ] && grep '"deps"' "$bp" 2>/dev/null \
+      | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"'
   done | cksum | awk '{print $1}'
 }
 

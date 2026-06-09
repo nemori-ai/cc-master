@@ -153,11 +153,16 @@ is written, run codex over the **same transcript + the same four assertions** an
 ask it to render its own verdict:
 
 ```bash
-scripts/codex-review.sh        # the P2 reviewer, or:
-codex exec review "<the four assertions, verbatim> — judge each PASS/FAIL \
-  against this transcript with evidence; you are a second, independent judge." \
-  --base main -m gpt-5.5 -c model_reasoning_effort=high --json -o /tmp/codex-grade.json \
-  < /dev/null
+# Grade the SAME transcript with a non-Claude judge. NOT `codex exec review` — that reviews a git
+# DIFF (not a transcript) and forbids a custom prompt alongside a scope flag like --base (Finding
+# #20). `scripts/codex-review.sh` is the diff reviewer (for code changes), NOT a transcript grader.
+# For Track B use plain `codex exec`: the transcript goes in on stdin (appended as a <stdin> block),
+# the grading instructions are the prompt; force a read-only sandbox so the judge cannot mutate anything.
+codex exec "Four behavioral assertions: <the four assertions, verbatim>. Judge each PASS/FAIL \
+  against the transcript provided on stdin, with a one-line evidence quote per assertion. You are a \
+  second, independent (non-Claude) judge — do not defer to the Claude grader." \
+  -m gpt-5.5 -c model_reasoning_effort=high -c sandbox_mode='"read-only"' \
+  --json -o /tmp/codex-grade.json < "$TRANSCRIPT"
 ```
 
 Then diff codex's per-assertion verdicts against the grader's `grading.json`.
