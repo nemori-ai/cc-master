@@ -25,23 +25,20 @@ fi
 OUT="$(mktemp -t codex-review.XXXXXX)"
 trap 'rm -f "$OUT"' EXIT
 
-# Review-only instruction. Focus on skill/plugin quality; respect the filesystem
-# boundary — other AIs' skill definitions are out of scope.
-PROMPT='Review-only. Do NOT modify any file. Focus on skill/plugin quality of THIS repo:
-- SKILL.md description: does it actually trigger at the moments it should (trigger force)?
-- instruction ambiguity: are any directives vague or self-contradictory?
-- bash code blocks: would they actually run (syntax, quoting, regex, shell/boundary bugs)?
-- dead references: any pointer to a file/section/anchor that does not exist?
-- hooks: are they still pure bash with NO jq / node dependency?
-FILESYSTEM BOUNDARY — IGNORE these entirely (they are OTHER AIs skill definitions, not this repo):
-  ~/.claude/ , .claude/skills/ , agents/ .
-Output the verdict per review-output.schema.json (verdict: approve | needs-attention).'
-
-# Core call. `< /dev/null` prevents a stdin deadlock (codex reads instructions
-# from the PROMPT arg, not stdin). --json streams JSONL events to stdout; -o writes
-# the final agent message (the verdict) to $OUT.
-if ! codex exec review "$PROMPT" --base "$BASE" \
-      -m gpt-5.5 -c model_reasoning_effort=high \
+# NOTE (Finding #20, found by running this very script at the PR gate): `codex exec review`
+# FORBIDS a custom [PROMPT] together with a scope flag (`--base` / `--uncommitted` / `--commit`) —
+# they are mutually exclusive. So we do NOT pass a custom focus prompt; codex runs its default
+# review over the --base diff and picks up this repo's review conventions from AGENTS.md (which it
+# reads). The diff is repo-scoped (only this repo's tracked changes vs <base>), so the "ignore
+# other AIs' ~/.claude skill defs" boundary is already moot — those files are not in the diff.
+#
+# Core call. `< /dev/null` prevents a stdin deadlock. --json streams JSONL events to stdout;
+# -o writes the final agent message (the verdict) to $OUT.
+# `-c sandbox_mode='"read-only"'` FORCES a read-only sandbox for this review regardless of the
+# user's ~/.codex/config.toml (which may be workspace-write or danger-full-access) — a reviewer must
+# never mutate the repo (codex review catch, Finding #21).
+if ! codex exec review --base "$BASE" \
+      -m gpt-5.5 -c model_reasoning_effort=high -c sandbox_mode='"read-only"' \
       --json -o "$OUT" < /dev/null; then
   echo "CODEX_REVIEW_FAILED (treat as NOT passed)"
   exit 2

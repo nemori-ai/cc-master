@@ -73,12 +73,15 @@ for b in "$HOME_DIR"/*.board.json; do
   fi
 done
 
-# Fingerprint of THIS session's matched boards' status multiset (pure bash, no jq). cksum over the
-# sorted list of status enums → a stable digest of the completion state. Used as the handshake key.
+# Fingerprint of THIS session's matched boards' completion state (pure bash, no jq). cksum over the
+# per-task id+status+blocked_on triples IN FILE ORDER (NOT sorted) → the digest binds each id to its
+# status, so swapping two tasks' statuses or changing a task's blocked_on yields a DIFFERENT
+# fingerprint and re-forces the self-check (codex review catch, Finding #21). Status-multiset-only
+# hashing missed those identity-preserving changes. Used as the handshake key.
 status_fingerprint() {
   printf '%s' "$matched_boards" | while IFS= read -r bp; do
-    [ -n "$bp" ] && grep -oE '"status"[[:space:]]*:[[:space:]]*"[a-z_]+"' "$bp" 2>/dev/null
-  done | sort | cksum | awk '{print $1}'
+    [ -n "$bp" ] && grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' "$bp" 2>/dev/null
+  done | cksum | awk '{print $1}'
 }
 
 # ── decision ──────────────────────────────────────────────────────────────────────────────────────

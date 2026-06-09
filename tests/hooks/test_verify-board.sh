@@ -72,9 +72,10 @@ rm -rf "$H"
 
 # ─── SELF-CHECK HANDSHAKE (completion state: all in_flight/blocked/done) ───────────────────────────
 
-# fp_of BOARD — compute the status-multiset fingerprint of a board exactly as the hook does, so
-# tests can seed the sidecar's last_handshook_fp field deterministically.
-fp_of() { grep -oE '"status"[[:space:]]*:[[:space:]]*"[a-z_]+"' "$1" 2>/dev/null | sort | cksum | awk '{print $1}'; }
+# fp_of BOARD — compute the completion-state fingerprint of a board exactly as the hook does
+# (id+status+blocked_on triples, file order, no sort), so tests can seed the sidecar's
+# last_handshook_fp field deterministically. MUST mirror status_fingerprint() in verify-board.sh.
+fp_of() { grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' "$1" 2>/dev/null | cksum | awk '{print $1}'; }
 
 # Case H (NEW): completion state (in_flight/blocked/done), no sidecar mark → BLOCK with self-check
 #                checklist, AND sidecar's last_handshook_fp set to the current fingerprint.
@@ -120,6 +121,19 @@ run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "actionable again → block"
 SCFP="$(awk '{print $2}' "$H/.$SID.stopcheck")"
 assert_eq "-" "$SCFP" "actionable again → no fingerprint written (handshake state reset)"
+rm -rf "$H"
+
+# Case Q (codex review catch, Finding #21): identity-preserving status SWAP must re-handshake. Two
+#  tasks swap in_flight<->blocked, so the status MULTISET is unchanged. A status-only fingerprint
+#  would match the seeded handshook fp and wrongly ALLOW Stop, skipping the self-check for the new
+#  state; the id+status+blocked_on fingerprint changes → BLOCK anew.
+H="$(make_project)"
+SID="sess-swap"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"deps\":[]}]}"
+printf '0 %s\n' "$(fp_of "$H/b1.board.json")" > "$H/.$SID.stopcheck"   # seed: this state already handshook
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"blocked\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "status swap (same multiset, different identity) → re-handshake block (codex catch #21)"
 rm -rf "$H"
 
 # ─── SESSION FILTERING (Finding #4) ───────────────────────────────────────────────────────────────

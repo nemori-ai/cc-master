@@ -31,6 +31,8 @@
 | 17 | phantom in_flight:标 board 在前、dispatch 在后,被 sibling 完成通知打断致漏派 worker | should-fix(流程纪律) | ✅ 已应对(先 dispatch 再标板 + agentId 实证);待固化进 AGENTS/SKILL |
 | 18 | eval Track A 触发召回近零(冷启 claude -p 单轮欠表征真实触发),绝对召回不可当 description 判据 | should-fix(eval 可靠性) | 已记;infra 已交付跑通;Track A 宜作 precision+相对 delta,绝对召回 caveat 待后续提保真度 |
 | 19 | codex 自审(新 reviewer 首跑)逮到 #16 修复的首行内联残漏(测试+自读都漏) | ✅ 机制验证(正向)+ 残漏已修 | codex needs-attention→TDD 收口(Case E3 + standalone 精确匹配),passed=21。reviewer 交付物活证据 / GTM 素材 |
+| 20 | codex-review.sh 非功能:codex exec review 禁止自定义 PROMPT 与 --base/--uncommitted 同用,P2 只 bash -n 没真跑漏检 | should-fix(deliverable 可用性) | ✅ 已修(去自定义 PROMPT,靠 AGENTS.md 供约定);教训:带外脚本 V 端点必须真跑一次 |
+| 21 | codex 功能 review 再逮两条:(A) goal-hook fingerprint 只哈希 status 多重集→身份变不重握(P4 缺口)(B) codex-review.sh 未强制 read-only,用户 danger-full-access 配置下 reviewer 可写仓库(P2 缺口) | ✅ 机制验证(正向)+ 2 should-fix 已修 | A:fingerprint→id+status+blocked_on(Case Q,passed=37);B:加 -c sandbox_mode=read-only。一程逮 #19/#20/#21 |
 
 > 基线健康(无问题留痕):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
@@ -327,3 +329,39 @@
   对 `'<!-- cc-master:bootstrap:v1 -->'` **standalone 精确匹配**(Green,passed=21/0)→ 合法触发(marker 独立成行)
   回归仍建 board。#16 修复至此完整。
 - **严重度 / 来源**:✅ 机制验证(正向)+ should-fix 残漏已修 / 一手(codex 首跑实测)。
+
+## Finding #20 — codex-review.sh 非功能:`codex exec review` 禁止自定义 PROMPT 与 scope flag 同用
+
+- **现象**:V/PR 终审门**真跑** deliverable 脚本 `scripts/codex-review.sh --base main`,codex 退出码 2:
+  `error: the argument '[PROMPT]' cannot be used with '--base <BRANCH>'`。脚本同传**自定义 PROMPT + `--base`** →
+  每次必报错 → silent-pass-through guard(正确地)判 `CODEX_REVIEW_FAILED` / exit 2,但**它从未真正 review 过任何东西**。
+- **根因**:`codex exec review` 的 `[PROMPT]` 与 scope flag(`--base` / `--uncommitted` / `--commit`)**互斥**(逐字 `--help`
+  证实)。P2 实现时按约束"不发起会消耗 API 的真 codex 调用",只做了 `bash -n` 语法检查 → **运行期 CLI 契约不兼容遂漏检**。
+  (本轮早先那次成功的 `--uncommitted` 自审,恰因我手动**没带**自定义 prompt 才绕过了这个互斥——所以 reviewer 机制本身能用,
+  是**脚本封装**写错了参数组合。)
+- **影响**:codex-reviewer 这个**核心 deliverable 如 P2 交付即不可用**——每次假性 NOT passed,等于没有 reviewer。
+  **幸 silent-pass-through guard 让它 fail-safe**(绝不误判成 approve),坏也只坏向安全侧。
+- **处置**:orchestrator 直接修(端点验收本身暴露、T∞≈T₁):**去掉自定义 PROMPT**,改用 codex 默认 review + 仓库 `AGENTS.md`
+  供 review 约定(codex 会读 AGENTS.md);`--base` diff 本就只含本仓 tracked 改动,故"忽略别的 AI 的 ~/.claude skill defs"
+  这个 filesystem boundary 自然 moot(那些文件不在 diff 里)。重跑确认产出真 verdict。
+- **教训(固化候选)**:**带外脚本(codex / eval)不能只 `bash -n` —— V 端点必须真跑一次冒烟**。"语法过 / determinism 三禁过"
+  ≠ "运行期 CLI 契约对"。P2/P3 为省 token 约束"不真跑",是对的;但 orchestrator 在 V 端点验收时**有责任真跑一次**,
+  本轮正是 V 真跑才逮到 #20(和 #19)。建议写进 AGENTS.md §10 测试纪律 / §7 codex 段。
+- **严重度 / 来源**:should-fix(deliverable 可用性)/ 一手(V/PR 终审门真跑实测)。
+
+## Finding #21 — codex 功能性 review(脚本修好后首跑)再逮两条:fingerprint 身份不足 + reviewer 未强制只读 ✅正向
+
+- **现象**:`codex-review.sh` 修好(#20)后真跑 `--base main`,codex 出 **needs-attention 两条**:
+  - **(A) `verify-board.sh` fingerprint 身份不足**:只哈希排序后的 status 多重集 → 当完成态 board 的 status **计数不变但归属变了**
+    (两个 task 互换 in_flight↔blocked、或某 blocked 任务的 `blocked_on` 变)时,指纹**不变** → 误判"已自检"→ **跳过新状态的必要自检**(P4 缺口)。
+  - **(B) `codex-review.sh` 未强制 read-only**:未显式覆盖 sandbox,用户 `~/.codex/config.toml` 为 `workspace-write`/`danger-full-access`
+    时(codex 实查到正是 `danger-full-access`)review 继承**可写沙箱**、可改仓库,违反"只读 reviewer"契约(P2 缺口 + 实在风险)。
+- **根因(机制成功)**:codex 作为独立第二验收者,审出 P4(指纹身份)与 P2(沙箱契约)各自的真缺口——前者测试只覆盖了
+  "multiset 不变=不重问"、漏了"multiset 不变但身份变=该重问";后者 doc/注释声称 read-only 但实现没强制。
+- **影响**:**codex-reviewer 价值再证**——这一程它逮了 **#19 / #20 / #21 共四条真 bug**(全是测试 + 我自读漏掉的)。
+  (B) 在当前 danger-full-access 配置下是实在的"reviewer 可写仓库"风险。这是端点验收红线"只信独立端点验收"的最强活证据。
+- **处置**:orchestrator TDD 收口(端点暴露、T∞≈T₁):
+  - (A) `status_fingerprint()` 改 **id+status+blocked_on 三元组、file order 不排序**(绑定 id↔status);加 `test_verify-board.sh`
+    Case Q(status 互换→重握,passed=37);`fp_of` helper 同步镜像。Finding #18 的"同状态不重问"不回归(同状态→同指纹)。
+  - (B) `codex-review.sh` 加 `-c sandbox_mode='"read-only"'` **强制只读**,不继承用户配置。
+- **严重度 / 来源**:✅ 机制验证(正向)+ 2 should-fix 已修 / 一手(codex 第三次真跑,脚本修好后首次功能性输出)。
