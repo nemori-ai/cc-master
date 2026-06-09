@@ -61,6 +61,24 @@ correctness must live at the endpoint.
 Verification is the validation step of the resume cache (§1): only an artifact that exists
 **and** passes this endpoint check is treated as done.
 
+### codex as an independent second endpoint verifier
+
+`scripts/codex-review.sh` runs `codex exec review --base <branch> --json` (review-only,
+read-only sandbox) and emits a `verdict` per the openai-codex plugin's
+`review-output.schema.json` (`approve | needs-attention`, each finding carrying
+severity/file/line/confidence). The verdict maps straight onto the §4 Joiner gate:
+
+- `needs-attention` → **`Replan(feedback)`** — carry the findings as the diagnosis-bearing
+  replan signal; fix and re-verify.
+- `approve` **and** review non-empty **and** the diff was actually read → **`FinalResponse`** (done).
+- empty review / call failed (`exit 2`, `CODEX_REVIEW_FAILED`) → **NOT passed** — the
+  silent-pass-through guard (§3); never silent approval, never done.
+
+This is the same red line as the orchestrator's own endpoint check: trust only endpoint
+verification, gate-green ≠ passed, an agent's self-report is not trustworthy. codex is a
+*second* endpoint reader, not a replacement for running the gate — read the diff and run the
+gate; codex catches contract violations the run does not.
+
 ---
 
 ## 4. Loop convergence — structured gate + fuse + dedup
