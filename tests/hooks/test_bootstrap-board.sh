@@ -12,9 +12,10 @@ assert_contains "$HOOK_OUT" ".board.json" "injects the board path"
 assert_contains "$HOOK_OUT" "orchestrator" "injects the orchestrator role"
 rm -rf "$P"
 
-# Case B: body sentinel (expanded-body case) → also creates a board
+# Case B: body sentinel (expanded-body case) — marker is the FIRST non-empty line (the command body
+# opens with the sentinel right after frontmatter) → also creates a board
 P="$(make_project)"
-run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"...\n<!-- cc-master:bootstrap:v1 -->\n..."}' "$P"
+run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"<!-- cc-master:bootstrap:v1 -->\n..."}' "$P"
 assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "board created via body sentinel"
 rm -rf "$P"
 
@@ -52,12 +53,40 @@ assert_eq 0 "$HOOK_RC" "raw command exits 0"
 assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "board created for a raw command prompt (leading whitespace allowed)"
 rm -rf "$P"
 
-# Case G (Finding #15): expanded-body — prompt carries the bootstrap marker comment (only ever present
-# in the expanded command body, never in a mention) → must build a board via the gate marker backup.
+# Case G (Finding #15): expanded-body — prompt opens with the bootstrap marker comment on its first
+# non-empty line (only ever the case in the expanded command body, never in a mention) → must build a
+# board via the gate marker backup.
 P="$(make_project)"
-run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"...\n<!-- cc-master:bootstrap:v1 -->\nYou are being initialized as a master orchestrator..."}' "$P"
+run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"<!-- cc-master:bootstrap:v1 -->\nYou are being initialized as a master orchestrator..."}' "$P"
 assert_eq 0 "$HOOK_RC" "expanded-body exits 0"
 assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "board created via expanded-body marker"
+rm -rf "$P"
+
+# Case E1 (Finding #16): expanded-body marker is the prompt's FIRST non-empty line (the as-master-
+# orchestrator command body opens with the sentinel comment right after frontmatter) → must build a
+# board. Preserves the legitimate marker-backup contract.
+P="$(make_project)"
+run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"<!-- cc-master:bootstrap:v1 -->\nYou are being initialized..."}' "$P"
+assert_eq 0 "$HOOK_RC" "marker-first-line exits 0"
+assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "P4b: marker on first non-empty line → builds board"
+rm -rf "$P"
+
+# Case E2 (Finding #16): the marker is merely MENTIONED inline mid-prose (e.g. a survey sub-agent's
+# report quotes the sentinel while describing the command-file convention). The marker is NOT the
+# first non-empty line → must NOT build a board. Direct regression for Finding #16.
+P="$(make_project)"
+run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"# report\nname the sentinel comment (`<!-- cc-master:bootstrap:v1 -->`) and put it on the body first line."}' "$P"
+assert_eq 0 "$HOOK_RC" "inline-mention exits 0 (no-op)"
+assert_eq 0 "$(count_boards "$P/.claude/cc-master")" "P4b: marker mentioned inline mid-prose → no board (Finding#16)"
+rm -rf "$P"
+
+# Case E3 (Finding #16, codex self-review catch): the marker is quoted INLINE on the FIRST non-empty
+# line (prose that happens to lead with a sentence mentioning the sentinel). The marker must be the
+# first line STANDALONE — merely appearing on the first line is not enough. Must NOT build a board.
+P="$(make_project)"
+run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"First line mentions the sentinel <!-- cc-master:bootstrap:v1 --> inline, not standalone."}' "$P"
+assert_eq 0 "$HOOK_RC" "first-line inline-marker exits 0 (no-op)"
+assert_eq 0 "$(count_boards "$P/.claude/cc-master")" "P4b: marker inline on first line (not standalone) → no board (codex catch)"
 rm -rf "$P"
 
 finish

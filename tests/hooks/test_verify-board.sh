@@ -72,8 +72,13 @@ rm -rf "$H"
 
 # ─── SELF-CHECK HANDSHAKE (completion state: all in_flight/blocked/done) ───────────────────────────
 
+# fp_of BOARD — compute the completion-state fingerprint of a board exactly as the hook does
+# (id+status+blocked_on triples, file order, no sort), so tests can seed the sidecar's
+# last_handshook_fp field deterministically. MUST mirror status_fingerprint() in verify-board.sh.
+fp_of() { grep '"deps"' "$1" 2>/dev/null | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | cksum | awk '{print $1}'; }
+
 # Case H (NEW): completion state (in_flight/blocked/done), no sidecar mark → BLOCK with self-check
-#                checklist, AND sidecar selfcheck_done flipped to 1.
+#                checklist, AND sidecar's last_handshook_fp set to the current fingerprint.
 H="$(make_project)"
 SID="sess-handshake-1"
 mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T3\",\"status\":\"blocked\",\"deps\":[]}]}"
@@ -82,32 +87,63 @@ assert_contains "$HOOK_OUT" "block" "first completion → block"
 assert_contains "$HOOK_OUT" "self-check" "first completion → reason has self-check keyword"
 assert_contains "$HOOK_OUT" "original goal" "first completion → reason cites original goal"
 assert_file "$H/.$SID.stopcheck" "first completion → sidecar created"
-# sidecar now records selfcheck_done=1 (second field)
-SCDONE="$(awk '{print $2}' "$H/.$SID.stopcheck")"
-assert_eq 1 "$SCDONE" "first completion → selfcheck_done set to 1"
+# sidecar now records last_handshook_fp = current fingerprint (second field)
+EXP_FP="$(fp_of "$H/b1.board.json")"
+GOT_FP="$(awk '{print $2}' "$H/.$SID.stopcheck")"
+assert_eq "$EXP_FP" "$GOT_FP" "first completion → last_handshook_fp set to current fingerprint"
 rm -rf "$H"
 
-# Case I (NEW): completion state, sidecar already selfcheck_done=1 → ALLOW + sidecar cleared
+# Case I (NEW): completion state, sidecar's last_handshook_fp == current fingerprint → ALLOW, and the
+#                fingerprint is KEPT (streak reset to 0) so the SAME state keeps allowing on later Stops.
 H="$(make_project)"
 SID="sess-handshake-2"
 mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
-printf '0 1\n' > "$H/.$SID.stopcheck"   # block_streak=0, selfcheck_done=1
+EXP_FP="$(fp_of "$H/b1.board.json")"
+printf '0 %s\n' "$EXP_FP" > "$H/.$SID.stopcheck"   # streak=0, fp already handshook
 run_stop_sid "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "second completion → rc 0"
 assert_not_contains "$HOOK_OUT" "block" "second completion → allow (no block)"
-assert_no_file "$H/.$SID.stopcheck" "second completion → sidecar cleared on allow"
+assert_file "$H/.$SID.stopcheck" "second completion → sidecar kept (fingerprint persists)"
+KEPT_FP="$(awk '{print $2}' "$H/.$SID.stopcheck")"
+assert_eq "$EXP_FP" "$KEPT_FP" "second completion → handshook fingerprint retained"
+KEPT_STREAK="$(awk '{print $1}' "$H/.$SID.stopcheck")"
+assert_eq 0 "$KEPT_STREAK" "second completion → streak reset to 0 on allow"
 rm -rf "$H"
 
-# Case J (NEW): handshake reset — selfcheck_done was 1, but board now has a ready task again →
-#                BLOCK (actionable) and selfcheck_done reset to 0 (next completion must self-check anew).
+# Case J (NEW): handshake reset — sidecar carried a handshook fingerprint, but board now has a ready
+#                task again → BLOCK (actionable). Actionable is not a handshake, so it does not write a
+#                fingerprint; the next completion state must self-check anew.
 H="$(make_project)"
 SID="sess-reset"
 mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[]}]}"
-printf '0 1\n' > "$H/.$SID.stopcheck"   # pretend a previous self-check happened
+printf '0 12345\n' > "$H/.$SID.stopcheck"   # pretend a previous completion-state handshake happened
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "actionable again → block"
-SCDONE="$(awk '{print $2}' "$H/.$SID.stopcheck")"
-assert_eq 0 "$SCDONE" "actionable again → selfcheck_done reset to 0"
+SCFP="$(awk '{print $2}' "$H/.$SID.stopcheck")"
+assert_eq "-" "$SCFP" "actionable again → no fingerprint written (handshake state reset)"
+rm -rf "$H"
+
+# Case Q (codex review catch, Finding #21): identity-preserving status SWAP must re-handshake. Two
+#  tasks swap in_flight<->blocked, so the status MULTISET is unchanged. A status-only fingerprint
+#  would match the seeded handshook fp and wrongly ALLOW Stop, skipping the self-check for the new
+#  state; the id+status+blocked_on fingerprint changes → BLOCK anew.
+H="$(make_project)"
+SID="sess-swap"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"deps\":[]}]}"
+printf '0 %s\n' "$(fp_of "$H/b1.board.json")" > "$H/.$SID.stopcheck"   # seed: this state already handshook
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"blocked\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "status swap (same multiset, different identity) → re-handshake block (codex catch #21)"
+rm -rf "$H"
+
+# Case R (codex review catch, Finding #22): fingerprint is scoped to TASK rows (lines carrying
+#  `"deps"`). A multi-line board whose flexible `log` entries use id/status as keys must NOT affect
+#  the fingerprint — only the task waist counts (narrow-waist contract). Two boards with identical
+#  tasks but different log id/status → SAME fingerprint.
+H="$(make_project)"
+printf '%s\n' '{"owner":{"active":true,"session_id":"s"},' '"tasks":[ {"id":"T1","status":"done","deps":[]} ],' '"log":[ {"id":"L1","status":"alpha"} ]}' > "$H/a.board.json"
+printf '%s\n' '{"owner":{"active":true,"session_id":"s"},' '"tasks":[ {"id":"T1","status":"done","deps":[]} ],' '"log":[ {"id":"L9","status":"omega"} ]}' > "$H/b.board.json"
+assert_eq "$(fp_of "$H/a.board.json")" "$(fp_of "$H/b.board.json")" "fingerprint scoped to task rows — log id/status does not change fp (codex catch #22)"
 rm -rf "$H"
 
 # ─── SESSION FILTERING (Finding #4) ───────────────────────────────────────────────────────────────
@@ -120,8 +156,9 @@ MINE="sess-mine"
 OTHER="sess-other"
 mkactive "$H" "mine"  "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$MINE\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
 mkactive "$H" "other" "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$OTHER\"},\"tasks\":[]}"
-# pre-mark MINE's self-check as done so it allows (isolate: we are testing it is NOT blocked by OTHER)
-printf '0 1\n' > "$H/.$MINE.stopcheck"
+# pre-mark MINE's completion state as already handshook (seed its fingerprint) so it allows
+# (isolate: we are testing it is NOT blocked by OTHER's empty board).
+printf '0 %s\n' "$(fp_of "$H/mine.board.json")" > "$H/.$MINE.stopcheck"
 run_stop_sid "$H" "$MINE"
 assert_eq 0 "$HOOK_RC" "session filter → rc 0 (other session's empty board ignored)"
 assert_not_contains "$HOOK_OUT" "block" "session filter → my session not blocked by other's empty board"
@@ -150,12 +187,13 @@ rm -rf "$H"
 # ─── FUSE (anti-deadlock) ─────────────────────────────────────────────────────────────────────────
 
 # Case N (NEW): fuse — after FUSE (5) consecutive blocks, the hook force-allows with a warning.
-#                Seed sidecar at block_streak=4, selfcheck_done=0, board in completion state. The next
-#                block would push streak to 5 (>= FUSE) → force allow + warning keyword.
+#                Seed sidecar at block_streak=4, last_handshook_fp=0 (won't match the real cksum
+#                fingerprint, so the completion branch takes the block path). The next block would push
+#                streak to 5 (>= FUSE) → force allow + warning keyword.
 H="$(make_project)"
 SID="sess-fuse"
 mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
-printf '4 0\n' > "$H/.$SID.stopcheck"   # block_streak=4 — one more block trips the fuse
+printf '4 0\n' > "$H/.$SID.stopcheck"   # block_streak=4, fp=0 (mismatch) — one more block trips the fuse
 run_stop_sid "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "fuse → rc 0"
 # Force-allow = no block DECISION (the warning text itself legitimately contains the word "blocked").
@@ -184,6 +222,36 @@ run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "fresh completion → block"
 STREAK="$(awk '{print $1}' "$H/.$SID.stopcheck")"
 assert_eq 1 "$STREAK" "fresh block → block_streak incremented to 1"
+rm -rf "$H"
+
+# ─── FINGERPRINT HANDSHAKE (P4: same completion-state fingerprint must NOT re-self-check) ──────────
+# Root cause (this round): a completion state (only in_flight/blocked/done) went through the same
+# handshake as a true completion, and the sidecar zeroed on every allow → the SAME board state got
+# re-asked to self-check during a long background wait. Fix: sidecar second field becomes the last
+# handshook status-multiset fingerprint. Same fingerprint → allow (already handshook); changed
+# fingerprint → block + re-handshake.
+
+# Case Q (NEW): first completion-state Stop on a fingerprint blocks; second Stop with the SAME
+#                fingerprint allows; THIRD Stop with the SAME fingerprint STILL allows (the bug this
+#                round fixes — previously the third would block again); then a CHANGED fingerprint
+#                re-blocks the handshake.
+H="$(make_project)"; SID="sess-fp"
+BOARD="$H/20260101T000000Z-1.board.json"
+mkdir -p "$H"
+printf '%s' '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-fp"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$BOARD"
+# First completion-state Stop: should block (first handshake of this fingerprint)
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "P4: first completion handshake → block"
+# Second Stop (fingerprint unchanged): should allow
+run_stop_sid "$H" "$SID"
+assert_not_contains "$HOOK_OUT" "block" "P4: same fingerprint second Stop → allow"
+# Third Stop (fingerprint STILL unchanged): should STILL allow (this round's fix)
+run_stop_sid "$H" "$SID"
+assert_not_contains "$HOOK_OUT" "block" "P4: same fingerprint third Stop → still allow (repeated self-check fixed)"
+# Fingerprint changes (T1 in_flight→done plus a new in_flight T2) → re-block the handshake
+printf '%s' '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-fp"},"tasks":[{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":[]}]}' > "$BOARD"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "P4: fingerprint changed → re-block handshake"
 rm -rf "$H"
 
 finish

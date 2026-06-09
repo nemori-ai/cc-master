@@ -6,6 +6,17 @@
 > revised. Adapted from research report 1
 > (`design_docs/research/01-claude-code-dynamic-workflow-mechanism.md`).
 
+## Contents
+
+- [§0 Contract vs internals](#0-the-one-distinction-that-governs-everything-contract-vs-internals)
+- [§1 One-line essence](#1-one-line-essence)
+- [§2 The 7 primitives + 2 injected objects](#2-the-7-primitives--2-injected-objects-true-semantics)
+- [§3 `parallel` (barrier) vs `pipeline` (streaming) + the smell-test](#3-parallel-barrier-vs-pipeline-streaming--the-core-clarification)
+- [§4 Determinism三禁 — and why](#4-determinism三禁-the-three-forbidden-things--and-why)
+- [§5 Resume = "longest unchanged prefix"](#5-resume--longest-unchanged-prefix)
+- [§6 Hard caps](#6-hard-caps-resource-bounds)
+- [§7 Background execution](#7-background-execution-the-contract-that-makes-the-main-thread-free)
+
 ## 0. The one distinction that governs everything: contract vs internals
 
 Always separate two layers:

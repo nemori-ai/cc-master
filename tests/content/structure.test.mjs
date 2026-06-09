@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -32,11 +32,19 @@ test('sentinel consistency: command body carries the exact string the bootstrap 
   assert.match(hook, /cc-master:as-master-orchestrator/, 'hook also greps command-name sentinel');
 });
 
-test('every SKILL.md has YAML frontmatter with name + description', () => {
-  const skillDirs = readdirSync(join(ROOT, 'skills'));
-  for (const d of skillDirs) {
-    const md = read(`skills/${d}/SKILL.md`);
-    assert.match(md, /^---\n[\s\S]*?^name:\s*\S+/m, `${d}/SKILL.md has name`);
-    assert.match(md, /\ndescription:\s*\S+/m, `${d}/SKILL.md has description`);
+test('every SKILL.md (distributed + project-internal) has YAML frontmatter with name + description', () => {
+  // Validate BOTH the distributed plugin skills (skills/) and the project-internal dev skills
+  // (.claude/skills/, e.g. cc-master-skillsmith) — the latter are not shipped but are still tracked
+  // skills that must load, so they get the same structure gate (Finding #1 YAML footgun applies to both).
+  for (const label of ['skills', '.claude/skills']) {
+    const dir = join(ROOT, label);
+    if (!existsSync(dir)) continue;
+    for (const d of readdirSync(dir)) {
+      if (!statSync(join(dir, d)).isDirectory()) continue;
+      if (!existsSync(join(dir, d, 'SKILL.md'))) continue;
+      const md = read(`${label}/${d}/SKILL.md`);
+      assert.match(md, /^---\n[\s\S]*?^name:\s*\S+/m, `${label}/${d}/SKILL.md has name`);
+      assert.match(md, /\ndescription:\s*\S+/m, `${label}/${d}/SKILL.md has description`);
+    }
   }
 });
