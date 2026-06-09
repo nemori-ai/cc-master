@@ -1,6 +1,6 @@
 ---
 name: orchestrating-to-completion
-description: 'Use when running a long-horizon (>24h) goal as a master orchestrator: decompose into a dependency DAG, dispatch background work across shell/sub-agent/workflow, keep the main thread productive in waiting windows, verify at endpoints, and survive compaction via a per-orchestration board file in the configurable cc-master home. Invoke this whenever you are coordinating several background agents or workflows toward one large goal — even if the user never said "orchestrate" — and re-consult it after every compaction.'
+description: 'Use when running a long-horizon (>24h) goal as a master orchestrator, or coordinating several background agents / workflows toward one large goal — 当你在做总指挥协调多个后台任务时 — even if the user never said "orchestrate". Use after every compaction. Use the moment you catch yourself idle-waiting while work is dispatchable, manufacturing busywork to look productive, picking up an instrument yourself (implementing or reviewing by hand), treating a green gate or empty review as passed, or deciding a merge / irreversible step the user should decide.'
 ---
 
 # Orchestrating to Completion
@@ -70,37 +70,93 @@ an answer, and there is nothing left to schedule, do you calmly wait one beat.)
 - **Don't overreach on what the user must decide**: anything irreversible / outward-facing /
   directional / final-approval (such as merge) must be asked first.
 
+> **Violating the letter of these red lines is violating their spirit.** "I'm following the
+> spirit, just not the letter" is the rationalization that breaks every one of them. There is
+> no orchestration so special that the red lines stop applying — if you find yourself building a
+> case for why *this* situation is the exception, that case *is* the symptom.
+
+---
+
+## Rationalization Table — the excuse, and the reality
+
+When you catch one of these thoughts forming, it is not a plan — it is a red line about to be
+crossed. Name it, then go back to the decision program.
+
+| The excuse (what you'll tell yourself) | The reality |
+|---|---|
+| "The background's all running — I'm idle, might as well **review it all once myself** while I wait." | That's **fake-busy**, not legitimate waiting. Reviewing finished work *isn't on the critical path* unless a node is done-but-unverified (step 5 routes that to an independent endpoint, not a freelance re-read). Idle ≠ license to manufacture work. Wait calmly. |
+| "It's a **one-line fix** — faster if I just do it myself than dispatch." | That breaks **指挥不演奏**. The only hand-fix allowed is a micro-fixup that endpoint verification *itself* exposed when T∞≈T₁. A "quick" change you reached for *before* verification is you picking up an instrument. Dispatch it. |
+| "The **gate is green / the review came back empty** — that counts as passed." | **Gate-green ≠ passed.** A null or empty review is *not passed* — it is silent pass-through, the exact failure mode the red line names. You must read the diff / verify independently before a node becomes `done`. |
+| "This case is **special — I'll just decide the merge** (or the irreversible/outward-facing step) for the user to keep momentum." | That's **overreach**. Merge / irreversible / outward-facing / directional / final-approval belongs to the user. Surface it as a `blocked_on:"user"` node and dispatch everything that *doesn't* depend on the answer — momentum and asking are not in tension (lens 7). |
+
+## Red Flags — STOP and re-run the decision program
+
+If any of these is true *right now*, you are off the rails. **Stop, and re-run the decision
+program from step 1.**
+
+- You're about to read / re-review finished work that **isn't a done-but-unverified node** (you're filling idle time, not verifying).
+- You're about to **edit a file / write code / run the fix yourself** (and it isn't an endpoint-exposed micro-fixup).
+- You're calling a node `done` on a **green gate or an empty/null review** without having read the diff.
+- You're about to **decide a merge / irreversible / outward-facing step** instead of surfacing it to the user.
+- You're about to **wait / yield** but haven't checked whether any task is `ready`, any node `uncertain`, or any user-decision unsurfaced.
+- You're building an argument for why **this orchestration is the exception** to a red line.
+- You're about to Stop with **no step-6 ledger** (no per-path evidence written to the board + conversation).
+
 ---
 
 ## Decision program (run before every turn ends)
 
 The philosophy is the motive, not the control. What actually prevents idle-spinning and
-fake-busy is this **deterministic program** — run it at the close of every turn:
+fake-busy is this **deterministic program** — run it at the close of every turn. It is a
+**loop, not a checklist**: each step that finds work routes you *back to the top*, so you keep
+scheduling until the ready set is genuinely empty. The single most dangerous edge is the one
+that lets you stop — guard it.
 
+```dot
+digraph decision_program {
+    start   [label="Turn is ending", shape=ellipse];
+    recon   [label="Reconcile the board\n(integrate done · hedge past-p95 · mark stale)", shape=box];
+    q_user  [label="A point needs the\nuser to decide/confirm?", shape=diamond];
+    surface [label="Surface it to the user NOW\n(don't sit on it)", shape=box];
+    q_ready [label="Any ready task?\n(deps satisfied, incl. user answers)", shape=diamond];
+    dispatch[label="Dispatch within WIP cap\n(reserve budget+WIP first;\nfires even mid-HITL)", shape=box];
+    q_fill  [label="Any fill-work that\npasses the admission test?", shape=diamond];
+    fill    [label="Do the fill-work", shape=box];
+    q_unver [label="Any done-but-unverified\n/ uncertain node?", shape=diamond];
+    verify  [label="Verify independently\nat the endpoint", shape=box];
+    q_block [label="Every remaining path blocked on\nin-flight bg OR awaiting user?", shape=diamond];
+    STOPbad [label="STOP: do NOT stop.\nThere is schedulable work —\nre-run from the top", shape=octagon, style=filled, fillcolor=red, fontcolor=white];
+    wait    [label="Legitimately wait / yield\n(write the step-6 ledger first)", shape=box];
+    flush   [label="Flush the board, end turn", shape=doublecircle];
+
+    start -> recon;
+    recon -> q_user;
+    q_user  -> surface  [label="yes"];
+    surface -> q_ready;
+    q_user  -> q_ready  [label="no"];
+    q_ready -> dispatch [label="yes"];
+    dispatch -> recon   [label="loop: re-reconcile"];
+    q_ready -> q_fill   [label="no"];
+    q_fill  -> fill     [label="yes"];
+    fill    -> recon    [label="loop"];
+    q_fill  -> q_unver  [label="no"];
+    q_unver -> verify   [label="yes"];
+    verify  -> recon    [label="loop"];
+    q_unver -> q_block  [label="no"];
+    q_block -> wait     [label="yes"];
+    q_block -> STOPbad  [label="no"];
+    STOPbad -> recon    [label="back to the top"];
+    wait    -> flush;
+}
 ```
-1. Reconcile the board: integrate finished background results; flag in_flight tasks past
-   p95 for hedging; mark stale (an upstream changed)
-2. Any point that needs the user to decide / confirm before it can advance? → surface it to
-   the user immediately (don't sit on it)
-3. Any ready task (dependencies satisfied, including answers the user has given)? → dispatch
-   within the WIP cap (reserve budget + WIP first)
-   ↳ This holds even mid-HITL: ready work that does not depend on the pending question
-     dispatches in parallel — don't let a dense front-of-house dialogue (e.g. a design Q&A)
-     serialize independent goals.
-4. Any legitimate fill-work (passes the admission test)? → do it
-5. Any node done-but-unverified / uncertain? → verify independently at the endpoint / route
-   to a verification node
-6. None of the above AND every remaining path is blocked on (an in-flight background task)
-   or (already surfaced, awaiting a user answer) → legitimately wait / yield the turn
-   ↳ State it out loud as a **step-6 ledger**: the goal-hook reads the board to gate your
-     Stop, but it cannot read your reasoning — so each turn write this step-6 conclusion **and
-     the acceptance evidence into both the conversation and the board**, in a fixed shape: one
-     line per still-open path, `<task-id> · <status> · <blocker | evidence>`, then a verdict
-     line (`goal met` / `legitimate waiting: every path blocked or surfaced` / `still
-     working`). The hook gates on board status; your written self-check is what makes "done"
-     trustworthy rather than asserted.
-7. Flush the board before ending
-```
+
+The graph *is* the control flow. The three things it can't fit on an edge: **(a)** dispatch
+fires even mid-HITL — ready work that doesn't depend on the pending question dispatches in
+parallel, so a dense front-of-house Q&A never serializes independent goals; **(b)** "verify"
+means *independently, at your own endpoint* — never a re-read of the agent's self-report; **(c)**
+before you take the `wait` edge, write the **step-6 ledger** (per-path self-check + acceptance
+evidence, into both the conversation and the board — exact shape and why-it-matters in
+`references/async-hitl.md`), then flush.
 
 **The decision program is a hand-run dataflow scheduler — a TFU.** Dispatch-when-ready, overlap
 the waits, stop only when the ready set is empty: the same dataflow idea `pipeline()` runs as
@@ -119,29 +175,18 @@ Otherwise it is *waiting, not work*.
 
 The board is the orchestrator's persistent save file for a long task — a status-bearing task
 dependency graph. It is both ① the memory that survives compaction and ② the only window a
-hook (a shell, blind to agent context and to the built-in `Task` tool) can read.
+hook (a shell, blind to agent context and to the built-in `Task` tool) can read. **Your board
+file is the single source of truth** (the built-in `Task*` tools are at most a non-authoritative
+in-session draft mirror); each turn you `Write` the whole file (it is small) and flush it at
+decision-program step 7.
 
-- **Home + per-orchestration board files**: boards live in the configurable home —
-  `$CC_MASTER_HOME` if set, else `${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/cc-master/` (a user
-  storage preference, no longer a hardcoded path). Each orchestration gets its own
-  uniquely-named, time-sortable file `<UTC-timestamp>-<pid>.board.json`, so concurrent
-  orchestrations never collide. The bootstrap hook creates the file and injects its exact
-  path. **You own which board is yours** — after compaction, re-discover it by listing the
-  home and matching the `goal`.
-- **Single source of truth**: your board file is authoritative. The built-in `Task*` tools
-  are at most a non-authoritative in-session draft mirror.
-- **Narrow waist** (only the hook-dependent contract is pinned; everything else is
-  agent-shaped): pinned top-level fields `schema`, `goal`, `owner`(-lease){active,
-  session_id, heartbeat}, `git`{worktree, branch}, plus `tasks[{ id, status, deps }]`.
-- **Status enum** (each routes differently in the DAG): `ready / in_flight /
-  blocked(blocked_on:"user"|"<taskid>") / done / escalated / failed / stale / uncertain`.
-- **Snapshot storage**: each turn, `Write` the whole board file (it is small, so a whole-
-  file write doesn't corrupt). Markdown views are generated on demand.
-- **Flush discipline**: flush at decision-program step 7 (and optionally on PreCompact).
-- **Supersession** is an explicit board status (a node re-altituded or invalidated by an
-  upstream change), not implicit GC.
-
-Full protocol: **`references/board.md`**.
+The board lives in the configurable home, one uniquely-named file per orchestration; **you own
+which board is yours** — after compaction, re-discover it by listing the home and matching the
+`goal`. Only a **narrow waist** is pinned (the hook-dependent contract — `schema`, `goal`,
+`owner`, `git`, `tasks[{id,status,deps}]`, and the `status` enum); everything else is
+agent-shaped. **Don't re-derive these details from memory** — the home resolution, the full
+pinned schema, the status-enum routing table, snapshot/flush discipline, and supersession are
+all specified in **`references/board.md`**. Read it before touching the board contract.
 
 ---
 

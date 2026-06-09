@@ -5,6 +5,16 @@ dependency graph**. It is simultaneously ① the memory that survives compaction
 window into orchestration state a hook can read (a hook is a shell — it cannot read the agent's
 context, and it cannot read the built-in `Task` tool).
 
+## Contents
+
+- [Key decisions](#key-decisions)
+- [The narrow-waist principle](#the-narrow-waist-principle)
+- [Single source of truth](#single-source-of-truth)
+- [Read / write / flush discipline](#read--write--flush-discipline)
+- [Supersession — explicit state](#supersession--explicit-state-not-implicit-gc)
+- [The `log` segment](#the-log-segment--lightweight-audit)
+- [Example](#example-consistent-with-boardexamplejson)
+
 ---
 
 ## Key decisions

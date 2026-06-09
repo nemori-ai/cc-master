@@ -1,6 +1,6 @@
 ---
 name: authoring-workflows
-description: Use whenever you are about to call the Workflow tool or author/debug a Claude Code dynamic-workflow script — even if you think you already know the API. Picks the right paradigm (fan-out/pipeline/loop), writes to the runtime's own validation contract (the harness is the authoritative checker), and points to mechanism/patterns/api references plus templates and examples. The engine has non-obvious determinism and resume rules; consult this before guessing rather than after a failed run.
+description: 'Use when you are about to call the Workflow tool, or author / debug / launch a Claude Code dynamic-workflow script — 当你要写 workflow 脚本时 — even if you think you already know the API. Use when you catch yourself guessing the engine''s determinism or resume rules, reaching for parallel() / pipeline() without checking the shape, hand-writing a validation linter, or about to relaunch after a harness error. Use before you guess, not after a failed run.'
 ---
 
 # Authoring dynamic workflows
@@ -52,6 +52,12 @@ Pick by the **shape** of the work, not by taste. (Full semantics in
 > early-exit, "compare against all others"). "Cleaner code" is not a reason — the
 > barrier's latency is real. See the smell-test in `references/mechanism.md` §3.
 
+> **Real workflows compose these shapes.** A loop inside a fan-out, a verify
+> stage after a scout, a self-repair gate inside a pipeline — the composed
+> shapes (bug-hunt-loop, pr-issue-triage, dep-upgrade-sweep, and more) live in
+> `references/patterns.md` and ship whole in `assets/examples/`. When your work
+> doesn't match one bare shape, start from the closest composed example.
+
 ## 3. Author flow — draft to the harness contract, then launch
 
 1. **Draft** from a skeleton in `assets/templates/` (or a full composition in
@@ -88,19 +94,35 @@ Pick by the **shape** of the work, not by taste. (Full semantics in
   true semantics; `parallel`(barrier) vs `pipeline`(streaming) + the smell-test;
   why `Date.now()` breaks resume; resume = "longest unchanged prefix"; the hard
   caps (16 concurrent / 1,000 total / 4,096 per call / 512 KB).
-- **`references/patterns.md`** — pick the *shape*: fan-out+synthesize,
-  pipeline-by-default, adversarial-verify, perspective-diverse-verify,
-  judge-panel, loop-until-{count,budget,dry}, multi-modal-sweep,
-  completeness-critic, plus deferred niche shapes (tournament-bracket /
-  self-repair-loop / staged-escalation). Each says *when* + skeleton + which
-  bundled asset demonstrates it.
+- **`references/patterns.md`** — pick the *shape*: the control-flow primitives
+  (fan-out+synthesize, pipeline-by-default, loop-until-{count,budget,dry},
+  scout-then-fanout), the quality patterns (adversarial-verify,
+  perspective-diverse-verify, judge-panel, multi-modal-sweep, completeness-critic,
+  migrate→transform→verify), and the composed shapes (bug-hunt-loop,
+  pr-issue-triage, dep-upgrade-sweep, test-generation-and-repair,
+  tournament-bracket, self-repair-loop, staged-escalation). Has a section TOC at
+  the top; each section says *when* + skeleton + which bundled asset demonstrates
+  it. **Every shape is demonstrated by a bundled file** — none is prose-only.
 - **`references/api-reference.md`** — primitive signatures, every `agent()` opt
   (`label`/`phase`/`schema`/`model`/`isolation`/`agentType`), the cache-key four
   elements, and failure semantics. No invented options.
 - **`assets/templates/`** — 5 control-flow skeletons (copy → fill).
-- **`assets/examples/`** — 4 complete, real-prompt workflows
-  (review-adversarial-verify, design-judge-panel, research-multimodal-sweep,
-  migrate-discover-transform-verify).
+
+### `assets/examples/` — 11 complete, real-prompt workflows (when to read each)
+
+| Example | When to read |
+|---|---|
+| `review-adversarial-verify.js` | Reviewing changed code across dimensions, then refuting each finding before reporting (the canonical adversarial-verify composition). |
+| `design-judge-panel.js` | Generating N independent design approaches, scoring with a judge panel, synthesizing from the winner. |
+| `research-multimodal-sweep.js` | Researching a question from several search angles → dedup → deep-read → completeness critic. |
+| `migrate-discover-transform-verify.js` | A migration that must discover sites, transform each in an isolated worktree, then gate-verify (the only `isolation:'worktree'` asset). |
+| `bug-hunt-loop.js` | Repo-wide bug hunt until K dry rounds, then adversarially verify each survivor (loop-until-dry + adversarial-verify). |
+| `pr-issue-triage.js` | Scout open PRs/issues, fan out a classifier, judge the batch into a prioritized queue (scout-then-fanout + judge-panel). |
+| `dep-upgrade-sweep.js` | Discover outdated deps, upgrade each in an isolated worktree, gate, keep only the green bumps. |
+| `test-generation-and-repair.js` | Generate tests per module, then self-repair every failing suite to green under an attempt cap. |
+| `tournament-bracket.js` | Pick one winner from many candidates by pairwise elimination (relative comparison, not absolute scoring). |
+| `self-repair-loop.js` | Drive one artifact to pass a gate, feeding failure diagnostics back into bounded retries. |
+| `staged-escalation.js` | Try each item with a cheap pass first; escalate to the strong model only where confidence was low. |
 
 Every bundled template and example is written to the harness contract, so any one
 of them is a known-good starting point.

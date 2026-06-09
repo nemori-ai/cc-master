@@ -3,6 +3,17 @@
 The core of main-thread orchestration: choose *where* to run each node and orchestrate the
 lanes. Source: research report 3 (LLM-Compiler TFU dataflow) + codex second review.
 
+## Contents
+
+- [The fractal three altitudes](#the-fractal-three-altitudes)
+- [Dataflow at two scales](#dataflow-at-two-scales--why-the-altitudes-are-self-similar)
+- [Background execution mechanisms — the three](#background-execution-mechanisms--there-are-exactly-three)
+- [Selection criteria — control / synthesis / context](#selection-criteria--control--synthesis--context-not-count)
+- [Intra vs inter workflow](#intra-vs-inter-workflow--axis--lifecycle-coupling)
+- [Re-altitude via escalation](#re-altitude-core--via-escalation-never-blind-kill)
+- [Hybrid + admission control](#hybrid--admission-control)
+- [Dispatch hygiene](#dispatch-hygiene--mechanics-that-bite-the-moment-you-run-real-parallel-work)
+
 ---
 
 ## The fractal three altitudes

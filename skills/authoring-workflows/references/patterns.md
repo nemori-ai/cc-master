@@ -4,12 +4,40 @@
 > bundled `assets/templates/` skeleton or `assets/examples/` workflow
 > demonstrates it. The patterns are confirmed by the tool contract and the
 > community catalog (ray-amjad, alexop.dev); see `mechanism.md` for the
-> underlying semantics. The four niche shapes at the end are **prose only** —
-> no bundled file.
+> underlying semantics. **Every shape on this page is demonstrated by a bundled
+> file** — there is no prose-only shape; each section names the exact
+> `assets/templates/` or `assets/examples/` file that runs it.
 
 Every bundled template and example is referenced from this page. Copy from a
 template for the bare control-flow shape; copy from an example for a full,
 real-prompt composition.
+
+## Contents
+
+**Control-flow primitives** (one bundled template each)
+- [fan-out + synthesize](#fan-out--synthesize)
+- [pipeline-by-default](#pipeline-by-default)
+- [loop-until-count](#loop-until-count)
+- [loop-until-budget](#loop-until-budget)
+- [loop-until-dry](#loop-until-dry)
+- [scout-then-fanout (entry shape)](#scout-then-fanout-entry-shape)
+
+**Quality patterns** (bundled example each)
+- [adversarial-verify](#adversarial-verify)
+- [perspective-diverse-verify](#perspective-diverse-verify)
+- [judge-panel](#judge-panel)
+- [multi-modal-sweep](#multi-modal-sweep)
+- [completeness-critic](#completeness-critic)
+- [migrate / discover → transform → verify](#migrate--discover--transform--verify-with-worktree-isolation)
+
+**Composed shapes** (full bundled example each)
+- [bug-hunt-loop](#bug-hunt-loop)
+- [pr-issue-triage](#pr-issue-triage)
+- [dep-upgrade-sweep](#dep-upgrade-sweep)
+- [test-generation-and-repair](#test-generation-and-repair)
+- [tournament-bracket](#tournament-bracket)
+- [self-repair-loop](#self-repair-loop)
+- [staged-escalation](#staged-escalation)
 
 ---
 
@@ -239,34 +267,100 @@ const out = await pipeline(scout.items ?? [], (it) => agent(`process ${it}`))
 
 ---
 
-## Deferred niche shapes (prose only — no bundled file)
+## Composed shapes — full real-prompt workflows
 
-These are real shapes but too narrow to ship as their own template/example in v1.
-Compose them from the primitives above when you actually need them.
+These compose the primitives and quality patterns above into complete, runnable
+workflows. Each ships as a bundled `assets/examples/` file you can copy whole.
 
-**tournament-bracket.** When you have many candidates and want a single winner
-via pairwise elimination rather than absolute scoring (judge-panel scores
-*absolutely*; a bracket compares *relatively*). Run rounds: pair candidates, a
-judge agent picks the winner of each pair, halve the field, repeat until one
-remains. Each round is a `parallel()` over pairs; the loop over rounds is a
-plain `while (field.length > 1)`. Use it when relative comparison is more reliable
-than an absolute 0–10 score, and the field is large enough that scoring everyone
-is wasteful.
+---
 
-**self-repair-loop.** When an agent's output must pass a gate and you want it to
-fix its own failures up to a bounded number of attempts. Loop: produce → run the
-gate → if it fails, feed the gate's diagnostics back into the next attempt's
-prompt; stop on pass or after `MAX_ATTEMPTS`. This is loop-until-{count} with a
-structured pass/fail gate instead of a counter, plus a hard attempt cap as the
-fuse. Dedup-against-seen does **not** apply (it's the same item being repaired);
-the fuse is the attempt count. Use it for "make this compile / pass tests"
+## bug-hunt-loop
+
+**When:** repo-wide bug discovery where you don't know how many bugs exist and
+every reported bug must be trustworthy. Combines **loop-until-dry** (hunt until K
+dry rounds find nothing new) with **adversarial-verify** (refute each survivor
+before reporting). Use it instead of a single review pass when both completeness
+*and* low false-positive rate matter.
+
+**Demonstrated by:** `assets/examples/bug-hunt-loop.js`.
+
+---
+
+## pr-issue-triage
+
+**When:** you have an open queue of PRs/issues to classify and prioritize, but
+the list isn't known up front. Composes **scout-then-fanout** (scout the open
+items) → fan-out a classifier over each → **judge-panel** to rank the labelled
+batch into a prioritized queue. Use it for "triage everything in the backlog,"
+not for a single known item.
+
+**Demonstrated by:** `assets/examples/pr-issue-triage.js`.
+
+---
+
+## dep-upgrade-sweep
+
+**When:** you want to bump many dependencies, each upgrade isolated so parallel
+edits can't conflict, keeping only the bumps that stay green. The
+**discover → transform → verify** shape with `isolation: 'worktree'`, specialized
+to dependency upgrades (discover outdated deps → upgrade each in its own worktree
+→ gate → keep green). Use it for batch dependency maintenance.
+
+**Demonstrated by:** `assets/examples/dep-upgrade-sweep.js`.
+
+---
+
+## test-generation-and-repair
+
+**When:** you want generated test suites for many modules *and* you want each
+failing suite driven to green automatically. Composes a fan-out test-generation
+stage with a per-suite **self-repair-loop** (bounded attempt cap). Use it for
+"generate and stabilize tests across the codebase," not for a single test file.
+
+**Demonstrated by:** `assets/examples/test-generation-and-repair.js`.
+
+---
+
+## tournament-bracket
+
+**When:** you have many candidates and want a single winner via pairwise
+elimination rather than absolute scoring (judge-panel scores *absolutely*; a
+bracket compares *relatively*). Run rounds: pair candidates, a judge agent picks
+the winner of each pair, halve the field, repeat until one remains. Each round is
+a `parallel()` over pairs; the loop over rounds is a plain
+`while (field.length > 1)`. Use it when relative comparison is more reliable than
+an absolute 0–10 score, and the field is large enough that scoring everyone is
+wasteful.
+
+**Demonstrated by:** `assets/examples/tournament-bracket.js`.
+
+---
+
+## self-repair-loop
+
+**When:** an agent's output must pass a gate and you want it to fix its own
+failures up to a bounded number of attempts. Loop: produce → run the gate → if it
+fails, feed the gate's diagnostics back into the next attempt's prompt; stop on
+pass or after `MAX_ATTEMPTS`. This is loop-until-{count} with a structured
+pass/fail gate instead of a counter, plus a hard attempt cap as the fuse.
+Dedup-against-seen does **not** apply (it's the same item being repaired); the
+fuse is the attempt count. Use it for "make this compile / pass tests"
 single-artifact convergence — *not* for multi-finding discovery.
 
-**staged-escalation.** When work should start cheap and only escalate to an
-expensive model/approach when the cheap stage fails or returns low confidence.
-A `pipeline()` whose stage 1 is a cheap pass and stage 2 is conditional — stage 2
-short-circuits (returns the stage-1 result unchanged) when stage 1 already cleared
-a confidence threshold, and only spawns the expensive `agent('escalate: ' + item, { model: ... })` when
-it didn't. Use it to spend the strong model only where the weak model struggled,
-rather than uniformly. Beware: `model` is part of the cache key (`api-reference.md`),
-so the escalation branch reruns live on resume if you change the model choice.
+**Demonstrated by:** `assets/examples/self-repair-loop.js`.
+
+---
+
+## staged-escalation
+
+**When:** work should start cheap and only escalate to an expensive
+model/approach when the cheap stage fails or returns low confidence. A
+`pipeline()` whose stage 1 is a cheap pass and stage 2 is conditional — stage 2
+short-circuits (returns the stage-1 result unchanged) when stage 1 already
+cleared a confidence threshold, and only spawns the expensive
+`agent('escalate: ' + item, { model: ... })` when it didn't. Use it to spend the
+strong model only where the weak model struggled, rather than uniformly. Beware:
+`model` is part of the cache key (`api-reference.md`), so the escalation branch
+reruns live on resume if you change the model choice.
+
+**Demonstrated by:** `assets/examples/staged-escalation.js`.

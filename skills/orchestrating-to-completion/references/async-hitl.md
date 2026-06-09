@@ -76,3 +76,21 @@ yours to do: keep the board's `status` enum honest (mark satisfied-and-dispatcha
 `ready`, blocked ones `blocked`, done-but-unverified ones `uncertain`), and write your
 decision-program step-6 ledger + acceptance evidence into both the conversation and the board.
 The hook gates on board status; your written self-check is what makes a Stop trustworthy.
+
+### The step-6 ledger — the fixed shape (single source)
+
+This is the canonical definition the SKILL.md decision program points to. The goal-hook reads
+the board to gate your Stop, but **it cannot read your reasoning** — so each turn you reach
+decision-program step 6, write the conclusion **and the acceptance evidence into both the
+conversation and the board**, in a fixed shape:
+
+- **one line per still-open path**: `<task-id> · <status> · <blocker | evidence>`
+- then **one verdict line**, exactly one of:
+  - `goal met` — every path is `done` and verified at the endpoint;
+  - `legitimate waiting: every path blocked or surfaced` — every remaining path is blocked on
+    an in-flight background task or is awaiting a user answer;
+  - `still working` — there is schedulable work (you should not be at step 6 — go back to the
+    top of the decision program).
+
+The hook gates on board status; this written ledger is what makes "done" *trustworthy* rather
+than merely asserted. A bare "looks done" with no per-path evidence is **not** a valid Stop.
