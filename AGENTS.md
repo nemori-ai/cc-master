@@ -44,10 +44,10 @@ cc-master/
 ├── CHANGELOG.md
 ├── .claude-plugin/           ← plugin.json 清单 + marketplace.json
 ├── commands/                 ← as-master-orchestrator / status / stop（一次性点火）
-├── skills/
+├── skills/                    ← **分发**给插件用户的 skill 源码（仅这两个随插件 ship）
 │   ├── orchestrating-to-completion/  ← SKILL A：编排方法论（魂）+ references/
-│   ├── authoring-workflows/          ← SKILL B：workflow 写法 + references/ + assets/examples/
-│   └── authoring-skills/             ← 元 skill：TDD-for-skills（怎么写/改本仓 skill）
+│   └── authoring-workflows/          ← SKILL B：workflow 写法 + references/ + assets/examples/
+├── .claude/skills/            ← **项目自用** dev skill（cc-master-skillsmith：怎么造本仓 skill，**不分发**）
 ├── hooks/scripts/            ← bootstrap-board / reinject / verify-board（纯 bash 门控）
 ├── scripts/                  ← 带外手动调用脚本：codex-review / eval-trigger / eval-benchmark
 ├── adrs/                     ← 结构性决策快照（ADR-001..005 + AGENTS.md 规约）
@@ -108,13 +108,13 @@ cc-master/
 
 ## 6. Skill 创作 / 维护纪律（含 TDD-for-skills）
 
-本仓有三个 skill：A（编排）、B（workflow 写法）、`authoring-skills`（怎么写/改 skill 本身）。**三者不重叠**（红线 3）：A = orchestrator 做什么，B = workflow 脚本怎么写，`authoring-skills` = skill 怎么被创作/施压测试。
+本仓**分发**两个 skill：A（编排）、B（workflow 写法）——**互不重叠**（红线 3）：A = orchestrator 做什么，B = workflow 脚本怎么写。另有一个**项目自用、不随插件分发**的 dev skill `cc-master-skillsmith`（在 `.claude/skills/`，不在 `skills/`）= 怎么按本仓纪律创作 / 施压测试 skill 本身。它是「造 skill 的工具」，不是 cc-master 这个产品的一部分——终端用户装插件时不会看到它。
 
-**TDD-for-skills（纪律型 skill 改前必跑 baseline）**：任何"纪律型 / judgment-bearing"的 skill prose（agent 在压力下能把它合理化掉的规则）——新建或编辑——都**必须先跑一遍 subagent pressure baseline 看它在没有该段时选错**，再写堵漏。完整 Iron Law + 三压（time + sunk cost + exhaustion）配方在 → [`skills/authoring-skills/SKILL.md`](skills/authoring-skills/SKILL.md)（指针 `superpowers:test-driven-development` + `superpowers:writing-skills` + 官方 `skill-creator`）。pressure baseline 是**定性**（哪条 rationalization 要堵）；§8 eval 是**定量**（堵了有没有用）——互补，不替代。
+**TDD-for-skills（纪律型 skill 改前必跑 baseline）**：任何"纪律型 / judgment-bearing"的 skill prose（agent 在压力下能把它合理化掉的规则）——新建或编辑——都**必须先跑一遍 subagent pressure baseline 看它在没有该段时选错**，再写堵漏。完整 Iron Law + 三压（time + sunk cost + exhaustion）配方在 → [`.claude/skills/cc-master-skillsmith/SKILL.md`](.claude/skills/cc-master-skillsmith/SKILL.md)（指针 `superpowers:test-driven-development` + `superpowers:writing-skills` + 官方 `skill-creator`）。pressure baseline 是**定性**（哪条 rationalization 要堵）；§8 eval 是**定量**（堵了有没有用）——互补，不替代。
 
-**Frontmatter YAML 引号反模式（Finding #1，血泪）**：`description` 里只要含 `:` 或 `"`，**整个值必须用单引号包起来**——否则 YAML parser 误读、`plugin validate` / content 测试以非显然的方式失败。本仓三个 skill 的 frontmatter 都是单引号整包，照抄即可。**拿不准就加引号**——这是本仓最常见的 skill-authoring footgun。
+**Frontmatter YAML 引号反模式（Finding #1，血泪）**：`description` 里只要含 `:` 或 `"`，**整个值必须用单引号包起来**——否则 YAML parser 误读、`plugin validate` / content 测试以非显然的方式失败。本仓所有 skill 的 frontmatter 都是单引号整包，照抄即可。**拿不准就加引号**——这是本仓最常见的 skill-authoring footgun。
 
-**content contract = 权威结构 validator**：结构（frontmatter 有 name + description、目录布局）由 `bash run-tests.sh`（node content 段，自动 iterate `skills/*/SKILL.md`）+ `claude plugin validate .` 把关，**别手检它们查的东西**。行为靠 pressure baseline，结构靠 contract。
+**content contract = 权威结构 validator**：结构（frontmatter 有 name + description、目录布局）由 `bash run-tests.sh`（node content 段,自动 iterate `skills/*` 与 `.claude/skills/*` 的 SKILL.md）+ `claude plugin validate .`（仅校验分发的 `skills/`）把关，**别手检它们查的东西**。行为靠 pressure baseline，结构靠 contract。
 
 ---
 
@@ -195,7 +195,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 | 异步完成 + HITL / p95 hedging / 用户当 async worker | [`skills/orchestrating-to-completion/references/async-hitl.md`](skills/orchestrating-to-completion/references/async-hitl.md) |
 | 廉价续跑 + 端点验收 / content-hash / codex 第二验收者 | [`skills/orchestrating-to-completion/references/resume-verify.md`](skills/orchestrating-to-completion/references/resume-verify.md) |
 | 写 / 调试 / 启动 workflow 脚本（API + 机制 + pattern + 11 个 example）| [`skills/authoring-workflows/SKILL.md`](skills/authoring-workflows/SKILL.md) + [`references/`](skills/authoring-workflows/references/) + [`assets/examples/`](skills/authoring-workflows/assets/examples/) |
-| 写 / 改任何本仓 skill（尤其纪律型）/ 跑 pressure baseline | [`skills/authoring-skills/SKILL.md`](skills/authoring-skills/SKILL.md)（TDD-for-skills）|
+| 写 / 改任何本仓 skill（尤其纪律型）/ 跑 pressure baseline | [`.claude/skills/cc-master-skillsmith/SKILL.md`](.claude/skills/cc-master-skillsmith/SKILL.md)（TDD-for-skills，项目自用 dev skill）|
 | 改 hook | [`hooks/scripts/`](hooks/scripts/) + [`tests/`](tests/) + [`CONTRIBUTING.md`](CONTRIBUTING.md)（先确认红线 1 纯 bash）|
 | 让 codex 当端点验收 reviewer | [`scripts/codex-review.sh`](scripts/codex-review.sh) + `/codex` skill |
 | 跑触发准确率 eval（description 改动前后）| [`scripts/eval-trigger.sh`](scripts/eval-trigger.sh) + [`design_docs/eval/README.md`](design_docs/eval/README.md) |

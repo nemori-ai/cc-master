@@ -4,7 +4,7 @@ Track A asks one cheap, fully-automatic question: *does the description trigger
 at the right moment?* Track B asks the expensive, behavioral one: **once
 `orchestrating-to-completion` is in context, does it actually make the
 orchestrator behave better end-to-end?** It is the quantitative partner to the
-qualitative pressure-testing in `authoring-skills` — but unlike Track A it is
+qualitative pressure-testing in `cc-master-skillsmith` — but unlike Track A it is
 **not** a single command. It is an agent-orchestrated, half-manual loop, so this
 document is the procedure and `scripts/eval-benchmark.sh` is only the last
 mechanical step of it.

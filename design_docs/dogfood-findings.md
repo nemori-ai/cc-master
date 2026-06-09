@@ -34,6 +34,7 @@
 | 20 | codex-review.sh 非功能:codex exec review 禁止自定义 PROMPT 与 --base/--uncommitted 同用,P2 只 bash -n 没真跑漏检 | should-fix(deliverable 可用性) | ✅ 已修(去自定义 PROMPT,靠 AGENTS.md 供约定);教训:带外脚本 V 端点必须真跑一次 |
 | 21 | codex 功能 review 再逮两条:(A) goal-hook fingerprint 只哈希 status 多重集→身份变不重握(P4 缺口)(B) codex-review.sh 未强制 read-only,用户 danger-full-access 配置下 reviewer 可写仓库(P2 缺口) | ✅ 机制验证(正向)+ 2 should-fix 已修 | A:fingerprint→id+status+blocked_on(Case Q,passed=37);B:加 -c sandbox_mode=read-only。一程逮 #19/#20/#21 |
 | 22 | codex 第4次再逮两条:(C) #21 的 fingerprint 扫全 board、把 log 等 flexible 字段也算→违反 narrow-waist(D) track-b 文档 codex 配对指向不工作的调用(审 diff 非 transcript + #20 互斥) | ✅ 机制验证(正向)+ 2 should-fix 已修 | C:fingerprint scope 到含 deps 的 task 行(Case R,passed=38);D:改 plain codex exec grade transcript。一程共逮 6 条→fuse 停自动循环 |
+| 23 | meta-skill 误置为分发制品 + 命名过泛:authoring-skills 放进分发的 skills/、名字太通用(它其实是"怎么造本仓 skill"的项目自用工具) | should-fix(product hygiene) | ✅ 已修(git mv → .claude/skills/cc-master-skillsmith;引用全更;content 测试扩到也 iterate .claude/skills/)。用户 review catch |
 
 > 基线健康(无问题留痕):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
@@ -384,3 +385,20 @@
 - **收口决定(fuse)**:codex 一程(4 次真跑)共逮 **6 条真 bug**(#19 / #20 / #21A / #21B / #22C / #22D),**全部收口**;
   按预设 fuse **停掉自动 codex 循环**(不再自动再跑,避免无限逼近;如需再验可手动 `bash scripts/codex-review.sh --base main`)。
 - **严重度 / 来源**:✅ 机制验证(正向)+ 2 should-fix 已修 / 一手(codex 第 4 次)。
+
+## Finding #23 — meta-skill 误置为「分发制品」+ 命名过泛(用户 review catch)
+
+- **现象**:`authoring-skills`(TDD-for-skills 元规范)被放进**分发的** `skills/`,且命名过于通用。但它其实是
+  「怎么按本仓纪律造/改 cc-master 的 skill」的**项目自用开发工具**——对插件**终端用户毫无意义**,不该随插件分发。
+- **根因**:P1b 实现 + orchestrator 端点验收时混淆了两个边界:**`skills/` = 随插件 ship 给用户的「软件源码 / 产品」**;
+  而 dev tooling(怎么造这个项目)该进 **`.claude/skills/`(项目自用,本仓贡献者用,git 跟踪但不分发)**。命名 `authoring-skills`
+  听着像「通用 skill 写作指南」,无项目区分度,且进 `.claude/skills/` 后会和用户全局一堆 skill 并列显示、更易混。
+- **影响**:① 分发集污染——终端用户会拿到一个讲"怎么改 cc-master 自身 skill"、对他们无用的 skill;② 泛名混淆。
+  均属 product hygiene(产品边界 / 命名),由用户 review 逮到。
+- **处置**:`git mv skills/authoring-skills .claude/skills/cc-master-skillsmith`(历史保留);frontmatter `name` + 标题 +
+  全部引用(AGENTS §2 目录树/§6 三-skill 框架/§N 触发表、`design_docs/eval/README.md`、`track-b-benchmark.md`、设计 spec §1.5)
+  同步更新;**顺带把 content 测试(`tests/content/structure.test.mjs`)扩到也 iterate `.claude/skills/*/SKILL.md`**——
+  这个讲"结构靠 content 契约把关"的 meta-skill 原本因移出 `skills/` 而脱离了它自己鼓吹的那道门,现在重新纳入。
+- **教训(固化候选)**:**分清「分发制品(`skills/`,随插件 ship)」与「项目自用工具(`.claude/skills/`,本仓 dev)」**——
+  meta / 内部工具进 `.claude/`,命名 project-specific。已在 AGENTS §1「这个插件是什么/不是什么」+ §2 目录树 + §6 体现。
+- **严重度 / 来源**:should-fix(product hygiene)/ 一手(用户 review catch,PR #4 开后)。

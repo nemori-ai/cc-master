@@ -52,7 +52,7 @@ R2 提炼(superpowers 标志性结构,均有实测/baseline 背书):
 
 ### 1.5 [结构性·新增] TDD-for-skills 元规范
 
-把"纪律型 skill 必须先跑 subagent pressure baseline 再写堵漏"固化。形态(P1b 定):**优先做成 cc-master 自己的一个 meta-skill `authoring-skills`(或并入 CONTRIBUTING + AGENTS.md 的 skill 创作纪律段)**。内容:Iron Law(无 failing baseline 不写纪律 skill)+ pressure scenario 配方(time + sunk cost + exhaustion 三压)+ verbatim 记录合理化 → 回填 Rationalization Table。与支柱三 eval 的 Track A/B 互补(pressure baseline 是定性、eval 是定量)。
+把"纪律型 skill 必须先跑 subagent pressure baseline 再写堵漏"固化。形态:做成 cc-master 自己的一个 meta-skill,**最终命名 `cc-master-skillsmith`、放 `.claude/skills/`(项目自用 dev 工具,不随插件分发——见 Finding #23)**,而非分发的 `skills/`。内容:Iron Law(无 failing baseline 不写纪律 skill)+ pressure scenario 配方(time + sunk cost + exhaustion 三压)+ verbatim 记录合理化 → 回填 Rationalization Table。与支柱三 eval 的 Track A/B 互补(pressure baseline 是定性、eval 是定量)。
 
 ---
 

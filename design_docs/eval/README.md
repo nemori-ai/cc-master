@@ -7,7 +7,7 @@ frontmatter `description` is under test, because that is the single string
 Claude sees when deciding whether to invoke the skill.
 
 This is the cheap-cheap quantitative gate that pairs with the qualitative
-pressure-testing in `authoring-skills`. Track B (behavioral benchmark) is a
+pressure-testing in `cc-master-skillsmith`. Track B (behavioral benchmark) is a
 separate, heavier loop documented elsewhere.
 
 ## What it does

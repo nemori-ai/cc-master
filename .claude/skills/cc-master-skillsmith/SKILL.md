@@ -1,9 +1,14 @@
 ---
-name: authoring-skills
+name: cc-master-skillsmith
 description: 'Use when creating, editing, or reviewing a cc-master skill — especially a discipline-enforcing one (orchestrating-to-completion, authoring-workflows, this skill) whose rules an agent could rationalize away under pressure. Triggers: 新建/修改/审查本仓 skill、加 Rationalization Table / Red Flags / 决策程序、改 SKILL.md 的纪律段或 description；or when you catch yourself about to write skill prose without first watching an agent fail. Covers the TDD-for-skills loop: failing pressure baseline first, then write/edit, then close loopholes.'
 ---
 
-# Authoring Skills (TDD for skill discipline)
+# cc-master-skillsmith — TDD for cc-master skill discipline
+
+> **This is a project-internal dev tool, not a distributed plugin skill.** It lives in
+> `.claude/skills/` (used by cc-master's own contributors), NOT in `skills/` (which ships to
+> plugin users). End users installing cc-master never see it; it exists only to forge *this repo's*
+> skills.
 
 This is the meta-skill: how cc-master writes and edits its own skills. It exists
 because a skill that *enforces discipline* — "the conductor never plays an
@@ -133,16 +138,17 @@ Behavior is yours to baseline; **structure is the harness's to enforce.** Do not
 hand-check what the gates check.
 
 ```bash
-./run-tests.sh                 # node "content" suite asserts every skills/*/SKILL.md
-                               # has YAML frontmatter with name + description
-claude plugin validate .       # validates the plugin manifest, skills, commands
+./run-tests.sh                 # node "content" suite asserts every SKILL.md under BOTH
+                               # skills/ (distributed) AND .claude/skills/ (project-internal,
+                               # incl. THIS skill) has YAML frontmatter with name + description
+claude plugin validate .       # validates the plugin manifest, distributed skills, commands
 ```
 
-`run-tests.sh` must end with `ALL TESTS PASSED`; `claude plugin validate .` must
-report no errors. These two are the authoritative validators for skill *structure*
-— there is intentionally no third checker to maintain. A new skill directory is
-picked up automatically by the content suite (it iterates `skills/*/SKILL.md`), so
-the contract is: ship the frontmatter correctly and both gates pass.
+`run-tests.sh` must end with `ALL TESTS PASSED`. The content suite iterates both `skills/*/SKILL.md`
+and `.claude/skills/*/SKILL.md`, so this very skill is under the same structure gate it preaches —
+ship the frontmatter correctly and it passes. `claude plugin validate .` validates the *distributed*
+plugin (manifest + `skills/` + commands); it does **not** see `.claude/skills/` (those are not part of
+the shipped plugin), which is exactly why the content suite covers them.
 
 ### Frontmatter YAML quoting (Finding #1, blood-and-tears)
 
