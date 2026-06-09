@@ -7,9 +7,13 @@
 # command) no longer false-triggers an empty board (Finding #15):
 #   1. raw command  — the prompt field VALUE starts with /cc-master:as-master-orchestrator
 #                     (leading whitespace tolerated); a mid-text mention does not qualify.
-#   2. expanded body— stdin carries the cc-master:bootstrap:v1 marker, an HTML comment that only
-#                     ever appears in the expanded command body, never in a mention. Kept as a
-#                     safety backup in case UserPromptSubmit sees the expanded body, not the raw cmd.
+#   2. expanded body— the cc-master:bootstrap:v1 marker (an HTML comment that opens the expanded
+#                     command body, right after the frontmatter) is the prompt's FIRST non-empty
+#                     line. Kept as a safety backup in case UserPromptSubmit sees the expanded body,
+#                     not the raw cmd. The marker MUST be the first non-empty line, not a bare
+#                     substring anywhere in stdin — otherwise prose that merely *mentions* the marker
+#                     mid-sentence (a sub-agent report quoting the command-file convention) would
+#                     false-trigger an empty board (Finding #16).
 # Pure bash extraction of the JSON prompt field — no jq/node (ship-anywhere).
 set -uo pipefail
 
@@ -23,13 +27,23 @@ prompt="${stdin#*\"prompt\":\"}"          # drop everything up to & including  "
 prompt="${prompt%%\"*}"                    # drop from the first " onward → the raw field value
 trimmed="${prompt#"${prompt%%[![:space:]]*}"}"   # strip leading whitespace
 
+# Expanded-body backup: unescape \n in the prompt field value, take the first non-empty line, and
+# require the bootstrap marker to live ON that line. A mid-prose mention (marker quoted inside a
+# sentence) leaves a non-marker first line and does not qualify (Finding #16).
+first_line="$(printf '%s' "$prompt" | sed -e 's/\\n/\n/g' | grep -m1 -v '^[[:space:]]*$')"
+first_line="${first_line#"${first_line%%[![:space:]]*}"}"   # strip leading whitespace
+first_line="${first_line%"${first_line##*[![:space:]]}"}"   # strip trailing whitespace
+marker_hit=0
+case "$first_line" in
+  '<!-- cc-master:bootstrap:v1 -->') marker_hit=1 ;;        # STANDALONE first line only — an inline
+                                                            # mention on the first line is NOT enough
+                                                            # (codex self-review catch, Finding #16)
+esac
+
 case "$trimmed" in
   /cc-master:as-master-orchestrator*) : ;;        # raw command: name is the prompt PREFIX
   *)
-    case "$stdin" in
-      *"cc-master:bootstrap:v1"*) : ;;            # expanded-body marker backup
-      *) exit 0 ;;                                # unrelated / mere mention → silent no-op
-    esac ;;
+    [ "$marker_hit" -eq 1 ] || exit 0 ;;          # not the marker first-line → silent no-op
 esac
 
 # Home is configurable (storage preference); default to the project's .claude/cc-master.

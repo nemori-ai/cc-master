@@ -26,7 +26,11 @@
 | 12 | 并行实现各跑子集 → 漏集成测试,端点跑全套才逮到 | 运营经验/should-fix | 已应对(端点全套) |
 | 13 | orchestrator 红线「不演奏」vs 端点验收的微修张力 | nice-to-have(skill) | 已识别 |
 | 14 | goal-hook 自我验证:真拦住 orchestrator 一次提前 yield | ✅ 机制验证(正向) | 活证据 / GTM 素材 |
-| 15 | bootstrap sentinel 裸子串匹配,被「提及命令名」的输入(notification/result)误触发建空 board | should-fix | 已清理误建;修复待 P3 决策 |
+| 15 | bootstrap sentinel 裸子串匹配,被「提及命令名」的输入(notification/result)误触发建空 board | should-fix | ✅ 已修(P2c-F 收紧前缀分支);marker 分支残留见 #16 |
+| 16 | bootstrap marker 分支仍裸子串,被 sub-agent 报告内联引用 marker 误触发建空 board(#15 同类残留) | should-fix | ✅ 已修(P4b:marker 须 prompt 首非空行;codex 又逮到首行内联残漏→收紧为 standalone 精确匹配,见 #19) |
+| 17 | phantom in_flight:标 board 在前、dispatch 在后,被 sibling 完成通知打断致漏派 worker | should-fix(流程纪律) | ✅ 已应对(先 dispatch 再标板 + agentId 实证);待固化进 AGENTS/SKILL |
+| 18 | eval Track A 触发召回近零(冷启 claude -p 单轮欠表征真实触发),绝对召回不可当 description 判据 | should-fix(eval 可靠性) | 已记;infra 已交付跑通;Track A 宜作 precision+相对 delta,绝对召回 caveat 待后续提保真度 |
+| 19 | codex 自审(新 reviewer 首跑)逮到 #16 修复的首行内联残漏(测试+自读都漏) | ✅ 机制验证(正向)+ 残漏已修 | codex needs-attention→TDD 收口(Case E3 + standalone 精确匹配),passed=21。reviewer 交付物活证据 / GTM 素材 |
 
 > 基线健康(无问题留痕):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
@@ -254,3 +258,72 @@
   raw → 额外要求命令名出现在 prompt 字段**开头**(纯 bash 提取 prompt 值查前缀)。须保持 content test 的
   sentinel-consistency 断言仍绿。
 - **严重度 / 来源**:should-fix / 一手(实时撞上)。
+
+## Finding #16 — bootstrap marker 分支仍裸子串(#15 同类残留),被 sub-agent 报告内联引用 marker 误触发
+
+- **现象**:R5(omne 范式勘察)报告正文逐字引用 sentinel 标记 `cc-master:bootstrap:v1`(在讲 command 文件约定时),
+  该报告经 task-notification 走 UserPromptSubmit 时,`bootstrap-board.sh` 的「stdin 含 marker 子串」判据命中,
+  **误建空 board**(`20260608T121833Z-2069`)。
+- **根因**:#15 的 P2c-F 只收紧了 `/cc-master:as-master-orchestrator` **前缀分支**;marker 那条 OR 分支
+  (`*"cc-master:bootstrap:v1"*`)仍是**裸子串匹配** —— 任何提及该 marker 的文本(sub-agent 报告 / 文档 / 对话)
+  都触发。修了一半,另一半同病未除。
+- **影响**:home 被空 board 污染。**幸:goal-hook 的 session 过滤(#4 修复)再次兜住** —— 误建 board 的
+  `owner.session_id` 为空 ≠ 本 session,故 goal-hook 不 gate 它、不误伤(与 #15 同样的交汇救援)。
+- **处置**:① `rm` 误建空壳;② **P4b** 把 marker 判据从「stdin 含子串」改为「**marker 须是 prompt 提取值的首个
+  非空行**」(prose 内联提及不触发;`as-master-orchestrator.md` 的 command body frontmatter 之后首非空行正是该 marker,
+  合法触发不破),与 P2c-F 前缀纪律同源。`test_bootstrap-board.sh` 加 E1(首行 marker→建)/E2(内联提及→不建)回归,
+  并修正 Case B/G 旧 fixture(marker 移首行贴合真实 body),`passed=19 failed=0`。
+- **严重度 / 来源**:should-fix / 一手(实时撞上)。✅ 已修(P4b)
+
+## Finding #17 — phantom in_flight:标 board 在前、dispatch 在后,被 sibling 完成通知打断致漏派 worker
+
+- **现象**:Wave1 批 b 的 P2c/P1/P1b 在 board 被标 `in_flight`,但**实际从未 dispatch sub-agent** —— 零产物、
+  零 transcript。仅 P3b(在同一拍内既改 board 又发 Agent 调用、且未被打断)真跑。空挂数轮,进度停滞,直到用户
+  「继续推进」催问,orchestrator 核 `git status` / transcript 才发现。
+- **根因**:orchestrator 把「标 board `in_flight`」与「实际发 Agent 调用」拆成**两步**;每次刚标完 board,一个
+  sibling 的完成通知就插进来打断本拍 → 转去验收那个刚完成的节点时,**漏掉了实际的 dispatch tool-call**。
+  step-6 ledger 据 board 断言「in_flight」,却**未核实背后真有活 worker**(board 是模型,现实才是真相)。
+- **影响**:三节点空挂,效率严重受损 —— 正是 goal 1 要找的「效率没真正最大化」的活样本(且这次是 orchestrator
+  自身执行 bug,非 plugin bug)。
+- **处置**:① 真 dispatch 三节点,**agentId 写入 board 当 worker 实证**;② 固化纪律:**先 dispatch 拿 agentId、
+  再标 board**(标 `in_flight` 必须有 worker 实证);reconcile 时**核实 `in_flight` 是否真有活 worker**(无 agentId /
+  无 transcript / 零进度 = phantom)。建议写进 AGENTS.md 反模式 + orchestrating Red Flags(「标了 in_flight 却没发
+  Agent 调用」「step-6 只凭 board 断言 in_flight 未核 worker」)。
+- **严重度 / 来源**:should-fix(skill,流程纪律)/ 一手(用户催问逮到)。✅ 已应对(待 V 后固化进 AGENTS/SKILL)
+
+## Finding #18 — eval Track A 触发召回近零:冷启 `claude -p` 单轮欠表征真实触发(非 description 缺陷)
+
+- **现象**:V 阶段首次真跑 `scripts/eval-trigger.sh orchestrating-to-completion`(20 query × 3 run,uv 3.12 + claude CLI):
+  **10 条 should-not-trigger 全 PASS**(零误触发,precision 满分);**10 条 should-trigger 全 FAIL**——9 条 `rate 0/3`、
+  1 条 `1/3`,召回 ≈ 1/30 ≈ 0.03。连「我手头有 6 个后台 agent 在跑…要协调到全部完成」「跨好几天、compaction 后续跑」
+  这类教科书级编排 query 都几乎不触发。
+- **根因(推断)**:那条 `1/3` 证明 skill 在 harness 里**能**触发(并非完全没加载暴露),故非"未暴露 bug";更可能是
+  **冷启 `claude -p` 单轮对行为型 skill 本就极少主动调用**。run_eval 的判定 = "裸单轮 `claude -p <query>` 是否选择
+  调用该 skill(经临时 command wrapper)";这个条件比 cc-master 真实使用(plugin 上下文 + SessionStart 每 compaction
+  重注 + `using-superpowers` 的"1% 可能就调 skill"主动纪律 + 多轮对话)**苛刻得多、欠表征**。R3 调研早标注过该天花板
+  (平凡 query 不触发与 description 无关);此处实测把它放大到了行为型 skill 的"绝对召回"上。
+- **影响**:**直接关乎 goal #3「建立 eval 机制可靠指导迭代」的"可靠"**——Track A 的**绝对召回数字对行为型 plugin skill
+  不能直接当"description 好不好"的判据**(会把好 description 误判为差)。但:① 负例 / precision 仍可靠(无误触发);
+  ② seed=42 同 harness 下**改前后相对 delta 仍有意义**(描述改动是否抬高/压低召回可比)。即 Track A 宜定位为
+  **precision 门 + 相对迭代信号**,而非绝对召回评判。
+- **处置**:① eval 基础设施已交付且**跑通**(证 infra OK,这是 goal #3 的交付物);② 记此可靠性 caveat;
+  ③ 后续候选(非本轮、非阻塞):提高 harness 保真度(在更接近真实的多轮 / 加载 plugin 的上下文里测),或在
+  `design_docs/eval/README.md` 明确 Track A 的"相对 delta + precision"定位与绝对召回 caveat。
+- **严重度 / 来源**:should-fix(eval 可靠性)/ 一手(V 阶段首次真跑实测,eval 自曝可靠性边界——eval 在做它该做的事)。
+
+## Finding #19 — codex 自审(新 reviewer 首跑)逮到 #16 修复的首行内联残漏 ✅正向
+
+- **现象**:V 阶段用本轮新建的 codex-as-reviewer(`codex exec review --uncommitted`)自审本轮全部改动,codex 出
+  **needs-attention**:P4b 的 bootstrap marker 修复用 glob `*'<!-- cc-master:bootstrap:v1 -->'*`,只要 marker 落在
+  首个非空行的**任意位置**(含首行内联在 prose 里)就 `marker_hit=1` 建 board;契约要求 marker **独立成行**。E2 回归
+  只覆盖了"marker 在第 2 行 prose",漏了"marker 内联在第 1 行"——后者仍误触发。
+- **根因(机制成功)**:codex 作为**独立第二端点验收者**,审出了我的回归测试 + 我自己的 diff-read **都漏掉**的真残漏——
+  注释写的意图("MUST be the first non-empty line, not a bare substring")与实现(glob 允许首行内联)之间的缝。
+- **影响**:**codex-reviewer 交付物价值在真实 dogfood 中兑现的活证据**——新 reviewer 在自己诞生的同一轮里,审出了
+  另一处 hook 修复(#16)的诞生缺陷(与 Finding #14 goal-hook 自验同类正向)。是 README/demo 的"眼见为实"说服素材:
+  端点验收红线("agent 自报不可信、只信独立端点验收")不是口号——连 orchestrator 自己的修复都被独立 reviewer 拦下补全。
+- **处置**:按红线例外(端点验收**本身**暴露的微修,T∞≈T₁,Finding #13 立的 carve-out)orchestrator 直接 TDD 收口:
+  加 `tests/hooks/test_bootstrap-board.sh` Case E3(marker 内联首行→不建,先 Red 确认 FAIL=20/1)→ 改 glob 为 trim 后
+  对 `'<!-- cc-master:bootstrap:v1 -->'` **standalone 精确匹配**(Green,passed=21/0)→ 合法触发(marker 独立成行)
+  回归仍建 board。#16 修复至此完整。
+- **严重度 / 来源**:✅ 机制验证(正向)+ should-fix 残漏已修 / 一手(codex 首跑实测)。
