@@ -44,40 +44,11 @@ surfaced under a real session.
 
 ## Design invariants — do not break these
 
-These constraints are load-bearing. A PR that violates one will be sent back.
-
-1. **Hooks are pure bash. No `jq`, no `node`, no other runtime.**
-   Hooks run in a shell that is blind to agent context and must work everywhere
-   cc-master ships (including Bedrock / Vertex / Foundry). Parse JSON with shell
-   tools, not interpreters. Keep them deterministic and dependency-free.
-
-2. **Keep the board's narrow waist stable.**
-   The board is the single source of truth and the only state a hook can read.
-   Only a small, fixed set of fields are hook-dependent (the "narrow waist").
-   Changing their names, shapes, or semantics breaks the hooks silently. If you
-   must touch the waist, update every hook and its tests in the same PR, and call
-   it out explicitly in the PR description.
-
-3. **The two skills stay self-contained and non-overlapping.**
-   - **Skill A (`orchestrating-to-completion`)** = main-thread orchestration: the
-     method the orchestrator runs (decompose, dispatch-on-ready, productive idle
-     windows, endpoint verification).
-   - **Skill B (`authoring-workflows`)** = inside-the-script authoring: how to
-     write dynamic-workflow scripts.
-
-   Don't let responsibilities bleed across the two, and don't duplicate guidance
-   between them. If a piece of advice belongs to "what the orchestrator does," it
-   goes in A; if it belongs to "how a workflow script is written," it goes in B.
-
-4. **The conductor never plays an instrument.**
-   The orchestrator coordinates; it does not do the unit work by hand. Any change
-   that nudges the main thread toward doing the work directly is going the wrong way.
-
-5. **Stay ship-anywhere.**
-   The supported background mechanisms are background shell, sub-agent
-   (`run_in_background`), and workflow. Agent-teams and scheduled routines are
-   out of scope by design (not reliably available everywhere). Don't add a
-   dependency that breaks on Bedrock / Vertex / Foundry.
+The five load-bearing design red lines (pure-bash hooks · stable board narrow
+waist · two non-overlapping skills · the conductor never plays an instrument ·
+ship-anywhere) have a **single source of truth in [`AGENTS.md` §3](AGENTS.md#3-non-negotiable-红线ssot-在此)** —
+each with its decision-record link and a PR/CI grep checkpoint. Read it before
+opening a PR; a PR that violates one will be sent back.
 
 ## Style & conventions
 
