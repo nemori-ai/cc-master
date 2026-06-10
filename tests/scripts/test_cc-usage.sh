@@ -15,8 +15,9 @@ used="$(printf '%s' "$OUT" | python3 -c 'import sys,json;print(json.load(sys.std
 rem="$(printf '%s'  "$OUT" | python3 -c 'import sys,json;print(json.load(sys.stdin)["five_hour"]["window_remaining_min"])')"
 wk="$(printf '%s'   "$OUT" | python3 -c 'import sys,json;print(json.load(sys.stdin)["seven_day"]["used_tokens"])')"
 
-# m1=1350, m2=2050 (m2 row appears twice → dedup by message.id) → 3400
-assert_eq 3400 "$used" "5h used_tokens (dedup by message.id + sum of all token kinds)"
+# m1=1350; m2 is rewritten twice (partial cr=0 → 50, then full cr=2000 → 2050) → dedup keeps
+# the MAX usage per id = 2050, so total = 3400 (first-seen would wrongly keep 50 → 1400).
+assert_eq 3400 "$used" "5h used_tokens (dedup keeps largest usage per id + sums all kinds)"
 # window starts at the block's first msg 10:00Z; remaining = (10:00+5h) - 12:00 = 180 min
 assert_eq 180  "$rem"  "5h window_remaining_min (now=12:00Z)"
 # both messages are within 7d of 2026-06-10T12:00:00Z
@@ -44,5 +45,14 @@ r_rem="$(printf '%s'  "$ROLLOUT" | python3 -c 'import sys,json;print(json.load(s
 assert_eq 300 "$r_used" "5h used = current rolling block only (new block opens at the 5h boundary even under continuous use)"
 # new block starts 15:01Z; remaining = (15:01+5h) - 15:02 = 299 min
 assert_eq 299 "$r_rem"  "5h window_remaining_min tracks the NEW block start, not the old one"
+
+# --- --now filters future rows (codex Finding #27 round-4 [P3]): same rolling fixture but
+#     now=11:00Z, BEFORE the 14:59 / 15:01 msgs. Those future rows must NOT count — only r1
+#     (10:00, 100 tok) is <= now → used=100, remaining=(10:00+5h)-11:00=240. ---
+FUTURE="$(bash "$ROOT/scripts/cc-usage.sh" --dir "$ROLL" --now "2026-06-10T11:00:00Z")"
+f_used="$(printf '%s' "$FUTURE" | python3 -c 'import sys,json;print(json.load(sys.stdin)["five_hour"]["used_tokens"])')"
+f_rem="$(printf '%s'  "$FUTURE" | python3 -c 'import sys,json;print(json.load(sys.stdin)["five_hour"]["window_remaining_min"])')"
+assert_eq 100 "$f_used" "rows newer than --now are excluded (no future usage counted)"
+assert_eq 240 "$f_rem"  "window_remaining tracks the only <=now block (10:00), not a future one"
 
 finish

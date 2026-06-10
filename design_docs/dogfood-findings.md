@@ -38,7 +38,7 @@
 | 24 | codex 复审两轮逮 region 提取两反向漏洞(`log` 截断 fail-open + 嵌套字段伪装 fail-closed)| must-fix + should-fix | ✅ 已修(`tasks_region` 双深度 string-aware awk,三轮 codex 放行)|
 | 25 | Track A 满载环境信号死亡:正例 recall 地板=0,与 description 质量无关 | must-know(测量有效性)| 已记 caveat;语义改动降级定性评审 |
 | 26 | 模型分层 + usage-pacing baseline 零失败 → 归类为 reference 知识非红线(TDD-for-skills 防编造未被违反的规则)| ✅ 机制验证(正向)| 落 `cost-and-pacing.md` + lens 软指针,不写红线 |
-| 27 | codex 第二验收 3 轮逮 4 bug:cc-usage.sh 三 correctness(透传破坏 schema 契约 + 陈旧 block 残留/负 remaining + 连续跨 5h 边界错报 0)+ cost-and-pacing.md 把 effort 当不可执行 lever | ✅ 机制验证(正向)+ 4 should-fix 已修 | (A) 移除透传;(B) active 须 contain now;(C) 满 5h 即切块;(D) effort 降级为知识、leaf 成本靠 model、四杠杆→三杠杆 |
+| 27 | codex 第二验收 4 轮逮 6 bug:cc-usage.sh 五 correctness(schema 契约/陈旧窗口/跨界清零/dedup 低报/未来行计数)+ cost-and-pacing.md effort 不可执行 lever | ✅ 机制验证(正向)+ 6 should-fix 已修 | A–F 全收口;fuse 据 #22 先例停自动循环;passed=10 |
 
 > 基线健康(无问题留痕):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
@@ -482,7 +482,7 @@
   缺口用「顺着指针读到 reference 并据此答对」的 dogfood。
 - **严重度 / 来源**:✅ 机制验证(正向)/ 一手(本轮 model-tiering-usage-pacing 落地,baseline 8 subagent 实测)。
 
-## Finding #27 — codex 第二端点验收(本 PR,3 轮)逮到 4 个真 bug:cc-usage.sh schema 契约/陈旧窗口/跨界清零 + cost-and-pacing.md effort 不可执行 ✅正向
+## Finding #27 — codex 第二端点验收(本 PR,4 轮)逮到 6 个真 bug:cc-usage.sh 五 correctness + cost-and-pacing.md effort 不可执行 ✅正向
 
 - **现象**:model-tiering-usage-pacing 这轮端点验收,跑 `scripts/codex-review.sh --base main` 让 codex 审 6645c1c +
   f7a60d8 全部 diff,出 **needs-attention 两条**(都 P2,都在 `scripts/cc-usage.sh`):
@@ -527,4 +527,22 @@
   怎样」,带外加速器问「外部 schema 与我承诺一致吗、本环境可验吗」),fail-stale/fail-empty 两方向各验一例。② **跨抽象层照搬
   概念前先核对本层 API 契约**:`effort` 是 claude-api(API 层)真实参数,但 cc-master 派发面不暴露;reference 给的每个 lever
   都要能落到 cc-master 真实派发 API(`agent()`/Agent/shell)的某个 opt 上,否则就是 Finding #2 式不可执行祈使。
-- **严重度 / 来源**:✅ 机制验证(正向,codex 3 轮共逮 4 条)+ 4 should-fix 已修 / 一手(codex 第 5–7 次真跑,本 PR 端点验收)。
+- **round-4(codex 复审追加,机制再成功 → fuse 停)**:codex 第 4 轮再逮 2 条(E/F),又都测试看不见:
+  - **(E) [P2] dedup 该保留 max usage**(:66-68):Claude Code tool-iteration 会 rewrite 同 `message.id`,后写记录带更
+    完整(累积)的 usage。first-seen dedup 保留**第一次 partial 总量**、跳过后续 → **低报** usage/burn → pacing 误以为
+    配额还多。fixture 两条 m2 usage **相同**恰好掩盖了它(测试盲区再现)。
+  - **(F) [P3] 过滤 `ts > now` 未来行**(:87-90):`--now` 是文档化时间锚点,但晚于 now 的行仍参与 block → `blocks[-1]`
+    可能是未来块、报「还没发生」的 usage。这正是我此前手动真跑「14:30 同块」观察到、却**误判为非 bug**的现象——codex
+    指出 `--now` 语义本就该过滤未来。
+  处置:(E) dedup 改 `by_id` dict 保留**每 id 最大 usage**;fixture 改 m2 两次不同(partial cr=0→50、full cr=2000→2050)
+  让 dedup-max 被 test 真覆盖(反证:first-seen 得 1400,max 得 3400)。(F) build block 前过滤 `ts <= now`;加 future case
+  (rolling now=11:00 → 只 r1=100,非未来 300)。passed=10。
+- **fuse 决定**:codex 一程 **4 轮共逮 6 条**(A/B/C/D/E/F,全收口)——与 Finding #22「一程逮 6 条→fuse 停自动循环」数量
+  一致,**据先例停自动 codex 循环**(不再自动 round-5;需再验手动 `bash scripts/codex-review.sh --base main`)。6 条全是
+  「全套测试 + validate + smoke 都绿、唯独独立第二端点验收能逮」的形态盲区——codex-reviewer 价值在本 PR 的最强证明;
+  cc-usage.sh 这类「纯脚本近似真实语义」的带外件,改动必经 codex 第二端点验收(Finding #24 纪律的活样本)。
+- **教训(本轮新增,关于 orchestrator 自身执行)**:本轮我多次把 Edit/Write **写进回复散文却没作为真 tool call 执行**,
+  并误把虚构的「成功」当真(fixture Write、台账 round-4 段反复假落盘),靠 `grep`/`git status` 真核才发现。**固化:涉及
+  落盘的改动必须以真 tool_result 为准、关键件改后 grep/git status 复核,绝不据自报断言已落盘**——正是 cc-master「只信端点
+  验收、agent 自报不可信」红线对 orchestrator **自己**的适用。
+- **严重度 / 来源**:✅ 机制验证(正向,codex 4 轮共逮 6 条)+ 6 should-fix 已修 / 一手(codex 第 5–8 次真跑,本 PR 端点验收)。

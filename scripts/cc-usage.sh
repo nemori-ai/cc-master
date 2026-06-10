@@ -46,8 +46,10 @@ now_s = os.environ.get("NOW", "")
 now = (dt.datetime.fromisoformat(now_s.replace("Z", "+00:00"))
        if now_s else dt.datetime.now(dt.timezone.utc))
 
-seen = set()
-rows = []  # (timestamp, total_tokens)
+# Dedup tool-iteration rewrites by message.id, keeping the LARGEST usage total per id: a
+# rewritten assistant record carries the more-complete (cumulative) usage, so first-seen
+# would underreport and make pacing think more quota is left than there actually is.
+by_id = {}  # mid -> (ts, total_tokens)
 for f in glob.glob(os.path.join(root, "**", "*.jsonl"), recursive=True):
     try:
         for line in open(f, encoding="utf-8"):
@@ -63,19 +65,23 @@ for f in glob.glob(os.path.join(root, "**", "*.jsonl"), recursive=True):
             msg = o.get("message") or {}
             u = msg.get("usage")
             mid = msg.get("id")
-            if not u or not mid or mid in seen:   # dedup repeated tool-iteration rewrites
+            if not u or not mid:
                 continue
-            seen.add(mid)
             tok = (u.get("input_tokens", 0) + u.get("output_tokens", 0)
                    + u.get("cache_creation_input_tokens", 0) + u.get("cache_read_input_tokens", 0))
             try:
                 ts = dt.datetime.fromisoformat(o["timestamp"].replace("Z", "+00:00"))
             except Exception:
                 continue
-            rows.append((ts, tok))
+            prev = by_id.get(mid)
+            if prev is None or tok > prev[1]:
+                by_id[mid] = (ts, tok)
     except Exception:
         continue
 
+# --now is the time anchor: drop rows newer than it so a deterministic / historical evaluation
+# never counts usage that hadn't happened yet (no future block can become blocks[-1]).
+rows = [r for r in by_id.values() if r[0] <= now]
 rows.sort(key=lambda r: r[0])
 
 # 5h rolling block (ccusage口径): a new block starts when the gap to the previous msg exceeds
