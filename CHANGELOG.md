@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-06-10
+
 ### Added
 
 - **Model tiering & usage-aware pacing (SKILL A reference)** — new
@@ -119,5 +121,6 @@ advancing across context compaction and across sessions.
 - **Docs** — `README.md` (EN) and `README_zh.md` (中文); design specification,
   design notes, and four research reports under `design_docs/`.
 
-[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/nemori-ai/cc-master/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/nemori-ai/cc-master/releases/tag/v0.1.0
