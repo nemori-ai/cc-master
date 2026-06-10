@@ -35,6 +35,10 @@
 | 21 | codex 功能 review 再逮两条:(A) goal-hook fingerprint 只哈希 status 多重集→身份变不重握(P4 缺口)(B) codex-review.sh 未强制 read-only,用户 danger-full-access 配置下 reviewer 可写仓库(P2 缺口) | ✅ 机制验证(正向)+ 2 should-fix 已修 | A:fingerprint→id+status+blocked_on(Case Q,passed=37);B:加 -c sandbox_mode=read-only。一程逮 #19/#20/#21 |
 | 22 | codex 第4次再逮两条:(C) #21 的 fingerprint 扫全 board、把 log 等 flexible 字段也算→违反 narrow-waist(D) track-b 文档 codex 配对指向不工作的调用(审 diff 非 transcript + #20 互斥) | ✅ 机制验证(正向)+ 2 should-fix 已修 | C:fingerprint scope 到含 deps 的 task 行(Case R,passed=38);D:改 plain codex exec grade transcript。一程共逮 6 条→fuse 停自动循环 |
 | 23 | meta-skill 误置为分发制品 + 命名过泛:authoring-skills 放进分发的 skills/、名字太通用(它其实是"怎么造本仓 skill"的项目自用工具) | should-fix(product hygiene) | ✅ 已修(git mv → .claude/skills/cc-master-skillsmith;引用全更;content 测试扩到也 iterate .claude/skills/)。用户 review catch |
+| 24 | codex 复审两轮逮 region 提取两反向漏洞(`log` 截断 fail-open + 嵌套字段伪装 fail-closed)| must-fix + should-fix | ✅ 已修(`tasks_region` 双深度 string-aware awk,三轮 codex 放行)|
+| 25 | Track A 满载环境信号死亡:正例 recall 地板=0,与 description 质量无关 | must-know(测量有效性)| 已记 caveat;语义改动降级定性评审 |
+| 26 | 模型分层 + usage-pacing baseline 零失败 → 归类为 reference 知识非红线(TDD-for-skills 防编造未被违反的规则)| ✅ 机制验证(正向)| 落 `cost-and-pacing.md` + lens 软指针,不写红线 |
+| 27 | codex 第二验收 4 轮逮 6 bug:cc-usage.sh 五 correctness(schema 契约/陈旧窗口/跨界清零/dedup 低报/未来行计数)+ cost-and-pacing.md effort 不可执行 lever | ✅ 机制验证(正向)+ 6 should-fix 已修 | A–F 全收口;fuse 据 #22 先例停自动循环;passed=10 |
 
 > 基线健康(无问题留痕):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
@@ -442,3 +446,103 @@
   被测物;"负例全过"在 recall=0 时是症状不是成绩。上游修复方向(供 skill-creator 反馈):隔离
   project root、侦测器看全程而非首发、用真 SKILL.md 而非 stub。
 - **严重度 / 来源**:must-know(测量有效性)/ 一手(本轮 deferred-trio 落地,最小复现 ×3)。
+
+## Finding #26 — 模型分层 + usage-pacing 的 pressure baseline 零失败 → 正确归类为 reference 知识(非红线)✅正向
+
+- **现象**:2026-06-10 给 SKILL A 补「模型分层 + usage-aware pacing」两块编排能力,按 §6 TDD-for-skills「先跑 subagent
+  pressure baseline 看失败、再写堵漏 prose」。三压场景(time + sunk cost + exhaustion)+ 强制 A/B/C 单选:模型分层派
+  **6 个** subagent(无该纪律)、usage-pacing 派 **2 个**——**8/8 全选合规项 A,零失败**。逐字推理都从既有 lens 自行推出:
+  模型分层引 lens 2「concentrate resources on the critical chain」+ Rationalization meta-rule;pacing 引 lens 4「主观能动
+  不空等」+ lens 5「量力而行不顶满」+ step-6 ledger 纪律。甚至有 agent 主动点出「中途切主线模型会破坏 `owner.session_id`
+  连续性」——这条我原以为要专门教,它自己从 board 协议推到了。
+- **根因(机制成功)**:既有七镜头 + Rationalization Table 覆盖面已足够强,agent 在「给了信息 / 给了选项」时能从既有纪律推出
+  正确编排行为。两块的真实缺口**不是「会被合理化掉的判断型规则」,而是 agent 默认缺的事实知识**:① 四档模型
+  (Fable/Opus/Sonnet/Haiku)各自定位 + 相对 output 成本(10×/5×/3×/1×);② 中途切主线模型废 prompt cache 的技术代价;
+  ③ 5h/7d 配额窗口存在 + 有 `scripts/cc-usage.sh` 可程序化感知。这些是 **reference / how-to 知识**,§6 明确**不 gate**
+  pressure baseline(baseline 只 gate「judgment-bearing 能被合理化掉的规则」)。
+- **影响(纪律正向)**:**TDD-for-skills 的 Iron Law 在此第二次发挥作用——防止我编造一条 agent 根本不会违反的红线**。原 plan
+  (Task 4/6)预设 baseline 会失败、要写新红线 + Rationalization 行 + Red Flags 行;实测零失败,若仍照写就是「为不存在的违规
+  造规则」,反而稀释 reinject 每次全文重注的 SKILL A、压低真红线的信噪比。**正确处置 = 降级为 reference 知识**,不进
+  红线 / Table / Flags。
+- **处置**:① 新建 `references/cost-and-pacing.md` 承载全部 reference 知识(四档表 + per-node 选模型 + 主线固定模型保 cache
+  + usage 感知三路径 + burn-rate 撞墙预测 + 四杠杆 pacing),顶部显式标注「informational, not a red line;baselines 证明
+  agent 自发会推」;② SKILL A 主文件只加 lens 2 / lens 5 各一句软指针 + reference index 一行(reinject 友好,主文件几乎
+  不膨胀);③ 扩 `decomposition.md` 资源种子加 model 维度;④ 信号脚本 `scripts/cc-usage.sh`(带外、非 hook)作
+  ship-anywhere 落地物。**不加任何红线 / Rationalization 行 / Red Flags 行。**
+- **dogfood 确认(live)**:派 subagent 模拟 orchestrator(只给 SKILL.md + references 访问、**不**直接喂
+  `cost-and-pacing.md`),问「配额紧张 + 7 个 leaf 怎么调度 / 各配什么模型 / 要不要切主线」——它顺着 lens 2/5
+  软指针**自己去读了 `cost-and-pacing.md`**,4 问全答对(`cc-usage.sh` 感知 + burn-rate 撞墙公式;5 机械→Haiku、
+  2 难活→Opus;90% 窗口时四杠杆 pacing + `blocked_on:quota-reset` defer + 不全停;不切主线保 cache 三理由),并
+  逐条给出文件引用追溯。**软指针 → reference 可达性 + 内容有效性闭环成立。**
+- **教训(固化候选)**:**baseline 零失败本身就是有效产出——它把「我以为该是红线」证伪成「其实是信息缺口」**。判断型纪律
+  (红线 / Table)与告知型知识(reference)的分界,正应由 pressure baseline 来划:失败 → 判断缺口 → 红线;不失败 →
+  信息缺口 → reference。不是每个「看起来该管」的主题都需要一条红线;TDD-for-skills 同时防漏(该堵的没堵)与防造(不该造的造了)。
+  另一条:**reference 知识的验收 = dogfood 可达性**(软指针真把 agent 引到 reference、且内容够它据此决策),而非判断型
+  纪律的 A/B pressure baseline——两类知识,两种验法:判断缺口用「无该 prose 时选错 → 加 prose 后选对」的 A/B,信息
+  缺口用「顺着指针读到 reference 并据此答对」的 dogfood。
+- **严重度 / 来源**:✅ 机制验证(正向)/ 一手(本轮 model-tiering-usage-pacing 落地,baseline 8 subagent 实测)。
+
+## Finding #27 — codex 第二端点验收(本 PR,4 轮)逮到 6 个真 bug:cc-usage.sh 五 correctness + cost-and-pacing.md effort 不可执行 ✅正向
+
+- **现象**:model-tiering-usage-pacing 这轮端点验收,跑 `scripts/codex-review.sh --base main` 让 codex 审 6645c1c +
+  f7a60d8 全部 diff,出 **needs-attention 两条**(都 P2,都在 `scripts/cc-usage.sh`):
+  - **(A) ccusage 加速器透传破坏 schema 契约**(:42-43):装了 `ccusage` 的机器上,该分支直接 `printf` 原始
+    `ccusage blocks --json` 后 exit——但脚本头注释 + `cost-and-pacing.md` 都承诺归一化的 `five_hour`/`seven_day`
+    schema。任何按文档 schema 解析的调用方,**只在装了 ccusage 的机器上**会坏(环境相关、隐蔽)。
+  - **(B) 陈旧 5h block 误报**(:97-105):最新 JSONL 消息 >5h 前时,`blocks[-1]` 仍被当当前窗口,产出陈旧
+    `used_tokens`、甚至**负的** `window_remaining_min`(实测 now=20:00Z、窗口 15:00Z 已关 → used=3400 残留、
+    remaining=-300)。隔夜空闲后的 pacing 决策会误以为旧窗口还活着。
+- **根因(机制成功)**:codex 作为独立第二端点验收者,审出我**测试 + 自读 diff 都漏掉**的两个形态盲区——测试只覆盖了
+  「窗口活跃 + 无 ccusage」这一种乖形态(与 Finding #24「测试只覆盖乖 board 形态」、#12「各子集绿≠全绿」同根)。
+  (A) 是「带外脚本对未安装的外部工具 schema 下注」;(B) 是「滑动窗口边界没处理过期」。
+- **影响**:**codex-reviewer 价值第 5 次真实兑现**(继 #19/#20/#21/#22/#24 之后)。两条都过了当时全套测试
+  (passed=45+3+6)+ plugin validate + smoke——纯结构/correctness 测试看不见,只有独立语义审查能逮。(B) 的负
+  remaining 会直接误导 pacing(本 PR 的核心用途),危害不小。
+- **处置**(端点暴露、T∞≈T₁,按 Finding #13/#19 carve-out orchestrator 直接 TDD 收口):
+  - (A) **彻底移除 ccusage 透传分支** + `--no-ccusage` flag——纯 python 解析自洽、受控、零依赖、可测;ccusage「更准」的
+    边际收益不抵 schema 不一致 + 本环境不可验(没装 ccusage,违反 Finding #20「带外脚本 V 端点必须真跑」)的代价。注释
+    留增强指针(「未来加速器须先把 ccusage 归一化到本 schema」);`cost-and-pacing.md` §Sensing 第 2 路径改为
+    「orchestrator 可独立跑 ccusage」,不再宣称 cc-usage.sh 内部用它。
+  - (B) **active block 须 CONTAIN now**:`now <= start + 5h` 才算活跃窗口,否则报 clean zero(窗口已翻新),绝不残留
+    used 或负 remaining。
+  - test 加 stale-window case(now=20:00Z → used=0/rem=0;先 Red 确认 used=3400/rem=-300、passed=4 failed=2 →
+    Green passed=6)。
+- **教训(固化候选)**:呼应 Finding #24——**纯 shell/脚本近似真实语义时,必须对协议/环境允许的全部形态做对抗推演**:
+  滑动窗口问「过期了会怎样」(负数/残留),带外加速器问「外部工具 schema 和我承诺的一致吗 / 我能在本环境验证它吗」。
+  codex 第二端点验收对这类「测试全绿但形态覆盖不足」命中率极高(本案再中两条),hook/带外脚本改动上值得常设。
+- **round-2(codex 复审追加,机制再成功)**:修 (B) 时把「整个 block 隔夜过期」修对了,却**引入反向回归**——分组仍只按
+  「与上条 gap>5h」切块,**连续使用跨 5h 边界**(无 gap)时所有消息留在旧块,活跃新窗口被错报为 0(例 10:00/14:59/15:01,
+  在 15:02 报 `used=0`,明明 15:01 刚开新窗口)。codex 第 2 轮精准逮到(`cur[0][0]+five` 才是 split 依据)。**Finding #24
+  「修一处带出一处」+「fail 两方向都各验一例」再现**——我只验了「陈旧残留」(fail-stale),漏了「活跃清零」(fail-empty)。
+  处置:分组条件改 `gap>5h OR ts-cur[0][0]>=5h`(满 5h 即开新块);test 隔离 fixture 到 `sample/`+`rolling/` 子目录
+  (避 `**/*.jsonl` glob 污染)加连续跨边界 case(15:02 → used=300 新块,passed=8)。
+- **round-3(codex 复审追加,机制再成功)**:codex 第 3 轮在 `cost-and-pacing.md` 逮到第 4 条(**非回归**,reference 首版
+  就有的**可执行性**缺陷):我把 `effort`(`output_config:{effort}`)当 leaf 的 pacing lever 写进 reference,但 **cc-master
+  的派发 API 根本不透传它**——workflow `agent()` opts 只有 label/phase/schema/model/isolation/agentType,Agent sub-agent
+  也无 effort 钮,SKILL B 明禁传 invented option。**这是 Finding #2「/goal 对 agent 不可执行」的同类**:reference 给了 agent
+  够不到的 lever,照做会写出无效 workflow 脚本。处置:effort 从「可执行 lever」降级为「知识备注」(标注 API 层概念、主线
+  effortLevel 受其影响、但派发 API 不透传 → leaf 成本靠 **model tier**);四杠杆→三杠杆(downgrade model 提为首要 / lower
+  WIP / defer high-float);SKILL.md reference index + CHANGELOG lever 列表同步去 effort。
+- **教训补强**:① 呼应 #24——纯 shell/脚本近似真实语义,必须对协议/环境允许的全部形态做对抗推演(滑动窗口问「过期/连续跨界
+  怎样」,带外加速器问「外部 schema 与我承诺一致吗、本环境可验吗」),fail-stale/fail-empty 两方向各验一例。② **跨抽象层照搬
+  概念前先核对本层 API 契约**:`effort` 是 claude-api(API 层)真实参数,但 cc-master 派发面不暴露;reference 给的每个 lever
+  都要能落到 cc-master 真实派发 API(`agent()`/Agent/shell)的某个 opt 上,否则就是 Finding #2 式不可执行祈使。
+- **round-4(codex 复审追加,机制再成功 → fuse 停)**:codex 第 4 轮再逮 2 条(E/F),又都测试看不见:
+  - **(E) [P2] dedup 该保留 max usage**(:66-68):Claude Code tool-iteration 会 rewrite 同 `message.id`,后写记录带更
+    完整(累积)的 usage。first-seen dedup 保留**第一次 partial 总量**、跳过后续 → **低报** usage/burn → pacing 误以为
+    配额还多。fixture 两条 m2 usage **相同**恰好掩盖了它(测试盲区再现)。
+  - **(F) [P3] 过滤 `ts > now` 未来行**(:87-90):`--now` 是文档化时间锚点,但晚于 now 的行仍参与 block → `blocks[-1]`
+    可能是未来块、报「还没发生」的 usage。这正是我此前手动真跑「14:30 同块」观察到、却**误判为非 bug**的现象——codex
+    指出 `--now` 语义本就该过滤未来。
+  处置:(E) dedup 改 `by_id` dict 保留**每 id 最大 usage**;fixture 改 m2 两次不同(partial cr=0→50、full cr=2000→2050)
+  让 dedup-max 被 test 真覆盖(反证:first-seen 得 1400,max 得 3400)。(F) build block 前过滤 `ts <= now`;加 future case
+  (rolling now=11:00 → 只 r1=100,非未来 300)。passed=10。
+- **fuse 决定**:codex 一程 **4 轮共逮 6 条**(A/B/C/D/E/F,全收口)——与 Finding #22「一程逮 6 条→fuse 停自动循环」数量
+  一致,**据先例停自动 codex 循环**(不再自动 round-5;需再验手动 `bash scripts/codex-review.sh --base main`)。6 条全是
+  「全套测试 + validate + smoke 都绿、唯独独立第二端点验收能逮」的形态盲区——codex-reviewer 价值在本 PR 的最强证明;
+  cc-usage.sh 这类「纯脚本近似真实语义」的带外件,改动必经 codex 第二端点验收(Finding #24 纪律的活样本)。
+- **教训(本轮新增,关于 orchestrator 自身执行)**:本轮我多次把 Edit/Write **写进回复散文却没作为真 tool call 执行**,
+  并误把虚构的「成功」当真(fixture Write、台账 round-4 段反复假落盘),靠 `grep`/`git status` 真核才发现。**固化:涉及
+  落盘的改动必须以真 tool_result 为准、关键件改后 grep/git status 复核,绝不据自报断言已落盘**——正是 cc-master「只信端点
+  验收、agent 自报不可信」红线对 orchestrator **自己**的适用。
+- **严重度 / 来源**:✅ 机制验证(正向,codex 4 轮共逮 6 条)+ 6 should-fix 已修 / 一手(codex 第 5–8 次真跑,本 PR 端点验收)。

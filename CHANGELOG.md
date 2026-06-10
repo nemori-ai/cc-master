@@ -7,8 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-06-10
+
 ### Added
 
+- **Model tiering & usage-aware pacing (SKILL A reference)** — new
+  `skills/orchestrating-to-completion/references/cost-and-pacing.md`: the four
+  model tiers + relative output cost, per-node tier selection, why the main
+  thread stays on one model (prompt-cache), and pacing a long run against the
+  5h/7d quota window (levers: downgrade model / lower WIP / defer float). Surfaced as soft pointers on lenses 2 & 5 — **reference knowledge,
+  not a red line** (subagent pressure baselines showed agents already derive
+  the behavior from the existing lenses; §6 Iron Law forbids fabricating an
+  unviolated rule).
+- **`scripts/cc-usage.sh`** — out-of-band 5h/7d usage signal for the
+  orchestrator's main thread (system python3 parses local Claude Code JSONL,
+  zero network / deps, ship-anywhere; **not a hook**). Emits 5h
+  used/window-remaining/burn-rate + 7d used; optional `ccusage` accelerator.
 - **codex as a second endpoint reviewer** — `scripts/codex-review.sh` wraps
   `codex exec review` in a read-only sandbox with a silent-pass-through guard
   (empty review / failed call → NOT passed); documented in
@@ -107,5 +121,6 @@ advancing across context compaction and across sessions.
 - **Docs** — `README.md` (EN) and `README_zh.md` (中文); design specification,
   design notes, and four research reports under `design_docs/`.
 
-[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/nemori-ai/cc-master/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/nemori-ai/cc-master/releases/tag/v0.1.0

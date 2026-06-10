@@ -49,7 +49,7 @@ cc-master/
 │   └── authoring-workflows/          ← SKILL B：workflow 写法 + references/ + assets/examples/
 ├── .claude/skills/            ← **项目自用** dev skill（cc-master-skillsmith：怎么造本仓 skill，**不分发**）
 ├── hooks/scripts/            ← bootstrap-board / reinject / verify-board（纯 bash 门控）
-├── scripts/                  ← 带外手动调用脚本：codex-review / eval-trigger / eval-benchmark
+├── scripts/                  ← 带外手动调用脚本：codex-review / eval-trigger / eval-benchmark / cc-usage
 ├── adrs/                     ← 结构性决策快照（ADR-001..005 + AGENTS.md 规约）
 ├── tests/                    ← hook 测试（bash）；run-tests.sh 编排 hook + content contract
 ├── design_docs/             ← 设计文档 + eval/ + dogfood-findings.md（plans/ gitignored）
@@ -194,10 +194,12 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 | 动 board 协议 / narrow-waist schema / status enum / 续跑续接 | [`skills/orchestrating-to-completion/references/board.md`](skills/orchestrating-to-completion/references/board.md) |
 | 异步完成 + HITL / p95 hedging / 用户当 async worker | [`skills/orchestrating-to-completion/references/async-hitl.md`](skills/orchestrating-to-completion/references/async-hitl.md) |
 | 廉价续跑 + 端点验收 / content-hash / codex 第二验收者 | [`skills/orchestrating-to-completion/references/resume-verify.md`](skills/orchestrating-to-completion/references/resume-verify.md) |
+| 选每节点模型档位 / 主线为何固定模型保 cache / 按 5h-7d 配额窗口 pace | [`skills/orchestrating-to-completion/references/cost-and-pacing.md`](skills/orchestrating-to-completion/references/cost-and-pacing.md)（reference 知识,非红线）|
 | 写 / 调试 / 启动 workflow 脚本（API + 机制 + pattern + 11 个 example）| [`skills/authoring-workflows/SKILL.md`](skills/authoring-workflows/SKILL.md) + [`references/`](skills/authoring-workflows/references/) + [`assets/examples/`](skills/authoring-workflows/assets/examples/) |
 | 写 / 改任何本仓 skill（尤其纪律型）/ 跑 pressure baseline | [`.claude/skills/cc-master-skillsmith/SKILL.md`](.claude/skills/cc-master-skillsmith/SKILL.md)（TDD-for-skills，项目自用 dev skill）|
 | 改 hook | [`hooks/scripts/`](hooks/scripts/) + [`tests/`](tests/) + [`CONTRIBUTING.md`](CONTRIBUTING.md)（先确认红线 1 纯 bash）|
 | 让 codex 当端点验收 reviewer | [`scripts/codex-review.sh`](scripts/codex-review.sh) + `/codex` skill |
+| 在 pacing 决策点感知 5h-7d usage（带外信号脚本，非 hook）| [`scripts/cc-usage.sh`](scripts/cc-usage.sh)（系统 python3 解析本地 JSONL，ship-anywhere）|
 | 跑触发准确率 eval（description 改动前后）| [`scripts/eval-trigger.sh`](scripts/eval-trigger.sh) + [`design_docs/eval/README.md`](design_docs/eval/README.md) |
 | 跑编排纪律 benchmark（行为型 + codex 第二评委）| [`scripts/eval-benchmark.sh`](scripts/eval-benchmark.sh) + [`design_docs/eval/track-b-benchmark.md`](design_docs/eval/track-b-benchmark.md) |
 | 写新 ADR / 援引现有 ADR / 判断 ADR-vs-design_docs | [`adrs/AGENTS.md`](adrs/AGENTS.md) + [`adrs/`](adrs/) |
