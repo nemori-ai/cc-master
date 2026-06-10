@@ -22,7 +22,9 @@ const audits = await pipeline((scoped?.modules ?? []).filter((m) => m.risk !== '
   (m) => workflow('security-audit-module', { target: m.path })   // child's `args` = {target}
     .catch(() => agent(`Audit ${m.path} for injection, authz bypass, and unsafe deserialization. Return findings as plain text.`,
       { label: `fallback:${m.path}`, phase: 'Audit' }))
-    .then((r) => ({ module: m.path, report: r })))
+    // child or fallback may yield null (dead child after retries, or a user-skipped agent) — return
+    // null so audits.filter(Boolean) drops it; wrapping it would over-report coverage in the log.
+    .then((r) => (r == null ? null : { module: m.path, report: r })))
 
 const done = audits.filter(Boolean)
 log(`audited ${done.length}/${(scoped?.modules ?? []).length} modules (low-risk skipped — saying so beats silent truncation)`)
