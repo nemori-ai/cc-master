@@ -38,6 +38,7 @@
 | 24 | codex 复审两轮逮 region 提取两反向漏洞(`log` 截断 fail-open + 嵌套字段伪装 fail-closed)| must-fix + should-fix | ✅ 已修(`tasks_region` 双深度 string-aware awk,三轮 codex 放行)|
 | 25 | Track A 满载环境信号死亡:正例 recall 地板=0,与 description 质量无关 | must-know(测量有效性)| 已记 caveat;语义改动降级定性评审 |
 | 26 | 模型分层 + usage-pacing baseline 零失败 → 归类为 reference 知识非红线(TDD-for-skills 防编造未被违反的规则)| ✅ 机制验证(正向)| 落 `cost-and-pacing.md` + lens 软指针,不写红线 |
+| 27 | codex 第二验收逮 `cc-usage.sh` 两 bug:ccusage 透传破坏 schema 契约(装了才坏)+ 陈旧 5h block 残留/负 remaining 误导 pacing | ✅ 机制验证(正向)+ 2 should-fix 已修 | (A) 移除 ccusage 透传走纯 python 单 schema;(B) active block 须 contain now、过期报 0;test 加 stale case passed=6 |
 
 > 基线健康(无问题留痕):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
@@ -468,7 +469,45 @@
   agent 自发会推」;② SKILL A 主文件只加 lens 2 / lens 5 各一句软指针 + reference index 一行(reinject 友好,主文件几乎
   不膨胀);③ 扩 `decomposition.md` 资源种子加 model 维度;④ 信号脚本 `scripts/cc-usage.sh`(带外、非 hook)作
   ship-anywhere 落地物。**不加任何红线 / Rationalization 行 / Red Flags 行。**
+- **dogfood 确认(live)**:派 subagent 模拟 orchestrator(只给 SKILL.md + references 访问、**不**直接喂
+  `cost-and-pacing.md`),问「配额紧张 + 7 个 leaf 怎么调度 / 各配什么模型 / 要不要切主线」——它顺着 lens 2/5
+  软指针**自己去读了 `cost-and-pacing.md`**,4 问全答对(`cc-usage.sh` 感知 + burn-rate 撞墙公式;5 机械→Haiku、
+  2 难活→Opus;90% 窗口时四杠杆 pacing + `blocked_on:quota-reset` defer + 不全停;不切主线保 cache 三理由),并
+  逐条给出文件引用追溯。**软指针 → reference 可达性 + 内容有效性闭环成立。**
 - **教训(固化候选)**:**baseline 零失败本身就是有效产出——它把「我以为该是红线」证伪成「其实是信息缺口」**。判断型纪律
   (红线 / Table)与告知型知识(reference)的分界,正应由 pressure baseline 来划:失败 → 判断缺口 → 红线;不失败 →
   信息缺口 → reference。不是每个「看起来该管」的主题都需要一条红线;TDD-for-skills 同时防漏(该堵的没堵)与防造(不该造的造了)。
+  另一条:**reference 知识的验收 = dogfood 可达性**(软指针真把 agent 引到 reference、且内容够它据此决策),而非判断型
+  纪律的 A/B pressure baseline——两类知识,两种验法:判断缺口用「无该 prose 时选错 → 加 prose 后选对」的 A/B,信息
+  缺口用「顺着指针读到 reference 并据此答对」的 dogfood。
 - **严重度 / 来源**:✅ 机制验证(正向)/ 一手(本轮 model-tiering-usage-pacing 落地,baseline 8 subagent 实测)。
+
+## Finding #27 — codex 第二端点验收(本 PR 首跑)逮到 `cc-usage.sh` 两个真 bug:schema 契约破裂 + 陈旧窗口误报 ✅正向
+
+- **现象**:model-tiering-usage-pacing 这轮端点验收,跑 `scripts/codex-review.sh --base main` 让 codex 审 6645c1c +
+  f7a60d8 全部 diff,出 **needs-attention 两条**(都 P2,都在 `scripts/cc-usage.sh`):
+  - **(A) ccusage 加速器透传破坏 schema 契约**(:42-43):装了 `ccusage` 的机器上,该分支直接 `printf` 原始
+    `ccusage blocks --json` 后 exit——但脚本头注释 + `cost-and-pacing.md` 都承诺归一化的 `five_hour`/`seven_day`
+    schema。任何按文档 schema 解析的调用方,**只在装了 ccusage 的机器上**会坏(环境相关、隐蔽)。
+  - **(B) 陈旧 5h block 误报**(:97-105):最新 JSONL 消息 >5h 前时,`blocks[-1]` 仍被当当前窗口,产出陈旧
+    `used_tokens`、甚至**负的** `window_remaining_min`(实测 now=20:00Z、窗口 15:00Z 已关 → used=3400 残留、
+    remaining=-300)。隔夜空闲后的 pacing 决策会误以为旧窗口还活着。
+- **根因(机制成功)**:codex 作为独立第二端点验收者,审出我**测试 + 自读 diff 都漏掉**的两个形态盲区——测试只覆盖了
+  「窗口活跃 + 无 ccusage」这一种乖形态(与 Finding #24「测试只覆盖乖 board 形态」、#12「各子集绿≠全绿」同根)。
+  (A) 是「带外脚本对未安装的外部工具 schema 下注」;(B) 是「滑动窗口边界没处理过期」。
+- **影响**:**codex-reviewer 价值第 5 次真实兑现**(继 #19/#20/#21/#22/#24 之后)。两条都过了当时全套测试
+  (passed=45+3+6)+ plugin validate + smoke——纯结构/correctness 测试看不见,只有独立语义审查能逮。(B) 的负
+  remaining 会直接误导 pacing(本 PR 的核心用途),危害不小。
+- **处置**(端点暴露、T∞≈T₁,按 Finding #13/#19 carve-out orchestrator 直接 TDD 收口):
+  - (A) **彻底移除 ccusage 透传分支** + `--no-ccusage` flag——纯 python 解析自洽、受控、零依赖、可测;ccusage「更准」的
+    边际收益不抵 schema 不一致 + 本环境不可验(没装 ccusage,违反 Finding #20「带外脚本 V 端点必须真跑」)的代价。注释
+    留增强指针(「未来加速器须先把 ccusage 归一化到本 schema」);`cost-and-pacing.md` §Sensing 第 2 路径改为
+    「orchestrator 可独立跑 ccusage」,不再宣称 cc-usage.sh 内部用它。
+  - (B) **active block 须 CONTAIN now**:`now <= start + 5h` 才算活跃窗口,否则报 clean zero(窗口已翻新),绝不残留
+    used 或负 remaining。
+  - test 加 stale-window case(now=20:00Z → used=0/rem=0;先 Red 确认 used=3400/rem=-300、passed=4 failed=2 →
+    Green passed=6)。
+- **教训(固化候选)**:呼应 Finding #24——**纯 shell/脚本近似真实语义时,必须对协议/环境允许的全部形态做对抗推演**:
+  滑动窗口问「过期了会怎样」(负数/残留),带外加速器问「外部工具 schema 和我承诺的一致吗 / 我能在本环境验证它吗」。
+  codex 第二端点验收对这类「测试全绿但形态覆盖不足」命中率极高(本案再中两条),hook/带外脚本改动上值得常设。
+- **严重度 / 来源**:✅ 机制验证(正向)+ 2 should-fix 已修 / 一手(codex 第 5 次真跑,本 PR 端点验收)。

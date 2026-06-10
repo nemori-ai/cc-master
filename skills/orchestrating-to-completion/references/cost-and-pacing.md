@@ -82,7 +82,9 @@ Three ways to read them, in ship-anywhere order:
    the main thread at a pacing decision point, like `codex-review.sh`). Emits
    `five_hour{used_tokens, window_remaining_min, burn_rate_per_min}` + `seven_day{used_tokens}`.
 2. **`npx ccusage blocks --json`** — community tool, more accurate, carries an official burn
-   rate; `cc-usage.sh` uses it as an optional accelerator when present.
+   rate; run it directly if you have it. (`cc-usage.sh` deliberately does **not** shell out to
+   it — ccusage's raw schema differs from ours, so `cc-usage.sh` always emits the normalized
+   schema above; a future accelerator would have to map ccusage into that schema first.)
 3. **Status-line stdin** `rate_limits.{five_hour,seven_day}.used_percentage` — Pro/Max only,
    reachable **only** from a status-line script (not the JSONL). So `cc-usage.sh` does *not*
    emit context% / `used_percentage` — that one is status-line-only.

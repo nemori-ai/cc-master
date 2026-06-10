@@ -3,9 +3,8 @@
 #
 # Ship-anywhere: the system python3 (3.9-compatible) parses local Claude Code JSONL
 # (~/.claude/projects/**/*.jsonl, the assistant.message.usage records) and computes the
-# current 5h rolling block + the 7d total. Zero network, zero extra deps. If `ccusage` is
-# on PATH it is used as an optional accelerator (more accurate, carries an official burn
-# rate) — pass --no-ccusage to force the pure parser.
+# current 5h rolling block + the 7d total. Zero network, zero extra deps — and it ALWAYS
+# emits the normalized schema below (no external tool whose output shape we don't control).
 #
 # Out-of-band like codex-review / eval: this is a script the orchestrator's MAIN THREAD
 # runs deliberately at a pacing decision point. It is NOT a hook — it does NOT live in
@@ -17,32 +16,28 @@
 # it. It emits 5h/7d token usage + a 5h burn rate, which is what a long-horizon
 # orchestrator needs to pace against a rolling quota window.
 #
-# Usage: cc-usage.sh [--dir <jsonl-root>] [--now <ISO8601>] [--no-ccusage]
-#   --dir         JSONL root (default ~/.claude/projects) — also lets tests point at a fixture.
-#   --now         override "now" with an ISO-8601 instant — makes the rolling window deterministic.
-#   --no-ccusage  force the pure-python parser even when ccusage is installed.
+# Usage: cc-usage.sh [--dir <jsonl-root>] [--now <ISO8601>]
+#   --dir  JSONL root (default ~/.claude/projects) — also lets tests point at a fixture.
+#   --now  override "now" with an ISO-8601 instant — makes the rolling window deterministic.
 #
 # Output (JSON, one line):
 #   {"five_hour":{"used_tokens":N,"window_remaining_min":M,"burn_rate_per_min":R},
 #    "seven_day":{"used_tokens":N}}
 set -uo pipefail
 
-DIR="${HOME}/.claude/projects"; NOW=""; USE_CCUSAGE=1
+DIR="${HOME}/.claude/projects"; NOW=""
 while [ $# -gt 0 ]; do
   case "$1" in
-    --dir)        DIR="$2"; shift 2;;
-    --now)        NOW="$2"; shift 2;;
-    --no-ccusage) USE_CCUSAGE=0; shift;;
-    *)            shift;;
+    --dir) DIR="$2"; shift 2;;
+    --now) NOW="$2"; shift 2;;
+    *)     shift;;
   esac
 done
 
-# Optional accelerator: only when ccusage is present AND no fixed --now was requested
-# (ccusage always reports against the real now, so it cannot honor a test --now).
-if [ "$USE_CCUSAGE" -eq 1 ] && command -v ccusage >/dev/null 2>&1 && [ -z "$NOW" ]; then
-  out="$(ccusage blocks --json 2>/dev/null)" && [ -n "$out" ] && { printf '%s\n' "$out"; exit 0; }
-fi
-
+# Pure-python parse only — always emits the normalized schema below. (A `ccusage` accelerator
+# was intentionally dropped: its raw `blocks --json` shape differs from ours, so piping it
+# through verbatim would break any caller parsing the documented schema. A future accelerator
+# MUST first normalize ccusage output into THIS schema; until then, zero external-tool dep.)
 DIR="$DIR" NOW="$NOW" python3 - <<'PY'
 import os, json, glob, datetime as dt
 
@@ -94,17 +89,21 @@ for ts, tok in rows:
 if cur:
     blocks.append(cur)
 
+# Only the block that still CONTAINS now is the active window. If the most recent activity is
+# >5h old, that block already closed (the quota window refreshed) — report a clean zero, never
+# a stale used_tokens nor a negative window_remaining_min.
 fh = {"used_tokens": 0, "window_remaining_min": 0, "burn_rate_per_min": 0}
 if blocks:
     b = blocks[-1]
-    used = sum(t for _, t in b)
     start = b[0][0]
-    elapsed_min = max((now - start).total_seconds() / 60, 1)
-    fh = {
-        "used_tokens": used,
-        "window_remaining_min": round(((start + five) - now).total_seconds() / 60),
-        "burn_rate_per_min": round(used / elapsed_min),
-    }
+    if now <= start + five:
+        used = sum(t for _, t in b)
+        elapsed_min = max((now - start).total_seconds() / 60, 1)
+        fh = {
+            "used_tokens": used,
+            "window_remaining_min": round(((start + five) - now).total_seconds() / 60),
+            "burn_rate_per_min": round(used / elapsed_min),
+        }
 
 wk = sum(tok for ts, tok in rows if now - ts <= dt.timedelta(days=7))
 print(json.dumps({"five_hour": fh, "seven_day": {"used_tokens": wk}}))
