@@ -88,6 +88,7 @@ crossed. Name it, then go back to the decision program.
 | "It's a **one-line fix** — faster if I just do it myself than dispatch." | That breaks **指挥不演奏**. The only hand-fix allowed is a micro-fixup that endpoint verification *itself* exposed when T∞≈T₁. A "quick" change you reached for *before* verification is you picking up an instrument. Dispatch it. |
 | "The **gate is green / the review came back empty** — that counts as passed." | **Gate-green ≠ passed.** A null or empty review is *not passed* — it is silent pass-through, the exact failure mode the red line names. You must read the diff / verify independently before a node becomes `done`. |
 | "This case is **special — I'll just decide the merge** (or the irreversible/outward-facing step) for the user to keep momentum." | That's **overreach**. Merge / irreversible / outward-facing / directional / final-approval belongs to the user. Surface it as a `blocked_on:"user"` node and dispatch everything that *doesn't* depend on the answer — momentum and asking are not in tension (lens 7). |
+| "That decision point **isn't ready yet — I'll stop and ask the user when we get there**." | Sitting on a *foreseeable* user decision welds the future critical path to the user's online schedule. The answer is an async dependency (lens 7) — **prefetch it**: if only the user can answer and the question is already decision-shaped, ask now, in parallel with the background. The ask-trigger is "foreseeable + user reachable", never "node became ready" — see `references/async-hitl.md` §HITL. |
 
 ## Red Flags — STOP and re-run the decision program
 
@@ -156,7 +157,7 @@ parallel, so a dense front-of-house Q&A never serializes independent goals; **(b
 means *independently, at your own endpoint* — never a re-read of the agent's self-report; **(c)**
 before you take the `wait` edge, write the **step-6 ledger** (per-path self-check + acceptance
 evidence, into both the conversation and the board — exact shape and why-it-matters in
-`references/async-hitl.md`), then flush.
+`references/async-hitl.md` §"The step-6 ledger — the fixed shape (single source)"), then flush.
 
 **The decision program is a hand-run dataflow scheduler — a TFU.** Dispatch-when-ready, overlap
 the waits, stop only when the ready set is empty: the same dataflow idea `pipeline()` runs as

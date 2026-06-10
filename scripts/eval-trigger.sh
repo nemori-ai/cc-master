@@ -15,12 +15,13 @@ set -euo pipefail
 
 SKILL="${1:?usage: eval-trigger.sh <skill-name>}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-SC="$HOME/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator"
+SC="${CC_MASTER_SKILL_CREATOR:-$HOME/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator}"
 
 EVAL_SET="$REPO/skills/$SKILL/evals/trigger.json"
 SKILL_PATH="$REPO/skills/$SKILL"
 
-[ -d "$SC" ] || { echo "skill-creator not found at: $SC" >&2; exit 1; }
+command -v uv >/dev/null 2>&1 || { echo "uv not found on PATH — install uv (https://docs.astral.sh/uv/) first" >&2; exit 1; }
+[ -d "$SC" ] || { echo "skill-creator not found at: $SC (set CC_MASTER_SKILL_CREATOR to override)" >&2; exit 1; }
 [ -f "$EVAL_SET" ] || { echo "no eval set at: $EVAL_SET" >&2; exit 1; }
 [ -f "$SKILL_PATH/SKILL.md" ] || { echo "no SKILL.md at: $SKILL_PATH" >&2; exit 1; }
 

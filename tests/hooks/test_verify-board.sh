@@ -73,9 +73,39 @@ rm -rf "$H"
 # ─── SELF-CHECK HANDSHAKE (completion state: all in_flight/blocked/done) ───────────────────────────
 
 # fp_of BOARD — compute the completion-state fingerprint of a board exactly as the hook does
-# (id+status+blocked_on triples, file order, no sort), so tests can seed the sidecar's
-# last_handshook_fp field deterministically. MUST mirror status_fingerprint() in verify-board.sh.
-fp_of() { grep '"deps"' "$1" 2>/dev/null | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | cksum | awk '{print $1}'; }
+# (id+status+blocked_on triples inside the bracket-matched tasks array, file order, no sort), so
+# tests can seed the sidecar's last_handshook_fp field deterministically. MUST mirror
+# status_fingerprint() + tasks_region() in verify-board.sh.
+tasks_region_t() {
+  awk '
+    { s = s $0 "\n" }
+    END {
+      i = index(s, "\"tasks\""); if (!i) exit
+      s = substr(s, i + 7)
+      j = index(s, "["); if (!j) exit
+      s = substr(s, j + 1)
+      bd = 1; cd = 0; instr = 0; esc = 0; out = ""
+      n = length(s)
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        if (instr) {
+          if (bd == 1 && cd == 1) out = out ch
+          if (esc) esc = 0
+          else if (ch == "\\") esc = 1
+          else if (ch == "\"") instr = 0
+          continue
+        }
+        if (ch == "\"") { instr = 1; if (bd == 1 && cd == 1) out = out ch; continue }
+        if (ch == "[") { bd++; continue }
+        if (ch == "]") { bd--; if (bd == 0) break; continue }
+        if (ch == "{") { cd++; continue }
+        if (ch == "}") { cd--; continue }
+        if (bd == 1 && cd == 1) out = out ch
+      }
+      printf "%s", out
+    }' "$1" 2>/dev/null
+}
+fp_of() { tasks_region_t "$1" | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | cksum | awk '{print $1}'; }
 
 # Case H (NEW): completion state (in_flight/blocked/done), no sidecar mark → BLOCK with self-check
 #                checklist, AND sidecar's last_handshook_fp set to the current fingerprint.
@@ -252,6 +282,59 @@ assert_not_contains "$HOOK_OUT" "block" "P4: same fingerprint third Stop → sti
 printf '%s' '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-fp"},"tasks":[{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":[]}]}' > "$BOARD"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "P4: fingerprint changed → re-block handshake"
+rm -rf "$H"
+
+# ─── SINGLE-LINE BOARD (format-agnostic tasks-region scoping) ─────────────────────────────────────
+# The hook must behave identically on compact single-line JSON and on pretty-printed multi-line
+# JSON — the old line-based grep scoping silently assumed "one task object per line".
+
+# Case S: SINGLE-LINE board, empty tasks[] but log[] carries "id" entries → must still be detected
+#          as EMPTY and block. (Line-based grep -c '"id"' saw the whole line and miscounted.)
+H="$(make_project)"
+mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[],"log":[{"id":"L1","status":"note"}]}'
+run_stop "$H"
+assert_contains "$HOOK_OUT" "no tasks" "single-line: empty tasks + log ids → still detected EMPTY (not mistaken for a filled board)"
+rm -rf "$H"
+
+# Case T: SINGLE-LINE board, all tasks done, log entry carries status:"ready" → log must NOT count
+#          as actionable. First Stop = completion handshake (self-check), and a LOG APPEND between
+#          Stops must not change the fingerprint → second Stop allows.
+H="$(make_project)"; SID="sess-slog"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}],\"log\":[{\"id\":\"L1\",\"status\":\"ready\"}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "self-check" "single-line: log status=ready ignored → completion handshake, not actionable block"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}],\"log\":[{\"id\":\"L1\",\"status\":\"ready\"},{\"id\":\"L2\",\"status\":\"appended\"}]}"
+run_stop_sid "$H" "$SID"
+assert_not_contains "$HOOK_OUT" "block" "single-line: log append does not change fingerprint → same state allows"
+rm -rf "$H"
+
+# Case V (codex review catch): a TASK-LOCAL flexible "log" field must not truncate the region.
+#          T1 carries tasks[0].log (allowed agent-shaped field); T2 after it is ready. The hook must
+#          still see T2 as actionable and block with the ACTIONABLE message (not a self-check
+#          handshake on a truncated prefix).
+H="$(make_project)"
+mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[{"id":"T1","status":"done","deps":[],"log":["did x"]},{"id":"T2","status":"ready","deps":[]}],"log":[]}'
+run_stop "$H"
+assert_contains "$HOOK_OUT" "still has" "task-local log field does not truncate region → later ready task still actionable (codex catch)"
+rm -rf "$H"
+
+# Case W (codex review catch, round 2): STRUCTURED task-local log entries must not read as task
+#          state. A done task carrying "log":[{"id":"L1","status":"ready"}] is a COMPLETION state —
+#          first Stop must be the self-check handshake (not an actionable block), and the same
+#          state must allow on the second Stop instead of blocking until the fuse trips.
+H="$(make_project)"; SID="sess-tlog"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[],\"log\":[{\"id\":\"L1\",\"status\":\"ready\"}]}],\"log\":[]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "self-check" "structured task-local log status=ready ignored → completion handshake (codex catch r2)"
+run_stop_sid "$H" "$SID"
+assert_not_contains "$HOOK_OUT" "block" "structured task-local log → same completion state allows on second Stop"
+rm -rf "$H"
+
+# Case U: SINGLE-LINE fingerprint scoped to tasks region — identical tasks, different log → SAME fp.
+H="$(make_project)"
+printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]}],"log":[{"id":"L1","status":"alpha"}]}' > "$H/a.board.json"
+printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]}],"log":[{"id":"L9","status":"omega"}]}' > "$H/b.board.json"
+assert_eq "$(fp_of "$H/a.board.json")" "$(fp_of "$H/b.board.json")" "single-line fingerprint scoped to tasks region (log excluded)"
 rm -rf "$H"
 
 finish

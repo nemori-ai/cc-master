@@ -54,6 +54,46 @@ board_matches() { # $1 = board path
   [ "$board_sid" = "$sid" ]
 }
 
+# tasks_region BOARD — print the TOP-LEVEL FIELD STREAM of each object in the "tasks" array, via a
+# string- and escape-aware double-depth scan ([ ] and { }) in POSIX awk (a shell tool, like the
+# cksum|awk below — NOT a jq/node runtime). FORMAT-AGNOSTIC: multi-line and compact single-line
+# JSON behave identically — no per-line layout assumption. Only characters at task-object top level
+# (bracket depth 1 inside the array, curly depth 1 inside the task) are emitted: nested flexible
+# fields — a task-local "log" array, structured entries like {"id":"L1","status":"ready"} inside it
+# (codex review catches, rounds 1+2) — are dropped wholesale, so they can neither truncate the scan
+# nor masquerade as task id/status/blocked_on state. Sole remaining caveat: the first quoted
+# literal `"tasks"` token in the file must be the tasks key itself (true for the pinned waist;
+# goal/log prose never needs that exact quoted token).
+tasks_region() {
+  awk '
+    { s = s $0 "\n" }
+    END {
+      i = index(s, "\"tasks\""); if (!i) exit
+      s = substr(s, i + 7)
+      j = index(s, "["); if (!j) exit
+      s = substr(s, j + 1)                 # start INSIDE the tasks array
+      bd = 1; cd = 0; instr = 0; esc = 0; out = ""
+      n = length(s)
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        if (instr) {
+          if (bd == 1 && cd == 1) out = out ch
+          if (esc) esc = 0
+          else if (ch == "\\") esc = 1
+          else if (ch == "\"") instr = 0
+          continue
+        }
+        if (ch == "\"") { instr = 1; if (bd == 1 && cd == 1) out = out ch; continue }
+        if (ch == "[") { bd++; continue }
+        if (ch == "]") { bd--; if (bd == 0) break; continue }
+        if (ch == "{") { cd++; continue }
+        if (ch == "}") { cd--; continue }
+        if (bd == 1 && cd == 1) out = out ch
+      }
+      printf "%s", out
+    }' "$1" 2>/dev/null
+}
+
 active_found=0; empty_active=0; actionable=0
 matched_boards=""                          # newline-separated paths of THIS session's active boards
 for b in "$HOME_DIR"/*.board.json; do
@@ -62,13 +102,16 @@ for b in "$HOME_DIR"/*.board.json; do
   active_found=1
   matched_boards="$matched_boards$b
 "
-  # Count task objects by their "id" key (robust vs the word "status" appearing in log/note text).
-  # Keep the fallback OUTSIDE the substitution: grep -c prints "0" AND exits 1 on zero matches, so a
-  # `|| echo 0` inside $(...) would append a second "0" → "0\n0" → integer test crash.
-  tc="$(grep -cE '"id"[[:space:]]*:' "$b" 2>/dev/null)" || tc=0
+  # All detection below is scoped to the tasks REGION, never the whole file — log/owner fields can
+  # then never masquerade as tasks, regardless of how the JSON is line-wrapped.
+  region="$(tasks_region "$b")"
+  # Count task objects by their "id" key inside the region. Keep the fallback OUTSIDE the
+  # substitution: grep -c prints "0" AND exits 1 on zero matches, so a `|| echo 0` inside $(...)
+  # would append a second "0" → "0\n0" → integer test crash.
+  tc="$(printf '%s' "$region" | grep -cE '"id"[[:space:]]*:')" || tc=0
   [ "$tc" -eq 0 ] && empty_active=1
-  # Actionable = a ready or uncertain task remains (still-ready work / output pending verification).
-  if grep -qE '"status"[[:space:]]*:[[:space:]]*"(ready|uncertain)"' "$b" 2>/dev/null; then
+  # Actionable = a ready or uncertain TASK remains (log entries excluded by the region scope).
+  if printf '%s' "$region" | grep -qE '"status"[[:space:]]*:[[:space:]]*"(ready|uncertain)"'; then
     actionable=1
   fi
 done
@@ -77,13 +120,13 @@ done
 # per-task id+status+blocked_on triples IN FILE ORDER (NOT sorted) → the digest binds each id to its
 # status, so swapping two tasks' statuses or changing a task's blocked_on yields a DIFFERENT
 # fingerprint and re-forces the self-check (Finding #21). Status-multiset-only hashing missed those.
-# SCOPING (Finding #22, codex review catch): only TASK rows are fingerprinted — we first select lines
-# carrying `"deps"` (every task in the pinned waist has deps; flexible fields like `log` entries do
-# not), so audit-log prose or other non-task fields can never look like a changed completion state.
-# (Assumes one task object per line, as written by the snapshot Write and the board template.)
+# SCOPING (Finding #22 + format-agnostic rework): only the tasks REGION is fingerprinted (see
+# tasks_region above), so audit-log prose or other non-task fields can never look like a changed
+# completion state — and a log append between Stops never re-forces a handshake. Works identically
+# on single-line and multi-line JSON; no per-line layout assumption remains.
 status_fingerprint() {
   printf '%s' "$matched_boards" | while IFS= read -r bp; do
-    [ -n "$bp" ] && grep '"deps"' "$bp" 2>/dev/null \
+    [ -n "$bp" ] && tasks_region "$bp" \
       | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"'
   done | cksum | awk '{print $1}'
 }
@@ -99,7 +142,8 @@ emit_block() { # $1 = reason text — bump streak, fuse-check, write sidecar, pr
     printf '{"reason":%s}\n' "$esc"   # no decision:block → not a block; agent stops with a warning shown
     exit 0
   fi
-  printf '%s %s\n' "$block_streak" "$last_handshook_fp" > "$SIDECAR"
+  # Atomic write (tmp + mv): a concurrent Stop never observes a torn sidecar.
+  printf '%s %s\n' "$block_streak" "$last_handshook_fp" > "$SIDECAR.tmp.$$" && mv -f "$SIDECAR.tmp.$$" "$SIDECAR"
   esc="$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/^/"/; s/$/"/')"
   printf '{"decision":"block","reason":%s}\n' "$esc"
   exit 0
@@ -108,7 +152,7 @@ allow() { rm -f "$SIDECAR"; exit 0; }   # allow → clear sidecar (streak → 0)
 # allow_handshook_fp — allow, but KEEP the handshook fingerprint so the SAME completion state keeps
 # allowing on every subsequent Stop (it has already been self-checked). Streak resets to 0; only a
 # CHANGED fingerprint (or actionable work, which writes "-") will re-force a self-check.
-allow_handshook_fp() { printf '0 %s\n' "$last_handshook_fp" > "$SIDECAR"; exit 0; }
+allow_handshook_fp() { printf '0 %s\n' "$last_handshook_fp" > "$SIDECAR.tmp.$$" && mv -f "$SIDECAR.tmp.$$" "$SIDECAR"; exit 0; }
 
 # No matching active board → dormant → allow.
 [ "$active_found" -eq 0 ] && allow

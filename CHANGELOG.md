@@ -7,7 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **codex as a second endpoint reviewer** — `scripts/codex-review.sh` wraps
+  `codex exec review` in a read-only sandbox with a silent-pass-through guard
+  (empty review / failed call → NOT passed); documented in
+  `skills/orchestrating-to-completion/references/resume-verify.md`.
+- **Eval mechanism** — Track A (trigger-accuracy: `scripts/eval-trigger.sh` +
+  per-skill `evals/trigger.json`) and Track B (orchestration-discipline
+  benchmark: `scripts/eval-benchmark.sh` + `design_docs/eval/`).
+
+### Fixed
+
+- **goal-hook is now JSON-layout-agnostic** — task counting, actionable
+  detection, and the completion fingerprint in `verify-board.sh` are scoped to
+  the bracket-matched `tasks` array (string- and escape-aware depth scan)
+  emitting only task-object top-level fields, instead of relying on a
+  one-task-object-per-line layout. Compact single-line boards no longer
+  miscount log entries as tasks, a `status:"ready"` inside `log[]` no longer
+  blocks forever, a log append between Stops no longer re-forces the self-check
+  handshake, and flexible task-local fields — including a nested `log` with
+  structured `{"id","status"}` entries — can neither truncate the scan nor
+  masquerade as task state (codex review catches, two rounds).
+- **Sidecar writes are atomic** (tmp + `mv`) — a concurrent Stop can never
+  observe a torn handshake/fuse state.
+
+### Changed
+
+- **SKILL A: question-prefetch discipline (HITL)** — new `async-hitl.md` HITL
+  bullet + Rationalization Table row: a foreseeable user decision on a
+  not-yet-ready node is asked NOW while the user is reachable (the ask-trigger
+  is "only the user can answer", never "the node became ready"), bounded
+  against speculative question-peppering. Pressure-baselined per the
+  skillsmith Iron Law: 6 baseline runs, 1 captured failure ("I'll stop and ask
+  when we get there"), GREEN verified 2/2 with citations.
+- **Skills optimization pass** — both shipped skills tightened (descriptions,
+  reference TOCs, SSOT convergence per dogfood findings #7/#11/#13).
+- **Out-of-band scripts hardened** — `CODEX_REVIEW_MODEL` overrides the codex
+  review model; `CC_MASTER_SKILL_CREATOR` overrides the skill-creator path in
+  both eval wrappers; both eval wrappers pre-check that `uv` is on PATH and
+  fail with an actionable message instead of `command not found`.
+- **AGENTS.md** rewritten as the contributor entry point: five red lines with
+  SSOT + grep/CI gates, a trigger-based deep-reading table, and the
+  gstack × superpowers iteration paradigm.
 
 ## [0.1.0] — 2026-06-08
 

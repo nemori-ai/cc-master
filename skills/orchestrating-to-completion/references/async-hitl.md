@@ -48,6 +48,16 @@ not poll; the notification drives reconciliation, and reconciliation drives the 
 - **User input is an async dependency** — model it as a board node with
   `status: "blocked"`, `blocked_on: "user"`. The user's answer is just another async
   dependency satisfying that edge.
+- **Prefetch foreseeable user decisions — the ask-trigger is "only the user can answer",
+  never "the node became ready"** — scan the DAG's not-yet-ready nodes for decision-shaped
+  ambiguities (acceptable downtime, scope cuts, go/no-go constraints, unwritten spec points).
+  If the user is reachable and the answer would change what gets dispatched or how, ask NOW —
+  a natural front-of-house beat (a status reply) is the perfect carrier. A prefetched answer
+  is float bought for free; "I'll stop and ask when we get there" welds the future critical
+  path to the user's online schedule. Boundary: this is *not* "clear the whole question
+  backlog" — a speculative question whose context doesn't exist yet yields an unreliable
+  answer plus noise. Ask only what is already decision-shaped and will foreseeably sit on a
+  path; batch into the beat, don't pepper.
 - **Ready work that doesn't depend on the user dispatches anyway** — the front-of-house
   question runs **in parallel** with background execution. Surfacing a question to the user
   never stalls work that doesn't need that answer (lens 7: front-of-house dialogue ∥
