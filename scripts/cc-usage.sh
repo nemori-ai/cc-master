@@ -78,12 +78,14 @@ for f in glob.glob(os.path.join(root, "**", "*.jsonl"), recursive=True):
 
 rows.sort(key=lambda r: r[0])
 
-# 5h rolling block (ccusage口径): break when the gap to the previous msg exceeds 5h;
-# the active block is the one containing the most recent message.
+# 5h rolling block (ccusage口径): a new block starts when the gap to the previous msg exceeds
+# 5h (idle) OR when the running block has already spanned a full 5h from its FIRST msg
+# (continuous use crossing the boundary — otherwise sustained usage past 5h would wrongly
+# report 0). The active block is then the one that still contains now.
 five = dt.timedelta(hours=5)
 blocks, cur = [], []
 for ts, tok in rows:
-    if cur and ts - cur[-1][0] > five:
+    if cur and (ts - cur[-1][0] > five or ts - cur[0][0] >= five):
         blocks.append(cur); cur = []
     cur.append((ts, tok))
 if cur:
