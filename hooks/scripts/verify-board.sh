@@ -54,17 +54,36 @@ board_matches() { # $1 = board path
   [ "$board_sid" = "$sid" ]
 }
 
-# tasks_region BOARD — print the slice of the board between the "tasks" key and the "log" key
-# (or EOF when no "log"). Pure bash parameter expansion → FORMAT-AGNOSTIC: multi-line and compact
-# single-line JSON behave identically, so the old "one task object per line" assumption is gone.
-# Caveats (template-backed): the pinned waist orders tasks before log; a quoted literal "tasks" /
-# "log" KEY inside prose text would shift the slice — board text never needs those exact tokens.
+# tasks_region BOARD — print exactly the "tasks" ARRAY by bracket matching (depth-scanned, string-
+# and escape-aware), via POSIX awk (a shell tool, like the cksum|awk below — NOT a jq/node runtime).
+# FORMAT-AGNOSTIC: multi-line and compact single-line JSON behave identically, so the old "one task
+# object per line" assumption is gone. Bracket matching (not a cut at the next top-level key) means
+# flexible agent-shaped fields INSIDE a task — including one literally named "log" (codex review
+# catch) — can never truncate the region. Sole remaining caveat: the first quoted literal `"tasks"`
+# token in the file must be the tasks key itself (true for the pinned waist; goal/log prose never
+# needs that exact quoted token).
 tasks_region() {
-  local c r
-  c="$(cat "$1" 2>/dev/null)" || return 0
-  r="${c#*\"tasks\"}"
-  [ "$r" = "$c" ] && return 0          # no "tasks" key at all → empty region
-  printf '%s' "${r%%\"log\"*}"
+  awk '
+    { s = s $0 "\n" }
+    END {
+      i = index(s, "\"tasks\""); if (!i) exit
+      s = substr(s, i + 7)
+      j = index(s, "["); if (!j) exit
+      s = substr(s, j)
+      depth = 0; instr = 0; esc = 0; out = ""
+      n = length(s)
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        out = out ch
+        if (esc)        { esc = 0; continue }
+        if (ch == "\\") { if (instr) esc = 1; continue }
+        if (ch == "\"") { instr = !instr; continue }
+        if (instr) continue
+        if (ch == "[") depth++
+        else if (ch == "]") { depth--; if (depth == 0) break }
+      }
+      printf "%s", out
+    }' "$1" 2>/dev/null
 }
 
 active_found=0; empty_active=0; actionable=0

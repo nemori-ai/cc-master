@@ -73,10 +73,33 @@ rm -rf "$H"
 # ─── SELF-CHECK HANDSHAKE (completion state: all in_flight/blocked/done) ───────────────────────────
 
 # fp_of BOARD — compute the completion-state fingerprint of a board exactly as the hook does
-# (id+status+blocked_on triples inside the tasks region, file order, no sort), so tests can seed
-# the sidecar's last_handshook_fp field deterministically. MUST mirror status_fingerprint() +
-# tasks_region() in verify-board.sh.
-fp_of() { local c r; c="$(cat "$1" 2>/dev/null)"; r="${c#*\"tasks\"}"; [ "$r" = "$c" ] && r=""; r="${r%%\"log\"*}"; printf '%s' "$r" | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | cksum | awk '{print $1}'; }
+# (id+status+blocked_on triples inside the bracket-matched tasks array, file order, no sort), so
+# tests can seed the sidecar's last_handshook_fp field deterministically. MUST mirror
+# status_fingerprint() + tasks_region() in verify-board.sh.
+tasks_region_t() {
+  awk '
+    { s = s $0 "\n" }
+    END {
+      i = index(s, "\"tasks\""); if (!i) exit
+      s = substr(s, i + 7)
+      j = index(s, "["); if (!j) exit
+      s = substr(s, j)
+      depth = 0; instr = 0; esc = 0; out = ""
+      n = length(s)
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        out = out ch
+        if (esc)        { esc = 0; continue }
+        if (ch == "\\") { if (instr) esc = 1; continue }
+        if (ch == "\"") { instr = !instr; continue }
+        if (instr) continue
+        if (ch == "[") depth++
+        else if (ch == "]") { depth--; if (depth == 0) break }
+      }
+      printf "%s", out
+    }' "$1" 2>/dev/null
+}
+fp_of() { tasks_region_t "$1" | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | cksum | awk '{print $1}'; }
 
 # Case H (NEW): completion state (in_flight/blocked/done), no sidecar mark → BLOCK with self-check
 #                checklist, AND sidecar's last_handshook_fp set to the current fingerprint.
@@ -277,6 +300,16 @@ assert_contains "$HOOK_OUT" "self-check" "single-line: log status=ready ignored 
 mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}],\"log\":[{\"id\":\"L1\",\"status\":\"ready\"},{\"id\":\"L2\",\"status\":\"appended\"}]}"
 run_stop_sid "$H" "$SID"
 assert_not_contains "$HOOK_OUT" "block" "single-line: log append does not change fingerprint → same state allows"
+rm -rf "$H"
+
+# Case V (codex review catch): a TASK-LOCAL flexible "log" field must not truncate the region.
+#          T1 carries tasks[0].log (allowed agent-shaped field); T2 after it is ready. The hook must
+#          still see T2 as actionable and block with the ACTIONABLE message (not a self-check
+#          handshake on a truncated prefix).
+H="$(make_project)"
+mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[{"id":"T1","status":"done","deps":[],"log":["did x"]},{"id":"T2","status":"ready","deps":[]}],"log":[]}'
+run_stop "$H"
+assert_contains "$HOOK_OUT" "still has" "task-local log field does not truncate region → later ready task still actionable (codex catch)"
 rm -rf "$H"
 
 # Case U: SINGLE-LINE fingerprint scoped to tasks region — identical tasks, different log → SAME fp.

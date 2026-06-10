@@ -21,11 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **goal-hook is now JSON-layout-agnostic** — task counting, actionable
   detection, and the completion fingerprint in `verify-board.sh` are scoped to
-  the board's tasks region (between the `"tasks"` and `"log"` keys) instead of
-  relying on a one-task-object-per-line layout. Compact single-line boards no
-  longer miscount log entries as tasks, a `status:"ready"` inside `log[]` no
-  longer blocks forever, and a log append between Stops no longer re-forces the
-  self-check handshake.
+  the bracket-matched `tasks` array (string- and escape-aware depth scan)
+  instead of relying on a one-task-object-per-line layout. Compact single-line
+  boards no longer miscount log entries as tasks, a `status:"ready"` inside
+  `log[]` no longer blocks forever, a log append between Stops no longer
+  re-forces the self-check handshake, and a flexible task-local `log` field
+  cannot truncate the scan (codex review catch).
 - **Sidecar writes are atomic** (tmp + `mv`) — a concurrent Stop can never
   observe a torn handshake/fuse state.
 
