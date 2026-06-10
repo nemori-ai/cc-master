@@ -51,7 +51,10 @@ total duration; compressing non-critical-path tasks is wasted effort. A non-crit
 
 **Resource decision**: put the strongest resources on critical-path tasks (opus impl + dual
 reviewers + orchestrator watching closely); give high-float tasks cheaper resources and defer
-them into gaps.
+them into gaps. "Resource" includes the **model tier** per node — strong tiers (Opus/Fable)
+on the critical chain, cheap tiers (Haiku/Sonnet) on mechanical float. The four-tier table,
+relative output cost, and why the *main thread* never switches model are in
+`references/cost-and-pacing.md`.
 
 ---
 

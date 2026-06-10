@@ -35,6 +35,9 @@
 | 21 | codex 功能 review 再逮两条:(A) goal-hook fingerprint 只哈希 status 多重集→身份变不重握(P4 缺口)(B) codex-review.sh 未强制 read-only,用户 danger-full-access 配置下 reviewer 可写仓库(P2 缺口) | ✅ 机制验证(正向)+ 2 should-fix 已修 | A:fingerprint→id+status+blocked_on(Case Q,passed=37);B:加 -c sandbox_mode=read-only。一程逮 #19/#20/#21 |
 | 22 | codex 第4次再逮两条:(C) #21 的 fingerprint 扫全 board、把 log 等 flexible 字段也算→违反 narrow-waist(D) track-b 文档 codex 配对指向不工作的调用(审 diff 非 transcript + #20 互斥) | ✅ 机制验证(正向)+ 2 should-fix 已修 | C:fingerprint scope 到含 deps 的 task 行(Case R,passed=38);D:改 plain codex exec grade transcript。一程共逮 6 条→fuse 停自动循环 |
 | 23 | meta-skill 误置为分发制品 + 命名过泛:authoring-skills 放进分发的 skills/、名字太通用(它其实是"怎么造本仓 skill"的项目自用工具) | should-fix(product hygiene) | ✅ 已修(git mv → .claude/skills/cc-master-skillsmith;引用全更;content 测试扩到也 iterate .claude/skills/)。用户 review catch |
+| 24 | codex 复审两轮逮 region 提取两反向漏洞(`log` 截断 fail-open + 嵌套字段伪装 fail-closed)| must-fix + should-fix | ✅ 已修(`tasks_region` 双深度 string-aware awk,三轮 codex 放行)|
+| 25 | Track A 满载环境信号死亡:正例 recall 地板=0,与 description 质量无关 | must-know(测量有效性)| 已记 caveat;语义改动降级定性评审 |
+| 26 | 模型分层 + usage-pacing baseline 零失败 → 归类为 reference 知识非红线(TDD-for-skills 防编造未被违反的规则)| ✅ 机制验证(正向)| 落 `cost-and-pacing.md` + lens 软指针,不写红线 |
 
 > 基线健康(无问题留痕):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
@@ -442,3 +445,30 @@
   被测物;"负例全过"在 recall=0 时是症状不是成绩。上游修复方向(供 skill-creator 反馈):隔离
   project root、侦测器看全程而非首发、用真 SKILL.md 而非 stub。
 - **严重度 / 来源**:must-know(测量有效性)/ 一手(本轮 deferred-trio 落地,最小复现 ×3)。
+
+## Finding #26 — 模型分层 + usage-pacing 的 pressure baseline 零失败 → 正确归类为 reference 知识(非红线)✅正向
+
+- **现象**:2026-06-10 给 SKILL A 补「模型分层 + usage-aware pacing」两块编排能力,按 §6 TDD-for-skills「先跑 subagent
+  pressure baseline 看失败、再写堵漏 prose」。三压场景(time + sunk cost + exhaustion)+ 强制 A/B/C 单选:模型分层派
+  **6 个** subagent(无该纪律)、usage-pacing 派 **2 个**——**8/8 全选合规项 A,零失败**。逐字推理都从既有 lens 自行推出:
+  模型分层引 lens 2「concentrate resources on the critical chain」+ Rationalization meta-rule;pacing 引 lens 4「主观能动
+  不空等」+ lens 5「量力而行不顶满」+ step-6 ledger 纪律。甚至有 agent 主动点出「中途切主线模型会破坏 `owner.session_id`
+  连续性」——这条我原以为要专门教,它自己从 board 协议推到了。
+- **根因(机制成功)**:既有七镜头 + Rationalization Table 覆盖面已足够强,agent 在「给了信息 / 给了选项」时能从既有纪律推出
+  正确编排行为。两块的真实缺口**不是「会被合理化掉的判断型规则」,而是 agent 默认缺的事实知识**:① 四档模型
+  (Fable/Opus/Sonnet/Haiku)各自定位 + 相对 output 成本(10×/5×/3×/1×);② 中途切主线模型废 prompt cache 的技术代价;
+  ③ 5h/7d 配额窗口存在 + 有 `scripts/cc-usage.sh` 可程序化感知。这些是 **reference / how-to 知识**,§6 明确**不 gate**
+  pressure baseline(baseline 只 gate「judgment-bearing 能被合理化掉的规则」)。
+- **影响(纪律正向)**:**TDD-for-skills 的 Iron Law 在此第二次发挥作用——防止我编造一条 agent 根本不会违反的红线**。原 plan
+  (Task 4/6)预设 baseline 会失败、要写新红线 + Rationalization 行 + Red Flags 行;实测零失败,若仍照写就是「为不存在的违规
+  造规则」,反而稀释 reinject 每次全文重注的 SKILL A、压低真红线的信噪比。**正确处置 = 降级为 reference 知识**,不进
+  红线 / Table / Flags。
+- **处置**:① 新建 `references/cost-and-pacing.md` 承载全部 reference 知识(四档表 + per-node 选模型 + 主线固定模型保 cache
+  + usage 感知三路径 + burn-rate 撞墙预测 + 四杠杆 pacing),顶部显式标注「informational, not a red line;baselines 证明
+  agent 自发会推」;② SKILL A 主文件只加 lens 2 / lens 5 各一句软指针 + reference index 一行(reinject 友好,主文件几乎
+  不膨胀);③ 扩 `decomposition.md` 资源种子加 model 维度;④ 信号脚本 `scripts/cc-usage.sh`(带外、非 hook)作
+  ship-anywhere 落地物。**不加任何红线 / Rationalization 行 / Red Flags 行。**
+- **教训(固化候选)**:**baseline 零失败本身就是有效产出——它把「我以为该是红线」证伪成「其实是信息缺口」**。判断型纪律
+  (红线 / Table)与告知型知识(reference)的分界,正应由 pressure baseline 来划:失败 → 判断缺口 → 红线;不失败 →
+  信息缺口 → reference。不是每个「看起来该管」的主题都需要一条红线;TDD-for-skills 同时防漏(该堵的没堵)与防造(不该造的造了)。
+- **严重度 / 来源**:✅ 机制验证(正向)/ 一手(本轮 model-tiering-usage-pacing 落地,baseline 8 subagent 实测)。

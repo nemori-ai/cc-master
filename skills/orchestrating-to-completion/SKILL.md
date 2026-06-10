@@ -36,7 +36,9 @@ an answer, and there is nothing left to schedule, do you calmly wait one beat.)
 1. **指挥不演奏 (Conduct, don't play)** — Decompose / dispatch / verify / integrate. Never
    implement or review by hand.
 2. **目标即依赖图 (Goal = dependency graph)** — Decompose to a DAG, find the critical path,
-   concentrate resources on the critical chain (non-critical float is free parallel budget).
+   concentrate resources on the critical chain (non-critical float is free parallel budget;
+   "resources" includes *model tier* — strong on the chain, cheap on float — see
+   `references/cost-and-pacing.md`).
 3. **就绪即发，绝不在 barrier 干等 (Dispatch on ready, never wait at a barrier)** —
    Dataflow: dispatch a node the moment its dependencies are satisfied; parallelism = T₁/T∞
    decides how many lanes to open.
@@ -46,6 +48,8 @@ an answer, and there is nothing left to schedule, do you calmly wait one beat.)
    The sin is being *passive when you could act*, not idleness itself.
 5. **量力而行，不顶满利用率 (Work within capacity, don't max utilization)** — Bound WIP,
    target ~75% (Little's Law + utilization cliff; adding agents is not always faster).
+   Capacity also means the 5h/7d quota window, not just instantaneous WIP — sense it with
+   `scripts/cc-usage.sh`, pace it via `references/cost-and-pacing.md`.
 6. **只信端点验收，产出可记账可续 (Trust only endpoint verification; outputs are
    accountable and resumable)** — Verify independently at your own endpoint; agent
    self-reports are untrustworthy. Content-hash for accounting; done+verified can be skipped
@@ -200,3 +204,4 @@ all specified in **`references/board.md`**. Read it before touching the board co
 | `references/board.md` | The full board protocol: narrow-waist schema, status enum routing, flexible edges, snapshot, the configurable home + per-orchestration board files (owner.active = "active"), flush discipline, single source of truth, supersession, the log segment. |
 | `references/async-hitl.md` | Async completion + human-in-the-loop: in-flight p95 tracking and hedging, integrate-on-notification, the HITL model (user as async worker), front-of-house ∥ background. |
 | `references/resume-verify.md` | Cheap resume + endpoint verification: content-hash action keys, dependency pinning / stale detection, independent endpoint verification, loop convergence. |
+| `references/cost-and-pacing.md` | Choosing a model tier per node + why the main thread stays on one model (prompt-cache); pacing a long run against the 5h/7d quota window — sense via `scripts/cc-usage.sh`, levers: lower WIP / effort / downgrade model / defer float. |
