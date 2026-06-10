@@ -402,3 +402,20 @@
 - **教训(固化候选)**:**分清「分发制品(`skills/`,随插件 ship)」与「项目自用工具(`.claude/skills/`,本仓 dev)」**——
   meta / 内部工具进 `.claude/`,命名 project-specific。已在 AGENTS §1「这个插件是什么/不是什么」+ §2 目录树 + §6 体现。
 - **严重度 / 来源**:should-fix(product hygiene)/ 一手(用户 review catch,PR #4 开后)。
+
+## Finding #24 — codex 复审两轮连逮 region 提取的两个反向漏洞:截断 fail-open + 嵌套伪装 fail-closed ✅正向
+
+- **现象**:2026-06-10 修「goal-hook 行格式假设」时,第一版 region 提取(`"tasks"` 键切到首个 `"log"` token)被
+  codex 一审逮住:task 自带 flexible `log` 字段会**截断** region,后续 `ready` task 漏检 → Stop 误放行(fail-open)。
+  改为括号配对提取整个 tasks 数组后,codex 二审又逮住反向问题:task 内**结构化** log 条目
+  (`tasks[0].log:[{"id":"L1","status":"ready"}]`)落在数组 region 内,被 actionable grep 误判 → 误 block 到熔丝跳闸(fail-closed)。
+- **根因**:用「文本切片」近似「JSON 语义」时,每个近似都有两类死角——切早了(嵌套同名 key 截断)和切宽了
+  (嵌套字段伪装顶层字段)。board 协议允许 task 携带 agent-shaped flexible 字段,这两类死角都真实可达。
+- **影响**:① fail-open 破坏 goal-hook 的核心闸门(该 block 不 block);② fail-closed 反复误 block 消耗熔丝、
+  打断长等待。两者都过了当时的全套测试——测试只覆盖了「乖」board 形态。
+- **处置**:`tasks_region()` 终版 = 双深度([ ] + { })、string/escape-aware 的 awk 字符扫描,**只输出 task 对象
+  顶层字段流**,嵌套字段整体丢弃;Case V/W 红先行固化两类死角;test 镜像 `fp_of` 同步。三轮 codex 后放行。
+- **教训(固化候选)**:**纯 shell 解析 JSON 时,"切片近似"必须对协议允许的全部形态(含 flexible 字段)做对抗推演**——
+  问一句「嵌套里出现同名 key / 同形 pair 会怎样」;且 fail-open 与 fail-closed 要分开各验一例。codex 第二端点
+  复审对这类"测试全绿但形态覆盖不足"的盲区命中率极高(本案两轮两中),值得在 hook 改动上常设。
+- **严重度 / 来源**:must-fix(fail-open)+ should-fix(fail-closed)/ 一手(codex 复审 rounds 1-2,2026-06-10)。
