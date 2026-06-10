@@ -73,9 +73,10 @@ rm -rf "$H"
 # ─── SELF-CHECK HANDSHAKE (completion state: all in_flight/blocked/done) ───────────────────────────
 
 # fp_of BOARD — compute the completion-state fingerprint of a board exactly as the hook does
-# (id+status+blocked_on triples, file order, no sort), so tests can seed the sidecar's
-# last_handshook_fp field deterministically. MUST mirror status_fingerprint() in verify-board.sh.
-fp_of() { grep '"deps"' "$1" 2>/dev/null | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | cksum | awk '{print $1}'; }
+# (id+status+blocked_on triples inside the tasks region, file order, no sort), so tests can seed
+# the sidecar's last_handshook_fp field deterministically. MUST mirror status_fingerprint() +
+# tasks_region() in verify-board.sh.
+fp_of() { local c r; c="$(cat "$1" 2>/dev/null)"; r="${c#*\"tasks\"}"; [ "$r" = "$c" ] && r=""; r="${r%%\"log\"*}"; printf '%s' "$r" | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | cksum | awk '{print $1}'; }
 
 # Case H (NEW): completion state (in_flight/blocked/done), no sidecar mark → BLOCK with self-check
 #                checklist, AND sidecar's last_handshook_fp set to the current fingerprint.
@@ -252,6 +253,37 @@ assert_not_contains "$HOOK_OUT" "block" "P4: same fingerprint third Stop → sti
 printf '%s' '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-fp"},"tasks":[{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":[]}]}' > "$BOARD"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "P4: fingerprint changed → re-block handshake"
+rm -rf "$H"
+
+# ─── SINGLE-LINE BOARD (format-agnostic tasks-region scoping) ─────────────────────────────────────
+# The hook must behave identically on compact single-line JSON and on pretty-printed multi-line
+# JSON — the old line-based grep scoping silently assumed "one task object per line".
+
+# Case S: SINGLE-LINE board, empty tasks[] but log[] carries "id" entries → must still be detected
+#          as EMPTY and block. (Line-based grep -c '"id"' saw the whole line and miscounted.)
+H="$(make_project)"
+mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[],"log":[{"id":"L1","status":"note"}]}'
+run_stop "$H"
+assert_contains "$HOOK_OUT" "no tasks" "single-line: empty tasks + log ids → still detected EMPTY (not mistaken for a filled board)"
+rm -rf "$H"
+
+# Case T: SINGLE-LINE board, all tasks done, log entry carries status:"ready" → log must NOT count
+#          as actionable. First Stop = completion handshake (self-check), and a LOG APPEND between
+#          Stops must not change the fingerprint → second Stop allows.
+H="$(make_project)"; SID="sess-slog"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}],\"log\":[{\"id\":\"L1\",\"status\":\"ready\"}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "self-check" "single-line: log status=ready ignored → completion handshake, not actionable block"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}],\"log\":[{\"id\":\"L1\",\"status\":\"ready\"},{\"id\":\"L2\",\"status\":\"appended\"}]}"
+run_stop_sid "$H" "$SID"
+assert_not_contains "$HOOK_OUT" "block" "single-line: log append does not change fingerprint → same state allows"
+rm -rf "$H"
+
+# Case U: SINGLE-LINE fingerprint scoped to tasks region — identical tasks, different log → SAME fp.
+H="$(make_project)"
+printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]}],"log":[{"id":"L1","status":"alpha"}]}' > "$H/a.board.json"
+printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]}],"log":[{"id":"L9","status":"omega"}]}' > "$H/b.board.json"
+assert_eq "$(fp_of "$H/a.board.json")" "$(fp_of "$H/b.board.json")" "single-line fingerprint scoped to tasks region (log excluded)"
 rm -rf "$H"
 
 finish
