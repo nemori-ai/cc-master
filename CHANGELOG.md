@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **codex as a second endpoint reviewer** — `scripts/codex-review.sh` wraps
+  `codex exec review` in a read-only sandbox with a silent-pass-through guard
+  (empty review / failed call → NOT passed); documented in
+  `skills/orchestrating-to-completion/references/resume-verify.md`.
+- **Eval mechanism** — Track A (trigger-accuracy: `scripts/eval-trigger.sh` +
+  per-skill `evals/trigger.json`) and Track B (orchestration-discipline
+  benchmark: `scripts/eval-benchmark.sh` + `design_docs/eval/`).
+
+### Changed
+
+- **Skills optimization pass** — both shipped skills tightened (descriptions,
+  reference TOCs, SSOT convergence per dogfood findings #7/#11/#13).
+- **AGENTS.md** rewritten as the contributor entry point: five red lines with
+  SSOT + grep/CI gates, a trigger-based deep-reading table, and the
+  gstack × superpowers iteration paradigm.
 
 ## [0.1.0] — 2026-06-08
 

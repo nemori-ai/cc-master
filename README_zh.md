@@ -142,7 +142,7 @@ claude plugin install cc-master@cc-master
 
 ## Demo
 
-端到端走查与可直接跑的示例目标即将放进 [`examples/`](examples/)。_（占位——待补。）_
+可直接跑的端到端示例在 [`examples/sample-orchestration/`](examples/sample-orchestration/)：[`walkthrough.md`](examples/sample-orchestration/walkthrough.md) 逐步走查一个完整编排案例，[`smoke.sh`](examples/sample-orchestration/smoke.sh) 冒烟整条 hook 链——`bash examples/sample-orchestration/smoke.sh` 即可运行。
 
 ---
 

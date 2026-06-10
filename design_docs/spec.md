@@ -5,9 +5,7 @@
 **性质**：通用、ship-anywhere 的 Claude Code **plugin**（不绑 OMNE，装到任意环境的任意 cc agent 可用）。
 **研究基线**：`research/dynamic-workflow/`（4 报告，commit 9047592d）。
 **对话史/草稿**：`docs/plans/cc-master-plugin-design.md`（本 spec 是它的干净定稿版）。
-**2026-06-08 增补**：原生 `/goal`·`/loop` 整合（分阶段叠加 `/goal`、后台 shell 消解 `/loop`）—— 详见 `design_docs/2026-06-08-native-goal-loop-integration.md`，本 spec 的 §3/§5/§10/§12 已据此增量修订。
-
-> ⚠ **/goal 集成方案已被 goal-hook 取代**（agent 无法自设 native `/goal`；改由 verify-board 升级为确定性 Stop-hook 自检闸）——见 `design_docs/2026-06-08-goal-hook-design.md` 与 `dogfood-findings.md` #2。
+**2026-06-08 修订（最终态）**：completion gate 由 **goal-hook** 承担——`verify-board.sh` 升级为确定性 Stop-hook 自检闸；`/loop` 由后台 shell 消解。（原"原生 `/goal` 整合"路线已废弃：agent 无法自设 native `/goal`。）本 spec 的 §3/§5/§10/§12 均为修订后的最终方案。决策史见 [`adrs/ADR-004-loop-dissolution-and-goal-hook.md`](../adrs/ADR-004-loop-dissolution-and-goal-hook.md)，设计细节见 `design_docs/2026-06-08-goal-hook-design.md`。
 
 ---
 

@@ -142,7 +142,7 @@ The full command set:
 
 ## Demo
 
-End-to-end walkthroughs and runnable sample goals are coming to [`examples/`](examples/). _(Placeholder — to be filled in.)_
+A runnable end-to-end demo lives in [`examples/sample-orchestration/`](examples/sample-orchestration/): [`walkthrough.md`](examples/sample-orchestration/walkthrough.md) traces a full orchestration case study step by step, and [`smoke.sh`](examples/sample-orchestration/smoke.sh) exercises the entire hook chain — run it with `bash examples/sample-orchestration/smoke.sh`.
 
 ---
 
