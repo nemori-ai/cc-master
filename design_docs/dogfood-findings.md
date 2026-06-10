@@ -38,7 +38,7 @@
 | 24 | codex 复审两轮逮 region 提取两反向漏洞(`log` 截断 fail-open + 嵌套字段伪装 fail-closed)| must-fix + should-fix | ✅ 已修(`tasks_region` 双深度 string-aware awk,三轮 codex 放行)|
 | 25 | Track A 满载环境信号死亡:正例 recall 地板=0,与 description 质量无关 | must-know(测量有效性)| 已记 caveat;语义改动降级定性评审 |
 | 26 | 模型分层 + usage-pacing baseline 零失败 → 归类为 reference 知识非红线(TDD-for-skills 防编造未被违反的规则)| ✅ 机制验证(正向)| 落 `cost-and-pacing.md` + lens 软指针,不写红线 |
-| 27 | codex 第二验收逮 `cc-usage.sh` 两 bug:ccusage 透传破坏 schema 契约(装了才坏)+ 陈旧 5h block 残留/负 remaining 误导 pacing | ✅ 机制验证(正向)+ 2 should-fix 已修 | (A) 移除 ccusage 透传走纯 python 单 schema;(B) active block 须 contain now、过期报 0;test 加 stale case passed=6 |
+| 27 | codex 第二验收 3 轮逮 4 bug:cc-usage.sh 三 correctness(透传破坏 schema 契约 + 陈旧 block 残留/负 remaining + 连续跨 5h 边界错报 0)+ cost-and-pacing.md 把 effort 当不可执行 lever | ✅ 机制验证(正向)+ 4 should-fix 已修 | (A) 移除透传;(B) active 须 contain now;(C) 满 5h 即切块;(D) effort 降级为知识、leaf 成本靠 model、四杠杆→三杠杆 |
 
 > 基线健康(无问题留痕):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
@@ -482,7 +482,7 @@
   缺口用「顺着指针读到 reference 并据此答对」的 dogfood。
 - **严重度 / 来源**:✅ 机制验证(正向)/ 一手(本轮 model-tiering-usage-pacing 落地,baseline 8 subagent 实测)。
 
-## Finding #27 — codex 第二端点验收(本 PR 首跑)逮到 `cc-usage.sh` 两个真 bug:schema 契约破裂 + 陈旧窗口误报 ✅正向
+## Finding #27 — codex 第二端点验收(本 PR,3 轮)逮到 4 个真 bug:cc-usage.sh schema 契约/陈旧窗口/跨界清零 + cost-and-pacing.md effort 不可执行 ✅正向
 
 - **现象**:model-tiering-usage-pacing 这轮端点验收,跑 `scripts/codex-review.sh --base main` 让 codex 审 6645c1c +
   f7a60d8 全部 diff,出 **needs-attention 两条**(都 P2,都在 `scripts/cc-usage.sh`):
@@ -510,4 +510,21 @@
 - **教训(固化候选)**:呼应 Finding #24——**纯 shell/脚本近似真实语义时,必须对协议/环境允许的全部形态做对抗推演**:
   滑动窗口问「过期了会怎样」(负数/残留),带外加速器问「外部工具 schema 和我承诺的一致吗 / 我能在本环境验证它吗」。
   codex 第二端点验收对这类「测试全绿但形态覆盖不足」命中率极高(本案再中两条),hook/带外脚本改动上值得常设。
-- **严重度 / 来源**:✅ 机制验证(正向)+ 2 should-fix 已修 / 一手(codex 第 5 次真跑,本 PR 端点验收)。
+- **round-2(codex 复审追加,机制再成功)**:修 (B) 时把「整个 block 隔夜过期」修对了,却**引入反向回归**——分组仍只按
+  「与上条 gap>5h」切块,**连续使用跨 5h 边界**(无 gap)时所有消息留在旧块,活跃新窗口被错报为 0(例 10:00/14:59/15:01,
+  在 15:02 报 `used=0`,明明 15:01 刚开新窗口)。codex 第 2 轮精准逮到(`cur[0][0]+five` 才是 split 依据)。**Finding #24
+  「修一处带出一处」+「fail 两方向都各验一例」再现**——我只验了「陈旧残留」(fail-stale),漏了「活跃清零」(fail-empty)。
+  处置:分组条件改 `gap>5h OR ts-cur[0][0]>=5h`(满 5h 即开新块);test 隔离 fixture 到 `sample/`+`rolling/` 子目录
+  (避 `**/*.jsonl` glob 污染)加连续跨边界 case(15:02 → used=300 新块,passed=8)。
+- **round-3(codex 复审追加,机制再成功)**:codex 第 3 轮在 `cost-and-pacing.md` 逮到第 4 条(**非回归**,reference 首版
+  就有的**可执行性**缺陷):我把 `effort`(`output_config:{effort}`)当 leaf 的 pacing lever 写进 reference,但 **cc-master
+  的派发 API 根本不透传它**——workflow `agent()` opts 只有 label/phase/schema/model/isolation/agentType,Agent sub-agent
+  也无 effort 钮,SKILL B 明禁传 invented option。**这是 Finding #2「/goal 对 agent 不可执行」的同类**:reference 给了 agent
+  够不到的 lever,照做会写出无效 workflow 脚本。处置:effort 从「可执行 lever」降级为「知识备注」(标注 API 层概念、主线
+  effortLevel 受其影响、但派发 API 不透传 → leaf 成本靠 **model tier**);四杠杆→三杠杆(downgrade model 提为首要 / lower
+  WIP / defer high-float);SKILL.md reference index + CHANGELOG lever 列表同步去 effort。
+- **教训补强**:① 呼应 #24——纯 shell/脚本近似真实语义,必须对协议/环境允许的全部形态做对抗推演(滑动窗口问「过期/连续跨界
+  怎样」,带外加速器问「外部 schema 与我承诺一致吗、本环境可验吗」),fail-stale/fail-empty 两方向各验一例。② **跨抽象层照搬
+  概念前先核对本层 API 契约**:`effort` 是 claude-api(API 层)真实参数,但 cc-master 派发面不暴露;reference 给的每个 lever
+  都要能落到 cc-master 真实派发 API(`agent()`/Agent/shell)的某个 opt 上,否则就是 Finding #2 式不可执行祈使。
+- **严重度 / 来源**:✅ 机制验证(正向,codex 3 轮共逮 4 条)+ 4 should-fix 已修 / 一手(codex 第 5–7 次真跑,本 PR 端点验收)。

@@ -13,8 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `skills/orchestrating-to-completion/references/cost-and-pacing.md`: the four
   model tiers + relative output cost, per-node tier selection, why the main
   thread stays on one model (prompt-cache), and pacing a long run against the
-  5h/7d quota window (levers: lower WIP / effort / downgrade model / defer
-  float). Surfaced as soft pointers on lenses 2 & 5 — **reference knowledge,
+  5h/7d quota window (levers: downgrade model / lower WIP / defer float). Surfaced as soft pointers on lenses 2 & 5 — **reference knowledge,
   not a red line** (subagent pressure baselines showed agents already derive
   the behavior from the existing lenses; §6 Iron Law forbids fabricating an
   unviolated rule).

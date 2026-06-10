@@ -34,9 +34,12 @@ Output dominates orchestration spend (agents emit far more than they read), so t
 **relative output multiplier** — Haiku 1× / Sonnet 3× / Opus 5× / Fable 10× — is the number
 to pace against: one Opus leaf ≈ five Haiku leaves; one Fable leaf ≈ ten.
 
-`effort` is the orthogonal dial (`output_config: {effort: …}`): `low` for subagents / simple
-leaves, `high`/`xhigh` for intelligence-sensitive work. Lower effort = fewer tool calls +
-less preamble — a real token lever, see `dispatch.md` admission control.
+A note on `effort` (`output_config: {effort: …}`): it is a real **API-layer** token dial, and
+your *main session* honors its own `effortLevel`. But cc-master's dispatch APIs do **not**
+thread it through — a workflow `agent()` accepts only label/phase/schema/model/isolation/
+agentType, and an Agent sub-agent likewise has no effort knob. So the lever you actually
+control for a *leaf's* cost is its **model tier**, not effort — don't pass an invented `effort`
+option to `agent()` (SKILL B forbids inventing options).
 
 ## Per-node model selection
 
@@ -103,11 +106,12 @@ window — they pace on cumulative token spend instead.
 When the burn-rate wall is imminent, **throttle without stopping** — 机械活仍可推进,全停是把
 可用配额浪费掉 (lens 4);顶满会半截撞墙停摆 (lens 5). Four levers, roughly in order:
 
-1. **Lower WIP** — fewer concurrent leaves in flight (Little's Law; `dispatch.md` admission control).
-2. **Lower effort** — `high` → `low` on leaves that tolerate it.
-3. **Downgrade model** — the main execution lever; route token-heavy work to a cheaper tier.
-   This is where tiering and pacing mesh: **model downgrade *is* a pacing move.**
-4. **Defer high-float work** — push non-critical token-heavy leaves to the next window; record
+1. **Downgrade model** — the primary lever; route token-heavy leaves to a cheaper tier
+   (`agent({model})` or a cheaper sub-agent). This is where tiering and pacing mesh: **model
+   downgrade *is* a pacing move.** (effort is *not* a lever here — the dispatch APIs don't
+   thread it through; see §Model tiers above.)
+2. **Lower WIP** — fewer concurrent leaves in flight (Little's Law; `dispatch.md` admission control).
+3. **Defer high-float work** — push non-critical token-heavy leaves to the next window; record
    on the board as `blocked_on: "quota-reset"` so they re-trigger when the window refreshes (a
    deferred decision the step-6 ledger keeps resumable).
 
