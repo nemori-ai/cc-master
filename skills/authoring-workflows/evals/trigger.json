@@ -9,6 +9,10 @@
   {"query": "before I call the Workflow tool for this — I have a multi-stage pipeline where each item goes summarize -> classify -> route, and stages don't need to sync. is streaming pipeline the right default here, or am I overthinking it?", "should_trigger": true},
   {"query": "我准备给一个三阶段的批处理写 workflow 脚本,但 parallel() 那块老是只跑了一次就退出了——是不是我传了裸 promise 而不是 thunk?这个 API 有什么坑?", "should_trigger": true},
   {"query": "want to fan a hundred files through a quality-check workflow but keep hitting the concurrency cap. what are the runtime's hard limits and how should I structure the script to stay under them?", "should_trigger": true},
+  {"query": "我的 workflow 上次跑挂在一半,想用 resumeFromRunId 续跑。但我改过脚本里两个 agent() 的 prompt 了——续跑时哪些调用会命中 cache、哪些会重跑?", "should_trigger": true},
+  {"query": "writing a workflow where a judge panel scores N independent attempts and I synthesize from the winner — how do I shape the schema option so agent() hands me validated objects instead of text I have to parse myself?", "should_trigger": true},
+  {"query": "想让预算说了算:budget.remaining() 还够就继续开 finder agent,不够就收手。这种 loop-until-budget 的 workflow 怎么写才不会一路冲到 agent 数上限?", "should_trigger": true},
+  {"query": "my workflow has a stage where agents mutate files in parallel — when is isolation:'worktree' actually worth the per-agent setup cost, versus just letting them write to the same tree?", "should_trigger": true},
 
   {"query": "我想并行跑这几个命令:npm run build、npm run lint、npm run test,然后等它们全部结束。一行 bash 怎么写?", "should_trigger": false},
   {"query": "帮我把 GitHub Actions 的 CI workflow yaml 改一下,加一个只在 main 分支跑的部署 job。", "should_trigger": false},
@@ -19,5 +23,9 @@
   {"query": "我有一个跑了两天的目标,中途反复有子任务回来、有的卡在外部依赖上。我老想着 gate 绿了就当完成,完成前到底该怎么在端点验收?", "should_trigger": false},
   {"query": "n8n 和 Zapier 哪个更适合搭一个把表单提交同步到 Notion 数据库的自动化 workflow?", "should_trigger": false},
   {"query": "git rebase 的时候出现 merge conflict,怎么逐个 hunk 解决然后 continue?", "should_trigger": false},
-  {"query": "刚从一次 compaction 醒来,不记得之前那个多日目标拆到哪步、哪些后台 job 还活着了。怎么重建状态续上之前的统筹?", "should_trigger": false}
+  {"query": "刚从一次 compaction 醒来,不记得之前那个多日目标拆到哪步、哪些后台 job 还活着了。怎么重建状态续上之前的统筹?", "should_trigger": false},
+  {"query": "后台已经派了一个 workflow 在跑了,主线这边我该拿等待的空档干什么才不算空转、也不算装忙?", "should_trigger": false},
+  {"query": "Temporal 和 Airflow 这类 workflow 引擎是怎么实现 deterministic replay 的?我想了解一下它们底层的 event-sourcing 原理。", "should_trigger": false},
+  {"query": "用 GitHub Actions 的 matrix strategy 把测试 fan-out 到 12 个 node 版本上并行跑,这个 yaml 该怎么写?", "should_trigger": false},
+  {"query": "一个跨周的大迁移,我得拆成依赖图、把独立的几路并行派出去、盯到全部完成,中途还得熬过几次 compaction。这种长程统筹怎么搞?", "should_trigger": false}
 ]

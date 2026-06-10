@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Eval mechanism** — Track A (trigger-accuracy: `scripts/eval-trigger.sh` +
   per-skill `evals/trigger.json`) and Track B (orchestration-discipline
   benchmark: `scripts/eval-benchmark.sh` + `design_docs/eval/`).
+- **`nested-workflow-composition.js` example** — the first `workflow()` asset:
+  composes a saved/file workflow as a per-item sub-step with shared
+  budget/caps, one-level nesting, and catch-and-degrade fallback. Indexed in
+  SKILL B + `patterns.md`, cross-linked from `api-reference.md`.
 
 ### Fixed
 
@@ -43,6 +47,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when we get there"), GREEN verified 2/2 with citations.
 - **Skills optimization pass** — both shipped skills tightened (descriptions,
   reference TOCs, SSOT convergence per dogfood findings #7/#11/#13).
+- **Eval sets expanded + Track A floor documented** — both `evals/trigger.json`
+  grown 20→28 (cross-skill near-miss + strong-distractor negatives); SKILL B
+  `description` de-escaped (`engine''s` → `the workflow engine`,
+  semantic-equivalent). `design_docs/eval/README.md` gains a measured-floor
+  warning: a real run scored every positive `trigger_rate 0.0` (root-caused in
+  dogfood #25 — `find_project_root` lands on `$HOME`, advice-shaped queries are
+  answered without invoking a stub, detector bails on the first tool), so a
+  before==after==floor comparison carries no signal — fall back to qualitative
+  review there.
 - **Out-of-band scripts hardened** — `CODEX_REVIEW_MODEL` overrides the codex
   review model; `CC_MASTER_SKILL_CREATOR` overrides the skill-creator path in
   both eval wrappers; both eval wrappers pre-check that `uv` is on PATH and

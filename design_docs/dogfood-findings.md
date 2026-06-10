@@ -419,3 +419,26 @@
   问一句「嵌套里出现同名 key / 同形 pair 会怎样」;且 fail-open 与 fail-closed 要分开各验一例。codex 第二端点
   复审对这类"测试全绿但形态覆盖不足"的盲区命中率极高(本案两轮两中),值得在 hook 改动上常设。
 - **严重度 / 来源**:must-fix(fail-open)+ should-fix(fail-closed)/ 一手(codex 复审 rounds 1-2,2026-06-10)。
+
+## Finding #25 — Track A 在满载环境下信号死亡:正例 recall 地板 = 0,与 description 质量无关
+
+- **现象**:2026-06-10 按 §8 跑 `authoring-workflows` 的 description 改动前 baseline(28 query × 3 runs,
+  扩容后的 eval 集),**14 个正例全部 trigger_rate=0.0**(42 次运行零触发),14 个负例全部"通过"。
+  连 "I'm about to author a dynamic-workflow script…should this be pipeline() or parallel()" 这种
+  点名条目都不触发。
+- **根因**(systematic-debugging,三个假设逐一验证):① `run_eval` 的 `find_project_root()` 从
+  skill-creator 缓存目录向上爬,命中 **$HOME**——临时 stub 写进 `~/.claude/commands/`,`claude -p` 在
+  用户全局满载环境(global CLAUDE.md + 全部插件 + ~100 个技能)里跑;② **决定性的一条**:最小复现
+  (含 `--bare` 全隔离)显示当前默认模型对咨询型 query **直接凭知识作答、零工具调用**——一个 body 只有
+  description 的 stub command 根本不在它的调用考虑内;③ 侦测器只看第一发 tool_use,非 Skill/Read 即判负。
+  ②是地板本身,①③是雪上加霜。
+- **影响**:Track A 的 before/after 对比在该环境读出 0 vs 0,**不携带任何信息**;若不察觉,会把
+  "改了没掉点"误读成"改动安全",或把 0 recall 误读成"description 写得烂"而瞎调。负例 14/14 全过
+  同样是死通道的副产物,不是 precision 好。
+- **处置**:① description 等价美化照做(语义不变,YAML/结构门把关);② `design_docs/eval/README.md`
+  增设 "Measured floor warning" 小节(数字 + 日期 + 根因 + "不要对着死通道调 description" 纪律);
+  ③ 语义性 description 改动在测量通道修复前,降级为定性评审(diff review)把关。
+- **教训(固化候选)**:**跑 eval 先验通道,再信数字**——一个全 0(或全满)的指标先怀疑测量,后怀疑
+  被测物;"负例全过"在 recall=0 时是症状不是成绩。上游修复方向(供 skill-creator 反馈):隔离
+  project root、侦测器看全程而非首发、用真 SKILL.md 而非 stub。
+- **严重度 / 来源**:must-know(测量有效性)/ 一手(本轮 deferred-trio 落地,最小复现 ×3)。

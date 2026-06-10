@@ -66,6 +66,8 @@ name or `{scriptPath}`.
   and token budget.
 - An unknown name / unreadable path / child syntax error **throws** — `catch` it
   to degrade gracefully.
+- Demonstrated by `assets/examples/nested-workflow-composition.js` (per-item
+  child run + catch-and-degrade fallback).
 
 ## `args` — injected global
 

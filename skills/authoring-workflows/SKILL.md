@@ -1,6 +1,6 @@
 ---
 name: authoring-workflows
-description: 'Use when you are about to call the Workflow tool, or author / debug / launch a Claude Code dynamic-workflow script — 当你要写 workflow 脚本时 — even if you think you already know the API. Use when you catch yourself guessing the engine''s determinism or resume rules, reaching for parallel() / pipeline() without checking the shape, hand-writing a validation linter, or about to relaunch after a harness error. Use before you guess, not after a failed run.'
+description: 'Use when you are about to call the Workflow tool, or author / debug / launch a Claude Code dynamic-workflow script — 当你要写 workflow 脚本时 — even if you think you already know the API. Use when you catch yourself guessing the determinism or resume rules of the workflow engine, reaching for parallel() / pipeline() without checking the shape, hand-writing a validation linter, or about to relaunch after a harness error. Use before you guess, not after a failed run.'
 ---
 
 # Authoring dynamic workflows
@@ -108,7 +108,7 @@ Pick by the **shape** of the work, not by taste. (Full semantics in
   elements, and failure semantics. No invented options.
 - **`assets/templates/`** — 5 control-flow skeletons (copy → fill).
 
-### `assets/examples/` — 11 complete, real-prompt workflows (when to read each)
+### `assets/examples/` — 12 complete, real-prompt workflows (when to read each)
 
 | Example | When to read |
 |---|---|
@@ -123,6 +123,7 @@ Pick by the **shape** of the work, not by taste. (Full semantics in
 | `tournament-bracket.js` | Pick one winner from many candidates by pairwise elimination (relative comparison, not absolute scoring). |
 | `self-repair-loop.js` | Drive one artifact to pass a gate, feeding failure diagnostics back into bounded retries. |
 | `staged-escalation.js` | Try each item with a cheap pass first; escalate to the strong model only where confidence was low. |
+| `nested-workflow-composition.js` | Composing a saved/file workflow as one sub-step via `workflow()` — shared budget/caps, one-level nesting, per-item catch-and-degrade (the only `workflow()` asset). |
 
 Every bundled template and example is written to the harness contract, so any one
 of them is a known-good starting point.

@@ -61,6 +61,28 @@ that belongs to `orchestrating-to-completion` rather than `authoring-workflows`)
 Read the numbers as **direction, not verdict** — they tell you whether a change
 helped or hurt, not whether the skill is "done".
 
+### Measured floor warning (2026-06-10): recall can be a flat 0 in a loaded environment
+
+A real measurement on this machine: `authoring-workflows`, 28 queries × 3 runs,
+**every positive scored trigger_rate 0.0** (and every negative trivially passed).
+Root-caused via minimal repro, NOT a description problem — three stacked causes:
+
+1. `run_eval`'s `find_project_root()` walks up from the skill-creator cache dir
+   and lands on `$HOME`, so `claude -p` runs with the user's FULL global stack
+   (global CLAUDE.md, all plugins, ~100 competing skills) as context noise.
+2. The current default model answers advice-shaped queries ("pipeline or
+   parallel?") directly from knowledge — it never invokes a stub command whose
+   body is just the description. Reproduced with `--bare` (hermetic, no plugins,
+   no global CLAUDE.md): still **zero** tool calls.
+3. The detector bails on the FIRST tool_use block — any unrelated first tool
+   (TodoWrite, a different Skill) is an instant False.
+
+Consequence: when both the before AND after runs sit on this floor, the
+comparison carries no information — record the numbers, say so explicitly, and
+fall back to qualitative review of the description diff (semantic-equivalence
+edits can proceed; semantic changes should wait for a working harness or an
+isolated eval environment). Do not tune a description against a dead channel.
+
 ## When to run
 
 - **Mandatory whenever you change a skill's `description`.** Run the eval before
