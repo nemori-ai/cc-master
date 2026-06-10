@@ -37,14 +37,15 @@ ITER_DIR="${1:?usage: eval-benchmark.sh <iteration-dir> <skill-name>}"
 SKILL="${2:?usage: eval-benchmark.sh <iteration-dir> <skill-name>}"
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-SC="$HOME/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator"
+SC="${CC_MASTER_SKILL_CREATOR:-$HOME/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator}"
+command -v uv >/dev/null 2>&1 || { echo "uv not found on PATH — install uv (https://docs.astral.sh/uv/) first" >&2; exit 1; }
 
 # Resolve the iteration dir to an absolute path BEFORE we cd into skill-creator,
 # so a caller-relative path keeps pointing at the right place.
 [ -d "$ITER_DIR" ] || { echo "iteration dir not found: $ITER_DIR" >&2; exit 1; }
 ITER_ABS="$(cd "$ITER_DIR" && pwd)"
 
-[ -d "$SC" ] || { echo "skill-creator not found at: $SC" >&2; exit 1; }
+[ -d "$SC" ] || { echo "skill-creator not found at: $SC (set CC_MASTER_SKILL_CREATOR to override)" >&2; exit 1; }
 [ -f "$SC/scripts/aggregate_benchmark.py" ] || {
   echo "aggregate_benchmark.py missing under: $SC/scripts" >&2; exit 1; }
 

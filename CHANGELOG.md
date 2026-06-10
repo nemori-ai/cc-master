@@ -33,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Skills optimization pass** — both shipped skills tightened (descriptions,
   reference TOCs, SSOT convergence per dogfood findings #7/#11/#13).
+- **Out-of-band scripts hardened** — `CODEX_REVIEW_MODEL` overrides the codex
+  review model; `CC_MASTER_SKILL_CREATOR` overrides the skill-creator path in
+  both eval wrappers; both eval wrappers pre-check that `uv` is on PATH and
+  fail with an actionable message instead of `command not found`.
 - **AGENTS.md** rewritten as the contributor entry point: five red lines with
   SSOT + grep/CI gates, a trigger-based deep-reading table, and the
   gstack × superpowers iteration paradigm.

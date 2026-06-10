@@ -7,6 +7,7 @@
 # review-output.schema.json. This is the dogfood reviewer for skill/plugin quality.
 #
 # Requires: codex CLI, logged in (OAuth). Usage: codex-review.sh [--base <branch>]
+# Env: CODEX_REVIEW_MODEL overrides the review model (default gpt-5.5).
 #
 # Silent-pass-through guard (see skills/orchestrating-to-completion/references/
 # resume-verify.md §3): an empty review or a failed call is treated as NOT passed.
@@ -21,6 +22,7 @@ if [ "${1:-}" = "--base" ]; then
 elif [ -n "${1:-}" ]; then
   BASE="$1"
 fi
+MODEL="${CODEX_REVIEW_MODEL:-gpt-5.5}"
 
 OUT="$(mktemp -t codex-review.XXXXXX)"
 trap 'rm -f "$OUT"' EXIT
@@ -38,7 +40,7 @@ trap 'rm -f "$OUT"' EXIT
 # user's ~/.codex/config.toml (which may be workspace-write or danger-full-access) — a reviewer must
 # never mutate the repo (codex review catch, Finding #21).
 if ! codex exec review --base "$BASE" \
-      -m gpt-5.5 -c model_reasoning_effort=high -c sandbox_mode='"read-only"' \
+      -m "$MODEL" -c model_reasoning_effort=high -c sandbox_mode='"read-only"' \
       --json -o "$OUT" < /dev/null; then
   echo "CODEX_REVIEW_FAILED (treat as NOT passed)"
   exit 2
