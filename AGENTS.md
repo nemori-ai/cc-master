@@ -49,7 +49,7 @@ cc-master/
 │   └── authoring-workflows/          ← SKILL B：workflow 写法 + references/ + assets/examples/
 ├── .claude/skills/            ← **项目自用** dev skill（cc-master-skillsmith：怎么造本仓 skill，**不分发**）
 ├── hooks/scripts/            ← bootstrap-board / reinject / verify-board（纯 bash 门控）
-├── scripts/                  ← 带外手动调用脚本：codex-review / eval-trigger / eval-benchmark
+├── scripts/                  ← 带外手动调用脚本：codex-review / eval-trigger / eval-benchmark / cc-usage
 ├── adrs/                     ← 结构性决策快照（ADR-001..005 + AGENTS.md 规约）
 ├── tests/                    ← hook 测试（bash）；run-tests.sh 编排 hook + content contract
 ├── design_docs/             ← 设计文档 + eval/ + dogfood-findings.md（plans/ gitignored）

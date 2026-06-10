@@ -70,6 +70,7 @@ flowchart LR
 | **Survives compaction** | No | No | Yes — role + board re-injected |
 | **Cross-session resume** | No | Same-session only | Yes — re-discovered from the board file |
 | **Endpoint verification** | Ad hoc | Inside the script | Orchestrator verifies independently |
+| **Quota awareness** | No | No | Yes — senses the 5h/7d window, throttles by model tier · WIP · defer |
 
 ---
 
