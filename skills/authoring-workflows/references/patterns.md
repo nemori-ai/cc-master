@@ -38,6 +38,7 @@ real-prompt composition.
 - [tournament-bracket](#tournament-bracket)
 - [self-repair-loop](#self-repair-loop)
 - [staged-escalation](#staged-escalation)
+- [nested-workflow-composition](#nested-workflow-composition)
 
 ---
 
@@ -333,6 +334,25 @@ an absolute 0–10 score, and the field is large enough that scoring everyone is
 wasteful.
 
 **Demonstrated by:** `assets/examples/tournament-bracket.js`.
+
+---
+
+## nested-workflow-composition
+
+**When:** a reusable sub-procedure already exists as a saved workflow (or a script
+file you Wrote earlier) and you want to run it as ONE step of a larger script —
+per item, with its own `args`. `workflow(nameOrRef, args)` inline-runs the child:
+it shares the parent's concurrency cap, agent counter, abort signal, and token
+budget (its tokens count toward `budget.spent()`), and its agents render under a
+`▸ name` group. Two hard edges: nesting is **one level only** (a child calling
+`workflow()` throws — keep children leaf-shaped), and an unknown name / unreadable
+`scriptPath` / child syntax error **throws** — wrap the call in a per-item `catch`
+so one broken child degrades to an inline fallback instead of killing the parent.
+Don't reach for this to "organize code": a child run costs a whole workflow's
+machinery — compose only when the child is genuinely reusable or independently
+maintained.
+
+**Demonstrated by:** `assets/examples/nested-workflow-composition.js`.
 
 ---
 
