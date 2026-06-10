@@ -156,7 +156,7 @@ parallel, so a dense front-of-house Q&A never serializes independent goals; **(b
 means *independently, at your own endpoint* — never a re-read of the agent's self-report; **(c)**
 before you take the `wait` edge, write the **step-6 ledger** (per-path self-check + acceptance
 evidence, into both the conversation and the board — exact shape and why-it-matters in
-`references/async-hitl.md`), then flush.
+`references/async-hitl.md` §"The step-6 ledger — the fixed shape (single source)"), then flush.
 
 **The decision program is a hand-run dataflow scheduler — a TFU.** Dispatch-when-ready, overlap
 the waits, stop only when the ready set is empty: the same dataflow idea `pipeline()` runs as
