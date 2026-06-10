@@ -34,6 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **SKILL A: question-prefetch discipline (HITL)** — new `async-hitl.md` HITL
+  bullet + Rationalization Table row: a foreseeable user decision on a
+  not-yet-ready node is asked NOW while the user is reachable (the ask-trigger
+  is "only the user can answer", never "the node became ready"), bounded
+  against speculative question-peppering. Pressure-baselined per the
+  skillsmith Iron Law: 6 baseline runs, 1 captured failure ("I'll stop and ask
+  when we get there"), GREEN verified 2/2 with citations.
 - **Skills optimization pass** — both shipped skills tightened (descriptions,
   reference TOCs, SSOT convergence per dogfood findings #7/#11/#13).
 - **Out-of-band scripts hardened** — `CODEX_REVIEW_MODEL` overrides the codex
