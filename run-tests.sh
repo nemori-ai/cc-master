@@ -10,6 +10,13 @@ for t in tests/hooks/test_*.sh; do
   bash "$t" || fail=1
 done
 
+echo "== script tests (bash) =="
+for t in tests/scripts/test_*.sh; do
+  [ -e "$t" ] || continue
+  echo "--- $t"
+  bash "$t" || fail=1
+done
+
 echo "== node tests (content) =="
 # Node 22+ treats `--test` path args as test files/globs, NOT discovery dirs (a bare dir is
 # read as a module to execute and errors). So enumerate explicit test files via find — this
