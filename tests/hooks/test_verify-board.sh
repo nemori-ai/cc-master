@@ -83,18 +83,24 @@ tasks_region_t() {
       i = index(s, "\"tasks\""); if (!i) exit
       s = substr(s, i + 7)
       j = index(s, "["); if (!j) exit
-      s = substr(s, j)
-      depth = 0; instr = 0; esc = 0; out = ""
+      s = substr(s, j + 1)
+      bd = 1; cd = 0; instr = 0; esc = 0; out = ""
       n = length(s)
       for (k = 1; k <= n; k++) {
         ch = substr(s, k, 1)
-        out = out ch
-        if (esc)        { esc = 0; continue }
-        if (ch == "\\") { if (instr) esc = 1; continue }
-        if (ch == "\"") { instr = !instr; continue }
-        if (instr) continue
-        if (ch == "[") depth++
-        else if (ch == "]") { depth--; if (depth == 0) break }
+        if (instr) {
+          if (bd == 1 && cd == 1) out = out ch
+          if (esc) esc = 0
+          else if (ch == "\\") esc = 1
+          else if (ch == "\"") instr = 0
+          continue
+        }
+        if (ch == "\"") { instr = 1; if (bd == 1 && cd == 1) out = out ch; continue }
+        if (ch == "[") { bd++; continue }
+        if (ch == "]") { bd--; if (bd == 0) break; continue }
+        if (ch == "{") { cd++; continue }
+        if (ch == "}") { cd--; continue }
+        if (bd == 1 && cd == 1) out = out ch
       }
       printf "%s", out
     }' "$1" 2>/dev/null
@@ -310,6 +316,18 @@ H="$(make_project)"
 mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[{"id":"T1","status":"done","deps":[],"log":["did x"]},{"id":"T2","status":"ready","deps":[]}],"log":[]}'
 run_stop "$H"
 assert_contains "$HOOK_OUT" "still has" "task-local log field does not truncate region → later ready task still actionable (codex catch)"
+rm -rf "$H"
+
+# Case W (codex review catch, round 2): STRUCTURED task-local log entries must not read as task
+#          state. A done task carrying "log":[{"id":"L1","status":"ready"}] is a COMPLETION state —
+#          first Stop must be the self-check handshake (not an actionable block), and the same
+#          state must allow on the second Stop instead of blocking until the fuse trips.
+H="$(make_project)"; SID="sess-tlog"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[],\"log\":[{\"id\":\"L1\",\"status\":\"ready\"}]}],\"log\":[]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "self-check" "structured task-local log status=ready ignored → completion handshake (codex catch r2)"
+run_stop_sid "$H" "$SID"
+assert_not_contains "$HOOK_OUT" "block" "structured task-local log → same completion state allows on second Stop"
 rm -rf "$H"
 
 # Case U: SINGLE-LINE fingerprint scoped to tasks region — identical tasks, different log → SAME fp.

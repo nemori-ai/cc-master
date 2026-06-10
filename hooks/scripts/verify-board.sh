@@ -54,14 +54,16 @@ board_matches() { # $1 = board path
   [ "$board_sid" = "$sid" ]
 }
 
-# tasks_region BOARD — print exactly the "tasks" ARRAY by bracket matching (depth-scanned, string-
-# and escape-aware), via POSIX awk (a shell tool, like the cksum|awk below — NOT a jq/node runtime).
-# FORMAT-AGNOSTIC: multi-line and compact single-line JSON behave identically, so the old "one task
-# object per line" assumption is gone. Bracket matching (not a cut at the next top-level key) means
-# flexible agent-shaped fields INSIDE a task — including one literally named "log" (codex review
-# catch) — can never truncate the region. Sole remaining caveat: the first quoted literal `"tasks"`
-# token in the file must be the tasks key itself (true for the pinned waist; goal/log prose never
-# needs that exact quoted token).
+# tasks_region BOARD — print the TOP-LEVEL FIELD STREAM of each object in the "tasks" array, via a
+# string- and escape-aware double-depth scan ([ ] and { }) in POSIX awk (a shell tool, like the
+# cksum|awk below — NOT a jq/node runtime). FORMAT-AGNOSTIC: multi-line and compact single-line
+# JSON behave identically — no per-line layout assumption. Only characters at task-object top level
+# (bracket depth 1 inside the array, curly depth 1 inside the task) are emitted: nested flexible
+# fields — a task-local "log" array, structured entries like {"id":"L1","status":"ready"} inside it
+# (codex review catches, rounds 1+2) — are dropped wholesale, so they can neither truncate the scan
+# nor masquerade as task id/status/blocked_on state. Sole remaining caveat: the first quoted
+# literal `"tasks"` token in the file must be the tasks key itself (true for the pinned waist;
+# goal/log prose never needs that exact quoted token).
 tasks_region() {
   awk '
     { s = s $0 "\n" }
@@ -69,18 +71,24 @@ tasks_region() {
       i = index(s, "\"tasks\""); if (!i) exit
       s = substr(s, i + 7)
       j = index(s, "["); if (!j) exit
-      s = substr(s, j)
-      depth = 0; instr = 0; esc = 0; out = ""
+      s = substr(s, j + 1)                 # start INSIDE the tasks array
+      bd = 1; cd = 0; instr = 0; esc = 0; out = ""
       n = length(s)
       for (k = 1; k <= n; k++) {
         ch = substr(s, k, 1)
-        out = out ch
-        if (esc)        { esc = 0; continue }
-        if (ch == "\\") { if (instr) esc = 1; continue }
-        if (ch == "\"") { instr = !instr; continue }
-        if (instr) continue
-        if (ch == "[") depth++
-        else if (ch == "]") { depth--; if (depth == 0) break }
+        if (instr) {
+          if (bd == 1 && cd == 1) out = out ch
+          if (esc) esc = 0
+          else if (ch == "\\") esc = 1
+          else if (ch == "\"") instr = 0
+          continue
+        }
+        if (ch == "\"") { instr = 1; if (bd == 1 && cd == 1) out = out ch; continue }
+        if (ch == "[") { bd++; continue }
+        if (ch == "]") { bd--; if (bd == 0) break; continue }
+        if (ch == "{") { cd++; continue }
+        if (ch == "}") { cd--; continue }
+        if (bd == 1 && cd == 1) out = out ch
       }
       printf "%s", out
     }' "$1" 2>/dev/null
