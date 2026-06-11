@@ -72,7 +72,7 @@
 
 ### 5.3 Pre-flight gate（硬门，任一不满足就 STOP）
 
-- (i) 候选的能力方向已经能用一两句话说清（说不清 = 先去 brainstorming，不是先准入）。
+- (i) 候选的能力方向已经能用一两句话说清（说不清 = 先去 `requirement-elicitation` 挖清真需求，不是先准入）。
 - (ii) cc-master 的受众面声明可引用（哪些进 `skills/`、哪些进 `.claude/skills/`），否则 D1 无法评分。
 
 ## 6. 演化锚

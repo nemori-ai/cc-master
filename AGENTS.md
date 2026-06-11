@@ -47,7 +47,7 @@ cc-master/
 ├── skills/                    ← **分发**给插件用户的 skill 源码（仅这两个随插件 ship）
 │   ├── orchestrating-to-completion/  ← SKILL A：编排方法论（魂）+ references/
 │   └── authoring-workflows/          ← SKILL B：workflow 写法 + references/ + assets/examples/
-├── .claude/skills/            ← **项目自用** dev skill（cc-master-skillsmith：怎么造本仓 skill，**不分发**）
+├── .claude/skills/            ← **项目自用** dev skill（造/评/治三件套 + requirement-elicitation 上游需求发现，**不分发**）
 ├── hooks/scripts/            ← bootstrap-board / reinject / verify-board（纯 bash 门控）
 ├── scripts/                  ← 带外手动调用脚本：codex-review / eval-trigger / eval-benchmark / cc-usage
 ├── adrs/                     ← 结构性决策快照（ADR-001..005 + AGENTS.md 规约）
@@ -92,6 +92,8 @@ cc-master/
 本仓的开发遵循用户全局的 **gstack × superpowers 组合范式**——gstack 管"前"（方向判断）和"后"（review / QA / 安全 / ship），superpowers 管"中间"（brainstorming → plans → TDD → debugging → verification）。冲突仲裁：**用户显式指令 > skill > 默认行为**。
 → 完整路由表 + 分工原则 + 避坑：用户全局 `~/.claude/CLAUDE.md` §「gstack × superpowers 组合使用范式」。**本仓收口用项目自带 `github-pr` / `github-tag-release`，不用 gstack 的 `/ship` `/canary` `/land-and-deploy`**（它们假设别的部署形态）。
 
+> **本仓对 superpowers 的一处覆盖（self-contain）**：「中间」段最前那一步**需求发现 / brainstorming** 在本仓用项目自带的 [`requirement-elicitation`](.claude/skills/requirement-elicitation/SKILL.md)（dev skill），**不用 `superpowers:brainstorming`**——把这一步内化进本仓、重接地到 board `goal` 模型与「发现 → 准入 → 造 → 度量」生命周期，让贡献者无须外装 superpowers 也有这一步。其余「中间」段（plans / TDD / debugging / verification）与「前 / 后」仍按全局路由表。
+
 ---
 
 ## 5. 编排纪律（SKILL A 是灵魂）
@@ -108,13 +110,14 @@ cc-master/
 
 ## 6. Skill 创作 / 维护纪律（含 TDD-for-skills）
 
-本仓**分发**两个 skill：A（编排）、B（workflow 写法）——**互不重叠**（红线 3）：A = orchestrator 做什么，B = workflow 脚本怎么写。另有**三个项目自用、不随插件分发**的 dev meta-skill（住 `.claude/skills/`，不在 `skills/`），终端用户装插件时看不到它们：
+本仓**分发**两个 skill：A（编排）、B（workflow 写法）——**互不重叠**（红线 3）：A = orchestrator 做什么，B = workflow 脚本怎么写。另有**四个项目自用、不随插件分发**的 dev meta-skill（住 `.claude/skills/`，不在 `skills/`），终端用户装插件时看不到它们——**造 / 评 / 治三件套**（skillsmith / curating / grounding）+ 它们**上游**的一个需求发现 skill：
 
+- **`requirement-elicitation`** — 在动手任何 feature / skill / 行为改动**之前**，通过协作对话挖出用户真实痛点、过设计闸（批准前不实现）。本仓 dev 流的需求发现闸，**取代 `superpowers:brainstorming`**（self-contain + 重接地到 board `goal` 模型）。**它不是「为对仗凑的第四件造/评/治」**——是不同家族的**发现层**（喂给 curating），靠 self-containment 缺口 + 强 B1 覆写挣得席位，见其 [`DESIGN.md`](.claude/skills/requirement-elicitation/DESIGN.md)。
 - **`cc-master-skillsmith`** — 写或改**一个** skill 的 body（craft 两轴诊断 + 4 类 body 内容 + pressure-test 纪律）。
 - **`curating-skill-portfolios`** — 判断要不要建一个 skill / 这块该 skill 还是 reference / 一组 skill 的边界与重叠（Counterfactual Probe A/B + 裁剪七维 + DESIGN 宪法）。
 - **`grounding-skill-evals`** — 声明 J（成功契约）/ 度量一个 skill / 跑触发或行为 eval（轻量 J 写法 + 接现有 eval 三脚本 + holdout / predict-then-validate 防过拟合）。
 
-**路由**：**要不要建 skill / 边界 / 重叠 → `curating-skill-portfolios`；写或改一个 skill 的 body → `cc-master-skillsmith`；声明 J / 跑触发或行为 eval / 度量一个 skill → `grounding-skill-evals`**。三者触发时机正交，靠 description 识别，不设路由器 skill。
+**路由**：**还没搞清用户真需求 / 动手实现之前 → `requirement-elicitation`；要不要建 skill / 边界 / 重叠 → `curating-skill-portfolios`；写或改一个 skill 的 body → `cc-master-skillsmith`；声明 J / 跑触发或行为 eval / 度量一个 skill → `grounding-skill-evals`**。四者触发时机正交（发现 → 准入 → 造 → 度量），靠 description 识别，不设路由器 skill。
 
 **语言纪律**：本仓所有 skill 正文 + references 一律**中文**；例外仅 `name`（kebab-case 英文）、代码/路径/CLI/API 字段/工具名等技术术语；`description` 中文为主可含英文触发词。
 
@@ -204,6 +207,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 | 廉价续跑 + 端点验收 / content-hash / codex 第二验收者 | [`skills/orchestrating-to-completion/references/resume-verify.md`](skills/orchestrating-to-completion/references/resume-verify.md) |
 | 选每节点模型档位 / 主线为何固定模型保 cache / 按 5h-7d 配额窗口 pace | [`skills/orchestrating-to-completion/references/cost-and-pacing.md`](skills/orchestrating-to-completion/references/cost-and-pacing.md)（reference 知识,非红线）|
 | 写 / 调试 / 启动 workflow 脚本（API + 机制 + pattern + 11 个 example）| [`skills/authoring-workflows/SKILL.md`](skills/authoring-workflows/SKILL.md) + [`references/`](skills/authoring-workflows/references/) + [`assets/examples/`](skills/authoring-workflows/assets/examples/) |
+| 动手任何 feature / skill / 行为改动前先挖真需求 / 过设计闸（取代 `superpowers:brainstorming`）| [`.claude/skills/requirement-elicitation/SKILL.md`](.claude/skills/requirement-elicitation/SKILL.md)（道 + 五个 discovery moves + strawman + 设计闸，项目自用 dev skill）|
 | 写 / 改任何本仓 skill（尤其纪律型）/ 跑 pressure baseline | [`.claude/skills/cc-master-skillsmith/SKILL.md`](.claude/skills/cc-master-skillsmith/SKILL.md)（TDD-for-skills，项目自用 dev skill）|
 | 判断要不要建 skill / 该 skill 还是 reference / 一组 skill 边界与重叠 | [`.claude/skills/curating-skill-portfolios/SKILL.md`](.claude/skills/curating-skill-portfolios/SKILL.md)（Counterfactual Probe A/B + 裁剪七维 + DESIGN 宪法，项目自用 dev skill）|
 | 声明 J（成功契约）/ 度量一个 skill / 跑触发或行为 eval | [`.claude/skills/grounding-skill-evals/SKILL.md`](.claude/skills/grounding-skill-evals/SKILL.md)（轻量 J 写法 + Track A/B + holdout / predict-then-validate，项目自用 dev skill）|
