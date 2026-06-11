@@ -1,178 +1,120 @@
-# Dispatch — choosing a mechanism + orchestrating parallelism
+# 派发 —— 选机制 + 编排并行
 
-The core of main-thread orchestration: choose *where* to run each node and orchestrate the
-lanes. Source: research report 3 (LLM-Compiler TFU dataflow) + codex second review.
+> **服务愿景：C1**（异步并行 + 完整落地）**· C5**（在资源预算内高效调度）。**何时读：** 选后台机制并编排并行时——三机制（shell / sub-agent / workflow）、intra-vs-inter workflow、靠 escalation 重新定位（re-altitude）、admission control。
 
-## Contents
+主线编排的核心：选每个节点*在哪*跑、再把这些道编排起来。来源：research report 3（LLM-Compiler TFU dataflow）+ codex 二审。
 
-- [The fractal three altitudes](#the-fractal-three-altitudes)
-- [Dataflow at two scales](#dataflow-at-two-scales--why-the-altitudes-are-self-similar)
-- [Background execution mechanisms — the three](#background-execution-mechanisms--there-are-exactly-three)
-- [Selection criteria — control / synthesis / context](#selection-criteria--control--synthesis--context-not-count)
-- [Intra vs inter workflow](#intra-vs-inter-workflow--axis--lifecycle-coupling)
-- [Re-altitude via escalation](#re-altitude-core--via-escalation-never-blind-kill)
+## 目录
+
+- [分形的三个高度](#分形的三个高度)
+- [两个尺度上的 dataflow](#两个尺度上的-dataflow--为何这些高度是自相似的)
+- [后台执行机制 —— 恰好三种](#后台执行机制--恰好三种)
+- [选择标准 —— 控制 / 综合 / context](#选择标准--控制--综合--context不是数量)
+- [Intra vs inter workflow](#intra-vs-inter-workflow--轴--生命周期耦合)
+- [靠 escalation 重新定位](#靠-escalation-重新定位core--绝不盲杀)
 - [Hybrid + admission control](#hybrid--admission-control)
-- [Dispatch hygiene](#dispatch-hygiene--mechanics-that-bite-the-moment-you-run-real-parallel-work)
+- [派发卫生](#派发卫生--一跑真并行就咬人的机械细节)
 
 ---
 
-## The fractal three altitudes
+## 分形的三个高度
 
-Dispatch is fractal across three altitudes — choosing a mechanism = choosing at which altitude
-a node executes:
+派发在三个高度上是分形的——选一个机制，就等于选一个节点在哪个高度执行：
 
-- **Top (main thread)** = a **dataflow scheduler**: dispatches background mechanisms onto DAG
-  nodes and interleaves HITL, bounded by WIP + a shared budget, recording everything on the
-  board.
-- **Middle** = fan-out *inside* a workflow.
-- **Leaf** = a sub-agent / shell.
+- **顶层（主线）** = 一个 **dataflow 调度器**：把后台机制派到 DAG 节点上、并穿插 HITL，受 WIP + 一份共享预算约束，一切都记在 board 上。
+- **中层** = workflow *内部*的 fan-out。
+- **叶子** = 一个 sub-agent / shell。
 
 ---
 
-## Dataflow at two scales — why the altitudes are self-similar
+## 两个尺度上的 dataflow —— 为何这些高度是自相似的
 
-The three altitudes are not three ideas — they are **one dataflow idea (dispatch-when-ready,
-never block at a barrier) appearing at two scales**. Internalizing this is what lets you carry
-the same instinct into an unfamiliar situation instead of matching it against a rule list.
+这三个高度不是三个想法——它们是**同一个 dataflow 想法（就绪即派、绝不在 barrier 处阻塞）在两个尺度上的两次现身**。把这点内化，你才能把同一个本能带进一个陌生情境，而不是去对照一张规则清单。
 
-The academic root is the LLM-Compiler **Task Fetching Unit** (report 3): a dependency is
-dispatched the instant its inputs are ready; nothing already-runnable waits on something
-not-yet-ready, and the planner streams the graph so plan and execute overlap. cc-master runs
-that same algorithm at two scales:
+学术根源是 LLM-Compiler 的 **Task Fetching Unit**（report 3）：一条依赖在它的输入就绪那一刻就被派出去；已经能跑的东西绝不等一个还没就绪的；而且 planner 流式地吐图，让 plan 和 execute overlap。cc-master 在两个尺度上跑的是同一套算法：
 
-- **Macro (main thread) — dataflow as an internalized *mindset*.** The decision program *is* a
-  hand-run TFU: reconcile the board (the observation blackboard) → dispatch ready tasks
-  (fetch-when-ready) → fill-work in the gaps (planner/executor overlap) → verify at the endpoint
-  (the Joiner gate) → wait only when the ready set is empty. There is **no `pipeline()`
-  primitive here** — the main-thread DAG is dynamic, heterogeneous, and has a human in it, so no
-  compile-time script can express it. Dataflow lives as discipline (lenses 3 & 4), not as code.
-- **Micro (inside a workflow) — dataflow as an explicit *primitive*.** Here `pipeline()` is real
-  code: deterministic, journaled, resumable. But rigid — once a workflow starts its structure is
-  fixed, with no mid-run input (`authoring-workflows/references/mechanism.md` §7).
+- **宏观（主线）—— dataflow 作为一种内化的*心态*。** 决策程序*本身*就是一个手跑的 TFU：对账 board（observation 黑板）→ 派发就绪任务（fetch-when-ready）→ 在空隙里塞 fill-work（planner/executor overlap）→ 在端点验收（Joiner 闸）→ 唯有就绪集为空才等。这里**没有 `pipeline()` 原语**——主线 DAG 是动态的、异构的、里头还有个人，没有任何 compile-time 脚本能表达它。Dataflow 在这里以纪律存在（镜头 3 & 4），不是代码。
+- **微观（workflow 内部）—— dataflow 作为一个显式*原语*。** 这里 `pipeline()` 是真代码：确定性、有日志、可续。但它僵硬——workflow 一经启动结构就固定，没有运行中途的输入（`authoring-workflows/references/mechanism.md` §7）。
 
-**The cut between the two scales is the cut by dynamism.** Work that must adapt mid-run — react
-to an external completion, re-altitude an escalation, absorb a HITL answer — belongs at the
-macro scale (board + decision program, LLM in the loop). Work fixable at compile time — uniform
-items streaming through fixed stages — belongs in a `pipeline()`. This is the LLM-Compiler split
-*"the LLM emits the graph, code schedules it"* scaled up from one agent task to a whole
-long-horizon orchestration: the main-thread LLM does the dynamic planning (emit + replan), the
-workflow script does the deterministic scheduling. Self-similar — one scale nested in the other.
+**两个尺度之间的切线，就是按动态性切的。** 必须运行中途随机应变的工作——对一个外部完成做出反应、把一个 escalation 重新定位、吸收一个 HITL 回答——归宏观尺度（board + 决策程序，LLM 在 loop 里）。能在 compile time 就固定下来的工作——一批同构项目流过固定 stage——归一个 `pipeline()`。这正是把 LLM-Compiler 那条切线 *"LLM 吐图、代码调度它"* 从单个 agent 任务放大到整场 long-horizon 编排：主线 LLM 做动态规划（吐图 + replan），workflow 脚本做确定性调度。自相似——一个尺度嵌在另一个里。
 
-**The caveat that stops you over-applying it.** `pipeline()` optimizes *throughput* (many like
-items through fixed stages); a single long-horizon goal is a *heterogeneous DAG* whose governing
-tool is the **critical path** (CPM / work-span), not pipeline throughput. So pipeline
-parallelism is a **constituent** of cc-master, not its top-level skeleton:
+**防你过度套用的告诫。** `pipeline()` 优化的是*吞吐量*（许多同类项目穿过固定 stage）；而一个单一的 long-horizon 目标是一张*异构 DAG*，治理它的工具是**临界路径**（CPM / work-span），不是 pipeline 吞吐量。所以 pipeline 并行只是 cc-master 的一个**构件（constituent）**，不是它的顶层骨架：
 
-- the **critical chain** sets the makespan — pipelining can't help a serial dependency;
-- only the **non-critical float** is the free parallel budget a pipeline / fan-out fills;
-- **batches of like subtasks** (migrate N files, review N findings) are its home turf.
+- **临界链**定 makespan——pipelining 救不了一条串行依赖；
+- 只有**非临界 float** 才是 pipeline / fan-out 能填的免费并行预算；
+- **一批同类子任务**（迁移 N 个文件、review N 条 finding）才是它的主场。
 
-The top-level skeleton is dataflow DAG *scheduling*; a `pipeline()` is its degenerate special
-case when the items happen to be uniform. Reaching for fan-out on a serial critical chain is the
-classic mis-apply — when T₁/T∞ ≈ 1, don't fan out at all.
+顶层骨架是 dataflow DAG *调度*；`pipeline()` 只是项目恰好同构时它退化成的特例。在一条串行临界链上硬抓 fan-out 是经典的误套——T₁/T∞ ≈ 1 时，根本别 fan out。
 
 ---
 
-## Background execution mechanisms — there are exactly three
+## 后台执行机制 —— 恰好三种
 
-Teach the agent only these three. (No other background mechanisms exist for this plugin's
-purposes.)
+只教 agent 这三种。（就本插件的用途而言，没有别的后台机制。）
 
-- **shell** — mechanically checkable execution (build / test / pull data / listen / poll CI).
-  Zero token cost. Must be configured with a **timeout + success predicate + log capture**,
-  and failures must be routable to a downstream reasoning node (otherwise split into a "shell
-  execution node + sub-agent diagnosis node").
-- **sub-agent** (`run_in_background`) — one **terminal** reasoning unit: a single evidence
-  surface + a single reasoning chain + a single deliverable + no need to fan out + no need for
-  a unified schema + context-safe + carrying an explicit escalation path.
-- **workflow** — when you need **deterministic control over multiple leaves** (fan-out /
-  fan-in · a unified leaf schema · adversarial verification / retry / loop · joint synthesis ·
-  context-flood risk · journal-resume) — **choose it even when the leaf count is small**.
+- **shell** —— 可机械检查的执行（build / test / 拉数据 / 监听 / poll CI）。零 token 成本。必须配齐 **timeout + success predicate + log 捕获**，且失败必须能路由到一个下游推理节点（否则就拆成"一个 shell 执行节点 + 一个 sub-agent 诊断节点"）。
+- **sub-agent**（`run_in_background`）—— 一个**终端（terminal）**推理单元：单一证据面 + 单一推理链 + 单一交付物 + 无需 fan out + 无需统一 schema + context-safe + 携带一条显式 escalation 路径。
+- **workflow** —— 当你需要**对多个叶子的确定性控制**时（fan-out / fan-in · 统一叶子 schema · 对抗式验证 / retry / loop · 联合综合 · context-flood 风险 · journal-resume）——**哪怕叶子数很少也选它**。
 
-### Waiting on external state — with a background shell
+### 等待外部状态 —— 用一个后台 shell
 
-cc-master is event-driven: when a background job finishes, the harness wakes the main thread
-and re-enters — so it never needs a timer to poll. For state the harness *cannot* track for you
-(CI status, a remote queue, an approval timeout), wait on it with a background shell that polls
-its own predicate and rides the completion notification back in:
+cc-master 是事件驱动的：一个后台 job 完成时，harness 会唤醒主线并重新进入——所以它从不需要一个定时器去轮询。至于 harness *无法*替你追踪的状态（CI 状态、一个远程队列、一个审批超时），用一个后台 shell 去等它——这个 shell 轮询它自己的 predicate，再骑着完成通知回来：
 
 ```bash
 until <external state ready>; do sleep 60; done   # run_in_background → harness notifies on exit, re-enters
 ```
 
-This is event-driven and ship-anywhere — it reuses an existing building block (a background
-shell + the completion notification) rather than introducing a separate timer mechanism.
+这既事件驱动又 ship-anywhere——它复用的是一个现成积木（一个后台 shell + 完成通知），而不是另引入一套定时器机制。
 
 ---
 
-## Selection criteria — control / synthesis / context, NOT count
+## 选择标准 —— 控制 / 综合 / context，不是数量
 
-Do not choose by how many things there are. Choose by control / synthesis / context:
+别按有多少东西来选，按控制 / 综合 / context 来选：
 
-- Does it need reasoning? **No → shell.**
-- Reasoning and **terminal → sub-agent.**
-- Need **deterministic control over multiple leaves → workflow.**
-
----
-
-## Intra vs inter workflow — axis = lifecycle coupling
-
-The primary axis is **lifecycle coupling**, not count.
-
-- **One workflow** — the leaves share a single lifecycle: same goal / schema / quality gate /
-  budget envelope / synthesis point / acceptable failure policy, with no mid-stream HITL need.
-- **Multiple workflows** — the streams differ in priority / failure mode / restart cost /
-  budget ceiling / escalation / integration timing, or each needs an independent gate
-  discussion.
-
-HITL is only one axis; failure isolation, priority, and integration timing matter equally.
-**Middle tier**: a single workflow with multiple phases; one level of `workflow()` nesting.
+- 它需要推理吗？**否 → shell。**
+- 需要推理、且**终端 → sub-agent。**
+- 需要**对多个叶子的确定性控制 → workflow。**
 
 ---
 
-## Re-altitude (core) — via escalation, never blind kill
+## Intra vs inter workflow —— 轴 = 生命周期耦合
 
-A sub-agent that discovers it is actually a **sub-DAG**:
+首要的轴是**生命周期耦合（lifecycle coupling）**，不是数量。
 
-- **must not self-promote or fan out on its own** (a workflow leaf likewise cannot spawn);
-- it **STOPs and returns an escalation result** (a scope map + proposed leaves + deps + partial
-  evidence + the reason);
-- the orchestrator **supersedes** the old node and uses that map to seed a workflow.
+- **一个 workflow** —— 叶子共享同一条生命周期：同一个 goal / schema / 质量闸 / budget envelope / 综合点 / 可接受失败策略，且运行中途没有 HITL 需求。
+- **多个 workflow** —— 这些流在优先级 / 失败模式 / 重启成本 / budget 上限 / escalation / 整合时机上各不相同，或者每个都需要独立的闸讨论。
 
-You re-altitude **by checkpoint, not by blind kill.** Corollary: a workflow leaf's prompt must
-be small and terminal enough; when unsure, first run a scoping sub-agent / workflow.
+HITL 只是诸多轴之一；失败隔离、优先级、整合时机同样重要。**中层**：一个带多 phase 的单 workflow；一层 `workflow()` 嵌套。
 
-Node-status routing for this: `uncertain → verification node`; `stale → upstream changed,
-re-run`; `escalated → supersede → workflow`.
+---
+
+## 靠 escalation 重新定位（core）—— 绝不盲杀
+
+一个发现自己其实是一张 **sub-DAG** 的 sub-agent：
+
+- **绝不能自我提拔、也不能自行 fan out**（workflow 叶子同样不能 spawn）；
+- 它 **STOP 并返回一个 escalation 结果**（一张 scope map + 提议的叶子 + deps + 部分证据 + 原因）；
+- 编排者 **supersede** 旧节点，并用那张 map 去 seed 一个 workflow。
+
+你**靠 checkpoint 重新定位，不靠盲杀。** 推论：一个 workflow 叶子的 prompt 必须足够小、且终端；拿不准时，先跑一个 scoping sub-agent / workflow。
+
+对应的节点状态路由：`uncertain → 验证节点`；`stale → 上游变了，重跑`；`escalated → supersede → workflow`。
 
 ---
 
 ## Hybrid + admission control
 
-The top tier can have a shell + N sub-agents + a workflow in flight simultaneously. Govern it
-with admission control:
+顶层可以同时有一个 shell + N 个 sub-agent + 一个 workflow 在飞。用 admission control 来治理它：
 
-- **Reserve before launch** — reserve WIP + token budget on launch (reserve-on-launch, not
-  spend-then-report).
-- **WIP cap includes the integration burden** — to avoid the synchronization cliff when N
-  workflows all return at once.
-- **Concurrency cap = min** of: CPU/IO, model budget, rate limit, context-return budget, and
-  synthesis load.
+- **启动前先预留** —— 启动那一刻就预留 WIP + token budget（reserve-on-launch，不是 spend-then-report）。
+- **WIP cap 把整合负担也算进去** —— 避免 N 个 workflow 一齐返回时的同步悬崖（synchronization cliff）。
+- **并发上限 = 取 min**：CPU/IO、模型 budget、rate limit、context-return budget、综合负载，几者中的最小值。
 
 ---
 
-## Dispatch hygiene — mechanics that bite the moment you run real parallel work
+## 派发卫生 —— 一跑真并行就咬人的机械细节
 
-- **Absolute paths to the work target — never inherit cwd.** The orchestrator's cwd is often
-  *not* the repo the work lands in (you may be driving from a different worktree or a parent
-  directory). Every dispatched agent's prompt must give **absolute paths** to the target and
-  tell it not to rely on inherited cwd — otherwise files land in the wrong tree.
-- **Single-committer: leaves write + self-test, the orchestrator commits.** Parallel agents
-  that each `git commit` race the git index. Instruct each leaf to **write its files and run
-  its tests to prove green, but never commit**; the orchestrator verifies at the endpoint and
-  commits in dependency order. (The end-to-end argument again — commit integrity belongs at the
-  orchestrator endpoint, not the leaf. See `resume-verify.md`.)
-- **Serialize writers to a shared mutable file across waves.** If several tasks append to the
-  same file (a shared test file, a registry), two of them in the *same* wave will clobber each
-  other. Put those writers in **different waves** so at most one touches the file at a time —
-  the orchestrator absorbs this coordination cost so the leaves stay independent and disjoint.
+- **用绝对路径指向工作目标——绝不靠继承 cwd。** 编排者的 cwd 常常*不是*工作落地的那个 repo（你可能在从另一个 worktree 或一个父目录驱动）。每个被派发 agent 的 prompt 都必须给出指向目标的**绝对路径**、并告诉它别依赖继承来的 cwd——否则文件会落进错误的树。
+- **单一提交者：叶子负责写 + 自测，编排者负责提交。** 各自 `git commit` 的并行 agent 会抢 git index。要求每个叶子**写它的文件、跑它的测试证明是绿的，但绝不 commit**；由编排者在端点验收、再按依赖序提交。（又是 end-to-end argument——commit 完整性归编排者端点，不归叶子。见 `resume-verify.md`。）
+- **对同一个共享可变文件的写者，跨波串行化。** 若几个任务都追加到同一个文件（一个共享测试文件、一个 registry），*同一*波里的两个会互相覆盖。把这些写者拆进**不同的波**，使任一时刻至多一个去碰那文件——编排者吸收这份协调成本，好让叶子保持独立、互不相交。

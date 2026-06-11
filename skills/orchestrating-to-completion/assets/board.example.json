@@ -1,8 +1,8 @@
 {
   "schema": "cc-master/v1",
-  "goal": "Migrate user_cognition's 9 domains to the new CognitionRecord schema",
+  "goal": "Internationalize the app to 6 locales (i18n framework + per-locale translation + locale routing)",
   "owner": { "active": true, "session_id": "abc123", "heartbeat": "2026-06-05T12:30Z" },
-  "git": { "worktree": "/repo/.worktrees/cog-migrate", "branch": "feat/cog-migrate" },
+  "git": { "worktree": "/repo/.worktrees/i18n", "branch": "feat/i18n-rollout" },
   "wip_limit": 4,
   "tasks": [
     { "id": "T0", "status": "done", "deps": [], "artifact": "commit a1b2c3", "verified": true },
