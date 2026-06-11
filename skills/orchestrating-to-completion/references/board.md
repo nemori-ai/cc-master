@@ -52,12 +52,17 @@ tasks[ { id, status, deps } ]
 | `stale` | 一个上游产物变了——重跑（见 `resume-verify.md` 的依赖 pinning）。 |
 | `uncertain` | 做了但未验——路由到一个验证节点 / 在端点验。 |
 
-### 柔性边（agent 可自由塑形、hook 忽略）
+### 柔性边（agent 可自由塑形）
 
 `title / artifact / dispatched_at / mechanism / handle / kind / justification / output_schema /
 dep_pins / notes / log` —— 外加示例字段 `verified`、`blocked_on`，以及 top-level 的 `wip_limit`。
 
-钉死的 waist 之外，hook 一概忽略，所以 agent 尽可按任务需要随意塑造这些柔性边。
+钉死的 waist 之外，agent 尽可按任务需要随意塑造这些柔性边。但柔性边里要再分两档（hook 对它们的态度不同）：
+
+- **大多数柔性边 = hook 完全忽略**：上面绝大多数字段，hook 一概不读、不依赖，纯属 agent-shaped。
+- **少数柔性边 = soft / optional 的「hook 可观察」字段**：hook **若有则用、缺失则静默关闭对应行为（graceful degrade，不报错）**——它们既不是硬 waist（hook **要求**存在的字段），也不是「hook 完全无视」。目前唯一一个是 top-level 的 **`wip_limit`**：`posttool-batch.sh` 会 best-effort 读它，当 `in_flight` 数超过 `wip_limit` 时注入一条 **C5 过调度软警告**（非阻塞）。**这是「读」不是「要求」**：board 没有 `wip_limit`、或它非数字时，该警告按设计**静默关闭**（不报错、不影响其它行为）——省掉 `wip_limit` 就等于关掉 C5 过调度警告，知情即可，不是错误。
+
+> **硬 waist vs soft observed —— 别混淆**：hook **要求**的字段（`schema` / `goal` / `owner.session_id` / `git` / `tasks[{id,status,deps}]` + status enum）才是受红线 2 保护、动它必须同 PR 改全部 hook + 测试的**硬 narrow-waist**；`wip_limit` 这类**「hook 若有则用」的 soft observed 字段不在硬 waist 内**——把它提进硬 waist 是结构性改动、需人审，不要顺手做。未来改 board 者：增 / 删一个 soft observed 字段只影响它驱动的那条可观察行为（如删 `wip_limit` = 关 C5 警告），不动硬 waist 契约。
 
 ---
 
