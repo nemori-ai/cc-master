@@ -131,7 +131,7 @@ cc-master 的 charter 是六项能力（C1–C6，SSOT 在 `design_docs/spec.md`
 
 | 愿景 | 镜头 | Reference(s) | 决策程序节点 | Hook 共鸣（注入短语 → 锚点） |
 |---|---|---|---|---|
-| **C1** 异步并行 + 完整落地 | 1 / 3 / 4 / 6 | `dispatch` · `resume-verify` · `board` | recon → dispatch → verify → wait（整个 loop） | SessionStart "integrate any completed background results first / Do not restart work already done/verified"; SubagentStop (H6) "a background sub-agent just finished ... integrate ... gate-green ≠ passed" → recon/integrate + 镜头 6; Stop "is every to-do actually done — including any NOT yet listed on the board" → 镜头 1 + step-6 ledger |
+| **C1** 异步并行 + 完整落地 | 1 / 3 / 4 / 6 | `dispatch` · `resume-verify` · `board` | recon → dispatch → verify → wait（整个 loop） | SessionStart "integrate any completed background results first / Do not restart work already done/verified" → recon/integrate + 镜头 6; Stop "is every to-do actually done — including any NOT yet listed on the board" → 镜头 1 + step-6 ledger |
 | **C2** 控制 token 消耗速度 | 5 | `cost-and-pacing` | dispatch 的 "reserve budget+WIP first" 备注 | Stop (H8 usage-pacing) "[cc-master pacing] 5h 配额临界 ... pace 杠杆（见 orchestrating-to-completion / cost-and-pacing）" → 镜头 5 |
 | **C3** 自主决策 vs 人类接入边界 | 7 | `async-hitl` | q_user → surface | Stop "every point that needs the user surfaced / marked `blocked_on:"user"`"; Stop (H3) "Unanswered user decisions still on this board" → 镜头 7 |
 | **C4** 分解 / 管理 / 更新 / 规划 | 2 | `decomposition` · `board` · `resume-verify` §4 | recon（integrate / mark stale） | bootstrap & Stop "Decompose the goal into a dependency DAG" → 镜头 2 + decomposition; Stop "self-check against this board's `goal`" → board/goal 重认领 |
@@ -146,7 +146,6 @@ cc-master 的 charter 是六项能力（C1–C6，SSOT 在 `design_docs/spec.md`
 
 - **SessionStart** "invoke the orchestrating-to-completion skill and continue the decision program"、"recognise it by its goal"、"integrate any completed background results first" → 你刚 compact 过：回到 *Board protocol essentials*，重新认领你的 board，从 **recon** 重启决策程序——排程之前先整合（镜头 1 / 6）。
 - **UserPromptSubmit** "Decompose the goal into a dependency DAG ... run the decision program" → 一场新 orchestration 的起点：**镜头 2** + `decomposition.md`——派发之前先画 DAG。
-- **SubagentStop** (H6) "a background sub-agent just finished ... integrate the result, and verify independently at your own endpoint before marking it done — gate-green ≠ passed" → 去 **recon**，整合它映射的那个 `in_flight` 任务，再在你自己的端点验收（镜头 6，不是对 agent 自报的一次重读）。
 - **PostToolBatch** (H5) "WIP is at/over the cap ... Don't add more parallel work next round — consider deferring high-float tasks to keep ~75% utilization (lens 5)" → **镜头 5**：别再加并行工作，推迟 high-float 任务。它是软警告，不是 block。
 - **Stop** —— 决策程序从外部为你兜底；它的每条注入各指向一个锚点：
   - "this board still has a `ready` or `uncertain` task ... Resolve it" → **q_ready / q_unver** 还有活：别停，回去跑（镜头 3 / 6）。

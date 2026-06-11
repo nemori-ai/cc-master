@@ -2,8 +2,8 @@
 
 > Status: **Accepted**
 > Date: 2026-06-11
-> Scope: All cc-master hooks (`bootstrap-board.sh` / `reinject.sh` / `verify-board.sh` / `subagent-stop.sh` / `posttool-batch.sh` / `usage-pacing.js`) and any future hook. Establishes a single arming contract every hook must satisfy before producing any output / block.
-> Source: Reinject false-activation gap (a brand-new session that never ran `as-master-orchestrator` got re-anchored as an orchestrator just because *some other* session left an active board behind) + the new notification/pacing hooks (`subagent-stop` / `posttool-batch` / `usage-pacing`) which, ungated, would fire in every host session.
+> Scope: All cc-master hooks (`bootstrap-board.sh` / `reinject.sh` / `verify-board.sh` / `posttool-batch.sh` / `usage-pacing.js`) and any future hook. Establishes a single arming contract every hook must satisfy before producing any output / block.
+> Source: Reinject false-activation gap (a brand-new session that never ran `as-master-orchestrator` got re-anchored as an orchestrator just because *some other* session left an active board behind) + the new notification/pacing hooks (`posttool-batch` / `usage-pacing`) which, ungated, would fire in every host session.
 > Co-signed: user (owner)
 > Elevation: this decision has been **elevated to a non-negotiable red line — [`../AGENTS.md`](../AGENTS.md) §3 red line 6** (dormant-until-armed), guarded by the `grep -rL 'board_matches\|isArmed' hooks/scripts/*.sh hooks/scripts/*.js` PR/CI checkpoint.
 
@@ -17,9 +17,9 @@ Without a gate this is actively harmful, not merely noisy:
 
 - **`reinject.sh`** previously activated on *any* active board in home and discarded the stdin `session_id`. A brand-new, unrelated session got falsely re-anchored as an orchestrator just because a different session had left an active board behind (the **false-activation gap** that triggered this ADR).
 - **`usage-pacing.js`**, ungated, would read the host-global usage JSONL and inject a pacing warning into **every** session on the machine — polluting plain coding sessions with orchestrator-only chatter.
-- **`subagent-stop.sh`** / **`posttool-batch.sh`** would nudge "go integrate / you're over-dispatched" in sessions that have no board and no dispatched work at all.
+- **`posttool-batch.sh`** would nudge "you're over-dispatched" in sessions that have no board and no dispatched work at all.
 
-The hard part is **state**. A hook runs in a fresh shell, blind to agent context, and must decide "is this session an armed orchestration?" **across compaction and across the gap between separate `Stop` / `SessionStart` / `SubagentStop` fires** — events that share no in-process memory. We need a persistence substrate the hook can read on every cold fire.
+The hard part is **state**. A hook runs in a fresh shell, blind to agent context, and must decide "is this session an armed orchestration?" **across compaction and across the gap between separate `Stop` / `SessionStart` / `PostToolBatch` fires** — events that share no in-process memory. We need a persistence substrate the hook can read on every cold fire.
 
 Investigation conclusion (recorded so it is not re-litigated): **Claude Code exposes no native, hook-readable, cross-compaction session state.** Hooks receive only their event's stdin JSON (which carries `session_id`); there is no durable per-session key/value a hook can stash an "armed" flag in. **Disk is the only durable channel** a hook can both write (at arm time) and read (on every later fire). cc-master already has exactly such an on-disk artifact: the **board** (`*.board.json`), which is the orchestration's single source of truth (ADR-003) and already lives in a configurable home keyed per orchestration.
 
@@ -73,7 +73,7 @@ A session is **disarmed** when `/cc-master:stop` archives the board (`owner.acti
 ### 3.3 Neutral
 
 - **Arming ≠ correctness of the board's contents.** The gate only asks "is this session an armed orchestration?"; the goal-hook's completion logic, WIP counting, etc. remain each hook's own concern downstream of the gate.
-- **Per-fire cost is one directory scan** of `*.board.json` headers — negligible for the low-frequency events these hooks bind (`Stop` / `SessionStart` / `SubagentStop` / `PostToolBatch`).
+- **Per-fire cost is one directory scan** of `*.board.json` headers — negligible for the low-frequency events these hooks bind (`Stop` / `SessionStart` / `PostToolBatch`).
 
 ## 4. Alternatives Considered
 

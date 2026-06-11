@@ -6,7 +6,7 @@ in your environment, so please read this before reporting.
 ## Trust surface
 
 - **Hooks run shell on your machine.** cc-master ships hooks
-  (`UserPromptSubmit`, `SessionStart`, `Stop`, `SubagentStop`, `PostToolBatch`) that
+  (`UserPromptSubmit`, `SessionStart`, `Stop`, `PostToolBatch`) that
   execute locally on every matching event. They are limited to **bash +
   Node.js/JavaScript** — runtimes Claude Code itself guarantees (no
   `jq`/`python`/extra installs; see ADR-006) — and read your project directory +

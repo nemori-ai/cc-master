@@ -50,7 +50,7 @@ cc-master/
 │   ├── orchestrating-to-completion/  ← SKILL A：编排方法论（魂）+ references/
 │   └── authoring-workflows/          ← SKILL B：workflow 写法 + references/ + assets/examples/
 ├── .claude/skills/            ← **项目自用** dev skill（造/评/治三件套 + requirement-elicitation 上游需求发现，**不分发**）
-├── hooks/scripts/            ← 6 个 hook，全 board-derived「武装」后才醒（ADR-007）：bootstrap-board（ARM 动作）/ reinject / verify-board（goal-hook）/ subagent-stop（后台完成通知）/ posttool-batch（过调度软警告）·bash + usage-pacing.js（5h/7d burn-rate pacing）·node·JS（红线1·ADR-006 已允许 node）
+├── hooks/scripts/            ← 5 个 hook，全 board-derived「武装」后才醒（ADR-007）：bootstrap-board（ARM 动作）/ reinject / verify-board（goal-hook）/ posttool-batch（过调度软警告）·bash + usage-pacing.js（5h/7d burn-rate pacing）·node·JS（红线1·ADR-006 已允许 node）
 ├── scripts/                  ← 带外手动调用脚本：codex-review / eval-trigger / eval-benchmark / cc-usage
 ├── adrs/                     ← 结构性决策快照（ADR-001..007 + AGENTS.md 规约）
 ├── tests/                    ← hook 测试（bash）；run-tests.sh 编排 hook + content contract

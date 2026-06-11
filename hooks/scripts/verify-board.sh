@@ -45,7 +45,7 @@ fi
 # A board is "mine" when active AND (sid empty → degraded: any active board; else owner.session_id==sid).
 # This board_matches IS this hook's arming gate: every cc-master hook stays dormant until THIS session
 # is armed (an active board it owns), and only a matched board drives any behavior below. (Unified
-# armed-hook discipline — same gate in reinject.sh / subagent-stop.sh / posttool-batch.sh and the node
+# armed-hook discipline — same gate in reinject.sh / posttool-batch.sh and the node
 # usage-pacing.js; bootstrap-board.sh is the ARM action and is the sole gate-exempt hook.)
 board_matches() { # $1 = board path
   grep -qE '"active"[[:space:]]*:[[:space:]]*true' "$1" 2>/dev/null || return 1

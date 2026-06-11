@@ -9,8 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **三个新 hook（接通通知 + pacing 通道，均已建 + 测 + 接线 LIVE）** — 把此前「编译进 prose、compaction 一冲就丢」的运行时信号变成确定性 hook：
-  - `subagent-stop.sh`（`SubagentStop`，bash）— 后台 sub-agent 完成时注入「去对账 board、整合、在你自己端点独立验收（gate-green ≠ passed）」的非阻断提示，闭合「记得收割后台完成」的脆弱 prose。
+- **两个新 hook（接通过调度 + pacing 通道，均已建 + 测 + 接线 LIVE）** — 把此前「编译进 prose、compaction 一冲就丢」的运行时信号变成确定性 hook：
   - `posttool-batch.sh`（`PostToolBatch`，bash）— 一批并行工具调用后数 in_flight 任务对 board 的 `wip_limit`，超限时注入「下回合别再加并行、延后高 float」软警告；**绝不 block**，保住并行自由。
   - `usage-pacing.js`（`Stop`，**node**，ADR-006 解锁的旗舰 node hook）— 读本地 usage JSONL（同 `scripts/cc-usage.sh` 口径）算 5h/7d burn-rate，临近撞墙时注入**非阻断** pacing 警告；怎么 pace 是认知（属 SKILL A），hook 只感知不替主线调度。
 - **hook 武装纪律 + ADR-007（结构决策）** — 新增 [`adrs/ADR-007-hook-arming-gate.md`](adrs/ADR-007-hook-arming-gate.md)：**所有 hook 在本 session 被 `as-master-orchestrator` 武装之前完全休眠**。armed ⟺ home 里有一个 `*.board.json` 且 `owner.active:true` 且 `owner.session_id == 本次 stdin session_id`（sid 空 → 降级匹配任一 active 板，保 compaction 边界鲁棒）；每个 hook 的 `board_matches`/`isArmed` 即这道闸，未武装一律静默（空 stdout、RC 0、不 block）。`bootstrap-board.sh` 是唯一豁免者（ARM 动作本身，建板即盖 `owner.session_id`），解除武装 = `/stop`。**复用已 pinned 的 `active`/`session_id` 两个 narrow-waist 字段判 arming，不动红线 2（ADR-003）**；Context 记录调研结论：CC 无原生跨-compaction session state，disk 是 hook 唯一能读的持久通道。纪律落 `AGENTS.md` §12（红线级口吻硬规则）+ §2 树 + §N 阅读表；`adrs/AGENTS.md` ADR 表加 ADR-007 一行。
@@ -45,6 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`AGENTS.md` §4 增本仓对 superpowers 的一处覆盖** — dev 流「需求发现 / brainstorming」步改用项目自带 `requirement-elicitation`，不用 `superpowers:brainstorming`；其余「中间」段（plans / TDD / debugging / verification）与「前 / 后」仍按全局路由。
 - **`AGENTS.md` §2 / §6 / §N + curating 版图自述同步** — dev meta-skill 由「三件套」扩为「三件套（造/评/治）+ `requirement-elicitation` 上游」，§6 路由四者正交（发现 → 准入 → 造 → 度量）；curating 的 portfolio 计数 2+3 → 2+4，并在 `references/counterfactual-probe.md` 注明第四件经 Probe 准入、非违背「为对仗而建第四个」警告。
 - **红线 1 修订（[ADR-006](adrs/ADR-006-hooks-may-use-node-js.md) 取代 [ADR-001](adrs/ADR-001-hooks-pure-bash.md) 的「no node」立场）** — hook runtime 约束从「纯 bash」改为 **bash + node/JS（JS only；`jq`/`python`/TS-直跑仍排除）**：Claude Code 本身是 Node 应用，`node` 在任何能触发 hook 的环境天然在（原「no node」把模型后端 Bedrock/Vertex/Foundry 误当 CLI 宿主）。最大后果：**C2 usage 感知翻盘为可做成 node hook**（原判「唯一被红线1 否决」）；board 解析可 `JSON.parse`。ship-anywhere 精神保留。同步：`AGENTS.md` §3 红线1 + §2/§12/§N、`CONTRIBUTING.md`、`SECURITY.md`、PR/issue 模板、`README(_zh).md`、`grounding-skill-evals`、`vision-landing-tracker`。ADR-001 状态 → Superseded。
+
+### Removed
+
+- **移除 `subagent-stop.sh`（`SubagentStop` / H6）hook + 全仓级联引用** — 经官方文档 + codex 第二端点验收双重确认，`SubagentStop` 的 `hookSpecificOutput.additionalContext` 注入的是**刚结束的 sub-agent 自己的 context、不穿过父 orchestrator 边界**，故这个 hook 想做的「后台 sub-agent 完成 → 自动提醒父 orchestrator 去 integrate / 验收」根本做不到（递错对象）；且与 Claude Code 内建的「sub-agent 结果摘要自动回父线」**冗余**。「完成即整合」的纪律保留在 SKILL A 决策程序的 recon 步（integrate done background）+ 内建通知里，不靠此 hook（子 → 父通知属 background agents / agent teams，本仓红线 5 有意排除）。级联：`hooks/hooks.json` 删 `SubagentStop` 事件块、删 `hooks/scripts/subagent-stop.sh` + `tests/hooks/test_subagent-stop.sh`、`tests/content/structure.test.mjs` 改「5 hook / 4 事件」、`README(_zh).md` / SKILL A `SKILL.md`+`DESIGN.md` / `AGENTS.md` §2 / `SECURITY.md` / `ADR-007` Scope / `design_docs/` 两篇同步去引用或校正为「已评估并移除」。
 
 ## [0.2.0] — 2026-06-10
 
