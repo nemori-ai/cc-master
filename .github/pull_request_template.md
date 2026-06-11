@@ -31,6 +31,7 @@ Paste the relevant output if helpful:
 - [ ] **Skill A / Skill B** stay self-contained and non-overlapping
 - [ ] Change is **ship-anywhere** (no agent-teams / scheduled-routines dependency)
 - [ ] The conductor still never does unit work by hand
+- [ ] Every hook is **dormant-until-armed** (`board_matches` / `isArmed` gate) — only `bootstrap-board.sh` is exempt; see ADR-007
 
 ## Docs
 

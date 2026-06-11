@@ -6,11 +6,17 @@ in your environment, so please read this before reporting.
 ## Trust surface
 
 - **Hooks run shell on your machine.** cc-master ships hooks
-  (`UserPromptSubmit`, `SessionStart`, `Stop`) that execute locally on every
-  matching event. They are limited to **bash + Node.js/JavaScript** — runtimes
-  Claude Code itself guarantees (no `jq`/`python`/extra installs; see ADR-006) —
-  and read your project directory + write to the cc-master home
-  (`$CC_MASTER_HOME`, else `<project>/.claude/cc-master/`).
+  (`UserPromptSubmit`, `SessionStart`, `Stop`, `SubagentStop`, `PostToolBatch`) that
+  execute locally on every matching event. They are limited to **bash +
+  Node.js/JavaScript** — runtimes Claude Code itself guarantees (no
+  `jq`/`python`/extra installs; see ADR-006) — and read your project directory +
+  write to the cc-master home (`$CC_MASTER_HOME`, else
+  `<project>/.claude/cc-master/`).
+- **Hooks stay dormant until you explicitly arm a session.** Every hook except
+  `bootstrap-board.sh` is gated **dormant-until-armed** (a non-negotiable red
+  line; see ADR-007): until you run `/cc-master:as-master-orchestrator` in *that*
+  session, each hook produces no output and never blocks — so a plain coding
+  session in the same host is unaffected and unpolluted.
 - **The plugin injects context into the agent.** Commands and hooks add text to
   the model's context (role priming, board path, re-injection after compaction).
   Treat any plugin that can shape agent context as part of your trust boundary.
