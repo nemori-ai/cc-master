@@ -39,6 +39,8 @@
 | 25 | Track A 满载环境信号死亡:正例 recall 地板=0,与 description 质量无关 | must-know(测量有效性)| 已记 caveat;语义改动降级定性评审 |
 | 26 | 模型分层 + usage-pacing baseline 零失败 → 归类为 reference 知识非红线(TDD-for-skills 防编造未被违反的规则)| ✅ 机制验证(正向)| 落 `cost-and-pacing.md` + lens 软指针,不写红线 |
 | 27 | codex 第二验收 4 轮逮 6 bug:cc-usage.sh 五 correctness(schema 契约/陈旧窗口/跨界清零/dedup 低报/未来行计数)+ cost-and-pacing.md effort 不可执行 lever | ✅ 机制验证(正向)+ 6 should-fix 已修 | A–F 全收口;fuse 据 #22 先例停自动循环;passed=10 |
+| 28 | 常驻重注的魂(SKILL.md Vision-index)把已 live 的 H8(usage-pacing)标作「TODO/待批准」,误导未来每场 orchestration 以为 C2 pacing hook 不存在 | should-fix(指导失真)| ✅ 已修(POLISH-SOUL 端点验收亲读暴露→micro-fixup 校准3处,dot-graph 重验未扰);根因=MAPSYNC 只同步 H6/H5/H3 子集、漏 H8 |
+| 29 | 公开落地页(README)demo 直接照搬一个真实保密项目的场景(user_cognition/CognitionRecord 数据模型),且泄密早已潜伏在 walkthrough/smoke.sh/board.md(分发)——README 只是放大到最高曝光面 | **must-fix(泄密)** | ✅ 已修(用户 review catch→全仓 scrub 换通用 i18n 场景 + 彻底去外部出处痕迹 self-contain;repo-wide grep 零残留+smoke.sh 真跑过) |
 
 > 基线健康(无问题留痕):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
@@ -269,7 +271,7 @@
 
 ## Finding #16 — bootstrap marker 分支仍裸子串(#15 同类残留),被 sub-agent 报告内联引用 marker 误触发
 
-- **现象**:R5(omne 范式勘察)报告正文逐字引用 sentinel 标记 `cc-master:bootstrap:v1`(在讲 command 文件约定时),
+- **现象**:R5(迭代范式勘察)报告正文逐字引用 sentinel 标记 `cc-master:bootstrap:v1`(在讲 command 文件约定时),
   该报告经 task-notification 走 UserPromptSubmit 时,`bootstrap-board.sh` 的「stdin 含 marker 子串」判据命中,
   **误建空 board**(`20260608T121833Z-2069`)。
 - **根因**:#15 的 P2c-F 只收紧了 `/cc-master:as-master-orchestrator` **前缀分支**;marker 那条 OR 分支
@@ -546,3 +548,33 @@
   落盘的改动必须以真 tool_result 为准、关键件改后 grep/git status 复核,绝不据自报断言已落盘**——正是 cc-master「只信端点
   验收、agent 自报不可信」红线对 orchestrator **自己**的适用。
 - **严重度 / 来源**:✅ 机制验证(正向,codex 4 轮共逮 6 条)+ 6 should-fix 已修 / 一手(codex 第 5–8 次真跑,本 PR 端点验收)。
+
+## Finding #28 — 常驻重注的魂把已 live 的 hook 标作「TODO」,reinject 指导失真 ✅已修
+
+- **现象**:对 POLISH-SOUL 产出做端点验收、逐行亲读 `skills/orchestrating-to-completion/SKILL.md` 时,发现 Vision-index
+  的 C2 行、by-design 收口句、resonance 闭注三处仍把 **H8(usage-pacing.js)标作「TODO / 待批准 / 随它的 PR 落地」**——可
+  H8 早已建成、wired 进 `hooks.json`(Stop 段两个 hook)、被 ADR-007 列为已接受的六 hook 之一、`structure.test.mjs` 断言它
+  跨 5 事件 live、红线 6 grep 也把它纳入武装闸覆盖。文档与现实直接打架。
+- **根因**:MAPSYNC(把 hook 从 TODO 迁到 live 的那步)当初**只同步了 H6/H5/H3 子集,漏了 H8**。是「同步一张状态映射表时只改了记得起来的那几行、没穷举全部条目」的典型部分同步遗漏。
+- **影响**:`SKILL.md` 是 `SessionStart` hook 每次 compaction **整篇重注**的常驻手册——读者基数 = 未来每一场 orchestration 的
+  每一次 compaction。它谎报「C2 的 pacing hook 还不存在」,会让 orchestrator 误以为没有 usage 感知、转而手动补偿或误判
+  pacing,而 H8 其实一直在 Stop 上如常注入 `[cc-master pacing] 5h 配额临界…`。这是「给 agent 的指导不对」最高曝光的一类:错在魂里。
+- **处置**:端点验收**本身**暴露的 micro-fixup(红线唯一例外,T∞≈T₁、派发成本 > 自收),属「integrate:校准魂的 hook 状态图与
+  live hook 集对齐」——由建并验过这些 hook 的 orchestrator 直接收掉。校准三处:C2 行改引 H8 真注入短语、by-design 句改「C2 的
+  hook 列现由 H8 兑现」、resonance 段加 H8 的 Stop pacing 锚点 + 闭注改「H3/H5/H6/H8 现均已 live」。改后**重验 dot-graph md5
+  对 HEAD 仍 byte-identical、签名短语 2/2/3/3/6 未变、`H8.*TODO|待批准` 残留归零**——确认只动了 Vision-index 散文、牙齿零扰动。
+- **教训(固化候选)**:① **同步任何「状态映射表」(hook 清单 / 能力矩阵 / TODO→live 迁移)必须穷举全部条目,不能只改记得起的子集**
+  ——部分同步会留下「文档说没有、现实已存在」的反向漂移,且越是常驻重注的文档(魂)曝光越大。MAPSYNC 这类批量状态迁移宜配一条
+  「迁移后 grep 残留标记数应归零」的自检(本案的 `grep 'H8.*TODO|待批准'`==0 即是)。② 呼应 Finding #19/#22 —— 文档/现实漂移
+  是「测试全绿也看不见」的形态盲区(`run-tests` 只验结构、不验 Vision-index 散文真不真),codex 第二端点验收对这类高命中,本条
+  恰是 POLISH 阶段亲读魂、抢在 codex 之前自逮的一例。
+- **严重度 / 来源**:should-fix(reinject 指导失真,高曝光低 blast)/ 一手(POLISH-SOUL 端点验收亲读暴露,本 PR)。
+
+## Finding #29 — 公开落地页 demo 照搬真实保密项目场景 = 泄密;且泄密早潜伏在分发件里 ✅已修
+
+- **现象**:为 README 重定位写「Watch one run」demo 时,我直接复用了仓库现成的 `walkthrough.md` 例子——一个 `user_cognition` 9-domain 迁移到 `CognitionRecord` schema 的场景。用户 review 当场指出:**这是一个真实保密项目的数据模型,放进公开落地页有泄密风险**;且这个 demo「太单薄」(只一个 T0→三叶 fan-out),没体现插件的多层能力。
+- **根因**:① **照搬现成例子时没核它的 provenance 是否适合公开**——`walkthrough.md` 是内部 dogfood 时写的,用了手边真实项目的 schema;搬到「最高曝光面的公开落地页」时,我没问「这个场景能不能公开」。② 更深一层:泄密**早已潜伏**在 `walkthrough.md` / `smoke.sh` / `board.md`(**随插件分发**)/ `board.example.json` / `spec.md` 里——README 不是引入者,是**放大器**(把一个本就在公开仓库里的保密场景,搬到了所有人第一眼看的地方)。
+- **影响**:保密项目的数据模型(`user_cognition` / `CognitionRecord` / 三 domain 名)出现在 8 个公开站点,其中 2 个(`board.md` / `board.example.json`)**随插件分发给每个用户**。这是 must-fix 级——一旦发布,等于把别人的私有 schema 钉在了公开 README 与分发制品上。
+- **处置**:① 全仓 scrub——把保密场景换成一个**通用、合成、非保密**的 i18n 国际化场景(8 站点:README×2 / walkthrough / smoke.sh / board.md / board.example.json / spec.md / track-b),三者(README ⇄ walkthrough ⇄ smoke.sh)严格对齐、`smoke.sh` 真跑 exit 0;② 顺带按用户「self-contain」要求,**彻底清除所有外部出处/上游项目的字眼与暗示**(13 站点),让本仓所有文档项目内自洽;③ README demo 同时**做厚**——显出模型分档(临界根强模型/float 廉价)、HITL(`blocked_on:"user"` 决策节点并行 surface)、escalation(RTL locale 升格 workflow)、pacing(5h 墙节流)、compaction 存活、端点验收+强制自检列未答决策。repo-wide grep 两轴零残留、全套绿、smoke.sh PASS 自证。
+- **教训(固化)**:① **任何进入公开/分发面的「示例 / demo / fixture」场景,必须是通用合成的,绝不照搬任何真实(尤其可能保密)项目的领域模型/命名/schema**——哪怕它就在仓库里现成可用。搬运现成内容到更高曝光面时,**provenance 审查**是必做的一步(同 §11「对外/不可逆先问用户」精神)。② 内部 dogfood 写的例子若用了真实项目素材,**在它还只躺在内部文档时就该 scrub**,别等它被搬上落地页才发现——「分发件里的保密场景」是比「README 里的」更隐蔽、更早该堵的洞。③ 这也是一次正向的 **HITL 验证**:用户作为 async reviewer 在 commit 前一眼逮到了测试与 codex 都不会报的「语义级泄密」——印证 lens 7「用户是特殊的 async worker」+ 端点人审不可替代。
+- **严重度 / 来源**:**must-fix(泄密)** / 一手(用户 review catch,本 PR)。
