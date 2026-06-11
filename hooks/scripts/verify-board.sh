@@ -98,9 +98,12 @@ tasks_region() {
     }' "$1" 2>/dev/null
 }
 
-# pending_user_decisions BOARD — print, one per line, the human label of every task object whose
-# TOP-LEVEL fields carry `"blocked_on":"user"` (whitespace-tolerant): its "title" if present, else
-# its "id". This is a PER-OBJECT scan (tasks_region above flattens every object's fields into one
+# pending_user_decisions BOARD — print, one per line, the human label of every task object that is
+# GENUINELY parked on the user: its TOP-LEVEL fields carry BOTH `"status":"blocked"` AND
+# `"blocked_on":"user"` (whitespace-tolerant) — the `blocked(blocked_on:"user")` contract. Requiring
+# status:"blocked" (not just blocked_on) excludes ANSWERED decisions: a task already `status:"done"`
+# that still carries stale `blocked_on:"user"` metadata is no longer pending, so it is not re-warned.
+# Label = its "title" if present, else its "id". This is a PER-OBJECT scan (tasks_region above flattens every object's fields into one
 # stream and so cannot bind a title back to the object whose blocked_on it belongs to). Same
 # string/escape/double-depth ([ ] and { }) awareness as tasks_region, so it is FORMAT-AGNOSTIC:
 # single-line and multi-line JSON behave identically. Only characters at the task-object top level
@@ -138,9 +141,14 @@ pending_user_decisions() {
         if (bd == 1 && cd == 1) obj = obj ch
       }
     }
-    # emit OBJ — if OBJ has a top-level "blocked_on":"user", print its "title" (else its "id").
-    function emit(o,   bo, lbl) {
-      if (o !~ /"blocked_on"[ \t]*:[ \t]*"user"/) return
+    # emit OBJ — list OBJ as an unanswered user decision ONLY if it is genuinely parked on the user:
+    # top-level status MUST be "blocked" AND blocked_on MUST be "user" (the blocked(blocked_on:"user")
+    # contract). A task already status:"done" (etc.) that still carries stale blocked_on:"user"
+    # metadata is an ANSWERED decision — excluding it stops the Stop handshake re-warning on it forever.
+    # Read both fields from this object OWN top-level fields via field() (per-object, nested log cannot leak).
+    function emit(o,   lbl) {
+      if (field(o, "status") != "blocked") return
+      if (field(o, "blocked_on") != "user") return
       lbl = field(o, "title")
       if (lbl == "") lbl = field(o, "id")
       if (lbl != "") print lbl

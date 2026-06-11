@@ -389,4 +389,17 @@ assert_contains "$HOOK_OUT" "real top-level title" "H3 nested log → reads the 
 assert_not_contains "$HOOK_OUT" "nested decoy" "H3 nested log → nested log title does not leak into the list"
 rm -rf "$H"
 
+# Case X6 (codex catch): a task with stale `blocked_on:"user"` metadata that is ALREADY `status:"done"`
+#               must NOT be listed as an unanswered user decision — an answered decision marked done
+#               but still carrying its blocked_on:"user" tag would otherwise make the Stop handshake
+#               re-warn forever. The predicate must require BOTH status:"blocked" AND blocked_on:"user"
+#               (the `blocked(blocked_on:"user")` contract). A genuinely pending blocked task IS listed.
+H="$(make_project)"; SID="sess-h3-stale"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"blocked_on\":\"user\",\"title\":\"already answered region pick\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"genuinely pending approval\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "H3 stale blocked_on → still completion handshake block"
+assert_contains "$HOOK_OUT" "genuinely pending approval" "H3 stale blocked_on → genuinely blocked+user decision IS listed"
+assert_not_contains "$HOOK_OUT" "already answered region pick" "H3 stale blocked_on → status:done task NOT listed (require status:blocked too)"
+rm -rf "$H"
+
 finish
