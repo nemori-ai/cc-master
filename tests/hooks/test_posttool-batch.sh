@@ -85,4 +85,26 @@ assert_eq 0 "$HOOK_RC" "session filter → rc 0"
 assert_eq "" "$HOOK_OUT" "session filter → other session's over-cap board does not warn me"
 rm -rf "$H"
 
+# Case 9: NO top-level wip_limit, but a TASK carries a nested "wip_limit":1 (agent-shaped payload).
+#          in_flight=2 > 1. The nested cap must NOT be picked up — only a board-root top-level wip_limit
+#          is a real cap, so this degrades gracefully to silent (no threshold → no warning). Guards
+#          against the grep mis-catching a nested same-name key (codex round-2 finding).
+H="$(make_project)"; SID="sess-nested"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[],\"wip_limit\":1},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "nested wip_limit → rc 0"
+assert_eq "" "$HOOK_OUT" "nested task wip_limit ignored → no top-level cap → silent (graceful degrade)"
+rm -rf "$H"
+
+# Case 10: REAL top-level wip_limit=1 AND a task ALSO carries nested "wip_limit":99 → the top-level cap
+#           must still win. in_flight=2 > 1 → warn. Guards against over-correcting Case 9 into never
+#           reading a genuine top-level cap when a nested same-name key is present.
+H="$(make_project)"; SID="sess-toplevel-wins"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"wip_limit\":1,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[],\"wip_limit\":99},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "top-level wip_limit with nested same-name → rc 0"
+assert_contains "$HOOK_OUT" "WIP" "top-level wip_limit still read despite nested same-name key → warns"
+assert_contains "$HOOK_OUT" "additionalContext" "top-level cap → injects additionalContext"
+rm -rf "$H"
+
 finish

@@ -33,6 +33,39 @@ board_matches() { # $1 = board path
   [ "$board_sid" = "$sid" ]
 }
 
+# board_root_stream BOARD — print the BOARD ROOT OBJECT's TOP-LEVEL FIELD STREAM only, via a string-
+# and escape-aware depth scan ([ ] and { }) in POSIX awk. The board file is one root object; this emits
+# only characters at root depth (curly depth 1, bracket depth 0) — every value nested inside an array
+# (tasks[], log[], deps[]) or sub-object (owner{}) is dropped wholesale. FORMAT-AGNOSTIC: single-line
+# and multi-line JSON behave identically. Used so a `wip_limit` cap is read ONLY from the board's
+# top-level field — a `"wip_limit":N` buried in an agent-shaped task/log payload can never masquerade as
+# the real cap (codex round-2 finding). Mirrors verify-board.sh's region/per-object isolation.
+board_root_stream() {
+  awk '
+    { s = s $0 "\n" }
+    END {
+      n = length(s)
+      bd = 0; cd = 0; instr = 0; esc = 0; out = ""
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        if (instr) {
+          if (bd == 0 && cd == 1) out = out ch
+          if (esc) esc = 0
+          else if (ch == "\\") esc = 1
+          else if (ch == "\"") instr = 0
+          continue
+        }
+        if (ch == "\"") { instr = 1; if (bd == 0 && cd == 1) out = out ch; continue }
+        if (ch == "[") { bd++; continue }
+        if (ch == "]") { if (bd > 0) bd--; continue }
+        if (ch == "{") { cd++; continue }
+        if (ch == "}") { if (cd > 0) cd--; continue }
+        if (bd == 0 && cd == 1) out = out ch
+      }
+      printf "%s", out
+    }' "$1" 2>/dev/null
+}
+
 # tasks_region BOARD — print the TOP-LEVEL FIELD STREAM of each object in the "tasks" array via a
 # string- and escape-aware double-depth scan ([ ] and { }) in POSIX awk. FORMAT-AGNOSTIC: single-line
 # and multi-line JSON behave identically. Nested flexible fields (a task-local "log" array, structured
@@ -85,9 +118,13 @@ for b in "$HOME_DIR"/*.board.json; do
   # Accumulate across all of this session's active boards.
   n="$(printf '%s' "$region" | grep -oE '"status"[[:space:]]*:[[:space:]]*"in_flight"' | grep -c '')" || n=0
   in_flight=$((in_flight + n))
-  # wip_limit: a board top-level flexible integer field. Take the FIRST board that carries one.
+  # wip_limit: a board ROOT top-level flexible integer field. Take the FIRST board that carries one.
+  # Read it from the board-root field stream ONLY (board_root_stream above) so a `"wip_limit":N` buried
+  # in an agent-shaped task/log payload can never be mistaken for the cap — only the board's own
+  # top-level field counts (narrow-waist scope; codex round-2 finding).
   if [ -z "$wip_limit" ]; then
-    wl="$(grep -oE '"wip_limit"[[:space:]]*:[[:space:]]*[0-9]+' "$b" 2>/dev/null \
+    wl="$(board_root_stream "$b" \
+          | grep -oE '"wip_limit"[[:space:]]*:[[:space:]]*[0-9]+' 2>/dev/null \
           | sed -n 's/.*"wip_limit"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)"
     [ -n "$wl" ] && wip_limit="$wl"
   fi
