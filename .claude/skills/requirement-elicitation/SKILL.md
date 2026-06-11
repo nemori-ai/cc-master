@@ -7,7 +7,7 @@ description: '通过协作对话挖出用户真实业务痛点、在动手实现
 
 你已经会各种访谈技巧——five whys、jobs-to-be-done、开放式提问。这个 skill 装的是技巧清单装不下的东西：对「一个用户请求到底是什么」的**信念（conviction）**，和「何时、挖多深」的**品味（taste）**。这里**故意没有问题清单**；一个握住信念的模型，即兴出的问题比任何脚本都好。
 
-> **它在本仓的位置**：这是 cc-master dev 流的**需求发现闸**，取代通用的 `superpowers:brainstorming`（把那一步内化进本仓、重接地到本仓的形态，让造 / 评 / 治三件套有一个自洽的上游）。它是 `发现 → 准入（curating）→ 造 body（skillsmith）→ 度量（grounding）` 这条链最上游的一环。
+> **它在本仓的位置**：这是 cc-master dev 流的**需求发现闸**，取代通用的 `superpowers:brainstorming`（这一步内置于本仓、接地到本仓的形态，让造 / 评 / 治三件套有一个自洽的上游）。它是 `发现 → 准入（curating）→ 造 body（skillsmith）→ 度量（grounding）` 这条链最上游的一环。
 
 ## 核心信念（道）
 

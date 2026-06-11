@@ -2,7 +2,7 @@
 
 > 本文回答「这 skill 是什么 / 为什么」。「怎么用」在 [`SKILL.md`](SKILL.md)；「成功 = 什么」在 [`OBJECTIVE.md`](OBJECTIVE.md)。
 > 设计先于实现——任何对 SKILL.md 的实质改动，先在此更新对应段。
-> 本 skill 由 omne-next 的 `requirement-elicitation` **本地化**而来：保留仓库无关的方法论内核（道 + 五个 discovery moves + strawman + 设计闸 + 何时停止挖掘），剥掉全部 omne-next 硬依赖（`UserNeed` 领域模型 / 源码路径 / `domain_driven_design` 等兄弟 skill 跨链接 / `omne-explore` / OMNE 品牌），重接地到 cc-master 的 board `goal` 模型与造-skill 生命周期，并按本仓纪律译为中文。
+> 本 skill 是 cc-master 自成一体的需求发现 dev skill：方法论内核（道 + 五个 discovery moves + strawman + 设计闸 + 何时停止挖掘）与仓库无关、可独立成立，接地到 cc-master 的 board `goal` 模型与造-skill 生命周期，全中文，不依赖任何外部领域模型 / 源码路径 / 跨链接。
 
 ## 1. One-liner
 
@@ -87,7 +87,7 @@
 - **Lifecycle class**：methodology——它编码的是「动手前先挖真需求」的纪律，模型越强越该守（更强模型更自信地照字面快速实现，越需要这道闸拦），不会因模型变强而过时。
 - **Sunset trigger**：不适用（methodology 带存续推定）。唯一会让它退役的：cc-master 不再自维护、也不再有人对它提需求（极不可能）。
 - **Fitness 不变量 → 可跑 probe**：
-  - *self-contain（已剥净 omne-next 依赖、已取代外部 brainstorming）* → grep 本 skill `SKILL.md` + `references/` 正文 **不出现** omne-next 专有标记 `UserNeed` / `omne_` / `omne-explore` / `domain_driven_design` 等残留（注：cc-master 自己的 `design_docs/plans/` 是正确的重接地路径、非残留——别和 omne-next 的**裸** `docs/plans/` 混淆；DESIGN.md 里列举「剥掉了什么」的元注释也不算残留）；`AGENTS.md` §4 dev 流的需求发现一步指向本 skill 而非 `superpowers:brainstorming`。
+  - *self-contain（方法论自成一体、已取代外部 brainstorming）* → grep 本 skill `SKILL.md` + `references/` 正文 **不出现**任何外部领域模型 / 外部源码路径 / 跨仓库专有标记等残留，所有引用都指向 cc-master 自身（board `goal` 模型、`design_docs/plans/` 等本仓路径）；`AGENTS.md` §4 dev 流的需求发现一步指向本 skill 而非 `superpowers:brainstorming`。
   - *设计闸纪律在场* → SKILL.md 始终含「批准前不实现」红线 + 「猜出的需求 ≠ 确认的需求」的 no-silent-failure 同构（呼应红线「gate-green ≠ passed」）。
   - *与 skillsmith / curating / grounding 不重叠（红线 3）* → 见下「重叠诚实交代」；四者 description 的 Do-NOT 互指闭合。
   - *全中文正文 + frontmatter 单引号整包* → 人审 / PR review + `bash run-tests.sh` content 段。
@@ -105,4 +105,4 @@
 ### 已知缺口（reject-and-surface，不无声化）
 
 - **本 skill 的 `evals/trigger.json` 尚未建立，Track A 待跑**——与其它 meta-skill 一致 defer（用户已决定三件 meta-skill 暂 defer Track A，本 skill 并入同一 defer）。补建时机：本 skill 的 `description` 要实质改动、需前后比 accuracy 时。
-- **discipline prose 是从 omne-next 移植的成熟内核，未在本仓重跑 pressure baseline**——按 TDD-for-skills，net-new discipline 才强制 failing baseline 先行；本 skill 是 port-proven 移植（红线与反模式在 omne-next 已实战），故 fresh baseline 标注 defer 而非阻塞。若日后实质改写某条红线 prose，则按 `cc-master-skillsmith` 的 Iron Law 先跑 baseline。
+- **discipline prose 是成熟内核，尚未跑过 pressure baseline**——按 TDD-for-skills，net-new discipline 才强制 failing baseline 先行；本 skill 的红线与反模式已是验证过的成熟内核，故 fresh baseline 标注 defer 而非阻塞。若日后实质改写某条红线 prose，则按 `cc-master-skillsmith` 的 Iron Law 先跑 baseline。

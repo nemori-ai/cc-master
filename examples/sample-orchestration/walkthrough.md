@@ -1,10 +1,11 @@
 # Sample orchestration — a walkthrough you can watch happen
 
 This is the story of one cc-master orchestration, start to finish, told so you can
-**see it with your own eyes**. A toy goal goes in; a persistent board, three parallel
-workers, an independent acceptance check, and a clean stand-down come out. Every board
-JSON below is a real snapshot of the file the orchestrator keeps on disk — the same one a
-hook reads when it decides whether you're allowed to stop.
+**see it with your own eyes**. A real long goal goes in; a persistent board, three
+model-tiered parallel workers, a decision routed to *you*, an on-the-fly escalation, and an
+independent acceptance check come out. Every board JSON below is a real snapshot of the file
+the orchestrator keeps on disk — the same one a hook reads when it decides whether you're
+allowed to stop.
 
 Want the runnable proof? Every hook decision narrated here is exercised end-to-end by
 [`smoke.sh`](smoke.sh) in this directory:
@@ -25,18 +26,19 @@ decided*, then a PASS/FAIL with an exit code — so it doubles as a CI smoke che
 
 ---
 
-## The toy goal
+## The goal
 
-> **Migrate `user_cognition`'s 3 domains (`memory`, `profile`, `preference`) to the new
-> `CognitionRecord` schema.**
+> **Internationalize the web app to 6 locales — stand up the i18n framework, extract every
+> hardcoded string, translate per locale, and ship locale routing.**
 
 Small enough to read in one sitting; shaped exactly like the real thing — one shared
-foundation, then independent per-domain work that wants to run in parallel.
+foundation, then independent per-locale work that wants to run in parallel, plus one call
+only a human can make.
 
 The whole thing is one command:
 
 ```
-/cc-master:as-master-orchestrator Migrate user_cognition's 3 domains to the new CognitionRecord schema
+/cc-master:as-master-orchestrator Internationalize the app to 6 locales (i18n framework + per-locale translation + locale routing)
 ```
 
 ---
@@ -94,51 +96,61 @@ The board at this instant is an empty skeleton — the DAG isn't filled yet:
 ## Act 2 — Decompose: the goal becomes a dependency DAG
 
 Now the agent does the conductor's first real job — turn the goal into a dependency graph
-and write it into *its* board. For this toy goal the shape is the classic **fan-out on a
-shared root**:
+and write it into *its* board. For this goal the shape is the classic **fan-out on a shared
+root**, plus one node only a human can resolve:
 
-- **`T0`** — build the new `CognitionRecord` schema + a shared migration library. This is
-  the critical-path root; nothing else can start until it lands.
-- **`M1` / `M2` / `M3`** — migrate `memory` / `profile` / `preference`. Three independent
-  leaves, each depending only on `T0`. The moment `T0` is done they can all run at once.
+- **`T0`** — stand up the i18n framework + extract every hardcoded string. This is the
+  critical-path root; nothing else can start until it lands. It's the hard, shared
+  foundation, so it runs on a **strong model** (`opus`).
+- **`de` / `ja` / `ar`** — translate each locale. Three independent leaves, each depending
+  only on `T0`. The moment `T0` is done they can all run at once. The straightforward ones
+  (`de` / `ja`) run on a **cheap model** (`haiku`) — strong on the critical chain, cheap on
+  the float.
+- **`D1`** — *glossary + register decision*: translate product terms or keep them in
+  English? formal or informal register? That's not the orchestrator's call to make, so it
+  lands as a `blocked_on:"user"` node — surfaced to you **immediately**, in parallel with
+  everything else.
 
 ```
-            ┌────────────────────────┐
-            │ T0  schema + migr. lib │  (critical-path root, in_flight)
-            └───────────┬────────────┘
-            ┌───────────┼───────────┐
-            ▼           ▼           ▼
-        ┌───────┐   ┌───────┐   ┌────────────┐
-        │M1 mem │   │M2 prof│   │M3 preference│   (3 leaves, blocked on T0)
-        └───────┘   └───────┘   └────────────┘
+            ┌──────────────────────────────┐     ┌────────────────────────┐
+            │ T0  i18n framework + extract  │     │ D1  glossary + register │
+            │     (critical root, opus)     │     │     (blocked_on: user)  │
+            └───────────────┬──────────────┘     └────────────────────────┘
+            ┌───────────────┼───────────────┐
+            ▼               ▼               ▼
+        ┌──────────┐   ┌──────────┐   ┌──────────────┐
+        │ de haiku │   │ ja haiku │   │ ar (RTL)     │   (3 leaves, blocked on T0)
+        └──────────┘   └──────────┘   └──────────────┘
 ```
 
 The agent also stamps `owner.session_id` — that's the key the goal-hook later filters on,
 so it gates *this* session's board and never trips over a concurrent orchestration's.
 
-Board snapshot — **INITIAL** (root in flight, leaves blocked waiting on it):
+Board snapshot — **INITIAL** (root in flight, locale leaves blocked on it, one decision routed to you):
 
 ```json
 {
   "schema": "cc-master/v1",
-  "goal": "Migrate user_cognition 3 domains to the new CognitionRecord schema",
+  "goal": "Internationalize the app to 6 locales (i18n framework + per-locale translation + locale routing)",
   "owner": { "active": true, "session_id": "smoke-session-001", "heartbeat": "2026-06-08T10:00Z" },
-  "git": { "worktree": "/repo/.worktrees/cog-migrate", "branch": "feat/cog-migrate" },
+  "git": { "worktree": "/repo/.worktrees/i18n", "branch": "feat/i18n-rollout" },
   "wip_limit": 4,
   "tasks": [
-    { "id": "T0", "status": "in_flight", "deps": [], "title": "schema + shared migration lib", "mechanism": "sub-agent" },
-    { "id": "M1", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "migrate domain: memory" },
-    { "id": "M2", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "migrate domain: profile" },
-    { "id": "M3", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "migrate domain: preference" }
+    { "id": "T0", "status": "in_flight", "deps": [], "model": "opus", "title": "i18n framework + string extraction", "mechanism": "sub-agent" },
+    { "id": "de", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "model": "haiku", "title": "translate locale: de" },
+    { "id": "ja", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "model": "haiku", "title": "translate locale: ja" },
+    { "id": "ar", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "translate locale: ar (RTL)" },
+    { "id": "D1", "status": "blocked", "deps": [], "blocked_on": "user", "title": "glossary + register decision" }
   ],
   "log": []
 }
 ```
 
 The conductor dispatches `T0` to a background sub-agent and — per the decision program —
-does **not** sit and watch it. There's no ready leaf yet (all three are blocked on `T0`),
-so the only legitimate moves are fill-work that passes the admission test, or, if there's
-none, calmly waiting one beat. The orchestra is playing; the conductor keeps the books.
+does **not** sit and watch it. There's no ready leaf yet (all three locales are blocked on
+`T0`), so the only legitimate moves are fill-work that passes the admission test, or, if
+there's none, calmly waiting one beat. The orchestra is playing; the conductor keeps the
+books.
 
 ---
 
@@ -154,11 +166,11 @@ it scans the home, finds the active board, reads its goal back out, and re-injec
 
 ```
 You are a cc-master master orchestrator. Your orchestration board(s) live in <home>.
-Active: • 20260608T105439Z-98526.board.json [Migrate user_cognition 3 domains to the new
-CognitionRecord schema]. Re-read the board for the task you are working on (recognise it by
-its goal), then invoke the orchestrating-to-completion skill and continue the decision
-program. Do not restart work already done/verified; integrate any completed background
-results first.
+Active: • 20260608T105439Z-98526.board.json [Internationalize the app to 6 locales (i18n
+framework + per-locale translation + locale routing)]. Re-read the board for the task you
+are working on (recognise it by its goal), then invoke the orchestrating-to-completion skill
+and continue the decision program. Do not restart work already done/verified; integrate any
+completed background results first.
 ```
 
 > **The key moment.** Post-compaction, the agent wakes up not knowing it was orchestrating.
@@ -173,33 +185,39 @@ not restart anything.
 
 ---
 
-## Act 4 — Dispatch on ready: three leaves in parallel
+## Act 4 — Dispatch on ready — and adapt
 
 `T0` lands and is verified at the endpoint (the conductor reads the diff itself — a
-green gate is *not* a pass). That clears the only dependency the three leaves had, so
-`M1`/`M2`/`M3` all flip from `blocked` to `ready` at once. With `wip_limit: 4` there's room
+green gate is *not* a pass). That clears the only dependency the three locale leaves had, so
+`de`/`ja`/`ar` all flip from `blocked` to `ready` at once. With `wip_limit: 4` there's room
 to dispatch all three in parallel — no barrier-waiting, no doing them one at a time.
 
-Board snapshot — **MID-RUN** (root done + verified; three leaves ready to fire):
+Then the plan meets reality. `ar` isn't just translation — right-to-left layout needs real
+work — so the conductor **escalates** it from a plain leaf to a `workflow` and re-plans,
+rather than forcing a node that no longer fits. (Meanwhile `usage-pacing.js` notices the run
+nearing the 5h quota wall and injects a **non-blocking** nudge; the conductor throttles —
+lowers WIP, defers the lowest-priority locale — instead of redlining.)
+
+Board snapshot — **MID-RUN** (root done + verified; three locale leaves ready to fire):
 
 ```json
 {
   "schema": "cc-master/v1",
-  "goal": "Migrate user_cognition 3 domains to the new CognitionRecord schema",
+  "goal": "Internationalize the app to 6 locales (i18n framework + per-locale translation + locale routing)",
   "owner": { "active": true, "session_id": "smoke-session-001", "heartbeat": "2026-06-08T11:00Z" },
   "wip_limit": 4,
   "tasks": [
-    { "id": "T0", "status": "done", "deps": [], "title": "schema + shared migration lib", "verified": true },
-    { "id": "M1", "status": "ready", "deps": ["T0"], "title": "migrate: memory" },
-    { "id": "M2", "status": "ready", "deps": ["T0"], "title": "migrate: profile" },
-    { "id": "M3", "status": "ready", "deps": ["T0"], "title": "migrate: preference" }
+    { "id": "T0", "status": "done", "deps": [], "title": "i18n framework + string extraction", "verified": true },
+    { "id": "de", "status": "ready", "deps": ["T0"], "title": "translate locale: de" },
+    { "id": "ja", "status": "ready", "deps": ["T0"], "title": "translate locale: ja" },
+    { "id": "ar", "status": "ready", "deps": ["T0"], "mechanism": "workflow", "title": "translate locale: ar (RTL)" }
   ],
-  "log": [ { "t": "11:00Z", "note": "T0 verified done; 3 leaves now ready to dispatch in parallel" } ]
+  "log": [ { "t": "11:00Z", "note": "T0 verified done; 3 locale leaves now ready; ar escalated to workflow for RTL layout" } ]
 }
 ```
 
-Suppose the conductor got sloppy here and tried to end the turn with those three leaves
-still `ready`. The goal-hook stops it cold:
+Suppose the conductor got sloppy here and tried to end the turn with those three locale
+leaves still `ready`. The goal-hook stops it cold:
 
 > `verify-board.sh` sees a `ready` task → **BLOCK**: *"this board still has a `ready` or
 > `uncertain` task. A `ready` task can proceed now... Resolve it (or mark it
@@ -213,31 +231,35 @@ blocks for the same reason: *"an active board has no tasks; decompose the goal f
 
 ## Act 5 — Acceptance, then the forced self-check
 
-The three leaves run in parallel, finish, and are each **independently verified** at the
-endpoint — the conductor checks the actual migrated records, not the workers' self-reports.
-Every node is now `done`. Nothing is `ready`, nothing is `uncertain`.
+The three locale leaves run in parallel (`ar` via its escalated workflow), finish, and are
+each **independently verified** at the endpoint — the conductor checks the rendered locale,
+not the workers' self-reports. And the user answered `D1` (the glossary + register call), so
+that node is now resolved too. Every node is now `done`. Nothing is `ready`, nothing is
+`uncertain`.
 
-Board snapshot — **DONE** (every node done + verified):
+Board snapshot — **DONE** (every work node verified; the user decision answered and applied):
 
 ```json
 {
   "schema": "cc-master/v1",
-  "goal": "Migrate user_cognition 3 domains to the new CognitionRecord schema",
+  "goal": "Internationalize the app to 6 locales (i18n framework + per-locale translation + locale routing)",
   "owner": { "active": true, "session_id": "smoke-session-001", "heartbeat": "2026-06-08T12:30Z" },
   "wip_limit": 4,
   "tasks": [
-    { "id": "T0", "status": "done", "deps": [], "title": "schema + shared migration lib", "verified": true },
-    { "id": "M1", "status": "done", "deps": ["T0"], "title": "migrate: memory", "verified": true },
-    { "id": "M2", "status": "done", "deps": ["T0"], "title": "migrate: profile", "verified": true },
-    { "id": "M3", "status": "done", "deps": ["T0"], "title": "migrate: preference", "verified": true }
+    { "id": "T0", "status": "done", "deps": [], "title": "i18n framework + string extraction", "verified": true },
+    { "id": "de", "status": "done", "deps": ["T0"], "title": "translate locale: de", "verified": true },
+    { "id": "ja", "status": "done", "deps": ["T0"], "title": "translate locale: ja", "verified": true },
+    { "id": "ar", "status": "done", "deps": ["T0"], "mechanism": "workflow", "title": "translate locale: ar (RTL)", "verified": true },
+    { "id": "D1", "status": "done", "deps": [], "title": "glossary + register decision (answered)" }
   ],
-  "log": [ { "t": "12:30Z", "note": "all 3 domains migrated + independently verified; goal looks met" } ]
+  "log": [ { "t": "12:30Z", "note": "all 3 locales shipped + independently verified; user decision answered; goal looks met" } ]
 }
 ```
 
 The board looks finished — so the agent tries to stop. **Here is the most important hook
 moment in the whole story.** The goal-hook will not take "done" on faith. On the *first*
-stop in a completion state, it blocks exactly once and forces a self-check:
+stop in a completion state, it blocks exactly once and forces a self-check — and surfaces
+that the glossary decision was still owed to you until you answered it:
 
 > `verify-board.sh` sees a completion state, first stop → **BLOCK (once)**: *"before you
 > stop, self-check against this board's `goal`. (1) Is every point that needs the user
@@ -252,7 +274,7 @@ stop in a completion state, it blocks exactly once and forces a self-check:
 > "I forced the self-check this round" in a sidecar file it owns — **it never writes the
 > board**, which stays the agent's single source of truth.
 
-The agent does the self-check, confirms all three domains really are migrated and verified
+The agent does the self-check, confirms all three locales really are shipped and verified
 and nothing is owed to the user, and tries to stop again. This time the handshake is
 already satisfied:
 
@@ -276,13 +298,14 @@ Board snapshot — **ARCHIVED** (`owner.active:false`):
 ```json
 {
   "schema": "cc-master/v1",
-  "goal": "Migrate user_cognition 3 domains to the new CognitionRecord schema",
+  "goal": "Internationalize the app to 6 locales (i18n framework + per-locale translation + locale routing)",
   "owner": { "active": false, "session_id": "smoke-session-001" },
   "tasks": [
     { "id": "T0", "status": "done", "deps": [] },
-    { "id": "M1", "status": "done", "deps": ["T0"] },
-    { "id": "M2", "status": "done", "deps": ["T0"] },
-    { "id": "M3", "status": "done", "deps": ["T0"] }
+    { "id": "de", "status": "done", "deps": ["T0"] },
+    { "id": "ja", "status": "done", "deps": ["T0"] },
+    { "id": "ar", "status": "done", "deps": ["T0"] },
+    { "id": "D1", "status": "done", "deps": [] }
   ]
 }
 ```
@@ -303,9 +326,9 @@ Curtain.
 | Act | Board state | Hook | Decision |
 |---|---|---|---|
 | 1 Ignition | (none → empty skeleton) | `bootstrap-board.sh` | create board, inject path + role |
-| 2 Decompose | 4-node DAG, root `in_flight` | — | agent fills `tasks[]` |
+| 2 Decompose | 5-node DAG, root `in_flight` + `D1` blocked on user | — | agent fills `tasks[]` |
 | 3 Compaction | unchanged | `reinject.sh` | re-inject role + board listing |
-| 4 Dispatch | 3 leaves `ready` | `verify-board.sh` | **block** (ready work pending) |
+| 4 Dispatch | 3 locale leaves `ready` (`ar` escalated) | `verify-board.sh` | **block** (ready work pending) |
 | 5a Done, 1st stop | all `done` | `verify-board.sh` | **block once** (forced self-check) |
 | 5b Done, 2nd stop | all `done` | `verify-board.sh` | **allow** (handshake satisfied) |
 | 6 Archive | `owner.active:false` | `reinject.sh` / `verify-board.sh` | **silent** / **allow** (dormant) |

@@ -2,12 +2,12 @@
 
 状态:勘察完成(R1–R5)、D1 已用户拍板(2026-06-08)、本 spec 起草中(支柱 1/3/4 + 支柱二 codex 部分已定;§2.B AGENTS.md/CLAUDE.md 大纲待 R5 落地补全),**待用户 review** 后转 writing-plans。
 
-源起:接续 dogfood 的深水区。参考高质量 skill 库(ljg-skills / superpowers)+ 官方 skill-creator,系统性打磨本仓 skills;引入 codex 当 reviewer;立 eval 机制让迭代有据可依。四路勘察(R1 本仓审计 / R2 exemplar 拆解 / R3 skill-creator+eval / R4 codex 路径)+ R5(omne 范式)为依据。
+源起:接续 dogfood 的深水区。参考高质量 skill 库(ljg-skills / superpowers)+ 官方 skill-creator,系统性打磨本仓 skills;引入 codex 当 reviewer;立 eval 机制让迭代有据可依。四路勘察(R1 本仓审计 / R2 exemplar 拆解 / R3 skill-creator+eval / R4 codex 路径)+ R5(迭代范式勘察)为依据。
 
 ## D1 决策(用户拍板)
 
 1. **支柱一 skills 优化 = 全面**:必修(authoring-workflows 文档资产漂移)+ 纪律武器(Rationalization Table / Red Flags / description 剥离 workflow)+ 结构性改造(decision-program 改 dot-graph / 按 `wc -w` 瘦身常驻 SKILL.md / 覆盖性金句 / 新增 **TDD-for-skills** 元规范)。
-2. **支柱二 codex reviewer + 范式文档**:codex 当端点验收 reviewer;**新增 AGENTS.md + CLAUDE.md(仿 omne_harness)引导本项目未来整个迭代范式**,codex reviewer 为其一环。
+2. **支柱二 codex reviewer + 范式文档**:codex 当端点验收 reviewer;**新增 AGENTS.md + CLAUDE.md 引导本项目未来整个迭代范式**,codex reviewer 为其一环。
 3. **支柱三 eval = Track A + Track B**:触发准确率门 + 编排纪律 benchmark(codex 当 Track B 第二评委)。
 4. **支柱四**:本轮顺手修 goal-hook 重复自检 finding。
 
@@ -69,33 +69,33 @@ R2 提炼(superpowers 标志性结构,均有实测/baseline 背书):
 - **文档化**:在 `orchestrating-to-completion/references/resume-verify.md` 的端点验收段补"codex 作为独立第二验收者"小节——`verdict` 直接映射现有 `FinalResponse` / `Replan(feedback)` Joiner 闸(`needs-attention` → Replan;`approve` + 非空 + 已读 diff → done)。
 - **批量**(评审多 skill):走 workflow stage,每 leaf `codex exec review --output-schema review-output.schema.json` 对一个 skill 的 diff,fan-in 成质量 scorecard。顺带沉淀为 `authoring-workflows/assets/examples/codex-review-fanout.js`。
 
-### 2.B AGENTS.md + CLAUDE.md 迭代范式文档(仿 omne_harness)
+### 2.B AGENTS.md + CLAUDE.md 迭代范式文档
 
-**范式确认**(R5 初定 + 已核):`CLAUDE.md = @AGENTS.md`(一行 include),AGENTS.md 是单一真相源,让 Claude Code 与 codex 等读同一份。omne_harness/AGENTS.md(569 行)是主范本,harness 配 `adrs/`(ADR 决策记录)、`design_docs/`、`contracts/`、`.benchmarks/`。
+**范式确认**(R5 初定 + 已核):`CLAUDE.md = @AGENTS.md`(一行 include),AGENTS.md 是单一真相源,让 Claude Code 与 codex 等读同一份。本仓采用「AGENTS.md 作着陆页 + 配套 `adrs/`(ADR 决策记录)、`design_docs/`、eval 资产」的仓库形态。
 
-**核心定位(R5 定调)**:AGENTS.md = 「未来迭代者/贡献者 + 进入本仓的 agent 的**着陆页/最小心智地图 + 渐进式披露导航表**」,**不是手册**。元原则 = **SSOT + 跨引用而非复述**(omne 红线 #5)。**绝不复述** SKILL.md(运行时灵魂、reinject 每次 compaction 重注、Finding #7 已证重复是负担)、README(用户视角)、CONTRIBUTING(已有 dev loop + 5 不变式)——只把它们织进一张导航地图,并补 omne 有而 cc-master 缺的「迭代纪律层」。目标篇幅 **180–260 行**(比 omne 小一个量级)。
+**核心定位(R5 定调)**:AGENTS.md = 「未来迭代者/贡献者 + 进入本仓的 agent 的**着陆页/最小心智地图 + 渐进式披露导航表**」,**不是手册**。元原则 = **SSOT + 跨引用而非复述**。**绝不复述** SKILL.md(运行时灵魂、reinject 每次 compaction 重注、Finding #7 已证重复是负担)、README(用户视角)、CONTRIBUTING(已有 dev loop + 5 不变式)——只把它们织进一张导航地图,并补一层 cc-master 目前缺的「迭代纪律层」。目标篇幅 **180–260 行**(克制、远小于一本完整手册)。
 
 **cc-master AGENTS.md 章节 outline**(【正文】=写进 / 【指针】=一行链到现有 SSOT):
-- **Frontmatter**【正文 ~12】:`path/version/last-edited` + **`agent-edit-policy` 三级编辑分级**(照搬 omne:① 自主刷新=命令表/触发表/findings/last-edited ② 走 PR 人审=红线/章节重排/目录拓扑 ③ 禁止=把 SKILL.md 灵魂公式塞回正文)+ content-summary。
+- **Frontmatter**【正文 ~12】:`path/version/last-edited` + **`agent-edit-policy` 三级编辑分级**(① 自主刷新=命令表/触发表/findings/last-edited ② 走 PR 人审=红线/章节重排/目录拓扑 ③ 禁止=把 SKILL.md 灵魂公式塞回正文)+ content-summary。
 - **导语**【正文 ~5】:「进入 cc-master 仓库的第一站」+ progressive disclosure 声明 + 「运行时灵魂在 SKILL A,本文不复述」。
 - **§1 这个插件是什么**【正文 ~12,多指针】:定位(把 CC 主会话变 long-horizon orchestrator)+「不是什么」(非 agent framework、不依赖 agent-teams/scheduled routines)+ 指针(用户→README、方法论→SKILL A、脚本→SKILL B)。
 - **§2 仓库形态 + 关键不变式**【正文目录树 + 指针 ~30】:目录树;5 条不变式各一句话 + 链回 SSOT;临时计划 `design_docs/plans/`(gitignored)vs 正式 design_docs。
-- **§3 Non-negotiable 红线**【正文 ~15】:cc-master 版 omne §4——每条一句话 + 链回 SSOT + 标 PR/CI grep 硬卡点(如「hooks 纯 bash」→ `grep -rE 'jq|node' hooks/scripts/` 须 0)。**去重拍板点:红线 SSOT 定在 AGENTS.md,CONTRIBUTING 改指针**(二选一)。
+- **§3 Non-negotiable 红线**【正文 ~15】:每条一句话 + 链回 SSOT + 标 PR/CI grep 硬卡点(如「hooks 纯 bash」→ `grep -rE 'jq|node' hooks/scripts/` 须 0)。**去重拍板点:红线 SSOT 定在 AGENTS.md,CONTRIBUTING 改指针**(二选一)。
 - **§4 迭代范式总图(gstack × superpowers 路由)**【指针 ~8】:一句话 + 指针到用户全局 CLAUDE.md;强调本仓收口用 github-pr(不用 gstack ship)。
 - **§5 编排纪律(SKILL A 是灵魂)**【指针为主 ~10】:**绝不复述**七镜头/红线/决策程序;只放定位 + 「改方法论→改 SKILL A 而非这里」+ 改 SKILL A 的纪律(reinject 重注友好/越短越好、决策程序骨架不动、Finding #7 收敛结论)。
 - **§6 Skill 创作/维护纪律(含 TDD-for-skills)**【正文+指针 ~22】:两 skill 不重叠;**frontmatter YAML 引号纪律(Finding #1 血泪:`:`/`"` 必引号)写成反模式**;**TDD-for-skills**(纪律型 skill 改前跑 subagent pressure baseline)指针 skill-creator;content contract = `run-tests.sh` node 段 + `claude plugin validate .` 为权威 validator。
 - **§7 codex 作为 reviewer 范式**【正文 ~12】:codex=端点验收节点(呼应红线「只信端点验收/gate-green≠passed」);`codex exec review --json` + `review-output.schema.json`;指针 codex skill。
 - **§8 Eval 机制**【正文+指针 ~14】:Track A(description 改动跑触发准确率)+ Track B(`uv run --python 3.12` 跑 benchmark);何时跑(纪律型改前后必跑 baseline、description 改必跑 A);指针 skill-creator。
-- **§9 Dogfood 循环**【正文+指针 ~12】:用本插件改本插件;behavioral 改动必 dogfood;**findings 台账 `design_docs/dogfood-findings.md` = omne 式「已踩反模式永久写入纪律」**,立纪律「用着不爽/指导不对/效率没拉满必落台账」。
+- **§9 Dogfood 循环**【正文+指针 ~12】:用本插件改本插件;behavioral 改动必 dogfood;**findings 台账 `design_docs/dogfood-findings.md` = 「已踩反模式永久写入纪律」**,立纪律「用着不爽/指导不对/效率没拉满必落台账」。
 - **§10 测试纪律 + 验收门**【正文 ~12】:`run-tests.sh` 全绿 + `plugin validate` 无错;**测试只保 correctness,quality 靠 dogfood + 端点验收**;并行后端点必跑全套(Finding #12);红线零违反 grep 门。
 - **§11 分支/PR/commit 约定**【正文 ~10】:feature branch;`gh` + PR body 带 Claude 署名 + github-pr 收口;commit 末尾 Co-Authored-By + type 前缀(feat/fix/docs/chore/adr);CHANGELOG/README 同步指针。
 - **§12 目录与文件约定**【正文 ~10】:command/skill/hook 文件约定 + sentinel 注释;design_docs 命名;board 不入版本控制。
 - **§13 ADR 约定**【指针 ~6】:一段话 + 链到 `adrs/AGENTS.md`(见下)。
-- **§N 触发式深入阅读**【正文大表 ~25】:cc-master 版 omne §9 单层「做 X→读 Y」表(改方法论→SKILL A;写 workflow→SKILL B+refs;改 hook→hooks/+tests/+CONTRIBUTING;改 board schema→board.md+content 测试;写 ADR→adrs/;落 dogfood→findings 台账;跑 eval→skill-creator;codex review→/codex;设计留痕→spec.md §12)。
+- **§N 触发式深入阅读**【正文大表 ~25】:单层「做 X→读 Y」表(改方法论→SKILL A;写 workflow→SKILL B+refs;改 hook→hooks/+tests/+CONTRIBUTING;改 board schema→board.md+content 测试;写 ADR→adrs/;落 dogfood→findings 台账;跑 eval→skill-creator;codex review→/codex;设计留痕→spec.md §12)。
 
-**ADR(R5 建议:值得轻量引入)**:建 `adrs/`(无语言分层),首批回填 4–5 条结构性决策:`hooks-pure-bash`、`ship-anywhere-scope`、`board-narrow-waist`、`loop-dissolution-and-goal-hook`(Finding #2 supersession 典型)、`two-skills-separation`。命名 `ADR-NNN-<slug>.md` + Status/Date/Scope frontmatter + Context/Decision/Consequences/Alternatives/Related/References 模板 + judgment checklist——全照搬 omne `adrs/AGENTS.md`。**此项可独立成 P2c(ADR 回填),非 AGENTS.md 硬前置,可作为全面档的一部分;若想收敛范围,首版 AGENTS.md 先放 §13 指针、adrs/ 回填留后续。**
+**ADR(R5 建议:值得轻量引入)**:建 `adrs/`(无语言分层),首批回填 4–5 条结构性决策:`hooks-pure-bash`、`ship-anywhere-scope`、`board-narrow-waist`、`loop-dissolution-and-goal-hook`(Finding #2 supersession 典型)、`two-skills-separation`。命名 `ADR-NNN-<slug>.md` + Status/Date/Scope frontmatter + Context/Decision/Consequences/Alternatives/Related/References 模板 + judgment checklist——约定写进 `adrs/AGENTS.md`。**此项可独立成 P2c(ADR 回填),非 AGENTS.md 硬前置,可作为全面档的一部分;若想收敛范围,首版 AGENTS.md 先放 §13 指针、adrs/ 回填留后续。**
 
-**CLAUDE.md**:确认照搬 `@AGENTS.md` 一行 include(已逐字核实 omne 全仓 CLAUDE.md 均为 11 字节单行)。cc-master 仓库根目前无 CLAUDE.md / AGENTS.md,干净起点。
+**CLAUDE.md**:确认用 `@AGENTS.md` 一行 include。cc-master 仓库根目前无 CLAUDE.md / AGENTS.md,干净起点。
 
 ---
 

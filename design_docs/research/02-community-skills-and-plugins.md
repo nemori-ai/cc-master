@@ -99,7 +99,7 @@
 | [shinpr/claude-code-workflows](https://github.com/shinpr/claude-code-workflows) | 专精 SWE 端到端；`/recipe-implement` `/recipe-design`；complexity-based routing；layered verification；ephemeral state 进 `docs/plans/` 不进 git | 420★ | **明确不基于** runtime，是自洽 subagent pipeline |
 | claude_code_agent_farm | 多个并行 CC session 系统性改进 codebase | — | 多 session，非 runtime |
 
-**判断**：这一层全是**官方 runtime 出现之前为了凑同样效果手搓的脚手架**。barkain 的 `soft enforcement`（逐级 nudge 主 agent 别亲自干活、强制委派）和 OMNE 项目里 `dev-master-orchestrator` 的"master 不亲自上手"红线高度同构——是同一类问题的不同解法。
+**判断**：这一层全是**官方 runtime 出现之前为了凑同样效果手搓的脚手架**。barkain 的 `soft enforcement`（逐级 nudge 主 agent 别亲自干活、强制委派）和本项目"指挥不演奏、master 不亲自上手"的红线高度同构——是同一类问题的不同解法。
 
 ---
 
@@ -199,7 +199,7 @@
 
    也就是说：生态对"主线程 + 后台异步"的成熟度，停留在"完成了能不能可靠地戳醒主 agent"，**远没到"等待期间主 agent 自驱干别的"**。
 
-**对元目标的直接含义**：OMNE 项目里的红线"后台工作时主线程不空转——持续推进文档维护 / 下一批 anchor 组装 / 经验沉淀"**在 CC dynamic workflow 生态里没有任何现成解法或先例**。官方范式甚至与之**结构性相悖**（主 agent 被设计成 idle 收尾）。能借鉴的最近思想是 superpowers 的"留 context 给 coordination"，但那是手动协调、非自驱填充。**这个空白本身是本研究最重要的发现之一**：你的"主线程不空转"实践属于生态前沿/无人区，**需自建机制**（例如：主 session 在后台 workflow 跑时，由 orchestrator 主动循环做文档/经验沉淀/下批组装），而不是套用社区范式。报告 3（TFU streaming planner）与报告 4（latency-hiding / look-ahead）给的是填这个空白的"原理弹药"。
+**对元目标的直接含义**：本项目的红线"后台工作时主线程不空转——持续推进文档维护 / 下一批 anchor 组装 / 经验沉淀"**在 CC dynamic workflow 生态里没有任何现成解法或先例**。官方范式甚至与之**结构性相悖**（主 agent 被设计成 idle 收尾）。能借鉴的最近思想是 superpowers 的"留 context 给 coordination"，但那是手动协调、非自驱填充。**这个空白本身是本研究最重要的发现之一**：你的"主线程不空转"实践属于生态前沿/无人区，**需自建机制**（例如：主 session 在后台 workflow 跑时，由 orchestrator 主动循环做文档/经验沉淀/下批组装），而不是套用社区范式。报告 3（TFU streaming planner）与报告 4（latency-hiding / look-ahead）给的是填这个空白的"原理弹药"。
 
 ---
 
