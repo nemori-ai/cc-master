@@ -214,4 +214,31 @@ assert_eq 0 "$HOOK_RC" "(f6) no session_id, no board → rc 0"
 assert_eq "" "$HOOK_OUT" "(f6) degraded path with no active board → silent (not armed)"
 rm -rf "$H"
 
+# ── STOP RE-ENTRY GUARD: stop_hook_active:true → silent (the never-blocks / no-loop contract) ─────────
+# Claude Code re-fires a Stop hook with stop_hook_active:true when a prior Stop hook's additionalContext
+# continued the conversation and the agent tries to Stop again. If usage is still over budget, re-injecting
+# the same pacing warning every Stop creates a "session can never stop" loop (no decision:block, but the
+# effect is a hang) — violating the never-blocks contract. On re-entry the hook MUST stay silent so the
+# warning shows at most once per genuine new Stop.
+
+# (g1) ARMED + CRITICAL (used 3400 > budget 3000) + stop_hook_active:true → MUST be silent (re-entry guard).
+H="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-re"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/mine.board.json"
+run_pacing_stdin "$SAMPLE" "2026-06-10T12:00:00Z" "$H" \
+  '{"session_id":"sess-re","hook_event_name":"Stop","stop_hook_active":true}' "3000"
+assert_eq 0 "$HOOK_RC" "(g1) re-entry → rc 0"
+assert_eq "" "$HOOK_OUT" "(g1) stop_hook_active:true → silent (re-entry guard, no Stop loop)"
+assert_not_contains "$HOOK_OUT" "additionalContext" "(g1) re-entry injects NO additionalContext"
+rm -rf "$H"
+
+# (g2) CONTROL — identical armed+critical case but stop_hook_active:false (a genuine new Stop) → warns.
+#       Proves the guard keys on the re-entry flag, not on the armed/critical state itself.
+H="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-re"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/mine.board.json"
+run_pacing_stdin "$SAMPLE" "2026-06-10T12:00:00Z" "$H" \
+  '{"session_id":"sess-re","hook_event_name":"Stop","stop_hook_active":false}' "3000"
+assert_eq 0 "$HOOK_RC" "(g2) genuine new Stop → rc 0"
+assert_contains "$HOOK_OUT" "additionalContext" "(g2) stop_hook_active:false → warns (first Stop still fires)"
+rm -rf "$H"
+
 finish

@@ -271,12 +271,22 @@ function main() {
     stdin = '';
   }
   let sid = '';
+  let stopHookActive = false;
   try {
     const o = JSON.parse(stdin || '{}');
     if (o && typeof o.session_id === 'string') sid = o.session_id;
+    // stop_hook_active:true ⟺ Claude Code 因「上一次 Stop hook 续了对话 → agent 再次尝试 Stop」而
+    // **重入**本 hook。同一 stdin 口径解析，零新依赖（红线1：node/JS only）。
+    if (o && o.stop_hook_active === true) stopHookActive = true;
   } catch (_e) {
     /* ignore — 非法 stdin 不致命；sid 留空 → 走降级 arming 判定 */
   }
+
+  // ── STOP RE-ENTRY GUARD：stop_hook_active:true → 立即静默 exit 0（在任何 usage 计算/注入之前）。──
+  // 不加这道闸，usage 仍超预算时本 hook 会在**每一次** Stop 重注同一 pacing 警告——effect 等同
+  // 「session 永远停不下来」的循环（虽不 decision:block，但实质卡死），违背「never blocks」契约。
+  // 有了它，警告对每个**真正的新 Stop**最多出现一次，re-entry 一律静默（不破坏 unarmed→silent）。
+  if (stopHookActive) return;
 
   // ── ARMED GATE：本 session 未被武装（home 无匹配的 active 板）→ 在读 usage 之前就静默 exit 0。──
   // 这是本 hook 最关键的行为修复：不武装就不读宿主全局 usage、不注入 —— 不再污染无关 session。
