@@ -216,7 +216,7 @@ board 有一条**窄腰**：那一小撮 hook 依赖的固定字段（`owner.ses
 
 ## 贡献
 
-开发闭环 = 一次 clone + 两道门——`./run-tests.sh`（hook 测试 + 内容契约）与 `claude plugin validate .`。设计不变量（纯 bash hook、稳定的 board 窄腰、两个不重叠的 skill、「指挥绝不演奏乐器」红线、ship-anywhere）都写在 [CONTRIBUTING.md](CONTRIBUTING.md) 里。提 PR 前先读它。
+开发闭环 = 一次 clone + 两道门——`./run-tests.sh`（hook 测试 + 内容契约）与 `claude plugin validate .`。设计不变量（hook 限 bash + node/JS——ADR-006、稳定的 board 窄腰、两个不重叠的 skill、「指挥绝不演奏乐器」红线、ship-anywhere）都写在 [CONTRIBUTING.md](CONTRIBUTING.md) 里。提 PR 前先读它。
 
 ---
 

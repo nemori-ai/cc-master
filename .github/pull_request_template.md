@@ -26,7 +26,7 @@ Paste the relevant output if helpful:
 
 ## Design invariants (confirm none are broken — see CONTRIBUTING.md)
 
-- [ ] Hooks remain **pure bash**, no `jq` / `node` / other runtime
+- [ ] Hooks use only **bash + node/JS** (JS only; no `jq` / `python` / TS-direct) — see ADR-006
 - [ ] Board **narrow waist** unchanged — or, if changed, every hook + test updated in this PR
 - [ ] **Skill A / Skill B** stay self-contained and non-overlapping
 - [ ] Change is **ship-anywhere** (no agent-teams / scheduled-routines dependency)

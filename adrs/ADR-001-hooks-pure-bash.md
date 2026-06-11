@@ -1,6 +1,6 @@
 # ADR-001 — Hooks are pure bash
 
-> Status: **Accepted**
+> Status: **Superseded by [ADR-006](ADR-006-hooks-may-use-node-js.md)** (2026-06-11) — the "no `node`" decision rested on a model-backend vs CLI-host conflation; since Claude Code *is* a Node app, `node` IS guaranteed wherever a hook fires. ADR-006 allows **bash + node/JS** (JS only; `jq`/`python`/TS-direct still out). The **ship-anywhere spirit below stays correct**; only §2's "no node" and §4.2 are corrected. Kept for history.
 > Date: 2026-06-08
 > Scope: All three hook scripts (`hooks/scripts/bootstrap-board.sh`,
 > `reinject.sh`, `verify-board.sh`) and their test suite. Constrains every future

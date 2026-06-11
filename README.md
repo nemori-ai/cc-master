@@ -216,7 +216,7 @@ The board has a **narrow waist**: a small, fixed set of fields the hooks depend 
 
 ## Contributing
 
-The dev loop is one clone and two gates — `./run-tests.sh` (hook tests + content contract) and `claude plugin validate .`. The design invariants (pure-bash hooks, stable board waist, two non-overlapping skills, the conductor-never-plays-an-instrument red line, ship-anywhere) are spelled out in [CONTRIBUTING.md](CONTRIBUTING.md). Read it before opening a PR.
+The dev loop is one clone and two gates — `./run-tests.sh` (hook tests + content contract) and `claude plugin validate .`. The design invariants (hooks limited to bash + node/JS — ADR-006, stable board waist, two non-overlapping skills, the conductor-never-plays-an-instrument red line, ship-anywhere) are spelled out in [CONTRIBUTING.md](CONTRIBUTING.md). Read it before opening a PR.
 
 ---
 

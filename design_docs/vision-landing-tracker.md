@@ -11,7 +11,9 @@
 - 🔴 **design-only**——只在文档/spec 说，运行时无承载。
 - ⚫ **缺失**——愿景里有，产品里找不到对应物。
 
-> **关键判读**：🟡 在本仓**大多是设计意图、不是缺陷**——cc-master 故意让很多东西是 prose 而非 hook（红线 4 指挥不演奏 / 红线 1+5 hooks 纯 bash · ship-anywhere / §6 Iron Law 禁造 agent 不违反的红线）。所以每张卡第 ⑥ 栏专门区分「该是机制却只 prose = **真 gap**」与「按设计就该 prose = **非 gap**」。
+> **关键判读**：🟡 在本仓**大多是设计意图、不是缺陷**——cc-master 故意让很多东西是 prose 而非 hook（红线 4 指挥不演奏 / 红线 1+5 hooks 限 bash+node·JS · ship-anywhere，见 ADR-006 / §6 Iron Law 禁造 agent 不违反的红线）。所以每张卡第 ⑥ 栏专门区分「该是机制却只 prose = **真 gap**」与「按设计就该 prose = **非 gap**」。
+>
+> **注（ADR-006 更新）**：本 tracker 写于「hooks 纯 bash」假设下；现 hook 可用 **node/JS**——最大影响是 **C2 usage 感知可做成 node hook**（原判「注定 prose/script」翻盘）。详见 [`2026-06-11-orchestrator-as-program-redesign.md`](2026-06-11-orchestrator-as-program-redesign.md) §5.1 H8。下次重审本 tracker 时据此更新 C2 卡。
 
 ---
 

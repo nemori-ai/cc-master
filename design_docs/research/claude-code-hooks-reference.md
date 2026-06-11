@@ -81,12 +81,14 @@
 
 ## 4. cc-master 落地约束与结论
 
-### 4.1 纯 bash 硬约束（红线 1）改写什么、不改写什么
+### 4.1 runtime 约束（红线 1 / [ADR-006](../../adrs/ADR-006-hooks-may-use-node-js.md)）改写什么、不改写什么
 
-hook 必须纯 bash、ship-anywhere（Bedrock/Vertex/Foundry），**不能跑 python/node/jq**。后果：
+> **⚠️ 本节已按 ADR-006 修订**（取代原「纯 bash」）。hook 可用 **bash + node/JS（JS only）**——Claude Code 本身是 Node 应用，`node` 在任何能触发 hook 的环境天然在（Bedrock/Vertex/Foundry 是模型后端、非 CLI 宿主）。仍**排除** `jq` / `python` / 直接跑 TS（不随 Claude Code 保证存在）。
 
-- ✅ **能做**：读 board（escape-aware awk，verify-board 已有先例）、数 `tasks[]`/`in_flight`、读 `blocked_on`/`wip_limit`、写 sidecar、注入短 context。
-- ❌ **做不成**：**算 token usage**——需 `scripts/cc-usage.sh` 的 python 解析 JSONL，hook 跑不了。**故 C2「在 loop 里确定性感知 usage」无论用哪个 hook 事件都做不成纯 bash hook**，只能：① 在 reinject/Stop 注入「记得跑 cc-usage.sh」的弱提醒；② 退回主线决策程序自觉调脚本（prose）。这是 ship-anywhere 的硬代价。
+- ✅ **能做**：读 board（node `JSON.parse` 一行，或 bash escape-aware awk）、数 `tasks[]`/`in_flight`、读 `blocked_on`/`wip_limit`、写 sidecar、注入短 context。**用 node 做结构化 JSON 解析/计算，用 bash 做简单/高频 hook**（node 启动 ~数十 ms，per-tool PostToolUse 这类高频事件留 bash）。
+- ✅ **现在能做了（ADR-006 解锁）**：**算 token usage**——node 一个 `JSON.parse` 读 JSONL usage 记录、算 5h/7d burn-rate（即 `scripts/cc-usage.sh` 那套 python 逻辑），在 `Stop`/`PostToolBatch` hook 里**确定性感知 + 注入 pacing 警告**。于是 **C2「在 loop 里确定性感知 usage」从「注定 prose/script」翻盘为「可做成 node hook」**（见 §4.2 H8）。
+- ❌ **仍做不成**：调用 `jq`/`python`/直接跑 `.ts`（红线1 仍排除）；读对话语义（hook 只有 `transcript_path` 指针，不重建语义）；改权威源 board（只读 + sidecar 写）。
+- ⚠️ **残留边界**：`node` 在 npm/global 安装铁定在 PATH；standalone-binary 安装可能内嵌 node 而不暴露 `node` 到 PATH——若 cc-master 要覆盖那类，node hook 需 `command -v node` 守 + bash 兜底（见 ADR-006 §3.2）。
 
 ### 4.2 Part B 的 H1–H7 按官方矩阵修正后的事件落点
 
@@ -98,13 +100,14 @@ hook 必须纯 bash、ship-anywhere（Bedrock/Vertex/Foundry），**不能跑 py
 | H4 | resume 后提示未消化 stale + deps 悬挂 | C4 supersession | **SessionStart**(扩 reinject, additionalContext) | 通知 | 纯 bash 检 deps，可行 ✅ |
 | H5 | 过调度后注入软警告 | C5 过调度(通知版) | **PostToolBatch**（批量 fan-out 解析后, additionalContext）/ PostToolUse | 通知 | 纯 bash 数 in_flight；**PostToolBatch 是天选**（首轮调研不知它存在）✅ |
 | **H6** | **后台完成自动通知主线去 integrate+验收** | C1/C5 integrate-on-notification | **SubagentStop**（additionalContext，可叠 block）| 通知（+可保证）| 纯 bash；**首轮调研漏了此事件，实为最强新机会**✅ |
-| H7 | compact 前快照 budget/plan | C2/C4 跨 compaction | **PreCompact 写 sidecar** + **SessionStart reinject 读回** | 快照+通知 | PreCompact **不能注入 context**，故走 sidecar；usage 仍算不了（4.1）|
+| H7 | compact 前快照 budget/plan | C2/C4 跨 compaction | **PreCompact 写 sidecar** + **SessionStart reinject 读回** | 快照+通知 | PreCompact **不能注入 context**，故走 sidecar；node 可在此快照算好的 usage |
+| **H8** ⭐ | **node hook 算 usage + 注入 pacing 警告** | C2 传感器不被 loop 调 | **Stop / PostToolBatch**（node `JSON.parse` JSONL → burn-rate → additionalContext）| **确定性感知+通知** | **node/JS（ADR-006 解锁）**；把 C2 从「注定 prose/script」变成真 hook 机制——本次约束修正最大净收获 |
 
 ### 4.3 选型取向
 
 - **确定性保证**（H1/H2）成本高（动 narrow waist=红线2，须 ADR-003+全 hook+测试同步）——先用 **Track B eval** 守行为型 gap，确有硬保证需求再上 hook。
 - **自动通知**（H3/H4/H5/H6）多数纯 bash、不动 waist，是**廉价高杠杆先做项**；其中 **H6（SubagentStop）+ H5（PostToolBatch）** 是这次端点验收**新挖出**的、首轮调研漏报的真实机制。
-- **C2 usage** 是唯一被红线1 否决、注定留 prose/script 的一条，任何 hook 事件都改不了。
+- **C2 usage**（H8）—— **ADR-006 后翻盘**：node hook 能 `JSON.parse` JSONL 算 burn-rate，在 `Stop`/`PostToolBatch` 确定性感知 + 注入 pacing 警告。曾以为「唯一被红线1 否决、注定 prose/script」，现为本次约束修正的最大净收获。（`scripts/cc-usage.sh` 仍可作主线带外手动调用，但 in-loop 自动感知现在有 hook 路径了。）
 
 ## 5. 源
 

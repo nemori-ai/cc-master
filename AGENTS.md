@@ -50,7 +50,7 @@ cc-master/
 │   ├── orchestrating-to-completion/  ← SKILL A：编排方法论（魂）+ references/
 │   └── authoring-workflows/          ← SKILL B：workflow 写法 + references/ + assets/examples/
 ├── .claude/skills/            ← **项目自用** dev skill（造/评/治三件套 + requirement-elicitation 上游需求发现，**不分发**）
-├── hooks/scripts/            ← bootstrap-board / reinject / verify-board（纯 bash 门控）
+├── hooks/scripts/            ← bootstrap-board / reinject / verify-board（bash / node·JS 门控，红线1）
 ├── scripts/                  ← 带外手动调用脚本：codex-review / eval-trigger / eval-benchmark / cc-usage
 ├── adrs/                     ← 结构性决策快照（ADR-001..005 + AGENTS.md 规约）
 ├── tests/                    ← hook 测试（bash）；run-tests.sh 编排 hook + content contract
@@ -60,7 +60,7 @@ cc-master/
 
 **关键不变式**（每条一句话 + SSOT；硬约束的完整体在 §3 红线）：
 
-- **五条 design 红线**——hooks 纯 bash / board narrow waist / 两 skill 不重叠 / 指挥不演奏 / ship-anywhere。SSOT 在本文 **§3**（每条带 grep/CI 卡点）。
+- **五条 design 红线**——hooks 只用 bash+node/JS（红线1，ADR-006）/ board narrow waist / 两 skill 不重叠 / 指挥不演奏 / ship-anywhere。SSOT 在本文 **§3**（每条带 grep/CI 卡点）。
 - **临时计划 / 草稿放 `design_docs/plans/`**——已 gitignored，不进版本控制，与正式 `design_docs/` 严格分开。
 - **运行时 board 不入版本控制**——`.claude/cc-master/`（或 `$CC_MASTER_HOME`）gitignored；每个 orchestration 一份 time-sortable 文件，并发不撞。
 
@@ -70,8 +70,8 @@ cc-master/
 
 这五条是 **cc-master 内任何代码 / 文档变更都不能违反的硬约束**。**本节是这五条红线的单一真相源**（用户拍板）——每条只一句话 + 一个 PR/CI 可执行的 grep/CI 硬卡点；理由 / 决策心智 / 例外在指向的 SSOT 里，本文不复述。违反任一的 PR 会被打回。
 
-1. **Hooks 纯 bash，无 `jq` / `node` / 其它 runtime。** Hook 跑在对 agent context 失明的 shell 里，必须在 cc-master ship 的每个地方都能跑（含 Bedrock / Vertex / Foundry）；用 shell 工具解析 JSON，不用解释器。
-   → 决策快照：[`adrs/ADR-001-hooks-pure-bash.md`](adrs/ADR-001-hooks-pure-bash.md) · 硬卡点：`grep -rE 'jq|node' hooks/scripts/` 须只命中注释（无真调用）。
+1. **Hooks 只用 Claude Code 保证存在的 runtime：bash + node/JS（JS only）。** 不用 `jq` / `python` / 直接跑 TS（这些不随 Claude Code 保证存在）。Hook 跑在对 agent context 失明的 shell 里，但 **Claude Code 本身是 Node 应用——`node` 在任何能触发 hook 的环境天然在**，故 node/JS 不破 ship-anywhere（Bedrock/Vertex/Foundry 是模型后端，非 CLI 宿主）。需结构化 JSON 解析/计算（如从 JSONL 算 usage、deps 图校验）用 node，简单/高频 hook（如 per-tool PostToolUse）用 bash。
+   → 决策快照：[`adrs/ADR-006-hooks-may-use-node-js.md`](adrs/ADR-006-hooks-may-use-node-js.md)（取代 [ADR-001](adrs/ADR-001-hooks-pure-bash.md)，纠正「no node」事实错、保留 ship-anywhere 精神）· 硬卡点：`grep -rnE '\bjq\b|\bpython3?\b|tsx|ts-node' hooks/scripts/` 须只命中注释（node/JS 现已允许）。
 
 2. **保持 board 的 narrow waist 稳定。** Board 是单一真相源、也是 hook 唯一能读的状态；只有一小撮固定字段是 hook-dependent（`schema` / `goal` / `owner.session_id` / `git` / `tasks[{id,status,deps}]` + status enum），其余 agent-shaped。动 waist 必须同 PR 改全部 hook + 测试并在 PR 描述显式说明。
    → 决策快照：[`adrs/ADR-003-board-narrow-waist.md`](adrs/ADR-003-board-narrow-waist.md) · 协议 SSOT：[`skills/orchestrating-to-completion/references/board.md`](skills/orchestrating-to-completion/references/board.md) · 硬卡点：动 waist 的 PR 必带 `bash run-tests.sh` 全绿 + hook 测试同步更新。
@@ -183,7 +183,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 
 - **command**（`commands/*.md`）——一次性点火，frontmatter + body；body 首个非空行的 sentinel 注释（如 `<!-- cc-master:bootstrap:v1 -->`）是 hook 触发标记，**只在首行独立成行时触发**（内联提及不触发，Finding #16）。仅作为 hook 触发点的 command 需要 sentinel（目前只有 `as-master-orchestrator`）；`status` / `stop` 等普通 command 不需要。
 - **skill**（`skills/<name>/SKILL.md` + `references/` + `assets/`）——frontmatter `name` + `description`（单引号整包，§6）；大 reference 顶部加锚点 TOC；深度细节进 `references/` 保持主文件瘦。
-- **hook**（`hooks/scripts/*.sh`）——纯 bash（红线 1）；状态写 sidecar，**永不碰 board**。
+- **hook**（`hooks/scripts/*.sh` / `*.js`）——bash 或 node/JS（红线 1·ADR-006）；状态写 sidecar，**永不碰 board**。
 - **design_docs**——正式文档进 `design_docs/`；临时 plan 进 `design_docs/plans/`（gitignored）；日期前缀命名（`YYYY-MM-DD-<slug>.md`）。
 - **board 不入版本控制**——`.claude/cc-master/`（或 `$CC_MASTER_HOME`）gitignored。
 
@@ -213,7 +213,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 | 写 / 改任何本仓 skill（尤其纪律型）/ 跑 pressure baseline | [`.claude/skills/cc-master-skillsmith/SKILL.md`](.claude/skills/cc-master-skillsmith/SKILL.md)（TDD-for-skills，项目自用 dev skill）|
 | 判断要不要建 skill / 该 skill 还是 reference / 一组 skill 边界与重叠 | [`.claude/skills/curating-skill-portfolios/SKILL.md`](.claude/skills/curating-skill-portfolios/SKILL.md)（Counterfactual Probe A/B + 裁剪七维 + DESIGN 宪法，项目自用 dev skill）|
 | 声明 J（成功契约）/ 度量一个 skill / 跑触发或行为 eval | [`.claude/skills/grounding-skill-evals/SKILL.md`](.claude/skills/grounding-skill-evals/SKILL.md)（轻量 J 写法 + Track A/B + holdout / predict-then-validate，项目自用 dev skill）|
-| 改 hook | [`hooks/scripts/`](hooks/scripts/) + [`tests/`](tests/) + [`CONTRIBUTING.md`](CONTRIBUTING.md)（先确认红线 1 纯 bash）|
+| 改 hook | [`hooks/scripts/`](hooks/scripts/) + [`tests/`](tests/) + [`CONTRIBUTING.md`](CONTRIBUTING.md)（先确认红线 1：bash+node/JS，ADR-006）|
 | 让 codex 当端点验收 reviewer | [`scripts/codex-review.sh`](scripts/codex-review.sh) + `/codex` skill |
 | 在 pacing 决策点感知 5h-7d usage（带外信号脚本，非 hook）| [`scripts/cc-usage.sh`](scripts/cc-usage.sh)（系统 python3 解析本地 JSONL，ship-anywhere）|
 | 跑触发准确率 eval（description 改动前后）| [`scripts/eval-trigger.sh`](scripts/eval-trigger.sh) + [`design_docs/eval/README.md`](design_docs/eval/README.md) |

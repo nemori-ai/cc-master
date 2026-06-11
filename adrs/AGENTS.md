@@ -28,11 +28,12 @@ If something is "how it currently works / where the boundary is right now," it i
 
 | # | Topic | Status | One line |
 |---|---|---|---|
-| **ADR-001** | [hooks are pure bash](ADR-001-hooks-pure-bash.md) | Accepted | The three hooks parse JSON with shell tools only — no `jq`, no `node`, no runtime — so cc-master ships everywhere including Bedrock / Vertex / Foundry. |
+| **ADR-001** | [hooks are pure bash](ADR-001-hooks-pure-bash.md) | **Superseded by ADR-006** | (historical) Hooks parse JSON with shell tools only — no `jq`/`node`. The "no node" rested on a model-backend vs CLI-host conflation; corrected by ADR-006. |
 | **ADR-002** | [ship-anywhere scope](ADR-002-ship-anywhere-scope.md) | Accepted | Supported background mechanisms = background shell + sub-agent + workflow only; agent-teams and scheduled routines are out of scope (not reliably available everywhere). |
 | **ADR-003** | [the board narrow waist](ADR-003-board-narrow-waist.md) | Accepted | A small, fixed set of pinned fields is the only contract the hooks read; everything else is flexible edges the agent shapes freely. |
 | **ADR-004** | [`/loop`·`/goal` dissolution + goal-hook](ADR-004-loop-dissolution-and-goal-hook.md) | Accepted (supersedes the native-`/goal` integration stance) | Native `/goal` is unexecutable by an agent (Finding #2) and `/loop`/`ScheduleWakeup` break ship-anywhere; both are replaced by background shell + completion re-entry and a deterministic Stop hook (goal-hook). |
 | **ADR-005** | [two-skill separation](ADR-005-two-skills-separation.md) | Accepted | `orchestrating-to-completion` (main-thread orchestration) and `authoring-workflows` (inside-the-script authoring) stay self-contained and non-overlapping. |
+| **ADR-006** | [hooks may use node/JS](ADR-006-hooks-may-use-node-js.md) | Accepted (supersedes ADR-001) | Hooks may use bash + Node.js/JavaScript (JS only; `jq`/`python`/TS-direct still out) — Claude Code *is* a Node app, so `node` is guaranteed wherever a hook fires. Unblocks C2 usage-sensing as a hook + trivial JSON parsing. |
 
 ---
 

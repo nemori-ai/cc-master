@@ -5,10 +5,11 @@ in your environment, so please read this before reporting.
 
 ## Trust surface
 
-- **Hooks run shell on your machine.** cc-master ships `bash` hooks
+- **Hooks run shell on your machine.** cc-master ships hooks
   (`UserPromptSubmit`, `SessionStart`, `Stop`) that execute locally on every
-  matching event. They are intentionally pure bash (no `jq`/`node`), but they
-  still read your project directory and write to the cc-master home
+  matching event. They are limited to **bash + Node.js/JavaScript** — runtimes
+  Claude Code itself guarantees (no `jq`/`python`/extra installs; see ADR-006) —
+  and read your project directory + write to the cc-master home
   (`$CC_MASTER_HOME`, else `<project>/.claude/cc-master/`).
 - **The plugin injects context into the agent.** Commands and hooks add text to
   the model's context (role priming, board path, re-injection after compaction).

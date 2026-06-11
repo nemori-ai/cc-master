@@ -44,7 +44,7 @@ surfaced under a real session.
 
 ## Design invariants — do not break these
 
-The five load-bearing design red lines (pure-bash hooks · stable board narrow
+The five load-bearing design red lines (hooks use bash + node/JS — ADR-006 · stable board narrow
 waist · two non-overlapping skills · the conductor never plays an instrument ·
 ship-anywhere) have a **single source of truth in [`AGENTS.md` §3](AGENTS.md#3-non-negotiable-红线ssot-在此)** —
 each with its decision-record link and a PR/CI grep checkpoint. Read it before
