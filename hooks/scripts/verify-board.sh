@@ -41,8 +41,12 @@ if [ -f "$SIDECAR" ]; then
   case "$last_handshook_fp" in '') last_handshook_fp="-";; esac
 fi
 
-# ── board matching ────────────────────────────────────────────────────────────────────────────────
+# ── board matching = THE ARMING GATE ────────────────────────────────────────────────────────────────
 # A board is "mine" when active AND (sid empty → degraded: any active board; else owner.session_id==sid).
+# This board_matches IS this hook's arming gate: every cc-master hook stays dormant until THIS session
+# is armed (an active board it owns), and only a matched board drives any behavior below. (Unified
+# armed-hook discipline — same gate in reinject.sh / subagent-stop.sh / posttool-batch.sh and the node
+# usage-pacing.js; bootstrap-board.sh is the ARM action and is the sole gate-exempt hook.)
 board_matches() { # $1 = board path
   grep -qE '"active"[[:space:]]*:[[:space:]]*true' "$1" 2>/dev/null || return 1
   [ -z "$sid" ] && return 0
@@ -91,6 +95,65 @@ tasks_region() {
         if (bd == 1 && cd == 1) out = out ch
       }
       printf "%s", out
+    }' "$1" 2>/dev/null
+}
+
+# pending_user_decisions BOARD — print, one per line, the human label of every task object whose
+# TOP-LEVEL fields carry `"blocked_on":"user"` (whitespace-tolerant): its "title" if present, else
+# its "id". This is a PER-OBJECT scan (tasks_region above flattens every object's fields into one
+# stream and so cannot bind a title back to the object whose blocked_on it belongs to). Same
+# string/escape/double-depth ([ ] and { }) awareness as tasks_region, so it is FORMAT-AGNOSTIC:
+# single-line and multi-line JSON behave identically. Only characters at the task-object top level
+# (bracket depth 1 inside the tasks array, curly depth 1 inside the task) are buffered per object —
+# nested flexible fields (a task-local "log" array, structured entries inside it) are dropped
+# wholesale, so they can neither inject a spurious blocked_on:user nor masquerade as a title/id.
+pending_user_decisions() {
+  awk '
+    { s = s $0 "\n" }
+    END {
+      i = index(s, "\"tasks\""); if (!i) exit
+      s = substr(s, i + 7)
+      j = index(s, "["); if (!j) exit
+      s = substr(s, j + 1)                 # start INSIDE the tasks array
+      bd = 1; cd = 0; instr = 0; esc = 0; obj = ""
+      n = length(s)
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        if (instr) {
+          if (bd == 1 && cd == 1) obj = obj ch
+          if (esc) esc = 0
+          else if (ch == "\\") esc = 1
+          else if (ch == "\"") instr = 0
+          continue
+        }
+        if (ch == "\"") { instr = 1; if (bd == 1 && cd == 1) obj = obj ch; continue }
+        if (ch == "[") { bd++; continue }
+        if (ch == "]") { bd--; if (bd == 0) break; continue }
+        if (ch == "{") { cd++; if (bd == 1 && cd == 1) obj = ""; continue }   # open a task object → fresh buffer
+        if (ch == "}") {
+          cd--
+          if (bd == 1 && cd == 0) emit(obj)   # closed a task object → decide on its top-level fields
+          continue
+        }
+        if (bd == 1 && cd == 1) obj = obj ch
+      }
+    }
+    # emit OBJ — if OBJ has a top-level "blocked_on":"user", print its "title" (else its "id").
+    function emit(o,   bo, lbl) {
+      if (o !~ /"blocked_on"[ \t]*:[ \t]*"user"/) return
+      lbl = field(o, "title")
+      if (lbl == "") lbl = field(o, "id")
+      if (lbl != "") print lbl
+    }
+    # field(O, NAME) — extract the string value of top-level key NAME from object buffer O ("" if absent).
+    function field(o, name,   re, m) {
+      re = "\"" name "\"[ \t]*:[ \t]*\""
+      if (match(o, re)) {
+        m = substr(o, RSTART + RLENGTH)
+        sub(/".*/, "", m)
+        return m
+      }
+      return ""
     }' "$1" 2>/dev/null
 }
 
@@ -179,4 +242,27 @@ if [ "$last_handshook_fp" = "$fp_now" ]; then
 fi
 # New (or changed) completion state → record the fingerprint we are handshaking on, then block.
 last_handshook_fp="$fp_now"
-emit_block 'cc-master: before you stop, self-check against this board'\''s `goal`. (1) Is every point that needs the user surfaced / marked `blocked_on:"user"`? (2) Against the **original goal**, is every to-do actually done — including any NOT yet listed on the board? If something is missing, add it to `tasks[]` and keep going; only stop once the goal is truly met.'
+handshake_reason='cc-master: before you stop, self-check against this board'\''s `goal`. (1) Is every point that needs the user surfaced / marked `blocked_on:"user"`? (2) Against the **original goal**, is every to-do actually done — including any NOT yet listed on the board? If something is missing, add it to `tasks[]` and keep going; only stop once the goal is truly met.'
+# H3: if any task on a matched board is parked on the user (status blocked, `blocked_on:"user"`),
+# name those open decisions in the handshake so the agent cannot silently exit on an unanswered one.
+# Collect the human label (title, else id) of each across all of THIS session's matched boards.
+pending_list=""
+while IFS= read -r bp; do
+  [ -n "$bp" ] || continue
+  pending_list="$pending_list$(pending_user_decisions "$bp")
+"
+done <<EOF
+$matched_boards
+EOF
+# Join the non-empty labels with "; " (pure bash; preserves file order, dedup not needed for naming).
+pending_joined=""
+while IFS= read -r lbl; do
+  [ -n "$lbl" ] || continue
+  if [ -z "$pending_joined" ]; then pending_joined="$lbl"; else pending_joined="$pending_joined; $lbl"; fi
+done <<EOF
+$pending_list
+EOF
+if [ -n "$pending_joined" ]; then
+  handshake_reason="$handshake_reason Unanswered user decisions still on this board: $pending_joined. Confirm each is genuinely still pending (or resolve it) before you stop — don't silently exit on an open user decision."
+fi
+emit_block "$handshake_reason"

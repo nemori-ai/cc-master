@@ -15,9 +15,21 @@
 #                     mid-sentence (a sub-agent report quoting the command-file convention) would
 #                     false-trigger an empty board (Finding #16).
 # Pure bash extraction of the JSON prompt field — no jq/node (ship-anywhere).
+#
+# ARMING NOTE (hook armed-gate discipline): every OTHER cc-master hook stays fully dormant until this
+# session is "armed" — armed ⟺ home holds a *.board.json with owner.active:true AND owner.session_id
+# == this session's id. This bootstrap hook is the ARM ACTION ITSELF: it is the only hook EXEMPT from
+# that gate (it cannot require a prior armed board — it creates the armed state). To make the
+# session-scoped gate satisfiable the instant the board is born, it stamps owner.session_id from the
+# stdin session_id below (instead of leaving it ""), so the creating session immediately owns its board.
 set -uo pipefail
 
 stdin="$(cat)"
+
+# ── stdin → session_id (pure bash, no jq; same extraction as verify-board.sh / reinject.sh) ─────────
+# This is the ARM identity stamped onto the new board's owner.session_id, so the armed gate
+# (active:true AND owner.session_id==sid) is immediately true for the session that armed it.
+sid="$(printf '%s' "$stdin" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
 
 # Extract the value of the top-level "prompt" string field. Grab everything after `"prompt":"` up to
 # the next unescaped double-quote. This is a best-effort extraction sufficient to test a prefix; if
@@ -56,10 +68,22 @@ mkdir -p "$HOME_DIR"
 # distinct (the human-readable identity lives in the board's "goal" field). Each invocation
 # starts a NEW orchestration; archive stale ones with /cc-master:stop.
 BOARD="$HOME_DIR/$(date -u +%Y%m%dT%H%M%SZ)-$$.board.json"
+# Escape the sid for safe inclusion in the JSON string value (backslash + double-quote only; a
+# session id is otherwise printable). Empty sid → stamps "" (degraded: armed gate falls back to
+# any-active). Keep this pure bash (no jq) — ship-anywhere.
+sid_esc="$(printf '%s' "$sid" | sed 's/\\/\\\\/g; s/"/\\"/g')"
 if [ -f "$TEMPLATE" ]; then
   cp "$TEMPLATE" "$BOARD"
+  # Stamp owner.session_id with the creating session's id (the ARM identity). The template ships the
+  # field as `"session_id": ""`; replace ONLY that empty owner field. A literal-anchored sed on the
+  # empty value keeps the substitution from ever touching a non-empty value (none exists in a fresh
+  # template, but this stays safe if the template gains other session_id-shaped fields later).
+  tmp="$BOARD.tmp.$$"
+  sed "s/\"session_id\"[[:space:]]*:[[:space:]]*\"\"/\"session_id\": \"$sid_esc\"/" "$BOARD" > "$tmp" && mv -f "$tmp" "$BOARD"
 else
-  printf '{"schema":"cc-master/v1","goal":"","owner":{"active":true,"session_id":"","heartbeat":""},"git":{"worktree":"","branch":""},"wip_limit":4,"tasks":[],"log":[]}\n' > "$BOARD"
+  # Template-missing fallback: build the board inline, stamping the real sid into owner.session_id
+  # (was a hardcoded empty "" before — that left every bootstrapped board unowned).
+  printf '{"schema":"cc-master/v1","goal":"","owner":{"active":true,"session_id":"%s","heartbeat":""},"git":{"worktree":"","branch":""},"wip_limit":4,"tasks":[],"log":[]}\n' "$sid_esc" > "$BOARD"
 fi
 
 ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. Decompose the goal into a dependency DAG and write tasks[] into that board file, set goal/owner/git, then invoke the orchestrating-to-completion skill and run the decision program."

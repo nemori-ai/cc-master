@@ -34,6 +34,7 @@ If something is "how it currently works / where the boundary is right now," it i
 | **ADR-004** | [`/loop`·`/goal` dissolution + goal-hook](ADR-004-loop-dissolution-and-goal-hook.md) | Accepted (supersedes the native-`/goal` integration stance) | Native `/goal` is unexecutable by an agent (Finding #2) and `/loop`/`ScheduleWakeup` break ship-anywhere; both are replaced by background shell + completion re-entry and a deterministic Stop hook (goal-hook). |
 | **ADR-005** | [two-skill separation](ADR-005-two-skills-separation.md) | Accepted | `orchestrating-to-completion` (main-thread orchestration) and `authoring-workflows` (inside-the-script authoring) stay self-contained and non-overlapping. |
 | **ADR-006** | [hooks may use node/JS](ADR-006-hooks-may-use-node-js.md) | Accepted (supersedes ADR-001) | Hooks may use bash + Node.js/JavaScript (JS only; `jq`/`python`/TS-direct still out) — Claude Code *is* a Node app, so `node` is guaranteed wherever a hook fires. Unblocks C2 usage-sensing as a hook + trivial JSON parsing. |
+| **ADR-007** | [hook arming gate](ADR-007-hook-arming-gate.md) | Accepted | Every hook is dormant-until-armed; armed ⟺ home holds a `*.board.json` with `owner.active:true` AND `owner.session_id == stdin session_id` (degraded to any-active on empty sid). Reuses pinned waist fields (ADR-003 untouched); `bootstrap-board.sh` is the sole exempt ARM action; disarm = `/stop`. Disk is the only cross-compaction channel a hook can read. |
 
 ---
 
@@ -140,7 +141,7 @@ Any No → file it in `design_docs/` instead; do not create an ADR.
 
 | Concern | Where |
 |---|---|
-| Repo-wide navigation + the five design invariants (red-line SSOT) | [`../AGENTS.md`](../AGENTS.md) |
+| Repo-wide navigation + the six design invariants (red-line SSOT) | [`../AGENTS.md`](../AGENTS.md) |
 | Contribution dev loop + invariant pointer | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
 | Plugin spec (intentional exclusions in §12) | [`../design_docs/spec.md`](../design_docs/spec.md) |
 | Dogfood findings ledger (the anti-pattern record many ADRs cite) | [`../design_docs/dogfood-findings.md`](../design_docs/dogfood-findings.md) |

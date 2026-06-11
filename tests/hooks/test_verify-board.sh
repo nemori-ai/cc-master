@@ -337,4 +337,56 @@ printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","stat
 assert_eq "$(fp_of "$H/a.board.json")" "$(fp_of "$H/b.board.json")" "single-line fingerprint scoped to tasks region (log excluded)"
 rm -rf "$H"
 
+# ─── H3: COMPLETION HANDSHAKE NAMES UNANSWERED blocked_on:"user" DECISIONS ─────────────────────────
+# When the board is in a completion state (no ready/uncertain) AND carries one or more
+# status=blocked, blocked_on:"user" tasks, the self-check handshake must additionally list those
+# open decisions by title (or id). Fresh PROJECT_DIR + fresh SID per case → no sidecar yet → the
+# first Stop always reaches the completion-state handshake (block), so the appended text is testable.
+
+# Case X1 (H3): one blocked_on:user task WITH a title → reason names that title.
+H="$(make_project)"; SID="sess-h3-title"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"pick the deploy region\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "H3 one user decision → completion handshake block"
+assert_contains "$HOOK_OUT" "self-check" "H3 one user decision → still the self-check handshake"
+assert_contains "$HOOK_OUT" "Unanswered user decisions still on this board" "H3 one user decision → reason lists unanswered user decisions"
+assert_contains "$HOOK_OUT" "pick the deploy region" "H3 one user decision → reason names the task title"
+rm -rf "$H"
+
+# Case X2 (H3): two blocked_on:user tasks WITH titles → both titles listed.
+H="$(make_project)"; SID="sess-h3-two"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"approve the migration\",\"deps\":[]},{\"id\":\"T3\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"confirm the rollback plan\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "approve the migration" "H3 two user decisions → first title listed"
+assert_contains "$HOOK_OUT" "confirm the rollback plan" "H3 two user decisions → second title listed"
+rm -rf "$H"
+
+# Case X3 (H3): blocked_on:user task WITHOUT a title → its id is listed instead.
+H="$(make_project)"; SID="sess-h3-noti"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"DECISION-9\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "Unanswered user decisions still on this board" "H3 titleless user decision → still lists unanswered decisions"
+assert_contains "$HOOK_OUT" "DECISION-9" "H3 titleless user decision → falls back to task id"
+rm -rf "$H"
+
+# Case X4 (H3): completion state with NO blocked_on:user task → reason identical to status quo
+#               (must NOT contain the H3 sentence). A task blocked on something else (or a non-user
+#               blocked_on) must not trip it.
+H="$(make_project)"; SID="sess-h3-none"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"T1\",\"deps\":[]},{\"id\":\"T3\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "self-check" "H3 no user decision → still the self-check handshake"
+assert_not_contains "$HOOK_OUT" "Unanswered user decisions" "H3 no user decision → reason matches status quo (no H3 sentence)"
+rm -rf "$H"
+
+# Case X5 (H3, format-agnostic): blocked_on:user with a task-local log/object must not pollute the
+#               per-object scan — the title is still read from the task's OWN top-level fields, and a
+#               nested log carrying its own "title"/"blocked_on" must not leak in.
+H="$(make_project)"; SID="sess-h3-nested"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"real top-level title\",\"deps\":[],\"log\":[{\"id\":\"L1\",\"title\":\"nested decoy\",\"blocked_on\":\"user\"}]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "real top-level title" "H3 nested log → reads the task's own top-level title"
+assert_not_contains "$HOOK_OUT" "nested decoy" "H3 nested log → nested log title does not leak into the list"
+rm -rf "$H"
+
 finish

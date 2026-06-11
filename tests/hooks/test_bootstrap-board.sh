@@ -2,6 +2,10 @@
 . "$(dirname "$0")/helpers.sh"
 
 count_boards() { ls "$1"/*.board.json 2>/dev/null | wc -l | tr -d ' '; }
+# board_sid FILE — extract owner.session_id value (pure bash, mirrors the hooks' extraction).
+board_sid() { sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1" | head -1; }
+# only_board HOME — echo the single board path in HOME (assumes exactly one).
+only_board() { ls "$1"/*.board.json 2>/dev/null | head -1; }
 
 # Case A: command-name sentinel → exactly one board in the default home, path + role injected
 P="$(make_project)"
@@ -10,6 +14,35 @@ assert_eq 0 "$HOOK_RC" "bootstrap exits 0"
 assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "exactly one board created in default home"
 assert_contains "$HOOK_OUT" ".board.json" "injects the board path"
 assert_contains "$HOOK_OUT" "orchestrator" "injects the orchestrator role"
+rm -rf "$P"
+
+# Case A1 (ARM = stamp session_id): bootstrap is the ARM action — the board it creates is born
+# OWNED by the creating session. The hook must stamp owner.session_id from the stdin session_id
+# (not leave it ""), so the session-scoped armed gate (active:true AND owner.session_id==sid) is
+# immediately satisfiable for the very session that armed it.
+P="$(make_project)"
+HOOK_OUT="$(printf '%s' '{"session_id":"sess-boot-1","prompt":"/cc-master:as-master-orchestrator do the thing"}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "A1: board created"
+assert_eq "sess-boot-1" "$(board_sid "$(only_board "$P/.claude/cc-master")")" "A1: bootstrap stamps owner.session_id from stdin session_id"
+rm -rf "$P"
+
+# Case A2 (stamp regression, body-sentinel path + template fallback): even when the prompt arrives
+# as the expanded body marker (not the raw command), the created board still carries the real sid.
+P="$(make_project)"
+HOOK_OUT="$(printf '%s' '{"session_id":"sess-boot-2","prompt":"<!-- cc-master:bootstrap:v1 -->\n..."}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+assert_eq "sess-boot-2" "$(board_sid "$(only_board "$P/.claude/cc-master")")" "A2: body-sentinel path also stamps the sid"
+rm -rf "$P"
+
+# Case A3 (no session_id in stdin → empty stamp, not a crash): a bootstrap whose stdin carries no
+# session_id stamps owner.session_id="" (degraded — the armed gate then falls back to any-active).
+P="$(make_project)"
+run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"/cc-master:as-master-orchestrator x"}' "$P"
+assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "A3: board created without a session_id"
+assert_eq "" "$(board_sid "$(only_board "$P/.claude/cc-master")")" "A3: no stdin session_id → owner.session_id stays empty (degraded gate)"
 rm -rf "$P"
 
 # Case B: body sentinel (expanded-body case) — marker is the FIRST non-empty line (the command body
