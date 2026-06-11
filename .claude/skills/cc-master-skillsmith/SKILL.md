@@ -1,195 +1,230 @@
 ---
 name: cc-master-skillsmith
-description: 'Use when creating, editing, or reviewing a cc-master skill — especially a discipline-enforcing one (orchestrating-to-completion, authoring-workflows, this skill) whose rules an agent could rationalize away under pressure. Triggers: 新建/修改/审查本仓 skill、加 Rationalization Table / Red Flags / 决策程序、改 SKILL.md 的纪律段或 description；or when you catch yourself about to write skill prose without first watching an agent fail. Covers the TDD-for-skills loop: failing pressure baseline first, then write/edit, then close loopholes.'
+description: '当你创建、编辑或审查一个 cc-master skill 时用——尤其是那种纪律型（discipline-enforcing）skill（orchestrating-to-completion、authoring-workflows、本 skill），它的规则 agent 在压力下能合理化掉。Triggers: 新建/修改/审查本仓 skill、加 Rationalization Table / Red Flags / 决策程序、改 SKILL.md 的纪律段或 description；或当你发现自己正打算先动手写 skill 正文、却没先看一个 agent 失败。Do NOT use when 你只是要判断要不要建一个 skill / 这块该 skill 还是 reference / 两个 skill 重不重叠（那是 curating-skill-portfolios）；Do NOT use when 你要声明 J / 跑触发或行为 eval / 度量一个 skill（那是 grounding-skill-evals）。'
 ---
 
-# cc-master-skillsmith — TDD for cc-master skill discipline
+# cc-master-skillsmith — cc-master skill 纪律的 TDD
 
-> **This is a project-internal dev tool, not a distributed plugin skill.** It lives in
-> `.claude/skills/` (used by cc-master's own contributors), NOT in `skills/` (which ships to
-> plugin users). End users installing cc-master never see it; it exists only to forge *this repo's*
-> skills.
+> **这是项目自用的 dev 工具，不是分发给插件用户的 skill。** 它住在
+> `.claude/skills/`（cc-master 自己的贡献者用），**不在** `skills/`（那才会 ship 给
+> 插件用户）。终端用户装 cc-master 永远看不到它；它只为锻造*本仓*的 skill 存在。
 
-This is the meta-skill: how cc-master writes and edits its own skills. It exists
-because a skill that *enforces discipline* — "the conductor never plays an
-instrument," "no production code without a failing test," "trust only the
-endpoint, not a green gate" — is itself a piece of behavior under test. You cannot
-know whether the prose actually changes an agent's behavior until you have watched
-an agent **fail without it**.
+这是 meta-skill：cc-master 怎么写、怎么改自己的 skill。它之所以存在，是因为一个
+*强制纪律* 的 skill——「指挥永不演奏」「没有失败测试就没有生产代码」「只信端点、
+不信绿闸」——它本身就是一段处于测试之下的行为。你无法知道这段 prose 到底有没有真正
+改变 agent 的行为，除非你已经亲眼看过一个 agent **在没有它的情况下失败**。
 
-**Writing a discipline skill IS test-driven development applied to prose.** The
-pressure scenario is the test. The agent's verbatim rationalization is the failing
-output. The skill section that kills that rationalization is the production code.
+**写一个纪律型 skill，就是把 test-driven development 应用到 prose 上。** 压力场景就
+是测试。agent 逐字的合理化就是那个失败的输出。杀掉那条合理化的 skill 段落就是生产
+代码。
 
-> **REQUIRED BACKGROUND:** This skill adapts the RED-GREEN-REFACTOR cycle from
-> `superpowers:test-driven-development` and the subagent pressure-testing format
-> from `superpowers:writing-skills`. If you have not internalized those, read them
-> first — this skill assumes them and only adds the cc-master-specific contract.
+> **REQUIRED BACKGROUND：** 本 skill 改编自 `superpowers:test-driven-development` 的
+> RED-GREEN-REFACTOR 循环，以及 `superpowers:writing-skills` 的 subagent 压力测试格式。
+> 如果你还没把这两者内化，先读它们——本 skill 假设你已经懂了，只在其上补 cc-master
+> 特有的契约。
 
 ---
 
-## The Iron Law
+## 铁律（The Iron Law）
 
 ```
 NO DISCIPLINE SKILL — NEW OR EDITED — WITHOUT A FAILING PRESSURE BASELINE FIRST
+（任何纪律型 skill——新建或编辑——都不许在没有一个失败的压力 baseline 之前动笔）
 ```
 
-The same Iron Law as TDD, mapped onto prose. Before you write or change a rule
-that an agent could rationalize away, you must first run a **pressure scenario
-through a subagent that does NOT have the skill** (or does not have the new
-section) and watch it choose the wrong thing. No recorded failure → no skill edit.
+和 TDD 同一条铁律，映射到 prose 上。在你写或改一条 agent 能合理化掉的规则之前，你必须
+先把一个**压力场景跑过一个没有该 skill（或没有该新段落）的 subagent**，看它选错那个。
+没有记录在案的失败 → 不许改 skill。
 
-Wrote the skill section before running the baseline? Delete it. Start over from
-the baseline.
+在跑 baseline 之前就写好了 skill 段落？删掉它。从 baseline 重新开始。
 
-**No exceptions:**
-- Not for "the rule is obviously right."
-- Not for "I'm just adding one Rationalization Table row."
-- Not for "it's only a wording tweak to a discipline section."
-- Don't keep the unbaselined draft "as a reference" while you run the scenario —
-  you will adapt it, and that is writing-after. Delete means delete.
+**没有例外：**
+- 「这条规则显然是对的」不算例外。
+- 「我只是加一行 Rationalization Table」不算例外。
+- 「这只是给纪律段落改个措辞」不算例外。
+- 别在跑场景时把没 baseline 的草稿「留着当参考」——你会去 adapt 它，那就是 writing-after。
+  删除就是删除。
 
-**Violating the letter of the Iron Law is violating its spirit.** "I know what
-agents would say, so I'll skip the baseline and just write the counters" is the
-exact rationalization this skill forbids. You don't know what they'll say. You
-*think* you do. The baseline is how you find out you were wrong.
+**违背铁律的字面就是违背它的精神。** 「我知道 agent 会说什么，所以我跳过 baseline 直接
+写反驳」正是本 skill 禁止的那条合理化。你不知道它们会说什么。你*以为*你知道。baseline
+正是你发现自己想错了的途径。
 
-### What this does and does NOT gate
+### 这条铁律 gate 什么、不 gate 什么
 
-This Iron Law gates **judgment-bearing, discipline-enforcing prose** — rules an
-agent under pressure could talk itself out of. It does **not** gate:
+这条铁律 gate 的是**判断型、强制纪律的 prose**——agent 在压力下能把自己说服绕过去的
+规则。它**不** gate：
 
-- Pure reference/how-to content (API signatures, the workflow paradigm tree, a
-  TOC, a fixed-format table). Those are validated by use, not by pressure. If a
-  constraint is mechanically checkable (regex, `plugin validate`, a test), automate
-  it — don't write a rule and pressure-test it.
-- Mechanical edits with no behavioral claim (fix a dead link, rename a file in an
-  index, update a count). The content contract (below) catches structural breakage.
+- 纯 reference / how-to 内容（API 签名、workflow 范式树、TOC、固定格式的表格）。这些靠
+  使用来验证，不靠压力。如果一条约束是机械可检的（regex、`plugin validate`、一个测试），
+  就自动化它——别写成一条规则再去压力测它。
+- 没有行为主张的机械编辑（修一条死链、给索引里的文件改名、更新一个计数）。content
+  contract（见下）会接住结构性破损。
 
-If you are unsure whether an edit is "discipline" or "reference": does the edit
-make a claim about *what an agent should choose when it's tempted not to*? If yes,
-it's discipline — baseline it.
+如果你拿不准一次编辑是「纪律」还是「reference」：这次编辑有没有对*一个 agent 在被诱惑不
+照做时该选什么*作出主张？如果有，它就是纪律——给它跑 baseline。
 
 ---
 
-## The loop (RED → GREEN → REFACTOR)
+## 循环（RED → GREEN → REFACTOR）
 
-| Phase | What you do | cc-master artifact |
+| 阶段 | 你做什么 | cc-master 产物 |
 |-------|-------------|--------------------|
-| **RED** | Run a 3-pressure scenario through a subagent **without** the skill/section. | Verbatim rationalizations captured. |
-| **Verify RED** | Confirm the agent actually chose wrong and *why* (the excuse). | The excuse text — copied word-for-word. |
-| **GREEN** | Write the minimal skill prose that kills exactly those excuses. | New/edited SKILL.md section + a Rationalization Table row per excuse. |
-| **Verify GREEN** | Re-run the same scenario **with** the skill. Agent now complies. | Agent cites the section, picks the right option. |
-| **REFACTOR** | New rationalization surfaced? Add a counter + table row. Re-run. | Loophole closed, still GREEN. |
+| **RED** | 把一个 3 压场景跑过一个**没有**该 skill/段落的 subagent。 | 逐字捕获到的合理化。 |
+| **Verify RED** | 确认 agent 确实选错了，以及*为什么*（那个借口）。 | 借口原文——逐字抄录。 |
+| **GREEN** | 写出恰好杀掉那些借口的最小 skill prose。 | 新建/编辑的 SKILL.md 段落 + 每个借口一行 Rationalization Table。 |
+| **Verify GREEN** | 把同一场景**带着** skill 重跑。agent 现在合规了。 | agent 引用该段落，选了对的那个。 |
+| **REFACTOR** | 冒出新的合理化？加一条反驳 + 表格行。重跑。 | 漏洞堵上，仍 GREEN。 |
 
-The full pressure-scenario recipe (the three pressures, the fixed prompt
-scaffold, how to capture excuses, how to back-fill the table) lives in
-[`references/pressure-testing.md`](references/pressure-testing.md). Read it before
-you run your first baseline.
+完整的压力场景配方（三压、固定的 prompt 脚手架、怎么捕获借口、怎么回填表格）在
+[`references/pressure-testing.md`](references/pressure-testing.md)。跑你的第一个 baseline
+之前先读它。
 
-### The three pressures (always combine 3+)
+### 三压（永远叠加 3+ 条）
 
-A single pressure is academic — the agent just recites the rule. Real failures
-need **time pressure + sunk cost + exhaustion** stacked together, forcing an
-explicit A/B/C choice with no "I'd ask the user" escape hatch. The recipe file
-has the exact wording; the short version:
+单一一条压力是学院派的——agent 只会背诵规则。真实的失败需要 **time pressure + sunk
+cost + exhaustion** 叠在一起，逼出一个明确的 A/B/C 选择，且没有「我会去问用户」的逃生口。
+配方文件里有确切措辞；短版本：
 
-- **Time** — deploy window closing, user waiting, deadline now.
-- **Sunk cost** — hours/lines already invested; deleting "feels wasteful."
-- **Exhaustion** — end of a long run, "just want this done."
+- **Time（时间）**——部署窗口正在关闭、用户在等、deadline 就是现在。
+- **Sunk cost（沉没成本）**——已经投入了几小时/几行；删掉「感觉很浪费」。
+- **Exhaustion（疲惫）**——一段长跑的尾声，「只想把这个搞完」。
 
-Then capture the agent's excuse **verbatim** and back-fill it into the target
-skill's **Rationalization Table** (excuse → reality, two columns) and **Red Flags**
-list. The table is not invented from your imagination — it is a transcript of real
-failures. That is the whole point of the baseline.
+然后**逐字**捕获 agent 的借口，回填进目标 skill 的 **Rationalization Table**（借口 → 现实，
+两列）和 **Red Flags** 列表。这张表不是凭你想象编的——它是真实失败的 transcript。这正是
+跑 baseline 的全部意义。
 
 ---
 
-## How this relates to eval (qualitative vs quantitative)
+## 本 skill 与 eval 的关系（定性 vs 定量）
 
-cc-master tests its skills along two complementary axes. Do not conflate them.
+cc-master 沿两条互补的轴测试它的 skill。别把它们混为一谈。
 
-| | This skill (pressure baseline) | Eval (`design_docs/eval/`) |
+| | 本 skill（压力 baseline） | Eval（`design_docs/eval/`） |
 |---|---|---|
-| **Kind** | Qualitative — surfaces *which* rationalizations exist | Quantitative — scores trigger/behavior rates |
-| **Output** | Verbatim excuses → Rationalization Table rows | precision/recall numbers, mean±stddev |
-| **Answers** | "What loophole must the prose close?" | "Did the change help or hurt, by how much?" |
-| **When** | Before writing/editing any discipline rule | Track A on every `description` change; Track B around behavioral changes |
+| **种类** | 定性——浮现出*哪些*合理化存在 | 定量——给触发率/行为率打分 |
+| **输出** | 逐字借口 → Rationalization Table 行 | precision/recall 数字、mean±stddev |
+| **回答** | 「prose 必须堵哪个漏洞？」 | 「这次改动帮了还是害了，幅度多大？」 |
+| **何时** | 写/改任何纪律规则之前 | Track A 在每次 `description` 改动；Track B 围绕行为改动 |
 
-- **Track A — trigger accuracy** (`design_docs/eval/README.md`): does the
-  `description` make Claude read the skill exactly when it should. Run before/after
-  any `description` edit. Pressure baselines test the *body*; Track A tests the
-  *frontmatter trigger*.
-- **Track B — behavioral benchmark** (`design_docs/eval/track-b-benchmark.md`):
-  with-skill vs without-skill behavioral assertions over transcripts, with codex
-  as a second grader. The pressure baseline finds the loophole; Track B measures
-  whether closing it moved the aggregate behavior.
+- **Track A —— 触发准确率**（`design_docs/eval/README.md`）：`description` 有没有让 Claude
+  恰好在该读时读这个 skill。任何 `description` 编辑前后各跑一遍。压力 baseline 测的是
+  *body*；Track A 测的是 *frontmatter 触发*。
+- **Track B —— 行为 benchmark**（`design_docs/eval/track-b-benchmark.md`）：with-skill vs
+  without-skill 在 transcript 上的行为断言，以 codex 当第二评委。压力 baseline 找到漏洞；
+  Track B 度量堵上它有没有移动整体行为。
 
-The flow is: **pressure baseline (find the loophole, qualitative) → write/edit
-prose → eval (confirm it helped, quantitative).** They are sequential, not
-substitutes — a green Track-A number with no pressure baseline means you optimized
-a trigger for a body you never tested under stress.
+流程是：**压力 baseline（找到漏洞，定性）→ 写/改 prose → eval（确认有用，定量）。** 它们
+是顺序的，不是替代——一个绿的 Track-A 数字背后没有压力 baseline，意味着你为一个从未在压力
+下测过的 body 优化了它的触发器。
 
 ---
 
-## The content contract is the authoritative structure gate
+## content contract 是权威的结构闸
 
-Behavior is yours to baseline; **structure is the harness's to enforce.** Do not
-hand-check what the gates check.
+行为是你拿 baseline 去守的；**结构是 harness 拿来强制的。** 别手检闸门已经查的东西。
 
 ```bash
-./run-tests.sh                 # node "content" suite asserts every SKILL.md under BOTH
-                               # skills/ (distributed) AND .claude/skills/ (project-internal,
-                               # incl. THIS skill) has YAML frontmatter with name + description
-claude plugin validate .       # validates the plugin manifest, distributed skills, commands
+./run-tests.sh                 # node "content" 套件断言 skills/（分发）和
+                               # .claude/skills/（项目自用，含本 skill）下每个 SKILL.md
+                               # 都有带 name + description 的 YAML frontmatter
+claude plugin validate .       # 校验 plugin manifest、分发的 skill、command
 ```
 
-`run-tests.sh` must end with `ALL TESTS PASSED`. The content suite iterates both `skills/*/SKILL.md`
-and `.claude/skills/*/SKILL.md`, so this very skill is under the same structure gate it preaches —
-ship the frontmatter correctly and it passes. `claude plugin validate .` validates the *distributed*
-plugin (manifest + `skills/` + commands); it does **not** see `.claude/skills/` (those are not part of
-the shipped plugin), which is exactly why the content suite covers them.
+`run-tests.sh` 必须以 `ALL TESTS PASSED` 收尾。content 套件同时 iterate `skills/*/SKILL.md`
+和 `.claude/skills/*/SKILL.md`，所以这个 skill 本身就处在它所宣讲的同一道结构闸之下——把
+frontmatter 写对它就过。`claude plugin validate .` 校验的是*分发的*插件（manifest +
+`skills/` + command）；它**看不到** `.claude/skills/`（那些不属于 ship 出去的插件），这正是
+为什么 content 套件要覆盖它们。
 
-### Frontmatter YAML quoting (Finding #1, blood-and-tears)
+### Frontmatter YAML 引号（Finding #1，血泪）
 
-A `description` containing a `:` or `"` **must be quoted**, or the YAML parser
-mis-reads it and `plugin validate` / the content test fail in non-obvious ways.
-Wrap the whole value in single quotes (as this skill's own frontmatter does).
-This is the single most common skill-authoring footgun in this repo — see
-AGENTS.md §6. When in doubt, quote.
+一个含 `:` 或 `"` 的 `description` **必须加引号**，否则 YAML parser 会误读它，
+`plugin validate` / content 测试以非显然的方式失败。整个值用单引号包起来（像本 skill 自己
+的 frontmatter 那样）。这是本仓最常见的 skill-authoring footgun——见 AGENTS.md §6。拿不准
+就加引号。
+
+---
+
+## 写 body 前先跑 craft 两轴诊断（强制前置）
+
+压力 baseline 回答的是「这条纪律规则有没有被堵住」；它**不**回答「这整个
+skill 的 body 该长什么形状」。这两件事正交：你可以把每条规则都堵得密不透
+风，却把一个本该是**心智模型**的 skill 写成一串编号步骤——形状错配，规则再
+严也教错了 substrate。
+
+所以：**写 body 的第一行之前，先对这个 skill 跑一遍 craft 两轴诊断**，定下它
+是哪一种 craft，再按那种 craft 的形状落笔。两轴各 5 题、每题 yes +1、≥3=strong，
+组合成 4 象限：
+
+| | cognitive 弱 | cognitive 强 |
+|---|---|---|
+| **process 强** | **Craft A** 机械配方（编号步骤） | **Craft C** 纪律级（命名锚 + 流程 + 硬规则 backstop） |
+| **process 弱** | **(弱,弱) 反模式 → 拒绝建** | **Craft B** 心智模型（命名锚为主） |
+
+完整的两轴 10 题（每题带 yes-trigger 例子）+ 4 象限决策表在
+[`references/craft-axis-diagnosis.md`](references/craft-axis-diagnosis.md)。诊断
+定下 craft 之后，body 只装四类内容（触发 / 命名锚 / 流程骨架 / 硬约束），4 层
+写作分配 + progressive-disclosure 阈值在
+[`references/body-content-types.md`](references/body-content-types.md)。
+
+**craft 诊断必做，不是可选的开场白。** 跳过诊断默认会落进「Step 1 做 X、Step 2
+做 Y」的编号清单形状——那是模型见得最多的写法，它只贴合两轴里的一个极端
+（process 强 / cognitive 弱）。住在网格别处的 skill 一旦这么写，要等到 baseline
+跑出形状不对才发现，那时已经是整篇重写。诊断本身就是预防。
+
+### craft 诊断的 Rationalization Table
+
+| 借口 | 现实 |
+|------|------|
+| 「我一看就知道这是纪律级，不用跑两轴。」 | 「一看就知道」正是默认落进编号清单的那条路。10 题花两分钟，重写花两小时。 |
+| 「先按编号步骤写出来，形状不对再调。」 | 形状是 substrate，不是排版。写成编号清单再改成心智模型 = 整篇重写，不是局部调。 |
+| 「(弱,弱) 也写出来看看，万一有用呢。」 | 弱弱象限既不给步骤也不给心智模型，是占位 prose。它一旦发布就永久和更密的 sibling 抢注意力。拒绝建 / 折进别的 skill / 重审 scope。 |
+| 「诊断和压力 baseline 是一回事，跑了一个就够。」 | 不是。baseline 测「规则有没有被堵」（定性堵漏），诊断测「body 形状对不对」（craft 选型）。互补，不替代。 |
+
+> **违背字面就是违背精神。** 「我跑了压力 baseline，相当于诊断过了」——没有。
+> 你堵了规则的漏，没定 body 的形。当你开始论证「*这个* skill 太明显不用诊断」，
+> 那套论证本身就是症状：最明显的 skill 恰是最容易被默认写成编号清单的那个。
 
 ---
 
 ## Pointers
 
-- **`references/pressure-testing.md`** — the full recipe: three-pressure scenario
-  template, the fixed real-scenario prompt scaffold, capturing rationalizations
-  verbatim, meta-testing when GREEN won't hold, and back-filling the
-  Rationalization Table / Red Flags of the target skill.
-- **`superpowers:test-driven-development`** — the RED-GREEN-REFACTOR cycle and the
-  Iron Law this skill is modeled on. REQUIRED background.
-- **`superpowers:writing-skills`** — the general (non-cc-master) skill-authoring
-  discipline, the TDD↔skill mapping table, and the subagent testing methodology.
-- **`skill-creator`** — the official Anthropic skill for scaffolding a skill,
-  optimizing a `description`, and running evals. Use it to *create the files and
-  run Track A/B*; use **this** skill to know *when you are allowed to write the
-  discipline prose at all* (the pressure-baseline gate).
-- **`design_docs/eval/README.md`** + **`design_docs/eval/track-b-benchmark.md`** —
-  the quantitative half (Track A trigger accuracy, Track B behavioral benchmark).
-- **`AGENTS.md` §6** — skill creation/maintenance discipline at the repo level
-  (two-skills non-overlap, the YAML-quoting anti-pattern, content-contract pointer).
+- **`references/craft-axis-diagnosis.md`** — 写 body 前的 craft 两轴诊断：
+  process-control 轴 5 题 + cognitive-override 轴 5 题（每题带 yes-trigger 例子）
+  + 4 象限决策表（强强→Craft C / 强弱→Craft A / 弱强→Craft B / 弱弱→拒绝建）。
+- **`references/body-content-types.md`** — body 只装的 4 类内容（触发 / 命名锚 /
+  流程骨架 / 硬约束）+ 4 层写作分配表（SKILL.md / references / scripts /
+  templates 各装什么）+ progressive-disclosure 阈值（≤500 行 / ≥100 行拆
+  reference / 一层深 / no orphan）。
+- **`references/pressure-testing.md`** — 完整配方：三压场景模板、固定的 real-scenario
+  prompt 脚手架、逐字捕获合理化、GREEN 守不住时的 meta-testing、以及回填目标 skill 的
+  Rationalization Table / Red Flags。
+- **`superpowers:test-driven-development`** — 本 skill 所仿照的 RED-GREEN-REFACTOR 循环和
+  铁律。REQUIRED background。
+- **`superpowers:writing-skills`** — 通用的（非 cc-master）skill-authoring 纪律、TDD↔skill
+  映射表、subagent 测试方法论。
+- **`skill-creator`** — Anthropic 官方的 skill，用来 scaffold 一个 skill、优化 `description`、
+  跑 eval。用它来*创建文件并跑 Track A/B*；用**本** skill 来知道*你究竟在什么时候才被允许写
+  纪律 prose*（压力 baseline 闸）。
+- **`design_docs/eval/README.md`** + **`design_docs/eval/track-b-benchmark.md`** — 定量的那一半
+  （Track A 触发准确率、Track B 行为 benchmark）。
+- **`AGENTS.md` §6** — 仓库层面的 skill 创作/维护纪律（两 skill 不重叠、YAML 引号反模式、
+  content-contract 指针）。
 
 ---
 
-## Red Flags — STOP, you skipped the baseline
+## Red Flags — STOP，你跳过了 baseline
 
-- About to write a discipline rule and you have **no captured failure** for it.
-- "I'll baseline it later / after I draft the prose."
-- "I already know what agents would rationalize."
-- Adding a Rationalization Table row you **invented** rather than transcribed.
-- Editing a discipline section's wording without re-running the scenario.
-- "It's just a small wording change, the Iron Law doesn't really apply here."
-- Treating a green Track-A eval as proof the *body* works (it only tests the trigger).
+- 正打算写一条纪律规则，而你**没有为它捕获到任何失败**。
+- 「我晚点再 baseline / 等草稿写完再说。」
+- 「我已经知道 agent 会怎么合理化。」
+- 加一行你**编出来**而不是抄录下来的 Rationalization Table。
+- 改一段纪律段落的措辞却不重跑场景。
+- 「这只是一个小措辞改动，铁律在这里不太适用。」
+- 把一个绿的 Track-A eval 当成 *body* 有效的证明（它只测触发器）。
+- 准备写 body 第一行了，却没先跑 craft 两轴诊断（默认就会写成编号清单）。
+- 「这个 skill 太明显，跳过诊断 / 跳过 baseline」——最明显的恰是最容易写错形状的。
+- 诊断落进 (弱,弱) 象限了，却还想「先写出来看看」——弱弱象限是拒绝建，不是写出来。
 
-**All of these mean: stop. Run the pressure baseline through a subagent first.
-Then write.**
+**所有这些都意味着：停。先把压力 baseline 跑过一个 subagent。再写。** craft 诊断同理——
+写 body 前先跑两轴，定下形状再落笔。
