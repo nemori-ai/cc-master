@@ -12,6 +12,14 @@ in your environment, so please read this before reporting.
   `jq`/`python`/extra installs; see ADR-006) — and read your project directory +
   write to the cc-master home (`$CC_MASTER_HOME`, else
   `<project>/.claude/cc-master/`).
+- **The `Stop` pacing hook reads Claude's local usage JSONL.** One hook
+  (`usage-pacing.js`), and only once a session is armed, reads this machine's
+  Claude usage/transcript JSONL to compute 5h/7d burn-rate pacing. By default
+  this is `~/.claude/projects/**/*.jsonl` (overridable via `CC_MASTER_USAGE_DIR`)
+  — which is **outside your project directory and the cc-master home**. The read
+  is **read-only**: the hook never writes to those files and never transmits
+  their contents off your machine. If you run in a sensitive environment, point
+  `CC_MASTER_USAGE_DIR` at a fixture or empty directory to opt out.
 - **Hooks stay dormant until you explicitly arm a session.** Every hook except
   `bootstrap-board.sh` is gated **dormant-until-armed** (a non-negotiable red
   line; see ADR-007): until you run `/cc-master:as-master-orchestrator` in *that*
