@@ -11,7 +11,28 @@
 
 ## 1. 目标
 
-一个 Claude Code plugin，用一条 slash command 把任意 main-session agent 一键初始化成 **master orchestrator**，服务 long-horizon（通常 >24h）任务。两大能力：
+一个 Claude Code plugin，用一条 slash command 把任意 main-session agent 一键初始化成 **master orchestrator**，服务 long-horizon（通常 >24h）任务。
+
+### 1.0 产品愿景 / 北极星（charter —— 本仓单一真相源）
+
+> **本节是 cc-master 产品愿景的单一真相源（SSOT）。** README / AGENTS.md 里的愿景表述都是本节的紧凑摘要 + 回指，不另起一份。**这是北极星，不是验收单**——下列六条是 cc-master **致力于让 agent 具备**的能力目标（aspirational charter），用以持续指导迭代方向；其中哪些已落地、哪些仍是 design-only，由「愿景 vs 现状」gap 审计单独度量，**别把目标当既成事实**。
+
+cc-master 给 Claude Code agent 提供一套 plugin，**旨在让它能够化身为一个 master orchestrator**，致力于具备以下六项能力：
+
+1. **异步并行多线程推进、实现目标完整落地**——把目标拆成依赖图、并行派发后台工作，全程异步地把每条路径推到目标真正完整落地，而非半途。
+2. **控制资源（token 用量）消耗的速度**——懂得按配额窗口（如 5h / 7d）感知并调控 token 的燃烧速率，不盲目顶满。
+3. **把握好自主决策与寻求人类用户接入的边界**——懂得哪些该自己拍板、哪些必须 surface 给人类用户拍板（难撤销 / 对外可见 / 方向抉择 / 终审），在自主与 HITL 之间守住边界。
+4. **目标的分解、管理、更新、规划**——懂得把目标拆解成可执行单元、持续管理与更新这张计划、在过程中重规划。
+5. **在资源消耗速度合理的前提下最大化实施效率的调度编排**——懂得在 token 燃烧速率可控的约束下，把并行与调度编排到实施效率最大化。
+6. **根据复杂性 / 难度 / 所需时长选择合适的模型**——懂得按一件事的复杂度、难度、预计执行时长，为每个节点选用恰当档位的模型。
+
+> 这六条是**目标**；今天的实现可能只部分兑现其中几条。愿景文档记录方向，审计度量差距——切勿据本节声称「cc-master 已做到全部六条」。
+>
+> **gap 审计 SSOT → [`design_docs/vision-landing-tracker.md`](vision-landing-tracker.md)**：六条愿景在当前实现里的落地真实性（🟢真落地/🟡半落地/🔴design-only/⚫缺失）+ adversarial 断点 + 真 gap vs 设计意图，持续追踪。本节说目标，那份量差距。
+
+### 1.1 两大能力（落地视角）
+
+落到当前实现，charter 主要由两大能力承载：
 
 1. **会写**：按目标选对范式、写出真正稳定 / 高效 / 高并行的 dynamic-workflow 脚本。
 2. **会推进**：long-horizon 里综合用 **background shell + sub-agent + workflow** 三种后台手段 + 前台 HITL，分派后台任务后用等待空档**主观能动**地做事而非空转，全程异步——并熬过反复的 context compaction 与跨会话。

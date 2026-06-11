@@ -14,6 +14,21 @@ That one command bootstraps a persistent board and makes the session the orchest
 
 ---
 
+## The vision (north star)
+
+cc-master **aims to** make a Claude Code agent into a master orchestrator that can:
+
+1. **Drive a goal to full completion** across asynchronous, parallel, multi-threaded work — not halfway, all the way.
+2. **Control the *rate* of resource (token) burn** — sensing the quota window (e.g. 5h / 7d) and throttling rather than redlining.
+3. **Hold the line between deciding autonomously and pulling in the human** — knowing what to settle itself vs. what must be surfaced to the user (irreversible / outward-facing / direction-setting / final sign-off).
+4. **Decompose, manage, update, and re-plan the goal** as it learns.
+5. **Maximize execution throughput *under* a sane burn rate** — scheduling and orchestrating parallelism for efficiency without exceeding the budget.
+6. **Pick the right model for the job** — by complexity, difficulty, and expected duration.
+
+These are **goals that guide the design, not a claim that all six already ship.** Which capabilities are live today vs. still design-only is tracked separately. The full charter is the single source of truth in [`design_docs/spec.md` §1.0](design_docs/spec.md).
+
+---
+
 ## The painful gap it fills
 
 Dynamic workflows (shipped with Opus 4.8) gave Claude Code real parallelism — fan out hundreds of agents from one script. But for a *long-horizon* goal, two gaps remain:
