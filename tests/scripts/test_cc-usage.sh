@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Out-of-band cc-usage.sh correctness: deterministic fixture + fixed --now → exact 5h numbers.
+# Out-of-band cc-usage.sh correctness: deterministic fixture + fixed --now → exact numbers.
+# Finding #37: cc-usage.sh now PREFERS the account-authoritative rate_limits captured into a sidecar
+# (status-line is the only programmatic source of 5h/7d used_percentage + resets_at). When the sidecar
+# is fresh it emits source:"account" with the AUTHORITATIVE used_percentage + reset-derived window; when
+# it is missing/stale it falls back to the local-JSONL 反推 and HONESTLY labels source:"local-derived-approx".
 . "$(dirname "$0")/../hooks/helpers.sh"
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -7,52 +11,59 @@ FIX="$(cd "$(dirname "$0")/fixtures" && pwd)"
 # Each fixture lives in its OWN subdir — cc-usage.sh globs **/*.jsonl recursively, so a shared
 # dir would let one fixture's rows leak into another's window.
 SAMPLE="$FIX/sample"; ROLL="$FIX/rolling"
+# Local-反推 cases must NOT accidentally read a real ~/.claude sidecar — pin the cache to a path that
+# does not exist so they deterministically take the fallback branch.
+NOCACHE="/nonexistent-cc-master-rate-cache-xyz"
+jval() { python3 -c 'import sys,json;d=json.load(sys.stdin)
+for k in sys.argv[1].split("."): d=d[k]
+print(d)' "$1"; }
 
-# --- active window: now=12:00Z, latest msg 11:00Z is <5h ago → block is live ---
-OUT="$(bash "$ROOT/scripts/cc-usage.sh" --dir "$SAMPLE" --now "2026-06-10T12:00:00Z")"
+# ── FALLBACK: no sidecar → local-derived-approx, original schema intact ──────────────────────────────
+# active window: now=12:00Z, latest msg 11:00Z is <5h ago → block is live.
+OUT="$(CC_MASTER_RATE_CACHE="$NOCACHE" bash "$ROOT/skills/orchestrating-to-completion/scripts/cc-usage.sh" --dir "$SAMPLE" --now "2026-06-10T12:00:00Z")"
+assert_eq local-derived-approx "$(printf '%s' "$OUT" | jval source)" "no sidecar → source=local-derived-approx (honest label)"
+# m1=1350; m2 rewritten twice → dedup keeps MAX usage per id = 2050, total = 3400 (first-seen → 1400).
+assert_eq 3400 "$(printf '%s' "$OUT" | jval five_hour.used_tokens)" "5h used_tokens (dedup keeps largest usage per id + sums all kinds)"
+# window starts at block's first msg 10:00Z; remaining = (10:00+5h) - 12:00 = 180 min
+assert_eq 180  "$(printf '%s' "$OUT" | jval five_hour.window_remaining_min)" "5h window_remaining_min (now=12:00Z)"
+assert_eq 3400 "$(printf '%s' "$OUT" | jval seven_day.used_tokens)" "7d used_tokens"
 
-used="$(printf '%s' "$OUT" | python3 -c 'import sys,json;print(json.load(sys.stdin)["five_hour"]["used_tokens"])')"
-rem="$(printf '%s'  "$OUT" | python3 -c 'import sys,json;print(json.load(sys.stdin)["five_hour"]["window_remaining_min"])')"
-wk="$(printf '%s'   "$OUT" | python3 -c 'import sys,json;print(json.load(sys.stdin)["seven_day"]["used_tokens"])')"
+# stale window (Finding #27): now=20:00Z, block 10:00Z+5h=15:00Z < now → closed → clean zero, never negative.
+STALE="$(CC_MASTER_RATE_CACHE="$NOCACHE" bash "$ROOT/skills/orchestrating-to-completion/scripts/cc-usage.sh" --dir "$SAMPLE" --now "2026-06-10T20:00:00Z")"
+assert_eq 0    "$(printf '%s' "$STALE" | jval five_hour.used_tokens)" "5h used_tokens zero once window closed (no stale carryover)"
+assert_eq 0    "$(printf '%s' "$STALE" | jval five_hour.window_remaining_min)" "5h window_remaining_min zero once closed (never negative)"
+assert_eq 3400 "$(printf '%s' "$STALE" | jval seven_day.used_tokens)" "7d used_tokens still counts closed-5h msgs within 7d"
 
-# m1=1350; m2 is rewritten twice (partial cr=0 → 50, then full cr=2000 → 2050) → dedup keeps
-# the MAX usage per id = 2050, so total = 3400 (first-seen would wrongly keep 50 → 1400).
-assert_eq 3400 "$used" "5h used_tokens (dedup keeps largest usage per id + sums all kinds)"
-# window starts at the block's first msg 10:00Z; remaining = (10:00+5h) - 12:00 = 180 min
-assert_eq 180  "$rem"  "5h window_remaining_min (now=12:00Z)"
-# both messages are within 7d of 2026-06-10T12:00:00Z
-assert_eq 3400 "$wk"   "7d used_tokens"
+# continuous use across 5h boundary (Finding #27 r2): new block opens at 15:01Z; at 15:02 active=300, rem=299.
+ROLLOUT="$(CC_MASTER_RATE_CACHE="$NOCACHE" bash "$ROOT/skills/orchestrating-to-completion/scripts/cc-usage.sh" --dir "$ROLL" --now "2026-06-10T15:02:00Z")"
+assert_eq 300 "$(printf '%s' "$ROLLOUT" | jval five_hour.used_tokens)" "5h used = current rolling block only (new block at 5h boundary)"
+assert_eq 299 "$(printf '%s' "$ROLLOUT" | jval five_hour.window_remaining_min)" "5h window_remaining tracks the NEW block start"
 
-# --- stale window (codex Finding #27): now=20:00Z, block start 10:00Z + 5h = 15:00Z < now →
-#     the window already closed. Must report a clean zero — never stale used_tokens, and never
-#     a NEGATIVE window_remaining_min. ---
-STALE="$(bash "$ROOT/scripts/cc-usage.sh" --dir "$SAMPLE" --now "2026-06-10T20:00:00Z")"
-s_used="$(printf '%s' "$STALE" | python3 -c 'import sys,json;print(json.load(sys.stdin)["five_hour"]["used_tokens"])')"
-s_rem="$(printf '%s'  "$STALE" | python3 -c 'import sys,json;print(json.load(sys.stdin)["five_hour"]["window_remaining_min"])')"
-s_wk="$(printf '%s'   "$STALE" | python3 -c 'import sys,json;print(json.load(sys.stdin)["seven_day"]["used_tokens"])')"
-assert_eq 0    "$s_used" "5h used_tokens is zero once the window has closed (no stale carryover)"
-assert_eq 0    "$s_rem"  "5h window_remaining_min is zero once closed (never negative)"
-# 7d window is independent of the 5h block: both msgs are still within 7d of 20:00Z
-assert_eq 3400 "$s_wk"   "7d used_tokens still counts closed-5h-window msgs within 7d"
+# --now filters future rows (Finding #27 r4): now=11:00Z before 14:59/15:01 msgs → only r1 (100) counts.
+FUTURE="$(CC_MASTER_RATE_CACHE="$NOCACHE" bash "$ROOT/skills/orchestrating-to-completion/scripts/cc-usage.sh" --dir "$ROLL" --now "2026-06-10T11:00:00Z")"
+assert_eq 100 "$(printf '%s' "$FUTURE" | jval five_hour.used_tokens)" "rows newer than --now excluded (no future usage counted)"
+assert_eq 240 "$(printf '%s' "$FUTURE" | jval five_hour.window_remaining_min)" "window_remaining tracks the only <=now block (10:00)"
 
-# --- continuous use across the 5h boundary (codex Finding #27 round-2): msgs 10:00 / 14:59 /
-#     15:01 with NO >5h gap. 15:01 is 5h01m after the block's first msg → it opens a NEW block.
-#     At 15:02 the active window is that new block (r3=300) — NOT a stale zero, NOT the whole 600.
-#     Guards against sustained-usage-past-5h wrongly reporting an empty window. ---
-ROLLOUT="$(bash "$ROOT/scripts/cc-usage.sh" --dir "$ROLL" --now "2026-06-10T15:02:00Z")"
-r_used="$(printf '%s' "$ROLLOUT" | python3 -c 'import sys,json;print(json.load(sys.stdin)["five_hour"]["used_tokens"])')"
-r_rem="$(printf '%s'  "$ROLLOUT" | python3 -c 'import sys,json;print(json.load(sys.stdin)["five_hour"]["window_remaining_min"])')"
-assert_eq 300 "$r_used" "5h used = current rolling block only (new block opens at the 5h boundary even under continuous use)"
-# new block starts 15:01Z; remaining = (15:01+5h) - 15:02 = 299 min
-assert_eq 299 "$r_rem"  "5h window_remaining_min tracks the NEW block start, not the old one"
+# ── ACCOUNT: fresh sidecar (five_hour.resets_at>now) → source:account + authoritative %/reset ────────
+NOWEP="$(python3 -c 'import datetime as d;print(int(d.datetime(2026,6,10,12,0,0,tzinfo=d.timezone.utc).timestamp()))')"
+ACC_DIR="$(make_project)"; ACACHE="$ACC_DIR/rate.json"
+R5=$((NOWEP+180*60)); R7=$((NOWEP+2*86400))   # 5h resets in 180min, 7d resets in 2d
+printf '{"captured_at":%d,"five_hour":{"used_percentage":59,"resets_at":%d},"seven_day":{"used_percentage":86,"resets_at":%d}}' "$NOWEP" "$R5" "$R7" > "$ACACHE"
+AOUT="$(CC_MASTER_RATE_CACHE="$ACACHE" bash "$ROOT/skills/orchestrating-to-completion/scripts/cc-usage.sh" --dir "$SAMPLE" --now "2026-06-10T12:00:00Z")"
+assert_eq account "$(printf '%s' "$AOUT" | jval source)" "fresh sidecar → source=account"
+assert_eq 59  "$(printf '%s' "$AOUT" | jval five_hour.used_percentage)"     "account: 5h used_percentage from sidecar (authoritative)"
+assert_eq 180 "$(printf '%s' "$AOUT" | jval five_hour.window_remaining_min)" "account: 5h window_remaining from authoritative resets_at (not反推)"
+assert_eq 86  "$(printf '%s' "$AOUT" | jval seven_day.used_percentage)"      "account: 7d used_percentage from sidecar"
+assert_eq 3400 "$(printf '%s' "$AOUT" | jval five_hour.used_tokens)"         "account: still carries local used_tokens (burn context)"
+rm -rf "$ACC_DIR"
 
-# --- --now filters future rows (codex Finding #27 round-4 [P3]): same rolling fixture but
-#     now=11:00Z, BEFORE the 14:59 / 15:01 msgs. Those future rows must NOT count — only r1
-#     (10:00, 100 tok) is <= now → used=100, remaining=(10:00+5h)-11:00=240. ---
-FUTURE="$(bash "$ROOT/scripts/cc-usage.sh" --dir "$ROLL" --now "2026-06-10T11:00:00Z")"
-f_used="$(printf '%s' "$FUTURE" | python3 -c 'import sys,json;print(json.load(sys.stdin)["five_hour"]["used_tokens"])')"
-f_rem="$(printf '%s'  "$FUTURE" | python3 -c 'import sys,json;print(json.load(sys.stdin)["five_hour"]["window_remaining_min"])')"
-assert_eq 100 "$f_used" "rows newer than --now are excluded (no future usage counted)"
-assert_eq 240 "$f_rem"  "window_remaining tracks the only <=now block (10:00), not a future one"
+# ── STALE sidecar (five_hour.resets_at<=now → window already rolled) → fallback, honest label ────────
+ACC_DIR="$(make_project)"; SCACHE="$ACC_DIR/rate.json"
+RPAST=$((NOWEP-60))
+printf '{"captured_at":%d,"five_hour":{"used_percentage":59,"resets_at":%d}}' "$NOWEP" "$RPAST" > "$SCACHE"
+SOUT="$(CC_MASTER_RATE_CACHE="$SCACHE" bash "$ROOT/skills/orchestrating-to-completion/scripts/cc-usage.sh" --dir "$SAMPLE" --now "2026-06-10T12:00:00Z")"
+assert_eq local-derived-approx "$(printf '%s' "$SOUT" | jval source)" "stale sidecar (resets_at in past) → fallback source"
+assert_eq 3400 "$(printf '%s' "$SOUT" | jval five_hour.used_tokens)" "stale sidecar → local used_tokens still emitted"
+rm -rf "$ACC_DIR"
 
 finish

@@ -52,6 +52,12 @@ const HOME_DIR =
 const NOW_OVERRIDE = process.env.CC_MASTER_NOW || '';
 const BUDGET_RAW = process.env.CC_MASTER_5H_BUDGET || '';
 const BURN_FLOOR_RAW = process.env.CC_MASTER_5H_BURN_FLOOR || '';
+// account-authoritative pacing (Finding #37): 优先信 status-line 捕获的账户权威 5h/7d used_percentage
+//   (落在 sidecar);只有 sidecar 缺/坏时才降级本地反推。PCT_FLOOR:某窗口 used% 到此即临界(默认 85)。
+const RATE_CACHE =
+  process.env.CC_MASTER_RATE_CACHE ||
+  path.join(process.env.HOME || '', '.claude', '.cc-master-rate-limits.json');
+const PCT_FLOOR_RAW = process.env.CC_MASTER_PCT_FLOOR || '';
 
 // 「明显临界」启发式阈值（ceiling 未知时的保守降级，避免刷屏）：仅当**两条同时成立**才出声 ——
 //   (a) 5h 窗口剩余时间 ≤ HEUR_REMAIN_MIN（墙在不远处）；
@@ -208,6 +214,48 @@ function decideWarning(fh) {
   return formatWarning({ used, burn, remain, budget: null, projected: null, pctNow: null });
 }
 
+// ── ACCOUNT-AUTHORITATIVE pacing (Finding #37) ──────────────────────────────────────────────────────
+// 账户权威 5h/7d used_percentage(+resets_at)只在 status-line stdin 出现(官方核实:hook/JSONL/CLI 全无),由
+// statusline-capture.js 落到 sidecar。撞墙判据优先用它——账户 % 是权威,不像本地反推 window_remaining_min
+// 会失真到数量级(Finding #37);并第一次把 7d 纳入(此前 hook 只看 5h、对 7d 全盲,Finding #31)。
+function readRateCache(p) {
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (_e) {
+    return null; // 缺/坏 sidecar → 账户口径不可用 → 调用方降级本地反推
+  }
+}
+function pctOf(w) {
+  return w && typeof w.used_percentage === 'number' ? w.used_percentage : null;
+}
+function parsePctFloor(raw) {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 85; // 默认 85%:账户某窗口用量到 85% 即临界
+}
+// 返回 {valid, warn}:valid=false ⟺ 账户口径不可用(缺/坏/空)→ 调用方 fallback 本地反推;
+// valid=true 时 warn 是文案(到墙)或 null(账户有效但未到墙 → 权威静默,不再反推)。
+function decideAccountWarning(acct, nowSec, floor) {
+  if (!acct || typeof acct !== 'object') return { valid: false, warn: null };
+  const p5 = pctOf(acct.five_hour);
+  const p7 = pctOf(acct.seven_day);
+  if (p5 === null && p7 === null) return { valid: false, warn: null }; // 空/无效 → fallback
+  const f = acct.five_hour;
+  // 5h 仅在窗口仍有效(resets_at 在未来,或无 resets_at)时参与判墙;已过 reset 的 stale 5h 不参与,
+  // 但 7d 不依赖 5h 的 resets_at,仍权威。
+  const fhValid = p5 !== null && (typeof f.resets_at !== 'number' || f.resets_at > nowSec);
+  const hits = [];
+  if (fhValid && p5 >= floor) hits.push(`5h ${p5}%`);
+  if (p7 !== null && p7 >= floor) hits.push(`7d ${p7}%`);
+  if (!hits.length) return { valid: true, warn: null }; // 账户有效但未到墙 → 权威静默
+  const warn =
+    `[cc-master pacing] 账户配额临界(权威口径,来自 status-line 捕获):` +
+    hits.join(' / ') +
+    ` 已达/超过 ${floor}% 阈值。pace 杠杆(怎么 pace 是你的认知判断,见 orchestrating-to-completion / ` +
+    `cost-and-pacing):① 把后续节点降到更便宜的模型档;② 降并发 WIP、暂缓新派工;③ defer 高 float 的非临界` +
+    `任务到窗口 reset 后。这是非阻断提示,不替你决策。`;
+  return { valid: true, warn };
+}
+
 function parseBudget(raw) {
   if (!raw) return null;
   const n = Number(raw);
@@ -307,8 +355,19 @@ function main() {
   const nowMs = NOW_OVERRIDE ? parseIso(NOW_OVERRIDE) : Date.now();
   if (nowMs === null) return; // --now 非法 → 静默（不猜）
 
-  const fh = computeFiveHour(USAGE_DIR, nowMs);
-  const warning = decideWarning(fh);
+  // account-authoritative override (Finding #37): 优先用 status-line 捕获的账户权威 5h/7d used_percentage
+  // 判墙(脱钩会失真到数量级的本地反推 window_remaining_min),并纳入 7d。账户口径权威——可用就以它为准(到墙
+  // 警告/没到就静默),只有 sidecar 缺/坏时才降级本地反推(approx)。
+  const floor = parsePctFloor(PCT_FLOOR_RAW);
+  const acct = readRateCache(RATE_CACHE);
+  const a = decideAccountWarning(acct, Math.floor(nowMs / 1000), floor);
+  let warning;
+  if (a.valid) {
+    warning = a.warn; // 账户口径权威:有就警告,没有就静默(不再 fallback 反推)
+  } else {
+    const fh = computeFiveHour(USAGE_DIR, nowMs); // 账户不可用 → 本地反推 fallback(approx)
+    warning = decideWarning(fh);
+  }
   if (!warning) return; // 余量充足 / 无数据 / 降级判定不临界 → 静默 exit 0
 
   // 非阻断注入：仅 additionalContext，hookEventName "Stop"。绝不 decision:block。
