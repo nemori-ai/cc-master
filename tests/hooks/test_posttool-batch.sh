@@ -136,4 +136,30 @@ assert_contains "$HOOK_OUT" "additionalContext" "per-board over-cap → injects 
 assert_not_contains "$HOOK_OUT" "\"decision\":\"block\"" "per-board over-cap → NEVER a block decision"
 rm -rf "$H"
 
+# ── 武装闸：active/session_id 只从 board 根的 owner 子对象读（CODEX7，破红线 6 修复回归用例）─────────
+# 旧版 board_matches 用全文 grep 判 arming：`"active":true` 与 session_id 都从整个文件读。一块归档板
+# （owner.active:false）若其某个 flexible 的 tasks[] / log[] 载荷里恰好出现 `"active":true`，全文 grep
+# 命中 → 第一关误过；head -1 取到的第一个 session_id 仍是 owner.session_id，若它 == 当前 sid，则该归档板
+# 被误判为 armed —— /stop 归档后 hook 仍激活。下面两例锁死「只从 owner 子对象读」。
+
+# Case 13 (CODEX7 回归)：归档板 owner.active:false、owner.session_id == 本 session sid，但 log[] 的某个
+#           flexible 嵌套对象里塞了 "active":true 和混淆用的 "session_id":"other"。owner 子对象本身是
+#           active:false → 必须休眠（空 stdout、rc 0、不警告）。修前全文 grep 命中 → 误判 armed → 误警告。
+H="$(make_project)"; SID="sess-archived-falsearm"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"wip_limit\":1,\"owner\":{\"active\":false,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}],\"log\":[{\"id\":\"L1\",\"snapshot\":{\"active\":true,\"session_id\":\"other\"}}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "归档板含嵌套 active:true → rc 0"
+assert_eq "" "$HOOK_OUT" "归档板（owner.active:false）+ 嵌套 active:true → 休眠（owner 子对象才算数）"
+rm -rf "$H"
+
+# Case 14 (反向保活)：真 active 板（owner.active:true、owner.session_id == sid）即便某 task 嵌套
+#           "active":false，仍照常 armed —— in_flight=2 > wip_limit=1 → 该警告。防过度修复。
+H="$(make_project)"; SID="sess-real-active"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"wip_limit\":1,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[],\"meta\":{\"active\":false}},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "真 active 板含嵌套 active:false → rc 0"
+assert_contains "$HOOK_OUT" "WIP" "真 active 板（owner.active:true）照常 armed → 超 cap 警告"
+assert_contains "$HOOK_OUT" "additionalContext" "真 active 板 → 注入 additionalContext"
+rm -rf "$H"
+
 finish

@@ -21,15 +21,82 @@ sid="$(printf '%s' "$input" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"
 
 HOME_DIR="${CC_MASTER_HOME:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/cc-master}"
 
+# owner_region BOARD — print the ROOT "owner" object's DEPTH-1 FIELD STREAM only, via a string- and
+# escape-aware depth scan ([ ] and { }) in POSIX awk. The board is one root object; this enters ONLY the
+# `"owner"` key found at ROOT depth (curly depth 1, bracket depth 0) and emits the chars at the owner
+# object's own field level (active / session_id / heartbeat) — every value nested DEEPER inside owner, or
+# anywhere else in the file (tasks[], log[], deps[]), is dropped wholesale. FORMAT-AGNOSTIC: single-line
+# and multi-line JSON behave identically. Used so the arming gate reads `active` / `session_id` ONLY from
+# the board-root owner sub-object — an `"active":true` or a `session_id` buried in an agent-shaped
+# task/log payload of an ARCHIVED board can never masquerade as owner's and false-arm the hook (CODEX7).
+# Only a ROOT-depth `"owner"` key is honored (goal prose or a task with its own `"owner"` field can never
+# be captured — same root-only caveat as the tasks-region scan). Same string/escape rules as dangling_nodes.
+owner_region() {
+  awk '
+    { s = s $0 "\n" }
+    END {
+      n = length(s)
+      cd = 0; bd = 0; instr = 0; esc = 0
+      capkey = 0; key = ""; pendKey = ""        # pendKey: last completed ROOT-depth key string
+      inowner = 0; od = 0; out = ""
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        if (inowner) {                          # already inside the root owner object (opened at depth od)
+          if (instr) {
+            if (cd == od + 1 && bd == 0) out = out ch
+            if (esc) esc = 0
+            else if (ch == "\\") esc = 1
+            else if (ch == "\"") instr = 0
+            continue
+          }
+          if (ch == "\"") { instr = 1; if (cd == od + 1 && bd == 0) out = out ch; continue }
+          if (ch == "[") { bd++; continue }
+          if (ch == "]") { if (bd > 0) bd--; continue }
+          if (ch == "{") { cd++; continue }
+          if (ch == "}") { cd--; if (cd == od) { inowner = 0; break } continue }   # owner closed → done
+          if (cd == od + 1 && bd == 0) out = out ch
+          continue
+        }
+        if (instr) {                            # in a string while still scanning for root "owner":{
+          if (esc) { esc = 0; if (capkey) key = key ch; continue }
+          if (ch == "\\") { esc = 1; if (capkey) key = key ch; continue }
+          if (ch == "\"") { instr = 0; if (capkey) { capkey = 0; pendKey = key } continue }
+          if (capkey) key = key ch
+          continue
+        }
+        if (ch == "\"") {                        # a string starting at ROOT depth is a candidate key
+          instr = 1
+          if (cd == 1 && bd == 0) { capkey = 1; key = "" } else capkey = 0
+          continue
+        }
+        if (ch == "[") { bd++; pendKey = ""; continue }
+        if (ch == "]") { if (bd > 0) bd--; continue }
+        if (ch == "{") {
+          cd++
+          if (cd == 2 && bd == 0 && pendKey == "owner") { inowner = 1; od = 1 }   # entered root owner{}
+          pendKey = ""
+          continue
+        }
+        if (ch == "}") { if (cd > 0) cd--; pendKey = ""; continue }
+        if (ch == ",") pendKey = ""
+      }
+      printf "%s", out
+    }' "$1" 2>/dev/null
+}
+
 # ── board matching (the arming gate; mirrors verify-board.sh) ───────────────────────────────────────
 # A board is "mine" when active AND (sid empty → degraded: any active board; else owner.session_id==sid).
+# active AND session_id are read ONLY from the ROOT owner sub-object (owner_region above) — NEVER full-text
+# grep: a flexible tasks[]/log[] payload of an ARCHIVED board carrying `"active":true` must never false-arm
+# the hook (CODEX7, red line 6).
 board_matches() { # $1 = board path
-  grep -qE '"active"[[:space:]]*:[[:space:]]*true' "$1" 2>/dev/null || return 1
+  owner="$(owner_region "$1")"
+  printf '%s' "$owner" | grep -qE '"active"[[:space:]]*:[[:space:]]*true' || return 1
   [ -z "$sid" ] && return 0
   # owner.session_id must equal $sid EXACTLY. Never splice $sid into a grep -E pattern: a session id
-  # carrying regex metachars (., *, [, etc.) would otherwise match the wrong board. Extract the board's
+  # carrying regex metachars (., *, [, etc.) would otherwise match the wrong board. Extract owner's
   # session_id *value* with a fixed regex, then compare as a literal shell string.
-  board_sid="$(grep -oE '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' "$1" 2>/dev/null \
+  board_sid="$(printf '%s' "$owner" | grep -oE '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' \
                | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
   [ "$board_sid" = "$sid" ]
 }

@@ -175,4 +175,29 @@ run_ss "$H"   # empty stdin → no sid → degraded
 assert_contains "$HOOK_OUT" "DEGRADED GOAL" "P: empty session_id → degraded match any active board (compaction robustness)"
 rm -rf "$H"
 
+# ── 武装闸：active/session_id 只从 board 根的 owner 子对象读（CODEX7，破红线 6 修复回归用例）─────────
+# 旧版 board_matches 用全文 grep 判 arming，会把归档板某个 flexible 载荷里的 `"active":true` 误读为 owner
+# 的 active，head -1 取到的第一个 session_id 仍是 owner.session_id —— 若它 == 当前 sid，归档板被误判 armed，
+# reinject 仍会把已 /stop 归档的目标重注回上下文。下面两例锁死「只从 owner 子对象读」。
+
+# Case Q (CODEX7 回归)：归档板 owner.active:false、owner.session_id == 本 session sid，log[] 嵌套对象塞
+#          "active":true + 混淆 "session_id":"OTHER"。owner 子对象本身 active:false → reinject 必须休眠
+#          （空 stdout，不重注目标 / 角色）。修前全文 grep 命中 → 误判 armed → 误重注归档目标。
+H="$(make_project)"
+mkactive "$H" "20260101T000000Z-Q" '{"schema":"cc-master/v1","goal":"ARCHIVED FALSE-ARM GOAL","owner":{"active":false,"session_id":"sess-arch"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}],"log":[{"id":"L1","snapshot":{"active":true,"session_id":"OTHER"}}]}'
+run_ss_sid "$H" "sess-arch"
+assert_eq 0 "$HOOK_RC" "Q: 归档板含嵌套 active:true → rc 0"
+assert_eq "" "$HOOK_OUT" "Q: 归档板（owner.active:false）+ 嵌套 active:true → 休眠（owner 子对象才算数，不重注归档目标）"
+rm -rf "$H"
+
+# Case R (反向保活)：真 active 板（owner.active:true、owner.session_id == sid），某 task 嵌套
+#          "active":false —— reinject 仍照常重注角色 + 目标。防过度修复。
+H="$(make_project)"
+mkactive "$H" "20260101T000000Z-R" '{"schema":"cc-master/v1","goal":"REAL ACTIVE GOAL","owner":{"active":true,"session_id":"sess-rr"},"tasks":[{"id":"T1","status":"in_flight","deps":[],"meta":{"active":false}}]}'
+run_ss_sid "$H" "sess-rr"
+assert_eq 0 "$HOOK_RC" "R: 真 active 板含嵌套 active:false → rc 0"
+assert_contains "$HOOK_OUT" "REAL ACTIVE GOAL" "R: 真 active 板（owner.active:true）照常重注目标"
+assert_contains "$HOOK_OUT" "orchestrator" "R: 真 active 板照常重注角色"
+rm -rf "$H"
+
 finish
