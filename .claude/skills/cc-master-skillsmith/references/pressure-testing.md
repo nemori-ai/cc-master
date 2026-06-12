@@ -124,6 +124,11 @@ Red Flags 把它们镜像成第一人称症状：
 纪律：**一行背后没有 baseline 的 Rationalization Table 就是一句谎**——它声称某个 agent 说了
 它从未说过的话。删掉编出来的行。
 
+回填来源不限于合成 baseline 的抄录：dogfood 台账的失败条目（`design_docs/dogfood-findings.md`，
+AGENTS.md §9）、Track A miss、真 session transcript 与压力 RED 同权——它们是已经在现实里跑完
+的 RED（证物目录见 SKILL.md 铁律段）。蒸馏是**双向**的：成功机制的正向验证同样回流——成功 →
+沉淀为命名锚 / 正例（台账 ✅正向 条目即此类），不只把踩坑写进表。编出来的行仍然是谎。
+
 ## 7. GREEN 守不住时的 meta-testing
 
 如果 agent 读了 skill 却*仍然*选错，直接问它：

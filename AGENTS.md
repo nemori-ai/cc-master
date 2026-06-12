@@ -1,7 +1,7 @@
 ---
 path: AGENTS.md
 version: v1.0
-last-edited: 2026-06-09
+last-edited: 2026-06-12
 agent-edit-policy: |
   仓库根 AGENTS.md——agent / 贡献者进入 cc-master 的着陆页与导航地图。三类编辑分级：
   - 自主刷新（无需 PR 人审）：§12 目录/文件约定在子目录增减时刷新行级；§N 触发式深入阅读表新增行；§9 findings 台账新增条目的指针；frontmatter 的 last-edited / version 字段；命令或脚本落地后在对应表追加行。
@@ -106,7 +106,7 @@ cc-master/
 编排方法论的**唯一真相源是 [`skills/orchestrating-to-completion/SKILL.md`](skills/orchestrating-to-completion/SKILL.md)（SKILL A）**——七镜头、红线、Rationalization Table、Red Flags、决策程序（dot-graph）都在那里，是 `SessionStart` hook 每次 compaction 全文重注的常驻手册。**本文不复述任何一条**；要援引方法论就读 SKILL A，要改方法论就改 SKILL A，不在这里另起一份。
 
 **改 SKILL A 的纪律**（这是本文该说的，SKILL A 正文不必自陈）：
-- **reinject 重注友好**——它每回合 compaction 后被整篇重注，**越短越好**；新增内容前先问"这能不能进 `references/` 让主文件保持瘦"。
+- **reinject 重注友好**——它每回合 compaction 后被整篇重注，**越短越好**；新增内容前先问"这能不能进 `references/` 让主文件保持瘦"；但收敛靠 delta 下沉 `references/`，**非整篇重写 / 有损压缩**——双侧悬崖：过短 → brevity bias 丢洞察，整篇重生成 → context collapse 蚀细节（delta-only 纪律 SSOT：`.claude/skills/cc-master-skillsmith/SKILL.md`）。
 - **决策程序骨架不动**——7 步 + step-6 ledger gate 的 dot-graph 是"牙齿"，结构性改动走 PR 人审（红线级）。
 - **Finding #7 收敛结论**——主文件曾与 `references/async-hitl.md` 整段重复 step-6 ledger，已收敛为一句指针；新增时不要重新制造跨文件重复（SSOT 原则）。
 - 改 SKILL A 的**纪律段 / description** 前，先走 §6 的 TDD-for-skills pressure baseline。
@@ -157,7 +157,7 @@ eval 让 skill 迭代**有数可依**。运行钥匙：`uv run --python 3.12`（
 
 cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dogfood**（用 `/cc-master:as-master-orchestrator <goal>` 起真 orchestration，对 live runtime 验证）。多个历史 bug 对测试套件不可见，只在真 session 下浮现。
 
-**findings 台账 [`design_docs/dogfood-findings.md`](design_docs/dogfood-findings.md) = 已踩反模式的永久纪律记录**（纪律式：踩过一次就写进纪律永久避免）。纪律：**用着不爽 / 给 agent 的指导不对 / 效率没真正拉满，必落台账**（现象 → 根因 → 影响 → 处置 → 严重度/来源）。台账是 §6 Rationalization Table 与 §3 红线的素材源——很多红线就是 finding 沉淀出来的。
+**findings 台账 [`design_docs/dogfood-findings.md`](design_docs/dogfood-findings.md) = 已踩反模式的永久纪律记录**（纪律式：踩过一次就写进纪律永久避免）。纪律：**用着不爽 / 给 agent 的指导不对 / 效率没真正拉满，必落台账**（现象 → 根因 → 影响 → 处置 → 严重度/来源）。「处置」字段**必须含蒸馏判定**——回流到哪个 skill 的 body / reference（指明具体落点），或显式判「不回流」+ 理由；**成功机制的验证与失败同权入账蒸馏**（不只记踩坑——台账已有 ✅正向 先例）。台账是 §6 Rationalization Table 与 §3 红线的素材源——很多红线就是 finding 沉淀出来的。
 
 ---
 

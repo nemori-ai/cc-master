@@ -17,6 +17,12 @@ for t in tests/scripts/test_*.sh; do
   bash "$t" || fail=1
 done
 
+echo "== skill prose-lint (out-of-band, node) =="
+# Cheap static checks over every SKILL.md: frontmatter quote anti-pattern (Finding #1),
+# required name+description fields, and dead relative links. Checker only — never edits.
+echo "--- scripts/skill-lint.sh"
+bash scripts/skill-lint.sh || fail=1
+
 echo "== node tests (content) =="
 # Node 22+ treats `--test` path args as test files/globs, NOT discovery dirs (a bare dir is
 # read as a module to execute and errors). So enumerate explicit test files via find — this
