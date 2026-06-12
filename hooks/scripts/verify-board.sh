@@ -106,7 +106,13 @@ owner_region() {
 }
 
 # ── board matching = THE ARMING GATE ────────────────────────────────────────────────────────────────
-# A board is "mine" when active AND (sid empty → degraded: any active board; else owner.session_id==sid).
+# A board is "mine" when active AND (sid empty → degraded: any active board; OR board's owner.session_id
+# empty → degraded: an unclaimed board this session may adopt; else owner.session_id==sid). The degrade is
+# SYMMETRIC — it fires when EITHER side's session_id is empty (CODEX12): a board stamped with an EMPTY
+# owner.session_id (bootstrap on a sid-less stdin, or a migrated/hand-edited board) would otherwise never
+# literally equal a non-empty stdin sid → permanently orphaned (no resuming session could ever arm on it).
+# Only an EMPTY board session_id is adopted; a board whose session_id is NON-empty but != $sid still does
+# NOT match (red line 6 — the real cross-session pollution defence is untouched).
 # This board_matches IS this hook's arming gate: every cc-master hook stays dormant until THIS session
 # is armed (an active board it owns), and only a matched board drives any behavior below. (Unified
 # armed-hook discipline — same gate in reinject.sh / posttool-batch.sh and the node
@@ -123,6 +129,7 @@ board_matches() { # $1 = board path
   # session_id *value* with a fixed regex, then compare as a literal shell string.
   board_sid="$(printf '%s' "$owner" | grep -oE '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' \
                | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+  [ -z "$board_sid" ] && return 0   # board not yet stamped (empty session_id) → adoptable → armed (CODEX12, symmetric degrade)
   [ "$board_sid" = "$sid" ]
 }
 

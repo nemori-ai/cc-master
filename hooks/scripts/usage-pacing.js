@@ -13,7 +13,9 @@
 // ARMED GATE（armed-hook 纪律的 node 版，本文件最关键的行为修复）：所有 cc-master hook 在本 session
 //   「被武装」之前完全休眠 —— armed ⟺ home（CC_MASTER_HOME / CLAUDE_PROJECT_DIR/.claude/cc-master）里
 //   存在一个 *.board.json，其 owner.active:true **且** owner.session_id == 本次 stdin 的 session_id
-//   （sid 空 → 降级：匹配任一 active 板，保 compaction 边界鲁棒）。在此之前 usage-pacing 完全不 gate，
+//   （sid 空 **或** board 未盖 session_id → 对称降级：前者匹配任一 active 板保 compaction 边界鲁棒，后者
+//   收养未认领的 active 板防 empty-session_id 孤儿化，CODEX12；board sid 非空且 ≠ stdin sid 仍不武装，红线 6）。
+//   在此之前 usage-pacing 完全不 gate，
 //   读宿主全局 usage 就注入 —— 于是它会在**每一个** session（包括从没跑过 as-master-orchestrator 的）
 //   里刷 pacing 提示，污染所有 session。现在 main() 最前面先判 armed，**未武装 → 在读 usage 之前就静默
 //   exit 0**。注意：这个 board 读取**只为判 arming**（active + session_id 两个早已 pinned 的 narrow-
@@ -234,7 +236,10 @@ function formatWarning({ used, burn, remain, budget, projected, pctNow }) {
 
 // ── ARMED GATE（node 版 board_matches）─────────────────────────────────────────────────────────────
 // isArmed(homeDir, sid) → 本 session 是否被武装：homeDir 里存在一个 *.board.json 满足
-//   owner.active === true 且 (sid 空 → 降级：任一 active 板；否则 owner.session_id === sid)。
+//   owner.active === true 且 (sid 空 → 降级：任一 active 板；OR board 未盖 session_id → 降级：可收养的未认领
+//   板；否则 owner.session_id === sid)。降级是**对称**的 —— 任一侧 session_id 空即触发（CODEX12）：board 的
+//   owner.session_id 为空（bootstrap 在缺 sid 的 stdin 上建板、或迁移/手改板）时，它对任何非空 stdin sid 都
+//   不字面相等 → 永久孤儿化；故空 board sid 也收养。但 board sid **非空**且 ≠ stdin sid 仍不匹配（红线 6）。
 // 只读 owner.active / owner.session_id 两个 narrow-waist pinned 字段（不读 tasks、不写 board）。
 // 任何读/解析失败都按「该板不匹配」处理（try/catch 兜住），整体绝不抛 —— 失败 → 视为未武装 → 静默。
 // 注意：用 JSON.parse 取结构化字段，不靠 grep/正则去 board 里捞 —— node hook 的既定做法（红线1 允许）。
@@ -256,6 +261,7 @@ function isArmed(homeDir, sid) {
     const owner = (board && board.owner) || {};
     if (owner.active !== true) continue; // 必须 active
     if (!sid) return true; // 降级：sid 空 → 任一 active 板即武装（compaction 边界鲁棒）
+    if (!owner.session_id) return true; // 对称降级：board 未盖 session_id（""/null/undefined）→ 可收养 → 武装（CODEX12）
     if (owner.session_id === sid) return true; // session-scoped 精确匹配
   }
   return false;

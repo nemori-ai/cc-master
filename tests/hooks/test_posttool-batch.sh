@@ -256,4 +256,31 @@ assert_eq 0 "$HOOK_RC" "干净主线 → rc 0"
 assert_contains "$HOOK_OUT" "WIP" "干净主线（顶层 session 匹配、无 agent_id）→ 照常警告"
 rm -rf "$H"
 
+# ── 对称 degrade：board 的 owner.session_id 为空串（未认领板）也降级到 active-match（CODEX12 真缺口）──
+# ADR-007 §2.3 原只在 stdin sid 空时 degrade；但 board 的 owner.session_id 为**空串 ""**（bootstrap 若在
+# 缺 sid 的 stdin 上建板会盖空、或迁移/手改板留空）时，它对任何**非空** stdin sid 都不字面相等 →
+# 永久孤儿化（续跑会话再也武装不上这块板，超 cap 也收不到 WIP 警告）。修法：对称化 —— stdin sid 空 ∨
+# board sid 空 → 收养武装。但「board sid 非空但 ≠ stdin sid」**仍须休眠**（红线 6 防真跨会话污染，一字不动）。
+
+# Case 22 (CODEX12 回归：empty-session_id 板被收养)：active 板 owner.session_id:""（空串），wip_limit=1、
+#           2 个 in_flight（超 cap），stdin 带**非空** session_id（主线，无 agent_id）。修前严格匹配
+#           "" != "sess-adopt" → 误判未武装 → 静默（无 WIP 警告，Red）。修后 board sid 空 → 收养武装 → 警告。
+H="$(make_project)"; SID="sess-adopt"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"wip_limit\":1,\"owner\":{\"active\":true,\"session_id\":\"\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "22: empty-session_id 板 + 非空 stdin sid → rc 0"
+assert_contains "$HOOK_OUT" "WIP" "22: empty-session_id 的 active 板被非空 stdin sid 收养 → 超 cap 照常警告（修前孤儿化）"
+assert_contains "$HOOK_OUT" "additionalContext" "22: empty-session_id 板被收养 → 注入 additionalContext"
+rm -rf "$H"
+
+# Case 23 (红线 6 防线保活：board sid 非空且 ≠ stdin sid 仍休眠)：active 板 owner.session_id:"OTHER"
+#           （非空），wip_limit=1、2 个 in_flight（超 cap），stdin sid "MINE"（不同）→ 必须静默（空 stdout，
+#           不警告）。证明对称 degrade **没有**退化成「任何 active 板即武装」—— 红线 6 防线原样保留。
+H="$(make_project)"; SID="MINE"
+mkactive "$H" "b1" '{"schema":"cc-master/v1","goal":"g","wip_limit":1,"owner":{"active":true,"session_id":"OTHER"},"tasks":[{"id":"T1","status":"in_flight","deps":[]},{"id":"T2","status":"in_flight","deps":[]}]}'
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "23: board sid 非空且 ≠ stdin sid → rc 0"
+assert_eq "" "$HOOK_OUT" "23: board sid=OTHER（非空）≠ stdin sid=MINE → 仍休眠（不警告，红线 6 防线未退化）"
+rm -rf "$H"
+
 finish

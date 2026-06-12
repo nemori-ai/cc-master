@@ -425,4 +425,29 @@ run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "Z: 真 active 板（owner.active:true）照常 armed → ready task → block stop"
 rm -rf "$H"
 
+# ── 对称 degrade：board 的 owner.session_id 为空串（未认领板）也降级到 active-match（CODEX12 真缺口）──
+# ADR-007 §2.3 原只在 stdin sid 空时 degrade；但 board 的 owner.session_id 为**空串 ""**（bootstrap 若在
+# 缺 sid 的 stdin 上建板会盖空、或迁移/手改板留空）时，它对任何**非空** stdin sid 都不字面相等 →
+# 永久孤儿化（续跑会话再也武装不上这块板）。修法：对称化 —— stdin sid 空 ∨ board sid 空 → 收养武装。
+# 但「board sid 非空但 ≠ stdin sid」**仍须休眠**（红线 6 防真跨会话污染，一字不动）。
+
+# Case AA (CODEX12 回归：empty-session_id 板被收养)：active 板 owner.session_id:""（空串），含一个 ready
+#          task，stdin 带**非空** session_id。修前严格匹配 "" != "MINE" → 误判未武装 → 休眠 allow（孤儿化，
+#          Red）。修后 board sid 空 → 收养武装 → ready 工作 → block stop。
+H="$(make_project)"; SID="sess-adopt-mine"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "AA: empty-session_id 的 active 板被非空 stdin sid 收养 → armed → ready task → block（修前孤儿化）"
+rm -rf "$H"
+
+# Case AB (红线 6 防线保活：board sid 非空且 ≠ stdin sid 仍休眠)：active 板 owner.session_id:"OTHER"
+#          （非空），含一个 ready task，stdin sid "MINE"（不同）→ 必须休眠 allow（不 block）。证明对称
+#          degrade **没有**退化成「任何 active 板即武装」—— 真跨会话污染防线（红线 6）原样保留。
+H="$(make_project)"; SID="MINE"
+mkactive "$H" "b1" '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"OTHER"},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_stop_sid "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "AB: board sid 非空且 ≠ stdin sid → rc 0"
+assert_not_contains "$HOOK_OUT" "block" "AB: board sid=OTHER（非空）≠ stdin sid=MINE → 仍休眠 allow（红线 6 防线未退化）"
+rm -rf "$H"
+
 finish

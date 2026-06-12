@@ -200,4 +200,31 @@ assert_contains "$HOOK_OUT" "REAL ACTIVE GOAL" "R: 真 active 板（owner.active
 assert_contains "$HOOK_OUT" "orchestrator" "R: 真 active 板照常重注角色"
 rm -rf "$H"
 
+# ── 对称 degrade：board 的 owner.session_id 为空串（未认领板）也降级到 active-match（CODEX12 真缺口）──
+# ADR-007 §2.3 原只在 stdin sid 空时 degrade；但 board 的 owner.session_id 为**空串 ""**（bootstrap 若在
+# 缺 sid 的 stdin 上建板会盖空、或迁移/手改板留空）时，它对任何**非空** stdin sid 都不字面相等 →
+# 永久孤儿化（续跑会话再也武装不上这块板，目标不再重注）。修法：对称化 —— stdin sid 空 ∨ board sid 空 →
+# 收养武装。但「board sid 非空但 ≠ stdin sid」**仍须休眠**（红线 6 防真跨会话污染，一字不动）。
+
+# Case S (CODEX12 回归：empty-session_id 板被收养)：active 板 owner.session_id:""（空串），带 goal，stdin
+#          带**非空** session_id。修前严格匹配 "" != "sess-resume" → 误判未武装 → 静默（不重注，Red）。
+#          修后 board sid 空 → 收养武装 → 重注角色 + 目标。
+H="$(make_project)"
+mkactive "$H" "20260101T000000Z-S" '{"schema":"cc-master/v1","goal":"ORPHANED EMPTY-SID GOAL","owner":{"active":true,"session_id":""},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+run_ss_sid "$H" "sess-resume"
+assert_eq 0 "$HOOK_RC" "S: empty-session_id 板 + 非空 stdin sid → rc 0"
+assert_contains "$HOOK_OUT" "ORPHANED EMPTY-SID GOAL" "S: empty-session_id 的 active 板被非空 stdin sid 收养 → 重注目标（修前孤儿化）"
+assert_contains "$HOOK_OUT" "orchestrator" "S: empty-session_id 板被收养 → 重注角色"
+rm -rf "$H"
+
+# Case T (红线 6 防线保活：board sid 非空且 ≠ stdin sid 仍休眠)：active 板 owner.session_id:"OTHER"
+#          （非空），带 goal，stdin sid "MINE"（不同）→ 必须静默（空 stdout，不重注）。证明对称 degrade
+#          **没有**退化成「任何 active 板即武装」—— false-activation gap / 红线 6 防线原样保留。
+H="$(make_project)"
+mkactive "$H" "20260101T000000Z-T" '{"schema":"cc-master/v1","goal":"OTHER NONEMPTY-SID GOAL","owner":{"active":true,"session_id":"OTHER"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+run_ss_sid "$H" "MINE"
+assert_eq 0 "$HOOK_RC" "T: board sid 非空且 ≠ stdin sid → rc 0"
+assert_eq "" "$HOOK_OUT" "T: board sid=OTHER（非空）≠ stdin sid=MINE → 仍休眠（不重注，红线 6 防线未退化）"
+rm -rf "$H"
+
 finish

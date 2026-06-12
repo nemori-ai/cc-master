@@ -241,4 +241,33 @@ assert_eq 0 "$HOOK_RC" "(g2) genuine new Stop → rc 0"
 assert_contains "$HOOK_OUT" "additionalContext" "(g2) stop_hook_active:false → warns (first Stop still fires)"
 rm -rf "$H"
 
+# ── SYMMETRIC DEGRADE: an active board whose owner.session_id is the EMPTY string is adopted (CODEX12) ─
+# ADR-007 §2.3 originally degraded only when the STDIN sid was empty. But when a board's owner.session_id
+# is the EMPTY string "" (bootstrap stamping it blank on a sid-less stdin, or a migrated/hand-edited
+# board), it can never literally equal a NON-empty stdin sid → permanently orphaned (no resuming session
+# can ever arm on it). Fix: make the degrade symmetric — stdin sid empty OR board sid empty → adopt+arm.
+# But "board sid non-empty yet != stdin sid" MUST still stay dormant (red line 6, the real cross-session
+# pollution defence — left untouched).
+
+# (h1) EMPTY-SID BOARD ADOPTED — active board with owner.session_id:"" + a NON-empty stdin sid, at a
+#       CRITICAL usage threshold. Before the fix, strict match "" != "sess-adopt" → unarmed → silent
+#       (orphaned, Red). After the fix, board sid empty → adopt → armed → warns.
+H="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":""},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/empty.board.json"
+run_pacing_home "$SAMPLE" "2026-06-10T12:00:00Z" "$H" "sess-adopt" "3000"
+assert_eq 0 "$HOOK_RC" "(h1) empty-session_id board + non-empty stdin sid → rc 0"
+assert_contains "$HOOK_OUT" "additionalContext" "(h1) empty-session_id active board adopted by non-empty stdin sid → armed → warns (was orphaned)"
+rm -rf "$H"
+
+# (h2) RED LINE 6 DEFENCE RETAINED — active board with owner.session_id:"OTHER" (non-empty) + a
+#       DIFFERENT non-empty stdin sid "MINE", at critical usage → MUST stay silent. Proves the symmetric
+#       degrade did NOT collapse into "any active board arms"; the true cross-session pollution defence
+#       is unchanged.
+H="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"OTHER"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/other.board.json"
+run_pacing_home "$SAMPLE" "2026-06-10T12:00:00Z" "$H" "MINE" "3000"
+assert_eq 0 "$HOOK_RC" "(h2) board sid non-empty & != stdin sid → rc 0"
+assert_eq "" "$HOOK_OUT" "(h2) board sid=OTHER (non-empty) != stdin sid=MINE → still silent (red line 6 defence intact)"
+rm -rf "$H"
+
 finish

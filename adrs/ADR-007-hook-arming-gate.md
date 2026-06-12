@@ -40,9 +40,14 @@ This is exactly the `board_matches` helper in the bash hooks and `isArmed` in `u
 
 Arming reads **only** `owner.active` and `owner.session_id` — both **already** pinned narrow-waist fields (ADR-003). The gate adds **no** new hook-dependent field and reads **nothing** from the board's agent-shaped parts (tasks, log, flexible fields are untouched for the arming decision). **ADR-003's narrow waist is therefore unchanged by this ADR.**
 
-### 2.3 Degraded match for compaction robustness
+### 2.3 Degraded match — symmetric, for compaction robustness **and** unclaimed-board adoption
 
-If the stdin `session_id` is **empty** (e.g. a compaction event that drops it), the predicate falls back to matching **any** active board in home. This trades a sliver of cross-session precision for robustness across the compaction boundary, where losing arming entirely would be the worse failure (the orchestrator silently un-roles itself mid-run). A non-empty `session_id` always uses the exact-match path.
+The degrade fires when **either** side's `session_id` is empty:
+
+- **stdin `session_id` empty** (e.g. a compaction event that drops it) → fall back to matching **any** active board in home. Trades a sliver of cross-session precision for robustness across the compaction boundary, where losing arming entirely would be the worse failure (the orchestrator silently un-roles itself mid-run).
+- **board's `owner.session_id` empty** (`""`) → the board is **unclaimed**, and the current session **adopts** it (armed). Without this, a board stamped with an empty `owner.session_id` could never literally equal a *non-empty* stdin sid → **permanently orphaned**: no resuming session could ever arm on it, breaking resume (CODEX12). Empty-session_id boards arise when bootstrap stamps the field blank (building a board on a stdin that carried no `session_id`), or when a board is migrated / hand-edited.
+
+A non-empty board `session_id` against a non-empty stdin sid always uses the **exact-match** path. Crucially, the degrade adopts **only** an *empty* board `session_id` — a board whose `owner.session_id` is **non-empty but `!= sid`** still does **not** match and the hook stays dormant. That is the real cross-session pollution defence (red line 6) and it is left untouched; the symmetric degrade does **not** collapse into "any active board arms" (§4.3 Alternative C remains rejected).
 
 ### 2.4 Literal session-id comparison (security note)
 
@@ -56,6 +61,21 @@ The board's `session_id` **value** is extracted with a fixed regex and compared 
 
 A session is **disarmed** when `/cc-master:stop` archives the board (`owner.active:false`). After that the arming predicate is false for every hook, and they all go silent again — the `Stop` goal-hook (`verify-board.sh`) included, since an inactive board no longer matches. There is no separate "reset" mechanism: arm = bootstrap, disarm = stop. Re-arming starts a fresh board.
 
+### 2.7 Official-semantics ruling — what the session-scoped gate does NOT break (authoritatively verified)
+
+CODEX12 first read the session-scoped gate as silently orphaning any active board whose `owner.session_id` did not match the stdin sid, including across resume / compaction — which would break resume broadly. That first reading rests on a **wrong premise**. The platform semantics were **authoritatively verified against the official Claude Code docs** (via `claude-code-guide`, honouring Finding #30's discipline that platform semantics must be authoritatively verified, never assumed):
+
+- **`claude --resume` / `--continue` (`-c`) preserve the original `session_id`** — the `SessionStart` event fires with `source:"resume"` and the **same** `session_id`.
+- **Compaction preserves the `session_id`** too — `SessionStart` fires with `source:"compact"`, `session_id` unchanged.
+- `SessionStart` carries a `source` field whose values are `startup` / `resume` / `compact` / `clear`.
+- **Sessions are independent** — a brand-new session (no `--resume`/`-c`) always gets a **fresh** `session_id`; there is no official范式 for a brand-new independent session "taking over" a prior session's board.
+
+**Therefore:**
+
+- **On the official resume / compaction paths, arming and reinject keep working unchanged** — the exact-match gate matches because the `session_id` is carried through. This is **not** a bug, and §2.3's symmetric degrade is **not** needed for that path.
+- **A brand-new independent session staying dormant on another session's active board is the design goal, not a resume failure** — it is exactly red line 6 (no cross-session pollution), and §4.3 rejects "any active board arms."
+- **The one genuine gap is the empty-`session_id` board** — an *unclaimed* board (`owner.session_id == ""`) can never literally equal a non-empty stdin sid and is permanently orphaned. **Only** this case needs the §2.3 symmetric degrade (adoption). A non-empty-but-mismatched board `session_id` is deliberately left dormant.
+
 ## 3. Consequences
 
 ### 3.1 Positive
@@ -68,12 +88,13 @@ A session is **disarmed** when `/cc-master:stop` archives the board (`owner.acti
 ### 3.2 Negative
 
 - **Disk dependency for arming.** If the board is unreadable / the home is misconfigured, every hook silently no-ops. This is the safe failure direction (silence, never a spurious block), but it means a broken home = a fully dormant orchestration with no loud error.
-- **Degraded-match imprecision.** With an empty `session_id`, two concurrent armed orchestrations in the same home both match; a hook may act on the wrong board for that one fire. Accepted as strictly better than losing arming across compaction (§2.3).
+- **Degraded-match imprecision.** With an empty stdin `session_id`, two concurrent armed orchestrations in the same home both match; a hook may act on the wrong board for that one fire. Symmetrically, an **unclaimed** board (empty `owner.session_id`) is adopted by whichever active session fires next — if two sessions race, the first to fire claims it for that fire. Both are accepted as strictly better than the alternatives: losing arming across compaction (empty stdin sid), or permanently orphaning the board (empty board sid). The non-empty-but-mismatched case is **not** affected — it stays dormant (red line 6).
 
 ### 3.3 Neutral
 
 - **Arming ≠ correctness of the board's contents.** The gate only asks "is this session an armed orchestration?"; the goal-hook's completion logic, WIP counting, etc. remain each hook's own concern downstream of the gate.
 - **Per-fire cost is one directory scan** of `*.board.json` headers — negligible for the low-frequency events these hooks bind (`Stop` / `SessionStart` / `PostToolBatch`).
+- **Resume / compaction are unaffected (§2.7).** Per the authoritatively-verified platform semantics, `--resume`/`-c` and compaction carry the original `session_id` through, so the exact-match gate keeps arming and reinject working across them; the symmetric degrade exists **only** for unclaimed (empty-session_id) boards, not for the resume path.
 
 ## 4. Alternatives Considered
 
