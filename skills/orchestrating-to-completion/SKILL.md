@@ -154,4 +154,4 @@ cc-master 的 charter 是六项能力（C1–C6，SSOT 在 `design_docs/spec.md`
   - 保险丝 "a `ready` task that cannot actually proceed (mark it `blocked`/`escalated`)" → 你撞上了「每个 loop 都必须有保险丝」那条红线：揪出假 `ready`。
   - (H8 usage-pacing，Stop 上的第二个 hook) "[cc-master pacing] 5h 配额临界 ... pace 杠杆（见 orchestrating-to-completion / cost-and-pacing）" → **镜头 5**：你贴近 5h burn-rate 墙了——怎么 pace 是你的认知判断（downgrade 模型 / 降 WIP / defer float），它是软提示，不是 block。
 
-*（H3/H5/H6/H8 现均已 live，见上。）*
+*（H3/H5/H8 现均已 live，见上。）*
