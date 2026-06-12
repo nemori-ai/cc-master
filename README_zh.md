@@ -73,7 +73,7 @@ flowchart LR
 | **能否熬过 compaction** | 否 | 否 | **能**——角色 + board 被重注 | `reinject.sh`（SessionStart hook） |
 | **跨会话续接** | 否 | 仅限同一会话 | **能**——靠 board 文件重新认回 | board（持久存档文件） |
 | **端点验收** | 临时随手 | 写在脚本里 | 总指挥独立验收 | 镜头 6 + 决策程序（Skill A） |
-| **配额感知** | 否 | 否 | **能**——live 感知 5h burn-rate 墙（7d 累计经 `cc-usage.sh`） | `usage-pacing.js`（Stop hook）+ `cc-usage.sh` |
+| **配额感知** | 否 | 否 | **能**——账户权威 5h/**7d** `used_percentage`（从 status line 捕获；本地反推作 fallback） | `usage-pacing.js`（Stop hook）+ `statusline-capture.js` + `cc-usage.sh` |
 
 ---
 
@@ -185,6 +185,19 @@ claude plugin install cc-master@cc-master
 /cc-master:stop                            # 归档 board 并收尾（board 保留，不删除）
 ```
 
+### 可选 —— 打开账户权威的配额感知
+
+cc-master 能对照你订阅的**真实** 5h/7d 配额 `used_percentage` 来 pace——但这个信号**只**出现在 status line 脚本的 stdin 里（任何 hook / CLI / 文件都够不到）。要捕获它，得把 `statusline-capture.js` 接进你的 status line。别去手改 `settings.json`——**最 AI-native 的做法**是把下面这段 instruction 贴给 Claude Code，让它替你接线（它会定位真实安装路径、用 `--passthrough` 保住你已有的 status line、用绝对路径绕开「`${CLAUDE_PLUGIN_ROOT}` 在 `statusLine.command` 里是否展开」这个未文档化问题、并验证 sidecar 真落了盘）：
+
+> 帮我启用 cc-master 的账户权威用量 pacing。我订阅的 5h/7d 配额 `used_percentage` 只出现在 **status line** 脚本的 stdin 里；cc-master 提供了 `statusline-capture.js` 把它捕获到一个 sidecar（`~/.claude/.cc-master-rate-limits.json`），供它的 pacing hook 和 `cc-usage.sh` 读取。请：
+> 1. 定位 `statusline-capture.js` 的真实绝对路径——它在插件的 `skills/orchestrating-to-completion/scripts/` 下；插件可能装在 `~/.claude/plugins/cache/.../` 某个版本目录，或通过 `--plugin-dir` 指向本地 repo，用 `find`/`ls` 把真实路径找出来。
+> 2. 读我现有的 `~/.claude/settings.json` 里的 `statusLine.command`（如果有）。
+> 3. 把 `statusLine.command` 改成先跑 `statusline-capture.js`、再用 `--passthrough` 透传我原本的命令，这样我的状态行显示不变。用**绝对路径**（这个字段的变量展开官方未文档化）。把确切的改动 diff 给我看、我确认后再写。
+> 4. 改完后让 status line 渲染一次（我会发条消息），检查 `~/.claude/.cc-master-rate-limits.json` 有没有按正确结构落盘，再跑一次插件的 `cc-usage.sh` 确认它的 `source` 是 `"account"`（不是 `local-derived-approx`）。
+> 5. 如果我是 Pro/Max 但 `rate_limits` 一直没出现，告诉我为什么（它只在首次 API 响应后出现、且仅 Pro/Max）。
+
+不接也能用——pacing 会静默退回本地 JSONL **反推**，那是个 reset 倒计时可能差一个数量级的近似（[Finding #37](design_docs/dogfood-findings.md)）。仅 Pro/Max 订阅有此信号；其余环境此步是 no-op、由 fallback 兜底。
+
 ---
 
 ## 六愿景 charter（C1–C6）
@@ -194,7 +207,7 @@ cc-master **致力于让** Claude Code agent 化身一个具备六项能力的 m
 | # | 能力 | 状态 | 今天怎么兑现 |
 |---|---|---|---|
 | **C1** | 异步并行多线程推进、把目标完整落地——不是干到一半，而是一路到底 | 🟢 Live | 三种后台手段 + 决策程序 loop + `Stop` 门强制「真的全做完」 |
-| **C2** | 控制 token 消耗*速度*——节流，而非顶满 | 🟢 Live | `usage-pacing.js`（非阻断的 live 5h burn-rate 警告）+ `cc-usage.sh`（带外 7d 累计） |
+| **C2** | 控制 token 消耗*速度*——节流，而非顶满 | 🟢 Live | `usage-pacing.js`（对账户 5h/**7d** `used_percentage` 出非阻断警告，经 `statusline-capture.js` 捕获；本地反推 fallback）+ `cc-usage.sh`（带外查询，account 优先） |
 | **C3** | 把握自主决策与寻求人类接入的边界 | 🟢 Live | 红线 + `blocked_on:user` 节点 + `Stop` 门列出未答用户决策 |
 | **C4** | 边学边分解、管理、更新、重规划目标 | 🟢 Live | board DAG + CPM 拆解 + resume 报出悬挂的 `stale`/`escalated` 节点 |
 | **C5** | 在合理燃烧速率*之下*最大化吞吐 | 🟢 Live | WIP cap（~75% 利用率）+ 免费 float 并行 + `posttool-batch.sh` 软警告 |
@@ -228,7 +241,7 @@ cc-master/
 
 - **命令**是一次性开机引导——你主动触发，它把「我是 master orchestrator」的哲学与操作纪律灌进来，并开好 board。
 - **skill** 是按需调阅的深度手册——跑编排循环时翻 Skill A，写 workflow 脚本时翻 Skill B。
-- **hook** 是总指挥的运行时——它熬过 compaction（重注「你是总指挥 + 这是你的 board」）、把关收尾、对过度派发软警告、感知 5h burn-rate 配额墙（7d 累计总量由带外的 `cc-usage.sh` 读）。只在结构化 JSON 解析划算处（从 JSONL 算 usage）才用 `node`，其余一律 bash（[ADR-006](adrs/ADR-006-hooks-may-use-node-js.md)）。
+- **hook** 是总指挥的运行时——它熬过 compaction（重注「你是总指挥 + 这是你的 board」）、把关收尾、对过度派发软警告、对照账户 5h/7d `used_percentage` 感知配额墙（由 `statusline-capture.js` 从 status line 捕获；本地反推作 fallback）。只在结构化 JSON 解析划算处（算 usage / rate-limit JSON）才用 `node`，其余一律 bash（[ADR-006](adrs/ADR-006-hooks-may-use-node-js.md)）。
 
 ### 它教的三种后台手段
 
@@ -247,7 +260,7 @@ board 是否存在，**不依赖 agent 听不听话**；总指挥也无法偷偷
 1. **`UserPromptSubmit`**（`bootstrap-board.sh`）检测到命令体里的 sentinel → 确定性地建好一个空 board 骨架 + 把其确切路径和总指挥角色注入进来。这也是**武装动作**（见下）。
 2. **`SessionStart`**（`reinject.sh`）在每次 compaction 后、以及 resume 时重注角色 + board——resume 时还会**报出上一轮 plan 更新未对账遗留的 `stale`/`escalated` 悬挂节点**。
 3. **`Stop`**（`verify-board.sh`）对**本 session** 的 active board 跑一道纯 bash 的门（按 `owner.session_id` 过滤，所以并发编排互不干扰）。board 为空、或还剩 `ready`/`uncertain` 的活，就 **block** 住这次 Stop；当 board 看起来完成了，它会逼一次对照 goal 的**自检**——并**列出未答的 `blocked_on:user` 决策**——才放行；还有一道 fuse（连续 block 5 次）兜底，防止误判把 agent 永久焊死。
-4. **`Stop`** 上还跑 `usage-pacing.js`（node）：读本地 usage JSONL、算 5h burn-rate（7d 累计总量是经 `cc-usage.sh` 的另一路带外信号），临近撞墙时注入**非阻断**的 pacing 警告——它绝不 block，也绝不替你决定**怎么 pace**（那是总指挥的判断）。
+4. **`Stop`** 上还跑 `usage-pacing.js`（node）：优先用 `statusline-capture.js` 捕获到 sidecar 的**账户权威** 5h/7d `used_percentage`（sidecar 缺位时退回本地 JSONL 反推），任一窗口临近上限时注入**非阻断**的 pacing 警告——它绝不 block，也绝不替你决定**怎么 pace**（那是总指挥的判断）。
 5. **`PostToolBatch`**（`posttool-batch.sh`）在一批并行调用后，数 in_flight 任务对 board 的 `wip_limit`，过度派发时**软警告**——绝不 block，并行自由照旧。
 
 **每个 hook 未武装即休眠。**「武装」由磁盘上的 board 派生：hook 只在**本 session 拥有一块 active board**时才动作（`owner.active:true` **且** `owner.session_id` == hook stdin 的 `session_id`；sid 为空则降级匹配任一 active 板，保 compaction 鲁棒）。在那之前——同一宿主里任何普通编码 session——每个 hook 都完全静默。`bootstrap-board.sh` 是唯一例外：它**就是**那个武装动作（建板时盖上 `owner.session_id`）。解除武装 = `/stop`。详见 [ADR-007](adrs/ADR-007-hook-arming-gate.md)。

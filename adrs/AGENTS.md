@@ -35,6 +35,7 @@ If something is "how it currently works / where the boundary is right now," it i
 | **ADR-005** | [two-skill separation](ADR-005-two-skills-separation.md) | Accepted | `orchestrating-to-completion` (main-thread orchestration) and `authoring-workflows` (inside-the-script authoring) stay self-contained and non-overlapping. |
 | **ADR-006** | [hooks may use node/JS](ADR-006-hooks-may-use-node-js.md) | Accepted (supersedes ADR-001) | Hooks may use bash + Node.js/JavaScript (JS only; `jq`/`python`/TS-direct still out) — Claude Code *is* a Node app, so `node` is guaranteed wherever a hook fires. Unblocks C2 usage-sensing as a hook + trivial JSON parsing. |
 | **ADR-007** | [hook arming gate](ADR-007-hook-arming-gate.md) | Accepted | Every hook is dormant-until-armed; armed ⟺ home holds a `*.board.json` with `owner.active:true` AND `owner.session_id == stdin session_id` (degraded to any-active on empty sid). Reuses pinned waist fields (ADR-003 untouched); `bootstrap-board.sh` is the sole exempt ARM action; disarm = `/stop`. Disk is the only cross-compaction channel a hook can read. |
+| **ADR-008** | [account-authoritative usage + script placement](ADR-008-account-authoritative-usage-and-script-placement.md) | Accepted | 账户权威 5h/7d `used_percentage`+`resets_at` 只在 status-line stdin → `statusline-capture.js` 捕获到 sidecar，`cc-usage.sh`/`usage-pacing.js` 优先读它（本地反推退 fallback，标 approx）；capture 不受武装闸（只缓存账户全局只读信号，无注入/无 block，红线 6 精神之外）；运行时带外脚本落 `skills/<skill>/scripts/`（随 skill 分发，`${CLAUDE_SKILL_DIR}` 引用），dev-only 留顶层 `scripts/`。Source: Finding #37/#38。 |
 
 ---
 
