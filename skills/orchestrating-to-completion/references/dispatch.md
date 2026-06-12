@@ -66,6 +66,8 @@ until <external state ready>; do sleep 60; done   # run_in_background → harnes
 
 这既事件驱动又 ship-anywhere——它复用的是一个现成积木（一个后台 shell + 完成通知），而不是另引入一套定时器机制。
 
+> **澄清（与 `async-hitl.md` 的「禁 busy-poll」并不矛盾）：** 那里禁的是**主线前台 busy-poll**——指挥在前台空转忙等。这里的后台 shell 轮询正交：轮询关进一个零 token 后台 shell、骑完成通知重入，主线腾出来去填等待窗口。后台等外部状态（荐）≠ 前台空等单个 agent（禁）。
+
 ---
 
 ## 选择标准 —— 控制 / 综合 / context，不是数量

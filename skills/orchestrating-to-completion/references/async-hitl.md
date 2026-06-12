@@ -17,6 +17,8 @@
 
 这背后的纪律（"某个 agent 卡死了 → 退回任务池" / "60 分钟硬截止"）：别让单个慢 agent 拖垮整批。**别** busy-poll 单个 agent 的进度，也别手搓 file-size 轮询去猜它完成没有（已被证明是瞎蒙的失招）——用结构化并发（structured-concurrency）的 join，再拿有用的工作填满等待窗口。
 
+> **澄清（别误读成与 `dispatch.md` 打架）：** 这里禁的是**主线前台 busy-poll**——指挥在前台空转忙等单个 agent。而 `dispatch.md` §「等待外部状态」推荐的**后台 shell 轮询**（`until … sleep` 骑完成通知重入）是正交且正确的：它把轮询放进一个零 token 的后台 shell、靠完成通知驱动重入，主线照样去填等待窗口、绝不空转。一个是前台空等（禁），一个是后台等外部状态（荐）。
+
 ---
 
 ## 整合各项完成 —— 收到 `<task-notification>` 时
