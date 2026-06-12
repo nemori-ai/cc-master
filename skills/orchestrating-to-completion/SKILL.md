@@ -23,7 +23,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 2. **目标即依赖图 (Goal = dependency graph)** — 拆成 DAG，找临界路径，把资源压到临界链上（非临界的 float 是免费的并行预算；「资源」也含**模型档位**——临界链上用强模型、float 上用廉价模型——见 `references/cost-and-pacing.md`）。
 3. **就绪即发，绝不在 barrier 干等 (Dispatch on ready, never wait at a barrier)** — dataflow：一个节点的依赖刚满足就立刻派发它；并行度 = 用 T₁/T∞ 算该开几条 lane。
 4. **主观能动，不被动空等 (Be proactive, never idle-wait)** — 歇下来之前，先把可做工作池榨干、主动排程。合法的等待 = 剩下的每条 path 要么 blocked 在某个 `in-flight` 后台任务上、要么已抛给用户待答。罪在**本可行动却被动**，不在闲置本身。
-5. **量力而行，不顶满利用率 (Work within capacity, don't max utilization)** — 限制 WIP，瞄准 ~75%（Little's Law + 利用率悬崖；加 agent 不总是更快）。capacity 也指 5h/7d 配额窗口，不只是瞬时 WIP——用 `scripts/cc-usage.sh` 感知它、按 `references/cost-and-pacing.md` 去 pace 它。
+5. **量力而行，不顶满利用率 (Work within capacity, don't max utilization)** — 限制 WIP，瞄准 ~75%（Little's Law + 利用率悬崖；加 agent 不总是更快）。capacity 也指 5h/7d 配额窗口，不只是瞬时 WIP——用 `${CLAUDE_SKILL_DIR}/scripts/cc-usage.sh` 感知它、按 `references/cost-and-pacing.md` 去 pace 它。
 6. **只信端点验收，产出可记账可续 (Trust only endpoint verification; outputs are accountable and resumable)** — 在你自己的端点独立验收，agent 的自报不可信。用 content-hash 记账；done+verified 的可跳过、可续跑。
 7. **该问就问，前台对话∥后台执行 (Ask when you should; front-of-house dialogue ∥ background execution)** — 用户是一种特殊的 async worker；该他拍板的立刻抛出来，别捂着、也别越权。他的回答是一条 async 依赖；不依赖它的就绪工作照常派发、照常跑。
 

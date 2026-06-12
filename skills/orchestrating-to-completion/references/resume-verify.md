@@ -38,7 +38,7 @@
 
 ### codex 作为一个独立的第二端点验收者
 
-`scripts/codex-review.sh` 跑 `codex exec review --base <branch> --json`（review-only、只读 sandbox），并按 openai-codex 插件的 `review-output.schema.json` 吐出一个 `verdict`（`approve | needs-attention`，每条 finding 携带 severity/file/line/confidence）。这个 verdict 直接映射到 §4 的 Joiner 闸：
+`${CLAUDE_SKILL_DIR}/scripts/codex-review.sh` 跑 `codex exec review --base <branch> --json`（review-only、只读 sandbox），并按 openai-codex 插件的 `review-output.schema.json` 吐出一个 `verdict`（`approve | needs-attention`，每条 finding 携带 severity/file/line/confidence）。这个 verdict 直接映射到 §4 的 Joiner 闸：
 
 - `needs-attention` → **`Replan(feedback)`** —— 把 finding 当成那条带诊断的 replan 信号；修了再验。
 - `approve` **且** review 非空 **且** diff 确实读过 → **`FinalResponse`**（done）。

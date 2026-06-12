@@ -47,12 +47,12 @@ cc-master/
 ├── .claude-plugin/           ← plugin.json 清单 + marketplace.json
 ├── commands/                 ← as-master-orchestrator / status / stop（一次性点火）
 ├── skills/                    ← **分发**给插件用户的 skill 源码（仅这两个随插件 ship）
-│   ├── orchestrating-to-completion/  ← SKILL A：编排方法论（魂）+ references/
+│   ├── orchestrating-to-completion/  ← SKILL A：编排方法论（魂）+ references/ + scripts/（运行时带外脚本 cc-usage / codex-review / statusline-capture，随 skill 分发，prose 用 `${CLAUDE_SKILL_DIR}` 引用）
 │   └── authoring-workflows/          ← SKILL B：workflow 写法 + references/ + assets/examples/
 ├── .claude/skills/            ← **项目自用** dev skill（造/评/治三件套 + requirement-elicitation 上游需求发现，**不分发**）
-├── hooks/scripts/            ← 5 个 hook，全 board-derived「武装」后才醒（ADR-007）：bootstrap-board（ARM 动作）/ reinject / verify-board（goal-hook）/ posttool-batch（过调度软警告）·bash + usage-pacing.js（5h burn-rate pacing；7d 累计经带外 cc-usage.sh）·node·JS（红线1·ADR-006 已允许 node）
-├── scripts/                  ← 带外手动调用脚本：codex-review / eval-trigger / eval-benchmark / cc-usage
-├── adrs/                     ← 结构性决策快照（ADR-001..007 + AGENTS.md 规约）
+├── hooks/scripts/            ← 5 个 hook，全 board-derived「武装」后才醒（ADR-007）：bootstrap-board（ARM 动作）/ reinject / verify-board（goal-hook）/ posttool-batch（过调度软警告）·bash + usage-pacing.js（**账户权威 5h/7d `used_percentage` pacing**，读 statusline-capture 落的 sidecar；缺则降级本地反推·Finding #37）·node·JS（红线1·ADR-006 已允许 node）
+├── scripts/                  ← 带外 **dev-only** 脚本：eval-trigger / eval-benchmark / skill-lint（仅开发本仓用、repo 根调用，**不随 plugin 分发**；裸路径在此正确）。运行时带外脚本（cc-usage / codex-review / statusline-capture）已搬入 `skills/orchestrating-to-completion/scripts/`（随 skill 分发，见上）
+├── adrs/                     ← 结构性决策快照（ADR-001..008 + AGENTS.md 规约）
 ├── tests/                    ← hook 测试（bash）；run-tests.sh 编排 hook + content contract
 ├── design_docs/             ← 设计文档 + eval/ + dogfood-findings.md（plans/ gitignored）
 └── examples/                 ← 可跑样例（sample-orchestration：i18n 场景 walkthrough.md + smoke.sh 冒烟证明）
@@ -83,7 +83,7 @@ cc-master/
    → 纪律 SSOT（含唯一例外、Rationalization Table、Red Flags）：[`skills/orchestrating-to-completion/SKILL.md`](skills/orchestrating-to-completion/SKILL.md) §Red lines · 硬卡点：行为型红线，由 §8 Track B benchmark + 端点验收守护（非 grep 能拦）。
 
 5. **保持 ship-anywhere。** 支持的后台机制只有 background shell / sub-agent（`run_in_background`）/ workflow；agent-teams 与 scheduled routines 因不可靠 ship-anywhere 而**有意排除**。别加在 Bedrock / Vertex / Foundry 上会断的依赖。
-   → 决策快照：[`adrs/ADR-002-ship-anywhere-scope.md`](adrs/ADR-002-ship-anywhere-scope.md) · 排除留痕：[`design_docs/spec.md` §12](design_docs/spec.md) · 硬卡点：带外脚本（codex / eval）依赖 `uv` + Python 3.12 + `claude`/`codex` CLI——**只许进 `scripts/`（手动调用），绝不进 `hooks/`**。
+   → 决策快照：[`adrs/ADR-002-ship-anywhere-scope.md`](adrs/ADR-002-ship-anywhere-scope.md) · 排除留痕：[`design_docs/spec.md` §12](design_docs/spec.md) · 硬卡点：带外脚本（codex / eval / cc-usage / statusline-capture）依赖 `uv` + Python 3.12 + `claude`/`codex` CLI 或 node——**绝不进 `hooks/`**（那会破 ship-anywhere）。落点二分：**运行时**带外脚本（终端用户会跑：cc-usage / codex-review / statusline-capture）进 `skills/<skill>/scripts/`（随 skill 分发，prose 用 `${CLAUDE_SKILL_DIR}`/`${CLAUDE_PLUGIN_ROOT}` 引用，**裸相对路径会在用户 cwd 下找不到**·Finding #37）；**dev-only** 脚本（eval / skill-lint）留顶层 `scripts/`（仅 repo 根调用，裸路径正确）。
 
 6. **所有 hook 武装后才激活（dormant-until-armed）。** 每个 hook 在本 session 被 `as-master-orchestrator` 武装（board-derived：home 有 `*.board.json` 且 `owner.active:true` 且 `owner.session_id == 本次 hook stdin 的 session_id`；sid 空 → 降级匹配任一 active 板）之前完全休眠（空 stdout、RC 0、不 block）；`bootstrap-board.sh` 唯一豁免（它**是** ARM 动作本身，建板即把 `owner.session_id` 盖成创建它的 session）。
    → 决策快照：[`adrs/ADR-007-hook-arming-gate.md`](adrs/ADR-007-hook-arming-gate.md)（board-derived armed-gate）· 协议 SSOT：本文 §12 hook 武装纪律 · 硬卡点：`grep -rL 'board_matches\|isArmed' hooks/scripts/*.sh hooks/scripts/*.js` 须只剩 `bootstrap-board.sh`（除豁免者外每个 hook 都须含武装判定，否则违规）。
@@ -138,7 +138,7 @@ cc-master/
 
 cc-master 把 **codex 当独立的第二端点验收者**（呼应红线 4 "指挥不演奏" + SKILL A 的"只信端点验收 / gate-green ≠ passed"）。它**不进任何 hook**（要联网 / OAuth / 多分钟超时 / JSON 解析，违背纯 bash ship-anywhere），只以**带外手动 / 编排调用的 sub-agent 端点验收节点**形态接入。
 
-落地物：[`scripts/codex-review.sh`](scripts/codex-review.sh)——纯 shell 封装 `codex exec review ... --json`，只读 sandbox，对一段 diff 出 `verdict: approve | needs-attention` + 每条 finding 的 severity/file/line。**空 review / OAuth 过期 → 按"未通过"处理**（silent-pass-through guard，不静默放行）。`verdict` 映射现有 Joiner 闸：`needs-attention` → Replan；`approve` + 非空 + 已读 diff → done。
+落地物：[`skills/orchestrating-to-completion/scripts/codex-review.sh`](skills/orchestrating-to-completion/scripts/codex-review.sh)——纯 shell 封装 `codex exec review ... --json`，只读 sandbox，对一段 diff 出 `verdict: approve | needs-attention` + 每条 finding 的 severity/file/line。**空 review / OAuth 过期 → 按"未通过"处理**（silent-pass-through guard，不静默放行）。`verdict` 映射现有 Joiner 闸：`needs-attention` → Replan；`approve` + 非空 + 已读 diff → done。
 → 文档化：[`skills/orchestrating-to-completion/references/resume-verify.md`](skills/orchestrating-to-completion/references/resume-verify.md)（codex 第二验收者小节）· 指针：`/codex` skill。
 
 ---
@@ -195,7 +195,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 
 ## 13. ADR 约定
 
-结构性架构决策（"为什么 X 不 Y / 何时可推翻"）记成 ADR——与 design_docs（描述当前状态）严格分开。命名 `ADR-NNN-<slug>.md`，带 Status/Date/Scope frontmatter + Context/Decision/Consequences/Alternatives/Related 模板。**何时写 ADR、ADR-vs-design_docs 试金石、workflow 全在** → [`adrs/AGENTS.md`](adrs/AGENTS.md)。现有 ADR-001..007（hooks-pure-bash / ship-anywhere-scope / board-narrow-waist / loop-dissolution-and-goal-hook / two-skills-separation / hooks-may-use-node-js / hook-arming-gate）。
+结构性架构决策（"为什么 X 不 Y / 何时可推翻"）记成 ADR——与 design_docs（描述当前状态）严格分开。命名 `ADR-NNN-<slug>.md`，带 Status/Date/Scope frontmatter + Context/Decision/Consequences/Alternatives/Related 模板。**何时写 ADR、ADR-vs-design_docs 试金石、workflow 全在** → [`adrs/AGENTS.md`](adrs/AGENTS.md)。现有 ADR-001..008（hooks-pure-bash / ship-anywhere-scope / board-narrow-waist / loop-dissolution-and-goal-hook / two-skills-separation / hooks-may-use-node-js / hook-arming-gate / account-authoritative-usage-and-script-placement）。
 
 ---
 
@@ -212,6 +212,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 | 异步完成 + HITL / p95 hedging / 用户当 async worker | [`skills/orchestrating-to-completion/references/async-hitl.md`](skills/orchestrating-to-completion/references/async-hitl.md) |
 | 廉价续跑 + 端点验收 / content-hash / codex 第二验收者 | [`skills/orchestrating-to-completion/references/resume-verify.md`](skills/orchestrating-to-completion/references/resume-verify.md) |
 | 选每节点模型档位 / 主线为何固定模型保 cache / 按 5h-7d 配额窗口 pace | [`skills/orchestrating-to-completion/references/cost-and-pacing.md`](skills/orchestrating-to-completion/references/cost-and-pacing.md)（reference 知识,非红线）|
+| 沿愿景轴定位（哪条镜头 / reference / 决策程序节点服务哪项 charter 能力）/ 把 hook 注入短语回溯到锚点 | [`skills/orchestrating-to-completion/references/external-coordinates.md`](skills/orchestrating-to-completion/references/external-coordinates.md)（愿景索引 + hook 共享词汇,魂瘦身下沉的坐标系）|
 | 写 / 调试 / 启动 workflow 脚本（API + 机制 + pattern + 11 个 example）| [`skills/authoring-workflows/SKILL.md`](skills/authoring-workflows/SKILL.md) + [`references/`](skills/authoring-workflows/references/) + [`assets/examples/`](skills/authoring-workflows/assets/examples/) |
 | 动手任何 feature / skill / 行为改动前先挖真需求 / 过设计闸（取代 `superpowers:brainstorming`）| [`.claude/skills/requirement-elicitation/SKILL.md`](.claude/skills/requirement-elicitation/SKILL.md)（道 + 五个 discovery moves + strawman + 设计闸，项目自用 dev skill）|
 | 写 / 改任何本仓 skill（尤其纪律型）/ 跑 pressure baseline | [`.claude/skills/cc-master-skillsmith/SKILL.md`](.claude/skills/cc-master-skillsmith/SKILL.md)（TDD-for-skills，项目自用 dev skill）|
@@ -219,8 +220,8 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 | 声明 J（成功契约）/ 度量一个 skill / 跑触发或行为 eval | [`.claude/skills/grounding-skill-evals/SKILL.md`](.claude/skills/grounding-skill-evals/SKILL.md)（轻量 J 写法 + Track A/B + holdout / predict-then-validate，项目自用 dev skill）|
 | 改 hook | [`hooks/scripts/`](hooks/scripts/) + [`tests/`](tests/) + [`CONTRIBUTING.md`](CONTRIBUTING.md)（先确认红线 1：bash+node/JS，ADR-006）|
 | 新建 / 改任何 hook 前先懂「武装闸」/ 为什么所有 hook 未武装即休眠 | [`adrs/ADR-007-hook-arming-gate.md`](adrs/ADR-007-hook-arming-gate.md)（board-derived armed-gate）+ 本文 §12 hook 武装纪律 |
-| 让 codex 当端点验收 reviewer | [`scripts/codex-review.sh`](scripts/codex-review.sh) + `/codex` skill |
-| 在 pacing 决策点感知 5h-7d usage（带外信号脚本，非 hook）| [`scripts/cc-usage.sh`](scripts/cc-usage.sh)（系统 python3 解析本地 JSONL，ship-anywhere）|
+| 让 codex 当端点验收 reviewer | [`skills/orchestrating-to-completion/scripts/codex-review.sh`](skills/orchestrating-to-completion/scripts/codex-review.sh) + `/codex` skill |
+| 在 pacing 决策点感知 5h-7d usage（带外信号脚本，非 hook）| [`skills/orchestrating-to-completion/scripts/cc-usage.sh`](skills/orchestrating-to-completion/scripts/cc-usage.sh)（账户权威 `used_percentage` 优先、本地反推 fallback；信号由 `statusline-capture.js` 捕获·Finding #37）|
 | 跑触发准确率 eval（description 改动前后）| [`scripts/eval-trigger.sh`](scripts/eval-trigger.sh) + [`design_docs/eval/README.md`](design_docs/eval/README.md) |
 | 跑编排纪律 benchmark（行为型 + codex 第二评委）| [`scripts/eval-benchmark.sh`](scripts/eval-benchmark.sh) + [`design_docs/eval/track-b-benchmark.md`](design_docs/eval/track-b-benchmark.md) |
 | 写新 ADR / 援引现有 ADR / 判断 ADR-vs-design_docs | [`adrs/AGENTS.md`](adrs/AGENTS.md) + [`adrs/`](adrs/) |
