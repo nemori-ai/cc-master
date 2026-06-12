@@ -26,7 +26,7 @@ That one command bootstraps a persistent board and makes the session the orchest
 
 Dynamic workflows (shipped with Opus 4.8) gave Claude Code real parallelism — fan out hundreds of agents from one script. But for a *long-horizon* goal two gaps remain: the official model only promises the main session stays **responsive**, never that the orchestrator stays **productive**; and nothing carries your **role and progress across compaction**. cc-master fills exactly that gap — it doesn't replace dynamic workflows, it *wraps* them.
 
-Here is the same long goal — *"migrate 9 domains to a new schema"* — run three ways:
+Here is the same long goal — *"internationalize an app into 6 locales"* — run three ways:
 
 ```mermaid
 flowchart LR

@@ -26,7 +26,7 @@
 
 Dynamic workflows（随 Opus 4.8 一同发布）给了 Claude Code 真正的并行能力——一段脚本就能 fan out 出上百个 agent。但对一个**长周期**目标来说，仍有两处空白：官方模型只承诺主会话**保持响应**，从不承诺总指挥**保持产出**；也没有任何机制能把你的**角色与进度带过一次 compaction**。cc-master 填的正是这块空白——它不取代 dynamic workflow，而是把它*包了进来*。
 
-下面是同一个长目标——*「把 9 个 domain 迁移到新 schema」*——三种跑法的对照：
+下面是同一个长目标——*「把一个应用国际化到 6 种语言（locale）」*——三种跑法的对照：
 
 ```mermaid
 flowchart LR

@@ -24,9 +24,9 @@ rm -rf "$H"
 
 # Case B: an active board with a goal → re-injects role + home + goal + board name
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-1" '{"schema":"cc-master/v1","goal":"MIGRATE THE COGNITION SCHEMA","owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-1" '{"schema":"cc-master/v1","goal":"INTERNATIONALIZE THE APP TO 6 LOCALES","owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
 run_ss "$H"
-assert_contains "$HOOK_OUT" "MIGRATE THE COGNITION SCHEMA" "re-injects the goal"
+assert_contains "$HOOK_OUT" "INTERNATIONALIZE THE APP TO 6 LOCALES" "re-injects the goal"
 assert_contains "$HOOK_OUT" "orchestrator" "re-anchors the role"
 assert_contains "$HOOK_OUT" "20260101T000000Z-1.board.json" "names the active board"
 assert_contains "$HOOK_OUT" "$H" "points at the home dir"
