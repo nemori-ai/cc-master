@@ -23,6 +23,15 @@ HOME_DIR="${CC_MASTER_HOME:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/cc-master}"
 input="$(cat)"
 sid="$(printf '%s' "$input" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
 
+# ── SUB-AGENT 闸（红线4：指挥不演奏）──────────────────────────────────────────────────────────────────
+# PostToolBatch 在 sub-agent（Task 派生的子 agent）上下文内部也触发；官方 stdin 此时带 `agent_id`（主线缺席）。
+# 官方语义：sub-agent 内注入的 additionalContext 进的是该 leaf worker 自己的 context（贴在 tool result 旁）——
+# 主编排者专属的 WIP/编排软警告绝不能泄漏给单元 worker（否则把指挥的乐谱递给乐手，破红线4：指挥不演奏）。
+# 纯 bash 解析（红线1 禁 jq），比照上面 session_id：只匹配带引号的字符串值，故 `"agent_id":null`
+# 或字段缺席 → 解析为空 → 视为主线。非空（sub-agent）→ 静默 exit 0（在武装闸之前，最早可静默处）。
+agent_id="$(printf '%s' "$input" | sed -n 's/.*"agent_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+[ -n "$agent_id" ] && exit 0
+
 # owner_region BOARD — print the ROOT "owner" object's DEPTH-1 FIELD STREAM only, via a string- and
 # escape-aware depth scan ([ ] and { }) in POSIX awk. The board is one root object; this enters ONLY the
 # `"owner"` key found at ROOT depth (curly depth 1, bracket depth 0) and emits the chars at the owner

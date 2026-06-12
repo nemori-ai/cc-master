@@ -13,6 +13,13 @@ run_batch() {
              | CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
                bash "$PLUGIN_ROOT/hooks/scripts/posttool-batch.sh" 2>/dev/null)"; HOOK_RC=$?
 }
+# run_batch_raw HOME STDIN_JSON — run the PostToolBatch hook with a caller-supplied stdin JSON literal
+# (so tests can inject extra fields like agent_id). The hook itself extracts session_id from the JSON.
+run_batch_raw() {
+  HOOK_OUT="$(printf '%s' "$2" \
+             | CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
+               bash "$PLUGIN_ROOT/hooks/scripts/posttool-batch.sh" 2>/dev/null)"; HOOK_RC=$?
+}
 
 # Case 1: active board, in_flight=5, wip_limit=4 → warn. HOOK_OUT contains "WIP", "5", "4", rc 0,
 #          and MUST NOT contain a block decision.
@@ -160,6 +167,42 @@ run_batch "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "真 active 板含嵌套 active:false → rc 0"
 assert_contains "$HOOK_OUT" "WIP" "真 active 板（owner.active:true）照常 armed → 超 cap 警告"
 assert_contains "$HOOK_OUT" "additionalContext" "真 active 板 → 注入 additionalContext"
+rm -rf "$H"
+
+# ── SUB-AGENT 闸：sub-agent 上下文（stdin 带 agent_id）不得收到指挥专属 WIP 警告（CODEX9，破红线 4 修复）──
+# PostToolBatch 在 Task 派生的 sub-agent 上下文内部也触发；官方 stdin 此时带 `agent_id`（主线缺席）。
+# 旧版 board_matches 只用 session_id 判 arming → leaf worker 自己的一批工具调用会匹配主板、在主板超
+# wip_limit 时收到「指挥专属」的 WIP/编排 additionalContext —— 把指挥的乐谱递给了乐手（WIP 警告是
+# orchestrator-only 的认知指导，绝不该到单元 worker）。下面用例锁死：agent_id 非空 → 静默早退。
+
+# Case 15 (CODEX9 回归)：真 active 主板（owner.active:true、owner.session_id == sid，2 个 in_flight、
+#           wip_limit=1 → 超 cap）。stdin 同时带 session_id 与 "agent_id":"sub-xyz"（sub-agent 上下文）。
+#           必须静默（空 stdout、rc 0、无 WIP additionalContext）。修前只用 session_id 判 → 误注 WIP 警告。
+H="$(make_project)"; SID="sess-subagent"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"wip_limit\":1,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_batch_raw "$H" "{\"session_id\":\"$SID\",\"agent_id\":\"sub-xyz\",\"hook_event_name\":\"PostToolBatch\",\"tool_results\":[]}"
+assert_eq 0 "$HOOK_RC" "sub-agent 上下文（agent_id 非空）→ rc 0"
+assert_eq "" "$HOOK_OUT" "sub-agent 上下文 → 静默（指挥专属 WIP 警告不泄漏给 leaf worker，红线4）"
+assert_not_contains "$HOOK_OUT" "WIP" "sub-agent 上下文 → 无 WIP 警告"
+rm -rf "$H"
+
+# Case 16 (反向保活)：同一超 cap 主板，stdin 只带 session_id、无 agent_id（主线）→ 照常注入 WIP 警告。
+#           防过度修复：sub-agent 闸不得误伤主线编排者。
+H="$(make_project)"; SID="sess-mainline"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"wip_limit\":1,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_batch_raw "$H" "{\"session_id\":\"$SID\",\"hook_event_name\":\"PostToolBatch\",\"tool_results\":[]}"
+assert_eq 0 "$HOOK_RC" "主线（无 agent_id）→ rc 0"
+assert_contains "$HOOK_OUT" "WIP" "主线（无 agent_id）→ 照常注入 WIP 警告（不误伤主线）"
+assert_contains "$HOOK_OUT" "additionalContext" "主线 → 注入 additionalContext"
+rm -rf "$H"
+
+# Case 17 (null/缺席当主线)："agent_id":null（JSON null，非带引号字符串）→ sed 只认带引号值 → 解析为空
+#           → 视为主线 → 同一超 cap 板照常警告。验证 sed 不会把 null 误当 sub-agent 而误静默主线。
+H="$(make_project)"; SID="sess-agentnull"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"wip_limit\":1,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_batch_raw "$H" "{\"session_id\":\"$SID\",\"agent_id\":null,\"hook_event_name\":\"PostToolBatch\",\"tool_results\":[]}"
+assert_eq 0 "$HOOK_RC" "agent_id:null → rc 0"
+assert_contains "$HOOK_OUT" "WIP" "agent_id:null（非带引号字符串）→ 当主线 → 照常警告"
 rm -rf "$H"
 
 finish
