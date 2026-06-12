@@ -10,6 +10,7 @@
 - [4. codex 第二评委（codex-review.sh）](#4-codex-第二评委codex-reviewsh)
 - [5. generator ≠ judge（为什么非要分家族）](#5-generator--judge为什么非要分家族)
 - [6. 读判决的诚实纪律](#6-读判决的诚实纪律)
+- [7. 演化频率分层 + 谱系/回滚安全网](#7-演化频率分层--谱系回滚安全网)
 
 ---
 
@@ -98,3 +99,24 @@ scripts/codex-review.sh [--base <branch>]   # 默认 base = main
 - **空 review / 失败调用 → 未通过**，不是「没问题」。silent-pass-through 是要堵的洞，不是默认放行。
 - **delta 小于噪声 → 没结论。** Track B 的 mean±stddev 里，delta 不显著就别宣布胜利。
 - **跑不全要显式标注待补。** 若分批 / 受限跑不全（如 eval set 还没建、codex OAuth 过期），**显式说「这部分没跑，待补」**，不静默跳过当成跑过了（reject-and-surface）。
+
+## 7. 演化频率分层 + 谱系/回滚安全网
+
+### 评估成本决定演化节奏
+
+prose 的迭代（演化）能跑多快，**由「评估一次有多贵」决定，不由「改一次有多容易」决定**——改一行 description 和改一段纪律 prose 都很便宜，但验证它们的成本差一个量级，演化节奏必须跟着评估成本分层（借思想：评估器成本必须匹配演化预算——外部演化式优化方法论的共性教训；只借原则，不搬引擎）：
+
+| 标的 | 评估一次的成本 | 允许的演化节奏 |
+|---|---|---|
+| `description`（触发器） | Track A 一次：廉价、客观、全自动（§2） | **高频、多变体**——一轮可试多个候选措辞，各跑一遍比 accuracy |
+| skill body 的行为（纪律段 / 流程） | Track B 一次：多分钟、多 run、半手动（§3），还要配 codex 第二评委（§4） | **低频、小步**——一次只动一处，改前后各量一遍，绝不堆叠多个未验证改动再跑一次 |
+
+节奏错配两个方向都是错：把贵评估的标的当便宜的演化（body 一轮改五处、最后才跑一次 Track B）= 分不清哪处改动贡献了 delta；把便宜评估的标的当贵的演化（description 换个词也排队等慎重评审）= 白白浪费演化预算。
+
+**每次演化的诚实形态**：改前写预测、改前后各跑一遍比对、holdout 防过拟合（predict-then-validate）——完整配方在 [`anti-overfit-lite.md`](anti-overfit-lite.md)，此处不复述。
+
+**Track A 信号不可用时的降级路径（Finding #18 / #25，本仓实测）：** 本仓已两次实测到 Track A 的正例 recall 在冷启单轮 / 满载环境下塌到地板（≈0）——根因是测量通道，与 description 质量无关（权威记录：`design_docs/eval/README.md` 的 "Measured floor warning"）。此时 before/after 读出 0 vs 0 不携带任何信息——「无数字不合入」若硬卡这个塌掉的数字，就是在对着死通道调 description。降级纪律：**先验通道、再信数字**——一个全 0（或全满）的指标先怀疑测量、后怀疑被测物；通道确认死了，就降级为**记录在案的定性评审（description diff review）+ predict-then-validate**（预测照写，用定性比对验证），并显式标注「Track A 信号不可用，待通道修复」（reject-and-surface）。**绝不硬卡一个塌掉的数字；也绝不因为数字塌了就什么都不验。**
+
+### 谱系与回滚锚 = git（不另建存档机制）
+
+prose 演化需要谱系（哪个版本从哪来）和回滚（演化失败退回上一个好版本），本仓的答案就是 **git**：每次演化独立 commit（按 `AGENTS.md` §11 分组提交），回滚 = revert / checkout 旧版——不另建快照目录或版本存档机制。同时，**外部锚（可执行 eval + codex 第二评委）是演化闭环的必需件、不是可选项**：没有非同家族端点当锚，prose 自演化会漂成「自己评自己、越评越好」——这条纪律 §4–§5 已立（generator≠judge），此处只指回、不复述。

@@ -26,10 +26,12 @@
 set -uo pipefail
 
 DIR="${HOME}/.claude/projects"; NOW=""
+RATE_CACHE="${CC_MASTER_RATE_CACHE:-${HOME}/.claude/.cc-master-rate-limits.json}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --dir) DIR="$2"; shift 2;;
     --now) NOW="$2"; shift 2;;
+    --rate-cache) RATE_CACHE="$2"; shift 2;;
     *)     shift;;
   esac
 done
@@ -38,7 +40,7 @@ done
 # was intentionally dropped: its raw `blocks --json` shape differs from ours, so piping it
 # through verbatim would break any caller parsing the documented schema. A future accelerator
 # MUST first normalize ccusage output into THIS schema; until then, zero external-tool dep.)
-DIR="$DIR" NOW="$NOW" python3 - <<'PY'
+DIR="$DIR" NOW="$NOW" RATE_CACHE="$RATE_CACHE" python3 - <<'PY'
 import os, json, glob, datetime as dt
 
 root = os.environ["DIR"]
@@ -114,5 +116,40 @@ if blocks:
         }
 
 wk = sum(tok for ts, tok in rows if now - ts <= dt.timedelta(days=7))
-print(json.dumps({"five_hour": fh, "seven_day": {"used_tokens": wk}}))
+
+# account-authoritative override (Finding #37): 订阅账户的权威 5h/7d used_percentage + resets_at 只在
+# status-line stdin 出现(JSONL 里没有),由 statusline-capture.js 落到 sidecar。若 sidecar 存在且 5h 窗口
+# 仍有效(resets_at 在未来),用它当权威口径(source:"account");否则诚实退回本地反推(source:"local-derived-
+# approx")——绝不让一个看似精确的反推值冒充权威(Finding #37 的核心:反推 reset 倒计时可失真到数量级)。
+cache = os.environ.get("RATE_CACHE", "")
+acct = None
+if cache:
+    try:
+        acct = json.load(open(cache, encoding="utf-8"))
+    except Exception:
+        acct = None  # 缺/坏 sidecar → 当作没有 → fallback
+
+now_ep = now.timestamp()
+source = "local-derived-approx"
+out_fh = fh
+out_wk = {"used_tokens": wk}
+
+a5 = acct.get("five_hour") if isinstance(acct, dict) else None
+# account 模式仅当 5h reset 在未来(窗口仍有效);resets_at<=now 说明 sidecar 跨过了 reset、已 stale → fallback。
+if isinstance(a5, dict) and isinstance(a5.get("resets_at"), (int, float)) and a5["resets_at"] > now_ep:
+    source = "account"
+    out_fh = {
+        "used_percentage": a5.get("used_percentage"),       # 权威
+        "resets_at": a5["resets_at"],                       # 权威
+        "window_remaining_min": round((a5["resets_at"] - now_ep) / 60),  # 从权威 resets_at 算,非反推
+        "used_tokens": fh["used_tokens"],                   # 本地补充(账户不给绝对 token,但 burn 预测要)
+        "burn_rate_per_min": fh["burn_rate_per_min"],
+    }
+    a7 = acct.get("seven_day")
+    if isinstance(a7, dict):
+        out_wk = {"used_percentage": a7.get("used_percentage"), "used_tokens": wk}
+        if isinstance(a7.get("resets_at"), (int, float)):
+            out_wk["resets_at"] = a7["resets_at"]
+
+print(json.dumps({"source": source, "five_hour": out_fh, "seven_day": out_wk}))
 PY

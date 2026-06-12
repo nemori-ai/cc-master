@@ -30,7 +30,7 @@ run_pacing() {
   HOOK_OUT="$(printf '{"session_id":"sess-x","hook_event_name":"Stop"}' \
     | CC_MASTER_USAGE_DIR="$1" CC_MASTER_NOW="$2" \
       CC_MASTER_5H_BUDGET="${3:-}" CC_MASTER_5H_BURN_FLOOR="${4:-}" \
-      CC_MASTER_HOME="$ARMED_HOME" \
+      CC_MASTER_HOME="$ARMED_HOME" CC_MASTER_RATE_CACHE="/nonexistent-pacing-rate-cache" \
       "$HOOK" 2>/dev/null)"; HOOK_RC=$?
   rm -rf "$ARMED_HOME"
 }
@@ -38,14 +38,14 @@ run_pacing() {
 # (for the armed-gate cases: unarmed home, other-session board, missing-session stdin, etc.).
 run_pacing_home() {
   HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$4" \
-    | CC_MASTER_USAGE_DIR="$1" CC_MASTER_NOW="$2" CC_MASTER_HOME="$3" \
+    | CC_MASTER_USAGE_DIR="$1" CC_MASTER_NOW="$2" CC_MASTER_HOME="$3" CC_MASTER_RATE_CACHE="/nonexistent-pacing-rate-cache" \
       CC_MASTER_5H_BUDGET="${5:-}" CC_MASTER_5H_BURN_FLOOR="${6:-}" \
       "$HOOK" 2>/dev/null)"; HOOK_RC=$?
 }
 # run_pacing_stdin USAGE_DIR NOW HOME STDIN_JSON [BUDGET] [BURN_FLOOR] -> arbitrary stdin (e.g. no sid).
 run_pacing_stdin() {
   HOOK_OUT="$(printf '%s' "$4" \
-    | CC_MASTER_USAGE_DIR="$1" CC_MASTER_NOW="$2" CC_MASTER_HOME="$3" \
+    | CC_MASTER_USAGE_DIR="$1" CC_MASTER_NOW="$2" CC_MASTER_HOME="$3" CC_MASTER_RATE_CACHE="/nonexistent-pacing-rate-cache" \
       CC_MASTER_5H_BUDGET="${5:-}" CC_MASTER_5H_BURN_FLOOR="${6:-}" \
       "$HOOK" 2>/dev/null)"; HOOK_RC=$?
 }
@@ -269,5 +269,52 @@ run_pacing_home "$SAMPLE" "2026-06-10T12:00:00Z" "$H" "MINE" "3000"
 assert_eq 0 "$HOOK_RC" "(h2) board sid non-empty & != stdin sid → rc 0"
 assert_eq "" "$HOOK_OUT" "(h2) board sid=OTHER (non-empty) != stdin sid=MINE → still silent (red line 6 defence intact)"
 rm -rf "$H"
+
+# ── ACCOUNT 口径 (Finding #37): sidecar 的权威 5h/7d used_percentage 判墙,脱钩失真反推,纳入 7d ──────────
+# 账户权威 used_percentage(+resets_at)由 statusline-capture.js 落到 sidecar(status-line 是唯一来源)。sidecar
+# 可用且窗口有效时,撞墙判据改用账户 % —— 不再依赖会失真到数量级的本地反推 window_remaining_min(Finding #37);
+# 并第一次把 7d 纳入(此前 hook 只看 5h、对 7d 全盲,Finding #31)。sidecar 不可用 → 降级本地反推(上面的 cases)。
+# run_pacing_acct SIDECAR_JSON NOW HOME SID -> drive an armed Stop carrying a rate-limit sidecar.
+run_pacing_acct() {
+  local cdir; cdir="$(make_project)"; local cache="$cdir/rate.json"
+  printf '%s' "$1" > "$cache"
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$4" \
+    | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="$2" CC_MASTER_HOME="$3" CC_MASTER_RATE_CACHE="$cache" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+  rm -rf "$cdir"
+}
+ACCT_HOME="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$ACCT_HOME/mine.board.json"
+A_NOWEP="$(python3 -c 'import datetime as d;print(int(d.datetime(2026,6,10,12,0,0,tzinfo=d.timezone.utc).timestamp()))')"
+A_R5F=$((A_NOWEP+3600))  # 5h resets 1h in the future → window valid
+
+# (acct-1) high 5h used% (90 ≥ floor 85) → warns, carries account 5h %, non-blocking.
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
+  "2026-06-10T12:00:00Z" "$ACCT_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(acct-1) high 5h% → rc 0"
+assert_contains "$HOOK_OUT" "additionalContext" "(acct-1) high account 5h used% → warns"
+assert_contains "$HOOK_OUT" "90" "(acct-1) carries account 5h used_percentage (authoritative, not反推)"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(acct-1) never blocks"
+
+# (acct-2) high 7d used% (88) while 5h low (10) → warns on 7d (Finding #31: 7d now in scope).
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":10,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":88}}" \
+  "2026-06-10T12:00:00Z" "$ACCT_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(acct-2) high 7d% → rc 0"
+assert_contains "$HOOK_OUT" "additionalContext" "(acct-2) high account 7d used% → warns (7d now in scope)"
+assert_contains "$HOOK_OUT" "88" "(acct-2) carries account 7d used_percentage"
+
+# (acct-3) both windows under floor → silent (no wall, no spam).
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":30,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":40}}" \
+  "2026-06-10T12:00:00Z" "$ACCT_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(acct-3) both low → rc 0"
+assert_eq "" "$HOOK_OUT" "(acct-3) both account windows under floor → silent"
+
+# (acct-4) UNARMED + critical account sidecar → still silent (armed gate runs BEFORE reading cache).
+A_UH="$(make_project)"
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":99,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":99}}" \
+  "2026-06-10T12:00:00Z" "$A_UH" "sess-unarmed-acct"
+assert_eq "" "$HOOK_OUT" "(acct-4) unarmed → silent even at critical account % (armed gate intact)"
+rm -rf "$A_UH"
+rm -rf "$ACCT_HOME"
 
 finish

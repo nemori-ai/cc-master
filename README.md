@@ -73,7 +73,7 @@ Every claim in column ③ is anchored to a real mechanism, not a marketing line:
 | **Survives compaction** | No | No | **Yes** — role + board re-injected | `reinject.sh` (SessionStart hook) |
 | **Cross-session resume** | No | Same-session only | **Yes** — re-discovered from the board file | the board (persistent save file) |
 | **Endpoint verification** | Ad hoc | Inside the script | Orchestrator verifies independently | lens 6 + the decision program (Skill A) |
-| **Quota awareness** | No | No | **Yes** — live 5h burn-rate wall (7d total via `cc-usage.sh`) | `usage-pacing.js` (Stop hook) + `cc-usage.sh` |
+| **Quota awareness** | No | No | **Yes** — account-authoritative 5h/**7d** `used_percentage` (captured from the status line; local-derived 反推 as fallback) | `usage-pacing.js` (Stop hook) + `statusline-capture.js` + `cc-usage.sh` |
 
 ---
 
@@ -185,6 +185,19 @@ Once loaded, hand it a goal big enough to be worth it (think >24h of work, many 
 /cc-master:stop                            # archive the board and stand down (board is kept, not deleted)
 ```
 
+### Optional — turn on account-authoritative quota awareness
+
+cc-master can pace against your subscription's **real** 5h/7d quota `used_percentage` — but that signal lives **only** in the status line's stdin (no hook, CLI, or file can reach it). Capturing it means wiring `statusline-capture.js` into your status line. Don't hand-edit `settings.json` — the **AI-native way** is to paste the prompt below to Claude Code and let it do the wiring (it resolves the real install path, preserves your existing status line via `--passthrough`, sidesteps the undocumented `${CLAUDE_PLUGIN_ROOT}`-in-`statusLine.command` question by using an absolute path, and verifies the sidecar lands):
+
+> Help me enable cc-master's account-authoritative usage pacing. My subscription's 5h/7d quota `used_percentage` only appears in the **status line** script's stdin; cc-master ships `statusline-capture.js` to capture it into a sidecar (`~/.claude/.cc-master-rate-limits.json`) that its pacing hook and `cc-usage.sh` read. Please:
+> 1. Locate the real absolute path of `statusline-capture.js` — it lives under the plugin's `skills/orchestrating-to-completion/scripts/`; the plugin may sit under `~/.claude/plugins/cache/.../` or be loaded via `--plugin-dir`, so use `find`/`ls` to resolve the actual path.
+> 2. Read my current `statusLine.command` in `~/.claude/settings.json` (if any).
+> 3. Rewrite `statusLine.command` to run `statusline-capture.js` first and `--passthrough` my original command, so my status-line display is unchanged. Use an **absolute path** (variable expansion in this field is undocumented). Show me the exact diff and let me confirm before you write it.
+> 4. Then have the status line render once (I'll send a message), check that `~/.claude/.cc-master-rate-limits.json` was written with the right shape, and run the plugin's `cc-usage.sh` to confirm its `source` is `"account"` (not `local-derived-approx`).
+> 5. If I'm on Pro/Max but `rate_limits` never shows up, tell me why (it only appears after the first API response, and only on Pro/Max).
+
+Without this, pacing silently falls back to local-JSONL 反推 — an approximation whose reset countdown can be off by an order of magnitude ([Finding #37](design_docs/dogfood-findings.md)). Pro/Max subscriptions only; everywhere else this is a no-op and the fallback handles it.
+
 ---
 
 ## The six-vision charter (C1–C6)
@@ -194,7 +207,7 @@ cc-master **aims to** make a Claude Code agent into a master orchestrator across
 | # | Capability | Status | How it's delivered today |
 |---|---|---|---|
 | **C1** | Drive a goal to full, async-parallel completion — not halfway, all the way | 🟢 Live | three background mechanisms + the decision-program loop + a `Stop` gate that forces "really all done" |
-| **C2** | Control the *rate* of token burn — throttle, don't redline | 🟢 Live | `usage-pacing.js` (non-blocking live 5h burn-rate warning) + `cc-usage.sh` (out-of-band 7d cumulative) |
+| **C2** | Control the *rate* of token burn — throttle, don't redline | 🟢 Live | `usage-pacing.js` (non-blocking warning on account 5h/**7d** `used_percentage`, captured via `statusline-capture.js`; local-derived fallback) + `cc-usage.sh` (out-of-band query, account-first) |
 | **C3** | Hold the line between deciding autonomously and pulling in the human | 🟢 Live | red lines + `blocked_on:user` nodes + the `Stop` gate listing unanswered user decisions |
 | **C4** | Decompose, manage, update, and re-plan the goal as it learns | 🟢 Live | the board DAG + CPM decomposition + resume flagging dangling `stale`/`escalated` nodes |
 | **C5** | Maximize throughput *under* a sane burn rate | 🟢 Live | WIP cap (~75% utilization) + free float parallelism + `posttool-batch.sh` soft-warn |
@@ -228,7 +241,7 @@ cc-master/
 
 - **Commands** are one-shot ignition — you trigger them; they inject the "I am the master orchestrator" philosophy and operating discipline, and open the board.
 - **Skills** are the on-demand deep manuals — Skill A when you run the orchestration loop, Skill B when you write a workflow script.
-- **Hooks** are the orchestrator's runtime — they survive compaction (re-injecting "you are the orchestrator + here is your board"), gate completion, soft-warn on over-dispatch, and sense the 5h burn-rate wall (the 7d cumulative total is read out-of-band by `cc-usage.sh`). They reach for `node` only where structured JSON parsing earns it (usage from JSONL), bash everywhere else ([ADR-006](adrs/ADR-006-hooks-may-use-node-js.md)).
+- **Hooks** are the orchestrator's runtime — they survive compaction (re-injecting "you are the orchestrator + here is your board"), gate completion, soft-warn on over-dispatch, and sense the quota wall against the account's 5h/7d `used_percentage` (captured from the status line by `statusline-capture.js`; local-derived 反推 as fallback). They reach for `node` only where structured JSON parsing earns it (usage / rate-limit JSON), bash everywhere else ([ADR-006](adrs/ADR-006-hooks-may-use-node-js.md)).
 
 ### The three background mechanisms it teaches
 
@@ -247,7 +260,7 @@ The board never depends on the agent cooperating, and the orchestrator can't qui
 1. **`UserPromptSubmit`** (`bootstrap-board.sh`) detects the command's sentinel → deterministically creates an empty board skeleton + injects its exact path and the orchestrator role. This is also the **arm action** (see below).
 2. **`SessionStart`** (`reinject.sh`) re-injects role + board after every compaction and on resume — and on resume it flags any **dangling `stale`/`escalated` nodes** left from an un-reconciled plan update.
 3. **`Stop`** (`verify-board.sh`) runs a pure-bash gate over *this session's* active board (filtered by `owner.session_id`, so concurrent orchestrations never interfere). An empty board, or one with `ready`/`uncertain` work left, **blocks** the stop; when the board looks done it forces a one-time **self-check against the goal** — surfacing any **unanswered `blocked_on:user` decisions** — before releasing, with a fuse (5 consecutive blocks) so a misjudgment can never wedge the agent.
-4. **`Stop`** also runs `usage-pacing.js` (node): it reads the local usage JSONL, computes the 5h burn-rate (the 7d cumulative total is a separate out-of-band signal via `cc-usage.sh`), and injects a **non-blocking** pacing warning when you near the wall — it never blocks and never decides *how* to pace (that's the orchestrator's judgment).
+4. **`Stop`** also runs `usage-pacing.js` (node): it prefers the **account-authoritative** 5h/7d `used_percentage` captured to a sidecar by `statusline-capture.js` (falling back to local-JSONL 反推 when the sidecar is absent), and injects a **non-blocking** pacing warning when either window nears its limit — it never blocks and never decides *how* to pace (that's the orchestrator's judgment).
 5. **`PostToolBatch`** (`posttool-batch.sh`) counts in-flight tasks against the board's `wip_limit` after a batch of parallel calls and **soft-warns** on over-dispatch — never blocking; parallel freedom is preserved.
 
 **Every hook is dormant until armed.** "Armed" is derived from the board on disk: a hook acts only when this session owns an active board (`owner.active:true` **and** `owner.session_id` == the hook's stdin `session_id`; an empty id degrades to any active board, for compaction robustness). Until then — in any plain coding session in the same host — every hook is completely silent. `bootstrap-board.sh` is the sole exception: it *is* the arm action (stamping `owner.session_id` as it creates the board). Disarming is `/stop`. See [ADR-007](adrs/ADR-007-hook-arming-gate.md).

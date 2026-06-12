@@ -1,6 +1,6 @@
 # Cost & pacing —— 模型档位与 usage-aware 节流
 
-> **服务愿景：C2**（节流 token 消耗）**· C6**（按难度选模型档位）。**何时读：** 给每个节点选模型档位 + 想清楚为何主线固定一个模型（prompt-cache）；把一场长跑对照 5h/7d 配额窗口来 pace——靠 `scripts/cc-usage.sh` 感知，levers：降级模型 / 降 WIP / 推迟 float。
+> **服务愿景：C2**（节流 token 消耗）**· C6**（按难度选模型档位）。**何时读：** 给每个节点选模型档位 + 想清楚为何主线固定一个模型（prompt-cache）；把一场长跑对照 5h/7d 配额窗口来 pace——靠 `${CLAUDE_SKILL_DIR}/scripts/cc-usage.sh` 感知（**账户权威 `used_percentage` 优先、本地反推 fallback**），levers：降级模型 / 降 WIP / 推迟 float。
 
 > **它是什么——以及它*不是*什么。** 这里装的是编排者默认会缺的那块 reference 知识：四个模型档位及其相对成本、为何主线固定一个模型、以及怎么把一场 long-horizon 跑对照 5h/7d 配额窗口来 pace。它是**informational，不是红线。** Subagent pressure baseline（model-tiering ×6、usage-pacing ×2，零失败）表明 agent 已经能从镜头 2（把资源集中到临界链）和镜头 5（在容量内干活）*推导*出正确的 tiering / pacing。它们真正缺的只是下面这几条具体事实——档位定位 + 成本、切主线模型的 cache 代价、以及配额窗口的信号来源。所以把它们嵌进 `decomposition.md` 的每节点契约里就够；**别**把它们升格成一条独立纪律、更别为它们加红线（baseline 证明一条都不需要——§6 TDD-for-skills 的 Iron Law 禁止编造一条 agent 根本不会违背的规则）。
 
@@ -15,6 +15,8 @@
 
 ## 模型档位
 
+> **易 stale 警告（SSOT 不在本表）。** 下表的具体 **model ID**、绝对 **$/1M 价格**、乃至档位构成都会随时间变动——本表的快照是**截至 2026-06**。**当前真值的单一真相源是 Anthropic API 官方文档（platform.claude.com 的 models / pricing 页），或本仓 `claude-api` skill**（它内嵌一张带 cache 日期的现价/现 ID 表）；选档要核对绝对数字时，去那里，别信本表的字面。本表的**教学价值不在绝对美元数，而在下面那行相对 multiplier 的心智模型**——那部分稳定，绝对价格不稳定。
+
 | Tier | Model ID | $/1M in·out | Relative output cost | Use for |
 |---|---|---|---|---|
 | Fable 5 | `claude-fable-5` | $10 · $50 | **10×** | 高杠杆判断与裁决(verdict-bearing):独立 review / 二审 · 端点验收 · 决策咨询 · 架构仲裁 / 方案选型 · 最难的开放推理 / 创意 / 叙事 |
@@ -22,7 +24,7 @@
 | Sonnet 4.6 | `claude-sonnet-4-6` | $3 · $15 | **3×** | 平衡主力:常规实现 |
 | Haiku 4.5 | `claude-haiku-4-5` | $1 · $5 | **1×** | 快 & 便宜:机械活(跑测试 / grep / 格式化 / 改名),200K context |
 
-编排的花销由输出主导（agent 吐的远多于它读的），所以真正该拿来 pace 的数字是 **relative output multiplier**——Haiku 1× / Sonnet 3× / Opus 5× / Fable 10×：一个 Opus 叶子 ≈ 五个 Haiku 叶子，一个 Fable 叶子 ≈ 十个。
+（绝对美元为截至 2026-06 的快照；现价以 API 官方文档 / `claude-api` skill 为准——见上方警告。）编排的花销由输出主导（agent 吐的远多于它读的），所以真正该拿来 pace 的数字是 **relative output multiplier**——Haiku 1× / Sonnet 3× / Opus 5× / Fable 10×：一个 Opus 叶子 ≈ 五个 Haiku 叶子，一个 Fable 叶子 ≈ 十个。这组**相对关系**（强档 ≈ 弱档的 N×）是这段真正稳定、可长期依赖的心智模型；档位重排或绝对单价变动时，更新上表数字即可，这组 multiplier 思路照旧。
 
 补一句 `effort`（`output_config: {effort: …}`）的事：它确实是一个 **API-layer** 的 token 旋钮，你的*主 session* 也遵循自己的 `effortLevel`。但 cc-master 的派发 API **不**把它往下穿透——workflow 的 `agent()` 只接受 label/phase/schema/model/isolation/agentType，Agent sub-agent 同样没有 effort 旋钮。所以你对*叶子*成本真正握得住的 lever 是它的**模型档位**，不是 effort——别给 `agent()` 传一个杜撰的 `effort` option（SKILL B 禁止杜撰 option）。
 
@@ -51,15 +53,21 @@
 
 ## 感知 5h/7d 配额窗口
 
-一个 Pro/Max 订阅按一个 **5 小时滚动窗口**和一个 **7 天窗口**计量用量。对一个 >24h 的目标，真正构成容量约束的是这两个窗口、而非 context%（镜头 5）。读它们有三种方式，按 ship-anywhere 优先级排：
+一个 Pro/Max 订阅按一个 **5 小时滚动窗口**和一个 **7 天窗口**计量用量。对一个 >24h 的目标，真正构成容量约束的是这两个窗口、而非 context%（镜头 5）。
 
-1. **`scripts/cc-usage.sh`** —— 本仓 ship 的带外信号来源（系统 python3 解析本地 `~/.claude/projects/**/*.jsonl`，零网络 / 零依赖；**不是 hook**，像 `codex-review.sh` 一样在 pacing 决策点跑在主线上）。吐出 `five_hour{used_tokens, window_remaining_min, burn_rate_per_min}` + `seven_day{used_tokens}`。
-2. **`npx ccusage blocks --json`** —— 社区工具，更准、自带一个官方 burn rate；手头有它就直接跑。（`cc-usage.sh` 刻意**不**去 shell out 调它——ccusage 的原始 schema 与我们的不同，而 `cc-usage.sh` 始终吐上面那个归一化 schema；将来若要接它，得先把 ccusage 映射进这个 schema。）
-3. **Status-line stdin** `rate_limits.{five_hour,seven_day}.used_percentage` —— 仅 Pro/Max，**只能**从一个 status-line 脚本拿到（JSONL 里没有）。所以 `cc-usage.sh` *不*吐 context% / `used_percentage`——那一项是 status-line 专属。
+> **口径优先级（Finding #37 血泪）：账户权威 > 本地反推。** 账户真实的 `used_percentage`（5h/7d）+ `resets_at`（reset 时刻）是**权威**，但官方核实它**只**出现在 status-line 脚本的 stdin 里——所有 hook 的 stdin、transcript JSONL、任何 `claude` CLI 子命令、API `anthropic-ratelimit-*` headers（那是 API tier 的 RPM/ITPM，与订阅 5h/7d 滚动窗口口径不同）**全都拿不到它**。本地 JSONL 只能**反推** 5h 窗口，而反推把窗口起点钉在「最近一段连续活动的首条消息」，看不见服务端真实计费窗口的 reset 事件——**reset 倒计时可失真到数量级**（实测反推「剩 21min」vs 账户权威「剩 2h55m」，差 2h40m）。所以：能拿到账户口径就**绝不**信反推。
 
-**Burn-rate 撞墙预测。** 当前窗口熬得过下一批吗？拿 `used_tokens + burn_rate_per_min × window_remaining_min` 对比你的 plan ceiling。如果它在 `window_remaining_min` 走完之前就越过 ceiling，你会半途撞墙——现在就 pace。
+读取方式，按口径可信度排：
 
-诚实交代 scope：5h/7d 是*订阅*概念；确切的 plan ceiling 官方没有公布（社区是反推出来的），所以 `cc-usage.sh` 只吐绝对的 `used_tokens` + burn rate，把 %-of-plan 的换算留给调用者。API-key 用户没有滚动窗口——他们改按累计 token 消耗来 pace。
+1. **账户权威（首选）—— `statusline-capture.js` → sidecar → `cc-usage.sh`。** 把 `${CLAUDE_SKILL_DIR}/scripts/statusline-capture.js` 接进你的 status line（见下「接法」），它在 status-line 被调用时把 `rate_limits.{five_hour,seven_day}.{used_percentage,resets_at}` 落到 sidecar。然后 `${CLAUDE_SKILL_DIR}/scripts/cc-usage.sh` 读 sidecar，吐 `source:"account"` + 权威 `used_percentage` + 从 `resets_at` 算的 `window_remaining_min`。**这是唯一不失真的 reset 倒计时来源。**
+2. **本地反推（fallback）—— `cc-usage.sh` 无 sidecar 时。** 系统 python3 解析本地 `~/.claude/projects/**/*.jsonl`（零网络 / 零依赖，ship-anywhere；**不是 hook**，像 `codex-review.sh` 一样在 pacing 决策点跑在主线上），吐 `source:"local-derived-approx"` + `five_hour{used_tokens, window_remaining_min, burn_rate_per_min}` + `seven_day{used_tokens}`。**reset 倒计时是反推、可能严重失真**——只在账户口径不可用（headless / 未接 status-line / 非 Pro-Max / API-key）时用，且当 approx 看。
+3. **`npx ccusage blocks --json`** —— 社区工具，自带官方 burn rate；手头有就直接跑。但它也是解析 JSONL 的反推，给不了账户 `used_percentage`（那只在 status-line）。
+
+**接法（把 capture 接进 status line，不覆盖你已有的）：** 在 `settings.json` 把 `statusLine.command` 设为 `<脚本路径> --passthrough '<你原本的 status line 命令>'`——它捕获 sidecar 后把 stdin 透传给你原本的命令、原样输出（你的状态行不变）；没接也能用，`cc-usage.sh` 自动降级反推。⚠️ **脚本路径写法（Finding #39）**：`${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}` 在 `statusLine.command` 的展开**官方未文档化**（hooks.json 的 command 字段明确支持，但 statusLine.command 未说明；且 statusLine 是 user-scoped、不绑特定 plugin，该变量很可能无定义）→ **保守用绝对路径**：dev / `--plugin-dir` 指向 `<repo>/skills/orchestrating-to-completion/scripts/statusline-capture.js`，安装场景指向 `~/.claude/plugins/cache/<marketplace>/cc-master/<version>/skills/orchestrating-to-completion/scripts/statusline-capture.js`。想用变量的，**自行实证一次**：设上去渲染一次，看 `~/.claude/.cc-master-rate-limits.json` 有没有落盘——落了＝展开了。⚠️ status-line 在 idle 时安静——长等后台时配 `refreshInterval` 保持 sidecar 新鲜（`resets_at` 是绝对时刻，即使 sidecar 略旧倒计时仍准，除非已跨 reset）。
+
+**撞墙预测。** 账户口径下直接看 `used_percentage`：任一窗口逼近上限（默认阈值 ≥85%）就 pace；**7d 尤其要看**（它窗口长、最容易在不知不觉中逼顶——`usage-pacing.js` 现在也对 7d 出声）。反推 fallback 下退用 `used_tokens + burn_rate_per_min × window_remaining_min` 对比 plan ceiling，但记得 ceiling 是社区反推、window 也可能失真，结论当 approx。
+
+诚实交代 scope：账户 `used_percentage` 仅 Pro/Max 交互式可见；API-key 用户没有滚动窗口、headless 拿不到 status-line——这些一律落到反推 fallback、按累计 token 消耗来 pace。
 
 ## Pacing levers
 
