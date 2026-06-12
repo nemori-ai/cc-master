@@ -425,19 +425,20 @@ run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "Z: 真 active 板（owner.active:true）照常 armed → ready task → block stop"
 rm -rf "$H"
 
-# ── 对称 degrade：board 的 owner.session_id 为空串（未认领板）也降级到 active-match（CODEX12 真缺口）──
-# ADR-007 §2.3 原只在 stdin sid 空时 degrade；但 board 的 owner.session_id 为**空串 ""**（bootstrap 若在
-# 缺 sid 的 stdin 上建板会盖空、或迁移/手改板留空）时，它对任何**非空** stdin sid 都不字面相等 →
-# 永久孤儿化（续跑会话再也武装不上这块板）。修法：对称化 —— stdin sid 空 ∨ board sid 空 → 收养武装。
-# 但「board sid 非空但 ≠ stdin sid」**仍须休眠**（红线 6 防真跨会话污染，一字不动）。
+# ── 非对称 degrade：blank-session 板（owner.session_id 空串）对非空 stdin sid 保持休眠（CODEX14 回退）──
+# 上一轮（CODEX12）曾对称 degrade 收养空 board sid；本轮（CODEX14）回退：收养会武装任意不相关 session，破红线 6。
+# 裁决（ADR-007 §2.3 / §4.5）：红线 6（非协商）优先于孤儿边缘 case。合法续跑因 resume/compaction 保留
+# session_id、板带原 session_id 故照常匹配；异常 blank 板保持休眠（fail-safe），由显式 re-arm（重跑
+# as-master-orchestrator → bootstrap 重盖 session_id）认领。「board sid 非空但 ≠ stdin sid」同样休眠（红线 6）。
 
-# Case AA (CODEX12 回归：empty-session_id 板被收养)：active 板 owner.session_id:""（空串），含一个 ready
-#          task，stdin 带**非空** session_id。修前严格匹配 "" != "MINE" → 误判未武装 → 休眠 allow（孤儿化，
-#          Red）。修后 board sid 空 → 收养武装 → ready 工作 → block stop。
+# Case AA (CODEX14 回退：blank-session 板对非空 stdin sid 休眠)：active 板 owner.session_id:""（空串），含一个
+#          ready task，stdin 带**非空** session_id。"" != "MINE" → 不武装 → 休眠 allow（不 block）。这正是红线 6
+#          要的 fail-safe：blank 板不收养任意 session。
 H="$(make_project)"; SID="sess-adopt-mine"
 mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
-assert_contains "$HOOK_OUT" "block" "AA: empty-session_id 的 active 板被非空 stdin sid 收养 → armed → ready task → block（修前孤儿化）"
+assert_eq 0 "$HOOK_RC" "AA: blank-session 板 + 非空 stdin sid → rc 0"
+assert_not_contains "$HOOK_OUT" "block" "AA: blank-session 板（owner.session_id:\"\"）对非空 stdin sid → 休眠 allow，不 block（CODEX14 回退，红线 6 fail-safe）"
 rm -rf "$H"
 
 # Case AB (红线 6 防线保活：board sid 非空且 ≠ stdin sid 仍休眠)：active 板 owner.session_id:"OTHER"

@@ -85,13 +85,15 @@ owner_region() {
 }
 
 # ── board matching (the arming gate; mirrors verify-board.sh) ───────────────────────────────────────
-# A board is "mine" when active AND (sid empty → degraded: any active board; OR board's owner.session_id
-# empty → degraded: an unclaimed board this session may adopt; else owner.session_id==sid). The degrade is
-# SYMMETRIC — it fires when EITHER side's session_id is empty (CODEX12): a board stamped with an EMPTY
-# owner.session_id (bootstrap on a sid-less stdin, or a migrated/hand-edited board) would otherwise never
-# literally equal a non-empty stdin sid → permanently orphaned (no resuming session could ever re-anchor).
-# Only an EMPTY board session_id is adopted; a board whose session_id is NON-empty but != $sid still does
-# NOT match (red line 6 — the false-activation defence is untouched).
+# A board is "mine" when active AND (sid empty → degraded: any active board; else owner.session_id==sid).
+# The degrade is ASYMMETRIC — it fires ONLY when the STDIN sid is empty (ADR-007 §2.3: a compaction that
+# drops session_id; the OWNING session re-anchoring across a compaction boundary). A board stamped with an
+# EMPTY owner.session_id is NOT adopted: it falls through to "" = "<non-empty sid>" → false → DORMANT
+# (fail-safe). Auto-adopting blank-session boards was tried (CODEX12) and REVERTED (CODEX14): it armed
+# EVERY unrelated session, re-introducing the cross-session pollution red line 6 forbids. Official
+# resume/compaction PRESERVES session_id, so a legitimately-resumed board carries its ORIGINAL session_id
+# (never blank) and matches normally; a blank board is only bootstrap's anomaly on a sid-less stdin, claimed
+# by an explicit re-arm (re-run as-master-orchestrator → bootstrap re-stamps it). → ADR-007.
 # active AND session_id are read ONLY from the ROOT owner sub-object (owner_region above) — NEVER full-text
 # grep: a flexible tasks[]/log[] payload of an ARCHIVED board carrying `"active":true` must never false-arm
 # the hook (CODEX7, red line 6).
@@ -101,10 +103,10 @@ board_matches() { # $1 = board path
   [ -z "$sid" ] && return 0
   # owner.session_id must equal $sid EXACTLY. Never splice $sid into a grep -E pattern: a session id
   # carrying regex metachars (., *, [, etc.) would otherwise match the wrong board. Extract owner's
-  # session_id *value* with a fixed regex, then compare as a literal shell string.
+  # session_id *value* with a fixed regex, then compare as a literal shell string. A blank board_sid falls
+  # through to "" = "<non-empty sid>" → false → DORMANT (blank board is NOT auto-adopted; red line 6).
   board_sid="$(printf '%s' "$owner" | grep -oE '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' \
                | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
-  [ -z "$board_sid" ] && return 0   # board not yet stamped (empty session_id) → adoptable → armed (CODEX12, symmetric degrade)
   [ "$board_sid" = "$sid" ]
 }
 

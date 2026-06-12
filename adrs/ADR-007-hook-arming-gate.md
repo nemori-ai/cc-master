@@ -40,14 +40,14 @@ This is exactly the `board_matches` helper in the bash hooks and `isArmed` in `u
 
 Arming reads **only** `owner.active` and `owner.session_id` — both **already** pinned narrow-waist fields (ADR-003). The gate adds **no** new hook-dependent field and reads **nothing** from the board's agent-shaped parts (tasks, log, flexible fields are untouched for the arming decision). **ADR-003's narrow waist is therefore unchanged by this ADR.**
 
-### 2.3 Degraded match — symmetric, for compaction robustness **and** unclaimed-board adoption
+### 2.3 Degraded match — **asymmetric**, fires ONLY on an empty stdin `session_id`
 
-The degrade fires when **either** side's `session_id` is empty:
+The degrade fires **only** when the **stdin** `session_id` is empty — **never** because the board's `owner.session_id` is empty:
 
-- **stdin `session_id` empty** (e.g. a compaction event that drops it) → fall back to matching **any** active board in home. Trades a sliver of cross-session precision for robustness across the compaction boundary, where losing arming entirely would be the worse failure (the orchestrator silently un-roles itself mid-run).
-- **board's `owner.session_id` empty** (`""`) → the board is **unclaimed**, and the current session **adopts** it (armed). Without this, a board stamped with an empty `owner.session_id` could never literally equal a *non-empty* stdin sid → **permanently orphaned**: no resuming session could ever arm on it, breaking resume (CODEX12). Empty-session_id boards arise when bootstrap stamps the field blank (building a board on a stdin that carried no `session_id`), or when a board is migrated / hand-edited.
+- **stdin `session_id` empty** (e.g. a compaction event that drops it) → fall back to matching **any** active board in home. Trades a sliver of cross-session precision for robustness across the compaction boundary, where losing arming entirely would be the worse failure (the owning session silently un-roles itself mid-run).
+- **board's `owner.session_id` empty** (`""`) → the board stays **dormant** for every non-empty stdin sid: it falls through to the literal compare `"" = "<non-empty sid>"` → false → not armed (**fail-safe**). A blank-session active board is **not** auto-adopted. This is the §2.7 official-semantics ruling applied: legitimate resume / compaction **preserve** `session_id`, so a legitimately-resumed board carries its **original** `session_id` (never blank) and matches normally; a blank board is only the **anomaly** of bootstrap building a board on a sid-less stdin (normal bootstrap stamps `session_id` — §2.5), and the correct way to claim it is an **explicit re-arm** (re-run `as-master-orchestrator` → bootstrap re-stamps `owner.session_id`), not silent auto-adoption.
 
-A non-empty board `session_id` against a non-empty stdin sid always uses the **exact-match** path. Crucially, the degrade adopts **only** an *empty* board `session_id` — a board whose `owner.session_id` is **non-empty but `!= sid`** still does **not** match and the hook stays dormant. That is the real cross-session pollution defence (red line 6) and it is left untouched; the symmetric degrade does **not** collapse into "any active board arms" (§4.3 Alternative C remains rejected).
+Both the empty-board-sid case and the **non-empty-but-mismatched** board sid case therefore stay dormant: the only path that arms a board this session did not stamp is the empty-**stdin**-sid degrade above (the owning session re-anchoring across a compaction boundary). The gate does **not** collapse into "any active board arms" (§4.3 Alternative C remains rejected); cross-session pollution (red line 6) is the controlling concern over the orphan edge-case (§4.5).
 
 ### 2.4 Literal session-id comparison (security note)
 
@@ -72,9 +72,9 @@ CODEX12 first read the session-scoped gate as silently orphaning any active boar
 
 **Therefore:**
 
-- **On the official resume / compaction paths, arming and reinject keep working unchanged** — the exact-match gate matches because the `session_id` is carried through. This is **not** a bug, and §2.3's symmetric degrade is **not** needed for that path.
+- **On the official resume / compaction paths, arming and reinject keep working unchanged** — the exact-match gate matches because the `session_id` is carried through. This is **not** a bug; no board-side degrade is needed for that path.
 - **A brand-new independent session staying dormant on another session's active board is the design goal, not a resume failure** — it is exactly red line 6 (no cross-session pollution), and §4.3 rejects "any active board arms."
-- **The one genuine gap is the empty-`session_id` board** — an *unclaimed* board (`owner.session_id == ""`) can never literally equal a non-empty stdin sid and is permanently orphaned. **Only** this case needs the §2.3 symmetric degrade (adoption). A non-empty-but-mismatched board `session_id` is deliberately left dormant.
+- **The empty-`session_id` board is an *anomaly*, not a resume path** — normal bootstrap stamps `session_id` (§2.5), and resume / compaction preserve it, so a *legitimate* board is never blank. A blank board is only bootstrap building on a sid-less stdin. **It deliberately stays dormant (fail-safe)** rather than being auto-adopted: adopting it would arm every unrelated session (the cross-session pollution red line 6 forbids — CODEX14). It is claimed by an **explicit re-arm** (re-run `as-master-orchestrator` → bootstrap re-stamps it), the explicit migration / ownership step. A non-empty-but-mismatched board `session_id` likewise stays dormant.
 
 ## 3. Consequences
 
@@ -88,13 +88,13 @@ CODEX12 first read the session-scoped gate as silently orphaning any active boar
 ### 3.2 Negative
 
 - **Disk dependency for arming.** If the board is unreadable / the home is misconfigured, every hook silently no-ops. This is the safe failure direction (silence, never a spurious block), but it means a broken home = a fully dormant orchestration with no loud error.
-- **Degraded-match imprecision.** With an empty stdin `session_id`, two concurrent armed orchestrations in the same home both match; a hook may act on the wrong board for that one fire. Symmetrically, an **unclaimed** board (empty `owner.session_id`) is adopted by whichever active session fires next — if two sessions race, the first to fire claims it for that fire. Both are accepted as strictly better than the alternatives: losing arming across compaction (empty stdin sid), or permanently orphaning the board (empty board sid). The non-empty-but-mismatched case is **not** affected — it stays dormant (red line 6).
+- **Degraded-match imprecision (stdin side only).** With an empty stdin `session_id`, two concurrent armed orchestrations in the same home both match; a hook may act on the wrong board for that one fire. This is accepted as strictly better than the alternative: losing arming across compaction. The board side has **no** degrade — a blank `owner.session_id` board stays dormant for every non-empty stdin sid (fail-safe; not auto-adopted), and a non-empty-but-mismatched board likewise stays dormant (red line 6).
 
 ### 3.3 Neutral
 
 - **Arming ≠ correctness of the board's contents.** The gate only asks "is this session an armed orchestration?"; the goal-hook's completion logic, WIP counting, etc. remain each hook's own concern downstream of the gate.
 - **Per-fire cost is one directory scan** of `*.board.json` headers — negligible for the low-frequency events these hooks bind (`Stop` / `SessionStart` / `PostToolBatch`).
-- **Resume / compaction are unaffected (§2.7).** Per the authoritatively-verified platform semantics, `--resume`/`-c` and compaction carry the original `session_id` through, so the exact-match gate keeps arming and reinject working across them; the symmetric degrade exists **only** for unclaimed (empty-session_id) boards, not for the resume path.
+- **Resume / compaction are unaffected (§2.7).** Per the authoritatively-verified platform semantics, `--resume`/`-c` and compaction carry the original `session_id` through, so the exact-match gate keeps arming and reinject working across them; the degrade exists **only** for the empty-stdin-sid path (the owning session re-anchoring across a compaction boundary), not for any board-side case.
 
 ## 4. Alternatives Considered
 
@@ -113,6 +113,10 @@ Treat "any active board in home" as armed and ignore stdin `session_id`. Rejecte
 ### 4.4 Alternative D: gate via environment variable set at bootstrap
 
 Export an env var when the orchestrator command runs and have hooks check it. Rejected: a hook fires in a fresh shell that does not inherit the agent's environment, and the var would not survive compaction or a new `Stop` fire. Env is not a cross-fire channel; disk is.
+
+### 4.5 Alternative E: auto-adopt blank-session boards (board `owner.session_id` empty also arms any session) — **tried and reverted**
+
+A symmetric degrade was briefly adopted (CODEX12): when a board's `owner.session_id` was the empty string, the current session would *adopt* it (arm), on the theory that such an *unclaimed* board would otherwise be permanently orphaned (no resuming session could literally match a blank sid). **Rejected and reverted (CODEX14).** It made a blank board arm **every** unrelated session — a brand-new session that never ran `as-master-orchestrator` would be block-stopped by `verify-board`, re-injected with orchestrator context, and pacing-warned — exactly the cross-session pollution the arming gate exists to prevent (red line 6). The premise was wrong: a blank board is only the **anomaly** of bootstrap building on a sid-less stdin (normal bootstrap stamps `owner.session_id` — §2.5), and official resume / compaction **preserve** `session_id` (§2.7), so a *legitimately*-resumed board carries its original `session_id` and is **never** blank — no auto-adoption is needed for the resume path. The anomalous blank board **stays dormant (fail-safe)** and is claimed by an **explicit re-arm** (re-run `as-master-orchestrator` → bootstrap re-stamps it) — the explicit migration / ownership step. CODEX12 (objecting to orphaning) and CODEX14 (objecting to pollution) squeeze from both sides; **red line 6 (non-negotiable) is the controlling concern**, so dormancy over adoption.
 
 ## 5. Related
 

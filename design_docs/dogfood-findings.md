@@ -589,6 +589,15 @@
 - **教训(固化)**:① **凡书面记录一次泄密 / 敏感清除,记录本身必须匿名化——绝不在台账里逐字复述被清除的秘密**。「描述删除」≠「安全」;ledger / changelog / commit message / PR body 都是发布面,和产物同等对待。② **验证一次 scrub 的 grep 必须把「正在写结论的那份文档」也纳入搜索面**——自指盲区(documenting-the-fix-reintroduces-it)是 #29→#35 这条链的根;scrub 类任务的收尾自检应是**全仓 `git grep <secret>` 归零**,而非「场景文件 grep 零残留」。③ 承 #19/#27/#30/#32/#34:又一例「测试全绿、唯独 codex 第二端点验收能逮」——语义/安全类盲区里,**自指型泄露**(修复说明里带着被修的东西)codex 命中率高。④ 本条与 #29 是同一根的两层:#29 是「场景泄密」,#35 是「记录场景泄密时再泄一次」——提醒任何 must-fix 安全项**收尾验证的搜索面要覆盖到验证文档自身**。
 - **严重度 / 来源**:**must-fix(泄密,release-blocking)** / 一手(codex 第二端点验收 CODEX13,本 PR)。
 
+## Finding #36 — 两个 reviewer finding 反向振荡(嫌孤儿化 ↔ 嫌污染);用非协商红线当裁决锚 + 文档化止振荡 ✅已修
+
+- **现象**:同一个设计点(blank-session active 板该不该武装)被 codex 连着两轮**反向**提:**CODEX12** 嫌严格 session-match 把 `owner.session_id:""` 的板**孤儿化** → 我加了「对称 degrade」(空 board sid 也武装);**CODEX14(P1)** 立刻反过来嫌这个对称 degrade **破红线 6**——blank 板会武装**任意**不相关 session(从没跑过 `as-master-orchestrator` 的普通 session 也被 block-stop / 注入编排 context / pacing 警告),正是跨会话污染。一加一减,典型的 fix-A-breaks-B 振荡。
+- **根因**:① **两个 finding 各自局部正确,但全局是一个 trade-off**——孤儿化 vs 污染是同一枚硬币两面,没有"两全"的天真解(blind hook 无法区分"该收养这块孤儿板的合法会话"与"不相关会话")。② 我第一轮(CODEX12)**没把它当 trade-off、而当 bug 直接修**,过度修正成了 red-line 违例。③ 真正的判别信号缺失被忽略了:**官方 resume/compaction 保留 session_id**(已 #34 核实),所以合法续跑的板**根本不是 blank**——CODEX12「blank=resume 路径」的前提本就错,孤儿化只是 bootstrap 缺 sid 建板的**异常**。
+- **影响**:对称 degrade(commit 37db5c3)若发布,会让任何 blank active 板武装宿主上每一个会话——把红线 6(用户非协商)在最隐蔽处打穿。CODEX14 在发布前逮住。
+- **处置**:**回退对称 degrade**(4 hook 删 board-sid-空分支,保留 stdin-sid-空的 compaction degrade);**blank 板保持休眠(fail-safe)**,由**显式 re-arm**(重跑 `as-master-orchestrator` → bootstrap 重盖 session_id)认领。**据非协商红线 6 裁决**(污染 > 孤儿边缘 case),并把整个振荡 + 裁决 + 理由写进 **ADR-007 §2.3(asymmetric)+ §4.5 Alternative E**(「auto-adopt blank — tried and reverted」),board.md 同步改正——**让下一个 reviewer 再提时有现成的书面裁决可指,不再 litigate**。端点亲手复现四情形(blank 休眠 / 非空不匹配休眠 / stdin 空武装 / 精确匹配武装)确认。
+- **教训(固化)**:① **遇到两个 reviewer finding 反向拉扯(振荡),别来回翻烙饼——停下,认出这是一个 trade-off,用一个更高的不变式(这里是用户非协商红线)当裁决锚,选定一边并把『为什么是这边 + 另一边为何被否』写进 ADR 的 Alternatives**。书面裁决是止振荡的唯一办法;只改代码不改文档,下一轮 reviewer 会把你推回去。② **第一次收到 finding 就要分清「这是 bug」还是「这是 trade-off 的一端」**——把 trade-off 当 bug 直接修,极易过度修正撞穿另一条约束(本案 CODEX12→红线 6)。③ **fail-safe > fail-open**:拿不准时,「保持休眠(少做)」几乎总比「武装(多做、可能污染)」安全——尤其当多做会打穿一条 red line。④ 振荡也是 closure-loop 的一个收敛信号:从"每轮新实质 bug"变成"对同一点反复拉扯",说明接近底部、该靠原则收口而非继续滴漏。
+- **严重度 / 来源**:P1(对称 degrade 破红线 6,发布前逮住)/ 一手(codex 第二端点验收 CODEX14,与 CODEX12 双向夹逼,本 PR)。
+
 ## Finding #30 — hook 建在「未验证的平台输出路由假设」上;codex 二审 + 官方文档裁决后移除 ✅已删
 
 - **现象**:本轮把 orchestrator 的运行时信号做成确定性 hook 时,新建了 `subagent-stop.sh`(`SubagentStop` 事件,代号 H6),目的是「后台 sub-agent 一完成,就自动**提醒父 orchestrator** 去 integrate / 端点验收」。它用 `hookSpecificOutput.additionalContext` 注入那条 nudge。**但 codex 对 committed 代码做第二端点验收时指出**:`SubagentStop` 的 additionalContext **注入的是刚结束的那个 sub-agent 自己的 context,不穿过父 orchestrator 边界**——所以这条「提醒父线」的 nudge 递错了对象,父线根本收不到。

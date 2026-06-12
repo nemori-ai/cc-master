@@ -241,22 +241,22 @@ assert_eq 0 "$HOOK_RC" "(g2) genuine new Stop → rc 0"
 assert_contains "$HOOK_OUT" "additionalContext" "(g2) stop_hook_active:false → warns (first Stop still fires)"
 rm -rf "$H"
 
-# ── SYMMETRIC DEGRADE: an active board whose owner.session_id is the EMPTY string is adopted (CODEX12) ─
-# ADR-007 §2.3 originally degraded only when the STDIN sid was empty. But when a board's owner.session_id
-# is the EMPTY string "" (bootstrap stamping it blank on a sid-less stdin, or a migrated/hand-edited
-# board), it can never literally equal a NON-empty stdin sid → permanently orphaned (no resuming session
-# can ever arm on it). Fix: make the degrade symmetric — stdin sid empty OR board sid empty → adopt+arm.
-# But "board sid non-empty yet != stdin sid" MUST still stay dormant (red line 6, the real cross-session
-# pollution defence — left untouched).
+# ── ASYMMETRIC DEGRADE: a blank-session active board stays DORMANT for a non-empty stdin sid (CODEX14) ─
+# A symmetric degrade adopting empty-board-sid boards was tried (CODEX12) and REVERTED (CODEX14): adopting
+# a blank board would arm EVERY unrelated session, re-introducing the cross-session pollution red line 6
+# forbids. Ruling (ADR-007 §2.3 / §4.5): red line 6 (non-negotiable) outranks the orphan edge-case.
+# Legitimate resume/compaction PRESERVE session_id, so a legitimately-resumed board carries its original
+# session_id and matches normally; the anomalous blank board stays dormant (fail-safe), claimed by an
+# explicit re-arm. "board sid non-empty yet != stdin sid" likewise stays dormant (red line 6).
 
-# (h1) EMPTY-SID BOARD ADOPTED — active board with owner.session_id:"" + a NON-empty stdin sid, at a
-#       CRITICAL usage threshold. Before the fix, strict match "" != "sess-adopt" → unarmed → silent
-#       (orphaned, Red). After the fix, board sid empty → adopt → armed → warns.
+# (h1) BLANK-SID BOARD STAYS DORMANT — active board with owner.session_id:"" + a NON-empty stdin sid, at a
+#       CRITICAL usage threshold. Strict match "" != "sess-adopt" → unarmed → silent. This is exactly the
+#       red line 6 fail-safe: a blank board does NOT auto-adopt an arbitrary session.
 H="$(make_project)"
 printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":""},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/empty.board.json"
 run_pacing_home "$SAMPLE" "2026-06-10T12:00:00Z" "$H" "sess-adopt" "3000"
-assert_eq 0 "$HOOK_RC" "(h1) empty-session_id board + non-empty stdin sid → rc 0"
-assert_contains "$HOOK_OUT" "additionalContext" "(h1) empty-session_id active board adopted by non-empty stdin sid → armed → warns (was orphaned)"
+assert_eq 0 "$HOOK_RC" "(h1) blank-session board + non-empty stdin sid → rc 0"
+assert_eq "" "$HOOK_OUT" "(h1) blank-session active board (owner.session_id:\"\") + non-empty stdin sid → stays dormant, silent (CODEX14 revert, red line 6 fail-safe)"
 rm -rf "$H"
 
 # (h2) RED LINE 6 DEFENCE RETAINED — active board with owner.session_id:"OTHER" (non-empty) + a
