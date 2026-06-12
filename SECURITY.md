@@ -14,7 +14,7 @@ in your environment, so please read this before reporting.
   `<project>/.claude/cc-master/`).
 - **The `Stop` pacing hook reads Claude's local usage JSONL.** One hook
   (`usage-pacing.js`), and only once a session is armed, reads this machine's
-  Claude usage/transcript JSONL to compute 5h/7d burn-rate pacing. By default
+  Claude usage/transcript JSONL to compute 5h burn-rate pacing. By default
   this is `~/.claude/projects/**/*.jsonl` (overridable via `CC_MASTER_USAGE_DIR`)
   — which is **outside your project directory and the cc-master home**. The read
   is **read-only**: the hook never writes to those files and never transmits

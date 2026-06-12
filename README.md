@@ -73,7 +73,7 @@ Every claim in column ③ is anchored to a real mechanism, not a marketing line:
 | **Survives compaction** | No | No | **Yes** — role + board re-injected | `reinject.sh` (SessionStart hook) |
 | **Cross-session resume** | No | Same-session only | **Yes** — re-discovered from the board file | the board (persistent save file) |
 | **Endpoint verification** | Ad hoc | Inside the script | Orchestrator verifies independently | red line 6 + the decision program (Skill A) |
-| **Quota awareness** | No | No | **Yes** — senses the 5h/7d window | `usage-pacing.js` (Stop hook) |
+| **Quota awareness** | No | No | **Yes** — live 5h burn-rate wall (7d total via `cc-usage.sh`) | `usage-pacing.js` (Stop hook) + `cc-usage.sh` |
 
 ---
 
@@ -194,7 +194,7 @@ cc-master **aims to** make a Claude Code agent into a master orchestrator across
 | # | Capability | Status | How it's delivered today |
 |---|---|---|---|
 | **C1** | Drive a goal to full, async-parallel completion — not halfway, all the way | 🟢 Live | three background mechanisms + the decision-program loop + a `Stop` gate that forces "really all done" |
-| **C2** | Control the *rate* of token burn — throttle, don't redline | 🟢 Live | `usage-pacing.js` (non-blocking 5h/7d burn-rate warning) + `cc-usage.sh` |
+| **C2** | Control the *rate* of token burn — throttle, don't redline | 🟢 Live | `usage-pacing.js` (non-blocking live 5h burn-rate warning) + `cc-usage.sh` (out-of-band 7d cumulative) |
 | **C3** | Hold the line between deciding autonomously and pulling in the human | 🟢 Live | red lines + `blocked_on:user` nodes + the `Stop` gate listing unanswered user decisions |
 | **C4** | Decompose, manage, update, and re-plan the goal as it learns | 🟢 Live | the board DAG + CPM decomposition + resume flagging dangling `stale`/`escalated` nodes |
 | **C5** | Maximize throughput *under* a sane burn rate | 🟢 Live | WIP cap (~75% utilization) + free float parallelism + `posttool-batch.sh` soft-warn |
@@ -228,7 +228,7 @@ cc-master/
 
 - **Commands** are one-shot ignition — you trigger them; they inject the "I am the master orchestrator" philosophy and operating discipline, and open the board.
 - **Skills** are the on-demand deep manuals — Skill A when you run the orchestration loop, Skill B when you write a workflow script.
-- **Hooks** are the orchestrator's runtime — they survive compaction (re-injecting "you are the orchestrator + here is your board"), gate completion, soft-warn on over-dispatch, and sense the 5h/7d usage wall. They reach for `node` only where structured JSON parsing earns it (usage from JSONL), bash everywhere else ([ADR-006](adrs/ADR-006-hooks-may-use-node-js.md)).
+- **Hooks** are the orchestrator's runtime — they survive compaction (re-injecting "you are the orchestrator + here is your board"), gate completion, soft-warn on over-dispatch, and sense the 5h burn-rate wall (the 7d cumulative total is read out-of-band by `cc-usage.sh`). They reach for `node` only where structured JSON parsing earns it (usage from JSONL), bash everywhere else ([ADR-006](adrs/ADR-006-hooks-may-use-node-js.md)).
 
 ### The three background mechanisms it teaches
 
@@ -247,7 +247,7 @@ The board never depends on the agent cooperating, and the orchestrator can't qui
 1. **`UserPromptSubmit`** (`bootstrap-board.sh`) detects the command's sentinel → deterministically creates an empty board skeleton + injects its exact path and the orchestrator role. This is also the **arm action** (see below).
 2. **`SessionStart`** (`reinject.sh`) re-injects role + board after every compaction and on resume — and on resume it flags any **dangling `stale`/`escalated` nodes** left from an un-reconciled plan update.
 3. **`Stop`** (`verify-board.sh`) runs a pure-bash gate over *this session's* active board (filtered by `owner.session_id`, so concurrent orchestrations never interfere). An empty board, or one with `ready`/`uncertain` work left, **blocks** the stop; when the board looks done it forces a one-time **self-check against the goal** — surfacing any **unanswered `blocked_on:user` decisions** — before releasing, with a fuse (5 consecutive blocks) so a misjudgment can never wedge the agent.
-4. **`Stop`** also runs `usage-pacing.js` (node): it reads the local usage JSONL, computes the 5h/7d burn-rate, and injects a **non-blocking** pacing warning when you near the wall — it never blocks and never decides *how* to pace (that's the orchestrator's judgment).
+4. **`Stop`** also runs `usage-pacing.js` (node): it reads the local usage JSONL, computes the 5h burn-rate (the 7d cumulative total is a separate out-of-band signal via `cc-usage.sh`), and injects a **non-blocking** pacing warning when you near the wall — it never blocks and never decides *how* to pace (that's the orchestrator's judgment).
 5. **`PostToolBatch`** (`posttool-batch.sh`) counts in-flight tasks against the board's `wip_limit` after a batch of parallel calls and **soft-warns** on over-dispatch — never blocking; parallel freedom is preserved.
 
 **Every hook is dormant until armed.** "Armed" is derived from the board on disk: a hook acts only when this session owns an active board (`owner.active:true` **and** `owner.session_id` == the hook's stdin `session_id`; an empty id degrades to any active board, for compaction robustness). Until then — in any plain coding session in the same host — every hook is completely silent. `bootstrap-board.sh` is the sole exception: it *is* the arm action (stamping `owner.session_id` as it creates the board). Disarming is `/stop`. See [ADR-007](adrs/ADR-007-hook-arming-gate.md).
