@@ -39,8 +39,17 @@
 | 25 | Track A 满载环境信号死亡:正例 recall 地板=0,与 description 质量无关 | must-know(测量有效性)| 已记 caveat;语义改动降级定性评审 |
 | 26 | 模型分层 + usage-pacing baseline 零失败 → 归类为 reference 知识非红线(TDD-for-skills 防编造未被违反的规则)| ✅ 机制验证(正向)| 落 `cost-and-pacing.md` + lens 软指针,不写红线 |
 | 27 | codex 第二验收 4 轮逮 6 bug:cc-usage.sh 五 correctness(schema 契约/陈旧窗口/跨界清零/dedup 低报/未来行计数)+ cost-and-pacing.md effort 不可执行 lever | ✅ 机制验证(正向)+ 6 should-fix 已修 | A–F 全收口;fuse 据 #22 先例停自动循环;passed=10 |
+| 28 | 常驻重注的魂(SKILL.md Vision-index)把已 live 的 H8(usage-pacing)标作「TODO/待批准」,误导未来每场 orchestration 以为 C2 pacing hook 不存在 | should-fix(指导失真)| ✅ 已修(POLISH-SOUL 端点验收亲读暴露→micro-fixup 校准3处,dot-graph 重验未扰);根因=MAPSYNC 只同步 H6/H5/H3 子集、漏 H8 |
+| 29 | 公开落地页(README)demo 直接照搬一个真实保密项目的场景(数据模型 schema,标识符已隐去),且泄密早已潜伏在 walkthrough/smoke.sh/board.md(分发)——README 只是放大到最高曝光面 | **must-fix(泄密)** | ✅ 已修(用户 review catch→全仓 scrub 换通用 i18n 场景 + 彻底去外部出处痕迹 self-contain;repo-wide grep 零残留+smoke.sh 真跑过;台账自身的标识符残留见 [[Finding #35]] 二次清除) |
+| 30 | H6 `subagent-stop.sh` hook 建在一个**未验证的平台语义假设**上(以为 SubagentStop 的 additionalContext 通知父 orchestrator);实际它注入刚结束的 sub-agent 自己、达不到父线,且与内建结果摘要冗余 | should-fix(误设计 hook)| ✅ 已删(codex 二审 committed 代码逮出→claude-code-guide 查官方文档裁决→全仓级联移除;魂 dot-graph byte-identical) |
+| 31 | 落地页把 live hook 能力 over-claim 成「5h/7d burn-rate」,实现只有 5h(7d 连概念都不存在) | should-fix(对外 over-claim) | ✅ 已修(收窄宣称不补功能:11 处归 5h,7d 明确归 `cc-usage.sh` 带外累计) |
+| 32 | PostToolBatch 在 sub-agent 上下文也触发,指挥专属 WIP 警告泄漏给 leaf worker(破红线 4) | should-fix(红线 4 泄漏) | ✅ 已修(官方核实 `agent_id` 语义→sub-agent 闸:非空 `agent_id` 静默 exit 0) |
+| 33 | agent-facing 文本与 hook 契约脱节:命令叫 agent 重设 ARM 盖的 `session_id`(P1)+ 魂仍标已删 H6 为 live(P3) | P1=must-fix · P3=should-fix | ✅ 已修(命令改「保留勿覆写」;魂去 H6;MAPSYNC 穷举自检) |
+| 34 | armed-gate 把 empty-session_id 的 active 板孤儿化;权威核实反证 codex 半个前提 | should-fix(单边兜底盲区) | ✅ 已修后被 [[Finding #36]] **回退**——对称 degrade 破红线 6;终局=blank 板保持休眠(ADR-007 §4.5) |
+| 35 | 记录泄密的台账条目自身把秘密又写了一遍:dogfood ledger 也是发布面 | **must-fix(泄密,release-blocking)** | ✅ 已修(三处匿名化 + 全仓 re-grep 归零,搜索面含台账与测试) |
+| 36 | 两个 reviewer finding 反向振荡(孤儿化 ↔ 污染);用非协商红线当裁决锚 + 文档化止振荡 | P1(对称 degrade 破红线 6) | ✅ 已修(回退对称 degrade;裁决写进 ADR-007 §2.3/§4.5;blank 板休眠,显式 re-arm 认领) |
 
-> 基线健康(无问题留痕):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
+> 基线健康(无问题留痕,**早期 P2 阶段历史快照**——当时仓库为 3 个纯 bash hook;现行为 5 hook(4 bash + 1 node,ADR-006/ADR-007),当前健康以 `run-tests.sh` 本次输出为准):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
 > bootstrap dual-sentinel 稳;authoring-workflows 的 5 template + API 契约自洽。**确定性骨架是健康的。**
 
@@ -269,7 +278,7 @@
 
 ## Finding #16 — bootstrap marker 分支仍裸子串(#15 同类残留),被 sub-agent 报告内联引用 marker 误触发
 
-- **现象**:R5(omne 范式勘察)报告正文逐字引用 sentinel 标记 `cc-master:bootstrap:v1`(在讲 command 文件约定时),
+- **现象**:R5(迭代范式勘察)报告正文逐字引用 sentinel 标记 `cc-master:bootstrap:v1`(在讲 command 文件约定时),
   该报告经 task-notification 走 UserPromptSubmit 时,`bootstrap-board.sh` 的「stdin 含 marker 子串」判据命中,
   **误建空 board**(`20260608T121833Z-2069`)。
 - **根因**:#15 的 P2c-F 只收紧了 `/cc-master:as-master-orchestrator` **前缀分支**;marker 那条 OR 分支
@@ -546,3 +555,96 @@
   落盘的改动必须以真 tool_result 为准、关键件改后 grep/git status 复核,绝不据自报断言已落盘**——正是 cc-master「只信端点
   验收、agent 自报不可信」红线对 orchestrator **自己**的适用。
 - **严重度 / 来源**:✅ 机制验证(正向,codex 4 轮共逮 6 条)+ 6 should-fix 已修 / 一手(codex 第 5–8 次真跑,本 PR 端点验收)。
+
+## Finding #28 — 常驻重注的魂把已 live 的 hook 标作「TODO」,reinject 指导失真 ✅已修
+
+- **现象**:对 POLISH-SOUL 产出做端点验收、逐行亲读 `skills/orchestrating-to-completion/SKILL.md` 时,发现 Vision-index
+  的 C2 行、by-design 收口句、resonance 闭注三处仍把 **H8(usage-pacing.js)标作「TODO / 待批准 / 随它的 PR 落地」**——可
+  H8 早已建成、wired 进 `hooks.json`(Stop 段两个 hook)、被 ADR-007 列为已接受的六 hook 之一、`structure.test.mjs` 断言它
+  跨 5 事件 live、红线 6 grep 也把它纳入武装闸覆盖。文档与现实直接打架。
+- **根因**:MAPSYNC(把 hook 从 TODO 迁到 live 的那步)当初**只同步了 H6/H5/H3 子集,漏了 H8**。是「同步一张状态映射表时只改了记得起来的那几行、没穷举全部条目」的典型部分同步遗漏。
+- **影响**:`SKILL.md` 是 `SessionStart` hook 每次 compaction **整篇重注**的常驻手册——读者基数 = 未来每一场 orchestration 的
+  每一次 compaction。它谎报「C2 的 pacing hook 还不存在」,会让 orchestrator 误以为没有 usage 感知、转而手动补偿或误判
+  pacing,而 H8 其实一直在 Stop 上如常注入 `[cc-master pacing] 5h 配额临界…`。这是「给 agent 的指导不对」最高曝光的一类:错在魂里。
+- **处置**:端点验收**本身**暴露的 micro-fixup(红线唯一例外,T∞≈T₁、派发成本 > 自收),属「integrate:校准魂的 hook 状态图与
+  live hook 集对齐」——由建并验过这些 hook 的 orchestrator 直接收掉。校准三处:C2 行改引 H8 真注入短语、by-design 句改「C2 的
+  hook 列现由 H8 兑现」、resonance 段加 H8 的 Stop pacing 锚点 + 闭注改「H3/H5/H6/H8 现均已 live」。改后**重验 dot-graph md5
+  对 HEAD 仍 byte-identical、签名短语 2/2/3/3/6 未变、`H8.*TODO|待批准` 残留归零**——确认只动了 Vision-index 散文、牙齿零扰动。
+- **教训(固化候选)**:① **同步任何「状态映射表」(hook 清单 / 能力矩阵 / TODO→live 迁移)必须穷举全部条目,不能只改记得起的子集**
+  ——部分同步会留下「文档说没有、现实已存在」的反向漂移,且越是常驻重注的文档(魂)曝光越大。MAPSYNC 这类批量状态迁移宜配一条
+  「迁移后 grep 残留标记数应归零」的自检(本案的 `grep 'H8.*TODO|待批准'`==0 即是)。② 呼应 Finding #19/#22 —— 文档/现实漂移
+  是「测试全绿也看不见」的形态盲区(`run-tests` 只验结构、不验 Vision-index 散文真不真),codex 第二端点验收对这类高命中,本条
+  恰是 POLISH 阶段亲读魂、抢在 codex 之前自逮的一例。
+- **严重度 / 来源**:should-fix(reinject 指导失真,高曝光低 blast)/ 一手(POLISH-SOUL 端点验收亲读暴露,本 PR)。
+
+## Finding #29 — 公开落地页 demo 照搬真实保密项目场景 = 泄密;且泄密早潜伏在分发件里 ✅已修
+
+- **现象**:为 README 重定位写「Watch one run」demo 时,我直接复用了仓库现成的 `walkthrough.md` 例子——一个**某真实保密项目的数据模型 schema 迁移**场景(具体 schema / 字段标识符在本台账内一律隐去——见 [[Finding #35]]:台账自身也是发布面)。用户 review 当场指出:**这是一个真实保密项目的数据模型,放进公开落地页有泄密风险**;且这个 demo「太单薄」(只一个 T0→三叶 fan-out),没体现插件的多层能力。
+- **根因**:① **照搬现成例子时没核它的 provenance 是否适合公开**——`walkthrough.md` 是内部 dogfood 时写的,用了手边真实项目的 schema;搬到「最高曝光面的公开落地页」时,我没问「这个场景能不能公开」。② 更深一层:泄密**早已潜伏**在 `walkthrough.md` / `smoke.sh` / `board.md`(**随插件分发**)/ `board.example.json` / `spec.md` 里——README 不是引入者,是**放大器**(把一个本就在公开仓库里的保密场景,搬到了所有人第一眼看的地方)。
+- **影响**:保密项目的数据模型(具体 schema / 字段 / domain 标识符已隐去)出现在 8 个公开站点,其中 2 个(`board.md` / `board.example.json`)**随插件分发给每个用户**。这是 must-fix 级——一旦发布,等于把别人的私有 schema 钉在了公开 README 与分发制品上。
+- **处置**:① 全仓 scrub——把保密场景换成一个**通用、合成、非保密**的 i18n 国际化场景(8 站点:README×2 / walkthrough / smoke.sh / board.md / board.example.json / spec.md / track-b),三者(README ⇄ walkthrough ⇄ smoke.sh)严格对齐、`smoke.sh` 真跑 exit 0;② 顺带按用户「self-contain」要求,**彻底清除所有外部出处/上游项目的字眼与暗示**(13 站点),让本仓所有文档项目内自洽;③ README demo 同时**做厚**——显出模型分档(临界根强模型/float 廉价)、HITL(`blocked_on:"user"` 决策节点并行 surface)、escalation(RTL locale 升格 workflow)、pacing(5h 墙节流)、compaction 存活、端点验收+强制自检列未答决策。repo-wide grep 两轴零残留、全套绿、smoke.sh PASS 自证。**(注:当时的 grep 漏了台账自身这份发布面文档——本条目正文一度仍逐字带着保密标识符,后由 [[Finding #35]] 二次匿名化清除并把搜索面扩到全仓含 ledger。)**
+- **教训(固化)**:① **任何进入公开/分发面的「示例 / demo / fixture」场景,必须是通用合成的,绝不照搬任何真实(尤其可能保密)项目的领域模型/命名/schema**——哪怕它就在仓库里现成可用。搬运现成内容到更高曝光面时,**provenance 审查**是必做的一步(同 §11「对外/不可逆先问用户」精神)。② 内部 dogfood 写的例子若用了真实项目素材,**在它还只躺在内部文档时就该 scrub**,别等它被搬上落地页才发现——「分发件里的保密场景」是比「README 里的」更隐蔽、更早该堵的洞。③ 这也是一次正向的 **HITL 验证**:用户作为 async reviewer 在 commit 前一眼逮到了测试与 codex 都不会报的「语义级泄密」——印证 lens 7「用户是特殊的 async worker」+ 端点人审不可替代。
+- **严重度 / 来源**:**must-fix(泄密)** / 一手(用户 review catch,本 PR)。
+
+## Finding #35 — 记录泄密的台账条目自身把秘密又写了一遍:dogfood ledger 也是发布面 ✅已修
+
+- **现象**:Finding #29 在**记录**「保密 schema 已从全仓 scrub 干净」时,条目正文本身把那几个保密标识符(数据模型 / schema / domain 名)**逐字写了出来**用以描述「删了什么」。于是 #29 里「repo-wide grep 零残留」的断言**是假的**——秘密仍躺在 `design_docs/dogfood-findings.md`(tracked、随仓库发布)的三处(摘要表 + 现象 + 影响)。codex CODEX13 端点验收逮到(P1,release-blocking)。
+- **根因**:① **把「描述一次泄密」误当成安全的**——记录「我移除了 X」时,写出 X 本身**就是再次发布 X**。dogfood ledger 是 tracked 文档、会随仓库公开,它和 README / 分发件一样是**发布面**,不是私密笔记。② scrub #29 时的 `grep` 只搜了「场景文件」(walkthrough/smoke/board),**没把台账自己纳入搜索面**——验证范围漏掉了正在书写验证结论的那份文件(自指盲区)。③ 承 #29 自身的教训②「provenance 审查」:这次连「记录 provenance 问题的文档」都成了泄露 provenance 的载体。
+- **影响**:与 #29 同性质的 must-fix 泄密,只是藏在「已修」标记的台账条目里更隐蔽——发布即把私有 schema 标识符钉在公开 ledger 上。
+- **处置**:把 #29 三处(L43 摘要表 / 现象 / 影响)的保密标识符全部换成**匿名占位**(「某真实保密项目的数据模型」「schema / 字段 / domain 标识符已隐去」),教训与可追溯性零损失;#29 处置段补一句指向本条的「台账二次清除」。**全仓 re-grep 保密标识符归零**(含台账自身)。顺带中和 README 三范式示例里那句呼应保密场景形状(N-domain schema 迁移)的运行示例措辞(无保密名但属「暗示」,按用户 self-contain 指令一并改成与 i18n demo 一致);全仓 `git grep` 时本条也额外逮到 `tests/hooks/test_reinject.sh` 的测试 goal 串仍带旧保密场景的回声字样(codex 只标了台账、没标测试)——一并换成 i18n,印证「搜索面须含测试」。
+- **教训(固化)**:① **凡书面记录一次泄密 / 敏感清除,记录本身必须匿名化——绝不在台账里逐字复述被清除的秘密**。「描述删除」≠「安全」;ledger / changelog / commit message / PR body 都是发布面,和产物同等对待。② **验证一次 scrub 的 grep 必须把「正在写结论的那份文档」也纳入搜索面**——自指盲区(documenting-the-fix-reintroduces-it)是 #29→#35 这条链的根;scrub 类任务的收尾自检应是**全仓 `git grep <secret>` 归零**,而非「场景文件 grep 零残留」。③ 承 #19/#27/#30/#32/#34:又一例「测试全绿、唯独 codex 第二端点验收能逮」——语义/安全类盲区里,**自指型泄露**(修复说明里带着被修的东西)codex 命中率高。④ 本条与 #29 是同一根的两层:#29 是「场景泄密」,#35 是「记录场景泄密时再泄一次」——提醒任何 must-fix 安全项**收尾验证的搜索面要覆盖到验证文档自身**。
+- **严重度 / 来源**:**must-fix(泄密,release-blocking)** / 一手(codex 第二端点验收 CODEX13,本 PR)。
+
+## Finding #36 — 两个 reviewer finding 反向振荡(嫌孤儿化 ↔ 嫌污染);用非协商红线当裁决锚 + 文档化止振荡 ✅已修
+
+- **现象**:同一个设计点(blank-session active 板该不该武装)被 codex 连着两轮**反向**提:**CODEX12** 嫌严格 session-match 把 `owner.session_id:""` 的板**孤儿化** → 我加了「对称 degrade」(空 board sid 也武装);**CODEX14(P1)** 立刻反过来嫌这个对称 degrade **破红线 6**——blank 板会武装**任意**不相关 session(从没跑过 `as-master-orchestrator` 的普通 session 也被 block-stop / 注入编排 context / pacing 警告),正是跨会话污染。一加一减,典型的 fix-A-breaks-B 振荡。
+- **根因**:① **两个 finding 各自局部正确,但全局是一个 trade-off**——孤儿化 vs 污染是同一枚硬币两面,没有"两全"的天真解(blind hook 无法区分"该收养这块孤儿板的合法会话"与"不相关会话")。② 我第一轮(CODEX12)**没把它当 trade-off、而当 bug 直接修**,过度修正成了 red-line 违例。③ 真正的判别信号缺失被忽略了:**官方 resume/compaction 保留 session_id**(已 #34 核实),所以合法续跑的板**根本不是 blank**——CODEX12「blank=resume 路径」的前提本就错,孤儿化只是 bootstrap 缺 sid 建板的**异常**。
+- **影响**:对称 degrade(commit 37db5c3)若发布,会让任何 blank active 板武装宿主上每一个会话——把红线 6(用户非协商)在最隐蔽处打穿。CODEX14 在发布前逮住。
+- **处置**:**回退对称 degrade**(4 hook 删 board-sid-空分支,保留 stdin-sid-空的 compaction degrade);**blank 板保持休眠(fail-safe)**,由**显式 re-arm**(重跑 `as-master-orchestrator` → bootstrap 重盖 session_id)认领。**据非协商红线 6 裁决**(污染 > 孤儿边缘 case),并把整个振荡 + 裁决 + 理由写进 **ADR-007 §2.3(asymmetric)+ §4.5 Alternative E**(「auto-adopt blank — tried and reverted」),board.md 同步改正——**让下一个 reviewer 再提时有现成的书面裁决可指,不再 litigate**。端点亲手复现四情形(blank 休眠 / 非空不匹配休眠 / stdin 空武装 / 精确匹配武装)确认。
+- **教训(固化)**:① **遇到两个 reviewer finding 反向拉扯(振荡),别来回翻烙饼——停下,认出这是一个 trade-off,用一个更高的不变式(这里是用户非协商红线)当裁决锚,选定一边并把『为什么是这边 + 另一边为何被否』写进 ADR 的 Alternatives**。书面裁决是止振荡的唯一办法;只改代码不改文档,下一轮 reviewer 会把你推回去。② **第一次收到 finding 就要分清「这是 bug」还是「这是 trade-off 的一端」**——把 trade-off 当 bug 直接修,极易过度修正撞穿另一条约束(本案 CODEX12→红线 6)。③ **fail-safe > fail-open**:拿不准时,「保持休眠(少做)」几乎总比「武装(多做、可能污染)」安全——尤其当多做会打穿一条 red line。④ 振荡也是 closure-loop 的一个收敛信号:从"每轮新实质 bug"变成"对同一点反复拉扯",说明接近底部、该靠原则收口而非继续滴漏。
+- **严重度 / 来源**:P1(对称 degrade 破红线 6,发布前逮住)/ 一手(codex 第二端点验收 CODEX14,与 CODEX12 双向夹逼,本 PR)。
+
+## Finding #30 — hook 建在「未验证的平台输出路由假设」上;codex 二审 + 官方文档裁决后移除 ✅已删
+
+- **现象**:本轮把 orchestrator 的运行时信号做成确定性 hook 时,新建了 `subagent-stop.sh`(`SubagentStop` 事件,代号 H6),目的是「后台 sub-agent 一完成,就自动**提醒父 orchestrator** 去 integrate / 端点验收」。它用 `hookSpecificOutput.additionalContext` 注入那条 nudge。**但 codex 对 committed 代码做第二端点验收时指出**:`SubagentStop` 的 additionalContext **注入的是刚结束的那个 sub-agent 自己的 context,不穿过父 orchestrator 边界**——所以这条「提醒父线」的 nudge 递错了对象,父线根本收不到。
+- **根因**:① 建 hook 时只验证了**事件存在**(`SubagentStop` 真实存在、能 block / 注入),却**没验证它的输出路由**——additionalContext 到底注入**谁的** context。研究文档(`claude-code-hooks-reference.md`)甚至自称对官方端点验收过,断言「SubagentStop 自动通知主线」,但这条**路由断言是错的**(该文档第一轮还整个漏了 SubagentStop,第二轮补回来却把路由判反)。② 更深:**子 → 父的自动通知本就不是 hook 的职责**——父 orchestrator 本来就会自动收到 sub-agent 的结果摘要(Claude Code 内建),这个 hook 从设计上就**冗余**;真正的跨 agent 协调属 background agents / agent teams(本仓红线 5 有意排除)。
+- **影响**:一个**做不到自己设计目的、且冗余**的 hook 被建出来、测过、接线、还差点随 0.3.0 发布。它通过了所有单元测试 + smoke.sh + plugin validate——因为这些只验「给定 board 状态,hook 输出什么」,**验不了 additionalContext 注入进谁的 context** 这种平台语义。
+- **处置**:① claude-code-guide 查官方文档**权威裁决**:additionalContext 达 sub-agent 非父线、`decision:block` 是「拦 sub-agent 别停」的执行控制非通知、父线自动收结果摘要、子→父通知属 background-agents/teams。codex 与官方文档**双重确认**。② 全仓级联**删除** `subagent-stop.sh`(去 hooks.json 注册 / 删文件 + 测 / structure.test 6→5·5→4 事件 / README 双语 · SKILL 魂 · AGENTS · CHANGELOG · ADR-007 · SECURITY · redesign 文档去 H6,诚实改「已建后又移除」)。「完成即整合」的纪律不丢——它本就活在 SKILL A 决策程序的 recon 步 + 内建通知里。**魂 dot-graph md5 byte-identical**(只动 2 处 hook 共鸣引用、零碰牙齿)。
+- **教训(固化)**:① **建任何 hook 前,先验证它的「输出去向」,不只验「事件存不存在」**——`additionalContext` / `decision:block` 作用在谁身上(父 vs 子 vs 主会话),是 hook 能不能达成目的的命门。平台语义必须对**官方文档 / 源码**端点验收,连「自称验过」的二手研究文档都可能把路由判反(本条是研究文档**第二次**在 SubagentStop 上出错)。② **codex 第二端点验收必须能看到真代码**:这条之所以拖到现在才逮,是因为新 hook 文件一直 untracked、不进 `git diff`,前两轮 codex 都看不到它们的代码——**先 commit 再 codex** 是让第二验收真正生效的前提(呼应 Finding #20「带外脚本 V 端点必须真跑」)。③ 呼应 Finding #19/#21/#27——「全套测试 + validate 都绿、唯独独立第二端点验收能逮」的形态盲区里,**平台语义类**(谁收到注入)是 codex 命中率极高的一类。
+- **严重度 / 来源**:should-fix(误设计 hook,发布前逮住)/ 一手(codex 第二端点验收 + 官方文档裁决,本 PR)。
+
+## Finding #31 — 落地页把 hook 能力**过度宣称**:对外说 live「5h/7d burn-rate pacing」,实现只有 5h ✅已修
+
+- **现象**:codex 第二端点验收(CODEX8)指出:`usage-pacing.js` 运行时只调 `computeFiveHour()`、只算 5h 滚动窗,但 README / SECURITY / CHANGELOG / AGENTS 等对外文档把它宣称成 live「5h/**7d** burn-rate pacing」。当 5h 窗还有余量、而 7d 周配额已逼近上限时,这个 Stop hook 仍**静默**——长跑会对 7d 维度**全盲**,除非用户手动跑 `cc-usage.sh`。
+- **根因**:① 把**带外工具 `cc-usage.sh` 的能力**(它确实同时吐 `five_hour` + `seven_day:{used_tokens}`)错记到了 **live hook** 头上——README 重定位做能力矩阵时,「5h/7d」这个口号从 cc-usage.sh 顺手贴到了 hook 行。② 更细一层的事实错:**「7d burn-rate」这个概念根本不存在**——连 cc-usage.sh 在 7d 上也只算**累计 `used_tokens` 总量**(无 burn rate、无撞墙锚,因为周配额 reset 点不在 JSONL 里)。所以「5h/7d burn-rate」双重失真:既错把 7d 归给 live hook,又虚构了一个 7d burn-rate。③ hook 自身的 header 注释**一直只声称 5h**——是外层文档单方面 over-claim,代码与自述本来就对。
+- **影响**:最高曝光面(落地页能力矩阵 C2 标 🟢 Live)登了一条**实现兑现不了**的能力宣称。这正是本仓「no-silent-failure / gate-green ≠ passed / 诚实 🟢🟡⚪ 矩阵」纪律在**对外宣称**维度的同构破口——一条 advertised ≠ implemented 的 C2 行,等于把「闸绿」当「真过」登在了 README 第一屏。`run-tests` / `plugin validate` 全绿也看不见它(它们验结构,不验「宣称对不对得上实现」)。
+- **处置**:**收窄宣称、不补功能**(codex 给了「补 7d 信号 或 收窄宣称」两条路)。判据:无 `CC_MASTER_7D_BUDGET`(net-new env)时 7d 无诚实撞墙锚,对绝大多数没设预算的用户**仍会静默**——终局期补 7d = 加复杂度却不改可观测行为的 scope creep / gold-plating。故选**纯文档诚实修正**:凡把「5h/7d」能力归给 live hook 处一律收窄为 5h(SECURITY / README×4 / README_zh×4 / CHANGELOG / AGENTS 共 11 处),7d 明确归 `cc-usage.sh`(带外、累计总量、非 live 注入);概念性的「5h/7d 配额窗口」引用(cost-and-pacing.md / SKILL.md:26 / cc-usage.sh 自述)**准确,保留不动**。**零代码改**(hook 本就只做 5h),双语 `##` 节仍同构、全套门绿。
+- **教训(固化)**:① **落地页/能力矩阵的每条 capability 宣称,发布前必须对「它由哪个制品兑现、那个制品实际算什么」逐条核对**——尤其当一个能力跨「live hook + 带外脚本」两个制品时,别把带外脚本的能力贴到 hook 上(provenance 同 Finding #29:搬运到高曝光面必做来源审查)。② **宣称里的技术词要对实现为真**——「7d burn-rate」连工具层都不存在,口号化的并列(「5h/7d」)最易把一个不存在的概念夹带进对外文档。③ 收窄宣称 vs 补功能:**默认选「让文档说真话」而非终局期临时加 feature**——把 advertised 拉到 implemented,是稳妥、低风险、不 overreach 产品方向的诚实修正(对照 §6 Iron Law:别造一个 baseline 证明不需要的东西)。④ 再次印证 Finding #19/#27——「测试全绿、唯独 codex 第二端点验收能逮」的形态盲区里,**文档/实现漂移**是 codex 高命中的一类(本条是同一 PR 内第三例:#28 魂标 live hook 为 TODO、#30 平台路由判反、#31 对外 over-claim hook 能力)。
+- **严重度 / 来源**:should-fix(落地页 over-claim,高曝光低 blast,零代码)/ 一手(codex 第二端点验收 CODEX8,本 PR)。
+
+## Finding #32 — PostToolBatch 在 sub-agent 上下文也触发:指挥专属 WIP 警告泄漏给 leaf worker(破红线4)✅已修
+
+- **现象**:codex 第二端点验收(CODEX9)指出:`posttool-batch.sh` 注册的官方 `PostToolBatch` 事件**会在后台 sub-agent(Task 派生的 leaf worker)上下文内部也触发**;此时 hook 的 stdin 仍带 orchestrator 的 `session_id`,于是 leaf worker 自己的一批工具调用会**匹配上主板**,在主板超 `wip_limit` 时收到「指挥专属」的 WIP/编排 `additionalContext`——而 sub-agent 内注入的 additionalContext 进的是**该 leaf worker 自己**的 context。等于**把指挥的乐谱递给了乐手**,破红线 4(指挥不演奏:WIP pacing 是 orchestrator-only 的认知指导)。
+- **根因**:① 设计 `board_matches` 武装闸时,默认 PostToolBatch 只在主线触发,**只用 `session_id` 判 arming**——没考虑 per-tool 类 hook 在 sub-agent 内同样 fire 这一平台语义。② sub-agent 与主线**共享同一 `session_id`**,所以 session-scoped 闸**区分不了**两者;真正能区分的是官方 stdin 里**仅在 sub-agent 内出现、主线缺席**的 `agent_id` 字段——而原实现根本没解析它。③ 又一次「**测试全绿看不见**」:`run-tests`/`smoke` 只喂主线形态的 stdin 验「给定 board → 输出什么」,从不喂带 `agent_id` 的 sub-agent stdin,故 production 才会暴露的污染在单测里完全不可见(同 #30 的形态盲区)。
+- **影响**:一个破红线 4 的指导泄漏——leaf worker 会被灌入「别再加并行、defer 高 float」这种只对指挥有意义的指令,可能扰动单元 worker 的执行。通过了所有单测 + smoke + validate,只在真 sub-agent 上下文下才发生。
+- **处置**:**官方文档权威核实先行**(承 #30 铁律:平台语义不凭 codex/记忆断言)——派 claude-code-guide 对 docs.claude.com 逐条核实,**坐实** codex 全部断言:`PostToolBatch` 是有效事件、在 sub-agent 内会触发、官方字段确实叫 `agent_id`(仅 sub-agent 出现、主线缺席、官方推荐「空=主线 非空=子」)、sub-agent 内 additionalContext 进子自身 context。据此 TDD 修:在 `posttool-batch.sh` 的 `sid` 解析后、武装闸**之前**加一道 **sub-agent 闸**——纯 bash sed 解析 `agent_id`(红线1 禁 jq,比照 session_id 写法;只认带引号值,故 `null`/缺席当主线),**非空即静默 `exit 0`**。**只改 posttool-batch.sh 一个 hook**:`Stop`(verify-board/usage-pacing)与 `SessionStart`(reinject)是主线生命周期事件、不在 sub-agent 触发(子完成走独立 `SubagentStop`,本仓已不注册),无需此闸——不扩散。端点亲手复现(超 cap 主板 + 带 agent_id stdin → 静默;无 agent_id → 照常警告;`agent_id:null` → 当主线)全清。
+- **教训(固化)**:① **任何经 `additionalContext` 注入「编排者专属」指导的 per-tool 类 hook(PostToolUse/PostToolBatch),必须用 `agent_id` 把 sub-agent 上下文 gate 掉**——因为这类 hook 在 sub-agent 内同样 fire、且注入落在子自身 context,session-scoped 闸区分不了(主线与子共享 session_id)。这是红线 4 在 hook 层的具体落地。② **承 #30**:平台语义(事件在哪触发、stdin 带什么字段、注入进谁的 context)是 hook 正确性的命门,**必须对官方文档端点验收**——本条与 #30 互为镜像:#30 验证**推翻**了二手研究文档的错误路由断言,#32 验证**坐实**了 codex 的断言;两种结果都只有「真去查官方」才能得到,凭记忆/二手都不可靠。③ 单测盲区固化:**hook 测试除主线 stdin 外,应补一份带 `agent_id` 的 sub-agent 形态 stdin**,否则「sub-agent 内行为」永远测不到(本案 Case 15/16/17 即补此)。④ 同一 PR 内**第四例**平台/文档语义类(#28 魂标 live hook 为 TODO、#30 平台路由判反、#31 对外 over-claim、#32 sub-agent 触发未 gate)——印证 codex 第二端点验收对「测试全绿唯独独立验收能逮」这一形态盲区的高命中。
+- **严重度 / 来源**:should-fix(红线4 指导泄漏,发布前逮住)/ 一手(codex 第二端点验收 CODEX9 + 官方文档坐实,本 PR)。
+
+## Finding #33 — agent-facing 文本与 hook 契约脱节:命令叫 agent 重设 ARM 盖的 session_id(P1)+ 魂仍标已删 H6 为 live(P3)✅已修
+
+- **现象**:codex CODEX11 两条——① **P1(命令)**:`as-master-orchestrator.md` 第 2 步叫 agent「从运行环境设好 `owner.session_id`」。但 ADR-007 下 `bootstrap-board.sh` **建板即把唯一 hook 可见的 `owner.session_id` 盖成创建它的 session**(ARM 动作本身)。agent 拆 DAG 重写 board 时若把它覆写成空值/猜的值,**所有 session 精确匹配的 hook(reinject/verify-board/posttool-batch/usage-pacing)对本 orchestration 集体休眠**——整套运行时静默失效。② **P3(魂)**:常驻重注的 `SKILL.md` 收尾仍写「H3/H5/**H6**/H8 现均已 live」,但本 PR 已删 `subagent-stop.sh`/`SubagentStop`(H6,Finding #30)——魂的 hook 状态图带一条 stale claim,compaction 后会让编排者期待一个不存在的子→父通知路径。
+- **根因**:① **agent-facing 文本(命令散文 / 魂的 hook 图)没跟着 hook 契约的演进同步**——两条都是「文档说的」与「hook 实际做的」脱节。P1 是预存隐患:原英文命令一直这么写,ADR-007 引入 ARM-stamp 后该指令就**反了**,而 CMD 中文化忠实搬运了错的原意(中文化只换语言、不审语义正确性)。P3 是 Finding #28 同款 **MAPSYNC 漏**:删 H6 时改了 2 处共鸣引用、漏了这条收尾汇总行(#28 的教训「同步状态映射表必须穷举全部条目」恰好又被自己违反一次)。② 共性:**当一个 hook 以「写某个 narrow-waist 字段」作为它的契约动作(bootstrap ARM-stamp session_id),任何 agent-facing 指令都不能再叫 agent 去(重)设那个字段**——这是 ADR-007 的一条未写明推论。
+- **影响**:P1 是 **P1 级**——一条照着做就会让整套 armed-hook 运行时对本 orchestration 全哑的指令,印在点火命令里(每次起 orchestration 都注入)。P3 在魂里、每次 compaction 重注,误导面广但 blast 低(只是认知误期,不致命)。两条都通过了所有单测 + validate——测试验「给定 board → hook 输出」,验不了「命令散文叫 agent 干的事会不会破坏 hook 契约」「魂的 hook 图与实际 live 集是否一致」。
+- **处置**:① P1——命令第 2 步改为「填 `goal`/`git`/`tasks`;**`owner.session_id` 已由 bootstrap 盖好,原样保留、绝不覆写**」并写明覆写的后果(四个 hook 集体休眠)。**按 #28 教训穷举** `commands/`+`skills/`+`spec.md`+`adrs/`:确认别处再无「叫 agent 设 session_id」的指令,隐患封口。② P3——`SKILL.md:157` 删 H6,改「H3/H5/H8 现均已 live」;grep 穷举确认 SKILL.md 与全部 references 再无 H6 残留。改后**重验 dot-graph md5 对 HEAD 仍 byte-identical**(`d6923683…`,只动 Vision-index 收尾行、零碰牙齿)。
+- **教训(固化)**:① **凡 hook 以「写某 narrow-waist 字段」为其契约动作,所有 agent-facing 文本必须『保留勿覆写』那个字段**——ARM-stamp 的 `owner.session_id` 是头号案例;给 agent 的填板指令要显式区分「hook 已盖好、别碰」与「你来填」。② **翻译/中文化≠审校**:CMD 中文化忠实搬运了一条语义上已经错的英文指令——批量改写(翻译/重构)时,顺带对照当前 hook 契约审一遍语义正确性,别只换皮。③ **MAPSYNC 第三次复发**(#28 H8 标 TODO、本条 P3 H6 标 live)证明:魂里任何「hook 状态汇总表/收尾行」是高频漂移点,删/加 hook 的 PR **必带**一条 `grep 'H[0-9]'` 全量核对 live 集的自检。④ 承 #19/#27/#30/#32:agent-facing 散文与契约脱节是「测试全绿唯独 codex 第二端点验收能逮」形态盲区里的又一类(本 PR 第五例语义/文档类)。
+- **严重度 / 来源**:P1=must-fix(armed-hook 运行时全哑,发布前逮住)· P3=should-fix(魂 stale,高曝光低 blast)/ 一手(codex 第二端点验收 CODEX11,本 PR)。
+
+## Finding #34 — armed-gate 把 empty-session_id 的 active 板孤儿化;权威核实反证 codex 半个前提,对称 degrade 收口 ✅已修(处置后被 [[Finding #36]] 回退)
+
+- **现象**:codex CODEX12 指出 session-scoped 武装闸(`owner.session_id==stdin sid`)会把**未匹配 session_id 的 active 板静默孤儿化**,称这破坏「插件宣称的 board-based resume」:① 用户在「全新会话 restart」→ stdin sid 不匹配 → reinject 跳过 → resume 失效;② 升级时旧 active 板 `owner.session_id:""` → 不匹配 → 孤儿化。
+- **根因 / 权威反证**:**先对官方文档权威核实(claude-code-guide,承 Finding #30 铁律:平台语义不凭断言)**,结论把 codex 的两幕**劈成一真一伪**——① **伪**:`claude --resume`/`--continue` **保留原 session_id**(`SessionStart.source:"resume"`,session_id 不变),compaction 也保留(`source:"compact"`);官方 resume/compaction 路径下 gate 照常匹配、reinject 照常工作。「全新独立会话接管旧板」**无官方范式**(sessions are independent),armed-gate 在全新会话休眠**正是设计目标(红线 6)**——ADR-007 的 Alternatives 早已**明确否决**「任何 active 板即武装」。所以 codex 第一幕建立在「resume 会换 session_id」这个**错误前提**上。② **真**:当 board 的 `owner.session_id` 为**空串**(bootstrap 若在缺 session_id 的 stdin 上建板就会盖空、或迁移/手改)时,它对任何非空 stdin sid 都不匹配 → **永久孤儿化**。这是真缺口——原 degrade 只对「stdin sid 空」放行,**没对称覆盖「board sid 空」**。
+- **影响**:一块 `owner.session_id:""` 的 active 板会被所有 session 精确匹配的 hook 永久无视——orchestrator 起不来、reinject 不重注、goal-hook 不兜底。低概率(bootstrap 正常会盖非空 sid)但真实(缺 sid 的 UserPromptSubmit stdin 会触发)。
+- **处置**:**对称化 degrade**——`owner.active 且 (stdin sid 空 ∨ board owner.session_id 空 ∨ 二者字面相等)` 即武装(4 hook:3 bash `board_matches` 各加 `[ -z "$board_sid" ] && return 0`、node `isArmed` 加 `if (!owner.session_id) return true`)。**只放行 empty-session_id(未认领板),「非空但不匹配」仍休眠**——端点亲手复现:`owner.session_id:""`+非空 stdin → 收养(block/warn);`owner.session_id:"OTHER"`+不同 stdin → 仍休眠(红线 6 防线一字未动,没退化成被否决的「任何 active 板即武装」)。同步两文档:ADR-007 §2.3 扩成对称 degrade + 新增「官方语义裁决」小节(resume/compaction 保 session_id、`source` 字段、sessions independent——故 resume 路径照常、全新会话休眠是设计目标、只 empty-sid 需收养),board.md 加一小段续跑三态(SSOT 指回 ADR-007)。
+- **教训(固化)**:① **平台语义核实能反证 reviewer 的前提**——codex 是强 reviewer 但它对「resume 是否换 session_id」的隐含假设是错的;承 #30/#32,**任何「跨会话/续跑/事件在哪触发」类断言都要对官方文档端点验收**,核实结果可能让一条 finding 从「修代码」缩成「修半条 + 把另半条记成 by-design」。② **degrade/兜底逻辑要查对称性**:已为「我方(stdin)缺值」兜底时,对面(board)缺同一字段往往也要兜——单边兜底是常见盲区。③ **by-design 与 bug 要写进 ADR**:全新会话休眠是设计目标,不写明就会被一轮轮 reviewer 反复当 bug 提;ADR-007 现已把官方语义裁决固化,后人不必再 litigate。④ 承 #30/#32:本 PR 第三例「平台语义经权威核实改变结论」(#30 推翻研究文档、#32 坐实 codex、#34 半推翻 codex)——三种走向都只有真查官方才得到。
+- **严重度 / 来源**:should-fix(empty-sid 板孤儿化,低概率真实;另半条 by-design 澄清)/ 一手(codex 第二端点验收 CODEX12 + 官方文档权威核实,本 PR)。

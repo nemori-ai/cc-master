@@ -23,7 +23,7 @@
 | `scripts/eval-benchmark.sh` | skill-creator Track B 聚合步的薄封装——读 iteration 目录里的 grading.json 出 mean±stddev | `uv` + Python 3.12 |
 | `scripts/codex-review.sh` | codex 当独立第二端点验收者——对一段 diff 出 `approve`/`needs-attention` | `codex` CLI（OAuth） |
 
-> **这些脚本只进 `scripts/`，绝不进 `hooks/`（红线 1，ship-anywhere）。** 它们都依赖 runtime（`uv`/`claude`/`codex`），hook 必须纯 bash 才能在 Bedrock/Vertex/Foundry 跑。**本 skill 将来若补新工具脚本，同样只进 `scripts/`，且复用现有形态，不重造引擎。**
+> **这些脚本只进 `scripts/`，绝不进 `hooks/`（红线 1 / ADR-006，ship-anywhere）。** 它们都依赖 `uv`/`claude`/`codex`（不随 Claude Code 保证存在），而 hook 只允许 bash + node/JS，容不下它们。**本 skill 将来若补新工具脚本，同样只进 `scripts/`，且复用现有形态，不重造引擎。**
 
 权威用法 / 依赖 / 天花板：`design_docs/eval/README.md`（Track A）+ `design_docs/eval/track-b-benchmark.md`（Track B 完整半手动流程）。仓级 SSOT 是 `AGENTS.md` §8。
 

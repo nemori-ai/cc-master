@@ -41,15 +41,97 @@ if [ -f "$SIDECAR" ]; then
   case "$last_handshook_fp" in '') last_handshook_fp="-";; esac
 fi
 
-# ── board matching ────────────────────────────────────────────────────────────────────────────────
+# owner_region BOARD — print the ROOT "owner" object's DEPTH-1 FIELD STREAM only, via a string- and
+# escape-aware depth scan ([ ] and { }) in POSIX awk (a shell tool, like tasks_region — NOT a jq/node
+# runtime). The board is one root object; this enters ONLY the `"owner"` key found at ROOT depth (curly
+# depth 1, bracket depth 0) and emits the chars at the owner object's own field level (active /
+# session_id / heartbeat) — every value nested DEEPER inside owner, or anywhere else in the file
+# (tasks[], log[], deps[]), is dropped wholesale. FORMAT-AGNOSTIC: single-line and multi-line JSON behave
+# identically. Used so the arming gate reads `active` / `session_id` ONLY from the board-root owner
+# sub-object — an `"active":true` or a `session_id` buried in an agent-shaped task/log payload of an
+# ARCHIVED board can never masquerade as owner's and false-arm the hook (CODEX7, red line 6). Only a
+# ROOT-depth `"owner"` key is honored (goal prose or a task with its own `"owner"` field can never be
+# captured — same root-only caveat as tasks_region's `"tasks"` key). Same string/escape rules as tasks_region.
+owner_region() {
+  awk '
+    { s = s $0 "\n" }
+    END {
+      n = length(s)
+      cd = 0; bd = 0; instr = 0; esc = 0
+      capkey = 0; key = ""; pendKey = ""        # pendKey: last completed ROOT-depth key string
+      inowner = 0; od = 0; out = ""
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        if (inowner) {                          # already inside the root owner object (opened at depth od)
+          if (instr) {
+            if (cd == od + 1 && bd == 0) out = out ch
+            if (esc) esc = 0
+            else if (ch == "\\") esc = 1
+            else if (ch == "\"") instr = 0
+            continue
+          }
+          if (ch == "\"") { instr = 1; if (cd == od + 1 && bd == 0) out = out ch; continue }
+          if (ch == "[") { bd++; continue }
+          if (ch == "]") { if (bd > 0) bd--; continue }
+          if (ch == "{") { cd++; continue }
+          if (ch == "}") { cd--; if (cd == od) { inowner = 0; break } continue }   # owner closed → done
+          if (cd == od + 1 && bd == 0) out = out ch
+          continue
+        }
+        if (instr) {                            # in a string while still scanning for root "owner":{
+          if (esc) { esc = 0; if (capkey) key = key ch; continue }
+          if (ch == "\\") { esc = 1; if (capkey) key = key ch; continue }
+          if (ch == "\"") { instr = 0; if (capkey) { capkey = 0; pendKey = key } continue }
+          if (capkey) key = key ch
+          continue
+        }
+        if (ch == "\"") {                        # a string starting at ROOT depth is a candidate key
+          instr = 1
+          if (cd == 1 && bd == 0) { capkey = 1; key = "" } else capkey = 0
+          continue
+        }
+        if (ch == "[") { bd++; pendKey = ""; continue }
+        if (ch == "]") { if (bd > 0) bd--; continue }
+        if (ch == "{") {
+          cd++
+          if (cd == 2 && bd == 0 && pendKey == "owner") { inowner = 1; od = 1 }   # entered root owner{}
+          pendKey = ""
+          continue
+        }
+        if (ch == "}") { if (cd > 0) cd--; pendKey = ""; continue }
+        if (ch == ",") pendKey = ""
+      }
+      printf "%s", out
+    }' "$1" 2>/dev/null
+}
+
+# ── board matching = THE ARMING GATE ────────────────────────────────────────────────────────────────
 # A board is "mine" when active AND (sid empty → degraded: any active board; else owner.session_id==sid).
+# The degrade is ASYMMETRIC — it fires ONLY when the STDIN sid is empty (ADR-007 §2.3: a compaction that
+# drops session_id; the OWNING session re-anchoring across a compaction boundary). A board stamped with an
+# EMPTY owner.session_id is NOT adopted: it falls through to the literal compare "" = "<non-empty sid>" →
+# false → DORMANT (fail-safe). Auto-adopting blank-session boards was tried (CODEX12) and REVERTED (CODEX14):
+# it armed EVERY unrelated session, re-introducing exactly the cross-session pollution red line 6 forbids.
+# Official resume/compaction PRESERVES session_id, so a legitimately-resumed board carries its ORIGINAL
+# session_id (never blank) and matches normally; a blank board is only the anomaly of bootstrap building a
+# board on a sid-less stdin, and the correct way to claim it is an explicit re-arm (re-run
+# as-master-orchestrator → bootstrap re-stamps owner.session_id). → ADR-007 (board-derived armed-gate).
+# This board_matches IS this hook's arming gate: every cc-master hook stays dormant until THIS session
+# is armed (an active board it owns), and only a matched board drives any behavior below. (Unified
+# armed-hook discipline — same gate in reinject.sh / posttool-batch.sh and the node
+# usage-pacing.js; bootstrap-board.sh is the ARM action and is the sole gate-exempt hook.)
+# active AND session_id are read ONLY from the ROOT owner sub-object (owner_region above) — NEVER full-text
+# grep: a flexible tasks[]/log[] payload of an ARCHIVED board carrying `"active":true` must never false-arm
+# the hook (CODEX7, red line 6).
 board_matches() { # $1 = board path
-  grep -qE '"active"[[:space:]]*:[[:space:]]*true' "$1" 2>/dev/null || return 1
+  owner="$(owner_region "$1")"
+  printf '%s' "$owner" | grep -qE '"active"[[:space:]]*:[[:space:]]*true' || return 1
   [ -z "$sid" ] && return 0
   # owner.session_id must equal $sid EXACTLY. Never splice $sid into a grep -E pattern: a session id
-  # carrying regex metachars (., *, [, etc.) would otherwise match the wrong board. Instead extract the
-  # board's session_id *value* with a fixed regex, then compare as a literal shell string.
-  board_sid="$(grep -oE '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' "$1" 2>/dev/null \
+  # carrying regex metachars (., *, [, etc.) would otherwise match the wrong board. Instead extract owner's
+  # session_id *value* with a fixed regex, then compare as a literal shell string. A blank board_sid falls
+  # through to "" = "<non-empty sid>" → false → DORMANT (blank board is NOT auto-adopted; red line 6).
+  board_sid="$(printf '%s' "$owner" | grep -oE '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' \
                | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
   [ "$board_sid" = "$sid" ]
 }
@@ -91,6 +173,73 @@ tasks_region() {
         if (bd == 1 && cd == 1) out = out ch
       }
       printf "%s", out
+    }' "$1" 2>/dev/null
+}
+
+# pending_user_decisions BOARD — print, one per line, the human label of every task object that is
+# GENUINELY parked on the user: its TOP-LEVEL fields carry BOTH `"status":"blocked"` AND
+# `"blocked_on":"user"` (whitespace-tolerant) — the `blocked(blocked_on:"user")` contract. Requiring
+# status:"blocked" (not just blocked_on) excludes ANSWERED decisions: a task already `status:"done"`
+# that still carries stale `blocked_on:"user"` metadata is no longer pending, so it is not re-warned.
+# Label = its "title" if present, else its "id". This is a PER-OBJECT scan (tasks_region above flattens every object's fields into one
+# stream and so cannot bind a title back to the object whose blocked_on it belongs to). Same
+# string/escape/double-depth ([ ] and { }) awareness as tasks_region, so it is FORMAT-AGNOSTIC:
+# single-line and multi-line JSON behave identically. Only characters at the task-object top level
+# (bracket depth 1 inside the tasks array, curly depth 1 inside the task) are buffered per object —
+# nested flexible fields (a task-local "log" array, structured entries inside it) are dropped
+# wholesale, so they can neither inject a spurious blocked_on:user nor masquerade as a title/id.
+pending_user_decisions() {
+  awk '
+    { s = s $0 "\n" }
+    END {
+      i = index(s, "\"tasks\""); if (!i) exit
+      s = substr(s, i + 7)
+      j = index(s, "["); if (!j) exit
+      s = substr(s, j + 1)                 # start INSIDE the tasks array
+      bd = 1; cd = 0; instr = 0; esc = 0; obj = ""
+      n = length(s)
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        if (instr) {
+          if (bd == 1 && cd == 1) obj = obj ch
+          if (esc) esc = 0
+          else if (ch == "\\") esc = 1
+          else if (ch == "\"") instr = 0
+          continue
+        }
+        if (ch == "\"") { instr = 1; if (bd == 1 && cd == 1) obj = obj ch; continue }
+        if (ch == "[") { bd++; continue }
+        if (ch == "]") { bd--; if (bd == 0) break; continue }
+        if (ch == "{") { cd++; if (bd == 1 && cd == 1) obj = ""; continue }   # open a task object → fresh buffer
+        if (ch == "}") {
+          cd--
+          if (bd == 1 && cd == 0) emit(obj)   # closed a task object → decide on its top-level fields
+          continue
+        }
+        if (bd == 1 && cd == 1) obj = obj ch
+      }
+    }
+    # emit OBJ — list OBJ as an unanswered user decision ONLY if it is genuinely parked on the user:
+    # top-level status MUST be "blocked" AND blocked_on MUST be "user" (the blocked(blocked_on:"user")
+    # contract). A task already status:"done" (etc.) that still carries stale blocked_on:"user"
+    # metadata is an ANSWERED decision — excluding it stops the Stop handshake re-warning on it forever.
+    # Read both fields from this object OWN top-level fields via field() (per-object, nested log cannot leak).
+    function emit(o,   lbl) {
+      if (field(o, "status") != "blocked") return
+      if (field(o, "blocked_on") != "user") return
+      lbl = field(o, "title")
+      if (lbl == "") lbl = field(o, "id")
+      if (lbl != "") print lbl
+    }
+    # field(O, NAME) — extract the string value of top-level key NAME from object buffer O ("" if absent).
+    function field(o, name,   re, m) {
+      re = "\"" name "\"[ \t]*:[ \t]*\""
+      if (match(o, re)) {
+        m = substr(o, RSTART + RLENGTH)
+        sub(/".*/, "", m)
+        return m
+      }
+      return ""
     }' "$1" 2>/dev/null
 }
 
@@ -179,4 +328,27 @@ if [ "$last_handshook_fp" = "$fp_now" ]; then
 fi
 # New (or changed) completion state → record the fingerprint we are handshaking on, then block.
 last_handshook_fp="$fp_now"
-emit_block 'cc-master: before you stop, self-check against this board'\''s `goal`. (1) Is every point that needs the user surfaced / marked `blocked_on:"user"`? (2) Against the **original goal**, is every to-do actually done — including any NOT yet listed on the board? If something is missing, add it to `tasks[]` and keep going; only stop once the goal is truly met.'
+handshake_reason='cc-master: before you stop, self-check against this board'\''s `goal`. (1) Is every point that needs the user surfaced / marked `blocked_on:"user"`? (2) Against the **original goal**, is every to-do actually done — including any NOT yet listed on the board? If something is missing, add it to `tasks[]` and keep going; only stop once the goal is truly met.'
+# H3: if any task on a matched board is parked on the user (status blocked, `blocked_on:"user"`),
+# name those open decisions in the handshake so the agent cannot silently exit on an unanswered one.
+# Collect the human label (title, else id) of each across all of THIS session's matched boards.
+pending_list=""
+while IFS= read -r bp; do
+  [ -n "$bp" ] || continue
+  pending_list="$pending_list$(pending_user_decisions "$bp")
+"
+done <<EOF
+$matched_boards
+EOF
+# Join the non-empty labels with "; " (pure bash; preserves file order, dedup not needed for naming).
+pending_joined=""
+while IFS= read -r lbl; do
+  [ -n "$lbl" ] || continue
+  if [ -z "$pending_joined" ]; then pending_joined="$lbl"; else pending_joined="$pending_joined; $lbl"; fi
+done <<EOF
+$pending_list
+EOF
+if [ -n "$pending_joined" ]; then
+  handshake_reason="$handshake_reason Unanswered user decisions still on this board: $pending_joined. Confirm each is genuinely still pending (or resolve it) before you stop — don't silently exit on an open user decision."
+fi
+emit_block "$handshake_reason"

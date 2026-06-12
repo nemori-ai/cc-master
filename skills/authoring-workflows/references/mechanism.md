@@ -1,125 +1,112 @@
-# Mechanism — how the Workflow runtime actually behaves
+# Mechanism——Workflow runtime 实际是怎么跑的
 
-> Read this BEFORE trusting any belief about the engine. It exists to stop two
-> classes of mistake: (1) guessing whether code runs in parallel, and (2)
-> believing reverse-engineering folklore that the live tool contract has since
-> revised. Adapted from research report 1
-> (`design_docs/research/01-claude-code-dynamic-workflow-mechanism.md`).
+> 对引擎下任何判断**之前**先读它。它的存在就是为了挡掉两类错误：(1) 靠猜来断定代码到底
+> 是不是并行跑的，(2) 把逆向工程出来的民间传说当真，而 live 的工具契约其实早就变了。
+> 改编自 research report 1
+> （`design_docs/research/01-claude-code-dynamic-workflow-mechanism.md`）。
 
-## Contents
+## 目录
 
-- [§0 Contract vs internals](#0-the-one-distinction-that-governs-everything-contract-vs-internals)
-- [§1 One-line essence](#1-one-line-essence)
-- [§2 The 7 primitives + 2 injected objects](#2-the-7-primitives--2-injected-objects-true-semantics)
-- [§3 `parallel` (barrier) vs `pipeline` (streaming) + the smell-test](#3-parallel-barrier-vs-pipeline-streaming--the-core-clarification)
-- [§4 Determinism三禁 — and why](#4-determinism三禁-the-three-forbidden-things--and-why)
-- [§5 Resume = "longest unchanged prefix"](#5-resume--longest-unchanged-prefix)
-- [§6 Hard caps](#6-hard-caps-resource-bounds)
-- [§7 Background execution](#7-background-execution-the-contract-that-makes-the-main-thread-free)
+- [§0 契约 vs 内部](#0-the-one-distinction-that-governs-everything-contract-vs-internals)
+- [§1 一句话本质](#1-one-line-essence)
+- [§2 7 个 primitive + 2 个注入对象](#2-the-7-primitives--2-injected-objects-true-semantics)
+- [§3 `parallel`（barrier）vs `pipeline`（streaming）+ smell-test](#3-parallel-barrier-vs-pipeline-streaming--the-core-clarification)
+- [§4 Determinism三禁——以及为什么](#4-determinism三禁-the-three-forbidden-things--and-why)
+- [§5 Resume =「最长未变前缀」](#5-resume--longest-unchanged-prefix)
+- [§6 硬 caps](#6-hard-caps-resource-bounds)
+- [§7 后台执行](#7-background-execution-the-contract-that-makes-the-main-thread-free)
 
-## 0. The one distinction that governs everything: contract vs internals
+## 0. 统御一切的那个区分：契约 vs 内部
 
-Always separate two layers:
+永远把两层分开：
 
-- **Behavior contract** — what the runtime *promises* a primitive does. This is
-  documented: it comes from the `Workflow` tool schema the agent is handed and
-  from `code.claude.com/docs/en/workflows`. **You can rely on it.**
-- **Internal mechanism** — *how* the runtime achieves that promise (the sandbox
-  flavor, the journal file format, the exact cache index). This is a black box;
-  Anthropic almost never documents it. **Do not build beliefs on it.**
+- **行为契约**——runtime *承诺*一个 primitive 做什么。这有文档：来自递给 agent 的
+  `Workflow` 工具 schema 和 `code.claude.com/docs/en/workflows`。**它可以依赖。**
+- **内部机制**——runtime *怎么*兑现那个承诺（sandbox 的具体形态、journal 文件格式、cache
+  index 的确切实现）。这是个黑箱，Anthropic 几乎从不为它写文档。**别拿它当任何判断的地基。**
 
-For an author, the contract is enough. Everything below that is marked
-"confirmed" is contract-level; everything marked "unknown" is internals you must
-not depend on.
+对作者来说，契约就够了。其下凡标「confirmed」的都是契约级；凡标「unknown」的都是你绝不能
+依赖的内部。
 
-### Confirmed contract (rely on these)
+### 已确认的契约（依赖这些）
 
-| Fact | Confirmation |
+| 事实 | 确认来源 |
 |---|---|
-| `agent()`/`parallel()`/`pipeline()`/`phase()`/`log()`/`workflow()`/`args`/`budget` semantics | tool schema (first-party) |
-| `parallel` is a **barrier**; `pipeline` is **no-barrier streaming** | tool schema |
-| Failure semantics (thunk throw → `null` slot; stage throw → item dropped) | tool schema |
-| determinism三禁 throw (`Date.now`/`Math.random`/arg-less `new Date()`) | tool schema (behavior) |
-| resume = **longest unchanged prefix** of `agent()` calls | tool schema |
-| Concurrency `min(16, cpu cores − 2)` per workflow | tool schema |
-| 1,000 agents total per run; 4,096 items per `parallel`/`pipeline` call; 512 KB script | tool schema |
-| `budget` = `{total, spent(), remaining()}`; `spent()` = output tokens, shared across main loop + all workflows | tool schema |
-| `workflow()` is one-level nesting; child shares concurrency/counter/abort/budget | tool schema |
-| `args` is passed **verbatim as actual JSON values** (not stringified) | tool schema |
+| `agent()`/`parallel()`/`pipeline()`/`phase()`/`log()`/`workflow()`/`args`/`budget` 语义 | tool schema（first-party） |
+| `parallel` 是一个 **barrier**；`pipeline` 是 **no-barrier streaming** | tool schema |
+| Failure 语义（thunk throw → `null` 槽位；stage throw → item 被丢） | tool schema |
+| determinism三禁 抛错（`Date.now`/`Math.random`/无参 `new Date()`） | tool schema（behavior） |
+| resume = `agent()` 调用的**最长未变前缀** | tool schema |
+| 并发 `min(16, cpu cores − 2)` per workflow | tool schema |
+| 每次 run 总计 1,000 agent；每次 `parallel`/`pipeline` 调用 4,096 item；脚本 512 KB | tool schema |
+| `budget` = `{total, spent(), remaining()}`；`spent()` = output token，跨 main loop + 所有 workflow 共享 | tool schema |
+| `workflow()` 是一层嵌套；子 workflow 共享并发/计数器/abort/budget | tool schema |
+| `args` **原样作为真正的 JSON 值**传入（不被 stringify） | tool schema |
 
-### Internal unknowns (never depend on these)
+### 内部未知（绝不依赖这些）
 
-- Whether the sandbox is a `vm`-module in-process sandbox, QuickJS, or
-  `isolated-vm`. (The "V8 isolate" story is **folklore** — it actually describes
-  a *different* product, Cloudflare-backed Managed Agents, not the workflow
-  runtime.)
-- The cache key's true index (content-hash vs positional index+content).
-- The journal on-disk format (`agent-<id>.jsonl` is a community guess).
-- Whether the determinism guard is a pre-execution AST gate or a runtime throw.
-- The 180 s per-agent stall timeout and 30 s VM timeout (community single-source;
-  re-verify against the current build before relying).
+- sandbox 究竟是 `vm`-module 的进程内 sandbox、QuickJS、还是 `isolated-vm`。（「V8 isolate」
+  那套说法是**民间传说**——它其实描述的是*另一个*产品，Cloudflare 背后的 Managed Agents，
+  不是 workflow runtime。）
+- cache key 真正的 index（content-hash vs positional index+content）。
+- journal 的 on-disk 格式（`agent-<id>.jsonl` 是社区的猜测）。
+- determinism 守卫是一个 pre-execution 的 AST gate 还是一个 runtime throw。
+- 180 s 的 per-agent stall timeout 和 30 s 的 VM timeout（社区单来源；依赖前先对当前
+  build 重新核实）。
 
-## 1. One-line essence
+## 1. 一句话本质
 
-A dynamic workflow moves the "what runs next" decision **out of the LLM and into
-a deterministic JavaScript script**. The LLM writes the script once; a runtime
-executes it in the background. Intermediate results live in **script variables**,
-not the context window — only the final answer returns to the caller. This is
-what lets a single run coordinate tens-to-hundreds of agents without drowning the
-context.
+一个 dynamic workflow 把「下一步跑什么」的决策**从 LLM 手里收走、交给一段确定性的
+JavaScript 脚本**。LLM 把脚本写一次；runtime 在后台执行它。中间结果活在**脚本变量**里，
+而不在 context window 里——只有最终答案回到 caller。一次 run 能协调几十到几百个 agent 却
+不淹掉 context，靠的正是这一点。
 
-The script is a **pure coordinator**: no filesystem, no shell, no Node APIs. All
-side-effecting work (read, write, run commands) is delegated to leaf agents with
-throwaway context; only their results come back.
+脚本是个**纯协调器**：没有文件系统、没有 shell、没有 Node API。所有带副作用的活（读、写、
+跑命令）都委托给带一次性 context 的 leaf agent，只有它们的结果回来。
 
-## 2. The 7 primitives + 2 injected objects (true semantics)
+## 2. 7 个 primitive + 2 个注入对象（真实语义）
 
-| Primitive / object | What it does | Barrier? |
+| Primitive / 对象 | 它做什么 | Barrier？ |
 |---|---|---|
-| `agent(prompt, opts?)` | Spawn a fresh-context leaf subagent; returns its text, or a validated object if `schema` given. User skip → `null`. | n/a |
-| `parallel(thunks)` | Run an **array of thunks** concurrently and wait for ALL. | **YES** |
-| `pipeline(items, ...stages)` | Stream each item independently through all stages. | **NO** |
-| `phase(title)` | Open a named progress group for the agents that follow. | n/a |
-| `log(message)` | Emit one narrative line above the progress tree. | n/a |
-| `workflow(nameOrRef, args?)` | Inline-run another workflow (one level only). | n/a |
-| `args` | The input value passed to the run, exposed verbatim as a global. | n/a |
-| `budget` | `{total, spent(), remaining()}` — shared output-token pool. | n/a |
+| `agent(prompt, opts?)` | 派生一个 fresh-context 的 leaf subagent；返回它的文本，给了 `schema` 时返回一个已校验对象。用户跳过 → `null`。 | n/a |
+| `parallel(thunks)` | 并发跑一个 **thunk 数组**，等齐全部。 | **YES** |
+| `pipeline(items, ...stages)` | 让每个 item 独立流过所有 stage。 | **NO** |
+| `phase(title)` | 为接下来派生的 agent 开启一个命名的 progress group。 | n/a |
+| `log(message)` | 在 progress tree 上方发一行叙述。 | n/a |
+| `workflow(nameOrRef, args?)` | 内联跑另一个 workflow（只有一层）。 | n/a |
+| `args` | 传给本次 run 的输入值，原样作为全局暴露。 | n/a |
+| `budget` | `{total, spent(), remaining()}`——共享的 output-token 池。 | n/a |
 
-`agent()` detail: with no `schema` it returns the leaf's final text (a string);
-with a JSON `schema` it returns a validated **object** (no `JSON.parse` needed) —
-validation happens at the tool-call layer and a mismatch makes the model retry.
-A user-skipped agent returns `null`, which is why `.filter(Boolean)` appears
-everywhere. (Full opts in `api-reference.md`.)
+`agent()` 细节：不给 `schema` 时返回 leaf 的最终文本（一个 string）；给了 JSON `schema`
+时返回一个已校验的**对象**（不用 `JSON.parse`）——校验在 tool-call 层发生，不匹配就让
+model 重试。被用户跳过的 agent 返回 `null`，这就是到处都见 `.filter(Boolean)` 的缘由。
+（完整 opts 见 `api-reference.md`。）
 
-## 3. `parallel` (barrier) vs `pipeline` (streaming) — the core clarification
+## 3. `parallel`（barrier）vs `pipeline`（streaming）——核心澄清
 
-Both "run things in parallel," but the **shape** differs completely. This is the
-single most common source of confusion.
+两者都「并行跑东西」，但**形状**截然不同。这是最常见的混淆来源。
 
-**`parallel(thunks)` — a barrier fan-out.**
-- Takes an **array of thunks**: `[() => agent(...), () => agent(...)]` — **not**
-  an array of promises. (Bare promises start immediately, bypass the concurrency
-  limiter, and are a known anti-pattern.)
-- It is a **barrier**: it waits for *every* thunk before returning.
-- It **never rejects**: a thrown thunk becomes `null` in its result slot. Always
-  `.filter(Boolean)` — the result array is designed to have holes.
-- Use **only** when the downstream step genuinely needs the whole set at once:
-  cross-set dedup/merge, count-based early-exit ("0 bugs → skip all verification"),
-  or comparing one item against the whole group.
+**`parallel(thunks)`——一道 barrier fan-out。**
+- 收一个 **thunk 数组**：`[() => agent(...), () => agent(...)]`——**不是** promise 数组。
+  （裸 promise 会立刻启动、绕开并发限流器，是个已知的反模式。）
+- 它是一道 **barrier**：返回前等齐*每一个* thunk。
+- 它**绝不 reject**：抛错的 thunk 在自己的结果槽位里变 `null`。所以总要 `.filter(Boolean)`——
+  这个结果数组天生就会有洞。
+- **只**在下游某步真的要一次性拿到整个集合时才用：跨集合的 dedup / merge、按 count 提前
+  退出（「0 bug → 跳过全部 verification」），或拿单个 item 跟整组比。
 
-**`pipeline(items, ...stages)` — no-barrier streaming.**
-- Each item flows **independently** through **all** stages — item A can be in
-  stage 3 while item B is still in stage 1. No barrier between stages.
-- Wall-clock ≈ the slowest *single item's whole chain*, not the sum of the
-  slowest stage at each step.
-- Each stage callback receives `(prevResult, originalItem, index)` — annotate
-  later stages with `originalItem`/`index` instead of threading context through.
-- A thrown stage drops that item to `null` and skips its remaining stages.
-- **This is the default for multi-stage work.**
+**`pipeline(items, ...stages)`——no-barrier 流式。**
+- 每个 item **独立**流过**所有** stage——item A 可以在 stage 3，而 item B 还在 stage 1，
+  stage 之间没有 barrier。
+- 墙钟时间 ≈ *最慢那个 item 走完整条链*的耗时，不是各步最慢 stage 加总。
+- 每个 stage 回调收到 `(prevResult, originalItem, index)`——用 `originalItem`/`index` 给后
+  续 stage 标注，别手动把 context 一路串下去。
+- 抛错的 stage 把那个 item 降为 `null`，并跳过它余下的 stage。
+- **多阶段工作就默认用它。**
 
-### The smell-test (decide which one)
+### Smell-test（决定用哪个）
 
-If you find yourself writing:
+如果你发现自己在写：
 
 ```js
 const a = await parallel(...)
@@ -127,83 +114,73 @@ const b = transform(a)        // flatten / map / filter — NO cross-item depend
 const c = await parallel(b.map(...))
 ```
 
-…that intermediate `transform` does **not** need a barrier — rewrite it as a
-pipeline: `pipeline(items, stageA, r => transform([r]).flat(), stageB)`.
+……那么中间这个 `transform` **不**需要 barrier——把它改写成一个 pipeline：
+`pipeline(items, stageA, r => transform([r]).flat(), stageB)`。
 
-A barrier is justified **only** when stage N truly needs the *whole set* from
-stage N−1 (dedup/merge, count early-exit, "compare against all other findings").
-"Cleaner code" and "the stages are conceptually independent" are **not** reasons
-to use a barrier — barrier latency is real: with 5 finders where the slowest is
-3× the fastest, the barrier wastes two-thirds of the fast finders' idle time.
+只有当 stage N 真的要拿 stage N−1 的*整个集合*时（dedup / merge、按 count 提前退出、
+「跟其余每个 finding 比」），barrier 才站得住。「代码更整齐」和「这些 stage 概念上各自
+独立」**都不是**用 barrier 的理由——barrier latency 是实打实的：5 个 finder、最慢的是
+最快的 3 倍时，barrier 白白浪费掉那几个快 finder 三分之二的空闲时间。
 
-## 4. Determinism三禁 (the three forbidden things) — and *why*
+## 4. Determinism三禁（三件被禁的事）——以及*为什么*
 
-Inside a workflow script, three classic JavaScript non-determinism sources
-**throw (fail-loud)**:
+在 workflow 脚本里，三个经典的 JavaScript 非确定性来源会**抛错（fail-loud）**：
 
 1. `Date.now()`
 2. `Math.random()`
-3. arg-less `new Date()` / `Date()` — but `new Date(specificValue)` is fine.
+3. 无参 `new Date()` / `Date()`——但 `new Date(specificValue)` 没问题。
 
-**Why:** a run is journaled so it can resume. Resume replays cached `agent()`
-results for the unchanged prefix (§5). If the script's *control flow* depended on
-a wall clock or a random draw, the replay would diverge from the original run and
-the journal would be meaningless — the cache would silently go stale. So the
-runtime forbids the non-determinism rather than letting resume break quietly.
+**为什么：** 一次 run 会被 journal 记下来以便 resume。Resume 时，未变前缀的 `agent()`
+结果直接从 cache 重放（§5）。要是脚本的*控制流*依赖了墙钟或某次随机抽样，重放就会和原始
+run 分叉、journal 也就失去意义——cache 会悄悄变 stale。所以 runtime 干脆禁掉这种非确定性，
+而不是让 resume 默默坏掉。
 
-**The workarounds:**
-- Need a timestamp? Pass it in via `args`.
-- Need agents to differ? Vary the prompt by **loop index** or a **per-index
-  label**, not by randomizing.
+**变通办法：**
+- 需要时间戳？用 `args` 传进来。
+- 需要让 agent 各不相同？按 **loop index** 或一个 **per-index label** 来改 prompt，别用
+  随机。
 
-So if your `Date.now()` "broke resume," the real story is: the runtime threw to
-*protect* resume — the script must be deterministic for the longest-unchanged-prefix
-cache to be sound.
+所以你的 `Date.now()`「破坏了 resume」，真相其实是反过来的：runtime 抛错正是为了*保护*
+resume——脚本必须确定，最长未变前缀的 cache 才成立。
 
-## 5. Resume = "longest unchanged prefix"
+## 5. Resume =「最长未变前缀」
 
-The contract's exact wording:
+契约的原话：
 
-> "the **longest unchanged prefix** of `agent()` calls returns cached results
-> instantly; the first edited/new call and everything after it runs live. Same
-> script + same args → 100% cache hit."
+> 「`agent()` 调用的**最长未变前缀**立刻返回 cache 的结果；第一个被编辑/新增的调用以及
+> 它之后的一切都 live 跑。同一脚本 + 同一 args → 100% cache 命中。」
 
-Mental model: resume walks the **sequence** of `agent()` calls in order,
-comparing each by content (`prompt` + the cache-affecting opts). As long as a
-call is unchanged it hits the cache; at the **first** changed call it switches to
-live, and everything after it runs live too. It is therefore *prefix-ordered +
-content-compared* — neither purely positional nor an out-of-order content-hash.
+心智模型：resume 顺着 `agent()` 调用的**序列**逐个往下走，按内容（`prompt` + 影响 cache
+的 opts）逐项比对。某个调用没变就命中 cache；走到**第一个**变了的调用，它切到 live，此后
+的一切也跟着 live 跑。所以它是*前缀有序 + 按内容比对*——既不是纯按位置，也不是乱序的
+content-hash。
 
-- `schema` / `model` / `isolation` / `agentType` changes **invalidate** the cache
-  (force a rerun of that call).
-- `label` / `phase` are purely decorative and **never** invalidate.
+- 改 `schema` / `model` / `isolation` / `agentType` 会**让 cache 失效**（逼那个调用重跑）。
+- `label` / `phase` 是纯装饰，**绝不**让 cache 失效。
 
-This is the "edit-and-resume" workflow: run once → Write/Edit the saved script →
-re-invoke with `{scriptPath, resumeFromRunId}`; the unchanged prefix replays
-instantly, so you only pay live cost for what you changed and what follows it.
+这正是「edit-and-resume」的工作流：跑一次 → Write/Edit 那个 saved 脚本 → 用
+`{scriptPath, resumeFromRunId}` 重新调用；未变前缀立刻重放，于是你只为改动的部分、以及
+它之后的部分付 live 成本。
 
-## 6. Hard caps (resource bounds)
+## 6. 硬 caps（资源边界）
 
-| Cap | Value |
+| Cap | 值 |
 |---|---|
-| Concurrent agents per workflow | **`min(16, cpu cores − 2)`** — excess queues, runs as slots free |
-| Total agents per run | **1,000** (runaway-loop backstop, far above real need) |
-| Items per single `parallel()`/`pipeline()` call | **4,096** (explicit error if exceeded — not a silent truncation) |
-| Script size | **512 KB** (`maxLength: 524288` on the `script` param) |
+| 每个 workflow 的并发 agent | **`min(16, cpu cores − 2)`**——超出的排队，slot 空出来就跑 |
+| 每次 run 的 agent 总量 | **1,000**（runaway-loop 兜底，远高于真实需要） |
+| 单次 `parallel()`/`pipeline()` 调用的 item 数 | **4,096**（超出显式报错——不是静默截断） |
+| 脚本大小 | **512 KB**（`script` 参数上的 `maxLength: 524288`） |
 
-**Engineering consequence:** you can hand `parallel`/`pipeline` up to 4,096 items
-and they all complete, but only ~`min(16, cores−2)` run at any instant — the rest
-queue. This is why fanning out 100 agents does **not** give a 100× speedup: a
-fixed concurrency window throttles throughput (Amdahl/Gustafson + a fixed window).
-Plan parallelism for the window you actually have, not the item count.
+**工程后果：** 你可以给 `parallel`/`pipeline` 喂多达 4,096 个 item，它们最终都会跑完，但
+任一瞬间只有约 `min(16, cores−2)` 个在跑——其余排队。这就是为什么 fan out 100 个 agent
+**并不**等于 100× 加速：一个固定的并发窗口卡住了吞吐（Amdahl / Gustafson + 一道固定窗口）。
+按你实际拥有的窗口来规划并行度，别按 item 数。
 
-## 7. Background execution (the contract that makes the main thread free)
+## 7. 后台执行（让主线空出来的那个契约）
 
-A `Workflow` tool call **returns immediately with a task ID**; the workflow runs
-in the background and injects a `<task-notification>` into the conversation on
-completion. So the main thread is not blocked — it gets control back immediately
-and can do the next thing while the workflow runs. (Active short-interval polling
-is wasteful — the harness re-wakes you on completion.) Note the limit, though:
-once a workflow starts, its script structure is fixed — there is **no mid-run
-input**. "Continuous progress" inside a workflow is a compile-time decision you
-make by writing a streaming `pipeline()`, not a runtime adaptation.
+一次 `Workflow` 工具调用**立刻带一个 task ID 返回**；workflow 在后台跑，完成时往对话里
+注入一个 `<task-notification>`。所以主线不被阻塞——它立刻拿回控制权，能在 workflow 跑的
+同时做下一件事。（主动短间隔轮询是浪费——harness 会在完成时重新唤醒你。）但有一条限制要
+记牢：workflow 一旦启动，它的脚本结构就定死了——**没有 mid-run 输入**。workflow 内部的
+「持续推进」，是你写流式 `pipeline()` 时就做下的 compile-time 决策，而不是 runtime 现场的
+临场调整。

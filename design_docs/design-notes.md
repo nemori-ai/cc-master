@@ -11,7 +11,7 @@
 2. **会推进**：long-horizon 里综合用 sub-agent + workflow + 前台 HITL，分派后台任务后用等待空档**主观能动**地做事而非空转，全程异步。
 
 ## 1. 形态（locked）
-plugin `cc-master` = **命令 + 2 skills + hooks + board 文件**。通用、ship-anywhere（不绑 OMNE）。
+plugin `cc-master` = **命令 + 2 skills + hooks + board 文件**。通用、ship-anywhere（装到任意环境的任意 cc agent 即可用）。
 
 ## 2. 命令（locked）
 - `/cc-master:as-master-orchestrator [goal]` —— bootstrap（开机引导）。

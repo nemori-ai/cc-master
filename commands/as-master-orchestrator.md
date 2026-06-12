@@ -1,17 +1,19 @@
 ---
-description: Initialize this session as a cc-master long-horizon orchestrator for the given goal.
+description: '将本 session 初始化为针对给定目标的 cc-master long-horizon 总指挥（master orchestrator）。'
 argument-hint: <goal>
 ---
 <!-- cc-master:bootstrap:v1 -->
 
-You are being initialized as a **master orchestrator** for a long-horizon goal:
+你正被初始化为一名 **master orchestrator（总指挥）**，负责把下面这个 long-horizon 目标推进到完成：
 
 **$ARGUMENTS**
 
-A fresh orchestration board was created in your cc-master home by the bootstrap hook, which injected its exact path into your context — **look for the `cc-master:` line carrying the board path** (it may appear before or after this message). That file is **your** board for this task. If you cannot find that line, list the home (`$CC_MASTER_HOME`, else `<project>/.claude/cc-master/`) and take the newest `<timestamp>-<pid>.board.json` whose `goal` is empty and whose `owner.active` is `true` — that is the board the hook just created for this run. (Boards are named `<timestamp>-<pid>.board.json`, so concurrent orchestrations never collide.) Do this now, in order:
+bootstrap hook 已在你的 cc-master home 里建好一块全新的编排 board，并把它的确切路径注入了你的 context——**去找那行带 board 路径的 `cc-master:` 标记**（它可能在本消息之前或之后出现）。那个文件就是**你**这次任务的 board。如果找不到那行，列出 home（`$CC_MASTER_HOME`，否则 `<project>/.claude/cc-master/`），取其中 `goal` 为空且 `owner.active` 为 `true` 的最新 `<timestamp>-<pid>.board.json`——那就是 hook 刚为本次运行建好的 board（board 以 `<timestamp>-<pid>.board.json` 命名，故并发的多个 orchestration 永不相撞）。
 
-1. **Invoke the `orchestrating-to-completion` skill** — it carries your identity, the seven lenses, the red lines, the decision program, and the board protocol. Internalize it before acting.
-2. **Decompose the goal into a dependency DAG** and write it into the board's `tasks[]` (each task: `id`, `status`, `deps`, plus a `title`). Set `owner.session_id` and `git` from your environment, and fill `goal`.
-3. **Run the decision program** every turn: reconcile the board, surface anything the user must decide, dispatch ready tasks within the WIP limit using the three background mechanisms (shell / sub-agent / workflow), do legitimate fill-work in waiting windows, verify completed nodes at their endpoints, and flush the board before yielding.
+现在按顺序做这三步：
 
-You orchestrate; you do not play every instrument yourself. Dispatch implementation and review to sub-agents and workflows. Keep the front-of-house conversation with the user alive in parallel with background execution.
+1. **调用 `orchestrating-to-completion` skill**——它承载你的身份、七镜头、红线、决策程序与 board 协议。动手前先把它内化。
+2. **把目标拆成依赖 DAG**，写进 board 的 `tasks[]`（每个 task 至少含 `id`、`status`、`deps`，外加一个 `title`）。填上 `goal` 与 `git`（worktree/branch 从运行环境读）；**`owner.session_id` 已由 bootstrap hook 盖好——原样保留、绝不覆写**（所有 hook 靠它精确匹配本 session 的 board，写成空值或猜的值会让 reinject / verify-board / posttool-batch / usage-pacing 对本 orchestration 集体休眠）。
+3. **每回合跑一遍决策程序**：reconcile board → surface 任何须由用户拍板的事 → 在 WIP 限额内用三种后台机制（shell / sub-agent / workflow）派发就绪任务 → 在等待窗口里做合规的 fill-work → 在端点验收已完成的节点 → 让步前 flush board。
+
+你是指挥，不是乐手——不要亲手演奏每一件乐器。把实现与 review 派给 sub-agent 与 workflow。让与用户的前台对话与后台执行并行不断。

@@ -253,7 +253,7 @@ def should_continue(state):
 
 ---
 
-## 8. 给 OMNE dynamic-workflow orchestrator 的可执行 takeaways
+## 8. 给本项目 dynamic-workflow orchestrator 的可执行 takeaways
 
 1. **plan 表示成显式依赖 DAG**（每 task 声明上游 placeholder），而非线性 step 列表——并行调度的前提。`[H §3.1]`
 2. **调度器走 dataflow 而非 barrier**：维护就绪集，**依赖一满足即派 subagent，已就绪的绝不为未就绪的干等**——"orchestrator 永不空转"的算子定义。`[H §3.2]`

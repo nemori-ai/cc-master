@@ -1,120 +1,85 @@
-# Decomposition — goal → dependency DAG
+# 拆解 —— 目标 → 依赖 DAG
 
-Turn a long-horizon goal into a scheduled dependency graph: decompose into task nodes, draw
-dependency edges, get a DAG, compute the critical path, decide how many lanes are worth
-opening, and give every node a contract before you dispatch it.
+> **服务愿景：C4**（拆解 / 管理 / 更新 / 规划）**· C5**（在资源预算内高效调度）。**何时读：** 把目标变成依赖 DAG 时——CPM 前向 / 后向遍历、ES/EF/LS/LF + float、临界路径、并行度 T₁/T∞、粒度、每节点契约。
 
-Source: research report 4 (CPM / work-span / Brent).
+把一个 long-horizon 目标变成一张排好程的依赖图：拆成任务节点、画依赖边、得到一张 DAG、算出临界路径、判断值得开几条道，再在派发每个节点之前给它一份契约。
 
----
-
-## 1. Goal → task nodes → dependency edges → DAG
-
-Any decomposable goal is a **DAG** (nodes = units of work, edges = dependencies). The
-legality of an execution order is guaranteed by **topological sort**: a node is `ready` only
-after all of its predecessors are done. This is the graph-theory basis of the dataflow
-"dispatch when ready" idea — a fork point is a node with out-degree > 1, a join point is a
-node with in-degree > 1.
-
-Steps:
-
-1. Decompose the goal into task nodes, draw the dependency edges, get a DAG.
-2. Run a **topological sort** to fix a legal execution order.
-3. Run CPM (next section) to find the critical path.
+来源：research report 4（CPM / work-span / Brent）。
 
 ---
 
-## 2. Critical Path Method — forward/backward pass, float
+## 1. 目标 → 任务节点 → 依赖边 → DAG
 
-**CPM** (Kelley & Walker, 1959) uses deterministic durations to find "the chain of tasks
-that determines the project's shortest completion time" — the **critical path**. Tasks on
-the critical path have **float / slack = 0**: any delay there directly delays the whole
-project.
+任何可拆解的目标都是一张 **DAG**（节点 = 工作单元，边 = 依赖）。执行序合法与否由**拓扑排序（topological sort）**保证：一个节点只有在所有前驱都做完之后才 `ready`。这正是 dataflow"就绪即派"思想的图论根基——出度 > 1 的节点是 fork 点，入度 > 1 的节点是 join 点。
 
-Two passes:
+步骤：
 
-- **Forward pass** → each task's **ES / EF** (earliest start / earliest finish).
-- **Backward pass** → **LS / LF** (latest start / latest finish) and **float = LS − ES**.
-
-Two distinct slacks, with different scheduling priorities:
-
-- **Total float** — how long a task can slip without delaying the whole project.
-- **Free float** — how long it can slip without delaying its successor tasks.
-
-PERT (three-point estimate: optimistic / most-likely / pessimistic, for uncertain durations)
-applies when durations are unknown; **CPM is for known durations**. Because agent task
-durations are inherently uncertain, lean toward a **PERT mindset** (carry buffers).
-
-**The core operable claim**: only compressing tasks **on the critical path** shortens the
-total duration; compressing non-critical-path tasks is wasted effort. A non-critical task's
-**float is your "free" parallel/overlap budget** — fill waiting windows with it.
-
-**Resource decision**: put the strongest resources on critical-path tasks (opus impl + dual
-reviewers + orchestrator watching closely); give high-float tasks cheaper resources and defer
-them into gaps. "Resource" includes the **model tier** per node — strong tiers (Opus/Fable)
-on the critical chain, cheap tiers (Haiku/Sonnet) on mechanical float. The four-tier table,
-relative output cost, and why the *main thread* never switches model are in
-`references/cost-and-pacing.md`.
+1. 把目标拆成任务节点、画依赖边、得到一张 DAG。
+2. 跑一遍**拓扑排序**，定下一个合法的执行序。
+3. 跑 CPM（下一节）找临界路径。
 
 ---
 
-## 3. Parallelism = T₁/T∞ — how many lanes are worth it
+## 2. 临界路径法（CPM）—— 前向 / 后向遍历、float
 
-The work-span model quantifies whether parallelism is worth it and what its ceiling is:
+**CPM**（Kelley & Walker, 1959）用确定性时长找出"决定项目最短完成时间的那条任务链"——**临界路径（critical path）**。临界路径上的任务 **float / slack = 0**：这里的任何延迟都会直接顺延整个项目。
 
-- **Work T₁** = total operations on a single processor.
-- **Span / depth T∞** = the longest serial chain forced by data dependencies (= the length
-  of the critical path).
-- **Parallelism = T₁/T∞** = the maximum possible speedup at any processor count.
+两趟遍历：
 
-This tells you "how many lanes of parallelism this goal is at most worth":
+- **前向遍历（forward pass）** → 每个任务的 **ES / EF**（最早开始 / 最早完成）。
+- **后向遍历（backward pass）** → **LS / LF**（最晚开始 / 最晚完成），以及 **float = LS − ES**。
 
-- If parallelism ≈ 1 (one long serial chain), fan-out is pointless — **don't waste the agent
-  budget**, run it sequentially.
-- If parallelism is high, fan out boldly.
+两种 slack，对应的调度优先级不同：
 
-**Brent's theorem** (greedy scheduling bound, Brent 1974) gives the expectation anchor:
-`T_p ≤ T∞ + (T₁ − T∞)/p`, equivalently `T₁/p ≤ T_p ≤ T₁/p + T∞`. Intuition: actual time ≈
-the parallelizable part amortized over p workers + the incompressible critical path. With N
-tasks, a critical path of length t, and p lanes, expect ≈ `t + (N−t)/p` — use this to judge
-the **marginal value of adding one more lane**.
+- **Total float** —— 一个任务能滑多久而不顺延整个项目。
+- **Free float** —— 它能滑多久而不顺延它的后继任务。
 
-**Amdahl's reminder**: your own serial synthesis work (writing the plan, verifying,
-integrating) is the serial fraction `s`. No amount of parallel agents fixes total time if you
-don't overlap this part — which is exactly why "don't idle" overlaps your synthesis with
-background execution. **Graham anomaly** is the warning that scheduling is non-monotone in its
-parameters: adding processors or shortening tasks can *lengthen* makespan — never assume "more
-workers = faster".
+PERT（三点估计：乐观 / 最可能 / 悲观，对应不确定的时长）用在时长未知时；**CPM 给的是已知时长**。agent 任务的时长天生不确定，所以倾向于用 **PERT 心态**（留 buffer）。
+
+**核心可操作主张**：只有压缩**临界路径上**的任务才能缩短总时长；压缩非临界路径上的任务纯属白费力气。一个非临界任务的 **float 就是你"白赚"的并行 / overlap 预算**——拿它来填满等待窗口。
+
+**资源决策**：把最强的资源压在临界路径任务上（难实现 + 双 reviewer + 编排者紧盯）；高 float 任务配便宜资源、塞进空隙里跑。这里的"资源"包含每节点的**模型档位（model tier）**——临界路径上的**难实现**用 **Opus**，**机械性的 float** 用 **Haiku**、**常规实现**用 **Sonnet**；而 reviewer / 决策咨询 / 端点验收这类**裁决身份**（决定「对不对 / 选哪个」）用 **Fable**，**常规 review** 用 **Opus**。四档表、相对输出成本、以及为何*主线*绝不切模型，都在 `references/cost-and-pacing.md` 里。
 
 ---
 
-## 4. Granularity tradeoff
+## 3. 并行度 = T₁/T∞ —— 值得开几条道
 
-Get the node size right:
+work-span 模型量化并行到底值不值、天花板又在哪：
 
-- **Too fine** → coordination explosion (the overhead of dispatching, tracking, and
-  reconciling more nodes than the work warrants).
-- **Too coarse** → cannot be parallelized and cannot be verified at the endpoint (a node so
-  large it bundles independent sub-work that should have been separate lanes, or so opaque you
-  cannot independently check it).
+- **Work T₁** = 单处理器上的总操作量。
+- **Span / depth T∞** = 数据依赖逼出的最长串行链（即临界路径的长度）。
+- **并行度 = T₁/T∞** = 不限处理器数时可能达到的最大加速比。
 
-Pick a granularity where each node is an independently dispatchable, independently verifiable
-unit of work.
+它告诉你"这个目标的并行最多值得开几条道"：
+
+- 并行度 ≈ 1（一条长串行链）时，fan-out 毫无意义——**别浪费 agent 预算**，串行跑。
+- 并行度高，就大胆 fan out。
+
+**Brent 定理**（贪心调度界，Brent 1974）给出期望锚点：`T_p ≤ T∞ + (T₁ − T∞)/p`，等价地 `T₁/p ≤ T_p ≤ T₁/p + T∞`。直觉：实际时间 ≈ 可并行部分摊到 p 个 worker 上 + 压不掉的临界路径。有 N 个任务、临界路径长度为 t、开 p 条道时，期望 ≈ `t + (N−t)/p`——拿它来掂量**再加一条道的边际价值**。
+
+**Amdahl 的提醒**：你自己那部分串行综合工作（写 plan、验收、整合）就是串行分数 `s`。这部分若不 overlap 起来，再多并行 agent 也修不了总时间——这正是"别空等"为何要把你的综合与后台执行 overlap。**Graham 反常**则是个警告：调度对其参数非单调——加处理器或缩短任务反而可能*拉长* makespan——永远别想当然"worker 越多 = 越快"。
 
 ---
 
-## 5. Per-node contract — define before dispatch
+## 4. 粒度权衡
 
-Before dispatching a node, define its contract:
+把节点大小定对：
 
-- **Input deps** — pin the upstream artifact (version / hash) each dependency feeds in. See
-  `resume-verify.md` for dependency pinning and stale detection.
-- **Output schema** — shaped by what downstream needs: `verdict` · `evidence` · `confidence` ·
-  `blockers` · `open-q` (open questions) · `artifacts`.
-- **Success predicate** — the explicit condition under which the node counts as done.
-- **Timeout + budget** — the time/token ceiling for the node.
-- **Escalation condition** — when the node should STOP and return an escalation result instead
-  of pressing on (see `dispatch.md` re-altitude).
+- **太细** → 协调爆炸（派发、追踪、对账的开销，超过节点本身值得的工作量）。
+- **太粗** → 既没法并行、也没法在端点验收（一个节点大到把本该分成独立道的子工作捆在一起，或不透明到你无法独立检查它）。
 
-A node without a contract cannot be dispatched safely, cannot be verified at the endpoint, and
-cannot be resumed from a content hash.
+挑一个粒度，让每个节点都是一个可独立派发、可独立验证的工作单元。
+
+---
+
+## 5. 每节点契约 —— 派发前定义
+
+派发一个节点之前，先定义它的契约：
+
+- **Input deps** —— pin 住每条依赖喂进来的上游产物（version / hash）。依赖 pinning 与 stale 检测见 `resume-verify.md`。
+- **Output schema** —— 按下游的需要来塑形：`verdict` · `evidence` · `confidence` · `blockers` · `open-q`（open questions）· `artifacts`。
+- **Success predicate** —— 该节点算 done 的显式条件。
+- **Timeout + budget** —— 该节点的时间 / token 上限。
+- **Escalation condition** —— 该节点何时应当 STOP 并返回一个 escalation 结果，而不是硬撑下去（见 `dispatch.md` 的 re-altitude）。
+
+没有契约的节点无法被安全派发、无法在端点验证、也无法从一个 content hash 续跑。

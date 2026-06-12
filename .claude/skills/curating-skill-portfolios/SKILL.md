@@ -52,7 +52,7 @@ description: 'Use when deciding whether a capability deserves its own skill, whe
 
 ## cc-master 只用 3 条承重维
 
-cc-master 是 2+3 的小 portfolio（2 个分发 + 3 个 dev-only），**只用三条承重维**（audience-plane / bounded-context / Probe）：任一不过即拒，没有 trade-off 路径——
+cc-master 是 2+4 的小 portfolio（2 个分发 + 4 个 dev-only：造/评/治三件套 + `requirement-elicitation` 上游需求发现），**只用三条承重维**（audience-plane / bounded-context / Probe）：任一不过即拒，没有 trade-off 路径——
 
 1. **audience-plane（受众面）**——受众是插件**用户**（装 cc-master 的人 / 替他们行动的 agent）还是仓库**维护者**？维护者用的 dev skill 进 `.claude/skills/`，**不进**分发的 `skills/`，更不进 marketplace。判错受众 = 把 dev 工具混进产品。
 2. **bounded-context（单一职责）**——候选是否落入**恰好一个**清晰职责方向？跨两个职责 = 它其实是两个 skill，先拆。

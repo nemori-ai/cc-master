@@ -70,7 +70,7 @@ show_board() { # $1 = board path, $2 = caption
   while IFS= read -r line; do printf '   │ %s\n' "$line"; done < "$1"
 }
 
-GOAL='Migrate user_cognition 3 domains to the new CognitionRecord schema'
+GOAL='Internationalize the app to 6 locales (i18n framework + per-locale translation + locale routing)'
 
 printf '%s╭───────────────────────────────────────────────────────────────────╮%s\n' "$B" "$Z"
 printf '%s│  cc-master — end-to-end hook smoke (a walkthrough that runs)        │%s\n' "$B" "$Z"
@@ -103,27 +103,29 @@ show_board "$BOARD" "the freshly-bootstrapped board (empty skeleton — DAG not 
 step "2 — the agent decomposes the goal into a DAG  (we stand in for it here)"
 # =====================================================================================
 say "In a real session the agent now writes tasks[] into ITS board. The toy DAG:"
-say "  T0  prep new CognitionRecord schema + shared migration lib   (critical-path root)"
-say "  D1  memory/profile/preference — one leaf per domain, all depend on T0 (parallel fan-out)"
+say "  T0  i18n framework + string extraction                       (critical-path root)"
+say "  de/ja/ar  one leaf per locale, all depend on T0              (parallel fan-out)"
+say "  D1  glossary + register decision — a call only a human can make (blocked_on:user)"
 say "We also stamp owner.session_id so the goal-hook can tell this board is THIS session's."
-# A 3-leaf fan-out on a shared root: the classic 'dispatch on ready' shape. T0 in_flight first.
+# A 3-leaf fan-out on a shared root + one HITL decision node. The classic 'dispatch on ready' shape.
 cat > "$BOARD" <<JSON
 {
   "schema": "cc-master/v1",
   "goal": "$GOAL",
   "owner": { "active": true, "session_id": "$SID", "heartbeat": "2026-06-08T10:00Z" },
-  "git": { "worktree": "/repo/.worktrees/cog-migrate", "branch": "feat/cog-migrate" },
+  "git": { "worktree": "/repo/.worktrees/i18n", "branch": "feat/i18n-rollout" },
   "wip_limit": 4,
   "tasks": [
-    { "id": "T0", "status": "in_flight", "deps": [], "title": "schema + shared migration lib", "mechanism": "sub-agent" },
-    { "id": "M1", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "migrate domain: memory" },
-    { "id": "M2", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "migrate domain: profile" },
-    { "id": "M3", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "migrate domain: preference" }
+    { "id": "T0", "status": "in_flight", "deps": [], "model": "opus", "title": "i18n framework + string extraction", "mechanism": "sub-agent" },
+    { "id": "de", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "model": "haiku", "title": "translate locale: de" },
+    { "id": "ja", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "model": "haiku", "title": "translate locale: ja" },
+    { "id": "ar", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "translate locale: ar (RTL)" },
+    { "id": "D1", "status": "blocked", "deps": [], "blocked_on": "user", "title": "glossary + register decision" }
   ],
   "log": []
 }
 JSON
-what "tasks[] now holds a 4-node DAG: one root T0 with three leaves fanning out from it."
+what "tasks[] now holds a 5-node DAG: root T0, three locale leaves, and one blocked_on:user decision."
 say  "owner.session_id is now \"$SID\" — the Stop hook will filter on it."
 show_board "$BOARD" "board snapshot — INITIAL (root in_flight, leaves blocked on it):"
 
@@ -168,39 +170,42 @@ cat > "$BOARD" <<JSON
   "owner": { "active": true, "session_id": "$SID", "heartbeat": "2026-06-08T10:00Z" },
   "wip_limit": 4,
   "tasks": [
-    { "id": "T0", "status": "in_flight", "deps": [], "title": "schema + shared migration lib" },
-    { "id": "M1", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "migrate: memory" },
-    { "id": "M2", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "migrate: profile" },
-    { "id": "M3", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "migrate: preference" }
+    { "id": "T0", "status": "in_flight", "deps": [], "title": "i18n framework + string extraction" },
+    { "id": "de", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "translate locale: de" },
+    { "id": "ja", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "translate locale: ja" },
+    { "id": "ar", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "translate locale: ar (RTL)" },
+    { "id": "D1", "status": "blocked", "deps": [], "blocked_on": "user", "title": "glossary + register decision" }
   ], "log": []
 }
 JSON
 
 # ── 4b — has a ready leaf → block (actionable work) ──
 say ''
-say "4b) T0 finished → its three leaves go READY (dependency cleared). MID-RUN snapshot:"
+say "4b) T0 finished → its three locale leaves go READY (dependency cleared). MID-RUN snapshot:"
 cat > "$BOARD" <<JSON
 {
   "schema": "cc-master/v1", "goal": "$GOAL",
   "owner": { "active": true, "session_id": "$SID", "heartbeat": "2026-06-08T11:00Z" },
   "wip_limit": 4,
   "tasks": [
-    { "id": "T0", "status": "done", "deps": [], "title": "schema + shared migration lib", "verified": true },
-    { "id": "M1", "status": "ready", "deps": ["T0"], "title": "migrate: memory" },
-    { "id": "M2", "status": "ready", "deps": ["T0"], "title": "migrate: profile" },
-    { "id": "M3", "status": "ready", "deps": ["T0"], "title": "migrate: preference" }
-  ], "log": [ { "t": "11:00Z", "note": "T0 verified done; 3 leaves now ready to dispatch in parallel" } ]
+    { "id": "T0", "status": "done", "deps": [], "title": "i18n framework + string extraction", "verified": true },
+    { "id": "de", "status": "ready", "deps": ["T0"], "title": "translate locale: de" },
+    { "id": "ja", "status": "ready", "deps": ["T0"], "title": "translate locale: ja" },
+    { "id": "ar", "status": "ready", "deps": ["T0"], "title": "translate locale: ar (RTL)" },
+    { "id": "D1", "status": "blocked", "deps": [], "blocked_on": "user", "title": "glossary + register decision" }
+  ], "log": [ { "t": "11:00Z", "note": "T0 verified done; 3 locale leaves now ready to dispatch in parallel" } ]
 }
 JSON
-show_board "$BOARD" "board snapshot — MID-RUN (root done+verified, 3 leaves ready to dispatch):"
+show_board "$BOARD" "board snapshot — MID-RUN (root done+verified, 3 locale leaves ready to dispatch):"
 run_hook verify-board.sh "$STDIN_STOP"
-what "the board has READY tasks — three leaves can be dispatched right now."
+what "the board has READY tasks — three locale leaves can be dispatched right now."
 deci "BLOCK — 'this board still has a ready task; dispatch (or mark blocked/escalated) first.'"
 check "ready work present → Stop is BLOCKED" "$OUT" '"decision":"block"'
 
 # ── 4c — completion state, FIRST stop → block (forced self-check handshake) ──
 say ''
 say "4c) The 3 leaves dispatched in parallel, finished, and were verified at the endpoint."
+say "    (ar needed RTL layout work, so it was escalated to a workflow; the user answered D1.)"
 say "    DONE snapshot — every node done; nothing ready, nothing uncertain:"
 cat > "$BOARD" <<JSON
 {
@@ -208,14 +213,15 @@ cat > "$BOARD" <<JSON
   "owner": { "active": true, "session_id": "$SID", "heartbeat": "2026-06-08T12:30Z" },
   "wip_limit": 4,
   "tasks": [
-    { "id": "T0", "status": "done", "deps": [], "title": "schema + shared migration lib", "verified": true },
-    { "id": "M1", "status": "done", "deps": ["T0"], "title": "migrate: memory", "verified": true },
-    { "id": "M2", "status": "done", "deps": ["T0"], "title": "migrate: profile", "verified": true },
-    { "id": "M3", "status": "done", "deps": ["T0"], "title": "migrate: preference", "verified": true }
-  ], "log": [ { "t": "12:30Z", "note": "all 3 domains migrated + independently verified; goal looks met" } ]
+    { "id": "T0", "status": "done", "deps": [], "title": "i18n framework + string extraction", "verified": true },
+    { "id": "de", "status": "done", "deps": ["T0"], "title": "translate locale: de", "verified": true },
+    { "id": "ja", "status": "done", "deps": ["T0"], "title": "translate locale: ja", "verified": true },
+    { "id": "ar", "status": "done", "deps": ["T0"], "title": "translate locale: ar (RTL)", "mechanism": "workflow", "verified": true },
+    { "id": "D1", "status": "done", "deps": [], "title": "glossary + register decision (answered)" }
+  ], "log": [ { "t": "12:30Z", "note": "all 3 locales shipped + independently verified; user decision answered; goal looks met" } ]
 }
 JSON
-show_board "$BOARD" "board snapshot — DONE (all nodes done+verified):"
+show_board "$BOARD" "board snapshot — DONE (all nodes done+verified; user decision answered):"
 run_hook verify-board.sh "$STDIN_STOP"
 what "completion state reached — but it is the FIRST stop, so the hook won't take 'done' on faith."
 deci "BLOCK once — forces a self-check against the original goal (incl. to-dos NOT on the board)."
@@ -243,17 +249,18 @@ cat > "$BOARD" <<JSON
   "owner": { "active": false, "session_id": "$SID" },
   "tasks": [
     { "id": "T0", "status": "done", "deps": [] },
-    { "id": "M1", "status": "done", "deps": ["T0"] },
-    { "id": "M2", "status": "done", "deps": ["T0"] },
-    { "id": "M3", "status": "done", "deps": ["T0"] }
+    { "id": "de", "status": "done", "deps": ["T0"] },
+    { "id": "ja", "status": "done", "deps": ["T0"] },
+    { "id": "ar", "status": "done", "deps": ["T0"] },
+    { "id": "D1", "status": "done", "deps": [] }
   ]
 }
 JSON
 run_hook reinject.sh '{"hook_event_name":"SessionStart","source":"resume"}'
 what "reinject scanned the home and found NO active board (owner.active:false)."
 deci "stay SILENT — no role injected; the orchestration is dormant. (empty stdout, exit 0)"
-check "archived board → reinject is silent (no output)" "$OUT" ""
-[ -z "$OUT" ] && ok "reinject produced exactly empty output after archive" \
+# (an empty-needle `check` is vacuous — assert emptiness explicitly instead)
+[ -z "$OUT" ] && ok "archived board → reinject is silent (exactly empty output)" \
               || no "reinject should be empty after archive (got: $OUT)"
 
 run_hook verify-board.sh "$STDIN_STOP"

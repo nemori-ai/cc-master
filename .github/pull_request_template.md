@@ -26,11 +26,12 @@ Paste the relevant output if helpful:
 
 ## Design invariants (confirm none are broken — see CONTRIBUTING.md)
 
-- [ ] Hooks remain **pure bash**, no `jq` / `node` / other runtime
+- [ ] Hooks use only **bash + node/JS** (JS only; no `jq` / `python` / TS-direct) — see ADR-006
 - [ ] Board **narrow waist** unchanged — or, if changed, every hook + test updated in this PR
 - [ ] **Skill A / Skill B** stay self-contained and non-overlapping
 - [ ] Change is **ship-anywhere** (no agent-teams / scheduled-routines dependency)
 - [ ] The conductor still never does unit work by hand
+- [ ] Every hook is **dormant-until-armed** (`board_matches` / `isArmed` gate) — only `bootstrap-board.sh` is exempt; see ADR-007
 
 ## Docs
 

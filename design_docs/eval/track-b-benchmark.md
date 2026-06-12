@@ -23,11 +23,12 @@ behavioral pass rate and the with_skill − without_skill **delta**. Three runs 
 the floor that lets `aggregate_benchmark.py` compute a sample stddev at all
 (n−1 denominator) — that stddev is the whole point (see the honesty section).
 
-**Fixture:** `examples/sample-orchestration/` — the `user_cognition` 3-domain
-migration toy goal (one shared foundation, then independent per-domain work that
-wants to run in parallel). It is already the canonical sample orchestration in
-the repo, and its `smoke.sh` exercises every goal-hook decision, so the board
-shapes the assertions reference are real, not invented for the eval.
+**Fixture:** `examples/sample-orchestration/` — the i18n rollout toy goal
+(internationalize the app to 6 locales: one shared foundation `T0`, then
+independent per-locale leaves that want to run in parallel, plus a
+`blocked_on:"user"` decision node). It is already the canonical sample
+orchestration in the repo, and its `smoke.sh` exercises every goal-hook decision,
+so the board shapes the assertions reference are real, not invented for the eval.
 
 ## The behavioral assertion set
 

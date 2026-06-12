@@ -337,4 +337,118 @@ printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","stat
 assert_eq "$(fp_of "$H/a.board.json")" "$(fp_of "$H/b.board.json")" "single-line fingerprint scoped to tasks region (log excluded)"
 rm -rf "$H"
 
+# ─── H3: COMPLETION HANDSHAKE NAMES UNANSWERED blocked_on:"user" DECISIONS ─────────────────────────
+# When the board is in a completion state (no ready/uncertain) AND carries one or more
+# status=blocked, blocked_on:"user" tasks, the self-check handshake must additionally list those
+# open decisions by title (or id). Fresh PROJECT_DIR + fresh SID per case → no sidecar yet → the
+# first Stop always reaches the completion-state handshake (block), so the appended text is testable.
+
+# Case X1 (H3): one blocked_on:user task WITH a title → reason names that title.
+H="$(make_project)"; SID="sess-h3-title"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"pick the deploy region\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "H3 one user decision → completion handshake block"
+assert_contains "$HOOK_OUT" "self-check" "H3 one user decision → still the self-check handshake"
+assert_contains "$HOOK_OUT" "Unanswered user decisions still on this board" "H3 one user decision → reason lists unanswered user decisions"
+assert_contains "$HOOK_OUT" "pick the deploy region" "H3 one user decision → reason names the task title"
+rm -rf "$H"
+
+# Case X2 (H3): two blocked_on:user tasks WITH titles → both titles listed.
+H="$(make_project)"; SID="sess-h3-two"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"approve the migration\",\"deps\":[]},{\"id\":\"T3\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"confirm the rollback plan\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "approve the migration" "H3 two user decisions → first title listed"
+assert_contains "$HOOK_OUT" "confirm the rollback plan" "H3 two user decisions → second title listed"
+rm -rf "$H"
+
+# Case X3 (H3): blocked_on:user task WITHOUT a title → its id is listed instead.
+H="$(make_project)"; SID="sess-h3-noti"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"DECISION-9\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "Unanswered user decisions still on this board" "H3 titleless user decision → still lists unanswered decisions"
+assert_contains "$HOOK_OUT" "DECISION-9" "H3 titleless user decision → falls back to task id"
+rm -rf "$H"
+
+# Case X4 (H3): completion state with NO blocked_on:user task → reason identical to status quo
+#               (must NOT contain the H3 sentence). A task blocked on something else (or a non-user
+#               blocked_on) must not trip it.
+H="$(make_project)"; SID="sess-h3-none"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"T1\",\"deps\":[]},{\"id\":\"T3\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "self-check" "H3 no user decision → still the self-check handshake"
+assert_not_contains "$HOOK_OUT" "Unanswered user decisions" "H3 no user decision → reason matches status quo (no H3 sentence)"
+rm -rf "$H"
+
+# Case X5 (H3, format-agnostic): blocked_on:user with a task-local log/object must not pollute the
+#               per-object scan — the title is still read from the task's OWN top-level fields, and a
+#               nested log carrying its own "title"/"blocked_on" must not leak in.
+H="$(make_project)"; SID="sess-h3-nested"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"real top-level title\",\"deps\":[],\"log\":[{\"id\":\"L1\",\"title\":\"nested decoy\",\"blocked_on\":\"user\"}]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "real top-level title" "H3 nested log → reads the task's own top-level title"
+assert_not_contains "$HOOK_OUT" "nested decoy" "H3 nested log → nested log title does not leak into the list"
+rm -rf "$H"
+
+# Case X6 (codex catch): a task with stale `blocked_on:"user"` metadata that is ALREADY `status:"done"`
+#               must NOT be listed as an unanswered user decision — an answered decision marked done
+#               but still carrying its blocked_on:"user" tag would otherwise make the Stop handshake
+#               re-warn forever. The predicate must require BOTH status:"blocked" AND blocked_on:"user"
+#               (the `blocked(blocked_on:"user")` contract). A genuinely pending blocked task IS listed.
+H="$(make_project)"; SID="sess-h3-stale"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"blocked_on\":\"user\",\"title\":\"already answered region pick\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"genuinely pending approval\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "H3 stale blocked_on → still completion handshake block"
+assert_contains "$HOOK_OUT" "genuinely pending approval" "H3 stale blocked_on → genuinely blocked+user decision IS listed"
+assert_not_contains "$HOOK_OUT" "already answered region pick" "H3 stale blocked_on → status:done task NOT listed (require status:blocked too)"
+rm -rf "$H"
+
+# ── 武装闸：active/session_id 只从 board 根的 owner 子对象读（CODEX7，破红线 6 修复回归用例）─────────
+# 旧版 board_matches 用全文 grep 判 arming，会把归档板某个 flexible 载荷里的 `"active":true` 误读为 owner
+# 的 active；head -1 取到的第一个 session_id 仍是 owner.session_id —— 若它 == 当前 sid，归档板被误判 armed，
+# 已 /stop 归档的板 verify-board 仍会 block 住 stop。下面两例锁死「只从 owner 子对象读」。
+
+# Case Y (CODEX7 回归)：归档板 owner.active:false、owner.session_id == 本 session sid，含一个 ready task
+#          （若误判 armed 会触发 actionable block）+ log[] 嵌套对象塞 "active":true 与混淆 "session_id"。
+#          owner 子对象本身 active:false → 必须 allow（dormant，不 block）。修前全文 grep 命中 → 误 block。
+H="$(make_project)"; SID="sess-arch-stop"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":false,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[]}],\"log\":[{\"id\":\"L1\",\"snapshot\":{\"active\":true,\"session_id\":\"OTHER\"}}]}"
+run_stop_sid "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "Y: 归档板含嵌套 active:true → rc 0"
+assert_not_contains "$HOOK_OUT" "block" "Y: 归档板（owner.active:false）+ 嵌套 active:true → 休眠 allow（owner 子对象才算数，不 block stop）"
+rm -rf "$H"
+
+# Case Z (反向保活)：真 active 板（owner.active:true、owner.session_id == sid）含一个 ready task，某 task
+#          嵌套 "active":false —— verify-board 仍照常 armed → ready 工作 → block。防过度修复。
+H="$(make_project)"; SID="sess-real-stop"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[],\"meta\":{\"active\":false}}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "Z: 真 active 板（owner.active:true）照常 armed → ready task → block stop"
+rm -rf "$H"
+
+# ── 非对称 degrade：blank-session 板（owner.session_id 空串）对非空 stdin sid 保持休眠（CODEX14 回退）──
+# 上一轮（CODEX12）曾对称 degrade 收养空 board sid；本轮（CODEX14）回退：收养会武装任意不相关 session，破红线 6。
+# 裁决（ADR-007 §2.3 / §4.5）：红线 6（非协商）优先于孤儿边缘 case。合法续跑因 resume/compaction 保留
+# session_id、板带原 session_id 故照常匹配；异常 blank 板保持休眠（fail-safe），由显式 re-arm（重跑
+# as-master-orchestrator → bootstrap 重盖 session_id）认领。「board sid 非空但 ≠ stdin sid」同样休眠（红线 6）。
+
+# Case AA (CODEX14 回退：blank-session 板对非空 stdin sid 休眠)：active 板 owner.session_id:""（空串），含一个
+#          ready task，stdin 带**非空** session_id。"" != "MINE" → 不武装 → 休眠 allow（不 block）。这正是红线 6
+#          要的 fail-safe：blank 板不收养任意 session。
+H="$(make_project)"; SID="sess-adopt-mine"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "AA: blank-session 板 + 非空 stdin sid → rc 0"
+assert_not_contains "$HOOK_OUT" "block" "AA: blank-session 板（owner.session_id:\"\"）对非空 stdin sid → 休眠 allow，不 block（CODEX14 回退，红线 6 fail-safe）"
+rm -rf "$H"
+
+# Case AB (红线 6 防线保活：board sid 非空且 ≠ stdin sid 仍休眠)：active 板 owner.session_id:"OTHER"
+#          （非空），含一个 ready task，stdin sid "MINE"（不同）→ 必须休眠 allow（不 block）。证明对称
+#          degrade **没有**退化成「任何 active 板即武装」—— 真跨会话污染防线（红线 6）原样保留。
+H="$(make_project)"; SID="MINE"
+mkactive "$H" "b1" '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"OTHER"},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_stop_sid "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "AB: board sid 非空且 ≠ stdin sid → rc 0"
+assert_not_contains "$HOOK_OUT" "block" "AB: board sid=OTHER（非空）≠ stdin sid=MINE → 仍休眠 allow（红线 6 防线未退化）"
+rm -rf "$H"
+
 finish

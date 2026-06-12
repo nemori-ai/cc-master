@@ -1,106 +1,62 @@
-# Async completion + HITL
+# 异步完成 + HITL
 
-How to drive completions asynchronously and treat the user as a special async worker, so the
-front-of-house dialogue runs in parallel with background execution and the main thread never
-idle-waits.
+> **服务愿景：C3**（自主决策 vs 人类接入的边界）。**何时读：** 驱动异步完成 + human-in-the-loop 时——in-flight 的 p95 追踪与 hedging、收到通知即整合（integrate-on-notification）、HITL 模型（用户即异步 worker）、前台对话 ∥ 后台执行、step-6 ledger。
 
-Source: research report 2 ("the main thread doesn't idle-wait" = an ecosystem gap) + lenses
-4 and 7.
+怎样异步地驱动各项工作收尾，并把用户当成一个特殊的异步 worker——让前台对话与后台执行并行跑，主线永不空等（idle-wait）。
 
----
-
-## In-flight tracking — `dispatched_at` → p95 → hedge / degrade
-
-Every dispatched node carries `dispatched_at` on the board. Track elapsed time against the
-**p95 duration for that class of task**. When a node exceeds its class p95:
-
-- **hedge** — dispatch a backup agent for the same task and take whichever finishes first; or
-- **degrade** — let it pass with a degraded result.
-
-This mirrors the OMNE discipline ("codex hung → defer to the milestone pool" / a "60-minute
-hard deadline"): do not let a single slow agent drag the whole batch. Do **not** busy-poll a
-single agent's progress or hand-roll file-size polling to guess completion (a proven
-misfire) — use a structured-concurrency join and fill the waiting window with useful work.
+来源：research report 2（"主线不空等" = 一处生态缺口）+ 镜头 4 与 7。
 
 ---
 
-## Integrate completions — on `<task-notification>`
+## In-flight 追踪 —— `dispatched_at` → p95 → hedge / degrade
 
-When a `<task-notification>` arrives:
+每个已派发的节点在 board 上携带 `dispatched_at`。把它已耗的时间对照**这一类任务的 p95 时长**来追踪。一旦某个节点超过它那一类的 p95：
 
-1. **Reconcile the board** — fold the finished background result into its node, mark it
-   `done` (after endpoint verification — see `resume-verify.md`).
-2. **Unlock newly-ready** — any node whose last dependency just satisfied becomes `ready`.
-3. **Dispatch within WIP** — launch the newly-ready nodes inside the WIP cap.
+- **hedge** —— 为同一任务再派一个备份 agent，谁先完成用谁；或
+- **degrade** —— 让它带着降级的结果通过。
 
-This is the integrate-on-notification half of the decision program (step 1 + step 3): you do
-not poll; the notification drives reconciliation, and reconciliation drives the next dispatch.
+这背后的纪律（"某个 agent 卡死了 → 退回任务池" / "60 分钟硬截止"）：别让单个慢 agent 拖垮整批。**别** busy-poll 单个 agent 的进度，也别手搓 file-size 轮询去猜它完成没有（已被证明是瞎蒙的失招）——用结构化并发（structured-concurrency）的 join，再拿有用的工作填满等待窗口。
 
 ---
 
-## The HITL model — the user is a special async worker (lenses 4 & 7)
+## 整合各项完成 —— 收到 `<task-notification>` 时
 
-- **Surface user-decisions immediately** — the moment a point needs the user to decide or
-  confirm, surface it to the user. Don't sit on it (lens 4: the sin is being passive when you
-  could act). Don't overreach on what the user must decide: anything irreversible /
-  outward-facing / directional / final-approval (such as merge) must be asked first (lens 7,
-  don't自专).
-- **User input is an async dependency** — model it as a board node with
-  `status: "blocked"`, `blocked_on: "user"`. The user's answer is just another async
-  dependency satisfying that edge.
-- **Prefetch foreseeable user decisions — the ask-trigger is "only the user can answer",
-  never "the node became ready"** — scan the DAG's not-yet-ready nodes for decision-shaped
-  ambiguities (acceptable downtime, scope cuts, go/no-go constraints, unwritten spec points).
-  If the user is reachable and the answer would change what gets dispatched or how, ask NOW —
-  a natural front-of-house beat (a status reply) is the perfect carrier. A prefetched answer
-  is float bought for free; "I'll stop and ask when we get there" welds the future critical
-  path to the user's online schedule. Boundary: this is *not* "clear the whole question
-  backlog" — a speculative question whose context doesn't exist yet yields an unreliable
-  answer plus noise. Ask only what is already decision-shaped and will foreseeably sit on a
-  path; batch into the beat, don't pepper.
-- **Ready work that doesn't depend on the user dispatches anyway** — the front-of-house
-  question runs **in parallel** with background execution. Surfacing a question to the user
-  never stalls work that doesn't need that answer (lens 7: front-of-house dialogue ∥
-  background execution).
-- **Legitimate waiting** (lens 4) is reached only when every remaining path is blocked on an
-  `in_flight` background task or has been surfaced to the user and awaits an answer — at which
-  point you calmly wait one beat.
+当一个 `<task-notification>` 到达：
 
-Front-of-house dialogue ∥ background execution is the whole point: asking the user a question
-and letting the background play are never mutually exclusive.
+1. **对账 board（reconcile）** —— 把完成的后台结果折回它的节点，标 `done`（在端点验收之后——见 `resume-verify.md`）。
+2. **解锁新就绪** —— 凡是最后一条依赖刚被满足的节点，转为 `ready`。
+3. **在 WIP 内派发** —— 在 WIP cap 内启动这些新就绪的节点。
+
+这就是决策程序里"收到通知即整合"的那一半（step 1 + step 3）：你不轮询；通知驱动对账，对账驱动下一次派发。
 
 ---
 
-## The goal-hook — forced self-check + board gate at Stop
+## HITL 模型 —— 用户是一个特殊的异步 worker（镜头 4 & 7）
 
-cc-master's deterministic guard against stopping early is the **goal-hook** (the `verify-board`
-Stop hook). When you try to stop, it reads **your board** (never your reasoning) and gates the
-Stop: if the board still carries actionable work — a `ready` task, or an `uncertain`
-done-but-unverified node — it blocks and kicks you back. When the board is in a completion
-state, it first **forces a self-check against the board's `goal`** before letting you go (a
-fuse releases the gate if it ever blocks too many times in a row, so a misjudgement can't weld
-you shut).
+- **用户决策即刻抛出** —— 一旦某个点需要用户拍板或确认，就立刻抛给用户，别压着（镜头 4：明明能行动却被动，就是罪过）。同时也别在本该由用户决定的事情上越界：任何不可逆 / 对外 / 方向性 / 最终批准（如 merge）都必须先问（镜头 7，别擅自做主）。
+- **用户输入是一条异步依赖** —— 把它建模成一个 board 节点：`status: "blocked"`、`blocked_on: "user"`。用户的回答不过是满足那条边的又一条异步依赖。
+- **prefetch 可预见的用户决策——ask-trigger 是"只有用户能回答"，绝不是"该节点变就绪了"** —— 扫一遍 DAG 里那些还没就绪的节点，挑出决策形态的歧义（可接受的停机时间、scope 砍取、go/no-go 约束、spec 没写到的点）。只要用户可达、且答案会左右派什么 / 怎么派，**现在就问**——一个自然的前台节拍（一次状态回复）就是完美的载体。一个 prefetch 来的答案是白赚的 float；"到那一步我再停下来问"会把未来的临界路径死死焊在用户的在线时间表上。边界：这**不是**"把整个问题积压一次清空"——一个 context 都还不存在的投机性问题，换来的是不可靠的答案外加噪声。只问那些已经成形为决策、且可预见会卡住某条路径的问题；把它们攒进节拍里一并问，别一个个去戳。
+- **不依赖用户的就绪工作照样派** —— 前台问题与后台执行**并行**跑。把一个问题抛给用户，绝不连带卡住那些不需要这个答案的工作（镜头 7：前台对话 ∥ 后台执行）。
+- **合法等待**（镜头 4）只在这种时刻才到来：每一条剩余路径要么被一个 `in_flight` 后台任务卡住、要么已抛给用户等答——这时你才安心地等上一个节拍。
 
-Because the hook is a shell — it sees the board, not the conversation — the self-check is
-yours to do: keep the board's `status` enum honest (mark satisfied-and-dispatchable nodes
-`ready`, blocked ones `blocked`, done-but-unverified ones `uncertain`), and write your
-decision-program step-6 ledger + acceptance evidence into both the conversation and the board.
-The hook gates on board status; your written self-check is what makes a Stop trustworthy.
+前台对话 ∥ 后台执行就是全部要义：问用户一个问题，和让后台继续跑，从来不互斥。
 
-### The step-6 ledger — the fixed shape (single source)
+---
 
-This is the canonical definition the SKILL.md decision program points to. The goal-hook reads
-the board to gate your Stop, but **it cannot read your reasoning** — so each turn you reach
-decision-program step 6, write the conclusion **and the acceptance evidence into both the
-conversation and the board**, in a fixed shape:
+## goal-hook —— Stop 时强制自检 + board 闸
 
-- **one line per still-open path**: `<task-id> · <status> · <blocker | evidence>`
-- then **one verdict line**, exactly one of:
-  - `goal met` — every path is `done` and verified at the endpoint;
-  - `legitimate waiting: every path blocked or surfaced` — every remaining path is blocked on
-    an in-flight background task or is awaiting a user answer;
-  - `still working` — there is schedulable work (you should not be at step 6 — go back to the
-    top of the decision program).
+cc-master 对抗"过早停止"的确定性守卫是 **goal-hook**（`verify-board` 这个 Stop hook）。当你试图停止时，它读**你的 board**（绝不读你的推理）并对 Stop 设闸：board 但凡还携带可行动的工作——一个 `ready` 任务，或一个 `uncertain` 的"做了但未验"节点——它就拦下把你踢回去。当 board 已是完成状态时，它会先**强制你对照 board 的 `goal` 做一次自检**，再放你走（连续拦太多次时有一根保险丝会松开闸，所以一次误判不会把你永久焊死）。
 
-The hook gates on board status; this written ledger is what makes "done" *trustworthy* rather
-than merely asserted. A bare "looks done" with no per-path evidence is **not** a valid Stop.
+因为 hook 是个 shell——它看到的是 board，不是对话——所以自检这件事得你自己来：让 board 的 `status` enum 保持诚实（依赖已满足、可派的标 `ready`，被卡住的标 `blocked`，做了但未验的标 `uncertain`），并把你的决策程序 step-6 ledger + 验收证据写进对话和 board 两边。hook 对 board 状态设闸；真正让一次 Stop 可信的，是你写下的那份自检。
+
+### step-6 ledger —— 固定形态（单一来源）
+
+这是 SKILL.md 决策程序所指向的权威定义。goal-hook 读 board 来给你的 Stop 设闸，但**它读不到你的推理**——所以每当这一回合走到决策程序 step 6，就把结论**连同验收证据一起写进对话和 board 两边**，用一个固定形态：
+
+- **每条仍未关闭的路径一行**：`<task-id> · <status> · <blocker | evidence>`
+- 然后**一行裁决**，恰好是以下之一：
+  - `goal met` —— 每条路径都 `done`、且已在端点验过；
+  - `legitimate waiting: every path blocked or surfaced` —— 每条剩余路径要么被一个 in-flight 后台任务卡住、要么在等一个用户回答；
+  - `still working` —— 还有可排程的工作（那你根本不该在 step 6——回到决策程序顶端）。
+
+hook 对 board 状态设闸；这份写下的 ledger 才是让"done"*可信*、而不只是被嘴上断言的东西。一句光秃秃的"看起来做完了"、拿不出每条路径的证据，**不算**一次有效的 Stop。

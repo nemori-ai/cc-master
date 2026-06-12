@@ -1,13 +1,13 @@
 ---
-description: Archive the cc-master board and deactivate the orchestrator (does not delete the board).
+description: '归档 cc-master board 并停用 orchestrator（不删除 board）。'
 ---
 
-Wind down cc-master orchestration cleanly. Deactivating a board is **destructive** (it archives the orchestration), so identify the right board and confirm before writing.
+干净地收尾 cc-master 编排。停用一块 board 是**破坏性的**（它会归档这次 orchestration），所以要先认准对的那块 board，并在写入前确认。
 
-1. **Identify the board.** Boards live in the cc-master home (`$CC_MASTER_HOME`, else `<project>/.claude/cc-master/`), named `<timestamp>-<pid>.board.json`. List the home and read every board whose `owner.active` is `true`.
-   - If exactly one is active, that is the candidate.
-   - If several are active, match each board's `goal` field against the goal you have been driving, and take the one that matches.
-   - If several match, none match, or you cannot determine the board unambiguously, **ask the user which board to stop** (list the candidates with their `goal` and file name) rather than guessing — stopping the wrong board archives someone else's orchestration.
-2. **Confirm before deactivating.** State which board you are about to stop (its `goal` and file name) and ask the user to confirm, since setting `owner.active` to `false` is irreversible from the hooks' point of view. Do not deactivate without that confirmation.
-3. Once confirmed, set `owner.active` to `false` in that board file (keep the file as the audit record; do not delete it). That single edit is what deactivates it: the hooks treat only boards whose `owner.active` is `true` as live, so there is no separate marker file to remove.
-4. Give the user a one-paragraph closeout: what finished (with artifacts), what is still in flight, and what remains blocked on them.
+1. **认准 board。** Board 住在 cc-master home（`$CC_MASTER_HOME`，否则 `<project>/.claude/cc-master/`），以 `<timestamp>-<pid>.board.json` 命名。列出 home，读取每一块 `owner.active` 为 `true` 的 board。
+   - 若恰好只有一块 active，它就是候选。
+   - 若有多块 active，把每块 board 的 `goal` 字段与你一直在推进的目标做匹配，取匹配上的那块。
+   - 若多块匹配、无一匹配、或你无法无歧义地确定 board，**向用户询问该停哪块 board**（列出候选及其 `goal` 与文件名），不要靠猜——停错 board 会归档掉别人的 orchestration。
+2. **停用前先确认。** 说明你将要停的是哪块 board（它的 `goal` 与文件名），并请用户确认，因为把 `owner.active` 置为 `false` 从 hooks 的视角看是不可逆的。没有这一确认，不要停用。
+3. 确认后，把那个 board 文件里的 `owner.active` 置为 `false`（保留文件作为审计记录；不要删除它）。就这一处编辑即完成停用：hooks 只把 `owner.active` 为 `true` 的 board 当作活的，所以没有另外的标记文件需要清除。
+4. 给用户一段一段话的收尾说明：什么完成了（带 artifacts）、什么还在飞、什么仍阻塞在他们身上。

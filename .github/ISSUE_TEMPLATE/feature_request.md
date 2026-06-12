@@ -26,10 +26,11 @@ so we can reason about fit (see [CONTRIBUTING.md](../../CONTRIBUTING.md)):
 
 - [ ] Stays **ship-anywhere** (works on Anthropic API, Bedrock, Vertex, Foundry —
       no agent-teams / scheduled-routines dependency)
-- [ ] Hooks (if touched) stay **pure bash**, no `jq` / `node`
+- [ ] Hooks (if touched) use only **bash + node/JS** (no `jq` / `python` / TS-direct) — ADR-006
 - [ ] Keeps the board's **narrow waist** stable
 - [ ] Respects the **Skill A / Skill B** split (orchestration vs script authoring)
 - [ ] Keeps the conductor from doing unit work by hand
+- [ ] Hooks (if added/touched) stay **dormant-until-armed** (`board_matches` / `isArmed` gate; only `bootstrap-board.sh` is exempt) — ADR-007
 
 ## Additional context
 
