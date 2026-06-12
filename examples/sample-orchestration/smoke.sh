@@ -259,8 +259,8 @@ JSON
 run_hook reinject.sh '{"hook_event_name":"SessionStart","source":"resume"}'
 what "reinject scanned the home and found NO active board (owner.active:false)."
 deci "stay SILENT — no role injected; the orchestration is dormant. (empty stdout, exit 0)"
-check "archived board → reinject is silent (no output)" "$OUT" ""
-[ -z "$OUT" ] && ok "reinject produced exactly empty output after archive" \
+# (an empty-needle `check` is vacuous — assert emptiness explicitly instead)
+[ -z "$OUT" ] && ok "archived board → reinject is silent (exactly empty output)" \
               || no "reinject should be empty after archive (got: $OUT)"
 
 run_hook verify-board.sh "$STDIN_STOP"

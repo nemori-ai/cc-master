@@ -68,7 +68,7 @@ CODEX12 first read the session-scoped gate as silently orphaning any active boar
 - **`claude --resume` / `--continue` (`-c`) preserve the original `session_id`** — the `SessionStart` event fires with `source:"resume"` and the **same** `session_id`.
 - **Compaction preserves the `session_id`** too — `SessionStart` fires with `source:"compact"`, `session_id` unchanged.
 - `SessionStart` carries a `source` field whose values are `startup` / `resume` / `compact` / `clear`.
-- **Sessions are independent** — a brand-new session (no `--resume`/`-c`) always gets a **fresh** `session_id`; there is no official范式 for a brand-new independent session "taking over" a prior session's board.
+- **Sessions are independent** — a brand-new session (no `--resume`/`-c`) always gets a **fresh** `session_id`; there is no official pattern for a brand-new independent session "taking over" a prior session's board.
 
 **Therefore:**
 

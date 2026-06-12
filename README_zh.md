@@ -128,7 +128,7 @@ flowchart LR
 }
 ```
 
-**想要可跑的证明？** 这里叙述的 hook 链——bootstrap、reinject，以及每一个 `verify-board` 的 block/allow 决策——都被 `smoke.sh` 端到端跑过一遍（no jq、no node、no network），它逐步打印*发生了什么*和*hook 决定了什么*，外加 PASS/FAIL 退出码（兼作 CI 冒烟检查）：
+**想要可跑的证明？** 这里叙述的 hook 链——bootstrap、reinject，以及每一个 `verify-board` 的 block/allow 决策——都被 `smoke.sh` 端到端跑过一遍（这三个都是 bash hook，故 smoke 本身无需 jq、node 或网络），它逐步打印*发生了什么*和*hook 决定了什么*，外加 PASS/FAIL 退出码（兼作 CI 冒烟检查）：
 
 ```bash
 bash examples/sample-orchestration/smoke.sh

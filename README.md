@@ -128,7 +128,7 @@ The fastest way to understand cc-master is to watch one orchestration happen —
 }
 ```
 
-**Want the runnable proof?** The hook chain narrated here — bootstrap, reinject, and every `verify-board` block/allow decision — is exercised end-to-end (no jq, no node, no network) by `smoke.sh`, which prints *what happened* and *what the hook decided* plus a PASS/FAIL exit code (it doubles as a CI smoke check):
+**Want the runnable proof?** The hook chain narrated here — bootstrap, reinject, and every `verify-board` block/allow decision — is exercised end-to-end by `smoke.sh` (all three are bash hooks, so the smoke run itself needs no jq, no node, no network), which prints *what happened* and *what the hook decided* plus a PASS/FAIL exit code (it doubles as a CI smoke check):
 
 ```bash
 bash examples/sample-orchestration/smoke.sh

@@ -69,8 +69,11 @@ mkdir -p "$HOME_DIR"
 # starts a NEW orchestration; archive stale ones with /cc-master:stop.
 BOARD="$HOME_DIR/$(date -u +%Y%m%dT%H%M%SZ)-$$.board.json"
 # Escape the sid for safe inclusion in the JSON string value (backslash + double-quote only; a
-# session id is otherwise printable). Empty sid → stamps "" (degraded: armed gate falls back to
-# any-active). Keep this pure bash (no jq) — ship-anywhere.
+# session id is otherwise printable). Empty sid → stamps "" — an ANOMALY (normal bootstrap stdin
+# carries a sid): such a blank board stays DORMANT for every non-empty stdin sid (it is NOT
+# auto-adopted — red line 6 / ADR-007 §2.3; hooks degrade to any-active ONLY when THEIR OWN stdin
+# sid is empty). Claim it by re-running as-master-orchestrator (re-arm re-stamps owner.session_id).
+# Keep this pure bash (no jq) — ship-anywhere.
 sid_esc="$(printf '%s' "$sid" | sed 's/\\/\\\\/g; s/"/\\"/g')"
 if [ -f "$TEMPLATE" ]; then
   cp "$TEMPLATE" "$BOARD"

@@ -55,7 +55,7 @@ cc-master/
 ├── adrs/                     ← 结构性决策快照（ADR-001..007 + AGENTS.md 规约）
 ├── tests/                    ← hook 测试（bash）；run-tests.sh 编排 hook + content contract
 ├── design_docs/             ← 设计文档 + eval/ + dogfood-findings.md（plans/ gitignored）
-└── examples/                 ← 可跑样例目标（占位待补）
+└── examples/                 ← 可跑样例（sample-orchestration：i18n 场景 walkthrough.md + smoke.sh 冒烟证明）
 ```
 
 **关键不变式**（每条一句话 + SSOT；硬约束的完整体在 §3 红线）：

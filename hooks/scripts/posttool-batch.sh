@@ -261,7 +261,7 @@ for b in "$HOME_DIR"/*.board.json; do
   [ "$n" -le "$m" ] && continue                          # this board: within its own cap → no warn
 
   # this board is strictly over its OWN cap → contribute its warning
-  over_warn="${over_warn}cc-master: WIP is at/over the cap (${n} in_flight, wip_limit ${m}). Don't add more parallel work next round — consider deferring high-float tasks to keep ~75% utilization (lens 5). This is a soft warning, not a block. "
+  over_warn="${over_warn}cc-master: WIP is over the cap (${n} in_flight, wip_limit ${m}). Don't add more parallel work next round — consider deferring high-float tasks to keep ~75% utilization (lens 5). This is a soft warning, not a block. "
 done
 
 # ── self-gate ──────────────────────────────────────────────────────────────────────────────────────

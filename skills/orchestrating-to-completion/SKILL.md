@@ -135,7 +135,7 @@ cc-master 的 charter 是六项能力（C1–C6，SSOT 在 `design_docs/spec.md`
 | **C2** 控制 token 消耗速度 | 5 | `cost-and-pacing` | dispatch 的 "reserve budget+WIP first" 备注 | Stop (H8 usage-pacing) "[cc-master pacing] 5h 配额临界 ... pace 杠杆（见 orchestrating-to-completion / cost-and-pacing）" → 镜头 5 |
 | **C3** 自主决策 vs 人类接入边界 | 7 | `async-hitl` | q_user → surface | Stop "every point that needs the user surfaced / marked `blocked_on:"user"`"; Stop (H3) "Unanswered user decisions still on this board" → 镜头 7 |
 | **C4** 分解 / 管理 / 更新 / 规划 | 2 | `decomposition` · `board` · `resume-verify` §4 | recon（integrate / mark stale） | bootstrap & Stop "Decompose the goal into a dependency DAG" → 镜头 2 + decomposition; Stop "self-check against this board's `goal`" → board/goal 重认领 |
-| **C5** 资源预算内的高效调度 | 2 / 3 / 5 | `dispatch` · `decomposition` | dispatch（WIP cap）· fill（准入测试） | PostToolBatch (H5) "WIP is at/over the cap ... defer high-float ... (lens 5)" → 镜头 5 + fill 准入; Stop "A `ready` task can proceed now" → q_ready; 保险丝 "`ready` task that cannot actually proceed (mark it `blocked`/`escalated`)" → 保险丝红线 |
+| **C5** 资源预算内的高效调度 | 2 / 3 / 5 | `dispatch` · `decomposition` | dispatch（WIP cap）· fill（准入测试） | PostToolBatch (H5) "WIP is over the cap ... defer high-float ... (lens 5)" → 镜头 5 + fill 准入; Stop "A `ready` task can proceed now" → q_ready; 保险丝 "`ready` task that cannot actually proceed (mark it `blocked`/`escalated`)" → 保险丝红线 |
 | **C6** 按难度选模型档位 | 2（一行） | `cost-and-pacing` | *(无节点——by design)* | *(无现存 hook；模型选择是判断，不可由 hook 强制)* |
 
 这张地图把话挑明：C2/C6 的「薄 hook + 无节点 / 旁注节点」姿态是 **by design**，不是疏漏（模型分档与 pacing *派生自*镜头 2/5——为它们加一条红线会违背 Iron Law；见 `references/cost-and-pacing.md`）。C2 的 hook 列现由 H8（usage-pacing，Stop 上的第二个 hook，5h burn-rate 感知）兑现——感知是 hook 的活、怎么 pace 仍是认知（属本 skill）。
@@ -146,7 +146,7 @@ cc-master 的 charter 是六项能力（C1–C6，SSOT 在 `design_docs/spec.md`
 
 - **SessionStart** "invoke the orchestrating-to-completion skill and continue the decision program"、"recognise it by its goal"、"integrate any completed background results first" → 你刚 compact 过：回到 *Board protocol essentials*，重新认领你的 board，从 **recon** 重启决策程序——排程之前先整合（镜头 1 / 6）。
 - **UserPromptSubmit** "Decompose the goal into a dependency DAG ... run the decision program" → 一场新 orchestration 的起点：**镜头 2** + `decomposition.md`——派发之前先画 DAG。
-- **PostToolBatch** (H5) "WIP is at/over the cap ... Don't add more parallel work next round — consider deferring high-float tasks to keep ~75% utilization (lens 5)" → **镜头 5**：别再加并行工作，推迟 high-float 任务。它是软警告，不是 block。
+- **PostToolBatch** (H5) "WIP is over the cap ... Don't add more parallel work next round — consider deferring high-float tasks to keep ~75% utilization (lens 5)" → **镜头 5**：别再加并行工作，推迟 high-float 任务。它是软警告，不是 block。
 - **Stop** —— 决策程序从外部为你兜底；它的每条注入各指向一个锚点：
   - "this board still has a `ready` or `uncertain` task ... Resolve it" → **q_ready / q_unver** 还有活：别停，回去跑（镜头 3 / 6）。
   - "every point that needs the user surfaced / marked `blocked_on:"user"`" → **镜头 7**，该问就问。完成态握手现在还会**显式列出**任何挂起的用户停泊决策——"Unanswered user decisions still on this board: \<titles\>" (H3) → **镜头 7**：停下之前，逐项确认它们确实仍挂起（或就地解决）。

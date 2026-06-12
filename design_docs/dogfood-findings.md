@@ -42,8 +42,14 @@
 | 28 | 常驻重注的魂(SKILL.md Vision-index)把已 live 的 H8(usage-pacing)标作「TODO/待批准」,误导未来每场 orchestration 以为 C2 pacing hook 不存在 | should-fix(指导失真)| ✅ 已修(POLISH-SOUL 端点验收亲读暴露→micro-fixup 校准3处,dot-graph 重验未扰);根因=MAPSYNC 只同步 H6/H5/H3 子集、漏 H8 |
 | 29 | 公开落地页(README)demo 直接照搬一个真实保密项目的场景(数据模型 schema,标识符已隐去),且泄密早已潜伏在 walkthrough/smoke.sh/board.md(分发)——README 只是放大到最高曝光面 | **must-fix(泄密)** | ✅ 已修(用户 review catch→全仓 scrub 换通用 i18n 场景 + 彻底去外部出处痕迹 self-contain;repo-wide grep 零残留+smoke.sh 真跑过;台账自身的标识符残留见 [[Finding #35]] 二次清除) |
 | 30 | H6 `subagent-stop.sh` hook 建在一个**未验证的平台语义假设**上(以为 SubagentStop 的 additionalContext 通知父 orchestrator);实际它注入刚结束的 sub-agent 自己、达不到父线,且与内建结果摘要冗余 | should-fix(误设计 hook)| ✅ 已删(codex 二审 committed 代码逮出→claude-code-guide 查官方文档裁决→全仓级联移除;魂 dot-graph byte-identical) |
+| 31 | 落地页把 live hook 能力 over-claim 成「5h/7d burn-rate」,实现只有 5h(7d 连概念都不存在) | should-fix(对外 over-claim) | ✅ 已修(收窄宣称不补功能:11 处归 5h,7d 明确归 `cc-usage.sh` 带外累计) |
+| 32 | PostToolBatch 在 sub-agent 上下文也触发,指挥专属 WIP 警告泄漏给 leaf worker(破红线 4) | should-fix(红线 4 泄漏) | ✅ 已修(官方核实 `agent_id` 语义→sub-agent 闸:非空 `agent_id` 静默 exit 0) |
+| 33 | agent-facing 文本与 hook 契约脱节:命令叫 agent 重设 ARM 盖的 `session_id`(P1)+ 魂仍标已删 H6 为 live(P3) | P1=must-fix · P3=should-fix | ✅ 已修(命令改「保留勿覆写」;魂去 H6;MAPSYNC 穷举自检) |
+| 34 | armed-gate 把 empty-session_id 的 active 板孤儿化;权威核实反证 codex 半个前提 | should-fix(单边兜底盲区) | ✅ 已修后被 [[Finding #36]] **回退**——对称 degrade 破红线 6;终局=blank 板保持休眠(ADR-007 §4.5) |
+| 35 | 记录泄密的台账条目自身把秘密又写了一遍:dogfood ledger 也是发布面 | **must-fix(泄密,release-blocking)** | ✅ 已修(三处匿名化 + 全仓 re-grep 归零,搜索面含台账与测试) |
+| 36 | 两个 reviewer finding 反向振荡(孤儿化 ↔ 污染);用非协商红线当裁决锚 + 文档化止振荡 | P1(对称 degrade 破红线 6) | ✅ 已修(回退对称 degrade;裁决写进 ADR-007 §2.3/§4.5;blank 板休眠,显式 re-arm 认领) |
 
-> 基线健康(无问题留痕):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
+> 基线健康(无问题留痕,**早期 P2 阶段历史快照**——当时仓库为 3 个纯 bash hook;现行为 5 hook(4 bash + 1 node,ADR-006/ADR-007),当前健康以 `run-tests.sh` 本次输出为准):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
 > bootstrap dual-sentinel 稳;authoring-workflows 的 5 template + API 契约自洽。**确定性骨架是健康的。**
 
@@ -634,7 +640,7 @@
 - **教训(固化)**:① **凡 hook 以「写某 narrow-waist 字段」为其契约动作,所有 agent-facing 文本必须『保留勿覆写』那个字段**——ARM-stamp 的 `owner.session_id` 是头号案例;给 agent 的填板指令要显式区分「hook 已盖好、别碰」与「你来填」。② **翻译/中文化≠审校**:CMD 中文化忠实搬运了一条语义上已经错的英文指令——批量改写(翻译/重构)时,顺带对照当前 hook 契约审一遍语义正确性,别只换皮。③ **MAPSYNC 第三次复发**(#28 H8 标 TODO、本条 P3 H6 标 live)证明:魂里任何「hook 状态汇总表/收尾行」是高频漂移点,删/加 hook 的 PR **必带**一条 `grep 'H[0-9]'` 全量核对 live 集的自检。④ 承 #19/#27/#30/#32:agent-facing 散文与契约脱节是「测试全绿唯独 codex 第二端点验收能逮」形态盲区里的又一类(本 PR 第五例语义/文档类)。
 - **严重度 / 来源**:P1=must-fix(armed-hook 运行时全哑,发布前逮住)· P3=should-fix(魂 stale,高曝光低 blast)/ 一手(codex 第二端点验收 CODEX11,本 PR)。
 
-## Finding #34 — armed-gate 把 empty-session_id 的 active 板孤儿化;权威核实反证 codex 半个前提,对称 degrade 收口 ✅已修
+## Finding #34 — armed-gate 把 empty-session_id 的 active 板孤儿化;权威核实反证 codex 半个前提,对称 degrade 收口 ✅已修(处置后被 [[Finding #36]] 回退)
 
 - **现象**:codex CODEX12 指出 session-scoped 武装闸(`owner.session_id==stdin sid`)会把**未匹配 session_id 的 active 板静默孤儿化**,称这破坏「插件宣称的 board-based resume」:① 用户在「全新会话 restart」→ stdin sid 不匹配 → reinject 跳过 → resume 失效;② 升级时旧 active 板 `owner.session_id:""` → 不匹配 → 孤儿化。
 - **根因 / 权威反证**:**先对官方文档权威核实(claude-code-guide,承 Finding #30 铁律:平台语义不凭断言)**,结论把 codex 的两幕**劈成一真一伪**——① **伪**:`claude --resume`/`--continue` **保留原 session_id**(`SessionStart.source:"resume"`,session_id 不变),compaction 也保留(`source:"compact"`);官方 resume/compaction 路径下 gate 照常匹配、reinject 照常工作。「全新独立会话接管旧板」**无官方范式**(sessions are independent),armed-gate 在全新会话休眠**正是设计目标(红线 6)**——ADR-007 的 Alternatives 早已**明确否决**「任何 active 板即武装」。所以 codex 第一幕建立在「resume 会换 session_id」这个**错误前提**上。② **真**:当 board 的 `owner.session_id` 为**空串**(bootstrap 若在缺 session_id 的 stdin 上建板就会盖空、或迁移/手改)时,它对任何非空 stdin sid 都不匹配 → **永久孤儿化**。这是真缺口——原 degrade 只对「stdin sid 空」放行,**没对称覆盖「board sid 空」**。
