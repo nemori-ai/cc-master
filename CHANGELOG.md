@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-12
+
 ### Added
 
 - **两个新 hook（接通过调度 + pacing 通道，均已建 + 测 + 接线 LIVE）** — 把此前「编译进 prose、compaction 一冲就丢」的运行时信号变成确定性 hook：
@@ -44,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`AGENTS.md` §4 增本仓对 superpowers 的一处覆盖** — dev 流「需求发现 / brainstorming」步改用项目自带 `requirement-elicitation`，不用 `superpowers:brainstorming`；其余「中间」段（plans / TDD / debugging / verification）与「前 / 后」仍按全局路由。
 - **`AGENTS.md` §2 / §6 / §N + curating 版图自述同步** — dev meta-skill 由「三件套」扩为「三件套（造/评/治）+ `requirement-elicitation` 上游」，§6 路由四者正交（发现 → 准入 → 造 → 度量）；curating 的 portfolio 计数 2+3 → 2+4，并在 `references/counterfactual-probe.md` 注明第四件经 Probe 准入、非违背「为对仗而建第四个」警告。
 - **红线 1 修订（[ADR-006](adrs/ADR-006-hooks-may-use-node-js.md) 取代 [ADR-001](adrs/ADR-001-hooks-pure-bash.md) 的「no node」立场）** — hook runtime 约束从「纯 bash」改为 **bash + node/JS（JS only；`jq`/`python`/TS-直跑仍排除）**：Claude Code 本身是 Node 应用，`node` 在任何能触发 hook 的环境天然在（原「no node」把模型后端 Bedrock/Vertex/Foundry 误当 CLI 宿主）。最大后果：**C2 usage 感知翻盘为可做成 node hook**（原判「唯一被红线1 否决」）；board 解析可 `JSON.parse`。ship-anywhere 精神保留。同步：`AGENTS.md` §3 红线1 + §2/§12/§N、`CONTRIBUTING.md`、`SECURITY.md`、PR/issue 模板、`README(_zh).md`、`grounding-skill-evals`、`vision-landing-tracker`。ADR-001 状态 → Superseded。
+- **模型档位指导上提高杠杆裁决身份（`cost-and-pacing.md` + `decomposition.md`）** — 按「一次错判下游成本极大、且低并发」把判断 / 审查 / 咨询 / 裁决身份压到最强档:**Fable 5** = 独立 review / 二审 · 端点验收 · 决策咨询 · 架构仲裁 + 最难开放推理;**Opus** = 难实现 + 常规 review;**Sonnet** = 常规实现;**Haiku** = 机械活。相对输出倍率 10×/5×/3×/1× 不变;仍是 informational reference(非红线,Finding #26)。
+- **`commands/` 全中文化 + `as-master-orchestrator` 整体重构** — 三个命令(`as-master-orchestrator` / `status` / `stop`)正文中文化;点火命令 `as-master-orchestrator` 重构为**薄点火层**(点火 + 指向 `orchestrating-to-completion` skill,不复述七镜头 / 红线 / 决策程序——红线 3 + reinject 重注友好),保留三步骨架 + 「指挥不演奏」收尾;bootstrap sentinel(`<!-- cc-master:bootstrap:v1 -->`)byte-exact 首行触发机制与所有技术字面量(`$ARGUMENTS` / `owner.session_id` / `tasks[]` / `blocked_on:"user"` 等)原样保留。
 
 ### Removed
 

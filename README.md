@@ -2,7 +2,7 @@
 
 > 中文版见 [README_zh.md](README_zh.md)。
 
-![version](https://img.shields.io/badge/version-0.2.0-blue)
+![version](https://img.shields.io/badge/version-0.3.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![ship-anywhere](https://img.shields.io/badge/ship--anywhere-Bedrock%20%7C%20Vertex%20%7C%20Foundry-7c3aed)
 ![requires](https://img.shields.io/badge/requires-Node%2022%2B%20%2B%20bash-orange)
