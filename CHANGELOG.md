@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-12
+
 ### Added
 
 - **账户权威 usage pacing（Finding #37 / [ADR-008](adrs/ADR-008-account-authoritative-usage-and-script-placement.md)）** — 订阅账户的 5h/7d `used_percentage` + `resets_at` 是**权威**用量信号，但官方核实它**只**出现在 status-line 脚本的 stdin 里（所有 hook 的 stdin、transcript JSONL、`claude` CLI 子命令全无；API `anthropic-ratelimit-*` 是 tier RPM/ITPM、口径不等价）。新增 `statusline-capture.js`（接进你的 status line，把 `rate_limits` 落到账户级 sidecar，`--passthrough` 不覆盖你既有的 status line）；`cc-usage.sh` / `usage-pacing.js` 优先读它（`source:"account"`），缺/陈旧则降级本地 JSONL 反推（`source:"local-derived-approx"`，**标 approx**）。`usage-pacing.js` 撞墙判据**脱钩会失真到数量级的本地反推 `window_remaining_min`**、改用账户 `used_percentage`，并**首次纳入 7d**（修 Finding #31 的 7d 全盲缺口）。接法见 [`cost-and-pacing.md`](skills/orchestrating-to-completion/references/cost-and-pacing.md)「接法」段。
+- **自进化 commands/skills 方法论整合** — 整合研究-grounded 的自进化方法论（Option B 纯整合）；SKILL A reinject 瘦身（愿景索引 + hook 词汇下沉 `references/`）；分发物措辞诚实性修正。
 
 ### Fixed
 
 - **既存运行时带外脚本分发 bug（Finding #38 / ADR-008）** — `cc-usage.sh` / `codex-review.sh` 此前在**分发的** skill/command prose 里是**裸相对路径** `scripts/xxx`，终端用户 cwd（用户项目）下解析、**触不到 plugin 安装位置**（裸路径在 dev 的 repo 根碰巧能跑，真实安装才现形）。运行时带外脚本（cc-usage / codex-review / statusline-capture）搬入 `skills/orchestrating-to-completion/scripts/`（随 skill 分发），分发 prose 改用 `${CLAUDE_SKILL_DIR}` / `${CLAUDE_PLUGIN_ROOT}` 引用；dev-only 脚本（eval / skill-lint）留顶层 `scripts/`（仅 repo 根调用，裸路径正确）。
+- **skill/command 分发 self-contain（不断链）** — 去除分发 skill/command 里对 `design_docs/` 等**非约定目录**文件的引用（安装到用户机器后死链）；plugin 内约定目录改用 `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}` 绝对引用。AGENTS §12 加 self-contain 纪律 + 硬卡点 grep。
 
 ### Changed
 
