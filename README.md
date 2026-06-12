@@ -72,7 +72,7 @@ Every claim in column ③ is anchored to a real mechanism, not a marketing line:
 | **Main thread while waiting** | Blocked, or doing it by hand | Responsive but idle | Proactive: verify · look-ahead · HITL · distil | the decision program (Skill A) |
 | **Survives compaction** | No | No | **Yes** — role + board re-injected | `reinject.sh` (SessionStart hook) |
 | **Cross-session resume** | No | Same-session only | **Yes** — re-discovered from the board file | the board (persistent save file) |
-| **Endpoint verification** | Ad hoc | Inside the script | Orchestrator verifies independently | red line 6 + the decision program (Skill A) |
+| **Endpoint verification** | Ad hoc | Inside the script | Orchestrator verifies independently | lens 6 + the decision program (Skill A) |
 | **Quota awareness** | No | No | **Yes** — live 5h burn-rate wall (7d total via `cc-usage.sh`) | `usage-pacing.js` (Stop hook) + `cc-usage.sh` |
 
 ---

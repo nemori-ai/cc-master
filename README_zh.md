@@ -72,7 +72,7 @@ flowchart LR
 | **等待时的主线程** | 阻塞，或亲自上手 | 响应但空转 | 主观能动：验收 · 前瞻 · HITL · 沉淀 | 决策程序（Skill A） |
 | **能否熬过 compaction** | 否 | 否 | **能**——角色 + board 被重注 | `reinject.sh`（SessionStart hook） |
 | **跨会话续接** | 否 | 仅限同一会话 | **能**——靠 board 文件重新认回 | board（持久存档文件） |
-| **端点验收** | 临时随手 | 写在脚本里 | 总指挥独立验收 | 红线 6 + 决策程序（Skill A） |
+| **端点验收** | 临时随手 | 写在脚本里 | 总指挥独立验收 | 镜头 6 + 决策程序（Skill A） |
 | **配额感知** | 否 | 否 | **能**——live 感知 5h burn-rate 墙（7d 累计经 `cc-usage.sh`） | `usage-pacing.js`（Stop hook）+ `cc-usage.sh` |
 
 ---

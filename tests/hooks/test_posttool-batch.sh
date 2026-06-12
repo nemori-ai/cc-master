@@ -205,4 +205,55 @@ assert_eq 0 "$HOOK_RC" "agent_id:null → rc 0"
 assert_contains "$HOOK_OUT" "WIP" "agent_id:null（非带引号字符串）→ 当主线 → 照常警告"
 rm -rf "$H"
 
+# ── stdin 顶层字段限定：session_id / agent_id 只从 stdin 根对象的顶层字段读，绝不被 tool_results 污染 ──
+# （CODEX10，破红线 4 + 红线 6 修复）。PostToolBatch 的 stdin 是一个 JSON 对象：顶层有 hook 元数据
+# （session_id / agent_id / hook_event_name / transcript_path…），但还带 `tool_results`（一批工具调用的
+# 任意输出）。工具输出里可能含 JSON 或散文如 `"agent_id":"..."` / `"session_id":"..."`。旧版用贪婪全
+# stdin sed（`.*` 贪婪）解析 → 紧凑单行 JSON 下匹配到最后一个（嵌在 tool_results 里的）值，而非顶层 hook
+# 元数据。后果：主线 batch 的工具输出含 `"agent_id":"x"` → 误读出非空 agent_id → 误判 sub-agent 而静默 →
+# 超 cap 主板收不到本该有的 WIP 警告；或工具输出含 `"session_id":"other"` → 匹配错 session → 武装判定错乱。
+# 下面用例锁死「session_id / agent_id 只从 stdin 根对象顶层字段读，tool_results 内同名字段整体丢弃」。
+
+# Case 18 (CODEX10 回归 · 紧凑单行)：主线 stdin（顶层 "session_id":"SID"、无顶层 agent_id），但其
+#           tool_results 里某工具返回的嵌套对象带真 JSON 字段 "agent_id":"POISON" 与 "session_id":"OTHER"
+#           （未转义、真实嵌套 JSON——工具输出可含此类结构化载荷）。超 cap 主板 owner.session_id==SID、
+#           wip_limit:1、两个 in_flight。修后须照常注入 WIP 警告（没把嵌套 POISON 读成 sub-agent、也没把
+#           session 匹配到 OTHER）。修前贪婪 sed（.* 贪婪）会误读最后一个即 POISON → 静默（Red）。
+#           紧凑单行最能触发贪婪 bug。
+H="$(make_project)"; SID="sess-toplevel-only"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"wip_limit\":1,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_batch_raw "$H" "{\"session_id\":\"$SID\",\"hook_event_name\":\"PostToolBatch\",\"tool_results\":[{\"type\":\"tool_result\",\"meta\":{\"agent_id\":\"POISON\",\"session_id\":\"OTHER\"}}]}"
+assert_eq 0 "$HOOK_RC" "tool_results 含嵌套 agent_id/session_id → rc 0"
+assert_contains "$HOOK_OUT" "WIP" "顶层无 agent_id、tool_results 内 agent_id 不算 → 当主线 → 照常警告"
+assert_contains "$HOOK_OUT" "additionalContext" "顶层 session 匹配（非 tool_results 内 OTHER）→ 注入 additionalContext"
+rm -rf "$H"
+
+# Case 19 (CODEX10 回归 · 多行缩进，证 format-agnostic)：同 Case 18 语义，但 stdin 用多行缩进 JSON，
+#           tool_results 内嵌真 JSON 字段 "agent_id":"POISON" / "session_id":"OTHER"。须与单行行为一致 → 照常警告。
+H="$(make_project)"; SID="sess-toplevel-multiline"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"wip_limit\":1,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+ML_STDIN="$(printf '{\n  "session_id": "%s",\n  "hook_event_name": "PostToolBatch",\n  "tool_results": [\n    {\n      "type": "tool_result",\n      "meta": { "agent_id": "POISON", "session_id": "OTHER" }\n    }\n  ]\n}' "$SID")"
+run_batch_raw "$H" "$ML_STDIN"
+assert_eq 0 "$HOOK_RC" "多行缩进 + tool_results 嵌套同名字段 → rc 0"
+assert_contains "$HOOK_OUT" "WIP" "多行缩进下顶层字段限定仍生效（format-agnostic）→ 照常警告"
+rm -rf "$H"
+
+# Case 20 (保活①·真 sub-agent 顶层 agent_id)：顶层带 "agent_id":"sub-1"（真 sub-agent 上下文）→ 即便
+#           tool_results 也提到 agent_id，顶层非空 agent_id 必须被读到 → 静默早退（不误伤 sub-agent 闸）。
+H="$(make_project)"; SID="sess-real-subagent"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"wip_limit\":1,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_batch_raw "$H" "{\"session_id\":\"$SID\",\"agent_id\":\"sub-1\",\"hook_event_name\":\"PostToolBatch\",\"tool_results\":[{\"meta\":{\"agent_id\":\"noise\"}}]}"
+assert_eq 0 "$HOOK_RC" "顶层真 agent_id（sub-agent）→ rc 0"
+assert_eq "" "$HOOK_OUT" "顶层 agent_id 非空 → sub-agent → 静默（顶层字段流照常读到 sub-1）"
+rm -rf "$H"
+
+# Case 21 (保活②·干净主线)：干净主线 stdin（无 agent_id、顶层 session 匹配、超 cap、tool_results 为空对象
+#           批次但不含 agent_id/session_id 杂质）→ 照常警告。防顶层字段流把干净主线的合法字段也漏掉。
+H="$(make_project)"; SID="sess-clean-mainline"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"wip_limit\":1,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_batch_raw "$H" "{\"session_id\":\"$SID\",\"hook_event_name\":\"PostToolBatch\",\"tool_results\":[{\"type\":\"tool_result\",\"content\":\"ok\"},{\"type\":\"tool_result\",\"content\":\"done\"}]}"
+assert_eq 0 "$HOOK_RC" "干净主线 → rc 0"
+assert_contains "$HOOK_OUT" "WIP" "干净主线（顶层 session 匹配、无 agent_id）→ 照常警告"
+rm -rf "$H"
+
 finish

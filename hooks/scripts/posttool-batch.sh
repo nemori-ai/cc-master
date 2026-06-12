@@ -19,17 +19,57 @@ set -uo pipefail
 
 HOME_DIR="${CC_MASTER_HOME:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/cc-master}"
 
-# ── stdin → session_id (pure bash, no jq) ─────────────────────────────────────────────────────────
+# ── stdin → 顶层字段流（root-object top-level fields ONLY） ────────────────────────────────────────
 input="$(cat)"
-sid="$(printf '%s' "$input" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+
+# stdin_top_fields — 把 stdin（经管道喂入）当成一个根 JSON 对象，只发射 curly-depth-1 且 bracket-depth-0
+# 的字符，即根对象自己的顶层字段流；凡嵌进数组（tool_results[...]）或子对象的内容整体丢弃。
+# 与本文件的 board_root_stream 完全同构——唯一区别是输入源从文件改成 stdin 字符串（awk 无文件参数即读 stdin）。
+# 动因（CODEX10）：PostToolBatch 的 stdin 是一个 JSON 对象，顶层有 hook 元数据（session_id / agent_id /
+# hook_event_name / transcript_path…），但还带 `tool_results`（一批工具调用的任意输出，可能含 JSON 或散文
+# 如 "agent_id":"x" / "session_id":"y"）。旧版用贪婪全 stdin sed（.* 贪婪）→ 紧凑单行 JSON 下匹配到最后一个
+# （嵌在 tool_results 里的）值，而非顶层元数据 → 主线 batch 的工具输出含 "agent_id" → 误判 sub-agent 而静默
+# → 超 cap 主板收不到 WIP 警告；或工具输出含 "session_id":"other" → 匹配错 session → 武装判定错乱。先把 stdin
+# 缩到顶层字段流，再从中 grep/sed，则 tool_results 内同名字段整体被丢弃。FORMAT-AGNOSTIC：单行紧凑与多行
+# 缩进行为一致；string/escape 处理（引号内字符、\ 转义不被当结构括号）——与 board_root_stream 同。
+stdin_top_fields() {
+  awk '
+    { s = s $0 "\n" }
+    END {
+      n = length(s)
+      bd = 0; cd = 0; instr = 0; esc = 0; out = ""
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        if (instr) {
+          if (bd == 0 && cd == 1) out = out ch
+          if (esc) esc = 0
+          else if (ch == "\\") esc = 1
+          else if (ch == "\"") instr = 0
+          continue
+        }
+        if (ch == "\"") { instr = 1; if (bd == 0 && cd == 1) out = out ch; continue }
+        if (ch == "[") { bd++; continue }
+        if (ch == "]") { if (bd > 0) bd--; continue }
+        if (ch == "{") { cd++; continue }
+        if (ch == "}") { if (cd > 0) cd--; continue }
+        if (bd == 0 && cd == 1) out = out ch
+      }
+      printf "%s", out
+    }'
+}
+
+# 只含 stdin 根对象顶层字段（tool_results[] 及任何嵌套对象的内容已整体丢弃）
+top="$(printf '%s' "$input" | stdin_top_fields)"
+sid="$(printf '%s' "$top" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
 
 # ── SUB-AGENT 闸（红线4：指挥不演奏）──────────────────────────────────────────────────────────────────
 # PostToolBatch 在 sub-agent（Task 派生的子 agent）上下文内部也触发；官方 stdin 此时带 `agent_id`（主线缺席）。
 # 官方语义：sub-agent 内注入的 additionalContext 进的是该 leaf worker 自己的 context（贴在 tool result 旁）——
 # 主编排者专属的 WIP/编排软警告绝不能泄漏给单元 worker（否则把指挥的乐谱递给乐手，破红线4：指挥不演奏）。
-# 纯 bash 解析（红线1 禁 jq），比照上面 session_id：只匹配带引号的字符串值，故 `"agent_id":null`
-# 或字段缺席 → 解析为空 → 视为主线。非空（sub-agent）→ 静默 exit 0（在武装闸之前，最早可静默处）。
-agent_id="$(printf '%s' "$input" | sed -n 's/.*"agent_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+# 纯 bash 解析（红线1 禁 jq），比照上面 session_id：从 stdin 顶层字段流（top，已剥掉 tool_results）里只匹配
+# 带引号的字符串值，故 `"agent_id":null` 或字段缺席 → 解析为空 → 视为主线；tool_results 内的 "agent_id" 已
+# 被 stdin_top_fields 丢弃，不再污染（CODEX10）。非空（sub-agent）→ 静默 exit 0（在武装闸之前，最早可静默处）。
+agent_id="$(printf '%s' "$top" | sed -n 's/.*"agent_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
 [ -n "$agent_id" ] && exit 0
 
 # owner_region BOARD — print the ROOT "owner" object's DEPTH-1 FIELD STREAM only, via a string- and
