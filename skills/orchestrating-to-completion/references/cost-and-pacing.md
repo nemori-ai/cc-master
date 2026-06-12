@@ -17,9 +17,9 @@
 
 | Tier | Model ID | $/1M in·out | Relative output cost | Use for |
 |---|---|---|---|---|
-| Fable 5 | `claude-fable-5` | $10 · $50 | **10×** | 最难的开放推理 / 创意 / 叙事 |
-| Opus 4.8 | `claude-opus-4-8` | $5 · $25 | **5×** | 旗舰推理 · agentic · 临界路径难活 · 端点验收 |
-| Sonnet 4.6 | `claude-sonnet-4-6` | $3 · $15 | **3×** | 平衡主力:常规实现 / review |
+| Fable 5 | `claude-fable-5` | $10 · $50 | **10×** | 高杠杆判断与裁决(verdict-bearing):独立 review / 二审 · 端点验收 · 决策咨询 · 架构仲裁 / 方案选型 · 最难的开放推理 / 创意 / 叙事 |
+| Opus 4.8 | `claude-opus-4-8` | $5 · $25 | **5×** | 旗舰执行推理:agentic 实现 · 临界路径难实现活 · 复杂并发 bug 根因 · 常规 review |
+| Sonnet 4.6 | `claude-sonnet-4-6` | $3 · $15 | **3×** | 平衡主力:常规实现 |
 | Haiku 4.5 | `claude-haiku-4-5` | $1 · $5 | **1×** | 快 & 便宜:机械活(跑测试 / grep / 格式化 / 改名),200K context |
 
 编排的花销由输出主导（agent 吐的远多于它读的），所以真正该拿来 pace 的数字是 **relative output multiplier**——Haiku 1× / Sonnet 3× / Opus 5× / Fable 10×：一个 Opus 叶子 ≈ 五个 Haiku 叶子，一个 Fable 叶子 ≈ 十个。
@@ -31,9 +31,11 @@
 给 `decomposition.md` 的每节点契约加一个 **model** 字段，按任务*难度*来定——不是按主线恰好跑在哪个模型上：
 
 - **机械 / 可机械检查**（跑测试套件、grep 定位、批量格式化、改变量名）→ **Haiku**。无需推理。
-- **常规实现 / review** → **Sonnet**。主力 workhorse。
-- **难 / correctness-critical / 临界路径**（架构选型、复杂并发 bug 的根因、端点验收一段关键 diff）→
-  **Opus**；最难的开放推理 / 创意 → **Fable**。
+- **常规实现** → **Sonnet**。主力 workhorse。
+- **难实现 / correctness-critical / 临界路径**（agentic 实现、临界路径上难实现的活、复杂并发 bug 的根因）→ **Opus**；**常规 review**（日常代码审查，够重要不该降到 Sonnet）也走 **Opus**。
+- **高杠杆判断与裁决**（verdict-bearing：决定「对不对 / 选哪个」的节点——独立 review / 二审、端点验收、决策咨询、架构仲裁 / 方案选型）→ **Fable**；最难的开放推理 / 创意 → 同样 **Fable**。一次错判下游成本极大、且这些节点低并发，值最强档。
+
+> **关键区分**：判断 / 审查 / 咨询 / 裁决（决定「对不对 / 选哪个」的 verdict 节点）= **Fable**；做出那个被选定的难架构 / 复杂实现 = **Opus**——二者别混。常规 review 走 Opus；高杠杆的独立 review / 二审 / 端点验收走 Fable。
 
 强档集中到临界链上（镜头 2）；高 float 的机械活配便宜档、让它在空隙里跑（`decomposition.md` 的"资源决策"）。它在 workflow 一侧的对应物——随着某个 stage 变难、*在脚本内部*升级模型档位——是 SKILL B examples 里的 `staged-escalation.js`（`agent({model})`）；那里模型字面量是 resume cache key 的一部分，所以务必保持它是字面量。
 
