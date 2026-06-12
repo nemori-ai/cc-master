@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 # PostToolBatch hook — WIP soft-warning (H5, design 2026-06-11 §5.1). After a batch of parallel tool
-# calls is fully parsed, this hook reads THIS session's ACTIVE board, counts in_flight tasks (N) and
-# the board's top-level flexible `wip_limit` field (M). If N > M it injects a NON-BLOCKING
-# additionalContext warning ("don't add more parallel work next round, defer high-float"). It NEVER
-# blocks — parallel freedom is preserved; this only nudges (lens 5 ~75% utilization). Pure bash, NO
-# jq/node, ship-anywhere (Bedrock/Vertex/Foundry).
+# calls is fully parsed, this hook reads THIS session's ACTIVE boards. `wip_limit` is a board-LOCAL
+# cap, so EACH matched board is evaluated INDEPENDENTLY: its own in_flight count (N) vs its own
+# top-level flexible `wip_limit` field (M). Any board with N > M contributes a NON-BLOCKING
+# additionalContext warning carrying THAT board's numbers ("don't add more parallel work next round,
+# defer high-float"). NEVER aggregate in_flight across boards against a single board's cap — that would
+# (a) false-warn two boards each within their own cap, or (b) hide a board over its own smaller cap
+# behind a sibling's larger cap (codex round-2 finding). It NEVER blocks — parallel freedom is
+# preserved; this only nudges (lens 5 ~75% utilization). Pure bash, NO jq/node, ship-anywhere
+# (Bedrock/Vertex/Foundry).
 #
 # Self-gating (silent exit 0, no warning) on any of:
 #   - no matching active board for this session (dormant)
-#   - board has no `wip_limit` field, or it is non-numeric (graceful degradation — no threshold, no warn)
-#   - N <= M (WIP within cap)
+#   - every matched board has no `wip_limit` field / non-numeric one (graceful degrade — no threshold)
+#   - every matched board is within its own cap (N <= M per board)
 # It is READ-ONLY on the board, owns no sidecar, and emits ONLY additionalContext — never decision:block.
 set -uo pipefail
 
@@ -102,41 +106,45 @@ tasks_region() {
     }' "$1" 2>/dev/null
 }
 
-# ── find this session's active board + count in_flight + read wip_limit ────────────────────────────
-in_flight=0; wip_limit=""; matched=0
+# ── evaluate EACH matched board INDEPENDENTLY against its OWN board-local cap ───────────────────────
+# wip_limit is board-LOCAL, so per board: count ITS in_flight, read ITS top-level wip_limit, and if that
+# board is strictly over its OWN cap, append a warning carrying THAT board's numbers. No cross-board
+# aggregation — each board stands on its own cap (codex round-2 finding).
+matched=0; over_warn=""
 for b in "$HOME_DIR"/*.board.json; do
   [ -e "$b" ] || continue                 # no boards → unexpanded glob
   board_matches "$b" || continue          # archived or not this session's → ignore
   matched=1
+
+  # in_flight for THIS board only. Count in_flight tasks inside the tasks REGION only (log entries can't
+  # masquerade as task state). Use `grep -oE | grep -c` (NOT a bare `grep -c`): the region is emitted as
+  # a SINGLE LINE, so a line-counting `grep -c` would return 1 regardless of how many in_flight tasks
+  # there are. `grep -o` prints one match per line first, so the second `grep -c` counts OCCURRENCES.
+  # Keep the `|| n=0` fallback OUTSIDE the substitution: grep prints "0" AND exits 1 on zero matches, so
+  # a `|| echo 0` inside $(...) would append a second "0" → "0\n0" → integer-test crash (verify-board.sh caveat).
   region="$(tasks_region "$b")"
-  # Count in_flight tasks inside the tasks REGION only (log entries can't masquerade as task state).
-  # Use `grep -oE | grep -c` (NOT a bare `grep -c`): the region is emitted as a SINGLE LINE, so a
-  # line-counting `grep -c` would return 1 regardless of how many in_flight tasks there are. `grep -o`
-  # prints one match per line first, so the second `grep -c` then counts OCCURRENCES. Keep the `|| n=0`
-  # fallback OUTSIDE the substitution: grep prints "0" AND exits 1 on zero matches, so a `|| echo 0`
-  # inside $(...) would append a second "0" → "0\n0" → integer-test crash (verify-board.sh caveat).
-  # Accumulate across all of this session's active boards.
   n="$(printf '%s' "$region" | grep -oE '"status"[[:space:]]*:[[:space:]]*"in_flight"' | grep -c '')" || n=0
-  in_flight=$((in_flight + n))
-  # wip_limit: a board ROOT top-level flexible integer field. Take the FIRST board that carries one.
-  # Read it from the board-root field stream ONLY (board_root_stream above) so a `"wip_limit":N` buried
-  # in an agent-shaped task/log payload can never be mistaken for the cap — only the board's own
-  # top-level field counts (narrow-waist scope; codex round-2 finding).
-  if [ -z "$wip_limit" ]; then
-    wl="$(board_root_stream "$b" \
-          | grep -oE '"wip_limit"[[:space:]]*:[[:space:]]*[0-9]+' 2>/dev/null \
-          | sed -n 's/.*"wip_limit"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)"
-    [ -n "$wl" ] && wip_limit="$wl"
-  fi
+
+  # wip_limit for THIS board: a board ROOT top-level flexible integer field. Read it from the board-root
+  # field stream ONLY (board_root_stream above) so a `"wip_limit":N` buried in an agent-shaped task/log
+  # payload can never be mistaken for the cap — only the board's own top-level field counts (narrow-waist
+  # scope; codex round-2 finding).
+  m="$(board_root_stream "$b" \
+        | grep -oE '"wip_limit"[[:space:]]*:[[:space:]]*[0-9]+' 2>/dev/null \
+        | sed -n 's/.*"wip_limit"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)"
+  case "$m" in ''|*[!0-9]*) continue;; esac             # this board: no/non-numeric cap → skip it
+  [ "$n" -le "$m" ] && continue                          # this board: within its own cap → no warn
+
+  # this board is strictly over its OWN cap → contribute its warning
+  over_warn="${over_warn}cc-master: WIP is at/over the cap (${n} in_flight, wip_limit ${m}). Don't add more parallel work next round — consider deferring high-float tasks to keep ~75% utilization (lens 5). This is a soft warning, not a block. "
 done
 
 # ── self-gate ──────────────────────────────────────────────────────────────────────────────────────
 [ "$matched" -eq 0 ] && exit 0                          # no active board for this session → dormant
-case "$wip_limit" in ''|*[!0-9]*) exit 0;; esac         # no/non-numeric wip_limit → graceful degrade
-[ "$in_flight" -le "$wip_limit" ] && exit 0             # WIP within cap → nothing to warn
+[ -z "$over_warn" ] && exit 0                            # no board over its own cap → nothing to warn
 
-# ── over-cap → inject NON-BLOCKING additionalContext warning (never decision:block) ────────────────
-warn="cc-master: WIP is at/over the cap (${in_flight} in_flight, wip_limit ${wip_limit}). Don't add more parallel work next round — consider deferring high-float tasks to keep ~75% utilization (lens 5). This is a soft warning, not a block."
+# ── one-or-more board over its own cap → inject NON-BLOCKING additionalContext (never decision:block) ─
+warn="${over_warn% }"                                    # trim trailing separator space
 esc="$(printf '%s' "$warn" | sed 's/\\/\\\\/g; s/"/\\"/g; s/^/"/; s/$/"/')"
 printf '{"hookSpecificOutput":{"hookEventName":"PostToolBatch","additionalContext":%s}}\n' "$esc"
 exit 0

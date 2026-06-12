@@ -107,4 +107,33 @@ assert_contains "$HOOK_OUT" "WIP" "top-level wip_limit still read despite nested
 assert_contains "$HOOK_OUT" "additionalContext" "top-level cap → injects additionalContext"
 rm -rf "$H"
 
+# ── per-board independent WIP evaluation (wip_limit is board-LOCAL) ──────────────────────────────────
+# A session can own MULTIPLE active boards. wip_limit is a board-LOCAL cap, so each board's in_flight
+# must be compared against ITS OWN cap — never an aggregated in_flight against a single board's cap.
+
+# Case 11: TWO active boards, same session. b1: in_flight=3, wip_limit=4 (within). b2: in_flight=2,
+#           wip_limit=3 (within). EACH board is within its OWN cap → MUST be silent. The old logic
+#           summed in_flight across boards (3+2=5) and compared to the FIRST board's cap (4) → 5>4 →
+#           it falsely warned. Per-board evaluation must NOT warn here.
+H="$(make_project)"; SID="sess-multi-within"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g1\",\"wip_limit\":4,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T3\",\"status\":\"in_flight\",\"deps\":[]}]}"
+mkactive "$H" "b2" "{\"schema\":\"cc-master/v1\",\"goal\":\"g2\",\"wip_limit\":3,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"U1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"U2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "two boards each within own cap → rc 0"
+assert_eq "" "$HOOK_OUT" "two boards each within own cap → silent (no aggregation across boards)"
+rm -rf "$H"
+
+# Case 12: TWO active boards, same session. b1: in_flight=2, wip_limit=4 (within). b2: in_flight=3,
+#           wip_limit=2 (OVER its own cap). The over-cap board must trigger a warning carrying ITS OWN
+#           numbers (3 in_flight vs cap 2) — and must NOT be hidden behind the within-cap board.
+H="$(make_project)"; SID="sess-multi-over"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g1\",\"wip_limit\":4,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+mkactive "$H" "b2" "{\"schema\":\"cc-master/v1\",\"goal\":\"g2\",\"wip_limit\":2,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"U1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"U2\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"U3\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "one of two boards over its own cap → rc 0"
+assert_contains "$HOOK_OUT" "WIP" "over-cap board warns despite a sibling within-cap board"
+assert_contains "$HOOK_OUT" "additionalContext" "per-board over-cap → injects additionalContext"
+assert_not_contains "$HOOK_OUT" "\"decision\":\"block\"" "per-board over-cap → NEVER a block decision"
+rm -rf "$H"
+
 finish
