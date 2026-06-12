@@ -2,7 +2,7 @@
 
 > **服务愿景：全部 C1–C6**（这是把魂接到外部坐标的导航表，不专属某一项能力）。**何时读：** ① 想沿愿景轴定位「哪条镜头 / 哪个 reference / 哪个决策程序节点服务哪项能力」时；② compaction 后 / 任意时刻看到一个 hook 从你 context 之外注入的短语，想顺着它回到对应的镜头或决策程序锚点时。
 
-这张表是**导航用的坐标系**，不是每回合要跑的决策输入——它把魂连到两个魂之外的真相源：六项 charter 能力（C1–C6，SSOT 在 `design_docs/spec.md` §1.0）和五个 hook（注入短语的 SSOT 在 `hooks/scripts/` 各脚本里）。**魂主文只留一句指针指向这里，详表不在魂里重复**——因为「常驻重注的魂里复述一张 hook / 愿景状态映射表」已被实证为 desync-prone（dogfood Finding #28：魂曾把一个已 live 的 hook 标作 TODO；Finding #7：魂内 SSOT 重复是 reinject 负担）。要核 hook 注入短语的当前真相，永远以 `hooks/scripts/` 脚本为准；要核某 reference 服务哪项愿景，以各 reference header 的 `服务愿景：Cx` tag 为准——这张表只是把它们汇到一处方便定位。
+这张表是**导航用的坐标系**，不是每回合要跑的决策输入——它把魂连到两类真相源：六项 charter 能力（C1–C6，即下方愿景索引表）和五个 hook（注入短语的 SSOT 在本 plugin 的 hook 脚本里）。**魂主文只留一句指针指向这里，详表不在魂里重复**——因为「常驻重注的魂里复述一张 hook / 愿景状态映射表」已被实证为 desync-prone（dogfood Finding #28：魂曾把一个已 live 的 hook 标作 TODO；Finding #7：魂内 SSOT 重复是 reinject 负担）。要核 hook 注入短语的当前真相，永远以本 plugin 的 hook 脚本为准；要核某 reference 服务哪项愿景，以各 reference header 的 `服务愿景：Cx` tag 为准——这张表只是把它们汇到一处方便定位。
 
 ---
 
@@ -37,4 +37,4 @@
   - 保险丝 "a `ready` task that cannot actually proceed (mark it `blocked`/`escalated`)" → 你撞上了「每个 loop 都必须有保险丝」那条红线：揪出假 `ready`。
   - (H8 usage-pacing，Stop 上的第二个 hook) "[cc-master pacing] 5h 配额临界 ... pace 杠杆（见 orchestrating-to-completion / cost-and-pacing）" → **镜头 5**：你贴近 5h burn-rate 墙了——怎么 pace 是你的认知判断（downgrade 模型 / 降 WIP / defer float），它是软提示，不是 block。
 
-*（H3/H5/H8 现均已 live。注入短语的当前真相以 `hooks/scripts/` 各脚本为准——本表与脚本漂移时信脚本，删/加 hook 的 PR 必带 `grep 'H[0-9]'` 全量核对，见 Finding #28。）*
+*（H3/H5/H8 现均已 live。注入短语的当前真相以本 plugin 的 hook 脚本为准——本表与脚本漂移时信脚本，删/加 hook 的 PR 必带 `grep 'H[0-9]'` 全量核对，见 Finding #28。）*

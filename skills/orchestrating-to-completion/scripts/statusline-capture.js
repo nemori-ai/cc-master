@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // statusline-capture.js — 把账户权威用量信号(5h/7d rate_limits)从 status-line stdin 捕获落盘。
 //
-// 为什么存在(Finding #37 / design_docs/plans/2026-06-12-account-authoritative-usage-pacing.md):
+// 为什么存在(账户权威 usage pacing,本 skill 内详见 references/cost-and-pacing.md):
 //   订阅账户的 5h/7d `used_percentage` + `resets_at` 是**权威**用量信号,但官方核实(claude-code-guide
 //   查 code.claude.com)结论是它**只**出现在 status-line 脚本的 stdin 里——所有 hook 的 stdin、transcript
 //   JSONL、任何 CLI 子命令(/usage /status /cost)、~/.claude 落盘**全都没有**;API `anthropic-ratelimit-*`

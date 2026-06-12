@@ -2,8 +2,7 @@
 
 > 对引擎下任何判断**之前**先读它。它的存在就是为了挡掉两类错误：(1) 靠猜来断定代码到底
 > 是不是并行跑的，(2) 把逆向工程出来的民间传说当真，而 live 的工具契约其实早就变了。
-> 改编自 research report 1
-> （`design_docs/research/01-claude-code-dynamic-workflow-mechanism.md`）。
+> 改编自一份 Claude Code dynamic-workflow 机制的 research report。
 
 ## 目录
 
