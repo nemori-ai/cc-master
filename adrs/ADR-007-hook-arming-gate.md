@@ -70,6 +70,8 @@ CODEX12 first read the session-scoped gate as silently orphaning any active boar
 - `SessionStart` carries a `source` field whose values are `startup` / `resume` / `compact` / `clear`.
 - **Sessions are independent** — a brand-new session (no `--resume`/`-c`) always gets a **fresh** `session_id`; there is no official pattern for a brand-new independent session "taking over" a prior session's board.
 
+> **Updated by [ADR-009](ADR-009-resume-cross-session-re-arm.md) (cross-reference, not a body change):** the "no pattern for a brand-new independent session taking over a prior session's board" statement above was a factual observation **at the time** (there was no *authorized* takeover path then, and *implicit* auto-adoption pollutes — §4.5). ADR-009 introduces an **explicit, user-authorized** takeover via `/cc-master:as-master-orchestrator --resume <selector>` (selector-scoped + live-detection gate, incl. reviving a `/stop`-archived board). This ADR's arming predicate (§2.1) and the other four hooks are **unchanged byte-for-byte**; the only delta is that `bootstrap-board.sh` (the sole exempt ARM action, §2.5) gains a second arm form. **Dormancy on another session's board remains the default; explicit `--resume` is the authorized exception** — the implicit auto-adoption §4.5 rejects stays rejected.
+
 **Therefore:**
 
 - **On the official resume / compaction paths, arming and reinject keep working unchanged** — the exact-match gate matches because the `session_id` is carried through. This is **not** a bug; no board-side degrade is needed for that path.
@@ -120,6 +122,7 @@ A symmetric degrade was briefly adopted (CODEX12): when a board's `owner.session
 
 ## 5. Related
 
+- [`ADR-009-resume-cross-session-re-arm.md`](ADR-009-resume-cross-session-re-arm.md) — **refines** this ADR: introduces the **explicit, authorized** cross-session re-arm (`--resume`, incl. reviving an archived board) that §2.7's "no takeover pattern" line did not yet anticipate. This ADR's arming predicate and the other four hooks are unchanged; `bootstrap-board.sh` (the sole exempt ARM action) gains a second arm form. Dormancy stays the default; explicit `--resume` is the authorized exception (the implicit auto-adoption §4.5 rejects stays rejected).
 - [`ADR-003-board-narrow-waist.md`](ADR-003-board-narrow-waist.md) — arming reads **only** the already-pinned `owner.active` / `owner.session_id`; this ADR adds no new waist field and leaves ADR-003 intact.
 - [`ADR-006-hooks-may-use-node-js.md`](ADR-006-hooks-may-use-node-js.md) — unblocks `usage-pacing.js` (node), which carries the same arming gate as `isArmed`.
 - [`ADR-004-loop-dissolution-and-goal-hook.md`](ADR-004-loop-dissolution-and-goal-hook.md) — the `Stop` goal-hook (`verify-board.sh`) is itself gated by arming (an archived board no longer matches → disarmed).

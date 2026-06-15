@@ -677,3 +677,27 @@
 - **影响**:接法文档若照原样发布,Pro/Max 用户照抄接 status-line 时**大概率接不上**(变量不展开→路径错→sidecar 不落→account 口径静默失效,只剩反推 approx)——而 account 口径正是 [[Finding #37]] 整个修复的目的。讽刺地:修 #38 时正确地在**被文档化支持**的 skill prose/hooks 上下文用 `${CLAUDE_PLUGIN_ROOT}`,却把同一变量**外推**到了一个未文档化的字段。
 - **处置**:**接法改保守 + 诚实标注**——cost-and-pacing.md「接法」段 + statusline-capture.js 注释:① 默认**绝对路径**(dev/`--plugin-dir`=repo 内路径,安装=`~/.claude/plugins/cache/<mp>/cc-master/<ver>/skills/.../statusline-capture.js`);② 显式标注「该字段变量展开官方未文档化」;③ 给**实证步骤**(设变量→渲染一次→看 sidecar 落不落=展不展开),判定权交给能实测的用户。**蒸馏**:平台变量/字段的支持范围**逐字段核实**,别从「字段 A 支持」外推「字段 B 也支持」——尤其跨 scope(plugin-scoped → user-scoped)。**待补实证**:用户那个 session 正在接,一测即可把接法从「绝对路径 + 未知变量」收敛为确定写法。**未来更顺选项**:若 plugin 能自带 statusLine(claude-code-guide 第 3 问亦未明确,待核实),可绕过手改 settings + 变量问题——记为后续探索,非本轮。
 - **严重度 / 来源**:should-fix(接法文档准确性,发布前逮住)/ 一手(用户真 session 试接暴露 + 官方文档核实「未明确」)。
+
+## Finding #40 — codex 多轮独立复审揪出 4 轮共 7 个单测看不见的退化路径 bug ✅正向
+
+- **现象**:`--resume` hook 的单测(S1–S24,120 assertions)全绿、指挥亲读每段 diff 也过,但 codex 第二验收者跨 **4 轮**独立复审揪出 **7 个真 bug**,全是单测+作者亲读的共同盲区:round1(3×P2:`inject_ctx` 多行消歧 context 产出非法 JSON / expanded-body `--resume` 落空建 fresh 空板 / freshness 闸误拦刚归档板) → round2(2×P2:空 sid 覆写损坏现有板 owner / heartbeat 从不定龄、mtime 不可用时漏放 force) → round3(P2:heartbeat 解析器拒了 board 示例/活 session 实写的**分钟精度**格式→defeat 安全闸 + P3:命令体裸相对路径) → round4(P3:helpers 红线注释事实错)。
+- **根因**:单测断言「子串存在」,**不验**「JSON 合法性 / 退化输入(空 sid、坏 heartbeat) / 跨产物格式一致性(分钟 vs 秒精度)」。happy-path 测试与作者亲读共享同一盲区:都只想到正常输入。codex 作独立非-Claude 端点专攻「作者没想到的契约违背」。
+- **影响**:无 codex 多轮复审,7 个会带病合并——其中「空 sid 覆写损坏现有板」(破坏性)、「heartbeat 拒分钟精度→活板被当 abandoned 静默接管」(安全)是真实危害,且全部躲过 120 条单测。
+- **处置**:✅正向印证——codex 第二端点验收 + 多轮 needs-attention→Replan→re-review 直到 approve,是本仓 review 纪律的**核心价值**、非冗余。**蒸馏**:退化/边界路径 bug 单测系统性看不见,必须独立端点守;loop 带 fuse(round-3 出新 P2 surface 用户)。回流:已是 SKILL A 红线(「Gate-green≠passed/只信端点验收」)+ AGENTS §7 codex reviewer 的活证据,作正向先例入账,**不新增 prose**(避免双 SSOT)。
+- **严重度 / 来源**:✅正向机制验证 / 一手(本次 `--resume` 编排 4 轮 codex 复审实录)。
+
+## Finding #41 — 跨 session bug 报告:另一 agent 凭推断误诊「我的安全闸误建空板」,实为旧缓存代码(实证 > 臆测)✅正向
+
+- **现象**:用户在 omne-next session 试 `--resume`,那边 agent 诊断「bootstrap 因接管安全闸触发误建空板 45857」,当**我的新代码 bug** 报上来(还手写进它的 board log + 把 45857 archive)。
+- **根因**:那个 agent **假设新代码在跑**就推断了因果,**没核实**「加载的插件是哪个版本/其 bootstrap 实际有没有 `--resume`」。实测:omne-next 加载的是 marketplace **0.1.0 陈旧缓存**(`grep -c resume_main`=0,根本无 `--resume`),`--resume <sel>` 被当 goal 文本走 fresh 路径**正常**建板。我的新代码 withhold 路径已验证**不建板**(注入警告后 `return 0`+`exit 0`)。
+- **影响**:若指挥不实证就信那诊断,会去「修」一个代码里**不存在**的 bug,基于误诊改坏本来正确的代码——经典「信他人结论而非验证」。
+- **处置**:✅正向——实证(`claude plugin list`=0.1.0 + grep 缓存 bootstrap `resume_main`=0)直接推翻臆测。**蒸馏**:跨 session/跨环境的 bug 报告,**先核实对方跑的是哪个版本的代码**,别假设新代码已 live;这是「Gate-green≠passed」对 bug 报告的**对偶**——别信他人诊断**结论**,验证它的**地面真相**。呼应 [[never-fabricate-tool-results]] / SKILL A「只信真实 function_result」。回流:作跨 session 诊断的具体先例入账,精神已在 SKILL A。
+- **严重度 / 来源**:✅正向(实证纪律)/ 一手(omne-next dogfood 报告 + 指挥实证诊断推翻)。
+
+## Finding #42 — plugin 部署形态盲区:directory marketplace 缓存快照陈旧 + project-scope 覆盖 user-scope ⚠️发版纪律
+
+- **现象**:cc-master 全局注册早已就位(`~/.claude/settings.json` 有 `cc-master@cc-master`+directory marketplace→本仓),但 omne-next 仍加载 **0.1.0**、用不了 `--resume`。
+- **根因**:两连环。① **directory-source plugin 的 cache 是安装时快照、非 live link**:装时拷 0.1.0 到 `~/.claude/plugins/cache/.../0.1.0/`,repo marketplace.json 后来到 0.4.2,但**缓存不自动 re-sync**(`marketplace update` 只刷 metadata,要 `plugin install/update` 才真拷新代码)。② **scope 优先级 project>user 非显然**:omne-next 有 project-scope cc-master enable,即便 user scope 装了 0.4.2 也被 project 0.1.0 压住(`plugin list` 同显两条,project 那条生效)。
+- **影响**:用户以为「注册到全局就最新」,实被「陈旧缓存 + scope 覆盖」双重卡住;`--resume` 永远用不上,且 **dogfood 在旧代码上跑会误导诊断**(正是 [[Finding #41]] 的上游成因)。
+- **处置**:治法——`claude plugin marketplace update` + `claude plugin install cc-master@cc-master --scope user` 刷 0.4.2;**最干净是删项目级 cc-master 配置、纯靠全局 user-scope**(用户提出),一处维护、全项目自动跟版。**蒸馏**:① 发版后**必须刷新全局缓存**(`plugin update`,非仅 `marketplace update`);② 本地 plugin dev 建议**只在 user scope 配一次**、别每项目 project-scope pin。回流:`deliver` 已含「发版后从干净 main 刷新全局缓存」步骤;README 可加一句「directory 安装更新需 `plugin update`」(发版连带)。
+- **严重度 / 来源**:should-fix(部署/发版形态,真实安装才现形)/ 一手(omne-next 试用 + 全局注册排查 + scope 实测)。

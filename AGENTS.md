@@ -52,7 +52,7 @@ cc-master/
 ├── .claude/skills/            ← **项目自用** dev skill（造/评/治三件套 + requirement-elicitation 上游需求发现，**不分发**）
 ├── hooks/scripts/            ← 5 个 hook，全 board-derived「武装」后才醒（ADR-007）：bootstrap-board（ARM 动作）/ reinject / verify-board（goal-hook）/ posttool-batch（过调度软警告）·bash + usage-pacing.js（**账户权威 5h/7d `used_percentage` pacing**，读 statusline-capture 落的 sidecar；缺则降级本地反推·Finding #37）·node·JS（红线1·ADR-006 已允许 node）
 ├── scripts/                  ← 带外 **dev-only** 脚本：eval-trigger / eval-benchmark / skill-lint（仅开发本仓用、repo 根调用，**不随 plugin 分发**；裸路径在此正确）。运行时带外脚本（cc-usage / codex-review / statusline-capture）已搬入 `skills/orchestrating-to-completion/scripts/`（随 skill 分发，见上）
-├── adrs/                     ← 结构性决策快照（ADR-001..008 + AGENTS.md 规约）
+├── adrs/                     ← 结构性决策快照（ADR-001..009 + AGENTS.md 规约）
 ├── tests/                    ← hook 测试（bash）；run-tests.sh 编排 hook + content contract
 ├── design_docs/             ← 设计文档 + eval/ + dogfood-findings.md（plans/ gitignored）
 └── examples/                 ← 可跑样例（sample-orchestration：i18n 场景 walkthrough.md + smoke.sh 冒烟证明）
@@ -85,7 +85,7 @@ cc-master/
 5. **保持 ship-anywhere。** 支持的后台机制只有 background shell / sub-agent（`run_in_background`）/ workflow；agent-teams 与 scheduled routines 因不可靠 ship-anywhere 而**有意排除**。别加在 Bedrock / Vertex / Foundry 上会断的依赖。
    → 决策快照：[`adrs/ADR-002-ship-anywhere-scope.md`](adrs/ADR-002-ship-anywhere-scope.md) · 排除留痕：[`design_docs/spec.md` §12](design_docs/spec.md) · 硬卡点：带外脚本（codex / eval / cc-usage / statusline-capture）依赖 `uv` + Python 3.12 + `claude`/`codex` CLI 或 node——**绝不进 `hooks/`**（那会破 ship-anywhere）。落点二分：**运行时**带外脚本（终端用户会跑：cc-usage / codex-review / statusline-capture）进 `skills/<skill>/scripts/`（随 skill 分发，prose 用 `${CLAUDE_SKILL_DIR}`/`${CLAUDE_PLUGIN_ROOT}` 引用，**裸相对路径会在用户 cwd 下找不到**·Finding #37）；**dev-only** 脚本（eval / skill-lint）留顶层 `scripts/`（仅 repo 根调用，裸路径正确）。
 
-6. **所有 hook 武装后才激活（dormant-until-armed）。** 每个 hook 在本 session 被 `as-master-orchestrator` 武装（board-derived：home 有 `*.board.json` 且 `owner.active:true` 且 `owner.session_id == 本次 hook stdin 的 session_id`；sid 空 → 降级匹配任一 active 板）之前完全休眠（空 stdout、RC 0、不 block）；`bootstrap-board.sh` 唯一豁免（它**是** ARM 动作本身，建板即把 `owner.session_id` 盖成创建它的 session）。
+6. **所有 hook 武装后才激活（dormant-until-armed）。** 每个 hook 在本 session 被 `as-master-orchestrator` 武装（board-derived：home 有 `*.board.json` 且 `owner.active:true` 且 `owner.session_id == 本次 hook stdin 的 session_id`；sid 空 → 降级匹配任一 active 板）之前完全休眠（空 stdout、RC 0、不 block）；`bootstrap-board.sh` 唯一豁免（它**是** ARM 动作本身）。**ARM 有 fresh / resume 两形态**：fresh（新建板并盖 `owner.session_id`）与 resume（`as-master-orchestrator --resume` 盖到选定旧板上、`owner.active` 置 true 含复活归档板、保留 `tasks`/`log`/`goal`，经 live 安全闸；ADR-009）——红线实质不变（仍是「bootstrap 是唯一豁免的 ARM 动作」）。
    → 决策快照：[`adrs/ADR-007-hook-arming-gate.md`](adrs/ADR-007-hook-arming-gate.md)（board-derived armed-gate）· 协议 SSOT：本文 §12 hook 武装纪律 · 硬卡点：`grep -rL 'board_matches\|isArmed' hooks/scripts/*.sh hooks/scripts/*.js` 须只剩 `bootstrap-board.sh`（除豁免者外每个 hook 都须含武装判定，否则违规）。
 
 > **违背字面就是违背精神。** "我遵循的是精神，不是字面" 是攻破每一条红线的那句合理化。没有哪个 orchestration 特殊到红线失效——当你开始论证 *这次* 是例外，那套论证本身就是症状。
@@ -189,7 +189,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 - **skill**（`skills/<name>/SKILL.md` + `references/` + `assets/`）——frontmatter `name` + `description`（单引号整包，§6）；大 reference 顶部加锚点 TOC；深度细节进 `references/` 保持主文件瘦。
 - **command / skill 必须分发 self-contain（不断链）**——分发的 `commands/` 与 `skills/<name>/` 里的任何文件（命令体 / SKILL.md / `references/` / `scripts/` / DESIGN.md…）引用别的文件时，**只能指向随 plugin 分发的约定目录**（`skills/` `hooks/` `commands/` `agents/` `bin/`），且**必须用 `${CLAUDE_PLUGIN_ROOT}/<dir>/…` 绝对引用**（skill 引用自己目录内的资产用 `${CLAUDE_SKILL_DIR}/…`）。**两类断链禁止**：① **裸相对路径**（如 `scripts/cc-usage.sh`——装到用户机器后相对其 cwd 解析、找不到）；② **引用非约定目录的文件**（`design_docs/` `adrs/` `README` `AGENTS.md` `CHANGELOG`——这些不保证随 plugin 分发，安装后死链）。**概念性提及不算文件引用、可留**：泛指「以本 plugin 的 hook 脚本为准」、叙事性 `Finding #NN` / `ADR-NNN`（不带路径）、描述脚本运行时读「所在 repo 的 AGENTS.md」这类行为。→ 硬卡点：`grep -rnE 'design_docs\|adrs/[A-Z]\|\]\(\.\.\|hooks/scripts\|README\.md' commands/ skills/ \| grep -v CLAUDE_` 须只剩 `codex-review.sh` 那条「读所在 repo 的 AGENTS.md」行为描述。来源 [[Finding #38]]/[[Finding #39]]（真实安装才现形的形态盲区）。
 - **hook**（`hooks/scripts/*.sh` / `*.js`）——bash 或 node/JS（红线 1·ADR-006）；状态写 sidecar，**永不碰 board**。
-  - **hook 武装纪律（硬规则，违背字面就是违背精神）**：**所有 hook 在本 session 被 `as-master-orchestrator` 武装之前完全休眠。** 武装是 board-derived 且跨 compaction 持久——armed ⟺ home 里存在一个 `*.board.json`，其 `owner.active:true` 且 `owner.session_id == 本次 hook stdin 的 session_id`（sid 空 → 降级匹配任一 active 板，保 compaction 边界鲁棒）。每个 hook 的 `board_matches` / `isArmed` 即这道闸——**未武装一律静默**（空 stdout、RC 0、不 block）。`bootstrap-board.sh` 是**唯一豁免者**：它就是 ARM 动作本身（建板即把 `owner.session_id` 盖成创建它的 session）。解除武装 = `/stop` 归档板（`owner.active:false`）+ goal-hook。新增 / 修改任何 hook **必须**先过这道闸（绝不在未武装路径上注入或 block），且只读 narrow-waist 的 `active` / `session_id` 判 arming——不碰 board 的 agent-shaped 部分（红线 2）。→ 决策快照：[`adrs/ADR-007-hook-arming-gate.md`](adrs/ADR-007-hook-arming-gate.md)。
+  - **hook 武装纪律（硬规则，违背字面就是违背精神）**：**所有 hook 在本 session 被 `as-master-orchestrator` 武装之前完全休眠。** 武装是 board-derived 且跨 compaction 持久——armed ⟺ home 里存在一个 `*.board.json`，其 `owner.active:true` 且 `owner.session_id == 本次 hook stdin 的 session_id`（sid 空 → 降级匹配任一 active 板，保 compaction 边界鲁棒）。每个 hook 的 `board_matches` / `isArmed` 即这道闸——**未武装一律静默**（空 stdout、RC 0、不 block）。`bootstrap-board.sh` 是**唯一豁免者**：它就是 ARM 动作本身。**ARM 有两种形态**：fresh（建板即把 `owner.session_id` 盖成创建它的 session）与 resume（`as-master-orchestrator --resume <选择器>` 把选定的**已存在**旧板盖成新 sid、`owner.active` 无条件置 true 含**复活 `/stop` 归档板**、保留 `tasks`/`log`/`goal`/`git`，经 live 安全闸——见 ADR-009）。两形态都经 `bootstrap-board.sh` + 显式用户命令，仍是「唯一豁免的 ARM 动作」，红线 6 实质不变。解除武装 = `/stop` 归档板（`owner.active:false`，此后**显式可逆**——可经 `--resume` 复活）+ goal-hook。新增 / 修改任何 hook **必须**先过这道闸（绝不在未武装路径上注入或 block），且只读 narrow-waist 的 `active` / `session_id` 判 arming——不碰 board 的 agent-shaped 部分（红线 2）。→ 决策快照：[`adrs/ADR-007-hook-arming-gate.md`](adrs/ADR-007-hook-arming-gate.md)（+ resume re-arm：[`adrs/ADR-009-resume-cross-session-re-arm.md`](adrs/ADR-009-resume-cross-session-re-arm.md)）。
 - **design_docs**——正式文档进 `design_docs/`；临时 plan 进 `design_docs/plans/`（gitignored）；日期前缀命名（`YYYY-MM-DD-<slug>.md`）。
 - **board 不入版本控制**——`.claude/cc-master/`（或 `$CC_MASTER_HOME`）gitignored。
 
@@ -197,7 +197,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 
 ## 13. ADR 约定
 
-结构性架构决策（"为什么 X 不 Y / 何时可推翻"）记成 ADR——与 design_docs（描述当前状态）严格分开。命名 `ADR-NNN-<slug>.md`，带 Status/Date/Scope frontmatter + Context/Decision/Consequences/Alternatives/Related 模板。**何时写 ADR、ADR-vs-design_docs 试金石、workflow 全在** → [`adrs/AGENTS.md`](adrs/AGENTS.md)。现有 ADR-001..008（hooks-pure-bash / ship-anywhere-scope / board-narrow-waist / loop-dissolution-and-goal-hook / two-skills-separation / hooks-may-use-node-js / hook-arming-gate / account-authoritative-usage-and-script-placement）。
+结构性架构决策（"为什么 X 不 Y / 何时可推翻"）记成 ADR——与 design_docs（描述当前状态）严格分开。命名 `ADR-NNN-<slug>.md`，带 Status/Date/Scope frontmatter + Context/Decision/Consequences/Alternatives/Related 模板。**何时写 ADR、ADR-vs-design_docs 试金石、workflow 全在** → [`adrs/AGENTS.md`](adrs/AGENTS.md)。现有 ADR-001..009（hooks-pure-bash / ship-anywhere-scope / board-narrow-waist / loop-dissolution-and-goal-hook / two-skills-separation / hooks-may-use-node-js / hook-arming-gate / account-authoritative-usage-and-script-placement / resume-cross-session-re-arm）。
 
 ---
 
@@ -222,6 +222,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 | 声明 J（成功契约）/ 度量一个 skill / 跑触发或行为 eval | [`.claude/skills/grounding-skill-evals/SKILL.md`](.claude/skills/grounding-skill-evals/SKILL.md)（轻量 J 写法 + Track A/B + holdout / predict-then-validate，项目自用 dev skill）|
 | 改 hook | [`hooks/scripts/`](hooks/scripts/) + [`tests/`](tests/) + [`CONTRIBUTING.md`](CONTRIBUTING.md)（先确认红线 1：bash+node/JS，ADR-006）|
 | 新建 / 改任何 hook 前先懂「武装闸」/ 为什么所有 hook 未武装即休眠 | [`adrs/ADR-007-hook-arming-gate.md`](adrs/ADR-007-hook-arming-gate.md)（board-derived armed-gate）+ 本文 §12 hook 武装纪律 |
+| 让新 session 用 `--resume` 续旧板 / 复活归档板 / 接管安全闸的「显式 vs 隐式」论证 | [`adrs/ADR-009-resume-cross-session-re-arm.md`](adrs/ADR-009-resume-cross-session-re-arm.md)（显式跨 session re-arm）+ [`hooks/scripts/bootstrap-board.sh`](hooks/scripts/bootstrap-board.sh) 的 resume 分支 |
 | 让 codex 当端点验收 reviewer | [`skills/orchestrating-to-completion/scripts/codex-review.sh`](skills/orchestrating-to-completion/scripts/codex-review.sh) + `/codex` skill |
 | 在 pacing 决策点感知 5h-7d usage（带外信号脚本，非 hook）| [`skills/orchestrating-to-completion/scripts/cc-usage.sh`](skills/orchestrating-to-completion/scripts/cc-usage.sh)（账户权威 `used_percentage` 优先、本地反推 fallback；信号由 `statusline-capture.js` 捕获·Finding #37）|
 | 跑触发准确率 eval（description 改动前后）| [`scripts/eval-trigger.sh`](scripts/eval-trigger.sh) + [`design_docs/eval/README.md`](design_docs/eval/README.md) |

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`as-master-orchestrator --resume` —— 新 session 接续已存在 board（跨 session re-arm + 复活归档板 + live 接管安全闸）** — `/cc-master:as-master-orchestrator --resume [选择器]` 让一个全新 session **显式接管**一块已存在的 board：bootstrap（唯一武装豁免 hook）的第二种 ARM 形态——按选择器（板文件名 / 时间戳前缀 / `goal` 子串）选板，把 `owner.session_id` 盖成新 sid、`owner.active` 无条件置 true（**可复活 `/stop` 归档板** `false → true`）、`owner.heartbeat` 写接管时间戳，**保留 `tasks`/`log`/`goal`/`git`**；选择器省略 / 歧义 / 缺失时**绝不写盘**，注入分两组（active-but-abandoned / archived）的候选让用户消歧重发。**live 接管安全闸**：板看起来仍活（heartbeat / mtime 新鲜）时先警告、要 `--force-takeover` 二步确认，无信号时保守要 force。命令体加 resume 形态叙述（接手而非重启：reconcile 现有 `tasks[]`、孤儿 `in_flight` 走端点验或重派、每回合 flush 更新 heartbeat）；`resume-verify.md` 加「孤儿 in_flight 续接」小节（复用既有 content-hash + 端点验收，不新建机制）；`board.md` 给 `owner.heartbeat` 首个读者/写者用途。新增 [ADR-009](adrs/ADR-009-resume-cross-session-re-arm.md)：resume = 经 `as-master-orchestrator` + 用户显式授权的合法 ARM 形态，区分「ADR-009 显式命令接管 + selector + live 闸」vs「CODEX14 拒绝的隐式自动收养」（后者仍禁）；ADR-007 武装闸 + 其余 4 hook 一字不变，`/stop` 终态语义弱化为「显式可逆归档」。
+
 ## [0.4.2] — 2026-06-15
 
 ### Fixed
