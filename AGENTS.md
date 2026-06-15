@@ -95,7 +95,7 @@ cc-master/
 ## 4. 迭代范式总图（gstack × superpowers 路由）
 
 本仓的开发遵循用户全局的 **gstack × superpowers 组合范式**——gstack 管"前"（方向判断）和"后"（review / QA / 安全 / ship），superpowers 管"中间"（brainstorming → plans → TDD → debugging → verification）。冲突仲裁：**用户显式指令 > skill > 默认行为**。
-→ 完整路由表 + 分工原则 + 避坑：用户全局 `~/.claude/CLAUDE.md` §「gstack × superpowers 组合使用范式」。**本仓收口用项目自带 `github-pr` / `github-tag-release`，不用 gstack 的 `/ship` `/canary` `/land-and-deploy`**（它们假设别的部署形态）。
+→ 完整路由表 + 分工原则 + 避坑：用户全局 `~/.claude/CLAUDE.md` §「gstack × superpowers 组合使用范式」。**本仓收口用 `gh` CLI 手工流程（feature branch → PR → squash merge → `gh release`；本仓**没有** `github-pr` / `github-tag-release` skill——那是历史占位、实物不存在，别去找），不用 gstack 的 `/ship` `/canary` `/land-and-deploy`**（它们假设别的部署形态）。详见 §11。
 
 > **本仓对 superpowers 的一处覆盖（self-contain）**：「中间」段最前那一步**需求发现 / brainstorming** 在本仓用项目自带的 [`requirement-elicitation`](.claude/skills/requirement-elicitation/SKILL.md)（dev skill），**不用 `superpowers:brainstorming`**——把这一步内化进本仓、重接地到 board `goal` 模型与「发现 → 准入 → 造 → 度量」生命周期，让贡献者无须外装 superpowers 也有这一步。其余「中间」段（plans / TDD / debugging / verification）与「前 / 后」仍按全局路由表。
 
@@ -174,7 +174,8 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 ## 11. 分支 / PR / commit 约定
 
 - **feature branch**——不在 default 分支直接动手（先 branch）。
-- **PR 走 `gh` + 本仓 `github-pr` skill 收口**（不用 gstack `/ship`）；PR body 末尾带 Claude 署名（`🤖 Generated with [Claude Code]`）。
+- **PR 走 `gh` CLI 手工收口**——`gh pr create`（PR body 末尾带 Claude 署名 `🤖 Generated with [Claude Code]`）→ `gh pr merge <N> --squash --delete-branch`（本仓惯例 squash，main 上 commit 形如 `… (#N)`）。本仓**没有** `github-pr` / `github-tag-release` skill（历史占位、实物不存在，别去找）；不用 gstack `/ship`。
+- **发版（release）**——版本号同步改三处：`.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json`（两个 manifest 都要 bump，漏一个会版本不一致）+ `CHANGELOG.md`（`[Unreleased]` 定版为 `[x.y.z] — YYYY-MM-DD`，顶部留空 `[Unreleased]`）；合并进 main 后 `gh release create vx.y.z --target main`。无 CI，发版前手动跑 `bash run-tests.sh`（须 `ALL TESTS PASSED`）+ `claude plugin validate .`（须 `Validation passed`）两道门。
 - **commit 末尾带** `Co-Authored-By: Claude <noreply@anthropic.com>`；type 前缀 `feat/fix/docs/chore/adr`。
 - **single-committer**——sub-agent 只写 + 自证测试绿，**绝不 commit**；orchestrator 端点验收（含 §7 codex 自审）后统一分组 commit。
 - **README.md / README_zh.md 同步**——动 user-facing 文档时两份一起改；user-visible 改动加 `CHANGELOG.md ## [Unreleased]` 条目。
