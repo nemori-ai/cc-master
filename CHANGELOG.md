@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-06-15
+
 ### Fixed
 
 - **self-contain 收口:跨 skill 裸引用统一 `${CLAUDE_PLUGIN_ROOT}` + §12 grep 盲区接进可执行卡点（Finding #50 闭环）** — codex 第二验收 flag 出的 install-safety 灰区两候选**都做了**：`references/dispatch.md` 的 3 处裸跨 skill 引用（line 37 两处 `authoring-workflows/references/mechanism.md` + line 59 `authoring-workflows/SKILL.md`）统一升级为 `${CLAUDE_PLUGIN_ROOT}/skills/authoring-workflows/…` 绝对形式（裸相对路径装到用户机器后相对其 cwd 解析、找不到 plugin 安装位置 → 死链）；`scripts/skill-lint.sh` 新增 **check (4)** 把 §12 散文红线接进可执行卡点——扫 `skills/`/`commands/`/`hooks/` 下 `.md`，捕获反引号包裹、以兄弟分发 skill 名（`authoring-workflows`/`orchestrating-to-completion`）开头带 `/` 且未用 `${CLAUDE_*}` 的裸引用，命中即 `exit 1`，`AGENTS.md §12` 同步文档化。**有意剔除 `scripts/` 分支**（否则误报 DESIGN.md 对 dev-only repo 根脚本的合法引用·红线 5）。把此前靠人审拦的 grep 盲区升级为 CI 拦。
