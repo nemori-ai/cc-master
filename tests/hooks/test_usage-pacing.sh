@@ -287,6 +287,7 @@ ACCT_HOME="$(make_project)"
 printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$ACCT_HOME/mine.board.json"
 A_NOWEP="$(python3 -c 'import datetime as d;print(int(d.datetime(2026,6,10,12,0,0,tzinfo=d.timezone.utc).timestamp()))')"
 A_R5F=$((A_NOWEP+3600))  # 5h resets 1h in the future → window valid
+A_R5FAR=$((A_NOWEP+18000))  # 5h resets 5h out → window valid but NOT nearReset (keeps underuse branch quiet)
 
 # (acct-1) high 5h used% (90 ≥ floor 85) → warns, carries account 5h %, non-blocking.
 run_pacing_acct "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
@@ -303,11 +304,12 @@ assert_eq 0 "$HOOK_RC" "(acct-2) high 7d% → rc 0"
 assert_contains "$HOOK_OUT" "additionalContext" "(acct-2) high account 7d used% → warns (7d now in scope)"
 assert_contains "$HOOK_OUT" "88" "(acct-2) carries account 7d used_percentage"
 
-# (acct-3) both windows under floor → silent (no wall, no spam).
-run_pacing_acct "{\"five_hour\":{\"used_percentage\":30,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":40}}" \
+# (acct-3) both windows under wall floor + reset NOT near (5h out) → silent (no wall warning, and the
+#          underuse branch stays quiet because nearReset is not satisfied — isolates the WALL path).
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":30,\"resets_at\":$A_R5FAR},\"seven_day\":{\"used_percentage\":40}}" \
   "2026-06-10T12:00:00Z" "$ACCT_HOME" "sess-acct"
 assert_eq 0 "$HOOK_RC" "(acct-3) both low → rc 0"
-assert_eq "" "$HOOK_OUT" "(acct-3) both account windows under floor → silent"
+assert_eq "" "$HOOK_OUT" "(acct-3) both account windows under wall floor (reset far) → silent (no wall warning)"
 
 # (acct-4) UNARMED + critical account sidecar → still silent (armed gate runs BEFORE reading cache).
 A_UH="$(make_project)"
@@ -316,5 +318,118 @@ run_pacing_acct "{\"five_hour\":{\"used_percentage\":99,\"resets_at\":$A_R5F},\"
 assert_eq "" "$HOOK_OUT" "(acct-4) unarmed → silent even at critical account % (armed gate intact)"
 rm -rf "$A_UH"
 rm -rf "$ACCT_HOME"
+
+# ── UNDERUSE 口径 (对偶于撞墙侧): 欠用 + 临近 reset + 7d 有余量 → 对称的「加速」非阻断提示 ──────────────
+# decideAccountUnderuse 与 decideAccountWarning 对称：撞墙问「快烧到墙了要不要减速」，欠用问「窗口快 reset
+# 了却没怎么用、再不烧就白白蒸发，要不要加速」。三条 AND 判据（缺一静默，保守不乱催）：① 5h used% <
+# UNDERUSE_PCT_CEIL(默认60)；② 5h resets_at 有效且距 reset 剩余 ≤ UNDERUSE_REMAIN_MIN(默认60)；③ 7d used% <
+# SEVEN_DAY_HEADROOM(默认80)，**7d 缺失即静默**(总闸未知不开闸)。账户分支才有欠用提示——本地反推路径禁。
+# 用 run_pacing_acct（armed Stop + sidecar 注入）；nearReset 用「resets_at = now + 30min」(<60 默认窗)。
+U_HOME="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$U_HOME/mine.board.json"
+U_NEAR=$((A_NOWEP+1800))   # 5h reset 30min in the future → nearReset 满足(≤60)
+U_FAR=$((A_NOWEP+9000))    # 5h reset 150min in the future → nearReset 不满足(>60)
+# Freshness gate (④): sidecar carries captured_at (epoch sec, written by statusline-capture.js). The
+# underuse→accelerate branch now requires captured_at fresh (≤ CC_MASTER_UNDERUSE_MAX_STALE_MIN, default
+# 15min) — stale/missing → silent (idle-waiting on background烧配额 → stale-low p5 不可信，绝不据陈值误催加速).
+U_FRESH=$((A_NOWEP-300))    # captured 5min ago → fresh (≤15min) → gate open
+U_STALE=$((A_NOWEP-3600))   # captured 60min ago → stale (>15min) → gate shut → silent
+
+# (under-1) 三条 AND 全真（5h 20% < 60、reset 30min ≤ 60、7d 30% < 80）+ 新鲜 captured_at → 出加速提示，非阻断，rc 0。
+run_pacing_acct "{\"captured_at\":$U_FRESH,\"five_hour\":{\"used_percentage\":20,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":30}}" \
+  "2026-06-10T12:00:00Z" "$U_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(under-1) underuse all-AND → rc 0"
+assert_contains "$HOOK_OUT" "additionalContext" "(under-1) underuse → injects additionalContext"
+assert_contains "$HOOK_OUT" "欠用" "(under-1) carries the underuse signal phrase (欠用)"
+assert_contains "$HOOK_OUT" "加速" "(under-1) points at accelerate levers (加速)"
+assert_contains "$HOOK_OUT" "20" "(under-1) carries account 5h used_percentage (20)"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(under-1) NEVER blocks — non-blocking only"
+
+# (under-fresh) 三条 AND 全真 + captured_at 新鲜（now-300s ≤ 15min）→ 仍出加速提示（新鲜度闸放行）。
+run_pacing_acct "{\"captured_at\":$U_FRESH,\"five_hour\":{\"used_percentage\":20,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":30}}" \
+  "2026-06-10T12:00:00Z" "$U_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(under-fresh) fresh sidecar → rc 0"
+assert_contains "$HOOK_OUT" "additionalContext" "(under-fresh) fresh captured_at → accelerate prompt still fires (gate open)"
+assert_contains "$HOOK_OUT" "欠用" "(under-fresh) fresh → carries the underuse signal (欠用)"
+
+# (under-stale) 三条 AND 全真 + captured_at 过旧（now-3600s > 15min）→ 静默（新鲜度闸拦住，stale-low p5 不可信）。
+run_pacing_acct "{\"captured_at\":$U_STALE,\"five_hour\":{\"used_percentage\":20,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":30}}" \
+  "2026-06-10T12:00:00Z" "$U_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(under-stale) stale sidecar → rc 0"
+assert_eq "" "$HOOK_OUT" "(under-stale) captured_at 过旧(>15min) → silent (freshness gate, no误催加速)"
+assert_not_contains "$HOOK_OUT" "欠用" "(under-stale) stale → injects NO accelerate prompt"
+
+# (under-nocap) 三条 AND 全真 + sidecar 无 captured_at 字段 → 静默（缺失 = 保守静默，不据无新鲜度证据催加速）。
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":20,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":30}}" \
+  "2026-06-10T12:00:00Z" "$U_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(under-nocap) sidecar without captured_at → rc 0"
+assert_eq "" "$HOOK_OUT" "(under-nocap) no captured_at field → silent (missing = conservative silence)"
+assert_not_contains "$HOOK_OUT" "欠用" "(under-nocap) missing captured_at → injects NO accelerate prompt"
+
+# (under-2) UNARMED + underuse-shaped sidecar → still silent (armed gate runs BEFORE reading cache).
+U_UH="$(make_project)"
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":20,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":30}}" \
+  "2026-06-10T12:00:00Z" "$U_UH" "sess-unarmed-under"
+assert_eq 0 "$HOOK_RC" "(under-2) unarmed → rc 0"
+assert_eq "" "$HOOK_OUT" "(under-2) unarmed → silent even on underuse-shaped sidecar (armed gate intact)"
+rm -rf "$U_UH"
+
+# (under-3) WALL (5h 90% ≥ floor 85) → still the SLOWDOWN warning, NOT the accelerate one (mutually
+#           exclusive: 撞墙优先，到墙只发减速；欠用区间 used%<60 与撞墙 used%≥85 天然不重叠).
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":20}}" \
+  "2026-06-10T12:00:00Z" "$U_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(under-3) wall → rc 0"
+assert_contains "$HOOK_OUT" "临界" "(under-3) wall → emits the SLOWDOWN warning (临界)"
+assert_contains "$HOOK_OUT" "降到更便宜的模型档" "(under-3) wall → points at slowdown levers (降到更便宜的模型档)"
+assert_not_contains "$HOOK_OUT" "欠用" "(under-3) wall → does NOT emit accelerate (mutually exclusive)"
+
+# (under-4) 7d MISSING (no seven_day key) while 5h underused + nearReset → silent (保守：总闸未知不开闸).
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":20,\"resets_at\":$U_NEAR}}" \
+  "2026-06-10T12:00:00Z" "$U_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(under-4) 7d missing → rc 0"
+assert_eq "" "$HOOK_OUT" "(under-4) 7d signal missing → silent (总闸状态未知就别开闸)"
+
+# (under-5) 7d NEAR-CAP — 7d 82% sits in the band [headroom 80, wall floor 85): the wall branch does NOT
+#           fire (82 < 85) so we reach the underuse branch, where 82 ≥ headroom(80) blocks acceleration →
+#           silent. Isolates the 7d 总闸 gate of the underuse branch (not the wall path).
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":20,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":82}}" \
+  "2026-06-10T12:00:00Z" "$U_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(under-5) 7d near cap → rc 0"
+assert_eq "" "$HOOK_OUT" "(under-5) 7d ≥ headroom(80) but < wall floor(85) → silent (7d 总闸拦住加速，别把 5h 余量烧成 7d 透支)"
+
+# (under-6) WINDOW JUST OPENED (reset 150min out, ≫60) + 5h underused + 7d ok → silent (nearReset 不满足).
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":20,\"resets_at\":$U_FAR},\"seven_day\":{\"used_percentage\":30}}" \
+  "2026-06-10T12:00:00Z" "$U_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(under-6) window just opened → rc 0"
+assert_eq "" "$HOOK_OUT" "(under-6) reset far out (>60min) → silent (nearReset not satisfied)"
+
+# (under-7) LOCAL-REVERSAL path (no sidecar) shaped like underuse → must NOT emit accelerate. The local
+#           fallback (computeFiveHour) only does WALL detection; the underuse branch is account-only because
+#           反推的 reset 倒计时会失真到数量级 (Finding #37). Here SAMPLE @ 12:00Z has remaining 180min and
+#           low burn → local path stays silent and crucially emits no accelerate prompt.
+U_LH="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-local"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$U_LH/mine.board.json"
+run_pacing_home "$SAMPLE" "2026-06-10T12:00:00Z" "$U_LH" "sess-local"
+assert_eq 0 "$HOOK_RC" "(under-7) local fallback path → rc 0"
+assert_eq "" "$HOOK_OUT" "(under-7) no sidecar (local 反推 path) → silent"
+assert_not_contains "$HOOK_OUT" "欠用" "(under-7) local 反推 path NEVER emits accelerate (反推 reset 失真，禁欠用提示)"
+rm -rf "$U_LH"
+
+# (under-8) STOP RE-ENTRY (stop_hook_active:true) + underuse-shaped sidecar → silent (re-entry guard
+#           runs before reading cache, mirrors the wall side). No accelerate-loop on re-fired Stop.
+run_pacing_acct() { # re-define inline to thread stop_hook_active for this one case
+  local cdir; cdir="$(make_project)"; local cache="$cdir/rate.json"
+  printf '%s' "$1" > "$cache"
+  HOOK_OUT="$(printf '{"session_id":"sess-acct","hook_event_name":"Stop","stop_hook_active":true}' \
+    | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="$2" CC_MASTER_HOME="$3" CC_MASTER_RATE_CACHE="$cache" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+  rm -rf "$cdir"
+}
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":20,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":30}}" \
+  "2026-06-10T12:00:00Z" "$U_HOME"
+assert_eq 0 "$HOOK_RC" "(under-8) re-entry → rc 0"
+assert_eq "" "$HOOK_OUT" "(under-8) stop_hook_active:true → silent (re-entry guard, no accelerate loop)"
+assert_not_contains "$HOOK_OUT" "欠用" "(under-8) re-entry injects NO accelerate prompt"
+rm -rf "$U_HOME"
 
 finish

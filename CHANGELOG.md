@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **魂新增反过度串行纪律 + `orchestrating-to-completion/OBJECTIVE.md`（Finding #44）** — 反假串行的承重纪律此前全住 references（`decomposition.md` / `dispatch.md` / `cost-and-pacing.md`），而每次 compaction 整篇重注的常驻手册 `SKILL.md` 无显式护栏——常驻的反并行压力（lens5「限 WIP / 瞄 75%」）对上非常驻的反串行纪律，天平系统性倒向串行。现把三处承重护栏上提进魂：**lens2 加「边即债务 / 默认并行 / 逐边举证」**、**Rationalization Table 加「窗口紧 / 预算紧 → 串起来省」行**（真相：串行**不省 token**、只拉长 makespan，省预算靠降档 / 控 WIP / 推迟 float）、**Red Flags 加「画了边却说不出被下游消费的上游产物」条**；`decomposition.md` §2 加反向指针（规则 SSOT 在魂、论证 SSOT 在 reference，勿互抄）。新增 `skills/orchestrating-to-completion/OBJECTIVE.md` 把**并行度**纳入成功契约 J。Track B 重跑：魂-only 臂从「靠推导默认并行」变为「逐字引用三处新规则 + 具名删 4 条假边」（价值在强模型天花板下的 legibility + 跨 compaction 一致性，非宽度跃升）。
+
+### Changed
+
+- **双侧 pacing：从单边刹车到双侧目标走廊（Finding #45 / ADR-010）** — 5h/7d pacing 此前是**单边刹车**（杠杆全朝减速：降模型 / 降 WIP / 推迟 float；目标只有 75% 上限护栏、无 setpoint），**欠用**配额时让 5h 窗口额度白白蒸发，且欠 pace 探针下两个有能力 agent 会做出相反决策（沉默→掷硬币）。用户拍板 **B②（双侧目标走廊 · 7d 当总闸）**：
+  - `cost-and-pacing.md` **重构为双侧** — 目标走廊 **70–90%** / 减速侧 3 杠杆 / 加速侧 3 镜像杠杆 / **7d 当硬总闸** / 诚实天花板。
+  - 魂 **lens5 双向化** — 常驻层既反顶满也反欠用（修 Finding #45 同源的「单边常驻压力」非对称）。
+  - `usage-pacing.js` 新增 `decideAccountUnderuse` **欠用 → 加速非阻断提示** — 限定**账户口径** / 7d 缺失则静默 / 本地反推禁欠用提示 / 撞墙优先与欠用互斥。
+  - `external-coordinates.md` 短语 → 锚点表双向同步；新增 [ADR-010]。
+  - **诚实边界**：「reset 时配额精确归零」做不到（账户无分母 + 无权威 burn），只承诺**方向性双侧逼近**，绝不承诺做不到的控制精度。Track B 重跑：欠用 ×2 一致加速且先过 7d 闸；holdout（7d=88%）正确拒绝加速、让额度蒸发（防过拟合：学的是「过 7d 闸的双侧判断」非「临 reset 一律冲」）。
+
 ## [0.4.4] — 2026-06-15
 
 ### Added

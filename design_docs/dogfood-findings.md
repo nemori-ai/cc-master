@@ -51,6 +51,12 @@
 | 37 | cc-usage.sh/usage-pacing.js 本地反推 5h 窗口失真到数量级:反推报 reset 剩 21m,账户权威剩 2h55m(且 5h 59%/7d 86% 才是真值),误导 orchestrator 误报「快撞墙、赶紧收口」| should-fix(逼近 must:钦定主动查询工具最关键信号数量级失真 + 误导 pacing 决策)| ✅ 已落地(statusline-capture 捕获→sidecar→cc-usage/usage-pacing 优先读 account `used_percentage`+纳入 7d+反推 fallback;ADR-008;全绿。剩 README/CHANGELOG/端点验收)|
 | 38 | 既存运行时带外脚本(cc-usage/codex-review)在分发 prose 里裸相对路径,终端用户 cwd 触不到 plugin 安装位置(真实安装才现形的形态盲区);新加 statusline-capture 同隐患 | should-fix(分发可用性:终端用户跑不起来)| ✅ 已修(运行时脚本搬 skills/<s>/scripts/ + `${CLAUDE_SKILL_DIR}`/`${CLAUDE_PLUGIN_ROOT}` 引用;dev-only 留顶层;ADR-008)|
 | 39 | 接法文档假设 `${CLAUDE_PLUGIN_ROOT}` 在用户 settings.json `statusLine.command` 里展开(未核实);官方核实=该字段变量展开**未文档化**、且 statusLine user-scoped 不绑 plugin→大概率不展开,用户照抄接不上 | should-fix(接法文档准确性)| ✅ 已修(接法改保守绝对路径 + 标注未文档化 + 给实证步骤;cost-and-pacing/statusline 注释同步)|
+| 40 | codex 多轮独立复审揪出 4 轮共 7 个单测看不见的退化路径 bug | ✅ 机制验证(正向)| 印证 codex 第二端点验收核心价值;不新增 prose(已是红线 + AGENTS §7 活证据)|
+| 41 | 跨 session bug 报告:另一 agent 凭推断误诊「安全闸误建空板」,实为旧缓存代码(实证 > 臆测)| ✅ 机制验证(正向)| 实证推翻臆测;作跨 session 诊断先例入账,精神已在 SKILL A |
+| 42 | plugin 部署形态盲区:directory marketplace 缓存快照陈旧 + project-scope 覆盖 user-scope | should-fix(部署/发版纪律)| ✅ 已应对(发版后刷全局缓存 `plugin update`;建议只 user-scope 配一次)|
+| 43 | 新命令体写成第三人称 reference 文档而非注入 agent 的 prompt;端点验收漏「命令体当 prompt 品嗓音」一维 | should-fix(agent-facing 指导质量)| ✅ 已修(命令体改 imperative;§12 加约定 + 端点验收增一检)|
+| 44 | board DAG 假串行偏多:反过度串行的承重纪律全住 references、魂里无显式护栏(常驻反并行压力 vs 非常驻反串行纪律的非对称)| 中(行为质量) | 回流魂(lens2/Rationalization/Red Flag)+ OBJECTIVE.md 纳并行度;✅ predict-then-validate 抓到眼读误判 |
+| 45 | 5h/7d pacing 单边刹车:杠杆全减速、目标只有上限护栏无 setpoint、欠用配额白白蒸发 | 中-高(资源利用效率) | 用户拍板 B②(双侧走廊 70–90%·7d 当总闸);重构 cost-and-pacing + 魂 lens5 双向化 + usage-pacing.js 欠用提示 + ADR-010;诚实只做方向性逼近 |
 
 > 基线健康(无问题留痕,**早期 P2 阶段历史快照**——当时仓库为 3 个纯 bash hook;现行为 5 hook(4 bash + 1 node,ADR-006/ADR-007),当前健康以 `run-tests.sh` 本次输出为准):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
@@ -709,3 +715,21 @@
 - **影响**:agent 读到的开头是两段说教而非指令,降低指令性;且哲学段与 reference 重复(双 SSOT 雏形,违 [[Finding #7]] 收敛精神)。非功能错(6 步本身是正经 imperative),是**给 agent 的指导质量**问题——正是 charter「给 agent 的指导对不对」该守的。
 - **处置**:端点 micro-fixup 就地改(review 暴露、T∞≈T₁、指挥手握确切批评 + 兄弟范本):开篇直呼 agent、task-first、破坏性提醒像 `stop.md` 折进一句、哲学说教下沉回 `handoff.md`;门重跑全绿、amend 进 PR #14。**蒸馏**:① `AGENTS.md` §12 command 约定加一句「命令体正文 = 注入 agent 的 prompt,用 imperative/第二人称/task-first,对齐 status/stop,别写成第三人称 reference」;② 指挥端点验收 + `cc-master-skillsmith` 增一检「命令/skill 体当 prompt 品嗓音」。回流:落 §12(约定 SSOT)+ 本条作先例,不在多处复述。
 - **严重度 / 来源**:should-fix(agent-facing 指导质量,自动门全绿唯 review 能逮的形态盲区)/ 一手(本次 handoff 功能 PR #14 用户 review)。
+
+## Finding #44 — board DAG 假串行偏多:反过度串行的承重纪律全住 references、魂里无显式护栏 ⚠️质量 + ✅正向(predict-then-validate)
+
+- **现象**:用户 dogfood 观察到 cc-master 规划出的 board DAG **串行偏多、并行偏少**——本可后台并行的独立任务被挂成链,makespan 被无谓拉长。
+- **根因**:反假串行的承重纪律——**float 是免费的并行预算 / 边只能来自真前驱依赖 / 串行并不省 token**——全住在 references(`decomposition.md` / `dispatch.md` / `cost-and-pacing.md`),而**魂 `SKILL.md`(每次 compaction 整篇重注的唯一常驻手册)里无显式表述**。强模型单次决策能从镜头 2/3/5 推导出「默认并行」(**强模型天花板**),但 compaction 后退化 context + 常驻预算压力下推导**不保证**,且无显式护栏接住「假串行边」。更关键的**非对称**:镜头 5「限 WIP / 瞄 75%」+ 常驻预算意识是**常驻**的反并行压力,而反过度串行的纪律却**非常驻**(只在 references)→ 天平系统性倒向串行。
+- **影响**:makespan 被拉长;预算压力下 agent 有现成的合理化(「串行省 token」)且无红旗拦截它画出说不出下游消费者的假边。
+- **处置**(含蒸馏判定):回流到**魂**——① lens2 加「边即债务 / 默认并行 / 逐边举证」一句;② Rationalization Table 加「窗口紧 / 预算紧 → 串起来省」一行(真相:串行**不省 token**、只拉长 makespan;省预算靠**降档 / 控 WIP / 推迟 float**,不是串行);③ Red Flags 加「画了边却说不出被下游消费的上游产物」一条。`decomposition.md` §2 加**反向指针**(规则 SSOT 在魂、论证 SSOT 在 reference,**勿互抄**,守 [[Finding #7]] 收敛精神);新建 `orchestrating-to-completion/OBJECTIVE.md` 把**并行度**纳入成功契约 J。**Track B 重跑验证**:魂-only 臂从改前「靠推导」变为「**逐字引用三处新规则 + 具名删 4 条假边**」(宽度本就触顶 4,价值不在宽度跃升而在**强模型天花板下的 legibility + 跨 compaction 一致性**)。
+- **✅ 正向同权入账**:① **端点验收纪律**——亲跑 `run-tests` 不信 leaf 自报,再次兑现([[Finding #12]] 家族);② **predict-then-validate 抓到我自己的误判**——眼读所下的假设「指导不对称→助长串行」被行为 eval **证伪**:指导被**完整读到**时反而**防住**串行,真缺口在「可达性 / 常驻层」(魂里没有)而**不在内容**(references 里讲得很清楚)。这正是 `grounding-skill-evals` 的 predict-then-validate 防自欺纪律的活样本——眼读直觉错了,行为 eval 纠了它。
+- **严重度 / 来源**:中(行为质量,非 correctness)/ 用户 dogfood 观察 + 本会话 Track B 行为 eval。
+
+## Finding #45 — 5h/7d pacing 是单边刹车:杠杆全减速、欠用配额白白蒸发 ⚠️质量(资源利用效率)
+
+- **现象**:5h/7d pacing 是**单边刹车**——所有杠杆都朝**减速**(降模型 / 降 WIP / 推迟 float),目标只有 75% 上限护栏、**无 setpoint**;**欠用**配额时(用量远低于窗口额度)让 5h 窗口的额度**白白蒸发**,进度净浪费。
+- **根因**:三层各有缺口。① **认知层** `cost-and-pacing.md` 的杠杆**全是减速**,没有加速侧的镜像;② **hook** `usage-pacing.js` **只在撞墙**(`used%≥85`)才出声、对**欠用全盲**;③ **信号层**账户口径虽给 `used_percentage`,却**不给绝对 token 分母**、**不给权威 burn**(只在可失真的本地反推里有,[[Finding #37]] 已证其失真到数量级)。
+- **影响**:同一个**欠 pace 探针**下,两个**有能力**的 agent 会做出**相反决策**(一个加速、一个拒绝)——指导沉默 → 掷硬币。字面读法**系统性**把 agent 推离高效利用;配额**用进废退**,欠用即净浪费进度。
+- **处置**(含蒸馏判定):用户拍板 **B②(双侧目标走廊 · 7d 当总闸 + 认知层 + hook 双深度)**。回流:① `cost-and-pacing.md` **重构为双侧**(目标走廊 **70–90%** / 减速侧 3 杠杆 / 加速侧 3 镜像杠杆 / **7d 当硬总闸** / 诚实天花板);② 魂 **lens5 极简双向化**(常驻层既反顶满也反欠用,修 [[Finding #44]] 同源的「单边常驻压力」非对称);③ `usage-pacing.js` 加 `decideAccountUnderuse` **对称提示**(限定**账户口径** / 7d 缺失则**静默** / 本地反推**禁欠用**提示 / **撞墙优先**与欠用互斥);④ `external-coordinates.md` 短语→锚点表**双向同步**;⑤ 新增 **ADR-010** 留痕。**Track B 重跑验证**:欠用 ×2 一致**加速且先过 7d 闸**;**holdout(7d=88%)正确拒绝加速**、让额度蒸发(防过拟合:学的是「过 7d 闸的双侧判断」而**非**「临 reset 一律冲」)。
+- **诚实天花板入账**:「reset 时配额精确归零」**做不到**(账户无分母 + 无权威 burn,两量永不同路)——只承诺**方向性双侧逼近**,绝不承诺做不到的控制精度(同 [[Finding #37]] 的诚实标注纪律)。
+- **严重度 / 来源**:中-高(直接关系资源利用效率、用户明确诉求)/ 用户提问 + 本会话 Track B 行为 eval。

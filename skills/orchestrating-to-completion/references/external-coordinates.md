@@ -13,7 +13,7 @@
 | 愿景 | 镜头 | Reference(s) | 决策程序节点 | Hook 共鸣（注入短语 → 锚点） |
 |---|---|---|---|---|
 | **C1** 异步并行 + 完整落地 | 1 / 3 / 4 / 6 | `dispatch` · `resume-verify` · `board` | recon → dispatch → verify → wait（整个 loop） | SessionStart "integrate any completed background results first / Do not restart work already done/verified" → recon/integrate + 镜头 6; Stop "is every to-do actually done — including any NOT yet listed on the board" → 镜头 1 + step-6 ledger |
-| **C2** 控制 token 消耗速度 | 5 | `cost-and-pacing` | dispatch 的 "reserve budget+WIP first" 备注 | Stop (H8 usage-pacing) "[cc-master pacing] 5h 配额临界 ... pace 杠杆（见 orchestrating-to-completion / cost-and-pacing）" → 镜头 5 |
+| **C2** 控制 token 消耗速度 | 5 | `cost-and-pacing` | dispatch 的 "reserve budget+WIP first" 备注 | Stop (H8 usage-pacing) "[cc-master pacing] 5h 配额临界 ... pace 杠杆（见 orchestrating-to-completion / cost-and-pacing）" → 镜头 5（减速侧）; "5h 配额欠用 + 临 reset" / "未用满的额度…会永久蒸发" / "可加速" → 镜头 5 + cost-and-pacing 加速侧 lever |
 | **C3** 自主决策 vs 人类接入边界 | 7 | `async-hitl` | q_user → surface | Stop "every point that needs the user surfaced / marked `blocked_on:"user"`"; Stop (H3) "Unanswered user decisions still on this board" → 镜头 7 |
 | **C4** 分解 / 管理 / 更新 / 规划 | 2 | `decomposition` · `board` · `resume-verify` §4 | recon（integrate / mark stale） | bootstrap & Stop "Decompose the goal into a dependency DAG" → 镜头 2 + decomposition; Stop "self-check against this board's `goal`" → board/goal 重认领 |
 | **C5** 资源预算内的高效调度 | 2 / 3 / 5 | `dispatch` · `decomposition` | dispatch（WIP cap）· fill（准入测试） | PostToolBatch (H5) "WIP is over the cap ... defer high-float ... (lens 5)" → 镜头 5 + fill 准入; Stop "A `ready` task can proceed now" → q_ready; 保险丝 "`ready` task that cannot actually proceed (mark it `blocked`/`escalated`)" → 保险丝红线 |
@@ -35,6 +35,6 @@
   - "every point that needs the user surfaced / marked `blocked_on:"user"`" → **镜头 7**，该问就问。完成态握手现在还会**显式列出**任何挂起的用户停泊决策——"Unanswered user decisions still on this board: \<titles\>" (H3) → **镜头 7**：停下之前，逐项确认它们确实仍挂起（或就地解决）。
   - "self-check against this board's `goal` ... every to-do actually done — including any NOT yet listed on the board" → **step-6 ledger** + **镜头 1**，完整落地。
   - 保险丝 "a `ready` task that cannot actually proceed (mark it `blocked`/`escalated`)" → 你撞上了「每个 loop 都必须有保险丝」那条红线：揪出假 `ready`。
-  - (H8 usage-pacing，Stop 上的第二个 hook) "[cc-master pacing] 5h 配额临界 ... pace 杠杆（见 orchestrating-to-completion / cost-and-pacing）" → **镜头 5**：你贴近 5h burn-rate 墙了——怎么 pace 是你的认知判断（downgrade 模型 / 降 WIP / defer float），它是软提示，不是 block。
+  - (H8 usage-pacing，Stop 上的第二个 hook) "[cc-master pacing] 5h 配额临界 ... pace 杠杆（见 orchestrating-to-completion / cost-and-pacing）" → **镜头 5（减速侧）**：你贴近 5h burn-rate 墙了——怎么 pace 是你的认知判断（downgrade 模型 / 降 WIP / defer float），它是软提示，不是 block。反向：看到 "5h 配额欠用 + 临 reset" / "未用满的额度…会永久蒸发" / "可加速" → **镜头 5（加速侧）**：5h 欠用、临 reset、且 7d 仍有余量时，把本就 ready 的真实工作提前拉进本窗口（升档模型 / 升 WIP / 提前拉 float），别让额度白白蒸发——这同样是认知判断，不是 block。
 
 *（H3/H5/H8 现均已 live。注入短语的当前真相以本 plugin 的 hook 脚本为准——本表与脚本漂移时信脚本，删/加 hook 的 PR 必带 `grep 'H[0-9]'` 全量核对，见 Finding #28。）*
