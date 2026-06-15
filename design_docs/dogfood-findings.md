@@ -701,3 +701,11 @@
 - **影响**:用户以为「注册到全局就最新」,实被「陈旧缓存 + scope 覆盖」双重卡住;`--resume` 永远用不上,且 **dogfood 在旧代码上跑会误导诊断**(正是 [[Finding #41]] 的上游成因)。
 - **处置**:治法——`claude plugin marketplace update` + `claude plugin install cc-master@cc-master --scope user` 刷 0.4.2;**最干净是删项目级 cc-master 配置、纯靠全局 user-scope**(用户提出),一处维护、全项目自动跟版。**蒸馏**:① 发版后**必须刷新全局缓存**(`plugin update`,非仅 `marketplace update`);② 本地 plugin dev 建议**只在 user scope 配一次**、别每项目 project-scope pin。回流:`deliver` 已含「发版后从干净 main 刷新全局缓存」步骤;README 可加一句「directory 安装更新需 `plugin update`」(发版连带)。
 - **严重度 / 来源**:should-fix(部署/发版形态,真实安装才现形)/ 一手(omne-next 试用 + 全局注册排查 + scope 实测)。
+
+## Finding #43 — 新命令体写成第三人称 reference 文档而非注入 agent 的 prompt;端点验收漏「命令体当 prompt 品嗓音」一维 ⚠️质量
+
+- **现象**:`handoff-to-new-session.md` 命令体开篇两段是 doc 嗓音——第三人称描述(「由当前正在跑的 orchestrator session 运行」)、被动(「board 被归档」)、外加一整段从 `handoff.md` 重复来的设计哲学说教(「交接的价值恰恰在 board 装不下的东西…」),半天没有一句冲 agent 来的指令。与兄弟普通命令 `status.md`(「读取你的编排 board,渲染…」)/`stop.md`(「列出 home,读取每一块…」)的 imperative 第二人称 task-first 嗓音不一致。run-tests + plugin validate + 自动门 + 红线 + handoff.md 行为 pressure-test **全绿**,靠用户 review「你自己品一品这在 agent 视角自然吗」才现形。
+- **根因**:命令体正文本质是**用户敲 `/command` 时注入 agent context 的 prompt**,但作者(和指挥的端点验收)当成了 reference 文档来写/审——把「这命令是什么、为什么」的定义与哲学放进了应当直接下指令的位置。指挥端点验收清单覆盖了内容正确性 / 红线 / self-contain / 甚至 handoff.md 纪律 prose 的行为 pressure-test,**唯独缺「把命令/skill 体当 prompt 读、品它的嗓音是否 imperative 直呼 agent」这一维**——一个只有代入「敲完命令那一刻读到这段的 agent」才察觉的盲区(同 [[Finding #30]]/[[Finding #38]] 的形态盲区家族:自动门全绿、唯独某个真实视角能逮)。
+- **影响**:agent 读到的开头是两段说教而非指令,降低指令性;且哲学段与 reference 重复(双 SSOT 雏形,违 [[Finding #7]] 收敛精神)。非功能错(6 步本身是正经 imperative),是**给 agent 的指导质量**问题——正是 charter「给 agent 的指导对不对」该守的。
+- **处置**:端点 micro-fixup 就地改(review 暴露、T∞≈T₁、指挥手握确切批评 + 兄弟范本):开篇直呼 agent、task-first、破坏性提醒像 `stop.md` 折进一句、哲学说教下沉回 `handoff.md`;门重跑全绿、amend 进 PR #14。**蒸馏**:① `AGENTS.md` §12 command 约定加一句「命令体正文 = 注入 agent 的 prompt,用 imperative/第二人称/task-first,对齐 status/stop,别写成第三人称 reference」;② 指挥端点验收 + `cc-master-skillsmith` 增一检「命令/skill 体当 prompt 品嗓音」。回流:落 §12(约定 SSOT)+ 本条作先例,不在多处复述。
+- **严重度 / 来源**:should-fix(agent-facing 指导质量,自动门全绿唯 review 能逮的形态盲区)/ 一手(本次 handoff 功能 PR #14 用户 review)。

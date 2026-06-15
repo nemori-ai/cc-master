@@ -45,7 +45,7 @@ cc-master/
 ├── CONTRIBUTING.md           ← dev loop + before-PR 两道门（红线 SSOT 已外链本文 §3）
 ├── CHANGELOG.md
 ├── .claude-plugin/           ← plugin.json 清单 + marketplace.json
-├── commands/                 ← as-master-orchestrator / status / stop（一次性点火）
+├── commands/                 ← as-master-orchestrator / status / handoff-to-new-session / stop（一次性点火）
 ├── skills/                    ← **分发**给插件用户的 skill 源码（仅这两个随插件 ship）
 │   ├── orchestrating-to-completion/  ← SKILL A：编排方法论（魂）+ references/ + scripts/（运行时带外脚本 cc-usage / codex-review / statusline-capture，随 skill 分发，prose 用 `${CLAUDE_SKILL_DIR}` 引用）
 │   └── authoring-workflows/          ← SKILL B：workflow 写法 + references/ + assets/examples/
@@ -185,7 +185,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 
 ## 12. 目录与文件约定
 
-- **command**（`commands/*.md`）——一次性点火，frontmatter + body；body 首个非空行的 sentinel 注释（如 `<!-- cc-master:bootstrap:v1 -->`）是 hook 触发标记，**只在首行独立成行时触发**（内联提及不触发，Finding #16）。仅作为 hook 触发点的 command 需要 sentinel（目前只有 `as-master-orchestrator`）；`status` / `stop` 等普通 command 不需要。
+- **command**（`commands/*.md`）——一次性点火，frontmatter + body；body 首个非空行的 sentinel 注释（如 `<!-- cc-master:bootstrap:v1 -->`）是 hook 触发标记，**只在首行独立成行时触发**（内联提及不触发，Finding #16）。仅作为 hook 触发点的 command 需要 sentinel（目前只有 `as-master-orchestrator`）；`status` / `stop` / `handoff-to-new-session` 等普通 command 不需要（`handoff-to-new-session` 由旧 session 运行、把 board 优雅交接给新 session——是 `--resume` 跨 session re-arm 的写/准备侧，本身不武装 hook，故无 sentinel）。**命令体正文是用户敲 `/command` 时注入 agent context 的 prompt——用 imperative / 第二人称 / task-first 写（对齐 `status` / `stop` 的嗓音），别写成第三人称 reference 文档、也别把 reference 的哲学说教复述进来（[[Finding #43]]）。**
 - **skill**（`skills/<name>/SKILL.md` + `references/` + `assets/`）——frontmatter `name` + `description`（单引号整包，§6）；大 reference 顶部加锚点 TOC；深度细节进 `references/` 保持主文件瘦。
 - **command / skill 必须分发 self-contain（不断链）**——分发的 `commands/` 与 `skills/<name>/` 里的任何文件（命令体 / SKILL.md / `references/` / `scripts/` / DESIGN.md…）引用别的文件时，**只能指向随 plugin 分发的约定目录**（`skills/` `hooks/` `commands/` `agents/` `bin/`），且**必须用 `${CLAUDE_PLUGIN_ROOT}/<dir>/…` 绝对引用**（skill 引用自己目录内的资产用 `${CLAUDE_SKILL_DIR}/…`）。**两类断链禁止**：① **裸相对路径**（如 `scripts/cc-usage.sh`——装到用户机器后相对其 cwd 解析、找不到）；② **引用非约定目录的文件**（`design_docs/` `adrs/` `README` `AGENTS.md` `CHANGELOG`——这些不保证随 plugin 分发，安装后死链）。**概念性提及不算文件引用、可留**：泛指「以本 plugin 的 hook 脚本为准」、叙事性 `Finding #NN` / `ADR-NNN`（不带路径）、描述脚本运行时读「所在 repo 的 AGENTS.md」这类行为。→ 硬卡点：`grep -rnE 'design_docs\|adrs/[A-Z]\|\]\(\.\.\|hooks/scripts\|README\.md' commands/ skills/ \| grep -v CLAUDE_` 须只剩 `codex-review.sh` 那条「读所在 repo 的 AGENTS.md」行为描述。来源 [[Finding #38]]/[[Finding #39]]（真实安装才现形的形态盲区）。
 - **hook**（`hooks/scripts/*.sh` / `*.js`）——bash 或 node/JS（红线 1·ADR-006）；状态写 sidecar，**永不碰 board**。
@@ -223,6 +223,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 | 改 hook | [`hooks/scripts/`](hooks/scripts/) + [`tests/`](tests/) + [`CONTRIBUTING.md`](CONTRIBUTING.md)（先确认红线 1：bash+node/JS，ADR-006）|
 | 新建 / 改任何 hook 前先懂「武装闸」/ 为什么所有 hook 未武装即休眠 | [`adrs/ADR-007-hook-arming-gate.md`](adrs/ADR-007-hook-arming-gate.md)（board-derived armed-gate）+ 本文 §12 hook 武装纪律 |
 | 让新 session 用 `--resume` 续旧板 / 复活归档板 / 接管安全闸的「显式 vs 隐式」论证 | [`adrs/ADR-009-resume-cross-session-re-arm.md`](adrs/ADR-009-resume-cross-session-re-arm.md)（显式跨 session re-arm）+ [`hooks/scripts/bootstrap-board.sh`](hooks/scripts/bootstrap-board.sh) 的 resume 分支 |
+| 由旧 session 优雅交接 board 给新 session（`--resume` 的写/准备侧：停派发 + 兜底在飞任务 + 写叙事交接文档 + 归档板）| [`commands/handoff-to-new-session.md`](commands/handoff-to-new-session.md)（与 `--resume` 配对的写侧）|
 | 让 codex 当端点验收 reviewer | [`skills/orchestrating-to-completion/scripts/codex-review.sh`](skills/orchestrating-to-completion/scripts/codex-review.sh) + `/codex` skill |
 | 在 pacing 决策点感知 5h-7d usage（带外信号脚本，非 hook）| [`skills/orchestrating-to-completion/scripts/cc-usage.sh`](skills/orchestrating-to-completion/scripts/cc-usage.sh)（账户权威 `used_percentage` 优先、本地反推 fallback；信号由 `statusline-capture.js` 捕获·Finding #37）|
 | 跑触发准确率 eval（description 改动前后）| [`scripts/eval-trigger.sh`](scripts/eval-trigger.sh) + [`design_docs/eval/README.md`](design_docs/eval/README.md) |

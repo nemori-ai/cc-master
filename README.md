@@ -2,7 +2,7 @@
 
 > 中文版见 [README_zh.md](README_zh.md)。
 
-![version](https://img.shields.io/badge/version-0.3.0-blue)
+![version](https://img.shields.io/badge/version-0.4.3-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![ship-anywhere](https://img.shields.io/badge/ship--anywhere-Bedrock%20%7C%20Vertex%20%7C%20Foundry-7c3aed)
 ![requires](https://img.shields.io/badge/requires-Node%2022%2B%20%2B%20bash-orange)
@@ -183,6 +183,7 @@ Once loaded, hand it a goal big enough to be worth it (think >24h of work, many 
 /cc-master:as-master-orchestrator <goal>           # bootstrap a board and become the orchestrator
 /cc-master:as-master-orchestrator --resume [sel]   # pick up an EXISTING board in a new session (see below)
 /cc-master:status                                  # render the board summary + validate the narrow waist
+/cc-master:handoff-to-new-session                  # gracefully hand the board off to a fresh session (write side of --resume)
 /cc-master:stop                                    # archive the board and stand down (board is kept, not deleted)
 ```
 
@@ -199,6 +200,16 @@ A long-horizon orchestration outlives any single session. When the original sess
 - **Any board is resumable** — both still-`active` (abandoned) boards and `/stop`-**archived** ones. Resuming an archived board **revives** it (`active:false → true`). `/stop` is a *reversible archive*, not a permanent end-state; the board file, its `tasks`, `log`, and `goal` are all preserved across archive → revive.
 - **Takeover is safe by default.** Re-stamping the board hands it to the new session and orphans the old one's background work — so if a board still *looks alive* (recent heartbeat / file mtime), `--resume` warns and **withholds** the takeover until you re-send with `--force-takeover`. Ambiguous or missing selector → nothing is written; it lists the candidates (grouped into *abandoned* vs *will-be-revived*) and asks you to pick.
 - **Resume means pick up, not restart.** The conductor reconciles the existing `tasks[]` rather than re-decomposing the goal, and treats any `in_flight` task left by the dead session as an orphan — endpoint-verifying its artifact (and marking it done) or re-dispatching it for a fresh handle, never idle-waiting on a dead handle. See [ADR-009](adrs/ADR-009-resume-cross-session-re-arm.md).
+
+### Hand a board off cleanly before the session ends
+
+`--resume` is the *read* side of cross-session continuity; `/cc-master:handoff-to-new-session` is the *write* side. Run it from the **old** orchestrator session to gracefully prepare a board for a **new** one, instead of leaving an abandoned board for `--resume` to discover after the fact:
+
+```
+/cc-master:handoff-to-new-session   # run in the OLD session to prepare a clean handoff
+```
+
+The conductor: (1) stops dispatching new work; (2) lets in-flight tasks finish and verify in the current session (stragglers that run too long are degraded to orphans + re-verify and surfaced to you); (3) writes a **narrative** handoff doc — a sidecar in the cc-master home that points at the board and explains the *story* without restating its DAG; (4) appends a pointer to that doc in `board.log`; (5) archives the board (`owner.active:false`) so the next session's `--resume` revives it frictionlessly; (6) tells you the doc path and the exact `--resume` command to run next. Handoff (prepare) and `--resume` (take over) are the two halves of one clean cross-session relay.
 
 ### Optional — turn on account-authoritative quota awareness
 
@@ -244,6 +255,7 @@ cc-master/
 ├── commands/
 │   ├── as-master-orchestrator.md       bootstrap — become the orchestrator
 │   ├── status.md                       summarize board progress / health
+│   ├── handoff-to-new-session.md       prepare a clean handoff to a fresh session
 │   └── stop.md                         archive / mark the board inactive
 ├── skills/
 │   ├── orchestrating-to-completion/    Skill A — the orchestration method (the soul)
