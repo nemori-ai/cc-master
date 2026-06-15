@@ -24,6 +24,8 @@
 | Sonnet 4.6 | `claude-sonnet-4-6` | $3 · $15 | **3×** | 平衡主力:常规实现 |
 | Haiku 4.5 | `claude-haiku-4-5` | $1 · $5 | **1×** | 快 & 便宜:机械活(跑测试 / grep / 格式化 / 改名),200K context |
 
+> **⚠️ 运行时可用性补充（2026-06，临时框——Fable 5 恢复即删本框、上表与下文不动）。** 当前账户层 **Claude Fable 5 不可用**：点名调用会被挡回 *"Claude Fable 5 is currently unavailable. Please use Opus 4.8 or another available model."* 在它恢复前，本文与 `decomposition.md` 里**每一处指派给 Fable 的节点——高杠杆判断与裁决（独立 review / 二审 · 端点验收 · 决策咨询 · 架构仲裁 / 方案选型）、最难的开放推理 / 创意 / 叙事——一律回退到次强档 Opus 4.8（`claude-opus-4-8`）。** 上表 Fable 行与下文每处 Fable 指派**一律保留不删**（它们记录的是「档位本应如何」这套稳定心智模型，可用性是一时的运行时约束、非档位重排）；只把落点临时从 Fable 改投 Opus。副作用：回退期 Opus 同时背「难实现」与「裁决」两副身份，§每节点模型选择 末尾那条「Fable 裁决 vs Opus 实现」的关键区分在*档位落点*上暂时合一——**但判断标准本身不变**，只是这两类活暂用同一档执行。Fable 恢复后照上表 / 下文原指派切回即可。
+
 （绝对美元为截至 2026-06 的快照；现价以 API 官方文档 / `claude-api` skill 为准——见上方警告。）编排的花销由输出主导（agent 吐的远多于它读的），所以真正该拿来 pace 的数字是 **relative output multiplier**——Haiku 1× / Sonnet 3× / Opus 5× / Fable 10×：一个 Opus 叶子 ≈ 五个 Haiku 叶子，一个 Fable 叶子 ≈ 十个。这组**相对关系**（强档 ≈ 弱档的 N×）是这段真正稳定、可长期依赖的心智模型；档位重排或绝对单价变动时，更新上表数字即可，这组 multiplier 思路照旧。
 
 补一句 `effort`（`output_config: {effort: …}`）的事：它确实是一个 **API-layer** 的 token 旋钮，你的*主 session* 也遵循自己的 `effortLevel`。但 cc-master 的派发 API **不**把它往下穿透——workflow 的 `agent()` 只接受 label/phase/schema/model/isolation/agentType，Agent sub-agent 同样没有 effort 旋钮。所以你对*叶子*成本真正握得住的 lever 是它的**模型档位**，不是 effort——别给 `agent()` 传一个杜撰的 `effort` option（SKILL B 禁止杜撰 option）。
@@ -35,9 +37,9 @@
 - **机械 / 可机械检查**（跑测试套件、grep 定位、批量格式化、改变量名）→ **Haiku**。无需推理。
 - **常规实现** → **Sonnet**。主力 workhorse。
 - **难实现 / correctness-critical / 临界路径**（agentic 实现、临界路径上难实现的活、复杂并发 bug 的根因）→ **Opus**；**常规 review**（日常代码审查，够重要不该降到 Sonnet）也走 **Opus**。
-- **高杠杆判断与裁决**（verdict-bearing：决定「对不对 / 选哪个」的节点——独立 review / 二审、端点验收、决策咨询、架构仲裁 / 方案选型）→ **Fable**；最难的开放推理 / 创意 → 同样 **Fable**。一次错判下游成本极大、且这些节点低并发，值最强档。
+- **高杠杆判断与裁决**（verdict-bearing：决定「对不对 / 选哪个」的节点——独立 review / 二审、端点验收、决策咨询、架构仲裁 / 方案选型）→ **Fable**；最难的开放推理 / 创意 → 同样 **Fable**。一次错判下游成本极大、且这些节点低并发，值最强档。（⚠️ **Fable 当前不可用 → 这些节点回退 Opus 4.8**，见 §模型档位 的「运行时可用性补充」。）
 
-> **关键区分**：判断 / 审查 / 咨询 / 裁决（决定「对不对 / 选哪个」的 verdict 节点）= **Fable**；做出那个被选定的难架构 / 复杂实现 = **Opus**——二者别混。常规 review 走 Opus；高杠杆的独立 review / 二审 / 端点验收走 Fable。
+> **关键区分**：判断 / 审查 / 咨询 / 裁决（决定「对不对 / 选哪个」的 verdict 节点）= **Fable**；做出那个被选定的难架构 / 复杂实现 = **Opus**——二者别混。常规 review 走 Opus；高杠杆的独立 review / 二审 / 端点验收走 Fable。（**Fable 不可用期**：这些 Fable 落点临时回退 Opus 4.8——见 §模型档位 的「运行时可用性补充」。判断标准照旧，只是档位落点暂与 Opus 合并；此时靠任务身份本身、而非档位差异来区分裁决 vs 实现。）
 
 强档集中到临界链上（镜头 2）；高 float 的机械活配便宜档、让它在空隙里跑（`decomposition.md` 的"资源决策"）。它在 workflow 一侧的对应物——随着某个 stage 变难、*在脚本内部*升级模型档位——是 SKILL B examples 里的 `staged-escalation.js`（`agent({model})`）；那里模型字面量是 resume cache key 的一部分，所以务必保持它是字面量。
 

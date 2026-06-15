@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-06-15
+
+### Changed
+
+- **模型档位指导加 Fable 5 临时不可用回退（运行时可用性补充）** — 当前账户层 Claude Fable 5 不可用（点名调用被挡回 *"Claude Fable 5 is currently unavailable. Please use Opus 4.8 or another available model."*）。`cost-and-pacing.md` 模型档位表下新增「运行时可用性补充」callout（回退口径 SSOT），并在每处 Fable 指派（`cost-and-pacing.md` §每节点模型选择 的两处 + `decomposition.md` 资源决策）加简短回指：所有指派给 Fable 的高杠杆裁决 / 最难开放推理节点临时回退 **Opus 4.8**。**Fable 相关描述一律保留不删**（记录「档位本应如何」的稳定心智模型，可用性只是一时运行时约束）；Fable 恢复即删回退框、按原指派切回。属 informational reference、非红线（Finding #26）。
+
 ## [0.4.0] — 2026-06-12
 
 ### Added
