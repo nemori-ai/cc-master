@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-06-15
+
+### Fixed
+
+- **AGENTS.md 修正 `github-pr` / `github-tag-release` skill 误引用** — §4 / §11 此前把这两个**不存在**的 skill 当「本仓项目自带收口工具」引用（实物在本仓与 `~/.claude` 均无），照它找会扑空。改为 `gh` CLI 手工流程描述，并把真实发版步骤（版本号三处同步 bump + squash merge + `gh release` + 两道验收门）固化进 §11。纯贡献者文档（dev-facing）修正，不影响分发物。
+
 ## [0.4.1] — 2026-06-15
 
 ### Changed
