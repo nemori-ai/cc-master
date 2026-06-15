@@ -217,10 +217,24 @@ board_mtime_epoch() {
   stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || true
 }
 
-# inject_ctx TEXT — emit the UserPromptSubmit additionalContext JSON envelope (same escaping as fresh).
+# json_string TEXT — emit TEXT as ONE properly-escaped JSON string literal (including the surrounding
+# quotes). A correct escaper: backslash → \\, double-quote → \", and any LITERAL newline → \n, then the
+# whole stream wrapped in a single pair of quotes. The fresh path's `sed 's/^/"/; s/$/"/'` quotes
+# PER LINE — fine for its single-line context, but the resume disambiguation context carries literal
+# newlines (the multi-board candidate listing), which per-line quoting turns into ILLEGAL JSON (each
+# physical line gets its own quote pair, raw newlines left between them). So escape newlines to \n and
+# wrap once. `awk` (a shell tool, not jq/node — red line 1) reads the whole stream and joins records
+# with the two-char sequence backslash-n; ORS="" stops awk re-appending a trailing newline.
+json_string() { # $1 text
+  printf '%s' "$1" \
+    | awk 'BEGIN{ORS=""} { gsub(/\\/,"\\\\"); gsub(/"/,"\\\""); if(NR>1) printf "\\n"; printf "%s",$0 }' \
+    | sed 's/^/"/; s/$/"/'
+}
+# inject_ctx TEXT — emit the UserPromptSubmit additionalContext JSON envelope (a single valid object,
+# newline-safe via json_string above).
 inject_ctx() {
   printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":%s}}\n' \
-    "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/^/"/; s/$/"/')"
+    "$(json_string "$1")"
 }
 
 # FRESHNESS_THRESHOLD_SECS — a board touched within this window is treated as "possibly still live"
@@ -323,24 +337,36 @@ EOF
   TARGET="$(printf '%s' "$matches" | grep -m1 '.board.json')"
 
   # ── live-safety probe (design §5): is the board possibly still live? heartbeat / mtime freshness ──
-  hb="$(owner_field_value "$TARGET" heartbeat)"
-  now="$(date -u +%s)"
-  mt="$(board_mtime_epoch "$TARGET")"
+  # The freshness gate exists ONLY to protect a possibly-LIVE session from being orphaned. An ARCHIVED
+  # board (owner.active:false, just /stop'd) has NO live session — its mtime is fresh precisely because
+  # /stop just wrote active:false, so a fresh mtime there is a false "still live" signal. Gate the whole
+  # probe on active:true: an archived board skips it and proceeds straight to revive-takeover, no force
+  # required (codex Finding 3 — the common "just /stop'd, now --resume to revive" path must not stall).
+  target_active="$(owner_field_value "$TARGET" active)"
   fresh=0          # 1 = looks possibly-live (recent activity); 0 = looks abandoned/stale
   signal=0         # 1 = we HAVE a usable freshness signal; 0 = no signal (→ conservative)
-  # mtime signal: a usable, NON-FUTURE mtime within the window = fresh.
-  if [ -n "$mt" ] && printf '%s' "$mt" | grep -qE '^[0-9]+$'; then
-    if [ "$mt" -le "$now" ]; then
-      signal=1
-      age=$((now - mt))
-      [ "$age" -lt "$FRESHNESS_THRESHOLD_SECS" ] && fresh=1
+  if [ "$target_active" = "true" ]; then
+    hb="$(owner_field_value "$TARGET" heartbeat)"
+    now="$(date -u +%s)"
+    mt="$(board_mtime_epoch "$TARGET")"
+    # mtime signal: a usable, NON-FUTURE mtime within the window = fresh.
+    if [ -n "$mt" ] && printf '%s' "$mt" | grep -qE '^[0-9]+$'; then
+      if [ "$mt" -le "$now" ]; then
+        signal=1
+        age=$((now - mt))
+        [ "$age" -lt "$FRESHNESS_THRESHOLD_SECS" ] && fresh=1
+      fi
+      # an mtime in the FUTURE is not a usable "stale" signal → leave signal=0 (conservative).
     fi
-    # an mtime in the FUTURE is not a usable "stale" signal → leave signal=0 (conservative).
+    # heartbeat signal (best-effort): a non-empty heartbeat is itself a sign the board was being written.
+    # We treat a present heartbeat as a (weak) freshness signal source but rely primarily on mtime; if a
+    # heartbeat exists we at least have A signal.
+    [ -n "$hb" ] && signal=1
   fi
-  # heartbeat signal (best-effort): a non-empty heartbeat is itself a sign the board was being written.
-  # We treat a present heartbeat as a (weak) freshness signal source but rely primarily on mtime; if a
-  # heartbeat exists we at least have A signal.
-  [ -n "$hb" ] && signal=1
+  # archived board (active:false) → fresh=0, signal stays at its init; the force==0 block below is a
+  # no-op for it (fresh!=1 and we set signal=1 to skip the no-signal branch), so it falls through to
+  # the revive-takeover. Make that explicit: an archived board always has "a signal" (it IS abandoned).
+  [ "$target_active" = "true" ] || signal=1
 
   if [ "$force" -eq 0 ]; then
     if [ "$fresh" -eq 1 ]; then
@@ -438,14 +464,28 @@ case "$rest" in
     selector="${rest#--resume}"
     selector="${selector#"${selector%%[![:space:]]*}"}" ;;   # remaining = selector (may be empty)
 esac
-# body-sentinel path: the expanded command body conditionally renders a machine-readable
-# `cc-master:resume <selector>` line right after the sentinel ONLY when $ARGUMENTS held --resume. If
-# we triggered via the marker (not the raw prefix) and that line is present, honor it (design §2.2).
+# body-sentinel path: the expanded command body cannot conditionally render on $ARGUMENTS (it is
+# static markdown), so it UNCONDITIONALLY carries a machine-readable args line right after the
+# sentinel: `<!-- cc-master:args: <raw $ARGUMENTS> -->`. When we triggered via the marker (not the raw
+# prefix), recover the original args from THAT line and run them through the SAME --resume first-token
+# demux as the raw-command path — so fresh/resume routing is identical on both paths (design §2.2;
+# codex Finding 2: the old `cc-master:resume` line was never rendered, so --resume fell through to a
+# spurious fresh board). The args line must be the SECOND machine-readable line (an HTML comment),
+# matched standalone like the sentinel (Finding #16 discipline) — a mid-prose `cc-master:args:`
+# mention won't false-route because we anchor on the line and strip the comment wrapper.
 if [ "$mode" = "fresh" ] && [ "$marker_hit" -eq 1 ]; then
-  resume_line="$(printf '%s' "$prompt" | sed -e 's/\\n/\n/g' | grep -m1 -E '^[[:space:]]*cc-master:resume( |$)' || true)"
-  if [ -n "$resume_line" ]; then
-    mode=resume
-    selector="$(printf '%s' "$resume_line" | sed -e 's/^[[:space:]]*cc-master:resume//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  args_line="$(printf '%s' "$prompt" | sed -e 's/\\n/\n/g' | grep -m1 -E '^[[:space:]]*<!--[[:space:]]*cc-master:args:' || true)"
+  if [ -n "$args_line" ]; then
+    # strip the `<!-- cc-master:args:` opener and the trailing ` -->`, then trim → the raw $ARGUMENTS.
+    body_args="$(printf '%s' "$args_line" \
+      | sed -e 's/^[[:space:]]*<!--[[:space:]]*cc-master:args://' -e 's/[[:space:]]*-->[[:space:]]*$//' \
+            -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    case "$body_args" in
+      --resume|--resume\ *)
+        mode=resume
+        selector="${body_args#--resume}"
+        selector="${selector#"${selector%%[![:space:]]*}"}" ;;   # remaining = selector (may be empty)
+    esac
   fi
 fi
 

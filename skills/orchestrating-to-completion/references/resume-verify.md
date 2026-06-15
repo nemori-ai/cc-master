@@ -36,6 +36,16 @@
 
 验收是续跑缓存（§1）的校验步骤：唯有一个既存在**又**通过这道端点检查的产物，才算 done。
 
+### 孤儿 `in_flight` 续接（新 session 接管旧板时）
+
+`--resume` 把一块**已存在**的 board 盖成本 session 后（跨 session re-arm，见 ADR-009），上一段 orchestration 派发的后台任务的 **handle 活在那个已不在的旧 session 里**——新 session **attach 不回这些 handle**，那些后台进程可能早随旧 session 死了，也可能还在跑但你无从收割。board 上它们是 `status:"in_flight"` + 一个**已失效的 handle**。这是 resume 最微妙的正确性点——但它**不引入新机制**，只是把这个触发场景接进上面已有的 §1 content-hash 续跑 + §3 端点验收 + status enum 的 `stale`/`ready` 路由：
+
+- **旧 handle 一律当作【失效】**——绝不用它去查 / 收割后台输出（attach 不上）。
+- **走端点验收判它到底有没有真做完**：算该节点的 content-hash（§1：`spec + 上游产物 + key context`），查产物是否已落地（commit / PR / 文件已存在）。
+  - 产物**存在且通过端点验收**（§3：亲跑闸 + 读 diff，不信任何自报）→ 标 `done`/`verified`。这正是 §1 的 content-hash 续跑：产物在且验过 = 不重跑（O(changeset)）。
+  - 产物**不存在 / 验收不过** → 该 `in_flight` 是孤儿、未完成：降回 `ready`（或 `stale`，若它依赖的上游产物也可能变了，见 §2），**重新派发**拿到一个写回 board 的**新 handle**。
+- **绝不把旧 `in_flight` 当作「还在飞、继续等」**——旧 handle 已死，干等 = idle-wait 空等（七镜头第 4 的反模式）。在端点【验或重派】，二选一，不留薛定谔的 `in_flight`。
+
 ### codex 作为一个独立的第二端点验收者
 
 `${CLAUDE_SKILL_DIR}/scripts/codex-review.sh` 跑 `codex exec review --base <branch> --json`（review-only、只读 sandbox），并按 openai-codex 插件的 `review-output.schema.json` 吐出一个 `verdict`（`approve | needs-attention`，每条 finding 携带 severity/file/line/confidence）。这个 verdict 直接映射到 §4 的 Joiner 闸：

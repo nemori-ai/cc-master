@@ -371,4 +371,80 @@ assert_eq "new-m" "$(board_sid "$Bm")" "S16b: pretty multi-line JSON re-stamped"
 assert_eq "true" "$(board_active "$Bm")" "S16b: pretty multi-line JSON active stays true"
 rm -rf "$H"
 
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+# codex P2 finding regressions (second-reviewer catches, 2026-06-15)
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+
+# ── S17 (codex Finding 1): multi-board disambiguation must emit VALID single-object JSON. The
+# candidate listing (list_candidates) carries LITERAL newlines; inject_ctx must escape them into \n
+# inside ONE quoted JSON string, not wrap each physical line in its own pair of quotes (which yields
+# illegal JSON). S5/S7 only grep substrings of the (broken) output, so they missed this — assert the
+# stdout PARSES. Three disambiguation paths exercise the multi-line context: ≥2 selector matches,
+# empty-selector ≥2 candidates (active+archived two-group listing), and zero matches with a listing.
+H="$(make_project)"
+B1="$(seed_board "$H" "old-a" "true" "migrate the database")"
+B2="$(seed_board "$H" "old-b" "true" "migrate the auth service")"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume migrate'
+assert_valid_json "$HOOK_OUT" "S17a: ≥2-selector-match disambiguation stdout is valid JSON"
+rm -rf "$H"
+H="$(make_project)"
+Ba="$(seed_board "$H" "old-a" "true" "active board goal")"
+Bx="$(seed_board "$H" "old-b" "false" "archived board goal")"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume'
+assert_valid_json "$HOOK_OUT" "S17b: empty-selector two-group listing stdout is valid JSON"
+rm -rf "$H"
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "alpha")"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume nonexistent-goal-xyz'
+assert_valid_json "$HOOK_OUT" "S17c: zero-match (with candidate listing) stdout is valid JSON"
+rm -rf "$H"
+
+# ── S18 (codex Finding 2): EXPANDED-BODY path must honor --resume from the machine-readable args
+# line. When UserPromptSubmit sees the expanded command body (first line = sentinel), the SECOND line
+# carries `cc-master:args: <raw $ARGUMENTS>`. If those args lead with --resume, the hook must take
+# over the existing board — NOT create a spurious fresh board (the old logic only honored a never-
+# rendered `cc-master:resume` line, so --resume silently fell through to fresh).
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "expanded body resume goal")"
+touch_mtime "$B" 60
+run_resume "$H" "new-sess" '<!-- cc-master:bootstrap:v1 -->\n<!-- cc-master:args: --resume expanded -->\nbody prose...'
+assert_eq "new-sess" "$(board_sid "$B")" "S18: expanded-body --resume takes over (sid re-stamped)"
+assert_eq "true" "$(board_active "$B")" "S18: expanded-body resume keeps active true"
+assert_eq 1 "$(count_boards "$H")" "S18: expanded-body --resume does NOT create a fresh board"
+rm -rf "$H"
+
+# ── S18b (codex Finding 2, negative): expanded-body args WITHOUT --resume → correct FRESH path
+# (new board created, existing board untouched). Defends the fresh routing of the args-line parse.
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "pre-existing untouched goal")"
+run_resume "$H" "new-sess" '<!-- cc-master:bootstrap:v1 -->\n<!-- cc-master:args: migrate the thing -->\nbody prose...'
+assert_eq 2 "$(count_boards "$H")" "S18b: expanded-body without --resume → fresh board created"
+assert_eq "old-sess" "$(board_sid "$B")" "S18b: pre-existing board owner UNTOUCHED on fresh"
+assert_contains "$HOOK_OUT" "fresh" "S18b: expanded-body fresh context injected"
+rm -rf "$H"
+
+# ── S18c (codex Finding 2): expanded-body --resume <selector> selects the right board via the args
+# line (selector after --resume is honored, same as the raw-command path).
+H="$(make_project)"
+Bi="$(seed_board "$H" "old-a" "true" "ship the i18n localization")"
+Bp="$(seed_board "$H" "old-b" "true" "refactor the payments gateway")"
+touch_mtime "$Bi" 60; touch_mtime "$Bp" 60
+run_resume "$H" "new-sess" '<!-- cc-master:bootstrap:v1 -->\n<!-- cc-master:args: --resume i18n -->\nbody...'
+assert_eq "new-sess" "$(board_sid "$Bi")" "S18c: expanded-body selector picks i18n board"
+assert_eq "old-b" "$(board_sid "$Bp")" "S18c: payments board owner UNTOUCHED"
+rm -rf "$H"
+
+# ── S19 (codex Finding 3): a FRESH-mtime ARCHIVED board (active:false, just /stop'd) → --resume
+# revives it WITHOUT --force-takeover. The freshness gate exists to protect a possibly-LIVE session;
+# an archived board has no live session to orphan, so its new mtime must NOT block takeover. (S10b
+# used a STALE mtime, so it never exercised the gate on an archived board — this uses a fresh one.)
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "false" "freshly archived goal")"
+touch_mtime "$B" 0   # FRESH mtime (just written) — but active:false, so freshness gate must skip it
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume freshly'
+assert_eq "new-sess" "$(board_sid "$B")" "S19: fresh-mtime archived board revived w/o force (sid re-stamped)"
+assert_eq "true" "$(board_active "$B")" "S19: fresh-mtime archived board active false→true"
+assert_contains "$HOOK_OUT" "TAKEN OVER" "S19: fresh archived board → takeover context (not a freshness warning)"
+rm -rf "$H"
+
 finish

@@ -180,10 +180,25 @@ Or enable it declaratively in settings. The `enabledPlugins` value is an **objec
 Once loaded, hand it a goal big enough to be worth it (think >24h of work, many independent units). The full command set:
 
 ```
-/cc-master:as-master-orchestrator <goal>   # bootstrap a board and become the orchestrator
-/cc-master:status                          # render the board summary + validate the narrow waist
-/cc-master:stop                            # archive the board and stand down (board is kept, not deleted)
+/cc-master:as-master-orchestrator <goal>           # bootstrap a board and become the orchestrator
+/cc-master:as-master-orchestrator --resume [sel]   # pick up an EXISTING board in a new session (see below)
+/cc-master:status                                  # render the board summary + validate the narrow waist
+/cc-master:stop                                    # archive the board and stand down (board is kept, not deleted)
 ```
+
+### Resume an existing board in a new session
+
+A long-horizon orchestration outlives any single session. When the original session is closed / crashed / you're on another machine — or you ran `/cc-master:stop` and changed your mind — `--resume` lets a **brand-new session take over an existing board** instead of starting from scratch:
+
+```
+/cc-master:as-master-orchestrator --resume                 # one resumable board → pick it; else list candidates
+/cc-master:as-master-orchestrator --resume i18n            # select by goal substring, board filename, or timestamp prefix
+/cc-master:as-master-orchestrator --resume i18n --force-takeover   # confirm taking over a board that still looks alive
+```
+
+- **Any board is resumable** — both still-`active` (abandoned) boards and `/stop`-**archived** ones. Resuming an archived board **revives** it (`active:false → true`). `/stop` is a *reversible archive*, not a permanent end-state; the board file, its `tasks`, `log`, and `goal` are all preserved across archive → revive.
+- **Takeover is safe by default.** Re-stamping the board hands it to the new session and orphans the old one's background work — so if a board still *looks alive* (recent heartbeat / file mtime), `--resume` warns and **withholds** the takeover until you re-send with `--force-takeover`. Ambiguous or missing selector → nothing is written; it lists the candidates (grouped into *abandoned* vs *will-be-revived*) and asks you to pick.
+- **Resume means pick up, not restart.** The conductor reconciles the existing `tasks[]` rather than re-decomposing the goal, and treats any `in_flight` task left by the dead session as an orphan — endpoint-verifying its artifact (and marking it done) or re-dispatching it for a fresh handle, never idle-waiting on a dead handle. See [ADR-009](adrs/ADR-009-resume-cross-session-re-arm.md).
 
 ### Optional — turn on account-authoritative quota awareness
 
@@ -257,13 +272,13 @@ It deliberately does **not** use **agent-teams** or **scheduled routines**: neit
 
 The board never depends on the agent cooperating, and the orchestrator can't quietly quit early. The five hooks span four events:
 
-1. **`UserPromptSubmit`** (`bootstrap-board.sh`) detects the command's sentinel → deterministically creates an empty board skeleton + injects its exact path and the orchestrator role. This is also the **arm action** (see below).
+1. **`UserPromptSubmit`** (`bootstrap-board.sh`) detects the command's sentinel → deterministically creates an empty board skeleton + injects its exact path and the orchestrator role. This is also the **arm action** (see below) — and with `--resume` it instead re-arms an *existing* board (the second arm form: stamp owner onto a selected old board, reviving it if archived; [ADR-009](adrs/ADR-009-resume-cross-session-re-arm.md)).
 2. **`SessionStart`** (`reinject.sh`) re-injects role + board after every compaction and on resume — and on resume it flags any **dangling `stale`/`escalated` nodes** left from an un-reconciled plan update.
 3. **`Stop`** (`verify-board.sh`) runs a pure-bash gate over *this session's* active board (filtered by `owner.session_id`, so concurrent orchestrations never interfere). An empty board, or one with `ready`/`uncertain` work left, **blocks** the stop; when the board looks done it forces a one-time **self-check against the goal** — surfacing any **unanswered `blocked_on:user` decisions** — before releasing, with a fuse (5 consecutive blocks) so a misjudgment can never wedge the agent.
 4. **`Stop`** also runs `usage-pacing.js` (node): it prefers the **account-authoritative** 5h/7d `used_percentage` captured to a sidecar by `statusline-capture.js` (falling back to local-JSONL 反推 when the sidecar is absent), and injects a **non-blocking** pacing warning when either window nears its limit — it never blocks and never decides *how* to pace (that's the orchestrator's judgment).
 5. **`PostToolBatch`** (`posttool-batch.sh`) counts in-flight tasks against the board's `wip_limit` after a batch of parallel calls and **soft-warns** on over-dispatch — never blocking; parallel freedom is preserved.
 
-**Every hook is dormant until armed.** "Armed" is derived from the board on disk: a hook acts only when this session owns an active board (`owner.active:true` **and** `owner.session_id` == the hook's stdin `session_id`; an empty id degrades to any active board, for compaction robustness). Until then — in any plain coding session in the same host — every hook is completely silent. `bootstrap-board.sh` is the sole exception: it *is* the arm action (stamping `owner.session_id` as it creates the board). Disarming is `/stop`. See [ADR-007](adrs/ADR-007-hook-arming-gate.md).
+**Every hook is dormant until armed.** "Armed" is derived from the board on disk: a hook acts only when this session owns an active board (`owner.active:true` **and** `owner.session_id` == the hook's stdin `session_id`; an empty id degrades to any active board, for compaction robustness). Until then — in any plain coding session in the same host — every hook is completely silent. `bootstrap-board.sh` is the sole exception: it *is* the arm action (stamping `owner.session_id` as it creates the board — or, with `--resume`, as it re-stamps a selected existing board). Disarming is `/stop` — a *reversible* archive that `--resume` can revive. See [ADR-007](adrs/ADR-007-hook-arming-gate.md) and [ADR-009](adrs/ADR-009-resume-cross-session-re-arm.md).
 
 ### The board
 
