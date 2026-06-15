@@ -50,9 +50,9 @@ cc-master/
 │   ├── orchestrating-to-completion/  ← SKILL A：编排方法论（魂）+ references/ + scripts/（运行时带外脚本 cc-usage / codex-review / statusline-capture，随 skill 分发，prose 用 `${CLAUDE_SKILL_DIR}` 引用）
 │   └── authoring-workflows/          ← SKILL B：workflow 写法 + references/ + assets/examples/
 ├── .claude/skills/            ← **项目自用** dev skill（造/评/治三件套 + requirement-elicitation 上游需求发现，**不分发**）
-├── hooks/scripts/            ← 5 个 hook，全 board-derived「武装」后才醒（ADR-007）：bootstrap-board（ARM 动作）/ reinject / verify-board（goal-hook）/ posttool-batch（过调度软警告）·bash + usage-pacing.js（**账户权威 5h/7d `used_percentage` pacing**，读 statusline-capture 落的 sidecar；缺则降级本地反推·Finding #37）·node·JS（红线1·ADR-006 已允许 node）
+├── hooks/scripts/            ← 5 个 hook，全 board-derived「武装」后才醒（ADR-007）：bootstrap-board（ARM 动作）/ reinject / verify-board（goal-hook）/ posttool-batch（过调度软警告）·bash + usage-pacing.js（**账户权威 5h/7d `used_percentage` 双侧 pacing**：临界轻推减速 + 5h 欠用轻推加速、7d 当硬总闸·ADR-010；读 statusline-capture 落的 sidecar，缺则降级本地反推·Finding #37）·node·JS（红线1·ADR-006 已允许 node）
 ├── scripts/                  ← 带外 **dev-only** 脚本：eval-trigger / eval-benchmark / skill-lint（仅开发本仓用、repo 根调用，**不随 plugin 分发**；裸路径在此正确）。运行时带外脚本（cc-usage / codex-review / statusline-capture）已搬入 `skills/orchestrating-to-completion/scripts/`（随 skill 分发，见上）
-├── adrs/                     ← 结构性决策快照（ADR-001..009 + AGENTS.md 规约）
+├── adrs/                     ← 结构性决策快照（ADR-001..010 + AGENTS.md 规约）
 ├── tests/                    ← hook 测试（bash）；run-tests.sh 编排 hook + content contract
 ├── design_docs/             ← 设计文档 + eval/ + dogfood-findings.md（plans/ gitignored）
 └── examples/                 ← 可跑样例（sample-orchestration：i18n 场景 walkthrough.md + smoke.sh 冒烟证明）
@@ -197,7 +197,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 
 ## 13. ADR 约定
 
-结构性架构决策（"为什么 X 不 Y / 何时可推翻"）记成 ADR——与 design_docs（描述当前状态）严格分开。命名 `ADR-NNN-<slug>.md`，带 Status/Date/Scope frontmatter + Context/Decision/Consequences/Alternatives/Related 模板。**何时写 ADR、ADR-vs-design_docs 试金石、workflow 全在** → [`adrs/AGENTS.md`](adrs/AGENTS.md)。现有 ADR-001..009（hooks-pure-bash / ship-anywhere-scope / board-narrow-waist / loop-dissolution-and-goal-hook / two-skills-separation / hooks-may-use-node-js / hook-arming-gate / account-authoritative-usage-and-script-placement / resume-cross-session-re-arm）。
+结构性架构决策（"为什么 X 不 Y / 何时可推翻"）记成 ADR——与 design_docs（描述当前状态）严格分开。命名 `ADR-NNN-<slug>.md`，带 Status/Date/Scope frontmatter + Context/Decision/Consequences/Alternatives/Related 模板。**何时写 ADR、ADR-vs-design_docs 试金石、workflow 全在** → [`adrs/AGENTS.md`](adrs/AGENTS.md)。现有 ADR-001..010（hooks-pure-bash / ship-anywhere-scope / board-narrow-waist / loop-dissolution-and-goal-hook / two-skills-separation / hooks-may-use-node-js / hook-arming-gate / account-authoritative-usage-and-script-placement / resume-cross-session-re-arm / two-sided-pacing-corridor —— ADR-010：pacing 从单边上限护栏改为**双侧目标走廊**（5h reset 目标落 70–90% 区间、欠用侧轻推加速 / 临界侧轻推减速），以 **7d 窗口当加速硬总闸**）。
 
 ---
 
@@ -209,11 +209,12 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 |---|---|
 | 改编排方法论 / 援引七镜头 · 红线 · 决策程序 | [`skills/orchestrating-to-completion/SKILL.md`](skills/orchestrating-to-completion/SKILL.md)（魂 · 不在本文复述）|
 | 把目标拆成依赖 DAG（CPM / float / 临界路径 / 粒度）| [`skills/orchestrating-to-completion/references/decomposition.md`](skills/orchestrating-to-completion/references/decomposition.md) |
-| 选后台机制 / 编排并行（shell · sub-agent · workflow · 两尺度 dataflow）| [`skills/orchestrating-to-completion/references/dispatch.md`](skills/orchestrating-to-completion/references/dispatch.md) |
+| 派发的某个大节点*内部*本身是个复杂规划问题（让执行者发现并遵循**被编排项目自己**约定的 planning 规范 + 维护其计划文档 / board ⊥ 项目 planning 层的多层次调度）| [`skills/orchestrating-to-completion/references/multi-layer-planning.md`](skills/orchestrating-to-completion/references/multi-layer-planning.md)（注意：「项目」指 orchestrator 所服务的目标项目，**非 cc-master 本仓**）|
+| 选后台机制 / 编排并行（shell · sub-agent · workflow · 两尺度 dataflow / 反过度工程护栏 · parallel-vs-pipeline smell-test）| [`skills/orchestrating-to-completion/references/dispatch.md`](skills/orchestrating-to-completion/references/dispatch.md) |
 | 动 board 协议 / narrow-waist schema / status enum / 续跑续接 | [`skills/orchestrating-to-completion/references/board.md`](skills/orchestrating-to-completion/references/board.md) |
 | 异步完成 + HITL / p95 hedging / 用户当 async worker | [`skills/orchestrating-to-completion/references/async-hitl.md`](skills/orchestrating-to-completion/references/async-hitl.md) |
 | 廉价续跑 + 端点验收 / content-hash / codex 第二验收者 | [`skills/orchestrating-to-completion/references/resume-verify.md`](skills/orchestrating-to-completion/references/resume-verify.md) |
-| 选每节点模型档位 / 主线为何固定模型保 cache / 按 5h-7d 配额窗口 pace | [`skills/orchestrating-to-completion/references/cost-and-pacing.md`](skills/orchestrating-to-completion/references/cost-and-pacing.md)（reference 知识,非红线）|
+| 选每节点模型档位 / 主线为何固定模型保 cache / 按 5h-7d 配额窗口 pace（**双侧目标走廊**：欠用加速 / 临界减速、**7d 当硬总闸**·ADR-010）| [`skills/orchestrating-to-completion/references/cost-and-pacing.md`](skills/orchestrating-to-completion/references/cost-and-pacing.md)（reference 知识,非红线）+ [`adrs/ADR-010-two-sided-pacing-corridor.md`](adrs/ADR-010-two-sided-pacing-corridor.md) |
 | 沿愿景轴定位（哪条镜头 / reference / 决策程序节点服务哪项 charter 能力）/ 把 hook 注入短语回溯到锚点 | [`skills/orchestrating-to-completion/references/external-coordinates.md`](skills/orchestrating-to-completion/references/external-coordinates.md)（愿景索引 + hook 共享词汇,魂瘦身下沉的坐标系）|
 | 写 / 调试 / 启动 workflow 脚本（API + 机制 + pattern + 11 个 example）| [`skills/authoring-workflows/SKILL.md`](skills/authoring-workflows/SKILL.md) + [`references/`](skills/authoring-workflows/references/) + [`assets/examples/`](skills/authoring-workflows/assets/examples/) |
 | 动手任何 feature / skill / 行为改动前先挖真需求 / 过设计闸（取代 `superpowers:brainstorming`）| [`.claude/skills/requirement-elicitation/SKILL.md`](.claude/skills/requirement-elicitation/SKILL.md)（道 + 五个 discovery moves + strawman + 设计闸，项目自用 dev skill）|

@@ -2,7 +2,7 @@
 
 > 中文版见 [README_zh.md](README_zh.md)。
 
-![version](https://img.shields.io/badge/version-0.4.3-blue)
+![version](https://img.shields.io/badge/version-0.5.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![ship-anywhere](https://img.shields.io/badge/ship--anywhere-Bedrock%20%7C%20Vertex%20%7C%20Foundry-7c3aed)
 ![requires](https://img.shields.io/badge/requires-Node%2022%2B%20%2B%20bash-orange)
@@ -233,7 +233,7 @@ cc-master **aims to** make a Claude Code agent into a master orchestrator across
 | # | Capability | Status | How it's delivered today |
 |---|---|---|---|
 | **C1** | Drive a goal to full, async-parallel completion — not halfway, all the way | 🟢 Live | three background mechanisms + the decision-program loop + a `Stop` gate that forces "really all done" |
-| **C2** | Control the *rate* of token burn — throttle, don't redline | 🟢 Live | `usage-pacing.js` (non-blocking warning on account 5h/**7d** `used_percentage`, captured via `statusline-capture.js`; local-derived fallback) + `cc-usage.sh` (out-of-band query, account-first) |
+| **C2** | Control the *rate* of token burn — steer into a two-sided corridor, neither redline nor under-use | 🟢 Live | `usage-pacing.js` (non-blocking, **two-sided** warning on account 5h/**7d** `used_percentage`: throttle near a limit *and* accelerate when the 5h window is under-used, with the 7d window as the hard ceiling — see [ADR-010](adrs/ADR-010-two-sided-pacing-corridor.md); captured via `statusline-capture.js`, local-derived fallback) + `cc-usage.sh` (out-of-band query, account-first) |
 | **C3** | Hold the line between deciding autonomously and pulling in the human | 🟢 Live | red lines + `blocked_on:user` nodes + the `Stop` gate listing unanswered user decisions |
 | **C4** | Decompose, manage, update, and re-plan the goal as it learns | 🟢 Live | the board DAG + CPM decomposition + resume flagging dangling `stale`/`escalated` nodes |
 | **C5** | Maximize throughput *under* a sane burn rate | 🟢 Live | WIP cap (~75% utilization) + free float parallelism + `posttool-batch.sh` soft-warn |

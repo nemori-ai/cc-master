@@ -34,7 +34,7 @@
 学术根源是 LLM-Compiler 的 **Task Fetching Unit**（report 3）：一条依赖在它的输入就绪那一刻就被派出去；已经能跑的东西绝不等一个还没就绪的；而且 planner 流式地吐图，让 plan 和 execute overlap。cc-master 在两个尺度上跑的是同一套算法：
 
 - **宏观（主线）—— dataflow 作为一种内化的*心态*。** 决策程序*本身*就是一个手跑的 TFU：对账 board（observation 黑板）→ 派发就绪任务（fetch-when-ready）→ 在空隙里塞 fill-work（planner/executor overlap）→ 在端点验收（Joiner 闸）→ 唯有就绪集为空才等。这里**没有 `pipeline()` 原语**——主线 DAG 是动态的、异构的、里头还有个人，没有任何 compile-time 脚本能表达它。Dataflow 在这里以纪律存在（镜头 3 & 4），不是代码。
-- **微观（workflow 内部）—— dataflow 作为一个显式*原语*。** 这里 `pipeline()` 是真代码：确定性、有日志、可续。但它僵硬——workflow 一经启动结构就固定，没有运行中途的输入（`authoring-workflows/references/mechanism.md` §7）。
+- **微观（workflow 内部）—— dataflow 作为一个显式*原语*。** 这里 `pipeline()` 是真代码：确定性、有日志、可续。但它僵硬——workflow 一经启动结构就固定，没有运行中途的输入（`authoring-workflows/references/mechanism.md` §7）。微观尺度选 `parallel()`（barrier）还是 `pipeline()`（streaming）的判据，见 `authoring-workflows/references/mechanism.md` §3 的 parallel-vs-pipeline smell-test（默认 pipeline，只有下游真要整批集合才上 barrier）——此处不复述。
 
 **两个尺度之间的切线，就是按动态性切的。** 必须运行中途随机应变的工作——对一个外部完成做出反应、把一个 escalation 重新定位、吸收一个 HITL 回答——归宏观尺度（board + 决策程序，LLM 在 loop 里）。能在 compile time 就固定下来的工作——一批同构项目流过固定 stage——归一个 `pipeline()`。这正是把 LLM-Compiler 那条切线 *"LLM 吐图、代码调度它"* 从单个 agent 任务放大到整场 long-horizon 编排：主线 LLM 做动态规划（吐图 + replan），workflow 脚本做确定性调度。自相似——一个尺度嵌在另一个里。
 
@@ -55,6 +55,8 @@
 - **shell** —— 可机械检查的执行（build / test / 拉数据 / 监听 / poll CI）。零 token 成本。必须配齐 **timeout + success predicate + log 捕获**，且失败必须能路由到一个下游推理节点（否则就拆成"一个 shell 执行节点 + 一个 sub-agent 诊断节点"）。
 - **sub-agent**（`run_in_background`）—— 一个**终端（terminal）**推理单元：单一证据面 + 单一推理链 + 单一交付物 + 无需 fan out + 无需统一 schema + context-safe + 携带一条显式 escalation 路径。
 - **workflow** —— 当你需要**对多个叶子的确定性控制**时（fan-out / fan-in · 统一叶子 schema · 对抗式验证 / retry / loop · 联合综合 · context-flood 风险 · journal-resume）——**哪怕叶子数很少也选它**。
+
+> **反过度工程的对称护栏**：workflow 背着一整套机器开销——只有一条推理链 / 一份交付物 / 没有 fan-out 时，单个 sub-agent 就够了，起 workflow 是过度工程（对称于上面「哪怕叶子数很少也选它」，两侧都要守）。论证 SSOT 在 `authoring-workflows/SKILL.md` §1「workflow 是有开销的」，此处不复述。
 
 ### 等待外部状态 —— 用一个后台 shell
 
@@ -117,6 +119,7 @@ HITL 只是诸多轴之一；失败隔离、优先级、整合时机同样重要
 
 ## 派发卫生 —— 一跑真并行就咬人的机械细节
 
+- **派发先于 board 标注，handle 是 `in_flight` 的唯一入场券。** board 标注与真实派发是**两个独立动作**：`Write` board 把一个 task 标 `in_flight` 只是改了**模型**，真正派出 worker 的是那次 `Agent` / `Bash` 工具调用。两者一旦顺序颠倒（先标板、再去发调用），就极易在多线程编排里漏掉那次调用——尤其当一个 sibling 的完成通知插进本拍、把你引去验收它时，那次未发的 dispatch 就这样蒸发了（[[Finding #17]] 的精确复发路径）。**纪律**：先调工具拿 handle（agentId / shell handle）、再 `Write` board 标 `in_flight`；handle 写进该 task 当 worker 实证。没有 handle 的 `in_flight` 是**幽灵任务（phantom）**——board 与自报都「显示在跑」、背后却没有活 worker，你在空等一个不存在的进程并据此**虚构进度**。**为什么软纪律不够**：[[Finding #46]] 里这条教训已被写进 board log，却在同一场编排的压力下**再次**复发——一次性 log 拦不住它，故它升进了魂的决策程序（dispatch / recon 节点）作常驻护栏。**地面真相验证法**（recon 时逐个对账每个 `in_flight`）：① 该 task 是否带一个真实 handle（agentId / shell handle）；② `git status` / 工具结果里是否有它的真实产物或 transcript；③ 三者皆空 = phantom，立即降级回 `ready` 重派——别信 board 的字面、别信自报，只信 git 与工具结果这层地面真相。
 - **用绝对路径指向工作目标——绝不靠继承 cwd。** 编排者的 cwd 常常*不是*工作落地的那个 repo（你可能在从另一个 worktree 或一个父目录驱动）。每个被派发 agent 的 prompt 都必须给出指向目标的**绝对路径**、并告诉它别依赖继承来的 cwd——否则文件会落进错误的树。
 - **单一提交者：叶子负责写 + 自测，编排者负责提交。** 各自 `git commit` 的并行 agent 会抢 git index。要求每个叶子**写它的文件、跑它的测试证明是绿的，但绝不 commit**；由编排者在端点验收、再按依赖序提交。（又是 end-to-end argument——commit 完整性归编排者端点，不归叶子。见 `resume-verify.md`。）
 - **对同一个共享可变文件的写者，跨波串行化。** 若几个任务都追加到同一个文件（一个共享测试文件、一个 registry），*同一*波里的两个会互相覆盖。把这些写者拆进**不同的波**，使任一时刻至多一个去碰那文件——编排者吸收这份协调成本，好让叶子保持独立、互不相交。

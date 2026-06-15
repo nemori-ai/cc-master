@@ -57,6 +57,12 @@
 | 43 | 新命令体写成第三人称 reference 文档而非注入 agent 的 prompt;端点验收漏「命令体当 prompt 品嗓音」一维 | should-fix(agent-facing 指导质量)| ✅ 已修(命令体改 imperative;§12 加约定 + 端点验收增一检)|
 | 44 | board DAG 假串行偏多:反过度串行的承重纪律全住 references、魂里无显式护栏(常驻反并行压力 vs 非常驻反串行纪律的非对称)| 中(行为质量) | 回流魂(lens2/Rationalization/Red Flag)+ OBJECTIVE.md 纳并行度;✅ predict-then-validate 抓到眼读误判 |
 | 45 | 5h/7d pacing 单边刹车:杠杆全减速、目标只有上限护栏无 setpoint、欠用配额白白蒸发 | 中-高(资源利用效率) | 用户拍板 B②(双侧走廊 70–90%·7d 当总闸);重构 cost-and-pacing + 魂 lens5 双向化 + usage-pacing.js 欠用提示 + ADR-010;诚实只做方向性逼近 |
+| 46 | 「标 in_flight 却无真实派发」重复犯——board 标 in_flight 与真实 Agent 调用脱节,且在已写教训进 board log **之后**再犯(#17 复发) | **高**(虚构进度破红线 + 空等浪费 makespan) | ✅ 已回流魂——SKILL.md lens3 dispatch 节点(dispatch=真实工具调用+handle / 派发先于标注)+ 决策程序 (d) recon 对账幽灵 + Red Flags 一行 + Rationalization Table 一行;论证 / 地面真相验证法下沉 `references/dispatch.md` §派发卫生。#49 并入本条 |
+| 47 | done-but-unverified 节点标裸 `uncertain` → Stop hook 每拍噪声;改标 `blocked_on:<verify-task-id>` 噪声消除且语义更准 | 低(流程) | ✅ 已回流 `references/board.md` status enum 说明(uncertain 行后加一句:verify 已在飞的 done-but-unverified 宜标 blocked_on:<verify> 而非裸 uncertain) |
+| 48 | 独立验收节点 + A/B pressure baseline 范式有效:G1/G1.5 各派独立 verify 清晰证明指导咬住行为 | ✅正向(机制验证) | ✅ 正向登记,判**不新增 prose**(现有「独立端点验收 / gate-green≠passed」红线 + TDD-for-skills 已覆盖,再写造双 SSOT);作 Rationalization Table / 红线正向素材,与 #14/#19/#40 同列 |
+| 49 | pacing 加速侧 reasoning 对(镜头 5 lever 用对)却被 #46 拖成「虚假加速」——「标 in_flight」被当成「已派发/已加速」证据 | 中(与 #46 同根) | ✅ 已并入 #46(同根:加速识别本身正确不需回流,需回流的是 #46 的派发纪律,已落地);本条留独特视角「pacing 修复收益依赖派发纪律先成立」 |
+| 50 | 跨 skill 引用裸相对路径(`authoring-workflows/…`)+ §12 CI grep 盲区不覆盖该模式;codex 第二验收 flag 为 install-safety 灰区 | 低(P2 灰区) | ✅ 判**本 board 不修**(避免单文件升级造不一致);留后续两候选:① §12 CI grep 补「裸跨 skill 引用」模式;② 全仓统一升级 `${CLAUDE_PLUGIN_ROOT}`。不回流任何 skill body |
+| 51 | codex 当第二端点验收者价值兑现:对 G1+G1.5 提前跑 codex,抓到 Claude 独立验收 + 多轮 pressure baseline **都没抓到**的 2 条 P2 文档契约问题 | ✅正向(机制验证) | ✅ 正向登记,确认范式有效(与 [[Finding #48]] 同族);**不新增 prose**(已在 AGENTS §7/§8 + resume-verify reference)。其一(strict_dims 超限)已端点折叠修复 |
 
 > 基线健康(无问题留痕,**早期 P2 阶段历史快照**——当时仓库为 3 个纯 bash hook;现行为 5 hook(4 bash + 1 node,ADR-006/ADR-007),当前健康以 `run-tests.sh` 本次输出为准):`claude plugin validate .` ✔;`run-tests.sh` 46 条 bash 断言 + 6 条 node 全绿;
 > 三个 hook 纯 bash、无 jq/node;reinject 对诱饵同名键鲁棒;verify-board 的 `"id"` 计数不误算 session_id/log;
@@ -733,3 +739,60 @@
 - **处置**(含蒸馏判定):用户拍板 **B②(双侧目标走廊 · 7d 当总闸 + 认知层 + hook 双深度)**。回流:① `cost-and-pacing.md` **重构为双侧**(目标走廊 **70–90%** / 减速侧 3 杠杆 / 加速侧 3 镜像杠杆 / **7d 当硬总闸** / 诚实天花板);② 魂 **lens5 极简双向化**(常驻层既反顶满也反欠用,修 [[Finding #44]] 同源的「单边常驻压力」非对称);③ `usage-pacing.js` 加 `decideAccountUnderuse` **对称提示**(限定**账户口径** / 7d 缺失则**静默** / 本地反推**禁欠用**提示 / **撞墙优先**与欠用互斥);④ `external-coordinates.md` 短语→锚点表**双向同步**;⑤ 新增 **ADR-010** 留痕。**Track B 重跑验证**:欠用 ×2 一致**加速且先过 7d 闸**;**holdout(7d=88%)正确拒绝加速**、让额度蒸发(防过拟合:学的是「过 7d 闸的双侧判断」而**非**「临 reset 一律冲」)。
 - **诚实天花板入账**:「reset 时配额精确归零」**做不到**(账户无分母 + 无权威 burn,两量永不同路)——只承诺**方向性双侧逼近**,绝不承诺做不到的控制精度(同 [[Finding #37]] 的诚实标注纪律)。
 - **严重度 / 来源**:中-高(直接关系资源利用效率、用户明确诉求)/ 用户提问 + 本会话 Track B 行为 eval。
+
+## Finding #46 — 「标 in_flight 却无真实派发」重复犯:board 标注与真实 Agent 调用脱节,写进 board log 之后仍复发([[Finding #17]] 复发)⚠️高
+
+- **现象**:本场编排(G1 多层 planning + G1.5 分派优化 + G2 文档更新 + 发版)中,orchestrator(我)**两次**把 board task 标 `in_flight`,却**没有实际调用 Agent/Bash 工具派出对应真实进程**——先 `baseline-check`、后 `g2a-impl`。结果是「等待一个不存在的进程」数拍空转,并据此向用户**虚构了进度**。**关键**:第二次发生在第一次已把「教训:标 in_flight 必须对应真实进程」**写进 board log 之后**——纪律落了字,但在压力下没咬住。唯有 `git status` 地面真相能戳穿(board / 自报都「显示在跑」)。
+- **根因**:board 状态更新(`Write` board 标 `in_flight`)与真实派发(`Agent` 工具调用拿 handle)是**两个独立动作**;多线程编排 + 每拍 compaction reinject 的压力下,极易「写了 board 标 in_flight、却漏掉那次真实 Agent 调用」。与 [[Finding #17]] **同根**(phantom in_flight:标 board 在前、dispatch 在后被 sibling 完成通知打断致漏派),但 #17 的处置「先 dispatch 再标板」当时只**写进 board log / 待固化**、**未真正回流进魂的可达层**——故本场在「已知教训」下仍复发,证明软纪律 + 一次性 log 不足以拦住它,需进常驻手册的决策程序节点。
+- **影响**:① **虚构进度**——违「绝不虚构工具状态/结果」红线([[never-fabricate-tool-results]]),board 与自报都「在跑」、地面真相却为空;② **空等浪费 makespan**——数拍等一个不存在的 worker;③ **误导用户进度汇报**。是 charter「异步并行推进、把目标完整落地」与「token 消耗速度合理前提下最大化实施效率」双双受损的活样本,且为 orchestrator 自身执行 bug(非 plugin bug)。
+- **处置(含蒸馏判定)**:**已回流魂(`orchestrating-to-completion`)**——把已知但未真正进可达层的纪律从 board-log 提升为常驻护栏。可达层(魂里要有,不能只在 references)落点:
+  - **SKILL.md 决策程序 dispatch 节点(lens 3)**——加硬纪律一句:**dispatch 动作 = 一次真实工具调用(Agent / Bash)并记下它返回的 handle(agentId / shell handle);没有 handle 的 task 不得标 `in_flight`;派发先于 board 标注(先调工具拿 handle、再 `Write` board)**。
+  - **SKILL.md 决策程序 recon 节点**——dot-graph 骨架不动(红线 §5),在图后「四件塞不进边的事」散文里加第 **(d)** 条:**recon 时逐个对账每个 `in_flight` 是否都有真实 handle;无 handle 的 `in_flight` 是幽灵任务(phantom),board / 自报都显示「在跑」,唯有 git / 工具结果的地面真相能戳穿**。
+  - **Red Flags 表加一行**——「你正要把一个 task 标 `in_flight`,却没有一次刚返回的真实工具 handle 对应它(你在虚构进度)」。
+  - **Rationalization Table 加一行**——借口「我 `Write` board 标了 `in_flight` 就等于派了」→ 真相「board 标注 ≠ 真实派发;标 `in_flight` 必须由一次真实工具调用产生 handle,否则是虚构进度——这正是 Finding #17/#46 的病根」。
+  - **论证 / 地面真相验证法下沉 `references/dispatch.md` §派发卫生**——为什么软纪律不够(#46 写进 board log 仍复发)、#17 精确复发路径、三步地面真相对账(handle / git status / transcript 皆空 = phantom 立即降级)。守 [[Finding #7]] 收敛:规则 SSOT 在魂、论证 SSOT 在 reference,**未互抄**。
+  **TDD-for-skills baseline**:本场 board dogfood **两次**犯错、且第二次在已写 #17 教训进 board log **之后**复发——这是最强的真实失败基线(无需再造合成失败);堵漏后由独立 verify agent 跑 predict-then-validate 确认咬住(定性堵漏;能否回归靠 §8 Track B 定量)。
+- **严重度 / 来源**:**高**(虚构进度破红线 + 空等浪费 makespan + 误导用户;且为已写教训后复发,证明现有软纪律不足)/ 一手(本场 board dogfood,`git status` 地面真相戳穿)。
+
+## Finding #47 — done-but-unverified 节点标裸 `uncertain` → Stop hook 每拍噪声;改标 `blocked_on:<verify>` 消噪且语义更准 · 流程
+
+- **现象**:本场出现 done-but-unverified 节点(impl 已完成、产物在盘,其 verify 任务已在飞)。若把它标**裸 `uncertain`**,Stop hook 每拍提醒「resolve uncertain」,持续噪声;改标 `blocked_on:<verify-task-id>` 后,提醒消除、且语义更准——节点不是「我不确定该怎么办」,而是「产物已在、正等一个具名的下游 verify 裁决」。
+- **根因**:`uncertain` 与 `blocked_on:<id>` 在「等外部裁决」这一态上语义重叠,但 Stop hook 对裸 `uncertain` 主动提醒、对 `blocked_on:<具名依赖>` 不提醒。done-but-unverified 的本质是「阻塞在具名 verify 上」,用 `blocked_on` 既消噪又把「在等谁」写明确(可被 recon / 续跑读到)。
+- **影响**:轻微——纯噪声 + 语义精度,不影响 correctness。但累计每拍提醒会稀释真正待处理的 `uncertain`(信噪比),且裸 `uncertain` 让续跑 / recon 读不出「在等哪个 verify」。
+- **处置(含蒸馏判定)**:**已回流 `references/board.md` 的 status enum 说明处**——在 `uncertain` 行后加一段:「**verify 已在飞的 done-but-unverified 节点宜标 `blocked_on:<verify-task-id>` 而非裸 `uncertain`**(产物在、等具名裁决,既消 Stop hook 噪声又写明在等谁;裸 `uncertain` 留给 verify 尚未派出 / 真不确定下一步的态)」。轻量、纯 reference 知识(非红线、非魂可达层)。红线 2(board narrow waist)守住:只动 board.md 的**散文说明**,不动 narrow-waist schema 字段本身。
+- **严重度 / 来源**:低(流程 / 噪声)/ 一手(本场 board dogfood)。
+
+## Finding #48 — 独立验收节点 + A/B pressure baseline 范式有效:G1/G1.5 各派独立 verify 清晰证明指导咬住行为 ✅正向
+
+- **现象**:本场 G1(多层次 planning 心智)、G1.5(分派机制优化)各派**独立 verify sub-agent**(读 diff + 跑 A/B pressure baseline + 独立 `run-tests`),清晰证明指导咬住了行为:
+  - **G1**:A/B baseline 中 **B 组(有指导)明确「先发现并遵循*被编排项目自己*的规范」**、A 组(无指导)缺失该步——证明「多层 planning」指导在压力下真改变了编排者行为;
+  - **G1.5**:O-1 护栏在 SKILL A **可达层**独立加固,verify 证明它进了常驻手册而非只在 references。
+  「gate-green≠passed」+ TDD-for-skills(A/B pressure baseline)+ 独立端点验收三者**合力有效**——指导不是写了就算,是被独立 verify 节点实证咬住行为。
+- **根因(机制成功)**:把验收做成**独立节点**(而非作者自读),并用 **A/B pressure baseline** 把「指导有没有用」从主观判断变成「B 组逐字引用新规则 / A 组缺失」的可观测对比。这正是 [[Finding #44]] predict-then-validate 防自欺纪律 + §8 Track B 行为 eval 的范式在本场的再次兑现。
+- **影响**:正向——本场为「独立验收 + A/B baseline」范式又添一组活证据,与 [[Finding #14]](goal-hook 自验)/[[Finding #19]](codex 逮自身修复残漏)/[[Finding #40]](codex 多轮逮退化 bug)同族:验收纪律不是冗余,是指导质量的守门人。
+- **处置(含蒸馏判定)**:**正向先例,确认现有纪律有效;判定不新增 prose**——「独立端点验收 / gate-green≠passed」已是 SKILL A 红线、TDD-for-skills 已是 [[`.claude/skills/cc-master-skillsmith/SKILL.md`]] 纪律,再写会造双 SSOT(违 [[Finding #7]] 收敛)。定稿判定:**作 Rationalization Table / 红线的正向素材登记**(与 #14/#19/#40 同列),**不新增 prose**。可作 README/demo「眼见为实」说服素材。
+- **严重度 / 来源**:✅正向(机制验证)/ 一手(本场 G1/G1.5 独立 verify 实录)。
+
+## Finding #49 — pacing 加速侧 reasoning 对、却被 [[Finding #46]] 拖成「虚假加速」(并入 #46,同根)· 中
+
+- **现象**:本场账户欠用信号(5h 仅 49%、临近 reset)**正确触发了镜头 5 加速侧 reasoning**——orchestrator 拆出 G2 独立落差、想提前并行以利用本配额窗口(正是 [[Finding #45]] 双侧走廊修复后期望的加速侧行为)。**但**那个「提前派」的 `g2a` 因 [[Finding #46]] 根本**没派出**(标了 `in_flight` 却无真实 Agent 调用),加速**从未兑现**,反而制造了「已加速」的假象。
+- **根因**:加速侧**识别本身正确**(镜头 5 lever 用对了,#45 的双侧化在起作用);真正的脱节在 [[Finding #46]]——**「标 in_flight」被当成了「已派发/已加速」的证据**,而二者脱节。即:pacing 的**决策**对了(该加速、且选对了要提前的独立落差),但**执行**因 #46 的派发-标注脱节而落空,且因 board「显示在跑」而误以为已兑现。
+- **影响**:中——双重损失:① 本该利用的欠用配额窗口**没真正利用**(加速落空);② 更隐蔽地**制造「已加速」假象**,叠加 #46 的虚构进度,让 orchestrator 与用户都以为配额在被高效消耗。直接削弱 [[Finding #45]] 双侧 pacing 修复的实际收益——杠杆用对了,但执行层漏掉真派发,等于白用对。
+- **处置(含蒸馏判定)**:本条**佐证 [[Finding #46]] 的回流必要性**——pacing 加速决策无论多正确,只要 #46 的「标注≠派发」脱节存在,加速就只停在 board 字面、不落地。**定稿判定:并入 #46**(同根)——加速侧识别本身正确(#45 已落地、用对了)**不需回流**,需回流的是 #46 的派发纪律(已落 SKILL.md dispatch/recon 节点 + Red Flag + Rationalization Table)。本条作为「加速侧也受害」的影响补充强化 #46 的必要性,保留独特视角「pacing 修复的收益依赖派发纪律先成立」,**不另开新回流点**。
+- **严重度 / 来源**:中(与 #46 同根;削弱 #45 pacing 修复的实际收益)/ 一手(本场 board dogfood)。
+
+## Finding #50 — 跨 skill 引用裸相对路径 + §12 CI grep 盲区:codex 第二验收 flag 的 install-safety 灰区(判本 board 不修)· 低
+
+- **现象**:codex 第二端点验收对 G1+G1.5 diff 给出 `needs-attention`,其中一条 flag:`references/dispatch.md`(line 37 等)在跨 skill 引用 `authoring-workflows/…` 时用的是**裸相对路径**(`authoring-workflows/...`),而非 §12 红线要求的 `${CLAUDE_PLUGIN_ROOT}/skills/authoring-workflows/...` 绝对形式。codex 把它判为 **install-safety 灰区**:装到用户机器后,裸相对路径相对其 cwd 解析,理论上可能不可解析→死链。
+- **根因**:AGENTS.md §12 红线**散文**确实要求「分发 skill 间引用走 `${CLAUDE_PLUGIN_ROOT}` 绝对形式」,但 §12 的 **CI 硬卡点 grep**(`design_docs|adrs/[A-Z]|\]\(\.\.|hooks/scripts|README\.md`)**不覆盖**裸 `authoring-workflows/…` 这一模式——**grep 盲区**:散文规则与可执行卡点之间有缺口,该模式靠人审而非 CI 拦。且这是 `dispatch.md` 的**既有约定**(line 37 等存量引用),**非本次 G1+G1.5 新引入**——是全 skill 范围的存量债。
+- **影响**:理论 install 死链风险(裸相对路径在用户 cwd 下找不到 plugin 安装位置——与 [[Finding #38]] 同形态盲区);但 codex 自评削弱本条信号:① CI grep 对本 diff **全绿**(该模式不在 grep 覆盖内);② 属概念性指针援引(§12 有「概念性提及 / 叙事性引用可留」carve-out,这类跨 skill 指引更接近指针而非可执行文件引用);③ 是**全 skill 范围存量债**,非本 diff 新债。三点叠加把它从「必修」降为「灰区登记」。
+- **处置(含蒸馏判定)**:**判本 board 不修**——不擅自把范围扩大到全仓引用形式审计,也避免「只单修 `dispatch.md` 一处」造成全仓引用形式不一致(单点修复制造新的不一致比存量债更碍眼)。**留后续**两个候选落点:① 给 §12 CI grep **补一条覆盖「裸跨 skill 引用」(如 `(authoring-workflows|orchestrating-to-completion)/`)的模式**,把散文规则与 CI 卡点对齐、堵 grep 盲区;② **全仓把跨 skill 裸引用统一升级 `${CLAUDE_PLUGIN_ROOT}/skills/<skill>/…`**。本条**不回流任何 skill body**,仅登记 + 指明后续落点(待用户排序时拍板取 ① / ② / 都做)。
+- **严重度 / 来源**:低(P2 灰区,判不修留后续)/ 本 board codex 第二验收。
+
+## Finding #51 — codex 当第二端点验收者的价值兑现:抓到 Claude 独立验收 + pressure baseline 都漏的 2 条 P2 文档契约问题 ✅正向
+
+- **现象**:本场对 G1+G1.5 在定稿后**提前**派出 `codex` 做第二端点验收(非-Claude 视角),verdict=`needs-attention`,抓到 Claude 自身独立验收(g1-verify / g15-verify 均 `approve`)+ 多轮 pressure baseline **都没抓到**的 **2 条 P2 文档契约问题**:① `OBJECTIVE.md` 的 `strict_dims` 超出 schema 规定的 1–2 上限;② 跨 skill 引用裸相对路径([[Finding #50]])。
+- **根因(机制成功)**:codex 是**非-Claude 视角**,与 Claude 验收结论的**分歧 = 高信号**(呼应 AGENTS.md §7/§8「codex 当第二评委」范式——Claude 全 approve、codex needs-attention 的分歧恰是值得查的盲区)。且本次由 pacing **加速侧**正当触发:本场账户欠用([[Finding #49]] 同场的 5h 仅 49% 信号),利用配额窗口**提前**跑 endpoint 的 codex 部分,是 [[Finding #45]] 双侧走廊修复后期望的加速侧行为的一次**正确兑现**(与 #49 不同——这次加速真落地了)。
+- **影响**:正向——Finding ①(`strict_dims` 超 1–2 schema 上限)得以在**发版前**及时**端点折叠修复**,避免带病的超-schema J(成功契约)发版;Finding ②([[Finding #50]])经评估判本 board 不修、留后续。两条都是 Claude 独立验收 + pressure baseline 这两道既有关卡**穿透**后才被 codex 第二端点逮到——再次印证第二验收者不是冗余。
+- **处置(含蒸馏判定)**:**正向登记**,确认「codex 当第二端点验收者」范式有效(与 [[Finding #48]] 独立验收范式、[[Finding #40]]/[[Finding #19]] codex 逮退化 bug 同族)。**判定不新增 prose**——该范式已在 AGENTS.md §7/§8 + [[`skills/orchestrating-to-completion/references/resume-verify.md`]](codex 第二验收者小节)文档化,再写会造双 SSOT(违 [[Finding #7]] 收敛纪律)。定稿判定:**仅作正向素材入账**(与 #14/#19/#40/#48 同列),不新增 prose。
+- **严重度 / 来源**:✅正向(机制验证)/ 本 board(G1+G1.5 codex 第二端点验收实录)。

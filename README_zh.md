@@ -2,7 +2,7 @@
 
 > For English, see [README.md](README.md)。
 
-![version](https://img.shields.io/badge/version-0.4.3-blue)
+![version](https://img.shields.io/badge/version-0.5.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![ship-anywhere](https://img.shields.io/badge/ship--anywhere-Bedrock%20%7C%20Vertex%20%7C%20Foundry-7c3aed)
 ![requires](https://img.shields.io/badge/requires-Node%2022%2B%20%2B%20bash-orange)
@@ -233,7 +233,7 @@ cc-master **致力于让** Claude Code agent 化身一个具备六项能力的 m
 | # | 能力 | 状态 | 今天怎么兑现 |
 |---|---|---|---|
 | **C1** | 异步并行多线程推进、把目标完整落地——不是干到一半，而是一路到底 | 🟢 Live | 三种后台手段 + 决策程序 loop + `Stop` 门强制「真的全做完」 |
-| **C2** | 控制 token 消耗*速度*——节流，而非顶满 | 🟢 Live | `usage-pacing.js`（对账户 5h/**7d** `used_percentage` 出非阻断警告，经 `statusline-capture.js` 捕获；本地反推 fallback）+ `cc-usage.sh`（带外查询，account 优先） |
+| **C2** | 控制 token 消耗*速度*——往双侧走廊里收，既不顶满也不欠用 | 🟢 Live | `usage-pacing.js`（对账户 5h/**7d** `used_percentage` 出**双侧**非阻断警告：临近上限轻推节流 *且* 5h 窗口欠用时轻推加速，并以 7d 窗口作硬上限——见 [ADR-010](adrs/ADR-010-two-sided-pacing-corridor.md)；经 `statusline-capture.js` 捕获，本地反推 fallback）+ `cc-usage.sh`（带外查询，account 优先） |
 | **C3** | 把握自主决策与寻求人类接入的边界 | 🟢 Live | 红线 + `blocked_on:user` 节点 + `Stop` 门列出未答用户决策 |
 | **C4** | 边学边分解、管理、更新、重规划目标 | 🟢 Live | board DAG + CPM 拆解 + resume 报出悬挂的 `stale`/`escalated` 节点 |
 | **C5** | 在合理燃烧速率*之下*最大化吞吐 | 🟢 Live | WIP cap（~75% 利用率）+ 免费 float 并行 + `posttool-batch.sh` 软警告 |

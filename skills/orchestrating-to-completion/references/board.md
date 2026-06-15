@@ -52,6 +52,8 @@ tasks[ { id, status, deps } ]
 | `stale` | 一个上游产物变了——重跑（见 `resume-verify.md` 的依赖 pinning）。 |
 | `uncertain` | 做了但未验——路由到一个验证节点 / 在端点验。 |
 
+> **`uncertain` vs `blocked_on:<verify>` —— done-but-unverified 的标法**：当一个 done-but-unverified 节点的 verify 任务**已在飞**（产物在盘、正等一个具名的下游 verify 裁决）时，宜把它标 `blocked_on:<verify-task-id>` 而非裸 `uncertain`。两者在「等外部裁决」这一态上语义重叠，但 goal-hook（Stop hook）对裸 `uncertain` **每拍主动提醒**「resolve uncertain」、对 `blocked_on:<具名依赖>` 不提醒——标 `blocked_on:<verify>` 既消掉这层每拍噪声、又把「在等谁」写明确（可被 recon / 续跑读出），语义也更准（不是「我不确定该怎么办」，而是「产物已在、正等一个具名的下游 verify 裁决」）。裸 `uncertain` 留给「verify 尚未派出 / 真不确定下一步」的态。来源 [[Finding #47]]。
+
 ### 柔性边（agent 可自由塑形）
 
 `title / artifact / dispatched_at / mechanism / handle / kind / justification / output_schema /

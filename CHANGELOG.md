@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-15
+
+### Added
+
+- **`orchestrating-to-completion` 新增 `references/multi-layer-planning.md`（多层次调度心智 · G1）** — 补上一层此前缺失的指导：当 orchestrator 派发的某个大节点*内部*本身就是个复杂规划问题时，让承接它的执行者去**发现并遵循「被编排项目自己」约定的** planning 流程 / 规范（读那个项目的 `CONTRIBUTING` / `AGENTS.md` / `CLAUDE.md` / 既有 design docs 把它自己的规范挖出来），并维护那个项目约定位置的计划文档。核心是**两层正交调度心智**：cc-master 的 board（跨任务依赖 DAG / 并行 / 派发 / 端点验收）∥ 被编排项目的 planning 层（大节点*内部*怎么分步推进）。**承重澄清贯穿全文**：「项目」永远指 orchestrator 所服务的目标项目，**不是 cc-master 本仓**。来源 dogfood——大节点派发后内部失序、无可追溯记录、换 session 接不上手。`decomposition.md` §4 与 `SKILL.md` 镜头 2 各加一句反向指针（`decomposition.md` 只拆到「定粒度 / 定每节点契约」就停，节点*内部*的规划由这份 reference 补）。
+
+### Changed
+
+- **dispatch 指导优化（反过度工程护栏 + parallel-vs-pipeline smell-test 指针 + 机制选择软指针 · G1.5）** — 收紧机制选择这一段，防「为并行而并行」的过度工程：
+  - `dispatch.md` 加**反过度工程护栏（O-1）**——并行 / pipeline / workflow 是有开销的手段，节点真有独立性 / 真有可被下游消费的产物时才用，别为「显得在并行」硬拆。
+  - `dispatch.md` 加 **parallel-vs-pipeline smell-test 指针（O-2）**——给出快速判别：选并行还是 pipeline 看的是「下游要不要消费上游的产物」。
+  - `SKILL.md` 镜头 3 加**机制选择软指针（O-3）**——常驻手册层一句轻指引，指向 `dispatch.md` 的机制选择段，不复述细节（红线 3 + reinject 重注友好）。
+  - `orchestrating-to-completion/OBJECTIVE.md` 新增**「机制选择正确率」`strict_dim`（O-4）**——把「机制选对没有」纳入成功契约 J 的可度量维度。
+
+- **标 `in_flight` 必对应真实派发的纪律进魂（#46 回流 · dogfood Finding #46/#47）** — 本轮 dogfood 抓到编排者两次「`Write` board 标 task `in_flight`，却没实际调用工具派出真实进程」（幽灵任务），经诊断是 Finding #17 复发（旧教训只记 board log、没进魂的可达层）。把纪律真正上提进 `SKILL.md` 决策程序可达层：**dispatch 节点**加「dispatch = 真实工具调用 + 记 handle、无 handle 不得标 `in_flight`、派发先于 board 标注」、**recon 节点**加「对账每个 `in_flight` 是否都有真实 handle、幽灵靠 git / 工具结果地面真相戳穿」、**Red Flags / Rationalization Table 各加一行**（决策程序 7 步 + step-6 ledger 的 dot-graph 骨架 byte-identical 未动）；论证下沉 `dispatch.md` §派发卫生（规则 SSOT 在魂、论证 SSOT 在 reference，勿互抄）。`board.md` status enum 加 #47：verify 已在飞的 done-but-unverified 宜标 `blocked_on:<verify>` 而非裸 `uncertain`（消 goal-hook 每拍噪声）。`design_docs/dogfood-findings.md` 记 #46–#51。
+
+- **AGENTS.md / README 中英对近期迭代的文档沉淀（G2）** — 把双侧 pacing 走廊（ADR-010）/ multi-layer-planning（G1）/ dispatch 优化（G1.5）回流进 contributor 与 user-facing 文档：
+  - `AGENTS.md`：ADR 列表 `ADR-001..009 → ADR-001..010`（§2 树 + §13 清单，§13 给 ADR-010 补「双侧目标走廊 + 7d 总闸」一句话描述）；§N 触发式阅读表加 multi-layer-planning 一行（含「项目 ≠ cc-master 本仓」澄清）+ cost-and-pacing 行补 ADR-010 双侧走廊 / 7d 硬总闸指针；§2 树 `usage-pacing.js` 描述双侧化；dispatch 行补「反过度工程护栏 · parallel-vs-pipeline smell-test」。
+  - `README.md` / `README_zh.md`（严格镜像同步）：C2 charter 行从单边「节流」补为**双侧目标走廊**（临界减速 + 欠用加速、7d 当硬上限、see ADR-010），与「工作原理」hook 列表既有的双侧描述对齐。
+
 ## [0.4.5] — 2026-06-15
 
 ### Added
