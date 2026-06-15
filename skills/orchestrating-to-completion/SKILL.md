@@ -20,10 +20,10 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 ## The seven lenses（七镜头）
 
 1. **指挥不演奏 (Conduct, don't play)** — 拆图 / 派发 / 验收 / 整合。绝不亲手实现或 review。
-2. **目标即依赖图 (Goal = dependency graph)** — 拆成 DAG，找临界路径，把资源压到临界链上（非临界的 float 是免费的并行预算；「资源」也含**模型档位**——临界链上用强模型、float 上用廉价模型——见 `references/cost-and-pacing.md`）。
+2. **目标即依赖图 (Goal = dependency graph)** — 拆成 DAG，找临界路径，把资源压到临界链上（非临界的 float 是免费的并行预算；「资源」也含**模型档位**——临界链上用强模型、float 上用廉价模型——见 `references/cost-and-pacing.md`）。**每条依赖边都是债务，默认错——除非你能指名一个被下游直接消费的具体上游产物（artifact / hash），否则删掉它。**「先做 X 当安全网」「按这个顺序更稳妥」是顺序习惯，不是数据依赖。默认全并行，逐边举证；拆图细节见 `references/decomposition.md` §1–§2。
 3. **就绪即发，绝不在 barrier 干等 (Dispatch on ready, never wait at a barrier)** — dataflow：一个节点的依赖刚满足就立刻派发它；并行度 = 用 T₁/T∞ 算该开几条 lane。
 4. **主观能动，不被动空等 (Be proactive, never idle-wait)** — 歇下来之前，先把可做工作池榨干、主动排程。合法的等待 = 剩下的每条 path 要么 blocked 在某个 `in-flight` 后台任务上、要么已抛给用户待答。罪在**本可行动却被动**，不在闲置本身。
-5. **量力而行，不顶满利用率 (Work within capacity, don't max utilization)** — 限制 WIP，瞄准 ~75%（Little's Law + 利用率悬崖；加 agent 不总是更快）。capacity 也指 5h/7d 配额窗口，不只是瞬时 WIP——用 `${CLAUDE_SKILL_DIR}/scripts/cc-usage.sh` 感知它、按 `references/cost-and-pacing.md` 去 pace 它。
+5. **量力而行，不顶满也不空耗 (Work within capacity — neither max it out nor let it evaporate)** — 限制 WIP，瞄一条**目标走廊**而非单边上限（Little's Law + 利用率悬崖；加 agent 不总是更快）。capacity 也指 5h/7d 配额窗口：墙迫近就节流（降档/降WIP/推迟float），**有余量却临 reset 就提速**（升档/升WIP/把后续 float 提前拉进来）——白白蒸发额度和半截撞墙同是失败。加速先过 **7d 总闸**。用 `${CLAUDE_SKILL_DIR}/scripts/cc-usage.sh` 感知、按 `references/cost-and-pacing.md` 去 pace（双侧 lever + 走廊 + 7d 总闸都在那）。
 6. **只信端点验收，产出可记账可续 (Trust only endpoint verification; outputs are accountable and resumable)** — 在你自己的端点独立验收，agent 的自报不可信。用 content-hash 记账；done+verified 的可跳过、可续跑。
 7. **该问就问，前台对话∥后台执行 (Ask when you should; front-of-house dialogue ∥ background execution)** — 用户是一种特殊的 async worker；该他拍板的立刻抛出来，别捂着、也别越权。他的回答是一条 async 依赖；不依赖它的就绪工作照常派发、照常跑。
 
@@ -52,6 +52,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | 「**gate 绿了 / review 返回空的**——那算通过。」 | **Gate-green ≠ passed。** 一个空的或为 null 的 review 是*未通过*——它是 silent pass-through（静默放行），正是红线点名的那种失败模式。一个节点变成 `done` 之前，你必须读 diff / 独立验收。 |
 | 「这个情形**特殊——我就替用户把这个 merge（或那个不可逆 / 对外的步骤）决了**，好保持势头。」 | 那是**越权**。merge / 不可逆 / 对外 / 方向性 / 终审性的步骤归用户。把它作为一个 `blocked_on:"user"` 节点抛出来，并派发所有*不依赖*那个答案的活——势头与发问并不矛盾（镜头 7）。 |
 | 「那个决策点**还没到——等我们到那儿了我再停下来问用户**。」 | 捂着一个*可预见的*用户决策，会把未来的临界路径焊死在用户的在线日程上。那个答案是一个 async 依赖（镜头 7）——**预取它（prefetch）**：如果只有用户能答、且问题已成 decision-shaped（决策形态），现在就问，与后台并行。发问的触发条件是「可预见 + 用户可达」，绝不是「节点变 ready 了」——见 `references/async-hitl.md` §HITL。 |
+| 「**窗口紧 / 预算紧，我把这几个任务串起来跑，省点也更稳妥。**」 | 串行化**不省 token 总量、只拉长 makespan**——同样的活照样要干，你只是不让它们重叠。省预算靠**降档 / 控 WIP / 推迟 float**（见 `references/cost-and-pacing.md`），绝不靠焊死并行。一条边要么指得出一个被下游消费的具体上游产物，要么删掉——别拿预算当画假串行边的借口。 |
 
 ## Red Flags（红旗）—— 停下，重跑决策程序
 
@@ -62,6 +63,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 - 你正在凭一个**绿 gate 或一个空的 / null 的 review** 就把一个节点叫 `done`，而没读过 diff。
 - 你正要**替用户决定一个 merge / 不可逆 / 对外的步骤**，而非把它抛给用户。
 - 你正要**等待 / 让出**，却还没检查是否有任何任务 `ready`、任何节点 `uncertain`、或任何用户决策未抛出。
+- 你正要画一条依赖边 / 把两个任务串起来跑，却**说不出一个被下游直接消费的具体上游产物**——你在凭顺序习惯串行化，不是在跟数据依赖走。
 - 你正在为「**这场 orchestration 是某条红线的例外**」构建论证。
 - 你正要 Stop，却**没有 step-6 ledger**（没有把每条 path 的证据写进 board + 对话）。
 

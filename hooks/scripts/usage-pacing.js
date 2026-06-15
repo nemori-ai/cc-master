@@ -58,6 +58,17 @@ const RATE_CACHE =
   process.env.CC_MASTER_RATE_CACHE ||
   path.join(process.env.HOME || '', '.claude', '.cc-master-rate-limits.json');
 const PCT_FLOOR_RAW = process.env.CC_MASTER_PCT_FLOOR || '';
+// account-authoritative UNDERUSE pacing (对偶于撞墙侧): 当账户口径显示 5h 窗口**欠用**（used% 低）且
+//   **临近 reset**（窗口快归零、再不烧就白白浪费）且 **7d 总闸有余量**时，注入一条对称的「加速」非阻断提示。
+//   三条 env 覆写点（与撞墙侧 CC_MASTER_PCT_FLOOR 对偶；解析失败一律回退默认）：
+//     CC_MASTER_UNDERUSE_PCT_CEIL    5h used% 低于此即「欠用」（默认 60）
+//     CC_MASTER_UNDERUSE_REMAIN_MIN  距 5h reset 剩余分钟 ≤ 此即「临近 reset」（默认 60）
+//     CC_MASTER_SEVEN_DAY_HEADROOM   7d used% 低于此即「总闸有余量」（默认 80；7d 缺失 → 静默，保守取向）
+//     CC_MASTER_UNDERUSE_MAX_STALE_MIN  sidecar 新鲜度上限（分钟，默认 15）：captured_at 距今 > 此即陈旧 → 静默
+const UNDERUSE_PCT_CEIL_RAW = process.env.CC_MASTER_UNDERUSE_PCT_CEIL || '';
+const UNDERUSE_REMAIN_MIN_RAW = process.env.CC_MASTER_UNDERUSE_REMAIN_MIN || '';
+const SEVEN_DAY_HEADROOM_RAW = process.env.CC_MASTER_SEVEN_DAY_HEADROOM || '';
+const UNDERUSE_MAX_STALE_MIN_RAW = process.env.CC_MASTER_UNDERUSE_MAX_STALE_MIN || '';
 
 // 「明显临界」启发式阈值（ceiling 未知时的保守降级，避免刷屏）：仅当**两条同时成立**才出声 ——
 //   (a) 5h 窗口剩余时间 ≤ HEUR_REMAIN_MIN（墙在不远处）；
@@ -256,6 +267,56 @@ function decideAccountWarning(acct, nowSec, floor) {
   return { valid: true, warn };
 }
 
+// ── ACCOUNT-AUTHORITATIVE UNDERUSE pacing（对偶于 decideAccountWarning 的「欠用→加速」侧）──────────────
+// 撞墙侧问「快烧到墙了，要不要减速」；欠用侧对称地问「窗口快 reset 了却还没怎么用，要不要在它白白浪费前加速」。
+// 三条判据 AND（缺一静默——保守，不无端催加速）：
+//   ① underused：5h used% < UNDERUSE_PCT_CEIL（默认 60）—— 当前窗口确实欠用。
+//   ② nearReset：5h.resets_at 有效（数字）且 (resets_at - nowSec)/60 ≤ UNDERUSE_REMAIN_MIN（默认 60）——
+//      窗口快归零；resets_at 缺/已过 → 静默（窗口何时刷新未知/已刷新，催加速无意义）。
+//   ③ sevenDayOK：7d used% < SEVEN_DAY_HEADROOM（默认 80）—— 总闸有余量才敢催加速。**7d 信号缺失
+//      （null/缺）→ 静默**（用户拍板的保守取向：总闸状态未知就别开闸——不能在 7d 也许快满时催 5h 加速）。
+//   ④ fresh：sidecar 的 captured_at 距今 ≤ UNDERUSE_MAX_STALE_MIN（默认 15min）。captured_at 缺/陈旧 → 静默。
+//      **为何只欠用侧需要这道闸、撞墙侧不需要（不对称）**：sidecar 由 status-line 捕获，主线 idle 等后台时
+//      status-line 不刷新 → captured_at 不更新，而后台 agent 仍在烧配额 → 账户真实 5h used% 已上涨，但 sidecar
+//      里的 p5 仍停在旧的偏低值（stale-low p5）。在**欠用侧**，stale-low p5 让本函数误判「还很闲」→ 临 reset
+//      误催加速 → 多烧（危险方向）；在**撞墙侧**（decideAccountWarning），stale-low p5 只会让 used%≥floor 的
+//      判墙**少报一次警**（stale-low = 漏报减速 = 安全方向，最坏只是没及时刹车、不会主动多烧）。故新鲜度闸只在
+//      催加速这个「越陈越危险」的方向上加，撞墙侧无此要求（红线4 精神：宁可少催加速，不可据陈值乱催）。
+// 返回 {warn}（要注入的文案）或 {warn:null}（静默）。撞墙(used%≥85)与欠用(used%<60)区间天然互斥，
+//   且本函数仅在 decideAccountWarning 判定「账户有效但未到墙」时才被主流程调用 → 同一 Stop 绝不双发。
+function decideAccountUnderuse(acct, nowSec) {
+  if (!acct || typeof acct !== 'object') return { warn: null };
+  const f = acct.five_hour;
+  const p5 = pctOf(f);
+  const p7 = pctOf(acct.seven_day);
+  // ① underused（5h used% < ceil）。5h 信号缺失 → 无从判欠用 → 静默。
+  const ceil = parseUnderusePctCeil(UNDERUSE_PCT_CEIL_RAW);
+  if (p5 === null || p5 >= ceil) return { warn: null };
+  // ② nearReset（resets_at 有效且距 reset 剩余 ≤ remainMin）。resets_at 缺/非数/已过 → 静默。
+  if (!f || typeof f.resets_at !== 'number' || f.resets_at <= nowSec) return { warn: null };
+  const remainMin = (f.resets_at - nowSec) / 60;
+  const remainCeil = parseUnderuseRemainMin(UNDERUSE_REMAIN_MIN_RAW);
+  if (remainMin > remainCeil) return { warn: null };
+  // ③ sevenDayOK（7d used% < headroom）。**7d 缺失 → 静默**（保守：总闸未知不开闸）。
+  const headroom = parseSevenDayHeadroom(SEVEN_DAY_HEADROOM_RAW);
+  if (p7 === null || p7 >= headroom) return { warn: null };
+  // ④ fresh（sidecar 新鲜度闸，见函数头注释的不对称论证）。captured_at 缺失（非数字）或距今 >
+  //    maxStaleMin → stale-low p5 不可信 → 静默，绝不据陈值催加速。
+  const maxStaleMin = parseUnderuseMaxStale(UNDERUSE_MAX_STALE_MIN_RAW);
+  if (typeof acct.captured_at !== 'number' || nowSec - acct.captured_at > maxStaleMin * 60) {
+    return { warn: null };
+  }
+  const warn =
+    `[cc-master pacing] 账户配额欠用(权威口径,来自 status-line 捕获):5h 仅用 ${p5}%、` +
+    `窗口约 ${Math.round(remainMin)} min 后 reset(7d 总闸余量充足,仅 ${p7}%)。当前窗口的配额若不用` +
+    `将随 reset 白白蒸发——可考虑加速以充分利用。加速杠杆(怎么加速是你的认知判断,见 ` +
+    `orchestrating-to-completion / cost-and-pacing 的加速侧 lever):① 把临界路径节点升到更强的模型档以提质提速;` +
+    `② 提并发 WIP、把已就绪的高 float 任务提前派发;③ 把原计划 defer 到下一窗口的就绪工作拉进本窗口。` +
+    `注意:加速须先过 7d 总闸(别把 5h 余量烧成 7d 透支);且这不是制造 busywork——没有真正就绪的活就别硬凑。` +
+    `这是非阻断提示,不替你决策。`;
+  return { warn };
+}
+
 function parseBudget(raw) {
   if (!raw) return null;
   const n = Number(raw);
@@ -266,6 +327,24 @@ function parseFloorOr(raw, fallback) {
   if (!raw) return fallback;
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? n : fallback; // 非正/非数 → 回退默认地板
+}
+
+// 欠用侧三个阈值的解析（与撞墙侧 parsePctFloor 同形态：非正/非数/缺 → 回退默认）。
+function parseUnderusePctCeil(raw) {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 60; // 默认 60%:5h used% 低于此即欠用
+}
+function parseUnderuseRemainMin(raw) {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 60; // 默认 60min:距 5h reset ≤ 此即临近 reset
+}
+function parseSevenDayHeadroom(raw) {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 80; // 默认 80%:7d used% 低于此即总闸有余量
+}
+function parseUnderuseMaxStale(raw) {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 15; // 默认 15min:sidecar captured_at 距今超过此即陈旧 → 静默
 }
 
 function formatWarning({ used, burn, remain, budget, projected, pctNow }) {
@@ -360,12 +439,18 @@ function main() {
   // 警告/没到就静默),只有 sidecar 缺/坏时才降级本地反推(approx)。
   const floor = parsePctFloor(PCT_FLOOR_RAW);
   const acct = readRateCache(RATE_CACHE);
-  const a = decideAccountWarning(acct, Math.floor(nowMs / 1000), floor);
+  const nowSec = Math.floor(nowMs / 1000);
+  const a = decideAccountWarning(acct, nowSec, floor);
   let warning;
   if (a.valid) {
-    warning = a.warn; // 账户口径权威:有就警告,没有就静默(不再 fallback 反推)
+    // 账户口径权威。撞墙优先：到墙就只发减速提示（a.warn 非空）；没到墙再问欠用 → 可能发对称的加速提示。
+    // 撞墙(used%≥85)与欠用(used%<60)区间天然互斥，account 分支里同一 Stop 绝不同发两条。
+    if (a.warn) warning = a.warn;
+    else warning = decideAccountUnderuse(acct, nowSec).warn;
   } else {
-    const fh = computeFiveHour(USAGE_DIR, nowMs); // 账户不可用 → 本地反推 fallback(approx)
+    // 账户不可用 → 本地反推 fallback(approx)：维持现状只做撞墙判定。**本地反推路径禁欠用提示**——反推的
+    // reset 倒计时会失真到数量级（Finding #37），据此催加速会乱催，故此路径不出欠用提示。
+    const fh = computeFiveHour(USAGE_DIR, nowMs);
     warning = decideWarning(fh);
   }
   if (!warning) return; // 余量充足 / 无数据 / 降级判定不临界 → 静默 exit 0
