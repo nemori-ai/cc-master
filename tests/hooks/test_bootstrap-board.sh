@@ -175,12 +175,23 @@ set_heartbeat() { # $1 file $2 value
   local tmp; tmp="$1.hb.$$"
   sed "s/\"heartbeat\"[[:space:]]*:[[:space:]]*\"\"/\"heartbeat\": \"$2\"/" "$1" > "$tmp" && mv -f "$tmp" "$1"
 }
-# iso_minutes_ago MINUTES — print an ISO8601 UTC timestamp (YYYY-MM-DDTHH:MM:SSZ) MINUTES in the past
-# (the format an active session flushes into owner.heartbeat). GNU `date -d` / BSD `date -v` portable.
+# iso_minutes_ago MINUTES — print an ISO8601 UTC timestamp (YYYY-MM-DDTHH:MM:SSZ, SECOND precision)
+# MINUTES in the past (the format a TAKEOVER write flushes into owner.heartbeat). GNU `date -d` / BSD
+# `date -v` portable.
 iso_minutes_ago() { # $1 minutes
   date -u -d "$1 minutes ago" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
     || date -u -v-"$1"M +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
     || date -u +%Y-%m-%dT%H:%M:%SZ
+}
+# iso_minutes_ago_minprec MINUTES — print an ISO8601 UTC timestamp at MINUTE precision
+# (YYYY-MM-DDTHH:MMZ, no seconds) MINUTES in the past. THIS is the format board.example.json /
+# board.md document and a live session actually flushes into owner.heartbeat (e.g. 2026-06-15T05:52Z),
+# distinct from the second-precision timestamp the takeover re-stamp writes. GNU `date -d` / BSD
+# `date -v` portable.
+iso_minutes_ago_minprec() { # $1 minutes
+  date -u -d "$1 minutes ago" +%Y-%m-%dT%H:%MZ 2>/dev/null \
+    || date -u -v-"$1"M +%Y-%m-%dT%H:%MZ 2>/dev/null \
+    || date -u +%Y-%m-%dT%H:%MZ
 }
 # run_resume_nosid HOME PROMPT — like run_resume but the stdin JSON carries NO session_id field at all
 # (a DEGRADED UserPromptSubmit env). Sets HOOK_OUT / HOOK_RC.
@@ -543,6 +554,61 @@ run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume "old hear
 assert_eq "new-sess" "$(board_sid "$B")" "S23: old heartbeat → abandoned → taken over (sid re-stamped)"
 assert_eq "true" "$(board_active "$B")" "S23: old-heartbeat takeover keeps active true"
 assert_contains "$HOOK_OUT" "TAKEN OVER" "S23: old heartbeat → takeover context (not a freshness warning)"
+rm -rf "$H"
+
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+# codex round-3 finding regressions (second-reviewer catches, 2026-06-15)
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+
+# ── S24 (codex round-3 Finding C): the heartbeat parser must accept the MINUTE-precision ISO8601 that
+# board.example.json / board.md document and a live session actually flushes (YYYY-MM-DDTHH:MMZ, e.g.
+# 2026-06-15T05:52Z) — not only the SECOND-precision form the takeover re-stamp writes. The old shape-
+# gate required seconds (`...T[0-9]{2}:[0-9]{2}:[0-9]{2}Z`), so a documented/real minute-precision
+# heartbeat failed to parse → contributed NO freshness signal → with mtime unusable it defeated the
+# live-safety gate (a possibly-LIVE board would be silently taken over). With the fix, a JUST-NOW
+# minute-precision heartbeat dates as FRESH → --resume WITHOUT --force-takeover is withheld.
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "minute precision live goal")"
+set_heartbeat "$B" "$(iso_minutes_ago_minprec 0)"   # minute-precision heartbeat, current minute → LIVE
+mtime_future "$B"                                    # mtime unusable → heartbeat is the only signal
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume "minute precision"'
+assert_eq "old-sess" "$(board_sid "$B")" "S24: minute-precision recent heartbeat → board NOT taken over (sid unchanged)"
+assert_eq "true" "$(board_active "$B")" "S24: minute-precision recent-heartbeat board active unchanged"
+# MUST withhold via the FRESH (looks-LIVE) branch, NOT the no-signal branch — that distinction is the
+# whole point: an unparseable minute heartbeat would ALSO withhold (signal=0 conservative branch) and
+# pass a bare "force-takeover" check, masking the bug. Assert the LIVE-session phrasing so the test
+# only passes when the minute-precision heartbeat actually DATES as fresh (the fix), not when it fails
+# to parse and lands on the no-signal withhold (the bug).
+assert_contains "$HOOK_OUT" "LIVE session" "S24: minute-precision recent heartbeat dates as FRESH (live-session withhold, not no-signal)"
+assert_contains "$HOOK_OUT" "force-takeover" "S24: minute-precision recent heartbeat → asks for --force-takeover"
+rm -rf "$H"
+
+# ── S24b (codex round-3 Finding C): the SECOND-precision form the takeover re-stamp writes must STILL
+# parse as a usable freshness signal (zero regression on the precision S21 already covers). An OLD
+# second-precision heartbeat (well past threshold) + unusable mtime → reads ABANDONED via the heartbeat
+# channel → direct takeover WITHOUT force. Proves the optional-seconds shape-gate keeps both precisions
+# datable, not just the new minute one.
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "second precision old goal")"
+set_heartbeat "$B" "$(iso_minutes_ago 120)"   # second-precision heartbeat 2h ago → abandoned
+mtime_future "$B"                              # mtime unusable → heartbeat is the sole signal
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume "second precision"'
+assert_eq "new-sess" "$(board_sid "$B")" "S24b: old second-precision heartbeat still datable → abandoned → taken over"
+assert_eq "true" "$(board_active "$B")" "S24b: second-precision takeover keeps active true"
+assert_contains "$HOOK_OUT" "TAKEN OVER" "S24b: old second-precision heartbeat → takeover context (no regression)"
+rm -rf "$H"
+
+# ── S24c (codex round-3 Finding C): a minute-precision heartbeat that is OLD (past threshold) + mtime
+# unusable → reads ABANDONED via the (now-parseable) heartbeat channel → direct takeover WITHOUT force.
+# Positive arm proving minute precision is fully datable in BOTH directions (fresh-withhold AND
+# abandoned-takeover), not merely accepted by the shape-gate.
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "minute precision old goal")"
+set_heartbeat "$B" "$(iso_minutes_ago_minprec 120)"   # minute-precision heartbeat 2h ago → abandoned
+mtime_future "$B"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume "minute precision old"'
+assert_eq "new-sess" "$(board_sid "$B")" "S24c: old minute-precision heartbeat datable → abandoned → taken over"
+assert_contains "$HOOK_OUT" "TAKEN OVER" "S24c: old minute-precision heartbeat → takeover context"
 rm -rf "$H"
 
 finish

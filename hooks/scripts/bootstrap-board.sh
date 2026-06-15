@@ -217,19 +217,26 @@ board_mtime_epoch() {
   stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || true
 }
 
-# iso8601_to_epoch TS — parse an ISO8601 UTC `YYYY-MM-DDTHH:MM:SSZ` (the format an active session
-# flushes into owner.heartbeat) to epoch seconds. Prints the epoch on success; prints NOTHING (empty)
-# when TS is empty or NOT parseable — the caller treats "no output" as "no usable signal" (conservative,
-# design §5.4: heartbeat 解析失败 → 退 mtime-only；两者都拿不到 → 保守要 force). Portability: BSD
-# `date -j -f` (macOS) and GNU `date -d` reject malformed input with non-zero RC, so a garbage TS yields
-# empty regardless of platform. TZ=UTC pins the parse so a Z timestamp maps to the same epoch on both.
+# iso8601_to_epoch TS — parse an ISO8601 UTC heartbeat to epoch seconds. TWO precisions are accepted,
+# because BOTH are actually in use: a live session / the documented board (board.example.json,
+# board.md) flushes MINUTE precision `YYYY-MM-DDTHH:MMZ` (e.g. 2026-06-15T05:52Z), while the takeover
+# re-stamp below writes SECOND precision `YYYY-MM-DDTHH:MM:SSZ` (date -u +%Y-%m-%dT%H:%M:%SZ). Prints
+# the epoch on success; prints NOTHING (empty) when TS is empty or NOT parseable — the caller treats
+# "no output" as "no usable signal" (conservative, design §5.4: heartbeat 解析失败 → 退 mtime-only；两者都
+# 拿不到 → 保守要 force). Portability: BSD `date -j -f` (macOS) and GNU `date -d` reject malformed input
+# with non-zero RC, so a garbage TS yields empty regardless of platform. TZ=UTC pins the parse so a Z
+# timestamp maps to the same epoch on both.
 iso8601_to_epoch() { # $1 ts
   [ -n "$1" ] || return 0
-  # Shape-gate first: only a strict YYYY-MM-DDTHH:MM:SSZ is accepted. This stops a loose `date` (some
-  # GNU builds coerce partial/garbage strings) from inventing an epoch for a non-timestamp value.
-  printf '%s' "$1" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' || return 0
-  # BSD/macOS: `date -j -u -f FMT VALUE +%s`. GNU/Linux: `date -u -d VALUE +%s`. Try BSD then GNU.
+  # Shape-gate first: accept YYYY-MM-DDTHH:MM[:SS]Z — seconds OPTIONAL (minute precision is the
+  # documented/flushed form; the takeover re-stamp adds seconds). This stops a loose `date` (some GNU
+  # builds coerce partial/garbage strings) from inventing an epoch for a non-timestamp value while no
+  # longer rejecting the minute-precision heartbeat the board actually carries (round-3 Finding C).
+  printf '%s' "$1" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2})?Z$' || return 0
+  # BSD/macOS: `date -j -u -f FMT VALUE +%s`. GNU/Linux: `date -u -d VALUE +%s`. Try the second-precision
+  # then the minute-precision BSD format, then GNU (which generally accepts both shapes from the string).
   date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null \
+    || date -j -u -f '%Y-%m-%dT%H:%MZ' "$1" +%s 2>/dev/null \
     || date -u -d "$1" +%s 2>/dev/null \
     || true
 }
