@@ -2,7 +2,7 @@
 
 > For English, see [README.md](README.md)。
 
-![version](https://img.shields.io/badge/version-0.3.0-blue)
+![version](https://img.shields.io/badge/version-0.4.3-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![ship-anywhere](https://img.shields.io/badge/ship--anywhere-Bedrock%20%7C%20Vertex%20%7C%20Foundry-7c3aed)
 ![requires](https://img.shields.io/badge/requires-Node%2022%2B%20%2B%20bash-orange)
@@ -183,6 +183,7 @@ claude plugin install cc-master@cc-master
 /cc-master:as-master-orchestrator <目标>            # bootstrap 一块 board，并就此化身总指挥
 /cc-master:as-master-orchestrator --resume [选择器]  # 在新 session 里接续一块已存在的 board（见下）
 /cc-master:status                                   # 渲染 board 摘要 + 校验「窄腰」契约
+/cc-master:handoff-to-new-session                   # 把 board 优雅交接给一个新 session（--resume 的写侧）
 /cc-master:stop                                     # 归档 board 并收尾（board 保留，不删除）
 ```
 
@@ -199,6 +200,16 @@ claude plugin install cc-master@cc-master
 - **任意板都可续**——既含仍 `active`（被遗弃）的板，也含 `/stop` **归档**的板。续一块归档板会**复活**它（`active:false → true`）。`/stop` 是一次**可逆的归档**而非永久终态；board 文件、它的 `tasks`、`log`、`goal` 在归档 → 复活之间全部保留。
 - **接管默认安全。** 重盖 board 即把它交给新 session、令旧 session 的后台工作成孤儿——所以一块板若**看起来仍活着**（heartbeat / 文件 mtime 新鲜），`--resume` 会先警告并**暂不接管**，直到你带 `--force-takeover` 重发。选择器歧义 / 缺失 → 不写盘，列出候选（分为*被遗弃*与*将被复活*两组）请你挑定。
 - **接续 = 接手，不是重启。** 指挥 reconcile 现有 `tasks[]` 而非重拆 goal，并把旧 session 留下的任何 `in_flight` 任务当孤儿——在端点验收它的产物（验过就标 done）或重新派发拿新 handle，绝不对着一个死掉的 handle 干等。详见 [ADR-009](adrs/ADR-009-resume-cross-session-re-arm.md)。
+
+### 在 session 结束前优雅交接一块 board
+
+`--resume` 是跨会话续接的*读*侧；`/cc-master:handoff-to-new-session` 是*写*侧。它由**旧** orchestrator session 运行，优雅地为一个**新** session 准备好 board——而不是丢下一块被遗弃的 board 等 `--resume` 事后发现：
+
+```
+/cc-master:handoff-to-new-session   # 在旧 session 里运行，准备一次干净的交接
+```
+
+指挥会：(1) 停止派发新活；(2) 让在飞任务在当前 session 跑完并验收（长跑掉队的兜底降级成孤儿 + 重验、surface 给你）；(3) 写一份**叙事层**交接文档——cc-master home 里的 sidecar 文件，指向 board、讲清*来龙去脉*而**不复述**它的 DAG；(4) 在 `board.log` 加一条指向该文档的指针；(5) 归档 board（`owner.active:false`），让下一个 session 的 `--resume` 无摩擦复活它；(6) 把文档路径和接下来要跑的确切 `--resume` 命令告诉你。handoff（准备）与 `--resume`（接管）是同一次干净跨会话接力的两半。
 
 ### 可选 —— 打开账户权威的配额感知
 
@@ -244,6 +255,7 @@ cc-master/
 ├── commands/
 │   ├── as-master-orchestrator.md       bootstrap —— 化身总指挥
 │   ├── status.md                       汇总 board 进度 / 健康度
+│   ├── handoff-to-new-session.md       为一个新 session 准备干净交接
 │   └── stop.md                         归档 / 置 board 非活跃
 ├── skills/
 │   ├── orchestrating-to-completion/    Skill A —— 编排方法论（魂在这）

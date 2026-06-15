@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] — 2026-06-15
+
+### Added
+
+- **`handoff-to-new-session` —— 由旧 session 优雅交接 board 给新 session（`--resume` 的写/准备侧）** — 新增普通 slash command `/cc-master:handoff-to-new-session`（无 sentinel，由**旧** orchestrator session 运行），把 board 优雅交接给一个**新** session：(1) 停止派发新活；(2) 让在飞任务在当前 session 跑完并验收（straggler 兜底——长跑任务降级成孤儿 + 重验、surface 给用户）；(3) 写一份**叙事层**交接文档（cc-master home 里的 sidecar 文件，指向 board、**不复述** board 的 DAG）；(4) 在 `board.log` 加一条指向该交接文档的指针；(5) 归档 board（`owner.active:false`）让新 session 的 `--resume` 无摩擦复活；(6) 告诉用户文档路径 + 下一步要跑的 `--resume` 命令。与 v0.4.3 的 `--resume` 跨 session re-arm **配对**：handoff 是**写/准备侧**，`--resume` 是**读/接管侧**——同一次干净跨会话接力的两半。
+
 ## [0.4.3] — 2026-06-15
 
 ### Added
