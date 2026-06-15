@@ -44,5 +44,8 @@ board_active() { sed -n 's/.*"active"[[:space:]]*:[[:space:]]*\([a-z][a-z]*\).*/
 # board_goal FILE — extract the top-level "goal" string value (pure bash). goal is the first
 # "goal": token in the pinned waist (it precedes owner/tasks in template / example board order).
 board_goal() { sed -n 's/.*"goal"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1" | head -1; }
+# board_heartbeat FILE — extract owner.heartbeat value (pure bash). owner.heartbeat is the FIRST
+# "heartbeat": token in the pinned waist (owner precedes tasks[]). Empty if absent/blank.
+board_heartbeat() { sed -n 's/.*"heartbeat"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1" | head -1; }
 
 finish() { echo "passed=$PASS failed=$FAILED"; [ "$FAILED" -eq 0 ] || exit 1; }

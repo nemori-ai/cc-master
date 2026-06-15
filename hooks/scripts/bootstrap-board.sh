@@ -217,6 +217,23 @@ board_mtime_epoch() {
   stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || true
 }
 
+# iso8601_to_epoch TS — parse an ISO8601 UTC `YYYY-MM-DDTHH:MM:SSZ` (the format an active session
+# flushes into owner.heartbeat) to epoch seconds. Prints the epoch on success; prints NOTHING (empty)
+# when TS is empty or NOT parseable — the caller treats "no output" as "no usable signal" (conservative,
+# design §5.4: heartbeat 解析失败 → 退 mtime-only；两者都拿不到 → 保守要 force). Portability: BSD
+# `date -j -f` (macOS) and GNU `date -d` reject malformed input with non-zero RC, so a garbage TS yields
+# empty regardless of platform. TZ=UTC pins the parse so a Z timestamp maps to the same epoch on both.
+iso8601_to_epoch() { # $1 ts
+  [ -n "$1" ] || return 0
+  # Shape-gate first: only a strict YYYY-MM-DDTHH:MM:SSZ is accepted. This stops a loose `date` (some
+  # GNU builds coerce partial/garbage strings) from inventing an epoch for a non-timestamp value.
+  printf '%s' "$1" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' || return 0
+  # BSD/macOS: `date -j -u -f FMT VALUE +%s`. GNU/Linux: `date -u -d VALUE +%s`. Try BSD then GNU.
+  date -j -u -f '%Y-%m-%dT%H:%M:%SZ' "$1" +%s 2>/dev/null \
+    || date -u -d "$1" +%s 2>/dev/null \
+    || true
+}
+
 # json_string TEXT — emit TEXT as ONE properly-escaped JSON string literal (including the surrounding
 # quotes). A correct escaper: backslash → \\, double-quote → \", and any LITERAL newline → \n, then the
 # whole stream wrapped in a single pair of quotes. The fresh path's `sed 's/^/"/; s/$/"/'` quotes
@@ -244,6 +261,17 @@ FRESHNESS_THRESHOLD_SECS=600
 # resume_main — the full resume flow: select board → live-safety probe → owner re-stamp → inject.
 # selector + HOME_DIR + sid are in scope. Pure bash control flow; per-board reads use the awk helpers.
 resume_main() {
+  # ── Finding A guard (codex P2): a DEGRADED UserPromptSubmit (no session_id in stdin → $sid empty)
+  #    must NEVER touch an EXISTING board. Resume OVERWRITES owner on a selected pre-existing board;
+  #    re-stamping owner.session_id="" would (a) erase the original owner and (b) — per the armed gate
+  #    (active:true AND owner.session_id==stdin sid) — leave the board DORMANT for every real non-empty
+  #    session_id, i.e. "taken over" into permanent silence while the injected context claims success.
+  #    The fresh path tolerates an empty sid because it builds a NEW blank board (recoverable); resume
+  #    cannot. Refuse up-front — before any board selection or write — leaving every board untouched.
+  if [ -z "$sid" ]; then
+    inject_ctx "cc-master resume: cannot resume without a session id (degraded hook environment — stdin carried no session_id) — the board was NOT modified. Re-invoke --resume from a session that carries a session_id."
+    return 0
+  fi
   mkdir -p "$HOME_DIR"
   # ── build the candidate set: ALL *.board.json (active AND archived), excluding boards already owned
   #    by THIS session's sid (fork #4: any board is resumable; only self-owned boards are skipped). ──
@@ -349,19 +377,27 @@ EOF
     hb="$(owner_field_value "$TARGET" heartbeat)"
     now="$(date -u +%s)"
     mt="$(board_mtime_epoch "$TARGET")"
-    # mtime signal: a usable, NON-FUTURE mtime within the window = fresh.
-    if [ -n "$mt" ] && printf '%s' "$mt" | grep -qE '^[0-9]+$'; then
-      if [ "$mt" -le "$now" ]; then
-        signal=1
-        age=$((now - mt))
-        [ "$age" -lt "$FRESHNESS_THRESHOLD_SECS" ] && fresh=1
-      fi
-      # an mtime in the FUTURE is not a usable "stale" signal → leave signal=0 (conservative).
+    # ── Two freshness channels, treated SYMMETRICALLY (design §5.4: freshness = max(heartbeat 新鲜度,
+    #    mtime 新鲜度); signal = 任一通道可定龄). A channel contributes ONLY when it can be DATED to a
+    #    NON-FUTURE epoch; a value that cannot be aged contributes NOTHING (not a "present → signal=1").
+    # mtime channel: a usable, NON-FUTURE mtime → a signal; within the window → fresh.
+    if [ -n "$mt" ] && printf '%s' "$mt" | grep -qE '^[0-9]+$' && [ "$mt" -le "$now" ]; then
+      signal=1
+      age=$((now - mt))
+      [ "$age" -lt "$FRESHNESS_THRESHOLD_SECS" ] && fresh=1
     fi
-    # heartbeat signal (best-effort): a non-empty heartbeat is itself a sign the board was being written.
-    # We treat a present heartbeat as a (weak) freshness signal source but rely primarily on mtime; if a
-    # heartbeat exists we at least have A signal.
-    [ -n "$hb" ] && signal=1
+    # heartbeat channel (Finding B fix): an active session flushes an ISO8601 heartbeat each round, so
+    # AGE it — do NOT mis-read mere presence as a signal. Parse to epoch (empty if unparseable/future);
+    # a datable, non-future heartbeat is a signal in its own right, and a recent one marks the board
+    # possibly-LIVE (→ fresh). An UNPARSEABLE / future heartbeat contributes nothing → with mtime also
+    # unusable this lands on the signal==0 conservative "require force" branch (design §5.4 fail-safe),
+    # NOT on a silent no-force takeover.
+    hb_epoch="$(iso8601_to_epoch "$hb")"
+    if [ -n "$hb_epoch" ] && [ "$hb_epoch" -le "$now" ]; then
+      signal=1
+      hb_age=$((now - hb_epoch))
+      [ "$hb_age" -lt "$FRESHNESS_THRESHOLD_SECS" ] && fresh=1
+    fi
   fi
   # archived board (active:false) → fresh=0, signal stays at its init; the force==0 block below is a
   # no-op for it (fresh!=1 and we set signal=1 to skip the no-signal branch), so it falls through to

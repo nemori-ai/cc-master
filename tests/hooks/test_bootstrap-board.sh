@@ -165,6 +165,30 @@ touch_mtime() {
   hh=$(printf '%02d' $((secs/3600))); mm=$(printf '%02d' $(((secs%3600)/60))); ss=$(printf '%02d' $((secs%60)))
   touch -A "-${hh}${mm}${ss}" "$f" 2>/dev/null || true
 }
+# mtime_future FILE — set FILE's mtime far in the FUTURE → undatable as a "stale" mtime signal, so the
+# mtime channel contributes NO signal (forces the heartbeat channel to be the sole freshness source).
+mtime_future() { touch -t 209901010000 "$1" 2>/dev/null || true; }
+# set_heartbeat FILE VALUE — rewrite owner.heartbeat="" (seed_board's default) to "VALUE" in place.
+# Literal-anchored sed on the empty heartbeat value (seed_board always emits it empty), so only that
+# owner field is touched. Pure bash; VALUE is an ISO8601 timestamp or a garbage token for the tests.
+set_heartbeat() { # $1 file $2 value
+  local tmp; tmp="$1.hb.$$"
+  sed "s/\"heartbeat\"[[:space:]]*:[[:space:]]*\"\"/\"heartbeat\": \"$2\"/" "$1" > "$tmp" && mv -f "$tmp" "$1"
+}
+# iso_minutes_ago MINUTES — print an ISO8601 UTC timestamp (YYYY-MM-DDTHH:MM:SSZ) MINUTES in the past
+# (the format an active session flushes into owner.heartbeat). GNU `date -d` / BSD `date -v` portable.
+iso_minutes_ago() { # $1 minutes
+  date -u -d "$1 minutes ago" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+    || date -u -v-"$1"M +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+    || date -u +%Y-%m-%dT%H:%M:%SZ
+}
+# run_resume_nosid HOME PROMPT — like run_resume but the stdin JSON carries NO session_id field at all
+# (a DEGRADED UserPromptSubmit env). Sets HOOK_OUT / HOOK_RC.
+run_resume_nosid() { # $1 home $2 prompt
+  HOOK_OUT="$(printf '%s' "$(printf '{"prompt":"%s"}' "$2")" \
+    | CLAUDE_PROJECT_DIR="$(make_project)" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
+      bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"; HOOK_RC=$?
+}
 
 # ── R2: fresh path zero-regression — no --resume → still NEW board + fresh context (no resume branch)
 H="$(make_project)"
@@ -445,6 +469,80 @@ run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume freshly'
 assert_eq "new-sess" "$(board_sid "$B")" "S19: fresh-mtime archived board revived w/o force (sid re-stamped)"
 assert_eq "true" "$(board_active "$B")" "S19: fresh-mtime archived board active false→true"
 assert_contains "$HOOK_OUT" "TAKEN OVER" "S19: fresh archived board → takeover context (not a freshness warning)"
+rm -rf "$H"
+
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+# codex P2 finding regressions (second-reviewer catches on the resume degraded paths, 2026-06-15)
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+
+# ── S20 (codex Finding A): a DEGRADED UserPromptSubmit (stdin carries NO session_id) must NOT mutate
+# any existing board on --resume. Re-stamping owner.session_id="" would erase the original owner AND
+# (per the armed gate) leave the board DORMANT for every real non-empty session_id — a board "taken
+# over" into permanent silence. The resume flow must refuse up-front (before selecting/writing) and
+# leave the board byte-for-byte unchanged. (Fresh path tolerates an empty sid because it builds a NEW
+# blank board; resume OVERWRITES an existing owner, so the same empty sid is destructive here.)
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "abandoned active goal")"
+before="$(cat "$B")"
+run_resume_nosid "$H" '/cc-master:as-master-orchestrator --resume'
+assert_eq 0 "$HOOK_RC" "S20: empty-sid resume exits 0 (no-op)"
+assert_eq "$before" "$(cat "$B")" "S20: board byte-identical — empty-sid resume modifies NOTHING"
+assert_eq "old-sess" "$(board_sid "$B")" "S20: original owner.session_id preserved (NOT erased to empty)"
+assert_eq "true" "$(board_active "$B")" "S20: owner.active preserved"
+assert_eq 1 "$(count_boards "$H")" "S20: no new board created on empty-sid resume"
+assert_contains "$HOOK_OUT" "session id" "S20: context refuses — cannot resume without a session id"
+rm -rf "$H"
+
+# ── S21 (codex Finding B): heartbeat freshness must be DATED, not merely tested for presence. An
+# active board with a JUST-NOW heartbeat but an unusable mtime (future) is possibly-LIVE → --resume
+# WITHOUT --force-takeover must be withheld. The old code only checked `[ -n "$hb" ] && signal=1`
+# (never aged the timestamp), so freshness rested entirely on mtime and a recent heartbeat could not
+# block takeover.
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "live heartbeat goal")"
+set_heartbeat "$B" "$(iso_minutes_ago 1)"   # heartbeat ~1min ago → strongly looks LIVE
+mtime_future "$B"                            # mtime unusable → heartbeat is the only freshness signal
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume live'
+assert_eq "old-sess" "$(board_sid "$B")" "S21: recent heartbeat → board NOT taken over (sid unchanged)"
+assert_eq "true" "$(board_active "$B")" "S21: recent-heartbeat board active unchanged"
+assert_contains "$HOOK_OUT" "force-takeover" "S21: recent heartbeat → asks for --force-takeover"
+rm -rf "$H"
+
+# ── S22 (codex Finding B): heartbeat present but UNPARSEABLE (garbage, not ISO8601) AND mtime unusable
+# → NO usable freshness signal → conservatively require force (withhold without --force-takeover). The
+# old `[ -n "$hb" ] && signal=1` mis-read "non-empty" as "a signal", which (with mtime future) sailed
+# straight to takeover with no force. Now a non-datable heartbeat contributes nothing.
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "garbage heartbeat goal")"
+set_heartbeat "$B" "not-a-timestamp-xyz"   # non-empty but cannot be parsed to epoch
+mtime_future "$B"                           # mtime unusable too → genuinely NO signal
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume garbage'
+assert_eq "old-sess" "$(board_sid "$B")" "S22: unparseable heartbeat + no mtime → NOT taken over (no force)"
+assert_contains "$HOOK_OUT" "force-takeover" "S22: no usable signal → asks for force"
+rm -rf "$H"
+
+# ── S22b (codex Finding B): with force, the SAME unparseable-heartbeat board IS taken over (force
+# overrides the conservative withhold) — proves S22 withholds on signal, not on a hard block.
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "garbage heartbeat forced goal")"
+set_heartbeat "$B" "not-a-timestamp-xyz"
+mtime_future "$B"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume garbage --force-takeover'
+assert_eq "new-sess" "$(board_sid "$B")" "S22b: --force-takeover overrides the no-signal withhold"
+assert_eq "true" "$(board_active "$B")" "S22b: forced takeover keeps active true"
+rm -rf "$H"
+
+# ── S23 (codex Finding B): heartbeat present and PARSEABLE but OLD (well past the threshold) AND mtime
+# unusable → the board reads ABANDONED via the heartbeat channel → direct takeover WITHOUT force. This
+# is the positive arm: an aged heartbeat is a usable "abandoned" signal, not a "withhold" one.
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "old heartbeat goal")"
+set_heartbeat "$B" "$(iso_minutes_ago 120)"   # heartbeat 2h ago → well past the 10min threshold
+mtime_future "$B"                              # mtime unusable → heartbeat is the sole signal
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume "old heartbeat"'
+assert_eq "new-sess" "$(board_sid "$B")" "S23: old heartbeat → abandoned → taken over (sid re-stamped)"
+assert_eq "true" "$(board_active "$B")" "S23: old-heartbeat takeover keeps active true"
+assert_contains "$HOOK_OUT" "TAKEN OVER" "S23: old heartbeat → takeover context (not a freshness warning)"
 rm -rf "$H"
 
 finish
