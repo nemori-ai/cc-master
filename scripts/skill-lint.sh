@@ -13,6 +13,17 @@
 #   2. required frontmatter fields — `name` + `description` both present & non-empty.
 #   3. dead relative links — every markdown link `](relpath)` to a repo-relative
 #      file (references/x.md, assets/..., DESIGN.md, …) must resolve on disk.
+#   4. bare cross-skill path references (Finding #50, AGENTS.md §12) — inside any
+#      distributed markdown (skills/ commands/ hooks/), a backtick-wrapped path that
+#      starts with a sibling *distributed skill name* (authoring-workflows /
+#      orchestrating-to-completion) followed by `/…` is a dead link at install time:
+#      it resolves relative to the user's cwd, not the plugin root. Such refs MUST be
+#      ${CLAUDE_PLUGIN_ROOT}/skills/<name>/… absolute (or ${CLAUDE_SKILL_DIR}/… for
+#      same-skill assets). Bare skill-name mentions WITHOUT a `/` are fine (the name
+#      used as a noun), and same-skill self-refs (`references/x.md`) don't start with
+#      a skill name so they're never matched. NOTE: dev-only repo-root `scripts/`
+#      paths (e.g. in DESIGN.md) are intentionally NOT flagged — those scripts are not
+#      distributed (红线5) and the bare path is correct from repo root.
 #
 # Why node, not bash+jq/python: the repo's content tests are node-based, and node
 # is guaranteed present in any Claude Code host (AGENTS.md §3 红线1 / ADR-006).
@@ -32,10 +43,33 @@ command -v node >/dev/null 2>&1 || {
 REPO="$REPO" node - "$@" <<'NODE'
 'use strict';
 const { readFileSync, readdirSync, existsSync, statSync } = require('node:fs');
-const { join, dirname } = require('node:path');
+const { join, dirname, relative } = require('node:path');
 
 const ROOT = process.env.REPO;
 const SKILL_DIRS = ['skills', '.claude/skills'];
+
+// Distributed-tree roots scanned by the bare-cross-skill-ref check (4). Only the
+// dirs that actually ship with the plugin — bare refs in here die at install time.
+const DIST_DIRS = ['skills', 'commands', 'hooks'];
+// Distributed skill names whose bare `<name>/…` path refs are install-time dead links.
+const DIST_SKILL_NAMES = ['authoring-workflows', 'orchestrating-to-completion'];
+
+// Recursively collect every *.md file under a repo-relative base dir.
+function markdownFiles(base) {
+  const out = [];
+  const abs = join(ROOT, base);
+  if (!existsSync(abs)) return out;
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      const st = statSync(p);
+      if (st.isDirectory()) walk(p);
+      else if (st.isFile() && name.endsWith('.md')) out.push(p);
+    }
+  };
+  walk(abs);
+  return out.sort();
+}
 
 // Collect every <dir>/<name>/SKILL.md that exists.
 function skillFiles() {
@@ -140,6 +174,39 @@ for (const s of skillFiles()) {
       const resolved = join(s.dir, path);
       if (!existsSync(resolved)) {
         add(s.rel, i + 1, `dead link → \`${target}\` (no file at ${path} relative to this skill)`);
+      }
+    }
+  }
+}
+
+// ---- (4) bare cross-skill path references (Finding #50) ----
+// Scan every distributed *.md for a backtick-wrapped path beginning with a sibling
+// distributed-skill name + `/`, that is NOT a ${CLAUDE_*} absolute reference.
+const crossSkillRe = new RegExp(
+  '`(' + DIST_SKILL_NAMES.join('|') + ')/[^`]*`', 'g');
+const seenMd = new Set();
+for (const base of DIST_DIRS) {
+  for (const abs of markdownFiles(base)) {
+    if (seenMd.has(abs)) continue; // skills/ overlaps nothing here, but be safe
+    seenMd.add(abs);
+    const rel = relative(ROOT, abs);
+    const lines = readFileSync(abs, 'utf8').split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const ln = lines[i];
+      // No line-level CLAUDE_ skip ON PURPOSE: the regex anchors the skill name *immediately
+      // after the backtick*, so a corrected `${CLAUDE_PLUGIN_ROOT}/skills/<name>/…` ref (backtick
+      // followed by `$`, not the bare name) never matches in the first place — no skip needed to
+      // spare it. A line-level skip would instead be a FALSE-NEGATIVE: a line carrying both a
+      // corrected ref and a remaining bare ref would be skipped wholesale, letting the dead link
+      // pass (codex round-2 second-endpoint catch). We match per-token, so each bare ref is caught
+      // regardless of what else shares its line.
+      crossSkillRe.lastIndex = 0;
+      let m;
+      while ((m = crossSkillRe.exec(ln)) !== null) {
+        add(rel, i + 1,
+          `bare cross-skill ref \`${m[0].slice(1, -1)}\` — resolves relative to ` +
+          `user cwd at install time (dead link). Use ` +
+          `\${CLAUDE_PLUGIN_ROOT}/skills/${m[1]}/… (Finding #50 / AGENTS.md §12)`);
       }
     }
   }

@@ -2,6 +2,23 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Suite-level temp sweep: reap STALE leaked .tmp-ccm.* dirs from helpers.sh's make_project
+# (template "${TMPDIR:-/tmp}/.tmp-ccm.XXXXXX"). Run at startup + via trap EXIT.
+# AGE-FILTERED (mtime >60min) ON PURPOSE: a blanket `rm -rf ${TMPDIR}/.tmp-ccm.*` would delete
+# the LIVE CC_MASTER_HOME / project dirs that a CONCURRENT `bash run-tests.sh` (or the repo's own
+# concurrent-isolation tests) created seconds ago — one run's startup sweep, or an earlier-finishing
+# run's EXIT trap, would yank another in-flight suite's active temp mid-test and REINTRODUCE flaky
+# failures (codex second-endpoint review catch). No suite run lasts 60min, so anything older than
+# that is abandoned backlog, never an active run. The source fix (run_resume/run_resume_nosid now
+# rm -rf their own dirs) already prevents new leaks; this only reaps pre-existing stale backlog.
+# Scoped strictly to the .tmp-ccm.* prefix at depth 1; errors swallowed (glob/empty-dir safe).
+sweep_ccm_tmp() {
+  find "${TMPDIR:-/tmp}" -maxdepth 1 -type d -name '.tmp-ccm.*' -mmin +60 \
+    -exec rm -rf {} + 2>/dev/null || true
+}
+sweep_ccm_tmp
+trap sweep_ccm_tmp EXIT
+
 fail=0
 echo "== hook tests (bash) =="
 for t in tests/hooks/test_*.sh; do

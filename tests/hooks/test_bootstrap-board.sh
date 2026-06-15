@@ -153,9 +153,11 @@ seed_board() { # $1 home $2 sid $3 active $4 goal [$5 extra-tasks-json]
 # run_resume HOME SID PROMPT — fire bootstrap with a custom CC_MASTER_HOME + stdin session_id, set
 # HOOK_OUT / HOOK_RC. (run_hook uses the project default home; resume tests seed a custom home.)
 run_resume() { # $1 home $2 sid $3 prompt
+  local proj; proj="$(make_project)"
   HOOK_OUT="$(printf '%s' "$(printf '{"session_id":"%s","prompt":"%s"}' "$2" "$3")" \
-    | CLAUDE_PROJECT_DIR="$(make_project)" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
+    | CLAUDE_PROJECT_DIR="$proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
       bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"; HOOK_RC=$?
+  rm -rf "$proj"
 }
 # touch_mtime FILE MINUTES_AGO — set FILE's mtime to MINUTES_AGO minutes in the past (GNU/BSD touch).
 touch_mtime() {
@@ -196,9 +198,11 @@ iso_minutes_ago_minprec() { # $1 minutes
 # run_resume_nosid HOME PROMPT — like run_resume but the stdin JSON carries NO session_id field at all
 # (a DEGRADED UserPromptSubmit env). Sets HOOK_OUT / HOOK_RC.
 run_resume_nosid() { # $1 home $2 prompt
+  local proj; proj="$(make_project)"
   HOOK_OUT="$(printf '%s' "$(printf '{"prompt":"%s"}' "$2")" \
-    | CLAUDE_PROJECT_DIR="$(make_project)" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
+    | CLAUDE_PROJECT_DIR="$proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
       bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"; HOOK_RC=$?
+  rm -rf "$proj"
 }
 
 # ── R2: fresh path zero-regression — no --resume → still NEW board + fresh context (no resume branch)

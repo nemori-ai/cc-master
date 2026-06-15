@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **self-contain 收口:跨 skill 裸引用统一 `${CLAUDE_PLUGIN_ROOT}` + §12 grep 盲区接进可执行卡点（Finding #50 闭环）** — codex 第二验收 flag 出的 install-safety 灰区两候选**都做了**：`references/dispatch.md` 的 3 处裸跨 skill 引用（line 37 两处 `authoring-workflows/references/mechanism.md` + line 59 `authoring-workflows/SKILL.md`）统一升级为 `${CLAUDE_PLUGIN_ROOT}/skills/authoring-workflows/…` 绝对形式（裸相对路径装到用户机器后相对其 cwd 解析、找不到 plugin 安装位置 → 死链）；`scripts/skill-lint.sh` 新增 **check (4)** 把 §12 散文红线接进可执行卡点——扫 `skills/`/`commands/`/`hooks/` 下 `.md`，捕获反引号包裹、以兄弟分发 skill 名（`authoring-workflows`/`orchestrating-to-completion`）开头带 `/` 且未用 `${CLAUDE_*}` 的裸引用，命中即 `exit 1`，`AGENTS.md §12` 同步文档化。**有意剔除 `scripts/` 分支**（否则误报 DESIGN.md 对 dev-only repo 根脚本的合法引用·红线 5）。把此前靠人审拦的 grep 盲区升级为 CI 拦。
+
+- **测试 temp-dir 泄漏致偶发 flaky 的源头封堵（Finding #52）** — `tests/hooks/test_bootstrap-board.sh` 的 `run_resume` / `run_resume_nosid` 两个 helper 内联建临时项目目录却**从不 `rm -rf`**，每轮泄漏 ~44 个 `.tmp-ccm.*` 到 `$TMPDIR`，久跑脏机器累积致 `mktemp` 偶发失败 → 空 home 路径 → board 操作打错路径 → **偶发红**（解释了「新 checkout 复现不出、脏机器偶发」的诡异表现）。修法二处：两 helper 补 capture + `rm -rf` 源头封堵；`run-tests.sh` 加套件级 `sweep_ccm_tmp()`（startup + `trap EXIT`）**age-filtered（只删 mtime >60min 的 stale 残留）**清掉历史累积。**age-filter 是关键**：初版用 `rm -rf ${TMPDIR}/.tmp-ccm.*` 全局删，被 codex 第二端点验收逮到会**误删并发 `run-tests.sh` 的 active `CC_MASTER_HOME`**（一个 run 的 startup sweep / 另一个先结束 run 的 EXIT trap 会删掉在飞 run 的活动临时目录 → 重引入 flaky）；改 age-filter 后并发 run 的 fresh 目录（<60min）绝不被碰、stale backlog 仍被清。连跑（含并发 ×3）后泄漏恒 0、全绿；隔离设计本身经 80+ 次含并发压测验证过硬，根因纯在清理缺口而非隔离机制。
+
 ## [0.5.0] — 2026-06-15
 
 ### Added
