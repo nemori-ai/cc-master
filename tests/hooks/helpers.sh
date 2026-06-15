@@ -16,8 +16,9 @@ assert_contains() { # $1 haystack $2 needle $3 msg
   case "$1" in *"$2"*) PASS=$((PASS+1));; *) FAILED=$((FAILED+1)); _red "FAIL: $3 (missing [$2])";; esac
 }
 assert_not_contains() { case "$1" in *"$2"*) FAILED=$((FAILED+1)); _red "FAIL: $3 (unexpected [$2])";; *) PASS=$((PASS+1));; esac; }
-# assert_valid_json STR MSG — assert STR parses as valid JSON. node is permitted in TESTS (it is the
-# Claude Code runtime; red line 1 bans jq/python/node in HOOKS, not in test assertions). The hook stdout
+# assert_valid_json STR MSG — assert STR parses as valid JSON. node is fine here (it IS the Claude Code
+# runtime; red line 1 / ADR-006 allows node/JS in hooks too — it bans only jq/python, never node — so a
+# node-based test assertion is unambiguously fine). The hook stdout
 # (an additionalContext envelope) must be a single, well-formed JSON object even when the embedded
 # context string carries literal newlines (the multi-board disambiguation listing) — Finding-style
 # regression guard for the per-line `sed` quoting bug that emitted invalid JSON.
