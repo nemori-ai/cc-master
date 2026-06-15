@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] — 2026-06-15
+
 ### Added
 
 - **魂新增反过度串行纪律 + `orchestrating-to-completion/OBJECTIVE.md`（Finding #44）** — 反假串行的承重纪律此前全住 references（`decomposition.md` / `dispatch.md` / `cost-and-pacing.md`），而每次 compaction 整篇重注的常驻手册 `SKILL.md` 无显式护栏——常驻的反并行压力（lens5「限 WIP / 瞄 75%」）对上非常驻的反串行纪律，天平系统性倒向串行。现把三处承重护栏上提进魂：**lens2 加「边即债务 / 默认并行 / 逐边举证」**、**Rationalization Table 加「窗口紧 / 预算紧 → 串起来省」行**（真相：串行**不省 token**、只拉长 makespan，省预算靠降档 / 控 WIP / 推迟 float）、**Red Flags 加「画了边却说不出被下游消费的上游产物」条**；`decomposition.md` §2 加反向指针（规则 SSOT 在魂、论证 SSOT 在 reference，勿互抄）。新增 `skills/orchestrating-to-completion/OBJECTIVE.md` 把**并行度**纳入成功契约 J。Track B 重跑：魂-only 臂从「靠推导默认并行」变为「逐字引用三处新规则 + 具名删 4 条假边」（价值在强模型天花板下的 legibility + 跨 compaction 一致性，非宽度跃升）。
