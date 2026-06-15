@@ -2,8 +2,14 @@
 . "$(dirname "$0")/helpers.sh"
 
 count_boards() { ls "$1"/*.board.json 2>/dev/null | wc -l | tr -d ' '; }
-# board_sid FILE — extract owner.session_id value (pure bash, mirrors the hooks' extraction).
-board_sid() { sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1" | head -1; }
+# board_sid FILE — extract owner.session_id value (pure bash). owner precedes tasks[] in the pinned
+# waist, so the FIRST "session_id" token is owner's. grep -o the first token BEFORE sed: a greedy
+# `.*"session_id"` on a single line bearing several session_id-shaped fields would otherwise capture
+# the LAST one (a task-level decoy), not owner's.
+board_sid() {
+  grep -oE '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' "$1" | head -1 \
+    | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
+}
 # only_board HOME — echo the single board path in HOME (assumes exactly one).
 only_board() { ls "$1"/*.board.json 2>/dev/null | head -1; }
 
@@ -121,5 +127,248 @@ run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"First line mentions the 
 assert_eq 0 "$HOOK_RC" "first-line inline-marker exits 0 (no-op)"
 assert_eq 0 "$(count_boards "$P/.claude/cc-master")" "P4b: marker inline on first line (not standalone) → no board (codex catch)"
 rm -rf "$P"
+
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+# RESUME mechanism (design 2026-06-15-resume-board-mechanism.md §1/§2/§3/§5/§8)
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+#
+# seed_board HOME SID ACTIVE GOAL [EXTRA_TASKS_JSON] — write a pre-existing board into HOME with a
+# UNIQUE time-sortable name, owner.session_id=SID, owner.active=ACTIVE (true|false), goal=GOAL, two
+# stub tasks (+ optional EXTRA_TASKS_JSON inserted verbatim). Echoes the board path. Uniqueness via
+# mktemp (a counter would NOT survive the $(...) subshell each call runs in). Heartbeat left empty
+# (the common case for stale/abandoned boards).
+seed_board() { # $1 home $2 sid $3 active $4 goal [$5 extra-tasks-json]
+  local home="$1" sid="$2" active="$3" goal="$4" extra="${5:-}"
+  mkdir -p "$home"
+  local bp; bp="$(mktemp "$home/20260101T000000Z-seedXXXXXX")"; mv "$bp" "$bp.board.json"; bp="$bp.board.json"
+  local tasks='{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":["T1"]}'
+  [ -n "$extra" ] && tasks="$tasks,$extra"
+  printf '{"schema":"cc-master/v1","goal":"%s","owner":{"active":%s,"session_id":"%s","heartbeat":""},"git":{"worktree":"","branch":""},"wip_limit":4,"tasks":[%s],"log":[{"t":"2026-01-01","msg":"seeded"}]}\n' \
+    "$goal" "$active" "$sid" "$tasks" > "$bp"
+  # Default an aged (stale) mtime so a seeded board reads as ABANDONED (the common resume case). The
+  # live-safety gate (S10–S13) overrides this per-test by calling touch_mtime explicitly.
+  touch_mtime "$bp" 120
+  echo "$bp"
+}
+# run_resume HOME SID PROMPT — fire bootstrap with a custom CC_MASTER_HOME + stdin session_id, set
+# HOOK_OUT / HOOK_RC. (run_hook uses the project default home; resume tests seed a custom home.)
+run_resume() { # $1 home $2 sid $3 prompt
+  HOOK_OUT="$(printf '%s' "$(printf '{"session_id":"%s","prompt":"%s"}' "$2" "$3")" \
+    | CLAUDE_PROJECT_DIR="$(make_project)" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
+      bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"; HOOK_RC=$?
+}
+# touch_mtime FILE MINUTES_AGO — set FILE's mtime to MINUTES_AGO minutes in the past (GNU/BSD touch).
+touch_mtime() {
+  local f="$1" mins="$2"
+  if touch -d "$mins minutes ago" "$f" 2>/dev/null; then return 0; fi   # GNU
+  local secs=$((mins*60)) hh mm ss                                       # BSD touch -A: [-]HHMMSS
+  hh=$(printf '%02d' $((secs/3600))); mm=$(printf '%02d' $(((secs%3600)/60))); ss=$(printf '%02d' $((secs%60)))
+  touch -A "-${hh}${mm}${ss}" "$f" 2>/dev/null || true
+}
+
+# ── R2: fresh path zero-regression — no --resume → still NEW board + fresh context (no resume branch)
+H="$(make_project)"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator migrate the thing'
+assert_eq 0 "$HOOK_RC" "R2: fresh exits 0"
+assert_eq 1 "$(count_boards "$H")" "R2: no --resume → new board created"
+assert_eq "new-sess" "$(board_sid "$(only_board "$H")")" "R2: fresh stamps new sid"
+assert_contains "$HOOK_OUT" "fresh" "R2: fresh context injected"
+rm -rf "$H"
+
+# ── R3: goal text CONTAINS --resume but not as the first token after the prefix → still fresh
+H="$(make_project)"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator migrate the --resume flag handling'
+assert_eq 1 "$(count_boards "$H")" "R3: --resume mid-goal → still fresh (new board), not resume"
+assert_contains "$HOOK_OUT" "fresh" "R3: mid-goal --resume → fresh context"
+rm -rf "$H"
+
+# ── S1: happy path, unique candidate — empty selector, one abandoned-active board → re-stamp sid
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "build the thing")"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume'
+assert_eq 0 "$HOOK_RC" "S1: resume exits 0"
+assert_eq 1 "$(count_boards "$H")" "S1: no new board created (count stays 1)"
+assert_eq "new-sess" "$(board_sid "$B")" "S1: owner.session_id re-stamped to new sid"
+assert_eq "true" "$(board_active "$B")" "S1: owner.active stays true"
+assert_contains "$HOOK_OUT" "$B" "S1: resume context names the board path"
+rm -rf "$H"
+
+# ── S2: goal substring selects the right board — payments board untouched
+H="$(make_project)"
+Bi="$(seed_board "$H" "old-a" "true" "ship the i18n localization")"
+Bp="$(seed_board "$H" "old-b" "true" "refactor the payments gateway")"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume i18n'
+assert_eq "new-sess" "$(board_sid "$Bi")" "S2: i18n board re-stamped"
+assert_eq "old-b" "$(board_sid "$Bp")" "S2: payments board owner UNTOUCHED"
+rm -rf "$H"
+
+# ── S3: explicit board filename selects the board
+H="$(make_project)"
+B1="$(seed_board "$H" "old-a" "true" "alpha goal")"
+B2="$(seed_board "$H" "old-b" "true" "beta goal")"
+run_resume "$H" "new-sess" "/cc-master:as-master-orchestrator --resume $(basename "$B2")"
+assert_eq "new-sess" "$(board_sid "$B2")" "S3: explicit board name re-stamped"
+assert_eq "old-a" "$(board_sid "$B1")" "S3: other board untouched"
+rm -rf "$H"
+
+# ── S4: tasks/log/goal preserved byte-for-byte (red line 2 regression gate)
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "preserve me")"
+before_tasks="$(tr -d '\n' < "$B" | sed -n 's/.*\("tasks":\[.*\]\),"log".*/\1/p')"
+before_log="$(tr -d '\n' < "$B" | sed -n 's/.*\("log":\[[^]]*\]\).*/\1/p')"
+before_goal="$(board_goal "$B")"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume preserve'
+after_tasks="$(tr -d '\n' < "$B" | sed -n 's/.*\("tasks":\[.*\]\),"log".*/\1/p')"
+after_log="$(tr -d '\n' < "$B" | sed -n 's/.*\("log":\[[^]]*\]\).*/\1/p')"
+assert_eq "$before_tasks" "$after_tasks" "S4: tasks[] byte-identical after resume"
+assert_eq "$before_log" "$after_log" "S4: log[] byte-identical after resume"
+assert_eq "$before_goal" "$(board_goal "$B")" "S4: goal byte-identical after resume"
+rm -rf "$H"
+
+# ── S5: multiple boards match selector → NO write, disambiguation context
+H="$(make_project)"
+B1="$(seed_board "$H" "old-a" "true" "migrate the database")"
+B2="$(seed_board "$H" "old-b" "true" "migrate the auth service")"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume migrate'
+assert_eq "old-a" "$(board_sid "$B1")" "S5: board1 owner unchanged (no write)"
+assert_eq "old-b" "$(board_sid "$B2")" "S5: board2 owner unchanged (no write)"
+assert_eq 2 "$(count_boards "$H")" "S5: no new board created"
+assert_contains "$HOOK_OUT" "more precise" "S5: context asks for a more precise selector"
+rm -rf "$H"
+
+# ── S6: selector non-empty but zero matches → no write, "no match" context
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "alpha")"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume nonexistent-goal-xyz'
+assert_eq "old-sess" "$(board_sid "$B")" "S6: board owner unchanged (no write on zero match)"
+assert_contains "$HOOK_OUT" "no" "S6: context indicates no match"
+rm -rf "$H"
+
+# ── S7: empty selector + multiple candidates (active + archived mix) → no write, two-group listing
+H="$(make_project)"
+Ba="$(seed_board "$H" "old-a" "true" "active board goal")"
+Bx="$(seed_board "$H" "old-b" "false" "archived board goal")"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume'
+assert_eq "old-a" "$(board_sid "$Ba")" "S7: active board owner unchanged (no write)"
+assert_eq "old-b" "$(board_sid "$Bx")" "S7: archived board owner unchanged (no write)"
+assert_contains "$HOOK_OUT" "$(basename "$Ba")" "S7: active candidate listed"
+assert_contains "$HOOK_OUT" "$(basename "$Bx")" "S7: archived candidate listed"
+assert_contains "$HOOK_OUT" "archived" "S7: groups the candidates (archived group named)"
+rm -rf "$H"
+
+# ── S8: zero candidate boards → no write, "no resumable board" context
+H="$(make_project)"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume'
+assert_eq 0 "$(count_boards "$H")" "S8: no board created on resume with empty home"
+assert_contains "$HOOK_OUT" "no" "S8: context indicates no resumable board"
+rm -rf "$H"
+
+# ── S9: abandoned-active direct takeover (sid re-stamp, active stays true, tasks preserved)
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "takeover goal")"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume takeover'
+assert_eq "new-sess" "$(board_sid "$B")" "S9: abandoned-active sid re-stamped"
+assert_eq "true" "$(board_active "$B")" "S9: active stays true"
+rm -rf "$H"
+
+# ── S9b: revive an archived board (active:false → true) + re-stamp sid + tasks byte-unchanged
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "false" "revive this archived goal")"
+before_tasks="$(tr -d '\n' < "$B" | sed -n 's/.*\("tasks":\[.*\]\),"log".*/\1/p')"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume revive'
+assert_eq "true" "$(board_active "$B")" "S9b: archived board revived (active false→true)"
+assert_eq "new-sess" "$(board_sid "$B")" "S9b: archived board sid re-stamped"
+after_tasks="$(tr -d '\n' < "$B" | sed -n 's/.*\("tasks":\[.*\]\),"log".*/\1/p')"
+assert_eq "$before_tasks" "$after_tasks" "S9b: tasks byte-unchanged on revive"
+rm -rf "$H"
+
+# ── S9c: an archived board IS in the candidate set (empty selector, only one archived board) → locked
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "false" "lonely archived goal")"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume'
+assert_eq "new-sess" "$(board_sid "$B")" "S9c: archived board is a candidate (unique → locked, not filtered)"
+assert_eq "true" "$(board_active "$B")" "S9c: archived unique candidate revived"
+rm -rf "$H"
+
+# ── S10: stale board (mtime ~1h ago, empty heartbeat) → direct takeover, "took over" context
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "stale goal")"
+touch_mtime "$B" 60
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume stale'
+assert_eq "new-sess" "$(board_sid "$B")" "S10: stale board taken over (sid re-stamped)"
+rm -rf "$H"
+
+# ── S10b: stale archived board revives without --force-takeover
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "false" "stale archived goal")"
+touch_mtime "$B" 90
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume archived'
+assert_eq "true" "$(board_active "$B")" "S10b: stale archived revived w/o force (active→true)"
+assert_eq "new-sess" "$(board_sid "$B")" "S10b: stale archived sid re-stamped"
+rm -rf "$H"
+
+# ── S11: fresh board (mtime just now) + no force → NO re-stamp, warning context
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "fresh live goal")"
+touch_mtime "$B" 0
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume fresh'
+assert_eq "old-sess" "$(board_sid "$B")" "S11: fresh board NOT taken over (sid unchanged)"
+assert_eq "true" "$(board_active "$B")" "S11: fresh board active unchanged"
+assert_contains "$HOOK_OUT" "force-takeover" "S11: warning asks for --force-takeover"
+rm -rf "$H"
+
+# ── S12: fresh board + --force-takeover → takeover (sid re-stamped, active true)
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "force goal")"
+touch_mtime "$B" 0
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume force --force-takeover'
+assert_eq "new-sess" "$(board_sid "$B")" "S12: --force-takeover overrides freshness gate"
+assert_eq "true" "$(board_active "$B")" "S12: forced takeover sets active true"
+rm -rf "$H"
+
+# ── S13: no freshness signal (heartbeat empty + mtime in the FUTURE → undatable as stale) →
+# conservatively require force. mtime far in the future cannot be "stale"; without force, withhold.
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "nosignal goal")"
+touch -t 209901010000 "$B" 2>/dev/null || true   # mtime in the FUTURE → not usable as a "stale" signal
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume nosignal'
+assert_eq "old-sess" "$(board_sid "$B")" "S13: no-signal board NOT taken over without force"
+assert_contains "$HOOK_OUT" "force-takeover" "S13: no-signal asks for force"
+rm -rf "$H"
+
+# ── S14: a session_id-shaped field inside tasks[] is NOT touched (owner-scope gate, red line 2)
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "scope goal" '{"id":"T3","status":"ready","deps":[],"session_id":"decoy-must-not-change"}')"
+touch_mtime "$B" 60
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume scope'
+assert_eq "new-sess" "$(board_sid "$B")" "S14: owner.session_id re-stamped (first session_id is owner's)"
+assert_contains "$(cat "$B")" '"session_id":"decoy-must-not-change"' "S14: task-level session_id decoy UNCHANGED"
+rm -rf "$H"
+
+# ── S15: new sid contains sed metachars (/ & . *) → owner.session_id exactly equals it (awk -v safe)
+H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "true" "meta goal")"
+touch_mtime "$B" 60
+run_resume "$H" "sess/a.b*c&d" '/cc-master:as-master-orchestrator --resume meta'
+assert_eq "sess/a.b*c&d" "$(board_sid "$B")" "S15: metachar sid re-stamped exactly (no sed-escape corruption)"
+rm -rf "$H"
+
+# ── S16: compact single-line vs pretty multi-line JSON → identical resume result (format-agnostic)
+H="$(make_project)"
+Bc="$H/20260101T010101Z-compact.board.json"
+printf '{"schema":"cc-master/v1","goal":"compactfmt","owner":{"active":true,"session_id":"old-c","heartbeat":""},"git":{"worktree":"","branch":""},"tasks":[{"id":"T1","status":"done"}],"log":[]}\n' > "$Bc"
+touch_mtime "$Bc" 60
+run_resume "$H" "new-c" '/cc-master:as-master-orchestrator --resume compactfmt'
+assert_eq "new-c" "$(board_sid "$Bc")" "S16a: compact JSON re-stamped"
+assert_eq "true" "$(board_active "$Bc")" "S16a: compact JSON active stays true"
+rm -rf "$H"
+H="$(make_project)"
+Bm="$H/20260101T020202Z-multi.board.json"
+printf '{\n  "schema": "cc-master/v1",\n  "goal": "prettyfmt",\n  "owner": {\n    "active": true,\n    "session_id": "old-m",\n    "heartbeat": ""\n  },\n  "git": { "worktree": "", "branch": "" },\n  "tasks": [ { "id": "T1", "status": "done" } ],\n  "log": []\n}\n' > "$Bm"
+touch_mtime "$Bm" 60
+run_resume "$H" "new-m" '/cc-master:as-master-orchestrator --resume prettyfmt'
+assert_eq "new-m" "$(board_sid "$Bm")" "S16b: pretty multi-line JSON re-stamped"
+assert_eq "true" "$(board_active "$Bm")" "S16b: pretty multi-line JSON active stays true"
+rm -rf "$H"
 
 finish
