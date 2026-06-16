@@ -176,6 +176,40 @@
     .vrule { width: 1px; align-self: stretch; margin: 12px 0;
       background: var(--hair-soft); }
 
+    /* ---- view toggle — a Mission-Control segmented control --------------- */
+    /* Two segments (⬡ GRAPH / ☰ LIST); the active one is a raised inset with a
+       cool-blue lamp tint. Keyboard-reachable (real <button>s), obvious. */
+    .viewtoggle {
+      display: inline-flex; align-items: stretch; gap: 0;
+      padding: 3px; border-radius: var(--r-md);
+      background: oklch(0.16 0.012 255 / 0.7);
+      border: 1px solid var(--hair);
+    }
+    .viewtoggle button {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 11px; border-radius: var(--r-sm);
+      background: transparent; border: 1px solid transparent;
+      color: var(--ink-faint);
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9.5px; font-weight: 500; letter-spacing: 0.14em;
+      text-transform: uppercase; cursor: pointer;
+      transition: color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  background 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  border-color 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .viewtoggle button .tg { font-size: 12px; line-height: 1; }
+    .viewtoggle button:hover { color: var(--ink-dim); }
+    .viewtoggle button.on {
+      color: var(--ready);
+      background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+      border-color: oklch(0.70 0.115 244 / 0.4);
+      box-shadow: 0 0 0 1px oklch(0.70 0.115 244 / 0.18),
+                  0 1px 3px oklch(0.10 0.01 255 / 0.5);
+    }
+    .viewtoggle button:focus-visible {
+      outline: 2px solid oklch(0.70 0.115 244 / 0.7); outline-offset: 1px;
+    }
+
     /* user-gate alarm — the ONE allowed alarm element, prominent not harsh */
     .alarm {
       display: flex; align-items: center; gap: 8px;
@@ -752,6 +786,173 @@
       background: oklch(0.74 0.135 162 / 0.10); }
     .badge.bneck { color: var(--alert); border-color: oklch(0.80 0.150 66 / 0.5);
       background: oklch(0.80 0.150 66 / 0.12); }
+
+    /* ============================ LIST VIEW — the status-board ============== */
+    /* The TUI status-board's web twin: a scannable, status-grouped column. Same
+       live board / poll / analyze() as the DAG, same detail rail. Replaces the
+       #flow canvas (insights rail + detail rail stay). NO accent side-stripes —
+       grouping is carried by leading lamps + a section header + a subtle full-
+       border row; emphasis by background tint, never a 2px left rail. */
+    #listview {
+      flex: 1 1 auto; min-width: 0; min-height: 0;
+      display: flex; flex-direction: column;
+      overflow-y: auto; overflow-x: hidden;
+      background:
+        radial-gradient(120% 80% at 50% -8%, oklch(0.20 0.016 255), var(--ground) 60%);
+    }
+
+    /* condensed insights strip atop the list (mirrors the rail, one line) */
+    .lvstrip {
+      position: sticky; top: 0; z-index: 4;
+      display: flex; align-items: center; gap: 0;
+      flex-wrap: wrap;
+      padding: 0;
+      background: linear-gradient(180deg, var(--panel), var(--panel-hi) 130%);
+      border-bottom: 1px solid var(--hair);
+      box-shadow: 0 1px 0 oklch(0.12 0.01 255 / 0.5);
+    }
+    .lvstrip .si {
+      display: flex; flex-direction: column; gap: 3px;
+      padding: 9px 16px;
+      border-right: 1px solid var(--hair-soft);
+    }
+    .lvstrip .si:last-child { border-right: none; }
+    .lvstrip .si.grow { flex: 1 1 auto; min-width: 0; }
+    .lvstrip .sl {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .lvstrip .sv {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 12px; font-weight: 500; color: var(--ink);
+      font-variant-numeric: tabular-nums; letter-spacing: 0.01em;
+    }
+    .lvstrip .si.grow .sv {
+      font-family: 'Archivo', sans-serif; font-size: 13px; font-weight: 600;
+      letter-spacing: -0.005em;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .lvstrip .sv .unit { color: var(--ink-faint); font-size: 11px; }
+    .lvstrip .si.flag .sl, .lvstrip .si.flag .sv { color: var(--alert); }
+
+    /* a status section: header (icon + name + count) then its rows */
+    .lvsect { display: flex; flex-direction: column; }
+    .lvsect .shead {
+      display: flex; align-items: center; gap: 9px;
+      padding: 13px 18px 8px;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-dim);
+    }
+    .lvsect .shead .sic { font-size: 12px; line-height: 1; color: var(--shc, var(--ink-dim)); }
+    .lvsect .shead .snm { color: var(--shc, var(--ink-dim)); font-weight: 500; }
+    .lvsect .shead .scount {
+      font-variant-numeric: tabular-nums; color: var(--ink-faint);
+      background: oklch(0.26 0.012 255 / 0.7);
+      border: 1px solid var(--hair-soft); border-radius: 9px;
+      padding: 1px 8px; font-size: 9px; letter-spacing: 0.04em;
+    }
+    .lvsect .shead .srule {
+      flex: 1 1 auto; height: 1px; background: var(--hair-soft);
+    }
+    /* the AWAITING-YOU section header reads as the one alarm — amber, held */
+    .lvsect.gate .shead { --shc: var(--alert); }
+    .lvsect.gate .shead .scount {
+      color: var(--alert); border-color: oklch(0.80 0.150 66 / 0.45);
+      background: oklch(0.80 0.150 66 / 0.12);
+    }
+
+    /* a row: leading lamp + id·title + per-status detail + structural chips.
+       Full bottom hairline (no side stripe); selected = full ring + tint. */
+    .lvrow {
+      display: flex; align-items: center; gap: 11px;
+      padding: 9px 18px; cursor: pointer;
+      border-bottom: 1px solid var(--hair-soft);
+      border-left: 1px solid transparent; border-right: 1px solid transparent;
+      transition: background 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .lvrow:hover { background: oklch(0.225 0.016 255 / 0.5); }
+    .lvrow.sel {
+      background: oklch(0.70 0.115 244 / 0.10);
+      box-shadow: inset 0 0 0 1px oklch(0.70 0.115 244 / 0.45);
+    }
+    .lvrow .lamp {
+      width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto;
+      box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6),
+                  0 0 7px currentColor, 0 0 2px currentColor;
+    }
+    /* the in_flight row lamp breathes like the tile lamp */
+    .lvrow.s-in_flight .lamp { animation: lamppulse 1.7s ease-in-out infinite; }
+    /* awaiting-you row lamp: held alert pulse */
+    .lvrow.usergate .lamp { animation: gatelamp 2.0s ease-in-out infinite; }
+
+    .lvrow .body { flex: 1 1 auto; min-width: 0;
+      display: flex; flex-direction: column; gap: 3px; }
+    .lvrow .line1 { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+    .lvrow .rid {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 10px; font-weight: 500; color: var(--ink-dim);
+      font-variant-numeric: tabular-nums; flex: 0 0 auto;
+    }
+    .lvrow .rtitle {
+      font-size: 13px; font-weight: 500; color: var(--ink);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+    }
+    .lvrow .rtitle.empty { color: var(--ink-faint); font-style: italic; }
+    /* per-status detail line — mechanism / clock / blocked-on / artifact */
+    .lvrow .detailline {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9.5px; letter-spacing: 0.02em; color: var(--ink-dim);
+      font-variant-numeric: tabular-nums;
+    }
+    .lvrow .detailline .dpart { display: inline-flex; align-items: center; gap: 4px; }
+    .lvrow .detailline .dpart .dk {
+      color: var(--ink-faint); letter-spacing: 0.08em; text-transform: uppercase;
+      font-size: 8px;
+    }
+    .lvrow .detailline .clk { color: var(--inflight); }
+    .lvrow .detailline .clk .cglyph { font-size: 9px; opacity: 0.9; }
+    .lvrow .detailline .art { color: var(--done); }
+    .lvrow .detailline .bon { color: var(--ink-dim); }
+    .lvrow .detailline .gate { color: var(--alert); }
+
+    /* structural chips, right-aligned cluster (gates / fan-in / bottleneck / crit) */
+    .lvrow .chips { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+    .lvrow .lchip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 7px; border-radius: var(--r-sm);
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
+      background: oklch(0.26 0.012 255 / 0.7);
+      color: var(--ink-dim); border: 1px solid var(--hair-soft);
+    }
+    .lvrow .lchip .cn { color: var(--ink); font-variant-numeric: tabular-nums; font-size: 9px; }
+    .lvrow .lchip.impact.hot {
+      background: oklch(0.80 0.160 70 / 0.12);
+      border-color: oklch(0.80 0.160 70 / 0.35); color: var(--spine);
+    }
+    .lvrow .lchip.impact.hot .cn { color: var(--spine); }
+    .lvrow .lchip.conv {
+      background: oklch(0.70 0.115 244 / 0.12);
+      border-color: oklch(0.70 0.115 244 / 0.4); color: var(--ready);
+    }
+    .lvrow .lchip.conv .cn { color: var(--ready); }
+    .lvrow .lchip.crit {
+      background: oklch(0.80 0.160 70 / 0.10);
+      border-color: oklch(0.80 0.160 70 / 0.4); color: var(--spine);
+    }
+    .lvrow .lchip.bneck {
+      background: oklch(0.80 0.150 66 / 0.12);
+      border-color: oklch(0.80 0.150 66 / 0.5); color: var(--alert);
+    }
+
+    .lvempty {
+      padding: 40px 18px; text-align: center;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 11px; letter-spacing: 0.04em; color: var(--ink-faint);
+    }
 
     /* ============================ STATUS / ERROR ============================ */
     .err {
@@ -1384,6 +1585,18 @@
       const [edges, setEdges] = useState([]);
       const [err, setErr] = useState(null);
       const [sel, setSel] = useState(null);  // selected task id (lineage anchor)
+      // view mode: 'graph' (xyflow DAG) | 'list' (status-board). Persisted in
+      // localStorage (key ccm-view); default 'graph'. read-only UI preference.
+      const [view, setView] = useState(() => {
+        try {
+          const v = localStorage.getItem('ccm-view');
+          return v === 'list' ? 'list' : 'graph';
+        } catch (_e) { return 'graph'; }
+      });
+      const setViewPersist = useCallback((v) => {
+        setView(v);
+        try { localStorage.setItem('ccm-view', v); } catch (_e) {}
+      }, []);
       const sigRef = useRef(null);
       const posRef = useRef(new Map());
       const boardRef = useRef(null);
@@ -1493,6 +1706,24 @@
           ),
           // telemetry readouts
           h('div', { className: 'readouts' },
+            // view toggle — GRAPH (xyflow DAG) | LIST (status-board)
+            h('div', { className: 'viewtoggle', role: 'group', 'aria-label': 'view mode' },
+              h('button', {
+                type: 'button',
+                className: view === 'graph' ? 'on' : '',
+                'aria-pressed': view === 'graph',
+                title: 'graph view — the dependency DAG',
+                onClick: () => setViewPersist('graph'),
+              }, h('span', { className: 'tg' }, '⬡'), 'graph'),
+              h('button', {
+                type: 'button',
+                className: view === 'list' ? 'on' : '',
+                'aria-pressed': view === 'list',
+                title: 'list view — the status-board',
+                onClick: () => setViewPersist('list'),
+              }, h('span', { className: 'tg' }, '☰'), 'list'),
+            ),
+            h('div', { className: 'vrule' }),
             h('div', { className: 'readout' },
               h('span', { className: 'rl' }, 'progress'),
               h('span', { className: 'rv' },
@@ -1517,8 +1748,14 @@
         h('div', { id: 'stage' },
           // left analytics rail
           h(Insights, { an, board, progress, pct, nodeCount, onPick: select }),
-          // center canvas
-          h('div', { id: 'flow', className: sel ? 'has-selection' : '' },
+          // center: LIST view (status-board) — same live board, same analyze(),
+          // same select(); replaces the canvas while keeping rails intact.
+          view === 'list' ? h(ListView, {
+            an, board, progress, pct, sel, onPick: select,
+          }) : null,
+          // center canvas — GRAPH view. Kept mounted only in graph mode so xyflow
+          // doesn't measure/animate while hidden; nodes/edges state still updates.
+          view === 'graph' ? h('div', { id: 'flow', className: sel ? 'has-selection' : '' },
             err ? h('div', { className: 'err' }, err) : null,
             h(ReactFlow, {
               nodes, edges, nodeTypes,
@@ -1553,7 +1790,7 @@
               }) : null,
             ),
             h(Legend, { counts, total: progress.total }),
-          ),
+          ) : null,
           // right detail rail (slides in on selection)
           h(Detail, { task: selTask, an, board, onClose: () => select(null), onPick: select }),
         ),
@@ -1665,6 +1902,194 @@
     function msFromDispatch(t) {
       const ts = parseTs(t.dispatched_at);
       return ts != null ? Date.now() - ts : null;
+    }
+
+    // ---- LIST VIEW — the status-board (TUI status-board's web twin) --------
+    // Same live board + analyze() + select() as the DAG; a scannable, status-
+    // grouped column. Sections in a fixed priority order, EMPTY ones omitted:
+    //   AWAITING YOU (top, most prominent) → IN FLIGHT → BLOCKED → READY
+    //   → DONE/VERIFIED → NEEDS ATTENTION.
+    // Within each section, rows sort by downstream impact (criticality) desc so
+    // the heaviest items float up. Each row earns the graph's analytics in list
+    // form: gates N / ⋈ N fan-in / ⟋ critical / ⚠ bottleneck chips.
+    const NEEDS_ATTN = new Set(['stale', 'failed', 'escalated', 'uncertain']);
+    function ListView({ an, board, progress, pct, sel, onPick }) {
+      if (!an || !board) {
+        return h('div', { id: 'listview' },
+          h('div', { className: 'lvempty' }, 'acquiring board…'));
+      }
+      const tasks = Array.isArray(board.tasks) ? board.tasks : [];
+
+      // partition into sections. AWAITING-YOU pulls ANY blocked_on:'user' task
+      // out FIRST (regardless of status) so a user gate is never buried; the
+      // remaining sections are status-driven and mutually exclusive with it.
+      const gateIds = new Set(an.userGateIds);
+      const buckets = {
+        gate: [], in_flight: [], blocked: [], ready: [], done: [], attn: [],
+      };
+      for (const t of tasks) {
+        if (gateIds.has(t.id)) { buckets.gate.push(t); continue; }
+        const s = t.status;
+        if (s === 'in_flight') buckets.in_flight.push(t);
+        else if (s === 'blocked') buckets.blocked.push(t);
+        else if (s === 'ready') buckets.ready.push(t);
+        else if (DONE_STATUSES.has(s)) buckets.done.push(t);
+        else if (NEEDS_ATTN.has(s)) buckets.attn.push(t);
+        else buckets.attn.push(t); // unknown statuses surface, never vanish
+      }
+      // sort each bucket by downstream impact desc (criticality), id as tiebreak
+      const byImpact = (a, b) =>
+        (an.impact.get(b.id) || 0) - (an.impact.get(a.id) || 0) ||
+        String(a.id).localeCompare(String(b.id));
+      for (const k of Object.keys(buckets)) buckets[k].sort(byImpact);
+
+      // section descriptors, in render order
+      const SECTIONS = [
+        { key: 'gate',      cls: 'gate', icon: '⏸', name: 'awaiting you',     kind: 'gate' },
+        { key: 'in_flight', cls: '',     icon: '▶', name: 'in flight',        kind: 'inflight' },
+        { key: 'blocked',   cls: '',     icon: '⛔', name: 'blocked',          kind: 'blocked' },
+        { key: 'ready',     cls: '',     icon: '◷', name: 'ready',            kind: 'ready' },
+        { key: 'done',      cls: '',     icon: '✓', name: 'done / verified',  kind: 'done' },
+        { key: 'attn',      cls: '',     icon: '⚠', name: 'needs attention',  kind: 'attn' },
+      ];
+
+      const sections = SECTIONS.filter(s => buckets[s.key].length).map(s =>
+        h('div', { className: 'lvsect ' + s.cls, key: s.key },
+          h('div', { className: 'shead' },
+            h('span', { className: 'sic' }, s.icon),
+            h('span', { className: 'snm' }, s.name),
+            h('span', { className: 'scount' }, buckets[s.key].length),
+            h('span', { className: 'srule' }),
+          ),
+          ...buckets[s.key].map(t => h(ListRow, {
+            key: t.id, task: t, an, kind: s.kind,
+            selected: t.id === sel, onPick,
+          })),
+        ),
+      );
+
+      const userGates = an.userGateIds.length;
+
+      return h('div', { id: 'listview' },
+        // condensed insights strip — mirrors the rail, one horizontal line
+        h('div', { className: 'lvstrip' },
+          h('div', { className: 'si grow' },
+            h('span', { className: 'sl' }, 'objective'),
+            h('span', { className: 'sv', title: board.goal || '' }, board.goal || 'no goal set'),
+          ),
+          h('div', { className: 'si' },
+            h('span', { className: 'sl' }, 'progress'),
+            h('span', { className: 'sv' }, progress.done + '/' + progress.total + ' · ' + pct + '%'),
+          ),
+          h('div', { className: 'si' },
+            h('span', { className: 'sl' }, 'critical path'),
+            h('span', { className: 'sv' }, String(an.critLen)),
+          ),
+          h('div', { className: 'si' },
+            h('span', { className: 'sl' }, 'wip'),
+            h('span', { className: 'sv' }, String(an.wip)),
+          ),
+          h('div', { className: 'si' + (userGates ? ' flag' : '') },
+            h('span', { className: 'sl' }, 'awaiting you'),
+            h('span', { className: 'sv' }, String(userGates)),
+          ),
+        ),
+        sections.length ? sections : h('div', { className: 'lvempty' }, 'no tasks on the board'),
+      );
+    }
+
+    // a single list row — its own component so the in_flight clock can tick via
+    // useSecondTick scoped to exactly the rows that need it.
+    function ListRow({ task: t, an, kind, selected, onPick }) {
+      const status = t.status;
+      const userGate = t.blocked_on === 'user';
+      // live clock: in_flight (or any user-gate row dispatched & running) ticks.
+      const running = status === 'in_flight' && parseTs(t.dispatched_at) != null;
+      useSecondTick(running);
+
+      const cls = ['lvrow', 's-' + (status || 'unknown')];
+      if (userGate) cls.push('usergate');
+      if (selected) cls.push('sel');
+      const lamp = userGate ? cssVar('--alert') : statusColor(status);
+
+      // ---- per-status detail line --------------------------------------------
+      const parts = [];
+      if (userGate) {
+        const elStr = fmtElapsed(msFromDispatch(t));
+        parts.push(h('span', { className: 'dpart gate', key: 'g' },
+          h('span', { className: 'dk' }, 'gate'),
+          'awaiting your decision' + (elStr != null ? ' · ' + elStr : '')));
+      }
+      if (kind === 'inflight' || running) {
+        if (running) {
+          const elapsed = Date.now() - parseTs(t.dispatched_at);
+          const clk = fmtElapsed(elapsed);
+          if (clk != null) parts.push(h('span', { className: 'dpart clk', key: 'clk' },
+            h('span', { className: 'cglyph' }, '◷'), 'running ' + clk));
+        }
+        if (t.mechanism) parts.push(h('span', { className: 'dpart', key: 'mech' },
+          h('span', { className: 'dk' }, 'via'), t.mechanism + (t.handle ? ' · ' + t.handle : '')));
+      } else if (kind === 'blocked' && !userGate) {
+        const deps = an.upstream.get(t.id) || [];
+        const blockers = deps.filter(d => {
+          const dt = an.byId.get(d);
+          return dt && !DONE_STATUSES.has(dt.status);
+        });
+        const showDeps = blockers.length ? blockers : deps;
+        if (t.blocked_on && t.blocked_on !== 'user') {
+          parts.push(h('span', { className: 'dpart bon', key: 'bon' },
+            h('span', { className: 'dk' }, 'blocked on'), String(t.blocked_on)));
+        } else if (showDeps.length) {
+          parts.push(h('span', { className: 'dpart bon', key: 'bon' },
+            h('span', { className: 'dk' }, 'blocked on'), showDeps.join(', ')));
+        }
+      } else if (kind === 'done') {
+        const dur = taskDuration(t);
+        const durStr = fmtDuration(dur);
+        if (durStr != null) parts.push(h('span', { className: 'dpart', key: 'dur' },
+          h('span', { className: 'dk' }, 'took'), durStr));
+        if (t.artifact) parts.push(h('span', { className: 'dpart art', key: 'art' },
+          h('span', { className: 'dk' }, 'artifact'), String(t.artifact)));
+      } else if (kind === 'attn') {
+        const elStr = fmtElapsed(msFromDispatch(t));
+        parts.push(h('span', { className: 'dpart bon', key: 'st' },
+          h('span', { className: 'dk' }, 'status'),
+          (STATUS_LABEL[status] || status) + (elStr != null ? ' · ' + elStr : '')));
+      }
+
+      // ---- structural chips (right cluster) ----------------------------------
+      const impact = an.impact.get(t.id) || 0;
+      const inDeg = an.inDeg.get(t.id) || 0;
+      const chips = [];
+      if (an.critSet.has(t.id)) chips.push(
+        h('span', { className: 'lchip crit', key: 'cr', title: 'on the critical path' }, '⟋ crit'));
+      if (an.bneck === t.id) chips.push(
+        h('span', { className: 'lchip bneck', key: 'bn', title: 'bottleneck — stalling the most work' }, '⚠ bottleneck'));
+      if (impact > 0) chips.push(
+        h('span', { className: 'lchip impact' + (impact >= IMPACT_HOT ? ' hot' : ''), key: 'imp',
+          title: 'gates ' + impact + ' downstream tasks' },
+          'gates', h('span', { className: 'cn' }, impact)));
+      if (inDeg >= CONV_MIN) chips.push(
+        h('span', { className: 'lchip conv', key: 'cv', title: 'convergence — ' + inDeg + ' direct deps' },
+          '⋈', h('span', { className: 'cn' }, inDeg)));
+
+      const title = (t.title || '').trim();
+
+      return h('div', {
+        className: cls.join(' '),
+        onClick: () => onPick(t.id),
+        style: { '--lamp': lamp },
+      },
+        h('span', { className: 'lamp', style: { background: lamp, color: lamp } }),
+        h('div', { className: 'body' },
+          h('div', { className: 'line1' },
+            h('span', { className: 'rid' }, t.id),
+            h('span', { className: 'rtitle' + (title ? '' : ' empty') }, title || 'untitled'),
+          ),
+          parts.length ? h('div', { className: 'detailline' }, ...parts) : null,
+        ),
+        chips.length ? h('div', { className: 'chips' }, ...chips) : null,
+      );
     }
 
     // ---- DETAIL RAIL — full task readout -----------------------------------
