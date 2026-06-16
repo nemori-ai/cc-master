@@ -216,29 +216,35 @@
     }
     /* left identity block — feels like a console nameplate */
     .ident {
-      display: flex; align-items: center; gap: 11px;
+      flex: 0 0 auto;
+      display: flex; align-items: center; gap: 10px;
       padding: 0 18px 0 20px;
       border-right: 1px solid var(--hair-soft);
     }
+    /* beacon — live "online" telemetry dot; sits on the wordmark cap line,
+       nudged down a hair so it reads against the uppercase mark, not the subline */
     .ident .beacon {
-      width: 9px; height: 9px; border-radius: 50%;
+      flex: 0 0 auto;
+      width: 8px; height: 8px; border-radius: 50%;
       background: var(--done);
-      box-shadow: 0 0 0 0 var(--done);
+      box-shadow: 0 0 0 0 var(--done), 0 0 6px oklch(0.74 0.135 162 / 0.5);
+      margin-top: -5px;
       animation: beacon 2.6s ease-out infinite;
     }
     @keyframes beacon {
-      0%   { box-shadow: 0 0 0 0 oklch(0.74 0.135 162 / 0.55); }
-      70%  { box-shadow: 0 0 0 7px oklch(0.74 0.135 162 / 0); }
-      100% { box-shadow: 0 0 0 0 oklch(0.74 0.135 162 / 0); }
+      0%   { box-shadow: 0 0 0 0 oklch(0.74 0.135 162 / 0.5), 0 0 6px oklch(0.74 0.135 162 / 0.5); }
+      70%  { box-shadow: 0 0 0 6px oklch(0.74 0.135 162 / 0), 0 0 6px oklch(0.74 0.135 162 / 0.5); }
+      100% { box-shadow: 0 0 0 0 oklch(0.74 0.135 162 / 0), 0 0 6px oklch(0.74 0.135 162 / 0.5); }
     }
     .ident .mark {
-      font-weight: 700; font-size: 13px; letter-spacing: 0.14em;
+      font-weight: 700; font-size: 13px; letter-spacing: 0.15em;
       text-transform: uppercase; color: var(--ink);
+      white-space: nowrap;
     }
     .ident .sub {
       font-family: 'Martian Mono', ui-monospace, monospace;
-      font-size: 9px; letter-spacing: 0.18em; color: var(--ink-faint);
-      text-transform: uppercase; margin-top: 2px;
+      font-size: 8.5px; letter-spacing: 0.26em; color: var(--ink-faint);
+      text-transform: uppercase; white-space: nowrap; margin-top: 3px;
     }
     .ident .mark-wrap { display: flex; flex-direction: column; line-height: 1; }
 
