@@ -184,7 +184,7 @@
        shorthand or animate layout (width / flex-basis / transform). The large
        grounds + panels carry the felt transition. Reduced-motion → instant swap
        (global reduce block below). */
-    body, header.bar, #insights, #flow, #listview,
+    body, header.bar, #insights, #flow, #listview, #boardview, .bvlane,
     .legend, .lvstrip, .metric, .dpanel, .dhead, .dsect,
     .react-flow__minimap {
       transition-property: background-color, background, color, border-color, box-shadow, fill;
@@ -1105,6 +1105,206 @@
       font-size: 11px; letter-spacing: 0.04em; color: var(--ink-faint);
     }
 
+    /* ============================ BOARD VIEW — the Kanban card board ========= */
+    /* The agile card board between the DAG and the list: workflow stages become
+       lanes (columns), tasks become compact cards with density BETWEEN a graph
+       node and a list row. Same live board + analyze() + select() + clock as the
+       other two views; replaces the #flow canvas (insights + detail rails stay).
+       Discipline: NO side-stripe accent rails on lanes or cards — grouping is
+       carried by the lane header + the leading status lamp + full hairline
+       borders + background tint, never a 2px left/right edge. */
+    #boardview {
+      flex: 1 1 auto; min-width: 0; min-height: 0;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      background:
+        radial-gradient(120% 80% at 50% -8%, var(--canvas-glow), var(--ground) 60%);
+    }
+
+    /* the lanes track: a horizontal row of columns, scrolls sideways on overflow */
+    .bvlanes {
+      flex: 1 1 auto; min-height: 0;
+      display: flex; align-items: stretch; gap: 14px;
+      padding: 16px 18px;
+      overflow-x: auto; overflow-y: hidden;
+    }
+
+    /* a LANE — a column container (NOT a card; no card chrome around it). Header
+       on top, then an independently vertical-scrolling body of cards. */
+    .bvlane {
+      flex: 0 0 286px; width: 286px;
+      display: flex; flex-direction: column; min-height: 0;
+      background: linear-gradient(180deg, var(--panel), var(--ground) 96%);
+      border: 1px solid var(--hair-soft);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+    }
+    .bvlane .lanehead {
+      flex: 0 0 auto;
+      display: flex; align-items: center; gap: 9px;
+      padding: 11px 13px 10px;
+      border-bottom: 1px solid var(--hair-soft);
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--ink-dim);
+    }
+    .bvlane .lanehead .lic { font-size: 12px; line-height: 1; color: var(--lhc, var(--ink-dim)); }
+    .bvlane .lanehead .lnm { color: var(--lhc, var(--ink-dim)); font-weight: 500; flex: 1 1 auto; }
+    .bvlane .lanehead .lct {
+      font-variant-numeric: tabular-nums; color: var(--ink-faint);
+      background: var(--chip-bg);
+      border: 1px solid var(--hair-soft); border-radius: 9px;
+      padding: 1px 8px; font-size: 9px; letter-spacing: 0.04em; flex: 0 0 auto;
+    }
+    /* the AWAITING-YOU lane header reads as the one allowed alarm — amber, held */
+    .bvlane.gate { border-color: oklch(0.80 0.150 66 / 0.4); }
+    .bvlane.gate .lanehead { --lhc: var(--alert); border-bottom-color: oklch(0.80 0.150 66 / 0.3); }
+    .bvlane.gate .lanehead .lct {
+      color: var(--alert); border-color: oklch(0.80 0.150 66 / 0.45);
+      background: oklch(0.80 0.150 66 / 0.12);
+    }
+
+    .bvlane .lanebody {
+      flex: 1 1 auto; min-height: 0;
+      overflow-y: auto; overflow-x: hidden;
+      display: flex; flex-direction: column; gap: 10px;
+      padding: 11px 11px 13px;
+    }
+
+    /* a CARD — a compact instrument tile, denser than a node, lighter than a row.
+       Full hairline border + raised panel fill; the leading status lamp carries
+       the status colour. No side-stripe. Hover lifts a hair; selected = full ring. */
+    .bvcard {
+      --lamp: var(--blocked);
+      position: relative;
+      display: flex; flex-direction: column; gap: 7px;
+      padding: 9px 11px 10px;
+      border-radius: var(--r-md);
+      background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+      border: 1px solid var(--hair);
+      cursor: pointer;
+      box-shadow: 0 1px 2px oklch(0.10 0.01 255 / 0.4);
+      transition: border-color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  background 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    :root[data-theme="light"] .bvcard {
+      box-shadow: 0 1px 2px oklch(0.55 0.02 255 / 0.10);
+    }
+    .bvcard:hover {
+      transform: translateY(-1px); border-color: var(--hair);
+      box-shadow: 0 2px 4px oklch(0.10 0.01 255 / 0.4), 0 8px 18px oklch(0.10 0.01 255 / 0.28);
+    }
+    :root[data-theme="light"] .bvcard:hover {
+      box-shadow: 0 2px 4px oklch(0.55 0.02 255 / 0.10), 0 8px 18px oklch(0.55 0.02 255 / 0.14);
+    }
+    .bvcard.sel {
+      border-color: oklch(0.70 0.115 244 / 0.75);
+      box-shadow: 0 0 0 1px oklch(0.70 0.115 244 / 0.45),
+                  0 2px 4px oklch(0.10 0.01 255 / 0.4);
+    }
+    :root[data-theme="light"] .bvcard.sel {
+      box-shadow: 0 0 0 1px oklch(0.70 0.115 244 / 0.55),
+                  0 2px 4px oklch(0.55 0.02 255 / 0.10);
+    }
+    /* critical-path card: amber border + faint amber field (no top bar needed at
+       this density; the border + tint reads as "on the spine"). */
+    .bvcard.crit {
+      border-color: oklch(0.80 0.160 70 / 0.5);
+      background: linear-gradient(180deg, oklch(0.80 0.160 70 / 0.05), var(--panel));
+    }
+    /* bottleneck card: heavier amber halo — the single "stalling the most" tile */
+    .bvcard.bneck {
+      border-color: oklch(0.80 0.150 66 / 0.6);
+      box-shadow: 0 0 0 1px oklch(0.80 0.150 66 / 0.35),
+                  0 2px 4px oklch(0.10 0.01 255 / 0.4);
+    }
+
+    .bvcard .cardtop { display: flex; align-items: center; gap: 7px; }
+    .bvcard .lamp {
+      width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;
+      background: var(--lamp);
+      box-shadow: 0 0 0 1px var(--lamp-ring), 0 0 6px var(--lamp), 0 0 2px var(--lamp);
+    }
+    /* in_flight card lamp breathes; awaiting-you card lamp holds an alert pulse */
+    .bvcard.s-in_flight .lamp { animation: lamppulse 1.7s ease-in-out infinite; }
+    .bvcard.usergate .lamp { animation: gatelamp 2.0s ease-in-out infinite; }
+    .bvcard .cid {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9.5px; font-weight: 500; letter-spacing: 0.04em;
+      color: var(--ink-dim); font-variant-numeric: tabular-nums; flex: 0 0 auto;
+    }
+    .bvcard .ctitle {
+      font-size: 12px; line-height: 1.32; font-weight: 500; color: var(--ink);
+      /* clamp to ~2 lines with ellipsis */
+      display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2;
+      -webkit-box-orient: vertical; overflow: hidden;
+      word-break: break-word;
+    }
+    .bvcard .ctitle.empty { color: var(--ink-faint); font-style: italic; }
+
+    /* the chip row — reuses analyze(): gates N / ⋈ N / ⟋ crit / ⚠ bottleneck */
+    .bvcard .cchips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .bvcard .bchip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 1px 6px; border-radius: var(--r-sm);
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase;
+      background: var(--chip-bg); color: var(--ink-dim);
+      border: 1px solid var(--hair-soft);
+    }
+    .bvcard .bchip .cn { color: var(--ink); font-variant-numeric: tabular-nums; font-size: 9px; }
+    .bvcard .bchip.impact.hot {
+      background: oklch(0.80 0.160 70 / 0.12);
+      border-color: oklch(0.80 0.160 70 / 0.35); color: var(--spine);
+    }
+    .bvcard .bchip.impact.hot .cn { color: var(--spine); }
+    .bvcard .bchip.conv {
+      background: oklch(0.70 0.115 244 / 0.12);
+      border-color: oklch(0.70 0.115 244 / 0.4); color: var(--ready);
+    }
+    .bvcard .bchip.conv .cn { color: var(--ready); }
+    .bvcard .bchip.crit {
+      background: oklch(0.80 0.160 70 / 0.10);
+      border-color: oklch(0.80 0.160 70 / 0.4); color: var(--spine);
+    }
+    .bvcard .bchip.bneck {
+      background: oklch(0.80 0.150 66 / 0.12);
+      border-color: oklch(0.80 0.150 66 / 0.5); color: var(--alert);
+    }
+
+    /* the ONE per-stage detail line — clock / took / blocked-on / awaiting-you */
+    .bvcard .cdetail {
+      display: flex; align-items: center; gap: 5px;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9px; letter-spacing: 0.02em; color: var(--ink-dim);
+      font-variant-numeric: tabular-nums; min-width: 0;
+    }
+    .bvcard .cdetail .dk {
+      color: var(--ink-faint); letter-spacing: 0.08em; text-transform: uppercase;
+      font-size: 8px; flex: 0 0 auto;
+    }
+    .bvcard .cdetail .dv {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+    }
+    .bvcard .cdetail.clk { color: var(--inflight); }
+    .bvcard .cdetail.clk .cglyph { font-size: 9px; opacity: 0.9; }
+    .bvcard .cdetail.took .dv { color: var(--done); }
+    .bvcard .cdetail.bon { color: var(--ink-dim); }
+    .bvcard .cdetail.gate { color: var(--alert); }
+    .bvcard .cdetail.gate .gpause { display: inline-flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+    .bvcard .cdetail.gate .gpause i {
+      width: 2px; height: 7px; border-radius: 1px;
+      background: var(--alert); box-shadow: 0 0 5px oklch(0.80 0.150 66 / 0.6);
+    }
+
+    .bvempty {
+      margin: auto; padding: 40px 18px; text-align: center;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 11px; letter-spacing: 0.04em; color: var(--ink-faint);
+    }
+
     /* ============================ STATUS / ERROR ============================ */
     .err {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
@@ -1785,12 +1985,13 @@
       const [edges, setEdges] = useState([]);
       const [err, setErr] = useState(null);
       const [sel, setSel] = useState(null);  // selected task id (lineage anchor)
-      // view mode: 'graph' (xyflow DAG) | 'list' (status-board). Persisted in
-      // localStorage (key ccm-view); default 'graph'. read-only UI preference.
+      // view mode: 'graph' (xyflow DAG) | 'board' (Kanban card board) | 'list'
+      // (status-board). Persisted in localStorage (key ccm-view); default 'graph'.
+      // Migrate gracefully: any unknown / legacy value falls back to 'graph'.
       const [view, setView] = useState(() => {
         try {
           const v = localStorage.getItem('ccm-view');
-          return v === 'list' ? 'list' : 'graph';
+          return (v === 'list' || v === 'board' || v === 'graph') ? v : 'graph';
         } catch (_e) { return 'graph'; }
       });
       const setViewPersist = useCallback((v) => {
@@ -1930,7 +2131,7 @@
           ),
           // telemetry readouts
           h('div', { className: 'readouts' },
-            // view toggle — GRAPH (xyflow DAG) | LIST (status-board)
+            // view toggle — GRAPH (xyflow DAG) | BOARD (Kanban) | LIST (status-board)
             h('div', { className: 'viewtoggle', role: 'group', 'aria-label': 'view mode' },
               h('button', {
                 type: 'button',
@@ -1939,6 +2140,13 @@
                 title: 'graph view — the dependency DAG',
                 onClick: () => setViewPersist('graph'),
               }, h('span', { className: 'tg' }, '⬡'), 'graph'),
+              h('button', {
+                type: 'button',
+                className: view === 'board' ? 'on' : '',
+                'aria-pressed': view === 'board',
+                title: 'board view — the Kanban card board',
+                onClick: () => setViewPersist('board'),
+              }, h('span', { className: 'tg' }, '▦'), 'board'),
               h('button', {
                 type: 'button',
                 className: view === 'list' ? 'on' : '',
@@ -1985,6 +2193,12 @@
         h('div', { id: 'stage' },
           // left analytics rail
           h(Insights, { an, board, progress, pct, nodeCount, onPick: select }),
+          // center: BOARD view (Kanban card board) — same live board, same
+          // analyze(), same select(); lanes by workflow stage, cards between a
+          // node and a row. Rails stay mounted (as in list view).
+          view === 'board' ? h(BoardView, {
+            an, board, sel, onPick: select,
+          }) : null,
           // center: LIST view (status-board) — same live board, same analyze(),
           // same select(); replaces the canvas while keeping rails intact.
           view === 'list' ? h(ListView, {
@@ -2145,6 +2359,164 @@
     function msFromDispatch(t) {
       const ts = parseTs(t.dispatched_at);
       return ts != null ? Date.now() - ts : null;
+    }
+
+    // ---- BOARD VIEW — the Kanban / agile card board ------------------------
+    // The third view: workflow stages become lanes (columns), tasks become
+    // compact cards (density BETWEEN a graph node and a list row). Same live
+    // board + analyze() + select() + clock + isAwaitingUser() as the other two.
+    // Lanes in a fixed order, EMPTY ones omitted; each task in exactly ONE lane:
+    //   AWAITING YOU (leftmost when present) → READY → IN FLIGHT → BLOCKED
+    //   → DONE/VERIFIED → NEEDS ATTENTION.
+    // Within a lane, cards sort by downstream impact (criticality) desc, id tie.
+    function BoardView({ an, board, sel, onPick }) {
+      if (!an || !board) {
+        return h('div', { id: 'boardview' },
+          h('div', { className: 'bvempty' }, 'acquiring board…'));
+      }
+      const tasks = Array.isArray(board.tasks) ? board.tasks : [];
+
+      // partition into lanes. AWAITING-YOU pulls ANY awaiting-user task out FIRST
+      // (its blocked ones are thus excluded from the BLOCKED lane — each task lands
+      // in exactly one lane). Remaining lanes are status-driven, mutually exclusive.
+      const gateIds = new Set(an.userGateIds);
+      const lanes = {
+        gate: [], ready: [], in_flight: [], blocked: [], done: [], attn: [],
+      };
+      for (const t of tasks) {
+        if (gateIds.has(t.id)) { lanes.gate.push(t); continue; }
+        const s = t.status;
+        if (s === 'ready') lanes.ready.push(t);
+        else if (s === 'in_flight') lanes.in_flight.push(t);
+        else if (s === 'blocked') lanes.blocked.push(t);
+        else if (DONE_STATUSES.has(s)) lanes.done.push(t);
+        else if (NEEDS_ATTN.has(s)) lanes.attn.push(t);
+        else lanes.attn.push(t); // unknown statuses surface, never vanish
+      }
+      // sort each lane by downstream impact desc (criticality), id as tiebreak
+      const byImpact = (a, b) =>
+        (an.impact.get(b.id) || 0) - (an.impact.get(a.id) || 0) ||
+        String(a.id).localeCompare(String(b.id));
+      for (const k of Object.keys(lanes)) lanes[k].sort(byImpact);
+
+      // lane descriptors, in render order
+      const LANES = [
+        { key: 'gate',      cls: 'gate', icon: '⏸', name: 'awaiting you',     kind: 'gate' },
+        { key: 'ready',     cls: '',     icon: '◷', name: 'ready',            kind: 'ready' },
+        { key: 'in_flight', cls: '',     icon: '▶', name: 'in flight',        kind: 'inflight' },
+        { key: 'blocked',   cls: '',     icon: '⛔', name: 'blocked',          kind: 'blocked' },
+        { key: 'done',      cls: '',     icon: '✓', name: 'done · verified',  kind: 'done' },
+        { key: 'attn',      cls: '',     icon: '⚠', name: 'needs attention',  kind: 'attn' },
+      ];
+
+      const laneEls = LANES.filter(l => lanes[l.key].length).map(l =>
+        h('div', { className: 'bvlane ' + l.cls, key: l.key },
+          h('div', { className: 'lanehead' },
+            h('span', { className: 'lic' }, l.icon),
+            h('span', { className: 'lnm' }, l.name),
+            h('span', { className: 'lct' }, lanes[l.key].length),
+          ),
+          h('div', { className: 'lanebody' },
+            ...lanes[l.key].map(t => h(BoardCard, {
+              key: t.id, task: t, an, kind: l.kind,
+              selected: t.id === sel, onPick,
+            })),
+          ),
+        ),
+      );
+
+      return h('div', { id: 'boardview' },
+        laneEls.length
+          ? h('div', { className: 'bvlanes' }, ...laneEls)
+          : h('div', { className: 'bvempty' }, 'no tasks on the board'),
+      );
+    }
+
+    // a single board card — its own component so the in_flight clock can tick via
+    // useSecondTick scoped to exactly the cards that need it. Density sits between
+    // a graph node and a list row: lamp + id + clamped 2-line title + a chip row
+    // (gates / ⋈ / ⟋ crit / ⚠ bottleneck) + ONE per-stage detail line.
+    function BoardCard({ task: t, an, kind, selected, onPick }) {
+      const status = t.status;
+      const userGate = isAwaitingUser(t);
+      // live clock: in_flight cards (dispatched & running) tick once/second.
+      const running = status === 'in_flight' && parseTs(t.dispatched_at) != null;
+      useSecondTick(running);
+
+      const cls = ['bvcard', 's-' + (status || 'unknown')];
+      if (userGate) cls.push('usergate');
+      if (an.critSet.has(t.id)) cls.push('crit');
+      if (an.bneck === t.id) cls.push('bneck');
+      if (selected) cls.push('sel');
+      const lamp = userGate ? cssVar('--alert') : statusColor(status);
+
+      // ---- structural chips (reuse analyze()) --------------------------------
+      const impact = an.impact.get(t.id) || 0;
+      const inDeg = an.inDeg.get(t.id) || 0;
+      const chips = [];
+      if (impact > 0) chips.push(
+        h('span', { className: 'bchip impact' + (impact >= IMPACT_HOT ? ' hot' : ''), key: 'imp',
+          title: 'gates ' + impact + ' downstream tasks' },
+          'gates', h('span', { className: 'cn' }, impact)));
+      if (inDeg >= CONV_MIN) chips.push(
+        h('span', { className: 'bchip conv', key: 'cv', title: 'convergence — ' + inDeg + ' direct deps' },
+          '⋈', h('span', { className: 'cn' }, inDeg)));
+      if (an.critSet.has(t.id)) chips.push(
+        h('span', { className: 'bchip crit', key: 'cr', title: 'on the critical path' }, '⟋ crit'));
+      if (an.bneck === t.id) chips.push(
+        h('span', { className: 'bchip bneck', key: 'bn', title: 'bottleneck — stalling the most work' }, '⚠ bottleneck'));
+
+      // ---- ONE per-stage detail line -----------------------------------------
+      // in_flight → live clock; done → TOOK <dur>; blocked → ⛔ <blocked_on/dep>;
+      // awaiting-you → ⏸ awaiting you (dominant on combined nodes).
+      let detail = null;
+      if (userGate) {
+        detail = h('div', { className: 'cdetail gate' },
+          h('span', { className: 'gpause' }, h('i'), h('i')),
+          h('span', { className: 'dv' }, 'awaiting you'));
+      } else if (kind === 'inflight') {
+        if (running) {
+          const clk = fmtElapsed(Date.now() - parseTs(t.dispatched_at));
+          if (clk != null) detail = h('div', { className: 'cdetail clk' },
+            h('span', { className: 'cglyph' }, '◷'), h('span', { className: 'dv' }, clk));
+        }
+      } else if (kind === 'done') {
+        const durStr = fmtDuration(taskDuration(t));
+        if (durStr != null) detail = h('div', { className: 'cdetail took' },
+          h('span', { className: 'dk' }, 'took'), h('span', { className: 'dv' }, durStr));
+      } else if (kind === 'blocked') {
+        // blocked_on (non-user) wins; else the first unfinished upstream dep.
+        let on = null;
+        if (t.blocked_on && t.blocked_on !== 'user') {
+          on = String(t.blocked_on);
+        } else {
+          const deps = an.upstream.get(t.id) || [];
+          const blockers = deps.filter(d => {
+            const dt = an.byId.get(d);
+            return dt && !DONE_STATUSES.has(dt.status);
+          });
+          const showDeps = blockers.length ? blockers : deps;
+          if (showDeps.length) on = showDeps.join(', ');
+        }
+        if (on != null) detail = h('div', { className: 'cdetail bon' },
+          h('span', { className: 'dk' }, '⛔'), h('span', { className: 'dv' }, on));
+      }
+
+      const title = (t.title || '').trim();
+
+      return h('div', {
+        className: cls.join(' '),
+        onClick: () => onPick(t.id),
+        style: { '--lamp': lamp },
+      },
+        h('div', { className: 'cardtop' },
+          h('span', { className: 'lamp', style: { background: lamp, color: lamp } }),
+          h('span', { className: 'cid' }, t.id),
+        ),
+        h('div', { className: 'ctitle' + (title ? '' : ' empty') }, title || 'untitled'),
+        chips.length ? h('div', { className: 'cchips' }, ...chips) : null,
+        detail,
+      );
     }
 
     // ---- LIST VIEW — the status-board (TUI status-board's web twin) --------

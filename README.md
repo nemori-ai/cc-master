@@ -193,7 +193,25 @@ Once loaded, hand it a goal big enough to be worth it (think >24h of work, many 
 Two read-only ways to look at where the orchestration stands, both safe to run any time (neither writes the board):
 
 - **`/cc-master:status`** renders a **scannable board view** in the terminal — the DAG grouped by status (overall progress, what's in flight, what's blocked, and **decisions waiting on you** surfaced prominently), plus the critical-path estimate (the agent's own mental math, not machine-computed CPM) and a quick health check of the narrow waist.
-- **`/cc-master:view`** launches a **local, read-only DAG webview** in your browser. It stands up a dependency-free local `node` http server that renders the task DAG with [xyflow](https://xyflow.com) and **live-polls the board every 2s** (no manual refresh — the picture updates as the board changes). A header toggle (⬡ GRAPH / ☰ LIST) flips between the visual dependency graph and a **status-grouped list view** — the web equivalent of `/cc-master:status` (AWAITING-YOU / IN FLIGHT / BLOCKED / READY / DONE, each row with the same analytics chips and a click-to-open detail rail); your choice persists across reloads. The design is a "Mission Control" dark telemetry aesthetic: status nodes as instrument lamps, an amber critical-path spine, and prominent alarms for `blocked_on:user` gates. Every asset (React / xyflow / dagre + fonts) is **vendored locally**, so it works fully offline — no CDN — honoring the ship-anywhere guarantee. Stop it by killing the background shell (or it exits with the session).
+- **`/cc-master:view`** launches a **local, read-only webview** in your browser. It stands up a dependency-free local `node` http server that renders the board with [xyflow](https://xyflow.com) and **live-polls every 2s** (no manual refresh — the picture updates as the board changes). A header offers a **three-way toggle — ⬡ GRAPH (the visual dependency DAG) · ▦ BOARD (a Kanban card board: status lanes of mid-density cards) · ☰ LIST (the status-grouped list)** — plus a ☀ / ☾ day-night theme switch; your choices persist across reloads. The BOARD and LIST views are the web equivalent of `/cc-master:status` (AWAITING-YOU / READY / IN FLIGHT / BLOCKED / DONE·VERIFIED / NEEDS-ATTENTION lanes, each card carrying the same analytics chips and a click-to-open detail rail). The design is a "Mission Control" telemetry aesthetic: status nodes as instrument lamps, an amber critical-path spine, and prominent alarms for `blocked_on:user` gates. Every asset (React / xyflow / dagre + fonts) is **vendored locally**, so it works fully offline — no CDN — honoring the ship-anywhere guarantee. Stop it by killing the background shell (or it exits with the session).
+
+The DAG graph (the hero), the Kanban card board, and the status-grouped list — all live-polling, all offline:
+
+![cc-master:view — the dependency DAG graph view (dark theme): task nodes as instrument lamps wired by an amber critical-path spine](docs/images/view-graph-dark.png)
+
+*⬡ GRAPH — the dependency DAG, "Mission Control" dark telemetry.*
+
+![cc-master:view — the Kanban card board (dark theme): status lanes of mid-density task cards](docs/images/view-board-dark.png)
+
+*▦ BOARD — the Kanban card board: status lanes of mid-density cards.*
+
+![cc-master:view — the Kanban card board in light / day theme](docs/images/view-board-light.png)
+
+*☀ The same BOARD in day mode — toggle the theme with ☀ / ☾.*
+
+![cc-master:view — the status-grouped list view (dark theme)](docs/images/view-list-dark.png)
+
+*☰ LIST — status-grouped rows, the web twin of `/cc-master:status`.*
 
 ### Resume an existing board in a new session
 

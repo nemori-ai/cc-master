@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`/cc-master:view` 新增第三视图 ▦ BOARD（看板 / 敏捷卡片板）** — webview 顶栏开关从 ⬡ GRAPH ⇄ ☰ LIST 双视图升级为**三路切换**：⬡ GRAPH（依赖 DAG）· ▦ BOARD（看板卡片板）· ☰ LIST（按状态分组列表）。BOARD 把任务铺成**按状态分泳道的中密度卡片**——awaiting-you / ready / in-flight / blocked / done·verified / needs-attention 各一道泳道，每张卡复用与 LIST/GRAPH 同一套**分析 chip + 点击打开的详情侧栏**（不另起一套渲染逻辑）。深 / 浅两套主题（☀ / ☾ 日夜切换）都适配。视图选择存 localStorage、跨刷新持久保留。仍是**只读 · 离线 · vendored**（绝不写 board）。
+- **README / README_zh 内嵌 `/cc-master:view` 截图** — 「看一眼 board」一节嵌入四张截图（`docs/images/`）：依赖 DAG 图（hero）、看板卡片板深 / 浅两色、按状态分组列表，直观展示三视图与日夜主题。
+
 ## [0.6.0] — 2026-06-16
 
 ### Added
