@@ -10,6 +10,10 @@
 
 **Hand Claude Code a goal too big for one session — and let it conduct itself to the finish.**
 
+![cc-master live board — an interactive DAG graph view of an orchestration, tasks as nodes wired by dependency edges, colored by status](docs/images/view-graph-dark.png)
+
+*The live board, visualized: every task a node, every dependency an edge — the orchestrator's whole plan at a glance.*
+
 A long-horizon goal shouldn't die at the next context compaction. You hand the agent two days of work; it makes real progress, the context fills, and one compaction later it has forgotten it was ever orchestrating — now it's *busy looking busy and shipping nothing*. cc-master is the layer that doesn't forget.
 
 It's a ship-anywhere Claude Code plugin that turns any main-session agent into a long-horizon **master orchestrator**: it decomposes the goal into a dependency graph, dispatches background work in parallel, keeps the main thread *productively* advancing in every idle window, and survives repeated compaction and cross-session restarts without losing the thread. It is **not a framework** — just commands + 2 skills + hooks + one board file.

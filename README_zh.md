@@ -10,6 +10,10 @@
 
 **把一个单会话装不下的大目标交给 Claude Code —— 让它自己指挥自己干到收尾。**
 
+![cc-master 实时 board —— 一个编排的 DAG 图视图，任务即节点、依赖即连边，按状态着色](docs/images/view-graph-dark-zh.png)
+
+*实时 board 的可视化：每个任务是一个节点，每条依赖是一条连边——总指挥的整张计划图一眼尽收。*
+
 一个长周期目标，不该在下一次 context compaction 时就这么死掉。你把两天的活交给 agent，它干出了真进展，上下文一满、一次 compaction 之后，它就忘了自己正在指挥——只剩*装着忙、却什么都没产出*。cc-master 就是那个不会忘的层。
 
 它是一个「随处可用」（ship-anywhere）的 Claude Code 插件，把任意 main-session agent 变成长周期的 **master orchestrator（总指挥）**：把目标拆成依赖图、把后台工作并行派发、在每一个等待空档里让主线程**有产出地**持续推进，并熬过反复 compaction 与跨会话续接、全程不丢线索。它**不是一个 framework**——只是命令 + 2 个 skill + hooks + 一份 board 文件。
