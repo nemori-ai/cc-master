@@ -182,10 +182,18 @@ Once loaded, hand it a goal big enough to be worth it (think >24h of work, many 
 ```
 /cc-master:as-master-orchestrator <goal>           # bootstrap a board and become the orchestrator
 /cc-master:as-master-orchestrator --resume [sel]   # pick up an EXISTING board in a new session (see below)
-/cc-master:status                                  # render the board summary + validate the narrow waist
+/cc-master:status                                  # render the board summary (board view) + validate the narrow waist
+/cc-master:view                                    # open a read-only DAG webview of the board in your browser
 /cc-master:handoff-to-new-session                  # gracefully hand the board off to a fresh session (write side of --resume)
 /cc-master:stop                                    # archive the board and stand down (board is kept, not deleted)
 ```
+
+### See the board — at a glance or as a live DAG
+
+Two read-only ways to look at where the orchestration stands, both safe to run any time (neither writes the board):
+
+- **`/cc-master:status`** renders a **scannable board view** in the terminal — the DAG grouped by status (overall progress, what's in flight, what's blocked, and **decisions waiting on you** surfaced prominently), plus the critical-path estimate (the agent's own mental math, not machine-computed CPM) and a quick health check of the narrow waist.
+- **`/cc-master:view`** launches a **local, read-only DAG webview** in your browser. It stands up a dependency-free local `node` http server that renders the task DAG with [xyflow](https://xyflow.com) and **live-polls the board every 2s** (no manual refresh — the picture updates as the board changes). A header toggle (⬡ GRAPH / ☰ LIST) flips between the visual dependency graph and a **status-grouped list view** — the web equivalent of `/cc-master:status` (AWAITING-YOU / IN FLIGHT / BLOCKED / READY / DONE, each row with the same analytics chips and a click-to-open detail rail); your choice persists across reloads. The design is a "Mission Control" dark telemetry aesthetic: status nodes as instrument lamps, an amber critical-path spine, and prominent alarms for `blocked_on:user` gates. Every asset (React / xyflow / dagre + fonts) is **vendored locally**, so it works fully offline — no CDN — honoring the ship-anywhere guarantee. Stop it by killing the background shell (or it exits with the session).
 
 ### Resume an existing board in a new session
 
@@ -254,7 +262,8 @@ cc-master/
 │   └── marketplace.json                marketplace entry (install path B)
 ├── commands/
 │   ├── as-master-orchestrator.md       bootstrap — become the orchestrator
-│   ├── status.md                       summarize board progress / health
+│   ├── status.md                       summarize board progress / health (board view)
+│   ├── view.md                         launch a read-only DAG webview of the board
 │   ├── handoff-to-new-session.md       prepare a clean handoff to a fresh session
 │   └── stop.md                         archive / mark the board inactive
 ├── skills/
