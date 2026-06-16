@@ -10,6 +10,10 @@
 
 **把一个单会话装不下的大目标交给 Claude Code —— 让它自己指挥自己干到收尾。**
 
+![cc-master 实时 board —— 一个编排的 DAG 图视图，任务即节点、依赖即连边，按状态着色](docs/images/view-graph-dark-zh.png)
+
+*实时 board 的可视化：每个任务是一个节点，每条依赖是一条连边——总指挥的整张计划图一眼尽收。*
+
 一个长周期目标，不该在下一次 context compaction 时就这么死掉。你把两天的活交给 agent，它干出了真进展，上下文一满、一次 compaction 之后，它就忘了自己正在指挥——只剩*装着忙、却什么都没产出*。cc-master 就是那个不会忘的层。
 
 它是一个「随处可用」（ship-anywhere）的 Claude Code 插件，把任意 main-session agent 变成长周期的 **master orchestrator（总指挥）**：把目标拆成依赖图、把后台工作并行派发、在每一个等待空档里让主线程**有产出地**持续推进，并熬过反复 compaction 与跨会话续接、全程不丢线索。它**不是一个 framework**——只是命令 + 2 个 skill + hooks + 一份 board 文件。
@@ -193,7 +197,25 @@ claude plugin install cc-master@cc-master
 两种只读的方式看编排进展，随时跑都安全（都不写 board）：
 
 - **`/cc-master:status`** 在终端渲一份**可扫读的 board view**——按状态分组的 DAG（总进度、什么在飞、什么被阻塞、以及**等你拍板的决策**被显著抛出来），外加临界路径估计（指挥自己的心算，而非机器算的 CPM）与一道「窄腰」健康速检。
-- **`/cc-master:view`** 在浏览器里起一个**本地、只读的 DAG webview**。它拉起一个零依赖的本地 `node` http server，用 [xyflow](https://xyflow.com) 把任务 DAG 渲成图，并**每 2s 活轮询 board**（不用手动刷新——board 一变画面自动更新）。顶栏一个开关（⬡ GRAPH / ☰ LIST）在可视依赖图与一份**按状态分组的列表视图**之间切换——后者是 `/cc-master:status` 的网页等价物（AWAITING-YOU / IN FLIGHT / BLOCKED / READY / DONE，每行带同样的分析 chip 与点击打开的详情侧栏），你的选择跨刷新持久保留。设计是「Mission Control」深色遥测美学：状态节点化作仪表灯、一条琥珀色临界路径脊柱、以及对 `blocked_on:user` 闸门的显著告警。所有资产（React / xyflow / dagre + 字体）都**本地 vendored**，故完全离线可用——零 CDN——守住 ship-anywhere 承诺。要停掉它，杀掉那个后台 shell（或它会随 session 结束而退出）。
+- **`/cc-master:view`** 在浏览器里起一个**本地、只读的 webview**。它拉起一个零依赖的本地 `node` http server，用 [xyflow](https://xyflow.com) 把 board 渲成画面，并**每 2s 活轮询**（不用手动刷新——board 一变画面自动更新）。顶栏有一个**三路开关——⬡ GRAPH（可视依赖 DAG）· ▦ BOARD（看板卡片视图：按状态分泳道的中密度卡片）· ☰ LIST（按状态分组的列表）**——外加一个 ☀ / ☾ 日夜主题切换；你的选择都跨刷新持久保留。BOARD 与 LIST 是 `/cc-master:status` 的网页等价物（AWAITING-YOU / READY / IN FLIGHT / BLOCKED / DONE·VERIFIED / NEEDS-ATTENTION 泳道，每张卡带同样的分析 chip 与点击打开的详情侧栏）。设计是「Mission Control」遥测美学：状态节点化作仪表灯、一条琥珀色临界路径脊柱、以及对 `blocked_on:user` 闸门的显著告警。所有资产（React / xyflow / dagre + 字体）都**本地 vendored**，故完全离线可用——零 CDN——守住 ship-anywhere 承诺。要停掉它，杀掉那个后台 shell（或它会随 session 结束而退出）。
+
+DAG 依赖图（hero）、看板卡片、按状态分组的列表——全都活轮询、全都离线：
+
+![cc-master:view —— 依赖 DAG 图视图（深色）：任务节点化作仪表灯、由琥珀色临界路径脊柱串联](docs/images/view-graph-dark.png)
+
+*⬡ GRAPH —— 依赖 DAG，「Mission Control」深色遥测。*
+
+![cc-master:view —— 看板卡片视图（深色）：按状态分泳道的中密度任务卡片](docs/images/view-board-dark.png)
+
+*▦ BOARD —— 看板卡片视图：按状态分泳道的中密度卡片。*
+
+![cc-master:view —— 看板卡片视图的浅色 / 日间主题](docs/images/view-board-light.png)
+
+*☀ 同一个 BOARD 的日间模式 —— 用 ☀ / ☾ 切换主题。*
+
+![cc-master:view —— 按状态分组的列表视图（深色）](docs/images/view-list-dark.png)
+
+*☰ LIST —— 按状态分组的行，`/cc-master:status` 的网页孪生。*
 
 ### 在新 session 里接续一块已存在的 board
 
