@@ -1,0 +1,1868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>cc-master · mission control</title>
+  <!-- All assets are served from this server's /vendor/ — ZERO external URLs (offline / air-gapped). -->
+  <link rel="stylesheet" href="/vendor/xyflow-style.css" />
+  <style>
+    /* ============================================================================
+       cc-master — MISSION CONTROL · dark telemetry console
+       Vendored fonts (offline): Archivo (display grotesque) + Martian Mono (telemetry).
+       Color: OKLCH only, brand hue 255 (deep space blue-graphite). Neutrals tinted
+       subtly toward the hue; chroma drops near black/white; no pure #000/#fff.
+       ========================================================================= */
+
+    @font-face {
+      font-family: 'Archivo';
+      src: url('/vendor/fonts/archivo-500.woff2') format('woff2');
+      font-weight: 500; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Archivo';
+      src: url('/vendor/fonts/archivo-600.woff2') format('woff2');
+      font-weight: 600; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Archivo';
+      src: url('/vendor/fonts/archivo-700.woff2') format('woff2');
+      font-weight: 700; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Martian Mono';
+      src: url('/vendor/fonts/martian-mono-400.woff2') format('woff2');
+      font-weight: 400; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Martian Mono';
+      src: url('/vendor/fonts/martian-mono-500.woff2') format('woff2');
+      font-weight: 500; font-style: normal; font-display: swap;
+    }
+
+    :root {
+      color-scheme: dark;
+
+      /* ---- ground / panels (60: large neutral field) ---- */
+      --ground:    oklch(0.145 0.012 255);   /* deepest void behind canvas */
+      --panel:     oklch(0.185 0.014 255);   /* chrome panels (header/legend) */
+      --panel-hi:  oklch(0.225 0.016 255);   /* raised inset */
+      --grid:      oklch(0.255 0.012 255);   /* hairline canvas grid */
+
+      /* ---- lines + text (30: secondary structure) ---- */
+      --hair:      oklch(0.30 0.012 255);    /* hairline dividers */
+      --hair-soft: oklch(0.26 0.010 255);
+      --ink:       oklch(0.93 0.008 255);    /* primary text (never #fff) */
+      --ink-dim:   oklch(0.66 0.013 255);    /* secondary text */
+      --ink-faint: oklch(0.50 0.013 255);    /* tertiary / units */
+      --edge:      oklch(0.46 0.018 252);    /* idle DAG connector */
+
+      /* ---- status lamps (10: rare status-color light points) ---- */
+      --done:      oklch(0.74 0.135 162);    /* jade green — done / verified */
+      --inflight:  oklch(0.79 0.150 74);     /* amber — in flight (pulses) */
+      --blocked:   oklch(0.56 0.022 250);    /* muted slate — blocked on task */
+      --ready:     oklch(0.70 0.115 244);    /* cool blue — ready */
+      --escalated: oklch(0.64 0.165 300);    /* violet — escalated */
+      --failed:    oklch(0.63 0.190 26);     /* red — failed */
+      --stale:     oklch(0.72 0.115 96);     /* ochre — stale */
+      --uncertain: oklch(0.71 0.130 352);    /* pink — uncertain */
+
+      /* ---- the amber spine + the one allowed alarm ---- */
+      --spine:     oklch(0.80 0.160 70);     /* critical-path amber */
+      --alert:     oklch(0.80 0.150 66);     /* user-gate alarm amber */
+
+      --r-sm: 4px; --r-md: 7px; --r-lg: 11px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body, #root { height: 100%; margin: 0; }
+    body {
+      font-family: 'Archivo', ui-sans-serif, system-ui, sans-serif;
+      background: var(--ground);
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    #app { display: flex; flex-direction: column; height: 100%; }
+
+    /* ============================ HEADER / instrument rail ==================== */
+    header.bar {
+      flex: 0 0 auto;
+      display: flex; align-items: stretch; gap: 0;
+      background:
+        linear-gradient(180deg, var(--panel-hi), var(--panel));
+      border-bottom: 1px solid var(--hair);
+      box-shadow: 0 1px 0 oklch(0.12 0.01 255 / 0.6);
+      padding: 0 18px 0 0;
+      height: 54px;
+    }
+    /* left identity block — feels like a console nameplate */
+    .ident {
+      display: flex; align-items: center; gap: 11px;
+      padding: 0 18px 0 20px;
+      border-right: 1px solid var(--hair-soft);
+    }
+    .ident .beacon {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--done);
+      box-shadow: 0 0 0 0 var(--done);
+      animation: beacon 2.6s ease-out infinite;
+    }
+    @keyframes beacon {
+      0%   { box-shadow: 0 0 0 0 oklch(0.74 0.135 162 / 0.55); }
+      70%  { box-shadow: 0 0 0 7px oklch(0.74 0.135 162 / 0); }
+      100% { box-shadow: 0 0 0 0 oklch(0.74 0.135 162 / 0); }
+    }
+    .ident .mark {
+      font-weight: 700; font-size: 13px; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--ink);
+    }
+    .ident .sub {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9px; letter-spacing: 0.18em; color: var(--ink-faint);
+      text-transform: uppercase; margin-top: 2px;
+    }
+    .ident .mark-wrap { display: flex; flex-direction: column; line-height: 1; }
+
+    /* goal — the mission line */
+    .goalwrap {
+      flex: 1 1 auto; min-width: 0;
+      display: flex; flex-direction: column; justify-content: center;
+      gap: 3px; padding: 0 22px;
+    }
+    .goalwrap .label {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8.5px; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .goalwrap .goal {
+      font-weight: 600; font-size: 14.5px; letter-spacing: -0.005em;
+      color: var(--ink);
+      max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* readouts — right-aligned telemetry cluster */
+    .readouts { display: flex; align-items: center; gap: 14px; }
+    .readout {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+      min-width: 0;
+    }
+    .readout .rl {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .readout .rv {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-weight: 500; font-size: 13px; letter-spacing: 0.02em;
+      color: var(--ink); font-variant-numeric: tabular-nums;
+    }
+    .readout .rv .unit { color: var(--ink-faint); font-size: 11px; margin-left: 1px; }
+    .readout.branch .rv { color: var(--ink-dim); max-width: 30ch;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* slim progress meter sitting under the count */
+    .meter {
+      width: 96px; height: 3px; border-radius: 2px;
+      background: var(--hair); overflow: hidden;
+    }
+    .meter > i {
+      display: block; height: 100%; border-radius: 2px;
+      background: var(--done);
+      box-shadow: 0 0 8px oklch(0.74 0.135 162 / 0.6);
+      transition: width 600ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .vrule { width: 1px; align-self: stretch; margin: 12px 0;
+      background: var(--hair-soft); }
+
+    /* user-gate alarm — the ONE allowed alarm element, prominent not harsh */
+    .alarm {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 13px; border-radius: var(--r-md);
+      background: oklch(0.80 0.150 66 / 0.12);
+      border: 1px solid oklch(0.80 0.150 66 / 0.45);
+      color: var(--alert);
+      font-weight: 600; font-size: 12.5px; letter-spacing: 0.01em;
+      animation: alarmpulse 2.2s ease-in-out infinite;
+    }
+    .alarm .dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--alert);
+      box-shadow: 0 0 7px var(--alert);
+    }
+    .alarm .n {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-variant-numeric: tabular-nums; font-weight: 500;
+    }
+    @keyframes alarmpulse {
+      0%, 100% { box-shadow: 0 0 0 0 oklch(0.80 0.150 66 / 0); }
+      50%      { box-shadow: 0 0 14px 0 oklch(0.80 0.150 66 / 0.28); }
+    }
+
+    /* ============================ STAGE: insights | canvas | detail ========= */
+    /* The body is a three-column instrument: left analytics rail, center DAG,
+       right detail rail (slides in on selection). */
+    #stage {
+      flex: 1 1 auto; min-height: 0;
+      display: flex; align-items: stretch;
+      position: relative;
+    }
+
+    /* ---------------------------- INSIGHTS RAIL (left) --------------------- */
+    /* Not a card grid — a stacked telemetry readout column, the instrument's
+       analysis panel. Each row is a derived metric, label over value. */
+    #insights {
+      flex: 0 0 246px; width: 246px;
+      display: flex; flex-direction: column;
+      background: linear-gradient(180deg, var(--panel), var(--ground) 92%);
+      border-right: 1px solid var(--hair);
+      overflow-y: auto; overflow-x: hidden;
+    }
+    #insights .ihead {
+      padding: 11px 16px 9px;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8.5px; letter-spacing: 0.24em; text-transform: uppercase;
+      color: var(--ink-faint);
+      border-bottom: 1px solid var(--hair-soft);
+    }
+    .metric {
+      padding: 11px 16px 12px;
+      border-bottom: 1px solid var(--hair-soft);
+      display: flex; flex-direction: column; gap: 5px;
+    }
+    .metric .ml {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--ink-faint);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .metric .ml .ic { font-size: 10px; line-height: 1; }
+    .metric .mv {
+      font-size: 13.5px; font-weight: 600; color: var(--ink);
+      line-height: 1.34; word-break: break-word;
+    }
+    .metric .mv.mono {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 12px; font-weight: 500; letter-spacing: 0.01em;
+      font-variant-numeric: tabular-nums;
+    }
+    .metric .msub {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9.5px; color: var(--ink-dim); letter-spacing: 0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .metric .mv.dim { color: var(--ink-dim); font-weight: 500; font-size: 12px; }
+    /* the chain readout (critical path) — clickable id pills */
+    .chain { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 2px; }
+    .chain .seg {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 10.5px; font-weight: 500; letter-spacing: 0.02em;
+      color: var(--spine); padding: 1px 5px; border-radius: var(--r-sm);
+      background: oklch(0.80 0.160 70 / 0.10);
+      border: 1px solid oklch(0.80 0.160 70 / 0.22);
+      cursor: pointer; transition: background 160ms ease;
+    }
+    .chain .seg:hover { background: oklch(0.80 0.160 70 / 0.20); }
+    .chain .arrow { color: var(--ink-faint); font-size: 10px; }
+    .metric .pill-id {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      cursor: pointer; color: var(--ink);
+      border-bottom: 1px dotted var(--ink-faint);
+    }
+    .metric .pill-id:hover { color: var(--spine); border-bottom-color: var(--spine); }
+    .metric.flag .ml { color: var(--alert); }
+    .metric.flag .mv { color: var(--alert); }
+    .metric.warnwip .mv { color: var(--stale); }
+
+    /* ---------------------------- CANVAS ---------------------------------- */
+    #flow { flex: 1 1 auto; min-width: 0; min-height: 0; position: relative;
+      background:
+        radial-gradient(120% 80% at 50% -8%, oklch(0.20 0.016 255), var(--ground) 60%); }
+
+    .react-flow__attribution { display: none; }
+
+    /* dim non-lineage elements when a node is selected */
+    #flow.has-selection .cc-node:not(.lin-self):not(.lin-anc):not(.lin-desc) {
+      opacity: 0.24; filter: saturate(0.5);
+    }
+    #flow.has-selection .react-flow__edge:not(.edge-lin) { opacity: 0.12; }
+
+    /* ============================ NODES — instrument tiles =================== */
+    .cc-node {
+      --lamp: var(--blocked);
+      position: relative;
+      min-width: 168px; max-width: 232px;
+      padding: 9px 12px 10px;
+      border-radius: var(--r-md);
+      background:
+        linear-gradient(180deg, var(--panel-hi), var(--panel));
+      border: 1px solid var(--hair);
+      color: var(--ink);
+      box-shadow:
+        0 1px 2px oklch(0.10 0.01 255 / 0.5),
+        0 8px 20px oklch(0.10 0.01 255 / 0.35);
+      transition: border-color 240ms ease, box-shadow 240ms ease,
+                  transform 240ms ease, opacity 280ms ease, filter 280ms ease;
+    }
+    .cc-node:hover { transform: translateY(-1px);
+      border-color: var(--hair); box-shadow:
+        0 1px 2px oklch(0.10 0.01 255 / 0.5),
+        0 12px 28px oklch(0.08 0.01 255 / 0.5); }
+
+    /* selected node — a clear cyan focus ring (read-only selection, not edit) */
+    .cc-node.lin-self {
+      border-color: oklch(0.70 0.115 244 / 0.75);
+      box-shadow:
+        0 0 0 2px oklch(0.70 0.115 244 / 0.45),
+        0 1px 2px oklch(0.10 0.01 255 / 0.5),
+        0 12px 30px oklch(0.10 0.01 255 / 0.5);
+    }
+    /* ancestry / descendants keep full presence; everyone else dims (see #flow) */
+    .cc-node.lin-anc { border-color: oklch(0.50 0.04 244 / 0.6); }
+    .cc-node.lin-desc { border-color: oklch(0.50 0.04 300 / 0.5); }
+
+    /* the lamp row: a glowing status lamp + uppercase status readout */
+    .cc-node .lamprow {
+      display: flex; align-items: center; gap: 7px; margin-bottom: 7px;
+    }
+    .cc-node .lamp {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--lamp);
+      box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6),
+                  0 0 7px var(--lamp), 0 0 2px var(--lamp);
+      flex: 0 0 auto;
+    }
+    .cc-node .stat {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8.5px; font-weight: 500; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--lamp);
+    }
+    .cc-node .tid {
+      margin-left: auto;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 10px; font-weight: 500; letter-spacing: 0.04em;
+      color: var(--ink-dim); font-variant-numeric: tabular-nums;
+    }
+    .cc-node .title {
+      font-size: 12.5px; line-height: 1.32; font-weight: 500;
+      color: var(--ink); word-break: break-word;
+    }
+    .cc-node .title.empty { color: var(--ink-faint); font-style: italic; }
+
+    /* meta row — structural readouts: downstream impact + convergence fan-in.
+       This is what makes the graph reveal structure at a glance. */
+    .cc-node .meta {
+      display: flex; align-items: center; gap: 7px; margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .cc-node .chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 6px; border-radius: var(--r-sm);
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; font-weight: 500; letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: oklch(0.26 0.012 255 / 0.7);
+      color: var(--ink-dim); border: 1px solid var(--hair-soft);
+    }
+    .cc-node .chip .cn {
+      color: var(--ink); font-variant-numeric: tabular-nums; font-size: 9px;
+    }
+    /* impact chip scales presence with leverage */
+    .cc-node .chip.impact.hot {
+      background: oklch(0.80 0.160 70 / 0.12);
+      border-color: oklch(0.80 0.160 70 / 0.35);
+      color: var(--spine);
+    }
+    .cc-node .chip.impact.hot .cn { color: var(--spine); }
+    /* convergence chip — a distinct join glyph treatment */
+    .cc-node .chip.conv {
+      background: oklch(0.70 0.115 244 / 0.12);
+      border-color: oklch(0.70 0.115 244 / 0.4);
+      color: var(--ready);
+    }
+    .cc-node .chip.conv .cn { color: var(--ready); }
+    /* live running-duration chip on in_flight tiles — amber, telemetry feel.
+       This is a CLOCK readout: a clock glyph + a tabular Martian-Mono time that
+       ticks every second (see the 1s timer in CcNode). */
+    .cc-node .chip.dur {
+      background: oklch(0.79 0.150 74 / 0.12);
+      border-color: oklch(0.79 0.150 74 / 0.35);
+      color: var(--inflight);
+    }
+    .cc-node .chip.dur .cglyph {
+      font-size: 9px; line-height: 1; opacity: 0.9;
+    }
+    .cc-node .chip.dur .cn {
+      color: var(--inflight); font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+    }
+
+    /* ---------- in-flight BUSY lamp: an orbiting arc ring -------------------
+       The amber lamp gets a thin amber arc that rotates around it — a telemetry
+       "actively working / spinning" indicator (NOT a loading-spinner toy). The
+       lamp core still breathes gently underneath. Reduced-motion strips the
+       rotation and leaves a steady glow (handled by the global reduce block). */
+    .cc-node.s-in_flight .lamp { animation: lamppulse 1.7s ease-in-out infinite; }
+    @keyframes lamppulse {
+      0%, 100% { box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6),
+                             0 0 6px var(--lamp), 0 0 2px var(--lamp); }
+      50%      { box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6),
+                             0 0 13px var(--lamp), 0 0 5px var(--lamp); }
+    }
+    /* the orbiting arc: a conic-gradient ring masked to a hairline annulus, so
+       only a ~90° amber arc is visible, sweeping around the lamp once/1.1s. */
+    .cc-node.s-in_flight .lamp::after {
+      content: ''; position: absolute;
+      left: 50%; top: 50%; width: 17px; height: 17px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: conic-gradient(
+        from 0deg,
+        var(--inflight) 0deg,
+        oklch(0.79 0.150 74 / 0.55) 28deg,
+        oklch(0.79 0.150 74 / 0) 92deg,
+        oklch(0.79 0.150 74 / 0) 360deg);
+      /* annulus mask — keep only a 1.5px-wide ring, hollow center */
+      -webkit-mask: radial-gradient(closest-side, transparent 64%, #000 66%);
+              mask: radial-gradient(closest-side, transparent 64%, #000 66%);
+      animation: lamporbit 1.1s linear infinite;
+      pointer-events: none;
+    }
+    .cc-node .lamp { position: relative; }
+    @keyframes lamporbit {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to   { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* critical path: amber top accent line (not a side stripe) + amber border */
+    .cc-node.crit {
+      border-color: oklch(0.80 0.160 70 / 0.55);
+      box-shadow:
+        0 0 0 1px oklch(0.80 0.160 70 / 0.30),
+        0 1px 2px oklch(0.10 0.01 255 / 0.5),
+        0 10px 26px oklch(0.40 0.10 70 / 0.14);
+    }
+    .cc-node.crit::before {
+      content: ''; position: absolute; left: 11px; right: 11px; top: 0; height: 2px;
+      border-radius: 0 0 2px 2px;
+      background: var(--spine);
+      box-shadow: 0 0 8px oklch(0.80 0.160 70 / 0.65);
+    }
+
+    /* bottleneck: a heavier amber halo + corner glyph — the single "this is
+       stalling the most work" emphasis. */
+    .cc-node.bottleneck {
+      border-color: oklch(0.80 0.150 66 / 0.7);
+      box-shadow:
+        0 0 0 2px oklch(0.80 0.150 66 / 0.4),
+        0 1px 2px oklch(0.10 0.01 255 / 0.5),
+        0 0 30px oklch(0.80 0.150 66 / 0.22);
+    }
+    .cc-node .bneck {
+      position: absolute; top: -9px; right: -9px;
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 7px; border-radius: 9px;
+      background: var(--alert); color: oklch(0.16 0.01 255);
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+      box-shadow: 0 2px 10px oklch(0.80 0.150 66 / 0.45);
+    }
+
+    /* user-gate: the alarm node — amber ring, prominent. This is the "PAUSED,
+       needs you" state: a HELD, slow-pulsing alert ring (distinct from the busy
+       orbit of in_flight). It reads as attention-demanding, not spinning. */
+    .cc-node.usergate {
+      --lamp: var(--alert);
+      border-color: oklch(0.80 0.150 66 / 0.6);
+      box-shadow:
+        0 0 0 1px oklch(0.80 0.150 66 / 0.5),
+        0 1px 2px oklch(0.10 0.01 255 / 0.5),
+        0 0 22px oklch(0.80 0.150 66 / 0.18);
+      animation: gatehalo 2.2s ease-in-out infinite;
+    }
+    @keyframes gatehalo {
+      0%, 100% { box-shadow: 0 0 0 1px oklch(0.80 0.150 66 / 0.5),
+                             0 1px 2px oklch(0.10 0.01 255 / 0.5),
+                             0 0 16px oklch(0.80 0.150 66 / 0.12); }
+      50%      { box-shadow: 0 0 0 1px oklch(0.80 0.150 66 / 0.7),
+                             0 1px 2px oklch(0.10 0.01 255 / 0.5),
+                             0 0 28px oklch(0.80 0.150 66 / 0.30); }
+    }
+    /* COMBINED state (in_flight AND awaiting user): the "needs you" signal must
+       dominate the busy spinner. Force the lamp + status text to alert-amber and
+       calm the orbit (slower, dimmer) so the held alert ring wins the eye. The
+       clock keeps ticking (truthful: still running) but is no longer the loudest
+       thing. The gate ring on the tile is the dominant signal. */
+    .cc-node.usergate.s-in_flight .lamp { animation: gatelamp 2.0s ease-in-out infinite; }
+    .cc-node.usergate.s-in_flight .lamp::after {
+      animation-duration: 2.4s; opacity: 0.5;
+    }
+    @keyframes gatelamp {
+      0%, 100% { box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6),
+                             0 0 7px var(--alert), 0 0 2px var(--alert); }
+      50%      { box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6),
+                             0 0 11px var(--alert), 0 0 4px var(--alert); }
+    }
+
+    /* the "AWAITING YOU" flag — a held, alert chip with a pause glyph. On a
+       combined node this sits ABOVE/dominant over the running clock chip. */
+    .cc-node .gateflag {
+      display: inline-flex; align-items: center; gap: 6px; margin-top: 8px;
+      padding: 4px 9px; border-radius: var(--r-sm);
+      background: oklch(0.80 0.150 66 / 0.16);
+      border: 1px solid oklch(0.80 0.150 66 / 0.5);
+      color: var(--alert);
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8.5px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+      animation: gateflagpulse 2.2s ease-in-out infinite;
+    }
+    @keyframes gateflagpulse {
+      0%, 100% { background: oklch(0.80 0.150 66 / 0.12);
+                 border-color: oklch(0.80 0.150 66 / 0.4); }
+      50%      { background: oklch(0.80 0.150 66 / 0.20);
+                 border-color: oklch(0.80 0.150 66 / 0.62); }
+    }
+    /* the pause glyph (two bars) — a held, not-spinning indicator */
+    .cc-node .gateflag .gpause {
+      display: inline-flex; align-items: center; gap: 2px;
+    }
+    .cc-node .gateflag .gpause i {
+      width: 2px; height: 8px; border-radius: 1px;
+      background: var(--alert); box-shadow: 0 0 5px oklch(0.80 0.150 66 / 0.6);
+    }
+
+    /* staggered entrance — set by JS via --i */
+    .cc-node.enter {
+      animation: nodein 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-delay: calc(var(--i, 0) * 45ms);
+    }
+    @keyframes nodein {
+      from { opacity: 0; transform: translateY(8px) scale(0.985); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* xyflow handles — make them disappear into the tiles */
+    .cc-node .react-flow__handle {
+      width: 5px; height: 5px; min-width: 5px; min-height: 5px;
+      background: var(--edge); border: none; opacity: 0.6;
+    }
+
+    /* ============================ LEGEND — instrument panel ================== */
+    .legend {
+      position: absolute; left: 14px; bottom: 14px; z-index: 6;
+      display: flex; flex-direction: column;
+      background: linear-gradient(180deg, var(--panel-hi), var(--panel) 70%);
+      border: 1px solid var(--hair);
+      border-radius: var(--r-lg);
+      box-shadow: 0 10px 30px oklch(0.08 0.01 255 / 0.5);
+      overflow: hidden;
+      backdrop-filter: blur(2px);
+    }
+    .legend .lhead {
+      padding: 8px 13px 7px;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--ink-faint);
+      border-bottom: 1px solid var(--hair-soft);
+      display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    }
+    .legend .lhead .total {
+      color: var(--ink-dim); font-variant-numeric: tabular-nums;
+    }
+    .legend .grid {
+      display: grid; grid-template-columns: auto auto; gap: 1px 18px;
+      padding: 9px 13px 11px;
+    }
+    .legend .row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 2px 0; opacity: 0.45;
+      transition: opacity 240ms ease;
+    }
+    .legend .row.live { opacity: 1; }
+    .legend .lamp {
+      width: 8px; height: 8px; border-radius: 50%;
+      box-shadow: 0 0 6px currentColor;
+      flex: 0 0 auto;
+    }
+    .legend .nm {
+      font-size: 11px; color: var(--ink-dim); letter-spacing: 0.01em;
+      flex: 1 1 auto;
+    }
+    .legend .row.live .nm { color: var(--ink); }
+    .legend .ct {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 10px; font-weight: 500; color: var(--ink-dim);
+      font-variant-numeric: tabular-nums; min-width: 1.5ch; text-align: right;
+    }
+    .legend .row.live .ct { color: var(--ink); }
+    .legend .spine-key {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 13px; border-top: 1px solid var(--hair-soft);
+    }
+    .legend .spine-key .bar {
+      width: 18px; height: 2px; border-radius: 2px; background: var(--spine);
+      box-shadow: 0 0 7px oklch(0.80 0.160 70 / 0.6);
+    }
+    .legend .spine-key .nm { font-size: 10.5px; color: var(--ink-dim); }
+
+    /* ============================ DETAIL RAIL (right, slides in) ============= */
+    #detail {
+      flex: 0 0 0; width: 0;
+      overflow: hidden;
+      background: linear-gradient(180deg, var(--panel), var(--ground) 96%);
+      border-left: 1px solid var(--hair);
+      transition: flex-basis 300ms cubic-bezier(0.16, 1, 0.3, 1),
+                  width 300ms cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex; flex-direction: column;
+    }
+    #detail.open { flex: 0 0 360px; width: 360px; }
+    .dpanel { width: 360px; height: 100%; display: flex; flex-direction: column;
+      overflow-y: auto; overflow-x: hidden; }
+
+    .dhead {
+      position: sticky; top: 0; z-index: 2;
+      padding: 13px 16px 12px;
+      background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+      border-bottom: 1px solid var(--hair);
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .dhead .lamp {
+      width: 11px; height: 11px; border-radius: 50%; margin-top: 3px;
+      box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6), 0 0 8px currentColor, 0 0 2px currentColor;
+      flex: 0 0 auto;
+    }
+    .dhead .htext { flex: 1 1 auto; min-width: 0; }
+    .dhead .htitle {
+      font-size: 14.5px; font-weight: 600; line-height: 1.3; color: var(--ink);
+      word-break: break-word;
+    }
+    .dhead .htitle.empty { color: var(--ink-faint); font-style: italic; }
+    .dhead .hmeta {
+      margin-top: 5px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9px; letter-spacing: 0.08em; color: var(--ink-faint);
+      text-transform: uppercase;
+    }
+    .dhead .hmeta .hid { color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+    .dhead .hmeta .hstat { color: currentColor; }
+    .dclose {
+      flex: 0 0 auto; cursor: pointer; user-select: none;
+      width: 24px; height: 24px; border-radius: var(--r-sm);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--ink-faint); border: 1px solid transparent;
+      font-size: 16px; line-height: 1;
+      transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+    .dclose:hover { color: var(--ink); border-color: var(--hair); background: var(--panel-hi); }
+
+    .dsect { padding: 13px 16px; border-bottom: 1px solid var(--hair-soft); }
+    .dsect .sl {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase;
+      color: var(--ink-faint); margin-bottom: 8px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .dsect.why .sl { color: var(--spine); }
+    .kv { display: flex; flex-direction: column; gap: 7px; }
+    .kv .row { display: flex; gap: 10px; align-items: baseline; }
+    .kv .k {
+      flex: 0 0 84px;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .kv .v {
+      flex: 1 1 auto; min-width: 0;
+      font-size: 12px; color: var(--ink); word-break: break-word; line-height: 1.4;
+    }
+    .kv .v.mono {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 11px; color: var(--ink-dim); font-variant-numeric: tabular-nums;
+    }
+
+    .why-text {
+      font-size: 12.5px; line-height: 1.5; color: var(--ink);
+      border-left: 2px solid oklch(0.80 0.160 70 / 0.45);
+      padding-left: 11px;
+    }
+
+    /* dependency / dependent lists — by title with a status lamp */
+    .deplist { display: flex; flex-direction: column; gap: 2px; }
+    .depitem {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; border-radius: var(--r-sm);
+      cursor: pointer; transition: background 160ms ease;
+    }
+    .depitem:hover { background: var(--panel-hi); }
+    .depitem .lamp {
+      width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;
+      box-shadow: 0 0 5px currentColor;
+    }
+    .depitem .dt {
+      flex: 1 1 auto; min-width: 0; font-size: 11.5px; color: var(--ink);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .depitem .dt .did {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9.5px; color: var(--ink-faint); margin-right: 6px;
+    }
+    .depitem .ds {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--ink-dim); flex: 0 0 auto;
+    }
+    .deplist .empty {
+      font-size: 11px; color: var(--ink-faint); font-style: italic; padding: 2px 8px;
+    }
+    .deplist .transitive-head {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 7.5px; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--ink-faint); margin: 8px 0 2px 8px;
+    }
+
+    .activity { display: flex; flex-direction: column; gap: 6px; }
+    .activity .le {
+      font-size: 11.5px; line-height: 1.45; color: var(--ink-dim);
+      padding-left: 12px; position: relative;
+    }
+    .activity .le::before {
+      content: ''; position: absolute; left: 2px; top: 7px;
+      width: 4px; height: 4px; border-radius: 50%; background: var(--ink-faint);
+    }
+    .artifact-box {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 10.5px; line-height: 1.5; color: var(--ink-dim);
+      background: oklch(0.16 0.012 255 / 0.6);
+      border: 1px solid var(--hair-soft); border-radius: var(--r-sm);
+      padding: 8px 10px; word-break: break-word;
+    }
+
+    .badge-row { display: flex; gap: 7px; flex-wrap: wrap; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 8px; border-radius: var(--r-sm);
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8.5px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+      background: oklch(0.26 0.012 255 / 0.7); color: var(--ink-dim);
+      border: 1px solid var(--hair-soft);
+    }
+    .badge.crit { color: var(--spine); border-color: oklch(0.80 0.160 70 / 0.4);
+      background: oklch(0.80 0.160 70 / 0.10); }
+    .badge.verified { color: var(--done); border-color: oklch(0.74 0.135 162 / 0.4);
+      background: oklch(0.74 0.135 162 / 0.10); }
+    .badge.bneck { color: var(--alert); border-color: oklch(0.80 0.150 66 / 0.5);
+      background: oklch(0.80 0.150 66 / 0.12); }
+
+    /* ============================ STATUS / ERROR ============================ */
+    .err {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      color: var(--ink-faint); font-size: 12px; letter-spacing: 0.05em;
+    }
+
+    /* ============================ xyflow chrome overrides ==================== */
+    .react-flow__controls {
+      box-shadow: 0 8px 24px oklch(0.08 0.01 255 / 0.5);
+      border-radius: var(--r-md); overflow: hidden;
+      border: 1px solid var(--hair);
+    }
+    .react-flow__controls-button {
+      background: var(--panel); border-bottom: 1px solid var(--hair-soft);
+      color: var(--ink-dim); width: 26px; height: 26px;
+    }
+    .react-flow__controls-button:hover { background: var(--panel-hi); color: var(--ink); }
+    .react-flow__controls-button svg { fill: currentColor; }
+
+    .react-flow__minimap {
+      border: 1px solid var(--hair);
+      border-radius: var(--r-md);
+      box-shadow: 0 8px 24px oklch(0.08 0.01 255 / 0.5);
+      overflow: hidden;
+    }
+    /* legible minimap mask — clearly darker outside the viewport rectangle */
+    .react-flow__minimap-mask { fill: oklch(0.10 0.01 255 / 0.74); }
+    /* minimap node dots get a faint stroke so they never vanish into the bg */
+    .react-flow__minimap-node { stroke: oklch(0.30 0.012 255 / 0.5); stroke-width: 2px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Import-map: every specifier resolves to a LOCAL /vendor/ file. React is mapped to a
+       SINGLE file so react / react-dom / @xyflow/react all share ONE react instance
+       (two copies => hooks crash). No esm.sh / CDN / external URL anywhere. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "/vendor/react.mjs",
+      "react/jsx-runtime": "/vendor/jsx-runtime.mjs",
+      "react-dom": "/vendor/react-dom.mjs",
+      "react-dom/client": "/vendor/react-dom-client.mjs",
+      "@xyflow/react": "/vendor/xyflow.mjs",
+      "dagre": "/vendor/dagre.mjs"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import {
+      ReactFlow, Background, BackgroundVariant, Controls, MiniMap, Handle, Position,
+      ReactFlowProvider, useReactFlow,
+    } from '@xyflow/react';
+    import dagre from 'dagre';
+
+    const h = React.createElement;
+
+    // ---- status palette ----------------------------------------------------
+    // Resolved from the OKLCH CSS custom properties so the JS-driven surfaces
+    // (minimap node dots, legend lamps) stay in lockstep with the CSS tokens.
+    // One distinct illuminated-lamp color per enum value.
+    const STATUS_VAR = {
+      ready:     '--ready',
+      in_flight: '--inflight',
+      blocked:   '--blocked',
+      done:      '--done',
+      verified:  '--done',
+      uncertain: '--uncertain',
+      escalated: '--escalated',
+      failed:    '--failed',
+      stale:     '--stale',
+    };
+    const STATUS_ORDER = ['ready','in_flight','blocked','done','verified','uncertain','escalated','failed','stale'];
+    const STATUS_LABEL = {
+      ready: 'ready', in_flight: 'in flight', blocked: 'blocked', done: 'done',
+      verified: 'verified', uncertain: 'uncertain', escalated: 'escalated',
+      failed: 'failed', stale: 'stale',
+    };
+    const DONE_STATUSES = new Set(['done', 'verified']);
+    // statuses that count as "active / not yet settled" for bottleneck candidacy
+    const STALLING_STATUSES = new Set(['in_flight', 'blocked']);
+
+    const _css = getComputedStyle(document.documentElement);
+    const _cache = {};
+    function cssVar(name) {
+      if (_cache[name] === undefined) _cache[name] = _css.getPropertyValue(name).trim();
+      return _cache[name];
+    }
+    function statusColor(s) {
+      const v = STATUS_VAR[s];
+      return v ? cssVar(v) : cssVar('--blocked');
+    }
+    const SPINE = cssVar('--spine');
+    const EDGE = cssVar('--edge');
+
+    // ---- minimap dot palette ----------------------------------------------
+    // The minimap renders into an SVG that does NOT resolve our oklch() CSS
+    // custom properties — passing a CSS-var/oklch string leaves the rects
+    // unfilled (the "empty dark box" symptom). So the minimap gets CONCRETE
+    // solid colors, one per status enum, tuned to the OKLCH lamp palette.
+    const MINIMAP_HEX = {
+      ready:     '#4aa3ff',
+      in_flight: '#f5a524',
+      blocked:   '#7b8494',
+      done:      '#2fbf8f',
+      verified:  '#2fbf8f',
+      uncertain: '#e86fa6',
+      escalated: '#a06bff',
+      failed:    '#e5484d',
+      stale:     '#c9a227',
+    };
+    function minimapColor(s) {
+      return MINIMAP_HEX[s] || MINIMAP_HEX.blocked;
+    }
+
+    // ---- time helpers ------------------------------------------------------
+    // ONE robust timestamp parser for the whole instrument. A timestamp may be a
+    // full ISO ("2026-06-16T08:30:00Z"), a date-prefixed log line
+    // ("2026-06-15T09:00Z orchestration started"), or a short clock string
+    // ("12:18Z" / "08:30 dispatched"). Parse leniently; return ms epoch or null.
+    function parseTs(s) {
+      if (!s || typeof s !== 'string') return null;
+      // full / partial ISO anywhere at the start of the string (tolerates a
+      // trailing " some log text" by slicing the leading ISO token).
+      const iso = s.match(/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/);
+      if (iso) {
+        const ms = Date.parse(iso[0]);
+        if (!Number.isNaN(ms)) return ms;
+      }
+      // bare full-ISO date (no time)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        const ms = Date.parse(s);
+        if (!Number.isNaN(ms)) return ms;
+      }
+      // short "HH:MMZ" / "HH:MM:SSZ" — anchor to today (best-effort elapsed only)
+      const m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+      if (m) {
+        const d = new Date();
+        d.setHours(+m[1], +m[2], m[3] ? +m[3] : 0, 0);
+        return d.getTime();
+      }
+      return null;
+    }
+    // Compact duration formatter. Returns null (NEVER the string "null") when the
+    // span is unknown or nonsensical — callers must treat null as "omit".
+    function fmtElapsed(ms) {
+      if (ms == null || !Number.isFinite(ms) || ms < 0) return null;
+      const mins = Math.floor(ms / 60000);
+      if (mins < 1) return '<1m';
+      if (mins < 60) return mins + 'm';
+      const hrs = Math.floor(mins / 60);
+      const rem = mins % 60;
+      if (hrs < 24) return rem ? hrs + 'h ' + rem + 'm' : hrs + 'h';
+      const days = Math.floor(hrs / 24);
+      return (hrs % 24) ? days + 'd ' + (hrs % 24) + 'h' : days + 'd';
+    }
+
+    // ---- execution-time derivation -----------------------------------------
+    // How long has / did a task take? Returns { ms, running } or null if nothing
+    // is derivable.
+    //   in_flight       -> now - dispatched_at            (running: true)
+    //   done/verified   -> completed_at - dispatched_at   if completed_at present
+    //                      else span from the task's log timestamps
+    //                      (last log ts - first log ts, or dispatched -> last log)
+    function logSpan(t) {
+      const logs = Array.isArray(t.log) ? t.log : [];
+      const stamps = [];
+      for (const line of logs) {
+        const ts = parseTs(typeof line === 'string' ? line : '');
+        if (ts != null) stamps.push(ts);
+      }
+      if (!stamps.length) return null;
+      return { first: Math.min(...stamps), last: Math.max(...stamps) };
+    }
+    function taskDuration(t) {
+      if (!t) return null;
+      const disp = parseTs(t.dispatched_at);
+      if (t.status === 'in_flight') {
+        if (disp == null) return null;
+        const ms = Date.now() - disp;
+        return ms >= 0 ? { ms, running: true } : null;
+      }
+      if (DONE_STATUSES.has(t.status)) {
+        const comp = parseTs(t.completed_at);
+        if (comp != null && disp != null && comp >= disp) {
+          return { ms: comp - disp, running: false };
+        }
+        // fall back to deriving a span from the log timestamps
+        const span = logSpan(t);
+        if (span) {
+          if (disp != null && span.last >= disp) return { ms: span.last - disp, running: false };
+          if (span.last > span.first) return { ms: span.last - span.first, running: false };
+        }
+        // last resort: completed_at alone vs dispatched
+        if (comp != null && disp != null) {
+          const ms = comp - disp;
+          if (ms >= 0) return { ms, running: false };
+        }
+        return null;
+      }
+      // any other status with a dispatched_at: best-effort running span
+      if (disp != null) {
+        const ms = Date.now() - disp;
+        if (ms >= 0) return { ms, running: true };
+      }
+      return null;
+    }
+    // Render a duration object as a short string, prefixing "running " when live.
+    function fmtDuration(d) {
+      if (!d) return null;
+      const s = fmtElapsed(d.ms);
+      if (s == null) return null;
+      return d.running ? 'running ' + s : s;
+    }
+
+    // ---- derived analytics (ALL client-side, read-only — never written back) -
+    // deps[] are upstream ids; edge = dep -> task. Returns a rich analysis object
+    // the whole instrument reads from: critical path, per-node impact (transitive
+    // descendant count), fan-in (in-degree), convergence node, bottleneck.
+    function analyze(tasks, owner) {
+      const list = Array.isArray(tasks) ? tasks : [];
+      const byId = new Map(list.map(t => [t.id, t]));
+      const ids = new Set(list.map(t => t.id));
+
+      // adjacency: deps (upstream) and dependents (downstream), only valid edges
+      const upstream = new Map();    // id -> [dep ids]
+      const downstream = new Map();  // id -> [dependent ids]
+      for (const t of list) { upstream.set(t.id, []); downstream.set(t.id, []); }
+      for (const t of list) {
+        const deps = Array.isArray(t.deps) ? t.deps : [];
+        for (const d of deps) {
+          if (!ids.has(d)) continue;
+          upstream.get(t.id).push(d);
+          downstream.get(d).push(t.id);
+        }
+      }
+
+      // in-degree = direct fan-in (convergence signal)
+      const inDeg = new Map();
+      for (const t of list) inDeg.set(t.id, upstream.get(t.id).length);
+
+      // transitive descendant count = downstream impact (how many tasks this gates)
+      const descCache = new Map();
+      function descendants(id, seen) {
+        if (descCache.has(id)) return descCache.get(id);
+        const acc = new Set();
+        const stack = [...downstream.get(id)];
+        const local = new Set(seen);
+        local.add(id);
+        while (stack.length) {
+          const n = stack.pop();
+          if (acc.has(n) || local.has(n)) continue; // cycle guard
+          acc.add(n);
+          for (const c of downstream.get(n)) if (!acc.has(c)) stack.push(c);
+        }
+        descCache.set(id, acc);
+        return acc;
+      }
+      const impact = new Map();
+      for (const t of list) impact.set(t.id, descendants(t.id, new Set()).size);
+
+      // transitive ancestors (for lineage highlight upstream chain)
+      function ancestors(id) {
+        const acc = new Set();
+        const stack = [...upstream.get(id)];
+        while (stack.length) {
+          const n = stack.pop();
+          if (acc.has(n)) continue;
+          acc.add(n);
+          for (const p of upstream.get(n)) if (!acc.has(p)) stack.push(p);
+        }
+        return acc;
+      }
+
+      // critical path = longest dependency chain (by node count).
+      const memoLen = new Map();
+      const memoNext = new Map();
+      const visiting = new Set();
+      function lenEndingAt(id) {
+        if (memoLen.has(id)) return memoLen.get(id);
+        if (visiting.has(id)) return 1; // cycle guard
+        visiting.add(id);
+        let best = 1, bestPrev = null;
+        for (const d of upstream.get(id)) {
+          const cand = 1 + lenEndingAt(d);
+          if (cand > best) { best = cand; bestPrev = d; }
+        }
+        visiting.delete(id);
+        memoLen.set(id, best);
+        memoNext.set(id, bestPrev);
+        return best;
+      }
+      let endId = null, endLen = 0;
+      for (const t of list) {
+        const l = lenEndingAt(t.id);
+        if (l > endLen) { endLen = l; endId = t.id; }
+      }
+      const critSet = new Set();
+      const critChain = [];
+      let cur = endId;
+      while (cur != null) { critSet.add(cur); critChain.push(cur); cur = memoNext.get(cur); }
+      critChain.reverse(); // source -> ... -> sink
+
+      // highest-impact node
+      let impactNode = null, impactMax = -1;
+      for (const t of list) {
+        const v = impact.get(t.id);
+        if (v > impactMax) { impactMax = v; impactNode = t.id; }
+      }
+
+      // top convergence node (max in-degree, ties broken by impact)
+      let convNode = null, convMax = -1;
+      for (const t of list) {
+        const v = inDeg.get(t.id);
+        if (v > convMax || (v === convMax && convNode != null && impact.get(t.id) > impact.get(convNode))) {
+          if (v > convMax) { convMax = v; convNode = t.id; }
+          else { convNode = t.id; }
+        }
+      }
+
+      // bottleneck: the node stalling the most work. Primary signal = a
+      // stalling (in_flight/blocked) node with the highest downstream impact.
+      // Tie-break / fallback = the in_flight node running longest since dispatch.
+      const now = Date.now();
+      let bneck = null, bneckImpact = -1, bneckElapsed = -1;
+      let longestInflight = null, longestMs = -1;
+      for (const t of list) {
+        if (!STALLING_STATUSES.has(t.status)) continue;
+        const imp = impact.get(t.id);
+        const ts = parseTs(t.dispatched_at);
+        const el = ts != null ? now - ts : -1;
+        if (t.status === 'in_flight' && el > longestMs) { longestMs = el; longestInflight = t.id; }
+        if (imp > bneckImpact || (imp === bneckImpact && el > bneckElapsed)) {
+          bneck = t.id; bneckImpact = imp; bneckElapsed = el;
+        }
+      }
+      // if the top-impact stalling node gates nothing, prefer the longest-running
+      // in_flight node (a slow node IS the bottleneck even with low fan-out).
+      if (bneck != null && bneckImpact <= 0 && longestInflight != null) bneck = longestInflight;
+
+      // user gates (awaiting human) — blocked_on:'user' regardless of status,
+      // so an in_flight node that has hit a user gate is also counted (combined
+      // "spinning AND waiting" state).
+      const userGateIds = list
+        .filter(t => t.blocked_on === 'user')
+        .map(t => t.id);
+      let earliestGate = Infinity;
+      for (const id of userGateIds) {
+        const ts = parseTs(byId.get(id).dispatched_at);
+        if (ts != null && ts < earliestGate) earliestGate = ts;
+      }
+
+      // overall elapsed: from earliest dispatched_at, else owner.heartbeat
+      let earliest = Infinity;
+      for (const t of list) {
+        const ts = parseTs(t.dispatched_at);
+        if (ts != null && ts < earliest) earliest = ts;
+      }
+      if (earliest === Infinity && owner && owner.heartbeat) {
+        const ts = parseTs(owner.heartbeat);
+        if (ts != null) earliest = ts;
+      }
+      const totalElapsedMs = earliest === Infinity ? null : now - earliest;
+
+      const wip = list.filter(t => t.status === 'in_flight').length;
+
+      return {
+        byId, upstream, downstream, inDeg, impact, ancestors, descendants,
+        critSet, critChain, critLen: endLen,
+        impactNode, impactMax,
+        convNode, convMax,
+        bneck, bneckImpact,
+        userGateIds,
+        earliestGateElapsedMs: earliestGate === Infinity ? null : now - earliestGate,
+        totalElapsedMs,
+        wip,
+      };
+    }
+
+    // thresholds for structural chips — "hot" impact stands out, fan-in≥2 marks a join
+    const IMPACT_HOT = 3;     // gates ≥3 downstream → high-leverage
+    const CONV_MIN = 2;       // in-degree ≥2 → a convergence join
+
+    // ---- dagre layout (xyflow has no built-in layout) ----------------------
+    // Node height grew to fit the structural meta row.
+    const NODE_W = 200, NODE_H = 92;
+    function layout(tasks) {
+      const g = new dagre.graphlib.Graph();
+      g.setGraph({ rankdir: 'TB', nodesep: 48, ranksep: 80, marginx: 28, marginy: 28 });
+      g.setDefaultEdgeLabel(() => ({}));
+      const ids = new Set(tasks.map(t => t.id));
+      for (const t of tasks) g.setNode(t.id, { width: NODE_W, height: NODE_H });
+      for (const t of tasks) {
+        const deps = Array.isArray(t.deps) ? t.deps : [];
+        for (const d of deps) if (ids.has(d)) g.setEdge(d, t.id);
+      }
+      dagre.layout(g);
+      const pos = new Map();
+      for (const id of ids) {
+        const n = g.node(id);
+        if (n) pos.set(id, { x: n.x - NODE_W / 2, y: n.y - NODE_H / 2 });
+      }
+      return pos;
+    }
+
+    // ---- a 1-second ticker so live clocks read as live -----------------------
+    // The 2s board poll already refreshes node data, but a running clock should
+    // visibly advance between polls. This hook re-renders the subscribing node
+    // once per second WITHOUT re-fetching/re-laying-out anything — it only nudges
+    // the running-duration text. Only mounted while a node actually needs it.
+    function useSecondTick(active) {
+      const [, force] = useState(0);
+      useEffect(() => {
+        if (!active) return;
+        const iv = setInterval(() => force(n => (n + 1) & 0xffff), 1000);
+        return () => clearInterval(iv);
+      }, [active]);
+    }
+
+    // ---- custom node — an instrument tile ----------------------------------
+    function CcNode({ data }) {
+      const cls = ['cc-node', 's-' + (data.status || 'unknown')];
+      if (data.crit) cls.push('crit');
+      if (data.userGate) cls.push('usergate');
+      if (data.bottleneck) cls.push('bottleneck');
+      if (data.enter) cls.push('enter');
+      if (data.lineage) cls.push('lin-' + data.lineage); // self | anc | desc
+      const lamp = statusColor(data.status);
+      const label = STATUS_LABEL[data.status] || (data.status || 'unknown');
+      const title = (data.title || '').trim();
+
+      // Live running clock: in_flight tiles tick once/second off dispatched_at.
+      // data.dispatchedAt is the parsed ms epoch (or null when absent/unparseable).
+      const running = data.status === 'in_flight' && data.dispatchedAt != null;
+      useSecondTick(running);
+      let clockStr = null;
+      if (running) {
+        const elapsed = Date.now() - data.dispatchedAt;
+        clockStr = fmtElapsed(elapsed); // null when negative/nonsensical -> omit
+      }
+
+      const kids = [
+        h(Handle, { key: 'th', type: 'target', position: Position.Top }),
+      ];
+      if (data.bottleneck) {
+        kids.push(h('span', { key: 'bn', className: 'bneck' }, '⚠ bottleneck'));
+      }
+      kids.push(
+        h('div', { key: 'lr', className: 'lamprow' },
+          h('span', { className: 'lamp', style: { background: lamp, color: lamp } }),
+          h('span', { className: 'stat', style: { color: lamp } }, label),
+          h('span', { className: 'tid' }, data.id),
+        ),
+        h('div', { key: 'ti', className: 'title' + (title ? '' : ' empty') },
+          title || 'untitled'),
+      );
+
+      // structural meta row: downstream impact + convergence fan-in
+      const metaChips = [];
+      if (data.impact > 0) {
+        metaChips.push(
+          h('span', { key: 'imp', className: 'chip impact' + (data.impact >= IMPACT_HOT ? ' hot' : '') },
+            'gates', h('span', { className: 'cn' }, data.impact)),
+        );
+      }
+      if (data.inDeg >= CONV_MIN) {
+        metaChips.push(
+          h('span', { key: 'cv', className: 'chip conv', title: 'convergence join' },
+            '⋈ in', h('span', { className: 'cn' }, data.inDeg)),
+        );
+      }
+      // live running clock — a clear, legible readout on the tile (Martian Mono),
+      // ticking once/second. Omits gracefully when dispatched_at is absent.
+      if (clockStr) {
+        metaChips.push(
+          h('span', { key: 'dur', className: 'chip dur', title: 'running ' + clockStr + ' since dispatch' },
+            h('span', { className: 'cglyph' }, '◷'),
+            h('span', { className: 'cn' }, clockStr)),
+        );
+      }
+      if (metaChips.length) {
+        kids.push(h('div', { key: 'mt', className: 'meta' }, ...metaChips));
+      }
+
+      // awaiting-user indicator — a held "PAUSED, needs you" flag with a pause
+      // glyph. Triggered by blocked_on:'user' regardless of status, so it shows
+      // on a pure-blocked gate AND on an in_flight node that's hit a user gate.
+      // On the combined node this flag is the dominant signal (see .usergate CSS).
+      if (data.userGate) {
+        kids.push(
+          h('div', { key: 'gf', className: 'gateflag', title: 'paused — waiting on your decision' },
+            h('span', { className: 'gpause' }, h('i'), h('i')),
+            'awaiting you'),
+        );
+      }
+      kids.push(h(Handle, { key: 'sh', type: 'source', position: Position.Bottom }));
+
+      return h('div',
+        { className: cls.join(' '), style: { '--lamp': lamp, '--i': data.order || 0 } },
+        ...kids,
+      );
+    }
+    const nodeTypes = { cc: CcNode };
+
+    // ---- build nodes/edges from a board + analysis -------------------------
+    function buildGraph(board, an, sel, prevPositions, firstLayout) {
+      const tasks = Array.isArray(board.tasks) ? board.tasks : [];
+      const ids = new Set(tasks.map(t => t.id));
+      const positions = (prevPositions && prevPositions.size) ? prevPositions : layout(tasks);
+
+      // lineage sets for the selected node
+      let ancSet = null, descSet = null;
+      if (sel && an.byId.has(sel)) {
+        ancSet = an.ancestors(sel);
+        descSet = an.descendants(sel, new Set());
+      }
+
+      const nodes = tasks.map((t, i) => {
+        // awaiting-user = blocked_on:'user' regardless of status — this catches
+        // both a pure-blocked gate AND an in_flight node that has hit a point
+        // where it needs human input (the combined "spinning AND waiting" state).
+        const userGate = t.blocked_on === 'user';
+        const p = positions.get(t.id) || { x: 0, y: 0 };
+        let lineage = null;
+        if (sel) {
+          if (t.id === sel) lineage = 'self';
+          else if (ancSet && ancSet.has(t.id)) lineage = 'anc';
+          else if (descSet && descSet.has(t.id)) lineage = 'desc';
+        }
+        return {
+          id: t.id,
+          type: 'cc',
+          position: p,
+          selected: t.id === sel,
+          // explicit dims so the MiniMap can size its rects before xyflow has
+          // measured the custom node DOM (otherwise the dots are zero-size and
+          // the minimap reads as an empty dark box).
+          width: NODE_W,
+          height: NODE_H,
+          data: {
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            crit: an.critSet.has(t.id),
+            userGate,
+            bottleneck: an.bneck === t.id,
+            impact: an.impact.get(t.id) || 0,
+            inDeg: an.inDeg.get(t.id) || 0,
+            // parsed dispatch epoch (ms) so the tile can tick a LIVE clock itself
+            // every second; null when absent/unparseable -> clock omitted.
+            dispatchedAt: t.status === 'in_flight' ? parseTs(t.dispatched_at) : null,
+            lineage,
+            enter: !!firstLayout,
+            order: i,
+          },
+        };
+      });
+
+      // lineage edge set: edges fully inside {sel} ∪ ancestors ∪ descendants
+      // along the actual dependency chain to/from sel.
+      const linNodes = new Set();
+      if (sel) {
+        linNodes.add(sel);
+        if (ancSet) for (const a of ancSet) linNodes.add(a);
+        if (descSet) for (const d of descSet) linNodes.add(d);
+      }
+
+      const edges = [];
+      for (const t of tasks) {
+        const deps = Array.isArray(t.deps) ? t.deps : [];
+        for (const d of deps) {
+          if (!ids.has(d)) continue;
+          const onCrit = an.critSet.has(d) && an.critSet.has(t.id);
+          // an edge is on the lineage if both endpoints are in the lineage AND
+          // it points toward/away from sel (ancestor edge or descendant edge).
+          let onLin = false;
+          if (sel && linNodes.has(d) && linNodes.has(t.id)) {
+            const dAnc = d === sel || (ancSet && ancSet.has(d));
+            const tAnc = t.id === sel || (ancSet && ancSet.has(t.id));
+            const dDesc = d === sel || (descSet && descSet.has(d));
+            const tDesc = t.id === sel || (descSet && descSet.has(t.id));
+            onLin = (dAnc && tAnc) || (dDesc && tDesc);
+          }
+          edges.push({
+            id: d + '->' + t.id,
+            source: d,
+            target: t.id,
+            className: onLin ? 'edge-lin' : undefined,
+            animated: onCrit || onLin,
+            style: onLin
+              ? { stroke: cssVar('--ready'), strokeWidth: 2.2 }
+              : onCrit
+                ? { stroke: SPINE, strokeWidth: 2.4 }
+                : { stroke: EDGE, strokeWidth: 1.3, opacity: 0.75 },
+          });
+        }
+      }
+      return { nodes, edges, positions };
+    }
+
+    // structural signature: does the node/edge SET differ? (ignores status/label)
+    function structSig(board) {
+      const tasks = Array.isArray(board.tasks) ? board.tasks : [];
+      const ids = tasks.map(t => t.id).sort();
+      const edges = [];
+      const idset = new Set(ids);
+      for (const t of tasks) for (const d of (t.deps || [])) if (idset.has(d)) edges.push(d + '>' + t.id);
+      edges.sort();
+      return ids.join(',') + '|' + edges.join(',');
+    }
+
+    // ---- main component ---------------------------------------------------
+    function Board() {
+      const [board, setBoard] = useState(null);
+      const [nodes, setNodes] = useState([]);
+      const [edges, setEdges] = useState([]);
+      const [err, setErr] = useState(null);
+      const [sel, setSel] = useState(null);  // selected task id (lineage anchor)
+      const sigRef = useRef(null);
+      const posRef = useRef(new Map());
+      const boardRef = useRef(null);
+      const selRef = useRef(null);
+      const rf = useReactFlow();
+      const didFit = useRef(false);
+
+      // analysis recomputed whenever the board changes
+      const an = useMemo(() => {
+        if (!board) return null;
+        return analyze(board.tasks, board.owner);
+      }, [board]);
+      const anRef = useRef(null);
+      anRef.current = an;
+      boardRef.current = board;
+      selRef.current = sel;
+
+      // (re)render the graph from current board + analysis + selection
+      const render = useCallback((b, analysis, selection, fresh) => {
+        const { nodes: nn, edges: ee, positions } =
+          buildGraph(b, analysis, selection, fresh ? null : posRef.current, fresh);
+        if (fresh) posRef.current = positions;
+        setNodes(nn);
+        setEdges(ee);
+      }, []);
+
+      const apply = useCallback((b) => {
+        const sig = structSig(b);
+        const analysis = analyze(b.tasks, b.owner);
+        const fresh = sig !== sigRef.current;
+        if (fresh) sigRef.current = sig;
+        // keep selection only if the node still exists
+        let s = selRef.current;
+        if (s && !analysis.byId.has(s)) s = null;
+        render(b, analysis, s, fresh);
+        if (s !== selRef.current) setSel(s);
+        if (fresh && !didFit.current) {
+          didFit.current = true;
+          setTimeout(() => rf.fitView({ padding: 0.16 }), 30);
+        }
+        setBoard(b);
+      }, [rf, render]);
+
+      useEffect(() => {
+        let alive = true;
+        async function poll() {
+          try {
+            const r = await fetch('/board.json', { cache: 'no-store' });
+            if (!alive) return;
+            if (!r.ok) { return; } // mid-write -> skip this tick, keep last good render
+            const b = await r.json();
+            if (!alive) return;
+            setErr(null);
+            apply(b);
+          } catch (_e) { /* transient -> retry next tick */ }
+        }
+        poll();
+        const iv = setInterval(poll, 2000);
+        return () => { alive = false; clearInterval(iv); };
+      }, [apply]);
+
+      // selection handlers — re-render graph (lineage) without re-layout
+      const select = useCallback((id) => {
+        setSel(id);
+        const b = boardRef.current, a = anRef.current;
+        if (b && a) render(b, a, id, false);
+      }, [render]);
+
+      const onNodeClick = useCallback((_e, node) => { select(node.id); }, [select]);
+      const onPaneClick = useCallback(() => { select(null); }, [select]);
+
+      const progress = useMemo(() => {
+        const tasks = (board && Array.isArray(board.tasks)) ? board.tasks : [];
+        const done = tasks.filter(t => DONE_STATUSES.has(t.status)).length;
+        return { done, total: tasks.length };
+      }, [board]);
+
+      const counts = useMemo(() => {
+        const tasks = (board && Array.isArray(board.tasks)) ? board.tasks : [];
+        const c = {};
+        for (const t of tasks) c[t.status] = (c[t.status] || 0) + 1;
+        return c;
+      }, [board]);
+
+      const pct = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
+      const branch = board && board.git && board.git.branch ? board.git.branch : null;
+      const userGates = an ? an.userGateIds.length : 0;
+      const nodeCount = progress.total;
+
+      const selTask = (board && sel) ? (board.tasks || []).find(t => t.id === sel) : null;
+
+      return h('div', { id: 'app' },
+        h('header', { className: 'bar' },
+          // identity nameplate
+          h('div', { className: 'ident' },
+            h('span', { className: 'beacon' }),
+            h('div', { className: 'mark-wrap' },
+              h('span', { className: 'mark' }, 'cc-master'),
+              h('span', { className: 'sub' }, 'mission control'),
+            ),
+          ),
+          // mission line
+          h('div', { className: 'goalwrap' },
+            h('span', { className: 'label' }, 'objective'),
+            h('span', { className: 'goal', title: board ? board.goal : '' },
+              board ? (board.goal || 'no goal set') : 'acquiring board…'),
+          ),
+          // telemetry readouts
+          h('div', { className: 'readouts' },
+            h('div', { className: 'readout' },
+              h('span', { className: 'rl' }, 'progress'),
+              h('span', { className: 'rv' },
+                progress.done, h('span', { className: 'unit' }, '/' + progress.total),
+                h('span', { className: 'unit' }, '  ' + pct + '%'),
+              ),
+              h('div', { className: 'meter' }, h('i', { style: { width: pct + '%' } })),
+            ),
+            branch ? h('div', { className: 'vrule' }) : null,
+            branch ? h('div', { className: 'readout branch' },
+              h('span', { className: 'rl' }, 'branch'),
+              h('span', { className: 'rv' }, branch),
+            ) : null,
+            userGates > 0 ? h('div', { className: 'vrule' }) : null,
+            userGates > 0 ? h('div', { className: 'alarm' },
+              h('span', { className: 'dot' }),
+              h('span', { className: 'n' }, userGates),
+              'awaiting you',
+            ) : null,
+          ),
+        ),
+        h('div', { id: 'stage' },
+          // left analytics rail
+          h(Insights, { an, board, progress, pct, nodeCount, onPick: select }),
+          // center canvas
+          h('div', { id: 'flow', className: sel ? 'has-selection' : '' },
+            err ? h('div', { className: 'err' }, err) : null,
+            h(ReactFlow, {
+              nodes, edges, nodeTypes,
+              fitView: true,
+              minZoom: 0.1,
+              proOptions: { hideAttribution: true },
+              nodesDraggable: true,
+              nodesConnectable: false,
+              elementsSelectable: true,
+              onNodeClick,
+              onPaneClick,
+              defaultEdgeOptions: { type: 'smoothstep' },
+            },
+              h(Background, {
+                variant: BackgroundVariant.Dots,
+                gap: 22, size: 1, color: cssVar('--grid'),
+              }),
+              h(Controls, { showInteractive: false }),
+              // MiniMap: only worth showing on larger graphs — below ~10 nodes it
+              // adds nothing but a tiny dark inset. Auto-hide under the threshold.
+              nodeCount > 10 ? h(MiniMap, {
+                pannable: true, zoomable: true,
+                bgColor: '#13151c',
+                maskColor: 'rgba(14, 16, 22, 0.74)',
+                // CONCRETE solid colors per status — the minimap SVG does NOT
+                // resolve our oklch()/CSS-var lamps, so a var lookup leaves the
+                // rects unfilled (the empty-dark-box bug). Plain hex fills it.
+                nodeColor: (n) => minimapColor(n.data && n.data.status),
+                nodeStrokeColor: '#3a3f4d',
+                nodeStrokeWidth: 3,
+                nodeBorderRadius: 3,
+              }) : null,
+            ),
+            h(Legend, { counts, total: progress.total }),
+          ),
+          // right detail rail (slides in on selection)
+          h(Detail, { task: selTask, an, board, onClose: () => select(null), onPick: select }),
+        ),
+      );
+    }
+
+    // ---- INSIGHTS RAIL — derived analytics readout -------------------------
+    function Insights({ an, board, progress, pct, nodeCount, onPick }) {
+      if (!an || !board) {
+        return h('div', { id: 'insights' },
+          h('div', { className: 'ihead' }, 'analysis'),
+          h('div', { className: 'metric' },
+            h('div', { className: 'mv dim' }, 'acquiring board…')),
+        );
+      }
+      const idTitle = (id) => {
+        const t = an.byId.get(id);
+        const ti = t && (t.title || '').trim();
+        return ti || id;
+      };
+      const seg = (id) => h('span', {
+        className: 'seg', key: id, onClick: () => onPick(id), title: idTitle(id),
+      }, id);
+
+      const overWip = (typeof board.wip_limit === 'number') && an.wip > board.wip_limit;
+
+      const rows = [];
+
+      // critical path
+      rows.push(h('div', { className: 'metric', key: 'cp' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '⟋'), 'critical path'),
+        an.critChain.length
+          ? h('div', { className: 'chain' },
+              an.critChain.flatMap((id, i) =>
+                i === 0 ? [seg(id)] : [h('span', { className: 'arrow', key: 'a' + i }, '→'), seg(id)]))
+          : h('div', { className: 'mv dim' }, '—'),
+        h('div', { className: 'msub' }, 'length ' + an.critLen + ' · longest dependency chain'),
+      ));
+
+      // highest impact
+      rows.push(h('div', { className: 'metric', key: 'imp' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '◈'), 'highest impact'),
+        an.impactNode && an.impactMax > 0
+          ? h('div', { className: 'mv' },
+              h('span', { className: 'pill-id', onClick: () => onPick(an.impactNode) }, an.impactNode),
+              '  ', idTitle(an.impactNode))
+          : h('div', { className: 'mv dim' }, 'no node gates others'),
+        an.impactMax > 0 ? h('div', { className: 'msub' }, 'gates ' + an.impactMax + ' downstream tasks') : null,
+      ));
+
+      // top convergence
+      rows.push(h('div', { className: 'metric', key: 'conv' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '⋈'), 'top convergence'),
+        an.convNode && an.convMax >= CONV_MIN
+          ? h('div', { className: 'mv' },
+              h('span', { className: 'pill-id', onClick: () => onPick(an.convNode) }, an.convNode),
+              '  ', idTitle(an.convNode))
+          : h('div', { className: 'mv dim' }, 'no multi-dep join'),
+        an.convMax >= CONV_MIN ? h('div', { className: 'msub' }, an.convMax + ' dependencies aggregate here') : null,
+      ));
+
+      // bottleneck
+      const bt = an.bneck ? an.byId.get(an.bneck) : null;
+      const btDur = bt ? fmtDuration(taskDuration(bt)) : null;
+      rows.push(h('div', { className: 'metric flag', key: 'bn' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '⚠'), 'bottleneck'),
+        bt
+          ? h('div', { className: 'mv' },
+              h('span', { className: 'pill-id', onClick: () => onPick(an.bneck) }, an.bneck),
+              '  ', idTitle(an.bneck))
+          : h('div', { className: 'mv dim' }, 'none — nothing stalling'),
+        bt ? h('div', { className: 'msub' },
+          (STATUS_LABEL[bt.status] || bt.status)
+          + (an.impact.get(an.bneck) > 0 ? ' · gates ' + an.impact.get(an.bneck) : '')
+          + (btDur != null ? ' · ' + btDur : '')) : null,
+      ));
+
+      // WIP
+      const wipLimit = (typeof board.wip_limit === 'number') ? board.wip_limit : null;
+      rows.push(h('div', { className: 'metric' + (overWip ? ' warnwip' : ''), key: 'wip' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '≡'), 'work in flight'),
+        h('div', { className: 'mv mono' },
+          an.wip + (wipLimit != null ? ' / ' + wipLimit : '') + (overWip ? '  ⚠ over' : '')),
+        h('div', { className: 'msub' }, wipLimit != null ? 'in_flight vs wip_limit' : 'in_flight (no wip_limit set)'),
+      ));
+
+      // awaiting user
+      rows.push(h('div', { className: 'metric' + (an.userGateIds.length ? ' flag' : ''), key: 'au' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '◴'), 'awaiting user'),
+        h('div', { className: 'mv mono' }, String(an.userGateIds.length)),
+        (an.userGateIds.length && fmtElapsed(an.earliestGateElapsedMs) != null)
+          ? h('div', { className: 'msub' }, 'oldest gate ' + fmtElapsed(an.earliestGateElapsedMs) + ' waiting')
+          : h('div', { className: 'msub' }, 'human decisions pending'),
+      ));
+
+      // overall elapsed
+      rows.push(h('div', { className: 'metric', key: 'el' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '◷'), 'orchestration age'),
+        h('div', { className: 'mv mono' }, an.totalElapsedMs != null ? fmtElapsed(an.totalElapsedMs) : '—'),
+        h('div', { className: 'msub' }, progress.done + '/' + progress.total + ' done · ' + pct + '%'),
+      ));
+
+      return h('div', { id: 'insights' },
+        h('div', { className: 'ihead' }, 'analysis · ' + nodeCount + ' tasks'),
+        ...rows,
+      );
+    }
+
+    function msFromDispatch(t) {
+      const ts = parseTs(t.dispatched_at);
+      return ts != null ? Date.now() - ts : null;
+    }
+
+    // ---- DETAIL RAIL — full task readout -----------------------------------
+    function Detail({ task, an, board, onClose, onPick }) {
+      const open = !!task;
+      const lamp = task ? statusColor(task.status) : 'transparent';
+
+      const body = [];
+      if (task && an) {
+        const id = task.id;
+        const title = (task.title || '').trim();
+        const isCrit = an.critSet.has(id);
+        const isBneck = an.bneck === id;
+        // awaiting-user regardless of status (mirrors the tile + analyze).
+        const userGate = task.blocked_on === 'user';
+
+        // badges
+        const badges = [];
+        if (isCrit) badges.push(h('span', { className: 'badge crit', key: 'b1' }, '⟋ critical path'));
+        if (isBneck) badges.push(h('span', { className: 'badge bneck', key: 'b2' }, '⚠ bottleneck'));
+        if (task.verified === true) badges.push(h('span', { className: 'badge verified', key: 'b3' }, '✓ verified'));
+        if (badges.length) body.push(h('div', { className: 'dsect', key: 'badges' },
+          h('div', { className: 'badge-row' }, ...badges)));
+
+        // identity
+        const idRows = [];
+        const addRow = (k, v, mono) => {
+          if (v == null || v === '') return;
+          idRows.push(h('div', { className: 'row', key: k },
+            h('span', { className: 'k' }, k),
+            h('span', { className: 'v' + (mono ? ' mono' : '') }, v)));
+        };
+        addRow('kind', task.kind);
+        addRow('mechanism', task.mechanism, true);
+        addRow('handle', task.handle, true);
+        addRow('impact', (an.impact.get(id) || 0) + ' downstream', false);
+        addRow('fan-in', (an.inDeg.get(id) || 0) + ' direct deps', false);
+        if (idRows.length) body.push(h('div', { className: 'dsect', key: 'ident' },
+          h('div', { className: 'sl' }, 'identity'),
+          h('div', { className: 'kv' }, ...idRows)));
+
+        // WHY — the headline
+        const whyBits = [];
+        if (task.justification) whyBits.push(
+          h('div', { className: 'why-text', key: 'just' }, task.justification));
+        if (task.dep_pins && typeof task.dep_pins === 'object') {
+          const pins = Object.entries(task.dep_pins);
+          if (pins.length) whyBits.push(h('div', { className: 'kv', key: 'pins', style: { marginTop: '10px' } },
+            ...pins.map(([k, v]) => h('div', { className: 'row', key: k },
+              h('span', { className: 'k' }, 'pin ' + k),
+              h('span', { className: 'v mono' }, String(v))))));
+        }
+
+        // dependencies (upstream, by title + status)
+        const deps = (an.upstream.get(id) || []);
+        const depList = deps.length
+          ? h('div', { className: 'deplist' }, ...deps.map(d => depItem(d, an, onPick)))
+          : h('div', { className: 'deplist' }, h('div', { className: 'empty' }, 'no upstream dependencies — a root task'));
+
+        // dependents (downstream — direct + transitive count)
+        const directDown = (an.downstream.get(id) || []);
+        const allDown = an.descendants(id, new Set());
+        const transOnly = [...allDown].filter(x => !directDown.includes(x));
+        const downBits = [];
+        if (directDown.length) {
+          downBits.push(h('div', { className: 'deplist', key: 'dd' },
+            ...directDown.map(d => depItem(d, an, onPick))));
+          if (transOnly.length) {
+            downBits.push(h('div', { className: 'transitive-head', key: 'th' },
+              '+ ' + transOnly.length + ' transitive'));
+          }
+        } else {
+          downBits.push(h('div', { className: 'deplist', key: 'de' },
+            h('div', { className: 'empty' }, 'gates nothing — a leaf task')));
+        }
+
+        body.push(h('div', { className: 'dsect why', key: 'why' },
+          h('div', { className: 'sl' }, '◆ why this exists'),
+          whyBits.length ? whyBits : h('div', { className: 'mv dim', style: { fontSize: '11.5px', color: 'var(--ink-faint)' } }, 'no justification recorded'),
+        ));
+
+        body.push(h('div', { className: 'dsect', key: 'deps' },
+          h('div', { className: 'sl' }, 'waiting on'),
+          depList,
+        ));
+
+        body.push(h('div', { className: 'dsect', key: 'blocks' },
+          h('div', { className: 'sl' }, 'this blocks'),
+          ...downBits,
+        ));
+
+        // telemetry
+        const teleRows = [];
+        const addTele = (k, v, mono) => {
+          if (v == null || v === '') return;
+          teleRows.push(h('div', { className: 'row', key: k },
+            h('span', { className: 'k' }, k),
+            h('span', { className: 'v' + (mono ? ' mono' : '') }, v)));
+        };
+        addTele('dispatched', task.dispatched_at, true);
+        addTele('completed', task.completed_at, true);
+        const elStr = fmtElapsed(msFromDispatch(task));
+        if (elStr != null) addTele('elapsed', elStr, true);
+        // execution time — how long the task ran (live) or took (settled).
+        const dur = taskDuration(task);
+        const durStr = fmtDuration(dur);
+        if (durStr != null) addTele(dur && dur.running ? 'runtime' : 'duration', durStr, true);
+        if (userGate) {
+          addTele('awaiting', 'user' + (elStr != null ? ' · ' + elStr : ''), false);
+        } else if (task.blocked_on && task.blocked_on !== 'user') {
+          addTele('blocked on', task.blocked_on, true);
+        }
+        addTele('verified', task.verified === true ? 'yes' : (task.verified === false ? 'no' : null), false);
+        if (teleRows.length) body.push(h('div', { className: 'dsect', key: 'tele' },
+          h('div', { className: 'sl' }, 'telemetry'),
+          h('div', { className: 'kv' }, ...teleRows)));
+
+        // artifact
+        if (task.artifact) body.push(h('div', { className: 'dsect', key: 'art' },
+          h('div', { className: 'sl' }, 'artifact'),
+          h('div', { className: 'artifact-box' }, String(task.artifact))));
+
+        // activity (log + notes)
+        const logs = Array.isArray(task.log) ? task.log : [];
+        const activityBits = [];
+        if (task.notes) activityBits.push(h('div', { className: 'le', key: 'note', style: { color: 'var(--ink)' } }, task.notes));
+        for (let i = 0; i < logs.length; i++) {
+          activityBits.push(h('div', { className: 'le', key: 'l' + i }, String(logs[i])));
+        }
+        if (activityBits.length) body.push(h('div', { className: 'dsect', key: 'act' },
+          h('div', { className: 'sl' }, 'activity'),
+          h('div', { className: 'activity' }, ...activityBits)));
+      }
+
+      return h('div', { id: 'detail', className: open ? 'open' : '' },
+        open ? h('div', { className: 'dpanel' },
+          h('div', { className: 'dhead' },
+            h('span', { className: 'lamp', style: { background: lamp, color: lamp } }),
+            h('div', { className: 'htext' },
+              h('div', { className: 'htitle' + ((task.title || '').trim() ? '' : ' empty') },
+                (task.title || '').trim() || 'untitled'),
+              h('div', { className: 'hmeta' },
+                h('span', { className: 'hid' }, task.id),
+                h('span', { className: 'hstat', style: { color: lamp } },
+                  STATUS_LABEL[task.status] || task.status),
+              ),
+            ),
+            h('div', { className: 'dclose', onClick: onClose, title: 'close (or click canvas)' }, '✕'),
+          ),
+          ...body,
+        ) : null,
+      );
+    }
+
+    // a dependency / dependent line: lamp + id + title + status, clickable
+    function depItem(id, an, onPick) {
+      const t = an.byId.get(id);
+      const status = t ? t.status : 'unknown';
+      const c = statusColor(status);
+      const title = t && (t.title || '').trim();
+      return h('div', { className: 'depitem', key: id, onClick: () => onPick(id) },
+        h('span', { className: 'lamp', style: { background: c, color: c } }),
+        h('span', { className: 'dt' },
+          h('span', { className: 'did' }, id),
+          title || h('span', { style: { color: 'var(--ink-faint)', fontStyle: 'italic' } }, 'untitled')),
+        h('span', { className: 'ds', style: { color: c } }, STATUS_LABEL[status] || status),
+      );
+    }
+
+    function Legend({ counts, total }) {
+      return h('div', { className: 'legend' },
+        h('div', { className: 'lhead' },
+          h('span', null, 'status'),
+          h('span', { className: 'total' }, total + ' tasks'),
+        ),
+        h('div', { className: 'grid' },
+          STATUS_ORDER.map(s => {
+            const n = counts[s] || 0;
+            const c = statusColor(s);
+            return h('div', { className: 'row' + (n ? ' live' : ''), key: s },
+              h('span', { className: 'lamp', style: { background: c, color: c } }),
+              h('span', { className: 'nm' }, STATUS_LABEL[s] || s),
+              h('span', { className: 'ct' }, n ? n : '·'),
+            );
+          }),
+        ),
+        h('div', { className: 'spine-key' },
+          h('span', { className: 'bar' }),
+          h('span', { className: 'nm' }, 'critical path'),
+        ),
+      );
+    }
+
+    function App() {
+      return h(ReactFlowProvider, null, h(Board, null));
+    }
+
+    createRoot(document.getElementById('root')).render(h(App, null));
+  </script>
+</body>
+</html>

@@ -182,10 +182,18 @@ claude plugin install cc-master@cc-master
 ```
 /cc-master:as-master-orchestrator <目标>            # bootstrap 一块 board，并就此化身总指挥
 /cc-master:as-master-orchestrator --resume [选择器]  # 在新 session 里接续一块已存在的 board（见下）
-/cc-master:status                                   # 渲染 board 摘要 + 校验「窄腰」契约
+/cc-master:status                                   # 渲染 board 摘要（board view）+ 校验「窄腰」契约
+/cc-master:view                                     # 在浏览器里打开只读的 board DAG 可视化（webview）
 /cc-master:handoff-to-new-session                   # 把 board 优雅交接给一个新 session（--resume 的写侧）
 /cc-master:stop                                     # 归档 board 并收尾（board 保留，不删除）
 ```
+
+### 看一眼 board —— 速览或一张活的 DAG
+
+两种只读的方式看编排进展，随时跑都安全（都不写 board）：
+
+- **`/cc-master:status`** 在终端渲一份**可扫读的 board view**——按状态分组的 DAG（总进度、什么在飞、什么被阻塞、以及**等你拍板的决策**被显著抛出来），外加临界路径估计（指挥自己的心算，而非机器算的 CPM）与一道「窄腰」健康速检。
+- **`/cc-master:view`** 在浏览器里起一个**本地、只读的 DAG webview**。它拉起一个零依赖的本地 `node` http server，用 [xyflow](https://xyflow.com) 把任务 DAG 渲成图，并**每 2s 活轮询 board**（不用手动刷新——board 一变画面自动更新）。设计是「Mission Control」深色遥测美学：状态节点化作仪表灯、一条琥珀色临界路径脊柱、以及对 `blocked_on:user` 闸门的显著告警。所有资产（React / xyflow / dagre + 字体）都**本地 vendored**，故完全离线可用——零 CDN——守住 ship-anywhere 承诺。要停掉它，杀掉那个后台 shell（或它会随 session 结束而退出）。
 
 ### 在新 session 里接续一块已存在的 board
 
@@ -254,7 +262,8 @@ cc-master/
 │   └── marketplace.json                marketplace 条目（安装方案 B）
 ├── commands/
 │   ├── as-master-orchestrator.md       bootstrap —— 化身总指挥
-│   ├── status.md                       汇总 board 进度 / 健康度
+│   ├── status.md                       汇总 board 进度 / 健康度（board view）
+│   ├── view.md                         起一个只读的 board DAG 可视化 webview
 │   ├── handoff-to-new-session.md       为一个新 session 准备干净交接
 │   └── stop.md                         归档 / 置 board 非活跃
 ├── skills/

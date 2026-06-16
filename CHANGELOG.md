@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`/cc-master:view` —— 本地 xyflow DAG webview（只读 · 离线 · vendored）** — 新增 slash command `/cc-master:view`：在浏览器里打开当前 active 编排 board 的任务 DAG 可视化。它拉起一个**零依赖的本地 `node` http server**（`skills/orchestrating-to-completion/scripts/view-server.js` 起服务、`view.html` 渲染），用 **xyflow** 把 board 的 `tasks[]` 渲成节点 + 边的 DAG，并**每 2s 活轮询** `/board.json`（board 一变浏览器自动更新、无需手动刷新）。**只读**——绝不写 board，只起 http server 把 board 渲给浏览器看。设计是「Mission Control」深色遥测美学：状态节点化作仪表灯、一条琥珀色临界路径脊柱、对 `blocked_on:user` 闸门的显著告警。所有资产（React / xyflow / dagre + 字体）**本地 vendored**——零 CDN、完全离线可用，守住 ship-anywhere 承诺。命令体用 `${CLAUDE_PLUGIN_ROOT}/...` 绝对引用脚本（self-containment，Finding #38/#39）。
+
+### Changed
+
+- **`/cc-master:status` board view 升级** — `status` 命令的 board 摘要升级为一份**可扫读、按状态分组的 board view**：总进度、什么在飞、什么被阻塞、以及**等用户拍板的决策（`blocked_on:user`）**被显著抛出，外加临界路径估计（指挥心算、非机器 CPM）与「窄腰」健康速检。纯 prose 升级，无新增 infra。
+
 ## [0.6.0] — 2026-06-16
 
 ### Added
