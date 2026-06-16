@@ -7,16 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- **`/cc-master:view` —— 本地 xyflow DAG webview（只读 · 离线 · vendored）** — 新增 slash command `/cc-master:view`：在浏览器里打开当前 active 编排 board 的任务 DAG 可视化。它拉起一个**零依赖的本地 `node` http server**（`skills/orchestrating-to-completion/scripts/view-server.js` 起服务、`view.html` 渲染），用 **xyflow** 把 board 的 `tasks[]` 渲成节点 + 边的 DAG，并**每 2s 活轮询** `/board.json`（board 一变浏览器自动更新、无需手动刷新）。**只读**——绝不写 board，只起 http server 把 board 渲给浏览器看。设计是「Mission Control」深色遥测美学：状态节点化作仪表灯、一条琥珀色临界路径脊柱、对 `blocked_on:user` 闸门的显著告警。所有资产（React / xyflow / dagre + 字体）**本地 vendored**——零 CDN、完全离线可用，守住 ship-anywhere 承诺。命令体用 `${CLAUDE_PLUGIN_ROOT}/...` 绝对引用脚本（self-containment，Finding #38/#39）。
-
-- **`/cc-master:view` DAG ⇄ List 双视图切换** — webview 顶栏新增一个开关（⬡ GRAPH / ☰ LIST），在 xyflow 依赖图与一份**按状态分组的列表视图**之间切换。列表视图是 `/cc-master:status` 终端 board 的网页等价物：AWAITING-YOU / IN FLIGHT / BLOCKED / READY / DONE 分段，每行带同样的分析 chip + `in_flight` 行的活跑秒表 + 点击打开详情侧栏。选择存 localStorage、跨刷新持久保留。
-
-### Changed
-
-- **`/cc-master:status` board view 升级** — `status` 命令的 board 摘要升级为一份**可扫读、按状态分组的 board view**：总进度、什么在飞、什么被阻塞、以及**等用户拍板的决策（`blocked_on:user`）**被显著抛出，外加临界路径估计（指挥心算、非机器 CPM）与「窄腰」健康速检。纯 prose 升级，无新增 infra。
-
 ## [0.6.0] — 2026-06-16
 
 ### Added
@@ -25,10 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **工具降级链：CronCreate → ScheduleWakeup → Monitor → background-shell floor** — watchdog 按优先级选机制、缺则降级：(1) **CronCreate `recurring:false`**（首选/通用，本地 session 调度器，只在 REPL idle 时 fire——正好在空转时叫回、不打断干活）；(2) **ScheduleWakeup**（原生自定步长 + cache-warmth）；(3) **Monitor**（某后台任务有可观测 liveness 信号时事件驱动精准守，"silence ≠ success"：filter 必须覆盖失败终态、不能只 grep happy path）；(4) **background-shell `until <ready>; do sleep N; done` 丢进 `run_in_background`**（universal ship-anywhere floor，ADR-004 既有消解、永远兜底）。ship-anywhere 诚实性：即便用户已开放 ScheduleWakeup/cron，不同宿主可用性仍有别，故教法是降级链 + 显式可用性提示，background-shell 永为 floor。
 - **board 新增 `wakeup` 软字段（soft-observed，硬 waist 不动 · 红线2 不破）** — top-level 可选对象 `wakeup`（类比 `wip_limit` 的 soft-observed：hook 有则用、缺则 graceful-degrade 不报错），记 `armed_at` / `fire_at` / `mechanism`（`cron` | `loop` | `monitor` | `shell`）/ `job_id` / `checklist`（被唤醒后要 recon 的事项清单）。存在 = 已 arm 一个 watchdog。这是**柔性边**（agent-shaped），**绝不进硬 waist**（`schema`/`goal`/`owner`/`git`/`tasks[{id,status,deps}]`+status enum 才是硬 waist）。
 - **`verify-board.sh` 完成态握手加 watchdog 提醒（soft-observed）** — `Stop` goal-hook 完成态握手新增一条 clause：board 有 in_flight 后台任务但无已 arm 的 watchdog（`wakeup` 字段缺失或非对象）→ 注入提醒「为可能静默失败的 in_flight 任务 arm a watchdog wakeup（CronCreate 一次性 / ScheduleWakeup / Monitor / background-shell until 兜底），并把"被唤醒后要 recon 什么"写进 board 的 `wakeup.checklist`」；已有 `wakeup` → 静默不提醒（graceful-degrade，类比 wip_limit）。**武装闸不变**（board-derived armed-gate，红线6：未武装一律静默）；红线1：仅 bash、不引 jq/python。
+- **`/cc-master:view` —— 本地 xyflow DAG webview（只读 · 离线 · vendored）** — 新增 slash command `/cc-master:view`：在浏览器里打开当前 active 编排 board 的任务 DAG 可视化。它拉起一个**零依赖的本地 `node` http server**（`skills/orchestrating-to-completion/scripts/view-server.js` 起服务、`view.html` 渲染），用 **xyflow** 把 board 的 `tasks[]` 渲成节点 + 边的 DAG，并**每 2s 活轮询** `/board.json`（board 一变浏览器自动更新、无需手动刷新）。**只读**——绝不写 board，只起 http server 把 board 渲给浏览器看。设计是「Mission Control」深色遥测美学：状态节点化作仪表灯、一条琥珀色临界路径脊柱、对 `blocked_on:user` 闸门的显著告警。所有资产（React / xyflow / dagre + 字体）**本地 vendored**——零 CDN、完全离线可用，守住 ship-anywhere 承诺。命令体用 `${CLAUDE_PLUGIN_ROOT}/...` 绝对引用脚本（self-containment，Finding #38/#39）。
+- **`/cc-master:view` DAG ⇄ List 双视图切换** — webview 顶栏新增一个开关（⬡ GRAPH / ☰ LIST），在 xyflow 依赖图与一份**按状态分组的列表视图**之间切换。列表视图是 `/cc-master:status` 终端 board 的网页等价物：AWAITING-YOU / IN FLIGHT / BLOCKED / READY / DONE 分段，每行带同样的分析 chip + `in_flight` 行的活跑秒表 + 点击打开详情侧栏。选择存 localStorage、跨刷新持久保留。
 
 ### Changed
 
 - **红线 5 收窄：ScheduleWakeup / CronCreate 本地 timer 从「有意排除」改为「许可，用于自我唤醒 / watchdog」（ADR-011）** — CronCreate `durable:false` 是**本地 session 内存调度**、不需 claude.ai，故不破 ship-anywhere，得以解禁用于 watchdog。**仍排除**：agent-teams（实验开关、不可靠）+ RemoteTrigger / `/schedule` 云 routines（需 claude.ai OAuth、破 ship-anywhere）。background-shell `until` 轮询仍是 universal floor（ADR-004 不废，被 ADR-011 补充而非取代）。新增 [ADR-011](adrs/ADR-011-self-wakeup-watchdog.md)（watchdog 安全网 + 工具降级链 + 红线5 部分修订）；ADR-002（ship-anywhere scope）标注「部分被 ADR-011 收窄」、ADR-004 加指针（background-shell 仍是 floor，ADR-011 在其上补 timer primitives）。
+- **`/cc-master:status` board view 升级** — `status` 命令的 board 摘要升级为一份**可扫读、按状态分组的 board view**：总进度、什么在飞、什么被阻塞、以及**等用户拍板的决策（`blocked_on:user`）**被显著抛出，外加临界路径估计（指挥心算、非机器 CPM）与「窄腰」健康速检。纯 prose 升级，无新增 infra。
 
 ## [0.5.1] — 2026-06-15
 
