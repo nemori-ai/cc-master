@@ -125,7 +125,7 @@ digraph decision_program {
 
 board 是指挥为一场长任务存的持久 save file——一张带状态的任务依赖图。它一身二用：① 跨 compaction 存活的记忆，② hook（一个 shell，对 agent context 与内建 `Task` 工具都失明）唯一能读的窗口。**你的 board 文件才是单一真相源**（内建 `Task*` 工具至多是个非权威的 in-session 草稿镜像）；每个 turn 你 `Write` 整个文件（它很小），并在决策程序 step 7 flush 它。
 
-board 住在可配置的 home 里，每场 orchestration 一个唯一命名的文件；**哪块 board 归你，由你自己认领**——compaction 之后，列出 home、匹配 `goal`，就重新找到它。被钉死的只有一个 **narrow waist**（hook 依赖的契约——`schema`、`goal`、`owner`、`git`、`tasks[{id,status,deps}]`、以及 `status` enum），其余一切都 agent-shaped。**别凭记忆重推这些细节**——home 解析、完整的 pinned schema、status-enum 路由表、snapshot/flush 纪律、supersession，全都写在 **`references/board.md`** 里。动 board 契约之前先读它。
+board 住在可配置的 home 里，每场 orchestration 一个唯一命名的文件；**哪块 board 归你，由你自己认领**——compaction 之后，列出 home、匹配 `goal`，就重新找到它。被钉死的只有一个 **narrow waist**（hook 依赖的契约——`schema`、`goal`、`owner`、`git`、`tasks[{id,status,deps}]`、以及 `status` enum），其余一切都 agent-shaped。**记两个 agent-shaped 遥测字段**（非 waist、hook 不可见，让进度 / 人工成本可观测并回喂规划）：标一个任务 `done` / `verified` 时盖上 `completed_at`（ISO-8601）；一个任务从用户拍板 resume 时给 `hitl_rounds` +1——细节见 `references/board.md`。**别凭记忆重推这些细节**——home 解析、完整的 pinned schema、status-enum 路由表、snapshot/flush 纪律、supersession，全都写在 **`references/board.md`** 里。动 board 契约之前先读它。
 
 要把一场 orchestration **优雅交给一个新 session**（quiesce → drain 在飞任务并就地端点验收 → 写一份**叙事层** handoff 文档 → 归档板换无摩擦 `--resume`）时，走 `/cc-master:handoff-to-new-session`，写侧纪律（含「叙事层 carries board 装不下的、绝不复抄 board 已装下的」无噪声纪律 + 6 段模板）见 **`references/handoff.md`**。
 

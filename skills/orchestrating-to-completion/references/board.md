@@ -56,12 +56,20 @@ tasks[ { id, status, deps } ]
 
 ### 柔性边（agent 可自由塑形）
 
-`title / artifact / dispatched_at / mechanism / handle / kind / justification / output_schema /
-dep_pins / notes / log` —— 外加示例字段 `verified`、`blocked_on`，以及 top-level 的 `wip_limit`、`wakeup`。
+`title / artifact / dispatched_at / completed_at / hitl_rounds / mechanism / handle / kind /
+justification / output_schema / dep_pins / notes / log` —— 外加示例字段 `verified`、`blocked_on`，以及 top-level 的 `wip_limit`、`wakeup`。
 
 钉死的 waist 之外，agent 尽可按任务需要随意塑造这些柔性边。但柔性边里要再分两档（hook 对它们的态度不同）：
 
 - **大多数柔性边 = hook 完全忽略**：上面绝大多数字段，hook 一概不读、不依赖，纯属 agent-shaped。
+
+#### 两个 telemetry 柔性边 —— `completed_at` / `hitl_rounds`（progress / effort 可观测）
+
+这两个都是 **optional / agent-shaped / 非 waist / hook 不可见**的遥测字段——hook 一概不读、不依赖，缺失时（默认）任何读者（如 board 视图）best-effort 渲染、优雅降级。它们存在的意义是让「进度」与「人工干预成本」可被观测、并回喂未来规划：
+
+- **`completed_at`**（ISO-8601 时间戳，per task）：任务转入 `done` / `verified`（已验收完成）那一刻盖上。与既有的 `dispatched_at` 配对——一个任务的**执行时长**因此可推导（`completed_at − dispatched_at`），用于事后看哪类任务真实多慢、回流到对任务类 p95 与并行度的估计。
+- **`hitl_rounds`**（整数，per task，默认 / 缺省 = 0）：这个任务**累计绕过几轮 human-in-the-loop**——即它被 surface 给用户拍板（`blocked_on:"user"`）、用户答复后又 resume 的次数。每发生一次这样的循环就 +1。它把单个任务上的**人工介入成本**显性化——某个任务反复 HITL 往往揭示编排拆图 / 决策预取（prefetch）模式有缺陷，是回流改进编排的素材。
+
 - **少数柔性边 = soft / optional 的「hook 可观察」字段**：hook **若有则用、缺失则静默关闭对应行为（graceful degrade，不报错）**——它们既不是硬 waist（hook **要求**存在的字段），也不是「hook 完全无视」。两个例子（同一模式、两条独立可观察行为）：
   - top-level 的 **`wip_limit`**：`posttool-batch.sh` best-effort 读它，当 `in_flight` 数超过 `wip_limit` 时注入一条 **C5 过调度软警告**（非阻塞）。board 没有 `wip_limit`、或它非数字时，该警告按设计**静默关闭**——省掉 `wip_limit` 就等于关掉 C5 过调度警告。
   - top-level 的 **`wakeup`**：`verify-board.sh`（Stop 完成态握手）best-effort 读它——当 board 有 `in_flight` 任务、**却没有** `wakeup`（或 `wakeup` 非对象）时，注入一条提醒「为可能静默失败的 in_flight 任务 arm a watchdog wakeup」（非阻塞，ADR-011）；**已有 `wakeup` 则静默不提醒**。`wakeup` 的语义见下方独立小节；它驱动的 watchdog 心智在 `async-hitl.md` §等待前 arm watchdog + `dispatch.md` §watchdog/liveness。

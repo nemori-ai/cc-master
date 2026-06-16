@@ -714,10 +714,15 @@
       font-size: 11px; color: var(--ink-dim); font-variant-numeric: tabular-nums;
     }
 
+    /* "why this exists" justification — emphasis by a subtle inset amber wash
+       (low-chroma OKLCH tint + hairline frame), NOT a side-stripe 边条 (banned
+       AI-slop tell per .impeccable.md). The ◆ section label carries the accent. */
     .why-text {
       font-size: 12.5px; line-height: 1.5; color: var(--ink);
-      border-left: 2px solid oklch(0.80 0.160 70 / 0.45);
-      padding-left: 11px;
+      background: oklch(0.80 0.160 70 / 0.06);
+      border: 1px solid oklch(0.80 0.160 70 / 0.16);
+      border-radius: var(--r-sm);
+      padding: 9px 11px;
     }
 
     /* dependency / dependent lists — by title with a status lamp */
@@ -1633,7 +1638,11 @@
         if (s && !analysis.byId.has(s)) s = null;
         render(b, analysis, s, fresh);
         if (s !== selRef.current) setSel(s);
-        if (fresh && !didFit.current) {
+        if (fresh) {
+          // re-fit on every topology change (nodes added/removed) — on a live
+          // 2s-polling viewer, newly dispatched nodes must not land off-screen.
+          // structSig is topology-only, so status-only polls aren't `fresh` and
+          // won't fight the user's manual pan/zoom mid-status-update.
           didFit.current = true;
           setTimeout(() => rf.fitView({ padding: 0.16 }), 30);
         }
@@ -2197,6 +2206,8 @@
         const dur = taskDuration(task);
         const durStr = fmtDuration(dur);
         if (durStr != null) addTele(dur && dur.running ? 'runtime' : 'duration', durStr, true);
+        // human-in-the-loop cost: how many user-decision rounds this task cycled through.
+        if (typeof task.hitl_rounds === 'number' && task.hitl_rounds > 0) addTele('hitl rounds', String(task.hitl_rounds), true);
         if (userGate) {
           addTele('awaiting', 'user' + (elStr != null ? ' · ' + elStr : ''), false);
         } else if (task.blocked_on && task.blocked_on !== 'user') {
