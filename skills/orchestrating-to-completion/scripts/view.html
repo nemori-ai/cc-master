@@ -72,6 +72,124 @@
       --alert:     oklch(0.80 0.150 66);     /* user-gate alarm amber */
 
       --r-sm: 4px; --r-md: 7px; --r-lg: 11px;
+
+      /* JS-resolved scalars that the minimap SVG can't read from oklch() vars.
+         Concrete hex, theme-switched via the [data-theme] block below; JS reads
+         these (getComputedStyle) so minimap bg/mask/stroke track the theme too. */
+      --mm-bg:     #13151c;   /* minimap canvas background */
+      --mm-mask:   rgba(14, 16, 22, 0.74);  /* outside-viewport mask */
+      --mm-stroke: #3a3f4d;   /* node-dot stroke so dots never vanish */
+
+      /* drop-shadow base — darker (toward void) on dark; tinted-grey on light. */
+      --shadow:    oklch(0.10 0.01 255);
+
+      /* surfaces that on dark sit DARKER than --panel (insets, chips, the ring
+         separating a glowing lamp from its tile). On light these must flip to
+         sit slightly DARKER than the paper too — so they get redefined, not
+         inverted, in the light block. */
+      --inset:     oklch(0.16 0.012 255 / 0.6);   /* recessed inset surface */
+      --chip-bg:   oklch(0.26 0.012 255 / 0.7);   /* chip / badge fill */
+      --lamp-ring: oklch(0.16 0.012 255 / 0.6);   /* hairline ring around a lamp */
+
+      /* the canvas top-glow stop (radial vignette behind the DAG / list). On
+         dark it's a lift above --ground; on light a faint cool wash, not a dark
+         smudge. */
+      --canvas-glow: oklch(0.20 0.016 255);
+    }
+
+    /* ========================================================================
+       LIGHT THEME — "daylight control room"
+       NOT a naive invert. A warm-cool PAPER ground tinted toward brand hue 255
+       (very low chroma — never pure #fff), neutrals on the same hue, text dark
+       (never pure #000). On a light field the grid/hairlines must go DARKER to
+       read, and the status lamps want HIGHER chroma + LOWER lightness (the airy
+       high-L lamps that glow on dark go muddy/weak on white). The amber spine,
+       edges, and glows are re-tuned for a light backdrop (dialed-back halos).
+       The instrument identity is preserved — it reads as an intentionally-lit
+       day console, not a bleached dark theme.
+       ====================================================================== */
+    :root[data-theme="light"] {
+      color-scheme: light;
+
+      /* ---- ground / panels (60) — paper, panels RAISED brighter than ground -- */
+      --ground:    oklch(0.967 0.006 255);   /* cool-paper field (not #fff) */
+      --panel:     oklch(0.988 0.005 255);   /* raised chrome panel */
+      --panel-hi:  oklch(0.998 0.004 255);   /* highest inset (still tinted) */
+      --grid:      oklch(0.86 0.010 255);    /* hairline canvas grid — DARKER */
+
+      /* ---- lines + text (30) — darker on light to carry structure ---------- */
+      --hair:      oklch(0.83 0.012 255);    /* hairline dividers */
+      --hair-soft: oklch(0.88 0.009 255);
+      --ink:       oklch(0.27 0.020 255);    /* primary text (never #000) */
+      --ink-dim:   oklch(0.44 0.020 255);    /* secondary text */
+      --ink-faint: oklch(0.56 0.018 255);    /* tertiary / units */
+      --edge:      oklch(0.62 0.030 252);    /* idle DAG connector — readable */
+
+      /* ---- status lamps (10) — higher chroma, lower L so they read on white -- */
+      --done:      oklch(0.60 0.150 162);    /* jade green */
+      --inflight:  oklch(0.66 0.165 64);     /* amber */
+      --blocked:   oklch(0.58 0.030 250);    /* slate */
+      --ready:     oklch(0.57 0.150 250);    /* blue */
+      --escalated: oklch(0.55 0.200 300);    /* violet */
+      --failed:    oklch(0.56 0.215 27);     /* red */
+      --stale:     oklch(0.62 0.140 90);     /* ochre */
+      --uncertain: oklch(0.60 0.170 352);    /* pink */
+
+      /* ---- amber spine + the one alarm — deepened so it reads on paper ------ */
+      --spine:     oklch(0.66 0.175 65);     /* critical-path amber */
+      --alert:     oklch(0.64 0.180 58);     /* user-gate alarm amber */
+
+      /* drop-shadows go to a soft tinted grey (a black void shadow looks dirty
+         on paper); JS minimap hexes follow suit. */
+      --shadow:    oklch(0.60 0.020 255 / 0.5);
+      --mm-bg:     #eef0f5;
+      --mm-mask:   rgba(120, 126, 140, 0.30);
+      --mm-stroke: #b6bcc8;
+
+      /* recessed surfaces on paper: a touch darker than --panel, low chroma, so
+         chips / insets / the lamp ring read as gently sunk, not punched black. */
+      --inset:     oklch(0.93 0.008 255 / 0.7);
+      --chip-bg:   oklch(0.90 0.010 255 / 0.8);
+      --lamp-ring: oklch(0.99 0.004 255 / 0.85);  /* light ring lifts the lamp off the tile */
+      --canvas-glow: oklch(0.995 0.004 255);   /* a near-white cool wash, brighter than paper */
+    }
+
+    /* On light, the deep-void drop-shadows baked into the elevated surfaces read
+       as a dirty near-black bloom. Soften the heaviest ones to a low-alpha cool
+       grey so tiles / panels lift off the paper cleanly (kept subtle — paper
+       shadows are gentle). Only the big lift shadows need this; the 1px hairline
+       highlights are already imperceptible. */
+    :root[data-theme="light"] .cc-node {
+      box-shadow:
+        0 1px 2px oklch(0.55 0.02 255 / 0.10),
+        0 6px 16px oklch(0.55 0.02 255 / 0.12);
+    }
+    :root[data-theme="light"] .cc-node:hover {
+      box-shadow:
+        0 1px 2px oklch(0.55 0.02 255 / 0.10),
+        0 10px 24px oklch(0.55 0.02 255 / 0.16);
+    }
+    :root[data-theme="light"] .legend,
+    :root[data-theme="light"] .react-flow__controls,
+    :root[data-theme="light"] .react-flow__minimap {
+      box-shadow: 0 8px 24px oklch(0.55 0.02 255 / 0.16);
+    }
+
+    /* ---- theme transition — restyle smoothly, never animate layout ----------
+       A short exponential ease on the big color-carrying SURFACES so the day/night
+       flip feels like a console dimming, not a flash. Scoped deliberately to
+       containers that have NO transition of their own — elements with existing
+       transitions (.cc-node hover-lift, #detail width slide, .lvrow / .viewtoggle
+       button / .dclose) are left to swap instantly so we never clobber their
+       shorthand or animate layout (width / flex-basis / transform). The large
+       grounds + panels carry the felt transition. Reduced-motion → instant swap
+       (global reduce block below). */
+    body, header.bar, #insights, #flow, #listview,
+    .legend, .lvstrip, .metric, .dpanel, .dhead, .dsect,
+    .react-flow__minimap {
+      transition-property: background-color, background, color, border-color, box-shadow, fill;
+      transition-duration: 420ms;
+      transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     * { box-sizing: border-box; }
@@ -182,7 +300,7 @@
     .viewtoggle {
       display: inline-flex; align-items: stretch; gap: 0;
       padding: 3px; border-radius: var(--r-md);
-      background: oklch(0.16 0.012 255 / 0.7);
+      background: var(--inset);
       border: 1px solid var(--hair);
     }
     .viewtoggle button {
@@ -209,6 +327,28 @@
     .viewtoggle button:focus-visible {
       outline: 2px solid oklch(0.70 0.115 244 / 0.7); outline-offset: 1px;
     }
+
+    /* ---- day/night toggle — a single icon button (☀ day / ☾ night) ---------
+       Sits beside the GRAPH/LIST control. A real <button> (keyboard-reachable,
+       aria-pressed reflects light-on). The glyph swaps with the active theme:
+       it shows the destination — ☀ when dark (click → day), ☾ when light
+       (click → night). Same instrument chrome as the segmented control. */
+    .themetoggle {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; padding: 0;
+      border-radius: var(--r-md);
+      background: var(--inset);
+      border: 1px solid var(--hair);
+      color: var(--ink-faint); cursor: pointer; font-size: 14px; line-height: 1;
+      transition: color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  background 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  border-color 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .themetoggle:hover { color: var(--ink); border-color: var(--hair); }
+    .themetoggle:focus-visible {
+      outline: 2px solid oklch(0.70 0.115 244 / 0.7); outline-offset: 1px;
+    }
+    .themetoggle .glyph { display: inline-flex; line-height: 1; }
 
     /* user-gate alarm — the ONE allowed alarm element, prominent not harsh */
     .alarm {
@@ -311,7 +451,7 @@
     /* ---------------------------- CANVAS ---------------------------------- */
     #flow { flex: 1 1 auto; min-width: 0; min-height: 0; position: relative;
       background:
-        radial-gradient(120% 80% at 50% -8%, oklch(0.20 0.016 255), var(--ground) 60%); }
+        radial-gradient(120% 80% at 50% -8%, var(--canvas-glow), var(--ground) 60%); }
 
     .react-flow__attribution { display: none; }
 
@@ -362,7 +502,7 @@
     .cc-node .lamp {
       width: 9px; height: 9px; border-radius: 50%;
       background: var(--lamp);
-      box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6),
+      box-shadow: 0 0 0 1px var(--lamp-ring),
                   0 0 7px var(--lamp), 0 0 2px var(--lamp);
       flex: 0 0 auto;
     }
@@ -395,7 +535,7 @@
       font-family: 'Martian Mono', ui-monospace, monospace;
       font-size: 8px; font-weight: 500; letter-spacing: 0.08em;
       text-transform: uppercase;
-      background: oklch(0.26 0.012 255 / 0.7);
+      background: var(--chip-bg);
       color: var(--ink-dim); border: 1px solid var(--hair-soft);
     }
     .cc-node .chip .cn {
@@ -438,9 +578,9 @@
        rotation and leaves a steady glow (handled by the global reduce block). */
     .cc-node.s-in_flight .lamp { animation: lamppulse 1.7s ease-in-out infinite; }
     @keyframes lamppulse {
-      0%, 100% { box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6),
+      0%, 100% { box-shadow: 0 0 0 1px var(--lamp-ring),
                              0 0 6px var(--lamp), 0 0 2px var(--lamp); }
-      50%      { box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6),
+      50%      { box-shadow: 0 0 0 1px var(--lamp-ring),
                              0 0 13px var(--lamp), 0 0 5px var(--lamp); }
     }
     /* the orbiting arc: a conic-gradient ring masked to a hairline annulus, so
@@ -532,9 +672,9 @@
       animation-duration: 2.4s; opacity: 0.5;
     }
     @keyframes gatelamp {
-      0%, 100% { box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6),
+      0%, 100% { box-shadow: 0 0 0 1px var(--lamp-ring),
                              0 0 7px var(--alert), 0 0 2px var(--alert); }
-      50%      { box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6),
+      50%      { box-shadow: 0 0 0 1px var(--lamp-ring),
                              0 0 11px var(--alert), 0 0 4px var(--alert); }
     }
 
@@ -662,7 +802,7 @@
     }
     .dhead .lamp {
       width: 11px; height: 11px; border-radius: 50%; margin-top: 3px;
-      box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6), 0 0 8px currentColor, 0 0 2px currentColor;
+      box-shadow: 0 0 0 1px var(--lamp-ring), 0 0 8px currentColor, 0 0 2px currentColor;
       flex: 0 0 auto;
     }
     .dhead .htext { flex: 1 1 auto; min-width: 0; }
@@ -771,7 +911,7 @@
     .artifact-box {
       font-family: 'Martian Mono', ui-monospace, monospace;
       font-size: 10.5px; line-height: 1.5; color: var(--ink-dim);
-      background: oklch(0.16 0.012 255 / 0.6);
+      background: var(--inset);
       border: 1px solid var(--hair-soft); border-radius: var(--r-sm);
       padding: 8px 10px; word-break: break-word;
     }
@@ -782,7 +922,7 @@
       padding: 3px 8px; border-radius: var(--r-sm);
       font-family: 'Martian Mono', ui-monospace, monospace;
       font-size: 8.5px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
-      background: oklch(0.26 0.012 255 / 0.7); color: var(--ink-dim);
+      background: var(--chip-bg); color: var(--ink-dim);
       border: 1px solid var(--hair-soft);
     }
     .badge.crit { color: var(--spine); border-color: oklch(0.80 0.160 70 / 0.4);
@@ -803,7 +943,7 @@
       display: flex; flex-direction: column;
       overflow-y: auto; overflow-x: hidden;
       background:
-        radial-gradient(120% 80% at 50% -8%, oklch(0.20 0.016 255), var(--ground) 60%);
+        radial-gradient(120% 80% at 50% -8%, var(--canvas-glow), var(--ground) 60%);
     }
 
     /* condensed insights strip atop the list (mirrors the rail, one line) */
@@ -854,7 +994,7 @@
     .lvsect .shead .snm { color: var(--shc, var(--ink-dim)); font-weight: 500; }
     .lvsect .shead .scount {
       font-variant-numeric: tabular-nums; color: var(--ink-faint);
-      background: oklch(0.26 0.012 255 / 0.7);
+      background: var(--chip-bg);
       border: 1px solid var(--hair-soft); border-radius: 9px;
       padding: 1px 8px; font-size: 9px; letter-spacing: 0.04em;
     }
@@ -877,14 +1017,14 @@
       border-left: 1px solid transparent; border-right: 1px solid transparent;
       transition: background 200ms cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .lvrow:hover { background: oklch(0.225 0.016 255 / 0.5); }
+    .lvrow:hover { background: var(--panel-hi); }
     .lvrow.sel {
       background: oklch(0.70 0.115 244 / 0.10);
       box-shadow: inset 0 0 0 1px oklch(0.70 0.115 244 / 0.45);
     }
     .lvrow .lamp {
       width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto;
-      box-shadow: 0 0 0 1px oklch(0.16 0.012 255 / 0.6),
+      box-shadow: 0 0 0 1px var(--lamp-ring),
                   0 0 7px currentColor, 0 0 2px currentColor;
     }
     /* the in_flight row lamp breathes like the tile lamp */
@@ -930,7 +1070,7 @@
       padding: 2px 7px; border-radius: var(--r-sm);
       font-family: 'Martian Mono', ui-monospace, monospace;
       font-size: 8px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
-      background: oklch(0.26 0.012 255 / 0.7);
+      background: var(--chip-bg);
       color: var(--ink-dim); border: 1px solid var(--hair-soft);
     }
     .lvrow .lchip .cn { color: var(--ink); font-variant-numeric: tabular-nums; font-size: 9px; }
@@ -985,10 +1125,12 @@
       box-shadow: 0 8px 24px oklch(0.08 0.01 255 / 0.5);
       overflow: hidden;
     }
-    /* legible minimap mask — clearly darker outside the viewport rectangle */
-    .react-flow__minimap-mask { fill: oklch(0.10 0.01 255 / 0.74); }
+    /* legible minimap mask — clearly contrasted outside the viewport rectangle.
+       (xyflow's maskColor/nodeStrokeColor props win over these; kept theme-aware
+       via the --mm-* tokens as a backstop so a CSS-only render still tracks.) */
+    .react-flow__minimap-mask { fill: var(--mm-mask); }
     /* minimap node dots get a faint stroke so they never vanish into the bg */
-    .react-flow__minimap-node { stroke: oklch(0.30 0.012 255 / 0.5); stroke-width: 2px; }
+    .react-flow__minimap-node { stroke: var(--mm-stroke); stroke-width: 2px; }
 
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
@@ -1053,38 +1195,83 @@
     const DONE_STATUSES = new Set(['done', 'verified']);
     // statuses that count as "active / not yet settled" for bottleneck candidacy
     const STALLING_STATUSES = new Set(['in_flight', 'blocked']);
+    // a task only counts as AWAITING-USER when it is genuinely pending — i.e. its
+    // status is blocked or in_flight. A terminal task (done/verified/failed/
+    // escalated/…) that still carries a STALE blocked_on:'user' is NOT awaiting
+    // you; it already settled. Gate this everywhere await-user is derived so the
+    // header count / insights / node + list rendering all agree.
+    const USER_GATE_STATUSES = new Set(['blocked', 'in_flight']);
+    function isAwaitingUser(t) {
+      return !!t && t.blocked_on === 'user' && USER_GATE_STATUSES.has(t.status);
+    }
 
-    const _css = getComputedStyle(document.documentElement);
-    const _cache = {};
+    // ---- theme (day / night) ----------------------------------------------
+    // Token sets are CSS [data-theme] blocks; JS only flips the attribute and
+    // re-resolves the colors it computes itself (edges, critical-path spine,
+    // minimap). Initial theme: stored pref → OS prefers-color-scheme → dark.
+    const THEME_KEY = 'ccm-theme';
+    function initialTheme() {
+      try {
+        const stored = localStorage.getItem(THEME_KEY);
+        if (stored === 'light' || stored === 'dark') return stored;
+      } catch (_e) {}
+      try {
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light';
+      } catch (_e) {}
+      return 'dark';
+    }
+    function applyThemeAttr(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+    // Apply the resolved theme to the root BEFORE first paint/resolve so all
+    // getComputedStyle reads below see the right token set.
+    applyThemeAttr(initialTheme());
+
+    // cssVar cache — MUST be invalidated on theme switch (the tokens change). We
+    // re-read getComputedStyle live each switch rather than memoizing _css once.
+    let _cache = {};
+    function clearCssCache() { _cache = {}; }
     function cssVar(name) {
-      if (_cache[name] === undefined) _cache[name] = _css.getPropertyValue(name).trim();
+      if (_cache[name] === undefined) {
+        _cache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      }
       return _cache[name];
     }
     function statusColor(s) {
       const v = STATUS_VAR[s];
       return v ? cssVar(v) : cssVar('--blocked');
     }
-    const SPINE = cssVar('--spine');
-    const EDGE = cssVar('--edge');
+    // Theme-aware scalars the graph resolves itself (were module consts before —
+    // now functions so they re-read after a theme flip + cache clear).
+    function spineColor() { return cssVar('--spine'); }
+    function edgeColor() { return cssVar('--edge'); }
 
     // ---- minimap dot palette ----------------------------------------------
     // The minimap renders into an SVG that does NOT resolve our oklch() CSS
     // custom properties — passing a CSS-var/oklch string leaves the rects
     // unfilled (the "empty dark box" symptom). So the minimap gets CONCRETE
-    // solid colors, one per status enum, tuned to the OKLCH lamp palette.
+    // solid hex, one per status enum, tuned to the lamp palette — and keyed on
+    // the active theme (the light lamps are deepened / higher-chroma to read on
+    // paper). minimap bg / mask / stroke come from the concrete --mm-* tokens
+    // (plain hex/rgba, which DO resolve) so they track the theme too.
     const MINIMAP_HEX = {
-      ready:     '#4aa3ff',
-      in_flight: '#f5a524',
-      blocked:   '#7b8494',
-      done:      '#2fbf8f',
-      verified:  '#2fbf8f',
-      uncertain: '#e86fa6',
-      escalated: '#a06bff',
-      failed:    '#e5484d',
-      stale:     '#c9a227',
+      dark: {
+        ready:     '#4aa3ff', in_flight: '#f5a524', blocked: '#7b8494',
+        done:      '#2fbf8f', verified:  '#2fbf8f', uncertain: '#e86fa6',
+        escalated: '#a06bff', failed:    '#e5484d', stale:     '#c9a227',
+      },
+      light: {
+        ready:     '#2f6fd6', in_flight: '#b9740a', blocked: '#6b7585',
+        done:      '#1f8c63', verified:  '#1f8c63', uncertain: '#c23a78',
+        escalated: '#7a36c9', failed:    '#c5303a', stale:     '#9a7510',
+      },
     };
+    function currentTheme() {
+      return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    }
     function minimapColor(s) {
-      return MINIMAP_HEX[s] || MINIMAP_HEX.blocked;
+      const map = MINIMAP_HEX[currentTheme()] || MINIMAP_HEX.dark;
+      return map[s] || map.blocked;
     }
 
     // ---- time helpers ------------------------------------------------------
@@ -1312,11 +1499,12 @@
       // in_flight node (a slow node IS the bottleneck even with low fan-out).
       if (bneck != null && bneckImpact <= 0 && longestInflight != null) bneck = longestInflight;
 
-      // user gates (awaiting human) — blocked_on:'user' regardless of status,
-      // so an in_flight node that has hit a user gate is also counted (combined
-      // "spinning AND waiting" state).
+      // user gates (awaiting human) — blocked_on:'user' AND a pending status
+      // (blocked / in_flight). An in_flight node that has hit a user gate IS
+      // counted (combined "spinning AND waiting" state); a terminal task with a
+      // stale blocked_on:'user' is NOT (it already settled — see isAwaitingUser).
       const userGateIds = list
-        .filter(t => t.blocked_on === 'user')
+        .filter(isAwaitingUser)
         .map(t => t.id);
       let earliestGate = Infinity;
       for (const id of userGateIds) {
@@ -1490,10 +1678,11 @@
       }
 
       const nodes = tasks.map((t, i) => {
-        // awaiting-user = blocked_on:'user' regardless of status — this catches
-        // both a pure-blocked gate AND an in_flight node that has hit a point
-        // where it needs human input (the combined "spinning AND waiting" state).
-        const userGate = t.blocked_on === 'user';
+        // awaiting-user = blocked_on:'user' AND a pending status (blocked /
+        // in_flight) — catches a pure-blocked gate AND an in_flight node that has
+        // hit a point needing human input (combined "spinning AND waiting"), but
+        // NOT a terminal task carrying a stale blocked_on:'user' (see isAwaitingUser).
+        const userGate = isAwaitingUser(t);
         const p = positions.get(t.id) || { x: 0, y: 0 };
         let lineage = null;
         if (sel) {
@@ -1564,8 +1753,8 @@
             style: onLin
               ? { stroke: cssVar('--ready'), strokeWidth: 2.2 }
               : onCrit
-                ? { stroke: SPINE, strokeWidth: 2.4 }
-                : { stroke: EDGE, strokeWidth: 1.3, opacity: 0.75 },
+                ? { stroke: spineColor(), strokeWidth: 2.4 }
+                : { stroke: edgeColor(), strokeWidth: 1.3, opacity: 0.75 },
           });
         }
       }
@@ -1602,6 +1791,11 @@
         setView(v);
         try { localStorage.setItem('ccm-view', v); } catch (_e) {}
       }, []);
+      // theme: 'dark' | 'light'. The root attribute is already set (initialTheme
+      // ran at module load); mirror it into state so a flip re-renders and the
+      // JS-resolved colors (edges, spine, minimap) re-resolve. Persisted under
+      // ccm-theme; default came from stored pref → OS → dark.
+      const [theme, setTheme] = useState(() => currentTheme());
       const sigRef = useRef(null);
       const posRef = useRef(new Map());
       const boardRef = useRef(null);
@@ -1627,6 +1821,21 @@
         setNodes(nn);
         setEdges(ee);
       }, []);
+
+      // flip day/night — set the root attribute, invalidate the cssVar cache so
+      // edges/spine/minimap re-resolve, persist, and re-render the graph in place
+      // (fresh=false → keep dagre positions, keep selection, keep poll state; we
+      // only restyle, never re-layout). The CSS [data-theme] block restyles the
+      // rest; the graph rebuild repaints the JS-resolved edge strokes.
+      const toggleTheme = useCallback(() => {
+        const next = currentTheme() === 'light' ? 'dark' : 'light';
+        applyThemeAttr(next);
+        clearCssCache();
+        try { localStorage.setItem(THEME_KEY, next); } catch (_e) {}
+        setTheme(next);
+        const b = boardRef.current, a = anRef.current;
+        if (b && a) render(b, a, selRef.current, false);
+      }, [render]);
 
       const apply = useCallback((b) => {
         const sig = structSig(b);
@@ -1732,6 +1941,19 @@
                 onClick: () => setViewPersist('list'),
               }, h('span', { className: 'tg' }, '☰'), 'list'),
             ),
+            // day/night toggle — single icon button; glyph shows the DESTINATION
+            // (☀ when dark → click for day; ☾ when light → click for night).
+            // aria-pressed reflects "light theme is on".
+            h('button', {
+              type: 'button',
+              className: 'themetoggle',
+              'aria-pressed': theme === 'light',
+              'aria-label': theme === 'light'
+                ? 'switch to night (dark) theme'
+                : 'switch to day (light) theme',
+              title: theme === 'light' ? 'night theme' : 'day theme',
+              onClick: toggleTheme,
+            }, h('span', { className: 'glyph', 'aria-hidden': 'true' }, theme === 'light' ? '☾' : '☀')),
             h('div', { className: 'vrule' }),
             h('div', { className: 'readout' },
               h('span', { className: 'rl' }, 'progress'),
@@ -1786,14 +2008,20 @@
               // MiniMap: only worth showing on larger graphs — below ~10 nodes it
               // adds nothing but a tiny dark inset. Auto-hide under the threshold.
               nodeCount > 10 ? h(MiniMap, {
+                // keyed on theme so a switch remounts it with fresh colors
+                key: 'mm-' + theme,
                 pannable: true, zoomable: true,
-                bgColor: '#13151c',
-                maskColor: 'rgba(14, 16, 22, 0.74)',
+                // bg / mask / stroke from the concrete --mm-* tokens (plain
+                // hex/rgba — these DO resolve, unlike the oklch lamp vars), so
+                // the minimap tracks day/night too.
+                bgColor: cssVar('--mm-bg'),
+                maskColor: cssVar('--mm-mask'),
                 // CONCRETE solid colors per status — the minimap SVG does NOT
                 // resolve our oklch()/CSS-var lamps, so a var lookup leaves the
-                // rects unfilled (the empty-dark-box bug). Plain hex fills it.
+                // rects unfilled (the empty-dark-box bug). Plain hex fills it;
+                // minimapColor is keyed on the active theme.
                 nodeColor: (n) => minimapColor(n.data && n.data.status),
-                nodeStrokeColor: '#3a3f4d',
+                nodeStrokeColor: cssVar('--mm-stroke'),
                 nodeStrokeWidth: 3,
                 nodeBorderRadius: 3,
               }) : null,
@@ -2011,7 +2239,7 @@
     // useSecondTick scoped to exactly the rows that need it.
     function ListRow({ task: t, an, kind, selected, onPick }) {
       const status = t.status;
-      const userGate = t.blocked_on === 'user';
+      const userGate = isAwaitingUser(t);
       // live clock: in_flight (or any user-gate row dispatched & running) ticks.
       const running = status === 'in_flight' && parseTs(t.dispatched_at) != null;
       useSecondTick(running);
@@ -2112,8 +2340,9 @@
         const title = (task.title || '').trim();
         const isCrit = an.critSet.has(id);
         const isBneck = an.bneck === id;
-        // awaiting-user regardless of status (mirrors the tile + analyze).
-        const userGate = task.blocked_on === 'user';
+        // awaiting-user = blocked_on:'user' AND pending status (mirrors the tile
+        // + analyze via isAwaitingUser); a terminal task's stale gate doesn't count.
+        const userGate = isAwaitingUser(task);
 
         // badges
         const badges = [];
