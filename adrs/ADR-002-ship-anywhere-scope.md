@@ -1,6 +1,11 @@
 # ADR-002 — Ship-anywhere scope: supported background mechanisms
 
-> Status: **Accepted**
+> Status: **Accepted** — *Superseded in part by [ADR-011](ADR-011-self-wakeup-watchdog.md)*:
+> the `ScheduleWakeup` / cron (local timer primitives) exclusion is **narrowed** —
+> they are now permitted for self-wakeup / watchdog (silent-failure safety net,
+> background-shell still the floor). **agent-teams and cloud `scheduled routines`
+> (claude.ai OAuth) remain excluded.** Everything below stands except that one
+> narrowing.
 > Date: 2026-06-08
 > Scope: The set of background-execution mechanisms cc-master teaches and depends
 > on, across both skills and all commands/hooks. Constrains what may ever be added
@@ -41,12 +46,25 @@ trap: the agent will reach for a tool that is not actually available and stall.
   available. Not taught, not mentioned in the skills.
 - **Excluded — scheduled routines**: cloud-persistent but require a claude.ai
   account; not available on Bedrock / Vertex / Foundry. Not taught.
-- **Excluded — `ScheduleWakeup` / cron / native `/loop`**: `ScheduleWakeup` is
-  unsupported on Bedrock / Vertex / Foundry and cron sessions expire after 7 days.
-  The one legitimate use (waiting on external state the harness cannot track — CI,
-  a remote queue, an approval timeout) is dissolved into the **background-shell**
-  primitive (`until <ready>; do sleep N; done` dropped into `run_in_background`,
-  with harness completion re-entry). See ADR-004.
+- **Excluded — `ScheduleWakeup` / cron / native `/loop`** *(narrowed by ADR-011 —
+  see below)*: `ScheduleWakeup` is unsupported on Bedrock / Vertex / Foundry and
+  cron sessions expire after 7 days. The one legitimate use *for waiting on
+  external state the harness cannot track* (CI, a remote queue, an approval
+  timeout) is dissolved into the **background-shell** primitive
+  (`until <ready>; do sleep N; done` dropped into `run_in_background`, with harness
+  completion re-entry). See ADR-004.
+  - **Narrowed by [ADR-011](ADR-011-self-wakeup-watchdog.md)**: there is a *second*
+    legitimate use the background-shell floor does not cover — the **silent-failure
+    blind spot** (a background task hangs / dies silently / was never dispatched →
+    no completion event → the orchestrator waits forever). For that, `ScheduleWakeup`
+    and **`CronCreate` (`durable:false` — a *local* in-session memory scheduler, no
+    claude.ai OAuth)** are now **permitted as a watchdog safety net** layered on top
+    of harness completion re-entry. They are taught via a *degradation chain*
+    (CronCreate / ScheduleWakeup / Monitor) with **background-shell still the
+    universal floor**, so ship-anywhere remains a hard guarantee. This narrowing is
+    confined to those local timer primitives — it does **not** unblock cloud
+    `scheduled routines` / `/schedule` / RemoteTrigger (still claude.ai-bound) nor
+    agent-teams (still flag-gated). See ADR-011 §2.2 + §4.3.
 
 The skills say nothing about the excluded mechanisms — not even to warn against
 them — so the agent never reaches for a tool it cannot use.
@@ -99,6 +117,10 @@ small and every tool in it real.
   ship-anywhere constraint applied to the hook runtime.
 - [`ADR-004-loop-dissolution-and-goal-hook.md`](ADR-004-loop-dissolution-and-goal-hook.md)
   — `/loop`/`ScheduleWakeup` dissolved into background shell for ship-anywhere.
+- [`ADR-011-self-wakeup-watchdog.md`](ADR-011-self-wakeup-watchdog.md) — narrows the
+  `ScheduleWakeup`/cron (local timer primitives) exclusion: permitted as a watchdog
+  safety net for the silent-failure blind spot (background-shell still the floor);
+  cloud routines / agent-teams stay excluded.
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — design invariant #5.
 - [`../design_docs/spec.md`](../design_docs/spec.md) — §12 intentional exclusions
   (agent teams, scheduled routines).

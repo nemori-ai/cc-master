@@ -48,6 +48,14 @@ with a deterministic Stop hook (goal-hook).**
    state) is expressed as a background shell: `until <ready>; do sleep N; done`
    dropped into `run_in_background`, with the harness re-entering on completion.
    Event-driven, fully ship-anywhere. No `ScheduleWakeup` / cron.
+   - **Pointer — narrowed by [ADR-011](ADR-011-self-wakeup-watchdog.md)**: this
+     background-shell dissolution stays the **universal floor**, but it only covers
+     "wait for an external ready signal that *will* arrive." For the *silent-failure*
+     blind spot (a task that hangs / dies silently / was never dispatched — the ready
+     signal never comes, no completion event), ADR-011 **layers timer primitives**
+     (`CronCreate durable:false` / `ScheduleWakeup` / `Monitor`) on top as a watchdog
+     safety net, with background-shell still the floor. ADR-011 *supplements*, does
+     **not** supersede, this floor.
 2. **`/goal` removal + goal-hook** — instead of demoting `/goal` to "an optional
    action for the human," cc-master **customizes its own Stop hook**
    (`verify-board.sh`) to deterministically enforce "don't stop while the goal is
@@ -116,10 +124,16 @@ chose a deterministic hook over a human-only soft action.
 
 ### 4.2 Alternative B: use `ScheduleWakeup` / cron for phased self-drive
 
-Rejected. It is the only agent-invokable timer, and it *can* approximate
-"don't half-finish" via alarm re-entry — but it breaks ship-anywhere (unsupported
-on Bedrock / Vertex / Foundry; cron expires after 7 days). Only a deployment
-willing to give up ship-anywhere could use it. See ADR-002.
+Rejected *for this purpose* (phased self-drive braking — using an alarm as a stop
+backstop). It is the only agent-invokable timer, and it *can* approximate
+"don't half-finish" via alarm re-entry — but it breaks ship-anywhere as a *sole*
+mechanism (unsupported on Bedrock / Vertex / Foundry; cron expires after 7 days).
+Only a deployment willing to give up ship-anywhere could lean on it. See ADR-002.
+(Note: [ADR-011](ADR-011-self-wakeup-watchdog.md) later admits the same timer
+primitives for a *different* purpose — a watchdog over the silent-failure blind
+spot — but only as a *degradation chain* with background-shell as the universal
+floor, never as a sole mechanism. That admission does not revive this rejected
+self-drive-braking use.)
 
 ### 4.3 Alternative C: add a native-`/goal` semantic backstop layer
 
@@ -133,6 +147,10 @@ this decision's scope; a user can hold `/goal` themselves if they want that laye
   — the goal-hook design spec (the mechanism this ADR adopts).
 - [`ADR-002-ship-anywhere-scope.md`](ADR-002-ship-anywhere-scope.md) — why
   `/loop`/`ScheduleWakeup`/cron are out of scope.
+- [`ADR-011-self-wakeup-watchdog.md`](ADR-011-self-wakeup-watchdog.md) — supplements
+  this floor: background-shell stays the universal floor; ADR-011 layers timer
+  primitives on top as a watchdog for the silent-failure blind spot the floor
+  cannot self-heal.
 - [`ADR-001-hooks-pure-bash.md`](ADR-001-hooks-pure-bash.md) — why the hook can
   only gate on board state, not goal semantics.
 - [`ADR-003-board-narrow-waist.md`](ADR-003-board-narrow-waist.md) —

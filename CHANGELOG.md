@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-06-16
+
+### Added
+
+- **前台空转期 watchdog 自我唤醒（安全网，层叠于 harness 自动重唤起之上 · ADR-011）** — harness 对它追踪的后台任务**完成**（正常 / 报错）已会自动重唤起主线，但盲区是**静默失败**——后台任务 hang 死 / 静默死 / 压根没派出（幽灵任务 Finding #17/#46）→ 无完成事件 → orchestrator 永远等不到唤醒。本版给这个盲区加一张 watchdog 安全网：走决策程序 `wait` 边之前，**若剩余 path 中存在 blocked 在 in_flight 后台任务上的**（不只是 awaiting user），就 arm 一个定时唤醒间隔回来 **recon 对账地面真相**（逐个 in_flight 戳穿 hang / 静默死 / 幽灵）、处置静默失败、re-arm 或继续。纯 awaiting-user 的等待不需 watchdog（那条线由既有 HITL / PushNotification 覆盖）。「被唤醒后看什么」是**双层记录**：实质在 board（持久、扛 compaction），指针在轻量 wakeup prompt（compaction 后丢了也无妨，board 还在）；重唤起处置完后**退役 watchdog（两件一起做）**：CronDelete 待发 job 免重复 fire **且**清除 board 的 `wakeup` 对象——留陈旧 `wakeup` 会让 hook 误判仍 armed、对下次 in_flight 等待静默掉提醒、重开盲区（Finding #56）。
+- **工具降级链：CronCreate → ScheduleWakeup → Monitor → background-shell floor** — watchdog 按优先级选机制、缺则降级：(1) **CronCreate `recurring:false`**（首选/通用，本地 session 调度器，只在 REPL idle 时 fire——正好在空转时叫回、不打断干活）；(2) **ScheduleWakeup**（原生自定步长 + cache-warmth）；(3) **Monitor**（某后台任务有可观测 liveness 信号时事件驱动精准守，"silence ≠ success"：filter 必须覆盖失败终态、不能只 grep happy path）；(4) **background-shell `until <ready>; do sleep N; done` 丢进 `run_in_background`**（universal ship-anywhere floor，ADR-004 既有消解、永远兜底）。ship-anywhere 诚实性：即便用户已开放 ScheduleWakeup/cron，不同宿主可用性仍有别，故教法是降级链 + 显式可用性提示，background-shell 永为 floor。
+- **board 新增 `wakeup` 软字段（soft-observed，硬 waist 不动 · 红线2 不破）** — top-level 可选对象 `wakeup`（类比 `wip_limit` 的 soft-observed：hook 有则用、缺则 graceful-degrade 不报错），记 `armed_at` / `fire_at` / `mechanism`（`cron` | `loop` | `monitor` | `shell`）/ `job_id` / `checklist`（被唤醒后要 recon 的事项清单）。存在 = 已 arm 一个 watchdog。这是**柔性边**（agent-shaped），**绝不进硬 waist**（`schema`/`goal`/`owner`/`git`/`tasks[{id,status,deps}]`+status enum 才是硬 waist）。
+- **`verify-board.sh` 完成态握手加 watchdog 提醒（soft-observed）** — `Stop` goal-hook 完成态握手新增一条 clause：board 有 in_flight 后台任务但无已 arm 的 watchdog（`wakeup` 字段缺失或非对象）→ 注入提醒「为可能静默失败的 in_flight 任务 arm a watchdog wakeup（CronCreate 一次性 / ScheduleWakeup / Monitor / background-shell until 兜底），并把"被唤醒后要 recon 什么"写进 board 的 `wakeup.checklist`」；已有 `wakeup` → 静默不提醒（graceful-degrade，类比 wip_limit）。**武装闸不变**（board-derived armed-gate，红线6：未武装一律静默）；红线1：仅 bash、不引 jq/python。
+
+### Changed
+
+- **红线 5 收窄：ScheduleWakeup / CronCreate 本地 timer 从「有意排除」改为「许可，用于自我唤醒 / watchdog」（ADR-011）** — CronCreate `durable:false` 是**本地 session 内存调度**、不需 claude.ai，故不破 ship-anywhere，得以解禁用于 watchdog。**仍排除**：agent-teams（实验开关、不可靠）+ RemoteTrigger / `/schedule` 云 routines（需 claude.ai OAuth、破 ship-anywhere）。background-shell `until` 轮询仍是 universal floor（ADR-004 不废，被 ADR-011 补充而非取代）。新增 [ADR-011](adrs/ADR-011-self-wakeup-watchdog.md)（watchdog 安全网 + 工具降级链 + 红线5 部分修订）；ADR-002（ship-anywhere scope）标注「部分被 ADR-011 收窄」、ADR-004 加指针（background-shell 仍是 floor，ADR-011 在其上补 timer primitives）。
+
 ## [0.5.1] — 2026-06-15
 
 ### Fixed

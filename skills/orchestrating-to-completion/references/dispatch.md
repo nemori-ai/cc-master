@@ -1,6 +1,6 @@
 # 派发 —— 选机制 + 编排并行
 
-> **服务愿景：C1**（异步并行 + 完整落地）**· C5**（在资源预算内高效调度）。**何时读：** 选后台机制并编排并行时——三机制（shell / sub-agent / workflow）、intra-vs-inter workflow、靠 escalation 重新定位（re-altitude）、admission control。
+> **服务愿景：C1**（异步并行 + 完整落地）**· C5**（在资源预算内高效调度）。**何时读：** 选后台机制并编排并行时——三机制（shell / sub-agent / workflow）、intra-vs-inter workflow、靠 escalation 重新定位（re-altitude）、admission control、**派发卫生 + watchdog/liveness 安全网（含 watchdog 工具降级链）**。
 
 主线编排的核心：选每个节点*在哪*跑、再把这些道编排起来。来源：research report 3（LLM-Compiler TFU dataflow）+ codex 二审。
 
@@ -14,6 +14,7 @@
 - [靠 escalation 重新定位](#靠-escalation-重新定位core--绝不盲杀)
 - [Hybrid + admission control](#hybrid--admission-control)
 - [派发卫生](#派发卫生--一跑真并行就咬人的机械细节)
+- [watchdog / liveness](#watchdog--liveness--给静默失败盲区配一张安全网)
 
 ---
 
@@ -123,3 +124,20 @@ HITL 只是诸多轴之一；失败隔离、优先级、整合时机同样重要
 - **用绝对路径指向工作目标——绝不靠继承 cwd。** 编排者的 cwd 常常*不是*工作落地的那个 repo（你可能在从另一个 worktree 或一个父目录驱动）。每个被派发 agent 的 prompt 都必须给出指向目标的**绝对路径**、并告诉它别依赖继承来的 cwd——否则文件会落进错误的树。
 - **单一提交者：叶子负责写 + 自测，编排者负责提交。** 各自 `git commit` 的并行 agent 会抢 git index。要求每个叶子**写它的文件、跑它的测试证明是绿的，但绝不 commit**；由编排者在端点验收、再按依赖序提交。（又是 end-to-end argument——commit 完整性归编排者端点，不归叶子。见 `resume-verify.md`。）
 - **对同一个共享可变文件的写者，跨波串行化。** 若几个任务都追加到同一个文件（一个共享测试文件、一个 registry），*同一*波里的两个会互相覆盖。把这些写者拆进**不同的波**，使任一时刻至多一个去碰那文件——编排者吸收这份协调成本，好让叶子保持独立、互不相交。
+
+---
+
+## watchdog / liveness —— 给静默失败盲区配一张安全网
+
+派发卫生堵的是「board 标了却没真派」（phantom，上面那条 #17/#46）；**watchdog 堵的是它的下游孪生**——一个真派出去的 `in_flight` 任务**事后 hang 死 / 静默死**，或那个 phantom 一直没被戳穿，而你又走到了 `wait` 边。harness 的自动重唤起是 **completion-triggered**：只在任务**触发完成事件**时把你带回来，对「永不触发完成事件」的失败（hang / 静默死 / phantom）结构性失明（完整论证 + 「N 小时成功日志不是反证」的幸存者偏差，见 `async-hitl.md` §等待前 arm watchdog）。
+
+**何时 arm**：走 `wait` 边前，剩余 path 里有 blocked 在**可能静默失败的 `in_flight`** 上的（不只是 awaiting-user）→ arm 一个 watchdog 定时唤醒，间隔回来 recon 对地面真相。纯 awaiting-user 不 arm（按 mechanism 用、不按 ritual 用——触发条件与 board 双层记录见 `async-hitl.md`）。
+
+**工具降级链（情境三件套 + universal floor，按优先级，缺则降级）**——ship-anywhere 诚实性：即便用户已开放 cron / ScheduleWakeup，不同宿主（Bedrock / Vertex / Foundry）可用性仍有别，故教法是降级链 + 显式可用性提示，background-shell 永为 floor，不假设新工具到处都在：
+
+1. **CronCreate `recurring:false`（首选 / 通用 watchdog）** —— 本地 session 调度器，**只在 REPL idle 时 fire**（正好在你空转时叫回、不打断干活）。间隔 ≈ 最长 `in_flight` 任务的 p95 + 余量。cache 心智：<270s 保温 / ≥1200s 长等（贴 ScheduleWakeup 的 cache-warmth 心智；见 `cost-and-pacing.md`）。重唤起处置完后 **CronDelete** 清掉待发 job 免重复 fire。注意 `durable:false` 是**本地 session 内存调度**、不需 claude.ai OAuth，故 ship-anywhere OK——区别于云 routines / RemoteTrigger（破 ship-anywhere，不教）。
+2. **ScheduleWakeup** —— 原生自定步长 + cache-warmth；已在 /loop dynamic 时用过。
+3. **Monitor** —— 某后台任务有可观测 liveness 信号（log 文件 / 进程）时用：`tail -f | grep -E --line-buffered '<进度>|<失败签名>'`，事件驱动、精准。**"silence ≠ success"**：filter 必须覆盖**失败终态**，不能只 grep happy path——否则一个吐了错误就死的任务，你的 filter 等不到它的 happy 行、反而以为还在跑。
+4. **background-shell `until <ready>; do sleep N; done` 丢进 `run_in_background`（universal ship-anywhere floor）** —— ADR-004 既有消解（见 §等待外部状态），**永远兜底**：上面三者在某宿主不可用时，这条恒可用（harness 完成重入）。ADR-011 在它之上**补充** timer primitives，不取代它。
+
+被唤醒后 recon 用的就是上面派发卫生那套地面真相验证法（handle / `git status` / 工具结果），处置完静默失败的、该 re-arm 的 re-arm——细节在 `async-hitl.md` §等待前 arm watchdog。

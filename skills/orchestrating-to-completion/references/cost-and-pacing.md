@@ -57,6 +57,8 @@
 
 官方 Claude Code 的指导也是一样：把主对话固定在一个模型上；那些能跑在更便宜模型上的边角任务，交给一个 *subagent*。lever 是**每叶子的模型选择**——不是主线上的 `/model`。
 
+> **watchdog 间隔的 cache-warmth（一句指针）**：等待前 arm 一个 watchdog（`dispatch.md` §watchdog/liveness）时，唤醒间隔也吃这份 prompt-cache 心智——短间隔（<270s）保温、长间隔（≥1200s）当长等处理；间隔 ≈ 最长 `in_flight` 的 p95 + 余量，别短到把主线 cache 频繁失效又没活可干。完整降级链 + 间隔取法在 `dispatch.md`，此处不复述。
+
 ## 感知 5h/7d 配额窗口
 
 一个 Pro/Max 订阅按一个 **5 小时滚动窗口**和一个 **7 天窗口**计量用量。对一个 >24h 的目标，真正构成容量约束的是这两个窗口、而非 context%（镜头 5）。

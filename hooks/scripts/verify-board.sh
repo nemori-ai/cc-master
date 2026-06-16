@@ -243,7 +243,54 @@ pending_user_decisions() {
     }' "$1" 2>/dev/null
 }
 
+# wakeup_is_object BOARD — exit 0 iff the board carries a ROOT-depth `"wakeup"` key whose value is an
+# OBJECT (opens with `{`). This is the soft-observed read of the optional top-level `wakeup` watchdog
+# record (ADR-011): present-and-an-object → a watchdog is armed; absent OR a non-object value → no
+# watchdog (graceful-degrade, exactly like wip_limit). String/escape/depth-aware in POSIX awk (a shell
+# tool, NOT jq/node) so it is FORMAT-AGNOSTIC (single-line == multi-line) and a `"wakeup"` buried in an
+# agent-shaped task/log payload can never masquerade as the root field (same root-only discipline as
+# owner_region / tasks_region). After the root `"wakeup"` key is seen, the value is whatever non-space
+# char follows the `:` — only `{` counts as the armed object; anything else (a string, null, number,
+# array, false placeholder) is treated as "no watchdog" → reminder still fires.
+wakeup_is_object() { # $1 = board path
+  awk '
+    { s = s $0 "\n" }
+    END {
+      n = length(s)
+      cd = 0; bd = 0; instr = 0; esc = 0
+      capkey = 0; key = ""; pendKey = ""        # pendKey: last completed ROOT-depth key string
+      afterColon = 0                            # 1 once we are reading the root wakeup value
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        if (instr) {                            # skip over string contents (track key capture only)
+          if (esc) { esc = 0; if (capkey) key = key ch; continue }
+          if (ch == "\\") { esc = 1; if (capkey) key = key ch; continue }
+          if (ch == "\"") { instr = 0; if (capkey) { capkey = 0; pendKey = key } continue }
+          if (capkey) key = key ch
+          continue
+        }
+        if (afterColon) {                       # reading the value that follows root "wakeup":
+          if (ch == " " || ch == "\t" || ch == "\n" || ch == "\r" || ch == ":") continue
+          if (ch == "{") { print "yes"; exit }  # object → watchdog armed
+          exit                                  # any other value → not an object → no watchdog
+        }
+        if (ch == "\"") {                        # a string starting at ROOT depth is a candidate key
+          instr = 1
+          if (cd == 1 && bd == 0) { capkey = 1; key = "" } else capkey = 0
+          continue
+        }
+        if (ch == "[") { bd++; pendKey = ""; continue }
+        if (ch == "]") { if (bd > 0) bd--; continue }
+        if (ch == "{") { cd++; pendKey = ""; continue }
+        if (ch == "}") { if (cd > 0) cd--; pendKey = ""; continue }
+        if (ch == ":") { if (cd == 1 && bd == 0 && pendKey == "wakeup") afterColon = 1; continue }
+        if (ch == ",") pendKey = ""
+      }
+    }' "$1" 2>/dev/null | grep -q "yes"
+}
+
 active_found=0; empty_active=0; actionable=0
+watchdog_needed=0                          # 1 if any matched board has an in_flight task but no armed wakeup
 matched_boards=""                          # newline-separated paths of THIS session's active boards
 for b in "$HOME_DIR"/*.board.json; do
   [ -e "$b" ] || continue                 # no boards → unexpanded glob
@@ -263,6 +310,13 @@ for b in "$HOME_DIR"/*.board.json; do
   if printf '%s' "$region" | grep -qE '"status"[[:space:]]*:[[:space:]]*"(ready|uncertain)"'; then
     actionable=1
   fi
+  # Watchdog (ADR-011): if THIS board has an in_flight TASK but no armed `wakeup` object, a background
+  # task could fail silently with no one coming back to recon it. Soft-observed (graceful-degrade like
+  # wip_limit): only the completion-state handshake below acts on this — actionable/empty boards block
+  # earlier and never reach it. in_flight is read from the tasks REGION (log entries excluded).
+  if printf '%s' "$region" | grep -qE '"status"[[:space:]]*:[[:space:]]*"in_flight"'; then
+    wakeup_is_object "$b" || watchdog_needed=1
+  fi
 done
 
 # Fingerprint of THIS session's matched boards' completion state (pure bash, no jq). cksum over the
@@ -273,11 +327,22 @@ done
 # tasks_region above), so audit-log prose or other non-task fields can never look like a changed
 # completion state — and a log append between Stops never re-forces a handshake. Works identically
 # on single-line and multi-line JSON; no per-line layout assumption remains.
+# WATCHDOG DIMENSION (Finding #56 family, codex round-2): the watchdog_needed bit (0/1) is FOLDED INTO
+# the cksum input too. Two reasons: (1) a completion state needing a watchdog nudge (watchdog_needed=1)
+# must hash DIFFERENTLY from the same task triples WITHOUT it (=0), so transitioning into "needs
+# watchdog" re-forces the handshake that carries the reminder. (2) UPGRADE SAFETY — the fingerprint
+# FORMULA now changed, so any stale `.stopcheck` written by an OLDER hook (which hashed task triples
+# only, no watchdog dimension) can never equal the new digest → an in_flight/no-wakeup board that was
+# already handshook under the old logic is forced through ONE fresh handshake → watchdog reminder fires
+# instead of being silently skipped via the allow-early-exit path. watchdog_needed is computed in the
+# board scan ABOVE, so its value is already settled when this runs.
 status_fingerprint() {
-  printf '%s' "$matched_boards" | while IFS= read -r bp; do
-    [ -n "$bp" ] && tasks_region "$bp" \
-      | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"'
-  done | cksum | awk '{print $1}'
+  { printf 'watchdog_needed:%s\n' "$watchdog_needed"
+    printf '%s' "$matched_boards" | while IFS= read -r bp; do
+      [ -n "$bp" ] && tasks_region "$bp" \
+        | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"'
+    done
+  } | cksum | awk '{print $1}'
 }
 
 # ── decision ──────────────────────────────────────────────────────────────────────────────────────
@@ -350,5 +415,15 @@ $pending_list
 EOF
 if [ -n "$pending_joined" ]; then
   handshake_reason="$handshake_reason Unanswered user decisions still on this board: $pending_joined. Confirm each is genuinely still pending (or resolve it) before you stop — don't silently exit on an open user decision."
+fi
+# Watchdog reminder (ADR-011): the board is in a completion state but still has an in_flight background
+# task with NO armed `wakeup` record. The harness auto-reawakens on a tracked task's COMPLETION, but a
+# task that hangs / dies silently / was never dispatched emits no completion event — so nobody comes
+# back. Before stopping, arm a watchdog wakeup (CronCreate one-shot / ScheduleWakeup / Monitor /
+# background-shell `until` floor) and write what to recon into the board's `wakeup.checklist`. Soft-
+# observed: an already-armed `wakeup` object silences this (graceful-degrade like wip_limit). The
+# canonical anchor phrase "arm a watchdog wakeup" maps to the wait-edge in the orchestration skill.
+if [ "$watchdog_needed" -eq 1 ]; then
+  handshake_reason="$handshake_reason This board has an in_flight background task but no armed watchdog (the \`wakeup\` field is missing). Before you stop, arm a watchdog wakeup (CronCreate one-shot / ScheduleWakeup / Monitor / background-shell \`until\`) for the in_flight tasks that could fail silently, and record what to recon when it fires in the board's \`wakeup.checklist\` — otherwise a silently-failing background task leaves no one to come back and look."
 fi
 emit_block "$handshake_reason"
