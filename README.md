@@ -278,7 +278,9 @@ cc-master coaches the orchestrator to advance the main thread using three reliab
 2. **Sub-agent (`run_in_background`)** — an independent, terminal reasoning task, integrated on completion.
 3. **Workflow** — dynamic-workflow scripts (fan-out / pipeline / loop) for structured parallel orchestration.
 
-It deliberately does **not** use **agent-teams** or **scheduled routines**: neither is reliably ship-anywhere (one is behind an experimental flag, the other needs a claude.ai account and isn't available on Bedrock/Vertex/Foundry), so they are out of scope by design.
+On top of these, a **watchdog self-wakeup** safety net covers the one gap the harness can't: it auto-rewakes the main thread when a background task *completes*, but a task that hangs, dies silently, or was never really dispatched (a ghost task) fires no completion event. So before a legitimate idle wait with in-flight background work outstanding, the orchestrator arms a timed wakeup to come back and reconcile ground truth. Its mechanism degrades gracefully: a local `CronCreate` / `ScheduleWakeup` timer when available, else a `Monitor` on a liveness signal, else the universal background-shell `until` floor (ADR-011).
+
+It deliberately does **not** use **agent-teams** or **cloud scheduled routines**: neither is reliably ship-anywhere (one is behind an experimental flag, the other needs a claude.ai account and isn't available on Bedrock/Vertex/Foundry), so they are out of scope by design. The watchdog's local `ScheduleWakeup` / `CronCreate` timers are an in-session, OAuth-free exception — they don't break ship-anywhere (ADR-011).
 
 ### Bootstrap and completion, guaranteed by hooks
 

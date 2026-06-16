@@ -105,7 +105,55 @@ tasks_region_t() {
       printf "%s", out
     }' "$1" 2>/dev/null
 }
-fp_of() { tasks_region_t "$1" | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | cksum | awk '{print $1}'; }
+# wakeup_is_object_t BOARD — mirror of verify-board.sh's wakeup_is_object(): exit 0 iff the board has a
+# ROOT-depth `"wakeup"` key whose value is an OBJECT. Needed so fp_of can replicate watchdog_needed.
+wakeup_is_object_t() {
+  awk '
+    { s = s $0 "\n" }
+    END {
+      n = length(s)
+      cd = 0; bd = 0; instr = 0; esc = 0
+      capkey = 0; key = ""; pendKey = ""
+      afterColon = 0
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        if (instr) {
+          if (esc) { esc = 0; if (capkey) key = key ch; continue }
+          if (ch == "\\") { esc = 1; if (capkey) key = key ch; continue }
+          if (ch == "\"") { instr = 0; if (capkey) { capkey = 0; pendKey = key } continue }
+          if (capkey) key = key ch
+          continue
+        }
+        if (afterColon) {
+          if (ch == " " || ch == "\t" || ch == "\n" || ch == "\r" || ch == ":") continue
+          if (ch == "{") { print "yes"; exit }
+          exit
+        }
+        if (ch == "\"") { instr = 1; if (cd == 1 && bd == 0) { capkey = 1; key = "" } else capkey = 0; continue }
+        if (ch == "[") { bd++; pendKey = ""; continue }
+        if (ch == "]") { if (bd > 0) bd--; continue }
+        if (ch == "{") { cd++; pendKey = ""; continue }
+        if (ch == "}") { if (cd > 0) cd--; pendKey = ""; continue }
+        if (ch == ":") { if (cd == 1 && bd == 0 && pendKey == "wakeup") afterColon = 1; continue }
+        if (ch == ",") pendKey = ""
+      }
+    }' "$1" 2>/dev/null | grep -q "yes"
+}
+# fp_of BOARD — MUST mirror status_fingerprint() in verify-board.sh. Since codex round-2's P2 fix, the
+# fingerprint folds in the watchdog_needed bit (0/1) as a leading "watchdog_needed:<v>" line BEFORE the
+# task id+status+blocked_on triples (so a state needing a watchdog hashes differently, AND a stale
+# pre-upgrade .stopcheck can never collide). watchdog_needed = (board has an in_flight task in the tasks
+# region) AND (no root-depth wakeup OBJECT) — replicated here exactly. Single-board mirror (the seed/assert
+# tests below each use ONE matched board), matching the loop the hook runs over $matched_boards.
+fp_of() { # $1 = board path
+  local wn=0
+  if tasks_region_t "$1" | grep -qE '"status"[[:space:]]*:[[:space:]]*"in_flight"'; then
+    wakeup_is_object_t "$1" || wn=1
+  fi
+  { printf 'watchdog_needed:%s\n' "$wn"
+    tasks_region_t "$1" | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"'
+  } | cksum | awk '{print $1}'
+}
 
 # Case H (NEW): completion state (in_flight/blocked/done), no sidecar mark → BLOCK with self-check
 #                checklist, AND sidecar's last_handshook_fp set to the current fingerprint.
