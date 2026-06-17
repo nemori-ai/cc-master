@@ -1305,6 +1305,310 @@
       font-size: 11px; letter-spacing: 0.04em; color: var(--ink-faint);
     }
 
+    /* ============================ TIMELINE VIEW — the gantt swimlanes ======== */
+    /* The fourth view: tasks spread across a shared time axis. Each task is ONE
+       horizontal bar on its own lane (row); lanes share the same x-scale, so two
+       bars that span the same x-range visibly overlap — OVERLAP READS AS PARALLEL
+       at a glance. Same live board + analyze() + select() + clock + isAwaitingUser()
+       as the other three views; replaces the #flow canvas (insights + detail rails
+       stay). When wall-clock timestamps are present the axis is real time; when
+       they are sparse/absent it degrades to a TOPOLOGICAL axis (longest-path depth
+       from roots) so the chart is meaningful even on a clock-less board.
+       Discipline: NO side-stripe accent rails — the critical chain is carried by a
+       top accent bar + amber bar fill + lamp, never a 2px left/right edge. */
+    #timelineview {
+      flex: 1 1 auto; min-width: 0; min-height: 0;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      background:
+        radial-gradient(120% 80% at 50% -8%, var(--canvas-glow), var(--ground) 60%);
+    }
+
+    /* the sticky axis header: a left label gutter + a tick-ruled scale strip */
+    .tlaxis {
+      position: sticky; top: 0; z-index: 4;
+      flex: 0 0 auto;
+      display: flex; align-items: stretch;
+      background: linear-gradient(180deg, var(--panel), var(--panel-hi) 130%);
+      border-bottom: 1px solid var(--hair);
+      box-shadow: 0 1px 0 oklch(0.12 0.01 255 / 0.5);
+    }
+    .tlaxis .axhead {
+      flex: 0 0 var(--tl-gutter, 168px); width: var(--tl-gutter, 168px);
+      display: flex; flex-direction: column; gap: 3px; justify-content: center;
+      padding: 9px 14px;
+      border-right: 1px solid var(--hair-soft);
+    }
+    .tlaxis .axhead .axl {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .tlaxis .axhead .axmode {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 10px; font-weight: 500; color: var(--ink-dim);
+      letter-spacing: 0.04em;
+    }
+    /* the scale strip — tick labels evenly spaced across the time/depth span */
+    .tlaxis .axscale {
+      flex: 1 1 auto; min-width: 0; position: relative;
+      padding: 9px 16px 8px;
+    }
+    .tlaxis .axtick {
+      position: absolute; top: 0; bottom: 0;
+      display: flex; flex-direction: column; justify-content: center;
+      transform: translateX(-50%);
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8.5px; letter-spacing: 0.04em; color: var(--ink-faint);
+      font-variant-numeric: tabular-nums; white-space: nowrap;
+      pointer-events: none;
+    }
+    .tlaxis .axtick:first-child { transform: none; }
+    .tlaxis .axtick:last-child { transform: translateX(-100%); }
+
+    /* the lane area: vertical scroll of per-task rows, each row a shared-scale track */
+    .tllanes {
+      flex: 1 1 auto; min-height: 0;
+      overflow-y: auto; overflow-x: hidden;
+      padding: 10px 0 16px;
+    }
+    .tllane {
+      display: flex; align-items: stretch;
+      min-height: 34px;
+    }
+    .tllane:hover { background: oklch(0.70 0.115 244 / 0.04); }
+    /* the lane's left label gutter: lamp + id + clamped title */
+    .tllabel {
+      flex: 0 0 var(--tl-gutter, 168px); width: var(--tl-gutter, 168px);
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 14px 5px 16px;
+      border-right: 1px solid var(--hair-soft);
+      cursor: pointer; min-width: 0;
+      transition: background 160ms ease;
+    }
+    .tllabel:hover { background: var(--panel-hi); }
+    .tllabel .lamp {
+      width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;
+      box-shadow: 0 0 0 1px var(--lamp-ring), 0 0 6px currentColor, 0 0 2px currentColor;
+    }
+    .tllane.s-in_flight .tllabel .lamp { animation: lamppulse 1.7s ease-in-out infinite; }
+    .tllane.usergate .tllabel .lamp { animation: gatelamp 2.0s ease-in-out infinite; }
+    .tllabel .lid {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9.5px; font-weight: 500; color: var(--ink-dim);
+      font-variant-numeric: tabular-nums; flex: 0 0 auto;
+    }
+    .tllabel .ltt {
+      flex: 1 1 auto; min-width: 0;
+      font-size: 11px; color: var(--ink);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .tllabel .ltt.empty { color: var(--ink-faint); font-style: italic; }
+
+    /* the track: the shared-scale plotting strip a bar floats on */
+    .tltrack {
+      flex: 1 1 auto; min-width: 0; position: relative;
+      margin: 5px 16px;
+    }
+    /* faint vertical gridlines aligned to the axis ticks (drawn as a repeating
+       linear-gradient set inline per-render via --tl-grid background). The grid
+       reads as instrument ruling, low-contrast. */
+    .tltrack .tlgrid {
+      position: absolute; inset: 0; pointer-events: none;
+      opacity: 0.5;
+    }
+    .tltrack .tlgrid i {
+      position: absolute; top: -4px; bottom: -4px; width: 1px;
+      background: var(--grid);
+    }
+
+    /* a BAR — one task's span on the shared scale. left/width set inline (%).
+       The fill is the status lamp laid over the raised panel at low opacity (a
+       translucent tint layer, the file's idiom — NOT a hard lamp block), framed
+       by a lamp-tinted hairline. The leading edge carries a brighter lamp cap so
+       a zero/near-zero-width bar is still visible. */
+    .tlbar {
+      position: absolute; top: 0; bottom: 0;
+      min-width: 5px;
+      border-radius: var(--r-sm);
+      background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+      border: 1px solid var(--lamp);
+      box-shadow: 0 1px 2px oklch(0.10 0.01 255 / 0.35);
+      cursor: pointer; overflow: hidden;
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 8px;
+      transition: border-color 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                  filter 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    /* the lamp tint layer — the lamp colour washed across the bar at low opacity,
+       so the fill reads as the status colour without a flat block. Sits under the
+       cap + label (they carry z-index 1); the crit/sel overrides restyle it. */
+    .tlbar::after {
+      content: ''; position: absolute; inset: 0;
+      background: var(--lamp); opacity: 0.18; pointer-events: none;
+    }
+    :root[data-theme="light"] .tlbar {
+      box-shadow: 0 1px 2px oklch(0.55 0.02 255 / 0.10);
+    }
+    .tlbar:hover {
+      transform: translateY(-1px); filter: brightness(1.06);
+      box-shadow: 0 2px 5px oklch(0.10 0.01 255 / 0.32), 0 6px 14px oklch(0.10 0.01 255 / 0.22);
+    }
+    :root[data-theme="light"] .tlbar:hover {
+      box-shadow: 0 2px 5px oklch(0.55 0.02 255 / 0.10), 0 6px 14px oklch(0.55 0.02 255 / 0.12);
+    }
+    /* the bright leading cap so even a thin bar shows its status colour */
+    .tlbar .cap {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      border-radius: var(--r-sm) 0 0 var(--r-sm);
+      background: var(--lamp);
+      box-shadow: 0 0 6px var(--lamp);
+      z-index: 1; /* sits above the ::after lamp-tint wash */
+    }
+    /* in-bar label — id-or-clock, only shown when the bar is wide enough (JS gates
+       it via a min-width class). Martian Mono, sits on the fill. */
+    .tlbar .blabel {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9px; font-weight: 500; letter-spacing: 0.02em;
+      color: var(--ink); font-variant-numeric: tabular-nums;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      position: relative; z-index: 1;
+    }
+    .tlbar .blabel .cglyph { font-size: 9px; opacity: 0.85; margin-right: 3px; }
+    .tlbar.running .blabel { color: var(--inflight); }
+
+    /* selected bar: a clear cyan focus ring (read-only selection, matches nodes) */
+    .tlbar.sel {
+      border-color: oklch(0.70 0.115 244 / 0.8);
+      box-shadow: 0 0 0 2px oklch(0.70 0.115 244 / 0.45),
+                  0 1px 2px oklch(0.10 0.01 255 / 0.35);
+    }
+    .tllane.sel { background: oklch(0.70 0.115 244 / 0.08); }
+
+    /* critical-chain bar — amber spine: a top accent cap (NOT a side stripe) +
+       amber-shifted fill + amber frame. Same visual language as GRAPH crit nodes. */
+    .tlbar.crit {
+      background:
+        linear-gradient(180deg,
+          oklch(0.80 0.160 70 / 0.26), oklch(0.80 0.160 70 / 0.14));
+      border-color: oklch(0.80 0.160 70 / 0.55);
+    }
+    /* crit carries its own amber fill — drop the lamp-tint wash so it stays amber */
+    .tlbar.crit::after { display: none; }
+    .tlbar.crit::before {
+      content: ''; position: absolute; left: 4px; right: 4px; top: 0; height: 2px;
+      border-radius: 0 0 2px 2px;
+      background: var(--spine);
+      box-shadow: 0 0 7px oklch(0.80 0.160 70 / 0.6);
+    }
+    .tlbar.crit .blabel { color: var(--spine); }
+    /* bottleneck bar — heavier amber halo (the single "stalling the most" bar) */
+    .tlbar.bneck {
+      border-color: oklch(0.80 0.150 66 / 0.7);
+      box-shadow: 0 0 0 1px oklch(0.80 0.150 66 / 0.35),
+                  0 0 18px oklch(0.80 0.150 66 / 0.2);
+    }
+    /* awaiting-you bar holds the alert pulse (the one allowed alarm) */
+    .tlbar.usergate { border-color: oklch(0.80 0.150 66 / 0.6); }
+    .tlbar.usergate .cap { background: var(--alert); box-shadow: 0 0 6px var(--alert); }
+
+    /* a degraded "no span" pip — used when a task has no derivable extent at all
+       (e.g. a ready/blocked task on a real-time axis): a small lamp dot at its
+       anchor point so it still appears on the timeline rather than vanishing. */
+    .tlbar.pip {
+      min-width: 0; width: 11px !important; padding: 0; border-radius: 50%;
+      background: var(--lamp);
+      border: 1px solid var(--lamp-ring);
+      box-shadow: 0 0 6px var(--lamp), 0 0 2px var(--lamp);
+    }
+    .tlbar.pip::before, .tlbar.pip::after { display: none; }
+    .tlbar.pip .cap, .tlbar.pip .blabel { display: none; }
+
+    /* NOT-STARTED bar — a queued task (ready/blocked) with no data yet. Greyed +
+       weakened so it reads as "waiting in line", clearly behind any started/done
+       coloured bar, WITHOUT a side stripe (.impeccable): the desaturation is
+       carried by a neutral fill + lowered opacity + a grey lamp/cap, never a 2px
+       edge rail. The neutral comes from --blocked (the file's muted-slate token);
+       the lamp-tint wash + leading cap are overridden to that same grey so no
+       status colour leaks through, and overall opacity drops so it sits visually
+       under the live/completed bars sharing the chart. */
+    .tlbar.notstarted {
+      background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+      border-color: var(--blocked);
+      opacity: 0.5;
+      box-shadow: none;
+    }
+    .tlbar.notstarted::after { background: var(--blocked); opacity: 0.10; }
+    .tlbar.notstarted .cap { background: var(--blocked); box-shadow: none; }
+    .tlbar.notstarted .blabel { color: var(--ink-faint); }
+    /* a not-started PIP (time mode, no anchor) — the dot greys + dims to match */
+    .tlbar.pip.notstarted {
+      background: var(--blocked);
+      border-color: var(--lamp-ring);
+      box-shadow: none;
+    }
+    /* the lane lamp greys + loses its glow so the whole row reads "not started" */
+    .tllane.notstarted .tllabel .lamp {
+      background: var(--blocked) !important; color: var(--blocked) !important;
+      box-shadow: 0 0 0 1px var(--lamp-ring);
+      opacity: 0.7;
+    }
+
+    .tlempty {
+      margin: auto; padding: 40px 18px; text-align: center;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 11px; letter-spacing: 0.04em; color: var(--ink-faint);
+    }
+    /* the legend strip at the bottom — explains the axis + crit spine, mirrors the
+       graph legend's restraint (lamp/bar keys, no chrome side rails) */
+    .tlfoot {
+      flex: 0 0 auto;
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      padding: 8px 16px;
+      border-top: 1px solid var(--hair-soft);
+      background: linear-gradient(180deg, var(--panel), var(--panel-hi) 130%);
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .tlfoot .fk { display: inline-flex; align-items: center; gap: 6px; }
+    .tlfoot .fk .spinebar {
+      width: 16px; height: 2px; border-radius: 2px; background: var(--spine);
+      box-shadow: 0 0 6px oklch(0.80 0.160 70 / 0.6);
+    }
+    .tlfoot .fk .nowbar {
+      width: 2px; height: 11px; border-radius: 1px; background: var(--inflight);
+      box-shadow: 0 0 6px oklch(0.79 0.150 74 / 0.6);
+    }
+
+    /* the live "NOW" marker — a thin vertical line riding the lane area when the
+       axis is real-time and at least one task is still in flight. The marker's
+       left% must share the bars'/grid's coordinate system, so it lives inside a
+       .tlnowlayer overlay that reproduces the .tltrack plotting box: it starts
+       after the label gutter (--tl-gutter) + the track's 16px left margin and
+       stops 16px before the right edge. Inside it, .tlnow's left% then lands on
+       the same f as every bar and gridline (pixel-aligned). */
+    .tlnowlayer {
+      position: absolute; top: 0; bottom: 0;
+      left: calc(var(--tl-gutter, 168px) + 16px);
+      right: 16px;
+      pointer-events: none; z-index: 3;
+    }
+    .tlnow {
+      position: absolute; top: 0; bottom: 0; width: 2px;
+      background: var(--inflight);
+      box-shadow: 0 0 8px oklch(0.79 0.150 74 / 0.55);
+      pointer-events: none;
+    }
+    .tlnow::after {
+      content: 'now'; position: absolute; top: 2px; left: 4px;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 7.5px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--inflight); white-space: nowrap;
+    }
+
     /* ============================ STATUS / ERROR ============================ */
     .err {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
@@ -1401,6 +1705,19 @@
     const DONE_STATUSES = new Set(['done', 'verified']);
     // statuses that count as "active / not yet settled" for bottleneck candidacy
     const STALLING_STATUSES = new Set(['in_flight', 'blocked']);
+    // NOT-YET-STARTED statuses — queued, no data yet. The TIMELINE view renders
+    // these as a desaturated grey "not started" bar/pip (kept in the panorama,
+    // not filtered out) so they read as "waiting in line" rather than as a normal
+    // coloured span. With the time schema a task now ALSO counts as started the
+    // moment it carries a started_at — so isNotStarted() upgrades the old
+    // status-only judgement: a node is "not started" iff it has NO start anchor
+    // AND is still ready/blocked. An in_flight node that forgot to stamp
+    // started_at still reads as launched (status fallback, no regression); a node
+    // that DID stamp started_at reads as launched even if its status looks queued.
+    const NOT_STARTED_STATUSES = new Set(['ready', 'blocked']);
+    function isNotStarted(t) {
+      return !!t && startTs(t) == null && NOT_STARTED_STATUSES.has(t.status);
+    }
     // a task only counts as AWAITING-USER when it is genuinely pending — i.e. its
     // status is blocked or in_flight. A terminal task (done/verified/failed/
     // escalated/…) that still carries a STALE blocked_on:'user' is NOT awaiting
@@ -1508,6 +1825,28 @@
       }
       return null;
     }
+    // ---- time-anchor accessors (with LEGACY read-fallback) ------------------
+    // The time schema renamed the per-task anchors: started_at ≡ old dispatched_at,
+    // finished_at ≡ old completed_at, plus a new created_at. Read NEW names first,
+    // fall back to the OLD aliases so archived boards (revived via --resume) and
+    // hand-written legacy stamps still render. ONE accessor per anchor, used
+    // everywhere below — no scattered startTs(t) reads.
+    function startTs(t)  { return t ? parseTs(t.started_at ?? t.dispatched_at) : null; }
+    function endTs(t)    { return t ? parseTs(t.finished_at ?? t.completed_at) : null; }
+    function createTs(t) { return t ? parseTs(t.created_at) : null; }
+    // raw string for the telemetry panel (NEW name preferred, OLD as fallback)
+    function startStr(t) { return t ? (t.started_at ?? t.dispatched_at ?? null) : null; }
+    function endStr(t)   { return t ? (t.finished_at ?? t.completed_at ?? null) : null; }
+    // board template generation — the timeline's REAL-TIME-axis version gate. Only
+    // boards built this-release-or-later (carrying meta.template_version) are
+    // trusted to mean "timestamps absent = genuinely unstamped"; legacy boards
+    // (no meta) stay on the topological axis even if a few old stamps linger.
+    const TIME_SCHEMA_MIN_VERSION = 1;
+    function templateVersion(board) {
+      const m = board && board.meta;
+      const v = m && m.template_version;
+      return (typeof v === 'number' && Number.isFinite(v)) ? v : 0;
+    }
     // Compact duration formatter. Returns null (NEVER the string "null") when the
     // span is unknown or nonsensical — callers must treat null as "omit".
     function fmtElapsed(ms) {
@@ -1525,15 +1864,21 @@
     // ---- execution-time derivation -----------------------------------------
     // How long has / did a task take? Returns { ms, running } or null if nothing
     // is derivable.
-    //   in_flight       -> now - dispatched_at            (running: true)
-    //   done/verified   -> completed_at - dispatched_at   if completed_at present
+    //   in_flight       -> now - started_at               (running: true)
+    //   done/verified   -> finished_at - started_at        if finished_at present
     //                      else span from the task's log timestamps
-    //                      (last log ts - first log ts, or dispatched -> last log)
+    //                      (last log ts - first log ts, or started -> last log)
+    // Both anchors read via startTs()/endTs() so the legacy dispatched_at/
+    // completed_at aliases still work on revived boards.
     function logSpan(t) {
       const logs = Array.isArray(t.log) ? t.log : [];
       const stamps = [];
       for (const line of logs) {
-        const ts = parseTs(typeof line === 'string' ? line : '');
+        // log entries may be a bare string OR a rich object { ts, kind, summary, … }
+        let raw = '';
+        if (typeof line === 'string') raw = line;
+        else if (line && typeof line === 'object' && typeof line.ts === 'string') raw = line.ts;
+        const ts = parseTs(raw);
         if (ts != null) stamps.push(ts);
       }
       if (!stamps.length) return null;
@@ -1541,14 +1886,14 @@
     }
     function taskDuration(t) {
       if (!t) return null;
-      const disp = parseTs(t.dispatched_at);
+      const disp = startTs(t);
       if (t.status === 'in_flight') {
         if (disp == null) return null;
         const ms = Date.now() - disp;
         return ms >= 0 ? { ms, running: true } : null;
       }
       if (DONE_STATUSES.has(t.status)) {
-        const comp = parseTs(t.completed_at);
+        const comp = endTs(t);
         if (comp != null && disp != null && comp >= disp) {
           return { ms: comp - disp, running: false };
         }
@@ -1694,7 +2039,7 @@
       for (const t of list) {
         if (!STALLING_STATUSES.has(t.status)) continue;
         const imp = impact.get(t.id);
-        const ts = parseTs(t.dispatched_at);
+        const ts = startTs(t);
         const el = ts != null ? now - ts : -1;
         if (t.status === 'in_flight' && el > longestMs) { longestMs = el; longestInflight = t.id; }
         if (imp > bneckImpact || (imp === bneckImpact && el > bneckElapsed)) {
@@ -1714,14 +2059,14 @@
         .map(t => t.id);
       let earliestGate = Infinity;
       for (const id of userGateIds) {
-        const ts = parseTs(byId.get(id).dispatched_at);
+        const ts = startTs(byId.get(id));
         if (ts != null && ts < earliestGate) earliestGate = ts;
       }
 
       // overall elapsed: from earliest dispatched_at, else owner.heartbeat
       let earliest = Infinity;
       for (const t of list) {
-        const ts = parseTs(t.dispatched_at);
+        const ts = startTs(t);
         if (ts != null && ts < earliest) earliest = ts;
       }
       if (earliest === Infinity && owner && owner.heartbeat) {
@@ -1917,7 +2262,7 @@
             inDeg: an.inDeg.get(t.id) || 0,
             // parsed dispatch epoch (ms) so the tile can tick a LIVE clock itself
             // every second; null when absent/unparseable -> clock omitted.
-            dispatchedAt: t.status === 'in_flight' ? parseTs(t.dispatched_at) : null,
+            dispatchedAt: t.status === 'in_flight' ? startTs(t) : null,
             lineage,
             enter: !!firstLayout,
             order: i,
@@ -1986,12 +2331,13 @@
       const [err, setErr] = useState(null);
       const [sel, setSel] = useState(null);  // selected task id (lineage anchor)
       // view mode: 'graph' (xyflow DAG) | 'board' (Kanban card board) | 'list'
-      // (status-board). Persisted in localStorage (key ccm-view); default 'graph'.
-      // Migrate gracefully: any unknown / legacy value falls back to 'graph'.
+      // (status-board) | 'timeline' (the time/gantt swimlanes). Persisted in
+      // localStorage (key ccm-view); default 'graph'. Migrate gracefully: any
+      // unknown / legacy value falls back to 'graph'.
       const [view, setView] = useState(() => {
         try {
           const v = localStorage.getItem('ccm-view');
-          return (v === 'list' || v === 'board' || v === 'graph') ? v : 'graph';
+          return (v === 'list' || v === 'board' || v === 'timeline' || v === 'graph') ? v : 'graph';
         } catch (_e) { return 'graph'; }
       });
       const setViewPersist = useCallback((v) => {
@@ -2131,7 +2477,7 @@
           ),
           // telemetry readouts
           h('div', { className: 'readouts' },
-            // view toggle — GRAPH (xyflow DAG) | BOARD (Kanban) | LIST (status-board)
+            // view toggle — GRAPH (xyflow DAG) | BOARD (Kanban) | LIST (status-board) | TIMELINE (gantt)
             h('div', { className: 'viewtoggle', role: 'group', 'aria-label': 'view mode' },
               h('button', {
                 type: 'button',
@@ -2154,6 +2500,13 @@
                 title: 'list view — the status-board',
                 onClick: () => setViewPersist('list'),
               }, h('span', { className: 'tg' }, '☰'), 'list'),
+              h('button', {
+                type: 'button',
+                className: view === 'timeline' ? 'on' : '',
+                'aria-pressed': view === 'timeline',
+                title: 'timeline view — the time / gantt swimlanes',
+                onClick: () => setViewPersist('timeline'),
+              }, h('span', { className: 'tg' }, '▤'), 'timeline'),
             ),
             // day/night toggle — single icon button; glyph shows the DESTINATION
             // (☀ when dark → click for day; ☾ when light → click for night).
@@ -2203,6 +2556,13 @@
           // same select(); replaces the canvas while keeping rails intact.
           view === 'list' ? h(ListView, {
             an, board, progress, pct, sel, onPick: select,
+          }) : null,
+          // center: TIMELINE view (time / gantt swimlanes) — same live board,
+          // same analyze(), same select(); each task is a bar on a shared time
+          // axis, parallel tasks stack on their own lanes so OVERLAP reads as
+          // PARALLELISM at a glance, the critical chain is amber-spined.
+          view === 'timeline' ? h(TimelineView, {
+            an, board, sel, onPick: select,
           }) : null,
           // center canvas — GRAPH view. Kept mounted only in graph mode so xyflow
           // doesn't measure/animate while hidden; nodes/edges state still updates.
@@ -2357,7 +2717,7 @@
     }
 
     function msFromDispatch(t) {
-      const ts = parseTs(t.dispatched_at);
+      const ts = startTs(t);
       return ts != null ? Date.now() - ts : null;
     }
 
@@ -2440,7 +2800,7 @@
       const status = t.status;
       const userGate = isAwaitingUser(t);
       // live clock: in_flight cards (dispatched & running) tick once/second.
-      const running = status === 'in_flight' && parseTs(t.dispatched_at) != null;
+      const running = status === 'in_flight' && startTs(t) != null;
       useSecondTick(running);
 
       const cls = ['bvcard', 's-' + (status || 'unknown')];
@@ -2476,7 +2836,7 @@
           h('span', { className: 'dv' }, 'awaiting you'));
       } else if (kind === 'inflight') {
         if (running) {
-          const clk = fmtElapsed(Date.now() - parseTs(t.dispatched_at));
+          const clk = fmtElapsed(Date.now() - startTs(t));
           if (clk != null) detail = h('div', { className: 'cdetail clk' },
             h('span', { className: 'cglyph' }, '◷'), h('span', { className: 'dv' }, clk));
         }
@@ -2619,7 +2979,7 @@
       const status = t.status;
       const userGate = isAwaitingUser(t);
       // live clock: in_flight (or any user-gate row dispatched & running) ticks.
-      const running = status === 'in_flight' && parseTs(t.dispatched_at) != null;
+      const running = status === 'in_flight' && startTs(t) != null;
       useSecondTick(running);
 
       const cls = ['lvrow', 's-' + (status || 'unknown')];
@@ -2637,7 +2997,7 @@
       }
       if (kind === 'inflight' || running) {
         if (running) {
-          const elapsed = Date.now() - parseTs(t.dispatched_at);
+          const elapsed = Date.now() - startTs(t);
           const clk = fmtElapsed(elapsed);
           if (clk != null) parts.push(h('span', { className: 'dpart clk', key: 'clk' },
             h('span', { className: 'cglyph' }, '◷'), 'running ' + clk));
@@ -2704,6 +3064,321 @@
           parts.length ? h('div', { className: 'detailline' }, ...parts) : null,
         ),
         chips.length ? h('div', { className: 'chips' }, ...chips) : null,
+      );
+    }
+
+    // ---- TIMELINE VIEW — the time / gantt swimlanes ------------------------
+    // The fourth view: every task is one bar on a SHARED x-scale, each on its
+    // own lane (row), so two bars covering the same x-range visibly overlap —
+    // overlap reads as parallelism. Same live board + analyze() + select() +
+    // clock + isAwaitingUser() as the other three.
+    //
+    // Two axis modes, auto-selected so the chart is meaningful on ANY board:
+    //   • REAL-TIME — gated on meta.template_version (this-release-or-later board)
+    //     AND ≥2 tasks carrying a parseable started_at (created_at fallback)
+    //     spanning a non-zero range. Spans come from REUSED helpers: done/verified
+    //     use taskDuration() (finished_at − started_at, log-span fallback);
+    //     in_flight runs started_at → now (grows live under the 2s poll + 1s
+    //     ticker); ready/blocked with no start render as a pip at created_at/anchor.
+    //     started_at ≡ legacy dispatched_at, finished_at ≡ legacy completed_at
+    //     (read-fallback so revived archived boards still render).
+    //   • TOPOLOGICAL — fallback when real timestamps are too sparse (the dogfood
+    //     reality: most boards carry none). The x-axis becomes longest-path DEPTH
+    //     from roots (computed off an.upstream — REUSED adjacency, not re-derived):
+    //     a task at depth d spans [d−1, d]; siblings at the same depth overlap, so
+    //     the structural parallelism + critical chain still read at a glance.
+    // Lanes ordered by (start asc, critical first, impact desc, id) so the chart
+    // flows top-left → bottom-right along the spine.
+
+    // longest-path depth (1-based) ending at each id, off REUSED an.upstream.
+    // Memoized DFS with a cycle guard, mirroring analyze()'s lenEndingAt — kept
+    // local (analyze exposes adjacency, not per-node depth) so we don't widen its
+    // return shape just for this view.
+    function depthMap(an, ids) {
+      const memo = new Map();
+      const visiting = new Set();
+      function depthOf(id) {
+        if (memo.has(id)) return memo.get(id);
+        if (visiting.has(id)) return 1; // cycle guard
+        visiting.add(id);
+        let best = 1;
+        for (const d of (an.upstream.get(id) || [])) {
+          if (!ids.has(d)) continue;
+          best = Math.max(best, 1 + depthOf(d));
+        }
+        visiting.delete(id);
+        memo.set(id, best);
+        return best;
+      }
+      const m = new Map();
+      for (const id of ids) m.set(id, depthOf(id));
+      return m;
+    }
+
+    function TimelineView({ an, board, sel, onPick }) {
+      // mount a 1s ticker whenever any task is in_flight so live bars + the NOW
+      // marker advance between the 2s polls (scoped to this view only).
+      const tasksRaw = (board && Array.isArray(board.tasks)) ? board.tasks : [];
+      const anyRunning = tasksRaw.some(t => t.status === 'in_flight' && startTs(t) != null);
+      useSecondTick(anyRunning);
+
+      if (!an || !board) {
+        return h('div', { id: 'timelineview' },
+          h('div', { className: 'tlempty' }, 'acquiring board…'));
+      }
+      const tasks = tasksRaw;
+      if (!tasks.length) {
+        return h('div', { id: 'timelineview' },
+          h('div', { className: 'tlempty' }, 'no tasks on the board'));
+      }
+      const idSet = new Set(tasks.map(t => t.id));
+      const now = Date.now();
+
+      // ---- decide the axis mode -------------------------------------------
+      // real-time anchors = parseable started_at (created_at as the queued-node
+      // fallback so a not-yet-started node still anchors). Choosing the REAL-TIME
+      // axis only pays off when MOST tasks carry a timestamp — otherwise the
+      // un-anchored majority collapse into pips at "now" and the chart reads as a
+      // pile on the right edge (the dogfood reality: many boards timestamp few/no
+      // tasks). So: require ≥2 anchors, a non-zero span, AND coverage over half
+      // the board; else fall back to the TOPOLOGICAL depth axis.
+      // VERSION GATE: only trust the real-time axis on a this-release-or-later
+      // board (meta.template_version present). On a LEGACY board (no version) a
+      // few lingering old stamps must NOT flip the axis — they'd squash the
+      // majority of un-stamped nodes into a pile at the now-edge. Legacy boards
+      // stay topological and show a clear "no time schema" footer hint.
+      const verGated = templateVersion(board) >= TIME_SCHEMA_MIN_VERSION;
+      const anchors = [];
+      for (const t of tasks) {
+        const a = startTs(t) ?? createTs(t);
+        if (a != null) anchors.push(a);
+      }
+      let mode = 'topo';
+      if (verGated && anchors.length >= 2 && anchors.length >= Math.ceil(tasks.length / 2)) {
+        const span = Math.max(...anchors) - Math.min(...anchors);
+        if (span > 0) mode = 'time';
+      }
+
+      // ---- compute each task's [start, end] on the chosen scale -----------
+      // rows: { t, start, end, pip, running } in raw scale units (ms epoch for
+      // 'time', depth units for 'topo'); pip = no derivable extent (a dot).
+      const rows = [];
+      let lo = Infinity, hi = -Infinity;
+      if (mode === 'time') {
+        for (const t of tasks) {
+          const disp = startTs(t);
+          // bar start anchors on started_at; a not-yet-started node with only a
+          // created_at anchors there instead (reads as "queued at created" — a pip
+          // — rather than piling at now). A real span only grows from disp.
+          let start = disp != null ? disp : createTs(t);
+          let end = null, pip = false, running = false;
+          const dur = taskDuration(t); // REUSED span derivation
+          if (t.status === 'in_flight' && disp != null) {
+            end = now; running = true;
+          } else if (DONE_STATUSES.has(t.status) && dur && disp != null) {
+            end = disp + dur.ms;
+          } else if (disp != null && dur && dur.ms > 0) {
+            end = disp + dur.ms; running = !!dur.running;
+          }
+          if (start == null) {
+            // no real anchor → a pip at "now" so it still shows on the axis
+            start = now; end = now; pip = true;
+          } else if (disp == null) {
+            // anchored only at created_at (queued, not started) → a pip at created
+            end = start; pip = true;
+          } else if (end == null || end <= start) {
+            end = start; pip = true; // anchored but no extent → a pip at start
+          }
+          rows.push({ t, start, end, pip, running });
+          lo = Math.min(lo, start); hi = Math.max(hi, end);
+        }
+      } else {
+        const depth = depthMap(an, idSet); // REUSED an.upstream adjacency
+        for (const t of tasks) {
+          const d = depth.get(t.id) || 1;
+          const start = d - 1, end = d;
+          rows.push({ t, start, end, pip: false, running: t.status === 'in_flight' });
+          lo = Math.min(lo, start); hi = Math.max(hi, end);
+        }
+      }
+      if (!Number.isFinite(lo) || !Number.isFinite(hi)) { lo = 0; hi = 1; }
+      let total = hi - lo;
+      if (total <= 0) total = 1; // single-point board → avoid div-by-zero
+
+      // ---- lane order: start asc, critical first, impact desc, id ----------
+      rows.sort((a, b) =>
+        a.start - b.start ||
+        (an.critSet.has(b.t.id) ? 1 : 0) - (an.critSet.has(a.t.id) ? 1 : 0) ||
+        (an.impact.get(b.t.id) || 0) - (an.impact.get(a.t.id) || 0) ||
+        String(a.t.id).localeCompare(String(b.t.id)));
+
+      // ---- axis tick labels ------------------------------------------------
+      // 5 evenly-spaced ticks across the span; labels are clock-times in 'time'
+      // mode, depth indices in 'topo' mode. (left% across the track.)
+      const TICKS = 5;
+      const ticks = [];
+      for (let i = 0; i < TICKS; i++) {
+        const f = i / (TICKS - 1);
+        const at = lo + total * f;
+        let lab;
+        if (mode === 'time') {
+          // elapsed-from-start reads cleaner than wall-clock on a relative chart
+          lab = i === 0 ? 'start' : ('+' + (fmtElapsed(at - lo) || '0'));
+        } else {
+          lab = 'depth ' + Math.round(at);
+        }
+        ticks.push({ f, lab });
+      }
+      // dedupe consecutive identical labels (short boards) so ticks don't repeat
+      const tickEls = ticks.map((tk, i) =>
+        h('span', { className: 'axtick', key: i, style: { left: (tk.f * 100) + '%' } }, tk.lab));
+
+      // vertical gridlines at the same fractions (faint instrument ruling)
+      const gridEls = ticks.map((tk, i) =>
+        h('i', { key: i, style: { left: (tk.f * 100) + '%' } }));
+
+      // the live NOW marker — only in real-time mode while something runs and
+      // now sits within the plotted span. Wrapped in a track-aligned overlay
+      // (.tlnowlayer) so its f% basis is the same plotting strip the bars/grid
+      // live on: bars/grid position left% inside .tltrack, which sits after the
+      // label gutter (--tl-gutter) and inside the track's 16px side margins.
+      // The overlay reproduces exactly that box, so the line lands pixel-aligned
+      // with the bar/grid at the same f (was: left% on the gutter-inclusive
+      // .tllanes container → horizontally offset from every bar/tick).
+      let nowEl = null;
+      if (mode === 'time' && anyRunning && now >= lo && now <= hi) {
+        const f = (now - lo) / total;
+        nowEl = h('div', { className: 'tlnowlayer' },
+          h('div', { className: 'tlnow', style: { left: (f * 100) + '%' } }));
+      }
+
+      const laneEls = rows.map(r =>
+        h(TimelineLane, {
+          key: r.t.id, row: r, an, lo, total, mode,
+          selected: r.t.id === sel, onPick, gridEls,
+        }));
+
+      // ---- the bottom legend strip ----------------------------------------
+      const foot = h('div', { className: 'tlfoot' },
+        h('span', { className: 'fk' }, h('span', { className: 'spinebar' }), 'critical chain'),
+        mode === 'time'
+          ? h('span', { className: 'fk' }, h('span', { className: 'nowbar' }), 'now · live')
+          : null,
+        h('span', { className: 'fk' },
+          mode === 'time'
+            ? 'axis · real time (start → finish)'
+            : (verGated
+                ? 'axis · topological depth (no timestamps — structural fallback)'
+                : 'axis · topological depth (legacy board, no time schema — structural fallback)')),
+      );
+
+      return h('div', { id: 'timelineview' },
+        // sticky axis header: label gutter + ruled scale
+        h('div', { className: 'tlaxis' },
+          h('div', { className: 'axhead' },
+            h('span', { className: 'axl' }, 'timeline'),
+            h('span', { className: 'axmode' }, mode === 'time' ? 'time' : 'depth'),
+          ),
+          h('div', { className: 'axscale' }, ...tickEls),
+        ),
+        // lanes — each a shared-scale track; NOW marker overlays the whole area
+        h('div', { className: 'tllanes', style: { position: 'relative' } },
+          nowEl,
+          ...laneEls,
+        ),
+        foot,
+      );
+    }
+
+    // a single timeline lane: the left label gutter + the shared-scale track that
+    // carries this task's bar. Own component so the in_flight clock can tick via
+    // useSecondTick scoped to exactly the lanes that need it.
+    function TimelineLane({ row, an, lo, total, mode, selected, onPick, gridEls }) {
+      const t = row.t;
+      const status = t.status;
+      const userGate = isAwaitingUser(t);
+      const running = status === 'in_flight' && startTs(t) != null;
+      useSecondTick(running);
+
+      // NOT-STARTED = a queued task with no start anchor (started_at absent) AND a
+      // ready/blocked status. Rendered as a desaturated grey bar/pip — kept in the
+      // panorama, just visibly behind any started/done bar. A task that DID stamp
+      // started_at reads as launched (isNotStarted is false) even if its status
+      // looks queued; a task awaiting the USER is still "in play" so it keeps its
+      // alert lamp, not the grey treatment. Holds in BOTH axis modes.
+      const notStarted = isNotStarted(t) && !userGate;
+      const lamp = userGate ? cssVar('--alert') : statusColor(status);
+
+      // bar geometry on the shared scale (live for in_flight: recompute end=now)
+      let start = row.start, end = row.end, pip = row.pip;
+      if (mode === 'time' && running) { end = Date.now(); if (end <= start) { end = start; pip = true; } }
+      const leftF = (start - lo) / total;
+      const widthF = pip ? 0 : (end - start) / total;
+      const leftPct = Math.max(0, Math.min(100, leftF * 100));
+      const widthPct = Math.max(0, Math.min(100 - leftPct, widthF * 100));
+
+      const laneCls = ['tllane', 's-' + (status || 'unknown')];
+      if (userGate) laneCls.push('usergate');
+      if (notStarted) laneCls.push('notstarted');
+      if (selected) laneCls.push('sel');
+
+      const barCls = ['tlbar'];
+      if (pip) barCls.push('pip');
+      // not-started overrides crit/bneck colour accents so a queued node never
+      // reads as a live amber spine — it is greyed regardless of its DAG role.
+      if (notStarted) barCls.push('notstarted');
+      else {
+        if (an.critSet.has(t.id)) barCls.push('crit');
+        if (an.bneck === t.id) barCls.push('bneck');
+      }
+      if (userGate) barCls.push('usergate');
+      if (running) barCls.push('running');
+      if (selected) barCls.push('sel');
+
+      // in-bar label — a live clock for in_flight, took-duration for done, else
+      // the id. Only legible on a wide-enough bar; CSS truncates with ellipsis.
+      let blabel = null;
+      if (!pip) {
+        if (running) {
+          const clk = fmtElapsed(Date.now() - startTs(t));
+          if (clk != null) blabel = h('span', { className: 'blabel' },
+            h('span', { className: 'cglyph' }, '◷'), clk);
+        } else if (DONE_STATUSES.has(status)) {
+          const durStr = fmtDuration(taskDuration(t));
+          blabel = h('span', { className: 'blabel' }, durStr != null ? durStr : t.id);
+        }
+        if (blabel == null) blabel = h('span', { className: 'blabel' }, t.id);
+      }
+
+      const title = (t.title || '').trim();
+      const barTitle = t.id + (title ? ' · ' + title : '') +
+        ' · ' + (STATUS_LABEL[status] || status) +
+        (mode === 'time' && !pip ? ' · ' + (fmtElapsed(end - start) || '') : '');
+
+      const bar = h('div', {
+        className: barCls.join(' '),
+        title: barTitle,
+        onClick: (e) => { e.stopPropagation(); onPick(t.id); },
+        style: pip
+          ? { left: leftPct + '%', '--lamp': lamp }
+          : { left: leftPct + '%', width: widthPct + '%', '--lamp': lamp },
+      },
+        pip ? null : h('span', { className: 'cap' }),
+        blabel,
+      );
+
+      return h('div', { className: laneCls.join(' '), style: { '--lamp': lamp } },
+        h('div', {
+          className: 'tllabel', onClick: () => onPick(t.id), style: { '--lamp': lamp },
+        },
+          h('span', { className: 'lamp', style: { background: lamp, color: lamp } }),
+          h('span', { className: 'lid' }, t.id),
+          h('span', { className: 'ltt' + (title ? '' : ' empty') }, title || 'untitled'),
+        ),
+        h('div', { className: 'tltrack' },
+          h('div', { className: 'tlgrid' }, ...(gridEls || [])),
+          bar,
+        ),
       );
     }
 
@@ -2805,8 +3480,9 @@
             h('span', { className: 'k' }, k),
             h('span', { className: 'v' + (mono ? ' mono' : '') }, v)));
         };
-        addTele('dispatched', task.dispatched_at, true);
-        addTele('completed', task.completed_at, true);
+        addTele('created', task.created_at, true);
+        addTele('started', startStr(task), true);
+        addTele('finished', endStr(task), true);
         const elStr = fmtElapsed(msFromDispatch(task));
         if (elStr != null) addTele('elapsed', elStr, true);
         // execution time — how long the task ran (live) or took (settled).
@@ -2830,12 +3506,26 @@
           h('div', { className: 'sl' }, 'artifact'),
           h('div', { className: 'artifact-box' }, String(task.artifact))));
 
-        // activity (log + notes)
+        // activity (log + notes). A log entry may be a bare string OR a rich
+        // object { ts, kind, summary, detail?, refs? } (the append-only log
+        // schema) — render the rich shape as "ts · kind · summary" with detail/
+        // refs, falling back to String() for legacy bare-string entries.
         const logs = Array.isArray(task.log) ? task.log : [];
         const activityBits = [];
         if (task.notes) activityBits.push(h('div', { className: 'le', key: 'note', style: { color: 'var(--ink)' } }, task.notes));
         for (let i = 0; i < logs.length; i++) {
-          activityBits.push(h('div', { className: 'le', key: 'l' + i }, String(logs[i])));
+          const entry = logs[i];
+          if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+            const head = [entry.ts, entry.kind, entry.task].filter(x => x != null && x !== '').join(' · ');
+            const lines = [];
+            if (head) lines.push(h('span', { className: 'lehead', style: { color: 'var(--ink-faint)' } }, head));
+            if (entry.summary != null && entry.summary !== '') lines.push(h('span', { className: 'lesum' }, String(entry.summary)));
+            if (entry.detail != null && entry.detail !== '') lines.push(h('span', { className: 'ledet', style: { color: 'var(--ink-faint)' } }, String(entry.detail)));
+            if (Array.isArray(entry.refs) && entry.refs.length) lines.push(h('span', { className: 'lerefs', style: { color: 'var(--ink-faint)' } }, 'refs: ' + entry.refs.map(String).join(', ')));
+            activityBits.push(h('div', { className: 'le', key: 'l' + i }, lines.length ? lines : String(entry)));
+          } else {
+            activityBits.push(h('div', { className: 'le', key: 'l' + i }, String(entry)));
+          }
         }
         if (activityBits.length) body.push(h('div', { className: 'dsect', key: 'act' },
           h('div', { className: 'sl' }, 'activity'),

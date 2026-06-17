@@ -12,6 +12,12 @@ board_sid() {
 }
 # only_board HOME — echo the single board path in HOME (assumes exactly one).
 only_board() { ls "$1"/*.board.json 2>/dev/null | head -1; }
+# board_has_template_version FILE — grep the agent-shaped meta.template_version field (integer value).
+# Pure bash, no jq. Echoes the integer if present, empty otherwise.
+board_template_version() {
+  grep -oE '"template_version"[[:space:]]*:[[:space:]]*[0-9]+' "$1" | head -1 \
+    | sed -n 's/.*"template_version"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p'
+}
 
 # Case A: command-name sentinel → exactly one board in the default home, path + role injected
 P="$(make_project)"
@@ -20,7 +26,23 @@ assert_eq 0 "$HOOK_RC" "bootstrap exits 0"
 assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "exactly one board created in default home"
 assert_contains "$HOOK_OUT" ".board.json" "injects the board path"
 assert_contains "$HOOK_OUT" "orchestrator" "injects the orchestrator role"
+# fresh boards (template path) carry meta.template_version — agent-shaped versioning the timeline
+# reads to gate its real-time axis. The default run uses PLUGIN_ROOT's real board.template.json.
+HOOK_OUT="$(printf '%s' '{"prompt":"/cc-master:as-master-orchestrator x"}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+assert_eq 1 "$(board_template_version "$(ls -t "$P/.claude/cc-master"/*.board.json | head -1)")" "A: fresh board (template path) carries meta.template_version=1"
 rm -rf "$P"
+
+# Case A0 (template-missing fallback path): when board.template.json is absent the inline printf
+# fallback builds the board — it must ALSO seed meta.template_version (parity with the template).
+P="$(make_project)"; EMPTY_ROOT="$(make_project)"
+HOOK_OUT="$(printf '%s' '{"session_id":"sess-fb","prompt":"/cc-master:as-master-orchestrator x"}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$EMPTY_ROOT" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "A0: fallback path created a board"
+assert_eq 1 "$(board_template_version "$(only_board "$P/.claude/cc-master")")" "A0: fallback printf seeds meta.template_version=1"
+rm -rf "$P" "$EMPTY_ROOT"
 
 # Case A1 (ARM = stamp session_id): bootstrap is the ARM action — the board it creates is born
 # OWNED by the creating session. The hook must stamp owner.session_id from the stdin session_id

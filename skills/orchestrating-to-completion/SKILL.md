@@ -54,6 +54,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | 「那个决策点**还没到——等我们到那儿了我再停下来问用户**。」 | 捂着一个*可预见的*用户决策，会把未来的临界路径焊死在用户的在线日程上。那个答案是一个 async 依赖（镜头 7）——**预取它（prefetch）**：如果只有用户能答、且问题已成 decision-shaped（决策形态），现在就问，与后台并行。发问的触发条件是「可预见 + 用户可达」，绝不是「节点变 ready 了」——见 `references/async-hitl.md` §HITL。 |
 | 「**窗口紧 / 预算紧，我把这几个任务串起来跑，省点也更稳妥。**」 | 串行化**不省 token 总量、只拉长 makespan**——同样的活照样要干，你只是不让它们重叠。省预算靠**降档 / 控 WIP / 推迟 float**（见 `references/cost-and-pacing.md`），绝不靠焊死并行。一条边要么指得出一个被下游消费的具体上游产物，要么删掉——别拿预算当画假串行边的借口。 |
 | 「我 **`Write` board 标了 `in_flight` 就等于派了**。」 | **board 标注 ≠ 真实派发。** 标 `in_flight` 必须由一次真实工具调用（Agent / Bash）产生一个 handle，否则就是**虚构进度**——board 与自报都「显示在跑」，背后却没有活 worker，你在空等一个不存在的进程。这正是 Finding #17 / #46 的病根（已写进 board log 仍复发）。先调工具拿 handle、再标板。 |
+| 「我 `--resume` 接手了，**当前 cwd 就是干活的地方，直接 reconcile / 跑闸**。」 | **resume 的 cwd 未必 == `board.git.worktree`。** 不先 `cd` 进 worktree 并核对一致，后续相对路径 / git / 端点闸全在错目录静默跑——轻则挂、重则在另一棵树上跑绿、把非目标产物标 `done`，端点验收（镜头 6）的可信度连必要条件都不成立。resume 第 0 步永远是落 worktree、确认 cwd==它——见 `references/resume-verify.md` §resume 第 0 步。 |
 
 ## Red Flags（红旗）—— 停下，重跑决策程序
 
@@ -125,9 +126,11 @@ digraph decision_program {
 
 board 是指挥为一场长任务存的持久 save file——一张带状态的任务依赖图。它一身二用：① 跨 compaction 存活的记忆，② hook（一个 shell，对 agent context 与内建 `Task` 工具都失明）唯一能读的窗口。**你的 board 文件才是单一真相源**（内建 `Task*` 工具至多是个非权威的 in-session 草稿镜像）；每个 turn 你 `Write` 整个文件（它很小），并在决策程序 step 7 flush 它。
 
-board 住在可配置的 home 里，每场 orchestration 一个唯一命名的文件；**哪块 board 归你，由你自己认领**——compaction 之后，列出 home、匹配 `goal`，就重新找到它。被钉死的只有一个 **narrow waist**（hook 依赖的契约——`schema`、`goal`、`owner`、`git`、`tasks[{id,status,deps}]`、以及 `status` enum），其余一切都 agent-shaped。**记两个 agent-shaped 遥测字段**（非 waist、hook 不可见，让进度 / 人工成本可观测并回喂规划）：标一个任务 `done` / `verified` 时盖上 `completed_at`（ISO-8601）；一个任务从用户拍板 resume 时给 `hitl_rounds` +1——细节见 `references/board.md`。**别凭记忆重推这些细节**——home 解析、完整的 pinned schema、status-enum 路由表、snapshot/flush 纪律、supersession，全都写在 **`references/board.md`** 里。动 board 契约之前先读它。
+board 住在可配置的 home 里，每场 orchestration 一个唯一命名的文件；**哪块 board 归你，由你自己认领**——compaction 之后，列出 home、匹配 `goal`，就重新找到它。被钉死的只有一个 **narrow waist**（hook 依赖的契约——`schema`、`goal`、`owner`、`git`、`tasks[{id,status,deps}]`、以及 `status` enum），其余一切都 agent-shaped。**盖三个 per-task 时间锚**（agent-shaped、非 waist、hook 不可见，全用严格 ISO-8601 UTC `YYYY-MM-DDTHH:MM:SSZ`；让进度 / 时长可观测并回喂规划）：建任务写进 `tasks[]` 那刻盖 `created_at`、派发 / 起跑那刻盖 `started_at`、标 `done` / `verified` 那刻盖 `finished_at`（不分 done/verified，验收用既有 `verified` 标记）；外加 `hitl_rounds`——一个任务从用户拍板 resume 时 +1。**`log` append-only**：条目写下即不可变（只增不改不删），用富 schema `{ ts, kind, summary, … }`——细节见 `references/board.md`。**别凭记忆重推这些细节**——home 解析、完整的 pinned schema、status-enum 路由表、snapshot/flush 纪律、supersession，全都写在 **`references/board.md`** 里。动 board 契约之前先读它。**改完 board 用 lint 自检它没被写坏**（不合法 JSON / 缺窄腰 / status 拼错 / dep 悬挂或成环大多静默坏掉三条链路）——`Write` / `Edit` 改本 session active board 后 PostToolUse hook 自动 lint，**用 `Bash`（`sed`/`echo`/`cat >`）手改后 hook 看不见、必手动跑** `node ${CLAUDE_SKILL_DIR}/scripts/board-lint.js`；细节见 `references/board.md` §board lint。
 
 要把一场 orchestration **优雅交给一个新 session**（quiesce → drain 在飞任务并就地端点验收 → 写一份**叙事层** handoff 文档 → 归档板换无摩擦 `--resume`）时，走 `/cc-master:handoff-to-new-session`，写侧纪律（含「叙事层 carries board 装不下的、绝不复抄 board 已装下的」无噪声纪律 + 6 段模板）见 **`references/handoff.md`**。
+
+**`--resume` 接手时第 0 步：先 `cd` 进 board 窄腰里的 `git.worktree`、确认 cwd == 它，再 reconcile / 验收。** cwd ≠ worktree 时后续相对路径 / git / 端点闸全在错目录静默跑（轻则挂、重则在错的树上跑绿、把非目标产物标 done）——展开见 `references/resume-verify.md` §resume 第 0 步。
 
 ---
 

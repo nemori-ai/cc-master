@@ -17,6 +17,16 @@ test('board.template.json is the empty skeleton with the pinned schema + empty g
   assert.ok('git' in b && 'log' in b);
 });
 
+test('board.template.json carries meta.template_version (integer ≥ 1) — agent-shaped, NOT the pinned waist', () => {
+  const b = read(`${A}/board.template.json`);
+  // meta.template_version is an agent-shaped namespace field (red line 2: never the
+  // hook-read narrow waist `schema`). It lets the timeline gate the real-time axis on
+  // "this-release-or-later" boards. Lock it into the content contract to prevent regression.
+  assert.ok(b.meta && typeof b.meta === 'object', 'board.template.json must carry a top-level meta object');
+  assert.ok(Number.isInteger(b.meta.template_version), 'meta.template_version must be an integer');
+  assert.ok(b.meta.template_version >= 1, 'meta.template_version must be ≥ 1');
+});
+
 test('board.example.json is a valid worked board with ≥1 task carrying id/status/deps', () => {
   const b = read(`${A}/board.example.json`);
   assert.equal(b.schema, 'cc-master/v1');

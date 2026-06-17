@@ -35,8 +35,10 @@ so the board shapes the assertions reference are real, not invented for the eval
 These are the assertions the grader checks against each transcript. They are
 written to be **discriminating** — passable only by actually exercising the
 skill's discipline, the way `agents/grader.md` insists ("a passing grade on a
-weak assertion is worse than useless"). Each maps to one of the four pillars the
-skill exists to enforce.
+weak assertion is worse than useless"). Each maps to one of the pillars the
+skill exists to enforce: decompose-before-dispatch, productive waiting,
+endpoint verification, surviving compaction, and — added with #5/#6 below —
+working within capacity (lens 5: pacing / quota awareness).
 
 1. **Decomposes before dispatching.** Before spawning any worker, the
    orchestrator wrote a board/DAG: a `*.board.json` exists, conforms to the
@@ -72,6 +74,31 @@ skill exists to enforce.
    ready frontier.* This is the assertion that justifies the board-as-save-file
    design at all.
 
+5. **Works within capacity — does not over-dispatch.** When the foundation
+   completes and the parallel leaves all flip to `ready` at once, the orchestrator
+   respects the capacity ceiling rather than firing every leaf the instant it can:
+   it keeps concurrent `in_flight` tasks at or below the board's `wip_limit`, does
+   not spawn redundant workers to "fill" idle capacity (gold-plated busywork), and
+   does not dispatch the same task to more than one agent. *Evidence: script the
+   transcript — count concurrent `in_flight` dispatches at each point in time and
+   compare against the board's top-level `wip_limit`; and count distinct workers
+   spawned per task id to detect duplicate dispatch of the same work.* Anti-pass:
+   concurrency that clearly exceeds `wip_limit`, a worker manufactured to avoid
+   leaving capacity idle, or two workers spawned for one task fails this — even if
+   the goal still completes.
+
+6. **Senses usage and paces against the 5h–7d window.** Over a longer run the
+   orchestrator does not stay blind to its own burn rate: it actively senses the
+   quota window — invoking the cc-usage signal, or reasoning explicitly in the
+   transcript about 5h/7d pacing — and lets that sensing move a lever (downshift a
+   model tier, lower WIP, defer float when the wall is near; or pull later float
+   forward / upshift when there is headroom before a reset). *Evidence: a
+   transcript turn that either runs the cc-usage signal script or carries explicit
+   pacing reasoning (a downshift / WIP / defer-float decision tied to the 5h–7d
+   window), not just unconditioned dispatch.* Anti-pass: a full long run with zero
+   usage sensing and zero pacing reasoning — burn-rate-blind from start to finish
+   — fails, even if it happens not to hit the wall.
+
 Keep assertion text verbatim-stable across iterations so the benchmark viewer's
 per-assertion columns stay comparable run to run.
 
@@ -93,18 +120,19 @@ version:
        └── without_skill/ run-1/  run-2/  run-3/
    ```
 
-   Write an `eval_metadata.json` per eval with the four assertions above as the
+   Write an `eval_metadata.json` per eval with the six assertions above as the
    `assertions` array, and capture each subagent's `timing.json`
    (`total_tokens`, `duration_ms`) from its completion notification — that is the
    only moment that data exists.
 
 2. **Grade each transcript.** Spawn a grader subagent that reads
-   `agents/grader.md` and evaluates the four assertions against each
+   `agents/grader.md` and evaluates the six assertions against each
    `transcript.md`. It writes `grading.json` into each `run-*/` directory. The
    `expectations` array MUST use the exact fields `text`, `passed`, `evidence` —
-   the aggregator and viewer depend on them. For the grep-able assertions (#2's
-   foreground `sleep`, #1's board-on-disk) write and run a script rather than
-   eyeballing; scripts are reproducible across iterations.
+   the aggregator and viewer depend on them. For the grep-able / scriptable
+   assertions (#2's foreground `sleep`, #1's board-on-disk, #5's concurrent
+   `in_flight` vs `wip_limit` and per-task worker count) write and run a script
+   rather than eyeballing; scripts are reproducible across iterations.
 
 3. **Aggregate.** Run the wrapper from the repo root:
 
@@ -150,7 +178,7 @@ version:
 
 The grader is Claude judging a Claude transcript. That correlated blind spot is
 exactly where a second, *non-Claude* judge earns its keep. After `grading.json`
-is written, run codex over the **same transcript + the same four assertions** and
+is written, run codex over the **same transcript + the same six assertions** and
 ask it to render its own verdict:
 
 ```bash
@@ -159,7 +187,7 @@ ask it to render its own verdict:
 # #20). `scripts/codex-review.sh` is the diff reviewer (for code changes), NOT a transcript grader.
 # For Track B use plain `codex exec`: the transcript goes in on stdin (appended as a <stdin> block),
 # the grading instructions are the prompt; force a read-only sandbox so the judge cannot mutate anything.
-codex exec "Four behavioral assertions: <the four assertions, verbatim>. Judge each PASS/FAIL \
+codex exec "Six behavioral assertions: <the six assertions, verbatim>. Judge each PASS/FAIL \
   against the transcript provided on stdin, with a one-line evidence quote per assertion. You are a \
   second, independent (non-Claude) judge — do not defer to the Claude grader." \
   -m gpt-5.5 -c model_reasoning_effort=high -c sandbox_mode='"read-only"' \
@@ -185,7 +213,7 @@ mean-ed in.
   the direction. When they split, investigate the assertion — do not pick a
   winner by fiat.
 - **The numbers are directional, never a verdict.** They tell you whether a skill
-  edit helped or hurt the four behaviors, not whether the skill is "done."
+  edit helped or hurt the six behaviors, not whether the skill is "done."
 - **This is NOT a per-commit gate.** It spends real tokens and minutes per run
   and the result is noisy — running it on every commit is both wasteful and
   misleading. It is a **pre-release / before-and-after-a-discipline-edit check**,
@@ -212,6 +240,6 @@ mean-ed in.
 - **Before a release, and before/after any edit to `orchestrating-to-completion`'s
   discipline layer** (decision program, Rationalization Table, Red Flags, the
   board protocol). Compare with_skill vs without_skill, and the new skill vs the
-  old, to confirm a discipline edit moved the four behaviors in the right
+  old, to confirm a discipline edit moved the six behaviors in the right
   direction rather than just reading nicer.
 - Not on every commit, not in CI — see "Reading the numbers honestly."

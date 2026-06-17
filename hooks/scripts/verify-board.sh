@@ -289,6 +289,103 @@ wakeup_is_object() { # $1 = board path
     }' "$1" 2>/dev/null | grep -q "yes"
 }
 
+# wakeup_fire_at BOARD — print the STRING value of `fire_at` nested ONE level inside the ROOT-depth
+# `"wakeup"` object ("" if there is no root wakeup object, or it carries no fire_at string). Same
+# root-only, string/escape/depth-aware discipline as wakeup_is_object / owner_region: we only enter the
+# ROOT `"wakeup"` object (curly depth 1, bracket depth 0) and read `fire_at` at THAT object's own field
+# level (curly depth 2, bracket depth 0) — a `fire_at` nested deeper inside wakeup, or anywhere else in
+# the file (a task/log payload's own `wakeup.fire_at`), is never captured. FORMAT-AGNOSTIC (single-line
+# == multi-line). This is the expiry-aware half of the soft-observed watchdog read (ADR-011, Finding #56
+# family / 簇#2 self-heal): the watchdog判定 below treats an EXPIRED fire_at as "not armed" so a stale
+# wakeup left behind by a watchdog that already should have fired no longer silences the reminder.
+wakeup_fire_at() { # $1 = board path
+  awk '
+    { s = s $0 "\n" }
+    END {
+      n = length(s)
+      cd = 0; bd = 0; instr = 0; esc = 0
+      capkey = 0; key = ""; pendKey = ""        # pendKey: last completed key string at current depth
+      inwk = 0; wd = 0                          # inwk: inside root wakeup object, opened at curly depth wd
+      capval = 0; val = ""                      # capval: capturing the fire_at string value
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        if (inwk) {                             # already inside the root wakeup object (opened at depth wd)
+          if (instr) {
+            if (esc) { esc = 0; if (capkey) key = key ch; else if (capval) val = val ch; continue }
+            if (ch == "\\") { esc = 1; if (capkey) key = key ch; else if (capval) val = val ch; continue }
+            if (ch == "\"") {
+              instr = 0
+              if (capkey) { capkey = 0; pendKey = key }
+              else if (capval) { print val; exit }   # closed the fire_at string value → done
+              continue
+            }
+            if (capkey) key = key ch
+            else if (capval) val = val ch
+            continue
+          }
+          if (ch == "\"") {                     # a string at wakeup-field level is a key, or the fire_at value
+            instr = 1
+            if (cd == wd && bd == 0 && pendKey == "fire_at") { capval = 1; val = "" }
+            else if (cd == wd && bd == 0) { capkey = 1; key = "" }
+            else { capkey = 0; capval = 0 }
+            continue
+          }
+          if (ch == "[") { bd++; continue }
+          if (ch == "]") { if (bd > 0) bd--; continue }
+          if (ch == "{") { cd++; pendKey = ""; continue }
+          if (ch == "}") { cd--; pendKey = ""; if (cd < wd) { inwk = 0; break } continue }   # wakeup closed → no fire_at
+          if (ch == ":") continue
+          if (ch == ",") pendKey = ""
+          continue
+        }
+        if (instr) {                            # in a string while still scanning for root "wakeup":{
+          if (esc) { esc = 0; if (capkey) key = key ch; continue }
+          if (ch == "\\") { esc = 1; if (capkey) key = key ch; continue }
+          if (ch == "\"") { instr = 0; if (capkey) { capkey = 0; pendKey = key } continue }
+          if (capkey) key = key ch
+          continue
+        }
+        if (ch == "\"") {                        # a string starting at ROOT depth is a candidate key
+          instr = 1
+          if (cd == 1 && bd == 0) { capkey = 1; key = "" } else capkey = 0
+          continue
+        }
+        if (ch == "[") { bd++; pendKey = ""; continue }
+        if (ch == "]") { if (bd > 0) bd--; continue }
+        if (ch == "{") {
+          cd++
+          if (cd == 2 && bd == 0 && pendKey == "wakeup") { inwk = 1; wd = 2 }   # entered root wakeup{}
+          pendKey = ""
+          continue
+        }
+        if (ch == "}") { if (cd > 0) cd--; pendKey = ""; continue }
+        if (ch == ",") pendKey = ""
+      }
+    }' "$1" 2>/dev/null
+}
+
+# wakeup_armed BOARD — exit 0 iff the board carries a watchdog that should be honored as ARMED, i.e. NOT
+# stale (Finding #56 family / 簇#2 self-heal, ADR-011). "Armed" = a root `wakeup` OBJECT whose `fire_at`
+# is EITHER absent / not in strict ISO-8601-UTC `YYYY-MM-DDTHH:MM:SSZ` form (graceful-degrade: an old or
+# agent-shaped board we can't reason about is left ALONE → treated as armed, today's behavior) OR a
+# legal fire_at that is still in the FUTURE (>= now). The ONLY case treated as "not armed" is the trio
+# "object + legal fire_at + already past now" — a watchdog that should already have fired but a task is
+# still in_flight: that IS the silent-failure signal, so the reminder must fire again (self-heal).
+# ISO-8601-UTC strings (fixed-width, Z suffix) sort lexicographically in time order, so a plain string
+# compare `fire_at < now` is a valid time compare (pure bash, no date math). Graceful-degrade is red
+# line 2 (wakeup is soft-observed / agent-shaped, NOT pinned waist): a malformed/absent fire_at must
+# never break an older board — only the fully-determined stale trio downgrades to "not armed".
+ISO_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'
+wakeup_armed() { # $1 = board path
+  wakeup_is_object "$1" || return 1            # no root wakeup object → not armed
+  fa="$(wakeup_fire_at "$1")"
+  [ -z "$fa" ] && return 0                     # object but no fire_at → graceful-degrade → armed
+  printf '%s' "$fa" | grep -qE "$ISO_RE" || return 0   # malformed fire_at → graceful-degrade → armed
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  [ "$fa" \< "$now" ] && return 1              # legal fire_at already in the past → STALE → not armed
+  return 0                                     # legal fire_at still in the future → armed
+}
+
 active_found=0; empty_active=0; actionable=0
 watchdog_needed=0                          # 1 if any matched board has an in_flight task but no armed wakeup
 matched_boards=""                          # newline-separated paths of THIS session's active boards
@@ -310,12 +407,15 @@ for b in "$HOME_DIR"/*.board.json; do
   if printf '%s' "$region" | grep -qE '"status"[[:space:]]*:[[:space:]]*"(ready|uncertain)"'; then
     actionable=1
   fi
-  # Watchdog (ADR-011): if THIS board has an in_flight TASK but no armed `wakeup` object, a background
-  # task could fail silently with no one coming back to recon it. Soft-observed (graceful-degrade like
+  # Watchdog (ADR-011): if THIS board has an in_flight TASK but no ARMED `wakeup`, a background task
+  # could fail silently with no one coming back to recon it. Soft-observed (graceful-degrade like
   # wip_limit): only the completion-state handshake below acts on this — actionable/empty boards block
   # earlier and never reach it. in_flight is read from the tasks REGION (log entries excluded).
+  # EXPIRY-AWARE (Finding #56 family / 簇#2 self-heal): wakeup_armed counts a STALE wakeup (object with a
+  # legal fire_at already in the past) as NOT armed, so a stale safety net left behind by a watchdog that
+  # should already have fired no longer silences the reminder while a task is still in_flight.
   if printf '%s' "$region" | grep -qE '"status"[[:space:]]*:[[:space:]]*"in_flight"'; then
-    wakeup_is_object "$b" || watchdog_needed=1
+    wakeup_armed "$b" || watchdog_needed=1
   fi
 done
 
@@ -336,10 +436,21 @@ done
 # already handshook under the old logic is forced through ONE fresh handshake → watchdog reminder fires
 # instead of being silently skipped via the allow-early-exit path. watchdog_needed is computed in the
 # board scan ABOVE, so its value is already settled when this runs.
+# FIRE_AT DIMENSION (簇#2 self-heal): each matched board's root `wakeup.fire_at` value is ALSO folded in
+# — but ONLY when it is non-empty (a board with NO wakeup contributes nothing, so it hashes EXACTLY as
+# the pre-fire_at formula did → no spurious handshake churn on the no-wakeup majority, and the test
+# mirror for no-wakeup boards stays valid). Re-arming a stale watchdog with a FRESH future fire_at flips
+# watchdog_needed 1→0 (the digest already changes from the watchdog bit), but folding fire_at itself in
+# also makes "swap one future fire_at for another future fire_at" (watchdog_needed stays 0 both times)
+# count as a CHANGED completion state → re-force ONE fresh handshake so the orchestrator re-confirms the
+# new watchdog rather than silently riding the old handshook fingerprint.
 status_fingerprint() {
   { printf 'watchdog_needed:%s\n' "$watchdog_needed"
     printf '%s' "$matched_boards" | while IFS= read -r bp; do
-      [ -n "$bp" ] && tasks_region "$bp" \
+      [ -n "$bp" ] || continue
+      fa="$(wakeup_fire_at "$bp")"
+      [ -n "$fa" ] && printf 'fire_at:%s\n' "$fa"
+      tasks_region "$bp" \
         | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"'
     done
   } | cksum | awk '{print $1}'
@@ -424,6 +535,6 @@ fi
 # observed: an already-armed `wakeup` object silences this (graceful-degrade like wip_limit). The
 # canonical anchor phrase "arm a watchdog wakeup" maps to the wait-edge in the orchestration skill.
 if [ "$watchdog_needed" -eq 1 ]; then
-  handshake_reason="$handshake_reason This board has an in_flight background task but no armed watchdog (the \`wakeup\` field is missing). Before you stop, arm a watchdog wakeup (CronCreate one-shot / ScheduleWakeup / Monitor / background-shell \`until\`) for the in_flight tasks that could fail silently, and record what to recon when it fires in the board's \`wakeup.checklist\` — otherwise a silently-failing background task leaves no one to come back and look."
+  handshake_reason="$handshake_reason This board has an in_flight background task but no armed watchdog (the \`wakeup\` field is missing, or its \`fire_at\` is already in the past — a watchdog that should have fired but the task is still in_flight is itself the silent-failure signal). Before you stop, arm a watchdog wakeup (CronCreate one-shot / ScheduleWakeup / Monitor / background-shell \`until\`) for the in_flight tasks that could fail silently, and record what to recon when it fires in the board's \`wakeup.checklist\` — otherwise a silently-failing background task leaves no one to come back and look."
 fi
 emit_block "$handshake_reason"
