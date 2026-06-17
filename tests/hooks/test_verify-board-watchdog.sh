@@ -34,14 +34,16 @@ assert_contains "$HOOK_OUT" "$CANON" "WD-a: in_flight + no wakeup → reason car
 assert_valid_json "$HOOK_OUT" "WD-a: hook stdout is well-formed JSON with watchdog clause appended"
 rm -rf "$H"
 
-# Case WD-b: completion state, an in_flight task, WITH an armed top-level `wakeup` OBJECT → still a
-#            completion handshake block (in_flight is a completion state), but the reason must NOT carry
-#            the watchdog nudge (graceful-degrade: an armed watchdog silences the reminder).
+# Case WD-b: completion state, an in_flight task, WITH an armed top-level `wakeup` OBJECT whose `fire_at`
+#            is still in the FUTURE → still a completion handshake block (in_flight is a completion
+#            state), but the reason must NOT carry the watchdog nudge (graceful-degrade: a non-stale
+#            armed watchdog silences the reminder). fire_at fixed far in the future so it is unambiguously
+#            non-stale under the expiry-aware read (簇#2).
 H="$(make_project)"; SID="sess-wd-b"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"wakeup\":{\"armed_at\":\"2026-06-16T00:00:00Z\",\"fire_at\":\"2026-06-16T00:30:00Z\",\"mechanism\":\"cron\",\"job_id\":\"job-1\",\"checklist\":[\"recon T2 handle vs ground truth\"]},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"wakeup\":{\"armed_at\":\"2099-01-01T00:00:00Z\",\"fire_at\":\"2099-01-01T00:30:00Z\",\"mechanism\":\"cron\",\"job_id\":\"job-1\",\"checklist\":[\"recon T2 handle vs ground truth\"]},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
-assert_contains "$HOOK_OUT" "self-check" "WD-b: in_flight + armed wakeup → still the completion self-check handshake"
-assert_not_contains "$HOOK_OUT" "$CANON" "WD-b: in_flight + armed wakeup OBJECT → NO watchdog nudge (graceful-degrade like wip_limit)"
+assert_contains "$HOOK_OUT" "self-check" "WD-b: in_flight + armed (future) wakeup → still the completion self-check handshake"
+assert_not_contains "$HOOK_OUT" "$CANON" "WD-b: in_flight + armed (future) wakeup OBJECT → NO watchdog nudge (graceful-degrade like wip_limit)"
 rm -rf "$H"
 
 # Case WD-c: completion state with NO in_flight task (all done) → no watchdog nudge (nothing can fail
@@ -173,6 +175,30 @@ assert_not_contains "$HOOK_OUT" "block" "WD-j: 2nd Stop, same fingerprint → al
 assert_not_contains "$HOOK_OUT" "$CANON" "WD-j: 2nd Stop → no repeated watchdog nag (handshook once)"
 assert_eq 0 "$HOOK_RC" "WD-j: 2nd Stop → rc 0 (allow path)"
 assert_eq "0 $NEW_FP" "$(cat "$H/.$SID.stopcheck")" "WD-j: dedup allow KEEPS the handshook fp (allow_handshook_fp)"
+rm -rf "$H"
+
+# ── EXPIRY-AWARE SELF-HEAL (簇#2: a STALE wakeup must not silence the reminder) ────────────────────
+# wakeup_armed treats "object + legal fire_at + already past now" as NOT armed (the watchdog should have
+# fired but the task is still in_flight → itself the silent-failure signal). The ONLY downgrade case is
+# that fully-determined stale trio; missing/malformed fire_at graceful-degrades to "armed" (red line 2).
+
+# Case WD-k (STALE wakeup → re-remind): completion state + an in_flight task + a `wakeup` OBJECT whose
+#            `fire_at` is in the PAST (legal ISO-8601-UTC, < now). The stale safety net must NOT silence
+#            the reminder — the hook self-heals and re-injects the canonical watchdog nudge.
+H="$(make_project)"; SID="sess-wd-k"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"wakeup\":{\"armed_at\":\"2000-01-01T00:00:00Z\",\"fire_at\":\"2000-01-01T00:30:00Z\",\"mechanism\":\"cron\",\"job_id\":\"job-stale\",\"checklist\":[\"recon T2\"]},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "WD-k: stale wakeup (fire_at in past) + in_flight → completion handshake block"
+assert_contains "$HOOK_OUT" "$CANON" "WD-k: stale wakeup (fire_at already past) does NOT silence → reminder re-fires (self-heal)"
+rm -rf "$H"
+
+# Case WD-l (FUTURE wakeup → stay silent): same as WD-k but `fire_at` is in the FUTURE (not yet expired)
+#            → the watchdog is genuinely armed → the reminder must NOT fire (this dimension stays silent).
+H="$(make_project)"; SID="sess-wd-l"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"wakeup\":{\"armed_at\":\"2099-01-01T00:00:00Z\",\"fire_at\":\"2099-01-01T00:30:00Z\",\"mechanism\":\"cron\",\"job_id\":\"job-future\",\"checklist\":[\"recon T2\"]},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "self-check" "WD-l: future wakeup + in_flight → still the completion self-check handshake"
+assert_not_contains "$HOOK_OUT" "$CANON" "WD-l: future (non-expired) wakeup → reminder stays silent (genuinely armed)"
 rm -rf "$H"
 
 finish

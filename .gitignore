@@ -8,3 +8,4 @@ tests/**/.tmp-*/
 .claude/cc-master/
 # working plans + build board — not version-controlled
 design_docs/plans/
+.gstack/

@@ -1,5 +1,6 @@
 {
   "schema": "cc-master/v1",
+  "meta": { "template_version": 1 },
   "goal": "",
   "owner": { "active": true, "session_id": "", "heartbeat": "" },
   "git": { "worktree": "", "branch": "" },

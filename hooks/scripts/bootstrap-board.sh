@@ -563,8 +563,11 @@ if [ -f "$TEMPLATE" ]; then
   sed "s/\"session_id\"[[:space:]]*:[[:space:]]*\"\"/\"session_id\": \"$sid_esc\"/" "$BOARD" > "$tmp" && mv -f "$tmp" "$BOARD"
 else
   # Template-missing fallback: build the board inline, stamping the real sid into owner.session_id
-  # (was a hardcoded empty "" before — that left every bootstrapped board unowned).
-  printf '{"schema":"cc-master/v1","goal":"","owner":{"active":true,"session_id":"%s","heartbeat":""},"git":{"worktree":"","branch":""},"wip_limit":4,"tasks":[],"log":[]}\n' "$sid_esc" > "$BOARD"
+  # (was a hardcoded empty "" before — that left every bootstrapped board unowned). Seed the
+  # agent-shaped meta.template_version too, in parity with board.template.json — it is NOT the hook-read
+  # narrow waist `schema` (red line 2): no hook reads it; it lets the timeline gate its real-time axis on
+  # this-release-or-later boards. Pure bash printf only — no jq/python/node (red line 1).
+  printf '{"schema":"cc-master/v1","meta":{"template_version":1},"goal":"","owner":{"active":true,"session_id":"%s","heartbeat":""},"git":{"worktree":"","branch":""},"wip_limit":4,"tasks":[],"log":[]}\n' "$sid_esc" > "$BOARD"
 fi
 
 ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. Decompose the goal into a dependency DAG and write tasks[] into that board file, set goal/owner/git, then invoke the orchestrating-to-completion skill and run the decision program."

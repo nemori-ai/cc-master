@@ -81,8 +81,8 @@
 - **① 愿景断言**：拆成依赖 DAG、把计划做成被持续管理 / 跨 compaction 存活 / 可重规划的真文件。
 - **② 落地 trace**：`bootstrap-board.sh:43-66`（从 goal 建空 board 骨架，hook 不写 tasks）；board schema `assets/board.template.json` + narrow waist `tasks[{id,status,deps}]`+status enum（`board.md:43-66`，ADR-003）；`verify-board.sh:67-114`（escape-aware awk 真解析 tasks region、数 id、grep status）🟢；分解方法 CPM/float **只在** `references/decomposition.md` + `commands/status.md:19`（grep 确认 hooks/commands **零**机器计算 float）；supersession = 把 status 写 escalated/stale（`board.md:97-102`），纯靠 agent 每回合 Write 整文件。
 - **③ 等级**：**board=被管理的持久计划 🟢** · **narrow-waist 契约 🟢（最硬一块）** · 完成度判定 🟢 · 分解方法（CPM/float）🟡（prose-only）· per-node 契约 🟡 · **更新/supersession 跨 compaction 续 🟡（关键断点）**。
-- **④ adversarial 断点**：critical-path 是幻觉（无代码算 float，大 DAG 上 agent 心算会错且无校验）；supersession 漏写即丢（compaction 卡在标完一个、没标完剩下之间，reinject 不提示「上次没标完」）；重规划无事务性（重写 tasks[] 半截 compaction → torn-plan，hook 只数 id/status 不验 deps 图完整/无环）；per-node 契约可空（没 success predicate 也能 dispatch，端点验收无据）。
-- **⑤ 严重度 + 处置**：**中-高**（supersession/重规划）。处置：`status.md` health-check 增「deps 图完整性 + 悬挂 stale 检测」（read-only 纯 bash）；reinject 增「上次 board 有未消化的 stale/escalated 吗」；`status.md`「critical path」措辞标注「agent 心算」或提供带外 `scripts/` 真算 float 脚本（ship-anywhere 不进 hook）。
+- **④ adversarial 断点**：critical-path 是幻觉（无代码算 float，大 DAG 上 agent 心算会错且无校验）；supersession 漏写即丢（compaction 卡在标完一个、没标完剩下之间，reinject 不提示「上次没标完」）；重规划无事务性（重写 tasks[] 半截 compaction → torn-plan）；per-node 契约可空（没 success predicate 也能 dispatch，端点验收无据）。**deps 图完整性已由 board lint 兑现**（T9）：`board-lint-core.js` 的 R4（悬挂引用 / 自环 / 无环 DFS）+ PostToolUse hook（写坏即反馈）+ 手动脚本（补 Bash 编辑盲区）——「hook 只数 id/status 不验 deps 图完整/无环」的旧断点已闭合（hook 仍只数 id/status，但 lint hook 现验 deps 图）。
+- **⑤ 严重度 + 处置**：**中-高**（supersession/重规划）。处置：~~`status.md` health-check 增「deps 图完整性」~~ **已由 board lint 落地**（T9，node 实现比原计划纯 bash 更稳——ADR-006 §3.0 deps-graph integrity 用 node 用例；双交付 hook 自动 + 手动脚本，覆盖比「只在 /status 时手算」更广、更即时）；**悬挂 stale 检测**仍归 reinject 续跑提示（「上次 board 有未消化的 stale/escalated 吗」——属语义判断非结构正确性，board lint 不越界吃它）；`status.md`「critical path」措辞标注「agent 心算」或提供带外 `scripts/` 真算 float 脚本（ship-anywhere 不进 hook）。
 - **⑥ gap vs 设计意图**：分解方法 prose = **非 gap**（红线 1 hook 读不了语义算不了语义化临界路径 + 红线 4 分解是指挥判断活，ADR-004 §2.2）；board/narrow-waist/goal-hook 🟢 = 真机制无虚标；**真张力** = supersession/重规划**无事务一致性**——ADR-003 §3.3 有意把 supersession 设计成显式 status 改（留痕在 board），但「靠 agent 记得 Write」零 hook 兜底是 ADR-004 已自承的 ceiling；该不该加 read-only deps 一致性守护是**未被现有 ADR 正面拍板**的开放张力。
 
 ### C5 — 在资源消耗速度合理前提下最大化实施效率的调度编排
@@ -111,7 +111,7 @@
 
 1. **C5 过调度无兜底**〔中，**廉价护栏·首推**〕→ Track B 加第 5 条断言「不过调度」（in_flight ≤ wip_limit、无巨型 fan-out）。不碰 waist，补上唯一机制兜底的非对称。
 2. **C3 HITL 对称缺口**〔中，**廉价护栏**〕→ `verify-board.sh` 完成态握手文案在存在 `blocked_on:"user"` 时列出其 title。纯 bash 只读 board。
-3. **C4 supersession 无事务性**〔中-高，**廉价护栏 + 措辞**〕→ `status.md` 加 deps 图一致性 + 悬挂 stale 检测（read-only）；`status.md`「critical path」措辞标注「agent 心算」或带外 `scripts/` 真算 float。
+3. **C4 supersession 无事务性**〔中-高，**廉价护栏 + 措辞**〕→ ~~`status.md` 加 deps 图一致性~~ **deps 图一致性已由 board lint 兑现（T9，R4 悬挂/自环/无环 + 双交付 hook+手动脚本）**；悬挂 stale 检测仍归 reinject；`status.md`「critical path」措辞标注「agent 心算」或带外 `scripts/` 真算 float。
 4. **C2 传感器不被 loop 触发**〔中-高，**软 prose + 可选字段**〕→ 决策程序 reconcile 加软 sensing 节律提示（非红线）；board 加 agent-shaped budget 快照字段；Track B 加「长跑要 sense」断言。
 5. **C6 duration 维缺失 + overclaim**〔低-中，**措辞校准 or 接维**〕→ 二选一：把 duration 接进 `cost-and-pacing.md` 选档规则，或修 `README`/`spec` 措辞去掉 overclaim。
 6. **C1 board 完整性零机制保障**〔中-高，**最贵最慎**〕→ 候选 waist 字段 `done` 必带 `verified:true`+`artifact`（动 waist = 红线 2，须同 PR 改全部 hook + 测试 + ADR-003）；或显式接受为 ship-anywhere ceiling 并留痕。
