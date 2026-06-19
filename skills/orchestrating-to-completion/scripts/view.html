@@ -1053,6 +1053,76 @@
       word-break: break-all; text-align: center;
     }
 
+    /* ============================ DISCUSS HISTORY =========================== */
+    /* A node's past-discussion record in the detail rail. Same amber-wash +
+       hairline idiom as .deccard / .why-text (NO side-stripe). A collapsible
+       summary line (count + latest TL;DR + time) expands to per-round entries;
+       each entry reuses the .askbadge from the decision card. */
+    .dsect.dischist .sl { color: var(--ink-dim); }
+    .dischist-box {
+      background: oklch(0.80 0.150 66 / 0.05);
+      border: 1px solid oklch(0.80 0.150 66 / 0.18);
+      border-radius: var(--r-md);
+      overflow: hidden;
+    }
+    .dh-summary {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 10px 11px; cursor: pointer; user-select: none;
+      transition: background 160ms ease;
+    }
+    .dh-summary:hover { background: oklch(0.80 0.150 66 / 0.06); }
+    .dh-summary:focus-visible {
+      outline: 2px solid oklch(0.80 0.150 66 / 0.55); outline-offset: -2px;
+    }
+    .dh-caret {
+      flex: 0 0 auto; color: var(--alert); font-size: 11px; line-height: 1.5;
+      margin-top: 1px;
+    }
+    .dh-summary-text {
+      flex: 1 1 auto; min-width: 0;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .dh-summary-text .dh-count {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--alert);
+    }
+    .dh-summary-text .dh-tldr {
+      font-size: 12px; line-height: 1.45; color: var(--ink); word-break: break-word;
+    }
+    .dh-summary-text .dh-when {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9px; letter-spacing: 0.04em; color: var(--ink-faint);
+      font-variant-numeric: tabular-nums;
+    }
+    /* expanded per-round entries */
+    .dh-entries {
+      display: flex; flex-direction: column;
+      border-top: 1px solid oklch(0.80 0.150 66 / 0.16);
+    }
+    .dh-entry {
+      display: flex; flex-direction: column; gap: 5px;
+      padding: 9px 11px;
+      border-top: 1px solid var(--hair-soft);
+    }
+    .dh-entry:first-child { border-top: none; }
+    .dh-ehead {
+      display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+    }
+    .dh-ehead .dh-round {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9.5px; font-weight: 500; letter-spacing: 0.04em;
+      color: var(--ink-dim); font-variant-numeric: tabular-nums;
+    }
+    .dh-ehead .dh-when {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 9px; letter-spacing: 0.04em; color: var(--ink-faint);
+      font-variant-numeric: tabular-nums; margin-left: auto;
+    }
+    .dh-entry .dh-etldr {
+      font-size: 11.5px; line-height: 1.5; color: var(--ink-dim); word-break: break-word;
+    }
+
     /* ============================ LIST VIEW — the status-board ============== */
     /* The TUI status-board's web twin: a scannable, status-grouped column. Same
        live board / poll / analyze() as the DAG, same detail rail. Replaces the
@@ -2445,6 +2515,10 @@
       const [edges, setEdges] = useState([]);
       const [err, setErr] = useState(null);
       const [sel, setSel] = useState(null);  // selected task id (lineage anchor)
+      // discuss-history sidecars, fetched from the OPTIONAL read-only /decisions.json
+      // route (added by a newer view-server). Stays [] on any failure — an older
+      // server returns 404 here and the whole history feature silently no-ops.
+      const [decisions, setDecisions] = useState([]);
       // view mode: 'graph' (xyflow DAG) | 'board' (Kanban card board) | 'list'
       // (status-board) | 'timeline' (the time/gantt swimlanes). Persisted in
       // localStorage (key ccm-view); default 'graph'. Migrate gracefully: any
@@ -2543,6 +2617,57 @@
         const iv = setInterval(poll, 2000);
         return () => { alive = false; clearInterval(iv); };
       }, [apply]);
+
+      // ---- discuss history poll — OPTIONAL, fail-silent ---------------------
+      // Pull /decisions.json on the same 2s cadence as the board. This route is
+      // served only by a newer view-server; on an older server it 404s. Every
+      // failure path (404, network error, non-array body) collapses to keeping
+      // the last good list — never throws, never disturbs the board render. A
+      // node with no sidecars simply has no group → its history section is omitted.
+      useEffect(() => {
+        let alive = true;
+        async function pollDecisions() {
+          try {
+            const r = await fetch('/decisions.json', { cache: 'no-store' });
+            if (!alive) return;
+            if (!r.ok) { return; } // 404 (old server) or mid-write -> silently skip
+            const d = await r.json();
+            if (!alive) return;
+            setDecisions(Array.isArray(d) ? d : []);
+          } catch (_e) { /* old server / transient -> keep last, stay silent */ }
+        }
+        pollDecisions();
+        const iv = setInterval(pollDecisions, 2000);
+        return () => { alive = false; clearInterval(iv); };
+      }, []);
+
+      // group decision sidecars by node_id, newest-first within each group. Used
+      // by the detail rail to show a node's discuss history. Guards every field:
+      // a malformed entry (missing node_id, non-string stamps) degrades, never throws.
+      const decisionsByNode = useMemo(() => {
+        const m = new Map();
+        const list = Array.isArray(decisions) ? decisions : [];
+        for (const d of list) {
+          if (!d || typeof d !== 'object') continue;
+          const nid = (d.node_id != null && String(d.node_id).trim()) ? String(d.node_id).trim() : null;
+          if (!nid) continue;
+          if (!m.has(nid)) m.set(nid, []);
+          m.get(nid).push(d);
+        }
+        // sort each group by round (then resolved_at) ascending; the latest is last.
+        for (const arr of m.values()) {
+          arr.sort((a, b) => {
+            const ra = Number(a.round), rb = Number(b.round);
+            const aHas = Number.isFinite(ra), bHas = Number.isFinite(rb);
+            if (aHas && bHas && ra !== rb) return ra - rb;
+            const ta = parseTs(typeof a.resolved_at === 'string' ? a.resolved_at : '');
+            const tb = parseTs(typeof b.resolved_at === 'string' ? b.resolved_at : '');
+            if (ta != null && tb != null) return ta - tb;
+            return 0;
+          });
+        }
+        return m;
+      }, [decisions]);
 
       // selection handlers — re-render graph (lineage) without re-layout
       const select = useCallback((id) => {
@@ -2724,7 +2849,9 @@
             h(Legend, { counts, total: progress.total }),
           ) : null,
           // right detail rail (slides in on selection)
-          h(Detail, { task: selTask, an, board, onClose: () => select(null), onPick: select }),
+          h(Detail, { task: selTask, an, board,
+            discussions: (selTask ? (decisionsByNode.get(selTask.id) || []) : []),
+            onClose: () => select(null), onPick: select }),
         ),
       );
     }
@@ -3497,6 +3624,77 @@
       );
     }
 
+    // ---- DISCUSS HISTORY — past discussions on a node ----------------------
+    // Renders the discuss-sidecar record for one node: a summary line (count +
+    // latest TL;DR + latest time) that expands to per-round entries. Fed the
+    // already-grouped, round-ascending list for the selected node. Every field is
+    // guarded — a sidecar missing tldr / resolved_at / round still renders (that
+    // line just drops the absent bit); a wholly empty entry is skipped, never throws.
+    // The `ask_type` badge reuses the .askbadge idiom from the decision card.
+    function localTime(iso) {
+      const ms = parseTs(typeof iso === 'string' ? iso : '');
+      if (ms == null) return (typeof iso === 'string' && iso.trim()) ? iso.trim() : null;
+      try { return new Date(ms).toLocaleString(); } catch (_e) { return iso; }
+    }
+    function DiscussHistory({ items }) {
+      const [open, setOpen] = useState(false);
+      const list = Array.isArray(items) ? items : [];
+      if (!list.length) return null;
+
+      // latest = last element (the group is round/time ascending). TL;DR + time
+      // for the summary line both come from it, each independently guarded.
+      const latest = list[list.length - 1];
+      const latestTldr = (latest && typeof latest.tldr === 'string' && latest.tldr.trim())
+        ? latest.tldr.trim() : null;
+      const latestWhen = latest ? localTime(latest.resolved_at) : null;
+
+      const summaryBits = [
+        h('span', { key: 'n', className: 'dh-count' }, '已讨论 ' + list.length + ' 次'),
+      ];
+      if (latestTldr) summaryBits.push(
+        h('span', { key: 'tl', className: 'dh-tldr' }, '最近结论：' + latestTldr));
+      if (latestWhen) summaryBits.push(
+        h('span', { key: 'wh', className: 'dh-when' }, latestWhen));
+
+      const rows = list.map((d, i) => {
+        if (!d || typeof d !== 'object') return null;
+        const round = Number(d.round);
+        const roundStr = Number.isFinite(round) ? '#' + round : null;
+        const when = localTime(d.resolved_at);
+        const askKey = (d.ask_type === 'decision' || d.ask_type === 'advice' || d.ask_type === 'solution')
+          ? d.ask_type : null;
+        const askMeta = askKey ? ASK_META[askKey] : null;
+        const tldr = (typeof d.tldr === 'string' && d.tldr.trim()) ? d.tldr.trim() : null;
+        // skip an entry with literally nothing to show
+        if (!roundStr && !when && !askMeta && !tldr) return null;
+
+        const head = [];
+        if (roundStr) head.push(h('span', { key: 'r', className: 'dh-round' }, roundStr));
+        if (askMeta) head.push(
+          h('span', { key: 'ab', className: 'askbadge ' + askKey },
+            h('span', { className: 'glyph' }, askMeta.glyph), askMeta.label));
+        if (when) head.push(h('span', { key: 'w', className: 'dh-when' }, when));
+
+        return h('div', { className: 'dh-entry', key: (roundStr || '') + i },
+          head.length ? h('div', { className: 'dh-ehead' }, ...head) : null,
+          tldr ? h('div', { className: 'dh-etldr' }, tldr) : null,
+        );
+      }).filter(Boolean);
+
+      return h('div', { className: 'dischist-box' },
+        h('div', {
+          className: 'dh-summary' + (open ? ' open' : ''),
+          onClick: () => setOpen(o => !o),
+          role: 'button', tabIndex: 0,
+          title: open ? '收起讨论历史' : '展开讨论历史',
+        },
+          h('span', { className: 'dh-caret' }, open ? '▾' : '▸'),
+          h('span', { className: 'dh-summary-text' }, ...summaryBits),
+        ),
+        open && rows.length ? h('div', { className: 'dh-entries' }, ...rows) : null,
+      );
+    }
+
     // ---- DECISION CARD — rich awaiting-user briefing -----------------------
     // When an awaiting-user node carries a prepared `decision_package` (an
     // agent-shaped, on-board field — NOT part of the narrow waist), the amber
@@ -3633,7 +3831,7 @@
     }
 
     // ---- DETAIL RAIL — full task readout -----------------------------------
-    function Detail({ task, an, board, onClose, onPick }) {
+    function Detail({ task, an, board, discussions, onClose, onPick }) {
       const open = !!task;
       const lamp = task ? statusColor(task.status) : 'transparent';
 
@@ -3720,6 +3918,18 @@
           body.push(h('div', { className: 'dsect decision', key: 'decision' },
             h('div', { className: 'sl' }, '◈ decision needed'),
             h(DecisionCard, { pkg: task.decision_package }),
+          ));
+        }
+
+        // discuss history — any node (not just awaiting-user) that has ≥1 discuss
+        // sidecar shows a collapsible record of past discussions. Sourced from the
+        // OPTIONAL /decisions.json; when absent (old server) discussions is [] and
+        // this whole section is omitted. Independent of the live decision_package.
+        const discList = Array.isArray(discussions) ? discussions : [];
+        if (discList.length) {
+          body.push(h('div', { className: 'dsect dischist', key: 'dischist' },
+            h('div', { className: 'sl' }, '💬 discuss history'),
+            h(DiscussHistory, { items: discList }),
           ));
         }
 

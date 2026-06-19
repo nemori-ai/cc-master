@@ -62,7 +62,11 @@ argument-hint: <node-id>
 
 **先过一道 path-safe guard，再拼任何 sidecar 路径。** board 契约只要求 task id 是非空串——若某 id 含 `/` 或 `..`，把裸 `<node-id>` 拼进 sidecar 文件名会建嵌套文件、甚至逃出 board home。落 sidecar 前**校验 `<node-id>` 是 path-safe**：必须匹配 `^[A-Za-z0-9._-]+$`，且不是 `.` 也不是 `..`。**不满足就清楚报错并停**——告诉用户「节点 id `<...>` 含路径不安全字符，无法安全落 sidecar」，**绝不**用不安全 id 拼路径（实践中 board id 由 master 生成、本就 path-safe，这道闸只兜异常）。
 
-guard 通过后，把讨论整理成一份决策文档，写到 **`<board-home>/<board-stem>--<node-id>.decision.md`**（board home 同第 1 步；**`<board-stem>` = 第 1 步定位到的那块 board 的文件名去掉 `.board.json` 后缀**——例：board 文件 `20260619T052456Z-14584.board.json`、节点 `D1` → sidecar `20260619T052456Z-14584--D1.decision.md`）。带上 board-stem 是为了在共享的 cc-master home 下区分多块 active board——裸 `<node-id>.decision.md` 在多板（或两块板复用同一 id，如都有 `D1`）时会互相覆盖、被错误的板 recon 消化。
+guard 通过后，把讨论整理成一份决策文档，写到 **`<board-home>/<board-stem>--<node-id>--<STAMP>.decision.md`**（board home 同第 1 步；**`<board-stem>` = 第 1 步定位到的那块 board 的文件名去掉 `.board.json` 后缀**；**`<STAMP>` = 你收尾这一刻的真实 UTC 时间，写成紧凑形式 `YYYYMMDDTHHMMSSZ`**——无 `:`，path-safe、字典序即时间序——例：board 文件 `20260619T052456Z-14584.board.json`、节点 `D1`、收尾时刻 2026-06-19 09:31:07 UTC → sidecar `20260619T052456Z-14584--D1--20260619T093107Z.decision.md`）。带上 board-stem 是为了在共享的 cc-master home 下区分多块 active board——裸 `<node-id>.decision.md` 在多板（或两块板复用同一 id，如都有 `D1`）时会互相覆盖、被错误的板 recon 消化。
+
+**版本化、append-only、绝不覆盖。** 每次 discuss 都写一份**新** sidecar（用当时的 STAMP），**永不**覆盖该 node 已有的任何 sidecar——这样一个节点「聊过几次」就等于它名下 `*--<node-id>--*.decision.md` 文件的个数，全部历史都留得住（webview 据此显示「已讨论 N 次」、master 也能据此回溯）。拼路径前可先**数一下** board home 里已有几个 `<board-stem>--<node-id>--*.decision.md`：设为 `k`，则本次是这个节点的第 `k+1` 次讨论，把 `k+1` 写进 frontmatter 的 `round`（见下）。
+
+**同秒碰撞兜底（写前先存在检查，绝不覆盖）。** STAMP 是**秒**精度 `YYYYMMDDTHHMMSSZ`——两次 discuss 同一节点在**同一 UTC 秒**收尾会算出同一路径，裸写会让后者覆盖前者、毁掉 append-only。所以**真正写文件前先检查目标路径是否已存在**：若 `<board-stem>--<node-id>--<STAMP>.decision.md` 已在 board home 里，就给 STAMP 追加一个**碰撞兜底后缀** `-2`（即文件名变成 `…--<STAMP>-2.decision.md`），再查；仍存在就递增到 `-3`、`-4`…… 直到撞到一个**不存在**的路径才写。后缀只为去重、不参与时间排序的语义——它字典序排在裸 STAMP 之后（`<STAMP>` < `<STAMP>-2` < `<STAMP>-3`），故 webview 的 round 排序仍按「时间序 + 后缀 tiebreak」正确（view-server 的 `stampFromFilename` 解析端逐字对齐这条，容这个后缀）。这样**永不覆盖**任何已有 sidecar。
 
 **绝对不要写 board 文件。** board 由 master orchestrator 独占——你并发写会 torn-write、毁掉它的状态。你只写这一个 sidecar；master 会在下次 recon 时来读它、消化、回流进规划。
 
@@ -74,6 +78,7 @@ node_id: <node-id>
 resolved_at: <ISO-UTC 时间戳>
 inputs_hash_at_decision: <你在第 2 步算出的 hash>
 ask_type: <decision | advice | solution>
+round: <本节点第几次讨论，= 已有该 node sidecar 数 + 1；可选>
 ---
 
 ## TL;DR
@@ -89,4 +94,4 @@ ask_type: <decision | advice | solution>
 （指向这场讨论的关键来回 / 你翻过的代码或 board 位置，便于日后追溯。）
 ```
 
-写完，告诉用户："结论已落地到 `<board-stem>--<node-id>.decision.md`，master 会在下次 recon 时消化它、据此 replan 并清掉这个用户闸——你不用盯着。"
+写完，告诉用户："结论已落地到 `<board-stem>--<node-id>--<STAMP>.decision.md`（本节点第 `<round>` 次讨论），master 会在下次 recon 时消化它、据此 replan 并清掉这个用户闸——你不用盯着。"

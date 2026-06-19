@@ -222,7 +222,9 @@ DAG 依赖图（hero）、看板卡片、按状态分组的列表——全都活
 
 当编排撞上一个只有人能拍的决策，它不会甩一个干问题给你。趁着 idle，它会在那个 `blocked_on:"user"` 节点上预先备好一份自说明的**决策包（decision package）**——它怎么走到这一步、到底在问什么、是要*决策 / 建议 / 方案*、以及候选项各自的权衡。在 `/cc-master:view` 里，那张 awaiting-you 卡片就升级成一张**富决策卡**，底部一个一键**复制 `/cc-master:discuss <node-id>`** 的按钮。
 
-把命令粘进一个独立、满血的终端 session，你就能*在方便时、对着准确且仍有时效的完整依据*把这个决策谈清楚——discuss session **进入时会重新核对时效性**，若问题在期间又跑了的活下被架空就先 re-ground，再帮你判断（它能翻代码、翻 board）。谈完它把结论写成一份 `<board-stem>--<node-id>.decision.md` sidecar——要点摘要 + 完整决策文档——指挥在下一次 idle/recon 时拾取它来重规划、清掉这道闸。没有实时通知、谁都不打断谁：人类的注意力，被重新分配到了刀刃上。
+把命令粘进一个独立、满血的终端 session，你就能*在方便时、对着准确且仍有时效的完整依据*把这个决策谈清楚——discuss session **进入时会重新核对时效性**，若问题在期间又跑了的活下被架空就先 re-ground，再帮你判断（它能翻代码、翻 board）。谈完它把结论写成一份**版本化、append-only** 的 `<board-stem>--<node-id>--<STAMP>.decision.md` sidecar——要点摘要 + 完整决策文档——指挥在下一次 idle/recon 时拾取它（聊过不止一次就读**最新**那份）来重规划、清掉这道闸。没有实时通知、谁都不打断谁：人类的注意力，被重新分配到了刀刃上。
+
+而且**讨论完即使指挥还没消化，卡片也能立刻看到痕迹**。谈过一次后，该节点在 `/cc-master:view` 的卡片上就显示 **💬 已讨论 N 次** + 最近一次结论的 TL;DR，可逐次展开（直接从 sidecar 读，经一条只读 `/decisions.json` 路由——viewer 仍零联网零 POST）。下次再点进来你一眼就知道*这个决策聊过没、聊了几次、聊出啥*——不用等指挥下一拍 recon。
 
 ```
 /cc-master:discuss <node-id>   # 在一个新 session 里跑 —— 确切命令从 /cc-master:view 的决策卡上复制
