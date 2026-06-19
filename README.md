@@ -188,6 +188,7 @@ Once loaded, hand it a goal big enough to be worth it (think >24h of work, many 
 /cc-master:as-master-orchestrator --resume [sel]   # pick up an EXISTING board in a new session (see below)
 /cc-master:status                                  # render the board summary (board view) + validate the narrow waist
 /cc-master:view                                    # open a read-only DAG webview of the board in your browser
+/cc-master:discuss <node-id>                       # talk through a decision the orchestrator routed to you (see below)
 /cc-master:handoff-to-new-session                  # gracefully hand the board off to a fresh session (write side of --resume)
 /cc-master:stop                                    # archive the board and stand down (board is kept, not deleted)
 ```
@@ -216,6 +217,16 @@ The DAG graph (the hero), the Kanban card board, and the status-grouped list —
 ![cc-master:view — the status-grouped list view (dark theme)](docs/images/view-list-dark.png)
 
 *☰ LIST — status-grouped rows, the web twin of `/cc-master:status`.*
+
+### Talk through a decision the orchestrator routed to you
+
+When the orchestrator hits a call only a human can make, it doesn't drop a bare question on you. While idle it prepares a self-explaining **decision package** on the `blocked_on:"user"` node — the narrative of how it got here, what it's actually asking, whether it wants a *decision / advice / a solution*, and the candidate options with their trade-offs. In `/cc-master:view`, that awaiting-you card becomes a **rich decision card** with a one-click **copy `/cc-master:discuss <node-id>`** button.
+
+Paste it into a separate, full-capability terminal session and you talk the call through *at your convenience, against accurate and still-timely context* — the discuss session **re-checks freshness on entry** and re-grounds if the question has gone stale under work that ran since, then helps you reason (it can read the code and the board). It writes the outcome to a `<board-stem>--<node-id>.decision.md` sidecar — a TL;DR plus the full decision doc — which the orchestrator picks up on its next idle/recon pass to re-plan and clear the gate. No live notification, no interrupting either side: human attention, re-allocated.
+
+```
+/cc-master:discuss <node-id>   # run in a fresh session — copy the exact command from the decision card in /cc-master:view
+```
 
 ### Resume an existing board in a new session
 

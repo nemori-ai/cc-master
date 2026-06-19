@@ -188,6 +188,7 @@ claude plugin install cc-master@cc-master
 /cc-master:as-master-orchestrator --resume [选择器]  # 在新 session 里接续一块已存在的 board（见下）
 /cc-master:status                                   # 渲染 board 摘要（board view）+ 校验「窄腰」契约
 /cc-master:view                                     # 在浏览器里打开只读的 board DAG 可视化（webview）
+/cc-master:discuss <node-id>                        # 把指挥抛回给你的决策谈清楚（见下）
 /cc-master:handoff-to-new-session                   # 把 board 优雅交接给一个新 session（--resume 的写侧）
 /cc-master:stop                                     # 归档 board 并收尾（board 保留，不删除）
 ```
@@ -216,6 +217,16 @@ DAG 依赖图（hero）、看板卡片、按状态分组的列表——全都活
 ![cc-master:view —— 按状态分组的列表视图（深色）](docs/images/view-list-dark.png)
 
 *☰ LIST —— 按状态分组的行，`/cc-master:status` 的网页孪生。*
+
+### 把指挥抛回给你的决策谈清楚
+
+当编排撞上一个只有人能拍的决策，它不会甩一个干问题给你。趁着 idle，它会在那个 `blocked_on:"user"` 节点上预先备好一份自说明的**决策包（decision package）**——它怎么走到这一步、到底在问什么、是要*决策 / 建议 / 方案*、以及候选项各自的权衡。在 `/cc-master:view` 里，那张 awaiting-you 卡片就升级成一张**富决策卡**，底部一个一键**复制 `/cc-master:discuss <node-id>`** 的按钮。
+
+把命令粘进一个独立、满血的终端 session，你就能*在方便时、对着准确且仍有时效的完整依据*把这个决策谈清楚——discuss session **进入时会重新核对时效性**，若问题在期间又跑了的活下被架空就先 re-ground，再帮你判断（它能翻代码、翻 board）。谈完它把结论写成一份 `<board-stem>--<node-id>.decision.md` sidecar——要点摘要 + 完整决策文档——指挥在下一次 idle/recon 时拾取它来重规划、清掉这道闸。没有实时通知、谁都不打断谁：人类的注意力，被重新分配到了刀刃上。
+
+```
+/cc-master:discuss <node-id>   # 在一个新 session 里跑 —— 确切命令从 /cc-master:view 的决策卡上复制
+```
 
 ### 在新 session 里接续一块已存在的 board
 

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`/cc-master:discuss <node-id>` —— 为 board 上「等你拍板」的决策节点开「采访式决策」闭环** — 当编排撞上一个只有人能拍的决策（`blocked_on:"user"` 节点），用户此前是被空投到一个失去上下文的决策点：不知道 master 到底在纠结什么、缺一份「帮我判断该怎么选」的依据、问题还可能在 subagent 又跑了 n 步后被架空。本版把它升级为一场**预先备好的采访**——核心价值是**人类注意力的高效再分配**：把人从「实时盯盘」解放成「在我方便时、对着准确且仍有时效的完整依据做一次高质量决策」，并让结论干净回流进规划。三件套：① master 在 idle 时为该节点**预先准备一份自说明的 `decision_package`**（叙事上下文 + 在问什么 + 要决策/建议/方案 + 候选项与权衡），挂在节点上（agent-shaped flexible edge，**不动窄腰**）；② `/cc-master:view` 把 awaiting-you 卡片从单纯的 amber 旗标升级为**富决策卡**（渲染上下文 / 问题 / `ask_type` 徽章 / 候选项），底部一个**复制 `/cc-master:discuss <node-id>` 命令**的按钮——纯客户端剪贴板，**view-server 零改动、不破只读**；③ 用户在一个独立、满血的终端 session 里跑 `/cc-master:discuss <node-id>`：载入采访包、做**时效性自动刷新**（进入时重算输入指纹，过期则先 re-ground 再开谈，正面解掉「问题已被架空」痛点），随时翻代码 / 翻 board 把决策谈清楚，收尾把结论落成 `<node-id>.decision.md` sidecar（要点摘要 + 完整决策文档，**不写 board** 以守单写者纪律）。master 在下一次 recon / idle 时拾取该 sidecar、消化、据此 replan 并清掉 awaiting——**不需实时通知**，双方时间彻底解耦。讨论由独立 session 承载而非 master 亲自陪聊，**强化**「指挥不演奏」红线。
+
 ## [0.7.0] — 2026-06-17
 
 ### Added
