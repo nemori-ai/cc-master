@@ -46,6 +46,16 @@ Stop hook 在撞墙提示之外，新增一条对称的**欠用提示** `decideA
 
 `SKILL.md` 镜头5 从「单向防过度利用」改为极简的**双向表述**：既防撞墙透支，也防额度蒸发欠用，指向走廊 setpoint。改动保持 reinject-friendly 的极简（delta 下沉，不整篇重写）。
 
+### 2.6 7d≥85% 暂停 dispatch（硬总闸从挡加速强化到挡派发）
+
+§2.2 立了「7d 当加速硬总闸」——但它原本只挡**加速**（5h 欠用时是否升档/升WIP/提前拉 float）。本节把这道总闸强化：**当 7d `used%` 达 85% 时，它从「挡加速」收紧到「挡派发本身」**——orchestrator **停止 dispatch 任何新节点**（哪怕维持性的、哪怕在临界路径上），把「是否继续消耗 7d 配额」作为一个 **`blocked_on:"user"` 决策 surface 给用户**，等用户确认后再续派发；在飞任务可跑完、可端点验收，只是不再派新活。
+
+**为何是「暂停 dispatch」而非「自动停」——双轨（机械 + 心智）**。`usage-pacing.js` 是 Stop hook，输出只能是 `additionalContext` 软提示，**物理上不能真 block 主线下一回合的 dispatch 工具调用**（红线4：hook 感知、不替主线做调度决策）。故 7d≥85% 暂停 dispatch 必然落成双轨：
+- **机械轨**：hook 在 7d≥85% 时把那条撞墙提示从泛泛「减速（降档/降WIP/defer）」**升级措辞**为点名 dispatch 闸——「暂停 dispatch 新节点、把『是否续耗 7d 配额』作 `blocked_on:"user"` surface 用户」。它仍只是注入提示，不真拦截。
+- **心智轨**：决策程序 dispatch 节点 + cost-and-pacing.md 的纪律——真正「执行」暂停的地方（orchestrator 自律）。这是 judgment-bearing prose，经 TDD-for-skills pressure baseline 验证（RED：无此闸的 agent 在 7d 87% + 临界路径 + 「今天 ship」+ 疲惫三压下照样硬派新节点，逐字合理化「配额在授权内 / 临界路径不停 / 非阻断即 FYI」）。
+
+**num_account 耦合（措辞层，非机制）**：握多份配额（`num_account`>1）时，「切到下一份配额（切账号会刷新 7d 窗）」是用户可选的**一个响应**，与「暂停续耗」并列由用户拍。本闸只让 orchestrator 把该选项 surface 给用户，**不实现任何切换动作**（切换机制是另一个范围）。
+
 ## 3. Consequences
 
 ### 3.1 Positive
@@ -53,11 +63,14 @@ Stop hook 在撞墙提示之外，新增一条对称的**欠用提示** `decideA
 - 第一次有明确 **setpoint（目标走廊）**——「reset 时落 ~70–90%」是可对齐的目标，不再是只防上限的开环。
 - Stop hook 能在主线 idle / 欠用时**主动唤醒**（对称于它原本只在逼近撞墙时提示）。
 - 加速一律过 **7d 总闸**，防止「填满每个 5h」累积透支更长周期。
+- **7d≥85% 时把不可逆的「续耗 7d 配额」消耗决策交还用户**（§2.6）——orchestrator 不擅自跨这条跨窗口的消耗边界，与镜头 7 的「merge / 不可逆步骤归用户」一致；临界路径节点也不例外。
 
 ### 3.2 Negative（诚实天花板，必须写明）
 - **用当前信号做不到精确闭环到 100%。** 账户权威口径给 `used_percentage` + `resets_at`，但**不给绝对 token 分母**（算不出剩余的绝对额度）；也**不给权威 burn rate**（权威 burn 只存在于可失真的本地反推路径，账户口径没有）。精确预测「reset 时会落在百分之几」需要「剩余绝对额度 ÷ 权威 burn rate」，而这两个量**永不在同一条可信路径上凑齐**——账户路径有分母信息但无 burn，反推路径有 burn 但失真。故走廊只能做**方向性 / 区间**调节（欠用→偏加速、逼近→偏减速），**不是精确收敛**。
 - 账户 `used_percentage` 仅 **Pro/Max 交互式**可见；headless / API-key / 未接 status-line 的环境降级到本地反推，**加速侧在反推路径被禁用**（只剩减速侧刹车，与 ADR-008 的 fallback 链一致）。
 - **绝不承诺 reset 时配额精确归零**——任何把走廊读成「保证用满 100%」的实现或措辞都是过承诺，违背本节诚实天花板。
+- **7d≥85% dispatch 闸（§2.6）只在账户口径可用时由 hook 触发**——本地反推算不出 7d `used%`（无窗口绝对 token 分母），故 headless / API-key / 未接 status-line 的环境拿不到这道机械轨提示（与加速侧反推禁用同精神）。心智轨的 dispatch 闸纪律仍靠 orchestrator 自律执行，但失去了 hook 这一层提醒。
+- **hook 无法真 block dispatch**——「暂停 dispatch」的执行落在 orchestrator 的认知判断（心智轨），hook 只升级措辞（机械轨）。若 orchestrator 把「非阻断」误读为「可忽略」，闸就漏——这正是 §2.6 心智轨经 pressure baseline 堵的合理化（回流 SKILL.md Rationalization Table + Red Flag）。
 
 ### 3.3 Neutral
 - 减速侧三杠杆与原 ~75% 护栏的减速行为向后兼容；走廊上沿 ~90% 只是把原上限的语义并入双侧框架，不改撞墙侧的保护强度。

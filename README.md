@@ -2,7 +2,7 @@
 
 > 中文版见 [README_zh.md](README_zh.md)。
 
-![version](https://img.shields.io/badge/version-0.7.0-blue)
+![version](https://img.shields.io/badge/version-0.8.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![ship-anywhere](https://img.shields.io/badge/ship--anywhere-Bedrock%20%7C%20Vertex%20%7C%20Foundry-7c3aed)
 ![requires](https://img.shields.io/badge/requires-Node%2022%2B%20%2B%20bash-orange)
@@ -16,7 +16,7 @@
 
 A long-horizon goal shouldn't die at the next context compaction. You hand the agent two days of work; it makes real progress, the context fills, and one compaction later it has forgotten it was ever orchestrating — now it's *busy looking busy and shipping nothing*. cc-master is the layer that doesn't forget.
 
-It's a ship-anywhere Claude Code plugin that turns any main-session agent into a long-horizon **master orchestrator**: it decomposes the goal into a dependency graph, dispatches background work in parallel, keeps the main thread *productively* advancing in every idle window, and survives repeated compaction and cross-session restarts without losing the thread. It is **not a framework** — just commands + 2 skills + hooks + one board file.
+It's a ship-anywhere Claude Code plugin that turns any main-session agent into a long-horizon **master orchestrator**: it decomposes the goal into a dependency graph, dispatches background work in parallel, keeps the main thread *productively* advancing in every idle window, and survives repeated compaction and cross-session restarts without losing the thread. It is **not a framework** — just commands + 3 skills + hooks + one board file.
 
 ```
 /cc-master:as-master-orchestrator <a goal worth >24h of work>
@@ -78,6 +78,30 @@ Every claim in column ③ is anchored to a real mechanism, not a marketing line:
 | **Cross-session resume** | No | Same-session only | **Yes** — re-discovered from the board file | the board (persistent save file) |
 | **Endpoint verification** | Ad hoc | Inside the script | Orchestrator verifies independently | lens 6 + the decision program (Skill A) |
 | **Quota awareness** | No | No | **Yes** — account-authoritative 5h/**7d** `used_percentage` (captured from the status line; local-derived 反推 as fallback) | `usage-pacing.js` (Stop hook) + `statusline-capture.js` + `cc-usage.sh` |
+
+---
+
+## New in 0.8.0 — orchestrate straight through the quota wall
+
+A long-horizon run doesn't stop being long just because you hit a quota limit. 0.8.0 adds the missing piece for runs that outlast a single account's 5h/7d window — and pairs it with the safe account pool and the two-sided pacing that make it land cleanly.
+
+### Hot account switching — no restart, no lost state
+
+Mid-orchestration, you slam into the 5h or 7d quota wall. Before 0.8.0, that was the end of the run. Now cc-master can switch you to a backup account **without restarting the session and without losing any orchestration state** — the board, the in-flight tasks, the whole plan stay exactly where they were. The *running* Claude Code process lazily re-reads the fresh credentials and seamlessly picks up the new account's quota — as seamless as Orca's account switching, but **native to cc-master and driven by the conductor's own pacing judgment**, not a separate tool you have to remember to invoke.
+
+The mechanism in one line: switch overwrites the three official shared-credential stores → the running `claude` lazily re-reads them as its access token nears expiry → the new account takes over. **No `exec`, no process restart, no `--resume`** — the session never blinks.
+
+> This is validated end-to-end against real accounts: after a switch, the reported quota `%` doesn't reset to zero — it flips to the *switched-in* account's actual usage, proving the running process really did adopt the new credentials.
+
+### A safe backup-account pool — `/cc-master:accounts`
+
+Switching needs somewhere to switch *to*. `/cc-master:accounts` manages a **token-blind** pool of backup accounts (`--add` / `--delete` / `--refresh` / `--list`). Your OAuth token lives **only** in the OS keychain (macOS) or a `0600` file (everywhere else); the pool registry stores **non-secret pointers only** — `email → vault reference` + expiry + identity — and the token **never** enters agent context, logs, or the registry. Enrolling an account is one command (log into the target account, then `--add`), with an **identity guard** that refuses to mislabel the wrong account's credentials.
+
+### Two-sided pacing corridor
+
+cc-master paces your token burn against the rolling 5h/7d quota windows from *both* sides: **slow down** as you approach a wall, **speed up** when you have headroom and a reset is near — so you neither smash into a wall halfway nor let quota silently evaporate unused. The 7d window is the hard ceiling on accelerating. (See [ADR-010](adrs/ADR-010-two-sided-pacing-corridor.md).)
+
+> Want the hands-on guide to building and managing the account pool? See [Manage a backup-account pool](#manage-a-backup-account-pool--how-to-add-accounts) below.
 
 ---
 
@@ -189,6 +213,7 @@ Once loaded, hand it a goal big enough to be worth it (think >24h of work, many 
 /cc-master:status                                  # render the board summary (board view) + validate the narrow waist
 /cc-master:view                                    # open a read-only DAG webview of the board in your browser
 /cc-master:handoff-to-new-session                  # gracefully hand the board off to a fresh session (write side of --resume)
+/cc-master:accounts --add|--delete|--refresh <email> | --list   # manage the backup-account pool for hot switching
 /cc-master:stop                                    # archive the board and stand down (board is kept, not deleted)
 ```
 
@@ -254,6 +279,29 @@ cc-master can pace against your subscription's **real** 5h/7d quota `used_percen
 
 Without this, pacing silently falls back to local-JSONL 反推 — an approximation whose reset countdown can be off by an order of magnitude ([Finding #37](design_docs/dogfood-findings.md)). Pro/Max subscriptions only; everywhere else this is a no-op and the fallback handles it.
 
+### Manage a backup-account pool — how to add accounts
+
+Hot switching (above) needs a pool of backup accounts to switch *to*. `/cc-master:accounts` is how you build and maintain that pool. The agent runs the preset scripts for you; **your token never passes through it** — it lives only in the script subprocess and the OS keychain / `0600` file. (Not applicable on cloud backends — Bedrock/Vertex/Foundry have no subscription OAuth token to manage.)
+
+**Enroll an account — `/cc-master:accounts --add <email>`**
+
+- **Mechanism = direct keychain read.** The script reads the **full OAuth credential blob of your *currently logged-in* account** straight from the macOS keychain and stores it in the pool. No browser pops up, no `setup-token` — it only *reads* (never writes) your official credentials, so **your active login is left untouched**.
+- **The one prerequisite: you must currently be logged into the target account.** First log into account X via the **Orca app** or `claude`'s `/login`, *then* run `/cc-master:accounts --add X`.
+- **Identity guard.** The script verifies that *the email you're currently logged in as* == *the `--email` you passed*, and **fails immediately** on mismatch — so account B's credentials can never get mislabeled as account A.
+- **Build a multi-account pool:** log into A → `--add A`; switch your login to B → `--add B`; one at a time, once per account.
+- **Other operations:** `--list` (see the pool — each account's vault kind / expiry / active / switchable), `--delete <email>`, `--refresh <email>` (= re-enroll, identical to `--add`).
+
+**Important caveats (learned the hard way):**
+
+1. **It must be a real `/login` (full OAuth), not `claude setup-token`.** Only a real login writes a **non-empty `refreshToken`** into the keychain — and hot switching **depends on `refreshToken`** to renew credentials (the keychain's access token is only ~8h valid). `setup-token` produces no `refreshToken`, so a switched-in account fails to renew and dies quickly. If `--add` reports "couldn't fetch a complete blob with a non-empty refreshToken," you didn't truly `/login` — log in fully via Orca / `claude /login` and rerun.
+2. **Switching overwrites your global login.** Every `claude` session on this machine switches to the new account *together* (this is intentional — it keeps cross-session pacing accurate). It's reversible: switch back to any account in the pool at any time.
+3. **Token-blind end to end.** Your OAuth token stays inside the script subprocess + OS keychain / `0600` file the whole time — it never enters the agent's context, transcript, or logs, and never the pool registry (which holds non-secret pointers only).
+4. **Credentials expire — re-enroll if they go stale.** If an account's stored credentials expire or get invalidated (long unused, or enrolled by an older version), just log back into it + `--add` to re-enroll.
+5. **`switchable: no`** in `--list` means that account has no usable token yet (registered but needs enrollment before it can be switched into).
+6. **Not applicable on cloud backends** (Bedrock/Vertex/Foundry have no subscription OAuth token to manage).
+
+> **How a switch actually works (mental model):** read the target account's blob from the pool → force-refresh a fresh token via its `refreshToken` → overwrite the official credential stores → the running `claude` lazily re-reads them and takes over — no restart, no `--resume`.
+
 ---
 
 ## The six-vision charter (C1–C6)
@@ -275,7 +323,7 @@ cc-master **aims to** make a Claude Code agent into a master orchestrator across
 
 ## How it works
 
-The plugin is **commands + 2 skills + hooks + a board file**, and each piece has a distinct lifespan:
+The plugin is **commands + 3 skills + hooks + a board file**, and each piece has a distinct lifespan:
 
 ```
 cc-master/
@@ -287,10 +335,12 @@ cc-master/
 │   ├── status.md                       summarize board progress / health (board view)
 │   ├── view.md                         launch a read-only DAG webview of the board
 │   ├── handoff-to-new-session.md       prepare a clean handoff to a fresh session
+│   ├── accounts.md                     manage the account-switch pool (add/remove/refresh/list)
 │   └── stop.md                         archive / mark the board inactive
 ├── skills/
 │   ├── orchestrating-to-completion/    Skill A — the orchestration method (the soul)
-│   └── authoring-workflows/            Skill B — how to write workflow scripts
+│   ├── authoring-workflows/            Skill B — how to write workflow scripts
+│   └── account-management/             Skill C — the account-pool mechanism (select / switch / vault)
 └── hooks/
     └── scripts/{bootstrap-board, reinject, verify-board,    bash
                  posttool-batch}.sh +
@@ -298,7 +348,7 @@ cc-master/
 ```
 
 - **Commands** are one-shot ignition — you trigger them; they inject the "I am the master orchestrator" philosophy and operating discipline, and open the board.
-- **Skills** are the on-demand deep manuals — Skill A when you run the orchestration loop, Skill B when you write a workflow script.
+- **Skills** are the on-demand deep manuals — Skill A when you run the orchestration loop, Skill B when you write a workflow script, Skill C (`account-management`) when you manage the account-switch pool (build the registry, select the best switch-in account, keep tokens in a vault).
 - **Hooks** are the orchestrator's runtime — they survive compaction (re-injecting "you are the orchestrator + here is your board"), gate completion, soft-warn on over-dispatch, and sense the quota wall against the account's 5h/7d `used_percentage` (captured from the status line by `statusline-capture.js`; local-derived 反推 as fallback). They reach for `node` only where structured JSON parsing earns it (usage / rate-limit JSON), bash everywhere else ([ADR-006](adrs/ADR-006-hooks-may-use-node-js.md)).
 
 ### The three background mechanisms it teaches
@@ -333,7 +383,7 @@ The board is the orchestrator's **persistent save file** for a long task — a s
 
 ## Contributing
 
-The dev loop is one clone and two gates — `./run-tests.sh` (hook tests + content contract) and `claude plugin validate .`. The design invariants (hooks limited to bash + node/JS — ADR-006, stable board waist, two non-overlapping skills, the conductor-never-plays-an-instrument red line, ship-anywhere, every hook dormant-until-armed — ADR-007) are spelled out in [CONTRIBUTING.md](CONTRIBUTING.md). Read it before opening a PR.
+The dev loop is one clone and two gates — `./run-tests.sh` (hook tests + content contract) and `claude plugin validate .`. The design invariants (hooks limited to bash + node/JS — ADR-006, stable board waist, three non-overlapping skills, the conductor-never-plays-an-instrument red line, ship-anywhere, every hook dormant-until-armed — ADR-007) are spelled out in [CONTRIBUTING.md](CONTRIBUTING.md). Read it before opening a PR.
 
 ---
 

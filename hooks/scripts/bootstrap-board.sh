@@ -538,6 +538,17 @@ if [ "$mode" = "resume" ]; then
   resume_main
   exit 0
 fi
+
+# ── A2 T6: --num_account is GONE ─────────────────────────────────────────────────────────────────────
+# The FRESH-path `--num_account <n>` flag is REMOVED (A2 account-management refactor §C-T6). pacing's
+# effective-N is no longer user-supplied per session via a CLI flag → board top-level num_account; it is
+# now DERIVED by usage-pacing.js from the account pool registry (accounts.json: count of non-active,
+# token-unexpired switchable backups + 1). No registry = a natural single account (effective-N 1), so
+# there is nothing to parse or stamp here anymore. The board TEMPLATE still ships `"num_account": 1` as a
+# harmless backward-compat default (an OLD board that already carries num_account is NOT an error — it is
+# simply no longer read by the hook), so no template change is required; we just stop WRITING it from a
+# CLI arg. → design_docs/plans/2026-06-17-A2-account-management-design.md §C-T6 / §F.
+
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 TEMPLATE="$PLUGIN_ROOT/skills/orchestrating-to-completion/assets/board.template.json"
 
@@ -561,12 +572,17 @@ if [ -f "$TEMPLATE" ]; then
   # template, but this stays safe if the template gains other session_id-shaped fields later).
   tmp="$BOARD.tmp.$$"
   sed "s/\"session_id\"[[:space:]]*:[[:space:]]*\"\"/\"session_id\": \"$sid_esc\"/" "$BOARD" > "$tmp" && mv -f "$tmp" "$BOARD"
+  # A2 T6: num_account is NO LONGER stamped from a CLI arg (--num_account is gone; pacing's effective-N is
+  # derived from the accounts.json pool registry by usage-pacing.js). The template still ships the
+  # harmless backward-compat default `"num_account": 1`; we leave it untouched (the hook no longer reads it).
 else
   # Template-missing fallback: build the board inline, stamping the real sid into owner.session_id
   # (was a hardcoded empty "" before — that left every bootstrapped board unowned). Seed the
   # agent-shaped meta.template_version too, in parity with board.template.json — it is NOT the hook-read
   # narrow waist `schema` (red line 2): no hook reads it; it lets the timeline gate its real-time axis on
-  # this-release-or-later boards. Pure bash printf only — no jq/python/node (red line 1).
+  # this-release-or-later boards. Pure bash printf only — no jq/python/node (red line 1). A2 T6: no
+  # num_account field is seeded here — usage-pacing.js no longer reads it (effective-N now comes from
+  # accounts.json); an OLD board still carrying it is harmless, it is simply ignored.
   printf '{"schema":"cc-master/v1","meta":{"template_version":1},"goal":"","owner":{"active":true,"session_id":"%s","heartbeat":""},"git":{"worktree":"","branch":""},"wip_limit":4,"tasks":[],"log":[]}\n' "$sid_esc" > "$BOARD"
 fi
 

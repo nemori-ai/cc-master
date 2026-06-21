@@ -1,12 +1,14 @@
-# ADR-005 — Two-skill separation: orchestrating vs authoring-workflows
+# ADR-005 — Distributed-skill separation: orchestrating vs authoring-workflows vs account-management
 
 > Status: **Accepted**
-> Date: 2026-06-08
-> Scope: The skill layer — `skills/orchestrating-to-completion/` and
-> `skills/authoring-workflows/`. Constrains where any new piece of guidance lives
-> and forbids duplication between the two.
-> Source: cc-master design invariant #3 (CONTRIBUTING.md); `design_docs/spec.md`
-> §14 (two-skill non-overlap acceptance criterion).
+> Date: 2026-06-08 (extended 2026-06-17: two → three distributed skills)
+> Scope: The skill layer — `skills/orchestrating-to-completion/`,
+> `skills/authoring-workflows/`, and `skills/account-management/`. Constrains where
+> any new piece of guidance lives and forbids duplication between the skills.
+> Source: cc-master design invariant #3 (AGENTS.md §3 红线3); `design_docs/spec.md`
+> §14 (distributed-skill non-overlap acceptance criterion). 2026-06-17 extension:
+> account-management admitted as the third distributed skill (user-authorized DR
+> intake + curating-skill-portfolios boundary gate).
 
 ---
 
@@ -28,23 +30,40 @@ invites guidance to bleed across the boundary. If a single skill tried to carry
 both, the description would over-trigger (firing for the wrong job), the prose would
 duplicate, and a reader could not tell which altitude any given paragraph addresses.
 
+The same conflation risk recurred when account-switching landed (2026-06-17): the
+switch *decision* (a pacing judgment the orchestrator makes) and the switch
+*mechanism* (account-pool selection + token vault security) are again two different
+jobs sharing the word "switch." Rather than fold the mechanism into A, it became a
+third self-contained skill (`account-management`) under the identical ownership
+rule — decision in A, mechanism in C, crossed by a pointer not a copy. The
+separation principle below is unchanged; it now governs three skills, not two.
+
 ## 2. Decision
 
-**Keep two self-contained, non-overlapping skills, with a strict ownership rule for
-where guidance lives.**
+**Keep self-contained, non-overlapping distributed skills, with a strict ownership
+rule for where guidance lives.** As of 2026-06-17 there are **three** distributed
+skills (was two; account-management added) — the separation principle is unchanged,
+only the count grows.
 
 - **Skill A — `orchestrating-to-completion`** = main-thread orchestration: the
   method the orchestrator runs (decompose, dispatch-on-ready, productive idle
-  windows, endpoint verification, compaction survival via the board).
+  windows, endpoint verification, compaction survival via the board). Owns the
+  account-switch *decision* (when to switch, whether it's worth it, who signs off).
 - **Skill B — `authoring-workflows`** = inside-the-script authoring: how to write
   dynamic-workflow scripts (shapes, step/phase API, mechanism contract).
-- **Ownership rule**: if a piece of advice is about *what the orchestrator does*, it
-  goes in A; if it is about *how a workflow script is written*, it goes in B.
-  Responsibilities do not bleed across the two, and guidance is not duplicated
-  between them.
-- The two skills' `description` fields are each scoped to *only* their own trigger
-  conditions, so each fires for its own job and not the other's (validated by the
-  per-skill trigger eval set).
+- **Skill C — `account-management`** = the account-pool *mechanism* layer: how the
+  `accounts.json` registry is built, how the best switch-in account is selected,
+  how tokens move, and how tokens are kept secure (keychain / file vault only).
+  Owns the *mechanism* of switching, never the *decision* — A references C at the
+  pacing decision point without restating its mechanism.
+- **Ownership rule**: if a piece of advice is about *what the orchestrator does*
+  (incl. the switch decision), it goes in A; if it is about *how a workflow script
+  is written*, it goes in B; if it is about *the account-pool mechanism* (select /
+  switch / vault security), it goes in C. Responsibilities do not bleed across the
+  three, and guidance is not duplicated between them.
+- Each skill's `description` is scoped to *only* its own trigger conditions, so each
+  fires for its own job and not the others' (validated by the per-skill trigger eval
+  set).
 
 ## 3. Consequences
 
@@ -60,11 +79,14 @@ where guidance lives.**
 
 ### 3.2 Negative
 
-- **Cross-references cost discipline**: where the two genuinely touch (an
-  orchestrator dispatching a workflow), the boundary must be crossed by a pointer,
-  not by copying — which requires authors to resist the convenient duplication.
+- **Cross-references cost discipline**: where the skills genuinely touch (an
+  orchestrator dispatching a workflow, or A deciding to switch accounts and C
+  carrying out the switch), the boundary must be crossed by a pointer, not by
+  copying — which requires authors to resist the convenient duplication.
 - **Shared vocabulary needs care**: words like `loop` and `phase` mean different
-  things in A vs B and must be disambiguated rather than unified.
+  things in A vs B and must be disambiguated rather than unified. The
+  account-switch *decision / mechanism* split (A owns the decision, C owns the
+  mechanism) is the same discipline applied to the third skill.
 
 ### 3.3 Neutral
 
@@ -78,9 +100,9 @@ where guidance lives.**
 Rejected. A single skill would have to describe both altitudes, so its description
 could not be scoped to one job — it would over-trigger, loading orchestration prose
 when the user only wants to author a workflow (and vice versa). It would also invite
-the two concerns' prose to interleave, making it hard to tell which altitude any
-section addresses. The spec's acceptance criterion (§14) explicitly requires the two
-skills to be complete, self-contained, and non-overlapping.
+the concerns' prose to interleave, making it hard to tell which altitude any
+section addresses. The spec's acceptance criterion (§14) explicitly requires the
+distributed skills to be complete, self-contained, and non-overlapping.
 
 ### 4.2 Alternative B: keep two skills but allow shared/duplicated sections
 
@@ -90,13 +112,17 @@ rule prevents. Where the skills touch, the link is a pointer, not a copy.
 
 ## 5. Related
 
-- [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — design invariant #3.
+- [`../AGENTS.md`](../AGENTS.md) — §3 红线3 (the distributed-skill non-overlap red
+  line, SSOT).
 - [`../skills/orchestrating-to-completion/SKILL.md`](../skills/orchestrating-to-completion/SKILL.md)
   — Skill A.
 - [`../skills/authoring-workflows/SKILL.md`](../skills/authoring-workflows/SKILL.md)
   — Skill B.
+- [`../skills/account-management/SKILL.md`](../skills/account-management/SKILL.md)
+  — Skill C (added 2026-06-17; boundary three-liner at its top is the wording source
+  for 红线3's third-skill clause).
 - [`../design_docs/spec.md`](../design_docs/spec.md) — §14 acceptance criterion
-  (two skills non-overlapping).
+  (distributed skills non-overlapping).
 
 ## 6. References
 
