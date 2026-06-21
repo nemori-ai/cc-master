@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-06-21
+
+### Added
+
+- **account-management —— 第 3 个分发 skill + `/cc-master:accounts` 备用号池 + 无重启换号（方案 A）** — 给 master orchestrator 补上「撞配额墙时不重启、不丢编排状态就换号」这最后一块能力（charter ②/⑤）。四件套：① **`/cc-master:accounts` 命令**（`--add` / `--delete` / `--refresh` / `--list`）管理一个备用号池——非密 registry（`accounts.json`：email→vault 引用 + 到期 + 身份，**零 token**）+ token 本体存 macOS keychain（service `cc-master-oauth`）/ 非 mac 0600 文件 vault；② **录号 = keychain 直读**——从 macOS keychain「Claude Code-credentials」直读**当前登录号**的完整 `claudeAiOauth` blob（含 **refreshToken**）存进号池，**只读不写官方凭证 → 不扰动你的登录**，无浏览器、无 `setup-token`；带**身份 guard**（当前登录 email 须 == `--add <email>`，防把 B 的凭证错标成 A）；③ **无重启换号 `switch-account.sh`**——读号池目标号 blob → force-refresh（换新鲜 access token + 轮换 refreshToken）→ **覆写官方共享凭证三存储**（keychain「Claude Code-credentials」+ `.credentials.json` + `.claude.json` oauthAccount，原子 + 全或无回滚）→ 运行中 claude 惰性 re-read 接管新号，**不 exec / 不重启 / 不 `--resume`**；④ **选号算法** `select-account.js`（按号池 effective-N + `switchable` + 配额快照择号）。**token-blind 铁律**贯穿：OAuth token 全程只在脚本子进程 + OS keychain / 0600 文件，绝不进 agent context / transcript / log / registry（写 keychain 时经 `security … -w "$blob"` argv 的本机 sub-second 局部暴露，是单一审计过的例外——官方条目须单条完整 blob、`security` CLI 的 stdin `-w` 走 `readpassphrase` 有 128 字节硬上限会截断 blob）。**真账号端到端 dogfood 验证**：无重启换号后配额 % 不重启就翻到切入号（7d `resets_at` 随号变 = 铁证运行中进程真接管了新号）。skill 边界：SKILL A（编排决策，含「换号该不该」的 pacing 决策）单向引用 SKILL C（account-management，换号机制），职责不重叠。
+
+- **#4 配额 pacing —— 两侧目标走廊 + 7d≥85% dispatch 硬闸 + num_account 缩放（ADR-010）** — usage-pacing 从「只在临界减速」的单边上限护栏，升级为**双侧目标走廊**：5h reset 目标落 70–90% 区间，**欠用侧轻推加速**（有余量且临近 reset 就提速、把后续 float 提前拉进来）/ **临界侧轻推减速**——白白蒸发配额和半截撞墙同是失败。新增 **7d≥85% dispatch 硬闸**：账户权威 7d `used_percentage` 达闸（默认 85）→ 升级措辞到「暂停 dispatch」（7d 是跨窗口、跨号的加速总闸；本地反推算不出 7d used% 则不触发此闸）。新增 **num_account 缩放**——与备用号池联动：撞当前号 5h 墙（85%）时按可切换备用号数 `n` 连带修正，但 **7d 墙不随 n 变**（7d 总闸与 5h 内并行度正交）。落点 `hooks/scripts/usage-pacing.js`（+244 行）+ `references/cost-and-pacing.md` + ADR-010。
+
+### Changed
+
+- **两 skill 分离原则扩为三（ADR-005）** — `account-management` 作为第 3 个**分发** skill 经 curating 闸纳入，红线 3「三个分发 skill 各自自洽、互不重叠」成形：SKILL A（`orchestrating-to-completion`，编排决策 + 换号**决策**）/ SKILL B（`authoring-workflows`，workflow 脚本写法）/ SKILL C（`account-management`，换号**机制**层：号池管理 / 选号 / 切号 / vault token 安全）。换号的「何时换、谁拍板」归 A、「怎么选号切号管 vault」归 C，A 在 pacing 决策点**单向引用** C 而不复述其机制。`orchestrating-to-completion` 的 SKILL.md（镜头 5 换号 lever 改为「无重启」）+ `references/cost-and-pacing.md`（换号 lever 4 步决策序列）+ `references/external-coordinates.md` 同步。
+
 ## [0.7.0] — 2026-06-17
 
 ### Added

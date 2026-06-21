@@ -432,4 +432,354 @@ assert_eq "" "$HOOK_OUT" "(under-8) stop_hook_active:true → silent (re-entry g
 assert_not_contains "$HOOK_OUT" "欠用" "(under-8) re-entry injects NO accelerate prompt"
 rm -rf "$U_HOME"
 
+# ── NUM_ACCOUNT 缩放 (need ①): board top-level num_account → 把欠用催加速阈值抬高、撞墙侧按 n 分叉措辞 ────
+# num_account = 真实可序列消费的 n 份配额(非名义心智数)。usage-pacing 读它(soft-observed,缺/坏 → 降级 1):
+#   · 欠用侧 effective_ceil = min(95, ceil(60) × n) —— n 越大,同一剩余时间下「欠用」判定线越高、越积极催加速;
+#   · 撞墙侧 7d 不随 n 变(总闸正交);5h 撞墙时 n>1 → 「切下一份配额」措辞、不减速,n=1 → 回落减速。
+# 账户口径无绝对 token 分母 → 算不出 tok/min 精确速率,只缩放无量纲 used% 节奏(cost-and-pacing 诚实天花板)。
+# 用 run_pacing_acct（armed Stop + sidecar）；num_account 经 env CC_MASTER_NUM_ACCOUNT 注入(board 缺则 env 兜底)。
+N_HOME="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"num_account":3,"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$N_HOME/mine.board.json"
+# run_pacing_nacct SIDECAR_JSON NOW HOME SID NUM_ACCOUNT -> drive armed Stop + sidecar + env num_account.
+run_pacing_nacct() {
+  local cdir; cdir="$(make_project)"; local cache="$cdir/rate.json"
+  printf '%s' "$1" > "$cache"
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$4" \
+    | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="$2" CC_MASTER_HOME="$3" CC_MASTER_RATE_CACHE="$cache" \
+      CC_MASTER_NUM_ACCOUNT="$5" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+  rm -rf "$cdir"
+}
+
+# (nacct-1) 5h 70% would be NOT-underused at n=1 (70 ≥ ceil 60) → silent; but n=3 lifts effective_ceil to
+#           min(95, 60×3)=95, so 70 < 95 → underused → accelerate prompt fires. Proves n scales the ceil.
+run_pacing_nacct "{\"captured_at\":$U_FRESH,\"five_hour\":{\"used_percentage\":70,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":30}}" \
+  "2026-06-10T12:00:00Z" "$N_HOME" "sess-acct" "3"
+assert_eq 0 "$HOOK_RC" "(nacct-1) n=3 lifts underuse ceil → rc 0"
+assert_contains "$HOOK_OUT" "additionalContext" "(nacct-1) 5h 70% < effective_ceil(95) at n=3 → accelerate fires"
+assert_contains "$HOOK_OUT" "欠用" "(nacct-1) carries underuse signal (欠用)"
+assert_contains "$HOOK_OUT" "3 份" "(nacct-1) accelerate note names the n (3 份可序列消费的配额)"
+
+# (nacct-2) CONTROL — same sidecar but n=1 (default ceil 60): 70 ≥ 60 → NOT underused → silent. Proves
+#           the n=3 case above fired BECAUSE of the scaling, not the raw 70%.
+run_pacing_nacct "{\"captured_at\":$U_FRESH,\"five_hour\":{\"used_percentage\":70,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":30}}" \
+  "2026-06-10T12:00:00Z" "$N_HOME" "sess-acct" "1"
+assert_eq 0 "$HOOK_RC" "(nacct-2) n=1 control → rc 0"
+assert_eq "" "$HOOK_OUT" "(nacct-2) 5h 70% ≥ ceil(60) at n=1 → silent (no scaling = original behavior)"
+
+# (nacct-3) HIGH-BAND underuse — 5h 84% (just under the wall floor 85) at n=3 → effective_ceil=95, so
+#           84 < 95 → underused → accelerate fires. Proves n lifts the underuse ceil right up toward the
+#           wall (the n-scaled band reaches as high as min(95, ceil×n)). NB: the min(95,…) cap is purely
+#           defensive — any 5h% ≥ 85 hits the WALL fork first (85 < 95), so the cap never gates a real
+#           underuse decision; it only guards against ever calling a ≥95% window "underused".
+run_pacing_nacct "{\"captured_at\":$U_FRESH,\"five_hour\":{\"used_percentage\":84,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":30}}" \
+  "2026-06-10T12:00:00Z" "$N_HOME" "sess-acct" "3"
+assert_eq 0 "$HOOK_RC" "(nacct-3) high-band underuse at n=3 → rc 0"
+assert_contains "$HOOK_OUT" "欠用" "(nacct-3) 5h 84% < effective_ceil(95) at n=3 → accelerate fires (n lifts band to wall)"
+
+# (nacct-4) REGISTRY-SOURCED n (no env override) — A2 T6: effective-N now comes from accounts.json
+#           (NOT board num_account, which is砍'd). A registry with 1 active + 2 token-unexpired backups
+#           → effective-N = switchable(2)+1 = 3. env unset → reads registry → 70% underused at n=3 →
+#           accelerate. Proves the accounts.json pool (not env, not board) drives n.
+run_pacing_acct() { # registry-sourced: NO CC_MASTER_NUM_ACCOUNT in env; accounts.json lives in $HOME/accounts.json
+  local cdir; cdir="$(make_project)"; local cache="$cdir/rate.json"
+  printf '%s' "$1" > "$cache"
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$4" \
+    | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="$2" CC_MASTER_HOME="$3" CC_MASTER_RATE_CACHE="$cache" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+  rm -rf "$cdir"
+}
+# registry: 1 active + 2 unexpired backups (expires 2027) → effective-N = 3. CC_MASTER_HOME=$N_HOME so
+#   ACCOUNTS_FILE resolves to $N_HOME/accounts.json (user-level fallback uses CC_MASTER_HOME).
+printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"},"c@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"c@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"}}}' > "$N_HOME/accounts.json"
+run_pacing_acct "{\"captured_at\":$U_FRESH,\"five_hour\":{\"used_percentage\":70,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":30}}" \
+  "2026-06-10T12:00:00Z" "$N_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(nacct-4) registry-sourced effective-N=3 → rc 0"
+assert_contains "$HOOK_OUT" "欠用" "(nacct-4) accounts.json pool (1 active + 2 backups) drives n=3 (no env) → accelerate fires"
+rm -f "$N_HOME/accounts.json"
+
+# (nacct-5) WALL FORK at n>1 — 5h 90% wall, 7d 20% (only 5h hits) + n=3 → 「切下一份配额」signal, NOT slowdown.
+#           Proves撞墙侧 n>1 reframes the 5h wall as a switch-account trigger rather than a slow-down.
+run_pacing_nacct "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":20}}" \
+  "2026-06-10T12:00:00Z" "$N_HOME" "sess-acct" "3"
+assert_eq 0 "$HOOK_RC" "(nacct-5) wall fork n>1 → rc 0"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(nacct-5) n>1 + 5h wall → 切下一份配额 signal (not slowdown)"
+assert_not_contains "$HOOK_OUT" "降到更便宜的模型档" "(nacct-5) n>1 5h wall → NOT the slowdown levers"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(nacct-5) never blocks"
+
+# (nacct-6) 7d WALL not reframed by n — 7d 88% wall while 5h low (10%) + n=3 → 7d 总闸 still bites (n
+#           orthogonal to the cross-window total gate). Since 88 ≥ dispatch gate(85), it surfaces the
+#           need-② DISPATCH GATE wording (暂停 dispatch), NOT the 切下一份配额 / accelerate framing —
+#           proving 7d is not softened by n (the switch-account framing is 5h-only; 7d still halts派发).
+run_pacing_nacct "{\"five_hour\":{\"used_percentage\":10,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":88}}" \
+  "2026-06-10T12:00:00Z" "$N_HOME" "sess-acct" "3"
+assert_eq 0 "$HOOK_RC" "(nacct-6) 7d wall at n>1 → rc 0"
+assert_contains "$HOOK_OUT" "暂停 dispatch 新节点" "(nacct-6) 7d ≥85% at n=3 → dispatch gate wording (7d gate not softened by n)"
+assert_contains "$HOOK_OUT" "88" "(nacct-6) carries 7d used_percentage"
+rm -rf "$N_HOME"
+
+# ── 7d≥85% DISPATCH 闸 (need ②): 7d 撞墙时撞墙提示从泛泛减速「升级措辞」为点名「暂停 dispatch 新节点」 ──────
+# 需求②: hook 物理上不能真 block dispatch(红线4),故 7d≥85% 时只把**措辞**升级——点名「暂停 dispatch 新节点、把
+# 『是否续耗 7d 配额』作 blocked_on:"user" surface 用户」,比泛泛的「降档/降WIP/defer」重得多。真正的暂停由
+# orchestrator 在决策程序 dispatch 节点执行(心智轨)。**只在账户口径生效**(本地反推算不出 7d used%,不触发此闸)。
+G_HOME="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$G_HOME/mine.board.json"
+# run_pacing_acct (re-defined fresh here: armed Stop + sidecar, no stop_hook_active, no num_account env).
+run_pacing_acct() {
+  local cdir; cdir="$(make_project)"; local cache="$cdir/rate.json"
+  printf '%s' "$1" > "$cache"
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$4" \
+    | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="$2" CC_MASTER_HOME="$3" CC_MASTER_RATE_CACHE="$cache" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+  rm -rf "$cdir"
+}
+
+# (gate-1) 7d 87% (≥ gate 85), 5h fine (40%) → DISPATCH GATE wording: 「暂停 dispatch 新节点」+ blocked_on:"user"
+#          + surface 用户 + ADR-010, NON-blocking. This is the headline need-② case (mirrors the RED baseline).
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":40,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":87}}" \
+  "2026-06-10T12:00:00Z" "$G_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(gate-1) 7d≥85% dispatch gate → rc 0"
+assert_contains "$HOOK_OUT" "暂停 dispatch 新节点" "(gate-1) 7d 87% → 点名暂停 dispatch 新节点 (harder than slowdown)"
+assert_contains "$HOOK_OUT" "blocked_on:" "(gate-1) frames it as a blocked_on:user decision to surface"
+assert_contains "$HOOK_OUT" "surface 给用户" "(gate-1) surfaces the decision to the user"
+assert_contains "$HOOK_OUT" "硬总闸" "(gate-1) names the 7d hard total gate"
+assert_contains "$HOOK_OUT" "87" "(gate-1) carries the authoritative 7d used_percentage"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(gate-1) NEVER blocks — hook can't真 block dispatch, only software prompt"
+
+# (gate-2) 7d 84% (just UNDER gate) + 5h fine → NO wall at all (84 < floor 85) → silent. Proves the gate
+#          keys on ≥85, not below; sub-gate 7d does not surface the dispatch wording.
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":40,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":84}}" \
+  "2026-06-10T12:00:00Z" "$G_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(gate-2) 7d 84% (<85) → rc 0"
+assert_eq "" "$HOOK_OUT" "(gate-2) 7d 84% under gate → silent (no dispatch wording below the threshold)"
+
+# (gate-3) 7d 90% AND 5h 92% (both wall) → 7d dispatch gate wins the framing (暂停 dispatch), and notes 5h too.
+#          The 7d gate is the harder constraint — when both hit, the dispatch-halt framing dominates.
+run_pacing_acct "{\"five_hour\":{\"used_percentage\":92,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":90}}" \
+  "2026-06-10T12:00:00Z" "$G_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(gate-3) both walls → rc 0"
+assert_contains "$HOOK_OUT" "暂停 dispatch 新节点" "(gate-3) both walls → 7d dispatch gate dominates the framing"
+assert_contains "$HOOK_OUT" "5h 也已 92%" "(gate-3) still notes the concurrent 5h wall"
+
+# (gate-4) DISPATCH GATE at n>1 — 7d 87% + 5h 40% + num_account=3 → still 暂停 dispatch (7d gate orthogonal to
+#          n) AND mentions 切账号刷新 7d as ONE user-selectable response (need-② num_account coupling, prose only).
+run_pacing_nacct() {
+  local cdir; cdir="$(make_project)"; local cache="$cdir/rate.json"
+  printf '%s' "$1" > "$cache"
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$4" \
+    | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="$2" CC_MASTER_HOME="$3" CC_MASTER_RATE_CACHE="$cache" \
+      CC_MASTER_NUM_ACCOUNT="$5" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+  rm -rf "$cdir"
+}
+run_pacing_nacct "{\"five_hour\":{\"used_percentage\":40,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":87}}" \
+  "2026-06-10T12:00:00Z" "$G_HOME" "sess-acct" "3"
+assert_eq 0 "$HOOK_RC" "(gate-4) 7d gate at n=3 → rc 0"
+assert_contains "$HOOK_OUT" "暂停 dispatch 新节点" "(gate-4) 7d gate fires regardless of n (总闸 orthogonal)"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(gate-4) n>1 → mentions 切账号刷新 7d as ONE user-selectable response"
+assert_contains "$HOOK_OUT" "用户" "(gate-4) still surfaces the decision to the user (parallel to switching)"
+
+# (gate-5) LOCAL-REVERSAL path (no sidecar) → never emits the 7d dispatch gate. The local反推 path can't
+#          compute 7d used% (no分母) so the gate is account-only (与加速侧反推禁用同精神). SAMPLE @12:00Z low burn.
+G_LH="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-local"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$G_LH/mine.board.json"
+run_pacing_home "$SAMPLE" "2026-06-10T12:00:00Z" "$G_LH" "sess-local"
+assert_eq 0 "$HOOK_RC" "(gate-5) local fallback path → rc 0"
+assert_not_contains "$HOOK_OUT" "暂停 dispatch 新节点" "(gate-5) local反推 path NEVER emits the 7d dispatch gate (account-only, no 7d%)"
+rm -rf "$G_LH"
+
+# (gate-6) FLOOR LIFTED PAST GATE (Finding 3): user sets CC_MASTER_PCT_FLOOR=90 (above the 7d dispatch
+#          gate 85). 7d=87% sits in the band [gate 85, floor 90): the warning floor would NOT fire (87<90),
+#          but the HARD 7d dispatch gate (≥85) MUST still fire — it is decoupled from the configurable
+#          warning floor. Before the fix, sdHit=p7>=floor=false short-circuited the early return and the
+#          gate never fired. Now sdGateHit=p7>=gate is judged independently → dispatch wording still fires.
+run_pacing_acct_floor() { # SIDECAR_JSON NOW HOME SID FLOOR -> armed Stop + sidecar + CC_MASTER_PCT_FLOOR
+  local cdir; cdir="$(make_project)"; local cache="$cdir/rate.json"
+  printf '%s' "$1" > "$cache"
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$4" \
+    | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="$2" CC_MASTER_HOME="$3" CC_MASTER_RATE_CACHE="$cache" \
+      CC_MASTER_PCT_FLOOR="$5" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+  rm -rf "$cdir"
+}
+run_pacing_acct_floor "{\"five_hour\":{\"used_percentage\":40,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":87}}" \
+  "2026-06-10T12:00:00Z" "$G_HOME" "sess-acct" "90"
+assert_eq 0 "$HOOK_RC" "(gate-6) floor lifted past gate, 7d 87% → rc 0"
+assert_contains "$HOOK_OUT" "暂停 dispatch 新节点" "(gate-6) floor=90>gate=85, 7d 87% → hard dispatch gate STILL fires (decoupled from warning floor, Finding 3)"
+assert_contains "$HOOK_OUT" "87" "(gate-6) carries the authoritative 7d used_percentage even with floor lifted"
+assert_contains "$HOOK_OUT" "硬总闸" "(gate-6) names the 7d hard total gate"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(gate-6) never blocks"
+
+# (gate-7) CONTROL — floor=90, 7d=84% (just UNDER the gate 85) → no wall (84<90 floor) AND no dispatch
+#          gate (84<85) → silent. Proves the gate keys on ≥85 independently, not on the lifted floor.
+run_pacing_acct_floor "{\"five_hour\":{\"used_percentage\":40,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":84}}" \
+  "2026-06-10T12:00:00Z" "$G_HOME" "sess-acct" "90"
+assert_eq 0 "$HOOK_RC" "(gate-7) floor 90, 7d 84% (<gate 85) → rc 0"
+assert_eq "" "$HOOK_OUT" "(gate-7) 7d 84% under the hard gate AND under lifted floor → silent (gate keys on ≥85, not on floor)"
+rm -rf "$G_HOME"
+
+# ── A2 T6: effective-N derived from accounts.json registry (replaces board num_account/accounts[].consumed) ──
+# readNumAccount 现读号池 registry accounts.json（**不再**读 board num_account）算 effective-N =
+#   switchable(非 active 且 token 未过期) + 1。撞墙侧 n 分叉据此走：剩余可切入 0 → effective-N=1 → 回落减速
+#   (不喊切号)；仍有可切入 → n>1 → 切号信号。优雅降级：无文件 / 空池 / 坏 JSON → 1（天然单账号）。
+# run_pacing_acct_home: armed Stop + sidecar，从 $HOME/accounts.json 读 registry（无 env num_account 覆写——
+#   env 会绕过 registry；要测 registry 必须不设 CC_MASTER_NUM_ACCOUNT）。CC_MASTER_HOME=$HOME 使 ACCOUNTS_FILE
+#   解析到 $HOME/accounts.json（用户级 fallback 用 CC_MASTER_HOME）。
+run_pacing_acct_home() { # SIDECAR_JSON NOW HOME SID -> armed Stop + sidecar, accounts.json drives n (no env)
+  local cdir; cdir="$(make_project)"; local cache="$cdir/rate.json"
+  printf '%s' "$1" > "$cache"
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$4" \
+    | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="$2" CC_MASTER_HOME="$3" CC_MASTER_RATE_CACHE="$cache" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+  rm -rf "$cdir"
+}
+
+# (regn-1) registry = 1 active + NO switchable backup → effective-N = switchable(0)+1 = 1. 5h 90% wall +
+#   7d 20% low → at effective-N=1 this is a SLOWDOWN (回落减速), NOT a 切下一份配额 signal. Proves an empty
+#   backup pool yields single-account pacing (the LAST/only quota does not falsely encourage切号).
+C_HOME="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true}}}' > "$C_HOME/accounts.json"
+run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
+  "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(regn-1) effective-N=1 (only active, 0 switchable) → rc 0"
+assert_contains "$HOOK_OUT" "降到更便宜的模型档" "(regn-1) effective-N=1 → SLOWDOWN levers (not switch-account)"
+assert_not_contains "$HOOK_OUT" "切到下一份配额" "(regn-1) no switchable backup → NO 切下一份配额"
+rm -rf "$C_HOME"
+
+# (regn-2) CONTROL — registry = 1 active + 1 token-unexpired backup → effective-N = switchable(1)+1 = 2 (>1).
+#   Same 5h wall → 切下一份配额 signal fires (a fresh quota exists to switch to). Proves the n>1 fork keys on
+#   the registry-derived effective-N. Also the pool fact (号池) rides along (switchable≥1).
+C_HOME="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"}}}' > "$C_HOME/accounts.json"
+run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
+  "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(regn-2) effective-N=2 (1 active + 1 switchable) → rc 0"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(regn-2) effective-N=2 (>1) → 切下一份配额 signal fires"
+assert_contains "$HOOK_OUT" "2 份" "(regn-2) message names the effective-N (2 份)"
+assert_contains "$HOOK_OUT" "号池" "(regn-2) pool fact rides along (switchable≥1 → 号池 line appended)"
+assert_contains "$HOOK_OUT" "1 个 token 未过期" "(regn-2) pool fact names 1 switchable backup"
+rm -rf "$C_HOME"
+
+# (regn-3) EXPIRED-TOKEN backups don't count — registry = 1 active + 2 backups whose token已过期 (expires
+#   2025, < now 2026) → switchable=0 → effective-N=1 → SLOWDOWN, no切号. Proves token_expires_at gates
+#   switchable (an expired backup can't be switched into — auth would fail). Pool fact NOT appended (switchable=0).
+C_HOME="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2025-06-17T10:40:00Z"},"c@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"c@x.com"},"active":false,"token_expires_at":"2025-06-17T10:40:00Z"}}}' > "$C_HOME/accounts.json"
+run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
+  "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(regn-3) expired backups → switchable=0 → effective-N=1 → rc 0"
+assert_contains "$HOOK_OUT" "降到更便宜的模型档" "(regn-3) all backups token-expired → SLOWDOWN (no switch)"
+assert_not_contains "$HOOK_OUT" "切到下一份配额" "(regn-3) expired backups don't count → NO 切下一份配额"
+assert_not_contains "$HOOK_OUT" "号池" "(regn-3) switchable=0 → pool fact NOT appended"
+rm -rf "$C_HOME"
+
+# (regn-4) NO registry at all → natural single account → effective-N=1 → SLOWDOWN (the --num_account砍 path:
+#   no accounts.json = single account, behavior identical to old --num_account default 1). Pool fact NOT appended.
+C_HOME="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
+  "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(regn-4) no accounts.json → effective-N=1 (natural single account) → rc 0"
+assert_contains "$HOOK_OUT" "降到更便宜的模型档" "(regn-4) no registry → single-account SLOWDOWN (== old --num_account default 1)"
+assert_not_contains "$HOOK_OUT" "切到下一份配额" "(regn-4) no registry → NO 切下一份配额"
+assert_not_contains "$HOOK_OUT" "号池" "(regn-4) no registry → pool fact NOT appended"
+rm -rf "$C_HOME"
+
+# (regn-5) BAD JSON registry → graceful degrade to effective-N=1 (never crash; failure must be silent per the
+#   hook's总纪律). 5h wall → SLOWDOWN. Proves corrupt accounts.json degrades, not crashes.
+C_HOME="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+printf '%s' '{ this is not valid json ::: ' > "$C_HOME/accounts.json"
+run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
+  "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(regn-5) bad-JSON registry → degrades, rc still 0 (never crash)"
+assert_contains "$HOOK_OUT" "降到更便宜的模型档" "(regn-5) bad JSON → effective-N=1 → SLOWDOWN (graceful degrade)"
+assert_not_contains "$HOOK_OUT" "切到下一份配额" "(regn-5) bad JSON → degrade to 1 → NO 切下一份配额"
+rm -rf "$C_HOME"
+
+# (regn-6) UNARMED → registry read + pool injection MUST NOT happen (red line 6). NO board in home (unarmed),
+#   but a fat registry (3 switchable) + a 5h wall sidecar present. Hook must be SILENT (no num_account read,
+#   no pool fact, no pacing) because the armed gate short-circuits BEFORE any accounts.json read.
+C_HOME="$(make_project)"
+# deliberately NO *.board.json → unarmed
+printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"},"c@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"c@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"},"d@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"d@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"}}}' > "$C_HOME/accounts.json"
+run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
+  "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(regn-6) unarmed (no board) → rc 0"
+assert_eq "" "$HOOK_OUT" "(regn-6) unarmed → SILENT: no registry read, no pool fact, no pacing (red line 6 gate before accounts.json)"
+rm -rf "$C_HOME"
+
+# (regn-7) SWITCHABLE:FALSE backup doesn't count (P2-B) — registry = 1 active + 1 backup whose token is NOT
+#   expired (2027) but marked switchable:false (残缺号·只有 access token·无 refresh token) → switchable=0 →
+#   effective-N=1 → SLOWDOWN, no 切号. Proves poolStatus excludes switchable:false the same way select-account.js
+#   does (existing-but-not-switchable → counts into backups, NOT switchable). Without the fix effective-N would
+#   falsely be 2 and the hook would dangle a容量 lever (切到下一份配额) the选号 algorithm actually excludes.
+#   Pool fact NOT appended (switchable=0).
+C_HOME="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z","switchable":false}}}' > "$C_HOME/accounts.json"
+run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
+  "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(regn-7) switchable:false backup → switchable=0 → effective-N=1 → rc 0"
+assert_contains "$HOOK_OUT" "降到更便宜的模型档" "(regn-7) switchable:false backup → effective-N=1 → SLOWDOWN (not switch-account)"
+assert_not_contains "$HOOK_OUT" "切到下一份配额" "(regn-7) switchable:false backup don't count → NO 切下一份配额"
+assert_not_contains "$HOOK_OUT" "号池" "(regn-7) switchable=0 → pool fact NOT appended"
+rm -rf "$C_HOME"
+
+# (regn-8) MIXED pool — 1 active + 1 switchable:false (excluded) + 1 normal token-unexpired backup → switchable=1 →
+#   effective-N=2 (not 3). Proves the switchable:false号 is subtracted out of effective-N while the genuinely
+#   switchable号 still counts. 5h wall → 切号 signal fires naming「2 份」(not 3), pool fact names 1 switchable.
+C_HOME="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z","switchable":false},"c@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"c@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"}}}' > "$C_HOME/accounts.json"
+run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
+  "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
+assert_eq 0 "$HOOK_RC" "(regn-8) 1 active + 1 switchable:false + 1 normal → effective-N=2 (not 3) → rc 0"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(regn-8) effective-N=2 (>1) → 切下一份配额 signal fires"
+assert_contains "$HOOK_OUT" "2 份" "(regn-8) message names effective-N=2 (switchable:false号 subtracted, NOT 3)"
+assert_not_contains "$HOOK_OUT" "3 份" "(regn-8) switchable:false号 NOT counted → never names 3 份"
+assert_contains "$HOOK_OUT" "号池" "(regn-8) switchable≥1 → pool fact appended"
+assert_contains "$HOOK_OUT" "1 个 token 未过期" "(regn-8) pool fact names 1 switchable backup (the switchable:false号 excluded)"
+rm -rf "$C_HOME"
+
+# ── Finding 2: 7d signal MISSING (p7===null) → 切下一份配额 branch must NOT fire (don't assume 7d headroom) ──
+# When sidecar has 5h% but lacks seven_day.used_percentage, the n>1 「切到下一份配额」branch must NOT fire:
+# 7d is UNKNOWN (not confirmed有余量). Switching refreshes 5h but 7d accumulates across accounts — blindly
+# encouraging a switch could透支 an already-near-cap (but unmeasured) 7d. Fix: branch requires sdKnown
+# (p7!==null). 7d missing → fall through to conservative SLOWDOWN wording, never claim 7d headroom.
+S_HOME="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$S_HOME/mine.board.json"
+# run_pacing_nacct_g: armed Stop + sidecar + env num_account (board has no num_account here, env drives n).
+run_pacing_nacct_g() {
+  local cdir; cdir="$(make_project)"; local cache="$cdir/rate.json"
+  printf '%s' "$1" > "$cache"
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$4" \
+    | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="$2" CC_MASTER_HOME="$3" CC_MASTER_RATE_CACHE="$cache" \
+      CC_MASTER_NUM_ACCOUNT="$5" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+  rm -rf "$cdir"
+}
+
+# (sd-missing-1) n=3, 5h 90% wall, NO seven_day key → 切下一份配额 must NOT fire; falls to SLOWDOWN. The fix:
+#   without sdKnown guard, !sdHit (=true when p7===null) would wrongly fire the switch branch claiming 7d余量.
+run_pacing_nacct_g "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F}}" \
+  "2026-06-10T12:00:00Z" "$S_HOME" "sess-acct" "3"
+assert_eq 0 "$HOOK_RC" "(sd-missing-1) 7d missing + n=3 + 5h wall → rc 0"
+assert_not_contains "$HOOK_OUT" "切到下一份配额" "(sd-missing-1) 7d missing → NO 切下一份配额 (don't assume 7d headroom)"
+assert_not_contains "$HOOK_OUT" "7d 总闸仍有余量" "(sd-missing-1) 7d missing → NEVER claim 7d headroom"
+assert_contains "$HOOK_OUT" "降到更便宜的模型档" "(sd-missing-1) 7d missing → conservative SLOWDOWN wording instead"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(sd-missing-1) never blocks"
+
+# (sd-present-1) CONTROL — same n=3 + 5h 90% wall but 7d PRESENT and low (20%) → 切下一份配额 DOES fire (7d
+#   confirmed有余量). Proves the guard keys on 7d-missing specifically, not on n or the 5h wall.
+run_pacing_nacct_g "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
+  "2026-06-10T12:00:00Z" "$S_HOME" "sess-acct" "3"
+assert_eq 0 "$HOOK_RC" "(sd-present-1) 7d present & low + n=3 + 5h wall → rc 0"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(sd-present-1) 7d present & low → 切下一份配额 DOES fire (7d confirmed余量)"
+assert_contains "$HOOK_OUT" "7d 仅 20%" "(sd-present-1) names the confirmed 7d headroom value"
+rm -rf "$S_HOME"
+
 finish

@@ -24,7 +24,7 @@ content-summary: |
 
 `cc-master` 是一个 **ship-anywhere 的 Claude Code 插件**：把任意主会话 agent 变成一个 long-horizon **master orchestrator（总指挥）**。给它一个跨度 >24h 的目标，它把目标拆成依赖图、并行派发后台工作、在每个等待窗口里让主线**主动**推进，并且——最难的一环——在反复 context compaction 与跨 session 之间存活续跑而不忘记自己是谁、还剩什么。
 
-它**不是**：agent framework / library，不是某个 LLM API 的包装，不依赖 agent-teams 或 scheduled routines（见 §3 红线 5）。它是 **commands + 2 skills + hooks + 一个 board 文件**的薄编排层。
+它**不是**：agent framework / library，不是某个 LLM API 的包装，不依赖 agent-teams 或 scheduled routines（见 §3 红线 5）。它是 **commands + 3 skills + hooks + 一个 board 文件**的薄编排层。
 
 **产品愿景 / 北极星（charter）**——cc-master **致力于让** agent 化身 master orchestrator 并具备六项能力：① 异步并行多线程推进、把目标完整落地；② 控制 token 消耗速度；③ 把握自主决策 vs 寻求人类接入的边界；④ 目标的分解 / 管理 / 更新 / 规划；⑤ 资源消耗速度合理前提下最大化实施效率的调度编排；⑥ 按复杂性 / 难度 / 时长选合适的模型。这是**方向目标（aspirational）而非「已全部兑现」**——哪些已落地、哪些 design-only 由 gap 审计度量。**完整六条 charter 的 SSOT 在 [`design_docs/spec.md` §1.0](design_docs/spec.md)**，本段只是摘要回指，不复述。
 
@@ -46,9 +46,10 @@ cc-master/
 ├── CHANGELOG.md
 ├── .claude-plugin/           ← plugin.json 清单 + marketplace.json
 ├── commands/                 ← as-master-orchestrator / status / handoff-to-new-session / stop（一次性点火）
-├── skills/                    ← **分发**给插件用户的 skill 源码（仅这两个随插件 ship）
+├── skills/                    ← **分发**给插件用户的 skill 源码（这三个随插件 ship）
 │   ├── orchestrating-to-completion/  ← SKILL A：编排方法论（魂）+ references/ + scripts/（运行时带外脚本 cc-usage / codex-review / statusline-capture，随 skill 分发，prose 用 `${CLAUDE_SKILL_DIR}` 引用）
-│   └── authoring-workflows/          ← SKILL B：workflow 写法 + references/ + assets/examples/
+│   ├── authoring-workflows/          ← SKILL B：workflow 写法 + references/ + assets/examples/
+│   └── account-management/           ← SKILL C：换号号池机制层（accounts.json registry + vault token 录入 / 选号 / 切号）+ references/ + scripts/
 ├── .claude/skills/            ← **项目自用** dev skill（造/评/治三件套 + requirement-elicitation 上游需求发现，**不分发**）
 ├── hooks/scripts/            ← 5 个 hook，全 board-derived「武装」后才醒（ADR-007）：bootstrap-board（ARM 动作）/ reinject / verify-board（goal-hook）/ posttool-batch（过调度软警告）·bash + usage-pacing.js（**账户权威 5h/7d `used_percentage` 双侧 pacing**：临界轻推减速 + 5h 欠用轻推加速、7d 当硬总闸·ADR-010；读 statusline-capture 落的 sidecar，缺则降级本地反推·Finding #37）·node·JS（红线1·ADR-006 已允许 node）
 ├── scripts/                  ← 带外 **dev-only** 脚本：eval-trigger / eval-benchmark / skill-lint（仅开发本仓用、repo 根调用，**不随 plugin 分发**；裸路径在此正确）。运行时带外脚本（cc-usage / codex-review / statusline-capture）已搬入 `skills/orchestrating-to-completion/scripts/`（随 skill 分发，见上）
@@ -60,7 +61,7 @@ cc-master/
 
 **关键不变式**（每条一句话 + SSOT；硬约束的完整体在 §3 红线）：
 
-- **六条 design 红线**——hooks 只用 bash+node/JS（红线1，ADR-006）/ board narrow waist / 两 skill 不重叠 / 指挥不演奏 / ship-anywhere / 所有 hook 武装后才激活（dormant-until-armed，红线6，ADR-007）。SSOT 在本文 **§3**（每条带 grep/CI 卡点）。
+- **六条 design 红线**——hooks 只用 bash+node/JS（红线1，ADR-006）/ board narrow waist / 三 skill 不重叠 / 指挥不演奏 / ship-anywhere / 所有 hook 武装后才激活（dormant-until-armed，红线6，ADR-007）。SSOT 在本文 **§3**（每条带 grep/CI 卡点）。
 - **临时计划 / 草稿放 `design_docs/plans/`**——已 gitignored，不进版本控制，与正式 `design_docs/` 严格分开。
 - **运行时 board 不入版本控制**——`.claude/cc-master/`（或 `$CC_MASTER_HOME`）gitignored；每个 orchestration 一份 time-sortable 文件，并发不撞。
 
@@ -76,8 +77,8 @@ cc-master/
 2. **保持 board 的 narrow waist 稳定。** Board 是单一真相源、也是 hook 唯一能读的状态；只有一小撮固定字段是 hook-dependent（`schema` / `goal` / `owner.session_id` / `git` / `tasks[{id,status,deps}]` + status enum），其余 agent-shaped。动 waist 必须同 PR 改全部 hook + 测试并在 PR 描述显式说明。
    → 决策快照：[`adrs/ADR-003-board-narrow-waist.md`](adrs/ADR-003-board-narrow-waist.md) · 协议 SSOT：[`skills/orchestrating-to-completion/references/board.md`](skills/orchestrating-to-completion/references/board.md) · 硬卡点：动 waist 的 PR 必带 `bash run-tests.sh` 全绿 + hook 测试同步更新。
 
-3. **两个 skill 各自自洽、互不重叠。** SKILL A（`orchestrating-to-completion`）= 主线编排方法论；SKILL B（`authoring-workflows`）= 脚本内写法。不让职责跨界、不在两者间复述同一份指导。
-   → 决策快照：[`adrs/ADR-005-two-skills-separation.md`](adrs/ADR-005-two-skills-separation.md) · 硬卡点：跨界/复述在 PR review 拦——"orchestrator 做什么" 归 A，"workflow 脚本怎么写" 归 B。
+3. **三个分发 skill 各自自洽、互不重叠。** SKILL A（`orchestrating-to-completion`）= 主线编排**决策**（含「逼顶该不该换号」的 pacing 决策）；SKILL B（`authoring-workflows`）= 脚本内写法；SKILL C（`account-management`）= 换号号池**机制层**（号池管理 / 选号 / 切号 / vault token 安全）。不让职责跨界、不在三者间复述同一份指导——换号的**决策**（何时换、谁拍板）归 A，换号的**机制**（怎么选号、怎么切、怎么管 vault）归 C，A 在 pacing 决策点单向引用 C 而不复述其机制。
+   → 决策快照：[`adrs/ADR-005-two-skills-separation.md`](adrs/ADR-005-two-skills-separation.md)（两 skill 分离原则扩到三个，account-management 经 curating 闸纳入·不变其精神）· 硬卡点：跨界/复述在 PR review 拦——"orchestrator 做什么" 归 A，"workflow 脚本怎么写" 归 B，"号池怎么管 / 怎么选号切号 / token 怎么安全" 归 C。
 
 4. **指挥永不演奏（the conductor never plays an instrument）。** Orchestrator 协调，不亲手做单元工作；任何把主线推向亲自实现 / 亲自 review 的改动都是反方向。
    → 纪律 SSOT（含唯一例外、Rationalization Table、Red Flags）：[`skills/orchestrating-to-completion/SKILL.md`](skills/orchestrating-to-completion/SKILL.md) §Red lines · 硬卡点：行为型红线，由 §8 Track B benchmark + 端点验收守护（非 grep 能拦）。
@@ -115,7 +116,7 @@ cc-master/
 
 ## 6. Skill 创作 / 维护纪律（含 TDD-for-skills）
 
-本仓**分发**两个 skill：A（编排）、B（workflow 写法）——**互不重叠**（红线 3）：A = orchestrator 做什么，B = workflow 脚本怎么写。另有**四个项目自用、不随插件分发**的 dev meta-skill（住 `.claude/skills/`，不在 `skills/`），终端用户装插件时看不到它们——**造 / 评 / 治三件套**（skillsmith / curating / grounding）+ 它们**上游**的一个需求发现 skill：
+本仓**分发**三个 skill：A（编排决策）、B（workflow 写法）、C（`account-management`·换号号池机制层）——**互不重叠**（红线 3）：A = orchestrator 做什么（含换号**决策**），B = workflow 脚本怎么写，C = 号池怎么管 / 怎么选号切号 / token 怎么安全（换号**机制**）。另有**四个项目自用、不随插件分发**的 dev meta-skill（住 `.claude/skills/`，不在 `skills/`），终端用户装插件时看不到它们——**造 / 评 / 治三件套**（skillsmith / curating / grounding）+ 它们**上游**的一个需求发现 skill：
 
 - **`requirement-elicitation`** — 在动手任何 feature / skill / 行为改动**之前**，通过协作对话挖出用户真实痛点、过设计闸（批准前不实现）。本仓 dev 流的需求发现闸，**取代 `superpowers:brainstorming`**（self-contain + 重接地到 board `goal` 模型）。**它不是「为对仗凑的第四件造/评/治」**——是不同家族的**发现层**（喂给 curating），靠 self-containment 缺口 + 强 B1 覆写挣得席位，见其 [`DESIGN.md`](.claude/skills/requirement-elicitation/DESIGN.md)。
 - **`cc-master-skillsmith`** — 写或改**一个** skill 的 body（craft 两轴诊断 + 4 类 body 内容 + pressure-test 纪律）。
@@ -187,7 +188,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 
 - **command**（`commands/*.md`）——一次性点火，frontmatter + body；body 首个非空行的 sentinel 注释（如 `<!-- cc-master:bootstrap:v1 -->`）是 hook 触发标记，**只在首行独立成行时触发**（内联提及不触发，Finding #16）。仅作为 hook 触发点的 command 需要 sentinel（目前只有 `as-master-orchestrator`）；`status` / `stop` / `handoff-to-new-session` 等普通 command 不需要（`handoff-to-new-session` 由旧 session 运行、把 board 优雅交接给新 session——是 `--resume` 跨 session re-arm 的写/准备侧，本身不武装 hook，故无 sentinel）。**命令体正文是用户敲 `/command` 时注入 agent context 的 prompt——用 imperative / 第二人称 / task-first 写（对齐 `status` / `stop` 的嗓音），别写成第三人称 reference 文档、也别把 reference 的哲学说教复述进来（[[Finding #43]]）。**
 - **skill**（`skills/<name>/SKILL.md` + `references/` + `assets/`）——frontmatter `name` + `description`（单引号整包，§6）；大 reference 顶部加锚点 TOC；深度细节进 `references/` 保持主文件瘦。
-- **command / skill 必须分发 self-contain（不断链）**——分发的 `commands/` 与 `skills/<name>/` 里的任何文件（命令体 / SKILL.md / `references/` / `scripts/` / DESIGN.md…）引用别的文件时，**只能指向随 plugin 分发的约定目录**（`skills/` `hooks/` `commands/` `agents/` `bin/`），且**必须用 `${CLAUDE_PLUGIN_ROOT}/<dir>/…` 绝对引用**（skill 引用自己目录内的资产用 `${CLAUDE_SKILL_DIR}/…`）。**两类断链禁止**：① **裸相对路径**（如 `scripts/cc-usage.sh`——装到用户机器后相对其 cwd 解析、找不到）；② **引用非约定目录的文件**（`design_docs/` `adrs/` `README` `AGENTS.md` `CHANGELOG`——这些不保证随 plugin 分发，安装后死链）。**概念性提及不算文件引用、可留**：泛指「以本 plugin 的 hook 脚本为准」、叙事性 `Finding #NN` / `ADR-NNN`（不带路径）、描述脚本运行时读「所在 repo 的 AGENTS.md」这类行为。→ 硬卡点：`grep -rnE 'design_docs\|adrs/[A-Z]\|\]\(\.\.\|hooks/scripts\|README\.md' commands/ skills/ \| grep -v CLAUDE_` 须只剩 `codex-review.sh` 那条「读所在 repo 的 AGENTS.md」行为描述。来源 [[Finding #38]]/[[Finding #39]]（真实安装才现形的形态盲区）。→ **裸跨 skill 引用专项硬卡点**（[[Finding #50]]）：反引号包裹、以兄弟 skill 名（`authoring-workflows` / `orchestrating-to-completion`）开头带 `/` 的路径引用，是装机后相对用户 cwd 解析的死链，必须升为 `${CLAUDE_PLUGIN_ROOT}/skills/<name>/…`。模式：`` grep -rnE '`(authoring-workflows|orchestrating-to-completion)/[^`]*`' skills/ commands/ hooks/ `` 须零命中（正则反引号锚定已天然排除 `${CLAUDE_*}/…` 修正形式，故**不接** `| grep -v CLAUDE_` 行级过滤——加了反而对「同行既有修正形式又有残留裸引用」漏报，与 `skill-lint.sh` check(4) 的逐 token 匹配保持一致·[[Finding #50]] codex round-3 catch）。**注意范围**：只查这两个**分发 skill 名**——纯 skill 名提及（不带 `/`）合法、同 skill 内 `references/x.md` 自引用天然不匹配、dev-only repo 根 `scripts/`（如 DESIGN.md 里）不算（不分发·红线5，裸路径从 repo 根正确，故**有意不纳入**模式避免误报）。此卡点已接进 [`scripts/skill-lint.sh`](scripts/skill-lint.sh) check (4) 自动执行（命中即 `exit 1`）。
+- **command / skill 必须分发 self-contain（不断链）**——分发的 `commands/` 与 `skills/<name>/` 里的任何文件（命令体 / SKILL.md / `references/` / `scripts/` / DESIGN.md…）引用别的文件时，**只能指向随 plugin 分发的约定目录**（`skills/` `hooks/` `commands/` `agents/` `bin/`），且**必须用 `${CLAUDE_PLUGIN_ROOT}/<dir>/…` 绝对引用**（skill 引用自己目录内的资产用 `${CLAUDE_SKILL_DIR}/…`）。**两类断链禁止**：① **裸相对路径**（如 `scripts/cc-usage.sh`——装到用户机器后相对其 cwd 解析、找不到）；② **引用非约定目录的文件**（`design_docs/` `adrs/` `README` `AGENTS.md` `CHANGELOG`——这些不保证随 plugin 分发，安装后死链）。**概念性提及不算文件引用、可留**：泛指「以本 plugin 的 hook 脚本为准」、叙事性 `Finding #NN` / `ADR-NNN`（不带路径）、描述脚本运行时读「所在 repo 的 AGENTS.md」这类行为。→ 硬卡点：`grep -rnE 'design_docs\|adrs/[A-Z]\|\]\(\.\.\|hooks/scripts\|README\.md' commands/ skills/ \| grep -v CLAUDE_` 须只剩 `codex-review.sh` 那条「读所在 repo 的 AGENTS.md」行为描述。来源 [[Finding #38]]/[[Finding #39]]（真实安装才现形的形态盲区）。→ **裸跨 skill 引用专项硬卡点**（[[Finding #50]]）：反引号包裹、以兄弟 skill 名（`authoring-workflows` / `orchestrating-to-completion` / `account-management`）开头带 `/` 的路径引用，是装机后相对用户 cwd 解析的死链，必须升为 `${CLAUDE_PLUGIN_ROOT}/skills/<name>/…`。模式：`` grep -rnE '`(authoring-workflows|orchestrating-to-completion|account-management)/[^`]*`' skills/ commands/ hooks/ `` 须零命中（正则反引号锚定已天然排除 `${CLAUDE_*}/…` 修正形式，故**不接** `| grep -v CLAUDE_` 行级过滤——加了反而对「同行既有修正形式又有残留裸引用」漏报，与 `skill-lint.sh` check(4) 的逐 token 匹配保持一致·[[Finding #50]] codex round-3 catch）。**注意范围**：只查这三个**分发 skill 名**——纯 skill 名提及（不带 `/`）合法、同 skill 内 `references/x.md` 自引用天然不匹配、dev-only repo 根 `scripts/`（如 DESIGN.md 里）不算（不分发·红线5，裸路径从 repo 根正确，故**有意不纳入**模式避免误报）。此卡点已接进 [`scripts/skill-lint.sh`](scripts/skill-lint.sh) check (4) 自动执行（命中即 `exit 1`）。
 - **hook**（`hooks/scripts/*.sh` / `*.js`）——bash 或 node/JS（红线 1·ADR-006）；状态写 sidecar，**永不碰 board**。
   - **hook 武装纪律（硬规则，违背字面就是违背精神）**：**所有 hook 在本 session 被 `as-master-orchestrator` 武装之前完全休眠。** 武装是 board-derived 且跨 compaction 持久——armed ⟺ home 里存在一个 `*.board.json`，其 `owner.active:true` 且 `owner.session_id == 本次 hook stdin 的 session_id`（sid 空 → 降级匹配任一 active 板，保 compaction 边界鲁棒）。每个 hook 的 `board_matches` / `isArmed` 即这道闸——**未武装一律静默**（空 stdout、RC 0、不 block）。`bootstrap-board.sh` 是**唯一豁免者**：它就是 ARM 动作本身。**ARM 有两种形态**：fresh（建板即把 `owner.session_id` 盖成创建它的 session）与 resume（`as-master-orchestrator --resume <选择器>` 把选定的**已存在**旧板盖成新 sid、`owner.active` 无条件置 true 含**复活 `/stop` 归档板**、保留 `tasks`/`log`/`goal`/`git`，经 live 安全闸——见 ADR-009）。两形态都经 `bootstrap-board.sh` + 显式用户命令，仍是「唯一豁免的 ARM 动作」，红线 6 实质不变。解除武装 = `/stop` 归档板（`owner.active:false`，此后**显式可逆**——可经 `--resume` 复活）+ goal-hook。新增 / 修改任何 hook **必须**先过这道闸（绝不在未武装路径上注入或 block），且只读 narrow-waist 的 `active` / `session_id` 判 arming——不碰 board 的 agent-shaped 部分（红线 2）。→ 决策快照：[`adrs/ADR-007-hook-arming-gate.md`](adrs/ADR-007-hook-arming-gate.md)（+ resume re-arm：[`adrs/ADR-009-resume-cross-session-re-arm.md`](adrs/ADR-009-resume-cross-session-re-arm.md)）。
 - **design_docs**——正式文档进 `design_docs/`；临时 plan 进 `design_docs/plans/`（gitignored）；日期前缀命名（`YYYY-MM-DD-<slug>.md`）。

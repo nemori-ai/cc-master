@@ -21,6 +21,8 @@ run_stop_sid() {
 }
 
 CANON="arm a watchdog wakeup"   # canonical hook-injection anchor phrase (impl-contract §2.3)
+RECON_NOT_VERDICT="NOT a death verdict"   # Finding #60: ceiling is a recon trigger, not a kill signal
+NO_OUTPUT_STALL="never an output-size stall"   # Finding #60: don't use output-size as liveness signal
 
 # Case WD-a: completion state, an in_flight task, NO `wakeup` field → completion handshake block whose
 #            reason carries the canonical watchdog nudge. (T1 done, T2 in_flight → no ready/uncertain →
@@ -31,6 +33,8 @@ run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "WD-a: in_flight + no wakeup → completion handshake block"
 assert_contains "$HOOK_OUT" "self-check" "WD-a: in_flight + no wakeup → still the self-check handshake"
 assert_contains "$HOOK_OUT" "$CANON" "WD-a: in_flight + no wakeup → reason carries canonical 'arm a watchdog wakeup' nudge"
+assert_contains "$HOOK_OUT" "$RECON_NOT_VERDICT" "WD-a: reminder frames an expired ceiling as a recon trigger, NOT a death verdict (Finding #60)"
+assert_contains "$HOOK_OUT" "$NO_OUTPUT_STALL" "WD-a: reminder warns against output-size stall as the liveness signal (Finding #60)"
 assert_valid_json "$HOOK_OUT" "WD-a: hook stdout is well-formed JSON with watchdog clause appended"
 rm -rf "$H"
 
@@ -190,6 +194,7 @@ mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"act
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "WD-k: stale wakeup (fire_at in past) + in_flight → completion handshake block"
 assert_contains "$HOOK_OUT" "$CANON" "WD-k: stale wakeup (fire_at already past) does NOT silence → reminder re-fires (self-heal)"
+assert_contains "$HOOK_OUT" "$RECON_NOT_VERDICT" "WD-k: an expired fire_at + still in_flight is framed as recon-not-verdict, so a healthy long-runner isn't false-killed (Finding #60)"
 rm -rf "$H"
 
 # Case WD-l (FUTURE wakeup → stay silent): same as WD-k but `fire_at` is in the FUTURE (not yet expired)

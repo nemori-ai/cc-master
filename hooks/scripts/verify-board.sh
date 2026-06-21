@@ -534,7 +534,13 @@ fi
 # background-shell `until` floor) and write what to recon into the board's `wakeup.checklist`. Soft-
 # observed: an already-armed `wakeup` object silences this (graceful-degrade like wip_limit). The
 # canonical anchor phrase "arm a watchdog wakeup" maps to the wait-edge in the orchestration skill.
+# CEILING = RECON TRIGGER, NOT DEATH VERDICT (Finding #60): an expired fire_at while still in_flight
+# nudges the agent to come back and recon ground truth (git/mtime/long-silent-command), NOT to kill a
+# healthy long-runner. The wording must say "recon, not verdict" + "generous time ceiling, never
+# output-size stall as liveness signal" so the reminder cannot induce false-killing a healthy task that
+# is legitimately blocked on a long silent command (run-tests / big compile). See async-hitl.md
+# §ceiling = recon 触发器.
 if [ "$watchdog_needed" -eq 1 ]; then
-  handshake_reason="$handshake_reason This board has an in_flight background task but no armed watchdog (the \`wakeup\` field is missing, or its \`fire_at\` is already in the past — a watchdog that should have fired but the task is still in_flight is itself the silent-failure signal). Before you stop, arm a watchdog wakeup (CronCreate one-shot / ScheduleWakeup / Monitor / background-shell \`until\`) for the in_flight tasks that could fail silently, and record what to recon when it fires in the board's \`wakeup.checklist\` — otherwise a silently-failing background task leaves no one to come back and look."
+  handshake_reason="$handshake_reason This board has an in_flight background task but no armed watchdog (the \`wakeup\` field is missing, or its \`fire_at\` is already in the past). An expired \`fire_at\` while a task is still in_flight is a trigger to come back and RECON ground truth — NOT a death verdict: if recon shows it healthy (git moving / output mtime still changing / legitimately blocked on a long silent command like run-tests), extend / re-arm the watchdog and let it run; only a task frozen with no ground-truth change well past a generous ceiling is judged hung. Before you stop, arm a watchdog wakeup (CronCreate one-shot / ScheduleWakeup / Monitor / background-shell \`until\`) for the in_flight tasks that could fail silently — use a generous time ceiling, never an output-size stall as the liveness signal — and record what to recon when it fires in the board's \`wakeup.checklist\` — otherwise a silently-failing background task leaves no one to come back and look."
 fi
 emit_block "$handshake_reason"

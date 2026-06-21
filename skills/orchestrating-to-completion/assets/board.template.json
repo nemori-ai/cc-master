@@ -5,6 +5,7 @@
   "owner": { "active": true, "session_id": "", "heartbeat": "" },
   "git": { "worktree": "", "branch": "" },
   "wip_limit": 4,
+  "num_account": 1,
   "tasks": [],
   "log": []
 }
