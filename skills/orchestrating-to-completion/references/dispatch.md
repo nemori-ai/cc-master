@@ -45,7 +45,7 @@
 - 只有**非临界 float** 才是 pipeline / fan-out 能填的免费并行预算；
 - **一批同类子任务**（迁移 N 个文件、review N 条 finding）才是它的主场。
 
-顶层骨架是 dataflow DAG *调度*；`pipeline()` 只是项目恰好同构时它退化成的特例。在一条串行临界链上硬抓 fan-out 是经典的误套——T₁/T∞ ≈ 1 时，根本别 fan out。
+顶层骨架是 dataflow DAG *调度*；`pipeline()` 只是项目恰好同构时它退化成的特例。在一条串行临界链上硬抓 fan-out 是经典的误套——T₁/T∞ ≈ 1 时，根本别 fan out。拓扑复杂、拿不准这条链到底是不是 T₁/T∞ ≈ 1（心算易错估）时，可 `board-graph.js --cmd parallelism` 机器读 `parallelism` 值佐证（见 `graph-analysis.md`）；平凡图一眼看穿就别跑。
 
 ---
 
