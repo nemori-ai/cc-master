@@ -336,6 +336,75 @@ function lintBoard(text) {
     }
   }
 
+  // ── R8：awaiting-user 完整性（decision_package 采访闭环的最小机制保障）─────────────────────────────
+  // 背景：`decision_package` 是挂在 awaiting-user 节点上的「采访包」（agent-shaped 柔性边、行为 hook 一概不读）。
+  //   一个 awaiting-user 节点的**存在意义**就是「一个备好料的用户决策点」——没包 = 节点没兑现这个意义 = 新 session
+  //   跑 /cc-master:discuss 时开不起来讨论（discuss 据 board.md 协议「节点上没 decision_package → 停手」），采访闭环
+  //   （一个 session 备料、另一个讨论）整条塌掉。活体证据：awaiting-user 节点不带 / 带不全 decision_package，旧 lint
+  //   报 0 error 放行（C1「board 完整性零机制保障」典型）。R8 补这道闸。
+  //
+  // isAwaitingUser 口径（与 webview / discuss 两端对齐，board.md §decision_package「生命周期闸」+ discuss.md step 5）：
+  //   `blocked_on === "user"` 且 `status ∈ {blocked, in_flight}`——只这种节点才被 webview 渲成富决策卡 + 复制按钮、
+  //   才会被 discuss 当「仍在等用户拍板」。闸更窄会「邀请又拒绝」，更宽会误伤普通阻塞 / done 节点（守 silent-on-unknown）。
+  //
+  // 红线 2 不破（写进 board.md §decision_package「lint 强制」）：① 行为型 hook（reinject / verify-board /
+  //   posttool-batch / usage-pacing）仍**不读** decision_package，编排行为不依赖它；② board-lint 是**校验器**不是行为
+  //   hook，且它本就对 agent-shaped 字段合法性 hard-error（R5b blocked_on 是先例）；③ PostToolUse 的 board-lint hook
+  //   **绝不 decision:block**（只软提示），故 R8a hard error 不卡编排者写盘，只在 CLI / run-tests 端点闸真红。
+  //   decision_package **仍是 agent-shaped、不进 narrow waist**——R8 只校验「awaiting-user 节点这一既有契约位上的
+  //   柔性边」的存在 + 形状，不要求任何别的柔性边存在（守 silent-on-unknown：只查这一条，不顺手给别的柔性边加校验）。
+  const ASK_TYPE_ENUM = new Set(['decision', 'advice', 'solution']);
+  const INPUTS_HASH_RE = /^sha256:[0-9a-f]+$/;
+  for (const [id, t] of taskById) {
+    // isAwaitingUser 口径：blocked_on==="user" 且 status ∈ {blocked, in_flight}。
+    const isAwaitingUser = t.blocked_on === 'user' && (t.status === 'blocked' || t.status === 'in_flight');
+    if (!isAwaitingUser) continue; // 非 awaiting-user 节点一概不查（blocked_on 非 user / 普通 done … → 不触发 R8）
+
+    const dp = t.decision_package;
+    // R8a HARD ERROR：awaiting-user 节点必须有一个 decision_package 对象。
+    if (!dp || typeof dp !== 'object' || Array.isArray(dp)) {
+      err('R8a',
+        `${id} 是 awaiting-user 节点（blocked_on:"user" + status=${JSON.stringify(t.status)}），但缺少 decision_package 对象` +
+        `（当前：${JSON.stringify(dp)}）。awaiting-user 节点的存在意义就是一个「备好料的用户决策点」——没包 = 节点没兑现` +
+        `意义 = 新 session 跑 /cc-master:discuss 开不起来讨论（discuss 见「节点上没 decision_package」即停手），采访闭环塌掉。\n` +
+        `  怎么修：在 ${id} 上挂 decision_package（canonical 契约见 board.md §decision_package：version/inputs_hash/ask_type/` +
+        `context_md/what_i_need/options…），或若该节点已不在等用户拍板，把 blocked_on 改掉 / status 改成非 blocked·in_flight。`, id);
+      continue; // 没包 → 没有字段可逐项查，R8b 跳过
+    }
+
+    // R8b WARN：包在、但字段不全（每项不合 → 一条 warn；不 hard fail——graceful，editor 可补全）。
+    if (typeof dp.context_md !== 'string' || dp.context_md === '') {
+      warn('R8b',
+        `${id}.decision_package.context_md 应为非空字符串（当前：${JSON.stringify(dp.context_md)}）。` +
+        `影响：discuss 用它把「cc-master 为什么卡在这」讲清楚——缺它用户被空投到失上下文决策点（这正是 decision_package 要解的痛点）。`, id);
+    }
+    if (typeof dp.what_i_need !== 'string' || dp.what_i_need === '') {
+      warn('R8b',
+        `${id}.decision_package.what_i_need 应为非空字符串（当前：${JSON.stringify(dp.what_i_need)}）。` +
+        `影响：discuss 据它告诉用户「该给你什么」——缺它讨论没有明确产出物。`, id);
+    }
+    if (typeof dp.ask_type !== 'string' || !ASK_TYPE_ENUM.has(dp.ask_type)) {
+      warn('R8b',
+        `${id}.decision_package.ask_type 应 ∈ {decision, advice, solution}（当前：${JSON.stringify(dp.ask_type)}）。` +
+        `影响：discuss 据它设定姿态（拍板 / 给判断 / 给解法）——缺/错则姿态错配。`, id);
+    } else if (dp.ask_type === 'decision' && !(Array.isArray(dp.options) && dp.options.length > 0)) {
+      // ask_type==="decision" 时 options 必填非空（board.md §decision_package：decision 型 options 必填非空）。
+      warn('R8b',
+        `${id}.decision_package.ask_type 是 "decision" 却没有非空 options 数组（当前 options：${JSON.stringify(dp.options)}）。` +
+        `影响：decision 型采访让用户在 options 里拍板——没选项用户无从选起（advice/solution 型 options 可空）。`, id);
+    }
+    if (typeof dp.inputs_hash !== 'string' || !INPUTS_HASH_RE.test(dp.inputs_hash)) {
+      warn('R8b',
+        `${id}.decision_package.inputs_hash 应匹配 sha256:<hex>（当前：${JSON.stringify(dp.inputs_hash)}）。` +
+        `影响：discuss 入口重算此值做 freshness-check（上游变没变）——格式不对则时效性校验失效、可能拿过期依据糊弄用户。`, id);
+    }
+    if (typeof dp.enter_cmd !== 'string' || dp.enter_cmd === '') {
+      warn('R8b',
+        `${id}.decision_package.enter_cmd 应为非空字符串（当前：${JSON.stringify(dp.enter_cmd)}）。` +
+        `影响：webview 详情栏据此渲染复制 /cc-master:discuss 按钮——缺它用户没有一键讨论入口，采访闭环的「复制即用」那一环断掉。`, id);
+    }
+  }
+
   return { errors, warnings };
 }
 

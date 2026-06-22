@@ -25,12 +25,12 @@ if (!BOARD_PATH) {
 const SCRIPT_DIR = __dirname;
 const VENDOR_DIR = path.join(SCRIPT_DIR, 'vendor');
 const HTML_PATH = path.join(SCRIPT_DIR, 'view.html');
-// The shared graph-analysis core lives in hooks/scripts/ (the ONE source of truth that
-// hooks + the board-graph CLI + this webview all reuse — DRY, design §5.2/§5.8). The
-// viewer loads these as classic <script>s so its analyze() delegates to the same
-// analyzeGraph() instead of carrying a divergent copy. Both files are plugin-internal
-// (hooks/ and skills/ both ship), resolved relative to THIS script — never cwd.
-//   skills/orchestrating-to-completion/scripts/ → ../../../hooks/scripts/
+// The shared graph-analysis core lives under ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/ (the ONE
+// source of truth that hooks + the board-graph CLI + this webview all reuse — DRY, design
+// §5.2/§5.8). The viewer loads these as classic <script>s so its analyze() delegates to the
+// same analyzeGraph() instead of carrying a divergent copy. Both files are plugin-internal
+// (the plugin's hooks and skills trees both ship), resolved relative to THIS script — never cwd.
+//   ${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/scripts/ → ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/
 const CORE_DIR = path.resolve(SCRIPT_DIR, '..', '..', '..', 'hooks', 'scripts');
 // Only these two core files are exposed (allow-list, not an open hooks/ mount).
 const CORE_FILES = new Set(['board-graph-core.js', 'board-lint-core.js']);
@@ -300,8 +300,8 @@ const server = http.createServer((req, res) => {
   }
 
   // GET /core/<file>.js -> serve the shared graph-analysis core (board-graph-core.js /
-  // board-lint-core.js) from hooks/scripts/. Strict allow-list (CORE_FILES) — NOT an open
-  // hooks/ mount: only the two named files are reachable, no subpaths, no traversal. The
+  // board-lint-core.js) from ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/. Strict allow-list (CORE_FILES) — NOT an
+  // open mount: only the two named files are reachable, no subpaths, no traversal. The
   // viewer loads these as classic <script>s so analyze() reuses the ONE analyzeGraph()
   // (DRY — no second copy of the graph algorithms in the browser). Read-only, no network.
   if (urlPath.startsWith('/core/')) {

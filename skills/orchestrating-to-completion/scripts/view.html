@@ -461,8 +461,9 @@
 
     .react-flow__attribution { display: none; }
 
-    /* dim non-lineage elements when a node is selected */
-    #flow.has-selection .cc-node:not(.lin-self):not(.lin-anc):not(.lin-desc) {
+    /* dim non-lineage elements when a node is selected. lin-child (group membership —
+       children of a selected owner) is kept lit alongside the dep-chain classes. */
+    #flow.has-selection .cc-node:not(.lin-self):not(.lin-anc):not(.lin-desc):not(.lin-child) {
       opacity: 0.24; filter: saturate(0.5);
     }
     #flow.has-selection .react-flow__edge:not(.edge-lin) { opacity: 0.12; }
@@ -500,6 +501,17 @@
     /* ancestry / descendants keep full presence; everyone else dims (see #flow) */
     .cc-node.lin-anc { border-color: oklch(0.50 0.04 244 / 0.6); }
     .cc-node.lin-desc { border-color: oklch(0.50 0.04 300 / 0.5); }
+    /* group membership — a child of the SELECTED OWNER. The owner's cool-blue accent hue
+       (244), carried as a soft ring so it reads as "this belongs to the group you picked",
+       coordinated with .cc-node.owner / .child but clearly a selection echo (a ring, not
+       just a border tint). Distinct from the cyan self-ring and the anc/desc dep tints. */
+    .cc-node.lin-child {
+      border-color: oklch(0.70 0.115 244 / 0.55);
+      box-shadow:
+        0 0 0 2px oklch(0.70 0.115 244 / 0.30),
+        0 1px 2px oklch(0.10 0.01 255 / 0.5),
+        0 8px 20px oklch(0.30 0.06 244 / 0.18);
+    }
 
     /* the lamp row: a glowing status lamp + uppercase status readout */
     .cc-node .lamprow {
@@ -2420,7 +2432,7 @@
       const seen = new Set();
       for (const [s, t] of edgePairs) {
         if (s === t || !ids.has(s) || !ids.has(t)) continue;
-        const key = s + ' ' + t;
+        const key = s + '\u0000' + t;
         if (seen.has(key)) continue;     // dedupe rerouted multi-edges
         seen.add(key);
         g.setEdge(s, t);
@@ -2612,7 +2624,7 @@
           if (!visibleIds.has(d) && !hidden.has(d)) continue; // dangling dep -> skip
           const s = reroute(d), tg = reroute(t.id);
           if (s === tg || !visibleIds.has(s) || !visibleIds.has(tg)) continue;
-          const key = s + ' ' + tg;
+          const key = s + '\u0000' + tg;
           if (pairSeen.has(key)) continue;
           pairSeen.add(key);
           edgePairs.push([s, tg]);
@@ -2621,11 +2633,16 @@
 
       const positions = (prevPositions && prevPositions.size) ? prevPositions : layout(visibleTasks, edgePairs);
 
-      // lineage sets for the selected node
-      let ancSet = null, descSet = null;
+      // lineage sets for the selected node. ancSet/descSet trace the DEPENDENCY chain
+      // (who gates / is gated by sel). kidSet is the CONTAINMENT relation: if sel is an
+      // owner, its child nodes (the sub-DAG it holds) light up as "members of this group"
+      // — a distinct, coordinated cool-blue highlight (the owner's accent hue) so selecting
+      // a parent answers "what does it manage?" (#feat①). Only populated for an owner.
+      let ancSet = null, descSet = null, kidSet = null;
       if (sel && an.byId.has(sel)) {
         ancSet = an.ancestors(sel);
         descSet = an.descendants(sel, new Set());
+        if (owners.has(sel)) kidSet = new Set(an.childrenOf(sel));
       }
 
       const nodes = visibleTasks.map((t, i) => {
@@ -2640,6 +2657,10 @@
           if (t.id === sel) lineage = 'self';
           else if (ancSet && ancSet.has(t.id)) lineage = 'anc';
           else if (descSet && descSet.has(t.id)) lineage = 'desc';
+          // group membership — a child of the selected owner. Lowest precedence: a node
+          // already on sel's dependency chain (anc/desc) keeps that classification; a child
+          // that's NOT on the dep chain gets the containment highlight.
+          else if (kidSet && kidSet.has(t.id)) lineage = 'child';
         }
         // nesting metadata: is this node an owner (has children)? a child (has a parent)?
         const isOwner = owners.has(t.id);
@@ -2668,6 +2689,9 @@
             // every second; null when absent/unparseable -> clock omitted.
             dispatchedAt: t.status === 'in_flight' ? startTs(t) : null,
             lineage,
+            // staggered entrance fade — ONLY on the first paint (firstLayout), never on a
+            // re-layout (topology change / collapse toggle), or the whole graph re-fades
+            // from opacity:0 and high-stagger tiles read as "vanished" (#bug②).
             enter: !!firstLayout,
             order: i,
             // ── D3 nesting tile data ──
@@ -2810,11 +2834,20 @@
 
       // (re)render the graph from current board + analysis + selection. Reads the live
       // collapsed set via ref + passes the stable toggle so owner tiles can fold/unfold.
+      // `fresh` drives the dagre RE-LAYOUT (new visible/topology set → recompute positions);
+      // the staggered entrance fade (`enter`) is a SEPARATE one-shot — it must play only on
+      // the very FIRST paint, NEVER on a re-layout. Coupling the two (passing `fresh` as
+      // firstLayout) made every collapse/expand replay the whole graph's fade-from-opacity-0
+      // — the owner's tile (high stagger index) held opacity:0 for ~0.7s, reading as "the
+      // owner vanished on collapse" (#bug②). firstPaintRef flips false after the first paint.
+      const firstPaintRef = useRef(true);
       const render = useCallback((b, analysis, selection, fresh) => {
+        const entrance = firstPaintRef.current;
         const { nodes: nn, edges: ee, positions } =
-          buildGraph(b, analysis, selection, fresh ? null : posRef.current, fresh,
+          buildGraph(b, analysis, selection, fresh ? null : posRef.current, entrance,
             collapsedRef.current, toggleCollapse);
         if (fresh) posRef.current = positions;
+        firstPaintRef.current = false;
         setNodes(nn);
         setEdges(ee);
       }, [toggleCollapse]);

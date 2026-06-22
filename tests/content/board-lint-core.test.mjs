@@ -204,6 +204,132 @@ test('R7 backward-compat: a board with NO parent fields produces zero R7 errors/
   assert.equal(r.warnings.length, 0, 'old flat board: zero warnings');
 });
 
+// ── R8：awaiting-user 完整性（decision_package 采访闭环的最小机制保障）────────────────────────────
+// isAwaitingUser 口径（与 webview / discuss 对齐）：blocked_on==="user" 且 status ∈ {blocked, in_flight}。
+// R8a = 缺包 hard error；R8b = 包在但字段不全 warn。守 silent-on-unknown：只查这一条柔性边，非 awaiting-user 不触发。
+const COMPLETE_DP = {
+  prepared_at: '2026-06-19T09:25:00Z',
+  inputs_hash: 'sha256:05e0b09c4d63284ae9c753191e81129bd036fe6a6538a5129432e31af3834805',
+  freshness: 'fresh',
+  ask_type: 'decision',
+  context_md: 'cc-master 卡在选定持久层方向：narrow waist 不能动。',
+  question: '往哪个方向迁移？',
+  what_i_need: '你在三个 option 里拍板选一个。',
+  why_it_matters: '这是临界路径根节点，下游全 deps 在它上。',
+  options: [{ id: 'opt-1', label: 'sidecar 索引', rationale: 'r', tradeoffs: 't' }],
+  enter_cmd: '/cc-master:discuss D1 --board stem',
+};
+const awaitingUserBoard = (dp, status = 'blocked') => JSON.stringify({
+  schema: 'cc-master/v1', goal: 'g', owner: { active: true, session_id: 's' }, git: { worktree: '', branch: '' },
+  tasks: [{ id: 'D1', status, deps: [], blocked_on: 'user', ...(dp !== undefined ? { decision_package: dp } : {}) }],
+});
+
+test('R8a: awaiting-user node (blocked_on:user + blocked) with NO decision_package is a hard error', () => {
+  const r = lintBoard(awaitingUserBoard(undefined));
+  assert.ok(ruleSet(r.errors).has('R8a'), 'R8a missing decision_package is hard error');
+  const e = r.errors.find((x) => x.rule === 'R8a');
+  assert.equal(e.task, 'D1', 'names the offending awaiting-user node');
+  assert.match(e.message, /discuss/, 'message explains the discuss closure breaks');
+});
+
+test('R8a: awaiting-user via in_flight (not just blocked) also requires a package', () => {
+  // isAwaitingUser 口径含 status:in_flight（discuss.md step 5：blocked|in_flight 都算「仍在等用户」）。
+  const r = lintBoard(awaitingUserBoard(undefined, 'in_flight'));
+  assert.ok(ruleSet(r.errors).has('R8a'), 'in_flight + blocked_on:user is also awaiting-user → R8a');
+});
+
+test('R8a: decision_package present but NOT an object (array / scalar) is a hard error', () => {
+  assert.ok(ruleSet(lintBoard(awaitingUserBoard(['x'])).errors).has('R8a'), 'array package is hard R8a');
+  assert.ok(ruleSet(lintBoard(awaitingUserBoard('nope')).errors).has('R8a'), 'string package is hard R8a');
+  assert.ok(ruleSet(lintBoard(awaitingUserBoard(null)).errors).has('R8a'), 'null package is hard R8a');
+});
+
+test('R8: a complete decision_package on an awaiting-user node → zero errors, zero warnings', () => {
+  const r = lintBoard(awaitingUserBoard(COMPLETE_DP));
+  assert.equal(r.errors.length, 0, 'complete package: zero errors: ' + JSON.stringify(r.errors));
+  assert.equal(r.warnings.length, 0, 'complete package: zero warnings: ' + JSON.stringify(r.warnings));
+});
+
+test('R8b: each missing/malformed field WARNS (not hard fail) — never an R8a error when the package is a real object', () => {
+  // context_md missing → warn
+  const noCtx = lintBoard(awaitingUserBoard({ ...COMPLETE_DP, context_md: '' }));
+  assert.equal(noCtx.errors.length, 0, 'R8b is warn-only (package object present)');
+  assert.ok(ruleSet(noCtx.warnings).has('R8b'), 'empty context_md warns R8b');
+
+  // what_i_need missing → warn
+  const noNeed = lintBoard(awaitingUserBoard({ ...COMPLETE_DP, what_i_need: undefined }));
+  assert.ok(ruleSet(noNeed.warnings).has('R8b'), 'missing what_i_need warns R8b');
+
+  // ask_type out of enum → warn
+  const badAsk = lintBoard(awaitingUserBoard({ ...COMPLETE_DP, ask_type: 'opinion' }));
+  assert.ok(ruleSet(badAsk.warnings).has('R8b'), 'bad ask_type warns R8b');
+
+  // ask_type:decision but empty options → warn
+  const noOpts = lintBoard(awaitingUserBoard({ ...COMPLETE_DP, ask_type: 'decision', options: [] }));
+  assert.ok(ruleSet(noOpts.warnings).has('R8b'), 'decision-type with empty options warns R8b');
+
+  // inputs_hash not sha256:<hex> → warn
+  const badHash = lintBoard(awaitingUserBoard({ ...COMPLETE_DP, inputs_hash: 'md5:abc' }));
+  assert.ok(ruleSet(badHash.warnings).has('R8b'), 'malformed inputs_hash warns R8b');
+
+  // enter_cmd missing → warn (empty string)
+  const emptyCmd = lintBoard(awaitingUserBoard({ ...COMPLETE_DP, enter_cmd: '' }));
+  assert.equal(emptyCmd.errors.length, 0, 'R8b is warn-only (package object present)');
+  assert.ok(ruleSet(emptyCmd.warnings).has('R8b'), 'empty enter_cmd warns R8b');
+
+  // enter_cmd absent → warn (undefined)
+  const noCmd = lintBoard(awaitingUserBoard({ ...COMPLETE_DP, enter_cmd: undefined }));
+  assert.ok(ruleSet(noCmd.warnings).has('R8b'), 'missing enter_cmd warns R8b');
+});
+
+test('R8b: a package missing ONLY enter_cmd warns (the webview copy /cc-master:discuss button reads it) — and is the only R8b warn', () => {
+  // 单独隔离一条：完整包但 enter_cmd 缺失/空 → 恰好一条 R8b warn（webview 详情栏据 enter_cmd 渲染复制按钮，
+  // 缺它一张 lint-clean awaiting-user 卡仍给不出一键讨论入口——R8 本该防的「lint 干净但实际坏」）。
+  const onlyNoCmd = lintBoard(awaitingUserBoard({ ...COMPLETE_DP, enter_cmd: '' }));
+  assert.equal(onlyNoCmd.errors.length, 0, 'only-missing-enter_cmd: zero errors');
+  const r8b = onlyNoCmd.warnings.filter((w) => w.rule === 'R8b');
+  assert.equal(r8b.length, 1, 'exactly one R8b warn for the lone missing enter_cmd: ' + JSON.stringify(onlyNoCmd.warnings));
+  assert.match(r8b[0].message, /enter_cmd/, 'the warn names enter_cmd');
+  assert.match(r8b[0].message, /discuss/, 'the warn explains the discuss copy-button impact');
+});
+
+test('R8b: advice/solution ask_type with empty options is LEGAL (no options-warn) — only decision-type requires options', () => {
+  const advice = lintBoard(awaitingUserBoard({ ...COMPLETE_DP, ask_type: 'advice', options: [] }));
+  assert.equal(advice.errors.length, 0, 'advice + empty options: no error');
+  assert.equal(advice.warnings.length, 0, 'advice + empty options: no warn (options optional for advice): ' + JSON.stringify(advice.warnings));
+});
+
+test('R8 does NOT fire on non-awaiting-user nodes (silent-on-unknown守门)', () => {
+  // (a) blocked_on points at a task id (not "user") — even with no package → no R8.
+  const onTask = lintBoard(JSON.stringify({
+    schema: 'cc-master/v1', goal: 'g', owner: { active: true, session_id: 's' }, git: { worktree: '', branch: '' },
+    tasks: [{ id: 'T0', status: 'done', deps: [] }, { id: 'T9', status: 'blocked', deps: ['T0'], blocked_on: 'T0' }],
+  }));
+  assert.equal(onTask.errors.filter((e) => e.rule.startsWith('R8')).length, 0, 'blocked_on:<taskid> is not awaiting-user → no R8');
+
+  // (b) plain done node with no package → no R8.
+  const done = lintBoard(JSON.stringify({
+    schema: 'cc-master/v1', goal: 'g', owner: { active: true, session_id: 's' }, git: { worktree: '', branch: '' },
+    tasks: [{ id: 'T0', status: 'done', deps: [] }],
+  }));
+  assert.equal(done.errors.filter((e) => e.rule.startsWith('R8')).length, 0, 'plain done node → no R8');
+
+  // (c) blocked_on:user but status NOT in {blocked,in_flight} (e.g. done) — outside isAwaitingUser口径 → no R8.
+  //     (a stale residual blocked_on on a done node: discuss/webview both treat it as no longer awaiting user.)
+  const doneUser = lintBoard(JSON.stringify({
+    schema: 'cc-master/v1', goal: 'g', owner: { active: true, session_id: 's' }, git: { worktree: '', branch: '' },
+    tasks: [{ id: 'D1', status: 'done', deps: [], blocked_on: 'user' }],
+  }));
+  assert.equal(doneUser.errors.filter((e) => e.rule.startsWith('R8')).length, 0, 'done + residual blocked_on:user is outside isAwaitingUser → no R8');
+
+  // (d) a non-awaiting node MAY carry an arbitrary decision_package without any field-completeness warns.
+  const carriesAnyway = lintBoard(JSON.stringify({
+    schema: 'cc-master/v1', goal: 'g', owner: { active: true, session_id: 's' }, git: { worktree: '', branch: '' },
+    tasks: [{ id: 'T0', status: 'done', deps: [], decision_package: { whatever: 1 } }],
+  }));
+  assert.equal(carriesAnyway.warnings.filter((w) => w.rule.startsWith('R8')).length, 0, 'package on non-awaiting node: silent-on-unknown, no R8 warns');
+});
+
 test('R5/R6: degradable fields only WARN, never hard-fail', () => {
   const r = lintBoard(JSON.stringify({
     schema: 'cc-master/v1', goal: 'g', owner: { active: true, session_id: 's' }, git: { worktree: '', branch: '' },

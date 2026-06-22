@@ -2,7 +2,7 @@
 
 > For English, see [README.md](README.md)。
 
-![version](https://img.shields.io/badge/version-0.9.0-blue)
+![version](https://img.shields.io/badge/version-0.9.1-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![ship-anywhere](https://img.shields.io/badge/ship--anywhere-Bedrock%20%7C%20Vertex%20%7C%20Foundry-7c3aed)
 ![requires](https://img.shields.io/badge/requires-Node%2022%2B%20%2B%20bash-orange)
@@ -144,7 +144,21 @@ cc-master 把你的 token 烧速对着滚动的 5h/7d 配额窗口从*两侧* pa
     { "id": "de", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "model": "haiku", "title": "translate locale: de" },
     { "id": "ja", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "model": "haiku", "title": "translate locale: ja" },
     { "id": "ar", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "translate locale: ar (RTL)" },
-    { "id": "D1", "status": "blocked", "deps": [], "blocked_on": "user", "title": "glossary + register decision" }
+    // blocked_on:"user" 节点带一份 decision_package —— /cc-master:discuss 打开的「备好的采访」
+    { "id": "D1", "status": "blocked", "deps": [], "blocked_on": "user", "title": "glossary + register decision",
+      "decision_package": {
+        "prepared_at": "2026-06-08T10:05Z", "freshness": "fresh", "ask_type": "decision",
+        "inputs_hash": "sha256:3e7c1a9f4b08d62e5a0c7f1b9d4e8a26c0f3b7d519e6a2c84f0b1d7e93a5c6f2",
+        "context_md": "翻译 UI 时冒出一个产品术语取舍：品牌 / 产品术语是本地化还是保留英文？对用户用正式还是非正式语气？这定下全部 6 个 locale 的基调——是个产品决策，不该我替你拍。",
+        "question": "产品术语翻译还是保留英文？正式还是非正式语气？",
+        "what_i_need": "给一个术语表策略 + 一个语气档；我会把它当翻译约束下发给每个 locale 叶子。",
+        "why_it_matters": "每个 locale 叶子（de/ja/ar/…）都依赖这条约定。拍晚了得返工重译；现在拍板能让所有叶子并行地按同一条规则跑。",
+        "options": [
+          { "id": "opt-keep-en", "label": "产品术语保留英文，非正式语气", "rationale": "跨 locale 品牌一致；非正式贴合 app 的嗓音。", "tradeoffs": "✅ 术语零漂移。⚠️ 部分 locale 期望本地化术语。" },
+          { "id": "opt-localize", "label": "本地化产品术语，按各 locale 习惯用正式语气", "rationale": "每个市场读起来都地道。", "tradeoffs": "✅ 各 locale 最自然。⚠️ 要维护术语表；ar/ja 语气规范不同。" }
+        ],
+        "enter_cmd": "/cc-master:discuss D1 --board <board-stem>"
+      } }
   ]
 }
 ```

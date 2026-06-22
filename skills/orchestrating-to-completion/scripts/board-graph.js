@@ -24,7 +24,7 @@ const path = require('path');
 
 // 解析共享核心：本脚本在 ${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/scripts/，核心在
 //   ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/ —— 从 __dirname 上溯三级（scripts → skill-name → skills → root）
-//   再下到 hooks/scripts。这条 plugin 内相对路径装机后稳定（红线5：两目录都 ship）。
+//   再下到该 ${CLAUDE_PLUGIN_ROOT}/hooks/scripts。这条 plugin 内相对路径装机后稳定（红线5：两目录都 ship）。
 const CORE_PATH = path.resolve(__dirname, '..', '..', '..', 'hooks', 'scripts', 'board-graph-core.js');
 const { analyzeGraph } = require(CORE_PATH);
 
