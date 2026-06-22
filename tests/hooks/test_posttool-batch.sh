@@ -281,4 +281,92 @@ assert_eq 0 "$HOOK_RC" "23: board sid 非空且 ≠ stdin sid → rc 0"
 assert_eq "" "$HOOK_OUT" "23: board sid=OTHER（非空）≠ stdin sid=MINE → 仍休眠（不警告，红线 6 防线未退化）"
 rm -rf "$H"
 
+# ── rollup-aware 两级 WIP（D3.7·按 owner 分组限 N，叠在全局 wip_limit 限 M 之上）─────────────────────────
+# 除全局 wip_limit（限 M·限整板 in_flight 总数）外，soft-observed 的 root top-level `owner_wip_limit`（限 N·
+# 限每个 owner 名下 in_flight 子任务数）开启 per-owner 两级 WIP。某 owner 名下 in_flight 子任务 > N → 注入
+# 一条非阻塞软警告（点名该 owner + 其子 in_flight 数 vs 上限），与全局 C5 同形态。per-owner 可用 owner 节点
+# 自身的 `wip_limit` 字段覆写默认 N（per-owner 覆写优先于根 owner_wip_limit）。缺字段 / 旧板 / 无 parent 边
+# → 该检查静默关闭（graceful degrade，同 wip_limit 缺失即关 C5 的纪律）。
+
+# Case 24 (owner 超 per-owner 上限 → 点名警告)：owner M1 有 3 个 in_flight 子（M1.a/b/c），owner_wip_limit=2
+#           → 超 owner 级上限。全局 in_flight=4（含 owner M1 自身 in_flight），无全局 wip_limit → 全局检查关。
+#           须注入点名 M1 的 owner 级 WIP 警告（含 owner id "M1"、子 in_flight 数 3、上限 2），rc 0，非 block。
+H="$(make_project)"; SID="sess-owner-over"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner_wip_limit\":2,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"in_flight\",\"deps\":[],\"kind\":\"owner\"},{\"id\":\"M1.a\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.c\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "24: owner 超 per-owner 上限 → rc 0"
+assert_contains "$HOOK_OUT" "M1" "24: owner 级 WIP 警告点名 owner id M1"
+assert_contains "$HOOK_OUT" "additionalContext" "24: owner 超上限 → 注入 additionalContext"
+assert_not_contains "$HOOK_OUT" "\"decision\":\"block\"" "24: owner 超上限 → NEVER a block decision"
+rm -rf "$H"
+
+# Case 25 (owner 在 per-owner 上限内 → 静默)：owner M1 有 2 个 in_flight 子，owner_wip_limit=2（恰在上限、
+#           非超）。无全局 wip_limit。须静默（per-owner WIP 只在严格超时警告，N==上限不警告，与全局 C5 同口径）。
+H="$(make_project)"; SID="sess-owner-within"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner_wip_limit\":2,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"in_flight\",\"deps\":[],\"kind\":\"owner\"},{\"id\":\"M1.a\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "25: owner 在上限内 → rc 0"
+assert_eq "" "$HOOK_OUT" "25: owner in_flight 子数 == owner_wip_limit（非严格超）→ 静默"
+rm -rf "$H"
+
+# Case 26 (无 owner_wip_limit → owner 级检查静默关闭)：owner M1 有 3 个 in_flight 子，但板无 owner_wip_limit
+#           （也无全局 wip_limit）→ 两级 WIP 全关，graceful degrade，静默（缺字段即关，同 wip_limit 纪律）。
+H="$(make_project)"; SID="sess-owner-nolimit"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"in_flight\",\"deps\":[],\"kind\":\"owner\"},{\"id\":\"M1.a\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.c\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "26: 无 owner_wip_limit → rc 0"
+assert_eq "" "$HOOK_OUT" "26: 缺 owner_wip_limit → owner 级检查静默关闭（graceful degrade）"
+rm -rf "$H"
+
+# Case 27 (旧板无 parent 边 → owner 级检查静默关闭)：板有 owner_wip_limit=1 但全 flat top-level task、无任何
+#           parent 边（旧板）→ 无 owner → owner 级检查无对象 → 静默（且全局 wip_limit 缺失，全局也关）。
+H="$(make_project)"; SID="sess-owner-flat"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner_wip_limit\":1,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T3\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "27: 无 parent 边 → rc 0"
+assert_eq "" "$HOOK_OUT" "27: owner_wip_limit 在但无 parent 边（旧板）→ 无 owner → owner 级检查静默关闭"
+rm -rf "$H"
+
+# Case 28 (per-owner 覆写：owner 节点自身 wip_limit 优先于根 owner_wip_limit)：root owner_wip_limit=5（宽），
+#           但 owner M1 节点自带 wip_limit:1（窄覆写），M1 有 2 个 in_flight 子 > 1 → 须点名 M1 警告。
+#           证明 per-owner 覆写生效（紧的本地 cap 胜过宽的全局默认 N），且 task 级 wip_limit 不被误当全局 cap。
+H="$(make_project)"; SID="sess-owner-override"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner_wip_limit\":5,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"in_flight\",\"deps\":[],\"kind\":\"owner\",\"wip_limit\":1},{\"id\":\"M1.a\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "28: per-owner 覆写 → rc 0"
+assert_contains "$HOOK_OUT" "M1" "28: owner 节点自身 wip_limit=1 覆写根默认 N=5 → 点名 M1 超上限"
+assert_contains "$HOOK_OUT" "additionalContext" "28: per-owner 覆写超上限 → 注入 additionalContext"
+rm -rf "$H"
+
+# Case 29 (两级独立：仅全局超 / owner 各自不超 → 仍警告全局；owner 级不误增噪)：全局 wip_limit=2、in_flight=3
+#           （owner M1 自身 + 2 子）→ 全局超。owner_wip_limit=3，M1 有 2 子 in_flight ≤ 3 → owner 级不超。
+#           须有全局 C5 WIP 警告，且不含 owner 级点名（owner 级未触发）。证明两级各自独立判定。
+H="$(make_project)"; SID="sess-global-only"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"wip_limit\":2,\"owner_wip_limit\":3,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"in_flight\",\"deps\":[],\"kind\":\"owner\"},{\"id\":\"M1.a\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "29: 全局超 / owner 不超 → rc 0"
+assert_contains "$HOOK_OUT" "WIP" "29: 全局 in_flight=3 > wip_limit=2 → 全局 C5 WIP 警告照常"
+assert_not_contains "$HOOK_OUT" "owner M1" "29: owner M1（2 子 ≤ 3）未超 owner 级上限 → 不点名 M1"
+rm -rf "$H"
+
+# Case 30 (per-owner 子计数 narrow-waist：log[] 嵌套 parent/status 不污染 owner 子计数)：单行紧凑板，owner
+#           M1 有 2 个真子 in_flight（≤ owner_wip_limit=2，不超），但 log[] 里塞了嵌套 {"parent":"M1",
+#           "status":"in_flight"} ×2。若误把 log 嵌套算进 owner 子计数 → 会变 4 > 2 → 误警告。须静默
+#           （只数 tasks 顶层对象的 parent 边·narrow-waist scope，同 in_flight 计数的 tasks_region 隔离）。
+H="$(make_project)"; SID="sess-owner-log"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner_wip_limit\":2,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"in_flight\",\"deps\":[],\"kind\":\"owner\"},{\"id\":\"M1.a\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}],\"log\":[{\"id\":\"L1\",\"parent\":\"M1\",\"status\":\"in_flight\"},{\"id\":\"L2\",\"parent\":\"M1\",\"status\":\"in_flight\"}]}"
+run_batch "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "30: log 嵌套 parent → rc 0"
+assert_eq "" "$HOOK_OUT" "30: log[] 嵌套 parent/status 不计入 owner 子计数（narrow-waist）→ M1 仅 2 子 ≤ 2 → 静默"
+rm -rf "$H"
+
+# Case 31 (sub-agent 闸：owner 级两级 WIP 同样不泄漏给 leaf worker)：超 owner 上限的主板，stdin 带 agent_id
+#           → 必须静默（两级 WIP 仍是 orchestrator-only 认知指导，红线 4 不递乐谱给乐手）。
+H="$(make_project)"; SID="sess-owner-subagent"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner_wip_limit\":1,\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"in_flight\",\"deps\":[],\"kind\":\"owner\"},{\"id\":\"M1.a\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+run_batch_raw "$H" "{\"session_id\":\"$SID\",\"agent_id\":\"sub-xyz\",\"hook_event_name\":\"PostToolBatch\",\"tool_results\":[]}"
+assert_eq 0 "$HOOK_RC" "31: sub-agent 上下文 + owner 超上限 → rc 0"
+assert_eq "" "$HOOK_OUT" "31: sub-agent 上下文 → owner 级两级 WIP 也静默（红线 4，不泄漏给 leaf worker）"
+rm -rf "$H"
+
 finish

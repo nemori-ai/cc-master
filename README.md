@@ -2,7 +2,7 @@
 
 > 中文版见 [README_zh.md](README_zh.md)。
 
-![version](https://img.shields.io/badge/version-0.9.0-blue)
+![version](https://img.shields.io/badge/version-0.9.1-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![ship-anywhere](https://img.shields.io/badge/ship--anywhere-Bedrock%20%7C%20Vertex%20%7C%20Foundry-7c3aed)
 ![requires](https://img.shields.io/badge/requires-Node%2022%2B%20%2B%20bash-orange)
@@ -144,7 +144,21 @@ The fastest way to understand cc-master is to watch one orchestration happen —
     { "id": "de", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "model": "haiku", "title": "translate locale: de" },
     { "id": "ja", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "model": "haiku", "title": "translate locale: ja" },
     { "id": "ar", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "translate locale: ar (RTL)" },
-    { "id": "D1", "status": "blocked", "deps": [], "blocked_on": "user", "title": "glossary + register decision" }
+    // a blocked_on:"user" node carries a decision_package — the prepared interview /cc-master:discuss opens
+    { "id": "D1", "status": "blocked", "deps": [], "blocked_on": "user", "title": "glossary + register decision",
+      "decision_package": {
+        "prepared_at": "2026-06-08T10:05Z", "freshness": "fresh", "ask_type": "decision",
+        "inputs_hash": "sha256:3e7c1a9f4b08d62e5a0c7f1b9d4e8a26c0f3b7d519e6a2c84f0b1d7e93a5c6f2",
+        "context_md": "Translating the UI surfaces a product-terminology choice: do brand/product terms get localized or kept in English, and do we address users formally or informally? This sets the tone for all 6 locales — it's a product call, not mine to make.",
+        "question": "Translate product terms or keep them English? Formal or informal register?",
+        "what_i_need": "Pick a glossary policy and a register; I'll hand it to every locale leaf as a translation constraint.",
+        "why_it_matters": "Every locale leaf (de/ja/ar/…) depends on this convention. Deciding late means re-translating; deciding now lets all leaves run in parallel against one rule.",
+        "options": [
+          { "id": "opt-keep-en", "label": "Keep product terms in English, informal register", "rationale": "Brand consistency across locales; informal fits the app's voice.", "tradeoffs": "✅ No glossary drift. ⚠️ Some locales expect localized terms." },
+          { "id": "opt-localize", "label": "Localize product terms, formal register per locale norm", "rationale": "Reads native in each market.", "tradeoffs": "✅ Most natural per locale. ⚠️ Needs a maintained glossary; ar/ja registers differ." }
+        ],
+        "enter_cmd": "/cc-master:discuss D1 --board <board-stem>"
+      } }
   ]
 }
 ```

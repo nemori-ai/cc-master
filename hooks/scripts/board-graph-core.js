@@ -22,7 +22,26 @@
 // 全部函数**纯、只读、不抛**：坏输入（非数组 tasks / 缺字段 / 含环）→ 退化空结果 + 诚实 source 标注，
 //   绝不抛异常（hook 消费者不能因「图坏」崩）。
 
-const { buildGraph, findCycle } = require('./board-lint-core.js');
+// 依赖 board-lint-core 的 buildGraph/findCycle（单一真相源·不另起图·设计稿 §5.2）。
+//   ★双形态加载（D3.7·UMD 桥）：CommonJS 宿主（hook / CLI / node:test）走 require；浏览器把本文件当
+//   classic <script> 加载时无 require，从 globalThis.__ccmBoardLintCore 取（view-server 先 serve lint-core，
+//   它的 UMD 尾把导出挂到该 global）。这让 webview 复用同一份核心、杜绝 view.html 再自带一份 analyze（DRY）。
+//
+// ★IIFE 包裹（D3.7 followup·浏览器共享 global 词法环境陷阱）：本文件作为 classic <script> 与
+//   board-lint-core.js 加载进**同一个**浏览器 global 词法环境（global lexical environment）。
+//   lint-core 已在顶层声明 buildGraph/findCycle（function·进 global object 环境）与 ISO_UTC_RE
+//   （const·进 global lexical 环境）。若本文件也在顶层 `const { buildGraph, findCycle }` / `const ISO_UTC_RE`，
+//   两个脚本会**重复声明**同名标识符 → 第二个脚本抛 `SyntaxError: Identifier 'buildGraph' has already
+//   been declared` → analyzeGraph 永不发布、webview 的 owner rollup/折叠静默回退。把整个模块体裹进 IIFE
+//   让这些声明函数作用域化，顶层零 let/const/function 泄漏，彻底绕开该语义陷阱（vm.runInNewContext 的
+//   per-script 独立 context 复现不出这个共享语义——别再用那种 harness「验证」）。CommonJS require 路径
+//   零行为变化：IIFE 尾照常 module.exports = { analyzeGraph }。
+(function () {
+'use strict';
+
+const { buildGraph, findCycle } = (typeof require === 'function')
+  ? require('./board-lint-core.js')
+  : (typeof globalThis !== 'undefined' && globalThis.__ccmBoardLintCore) || {};
 
 // 终态状态（done 家族）。rollup「子全 done」判定用——只有 'done' 算真完成（与 verify-board / lint 口径一致）。
 const DONE = 'done';
@@ -343,4 +362,15 @@ function analyzeGraph(board) {
   };
 }
 
-module.exports = { analyzeGraph };
+// ── UMD 双形态导出（D3.7·浏览器桥）─────────────────────────────────────────────────────────────
+//   CommonJS（hook / CLI / node:test）：照常 module.exports，零行为变化。
+//   浏览器（view.html 把本文件当 classic <script> 加载）：无 module，挂到 globalThis 让 ESM 模块读取。
+//   这是 view.html 收敛掉自带 analyze、复用同一份图核心的接合点（设计稿 §5.8 webview 收敛）。
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { analyzeGraph };
+} else if (typeof globalThis !== 'undefined') {
+  globalThis.__ccmBoardGraphCore = { analyzeGraph };
+}
+
+})(); // ★IIFE 收口（见文件头 IIFE 包裹说明）——所有声明函数作用域化、顶层零泄漏，避免与 board-lint-core
+      //   的 classic-script 共享 global 词法环境撞名（SyntaxError redeclare）。

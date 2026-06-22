@@ -25,6 +25,15 @@ if (!BOARD_PATH) {
 const SCRIPT_DIR = __dirname;
 const VENDOR_DIR = path.join(SCRIPT_DIR, 'vendor');
 const HTML_PATH = path.join(SCRIPT_DIR, 'view.html');
+// The shared graph-analysis core lives under ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/ (the ONE
+// source of truth that hooks + the board-graph CLI + this webview all reuse — DRY, design
+// §5.2/§5.8). The viewer loads these as classic <script>s so its analyze() delegates to the
+// same analyzeGraph() instead of carrying a divergent copy. Both files are plugin-internal
+// (the plugin's hooks and skills trees both ship), resolved relative to THIS script — never cwd.
+//   ${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/scripts/ → ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/
+const CORE_DIR = path.resolve(SCRIPT_DIR, '..', '..', '..', 'hooks', 'scripts');
+// Only these two core files are exposed (allow-list, not an open hooks/ mount).
+const CORE_FILES = new Set(['board-graph-core.js', 'board-lint-core.js']);
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -287,6 +296,38 @@ const server = http.createServer((req, res) => {
       'Cache-Control': 'no-store',
     });
     res.end(JSON.stringify(payload));
+    return;
+  }
+
+  // GET /core/<file>.js -> serve the shared graph-analysis core (board-graph-core.js /
+  // board-lint-core.js) from ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/. Strict allow-list (CORE_FILES) — NOT an
+  // open mount: only the two named files are reachable, no subpaths, no traversal. The
+  // viewer loads these as classic <script>s so analyze() reuses the ONE analyzeGraph()
+  // (DRY — no second copy of the graph algorithms in the browser). Read-only, no network.
+  if (urlPath.startsWith('/core/')) {
+    const name = urlPath.slice('/core/'.length);
+    if (!CORE_FILES.has(name)) {
+      sendNotFound(res);
+      return;
+    }
+    const resolved = path.join(CORE_DIR, name);
+    // Belt-and-suspenders: the resolved path must stay inside CORE_DIR (name has no
+    // separators since it's an exact allow-list match, but verify regardless).
+    if (resolved !== path.join(CORE_DIR, name) || path.dirname(resolved) !== CORE_DIR) {
+      sendNotFound(res);
+      return;
+    }
+    fs.readFile(resolved, (err, buf) => {
+      if (err) {
+        sendNotFound(res);
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': CONTENT_TYPES['.js'],
+        'Cache-Control': 'no-store',
+      });
+      res.end(buf);
+    });
     return;
   }
 

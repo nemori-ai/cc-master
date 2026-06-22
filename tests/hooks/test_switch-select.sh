@@ -1731,6 +1731,76 @@ cred29_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(
 assert_eq "$FRESH_AT" "$cred29_at" "(29) P2: ① credentials.json stays FRESH (forward-align committed stores NOT rolled back·even when registry-align fails)"
 rm -rf "$FX29" "$SECSTUB_RO29"
 
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (30) **RC-P3 — forward-align 时切入号不在 registry → mutateRegistry 成功但 no-op → 绝不谎称「registry 一致」**.
+#      病根（与 (29) 的失败模式互补·(29) 测 mutateRegistry 自身 throw·本 case 测 mutateRegistry 成功却 no-op）：
+#        前向对齐分支的 mutator 形如 `if (reg.accounts[email]) setActive(...)`——当切入号**尚未录入 registry**
+#        （accounts.json 无该 email entry）时，guard 为假 → mutator 啥也不做 → mutateRegistry 正常返回 →
+#        `if node…then REG_ALIGNED=1` 误判 REG_ALIGNED=1 → 收尾打印「三存储与 registry 一致·避免 split-brain」。
+#        实际：①②③ 存储已是切入号、registry active 仍指旧号（stale·与现实脱节）= 正是 set_active_in 正常路径
+#        exit-5 处理的同一 stale-registry 情形（codex round#3 Finding A），却在 trap 路径被谎称已对齐。
+#      修：mutator 在账号缺失时显式 exit 非零（throw）→ REG_ALIGNED=0 → 走 (29) 已有的诚实失败分支
+#        （「registry active 对齐失败」消息），口径与 set_active_in exit-5 一致·绝不谎报一致。
+#      复现（hermetic·deterministic·照搬 (29)/(28) 的 slow-③-stub + SIGTERM 套路·无 lock-timing）：registry **只含 bob**
+#        （active·切出号），切入号 alice@x.com **不在 registry**（vault 形态/路径用显式 --vault-kind/--vault-file 给·
+#        因 registry 无 alice entry 可读）。slow security stub 在第一次官方 ③ 写时 sleep（SIGTERM 落在 sleep 中·
+#        STORES_COMMITTED=1·ACTIVE_ALIGNED=0·OVERWRITE_IN_PROGRESS 仍=1）。SIGTERM → trap 前向对齐 → mutateRegistry 找不到
+#        alice → 修前 no-op + REG_ALIGNED=1（谎报一致·RED）；修后显式 throw → REG_ALIGNED=0（诚实失败·GREEN）。
+#        断言：stderr **不含** 过度声称「三存储与 registry 一致」 + ① credentials.json 仍 FRESH（前向对齐已提交·不回滚）。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX30="$(make_fixture)"; REG30="$FX30/accounts.json"; VFILE30="$FX30/accounts.env"
+CRED30="$FX30/new-credentials.json"; CJSON30="$FX30/new-claude.json"
+[ -e "$CRED30" ] && rm -f "$CRED30"; [ -e "$CJSON30" ] && rm -f "$CJSON30"
+# registry 只有 bob（active·切出号）——切入号 alice@x.com **不在 registry**（这正是 RC-P3 的触发前提）。
+cat > "$REG30" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com": { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null }
+} }
+JSON
+umask 077
+# alice 的 token 放 file vault（registry 无 alice entry → vault 形态/路径靠显式 --vault-kind file --vault-file 给）。
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VFILE30"; chmod 600 "$VFILE30"
+# slow security stub（同 (28)）：第一次官方 ③ 写 sleep → SIGTERM 落在 sleep 中（post-commit 窗口）；第二次 ③ 写（前向对齐补写）即返回。
+SECSTUB_SLOW30="$(make_project)"
+cat > "$SECSTUB_SLOW30/security" <<'SEC'
+#!/usr/bin/env bash
+is_add=0; is_official=0; prev=""
+for a in "$@"; do
+  [ "$a" = "add-generic-password" ] && is_add=1
+  [ "$prev" = "-s" ] && [ "$a" = "Claude Code-credentials" ] && is_official=1
+  prev="$a"
+done
+if [ "$is_add" = "1" ] && [ "$is_official" = "1" ]; then
+  CNT_FILE="${SEC_CALL_COUNT_FILE:-/dev/null}"
+  n=0; [ -f "$CNT_FILE" ] && n="$(cat "$CNT_FILE" 2>/dev/null || echo 0)"; n=$((n+1)); printf '%s' "$n" > "$CNT_FILE" 2>/dev/null || true
+  if [ "$n" = "1" ]; then
+    [ -n "${SEC_READY_FILE:-}" ] && printf 'ready\n' > "$SEC_READY_FILE"
+    sleep 8   # SIGTERM lands here (post-commit window·forward-align trap will fire on the not-in-registry email).
+  fi
+fi
+exit 0
+SEC
+chmod +x "$SECSTUB_SLOW30/security"
+PORT30="$FX30/url.txt"; start_refresh_endpoint ok "$PORT30"; RURL30="$(cat "$PORT30")"
+SEC_READY30="$FX30/sec.ready"; SEC_CNT30="$FX30/kc.count"; STDERR30="$FX30/switch.stderr"
+# --email alice@x.com (EXPLICIT·skips auto-select) + explicit vault flags (registry has no alice entry to read vault from).
+( PATH="$SECSTUB_SLOW30:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL30" SEC_READY_FILE="$SEC_READY30" SEC_CALL_COUNT_FILE="$SEC_CNT30" CRED_PATH="$CRED30" CLAUDE_JSON_PATH="$CJSON30" \
+  bash "$SCRIPT" --registry "$REG30" --email "alice@x.com" --vault-kind file --vault-file "$VFILE30" --now "2026-06-17T09:00:00Z" --no-snapshot >/dev/null 2>"$STDERR30" ) &
+sw30_pid=$!
+i=0; while [ ! -s "$SEC_READY30" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i+1)); done
+sleep 0.3   # inside the ③ sleep window (post-commit·forward-align trap will run on SIGTERM).
+kill -TERM "$sw30_pid" 2>/dev/null || true
+wait "$sw30_pid" 2>/dev/null || true
+# CORE: forward-align found the switch-in email NOT in registry → it MUST NOT over-claim「三存储与 registry 一致」.
+#   修前：mutator no-op → REG_ALIGNED=1 → 谎报一致（RED）。修后：mutator throw → REG_ALIGNED=0 → 诚实失败分支（GREEN）。
+if grep -q "三存储与 registry 一致" "$STDERR30" 2>/dev/null; then FAILED=$((FAILED+1)); _red "FAIL: (30) RC-P3 message OVER-CLAIMS 「三存储与 registry 一致」 while switch-in email NOT in registry (the no-op-mutator lying-message bug)"; else PASS=$((PASS+1)); _green "(30) RC-P3: not-in-registry forward-align does NOT over-claim consistency (no-op mutator → honest failure)"; fi
+# and it MUST report the honest registry-align failure (same口径 as (29)·set_active_in exit-5).
+if grep -q "registry active 对齐失败" "$STDERR30" 2>/dev/null; then PASS=$((PASS+1)); _green "(30) RC-P3: not-in-registry forward-align HONESTLY reports 「registry active 对齐失败」 (aligned with set_active_in exit-5)"; else FAILED=$((FAILED+1)); _red "FAIL: (30) RC-P3 switch-in not in registry but message did NOT report 对齐失败 (stderr tail: $(tr '\n' ' ' < "$STDERR30" 2>/dev/null | tail -c 240))"; fi
+# ① credentials.json must still be FRESH (forward-align committed the stores·NOT rolled back·independent of REG_ALIGNED·no brick).
+cred30_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth&&j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("MISSING")}' "$CRED30" 2>/dev/null)"
+assert_eq "$FRESH_AT" "$cred30_at" "(30) RC-P3: ① credentials.json stays FRESH (forward-align committed stores NOT rolled back·even when switch-in not in registry)"
+rm -rf "$FX30" "$SECSTUB_SLOW30"
+
 # kill any lingering stub endpoints.
 for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
 rm -rf "$SECSTUB" "$SECSTUB_CAPTURE" "$SECSTUB_FAIL" "$FX1" "$FX1B" "$FX2" "$FX3" "$FX4" "$FX5" "$STUB_ROOT5" "$FX5D" "$FX5E" "$FX6" "$FX8" "$FX9" "$STUB_ROOT9" "$FX10" "$FX11" "$FX11B" "$STUB_ROOT11B" "$FX15" "$STUB_ROOT15" "$FX16"

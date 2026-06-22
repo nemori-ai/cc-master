@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-06-22
+
+> 0.9.0 的随后硬化：dag-in-dag 的四个 followup、换号修复、codex 二审探出的浏览器 bug 修复 + 永久回归测试、webview 折叠/高亮交互修复，以及 decision_package 完整性 lint（C1「board 完整性」首个落地）。本版以真 headless Chrome（CDP）实地验证 webview 行为，补上无头单测够不着的 render 层盲区。
+
+### Added
+
+- **decision_package 完整性 lint（R8 · C1「board 完整性」首个落地）** — board-lint 新增 R8a/R8b：`blocked_on:"user"`（status `blocked`|`in_flight`）节点**必须带 `decision_package` 对象**（R8a hard error——缺包 = awaiting-user 节点没兑现「备好料的决策点」意义、新 session `/cc-master:discuss` 开不起来、采访闭环塌掉），且包字段不全（`context_md`/`what_i_need` 空 / `ask_type` 非法 / `decision` 型 `options` 空 / `inputs_hash` 非 `sha256:<hex>`）逐项 warn（R8b）。**红线 2 不破**：行为型 hook 仍不读 `decision_package`、它仍 agent-shaped、不进窄腰；board-lint 是校验器（`R5b blocked_on` 是对 agent-shaped 字段 hard-error 的先例），且 PostToolUse 的 board-lint hook 绝不 `decision:block`，故 R8a 只在 CLI / run-tests 端点闸真红、不卡写盘。源起一场真实 dogfood：awaiting-user 节点不带 / 带不全 decision_package、旧 lint 0-error 放行——「schema 钉死 ≠ schema 被遵守」的现身说法。
+- **webview 选中 owner 高亮其子节点** — `/cc-master:view` 选中一个 owner（容器）节点时，点亮它管辖的全部子节点（`lin-child` 冷蓝环），高亮优先级 self > 依赖血缘（anc/desc）> 容器子（child）；补上「从父节点看见整组子节点」这个此前缺失的交互。
+- **D3.7 dag-in-dag 四个 followup** — ① viewer 套娃可视化 + 复用共享图核心（收敛掉 view.html 自带的 `analyze()` 拷贝·DRY·UMD 桥零构建零联网）；② 两级 rollup-aware WIP（`posttool-batch.sh` 在全局 `wip_limit` 之上加 per-owner `owner_wip_limit`，缺字段 / 旧板 graceful）；③ reinject 分组标注（dangling 列表点名「owner X 的子 Y」，无 parent 裸标 graceful）；④ `verified` 口径钉死（柔性边布尔·与 status enum 正交·非 status 值·board.md）。
+
+### Fixed
+
+- **webview 折叠 owner 时 owner 自身"消失"（render 层 · 真浏览器验）** — 折叠一个 owner 节点时 owner 自己也短暂不可见。真根因在 render 层：折叠触发的重渲染把"重排"标志当成"首次绘制"标志传给 `buildGraph`，致整图入场淡入动画重放，owner 在交错延迟里 hold `opacity:0` 约 720ms 像消失了。修：`firstPaintRef` 把"一次性入场动画"与"重排"解耦——重排不再重放淡入。新增 `tests/content/view-nested-render.test.mjs` 守这条不变式。
+- **board-graph-core 浏览器加载静默失效（codex P2）** — `board-graph-core.js` 与 `board-lint-core.js` 作为 classic `<script>` 加载进同一浏览器全局词法环境时，顶层 `const buildGraph/findCycle/ISO_UTC_RE` 重复声明抛 `SyntaxError` → `__ccmBoardGraphCore` 静默不发布 → 套娃可视化静默回退。修：整个 graph-core 模块体裹进 IIFE（顶层零泄漏），CommonJS `require` 路径零行为变化；补单 realm vm 永久回归测试（含剥 IIFE 断言 redeclare 的根因守卫）。
+- **webview 折叠态归属边变更不重排（codex P3）** — `structSig()` 漏算 `parent` 边，折叠 owner 下归属边变更时复用旧坐标、新可见节点落 `{0,0}` 不重排。修：`structSig` 折叠 `child^parent` 边（`^` 命名空间隔离 deps 的 `>`）。
+- **webview 源码混入字面 NUL 字节（codex P3）** — 去重键分隔符误用字面 `U+0000`（HTML 解析时被替换、分隔符实际失效，且文本资产里留控制字节）。修：两处改为转义 `'\u0000'`。
+- **switch-account 切入号未入 registry 时误报对齐（RC-P3）** — forward-align 的 `mutateRegistry` mutator 在切入号尚未录入 registry 时静默 no-op 却谎称「三存储与 registry 一致」。修：账号缺失时显式 `throw` → `REG_ALIGNED=0` → 走诚实失败分支（对齐 `set_active_in` exit-5 的 stale-registry 口径）。
+
 ## [0.9.0] — 2026-06-22
 
 ### Added
