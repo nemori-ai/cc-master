@@ -1589,6 +1589,148 @@ done
 assert_eq "alice@x.com" "$active27" "(27) CORE: post-commit SIGTERM → registry active FORWARD-aligned to alice (matches committed ①·no split-brain·not rolled back)"
 rm -rf "$FX27"
 
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (28) **codex re-§7 P1 — forward-align 后第二次 trap 不再误回滚 ①②（trap 幂等·无 split-brain）**.
+#      病根（codex 复现）：INT/TERM 落在「STORES_COMMITTED=1 已置、security 还没返回、OVERWRITE_IN_PROGRESS 还没清」
+#        这个窗口 → INT/TERM trap 跑前向对齐分支（补写 keychain ③ + setActive·置 ACTIVE_ALIGNED=1）然后 `exit`，`exit`
+#        又触发 EXIT trap **第二次** on_exit_or_interrupt。第二次：前向对齐被 ACTIVE_ALIGNED 跳过（对），但**仍为真的**
+#        OVERWRITE_IN_PROGRESS 让 elif 回滚 ①② → keychain/registry 对齐**新号**、①② 回退**旧号** = split-brain。
+#      **本 case 用「①② 换号前不存在」放大成真损坏**：(24) 用 pre-existing ①·第二次回滚因 snapshot 已被首次 trap 清掉
+#        而落到「无快照」else（不实际改 ①·只虚报告警），掩盖了逻辑 bug。这里 ① 不存在 → node 块**新建** ①·第二次误回滚
+#        走 CRED_PREEXISTED=0 的 `rm -f "$cred_path"` 分支（不依赖 snapshot）→ **真删掉前向对齐刚写的新号 credentials.json**
+#        → registry=alice 但 ① 文件被删 = 真 split-brain / brick。修后 forward-align 清 OVERWRITE_IN_PROGRESS → 第二次
+#        trap 不再回滚 → ① 新号文件存活 + registry=alice·三存储一致对齐新号。
+#      复现：slow security stub（③ 写时 sleep·给中断窗口·此刻 OVERWRITE_IN_PROGRESS 仍=1）；① 路径指向不存在文件；
+#        switch 在 ③ sleep（已过 STORES_COMMITTED=1）期间被 SIGTERM → 断言三存储一致对齐新号、不被第二次 trap 误删。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX28="$(make_fixture)"; REG28="$FX28/accounts.json"; VFILE28="$FX28/accounts.env"
+# ① / ② paths point at files that DO NOT EXIST yet (node block will CREATE them·CRED_PREEXISTED=0 → 误回滚走 rm -f 分支).
+CRED28="$FX28/new-credentials.json"; CJSON28="$FX28/new-claude.json"
+[ -e "$CRED28" ] && rm -f "$CRED28"; [ -e "$CJSON28" ] && rm -f "$CJSON28"
+cat > "$REG28" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE28","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VFILE28"; chmod 600 "$VFILE28"
+# slow security stub: the FIRST official ③ write SLEEPS (SIGTERM lands mid-sleep → OVERWRITE_IN_PROGRESS still=1·exactly
+#   the P1 window); the SECOND ③ write = the trap's forward-align re-commit (succeeds·proves keychain re-written to new号).
+SECSTUB_SLOW28="$(make_project)"
+cat > "$SECSTUB_SLOW28/security" <<'SEC'
+#!/usr/bin/env bash
+is_add=0; is_official=0; prev=""
+for a in "$@"; do
+  [ "$a" = "add-generic-password" ] && is_add=1
+  [ "$prev" = "-s" ] && [ "$a" = "Claude Code-credentials" ] && is_official=1
+  prev="$a"
+done
+if [ "$is_add" = "1" ] && [ "$is_official" = "1" ]; then
+  CNT_FILE="${SEC_CALL_COUNT_FILE:-/dev/null}"
+  n=0; [ -f "$CNT_FILE" ] && n="$(cat "$CNT_FILE" 2>/dev/null || echo 0)"; n=$((n+1)); printf '%s' "$n" > "$CNT_FILE" 2>/dev/null || true
+  if [ "$n" = "1" ]; then
+    [ -n "${SEC_READY_FILE:-}" ] && printf 'ready\n' > "$SEC_READY_FILE"
+    sleep 8   # SIGTERM lands here (OVERWRITE_IN_PROGRESS still=1·STORES_COMMITTED=1) → the double-trap window.
+  fi
+fi
+exit 0
+SEC
+chmod +x "$SECSTUB_SLOW28/security"
+PORT28="$FX28/url.txt"; start_refresh_endpoint ok "$PORT28"; RURL28="$(cat "$PORT28")"
+SEC_READY28="$FX28/sec.ready"; SEC_CNT28="$FX28/kc.count"
+( PATH="$SECSTUB_SLOW28:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL28" SEC_READY_FILE="$SEC_READY28" SEC_CALL_COUNT_FILE="$SEC_CNT28" CRED_PATH="$CRED28" CLAUDE_JSON_PATH="$CJSON28" \
+  bash "$SCRIPT" --registry "$REG28" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot >/dev/null 2>&1 ) &
+sw28_pid=$!
+# wait for the ③ keychain sleep to begin (①② already CREATED·STORES_COMMITTED=1·OVERWRITE_IN_PROGRESS still=1), then SIGTERM.
+i=0; while [ ! -s "$SEC_READY28" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i+1)); done
+sleep 0.3   # ensure we're inside the ③ sleep window.
+kill -TERM "$sw28_pid" 2>/dev/null || true
+wait "$sw28_pid" 2>/dev/null || true
+# CORE: after the double-trap, the three stores must be CONSISTENTLY aligned to the NEW account (alice) — NOT split-brain.
+#   ① credentials.json must EXIST and carry the FRESH (alice) token (forward-align created/committed it; the buggy 2nd-pass
+#   rollback would have rm -f'd it → registry=alice but ① missing = split-brain). registry active must = alice.
+if [ -f "$CRED28" ]; then PASS=$((PASS+1)); _green "(28) P1: forward-aligned ① credentials.json SURVIVES the 2nd trap (not rm -f'd·no split-brain)"; else FAILED=$((FAILED+1)); _red "FAIL: (28) P1 forward-aligned ① credentials.json DELETED by the 2nd trap's误回滚 (split-brain: registry=alice·① gone)"; fi
+cred28_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth&&j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("MISSING")}' "$CRED28" 2>/dev/null)"
+assert_eq "$FRESH_AT" "$cred28_at" "(28) P1: ① credentials.json carries FRESH (alice) token (forward-align committed·2nd trap did NOT roll it back to旧号)"
+active28="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);const a=Object.entries(r.accounts||{}).find(([k,e])=>e.active===true);process.stdout.write(a?a[0]:"NONE")' "$LIB_JS" "$REG28" 2>/dev/null)"
+assert_eq "alice@x.com" "$active28" "(28) P1 CORE: registry active = alice (forward-aligned) ⟺ ① credentials.json = alice(FRESH) — three stores CONSISTENT·no split-brain"
+# exactly one active (uniqueness held through the double-trap).
+nactive28="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(Object.values(r.accounts||{}).filter(e=>e.active===true).length))' "$LIB_JS" "$REG28" 2>/dev/null)"
+assert_eq "1" "$nactive28" "(28) P1: exactly ONE active account after the double-trap (active-uniqueness held)"
+# the ③ keychain re-commit (forward-align) ran (2nd security call) AND no double forward-align (idempotent): count must be ≥2.
+#   (the 1st call slept-then-killed·the 2nd is the forward-align re-commit; a buggy 3rd would mean the EXIT-trap re-ran forward-align.)
+seccnt28="$(cat "$SEC_CNT28" 2>/dev/null || echo 0)"
+if [ "$seccnt28" -ge 2 ] && [ "$seccnt28" -le 2 ]; then PASS=$((PASS+1)); _green "(28) P1: forward-align re-committed keychain exactly once (2 ③ writes total·2nd trap did NOT repeat forward-align·idempotent)"; else FAILED=$((FAILED+1)); _red "FAIL: (28) P1 keychain ③ write count=$seccnt28 (expected 2: 1 killed + 1 forward-align re-commit; >2 ⟹ 2nd trap repeated forward-align·not idempotent)"; fi
+rm -rf "$FX28" "$SECSTUB_SLOW28"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (29) **codex re-§7 P2 — forward-align 时 registry 对齐失败 → 收尾消息据实报「对齐失败」，绝不谎称「registry 一致」**.
+#      病根（codex 复现）：前向对齐分支里 node mutateRegistry 自身失败（registry 锁超时 / accounts.json 损坏 / 目录不可写）
+#        曾被 node 内 try/catch 吞掉，可下面仍无条件打印「三存储与 registry 一致·避免 split-brain」——谎称一致：实际
+#        ①②③ 存储已新号、registry active 仍旧号 = split-brain，消息却说已避免。修：移除 node 内吞异常 try/catch，
+#        `if node…then REG_ALIGNED=1`，消息按 REG_ALIGNED 分支（失败→诚实「registry active 对齐失败·下次
+#        detect_current_active 反向对账」）。语义不变（非永久 split-brain·可自愈），只让消息不撒谎。
+#      复现（hermetic·deterministic·无 lock-timing）：registry 放独立子目录；slow security stub 在**第一次**官方 ③ 写时
+#        先把该子目录 chmod 只读（forward-align 的 mutateRegistry 建不了 <reg>.lock → O_EXCL EACCES 立即抛·非 EEXIST 不重试
+#        → REG_ALIGNED=0），再 sleep 8（SIGTERM 落在 sleep 中·OVERWRITE_IN_PROGRESS 仍=1·STORES_COMMITTED=1）。换号锁挂在
+#        CRED_PATH（FX 根·可写·不受影响·line 1389），故只 registry 写失败。断言 stderr 走**诚实失败分支**（且不含过度声称）
+#        + ① credentials.json 仍 FRESH（P1 不回滚·独立于 REG_ALIGNED）。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX29="$(make_fixture)"; REGDIR29="$FX29/regdir"; mkdir -p "$REGDIR29"; REG29="$REGDIR29/accounts.json"; VFILE29="$FX29/accounts.env"
+CRED29="$FX29/new-credentials.json"; CJSON29="$FX29/new-claude.json"
+[ -e "$CRED29" ] && rm -f "$CRED29"; [ -e "$CJSON29" ] && rm -f "$CJSON29"
+cat > "$REG29" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE29","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VFILE29"; chmod 600 "$VFILE29"
+# slow security stub: on the 1st official ③ write, FIRST chmod the registry DIR read-only (forward-align mutateRegistry
+#   cannot create <reg>.lock → throws → REG_ALIGNED=0), THEN sleep 8 (SIGTERM lands mid-sleep·the post-commit window).
+#   The 2nd official ③ write (forward-align keychain re-commit) just exits 0.  `<<SEC` UNQUOTED so $REGDIR29 expands now;
+#   runtime vars are \$-escaped to survive into the generated stub.
+SECSTUB_RO29="$(make_project)"
+cat > "$SECSTUB_RO29/security" <<SEC
+#!/usr/bin/env bash
+is_add=0; is_official=0; prev=""
+for a in "\$@"; do
+  [ "\$a" = "add-generic-password" ] && is_add=1
+  [ "\$prev" = "-s" ] && [ "\$a" = "Claude Code-credentials" ] && is_official=1
+  prev="\$a"
+done
+if [ "\$is_add" = "1" ] && [ "\$is_official" = "1" ]; then
+  CNT_FILE="\${SEC_CALL_COUNT_FILE:-/dev/null}"
+  n=0; [ -f "\$CNT_FILE" ] && n="\$(cat "\$CNT_FILE" 2>/dev/null || echo 0)"; n=\$((n+1)); printf '%s' "\$n" > "\$CNT_FILE" 2>/dev/null || true
+  if [ "\$n" = "1" ]; then
+    chmod 555 "$REGDIR29" 2>/dev/null || true
+    [ -n "\${SEC_READY_FILE:-}" ] && printf 'ready\n' > "\$SEC_READY_FILE"
+    sleep 8
+  fi
+fi
+exit 0
+SEC
+chmod +x "$SECSTUB_RO29/security"
+PORT29="$FX29/url.txt"; start_refresh_endpoint ok "$PORT29"; RURL29="$(cat "$PORT29")"
+SEC_READY29="$FX29/sec.ready"; SEC_CNT29="$FX29/kc.count"; STDERR29="$FX29/switch.stderr"
+( PATH="$SECSTUB_RO29:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL29" SEC_READY_FILE="$SEC_READY29" SEC_CALL_COUNT_FILE="$SEC_CNT29" CRED_PATH="$CRED29" CLAUDE_JSON_PATH="$CJSON29" CCM_REGISTRY_LOCK_TIMEOUT_MS=2000 \
+  bash "$SCRIPT" --registry "$REG29" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot >/dev/null 2>"$STDERR29" ) &
+sw29_pid=$!
+i=0; while [ ! -s "$SEC_READY29" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i+1)); done
+sleep 0.3   # inside the ③ sleep window·registry dir already read-only.
+kill -TERM "$sw29_pid" 2>/dev/null || true
+wait "$sw29_pid" 2>/dev/null || true
+chmod 755 "$REGDIR29" 2>/dev/null || true   # restore writable for cleanup (rm -rf needs w+x on the dir).
+# CORE: the trap's forward-align registry write FAILED → the wrap-up message must HONESTLY report 对齐失败, NOT over-claim一致.
+if grep -q "registry active 对齐失败" "$STDERR29" 2>/dev/null; then PASS=$((PASS+1)); _green "(29) P2: registry-align failure → wrap-up message HONESTLY reports 「registry active 对齐失败」 (no over-claim)"; else FAILED=$((FAILED+1)); _red "FAIL: (29) P2 registry-align failed but message did NOT report 对齐失败 (stderr tail: $(tr '\n' ' ' < "$STDERR29" 2>/dev/null | tail -c 220))"; fi
+if grep -q "三存储与 registry 一致" "$STDERR29" 2>/dev/null; then FAILED=$((FAILED+1)); _red "FAIL: (29) P2 message OVER-CLAIMS 「三存储与 registry 一致」 while registry-align actually FAILED (the lying-message bug)"; else PASS=$((PASS+1)); _green "(29) P2: message does NOT over-claim consistency when registry-align failed"; fi
+# ① credentials.json must still be FRESH (P1 rollback-suppression holds independent of the registry-align outcome·no brick).
+cred29_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth&&j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("MISSING")}' "$CRED29" 2>/dev/null)"
+assert_eq "$FRESH_AT" "$cred29_at" "(29) P2: ① credentials.json stays FRESH (forward-align committed stores NOT rolled back·even when registry-align fails)"
+rm -rf "$FX29" "$SECSTUB_RO29"
+
 # kill any lingering stub endpoints.
 for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
 rm -rf "$SECSTUB" "$SECSTUB_CAPTURE" "$SECSTUB_FAIL" "$FX1" "$FX1B" "$FX2" "$FX3" "$FX4" "$FX5" "$STUB_ROOT5" "$FX5D" "$FX5E" "$FX6" "$FX8" "$FX9" "$STUB_ROOT9" "$FX10" "$FX11" "$FX11B" "$STUB_ROOT11B" "$FX15" "$STUB_ROOT15" "$FX16"

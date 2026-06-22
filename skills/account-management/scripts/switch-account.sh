@@ -898,16 +898,34 @@ on_exit_or_interrupt() {
       security add-generic-password -U -s "Claude Code-credentials" -a "$USER" -w "$COMMIT_WRAPPED_BLOB" >/dev/null 2>&1 || true
     fi
     # ② best-effort setActive 切入号（让 registry 追上存储·不回滚）。
-    node -e '
+    #   **align 成败要据实回传**（codex re-§7 P2）：mutateRegistry 自身失败（registry 锁超时 / accounts.json 损坏 /
+    #   目录不可写）时，下面收尾消息**绝不能**谎称「registry 一致·split-brain 已避免」——故移除 node 内吞异常的
+    #   try/catch，让失败以非零退出冒出来；`if … then REG_ALIGNED=1` 把成败捕进 shell（stderr 仍 /dev/null·不回显），
+    #   消息据此分支。语义不变：registry 没追上不是 brick，下次 detect_current_active 仍从存储反向对账（见失败分支消息）。
+    REG_ALIGNED=0
+    if node -e '
       "use strict";
-      try {
-        const lib = require(process.argv[1]);
-        const regPath = process.argv[2], email = process.argv[3];
-        lib.mutateRegistry(regPath, (reg) => { if (reg.accounts && reg.accounts[email]) lib.setActive(reg, email); });
-      } catch (_e) { /* best-effort·对齐失败下次 detect_current_active 仍可对账 */ }
-    ' "$LIB_JS" "$REGISTRY_PATH" "$COMMIT_SWITCHIN_EMAIL" >/dev/null 2>&1 || true
+      const lib = require(process.argv[1]);
+      const regPath = process.argv[2], email = process.argv[3];
+      lib.mutateRegistry(regPath, (reg) => { if (reg.accounts && reg.accounts[email]) lib.setActive(reg, email); });
+    ' "$LIB_JS" "$REGISTRY_PATH" "$COMMIT_SWITCHIN_EMAIL" >/dev/null 2>&1; then
+      REG_ALIGNED=1
+    fi
     ACTIVE_ALIGNED=1
-    err "switch-account: 换号在「①② 已提交、收尾未完成」窗口被中断——已**前向对齐全部到 ${COMMIT_SWITCHIN_EMAIL}**（补写 keychain ③ + registry active），三存储与 registry 一致·避免 split-brain（不回滚已提交的 ①）。"
+    # **trap 幂等·消除前向对齐后第二次 trap 的误回滚 split-brain（codex re-§7 P1）**：INT/TERM 落在「STORES_COMMITTED=1
+    #   已置、security 还没返回、OVERWRITE_IN_PROGRESS 还没清」这个窗口时，INT/TERM trap 跑完本前向对齐分支后会 `exit`，
+    #   `exit` 又触发 EXIT trap **第二次** on_exit_or_interrupt。第二次：本 if 被 ACTIVE_ALIGNED=1 跳过（对），但**仍为真的**
+    #   OVERWRITE_IN_PROGRESS 会让下面 elif 误回滚 ①② 到旧号 → keychain/registry 对齐新号、①② 回退旧号 = split-brain。
+    #   修：前向对齐已把状态推到「新号一致」（回滚是错的），故在此**清掉 OVERWRITE_IN_PROGRESS + 覆写路径**——让第二次
+    #   trap 既不重复前向对齐（ACTIVE_ALIGNED 守住）、也**绝不**进 elif 回滚分支。两次 trap 净效果 = 一次正确的前向对齐。
+    OVERWRITE_IN_PROGRESS=0
+    OVERWRITE_CRED_PATH=""
+    OVERWRITE_CJ_PATH=""
+    if [ "$REG_ALIGNED" -eq 1 ]; then
+      err "switch-account: 换号在「①② 已提交、收尾未完成」窗口被中断——已**前向对齐全部到 ${COMMIT_SWITCHIN_EMAIL}**（补写 keychain ③ + registry active），三存储与 registry 一致·避免 split-brain（不回滚已提交的 ①）。"
+    else
+      err "switch-account: 换号在「①② 已提交、收尾未完成」窗口被中断——已把 ①②③ 三存储前向对齐到 ${COMMIT_SWITCHIN_EMAIL}（补写 keychain ③·不回滚已提交的 ①），但 **registry active 对齐失败**（accounts.json 锁超时/损坏/目录不可写）——registry 暂留旧号、与存储暂不一致，**下次 detect_current_active 将从存储反向对账修正**（非永久 split-brain·可自愈）。"
+    fi
   elif [ "${OVERWRITE_IN_PROGRESS:-0}" -eq 1 ] && [ -n "$OVERWRITE_CRED_PATH" ]; then
     # 阶段 A·回滚：覆写窗口内、存储未提交 → 回滚 ①② 到旧号。
     rollback_official_stores_12 "$OVERWRITE_CRED_PATH" "$OVERWRITE_CJ_PATH" >/dev/null 2>&1 || true
