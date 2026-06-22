@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-06-22
+
 ### Added
 
 - **board 卡片显示某节点的 discuss 讨论历史（webview 只读 sidecar，不等 master 消化）** — discuss 完，即使 master 还没在下一次 recon 消化掉这个用户闸，`/cc-master:view` 的卡片也能**立刻**看到「聊过几次 / 最近结论」——正面解掉「下次再点进来记不清之前聊过没、聊了几次、聊出啥」。三处协同：① discuss sidecar 改为**版本化、append-only**——命名 `<board-stem>--<node-id>--<STAMP>.decision.md`（`STAMP=YYYYMMDDTHHMMSSZ` 紧凑 UTC，path-safe、字典序即时间序），每次 discuss 写一份**新**文件、**永不覆盖**，「聊过 N 次」= 该 node 名下 sidecar 个数，frontmatter 新增可选 `round`；master 消化时读该 node **全部** sidecar、取**最新**一份为准（之前 round 留作历史回溯）。② `view-server.js` 新增一条**只读 GET** `/decisions.json`——扫 board home 全部 `*.decision.md`、解析 frontmatter + 抽 `## TL;DR` 段首行，按 `node_id` 分组返回 `[{node_id,file,resolved_at,ask_type,round,tldr}]`（路径穿越防护同 `/vendor/*`、torn/缺失优雅降级返回 `[]` 不 500）；**view-server 仍零联网零 POST**（只多一条只读 GET，R5 不破）。③ `view.html` 卡片（任何有 decision sidecar 的节点，不止 awaiting-user）新增「💬 已讨论 N 次 · 最近结论 TL;DR:「…」· `<resolved_at>`」历史区、可展开看逐次——纯客户端 fetch（GET，与 `/board.json` 轮询同款），无 sidecar / 老 server 优雅降级。**board 永远 master 独占**：discuss 仍只写自己的 sidecar（自己的文件、零竞争），webview 直接只读 sidecar 渲染历史——给用户一模一样的可见效果且**立刻可见**，单写者纪律零破口（R2 narrow waist 零改动：sidecar 带外、board 不加字段）。
