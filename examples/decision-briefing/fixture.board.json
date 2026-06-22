@@ -62,7 +62,7 @@
             "tradeoffs": "✅ 持久层零风险、纯前端改动、不碰任何红线。⚠️ 没解决「主文件每回合全量重写」的写放大（>500 节点时仍会浮现）；治标，可能是第一步而非终态。"
           }
         ],
-        "enter_cmd": "/cc-master:discuss D1"
+        "enter_cmd": "/cc-master:discuss D1 --board 20260619T093000-0000"
       }
     },
     {

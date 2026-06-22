@@ -228,6 +228,7 @@ The card itself shows the **discussion history** — even before the orchestrato
 
 ```
 /cc-master:discuss <node-id>   # run in a fresh session — copy the exact command from the decision card in /cc-master:view
+                               # (the copied command defaults to carrying --board <board-stem>, so a fresh session can't cross-wire to another open orchestration)
 ```
 
 ### Resume an existing board in a new session

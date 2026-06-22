@@ -1,15 +1,17 @@
 ---
 description: '对一个 awaiting-user 决策节点开一场满血、有备而来的"采访式讨论"——载入 master 预备的决策包、做时效性校验（过期就先 re-ground）、带着完整依据跟用户把问题谈透，最后把结论写成 sidecar 决策文档回流给 master（绝不写 board）。'
-argument-hint: <node-id> [--home <path>]
+argument-hint: <node-id> [--home <path>] [--board <board-stem>]
 ---
 
 你被一个独立的、满血的 Claude Code session 用 `/cc-master:discuss <node-id>` 拉起，来陪用户把**一个等他拍板的决策节点**谈透。master orchestrator 此刻可能正忙别的活——你不打断它，它也不打断你们；你们俩在用户方便的时候，对着 master 预先准备好的依据，做一次高质量决策，然后把结论干净地回流给 master。
 
 你不是 orchestrator，**不要**碰 board、不要派发任务、不要替 master 编排。你的活就三件：**把上下文讲清楚 → 跟用户把问题谈透 → 把结论写成 sidecar**。
 
-参数整串由 **`$ARGUMENTS`** 传入，形如 `<node-id> [--home <path>]`。**先解析参数**：第一个 token 是 `<node-id>`（下文出现的 `<node-id>` 都指它）；若其后出现 `--home <path>`，把这个 `<path>` 当作本次的 cc-master home（**优先级最高**，覆盖 env 与默认）。
+参数整串由 **`$ARGUMENTS`** 传入，形如 `<node-id> [--home <path>] [--board <board-stem>]`。**先解析参数**：第一个 token 是 `<node-id>`（下文出现的 `<node-id>` 都指它）；若其后出现 `--home <path>`，把这个 `<path>` 当作本次的 cc-master home（**优先级最高**，覆盖 env 与默认）；若出现 `--board <board-stem>`，把它当作**显式 board 选择器**（`<board-stem>` = board 文件名去掉 `.board.json` 后缀），用来在共享 home 下多块并发 board 间**钉死用哪块板**（见 §1 step 2）——webview 复制按钮产出的命令**默认带上它**（见 board.md §decision_package `enter_cmd` 生成规则），让你新开 session 跑时即便同 home 下还开着别的 orchestration 也绝不窜到别人的板上。
 
 **`--home` 解析必须 quote-aware**（自定义 home 路径可能含空格，master 生成 `enter_cmd` 时会对路径加 shell 引号——见 board.md §decision_package；裸取空格前 token 会把 `/Users/me/My Project/.cc-master` 截成 `/Users/me/My`，找不到 home）：`--home` 之后若紧跟一个引号（单引号 `'` 或双引号 `"`），就取到**配对的同种引号为止**的整串（含其间所有空格）作为 path，再**剥掉外层那对引号**；若不跟引号，则取下一个空白分隔 token 作为 path。例：`--home '/Users/me/My Project/.cc-master'` → home = `/Users/me/My Project/.cc-master`；`--home /tmp/home` → home = `/tmp/home`。
+
+**`--board` 不需 quote-aware**——board-stem 由时间戳 `+` pid 构成、本就 path-safe 无空格，取 `--board` 后下一个空白分隔 token 即可。但**用它拼 board 文件路径前同样过一道 path-safe guard**（必须匹配 `^[A-Za-z0-9._-]+$`、且非 `.`/`..`；不满足就清楚报错并停，绝不用不安全 stem 拼路径逃出 home）——与 §5 落 sidecar 前对 `<node-id>` 的 guard 同源。
 
 按下面走：
 
@@ -18,7 +20,7 @@ argument-hint: <node-id> [--home <path>]
 先认准 board，再取出这个节点的决策包。
 
 1. cc-master home，按优先级取第一个有值的：**参数里的 `--home <path>`** → `$CC_MASTER_HOME` → `${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/cc-master/`。`--home` 优先是因为 discuss 是用户在**新终端**起的独立 session，未必继承本次编排的自定义 `CC_MASTER_HOME`——master 生成 `enter_cmd` 时若 home 非默认会把 `--home <绝对路径>` 带进复制命令（见 board.md §decision_package），让复制按钮产物自带选择器、不依赖 env。
-2. 列出 home，读取每块 `owner.active` 为 `true` 的 `<timestamp>-<pid>.board.json`。恰好一块 active 就用它；多块 active 则按你被告知的 `<node-id>` 落在哪块板上取那块；仍无法无歧义确定，就**列出候选板（`goal` + 文件名）问用户**，别靠猜。home 里**一块 active 板都没有** → 清楚报错并提示：「若本编排用了自定义 `CC_MASTER_HOME`，请用 `--home <path>` 指向它、或在本 session 设同样的 `CC_MASTER_HOME` 后重试」，然后停下。
+2. 定位 board。**若参数带了 `--board <board-stem>`**（已过上面的 path-safe guard）：直接在 home 里定位 `<board-stem>.board.json`——找到就**钉死用它、跳过下面的 active 扫描与消歧**（显式选择器覆盖一切自动判断；即便该板已归档 `owner.active:false` 也用它——挡 stale 的是节点级生命周期闸 step 5，不是这一步）；该 stem 在 home 里**找不到** → 清楚报错并停。**未带 `--board`** 时按自动消歧：列出 home、读取每块 `owner.active` 为 `true` 的 `<timestamp>-<pid>.board.json`，恰好一块 active 就用它；多块 active 则按你被告知的 `<node-id>` 落在哪块板上取那块；仍无法无歧义确定，就**列出候选板（`goal` + 文件名）问用户**，别靠猜。home 里**一块 active 板都没有** → 清楚报错并提示：「若本编排用了自定义 `CC_MASTER_HOME`，请用 `--home <path>` 指向它、或在本 session 设同样的 `CC_MASTER_HOME` 后重试」，然后停下。
 3. 在选定 board 的 `tasks[]` 里找 `id == <node-id>` 的任务，读出它挂着的 `decision_package`（agent-shaped flexible 字段）。
 4. **找不到节点、或节点上没有 `decision_package`** → 清楚地告诉用户"在 board `<文件名>` 上找不到节点 `<node-id>`"或"节点 `<node-id>` 还没有 master 准备的决策包"，然后**停下**——别凭空替 master 编一个决策包。
 5. **生命周期闸（节点仍在等用户吗？）**——拿到节点+决策包之后、**用决策包之前**，先校验该节点 `blocked_on === "user"`（**只看 `blocked_on`、不限定 `status`**——`status` 取 `blocked` 或 `in_flight` 都算「仍在等用户」，与 webview `isAwaitingUser` 两端对齐：webview 把 `{blocked|in_flight}+blocked_on:"user"` 都渲成富决策卡 + 复制按钮，闸若更窄会「邀请又拒绝」、还报与实情相反的错）。用户可能跑的是一条**旧的**复制命令：master 此前已消化该决策、清掉了 `blocked_on:"user"`，但 `decision_package` 还残留在节点上（freshness hash 只查输入变没变、**不查节点状态**，挡不住这种）。**若该节点 `blocked_on` 已非 `"user"`** → 清楚地告诉用户「节点 `<node-id>` 已不在等待用户（当前 status=`<status>`、blocked_on=`<blocked_on>`）——master 可能已消化过这个决策，无需再讨论」，然后**停下，不写任何 sidecar**——别对一个已解决的节点重开讨论、又落一份 sidecar 让 master 二次消化。
