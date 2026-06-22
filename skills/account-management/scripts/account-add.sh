@@ -94,6 +94,28 @@ CC_USAGE_SH="${CC_USAGE_SH:-${ORCH_SCRIPTS}/cc-usage.sh}"
 err()  { printf '%s\n' "$*" >&2; }
 info() { printf '%s\n' "$*"; }     # 进度行（绝不含 token）
 
+# ── 文件锁封装（codex round#9 Finding C·file vault 跨进程串行化·同 account-delete.sh）─────────────────────
+# 锁住 file vault（accounts.env）的「读-筛-写-rename」整段，防 add/writeback 与并发 delete/add 互踩（最后 mv 者赢
+#   会复活已删 token / 丢别号刚写 blob）。用 accounts-lib 通用文件锁（O_EXCL + owner token + stale 回收）。锁文件
+#   <vf>.lock 只含非密 pid/at/owner·绝不碰 token。
+# **fail-closed（codex round#10）**：取锁失败（contention 超时 / 建不了锁文件）→ **绝不无锁跑临界区**（那会重现锁要
+#   防的 race），而是 return 1·不执行 command。调用方据此把整个 vault 写当失败处理（原 vault 不动·token-blind）。
+with_vault_lock() { # $1 = vault file path; $2... = command (+args) to run while holding the lock
+  local vf="$1"; shift
+  local owner=""
+  # **记本 bash 进程的 $$ 当锁 livePid（codex round#13 Finding A）**：取锁的一次性 node 进程会立即退出·临界区在 bash
+  #   里跑——若锁记 node 的 pid，并发对手会立刻把这已死 pid 判 stale 破锁（锁形同虚设）。故把 bash `$$`（临界区期间
+  #   一直活着）当 livePid 写进锁文件·并发对手 process.kill($$,0) 看到活着 → 不破锁 → 真串行化。
+  owner="$(node -e 'try{const l=require(process.argv[1]);const h=l.acquireFileLock(process.argv[2],{livePid:Number(process.argv[3])});process.stdout.write(h.owner||"")}catch(e){process.stderr.write(String(e&&e.message||e)+"\n");process.exit(1)}' "$LIB_JS" "$vf" "$$" 2>/dev/null)" || owner=""
+  if [ -z "$owner" ]; then
+    err "vault: 无法取得 vault 文件锁（${vf}.lock·另有进程长时间持锁 / node 不可用）——**拒绝无锁重写 vault**（防并发互踩），未写入。"
+    return 1
+  fi
+  "$@"; local rc=$?
+  node -e 'try{const l=require(process.argv[1]);l.releaseFileLock({path:process.argv[2]+".lock",owner:process.argv[3]})}catch(_e){}' "$LIB_JS" "$vf" "$owner" 2>/dev/null
+  return $rc
+}
+
 usage() {
   err "usage: account-add.sh --email <email> [--vault-kind keychain|file]"
   err "       [--vault-file <path>] [--keychain-service <s>] [--expires YYYY-MM-DDTHH:MM:SSZ] [--dry-run]"
@@ -320,32 +342,53 @@ store_blob_file() {
   umask 077
   mkdir -p "$(dirname "$VAULT_FILE")" 2>/dev/null || true
   # 取 email 的安全行前缀（fixed-string）——node 从 accounts-lib 拿，绝不在 bash 手拼正则。
-  #   prefix = "<email>_"（awk index($0,p)==1 = 行以此前缀起头，非正则、对 `.`/`@` 免疫）。
-  local prefix
-  prefix="$(node -e 'const{fileVaultLineMatch}=require(process.argv[1]);process.stdout.write(fileVaultLineMatch(process.argv[2]).prefix)' "$LIB_JS" "$EMAIL" 2>/dev/null)" || prefix=""
-  if [ -z "$prefix" ]; then
+  #   **只匹配本号自己的两类行 `<email>_TOKEN=` / `<email>_EXPIRES=`（codex round#2·重叠标识 bug 收口）**：
+  #   旧码用宽前缀 `<email>_`（prefix）筛——脚本接受任意非空 `--email`、file-vault key 是纯字符串，故录/续期 `foo`
+  #   会把 `foo_bar_TOKEN=`/`_EXPIRES=`（另一个号 `foo_bar` 的行）一并删掉 → 误毁 sibling 号、使其 unswitchable。
+  #   修：删/重写只针对**精确的 `<email>_TOKEN=` 与 `<email>_EXPIRES=` 两个前缀**（tokenLine/expiresLine），
+  #   绝不用宽 `<email>_` 前缀。仍是 awk index($0,p)==1 行首锚定·定字符串·对 `.`/`@` 元字符免疫。
+  local token_line expires_line
+  token_line="$(node -e 'const{fileVaultLineMatch}=require(process.argv[1]);process.stdout.write(fileVaultLineMatch(process.argv[2]).tokenLine)' "$LIB_JS" "$EMAIL" 2>/dev/null)" || token_line=""
+  expires_line="$(node -e 'const{fileVaultLineMatch}=require(process.argv[1]);process.stdout.write(fileVaultLineMatch(process.argv[2]).expiresLine)' "$LIB_JS" "$EMAIL" 2>/dev/null)" || expires_line=""
+  if [ -z "$token_line" ] || [ -z "$expires_line" ]; then
     err "vault: 无法从 accounts-lib 取 email 安全前缀（node 失败？）——拒绝用裸正则删行（§A.4 元字符 bug），未写入。"
     return 1
   fi
-  # 步骤①（仅当文件已存在）：删掉同 email 的旧 _TOKEN= / _EXPIRES= 行。
-  #   **awk index($0,p)!=1** 保留「不以 <email>_ 前缀起头」的行 = 删掉所有 <email>_* 行（含 _TOKEN/_EXPIRES）。
-  #   注意：accounts.env 里同 email 只有 _TOKEN/_EXPIRES 两类行，故按 <email>_ 整前缀删等价于删该 email 全部记录。
-  #   绝不读等号右侧 blob 值（前缀匹配、token-blind）。
-  if [ -f "$VAULT_FILE" ]; then
-    if awk -v p="$prefix" 'index($0, p) != 1' "$VAULT_FILE" > "$VAULT_FILE.tmp" 2>/dev/null; then
-      mv "$VAULT_FILE.tmp" "$VAULT_FILE"
-    else
-      # awk 非 0（真错误，如文件不可读）——绝不 mv（防把空文件覆盖好 vault）。
-      rm -f "$VAULT_FILE.tmp"; err "vault: 删旧行失败（awk 非 0）——保留原文件，未写入。"; return 1
+  # **全或无原子写（codex round#1 Finding 3）+ 跨进程串行化（codex round#9 Finding C）**：旧码「先 mv 删旧 _TOKEN
+  #   行的版本到位、再 >> append 新 blob」——append 失败/部分写时旧 token 已删、新 token 没写 = vault 无有效 token；
+  #   且跨进程不串行（并发 delete/add 改同一文件最后 mv 者赢）。修：① temp 里先写齐（保留旧行 + 新 _TOKEN + 可选
+  #   _EXPIRES）全成功才 rename（全或无·原 vault 任一步失败都没动）；② 整段「筛-写-rename」在 vault 文件锁内做
+  #   （with_vault_lock·串行化跨进程重写）。token-blind 不变：awk 只按前缀筛行不读值；blob 经 printf 进 temp、不回显。
+  _store_blob_file_locked() {
+    local vtmp
+    vtmp="$(mktemp "${VAULT_FILE}.XXXXXX" 2>/dev/null || printf '%s' "${VAULT_FILE}.tmp.$$")"
+    if [ -z "$vtmp" ]; then err "vault: 无法建临时文件——未写入（原 vault 原封不动）。"; return 1; fi
+    chmod 600 "$vtmp" 2>/dev/null || true
+    # ① 保留的旧行（只删本号**精确**的 _TOKEN= / _EXPIRES= 两类行·codex round#2 重叠标识 bug）：仅当文件已存在才筛；
+    #    不存在 = temp 从空起。awk 保留「既不以 <email>_TOKEN= 起头、也不以 <email>_EXPIRES= 起头」的行——`foo_bar_*` 这类
+    #    sibling 行（前缀是 `foo_bar_TOKEN=`·不等于 `foo_TOKEN=`）天然保留。awk 非 0（文件不可读）→ 丢 temp 退出。
+    if [ -f "$VAULT_FILE" ]; then
+      if ! awk -v t="$token_line" -v x="$expires_line" 'index($0, t) != 1 && index($0, x) != 1' "$VAULT_FILE" > "$vtmp" 2>/dev/null; then
+        rm -f "$vtmp"; err "vault: 筛旧行失败（awk 非 0·文件不可读？）——保留原文件，未写入。"; return 1
+      fi
     fi
-  fi
-  # 步骤②：append 新 _TOKEN=<单行blob> 行（blob 进文件、不回显）。printf 而非 echo（避免转义歧义）。
-  printf '%s_TOKEN=%s\n' "$EMAIL" "$blob" >> "$VAULT_FILE" || { err "vault: 写 blob 行失败。"; return 1; }
-  # 步骤③：可选 _EXPIRES（非密、不含 token——记 refresh token 长期有效期，非 blob 内短期 expiresAt）。
-  if [ -n "$EXPIRES" ]; then
-    printf '%s_EXPIRES=%s\n' "$EMAIL" "$EXPIRES" >> "$VAULT_FILE" || err "vault: 写 _EXPIRES 行失败（blob 已写入，到期日未记）。"
-  fi
-  return 0
+    # ② 追加新 _TOKEN=<单行blob> 行进 temp（blob 进文件、不回显）。printf 而非 echo（避免转义歧义）。失败 → 丢 temp、原 vault 不动。
+    if ! printf '%s_TOKEN=%s\n' "$EMAIL" "$blob" >> "$vtmp"; then
+      rm -f "$vtmp"; err "vault: 写 blob 行失败（磁盘满 / IO 错？）——丢弃临时文件、原 vault 原封不动（旧 token 存活），未写入。"; return 1
+    fi
+    # ③ 可选 _EXPIRES（非密·refresh token 长期有效期，非 blob 内短期 expiresAt）。同样进 temp、失败即整体丢弃（全或无）。
+    if [ -n "$EXPIRES" ]; then
+      if ! printf '%s_EXPIRES=%s\n' "$EMAIL" "$EXPIRES" >> "$vtmp"; then
+        rm -f "$vtmp"; err "vault: 写 _EXPIRES 行失败——丢弃临时文件、原 vault 原封不动，未写入。"; return 1
+      fi
+    fi
+    # ④ 全部写齐 → 原子 rename 覆盖（同目录 rename 原子）。到这一步原 vault 才被替换；此前任一失败原 vault 都没动。
+    if ! mv "$vtmp" "$VAULT_FILE"; then
+      rm -f "$vtmp"; err "vault: 原子替换 vault 文件失败（rename 错）——原 vault 原封不动（旧 token 存活），未写入。"; return 1
+    fi
+    return 0
+  }
+  with_vault_lock "$VAULT_FILE" _store_blob_file_locked
 }
 
 store_blob() {
@@ -383,45 +426,47 @@ write_registry_entry() {
   #   **token_expires_at = refresh token 长期有效期（now+365d·非 blob 内短期 expiresAt）**——短期 expiresAt 只进 vault blob。
   #   所有值经 process.argv 传入（**全非密**：subscription_type 是订阅枚举·identity 是非密身份对象·绝不是 token）；
   #   token/blob 绝不出现在任何 argv。identity JSON 经 JSON.parse 塞 fields.identity（upsert 对其跑值扫描兜底）。
+  # **整个 load→改→save 在 mutateRegistry 锁内做（codex round#7 Finding C·防并发 lost-update）**：并发录号/换号
+  #   各自 load 同一旧态、各自改、后写 rename 覆盖先写 = 丢号 / active 错。mutateRegistry 加咨询文件锁串行化 RMW。
   node -e '
     "use strict";
     const lib = require(process.argv[1]);
     const [ , , email, vaultKind, kcService, vaultPath, expiresIso, nowIso, subType, identityJson, switchableArg, isActiveArg ] = process.argv;
     const regPath = lib.defaultRegistryPath();
-    const reg = lib.loadRegistry(regPath);                 // 缺文件 = 空池（设计稿 §F）
-    const prev = (reg.accounts && reg.accounts[email]) || {};
-    const vault = vaultKind === "keychain"
-      ? { kind: "keychain", service: kcService, account: email }
-      : { kind: "file", path: vaultPath, key: email };
-    const fields = {
-      vault,
-      // token_added_at 只在新增时盖；已存在的号保留原 added（refresh 不改首次录入时刻）。
-      token_added_at: (prev && prev.token_added_at) ? prev.token_added_at : nowIso,
-      token_refreshed_at: nowIso,
-    };
-    if (expiresIso) fields.token_expires_at = expiresIso;
-    if (subType) fields.subscription_type = subType;       // 非密订阅枚举（来自 blob.subscriptionType）。
-    // identity：JSON.parse 校验是对象再塞；解析失败 / 非对象 → 不写 identity（降级·不阻断）。
-    //   upsertAccount 对 fields.identity 跑带豁免 flag 的 scanForTokenLeak（保留值扫描），token 误入会抛错拦下。
-    if (identityJson) {
-      let id = null;
-      try { id = JSON.parse(identityJson); } catch (_e) { id = null; }
-      if (id && typeof id === "object" && !Array.isArray(id) && Object.keys(id).length > 0) fields.identity = id;
-    }
-    // switchable（残缺号标注防御路）：仅 "false" 时显式写 false（标不可切）；"true" 时显式写 true
-    //   （成功 add 路径·**覆写旧 false**·清掉之前 fallback 留下的 switchable:false → recovery 路径生效）；
-    //   缺省（其它/空）不写（视作可切·不破完整号）。upsertAccount 的 `if (f.switchable !== undefined)` 会
-    //   把这个 true 写进 entry.switchable（覆写旧 false·已核对·无需改 accounts-lib）。
-    if (switchableArg === "false") fields.switchable = false;
-    else if (switchableArg === "true") fields.switchable = true;
-    lib.upsertAccount(reg, email, fields);                 // 绝不传 token——upsert 自带 token-leak 断言（含 identity 值扫描）
-    // is_active：录的是**当前登录号** → setActive 标该号 active:true（其余 false·setActive 维护 active 唯一性·
-    //   设计 §A.1 不变式3）。**绝不放宽 validateRegistry 的 active 唯一性**——setActive 已保证唯一，saveRegistry 校验仍把关。
-    if (isActiveArg === "1") {
-      lib.setActive(reg, email);                           // 该 email active=true·其余全 false（唯一性）。
-      process.stderr.write("registry: 录的是当前登录号 → 标 " + email + " active:true（其余 false）。\n");
-    }
-    const out = lib.saveRegistry(reg, regPath);            // 原子写 + 校验（含 token-leak 拒写 + active 唯一性硬校验）
+    const out = lib.mutateRegistry(regPath, (reg) => {       // 锁内 load 最新态 → 改 → save（缺文件 = 空池·设计稿 §F）
+      const prev = (reg.accounts && reg.accounts[email]) || {};
+      const vault = vaultKind === "keychain"
+        ? { kind: "keychain", service: kcService, account: email }
+        : { kind: "file", path: vaultPath, key: email };
+      const fields = {
+        vault,
+        // token_added_at 只在新增时盖；已存在的号保留原 added（refresh 不改首次录入时刻）。
+        token_added_at: (prev && prev.token_added_at) ? prev.token_added_at : nowIso,
+        token_refreshed_at: nowIso,
+      };
+      if (expiresIso) fields.token_expires_at = expiresIso;
+      if (subType) fields.subscription_type = subType;       // 非密订阅枚举（来自 blob.subscriptionType）。
+      // identity：JSON.parse 校验是对象再塞；解析失败 / 非对象 → 不写 identity（降级·不阻断）。
+      //   upsertAccount 对 fields.identity 跑带豁免 flag 的 scanForTokenLeak（保留值扫描），token 误入会抛错拦下。
+      if (identityJson) {
+        let id = null;
+        try { id = JSON.parse(identityJson); } catch (_e) { id = null; }
+        if (id && typeof id === "object" && !Array.isArray(id) && Object.keys(id).length > 0) fields.identity = id;
+      }
+      // switchable（残缺号标注防御路）：仅 "false" 时显式写 false（标不可切）；"true" 时显式写 true
+      //   （成功 add 路径·**覆写旧 false**·清掉之前 fallback 留下的 switchable:false → recovery 路径生效）；
+      //   缺省（其它/空）不写（视作可切·不破完整号）。upsertAccount 的 `if (f.switchable !== undefined)` 会
+      //   把这个 true 写进 entry.switchable（覆写旧 false·已核对·无需改 accounts-lib）。
+      if (switchableArg === "false") fields.switchable = false;
+      else if (switchableArg === "true") fields.switchable = true;
+      lib.upsertAccount(reg, email, fields);                 // 绝不传 token——upsert 自带 token-leak 断言（含 identity 值扫描）
+      // is_active：录的是**当前登录号** → setActive 标该号 active:true（其余 false·setActive 维护 active 唯一性·
+      //   设计 §A.1 不变式3）。**绝不放宽 validateRegistry 的 active 唯一性**——setActive 已保证唯一，saveRegistry 校验仍把关。
+      if (isActiveArg === "1") {
+        lib.setActive(reg, email);                           // 该 email active=true·其余全 false（唯一性）。
+        process.stderr.write("registry: 录的是当前登录号 → 标 " + email + " active:true（其余 false）。\n");
+      }
+    });
     process.stderr.write("registry: 已写入 " + out + "\n");
   ' "$LIB_JS" "$EMAIL" "$VAULT_KIND" "$KEYCHAIN_SERVICE" "$VAULT_FILE" "$EXPIRES" "$now_iso" "$sub_type" "$identity_json" "$switchable_arg" "$is_active_arg" 2>&1
 }
@@ -447,12 +492,12 @@ write_observed_quota() {
   # ── best-effort 时限（可移植纯 bash·无 timeout/gtimeout 依赖·macOS 上它们不保证在）─────────────────
   # 真 cc-usage 读当前 session 的 JSONL transcript 算用量——超长 session 下 JSONL 巨大 → cc-usage 极慢，
   # 会让 add 长等（生产）/ 让 e2e 测试 + run-tests.sh 卡住（端点实测分钟级不出）。故用「后台跑进临时文件 +
-  # watchdog 轮询 + 超时 kill」可移植模式给它兜一个上限（CC_USAGE_TIMEOUT_S 默认 8s·可 env 覆写）：
+  # watchdog 轮询 + 超时 kill」可移植模式给它兜一个上限（CC_USAGE_TIMEOUT_S 默认 60s·可 env 覆写）：
   #   · 后台 bash 跑 cc-usage、stdout 重定向进 mktemp 临时文件；最多等 N 秒（每 0.2s 轮询子进程是否退出）。
   #   · 超时未退 → kill（TERM 后 KILL 兜底）、当 cc-usage 无输出处理（best-effort 跳过·选号少一个弱信号）。
   #   · 任何分支都 return 0 不阻断录号。token 安全：cc-usage 本就 token-blind；临时文件只承非密用量 JSON、
   #     用完即删；kill 只针对 cc-usage 子进程、不碰任何 token。
-  local timeout_s="${CC_USAGE_TIMEOUT_S:-8}"
+  local timeout_s="${CC_USAGE_TIMEOUT_S:-60}"
   local usage_tmp usage_json=""
   usage_tmp="$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/cc-usage-oq.$$.tmp")"
   ( bash "$CC_USAGE_SH" >"$usage_tmp" 2>/dev/null ) &
@@ -511,14 +556,16 @@ write_observed_quota() {
       return o;
     }
 
-    const reg = lib.loadRegistry(regPath);
-    if (!reg.accounts || !reg.accounts[email]) {
-      process.stderr.write("observed-quota: " + email + " 不在 registry——跳过（registry 写应已先于本步）。\n");
-      process.exit(0);
-    }
-    lib.recordObservedQuota(reg, email, { fiveHour: win(fh), sevenDay: win(sd) });
-    lib.saveRegistry(reg, regPath);                        // 原子写 + 校验（含 token-leak 拒写）
-    process.stderr.write("observed-quota: 已写 " + email + " 的 last_observed_quota（source=" + src + "·录号即当前登录号视角·选号信号）。\n");
+    // 锁内 RMW（codex round#7 Finding C·防并发 lost-update·与 write_registry_entry 串行不互踩）。
+    let skipped = false;
+    lib.mutateRegistry(regPath, (reg) => {
+      if (!reg.accounts || !reg.accounts[email]) {
+        process.stderr.write("observed-quota: " + email + " 不在 registry——跳过（registry 写应已先于本步）。\n");
+        skipped = true; return;                             // 不改不存（mutateRegistry 仍会 save 一份不变态·无害）。
+      }
+      lib.recordObservedQuota(reg, email, { fiveHour: win(fh), sevenDay: win(sd) });
+    });
+    if (!skipped) process.stderr.write("observed-quota: 已写 " + email + " 的 last_observed_quota（source=" + src + "·录号即当前登录号视角·选号信号）。\n");
   ' "$LIB_JS" "$EMAIL" "$usage_json" 2>&1)" || {
     # 写失败（多半 used_pct 降级被拒写 / node 错）——best-effort，绝不阻断、绝不回滚。
     err "  （提示：写录号配额快照 last_observed_quota 失败（多半 cc-usage 降级、used_pct 缺失被拒写）——录号已成、选号少一个弱信号："
@@ -576,11 +623,14 @@ try_mark_switchable_from_vault() {
     err "  ✓ 检测到 cc-master vault 已有 ${EMAIL} 的有效 blob（含非空 refreshToken）→ 已标 **switchable:true（可切）**。"
     err "    手动恢复闭环完成：该备号现已对 account-list.sh 可见、**计入 effective-N / 可被选号当备号**——无须当前登录匹配。"
     err "    （registry entry 全非密·不含 token；blob 仍只在你手动写入的 vault 里、脚本只 token-blind 探了「有没有」、绝不碰官方 keychain。）"
+    return 0
   else
-    err "  注意：检测到 vault 有有效 blob，但自动登记 registry entry 失败（node/registry 写出错）——"
-    err "    跑 account-list.sh 确认，或重跑本脚本。token 是安全的（从不经过脚本/registry）。"
+    # **registry 写失败 → 退非 0（codex round#9 Finding B·不谎报恢复成功）**：vault 有有效 blob，但 entry 没标成
+    #   switchable:true → 该号仍被 select-account / effective-N 排除（恢复未生效）。返回非 0 让 caller 不 exit 0 谎报成功。
+    err "  注意：检测到 vault 有有效 blob，但自动登记 registry entry 失败（坏 JSON / 不可写 / 锁超时）——**恢复未完成**："
+    err "    该号尚未标 switchable:true、仍被选号 / effective-N 排除。修好 accounts.json 后重跑本脚本补登记。token 是安全的（从不经过脚本/registry）。"
+    return 1
   fi
-  return 0
 }
 
 # ───────────────────────── fallback 手动录入（自动提取失败时·绝不静默/绝不存错）─────────────────────────
@@ -605,15 +655,25 @@ print_manual_fallback() {
     err "  blob 作 security 的 argv 参数写入 keychain（避 128 截断·存完整合法 JSON）；blob 从不经过本脚本/agent，写完即 unset。"
   else
     err ""
-    err "  # file 形态：单行 blob 写进 \$VAULT_FILE 的 <email>_TOKEN= 行（blob 单行·取行不截断）："
-    err "  umask 077; mkdir -p \"$(dirname "$VAULT_FILE")\""
-    err "  # 先删同 email 旧行（不读 blob 值，awk index() 精确前缀；§A.4 元字符安全）："
-    err "  if [ -f \"$VAULT_FILE\" ]; then awk -v p=\"${EMAIL}_\" 'index(\$0,p)!=1' \"$VAULT_FILE\" > \"$VAULT_FILE.tmp\" && mv \"$VAULT_FILE.tmp\" \"$VAULT_FILE\"; fi"
-    err "  # 再 append 新 _TOKEN=<单行blob> 行（blob 必单行，否则取行截断）："
-    err "  umask 077; printf '%s_TOKEN=%s\\n' \"$EMAIL\" \"\$BLOB\" >> \"$VAULT_FILE\"; unset BLOB"
+    err "  # file 形态：单行 blob 写进 \$VAULT_FILE 的 <email>_TOKEN= 行（blob 单行·取行不截断）。"
+    err "  # **全或无 + 精确前缀**（与 store_blob_file 同款·codex round#3/#11）：temp 里先写齐（只删本号**精确** _TOKEN="
+    err "  #   行·绝不用宽 ${EMAIL}_ 前缀以免误删 sibling 如 ${EMAIL}_bar_TOKEN= ；append 新行）→ **每步用 && 串联·任一步"
+    err "  #   失败就 rm \$VT 中止、绝不 mv**（否则 awk/printf 出错时 mv 仍会用只含新行的残缺 temp 覆盖 vault·丢别号·codex round#11）。"
+    err "  umask 077; mkdir -p \"$(dirname "$VAULT_FILE")\" && \\"
+    err "  VT=\"\$(mktemp \"$VAULT_FILE.XXXXXX\")\" && \\"
+    err "  { [ ! -f \"$VAULT_FILE\" ] || awk -v t=\"${EMAIL}_TOKEN=\" 'index(\$0,t)!=1' \"$VAULT_FILE\" > \"\$VT\"; } && \\"
     if [ -n "$EXPIRES" ]; then
-      err "  printf '%s_EXPIRES=%s\\n' \"$EMAIL\" \"$EXPIRES\" >> \"$VAULT_FILE\""
+      err "  awk -v x=\"${EMAIL}_EXPIRES=\" 'index(\$0,x)!=1' \"\$VT\" > \"\$VT.2\" && mv \"\$VT.2\" \"\$VT\" && \\"
+      err "  printf '%s_TOKEN=%s\\n' \"$EMAIL\" \"\$BLOB\" >> \"\$VT\" && \\"
+      err "  printf '%s_EXPIRES=%s\\n' \"$EMAIL\" \"$EXPIRES\" >> \"\$VT\" && \\"
+      err "  mv \"\$VT\" \"$VAULT_FILE\" || { rm -f \"\$VT\" \"\$VT.2\"; echo '录入失败·原 vault 原封不动（旧 token 存活）·未写入' >&2; }"
+    else
+      err "  printf '%s_TOKEN=%s\\n' \"$EMAIL\" \"\$BLOB\" >> \"\$VT\" && \\"
+      err "  mv \"\$VT\" \"$VAULT_FILE\" || { rm -f \"\$VT\"; echo '录入失败·原 vault 原封不动（旧 token 存活）·未写入' >&2; }"
     fi
+    err "  unset BLOB   # 写完即清（无论成功失败）。"
+    err "  # 说明：上面整条用 && 串联——awk 筛旧行失败（vault 不可读）/ printf 写 temp 失败（磁盘满）等任一步出错都不会"
+    err "  #   走到 mv，\$VT 被 rm、原 vault 原封不动（真全或无·旧 token 存活）。绝不用只含新行的残缺 temp 覆盖好 vault。"
   fi
   err ""
   err "  录完用 'security find-generic-password -s $KEYCHAIN_SERVICE -a $EMAIL'（不带 -w）或 account-list.sh 对账。"
@@ -767,13 +827,19 @@ if [ -n "$blob" ] && validate_blob "$blob"; then
       # 7) 优化①：录号那刻配额快照 last_observed_quota（best-effort·token-blind·失败不阻断）。
       #     仅在 registry entry 写成后才写（它要 upsert 在·recordObservedQuota 对不在池的号会抛错被容错）。
       write_observed_quota
+      unset sub_type 2>/dev/null || true
+      info "  对账（不取 blob 值）：account-list.sh  或  security find-generic-password -s $KEYCHAIN_SERVICE -a ${EMAIL}（不带 -w）"
+      exit 0
     else
-      err "warning: vault 已写好，但 accounts.json registry entry 写入失败——凭证是安全的（已进 vault），"
-      err "         只是号池对账少一条。用 account-list.sh 查看，或重跑本脚本补写 registry。"
+      # **registry 写失败 → 退非 0（codex round#9 Finding A·不谎报录号成功）**：vault 里 secret 是安全的，但号池 entry
+      #   没写成 → 该号对 account-list / select-account / effective-N **不可见**（automation 不能当录号已成）。surface +
+      #   exit 3（区别于干净成功的 0）：token 已安全进 vault，但需修好 accounts.json 后重跑补写 registry 才算录号完成。
+      unset sub_type 2>/dev/null || true
+      err "error: vault 已写好（凭证安全·已进 vault），但 accounts.json registry entry 写入失败（坏 JSON / 不可写 / 锁超时）——"
+      err "  **录号未完成**：该号对 account-list / select-account / effective-N 不可见。修好 accounts.json 后**重跑 --add ${EMAIL}**"
+      err "  补写 registry（脚本会探测到 vault 已有有效 blob·幂等补登记）。对账：account-list.sh。"
+      exit 3
     fi
-    unset sub_type 2>/dev/null || true
-    info "  对账（不取 blob 值）：account-list.sh  或  security find-generic-password -s $KEYCHAIN_SERVICE -a ${EMAIL}（不带 -w）"
-    exit 0
   else
     unset blob 2>/dev/null || true
     err "error: vault 写入失败——blob 未存。请检查上面的 vault 错误后重试，或走手动录入。"

@@ -256,7 +256,11 @@ function selectAccount(reg, nowArg, opts) {
     ranked.push({
       email,
       score: finalScore,
-      scoreUngated: scoreInfo.gated ? SCORE_UNUSABLE : finalScore, // 全员逼顶地板判定用「含到期降权后的分」。
+      // 全员逼顶地板判定用的分（codex round#2·到期降权不该伪装成配额逼顶）：地板判的是**配额耗尽**，不是临近到期。
+      //   故用**到期降权之前**的分（gated → SCORE_UNUSABLE·确保 7d 硬闸号仍跌破地板；否则 = scoreInfo.score·配额分）。
+      //   旧码地板判 `best.score`（已减 EXPIRY_PENALTY）→ 一个配额健康但临近到期的号（如 70%/70% 配额分 30·减 40 = -10）
+      //   会跌破地板被误报 NONE_ALL_EXHAUSTED·exit 3，违背「临近到期只降权不排除」的文档语义、白挡一次合法换号。
+      scoreForExhaustionFloor: scoreInfo.gated ? SCORE_UNUSABLE : scoreInfo.score,
       avail5h: scoreInfo.avail5h,
       avail7d: scoreInfo.avail7d,
       p5: scoreInfo.p5,
@@ -274,26 +278,53 @@ function selectAccount(reg, nowArg, opts) {
     });
   }
 
-  // 可选候选 = 未被排除（非 active、非 expired、非 not_switchable）的号。
-  const candidates = ranked.filter((r) => !r.active && !r.expired && !r.notSwitchable);
+  // 可选候选 = 未被排除（非 active、非 expired、非 not_switchable）**且非 7d 硬闸（gated）**的号。
+  //   **gated 必须从可选候选里彻底排除（codex round#4·硬闸是硬的）**：7d 硬闸号 score=SCORE_UNUSABLE(-1)、
+  //   「切进去马上又被 7d 卡」= 设计上**不可用**。旧码只给它低分、仍留在 candidates 里——混合池下（一个 gated 号 +
+  //   一个被 EXPIRY_PENALTY 压到 < -1 的可用号），gated 的 -1 反而 cmpRows 排在到期号前面成了 best，于是硬闸号被选中、
+  //   违背 7d 硬闸不变式。修：candidates 过滤器加 `!r.gated`——gated 号永不进可选集（仍在 sorted 输出里供 --json 看见、
+  //   标 gated）。这样硬闸号既不会被选中、也不会用它的 -1 干扰 best 排序。
+  const candidates = ranked.filter((r) => !r.active && !r.expired && !r.notSwitchable && !r.gated);
 
   // 主排序：score 降序；tiebreak：score 相同则 earliestReset 更早者优（更快彻底满血·§B.4）。
-  //   被排除项（active/expired）排到尾部、保留在 candidates 输出里供调用方完整看见排名。
+  //   被排除项（active/expired/gated）排到尾部、保留在 sorted 输出里供调用方完整看见排名。
   const sorted = ranked.slice().sort(cmpRows);
 
   if (candidates.length === 0) {
-    // 无可切换号（全 active / 全过期）→ 保持现状（单账号场景的天然行为·§B.6）。
+    // 无可切换号。区分退出语义（codex round#4 引入 gated 排除·round#6 收窄）——两类原因映射两类**可操作建议**：
+    //   · **NONE_ALL_EXHAUSTED（exit 3·blocked_on:user「等 reset」）**：仅当**非 active 备号全是 7d 硬闸**（纯配额
+    //     逼顶）——可操作的只有等 5h/7d reset，是用户拍板的配额决策。
+    //   · **NONE_NO_CANDIDATES（exit 1·「修号池 / 保持现状」）**：其余一切（无备号 / 全 active / 或**混合**——有 gated
+    //     但也有 expired / not_switchable 等**可刷新/可补录**的排除原因）。这类的可操作 fix 是 --refresh 过期号 /
+    //     --add 残缺号，**不是**等 reset——若误报 ALL_EXHAUSTED 会把用户引向错的恢复路（round#6：混合排除别误判成纯逼顶）。
+    //   判据：取所有**非 active**备号（active 是当前号·不算备号），它们**全部 gated** 才是纯逼顶；只要有一个是因
+    //     expired / not_switchable 被排除，就归 NONE_NO_CANDIDATES（混合·可操作是修号池）。
+    const nonActiveBackups = ranked.filter((r) => !r.active);
+    const allGated = nonActiveBackups.length > 0 && nonActiveBackups.every((r) => r.gated);
+    if (allGated) {
+      warnings.push('所有可切换备号都已 7d 逼顶（全部命中 7d 硬闸）——这是 blocked_on:"user" 决策：等 reset 还是别的，请用户拍板。');
+      return { selected: null, reason: 'NONE_ALL_EXHAUSTED', candidates: sorted, warnings };
+    }
+    // 混合排除（有 gated 但也有 expired / not_switchable）或全 active / 无备号 → NONE_NO_CANDIDATES（可操作=修号池·非等 reset）。
+    if (nonActiveBackups.some((r) => r.gated)) {
+      warnings.push('无可切入备号：部分号 7d 逼顶、另一些因 token 过期 / 残缺（switchable:false）被排除——可操作的是 --refresh 过期号 / --add 补录残缺号，未必只能等 reset。');
+    }
     return { selected: null, reason: 'NONE_NO_CANDIDATES', candidates: sorted, warnings };
   }
 
-  // 在可选候选里排序取最优。
+  // 在可选候选（已排除 gated）里排序取最优。
   const sortedCandidates = candidates.slice().sort(cmpRows);
   const best = sortedCandidates[0];
 
-  // 全员逼顶 / 不可用：最优号的分 ≤ 地板 → NONE_ALL_EXHAUSTED（别盲目切进一个一样满的号·§B.6）。
-  //   gated（7d 硬闸）号的 score=SCORE_UNUSABLE（-1）已 ≤ 地板（0），故「全 7d 逼顶」必命中此分支。
-  if (best.score <= SCORE_UNUSABLE_FLOOR) {
-    warnings.push('所有可切换备号都已逼顶 / 不可用（最优号评分跌破地板）——这是 blocked_on:"user" 决策：等 reset 还是别的，请用户拍板。');
+  // 全员逼顶 / 不可用：**所有候选的配额分（到期降权之前·codex round#2）都 ≤ 地板** → NONE_ALL_EXHAUSTED（别盲目切进
+  //   一个一样满的号·§B.6）。candidates 已排除 gated（codex round#4），故这里判的是「非 gated 候选的配额是否全跌破地板」
+  //   （如全部 used≈85% 边界但未触硬闸·配额分≈0）。**用 scoreForExhaustionFloor（配额分）而非 score（含到期降权）判地板**：
+  //   地板判的是配额耗尽——一个配额尚可但临近到期的号（score 被 EXPIRY_PENALTY 压到负）不该被误判成「全员逼顶」、
+  //   白挡换号（它仍可切·只是该续期）。**取候选里配额分的最大值判地板**：到期降权可能把一个配额更高的号压到 best 之后，
+  //   只看 best 的配额分会漏掉它、误报逼顶；扫全候选取「最高配额分」——只要有一个号配额分 > 地板，就不是全员逼顶。
+  const bestQuotaFloor = candidates.reduce((m, r) => Math.max(m, r.scoreForExhaustionFloor), -Infinity);
+  if (bestQuotaFloor <= SCORE_UNUSABLE_FLOOR) {
+    warnings.push('所有可切换备号都已逼顶 / 不可用（候选配额评分全跌破地板）——这是 blocked_on:"user" 决策：等 reset 还是别的，请用户拍板。');
     return { selected: null, reason: 'NONE_ALL_EXHAUSTED', candidates: sorted, warnings };
   }
 

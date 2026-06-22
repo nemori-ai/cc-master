@@ -281,6 +281,238 @@ if grep -q "$E3_AT" "$E3_VF" 2>/dev/null; then FAILED=$((FAILED+1)); _red "FAIL:
 assert_eq "true" "$(reg_active "$E3_HOME/accounts.json" "me@self.com")" "(3b) still active:true after refresh"
 rm -rf "$E3_HOME" "$E3_STUB"
 
+# ── (3c) **codex round#1 Finding 3 teeth — file-vault write is ALL-OR-NOTHING (old token survives a failed write)** ─
+# 病根：旧 store_blob_file「先 mv 删旧 _TOKEN 行的版本到位、再 >> append 新 blob」——append 失败 / 部分写（磁盘满 /
+#   quota / IO 错）时旧可用 token 已删、新 token 没写 = 该号 vault 无有效 token（switch 切不进·需重录）。
+# 修：temp 里先写齐（保留行 + 新 _TOKEN 行 + 可选 _EXPIRES），全部成功才 rename 覆盖；任一步失败丢 temp、原 vault
+#   原封不动（旧 token 存活）。teeth：extract store_blob_file（pinned to shipped body）→ 预置含旧 token 的 vault →
+#   把 vault 所在目录设只读（mktemp/temp 写不进 → 写步骤失败）→ 断言：① 函数 return 非0；② 原 vault 文件**原封不动**
+#   （旧 _TOKEN 行仍在、未被「删了旧又没写新」毁成空）。这正是非原子 bug 会让旧 token 蒸发的那个失败窗口。
+echo "-- (3c) file-vault store_blob_file is ALL-OR-NOTHING (failed write keeps the OLD token, never deletes-then-loses) --"
+eval_fn with_vault_lock || true   # store_blob_file now wraps its critical section in with_vault_lock (codex round#9).
+eval_fn store_blob_file || true
+A3C_DIR="$(make_project)"; A3C_VF="$A3C_DIR/accounts.env"
+A3C_OLD_RT='sk-ant-ort01-A3ColdREFRESH000000000000000000000000-_old'
+# pre-seed an EXISTING vault with alice's OLD (valid) token line — this must survive a failed re-write.
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"sk-ant-oat01-A3Cold000000000000000000000000-_o\",\"refreshToken\":\"$A3C_OLD_RT\",\"expiresAt\":1700000000000}" > "$A3C_VF"; chmod 600 "$A3C_VF"
+A3C_BEFORE="$(cat "$A3C_VF")"
+# make the vault's DIRECTORY read-only → mktemp / temp creation / writes inside it fail → store_blob_file must
+#   abort WITHOUT having touched the original $A3C_VF (atomic temp+rename: original only replaced on full success).
+chmod 500 "$A3C_DIR"
+A3C_NEW_BLOB="{\"accessToken\":\"sk-ant-oat01-A3CnewACCESS00000000000000000000-_n\",\"refreshToken\":\"sk-ant-ort01-A3CnewREFRESH0000000000000000000-_n\",\"expiresAt\":1800000000000}"
+# run the extracted function with EMAIL/VAULT_FILE/EXPIRES/LIB_JS set as the script would (token-blind unit harness).
+a3c_out="$(EMAIL="alice@x.com" VAULT_FILE="$A3C_VF" EXPIRES="" LIB_JS="$LIB_JS_REAL" store_blob_file "$A3C_NEW_BLOB" 2>&1)"; a3c_rc=$?
+chmod 700 "$A3C_DIR"   # restore so we can read/cleanup.
+if [ "$a3c_rc" -ne 0 ]; then PASS=$((PASS+1)); _green "(3c) store_blob_file returns非0 on a write it can't complete (does not pretend success)"; else FAILED=$((FAILED+1)); _red "FAIL: (3c) store_blob_file returned 0 despite an un-writable vault dir"; fi
+A3C_AFTER="$(cat "$A3C_VF" 2>/dev/null || echo '<UNREADABLE>')"
+assert_eq "$A3C_BEFORE" "$A3C_AFTER" "(3c) ORIGINAL vault file UNCHANGED on failed write (old token survives·全或无·non-atomic bug would've left it empty/partial)"
+# the OLD refresh token line is still intact (the号 is still recoverable·switch 仍能读到旧 token).
+if grep -q "$A3C_OLD_RT" "$A3C_VF" 2>/dev/null; then PASS=$((PASS+1)); _green "(3c) OLD refresh token still present after failed write (not deleted-then-lost)"; else FAILED=$((FAILED+1)); _red "FAIL: (3c) OLD refresh token GONE after failed write — the非原子 deletes-then-loses bug regressed"; fi
+# token no-leak even on this unit path: neither old nor new token half in the function's output.
+assert_not_contains "$a3c_out" "$A3C_OLD_RT" "(3c) old refresh token does NOT leak to store_blob_file output"
+rm -rf "$A3C_DIR"
+
+# ── (3d) **codex round#2 Finding A teeth — file-vault write matches ONLY exact rows, never clobbers a sibling** ─
+# 病根：旧 store_blob_file 用宽前缀 `<email>_`（prefix）筛旧行——录/续期 `foo` 会把 `foo_bar_TOKEN=`/`_EXPIRES=`
+#   （另一个号 `foo_bar` 的行）一并删掉 → 误毁 sibling 号。修：只删本号**精确**的 `<email>_TOKEN=` / `<email>_EXPIRES=`
+#   两类行（tokenLine/expiresLine），绝不用宽 `<email>_` 前缀。teeth：vault 预置 sibling `foo_bar` 的行 + `foo` 自己
+#   的旧行 → 对 `foo` 重写 → 断言：① `foo` 自己的 _TOKEN 被换成新 blob；② `foo_bar` 的 _TOKEN/_EXPIRES **原封不动存活**.
+echo "-- (3d) file-vault store_blob_file overlapping-identifier safety (refreshing 'foo' must NOT clobber 'foo_bar') --"
+eval_fn with_vault_lock || true   # store_blob_file wraps its critical section in with_vault_lock (codex round#9).
+eval_fn store_blob_file || true
+A3D_DIR="$(make_project)"; A3D_VF="$A3D_DIR/accounts.env"
+A3D_SIB_RT='sk-ant-ort01-A3DsiblingFOObar00000000000000000-_sib'
+A3D_FOO_OLD_RT='sk-ant-ort01-A3DfooOLD0000000000000000000000-_old'
+# pre-seed: sibling foo_bar (must survive) + foo's own old line (must be replaced).
+{
+  printf 'foo_bar@x.com_TOKEN=%s\n' "{\"accessToken\":\"sk-ant-oat01-A3Dsib0000000000000000-_s\",\"refreshToken\":\"$A3D_SIB_RT\",\"expiresAt\":1700000000000}"
+  printf 'foo_bar@x.com_EXPIRES=2099-01-01\n'
+  printf 'foo@x.com_TOKEN=%s\n' "{\"accessToken\":\"sk-ant-oat01-A3DfooOLD000000000000-_o\",\"refreshToken\":\"$A3D_FOO_OLD_RT\",\"expiresAt\":1700000000000}"
+} > "$A3D_VF"; chmod 600 "$A3D_VF"
+A3D_NEW_RT='sk-ant-ort01-A3DfooNEW0000000000000000000000-_new'
+A3D_NEW_BLOB="{\"accessToken\":\"sk-ant-oat01-A3DfooNEW000000000000-_n\",\"refreshToken\":\"$A3D_NEW_RT\",\"expiresAt\":1800000000000}"
+# rewrite foo@x.com (NOT foo_bar@x.com) — the broad-prefix bug would have deleted foo_bar's rows too.
+a3d_out="$(EMAIL="foo@x.com" VAULT_FILE="$A3D_VF" EXPIRES="" LIB_JS="$LIB_JS_REAL" store_blob_file "$A3D_NEW_BLOB" 2>&1)"; a3d_rc=$?
+assert_eq "0" "$a3d_rc" "(3d) store_blob_file rewrites foo@x.com OK (exit 0)"
+# ① foo@x.com's token replaced with the NEW one (old foo gone, exactly one foo line).
+if grep -q "$A3D_NEW_RT" "$A3D_VF" 2>/dev/null; then PASS=$((PASS+1)); _green "(3d) foo@x.com _TOKEN replaced with NEW blob"; else FAILED=$((FAILED+1)); _red "FAIL: (3d) foo@x.com NEW token not written"; fi
+n_foo="$(awk -v p='foo@x.com_TOKEN=' 'index($0,p)==1' "$A3D_VF" 2>/dev/null | wc -l | tr -d ' ')"
+assert_eq "1" "$n_foo" "(3d) exactly one foo@x.com_TOKEN line (old replaced, no dup)"
+# ② **CORE**: the SIBLING foo_bar@x.com rows MUST survive untouched (the broad-prefix bug deleted them).
+if grep -q "$A3D_SIB_RT" "$A3D_VF" 2>/dev/null; then PASS=$((PASS+1)); _green "(3d) CORE: sibling foo_bar@x.com _TOKEN SURVIVES (exact-row match·not clobbered by foo's rewrite)"; else FAILED=$((FAILED+1)); _red "FAIL: (3d) sibling foo_bar@x.com _TOKEN DELETED — the broad-prefix overlapping-identifier bug regressed"; fi
+if grep -q '^foo_bar@x.com_EXPIRES=2099-01-01$' "$A3D_VF" 2>/dev/null; then PASS=$((PASS+1)); _green "(3d) sibling foo_bar@x.com _EXPIRES also survives"; else FAILED=$((FAILED+1)); _red "FAIL: (3d) sibling foo_bar@x.com _EXPIRES deleted by foo's rewrite"; fi
+assert_not_contains "$a3d_out" "$A3D_SIB_RT" "(3d) sibling refresh token does NOT leak to output"
+rm -rf "$A3D_DIR"
+
+# ── (3e) **codex round#7 Finding C — mutateRegistry 串行化并发 RMW（防 lost-update）** ──
+# 病根：saveRegistry 的 tmp+rename 只防单次写撕裂，挡不住「load→改→save」跨步并发——两个进程各 load 同一旧态、各
+#   改、后写 rename 覆盖先写 = 丢号。修：mutateRegistry 在整个 load-改-save 外加咨询文件锁串行化。teeth：并发起 N
+#   个 node 进程，各自 mutateRegistry 加一个不同 email → 串行化后**全部 N 个号都在**（无锁则后写覆盖、丢号）。
+echo "-- (3e) mutateRegistry serializes concurrent RMW (no lost-update·all concurrent adds survive) --"
+A3E_DIR="$(make_project)"; A3E_REG="$A3E_DIR/accounts.json"
+printf '%s\n' '{ "schema": "cc-master/accounts/v1", "accounts": {} }' > "$A3E_REG"
+# launch N concurrent node procs, each adds a distinct email via mutateRegistry (load-mutate-save under the lock).
+#   Each proc EXITS NONZERO if its mutateRegistry throws (e.g. lock-acquire timeout) — collect rc so a lock failure
+#   shows as a test failure, not a silently-lost add. Generous CCM_REGISTRY_LOCK_TIMEOUT_MS for loaded CI.
+A3E_N=5
+A3E_pids=""; i=0
+while [ "$i" -lt "$A3E_N" ]; do
+  CCM_REGISTRY_LOCK_TIMEOUT_MS=30000 node -e '
+    "use strict";
+    const lib = require(process.argv[1]);
+    const regPath = process.argv[2], email = "concurrent" + process.argv[3] + "@x.com";
+    lib.mutateRegistry(regPath, (reg) => {
+      lib.upsertAccount(reg, email, { vault:{kind:"keychain", service:"cc-master-oauth", account: email} });
+    });
+  ' "$LIB_JS_REAL" "$A3E_REG" "$i" &
+  A3E_pids="$A3E_pids $!"
+  i=$((i+1))
+done
+a3e_anyfail=0
+for p in $A3E_pids; do wait "$p" || a3e_anyfail=1; done
+if [ "$a3e_anyfail" -eq 0 ]; then PASS=$((PASS+1)); _green "(3e) all $A3E_N concurrent mutateRegistry procs completed without lock-timeout error"; else FAILED=$((FAILED+1)); _red "FAIL: (3e) a concurrent mutateRegistry proc errored (lock-acquire timeout?)"; fi
+# all N accounts must be present — none lost to a concurrent overwrite.
+n_concurrent="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);const ks=Object.keys(r.accounts||{}).filter(k=>/^concurrent\d+@x\.com$/.test(k));process.stdout.write(String(ks.length))' "$LIB_JS_REAL" "$A3E_REG" 2>/dev/null)"
+assert_eq "$A3E_N" "$n_concurrent" "(3e) CORE: all $A3E_N concurrent mutateRegistry adds survived (no lost-update·lock serialized the RMW)"
+# the registry is still valid JSON (no torn write).
+if node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$A3E_REG" 2>/dev/null; then PASS=$((PASS+1)); _green "(3e) registry still valid JSON after concurrent writes (no torn write)"; else FAILED=$((FAILED+1)); _red "FAIL: (3e) registry corrupted by concurrent writes"; fi
+# the lock file must be released (not left lingering) after all ops complete.
+if [ ! -e "$A3E_REG.lock" ]; then PASS=$((PASS+1)); _green "(3e) lock file released after all RMW complete (no leaked lock)"; else FAILED=$((FAILED+1)); _red "FAIL: (3e) lock file $A3E_REG.lock leaked (not released)"; fi
+rm -rf "$A3E_DIR"
+
+# ── (3f) **codex round#8 Finding A — releaseRegistryLock 只删属于自己的锁（防 stale 抢占后原持有者误删新锁）** ──
+# 病根：旧 release 盲目 unlink lockfile by path——若原持有者 A 被判 stale、B 抢了锁（写了新 owner token），A resume 后
+#   release 会删掉 **B 的**锁 → 第三者 C 得以并发进临界区，重现 lost-update。修：锁文件存 owner token，release 只在
+#   token 仍是自己的才 unlink。teeth：A 取锁拿到 handleA → 模拟 B 抢锁（覆写 lockfile 成不同 owner）→ A 用 handleA
+#   release → 断言 lockfile **仍在**（A 没误删 B 的锁）；再用 B 的 handle release → 锁删净。
+echo "-- (3f) releaseRegistryLock only deletes ITS OWN lock (owner-token guard·no误删 after stale takeover) --"
+A3F_DIR="$(make_project)"; A3F_REG="$A3F_DIR/accounts.json"
+printf '%s\n' '{ "schema": "cc-master/accounts/v1", "accounts": {} }' > "$A3F_REG"
+a3f_out="$(node -e '
+  "use strict";
+  const lib = require(process.argv[1]);
+  const fs = require("fs");
+  const regPath = process.argv[2];
+  const lp = regPath + ".lock";
+  const handleA = lib.acquireRegistryLock(regPath);          // A 取锁。
+  // 模拟 A 被判 stale、B 抢锁：覆写 lockfile 成 B 的 owner（B 的 handle 自己造）。
+  const handleB = { path: lp, owner: "B-" + Date.now() + "-takeover" };
+  fs.writeFileSync(lp, JSON.stringify({ pid: 99999, at: new Date().toISOString(), owner: handleB.owner }));
+  // A resume → 用 handleA release：owner 不匹配（现在是 B 的）→ 必须 NOT 删 B 的锁。
+  lib.releaseRegistryLock(handleA);
+  const stillThereAfterA = fs.existsSync(lp);
+  // B release：owner 匹配 → 删净。
+  lib.releaseRegistryLock(handleB);
+  const goneAfterB = !fs.existsSync(lp);
+  process.stdout.write((stillThereAfterA ? "A-DIDNT-DELETE" : "A-WRONGLY-DELETED") + "/" + (goneAfterB ? "B-DELETED" : "B-LEFT"));
+' "$LIB_JS_REAL" "$A3F_REG" 2>&1)"
+assert_eq "A-DIDNT-DELETE/B-DELETED" "$a3f_out" "(3f) owner-token guard: stale-takeover A does NOT delete B's lock; B releases its own (no误删·no concurrent-entry race)"
+rm -rf "$A3F_DIR"
+
+# ── (3i) **codex round#12 Finding B — a LIVE lock is NOT broken by mtime alone (pid liveness is authoritative)** ──
+# 病根：旧 stale 判定先按 mtime>staleMs 置 stale·再仅在 !stale 时查 pid——一个活着但慢/被 descheduled 的持锁者，只要锁
+#   文件 mtime 老过阈值就被别人破锁 → 两进程同进临界区 → lost-update。修：先查 pid——活 → 永不 stale（无论 mtime 多老）。
+# teeth：预占锁·pid=本测试 shell（活着）·把锁文件 mtime 改成很久以前（远超 staleMs）→ 用很小 staleMs 跑 acquireFileLock
+#   → 断言它**超时失败**（NOT 破活锁抢占）。再把锁 pid 改成一个**死 pid**（不存在）→ acquire 应**回收**并取到锁。
+echo "-- (3i) live lock NOT broken by mtime alone (pid authoritative·codex round#12) --"
+I3_DIR="$(make_project)"; I3_REG="$I3_DIR/accounts.json"; I3_LOCK="$I3_REG.lock"
+printf '%s\n' '{ "schema": "cc-master/accounts/v1", "accounts": {} }' > "$I3_REG"
+# pre-occupy lock with a LIVE pid (this shell $$) + a VERY OLD mtime (1 year ago·far > staleMs).
+printf '%s' "{\"pid\":$$,\"at\":\"2020-01-01T00:00:00Z\",\"owner\":\"live-holder-$$\"}" > "$I3_LOCK"
+touch -t 202001010000 "$I3_LOCK" 2>/dev/null || true   # force old mtime.
+# small staleMs + small timeout → if mtime alone broke the lock, acquire would SUCCEED (wrong). It must instead TIME OUT.
+i3_live="$(CCM_REGISTRY_LOCK_STALE_MS=500 CCM_REGISTRY_LOCK_TIMEOUT_MS=900 node -e '
+  try { const l=require(process.argv[1]); const h=l.acquireRegistryLock(process.argv[2]); l.releaseRegistryLock(h); process.stdout.write("ACQUIRED-WRONGLY"); }
+  catch(e){ process.stdout.write("TIMED-OUT-CORRECTLY"); }
+' "$LIB_JS_REAL" "$I3_REG" 2>/dev/null)"
+assert_eq "TIMED-OUT-CORRECTLY" "$i3_live" "(3i) CORE: live lock (old mtime) is NOT broken — acquire times out instead of stealing it (pid authoritative)"
+# now flip the lock to a DEAD pid (very high, unlikely to exist) → acquire MUST reclaim (dead holder·safe).
+printf '%s' "{\"pid\":2147480000,\"at\":\"2020-01-01T00:00:00Z\",\"owner\":\"dead-holder\"}" > "$I3_LOCK"
+touch -t 202001010000 "$I3_LOCK" 2>/dev/null || true
+i3_dead="$(CCM_REGISTRY_LOCK_STALE_MS=500 CCM_REGISTRY_LOCK_TIMEOUT_MS=900 node -e '
+  try { const l=require(process.argv[1]); const h=l.acquireRegistryLock(process.argv[2]); l.releaseRegistryLock(h); process.stdout.write("RECLAIMED"); }
+  catch(e){ process.stdout.write("FAILED-TO-RECLAIM"); }
+' "$LIB_JS_REAL" "$I3_REG" 2>/dev/null)"
+assert_eq "RECLAIMED" "$i3_dead" "(3i) dead-pid lock IS reclaimed (acquire succeeds·stale recovery still works for genuinely-dead holders)"
+rm -f "$I3_LOCK"; rm -rf "$I3_DIR"
+
+# ── (3j) **codex round#13 Finding A — with_vault_lock ACTUALLY serializes (records live bash $$·not dead node pid)** ──
+# 病根：with_vault_lock 旧版经一次性 node 取锁、记 node 的 pid——那 node 立即退出·临界区在 bash 跑，并发对手 process.kill
+#   (deadNodePid,0) 看 pid 已死 → 立刻判 stale 破锁 → 锁形同虚设·并发 file-vault 重写仍 lost-update。修：记 bash `$$`
+#   （临界区期间活着）当 livePid → 并发对手看 $$ 活着 → 不破锁 → 真串行化。teeth：extract with_vault_lock·N 个并发
+#   bash 进程各 with_vault_lock 同一文件、临界区做「读-改-写 +1」——串行化后计数器最终 == N（无锁/坏锁则 lost-update < N）。
+echo "-- (3j) with_vault_lock actually serializes concurrent file-vault rewrites (live bash \$\$·codex round#13) --"
+eval_fn with_vault_lock || true
+J3_DIR="$(make_project)"; J3_COUNTER="$J3_DIR/counter.txt"; J3_VF="$J3_DIR/v.env"
+LIB_JS="$LIB_JS_REAL"
+printf '0' > "$J3_COUNTER"
+J3_N=6
+# each worker: with_vault_lock around a NON-atomic read-modify-write of the counter (sleep widens the race window).
+#   without a REAL lock, concurrent workers read the same value and the increments are lost (final < N).
+j3_worker() {
+  bash -c '
+    LIB_JS="'"$LIB_JS_REAL"'"
+    '"$(declare -f err 2>/dev/null || echo 'err(){ printf "%s\n" "$*" >&2; }')"'
+    '"$(declare -f with_vault_lock)"'
+    crit() {
+      v="$(cat "'"$J3_COUNTER"'")"
+      sleep 0.05                      # widen the read-modify-write window so a missing lock loses updates.
+      printf "%s" "$(( v + 1 ))" > "'"$J3_COUNTER"'"
+    }
+    with_vault_lock "'"$J3_VF"'" crit
+  '
+}
+i=0; while [ "$i" -lt "$J3_N" ]; do j3_worker & i=$((i+1)); done
+wait
+j3_final="$(cat "$J3_COUNTER" 2>/dev/null)"
+assert_eq "$J3_N" "$j3_final" "(3j) CORE: with_vault_lock serialized $J3_N concurrent rewrites → counter==$J3_N (no lost-update·lock is real·records live \$\$)"
+# lock released (no leak).
+if [ ! -e "$J3_VF.lock" ]; then PASS=$((PASS+1)); _green "(3j) vault lock file released after all workers (no leak)"; else FAILED=$((FAILED+1)); _red "FAIL: (3j) vault lock file leaked"; fi
+rm -rf "$J3_DIR"
+
+# ── (3g) **codex round#9 Finding A — vault written but registry write FAILS → exit非0 (不谎报录号成功)** ──
+# 病根：vault 写成、但 write_registry_entry 失败（坏 JSON / 不可写 / 锁超时）时旧码只 warn 仍 exit 0——secret 进了
+#   vault 但该号对 account-list / select / effective-N 不可见，automation 却当录号已成。修：registry 写失败 → exit 3
+#   （区别于干净成功 0）。teeth：keychain 直读成功（stub）→ vault 写成，但 CC_MASTER_HOME registry 目录**只读** →
+#   write_registry_entry 的 saveRegistry 写不进 → 断言 exit 3（非 0·非干净成功）+ stderr 说「录号未完成 / 不可见」。
+echo "-- (3g) vault stored but registry write fails → exit非0 (codex round#9·automation must not see a half-add as success) --"
+G3_HOME="$(make_project)"; G3_STUB="$(make_project)"
+G3_AT='sk-ant-oat01-G3accessFULLblob00000000000000000-_g3a'
+G3_RT='sk-ant-ort01-G3refreshFULLblob0000000000000000-_g3r'
+G3_BLOB="{\"claudeAiOauth\":{\"accessToken\":\"$G3_AT\",\"refreshToken\":\"$G3_RT\",\"expiresAt\":1750000000000,\"subscriptionType\":\"max\"}}"
+make_security_stub "$G3_STUB" "$G3_BLOB"
+G3_CCU="$G3_STUB/cc-usage-stub.sh"; make_ccu_stub "$G3_CCU"
+G3_CJ="$G3_STUB/claude.json"; make_claudejson "$G3_CJ" "g3@self.com"   # current login == --email (guard passes).
+# make the registry HOME read-only so saveRegistry (tmp+rename into it) fails, while the keychain vault write succeeds.
+chmod 500 "$G3_HOME"
+g3_out="$(CC_MASTER_HOME="$G3_HOME" PATH="$G3_STUB:$PATH" CC_USAGE_SH="$G3_CCU" CLAUDE_JSON_PATH="$G3_CJ" \
+   bash "$SCRIPT" --email g3@self.com --vault-kind keychain 2>&1)"; g3_rc=$?
+chmod 700 "$G3_HOME"   # restore for cleanup.
+assert_eq "3" "$g3_rc" "(3g) registry write failure (read-only HOME) → exit 3 (NOT 0·不谎报录号成功)"
+assert_contains "$g3_out" "录号未完成" "(3g) stderr says 录号未完成 (account invisible to list/select·automation must know)"
+# token no-leak even on this failure path.
+assert_not_contains "$g3_out" "$G3_RT" "(3g) refresh token does NOT leak on the registry-fail path"
+rm -rf "$G3_HOME" "$G3_STUB"
+
+# ── (3h) **codex round#10 — with_vault_lock FAILS CLOSED when the lock can't be acquired (no unlocked rewrite)** ──
+# 病根：with_vault_lock 旧版取锁失败时 owner="" 仍**无锁**跑临界区 → 重现锁要防的并发互踩（最后 mv 者赢复活已删
+#   token / 丢别号 blob）。修：取锁失败 → return 1·**绝不执行 command**（不无锁重写 vault）。teeth：extract with_vault_lock
+#   → 预占 <vf>.lock（一个**活着的** owner·新 mtime → acquireFileLock 必超时失败）+ 小锁超时 → 断言 with_vault_lock
+#   return非0 且**那段 command 根本没跑**（用一个 sentinel 文件证明 command 未执行）。
+echo "-- (3h) with_vault_lock fails CLOSED when lock unavailable (refuses to run the critical section unlocked) --"
+eval_fn with_vault_lock || true
+H3_DIR="$(make_project)"; H3_VF="$H3_DIR/accounts.env"; H3_LOCK="$H3_VF.lock"; H3_SENTINEL="$H3_DIR/ran.sentinel"
+LIB_JS="$LIB_JS_REAL"   # with_vault_lock calls node with $LIB_JS.
+# pre-occupy the lock with a LIVE owner (this shell's $$·alive) + fresh mtime → acquireFileLock must time out (not stale).
+printf '%s' "{\"pid\":$$,\"at\":\"2099-01-01T00:00:00Z\",\"owner\":\"held-by-test-$$\"}" > "$H3_LOCK"
+# the "critical section" command drops a sentinel — it must NOT run (lock unavailable → fail closed).
+h3_cmd() { printf 'RAN\n' > "$H3_SENTINEL"; return 0; }
+CCM_REGISTRY_LOCK_TIMEOUT_MS=800 with_vault_lock "$H3_VF" h3_cmd; h3_rc=$?
+if [ "$h3_rc" -ne 0 ]; then PASS=$((PASS+1)); _green "(3h) with_vault_lock returns非0 when lock cannot be acquired (fail-closed)"; else FAILED=$((FAILED+1)); _red "FAIL: (3h) with_vault_lock returned 0 despite being unable to acquire the lock"; fi
+# **CORE**: the critical section must NOT have run (no sentinel·no unlocked rewrite).
+if [ ! -e "$H3_SENTINEL" ]; then PASS=$((PASS+1)); _green "(3h) CORE: critical section did NOT run unlocked (no sentinel·race not reintroduced)"; else FAILED=$((FAILED+1)); _red "FAIL: (3h) critical section RAN despite lock-acquire failure (unlocked rewrite·race reintroduced)"; fi
+rm -f "$H3_LOCK"; rm -rf "$H3_DIR"
+
 # ── (4) IDENTITY-MISMATCH guard: --email != current-login email → FAIL + clear guard message, NO vault write ─
 # 病根防御：keychain「Claude Code-credentials」(account=$USER) 永远是机器当前登录号 B 的 blob。若 --email A != B，
 #   直读会把 B 的 blob 错标成 A 存进 vault/registry（A entry 实指 B 凭证·选号/换号灾难）。guard 必须 FAIL.
@@ -320,6 +552,20 @@ if [ "$n_rc" -ne 0 ]; then PASS=$((PASS+1)); _green "(5) no-refreshToken blob �
 if [ -f "$N_VF" ] && grep -q '_TOKEN=' "$N_VF" 2>/dev/null; then FAILED=$((FAILED+1)); _red "FAIL: (5) no-refreshToken WROTE a vault token line (must store no partial blob!)"; else PASS=$((PASS+1)); _green "(5) no partial blob stored in vault"; fi
 assert_contains "$n_out" "refreshToken" "(5) failure message mentions the missing refreshToken"
 assert_contains "$n_out" "手动" "(5) failure prints manual-recovery guidance"
+# **(5-recipe) codex round#11 — the printed file-vault recovery snippet must be &&-chained (all-or-nothing)**：
+#   每步用 && 串联 + 末尾 `|| { rm -f $VT; … }`——awk/printf 任一步失败都不会走到 mv·绝不用残缺 temp 覆盖 vault 丢别号。
+assert_contains "$n_out" 'mv "$VT"' "(5-recipe) prints the temp+rename recovery form (not a bare append)"
+# the snippet's final mv must be guarded by `|| { rm -f \$VT` (abort+cleanup on any prior-step failure).
+case "$n_out" in
+  *'|| { rm -f "$VT"'*) PASS=$((PASS+1)); _green "(5-recipe) recovery snippet is &&-chained with || rm-cleanup (fail-closed·codex round#11·no partial-temp clobber)";;
+  *) FAILED=$((FAILED+1)); _red "FAIL: (5-recipe) recovery snippet's mv NOT guarded by || rm-cleanup (a failed awk/printf could still clobber the vault)";;
+esac
+# structural: the snippet must NOT contain the OLD un-chained `> "$VT"; fi` followed by an unconditional separate mv.
+#   (the old bug: awk and mv on separate statements → mv runs even if awk failed.) Assert the awk-into-temp is &&-joined.
+case "$n_out" in
+  *'> "$VT"; } && \'*) PASS=$((PASS+1)); _green "(5-recipe) awk-into-temp is &&-joined to the next step (not a standalone statement)";;
+  *) FAILED=$((FAILED+1)); _red "FAIL: (5-recipe) awk-into-temp not &&-joined — a failed awk could fall through to mv";;
+esac
 # even the fallback's auto-registry write must keep the registry token-free.
 if [ -f "$N_HOME/accounts.json" ] && grep -q 'sk-ant-' "$N_HOME/accounts.json" 2>/dev/null; then
   FAILED=$((FAILED+1)); _red "FAIL: (5) registry contains an sk-ant- token string after no-refresh fallback"
@@ -424,6 +670,31 @@ assert_eq "false" "$m2_switchable" "(5d) empty vault → probe returns no → sw
 # improved guidance: tells the user to re-run --add after storing the blob (probe will then mark switchable).
 assert_contains "$m2_out" "重跑" "(5d) guidance tells user to re-run --add after manually storing the blob"
 rm -rf "$M_HOME" "$M_STUB" "$M2_HOME" "$M2_STUB"
+
+# ── (5e) **codex round#9 Finding B — manual-recovery (guard-fail bypass) + registry write FAILS → NOT exit 0** ──
+# 病根：身份 guard 失败旁路 try_mark_switchable_from_vault 在 vault 有有效 blob 时标 switchable:true·return 0——但若
+#   write_registry_entry 失败（坏 JSON / 不可写 / 锁超时），旧码仍 return 0 → caller exit 0，而该号没标 switchable:true、
+#   仍被 select / effective-N 排除（恢复未生效）。修：registry 写失败 → return 1·caller 不 exit 0 谎报恢复成功。
+# teeth：current login != --email（guard 失败 → 走旁路）+ cc-master file vault 已有有效 blob（probe 命中）+ registry
+#   目录只读（write_registry_entry 失败）→ 断言 exit非0（NOT 0·恢复未完成）+ stderr 说「恢复未完成」+ 无 token 泄漏。
+echo "-- (5e) manual-recovery bypass + registry write fails → exit非0 (codex round#9·no false recovery success) --"
+R5E_HOME="$(make_project)"; R5E_STUB="$(make_project)"
+R5E_CJ="$R5E_STUB/claude.json"; make_claudejson "$R5E_CJ" "someoneElse@self.com"   # current login != --email → guard FAILS → bypass.
+R5E_VF="$R5E_HOME/accounts.env"
+R5E_AT='sk-ant-oat01-R5Erecovery0000000000000000000000-_a'
+R5E_RT='sk-ant-ort01-R5Erecovery0000000000000000000000-_r'
+umask 077; mkdir -p "$R5E_HOME"
+printf '%s_TOKEN=%s\n' "wanted@x.com" "{\"accessToken\":\"$R5E_AT\",\"refreshToken\":\"$R5E_RT\",\"expiresAt\":1750000000000}" > "$R5E_VF"
+make_ccu_stub "$R5E_STUB/cc-usage-stub.sh"
+# make the registry HOME read-only → write_registry_entry inside try_mark_switchable_from_vault fails.
+chmod 500 "$R5E_HOME"
+r5e_out="$(CC_MASTER_HOME="$R5E_HOME" PATH="$R5E_STUB:$PATH" CC_USAGE_SH="$R5E_STUB/cc-usage-stub.sh" CLAUDE_JSON_PATH="$R5E_CJ" CREDENTIALS_JSON="$R5E_STUB/nope.json" \
+   bash "$SCRIPT" --email wanted@x.com --vault-kind file --vault-file "$R5E_VF" 2>&1)"; r5e_rc=$?
+chmod 700 "$R5E_HOME"   # restore for cleanup.
+if [ "$r5e_rc" -ne 0 ]; then PASS=$((PASS+1)); _green "(5e) recovery + registry-fail → exits非0 (not false recovery success)"; else FAILED=$((FAILED+1)); _red "FAIL: (5e) recovery exited 0 despite registry write failure (谎报恢复成功)"; fi
+assert_contains "$r5e_out" "恢复未完成" "(5e) stderr says 恢复未完成 (switchable not persisted·号 still excluded)"
+assert_not_contains "$r5e_out" "$R5E_RT" "(5e) pre-seeded refresh token does NOT leak on the recovery-fail path"
+rm -rf "$R5E_HOME" "$R5E_STUB"
 
 # ── (6) dry-run: never reads keychain, never writes, blob literal '<redacted>' only ──────────────────────
 echo "-- (6) dry-run: no keychain read, no write, <redacted> token only --"
