@@ -28,11 +28,20 @@ assert_contains "$HOOK_OUT" ".board.json" "injects the board path"
 assert_contains "$HOOK_OUT" "orchestrator" "injects the orchestrator role"
 # fresh boards (template path) carry meta.template_version — agent-shaped versioning the timeline
 # reads to gate its real-time axis. The default run uses PLUGIN_ROOT's real board.template.json.
+# DERIVE THE EXPECTED VERSION FROM THE SHIPPED TEMPLATE (TF1): the assertion must read the version the
+# template ACTUALLY declares, not a hardcoded literal that silently lags a template bump (board.template.json
+# was bumped v1→v2 in this branch; a hardcoded `1` here breaks deterministically the moment the template
+# moves — and worse, masquerades as a flake because `ls -t | head -1` non-deterministically selects which
+# of this case's TWO bootstrapped boards is read when their second-granularity mtimes tie). The test's real
+# intent is "a template-path board carries THE TEMPLATE'S version" — so source that version from the SSOT.
+# Also create the board in a FRESH project home so there is exactly one board → no ls -t tie-break at all.
+EXPECTED_TV="$(board_template_version "$PLUGIN_ROOT/skills/orchestrating-to-completion/assets/board.template.json")"
+P2="$(make_project)"
 HOOK_OUT="$(printf '%s' '{"prompt":"/cc-master:as-master-orchestrator x"}' \
-  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+  | CLAUDE_PROJECT_DIR="$P2" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
     bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
-assert_eq 1 "$(board_template_version "$(ls -t "$P/.claude/cc-master"/*.board.json | head -1)")" "A: fresh board (template path) carries meta.template_version=1"
-rm -rf "$P"
+assert_eq "$EXPECTED_TV" "$(board_template_version "$(only_board "$P2/.claude/cc-master")")" "A: fresh board (template path) carries the template's meta.template_version ($EXPECTED_TV)"
+rm -rf "$P" "$P2"
 
 # Case A0 (template-missing fallback path): when board.template.json is absent the inline printf
 # fallback builds the board — it must ALSO seed meta.template_version (parity with the template).
@@ -591,11 +600,22 @@ rm -rf "$H"
 # 2026-06-15T05:52Z) — not only the SECOND-precision form the takeover re-stamp writes. The old shape-
 # gate required seconds (`...T[0-9]{2}:[0-9]{2}:[0-9]{2}Z`), so a documented/real minute-precision
 # heartbeat failed to parse → contributed NO freshness signal → with mtime unusable it defeated the
-# live-safety gate (a possibly-LIVE board would be silently taken over). With the fix, a JUST-NOW
+# live-safety gate (a possibly-LIVE board would be silently taken over). With the fix, a RECENT
 # minute-precision heartbeat dates as FRESH → --resume WITHOUT --force-takeover is withheld.
+# DETERMINISTIC TIME (TF1): use 1 minute ago, NOT the current minute (0). A current-minute,
+# minute-precision string (`HH:MM Z`, seconds truncated to :00) parsed back to epoch by BSD `date -j`
+# fills the missing %S field from the CURRENT wall-clock seconds — so its epoch lands ON the same
+# minute as `now`, and because the hook samples `now` (L385) BEFORE it parses the heartbeat (L402),
+# any parse delay (≥1s under full-suite load) makes hb_epoch > now → the `hb_epoch -le now` guard
+# drops it as "no signal" → no-signal withhold instead of the LIVE-session withhold → this assert
+# fails intermittently (~5% under load). 1 minute ago keeps the heartbeat unambiguously fresh
+# (age ~60-119s ≪ 600s window → still dates as FRESH / LIVE) while making hb_epoch < now hold
+# regardless of parse timing — the BSD %S-fill can only push the second field within the PRIOR
+# minute, never past `now`. Discriminating power is preserved: still minute-precision, still
+# fresh-dating, still the LIVE-session branch (the round-3 Finding C contract).
 H="$(make_project)"
 B="$(seed_board "$H" "old-sess" "true" "minute precision live goal")"
-set_heartbeat "$B" "$(iso_minutes_ago_minprec 0)"   # minute-precision heartbeat, current minute → LIVE
+set_heartbeat "$B" "$(iso_minutes_ago_minprec 1)"   # minute-precision heartbeat, ~1min ago → fresh/LIVE, race-free
 mtime_future "$B"                                    # mtime unusable → heartbeat is the only signal
 run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume "minute precision"'
 assert_eq "old-sess" "$(board_sid "$B")" "S24: minute-precision recent heartbeat → board NOT taken over (sid unchanged)"
