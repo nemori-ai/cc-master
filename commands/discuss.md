@@ -1,6 +1,6 @@
 ---
 description: '对一个 awaiting-user 决策节点开一场满血、有备而来的"采访式讨论"——载入 master 预备的决策包、做时效性校验（过期就先 re-ground）、带着完整依据跟用户把问题谈透，最后把结论写成 sidecar 决策文档回流给 master（绝不写 board）。'
-argument-hint: <node-id>
+argument-hint: <node-id> [--home <path>]
 ---
 
 你被一个独立的、满血的 Claude Code session 用 `/cc-master:discuss <node-id>` 拉起，来陪用户把**一个等他拍板的决策节点**谈透。master orchestrator 此刻可能正忙别的活——你不打断它，它也不打断你们；你们俩在用户方便的时候，对着 master 预先准备好的依据，做一次高质量决策，然后把结论干净地回流给 master。
@@ -21,7 +21,7 @@ argument-hint: <node-id>
 2. 列出 home，读取每块 `owner.active` 为 `true` 的 `<timestamp>-<pid>.board.json`。恰好一块 active 就用它；多块 active 则按你被告知的 `<node-id>` 落在哪块板上取那块；仍无法无歧义确定，就**列出候选板（`goal` + 文件名）问用户**，别靠猜。home 里**一块 active 板都没有** → 清楚报错并提示：「若本编排用了自定义 `CC_MASTER_HOME`，请用 `--home <path>` 指向它、或在本 session 设同样的 `CC_MASTER_HOME` 后重试」，然后停下。
 3. 在选定 board 的 `tasks[]` 里找 `id == <node-id>` 的任务，读出它挂着的 `decision_package`（agent-shaped flexible 字段）。
 4. **找不到节点、或节点上没有 `decision_package`** → 清楚地告诉用户"在 board `<文件名>` 上找不到节点 `<node-id>`"或"节点 `<node-id>` 还没有 master 准备的决策包"，然后**停下**——别凭空替 master 编一个决策包。
-5. **生命周期闸（节点仍在等用户吗？）**——拿到节点+决策包之后、**用决策包之前**，先校验该节点 `status === "blocked" && blocked_on === "user"`。用户可能跑的是一条**旧的**复制命令：master 此前已消化该决策、清掉了 `blocked_on:"user"`，但 `decision_package` 还残留在节点上（freshness hash 只查输入变没变、**不查节点状态**，挡不住这种）。**若该节点不再 `blocked_on:"user"`**（status 已非 `blocked`、或 `blocked_on` 已非 `"user"`）→ 清楚地告诉用户「节点 `<node-id>` 已不在等待用户（当前 status=`<status>`、blocked_on=`<blocked_on>`）——master 可能已消化过这个决策，无需再讨论」，然后**停下，不写任何 sidecar**——别对一个已解决的节点重开讨论、又落一份 sidecar 让 master 二次消化。
+5. **生命周期闸（节点仍在等用户吗？）**——拿到节点+决策包之后、**用决策包之前**，先校验该节点 `blocked_on === "user"`（**只看 `blocked_on`、不限定 `status`**——`status` 取 `blocked` 或 `in_flight` 都算「仍在等用户」，与 webview `isAwaitingUser` 两端对齐：webview 把 `{blocked|in_flight}+blocked_on:"user"` 都渲成富决策卡 + 复制按钮，闸若更窄会「邀请又拒绝」、还报与实情相反的错）。用户可能跑的是一条**旧的**复制命令：master 此前已消化该决策、清掉了 `blocked_on:"user"`，但 `decision_package` 还残留在节点上（freshness hash 只查输入变没变、**不查节点状态**，挡不住这种）。**若该节点 `blocked_on` 已非 `"user"`** → 清楚地告诉用户「节点 `<node-id>` 已不在等待用户（当前 status=`<status>`、blocked_on=`<blocked_on>`）——master 可能已消化过这个决策，无需再讨论」，然后**停下，不写任何 sidecar**——别对一个已解决的节点重开讨论、又落一份 sidecar 让 master 二次消化。
 
 ## 2. 时效性校验（freshness-check）
 
