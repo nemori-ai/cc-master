@@ -46,6 +46,170 @@ function sendNotFound(res, body) {
   res.end(body !== undefined ? body : '{}');
 }
 
+// Board home = directory containing the board file. discuss sidecars live alongside it.
+const BOARD_HOME = path.dirname(BOARD_PATH);
+// Board stem = board filename minus trailing ".board.json" (best-effort), used as a
+// fallback to extract node_id from sidecar filenames like
+//   <board-stem>--<node-id>--<compact-stamp>.decision.md
+const BOARD_STEM = path.basename(BOARD_PATH).replace(/\.board\.json$/i, '');
+
+// Parse a minimal flat `key: value` YAML frontmatter block (the only shape discuss
+// sidecars emit). Pure hand-rolled — red line 1 forbids jq/python. Returns {} on any
+// shape we don't recognize. Tolerant of torn writes (no closing fence => parse what we got).
+function parseFrontmatter(text) {
+  const out = {};
+  // Frontmatter is a leading `---` fenced block. Tolerate a UTF-8 BOM / leading blank lines.
+  const m = text.replace(/^﻿/, '').match(/^[ \t]*\r?\n?---[ \t]*\r?\n([\s\S]*?)(?:\r?\n---[ \t]*(?:\r?\n|$)|$)/);
+  if (!m) {
+    // Also accept a `---` on the very first line with no preceding newline.
+    const m2 = text.replace(/^﻿/, '').match(/^---[ \t]*\r?\n([\s\S]*?)(?:\r?\n---[ \t]*(?:\r?\n|$)|$)/);
+    if (!m2) return out;
+    return parseFlatYaml(m2[1]);
+  }
+  return parseFlatYaml(m[1]);
+}
+
+function parseFlatYaml(block) {
+  const out = {};
+  for (const rawLine of block.split(/\r?\n/)) {
+    const line = rawLine.replace(/\s+$/, '');
+    if (!line || line.startsWith('#')) continue;
+    const idx = line.indexOf(':');
+    if (idx <= 0) continue;
+    const key = line.slice(0, idx).trim();
+    if (!key) continue;
+    let val = line.slice(idx + 1).trim();
+    // Strip a single layer of matching quotes.
+    if ((val.startsWith('"') && val.endsWith('"') && val.length >= 2) ||
+        (val.startsWith("'") && val.endsWith("'") && val.length >= 2)) {
+      val = val.slice(1, -1);
+    }
+    out[key] = val;
+  }
+  return out;
+}
+
+// Extract the first non-empty line under a `## TL;DR` heading (case-insensitive),
+// truncated to a sane length. Returns '' if no TL;DR section / no content.
+function extractTldr(text) {
+  const lines = text.split(/\r?\n/);
+  let inSection = false;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (/^#{1,6}\s/.test(line)) {
+      // A heading line. Enter the section iff it's a TL;DR heading; otherwise leaving it.
+      inSection = /^#{1,6}\s*TL;?\s*DR\b/i.test(line);
+      continue;
+    }
+    if (inSection && line) {
+      return line.length > 200 ? line.slice(0, 200) : line;
+    }
+  }
+  return '';
+}
+
+// Pull <node-id> out of a filename shaped `<board-stem>--<node-id>--<stamp>.decision.md`.
+// Returns '' if the shape doesn't match.
+function nodeIdFromFilename(file) {
+  const base = file.replace(/\.decision\.md$/i, '');
+  const parts = base.split('--');
+  // Expected: [stem..., nodeId, stamp]. The stamp is the last segment; nodeId is second-to-last.
+  if (parts.length >= 3) return parts[parts.length - 2];
+  return '';
+}
+
+// Build the /decisions.json payload by scanning BOARD_HOME for *.decision.md sidecars.
+// Read-only, single directory level (no recursion, no symlink following). Any individual
+// file that fails to read/parse is skipped — never throws, never 500s.
+function collectDecisions() {
+  let entries;
+  try {
+    entries = fs.readdirSync(BOARD_HOME, { withFileTypes: true });
+  } catch (_e) {
+    return []; // home gone / unreadable => empty, graceful.
+  }
+  const rows = [];
+  // Cross-board filter (this board only): sidecars are named
+  //   <board-stem>--<node-id>--<stamp>.decision.md
+  // so a sidecar belonging to THIS board must start with `${BOARD_STEM}--`. A shared
+  // cc-master home can hold several boards; without this prefix gate, another board's
+  // same-named node (e.g. both have `D1`) would bleed into this board's cards and skew
+  // the "discussed N times" count / latest TL;DR. Other boards' sidecars are dropped.
+  const STEM_PREFIX = BOARD_STEM + '--';
+  for (const ent of entries) {
+    // Only plain files named *.decision.md, this directory level only. Don't follow
+    // symlinks out of the home (mirrors the /vendor/* containment discipline).
+    if (!ent.isFile()) continue;
+    const file = ent.name;
+    if (!/\.decision\.md$/i.test(file)) continue;
+    // Belongs to this board only (cross-board bleed guard).
+    if (!file.startsWith(STEM_PREFIX)) continue;
+    const full = path.join(BOARD_HOME, file);
+    let text;
+    try {
+      const st = fs.lstatSync(full);
+      if (!st.isFile()) continue; // symlink/dir masquerading => skip.
+      text = fs.readFileSync(full, 'utf8');
+    } catch (_e) {
+      continue; // torn write / vanished mid-scan / unreadable => skip this one.
+    }
+    let fm;
+    try {
+      fm = parseFrontmatter(text);
+    } catch (_e) {
+      continue;
+    }
+    const nodeId = (fm.node_id && String(fm.node_id).trim()) || nodeIdFromFilename(file);
+    if (!nodeId) continue; // can't attribute it to a node => not useful, skip.
+    rows.push({
+      node_id: nodeId,
+      file,
+      resolved_at: (fm.resolved_at && String(fm.resolved_at)) || '',
+      ask_type: (fm.ask_type && String(fm.ask_type)) || '',
+      tldr: extractTldr(text),
+      // _stamp is an internal sort key (filename stamp, falls back to resolved_at); dropped before output.
+      _stamp: stampFromFilename(file) || (fm.resolved_at && String(fm.resolved_at)) || '',
+    });
+  }
+
+  // round = 1-based index within a node_id group, ordered ascending by stamp/resolved_at.
+  const byNode = new Map();
+  for (const r of rows) {
+    if (!byNode.has(r.node_id)) byNode.set(r.node_id, []);
+    byNode.get(r.node_id).push(r);
+  }
+  for (const group of byNode.values()) {
+    group.sort((a, b) => (a._stamp < b._stamp ? -1 : a._stamp > b._stamp ? 1 : (a.file < b.file ? -1 : a.file > b.file ? 1 : 0)));
+    group.forEach((r, i) => { r.round = i + 1; });
+  }
+
+  // Final order: by node_id, then by round.
+  rows.sort((a, b) =>
+    (a.node_id < b.node_id ? -1 : a.node_id > b.node_id ? 1 : a.round - b.round));
+
+  // Strip internal sort key and emit the pinned shape.
+  return rows.map((r) => ({
+    node_id: r.node_id,
+    file: r.file,
+    resolved_at: r.resolved_at,
+    ask_type: r.ask_type,
+    round: r.round,
+    tldr: r.tldr,
+  }));
+}
+
+// Last `--`-delimited segment (sans .decision.md) is the compact stamp; '' if absent.
+// May carry a same-second collision-avoidance suffix (`<STAMP>-2`, `-3`, …) when two
+// discusses on one node land in the same UTC second (discuss.md §5). The suffix sorts
+// lexically AFTER the bare stamp (a prefix), and `-2` < `-3`, so the existing string
+// sort still yields write order; the suffix is only a uniqueness tiebreak.
+function stampFromFilename(file) {
+  const base = file.replace(/\.decision\.md$/i, '');
+  const parts = base.split('--');
+  if (parts.length >= 3) return parts[parts.length - 1];
+  return '';
+}
+
 const server = http.createServer((req, res) => {
   // Only GET is supported (read-only viewer).
   if (req.method !== 'GET') {
@@ -104,6 +268,25 @@ const server = http.createServer((req, res) => {
       });
       res.end(txt);
     });
+    return;
+  }
+
+  // GET /decisions.json -> scan the board home for discuss sidecars (*.decision.md) and
+  // return them as a pinned-shape JSON array. Read-only, single dir level, no symlink
+  // follow-out (mirrors /vendor/* containment). Any unreadable/torn/unparseable file is
+  // skipped; a missing home or zero sidecars yields [] (200) — graceful, never 500.
+  if (urlPath === '/decisions.json') {
+    let payload;
+    try {
+      payload = collectDecisions();
+    } catch (_e) {
+      payload = []; // defensive: any unexpected failure degrades to empty, not 500.
+    }
+    res.writeHead(200, {
+      'Content-Type': CONTENT_TYPES['.json'],
+      'Cache-Control': 'no-store',
+    });
+    res.end(JSON.stringify(payload));
     return;
   }
 

@@ -136,6 +136,25 @@ CC_USAGE_SH="${ORCH_SCRIPTS}/cc-usage.sh"
 err()  { printf '%s\n' "$*" >&2; }
 plan() { printf '%s\n' "$*"; }    # dry-run 计划行（绝不含 token）
 
+# ── 文件锁封装（codex round#9 Finding C·file vault 跨进程串行化·同 account-add/delete）─────────────────────
+# 锁住 file vault（accounts.env）writeback 的「读-筛-写-rename」整段，防与并发 delete/add 互踩（最后 mv 者赢会复活
+#   已删 token / 丢别号刚写 blob）。用 accounts-lib 通用文件锁（O_EXCL + owner token + stale 回收）·锁文件零 token。
+# **fail-closed（codex round#10）**：取锁失败（contention 超时 / 建不了锁文件）→ **绝不无锁跑临界区**（那会重现锁要防
+#   的 race），return 1·不执行 command。writeback 回写失败非致命（caller surface 后换号继续·只是 vault token 没更新到最新）。
+with_vault_lock() { # $1 = vault file path; $2... = command (+args) to run while holding the lock
+  local vf="$1"; shift
+  local owner=""
+  # 记本 bash 进程的 $$ 当锁 livePid（codex round#13 Finding A·锁记录的 pid 必须在临界区期间活着·否则并发对手判 stale 破锁）。
+  owner="$(node -e 'try{const l=require(process.argv[1]);const h=l.acquireFileLock(process.argv[2],{livePid:Number(process.argv[3])});process.stdout.write(h.owner||"")}catch(e){process.exit(1)}' "$LIB_JS" "$vf" "$$" 2>/dev/null)" || owner=""
+  if [ -z "$owner" ]; then
+    err "writeback: 无法取得 vault 文件锁（${vf}.lock·另有进程长时间持锁 / node 不可用）——**拒绝无锁回写 vault**（防并发互踩），未回写。"
+    return 1
+  fi
+  "$@"; local rc=$?
+  node -e 'try{const l=require(process.argv[1]);l.releaseFileLock({path:process.argv[2]+".lock",owner:process.argv[3]})}catch(_e){}' "$LIB_JS" "$vf" "$owner" 2>/dev/null
+  return $rc
+}
+
 usage() {
   err "usage: switch-account.sh [--email <email>] [--registry <path>]"
   err "       [--vault-kind keychain|file|env] [--vault-file <path>] [--keychain-service <s>]"
@@ -329,6 +348,7 @@ fi
 SNAPSHOT_PLAN="(skipped: --no-snapshot)"
 ACTIVE_PLAN="(not yet set)"
 CURRENT_ACTIVE=""
+ACTIVE_WRITE_FAILED=0   # set_active_in 落盘失败时置 1（codex round#2 Finding B·最终消息如实标注·不谎报干净成功）。
 
 # 读当前 active 号（registry 维护的「cc-master 换号视角的 active」）。供快照与 dry-run 计划共用。
 # 无 active → 无切出号（首次换号 / 单账号建池）。绝不读 token。
@@ -348,8 +368,14 @@ detect_current_active() {
 
 # ── (A) snapshot（best-effort·可降级）：只对切出号 recordSwitchOut + saveRegistry，绝不碰 active。──
 #   失败（快照校验拒写 / registry 写出错 / cc-usage 降级）= 仅少一条快照，**绝不**阻断换号、绝不连累 setActive。
+#   **切出号身份必须在 set_active_in 翻 active 之前捕获（codex round#1 Finding 2·split-brain 窗口收口）**：
+#   真切路径已把调用顺序改成 set_active_in（关键态·先）→ record_switch_out（best-effort·后），让慢/挂的
+#   cc-usage 不再卡在「机器已切新号、registry 仍旧号」窗口。但 set_active_in 一旦翻 active，registry 里的
+#   active 已是切入号——此时再 detect_current_active 会把**切入号**当切出号（CURRENT_ACTIVE==EMAIL → 跳过快照）。
+#   故调用方在翻 active **之前**先 detect_current_active 把切出号钉进 CURRENT_ACTIVE；本函数**仅当 CURRENT_ACTIVE
+#   仍空**才自己探（兼容旧调用 / dry-run 路径）——已被钉好则复用，绝不被翻转后的 active 污染。
 record_switch_out() {
-  detect_current_active
+  [ -n "$CURRENT_ACTIVE" ] || detect_current_active
   if [ -z "$CURRENT_ACTIVE" ]; then
     SNAPSHOT_PLAN="(no current active account in registry — 首次换号 / 单账号建池，无切出快照可写)"
     return 0
@@ -364,14 +390,14 @@ record_switch_out() {
   #   病根：这个切出快照里的 cc-usage 无 timeout，跑在覆写官方存储**之后**、setActive **之前**——真 cc-usage 读当前
   #   session 巨 JSONL 算用量、超长 session 下极慢；slow/hung 会让机器已切到新号、但 accounts.json 还标旧号 active。
   #   修：用「后台跑进临时文件 + watchdog 轮询 + 超时 kill」可移植模式（无 timeout/gtimeout 依赖·macOS 上它们不保证在）
-  #   给它兜上限（CC_USAGE_TIMEOUT_S 默认 8s·可 env 覆写）。超时/失败 → usage_json 空 → 优雅降级（配额字段留空·仍写
+  #   给它兜上限（CC_USAGE_TIMEOUT_S 默认 60s·可 env 覆写）。超时/失败 → usage_json 空 → 优雅降级（配额字段留空·仍写
   #   last_switch_out 时间戳·继续到 setActive）。best-effort·绝不 wedge 换号。token 安全：cc-usage 本就 token-blind；
   #   临时文件只承非密用量 JSON、用完即删；kill 只针对 cc-usage 子进程、不碰任何 token。
   local usage_json=""
   if [ -f "$CC_USAGE_SH" ]; then
     local cu_args=()
     [ -n "$NOW_OVERRIDE" ] && cu_args+=(--now "$NOW_OVERRIDE")
-    local timeout_s="${CC_USAGE_TIMEOUT_S:-8}"
+    local timeout_s="${CC_USAGE_TIMEOUT_S:-60}"
     local usage_tmp
     usage_tmp="$(mktemp 2>/dev/null || printf '%s' "${TMPDIR:-/tmp}/cc-usage-so.$$.tmp")"
     # set -u + bash 3.2（macOS floor）：空数组 "${cu_args[@]}" 展开会 `unbound variable` 报错（cu_args
@@ -434,19 +460,13 @@ record_switch_out() {
       return o;
     }
 
-    const reg = lib.loadRegistry(regPath);
-    if (!reg.accounts || !reg.accounts[switchOutEmail]) {
-      process.stderr.write("snapshot: 切出号 " + switchOutEmail + " 不在 registry——跳过 recordSwitchOut。\n");
-      // 切出号不在池中 = 无快照可写，但这不是错（active 翻转独立进行）。
-      process.exit(0);
-    }
     const fiveWin = win(fh);
     const sevenWin = win(sd);
     // ── 优雅降级闸（P2-2 病根的根治·bug 2）：快照是 pacing 的**可选观测**，丢了非致命。cc-usage 降级/超时
     //   （used_percentage 缺失）→ intPct 返回 undefined → used_pct 非 0-100 整数 → saveRegistry 会 throw + 吐
     //   node stack trace（换号核心其实已不受影响、active 仍翻转，但 trace 看着像崩）。**在构造/落盘快照之前先判
     //   used_pct 是否有效**：任一窗口 used_pct 非 0-100 整数 → **干净跳过这条快照**（不把 undefined 塞进 registry、
-    //   绝不调用会 throw 的 saveRegistry），打一行清爽提示（非 stack-trace）后 exit 0。换号核心（三存储覆写 + active
+    //   绝不调用会 throw 的 saveRegistry），打一行清爽提示（非 stack-trace）后退出。换号核心（三存储覆写 + active
     //   翻转）此前已完成、与本块完全独立，跳过快照绝不回滚换号。
     const pctOk = (v) => Number.isInteger(v) && v >= 0 && v <= 100;
     if (!pctOk(fiveWin.used_pct) || !pctOk(sevenWin.used_pct)) {
@@ -461,9 +481,17 @@ record_switch_out() {
       fiveHour: fiveWin,
       sevenDay: sevenWin,
     };
-    lib.recordSwitchOut(reg, switchOutEmail, snap);
-    lib.saveRegistry(reg, regPath);
-    process.stderr.write("snapshot: 已写 " + switchOutEmail + " 的 last_switch_out（source=" + src + "）。\n");
+    // 锁内 RMW（codex round#7 Finding C·防并发 lost-update·与 set_active_in 串行不互踩）。切出号不在池 = 无快照可写
+    //   （不是错·active 翻转独立进行）→ mutator 内跳过（不改不存）。
+    let skipped = false;
+    lib.mutateRegistry(regPath, (reg) => {
+      if (!reg.accounts || !reg.accounts[switchOutEmail]) {
+        process.stderr.write("snapshot: 切出号 " + switchOutEmail + " 不在 registry——跳过 recordSwitchOut。\n");
+        skipped = true; return;
+      }
+      lib.recordSwitchOut(reg, switchOutEmail, snap);
+    });
+    if (!skipped) process.stderr.write("snapshot: 已写 " + switchOutEmail + " 的 last_switch_out（source=" + src + "）。\n");
   ' "$LIB_JS" "$REGISTRY_PATH" "$CURRENT_ACTIVE" "$usage_json" "$NOW_OVERRIDE" 2>&1)" || {
     # 快照写失败（多半 used_pct 降级被 saveRegistry 拒写·P2-2）——**仅**少一条快照，绝不连累 setActive、绝不阻断换号。
     err "switch-account: 写切出快照失败（多半 cc-usage 降级、used_pct 缺失被拒写）——换号继续、active 仍会翻转，仅少这一条快照："
@@ -481,29 +509,53 @@ record_switch_out() {
 #   切入号须在池中（不在则不强写——vault 取 token 那步已过、能到这里说明 token 拿到了；仍兜底告警）。
 #   **调用前置条件（P2-1）**：必在 token 读成功之后调用——绝不在 token 失败路径上翻 active。
 set_active_in() {
-  local act_out
+  local act_out act_rc
+  # node 退出码：0=active 已置且落盘成功；5=切入号**不在 registry**（无法置 active·registry 与现实脱节·codex round#3
+  #   Finding A）；其它非 0=setActive/saveRegistry 写失败（registry 与现实脱节·codex round#2 Finding B）。后两者都是
+  #   「三存储已是切入号、registry active 没对齐」= misalignment，统一置 ACTIVE_WRITE_FAILED=1·主流程不谎报干净成功。
   act_out="$(node -e '
     "use strict";
     const lib = require(process.argv[1]);
     const [ , , regPath, switchInEmail ] = process.argv;
-    const reg = lib.loadRegistry(regPath);
-    if (reg.accounts && reg.accounts[switchInEmail]) {
-      lib.setActive(reg, switchInEmail);          // active 唯一性：切入号 true、其余 false。
-      lib.saveRegistry(reg, regPath);             // 独立落盘（与 snapshot 解耦·不受其校验失败影响）。
-      process.stderr.write("active: 已置 " + switchInEmail + " 为 active（其余号 active=false）。\n");
-    } else {
-      // 切入号不在 registry——能到这里说明 token 已读成功（多半 --vault-kind/--keychain 显式覆写、号未入池）。
-      // 不强写 active（setActive 会对不在池的号抛错），仅告警；换号仍继续（token 已在手）。
-      process.stderr.write("active: 切入号 " + switchInEmail + " 不在 registry——未置 active（token 已读到、换号继续；建议 /cc-master:accounts --add 录号）。\n");
-    }
-  ' "$LIB_JS" "$REGISTRY_PATH" "$EMAIL" 2>&1)" || {
+    // 锁内 RMW（codex round#7 Finding C·防并发 lost-update·与 record_switch_out 串行不互踩）：mutateRegistry 持锁
+    //   load 最新态，故切入号是否在池、active 翻转都基于最新 registry（并发对手若先加了号 / 翻了 active·这里看得到）。
+    let notInRegistry = false;
+    lib.mutateRegistry(regPath, (reg) => {
+      if (reg.accounts && reg.accounts[switchInEmail]) {
+        lib.setActive(reg, switchInEmail);        // active 唯一性：切入号 true、其余 false。
+        process.stderr.write("active: 已置 " + switchInEmail + " 为 active（其余号 active=false）。\n");
+      } else {
+        // 切入号不在 registry——能到这里说明 token 已读成功（多半 --vault-kind/--keychain 显式覆写、号未入池）。
+        // 不强写 active（setActive 会对不在池的号抛错）·mutator 内不改不存。**标记 notInRegistry**·锁外 exit 5：
+        //   registry active 没对齐到切入号 = misalignment·主流程据此不谎报干净成功（codex round#3 Finding A）。
+        process.stderr.write("active: 切入号 " + switchInEmail + " 不在 registry——未置 active（token 已读到、换号已生效；建议 /cc-master:accounts --add 录号让 registry 对齐）。\n");
+        notInRegistry = true;
+      }
+    });
+    if (notInRegistry) process.exit(5);
+  ' "$LIB_JS" "$REGISTRY_PATH" "$EMAIL" 2>&1)"; act_rc=$?
+  if [ "$act_rc" -eq 5 ]; then
+    # 切入号不在 registry（codex round#3 Finding A）：三存储已是切入号、但 registry 里没这个号→active 没对齐·
+    #   后续选号 / 切出快照会从 stale active 推理。registry misalignment·置 ACTIVE_WRITE_FAILED=1·不谎报干净成功。
+    ACTIVE_WRITE_FAILED=1
+    [ -n "$act_out" ] && err "$act_out"
+    err "switch-account: 切入号 ${EMAIL} 不在 registry——换号本身已生效（三存储已是切入号·token 已读到），但 registry 没有该号 entry、active **未对齐到切入号**（仍指旧号）："
+    err "  → 请 /cc-master:accounts --add ${EMAIL} 录号让 registry 对齐（registry entry 全非密·token 已在你手动/keychain vault 里），或 --list 对账。"
+    ACTIVE_PLAN="(switch-in not in registry — registry active stale, see stderr; 换号已生效但 registry 需对齐)"
+    return 0
+  elif [ "$act_rc" -ne 0 ]; then
     # setActive 落盘失败是关键状态写失败——surface（但 token 已在手、不回滚 exec：现实已是切入号，宁可 registry
     #   滞后也不丢 token；下次 detect_current_active 会按 registry 旧 active，属可对账偏差、非 token 泄漏）。
-    err "switch-account: setActive 落盘失败（registry 写出错）——换号仍继续（token 已读到），但 registry active 标记可能滞后："
+    # **不谎报干净成功（codex round#2 Finding B）**：三存储已是切入号、registry active 却没翻成功 = registry 与现实
+    #   脱节（后续选号 / 切出快照会从 stale active 推理）。不回滚存储（回滚一个已成功的 token 切换风险更大），但**置
+    #   ACTIVE_WRITE_FAILED=1**，让主流程最终消息**如实标注 registry 落后 + 需手动对账**，绝不打印干净的「✓ 换号完成」。
+    ACTIVE_WRITE_FAILED=1
+    err "switch-account: setActive 落盘失败（registry 写出错·多半 accounts.json 不可写 / 坏 JSON）——换号本身已生效（三存储已是切入号·token 已读到），但 registry active 标记**未翻成功、与现实脱节**："
     err "$act_out"
-    ACTIVE_PLAN="(setActive FAILED — see stderr; 换号仍继续)"
+    err "  → 请手动对账：跑 /cc-master:accounts --list 看 active 是否正确；修好 accounts.json 后可重跑换号让 active 归位（三存储已是新号·重跑幂等）。"
+    ACTIVE_PLAN="(setActive FAILED — registry active stale, see stderr; 换号已生效但 registry 需手动对账)"
     return 0
-  }
+  fi
   [ -n "$act_out" ] && err "$act_out"
   ACTIVE_PLAN="set active=$EMAIL"
 }
@@ -658,9 +710,28 @@ refresh_blob() {
         process.stderr.write("refresh: vault blob 缺 refreshToken（前缀非 sk-ant-ort）——该号无 refresh token，无法主动续期（多半旧式残缺 blob）。\n");
         process.exit(3);
       }
-      // x-www-form-urlencoded body：refresh token 放 body、绝不进 argv。
-      const body = "grant_type=refresh_token&refresh_token=" + encodeURIComponent(rt) + "&client_id=" + encodeURIComponent(clientId);
       let u; try { u = new URL(url); } catch (_e) { process.stderr.write("refresh: REFRESH_TOKEN_URL 非法。\n"); process.exit(2); }
+      // **refresh 端点白名单（codex round#7 Finding A·防 refresh token 经 polluted env 被 exfiltrate）**：refresh token
+      //   是 bearer secret——POST 到哪个 URL 由 REFRESH_TOKEN_URL 控制，若被污染的 env / 误抄的测试值指到非 Claude 主机
+      //   或明文 http，token 就被发到攻击者端（仍满足 token-blind 的「不进 argv/log」，但实质泄漏）。故**在构造含 token 的
+      //   POST body 之前**先校验 host：① 授权的 Claude/Anthropic 主机（https·*.claude.com / *.anthropic.com / claude.ai）
+      //   永远放行；② loopback（127.0.0.1 / localhost / ::1）仅当显式 opt-in CCM_ALLOW_LOOPBACK_REFRESH=1（测试用·
+      //   stub endpoint）才放行；③ 其它一律**拒绝退出（exit 6·绝不发 token）**。token 在拒绝路径上从未进过 body、未上网。
+      const host = (u.hostname || "").toLowerCase();
+      const isHttps = u.protocol === "https:";
+      const isLoopback = host === "127.0.0.1" || host === "localhost" || host === "::1" || host === "[::1]";
+      const isAuthorizedClaudeHost =
+        host === "claude.ai" || host === "claude.com" || host === "anthropic.com" ||
+        host.endsWith(".claude.com") || host.endsWith(".anthropic.com");
+      const allowLoopback = process.env.CCM_ALLOW_LOOPBACK_REFRESH === "1";
+      if (!((isAuthorizedClaudeHost && isHttps) || (isLoopback && allowLoopback))) {
+        // 绝不回显 token / 仅报非密的 host + 协议：拒绝把 refresh token 发到未授权端点。
+        process.stderr.write("refresh: 拒绝向未授权 refresh 端点发送 refresh token（host=" + host + " proto=" + u.protocol +
+          "）——只允许 https://*.claude.com / *.anthropic.com / claude.ai（或显式 opt-in 的 loopback 测试端点 CCM_ALLOW_LOOPBACK_REFRESH=1）。token 未发送。\n");
+        process.exit(6);
+      }
+      // 通过白名单后才构造含 token 的 POST body（refresh token 放 body、绝不进 argv）。
+      const body = "grant_type=refresh_token&refresh_token=" + encodeURIComponent(rt) + "&client_id=" + encodeURIComponent(clientId);
       const mod = u.protocol === "http:" ? http : https;
       const opts = {
         method: "POST",
@@ -682,12 +753,17 @@ refresh_blob() {
           const at = r.access_token;
           if (typeof at !== "string" || at.indexOf("sk-ant-oat") !== 0) { process.stderr.write("refresh: oauth 响应缺 access_token（前缀非 sk-ant-oat）。\n"); process.exit(4); }
           const expiresIn = Number(r.expires_in);
+          // 响应给了新 refresh token 用新的，否则保留旧的（端点可能轮转 refresh token）。
+          const rotated = (typeof r.refresh_token === "string" && r.refresh_token.indexOf("sk-ant-ort") === 0 && r.refresh_token !== rt);
           const newBlob = {
             accessToken: at,
-            // 响应给了新 refresh token 用新的，否则保留旧的（端点可能轮转 refresh token）。
-            refreshToken: (typeof r.refresh_token === "string" && r.refresh_token.indexOf("sk-ant-ort") === 0) ? r.refresh_token : rt,
+            refreshToken: rotated ? r.refresh_token : rt,
             expiresAt: Date.now() + (isFinite(expiresIn) ? expiresIn : 8 * 3600) * 1000,
           };
+          // **非密轮转标记（codex round#15 Finding A）**：refresh token 被轮转时 newBlob 是新 refresh token 的**唯一副本**——
+          //   若后续 vault 回写失败、再被某次回滚丢弃 NEW_BLOB，vault 里只剩可能已被服务端吊销的旧 token = 该号 brick。
+          //   故 node 在 stderr 打一个**非密**标记（只说「轮转了」·绝不回显 token 值），让 bash 侧据此把回写当硬前提。
+          if (rotated) process.stderr.write("refresh: ROTATED\n");
           // scopes：响应给了用响应的（空格分隔），否则保留旧 blob 的。
           if (typeof r.scope === "string" && r.scope) newBlob.scopes = r.scope.split(/\s+/);
           else if (Array.isArray(blob.scopes)) newBlob.scopes = blob.scopes;
@@ -697,6 +773,18 @@ refresh_blob() {
         });
       });
       req.on("error", (e) => { process.stderr.write("refresh: 网络错误（" + (e && e.code || "ERR") + "）。\n"); process.exit(5); });
+      // **请求超时（codex round#5·防端点接受连接后挂死不响应 wedge 换号）**：node https.request 默认无超时——
+      //   captive proxy / 端点 stall（接了连接却迟迟不回）会让 switch-account.sh 在读完 vault blob 后无限挂等、
+      //   既不硬失败也不进 force-refresh 兜底。加 socket-inactivity timeout：到时 destroy 请求 → 当**网络错误**处理
+      //   （exit 5 → 上层 force-refresh 兜底·与 req error 同路·正是文档承诺的优雅降级，而非 wedge）。
+      //   REFRESH_TIMEOUT_MS 可 env 覆写（默认 15000·测试可注小值）。绝不回显 token（超时只报「超时」非密事实）。
+      var toMs = Number(process.env.REFRESH_TIMEOUT_MS);
+      if (!isFinite(toMs) || toMs <= 0) toMs = 15000;
+      req.setTimeout(toMs, function () {
+        process.stderr.write("refresh: oauth 端点 " + toMs + "ms 内无响应（连接 stall / captive proxy？）——当网络不通处理。\n");
+        req.destroy(); // 触发上面的 'error'（ECONNRESET/此后 socket 关）；显式 exit 5 兜底防 error 未及时触发。
+        process.exit(5);
+      });
       req.write(body);
       req.end();
     });
@@ -725,16 +813,31 @@ writeback_vault() {
       local token_line
       token_line="$(node -e 'const{fileVaultLineMatch}=require(process.argv[1]);process.stdout.write(fileVaultLineMatch(process.argv[2]).tokenLine)' "$LIB_JS" "$EMAIL" 2>/dev/null)" || token_line=""
       [ -n "$token_line" ] || { err "writeback: 无法取 email 安全前缀——跳过 vault 回写（拒裸正则）。"; return 1; }
-      if [ -f "$VAULT_FILE" ]; then
-        if awk -v p="$token_line" 'index($0, p) != 1' "$VAULT_FILE" > "$VAULT_FILE.tmp" 2>/dev/null; then
-          mv "$VAULT_FILE.tmp" "$VAULT_FILE"
-        else
-          rm -f "$VAULT_FILE.tmp"; err "writeback: 删旧 vault 行失败——保留原文件。"; return 1
+      # **全或无原子写（codex round#1 Finding 3）+ 跨进程串行化（codex round#9 Finding C）**：temp 里先写齐（保留行
+      #   [含 _EXPIRES] + 新 _TOKEN 行）全成功才 rename（全或无·原 vault 任一步失败都没动·旧 token 存活），并把整段
+      #   「筛-写-rename」放进 vault 文件锁内（with_vault_lock·防与并发 add/delete 互踩最后 mv 者赢）。只删 _TOKEN 行
+      #   （token_line 前缀）→ _EXPIRES 在保留集里存活。token-blind 不变（awk 只按前缀筛行不读值；blob 经 printf 进 temp）。
+      _writeback_vault_file_locked() {
+        local wb_tmp
+        wb_tmp="$(mktemp "${VAULT_FILE}.XXXXXX" 2>/dev/null || printf '%s' "${VAULT_FILE}.tmp.$$")"
+        [ -n "$wb_tmp" ] || { err "writeback: 无法建临时文件——跳过回写（原 vault 原封不动）。"; return 1; }
+        chmod 600 "$wb_tmp" 2>/dev/null || true
+        if [ -f "$VAULT_FILE" ]; then
+          if ! awk -v p="$token_line" 'index($0, p) != 1' "$VAULT_FILE" > "$wb_tmp" 2>/dev/null; then
+            rm -f "$wb_tmp"; err "writeback: 筛旧 _TOKEN 行失败——保留原文件，未回写。"; return 1
+          fi
         fi
-      fi
-      printf '%s_TOKEN=%s\n' "$EMAIL" "$blob" >> "$VAULT_FILE" || { err "writeback: 写新 vault 行失败。"; return 1; }
+        if ! printf '%s_TOKEN=%s\n' "$EMAIL" "$blob" >> "$wb_tmp"; then
+          rm -f "$wb_tmp"; err "writeback: 写新 vault 行失败（磁盘满 / IO 错？）——丢弃临时文件、原 vault 原封不动（旧 token 存活）。"; return 1
+        fi
+        if ! mv "$wb_tmp" "$VAULT_FILE"; then
+          rm -f "$wb_tmp"; err "writeback: 原子替换 vault 文件失败（rename 错）——原 vault 原封不动（旧 token 存活）。"; return 1
+        fi
+        return 0
+      }
+      with_vault_lock "$VAULT_FILE" _writeback_vault_file_locked || return 1
       # 旁存 _EXPIRES（refresh token 长期有效期·非密·token-blind）——沿用 registry 的 token_expires_at 不在此动。
-      #   注意：只删 _TOKEN 行（见上）→ 原有 _EXPIRES 行被保留，不被回写清掉。
+      #   注意：只删 _TOKEN 行（见上）→ 原有 _EXPIRES 行在保留集里存活，不被回写清掉。
       ;;
     env)
       # env 形态无持久存储可回写——跳过（仅调试用·告警）。
@@ -754,8 +857,88 @@ SNAP_CRED_TMP=""   # 0600 temp 备份 credentials.json（含 token·文件 cp·t
 SNAP_CJ_TMP=""     # 0600 temp 备份 ~/.claude.json（非密身份·统一文件 cp）；空 = 未 snapshot 或文件不存在
 CRED_PREEXISTED=0  # 1 = credentials.json 换号前已存在（回滚→从 snapshot 恢复）；0 = 换号新建（回滚→rm -f 删回无此文件）
 CJ_PREEXISTED=0    # 1 = ~/.claude.json 换号前已存在（回滚→从 snapshot 恢复）；0 = 换号新建（回滚→rm -f 删回无此文件）
+# **覆写进行中标志 + 中断回滚（codex round#12 Finding A·中断也保全或无）**：①② 写进官方存储到三存储提交完成之间有
+#   一个窗口——若此刻收到 SIGINT/TERM（用户 Ctrl-C / 被 kill），旧码的 EXIT trap 只删 snapshot，留下「①② 已新号、
+#   ③+registry 旧号」的 split-brain。修：用 OVERWRITE_IN_PROGRESS 标这段窗口；中断/退出时若仍在窗口内（=1）→ 先把
+#   ①② 回滚到旧号（从 snapshot 恢复·token 随文件走·token-blind），再清 snapshot。OVERWRITE_PATHS 存 ①② 路径供 trap 用。
+OVERWRITE_IN_PROGRESS=0
+OVERWRITE_CRED_PATH=""
+OVERWRITE_CJ_PATH=""
+# **三存储已提交 + 待对齐 active（codex round#17·post-commit 中断前向恢复）**：一旦最终存储（mac ③ keychain / Linux ②）
+#   提交成功，官方存储就**已是新号·不可回滚**（keychain 本脚本回不了）；此后到 set_active_in 跑完之间若被中断，正确
+#   恢复**不是回滚**（会制造 split-brain）而是**前向对齐**：让 registry active 也翻到切入号·使存储与 registry 一致。
+#   故用 STORES_COMMITTED 标这之后的窗口·trap 据此**前向 setActive**（而非回滚）。ACTIVE_ALIGNED 标 active 已对齐（幂等）。
+STORES_COMMITTED=0
+ACTIVE_ALIGNED=0
+COMMIT_SWITCHIN_EMAIL=""   # 待对齐成 active 的切入号（trap 前向恢复用）。
+COMMIT_WRAPPED_BLOB=""     # 待写 keychain ③ 的 wrapped blob（含 token·trap 前向恢复**补写 keychain** 用·codex round#19）。
+                           # token-blind：只在前向恢复路经 `security -w` argv 写 keychain（与正路同·决策 A）·绝不 echo/log。
 cleanup_overwrite_snapshots() { rm -f "$SNAP_CRED_TMP" "$SNAP_CJ_TMP" 2>/dev/null || true; }
-trap cleanup_overwrite_snapshots EXIT
+# 换号锁状态（codex round#14·下半身 step 3-4 临界段持锁·防并发 switch 交错官方三存储）。早声明供 trap 统一释放。
+SWITCH_LOCK_TARGET=""
+SWITCH_LOCK_OWNER=""
+release_switch_lock() {
+  [ -n "$SWITCH_LOCK_OWNER" ] && [ -n "$SWITCH_LOCK_TARGET" ] && \
+    node -e 'try{const l=require(process.argv[1]);l.releaseFileLock({path:process.argv[2]+".lock",owner:process.argv[3]})}catch(_e){}' "$LIB_JS" "$SWITCH_LOCK_TARGET" "$SWITCH_LOCK_OWNER" 2>/dev/null
+  SWITCH_LOCK_OWNER=""
+}
+# EXIT/中断统一清理（codex round#12/#17/#19·双向恢复·按提交阶段选回滚 vs 前向对齐）：
+#   · 阶段 A——覆写窗口内、**存储未提交**（OVERWRITE_IN_PROGRESS=1 且 STORES_COMMITTED=0）：中断 → **回滚 ①②** 到旧号
+#     （存储还没全提交·安全回滚·三存储与 registry 保守留旧号）。
+#   · 阶段 B——**①② 已提交、keychain ③ 提交与否不确定**（STORES_COMMITTED=1 且 ACTIVE_ALIGNED=0）：① credentials.json
+#     （claude 主认证源）已是新号·回滚它本身也是可被再中断的 mutation·且 keychain 若已提交就回不去——故中断的正确恢复是
+#     **前向把全部对齐到新号**：① **补写 keychain ③**（idempotent `-U`·确保 keychain 也=新号·消除「keychain 旧、①②新」
+#     split-brain·codex round#19）+ ② setActive（registry 追上存储）。token-blind：keychain 补写经 `security -w "$wrapped"`
+#     argv（与正路同·决策 A），$wrapped 从 COMMIT_WRAPPED_BLOB 取·绝不 echo/log。绝不回滚已提交的 ①。
+#   两阶段都：释放换号锁 + 清 snapshot。trap 幂等（再跑一次·标志已清·无副作用）。
+on_exit_or_interrupt() {
+  if [ "${STORES_COMMITTED:-0}" -eq 1 ] && [ "${ACTIVE_ALIGNED:-0}" -ne 1 ] && [ -n "$COMMIT_SWITCHIN_EMAIL" ]; then
+    # 阶段 B·前向对齐：① 补写 keychain ③（idempotent·确保 keychain=新号·消除 keychain-lag split-brain·codex round#19）。
+    if [ -n "$COMMIT_WRAPPED_BLOB" ] && command -v security >/dev/null 2>&1; then
+      security add-generic-password -U -s "Claude Code-credentials" -a "$USER" -w "$COMMIT_WRAPPED_BLOB" >/dev/null 2>&1 || true
+    fi
+    # ② best-effort setActive 切入号（让 registry 追上存储·不回滚）。
+    #   **align 成败要据实回传**（codex re-§7 P2）：mutateRegistry 自身失败（registry 锁超时 / accounts.json 损坏 /
+    #   目录不可写）时，下面收尾消息**绝不能**谎称「registry 一致·split-brain 已避免」——故移除 node 内吞异常的
+    #   try/catch，让失败以非零退出冒出来；`if … then REG_ALIGNED=1` 把成败捕进 shell（stderr 仍 /dev/null·不回显），
+    #   消息据此分支。语义不变：registry 没追上不是 brick，下次 detect_current_active 仍从存储反向对账（见失败分支消息）。
+    REG_ALIGNED=0
+    if node -e '
+      "use strict";
+      const lib = require(process.argv[1]);
+      const regPath = process.argv[2], email = process.argv[3];
+      lib.mutateRegistry(regPath, (reg) => { if (reg.accounts && reg.accounts[email]) lib.setActive(reg, email); });
+    ' "$LIB_JS" "$REGISTRY_PATH" "$COMMIT_SWITCHIN_EMAIL" >/dev/null 2>&1; then
+      REG_ALIGNED=1
+    fi
+    ACTIVE_ALIGNED=1
+    # **trap 幂等·消除前向对齐后第二次 trap 的误回滚 split-brain（codex re-§7 P1）**：INT/TERM 落在「STORES_COMMITTED=1
+    #   已置、security 还没返回、OVERWRITE_IN_PROGRESS 还没清」这个窗口时，INT/TERM trap 跑完本前向对齐分支后会 `exit`，
+    #   `exit` 又触发 EXIT trap **第二次** on_exit_or_interrupt。第二次：本 if 被 ACTIVE_ALIGNED=1 跳过（对），但**仍为真的**
+    #   OVERWRITE_IN_PROGRESS 会让下面 elif 误回滚 ①② 到旧号 → keychain/registry 对齐新号、①② 回退旧号 = split-brain。
+    #   修：前向对齐已把状态推到「新号一致」（回滚是错的），故在此**清掉 OVERWRITE_IN_PROGRESS + 覆写路径**——让第二次
+    #   trap 既不重复前向对齐（ACTIVE_ALIGNED 守住）、也**绝不**进 elif 回滚分支。两次 trap 净效果 = 一次正确的前向对齐。
+    OVERWRITE_IN_PROGRESS=0
+    OVERWRITE_CRED_PATH=""
+    OVERWRITE_CJ_PATH=""
+    if [ "$REG_ALIGNED" -eq 1 ]; then
+      err "switch-account: 换号在「①② 已提交、收尾未完成」窗口被中断——已**前向对齐全部到 ${COMMIT_SWITCHIN_EMAIL}**（补写 keychain ③ + registry active），三存储与 registry 一致·避免 split-brain（不回滚已提交的 ①）。"
+    else
+      err "switch-account: 换号在「①② 已提交、收尾未完成」窗口被中断——已把 ①②③ 三存储前向对齐到 ${COMMIT_SWITCHIN_EMAIL}（补写 keychain ③·不回滚已提交的 ①），但 **registry active 对齐失败**（accounts.json 锁超时/损坏/目录不可写）——registry 暂留旧号、与存储暂不一致，**下次 detect_current_active 将从存储反向对账修正**（非永久 split-brain·可自愈）。"
+    fi
+  elif [ "${OVERWRITE_IN_PROGRESS:-0}" -eq 1 ] && [ -n "$OVERWRITE_CRED_PATH" ]; then
+    # 阶段 A·回滚：覆写窗口内、存储未提交 → 回滚 ①② 到旧号。
+    rollback_official_stores_12 "$OVERWRITE_CRED_PATH" "$OVERWRITE_CJ_PATH" >/dev/null 2>&1 || true
+    err "switch-account: 换号在覆写窗口内被中断——已尝试把 ①② 官方存储回滚到旧号（避免 split-brain）。三存储与 registry 保守留旧号。"
+    OVERWRITE_IN_PROGRESS=0
+  fi
+  release_switch_lock
+  cleanup_overwrite_snapshots
+}
+trap on_exit_or_interrupt EXIT
+# INT/TERM：跑回滚清理后以约定码退出（130=INT·143=TERM·让 trap 链跑·EXIT trap 仍会再跑一次但 IN_PROGRESS 已清·幂等）。
+trap 'on_exit_or_interrupt; exit 130' INT
+trap 'on_exit_or_interrupt; exit 143' TERM
 
 # rollback_official_stores_12 CRED_PATH CLAUDE_JSON —— 把 ①② 回滚到换号前状态（原子·token 随文件走·绝不 echo）。
 #   **全或无含新建文件（codex P2·已坐实）**：文件 **原本存在**（*_PREEXISTED=1）→ 从 snapshot cp 回原位（写 tmp + mv）；
@@ -815,6 +998,7 @@ rollback_official_stores_12() {
 overwrite_official_stores() {
   local blob="$1"
   local identity_json="$2"   # 切入号 registry identity（非密·经 argv）；缺/空 → ②段降级只同步 subscriptionType。
+  local node_rc=0            # node 写 ①② 的退出码（PIPESTATUS 取·区分 ①失败 vs ②身份写失败·codex round#1 Finding 1）。
   # ①② 用 node 原子写（凭证经 stdin 不进 argv·identity 经 argv）。CRED_PATH / CLAUDE_JSON_PATH 可 env 覆写（测试注入）。
   local cred_path="${CRED_PATH:-${HOME}/.claude/.credentials.json}"
   local claude_json="${CLAUDE_JSON_PATH:-${HOME}/.claude.json}"
@@ -826,6 +1010,10 @@ overwrite_official_stores() {
   #   snapshot 为空，③ 失败时从空 snapshot 恢复 = 没东西可恢复 → 新建的（带新号 token 的）文件留下 = split-brain。
   #   故记录每个文件 **换号前是否存在**（CRED_PREEXISTED/CJ_PREEXISTED）；rollback 时：原本存在 → 从 snapshot 恢复；
   #   原本不存在（换号新建的）→ rm -f 删回「无此文件」状态，让 rollback 即便文件是新建的也真全或无。
+  #   **快照失败 → fail-closed 中止（codex round#2·全或无前提硬化）**：旧码快照 cp 失败只 warn 仍继续覆写——
+  #   若后续 ③ keychain（或 ② 身份写）失败要回滚，却没有旧副本可恢复 → ①② 留在新号、③+registry 旧号 = split-brain。
+  #   全或无的前提是「能回滚」，而「能回滚」的前提是「快照成功」。故**必需的快照（pre-existing 文件）一旦 cp 失败，
+  #   就在覆写任何存储之前 return 1 中止**——三存储原封不动、换号未发生·可重试，绝不进「覆写了却回不去」的险态。
   SNAP_CRED_TMP=""; SNAP_CJ_TMP=""
   CRED_PREEXISTED=0; CJ_PREEXISTED=0
   if [ -f "$cred_path" ]; then
@@ -835,7 +1023,9 @@ overwrite_official_stores() {
       chmod 600 "$SNAP_CRED_TMP" 2>/dev/null || true
     else
       rm -f "$SNAP_CRED_TMP" 2>/dev/null || true; SNAP_CRED_TMP=""
-      err "stores: 快照 ① credentials.json 失败——继续换号，但若 ③ keychain 失败将无法回滚 ①（需手动对账）。"
+      err "stores: 快照 ① credentials.json 失败——**中止换号**（无快照则后续失败无法回滚·会 split-brain）：未覆写任何存储、registry 原封不动、可重试。"
+      cleanup_overwrite_snapshots; SNAP_CRED_TMP=""; SNAP_CJ_TMP=""
+      return 1
     fi
   fi
   if [ -f "$claude_json" ]; then
@@ -845,11 +1035,20 @@ overwrite_official_stores() {
       chmod 600 "$SNAP_CJ_TMP" 2>/dev/null || true
     else
       rm -f "$SNAP_CJ_TMP" 2>/dev/null || true; SNAP_CJ_TMP=""
-      err "stores: 快照 ② ~/.claude.json 失败——继续换号，但若 ③ keychain 失败将无法回滚 ②（需手动对账）。"
+      err "stores: 快照 ② ~/.claude.json 失败——**中止换号**（无快照则后续失败无法回滚·会 split-brain）：未覆写任何存储、registry 原封不动、可重试。"
+      cleanup_overwrite_snapshots; SNAP_CRED_TMP=""; SNAP_CJ_TMP=""
+      return 1
     fi
   fi
 
-  if ! printf '%s' "$blob" | node -e '
+  # **进入覆写窗口（codex round#12 Finding A）**：从这里到三存储提交完成（return 0）/ 显式回滚之间，若被 SIGINT/TERM
+  #   中断，on_exit_or_interrupt trap 会据 OVERWRITE_IN_PROGRESS=1 把 ①② 回滚到旧号。记下 ①② 路径供 trap 用。
+  OVERWRITE_IN_PROGRESS=1
+  OVERWRITE_CRED_PATH="$cred_path"
+  OVERWRITE_CJ_PATH="$claude_json"
+  # node 退出码语义：0=①②全成（或 ② 优雅降级/跳过·非致命）；1=① credentials.json 写失败（② 未写·无需回滚）；
+  #   2=**身份切换路的 ② 写真失败**（① 已写新号·必须回滚 ① 到旧号·避免 split-identity·codex round#1 Finding 1）。
+  printf '%s' "$blob" | node -e '
     "use strict";
     const fs = require("fs");
     const path = require("path");
@@ -904,11 +1103,23 @@ overwrite_official_stores() {
           if (cj && typeof cj === "object" && !Array.isArray(cj)) {
             if (identity) {
               // 有 identity → 完整替换 oauthAccount（真切身份），保留 cj 所有其它顶层键。
-              cj.oauthAccount = identity;
-              atomicWrite(claudeJson, cj);
-              process.stderr.write("stores: ② ~/.claude.json oauthAccount 已用 registry identity 完整替换（真切身份·其它键保留·原子）。\n");
+              // **②写失败 → 触发回滚（codex round#1 Finding 1·split-identity 收口）**：身份切换路（identity 在·文件
+              //   在·合法 JSON）若 atomicWrite 真失败（权限 / 文件锁 / IO），旧码静默吞、仍让 ①③ 切到新号 → ①③ 是新号
+              //   token、② oauthAccount 仍旧号 = split-identity（违背三存储全或无）。修：身份切换路的 atomicWrite 失败
+              //   **exit 2** → bash caller 把 ① 回滚到旧号（① 已写新号），三存储全留旧号、换号未发生·可重试（不再 split）。
+              //   注意：仅**身份切换路的真写失败**才 exit 2；下面的「无 identity 降级 / 文件缺 / 损坏」是有意的优雅降级、非失败，仍非致命。
+              try {
+                cj.oauthAccount = identity;
+                atomicWrite(claudeJson, cj);
+                process.stderr.write("stores: ② ~/.claude.json oauthAccount 已用 registry identity 完整替换（真切身份·其它键保留·原子）。\n");
+              } catch (e2) {
+                process.stderr.write("stores: ② ~/.claude.json 身份切换写失败（权限 / 锁 / IO）：" + (e2 && e2.code || e2) + " —— 触发回滚 ①（避免 split-identity·三存储全或无）。\n");
+                process.exit(2);   // ① 已写新号 → caller 据 exit 2 回滚 ① 到旧号。
+              }
             } else {
               // 无 identity → 降级：保留旧 oauthAccount，仅同步 subscriptionType（若 oa 已有该字段）。
+              //   这是有意的优雅降级（claude 主要按 ① credentials.json token 认证·② 只同步显示层订阅档），**非身份切换路**：
+              //   它本就不切身份、不存在 split-identity 风险，故写失败仍非致命（catch 在外层兜·不 exit）。
               const oa = (cj.oauthAccount && typeof cj.oauthAccount === "object" && !Array.isArray(cj.oauthAccount)) ? cj.oauthAccount : {};
               if (typeof blob.subscriptionType === "string" && blob.subscriptionType && ("subscriptionType" in oa)) {
                 oa.subscriptionType = blob.subscriptionType;
@@ -924,14 +1135,38 @@ overwrite_official_stores() {
           process.stderr.write("stores: ② ~/.claude.json 不存在——跳过（不新建·身份由 credentials.json token 主导）。\n");
         }
       } catch (e) {
-        // ② 失败不致命（身份显示层）——surface 但不整体 fail（①是凭证主存、已成）。
-        process.stderr.write("stores: ② ~/.claude.json 写失败（非致命·身份显示层）：" + (e && e.code || e) + "\n");
+        // 到这的是**非身份切换路**的 ② 失败（无 identity 降级写 / 读文件异常）——非致命（身份显示层·不 split-identity）：
+        //   surface 但不整体 fail（①是凭证主存、已成；身份切换路的真写失败已在内层 exit 2 单独处理·会回滚）。
+        process.stderr.write("stores: ② ~/.claude.json 写失败（非致命·身份显示层·非身份切换路）：" + (e && e.code || e) + "\n");
       }
     });
-  ' "$cred_path" "$claude_json" "$identity_json"; then
-    # ① 在 node 内 process.exit(1) 前于 ② 之前，故 ① 失败时 ② 未写、①是原子写本身未改——无需回滚，仅清 snapshot。
+  ' "$cred_path" "$claude_json" "$identity_json"
+  # ${PIPESTATUS[1]} = node 的退出码（[0] 是左侧 printf）。set -o pipefail 下 `if !` 取的是整管道码、丢了
+  #   1 vs 2 的区分（codex round#1 Finding 1 要按 ② 是否已写新号决定回不回滚 ①）——故显式取 node 自身码。
+  node_rc="${PIPESTATUS[1]}"
+  if [ "$node_rc" -eq 1 ]; then
+    # ① credentials.json 写失败（node 在 ② 之前 process.exit(1)）：② 未写、① 原子写本身未落 → 无需回滚，仅清 snapshot。
+    OVERWRITE_IN_PROGRESS=0   # 窗口关闭（① 未提交·无残留新号态）。
     cleanup_overwrite_snapshots; SNAP_CRED_TMP=""; SNAP_CJ_TMP=""
     err "overwrite-stores: ① credentials.json 覆写失败——未完成换号（凭证主存未更新）。"
+    return 1
+  elif [ "$node_rc" -eq 2 ]; then
+    # **身份切换路的 ② 写真失败（① 已写新号·codex round#1 Finding 1）**：① 是新号 token、② oauthAccount 仍旧号
+    #   = split-identity。把 ① 回滚到旧号（全或无），三存储全留旧号、换号未发生·可重试（不再 split）。③ keychain 尚未写。
+    if rollback_official_stores_12 "$cred_path" "$claude_json"; then
+      err "overwrite-stores: ② 身份写失败 → 已回滚 ①，三存储全留旧号，换号未发生，可重试（避免 split-identity）。"
+    else
+      err "overwrite-stores: ② 身份写失败、且 ① 回滚失败——可能 split-identity（① 已是新号 token·② 仍旧号）·需手动对账！"
+    fi
+    OVERWRITE_IN_PROGRESS=0   # 窗口关闭（已回滚到旧号）。
+    cleanup_overwrite_snapshots; SNAP_CRED_TMP=""; SNAP_CJ_TMP=""
+    return 1
+  elif [ "$node_rc" -ne 0 ]; then
+    # 其它非 0（不该发生·防御）：保守按未完成换号处理、回滚 ①（① 可能已写）、不翻 registry。
+    rollback_official_stores_12 "$cred_path" "$claude_json" >/dev/null 2>&1 || true
+    OVERWRITE_IN_PROGRESS=0   # 窗口关闭（已尝试回滚）。
+    cleanup_overwrite_snapshots; SNAP_CRED_TMP=""; SNAP_CJ_TMP=""
+    err "overwrite-stores: 覆写 ①② 的 node 以未知码 ${node_rc} 退出——保守按换号未完成处理（已尝试回滚 ①）。"
     return 1
   fi
 
@@ -947,21 +1182,41 @@ overwrite_official_stores() {
   #    接受写 keychain 时经 argv 的 sub-second 本机局部暴露（可读 argv 的同用户本就能直接读 keychain）。
   if command -v security >/dev/null 2>&1; then
     local wrapped="{\"claudeAiOauth\":${blob}}"   # $blob 是合法单行 JSON 对象 → 拼出 {"claudeAiOauth":{...}}（claude 官方格式）。
+    # **在 security 调用之前就切到 post-commit 档（codex round#18·消除「keychain 已提交但 flag 未设」的中断盲窗）**：
+    #   security 返回成功 → 设 STORES_COMMITTED=1 之间有一个**纯 bash 不可对信号原子化**的窗口——若此刻被 SIGINT/TERM，
+    #   旧码的 trap 看 STORES_COMMITTED=0 会**回滚 ①②**，而 keychain 可能已提交成新号 → keychain 新、①②+registry 旧 = split-brain。
+    #   修：**在 security 之前**就置 STORES_COMMITTED=1 + 记切入号·武装 trap 的**前向对齐**分支。语义：从「即将写 keychain」
+    #   起，①② 都已是新号·凭证主存 ① credentials.json（claude 主认证源）已新——此后任何中断的**最小伤害恢复是前向**
+    #   （把 registry / keychain 都对齐到新号），绝非回滚 ①②（回滚本身也是可被中断的 mutation·且若 keychain 已提交就回不去）。
+    #   若 security **显式失败**（确知 keychain 是旧号）→ 在 else 分支**撤回** post-commit（STORES_COMMITTED=0）+ 回滚 ①② 到旧号（安全·确定性）。
+    STORES_COMMITTED=1
+    COMMIT_SWITCHIN_EMAIL="$EMAIL"
+    COMMIT_WRAPPED_BLOB="$wrapped"   # 供 trap 前向恢复**补写 keychain ③**（codex round#19·消除 keychain-lag·idempotent `-U`·token-blind argv）。
     if security add-generic-password -U -s "Claude Code-credentials" -a "$USER" -w "$wrapped" >/dev/null 2>&1; then
+      # keychain 提交成功·三存储全新号·换号已落地。关回滚分支（OVERWRITE_IN_PROGRESS=0）·trap 后续只会前向对齐（不回滚）。
+      OVERWRITE_IN_PROGRESS=0
       err "stores: ③ keychain \"Claude Code-credentials\" account=$USER 已覆写（argv -w·完整 blob·避 128 截断）。"
     else
-      # ③ keychain 失败、①② 已写新号 → split-brain（①②新号·③+registry 旧号）。**全或无**：把 ①② 回滚到旧号。
+      # ③ keychain **显式失败**——确知 keychain 仍是旧号（没提交）→ **撤回 post-commit**（STORES_COMMITTED=0·让 trap/此处回滚 ①②
+      #   安全·因 keychain 确定是旧号）。①② 已写新号 → 回滚到旧号（全或无·三存储全留旧号）。
+      STORES_COMMITTED=0; COMMIT_SWITCHIN_EMAIL=""; COMMIT_WRAPPED_BLOB=""   # 撤回·清掉 trap 的前向补写 keychain 物料（token 清理）。
       if rollback_official_stores_12 "$cred_path" "$claude_json"; then
         err "stores: ③ keychain 失败 → 已回滚 ①②，三存储全留旧号，换号未发生，可重试。"
       else
         err "stores: ③ keychain 失败、且 ①② 回滚失败——可能 split-brain（部分官方凭证态已在新号上）·需手动对账！"
       fi
+      OVERWRITE_IN_PROGRESS=0   # 窗口关闭（已回滚到旧号）。
       cleanup_overwrite_snapshots; SNAP_CRED_TMP=""; SNAP_CJ_TMP=""
       return 1   # 换号确实没成（已回滚到旧号·不再 split-brain）；caller 不翻 registry active。
     fi
   else
+    # Linux 无 keychain → ② 是最终存储·①② 都已写新号·换号已落地。**post-commit 切档**（同 mac·先武装前向对齐·再关回滚）。
+    STORES_COMMITTED=1
+    COMMIT_SWITCHIN_EMAIL="$EMAIL"
+    OVERWRITE_IN_PROGRESS=0
     err "stores: ③ 无 security（非 mac）——跳过 keychain，只覆写了①② 两个文件（Linux 正常路径）。"
   fi
+  # 到这里 OVERWRITE_IN_PROGRESS 已在「最终存储提交成功」处被清（mac=③ 成功后 / Linux=② 后）·此处只清 snapshot。
   cleanup_overwrite_snapshots; SNAP_CRED_TMP=""; SNAP_CJ_TMP=""
   return 0
 }
@@ -1039,6 +1294,11 @@ fi
 NEW_BLOB="$(refresh_blob "$VAULT_BLOB" 2>/tmp/.ccm-refresh-err.$$)"; refresh_rc=$?
 refresh_err="$(cat "/tmp/.ccm-refresh-err.$$" 2>/dev/null || true)"; rm -f "/tmp/.ccm-refresh-err.$$" 2>/dev/null || true
 FORCE_REFRESH_FALLBACK=0
+# **refresh token 是否被轮转（codex round#15 Finding A·非密标记）**：node 在轮转时 stderr 打 "refresh: ROTATED"
+#   （非密·无 token 值）。轮转时 NEW_BLOB 是新 refresh token 唯一副本 → 下面把 vault 回写当**硬前提**（回写失败即
+#   硬失败·绝不继续到可能丢弃 NEW_BLOB 的覆写/回滚路·避免该号 brick 成只剩可能已吊销的旧 token）。
+REFRESH_ROTATED=0
+case "$refresh_err" in *"refresh: ROTATED"*) REFRESH_ROTATED=1;; esac
 if [ "$refresh_rc" -ne 0 ] || [ -z "$NEW_BLOB" ]; then
   [ -n "$refresh_err" ] && err "$refresh_err"
   # ── 失败分流（设计稿 step 6 vs step 10）──
@@ -1066,6 +1326,12 @@ if [ "$refresh_rc" -ne 0 ] || [ -z "$NEW_BLOB" ]; then
     err "error: 该号 vault blob 缺 refresh token（多半旧式残缺 blob）——无法 refresh、无法 force-refresh 兜底。"
     err "  请用 /cc-master:accounts --refresh ${EMAIL} 重录完整 blob 后重试。未覆写任何存储、registry 原封不动。"
     exit 1
+  elif [ "$refresh_rc" -eq 6 ]; then
+    # **未授权 refresh 端点（codex round#7 Finding A）**：REFRESH_TOKEN_URL 指向非 Claude/Anthropic 主机 / 明文 http
+    #   → node 在发 token **之前**已拒绝（token 未上网）。硬失败·绝不 force-refresh（force-refresh 会用同一坏 URL）。
+    err "error: REFRESH_TOKEN_URL 指向**未授权**的 refresh 端点（见上 host/proto）——为防 refresh token 被发到非 Claude 主机/明文 http，已**拒绝发送 token、未覆写任何存储**、registry 原封不动。"
+    err "  请检查环境变量 REFRESH_TOKEN_URL（多半被污染 / 误抄了测试值）：生产应留默认 https://platform.claude.com/v1/oauth/token。token 安全（从未上网）。"
+    exit 1
   else
     err "error: refresh 失败（rc=${refresh_rc}·blob/URL 输入或逻辑错）——未覆写任何存储、registry 原封不动。"
     exit 1
@@ -1077,9 +1343,54 @@ if [ "${FORCE_REFRESH_FALLBACK:-0}" -ne 1 ]; then
   if writeback_vault "$NEW_BLOB"; then
     err "switch-account: 已回写 cc-master vault（${EMAIL}·refresh token 保新鲜）。"
   else
-    # 回写失败非致命——三存储仍会覆写（换号现实仍发生），只是 vault 里的 token 没更新到最新。surface。
-    err "switch-account: ⚠ vault 回写失败——三存储仍会覆写（换号继续），但 cc-master vault 里 $EMAIL 的 token 未更新到最新（下次换回可能需 --refresh）。"
+    # **回写失败的两种严重度（codex round#15 Finding A）**：
+    #   · refresh token **未轮转**（REFRESH_ROTATED=0）→ vault 里的旧 refresh token 仍有效·回写失败非致命：三存储仍覆写
+    #     （换号现实仍发生），只是 vault 的 access token 没更新到最新（下次换回可能需 --refresh）。继续。
+    #   · refresh token **已轮转**（=1）→ NEW_BLOB 是新 refresh token 唯一副本·而 vault 里的旧 refresh token 多半已被
+    #     服务端**吊销**。若继续到覆写、而覆写又失败回滚 → NEW_BLOB 被丢弃 → 该号 vault 只剩已吊销旧 token = brick（再也
+    #     切不进·需手动重 login）。故**硬失败**：未覆写任何官方存储、registry 原封不动、exit 非 0·明确提示重 login/refresh。
+    if [ "${REFRESH_ROTATED:-0}" -eq 1 ]; then
+      # **轮转后回写失败 → 先把 NEW_BLOB 抢救到 0600 recovery 文件再退（codex round#16 Finding A·绝不丢轮转的唯一 token）**：
+      #   仅硬失败不够——NEW_BLOB 是新 refresh token 唯一副本，进程一退就丢、该号 brick。故在 exit 前把它落到用户级安全区
+      #   （$CC_MASTER_HOME / ~/.claude/cc-master）的一个 0600 recovery 文件（与 file vault 同安全 floor·明文 0600）：token
+      #   经 stdin 喂 node 原子写（不进 argv·token-blind·绝不 echo）。再把**路径**（非密）告诉用户怎么手动装回 vault。
+      #   recovery 文件本身写不进（连这都失败）才真无可挽回——此时如实告知该号需重 login。
+      RECOVERY_DIR="${CC_MASTER_HOME:-${HOME}/.claude/cc-master}"
+      RECOVERY_FILE="${RECOVERY_DIR}/rotated-blob-recovery.${EMAIL}.$$.json"
+      recovery_ok=0
+      if ( umask 077; mkdir -p "$RECOVERY_DIR" 2>/dev/null ); then
+        if printf '%s' "$NEW_BLOB" | node -e '"use strict";const fs=require("fs");let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{fs.writeFileSync(process.argv[1],s,{mode:0o600});fs.chmodSync(process.argv[1],0o600);process.exit(0)}catch(e){process.exit(1)}})' "$RECOVERY_FILE" 2>/dev/null; then
+          recovery_ok=1
+        fi
+      fi
+      err "error: refresh token 已被服务端**轮转**、但回写 cc-master vault 失败（权限 / 磁盘满 / keychain 错）——新 refresh token 是唯一副本。"
+      if [ "$recovery_ok" -eq 1 ]; then
+        err "  ✓ 已把轮转后的完整 blob 抢救到 0600 recovery 文件（绝不丢该 token）：${RECOVERY_FILE}"
+        err "    恢复：修好 vault 写入问题后，把该文件内容装回 ${EMAIL} 的 vault（file vault：写成 ${EMAIL}_TOKEN=<该文件内容> 一行；keychain：security add-generic-password -U -s <service> -a ${EMAIL} -l \"cc-master OAuth\" -w \"\$(cat 该文件)\"），然后 rm 该 recovery 文件。"
+      else
+        err "  ✗ 连 recovery 文件也写不进（${RECOVERY_DIR} 不可写？）——轮转后的新 token 无法保存：该号 vault 只剩已吊销旧 token，"
+        err "    需**重新登录** ${EMAIL}（Orca / claude login）后跑 /cc-master:accounts --refresh ${EMAIL} 重录完整 blob。"
+      fi
+      err "  **未覆写任何官方存储、registry 原封不动**（不冒险继续到会丢弃 NEW_BLOB 的覆写路）。"
+      exit 1
+    fi
+    err "switch-account: ⚠ vault 回写失败（refresh token 未轮转·旧 token 仍有效）——三存储仍会覆写（换号继续），但 cc-master vault 里 $EMAIL 的 access token 未更新到最新（下次换回可能需 --refresh）。"
   fi
+fi
+
+# **跨进程换号锁（codex round#14 Finding A/B·串行化整个「覆写三存储 → setActive」临界段）**：registry 锁 / vault 锁
+#   只各自保护自己那个文件，挡不住两个并发 switch 的**官方三存储覆写交错**（A 写文件、B 写全三存储+翻 active B、A 再
+#   写 keychain+翻 active A → 文件 B、keychain/registry A·split-brain）。修：用一把**换号级锁**（键在官方 credentials.json
+#   路径上·所有 switcher 共同争用）罩住 step 3（覆写）+ step 4（setActive）整段——同一时刻只一个 switch 跑这段·消除交错。
+#   锁也覆盖「覆写提交完成 → setActive 落盘」那个窗口（codex round#14 Finding B）：持锁到 setActive 完成才释放，期间
+#   被中断由 overwrite 的 INT/TERM trap 兜（窗口内回滚 ①②）。token-blind：锁文件零 token；锁键是非密路径。
+# SWITCH_LOCK_TARGET / SWITCH_LOCK_OWNER / release_switch_lock 已在脚本上半身声明（供 EXIT/INT/TERM trap 统一释放·
+#   绝不在此另设 trap 覆盖掉 on_exit_or_interrupt·codex round#14 实现纪律）。这里只设 target + 取锁。
+SWITCH_LOCK_TARGET="${CRED_PATH:-${HOME}/.claude/.credentials.json}"
+SWITCH_LOCK_OWNER="$(node -e 'try{const l=require(process.argv[1]);const h=l.acquireFileLock(process.argv[2],{livePid:Number(process.argv[3])});process.stdout.write(h.owner||"")}catch(e){process.exit(1)}' "$LIB_JS" "$SWITCH_LOCK_TARGET" "$$" 2>/dev/null)" || SWITCH_LOCK_OWNER=""
+if [ -z "$SWITCH_LOCK_OWNER" ]; then
+  err "error: 无法取得换号锁（${SWITCH_LOCK_TARGET}.lock·另有 switch 在跑 / node 不可用）——**拒绝无锁覆写官方存储**（防并发交错三存储损坏），未换号、registry 原封不动。"
+  exit 1
 fi
 
 # 3) 覆写官方三存储（先非权威后权威）。① credentials.json 失败 = 致命（凭证主存未更新）→ 退非 0、不翻 registry。
@@ -1087,18 +1398,47 @@ if ! overwrite_official_stores "$NEW_BLOB" "$REG_IDENTITY_JSON"; then
   err "error: 覆写官方凭证存储失败（见上面 stores: 标到哪步）——换号未完成。registry 不翻 active（避免「registry 标新号、存储仍旧号」损坏态）。"
   # ③ keychain 失败时 overwrite_official_stores 已回滚 ①②到旧号（全或无·P2-C），三存储与 registry 全留旧号·不再 split-brain；
   #   surface 让用户对账（仅当回滚自身也失败才可能 split-brain·已在 stores: 强告警）；registry 不翻（active 仍指旧号·保守）。
+  release_switch_lock
   exit 1
 fi
 # 新号已被官方三存储接管；NEW_BLOB 用完即弃（绝不进 registry）。
 unset NEW_BLOB VAULT_BLOB 2>/dev/null || true
 
-# 4) snapshot + setActive（覆写三存储成功之后才翻 registry active·P2-2 解耦）。
-#    先 (A) snapshot（best-effort、失败容忍），再 (B) setActive（可靠、独立落盘）。
+# 4) setActive + snapshot（覆写三存储成功之后才翻 registry active·P2-2 解耦）。
+#    **顺序：先 (B) setActive 再 (A) snapshot（codex round#1 Finding 2·split-brain 窗口收口）**。
+#    病根：旧顺序是先跑 best-effort 快照（内含可慢/可挂的 cc-usage，timeout 默认已调到 60s）再 setActive——
+#    三存储**已**覆写成新号、但 registry 的 active 要等快照那一长段（最坏 60s 挂等）之后才翻。这段窗口里若
+#    用户中断 / shell 被 kill / session 死掉，机器实际在新号、accounts.json 仍标旧号 active = 正是 timeout
+#    想最小化的 split-brain。修：把**关键态 setActive 提到 best-effort 快照之前**——三存储一覆写成功就立刻、
+#    可靠地翻 active（独立落盘·与快照解耦·P2-2），registry 与现实瞬间一致；之后慢/挂的快照再久也只影响一条
+#    可选观测、绝不再留 split-brain 窗口。切出号身份在翻 active **之前**先钉进 CURRENT_ACTIVE（见 record_switch_out
+#    注释·翻转后 active 已是切入号，不先钉会把切入号误当切出号跳过快照）。
 if [ "$NO_SNAPSHOT" -ne 1 ]; then
-  record_switch_out      # (A) 写切出快照——失败仅少一条快照，绝不阻断、绝不连累 (B)。
+  detect_current_active  # 翻 active 前钉切出号身份（setActive 后 registry active 已是切入号·不先钉会丢切出号）。
 fi
-set_active_in            # (B) 翻 active 到切入号——独立可靠落盘（与快照解耦·三存储已覆写才到这）。
+set_active_in            # (B) 翻 active 到切入号——关键态·三存储已覆写就立刻可靠落盘（与快照解耦·不等 best-effort 快照）。
+ACTIVE_ALIGNED=1         # **active 已对齐（codex round#17）**：set_active_in 跑完（成功翻 / 或已如实标 misalign）→ trap 不再前向 setActive（幂等·避免重复）。
+COMMIT_WRAPPED_BLOB=""   # 收尾完成·清掉 trap 前向补写 keychain 的 token 物料（token 清理·此后 trap 不再需要它）。
+if [ "$NO_SNAPSHOT" -ne 1 ]; then
+  record_switch_out      # (A) 写切出快照——慢/挂只影响这一条可选观测，绝不阻断、绝不再留 split-brain 窗口（active 已先翻）。
+fi
+# **释放换号锁（codex round#14）**：到这里覆写三存储 + setActive 整段临界已完成（registry active 已对齐或已如实标 misalign），
+#   其它并发 switch 可以进了。snapshot 是 best-effort 后置观测·不在临界保护内（它若失败也只少一条·不影响 active 正确性）。
+release_switch_lock
 
+# **最终消息按 active 是否落盘成功分两路（codex round#2 Finding B·不谎报干净成功）**：
+#   · active 落盘成功（ACTIVE_WRITE_FAILED=0）→ 干净的「✓ 换号完成」+ exit 0。
+#   · active 落盘失败（=1）→ 换号本身已生效（三存储已是切入号·claude 会接管新号），但 registry active 与现实脱节——
+#     **不打印干净成功**：标注「换号已生效·但 registry 需手动对账」+ exit 4（区别于干净成功的 0），让调用方/编排者
+#     知道要对账（不回滚已成功的 token 切换·回滚一个已生效的换号风险更大；registry 滞后是可对账偏差、非 token 泄漏）。
+if [ "${ACTIVE_WRITE_FAILED:-0}" -eq 1 ]; then
+  err "⚠ 无重启换号已生效但 registry 未对齐：官方共享凭证三存储已覆写为 ${EMAIL}（\$USER=${USER} 视角·claude 会接管新号），"
+  err "  但 registry 的 active 标记落盘失败、仍与现实脱节——**这不是干净成功**：请 /cc-master:accounts --list 对账、修好 accounts.json 后重跑换号让 active 归位（三存储已是新号·重跑幂等）。"
+  if [ "${FORCE_REFRESH_FALLBACK:-0}" -eq 1 ]; then
+    err "  （本次走 force-refresh 兜底：覆写原 blob + 临近过期逼 claude 自己 refresh·有 vault-stale 风险，见上。）"
+  fi
+  exit 4
+fi
 err "✓ 无重启换号完成：官方共享凭证三存储已覆写为 ${EMAIL}（\$USER=${USER} 视角）。"
 err "  运行中的 claude 在 access token 临近过期时会惰性 refresh、重读被覆写的存储 → 新号接管（无需重启进程）。"
 if [ "${FORCE_REFRESH_FALLBACK:-0}" -eq 1 ]; then

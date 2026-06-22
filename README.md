@@ -2,7 +2,7 @@
 
 > 中文版见 [README_zh.md](README_zh.md)。
 
-![version](https://img.shields.io/badge/version-0.8.0-blue)
+![version](https://img.shields.io/badge/version-0.9.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![ship-anywhere](https://img.shields.io/badge/ship--anywhere-Bedrock%20%7C%20Vertex%20%7C%20Foundry-7c3aed)
 ![requires](https://img.shields.io/badge/requires-Node%2022%2B%20%2B%20bash-orange)
@@ -78,6 +78,22 @@ Every claim in column ③ is anchored to a real mechanism, not a marketing line:
 | **Cross-session resume** | No | Same-session only | **Yes** — re-discovered from the board file | the board (persistent save file) |
 | **Endpoint verification** | Ad hoc | Inside the script | Orchestrator verifies independently | lens 6 + the decision program (Skill A) |
 | **Quota awareness** | No | No | **Yes** — account-authoritative 5h/**7d** `used_percentage` (captured from the status line; local-derived 反推 as fallback) | `usage-pacing.js` (Stop hook) + `statusline-capture.js` + `cc-usage.sh` |
+
+---
+
+## New in 0.9.0 — nest the graph, brief the decision
+
+0.9.0 makes the board itself deeper and the human-in-the-loop smarter: a goal too big for one flat task list can now own *nested* scheduling subgraphs, and every decision the orchestrator routes to you arrives as a prepared interview instead of a context-less ping.
+
+### dag-in-dag — nested scheduling subgraphs (max depth 1)
+
+A goal at real scale doesn't fit one flat `tasks[]` — you want it grouped by module or phase. 0.9.0 lets an **owner** node own a layer of child tasks (a sub-plan), while cc-master keeps scheduling those children itself — dispatch, WIP, endpoint verification, watchdog all still apply. It stays **one flat board file**: every task remains top-level in `tasks[]`, and nesting is expressed by a single new relationship field, `tasks[].parent`. Two orthogonal edges do two jobs — `deps` (scheduling: open, can point anywhere, fires the moment its upstream is ready) and `parent` (containment / rollup: encapsulated, a child has at most one owner). `parent` enters the hard narrow-waist (the biggest hook change in cc-master's history); a `done` owner whose children aren't all done trips a **non-blocking** Stop-gate reminder, never a hard block. (See [ADR-012](adrs/ADR-012-parent-waist-and-rollup-aware-stop-gate.md).)
+
+It ships with a **graph-analysis library + CLI** (`board-graph.js`, reused by the hooks too): machine-compute the critical path / CPM (with honest `weight_source` labeling — it reports structure, not fake hours, when timestamps are missing), parallelism (T₁/T∞), impact (which node gates the most downstream), the ready set, and owner rollup — for when the dependency graph gets too tangled to mental-math reliably.
+
+### Decision-briefing — every decision routed to you arrives prepared
+
+When orchestration hits a call only a human can make (`blocked_on:"user"`), you used to get parachuted into a context-less decision point. 0.9.0 turns it into a **prepared interview**. While idle, the orchestrator attaches a self-explaining `decision_package` to the node (the narrative context, the question, what it needs — decision / advice / solution — and the options with their trade-offs). `/cc-master:view` renders it as a **rich decision card** with a one-click copy of the entry command. You run **`/cc-master:discuss <node-id>`** in a separate, full-strength session: it loads the briefing, **freshness-checks** it (re-grounds if the upstream moved since it was prepared), talks the decision through with you, and writes the conclusion to a sidecar — never the board. The orchestrator digests that sidecar on its next reconcile and replans. Your time and the orchestrator's are fully decoupled — and because a separate session runs the discussion, the "conductor never plays an instrument" red line gets *stronger*, not weaker.
 
 ---
 
@@ -212,6 +228,7 @@ Once loaded, hand it a goal big enough to be worth it (think >24h of work, many 
 /cc-master:as-master-orchestrator --resume [sel]   # pick up an EXISTING board in a new session (see below)
 /cc-master:status                                  # render the board summary (board view) + validate the narrow waist
 /cc-master:view                                    # open a read-only DAG webview of the board in your browser
+/cc-master:discuss <node-id>                       # talk through a decision the orchestrator routed to you (see below)
 /cc-master:handoff-to-new-session                  # gracefully hand the board off to a fresh session (write side of --resume)
 /cc-master:accounts --add|--delete|--refresh <email> | --list   # manage the backup-account pool for hot switching
 /cc-master:stop                                    # archive the board and stand down (board is kept, not deleted)
@@ -241,6 +258,19 @@ The DAG graph (the hero), the Kanban card board, and the status-grouped list —
 ![cc-master:view — the status-grouped list view (dark theme)](docs/images/view-list-dark.png)
 
 *☰ LIST — status-grouped rows, the web twin of `/cc-master:status`.*
+
+### Talk through a decision the orchestrator routed to you
+
+When the orchestrator hits a call only a human can make, it doesn't drop a bare question on you. While idle it prepares a self-explaining **decision package** on the `blocked_on:"user"` node — the narrative of how it got here, what it's actually asking, whether it wants a *decision / advice / a solution*, and the candidate options with their trade-offs. In `/cc-master:view`, that awaiting-you card becomes a **rich decision card** with a one-click **copy `/cc-master:discuss <node-id>`** button.
+
+Paste it into a separate, full-capability terminal session and you talk the call through *at your convenience, against accurate and still-timely context* — the discuss session **re-checks freshness on entry** and re-grounds if the question has gone stale under work that ran since, then helps you reason (it can read the code and the board). It writes the outcome to a versioned, append-only `<board-stem>--<node-id>--<STAMP>.decision.md` sidecar — a TL;DR plus the full decision doc — which the orchestrator picks up on its next idle/recon pass (reading the **latest** one if you talked it through more than once) to re-plan and clear the gate. No live notification, no interrupting either side: human attention, re-allocated.
+
+The card itself shows the **discussion history** — even before the orchestrator has digested it. Once you've talked a node through, its `/cc-master:view` card displays **💬 discussed N times** plus the latest conclusion's TL;DR, expandable round by round (read straight from the sidecars via a read-only `/decisions.json` route; the viewer stays zero-network, zero-POST). So next time you open the board you can see *whether you've talked this through, how many times, and what it concluded* — without waiting for the orchestrator's next pass.
+
+```
+/cc-master:discuss <node-id>   # run in a fresh session — copy the exact command from the decision card in /cc-master:view
+                               # (the copied command defaults to carrying --board <board-stem>, so a fresh session can't cross-wire to another open orchestration)
+```
 
 ### Resume an existing board in a new session
 

@@ -49,7 +49,7 @@ token-blind 铁律据此**细化为「token 绝不进 agent context / transcript
 修复：**绝不在 bash 手拼正则匹配 email 行，读 token 行也绝不 `grep -F`（子串匹配会取错行）**。`accounts-lib.fileVaultLineMatch(email)` 返回安全前缀（`<email>_TOKEN=` / `<email>_EXPIRES=`），调用方一律用 **`awk index($0,p)==1`（行首锚定·定字符串·对 `.`/`@` 元字符天然免疫）**：
 
 - **读**（switch-account.sh `read_token_file` / 到期巡检）：`awk -v p="<prefix>" 'index($0,p)==1' "$VAULT_FILE" | head -1` —— `index($0,p)==1` 只取「以该前缀**起头**」的行（行首锚定），既对 `.`/`@` 元字符免疫、又不会被重叠标识的子串误匹配（P2-5：`grep -F` 子串匹配会取错行→整行畸形当 token）。取到行后**参数展开切前缀**取值，绝不 `echo` 整行。
-- **删 / 重写**（account-add.sh `--refresh` 删旧行 / account-delete.sh 删号）：用 `awk index($0,p)!=1` 保留「不以 `<email>_` 前缀起头」的行 = 删该 email 全部记录（`_TOKEN`/`_EXPIRES` 两类）。同一族行首锚定、定字符串前缀、对元字符免疫。
+- **删 / 重写**（account-add.sh 续期删旧行 / account-delete.sh 删号 / switch-account.sh writeback）：用 `awk` 保留「**既不以 `<email>_TOKEN=` 也不以 `<email>_EXPIRES=` 起头**」的行——**必须用这两个精确前缀（`fileVaultLineMatch` 的 `tokenLine`/`expiresLine`），绝不用宽 `<email>_` 前缀**（重叠标识 bug·codex round#3/#5）：宽 `<email>_` 会把 sibling 号 `<email>_bar_TOKEN=` / `<email>_bar_EXPIRES=` 也删掉、误毁另一个号使其 unswitchable（脚本接受任意非空 email、file-vault key 是纯字符串，`foo` 与 `foo_bar` 这类前缀重叠真实存在）。删本号全部记录 = 同时筛掉这两个**精确**前缀的行：`awk -v t="<email>_TOKEN=" -v x="<email>_EXPIRES=" 'index($0,t)!=1 && index($0,x)!=1'`（writeback 只删 `_TOKEN=` 保 `_EXPIRES=`，则只筛 `tokenLine` 一个）。同一族行首锚定、定字符串前缀、对元字符免疫。
 - **绝不 `. "$VAULT_FILE"`**（source 会把所有备号 token 灌进当前 env，扩大泄漏面 / 污染子进程）——逐行只切本号那行的值。
 
 > **为什么读 token 行从 `grep -F` 升到 `awk index($0,p)==1`（P2-5）**：`grep -F` 解决了「`.`/`@` 元字符误匹配」，但它仍是**子串**匹配——重叠标识下取错行，且取错行后参数展开切前缀失败 → 整行畸形当 token。`awk index($0,p)==1` 同时拿下两道（行首锚定 + 定字符串），与删/写行的 `index!=1` 同一族范式。读 token 行**绝不用 `grep -F`**。
@@ -61,6 +61,7 @@ token 读进 shell 变量后：**绝不 echo / 绝不 print / 绝不写任何日
 1. **关 xtrace（第一条可执行语句）**：`set -x`（xtrace）会把变量赋值与一切碰 token 的命令行回显明文 token 到 stderr。故脚本**无条件** `set +x`（关本 shell xtrace）+ `unset SHELLOPTS 2>/dev/null`（堵 env 继承的 `SHELLOPTS=xtrace` 在子 shell 复活 set -x），**先于任何碰 token 的代码**。两条来源都堵：① 有人 `bash -x` 显式调试；② env 继承的 xtrace。
 2. **token 绝不进 agent context / transcript / log / registry（token-blind 铁律·决策 A 细化）。** 换号现在是**无重启凭证覆写**（不再 `exec claude`）：① 用 keychain 里的 refreshToken 经 **node https POST body** 主动续期出新 access token（**绝不**用 `curl` 把 token 放命令行）；② 把续期后的完整 blob 经 **stdin 喂 node** 原子写官方凭证文件（`~/.claude/.credentials.json` `.claudeAiOauth` + `~/.claude.json` `oauthAccount`）；③ 经 **argv `-w "$blob"`** 写 keychain（**唯一例外**·见上「keychain 写」节：完整 >128 字节 blob 只能作 argv，stdin 被 `readpassphrase` 128 截断会丢 refreshToken；这道 sub-second 本机 argv 暴露按决策 A 可接受——可读 argv 者本就能读 keychain）。运行中 claude 进程在 access token 临近过期时**惰性 re-read 这三个被覆写的存储、接管新号**（进程不重启、board 不动）。
    - **网络 / 文件写仍绝不把 token 放 argv（P2-6 反模式·绝不退回）**：任何 `cmd … <token> …`（含 `env NAME=<token> cmd` 把 `NAME=<token>` 当 `env` 自己的 argv 元素、`curl -H "Authorization: Bearer <token>"` 把 token 放 curl argv）在命令执行那一刻 `ps`/process snapshot 都能看到 token——而续期 / 原子写官方文件这两条都有 stdin / POST body 这条不经 argv 的正路，故它们**绝不退回 argv**。正解一律是**经 stdin / POST body 喂**（node https 把 refreshToken 放 POST body、node 原子写经 stdin 读 blob），命令行上永远只有非密路径 / 形态参数、没有 token。**唯一例外是 keychain `security -w "$blob"`**——它没有能写完整 >128 字节的非-argv 路径（stdin 被 128 截断），故按决策 A 走 argv（窗口仅 sub-second 本机、不引入新暴露面）；这是**经审定的单点例外，不可外推**到任何有 stdin 正路的写。
+   - **refresh 端点白名单（refresh token 不进非授权端点）**：refresh token 经 POST body 续期时，**POST 到哪个 URL** 也是泄漏面——`REFRESH_TOKEN_URL` 若被污染的 env / 误抄的测试值指到非 Claude 主机或明文 http，refresh token 就被发到攻击者端（虽满足「不进 argv/log」却实质泄漏）。故 `switch-account.sh` 在**构造含 token 的 POST body 之前**先校验 host：只放行 **https 的授权 Claude/Anthropic 主机**（`*.claude.com` / `*.anthropic.com` / `claude.ai`），或**显式 opt-in（`CCM_ALLOW_LOOPBACK_REFRESH=1`）的 loopback**（测试 stub 用）；其它一律拒绝退出、**token 从未进 body、从未上网**。
 
 **诊断纪律**：排查换号失败时只打印**非密派生事实**——取没取到（`non-empty: yes/no`）、长度、首尾空白 / 嵌入换行（经典 `$(...)` 尾换行 bug）、哪条 vault 源匹配。**token 原值零诊断信号、纯负债**：泄一次（哪怕只进终端 scrollback / agent transcript）就要重新 vault 每个号。dry-run 打印一律 `token: <redacted> (长度=N)`。
 
@@ -69,6 +70,12 @@ token 读进 shell 变量后：**绝不 echo / 绝不 print / 绝不写任何日
 accounts.json **只写 vault 非密指针 + 用量快照**，**绝不写 token 值**。这不是「方便起见」的取舍——`accounts-lib.js` 的校验器**主动断言无疑似 token**：发现任何 `sk-ant-` 前缀串或 `token`/`oauth`/`secret`/`credential`/`password`/`bearer` 字段名 → 报硬错（防误写）。理由：registry 是会被 `cat` / 贴 bug 报告 / 截图 / 同步 / 备份 / 误 commit / 交给队友调试的台账——token 进去就把每个日常操作变成凭证泄漏。**「指针 vs 值」的分离让 registry 永远可安全读**：任何人读到 vault 引用，仍要过 OS keychain 解锁 / 文件 0600 权限才拿得到 token。
 
 > **`base64` / 标 `# sensitive` 不算缓解**：base64 是 `atob()` 一下就解、不是加密；JSON 不支持注释（得用 `_comment` 键），标「敏感」只让人**感觉**处理了却 ship 同一个泄漏——这是把坏版本洗过判断的最危险路径。token 进 vault，registry 进指针，没有第三条路。
+
+## 轮转后回写失败的 token 抢救（rotated-blob recovery·绝不丢唯一副本）
+
+换号 refresh 时若服务端**轮转**了 refresh token（响应给了新 refresh token），那份新 blob（`NEW_BLOB`）就是新 refresh token 的**唯一副本**——而服务端多半已**吊销**旧 refresh token。此时若回写 cc-master vault 失败（vault 目录不可写 / 磁盘满 / keychain 错），继续到覆写官方存储、而覆写又回滚 → `NEW_BLOB` 被丢弃 → vault 只剩已吊销旧 token = 该号 **brick**（再也切不进·需手动重 login）。
+
+故 `switch-account.sh` 在「轮转 + 回写失败」时：① **硬失败**（未覆写任何官方存储、registry 原封不动·不冒险继续到会丢 `NEW_BLOB` 的路）；② 但在 exit 前先把 `NEW_BLOB` **抢救到一个 0600 recovery 文件**（`${CC_MASTER_HOME:-~/.claude/cc-master}/rotated-blob-recovery.<email>.<pid>.json`·token 经 stdin 喂 node 原子写·绝不进 argv / 绝不 echo·与 file vault 同明文 0600 floor）；③ 把该 recovery 文件**路径**（非密）告诉用户怎么手动装回 vault。这样轮转后的唯一 token **绝不因回写失败而永久丢失**——最坏也只是一次手动恢复，而非 brick。连 recovery 文件都写不进（home 不可写）才真无可挽回，此时如实提示重 login。
 
 ## file vault 明文 floor 的诚实局限
 

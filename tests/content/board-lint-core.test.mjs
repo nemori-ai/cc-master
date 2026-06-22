@@ -103,6 +103,107 @@ test('R4: deps-graph integrity (dangling / self-loop / cycle) are hard errors', 
   assert.ok(ruleSet(lintBoard(JSON.stringify({ schema: 'cc-master/v1', goal: 'g', owner: { active: true, session_id: 's' }, git: {}, tasks: [{ id: 'A', status: 'ready', deps: ['B'] }, { id: 'B', status: 'ready', deps: ['A'] }] })).errors).has('R4c'));
 });
 
+// ── R7：nesting 不变式（D3.3 / PR-2·路 ii lint 侧）─────────────────────────────────────────────
+// 口径与 board-graph-core.js 的 rollupConsistency()/checkDepth1()/parentCycles() 完全一致（同语义两处实现）。
+const withTasks = (tasks) => JSON.stringify({
+  schema: 'cc-master/v1', goal: 'g', owner: { active: true, session_id: 's' }, git: { worktree: '', branch: '' }, tasks,
+});
+
+test('R7a: parent pointing at a nonexistent id is a hard error (dangling parent, 类比 R4a)', () => {
+  const r = lintBoard(withTasks([{ id: 'C', status: 'ready', deps: [], parent: 'GHOST' }]));
+  assert.ok(ruleSet(r.errors).has('R7a'), 'R7a dangling parent is hard error');
+  const e = r.errors.find((x) => x.rule === 'R7a');
+  assert.match(e.message, /GHOST/, 'names the missing owner id so agent can locate it');
+});
+
+test('R7b: depth>1 (owner 的子又有子) is a hard error', () => {
+  // M1 是 owner（C 的 parent）；C 自己又是 GC 的 parent —— C 既是子又是父 = depth>1。
+  const r = lintBoard(withTasks([
+    { id: 'M1', status: 'in_flight', deps: [] },
+    { id: 'C', status: 'in_flight', deps: [], parent: 'M1' },
+    { id: 'GC', status: 'ready', deps: [], parent: 'C' },
+  ]));
+  assert.ok(ruleSet(r.errors).has('R7b'), 'R7b depth>1 is hard error');
+});
+
+test('R7c: parent self-loop is a hard error', () => {
+  const r = lintBoard(withTasks([{ id: 'A', status: 'ready', deps: [], parent: 'A' }]));
+  assert.ok(ruleSet(r.errors).has('R7c'), 'R7c parent self-loop is hard error');
+});
+
+test('R7c: parent 2-cycle (A.parent=B, B.parent=A) is a hard error', () => {
+  const r = lintBoard(withTasks([
+    { id: 'A', status: 'ready', deps: [], parent: 'B' },
+    { id: 'B', status: 'ready', deps: [], parent: 'A' },
+  ]));
+  assert.ok(ruleSet(r.errors).has('R7c'), 'R7c parent 2-cycle is hard error');
+});
+
+test('R7e: malformed parent (key present, value not a non-empty string) is a hard error', () => {
+  // parent 是硬 waist 字段（ADR-012·单值 string 或缺省）。畸形值会被 buildGraph 静默丢弃 → R7 误当顶层节点、
+  // rollup/depth=1 保护静默失效。一个 typo（数组 / 数字 / 空串）必须硬报错。口径对齐 R3d（deps 类型 hard error）。
+
+  // 数组 parent:["M1"] → hard R7e
+  const arr = lintBoard(withTasks([
+    { id: 'M1', status: 'in_flight', deps: [] },
+    { id: 'C', status: 'ready', deps: [], parent: ['M1'] },
+  ]));
+  assert.ok(ruleSet(arr.errors).has('R7e'), 'array parent is hard R7e');
+  const e = arr.errors.find((x) => x.rule === 'R7e');
+  assert.equal(e.task, 'C', 'names the offending task so agent can locate it');
+  assert.match(e.message, /parent/, 'message points at parent');
+
+  // 数字 parent:123 → hard R7e
+  const num = lintBoard(withTasks([{ id: 'C', status: 'ready', deps: [], parent: 123 }]));
+  assert.ok(ruleSet(num.errors).has('R7e'), 'numeric parent is hard R7e');
+
+  // 空串 parent:"" → hard R7e（空 string 非合法 owner 引用）
+  const empty = lintBoard(withTasks([{ id: 'C', status: 'ready', deps: [], parent: '' }]));
+  assert.ok(ruleSet(empty.errors).has('R7e'), 'empty-string parent is hard R7e');
+});
+
+test('R7e: legal parent ("M1") and absent parent produce no R7e error', () => {
+  // 合法单值 string parent — 不报 R7e（M1 是存在的 owner）。
+  const legal = lintBoard(withTasks([
+    { id: 'M1', status: 'in_flight', deps: [] },
+    { id: 'C', status: 'ready', deps: [], parent: 'M1' },
+  ]));
+  assert.equal(legal.errors.filter((e) => e.rule === 'R7e').length, 0, 'legal string parent: no R7e');
+
+  // 无 parent 键 — 缺省合法顶层节点，silent-on-unknown 不破。
+  const absent = lintBoard(withTasks([{ id: 'C', status: 'ready', deps: [] }]));
+  assert.equal(absent.errors.filter((e) => e.rule === 'R7e').length, 0, 'absent parent: no R7e');
+});
+
+test('R7d: done owner with a non-done child WARNS (not a hard fail — 容瞬态)', () => {
+  const r = lintBoard(withTasks([
+    { id: 'M1', status: 'done', deps: [] },
+    { id: 'M1.a', status: 'done', deps: [], parent: 'M1' },
+    { id: 'M1.b', status: 'in_flight', deps: [], parent: 'M1' },
+  ]));
+  assert.equal(r.errors.length, 0, 'R7d is warn-only, never a hard error: ' + JSON.stringify(r.errors));
+  assert.ok(ruleSet(r.warnings).has('R7d'), 'R7d rollup inconsistency warns');
+  const w = r.warnings.find((x) => x.rule === 'R7d');
+  assert.match(w.message, /M1\.b/, 'names the non-done child');
+});
+
+test('R7: legal nested board (owner + all-done children) is clean — zero R7 errors/warnings', () => {
+  const r = lintBoard(withTasks([
+    { id: 'M1', status: 'done', deps: [] },
+    { id: 'M1.a', status: 'done', deps: [], parent: 'M1' },
+    { id: 'M1.b', status: 'done', deps: ['M1.a'], parent: 'M1' },
+  ]));
+  assert.equal(r.errors.filter((e) => e.rule.startsWith('R7')).length, 0, 'no R7 errors: ' + JSON.stringify(r.errors));
+  assert.equal(r.warnings.filter((w) => w.rule.startsWith('R7')).length, 0, 'no R7 warnings: ' + JSON.stringify(r.warnings));
+});
+
+test('R7 backward-compat: a board with NO parent fields produces zero R7 errors/warnings (silent-on-unknown)', () => {
+  // The default-shaped GOOD board (flat, no parent) must stay completely clean under R7.
+  const r = lintBoard(GOOD);
+  assert.equal(r.errors.length, 0, 'old flat board: zero errors');
+  assert.equal(r.warnings.length, 0, 'old flat board: zero warnings');
+});
+
 test('R5/R6: degradable fields only WARN, never hard-fail', () => {
   const r = lintBoard(JSON.stringify({
     schema: 'cc-master/v1', goal: 'g', owner: { active: true, session_id: 's' }, git: { worktree: '', branch: '' },

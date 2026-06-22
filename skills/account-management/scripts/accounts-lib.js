@@ -320,6 +320,155 @@ function emptyRegistry() {
   return { schema: SCHEMA, accounts: {} };
 }
 
+// ── 并发串行化：registry 读-改-写锁（codex round#7 Finding C·防并发 lost-update）──────────────────────
+// 病根：saveRegistry 的 tmp+rename 只防**单次写**撕裂，挡不住「load→改→save」跨步的并发——两个换号/录号进程
+//   各自 loadRegistry 拿到同一份旧态、各自改、后写的 rename 覆盖先写的改动（丢新增号 / active 反映错号）。
+// 修：mutateRegistry(regPath, mutator) 在**整个 load-改-save 序列**外加一把咨询文件锁（O_EXCL lockfile·带重试 +
+//   超时 + stale 回收），让并发的 RMW 串行执行——每个 mutator 在持锁期间 load 到**最新**态再改再存，消除 lost-update。
+// token-blind 不变：锁文件只含非密 pid/时间戳·绝不碰 token；mutator 只动非密 registry（token 那一坨永在 vault）。
+function lockPath(regPath) { return (regPath || defaultRegistryPath()) + '.lock'; }
+
+// 同步睡眠 ms（让出 CPU·非 busy-spin）：Atomics.wait 在一个无人通知的 buffer 上等待，到时返回 'timed-out'。
+//   node -e 单次调用是同步流程（无 event loop 调度点），故用它实现「真睡眠」；不可用时（极旧 node）退化到 busy-spin。
+function sleepSyncMs(ms) {
+  try {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.max(1, ms | 0));
+  } catch (_e) {
+    const until = Date.now() + ms; while (Date.now() < until) { /* fallback busy-spin */ }
+  }
+}
+
+// 取锁：O_EXCL 独占建 lockfile（已存在 = 别人持锁）。带重试（默认最多 ~5s）+ stale 回收（持锁进程已死 / 锁超
+//   过 staleMs 视作残留·抢占）。返回锁句柄（{ path }）或抛错（超时未取到）。绝不写 token 进锁文件。
+function acquireRegistryLock(regPath, opts) {
+  const o = opts || {};
+  const lp = lockPath(regPath);
+  // timeout 默认 20s（registry RMW 每次都是毫秒级·20s 容得下数十个并发排队·又远短于会让用户以为卡死的时长）；
+  //   CCM_REGISTRY_LOCK_TIMEOUT_MS 可 env 覆写。staleMs 默认 30s（持锁进程异常死亡的残锁回收窗口·远大于正常 RMW）。
+  const timeoutMs = Number.isFinite(o.timeoutMs) ? o.timeoutMs
+    : (Number.isFinite(Number(process.env.CCM_REGISTRY_LOCK_TIMEOUT_MS)) && Number(process.env.CCM_REGISTRY_LOCK_TIMEOUT_MS) > 0
+        ? Number(process.env.CCM_REGISTRY_LOCK_TIMEOUT_MS) : 20000);
+  // staleMs 默认 120s（残锁回收窗口）：registry RMW 是毫秒级，但**高负载 / CPU 饥饿下持锁进程可能被 OS 长时间
+  //   descheduled**——staleMs 太小会**误判活着的持锁者为 stale 而抢占 → lost-update**。取 120s 远超任何真实 RMW、
+  //   又仍能回收真正异常死亡的残锁（进程已死还有 pid 检测兜底）。CCM_REGISTRY_LOCK_STALE_MS 可 env 覆写。
+  const staleMs = Number.isFinite(o.staleMs) ? o.staleMs
+    : (Number.isFinite(Number(process.env.CCM_REGISTRY_LOCK_STALE_MS)) && Number(process.env.CCM_REGISTRY_LOCK_STALE_MS) > 0
+        ? Number(process.env.CCM_REGISTRY_LOCK_STALE_MS) : 120000);
+  const start = Date.now();
+  // **livePid（codex round#13 Finding A·锁记录的 pid 必须在临界区期间活着）**：stale 判定靠 pid 存活性——若锁文件
+  //   记的 pid 在临界区跑完前就退出（如 bash 经一次性 `node` 进程取锁、那 node 立即退出·临界区在 bash 里跑），
+  //   并发对手会立刻把这个**已死 pid** 判 stale 破锁 → 锁形同虚设。故允许调用方传一个**会在临界区期间存活的 pid**
+  //   （bash 的 `$$`·经 opts.livePid / 第 1 个 CLI arg）记进锁文件；缺省 = 本 node 进程 pid（node 内全程持锁的场景）。
+  const livePid = (o && Number.isInteger(o.livePid) && o.livePid > 0) ? o.livePid : process.pid;
+  // 确保父目录在（与 saveRegistry 一致）。
+  try { fs.mkdirSync(path.dirname(lp), { recursive: true, mode: 0o700 }); } catch (_e) { /* best-effort */ }
+  // **owner token（codex round#8 Finding A·防 stale 抢占后原持有者误删新锁）**：每次取锁生成一个唯一 token 写进锁
+  //   文件；释放时只有锁文件里仍是**我的** token 才 unlink——若我已被判 stale、别人抢了锁（写了新 token），我 resume
+  //   后 release 读到不是我的 token → 不删，不会误删新持有者的锁、不会让第三者并发进入临界区。
+  const ownerToken = String(livePid) + '-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  for (;;) {
+    try {
+      // wx = O_CREAT|O_EXCL：文件已存在则抛 EEXIST（别人持锁）。内容仅非密 pid+时刻+owner token（诊断 / stale / 归属判定用·零 token）。
+      const fd = fs.openSync(lp, 'wx', 0o600);
+      try { fs.writeSync(fd, JSON.stringify({ pid: livePid, at: nowIso(), owner: ownerToken })); } catch (_e) { /* 内容 best-effort */ }
+      fs.closeSync(fd);
+      return { path: lp, owner: ownerToken };
+    } catch (e) {
+      if (!e || e.code !== 'EEXIST') throw e; // 非「已存在」的真错（权限等）→ 抛。
+      // 锁已存在：判 stale → 抢占；否则等一会儿重试。
+      // **pid 存活性是权威·绝不只凭 mtime 破锁（codex round#12 Finding B）**：旧码先按 mtime>staleMs 置 stale、再仅在
+      //   !stale 时查 pid——于是一个**活着但慢/被 descheduled** 的持锁者，只要锁文件 mtime 老过阈值就被别人 unlink
+      //   破锁 → 两进程同进临界区 → lost-update / vault 行复活。修：**先查 pid**——
+      //     · pid 可读且**活着**（process.kill(pid,0) 成功）→ **永不 stale**（活持有者·无论 mtime 多老都不破）；
+      //     · pid 可读且**已死**（ESRCH）→ stale（死持有者·安全回收）；
+      //     · pid 不可读（锁文件坏 / 缺 pid）**且 mtime 老过 staleMs** → stale（坏锁兜底回收）；mtime 单独**绝不**破活锁。
+      let stale = false;
+      let observedOwner = null;   // stale 判定时观察到的 owner token·破锁前 compare-and-delete 用（codex round#13 Finding C）。
+      try {
+        const st = fs.statSync(lp);
+        let pidKnown = false, pidAlive = false;
+        try {
+          const info = JSON.parse(fs.readFileSync(lp, 'utf8') || '{}');
+          observedOwner = (info && typeof info.owner === 'string') ? info.owner : null;
+          if (info && typeof info.pid === 'number') {
+            pidKnown = true;
+            try { process.kill(info.pid, 0); pidAlive = true; } // 活着 → 不抛。
+            catch (ke) { if (ke && ke.code === 'ESRCH') pidAlive = false; else pidAlive = true; } // EPERM 等 = 进程在（别的用户/权限）→ 当活着·保守不破。
+          }
+        } catch (_e) { pidKnown = false; observedOwner = null; /* 锁文件坏 / 读不出 pid */ }
+        if (pidKnown) {
+          stale = !pidAlive;                         // 活 → 不破；死 → 回收。mtime 不参与（活锁绝不因老 mtime 被破）。
+        } else {
+          stale = (Date.now() - st.mtimeMs > staleMs); // 仅当 pid 不可读（坏锁）才退回 mtime 兜底回收。
+        }
+      } catch (_e) { /* stat 失败（锁刚被释放？）→ 下轮重试直接抢 */ }
+      // **破 stale 锁前 compare-and-delete（codex round#13 Finding C·防破到别人的新锁）**：旧码据**早先**的 read/stat
+      //   就直接 unlink——若 A 与 B 同时判一把 stale 锁、A 先删并取了**新锁**（新 owner），B 的 unlink 会删掉 A 的新锁、
+      //   让第三者并发进入临界区。修：unlink 前**重读**锁文件确认 owner 仍是当初观察到的那个（stale 锁的 owner）才删；
+      //   owner 已变（被别人抢/重建）→ 不删（不是同一把锁了），回去重试。owner 不可读（坏锁）则按原样删（兜底）。
+      if (stale) {
+        let okToUnlink = true;
+        if (observedOwner != null) {
+          try {
+            const cur = JSON.parse(fs.readFileSync(lp, 'utf8') || '{}');
+            if (cur && typeof cur.owner === 'string' && cur.owner !== observedOwner) okToUnlink = false; // 已易主 → 不是那把 stale 锁，绝不删。
+          } catch (_e) { /* 读不出 = 坏锁/刚被删 → 按可删兜底（unlink 失败也无碍） */ }
+        }
+        if (okToUnlink) { try { fs.unlinkSync(lp); } catch (_e) { /* 竞争下别人已删·重试即可 */ } }
+        continue;
+      }
+      if (Date.now() - start > timeoutMs) {
+        throw new Error('acquireRegistryLock：取 registry 锁超时（' + timeoutMs + 'ms）——另有进程长时间持锁（' + lp + '）。稍后重试，或确认无卡死进程。');
+      }
+      // 同步等待 ~15-25ms 再重试（node -e 单次调用里无 async 调度）。**用 Atomics.wait 真睡眠·让出 CPU**（而非
+      //   busy-spin 烧满一核——高并发下 busy-spin 会让所有等锁进程争 CPU、拖慢持锁者 RMW、放大锁竞争·codex round#8 观察）。
+      //   抖动一点（15 + rand*10）减少多进程同步唤醒的 thundering-herd。
+      sleepSyncMs(15 + Math.floor(Math.random() * 10));
+    }
+  }
+}
+
+function releaseRegistryLock(handle) {
+  if (!handle || !handle.path) return;
+  // **只删属于自己的锁（codex round#8 Finding A）**：读锁文件确认 owner token 仍是我的才 unlink。若我曾被判 stale、
+  //   别人已抢锁（owner 变了）/ 锁已被回收（文件不在），就**不删**——绝不误删新持有者的锁让第三者并发进入临界区。
+  //   无 owner（旧式 handle / 读不出）则保守按「是我的」删（向后兼容·单进程场景无害）。
+  try {
+    if (handle.owner) {
+      let cur = null;
+      try { cur = JSON.parse(fs.readFileSync(handle.path, 'utf8') || '{}'); } catch (_e) { cur = null; }
+      if (cur && cur.owner && cur.owner !== handle.owner) return; // 锁已易主 → 不是我的，绝不删。
+    }
+    fs.unlinkSync(handle.path);
+  } catch (_e) { /* 已被回收 / 不存在 → 无碍 */ }
+}
+
+// mutateRegistry(regPath, mutator) —— 在锁内做完整 load→mutate→save（消除并发 lost-update·codex round#7 Finding C）。
+//   mutator(reg) 收**锁内 load 的最新 registry**、原地改它（调 upsertAccount/setActive/recordSwitchOut… 等助手）；
+//   返回后本函数 saveRegistry 落盘、释放锁。任何异常都先释放锁再抛（绝不漏锁）。返回 saveRegistry 的落盘路径。
+//   regPath 缺省 = defaultRegistryPath()。token-blind：只动非密 registry，锁文件零 token。
+function mutateRegistry(regPath, mutator) {
+  const rp = regPath || defaultRegistryPath();
+  const handle = acquireRegistryLock(rp);
+  try {
+    const reg = loadRegistry(rp);   // 锁内 load 最新态（并发对手的改动若先落盘·这里能看到）。
+    mutator(reg);                   // 原地改（调用方用 lib 助手）。
+    return saveRegistry(reg, rp);   // 锁内落盘（原子 tmp+rename + 校验 + token-leak 拒写）。
+  } finally {
+    releaseRegistryLock(handle);    // 无论成功 / 抛错都释放锁（不漏锁）。
+  }
+}
+
+// ── 通用文件锁（给 file vault 的「读-筛-写-rename」跨进程串行化用·codex round#9 Finding C）─────────────────
+//   file vault（accounts.env）的重写在单进程内是原子（temp+rename），但**跨进程不串行**：delete 与 add/writeback
+//   并发改同一 accounts.env 时各自筛旧快照、最后 mv 者赢 → 可能复活已删 token 行 / 丢另一个号刚写的 blob。
+//   修：用与 registry 同一把锁原语（O_EXCL + owner token + stale 回收），锁住 vault 文件的整段 read-filter-write-rename。
+//   withFileLock 是给 bash 用的薄封装：取 <vaultPath>.lock → 跑 fn() → 释放（无论成功/抛错·绝不漏锁）。
+//   token-blind：锁文件只含非密 pid/at/owner·绝不碰 token；fn 内的 vault 重写仍是 bash 的事（只读前缀·不读值）。
+//   注意：fn 在 node 里只能做 node 能做的（这里主要给 bash 当「持锁跑一段 shell」用·见下 acquireFileLock/releaseFileLock）。
+function acquireFileLock(targetPath, opts) { return acquireRegistryLock(targetPath, opts); }
+function releaseFileLock(handle) { return releaseRegistryLock(handle); }
+
 // ── 写：saveRegistry(reg, path?) ──────────────────────────────────────────────────────────────────
 // 原子写（写 tmp + rename）、mkdir -p 目录、0600 权限、刷新 updated_at。
 // 写前过 validateRegistry——有 token-leak / 结构硬 error 就**拒写抛错**（永不把含 token 的 entry 落盘）。
@@ -585,6 +734,13 @@ module.exports = {
   loadRegistry,
   saveRegistry,
   emptyRegistry,
+  // 并发串行化锁（codex round#7 Finding C·防并发 lost-update）。
+  mutateRegistry,
+  acquireRegistryLock,
+  releaseRegistryLock,
+  // 通用文件锁（codex round#9 Finding C·file vault 跨进程串行化）。
+  acquireFileLock,
+  releaseFileLock,
   // entry 助手。
   upsertAccount,
   removeAccount,

@@ -2,7 +2,7 @@
 
 > For English, see [README.md](README.md)。
 
-![version](https://img.shields.io/badge/version-0.8.0-blue)
+![version](https://img.shields.io/badge/version-0.9.0-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![ship-anywhere](https://img.shields.io/badge/ship--anywhere-Bedrock%20%7C%20Vertex%20%7C%20Foundry-7c3aed)
 ![requires](https://img.shields.io/badge/requires-Node%2022%2B%20%2B%20bash-orange)
@@ -78,6 +78,22 @@ flowchart LR
 | **跨会话续接** | 否 | 仅限同一会话 | **能**——靠 board 文件重新认回 | board（持久存档文件） |
 | **端点验收** | 临时随手 | 写在脚本里 | 总指挥独立验收 | 镜头 6 + 决策程序（Skill A） |
 | **配额感知** | 否 | 否 | **能**——账户权威 5h/**7d** `used_percentage`（从 status line 捕获；本地反推作 fallback） | `usage-pacing.js`（Stop hook）+ `statusline-capture.js` + `cc-usage.sh` |
+
+---
+
+## 0.9.0 新特性 —— 把图嵌套起来，把决策备成采访
+
+0.9.0 让 board 本身更有深度、让 human-in-the-loop 更聪明：一个大到单张扁平任务表装不下的目标，现在可以拥有*嵌套*的调度子图；而每一个指挥抛回给你的决策，都以一份备好的采访抵达，而不是一个失了上下文的干问题。
+
+### dag-in-dag —— 嵌套调度子图（max depth 1）
+
+真实规模的目标塞不进一张扁平 `tasks[]`——你想按模块或阶段把它分组。0.9.0 让一个 **owner** 节点拥有一层子任务（一个子计划），而 cc-master 仍自己横向调度这些子节点——派发 / WIP / 端点验收 / watchdog 全照旧适用。它仍是**一张扁平 board 文件**：每个 task 仍 top-level 留在 `tasks[]`，嵌套靠一个新的关系字段 `tasks[].parent` 表达。两条正交的边各司其职——`deps`（调度：open、可指任意节点、上游一就绪就触发）与 `parent`（容器 / rollup：封装、一个子最多一个父）。`parent` 升入硬 narrow-waist（cc-master 史上最大的 hook 改动）；一个 `done` 的 owner 若子节点没全 done 会触发一条**非阻断**的 Stop-gate 软提醒，绝非硬拦。（见 [ADR-012](adrs/ADR-012-parent-waist-and-rollup-aware-stop-gate.md)。）
+
+它配套一套**图分析库 + CLI**（`board-graph.js`，hook 也复用同一份）：机器算临界路径 / CPM（带诚实的 `weight_source` 标注——缺时间锚时只报结构、不报假小时数）、并行度（T₁/T∞）、impact（哪个节点 gating 最多下游）、ready 集、owner rollup——专为依赖图交错到心算靠不住时而备。
+
+### 决策采访 —— 每个抛回给你的决策都备好了再来
+
+当编排撞上一个只有人能拍的决策（`blocked_on:"user"`），你过去是被空投到一个失了上下文的决策点。0.9.0 把它变成一场**备好的采访**。趁着 idle，指挥在那个节点上挂一份自说明的 `decision_package`（叙事上下文、在问什么、要什么——决策 / 建议 / 方案——以及候选项各自的权衡）。`/cc-master:view` 把它渲成一张**富决策卡**，带一键复制入口命令。你在一个独立、满血的 session 里跑 **`/cc-master:discuss <node-id>`**：它载入采访包、做**时效性校验**（上游在备好之后变了就先 re-ground），陪你把决策谈透，再把结论写成一份 sidecar——绝不写 board。指挥在下一次 recon 时消化那份 sidecar、据此重规划。你的时间和指挥的时间彻底解耦——而且因为是一个独立 session 承载讨论，「指挥永不演奏」这条红线变得*更强*、而非更弱。
 
 ---
 
@@ -212,6 +228,7 @@ claude plugin install cc-master@cc-master
 /cc-master:as-master-orchestrator --resume [选择器]  # 在新 session 里接续一块已存在的 board（见下）
 /cc-master:status                                   # 渲染 board 摘要（board view）+ 校验「窄腰」契约
 /cc-master:view                                     # 在浏览器里打开只读的 board DAG 可视化（webview）
+/cc-master:discuss <node-id>                        # 把指挥抛回给你的决策谈清楚（见下）
 /cc-master:handoff-to-new-session                   # 把 board 优雅交接给一个新 session（--resume 的写侧）
 /cc-master:accounts --add|--delete|--refresh <email> | --list   # 管理无重启换号的备号池
 /cc-master:stop                                     # 归档 board 并收尾（board 保留，不删除）
@@ -241,6 +258,19 @@ DAG 依赖图（hero）、看板卡片、按状态分组的列表——全都活
 ![cc-master:view —— 按状态分组的列表视图（深色）](docs/images/view-list-dark.png)
 
 *☰ LIST —— 按状态分组的行，`/cc-master:status` 的网页孪生。*
+
+### 把指挥抛回给你的决策谈清楚
+
+当编排撞上一个只有人能拍的决策，它不会甩一个干问题给你。趁着 idle，它会在那个 `blocked_on:"user"` 节点上预先备好一份自说明的**决策包（decision package）**——它怎么走到这一步、到底在问什么、是要*决策 / 建议 / 方案*、以及候选项各自的权衡。在 `/cc-master:view` 里，那张 awaiting-you 卡片就升级成一张**富决策卡**，底部一个一键**复制 `/cc-master:discuss <node-id>`** 的按钮。
+
+把命令粘进一个独立、满血的终端 session，你就能*在方便时、对着准确且仍有时效的完整依据*把这个决策谈清楚——discuss session **进入时会重新核对时效性**，若问题在期间又跑了的活下被架空就先 re-ground，再帮你判断（它能翻代码、翻 board）。谈完它把结论写成一份**版本化、append-only** 的 `<board-stem>--<node-id>--<STAMP>.decision.md` sidecar——要点摘要 + 完整决策文档——指挥在下一次 idle/recon 时拾取它（聊过不止一次就读**最新**那份）来重规划、清掉这道闸。没有实时通知、谁都不打断谁：人类的注意力，被重新分配到了刀刃上。
+
+而且**讨论完即使指挥还没消化，卡片也能立刻看到痕迹**。谈过一次后，该节点在 `/cc-master:view` 的卡片上就显示 **💬 已讨论 N 次** + 最近一次结论的 TL;DR，可逐次展开（直接从 sidecar 读，经一条只读 `/decisions.json` 路由——viewer 仍零联网零 POST）。下次再点进来你一眼就知道*这个决策聊过没、聊了几次、聊出啥*——不用等指挥下一拍 recon。
+
+```
+/cc-master:discuss <node-id>   # 在一个新 session 里跑 —— 确切命令从 /cc-master:view 的决策卡上复制
+                               # （复制出的命令默认带 --board <board-stem>，新 session 即便同 home 下还开着别的 orchestration 也绝不窜板）
+```
 
 ### 在新 session 里接续一块已存在的 board
 

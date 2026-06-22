@@ -168,37 +168,125 @@ function lintBoard(text) {
 
   // ── R4：deps 图完整性（设计稿 §2.2；本 lint 相对 hook 现状的最大增量）──────────────────────────
   // 只对「id 合法、deps 是字符串数组」的 task 参与图校验（坏 task 已在 R3 报过，避免重复噪声）。
+  //
+  // 图构建本身（邻接表 + 悬挂/自环识别 + parent 倒排）已抽到纯函数 buildGraph（D3.2 接缝，喂 board-graph-core）。
+  //   lintBoard 调它拿结构，再把 buildGraph 已识别出的 dangling/selfLoops 转成 R4a/R4b 报告——
+  //   报告行为**字节级不变**（纯重构：同一组 dangling/selfLoops、同一 findCycle 环、同样的措辞）。
+  //   ★D3：buildGraph 算 parentOf/children 供库导出 + R7 nesting 校验（D3.3 / PR-2 已落地·见下方 R7 段）。
+  //   parent 现是硬 waist 字段（ADR-012），R7 用 buildGraph 的 parent 倒排做 nesting 不变式校验。
   const validIds = ids; // 已存在的 id 集合
-  const graph = new Map(); // id -> [dep, ...]（只含指向存在 id 的边，供环检测）
-  for (const [id, t] of taskById) {
-    const deps = Array.isArray(t.deps) ? t.deps.filter((d) => typeof d === 'string') : [];
-    const cleanDeps = [];
-    for (const d of deps) {
-      // R4a 无悬挂引用
-      if (!validIds.has(d)) {
-        err('R4a',
-          `${id}.deps 含 "${d}"，但没有任何 task 的 id 是 "${d}"。` +
-          `坏什么：webview 静默丢这条依赖边，且 ${id} 永远不会因上游完成而解锁。\n` +
-          `  怎么修：把 "${d}" 改成真实存在的上游 id，或从 ${id}.deps 删掉它。现有 id：${[...validIds].join(', ')}。`, id);
-        continue;
-      }
-      // R4b 无自环
-      if (d === id) {
-        err('R4b',
-          `${id}.deps 含它自己（自环）。坏什么：${id} 依赖自己 → 永远 blocked、永不 ready。怎么修：从 ${id}.deps 删掉 "${id}"。`, id);
-        continue;
-      }
-      cleanDeps.push(d);
+  const g = buildGraph(tasks);
+  // R4a/R4b：buildGraph 已识别 dangling/selfLoops 并记录其在 task→dep 顺序里的相对位置（edgeIssues），
+  //   这里按那个统一顺序逐条转报告——与抽取前「逐 task、task 内逐 dep、R4a/R4b 交错」的报告顺序字节级一致。
+  for (const issue of g.edgeIssues) {
+    if (issue.kind === 'dangling') {
+      err('R4a',
+        `${issue.id}.deps 含 "${issue.dep}"，但没有任何 task 的 id 是 "${issue.dep}"。` +
+        `坏什么：webview 静默丢这条依赖边，且 ${issue.id} 永远不会因上游完成而解锁。\n` +
+        `  怎么修：把 "${issue.dep}" 改成真实存在的上游 id，或从 ${issue.id}.deps 删掉它。现有 id：${[...validIds].join(', ')}。`, issue.id);
+    } else { // 'selfLoop'
+      err('R4b',
+        `${issue.id}.deps 含它自己（自环）。坏什么：${issue.id} 依赖自己 → 永远 blocked、永不 ready。怎么修：从 ${issue.id}.deps 删掉 "${issue.id}"。`, issue.id);
     }
-    graph.set(id, cleanDeps);
   }
   // R4c 无环（DFS 着色找有向环）。
-  const cycle = findCycle(graph);
+  const cycle = findCycle(g.upstream);
   if (cycle) {
     err('R4c',
       `deps 图存在环：${cycle.join(' → ')} → ${cycle[0]}。` +
       `坏什么：环上的任务互相等待 → 永远 ready 不了 → 编排死锁；viewer 拓扑/临界路径算法在环上行为未定义。\n` +
       `  怎么修：打破环——删掉环上某条 deps 边，让依赖关系回到无环的 DAG。`);
+  }
+
+  // ── R7：nesting 不变式（D3 PR-2 / D3.3 · 路 ii 的 lint 侧）──────────────────────────────────────
+  // `parent` 是 D3 升入硬窄腰的新 hook-dependent 字段（ADR-012）：单值 string，指向一个存在的 owner id，
+  //   且该 owner 自己不能再有 parent（depth=1 type 不变式·设计稿 §1.3/§2.1）。R7 用 buildGraph 已产出的
+  //   parentOf（child→owner）/ children（owner→[child...]）实现——**不 require board-graph-core**（那会造成
+  //   循环依赖：board-graph-core require 本文件的 buildGraph，反向不行）。R7 的检查全是 flat 集合运算，便宜。
+  //
+  //   ★口径与 board-graph-core.js 的 rollupConsistency()/checkDepth1()/parentCycles() 完全一致（同一语义两处
+  //     实现）：DONE 只认 'done'；depth1 违例 = owner 的子自己又被指为 parent（g.children.has(child)）；parent 环
+  //     = 把 parentOf 当邻接（每点 ≤1 出边）跑 findCycle。一份口径，lint 侧与库侧字节对齐。
+  //
+  //   silent-on-unknown 不破：旧板无 `parent` = 缺省 = 合法顶层节点（parentOf 为空 → R7 全不报）；
+  //     `parent` 现进 known 字段白名单（buildGraph 只收非空字符串 parent 边）。R7e 守类型边界：parent 键
+  //     存在但值非「非空 string」（数组 / 数字 / 空串）→ hard error（否则 buildGraph 静默丢弃、套娃保护失效）。
+  const { parentOf, children } = g;
+
+  // R7e parent 类型（hard error，口径对齐 R3d「deps 必须是字符串数组否则 hard error」）。
+  //   parent 现是硬 waist 字段（ADR-012·单值 string 或缺省）。buildGraph 只收非空字符串 parent 边——
+  //   非字符串（数组 parent:["M1"] / 数字 parent:123）或空串会被它**静默丢弃**、parentOf 不含该 child，
+  //   于是 R7 全家把它当顶层节点处理（零报错 + rollup 检查失效）。一个 typo 就悄悄关掉套娃/rollup 保护，
+  //   故畸形 parent 必须硬报错。**缺省（无 parent 键）仍合法**（顶层节点·silent-on-unknown 不破）。
+  //   ★这一趟扫原始 tasks（不是 buildGraph 的 parentOf——畸形值已被它丢掉），只对「id 合法、有 parent 键」者校验。
+  for (const t of tasks) {
+    if (!t || typeof t !== 'object' || Array.isArray(t)) continue;
+    if (typeof t.id !== 'string' || t.id === '' || taskById.get(t.id) !== t) continue;
+    if (!Object.prototype.hasOwnProperty.call(t, 'parent')) continue; // 缺省合法（顶层节点）
+    if (typeof t.parent !== 'string' || t.parent === '') {
+      err('R7e',
+        `${t.id}.parent 必须是非空字符串（指向一个存在的 owner id；当前：${JSON.stringify(t.parent)}）。` +
+        `parent 是钉死的窄腰容器边（ADR-012·单值 string 或缺省），非字符串（数组 / 数字 / 空串）会被图构建静默丢弃，` +
+        `让 R7 把它误当顶层节点、悄悄关掉套娃 depth=1 与 rollup 一致性保护（一个 typo 就关掉新保护）。\n` +
+        `  怎么修：把 parent 改成单个 owner task 的 id 字符串（如 "M1"），或删掉 parent 键让它成顶层节点。`, t.id);
+    }
+  }
+
+  // R7a parent 引用存在（hard error，类比 R4a dangling dep——parent 现在是硬 waist 字段）。
+  for (const [child, ownerId] of parentOf) {
+    if (!validIds.has(ownerId)) {
+      err('R7a',
+        `${child}.parent 是 "${ownerId}"，但没有任何 task 的 id 是 "${ownerId}"。` +
+        `坏什么：parent 是钉死的窄腰容器边（ADR-012），悬挂 parent = rollup gate 找不到 owner、webview 分组渲染丢边。\n` +
+        `  怎么修：把 "${ownerId}" 改成真实存在的 owner id，或从 ${child} 删掉 parent。现有 id：${[...validIds].join(', ')}。`, child);
+    }
+  }
+
+  // R7b depth=1（hard error）：有 parent 的节点，其 parent 指向的节点本身不能再有 parent（owner 只含 leaf）。
+  //   口径同 board-graph-core.checkDepth1()——owner 的某个子自己又被指为某节点的 parent（即 children.has(child)）。
+  for (const [owner, kids] of children) {
+    for (const c of kids) {
+      if (children.has(c)) {
+        err('R7b',
+          `${c} 既是 ${owner} 的子（有 parent="${owner}"），自己又是某些节点的 parent——违反 depth=1（owner 只能含 leaf 子，子不能再下钻）。` +
+          `坏什么：破 depth=1 type 不变式，rollup 与 webview 分组的「一层」假设崩。\n` +
+          `  怎么修：把 ${c} 的孙子节点（${children.get(c).join(', ')}）改挂到顶层 owner，或把 ${c} 升为顶层 owner（删它的 parent）。`, c);
+      }
+    }
+  }
+
+  // R7c parent 无环（hard error）：parent 链不成环（自指 A.parent=A / 2-环 A↔B）。
+  //   R7a∧R7b 成立时天然无环（owner 无 parent、子单跳指 owner），但显式第二趟兜底（口径同 parentCycles()——
+  //   把 parentOf 当邻接、每点 ≤1 出边跑 findCycle）。便宜，且若未来放松 depth=1 就需要它。
+  const padj = new Map();
+  for (const id of validIds) padj.set(id, []);
+  for (const [child, ownerId] of parentOf) {
+    if (validIds.has(child) && validIds.has(ownerId)) padj.get(child).push(ownerId);
+  }
+  const pCycle = findCycle(padj);
+  if (pCycle) {
+    err('R7c',
+      `parent 链存在环：${pCycle.join(' → ')} → ${pCycle[0]}（含自指或 2-环）。` +
+      `坏什么：parent 成环 = 容器归属无穷回指，rollup 永远算不出顶层 owner、depth=1 也被违反。\n` +
+      `  怎么修：打破环——让 parent 链回到「子单跳指向一个无 parent 的顶层 owner」。`);
+  }
+
+  // R7d rollup 一致性（warn，非 hard fail）：status=done 的 owner 不应有非 done 子。
+  //   口径同 board-graph-core.rollupConsistency()——done owner 的 children 里有非 done 的。warn 而非 hard：
+  //   容「父整合中、子刚标完」的瞬态（设计稿 §3.1 / Q-N1/Q-N3 已定 warn），硬拦会误伤。
+  for (const [owner, kids] of children) {
+    const ownerTask = taskById.get(owner);
+    if (!ownerTask || ownerTask.status !== 'done') continue;
+    const bad = kids.filter((c) => {
+      const ct = taskById.get(c);
+      return !ct || ct.status !== 'done';
+    });
+    if (bad.length) {
+      warn('R7d',
+        `${owner} 标 done，但它的子 ${bad.join(', ')} 还非 done——rollup 不一致（父不应在子未全 done 时算真 done）。` +
+        `影响：不致命（可能是父整合中、子刚标完的瞬态），但若非瞬态 = 父被错标 done 而子在飞，子图静默漏掉。\n` +
+        `  建议：确认子全 done + 父端点验收过再标父 done（Finding #12）。`, owner);
+    }
   }
 
   // ── R5：viewer 必需字段（多为 warn —— graceful-degrade，不立即坏链路；设计稿 §2.3）──────────────
@@ -249,6 +337,78 @@ function lintBoard(text) {
   }
 
   return { errors, warnings };
+}
+
+// buildGraph(tasks) — 从一个 tasks 数组建出图结构的纯函数（不抛、只读、对坏输入退化）。
+//   这是 board-lint-core 与 board-graph-core 共享的**单一真相源邻接构建器**（DRY：lint 的图、分析的图、
+//   rollup 的图都从这一份长出来，杜绝三份漂移）。lintBoard 调它拿 deps 邻接 + dangling/selfLoops 转 R4 报告；
+//   board-graph-core require 它在其上叠 CPM / impact / parallelism 等重算法。
+//
+//   返回的 upstream/downstream 只含**合法 deps 边**（指向存在 id、且非自环）——与抽取前 lintBoard 的
+//   `graph`（cleanDeps）语义一致，故 findCycle(upstream) 等价于旧的 findCycle(graph)。
+//   dangling（deps 指向不存在 id）/ selfLoops（deps 含自身）被剔出邻接、单列出来；edgeIssues 保留它们在
+//   「逐 task、task 内逐 dep」遍历里的相对顺序，让 lintBoard 能字节级复现旧报告顺序（纯重构纪律）。
+//
+//   ★D3：新增 parent 边倒排——parentOf（child→owner）+ children（owner→[child...]，按 task 出现序）。
+//   只收 parent 是非空字符串的边；parent 指向不存在 id 也照收进 parentOf（库/lint 各自判违例，buildGraph 不判）。
+//   buildGraph **不做任何 parent 合法性校验**（depth=1 / 环 / 引用存在都不在这里——那是消费者的事）。
+function buildGraph(tasks) {
+  const list = Array.isArray(tasks) ? tasks : [];
+  const ids = new Set();
+  const taskById = new Map();
+  for (const t of list) {
+    if (t && typeof t === 'object' && !Array.isArray(t) && typeof t.id === 'string' && t.id !== '') {
+      // 与 R3b 一致：重复 id 时保留**首个**（Map.set 后写覆盖，故先判 has 再 set 保首）。
+      if (!ids.has(t.id)) { ids.add(t.id); taskById.set(t.id, t); }
+    }
+  }
+
+  const upstream = new Map();   // id -> [合法 dep id...]（去悬挂、去自环）
+  const downstream = new Map(); // id -> [合法 dependent id...]
+  for (const id of ids) { upstream.set(id, []); downstream.set(id, []); }
+
+  const dangling = [];   // [{ id, dep }]
+  const selfLoops = [];  // [id]
+  const edgeIssues = []; // [{ kind:'dangling'|'selfLoop', id, dep? }]（保遍历顺序）
+
+  for (const t of list) {
+    if (!t || typeof t !== 'object' || Array.isArray(t)) continue;
+    const id = t.id;
+    if (typeof id !== 'string' || id === '' || !ids.has(id)) continue;
+    if (taskById.get(id) !== t) continue; // 重复 id 的后写者不参与图（只首个算·与 lint 一致）
+    const deps = Array.isArray(t.deps) ? t.deps.filter((d) => typeof d === 'string') : [];
+    for (const d of deps) {
+      if (!ids.has(d)) {
+        dangling.push({ id, dep: d });
+        edgeIssues.push({ kind: 'dangling', id, dep: d });
+        continue;
+      }
+      if (d === id) {
+        selfLoops.push(id);
+        edgeIssues.push({ kind: 'selfLoop', id });
+        continue;
+      }
+      upstream.get(id).push(d);
+      downstream.get(d).push(id);
+    }
+  }
+
+  // ── D3：parent 边倒排（child → owner 倒排成 owner → [children]）。
+  const parentOf = new Map();  // childId -> ownerId（parent 是非空字符串即收，不校验合法性）
+  const children = new Map();  // ownerId -> [childId...]（按 child 在 tasks 里的出现序）
+  for (const t of list) {
+    if (!t || typeof t !== 'object' || Array.isArray(t)) continue;
+    const id = t.id;
+    if (typeof id !== 'string' || id === '' || !ids.has(id)) continue;
+    if (taskById.get(id) !== t) continue;
+    const p = t.parent;
+    if (typeof p !== 'string' || p === '') continue;
+    parentOf.set(id, p);
+    if (!children.has(p)) children.set(p, []);
+    children.get(p).push(id);
+  }
+
+  return { ids, taskById, upstream, downstream, dangling, selfLoops, edgeIssues, children, parentOf };
 }
 
 // findCycle(graph: Map<id, deps[]>) → 返回环上的 id 数组（从环起点起），或 null（无环）。
@@ -309,4 +469,4 @@ function formatReport(result) {
   return lines.join('\n').replace(/\n+$/, '\n');
 }
 
-module.exports = { lintBoard, formatReport, findCycle, STATUS_ENUM, ISO_UTC_RE };
+module.exports = { lintBoard, formatReport, findCycle, buildGraph, STATUS_ENUM, ISO_UTC_RE };

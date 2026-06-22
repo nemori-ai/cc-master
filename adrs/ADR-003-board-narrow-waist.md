@@ -97,6 +97,10 @@ skeleton's purpose.
 
 ## 5. Related
 
+- [`ADR-012-parent-waist-and-rollup-aware-stop-gate.md`](ADR-012-parent-waist-and-rollup-aware-stop-gate.md)
+  — `tasks[].parent` is a field ADR-012 **extends** this waist set with (the first
+  deliberate waist extension); it broadens the pinned set, it does **not** overturn
+  the narrow-waist principle — this ADR stays Accepted (cf. ADR-011 narrowing ADR-002).
 - [`ADR-001-hooks-pure-bash.md`](ADR-001-hooks-pure-bash.md) — the small waist is
   what keeps shell-only parsing tractable.
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — design invariant #2.

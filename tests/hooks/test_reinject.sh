@@ -14,6 +14,18 @@ run_ss_sid() {
              | CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
                bash "$PLUGIN_ROOT/hooks/scripts/reinject.sh" 2>/dev/null)"; HOOK_RC=$?
 }
+# dangling_segment OUT — isolate JUST the dangling-node id list from a reinject context (the text after
+# `stale/escalated:` up to the next period). TF1 FIX: a negative id assertion (e.g. "T2 must NOT appear")
+# must NOT scan the WHOLE $HOOK_OUT — that output EMBEDS ${HOME_DIR}, a `mktemp .tmp-ccm.XXXXXX` path
+# whose random base-62 suffix contains the literal "T2" ≈0.12% of the time (and "T9" similarly). Scanning
+# the full output therefore false-FAILS `assert_not_contains "$HOOK_OUT" "T2"` whenever the temp path
+# happens to carry that substring — the dominant full-suite reinject flake (load-independent; it is pure
+# substring collision, surfacing more often under suite load only because more runs accumulate). The
+# dangling-id LIST is built solely from board task ids and never includes the path, so assert the negative
+# (and the positive ids) against THIS segment. Empty when there is no dangling note (the no-note cases).
+dangling_segment() { # $1 = HOOK_OUT
+  printf '%s' "$1" | sed -n 's/.*stale\/escalated:[[:space:]]*\([^.]*\)\..*/\1/p'
+}
 
 # Case A: no active board → silent no-op
 H="$(make_project)"
@@ -82,9 +94,12 @@ run_ss "$H"
 assert_contains "$HOOK_OUT" "RECONCILE GOAL" "G: still re-injects the goal"
 assert_contains "$HOOK_OUT" "orchestrator" "G: still re-anchors the role"
 assert_contains "$HOOK_OUT" "unresolved" "G: surfaces an unresolved-node note"
-assert_contains "$HOOK_OUT" "T1" "G: names the stale node id"
-assert_contains "$HOOK_OUT" "T3" "G: names the escalated node id"
-assert_not_contains "$HOOK_OUT" "T2" "G: does not name a non-dangling (in_flight) node"
+# Assert the ids against the dangling-id LIST only (path-free) — see dangling_segment (TF1: $HOOK_OUT
+# embeds the temp HOME_DIR path, whose random suffix can carry "T2"/"T3" and false-fail/pass otherwise).
+G_DANGLE="$(dangling_segment "$HOOK_OUT")"
+assert_contains "$G_DANGLE" "T1" "G: names the stale node id"
+assert_contains "$G_DANGLE" "T3" "G: names the escalated node id"
+assert_not_contains "$G_DANGLE" "T2" "G: does not name a non-dangling (in_flight) node"
 rm -rf "$H"
 
 # Case H: active board with NO stale/escalated (all ready/in_flight/done) → ctx unchanged, no note.
@@ -155,7 +170,10 @@ mkactive "$H" "other" '{"schema":"cc-master/v1","goal":"DIRTY GOAL","owner":{"ac
 run_ss_sid "$H" "sess-n"
 assert_contains "$HOOK_OUT" "CLEAN GOAL" "N: re-injects my clean goal"
 assert_not_contains "$HOOK_OUT" "unresolved" "N: other session's stale node does not trip MY dangling note"
-assert_not_contains "$HOOK_OUT" "T9" "N: other session's stale node id not surfaced to me"
+# No dangling note fires here, so the id list is empty — assert T9 is absent from it (path-free; see
+# dangling_segment / TF1: a bare `assert_not_contains "$HOOK_OUT" "T9"` could false-fail when the random
+# temp HOME_DIR suffix carries "T9").
+assert_not_contains "$(dangling_segment "$HOOK_OUT")" "T9" "N: other session's stale node id not surfaced to me"
 rm -rf "$H"
 
 # Case O (session-scoped H4, positive): MY board has a stale node → my dangling note fires, naming it.
@@ -163,7 +181,7 @@ H="$(make_project)"
 mkactive "$H" "20260101T000000Z-O" '{"schema":"cc-master/v1","goal":"RECONCILE MINE","owner":{"active":true,"session_id":"sess-o2"},"tasks":[{"id":"T1","status":"in_flight","deps":[]},{"id":"T5","status":"stale","deps":[]}]}'
 run_ss_sid "$H" "sess-o2"
 assert_contains "$HOOK_OUT" "unresolved" "O: my own stale node trips the dangling note"
-assert_contains "$HOOK_OUT" "T5" "O: my own stale node id is named"
+assert_contains "$(dangling_segment "$HOOK_OUT")" "T5" "O: my own stale node id is named"   # path-free (TF1)
 rm -rf "$H"
 
 # Case P (degraded: no session_id → match any active, compaction-boundary robustness). A SessionStart

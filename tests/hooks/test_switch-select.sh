@@ -30,6 +30,12 @@ assert_file "$SELECT_JS" "select-account.js exists (cross-skill dep)"
 # bash -n syntax gate (regression for the CJK-after-$VAR unbound-var footgun).
 if bash -n "$SCRIPT" 2>/dev/null; then PASS=$((PASS+1)); else FAILED=$((FAILED+1)); _red "FAIL: switch-account.sh bash -n syntax error"; fi
 
+# **refresh 端点白名单（codex round#7 Finding A）**：生产里 refresh_blob 只向授权 Claude/Anthropic 主机（或显式 opt-in
+#   的 loopback）发 refresh token，防污染 env 把 token exfiltrate 到任意端点。本套件全用 loopback stub endpoint
+#   （http://127.0.0.1:PORT/…）→ 需显式 opt-in 才放行。在此**统一 export** 让所有真切 case 的 stub refresh 通过白名单。
+#   （专测白名单**拒绝**未授权端点的 case 会在自己作用域内 unset / 覆盖它·见 (23)。）
+export CCM_ALLOW_LOOPBACK_REFRESH=1
+
 # Fake (NON-REAL) OAuth blob tokens — sk-ant-oat/ort prefixes, well-formed-looking, NOT real credentials.
 ALICE_AT='sk-ant-oat01-ALICEoldACCESS000000000000000000000aaaaaa-_aaa'
 ALICE_RT='sk-ant-ort01-ALICErefresh00000000000000000000000aaaaaa-_aaa'
@@ -455,18 +461,17 @@ assert_not_contains "$out5e" "$FRESH_RT" "(5e) P2: no token leak on the新建-fi
 assert_not_contains "$out5e" "$ALICE_RT" "(5e) P2: alice refresh token does NOT leak on the rollback path"
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────────
-# (5f) **codex §7 round-3 P2-c — credentials.json PRE-EXISTS but its SNAPSHOT FAILED → rollback must report
-#      FAILURE (split-brain risk), NOT silently skip the branch leaving ok=0 (谎报「已回滚」)**.
-#      病根：rollback_official_stores_12 的 ① 分支只有 (PREEXISTED=1 && snapshot存在) → 恢复 / (PREEXISTED=0) → 删；
-#      若 PREEXISTED=1 但 SNAP_CRED_TMP 空（换号前 cp 快照失败），两条都不命中、整段被跳过、ok 维持 0 → ③ keychain
-#      失败时 caller 报「①② 已回滚」而新号 token 仍在原地 = 正是这段要防的 split-brain。修：补 else 分支标 ok=1
-#      (回滚失败)，让 caller 如实报 split-brain / 需手动对账。
+# (5f) **codex round#2 — credentials.json PRE-EXISTS but its SNAPSHOT can't be created → FAIL-CLOSED: abort
+#      BEFORE overwriting ANY store (全或无前提硬化·split-brain 防于未然)**.
+#      演进：round-3 P2-c 让「快照失败后 ③ 又失败」时如实报 split-brain（不谎报已回滚）。codex round#2 更进一步——
+#      全或无的前提是「能回滚」，而能回滚的前提是「快照成功」；故快照 cp 失败时**根本不该开始覆写**。修：必需快照
+#      （pre-existing 文件）cp 失败 → 在覆写任何存储之前 return 1 中止——三存储原封不动、换号未发生·可重试，绝不进
+#      「覆写了却回不去」的险态（连 split-brain 风险都不进，而非进了再如实报）。
 #      复现手法（hermetic·deterministic）：装一个 `mktemp` STUB——对 BARE `mktemp`（snapshot 用·无模板 arg）返回一个
 #      指向 chmod 000 不可写目录的路径（exit 0）→ 脚本把它当 SNAP_*_TMP → 随后 `cp` 写不进去 → snapshot 失败 →
-#      SNAP_*_TMP 置空，而 *_PREEXISTED 仍=1（官方三存储在 fixture 可写目录里照常被覆写）。对**带模板**的 mktemp
-#      （如 select 的 `.ccm-sel-err.XXXXXX`）委派给真 mktemp（本 case 显式 --email·不触发 select·稳妥起见仍委派）。
-#      再用 SECSTUB_FAIL 让 ③ keychain 失败触发回滚。断言：stderr 报 split-brain / 无法回滚（NOT 「已回滚·可重试」
-#      的谎报）、exit非0、registry 未翻。
+#      新行为：立刻中止、不覆写。对**带模板**的 mktemp（如 select 的 `.ccm-sel-err.XXXXXX`）委派给真 mktemp。
+#      断言：exit非0、stderr 报「中止换号」+ 仍提示 split-brain（说明为何中止）、**三存储原封不动（OLD·从未被覆写）**、
+#      registry 未翻、无 token 泄漏。（注意：SECSTUB_FAIL 仍在 PATH，但新代码在快照阶段就 abort·根本到不了 ③ keychain。）
 # ──────────────────────────────────────────────────────────────────────────────────────────────────
 FX5F="$(make_fixture)"; REG5F="$FX5F/accounts.json"; VFILE5F="$FX5F/accounts.env"
 CRED5F="$FX5F/credentials.json"; CJSON5F="$FX5F/claude.json"
@@ -478,7 +483,8 @@ cat > "$REG5F" <<JSON
 JSON
 umask 077
 printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE5F"; chmod 600 "$VFILE5F"
-# Official stores PRE-EXIST in the (writable) fixture dir — they get overwritten normally; the SNAPSHOT is what fails.
+# Official stores PRE-EXIST in the (writable) fixture dir — the SNAPSHOT is what fails, so (new fail-closed behavior)
+#   the switch ABORTS before overwriting them: these OLD values must remain INTACT (never overwritten).
 OLD_CRED_AT_5F='sk-ant-oat01-OLD5Fcred0000000000000000000-_o'
 cat > "$CRED5F" <<'JSON'
 {"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLD5Fcred0000000000000000000-_o","refreshToken":"sk-ant-ort01-OLD5Fcredr000000000000000000-_o","expiresAt":1700000000000,"subscriptionType":"pro"},"keepThisKey":"keepme"}
@@ -500,24 +506,28 @@ exec /usr/bin/mktemp "\$@"
 MT
 chmod +x "$MTSTUB_5F/mktemp"
 PORT5F="$FX5F/url.txt"; start_refresh_endpoint ok "$PORT5F"; RURL5F="$(cat "$PORT5F")"
-# SECSTUB_FAIL + mktemp stub on PATH → ③ keychain fails AFTER ①② overwritten → rollback finds PREEXISTED=1 but no snapshot.
+# mktemp stub on PATH → snapshot cp fails → NEW fail-closed: abort BEFORE overwrite (never reaches ③·SECSTUB_FAIL moot).
 out5f="$(PATH="$MTSTUB_5F:$SECSTUB_FAIL:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL5F" CRED_PATH="$CRED5F" CLAUDE_JSON_PATH="$CJSON5F" \
         bash "$SCRIPT" --registry "$REG5F" --email "alice@x.com" --now "2026-06-17T09:00:00Z" 2>&1)"; rc5f=$?
 chmod 755 "$BADTMP_5F" 2>/dev/null || true   # restore perms so the fixture dir cleans up.
-assert_eq "1" "$rc5f" "(5f) P2-c: ③ keychain failure → exit非0 (switch did NOT succeed)"
-# CORE REGRESSION: stderr must HONESTLY report the split-brain / no-rollback (NOT the false「①② 已回滚·可重试」claim).
-assert_contains "$out5f" "split-brain" "(5f) P2-c CORE: rollback HONESTLY reports split-brain risk (preexisted but no snapshot — NOT 谎报已回滚)"
-assert_contains "$out5f" "手动对账" "(5f) P2-c: surfaces 需手动对账 (caller can't claim clean rollback)"
-# the caller's false-success line「已回滚 … 可重试」must NOT appear (that was the bug — silent skip kept ok=0).
-assert_not_contains "$out5f" "已回滚 ①②，三存储全留旧号" "(5f) P2-c: does NOT falsely claim ①② fully rolled back (the谎报 the bug produced)"
+assert_eq "1" "$rc5f" "(5f) fail-closed: snapshot failure → exit非0 (switch did NOT proceed)"
+# stderr says ABORTED换号 + explains it's to avoid split-brain (no rollback needed because nothing was overwritten).
+assert_contains "$out5f" "中止换号" "(5f) fail-closed: surfaces 中止换号 (aborts BEFORE overwriting any store)"
+assert_contains "$out5f" "split-brain" "(5f) fail-closed: explains WHY it aborts (无快照则后续失败无法回滚·会 split-brain)"
+# **CORE**: the OLD official stores must be UNCHANGED — abort happened BEFORE any overwrite (the new fail-closed win).
+cred5f_at="$(node -e 'const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken)' "$CRED5F" 2>/dev/null)"
+assert_eq "$OLD_CRED_AT_5F" "$cred5f_at" "(5f) fail-closed CORE: ① credentials.json UNCHANGED (OLD token·never overwritten — abort前置于覆写)"
+assert_not_contains "$cred5f_at" "$FRESH_AT" "(5f) fail-closed: ① is NOT the FRESH token (no overwrite happened at all)"
+cj5f_email="$(node -e 'const j=require(process.argv[1]);process.stdout.write(j.oauthAccount.emailAddress||"NONE")' "$CJSON5F" 2>/dev/null)"
+assert_eq "old@x.com" "$cj5f_email" "(5f) fail-closed: ② ~/.claude.json oauthAccount UNCHANGED old@x.com (never overwritten)"
 # registry active NOT flipped — the switch aborted (caller saw return 1 → never setActive).
 alice5f="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["alice@x.com"].active))' "$LIB_JS" "$REG5F" 2>/dev/null)"
 bob5f="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["bob@y.com"].active))' "$LIB_JS" "$REG5F" 2>/dev/null)"
-assert_eq "false" "$alice5f" "(5f) P2-c: registry alice active NOT flipped (switch aborted)"
-assert_eq "true"  "$bob5f"   "(5f) P2-c: registry bob still active=true"
-# token no-leak on the split-brain-reported path.
-assert_not_contains "$out5f" "$ALICE_RT" "(5f) P2-c: alice refresh token does NOT leak on the split-brain-reported path"
-assert_not_contains "$out5f" "$FRESH_RT" "(5f) P2-c: fresh refresh token does NOT leak on the split-brain-reported path"
+assert_eq "false" "$alice5f" "(5f) fail-closed: registry alice active NOT flipped (switch aborted)"
+assert_eq "true"  "$bob5f"   "(5f) fail-closed: registry bob still active=true"
+# token no-leak on the aborted path.
+assert_not_contains "$out5f" "$ALICE_RT" "(5f) fail-closed: alice refresh token does NOT leak on the aborted path"
+assert_not_contains "$out5f" "$FRESH_RT" "(5f) fail-closed: fresh refresh token does NOT leak on the aborted path"
 rm -rf "$FX5F" "$MTSTUB_5F"
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -927,8 +937,802 @@ else
   PASS=$((PASS+1)); _green "(14c) no live bare \"\${cu_args[@]}\" expansion (cu_args uses the \${cu_args[@]:-} guard)"
 fi
 
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (15) **codex round#1 Finding 2 teeth — split-brain 窗口收口：setActive 在（可慢/可挂的）切出快照之前翻**.
+#      病根：旧顺序「先 best-effort 快照（内含可挂的 cc-usage·timeout 默认已调到 60s）再 setActive」——三存储已覆写
+#      成新号、但 registry active 要等快照那一长段之后才翻；这段窗口里中断/被 kill = 机器在新号、registry 仍旧号
+#      （split-brain）。修：把关键态 setActive 提到快照之前——三存储一覆写成功就立刻翻 active。切出号身份在翻 active
+#      之前先钉进 CURRENT_ACTIVE（翻后 registry active 已是切入号·不先钉会把切入号误当切出号跳过快照）。
+#      teeth：用 FAST cc-usage stub（快照真跑、真写）→ 断言 ① alice 已 active=true（关键态翻了）；② bob 的
+#      last_switch_out 快照仍被正确写出（证明 CURRENT_ACTIVE 在翻 active **之前**钉对了 = bob，没被翻成 alice 后
+#      误判 current==switch-in 而跳过快照）；③ 结构锁：脚本里 set_active_in 调用必须排在 record_switch_out **之前**.
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX15="$(make_fixture)"; REG15="$FX15/accounts.json"; VFILE15="$FX15/accounts.env"; CRED15="$FX15/credentials.json"; CJSON15="$FX15/claude.json"
+cat > "$REG15" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE15","key":"alice@x.com"}, "active": false, "last_switch_out": null }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VFILE15"; chmod 600 "$VFILE15"
+cat > "$CRED15" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLD1500000000000000000000-_o","refreshToken":"sk-ant-ort01-OLD15r0000000000000000-_o","expiresAt":1700000000000}}
+JSON
+printf '{}' > "$CJSON15"
+# stub plugin root with a FAST cc-usage (returns immediately with valid used_percentage → snapshot actually writes).
+STUB_ROOT15="$(make_project)"
+mkdir -p "$STUB_ROOT15/skills/account-management/scripts" "$STUB_ROOT15/skills/orchestrating-to-completion/scripts"
+ln -s "$PLUGIN_ROOT/skills/account-management/scripts/switch-account.sh" "$STUB_ROOT15/skills/account-management/scripts/switch-account.sh"
+ln -s "$PLUGIN_ROOT/skills/account-management/scripts/accounts-lib.js"   "$STUB_ROOT15/skills/account-management/scripts/accounts-lib.js"
+ln -s "$PLUGIN_ROOT/skills/account-management/scripts/select-account.js" "$STUB_ROOT15/skills/account-management/scripts/select-account.js"
+cat > "$STUB_ROOT15/skills/orchestrating-to-completion/scripts/cc-usage.sh" <<'CU'
+#!/usr/bin/env bash
+printf '%s\n' '{"source":"account","five_hour":{"used_percentage":42,"resets_at":4102444800},"seven_day":{"used_percentage":17,"resets_at":4102444800}}'
+CU
+chmod +x "$STUB_ROOT15/skills/orchestrating-to-completion/scripts/cc-usage.sh"
+PORT15="$FX15/url.txt"; start_refresh_endpoint ok "$PORT15"; RURL15="$(cat "$PORT15")"
+out15="$(PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$STUB_ROOT15" REFRESH_TOKEN_URL="$RURL15" CRED_PATH="$CRED15" CLAUDE_JSON_PATH="$CJSON15" \
+         bash "$STUB_ROOT15/skills/account-management/scripts/switch-account.sh" --registry "$REG15" --email "alice@x.com" --now "2026-06-17T09:00:00Z" 2>&1)"; rc15=$?
+assert_eq "0" "$rc15" "(15) Finding 2: switch completes exit 0"
+# ① 关键态 setActive 翻了（alice active=true / bob false）—— 三存储覆写成功就立刻翻、不等快照.
+alice15="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["alice@x.com"].active))' "$LIB_JS" "$REG15" 2>/dev/null)"
+bob15="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["bob@y.com"].active))' "$LIB_JS" "$REG15" 2>/dev/null)"
+assert_eq "true"  "$alice15" "(15) Finding 2: setActive flipped alice → active=true (关键态先翻·split-brain 窗口收口)"
+assert_eq "false" "$bob15"   "(15) Finding 2: bob → active=false"
+# ② bob 的 last_switch_out 快照仍被写出——证明切出号身份在翻 active **之前**就钉对了（=bob），否则翻成 alice 后
+#    record_switch_out 会 detect 到 active==alice==switch-in → 误判「已是该号」跳过快照。这是 reorder 正确性的硬证.
+bob15_snap="$(node -e 'const e=(require(process.argv[1]).loadRegistry(process.argv[2]).accounts||{})["bob@y.com"]||{};const q=e.last_switch_out;process.stdout.write(q&&q["5h"]?String(q["5h"].used_pct):"NONE")' "$LIB_JS" "$REG15" 2>/dev/null)"
+assert_eq "42" "$bob15_snap" "(15) Finding 2: bob's last_switch_out STILL recorded (CURRENT_ACTIVE 在翻 active 前钉对=bob·没被翻成 alice 后误跳过快照)"
+assert_not_contains "$out15" "$ALICE_RT" "(15) Finding 2: no token leak"
+# ③ 结构锁：set_active_in 的调用必须排在 record_switch_out 的调用之前（reorder 是 load-bearing·防回归）.
+#    在去注释后的脚本里抓 step-4 这两个调用的行号——set_active_in 行号 < record_switch_out 行号才算修对.
+sa_line="$(grep -vE '^[[:space:]]*#' "$SCRIPT" | grep -nE '^[[:space:]]*set_active_in[[:space:]]*$|^[[:space:]]*set_active_in[[:space:]]+#' | tail -1 | cut -d: -f1)"
+rso_line="$(grep -vE '^[[:space:]]*#' "$SCRIPT" | grep -nE '^[[:space:]]*record_switch_out([[:space:]]|$)' | tail -1 | cut -d: -f1)"
+if [ -n "$sa_line" ] && [ -n "$rso_line" ] && [ "$sa_line" -lt "$rso_line" ]; then
+  PASS=$((PASS+1)); _green "(15) Finding 2 structural lock: set_active_in CALLED before record_switch_out (reorder is load-bearing)"
+else
+  FAILED=$((FAILED+1)); _red "FAIL: (15) Finding 2 set_active_in (line $sa_line) NOT before record_switch_out (line $rso_line) — split-brain window reopened"
+fi
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (16) **codex round#1 Finding 1 teeth — ② 身份切换写真失败 → 回滚 ① 到旧号（避免 split-identity·三存储全或无）**.
+#      病根：身份切换路（identity 在·② 文件在·合法 JSON）若 atomicWrite 真失败（权限/锁/IO），旧码静默吞、仍让 ①③
+#      切到新号 → ① 是新号 token、② oauthAccount 仍旧号 = split-identity。修：身份切换路的 atomicWrite 失败 exit 2 →
+#      caller 回滚 ① 到旧号，三存储全留旧号、换号未发生·可重试。复现（hermetic·deterministic）：把 ② ~/.claude.json
+#      所在**目录设只读**（文件预存合法 JSON·existsSync/read 成功，但 atomicWrite 的 tmp 写不进去 → throw → exit 2）。
+#      断言：① credentials.json 回滚到旧 token（非 FRESH）；② emailAddress 仍旧号；registry active 未翻；exit非0；
+#      stderr 报回滚；无 token 泄漏。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX16="$(make_fixture)"; REG16="$FX16/accounts.json"; VFILE16="$FX16/accounts.env"
+CRED16="$FX16/credentials.json"; CJDIR16="$FX16/cjdir"; CJSON16="$CJDIR16/claude.json"
+mkdir -p "$CJDIR16"
+cat > "$REG16" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE16","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"new@y.com","accountUuid":"uuid-new","organizationName":"NewOrg","subscriptionType":"max"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE16"; chmod 600 "$VFILE16"
+OLD_CRED_AT_16='sk-ant-oat01-OLD16cred0000000000000000000-_o'
+cat > "$CRED16" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLD16cred0000000000000000000-_o","refreshToken":"sk-ant-ort01-OLD16credr000000000000000-_o","expiresAt":1700000000000,"subscriptionType":"pro"},"keepThisKey":"keepme"}
+JSON
+# ② ~/.claude.json PRE-EXISTS with valid JSON (existsSync true·read OK)—but its DIR is made read-only so the
+#   identity-switch atomicWrite (tmp write+rename inside that dir) FAILS → 触发 exit 2 → rollback ①.
+cat > "$CJSON16" <<'JSON'
+{"oauthAccount":{"emailAddress":"old@x.com","subscriptionType":"pro","organizationName":"OldOrg"},"numStartups":42,"theme":"dark"}
+JSON
+chmod 500 "$CJDIR16"   # read-only dir → atomicWrite tmp creation fails → ② identity write throws.
+PORT16="$FX16/url.txt"; start_refresh_endpoint ok "$PORT16"; RURL16="$(cat "$PORT16")"
+out16="$(PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL16" CRED_PATH="$CRED16" CLAUDE_JSON_PATH="$CJSON16" \
+        bash "$SCRIPT" --registry "$REG16" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc16=$?
+chmod 700 "$CJDIR16"   # restore so we can read/cleanup.
+assert_eq "1" "$rc16" "(16) Finding 1: ② identity write failure → switch did NOT succeed → exit非0"
+# ① credentials.json ROLLED BACK to OLD access token (NOT the FRESH one) — all-or-nothing prevented split-identity.
+cred16_at="$(node -e 'const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken)' "$CRED16" 2>/dev/null)"
+assert_eq "$OLD_CRED_AT_16" "$cred16_at" "(16) Finding 1: ① credentials.json ROLLED BACK to OLD token (not FRESH·避免 split-identity)"
+assert_not_contains "$cred16_at" "$FRESH_AT" "(16) Finding 1: ① is NOT the FRESH token (rollback undid the ①写)"
+# ② emailAddress still old号 (the failed write never landed new@y.com).
+cj16_email="$(node -e 'const j=require(process.argv[1]);process.stdout.write(j.oauthAccount.emailAddress||"NONE")' "$CJSON16" 2>/dev/null)"
+assert_eq "old@x.com" "$cj16_email" "(16) Finding 1: ② oauthAccount.emailAddress still old@x.com (身份写失败·没切成新号)"
+# registry active NOT flipped — caller saw return 1, never setActive.
+alice16="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["alice@x.com"].active))' "$LIB_JS" "$REG16" 2>/dev/null)"
+bob16="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["bob@y.com"].active))' "$LIB_JS" "$REG16" 2>/dev/null)"
+assert_eq "false" "$alice16" "(16) Finding 1: registry alice active NOT flipped (switch aborted·no split-brain in registry)"
+assert_eq "true"  "$bob16"   "(16) Finding 1: registry bob still active=true"
+assert_contains "$out16" "回滚" "(16) Finding 1: stderr surfaces ① 回滚 (换号未发生·可重试·避免 split-identity)"
+assert_not_contains "$out16" "$FRESH_RT" "(16) Finding 1: no token leak on the ②-failure rollback path"
+assert_not_contains "$out16" "$ALICE_RT" "(16) Finding 1: alice refresh token does NOT leak on rollback path"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (17) **codex round#2 Finding D teeth — 临近到期降权不该伪装成「全员逼顶」（quota-healthy 仍被选中·只警告续期）**.
+#      病根：单个 quota-健康但临近到期的候选——70%/70% 配额分 = 0.4*30+0.6*30 = 30，减 EXPIRY_PENALTY(默认40) = -10
+#      ≤ 地板(0) → 旧码 best.score 判地板 → 误报 NONE_ALL_EXHAUSTED·exit 3，白挡一次合法换号（违背「到期只降权不
+#      排除」文档语义）。修：地板判**到期降权之前的配额分**（scoreForExhaustionFloor），故该号仍 SELECTED·exit 0、
+#      只附「将到期·建议 --refresh」警告。teeth：直接跑 select-account.js CLI（带 --now·确定性）断言 exit 0 + 选中.
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX17="$(make_fixture)"; REG17="$FX17/accounts.json"
+# alice: 70%/70% used (quota分=30·健康·远高于地板) BUT token_expires_at 仅 5 天后（≤14 天预警·触发 EXPIRY_PENALTY）.
+#   now=2026-06-17 → expires=2026-06-22（5 天后）. 7d 70% < 85% 硬闸（非 gated·确保走到期降权分支而非硬闸分支）.
+cat > "$REG17" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"alice@x.com"}, "token_expires_at":"2026-06-22T00:00:00Z", "active": false,
+                   "last_switch_out": {"at":"2026-06-17T05:00:00Z","5h":{"used_pct":70,"resets_at":"2026-06-24T05:00:00Z","source":"account"},"7d":{"used_pct":70,"resets_at":"2026-06-24T05:00:00Z","source":"account"}} }
+} }
+JSON
+# run select-account.js CLI directly (deterministic --now). Default (no --json) → prints selected email + exit code.
+sel17="$(node "$SELECT_JS" --registry "$REG17" --now "2026-06-17T09:00:00Z" 2>/tmp/.ccm17err.$$)"; sel17_rc=$?
+sel17_err="$(cat /tmp/.ccm17err.$$ 2>/dev/null || true)"; rm -f /tmp/.ccm17err.$$ 2>/dev/null || true
+assert_eq "0" "$sel17_rc" "(17) Finding D: quota-健康 but expiring-soon号 is SELECTED (exit 0·NOT exit 3 false-exhausted)"
+assert_eq "alice@x.com" "$sel17" "(17) Finding D: selected = alice@x.com (到期降权只降排名·不排除·不误报全员逼顶)"
+assert_contains "$sel17_err" "天后到期" "(17) Finding D: still warns it's expiring soon (建议 --refresh·降权不静默)"
+# negative control via --json: reason must be SELECTED, not NONE_ALL_EXHAUSTED.
+sel17j="$(node "$SELECT_JS" --registry "$REG17" --now "2026-06-17T09:00:00Z" --json 2>/dev/null)"
+sel17_reason="$(printf '%s' "$sel17j" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).reason||"NONE")}catch(_e){process.stdout.write("PARSEERR")}})' 2>/dev/null)"
+assert_eq "SELECTED" "$sel17_reason" "(17) Finding D: reason=SELECTED (not NONE_ALL_EXHAUSTED·地板判配额分·非含到期降权的分)"
+rm -rf "$FX17"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (18) **codex round#2 Finding B teeth — setActive saveRegistry 失败 → 不谎报干净成功（exit 4·如实标注 registry 滞后）**.
+#      病根：set_active_in 落盘失败时 return 0 + 主流程仍打印「✓ 换号完成」——三存储已是新号、registry active 没翻 =
+#      registry 与现实脱节（后续选号 / 切出快照从 stale active 推理·split-brain 复现），却谎报干净成功。修：置
+#      ACTIVE_WRITE_FAILED=1，最终消息标注「换号已生效·但 registry 需手动对账」+ exit 4（≠干净成功的 0）。
+#      复现（hermetic·deterministic）：registry 放进一个独立目录，三存储覆写成功**之后**把该目录设只读 → setActive 的
+#      saveRegistry（写 tmp+rename 进该目录）失败。用 `--email`（跳过 select·不提前写 registry）+ `--no-snapshot`
+#      （跳过 record_switch_out·set_active_in 是唯一 registry 写）确保只在 setActive 处失败。注意：registry 在只读目录里
+#      仍可**读**（loadRegistry / detect 不受影响），只有**写**失败。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX18="$(make_fixture)"; REGDIR18="$FX18/regdir"; mkdir -p "$REGDIR18"; REG18="$REGDIR18/accounts.json"; VFILE18="$FX18/accounts.env"
+CRED18="$FX18/credentials.json"; CJSON18="$FX18/claude.json"
+cat > "$REG18" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE18","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"new@y.com","accountUuid":"uuid-new","organizationName":"NewOrg","subscriptionType":"max"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE18"; chmod 600 "$VFILE18"
+cat > "$CRED18" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLD1800000000000000000000-_o","refreshToken":"sk-ant-ort01-OLD18r0000000000000000-_o","expiresAt":1700000000000}}
+JSON
+printf '{"oauthAccount":{"emailAddress":"old@x.com"},"x":1}' > "$CJSON18"
+PORT18="$FX18/url.txt"; start_refresh_endpoint ok "$PORT18"; RURL18="$(cat "$PORT18")"
+# A `security` stub that succeeds (③ keychain overwrite OK) AND, on the official-creds add, makes the registry DIR
+#   read-only — so by the time set_active_in runs (right after stores overwritten), saveRegistry's tmp write fails.
+#   Service-scoped: only chmod on the official "Claude Code-credentials" write (the LAST store write before setActive).
+SECSTUB_LOCKREG18="$(make_project)"
+cat > "$SECSTUB_LOCKREG18/security" <<SEC
+#!/usr/bin/env bash
+cat >/dev/null 2>&1
+is_add=0; is_official=0; prev=""
+for a in "\$@"; do
+  [ "\$a" = "add-generic-password" ] && is_add=1
+  [ "\$prev" = "-s" ] && [ "\$a" = "Claude Code-credentials" ] && is_official=1
+  prev="\$a"
+done
+# after the official ③ keychain overwrite succeeds, lock the registry dir so the upcoming setActive saveRegistry fails.
+if [ "\$is_add" = "1" ] && [ "\$is_official" = "1" ]; then chmod 500 "$REGDIR18" 2>/dev/null || true; fi
+exit 0
+SEC
+chmod +x "$SECSTUB_LOCKREG18/security"
+out18="$(PATH="$SECSTUB_LOCKREG18:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL18" CRED_PATH="$CRED18" CLAUDE_JSON_PATH="$CJSON18" \
+        bash "$SCRIPT" --registry "$REG18" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc18=$?
+chmod 700 "$REGDIR18" 2>/dev/null || true   # restore so we can read/cleanup.
+assert_eq "4" "$rc18" "(18) Finding B: setActive write failure → exit 4 (NOT 0·区别于干净成功)"
+# the message must NOT be the clean ✓ success line, and MUST say registry needs reconciliation.
+case "$out18" in
+  *"✓ 无重启换号完成"*) FAILED=$((FAILED+1)); _red "FAIL: (18) Finding B still prints the CLEAN ✓ success line despite stale registry (谎报)";;
+  *) PASS=$((PASS+1)); _green "(18) Finding B: does NOT print the clean ✓ success line (no谎报)";;
+esac
+assert_contains "$out18" "手动对账" "(18) Finding B: surfaces registry 需手动对账 (honest about the stale active state)"
+assert_contains "$out18" "已生效" "(18) Finding B: still tells user the switch DID take effect (三存储已是新号·别让用户以为没切)"
+assert_not_contains "$out18" "$ALICE_RT" "(18) Finding B: no token leak on the active-write-failure path"
+assert_not_contains "$out18" "$FRESH_RT" "(18) Finding B: fresh refresh token does NOT leak on this path"
+rm -rf "$FX18" "$SECSTUB_LOCKREG18"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (19) **codex round#3 Finding A teeth — 切入号不在 registry → 不谎报干净成功（exit 4·registry active 未对齐）**.
+#      病根：`--email` 指一个**不在 accounts.json** 的号（显式 --vault-file 取到 token）→ set_active_in 的 else 分支
+#      只警告、return 0 → 主流程打印「✓ 换号完成」，但 registry 没这个号 entry、active 仍指旧号（三存储已覆写）=
+#      registry 与现实脱节（后续选号 / 切出快照从 stale active 推理）。修：else 分支 exit 5 → 主流程置
+#      ACTIVE_WRITE_FAILED=1·exit 4·如实标注「换号已生效但 registry 需对齐·建议 --add 录号」，不谎报干净成功。
+#      复现：registry 只有 bob（active）；用 --email mallory@x.com（不在 registry）+ 显式 --vault-file 指向含 mallory
+#      有效 blob 的 file vault → token 读成功、三存储覆写成功，但 mallory 不在 registry → setActive else 分支.
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX19="$(make_fixture)"; REG19="$FX19/accounts.json"; VFILE19="$FX19/accounts.env"; CRED19="$FX19/credentials.json"; CJSON19="$FX19/claude.json"
+# registry has ONLY bob (active) — mallory@x.com is NOT in the pool.
+cat > "$REG19" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com": { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null }
+} }
+JSON
+umask 077
+# mallory's valid blob lives in the explicit file vault (token read will succeed) — but mallory has no registry entry.
+printf 'mallory@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VFILE19"; chmod 600 "$VFILE19"
+cat > "$CRED19" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLD1900000000000000000000-_o","refreshToken":"sk-ant-ort01-OLD19r0000000000000000-_o","expiresAt":1700000000000}}
+JSON
+printf '{}' > "$CJSON19"
+PORT19="$FX19/url.txt"; start_refresh_endpoint ok "$PORT19"; RURL19="$(cat "$PORT19")"
+out19="$(PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL19" CRED_PATH="$CRED19" CLAUDE_JSON_PATH="$CJSON19" \
+        bash "$SCRIPT" --registry "$REG19" --email "mallory@x.com" --vault-kind file --vault-file "$VFILE19" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc19=$?
+assert_eq "4" "$rc19" "(19) Finding A: switch-in not in registry → exit 4 (NOT 0·registry active 未对齐·不谎报干净成功)"
+# must NOT print the clean ✓ success line.
+case "$out19" in
+  *"✓ 无重启换号完成"*) FAILED=$((FAILED+1)); _red "FAIL: (19) Finding A still prints CLEAN ✓ success despite not-in-registry switch-in (谎报)";;
+  *) PASS=$((PASS+1)); _green "(19) Finding A: does NOT print clean ✓ success (registry not aligned)";;
+esac
+assert_contains "$out19" "不在 registry" "(19) Finding A: surfaces 切入号不在 registry (honest about misalignment)"
+assert_contains "$out19" "已生效" "(19) Finding A: still tells user the switch took effect (三存储已覆写·别让用户以为没切)"
+# registry bob still active (mallory not added·active not flipped to a non-existent entry).
+bob19="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["bob@y.com"].active))' "$LIB_JS" "$REG19" 2>/dev/null)"
+assert_eq "true" "$bob19" "(19) Finding A: registry bob still active=true (no active flip to a non-existent号)"
+mallory19="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);const a=r.accounts["mallory@x.com"];process.stdout.write(a?"PRESENT":"ABSENT")' "$LIB_JS" "$REG19" 2>/dev/null)"
+assert_eq "ABSENT" "$mallory19" "(19) Finding A: mallory still NOT in registry (switch didn't fabricate an entry)"
+assert_not_contains "$out19" "$ALICE_RT" "(19) Finding A: no token leak on the not-in-registry path"
+rm -rf "$FX19"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (20) **codex round#4 — 7d 硬闸号永不被选中（混合池下硬闸是硬的·不被到期降权的可用号拖累成 best）**.
+#      病根（我 round#2 Finding D 修复的回归）：旧码 gated 号只给低分 score=-1、仍留在 candidates 里。混合池下——
+#      一个 7d-gated 号（score=-1）+ 一个 quota 健康但临近到期被 EXPIRY_PENALTY 压到 score<-1 的可用号——cmpRows 按
+#      score 排序时 gated 的 -1 反而排在到期号前面成了 best，于是**硬闸号被选中**，违背 7d 硬闸不变式。修：candidates
+#      过滤器加 `!r.gated`——gated 号永不进可选集。teeth：直接跑 select-account.js·混合池→断言选中的是**到期号**（非 gated）.
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX20="$(make_fixture)"; REG20="$FX20/accounts.json"
+# gated@x.com: 7d 90% (> 85% 硬闸)·token 不临近到期；expiring@x.com: 7d 70%(健康·未触闸) 但 5 天后到期(触 EXPIRY_PENALTY).
+cat > "$REG20" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":      { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "gated@x.com":    { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"gated@x.com"}, "token_expires_at":"2027-06-17T00:00:00Z", "active": false,
+                      "last_switch_out": {"at":"2026-06-17T05:00:00Z","5h":{"used_pct":50,"resets_at":"2026-06-24T05:00:00Z","source":"account"},"7d":{"used_pct":90,"resets_at":"2026-06-24T05:00:00Z","source":"account"}} },
+  "expiring@x.com": { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"expiring@x.com"}, "token_expires_at":"2026-06-22T00:00:00Z", "active": false,
+                      "last_switch_out": {"at":"2026-06-17T05:00:00Z","5h":{"used_pct":70,"resets_at":"2026-06-24T05:00:00Z","source":"account"},"7d":{"used_pct":70,"resets_at":"2026-06-24T05:00:00Z","source":"account"}} }
+} }
+JSON
+sel20="$(node "$SELECT_JS" --registry "$REG20" --now "2026-06-17T09:00:00Z" 2>/dev/null)"; sel20_rc=$?
+assert_eq "0" "$sel20_rc" "(20) round#4: mixed pool (gated + expiring) still selects SOMETHING (exit 0)"
+assert_eq "expiring@x.com" "$sel20" "(20) round#4 CORE: selects the EXPIRING-but-usable号, NOT the 7d-gated号 (硬闸是硬的·gated 永不被选)"
+# negative control: the gated号 must NEVER be the selection.
+case "$sel20" in
+  *gated@x.com*) FAILED=$((FAILED+1)); _red "FAIL: (20) round#4 selected the 7d-GATED account (hard gate violated)";;
+  *) PASS=$((PASS+1)); _green "(20) round#4: 7d-gated account is NOT selected (hard gate holds in mixed pool)";;
+esac
+# --json: gated号 still appears in candidates output (visibility) but with gated:true; selection reason SELECTED.
+sel20j="$(node "$SELECT_JS" --registry "$REG20" --now "2026-06-17T09:00:00Z" --json 2>/dev/null)"
+sel20_reason="$(printf '%s' "$sel20j" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).reason||"NONE")}catch(_e){process.stdout.write("PARSEERR")}})' 2>/dev/null)"
+assert_eq "SELECTED" "$sel20_reason" "(20) round#4: reason=SELECTED (a usable候选 exists·not全员逼顶)"
+gated20_visible="$(printf '%s' "$sel20j" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const c=JSON.parse(s).candidates||[];const g=c.find(r=>r.email==="gated@x.com");process.stdout.write(g&&g.gated===true?"GATED-VISIBLE":"MISSING")}catch(_e){process.stdout.write("ERR")}})' 2>/dev/null)"
+assert_eq "GATED-VISIBLE" "$gated20_visible" "(20) round#4: gated号 still in candidates output w/ gated:true (excluded from selection·not from visibility)"
+rm -rf "$FX20"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (21) **codex round#5 — OAuth refresh 请求超时（端点接受连接却挂死不响应）→ force-refresh 兜底·不 wedge**.
+#      病根：refresh 的 node https.request 默认无超时——captive proxy / 端点 stall（接了连接却迟迟不回）会让换号
+#      在读完 vault blob 后无限挂等、既不硬失败也不进 force-refresh 兜底。修：加 socket-inactivity timeout（默认
+#      15s·REFRESH_TIMEOUT_MS 可覆写）→ 到时 destroy 请求 → 当网络不通处理（exit 5 → force-refresh 兜底·文档承诺的
+#      优雅降级）。teeth：装一个**接受连接但永不响应**的 stall 端点 + 小 REFRESH_TIMEOUT_MS → 断言换号不 hang、
+#      在合理时间内走完 force-refresh 兜底（exit 0），且超时提示出现。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX21="$(make_fixture)"; REG21="$FX21/accounts.json"; VFILE21="$FX21/accounts.env"; CRED21="$FX21/credentials.json"; CJSON21="$FX21/claude.json"
+cat > "$REG21" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE21","key":"alice@x.com"}, "active": false, "last_switch_out": null }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VFILE21"; chmod 600 "$VFILE21"
+cat > "$CRED21" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLD21000000000000000000000-_o","refreshToken":"sk-ant-ort01-OLD21r00000000000000000-_o","expiresAt":1700000000000}}
+JSON
+printf '{}' > "$CJSON21"
+# STALL endpoint: accepts the TCP connection but NEVER writes a response (simulates captive proxy / hung endpoint).
+STALL21="$FX21/stall_url.txt"
+node -e '
+  const http = require("http");
+  const s = http.createServer((req, res) => { /* accept connection, NEVER respond */ });
+  s.listen(0, () => { require("fs").writeFileSync(process.argv[1], "http://127.0.0.1:" + s.address().port + "/v1/oauth/token"); });
+  setTimeout(() => process.exit(0), 20000); // self-reap.
+' "$STALL21" 2>/dev/null &
+STALL21_PID=$!; ENDPOINT_PIDS+=("$STALL21_PID"); disown "$STALL21_PID" 2>/dev/null || true
+i=0; while [ ! -s "$STALL21" ] && [ "$i" -lt 50 ]; do sleep 0.1; i=$((i+1)); done
+RURL21="$(cat "$STALL21")"
+sw21_start=$(date +%s)
+# small REFRESH_TIMEOUT_MS=1500 → the stall must trip the timeout fast → exit-5 → force-refresh fallback (exit 0).
+out21="$(PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL21" REFRESH_TIMEOUT_MS=1500 CRED_PATH="$CRED21" CLAUDE_JSON_PATH="$CJSON21" \
+         bash "$SCRIPT" --registry "$REG21" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc21=$?
+sw21_elapsed=$(( $(date +%s) - sw21_start ))
+assert_eq "0" "$rc21" "(21) round#5: refresh-stall → timeout → force-refresh fallback completes (exit 0·NOT wedged)"
+# must NOT hang: the timeout (1.5s) must trip; generous ceiling < 15s (the default no-timeout would hang ~indefinitely).
+if [ "$sw21_elapsed" -lt 15 ]; then PASS=$((PASS+1)); _green "(21) round#5: refresh timeout bit (run took ${sw21_elapsed}s, not an indefinite hang)"; else FAILED=$((FAILED+1)); _red "FAIL: (21) round#5 run took ${sw21_elapsed}s — refresh timeout did NOT bite (wedged)"; fi
+assert_contains "$out21" "force-refresh 兜底" "(21) round#5: stall → force-refresh fallback engaged (graceful degrade·not wedge)"
+assert_not_contains "$out21" "$ALICE_RT" "(21) round#5: no token leak on the refresh-stall path"
+kill "$STALL21_PID" 2>/dev/null || true
+rm -rf "$FX21"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (22) **codex round#6 — 混合排除（gated + expired/not_switchable）→ NONE_NO_CANDIDATES(exit 1·修号池)·非 NONE_ALL_EXHAUSTED(exit 3·等 reset)**.
+#      病根（我 round#4 引入 gated 排除后的 over-classification）：anyGated 分支只要 ranked 里有 gated 就报 exit 3
+#      （「等 reset」）——但若另一些备号是因 expired / switchable:false 被排除（可操作 fix = --refresh / --add，非等
+#      reset），exit 3 把用户引向错的恢复路。修：仅当**非 active 备号全 gated**（纯配额逼顶）才 exit 3；混合 →
+#      NONE_NO_CANDIDATES(exit 1)。teeth：池 = bob(active) + gated(7d 90%) + expired(token 过期)·无可用候选 →
+#      断言 reason=NONE_NO_CANDIDATES·exit 1（非 3），且 warning 指向 --refresh/--add 而非纯等 reset.
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX22="$(make_fixture)"; REG22="$FX22/accounts.json"
+cat > "$REG22" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":     { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "gated@x.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"gated@x.com"}, "token_expires_at":"2027-06-17T00:00:00Z", "active": false,
+                     "last_switch_out": {"at":"2026-06-17T05:00:00Z","5h":{"used_pct":50,"resets_at":"2026-06-24T05:00:00Z","source":"account"},"7d":{"used_pct":90,"resets_at":"2026-06-24T05:00:00Z","source":"account"}} },
+  "expired@x.com": { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"expired@x.com"}, "token_expires_at":"2020-01-01T00:00:00Z", "active": false,
+                     "last_switch_out": {"at":"2026-06-17T05:00:00Z","5h":{"used_pct":10,"resets_at":"2026-06-24T05:00:00Z","source":"account"},"7d":{"used_pct":10,"resets_at":"2026-06-24T05:00:00Z","source":"account"}} }
+} }
+JSON
+sel22="$(node "$SELECT_JS" --registry "$REG22" --now "2026-06-17T09:00:00Z" 2>/dev/null)"; sel22_rc=$?
+# mixed exclusion → NONE_NO_CANDIDATES → exit 1 (NOT exit 3 ALL_EXHAUSTED).
+assert_eq "1" "$sel22_rc" "(22) round#6: mixed gated+expired → exit 1 (NONE_NO_CANDIDATES·可 --refresh/--add·NOT exit 3 等 reset)"
+assert_eq "" "$sel22" "(22) round#6: no email selected (empty stdout·no usable candidate)"
+sel22j="$(node "$SELECT_JS" --registry "$REG22" --now "2026-06-17T09:00:00Z" --json 2>/dev/null)"
+sel22_reason="$(printf '%s' "$sel22j" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).reason||"NONE")}catch(_e){process.stdout.write("PARSEERR")}})' 2>/dev/null)"
+assert_eq "NONE_NO_CANDIDATES" "$sel22_reason" "(22) round#6 CORE: reason=NONE_NO_CANDIDATES (mixed exclusion·not misclassified as ALL_EXHAUSTED)"
+# negative control: a PURE all-gated pool MUST still be NONE_ALL_EXHAUSTED (round#4 regression guard).
+FX22B="$FX22/b"; mkdir -p "$FX22B"; REG22B="$FX22B/accounts.json"
+cat > "$REG22B" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "g1@x.com":    { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"g1@x.com"}, "token_expires_at":"2027-06-17T00:00:00Z", "active": false,
+                   "last_switch_out": {"at":"2026-06-17T05:00:00Z","5h":{"used_pct":90,"resets_at":"2026-06-24T05:00:00Z","source":"account"},"7d":{"used_pct":90,"resets_at":"2026-06-24T05:00:00Z","source":"account"}} },
+  "g2@x.com":    { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"g2@x.com"}, "token_expires_at":"2027-06-17T00:00:00Z", "active": false,
+                   "last_switch_out": {"at":"2026-06-17T05:00:00Z","5h":{"used_pct":88,"resets_at":"2026-06-24T05:00:00Z","source":"account"},"7d":{"used_pct":88,"resets_at":"2026-06-24T05:00:00Z","source":"account"}} }
+} }
+JSON
+sel22b_rc=0; node "$SELECT_JS" --registry "$REG22B" --now "2026-06-17T09:00:00Z" >/dev/null 2>&1; sel22b_rc=$?
+assert_eq "3" "$sel22b_rc" "(22) round#6 control: PURE all-gated pool STILL → exit 3 NONE_ALL_EXHAUSTED (round#4 behavior preserved)"
+rm -rf "$FX22"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (23) **codex round#7 Finding A teeth — REFRESH_TOKEN_URL 白名单：未授权端点 → 拒发 token·硬失败（防 exfiltration）**.
+#      病根：refresh token 是 bearer secret——POST 到哪由 REFRESH_TOKEN_URL 控制，污染 env / 误抄测试值指到非 Claude
+#      主机或明文 http 就把 token 发给攻击者（仍满足 token-blind 不进 argv/log，但实质泄漏）。修：发 body 之前先校验
+#      host——授权 https Claude/Anthropic 主机 / 显式 opt-in 的 loopback 才放行，否则拒绝退出（exit 1·token 未上网）。
+#      teeth：(a) loopback 但**没** opt-in（unset CCM_ALLOW_LOOPBACK_REFRESH）→ 拒绝；(b) 非 Claude 主机（即便 opt-in）
+#      → 拒绝。两者都断言：exit非0、未覆写存储、registry 未翻、stderr 报「未授权/拒绝」、token 绝不泄漏。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX23="$(make_fixture)"; REG23="$FX23/accounts.json"; VFILE23="$FX23/accounts.env"; CRED23="$FX23/credentials.json"; CJSON23="$FX23/claude.json"
+cat > "$REG23" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE23","key":"alice@x.com"}, "active": false, "last_switch_out": null }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VFILE23"; chmod 600 "$VFILE23"
+OLD_CRED_AT_23='sk-ant-oat01-OLD23cred0000000000000000000-_o'
+cat > "$CRED23" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLD23cred0000000000000000000-_o","refreshToken":"sk-ant-ort01-OLD23credr000000000000000-_o","expiresAt":1700000000000}}
+JSON
+printf '{}' > "$CJSON23"
+# real ok endpoint exists (would succeed IF host passed whitelist) — proves rejection is the WHITELIST, not a dead endpoint.
+PORT23="$FX23/url.txt"; start_refresh_endpoint ok "$PORT23"; RURL23="$(cat "$PORT23")"
+# (23a) loopback endpoint but NO opt-in (env -u CCM_ALLOW_LOOPBACK_REFRESH) → reject.
+out23a="$(env -u CCM_ALLOW_LOOPBACK_REFRESH PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL23" CRED_PATH="$CRED23" CLAUDE_JSON_PATH="$CJSON23" \
+          bash "$SCRIPT" --registry "$REG23" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc23a=$?
+assert_eq "1" "$rc23a" "(23a) loopback refresh WITHOUT opt-in → rejected (exit非0·token 未发)"
+assert_contains "$out23a" "未授权" "(23a) stderr says 未授权 refresh 端点 (rejected before sending token)"
+# stores UNCHANGED (token never sent → no refresh → no overwrite).
+cred23a_at="$(node -e 'process.stdout.write(require(process.argv[1]).claudeAiOauth.accessToken)' "$CRED23" 2>/dev/null)"
+assert_eq "$OLD_CRED_AT_23" "$cred23a_at" "(23a) ① credentials.json UNCHANGED (no token sent·no overwrite)"
+alice23a="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["alice@x.com"].active))' "$LIB_JS" "$REG23" 2>/dev/null)"
+assert_eq "false" "$alice23a" "(23a) registry alice active NOT flipped (switch aborted at whitelist)"
+assert_not_contains "$out23a" "$ALICE_RT" "(23a) alice refresh token does NOT leak on the rejected path"
+# (23b) a NON-Claude host (with opt-in still set·proves opt-in only covers loopback) → reject.
+out23b="$(PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="https://evil.example.com/v1/oauth/token" CRED_PATH="$CRED23" CLAUDE_JSON_PATH="$CJSON23" \
+          bash "$SCRIPT" --registry "$REG23" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc23b=$?
+assert_eq "1" "$rc23b" "(23b) non-Claude host (evil.example.com) → rejected (exit非0·even with loopback opt-in set)"
+assert_contains "$out23b" "未授权" "(23b) stderr says 未授权 for the non-Claude host"
+cred23b_at="$(node -e 'process.stdout.write(require(process.argv[1]).claudeAiOauth.accessToken)' "$CRED23" 2>/dev/null)"
+assert_eq "$OLD_CRED_AT_23" "$cred23b_at" "(23b) ① credentials.json UNCHANGED (token never sent to evil host)"
+assert_not_contains "$out23b" "$ALICE_RT" "(23b) alice refresh token does NOT leak to / via the evil-host path"
+rm -rf "$FX23"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (24) **codex round#12/#18 — SIGTERM during the ③ keychain-write window → FORWARD-align (not rollback·no split-brain)**.
+#      演进：round#12 让中断在覆写窗口回滚 ①②。round#18 收口「keychain 已提交但 flag 未设」的盲窗——**在 security 调用
+#      之前**就置 STORES_COMMITTED=1，故中断落在 keychain 写窗口（keychain 提交与否不确定·①② 已是新号·① 是 claude 主
+#      认证源）时，最小伤害恢复是**前向对齐**（registry/① 都新·keychain 滞后由后续 reconcile），绝非回滚 ①②（回滚也是可
+#      被中断的 mutation·且 keychain 若已提交就回不去 → 反而 split-brain）。复现：security stub 在 ③ 写时 sleep（给中断窗口）；
+#      switch 在 ③ sleep（已过 STORES_COMMITTED=1）期间被 SIGTERM → 断言 registry **前向对齐**到 alice + ① 仍 FRESH（不回滚）。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX24="$(make_fixture)"; REG24="$FX24/accounts.json"; VFILE24="$FX24/accounts.env"; CRED24="$FX24/credentials.json"; CJSON24="$FX24/claude.json"
+cat > "$REG24" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE24","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"new@y.com","accountUuid":"uuid-new"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VFILE24"; chmod 600 "$VFILE24"
+OLD_CRED_AT_24='sk-ant-oat01-OLD24cred0000000000000000000-_o'
+cat > "$CRED24" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLD24cred0000000000000000000-_o","refreshToken":"sk-ant-ort01-OLD24credr000000000000000-_o","expiresAt":1700000000000},"keepThisKey":"keepme"}
+JSON
+cat > "$CJSON24" <<'JSON'
+{"oauthAccount":{"emailAddress":"old@x.com"},"numStartups":42}
+JSON
+# security stub: the FIRST official ③ keychain write SLEEPS (killed mid-sleep → never commits·simulates interrupt during
+#   the keychain write). The SECOND official ③ write (the trap's forward-align RE-COMMIT·codex round#19) CAPTURES the
+#   wrapped value to $SEC_CAPTURE_FILE so the test can verify the forward-align actually re-wrote keychain to the new account.
+SECSTUB_SLOW24="$(make_project)"
+cat > "$SECSTUB_SLOW24/security" <<'SEC'
+#!/usr/bin/env bash
+is_add=0; is_official=0; prev=""; wval=""; have_wval=0
+for a in "$@"; do
+  [ "$a" = "add-generic-password" ] && is_add=1
+  [ "$prev" = "-s" ] && [ "$a" = "Claude Code-credentials" ] && is_official=1
+  [ "$prev" = "-w" ] && { wval="$a"; have_wval=1; }
+  prev="$a"
+done
+if [ "$is_add" = "1" ] && [ "$is_official" = "1" ]; then
+  CNT_FILE="${SEC_CALL_COUNT_FILE:-/dev/null}"
+  n=0; [ -f "$CNT_FILE" ] && n="$(cat "$CNT_FILE" 2>/dev/null || echo 0)"; n=$((n+1)); printf '%s' "$n" > "$CNT_FILE" 2>/dev/null || true
+  if [ "$n" = "1" ]; then
+    # first ③ write (mid-overwrite): signal ready, then sleep → harness SIGTERMs it before it commits.
+    [ -n "${SEC_READY_FILE:-}" ] && printf 'ready\n' > "$SEC_READY_FILE"
+    sleep 8
+  else
+    # subsequent ③ write = the trap's forward-align re-commit: capture the wrapped value (proves keychain re-written to new号).
+    [ "$have_wval" = "1" ] && [ -n "${SEC_CAPTURE_FILE:-}" ] && printf '%s' "$wval" > "$SEC_CAPTURE_FILE"
+  fi
+fi
+exit 0
+SEC
+chmod +x "$SECSTUB_SLOW24/security"
+PORT24="$FX24/url.txt"; start_refresh_endpoint ok "$PORT24"; RURL24="$(cat "$PORT24")"
+SEC_READY24="$FX24/sec.ready"; SEC_CAP24="$FX24/kc-recommit.json"; SEC_CNT24="$FX24/kc.count"
+# run switch in the background; SIGTERM it once the ③ keychain sleep begins (= ①② already written).
+( PATH="$SECSTUB_SLOW24:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL24" SEC_READY_FILE="$SEC_READY24" SEC_CAPTURE_FILE="$SEC_CAP24" SEC_CALL_COUNT_FILE="$SEC_CNT24" CRED_PATH="$CRED24" CLAUDE_JSON_PATH="$CJSON24" \
+  bash "$SCRIPT" --registry "$REG24" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot >/dev/null 2>&1 ) &
+sw24_pid=$!
+# wait for the ③ keychain sleep to begin (①② already overwritten by now), then SIGTERM.
+i=0; while [ ! -s "$SEC_READY24" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i+1)); done
+sleep 0.3   # ensure we're inside the ③ sleep window (①② written, not yet committed).
+kill -TERM "$sw24_pid" 2>/dev/null || true
+wait "$sw24_pid" 2>/dev/null || true
+# **CORE INVARIANT (robust to exactly-which-window the SIGTERM landed in·timing-resilient)**：无论中断落在覆写前
+#   （回滚 → ① OLD + registry old）还是 keychain 窗口（前向对齐 → ① FRESH + registry alice），结果都必须**内部一致·
+#   绝不 split-brain**——① credentials.json（claude 主认证源·new=alice / old=bob）与 registry active 必须指向**同一个号**。
+cred24_at="$(node -e 'const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth&&j.claudeAiOauth.accessToken||"NONE")' "$CRED24" 2>/dev/null)"
+active24="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);const a=Object.entries(r.accounts||{}).find(([k,e])=>e.active===true);process.stdout.write(a?a[0]:"NONE")' "$LIB_JS" "$REG24" 2>/dev/null)"
+# map ① cred token → which account it points at; assert registry active points at the SAME account (no split-brain).
+case "$cred24_at" in
+  "$FRESH_AT")     assert_eq "alice@x.com" "$active24" "(24) CORE: ① credentials.json=alice(FRESH) ⟹ registry active=alice (consistent·forward-recovery·no split-brain)";;
+  "$OLD_CRED_AT_24") assert_eq "bob@y.com"  "$active24" "(24) CORE: ① credentials.json=bob(OLD·rolled back) ⟹ registry active=bob (consistent·rollback·no split-brain)";;
+  *) FAILED=$((FAILED+1)); _red "FAIL: (24) ① credentials.json in an unexpected state '$cred24_at' (neither clean FRESH nor clean OLD)";;
+esac
+# ① other keys preserved regardless of which branch (the node ① write / the snapshot rollback both keep them).
+cred24_keep="$(node -e 'const j=require(process.argv[1]);process.stdout.write(j.keepThisKey||"NONE")' "$CRED24" 2>/dev/null)"
+assert_eq "keepme" "$cred24_keep" "(24) ① other keys (keepThisKey) preserved through the interrupt (either branch)"
+# exactly one active (uniqueness held regardless of which window the interrupt hit).
+nactive24="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(Object.values(r.accounts||{}).filter(e=>e.active===true).length))' "$LIB_JS" "$REG24" 2>/dev/null)"
+assert_eq "1" "$nactive24" "(24) exactly ONE active account after the interrupt (active-uniqueness held)"
+# **(24-R19) codex round#19 — when forward-align happened (① FRESH), the trap RE-COMMITTED the keychain ③ to the new号**：
+#   the first ③ write was killed mid-sleep (never committed·keychain would be OLD); the trap's forward-align re-writes it →
+#   keychain ends up = new号 too (no keychain-lag split-brain). Verify only on the forward-align branch (① FRESH).
+if [ "$cred24_at" = "$FRESH_AT" ]; then
+  if [ -f "$SEC_CAP24" ]; then
+    cap24_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth&&j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("PARSEERR")}' "$SEC_CAP24" 2>/dev/null)"
+    assert_eq "$FRESH_AT" "$cap24_at" "(24-R19) forward-align RE-COMMITTED keychain ③ to the new号 (FRESH·no keychain-lag split-brain·codex round#19)"
+  else
+    FAILED=$((FAILED+1)); _red "FAIL: (24-R19) forward-align did NOT re-commit the keychain (keychain left OLD while ①/registry new = split-brain)"
+  fi
+fi
+rm -rf "$FX24" "$SECSTUB_SLOW24"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (25) **codex round#14 Finding A — 跨进程换号锁串行化并发 switch（官方三存储 + registry 不交错）**.
+#      病根：registry/vault 锁只各保护自己那个文件，挡不住两个并发 switch 的官方三存储覆写交错 → 文件归 A、
+#      keychain/registry 归 B 的 split-brain。修：换号级锁（键在 credentials.json 路径）罩住覆写+setActive 整段。
+#      teeth：两个并发 switch（切到不同号 alice / carol·各自 file vault 有 blob）→ 串行化后**最终三存储 + registry
+#      一致指向同一个号**（不交错）。security capture stub 记 ③ keychain 写的号·与 ① credentials.json + registry active 比对。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX25="$(make_fixture)"; REG25="$FX25/accounts.json"; VF_A25="$FX25/a.env"; VF_C25="$FX25/c.env"
+CRED25="$FX25/credentials.json"; CJSON25="$FX25/claude.json"; CAP25="$FX25/kc-capture.json"
+cat > "$REG25" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VF_A25","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice"} },
+  "carol@z.io":  { "vault": {"kind":"file","path":"$VF_C25","key":"carol@z.io"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"carol@z.io","accountUuid":"uuid-carol"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VF_A25"; chmod 600 "$VF_A25"
+printf 'carol@z.io_TOKEN=%s\n' "{\"accessToken\":\"sk-ant-oat01-CAROLaccess00000000000000000-_c\",\"refreshToken\":\"sk-ant-ort01-CAROLrefresh0000000000000000-_c\",\"expiresAt\":1700000000000}" > "$VF_C25"; chmod 600 "$VF_C25"
+cat > "$CRED25" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLD25000000000000000000000-_o","refreshToken":"sk-ant-ort01-OLD25r0000000000000000-_o","expiresAt":1700000000000}}
+JSON
+printf '{"oauthAccount":{"emailAddress":"old@x.com"}}' > "$CJSON25"
+PORT25="$FX25/url.txt"; start_refresh_endpoint ok "$PORT25"; RURL25="$(cat "$PORT25")"
+# run two switches concurrently (alice and carol); the switch lock must serialize them so the final state is consistent.
+( PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL25" CRED_PATH="$CRED25" CLAUDE_JSON_PATH="$CJSON25" \
+  bash "$SCRIPT" --registry "$REG25" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot >/dev/null 2>&1 ) &
+sw25a=$!
+( PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL25" CRED_PATH="$CRED25" CLAUDE_JSON_PATH="$CJSON25" \
+  bash "$SCRIPT" --registry "$REG25" --email "carol@z.io" --now "2026-06-17T09:00:00Z" --no-snapshot >/dev/null 2>&1 ) &
+sw25c=$!
+wait "$sw25a" 2>/dev/null || true; wait "$sw25c" 2>/dev/null || true
+# CORE: the registry's active account must be EXACTLY ONE of {alice, carol} (the serialized winner), and ② claude.json
+#   oauthAccount.emailAddress must MATCH that same winner — NOT a split (files for one, registry for the other).
+active25="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);const a=Object.entries(r.accounts||{}).find(([k,e])=>e.active===true);process.stdout.write(a?a[0]:"NONE")' "$LIB_JS" "$REG25" 2>/dev/null)"
+cj25_email="$(node -e 'const j=require(process.argv[1]);process.stdout.write(j.oauthAccount&&j.oauthAccount.emailAddress||"NONE")' "$CJSON25" 2>/dev/null)"
+# winner is whichever the registry marks active; the ② store identity must agree (consistency·no interleave).
+case "$active25" in
+  alice@x.com) assert_eq "alice@x.com" "$cj25_email" "(25) CORE: serialized → registry active=alice AND ② oauthAccount=alice (consistent·no interleave)";;
+  carol@z.io)  assert_eq "carol@z.io"  "$cj25_email" "(25) CORE: serialized → registry active=carol AND ② oauthAccount=carol (consistent·no interleave)";;
+  *) FAILED=$((FAILED+1)); _red "FAIL: (25) registry active is '$active25' (expected exactly one of alice/carol — neither switch committed cleanly)";;
+esac
+# exactly ONE account active (uniqueness held through concurrency).
+nactive25="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(Object.values(r.accounts||{}).filter(e=>e.active===true).length))' "$LIB_JS" "$REG25" 2>/dev/null)"
+assert_eq "1" "$nactive25" "(25) exactly ONE active account after concurrent switches (active-uniqueness held·no double-active)"
+# registry still valid JSON (no torn write from the two concurrent setActive RMW).
+if node -e 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"))' "$REG25" 2>/dev/null; then PASS=$((PASS+1)); _green "(25) registry valid JSON after concurrent switches (no torn write)"; else FAILED=$((FAILED+1)); _red "FAIL: (25) registry corrupted by concurrent switches"; fi
+rm -rf "$FX25"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (26) **codex round#15 Finding A — refresh token 轮转 + vault 回写失败 → 硬失败（不冒险丢轮转后的唯一 token）**.
+#      病根：refresh 端点轮转 refresh token 时 NEW_BLOB 是新 token 唯一副本；若 vault 回写失败、再继续到覆写而覆写
+#      回滚 → NEW_BLOB 被丢弃、vault 只剩已吊销旧 token = 该号 brick。修：轮转时把回写当硬前提——回写失败即硬失败、
+#      **不覆写任何官方存储**、registry 原封不动、exit非0 + 提示重 login。teeth：file vault 目录只读（writeback 失败）+
+#      轮转的 ok 端点（FRESH_RT != ALICE_RT）→ 断言 exit非0 + ① credentials.json **未被覆写**（仍 OLD）+ registry 未翻 + 提示。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX26="$(make_fixture)"; REG26="$FX26/accounts.json"; VFDIR26="$FX26/vdir"; mkdir -p "$VFDIR26"; VFILE26="$VFDIR26/accounts.env"
+CRED26="$FX26/credentials.json"; CJSON26="$FX26/claude.json"
+cat > "$REG26" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE26","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VFILE26"; chmod 600 "$VFILE26"
+OLD_CRED_AT_26='sk-ant-oat01-OLD26cred0000000000000000000-_o'
+cat > "$CRED26" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLD26cred0000000000000000000-_o","refreshToken":"sk-ant-ort01-OLD26credr000000000000000-_o","expiresAt":1700000000000}}
+JSON
+printf '{}' > "$CJSON26"
+# the `ok` endpoint ROTATES the refresh token (returns FRESH_RT != ALICE_RT) → REFRESH_ROTATED=1.
+PORT26="$FX26/url.txt"; start_refresh_endpoint ok "$PORT26"; RURL26="$(cat "$PORT26")"
+# CC_MASTER_HOME is a WRITABLE dir (recovery file lands here); the VAULT dir is read-only (writeback fails).
+CCMHOME26="$FX26/ccmhome"; mkdir -p "$CCMHOME26"
+chmod 500 "$VFDIR26"
+out26="$(CC_MASTER_HOME="$CCMHOME26" PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL26" CRED_PATH="$CRED26" CLAUDE_JSON_PATH="$CJSON26" \
+        bash "$SCRIPT" --registry "$REG26" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc26=$?
+chmod 700 "$VFDIR26"   # restore for cleanup.
+assert_eq "1" "$rc26" "(26) rotated refresh token + writeback fail → HARD FAIL (exit 1·不冒险丢轮转 token)"
+# ① credentials.json must be UNCHANGED (OLD·官方存储从未被覆写·硬失败发生在覆写之前).
+cred26_at="$(node -e 'const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken)' "$CRED26" 2>/dev/null)"
+assert_eq "$OLD_CRED_AT_26" "$cred26_at" "(26) CORE: ① credentials.json UNCHANGED (未覆写任何官方存储·硬失败在覆写前)"
+assert_not_contains "$cred26_at" "$FRESH_AT" "(26) ① is NOT the FRESH token (no overwrite happened)"
+# registry active NOT flipped.
+alice26="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["alice@x.com"].active))' "$LIB_JS" "$REG26" 2>/dev/null)"
+assert_eq "false" "$alice26" "(26) registry alice active NOT flipped (switch hard-failed before any store write)"
+# message guides re-login / refresh (the actionable recovery for a rotated-but-unpersisted token).
+assert_contains "$out26" "轮转" "(26) message explains the rotation + why it hard-failed (token-blind·no token value)"
+# **(26-recovery) codex round#16 — the rotated NEW_BLOB must be RESCUED to a 0600 recovery file (not lost·no brick)**.
+rec26="$(find "$CCMHOME26" -maxdepth 1 -name 'rotated-blob-recovery.alice@x.com.*.json' 2>/dev/null | head -1)"
+if [ -n "$rec26" ] && [ -f "$rec26" ]; then PASS=$((PASS+1)); _green "(26-recovery) rotated blob RESCUED to a recovery file (not lost·codex round#16·no brick)"; else FAILED=$((FAILED+1)); _red "FAIL: (26-recovery) rotated NEW_BLOB was NOT persisted to a recovery file (token lost·account bricked)"; fi
+# the recovery file must carry the FRESH rotated refresh token (so the account is actually recoverable).
+if [ -n "$rec26" ] && grep -q "$FRESH_RT" "$rec26" 2>/dev/null; then PASS=$((PASS+1)); _green "(26-recovery) recovery file carries the FRESH rotated refresh token (recoverable)"; else FAILED=$((FAILED+1)); _red "FAIL: (26-recovery) recovery file missing the fresh rotated refresh token"; fi
+# recovery file must be 0600 (token at rest·same floor as file vault).
+if [ -n "$rec26" ]; then rec26_perm="$(stat -f '%Lp' "$rec26" 2>/dev/null || stat -c '%a' "$rec26" 2>/dev/null)"; assert_eq "600" "$rec26_perm" "(26-recovery) recovery file is 0600 (token-at-rest floor)"; fi
+# the script must SURFACE the recovery file path (so the user can recover), and the token must NOT leak to stdout/stderr.
+assert_contains "$out26" "recovery" "(26-recovery) script surfaces the recovery file path so the user can recover the rotated token"
+assert_not_contains "$out26" "$FRESH_RT" "(26) rotated refresh token does NOT leak to script output (only into the 0600 file)"
+assert_not_contains "$out26" "$ALICE_RT" "(26) old refresh token does NOT leak on the hard-fail path"
+rm -rf "$FX26"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (27) **codex round#17 — SIGTERM in the post-commit/pre-setActive window → FORWARD-align registry (not rollback)**.
+#      病根：③ keychain 提交成功后、set_active_in 跑完前若被 SIGINT/TERM，旧 trap 只清 snapshot → 存储已新号、registry
+#      active 仍旧号 = split-brain。修：STORES_COMMITTED=1 后 trap 走**前向对齐**（best-effort setActive 切入号·让 registry
+#      追上已提交的存储），绝不回滚已提交存储。teeth（deterministic）：预占 registry 锁让 set_active_in 阻塞（此时 ③ 已提交·
+#      STORES_COMMITTED=1·ACTIVE_ALIGNED=0）→ SIGTERM switch → 释放 registry 锁 → trap 的前向对齐 setActive 完成 →
+#      断言 registry active **已翻到切入号**（前向对齐·非回滚）+ ① credentials.json 仍是 FRESH（已提交·没被回滚）。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX27="$(make_fixture)"; CCMHOME27="$FX27/ccmhome"; mkdir -p "$CCMHOME27"; REG27="$CCMHOME27/accounts.json"
+VFILE27="$FX27/accounts.env"; CRED27="$FX27/credentials.json"; CJSON27="$FX27/claude.json"
+cat > "$REG27" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE27","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VFILE27"; chmod 600 "$VFILE27"
+cat > "$CRED27" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLD2700000000000000000000-_o","refreshToken":"sk-ant-ort01-OLD27r0000000000000000-_o","expiresAt":1700000000000}}
+JSON
+printf '{"oauthAccount":{"emailAddress":"old@x.com"}}' > "$CJSON27"
+PORT27="$FX27/url.txt"; start_refresh_endpoint ok "$PORT27"; RURL27="$(cat "$PORT27")"
+# pre-hold the REGISTRY lock with a LIVE holder so set_active_in's mutateRegistry blocks (post-commit·pre-active window).
+REG27_LOCK="$REG27.lock"
+( sleep 30 ) & HOLDER27=$!   # a live process whose pid we put in the lock (kept alive so the lock isn't stale).
+printf '%s' "{\"pid\":$HOLDER27,\"at\":\"2099-01-01T00:00:00Z\",\"owner\":\"test-holder-27\"}" > "$REG27_LOCK"
+# run switch; --no-snapshot so after ③ commit it goes straight to set_active_in (which blocks on the held registry lock).
+( CC_MASTER_HOME="$CCMHOME27" PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL27" CRED_PATH="$CRED27" CLAUDE_JSON_PATH="$CJSON27" CCM_REGISTRY_LOCK_TIMEOUT_MS=8000 \
+  bash "$SCRIPT" --registry "$REG27" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot >/dev/null 2>&1 ) &
+sw27=$!
+# wait until ③ keychain committed (stores overwritten·STORES_COMMITTED=1) — detect via credentials.json now carrying FRESH.
+i=0; while [ "$i" -lt 100 ]; do
+  cur="$(node -e 'try{process.stdout.write(require(process.argv[1]).claudeAiOauth.accessToken||"")}catch(_e){}' "$CRED27" 2>/dev/null)"
+  case "$cur" in *FRESHaccess*) break;; esac
+  sleep 0.1; i=$((i+1))
+done
+sleep 0.2   # now in the post-commit window, set_active_in blocked on the held registry lock.
+kill -TERM "$sw27" 2>/dev/null || true
+# release the registry lock so the trap's forward-align setActive can proceed.
+kill "$HOLDER27" 2>/dev/null || true; rm -f "$REG27_LOCK" 2>/dev/null || true
+wait "$sw27" 2>/dev/null || true
+# ① credentials.json stays FRESH (committed stores NOT rolled back·confirmed FRESH before the SIGTERM·deterministic).
+cred27_at="$(node -e 'const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken)' "$CRED27" 2>/dev/null)"
+assert_eq "$FRESH_AT" "$cred27_at" "(27) ① credentials.json stays FRESH (committed stores not rolled back·post-commit·forward recovery)"
+# CORE: registry active FORWARD-ALIGNED to alice to MATCH the committed ① (no split-brain). The trap's forward-align
+#   setActive runs after the registry lock is released; give it a brief settle window (robust under load).
+i=0; while [ "$i" -lt 50 ]; do
+  active27="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);const a=Object.entries(r.accounts||{}).find(([k,e])=>e.active===true);process.stdout.write(a?a[0]:"NONE")' "$LIB_JS" "$REG27" 2>/dev/null)"
+  [ "$active27" = "alice@x.com" ] && break
+  sleep 0.1; i=$((i+1))
+done
+assert_eq "alice@x.com" "$active27" "(27) CORE: post-commit SIGTERM → registry active FORWARD-aligned to alice (matches committed ①·no split-brain·not rolled back)"
+rm -rf "$FX27"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (28) **codex re-§7 P1 — forward-align 后第二次 trap 不再误回滚 ①②（trap 幂等·无 split-brain）**.
+#      病根（codex 复现）：INT/TERM 落在「STORES_COMMITTED=1 已置、security 还没返回、OVERWRITE_IN_PROGRESS 还没清」
+#        这个窗口 → INT/TERM trap 跑前向对齐分支（补写 keychain ③ + setActive·置 ACTIVE_ALIGNED=1）然后 `exit`，`exit`
+#        又触发 EXIT trap **第二次** on_exit_or_interrupt。第二次：前向对齐被 ACTIVE_ALIGNED 跳过（对），但**仍为真的**
+#        OVERWRITE_IN_PROGRESS 让 elif 回滚 ①② → keychain/registry 对齐**新号**、①② 回退**旧号** = split-brain。
+#      **本 case 用「①② 换号前不存在」放大成真损坏**：(24) 用 pre-existing ①·第二次回滚因 snapshot 已被首次 trap 清掉
+#        而落到「无快照」else（不实际改 ①·只虚报告警），掩盖了逻辑 bug。这里 ① 不存在 → node 块**新建** ①·第二次误回滚
+#        走 CRED_PREEXISTED=0 的 `rm -f "$cred_path"` 分支（不依赖 snapshot）→ **真删掉前向对齐刚写的新号 credentials.json**
+#        → registry=alice 但 ① 文件被删 = 真 split-brain / brick。修后 forward-align 清 OVERWRITE_IN_PROGRESS → 第二次
+#        trap 不再回滚 → ① 新号文件存活 + registry=alice·三存储一致对齐新号。
+#      复现：slow security stub（③ 写时 sleep·给中断窗口·此刻 OVERWRITE_IN_PROGRESS 仍=1）；① 路径指向不存在文件；
+#        switch 在 ③ sleep（已过 STORES_COMMITTED=1）期间被 SIGTERM → 断言三存储一致对齐新号、不被第二次 trap 误删。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX28="$(make_fixture)"; REG28="$FX28/accounts.json"; VFILE28="$FX28/accounts.env"
+# ① / ② paths point at files that DO NOT EXIST yet (node block will CREATE them·CRED_PREEXISTED=0 → 误回滚走 rm -f 分支).
+CRED28="$FX28/new-credentials.json"; CJSON28="$FX28/new-claude.json"
+[ -e "$CRED28" ] && rm -f "$CRED28"; [ -e "$CJSON28" ] && rm -f "$CJSON28"
+cat > "$REG28" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE28","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VFILE28"; chmod 600 "$VFILE28"
+# slow security stub: the FIRST official ③ write SLEEPS (SIGTERM lands mid-sleep → OVERWRITE_IN_PROGRESS still=1·exactly
+#   the P1 window); the SECOND ③ write = the trap's forward-align re-commit (succeeds·proves keychain re-written to new号).
+SECSTUB_SLOW28="$(make_project)"
+cat > "$SECSTUB_SLOW28/security" <<'SEC'
+#!/usr/bin/env bash
+is_add=0; is_official=0; prev=""
+for a in "$@"; do
+  [ "$a" = "add-generic-password" ] && is_add=1
+  [ "$prev" = "-s" ] && [ "$a" = "Claude Code-credentials" ] && is_official=1
+  prev="$a"
+done
+if [ "$is_add" = "1" ] && [ "$is_official" = "1" ]; then
+  CNT_FILE="${SEC_CALL_COUNT_FILE:-/dev/null}"
+  n=0; [ -f "$CNT_FILE" ] && n="$(cat "$CNT_FILE" 2>/dev/null || echo 0)"; n=$((n+1)); printf '%s' "$n" > "$CNT_FILE" 2>/dev/null || true
+  if [ "$n" = "1" ]; then
+    [ -n "${SEC_READY_FILE:-}" ] && printf 'ready\n' > "$SEC_READY_FILE"
+    sleep 8   # SIGTERM lands here (OVERWRITE_IN_PROGRESS still=1·STORES_COMMITTED=1) → the double-trap window.
+  fi
+fi
+exit 0
+SEC
+chmod +x "$SECSTUB_SLOW28/security"
+PORT28="$FX28/url.txt"; start_refresh_endpoint ok "$PORT28"; RURL28="$(cat "$PORT28")"
+SEC_READY28="$FX28/sec.ready"; SEC_CNT28="$FX28/kc.count"
+( PATH="$SECSTUB_SLOW28:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL28" SEC_READY_FILE="$SEC_READY28" SEC_CALL_COUNT_FILE="$SEC_CNT28" CRED_PATH="$CRED28" CLAUDE_JSON_PATH="$CJSON28" \
+  bash "$SCRIPT" --registry "$REG28" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot >/dev/null 2>&1 ) &
+sw28_pid=$!
+# wait for the ③ keychain sleep to begin (①② already CREATED·STORES_COMMITTED=1·OVERWRITE_IN_PROGRESS still=1), then SIGTERM.
+i=0; while [ ! -s "$SEC_READY28" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i+1)); done
+sleep 0.3   # ensure we're inside the ③ sleep window.
+kill -TERM "$sw28_pid" 2>/dev/null || true
+wait "$sw28_pid" 2>/dev/null || true
+# CORE: after the double-trap, the three stores must be CONSISTENTLY aligned to the NEW account (alice) — NOT split-brain.
+#   ① credentials.json must EXIST and carry the FRESH (alice) token (forward-align created/committed it; the buggy 2nd-pass
+#   rollback would have rm -f'd it → registry=alice but ① missing = split-brain). registry active must = alice.
+if [ -f "$CRED28" ]; then PASS=$((PASS+1)); _green "(28) P1: forward-aligned ① credentials.json SURVIVES the 2nd trap (not rm -f'd·no split-brain)"; else FAILED=$((FAILED+1)); _red "FAIL: (28) P1 forward-aligned ① credentials.json DELETED by the 2nd trap's误回滚 (split-brain: registry=alice·① gone)"; fi
+cred28_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth&&j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("MISSING")}' "$CRED28" 2>/dev/null)"
+assert_eq "$FRESH_AT" "$cred28_at" "(28) P1: ① credentials.json carries FRESH (alice) token (forward-align committed·2nd trap did NOT roll it back to旧号)"
+active28="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);const a=Object.entries(r.accounts||{}).find(([k,e])=>e.active===true);process.stdout.write(a?a[0]:"NONE")' "$LIB_JS" "$REG28" 2>/dev/null)"
+assert_eq "alice@x.com" "$active28" "(28) P1 CORE: registry active = alice (forward-aligned) ⟺ ① credentials.json = alice(FRESH) — three stores CONSISTENT·no split-brain"
+# exactly one active (uniqueness held through the double-trap).
+nactive28="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(Object.values(r.accounts||{}).filter(e=>e.active===true).length))' "$LIB_JS" "$REG28" 2>/dev/null)"
+assert_eq "1" "$nactive28" "(28) P1: exactly ONE active account after the double-trap (active-uniqueness held)"
+# the ③ keychain re-commit (forward-align) ran (2nd security call) AND no double forward-align (idempotent): count must be ≥2.
+#   (the 1st call slept-then-killed·the 2nd is the forward-align re-commit; a buggy 3rd would mean the EXIT-trap re-ran forward-align.)
+seccnt28="$(cat "$SEC_CNT28" 2>/dev/null || echo 0)"
+if [ "$seccnt28" -ge 2 ] && [ "$seccnt28" -le 2 ]; then PASS=$((PASS+1)); _green "(28) P1: forward-align re-committed keychain exactly once (2 ③ writes total·2nd trap did NOT repeat forward-align·idempotent)"; else FAILED=$((FAILED+1)); _red "FAIL: (28) P1 keychain ③ write count=$seccnt28 (expected 2: 1 killed + 1 forward-align re-commit; >2 ⟹ 2nd trap repeated forward-align·not idempotent)"; fi
+rm -rf "$FX28" "$SECSTUB_SLOW28"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (29) **codex re-§7 P2 — forward-align 时 registry 对齐失败 → 收尾消息据实报「对齐失败」，绝不谎称「registry 一致」**.
+#      病根（codex 复现）：前向对齐分支里 node mutateRegistry 自身失败（registry 锁超时 / accounts.json 损坏 / 目录不可写）
+#        曾被 node 内 try/catch 吞掉，可下面仍无条件打印「三存储与 registry 一致·避免 split-brain」——谎称一致：实际
+#        ①②③ 存储已新号、registry active 仍旧号 = split-brain，消息却说已避免。修：移除 node 内吞异常 try/catch，
+#        `if node…then REG_ALIGNED=1`，消息按 REG_ALIGNED 分支（失败→诚实「registry active 对齐失败·下次
+#        detect_current_active 反向对账」）。语义不变（非永久 split-brain·可自愈），只让消息不撒谎。
+#      复现（hermetic·deterministic·无 lock-timing）：registry 放独立子目录；slow security stub 在**第一次**官方 ③ 写时
+#        先把该子目录 chmod 只读（forward-align 的 mutateRegistry 建不了 <reg>.lock → O_EXCL EACCES 立即抛·非 EEXIST 不重试
+#        → REG_ALIGNED=0），再 sleep 8（SIGTERM 落在 sleep 中·OVERWRITE_IN_PROGRESS 仍=1·STORES_COMMITTED=1）。换号锁挂在
+#        CRED_PATH（FX 根·可写·不受影响·line 1389），故只 registry 写失败。断言 stderr 走**诚实失败分支**（且不含过度声称）
+#        + ① credentials.json 仍 FRESH（P1 不回滚·独立于 REG_ALIGNED）。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX29="$(make_fixture)"; REGDIR29="$FX29/regdir"; mkdir -p "$REGDIR29"; REG29="$REGDIR29/accounts.json"; VFILE29="$FX29/accounts.env"
+CRED29="$FX29/new-credentials.json"; CJSON29="$FX29/new-claude.json"
+[ -e "$CRED29" ] && rm -f "$CRED29"; [ -e "$CJSON29" ] && rm -f "$CJSON29"
+cat > "$REG29" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE29","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VFILE29"; chmod 600 "$VFILE29"
+# slow security stub: on the 1st official ③ write, FIRST chmod the registry DIR read-only (forward-align mutateRegistry
+#   cannot create <reg>.lock → throws → REG_ALIGNED=0), THEN sleep 8 (SIGTERM lands mid-sleep·the post-commit window).
+#   The 2nd official ③ write (forward-align keychain re-commit) just exits 0.  `<<SEC` UNQUOTED so $REGDIR29 expands now;
+#   runtime vars are \$-escaped to survive into the generated stub.
+SECSTUB_RO29="$(make_project)"
+cat > "$SECSTUB_RO29/security" <<SEC
+#!/usr/bin/env bash
+is_add=0; is_official=0; prev=""
+for a in "\$@"; do
+  [ "\$a" = "add-generic-password" ] && is_add=1
+  [ "\$prev" = "-s" ] && [ "\$a" = "Claude Code-credentials" ] && is_official=1
+  prev="\$a"
+done
+if [ "\$is_add" = "1" ] && [ "\$is_official" = "1" ]; then
+  CNT_FILE="\${SEC_CALL_COUNT_FILE:-/dev/null}"
+  n=0; [ -f "\$CNT_FILE" ] && n="\$(cat "\$CNT_FILE" 2>/dev/null || echo 0)"; n=\$((n+1)); printf '%s' "\$n" > "\$CNT_FILE" 2>/dev/null || true
+  if [ "\$n" = "1" ]; then
+    chmod 555 "$REGDIR29" 2>/dev/null || true
+    [ -n "\${SEC_READY_FILE:-}" ] && printf 'ready\n' > "\$SEC_READY_FILE"
+    sleep 8
+  fi
+fi
+exit 0
+SEC
+chmod +x "$SECSTUB_RO29/security"
+PORT29="$FX29/url.txt"; start_refresh_endpoint ok "$PORT29"; RURL29="$(cat "$PORT29")"
+SEC_READY29="$FX29/sec.ready"; SEC_CNT29="$FX29/kc.count"; STDERR29="$FX29/switch.stderr"
+( PATH="$SECSTUB_RO29:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL29" SEC_READY_FILE="$SEC_READY29" SEC_CALL_COUNT_FILE="$SEC_CNT29" CRED_PATH="$CRED29" CLAUDE_JSON_PATH="$CJSON29" CCM_REGISTRY_LOCK_TIMEOUT_MS=2000 \
+  bash "$SCRIPT" --registry "$REG29" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot >/dev/null 2>"$STDERR29" ) &
+sw29_pid=$!
+i=0; while [ ! -s "$SEC_READY29" ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i+1)); done
+sleep 0.3   # inside the ③ sleep window·registry dir already read-only.
+kill -TERM "$sw29_pid" 2>/dev/null || true
+wait "$sw29_pid" 2>/dev/null || true
+chmod 755 "$REGDIR29" 2>/dev/null || true   # restore writable for cleanup (rm -rf needs w+x on the dir).
+# CORE: the trap's forward-align registry write FAILED → the wrap-up message must HONESTLY report 对齐失败, NOT over-claim一致.
+if grep -q "registry active 对齐失败" "$STDERR29" 2>/dev/null; then PASS=$((PASS+1)); _green "(29) P2: registry-align failure → wrap-up message HONESTLY reports 「registry active 对齐失败」 (no over-claim)"; else FAILED=$((FAILED+1)); _red "FAIL: (29) P2 registry-align failed but message did NOT report 对齐失败 (stderr tail: $(tr '\n' ' ' < "$STDERR29" 2>/dev/null | tail -c 220))"; fi
+if grep -q "三存储与 registry 一致" "$STDERR29" 2>/dev/null; then FAILED=$((FAILED+1)); _red "FAIL: (29) P2 message OVER-CLAIMS 「三存储与 registry 一致」 while registry-align actually FAILED (the lying-message bug)"; else PASS=$((PASS+1)); _green "(29) P2: message does NOT over-claim consistency when registry-align failed"; fi
+# ① credentials.json must still be FRESH (P1 rollback-suppression holds independent of the registry-align outcome·no brick).
+cred29_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth&&j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("MISSING")}' "$CRED29" 2>/dev/null)"
+assert_eq "$FRESH_AT" "$cred29_at" "(29) P2: ① credentials.json stays FRESH (forward-align committed stores NOT rolled back·even when registry-align fails)"
+rm -rf "$FX29" "$SECSTUB_RO29"
+
 # kill any lingering stub endpoints.
 for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
-rm -rf "$SECSTUB" "$SECSTUB_CAPTURE" "$SECSTUB_FAIL" "$FX1" "$FX1B" "$FX2" "$FX3" "$FX4" "$FX5" "$STUB_ROOT5" "$FX5D" "$FX5E" "$FX6" "$FX8" "$FX9" "$STUB_ROOT9" "$FX10" "$FX11" "$FX11B" "$STUB_ROOT11B"
+rm -rf "$SECSTUB" "$SECSTUB_CAPTURE" "$SECSTUB_FAIL" "$FX1" "$FX1B" "$FX2" "$FX3" "$FX4" "$FX5" "$STUB_ROOT5" "$FX5D" "$FX5E" "$FX6" "$FX8" "$FX9" "$STUB_ROOT9" "$FX10" "$FX11" "$FX11B" "$STUB_ROOT11B" "$FX15" "$STUB_ROOT15" "$FX16"
 
 finish

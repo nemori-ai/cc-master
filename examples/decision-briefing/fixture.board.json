@@ -1,0 +1,96 @@
+{
+  "schema": "cc-master/v1",
+  "goal": "把 cc-master 的 board 持久层从单文件 JSON 迁移到「单文件 JSON + 可选 sidecar 索引」，在不破 narrow waist 的前提下支撑 >200 节点的 board 不卡顿",
+  "owner": { "active": true, "session_id": "demo-decision-briefing-001", "heartbeat": "2026-06-19T09:30:00Z" },
+  "git": { "worktree": "/repo/.worktrees/board-persistence", "branch": "feat/board-persistence-scale" },
+  "wip_limit": 4,
+  "meta": { "template_version": 1 },
+  "tasks": [
+    {
+      "id": "P0",
+      "status": "done",
+      "deps": [],
+      "verified": true,
+      "title": "侦察：定位 >180 节点 board 的卡顿根因",
+      "mechanism": "sub-agent",
+      "artifact": "design_docs/plans/persistence-recon.md —— 侦察结论：当前单文件 board 在 ~180 节点时 webview 活轮询出现可感卡顿；瓶颈在每 2s 全量 re-parse + re-layout，而非磁盘 IO。",
+      "created_at": "2026-06-19T08:00:00Z"
+    },
+    {
+      "id": "P1",
+      "status": "done",
+      "deps": [],
+      "verified": true,
+      "title": "建立性能基线（解析 + 布局 p95）",
+      "mechanism": "sub-agent",
+      "artifact": "design_docs/plans/perf-baseline.md —— 基线：180 节点 board，view-server 全量解析 38ms / xyflow 重新布局 410ms（p95）；DAG 深度 9、最宽层 26 节点。",
+      "created_at": "2026-06-19T08:10:00Z"
+    },
+    {
+      "id": "D1",
+      "status": "blocked",
+      "deps": ["P0", "P1"],
+      "blocked_on": "user",
+      "title": "选定持久层架构方向（含 narrow-waist 取舍）",
+      "created_at": "2026-06-19T09:20:00Z",
+      "decision_package": {
+        "prepared_at": "2026-06-19T09:25:00Z",
+        "inputs_hash": "sha256:05e0b09c4d63284ae9c753191e81129bd036fe6a6538a5129432e31af3834805",
+        "freshness": "fresh",
+        "ask_type": "decision",
+        "context_md": "cc-master 走到这一步：P0 侦察确认 >180 节点 board 的卡顿根因不在磁盘 IO，而在 webview 每 2s 全量 re-parse + xyflow re-layout（P1 基线：解析 38ms、重布局 410ms p95）。要支撑 >200 节点不卡顿，必须改持久 / 加载形态。但 board 是 narrow waist（红线 2）——任何持久层改动都不能动 hook 依赖的硬字段（schema / goal / owner / git / tasks[{id,status,deps}]）。我卡在「往哪个架构方向走」这一步：三条路对 narrow waist、对 hook、对 viewer 的代价差异很大，这是一个只能由人拍板的方向性取舍，我不该擅自焊死。",
+        "question": "board 持久层往哪个方向迁移，才能在不破 narrow waist 的前提下扛住 >200 节点？",
+        "what_i_need": "你在下面三个 option 里拍板选一个（或给一个全新方向）。选定后我会据此重排 DAG、派发实现节点。",
+        "why_it_matters": "这是整条临界路径的根节点——P2（实现持久层）/ P3（viewer 增量加载）/ P4（迁移脚本）全都 deps 在这个决策上。不答它，下游三个实现节点全部焊死，goal 无法推进。",
+        "options": [
+          {
+            "id": "opt-sidecar-index",
+            "label": "单文件 JSON + 旁挂只读 sidecar 索引",
+            "rationale": "board 主文件原样不动（narrow waist 零改动），另写一份 <board>.index.json 缓存「布局 + 折叠层级」；viewer 优先读 index、主文件变更时增量重算。hook 完全无视 index（带外 sidecar）。",
+            "tradeoffs": "✅ narrow waist 零改动、hook 零改动、可回退（删 index 即退化到现状）。⚠️ 引入「index 与主文件不一致」的 staleness 面，需 content-hash 校验；多一个带外文件要管生命周期。"
+          },
+          {
+            "id": "opt-split-shards",
+            "label": "把 tasks[] 拆成分片文件（board.json 只留 waist + 指针）",
+            "rationale": "主 board 只保留 narrow-waist 头 + 一个 shard 清单；tasks 正文分片落盘，viewer / hook 按需加载。",
+            "tradeoffs": "✅ 单文件体积彻底解耦节点数。❌ 动了「tasks 是 board 内数组」这一硬 waist 假设——所有 hook + board-lint + viewer 全要改（红线 2 重改动、要人审），可回退性差。"
+          },
+          {
+            "id": "opt-viewer-only",
+            "label": "只优化 viewer（虚拟化渲染 + 增量 diff），持久层不动",
+            "rationale": "卡顿在 viewer 侧（P1 基线坐实），那就只改 view.html：可视区虚拟化 + 仅 diff 变更节点重布局，主文件与 hook 一律不碰。",
+            "tradeoffs": "✅ 持久层零风险、纯前端改动、不碰任何红线。⚠️ 没解决「主文件每回合全量重写」的写放大（>500 节点时仍会浮现）；治标，可能是第一步而非终态。"
+          }
+        ],
+        "enter_cmd": "/cc-master:discuss D1 --board 20260619T093000-0000"
+      }
+    },
+    {
+      "id": "P2",
+      "status": "blocked",
+      "deps": ["D1"],
+      "blocked_on": "D1",
+      "title": "实现选定的持久层方向",
+      "created_at": "2026-06-19T09:21:00Z"
+    },
+    {
+      "id": "P3",
+      "status": "blocked",
+      "deps": ["D1"],
+      "blocked_on": "D1",
+      "title": "viewer 增量加载 / 渲染适配",
+      "created_at": "2026-06-19T09:21:00Z"
+    },
+    {
+      "id": "P4",
+      "status": "blocked",
+      "deps": ["D1"],
+      "blocked_on": "D1",
+      "title": "旧 board 迁移脚本 + 回退路径",
+      "created_at": "2026-06-19T09:21:00Z"
+    }
+  ],
+  "log": [
+    { "t": "2026-06-19T09:25:00Z", "note": "P0/P1 侦察+基线 done+verified；为 D1 准备 decision_package（idle prefetch / fill-work），挂节点上等用户拍板方向。" }
+  ]
+}

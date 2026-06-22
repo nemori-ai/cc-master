@@ -141,7 +141,9 @@ wakeup_is_object_t() {
 }
 # fp_of BOARD — MUST mirror status_fingerprint() in verify-board.sh. Since codex round-2's P2 fix, the
 # fingerprint folds in the watchdog_needed bit (0/1) as a leading "watchdog_needed:<v>" line BEFORE the
-# task id+status+blocked_on triples (so a state needing a watchdog hashes differently, AND a stale
+# task id+status+blocked_on+parent quads (D3 added `parent` to the fold: a child's status flip changes the
+# owner sub-graph fingerprint; an old board with no `parent` token hashes exactly as the pre-D3 formula).
+# (so a state needing a watchdog hashes differently, AND a stale
 # pre-upgrade .stopcheck can never collide). watchdog_needed = (board has an in_flight task in the tasks
 # region) AND (no root-depth wakeup OBJECT) — replicated here exactly. Single-board mirror (the seed/assert
 # tests below each use ONE matched board), matching the loop the hook runs over $matched_boards.
@@ -151,7 +153,7 @@ fp_of() { # $1 = board path
     wakeup_is_object_t "$1" || wn=1
   fi
   { printf 'watchdog_needed:%s\n' "$wn"
-    tasks_region_t "$1" | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"'
+    tasks_region_t "$1" | grep -oE '"(id|status|blocked_on|parent)"[[:space:]]*:[[:space:]]*"[^"]*"'
   } | cksum | awk '{print $1}'
 }
 
@@ -497,6 +499,100 @@ mkactive "$H" "b1" '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"
 run_stop_sid "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "AB: board sid 非空且 ≠ stdin sid → rc 0"
 assert_not_contains "$HOOK_OUT" "block" "AB: board sid=OTHER（非空）≠ stdin sid=MINE → 仍休眠 allow（红线 6 防线未退化）"
+rm -rf "$H"
+
+# ─── D3 / ADR-012: ROLLUP-AWARE STOP GATE (parent container edge) ──────────────────────────────────
+# verify-board now reads the pinned-waist `parent` edge: on a completion state, a `done` owner that
+# still has a non-done child injects a NON-BLOCKING rollup-inconsistency reminder (path-ii, Q-N1 =
+# soft reminder, not a hard block). Degrade: old boards with no `parent` keep the flat behavior. Red
+# line 6: an unarmed session never injects it. The reminder rides the completion-state handshake.
+
+# Case RU1 (D3): ARMED + done owner + NON-done child → completion handshake names the rollup
+#                inconsistency (owner done, child still in flight). Still a block (the handshake),
+#                exit code unchanged (rc 0 — block is emitted as JSON, hook exits 0).
+H="$(make_project)"; SID="sess-rollup-bad"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[],\"kind\":\"owner\"},{\"id\":\"M1.a\",\"status\":\"done\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+run_stop_sid "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "RU1 rollup violation → rc 0 (reminder is non-blocking JSON, hook exits 0)"
+assert_contains "$HOOK_OUT" "block" "RU1 rollup violation → completion-state handshake block"
+assert_contains "$HOOK_OUT" "Rollup inconsistency" "RU1 done owner + non-done child → rollup reminder injected"
+assert_contains "$HOOK_OUT" "owner M1 is" "RU1 rollup reminder names the offending owner"
+assert_contains "$HOOK_OUT" "child M1.b is" "RU1 rollup reminder names the non-done child"
+rm -rf "$H"
+
+# Case RU2 (D3): ARMED + done owner + ALL children done → NO rollup reminder (consistent rollup).
+#                Still a completion handshake (self-check), just without the rollup sentence.
+H="$(make_project)"; SID="sess-rollup-ok"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.a\",\"status\":\"done\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.b\",\"status\":\"done\",\"deps\":[],\"parent\":\"M1\"}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "self-check" "RU2 done owner + all done children → still the self-check handshake"
+assert_not_contains "$HOOK_OUT" "Rollup inconsistency" "RU2 done owner + all done children → NO rollup reminder (consistent)"
+rm -rf "$H"
+
+# Case RU3 (D3): the owner is NOT done (in_flight整合中) while a child is in_flight → NO rollup
+#                violation (the gate only fires when the OWNER is `done` but a child is not — a
+#                still-working owner is legitimate). Mirrors graph-core: statusOf(owner)!=='done' → skip.
+H="$(make_project)"; SID="sess-rollup-owner-inflight"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+run_stop_sid "$H" "$SID"
+assert_not_contains "$HOOK_OUT" "Rollup inconsistency" "RU3 owner in_flight (not done) + child in_flight → NO rollup reminder (owner not done)"
+rm -rf "$H"
+
+# Case RU4 (D3 DEGRADE): an OLD board with NO `parent` edges (all flat top-level tasks, one done one
+#                in_flight) → degrades to flat behavior: no rollup reminder, no crash, the existing
+#                completion-state self-check handshake still fires (block). Proves rollup never breaks
+#                a pre-D3 board.
+H="$(make_project)"; SID="sess-rollup-degrade"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "RU4 degrade (no parent) → rc 0 (no crash)"
+assert_contains "$HOOK_OUT" "block" "RU4 degrade (no parent) → existing completion handshake still blocks"
+assert_contains "$HOOK_OUT" "self-check" "RU4 degrade (no parent) → existing self-check handshake preserved"
+assert_not_contains "$HOOK_OUT" "Rollup inconsistency" "RU4 degrade (no parent) → no rollup reminder (flat behavior)"
+rm -rf "$H"
+
+# Case RU5 (D3 DEGRADE): a `parent` pointing at a NON-EXISTENT owner id → no violation (we only flag a
+#                child against an owner that is BOTH a real task AND status:"done", exactly like
+#                graph-core statusOf(owner)===undefined). Malformed parent never breaks the Stop gate.
+H="$(make_project)"; SID="sess-rollup-dangling-parent"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"GHOST\"}]}"
+run_stop_sid "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "RU5 dangling parent → rc 0 (no crash)"
+assert_not_contains "$HOOK_OUT" "Rollup inconsistency" "RU5 parent → non-existent owner → no rollup violation (degrade)"
+rm -rf "$H"
+
+# Case RU6 (D3 RED LINE 6): UNARMED session (archived board, owner.active:false) with a clear rollup
+#                violation (done owner + in_flight child) → hook stays DORMANT: allow, NO block, and
+#                CRUCIALLY no rollup reminder is ever injected on an unarmed path.
+H="$(make_project)"; SID="sess-rollup-unarmed"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":false,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+run_stop_sid "$H" "$SID"
+assert_eq 0 "$HOOK_RC" "RU6 unarmed (archived) → rc 0 (dormant)"
+assert_not_contains "$HOOK_OUT" "block" "RU6 unarmed → dormant allow (no block)"
+assert_not_contains "$HOOK_OUT" "Rollup inconsistency" "RU6 unarmed → NO rollup reminder on unarmed path (red line 6)"
+rm -rf "$H"
+
+# Case RU7 (D3 FINGERPRINT): folding `parent` into the fingerprint means a CHILD's status change
+#                re-forces the self-check across Stops. Seed the sidecar with the fp of the
+#                child-in_flight state, then flip the child to done → fingerprint differs → re-block.
+H="$(make_project)"; SID="sess-rollup-fp"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+printf '0 %s\n' "$(fp_of "$H/b1.board.json")" > "$H/.$SID.stopcheck"   # seed: child-in_flight state handshook
+# Flip the child in_flight → done: the parent-folded fingerprint must change → re-block the handshake.
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"done\",\"deps\":[],\"parent\":\"M1\"}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "RU7 child status flip (in_flight→done) → fingerprint changes (parent folded) → re-block handshake"
+rm -rf "$H"
+
+# Case RU8 (D3 FINGERPRINT graceful-degrade): a board with NO `parent` field must hash IDENTICALLY to
+#                the pre-D3 (id|status|blocked_on) formula — no spurious handshake churn on the flat
+#                majority. Verify fp_of (which now includes parent) equals the old formula on a no-parent
+#                board.
+H="$(make_project)"
+mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":[]}]}'
+PRE_D3_FP="$(tasks_region_t "$H/b1.board.json" | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | { printf 'watchdog_needed:1\n'; cat; } | cksum | awk '{print $1}')"
+NOW_FP="$(fp_of "$H/b1.board.json")"
+assert_eq "$PRE_D3_FP" "$NOW_FP" "RU8 no-parent board → parent-folded fp == pre-D3 fp (graceful-degrade, no churn)"
 rm -rf "$H"
 
 finish

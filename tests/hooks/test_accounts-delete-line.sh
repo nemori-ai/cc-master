@@ -202,4 +202,61 @@ else
   fi
 fi
 
+# ── (P3a) **codex round#3 — account-delete.sh delete_vault_file matches ONLY exact rows (sibling safety)** ──
+# 病根：旧 delete_vault_file 用宽前缀 `<email>_` 删——删 `foo` 会把 sibling `foo_bar_TOKEN=`/`_EXPIRES=` 也删掉
+#   → 误毁另一个号、使其 unswitchable。修：只删本号**精确**的 `<email>_TOKEN=` / `<email>_EXPIRES=` 两类行。
+# teeth：file vault 预置 sibling `foo_bar@x.com` + 目标 `foo@x.com` → 真跑 account-delete.sh 删 `foo@x.com`（file
+#   vault·--registry 指向无该 entry 的空 registry·走 file 删行）→ 断言 foo 两行删净、sibling foo_bar 两行**存活**.
+echo "-- (P3a) account-delete.sh delete_vault_file overlapping-identifier safety (deleting foo must NOT clobber foo_bar) --"
+DEL_SH2="$PLUGIN_ROOT/skills/account-management/scripts/account-delete.sh"
+# account-delete.sh resolves the registry via defaultRegistryPath() = $CC_MASTER_HOME/accounts.json (no --registry flag).
+P3A="$(make_project)"; P3A_VF="$P3A/accounts.env"; P3A_REG="$P3A/accounts.json"
+printf '%s\n' '{ "schema": "cc-master/accounts/v1", "accounts": {} }' > "$P3A_REG"
+{
+  printf 'foo_bar@x.com_TOKEN=sibling-keep-BBB\n'
+  printf 'foo_bar@x.com_EXPIRES=2099-01-01\n'
+  printf 'foo@x.com_TOKEN=target-gone-AAA\n'
+  printf 'foo@x.com_EXPIRES=2099-01-01\n'
+} > "$P3A_VF"; chmod 600 "$P3A_VF"
+out_p3a="$(CC_MASTER_HOME="$P3A" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+          bash "$DEL_SH2" --email "foo@x.com" --vault-kind file --vault-file "$P3A_VF" 2>&1)"; rc_p3a=$?
+assert_eq "0" "$rc_p3a" "(P3a) delete foo@x.com (file vault) exits 0"
+# target foo@x.com both lines GONE.
+if grep -q "target-gone-AAA" "$P3A_VF" 2>/dev/null; then FAILED=$((FAILED+1)); _red "FAIL: (P3a) target foo@x.com token NOT deleted"; else PASS=$((PASS+1)); _green "(P3a) target foo@x.com _TOKEN deleted"; fi
+# **CORE**: sibling foo_bar@x.com rows MUST survive (the broad-prefix bug deleted them too).
+if grep -q "sibling-keep-BBB" "$P3A_VF" 2>/dev/null; then PASS=$((PASS+1)); _green "(P3a) CORE: sibling foo_bar@x.com _TOKEN SURVIVES delete-of-foo (exact-row match)"; else FAILED=$((FAILED+1)); _red "FAIL: (P3a) sibling foo_bar@x.com _TOKEN DELETED by delete-of-foo — overlapping-identifier bug in delete"; fi
+if grep -q '^foo_bar@x.com_EXPIRES=2099-01-01$' "$P3A_VF" 2>/dev/null; then PASS=$((PASS+1)); _green "(P3a) sibling foo_bar@x.com _EXPIRES survives too"; else FAILED=$((FAILED+1)); _red "FAIL: (P3a) sibling foo_bar@x.com _EXPIRES deleted by delete-of-foo"; fi
+# token-blind: no token VALUE printed by delete.
+assert_not_contains "$out_p3a" "sibling-keep-BBB" "(P3a) delete output does NOT print sibling token value (token-blind)"
+rm -rf "$P3A"
+
+# ── (P3b) **codex round#3 — delete_vault_file: rename failure → return non-zero (NOT false-success)** ──
+# 病根：旧 delete_vault_file 只看 awk 退出码；mv 失败（权限/race）时仍 fall through 按 before 报成功 → caller 继续
+#   删 registry entry，而 token 仍在 vault = token 残留 + 指针丢失（registry 不再指向它、却删不掉）。修：mv 失败 →
+#   return 1，caller 不继续删 registry（token 与 registry 仍一致地都留着·可重试）。
+# teeth：把 vault 文件所在**目录设只读** → awk 能读、能写 temp？不——temp 也在该目录建不了。改用更精准的注入：让
+#   vault 文件本身可读、目录可写到能建 temp，但**目标文件不可替换**——最稳的 deterministic 复现是目录只读（mktemp/temp
+#   建不了 → 走 ${VAULT_FILE}.tmp.$$ 也建不了 → awk 重定向失败 → 已在「删行失败」分支 return 1）。为专测 mv 失败分支，
+#   用一个 mv STUB（PATH 注入·让 mv 必败）保持 awk 写 temp 成功、只让 rename 失败。断言：exit非0 + 原 vault 原封不动.
+echo "-- (P3b) account-delete.sh delete_vault_file rename-failure → exit非0 (token survives·不谎报删净) --"
+P3B="$(make_project)"; P3B_VF="$P3B/accounts.env"; P3B_REG="$P3B/accounts.json"
+printf '%s\n' '{ "schema": "cc-master/accounts/v1", "accounts": {} }' > "$P3B_REG"
+printf 'foo@x.com_TOKEN=must-survive-rename-fail-CCC\nfoo@x.com_EXPIRES=2099-01-01\n' > "$P3B_VF"; chmod 600 "$P3B_VF"
+P3B_BEFORE="$(cat "$P3B_VF")"
+# mv STUB: always fail (so the rename in delete_vault_file fails while awk-to-temp succeeds). Other tools real.
+MVSTUB="$(make_project)"
+cat > "$MVSTUB/mv" <<'MV'
+#!/usr/bin/env bash
+exit 1
+MV
+chmod +x "$MVSTUB/mv"
+out_p3b="$(PATH="$MVSTUB:$PATH" CC_MASTER_HOME="$P3B" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+          bash "$DEL_SH2" --email "foo@x.com" --vault-kind file --vault-file "$P3B_VF" 2>&1)"; rc_p3b=$?
+if [ "$rc_p3b" -ne 0 ]; then PASS=$((PASS+1)); _green "(P3b) rename failure → account-delete exits非0 (not false-success)"; else FAILED=$((FAILED+1)); _red "FAIL: (P3b) rename failure but account-delete exited 0 (谎报删净)"; fi
+# the original vault file must be UNCHANGED — token still there (delete did NOT complete).
+P3B_AFTER="$(cat "$P3B_VF" 2>/dev/null || echo '<UNREADABLE>')"
+assert_eq "$P3B_BEFORE" "$P3B_AFTER" "(P3b) ORIGINAL vault UNCHANGED on rename failure (token survives·删未完成)"
+if grep -q "must-survive-rename-fail-CCC" "$P3B_VF" 2>/dev/null; then PASS=$((PASS+1)); _green "(P3b) token still present after rename failure (not lost·registry 也不会被删·一致)"; else FAILED=$((FAILED+1)); _red "FAIL: (P3b) token GONE after rename failure"; fi
+rm -rf "$P3B" "$MVSTUB"
+
 finish

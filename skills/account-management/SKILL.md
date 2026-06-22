@@ -36,7 +36,7 @@ description: '管理 cc-master 换号号池（accounts.json registry）+ vault t
 - **`last_observed_quota`**——录号那刻 `cc-usage.sh` 的配额快照（`{5h,7d}.{used_pct,…}`），选号的**弱信号**（比 `last_switch_out` 弱、仅供从没切出过的新号参考）。
 - **`last_switch_out`**——最近一次从该号切出时的 `{5h,7d}.{used_pct, resets_at, source}` 配额快照（选号算法的核心输入；null = 从没切出过的新号）。
 
-**关键不变式**：registry **零凭证**——读到它的任何 agent / 程序都无害（vault 是指针，仍要过 OS keychain 解锁 / 文件 0600 才拿得到 token）。schema 字段 / 校验 / 读写 helper 的机制 SSOT 是 `${CLAUDE_SKILL_DIR}/scripts/accounts-lib.js`（node 纯函数库，零 token，校验器主动断言「无疑似 token 值」防误写）。完整字段表 + 示例见 `${CLAUDE_SKILL_DIR}/assets/accounts.example.json`。
+**关键不变式**：registry **零凭证**——读到它的任何 agent / 程序都无害（vault 是指针，仍要过 OS keychain 解锁 / 文件 0600 才拿得到 token）。schema 字段 / 校验 / 读写 helper 的机制 SSOT 是 `${CLAUDE_SKILL_DIR}/scripts/accounts-lib.js`（node 纯函数库，零 token，校验器主动断言「无疑似 token 值」防误写）。**并发安全**：所有「读-改-写」registry 的操作（录号 / 换号翻 active / 写快照 / 删号）都经 `mutateRegistry`（accounts-lib.js）在一把咨询文件锁（`accounts.json.lock`·O_EXCL + stale 回收）内串行执行——防并发进程各自 load 旧态、后写覆盖先写的 lost-update。完整字段表 + 示例见 `${CLAUDE_SKILL_DIR}/assets/accounts.example.json`。
 
 ## 四件事 + 对应脚本
 
