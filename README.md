@@ -81,6 +81,22 @@ Every claim in column ③ is anchored to a real mechanism, not a marketing line:
 
 ---
 
+## New in 0.9.0 — nest the graph, brief the decision
+
+0.9.0 makes the board itself deeper and the human-in-the-loop smarter: a goal too big for one flat task list can now own *nested* scheduling subgraphs, and every decision the orchestrator routes to you arrives as a prepared interview instead of a context-less ping.
+
+### dag-in-dag — nested scheduling subgraphs (max depth 1)
+
+A goal at real scale doesn't fit one flat `tasks[]` — you want it grouped by module or phase. 0.9.0 lets an **owner** node own a layer of child tasks (a sub-plan), while cc-master keeps scheduling those children itself — dispatch, WIP, endpoint verification, watchdog all still apply. It stays **one flat board file**: every task remains top-level in `tasks[]`, and nesting is expressed by a single new relationship field, `tasks[].parent`. Two orthogonal edges do two jobs — `deps` (scheduling: open, can point anywhere, fires the moment its upstream is ready) and `parent` (containment / rollup: encapsulated, a child has at most one owner). `parent` enters the hard narrow-waist (the biggest hook change in cc-master's history); a `done` owner whose children aren't all done trips a **non-blocking** Stop-gate reminder, never a hard block. (See [ADR-012](adrs/ADR-012-parent-waist-and-rollup-aware-stop-gate.md).)
+
+It ships with a **graph-analysis library + CLI** (`board-graph.js`, reused by the hooks too): machine-compute the critical path / CPM (with honest `weight_source` labeling — it reports structure, not fake hours, when timestamps are missing), parallelism (T₁/T∞), impact (which node gates the most downstream), the ready set, and owner rollup — for when the dependency graph gets too tangled to mental-math reliably.
+
+### Decision-briefing — every decision routed to you arrives prepared
+
+When orchestration hits a call only a human can make (`blocked_on:"user"`), you used to get parachuted into a context-less decision point. 0.9.0 turns it into a **prepared interview**. While idle, the orchestrator attaches a self-explaining `decision_package` to the node (the narrative context, the question, what it needs — decision / advice / solution — and the options with their trade-offs). `/cc-master:view` renders it as a **rich decision card** with a one-click copy of the entry command. You run **`/cc-master:discuss <node-id>`** in a separate, full-strength session: it loads the briefing, **freshness-checks** it (re-grounds if the upstream moved since it was prepared), talks the decision through with you, and writes the conclusion to a sidecar — never the board. The orchestrator digests that sidecar on its next reconcile and replans. Your time and the orchestrator's are fully decoupled — and because a separate session runs the discussion, the "conductor never plays an instrument" red line gets *stronger*, not weaker.
+
+---
+
 ## New in 0.8.0 — orchestrate straight through the quota wall
 
 A long-horizon run doesn't stop being long just because you hit a quota limit. 0.8.0 adds the missing piece for runs that outlast a single account's 5h/7d window — and pairs it with the safe account pool and the two-sided pacing that make it land cleanly.
