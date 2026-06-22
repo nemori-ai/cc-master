@@ -49,7 +49,7 @@ CC_MASTER_BOARD="$(pwd)/examples/decision-briefing/fixture.board.json" \
 - **question 头条** + **context_md 自说明叙事**（cc-master 为什么卡在这），不再是 amber 旗标下的 *no justification recorded*。
 - **what i need** / **why it matters** 两栏。
 - **三个 option**，每个有 `label` / `rationale` / `trade`（tradeoffs）。
-- 底部一个 **「复制命令」按钮**（`⧉`）——点它把 `enter_cmd`（`/cc-master:discuss D1`）写进剪贴板。**纯客户端 `navigator.clipboard`，零 fetch / 零 POST / 零联网**（webview 是只读的，view-server 对非 GET 回 405）。点完按钮文案闪成「已复制」。
+- 底部一个 **「复制命令」按钮**（`⧉`）——点它把 `enter_cmd`（`/cc-master:discuss D1 --board <board-stem>`，默认带 board 选择器防窜板）写进剪贴板。**纯客户端 `navigator.clipboard`，零 fetch / 零 POST / 零联网**（webview 是只读的，view-server 对非 GET 回 405）。点完按钮文案闪成「已复制」。
 
 这一步是整个设计的**入口取舍**：拒绝「按钮直接拉起 session」（要 webview 长 POST 端点，撞红线 1/2/5），改用纯客户端剪贴板 + 复制命令——零红线代价，`view-server.js` 这次只新增一条**只读 GET**（见下），不破只读。
 
@@ -61,10 +61,10 @@ CC_MASTER_BOARD="$(pwd)/examples/decision-briefing/fixture.board.json" \
 
 ## B. 进入 discuss session + 时效性校验（freshness-check）
 
-把复制到的命令粘进**一个新终端的 Claude Code session**：
+把复制到的命令粘进**一个新终端的 Claude Code session**（命令默认带 `--board <board-stem>` 选择器，钉死是哪块板——同 home 下开着别的 orchestration 也不会窜板）：
 
 ```
-/cc-master:discuss D1
+/cc-master:discuss D1 --board 20260619T093000-0000
 ```
 
 这是一个独立、满血的 CC session（不是 master 主线——master 此刻可能正忙别的，互不打断）。它按 [`commands/discuss.md`](../../commands/discuss.md) 走：

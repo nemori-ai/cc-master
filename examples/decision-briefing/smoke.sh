@@ -157,8 +157,12 @@ assert "ask_type:decision → options 非空(≥2)且每项含 id+label" "$OPTS_
 
 ENTER="$(pkg_field "$BOARD" "$NODE_ID" enter_cmd)"
 assert "enter_cmd 就是用户在富卡上点「复制命令」拿到的那条" "$(contains "$ENTER" "/cc-master:discuss $NODE_ID")"
+# enter_cmd **默认带 --board <board-stem>**（board.md §decision_package 生成规则）——让用户新开 session
+# 跑复制命令时即便同 home 下还开着别的 orchestration board 也绝不窜板（不靠 node-id 自动消歧）
+assert "默认带 --board：enter_cmd 含 --board ${BOARD_STEM}（防共享 home 多板窜上下文）" \
+  "$(contains "$ENTER" "--board $BOARD_STEM")"
 # 本 fixture 用默认 home → enter_cmd 不带 --home（board.md §decision_package 生成规则）
-assert "默认 home：enter_cmd 不含 --home（裸 /cc-master:discuss <node-id>）" "$( [ "$(contains "$ENTER" "--home")" = no ] && echo yes || echo no )"
+assert "默认 home：enter_cmd 不含 --home（仅 /cc-master:discuss <node-id> --board <stem>）" "$( [ "$(contains "$ENTER" "--home")" = no ] && echo yes || echo no )"
 # 解析侧（discuss.md §1）：<node-id> [--home <path>] 里 --home 优先级最高，覆盖 env 默认
 #   --home 解析必须 quote-aware（自定义 home 路径可能含空格）——跟引号则取到配对引号、剥外层引号；
 #   否则取下一个空白分隔 token。这里走纯 node 复刻 discuss.md §1 那条 quote-aware 规则（禁 jq/python），
@@ -195,9 +199,23 @@ SPACE_HOME="/tmp/with space/home"
 assert "quote-aware 解析 \"--home '/tmp/with space/home'\"：剥引号得含空格完整路径" \
   "$( [ "$(parse_home "$NODE_ID --home '/tmp/with space/home'" "/env/elsewhere")" = "$SPACE_HOME" ] && echo yes || echo no )"
 # 生成端 ⟺ 解析端对齐：board.md §decision_package 生成的引号形式（home 非默认时单引号包路径）回灌解析必还原
-GEN_ENTER_CMD="/cc-master:discuss $NODE_ID --home '$SPACE_HOME'"
-assert "enter_cmd 生成端引号形式回灌解析：'$GEN_ENTER_CMD' → home == '$SPACE_HOME'" \
+GEN_ENTER_CMD="/cc-master:discuss $NODE_ID --board $BOARD_STEM --home '$SPACE_HOME'"
+assert "enter_cmd 生成端（含 --board + 引号 --home）回灌解析：home == '$SPACE_HOME'" \
   "$( [ "$(parse_home "${GEN_ENTER_CMD#/cc-master:discuss }" "")" = "$SPACE_HOME" ] && echo yes || echo no )"
+# --board 选择器解析（discuss.md §1）：board-stem path-safe 无空格，取下一 token 即可
+parse_board() {  # parse_board "<args 整串>" → 打印 --board 选出的 board-stem（无则空）
+  node -e '
+    const toks=process.argv[1].split(/\s+/).filter(Boolean);
+    let stem="";
+    for(let k=0;k<toks.length;k++){ if(toks[k]==="--board" && k+1<toks.length){ stem=toks[k+1]; break; } }
+    process.stdout.write(stem);
+  ' "$1"
+}
+assert "解析 enter_cmd 的 --board：选出 board-stem == ${BOARD_STEM}（钉死用哪块板、跳过自动消歧）" \
+  "$( [ "$(parse_board "${GEN_ENTER_CMD#/cc-master:discuss }")" = "$BOARD_STEM" ] && echo yes || echo no )"
+# 钉死的 board 文件确实在 home 里、且就是本 fixture 那块（--board 显式选择器 → 直接定位 <stem>.board.json）
+assert "--board 钉死的 $BOARD_STEM.board.json 存在于 home（discuss §1 step 2 直接定位、不扫 active）" \
+  "$( [ -f "$HOME_DIR/$BOARD_STEM.board.json" ] && echo yes || echo no )"
 say "  → 网页侧：view-server.js 指向本 board，view.html DecisionCard 渲染上面这些字段 + 复制按钮（见 walkthrough §A）。"
 
 # =====================================================================================

@@ -269,6 +269,7 @@ DAG 依赖图（hero）、看板卡片、按状态分组的列表——全都活
 
 ```
 /cc-master:discuss <node-id>   # 在一个新 session 里跑 —— 确切命令从 /cc-master:view 的决策卡上复制
+                               # （复制出的命令默认带 --board <board-stem>，新 session 即便同 home 下还开着别的 orchestration 也绝不窜板）
 ```
 
 ### 在新 session 里接续一块已存在的 board
