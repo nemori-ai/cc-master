@@ -57,17 +57,19 @@ test('pure-refactor: lint R4 (dangling/self-loop/cycle) reports unchanged after 
   assert.equal(good.errors.length, 0);
 });
 
-test('pure-refactor: PR-1 adds NO R7 nesting rules — parent is a soft field, lint ignores it', () => {
+test('D3.3 / PR-2: lint now enforces R7 nesting rules (parent is硬 waist) — full R7 coverage lives in board-lint-core.test.mjs', () => {
   const { lintBoard } = lintCore;
-  // 一个含 parent 指向不存在 id 的板：PR-1 里 lint **不**应报任何 nesting error（R7 是 PR-2 的事）。
+  // D3.3 landed R7（parent 升入硬 waist·ADR-012）：parent 指向不存在 id 现在是 R7a hard error。
+  // 这里只 smoke-check「图库侧的 lint 现在确实跑 R7」，详尽 R7a/b/c/d 断言在 board-lint-core.test.mjs。
   const r = lintBoard(JSON.stringify(board([
     { id: 'M1', status: 'in_flight', deps: [], kind: 'owner' },
     { id: 'M1.a', status: 'done', deps: [], parent: 'M1' },
-    { id: 'orphan', status: 'ready', deps: [], parent: 'GHOST' }, // parent 指向不存在 id
+    { id: 'orphan', status: 'ready', deps: [], parent: 'GHOST' }, // parent 指向不存在 id → R7a
   ])));
-  assert.equal(r.errors.length, 0, 'parent referencing a missing id is NOT an error in PR-1 (silent-on-unknown)');
-  // 也不应有任何 R7* 规则出现。
-  for (const e of [...r.errors, ...r.warnings]) assert.ok(!/^R7/.test(e.rule), `no R7 rule in PR-1 (got ${e.rule})`);
+  assert.ok(new Set(r.errors.map((e) => e.rule)).has('R7a'), 'dangling parent is now an R7a hard error (post-D3.3)');
+  // 向后兼容：无 parent 的扁平板仍零 R7。
+  const flat = lintBoard(JSON.stringify(board([{ id: 'A', status: 'done', deps: [] }, { id: 'B', status: 'ready', deps: ['A'] }])));
+  for (const e of [...flat.errors, ...flat.warnings]) assert.ok(!/^R7/.test(e.rule), `flat board has no R7 (got ${e.rule})`);
 });
 
 // ── buildGraph: parent 倒排 ──────────────────────────────────────────────────────────────────────

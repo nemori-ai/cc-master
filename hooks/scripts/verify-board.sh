@@ -243,6 +243,88 @@ pending_user_decisions() {
     }' "$1" 2>/dev/null
 }
 
+# rollup_violations BOARD — print, one per line, "<ownerId>\t<childId>\t<childStatus>" for every
+# (owner, child) pair that violates the rollup invariant: the owner task is itself status:"done" but
+# the child (a task whose top-level `parent` points at that owner) is NOT done. This is the bash side
+# of the rollup-aware Stop gate (D3 / path-ii, ADR-012) — it answers "is any owner marked done while a
+# child it contains is still in flight?", the silent-failure盲区 of a parent错标done而子在飞.
+#
+# WHY A FLAT, SINGLE-LAYER SCAN IS SOUND (max depth=1): `parent` is a single-value string pointer and
+# the depth=1 type invariant means an owner's children are themselves leaves (no grandchildren). So the
+# whole computation is a flat set operation over (id, status, parent) triples — NO recursion, NO depth
+# walk, NO awk depth门 on the relation. We do it in TWO awk passes folded into one per-object scan:
+# build (id→status) and (child→parent) flat maps, then for each child whose parent is a DONE owner and
+# whose own status≠done, emit the violation. Self-implemented flat set运算 here mirrors EXACTLY
+# board-graph-core.js rollupConsistency() (statusOf(owner)==='done' ∧ child status!=='done') — one口径,
+# two consumers (the JS lib for board-lint R7d, this bash for the Stop gate).
+#
+# GRACEFUL-DEGRADE (red line 2, same discipline as the三时间锚 / wakeup soft-observed reads): a board
+# with NO `parent` edges (old board / hand-written board) yields an EMPTY child→parent map → zero
+# owners → zero violations → the gate degrades to the existing flat behavior. A `parent` pointing at a
+# non-existent owner id, or at an owner whose status is not "done", simply produces no violation (we
+# only flag a child against an owner that is BOTH a real task AND status:"done", exactly like
+# graph-core where statusOf(owner)===undefined ≠ 'done'). A malformed parent never breaks the Stop gate.
+#
+# Same per-object, string/escape/double-depth ([ ] and { }) awareness as pending_user_decisions, so it
+# is FORMAT-AGNOSTIC (single-line == multi-line) and a nested flexible `parent` in a task-local log
+# payload can never masquerade as a top-level container edge (only task-object top-level fields are
+# buffered per object — nested objects are dropped wholesale).
+rollup_violations() { # $1 = board path
+  awk '
+    { s = s $0 "\n" }
+    END {
+      i = index(s, "\"tasks\""); if (!i) exit
+      s = substr(s, i + 7)
+      j = index(s, "["); if (!j) exit
+      s = substr(s, j + 1)                 # start INSIDE the tasks array
+      bd = 1; cd = 0; instr = 0; esc = 0; obj = ""
+      n = length(s)
+      ntask = 0                            # collected task objects (top-level field buffers)
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        if (instr) {
+          if (bd == 1 && cd == 1) obj = obj ch
+          if (esc) esc = 0
+          else if (ch == "\\") esc = 1
+          else if (ch == "\"") instr = 0
+          continue
+        }
+        if (ch == "\"") { instr = 1; if (bd == 1 && cd == 1) obj = obj ch; continue }
+        if (ch == "[") { bd++; continue }
+        if (ch == "]") { bd--; if (bd == 0) break; continue }
+        if (ch == "{") { cd++; if (bd == 1 && cd == 1) obj = ""; continue }   # open a task object → fresh buffer
+        if (ch == "}") {
+          cd--
+          if (bd == 1 && cd == 0) {                                            # closed a task object
+            id = field(obj, "id"); st = field(obj, "status"); pa = field(obj, "parent")
+            if (id != "") { ntask++; tid[ntask] = id; tst[ntask] = st; tpa[ntask] = pa; statusById[id] = st }
+          }
+          continue
+        }
+        if (bd == 1 && cd == 1) obj = obj ch
+      }
+      # Flat rollup pass: for each task that HAS a parent, check whether that parent is a DONE owner and
+      # the child itself is not done → violation. statusById maps an existing top-level task id to its
+      # status; a parent pointing at a missing id yields statusById[pa]=="" ≠ "done" → no violation.
+      for (t = 1; t <= ntask; t++) {
+        if (tpa[t] == "") continue                       # no parent edge → not a child → skip
+        if (statusById[tpa[t]] != "done") continue       # owner missing or not done → no rollup gate
+        if (tst[t] == "done") continue                   # child already done → consistent
+        print tpa[t] "\t" tid[t] "\t" tst[t]             # owner done but child not done → violation
+      }
+    }
+    # field(O, NAME) — extract the string value of top-level key NAME from object buffer O ("" if absent).
+    function field(o, name,   re, m) {
+      re = "\"" name "\"[ \t]*:[ \t]*\""
+      if (match(o, re)) {
+        m = substr(o, RSTART + RLENGTH)
+        sub(/".*/, "", m)
+        return m
+      }
+      return ""
+    }' "$1" 2>/dev/null
+}
+
 # wakeup_is_object BOARD — exit 0 iff the board carries a ROOT-depth `"wakeup"` key whose value is an
 # OBJECT (opens with `{`). This is the soft-observed read of the optional top-level `wakeup` watchdog
 # record (ADR-011): present-and-an-object → a watchdog is armed; absent OR a non-object value → no
@@ -420,9 +502,15 @@ for b in "$HOME_DIR"/*.board.json; do
 done
 
 # Fingerprint of THIS session's matched boards' completion state (pure bash, no jq). cksum over the
-# per-task id+status+blocked_on triples IN FILE ORDER (NOT sorted) → the digest binds each id to its
-# status, so swapping two tasks' statuses or changing a task's blocked_on yields a DIFFERENT
+# per-task id+status+blocked_on+parent quads IN FILE ORDER (NOT sorted) → the digest binds each id to
+# its status, so swapping two tasks' statuses or changing a task's blocked_on yields a DIFFERENT
 # fingerprint and re-forces the self-check (Finding #21). Status-multiset-only hashing missed those.
+# PARENT DIMENSION (D3 / ADR-012): `parent` is now a pinned-waist container edge. Folding it in means a
+# CHILD's status flipping (e.g. an owner's last in_flight child → done) changes the fingerprint of the
+# owner sub-graph it rolls into → the rollup-aware Stop gate's reminder is re-evaluated across a
+# compaction (a done-owner-with-non-done-child state hashes differently from the same triples without
+# the parent edge). An OLD board with no `parent` field contributes no `"parent":"..."` token → it
+# hashes EXACTLY as the pre-D3 formula did (graceful-degrade: no spurious handshake churn on flat boards).
 # SCOPING (Finding #22 + format-agnostic rework): only the tasks REGION is fingerprinted (see
 # tasks_region above), so audit-log prose or other non-task fields can never look like a changed
 # completion state — and a log append between Stops never re-forces a handshake. Works identically
@@ -451,7 +539,7 @@ status_fingerprint() {
       fa="$(wakeup_fire_at "$bp")"
       [ -n "$fa" ] && printf 'fire_at:%s\n' "$fa"
       tasks_region "$bp" \
-        | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"'
+        | grep -oE '"(id|status|blocked_on|parent)"[[:space:]]*:[[:space:]]*"[^"]*"'
     done
   } | cksum | awk '{print $1}'
 }
@@ -542,5 +630,36 @@ fi
 # §ceiling = recon 触发器.
 if [ "$watchdog_needed" -eq 1 ]; then
   handshake_reason="$handshake_reason This board has an in_flight background task but no armed watchdog (the \`wakeup\` field is missing, or its \`fire_at\` is already in the past). An expired \`fire_at\` while a task is still in_flight is a trigger to come back and RECON ground truth — NOT a death verdict: if recon shows it healthy (git moving / output mtime still changing / legitimately blocked on a long silent command like run-tests), extend / re-arm the watchdog and let it run; only a task frozen with no ground-truth change well past a generous ceiling is judged hung. Before you stop, arm a watchdog wakeup (CronCreate one-shot / ScheduleWakeup / Monitor / background-shell \`until\`) for the in_flight tasks that could fail silently — use a generous time ceiling, never an output-size stall as the liveness signal — and record what to recon when it fires in the board's \`wakeup.checklist\` — otherwise a silently-failing background task leaves no one to come back and look."
+fi
+# Rollup-aware reminder (D3 / path-ii, ADR-012, Q-N1 = SOFT reminder, NOT a hard block): on a completion
+# state, if any owner task is marked status:"done" while a child it contains (a task whose `parent` points
+# at it) is NOT done, the owner sub-graph is rolled up inconsistently — the parent was likely错标 done
+# while a child is still in flight, which would silently漏掉 the whole sub-graph. Collected ONLY over THIS
+# session's matched (= armed) boards (red line 6: the loop is inside the board_matches gate — an unarmed
+# session never reaches here, so no rollup reminder is ever injected when dormant). Graceful-degrade: an
+# old board with no `parent` edge yields zero violations and this block is silently skipped — the existing
+# flat Stop behavior is untouched. Same soft-nudge form as the watchdog / pending reminders (appended to
+# the self-check handshake reason, never a hard block — Q-N1: a parent done整合中、子刚标完 transient
+# would be误伤 by a hard gate, and it matches cc-master's "hook soft-reminds, never hard-stops" house style).
+rollup_pairs=""
+while IFS= read -r bp; do
+  [ -n "$bp" ] || continue
+  rollup_pairs="$rollup_pairs$(rollup_violations "$bp")
+"
+done <<EOF
+$matched_boards
+EOF
+# Join the violations into a human list "owner X done but child Y is <status>; ...". Pure bash,
+# file order, dedup not needed for naming.
+rollup_joined=""
+while IFS="$(printf '\t')" read -r owner child cstatus; do
+  [ -n "$owner" ] || continue
+  one="owner $owner is \`done\` but child $child is \`$cstatus\`"
+  if [ -z "$rollup_joined" ]; then rollup_joined="$one"; else rollup_joined="$rollup_joined; $one"; fi
+done <<EOF
+$rollup_pairs
+EOF
+if [ -n "$rollup_joined" ]; then
+  handshake_reason="$handshake_reason Rollup inconsistency on this board ($rollup_joined): a parent (owner) node should NOT be \`done\` while a child under its \`parent\` is still unfinished — a done parent means全子 done ∧ the parent's own端点验收 passed. Either the parent was错标 done while a child is in flight (un-done the parent and finish the child), or the child finished and just needs its status updated. Don't stop on a rolled-up-inconsistent owner sub-graph."
 fi
 emit_block "$handshake_reason"
