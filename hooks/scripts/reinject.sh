@@ -110,14 +110,18 @@ board_matches() { # $1 = board path
   [ "$board_sid" = "$sid" ]
 }
 
-# dangling_nodes BOARD — print, one per line, the "id" of every task object whose TOP-LEVEL "status"
-# is `stale` or `escalated` (the unresolved nodes left over from a prior, un-reconciled plan update).
-# PER-OBJECT scan (same string/escape/double-depth [ ] and { } awareness as verify-board.sh's
-# pending_user_decisions / tasks_region) → FORMAT-AGNOSTIC: single-line and multi-line JSON behave
-# identically. Only characters at the task-object top level (bracket depth 1 inside the tasks array,
-# curly depth 1 inside the task) are buffered per object — nested flexible fields (a task-local "log"
-# array, structured entries inside it) are dropped wholesale, so a log entry's stale/escalated
-# status can neither masquerade as a task status nor inject a spurious id.
+# dangling_nodes BOARD — print, one per line, "<id>\t<parent>" for every task object whose TOP-LEVEL
+# "status" is `stale` or `escalated` (the unresolved nodes left over from a prior, un-reconciled plan
+# update). `<parent>` is that node's top-level `parent` container edge (D3.7 grouping annotation) or
+# empty when the node is a bare top-level node (no `parent` → graceful degrade to the bare form). The
+# tab-separated pair lets the listing builder annotate a stale CHILD with its owner ("owner X 的子 Y")
+# while leaving a bare top-level node un-annotated. PER-OBJECT scan (same string/escape/double-depth
+# [ ] and { } awareness as verify-board.sh's pending_user_decisions / tasks_region) → FORMAT-AGNOSTIC:
+# single-line and multi-line JSON behave identically. Only characters at the task-object top level
+# (bracket depth 1 inside the tasks array, curly depth 1 inside the task) are buffered per object —
+# nested flexible fields (a task-local "log" array, structured entries inside it) are dropped wholesale,
+# so a log entry's stale/escalated status (or a nested `parent`) can neither masquerade as a task status
+# nor inject a spurious id/owner.
 dangling_nodes() {
   awk '
     { s = s $0 "\n" }
@@ -149,11 +153,14 @@ dangling_nodes() {
         if (bd == 1 && cd == 1) obj = obj ch
       }
     }
-    # emit OBJ — if OBJ has a top-level "status":"stale"|"escalated", print its "id".
-    function emit(o,   id) {
+    # emit OBJ — if OBJ has a top-level "status":"stale"|"escalated", print "<id>\t<parent>" (parent "" if
+    # the node has no top-level parent container edge → bare form, graceful degrade).
+    function emit(o,   id, pa) {
       if (o !~ /"status"[ \t]*:[ \t]*"(stale|escalated)"/) return
       id = field(o, "id")
-      if (id != "") print id
+      if (id == "") return
+      pa = field(o, "parent")
+      print id "\t" pa
     }
     # field(O, NAME) — string value of top-level key NAME from object buffer O ("" if absent).
     function field(o, name,   re, m) {
@@ -181,9 +188,13 @@ for b in "$HOME_DIR"/*.board.json; do
   goal="$(sed -n 's/.*"goal"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$b" | head -1)"
   [ -n "$goal" ] || goal="(goal not recorded yet)"
   listing="${listing} • $(basename "$b") [${goal}]"
-  while IFS= read -r did; do
+  # Each dangling line is "<id>\t<parent>". Annotate a stale CHILD with its owner ("Y (owner X)") for the
+  # at-a-glance grouping (D3.7); a bare top-level node (empty parent) keeps the un-annotated form (graceful
+  # degrade for old / flat boards — no `parent` edge → no owner annotation, never an invented owner).
+  while IFS="$(printf '\t')" read -r did dpar; do
     [ -n "$did" ] || continue
-    if [ -z "$dangling_ids" ]; then dangling_ids="$did"; else dangling_ids="$dangling_ids, $did"; fi
+    if [ -n "$dpar" ]; then entry="${did} (owner ${dpar})"; else entry="$did"; fi
+    if [ -z "$dangling_ids" ]; then dangling_ids="$entry"; else dangling_ids="$dangling_ids, $entry"; fi
   done <<EOF
 $(dangling_nodes "$b")
 EOF

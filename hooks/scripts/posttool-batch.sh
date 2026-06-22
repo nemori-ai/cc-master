@@ -231,6 +231,92 @@ tasks_region() {
     }' "$1" 2>/dev/null
 }
 
+# owner_wip_violations BOARD ROOT_N — print, one per line, "<ownerId>\t<inflightChildren>\t<cap>" for
+# every owner whose number of in_flight CHILDREN strictly exceeds its per-owner cap (rollup-aware 两级
+# WIP · D3.7). This is the SECOND level layered on top of the global `wip_limit` (limit M on total board
+# in_flight): per OWNER, limit N on its in_flight children. The cap is per-owner — the owner task's OWN
+# top-level `wip_limit` field overrides the board-root default N (ROOT_N, $2) when present; else ROOT_N.
+#
+# WHY A FLAT, SINGLE-LAYER SCAN IS SOUND (max depth=1, mirrors verify-board.sh rollup_violations): `parent`
+# is a single-value string pointer and the depth=1 type invariant means an owner's children are leaves (no
+# grandchildren). So grouping in_flight children by owner is a flat set operation over (id, status, parent,
+# wip_limit) quadruples — NO recursion, NO depth门 on the relation. One per-object scan buffers each tasks[]
+# top-level object's fields (same string/escape/double-depth [ ] and { } awareness as tasks_region), so a
+# nested flexible `parent`/`status` in a task-local log payload can never masquerade as a container edge.
+#
+# GRACEFUL-DEGRADE (red line 2, same discipline as the global wip_limit read): a board with NO `parent`
+# edges (old board / hand-written board) yields zero owners with children → zero violations → the
+# owner-level check is silently off. A non-numeric ROOT_N with no owner carrying a numeric own `wip_limit`
+# yields no effective cap for that owner → it is skipped (no violation). A `parent` pointing at a missing
+# id simply groups under that (absent) owner with no own cap → falls back to ROOT_N; if ROOT_N is also
+# absent that owner has no cap → skipped. A malformed parent never breaks the hook.
+owner_wip_violations() { # $1 = board path, $2 = root owner_wip_limit (may be empty/non-numeric)
+  awk -v rootN="$2" '
+    { s = s $0 "\n" }
+    END {
+      i = index(s, "\"tasks\""); if (!i) exit
+      s = substr(s, i + 7)
+      j = index(s, "["); if (!j) exit
+      s = substr(s, j + 1)                 # start INSIDE the tasks array
+      bd = 1; cd = 0; instr = 0; esc = 0; obj = ""
+      n = length(s)
+      ntask = 0
+      for (k = 1; k <= n; k++) {
+        ch = substr(s, k, 1)
+        if (instr) {
+          if (bd == 1 && cd == 1) obj = obj ch
+          if (esc) esc = 0
+          else if (ch == "\\") esc = 1
+          else if (ch == "\"") instr = 0
+          continue
+        }
+        if (ch == "\"") { instr = 1; if (bd == 1 && cd == 1) obj = obj ch; continue }
+        if (ch == "[") { bd++; continue }
+        if (ch == "]") { bd--; if (bd == 0) break; continue }
+        if (ch == "{") { cd++; if (bd == 1 && cd == 1) obj = ""; continue }   # open a task object → fresh buffer
+        if (ch == "}") {
+          cd--
+          if (bd == 1 && cd == 0) {                                            # closed a task object
+            id = field(obj, "id"); st = field(obj, "status"); pa = field(obj, "parent"); wl = numfield(obj, "wip_limit")
+            if (id != "") { ntask++; tid[ntask] = id; tst[ntask] = st; tpa[ntask] = pa; ownCap[id] = wl }
+          }
+          continue
+        }
+        if (bd == 1 && cd == 1) obj = obj ch
+      }
+      # Flat group-by-owner pass: count in_flight children per owner; flag owners strictly over their cap.
+      # Cap precedence: the owner task OWN numeric wip_limit (ownCap[owner]) wins; else the board-root
+      # default ROOT_N. An owner with NEITHER a numeric own cap NOR a numeric ROOT_N has no effective cap
+      # so it is never flagged (graceful degrade).
+      for (t = 1; t <= ntask; t++) {
+        if (tpa[t] == "") continue                     # not a child → skip
+        if (tst[t] == "in_flight") inflight[tpa[t]]++
+        seen[tpa[t]] = 1                                # this owner has at least one child
+      }
+      for (o in seen) {
+        cap = (ownCap[o] != "" ? ownCap[o] : rootN)     # per-owner own cap overrides root default N
+        if (cap == "" || cap !~ /^[0-9]+$/) continue    # no numeric effective cap → graceful degrade, skip
+        c = (o in inflight ? inflight[o] : 0)
+        if (c > cap + 0) print o "\t" c "\t" cap         # strictly over its own cap → violation
+      }
+    }
+    # field(O, NAME) — string value of top-level key NAME from object buffer O ("" if absent).
+    function field(o, name,   re, m) {
+      re = "\"" name "\"[ \t]*:[ \t]*\""
+      if (match(o, re)) { m = substr(o, RSTART + RLENGTH); sub(/".*/, "", m); return m }
+      return ""
+    }
+    # numfield(O, NAME) — numeric (unquoted integer) value of top-level key NAME from O ("" if absent/non-int).
+    function numfield(o, name,   re, m) {
+      re = "\"" name "\"[ \t]*:[ \t]*"
+      if (match(o, re)) {
+        m = substr(o, RSTART + RLENGTH)
+        if (match(m, /^[0-9]+/)) return substr(m, 1, RLENGTH)
+      }
+      return ""
+    }' "$1" 2>/dev/null
+}
+
 # ── evaluate EACH matched board INDEPENDENTLY against its OWN board-local cap ───────────────────────
 # wip_limit is board-LOCAL, so per board: count ITS in_flight, read ITS top-level wip_limit, and if that
 # board is strictly over its OWN cap, append a warning carrying THAT board's numbers. No cross-board
@@ -250,18 +336,38 @@ for b in "$HOME_DIR"/*.board.json; do
   region="$(tasks_region "$b")"
   n="$(printf '%s' "$region" | grep -oE '"status"[[:space:]]*:[[:space:]]*"in_flight"' | grep -c '')" || n=0
 
+  # ── LEVEL 1: GLOBAL wip_limit (limit M on TOTAL board in_flight) ──────────────────────────────────
   # wip_limit for THIS board: a board ROOT top-level flexible integer field. Read it from the board-root
   # field stream ONLY (board_root_stream above) so a `"wip_limit":N` buried in an agent-shaped task/log
   # payload can never be mistaken for the cap — only the board's own top-level field counts (narrow-waist
-  # scope; codex round-2 finding).
-  m="$(board_root_stream "$b" \
+  # scope; codex round-2 finding). Read it from the SAME root stream as owner_wip_limit below.
+  root="$(board_root_stream "$b")"
+  m="$(printf '%s' "$root" \
         | grep -oE '"wip_limit"[[:space:]]*:[[:space:]]*[0-9]+' 2>/dev/null \
         | sed -n 's/.*"wip_limit"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)"
-  case "$m" in ''|*[!0-9]*) continue;; esac             # this board: no/non-numeric cap → skip it
-  [ "$n" -le "$m" ] && continue                          # this board: within its own cap → no warn
+  # Global level fires only when a numeric cap exists AND in_flight strictly exceeds it. A missing/non-numeric
+  # cap silently disables the GLOBAL warning ONLY — it must NOT `continue` past the owner-level check below
+  # (the two levels are independent; an owner-level cap can be present even when the global one is absent).
+  case "$m" in
+    ''|*[!0-9]*) ;;                                       # no/non-numeric global cap → skip global level
+    *) [ "$n" -gt "$m" ] && over_warn="${over_warn}cc-master: WIP is over the cap (${n} in_flight, wip_limit ${m}). Don't add more parallel work next round — consider deferring high-float tasks to keep ~75% utilization (lens 5). This is a soft warning, not a block. ";;
+  esac
 
-  # this board is strictly over its OWN cap → contribute its warning
-  over_warn="${over_warn}cc-master: WIP is over the cap (${n} in_flight, wip_limit ${m}). Don't add more parallel work next round — consider deferring high-float tasks to keep ~75% utilization (lens 5). This is a soft warning, not a block. "
+  # ── LEVEL 2: PER-OWNER owner_wip_limit (limit N on EACH owner's in_flight children · rollup-aware) ──
+  # Read the board-root default per-owner cap N (soft-observed, same graceful-degrade as wip_limit: absent
+  # or non-numeric → no root default). owner_wip_violations groups in_flight children by owner (flat,
+  # max depth=1) and emits "<owner>\t<inflight>\t<cap>" for each owner strictly over its effective cap
+  # (own task wip_limit overriding root N). Empty output (no parent edges / no effective cap) → owner level
+  # silently off. Each violation contributes a NON-BLOCKING per-owner warning naming THAT owner.
+  rootN="$(printf '%s' "$root" \
+        | grep -oE '"owner_wip_limit"[[:space:]]*:[[:space:]]*[0-9]+' 2>/dev/null \
+        | sed -n 's/.*"owner_wip_limit"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)"
+  while IFS="$(printf '\t')" read -r ow oc ocap; do
+    [ -n "$ow" ] || continue
+    over_warn="${over_warn}cc-master: owner ${ow} has ${oc} in_flight children (per-owner cap ${ocap}). Don't fan out more work under this owner next round — defer high-float children to keep ~75% utilization (lens 5). This is a soft warning, not a block. "
+  done <<EOF
+$(owner_wip_violations "$b" "$rootN")
+EOF
 done
 
 # ── self-gate ──────────────────────────────────────────────────────────────────────────────────────

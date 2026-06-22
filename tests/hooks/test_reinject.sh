@@ -14,17 +14,20 @@ run_ss_sid() {
              | CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
                bash "$PLUGIN_ROOT/hooks/scripts/reinject.sh" 2>/dev/null)"; HOOK_RC=$?
 }
-# dangling_segment OUT — isolate JUST the dangling-node id list from a reinject context (the text after
-# `stale/escalated:` up to the next period). TF1 FIX: a negative id assertion (e.g. "T2 must NOT appear")
-# must NOT scan the WHOLE $HOOK_OUT — that output EMBEDS ${HOME_DIR}, a `mktemp .tmp-ccm.XXXXXX` path
-# whose random base-62 suffix contains the literal "T2" ≈0.12% of the time (and "T9" similarly). Scanning
-# the full output therefore false-FAILS `assert_not_contains "$HOOK_OUT" "T2"` whenever the temp path
-# happens to carry that substring — the dominant full-suite reinject flake (load-independent; it is pure
-# substring collision, surfacing more often under suite load only because more runs accumulate). The
-# dangling-id LIST is built solely from board task ids and never includes the path, so assert the negative
-# (and the positive ids) against THIS segment. Empty when there is no dangling note (the no-note cases).
+# dangling_segment OUT — isolate JUST the dangling-node id list from a reinject context (the text between
+# `stale/escalated:` and the sentence terminator `. Reconcile`). TF1 FIX: a negative id assertion (e.g.
+# "T2 must NOT appear") must NOT scan the WHOLE $HOOK_OUT — that output EMBEDS ${HOME_DIR}, a
+# `mktemp .tmp-ccm.XXXXXX` path whose random base-62 suffix contains the literal "T2" ≈0.12% of the time
+# (and "T9" similarly). Scanning the full output therefore false-FAILS `assert_not_contains "$HOOK_OUT"
+# "T2"` whenever the temp path happens to carry that substring — the dominant full-suite reinject flake
+# (load-independent; it is pure substring collision, surfacing more often under suite load only because
+# more runs accumulate). The dangling-id LIST is built solely from board task ids (and, since D3.7, owner
+# annotations) and never includes the path, so assert the negative (and the positive ids) against THIS
+# segment. The terminator is anchored on the literal `. Reconcile` (NOT just the next `.`) so DOTTED
+# nested ids like `M1.b` / owner annotations like `M1.b (owner M1)` are captured whole — a bare `[^.]*`
+# would stop at the first dot inside `M1.b`. Empty when there is no dangling note (the no-note cases).
 dangling_segment() { # $1 = HOOK_OUT
-  printf '%s' "$1" | sed -n 's/.*stale\/escalated:[[:space:]]*\([^.]*\)\..*/\1/p'
+  printf '%s' "$1" | sed -n 's/.*stale\/escalated:[[:space:]]*\(.*\)\. Reconcile.*/\1/p'
 }
 
 # Case A: no active board → silent no-op
@@ -242,6 +245,46 @@ mkactive "$H" "20260101T000000Z-T" '{"schema":"cc-master/v1","goal":"OTHER NONEM
 run_ss_sid "$H" "MINE"
 assert_eq 0 "$HOOK_RC" "T: board sid 非空且 ≠ stdin sid → rc 0"
 assert_eq "" "$HOOK_OUT" "T: board sid=OTHER（非空）≠ stdin sid=MINE → 仍休眠（不重注，红线 6 防线未退化）"
+rm -rf "$H"
+
+# ── dangling 列表 owner 分组标注（D3.7·点名「owner X 的子 Y stale」而非裸「Y stale」）─────────────────────
+# 可读性增强：重注的 dangling（stale/escalated）列表里，给有 parent 的子节点加上其 owner 标注，让 master
+# 一眼看出哪个 owner 子图有未对账节点。无 parent 的节点退化为现有裸标注（graceful）。非正确性——dangling
+# 集合本身仍由 dangling_nodes 正确算出（子节点是 top-level，照常被筛中）；本改只给输出加 parent 上下文。
+
+# Case U (子节点 stale → 标注其 owner)：owner M1（in_flight），子 M1.b 是 stale → dangling 列表须含 M1.b，
+#          且把它标注成属于 owner M1（如 "M1.b (owner M1)" 或 "owner M1 的子 M1.b"）。同时 owner id "M1" 出现。
+H="$(make_project)"
+mkactive "$H" "20260101T000000Z-U" '{"schema":"cc-master/v1","goal":"OWNER GROUPED GOAL","owner":{"active":true,"session_id":"sess-u"},"tasks":[{"id":"M1","status":"in_flight","deps":[],"kind":"owner"},{"id":"M1.a","status":"done","deps":[],"parent":"M1"},{"id":"M1.b","status":"stale","deps":["M1.a"],"parent":"M1"}]}'
+run_ss_sid "$H" "sess-u"
+assert_contains "$HOOK_OUT" "OWNER GROUPED GOAL" "U: re-injects the goal"
+assert_contains "$HOOK_OUT" "unresolved" "U: surfaces an unresolved-node note"
+U_DANGLE="$(dangling_segment "$HOOK_OUT")"
+assert_contains "$U_DANGLE" "M1.b" "U: names the stale child id"
+assert_contains "$U_DANGLE" "M1" "U: annotates the stale child with its owner M1 (grouped, not bare)"
+rm -rf "$H"
+
+# Case V (graceful：无 parent 的 dangling 节点退化为裸标注)：顶层 leaf T1 stale、无 parent → dangling 列表
+#          含 T1 但不带 owner 标注（裸 T1，现有行为不变）。证明无 parent 板优雅退化、不报错、不凭空造 owner。
+H="$(make_project)"
+mkactive "$H" "20260101T000000Z-V" '{"schema":"cc-master/v1","goal":"FLAT DANGLING GOAL","owner":{"active":true,"session_id":"sess-v"},"tasks":[{"id":"T1","status":"stale","deps":[]},{"id":"T2","status":"in_flight","deps":[]}]}'
+run_ss_sid "$H" "sess-v"
+assert_eq 0 "$HOOK_RC" "V: flat dangling board → rc 0"
+assert_contains "$HOOK_OUT" "FLAT DANGLING GOAL" "V: re-injects the goal"
+V_DANGLE="$(dangling_segment "$HOOK_OUT")"
+assert_contains "$V_DANGLE" "T1" "V: names the stale top-level node"
+assert_not_contains "$V_DANGLE" "owner" "V: no-parent node has NO owner annotation (graceful bare form)"
+rm -rf "$H"
+
+# Case W (混合：一个有 owner 的子 stale + 一个裸顶层 escalated)：M1（owner）的子 M1.a escalated 标注 owner，
+#          顶层 leaf X9 stale 裸标注。两者都进列表，各自正确（有 parent 的标 owner、无 parent 的裸）。
+H="$(make_project)"
+mkactive "$H" "20260101T000000Z-W" '{"schema":"cc-master/v1","goal":"MIXED DANGLING GOAL","owner":{"active":true,"session_id":"sess-w"},"tasks":[{"id":"M1","status":"in_flight","deps":[],"kind":"owner"},{"id":"M1.a","status":"escalated","deps":[],"parent":"M1"},{"id":"X9","status":"stale","deps":[]}]}'
+run_ss_sid "$H" "sess-w"
+W_DANGLE="$(dangling_segment "$HOOK_OUT")"
+assert_contains "$W_DANGLE" "M1.a" "W: names the escalated child"
+assert_contains "$W_DANGLE" "X9" "W: names the bare top-level stale node"
+assert_contains "$W_DANGLE" "M1" "W: child M1.a is annotated with its owner M1"
 rm -rf "$H"
 
 finish

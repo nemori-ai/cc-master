@@ -577,6 +577,69 @@
       letter-spacing: 0.02em;
     }
 
+    /* ============================ NESTING — owner / child (D3) ==============
+       A nested DAG renders flat by default; an OWNER (container node with one
+       depth-1 layer of children) is distinguished by a cool-blue accent + a
+       fold/unfold caret + a rollup-progress pill, and can be COLLAPSED to hide
+       its children (their cross-group edges reroute to the owner). A CHILD tile
+       (has a parent) gets a subtle inset tick so it reads as "belongs to a group"
+       at a glance. With no nesting present this whole block is inert. */
+
+    /* owner tile — a cool-blue container accent (distinct from the amber crit
+       spine + the status lamp). Reads as "this holds a sub-DAG". */
+    .cc-node.owner {
+      border-color: oklch(0.70 0.115 244 / 0.42);
+    }
+    /* a collapsed owner is emphasized a touch more — it's standing in for a whole
+       folded sub-graph, so it should carry visible weight. */
+    .cc-node.owner.collapsed {
+      border-color: oklch(0.70 0.115 244 / 0.62);
+      box-shadow:
+        0 0 0 1px oklch(0.70 0.115 244 / 0.22),
+        0 1px 2px oklch(0.10 0.01 255 / 0.5),
+        0 10px 26px oklch(0.30 0.06 244 / 0.16);
+    }
+    /* child tile — a slim cool inset bar on the left edge marks group membership.
+       Subtle (a tick, not a banner) so it doesn't fight the status lamp. */
+    .cc-node.child::after {
+      content: ''; position: absolute; left: 0; top: 9px; bottom: 9px; width: 2px;
+      border-radius: 0 2px 2px 0;
+      background: oklch(0.70 0.115 244 / 0.5);
+    }
+
+    /* the fold/unfold caret in the lamprow — a clickable cool-blue glyph. It sits
+       before the status lamp so the "expandable group" affordance reads first. */
+    .cc-node .ocaret {
+      flex: 0 0 auto; cursor: pointer; user-select: none;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 15px; height: 15px; margin-right: 1px; border-radius: var(--r-sm);
+      color: var(--ready); font-size: 11px; line-height: 1;
+      border: 1px solid transparent;
+      transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+    }
+    .cc-node .ocaret:hover {
+      background: oklch(0.70 0.115 244 / 0.14);
+      border-color: oklch(0.70 0.115 244 / 0.35);
+    }
+    .cc-node .ocaret:focus-visible {
+      outline: 2px solid oklch(0.70 0.115 244 / 0.7); outline-offset: 1px;
+    }
+
+    /* the owner rollup pill — done/total subtasks. Cool-blue while in progress,
+       jade once every child is done. */
+    .cc-node .chip.rollup {
+      background: oklch(0.70 0.115 244 / 0.12);
+      border-color: oklch(0.70 0.115 244 / 0.4);
+      color: var(--ready);
+    }
+    .cc-node .chip.rollup .cn { color: var(--ready); font-variant-numeric: tabular-nums; }
+    .cc-node .chip.rollup.done {
+      background: oklch(0.74 0.135 162 / 0.12);
+      border-color: oklch(0.74 0.135 162 / 0.4);
+      color: var(--done);
+    }
+    .cc-node .chip.rollup.done .cn { color: var(--done); }
+
     /* ---------- in-flight BUSY lamp: an orbiting arc ring -------------------
        The amber lamp gets a thin amber arc that rotates around it — a telemetry
        "actively working / spinning" indicator (NOT a loading-spinner toy). The
@@ -1842,6 +1905,17 @@
   <!-- Import-map: every specifier resolves to a LOCAL /vendor/ file. React is mapped to a
        SINGLE file so react / react-dom / @xyflow/react all share ONE react instance
        (two copies => hooks crash). No esm.sh / CDN / external URL anywhere. -->
+  <!-- Shared graph-analysis core (the ONE source of truth — same module hooks + the
+       board-graph CLI use). Loaded as CLASSIC scripts (no type=module) so they run, in
+       order, BEFORE the module below: board-lint-core first (publishes buildGraph/findCycle
+       to globalThis.__ccmBoardLintCore), then board-graph-core (reads that global, publishes
+       analyzeGraph to globalThis.__ccmBoardGraphCore). The module's analyze() then DELEGATES
+       to analyzeGraph() instead of re-implementing the graph algorithms (DRY — design §5.8).
+       Served from /core/* by view-server (read-only, zero network). If either fails to load
+       (older server with no /core route), the module degrades to a built-in fallback. -->
+  <script src="/core/board-lint-core.js"></script>
+  <script src="/core/board-graph-core.js"></script>
+
   <script type="importmap">
   {
     "imports": {
@@ -2114,52 +2188,76 @@
     // deps[] are upstream ids; edge = dep -> task. Returns a rich analysis object
     // the whole instrument reads from: critical path, per-node impact (transitive
     // descendant count), fan-in (in-degree), convergence node, bottleneck.
+    //
+    // ★DRY (D3.7 / design §5.8): the GRAPH primitives — adjacency (upstream/downstream),
+    // transitive descendants/ancestors, the longest-dependency-chain critical path — are
+    // NOT recomputed here. They come from the ONE shared graph core (analyzeGraph), the
+    // same module the hooks + the board-graph CLI use. This function now only layers the
+    // VIEW-specific derivations (impact/convergence/bottleneck node picks + time-based
+    // elapsed) on top of that core handle. No second copy of the graph algorithms.
+    //
+    // Core access: board-graph-core.js was loaded as a classic <script> and published
+    // analyzeGraph to globalThis.__ccmBoardGraphCore. If it failed to load (older server
+    // with no /core route), graphCore() returns null and analyze() falls back to a small
+    // inline adjacency build so the viewer never goes dark.
+    function graphCore() {
+      const c = (typeof globalThis !== 'undefined') ? globalThis.__ccmBoardGraphCore : null;
+      return (c && typeof c.analyzeGraph === 'function') ? c : null;
+    }
     function analyze(tasks, owner) {
       const list = Array.isArray(tasks) ? tasks : [];
       const byId = new Map(list.map(t => [t.id, t]));
       const ids = new Set(list.map(t => t.id));
 
-      // adjacency: deps (upstream) and dependents (downstream), only valid edges
-      const upstream = new Map();    // id -> [dep ids]
-      const downstream = new Map();  // id -> [dependent ids]
-      for (const t of list) { upstream.set(t.id, []); downstream.set(t.id, []); }
-      for (const t of list) {
-        const deps = Array.isArray(t.deps) ? t.deps : [];
-        for (const d of deps) {
-          if (!ids.has(d)) continue;
-          upstream.get(t.id).push(d);
-          downstream.get(d).push(t.id);
+      // ── graph primitives from the shared core (DRY) ─────────────────────────
+      const core = graphCore();
+      const G = core ? core.analyzeGraph({ tasks: list, owner }) : null;
+
+      // upstream / downstream adjacency (only valid edges). From the core when present;
+      // otherwise an equivalent inline build (graceful degradation, same edge filtering).
+      let upstream, downstream;
+      if (G) {
+        upstream = G.upstream;
+        downstream = G.downstream;
+      } else {
+        upstream = new Map(); downstream = new Map();
+        for (const t of list) { upstream.set(t.id, []); downstream.set(t.id, []); }
+        for (const t of list) {
+          const deps = Array.isArray(t.deps) ? t.deps : [];
+          for (const d of deps) {
+            if (!ids.has(d) || d === t.id) continue;
+            upstream.get(t.id).push(d);
+            downstream.get(d).push(t.id);
+          }
         }
       }
 
-      // in-degree = direct fan-in (convergence signal)
-      const inDeg = new Map();
-      for (const t of list) inDeg.set(t.id, upstream.get(t.id).length);
-
-      // transitive descendant count = downstream impact (how many tasks this gates)
+      // transitive descendants / ancestors — delegate to the core's closures (cycle-safe).
+      // Signatures kept compatible with existing callers: descendants(id, seen?) ignores the
+      // optional second arg (the core carries its own cycle guard); ancestors(id) → Set.
       const descCache = new Map();
-      function descendants(id, seen) {
+      function descendants(id /* , seen */) {
         if (descCache.has(id)) return descCache.get(id);
-        const acc = new Set();
-        const stack = [...downstream.get(id)];
-        const local = new Set(seen);
-        local.add(id);
-        while (stack.length) {
-          const n = stack.pop();
-          if (acc.has(n) || local.has(n)) continue; // cycle guard
-          acc.add(n);
-          for (const c of downstream.get(n)) if (!acc.has(c)) stack.push(c);
+        let acc;
+        if (G) acc = G.descendants(id);
+        else {
+          acc = new Set();
+          const stack = ids.has(id) ? [...downstream.get(id)] : [];
+          const local = new Set([id]);
+          while (stack.length) {
+            const n = stack.pop();
+            if (acc.has(n) || local.has(n)) continue;
+            acc.add(n);
+            for (const c of downstream.get(n)) if (!acc.has(c)) stack.push(c);
+          }
         }
         descCache.set(id, acc);
         return acc;
       }
-      const impact = new Map();
-      for (const t of list) impact.set(t.id, descendants(t.id, new Set()).size);
-
-      // transitive ancestors (for lineage highlight upstream chain)
       function ancestors(id) {
+        if (G) return G.ancestors(id);
         const acc = new Set();
-        const stack = [...upstream.get(id)];
+        const stack = ids.has(id) ? [...upstream.get(id)] : [];
         while (stack.length) {
           const n = stack.pop();
           if (acc.has(n)) continue;
@@ -2169,34 +2267,59 @@
         return acc;
       }
 
-      // critical path = longest dependency chain (by node count).
-      const memoLen = new Map();
-      const memoNext = new Map();
-      const visiting = new Set();
-      function lenEndingAt(id) {
-        if (memoLen.has(id)) return memoLen.get(id);
-        if (visiting.has(id)) return 1; // cycle guard
-        visiting.add(id);
-        let best = 1, bestPrev = null;
-        for (const d of upstream.get(id)) {
-          const cand = 1 + lenEndingAt(d);
-          if (cand > best) { best = cand; bestPrev = d; }
+      // in-degree = direct fan-in (convergence signal)
+      const inDeg = new Map();
+      for (const id of ids) inDeg.set(id, (upstream.get(id) || []).length);
+
+      // per-node downstream impact = transitive descendant count (how many tasks it gates)
+      const impact = new Map();
+      for (const id of ids) impact.set(id, descendants(id).size);
+
+      // critical path = longest dependency chain (by node count). From the core's
+      // longestPath() (the same node-count chain analyze() used to compute inline);
+      // fallback computes it here when the core is unavailable.
+      let critChain, endLen;
+      if (G) {
+        const lp = G.longestPath();
+        critChain = lp.chain.slice();      // already source -> ... -> sink
+        endLen = lp.length;
+      } else {
+        const memoLen = new Map(), memoNext = new Map(), visiting = new Set();
+        function lenEndingAt(id) {
+          if (memoLen.has(id)) return memoLen.get(id);
+          if (visiting.has(id)) return 1;
+          visiting.add(id);
+          let best = 1, bestPrev = null;
+          for (const d of upstream.get(id)) {
+            const cand = 1 + lenEndingAt(d);
+            if (cand > best) { best = cand; bestPrev = d; }
+          }
+          visiting.delete(id);
+          memoLen.set(id, best); memoNext.set(id, bestPrev);
+          return best;
         }
-        visiting.delete(id);
-        memoLen.set(id, best);
-        memoNext.set(id, bestPrev);
-        return best;
+        let endId = null; endLen = 0;
+        for (const t of list) { const l = lenEndingAt(t.id); if (l > endLen) { endLen = l; endId = t.id; } }
+        critChain = [];
+        let cur = endId;
+        while (cur != null) { critChain.push(cur); cur = memoNext.get(cur); }
+        critChain.reverse();
       }
-      let endId = null, endLen = 0;
+      const critSet = new Set(critChain);
+
+      // ── nesting (D3) — owner/child container edges, surfaced for the grouped view.
+      // children(ownerId) → child ids; parentOf(id) → owner id|null; rollup progress for
+      // a grouped owner's progress pill. All from the same core (parent-edge inversion).
+      function childrenOf(id) { return G ? G.children(id) : []; }
+      function parentOf(id) { return G ? G.parentOf(id) : null; }
+      function rollupProgress(id) { return G ? G.rollupProgress(id) : { done: 0, total: 0, ratio: 0 }; }
+      // owners = nodes any child points to (have ≥1 child); ownedIds = all child ids.
+      const owners = new Set();
+      const ownedIds = new Set();
       for (const t of list) {
-        const l = lenEndingAt(t.id);
-        if (l > endLen) { endLen = l; endId = t.id; }
+        const p = (typeof t.parent === 'string' && t.parent !== '') ? t.parent : null;
+        if (p && ids.has(p)) { owners.add(p); ownedIds.add(t.id); }
       }
-      const critSet = new Set();
-      const critChain = [];
-      let cur = endId;
-      while (cur != null) { critSet.add(cur); critChain.push(cur); cur = memoNext.get(cur); }
-      critChain.reverse(); // source -> ... -> sink
 
       // highest-impact node
       let impactNode = null, impactMax = -1;
@@ -2272,6 +2395,8 @@
         earliestGateElapsedMs: earliestGate === Infinity ? null : now - earliestGate,
         totalElapsedMs,
         wip,
+        // ── D3 nesting (container edges) — surfaced for the grouped DAG view ──
+        owners, ownedIds, childrenOf, parentOf, rollupProgress,
       };
     }
 
@@ -2282,15 +2407,23 @@
     // ---- dagre layout (xyflow has no built-in layout) ----------------------
     // Node height grew to fit the structural meta row.
     const NODE_W = 200, NODE_H = 92;
-    function layout(tasks) {
+    // layout(visibleTasks, edgePairs) — dagre over only the VISIBLE node set, using the
+    // already-rerouted edge pairs ([source,target]) so a collapsed owner sits where its
+    // (rerouted) dependencies put it. Owner tiles render a touch taller (rollup pill), but
+    // a uniform node box keeps ranks tidy; the extra pixels just overflow gracefully.
+    function layout(visibleTasks, edgePairs) {
       const g = new dagre.graphlib.Graph();
       g.setGraph({ rankdir: 'TB', nodesep: 48, ranksep: 80, marginx: 28, marginy: 28 });
       g.setDefaultEdgeLabel(() => ({}));
-      const ids = new Set(tasks.map(t => t.id));
-      for (const t of tasks) g.setNode(t.id, { width: NODE_W, height: NODE_H });
-      for (const t of tasks) {
-        const deps = Array.isArray(t.deps) ? t.deps : [];
-        for (const d of deps) if (ids.has(d)) g.setEdge(d, t.id);
+      const ids = new Set(visibleTasks.map(t => t.id));
+      for (const t of visibleTasks) g.setNode(t.id, { width: NODE_W, height: NODE_H });
+      const seen = new Set();
+      for (const [s, t] of edgePairs) {
+        if (s === t || !ids.has(s) || !ids.has(t)) continue;
+        const key = s + ' ' + t;
+        if (seen.has(key)) continue;     // dedupe rerouted multi-edges
+        seen.add(key);
+        g.setEdge(s, t);
       }
       dagre.layout(g);
       const pos = new Map();
@@ -2323,6 +2456,9 @@
       if (data.bottleneck) cls.push('bottleneck');
       if (data.enter) cls.push('enter');
       if (data.lineage) cls.push('lin-' + data.lineage); // self | anc | desc
+      if (data.isOwner) cls.push('owner');                // D3: container node
+      if (data.collapsed) cls.push('collapsed');          // owner currently folded shut
+      if (data.childOf) cls.push('child');                // belongs to an owner (has parent)
       const lamp = statusColor(data.status);
       const label = STATUS_LABEL[data.status] || (data.status || 'unknown');
       const title = (data.title || '').trim();
@@ -2343,18 +2479,57 @@
       if (data.bottleneck) {
         kids.push(h('span', { key: 'bn', className: 'bneck' }, '⚠ bottleneck'));
       }
+      // owner caret — a fold/unfold toggle (▾ open / ▸ collapsed). Clicking it toggles
+      // the owner's collapse WITHOUT selecting the node (stopPropagation). Only owners
+      // (have children) get one; leaf / childless tiles don't.
+      const lamprowKids = [
+        h('span', { key: 'l', className: 'lamp', style: { background: lamp, color: lamp } }),
+        h('span', { key: 's', className: 'stat', style: { color: lamp } }, label),
+      ];
+      if (data.isOwner && data.ownerChildCount > 0) {
+        lamprowKids.unshift(
+          h('span', {
+            key: 'caret',
+            className: 'ocaret',
+            role: 'button',
+            tabIndex: 0,
+            title: (data.collapsed ? 'expand' : 'collapse') + ' — ' + data.ownerChildCount + ' subtasks',
+            onClick: (e) => {
+              e.stopPropagation();
+              if (typeof data.onToggleCollapse === 'function') data.onToggleCollapse(data.id);
+            },
+            onKeyDown: (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault(); e.stopPropagation();
+                if (typeof data.onToggleCollapse === 'function') data.onToggleCollapse(data.id);
+              }
+            },
+          }, data.collapsed ? '▸' : '▾'),
+        );
+      }
+      lamprowKids.push(h('span', { key: 'tid', className: 'tid' }, data.id));
       kids.push(
-        h('div', { key: 'lr', className: 'lamprow' },
-          h('span', { className: 'lamp', style: { background: lamp, color: lamp } }),
-          h('span', { className: 'stat', style: { color: lamp } }, label),
-          h('span', { className: 'tid' }, data.id),
-        ),
+        h('div', { key: 'lr', className: 'lamprow' }, ...lamprowKids),
         h('div', { key: 'ti', className: 'title' + (title ? '' : ' empty') },
           title || 'untitled'),
       );
 
       // structural meta row: downstream impact + convergence fan-in
       const metaChips = [];
+      // owner rollup pill — child progress (done / total). On a collapsed owner it is the
+      // primary readout of "what's inside"; on an expanded owner it's a quick group gauge.
+      if (data.isOwner && data.ownerChildCount > 0) {
+        const allDone = data.ownerDone >= data.ownerChildCount;
+        metaChips.push(
+          h('span', {
+            key: 'rollup',
+            className: 'chip rollup' + (allDone ? ' done' : ''),
+            title: data.ownerDone + ' of ' + data.ownerChildCount + ' subtasks done'
+              + (data.collapsed ? ' · collapsed' : ''),
+          }, (data.collapsed ? '▸ ' : '▾ ') + 'subtasks',
+            h('span', { className: 'cn' }, data.ownerDone + '/' + data.ownerChildCount)),
+        );
+      }
       if (data.impact > 0) {
         metaChips.push(
           h('span', { key: 'imp', className: 'chip impact' + (data.impact >= IMPACT_HOT ? ' hot' : '') },
@@ -2401,10 +2576,50 @@
     const nodeTypes = { cc: CcNode };
 
     // ---- build nodes/edges from a board + analysis -------------------------
-    function buildGraph(board, an, sel, prevPositions, firstLayout) {
+    // collapsed: Set<ownerId> of owners the user has folded shut. A collapsed owner's
+    // CHILD nodes are hidden; their cross-group dependency edges reroute to/from the owner
+    // so the DAG stays connected (design §7 nested-DAG owner grouping + collapse). The
+    // owner tile then shows a child-count + rollup-progress pill and a ▾/▸ caret. With no
+    // nesting (legacy / flat boards) `an.owners` is empty and this is a no-op — every node
+    // renders exactly as before (graceful degradation, backward compatible).
+    function buildGraph(board, an, sel, prevPositions, firstLayout, collapsed, onToggleCollapse) {
       const tasks = Array.isArray(board.tasks) ? board.tasks : [];
-      const ids = new Set(tasks.map(t => t.id));
-      const positions = (prevPositions && prevPositions.size) ? prevPositions : layout(tasks);
+      const collapsedSet = collapsed instanceof Set ? collapsed : new Set();
+      const owners = an.owners || new Set();
+
+      // hidden = children of a COLLAPSED owner (only owners that are actually collapsed AND
+      // genuinely own children). reroute(id) maps a hidden child up to its visible owner.
+      const hidden = new Set();
+      for (const t of tasks) {
+        const par = an.parentOf(t.id);
+        if (par && collapsedSet.has(par) && owners.has(par)) hidden.add(t.id);
+      }
+      function reroute(id) {
+        if (!hidden.has(id)) return id;
+        const par = an.parentOf(id);
+        return (par && !hidden.has(par)) ? par : id; // owner is depth-1, always visible
+      }
+      const visibleTasks = tasks.filter(t => !hidden.has(t.id));
+      const visibleIds = new Set(visibleTasks.map(t => t.id));
+
+      // rerouted edge pairs (deduped, no self/internal loops) — feeds both dagre layout and
+      // the rendered edges. An edge dep->task becomes reroute(dep)->reroute(task).
+      const pairSeen = new Set();
+      const edgePairs = [];
+      for (const t of tasks) {
+        const deps = Array.isArray(t.deps) ? t.deps : [];
+        for (const d of deps) {
+          if (!visibleIds.has(d) && !hidden.has(d)) continue; // dangling dep -> skip
+          const s = reroute(d), tg = reroute(t.id);
+          if (s === tg || !visibleIds.has(s) || !visibleIds.has(tg)) continue;
+          const key = s + ' ' + tg;
+          if (pairSeen.has(key)) continue;
+          pairSeen.add(key);
+          edgePairs.push([s, tg]);
+        }
+      }
+
+      const positions = (prevPositions && prevPositions.size) ? prevPositions : layout(visibleTasks, edgePairs);
 
       // lineage sets for the selected node
       let ancSet = null, descSet = null;
@@ -2413,7 +2628,7 @@
         descSet = an.descendants(sel, new Set());
       }
 
-      const nodes = tasks.map((t, i) => {
+      const nodes = visibleTasks.map((t, i) => {
         // awaiting-user = blocked_on:'user' AND a pending status (blocked /
         // in_flight) — catches a pure-blocked gate AND an in_flight node that has
         // hit a point needing human input (combined "spinning AND waiting"), but
@@ -2426,6 +2641,10 @@
           else if (ancSet && ancSet.has(t.id)) lineage = 'anc';
           else if (descSet && descSet.has(t.id)) lineage = 'desc';
         }
+        // nesting metadata: is this node an owner (has children)? a child (has a parent)?
+        const isOwner = owners.has(t.id);
+        const childOf = an.parentOf(t.id);
+        const rp = isOwner ? an.rollupProgress(t.id) : null;
         return {
           id: t.id,
           type: 'cc',
@@ -2451,61 +2670,75 @@
             lineage,
             enter: !!firstLayout,
             order: i,
+            // ── D3 nesting tile data ──
+            isOwner,
+            collapsed: isOwner && collapsedSet.has(t.id),
+            ownerChildCount: rp ? rp.total : 0,
+            ownerDone: rp ? rp.done : 0,
+            childOf: childOf && visibleIds.has(childOf) ? childOf : null,
+            onToggleCollapse,
           },
         };
       });
 
       // lineage edge set: edges fully inside {sel} ∪ ancestors ∪ descendants
-      // along the actual dependency chain to/from sel.
+      // along the actual dependency chain to/from sel. Rerouted ids are used so a
+      // collapsed owner's lineage still reads (its children's lineage rolls up to it).
       const linNodes = new Set();
       if (sel) {
-        linNodes.add(sel);
-        if (ancSet) for (const a of ancSet) linNodes.add(a);
-        if (descSet) for (const d of descSet) linNodes.add(d);
+        linNodes.add(reroute(sel));
+        if (ancSet) for (const a of ancSet) linNodes.add(reroute(a));
+        if (descSet) for (const d of descSet) linNodes.add(reroute(d));
       }
 
       const edges = [];
-      for (const t of tasks) {
-        const deps = Array.isArray(t.deps) ? t.deps : [];
-        for (const d of deps) {
-          if (!ids.has(d)) continue;
-          const onCrit = an.critSet.has(d) && an.critSet.has(t.id);
-          // an edge is on the lineage if both endpoints are in the lineage AND
-          // it points toward/away from sel (ancestor edge or descendant edge).
-          let onLin = false;
-          if (sel && linNodes.has(d) && linNodes.has(t.id)) {
-            const dAnc = d === sel || (ancSet && ancSet.has(d));
-            const tAnc = t.id === sel || (ancSet && ancSet.has(t.id));
-            const dDesc = d === sel || (descSet && descSet.has(d));
-            const tDesc = t.id === sel || (descSet && descSet.has(t.id));
-            onLin = (dAnc && tAnc) || (dDesc && tDesc);
-          }
-          edges.push({
-            id: d + '->' + t.id,
-            source: d,
-            target: t.id,
-            className: onLin ? 'edge-lin' : undefined,
-            animated: onCrit || onLin,
-            style: onLin
-              ? { stroke: cssVar('--ready'), strokeWidth: 2.2 }
-              : onCrit
-                ? { stroke: spineColor(), strokeWidth: 2.4 }
-                : { stroke: edgeColor(), strokeWidth: 1.3, opacity: 0.75 },
-          });
+      for (const [d, tid] of edgePairs) {
+        const onCrit = an.critSet.has(d) && an.critSet.has(tid);
+        let onLin = false;
+        if (sel && linNodes.has(d) && linNodes.has(tid)) {
+          const dAnc = d === sel || (ancSet && ancSet.has(d));
+          const tAnc = tid === sel || (ancSet && ancSet.has(tid));
+          const dDesc = d === sel || (descSet && descSet.has(d));
+          const tDesc = tid === sel || (descSet && descSet.has(tid));
+          onLin = (dAnc && tAnc) || (dDesc && tDesc);
         }
+        edges.push({
+          id: d + '->' + tid,
+          source: d,
+          target: tid,
+          className: onLin ? 'edge-lin' : undefined,
+          animated: onCrit || onLin,
+          style: onLin
+            ? { stroke: cssVar('--ready'), strokeWidth: 2.2 }
+            : onCrit
+              ? { stroke: spineColor(), strokeWidth: 2.4 }
+              : { stroke: edgeColor(), strokeWidth: 1.3, opacity: 0.75 },
+        });
       }
       return { nodes, edges, positions };
     }
 
     // structural signature: does the node/edge SET differ? (ignores status/label)
+    // ★Topology = dep edges AND parent (container) edges. A parent re-point changes the
+    // OWNER GROUPING — and, while an owner is collapsed, which nodes are even VISIBLE
+    // (buildGraph hides a collapsed owner's children, keyed off an.parentOf). If the sig
+    // ignored parent, a board poll that only changed tasks[].parent would read as fresh=false
+    // → apply() reuses stale positions and never re-fits → a newly-visible node lands at {0,0}
+    // off-screen. So fold parent edges into the signature too (status/label still ignored).
     function structSig(board) {
       const tasks = Array.isArray(board.tasks) ? board.tasks : [];
       const ids = tasks.map(t => t.id).sort();
-      const edges = [];
       const idset = new Set(ids);
+      const edges = [];
       for (const t of tasks) for (const d of (t.deps || [])) if (idset.has(d)) edges.push(d + '>' + t.id);
       edges.sort();
-      return ids.join(',') + '|' + edges.join(',');
+      // parent (container) edges — child→owner, only when the owner id exists. Distinct
+      // namespace ('^') from dep edges ('>') so a dep edge and a parent edge between the
+      // same pair never collide in the signature.
+      const pedges = [];
+      for (const t of tasks) if (typeof t.parent === 'string' && t.parent && idset.has(t.parent)) pedges.push(t.id + '^' + t.parent);
+      pedges.sort();
+      return ids.join(',') + '|' + edges.join(',') + '|' + pedges.join(',');
     }
 
     // ---- main component ---------------------------------------------------
@@ -2515,6 +2748,13 @@
       const [edges, setEdges] = useState([]);
       const [err, setErr] = useState(null);
       const [sel, setSel] = useState(null);  // selected task id (lineage anchor)
+      // collapsed owners (D3 nested-DAG): a Set of owner ids the user has folded shut.
+      // Their children are hidden + their cross-group edges reroute to the owner. State,
+      // not persisted (a fresh load shows the full graph). selRef-style ref so the stable
+      // toggleCollapse / render callbacks read the live set without re-subscribing.
+      const [collapsed, setCollapsed] = useState(() => new Set());
+      const collapsedRef = useRef(collapsed);
+      collapsedRef.current = collapsed;
       // discuss-history sidecars, fetched from the OPTIONAL read-only /decisions.json
       // route (added by a newer view-server). Stays [] on any failure — an older
       // server returns 404 here and the whole history feature silently no-ops.
@@ -2555,14 +2795,29 @@
       boardRef.current = board;
       selRef.current = sel;
 
-      // (re)render the graph from current board + analysis + selection
+      // toggleCollapse(id) — fold/unfold an owner. Stable callback (functional setState);
+      // it flips id in the collapsed Set and re-renders FRESH (collapse changes the visible
+      // node set, so dagre must re-layout + re-fit, like a topology change). Defined as a
+      // ref-target so node tiles can call it; the actual re-render is driven by the
+      // collapsed-state effect below (keeps render's closure simple).
+      const toggleCollapse = useCallback((id) => {
+        setCollapsed((prev) => {
+          const next = new Set(prev);
+          if (next.has(id)) next.delete(id); else next.add(id);
+          return next;
+        });
+      }, []);
+
+      // (re)render the graph from current board + analysis + selection. Reads the live
+      // collapsed set via ref + passes the stable toggle so owner tiles can fold/unfold.
       const render = useCallback((b, analysis, selection, fresh) => {
         const { nodes: nn, edges: ee, positions } =
-          buildGraph(b, analysis, selection, fresh ? null : posRef.current, fresh);
+          buildGraph(b, analysis, selection, fresh ? null : posRef.current, fresh,
+            collapsedRef.current, toggleCollapse);
         if (fresh) posRef.current = positions;
         setNodes(nn);
         setEdges(ee);
-      }, []);
+      }, [toggleCollapse]);
 
       // flip day/night — set the root attribute, invalidate the cssVar cache so
       // edges/spine/minimap re-resolve, persist, and re-render the graph in place
@@ -2617,6 +2872,22 @@
         const iv = setInterval(poll, 2000);
         return () => { alive = false; clearInterval(iv); };
       }, [apply]);
+
+      // ---- collapse-change re-render (D3 nested-DAG) ------------------------
+      // Folding / unfolding an owner changes the VISIBLE node set, so the DAG must
+      // re-layout (dagre) and re-fit — exactly like a topology change. Re-render FRESH
+      // from the current board + analysis whenever the collapsed set changes. Skip the
+      // initial mount (no board yet / empty set) so this never double-renders the first
+      // poll. Pure view-state; the board itself is untouched (read-only viewer invariant).
+      const collapseInit = useRef(true);
+      useEffect(() => {
+        if (collapseInit.current) { collapseInit.current = false; return; }
+        const b = boardRef.current, a = anRef.current;
+        if (!b || !a) return;
+        render(b, a, selRef.current, true); // fresh=true -> re-layout the new visible set
+        didFit.current = true;
+        setTimeout(() => { try { rf.fitView({ padding: 0.16 }); } catch (_e) {} }, 30);
+      }, [collapsed, render, rf]);
 
       // ---- discuss history poll — OPTIONAL, fail-silent ---------------------
       // Pull /decisions.json on the same 2s cadence as the board. This route is

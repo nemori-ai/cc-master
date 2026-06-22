@@ -902,12 +902,22 @@ on_exit_or_interrupt() {
     #   目录不可写）时，下面收尾消息**绝不能**谎称「registry 一致·split-brain 已避免」——故移除 node 内吞异常的
     #   try/catch，让失败以非零退出冒出来；`if … then REG_ALIGNED=1` 把成败捕进 shell（stderr 仍 /dev/null·不回显），
     #   消息据此分支。语义不变：registry 没追上不是 brick，下次 detect_current_active 仍从存储反向对账（见失败分支消息）。
+    #   **切入号不在 registry 也是「未对齐」（RC-P3）**：旧 mutator `if (reg.accounts[email]) setActive(...)` 在切入号
+    #   尚未录入 registry 时 guard 为假 → 啥也不做却正常返回（exit 0）→ REG_ALIGNED 误判为 1 → 谎称「三存储与 registry
+    #   一致」，实际 registry active 仍指旧号（stale·与存储脱节）= 正是 set_active_in 正常路径 exit-5 处理的同一
+    #   stale-registry 情形（codex round#3 Finding A）。修：mutator 在账号缺失时**显式 throw**（非零退出）→ REG_ALIGNED=0
+    #   → 走下面已有的诚实失败分支，口径与 set_active_in exit-5 一致·绝不在 trap 路径谎报已对齐。
     REG_ALIGNED=0
     if node -e '
       "use strict";
       const lib = require(process.argv[1]);
       const regPath = process.argv[2], email = process.argv[3];
-      lib.mutateRegistry(regPath, (reg) => { if (reg.accounts && reg.accounts[email]) lib.setActive(reg, email); });
+      lib.mutateRegistry(regPath, (reg) => {
+        if (!reg.accounts || !reg.accounts[email]) {
+          throw new Error("switch-in email not in registry — cannot align active (RC-P3 stale-registry)");
+        }
+        lib.setActive(reg, email);
+      });
     ' "$LIB_JS" "$REGISTRY_PATH" "$COMMIT_SWITCHIN_EMAIL" >/dev/null 2>&1; then
       REG_ALIGNED=1
     fi

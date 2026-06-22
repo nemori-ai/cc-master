@@ -469,4 +469,16 @@ function formatReport(result) {
   return lines.join('\n').replace(/\n+$/, '\n');
 }
 
-module.exports = { lintBoard, formatReport, findCycle, buildGraph, STATUS_ENUM, ISO_UTC_RE };
+// ── UMD 双形态导出（D3.7·浏览器桥）─────────────────────────────────────────────────────────────
+//   CommonJS（hook / CLI / node:test）：照常 module.exports，零行为变化。
+//   浏览器（view.html 把本文件当 classic <script> 加载，供 board-graph-core 复用 buildGraph/findCycle）：
+//   无 module，挂到 globalThis.__ccmBoardLintCore 让 board-graph-core.js 的 require-fallback 读取（DRY：
+//   一份 buildGraph，hook / CLI / webview 三处共用·设计稿 §5.2）。
+{
+  const __ccmLintExports = { lintBoard, formatReport, findCycle, buildGraph, STATUS_ENUM, ISO_UTC_RE };
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = __ccmLintExports;
+  } else if (typeof globalThis !== 'undefined') {
+    globalThis.__ccmBoardLintCore = __ccmLintExports;
+  }
+}
