@@ -1,0 +1,6 @@
+{
+  "main": "dist/ccm-sea.cjs",
+  "output": "dist/ccm-sea.blob",
+  "disableExperimentalSEAWarning": true,
+  "useCodeCache": true
+}

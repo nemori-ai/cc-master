@@ -328,9 +328,13 @@ export function printVersion(out: Out): void {
   out(`ccm ${_readVersion()}`);
 }
 
-// _readVersion：cli/package.json → .claude-plugin/plugin.json → '0.0.0'。
+// _readVersion：process.env.CCM_VERSION → cli/package.json → .claude-plugin/plugin.json → '0.0.0'。
 //   __dirname = apps/cli/src；package.json 在 apps/cli/（上一级）；plugin.json 在更上层 .claude-plugin（fallback）。
+//   CCM_VERSION 优先：SEA blob 内 __dirname 不指向 apps/cli/，相对 package.json 读会落空 → '0.0.0'；
+//   故 SEA 入口（src/sea.ts）构建期把版本号注入 env.CCM_VERSION（见 ADR-014·T3）。非 SEA 路径不设该 env，行为不变。
 function _readVersion(): string {
+  const envVer = typeof process.env.CCM_VERSION === 'string' ? process.env.CCM_VERSION.trim() : '';
+  if (envVer) return envVer;
   const candidates = [
     path.join(__dirname, '..', 'package.json'), // apps/cli/package.json
     path.join(__dirname, '..', '..', '.claude-plugin', 'plugin.json'), // 上层 plugin.json（fallback）
