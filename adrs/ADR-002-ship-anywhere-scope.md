@@ -6,6 +6,11 @@
 > background-shell still the floor). **agent-teams and cloud `scheduled routines`
 > (claude.ai OAuth) remain excluded.** Everything below stands except that one
 > narrowing.
+> *Further amended by [ADR-014](ADR-014-cli-decoupling-as-independent-product.md)*:
+> the ship-anywhere 「no external prerequisite / 单件自包含」 stance is revised — the
+> `ccm` CLI becomes a **host-preinstalled per-OS Node SEA binary** the plugin shells
+> out to (TS/npm deps locked behind the process boundary; host-vs-model-backend
+> distinction per ADR-006). The **dispatch-mechanism scope below is unaffected**.
 > Date: 2026-06-08
 > Scope: The set of background-execution mechanisms cc-master teaches and depends
 > on, across both skills and all commands/hooks. Constrains what may ever be added
@@ -121,6 +126,9 @@ small and every tool in it real.
   `ScheduleWakeup`/cron (local timer primitives) exclusion: permitted as a watchdog
   safety net for the silent-failure blind spot (background-shell still the floor);
   cloud routines / agent-teams stay excluded.
+- [`ADR-014-cli-decoupling-as-independent-product.md`](ADR-014-cli-decoupling-as-independent-product.md)
+  — further amends the ship-anywhere 口径: 「no external prerequisite」 → host-preinstalled
+  `ccm` SEA binary + process boundary (dispatch-mechanism scope unaffected).
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — design invariant #5.
 - [`../design_docs/spec.md`](../design_docs/spec.md) — §12 intentional exclusions
   (agent teams, scheduled routines).

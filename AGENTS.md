@@ -53,7 +53,7 @@ cc-master/
 ├── .claude/skills/            ← **项目自用** dev skill（造/评/治三件套 + requirement-elicitation 上游需求发现，**不分发**）
 ├── hooks/scripts/            ← 5 个 hook，全 board-derived「武装」后才醒（ADR-007）：bootstrap-board（ARM 动作）/ reinject / verify-board（goal-hook）/ posttool-batch（过调度软警告）·bash + usage-pacing.js（**账户权威 5h/7d `used_percentage` 双侧 pacing**：临界轻推减速 + 5h 欠用轻推加速、7d 当硬总闸·ADR-010；读 statusline-capture 落的 sidecar，缺则降级本地反推·Finding #37）·node·JS（红线1·ADR-006 已允许 node）
 ├── scripts/                  ← 带外 **dev-only** 脚本：eval-trigger / eval-benchmark / skill-lint（仅开发本仓用、repo 根调用，**不随 plugin 分发**；裸路径在此正确）。运行时带外脚本（cc-usage / codex-review / statusline-capture）已搬入 `skills/orchestrating-to-completion/scripts/`（随 skill 分发，见上）
-├── adrs/                     ← 结构性决策快照（ADR-001..011 + AGENTS.md 规约）
+├── adrs/                     ← 结构性决策快照（ADR-001..014 + AGENTS.md 规约）
 ├── tests/                    ← hook 测试（bash）；run-tests.sh 编排 hook + content contract
 ├── design_docs/             ← 设计文档 + eval/ + dogfood-findings.md（plans/ gitignored）
 └── examples/                 ← 可跑样例（sample-orchestration：i18n 场景 walkthrough.md + smoke.sh 冒烟证明）
@@ -198,7 +198,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 
 ## 13. ADR 约定
 
-结构性架构决策（"为什么 X 不 Y / 何时可推翻"）记成 ADR——与 design_docs（描述当前状态）严格分开。命名 `ADR-NNN-<slug>.md`，带 Status/Date/Scope frontmatter + Context/Decision/Consequences/Alternatives/Related 模板。**何时写 ADR、ADR-vs-design_docs 试金石、workflow 全在** → [`adrs/AGENTS.md`](adrs/AGENTS.md)。现有 ADR-001..011（hooks-pure-bash / ship-anywhere-scope / board-narrow-waist / loop-dissolution-and-goal-hook / two-skills-separation / hooks-may-use-node-js / hook-arming-gate / account-authoritative-usage-and-script-placement / resume-cross-session-re-arm / two-sided-pacing-corridor / self-wakeup-watchdog —— ADR-010：pacing 从单边上限护栏改为**双侧目标走廊**（5h reset 目标落 70–90% 区间、欠用侧轻推加速 / 临界侧轻推减速），以 **7d 窗口当加速硬总闸**；ADR-011：前台空转期 **watchdog 自我唤醒**——`ScheduleWakeup`/`CronCreate`（本地内存调度）部分解禁、许可用于补静默失败盲区的安全网，**降级链 + background-shell 永为 floor**，云 routines / agent-teams 仍排除·收窄 ADR-002）。
+结构性架构决策（"为什么 X 不 Y / 何时可推翻"）记成 ADR——与 design_docs（描述当前状态）严格分开。命名 `ADR-NNN-<slug>.md`，带 Status/Date/Scope frontmatter + Context/Decision/Consequences/Alternatives/Related 模板。**何时写 ADR、ADR-vs-design_docs 试金石、workflow 全在** → [`adrs/AGENTS.md`](adrs/AGENTS.md)。现有 ADR-001..014（hooks-pure-bash / ship-anywhere-scope / board-narrow-waist / loop-dissolution-and-goal-hook / two-skills-separation / hooks-may-use-node-js / hook-arming-gate / account-authoritative-usage-and-script-placement / resume-cross-session-re-arm / two-sided-pacing-corridor / self-wakeup-watchdog / parent-waist-and-rollup-aware-stop-gate / board-v2-data-model-and-cli / cli-decoupling-as-independent-product —— ADR-010：pacing 从单边上限护栏改为**双侧目标走廊**（5h reset 目标落 70–90% 区间、欠用侧轻推加速 / 临界侧轻推减速），以 **7d 窗口当加速硬总闸**；ADR-011：前台空转期 **watchdog 自我唤醒**——`ScheduleWakeup`/`CronCreate`（本地内存调度）部分解禁、许可用于补静默失败盲区的安全网，**降级链 + background-shell 永为 floor**，云 routines / agent-teams 仍排除·收窄 ADR-002；ADR-012：`tasks[].parent` 升入 narrow-waist + rollup-aware Stop gate（nested max-depth=1 调度图，扩展 ADR-003）；ADR-013：board v2 完整 JS 数据模型 SSOT + 统一 CLI 访问层（演进 ADR-003 的 narrow-waist 为三档建模 🔒/👁/✎）；ADR-014：`ccm` CLI **解耦为独立安装的工业化 TS 产品/引擎**（`@ccm/engine` SSOT），plugin 降为消费方之一、经**进程边界 shell 调全局 `ccm` 二进制 + JSON**访问 board（绝不 import 引擎）、ship-anywhere 改由「主机预置 per-OS Node SEA + 进程边界」守·修订 ADR-013 的 CLI 定位 + ADR-002 的 ship-anywhere 口径）。
 
 ---
 
