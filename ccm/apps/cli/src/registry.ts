@@ -69,8 +69,12 @@ export const REGISTRY: Registry = {
       positionals: [],
       options: {
         json: { type: 'boolean', desc: '以 JSON 出 violations（否则人类报告）' },
+        raw: {
+          type: 'boolean',
+          desc: '直读 --board 指定文件的原始字节喂 lint（绕过 discover 的 JSON 预校验）——坏 JSON 也能 lint 成 FMT-JSON 错而非 exit 5（hook 用·须配 --board）',
+        },
       },
-      examples: ['ccm lint', 'ccm board lint --json'],
+      examples: ['ccm lint', 'ccm board lint --json', 'ccm board lint --board <path> --raw --json'],
       handler: 'board.lint',
     },
     graph: {

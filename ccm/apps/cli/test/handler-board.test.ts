@@ -174,6 +174,93 @@ test('board lint --json emits violations array', () => {
   assert.ok(Array.isArray(parsed.data.violations) && parsed.data.violations.length > 0);
 });
 
+// ══ board lint --raw（坏 JSON 容忍 / hook 支撑·T4-1a）══════════════════════════════════════════════
+// --raw 直读 --board 指定文件的原始字节喂 lintBoard，绕过 discover 的 JSON 预校验：
+//   坏 JSON → lint 成 FMT-JSON 错（exit 3）而非 discover 提前 exit 5（board-lint hook 的本职）。
+
+test('board lint --raw: bad JSON file → FMT-JSON error + EXIT.VALIDATION (not discover exit 5)', () => {
+  const root = mkTmp('ccm-rawlint-');
+  const badPath = join(root, 'bad.board.json');
+  writeFileSync(badPath, '{ "schema": "cc-master/v2", "goal": "x", BROKEN ', 'utf8');
+  const ctx = mkCtx({ values: { board: badPath, raw: true } });
+  const code = boardHandler.lint(ctx);
+  assert.equal(code, EXIT.VALIDATION, '坏 JSON → exit 3（lint 跑了），而非 discover exit 5');
+  assert.ok(ctx.outBuf.join('').includes('FMT-JSON'), '人类报告含 FMT-JSON');
+});
+
+test('board lint --raw --json: bad JSON file → violations carry rule FMT-JSON on stdout', () => {
+  const root = mkTmp('ccm-rawlint-');
+  const badPath = join(root, 'bad.board.json');
+  writeFileSync(badPath, '{ not json at all', 'utf8');
+  const ctx = mkCtx({ values: { board: badPath, raw: true }, flags: { json: true } });
+  const code = boardHandler.lint(ctx);
+  assert.equal(code, EXIT.VALIDATION);
+  const parsed = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.data.ok, false);
+  const rules = parsed.data.violations.map((v: { rule: string }) => v.rule);
+  assert.ok(rules.includes('FMT-JSON'), 'violations 含 rule FMT-JSON');
+});
+
+test('board lint --raw: well-formed valid board file → clean / EXIT.OK', () => {
+  const { boardPath } = mkBoardHome({ tasks: [task('T1')] });
+  const ctx = mkCtx({ values: { board: boardPath, raw: true } });
+  const code = boardHandler.lint(ctx);
+  assert.equal(code, EXIT.OK);
+  assert.ok(ctx.outBuf.join('').includes('PASS'));
+});
+
+test('board lint --raw --json: violations carry rule field per finding (GRAPH-ROLLUP filterable)', () => {
+  // 父 done 子未 done → GRAPH-ROLLUP（warn·level 字段可见、rule 可 filter）。
+  const tasks = [
+    task('M1', { status: 'done', deps: [] }),
+    task('M1.a', { status: 'done', parent: 'M1', deps: [] }),
+    task('M1.b', { status: 'in_flight', parent: 'M1', deps: [] }),
+  ];
+  const { boardPath } = mkBoardHome({ tasks });
+  const ctx = mkCtx({ values: { board: boardPath, raw: true }, flags: { json: true } });
+  boardHandler.lint(ctx);
+  const parsed = JSON.parse(ctx.outBuf.join(''));
+  const rollup = parsed.data.violations.find((v: { rule: string }) => v.rule === 'GRAPH-ROLLUP');
+  assert.ok(rollup, 'GRAPH-ROLLUP 在 violations 里·rule 字段可 filter');
+  assert.equal(rollup.level, 'warn', 'rollup 是 warn 级（每条 finding 带 level 字段）');
+  assert.equal(rollup.task, 'M1', '带 task 字段');
+});
+
+test('board lint --raw without --board → throws Usage (router maps to exit 2)', () => {
+  const ctx = mkCtx({ values: { raw: true } });
+  assert.throws(
+    () => boardHandler.lint(ctx),
+    (e: { errKind?: string }) => e.errKind === 'Usage',
+    '--raw 缺 --board → Usage',
+  );
+});
+
+test('board lint --raw: missing file → throws NotFound (router maps to exit 5)', () => {
+  const root = mkTmp('ccm-rawlint-');
+  const missing = join(root, 'does-not-exist.board.json');
+  const ctx = mkCtx({ values: { board: missing, raw: true } });
+  assert.throws(
+    () => boardHandler.lint(ctx),
+    (e: { errKind?: string }) => e.errKind === 'NotFound',
+    '读不到文件 → NotFound',
+  );
+});
+
+// 默认 lint（无 --raw）行为零变化的回归保险：坏 JSON 文件经 discover 仍 throw NotFound（exit 5），
+//   而非被 --raw 路径吃成 lint 结果——证明默认契约未被本次改动破坏。
+test('board lint (no --raw): bad JSON file still throws NotFound via discover (exit 5 契约不变)', () => {
+  const root = mkTmp('ccm-rawlint-');
+  const badPath = join(root, 'bad.board.json');
+  writeFileSync(badPath, '{ broken json', 'utf8');
+  const ctx = mkCtx({ values: { board: badPath } });
+  assert.throws(
+    () => boardHandler.lint(ctx),
+    (e: { errKind?: string }) => e.errKind === 'NotFound',
+    '默认路径坏 JSON 仍走 discover → NotFound（行为零变化）',
+  );
+});
+
 // ══ board graph ════════════════════════════════════════════════════════════════════════════════════
 test('board graph: human prints topo order + ready', () => {
   const { boardPath } = mkBoardHome({

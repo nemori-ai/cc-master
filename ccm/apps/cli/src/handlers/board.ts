@@ -22,6 +22,7 @@
 //   + require('../board-graph-core.js') 改成从 `@ccm/engine` import { lintBoard, analyzeGraph }。
 //   逻辑/数值/报错文案/.errKind/退出码逐字保持。
 
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { analyzeGraph, lintBoard } from '@ccm/engine';
 import * as discover from '../discover.js';
@@ -51,17 +52,53 @@ export function show(ctx: Ctx): number {
 // ── 读 verb：lint ───────────────────────────────────────────────────────────────────────────────
 // 校验整板；有 hard error → return EXIT.VALIDATION（设计稿 §4：lint 是「读」但 hard error 退 3）。
 //   注：runRead 恒返回 EXIT.OK，故 lint 不走 runRead——自己 resolve + 渲染 + 据 errors 决定退出码。
+//
+// 两种取板路径：
+//   · 默认（discover）：resolveBoard 先 JSON.parse 校验（坏 JSON → throw NotFound → router 退 5），再 lint
+//     parse 出的对象的 re-serialize 文本。这是历史行为，零变化（其它消费方契约）。
+//   · --raw（board-lint hook 用·须配 --board）：直读 --board 指定文件的**原始字节**喂 lintBoard——绕过
+//     discover 的 JSON 预校验，让坏 JSON 被 lint 成 FMT-JSON 错（而非 discover 提前退 5·hook 的本职是
+//     catch agent 刚写坏的 JSON）。lintBoard 本身吃 raw string 且自己处理坏 JSON（FMT-JSON·绝不抛）。
+//     读文件失败（路径缺失等）→ throw NotFound（router 退 5）；--raw 缺 --board → throw Usage（router 退 2）。
 export function lint(ctx: Ctx): number {
-  const resolved = discover.resolveBoard({
-    boardFlag: ctx.values && (ctx.values.board as string),
-    sid: ctx.sid,
-    homeFlag: ctx.values && (ctx.values.home as string),
-    goalSubstr: ctx.values && (ctx.values.goal as string),
-    env: ctx.env,
-  });
-  const res = lintBoard(JSON.stringify(resolved.board || {}));
+  let res: ReturnType<typeof lintBoard>;
+  if (ctx.values && ctx.values.raw) {
+    const raw = readRawBoard(ctx);
+    res = lintBoard(raw);
+  } else {
+    const resolved = discover.resolveBoard({
+      boardFlag: ctx.values && (ctx.values.board as string),
+      sid: ctx.sid,
+      homeFlag: ctx.values && (ctx.values.home as string),
+      goalSubstr: ctx.values && (ctx.values.goal as string),
+      env: ctx.env,
+    });
+    res = lintBoard(JSON.stringify(resolved.board || {}));
+  }
   ctx.out(render.renderLintReport(res, { json: !!ctx.flags.json, color: ctx.flags.color }));
   return Array.isArray(res.errors) && res.errors.length > 0 ? EXIT.VALIDATION : EXIT.OK;
+}
+
+// readRawBoard(ctx) → --board 指定文件的原始文本（绕过 discover 的 JSON 预校验·--raw 专用）。
+//   --raw 须配显式 --board / $CC_MASTER_BOARD（坏 JSON 文件没法靠 discover 自动锚——文件本就读不成 board）。
+//     缺 → throw Usage（router 退 2）。文件读不到（不存在/权限）→ throw NotFound（router 退 5）。
+function readRawBoard(ctx: Ctx): string {
+  const explicit =
+    (ctx.values && (ctx.values.board as string)) || (ctx.env && ctx.env.CC_MASTER_BOARD);
+  if (!explicit) {
+    const e = new Error(
+      'board lint --raw 须配 --board <path>（直读原始字节，不经 discover）',
+    ) as KindedError;
+    e.errKind = 'Usage';
+    throw e;
+  }
+  try {
+    return fs.readFileSync(path.resolve(explicit), 'utf8');
+  } catch (_e) {
+    const e = new Error(`board lint --raw 读不到文件：${path.resolve(explicit)}`) as KindedError;
+    e.errKind = 'NotFound';
+    throw e;
+  }
 }
 
 // ── 读 verb：graph ──────────────────────────────────────────────────────────────────────────────
