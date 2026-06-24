@@ -25,15 +25,57 @@
 //   重新强制 self-check。这阻止同一 board 态在漫长后台等待里被反复 self-check。
 // 保险丝：每次 block bump block_streak；>= FUSE 强制 allow；每次 allow 清 sidecar。
 //
-// 红线1/ADR-006：node/JS only，纯 stdlib（fs/path），零 spawn（不调 jq/python/awk）、零网络、零依赖。
+// ★ADR-014 解耦（T4-1b）：rollup 检测（owner done 而子未 done）**首选经进程边界 shell 调全局 `ccm` 二进制**
+//   （`ccm board lint --board <path> --json` → 取 `violations[].rule==='GRAPH-ROLLUP'` 定位违规 owner），
+//   再据其 owner 集从已解析 board 重建「owner X is done but child Y is C」每条 part（保持 handshake 措辞同今）。
+//   GRAPH-ROLLUP 是 warn（exit 0），故据 `violations` 数组判定、绝不靠退出码（1a 契约）。
+//   · 调用约定：`CCM_BIN`（绝对路径可执行）是 dev/test/自定义安装覆写口；生产 `ccm` 在 PATH。
+//   · fallback：ccm 失败（ENOENT / 非有效 JSON）→ 退回 require('../../cli/src/board-model.js') 的 isDoneStatus
+//     + 原内联 rollup 循环（旧 in-process 路径**保留不删**·stage3 才删），逐字同今。
+//   · 优雅降级：ccm 缺 ∧ fallback 抛 → 跳过 rollup part（不 crash，其余 Stop gate 逻辑照走）。
+//   注：verify-board 处理的是**可解析**板（listMatchingBoards 已跳过坏板），故不需 --raw。
+//
+// 红线1/ADR-006：node/JS only，纯 stdlib（fs/path/child_process），spawn `ccm` 二进制 + JSON 是 ADR-014 许可的
+//   进程边界访问（非 import 引擎、非调 jq/python/awk），零网络、零 npm 依赖。
 // 红线6：dormant-until-armed——未武装一律静默（空 stdout、RC 0、不 block），绝不在未武装路径上 block Stop。
+//   rollup 循环仍只在武装闸内（listMatchingBoards 已筛本 session 匹配板），spawn ccm 只发生在已武装路径。
 // 红线2：只读 narrow-waist（owner.active/session_id 判武装 + tasks[].status/parent 数完成态 + watchdog 软读），不写 board。
 // 兜底：全程 try/catch，异常静默放行 exit 0——hook 崩绝不把 agent 永久卡在 Stop。
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const { resolveHome, readStdin, parseStdin, listMatchingBoards } = require('./hook-common.js');
-const { isDoneStatus } = require('../../cli/src/board-model.js');
+
+// CCM_BIN：dev/test/自定义安装的覆写口（绝对路径可执行）；缺则用 PATH 上的 `ccm`（生产）。
+const CCM_BIN = process.env.CCM_BIN || 'ccm';
+
+// rollupOwnersViaCcm(boardPath) → Set<ownerId> | null。
+//   spawnSync ccm board lint --board <path> --json → parse stdout JSON → 取 GRAPH-ROLLUP violations 的 task（=owner id）。
+//   GRAPH-ROLLUP 是 warn（exit 0），不据退出码判——只扫 violations[].rule（1a 契约）。spawn 失败 / 非有效
+//   JSON / 形状不符 → null（让调用方走 fallback 的内联 rollup 循环）。空违规 → 空 Set（一致 / 无 rollup 问题）。
+function rollupOwnersViaCcm(boardPath) {
+  let r;
+  try {
+    r = spawnSync(CCM_BIN, ['board', 'lint', '--board', boardPath, '--json'], {
+      encoding: 'utf8',
+      timeout: 15000,
+    });
+  } catch (_e) {
+    return null;
+  }
+  if (!r || r.error || r.signal) return null;            // ENOENT / 被信号杀 → fallback
+  const stdout = typeof r.stdout === 'string' ? r.stdout : '';
+  let parsed;
+  try { parsed = JSON.parse(stdout); } catch (_e) { return null; } // 非有效 JSON → fallback
+  const data = parsed && typeof parsed === 'object' ? parsed.data : null;
+  if (!data || typeof data !== 'object' || !Array.isArray(data.violations)) return null; // 形状不符 → fallback
+  const owners = new Set();
+  for (const v of data.violations) {
+    if (v && v.rule === 'GRAPH-ROLLUP' && typeof v.task === 'string' && v.task !== '') owners.add(v.task);
+  }
+  return owners;
+}
 
 const FUSE = 5;
 // ISO-8601-UTC 严格定宽（与 board-model.js 同口径）。定宽 + Z 后缀的串按字典序即时间序。
@@ -296,17 +338,40 @@ function main() {
   //   武装闸内，未武装 session 到不了这里）。graceful-degrade：旧板无 parent 边 → 零违规、此段静默跳过。
   //   扁平 set 运算（depth=1·parent 是单值指针）：建 (id→status)，再对每个有 parent 且 parent 为 done owner、
   //   自身非 done 的 child 报违规。镜像 board-graph-core rollupConsistency。
+  //   ★T4-1b 解耦：检测「哪些 owner rollup 不一致」首选经 ccm（rollupOwnersViaCcm 取 GRAPH-ROLLUP violations
+  //   的 owner 集）；据该集从已解析 board 重建每条 part（措辞同今）。ccm 失败 → fallback：require board-model
+  //   的 isDoneStatus + 原内联循环（逐字保留）。两路皆不可用 → 跳过 rollup part（其余 Stop gate 照走·优雅降级）。
   const rollupParts = [];
-  for (const { board } of matched) {
+  for (const { path: boardPath, board } of matched) {
     const tasks = Array.isArray(board.tasks) ? board.tasks : [];
-    const statusById = {};
     const realTasks = [];
     for (const t of tasks) {
       if (!t || typeof t !== 'object' || Array.isArray(t)) continue;
       if (typeof t.id !== 'string' || t.id === '') continue;
-      const st = (typeof t.status === 'string') ? t.status : '';
-      statusById[t.id] = st;
       realTasks.push(t);
+    }
+    // 主路径：ccm 定位违规 owner 集。done 语义 = status==='done'（与引擎 isDoneStatus 字字一致·无需 require）。
+    const flaggedOwners = rollupOwnersViaCcm(boardPath);
+    if (flaggedOwners !== null) {
+      for (const t of realTasks) {
+        const pa = (typeof t.parent === 'string') ? t.parent : '';
+        if (!pa || !flaggedOwners.has(pa)) continue;            // 非 ccm 标记的违规 owner 的子 → 跳过
+        const cst = (typeof t.status === 'string') ? t.status : '';
+        if (cst === 'done') continue;                           // child 已 done → 一致（同引擎 doneStatus）
+        rollupParts.push('owner ' + pa + ' is `done` but child ' + t.id + ' is `' + cst + '`');
+      }
+      continue; // 本板已走 ccm 主路径，不再走 fallback
+    }
+    // fallback：ccm 不可用 → 退回 require board-model 的 isDoneStatus + 原内联 rollup 循环（保留·stage3 才删）。
+    let isDoneStatus;
+    try {
+      ({ isDoneStatus } = require('../../cli/src/board-model.js'));
+    } catch (_e) {
+      continue; // 优雅降级：fallback 也 require 不到 → 跳过本板 rollup part（不 crash）
+    }
+    const statusById = {};
+    for (const t of realTasks) {
+      statusById[t.id] = (typeof t.status === 'string') ? t.status : '';
     }
     for (const t of realTasks) {
       const pa = (typeof t.parent === 'string') ? t.parent : '';

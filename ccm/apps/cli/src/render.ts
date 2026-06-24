@@ -25,6 +25,10 @@ interface RenderOpts {
   json?: boolean;
   color?: boolean;
   lint?: { errors?: unknown[]; warnings?: unknown[] } | null;
+  // report（renderLintReport 专用·additive）：调用方传入的 formatReport 文本——--json 时折进 data.report，
+  //   让 board-lint hook 一次 `ccm board lint --raw --json` 既拿 violations（判有无）又拿 report（注入文本）。
+  //   不传 → data 不带 report 字段（json 形状只增不改·向后兼容）。
+  report?: string;
 }
 
 // paint：直接走 io.paint（原 CJS 的懒 require + 兜底在 ESM 下退化为静态 import·行为等价）。
@@ -427,7 +431,11 @@ export function renderLintReport(lintResult: any, opts?: RenderOpts): string {
     const violations = ([] as any[])
       .concat(errors.map((e) => _violation(e, 'hard')))
       .concat(warnings.map((w) => _violation(w, 'warn')));
-    return jsonString({ ok: clean, violations });
+    const data: Record<string, any> = { ok: clean, violations };
+    // additive：调用方给了 report（formatReport 文本）→ 折进 data.report（与文本模式同一份）。
+    //   board-lint hook 据此注入；不传则不带（json 形状只增不改）。
+    if (typeof opts.report === 'string') data.report = opts.report;
+    return jsonString(data);
   }
 
   const color = !!opts.color;

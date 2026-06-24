@@ -24,7 +24,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyzeGraph, lintBoard } from '@ccm/engine';
+import { analyzeGraph, formatReport, lintBoard } from '@ccm/engine';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
 import * as mutations from '../mutations.js';
@@ -75,7 +75,13 @@ export function lint(ctx: Ctx): number {
     });
     res = lintBoard(JSON.stringify(resolved.board || {}));
   }
-  ctx.out(render.renderLintReport(res, { json: !!ctx.flags.json, color: ctx.flags.color }));
+  // --json additive：折进 data.report（= formatReport 文本，与人读模式同一份）。board-lint hook 一次
+  //   `ccm board lint --raw --json` 拿到 violations（判有无 findings）+ report（直接注入 agent 的文本）。
+  //   人读模式 renderLintReport 自渲染（不需 report 参数·formatReport 只在 json 路径折入）。
+  const report = ctx.flags.json ? formatReport(res) : undefined;
+  ctx.out(
+    render.renderLintReport(res, { json: !!ctx.flags.json, color: ctx.flags.color, report }),
+  );
   return Array.isArray(res.errors) && res.errors.length > 0 ? EXIT.VALIDATION : EXIT.OK;
 }
 

@@ -7,25 +7,90 @@
 //   additionalContext 报告（hookEventName "PostToolUse"），点名「违了哪条规则 + 哪个 task + 怎么修」，
 //   让 agent 下一步去修。**绝不 decision:block** —— PostToolUse 编辑已落盘、撤不回，hook 只软提示。
 //
-// 红线1 / ADR-006：node/JS only。JSON.parse 解析 stdin + board，零 spawn jq/python，零网络，零依赖。
+// ★ADR-014 解耦（T4-1b）：四闸全过后，lint **首选经进程边界 shell 调全局 `ccm` 二进制**
+//   （`spawnSync(CCM_BIN || 'ccm', ['board','lint','--board',<file>,'--raw','--json'])` → parse stdout JSON →
+//   `data.violations` 判有无 finding、`data.report` 即注入文本）。这是 plugin 从「in-process require board 引擎」
+//   解耦为「shell 调 ccm + JSON」的消费侧——绝不 import 引擎（红线1 仍守：spawn 一个二进制是允许的 shell 操作）。
+//   · 调用约定：`CCM_BIN` 环境变量（绝对路径可执行）是 dev/test/自定义安装的覆写口；生产环境 `ccm` 在 PATH。
+//   · fallback：spawn 失败（ENOENT / 非 0 且无有效 JSON）→ 退回 require('../../cli/src/board-lint-core.js')
+//     的 lintBoard+formatReport（旧 in-process 路径**保留不删**·stage3 才删），行为字节级同今。
+//   · 优雅降级：ccm 缺 ∧ fallback 也抛 → 静默 exit 0（hook 绝不污染 agent 流·与现有 try/catch 纪律一致）。
+//
+// 红线1 / ADR-006：node/JS only。JSON.parse 解析 stdin + board，零 spawn jq/python，零网络，零依赖
+//   （spawn `ccm` 二进制 + JSON 是 ADR-014 许可的进程边界访问，非 import 引擎）。
 //   全程 try/catch 兜住 → 任何失败都静默 exit 0（hook 崩绝不污染 agent 流，与 usage-pacing 同纪律）。
 //
 // 红线2：lint 只校验窄腰 + 合法 JSON + deps 图完整性 + viewer 真会挂的字段，对 agent-shaped 字段
-//   silent-on-unknown —— 规则实现全在 board-lint-core.js（单一真相源），本 hook 只负责「门 + 注入」。
+//   silent-on-unknown —— 规则实现全在 ccm 引擎（lintBoard·解耦后 `@ccm/engine` SSOT），本 hook 只负责
+//   「门 + 调 ccm + 注入」。fallback 路径仍走旧 board-lint-core.js（同一套规则的旧 in-process 副本，stage3 删）。
 //
 // 红线6（dormant-until-armed）：本 hook 是 PostToolUse（非 bootstrap），不豁免武装闸。复用与
 //   usage-pacing.js **字字相同**的 board-derived isArmed —— 未武装一律静默。再叠一道「改的是本 session
 //   的 active board 吗」判定（闸4），只对当前在用的真相源把关，不对归档板 / 别 session 的板出声。
 //
-// DRY：lint 核心是 ./board-lint-core.js（同目录，随 plugin 分发的约定目录 hooks/ 内 —— 红线5：hook 不
-//   伸手进 skill 树）。手动脚本（skills/.../scripts/board-lint.js）经稳定的 plugin 内相对路径 require
-//   同一份核心，两个消费者零漂移（content 测试断言）。
+// DRY：解耦后 lint 规则的 SSOT 是 ccm 引擎（`ccm board lint --raw --json`）；fallback 才 require 同目录的
+//   board-lint-core.js（随 plugin 分发的约定目录 hooks/ 内·红线5：hook 不伸手进 skill 树）。手动脚本
+//   （skills/.../scripts/board-lint.js）仍 require 同一份核心（其测试 tests/scripts/test_board-lint.sh 守）。
 
 const fs = require('fs');
 const path = require('path');
-const { lintBoard, formatReport } = require('../../cli/src/board-lint-core.js');
+const { spawnSync } = require('child_process');
 // ★v2 收编：HOME 解析 + 武装闸 isArmed 收口到共享 hook-common（取代旧内联副本·SSOT、四个 node hook 一份）。
 const { resolveHome, isArmed } = require('./hook-common.js');
+
+// ── lint 核心获取：首选 ccm 二进制（进程边界），失败退回 require 旧引擎（fallback·stage3 才删）─────────────
+// CCM_BIN：dev/test/自定义安装的覆写口（绝对路径可执行）；缺则用 PATH 上的 `ccm`（生产）。
+const CCM_BIN = process.env.CCM_BIN || 'ccm';
+
+// lintViaCcm(resolvedFile) → { report } | null。
+//   spawnSync ccm board lint --board <file> --raw --json → parse stdout JSON。
+//   · 有 violations（含 hard / warn）→ 返回 { report: data.report }（注入文本）。
+//   · 0 violations → 返回 { report: '' }（lint 净，调用方静默）。
+//   · spawn 失败 / 退出码非 0..3 / stdout 非有效 JSON / 形状不对 → 返回 null（让调用方走 fallback）。
+//   退出码契约（1a 定）：0 无 hard error（含只 warn）/ 3 有 hard error；--raw 坏 JSON 也走 lint（exit 3），
+//   故 0 与 3 都是「ccm 跑成功、有有效 JSON」的正常态，不据退出码判有无 finding——只扫 data.violations。
+function lintViaCcm(resolvedFile) {
+  let r;
+  try {
+    r = spawnSync(CCM_BIN, ['board', 'lint', '--board', resolvedFile, '--raw', '--json'], {
+      encoding: 'utf8',
+      timeout: 15000,
+    });
+  } catch (_e) {
+    return null; // spawn 本身抛（极少）→ fallback
+  }
+  // ENOENT（ccm 不在 PATH / CCM_BIN 指向不存在）/ 被信号杀 → fallback。
+  if (!r || r.error || r.signal) return null;
+  const stdout = typeof r.stdout === 'string' ? r.stdout : '';
+  let parsed;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch (_e) {
+    return null; // 无有效 JSON（如 usage 错走 stderr、exit 2/5）→ fallback
+  }
+  // 形状校验：{ ok:true, data:{ violations:[...], report:<string> } }。形状不符 → fallback。
+  const data = parsed && typeof parsed === 'object' ? parsed.data : null;
+  if (!data || typeof data !== 'object' || !Array.isArray(data.violations)) return null;
+  if (data.violations.length === 0) return { report: '' }; // lint 净
+  const report = typeof data.report === 'string' ? data.report : '';
+  return { report };
+}
+
+// lintViaRequire(text) → { report } | null。fallback：require 旧 in-process 引擎（保留·stage3 才删）。
+//   懒 require（只在 fallback 路径才加载，避免 ccm 路径白付 require 成本 + 旧 cli 缺失时仍能优雅降级）。
+function lintViaRequire(text) {
+  let lintBoard;
+  let formatReport;
+  try {
+    ({ lintBoard, formatReport } = require('../../cli/src/board-lint-core.js'));
+  } catch (_e) {
+    return null; // 旧引擎也 require 不到 → 优雅降级（调用方静默 exit 0）
+  }
+  const result = lintBoard(text);
+  if (result.errors.length === 0 && result.warnings.length === 0) return { report: '' }; // 净 → 静默
+  const report = formatReport(result);
+  return { report: report || '' };
+}
 
 // HOME_DIR：与全 hook 同口径（CC_MASTER_HOME 覆写，否则 CLAUDE_PROJECT_DIR/.claude/cc-master，再否则
 //   cwd/.claude/cc-master）。测试经 CC_MASTER_HOME 注入。
@@ -139,19 +204,24 @@ function main() {
     if (!targetOwnedByMeTolerant(resolvedFile, sid)) return;
   }
 
-  // ── 四闸全过 → 读被编辑 board → 跑 lint ─────────────────────────────────────────────────────────
-  let text;
-  try {
-    text = fs.readFileSync(resolvedFile, 'utf8');
-  } catch (_e) {
-    return; // 文件读不出 → 静默（编辑可能已 mv 走等边角，不强求）
+  // ── 四闸全过 → lint 被编辑的 board ──────────────────────────────────────────────────────────────
+  // 主路径：经进程边界 shell 调 ccm（ADR-014）；fallback：require 旧 in-process 引擎（保留·stage3 才删）；
+  // 优雅降级：两路皆不可用 → outcome 为 null → 静默 exit 0（hook 绝不污染 agent 流）。
+  let outcome = lintViaCcm(resolvedFile);
+  if (outcome === null) {
+    // ccm 不可用（缺 / 非有效 JSON）→ 退回 require 旧引擎。需读文件文本喂 lintBoard（吃 raw string、容坏 JSON）。
+    let text;
+    try {
+      text = fs.readFileSync(resolvedFile, 'utf8');
+    } catch (_e) {
+      return; // 文件读不出 → 静默（编辑可能已 mv 走等边角，不强求）
+    }
+    outcome = lintViaRequire(text);
   }
+  if (outcome === null) return; // ccm 缺 ∧ fallback 也抛 → 优雅降级（静默 exit 0）
 
-  const result = lintBoard(text);
-  if (result.errors.length === 0 && result.warnings.length === 0) return; // lint 通过 → 静默（不刷屏）
-
-  const report = formatReport(result);
-  if (!report) return;
+  const report = outcome.report;
+  if (!report) return; // lint 净（0 finding）→ 静默（不刷屏）
 
   // 非阻断注入：仅 additionalContext，hookEventName "PostToolUse"。绝不 decision:block。
   const payload = {

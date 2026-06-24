@@ -174,6 +174,40 @@ test('board lint --json emits violations array', () => {
   assert.ok(Array.isArray(parsed.data.violations) && parsed.data.violations.length > 0);
 });
 
+// ── board lint --json: data.report 字段（T4-1b·board-lint hook 支撑）────────────────────────────────
+// --json 的 data 折进 report（= formatReport 文本，与人读模式同一份）。board-lint hook 一次调用既拿
+//   violations（判有无 findings）又拿 report（直接注入 agent 的文本），无须再跑一次文本模式。
+test('board lint --json: data.report carries formatReport text when findings exist', () => {
+  const { boardPath } = mkBoardHome({ tasks: [task('T1', { deps: ['NOPE'] })] });
+  const ctx = mkCtx({ boardPath, flags: { json: true } });
+  boardHandler.lint(ctx);
+  const parsed = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(typeof parsed.data.report, 'string', 'data.report 是字符串');
+  assert.ok(parsed.data.report.length > 0, 'report 非空（有 findings）');
+  assert.ok(parsed.data.report.includes('FAIL'), 'report 含 FAIL 头');
+  assert.ok(parsed.data.report.includes('[hard]'), 'report 列出 hard finding');
+});
+
+test('board lint --json: truly clean board (no warns) → data.report present but empty (formatReport 静默)', () => {
+  // type:'design' 不触发 BIZ-DEV-REFS / BIZ-ACCEPTANCE-REQUIRED warn → 0 finding → formatReport 返 ''。
+  const { boardPath } = mkBoardHome({ tasks: [task('T1', { type: 'design' })] });
+  const ctx = mkCtx({ boardPath, flags: { json: true } });
+  boardHandler.lint(ctx);
+  const parsed = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(parsed.data.ok, true, '净板 data.ok=true');
+  assert.equal(parsed.data.violations.length, 0, '0 finding');
+  assert.equal(parsed.data.report, '', '0 finding → report 空串（formatReport 无 finding → ""）');
+});
+
+test('board lint (human, no --json): unchanged — no report key, renders PASS/FAIL header', () => {
+  const { boardPath } = mkBoardHome({ tasks: [task('T1')] });
+  const ctx = mkCtx({ boardPath });
+  boardHandler.lint(ctx);
+  const out = ctx.outBuf.join('');
+  assert.ok(out.includes('PASS'), '人读模式仍渲 PASS');
+  assert.ok(!out.includes('"report"'), '人读模式不是 JSON、无 report 键');
+});
+
 // ══ board lint --raw（坏 JSON 容忍 / hook 支撑·T4-1a）══════════════════════════════════════════════
 // --raw 直读 --board 指定文件的原始字节喂 lintBoard，绕过 discover 的 JSON 预校验：
 //   坏 JSON → lint 成 FMT-JSON 错（exit 3）而非 discover 提前 exit 5（board-lint hook 的本职）。

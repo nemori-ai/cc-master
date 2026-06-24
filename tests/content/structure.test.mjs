@@ -26,8 +26,10 @@ test('hooks.json registers all 6 hook scripts across 5 events via plugin-root pa
   // PostToolUse carries the board-lint hook, matcher-scoped to edit tools.
   assert.match(JSON.stringify(h.hooks.PostToolUse), /Write\|Edit\|MultiEdit/, 'PostToolUse matcher scopes to edit tools');
   const all = JSON.stringify(h);
-  // v2 收编（ADR-013 §2.4）：reinject / posttool-batch / verify-board 从 bash 收编为 node（require board-model）。
-  // bootstrap-board.sh 仍为 bash（唯一豁免的 ARM 动作）；usage-pacing.js / board-lint.js 本就是 node。
+  // v2 收编（ADR-013 §2.4）：reinject / posttool-batch / verify-board 从 bash 收编为 node。
+  // T4-1b 解耦（ADR-014）：board-lint / verify-board 改为优先经进程边界 shell 调 ccm 二进制读 board，旧
+  //   require(board-lint-core/board-model) 降为 fallback（保留·stage3 才删）。bootstrap-board.sh 仍为 bash
+  //   （唯一豁免的 ARM 动作）；usage-pacing.js 本就是 node。本断言只验 6 个 hook 都在 hooks.json 里注册。
   for (const s of ['bootstrap-board.sh', 'verify-board.js', 'reinject.js', 'posttool-batch.js', 'usage-pacing.js', 'board-lint.js']) assert.match(all, new RegExp(s.replace(/\./g, '\\.')));
   assert.match(all, /CLAUDE_PLUGIN_ROOT/);
 });
