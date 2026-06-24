@@ -1,0 +1,21 @@
+{
+  "name": "ccm",
+  "version": "0.10.0",
+  "type": "module",
+  "bin": {
+    "ccm": "./bin/ccm.cjs"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "test": "node --test",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@ccm/engine": "workspace:*"
+  }
+}
