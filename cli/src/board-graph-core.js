@@ -55,8 +55,23 @@ function parseTs(v) {
   return Number.isFinite(ms) ? ms : null;
 }
 
-// nodeDuration(task, nowMs) → { dur, source }——单节点时长（小时为单位）+ 来源标注。
-//   measured：done 有 finished−started / in_flight 有 now−started（>0）。否则 unit（dur=1·无量纲）。
+// estimateHours(estimate) → 估点折算小时数（>0）或 null（缺/坏/未知单位）。
+//   estimate = {value:number, unit:string}（v2·喂 cadence 拆解校验 + CPM 预估时长·#29/#34）。
+//   支持单位：h/hour(s)·m/min/minute(s)·d/day(s)·w/week(s)（大小写不敏感）；未知单位 → null（降级 unit）。
+function estimateHours(estimate) {
+  if (!estimate || typeof estimate !== 'object' || Array.isArray(estimate)) return null;
+  const v = estimate.value;
+  if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) return null;
+  const u = typeof estimate.unit === 'string' ? estimate.unit.trim().toLowerCase() : '';
+  const mult = { h: 1, hour: 1, hours: 1, m: 1 / 60, min: 1 / 60, minute: 1 / 60, minutes: 1 / 60,
+    d: 24, day: 24, days: 24, w: 168, week: 168, weeks: 168 }[u];
+  return mult ? v * mult : null;
+}
+
+// nodeDuration(task, nowMs) → { dur, source }——单节点时长（小时为单位）+ 来源标注。降级链（设计稿 §5.6·v2 加 estimate 档）：
+//   measured（done 有 finished−started / in_flight 有 now−started>0·最高保真）
+//   → estimate（估点折算小时·计划值，任务还没跑时用·#29/#34）
+//   → unit（dur=1·无量纲·完全无数据）。
 function nodeDuration(task, nowMs) {
   if (task && typeof task === 'object') {
     const started = parseTs(task.started_at);
@@ -68,6 +83,8 @@ function nodeDuration(task, nowMs) {
       const el = nowMs - started;
       if (el > 0) return { dur: el / 3600000, source: 'measured' };
     }
+    const est = estimateHours(task.estimate);
+    if (est != null) return { dur: est, source: 'estimate' };
   }
   return { dur: 1, source: 'unit' };
 }
@@ -253,18 +270,25 @@ function analyzeGraph(board) {
     if (cyc) return { chain: [], schedule: new Map(), makespan: null, weight_source: 'cycle', cycle: cyc };
 
     const order = topoSort().order;
-    // 每节点时长 + 来源统计
+    // 每节点时长 + 来源统计（v2 三档：measured / estimate / unit）
     const dur = new Map();
-    let nMeasured = 0, nUnit = 0;
+    let nMeasured = 0, nEstimate = 0, nUnit = 0;
     for (const id of ids) {
       const { dur: d, source } = nodeDuration(taskById.get(id), nowMs);
       dur.set(id, d);
-      if (source === 'measured') nMeasured++; else nUnit++;
+      if (source === 'measured') nMeasured++;
+      else if (source === 'estimate') nEstimate++;
+      else nUnit++;
     }
-    // weight_source：全 measured → measured；有 measured 也有 unit → mixed；全 unit（含空图）→ unit。
+    // weight_source（诚实性·§5.6）：纯 measured → 'measured'（实测）；纯 estimate → 'estimate'（计划工时·连贯可报）；
+    //   纯 unit（含空图）→ 'unit'；任何混合（measured+estimate 实测掺计划 / 任意 + unit 有节点无数据）→ 'mixed'。
+    //   只有纯 measured / 纯 estimate 报小时级 makespan（两者各自是连贯的小时基准）；mixed/unit 不报（伪精确）。
+    const kinds = (nMeasured > 0 ? 1 : 0) + (nEstimate > 0 ? 1 : 0) + (nUnit > 0 ? 1 : 0);
     let weight_source = 'unit';
-    if (nMeasured > 0 && nUnit === 0) weight_source = 'measured';
-    else if (nMeasured > 0 && nUnit > 0) weight_source = 'mixed';
+    if (kinds > 1) weight_source = 'mixed';
+    else if (nMeasured > 0) weight_source = 'measured';
+    else if (nEstimate > 0) weight_source = 'estimate';
+    else weight_source = 'unit';
 
     // forward pass: ES/EF
     const es = new Map(), ef = new Map();
@@ -326,7 +350,8 @@ function analyzeGraph(board) {
     return {
       chain,
       schedule,
-      makespan: weight_source === 'measured' ? makespan : null, // ★mixed/unit 不报小时级 makespan（伪精确）
+      // 纯 measured（实测）或纯 estimate（计划工时）才报小时级 makespan；mixed/unit 不报（伪精确·§5.6）
+      makespan: (weight_source === 'measured' || weight_source === 'estimate') ? makespan : null,
       weight_source,
     };
   }
@@ -367,9 +392,9 @@ function analyzeGraph(board) {
 //   浏览器（view.html 把本文件当 classic <script> 加载）：无 module，挂到 globalThis 让 ESM 模块读取。
 //   这是 view.html 收敛掉自带 analyze、复用同一份图核心的接合点（设计稿 §5.8 webview 收敛）。
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { analyzeGraph };
+  module.exports = { analyzeGraph, nodeDuration, estimateHours };
 } else if (typeof globalThis !== 'undefined') {
-  globalThis.__ccmBoardGraphCore = { analyzeGraph };
+  globalThis.__ccmBoardGraphCore = { analyzeGraph, nodeDuration, estimateHours };
 }
 
 })(); // ★IIFE 收口（见文件头 IIFE 包裹说明）——所有声明函数作用域化、顶层零泄漏，避免与 board-lint-core

@@ -1,0 +1,239 @@
+// board-model.test.mjs — P4.1·board v2 数据模型 keystone（单一真相源 SSOT）契约门。
+//
+// board-model.js 是 board v2 的根 SSOT（ADR-013 §2.2 / spec §9）：enums、字段六要素元数据、不变式
+//   注册表（id/level/family）、status 状态机、跨消费者共享谓词，一处定义；lint/graph/CLI/viewer 全派生。
+//   本测试钉死这份 SSOT 的对外契约——下游（board-lint-core / board-graph-core / CLI）依赖的全部形状。
+//
+// 双形态（UMD）：CommonJS 宿主走 module.exports；浏览器 classic <script> 走 globalThis.__ccmBoardModel。
+//   且必须 IIFE 包裹（顶层零 let/const/function 泄漏）——与 board-graph-core 同纪律，避免共享 realm 撞名。
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import { readFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const read = (p) => readFileSync(join(ROOT, p), 'utf8');
+const require = createRequire(import.meta.url);
+
+const MODEL = 'cli/src/board-model.js';
+
+test('board-model.js exists in cli/src (CLI package, requirable)', () => {
+  assert.ok(existsSync(join(ROOT, MODEL)), 'board-model.js exists in cli/src');
+});
+
+const M = require(join(ROOT, MODEL));
+
+// ── schema 版本锚 ────────────────────────────────────────────────────────────────────────────────
+test('SCHEMA_VERSION is the v2 literal', () => {
+  assert.equal(M.SCHEMA_VERSION, 'cc-master/v2');
+});
+
+// ── ENUMS：全部命名枚举一处定义 ──────────────────────────────────────────────────────────────────
+test('ENUMS defines every named enum with the agreed members', () => {
+  assert.ok(M.ENUMS && typeof M.ENUMS === 'object');
+  assert.deepEqual([...M.ENUMS.status].sort(),
+    ['blocked', 'done', 'escalated', 'failed', 'in_flight', 'ready', 'stale', 'uncertain'].sort());
+  assert.deepEqual([...M.ENUMS.executor].sort(),
+    ['external', 'master-orchestrator', 'subagent', 'user', 'workflow'].sort());
+  assert.deepEqual([...M.ENUMS.taskType].sort(),
+    ['acceptance', 'design', 'development', 'development-demo', 'doc-alignment', 'e2e-integration', 'planning', 'pr'].sort());
+  assert.deepEqual([...M.ENUMS.role].sort(), ['fill-work', 'normal'].sort());
+  assert.deepEqual([...M.ENUMS.refKind].sort(),
+    ['code', 'doc', 'issue', 'other', 'plan', 'spec', 'web'].sort());
+  assert.deepEqual([...M.ENUMS.askType].sort(), ['advice', 'decision', 'solution'].sort());
+  assert.deepEqual([...M.ENUMS.logKind].sort(),
+    ['decision', 'dispatch', 'finding', 'handoff', 'note', 'recon', 'replan', 'verify'].sort());
+  assert.deepEqual([...M.ENUMS.jcCategory].sort(),
+    ['architecture', 'drift', 'other', 'spec-impl-misalignment'].sort());
+  assert.deepEqual([...M.ENUMS.jcSeverity].sort(), ['critical', 'high', 'low', 'medium'].sort());
+  assert.deepEqual([...M.ENUMS.jcStatus].sort(), ['overturned', 'pending_review', 'upheld'].sort());
+  assert.deepEqual([...M.ENUMS.iterationStatus].sort(), ['open', 'shipped'].sort());
+  assert.deepEqual([...M.ENUMS.watchdogMechanism].sort(), ['cron', 'loop', 'monitor', 'shell'].sort());
+  assert.deepEqual([...M.ENUMS.acceptanceKind].sort(), ['manual', 'metric', 'review', 'test'].sort());
+  assert.deepEqual([...M.ENUMS.acceptanceStatus].sort(), ['failed', 'met', 'pending'].sort());
+});
+
+test('OPEN_ENUMS marks taskType + refKind as open (unknown value → warn, not hard fail)', () => {
+  const open = new Set(M.OPEN_ENUMS);
+  assert.ok(open.has('taskType'), 'taskType is open/extensible');
+  assert.ok(open.has('refKind'), 'refKind is open/extensible');
+  assert.ok(!open.has('status'), 'status is CLOSED (hard enum)');
+  assert.ok(!open.has('executor'), 'executor is CLOSED (hard enum)');
+});
+
+test('isEnumMember checks membership for a named enum', () => {
+  assert.equal(M.isEnumMember('status', 'in_flight'), true);
+  assert.equal(M.isEnumMember('status', 'bogus'), false);
+  assert.equal(M.isEnumMember('executor', 'external'), true);
+  assert.equal(M.isEnumMember('executor', 'shell'), false); // shell 不再是 executor（并入前面几类）
+});
+
+// ── FIELDS：每字段六要素齐全（「完整建模」机械门）──────────────────────────────────────────────────
+const SIX = ['tier', 'type', 'default', 'readers', 'writers', 'when', 'degrade'];
+const TIER_VALUES = new Set(['🔒', '👁', '✎']);
+
+test('FIELDS models both board top-level and task entity', () => {
+  assert.ok(M.FIELDS && M.FIELDS.board && M.FIELDS.task);
+  // 11 顶层模块（spec §2.1）。
+  for (const k of ['schema', 'meta', 'goal', 'owner', 'git', 'scheduling', 'watchdog', 'tasks', 'log', 'judgment_calls', 'cadence']) {
+    assert.ok(M.FIELDS.board[k], `board top-level field "${k}" is modeled`);
+  }
+  // task 关键字段（spec §3.1）。
+  for (const k of ['id', 'status', 'deps', 'parent', 'title', 'acceptance', 'references', 'estimate',
+    'executor', 'type', 'role', 'verified', 'artifact', 'handle', 'blocked_on', 'decision_package',
+    'created_at', 'started_at', 'finished_at', 'wip_limit', 'hitl_rounds', 'observability']) {
+    assert.ok(M.FIELDS.task[k], `task field "${k}" is modeled`);
+  }
+});
+
+test('every modeled field carries all six 要素 + a legal tier (完整 baseline, mechanical)', () => {
+  for (const scope of ['board', 'task']) {
+    for (const [name, meta] of Object.entries(M.FIELDS[scope])) {
+      for (const key of SIX) {
+        assert.ok(meta[key] !== undefined && meta[key] !== '',
+          `FIELDS.${scope}.${name}.${key} must be defined & non-empty (六要素 completeness)`);
+      }
+      assert.ok(TIER_VALUES.has(meta.tier),
+        `FIELDS.${scope}.${name}.tier must be one of 🔒/👁/✎ (got ${JSON.stringify(meta.tier)})`);
+    }
+  }
+});
+
+test('load-bearing (🔒) subset matches the narrow-waist red-line set', () => {
+  const lb = Object.entries(M.FIELDS.board).filter(([, m]) => m.tier === '🔒').map(([k]) => k).sort();
+  // 红线2 真正保护的子集（spec §2.1 主档列）。
+  assert.deepEqual(lb, ['git', 'goal', 'owner', 'schema', 'tasks'].sort());
+  const lbTask = Object.entries(M.FIELDS.task).filter(([, m]) => m.tier === '🔒').map(([k]) => k).sort();
+  assert.deepEqual(lbTask, ['deps', 'id', 'parent', 'status'].sort());
+});
+
+// ── status 状态机 ────────────────────────────────────────────────────────────────────────────────
+test('STATUS_MACHINE defines transitions for all 8 statuses + classifications', () => {
+  assert.ok(M.STATUS_MACHINE && M.STATUS_MACHINE.transitions);
+  for (const s of M.ENUMS.status) {
+    assert.ok(Array.isArray(M.STATUS_MACHINE.transitions[s]),
+      `transitions["${s}"] is an array (every status has an out-edge list, possibly empty)`);
+  }
+  // 关键合法转移（spec §6）。
+  assert.ok(M.isLegalTransition('ready', 'in_flight'));
+  assert.ok(M.isLegalTransition('in_flight', 'done'));
+  assert.ok(M.isLegalTransition('in_flight', 'uncertain'));
+  assert.ok(M.isLegalTransition('uncertain', 'done'));
+  assert.ok(M.isLegalTransition('done', 'stale'));
+  assert.ok(M.isLegalTransition('failed', 'ready'));
+  // 非法转移示例：done 不能直接回 in_flight（须先 stale 再 ready）。
+  assert.equal(M.isLegalTransition('done', 'in_flight'), false);
+});
+
+// ── INVARIANTS 注册表：规则 id/级别/家族 的 SSOT（spec §5）─────────────────────────────────────────
+test('INVARIANTS is a registry of {id, level, family, scope, summary}, ids unique', () => {
+  assert.ok(Array.isArray(M.INVARIANTS) && M.INVARIANTS.length > 0);
+  const seen = new Set();
+  const LEVELS = new Set(['hard', 'warn', 'reserved']);
+  const FAMILIES = new Set(['FMT', 'GRAPH', 'BIZ']);
+  for (const inv of M.INVARIANTS) {
+    assert.ok(inv.id && !seen.has(inv.id), `invariant id "${inv.id}" is present & unique`);
+    seen.add(inv.id);
+    assert.ok(LEVELS.has(inv.level), `${inv.id}.level ∈ {hard,warn,reserved} (got ${inv.level})`);
+    assert.ok(FAMILIES.has(inv.family), `${inv.id}.family ∈ {FMT,GRAPH,BIZ} (got ${inv.family})`);
+    assert.ok(inv.scope, `${inv.id}.scope present`);
+    assert.ok(inv.summary, `${inv.id}.summary present`);
+  }
+});
+
+test('INVARIANTS catalog covers the key v2 rules at the agreed levels (spec §5)', () => {
+  const lvl = (id) => M.levelOf(id);
+  // FMT / GRAPH 硬。
+  assert.equal(lvl('FMT-SCHEMA'), 'hard');
+  assert.equal(lvl('FMT-STATUS'), 'hard');
+  assert.equal(lvl('GRAPH-CYCLE'), 'hard');
+  assert.equal(lvl('GRAPH-PARENT-DEPTH'), 'hard');
+  // rollup 容瞬态 → warn。
+  assert.equal(lvl('GRAPH-ROLLUP'), 'warn');
+  // type 开放枚举 → warn。
+  assert.equal(lvl('FMT-TYPE'), 'warn');
+  // awaiting-user 必带 decision_package → hard（采访闭环机制保障）。
+  assert.equal(lvl('BIZ-AWAITING'), 'hard');
+  // cadence 收口完整性 → hard。
+  assert.equal(lvl('BIZ-CADENCE-SHIPPED'), 'hard');
+  // 条件业务规则 → warn。
+  assert.equal(lvl('BIZ-DEV-REFS'), 'warn');
+  assert.equal(lvl('BIZ-ACCEPTANCE-REQUIRED'), 'warn');
+  assert.equal(lvl('BIZ-EXECUTOR-HANDLE'), 'warn');
+  assert.equal(lvl('BIZ-EXTERNAL-ISSUE'), 'warn');
+  // done 真语义 = P3 预留（#32，需 ADR）：登记在册但 reserved（lint 暂不强制）。
+  assert.equal(lvl('BIZ-DONE-VERIFIED'), 'reserved');
+});
+
+test('invariant(id) looks up the full entry; unknown id → undefined', () => {
+  const inv = M.invariant('GRAPH-CYCLE');
+  assert.equal(inv.family, 'GRAPH');
+  assert.equal(inv.level, 'hard');
+  assert.equal(M.invariant('NOPE'), undefined);
+});
+
+// ── 跨消费者共享谓词（lint 与 graph 一份口径，杜绝两处漂移）───────────────────────────────────────
+test('isAwaitingUser: blocked_on==="user" ∧ status ∈ {blocked,in_flight}', () => {
+  assert.equal(M.isAwaitingUser({ blocked_on: 'user', status: 'blocked' }), true);
+  assert.equal(M.isAwaitingUser({ blocked_on: 'user', status: 'in_flight' }), true);
+  assert.equal(M.isAwaitingUser({ blocked_on: 'user', status: 'done' }), false);
+  assert.equal(M.isAwaitingUser({ blocked_on: 'T1', status: 'blocked' }), false);
+  assert.equal(M.isAwaitingUser({ status: 'blocked' }), false);
+});
+
+test('isDoneStatus / isActiveStatus', () => {
+  assert.equal(M.isDoneStatus('done'), true);
+  assert.equal(M.isDoneStatus('uncertain'), false);
+  assert.equal(M.isActiveStatus('in_flight'), true);
+  assert.equal(M.isActiveStatus('ready'), false);
+});
+
+test('isISOUTC: strict YYYY-MM-DDTHH:MM:SSZ only', () => {
+  assert.equal(M.isISOUTC('2026-06-23T10:00:00Z'), true);
+  assert.equal(M.isISOUTC('2026-06-23T10:00Z'), false);
+  assert.equal(M.isISOUTC('not-a-date'), false);
+  assert.equal(M.isISOUTC(123), false);
+});
+
+test('isAbsolutePathOrUrl: absolute path or http(s) URL, never relative', () => {
+  assert.equal(M.isAbsolutePathOrUrl('/repo/docs/spec.md'), true);
+  assert.equal(M.isAbsolutePathOrUrl('https://example.com/x'), true);
+  assert.equal(M.isAbsolutePathOrUrl('http://example.com'), true);
+  assert.equal(M.isAbsolutePathOrUrl('docs/spec.md'), false); // 相对路径禁
+  assert.equal(M.isAbsolutePathOrUrl('./x'), false);
+  assert.equal(M.isAbsolutePathOrUrl('../x'), false);
+  assert.equal(M.isAbsolutePathOrUrl(42), false);
+});
+
+test('acceptanceConverged: string → null (不可判); object → 全 criteria met 才 true', () => {
+  assert.equal(M.acceptanceConverged('一句话 DoD'), null);
+  assert.equal(M.acceptanceConverged(undefined), null);
+  assert.equal(M.acceptanceConverged({ criteria: [{ desc: 'a', status: 'met' }, { desc: 'b', status: 'met' }] }), true);
+  assert.equal(M.acceptanceConverged({ criteria: [{ desc: 'a', status: 'met' }, { desc: 'b', status: 'pending' }] }), false);
+  assert.equal(M.acceptanceConverged({ criteria: [] }), false); // 空 criteria 不算收敛
+});
+
+test('taskTrulyDone (P3 #32 语义): status=done ∧ verified ∧ artifact 非空', () => {
+  assert.equal(M.taskTrulyDone({ status: 'done', verified: true, artifact: 'commit abc' }), true);
+  assert.equal(M.taskTrulyDone({ status: 'done', verified: true }), false);          // 缺 artifact
+  assert.equal(M.taskTrulyDone({ status: 'done', verified: false, artifact: 'x' }), false); // 未验
+  assert.equal(M.taskTrulyDone({ status: 'in_flight', verified: true, artifact: 'x' }), false);
+});
+
+// ── UMD / IIFE：浏览器 classic <script> 形态下挂上 globalThis.__ccmBoardModel，且顶层零泄漏 ──────────
+test('UMD: browser realm publishes globalThis.__ccmBoardModel; IIFE leaks nothing top-level', () => {
+  const src = read(MODEL);
+  const ctx = vm.createContext({});
+  vm.runInContext('var module = undefined; var require = undefined;', ctx);
+  vm.runInContext(src, ctx, { filename: 'board-model.js' });
+  assert.equal(vm.runInContext('typeof globalThis.__ccmBoardModel', ctx), 'object',
+    '__ccmBoardModel published on globalThis in browser mode');
+  assert.equal(vm.runInContext('globalThis.__ccmBoardModel.SCHEMA_VERSION', ctx), 'cc-master/v2');
+  // 顶层零泄漏：模块体 IIFE 包裹后，SCHEMA_VERSION / ENUMS / FIELDS 等不应泄漏成 realm 顶层标识符。
+  assert.equal(vm.runInContext('typeof SCHEMA_VERSION', ctx), 'undefined', 'no top-level SCHEMA_VERSION leak');
+  assert.equal(vm.runInContext('typeof ENUMS', ctx), 'undefined', 'no top-level ENUMS leak');
+  assert.equal(vm.runInContext('typeof INVARIANTS', ctx), 'undefined', 'no top-level INVARIANTS leak');
+});

@@ -25,15 +25,17 @@ if (!BOARD_PATH) {
 const SCRIPT_DIR = __dirname;
 const VENDOR_DIR = path.join(SCRIPT_DIR, 'vendor');
 const HTML_PATH = path.join(SCRIPT_DIR, 'view.html');
-// The shared graph-analysis core lives under ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/ (the ONE
+// The shared graph-analysis core lives under ${CLAUDE_PLUGIN_ROOT}/cli/src/ (the ONE
 // source of truth that hooks + the board-graph CLI + this webview all reuse — DRY, design
-// §5.2/§5.8). The viewer loads these as classic <script>s so its analyze() delegates to the
-// same analyzeGraph() instead of carrying a divergent copy. Both files are plugin-internal
-// (the plugin's hooks and skills trees both ship), resolved relative to THIS script — never cwd.
-//   ${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/scripts/ → ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/
-const CORE_DIR = path.resolve(SCRIPT_DIR, '..', '..', '..', 'hooks', 'scripts');
-// Only these two core files are exposed (allow-list, not an open hooks/ mount).
-const CORE_FILES = new Set(['board-graph-core.js', 'board-lint-core.js']);
+// §5.2/§5.8; board core migrated into the CLI package · dependency inversion). The viewer loads
+// these as classic <script>s so its analyze() delegates to the same analyzeGraph() instead of
+// carrying a divergent copy. Both files are plugin-internal (the plugin's cli and skills trees
+// both ship), resolved relative to THIS script — never cwd.
+//   ${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/scripts/ → ${CLAUDE_PLUGIN_ROOT}/cli/src/
+const CORE_DIR = path.resolve(SCRIPT_DIR, '..', '..', '..', 'cli', 'src');
+// Only these core files are exposed (allow-list, not an open cli/src/ mount). ★v2: board-model.js added
+// (board-lint-core require-fallback reads its globalThis publish in the browser; served FIRST·view.html).
+const CORE_FILES = new Set(['board-model.js', 'board-graph-core.js', 'board-lint-core.js']);
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -300,7 +302,7 @@ const server = http.createServer((req, res) => {
   }
 
   // GET /core/<file>.js -> serve the shared graph-analysis core (board-graph-core.js /
-  // board-lint-core.js) from ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/. Strict allow-list (CORE_FILES) — NOT an
+  // board-lint-core.js) from ${CLAUDE_PLUGIN_ROOT}/cli/src/. Strict allow-list (CORE_FILES) — NOT an
   // open mount: only the two named files are reachable, no subpaths, no traversal. The
   // viewer loads these as classic <script>s so analyze() reuses the ONE analyzeGraph()
   // (DRY — no second copy of the graph algorithms in the browser). Read-only, no network.

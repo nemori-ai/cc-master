@@ -26,8 +26,8 @@ import { dirname, join } from 'node:path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 
-const LINT_CORE = 'hooks/scripts/board-lint-core.js';
-const GRAPH_CORE = 'hooks/scripts/board-graph-core.js';
+const LINT_CORE = 'cli/src/board-lint-core.js';
+const GRAPH_CORE = 'cli/src/board-graph-core.js';
 const VIEW = 'skills/orchestrating-to-completion/scripts/view.html';
 
 // 在一个共享 realm 里加载真 lint-core + graph-core（与 board-graph-core.browser.test.mjs 同形），
@@ -59,7 +59,7 @@ function nestedBoard() {
   t.push({ id: 'M2.b', status: 'blocked', deps: ['M2.a'], parent: 'M2' });
   // 终点
   t.push({ id: 'TEND', status: 'blocked', deps: ['M2', 'M1'] });
-  return { schema: 'cc-master/v1', goal: 'g', owner: { active: true, session_id: 's' },
+  return { schema: 'cc-master/v2', goal: 'g', owner: { active: true, session_id: 's' },
     git: { worktree: '', branch: '' }, tasks: t };
 }
 

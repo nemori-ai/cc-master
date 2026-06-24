@@ -5,14 +5,14 @@ mkactive() { mkdir -p "$1"; printf '%s' "$3" > "$1/$2.board.json"; }
 # run_ss HOME — run reinject with EMPTY stdin (no session_id → degraded: match any active board).
 run_ss() {
   HOOK_OUT="$(CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
-             bash "$PLUGIN_ROOT/hooks/scripts/reinject.sh" </dev/null 2>/dev/null)"; HOOK_RC=$?
+             node "$PLUGIN_ROOT/hooks/scripts/reinject.js" </dev/null 2>/dev/null)"; HOOK_RC=$?
 }
 # run_ss_sid HOME SID — run reinject with stdin JSON carrying session_id=SID (SessionStart-shaped).
 # Session-scoped armed gate: only THIS session's active board(s) re-anchor the role.
 run_ss_sid() {
   HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"SessionStart","source":"compact"}' "$2" \
              | CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
-               bash "$PLUGIN_ROOT/hooks/scripts/reinject.sh" 2>/dev/null)"; HOOK_RC=$?
+               node "$PLUGIN_ROOT/hooks/scripts/reinject.js" 2>/dev/null)"; HOOK_RC=$?
 }
 # dangling_segment OUT — isolate JUST the dangling-node id list from a reinject context (the text between
 # `stale/escalated:` and the sentence terminator `. Reconcile`). TF1 FIX: a negative id assertion (e.g.
@@ -39,7 +39,7 @@ rm -rf "$H"
 
 # Case B: an active board with a goal → re-injects role + home + goal + board name
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-1" '{"schema":"cc-master/v1","goal":"INTERNATIONALIZE THE APP TO 6 LOCALES","owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-1" '{"schema":"cc-master/v2","goal":"INTERNATIONALIZE THE APP TO 6 LOCALES","owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
 run_ss "$H"
 assert_contains "$HOOK_OUT" "INTERNATIONALIZE THE APP TO 6 LOCALES" "re-injects the goal"
 assert_contains "$HOOK_OUT" "orchestrator" "re-anchors the role"
@@ -49,15 +49,15 @@ rm -rf "$H"
 
 # Case C: only an archived board (active:false) → no-op
 H="$(make_project)"
-mkactive "$H" "b1" '{"schema":"cc-master/v1","goal":"OLD DONE TASK","owner":{"active":false},"tasks":[]}'
+mkactive "$H" "b1" '{"schema":"cc-master/v2","goal":"OLD DONE TASK","owner":{"active":false},"tasks":[]}'
 run_ss "$H"
 assert_eq "" "$HOOK_OUT" "archived-only home → no output"
 rm -rf "$H"
 
 # Case D: two active boards → lists both goals
 H="$(make_project)"
-mkactive "$H" "a" '{"schema":"cc-master/v1","goal":"TASK ALPHA","owner":{"active":true},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
-mkactive "$H" "b" '{"schema":"cc-master/v1","goal":"TASK BETA","owner":{"active":true},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+mkactive "$H" "a" '{"schema":"cc-master/v2","goal":"TASK ALPHA","owner":{"active":true},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+mkactive "$H" "b" '{"schema":"cc-master/v2","goal":"TASK BETA","owner":{"active":true},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
 run_ss "$H"
 assert_contains "$HOOK_OUT" "TASK ALPHA" "lists first active goal"
 assert_contains "$HOOK_OUT" "TASK BETA" "lists second active goal"
@@ -67,7 +67,7 @@ rm -rf "$H"
 # inject any phase note (the phase mechanism is gone) and must not error: goal/role/board are
 # re-injected exactly as for a board with no phase at all.
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-1" '{"schema":"cc-master/v1","goal":"LEGACY PHASE BOARD","owner":{"active":true},"phase":{"current":"OLD PHASE NAME","goal_condition":"some old condition","task_ids":["T1","T2"]},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-1" '{"schema":"cc-master/v2","goal":"LEGACY PHASE BOARD","owner":{"active":true},"phase":{"current":"OLD PHASE NAME","goal_condition":"some old condition","task_ids":["T1","T2"]},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
 run_ss "$H"
 assert_eq 0 "$HOOK_RC" "residual phase block → still rc 0 (no error)"
 assert_contains "$HOOK_OUT" "LEGACY PHASE BOARD" "still re-injects the goal when a residual phase block is present"
@@ -80,7 +80,7 @@ rm -rf "$H"
 
 # Case F: an active board with NO phase field → goal/role/board re-injected, no phase reminder.
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-2" '{"schema":"cc-master/v1","goal":"NO PHASE HERE","owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-2" '{"schema":"cc-master/v2","goal":"NO PHASE HERE","owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
 run_ss "$H"
 assert_contains "$HOOK_OUT" "NO PHASE HERE" "still re-injects the goal when no phase"
 assert_not_contains "$HOOK_OUT" "phase" "no phase reminder when board has no phase"
@@ -92,7 +92,7 @@ rm -rf "$H"
 
 # Case G: active board with 1 stale + 1 escalated → ctx names them as unresolved, lists both ids.
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-3" '{"schema":"cc-master/v1","goal":"RECONCILE GOAL","owner":{"active":true},"tasks":[{"id":"T1","status":"stale","deps":[]},{"id":"T2","status":"in_flight","deps":[]},{"id":"T3","status":"escalated","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-3" '{"schema":"cc-master/v2","goal":"RECONCILE GOAL","owner":{"active":true},"tasks":[{"id":"T1","status":"stale","deps":[]},{"id":"T2","status":"in_flight","deps":[]},{"id":"T3","status":"escalated","deps":[]}]}'
 run_ss "$H"
 assert_contains "$HOOK_OUT" "RECONCILE GOAL" "G: still re-injects the goal"
 assert_contains "$HOOK_OUT" "orchestrator" "G: still re-anchors the role"
@@ -107,7 +107,7 @@ rm -rf "$H"
 
 # Case H: active board with NO stale/escalated (all ready/in_flight/done) → ctx unchanged, no note.
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-4" '{"schema":"cc-master/v1","goal":"ALL CLEAR GOAL","owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]},{"id":"T2","status":"in_flight","deps":[]},{"id":"T3","status":"done","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-4" '{"schema":"cc-master/v2","goal":"ALL CLEAR GOAL","owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]},{"id":"T2","status":"in_flight","deps":[]},{"id":"T3","status":"done","deps":[]}]}'
 run_ss "$H"
 assert_contains "$HOOK_OUT" "ALL CLEAR GOAL" "H: re-injects the goal"
 assert_not_contains "$HOOK_OUT" "unresolved" "H: no dangling-node note when nothing is stale/escalated"
@@ -115,7 +115,7 @@ rm -rf "$H"
 
 # Case I: no active board → still silent (H4 must not break the dormant no-op).
 H="$(make_project)"
-mkactive "$H" "b1" '{"schema":"cc-master/v1","goal":"ARCHIVED","owner":{"active":false},"tasks":[{"id":"T1","status":"stale","deps":[]}]}'
+mkactive "$H" "b1" '{"schema":"cc-master/v2","goal":"ARCHIVED","owner":{"active":false},"tasks":[{"id":"T1","status":"stale","deps":[]}]}'
 run_ss "$H"
 assert_eq "" "$HOOK_OUT" "I: archived board with a stale task → still silent (dormant)"
 rm -rf "$H"
@@ -123,7 +123,7 @@ rm -rf "$H"
 # Case J: stale/escalated tokens living only inside a nested task-local "log" array must NOT trip the
 # dangling-node note (the tasks-region scan isolates nested fields — same guard as verify-board.sh).
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-5" '{"schema":"cc-master/v1","goal":"NESTED LOG GOAL","owner":{"active":true},"tasks":[{"id":"T1","status":"in_flight","deps":[],"log":[{"id":"L1","status":"stale"},{"id":"L2","status":"escalated"}]}]}'
+mkactive "$H" "20260101T000000Z-5" '{"schema":"cc-master/v2","goal":"NESTED LOG GOAL","owner":{"active":true},"tasks":[{"id":"T1","status":"in_flight","deps":[],"log":[{"id":"L1","status":"stale"},{"id":"L2","status":"escalated"}]}]}'
 run_ss "$H"
 assert_contains "$HOOK_OUT" "NESTED LOG GOAL" "J: re-injects the goal"
 assert_not_contains "$HOOK_OUT" "unresolved" "J: nested log stale/escalated does not trip the note"
@@ -137,7 +137,7 @@ rm -rf "$H"
 
 # Case K (session match): board owned by THIS session → re-anchor (role + goal + board name).
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-K" '{"schema":"cc-master/v1","goal":"MY SESSION GOAL","owner":{"active":true,"session_id":"sess-mine"},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-K" '{"schema":"cc-master/v2","goal":"MY SESSION GOAL","owner":{"active":true,"session_id":"sess-mine"},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
 run_ss_sid "$H" "sess-mine"
 assert_eq 0 "$HOOK_RC" "K: my session's active board → rc 0"
 assert_contains "$HOOK_OUT" "MY SESSION GOAL" "K: my session's board → re-injects the goal"
@@ -149,7 +149,7 @@ rm -rf "$H"
 # THIS is a fresh session that never ran as-master-orchestrator → reinject must be SILENT (the new
 # session is NOT an orchestrator; the leftover board is not its concern).
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-L" '{"schema":"cc-master/v1","goal":"OTHER SESSION GOAL","owner":{"active":true,"session_id":"sess-other"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-L" '{"schema":"cc-master/v2","goal":"OTHER SESSION GOAL","owner":{"active":true,"session_id":"sess-other"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
 run_ss_sid "$H" "sess-fresh-newcomer"
 assert_eq 0 "$HOOK_RC" "L: other session's board, fresh session → rc 0"
 assert_eq "" "$HOOK_OUT" "L: other session's active board does NOT activate a fresh session (false-activation gap closed)"
@@ -158,8 +158,8 @@ rm -rf "$H"
 # Case M (mixed home): two active boards, one mine one another session's → only MY goal re-injected,
 # the other session's goal is NOT leaked into my context.
 H="$(make_project)"
-mkactive "$H" "mine"  '{"schema":"cc-master/v1","goal":"GOAL FOR ME","owner":{"active":true,"session_id":"sess-m"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
-mkactive "$H" "other" '{"schema":"cc-master/v1","goal":"GOAL FOR THEM","owner":{"active":true,"session_id":"sess-o"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+mkactive "$H" "mine"  '{"schema":"cc-master/v2","goal":"GOAL FOR ME","owner":{"active":true,"session_id":"sess-m"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+mkactive "$H" "other" '{"schema":"cc-master/v2","goal":"GOAL FOR THEM","owner":{"active":true,"session_id":"sess-o"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
 run_ss_sid "$H" "sess-m"
 assert_contains "$HOOK_OUT" "GOAL FOR ME" "M: re-injects MY session's goal"
 assert_not_contains "$HOOK_OUT" "GOAL FOR THEM" "M: does NOT leak the other session's goal"
@@ -168,8 +168,8 @@ rm -rf "$H"
 # Case N (session-scoped H4 dangling note): stale/escalated only counted on MY board. My board is
 # clean; the OTHER session's board has a stale node → no dangling note (it's not mine to reconcile).
 H="$(make_project)"
-mkactive "$H" "mine"  '{"schema":"cc-master/v1","goal":"CLEAN GOAL","owner":{"active":true,"session_id":"sess-n"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
-mkactive "$H" "other" '{"schema":"cc-master/v1","goal":"DIRTY GOAL","owner":{"active":true,"session_id":"sess-x"},"tasks":[{"id":"T9","status":"stale","deps":[]}]}'
+mkactive "$H" "mine"  '{"schema":"cc-master/v2","goal":"CLEAN GOAL","owner":{"active":true,"session_id":"sess-n"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+mkactive "$H" "other" '{"schema":"cc-master/v2","goal":"DIRTY GOAL","owner":{"active":true,"session_id":"sess-x"},"tasks":[{"id":"T9","status":"stale","deps":[]}]}'
 run_ss_sid "$H" "sess-n"
 assert_contains "$HOOK_OUT" "CLEAN GOAL" "N: re-injects my clean goal"
 assert_not_contains "$HOOK_OUT" "unresolved" "N: other session's stale node does not trip MY dangling note"
@@ -181,7 +181,7 @@ rm -rf "$H"
 
 # Case O (session-scoped H4, positive): MY board has a stale node → my dangling note fires, naming it.
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-O" '{"schema":"cc-master/v1","goal":"RECONCILE MINE","owner":{"active":true,"session_id":"sess-o2"},"tasks":[{"id":"T1","status":"in_flight","deps":[]},{"id":"T5","status":"stale","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-O" '{"schema":"cc-master/v2","goal":"RECONCILE MINE","owner":{"active":true,"session_id":"sess-o2"},"tasks":[{"id":"T1","status":"in_flight","deps":[]},{"id":"T5","status":"stale","deps":[]}]}'
 run_ss_sid "$H" "sess-o2"
 assert_contains "$HOOK_OUT" "unresolved" "O: my own stale node trips the dangling note"
 assert_contains "$(dangling_segment "$HOOK_OUT")" "T5" "O: my own stale node id is named"   # path-free (TF1)
@@ -191,7 +191,7 @@ rm -rf "$H"
 # whose stdin carries no session_id falls back to home-scoped matching so a compaction that drops the
 # sid still re-anchors. (Preserves the original behavior under the degraded path.)
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-P" '{"schema":"cc-master/v1","goal":"DEGRADED GOAL","owner":{"active":true,"session_id":"sess-whatever"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-P" '{"schema":"cc-master/v2","goal":"DEGRADED GOAL","owner":{"active":true,"session_id":"sess-whatever"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
 run_ss "$H"   # empty stdin → no sid → degraded
 assert_contains "$HOOK_OUT" "DEGRADED GOAL" "P: empty session_id → degraded match any active board (compaction robustness)"
 rm -rf "$H"
@@ -205,7 +205,7 @@ rm -rf "$H"
 #          "active":true + 混淆 "session_id":"OTHER"。owner 子对象本身 active:false → reinject 必须休眠
 #          （空 stdout，不重注目标 / 角色）。修前全文 grep 命中 → 误判 armed → 误重注归档目标。
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-Q" '{"schema":"cc-master/v1","goal":"ARCHIVED FALSE-ARM GOAL","owner":{"active":false,"session_id":"sess-arch"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}],"log":[{"id":"L1","snapshot":{"active":true,"session_id":"OTHER"}}]}'
+mkactive "$H" "20260101T000000Z-Q" '{"schema":"cc-master/v2","goal":"ARCHIVED FALSE-ARM GOAL","owner":{"active":false,"session_id":"sess-arch"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}],"log":[{"id":"L1","snapshot":{"active":true,"session_id":"OTHER"}}]}'
 run_ss_sid "$H" "sess-arch"
 assert_eq 0 "$HOOK_RC" "Q: 归档板含嵌套 active:true → rc 0"
 assert_eq "" "$HOOK_OUT" "Q: 归档板（owner.active:false）+ 嵌套 active:true → 休眠（owner 子对象才算数，不重注归档目标）"
@@ -214,7 +214,7 @@ rm -rf "$H"
 # Case R (反向保活)：真 active 板（owner.active:true、owner.session_id == sid），某 task 嵌套
 #          "active":false —— reinject 仍照常重注角色 + 目标。防过度修复。
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-R" '{"schema":"cc-master/v1","goal":"REAL ACTIVE GOAL","owner":{"active":true,"session_id":"sess-rr"},"tasks":[{"id":"T1","status":"in_flight","deps":[],"meta":{"active":false}}]}'
+mkactive "$H" "20260101T000000Z-R" '{"schema":"cc-master/v2","goal":"REAL ACTIVE GOAL","owner":{"active":true,"session_id":"sess-rr"},"tasks":[{"id":"T1","status":"in_flight","deps":[],"meta":{"active":false}}]}'
 run_ss_sid "$H" "sess-rr"
 assert_eq 0 "$HOOK_RC" "R: 真 active 板含嵌套 active:false → rc 0"
 assert_contains "$HOOK_OUT" "REAL ACTIVE GOAL" "R: 真 active 板（owner.active:true）照常重注目标"
@@ -231,7 +231,7 @@ rm -rf "$H"
 #          stdin 带**非空** session_id。"" != "sess-resume" → 不武装 → 静默（不重注）。这正是红线 6 要的
 #          fail-safe：blank 板不收养任意 session。
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-S" '{"schema":"cc-master/v1","goal":"ORPHANED EMPTY-SID GOAL","owner":{"active":true,"session_id":""},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-S" '{"schema":"cc-master/v2","goal":"ORPHANED EMPTY-SID GOAL","owner":{"active":true,"session_id":""},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
 run_ss_sid "$H" "sess-resume"
 assert_eq 0 "$HOOK_RC" "S: blank-session 板 + 非空 stdin sid → rc 0"
 assert_eq "" "$HOOK_OUT" "S: blank-session 板（owner.session_id:\"\"）对非空 stdin sid → 休眠，不重注（CODEX14 回退，红线 6 fail-safe）"
@@ -241,7 +241,7 @@ rm -rf "$H"
 #          （非空），带 goal，stdin sid "MINE"（不同）→ 必须静默（空 stdout，不重注）。证明对称 degrade
 #          **没有**退化成「任何 active 板即武装」—— false-activation gap / 红线 6 防线原样保留。
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-T" '{"schema":"cc-master/v1","goal":"OTHER NONEMPTY-SID GOAL","owner":{"active":true,"session_id":"OTHER"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-T" '{"schema":"cc-master/v2","goal":"OTHER NONEMPTY-SID GOAL","owner":{"active":true,"session_id":"OTHER"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
 run_ss_sid "$H" "MINE"
 assert_eq 0 "$HOOK_RC" "T: board sid 非空且 ≠ stdin sid → rc 0"
 assert_eq "" "$HOOK_OUT" "T: board sid=OTHER（非空）≠ stdin sid=MINE → 仍休眠（不重注，红线 6 防线未退化）"
@@ -255,7 +255,7 @@ rm -rf "$H"
 # Case U (子节点 stale → 标注其 owner)：owner M1（in_flight），子 M1.b 是 stale → dangling 列表须含 M1.b，
 #          且把它标注成属于 owner M1（如 "M1.b (owner M1)" 或 "owner M1 的子 M1.b"）。同时 owner id "M1" 出现。
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-U" '{"schema":"cc-master/v1","goal":"OWNER GROUPED GOAL","owner":{"active":true,"session_id":"sess-u"},"tasks":[{"id":"M1","status":"in_flight","deps":[],"kind":"owner"},{"id":"M1.a","status":"done","deps":[],"parent":"M1"},{"id":"M1.b","status":"stale","deps":["M1.a"],"parent":"M1"}]}'
+mkactive "$H" "20260101T000000Z-U" '{"schema":"cc-master/v2","goal":"OWNER GROUPED GOAL","owner":{"active":true,"session_id":"sess-u"},"tasks":[{"id":"M1","status":"in_flight","deps":[],"kind":"owner"},{"id":"M1.a","status":"done","deps":[],"parent":"M1"},{"id":"M1.b","status":"stale","deps":["M1.a"],"parent":"M1"}]}'
 run_ss_sid "$H" "sess-u"
 assert_contains "$HOOK_OUT" "OWNER GROUPED GOAL" "U: re-injects the goal"
 assert_contains "$HOOK_OUT" "unresolved" "U: surfaces an unresolved-node note"
@@ -267,7 +267,7 @@ rm -rf "$H"
 # Case V (graceful：无 parent 的 dangling 节点退化为裸标注)：顶层 leaf T1 stale、无 parent → dangling 列表
 #          含 T1 但不带 owner 标注（裸 T1，现有行为不变）。证明无 parent 板优雅退化、不报错、不凭空造 owner。
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-V" '{"schema":"cc-master/v1","goal":"FLAT DANGLING GOAL","owner":{"active":true,"session_id":"sess-v"},"tasks":[{"id":"T1","status":"stale","deps":[]},{"id":"T2","status":"in_flight","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-V" '{"schema":"cc-master/v2","goal":"FLAT DANGLING GOAL","owner":{"active":true,"session_id":"sess-v"},"tasks":[{"id":"T1","status":"stale","deps":[]},{"id":"T2","status":"in_flight","deps":[]}]}'
 run_ss_sid "$H" "sess-v"
 assert_eq 0 "$HOOK_RC" "V: flat dangling board → rc 0"
 assert_contains "$HOOK_OUT" "FLAT DANGLING GOAL" "V: re-injects the goal"
@@ -279,7 +279,7 @@ rm -rf "$H"
 # Case W (混合：一个有 owner 的子 stale + 一个裸顶层 escalated)：M1（owner）的子 M1.a escalated 标注 owner，
 #          顶层 leaf X9 stale 裸标注。两者都进列表，各自正确（有 parent 的标 owner、无 parent 的裸）。
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-W" '{"schema":"cc-master/v1","goal":"MIXED DANGLING GOAL","owner":{"active":true,"session_id":"sess-w"},"tasks":[{"id":"M1","status":"in_flight","deps":[],"kind":"owner"},{"id":"M1.a","status":"escalated","deps":[],"parent":"M1"},{"id":"X9","status":"stale","deps":[]}]}'
+mkactive "$H" "20260101T000000Z-W" '{"schema":"cc-master/v2","goal":"MIXED DANGLING GOAL","owner":{"active":true,"session_id":"sess-w"},"tasks":[{"id":"M1","status":"in_flight","deps":[],"kind":"owner"},{"id":"M1.a","status":"escalated","deps":[],"parent":"M1"},{"id":"X9","status":"stale","deps":[]}]}'
 run_ss_sid "$H" "sess-w"
 W_DANGLE="$(dangling_segment "$HOOK_OUT")"
 assert_contains "$W_DANGLE" "M1.a" "W: names the escalated child"

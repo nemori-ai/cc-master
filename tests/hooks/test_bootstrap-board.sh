@@ -50,7 +50,7 @@ HOOK_OUT="$(printf '%s' '{"session_id":"sess-fb","prompt":"/cc-master:as-master-
   | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$EMPTY_ROOT" \
     bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
 assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "A0: fallback path created a board"
-assert_eq 1 "$(board_template_version "$(only_board "$P/.claude/cc-master")")" "A0: fallback printf seeds meta.template_version=1"
+assert_eq 3 "$(board_template_version "$(only_board "$P/.claude/cc-master")")" "A0: fallback printf seeds meta.template_version=3 (parity with v2 template)"
 rm -rf "$P" "$EMPTY_ROOT"
 
 # Case A1 (ARM = stamp session_id): bootstrap is the ARM action — the board it creates is born

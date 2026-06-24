@@ -1917,14 +1917,16 @@
   <!-- Import-map: every specifier resolves to a LOCAL /vendor/ file. React is mapped to a
        SINGLE file so react / react-dom / @xyflow/react all share ONE react instance
        (two copies => hooks crash). No esm.sh / CDN / external URL anywhere. -->
-  <!-- Shared graph-analysis core (the ONE source of truth — same module hooks + the
+  <!-- Shared graph-analysis core (the ONE source of truth — same modules hooks + the
        board-graph CLI use). Loaded as CLASSIC scripts (no type=module) so they run, in
-       order, BEFORE the module below: board-lint-core first (publishes buildGraph/findCycle
-       to globalThis.__ccmBoardLintCore), then board-graph-core (reads that global, publishes
-       analyzeGraph to globalThis.__ccmBoardGraphCore). The module's analyze() then DELEGATES
-       to analyzeGraph() instead of re-implementing the graph algorithms (DRY — design §5.8).
-       Served from /core/* by view-server (read-only, zero network). If either fails to load
-       (older server with no /core route), the module degrades to a built-in fallback. -->
+       order, BEFORE the module below. ★v2 serve 顺序：board-model FIRST (publishes the v2 data
+       model to globalThis.__ccmBoardModel — board-lint-core's require-fallback reads it), THEN
+       board-lint-core (publishes buildGraph/findCycle to globalThis.__ccmBoardLintCore), THEN
+       board-graph-core (reads that global, publishes analyzeGraph to globalThis.__ccmBoardGraphCore).
+       The module's analyze() then DELEGATES to analyzeGraph() instead of re-implementing the graph
+       algorithms (DRY — design §5.8). Served from /core/* by view-server (read-only, zero network).
+       If any fails to load (older server with no /core route), the module degrades to a built-in fallback. -->
+  <script src="/core/board-model.js"></script>
   <script src="/core/board-lint-core.js"></script>
   <script src="/core/board-graph-core.js"></script>
 

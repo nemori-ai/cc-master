@@ -18,7 +18,7 @@
 ## 关键不变式
 - 只读——绝不写 board。
 - 临界路径是 agent 心算估计、非机器 CPM（board 无 float 字段）。
-- 未答用户决策必须 `status:"blocked"` AND `blocked_on:"user"` 双字段（与 `verify-board.sh` 契约一致）——已 done 却残留 `blocked_on:"user"` 元数据的是已答决策，不报。
+- 未答用户决策必须 `status:"blocked"` AND `blocked_on:"user"` 双字段（与 `verify-board.js` 契约一致）——已 done 却残留 `blocked_on:"user"` 元数据的是已答决策，不报。
 
 ## 失败模式
 - 多块 active 无法无歧义确定 → 询问用户，不靠猜（报错 board 无害——只读）。

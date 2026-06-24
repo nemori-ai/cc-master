@@ -12,8 +12,8 @@
 #   1. bootstrap-board.sh  — UserPromptSubmit: the /as-master-orchestrator command fires it,
 #                            it creates a fresh board and injects its path + the role.
 #   2. (we write a toy DAG into that board — standing in for the agent's decomposition)
-#   3. reinject.sh         — SessionStart(compact|resume): re-injects role + board listing.
-#   4. verify-board.sh     — Stop (the goal-hook): gates the agent across four board states.
+#   3. reinject.js         — SessionStart(compact|resume): re-injects role + board listing.
+#   4. verify-board.js     — Stop (the goal-hook): gates the agent across four board states.
 #   5. archive             — owner.active:false → reinject goes silent (orchestration stood down).
 #
 # Run:   bash examples/sample-orchestration/smoke.sh
@@ -58,9 +58,11 @@ check() { # $1 "PASS msg" $2 haystack $3 needle  [$4 = "!" for negate]
 # SCRIPT is the bare hook filename (it lives in $HOOKS).
 OUT=''; RC=0
 run_hook() {
+  # v2 收编：.js hook 用 node 跑，.sh hook 用 bash 跑（bootstrap-board.sh 仍 bash·唯一豁免 ARM 动作）。
+  local runner="bash"; case "$1" in *.js) runner="node";; esac
   OUT="$(printf '%s' "$2" \
         | CLAUDE_PROJECT_DIR="$PROJ" CLAUDE_PLUGIN_ROOT="$ROOT" CC_MASTER_HOME="$HOME_DIR" \
-          bash "$HOOKS/$1" 2>/dev/null)"
+          "$runner" "$HOOKS/$1" 2>/dev/null)"
   RC=$?
 }
 
@@ -110,13 +112,13 @@ say "We also stamp owner.session_id so the goal-hook can tell this board is THIS
 # A 3-leaf fan-out on a shared root + one HITL decision node. The classic 'dispatch on ready' shape.
 cat > "$BOARD" <<JSON
 {
-  "schema": "cc-master/v1",
+  "schema": "cc-master/v2",
   "goal": "$GOAL",
   "owner": { "active": true, "session_id": "$SID", "heartbeat": "2026-06-08T10:00Z" },
   "git": { "worktree": "/repo/.worktrees/i18n", "branch": "feat/i18n-rollout" },
-  "wip_limit": 4,
+  "scheduling": { "wip_limit": 4 },
   "tasks": [
-    { "id": "T0", "status": "in_flight", "deps": [], "model": "opus", "title": "i18n framework + string extraction", "mechanism": "sub-agent" },
+    { "id": "T0", "status": "in_flight", "deps": [], "model": "opus", "title": "i18n framework + string extraction", "executor": "subagent" },
     { "id": "de", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "model": "haiku", "title": "translate locale: de" },
     { "id": "ja", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "model": "haiku", "title": "translate locale: ja" },
     { "id": "ar", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "translate locale: ar (RTL)" },
@@ -130,11 +132,11 @@ say  "owner.session_id is now \"$SID\" — the Stop hook will filter on it."
 show_board "$BOARD" "board snapshot — INITIAL (root in_flight, leaves blocked on it):"
 
 # =====================================================================================
-step "3 — reinject.sh  (SessionStart compact|resume: survive a context wipe)"
+step "3 — reinject.js  (SessionStart compact|resume: survive a context wipe)"
 # =====================================================================================
 say "Compaction can erase 'I am an orchestrator' entirely — the agent can't restore that"
 say "for itself. SessionStart fires reinject, which re-injects the role from OUTSIDE."
-run_hook reinject.sh '{"hook_event_name":"SessionStart","source":"compact"}'
+run_hook reinject.js '{"hook_event_name":"SessionStart","source":"compact"}'
 what "reinject scanned the home, found one ACTIVE board, and read its goal back out."
 deci "inject role + a listing of active boards (name + goal) so the agent re-finds its own."
 say  "re-injected context (verbatim):"
@@ -144,7 +146,7 @@ check "reinject lists the active board by name"          "$OUT" "$(basename "$BO
 check "reinject echoes the goal so the agent re-IDs it"  "$OUT" "$GOAL"
 
 # =====================================================================================
-step "4 — verify-board.sh  (Stop: the goal-hook gates the agent across board states)"
+step "4 — verify-board.js  (Stop: the goal-hook gates the agent across board states)"
 # =====================================================================================
 say "The Stop hook is the goal-hook. It reads THIS session's active board and decides:"
 say "block (keep going) or allow (you may stop). It never edits the board; handshake state"
@@ -155,10 +157,10 @@ STDIN_STOP="{\"session_id\":\"$SID\",\"hook_event_name\":\"Stop\"}"
 say ''
 say "4a) FIRST, prove the empty-board backstop. Temporarily blank the DAG."
 cat > "$BOARD" <<JSON
-{ "schema": "cc-master/v1", "goal": "$GOAL",
+{ "schema": "cc-master/v2", "goal": "$GOAL",
   "owner": { "active": true, "session_id": "$SID" }, "tasks": [] }
 JSON
-run_hook verify-board.sh "$STDIN_STOP"
+run_hook verify-board.js "$STDIN_STOP"
 what "the matched active board has zero tasks."
 deci "BLOCK — 'an active board has no tasks; decompose the goal before ending.'"
 check "empty board → Stop is BLOCKED" "$OUT" '"decision":"block"'
@@ -166,9 +168,9 @@ check "empty board → Stop is BLOCKED" "$OUT" '"decision":"block"'
 # restore the real DAG for the remaining sub-steps
 cat > "$BOARD" <<JSON
 {
-  "schema": "cc-master/v1", "goal": "$GOAL",
+  "schema": "cc-master/v2", "goal": "$GOAL",
   "owner": { "active": true, "session_id": "$SID", "heartbeat": "2026-06-08T10:00Z" },
-  "wip_limit": 4,
+  "scheduling": { "wip_limit": 4 },
   "tasks": [
     { "id": "T0", "status": "in_flight", "deps": [], "title": "i18n framework + string extraction" },
     { "id": "de", "status": "blocked", "deps": ["T0"], "blocked_on": "T0", "title": "translate locale: de" },
@@ -184,9 +186,9 @@ say ''
 say "4b) T0 finished → its three locale leaves go READY (dependency cleared). MID-RUN snapshot:"
 cat > "$BOARD" <<JSON
 {
-  "schema": "cc-master/v1", "goal": "$GOAL",
+  "schema": "cc-master/v2", "goal": "$GOAL",
   "owner": { "active": true, "session_id": "$SID", "heartbeat": "2026-06-08T11:00Z" },
-  "wip_limit": 4,
+  "scheduling": { "wip_limit": 4 },
   "tasks": [
     { "id": "T0", "status": "done", "deps": [], "title": "i18n framework + string extraction", "verified": true },
     { "id": "de", "status": "ready", "deps": ["T0"], "title": "translate locale: de" },
@@ -197,7 +199,7 @@ cat > "$BOARD" <<JSON
 }
 JSON
 show_board "$BOARD" "board snapshot — MID-RUN (root done+verified, 3 locale leaves ready to dispatch):"
-run_hook verify-board.sh "$STDIN_STOP"
+run_hook verify-board.js "$STDIN_STOP"
 what "the board has READY tasks — three locale leaves can be dispatched right now."
 deci "BLOCK — 'this board still has a ready task; dispatch (or mark blocked/escalated) first.'"
 check "ready work present → Stop is BLOCKED" "$OUT" '"decision":"block"'
@@ -209,9 +211,9 @@ say "    (ar needed RTL layout work, so it was escalated to a workflow; the user
 say "    DONE snapshot — every node done; nothing ready, nothing uncertain:"
 cat > "$BOARD" <<JSON
 {
-  "schema": "cc-master/v1", "goal": "$GOAL",
+  "schema": "cc-master/v2", "goal": "$GOAL",
   "owner": { "active": true, "session_id": "$SID", "heartbeat": "2026-06-08T12:30Z" },
-  "wip_limit": 4,
+  "scheduling": { "wip_limit": 4 },
   "tasks": [
     { "id": "T0", "status": "done", "deps": [], "title": "i18n framework + string extraction", "verified": true },
     { "id": "de", "status": "done", "deps": ["T0"], "title": "translate locale: de", "verified": true },
@@ -222,7 +224,7 @@ cat > "$BOARD" <<JSON
 }
 JSON
 show_board "$BOARD" "board snapshot — DONE (all nodes done+verified; user decision answered):"
-run_hook verify-board.sh "$STDIN_STOP"
+run_hook verify-board.js "$STDIN_STOP"
 what "completion state reached — but it is the FIRST stop, so the hook won't take 'done' on faith."
 deci "BLOCK once — forces a self-check against the original goal (incl. to-dos NOT on the board)."
 check "completion state, first Stop → BLOCKED for a self-check" "$OUT" '"decision":"block"'
@@ -232,7 +234,7 @@ check "the block reason actually asks for a goal self-check"    "$OUT" "self-che
 say ''
 say "4d) The agent did its self-check, judged the goal truly met, and tries to stop again."
 say "    (Same board, same session — only the sidecar handshake state has advanced.)"
-run_hook verify-board.sh "$STDIN_STOP"
+run_hook verify-board.js "$STDIN_STOP"
 what "the self-check handshake was already forced once this round; board still complete."
 deci "ALLOW — the agent may stand down. (exit 0, no decision:block emitted.)"
 check "completion state, second Stop → ALLOWED" "$OUT" '"decision":"block"' "!"
@@ -245,7 +247,7 @@ say "Standing the orchestration down flips owner.active to false. The board is k
 say "deleted — but the hooks must now treat it as inactive and fall silent."
 cat > "$BOARD" <<JSON
 {
-  "schema": "cc-master/v1", "goal": "$GOAL",
+  "schema": "cc-master/v2", "goal": "$GOAL",
   "owner": { "active": false, "session_id": "$SID" },
   "tasks": [
     { "id": "T0", "status": "done", "deps": [] },
@@ -256,14 +258,14 @@ cat > "$BOARD" <<JSON
   ]
 }
 JSON
-run_hook reinject.sh '{"hook_event_name":"SessionStart","source":"resume"}'
+run_hook reinject.js '{"hook_event_name":"SessionStart","source":"resume"}'
 what "reinject scanned the home and found NO active board (owner.active:false)."
 deci "stay SILENT — no role injected; the orchestration is dormant. (empty stdout, exit 0)"
 # (an empty-needle `check` is vacuous — assert emptiness explicitly instead)
 [ -z "$OUT" ] && ok "archived board → reinject is silent (exactly empty output)" \
               || no "reinject should be empty after archive (got: $OUT)"
 
-run_hook verify-board.sh "$STDIN_STOP"
+run_hook verify-board.js "$STDIN_STOP"
 what "the Stop hook finds no active board owned by this session."
 deci "ALLOW (dormant) — nothing to gate; the agent stops freely."
 check "archived board → Stop allows (dormant)" "$OUT" '"decision":"block"' "!"

@@ -9,8 +9,9 @@
 //   任意给定的 board 路径都 lint（想查归档板也行），补 PostToolUse hook 看不见的编辑路径（尤其 Bash 改 board）。
 //
 // 红线1 / ADR-006：node/JS only。共用同一份 lint 核心（DRY） —— 不复制规则集。核心住
-//   ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/board-lint-core.js（hook 同目录 require 它；本脚本经 plugin 内
-//   相对路径 require 同一份）。两个目录都随 plugin 分发、一起 ship，故这条 plugin 内相对路径在装机后稳定。
+//   ${CLAUDE_PLUGIN_ROOT}/cli/src/board-lint-core.js（board 核心已迁入 CLI 包·依赖反转；hook 经相对路径
+//   require 同一份）。本脚本经 plugin 内相对路径 require 它，cli/ 与 skills/ 都随 plugin 分发、一起 ship，
+//   故这条 plugin 内相对路径在装机后稳定。
 //
 // CLI：
 //   node board-lint.js <board-path>     lint 该文件
@@ -22,10 +23,10 @@ const fs = require('fs');
 const path = require('path');
 
 // 解析共享核心：本脚本在 ${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/scripts/，核心在
-//   ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/ —— 两者都随 plugin 分发，从 __dirname 上溯三级
-//   （scripts → skill-name → skills → plugin-root）再下到 hooks 的 scripts。这条 plugin 内相对路径
-//   装机后稳定（红线5：依赖方向 skill→hooks 合法，两目录都 ship）。
-const CORE_PATH = path.resolve(__dirname, '..', '..', '..', 'hooks', 'scripts', 'board-lint-core.js');
+//   ${CLAUDE_PLUGIN_ROOT}/cli/src/ —— 两者都随 plugin 分发，从 __dirname 上溯三级
+//   （scripts → skill-name → skills → plugin-root）再下到 cli/src。这条 plugin 内相对路径
+//   装机后稳定（红线5：依赖方向 skill→cli 合法，两目录都 ship）。
+const CORE_PATH = path.resolve(__dirname, '..', '..', '..', 'cli', 'src', 'board-lint-core.js');
 const { lintBoard, formatReport } = require(CORE_PATH);
 
 function die(msg, code) {

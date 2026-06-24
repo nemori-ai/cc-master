@@ -583,7 +583,7 @@ else
   # this-release-or-later boards. Pure bash printf only — no jq/python/node (red line 1). A2 T6: no
   # num_account field is seeded here — usage-pacing.js no longer reads it (effective-N now comes from
   # accounts.json); an OLD board still carrying it is harmless, it is simply ignored.
-  printf '{"schema":"cc-master/v1","meta":{"template_version":1},"goal":"","owner":{"active":true,"session_id":"%s","heartbeat":""},"git":{"worktree":"","branch":""},"wip_limit":4,"tasks":[],"log":[]}\n' "$sid_esc" > "$BOARD"
+  printf '{"schema":"cc-master/v2","meta":{"template_version":3},"goal":"","owner":{"active":true,"session_id":"%s","heartbeat":""},"git":{"worktree":"","branch":""},"scheduling":{"wip_limit":4},"tasks":[],"log":[]}\n' "$sid_esc" > "$BOARD"
 fi
 
 ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. Decompose the goal into a dependency DAG and write tasks[] into that board file, set goal/owner/git, then invoke the orchestrating-to-completion skill and run the decision program."

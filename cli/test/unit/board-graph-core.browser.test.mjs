@@ -19,12 +19,14 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 
-const LINT_CORE = 'hooks/scripts/board-lint-core.js';
-const GRAPH_CORE = 'hooks/scripts/board-graph-core.js';
+const MODEL_CORE = 'cli/src/board-model.js';
+const LINT_CORE = 'cli/src/board-lint-core.js';
+const GRAPH_CORE = 'cli/src/board-graph-core.js';
 
+const modelSrc = read(MODEL_CORE);
 const lintSrc = read(LINT_CORE);
 const graphSrc = read(GRAPH_CORE);
 
@@ -33,8 +35,10 @@ const graphSrc = read(GRAPH_CORE);
 // graph 的 require-fallback 才读得到 buildGraph/findCycle），这里照此顺序在同一 realm 串起两个脚本。
 function browserRealmWith(graphScriptSrc) {
   const ctx = vm.createContext({});
-  // 浏览器宿主：无 CommonJS。显式把 module/require 钉成 undefined，让两份 UMD 尾都走 globalThis 分支。
+  // 浏览器宿主：无 CommonJS。显式把 module/require 钉成 undefined，让三份 UMD 尾都走 globalThis 分支。
   vm.runInContext('var module = undefined; var require = undefined;', ctx);
+  // ★v2 serve 顺序：board-model.js 先（IIFE·零泄漏·挂 __ccmBoardModel），lint-core 的 require-fallback 才读得到。
+  vm.runInContext(modelSrc, ctx, { filename: 'board-model.js' });
   // <script src="board-lint-core.js"> —— 顶层 function buildGraph/findCycle + const ISO_UTC_RE 进 global 词法环境。
   vm.runInContext(lintSrc, ctx, { filename: 'board-lint-core.js' });
   // <script src="board-graph-core.js"> —— 同一 global 词法环境；IIFE 包裹下顶层零泄漏，不撞名。
@@ -44,7 +48,7 @@ function browserRealmWith(graphScriptSrc) {
 
 // 小 board 构造糖（与 board-graph-core.test.mjs 同形）。
 const board = (tasks, extra = {}) => ({
-  schema: 'cc-master/v1', goal: 'g', owner: { active: true, session_id: 's' },
+  schema: 'cc-master/v2', goal: 'g', owner: { active: true, session_id: 's' },
   git: { worktree: '', branch: '' }, tasks, ...extra,
 });
 

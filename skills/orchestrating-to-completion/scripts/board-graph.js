@@ -9,8 +9,8 @@
 //   ready-set / owner rollup」——替代 status agent 心算（但**永不回写 board**·红线2，只 stdout/--json）。
 //
 // 红线1 / ADR-006：node/JS only，零 npm dep。复用同一份图核心（DRY）——核心住
-//   ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/board-graph-core.js（它再 require board-lint-core 的 buildGraph）。
-//   两目录都随 plugin 分发、一起 ship，故这条 plugin 内相对路径装机后稳定（依赖方向 skill→hooks 合法）。
+//   ${CLAUDE_PLUGIN_ROOT}/cli/src/board-graph-core.js（它再 require board-lint-core 的 buildGraph）。
+//   两目录都随 plugin 分发、一起 ship，故这条 plugin 内相对路径装机后稳定（依赖方向 skill→cli 合法）。
 //
 // CLI：
 //   node board-graph.js <board-path>          人读摘要：临界链 / ready-set / bottleneck / 并行度 / owner rollup
@@ -23,9 +23,9 @@ const fs = require('fs');
 const path = require('path');
 
 // 解析共享核心：本脚本在 ${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/scripts/，核心在
-//   ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/ —— 从 __dirname 上溯三级（scripts → skill-name → skills → root）
-//   再下到该 ${CLAUDE_PLUGIN_ROOT}/hooks/scripts。这条 plugin 内相对路径装机后稳定（红线5：两目录都 ship）。
-const CORE_PATH = path.resolve(__dirname, '..', '..', '..', 'hooks', 'scripts', 'board-graph-core.js');
+//   ${CLAUDE_PLUGIN_ROOT}/cli/src/ —— 从 __dirname 上溯三级（scripts → skill-name → skills → root）
+//   再下到该 ${CLAUDE_PLUGIN_ROOT}/cli/src。这条 plugin 内相对路径装机后稳定（红线5：两目录都 ship）。
+const CORE_PATH = path.resolve(__dirname, '..', '..', '..', 'cli', 'src', 'board-graph-core.js');
 const { analyzeGraph } = require(CORE_PATH);
 
 function die(msg, code) {

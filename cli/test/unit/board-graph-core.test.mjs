@@ -10,26 +10,26 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 const require = createRequire(import.meta.url);
 
-const LINT_CORE = 'hooks/scripts/board-lint-core.js';
-const GRAPH_CORE = 'hooks/scripts/board-graph-core.js';
+const LINT_CORE = 'cli/src/board-lint-core.js';
+const GRAPH_CORE = 'cli/src/board-graph-core.js';
 const CLI = 'skills/orchestrating-to-completion/scripts/board-graph.js';
 
-const { analyzeGraph } = require(join(ROOT, GRAPH_CORE));
+const { analyzeGraph, estimateHours } = require(join(ROOT, GRAPH_CORE));
 const lintCore = require(join(ROOT, LINT_CORE));
 
 // 小 board 构造糖：tasks → 一个合法 board 对象。
 const board = (tasks, extra = {}) => ({
-  schema: 'cc-master/v1', goal: 'g', owner: { active: true, session_id: 's' },
+  schema: 'cc-master/v2', goal: 'g', owner: { active: true, session_id: 's' },
   git: { worktree: '', branch: '' }, tasks, ...extra,
 });
 
 // ── DRY 守门（设计稿 §5.2：一份图，不漂移）──────────────────────────────────────────────────────
 test('DRY: board-graph-core requires board-lint-core (the ONE buildGraph, not a re-implemented graph)', () => {
-  assert.ok(existsSync(join(ROOT, GRAPH_CORE)), 'board-graph-core.js exists in hooks/scripts');
+  assert.ok(existsSync(join(ROOT, GRAPH_CORE)), 'board-graph-core.js exists in cli/src');
   assert.match(read(GRAPH_CORE), /require\(['"]\.\/board-lint-core(\.js)?['"]\)/, 'graph-core requires ./board-lint-core');
   // 它确实从 lint-core 拿到了 buildGraph（不是自己又写了一份邻接构建）。
   assert.equal(typeof lintCore.buildGraph, 'function', 'lint-core exports buildGraph');
@@ -42,34 +42,34 @@ test('CLI exists, requires the shared graph-core, and uses ${CLAUDE_SKILL_DIR} p
   assert.match(cli, /CLAUDE_SKILL_DIR|CLAUDE_PLUGIN_ROOT/, 'CLI prose uses plugin-root/skill-dir references, not bare relative paths');
 });
 
-// ── 纯重构证明：抽 buildGraph 后 lint R4 报告行为不变 ─────────────────────────────────────────────
-test('pure-refactor: lint R4 (dangling/self-loop/cycle) reports unchanged after buildGraph extraction', () => {
+// ── 纯重构证明：抽 buildGraph 后 lint GRAPH-* 报告行为不变（v2 规则码）────────────────────────────
+test('pure-refactor: lint GRAPH-* (dangling/self-loop/cycle) reports unchanged after buildGraph extraction', () => {
   const { lintBoard } = lintCore;
   const rs = (arr) => new Set(arr.map((v) => v.rule));
-  // R4a dangling
-  assert.ok(rs(lintBoard(JSON.stringify(board([{ id: 'T7', status: 'ready', deps: ['GONE'] }]))).errors).has('R4a'));
-  // R4b self-loop
-  assert.ok(rs(lintBoard(JSON.stringify(board([{ id: 'S', status: 'ready', deps: ['S'] }]))).errors).has('R4b'));
-  // R4c cycle
-  assert.ok(rs(lintBoard(JSON.stringify(board([{ id: 'A', status: 'ready', deps: ['B'] }, { id: 'B', status: 'ready', deps: ['A'] }]))).errors).has('R4c'));
-  // good board → no R4
+  // dangling
+  assert.ok(rs(lintBoard(JSON.stringify(board([{ id: 'T7', status: 'ready', deps: ['GONE'] }]))).errors).has('GRAPH-DANGLING'));
+  // self-loop
+  assert.ok(rs(lintBoard(JSON.stringify(board([{ id: 'S', status: 'ready', deps: ['S'] }]))).errors).has('GRAPH-SELFLOOP'));
+  // cycle
+  assert.ok(rs(lintBoard(JSON.stringify(board([{ id: 'A', status: 'ready', deps: ['B'] }, { id: 'B', status: 'ready', deps: ['A'] }]))).errors).has('GRAPH-CYCLE'));
+  // good board → no graph errors（done 无 finished 只产 BIZ-TIME-ORDER warn，不进 errors）
   const good = lintBoard(JSON.stringify(board([{ id: 'A', status: 'done', deps: [] }, { id: 'B', status: 'ready', deps: ['A'] }])));
-  assert.equal(good.errors.length, 0);
+  assert.equal(good.errors.length, 0, JSON.stringify(good.errors));
 });
 
-test('D3.3 / PR-2: lint now enforces R7 nesting rules (parent is硬 waist) — full R7 coverage lives in board-lint-core.test.mjs', () => {
+test('lint enforces GRAPH-PARENT-* nesting rules (parent is硬 waist) — full coverage lives in board-lint-core.test.mjs', () => {
   const { lintBoard } = lintCore;
-  // D3.3 landed R7（parent 升入硬 waist·ADR-012）：parent 指向不存在 id 现在是 R7a hard error。
-  // 这里只 smoke-check「图库侧的 lint 现在确实跑 R7」，详尽 R7a/b/c/d 断言在 board-lint-core.test.mjs。
+  // parent 升入硬 waist（ADR-012）：parent 指向不存在 id 现在是 GRAPH-PARENT-EXISTS hard error。
+  // 这里只 smoke-check「图库侧的 lint 现在确实跑 nesting」，详尽断言在 board-lint-core.test.mjs。
   const r = lintBoard(JSON.stringify(board([
     { id: 'M1', status: 'in_flight', deps: [], kind: 'owner' },
     { id: 'M1.a', status: 'done', deps: [], parent: 'M1' },
-    { id: 'orphan', status: 'ready', deps: [], parent: 'GHOST' }, // parent 指向不存在 id → R7a
+    { id: 'orphan', status: 'ready', deps: [], parent: 'GHOST' }, // parent 指向不存在 id → GRAPH-PARENT-EXISTS
   ])));
-  assert.ok(new Set(r.errors.map((e) => e.rule)).has('R7a'), 'dangling parent is now an R7a hard error (post-D3.3)');
-  // 向后兼容：无 parent 的扁平板仍零 R7。
+  assert.ok(new Set(r.errors.map((e) => e.rule)).has('GRAPH-PARENT-EXISTS'), 'dangling parent is a GRAPH-PARENT-EXISTS hard error');
+  // 向后兼容：无 parent 的扁平板仍零 nesting 报错（GRAPH-PARENT-*）。
   const flat = lintBoard(JSON.stringify(board([{ id: 'A', status: 'done', deps: [] }, { id: 'B', status: 'ready', deps: ['A'] }])));
-  for (const e of [...flat.errors, ...flat.warnings]) assert.ok(!/^R7/.test(e.rule), `flat board has no R7 (got ${e.rule})`);
+  for (const e of [...flat.errors, ...flat.warnings]) assert.ok(!/^GRAPH-PARENT/.test(e.rule), `flat board has no nesting error (got ${e.rule})`);
 });
 
 // ── buildGraph: parent 倒排 ──────────────────────────────────────────────────────────────────────
@@ -342,3 +342,46 @@ test('shipped board.example.json analyzes cleanly with the nested owner present'
   assert.equal(g.checkDepth1().length, 0, 'example respects depth=1');
   assert.equal(g.parentCycles().length, 0, 'example has no parent cycles');
 });
+
+// ── P4.3·v2：estimate 喂 CPM 时长（measured → estimate → unit 降级链·#29/#34）────────────────────────
+test('estimateHours: 单位折算 h/m/d/w；未知单位 / 非正 / 缺 → null', () => {
+  assert.equal(estimateHours({ value: 2, unit: 'h' }), 2);
+  assert.equal(estimateHours({ value: 120, unit: 'm' }), 2);
+  assert.equal(estimateHours({ value: 1, unit: 'd' }), 24);
+  assert.equal(estimateHours({ value: 1, unit: 'w' }), 168);
+  assert.equal(estimateHours({ value: 3, unit: 'sprints' }), null); // 未知单位
+  assert.equal(estimateHours({ value: 0, unit: 'h' }), null);       // 非正
+  assert.equal(estimateHours({ value: 'big', unit: 'h' }), null);   // 非数字
+  assert.equal(estimateHours(undefined), null);
+});
+
+test('criticalPath: 纯 estimate 板 → weight_source="estimate" + 报小时级 makespan', () => {
+  const g = analyzeGraph(board([
+    { id: 'A', status: 'ready', deps: [], estimate: { value: 2, unit: 'h' } },
+    { id: 'B', status: 'ready', deps: ['A'], estimate: { value: 3, unit: 'h' } },
+  ]));
+  const cp = g.criticalPath({ now: 0 });
+  assert.equal(cp.weight_source, 'estimate');
+  assert.equal(cp.makespan, 5, '计划工时连贯 → 报 makespan(2+3=5h)');
+  assert.deepEqual(cp.chain, ['A', 'B']);
+});
+
+test('criticalPath: estimate + 无数据节点(unit) 混合 → mixed，不报小时级 makespan', () => {
+  const g = analyzeGraph(board([
+    { id: 'A', status: 'ready', deps: [], estimate: { value: 2, unit: 'h' } },
+    { id: 'B', status: 'ready', deps: ['A'] }, // 无 estimate 无时间戳 → unit
+  ]));
+  const cp = g.criticalPath({ now: 0 });
+  assert.equal(cp.weight_source, 'mixed');
+  assert.equal(cp.makespan, null, 'mixed 不报小时级 makespan(伪精确)');
+});
+
+test('criticalPath: measured 优先于 estimate（实测盖过计划）', () => {
+  const g = analyzeGraph(board([
+    { id: 'A', status: 'done', deps: [], started_at: '2026-06-23T10:00:00Z', finished_at: '2026-06-23T14:00:00Z', estimate: { value: 1, unit: 'h' } },
+  ]));
+  const cp = g.criticalPath({ now: 0 });
+  assert.equal(cp.weight_source, 'measured', 'A 有实测时间戳 → measured 盖过 estimate');
+  assert.equal(cp.makespan, 4, '用实测 4h（非 estimate 的 1h）');
+});
+

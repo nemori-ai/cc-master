@@ -3,7 +3,7 @@
 # (skills/orchestrating-to-completion/scripts/board-lint.js — a RUNTIME out-of-band script shipped with
 # the skill, 红线5 / Finding #37), is invoked EXPLICITLY by agent/user (so it needs NO armed gate — like
 # cc-usage.sh / codex-review.sh), and lints any board path you hand it (or, with no arg, auto-finds the
-# single active board in home). It shares ONE lint core with the hook (hooks/scripts/board-lint-core.js
+# single active board in home). It shares ONE lint core with the hook (cli/src/board-lint-core.js
 # — same source of truth, no drift) which the content test asserts.
 #
 # CLI contract:
@@ -22,7 +22,7 @@ assert_contains() { case "$1" in *"$2"*) PASS=$((PASS+1));; *) FAILED=$((FAILED+
 assert_not_contains() { case "$1" in *"$2"*) FAILED=$((FAILED+1)); _red "FAIL: $3 (unexpected [$2])";; *) PASS=$((PASS+1));; esac; }
 mkproj() { mktemp -d "${TMPDIR:-/tmp}/.tmp-ccm.XXXXXX"; }
 
-GOOD='{"schema":"cc-master/v1","meta":{"template_version":1},"goal":"g","owner":{"active":true,"session_id":"s"},"git":{"worktree":"/w","branch":"b"},"tasks":[{"id":"T0","status":"done","deps":[]},{"id":"T1","status":"ready","deps":["T0"]}]}'
+GOOD='{"schema":"cc-master/v2","meta":{"template_version":1},"goal":"g","owner":{"active":true,"session_id":"s"},"git":{"worktree":"/w","branch":"b"},"tasks":[{"id":"T0","status":"done","deps":[],"started_at":"2026-06-23T10:00:00Z","finished_at":"2026-06-23T11:00:00Z"},{"id":"T1","status":"ready","deps":["T0"]}]}'
 
 # ── (a) good board → PASS, rc 0, report says PASS ────────────────────────────────────────────────────
 D="$(mkproj)"; printf '%s' "$GOOD" > "$D/b.board.json"
@@ -31,53 +31,53 @@ assert_eq 0 "$RC" "(a) good board → rc 0"
 assert_contains "$OUT" "PASS" "(a) report says PASS"
 rm -rf "$D"
 
-# ── (b) invalid JSON (R1) → rc 1, names R1, agent-friendly (not a raw stack trace) ──────────────────
-D="$(mkproj)"; printf '{"schema":"cc-master/v1","tasks":[{"id":"T0"' > "$D/b.board.json"
+# ── (b) invalid JSON (FMT-JSON) → rc 1, names FMT-JSON, agent-friendly (not a raw stack trace) ──────────────────
+D="$(mkproj)"; printf '{"schema":"cc-master/v2","tasks":[{"id":"T0"' > "$D/b.board.json"
 OUT="$(node "$SCRIPT" "$D/b.board.json" 2>&1)"; RC=$?
 assert_eq 1 "$RC" "(b) invalid JSON → rc 1"
-assert_contains "$OUT" "R1" "(b) names R1 (invalid JSON)"
+assert_contains "$OUT" "FMT-JSON" "(b) names FMT-JSON (invalid JSON)"
 assert_contains "$OUT" "FAIL" "(b) report says FAIL"
 assert_not_contains "$OUT" "at Object.<anonymous>" "(b) NOT a raw node stack trace (agent-friendly)"
 rm -rf "$D"
 
-# ── (c) dangling dep (R4a) + self-loop (R4b) + cycle (R4c) → rc 1, deps-graph rules named ────────────
+# ── (c) dangling dep (GRAPH-DANGLING) + self-loop (GRAPH-SELFLOOP) + cycle (GRAPH-CYCLE) → rc 1, deps-graph rules named ────────────
 D="$(mkproj)"
-printf '%s' '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"s"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T7","status":"ready","deps":["GONE"]},{"id":"S","status":"ready","deps":["S"]},{"id":"A","status":"ready","deps":["B"]},{"id":"B","status":"ready","deps":["A"]}]}' > "$D/b.board.json"
+printf '%s' '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"s"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T7","status":"ready","deps":["GONE"]},{"id":"S","status":"ready","deps":["S"]},{"id":"A","status":"ready","deps":["B"]},{"id":"B","status":"ready","deps":["A"]}]}' > "$D/b.board.json"
 OUT="$(node "$SCRIPT" "$D/b.board.json" 2>&1)"; RC=$?
 assert_eq 1 "$RC" "(c) deps-graph errors → rc 1"
-assert_contains "$OUT" "R4a" "(c) names dangling-dep (R4a)"
-assert_contains "$OUT" "R4b" "(c) names self-loop (R4b)"
-assert_contains "$OUT" "R4c" "(c) names cycle (R4c)"
+assert_contains "$OUT" "GRAPH-DANGLING" "(c) names dangling-dep (GRAPH-DANGLING)"
+assert_contains "$OUT" "GRAPH-SELFLOOP" "(c) names self-loop (GRAPH-SELFLOOP)"
+assert_contains "$OUT" "GRAPH-CYCLE" "(c) names cycle (GRAPH-CYCLE)"
 rm -rf "$D"
 
-# ── (d) duplicate id (R3b) + missing status (R3a/R3c) → rc 1 ─────────────────────────────────────────
+# ── (d) duplicate id (FMT-ID-UNIQUE) + missing status (FMT-ID/FMT-STATUS) → rc 1 ─────────────────────────────────────────
 D="$(mkproj)"
-printf '%s' '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"s"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T0","status":"done","deps":[]},{"id":"T0","status":"ready","deps":[]},{"id":"T2","deps":[]}]}' > "$D/b.board.json"
+printf '%s' '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"s"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T0","status":"done","deps":[]},{"id":"T0","status":"ready","deps":[]},{"id":"T2","deps":[]}]}' > "$D/b.board.json"
 OUT="$(node "$SCRIPT" "$D/b.board.json" 2>&1)"; RC=$?
 assert_eq 1 "$RC" "(d) dup id + missing status → rc 1"
-assert_contains "$OUT" "R3b" "(d) names duplicate-id (R3b)"
+assert_contains "$OUT" "FMT-ID-UNIQUE" "(d) names duplicate-id (FMT-ID-UNIQUE)"
 rm -rf "$D"
 
-# ── (d2) missing deps (R3d) → rc 1 — deps is a required waist field, not optional (codex P2-A) ───────
+# ── (d2) missing deps (FMT-DEPS) → rc 1 — deps is a required waist field, not optional (codex P2-A) ───────
 D="$(mkproj)"
-printf '%s' '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"s"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T0","status":"done","deps":[]},{"id":"T1","status":"ready"}]}' > "$D/b.board.json"
+printf '%s' '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"s"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T0","status":"done","deps":[]},{"id":"T1","status":"ready"}]}' > "$D/b.board.json"
 OUT="$(node "$SCRIPT" "$D/b.board.json" 2>&1)"; RC=$?
 assert_eq 1 "$RC" "(d2) task missing deps → rc 1 (required waist field)"
-assert_contains "$OUT" "R3d" "(d2) names the missing-deps rule (R3d)"
+assert_contains "$OUT" "FMT-DEPS" "(d2) names the missing-deps rule (FMT-DEPS)"
 assert_contains "$OUT" "T1" "(d2) names the offending task (T1)"
 rm -rf "$D"
 
-# ── (e) warn-only (R5b dangling blocked_on) → rc 0 (warnings don't fail), report PASS + warning ─────
+# ── (e) warn-only (FMT-BLOCKED-ON dangling blocked_on) → rc 0 (warnings don't fail), report PASS + warning ─────
 D="$(mkproj)"
-printf '%s' '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"s"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T9","status":"blocked","deps":[],"blocked_on":"T8"}]}' > "$D/b.board.json"
+printf '%s' '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"s"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T9","status":"blocked","deps":[],"blocked_on":"T8"}]}' > "$D/b.board.json"
 OUT="$(node "$SCRIPT" "$D/b.board.json" 2>&1)"; RC=$?
 assert_eq 0 "$RC" "(e) warn-only → rc 0 (warnings don't fail the lint)"
-assert_contains "$OUT" "R5b" "(e) warns on dangling blocked_on (R5b)"
+assert_contains "$OUT" "FMT-BLOCKED-ON" "(e) warns on dangling blocked_on (FMT-BLOCKED-ON)"
 rm -rf "$D"
 
 # ── (f) agent-shaped custom fields → PASS silently (红线2: never a second waist) ──────────────────────
 D="$(mkproj)"
-printf '%s' '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"s"},"git":{"worktree":"","branch":""},"invented":1,"tasks":[{"id":"T0","status":"done","deps":[],"my_field":"free","handle":"bg-1"}]}' > "$D/b.board.json"
+printf '%s' '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"s"},"git":{"worktree":"","branch":""},"invented":1,"tasks":[{"id":"T0","status":"done","deps":[],"my_field":"free","handle":"bg-1"}]}' > "$D/b.board.json"
 OUT="$(node "$SCRIPT" "$D/b.board.json" 2>&1)"; RC=$?
 assert_eq 0 "$RC" "(f) agent custom fields → rc 0"
 assert_contains "$OUT" "PASS" "(f) custom fields don't trip the lint"
@@ -98,7 +98,7 @@ assert_contains "$OUT" "board" "(g2) message mentions board (asks for an explici
 rm -rf "$D"
 
 # ── (h) --json → structured output parses + has errors/warnings keys; exit reflects hard errors ─────
-D="$(mkproj)"; printf '{"schema":"cc-master/v1","tasks":99}' > "$D/b.board.json"
+D="$(mkproj)"; printf '{"schema":"cc-master/v2","tasks":99}' > "$D/b.board.json"
 OUT="$(node "$SCRIPT" --json "$D/b.board.json" 2>&1)"; RC=$?
 assert_eq 1 "$RC" "(h) --json with hard error → rc 1"
 echo "$OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const o=JSON.parse(s);if(Array.isArray(o.errors)&&Array.isArray(o.warnings)&&o.errors.length>0)process.exit(0);process.exit(1)})' \
@@ -112,10 +112,10 @@ assert_not_contains "$OUT" "ENOENT" "(i) IO error is reported agent-friendly, no
 
 # ── (j) explicit path works even on an ARCHIVED board (manual script has no armed gate) ─────────────
 D="$(mkproj)"
-printf '%s' '{"schema":"cc-master/v1","goal":"g","owner":{"active":false,"session_id":"s"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T0","status":"ready","deps":["GONE"]}]}' > "$D/arch.board.json"
+printf '%s' '{"schema":"cc-master/v2","goal":"g","owner":{"active":false,"session_id":"s"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T0","status":"ready","deps":["GONE"]}]}' > "$D/arch.board.json"
 OUT="$(node "$SCRIPT" "$D/arch.board.json" 2>&1)"; RC=$?
 assert_eq 1 "$RC" "(j) explicit archived board with dangling dep → rc 1 (no armed gate; lints any path)"
-assert_contains "$OUT" "R4a" "(j) lints archived board too (manual = explicit, unconditional)"
+assert_contains "$OUT" "GRAPH-DANGLING" "(j) lints archived board too (manual = explicit, unconditional)"
 rm -rf "$D"
 
 echo "passed=$PASS failed=$FAILED"; [ "$FAILED" -eq 0 ] || exit 1

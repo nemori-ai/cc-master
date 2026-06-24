@@ -1,0 +1,377 @@
+// handler-task.test.mjs — P5.2·task noun handler（handlers/task.js）契约门。
+//
+// task.js 是 6 个 noun handler 之一，照 log.js 范式：写 verb（add/update/start/done/block/set-status/rm）走
+//   runWrite + mutations.*；读 verb（show/list）走 runRead + render。本测试用 mkdtemp 临时 home + 真 leaf +
+//   临时板，端到端验证每 verb happy path（写 verb 验板被改 + exit OK + render 出；读 verb 验输出）+ 关键错误：
+//     · rm 非 TTY 缺 --yes → USAGE。
+//     · update / set-status / done 对不存在 id → NotFound(5)。
+//     · set-status 非法转移 → VALIDATION(3)（IllegalTransition），--force 越。
+//     · 删后留悬挂依赖 → VALIDATION(3)（lint hard 挡）。
+import { test, afterEach } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src');
+const taskHandler = require(join(SRC, 'handlers', 'task.js'));
+const io = require(join(SRC, 'io.js'));
+const EXIT = io.EXIT;
+
+let TMPDIRS = [];
+function mkTmp(prefix) {
+  const d = mkdtempSync(join(tmpdir(), prefix));
+  TMPDIRS.push(d);
+  return d;
+}
+afterEach(() => {
+  for (const d of TMPDIRS) rmSync(d, { recursive: true, force: true });
+  TMPDIRS = [];
+});
+
+// mkBoardHome({tasks}) → 临时 home 下写一块 active board，返回 boardPath。
+function mkBoardHome({ tasks = [], log = [], judgment_calls } = {}) {
+  const root = mkTmp('ccm-htask-');
+  const home = join(root, '.claude', 'cc-master');
+  mkdirSync(home, { recursive: true });
+  const boardPath = join(home, '2026-06-24-task.board.json');
+  const board = {
+    schema: 'cc-master/v2',
+    meta: { template_version: 3 },
+    goal: 'task handler test',
+    owner: { active: true, session_id: 'sid-task', heartbeat: '2026-06-24T10:00:00Z' },
+    git: { worktree: '', branch: '' },
+    scheduling: { wip_limit: 4 },
+    tasks,
+    log,
+  };
+  if (judgment_calls) board.judgment_calls = judgment_calls;
+  writeFileSync(boardPath, JSON.stringify(board, null, 2) + '\n', 'utf8');
+  return boardPath;
+}
+
+// mkCtx(boardPath, {values, flags, positionals, isTTY}) → ctx（out/err 捕获器）。
+function mkCtx(boardPath, { values = {}, flags = {}, positionals = [], isTTY } = {}) {
+  const outBuf = [];
+  const errBuf = [];
+  const ctx = {
+    values: { board: boardPath, ...values },
+    positionals,
+    flags: { json: false, dryRun: false, force: false, yes: false, quiet: false, verbose: false, color: false, ...flags },
+    sid: 'sid-task',
+    env: {},
+    out: (s) => outBuf.push(s),
+    err: (s) => errBuf.push(s),
+    outBuf,
+    errBuf,
+  };
+  // 默认注入 isTTY:false（测试是非交互环境；rm 守门据此要求 --yes）。
+  ctx.isTTY = (isTTY === undefined) ? false : isTTY;
+  return ctx;
+}
+
+function readBoard(boardPath) {
+  return JSON.parse(readFileSync(boardPath, 'utf8'));
+}
+function findTask(board, id) {
+  return (board.tasks || []).find((t) => t && t.id === id);
+}
+
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+
+// ══ task add ══════════════════════════════════════════════════════════════════════════════════════
+test('task add creates a node (status=ready default, deps, created_at stamped)', () => {
+  // seed T1 (done) so the new T7 --deps T1 is a valid edge (no dangling-dep hard error).
+  const boardPath = mkBoardHome({ tasks: [{ id: 'T1', status: 'done', deps: [], created_at: '2026-06-24T08:00:00Z' }] });
+  const ctx = mkCtx(boardPath, {
+    values: { type: 'development', deps: 'T1', title: '实现 estimate 接缝' },
+    positionals: ['T7'],
+  });
+  const code = taskHandler.add(ctx);
+  assert.equal(code, EXIT.OK);
+  const t = findTask(readBoard(boardPath), 'T7');
+  assert.ok(t, 'task T7 written');
+  assert.equal(t.status, 'ready');
+  assert.deepEqual(t.deps, ['T1']);
+  assert.equal(t.type, 'development');
+  assert.equal(t.title, '实现 estimate 接缝');
+  assert.match(t.created_at, ISO_RE);
+  assert.ok(ctx.outBuf.join('').includes('T7'));
+});
+
+test('task add with --estimate (duration transform) lands {value,unit}', () => {
+  const boardPath = mkBoardHome();
+  const ctx = mkCtx(boardPath, { values: { estimate: '3h' }, positionals: ['T8'] });
+  const code = taskHandler.add(ctx);
+  assert.equal(code, EXIT.OK);
+  const t = findTask(readBoard(boardPath), 'T8');
+  assert.deepEqual(t.estimate, { value: 3, unit: 'h' });
+});
+
+test('task add --ref (ref transform) lands references[]', () => {
+  const boardPath = mkBoardHome();
+  const ctx = mkCtx(boardPath, {
+    values: { executor: 'external', ref: ['issue:https://github.com/o/r/issues/9'] },
+    positionals: ['EXT3'],
+  });
+  const code = taskHandler.add(ctx);
+  assert.equal(code, EXIT.OK);
+  const t = findTask(readBoard(boardPath), 'EXT3');
+  assert.equal(t.executor, 'external');
+  assert.deepEqual(t.references, [{ kind: 'issue', ref: 'https://github.com/o/r/issues/9' }]);
+});
+
+test('task add --json renders the new task detail', () => {
+  const boardPath = mkBoardHome();
+  const ctx = mkCtx(boardPath, { flags: { json: true }, positionals: ['T9'] });
+  const code = taskHandler.add(ctx);
+  assert.equal(code, EXIT.OK);
+  const parsed = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.data.id, 'T9');
+});
+
+test('task add --dry-run does not write', () => {
+  const boardPath = mkBoardHome();
+  const before = readFileSync(boardPath, 'utf8');
+  const ctx = mkCtx(boardPath, { flags: { dryRun: true }, positionals: ['TX'] });
+  const code = taskHandler.add(ctx);
+  assert.equal(code, EXIT.OK);
+  assert.equal(readFileSync(boardPath, 'utf8'), before, 'unchanged on dry-run');
+  assert.ok(ctx.outBuf.join('').includes('[dry-run]'));
+});
+
+test('task add with --log also appends a log entry', () => {
+  const boardPath = mkBoardHome();
+  const ctx = mkCtx(boardPath, { values: { log: '建了 T7' }, positionals: ['T7'] });
+  taskHandler.add(ctx);
+  const board = readBoard(boardPath);
+  assert.ok(findTask(board, 'T7'));
+  assert.equal(board.log.length, 1);
+  assert.equal(board.log[0].summary, '建了 T7');
+});
+
+// ══ task update ════════════════════════════════════════════════════════════════════════════════════
+const SEED_TASKS = [
+  { id: 'T1', status: 'done', deps: [], type: 'development', created_at: '2026-06-24T08:00:00Z' },
+  { id: 'T2', status: 'ready', deps: ['T1'], type: 'development', created_at: '2026-06-24T08:30:00Z' },
+];
+
+test('task update overwrites fields + add/rm deps', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, {
+    values: { estimate: '5h', 'add-dep': ['T1'] },
+    positionals: ['T2'],
+  });
+  // T2 already deps on T1 — add-dep is idempotent; also rm a non-present to confirm no-op safety.
+  const code = taskHandler.update(ctx);
+  assert.equal(code, EXIT.OK);
+  const t = findTask(readBoard(boardPath), 'T2');
+  assert.deepEqual(t.estimate, { value: 5, unit: 'h' });
+  assert.deepEqual(t.deps, ['T1']);
+});
+
+test('task update --rm-dep removes a dep', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, { values: { 'rm-dep': ['T1'] }, positionals: ['T2'] });
+  const code = taskHandler.update(ctx);
+  assert.equal(code, EXIT.OK);
+  assert.deepEqual(findTask(readBoard(boardPath), 'T2').deps, []);
+});
+
+test('task update on a missing id throws → NotFound(5)', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, { values: { title: 'x' }, positionals: ['NOPE'] });
+  assert.throws(() => taskHandler.update(ctx), (e) => e.errKind === 'NotFound');
+});
+
+// ══ task start / done ════════════════════════════════════════════════════════════════════════════
+test('task start transitions ready→in_flight and stamps started_at', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, { positionals: ['T2'] });
+  const code = taskHandler.start(ctx);
+  assert.equal(code, EXIT.OK);
+  const t = findTask(readBoard(boardPath), 'T2');
+  assert.equal(t.status, 'in_flight');
+  assert.match(t.started_at, ISO_RE);
+});
+
+test('task done transitions in_flight→done, stamps finished_at, lands artifact/verified', () => {
+  const tasks = [{ id: 'T2', status: 'in_flight', deps: [], created_at: '2026-06-24T08:30:00Z', started_at: '2026-06-24T09:00:00Z' }];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, { values: { artifact: '/abs/out.md', verified: true }, positionals: ['T2'] });
+  const code = taskHandler.done(ctx);
+  assert.equal(code, EXIT.OK);
+  const t = findTask(readBoard(boardPath), 'T2');
+  assert.equal(t.status, 'done');
+  assert.match(t.finished_at, ISO_RE);
+  assert.equal(t.artifact, '/abs/out.md');
+  assert.equal(t.verified, true);
+});
+
+test('task start on a missing id → NotFound(5)', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, { positionals: ['NOPE'] });
+  assert.throws(() => taskHandler.start(ctx), (e) => e.errKind === 'NotFound');
+});
+
+// ══ task block ════════════════════════════════════════════════════════════════════════════════════
+test('task block --on <task> sets blocked + blocked_on', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, { values: { on: 'T1' }, positionals: ['T2'] });
+  const code = taskHandler.block(ctx);
+  assert.equal(code, EXIT.OK);
+  const t = findTask(readBoard(boardPath), 'T2');
+  assert.equal(t.status, 'blocked');
+  assert.equal(t.blocked_on, 'T1');
+});
+
+test('task block --on user with --decision (literal JSON) lands decision_package', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const dp = JSON.stringify({ ask_type: 'decision', question: '选哪个方案?' });
+  const ctx = mkCtx(boardPath, { values: { on: 'user', decision: dp }, positionals: ['T2'] });
+  const code = taskHandler.block(ctx);
+  assert.equal(code, EXIT.OK);
+  const t = findTask(readBoard(boardPath), 'T2');
+  assert.equal(t.status, 'blocked');
+  assert.equal(t.blocked_on, 'user');
+  assert.equal(t.decision_package.question, '选哪个方案?');
+});
+
+// ══ task set-status ════════════════════════════════════════════════════════════════════════════════
+test('task set-status legal transition (in_flight→escalated)', () => {
+  const tasks = [{ id: 'T2', status: 'in_flight', deps: [], created_at: '2026-06-24T08:30:00Z' }];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, { positionals: ['T2', 'escalated'] });
+  const code = taskHandler.setStatus(ctx);
+  assert.equal(code, EXIT.OK);
+  assert.equal(findTask(readBoard(boardPath), 'T2').status, 'escalated');
+});
+
+test('task set-status illegal transition throws → IllegalTransition (VALIDATION 3)', () => {
+  // done→in_flight is not in STATUS_MACHINE; expect throw, router maps to VALIDATION.
+  const tasks = [{ id: 'T1', status: 'done', deps: [], created_at: '2026-06-24T08:00:00Z' }];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, { positionals: ['T1', 'in_flight'] });
+  assert.throws(() => taskHandler.setStatus(ctx), (e) => e.errKind === 'IllegalTransition');
+});
+
+test('task set-status --force crosses an illegal transition', () => {
+  const tasks = [{ id: 'T1', status: 'done', deps: [], created_at: '2026-06-24T08:00:00Z' }];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, { flags: { force: true }, positionals: ['T1', 'in_flight'] });
+  const code = taskHandler.setStatus(ctx);
+  assert.equal(code, EXIT.OK);
+  assert.equal(findTask(readBoard(boardPath), 'T1').status, 'in_flight');
+});
+
+// ══ task rm ════════════════════════════════════════════════════════════════════════════════════════
+test('task rm non-TTY without --yes → USAGE(2), board unchanged', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const before = readFileSync(boardPath, 'utf8');
+  const ctx = mkCtx(boardPath, { positionals: ['T2'] }); // isTTY:false default, no --yes
+  const code = taskHandler.rm(ctx);
+  assert.equal(code, EXIT.USAGE);
+  assert.equal(readFileSync(boardPath, 'utf8'), before, 'board unchanged when refused');
+  assert.ok(ctx.errBuf.join('').includes('--yes'));
+});
+
+test('task rm with --yes deletes a task (no dangling deps left)', () => {
+  // remove T2 (a leaf — nothing depends on T2) → lint clean.
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, { flags: { yes: true }, positionals: ['T2'] });
+  const code = taskHandler.rm(ctx);
+  assert.equal(code, EXIT.OK);
+  const board = readBoard(boardPath);
+  assert.equal(findTask(board, 'T2'), undefined, 'T2 removed');
+  assert.ok(findTask(board, 'T1'), 'T1 kept');
+});
+
+test('task rm leaving a dangling dep → VALIDATION(3) (lint hard error), board unchanged', () => {
+  // T2 deps on T1; removing T1 leaves T2 dangling → GRAPH dangling-dep lint hard error.
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const before = readFileSync(boardPath, 'utf8');
+  const ctx = mkCtx(boardPath, { flags: { yes: true }, positionals: ['T1'] });
+  const code = taskHandler.rm(ctx);
+  assert.equal(code, EXIT.VALIDATION, 'lint hard error on dangling dep');
+  assert.equal(readFileSync(boardPath, 'utf8'), before, 'board unchanged when lint refuses');
+});
+
+test('task rm on a missing id throws → NotFound(5)', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, { flags: { yes: true }, positionals: ['NOPE'] });
+  assert.throws(() => taskHandler.rm(ctx), (e) => e.errKind === 'NotFound');
+});
+
+// ══ task show ══════════════════════════════════════════════════════════════════════════════════════
+test('task show renders a single task (human + json)', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctxH = mkCtx(boardPath, { positionals: ['T2'] });
+  assert.equal(taskHandler.show(ctxH), EXIT.OK);
+  assert.ok(ctxH.outBuf.join('').includes('T2'));
+
+  const ctxJ = mkCtx(boardPath, { flags: { json: true }, positionals: ['T2'] });
+  assert.equal(taskHandler.show(ctxJ), EXIT.OK);
+  const parsed = JSON.parse(ctxJ.outBuf.join(''));
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.data.id, 'T2');
+});
+
+test('task show on a missing id → human placeholder / json data:null', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, { flags: { json: true }, positionals: ['NOPE'] });
+  assert.equal(taskHandler.show(ctx), EXIT.OK);
+  const parsed = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(parsed.data, null);
+});
+
+// ══ task list ══════════════════════════════════════════════════════════════════════════════════════
+const LIST_TASKS = [
+  { id: 'T1', status: 'done', deps: [], type: 'development', executor: 'subagent', created_at: '2026-06-24T08:00:00Z' },
+  { id: 'T2', status: 'ready', deps: ['T1'], type: 'development', executor: 'subagent', created_at: '2026-06-24T08:30:00Z' },
+  { id: 'T3', status: 'ready', deps: [], type: 'pr', executor: 'workflow', created_at: '2026-06-24T09:00:00Z' },
+];
+
+test('task list returns all (human table)', () => {
+  const boardPath = mkBoardHome({ tasks: LIST_TASKS });
+  const ctx = mkCtx(boardPath);
+  assert.equal(taskHandler.list(ctx), EXIT.OK);
+  const out = ctx.outBuf.join('\n');
+  assert.ok(out.includes('T1') && out.includes('T2') && out.includes('T3'));
+});
+
+test('task list --status filters (multiple values)', () => {
+  const boardPath = mkBoardHome({ tasks: LIST_TASKS });
+  const ctx = mkCtx(boardPath, { values: { status: ['ready'] }, flags: { json: true } });
+  taskHandler.list(ctx);
+  const parsed = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(parsed.data.length, 2);
+  assert.ok(parsed.data.every((t) => t.status === 'ready'));
+});
+
+test('task list --executor / --type filter', () => {
+  const boardPath = mkBoardHome({ tasks: LIST_TASKS });
+  const ctxE = mkCtx(boardPath, { values: { executor: 'workflow' }, flags: { json: true } });
+  taskHandler.list(ctxE);
+  assert.equal(JSON.parse(ctxE.outBuf.join('')).data.length, 1);
+
+  const ctxT = mkCtx(boardPath, { values: { type: 'development' }, flags: { json: true } });
+  taskHandler.list(ctxT);
+  assert.equal(JSON.parse(ctxT.outBuf.join('')).data.length, 2);
+});
+
+test('task list --parent filters by owner', () => {
+  const tasks = [
+    { id: 'P1', status: 'ready', deps: [], created_at: '2026-06-24T08:00:00Z' },
+    { id: 'C1', status: 'ready', deps: [], parent: 'P1', created_at: '2026-06-24T08:10:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, { values: { parent: 'P1' }, flags: { json: true } });
+  taskHandler.list(ctx);
+  const parsed = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(parsed.data.length, 1);
+  assert.equal(parsed.data[0].id, 'C1');
+});

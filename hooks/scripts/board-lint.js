@@ -23,41 +23,13 @@
 
 const fs = require('fs');
 const path = require('path');
-const { lintBoard, formatReport } = require('./board-lint-core.js');
+const { lintBoard, formatReport } = require('../../cli/src/board-lint-core.js');
+// ★v2 收编：HOME 解析 + 武装闸 isArmed 收口到共享 hook-common（取代旧内联副本·SSOT、四个 node hook 一份）。
+const { resolveHome, isArmed } = require('./hook-common.js');
 
 // HOME_DIR：与全 hook 同口径（CC_MASTER_HOME 覆写，否则 CLAUDE_PROJECT_DIR/.claude/cc-master，再否则
 //   cwd/.claude/cc-master）。测试经 CC_MASTER_HOME 注入。
-const HOME_DIR =
-  process.env.CC_MASTER_HOME ||
-  path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), '.claude', 'cc-master');
-
-// ── ARMED GATE（node 版 board_matches，与 usage-pacing.js isArmed 字字相同）─────────────────────────
-// isArmed(homeDir, sid)：homeDir 里存在一个 *.board.json 满足 owner.active === true 且（stdin sid 空 →
-//   非对称降级：任一 active 板；否则 owner.session_id === sid）。空 board sid 不收养（CODEX14，红线6）。
-//   只读 owner.active / owner.session_id 两个 pinned 字段（不读 tasks、不写 board）。任何读/解析失败按
-//   「该板不匹配」处理（try/catch 兜住）→ 失败视为未武装 → 静默。
-function isArmed(homeDir, sid) {
-  let entries;
-  try {
-    entries = fs.readdirSync(homeDir, { withFileTypes: true });
-  } catch (_e) {
-    return false;
-  }
-  for (const ent of entries) {
-    if (!ent.isFile() || !ent.name.endsWith('.board.json')) continue;
-    let board;
-    try {
-      board = JSON.parse(fs.readFileSync(path.join(homeDir, ent.name), 'utf8'));
-    } catch (_e) {
-      continue; // 坏板 → 跳过
-    }
-    const owner = (board && board.owner) || {};
-    if (owner.active !== true) continue;
-    if (!sid) return true; // 降级：stdin sid 空 → 任一 active 板即武装（ADR-007 §2.3）
-    if (owner.session_id === sid) return true; // session-scoped 精确匹配
-  }
-  return false;
-}
+const HOME_DIR = resolveHome();
 
 // targetIsMyActiveBoard(filePath, sid)：闸4 —— 被编辑文件是不是「本 session 拥有的那块 active
 //   board」。读该 board 的 owner.active === true 且（sid 非空时）owner.session_id === sid。

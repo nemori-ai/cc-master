@@ -19,7 +19,7 @@
 `board-graph.js` 是一个**手动带外 CLI**（住在 `${CLAUDE_SKILL_DIR}/scripts/board-graph.js`）——agent 在决策点**显式跑**它，**不是 plugin 自动 hook**。故它无武装闸、无 hook 注入短语（与 `cc-usage.sh` / `codex-review.sh` / `board-lint.js` 同族：显式被调、非自动注入）。它就是 `/cc-master:status` 与 `decomposition.md` 里那句「要真算 float / 临界链请走带外脚本」中的**那个脚本**。
 
 - **只读、永不回写 board**（红线 2）——临界路径 / float / 并行度 / rollup 都是 ephemeral 的 stdout / `--json` 输出，**绝不是 board 字段**。board 上没有机器算出来的 float；CLI 每次现算、不落盘。
-- **零 npm dep、node-only**（红线 1 · ADR-006）——复用 `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/board-graph-core.js` 这一份图核心（它再 require board-lint-core 的 `buildGraph`），与 board-lint **同一份图**、口径字节对齐（ADR-012）。
+- **零 npm dep、node-only**（红线 1 · ADR-006）——复用 `${CLAUDE_PLUGIN_ROOT}/cli/src/board-graph-core.js` 这一份图核心（它再 require board-lint-core 的 `buildGraph`），与 board-lint **同一份图**、口径字节对齐（ADR-012）。
 - **不是什么**：
   - **不是 gate**——「图坏」（缺窄腰 / dep 悬挂 / 成环）它也 exit 0、只分析 + 报告；gate 是 `board-lint.js` / `verify-board.sh` 的事。
   - **不是可视化**——节点 + 边的图形 webview 是 `/cc-master:view`。

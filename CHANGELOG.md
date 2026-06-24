@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> **board v2 数据模型地基（v0.10.0 第一阶段 · 敏捷开发 Epic #27 及子需求）** —— board 从「被动 JSON + 各消费者各自 sed/awk/JS 解析」演进为「**完整 JS 数据模型 SSOT + 统一访问层**」（ADR-013）。这是 v0.10.0 把敏捷能力（纵切可 ship 切片 / timebox / 估点 / 自决诚实台账）长进 board 的承重地基；统一 CLI 与三个配套 skill 随后接续。schema `cc-master/v1` → `cc-master/v2`。
+
+### Added
+
+- **board-model.js —— v2 数据模型 keystone（单一真相源）** — 一份 JS 模型把「散落在 lint 内联 / hook bash 串解析 / viewer 各自约定」的**声明性事实**收口到一处：全部命名枚举（status/executor/taskType/role/refKind/askType/logKind/judgment_calls 三枚举/iterationStatus/watchdogMechanism/acceptance kind+status）、**每字段六要素元数据**（tier 🔒/👁/✎ · type · 缺省 · 谁读 · 谁写 · 何时写 · 缺失降级，board 11 模块 + task 全字段）、**不变式注册表 INVARIANTS**（每条规则的 id/级别/家族 SSOT，lint 从 `levelOf(id)` 派生「hard 还是 warn」零漂移）、status 状态机、跨消费者共享谓词（`isAwaitingUser`/`acceptanceConverged`/`taskTrulyDone`/`isAbsolutePathOrUrl` 等）。lint / graph / CLI / viewer 全部派生。IIFE + UMD 双形态（CommonJS + 浏览器 globalThis）。
+- **board v2 task 实体 + 敏捷新模块** — task 升级为完整 DAG node：`executor`（5 值，取代 v1 `mechanism`+`assignee`，含 `external`·#31）· `type`（8 值开放枚举，未知值 warn）· `role`（normal/fill-work）· `references`（`{kind,ref}` 数组，`ref` 须绝对路径或 URL·禁相对）· `estimate`（估点·#29）· `acceptance`（**两态目标函数**：一句话 DoD 或 `{criteria:[…]}`，ML 比喻 objective）。新增三个顶层模块：`cadence`（节奏/timebox 策略层·#28）· `judgment_calls`（agent 自决诚实台账·HITL 第三姿态·#30）· `scheduling`（聚合 `wip_limit`+`owner_wip_limit`）。`wakeup`→`watchdog` 重命名；`num_account`/`accounts[]` 退役（pacing 的 effective-N 早已从 accounts.json registry 读·A2 T6）。
+- **board-lint-core v2 全集重写（FMT / GRAPH / BIZ 三家族 · 派生自 board-model）** — 规则改为家族前缀 id（`FMT-*`/`GRAPH-*`/`BIZ-*`），级别从 INVARIANTS 注册表读。补 v2 字段校验（executor/role/type 枚举、references 绝对路径、estimate/acceptance 形状、scheduling/watchdog/log/judgment_calls/cadence）+ 敏捷 BIZ 条件规则（`type=development`⇒spec+plan refs、dev 家族⇒acceptance、subagent/workflow⇒handle、external⇒issue ref、时间序、**cadence `shipped`⇒members 全 done+verified** 收口完整性 hard）。补 v1 漏校验：`owner.heartbeat` / `scheduling.owner_wip_limit` / `watchdog.fire_at`。`done⇒verified+artifact`（#32）登记为 reserved 待 ADR。inputs_hash 收紧为 `sha256:<64 hex>`（#38）。
+- **board-graph-core v2:estimate 喂 CPM** — `nodeDuration` 降级链加中间档：measured（实测时间戳）→ **estimate（估点折算工时·#29/#34）** → unit；`criticalPath.weight_source` 增 `estimate` 档（纯估点板可报小时级 makespan·计划工时连贯），混合仍诚实标 mixed 不报伪精确。
+- **board-lock.js —— 轻量 advisory 文件锁** — board 写入并发保护（O_EXCL 原子抢占 + 简单 stale 偷锁 + Atomics.wait 同步等待），纯 stdlib、零 spawn，不重型。供未来统一 CLI 写入关卡用。
+- **ADR-013** —— board v2 完整数据模型 + 统一访问层（narrow-waist 演进：从「只钉一小撮」→「全建模 + 三档标注」，红线 2 真正保护的仍只是 🔒 子集）。
+
+### Changed
+
+- **hook 收编为 node（ADR-013 §2.4 · ADR-006 解锁）** — `reinject` / `verify-board` / `posttool-batch` 三个 bash hook 收编为 node（`.sh`→`.js`），经新的共享 `hook-common.js`（武装闸 `isArmed`/`boardMatches`/`listMatchingBoards` + HOME 解析 + stdin）+ `board-model` 派生，**用 `JSON.parse` 取代 v1 的 owner_region/tasks_region/awk 深度扫描**——「归档板嵌套 `active:true`」「task-local log[] 里的 stale/status」等一整类全文 grep/awk 误读盲区由数据模型解析根除。`verify-board` 的 Stop 指纹握手用 node 精确重实现 POSIX cksum（CRC-32）以字节对齐 bash 行为；watchdog 读 `board.watchdog`（`wakeup` 旧板兼容 fallback）。`bootstrap-board.sh` 仍为 bash（唯一豁免的 ARM 动作）；红线 6 dormant-until-armed 与所有 hook 行为字节级保持。board.template.json / board.example.json / view-server 同步升 v2。
+
 ## [0.9.1] — 2026-06-22
 
 > 0.9.0 的随后硬化：dag-in-dag 的四个 followup、换号修复、codex 二审探出的浏览器 bug 修复 + 永久回归测试、webview 折叠/高亮交互修复，以及 decision_package 完整性 lint（C1「board 完整性」首个落地）。本版以真 headless Chrome（CDP）实地验证 webview 行为，补上无头单测够不着的 render 层盲区。
