@@ -26,19 +26,23 @@ import { dirname, join } from 'node:path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 
-const LINT_CORE = 'cli/src/board-lint-core.js';
-const GRAPH_CORE = 'cli/src/board-graph-core.js';
+// ★T4-3a: the webview's shared graph core is now the @ccm/engine IIFE, vendored alongside the
+//   skill (replacing the old cli/src/ board-model + board-lint-core + board-graph-core trio). The
+//   viewer loads it as ONE classic <script> publishing globalThis.__ccmEngine. This test loads the
+//   SAME vendored artifact (not cli/src/) so it asserts against the migrated reality.
+const ENGINE_IIFE = 'skills/orchestrating-to-completion/scripts/vendor/ccm-engine.iife.js';
 const VIEW = 'skills/orchestrating-to-completion/scripts/view.html';
 
-// 在一个共享 realm 里加载真 lint-core + graph-core（与 board-graph-core.browser.test.mjs 同形），
-// 拿到 analyzeGraph —— 这是 view.html 的 analyze() 实际委托的同一份图核心（DRY）。
+// 在一个裸 realm 里加载 vendored @ccm/engine IIFE（模拟浏览器 classic <script>：无 require → banner
+// 把 node:fs/crypto 退化成 {}，webview 路径从不触碰 board-lock），拿到 __ccmEngine.analyzeGraph ——
+// 这是 view.html 的 analyze() 实际委托的同一份图核心（DRY）。
 function loadGraphCore() {
   const ctx = vm.createContext({});
-  vm.runInContext('var module = undefined; var require = undefined; globalThis.module=undefined; globalThis.require=undefined;', ctx);
-  vm.runInContext(read(LINT_CORE), ctx, { filename: 'board-lint-core.js' });
-  vm.runInContext(read(GRAPH_CORE), ctx, { filename: 'board-graph-core.js' });
-  const core = vm.runInContext('globalThis.__ccmBoardGraphCore', ctx);
-  assert.ok(core && typeof core.analyzeGraph === 'function', 'graph-core published analyzeGraph');
+  // 浏览器里 globalThis === window，顶层 var 挂成全局；裸 realm 里给个 globalThis 自引用同形。
+  vm.runInContext('var globalThis = this;', ctx);
+  vm.runInContext(read(ENGINE_IIFE), ctx, { filename: 'ccm-engine.iife.js' });
+  const core = vm.runInContext('(typeof __ccmEngine !== "undefined") ? __ccmEngine : (globalThis.__ccmEngine || null)', ctx);
+  assert.ok(core && typeof core.analyzeGraph === 'function', '@ccm/engine IIFE published __ccmEngine.analyzeGraph');
   return core;
 }
 
