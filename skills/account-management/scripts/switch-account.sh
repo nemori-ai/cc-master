@@ -75,7 +75,9 @@
 #   --skip-token-check    （仅 --dry-run）允许在 vault 取不到 token 时仍走完逻辑打印计划。
 #
 # 退出码：0 成功（dry-run 走完 / 真 exec 不返回）；2 = 参数/前置校验失败；
-#         3 = 全员逼顶（select-account exit 3）→ surface 用户、未切；非 0 其它 = vault/选号失败。
+#         3 = 全员逼顶（select-account exit 3）→ surface 用户、未切；4 = 换号生效但 registry active 落盘失败（非干净成功）；
+#         7 = board.policy deny 机制闸拒绝换号（ADR-016 §2.2·覆写三存储前被 policy 拦下，未修改任何存储）；
+#         非 0 其它 = vault/选号失败。
 #
 # 这个脚本**只**做「选号 + refresh + 覆写三存储 + 写快照」这一机械动作。探测（cc-usage.sh）、drain（handoff）
 # 由主线编排器在调用本脚本前后驱动（见 cost-and-pacing.md §换号 lever）——指挥协调、脚本只演奏换号那一下
@@ -1509,6 +1511,43 @@ if [ "${FORCE_REFRESH_FALLBACK:-0}" -ne 1 ]; then
     err "switch-account: ⚠ vault 回写失败（refresh token 未轮转·旧 token 仍有效）——三存储仍会覆写（换号继续），但 cc-master vault 里 $EMAIL 的 access token 未更新到最新（下次换回可能需 --refresh）。"
   fi
 fi
+
+# ── policy 机制硬闸（ADR-016 §2.2·在覆写官方存储之前校验 board.policy）────────────────────────────
+# 经进程边界 `ccm policy show --json` 读 active board 的 policy；只有显式 "deny" 才拦——fail-open（ADR-016 §2.3）：
+#   ccm 缺 / 调用失败 / 输出非合法 JSON / 无 active board / policy 字段缺 → 解析为 allow·放行（不把未接 ccm 的环境误锁）。
+# 解析路径：`.data.effective.autonomous_account_switch`（`ccm policy show --json` 契约形状·钉死）。
+# 退出码 7（exit 7）：脚本现有码 0/1/2/3/4/5/6 均已占用（见脚本头注释·exit code 分配）；7 = policy-deny-blocked（新码·语义清晰）。
+# 红线1：纯 bash + node 解析 JSON，不用 jq/python。
+_CCM_BIN="$(command -v ccm 2>/dev/null || true)"
+_POLICY_SWITCH_ALLOWED="allow"  # fail-open default
+if [ -n "$_CCM_BIN" ]; then
+  _POLICY_JSON="$("$_CCM_BIN" policy show --json 2>/dev/null || true)"
+  if [ -n "$_POLICY_JSON" ]; then
+    _POLICY_SWITCH_ALLOWED="$(printf '%s' "$_POLICY_JSON" | node -e '
+      "use strict";
+      let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
+        try {
+          const o = JSON.parse(s);
+          // 契约路径: .data.effective.autonomous_account_switch（ccm policy show --json 钉死形状）
+          const val = o && o.data && o.data.effective && o.data.effective.autonomous_account_switch;
+          // 只有显式字符串 "deny" 才拦；缺字段 / 非字符串 / 非 deny → allow（fail-open·ADR-016 §2.3）
+          process.stdout.write(val === "deny" ? "deny" : "allow");
+        } catch (_e) {
+          process.stdout.write("allow");  // JSON 解析失败 → fail-open 放行
+        }
+      });
+    ' 2>/dev/null || printf '%s' "allow")"
+  fi
+fi
+if [ "${_POLICY_SWITCH_ALLOWED:-allow}" = "deny" ]; then
+  err "switch-account: 机制层硬闸：board.policy.autonomous_account_switch=deny，**拒绝本次自主换号**（未覆写任何凭证存储·registry 原封不动）。"
+  err "  如需换号，须用户先 'ccm policy set --autonomous-account-switch=allow --user-authorized' 修改 board policy，再重试。"
+  # best-effort log 留痕（ADR-016 §2.2 要求 board.log 记录一次越权拦截；ccm log 调用失败无害）
+  "$_CCM_BIN" log add "机制层按 board.policy=deny 拦下一次自主换号（switch-account.sh exit 7）" --kind decision 2>/dev/null || true
+  exit 7
+fi
+# policy 放行（allow / fail-open）→ 继续取换号锁 + 覆写三存储
+unset _CCM_BIN _POLICY_JSON _POLICY_SWITCH_ALLOWED
 
 # **跨进程换号锁（codex round#14 Finding A/B·串行化整个「覆写三存储 → setActive」临界段）**：registry 锁 / vault 锁
 #   只各自保护自己那个文件，挡不住两个并发 switch 的**官方三存储覆写交错**（A 写文件、B 写全三存储+翻 active B、A 再

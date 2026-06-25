@@ -1888,6 +1888,167 @@ assert_contains "$out31b" "≠ 切出号" "(31b) identity guard: skip message su
 for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
 rm -rf "$FX31B"
 
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (32) **policy 机制硬闸 — deny 拦截（ADR-016 §2.2）**.
+#      stub `ccm` 返回 autonomous_account_switch="deny" → switch-account.sh 必须：
+#        ① exit 7（policy-deny 拒绝码）；
+#        ② 官方三存储文件**保持 OLD 值**（凭证一字未改）；
+#        ③ registry active 未翻（alice 仍 false / bob 仍 true）。
+#      反向 teeth：若 policy 闸缺失或 deny 未拦，deny case 会通过，rc=0 + 三存储被改 → FAIL。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX32="$(make_fixture)"; REG32="$FX32/accounts.json"; VFILE32="$FX32/accounts.env"
+CRED32="$FX32/credentials.json"; CJSON32="$FX32/claude.json"
+cat > "$REG32" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE32","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice","subscriptionType":"max"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE32"; chmod 600 "$VFILE32"
+# pre-seed OLD official stores — must remain unchanged after a deny block.
+OLD32_AT='sk-ant-oat01-OLDcred32AAA000000000000000000-_o'
+cat > "$CRED32" <<JSON
+{"claudeAiOauth":{"accessToken":"$OLD32_AT","refreshToken":"sk-ant-ort01-OLDcred32r00000000000000000-_o","expiresAt":1700000000000,"subscriptionType":"pro"}}
+JSON
+cat > "$CJSON32" <<'JSON'
+{"oauthAccount":{"emailAddress":"old@x.com","subscriptionType":"pro"},"numStartups":7}
+JSON
+PORT32="$FX32/url.txt"; start_refresh_endpoint ok "$PORT32"; RURL32="$(cat "$PORT32")"
+# stub `ccm` that returns autonomous_account_switch="deny" for `policy show --json`.
+CCM32="$(make_project)"
+cat > "$CCM32/ccm" <<'CCM'
+#!/usr/bin/env bash
+# stub ccm: `policy show --json` → deny; any other subcommand → exit 0 silently (e.g. `log add`).
+if [ "${1:-}" = "policy" ] && [ "${2:-}" = "show" ]; then
+  printf '%s\n' '{"ok":true,"data":{"policy":{"autonomous_account_switch":"deny"},"effective":{"autonomous_account_switch":"deny"}}}'
+fi
+exit 0
+CCM
+chmod +x "$CCM32/ccm"
+out32="$(PATH="$CCM32:$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL32" CRED_PATH="$CRED32" CLAUDE_JSON_PATH="$CJSON32" \
+        bash "$SCRIPT" --registry "$REG32" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc32=$?
+# ① rc must be 7 (policy-deny拒绝码·区别于其他失败码).
+assert_eq "7" "$rc32" "(32) policy deny: exit code must be 7 (policy-deny blocked)"
+# ② 官方三存储 ① credentials.json 必须保持 OLD token（policy 闸拦在覆写之前·一字未改）.
+cred32_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED32" 2>/dev/null)"
+assert_eq "$OLD32_AT" "$cred32_at" "(32) policy deny: credentials.json UNCHANGED (凭证三存储未被覆写·policy 闸生效)"
+# ② ~/.claude.json oauthAccount must be unchanged (emailAddress still old@x.com).
+cj32_email="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.oauthAccount.emailAddress||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CJSON32" 2>/dev/null)"
+assert_eq "old@x.com" "$cj32_email" "(32) policy deny: ~/.claude.json oauthAccount UNCHANGED (emailAddress still old@x.com)"
+# ③ registry active NOT flipped (alice stays false / bob stays true).
+alice32="$(node -e 'try{const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["alice@x.com"].active))}catch(_e){process.stdout.write("ERROR")}' "$LIB_JS" "$REG32" 2>/dev/null)"
+bob32="$(node -e 'try{const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["bob@y.com"].active))}catch(_e){process.stdout.write("ERROR")}' "$LIB_JS" "$REG32" 2>/dev/null)"
+assert_eq "false" "$alice32" "(32) policy deny: registry alice active NOT flipped (stays false)"
+assert_eq "true"  "$bob32"   "(32) policy deny: registry bob still active=true"
+# stderr must surface the deny message.
+assert_contains "$out32" "board.policy" "(32) policy deny: stderr surfaces board.policy拦截消息"
+assert_contains "$out32" "deny" "(32) policy deny: stderr contains 'deny'"
+# **反向 teeth**: if policy gate is absent / not wired, the deny stub would be silently ignored and switch
+#   would succeed (rc=0, cred overwritten) — this test MUST fail in that case (the assertions above catch it).
+rm -rf "$FX32" "$CCM32"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (33) **policy 机制硬闸 — allow 放行（ADR-016 §2.3）**.
+#      stub `ccm` 返回 autonomous_account_switch="allow" → 换号正常完成（rc=0·三存储被覆写·active 翻转）。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX33="$(make_fixture)"; REG33="$FX33/accounts.json"; VFILE33="$FX33/accounts.env"
+CRED33="$FX33/credentials.json"; CJSON33="$FX33/claude.json"
+cat > "$REG33" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE33","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice","subscriptionType":"max"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE33"; chmod 600 "$VFILE33"
+cat > "$CRED33" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLDcred33AAA000000000000000000-_o","refreshToken":"sk-ant-ort01-OLDcred33r00000000000000000-_o","expiresAt":1700000000000,"subscriptionType":"pro"}}
+JSON
+cat > "$CJSON33" <<'JSON'
+{"oauthAccount":{"emailAddress":"old@x.com","subscriptionType":"pro"},"numStartups":3}
+JSON
+PORT33="$FX33/url.txt"; start_refresh_endpoint ok "$PORT33"; RURL33="$(cat "$PORT33")"
+# stub `ccm` that returns autonomous_account_switch="allow".
+CCM33="$(make_project)"
+cat > "$CCM33/ccm" <<'CCM'
+#!/usr/bin/env bash
+# stub ccm: `policy show --json` → allow; other subcommands → exit 0.
+if [ "${1:-}" = "policy" ] && [ "${2:-}" = "show" ]; then
+  printf '%s\n' '{"ok":true,"data":{"policy":{"autonomous_account_switch":"allow"},"effective":{"autonomous_account_switch":"allow"}}}'
+fi
+exit 0
+CCM
+chmod +x "$CCM33/ccm"
+out33="$(PATH="$CCM33:$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL33" CRED_PATH="$CRED33" CLAUDE_JSON_PATH="$CJSON33" \
+        bash "$SCRIPT" --registry "$REG33" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc33=$?
+assert_eq "0" "$rc33" "(33) policy allow: switch exits 0 (正常换号·policy 放行)"
+# credentials.json must be overwritten with FRESH token (happy-path succeeded).
+cred33_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED33" 2>/dev/null)"
+assert_eq "$FRESH_AT" "$cred33_at" "(33) policy allow: credentials.json overwritten with FRESH token (换号完成)"
+# registry: alice active, bob inactive.
+alice33="$(node -e 'try{const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["alice@x.com"].active))}catch(_e){process.stdout.write("ERROR")}' "$LIB_JS" "$REG33" 2>/dev/null)"
+assert_eq "true" "$alice33" "(33) policy allow: registry alice flipped to active=true"
+rm -rf "$FX33" "$CCM33"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (34) **policy 机制硬闸 — fail-open（ADR-016 §2.3）**.
+#      ccm 不存在（PATH 中无 ccm）→ 换号**仍正常完成**（降级放行·不把没接 ccm 的环境误锁）。
+#      另测：stub `ccm` 返回非法 JSON → 同样 fail-open 放行。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX34="$(make_fixture)"; REG34="$FX34/accounts.json"; VFILE34="$FX34/accounts.env"
+CRED34="$FX34/credentials.json"; CJSON34="$FX34/claude.json"
+cat > "$REG34" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE34","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice","subscriptionType":"max"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE34"; chmod 600 "$VFILE34"
+cat > "$CRED34" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLDcred34AAA000000000000000000-_o","refreshToken":"sk-ant-ort01-OLDcred34r00000000000000000-_o","expiresAt":1700000000000,"subscriptionType":"pro"}}
+JSON
+cat > "$CJSON34" <<'JSON'
+{"oauthAccount":{"emailAddress":"old@x.com","subscriptionType":"pro"},"numStartups":5}
+JSON
+PORT34="$FX34/url.txt"; start_refresh_endpoint ok "$PORT34"; RURL34="$(cat "$PORT34")"
+# (34a) — ccm 完全不存在（PATH 里故意 pre-pend 一个空目录，确保系统 ccm 不在 PATH）.
+EMPTY34="$(make_project)"
+out34="$(PATH="$EMPTY34:$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL34" CRED_PATH="$CRED34" CLAUDE_JSON_PATH="$CJSON34" \
+        bash "$SCRIPT" --registry "$REG34" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc34=$?
+assert_eq "0" "$rc34" "(34a) fail-open: ccm not found → switch exits 0 (降级放行·不误锁)"
+cred34_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED34" 2>/dev/null)"
+assert_eq "$FRESH_AT" "$cred34_at" "(34a) fail-open: credentials.json overwritten with FRESH token (换号完成·ccm 缺不误拦)"
+# (34b) — ccm 存在但返回非法 JSON（fail-open for bad output）.
+CCM34B="$(make_project)"
+cat > "$CCM34B/ccm" <<'CCM'
+#!/usr/bin/env bash
+# stub ccm: returns invalid JSON for policy show (simulate malformed output).
+if [ "${1:-}" = "policy" ] && [ "${2:-}" = "show" ]; then
+  printf '%s\n' 'NOT_VALID_JSON{{{garbage'
+fi
+exit 0
+CCM
+chmod +x "$CCM34B/ccm"
+# Re-seed stores to OLD for this sub-case (34a already overwrote them to FRESH).
+cat > "$CRED34" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLDcred34AAA000000000000000000-_o","refreshToken":"sk-ant-ort01-OLDcred34r00000000000000000-_o","expiresAt":1700000000000,"subscriptionType":"pro"}}
+JSON
+cat > "$CJSON34" <<'JSON'
+{"oauthAccount":{"emailAddress":"old@x.com","subscriptionType":"pro"},"numStartups":5}
+JSON
+# Also need to re-seed vault since the FRESH refresh token was written to it in (34a).
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE34"; chmod 600 "$VFILE34"
+# And we need a fresh refresh endpoint since the old one may have self-reaped.
+PORT34B="$FX34/url34b.txt"; start_refresh_endpoint ok "$PORT34B"; RURL34B="$(cat "$PORT34B")"
+out34b="$(PATH="$CCM34B:$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL34B" CRED_PATH="$CRED34" CLAUDE_JSON_PATH="$CJSON34" \
+         bash "$SCRIPT" --registry "$REG34" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc34b=$?
+assert_eq "0" "$rc34b" "(34b) fail-open: ccm returns bad JSON → switch exits 0 (坏 JSON 降级放行·不误拦)"
+cred34b_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED34" 2>/dev/null)"
+assert_eq "$FRESH_AT" "$cred34b_at" "(34b) fail-open: credentials.json overwritten with FRESH token (坏 JSON 不误拦换号)"
+rm -rf "$FX34" "$EMPTY34" "$CCM34B"
+
 # kill any lingering stub endpoints.
 for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
 rm -rf "$SECSTUB" "$SECSTUB_CAPTURE" "$SECSTUB_FAIL" "$FX1" "$FX1B" "$FX2" "$FX3" "$FX4" "$FX5" "$STUB_ROOT5" "$FX5D" "$FX5E" "$FX6" "$FX8" "$FX9" "$STUB_ROOT9" "$FX10" "$FX11" "$FX11B" "$STUB_ROOT11B" "$FX15" "$STUB_ROOT15" "$FX16"
