@@ -169,10 +169,14 @@ export function show(ctx: Ctx): number {
         const rawHours = estimateHours(t.estimate as never);
         const cal = calibrate(records, query, { nowMs });
         const calibrated = calibratedEstimate(rawHours, cal);
-        const point = calibrated ?? rawHours ?? null;
+        // conformal 区间喂 **rawHours**，不喂 calibrated（#bug-A·避免乐观因子被乘两次）：
+        //   conformal 残差是历史 actual/raw_estimate 比率（≈乐观因子·见 conformal.ts relativeResiduals），
+        //   对入参乘该比率分位得区间。raw×ratio_p50 = 已校准区间（p50 自然 ≈ calibrated point·乐观因子作用一次）；
+        //   喂 calibrated 会把乐观因子乘第二次（raw×mult×ratio·区间整体偏高）。点估值仍报 calibrated（point）。
+        //   守卫用 rawHours != null（与原 `point != null` 等价：rawHours 缺 → calibrated/point 必为 null·无估值→无区间）。
         const conf =
-          point != null
-            ? conformalInterval(point, records, {
+          rawHours != null
+            ? conformalInterval(rawHours, records, {
                 group: { type: query.type, executor: query.executor },
               })
             : null;

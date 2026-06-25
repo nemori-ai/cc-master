@@ -250,6 +250,51 @@ test('evm: token AC source → coverage_pct reflects telemetry presence', () => 
   assert.ok((evm.ac.coverage_pct as number) >= 0 && (evm.ac.coverage_pct as number) <= 100);
 });
 
+test('evm: baselineHours recognizes week unit — BAC same scale as PV/EV (#bug-B)', () => {
+  // baselineHours 旧内联换算只认 d/m·把 w/week 当 1h（fall-through mult=1）→ week 任务 BAC 用 168h（snapshot
+  //   口径·estimateHours）而 PV/EV 用 1h → SPI/CPI/EAC/VAC 全废。修复：baselineHours 改用 estimateHours SSOT
+  //   （w=168h）→ 三换算点（mutations baseline / board-graph / evm）口径归一。
+  // SSOT 自洽：baselineHours(1w) 等于 estimateHours(1w) = 168（baselineHours 私有·经 BAC 间接验证）。
+  assert.equal(estimateHours({ value: 1, unit: 'w' }), 168, 'estimateHours(1w) SSOT = 168');
+  assert.equal(estimateHours({ value: 1, unit: 'week' }), 168);
+
+  const baseline = {
+    t0: '2026-06-01T00:00:00Z',
+    captured_at: '2026-06-01T00:00:00Z',
+    task_estimates: {
+      W1: { value: 1, unit: 'w' }, // 168h
+      H1: { value: 2, unit: 'h' }, // 2h
+    },
+    dag_snapshot: { W1: { deps: [] }, H1: { deps: ['W1'] } },
+  };
+  const board = {
+    schema: 'cc-master/v2',
+    tasks: [
+      // W1 done：跨 168h（与 baseline week 估值一致）→ EV 应计 168h。
+      {
+        id: 'W1',
+        status: 'done',
+        started_at: '2026-06-01T00:00:00Z',
+        finished_at: '2026-06-08T00:00:00Z',
+      },
+      { id: 'H1', status: 'ready' },
+    ],
+  };
+  const evm = computeEvm(board, baseline, {
+    asOfMs: Date.parse('2026-06-10T00:00:00Z'),
+    acSource: 'duration',
+  });
+  // BAC = baselineHours(W1=168) + baselineHours(H1=2) = 170（week 不再被当 1h → BAC=3 的旧 bug 不复现）。
+  assert.equal(evm.bac.value, 170, `BAC ${evm.bac.value} must be 168+2 (week=168h), not 1+2=3`);
+  // EV = W1 done 的 baseline 计划小时 = 168（同口径·非 1）。
+  assert.equal(evm.ev.value, 168, `EV ${evm.ev.value} must be 168 (week=168h), not 1`);
+  // PV 走到 as-of 应覆盖全 baseline（W1 早已 EF ≤ AT）→ 与 BAC 同尺度（PV≈170·非 ~3）。
+  assert.ok(evm.pv.value > 100, `PV ${evm.pv.value} same week scale as BAC (not 1h-scale)`);
+  // SPI/CPI 同口径 → 落合理域（W1 168h 计划、实测正好 168h → CPI≈1·SPI≈1·非 NaN/废）。
+  assert.ok((evm.spi as number) > 0.5 && (evm.spi as number) < 2, `SPI ${evm.spi} sane`);
+  assert.ok((evm.cpi as number) > 0.5 && (evm.cpi as number) < 2, `CPI ${evm.cpi} sane`);
+});
+
 // ── SLE + WIP-aging ────────────────────────────────────────────────────────────────
 test('sle: cycle-time quantiles monotone P50 ≤ P85 ≤ P95', () => {
   const corpus = loadCorpus(HOME, { nowMs: NOW });

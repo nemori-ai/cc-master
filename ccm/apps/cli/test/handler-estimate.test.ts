@@ -55,6 +55,45 @@ function mkInlineBoard(tasks: unknown[]): string {
   );
   return bp;
 }
+// mkHomeWithCorpus(corpusTasks, targetTasks) → 写一个 home（语料板 + 目标板）并返回 { home, targetBoard }。
+//   corpus 板是 done 归档板（喂 calibrate/conformal 的历史 ratio）；target 板是 active forecast/show 目标。
+//   用于 #bug-A 回归：构造 ratio≈1.4 的语料 → 校准乘子 + conformal 残差都来自它。
+function mkHomeWithCorpus(
+  corpusTasks: unknown[],
+  targetTasks: unknown[],
+): { home: string; targetBoard: string } {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-corpus-'));
+  TMPDIRS.push(root);
+  const home = join(root, '.claude', 'cc-master');
+  mkdirSync(home, { recursive: true });
+  writeFileSync(
+    join(home, 'corpus.board.json'),
+    JSON.stringify({
+      schema: 'cc-master/v2',
+      meta: { created_at: '2026-06-20T00:00:00Z' },
+      goal: 'corpus archive',
+      owner: { active: false, session_id: 'sid-corpus', heartbeat: '2026-06-20T00:00:00Z' },
+      git: { worktree: '/repo/corpus', branch: 'main' },
+      tasks: corpusTasks,
+      log: [],
+    }),
+  );
+  const targetBoard = join(home, 'target.board.json');
+  writeFileSync(
+    targetBoard,
+    JSON.stringify({
+      schema: 'cc-master/v2',
+      meta: { template_version: 3, created_at: '2026-06-25T00:00:00Z' },
+      goal: 'target estimate',
+      owner: { active: true, session_id: 'sid-target' },
+      git: { worktree: '/repo/target', branch: 'feat' },
+      scheduling: { wip_limit: 4 },
+      tasks: targetTasks,
+      log: [],
+    }),
+  );
+  return { home, targetBoard };
+}
 afterEach(() => {
   for (const d of TMPDIRS) rmSync(d, { recursive: true, force: true });
   TMPDIRS = [];
@@ -218,6 +257,60 @@ test('show <id>: calibrated estimate + conformal interval (golden·monotone)', (
   assert.ok(row.interval.p80 <= row.interval.p95);
   assert.equal(row.coverage_basis, 'mondrian-group');
   assert.equal(row.confidence, 'high');
+});
+
+test('show: conformal interval feeds RAW estimate, not calibrated (no double-calibration·#bug-A)', () => {
+  // 历史语料：8 个 done dev/subagent 任务·est=10h actual=14h → ratio=1.4（乐观因子）。
+  //   calibrate 学到乘子（Bayesian 向 1.0 收缩·<1.4）；conformal 残差分位 = 1.4。
+  // 目标任务：raw=10h。
+  //   修复后（喂 rawHours）：interval p50 = 10 × ratio_p50(1.4) ≈ 14（乐观因子作用一次）。
+  //   bug（喂 calibrated）：p50 ≈ calibrated × 1.4 ≈ 18+（乐观因子被乘第二次·codex 的 10→19.6 例）。
+  const corpus = Array.from({ length: 8 }, (_, i) => ({
+    id: `D${i}`,
+    status: 'done',
+    type: 'development',
+    executor: 'subagent',
+    estimate: { value: 10, unit: 'h' },
+    started_at: '2026-06-20T00:00:00Z',
+    finished_at: '2026-06-20T14:00:00Z', // actual=14h → ratio=1.4
+  }));
+  const { home, targetBoard } = mkHomeWithCorpus(corpus, [
+    {
+      id: 'T1',
+      status: 'ready',
+      deps: [],
+      type: 'development',
+      executor: 'subagent',
+      estimate: { value: 10, unit: 'h' },
+    },
+  ]);
+  const ctx = mkCtx(targetBoard, {
+    home,
+    positionals: ['T1'],
+    values: { scope: 'home', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  const code = estimateHandler.show(ctx);
+  assert.equal(code, EXIT.OK);
+  const row = dataOf(ctx).tasks[0];
+  assert.equal(row.raw_estimate_h, 10);
+  // calibration 乘子学到 ~1.4 方向（Bayesian 收缩 → calibrated 落在 10~14·点估仍报 calibrated）。
+  assert.ok(
+    row.calibrated_h > 10 && row.calibrated_h < 15,
+    `calibrated ${row.calibrated_h} ∈ (10,15)`,
+  );
+  assert.equal(row.coverage_basis, 'mondrian-group');
+  // ★核心断言：p50 ≈ raw × 1.4 ≈ 14（乐观因子一次），而非 raw × 1.4 × 1.4 ≈ 19.6（双重 calibration·bug）。
+  assert.ok(
+    Math.abs(row.interval.p50 - 14) < 0.5,
+    `p50 ${row.interval.p50} should ≈ 14 (raw×1.4·once), NOT ~19.6 (double-applied)`,
+  );
+  // 区间整体不应被乐观因子乘两次：p95 远低于「双重 calibration」会产生的 ~27（10×1.4×1.4×1.4 量级）。
+  assert.ok(
+    row.interval.p95 < 18,
+    `p95 ${row.interval.p95} should not be inflated by double-calibration`,
+  );
+  // 单调性（5% 硬墙）仍成立。
+  assert.ok(row.interval.p50 <= row.interval.p80 && row.interval.p80 <= row.interval.p95);
 });
 
 test('show: task with no estimate → no-history (degrade, retain null)', () => {

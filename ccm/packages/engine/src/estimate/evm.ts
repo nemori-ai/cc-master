@@ -15,7 +15,7 @@
 // 红线1：node/JS only，零 npm dep。确定性：纯算术 + baseline 拓扑 CPM（复用 graph-core）。
 // 诚实降级（plan §3）：无 baseline → warn + 不报 EVM；AC 缺 token → coverage_pct 标注。
 
-import { analyzeGraph } from '../board-graph-core.js';
+import { analyzeGraph, estimateHours } from '../board-graph-core.js';
 import type { TaskLike } from '../board-model.js';
 import { ISO_UTC_RE } from '../board-model.js';
 
@@ -64,13 +64,11 @@ export interface EvmResult {
 }
 
 // baselineEstimateHours(baseline, id) → baseline 计划的该任务小时（task_estimates·只认 baseline 快照）。
+//   折算口径归一到引擎 SSOT `estimateHours`（同包 board-graph-core·认 h/m/d/w(eek)·#bug-B）——
+//   修旧内联换算只认 d/m 而把 w/week 当 1h 的口径分裂（baseline snapshot 用 estimateHours·week=168h，
+//   这里却当 1h → BAC≠PV/EV 口径，SPI/CPI/EAC/VAC 全废）。estimateHours 返 null（缺/坏/未知单位）→ 0（保原降级语义）。
 function baselineHours(baseline: Baseline, id: string): number {
-  const e = baseline.task_estimates?.[id];
-  if (!e || typeof e.value !== 'number' || !(e.value > 0)) return 0;
-  const u = (e.unit ?? 'h').toLowerCase();
-  const mult =
-    u === 'd' || u === 'day' || u === 'days' ? 24 : u === 'm' || u === 'min' ? 1 / 60 : 1;
-  return e.value * mult;
+  return estimateHours(baseline.task_estimates?.[id]) ?? 0;
 }
 
 // computeEvm(board, baseline, opts) → EVM + Earned Schedule。
