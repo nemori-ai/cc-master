@@ -19,11 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **board-graph-core v2:estimate 喂 CPM** — `nodeDuration` 降级链加中间档：measured（实测时间戳）→ **estimate（估点折算工时·#29/#34）** → unit；`criticalPath.weight_source` 增 `estimate` 档（纯估点板可报小时级 makespan·计划工时连贯），混合仍诚实标 mixed 不报伪精确。
 - **board-lock.js —— 轻量 advisory 文件锁** — board 写入并发保护（O_EXCL 原子抢占 + 简单 stale 偷锁 + Atomics.wait 同步等待），纯 stdlib、零 spawn，不重型。供未来统一 CLI 写入关卡用。
 - **ADR-013** —— board v2 完整数据模型 + 统一访问层（narrow-waist 演进：从「只钉一小撮」→「全建模 + 三档标注」，红线 2 真正保护的仍只是 🔒 子集）。
+- **`using-ccm` skill（第 4 个分发 skill·ADR-014 配套）** — `ccm` CLI 的操作手册：board 操作的机制层手册（board 状态机心智 / 三档字段操作规则 / footgun 速查 + 全量 `command-catalog`），与 A（编排决策）/ B（workflow 写法）/ C（号池机制）正交、互不重叠（红线 3 从「三个分发 skill」升「四个」）。补上 ADR-014 解耦后的缺口——机制层（hooks / skill 脚本 shell 调 `ccm`）已就位，但「指导 agent 怎么用 `ccm` 写 board」此前无 prose（`board.md` 还在教整文件 `Write`）。配套：① SKILL A 的 `board.md` + 主文件从「`Write` board + `ccm` 事后 lint」re-point 为「**`ccm` 命令为主写路径（写关卡）+ `ccm` 缺则 `Write` 降级**」；② AGENTS.md 新增「`ccm` ⟷ `using-ccm` 锁步」抗漂移硬约束（ccm 命令面改动必同 PR 同步 skill）+ `skill-lint.sh` check(4) 纳入 using-ccm。
 
 ### Changed
 
 - **hook 收编为 node（ADR-013 §2.4 · ADR-006 解锁）** — `reinject` / `verify-board` / `posttool-batch` 三个 bash hook 收编为 node（`.sh`→`.js`），经新的共享 `hook-common.js`（武装闸 `isArmed`/`boardMatches`/`listMatchingBoards` + HOME 解析 + stdin）+ `board-model` 派生，**用 `JSON.parse` 取代 v1 的 owner_region/tasks_region/awk 深度扫描**——「归档板嵌套 `active:true`」「task-local log[] 里的 stale/status」等一整类全文 grep/awk 误读盲区由数据模型解析根除。`verify-board` 的 Stop 指纹握手用 node 精确重实现 POSIX cksum（CRC-32）以字节对齐 bash 行为；watchdog 读 `board.watchdog`（`wakeup` 旧板兼容 fallback）。`bootstrap-board.sh` 仍为 bash（唯一豁免的 ARM 动作）；红线 6 dormant-until-armed 与所有 hook 行为字节级保持。board.template.json / board.example.json / view-server 同步升 v2。
 - **board-lint / verify-board hook + board webview 迁到 `ccm`（ADR-014 进程边界落地）** — board-lint 与 verify-board 这两个 hook 不再 in-process require 引擎，改为经进程边界 `spawn ccm` 调用独立 CLI（缺 `ccm` 则静默降级·不 block）；board webview 从内嵌核心改吃 vendored 的 `@ccm/engine` IIFE。随之**删除插件内旧的内嵌 `cli/`**（零依赖 CJS 实现）——board 引擎单一真相源现归 `@ccm/engine`。武装闸（红线6）与 narrow-waist 契约（红线2）不变；红线1 经进程边界反而更纯（TS/npm 依赖全锁在 ccm 内）。
+
+### Fixed
+
+- **`ccm` 首跑可用性 + 命令面打磨（真人 QA 实测一批批修）** — ① board 发现两层匹配（精确 sid 命中，否则未认领 `session_id:""` 板兜底）·#1；② 写命令 lint warning 默认收敛为一行摘要（`--verbose` 展开）、不再每次刷屏·#6；③ `board init` 建板后打印板路径 + 下一步提示·#13；④ `task --type` 改开放枚举（未知 taskType 不再硬拒 `exit 2`、降为 `FMT-TYPE` warn）·#2；⑤ **`board init --home <不存在目录>` 自建目录**（修复前 runWrite 抢锁 `openSync('<board>.lock','wx')` 先撞 ENOENT、建板失败且不留痕）·#16。
 
 ## [0.9.1] — 2026-06-22
 

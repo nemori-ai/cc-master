@@ -16,7 +16,7 @@
 
 一个长周期目标，不该在下一次 context compaction 时就这么死掉。你把两天的活交给 agent，它干出了真进展，上下文一满、一次 compaction 之后，它就忘了自己正在指挥——只剩*装着忙、却什么都没产出*。cc-master 就是那个不会忘的层。
 
-它是一个「随处可用」（ship-anywhere）的 Claude Code 插件，把任意 main-session agent 变成长周期的 **master orchestrator（总指挥）**：把目标拆成依赖图、把后台工作并行派发、在每一个等待空档里让主线程**有产出地**持续推进，并熬过反复 compaction 与跨会话续接、全程不丢线索。它**不是一个 framework**——只是命令 + 3 个 skill + hooks + 一份 board 文件。
+它是一个「随处可用」（ship-anywhere）的 Claude Code 插件，把任意 main-session agent 变成长周期的 **master orchestrator（总指挥）**：把目标拆成依赖图、把后台工作并行派发、在每一个等待空档里让主线程**有产出地**持续推进，并熬过反复 compaction 与跨会话续接、全程不丢线索。它**不是一个 framework**——只是命令 + 4 个 skill + hooks + 一份 board 文件。
 
 ```
 /cc-master:as-master-orchestrator <一个值得花 >24h 的目标>
@@ -389,7 +389,7 @@ cc-master **致力于让** Claude Code agent 化身一个具备六项能力的 m
 
 ## 工作原理
 
-这个插件 = **命令 + 3 个 skill + hooks + 一份 board 文件**，每件各有各的寿命：
+这个插件 = **命令 + 4 个 skill + hooks + 一份 board 文件**，每件各有各的寿命：
 
 ```
 cc-master/
@@ -406,7 +406,8 @@ cc-master/
 ├── skills/
 │   ├── orchestrating-to-completion/    Skill A —— 编排方法论（魂在这）
 │   ├── authoring-workflows/            Skill B —— 怎么写 workflow 脚本
-│   └── account-management/             Skill C —— 换号号池机制层（选号 / 切号 / vault）
+│   ├── account-management/             Skill C —— 换号号池机制层（选号 / 切号 / vault）
+│   └── using-ccm/                      Skill D —— ccm CLI 操作手册（用 ccm 读写 board）
 └── hooks/
     └── scripts/{bootstrap-board, reinject, verify-board,    bash
                  posttool-batch}.sh +
@@ -414,7 +415,7 @@ cc-master/
 ```
 
 - **命令**是一次性开机引导——你主动触发，它把「我是 master orchestrator」的哲学与操作纪律灌进来，并开好 board。
-- **skill** 是按需调阅的深度手册——跑编排循环时翻 Skill A，写 workflow 脚本时翻 Skill B，管换号号池时翻 Skill C（`account-management`：建号池 registry、选最优切入号、token 只进 vault）。
+- **skill** 是按需调阅的深度手册——跑编排循环时翻 Skill A，写 workflow 脚本时翻 Skill B，管换号号池时翻 Skill C（`account-management`：建号池 registry、选最优切入号、token 只进 vault），用 `ccm` CLI 操作 board 时翻 Skill D（`using-ccm`：命令面、board 状态机心智、写关卡纪律）。
 - **hook** 是总指挥的运行时——它熬过 compaction（重注「你是总指挥 + 这是你的 board」）、把关收尾、对过度派发软警告、对照账户 5h/7d `used_percentage` 感知配额墙（由 `statusline-capture.js` 从 status line 捕获；本地反推作 fallback）。只在结构化 JSON 解析划算处（算 usage / rate-limit JSON）才用 `node`，其余一律 bash（[ADR-006](adrs/ADR-006-hooks-may-use-node-js.md)）。
 
 ### 它教的三种后台手段
