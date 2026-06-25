@@ -21,7 +21,24 @@ edit you make takes effect on the next session — this is the fastest dogfood l
 (The marketplace + `enabledPlugins` install path *does* cache; don't use it while
 developing — see [README](README.md#install).)
 
-Requirements: **Node 22+** and **bash**. That's it.
+Requirements: **Node 22+** and **bash** to load the plugin. For full hook behavior
+you also need the `ccm` CLI built (see next).
+
+### board 引擎 = 独立 `ccm` CLI（ADR-014）
+
+board 的状态逻辑（lint / graph / model）已解耦为独立安装的 **`ccm` CLI**（源在
+`ccm/`·`@ccm/engine` 库 + `apps/cli`，**不随 plugin 分发**）。hooks（board-lint /
+verify-board）与 webview 经它工作：hooks 经进程边界 `spawn ccm`，webview 吃 vendored
+`@ccm/engine` IIFE。**`ccm` 缺失时 hooks 优雅降级（静默、不 block）**，故 plugin 仍能在
+只有 Node+bash 的环境加载——但要跑出**完整 hook 行为 + `run-tests.sh` 的 ccm 路径**，先建 ccm：
+
+```bash
+pnpm -C ccm install && pnpm -C ccm build   # 出 dist
+```
+
+`run-tests.sh` 会自动 `pnpm -C ccm build` + `export CCM_BIN` 指向 `ccm/apps/cli/dev-bin/ccm`
+（node-bin shim，免每次重建 SEA）；无 pnpm/dist 时软失败、hook 测试走降级路径。hooks 解析
+`ccm` 的顺序：`$CCM_BIN`（绝对路径覆写）> PATH 上的 `ccm`。
 
 ## Before you open a PR
 

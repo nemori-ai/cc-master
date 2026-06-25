@@ -27,7 +27,7 @@ const VENDOR_DIR = path.join(SCRIPT_DIR, 'vendor');
 const HTML_PATH = path.join(SCRIPT_DIR, 'view.html');
 // The shared graph-analysis core is now the @ccm/engine IIFE, vendored ALONGSIDE this skill at
 // ./vendor/ccm-engine.iife.js (a build artifact of ${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion,
-// re-generated each release; T4-3a migration off the old cli/src/ classic-script trio). It publishes a
+// re-generated each release; T4-3a migration off the old in-repo board-engine classic-script trio). It publishes a
 // SINGLE global — globalThis.__ccmEngine — carrying every engine symbol (analyzeGraph / lintBoard /
 // ENUMS / …). The viewer loads it as ONE classic <script> so its analyze() delegates to the same
 // analyzeGraph() instead of carrying a divergent copy (DRY). Self-contained: resolved relative to
