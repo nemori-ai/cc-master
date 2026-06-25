@@ -415,6 +415,7 @@ function validateEnums(
     const o = options[flag];
     if (!o) continue; // 防御（noUncheckedIndexedAccess）：遍历 keys 必有值。
     if (!Array.isArray(o.enum)) continue;
+    if (o.openEnum) continue; // 开放枚举（taskType·QA #2）：enum 仅作 help 建议，未知值不硬拒（交 lint FMT-TYPE warn）。
     if (values[flag] === undefined) continue;
     const vals = Array.isArray(values[flag]) ? (values[flag] as unknown[]) : [values[flag]];
     for (const v of vals) {

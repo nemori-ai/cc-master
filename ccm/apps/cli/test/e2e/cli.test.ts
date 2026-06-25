@@ -194,12 +194,22 @@ test('未知 flag → 2（usage error）', () => {
   assert.match(r.stderr, /usage error/);
 });
 
-test('非法 enum 值 → 2（router enum 校验）', () => {
+test('非法 enum 值（闭合枚举 --executor）→ 2（router enum 校验）', () => {
   const { home } = mkHome();
   seedBoard(home);
-  const r = runCcm(['task', 'add', 'TX', '--type', 'not-a-type'], { home });
+  const r = runCcm(['task', 'add', 'TX', '--executor', 'not-an-executor'], { home });
   assert.equal(r.status, 2);
-  assert.match(r.stderr, /invalid value for --type/);
+  assert.match(r.stderr, /invalid value for --executor/);
+});
+
+test('开放枚举 --type 未知值 → 接受（不硬拒）+ lint FMT-TYPE warn（QA #2）', () => {
+  const { home } = mkHome();
+  seedBoard(home);
+  // taskType 是开放枚举（board-model OPEN_ENUMS）：未知值不在 flag 层硬拒，由 lint 出 FMT-TYPE warn（不 fail）。
+  //   --verbose 才展开全量 warning（QA #6）——故这里加 --verbose 断言 FMT-TYPE 现身。
+  const r = runCcm(['task', 'add', 'TX', '--type', 'custom-type', '--verbose'], { home });
+  assert.equal(r.status, 0, `open --type 应被接受；stderr=${r.stderr}`);
+  assert.match(r.stderr, /FMT-TYPE/);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════════════════════════

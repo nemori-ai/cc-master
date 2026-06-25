@@ -28,6 +28,10 @@ const E = ENUMS;
 export interface OptionSpec {
   type: 'string' | 'boolean';
   enum?: readonly string[];
+  // openEnum:true —— enum 仅作 help 建议值，router 不硬拒未知值（开放枚举·QA #2）。对应 board-model
+  //   OPEN_ENUMS（taskType / refKind）：未知值合法、由 lint 出 warn（FMT-TYPE）而非 flag 层 fail。
+  //   不设（默认闭集）= router validateEnums 硬拒未知值（executor / role / status 等闭合枚举）。
+  openEnum?: boolean;
   transform?: 'duration' | 'csv' | 'ref' | 'kv' | 'json' | 'input';
   required?: boolean;
   multiple?: boolean;
@@ -157,6 +161,7 @@ export const REGISTRY: Registry = {
           type: 'string',
           field: 'type',
           enum: E.taskType,
+          openEnum: true,
           desc: '任务类型（开放·未知值 warn）',
         },
         executor: { type: 'string', field: 'executor', enum: E.executor, desc: '执行者类型' },
@@ -230,7 +235,7 @@ export const REGISTRY: Registry = {
       options: {
         status: { type: 'string', enum: E.status, multiple: true, desc: '只列某 status（可重复）' },
         executor: { type: 'string', enum: E.executor, desc: '只列某 executor' },
-        type: { type: 'string', enum: E.taskType, desc: '只列某 type' },
+        type: { type: 'string', enum: E.taskType, openEnum: true, desc: '只列某 type' },
         parent: { type: 'string', desc: '只列某 owner 的子节点' },
         json: { type: 'boolean', desc: 'JSON 数组' },
       },
@@ -244,7 +249,13 @@ export const REGISTRY: Registry = {
       options: {
         title: { type: 'string', field: 'title', desc: '卡片标题' },
         description: { type: 'string', field: 'description', desc: '详细描述' },
-        type: { type: 'string', field: 'type', enum: E.taskType, desc: '任务类型' },
+        type: {
+          type: 'string',
+          field: 'type',
+          enum: E.taskType,
+          openEnum: true,
+          desc: '任务类型（开放·未知值 warn）',
+        },
         executor: { type: 'string', field: 'executor', enum: E.executor, desc: '执行者类型' },
         handle: { type: 'string', field: 'handle', desc: '后台句柄' },
         estimate: {
