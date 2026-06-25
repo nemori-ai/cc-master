@@ -235,6 +235,28 @@ claude plugin install cc-master@cc-master
 
 > 一句话判断：在迭代插件本身 → `--plugin-dir`（live）。给团队钉一个版本 → marketplace + `enabledPlugins`（cached）。
 
+### 可选但推荐 —— 安装 `ccm` CLI 以获得完整的 board 校验
+
+`ccm` 是 cc-master 的 **board 引擎**——一个独立安装的 CLI，撑起 board lint（板一写坏当即捕获）、rollup stop-gate（父任务的子任务没全 done 就拒绝把父任务标完成），以及 board viewer 渲染所需的数据。这套引擎已从插件里抽出、自立为一个工业化的 TypeScript monorepo（`@ccm/engine` 库 + `ccm` 命令），好让它能长出独立的消费方——未来的桌面 / web 客户端，而不只是这个插件——这也是为什么插件现在经**进程边界**调用它、而非内嵌它（[ADR-014](adrs/ADR-014-cli-decoupling-as-independent-product.md)）。
+
+**它是推荐的增强项，不是硬前置。** 插件只靠 Node 22+ 与 bash 仍能加载并工作：`ccm` 找不到时，board-lint 与 `verify-board` 这两个 hook 会**优雅降级**——静默 no-op，绝不 block agent 的流程。没有它，你失去的只是自动的 board-lint 反馈与 rollup stop-gate 这两项增强，插件其余部分照常运转。
+
+有两条安装路：
+
+**(a) 从源码构建 —— 当前可用的路（dev）。** 构建这个 monorepo，然后把 dev 二进制放进 `PATH`，或用 `CCM_BIN` 指向它：
+
+```bash
+pnpm -C ccm install && pnpm -C ccm build   # 构建 @ccm/engine + ccm CLI
+# 然后要么把 dev shim 加进 PATH：
+export PATH="$PWD/ccm/apps/cli/dev-bin:$PATH"
+# …要么直接用 CCM_BIN 指向它（绝对路径会覆写 PATH）：
+export CCM_BIN="$PWD/ccm/apps/cli/dev-bin/ccm"
+```
+
+**(b) 下载预编译二进制 —— 未来的主路。** `ccm` 以 per-OS 的 [Node SEA](https://nodejs.org/api/single-executable-applications.html) 单文件可执行分发。自 v0.10.0 起，cc-master 的 GitHub release 将附带一个 `ccm-<os>-<arch>` 二进制，`chmod +x` 后放进 `PATH` 即可。**当前 v0.10.0 release 尚未附带它**——在它就位之前，按 (a) 从源码构建。
+
+**hook 怎么找到它：** 先试 `$CCM_BIN`（绝对路径覆写），再试 `PATH` 上的 `ccm`。两者都不设、又没装它——hook 就按上面所述降级。
+
 加载后，给它一个值得它出手的目标（量级上 >24h、含许多可独立推进的单元）。完整命令集：
 
 ```

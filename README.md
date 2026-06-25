@@ -235,6 +235,28 @@ Or enable it declaratively in settings. The `enabledPlugins` value is an **objec
 
 > Quick rule: iterating on the plugin → `--plugin-dir` (live). Pinning a version for a team → marketplace + `enabledPlugins` (cached).
 
+### Optional but recommended — install the `ccm` CLI for full board validation
+
+`ccm` is cc-master's **board engine** — a separately installed CLI that powers board lint (catching a malformed board the moment it's written), the rollup stop-gate (refusing to call a parent task done while its children aren't), and the data the board viewer renders. The engine was split out of the plugin into its own industrial TypeScript monorepo (the `@ccm/engine` library + the `ccm` command) so it can grow independent consumers — a future desktop / web client, not just this plugin — which is why the plugin now reaches it across a process boundary rather than embedding it ([ADR-014](adrs/ADR-014-cli-decoupling-as-independent-product.md)).
+
+**It is a recommended enhancement, not a hard prerequisite.** The plugin still loads and works with only Node 22+ and bash: when `ccm` isn't found, the board-lint and `verify-board` hooks **degrade gracefully** — they no-op silently, never blocking the agent's flow. What you lose without it is the automatic board-lint feedback and the rollup stop-gate, two enhancements on top of a plugin that otherwise runs fine.
+
+There are two ways to install it:
+
+**(a) Build from source — the path available today (dev).** Build the monorepo, then put the dev binary on your `PATH` or point `CCM_BIN` at it:
+
+```bash
+pnpm -C ccm install && pnpm -C ccm build   # builds @ccm/engine + the ccm CLI
+# then either add the dev shim to PATH:
+export PATH="$PWD/ccm/apps/cli/dev-bin:$PATH"
+# …or point CCM_BIN straight at it (an absolute path overrides PATH):
+export CCM_BIN="$PWD/ccm/apps/cli/dev-bin/ccm"
+```
+
+**(b) Download a prebuilt binary — the intended path going forward.** `ccm` ships as a per-OS [Node SEA](https://nodejs.org/api/single-executable-applications.html) single-file executable. From v0.10.0 onward, cc-master's GitHub releases will attach a `ccm-<os>-<arch>` binary you can `chmod +x` and drop on your `PATH`. **This isn't attached to the v0.10.0 release yet** — until it is, build from source as in (a).
+
+**How the hooks find it:** `$CCM_BIN` (an absolute-path override) is tried first, then `ccm` on your `PATH`. Set neither and it isn't installed — and the hooks simply degrade as described above.
+
 Once loaded, hand it a goal big enough to be worth it (think >24h of work, many independent units). The full command set:
 
 ```
