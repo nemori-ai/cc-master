@@ -46,15 +46,23 @@ interface BackupAccount {
 }
 
 // ── accounts.json registry 解析（只读·绝不写）──────────────────────────────────────────────────────
-//   路径同 accounts-lib.js 的 defaultRegistryPath：${CC_MASTER_HOME:-$HOME/.claude/cc-master}/accounts.json。
+//   home 解析口径同 estimate.ts 的 resolveHomeDir：--home flag 先于 CC_MASTER_HOME 先于默认
+//   $HOME/.claude/cc-master（multi-home/dev/test 下 --home 必须生效，否则 effective_n 错·选错号·P2）。
 //   无文件 / 坏 JSON / 非对象 → null（天然单账号优雅降级·不抛）。
-function registryPath(env: Record<string, string | undefined>): string {
-  const home = env.CC_MASTER_HOME || path.join(os.homedir(), '.claude', 'cc-master');
+function registryPath(env: Record<string, string | undefined>, homeFlag?: string): string {
+  const home = homeFlag
+    ? path.resolve(homeFlag)
+    : env.CC_MASTER_HOME
+      ? path.resolve(env.CC_MASTER_HOME)
+      : path.join(os.homedir(), '.claude', 'cc-master');
   return path.join(home, 'accounts.json');
 }
 
-function readRegistry(env: Record<string, string | undefined>): Record<string, unknown> | null {
-  const p = registryPath(env);
+function readRegistry(
+  env: Record<string, string | undefined>,
+  homeFlag?: string,
+): Record<string, unknown> | null {
+  const p = registryPath(env, homeFlag);
   let raw: string;
   try {
     raw = fs.readFileSync(p, 'utf8');
@@ -126,8 +134,9 @@ function staleByAge(asOf: string | null, nowMs: number): boolean {
 function readBackups(
   env: Record<string, string | undefined>,
   nowMs: number,
+  homeFlag?: string,
 ): { accounts: BackupAccount[]; raw: Record<string, unknown> } | null {
-  const accounts = readRegistry(env);
+  const accounts = readRegistry(env, homeFlag);
   if (!accounts) return null;
   const out: BackupAccount[] = [];
   for (const [email, rawEntry] of Object.entries(accounts)) {
@@ -213,9 +222,13 @@ function normalizeSignal(obj: Record<string, unknown>): UsageSignal {
   };
 }
 
-// effectiveNFromRegistry(env, nowMs) → 号池有效配额份数（复用引擎 effectiveN 纯函数）。无 registry → 1。
-function effectiveNFromRegistry(env: Record<string, string | undefined>, nowMs: number): number {
-  const accounts = readRegistry(env);
+// effectiveNFromRegistry(env, nowMs, homeFlag) → 号池有效配额份数（复用引擎 effectiveN 纯函数）。无 registry → 1。
+function effectiveNFromRegistry(
+  env: Record<string, string | undefined>,
+  nowMs: number,
+  homeFlag?: string,
+): number {
+  const accounts = readRegistry(env, homeFlag);
   if (!accounts) return 1;
   return effectiveN(accounts as never, nowMs).effective_n;
 }
@@ -230,9 +243,10 @@ export function show(ctx: Ctx): number {
     render: (_b, c) => {
       const nowMs = Date.now();
       const accountsScope = (c.values.accounts as string) || 'all';
+      const homeFlag = c.values.home as string | undefined;
       const sidecar = readUsageSidecar(c.env);
-      const backups = readBackups(c.env, nowMs);
-      const en = effectiveNFromRegistry(c.env, nowMs);
+      const backups = readBackups(c.env, nowMs, homeFlag);
+      const en = effectiveNFromRegistry(c.env, nowMs, homeFlag);
 
       const current = sidecar
         ? {
@@ -313,14 +327,15 @@ export function advise(ctx: Ctx): number {
     render: (_b, c) => {
       const nowMs = Date.now();
       const nowSec = Math.floor(nowMs / 1000);
+      const homeFlag = c.values.home as string | undefined;
       const sidecar = readUsageSidecar(c.env);
-      const backups = readBackups(c.env, nowMs);
+      const backups = readBackups(c.env, nowMs, homeFlag);
       // --effective-n 覆写优先；否则从 registry 算。
       const enFlag = c.values['effective-n'];
       const en =
         typeof enFlag === 'string' && Number.isInteger(Number(enFlag)) && Number(enFlag) >= 1
           ? Number(enFlag)
-          : effectiveNFromRegistry(c.env, nowMs);
+          : effectiveNFromRegistry(c.env, nowMs, homeFlag);
 
       const opts: PacingOptions = { nowSec, effectiveN: en };
       const advice = pacingAdvice(sidecar, opts);

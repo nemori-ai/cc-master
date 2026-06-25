@@ -19,7 +19,7 @@
 //   SCHEMA_VERSION / isLegalTransition / STATUS_MACHINE；module.exports 换成命名导出。逻辑/数值/正则/
 //   报错文案/.errKind 逐字保持。board 用宽松结构类型（mutations 只机械写形状·不强 schema）。
 
-import { isLegalTransition, SCHEMA_VERSION, STATUS_MACHINE } from '@ccm/engine';
+import { estimateHours, isLegalTransition, SCHEMA_VERSION, STATUS_MACHINE } from '@ccm/engine';
 
 // 带 .errKind 的 Error（router 据此映射退出码）。
 interface KindedError extends Error {
@@ -505,14 +505,11 @@ export function baselineSnapshot(board: Board, { t0, note }: { t0: string; note?
         value: t.estimate.value,
         unit: typeof t.estimate.unit === 'string' ? t.estimate.unit : 'h',
       };
-      // 累积 BAC（budget at completion）：换算成小时
-      const v = t.estimate.value;
-      const u = t.estimate.unit || 'h';
-      let hours = v;
-      if (u === 'm' || u === 'min') hours = v / 60;
-      else if (u === 'd') hours = v * 8;
-      else if (u === 'w') hours = v * 40;
-      bacH += hours;
+      // 累积 BAC（budget at completion）：换算成小时——共用引擎 estimateHours 这一 SSOT
+      //   （d=24h/w=168h·日历口径），与 EVM/estimate/MC 路径完全一致。未知/非法单位 → null
+      //   则跳过（与 estimate 路径把未知单位当 unit/no-data 一致，不按旧逻辑当小时塞进去）。
+      const hours = estimateHours(t.estimate);
+      if (hours != null) bacH += hours;
     }
   }
 
@@ -567,13 +564,10 @@ export function baselineReset(board: Board, { t0, note }: { t0: string; note?: s
         value: t.estimate.value,
         unit: typeof t.estimate.unit === 'string' ? t.estimate.unit : 'h',
       };
-      const v = t.estimate.value;
-      const u = t.estimate.unit || 'h';
-      let hours = v;
-      if (u === 'm' || u === 'min') hours = v / 60;
-      else if (u === 'd') hours = v * 8;
-      else if (u === 'w') hours = v * 40;
-      bacH += hours;
+      // 累积 BAC：共用引擎 estimateHours SSOT（d=24h/w=168h·日历口径），与 snapshot/EVM/estimate 一致。
+      //   未知/非法单位 → null 则跳过（同 snapshot 函数·与 estimate 路径把未知单位当 unit/no-data 一致）。
+      const hours = estimateHours(t.estimate);
+      if (hours != null) bacH += hours;
     }
   }
 

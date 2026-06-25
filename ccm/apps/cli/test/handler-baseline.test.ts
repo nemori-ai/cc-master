@@ -15,6 +15,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
+import * as M from '@ccm/engine';
 import type { Ctx } from '../src/handlers/_common.js';
 import * as baselineHandler from '../src/handlers/baseline.js';
 import * as io from '../src/io.js';
@@ -119,6 +120,65 @@ test('baseline snapshot writes baseline object with bac_h calculated', () => {
   assert.equal(board.baseline.bac_h, 5);
   assert.deepEqual(Object.keys(board.baseline.task_estimates).sort(), ['T1', 'T2'].sort());
   assert.ok(Array.isArray(board.baseline.history) && board.baseline.history.length === 0);
+});
+
+// 回归（Finding bug2·P2）：snapshot 的 bac_h 必须走引擎 estimateHours 这一 SSOT 口径——
+//   d=24h（日历日·非旧的 8h 工作日）、w=168h（非旧的 40h 周）、unknown unit → 跳过（非当小时塞）。
+//   旧内联换算（d*8/w*40/未知当小时）会让 baseline 与 EVM/estimate/MC 路径口径不一致 → BAC/SPI/CPI 全错。
+test('baseline snapshot bac_h uses estimateHours calendar units (d=24h, w=168h)', () => {
+  const boardPath = mkBoardHome({
+    tasks: [
+      { id: 'T1', status: 'ready', deps: [], estimate: { value: 1, unit: 'd' } }, // 1d → 24h（非 8h）
+      { id: 'T2', status: 'ready', deps: ['T1'], estimate: { value: 1, unit: 'w' } }, // 1w → 168h（非 40h）
+      { id: 'T3', status: 'ready', deps: ['T1'], estimate: { value: 30, unit: 'm' } }, // 30m → 0.5h
+    ],
+  });
+  const ctx = mkCtx(boardPath);
+  const code = baselineHandler.snapshot(ctx);
+  assert.equal(code, EXIT.OK);
+  const board = JSON.parse(readFileSync(boardPath, 'utf8'));
+  // 24 + 168 + 0.5 = 192.5（旧口径会是 8 + 40 + 0.5 = 48.5）。
+  assert.equal(board.baseline.bac_h, 192.5);
+  // task_estimates 仍存原始 {value,unit}（快照原值·不折算）。
+  assert.deepEqual(board.baseline.task_estimates.T1, { value: 1, unit: 'd' });
+  assert.deepEqual(board.baseline.task_estimates.T2, { value: 1, unit: 'w' });
+});
+
+test('baseline snapshot bac_h skips unknown/illegal estimate units (estimateHours → null)', () => {
+  const boardPath = mkBoardHome({
+    tasks: [
+      { id: 'T1', status: 'ready', deps: [], estimate: { value: 2, unit: 'h' } }, // 2h 计入
+      { id: 'T2', status: 'ready', deps: [], estimate: { value: 5, unit: 'sprint' } }, // 未知单位 → 跳过
+      { id: 'T3', status: 'ready', deps: [], estimate: { value: -1, unit: 'h' } }, // 非法值 → 跳过
+    ],
+  });
+  const ctx = mkCtx(boardPath);
+  const code = baselineHandler.snapshot(ctx);
+  assert.equal(code, EXIT.OK);
+  const board = JSON.parse(readFileSync(boardPath, 'utf8'));
+  // 只有 T1（2h）计入；T2 未知单位、T3 非法值都跳过（不按旧逻辑当小时塞 → 旧会是 2+5=7）。
+  assert.equal(board.baseline.bac_h, 2);
+});
+
+// 回归：baseline bac_h 与 EVM 估值口径一致——snapshot 出的 bac_h 必须等于 EVM 内部按
+//   baselineHours 折算的 sum(task_estimates)（同 d=24h SSOT），二者自洽不漂移。
+test('baseline bac_h is consistent with EVM estimate unit basis', () => {
+  const boardPath = mkBoardHome({
+    tasks: [
+      { id: 'T1', status: 'ready', deps: [], estimate: { value: 1, unit: 'd' } }, // 24h
+      { id: 'T2', status: 'ready', deps: ['T1'], estimate: { value: 4, unit: 'h' } }, // 4h
+    ],
+  });
+  const ctx = mkCtx(boardPath, { values: { t0: '2026-06-25T08:00:00Z' } });
+  const code = baselineHandler.snapshot(ctx);
+  assert.equal(code, EXIT.OK);
+  const board = JSON.parse(readFileSync(boardPath, 'utf8'));
+  // snapshot bac_h = 24 + 4 = 28（d=24h 口径）。
+  assert.equal(board.baseline.bac_h, 28);
+  // EVM 的 BAC（用 baseline.bac_h 优先）+ EVM 内部 sum(task_estimates via baselineHours) 都应等于 28——
+  //   口径自洽（baselineHours 同样 d→24h），证明 baseline 与 EVM 路径不再漂移。
+  const evm = M.computeEvm(board, board.baseline, { asOfMs: Date.parse('2026-06-25T08:00:00Z') });
+  assert.equal(evm.bac.value, 28, 'EVM BAC matches snapshot bac_h');
 });
 
 test('baseline snapshot with --t0 uses provided t0', () => {

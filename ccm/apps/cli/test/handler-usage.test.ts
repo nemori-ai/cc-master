@@ -200,6 +200,61 @@ test('usage show --accounts current filters to active only', () => {
   assert.equal(out.data.accounts[0].active, true);
 });
 
+test('usage show honors --home over CC_MASTER_HOME (registry read from --home·P2 regression)', () => {
+  // Regression（Finding bug3·P2）：registryPath used to read只 CC_MASTER_HOME, ignoring --home →
+  //   multi-home/dev/test 下读错 registry·effective_n 错·选错号。修复后 --home 优先（仿 estimate.ts resolveHomeDir）。
+  // 两个 home：--home 指向 3 号 registry，CC_MASTER_HOME 指向另一只有 1 号的 registry。
+  const flagHome = setupHome({ accounts: REGISTRY_3 });
+  const envHome = setupHome({
+    accounts: { 'solo@c.com': { active: true, vault: { kind: 'keychain' } } },
+  });
+  const ctx = mkCtx(envHome.home, flagHome.boardPath, {
+    values: { home: flagHome.home }, // --home 显式指向 3 号 registry
+    flags: { json: true },
+  });
+  // ctx.env.CC_MASTER_HOME 仍是 envHome（1 号）——若 --home 被忽略，effective_n 会是 1、账号是 solo@c.com。
+  const code = usageHandler.show(ctx);
+  assert.equal(code, EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.registry_present, true);
+  assert.equal(
+    out.data.effective_n,
+    3,
+    '--home registry has 3 accounts (NOT the 1-account CC_MASTER_HOME)',
+  );
+  assert.equal(out.data.accounts.length, 3);
+  const emails = out.data.accounts.map((a: { email: string }) => a.email).sort();
+  assert.deepEqual(emails, ['a@c.com', 'b@c.com', 'c@c.com'], 'accounts come from --home registry');
+  assert.ok(!emails.includes('solo@c.com'), 'must NOT read the CC_MASTER_HOME registry');
+});
+
+test('usage advise honors --home for effective_n + switch_candidate (P2 regression)', () => {
+  // advise 侧同样要认 --home（effective_n 从正确 registry 算、switch_candidate 选正确备号）。
+  const flagHome = setupHome({ accounts: REGISTRY_3, sidecar: SIDECAR_CRITICAL });
+  const envHome = setupHome({
+    accounts: { 'solo@c.com': { active: true, vault: { kind: 'keychain' } } },
+  });
+  const ctx = mkCtx(envHome.home, flagHome.boardPath, {
+    values: { home: flagHome.home },
+    // sidecar 走 --home 下的 rate-cache（advise 读的账户信号路径独立于 registry）。
+    rateCache: join(flagHome.home, '.cc-master-rate-limits.json'),
+    flags: { json: true },
+  });
+  const code = usageHandler.advise(ctx);
+  assert.equal(code, EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(
+    out.data.effective_n,
+    3,
+    'effective_n from --home registry (not 1-account env home)',
+  );
+  assert.equal(
+    out.data.switch_candidate,
+    'c@c.com',
+    'switch_candidate from --home registry backups',
+  );
+});
+
 // ══ usage advise ═════════════════════════════════════════════════════════════════════════════════
 
 test('usage advise with no sidecar holds + available:false (degrade, exit 0)', () => {
