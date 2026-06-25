@@ -79,6 +79,28 @@ function loadScopedCorpus(board: BoardArg, ctx: Ctx): { records: DoneRecord[]; s
   return { records, scope };
 }
 
+// windowFilter(records, windowDays, nowMs) → 按 --window <n> 天滑窗过滤 done 语料（codex round-3 #bug2）。
+//   只留完成时刻落在 [nowMs - n*86400000, nowMs] 内的 done 记录（按 finishedAtMs·缺锚的丢弃·无法判定窗口归属）。
+//   windowDays 缺省（undefined）→ 不过滤（沿用现状·spec「无 window 不过滤」）。≤0 / 非数 → 不过滤（保守）。
+function windowFilter(
+  records: DoneRecord[],
+  windowDays: number | null,
+  nowMs: number,
+): DoneRecord[] {
+  if (windowDays == null || !Number.isFinite(windowDays) || windowDays <= 0) return records;
+  const cutoff = nowMs - windowDays * 86400000;
+  return records.filter(
+    (r) => r.finishedAtMs != null && r.finishedAtMs >= cutoff && r.finishedAtMs <= nowMs,
+  );
+}
+
+// windowDaysFlag(ctx) → --window <n> 显式天数或 null（缺省·不过滤）。intFlag 走整数解析。
+function windowDaysFlag(ctx: Ctx): number | null {
+  const v = ctx.values.window;
+  if (v == null || (typeof v === 'string' && v === '')) return null; // 未传 → 不过滤
+  return intFlag(v, Number.NaN);
+}
+
 // nowMsOf(ctx) → --as-of（ISO）解析为 ms 或 Date.now()（backtest 用·plan §12.2）。
 function nowMsOf(ctx: Ctx): number {
   const asOf = ctx.values['as-of'];
@@ -229,6 +251,8 @@ export function forecast(ctx: Ctx): number {
       const mode = (c.values.mode as string) || 'both';
       const runs = intFlag(c.values.runs, 2000);
       const seed = intFlag(c.values.seed, 42);
+      // --effective-n：号池有效配额份数（默认 1·floor 1·仿 usage advise 读法·#bug3）。
+      const effectiveN = effectiveNFlag(c.values['effective-n']);
       const coverage = estimateCoverage(b);
       const backlog = backlogCount(b);
 
@@ -245,9 +269,28 @@ export function forecast(ctx: Ctx): number {
       const runThroughput = mode === 'throughput' || mode === 'both';
 
       const est = runEstimate ? estimateDagMonteCarlo(b, params, { seed, runs, nowMs }) : null;
-      const thr = runThroughput
+      const thrRaw = runThroughput
         ? throughputMonteCarlo(backlog, records, { seed, runs, nowMs })
         : null;
+      // --effective-n threading（#bug3）：N 份可序列消费配额 → N 路并行清 backlog → 吞吐通道天数 ≈ days/N。
+      //   只缩吞吐通道②（资源型加速·effectiveN 是配额并行度）；估算-DAG 通道① 是临界路径 makespan（已假设无界
+      //   并行·forward-pass 无资源闸），N 不缩它（critical-path bound·改它需动引擎签名·本次不碰·诚实标 note）。
+      const thr =
+        thrRaw && effectiveN > 1
+          ? {
+              ...thrRaw,
+              days: {
+                p50: thrRaw.days.p50 / effectiveN,
+                p80: thrRaw.days.p80 / effectiveN,
+                p95: thrRaw.days.p95 / effectiveN,
+              },
+              mean: thrRaw.mean / effectiveN,
+            }
+          : thrRaw;
+      if (effectiveN > 1 && thr != null && Number.isFinite(thr.days.p50))
+        notes.push(
+          `effective_n=${effectiveN}——吞吐通道②天数按 ${effectiveN} 路并行配额缩放（÷${effectiveN}）；估算-DAG 通道①为临界路径 makespan、不受 N 缩短`,
+        );
 
       const consistency =
         est && thr && Number.isFinite(est.makespan.p50) && Number.isFinite(thr.days.p50)
@@ -308,6 +351,7 @@ export function forecast(ctx: Ctx): number {
         scope,
         runs,
         seed,
+        effective_n: effectiveN,
         as_of: asOfISO(nowMs),
         source: records.length > 0 ? 'calibrated' : 'estimate',
         notes,
@@ -379,7 +423,11 @@ export function velocity(ctx: Ctx): number {
     render: (board, c) => {
       const b = board as BoardArg;
       const nowMs = nowMsOf(c);
-      const { records, scope } = loadScopedCorpus(b, c);
+      const { records: allRecords, scope } = loadScopedCorpus(b, c);
+      // --window <n>：按天滑窗过滤语料后再喂三处计算（SLE / throughput / tasksPerDay）·#bug2。
+      //   缺省（无 --window）→ 不过滤（沿用现状·history_n 不变）。
+      const windowDays = windowDaysFlag(c);
+      const records = windowFilter(allRecords, windowDays, nowMs);
       const sle = cycleTimeSle(records);
       const backlog = backlogCount(b);
       const thr = throughputMonteCarlo(backlog, records, { nowMs });
@@ -394,7 +442,8 @@ export function velocity(ctx: Ctx): number {
 
       const data = {
         scope,
-        window_days: intFlag(c.values.window, 7),
+        // window_days：实际生效的滑窗（--window 显式值；缺省 null = 不过滤·全语料）。
+        window_days: windowDays,
         velocity_tasks_per_day: tasksPerDay,
         backlog,
         eta_days: Number.isFinite(thr.days.p50)
@@ -559,6 +608,11 @@ function intFlag(v: unknown, dflt: number): number {
   if (typeof v === 'string' && v && Number.isFinite(Number(v))) return Math.floor(Number(v));
   if (typeof v === 'number' && Number.isFinite(v)) return Math.floor(v);
   return dflt;
+}
+// effectiveNFlag(v) → --effective-n 解析为整数（floor 1·仿 usage advise·缺/坏 → 1）。
+function effectiveNFlag(v: unknown): number {
+  const n = intFlag(v, 1);
+  return Number.isInteger(n) && n >= 1 ? n : 1;
 }
 function fmtH(h: number | null | undefined): string {
   return typeof h === 'number' && Number.isFinite(h) ? `${h}h` : 'N/A';

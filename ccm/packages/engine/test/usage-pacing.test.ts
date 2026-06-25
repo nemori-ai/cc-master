@@ -107,6 +107,64 @@ test('pacing: only 7d signal with headroom → available, hold', () => {
   assert.equal(a.verdict, 'hold');
 });
 
+// ── 过期窗口闸（#bug1·codex round-3）：resets_at < now ⟹ used% stale ⟹ 该窗口不可判 ──────────────
+test('pacing: expired 5h window (resets_at<now·used%=92) → not throttle (stale used% ignored)', () => {
+  // 陈旧 sidecar 跨了 reset：5h used%=92（超走廊上界）但 resets_at 已过 → used% stale → 该窗口不参与 verdict。
+  //   7d 有余量且未过期 → 只剩 7d 信号可判 → hold（绝不据过期 5h 误判 throttle）。
+  const a = pacingAdvice(
+    {
+      five_hour: { used_percentage: 92, resets_at: NOW_SEC - 600 }, // 10min 前已 reset → 过期
+      seven_day: { used_percentage: 50, resets_at: NOW_SEC + 86400 },
+    },
+    { nowSec: NOW_SEC },
+  );
+  assert.notEqual(a.verdict, 'throttle', '过期 5h 窗口不得触发 throttle');
+  assert.equal(a.verdict, 'hold');
+  assert.equal(a.window_5h_pct, null, '过期窗口 used% 判为不可用（null）');
+  assert.equal(a.window_7d_pct, 50, '未过期 7d 窗口仍可判');
+  assert.equal(a.available, true, '仍有 7d 可判 → available');
+});
+
+test('pacing: expired 7d window (resets_at<now·used%=90) → not hard_stop (stale used% ignored)', () => {
+  // 7d used%=90（达硬总闸）但 resets_at 已过 → stale → 不可判 → 不得 hard_stop。
+  //   5h 未过期且在走廊内 → hold。
+  const a = pacingAdvice(
+    {
+      five_hour: { used_percentage: 80, resets_at: NOW_SEC + 3600 },
+      seven_day: { used_percentage: 90, resets_at: NOW_SEC - 600 }, // 已过期
+    },
+    { nowSec: NOW_SEC },
+  );
+  assert.notEqual(a.verdict, 'hard_stop', '过期 7d 窗口不得触发 hard_stop');
+  assert.equal(a.hard_stop_7d, false);
+  assert.equal(a.window_7d_pct, null, '过期 7d used% 判为不可用');
+});
+
+test('pacing: both windows expired → available:false (degrade·same as no-signal)', () => {
+  const a = pacingAdvice(
+    {
+      five_hour: { used_percentage: 92, resets_at: NOW_SEC - 600 },
+      seven_day: { used_percentage: 90, resets_at: NOW_SEC - 600 },
+    },
+    { nowSec: NOW_SEC },
+  );
+  assert.equal(a.available, false, '两窗都过期 → 无可判信号 → available:false（同无信号降级）');
+  assert.equal(a.verdict, 'hold');
+});
+
+test('pacing: non-expired window with resets_at in future is judged normally (gate is exact)', () => {
+  // 对照：5h resets_at 在未来 → 不过期 → 92% 正常触发 throttle（证明闸只 null 掉真过期的，不误伤）。
+  const a = pacingAdvice(
+    {
+      five_hour: { used_percentage: 92, resets_at: NOW_SEC + 1800 },
+      seven_day: { used_percentage: 50, resets_at: NOW_SEC + 86400 },
+    },
+    { nowSec: NOW_SEC, effectiveN: 1 },
+  );
+  assert.equal(a.verdict, 'throttle', '未过期 5h 92% 正常 throttle');
+  assert.equal(a.window_5h_pct, 92);
+});
+
 // ── effective-N 缩放欠用判定线 ──────────────────────────────────────────────────────
 test('pacing: effectiveN raises underuse ceiling (50% underuse only with N≥2)', () => {
   const sig = {

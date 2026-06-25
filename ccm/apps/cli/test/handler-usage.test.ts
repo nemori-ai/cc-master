@@ -149,10 +149,12 @@ const REGISTRY_3 = {
   },
 };
 // 真实 sidecar 形态（statusline-capture.js 写）：epoch-秒 resets_at / captured_at + number used_percentage。
-//   captured_at 2026-06-25T09:00:00Z=1782378000·5h resets 2026-06-25T11:00:00Z=1782385200·7d 2026-07-01T00:00:00Z=1782864000。
+//   captured_at 2026-06-25T09:00:00Z=1782378000；resets_at 取**远未来**（2030/2031），让窗口对 wall-clock now
+//   绝不过期——这些 case 测的是 throttle/accelerate 走廊逻辑，**非过期闸**（过期闸专测见末尾 #bug1 段，
+//   注入固定 nowSec + resets_at<now）。否则 fixture reset 一旦落到运行时之前，过期闸正确地把 used% 判为 stale。
 const SIDECAR_CRITICAL = {
-  five_hour: { used_percentage: 92, resets_at: 1782385200 },
-  seven_day: { used_percentage: 50, resets_at: 1782864000 },
+  five_hour: { used_percentage: 92, resets_at: 1893456000 }, // 2030-01-01T00:00:00Z（远未来·不过期）
+  seven_day: { used_percentage: 50, resets_at: 1925078400 }, // 2031-01-01T00:00:00Z
   captured_at: 1782378000,
 };
 
@@ -189,6 +191,24 @@ test('usage show with registry lists all accounts with snapshot fields', () => {
     assert.ok('as_of' in a);
     assert.ok('five_hour' in a && 'seven_day' in a);
   }
+});
+
+test('usage show --effective-n override changes effective_n (#audit: was declared but ignored)', () => {
+  // registry 有 3 号 → 自动 effective_n=3；--effective-n 7 覆写应胜出（此前 show 忽略此 flag）。
+  const { home, boardPath } = setupHome({ accounts: REGISTRY_3 });
+  const auto = mkCtx(home, boardPath, { flags: { json: true } });
+  const override = mkCtx(home, boardPath, {
+    values: { 'effective-n': '7' },
+    flags: { json: true },
+  });
+  usageHandler.show(auto);
+  usageHandler.show(override);
+  assert.equal(JSON.parse(auto.outBuf.join('')).data.effective_n, 3, 'auto from registry');
+  assert.equal(
+    JSON.parse(override.outBuf.join('')).data.effective_n,
+    7,
+    '--effective-n override wins (flag now consumed)',
+  );
 });
 
 test('usage show --accounts current filters to active only', () => {
@@ -392,6 +412,129 @@ test('usage task-cost --group-by executor aggregates + coverage_pct', () => {
   // coverage: 2 of 3 tasks have token = 67%.
   assert.equal(out.data.coverage_pct, 67);
   assert.equal(out.data.total, 430);
+});
+
+test('usage task-cost --scope home aggregates cross-board observability (#audit: --scope was ignored)', () => {
+  // 构造 home：current 板 1 个 done token=150；归档 corpus 板 2 个 done token=300+500=800。
+  //   this-board（默认）→ 只见 current 的 150；home → 跨板见 150+800=950。证明 --scope 真改变输出。
+  const { home, boardPath } = setupHome({ tasks: COST_TASKS }); // current 板（T1 token=150·T2 token=280·T3 N/A）
+  // 写一块归档 corpus 板（done 任务带 observability·喂 home 语料）。
+  writeFileSync(
+    join(home, '2026-06-20-corpus.board.json'),
+    `${JSON.stringify({
+      schema: 'cc-master/v2',
+      meta: { created_at: '2026-06-20T00:00:00Z' },
+      goal: 'archived corpus',
+      owner: { active: false, session_id: 'sid-arch', heartbeat: '2026-06-20T00:00:00Z' },
+      git: { worktree: '/repo/wt', branch: 'feat' },
+      tasks: [
+        {
+          id: 'X1',
+          status: 'done',
+          type: 'development',
+          executor: 'subagent',
+          started_at: '2026-06-20T00:00:00Z',
+          finished_at: '2026-06-20T02:00:00Z',
+          observability: { tokens: { input: 200, output: 100 } }, // 300
+        },
+        {
+          id: 'X2',
+          status: 'done',
+          type: 'design',
+          executor: 'subagent',
+          started_at: '2026-06-20T03:00:00Z',
+          finished_at: '2026-06-20T05:00:00Z',
+          observability: { tokens: { input: 300, output: 200 } }, // 500
+        },
+      ],
+      log: [],
+    })}\n`,
+    'utf8',
+  );
+  const thisBoard = mkCtx(home, boardPath, {
+    values: { 'group-by': 'executor', scope: 'this-board' },
+    flags: { json: true },
+  });
+  const homeScope = mkCtx(home, boardPath, {
+    values: { 'group-by': 'executor', scope: 'home' },
+    flags: { json: true },
+  });
+  usageHandler.taskCost(thisBoard);
+  usageHandler.taskCost(homeScope);
+  const dTB = JSON.parse(thisBoard.outBuf.join('')).data;
+  const dHome = JSON.parse(homeScope.outBuf.join('')).data;
+  // this-board: T1(150)+T2(280)=430（COST_TASKS·T3 N/A）。
+  assert.equal(dTB.scope, 'this-board');
+  assert.equal(dTB.total, 430, 'this-board sees only current board tokens');
+  // home: this-board 430 + corpus 800 = 1230（跨板聚合）。
+  assert.equal(dHome.scope, 'home');
+  assert.equal(dHome.total, 1230, 'home scope aggregates cross-board corpus tokens');
+  assert.ok(dHome.total > dTB.total, '--scope home changes the output (flag now consumed)');
+});
+
+test('usage task-cost --scope this-repo filters corpus to same repo (#audit)', () => {
+  // corpus 含同 repo + 异 repo 各一 done·this-repo 只聚同 repo。
+  const { home, boardPath } = setupHome({ tasks: [] }); // current 板 git.worktree=/repo/wt
+  writeFileSync(
+    join(home, '2026-06-19-corpus.board.json'),
+    `${JSON.stringify({
+      schema: 'cc-master/v2',
+      meta: { created_at: '2026-06-19T00:00:00Z' },
+      goal: 'mixed-repo corpus',
+      owner: { active: false, session_id: 'sid-mix', heartbeat: '2026-06-19T00:00:00Z' },
+      git: { worktree: '/repo/wt', branch: 'feat' }, // 同 repo（boardRepo 用 worktree）
+      tasks: [
+        {
+          id: 'S1',
+          status: 'done',
+          type: 'development',
+          executor: 'subagent',
+          observability: { tokens: { input: 100, output: 100 } }, // 200·same repo
+        },
+      ],
+      log: [],
+    })}\n`,
+    'utf8',
+  );
+  writeFileSync(
+    join(home, '2026-06-18-other.board.json'),
+    `${JSON.stringify({
+      schema: 'cc-master/v2',
+      meta: { created_at: '2026-06-18T00:00:00Z' },
+      goal: 'other-repo corpus',
+      owner: { active: false, session_id: 'sid-oth', heartbeat: '2026-06-18T00:00:00Z' },
+      git: { worktree: '/other/repo', branch: 'main' }, // 异 repo
+      tasks: [
+        {
+          id: 'D1',
+          status: 'done',
+          type: 'development',
+          executor: 'subagent',
+          observability: { tokens: { input: 999, output: 1 } }, // 1000·other repo（须被 this-repo 排除）
+        },
+      ],
+      log: [],
+    })}\n`,
+    'utf8',
+  );
+  const repoScope = mkCtx(home, boardPath, {
+    values: { 'group-by': 'executor', scope: 'this-repo' },
+    flags: { json: true },
+  });
+  const homeScope = mkCtx(home, boardPath, {
+    values: { 'group-by': 'executor', scope: 'home' },
+    flags: { json: true },
+  });
+  usageHandler.taskCost(repoScope);
+  usageHandler.taskCost(homeScope);
+  const dRepo = JSON.parse(repoScope.outBuf.join('')).data;
+  const dHome = JSON.parse(homeScope.outBuf.join('')).data;
+  assert.equal(
+    dRepo.total,
+    200,
+    'this-repo only counts same-repo corpus (S1·excludes other-repo D1)',
+  );
+  assert.equal(dHome.total, 1200, 'home counts both (200+1000)');
 });
 
 test('usage task-cost <id> not found returns found:false', () => {

@@ -62,8 +62,14 @@ const DEFAULTS = {
   maxStaleMin: 15,
 };
 
-function pctOf(w: WindowSignal | null | undefined): number | null {
-  return w && typeof w.used_percentage === 'number' ? w.used_percentage : null;
+// pctOf(w, nowSec) → 该窗口的可判 used%（账户权威），否则 null。
+//   ★过期闸（codex round-3 #bug1）：窗口 `resets_at != null && resets_at < nowSec` ⟹ 该 reset 周期已过、
+//   used% 已 stale（陈旧 sidecar 跨了 reset 边界）⟹ 视为**不可判**（返 null·该窗口不参与任何 verdict gating）。
+//   与既有 captured_at 新鲜度闸正交并存（那闸管「sidecar 多久前抓的」，本闸管「窗口本身有没有过期」）。
+function pctOf(w: WindowSignal | null | undefined, nowSec: number): number | null {
+  if (!w || typeof w.used_percentage !== 'number') return null;
+  if (typeof w.resets_at === 'number' && w.resets_at < nowSec) return null; // 已过期 → used% stale → 不可判
+  return w.used_percentage;
 }
 
 // pacingAdvice(signal, opts) → 双侧走廊 verdict（纯函数·收口 usage-pacing.js 数学）。
@@ -77,8 +83,8 @@ export function pacingAdvice(
   const n =
     Number.isInteger(o.effectiveN) && (o.effectiveN as number) >= 1 ? (o.effectiveN as number) : 1;
 
-  const p5 = pctOf(signal?.five_hour);
-  const p7 = pctOf(signal?.seven_day);
+  const p5 = pctOf(signal?.five_hour, nowSec);
+  const p7 = pctOf(signal?.seven_day, nowSec);
 
   // 账户信号完全不可用（两窗口都无 used%）→ available:false（调用方降级本地反推·标 approx）。
   if (p5 === null && p7 === null) {

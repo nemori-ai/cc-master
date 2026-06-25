@@ -1029,12 +1029,12 @@ ccm estimate forecast [flags]
 | `--mode <v>` | | enum | `estimate` \| `throughput` \| `both`（默认） | 通道（coverage<50% 吞吐主导） |
 | `--scope <v>` | | enum | `home`（默认）\| `this-repo` \| `this-board` | 历史语料范围 |
 | `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（backtest·默认 now） |
-| `--effective-n <n>` | | string | | 号池有效配额份数覆写 |
+| `--effective-n <n>` | | string | 正整数（默认 1） | 号池有效配额份数：N 路并行配额 → **吞吐通道② 天数 ÷N**（资源型加速）。估算-DAG 通道① 是临界路径 makespan、**不受 N 缩短**（已假设无界并行·见输出 `notes`）。回显 `effective_n` |
 | `--runs <n>` | | string | | MC trials（默认 2000） |
 | `--seed <n>` | | string | | PRNG 种子（复现·默认 42） |
 | `--json` | | bool | | 结构化输出 |
 
-- 例：`ccm estimate forecast --json` · `ccm estimate forecast --mode both --runs 5000 --seed 42 --json`
+- 例：`ccm estimate forecast --json` · `ccm estimate forecast --mode both --runs 5000 --seed 42 --json` · `ccm estimate forecast --effective-n 3 --json`
 
 ### estimate evm
 
@@ -1071,7 +1071,7 @@ ccm estimate velocity [flags]
 | flag | 短名 | 类型 | 取值 | 含义 |
 |---|---|---|---|---|
 | `--scope <v>` | | enum | `home`（默认）\| `this-repo` \| `this-board` | 历史语料范围 |
-| `--window <n>` | | string | | 窗口天数（默认 7） |
+| `--window <n>` | | string | | 滑窗天数：只取 `finished_at` 落在最近 n 天的 done 语料喂 SLE/吞吐/velocity。**缺省（不传）→ 不过滤全语料**（`window_days` 回显 `null`）；传 n → 过滤 |
 | `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（默认 now） |
 | `--json` | | bool | | 结构化输出 |
 
@@ -1304,7 +1304,7 @@ id 不存在时 `data` = `null`，exit 0。
 单任务（给 `<task-id>`）：
 
 ```jsonc
-{ "task": "C2", "found": true,
+{ "task": "C2", "scope": "this-board", "found": true,
   "tokens": { "input": 156000, "output": 39000, "total": 195000 },
   "na": false, "source": "observability", "confidence": "high" }
 ```
@@ -1314,11 +1314,13 @@ id 不存在时 `data` = `null`，exit 0。
 聚合（`--group-by`）：
 
 ```jsonc
-{ "group_by": "executor",
+{ "group_by": "executor", "scope": "this-board",
   "groups": [ { "key": "subagent", "total": 504700, "n": 7, "na_count": 3 } ],
   "total": 569500, "coverage_pct": 56, "history_n": 3,
   "source": "observability", "confidence": "medium" }
 ```
+
+`--scope`（默认 `this-board`）切语料范围：`this-board` 读本板全 tasks 的 observability（含非 done → 标 N/A）；`home` / `this-repo` 跨板聚归档 done 任务的 token（`this-repo` 过滤同 repo）。回显 `scope`。
 
 ### estimate show（`ccm estimate show [<id>] --json`）
 
@@ -1343,9 +1345,9 @@ id 不存在时 `data` = `null`，exit 0。
   "schedule_sensitivity": [ {"id":"C4","sensitivity":0.665} ],
   "consistency": { "deviation": 0.495, "warning": true },     // ①②偏差>20% → warning
   "mode": "both", "coverage_pct": 83, "confidence": "medium", "history_n": 40,
-  "scope": "home", "runs": 2000, "seed": 42, "as_of": "ISO",
+  "scope": "home", "runs": 2000, "seed": 42, "effective_n": 1, "as_of": "ISO",
   "source": "calibrated",
-  "notes": ["1 tasks unit-time fallback…"] }
+  "notes": ["1 tasks unit-time fallback…"] }   // --effective-n N>1 → throughput_days ÷N + note（通道① makespan 不变）
 ```
 
 ### estimate evm（`ccm estimate evm --json`）
@@ -1366,11 +1368,12 @@ id 不存在时 `data` = `null`，exit 0。
 ### estimate velocity（`ccm estimate velocity --json`）
 
 ```jsonc
-{ "scope": "home", "window_days": 7,
+{ "scope": "home", "window_days": null,
   "velocity_tasks_per_day": 0.6, "backlog": 6,
   "eta_days": { "p50": 4, "p80": 4, "p95": 5 },
   "sle": { "p50": 2.58, "p85": 5.6, "p95": 9.18, "unit": "h", "confidence": "high", "history_n": 40 },
   "history_n": 40, "confidence": "high", "source": "observability", "as_of": "ISO" }
+// 注：`window_days` 回显**实际生效**的滑窗——不传 `--window` → `null`（不过滤）；`--window 14` → `14`（只取近 14 天 done）。
 ```
 
 ### estimate risk（`ccm estimate risk --json`）

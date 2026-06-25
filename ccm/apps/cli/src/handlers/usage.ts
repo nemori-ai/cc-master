@@ -21,8 +21,11 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
+  boardRepo,
+  type DoneRecord,
   effectiveN,
   extractDoneRecords,
+  loadCorpus,
   type PacingOptions,
   pacingAdvice,
   type UsageSignal,
@@ -43,6 +46,15 @@ interface BackupAccount {
   seven_day: WindowSnap;
   snapshot_stale: boolean;
   source: 'registry-snapshot';
+}
+
+// resolveHomeDir(env, homeFlag) → cc-master home（同 estimate.ts resolveHomeDir 口径·task-cost --scope 跨板用）。
+//   --home flag 先于 CC_MASTER_HOME 先于 CLAUDE_PROJECT_DIR 先于默认 $HOME/.claude/cc-master。
+function resolveHomeDir(env: Record<string, string | undefined>, homeFlag?: string): string {
+  if (homeFlag) return path.resolve(homeFlag);
+  if (env.CC_MASTER_HOME) return path.resolve(env.CC_MASTER_HOME);
+  if (env.CLAUDE_PROJECT_DIR) return path.resolve(env.CLAUDE_PROJECT_DIR, '.claude', 'cc-master');
+  return path.join(os.homedir(), '.claude', 'cc-master');
 }
 
 // ── accounts.json registry 解析（只读·绝不写）──────────────────────────────────────────────────────
@@ -246,7 +258,12 @@ export function show(ctx: Ctx): number {
       const homeFlag = c.values.home as string | undefined;
       const sidecar = readUsageSidecar(c.env);
       const backups = readBackups(c.env, nowMs, homeFlag);
-      const en = effectiveNFromRegistry(c.env, nowMs, homeFlag);
+      // --effective-n 覆写优先；否则从 registry 算（与 advise 一致·#audit：show 此前广告了 --effective-n 但忽略）。
+      const enFlag = c.values['effective-n'];
+      const en =
+        typeof enFlag === 'string' && Number.isInteger(Number(enFlag)) && Number(enFlag) >= 1
+          ? Number(enFlag)
+          : effectiveNFromRegistry(c.env, nowMs, homeFlag);
 
       const current = sidecar
         ? {
@@ -398,30 +415,76 @@ export function taskCost(ctx: Ctx): number {
       const records = extractDoneRecords(b);
       const taskId = c.positionals[0];
       const groupBy = (c.values['group-by'] as string) || 'task';
+      // --scope（#audit：此前广告了 home|this-repo|this-board 但忽略·永远读本板）。
+      //   默认 this-board（registry 文档口径·读本板全 tasks 含非 done → 能标 N/A）；
+      //   home / this-repo → 跨板读归档 done 任务的 observability token（DoneRecord 载 tokensIn/Out）。
+      const scope = (c.values.scope as string) || 'this-board';
+      const homeFlag = c.values.home as string | undefined;
 
-      // 全 board 任务（含非 done·读 observability·shell/无 token=N/A）——用 raw tasks 才能标 N/A vs 缺。
-      const tasks: Array<Record<string, unknown>> = Array.isArray(b?.tasks)
-        ? (b.tasks as Array<Record<string, unknown>>)
-        : [];
+      type CostRow = {
+        id: string;
+        executor: string;
+        type: string;
+        tier: string;
+        tokens_in: number | null;
+        tokens_out: number | null;
+        total: number | null;
+        na: boolean;
+      };
 
-      // 提取每任务 token（input+output·缺/shell → null）。
-      const rows = tasks.map((t) => {
-        const id = typeof t.id === 'string' ? t.id : '';
-        const executor = typeof t.executor === 'string' ? t.executor : '';
-        const type = typeof t.type === 'string' ? t.type : '';
-        const tier = typeof t.tier === 'string' ? t.tier : '';
-        const obs =
-          t.observability && typeof t.observability === 'object'
-            ? (t.observability as { tokens?: { input?: unknown; output?: unknown } })
-            : null;
-        const tok = obs?.tokens && typeof obs.tokens === 'object' ? obs.tokens : null;
-        const tin = tok && typeof tok.input === 'number' ? tok.input : null;
-        const tout = tok && typeof tok.output === 'number' ? tok.output : null;
-        const total = tin == null && tout == null ? null : (tin ?? 0) + (tout ?? 0);
-        // executor=shell（历史枚举·v2 已无，但旧板可能有）/ 无 token → N/A（诚实标注）。
-        const isNA = total == null;
-        return { id, executor, type, tier, tokens_in: tin, tokens_out: tout, total, na: isNA };
-      });
+      let rows: CostRow[];
+      if (scope === 'home' || scope === 'this-repo') {
+        // 跨板：从 home 语料抽 DoneRecord（已含 tokensIn/Out·executor/type/tier）；this-repo 过滤同 repo。
+        let corpus: DoneRecord[] = [];
+        try {
+          corpus = loadCorpus(resolveHomeDir(c.env, homeFlag));
+        } catch {
+          corpus = [];
+        }
+        if (scope === 'this-repo') {
+          const repo = boardRepo(b);
+          corpus = corpus.filter((r) => r.repo === repo);
+        }
+        rows = corpus.map((r) => {
+          const total =
+            r.tokensIn == null && r.tokensOut == null
+              ? null
+              : (r.tokensIn ?? 0) + (r.tokensOut ?? 0);
+          return {
+            id: r.taskId,
+            executor: r.executor,
+            type: r.type,
+            tier: r.tier,
+            tokens_in: r.tokensIn,
+            tokens_out: r.tokensOut,
+            total,
+            na: total == null,
+          };
+        });
+      } else {
+        // this-board（默认）：全 board 任务（含非 done·读 observability·shell/无 token=N/A）——用 raw tasks 才能标 N/A vs 缺。
+        const tasks: Array<Record<string, unknown>> = Array.isArray(b?.tasks)
+          ? (b.tasks as Array<Record<string, unknown>>)
+          : [];
+        // 提取每任务 token（input+output·缺/shell → null）。
+        rows = tasks.map((t) => {
+          const id = typeof t.id === 'string' ? t.id : '';
+          const executor = typeof t.executor === 'string' ? t.executor : '';
+          const type = typeof t.type === 'string' ? t.type : '';
+          const tier = typeof t.tier === 'string' ? t.tier : '';
+          const obs =
+            t.observability && typeof t.observability === 'object'
+              ? (t.observability as { tokens?: { input?: unknown; output?: unknown } })
+              : null;
+          const tok = obs?.tokens && typeof obs.tokens === 'object' ? obs.tokens : null;
+          const tin = tok && typeof tok.input === 'number' ? tok.input : null;
+          const tout = tok && typeof tok.output === 'number' ? tok.output : null;
+          const total = tin == null && tout == null ? null : (tin ?? 0) + (tout ?? 0);
+          // executor=shell（历史枚举·v2 已无，但旧板可能有）/ 无 token → N/A（诚实标注）。
+          const isNA = total == null;
+          return { id, executor, type, tier, tokens_in: tin, tokens_out: tout, total, na: isNA };
+        });
+      }
 
       const covered = rows.filter((r) => !r.na).length;
       const coveragePct = rows.length > 0 ? Math.round((covered / rows.length) * 100) : 0;
@@ -431,6 +494,7 @@ export function taskCost(ctx: Ctx): number {
         const row = rows.find((r) => r.id === taskId);
         const data = {
           task: taskId,
+          scope,
           found: !!row,
           tokens: row ? { input: row.tokens_in, output: row.tokens_out, total: row.total } : null,
           na: row ? row.na : true,
@@ -466,10 +530,11 @@ export function taskCost(ctx: Ctx): number {
 
       const data = {
         group_by: groupBy,
+        scope,
         groups: grouped,
         total: grouped.reduce((s, g) => s + g.total, 0),
         coverage_pct: coveragePct,
-        history_n: records.length,
+        history_n: scope === 'this-board' ? records.length : rows.length,
         source: 'observability' as const,
         confidence: coveragePct >= 50 ? 'medium' : 'low',
       };

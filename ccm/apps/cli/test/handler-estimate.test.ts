@@ -209,6 +209,63 @@ test('forecast --mode throughput skips estimate channel', () => {
   assert.equal(d.criticality_index.length, 0);
 });
 
+test('forecast --effective-n scales throughput channel days (#bug3 regression)', () => {
+  // --effective-n threading：N 份并行配额 → 吞吐通道天数 ÷N（资源型加速）。echo effective_n + note。
+  const base = mkCtx(CURRENT, {
+    values: { mode: 'both', scope: 'home', seed: '42', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  const n2 = mkCtx(CURRENT, {
+    values: {
+      mode: 'both',
+      scope: 'home',
+      seed: '42',
+      'as-of': '2026-06-25T12:00:00Z',
+      'effective-n': '2',
+    },
+  });
+  estimateHandler.forecast(base);
+  estimateHandler.forecast(n2);
+  const db = dataOf(base);
+  const dn = dataOf(n2);
+  // effective_n echo 反映 flag。
+  assert.equal(db.effective_n, 1, 'default effective_n=1');
+  assert.equal(dn.effective_n, 2, 'flag read → effective_n=2');
+  // ★核心：throughput_days 按 N=2 缩半（days/2）——证明 flag 真改变输出（非只塞 echo）。
+  assert.ok(db.throughput_days.p50 > 0, 'base throughput days finite');
+  assert.ok(
+    Math.abs(dn.throughput_days.p50 - db.throughput_days.p50 / 2) < 1e-9,
+    `n2 p50 ${dn.throughput_days.p50} ≈ base/2 ${db.throughput_days.p50 / 2}`,
+  );
+  assert.ok(
+    Math.abs(dn.throughput_days.p95 - db.throughput_days.p95 / 2) < 1e-9,
+    'p95 also halved by effective_n',
+  );
+  // 诚实 note：估算-DAG 通道① 不受 N 缩短（critical-path bound）——makespan 两次相同。
+  assert.deepEqual(dn.makespan, db.makespan, 'estimate-DAG makespan unchanged by effective_n');
+  assert.ok(
+    dn.notes.some((s: string) => s.includes('effective_n') || s.includes('临界路径')),
+    'has effective_n threading note',
+  );
+});
+
+test('forecast --effective-n 1 (default) is identical to omitting it (#bug3 no-op floor)', () => {
+  const omit = mkCtx(CURRENT, {
+    values: { mode: 'both', scope: 'home', seed: '42', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  const one = mkCtx(CURRENT, {
+    values: {
+      mode: 'both',
+      scope: 'home',
+      seed: '42',
+      'as-of': '2026-06-25T12:00:00Z',
+      'effective-n': '1',
+    },
+  });
+  estimateHandler.forecast(omit);
+  estimateHandler.forecast(one);
+  assert.deepEqual(dataOf(one).throughput_days, dataOf(omit).throughput_days);
+});
+
 test('forecast degrades when active tasks all miss estimate (coverage<50%·unit fallback note)', () => {
   // 全 active 任务无 estimate → coverage 0% → 吞吐通道主导 + unit-time fallback note。
   const bp = mkInlineBoard([
@@ -383,6 +440,57 @@ test('velocity: SLE quantiles monotone + history_n (golden)', () => {
     history_n: 40,
   });
   assert.equal(d.confidence, 'high');
+});
+
+test('velocity --window filters corpus by finish time → 7 vs 90 differ (#bug2 regression)', () => {
+  // 语料：1 个近期 done（as-of 前 3 天·落 window 7 内）+ 6 个久远 done（as-of 前 ~40 天·落 window 90 内、window 7 外）。
+  //   window 7 → 只见近期 1 条；window 90 → 见全部 7 条。history_n / SLE / tasksPerDay 都该因此不同。
+  const AS_OF = '2026-06-25T12:00:00Z';
+  const recentDone = {
+    id: 'R0',
+    status: 'done',
+    type: 'development',
+    executor: 'subagent',
+    estimate: { value: 2, unit: 'h' },
+    started_at: '2026-06-22T08:00:00Z',
+    finished_at: '2026-06-22T10:00:00Z', // 3 天前·actual 2h
+  };
+  const oldDone = Array.from({ length: 6 }, (_, i) => ({
+    id: `O${i}`,
+    status: 'done',
+    type: 'development',
+    executor: 'subagent',
+    estimate: { value: 5, unit: 'h' },
+    started_at: '2026-05-16T00:00:00Z',
+    finished_at: '2026-05-16T08:00:00Z', // ~40 天前·actual 8h（cycle-time 显著长于近期）
+  }));
+  const { home, targetBoard } = mkHomeWithCorpus(
+    [recentDone, ...oldDone],
+    [{ id: 'A1', status: 'ready', deps: [], type: 'development', executor: 'subagent' }],
+  );
+  const w7 = mkCtx(targetBoard, { home, values: { scope: 'home', window: '7', 'as-of': AS_OF } });
+  const w90 = mkCtx(targetBoard, { home, values: { scope: 'home', window: '90', 'as-of': AS_OF } });
+  assert.equal(estimateHandler.velocity(w7), EXIT.OK);
+  assert.equal(estimateHandler.velocity(w90), EXIT.OK);
+  const d7 = dataOf(w7);
+  const d90 = dataOf(w90);
+  // ★核心：窗口生效——7 天窗只见 1 条 done，90 天窗见全部 7 条。
+  assert.equal(d7.history_n, 1, 'window 7 → only the recent done in corpus');
+  assert.equal(d90.history_n, 7, 'window 90 → all 7 done in corpus');
+  // SLE 也不同（近期 cycle-time 2h vs 含久远 8h 任务的更高分位）。
+  assert.notDeepEqual(d7.sle, d90.sle, 'SLE differs because window changes the corpus');
+  // window_days 诚实回显实际生效窗口。
+  assert.equal(d7.window_days, 7);
+  assert.equal(d90.window_days, 90);
+});
+
+test('velocity with no --window does not filter (history_n unchanged·#bug2 default)', () => {
+  // 不传 --window → 不过滤（沿用现状）。golden 板全语料 history_n=40（同既有 golden 断言基线）。
+  const ctx = mkCtx(CURRENT, { values: { scope: 'home', 'as-of': '2026-06-25T12:00:00Z' } });
+  estimateHandler.velocity(ctx);
+  const d = dataOf(ctx);
+  assert.equal(d.history_n, 40, 'no window → full corpus (unfiltered)');
+  assert.equal(d.window_days, null, 'no window → window_days echoes null (not applied)');
 });
 
 test('velocity cold-start → no-history source, low confidence', () => {
