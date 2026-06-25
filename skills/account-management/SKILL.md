@@ -5,13 +5,14 @@ description: '管理 cc-master 换号号池（accounts.json registry）+ vault t
 
 # account-management — cc-master 换号号池的机制层
 
-> **红线 3 边界（一句话）**：换号**决策**的认知——何时换、值不值得换、谁拍板——归 `orchestrating-to-completion`（它在 pacing 决策点引用本 skill）；本 skill 只管**机制**：怎么选号、怎么切、怎么管 vault。六个分发 skill 关注面正交、单向引用、不复述彼此：
+> **红线 3 边界（一句话）**：换号**决策**的认知——何时换、值不值得换、谁拍板——归 `orchestrating-to-completion`（它在 pacing 决策点引用本 skill）；本 skill 只管**机制**：怎么选号、怎么切、怎么管 vault。七个分发 skill 关注面正交、单向引用、不复述彼此：
 > - **orchestrating-to-completion** = 编排者做什么（含「逼顶该不该换号」的 pacing 决策 + 决策程序）。
 > - **authoring-workflows** = workflow 脚本怎么写。
 > - **account-management（本 skill）** = 号池怎么管 + 怎么选号切号 + token 怎么安全存取（账号基础设施的机制层）。
 > - **using-ccm** = 怎么用 ccm CLI 读写 board（board 操作的机制层：状态机 verb / 三档字段 / footgun）。
 > - **slicing-goals-into-dags** = 怎么把目标**切**成 board DAG（纵切薄增量 / walking skeleton / 粒度品味，「切」先于 A 的「排」）。
-> - **dev-as-ml-loop** = 作为执行 agent 把一个已切好的任务**优化到验收**（开发=ML 优化过程的执行侧心智，与 A「指挥不演奏」不同 plane）。
+> - **dev-as-ml-loop** = 作为执行 agent 把一个已切好的任务**优化到验收**（开发=ML 优化过程的执行侧**循环形状**，与 A「指挥不演奏」不同 plane）。
+> - **engineering-with-craft** = 设计 / 开发 / 测试时**领域 / 类 / 合约 / 测试本身怎么建得好**（DDD/SDD/TDD/OOP 整合成五根 + 工程红线，与 F 不同 plane：F 给循环形状、G 给循环里的手艺内容）。
 
 ## Contents
 

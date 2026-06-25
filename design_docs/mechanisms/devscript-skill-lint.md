@@ -19,7 +19,7 @@
 ## 关键不变式
 - **dev-only**——不随 plugin 分发，仅 repo 根调用（红线 5）。绝不进 hooks/。
 - CHECKER 非 fixer——绝不编辑任何 skill 文件。
-- check 4 的范围只查六个分发 skill 名（纯 skill 名提及、同 skill 自引用、dev-only repo 根 scripts/ 不算）。
+- check 4 的范围只查七个分发 skill 名（纯 skill 名提及、同 skill 自引用、dev-only repo 根 scripts/ 不算）。
 
 ## 失败模式
 - 任一违规 → 打印 file:line + 原因、exit 1。
