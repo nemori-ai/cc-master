@@ -1944,6 +1944,23 @@ assert_eq "true"  "$bob32"   "(32) policy deny: registry bob still active=true"
 # stderr must surface the deny message.
 assert_contains "$out32" "board.policy" "(32) policy deny: stderr surfaces board.policy拦截消息"
 assert_contains "$out32" "deny" "(32) policy deny: stderr contains 'deny'"
+# ④ vault NOT refreshed/written-back（policy 闸前移关键断言·codex P2 bug fix）：
+#    deny 时 policy 闸必须在 refresh 和 vault 回写之前拦截。
+#    检验：vault 文件仍含 ALICE_AT（原 accessToken）、不含 FRESH_AT（stub refresh endpoint 的新 token）。
+#    若闸仍在 refresh 之后：refresh 已发生、vault blob 已被回写 FRESH_AT → vault 文件含 FRESH_AT → 断言失败。
+#    这正是 codex 指出的 bug 的反向 teeth：「deny 时 vault 已被 refresh/改写」= 此断言失败。
+vault32_content="$(cat "$VFILE32" 2>/dev/null || true)"
+if echo "$vault32_content" | grep -qF "$FRESH_AT" 2>/dev/null; then
+  FAILED=$((FAILED+1)); _red "FAIL: (32) policy deny+needs-refresh: vault was refreshed/overwritten (FRESH_AT found in vault) — policy gate ran AFTER refresh, not before!"
+else
+  PASS=$((PASS+1)); _green "(32) policy deny+needs-refresh: vault NOT refreshed/written (FRESH_AT absent — policy gate runs before any credential op)"
+fi
+# ④b vault blob refresh token also unchanged (still ALICE_RT, not FRESH_RT).
+if echo "$vault32_content" | grep -qF "$FRESH_RT" 2>/dev/null; then
+  FAILED=$((FAILED+1)); _red "FAIL: (32) policy deny: vault refresh token was rotated (FRESH_RT found in vault) — refresh happened before policy gate"
+else
+  PASS=$((PASS+1)); _green "(32) policy deny: vault refresh token NOT rotated (FRESH_RT absent — no refresh occurred before deny)"
+fi
 # **反向 teeth**: if policy gate is absent / not wired, the deny stub would be silently ignored and switch
 #   would succeed (rc=0, cred overwritten) — this test MUST fail in that case (the assertions above catch it).
 rm -rf "$FX32" "$CCM32"
