@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] — 2026-06-25
+
+> 修复换号号池的一个根因级 bug（Finding #72）：用过的号切出后逐个变「切不回去」的死号。补上 vault↔官方存储缺失的反向同步流，并以真账号 live spike 端到端验证。
+
+### Fixed
+
+- **切出 token 抢救 —— 修复「切号后原号无法重新切入」（Finding #72 · 根因级）** — `switch-account.sh` 换号的 token 数据流原本是单向的：切入号方向闭环（refresh → 回写切入号 vault → 覆写官方存储），但缺反向回流——运行中的 claude 在 access token 临近过期时**自己惰性 refresh**、服务端**轮转 refresh token**（旧的吊销）、claude 把新 blob 写回**官方存储**却**绝不**回流 cc-master vault，于是切出号 vault 停在切入那刻的旧值、其 refresh token 早被轮转吊销 → 下次切回该号即 refresh 失败（rc=4），号池里用过的号逐个变死号。修：新增 `rescue_switchout_token`——覆写官方存储**之前**（此刻官方存储仍是切出号被 claude 更新到最新的 blob）把它读出（mac keychain 主路径 + credentials.json fallback·解包 `.claudeAiOauth`）→ **身份 guard**（`~/.claude.json` `oauthAccount.emailAddress` 须 == 切出号·防把别号 token 写进切出号 vault 污染号池）→ token-blind 回写**切出号** vault，补「官方存储 → 切出号 vault」反向流、与既有「切入号 vault → 官方存储」形成闭环。best-effort（任一步失败仅告警跳过、绝不阻断换号）。验证：hermetic 测试（`test_switch-select.sh` case 31 抢救 happy-path + 31b 身份 guard · 反向 teeth）+ **真账号 live spike**（真 keychain / 真 OAuth 端点端到端：端点轮转坐实 → 人为造死号 → rescue 治愈 vault → 切回 rc=4→rc=0 复活）。
+
 ## [0.9.1] — 2026-06-22
 
 > 0.9.0 的随后硬化：dag-in-dag 的四个 followup、换号修复、codex 二审探出的浏览器 bug 修复 + 永久回归测试、webview 折叠/高亮交互修复，以及 decision_package 完整性 lint（C1「board 完整性」首个落地）。本版以真 headless Chrome（CDP）实地验证 webview 行为，补上无头单测够不着的 render 层盲区。
