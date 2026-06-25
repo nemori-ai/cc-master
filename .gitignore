@@ -16,3 +16,5 @@ ccm/**/dist
 ccm/.turbo
 ccm/**/.turbo
 ccm/**/*.tsbuildinfo
+# build cache (turborepo)
+.turbo/

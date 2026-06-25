@@ -799,19 +799,25 @@ refresh_blob() {
 #   agent context / log / registry。
 writeback_vault() {
   local blob="$1"
-  case "$VAULT_KIND" in
+  # 可选目标 vault 上下文（位置参数 2-5·默认 = 切入号全局·向后兼容原 `writeback_vault "$NEW_BLOB"` 调用）。
+  #   切出 token 抢救（rescue_switchout_token·Finding #72）传**切出号**的 vault 上下文，把官方存储最新 blob 写回切出号 vault。
+  local wb_email="${2:-$EMAIL}"
+  local wb_kind="${3:-$VAULT_KIND}"
+  local wb_svc="${4:-$KEYCHAIN_SERVICE}"
+  local wb_file="${5:-$VAULT_FILE}"
+  case "$wb_kind" in
     keychain)
       command -v security >/dev/null 2>&1 || { err "writeback: keychain 不可用（非 mac）——跳过 vault 回写。"; return 1; }
-      security add-generic-password -U -s "$KEYCHAIN_SERVICE" -a "$EMAIL" -l "cc-master OAuth: $EMAIL" -w "$blob" >/dev/null 2>&1 || { err "writeback: keychain 写失败。"; return 1; }
+      security add-generic-password -U -s "$wb_svc" -a "$wb_email" -l "cc-master OAuth: $wb_email" -w "$blob" >/dev/null 2>&1 || { err "writeback: keychain 写失败。"; return 1; }
       ;;
     file)
-      umask 077; mkdir -p "$(dirname "$VAULT_FILE")" 2>/dev/null || true
+      umask 077; mkdir -p "$(dirname "$wb_file")" 2>/dev/null || true
       # **只删 `<email>_TOKEN=` 行·保留 `<email>_EXPIRES=`（codex P3·已坐实）**：旧码用 `.prefix`（`<email>_`）
       #   删**所有** `<email>_` 行（含非密 `<email>_EXPIRES=`），首次换号回写后 _EXPIRES sidecar 即消失 → 后续
       #   file-vault 到期巡检读不到 _EXPIRES 无法告警。改用 `.tokenLine`（`<email>_TOKEN=`）当 awk 匹配前缀，只删
       #   token 行、_EXPIRES 存活。token-blind 不变（awk 只按前缀删行·不读等号右侧 blob 值）。
       local token_line
-      token_line="$(node -e 'const{fileVaultLineMatch}=require(process.argv[1]);process.stdout.write(fileVaultLineMatch(process.argv[2]).tokenLine)' "$LIB_JS" "$EMAIL" 2>/dev/null)" || token_line=""
+      token_line="$(node -e 'const{fileVaultLineMatch}=require(process.argv[1]);process.stdout.write(fileVaultLineMatch(process.argv[2]).tokenLine)' "$LIB_JS" "$wb_email" 2>/dev/null)" || token_line=""
       [ -n "$token_line" ] || { err "writeback: 无法取 email 安全前缀——跳过 vault 回写（拒裸正则）。"; return 1; }
       # **全或无原子写（codex round#1 Finding 3）+ 跨进程串行化（codex round#9 Finding C）**：temp 里先写齐（保留行
       #   [含 _EXPIRES] + 新 _TOKEN 行）全成功才 rename（全或无·原 vault 任一步失败都没动·旧 token 存活），并把整段
@@ -819,23 +825,23 @@ writeback_vault() {
       #   （token_line 前缀）→ _EXPIRES 在保留集里存活。token-blind 不变（awk 只按前缀筛行不读值；blob 经 printf 进 temp）。
       _writeback_vault_file_locked() {
         local wb_tmp
-        wb_tmp="$(mktemp "${VAULT_FILE}.XXXXXX" 2>/dev/null || printf '%s' "${VAULT_FILE}.tmp.$$")"
+        wb_tmp="$(mktemp "${wb_file}.XXXXXX" 2>/dev/null || printf '%s' "${wb_file}.tmp.$$")"
         [ -n "$wb_tmp" ] || { err "writeback: 无法建临时文件——跳过回写（原 vault 原封不动）。"; return 1; }
         chmod 600 "$wb_tmp" 2>/dev/null || true
-        if [ -f "$VAULT_FILE" ]; then
-          if ! awk -v p="$token_line" 'index($0, p) != 1' "$VAULT_FILE" > "$wb_tmp" 2>/dev/null; then
+        if [ -f "$wb_file" ]; then
+          if ! awk -v p="$token_line" 'index($0, p) != 1' "$wb_file" > "$wb_tmp" 2>/dev/null; then
             rm -f "$wb_tmp"; err "writeback: 筛旧 _TOKEN 行失败——保留原文件，未回写。"; return 1
           fi
         fi
-        if ! printf '%s_TOKEN=%s\n' "$EMAIL" "$blob" >> "$wb_tmp"; then
+        if ! printf '%s_TOKEN=%s\n' "$wb_email" "$blob" >> "$wb_tmp"; then
           rm -f "$wb_tmp"; err "writeback: 写新 vault 行失败（磁盘满 / IO 错？）——丢弃临时文件、原 vault 原封不动（旧 token 存活）。"; return 1
         fi
-        if ! mv "$wb_tmp" "$VAULT_FILE"; then
+        if ! mv "$wb_tmp" "$wb_file"; then
           rm -f "$wb_tmp"; err "writeback: 原子替换 vault 文件失败（rename 错）——原 vault 原封不动（旧 token 存活）。"; return 1
         fi
         return 0
       }
-      with_vault_lock "$VAULT_FILE" _writeback_vault_file_locked || return 1
+      with_vault_lock "$wb_file" _writeback_vault_file_locked || return 1
       # 旁存 _EXPIRES（refresh token 长期有效期·非密·token-blind）——沿用 registry 的 token_expires_at 不在此动。
       #   注意：只删 _TOKEN 行（见上）→ 原有 _EXPIRES 行在保留集里存活，不被回写清掉。
       ;;
@@ -845,6 +851,122 @@ writeback_vault() {
       return 1
       ;;
   esac
+  return 0
+}
+
+# ── read_official_blob：读官方共享凭证存储**当前**的完整 OAuth blob（裸 oauth 对象·已解包 .claudeAiOauth）──
+#   切出 token 抢救（Finding #72）用：覆写官方存储**之前**，存储里 account=$USER 的 blob 仍是**切出号**被运行中的
+#   claude 自主 refresh 更新到最新的那份（含已轮转的新 refreshToken）。把它读出来才能回写切出号 vault、补上缺失的
+#   「官方存储 → vault」反向流。
+#   **形状纪律（codex P1·已坐实）**：官方 keychain「Claude Code-credentials」与 credentials.json 都存**包裹形**
+#     `{"claudeAiOauth":{...}}`；cc-master vault 存**裸** oauth 对象 → 必须解包 `.claudeAiOauth` 再回写（否则污染 vault 形状）。
+#   **源优先级**：mac 主路径 = keychain（完整 blob 含 refreshToken·与录号捕获同源）；credentials.json 在 mac 上
+#     refreshToken 可能为空 → 仅当 keychain 读不到有效 blob 时 fallback（非 mac 唯一源·CRED_PATH 可 env 覆写·测试注入）。
+#   **校验**：解包后须是含**非空 accessToken / refreshToken / expiresAt** 的对象，否则视为无有效 blob（空输出+退 1）——
+#     抢救一个缺 refreshToken 的 blob 无意义（下次切回仍 refresh 不了）。
+#   **token-blind**：blob 含 token，只经 stdout 回调用方 local 变量（与既有 VAULT_BLOB/NEW_BLOB 同纪律·决策 A），绝不 echo/log/进 registry。
+read_official_blob() {
+  local raw=""
+  if command -v security >/dev/null 2>&1; then
+    raw="$(security find-generic-password -w -s "Claude Code-credentials" -a "$USER" 2>/dev/null)" || raw=""
+  fi
+  # node：stdin = keychain 原始值（可空）；argv1 = credentials.json 路径（fallback）。解包 .claudeAiOauth → 校验 →
+  #   stdout 输出裸 blob JSON（合法单行）；任何不满足 → 空输出 + exit 1（caller 据空字符串跳过抢救）。
+  printf '%s' "$raw" | node -e '
+    "use strict";
+    const fs = require("fs");
+    const credPath = process.argv[1];
+    let kc = "";
+    process.stdin.on("data", (d) => { kc += d; }).on("end", () => {
+      function unwrap(s) {
+        if (!s) return null;
+        let o; try { o = JSON.parse(s); } catch (_e) { return null; }
+        if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+        // 官方存储是 {claudeAiOauth:{...}} 包裹形 → 解包成裸 oauth 对象（既无包裹则按裸对象兜底）。
+        const b = (o.claudeAiOauth && typeof o.claudeAiOauth === "object") ? o.claudeAiOauth : o;
+        return (b && typeof b === "object" && !Array.isArray(b)) ? b : null;
+      }
+      function valid(b) {
+        return !!(b && typeof b.accessToken === "string" && b.accessToken
+               && typeof b.refreshToken === "string" && b.refreshToken
+               && (typeof b.expiresAt === "number" || (typeof b.expiresAt === "string" && b.expiresAt)));
+      }
+      let blob = unwrap(kc.replace(/\s+$/, ""));       // 主路径：keychain（mac·完整 blob）。
+      if (!valid(blob)) {                              // fallback：credentials.json（非 mac 唯一源·mac 上 RT 可能空 → 由 valid 把关）。
+        try { blob = unwrap(fs.readFileSync(credPath, "utf8")); } catch (_e) { /* 读不到 → 空 */ }
+      }
+      if (!valid(blob)) { process.exit(1); }           // 无有效完整 blob（缺 refreshToken 等）→ 空输出。
+      process.stdout.write(JSON.stringify(blob));
+    });
+  ' "${CRED_PATH:-${HOME}/.claude/.credentials.json}" 2>/dev/null
+}
+
+# ── rescue_switchout_token：切出 token 抢救（Finding #72·补 vault↔官方存储单向失同步）──────────────────────
+#   病根：cc-master vault 是官方存储的一次性快照；运行中的 claude 自主 refresh 会轮转 refreshToken、写回**官方存储**
+#   却**绝不**回流 cc-master vault → 切出号 vault 停在切入那刻的旧值、其 refreshToken 早被服务端吊销 → 下次切回 refresh
+#   失败（rc=4）、号池里用过的号逐个变死号。
+#   修：覆写官方存储**之前**（此刻 account=$USER 仍是切出号最新 blob），读出来 token-blind 回写**切出号** vault，
+#   补上「官方存储 → 切出号 vault」反向流，与既有「切入号 vault → 官方存储」闭环。
+#   纪律：① **时机不变式**——必在 overwrite_official_stores 之前调（之后官方存储已是切入号·读不到切出号 blob）；
+#         ② **身份 guard**（安全关键·防 mislabel）——官方存储 ~/.claude.json oauthAccount.emailAddress 须 == 切出号，
+#            否则官方存储当前不是切出号（用户手动 /login 切过？）→ 绝不把别号 token 写进切出号 vault（污染号池）·跳过；
+#         ③ **best-effort·绝不阻断换号**——任一步失败（无切出号 / 读不到有效 blob / 身份不匹配 / 回写失败）仅告警跳过，
+#            切入照常（最坏 = 下次切回该号需 --refresh·与修复前现状同）；
+#         ④ **token-blind**——blob 只活在 local 变量、经 writeback_vault argv/printf 写，绝不 echo/log/进 registry。
+rescue_switchout_token() {
+  # 切出号 = 当前 active（CURRENT_ACTIVE）。沿 record_switch_out 同范式：未钉则现探（探得的 active 即切出号·此刻 active 尚未翻）。
+  [ -n "$CURRENT_ACTIVE" ] || detect_current_active
+  local so_email="$CURRENT_ACTIVE"
+  # 无切出号（首次换入 / 检测不到）或切入==切出（切到自己）→ 无可抢救，跳过。
+  if [ -z "$so_email" ] || [ "$so_email" = "$EMAIL" ]; then
+    return 0
+  fi
+  # 1) 读官方存储当前完整 blob（裸·已解包·已校验非空 refreshToken）。token 进 local·绝不打印。
+  local so_blob; so_blob="$(read_official_blob)" || so_blob=""
+  if [ -z "$so_blob" ]; then
+    err "rescue: 官方存储无有效完整 blob（缺 refreshToken / 读取失败）——跳过切出 token 抢救（best-effort·非致命·切入照常）。"
+    return 0
+  fi
+  # 2) 身份 guard：官方存储 oauthAccount.emailAddress 须 == 切出号（非密 email·经 stdout 回变量）。不匹配 / 读不到 → 保守跳过。
+  local id_email
+  id_email="$(node -e '"use strict";const fs=require("fs");try{const cj=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const oa=cj&&cj.oauthAccount;if(oa&&typeof oa.emailAddress==="string")process.stdout.write(oa.emailAddress)}catch(_e){}' "${CLAUDE_JSON_PATH:-${HOME}/.claude.json}" 2>/dev/null)" || id_email=""
+  if [ -z "$id_email" ] || [ "$id_email" != "$so_email" ]; then
+    err "rescue: 官方存储身份（${id_email:-未知}）≠ 切出号（${so_email}）——跳过抢救（防把别号 token 写进切出号 vault·best-effort）。"
+    return 0
+  fi
+  # 3) 解析切出号自己的 vault 配置（kind / service-or-path·可能与切入号 vault 形态不同）。registry 缺 → 默认 keychain/cc-master-oauth（与切入号解析同兜底）。
+  local so_kind="" so_svc_or_path=""
+  if [ -n "$REGISTRY_PATH" ] && [ -f "$REGISTRY_PATH" ]; then
+    local so_vault
+    so_vault="$(node -e '
+      "use strict";
+      try {
+        const lib = require(process.argv[1]);
+        const reg = lib.loadRegistry(process.argv[2]);
+        const e = (reg.accounts && reg.accounts[process.argv[3]]) || {};
+        const v = e.vault || {};
+        const kind = (v.kind === "keychain" || v.kind === "file") ? v.kind : "";
+        const svcOrPath = kind === "keychain" ? (v.service || "") : (kind === "file" ? (v.path || "") : "");
+        process.stdout.write([kind, svcOrPath].join("\n"));
+      } catch (_e) { /* 缺/坏 → 空·下面兜底 */ }
+    ' "$LIB_JS" "$REGISTRY_PATH" "$so_email" 2>/dev/null || true)"
+    so_kind="$(printf '%s\n' "$so_vault" | sed -n '1p')"
+    so_svc_or_path="$(printf '%s\n' "$so_vault" | sed -n '2p')"
+  fi
+  [ -n "$so_kind" ] || so_kind="keychain"
+  local so_svc="cc-master-oauth" so_file="$VAULT_FILE"
+  if [ "$so_kind" = "keychain" ]; then
+    [ -n "$so_svc_or_path" ] && so_svc="$so_svc_or_path"
+  elif [ "$so_kind" = "file" ]; then
+    [ -n "$so_svc_or_path" ] && so_file="$so_svc_or_path"
+  fi
+  # 4) token-blind 回写切出号 vault（参数化 writeback_vault·目标 = 切出号上下文）。失败仅告警·绝不阻断换号。
+  if writeback_vault "$so_blob" "$so_email" "$so_kind" "$so_svc" "$so_file"; then
+    err "rescue: 已把官方存储最新 blob 回写切出号（${so_email}）vault——补 vault↔官方存储反向新鲜（Finding #72）。"
+  else
+    err "rescue: 回写切出号（${so_email}）vault 失败——跳过（best-effort·非致命·下次切回该号可能需 --refresh·切入照常）。"
+  fi
+  unset so_blob 2>/dev/null || true   # token 清理（best-effort）。
   return 0
 }
 
@@ -1402,6 +1524,11 @@ if [ -z "$SWITCH_LOCK_OWNER" ]; then
   err "error: 无法取得换号锁（${SWITCH_LOCK_TARGET}.lock·另有 switch 在跑 / node 不可用）——**拒绝无锁覆写官方存储**（防并发交错三存储损坏），未换号、registry 原封不动。"
   exit 1
 fi
+
+# 2.5) 切出 token 抢救（Finding #72·补 vault↔官方存储单向失同步）：**必在覆写官方存储之前**（此刻官方存储 account=$USER
+#   仍是切出号被 claude 自主 refresh 更新到最新的 blob）把它读出来 writeback 回切出号 vault。锁内（防并发）·best-effort
+#   （任一步失败跳过·绝不阻断换号·身份 guard 防 mislabel）。覆写之后官方存储就是切入号、再读不到切出号最新 blob 了。
+rescue_switchout_token
 
 # 3) 覆写官方三存储（先非权威后权威）。① credentials.json 失败 = 致命（凭证主存未更新）→ 退非 0、不翻 registry。
 if ! overwrite_official_stores "$NEW_BLOB" "$REG_IDENTITY_JSON"; then
