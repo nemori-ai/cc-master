@@ -13,6 +13,15 @@
 
 HOOK="$PLUGIN_ROOT/hooks/scripts/usage-pacing.js"
 
+# ── P4 收口: the hook now prefers `ccm usage advise --json` for the corridor verdict and falls back to
+# the local computation when ccm is unavailable. By DEFAULT we force the LOCAL fallback for every existing
+# case (export CCM_BIN to a nonexistent binary → adviseViaCcm returns null → local path) so all the local
+# account-authoritative / 本地反推 / num_account / registry cases below keep testing the FALLBACK exactly as
+# before. A dedicated "── CCM SHELL-OUT ──" section near the end injects a stub `ccm` (CCM_BIN=<stub>) to
+# test the ccm-driven path (present → use its verdict) and ccm-absent (→ fallback). The hook reads CCM_BIN
+# from its env (mirrors board-lint.js); exporting it here propagates to every $HOOK subprocess.
+export CCM_BIN="/nonexistent-ccm-bin-force-local-fallback"
+
 # run_pacing USAGE_DIR NOW [BUDGET] [BURN_FLOOR] -> sets HOOK_OUT / HOOK_RC.
 # ARMED: stdin carries a Stop event whose session_id (sess-x) OWNS an active board in CC_MASTER_HOME
 # (seeded below). The hook is now armed-gated — it only reads usage when this session is armed, so the
@@ -781,5 +790,127 @@ assert_eq 0 "$HOOK_RC" "(sd-present-1) 7d present & low + n=3 + 5h wall → rc 0
 assert_contains "$HOOK_OUT" "切到下一份配额" "(sd-present-1) 7d present & low → 切下一份配额 DOES fire (7d confirmed余量)"
 assert_contains "$HOOK_OUT" "7d 仅 20%" "(sd-present-1) names the confirmed 7d headroom value"
 rm -rf "$S_HOME"
+
+# ── CCM SHELL-OUT (P4 收口): hook prefers `ccm usage advise --json`; present → use its verdict; absent → fallback ──
+# The corridor verdict math is收口'd into the ccm engine (pacing.ts SSOT); the hook shells out to it
+# (adviseViaCcm → spawnSync `ccm usage advise --json`) and maps the verdict to a本 skill-vocabulary prompt.
+# These cases inject a STUB `ccm` via CCM_BIN (hermetic — no real ccm binary needed): the stub echoes a fixed
+# {"ok":true,"data":{…}} for each verdict. ccm-absent (CCM_BIN→nonexistent) must gracefully fall back to local.
+# All cases run ARMED (the gate still runs BEFORE any shell-out) and assert NON-blocking.
+CCM_HOME="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-ccm"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$CCM_HOME/mine.board.json"
+
+# mk_ccm_stub DATA_JSON -> path to an executable stub `ccm` that prints {"ok":true,"data":DATA_JSON} on
+#   `usage advise`. The DATA_JSON is written to a sibling payload file the stub `cat`s — no sed/interpolation
+#   fragility (DATA_JSON可含任意 JSON 字符). Mirrors the real `ccm usage advise --json` shape (ok+data).
+#   Any other subcommand → empty (defensive). The stub dir is the caller's to clean up.
+mk_ccm_stub() {
+  local dir; dir="$(make_project)"; local stub="$dir/ccm"; local payload="$dir/payload.json"
+  printf '%s' "$1" > "$payload"
+  cat > "$stub" <<STUB
+#!/usr/bin/env bash
+# stub ccm: only answers \`usage advise\` with the canned data payload next to this script.
+if [ "\$1" = "usage" ] && [ "\$2" = "advise" ]; then
+  printf '{"ok":true,"data":%s}\n' "\$(cat "$payload")"
+fi
+STUB
+  chmod +x "$stub"
+  echo "$stub"
+}
+
+# run_pacing_ccm STUB_DATA_JSON HOME SID -> armed Stop driven through a stub ccm (CCM_BIN=stub).
+run_pacing_ccm() {
+  local stub; stub="$(mk_ccm_stub "$1")"
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$3" \
+    | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="2026-06-10T12:00:00Z" CC_MASTER_HOME="$2" \
+      CC_MASTER_RATE_CACHE="/nonexistent-ccm-section-rate-cache" CCM_BIN="$stub" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+  rm -rf "$(dirname "$stub")"
+}
+
+# (ccm-1) THROTTLE verdict from ccm → SLOWDOWN prompt (降到更便宜的模型档), non-blocking. Proves the hook
+#         takes ccm's verdict (not local — local rate-cache is nonexistent here so local would be silent).
+run_pacing_ccm '{"verdict":"throttle","reason":"r","levers":["downgrade_model"],"hard_stop_7d":false,"window_5h_pct":92,"window_7d_pct":50,"effective_n":1,"switch_candidate":null,"confidence":"high","source":"account","available":true}' \
+  "$CCM_HOME" "sess-ccm"
+assert_eq 0 "$HOOK_RC" "(ccm-1) ccm throttle → rc 0"
+assert_contains "$HOOK_OUT" "additionalContext" "(ccm-1) ccm throttle → injects prompt"
+assert_contains "$HOOK_OUT" "降到更便宜的模型档" "(ccm-1) ccm throttle → SLOWDOWN levers (本 skill vocabulary)"
+assert_contains "$HOOK_OUT" "92" "(ccm-1) carries ccm window_5h_pct"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(ccm-1) NEVER blocks"
+
+# (ccm-2) HARD_STOP verdict (7d hard total gate) → 暂停 dispatch 新节点 + blocked_on:user + 硬总闸. The hardest framing.
+run_pacing_ccm '{"verdict":"hard_stop","reason":"r","levers":["pause_dispatch","surface_user"],"hard_stop_7d":true,"window_5h_pct":40,"window_7d_pct":87,"effective_n":1,"switch_candidate":null,"confidence":"high","source":"account","available":true}' \
+  "$CCM_HOME" "sess-ccm"
+assert_eq 0 "$HOOK_RC" "(ccm-2) ccm hard_stop → rc 0"
+assert_contains "$HOOK_OUT" "暂停 dispatch 新节点" "(ccm-2) ccm hard_stop → dispatch gate wording"
+assert_contains "$HOOK_OUT" "blocked_on:" "(ccm-2) frames blocked_on:user"
+assert_contains "$HOOK_OUT" "硬总闸" "(ccm-2) names the 7d hard total gate"
+assert_contains "$HOOK_OUT" "87" "(ccm-2) carries ccm window_7d_pct"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(ccm-2) NEVER blocks (hook can't真 block dispatch)"
+
+# (ccm-3) ACCELERATE+switch_account lever (n>1 + 5h critical + 7d headroom) → 切到下一份配额 signal.
+run_pacing_ccm '{"verdict":"accelerate","reason":"r","levers":["switch_account","continue_dispatch"],"hard_stop_7d":false,"window_5h_pct":92,"window_7d_pct":20,"effective_n":3,"switch_candidate":"b@x.com","confidence":"high","source":"account","available":true}' \
+  "$CCM_HOME" "sess-ccm"
+assert_eq 0 "$HOOK_RC" "(ccm-3) ccm accelerate-switch → rc 0"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(ccm-3) switch_account lever → 切下一份配额 signal"
+assert_contains "$HOOK_OUT" "3 份" "(ccm-3) names the effective_n (3 份)"
+
+# (ccm-4) ACCELERATE underuse (no switch lever) → 欠用 + 加速 prompt.
+run_pacing_ccm '{"verdict":"accelerate","reason":"r","levers":["upgrade_model_critical_path","increase_parallelism"],"hard_stop_7d":false,"window_5h_pct":20,"window_7d_pct":30,"effective_n":1,"switch_candidate":null,"confidence":"medium","source":"account","available":true}' \
+  "$CCM_HOME" "sess-ccm"
+assert_eq 0 "$HOOK_RC" "(ccm-4) ccm accelerate-underuse → rc 0"
+assert_contains "$HOOK_OUT" "欠用" "(ccm-4) underuse accelerate → carries 欠用 signal"
+assert_contains "$HOOK_OUT" "加速" "(ccm-4) points at accelerate levers (加速)"
+
+# (ccm-5) HOLD verdict → silent (corridor内·no prompt). Proves ccm hold suppresses output (no spam).
+run_pacing_ccm '{"verdict":"hold","reason":"r","levers":[],"hard_stop_7d":false,"window_5h_pct":78,"window_7d_pct":40,"effective_n":1,"switch_candidate":null,"confidence":"high","source":"account","available":true}' \
+  "$CCM_HOME" "sess-ccm"
+assert_eq 0 "$HOOK_RC" "(ccm-5) ccm hold → rc 0"
+assert_eq "" "$HOOK_OUT" "(ccm-5) ccm hold (corridor内) → silent (no prompt)"
+
+# (ccm-6) ccm available:false → degrade to LOCAL fallback. Stub returns available:false; local rate-cache
+#         is nonexistent + SAMPLE @12:00Z has 180min headroom → local path also silent. Proves available:false
+#         → adviseViaCcm returns null → local path runs (here silent), NOT ccm's (would've been hold anyway).
+run_pacing_ccm '{"verdict":"hold","reason":"r","levers":[],"hard_stop_7d":false,"window_5h_pct":null,"window_7d_pct":null,"effective_n":1,"switch_candidate":null,"confidence":"low","source":"local-derived-approx","available":false}' \
+  "$CCM_HOME" "sess-ccm"
+assert_eq 0 "$HOOK_RC" "(ccm-6) ccm available:false → rc 0"
+assert_eq "" "$HOOK_OUT" "(ccm-6) ccm available:false → degrade to local (here silent), not ccm verdict"
+
+# (ccm-7) ccm ABSENT (CCM_BIN→nonexistent) but a CRITICAL local account sidecar present → falls back to LOCAL
+#         account-authoritative path → still warns (proves graceful degrade preserves the local capability).
+CCM_CACHE_DIR="$(make_project)"; CCM_CACHE="$CCM_CACHE_DIR/rate.json"
+A_R5F_CCM=$((A_NOWEP+3600))
+printf '{"five_hour":{"used_percentage":90,"resets_at":%d},"seven_day":{"used_percentage":20}}' "$A_R5F_CCM" > "$CCM_CACHE"
+HOOK_OUT="$(printf '{"session_id":"sess-ccm","hook_event_name":"Stop"}' \
+  | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="2026-06-10T12:00:00Z" CC_MASTER_HOME="$CCM_HOME" \
+    CC_MASTER_RATE_CACHE="$CCM_CACHE" CCM_BIN="/nonexistent-ccm-absent" \
+    "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+assert_eq 0 "$HOOK_RC" "(ccm-7) ccm absent + critical local sidecar → rc 0"
+assert_contains "$HOOK_OUT" "additionalContext" "(ccm-7) ccm absent → LOCAL fallback path still warns (graceful degrade)"
+assert_contains "$HOOK_OUT" "降到更便宜的模型档" "(ccm-7) local fallback emits its account-authoritative SLOWDOWN"
+rm -rf "$CCM_CACHE_DIR"
+
+# (ccm-8) ccm GARBAGE JSON → degrade to local. Stub emits non-JSON; adviseViaCcm returns null → local path
+#         (nonexistent rate-cache + SAMPLE 180min headroom → silent). Proves bad JSON never crashes / never
+#         injects garbage, just degrades.
+GARBAGE_STUB_DIR="$(make_project)"; GARBAGE_STUB="$GARBAGE_STUB_DIR/ccm"
+printf '#!/usr/bin/env bash\nprintf "not json at all {{{\\n"\n' > "$GARBAGE_STUB"; chmod +x "$GARBAGE_STUB"
+HOOK_OUT="$(printf '{"session_id":"sess-ccm","hook_event_name":"Stop"}' \
+  | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="2026-06-10T12:00:00Z" CC_MASTER_HOME="$CCM_HOME" \
+    CC_MASTER_RATE_CACHE="/nonexistent-ccm-section-rate-cache" CCM_BIN="$GARBAGE_STUB" \
+    "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+assert_eq 0 "$HOOK_RC" "(ccm-8) ccm garbage JSON → rc 0 (no crash)"
+assert_eq "" "$HOOK_OUT" "(ccm-8) ccm garbage JSON → degrade to local (silent here), never inject garbage"
+rm -rf "$GARBAGE_STUB_DIR"
+
+# (ccm-9) ARMED GATE still runs BEFORE shell-out — UNARMED + a hard_stop stub ccm → silent (no shell-out
+#         leakage on unarmed sessions·red line 6). Proves the gate short-circuits before adviseViaCcm.
+CCM_UNARMED="$(make_project)"  # no *.board.json → unarmed
+run_pacing_ccm '{"verdict":"hard_stop","reason":"r","levers":["pause_dispatch"],"hard_stop_7d":true,"window_5h_pct":99,"window_7d_pct":99,"effective_n":1,"switch_candidate":null,"confidence":"high","source":"account","available":true}' \
+  "$CCM_UNARMED" "sess-ccm-unarmed"
+assert_eq 0 "$HOOK_RC" "(ccm-9) unarmed + hard_stop stub ccm → rc 0"
+assert_eq "" "$HOOK_OUT" "(ccm-9) unarmed → silent even with a critical ccm verdict (armed gate before shell-out, red line 6)"
+rm -rf "$CCM_UNARMED"
+rm -rf "$CCM_HOME"
 
 finish

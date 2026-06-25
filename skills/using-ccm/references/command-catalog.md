@@ -925,7 +925,7 @@ ccm policy set --autonomous-account-switch=allow|deny [flags]
 
 配额侧只读 advisory（ADR-015·charter ②控制 token 消耗速度 + ⑤资源下最大化效率）：当前号/备号用量 + 双侧走廊 pacing verdict + 任务 token 成本。**纯只读**——全 verb query/compute，零写、不抢 board-lock、不落状态（与 `baseline`/`policy` 这俩写 noun 相反）。诚实降级：账户信号不可得 = **exit 0 + `data.available:false`**（非 exit 1）；无 `accounts.json` registry → 天然单账号·`effective_n=1`（不报错）。诚实字段贯穿：`source`（account / registry-snapshot / observability / local-derived-approx）/ `confidence`（high/medium/low）/ `as_of` / `snapshot_stale` / `coverage_pct`。ccm 出 verdict/数据，**不替 orchestrator 决策**（真动作归 SKILL A·红线3）。
 
-> 备号数据 = **只读** `${CC_MASTER_HOME:-$HOME/.claude/cc-master}/accounts.json` registry 的生命周期快照（每号取 `last_observed_quota`/`last_switch_out`/`switch_history[]` 里 `at` 最大那条）——usage **绝不写 registry、绝不碰 token**（registry 写/管归 account-management）。当前号 5h/7d 用量读 status-line sidecar（`usage-snapshot.json`·账户权威·Finding #37），缺则 `available:false` 降级。
+> 备号数据 = **只读** `${CC_MASTER_HOME:-$HOME/.claude/cc-master}/accounts.json` registry 的生命周期快照（每号取 `last_observed_quota`/`last_switch_out`/`switch_history[]` 里 `at` 最大那条）——usage **绝不写 registry、绝不碰 token**（registry 写/管归 account-management）。当前号 5h/7d 用量读 status-line sidecar（`${CC_MASTER_RATE_CACHE:-$HOME/.claude/.cc-master-rate-limits.json}`·statusline-capture.js 写、cc-usage.sh / usage-pacing.js hook 同读·账户权威·Finding #37），缺则 `available:false` 降级。
 
 ### usage show
 

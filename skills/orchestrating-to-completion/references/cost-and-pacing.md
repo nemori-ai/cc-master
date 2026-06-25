@@ -1,6 +1,6 @@
 # Cost & pacing —— 模型档位与 usage-aware 节流
 
-> **服务愿景：C2**（节流 token 消耗）**· C6**（按难度选模型档位）。**何时读：** 给每个节点选模型档位 + 想清楚为何主线固定一个模型（prompt-cache）；把一场长跑对照 5h/7d 配额窗口来 pace——靠 `${CLAUDE_SKILL_DIR}/scripts/cc-usage.sh` 感知（**账户权威 `used_percentage` 优先、本地反推 fallback**），levers：降级模型 / 降 WIP / 推迟 float。
+> **服务愿景：C2**（节流 token 消耗）**· C6**（按难度选模型档位）。**何时读：** 给每个节点选模型档位 + 想清楚为何主线固定一个模型（prompt-cache）；把一场长跑对照 5h/7d 配额窗口来 pace——直接 `ccm usage advise --json` 拿**双侧走廊 verdict**（引擎 `pacing.ts` 是走廊数学 SSOT·ADR-010；账户权威 `used_percentage` 不可得则 `available:false` 降级），levers：降级模型 / 降 WIP / 推迟 float。**ccm 出 verdict、你（A）决策**（红线3：advisory 不替编排判断）。
 
 > **它是什么——以及它*不是*什么。** 这里装的是编排者默认会缺的那块 reference 知识：四个模型档位及其相对成本、为何主线固定一个模型、以及怎么把一场 long-horizon 跑对照 5h/7d 配额窗口来 pace。它是**informational，不是红线。** Subagent pressure baseline（model-tiering ×6、usage-pacing ×2，零失败）表明 agent 已经能从镜头 2（把资源集中到临界链）和镜头 5（在容量内干活）*推导*出正确的 tiering / pacing。它们真正缺的只是下面这几条具体事实——档位定位 + 成本、切主线模型的 cache 代价、以及配额窗口的信号来源。所以把它们嵌进 `decomposition.md` 的每节点契约里就够；**别**把它们升格成一条独立纪律、更别为它们加红线（baseline 证明一条都不需要——§6 TDD-for-skills 的 Iron Law 禁止编造一条 agent 根本不会违背的规则）。
 
@@ -69,15 +69,16 @@
 
 读取方式，按口径可信度排：
 
-1. **账户权威（首选）—— `statusline-capture.js` → sidecar → `cc-usage.sh`。** 把 `${CLAUDE_SKILL_DIR}/scripts/statusline-capture.js` 接进你的 status line（见下「接法」），它在 status-line 被调用时把 `rate_limits.{five_hour,seven_day}.{used_percentage,resets_at}` 落到 sidecar。然后 `${CLAUDE_SKILL_DIR}/scripts/cc-usage.sh` 读 sidecar，吐 `source:"account"` + 权威 `used_percentage` + 从 `resets_at` 算的 `window_remaining_min`。**这是唯一不失真的 reset 倒计时来源。**
-2. **本地反推（fallback）—— `cc-usage.sh` 无 sidecar 时。** 系统 python3 解析本地 `~/.claude/projects/**/*.jsonl`（零网络 / 零依赖，ship-anywhere；**不是 hook**，像 `codex-review.sh` 一样在 pacing 决策点跑在主线上），吐 `source:"local-derived-approx"` + `five_hour{used_tokens, window_remaining_min, burn_rate_per_min}` + `seven_day{used_tokens}`。**reset 倒计时是反推、可能严重失真**——只在账户口径不可用（headless / 未接 status-line / 非 Pro-Max / API-key）时用，且当 approx 看。
-3. **`npx ccusage blocks --json`** —— 社区工具，自带官方 burn rate；手头有就直接跑。但它也是解析 JSONL 的反推，给不了账户 `used_percentage`（那只在 status-line）。
+1. **走廊 verdict（首选）—— `ccm usage advise --json`。** 引擎 `pacing.ts` 是**双侧目标走廊数学的 SSOT**（ADR-010）：吃账户权威 5h/7d `used_percentage`（+ `resets_at` + effective-N），吐 `verdict`（`throttle` 临界减速 / `accelerate` 欠用或切号加速 / `hold` 走廊内 / `hard_stop` 7d 硬总闸）+ 推荐 lever 类 + `switch_candidate`。账户信号不可得 → `available:false`（pacing 不可判·降级）。**ccm 出 verdict、你决策**（红线3：advisory 不替编排判断；动作仍归你的认知）。配额**状态**（当前号/备号 5h/7d %、effective-N）用 `ccm usage show --json`；任务 token 成本用 `ccm usage task-cost`。
+2. **账户权威信号源 —— `statusline-capture.js` → sidecar。** ccm 的账户权威 `used_percentage`/`resets_at` 来自 status-line：把 `${CLAUDE_SKILL_DIR}/scripts/statusline-capture.js` 接进你的 status line（见下「接法」），它在 status-line 被调用时把 `rate_limits.{five_hour,seven_day}.{used_percentage,resets_at}` 落到 sidecar（`${CC_MASTER_RATE_CACHE:-~/.claude/.cc-master-rate-limits.json}`），ccm（`usage show`/`advise`）+ `cc-usage.sh` + `usage-pacing.js` hook 都读这同一份。**这是唯一不失真的 reset 倒计时来源。** `${CLAUDE_SKILL_DIR}/scripts/cc-usage.sh` 现在是 ccm 的**薄带外包装**（委托 `ccm usage show/advise --json`、reshape 成一行 JSON），**已去 python3 依赖**——无 sidecar 时它诚实吐 `source:"unavailable"` + `available:false`（**本地 JSONL 反推已撤**：引擎不含反推、Finding #37 证反推 reset 失真到数量级；此带外信号现仅账户权威）。
+3. **本地反推 floor（仅 Stop-hook 自带）。** 账户口径完全不可用时，`usage-pacing.js` hook 仍保留它**自带的**本地 JSONL 反推作为 Stop 时的撞墙 floor（hook 内部降级，非带外信号）——但 reset 倒计时是反推、可能严重失真，只当撞墙启发式、不据它催加速。带外的 orchestrator 信号（cc-usage.sh / ccm）不再提供反推。
+4. **`npx ccusage blocks --json`** —— 社区工具，自带官方 burn rate；手头有就直接跑。但它也是解析 JSONL 的反推，给不了账户 `used_percentage`（那只在 status-line）。
 
 **接法（把 capture 接进 status line，不覆盖你已有的）：** 在 `settings.json` 把 `statusLine.command` 设为 `<脚本路径> --passthrough '<你原本的 status line 命令>'`——它捕获 sidecar 后把 stdin 透传给你原本的命令、原样输出（你的状态行不变）；没接也能用，`cc-usage.sh` 自动降级反推。⚠️ **脚本路径写法（Finding #39）**：`${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_SKILL_DIR}` 在 `statusLine.command` 的展开**官方未文档化**（hooks.json 的 command 字段明确支持，但 statusLine.command 未说明；且 statusLine 是 user-scoped、不绑特定 plugin，该变量很可能无定义）→ **保守用绝对路径**：dev / `--plugin-dir` 指向 `<repo>/skills/orchestrating-to-completion/scripts/statusline-capture.js`，安装场景指向 `~/.claude/plugins/cache/<marketplace>/cc-master/<version>/skills/orchestrating-to-completion/scripts/statusline-capture.js`。想用变量的，**自行实证一次**：设上去渲染一次，看 `~/.claude/.cc-master-rate-limits.json` 有没有落盘——落了＝展开了。⚠️ status-line 在 idle 时安静——长等后台时配 `refreshInterval` 保持 sidecar 新鲜（`resets_at` 是绝对时刻，即使 sidecar 略旧倒计时仍准，除非已跨 reset）。
 
-**撞墙预测。** 账户口径下直接看 `used_percentage`：任一窗口逼近上限（默认阈值 ≥85%）就 pace；**7d 尤其要看**（它窗口长、最容易在不知不觉中逼顶——`usage-pacing.js` 现在也对 7d 出声）。反推 fallback 下退用 `used_tokens + burn_rate_per_min × window_remaining_min` 对比 plan ceiling，但记得 ceiling 是社区反推、window 也可能失真，结论当 approx。
+**撞墙预测。** `ccm usage advise` 的走廊数学（引擎 `pacing.ts`）已替你判这一步：任一窗口逼近上限就出 `throttle`/`hard_stop`（7d≥85% → `hard_stop`·跨窗口硬总闸·**7d 尤其要看**，它窗口长、最易不知不觉逼顶——`usage-pacing.js` hook 也对 7d 出声）。你只需读 verdict + 据它拍 lever；不必自己拿 `used_percentage` 重算走廊（那是引擎的活·DRY）。账户口径不可用 → `available:false`，此时 Stop-hook 的自带反推 floor 仍给撞墙启发式（当 approx 看）。
 
-诚实交代 scope：账户 `used_percentage` 仅 Pro/Max 交互式可见；API-key 用户没有滚动窗口、headless 拿不到 status-line——这些一律落到反推 fallback、按累计 token 消耗来 pace。
+诚实交代 scope：账户 `used_percentage` 仅 Pro/Max 交互式可见；API-key 用户没有滚动窗口、headless 拿不到 status-line——这些一律 `available:false` 降级（带外信号不再反推；仅 Stop-hook 自带 floor 按本地撞墙启发式出声）。
 
 ## Pacing levers —— 双侧：减速侧 ∥ 加速侧
 

@@ -152,23 +152,33 @@ function readBackups(
 }
 
 // ── 当前号信号（status-line sidecar·account-authoritative·Finding #37）─────────────────────────────
-//   sidecar 落点：${home}/usage-snapshot.json（statusline-capture.js 写）。形态 = UsageSignal。
+//   sidecar 落点：${CC_MASTER_RATE_CACHE:-$HOME/.claude/.cc-master-rate-limits.json}（账户级·跨 project
+//   共享）——这是 statusline-capture.js（writer）/ cc-usage.sh / usage-pacing.js hook（readers）三者钉死
+//   的同一路径。**绝非 ${home}/usage-snapshot.json**（旧错路径·永远找不到真 sidecar·P4 修复）。
+//   真实形态（statusline-capture.js 写）：`{ captured_at:<epoch秒>, five_hour:{used_percentage:<num>,
+//   resets_at?:<epoch秒>}, seven_day:{used_percentage,resets_at?} }`——`resets_at`/`captured_at` 是 epoch 秒。
 //   缺 → null（pacingAdvice 据此 available:false 降级·本地反推不归这俩只读 namespace·plan §4 性能边界）。
+function rateCachePath(env: Record<string, string | undefined>): string {
+  return (
+    env.CC_MASTER_RATE_CACHE || path.join(os.homedir(), '.claude', '.cc-master-rate-limits.json')
+  );
+}
+
 function readUsageSidecar(env: Record<string, string | undefined>): UsageSignal | null {
-  const home = env.CC_MASTER_HOME || path.join(os.homedir(), '.claude', 'cc-master');
-  for (const name of ['usage-snapshot.json', 'statusline-usage.json']) {
-    try {
-      const raw = fs.readFileSync(path.join(home, name), 'utf8');
-      const obj = JSON.parse(raw);
-      if (obj && typeof obj === 'object') return normalizeSignal(obj as Record<string, unknown>);
-    } catch {
-      // 试下一个候选名
-    }
+  try {
+    const raw = fs.readFileSync(rateCachePath(env), 'utf8');
+    const obj = JSON.parse(raw);
+    if (obj && typeof obj === 'object') return normalizeSignal(obj as Record<string, unknown>);
+  } catch {
+    return null; // 缺/坏 sidecar → 账户口径不可用（降级 available:false）
   }
   return null;
 }
 
-// normalizeSignal(obj) → 把 sidecar 多种可能形态归一到 UsageSignal（容忍 five_hour/5h、used_percentage/used_pct）。
+// normalizeSignal(obj) → 把 sidecar 归一到 UsageSignal。**真实 sidecar 形态**（statusline-capture.js 写）是
+//   `five_hour`/`seven_day` + `used_percentage`(num) + `resets_at`/`captured_at`(epoch 秒·num)——
+//   number 分支直接采纳。容忍冗余别名（5h/used_pct）+ ISO 字符串 resets_at/captured_at（Date.parse→epoch 秒），
+//   兼容 registry 快照口径，但**权威路径是真实 sidecar 的 epoch-秒数字形态**。
 function normalizeSignal(obj: Record<string, unknown>): UsageSignal {
   const win = (
     k1: string,

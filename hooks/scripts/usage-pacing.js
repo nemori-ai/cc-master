@@ -29,6 +29,15 @@
 //   **红线 1**：纯 JSON.parse、零 spawn、零网络。**红线 6**：读 registry / 注入号池事实**全在 armed gate 之后**，
 //   未武装一律静默。无 registry / 空池 / 坏 JSON → effective-N=1（天然单账号，与旧 --num_account 缺省一致，设计稿 §F）。
 //
+// P4 收口（ADR-014/015·plan §10-P4）：**走廊 verdict 计算**已收口进 ccm 引擎（`usage/pacing.ts` 的
+//   `pacingAdvice` 是双侧走廊数学的 SSOT）。本 hook 武装后**优先 shell 调 `ccm usage advise --json`**
+//   （进程边界·spawnSync·与 board-lint.js 同模式），把它的 verdict 映射成本 skill 词汇的非阻断提示。
+//   **优雅降级**：`ccm` 不在 PATH / 调用失败 / 非法 JSON / 形状不符 → **回退到本 hook 既有的本地计算路径**
+//   （account-authoritative sidecar + 本地反推），绝不直接丢失提示能力。ccm present 时以其 verdict 为准。
+//   红线1：spawn 一个二进制是允许的 shell 操作（非 import 引擎·非 python3）。红线6：shell 调 ccm 全在
+//   armed gate 之后（与读 usage/registry 同精神）。红线3：ccm 出 verdict、A 决策——映射出的提示仍只软告知。
+//   `CCM_BIN`（绝对路径可执行）是 dev/test/自定义安装的覆写口；缺则用 PATH 上的 `ccm`（生产）。
+//
 // node-on-PATH（ADR-006 §3.2）：npm/global 安装铁定有 `node`；standalone-binary 安装可能内嵌 node
 //   而不暴露到 PATH —— 那种宿主下本脚本（shebang `#!/usr/bin/env node`）根本不会被调起，等同于「该 hook
 //   不存在」。这是 Stop 事件上的**优雅降级**（不阻断、不报错），与本 hook「失败必静默」的精神一致；
@@ -39,6 +48,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 // ── 触发策略阈值（克制，避免每回合刷屏；见文件尾 README 块的完整论证）────────────────────────────
 //
@@ -100,6 +110,11 @@ const UNDERUSE_MAX_STALE_MIN_RAW = process.env.CC_MASTER_UNDERUSE_MAX_STALE_MIN 
 //   空池 / 坏 JSON → 1(天然单账号，行为与 --num_account 缺省一致)。env CC_MASTER_NUM_ACCOUNT 仍作**测试
 //   注入兜底**（registry 不可用或显式覆写时用），与其它 CC_MASTER_* 覆写点对偶；解析失败 / 缺失 / 非正整数 → null。
 const NUM_ACCOUNT_RAW = process.env.CC_MASTER_NUM_ACCOUNT || '';
+// CCM_BIN（P4 收口）：走廊 verdict 优先 shell 调 `ccm usage advise --json` 算（引擎 pacing.ts SSOT）。
+//   CCM_BIN 是 dev/test/自定义安装的覆写口（绝对路径可执行）；缺则用 PATH 上的 `ccm`（生产）。指向不存在
+//   的路径即可强制走本地降级路径（测试用·与 board-lint.js 同口径）。
+const CCM_BIN = process.env.CCM_BIN || 'ccm';
+// RATE_CACHE 路径要透传给 ccm（advise 也读同一 sidecar）——下面 RATE_CACHE 已定义；HOME_DIR 透传作 --home。
 
 // 「明显临界」启发式阈值（ceiling 未知时的保守降级，避免刷屏）：仅当**两条同时成立**才出声 ——
 //   (a) 5h 窗口剩余时间 ≤ HEUR_REMAIN_MIN（墙在不远处）；
@@ -588,6 +603,108 @@ function parseNumAccount(v) {
   return Number.isInteger(n) && n >= 1 ? n : null;
 }
 
+// ── ccm usage advise 收口（P4·走廊 verdict 的 SSOT 路径）────────────────────────────────────────────
+// adviseViaCcm(homeDir, rateCache, effN) → advise data 对象 | null。
+//   spawnSync `ccm usage advise --json [--effective-n N]`，透传 CC_MASTER_HOME / CC_MASTER_RATE_CACHE
+//   让 ccm 读到与 hook 同一份 sidecar / registry。形态：{ ok:true, data:{ verdict, reason, levers[],
+//   hard_stop_7d, window_5h_pct, window_7d_pct, effective_n, switch_candidate, confidence, source,
+//   available } }。任何失败（ENOENT / 信号 / 坏 JSON / 形状不符 / available:false）→ null（调用方降级本地）。
+//   注意：ccm advise 用真实 Date.now()（无 --now 覆写）——欠用侧的「临近 reset」判定依赖 sidecar 里的
+//   epoch resets_at 与真实当下比对，故 ccm 路径的时间口径权威；本地 fallback 才吃 CC_MASTER_NOW。
+function adviseViaCcm(homeDir, rateCache, effN) {
+  const args = ['usage', 'advise', '--json', '--home', homeDir];
+  if (Number.isInteger(effN) && effN >= 1) args.push('--effective-n', String(effN));
+  const env = Object.assign({}, process.env, { CC_MASTER_HOME: homeDir });
+  if (rateCache) env.CC_MASTER_RATE_CACHE = rateCache;
+  let r;
+  try {
+    r = spawnSync(CCM_BIN, args, { encoding: 'utf8', timeout: 15000, env });
+  } catch (_e) {
+    return null; // spawn 本身抛（极少）→ 降级本地
+  }
+  if (!r || r.error || r.signal) return null; // ENOENT（ccm 不在 PATH）/ 被信号杀 → 降级本地
+  const stdout = typeof r.stdout === 'string' ? r.stdout : '';
+  let parsed;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch (_e) {
+    return null; // 非有效 JSON → 降级本地
+  }
+  const data = parsed && typeof parsed === 'object' ? parsed.data : null;
+  if (!data || typeof data !== 'object' || typeof data.verdict !== 'string') return null; // 形状不符
+  // available:false（账户信号不可得）→ ccm 给不出权威走廊判定 → 降级本地反推（hook 既有撞墙启发式仍有价值）。
+  if (data.available !== true) return null;
+  return data;
+}
+
+// ccmWarning(data, pool) → 把 ccm advise verdict 映射成本 skill 词汇的非阻断提示（或 null=静默）。
+//   词汇与本地路径（decideAccountWarning / decideAccountUnderuse）对齐，让 ccm 路径与 fallback 路径的
+//   注入嗓音一致：hard_stop → 「暂停 dispatch 新节点」+ blocked_on:"user" + surface 用户 + 硬总闸；
+//   throttle → 「降到更便宜的模型档」减速 levers（临界）；accelerate(切号) → 「切到下一份配额」；
+//   accelerate(欠用) → 「欠用」+「加速」levers；hold → 静默。号池粗粒度事实由调用方在尾部统一附加。
+function ccmWarning(data, n) {
+  const p5 = typeof data.window_5h_pct === 'number' ? data.window_5h_pct : null;
+  const p7 = typeof data.window_7d_pct === 'number' ? data.window_7d_pct : null;
+  const levers = Array.isArray(data.levers) ? data.levers : [];
+  // effective_n 以 ccm 返回的为权威（它从 registry / --effective-n 算）；ccm 缺该字段才回退本地 numAccount。
+  const nAcct =
+    Number.isInteger(data.effective_n) && data.effective_n >= 1
+      ? data.effective_n
+      : Number.isInteger(n) && n >= 1
+        ? n
+        : 1;
+  if (data.verdict === 'hard_stop') {
+    // 7d 硬总闸：最硬措辞（点名暂停 dispatch + blocked_on:user + surface 用户 + 硬总闸·ADR-010 §2.2）。
+    const fhNote = p5 !== null && p5 >= 90 ? `(5h 也已 ${p5}%)` : '';
+    const switchNote =
+      nAcct > 1
+        ? `你声明了 ${nAcct} 份可序列消费的配额——「切到下一份配额(切账号会刷新 7d 窗)」是用户可选的一个响应,` +
+          `与「暂停续耗」并列由用户拍;切换动作本身不由 hook/本提示执行。`
+        : '';
+    return (
+      `[cc-master pacing] 7d 配额硬总闸(权威口径,来自 status-line 捕获):7d 已用 ${p7}%${fhNote}。` +
+      `按 ADR-010,7d 是加速硬总闸——**本回合起暂停 dispatch 新节点**,把「是否继续消耗 7d 配额」作为一个 ` +
+      `blocked_on:"user" 决策 surface 给用户,等用户确认后再续派发。在飞任务可继续跑完、可端点验收,但不要再派新活。` +
+      `${switchNote}这是非阻断提示,真正的暂停由你(orchestrator)在决策程序的 dispatch 节点执行,不替你决策。`
+    );
+  }
+  if (data.verdict === 'throttle') {
+    const slowdownLevers =
+      `pace 杠杆(怎么 pace 是你的认知判断,见 orchestrating-to-completion / cost-and-pacing):` +
+      `① 把后续节点降到更便宜的模型档;② 降并发 WIP、暂缓新派工;③ defer 高 float 的非临界任务到窗口 reset 后。`;
+    return (
+      `[cc-master pacing] 账户配额临界(权威口径,来自 status-line 捕获):5h ${p5}% ` +
+      `已达/超过走廊上界。${slowdownLevers}这是非阻断提示,不替你决策。`
+    );
+  }
+  if (data.verdict === 'accelerate') {
+    // ccm 在 n>1 且 5h 临界 + 7d 有余量时给 switch_account lever（「切到下一份配额」）；否则是欠用加速。
+    const wantsSwitch = levers.includes('switch_account');
+    if (wantsSwitch) {
+      return (
+        `[cc-master pacing] 账户 5h 配额临界(权威口径,来自 status-line 捕获):5h ${p5}% 已达/超过阈值。` +
+        `你声明了 ${nAcct} 份可序列消费的配额且 7d 总闸仍有余量(7d 仅 ${p7}%)——当前账号这份 ` +
+        `5h 烧满是**切到下一份配额**的触发信号,不是减速信号:理想是把这份烧满后顺势用下一份满配额的 5h 窗,` +
+        `而非在总配额还有余时减速空耗。切换/续派由你的认知判断;这是非阻断提示,不替你决策。`
+      );
+    }
+    // 欠用侧加速。
+    const nAcctNote =
+      nAcct > 1
+        ? `(按 ${nAcct} 份可序列消费的配额理想节奏,此刻本该烧得更多——欠用判定线已据此抬高)`
+        : '';
+    return (
+      `[cc-master pacing] 账户配额欠用(权威口径,来自 status-line 捕获):5h 仅用 ${p5}%${nAcctNote}、` +
+      `窗口临近 reset(7d 总闸余量充足,仅 ${p7}%)。当前窗口的配额若不用将随 reset 白白蒸发——` +
+      `可考虑加速以充分利用。加速杠杆(怎么加速是你的认知判断,见 orchestrating-to-completion / cost-and-pacing ` +
+      `的加速侧 lever):① 把临界路径节点升到更强的模型档以提质提速;② 提并发 WIP、把已就绪的高 float 任务提前派发;` +
+      `③ 把原计划 defer 到下一窗口的就绪工作拉进本窗口。注意:加速须先过 7d 总闸(别把 5h 余量烧成 7d 透支);` +
+      `且这不是制造 busywork——没有真正就绪的活就别硬凑。这是非阻断提示,不替你决策。`
+    );
+  }
+  return null; // hold → 走廊内 → 静默
+}
+
 // ── 主流程：全程 try/catch，任何异常 → 静默 exit 0 ──────────────────────────────────────────────
 function main() {
   // 读 stdin，取 session_id —— armed gate 要用它做 session-scoped 判定。
@@ -632,25 +749,36 @@ function main() {
   const pool = poolStatus(accounts, nowMs);
   const numAccount = readNumAccount(ACCOUNTS_FILE, nowMs) || 1;
 
-  // account-authoritative override (Finding #37): 优先用 status-line 捕获的账户权威 5h/7d used_percentage
-  // 判墙(脱钩会失真到数量级的本地反推 window_remaining_min),并纳入 7d。账户口径权威——可用就以它为准(到墙
-  // 警告/没到就静默),只有 sidecar 缺/坏时才降级本地反推(approx)。
-  const floor = parsePctFloor(PCT_FLOOR_RAW);
-  const dispatchGate = parseSevenDayDispatchGate(SEVEN_DAY_DISPATCH_GATE_RAW); // need ②:7d≥此 → 升级到「暂停 dispatch」
-  const acct = readRateCache(RATE_CACHE);
-  const nowSec = Math.floor(nowMs / 1000);
-  const a = decideAccountWarning(acct, nowSec, floor, numAccount, dispatchGate);
+  // ── P4 收口：走廊 verdict 优先经 ccm 引擎（pacing.ts SSOT）算 ──────────────────────────────────────
+  // adviseViaCcm shell 调 `ccm usage advise --json`（透传 home / rate-cache / effective-n）。ccm present
+  //   且给出权威走廊判定（available:true）→ **以 ccm verdict 为准**（hard_stop/throttle/accelerate → 映射成
+  //   本 skill 词汇的提示;hold → 静默）。ccm 不可用（ENOENT / 失败 / 坏 JSON / available:false）→ ccmAdvice
+  //   为 null → 落到下面既有的本地计算路径（account-authoritative sidecar + 本地反推），绝不丢失提示能力。
   let warning;
-  if (a.valid) {
-    // 账户口径权威。撞墙优先：到墙就只发减速提示（a.warn 非空）；没到墙再问欠用 → 可能发对称的加速提示。
-    // 撞墙(used%≥85)与欠用(used%<60)区间天然互斥，account 分支里同一 Stop 绝不同发两条。
-    if (a.warn) warning = a.warn;
-    else warning = decideAccountUnderuse(acct, nowSec, numAccount).warn;
+  const ccmAdvice = adviseViaCcm(HOME_DIR, RATE_CACHE, numAccount);
+  if (ccmAdvice) {
+    warning = ccmWarning(ccmAdvice, numAccount); // hold → null（静默）；其余 → 映射文案
   } else {
-    // 账户不可用 → 本地反推 fallback(approx)：维持现状只做撞墙判定。**本地反推路径禁欠用提示**——反推的
-    // reset 倒计时会失真到数量级（Finding #37），据此催加速会乱催，故此路径不出欠用提示。
-    const fh = computeFiveHour(USAGE_DIR, nowMs);
-    warning = decideWarning(fh);
+    // ── 本地降级路径（ccm 不可用时）：account-authoritative override (Finding #37) + 本地反推 ──
+    // 优先用 status-line 捕获的账户权威 5h/7d used_percentage 判墙(脱钩会失真到数量级的本地反推
+    //   window_remaining_min),并纳入 7d。账户口径权威——可用就以它为准(到墙警告/没到就静默),
+    //   只有 sidecar 缺/坏时才降级本地反推(approx)。
+    const floor = parsePctFloor(PCT_FLOOR_RAW);
+    const dispatchGate = parseSevenDayDispatchGate(SEVEN_DAY_DISPATCH_GATE_RAW); // need ②:7d≥此 → 升级到「暂停 dispatch」
+    const acct = readRateCache(RATE_CACHE);
+    const nowSec = Math.floor(nowMs / 1000);
+    const a = decideAccountWarning(acct, nowSec, floor, numAccount, dispatchGate);
+    if (a.valid) {
+      // 账户口径权威。撞墙优先：到墙就只发减速提示（a.warn 非空）；没到墙再问欠用 → 可能发对称的加速提示。
+      // 撞墙(used%≥85)与欠用(used%<60)区间天然互斥，account 分支里同一 Stop 绝不同发两条。
+      if (a.warn) warning = a.warn;
+      else warning = decideAccountUnderuse(acct, nowSec, numAccount).warn;
+    } else {
+      // 账户不可用 → 本地反推 fallback(approx)：维持现状只做撞墙判定。**本地反推路径禁欠用提示**——反推的
+      // reset 倒计时会失真到数量级（Finding #37），据此催加速会乱催，故此路径不出欠用提示。
+      const fh = computeFiveHour(USAGE_DIR, nowMs);
+      warning = decideWarning(fh);
+    }
   }
   if (!warning) return; // 余量充足 / 无数据 / 降级判定不临界 → 静默 exit 0
 

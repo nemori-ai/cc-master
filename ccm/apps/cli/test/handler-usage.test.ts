@@ -36,7 +36,7 @@ interface SetupOpts {
   accounts?: unknown;
   sidecar?: unknown;
 }
-function setupHome(opts: SetupOpts = {}): { home: string; boardPath: string } {
+function setupHome(opts: SetupOpts = {}): { home: string; boardPath: string; rateCache: string } {
   const root = mkTmp('ccm-usage-');
   const home = join(root, '.claude', 'cc-master');
   mkdirSync(home, { recursive: true });
@@ -59,10 +59,13 @@ function setupHome(opts: SetupOpts = {}): { home: string; boardPath: string } {
       'utf8',
     );
   }
+  // 真实 sidecar 路径（statusline-capture.js / cc-usage.sh / usage-pacing.js hook 钉死的同一路径）：
+  //   ${CC_MASTER_RATE_CACHE}（账户级 .cc-master-rate-limits.json）。**非** ${home}/usage-snapshot.json（旧错路径·P4 修复）。
+  const rateCache = join(home, '.cc-master-rate-limits.json');
   if (opts.sidecar !== undefined) {
-    writeFileSync(join(home, 'usage-snapshot.json'), `${JSON.stringify(opts.sidecar)}\n`, 'utf8');
+    writeFileSync(rateCache, `${JSON.stringify(opts.sidecar)}\n`, 'utf8');
   }
-  return { home, boardPath };
+  return { home, boardPath, rateCache };
 }
 
 type TestCtx = Ctx & { outBuf: string[]; errBuf: string[] };
@@ -73,10 +76,12 @@ function mkCtx(
     values = {},
     flags = {},
     positionals = [],
+    rateCache,
   }: {
     values?: Record<string, unknown>;
     flags?: Partial<Ctx['flags']>;
     positionals?: string[];
+    rateCache?: string;
   } = {},
 ): TestCtx {
   const outBuf: string[] = [];
@@ -95,7 +100,12 @@ function mkCtx(
       ...flags,
     },
     sid: 'sid-u',
-    env: { CC_MASTER_HOME: home },
+    // CC_MASTER_RATE_CACHE 必传——否则 readUsageSidecar 会回落到真实 $HOME/.claude/.cc-master-rate-limits.json
+    //   （污染/读到宿主真 sidecar）。默认指向 home 下的真实文件名（setupHome 落盘处）。
+    env: {
+      CC_MASTER_HOME: home,
+      CC_MASTER_RATE_CACHE: rateCache ?? join(home, '.cc-master-rate-limits.json'),
+    },
     out: (s: string) => outBuf.push(s),
     err: (s: string) => errBuf.push(s),
     isTTY: true,
@@ -138,10 +148,12 @@ const REGISTRY_3 = {
     },
   },
 };
+// 真实 sidecar 形态（statusline-capture.js 写）：epoch-秒 resets_at / captured_at + number used_percentage。
+//   captured_at 2026-06-25T09:00:00Z=1782378000·5h resets 2026-06-25T11:00:00Z=1782385200·7d 2026-07-01T00:00:00Z=1782864000。
 const SIDECAR_CRITICAL = {
-  five_hour: { used_percentage: 92, resets_at: '2026-06-25T11:00:00Z' },
-  seven_day: { used_percentage: 50, resets_at: '2026-07-01T00:00:00Z' },
-  captured_at: '2026-06-25T09:00:00Z',
+  five_hour: { used_percentage: 92, resets_at: 1782385200 },
+  seven_day: { used_percentage: 50, resets_at: 1782864000 },
+  captured_at: 1782378000,
 };
 
 // ══ usage show ═══════════════════════════════════════════════════════════════════════════════════
@@ -218,6 +230,43 @@ test('usage advise n>1 + 5h critical + 7d headroom → accelerate + switch_candi
   assert.equal(out.data.window_7d_pct, 50);
   assert.equal(out.data.available, true);
   assert.equal(out.data.source, 'account');
+});
+
+test('usage advise reads the REAL rate-cache sidecar path + normalizes epoch resets_at (P4 sidecar bug regression)', () => {
+  // Regression: the handler used to read ${home}/usage-snapshot.json — a path nothing ever writes —
+  //   so the account signal was永远 unavailable. The real sidecar lives at CC_MASTER_RATE_CACHE
+  //   (statusline-capture.js / cc-usage.sh / usage-pacing.js hook 同一路径) with epoch-秒 resets_at/captured_at.
+  const { home, boardPath, rateCache } = setupHome({
+    accounts: REGISTRY_3,
+    sidecar: SIDECAR_CRITICAL,
+  });
+  // sidecar deliberately at the real rate-cache path; the OLD wrong path must NOT exist.
+  assert.equal(
+    rateCache.endsWith('.cc-master-rate-limits.json'),
+    true,
+    'sidecar at rate-cache path',
+  );
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
+  const code = usageHandler.advise(ctx);
+  assert.equal(code, EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  // Account signal IS available (proves the path is now read) + epoch captured_at normalized to ISO as_of.
+  assert.equal(out.data.available, true, 'account signal available (real sidecar path read)');
+  assert.equal(out.data.source, 'account');
+  assert.equal(out.data.window_5h_pct, 92, 'epoch-shape used_percentage read through');
+  assert.equal(out.data.as_of, '2026-06-25T09:00:00Z', 'epoch captured_at normalized to ISO as_of');
+});
+
+test('usage advise with sidecar at the OLD wrong path (usage-snapshot.json) stays unavailable (degrade)', () => {
+  // Belt-and-braces: a sidecar at the historical wrong path must NOT be picked up — only the
+  //   rate-cache path counts. Proves the fix doesn't silently keep both readers alive.
+  const { home, boardPath } = setupHome({ accounts: REGISTRY_3 });
+  writeFileSync(join(home, 'usage-snapshot.json'), `${JSON.stringify(SIDECAR_CRITICAL)}\n`, 'utf8');
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
+  usageHandler.advise(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, false, 'old wrong path is NOT read → degrade');
+  assert.equal(out.data.source, 'local-derived-approx');
 });
 
 test('usage advise --effective-n 1 override → throttle (single account, no switch)', () => {
