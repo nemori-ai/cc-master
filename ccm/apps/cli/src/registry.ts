@@ -691,6 +691,159 @@ export const REGISTRY: Registry = {
       handler: 'policy.set',
     },
   },
+
+  // ════════════════════ usage（只读 advisory·ADR-015）═══════════════════════════════════════════════
+  //   配额侧只读 analysis namespace（纯只读·零写·不抢 board-lock）。enum 为 CLI-local 呈现枚举（scope /
+  //   accounts / group-by）——非 board-model 概念，故同 `jc resolve` 的 ['upheld','overturned'] 字面量先例。
+  usage: {
+    show: {
+      summary: '当前号 + 全备号 5h/7d used%/resets_at（备号=registry 生命周期快照·只读）',
+      read: true,
+      positionals: [],
+      options: {
+        accounts: {
+          type: 'string',
+          enum: ['all', 'current'],
+          desc: '列哪些账号：all（含备号·默认）| current（仅当前号）',
+        },
+        'effective-n': { type: 'string', desc: '号池有效配额份数覆写（默认从 registry 算）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm usage show', 'ccm usage show --accounts current --json'],
+      handler: 'usage.show',
+    },
+    advise: {
+      summary: '双侧走廊 verdict（throttle|accelerate|hold|hard_stop）+ lever + switch_candidate',
+      read: true,
+      positionals: [],
+      options: {
+        'effective-n': { type: 'string', desc: '号池有效配额份数覆写（默认从 registry 算）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm usage advise', 'ccm usage advise --effective-n 3 --json'],
+      handler: 'usage.advise',
+    },
+    'task-cost': {
+      summary: '单/聚合任务 token（读 board observability·shell=N/A·coverage_pct·--group-by）',
+      read: true,
+      positionals: [{ name: 'task-id', required: false }],
+      options: {
+        'group-by': {
+          type: 'string',
+          enum: ['task', 'executor', 'type', 'tier'],
+          desc: '聚合维度（无 task-id 时·默认 task）',
+        },
+        scope: {
+          type: 'string',
+          enum: ['home', 'this-repo', 'this-board'],
+          desc: '历史语料范围（默认 this-board 读本板 observability）',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm usage task-cost T7', 'ccm usage task-cost --group-by executor --json'],
+      handler: 'usage.taskCost',
+    },
+  },
+
+  // ════════════════════ estimate（只读 advisory·ADR-015）════════════════════════════════════════════
+  //   工作侧只读 analysis namespace（消费 @ccm/engine OR/ML 算法层·纯只读·零写·不抢 board-lock）。
+  //   p95=5% 硬墙永不取 max/不到 100%（引擎 conformal/MC 分位口径保证）。
+  estimate: {
+    show: {
+      summary: 'estimate 字段 + EWMA 校准覆写 + conformal 区间（快速瞥）',
+      read: true,
+      positionals: [{ name: 'task-id', required: false }],
+      options: {
+        scope: {
+          type: 'string',
+          enum: ['home', 'this-repo', 'this-board'],
+          desc: '历史语料范围（默认 home·跨板多层收缩）',
+        },
+        'as-of': { type: 'string', desc: 'as-of 时刻（ISO-8601 UTC·backtest 用·默认 now）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm estimate show T7', 'ccm estimate show --scope this-repo --json'],
+      handler: 'estimate.show',
+    },
+    forecast: {
+      summary: '双通道 MC（估算-DAG + 吞吐）→ P50/P80/P95 ETA + makespan + CI/CRI/SSI',
+      read: true,
+      positionals: [],
+      options: {
+        mode: {
+          type: 'string',
+          enum: ['estimate', 'throughput', 'both'],
+          desc: '通道（默认 both·coverage<50% 吞吐主导）',
+        },
+        scope: {
+          type: 'string',
+          enum: ['home', 'this-repo', 'this-board'],
+          desc: '历史语料范围（默认 home）',
+        },
+        'as-of': { type: 'string', desc: 'as-of 时刻（ISO-8601 UTC·backtest 用·默认 now）' },
+        'effective-n': { type: 'string', desc: '号池有效配额份数覆写' },
+        runs: { type: 'string', desc: 'MC trials（默认 2000）' },
+        seed: { type: 'string', desc: 'PRNG 种子（复现·默认 42）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm estimate forecast',
+        'ccm estimate forecast --mode both --runs 5000 --seed 42 --json',
+      ],
+      handler: 'estimate.forecast',
+    },
+    evm: {
+      summary: 'EVM + Earned Schedule（PV/EV/AC → CPI/EAC + SPI(t)·消费 board.baseline）',
+      read: true,
+      positionals: [],
+      options: {
+        'as-of': { type: 'string', desc: 'as-of 时刻（ISO-8601 UTC·默认 now）' },
+        'ac-source': {
+          type: 'string',
+          enum: ['duration', 'token'],
+          desc: 'AC 口径（duration 实测小时·默认 | token 遥测）',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm estimate evm', 'ccm estimate evm --ac-source token --json'],
+      handler: 'estimate.evm',
+    },
+    velocity: {
+      summary: '历史吞吐 + burn-down/up（P50/P80）+ SLE（cycle-time P85/P95）',
+      read: true,
+      positionals: [],
+      options: {
+        scope: {
+          type: 'string',
+          enum: ['home', 'this-repo', 'this-board'],
+          desc: '历史语料范围（默认 home）',
+        },
+        window: { type: 'string', desc: '窗口天数（默认 7）' },
+        'as-of': { type: 'string', desc: 'as-of 时刻（ISO-8601 UTC·默认 now）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm estimate velocity', 'ccm estimate velocity --window 14 --json'],
+      handler: 'estimate.velocity',
+    },
+    risk: {
+      summary: '综合风险（CI/CRI/SSI + WIP-aging SLE + CCPM buffer_health）',
+      read: true,
+      positionals: [],
+      options: {
+        scope: {
+          type: 'string',
+          enum: ['home', 'this-repo', 'this-board'],
+          desc: '历史语料范围（默认 home）',
+        },
+        seed: { type: 'string', desc: 'PRNG 种子（复现·默认 42）' },
+        runs: { type: 'string', desc: 'MC trials（默认 2000）' },
+        'as-of': { type: 'string', desc: 'as-of 时刻（ISO-8601 UTC·默认 now）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm estimate risk', 'ccm estimate risk --scope this-repo --json'],
+      handler: 'estimate.risk',
+    },
+  },
 };
 
 // ── ALIASES：热路径顶层捷径（cli-design §3.4·只给最高频两个）。alias → [noun, verb]。──────────────

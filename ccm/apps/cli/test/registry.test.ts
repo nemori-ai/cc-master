@@ -17,7 +17,7 @@ import { ALIASES, REGISTRY, WRITABLE_FIELDS_COVERED } from '../src/registry.js';
 
 const model = { ENUMS, FIELDS, TIERS };
 
-// ── 覆盖全部 8 namespace 的全部 verb（cli-design §3）──────────────────────────────────────────────
+// ── 覆盖全部 10 namespace 的全部 verb（cli-design §3·ADR-015 加 usage/estimate 只读 advisory）─────────
 const EXPECTED: Record<string, string[]> = {
   board: ['show', 'lint', 'graph', 'critical-path', 'next', 'init', 'update'],
   baseline: ['snapshot', 'show', 'reset'],
@@ -27,9 +27,11 @@ const EXPECTED: Record<string, string[]> = {
   cadence: ['update', 'open', 'ship', 'status'],
   watchdog: ['arm', 'disarm', 'status'],
   policy: ['show', 'set'],
+  usage: ['show', 'advise', 'task-cost'],
+  estimate: ['show', 'forecast', 'evm', 'velocity', 'risk'],
 };
 
-test('REGISTRY covers all 8 namespaces with all their verbs', () => {
+test('REGISTRY covers all 10 namespaces with all their verbs', () => {
   assert.deepEqual(Object.keys(REGISTRY).sort(), Object.keys(EXPECTED).sort());
   for (const noun of Object.keys(EXPECTED)) {
     assert.deepEqual(
@@ -102,6 +104,46 @@ test('option enums are sourced from board-model.ENUMS (no hand-typed drift)', ()
   assert.deepEqual(REGISTRY.jc!.add!.options.severity!.enum, model.ENUMS.jcSeverity);
   assert.deepEqual(REGISTRY.jc!.list!.options.status!.enum, model.ENUMS.jcStatus);
   assert.deepEqual(REGISTRY.watchdog!.arm!.options.mechanism!.enum, model.ENUMS.watchdogMechanism);
+});
+
+// ── usage / estimate 只读不变式（ADR-015 §2 不变式 1·硬约束：纯只读 = 全 verb read:true）──────────────
+//   零写不变式的 registry 层守门——这两个 advisory namespace 的每个 verb 都必须 read:true（走 runRead）。
+//   若有人误把某 verb 设 read:false（→ runWrite → 抢 board-lock + 落盘），此断言红灯。
+test('usage and estimate namespaces are read-only (every verb read:true)', () => {
+  for (const noun of ['usage', 'estimate'] as const) {
+    const nounSpec = REGISTRY[noun] as Record<string, { read: boolean; handler: string }>;
+    for (const verb of Object.keys(nounSpec)) {
+      assert.equal(
+        (nounSpec[verb] as { read: boolean }).read,
+        true,
+        `${noun} ${verb} must be read-only (read:true·零写不变式)`,
+      );
+    }
+  }
+});
+
+// usage/estimate flag 的 enum 是 CLI-local 呈现枚举（scope/mode/group-by/accounts/ac-source）——非
+//   board-model 概念，故有意不取自 ENUMS（同 jc resolve 的 ['upheld','overturned'] 字面量先例）。此处
+//   只钉死「它们确实是数组字面量」（结构契约已由 options-shape 测试覆盖），不与 ENUMS 比对（无对应键）。
+test('usage/estimate CLI-local enums are present literal arrays (not ENUMS-sourced, by design)', () => {
+  assert.deepEqual(REGISTRY.usage!.show!.options.accounts!.enum, ['all', 'current']);
+  assert.deepEqual(REGISTRY.usage!['task-cost']!.options['group-by']!.enum, [
+    'task',
+    'executor',
+    'type',
+    'tier',
+  ]);
+  assert.deepEqual(REGISTRY.estimate!.forecast!.options.mode!.enum, [
+    'estimate',
+    'throughput',
+    'both',
+  ]);
+  assert.deepEqual(REGISTRY.estimate!.evm!.options['ac-source']!.enum, ['duration', 'token']);
+  assert.deepEqual(REGISTRY.estimate!.show!.options.scope!.enum, [
+    'home',
+    'this-repo',
+    'this-board',
+  ]);
 });
 
 // ── 别名 ─────────────────────────────────────────────────────────────────────────────────────────

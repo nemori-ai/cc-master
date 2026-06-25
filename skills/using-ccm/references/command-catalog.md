@@ -54,6 +54,16 @@
 - [namespace policy](#namespace-policy)
   - [policy show](#policy-show)
   - [policy set](#policy-set)
+- [namespace usage（只读 advisory）](#namespace-usage只读-advisory)
+  - [usage show](#usage-show)
+  - [usage advise](#usage-advise)
+  - [usage task-cost](#usage-task-cost)
+- [namespace estimate（只读 advisory）](#namespace-estimate只读-advisory)
+  - [estimate show](#estimate-show)
+  - [estimate forecast](#estimate-forecast)
+  - [estimate evm](#estimate-evm)
+  - [estimate velocity](#estimate-velocity)
+  - [estimate risk](#estimate-risk)
 - [--json 输出形状](#--json-输出形状)
 
 ---
@@ -81,6 +91,8 @@ ccm <alias> [args] [flags]
 | `watchdog` | 自我唤醒 watchdog（ADR-011） |
 | `baseline` | EVM 计划基线快照（estimate 引擎的 plan SSOT·board 内唯一写 noun·ADR-015） |
 | `policy` | board 级 orchestrator 自主权限开关（首条 `autonomous_account_switch`·写 noun·用户所有·ADR-016） |
+| `usage` | 配额侧**只读 advisory**：当前号/备号 5h/7d 用量 + 双侧走廊 pacing verdict + 任务 token 成本（ADR-015） |
+| `estimate` | 工作侧**只读 advisory**：双通道 MC 工期预测 / EVM / velocity / 风险（消费 OR/ML 引擎·ADR-015） |
 
 ### Aliases
 
@@ -97,8 +109,6 @@ ccm <alias> [args] [flags]
 | 占位 | 计划 |
 |---|---|
 | `account` | 换号号池机制（skill C 收口） |
-| `estimate` | 运筹学 / ML 估算引擎（用时 / 关键路径 / 配速） |
-| `usage` | 用量配速（usage-pacing 收口） |
 
 ### Global flags
 
@@ -911,6 +921,186 @@ ccm policy set --autonomous-account-switch=allow|deny [flags]
 
 ---
 
+## namespace usage（只读 advisory）
+
+配额侧只读 advisory（ADR-015·charter ②控制 token 消耗速度 + ⑤资源下最大化效率）：当前号/备号用量 + 双侧走廊 pacing verdict + 任务 token 成本。**纯只读**——全 verb query/compute，零写、不抢 board-lock、不落状态（与 `baseline`/`policy` 这俩写 noun 相反）。诚实降级：账户信号不可得 = **exit 0 + `data.available:false`**（非 exit 1）；无 `accounts.json` registry → 天然单账号·`effective_n=1`（不报错）。诚实字段贯穿：`source`（account / registry-snapshot / observability / local-derived-approx）/ `confidence`（high/medium/low）/ `as_of` / `snapshot_stale` / `coverage_pct`。ccm 出 verdict/数据，**不替 orchestrator 决策**（真动作归 SKILL A·红线3）。
+
+> 备号数据 = **只读** `${CC_MASTER_HOME:-$HOME/.claude/cc-master}/accounts.json` registry 的生命周期快照（每号取 `last_observed_quota`/`last_switch_out`/`switch_history[]` 里 `at` 最大那条）——usage **绝不写 registry、绝不碰 token**（registry 写/管归 account-management）。当前号 5h/7d 用量读 status-line sidecar（`usage-snapshot.json`·账户权威·Finding #37），缺则 `available:false` 降级。
+
+### usage show
+
+**读**
+
+```
+ccm usage show [flags]
+```
+
+- positional：无
+- 行为：列当前号（account 权威 sidecar）+ 全备号 5h/7d `used%`/`resets_at`（备号 = registry 生命周期快照·标 `as_of`/`snapshot_stale`）；无 sidecar/registry → 优雅降级（`available:false`·exit 0）
+- flags：
+
+| flag | 短名 | 类型 | 取值 | 含义 |
+|---|---|---|---|---|
+| `--accounts <v>` | | enum | `all`（含备号·默认）\| `current`（仅当前号） | 列哪些账号 |
+| `--effective-n <n>` | | string | 正整数 | 号池有效配额份数覆写（默认从 registry 算） |
+| `--json` | | bool | | 结构化输出 |
+
+- 例：`ccm usage show` · `ccm usage show --accounts current --json`
+
+### usage advise
+
+**读**
+
+```
+ccm usage advise [flags]
+```
+
+- positional：无
+- 行为：双侧走廊 pacing verdict（`throttle` 临界减速 \| `accelerate` 欠用/切号加速 \| `hold` 走廊内 \| `hard_stop` 7d 硬总闸）+ 推荐 lever 类 + `switch_candidate`（号池 verdict 含切号 lever 时·选可切备号里 7d `used%` 最低的）。收口 usage-pacing 双侧走廊数学（引擎 `pacingAdvice` SSOT·ADR-010）。sidecar 缺 → `hold` + `available:false`（降级）
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--effective-n <n>` | | string | 号池有效配额份数覆写（默认从 registry 算·影响欠用判定线 + 切号触发） |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm usage advise` · `ccm usage advise --effective-n 3 --json`
+
+### usage task-cost
+
+**读**
+
+```
+ccm usage task-cost [<task-id>] [flags]
+```
+
+- positional：`<task-id>`（可选·给则单任务模式，不给则聚合模式）
+- 行为：读 board `observability.tokens`（input+output）算任务 token 成本；无 token / shell 任务 → `N/A`（`na:true`·诚实标）。聚合模式按 `--group-by` 维度合计 + `coverage_pct`（有 token 任务占比）
+- flags：
+
+| flag | 短名 | 类型 | 取值 | 含义 |
+|---|---|---|---|---|
+| `--group-by <v>` | | enum | `task`（默认）\| `executor` \| `type` \| `tier` | 聚合维度（无 task-id 时） |
+| `--scope <v>` | | enum | `home` \| `this-repo` \| `this-board`（默认本板 observability） | 历史语料范围 |
+| `--json` | | bool | | 结构化输出 |
+
+- 例：`ccm usage task-cost C2` · `ccm usage task-cost --group-by executor --json`
+
+---
+
+## namespace estimate（只读 advisory）
+
+工作侧只读 advisory（ADR-015·charter ④分解/规划 + ⑥按时长选档）：消费 `@ccm/engine` 的 OR/ML 算法层（双通道 Monte Carlo / EWMA 校准 / conformal 区间 / EVM+Earned Schedule / SLE / CCPM）。**纯只读**——全 verb compute、零写、不抢 board-lock。**5% 硬墙**：所有预测 `p95` = 95% 分位，**绝不算到 100%**（引擎分位口径保证·真上限是 session hard-stop）。历史语料范围由 `--scope home|this-repo|this-board`（默认 `home`·跨板多层收缩）控制。诚实降级：冷启动 / 数据不足 → 退原估值 + `low`-confidence / `no-history`。seeded 确定性：`--seed` 固定 → MC 复现（默认 42）。ccm 出区间/数据，**不替 orchestrator 决策**（红线3）。
+
+### estimate show
+
+**读**
+
+```
+ccm estimate show [<task-id>] [flags]
+```
+
+- positional：`<task-id>`（可选·给则单任务，不给则全部 active 任务）
+- 行为：每任务 raw estimate + EWMA 分层校准乘子覆写（`calibrated_h = raw × multiplier`·同 repo+type+executor+tier 多层收缩）+ conformal 区间（Mondrian 分组·快速瞥）。缺估值/无语料 → `no-history`（退原值）
+- flags：
+
+| flag | 短名 | 类型 | 取值 | 含义 |
+|---|---|---|---|---|
+| `--scope <v>` | | enum | `home`（默认）\| `this-repo` \| `this-board` | 历史语料范围 |
+| `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（backtest 回放·默认 now） |
+| `--json` | | bool | | 结构化输出 |
+
+- 例：`ccm estimate show C6 --json` · `ccm estimate show --scope this-repo`
+
+### estimate forecast
+
+**读**
+
+```
+ccm estimate forecast [flags]
+```
+
+- positional：无
+- 行为：双通道 Monte Carlo——① 估算-DAG-MC（依赖结构感知·log-normal·校准估值）+ ② 吞吐-MC（#NoEstimates·不依赖估值·`coverage<50%` 时主导）→ P50/P80/P95 ETA + makespan + 敏感度三件套 **CI/CRI/SSI**；①②偏差 >20% 出 consistency warning
+- flags：
+
+| flag | 短名 | 类型 | 取值 | 含义 |
+|---|---|---|---|---|
+| `--mode <v>` | | enum | `estimate` \| `throughput` \| `both`（默认） | 通道（coverage<50% 吞吐主导） |
+| `--scope <v>` | | enum | `home`（默认）\| `this-repo` \| `this-board` | 历史语料范围 |
+| `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（backtest·默认 now） |
+| `--effective-n <n>` | | string | | 号池有效配额份数覆写 |
+| `--runs <n>` | | string | | MC trials（默认 2000） |
+| `--seed <n>` | | string | | PRNG 种子（复现·默认 42） |
+| `--json` | | bool | | 结构化输出 |
+
+- 例：`ccm estimate forecast --json` · `ccm estimate forecast --mode both --runs 5000 --seed 42 --json`
+
+### estimate evm
+
+**读**
+
+```
+ccm estimate evm [flags]
+```
+
+- positional：无
+- 行为：EVM（PV/EV/AC → CPI/EAC/ETC/VAC）+ **Earned Schedule**（SPI(t)=ES/AT·SV(t)·IEAC(t)·全程保判别力·修 SPI($) 末期失灵）。消费 `board.baseline`——**无 baseline 降级 warn**（`has_baseline:false`·exit 0·先 `ccm baseline snapshot`）
+- flags：
+
+| flag | 短名 | 类型 | 取值 | 含义 |
+|---|---|---|---|---|
+| `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（默认 now） |
+| `--ac-source <v>` | | enum | `duration`（实测小时·默认）\| `token`（遥测） | AC 口径 |
+| `--json` | | bool | | 结构化输出 |
+
+- 例：`ccm estimate evm --json` · `ccm estimate evm --ac-source token --as-of 2026-06-25T12:00:00Z`
+
+### estimate velocity
+
+**读**
+
+```
+ccm estimate velocity [flags]
+```
+
+- positional：无
+- 行为：历史吞吐（tasks/day）+ backlog 清空 ETA（P50/P80/P95）+ **SLE**（cycle-time 服务水平期望 P50/P85/P95·Kanban Guide 2020）
+- flags：
+
+| flag | 短名 | 类型 | 取值 | 含义 |
+|---|---|---|---|---|
+| `--scope <v>` | | enum | `home`（默认）\| `this-repo` \| `this-board` | 历史语料范围 |
+| `--window <n>` | | string | | 窗口天数（默认 7） |
+| `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（默认 now） |
+| `--json` | | bool | | 结构化输出 |
+
+- 例：`ccm estimate velocity --json` · `ccm estimate velocity --window 14`
+
+### estimate risk
+
+**读**
+
+```
+ccm estimate risk [flags]
+```
+
+- positional：无
+- 行为：综合风险——敏感度 **CI/CRI/SSI**（MC 高临界节点）+ **WIP-aging SLE**（在飞任务 age > SLE_P85 → `at_risk`·> P95 → `critical`）+ **CCPM buffer_health**（项目缓冲绿/黄/红区）
+- flags：
+
+| flag | 短名 | 类型 | 取值 | 含义 |
+|---|---|---|---|---|
+| `--scope <v>` | | enum | `home`（默认）\| `this-repo` \| `this-board` | 历史语料范围 |
+| `--seed <n>` | | string | | PRNG 种子（复现·默认 42） |
+| `--runs <n>` | | string | | MC trials（默认 2000） |
+| `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（默认 now） |
+| `--json` | | bool | | 结构化输出 |
+
+- 例：`ccm estimate risk --json` · `ccm estimate risk --scope this-repo`
+
+---
+
 ## --json 输出形状
 
 通用信封：成功 `{"ok": true, "data": <below>}`，失败 `{"ok": false, "exit": N, "error": "…", "violations": []}`。以下只列 `data` 形状。
@@ -1061,4 +1251,137 @@ id 不存在时 `data` = `null`，exit 0。
 
 ```json
 { "policy": { "autonomous_account_switch": "deny" } }
+```
+
+### usage show（`ccm usage show --json`）
+
+```jsonc
+{
+  "available": true,
+  "accounts_scope": "all",
+  "effective_n": 3,
+  "current": {                          // status-line sidecar（账户权威）；缺则 available:false
+    "source": "account", "available": true,
+    "five_hour": { "used_percentage": 92, "resets_at": 1782385200 },
+    "seven_day": { "used_percentage": 50, "resets_at": 1782864000 },
+    "captured_at": 1782378000
+  },
+  "accounts": [                         // 全备号 registry 生命周期快照（active 排首）
+    { "email": "a@c.com", "active": true, "switchable": true, "as_of": "2026-06-25T07:00:00Z",
+      "five_hour": { "used_pct": 92, "resets_at": "2026-06-25T11:00:00Z" },
+      "seven_day": { "used_pct": 50, "resets_at": "2026-07-01T00:00:00Z" },
+      "snapshot_stale": false, "source": "registry-snapshot" }
+  ],
+  "registry_present": true,
+  "as_of": "2026-06-25T09:00:00Z",
+  "source": "registry-snapshot",
+  "confidence": "high"
+}
+```
+
+无 registry → `registry_present:false`、`accounts:[]`、`effective_n:1`（单账号优雅降级·exit 0）。
+
+### usage advise（`ccm usage advise --json`）
+
+```jsonc
+{
+  "verdict": "accelerate",              // throttle | accelerate | hold | hard_stop
+  "reason": "5h 已用 92%…当前 5h 烧满是切到下一份配额的触发信号",
+  "levers": ["switch_account", "continue_dispatch"],
+  "hard_stop_7d": false,
+  "window_5h_pct": 92, "window_7d_pct": 50,
+  "effective_n": 3,
+  "switch_candidate": "c@c.com",        // 可切备号里 7d used% 最低者（无切号 lever / 无备号 → null）
+  "confidence": "high",
+  "source": "account",                  // sidecar 缺 → "local-derived-approx" + available:false
+  "as_of": "2026-06-25T09:00:00Z",
+  "available": true
+}
+```
+
+### usage task-cost（`ccm usage task-cost [<id>] --json`）
+
+单任务（给 `<task-id>`）：
+
+```jsonc
+{ "task": "C2", "found": true,
+  "tokens": { "input": 156000, "output": 39000, "total": 195000 },
+  "na": false, "source": "observability", "confidence": "high" }
+```
+
+无 observability / shell → `na:true`、`tokens.total:null`；不存在 → `found:false`。
+
+聚合（`--group-by`）：
+
+```jsonc
+{ "group_by": "executor",
+  "groups": [ { "key": "subagent", "total": 504700, "n": 7, "na_count": 3 } ],
+  "total": 569500, "coverage_pct": 56, "history_n": 3,
+  "source": "observability", "confidence": "medium" }
+```
+
+### estimate show（`ccm estimate show [<id>] --json`）
+
+```jsonc
+{ "scope": "home", "as_of": "ISO", "history_n": 40,
+  "tasks": [ {
+    "id": "C6", "raw_estimate_h": 3,
+    "calibration": { "multiplier": 1.287, "source": "calibrated", "level": "type", "history_n": 23 },
+    "calibrated_h": 3.86,
+    "interval": { "p50": 4.83, "p80": 5.96, "p95": 10.04 },   // 5% 硬墙·单调
+    "confidence": "high", "coverage_basis": "mondrian-group", "source": "calibrated"
+  } ] }
+```
+
+### estimate forecast（`ccm estimate forecast --json`）
+
+```jsonc
+{ "forecast": { "p50": "ISO", "p80": "ISO", "p95": "ISO" },   // ETA·p95 = 5% 硬墙
+  "makespan": { "p50": {"value":16.16,"unit":"h"}, "p80": {...}, "p95": {...} },  // throughput-only mode → null
+  "throughput_days": { "p50": 4, "p80": 4, "p95": 5 },
+  "criticality_index": [ {"id":"C4","criticality":0.906,"cruciality":0.713,"sensitivity":0.665} ],
+  "schedule_sensitivity": [ {"id":"C4","sensitivity":0.665} ],
+  "consistency": { "deviation": 0.495, "warning": true },     // ①②偏差>20% → warning
+  "mode": "both", "coverage_pct": 83, "confidence": "medium", "history_n": 40,
+  "scope": "home", "runs": 2000, "seed": 42, "as_of": "ISO",
+  "source": "calibrated",
+  "notes": ["1 tasks unit-time fallback…"] }
+```
+
+### estimate evm（`ccm estimate evm --json`）
+
+```jsonc
+{ "has_baseline": true, "baseline_captured_at": "ISO", "as_of": "ISO",
+  "pv": {"value":29,"unit":"h"}, "ev": {"value":10,"unit":"h"},
+  "ac": {"value":13.5,"unit":"h","source":"duration","coverage_pct":100},
+  "spi": 0.345, "cpi": 0.741,
+  "spi_t": 0.086, "sv_t": -69.5, "es_hours": 6.5, "at_hours": 76,   // Earned Schedule
+  "eac": {"value":39.15,"unit":"h"}, "ieac_t": {"value":888.62,"unit":"h"},
+  "etc": {...}, "bac": {"value":29,"unit":"h"}, "vac": {"value":-10.15,"unit":"h"},
+  "confidence": "high", "warnings": [], "source": "evm-earned-schedule" }
+```
+
+无 baseline → `has_baseline:false` + `warnings:[…]`（exit 0·先 `baseline snapshot`）。
+
+### estimate velocity（`ccm estimate velocity --json`）
+
+```jsonc
+{ "scope": "home", "window_days": 7,
+  "velocity_tasks_per_day": 0.6, "backlog": 6,
+  "eta_days": { "p50": 4, "p80": 4, "p95": 5 },
+  "sle": { "p50": 2.58, "p85": 5.6, "p95": 9.18, "unit": "h", "confidence": "high", "history_n": 40 },
+  "history_n": 40, "confidence": "high", "source": "observability", "as_of": "ISO" }
+```
+
+### estimate risk（`ccm estimate risk --json`）
+
+```jsonc
+{ "scope": "home",
+  "criticality_index": [ {"id":"C4","criticality":0.906,"cruciality":0.713,"sensitivity":0.665} ],
+  "wip_aging": [ {"id":"C5","age_hours":49.43,"status":"critical","sle_p85":5.6,"sle_p95":9.18} ],
+  "ccpm": { "buffer_size_h": 1.97, "chain_mean_total_h": 16.61, "zone": "green",
+            "buffer_health": 0.333, "chain_progress_pct": 0.333 },
+  "sle": { "p85": 5.6, "p95": 9.18, "confidence": "high" },
+  "history_n": 40, "confidence": "medium", "source": "calibrated",
+  "as_of": "ISO", "seed": 42, "runs": 2000 }
 ```

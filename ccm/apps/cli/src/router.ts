@@ -30,10 +30,12 @@ import type { Ctx } from './handlers/_common.js';
 import * as baselineHandler from './handlers/baseline.js';
 import * as boardHandler from './handlers/board.js';
 import * as cadenceHandler from './handlers/cadence.js';
+import * as estimateHandler from './handlers/estimate.js';
 import * as jcHandler from './handlers/jc.js';
 import * as logHandler from './handlers/log.js';
 import * as policyHandler from './handlers/policy.js';
 import * as taskHandler from './handlers/task.js';
+import * as usageHandler from './handlers/usage.js';
 import * as watchdogHandler from './handlers/watchdog.js';
 import * as help from './help.js';
 import * as io from './io.js';
@@ -72,6 +74,8 @@ const HANDLERS: Record<string, HandlerModule> = {
   watchdog: watchdogHandler as unknown as HandlerModule,
   baseline: baselineHandler as unknown as HandlerModule,
   policy: policyHandler as unknown as HandlerModule,
+  usage: usageHandler as unknown as HandlerModule,
+  estimate: estimateHandler as unknown as HandlerModule,
 };
 
 // node util.parseArgs 的 options 形态（带 short / multiple）——router 自有，独立于 registry 的 OptionSpec。
