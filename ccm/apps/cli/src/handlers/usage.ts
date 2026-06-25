@@ -28,7 +28,9 @@ import {
   loadCorpus,
   type PacingOptions,
   pacingAdvice,
+  pctOf,
   type UsageSignal,
+  type WindowSignal,
 } from '@ccm/engine';
 import { type BoardArg, type Ctx, runRead } from './_common.js';
 
@@ -254,6 +256,7 @@ export function show(ctx: Ctx): number {
     resolve: () => ({ boardPath: '', board: {} }),
     render: (_b, c) => {
       const nowMs = Date.now();
+      const nowSec = Math.floor(nowMs / 1000);
       const accountsScope = (c.values.accounts as string) || 'all';
       const homeFlag = c.values.home as string | undefined;
       const sidecar = readUsageSidecar(c.env);
@@ -265,12 +268,30 @@ export function show(ctx: Ctx): number {
           ? Number(enFlag)
           : effectiveNFromRegistry(c.env, nowMs, homeFlag);
 
+      // current 窗口过期闸（codex round-4 #bug1）：show 与 advise(pacingAdvice) 口径一致——
+      //   复用引擎 `pctOf`（同一 SSOT 谓词：`resets_at < now` 的窗口 used% 视 stale → null），
+      //   绝不「sidecar 存在就 available:true」无脑放行陈旧数据。`available` 反映「≥1 个非过期窗口
+      //   有有效 used%」（两窗都过期/缺 → available:false）。下游 cc-usage.sh / switch-account.sh 据此判可用。
+      //   每窗口投影成 {used_percentage（过期→null）, resets_at（原样保留·透明）}；5h/7d 各自独立判（同 pctOf 逐窗）。
+      const projectWindow = (
+        w: WindowSignal | null | undefined,
+      ): { used_percentage: number | null; resets_at: number | null } | null => {
+        if (!w) return null;
+        const fresh = pctOf(w, nowSec); // 非过期且有效 → 数值；过期/缺 → null
+        return { used_percentage: fresh, resets_at: w.resets_at ?? null };
+      };
+      const cur5h = sidecar ? projectWindow(sidecar.five_hour) : null;
+      const cur7d = sidecar ? projectWindow(sidecar.seven_day) : null;
+      // 至少一个非过期窗口有有效 used% → 账户口径可用。
+      const currentAvailable =
+        sidecar != null &&
+        ((cur5h?.used_percentage ?? null) !== null || (cur7d?.used_percentage ?? null) !== null);
       const current = sidecar
         ? {
             source: 'account' as const,
-            available: true,
-            five_hour: sidecar.five_hour ?? null,
-            seven_day: sidecar.seven_day ?? null,
+            available: currentAvailable,
+            five_hour: cur5h,
+            seven_day: cur7d,
             captured_at: sidecar.captured_at ?? null,
           }
         : {

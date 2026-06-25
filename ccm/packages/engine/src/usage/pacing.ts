@@ -66,7 +66,9 @@ const DEFAULTS = {
 //   ★过期闸（codex round-3 #bug1）：窗口 `resets_at != null && resets_at < nowSec` ⟹ 该 reset 周期已过、
 //   used% 已 stale（陈旧 sidecar 跨了 reset 边界）⟹ 视为**不可判**（返 null·该窗口不参与任何 verdict gating）。
 //   与既有 captured_at 新鲜度闸正交并存（那闸管「sidecar 多久前抓的」，本闸管「窗口本身有没有过期」）。
-function pctOf(w: WindowSignal | null | undefined, nowSec: number): number | null {
+//   **导出为窗口可判 used% 的 SSOT 谓词**（codex round-4 #bug1）：CLI handler `usage show` 复用同一口径
+//   判 current 窗口是否过期，避免「show 路径漏过期闸」这类 sibling 漂移（与本文件 verdict gating 同源）。
+export function pctOf(w: WindowSignal | null | undefined, nowSec: number): number | null {
   if (!w || typeof w.used_percentage !== 'number') return null;
   if (typeof w.resets_at === 'number' && w.resets_at < nowSec) return null; // 已过期 → used% stale → 不可判
   return w.used_percentage;

@@ -1926,7 +1926,8 @@ fi
 exit 0
 CCM
 chmod +x "$CCM32/ccm"
-out32="$(PATH="$CCM32:$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL32" CRED_PATH="$CRED32" CLAUDE_JSON_PATH="$CJSON32" \
+# ccm 解析现优先 CCM_BIN（bug2 修复）→ stub 经 CCM_BIN 注入（canonical 路径·不受 run-tests.sh 继承的 dev-shim CCM_BIN 干扰）。
+out32="$(PATH="$CCM32:$SECSTUB:$PATH" CCM_BIN="$CCM32/ccm" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL32" CRED_PATH="$CRED32" CLAUDE_JSON_PATH="$CJSON32" \
         bash "$SCRIPT" --registry "$REG32" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc32=$?
 # ① rc must be 7 (policy-deny拒绝码·区别于其他失败码).
 assert_eq "7" "$rc32" "(32) policy deny: exit code must be 7 (policy-deny blocked)"
@@ -1997,7 +1998,8 @@ fi
 exit 0
 CCM
 chmod +x "$CCM33/ccm"
-out33="$(PATH="$CCM33:$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL33" CRED_PATH="$CRED33" CLAUDE_JSON_PATH="$CJSON33" \
+# stub 经 CCM_BIN 注入（canonical 路径·bug2 修复后 CCM_BIN 优先于 PATH·不受继承 dev-shim 干扰）。
+out33="$(PATH="$CCM33:$SECSTUB:$PATH" CCM_BIN="$CCM33/ccm" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL33" CRED_PATH="$CRED33" CLAUDE_JSON_PATH="$CJSON33" \
         bash "$SCRIPT" --registry "$REG33" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc33=$?
 assert_eq "0" "$rc33" "(33) policy allow: switch exits 0 (正常换号·policy 放行)"
 # credentials.json must be overwritten with FRESH token (happy-path succeeded).
@@ -2030,10 +2032,11 @@ cat > "$CJSON34" <<'JSON'
 {"oauthAccount":{"emailAddress":"old@x.com","subscriptionType":"pro"},"numStartups":5}
 JSON
 PORT34="$FX34/url.txt"; start_refresh_endpoint ok "$PORT34"; RURL34="$(cat "$PORT34")"
-# (34a) — ccm 完全不存在（PATH 里故意 pre-pend 一个空目录，确保系统 ccm 不在 PATH）.
+# (34a) — ccm 完全不存在（PATH 里故意 pre-pend 一个空目录·**并 `env -u CCM_BIN`** 抹掉 run-tests.sh 继承的 dev-shim，
+#         确保真·无 ccm：CCM_BIN 未设 且 PATH 无 ccm → fail-open allow·验 bug2 修复保留 ADR-016 §2.3 故意 fail-open）.
 EMPTY34="$(make_project)"
 out34="$(PATH="$EMPTY34:$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL34" CRED_PATH="$CRED34" CLAUDE_JSON_PATH="$CJSON34" \
-        bash "$SCRIPT" --registry "$REG34" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc34=$?
+        env -u CCM_BIN bash "$SCRIPT" --registry "$REG34" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc34=$?
 assert_eq "0" "$rc34" "(34a) fail-open: ccm not found → switch exits 0 (降级放行·不误锁)"
 cred34_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED34" 2>/dev/null)"
 assert_eq "$FRESH_AT" "$cred34_at" "(34a) fail-open: credentials.json overwritten with FRESH token (换号完成·ccm 缺不误拦)"
@@ -2059,12 +2062,104 @@ JSON
 printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE34"; chmod 600 "$VFILE34"
 # And we need a fresh refresh endpoint since the old one may have self-reaped.
 PORT34B="$FX34/url34b.txt"; start_refresh_endpoint ok "$PORT34B"; RURL34B="$(cat "$PORT34B")"
-out34b="$(PATH="$CCM34B:$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL34B" CRED_PATH="$CRED34" CLAUDE_JSON_PATH="$CJSON34" \
+# bad-JSON stub 经 CCM_BIN 注入（canonical 路径·bug2 修复后 CCM_BIN 优先·指向坏输出 stub → 调用成功但输出非法 JSON → fail-open）。
+out34b="$(PATH="$CCM34B:$SECSTUB:$PATH" CCM_BIN="$CCM34B/ccm" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL34B" CRED_PATH="$CRED34" CLAUDE_JSON_PATH="$CJSON34" \
          bash "$SCRIPT" --registry "$REG34" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc34b=$?
 assert_eq "0" "$rc34b" "(34b) fail-open: ccm returns bad JSON → switch exits 0 (坏 JSON 降级放行·不误拦)"
 cred34b_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED34" 2>/dev/null)"
 assert_eq "$FRESH_AT" "$cred34b_at" "(34b) fail-open: credentials.json overwritten with FRESH token (坏 JSON 不误拦换号)"
 rm -rf "$FX34" "$EMPTY34" "$CCM34B"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (36) **policy 机制硬闸 — ccm 经 CCM_BIN 提供（PATH 无 ccm）时 deny 仍被 enforce（codex round-4 #bug2）**.
+#      场景：ccm 仅经 `CCM_BIN` 环境变量提供（绝对路径·hooks/scripts/tests 惯例·usage-pacing.js / board-lint.js 同约定），
+#        **不在 PATH**。旧版 policy 闸只 `command -v ccm` → 返空 → 误判 fail-open → board policy=deny 被绕过（违 ADR-016 安全意图）。
+#      修复后 `_CCM_BIN="${CCM_BIN:-$(command -v ccm ...)}"` 优先认 CCM_BIN → deny 正确拦截 exit 7。
+#      **反向 teeth**：修复前 command -v 找不到 ccm（PATH 无）→ fail-open 放行 → rc=0 + 三存储被覆写 → 下方断言失败。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX36="$(make_fixture)"; REG36="$FX36/accounts.json"; VFILE36="$FX36/accounts.env"
+CRED36="$FX36/credentials.json"; CJSON36="$FX36/claude.json"
+cat > "$REG36" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE36","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice","subscriptionType":"max"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE36"; chmod 600 "$VFILE36"
+# pre-seed OLD official stores — must remain unchanged after a deny block.
+OLD36_AT='sk-ant-oat01-OLDcred36AAA000000000000000000-_o'
+cat > "$CRED36" <<JSON
+{"claudeAiOauth":{"accessToken":"$OLD36_AT","refreshToken":"sk-ant-ort01-OLDcred36r00000000000000000-_o","expiresAt":1700000000000,"subscriptionType":"pro"}}
+JSON
+cat > "$CJSON36" <<'JSON'
+{"oauthAccount":{"emailAddress":"old@x.com","subscriptionType":"pro"},"numStartups":7}
+JSON
+PORT36="$FX36/url.txt"; start_refresh_endpoint ok "$PORT36"; RURL36="$(cat "$PORT36")"
+# stub `ccm` returning deny — placed in its OWN dir that is **NOT on PATH**; provided ONLY via CCM_BIN (absolute path).
+CCMDIR36="$(make_project)"
+cat > "$CCMDIR36/ccm-stub" <<'CCM'
+#!/usr/bin/env bash
+# stub ccm: `policy show --json` → deny; any other subcommand → exit 0 silently (e.g. `log add`).
+if [ "${1:-}" = "policy" ] && [ "${2:-}" = "show" ]; then
+  printf '%s\n' '{"ok":true,"data":{"policy":{"autonomous_account_switch":"deny"},"effective":{"autonomous_account_switch":"deny"}}}'
+fi
+exit 0
+CCM
+chmod +x "$CCMDIR36/ccm-stub"
+# CRITICAL: ccm is NOT on PATH here (CCMDIR36 not added to PATH; binary named ccm-stub anyway). Provided via CCM_BIN only.
+#   This is the exact scenario the bug missed: command -v ccm → empty → old code fail-opens → deny bypassed.
+out36="$(PATH="$SECSTUB:$PATH" CCM_BIN="$CCMDIR36/ccm-stub" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL36" CRED_PATH="$CRED36" CLAUDE_JSON_PATH="$CJSON36" \
+        bash "$SCRIPT" --registry "$REG36" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc36=$?
+# ① rc must be 7 — policy deny enforced via CCM_BIN (NOT fail-open).
+assert_eq "7" "$rc36" "(36) CCM_BIN deny: exit 7 — ccm via CCM_BIN (PATH has no ccm) still enforces deny (was fail-open bypass)"
+# ② credentials.json must keep OLD token (gate blocks before any overwrite).
+cred36_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED36" 2>/dev/null)"
+assert_eq "$OLD36_AT" "$cred36_at" "(36) CCM_BIN deny: credentials.json UNCHANGED (policy gate via CCM_BIN ran before overwrite)"
+# ③ registry active NOT flipped.
+alice36="$(node -e 'try{const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["alice@x.com"].active))}catch(_e){process.stdout.write("ERROR")}' "$LIB_JS" "$REG36" 2>/dev/null)"
+assert_eq "false" "$alice36" "(36) CCM_BIN deny: registry alice active NOT flipped (deny enforced)"
+# ④ deny message surfaced.
+assert_contains "$out36" "deny" "(36) CCM_BIN deny: stderr surfaces deny"
+# ⑤ vault NOT refreshed (gate前移·no FRESH token leaked into vault).
+vault36_content="$(cat "$VFILE36" 2>/dev/null || true)"
+if echo "$vault36_content" | grep -qF "$FRESH_AT" 2>/dev/null; then
+  FAILED=$((FAILED+1)); _red "FAIL: (36) CCM_BIN deny: vault refreshed (FRESH_AT present) — gate ran AFTER refresh"
+else
+  PASS=$((PASS+1)); _green "(36) CCM_BIN deny: vault NOT refreshed (FRESH_AT absent — gate via CCM_BIN runs before credential ops)"
+fi
+rm -rf "$FX36" "$CCMDIR36"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (36b) **CONTROL — CCM_BIN unset AND ccm not on PATH → fail-open allow (ADR-016 §2.3 故意 fail-open 保留)**.
+#       证明修复**只**把「ccm 经 CCM_BIN 真实可用」从误判 fail-open 改成正确 enforce——真·无 ccm（CCM_BIN 未设 且
+#       PATH 无）时**仍** fail-open allow（不锁未接 ccm 的环境）。这是 (36) 的对照组（与 (34a) 同义·此处显式再断一次确保两路径都对）。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX36B="$(make_fixture)"; REG36B="$FX36B/accounts.json"; VFILE36B="$FX36B/accounts.env"
+CRED36B="$FX36B/credentials.json"; CJSON36B="$FX36B/claude.json"
+cat > "$REG36B" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE36B","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice","subscriptionType":"max"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE36B"; chmod 600 "$VFILE36B"
+cat > "$CRED36B" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLDcred36bAA000000000000000000-_o","refreshToken":"sk-ant-ort01-OLDcred36br0000000000000000-_o","expiresAt":1700000000000,"subscriptionType":"pro"}}
+JSON
+cat > "$CJSON36B" <<'JSON'
+{"oauthAccount":{"emailAddress":"old@x.com","subscriptionType":"pro"},"numStartups":5}
+JSON
+PORT36B="$FX36B/url.txt"; start_refresh_endpoint ok "$PORT36B"; RURL36B="$(cat "$PORT36B")"
+# EMPTY dir pre-pended to PATH so no real ccm leaks in; CCM_BIN explicitly UNSET.
+EMPTY36B="$(make_project)"
+out36b="$(PATH="$EMPTY36B:$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL36B" CRED_PATH="$CRED36B" CLAUDE_JSON_PATH="$CJSON36B" \
+         env -u CCM_BIN bash "$SCRIPT" --registry "$REG36B" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc36b=$?
+assert_eq "0" "$rc36b" "(36b) CONTROL fail-open: CCM_BIN unset + ccm not on PATH → switch exits 0 (真·无 ccm 仍 fail-open allow·不误锁)"
+cred36b_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED36B" 2>/dev/null)"
+assert_eq "$FRESH_AT" "$cred36b_at" "(36b) CONTROL fail-open: credentials.json overwritten with FRESH token (换号完成·真·无 ccm 不误拦)"
+rm -rf "$FX36B" "$EMPTY36B"
 
 # ── (35-snap-degrade) cc-usage.sh 不存在（CLAUDE_PLUGIN_ROOT 无 cc-usage）→ 换号仍完成·snapshot 干净跳过 ──
 # 场景：用户未安装 orchestrating-to-completion skill（或 CLAUDE_PLUGIN_ROOT 路径无对应 cc-usage.sh）→ CC_USAGE_SH

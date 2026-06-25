@@ -193,6 +193,89 @@ test('usage show with registry lists all accounts with snapshot fields', () => {
   }
 });
 
+// ── current 窗口过期闸（codex round-4 #bug1）─────────────────────────────────────────────────────
+// show 此前「sidecar 存在就 available:true」无脑放行——即便 sidecar 的 resets_at < now（窗口已 reset·used% 陈旧）。
+//   修复后 show 与 advise(pacingAdvice·引擎 pctOf) 口径一致：过期窗口（resets_at<now）used% 视 stale→null，
+//   available 反映「≥1 个非过期窗口有有效 used%」（两窗都过期→available:false）。
+//   ★用真实 Date.now()：过期 fixture 用**过去**的 epoch（2020·恒 < now），控制组用**远未来**（2030·恒 ≥ now）。
+const SIDECAR_BOTH_EXPIRED = {
+  five_hour: { used_percentage: 88, resets_at: 1577836800 }, // 2020-01-01T00:00:00Z（恒过去·已过期）
+  seven_day: { used_percentage: 60, resets_at: 1577836800 }, // 2020-01-01（已过期）
+  captured_at: 1577836800,
+};
+const SIDECAR_5H_EXPIRED_7D_FRESH = {
+  five_hour: { used_percentage: 88, resets_at: 1577836800 }, // 已过期 → 5h used% 视 null
+  seven_day: { used_percentage: 60, resets_at: 1893456000 }, // 2030-01-01（远未来·有效）
+  captured_at: 1577836800,
+};
+const SIDECAR_FUTURE_FRESH = {
+  five_hour: { used_percentage: 80, resets_at: 1893456000 }, // 2030-01-01（远未来·有效）
+  seven_day: { used_percentage: 40, resets_at: 1925078400 }, // 2031-01-01（有效）
+  captured_at: 1893456000,
+};
+
+test('usage show treats expired-window sidecar as stale (both windows expired → current.available:false)', () => {
+  // sidecar 存在但两窗口 resets_at 均 < now → used% 全 stale → current.available:false（不当权威发出）。
+  const { home, boardPath } = setupHome({ sidecar: SIDECAR_BOTH_EXPIRED });
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
+  const code = usageHandler.show(ctx);
+  assert.equal(code, EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(
+    out.data.current.available,
+    false,
+    'both windows expired (resets_at<now) → current NOT available (stale)',
+  );
+  // 过期窗口 used% 投影为 null（陈旧不可判）；resets_at 原样保留供透明。
+  assert.equal(out.data.current.five_hour.used_percentage, null, 'expired 5h used% nulled (stale)');
+  assert.equal(out.data.current.seven_day.used_percentage, null, 'expired 7d used% nulled (stale)');
+  // 无 registry → 整体 available 也 false（与 current 一致·不被陈旧 sidecar 误标可用）。
+  assert.equal(out.data.available, false, 'no registry + expired sidecar → overall unavailable');
+  assert.equal(out.data.confidence, 'low');
+});
+
+test('usage show with one window expired keeps the fresh one (5h expired, 7d fresh → available via 7d)', () => {
+  // 5h 过期、7d 仍有效 → available:true（≥1 非过期窗口有有效 used%）；5h used% null·7d used% 保留。
+  const { home, boardPath } = setupHome({ sidecar: SIDECAR_5H_EXPIRED_7D_FRESH });
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
+  usageHandler.show(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(
+    out.data.current.available,
+    true,
+    '7d window fresh → current available (≥1 non-expired window valid)',
+  );
+  assert.equal(out.data.current.five_hour.used_percentage, null, 'expired 5h used% nulled');
+  assert.equal(out.data.current.seven_day.used_percentage, 60, 'fresh 7d used% kept');
+});
+
+test('usage show CONTROL: non-expired sidecar (future resets_at) stays available:true', () => {
+  // 控制组：两窗口 resets_at 均在未来 → used% 有效 → current.available:true（口径回归·确认过期闸不误杀新鲜数据）。
+  const { home, boardPath } = setupHome({ sidecar: SIDECAR_FUTURE_FRESH });
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
+  usageHandler.show(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.current.available, true, 'future resets_at → fresh → available');
+  assert.equal(out.data.current.five_hour.used_percentage, 80, 'fresh 5h used% kept');
+  assert.equal(out.data.current.seven_day.used_percentage, 40, 'fresh 7d used% kept');
+  assert.equal(out.data.confidence, 'high');
+});
+
+test('usage show expiry gate is consistent with advise/pacingAdvice (same expired sidecar → both degrade)', () => {
+  // 口径一致性回归：同一份过期 sidecar——show 的 current.available 与 advise 的 available 都该 false（两路径同源 pctOf）。
+  //   防 sibling 漂移（round3 给 advise 加了过期闸·round4 给 show 补齐·此断言钉死二者不再分叉）。
+  const { home, boardPath } = setupHome({ sidecar: SIDECAR_BOTH_EXPIRED });
+  const showCtx = mkCtx(home, boardPath, { flags: { json: true } });
+  const adviseCtx = mkCtx(home, boardPath, { flags: { json: true } });
+  usageHandler.show(showCtx);
+  usageHandler.advise(adviseCtx);
+  const showOut = JSON.parse(showCtx.outBuf.join('')).data;
+  const adviseOut = JSON.parse(adviseCtx.outBuf.join('')).data;
+  assert.equal(showOut.current.available, false, 'show degrades on expired sidecar');
+  assert.equal(adviseOut.available, false, 'advise degrades on expired sidecar (same expiry gate)');
+  assert.equal(adviseOut.source, 'local-derived-approx', 'advise marks approx when expired');
+});
+
 test('usage show --effective-n override changes effective_n (#audit: was declared but ignored)', () => {
   // registry 有 3 号 → 自动 effective_n=3；--effective-n 7 覆写应胜出（此前 show 忽略此 flag）。
   const { home, boardPath } = setupHome({ accounts: REGISTRY_3 });

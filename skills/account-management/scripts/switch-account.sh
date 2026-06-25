@@ -1431,7 +1431,12 @@ fi
 # 退出码 7（exit 7）：脚本现有码 0/1/2/3/4/5/6 均已占用（见脚本头注释·exit code 分配）；7 = policy-deny-blocked（新码·语义清晰）。
 # 红线1：纯 bash + node 解析 JSON，不用 jq/python。
 # deny 时本段之后的 refresh / vault 回写 / 官方存储覆写 / 换号锁 / registry active 翻转——**一概未发生**。
-_CCM_BIN="$(command -v ccm 2>/dev/null || true)"
+# ccm 解析口径（codex round-4 #bug2）：优先 `CCM_BIN`（dev/test/自定义安装的覆写口·绝对路径可执行·
+#   与 usage-pacing.js / board-lint.js / verify-board.js 的 `process.env.CCM_BIN || 'ccm'` 同约定），回退 PATH 上的 `ccm`。
+#   旧版只 `command -v ccm`：当 ccm 仅经 CCM_BIN 提供（不在 PATH）时返空 → policy 闸误判 fail-open → board policy=deny 被绕过（违 ADR-016）。
+#   **保留 ADR-016 §2.3 故意 fail-open**：CCM_BIN 未设且 PATH 无 ccm → 真·无 ccm → 仍 fail-open allow（不锁未接 ccm 的环境）；
+#   CCM_BIN 指向坏路径 → 下方 `"$_CCM_BIN" ... || true` 调用失败 → 既有 fail-open 兜底（同 ccm 不可用）。
+_CCM_BIN="${CCM_BIN:-$(command -v ccm 2>/dev/null || true)}"
 _POLICY_SWITCH_ALLOWED="allow"  # fail-open default
 if [ -n "$_CCM_BIN" ]; then
   _POLICY_JSON="$("$_CCM_BIN" policy show --json 2>/dev/null || true)"
