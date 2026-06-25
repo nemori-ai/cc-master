@@ -141,16 +141,24 @@ export function next(ctx: Ctx): number {
 function initResolve(ctx: Ctx): { boardPath: string; board: null } {
   const explicit =
     (ctx.values && (ctx.values.board as string)) || (ctx.env && ctx.env.CC_MASTER_BOARD);
-  if (explicit) return { boardPath: path.resolve(explicit), board: null };
-  const home = discover.resolveHome({
-    homeFlag: ctx.values && (ctx.values.home as string),
-    env: ctx.env,
-  });
-  const stamp = new Date()
-    .toISOString()
-    .replace(/\.\d{3}Z$/, 'Z')
-    .replace(/[:-]/g, '');
-  const boardPath = path.join(home, `${stamp}-${process.pid}.board.json`);
+  let boardPath: string;
+  if (explicit) {
+    boardPath = path.resolve(explicit);
+  } else {
+    const home = discover.resolveHome({
+      homeFlag: ctx.values && (ctx.values.home as string),
+      env: ctx.env,
+    });
+    const stamp = new Date()
+      .toISOString()
+      .replace(/\.\d{3}Z$/, 'Z')
+      .replace(/[:-]/g, '');
+    boardPath = path.join(home, `${stamp}-${process.pid}.board.json`);
+  }
+  // QA #16：init 是「建板」命令——目标目录不存在时自建（否则 runWrite 抢锁 openSync('<board>.lock','wx')
+  //   先撞 ENOENT 而非建板，`ccm board init --home <新目录>` 报错且不留痕）。只有 init 这么做：它创建板，
+  //   故得负责让承载目录就位；其它写命令的板已由 discover 找到、父目录必然在，无需 mkdir。
+  fs.mkdirSync(path.dirname(boardPath), { recursive: true });
   return { boardPath, board: null };
 }
 

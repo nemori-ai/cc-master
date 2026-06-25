@@ -228,6 +228,20 @@ test('board init --goal → 板文件生成（exit 0）', () => {
   assert.equal(b.owner.active, true);
 });
 
+test('board init --home <不存在的多级目录> → 自建目录 + 板（QA #16）', () => {
+  // init 是建板命令：home 不存在时应自建（修复前 runWrite 抢锁 openSync(.lock,wx) 先撞 ENOENT）。
+  const root = mkdtempSync(join(tmpdir(), 'ccm-e2e-'));
+  TMPDIRS.push(root);
+  const freshHome = join(root, 'never', 'existed', 'cc-master'); // 多级且不存在
+  assert.ok(!existsSync(freshHome), 'precondition: home 目录不应预先存在');
+  const r = runCcm(['board', 'init', '--goal', 'mkdir me'], { home: freshHome });
+  assert.equal(r.status, 0, `init into fresh home should succeed; stderr=${r.stderr}`);
+  assert.ok(existsSync(freshHome), 'init should have created the home dir');
+  const files = readdirSync(freshHome).filter((n) => n.endsWith('.board.json'));
+  assert.equal(files.length, 1, 'exactly one board created in the freshly-made home');
+  assert.equal(readBoard(join(freshHome, files[0] as string)).goal, 'mkdir me');
+});
+
 test('task add → 0 + 板含该 task；start → done 状态机走通', () => {
   const { home } = mkHome();
   const boardPath = seedBoard(home, { goal: 'write path' });
