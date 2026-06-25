@@ -1,0 +1,53 @@
+# ccm-ci —— ccm monorepo（packages/engine + apps/cli）的持续集成门。
+# 只在 ccm/** 或本 workflow 自身变更时触发，避免与 cc-master 插件改动互相打扰。
+# 这些步骤逐条镜像本地可跑命令（pnpm -C ccm run <x>），改 CI 前先在本地把它们跑绿。
+name: ccm-ci
+
+on:
+  pull_request:
+    paths:
+      - 'ccm/**'
+      - '.github/workflows/ccm-ci.yml'
+  push:
+    paths:
+      - 'ccm/**'
+      - '.github/workflows/ccm-ci.yml'
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # pnpm 版本对齐 ccm/package.json 的 packageManager（pnpm@10.22.0）。
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.22.0
+
+      # setup-node 装的是 nodejs.org 官方 node；启用 pnpm store 缓存加速依赖安装。
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ccm/pnpm-lock.yaml
+
+      # 用 --frozen-lockfile 保证依赖与 lockfile 严格一致（不改 lock）。
+      - name: Install deps
+        working-directory: ccm
+        run: pnpm install --frozen-lockfile
+
+      # 以下四步与本地 `pnpm -C ccm run <x>` 一一对应；turbo 内部已处理任务依赖顺序。
+      - name: Build
+        run: pnpm -C ccm run build
+
+      - name: Typecheck
+        run: pnpm -C ccm run typecheck
+
+      - name: Lint
+        run: pnpm -C ccm run lint
+
+      - name: Test
+        run: pnpm -C ccm run test

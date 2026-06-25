@@ -177,7 +177,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 
 - **feature branch**——不在 default 分支直接动手（先 branch）。
 - **PR 走 `gh` CLI 手工收口**——`gh pr create`（PR body 末尾带 Claude 署名 `🤖 Generated with [Claude Code]`）→ `gh pr merge <N> --squash --delete-branch`（本仓惯例 squash，main 上 commit 形如 `… (#N)`）。本仓**没有** `github-pr` / `github-tag-release` skill（历史占位、实物不存在，别去找）；不用 gstack `/ship`。
-- **发版（release）**——版本号同步改三处：`.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json`（两个 manifest 都要 bump，漏一个会版本不一致）+ `CHANGELOG.md`（`[Unreleased]` 定版为 `[x.y.z] — YYYY-MM-DD`，顶部留空 `[Unreleased]`）；合并进 main 后 `gh release create vx.y.z --target main`。无 CI，发版前手动跑 `bash run-tests.sh`（须 `ALL TESTS PASSED`）+ `claude plugin validate .`（须 `Validation passed`）两道门。
+- **发版（release）**——版本号同步改三处：`.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json`（两个 manifest 都要 bump，漏一个会版本不一致）+ `CHANGELOG.md`（`[Unreleased]` 定版为 `[x.y.z] — YYYY-MM-DD`，顶部留空 `[Unreleased]`）；合并进 main 后 `gh release create vx.y.z --target main`。**插件本身无 CI**——发版前手动跑 `bash run-tests.sh`（须 `ALL TESTS PASSED`）+ `claude plugin validate .`（须 `Validation passed`）两道门。**例外：解耦出的 `ccm` 子产品（ADR-014·`ccm/`）有自己的 GitHub Actions CI**——`.github/workflows/ccm-ci.yml`（PR/push 碰 `ccm/**` 即跑 build/typecheck/lint/test）+ `ccm-release.yml`（tag `v*` 触发，多平台 Node SEA 二进制 → attach GH release）。两套并行不悖：插件走手动门 + changelog 手动定版，ccm 包走 CI + changesets（`ccm/.changeset/`）。
 - **commit 末尾带** `Co-Authored-By: Claude <noreply@anthropic.com>`；type 前缀 `feat/fix/docs/chore/adr`。
 - **single-committer**——sub-agent 只写 + 自证测试绿，**绝不 commit**；orchestrator 端点验收（含 §7 codex 自审）后统一分组 commit。
 - **README.md / README_zh.md 同步**——动 user-facing 文档时两份一起改；user-visible 改动加 `CHANGELOG.md ## [Unreleased]` 条目。

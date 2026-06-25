@@ -1,0 +1,91 @@
+# ccm-release —— 多平台 Node SEA 单文件二进制构建 + 随 GitHub release 附产物。
+#
+# 分发模型（ADR-014）：ccm 走 per-OS Node SEA 二进制，随 cc-master 的 GitHub release
+# 附带 `ccm-<os>-<arch>`（不走 npm optionalDeps 平台子包——已决策砍掉）。
+#
+# ⚠️ Node 版本（关键，CI 必读）：build-sea.sh 的 postject sentinel 注入只在 Node 22 上可靠工作；
+#    本地用 Node 25/26 实测 postject 报「Could not find the sentinel NODE_SEA_FUSE」而失败。
+#    故 matrix 全部 pin Node 22。setup-node 装的是 nodejs.org 官方静态 node——这同时满足
+#    build-sea.sh 头注的自包含前提（homebrew node 动态链接、不自包含；官方 node 才自包含）。
+#
+# ⚠️ Windows SEA —— 诚实 deferred（no-silent-cap）：build-sea.sh 是 bash + macOS codesign 链，
+#    Windows SEA 需另一套签名链（signtool / Authenticode，见 build-sea.sh 头注的平台坑）。
+#    本 workflow 当前只覆盖 macOS（arm64 + x64）+ Linux（x64）；Windows 待独立签名链落地后再加，
+#    不在此编一个跑不通的 Windows 步骤。
+name: ccm-release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write # 需写权限把产物 attach 到 GitHub release
+
+jobs:
+  build-sea:
+    strategy:
+      fail-fast: false
+      # 覆盖 macOS arm64 / macOS x64 / Linux x64；Windows deferred（见文件顶部注释）。
+      matrix:
+        include:
+          - os: macos-14 # Apple Silicon
+            asset: ccm-darwin-arm64
+          - os: macos-13 # Intel
+            asset: ccm-darwin-x64
+          - os: ubuntu-latest # Linux x64
+            asset: ccm-linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # pnpm 版本对齐 ccm/package.json 的 packageManager（pnpm@10.22.0）。
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.22.0
+
+      # 官方 node 22：满足 SEA sentinel 可靠注入 + 自包含前提（见文件顶部注释）。
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ccm/pnpm-lock.yaml
+
+      - name: Install deps
+        working-directory: ccm
+        run: pnpm install --frozen-lockfile
+
+      # 先产常规 dist（build-sea.sh 内部还会跑 tsdown.sea.config，但 CLI build 是其前置形态）。
+      - name: Build CLI
+        run: pnpm -C ccm/apps/cli build
+
+      # build-sea.sh 自己 cd 到 apps/cli，CCM_SEA_OUT 相对该目录解析，
+      # 故产物落 ccm/apps/cli/dist/${{ matrix.asset }}。
+      - name: Build SEA binary
+        run: CCM_SEA_OUT=dist/${{ matrix.asset }} bash ccm/apps/cli/scripts/build-sea.sh
+
+      # 冒烟：确认产物可执行且 --version 工作。
+      - name: Smoke test
+        run: |
+          BIN="ccm/apps/cli/dist/${{ matrix.asset }}"
+          chmod +x "$BIN"
+          "$BIN" --version
+
+      # 上传 artifact（workflow_dispatch / 非 tag 触发时也留存可下载）。
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ccm/apps/cli/dist/${{ matrix.asset }}
+          if-no-files-found: error
+
+      # 仅 tag 触发时 attach 到 GitHub release。
+      - name: Attach to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ccm/apps/cli/dist/${{ matrix.asset }}
