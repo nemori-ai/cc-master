@@ -102,4 +102,4 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 - **orchestrating-to-completion**(SKILL A)—— 切好的图怎么**排期**(CPM / float / 临界路径 / 并行度计算,在它的 board 协议 reference)、怎么**派发**(选 shell/subagent/workflow)。本 skill 是"切",它是"排 + 派"。
 - **dev-as-ml-loop**(#7)—— 切出来的**单个 task 怎么执行到验收**(把验收当 objective 迭代逼近)。本 skill 切出带验收的片,#7 把每片做到验收。
 - **using-ccm** —— 怎么把切出的 task / deps / estimate / cadence **写进** board(`ccm task add` / `cadence open` ...)。
-- 切片 → board 字段的协议细节(task / parent 嵌套 / cadence / estimate schema)以 board 协议 reference 为准。
+- 切片 → board 字段的协议细节(task / parent 嵌套 / cadence / estimate schema)以 **board 协议 SSOT(`@ccm/engine` 的 board-model)** 为准;字段怎么取值的操作视图见 using-ccm 的 board-model-guide。

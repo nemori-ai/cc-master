@@ -120,4 +120,4 @@ loss 到 0(验收每一条都绿)= **收敛,停**。继续"优化"就是**过拟
 - **orchestrating-to-completion**(SKILL A)—— 协调 / 派发 / 端点验收(指挥不演奏)。A 把任务**派给**执行 agent;执行 agent 用本 skill 的框架把它做到验收。A 的"只信端点验收 / gate-green≠passed"与本 skill 的"收敛=目标函数达标"是同一条:绿了才算 loss=0。
 - **using-ccm** —— 任务做到验收后,怎么用 `ccm task done --verified --artifact` 把结果写回 board。
 - **engineering-with-craft**(#G)—— 本 skill 给循环的**形状**(怎么迭代逼近验收);engineering-with-craft 给循环里那双手的**工程手艺内容**(领域怎么建模 / 类怎么写 / 要不要 spec-first / **test-first 这条纪律本身怎么执行**)。测试触点:本 skill 锚 3 讲「测试为何是循环里的梯度信号」,它的 `tdd.md` 讲「红绿铁律怎么执行」——不同 plane,互补。
-- board 的 `acceptance` 字段语义(两态 objective function:一句话 DoD / `{criteria}`)以 board 协议 reference 为准——本 skill 是它在执行侧的心法。
+- board 的 `acceptance` 字段语义(两态 objective function:一句话 DoD / `{criteria}`)以 **board 协议 SSOT(`@ccm/engine` 的 board-model)** 为准——本 skill 是它在执行侧的心法。
