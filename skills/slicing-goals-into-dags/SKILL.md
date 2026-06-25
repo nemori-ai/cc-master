@@ -24,6 +24,8 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 - **纵切**:`添加支出(端到端:够用的 schema 片 + 一个 endpoint + 最小表单)` / `看列表(端到端)` / `月度图(端到端)`——每片是一根穿层的细线。
 - **横切**:`T:数据模型层` → `T:后端层` → `T:前端层` → `T:测试层`——每个节点是一整层。
 
+> **落地**:每个纵切片 = 一个带 `--accept`(自己的 DoD)的 `ccm task`,片之间的真实数据依赖用 `--deps` 连。横切那种"一整层"节点往往**给不出自己的 DoD**——难端点验收,这本身就是切错的信号。命令语法见 `using-ccm`。
+
 横切为什么是默认、又为什么是错的:它**感觉**像工程严谨(地基先打牢),实则把地基做成 serial 瓶颈(并行度=1 直到它完成)、把任何可用价值推到最末、且那个"打牢的地基"是**投机的**(你还没切片,根本不知道下游真正需要什么)。
 
 ### Rationalization Table —— 横切最常见的自我说服(pressure baseline 逐字捕获)
@@ -56,6 +58,8 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 太细也是病:微任务多到协调开销 > 干活本身。`estimate` 给手感反馈——某片估时畸大 → 考虑再切;碎到 trivial → 并回去。
 
+> **落地**:粒度的两把尺都是 board 字段——`--accept`(给不出一句清爽验收 = 太大 / 太糊)+ `--estimate`(`3h` / `2d`,畸大就再切)。这两个字段也正是 `dev-as-ml-loop` 接手该片时的目标函数与步长参考。命令见 `using-ccm`。
+
 ---
 
 ## 心智锚 4:按 价值 × 风险 排序
@@ -65,6 +69,8 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 - **价值优先(节奏)**:把用户**最早能用上**的那片排前面——让"第一个可用增量"尽快落地,而不是攒到最后大爆发。
 - **风险优先(去风险)**:把**最不确定 / 最可能翻车**的集成,用一根 spike / walking skeleton 早早穿过去——把"做不出来"的发现提前到便宜的时候。
 - 二者常合一:**最薄的那根线,往往既穿过最险的路径、又交付一小条可用价值**——这就是 walking skeleton 该选的方向。
+
+> **落地**:硬先后(脊椎必须先于依赖它的片)用 `--deps` 编码进 board;但**同为 ready 时先派哪片**(价值还是风险优先)是 **dispatch 决策、归 A**(`orchestrating-to-completion`),不是 board 上的某个字段。本 skill 负责切出"谁依赖谁"的结构,A 负责在就绪集里挑先后。
 
 ---
 

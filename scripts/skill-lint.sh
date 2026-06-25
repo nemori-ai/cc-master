@@ -53,7 +53,7 @@ const SKILL_DIRS = ['skills', '.claude/skills'];
 // dirs that actually ship with the plugin — bare refs in here die at install time.
 const DIST_DIRS = ['skills', 'commands', 'hooks'];
 // Distributed skill names whose bare `<name>/…` path refs are install-time dead links.
-const DIST_SKILL_NAMES = ['authoring-workflows', 'orchestrating-to-completion', 'account-management', 'using-ccm', 'slicing-goals-into-dags'];
+const DIST_SKILL_NAMES = ['authoring-workflows', 'orchestrating-to-completion', 'account-management', 'using-ccm', 'slicing-goals-into-dags', 'dev-as-ml-loop'];
 
 // Recursively collect every *.md file under a repo-relative base dir.
 function markdownFiles(base) {
