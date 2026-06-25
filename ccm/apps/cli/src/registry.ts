@@ -613,6 +613,49 @@ export const REGISTRY: Registry = {
       handler: 'watchdog.status',
     },
   },
+
+  // ════════════════════ baseline ═════════════════════════════════════════════════════════════════
+  baseline: {
+    snapshot: {
+      summary: 'EVM plan-baseline 快照（写 board.baseline；已存在则 exit 3）',
+      read: false,
+      positionals: [],
+      options: {
+        t0: { type: 'string', desc: 'EVM 零时刻（严格 ISO-8601 UTC；默认 now）' },
+        note: { type: 'string', desc: '备注（快照说明）' },
+        'dry-run': { type: 'boolean', desc: '试跑不落盘' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm baseline snapshot',
+        'ccm baseline snapshot --t0 2026-06-25T08:00:00Z --note "sprint 1 start"',
+      ],
+      handler: 'baseline.snapshot',
+    },
+    show: {
+      summary: '只读当前 baseline 段（无 baseline 也 exit 0）',
+      read: true,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm baseline show', 'ccm baseline show --json'],
+      handler: 'baseline.show',
+    },
+    reset: {
+      summary: 're-baseline：旧快照进 history[]（只增不删）+ 建新（非 TTY 须 --yes）',
+      read: false,
+      positionals: [],
+      options: {
+        t0: { type: 'string', desc: '新基线 EVM 零时刻（严格 ISO-8601 UTC；默认 now）' },
+        note: { type: 'string', desc: '重新 baseline 理由' },
+        yes: { type: 'boolean', desc: '非 TTY 确认（破坏性操作）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm baseline reset --note "mid-sprint re-estimate" --yes'],
+      handler: 'baseline.reset',
+    },
+  },
 };
 
 // ── ALIASES：热路径顶层捷径（cli-design §3.4·只给最高频两个）。alias → [noun, verb]。──────────────

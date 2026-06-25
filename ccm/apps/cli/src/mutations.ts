@@ -484,3 +484,107 @@ export function applySetJson(board: Board, dotpath: string, json: unknown): Boar
   }
   return applySet(board, dotpath, value);
 }
+
+// ── baselineSnapshot：从 tasks 快照写 board.baseline（新建·已有时调用者须先判断 force）。
+export function baselineSnapshot(board: Board, { t0, note }: { t0: string; note?: string }): Board {
+  const b = clone(board);
+  touch(b);
+  const capturedAt = stampNow();
+
+  // 从当前 tasks 提取 estimate + deps 快照
+  const taskEstimates: Record<string, { value: number; unit: string }> = {};
+  const dagSnapshot: Record<string, { deps: string[] }> = {};
+  let bacH = 0;
+
+  for (const t of (Array.isArray(b.tasks) ? b.tasks : []) as Task[]) {
+    if (!t || typeof t.id !== 'string' || !t.id) continue;
+    const deps = Array.isArray(t.deps) ? t.deps.filter((d: unknown) => typeof d === 'string') : [];
+    dagSnapshot[t.id] = { deps };
+    if (t.estimate && typeof t.estimate === 'object' && typeof t.estimate.value === 'number') {
+      taskEstimates[t.id] = {
+        value: t.estimate.value,
+        unit: typeof t.estimate.unit === 'string' ? t.estimate.unit : 'h',
+      };
+      // 累积 BAC（budget at completion）：换算成小时
+      const v = t.estimate.value;
+      const u = t.estimate.unit || 'h';
+      let hours = v;
+      if (u === 'm' || u === 'min') hours = v / 60;
+      else if (u === 'd') hours = v * 8;
+      else if (u === 'w') hours = v * 40;
+      bacH += hours;
+    }
+  }
+
+  b.baseline = {
+    captured_at: capturedAt,
+    t0,
+    task_estimates: taskEstimates,
+    dag_snapshot: dagSnapshot,
+    bac_h: Math.round(bacH * 100) / 100,
+    history: [],
+    ...(note ? { note } : {}),
+  };
+
+  return b;
+}
+
+// ── baselineReset：旧 baseline 进 history[]（只增不删）+ 建新快照。
+export function baselineReset(board: Board, { t0, note }: { t0: string; note?: string }): Board {
+  const b = clone(board);
+  touch(b);
+
+  // 保存旧 baseline 到 history
+  const oldBaseline = b.baseline;
+  const history: unknown[] = [];
+
+  if (oldBaseline && typeof oldBaseline === 'object') {
+    const old = oldBaseline as Record<string, unknown>;
+    const oldHistory = Array.isArray(old.history) ? old.history : [];
+    // 旧 history 条目保留（只增不删）
+    history.push(...oldHistory);
+    // 旧 baseline 自身进 history
+    history.push({
+      reset_at: stampNow(),
+      ...(note ? { note } : {}),
+      bac_h: old.bac_h,
+      task_estimates_snapshot: old.task_estimates || {},
+    });
+  }
+
+  // 建新快照（复用 snapshot 逻辑）
+  const capturedAt = stampNow();
+  const taskEstimates: Record<string, { value: number; unit: string }> = {};
+  const dagSnapshot: Record<string, { deps: string[] }> = {};
+  let bacH = 0;
+
+  for (const t of (Array.isArray(b.tasks) ? b.tasks : []) as Task[]) {
+    if (!t || typeof t.id !== 'string' || !t.id) continue;
+    const deps = Array.isArray(t.deps) ? t.deps.filter((d: unknown) => typeof d === 'string') : [];
+    dagSnapshot[t.id] = { deps };
+    if (t.estimate && typeof t.estimate === 'object' && typeof t.estimate.value === 'number') {
+      taskEstimates[t.id] = {
+        value: t.estimate.value,
+        unit: typeof t.estimate.unit === 'string' ? t.estimate.unit : 'h',
+      };
+      const v = t.estimate.value;
+      const u = t.estimate.unit || 'h';
+      let hours = v;
+      if (u === 'm' || u === 'min') hours = v / 60;
+      else if (u === 'd') hours = v * 8;
+      else if (u === 'w') hours = v * 40;
+      bacH += hours;
+    }
+  }
+
+  b.baseline = {
+    captured_at: capturedAt,
+    t0,
+    task_estimates: taskEstimates,
+    dag_snapshot: dagSnapshot,
+    bac_h: Math.round(bacH * 100) / 100,
+    history,
+  };
+
+  return b;
+}

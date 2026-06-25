@@ -181,6 +181,7 @@ export function lintBoard(text: string): LintResult {
   lintLog(b, emit);
   lintJudgmentCalls(b, emit);
   lintCadenceFormat(b, emit);
+  lintBaseline(b, emit);
 
   // FMT-TASKS（数组）——非数组无从遍历，板级检查已做，提前返回。
   const tasks = b.tasks;
@@ -598,6 +599,64 @@ function lintCadenceFormat(board: BoardLike, emit: Emit): void {
   }
 }
 
+// FMT-BASELINE：baseline 对象形状（present 才校验）
+function lintBaseline(board: BoardLike, emit: Emit): void {
+  const bl = board.baseline;
+  if (bl === undefined || bl === null) return;
+  if (typeof bl !== 'object' || Array.isArray(bl)) {
+    emit('FMT-BASELINE', `baseline 若存在必须是对象（当前：${JSON.stringify(bl)}）。`);
+    return;
+  }
+  const b = bl as Record<string, unknown>;
+  for (const k of ['captured_at', 't0']) {
+    if (badTimestamp(b[k])) {
+      emit(
+        'FMT-BASELINE',
+        `baseline.${k} 是 ${JSON.stringify(b[k])}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：estimate evm 读它——格式不对则 EVM 时间轴错位。`,
+      );
+    }
+  }
+  for (const k of ['task_estimates', 'dag_snapshot']) {
+    if (b[k] !== undefined && (typeof b[k] !== 'object' || Array.isArray(b[k]) || b[k] === null)) {
+      emit('FMT-BASELINE', `baseline.${k} 若存在必须是对象（当前：${JSON.stringify(b[k])}）。`);
+    }
+  }
+  if (b.bac_h !== undefined && typeof b.bac_h !== 'number') {
+    emit('FMT-BASELINE', `baseline.bac_h 若存在必须是数字（当前：${JSON.stringify(b.bac_h)}）。`);
+  }
+  if (b.history !== undefined) {
+    if (!Array.isArray(b.history)) {
+      emit(
+        'FMT-BASELINE',
+        `baseline.history 若存在必须是数组（当前：${JSON.stringify(b.history)}）。`,
+      );
+    } else {
+      for (let i = 0; i < b.history.length; i++) {
+        const h = b.history[i] as Record<string, unknown>;
+        if (!h || typeof h !== 'object' || Array.isArray(h)) {
+          emit(
+            'FMT-BASELINE',
+            `baseline.history[${i}] 应为对象 {reset_at, note?, bac_h, task_estimates_snapshot}（当前：${JSON.stringify(h)}）。`,
+          );
+          continue;
+        }
+        if (badTimestamp(h.reset_at)) {
+          emit(
+            'FMT-BASELINE',
+            `baseline.history[${i}].reset_at 是 ${JSON.stringify(h.reset_at)}，非严格 ISO-8601 UTC。`,
+          );
+        }
+        if (h.bac_h !== undefined && typeof h.bac_h !== 'number') {
+          emit(
+            'FMT-BASELINE',
+            `baseline.history[${i}].bac_h 若存在必须是数字（当前：${JSON.stringify(h.bac_h)}）。`,
+          );
+        }
+      }
+    }
+  }
+}
+
 // ── 每个 task 的 v2 字段 FMT ────────────────────────────────────────────────────────────────────────
 function lintTaskFields(id: string, t: TaskLike, validIds: Set<string>, emit: Emit): void {
   // FMT-EXECUTOR（hard·枚举5）
@@ -729,6 +788,14 @@ function lintTaskFields(id: string, t: TaskLike, validIds: Set<string>, emit: Em
     emit(
       'FMT-WIP',
       `${id}.wip_limit 是 ${JSON.stringify(t.wip_limit)}，非数字。影响：posttool-batch 两级 WIP 读它覆写 owner cap——非数字则该覆写静默失效（graceful）。`,
+      id,
+    );
+  }
+  // FMT-MODEL（warn·task.model 若存在须为 string）
+  if (t.model !== undefined && typeof t.model !== 'string') {
+    emit(
+      'FMT-MODEL',
+      `${id}.model 是 ${JSON.stringify(t.model)}，非字符串。影响：estimate 层 tier 分层校准读它——非 string 则降级忽略。`,
       id,
     );
   }

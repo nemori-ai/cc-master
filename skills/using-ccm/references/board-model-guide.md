@@ -76,6 +76,7 @@
 | `type` | 建 task 时 | 见下方 taskType 枚举说明 |
 | `output_schema` | 需约束结构化产出时（低频） | workflow 节点的产出契约 |
 | `dep_pins` | 钉依赖快照时（低频） | freshness / inputs_hash 用 |
+| `model` | 派发 / 完成时记录该 task 用的模型档 | `--set tasks[ID].model=<模型id>`（如 `claude-sonnet-4-5`，无具名 flag）；estimate 层按档分层校准读它（#34 档位成本效益），缺→无 tier 校准 |
 
 **taskType 枚举参考**（开放枚举，未知值 warn 不 fail）：
 
@@ -97,6 +98,8 @@
 | `scheduling.owner_wip_limit` | board 顶层 | `ccm board update --owner-wip N` | 每 owner 过调度软警告静默关闭 |
 | `watchdog` | board 顶层 | `ccm watchdog arm / disarm` | 无 watchdog 时 Stop hook 提醒你 arm |
 | `task.wip_limit` | task 级 | `ccm task add/update --wip-limit N` | 覆写 owner_wip_limit（per-owner cap） |
+
+**board 级 ✎ 字段（走专属 noun、不经 `--set`）：** `baseline`——EVM 计划基线（plan 基线 SSOT），用 `ccm baseline snapshot / show / reset` 维护；缺→无 EVM baseline，形状坏→`FMT-BASELINE` warn。命令详见 command-catalog 的 baseline namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-BASELINE`。
 
 > **不要把 observed 字段写进硬 waist。** 这三档的边界由 `ccm` 引擎 `@ccm/engine` 的 board-model 权威定义（`FIELDS` 元数据标注每字段的 tier）；改边界需走 PR + hook + 测试同步（红线 2）。
 
@@ -764,12 +767,14 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `FMT-REF-KIND` | warn | `references[].kind` 不在 refKind 枚举内（开放枚举） | kind ∈ {spec, plan, doc, web, code, issue, other}，未知值不致命 |
 | `FMT-BLOCKED-ON` | warn | `blocked_on` 既非 `"user"` 也非存在的 task id | `task block --on user` 或 `--on <存在的 taskid>`——见 [G 节](#g-blocked_on-怎么选) |
 | `FMT-WIP` | warn | task 级 `wip_limit` 非数字 | `--wip-limit N`（整数）；非数字会让 per-owner WIP 覆写静默失效 |
+| `FMT-MODEL` | warn | task `model` 存在却非字符串 | `--set tasks[ID].model=<模型id>`（如 `claude-sonnet-4-5`）；非 string → estimate 层 tier 分层校准降级忽略 |
 | `FMT-SCHEDULING` | warn | `scheduling.wip_limit` / `owner_wip_limit`（或旧板顶层 `wip_limit`）非数字 | `ccm board update --wip-limit N --owner-wip N`（整数）；非数字 → WIP 软警告静默关闭 |
 | `FMT-WATCHDOG` | warn | `watchdog.mechanism` 不在枚举内，或 `armed_at`/`fire_at` 非严格 ISO-8601 UTC | `ccm watchdog arm --mechanism <cron/loop/monitor/shell> --fire-at YYYY-MM-DDTHH:MM:SSZ`——见 [K 节](#k-watchdog何时-armwakeup-字段含义) |
 | `FMT-META` | warn | `meta.template_version` 非整数，或 `meta.created_at` 非 ISO-8601 UTC | meta 由 bootstrap 写，别手改；template_version 是整数 |
 | `FMT-LOG` | warn | `log` 非数组，或条目缺 `ts`/`summary`、`ts` 非 ISO、`kind` 不在枚举内 | `ccm log add "<summary>" --kind <enum>`；ts 自动盖严格 UTC，summary 非空 |
 | `FMT-JUDGMENT-CALLS` | warn | `judgment_calls` 非数组，或条目 `summary` 空、`category`/`severity`/`status` 不在各枚举内、时间戳非 ISO | 用 `ccm jc add/resolve` 而非手拼——见 [H 节](#h-judgment_calljc何时建severity-怎么定) |
 | `FMT-CADENCE` | warn | `cadence` 非对象，或 iteration 的 `id` 空、`status` 不在 {open,shipped}、时间非 ISO、`members` 非字符串数组 | 用 `ccm cadence update/open/ship`；deadline 严格 UTC——见 [I 节](#i-cadence-与-iteration节奏怎么定) |
+| `FMT-BASELINE` | warn | `baseline` 非对象，或 `captured_at`/`t0`/`history[].reset_at` 非严格 ISO-8601 UTC、`task_estimates`/`dag_snapshot` 非对象、`bac_h` 非数字、`history` 非数组 | 用 `ccm baseline snapshot/reset` 维护、别手拼；时间严格 UTC（estimate evm 读它，格式不对则 EVM 时间轴错位） |
 | `FMT-ESTIMATE` | warn | `estimate` 不是 `{value:number, unit:string}` 对象 | `--estimate 3h`（ccm 自动解析成对象），别手拼——见 [E 节](#e-estimate-怎么估) |
 | `FMT-ACCEPTANCE` | warn | `acceptance` 既非字符串也非对象，或对象 `criteria` 空、`criterion.status` 不在 {pending,met,failed} | `--accept "一句话"` 或 `--set-json acceptance={criteria:[...]}`——见 [D 节](#d-acceptance-怎么写好) |
 | `FMT-TIME` | warn | 时间锚（`created_at`/`started_at`/`finished_at`/`owner.heartbeat`）存在却非严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`） | 用 ccm verb 自动盖戳（盖标准格式）；手填时严格 UTC 定宽、无时区偏移、无毫秒 |

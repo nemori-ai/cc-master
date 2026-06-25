@@ -196,6 +196,15 @@ export const FIELDS = {
       when: '定节奏 / 开收 iteration',
       degrade: '缺→无 cadence 牙齿;iteration 形状坏→warn(FMT-CADENCE)',
     },
+    baseline: {
+      tier: '✎',
+      type: 'object{captured_at:ISO, t0:ISO, task_estimates:{<id>:{value:number,unit:string}}, dag_snapshot:{<id>:{deps:[]}}, bac_h:number, history:[{reset_at:ISO, note:string?, bac_h:number, task_estimates_snapshot:{}}]}?',
+      default: '缺省(无 baseline)',
+      readers: 'estimate evm / baseline show',
+      writers: 'baseline snapshot / reset',
+      when: 'EVM 基线拍摄时',
+      degrade: '缺→无 EVM baseline；形状坏→warn(FMT-BASELINE)',
+    },
   },
   task: {
     id: {
@@ -431,6 +440,15 @@ export const FIELDS = {
       writers: 'agent 经 CLI',
       when: '建 awaiting-user 节点时',
       degrade: 'awaiting-user 缺→hard(BIZ-AWAITING);字段不全→warn(BIZ-DECISION-PACKAGE)',
+    },
+    model: {
+      tier: '✎',
+      type: 'string?',
+      default: '缺省',
+      readers: 'estimate tier 分层校准 / #34 档位成本效益',
+      writers: 'agent 经 CLI(dispatch/done 时记录)',
+      when: '派发或完成时记录模型档',
+      degrade: '缺→无 tier 校准',
     },
   },
 } satisfies Record<string, Record<string, FieldMeta>>;
@@ -745,6 +763,20 @@ export const INVARIANTS: Invariant[] = [
     family: 'BIZ',
     scope: 'task',
     summary: 'status=done ⇒ verified ∧ artifact 非空(done 真语义·#32·P3·需 ADR)',
+  },
+  {
+    id: 'FMT-BASELINE',
+    level: 'warn',
+    family: 'FMT',
+    scope: 'board',
+    summary: 'baseline.captured_at/t0 须 ISO-8601 UTC、task_estimates/dag_snapshot 形状合法',
+  },
+  {
+    id: 'FMT-MODEL',
+    level: 'warn',
+    family: 'FMT',
+    scope: 'task',
+    summary: 'task.model 若存在须为 string',
   },
 ];
 
