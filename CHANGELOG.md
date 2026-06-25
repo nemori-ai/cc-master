@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **board-lock.js —— 轻量 advisory 文件锁** — board 写入并发保护（O_EXCL 原子抢占 + 简单 stale 偷锁 + Atomics.wait 同步等待），纯 stdlib、零 spawn，不重型。供未来统一 CLI 写入关卡用。
 - **ADR-013** —— board v2 完整数据模型 + 统一访问层（narrow-waist 演进：从「只钉一小撮」→「全建模 + 三档标注」，红线 2 真正保护的仍只是 🔒 子集）。
 - **`using-ccm` skill（第 4 个分发 skill·ADR-014 配套）** — `ccm` CLI 的操作手册：board 操作的机制层手册（board 状态机心智 / 三档字段操作规则 / footgun 速查 + 全量 `command-catalog`），与 A（编排决策）/ B（workflow 写法）/ C（号池机制）正交、互不重叠（红线 3 从「三个分发 skill」升「四个」）。补上 ADR-014 解耦后的缺口——机制层（hooks / skill 脚本 shell 调 `ccm`）已就位，但「指导 agent 怎么用 `ccm` 写 board」此前无 prose（`board.md` 还在教整文件 `Write`）。配套：① SKILL A 的 `board.md` + 主文件从「`Write` board + `ccm` 事后 lint」re-point 为「**`ccm` 命令为主写路径（写关卡）+ `ccm` 缺则 `Write` 降级**」；② AGENTS.md 新增「`ccm` ⟷ `using-ccm` 锁步」抗漂移硬约束（ccm 命令面改动必同 PR 同步 skill）+ `skill-lint.sh` check(4) 纳入 using-ccm。
+- **`slicing-goals-into-dags` skill（第 5 个分发 skill）** — 敏捷切 DAG 方法论:教 orchestrator 把目标 / epic **切**成 board DAG——纵切薄的端到端可 ship 增量、walking skeleton 最小共享脊椎（schema 随片增量生长）、粒度为并行 + 可验收而定、按价值 × 风险排序。**「切」先于 A 的「排」**（A 的 `decomposition.md` 是 CPM 排期），A 在分解点引用 E、两者互补不重叠（红线 3「四→五个分发 skill」）。直击两个 dogfood 痛点:开发节奏（价值早落地）+ 派发效率（拉满安全并行）。纪律 backstop「纵切不横切」由 pressure-baseline **RED** 撑腰（受试 agent 三压下默认按技术层横切、逐字"schema 要一次定干净不然 API 返工"、自承造成 serial 瓶颈 + 价值堆到最后）。
 
 ### Changed
 
