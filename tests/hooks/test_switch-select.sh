@@ -2049,6 +2049,52 @@ cred34b_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write
 assert_eq "$FRESH_AT" "$cred34b_at" "(34b) fail-open: credentials.json overwritten with FRESH token (坏 JSON 不误拦换号)"
 rm -rf "$FX34" "$EMPTY34" "$CCM34B"
 
+# ── (35-snap-degrade) cc-usage.sh 不存在（CLAUDE_PLUGIN_ROOT 无 cc-usage）→ 换号仍完成·snapshot 干净跳过 ──
+# 场景：用户未安装 orchestrating-to-completion skill（或 CLAUDE_PLUGIN_ROOT 路径无对应 cc-usage.sh）→ CC_USAGE_SH
+#   解析到一个不存在的文件 → switch-account.sh record_switch_out() 内 [ -f "$CC_USAGE_SH" ] 为假 → usage_json=""
+#   → node 块走「used_pct undefined → 跳过本次切出配额快照」路径。换号核心（三存储覆写 + active 翻转）独立、不受影响。
+# teeth：① switch exits 0；② active 翻转正确（alice=true·bob=false）；③ bob.last_switch_out NOT written；
+#         ④ 无 stack trace；⑤ no token leak。
+echo "-- (35-snap-degrade) cc-usage.sh absent in CLAUDE_PLUGIN_ROOT → switch exits 0, snapshot cleanly skipped --"
+FX35="$(make_fixture)"; REG35="$FX35/accounts.json"; VFILE35="$FX35/accounts.env"
+CRED35="$FX35/credentials.json"; CJSON35="$FX35/claude.json"
+cat > "$REG35" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE35","key":"alice@x.com"}, "active": false, "last_switch_out": null }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE35"; chmod 600 "$VFILE35"
+cat > "$CRED35" <<'JSON'
+{"claudeAiOauth":{"accessToken":"sk-ant-oat01-OLD35000000000000000000000-_o","refreshToken":"sk-ant-ort01-OLD35r00000000000000000-_o","expiresAt":1700000000000}}
+JSON
+printf '{}' > "$CJSON35"
+# stub plugin root that does NOT have cc-usage.sh in the orch scripts dir → file-not-found path
+STUB_ROOT35="$(make_project)"
+mkdir -p "$STUB_ROOT35/skills/account-management/scripts" "$STUB_ROOT35/skills/orchestrating-to-completion/scripts"
+ln -s "$PLUGIN_ROOT/skills/account-management/scripts/switch-account.sh" "$STUB_ROOT35/skills/account-management/scripts/switch-account.sh"
+ln -s "$PLUGIN_ROOT/skills/account-management/scripts/accounts-lib.js"   "$STUB_ROOT35/skills/account-management/scripts/accounts-lib.js"
+ln -s "$PLUGIN_ROOT/skills/account-management/scripts/select-account.js" "$STUB_ROOT35/skills/account-management/scripts/select-account.js"
+# intentionally do NOT create cc-usage.sh in STUB_ROOT35/skills/orchestrating-to-completion/scripts/
+PORT35="$FX35/url.txt"; start_refresh_endpoint ok "$PORT35"; RURL35="$(cat "$PORT35")"
+out35="$(PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$STUB_ROOT35" REFRESH_TOKEN_URL="$RURL35" CRED_PATH="$CRED35" CLAUDE_JSON_PATH="$CJSON35" \
+        bash "$STUB_ROOT35/skills/account-management/scripts/switch-account.sh" --registry "$REG35" --email "alice@x.com" --now "2026-06-17T09:00:00Z" 2>&1)"; rc35=$?
+assert_eq "0" "$rc35" "(35-snap-degrade) cc-usage.sh absent → switch STILL exits 0 (graceful degradation, not blocked)"
+assert_contains "$out35" "无重启换号完成" "(35-snap-degrade) 换号核心完成 even without cc-usage"
+# active must flip correctly
+alice35="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["alice@x.com"].active))' "$LIB_JS" "$REG35" 2>/dev/null)"
+bob35="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["bob@y.com"].active))' "$LIB_JS" "$REG35" 2>/dev/null)"
+assert_eq "true"  "$alice35" "(35-snap-degrade) setActive flipped alice → active=true (snapshot skip never blocked core switch)"
+assert_eq "false" "$bob35"   "(35-snap-degrade) setActive flipped bob → active=false (independent setActive unaffected)"
+# bob.last_switch_out must NOT be written (no cc-usage signal → clean skip)
+bob35_lso="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(r.accounts["bob@y.com"].last_switch_out?"SET":"null")' "$LIB_JS" "$REG35" 2>/dev/null)"
+assert_eq "null" "$bob35_lso" "(35-snap-degrade) bob.last_switch_out NOT written when cc-usage absent (clean skip·no pollution)"
+assert_not_contains "$out35" "    at " "(35-snap-degrade) NO node stack-trace frame leaks on cc-usage-absent path"
+assert_not_contains "$out35" "$ALICE_RT" "(35-snap-degrade) alice refresh token does NOT leak in output"
+for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
+rm -rf "$FX35" "$STUB_ROOT35"
+
 # kill any lingering stub endpoints.
 for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
 rm -rf "$SECSTUB" "$SECSTUB_CAPTURE" "$SECSTUB_FAIL" "$FX1" "$FX1B" "$FX2" "$FX3" "$FX4" "$FX5" "$STUB_ROOT5" "$FX5D" "$FX5E" "$FX6" "$FX8" "$FX9" "$STUB_ROOT9" "$FX10" "$FX11" "$FX11B" "$STUB_ROOT11B" "$FX15" "$STUB_ROOT15" "$FX16"

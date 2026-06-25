@@ -982,4 +982,36 @@ if [ -f "$P2_VF" ] && grep -q '_TOKEN=' "$P2_VF" 2>/dev/null; then FAILED=$((FAI
 assert_not_contains "$p2_out" "$FAKE_RT" "(13b) keychain blob refresh token does NOT leak on the declined-bypass path"
 rm -rf "$P_HOME" "$P_STUB" "$P2_HOME" "$P2_STUB"
 
+# ── (14-snap-degrade) CC_USAGE_SH 缺失 → 录号 add 仍完成（exit 0）、last_observed_quota 不写、不阻断 ─────────
+# 病根场景：用户未安装 orchestrating-to-completion skill（cc-usage.sh 不在约定路径）→ CC_USAGE_SH 解析到一个
+#   不存在的文件。write_observed_quota() 应在 [ ! -f "$CC_USAGE_SH" ] 时 err 一行提示、return 0——录号核心不受
+#   影响。teeth：① add exits 0；② last_observed_quota 字段不写入 registry（NONE）；③ vault file 正常写；
+#   ④ registry active:true；⑤ no token leak。
+echo "-- (14-snap-degrade) CC_USAGE_SH missing → add exits 0, last_observed_quota skipped, no block --"
+SD_HOME="$(make_project)"; SD_STUB="$(make_project)"
+SD_AT='sk-ant-oat01-SNAPdegrade0000000000000000000000000-_sd'
+SD_RT='sk-ant-ort01-SNAPdegradR0000000000000000000000000-_sd'
+SD_BLOB="{\"claudeAiOauth\":{\"accessToken\":\"$SD_AT\",\"refreshToken\":\"$SD_RT\",\"expiresAt\":1750000000000,\"scopes\":[\"user:inference\"],\"subscriptionType\":\"max\"}}"
+make_security_stub "$SD_STUB" "$SD_BLOB"
+SD_CJ="$SD_STUB/claude.json"; make_claudejson "$SD_CJ" "snap@degrade.com"
+SD_VF="$SD_HOME/accounts.env"
+# CC_USAGE_SH points to a file that does NOT exist → write_observed_quota graceful skip
+SD_MISSING_CCU="$SD_HOME/does-not-exist-cc-usage.sh"
+sd_out="$(CC_MASTER_HOME="$SD_HOME" PATH="$SD_STUB:$PATH" CC_USAGE_SH="$SD_MISSING_CCU" CLAUDE_JSON_PATH="$SD_CJ" \
+   bash "$SCRIPT" --email snap@degrade.com --vault-kind file --vault-file "$SD_VF" --expires 2027-12-31 2>&1)"; sd_rc=$?
+assert_eq "0" "$sd_rc" "(14-snap-degrade) CC_USAGE_SH missing → add STILL exits 0 (graceful degradation, not blocked)"
+assert_file "$SD_VF" "(14-snap-degrade) vault file still created (add core path unaffected)"
+SD_REG="$SD_HOME/accounts.json"
+assert_eq "true" "$(reg_active "$SD_REG" "snap@degrade.com")" "(14-snap-degrade) registry entry active:true (add succeeded despite no cc-usage)"
+# last_observed_quota must NOT be written (no signal → skip)
+sd_loq="$(node -e 'const e=(require(process.argv[1]).loadRegistry(process.argv[2]).accounts||{})["snap@degrade.com"]||{};process.stdout.write(e.last_observed_quota?"SET":"NONE")' "$LIB_JS_REAL" "$SD_REG" 2>/dev/null)"
+assert_eq "NONE" "$sd_loq" "(14-snap-degrade) last_observed_quota NOT written when CC_USAGE_SH missing (clean skip)"
+# token no-leak
+assert_not_contains "$sd_out" "$SD_AT" "(14-snap-degrade) access token does NOT leak to stdout/stderr"
+assert_not_contains "$sd_out" "$SD_RT" "(14-snap-degrade) refresh token does NOT leak to stdout/stderr"
+if grep -q 'sk-ant-' "$SD_REG" 2>/dev/null; then
+  FAILED=$((FAILED+1)); _red "FAIL: (14-snap-degrade) registry contains an sk-ant- token string (must be token-free!)"
+else PASS=$((PASS+1)); _green "(14-snap-degrade) OK: registry is token-free (no sk-ant- string)"; fi
+rm -rf "$SD_HOME" "$SD_STUB"
+
 finish

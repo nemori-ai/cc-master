@@ -13,6 +13,7 @@
 - [source 信任分级（最大精度风险）](#source-信任分级最大精度风险)
 - [边界处理](#边界处理)
 - [落点纪律（红线 1）](#落点纪律红线-1)
+- [per-account 配额快照（录号 / 切出时采集）](#per-account-配额快照录号--切出时采集)
 
 ## 目标
 
@@ -96,3 +97,32 @@
 ## 落点纪律（红线 1）
 
 选号算法是 `switch-account.sh` 切号前调用的逻辑——它**不进 hook**，是带外脚本（node·ADR-006 允许）。hook 注入号池信息时只注「号池有 N 个可用备号」这类**粗粒度事实**，**绝不在 hook 里跑完整选号**（避免把调度逻辑塞进 hook + 红线 1 风险 + 复杂度）。
+
+## per-account 配额快照（录号 / 切出时采集）
+
+选号算法（`${CLAUDE_SKILL_DIR}/scripts/select-account.js`）核心依赖的是 `last_switch_out` 快照——但备号在**首次切出之前**没有该字段（`null`），只能被当满血处理（`SCORE_FRESH_FULL` 最优先）。为让刚录入的备号也有配额参考信号，系统在两个时机写入快照：
+
+### 采集时机
+
+| 字段 | 采集时机 | 信号来源 | 信任度 |
+|---|---|---|---|
+| `last_observed_quota` | 录号（add / refresh）成功后 | `cc-usage.sh`（当前 session 的号·非被录号视角） | 弱信号（录的就是当前 session 号时才准） |
+| `last_switch_out` | 切出该号之前（换号主流程·setActive 之前） | `cc-usage.sh`（当前号切出前的最新配额） | 高信任（该号最后一次活跃时的真实配额） |
+
+`switch_history[]` 是 `last_switch_out` 的追加历史，每次切出都 append 一条——不覆盖、只追加（复盘 / 审计用）。
+
+### 实现落点
+
+- **`${CLAUDE_SKILL_DIR}/scripts/accounts-lib.js`**：`recordObservedQuota(reg, email, snap)` 写 `last_observed_quota`（不 append history）；`recordSwitchOut(reg, email, snap)` 写 `last_switch_out` + append `switch_history`。两者均通过 `mutateRegistry` 在锁内 RMW，防并发 lost-update。
+- **`${CLAUDE_SKILL_DIR}/scripts/account-add.sh`**：`write_observed_quota()` 在 registry entry 写成后（best-effort）后台跑 `cc-usage.sh`（有 `CC_USAGE_TIMEOUT_S` 上限，默认 60s），解析结果调 `recordObservedQuota`。
+- **`${CLAUDE_SKILL_DIR}/scripts/switch-account.sh`**：`record_switch_out()` 在 `set_active_in()` 之后（切入号 active 已翻转）后台跑 `cc-usage.sh`，解析结果调 `recordSwitchOut`。
+
+### 优雅降级（best-effort·绝不阻断主流程）
+
+- `cc-usage.sh` 缺失 / 超时 / 无输出 → **跳过快照**，打一行 `err` 提示，`return 0`，主流程继续。
+- `cc-usage.sh` 降级（`source=local-derived-approx`，无有效 `used_percentage`）→ `used_pct` 为 `undefined`，validate 拒写（非 0-100 整数），干净跳过（不 throw stack trace）。
+- registry entry 不存在（极端竞争）→ 跳过（不是错误）。
+
+### 安全命门（HARD）
+
+快照只含**非密**字段：`used_pct`（整数）/ `resets_at`（ISO 时间串）/ `source`（字符串枚举）/ `at`（ISO 时间串）。`saveRegistry` 写前过 `validateRegistry`，任何疑似 `sk-ant-` token 值 → 硬 error 拒写。token 那一坨全程只活在 vault（keychain / file）——绝不进 `accounts.json`。
