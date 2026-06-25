@@ -318,11 +318,43 @@ test('board graph --json（真二进制）→ impact / rollup / nesting advisory
   const { home } = mkHome();
   seedBoard(home, {
     tasks: [
-      { id: 'T1', status: 'ready', type: 'development', deps: [], created_at: '2026-06-24T08:00:00Z' },
-      { id: 'T2', status: 'blocked', type: 'development', deps: ['T1'], created_at: '2026-06-24T08:00:00Z' },
-      { id: 'M1', status: 'done', type: 'development', deps: [], created_at: '2026-06-24T08:00:00Z' },
-      { id: 'M1.a', status: 'done', type: 'development', parent: 'M1', deps: [], created_at: '2026-06-24T08:00:00Z' },
-      { id: 'M1.b', status: 'in_flight', type: 'development', parent: 'M1', deps: [], created_at: '2026-06-24T08:00:00Z' },
+      {
+        id: 'T1',
+        status: 'ready',
+        type: 'development',
+        deps: [],
+        created_at: '2026-06-24T08:00:00Z',
+      },
+      {
+        id: 'T2',
+        status: 'blocked',
+        type: 'development',
+        deps: ['T1'],
+        created_at: '2026-06-24T08:00:00Z',
+      },
+      {
+        id: 'M1',
+        status: 'done',
+        type: 'development',
+        deps: [],
+        created_at: '2026-06-24T08:00:00Z',
+      },
+      {
+        id: 'M1.a',
+        status: 'done',
+        type: 'development',
+        parent: 'M1',
+        deps: [],
+        created_at: '2026-06-24T08:00:00Z',
+      },
+      {
+        id: 'M1.b',
+        status: 'in_flight',
+        type: 'development',
+        parent: 'M1',
+        deps: [],
+        created_at: '2026-06-24T08:00:00Z',
+      },
     ],
   });
   const r = runCcm(['board', 'graph', '--json'], { home });

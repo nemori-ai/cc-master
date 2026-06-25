@@ -79,9 +79,7 @@ export function lint(ctx: Ctx): number {
   //   `ccm board lint --raw --json` 拿到 violations（判有无 findings）+ report（直接注入 agent 的文本）。
   //   人读模式 renderLintReport 自渲染（不需 report 参数·formatReport 只在 json 路径折入）。
   const report = ctx.flags.json ? formatReport(res) : undefined;
-  ctx.out(
-    render.renderLintReport(res, { json: !!ctx.flags.json, color: ctx.flags.color, report }),
-  );
+  ctx.out(render.renderLintReport(res, { json: !!ctx.flags.json, color: ctx.flags.color, report }));
   return Array.isArray(res.errors) && res.errors.length > 0 ? EXIT.VALIDATION : EXIT.OK;
 }
 

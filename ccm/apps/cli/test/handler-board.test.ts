@@ -341,7 +341,11 @@ test('board graph --json exposes impact / rollup / nesting advisory', () => {
   // impact：T1 的传递后代含 T2。
   assert.ok(d.impact && d.impact.T1, 'impact 含 T1');
   assert.ok(d.impact.T1.descendants.includes('T2'), 'T1 → T2');
-  assert.equal(d.impact.T1.count, d.impact.T1.descendants.length, 'impact count = descendants.length');
+  assert.equal(
+    d.impact.T1.count,
+    d.impact.T1.descendants.length,
+    'impact count = descendants.length',
+  );
   // rollup：M1 是 owner（{done:1,total:2,children:[M1.a,M1.b]}）+ inconsistencies 含 M1。
   assert.ok(d.rollup && d.rollup.owners && d.rollup.owners.M1, 'rollup.owners 含 M1');
   assert.equal(d.rollup.owners.M1.total, 2);
