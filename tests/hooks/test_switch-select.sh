@@ -1801,6 +1801,93 @@ cred30_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(
 assert_eq "$FRESH_AT" "$cred30_at" "(30) RC-P3: ① credentials.json stays FRESH (forward-align committed stores NOT rolled back·even when switch-in not in registry)"
 rm -rf "$FX30" "$SECSTUB_SLOW30"
 
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (31) **切出 token 抢救 happy-path（Finding #72·补 vault↔官方存储单向失同步）**.
+#      切入 alice 时，覆写官方存储【之前】把官方存储当前 blob（属切出号 bob·被 claude 自主 refresh 更新到最新·含
+#      已轮转的新 refreshToken）读出 → 身份 guard 过（~/.claude.json oauthAccount.emailAddress == bob）→ token-blind
+#      回写 bob 的 file vault。断言：bob vault 的 _TOKEN 行从 STALE 刷新成官方存储里的 FRESH refreshToken（修前 bob
+#      vault 停在切入那刻旧值·下次切回 refresh 失败成死号）。stub security no-op → read_official_blob 走 CRED_PATH fallback。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+BOB_OFFICIAL_AT='sk-ant-oat01-BOBofficialFRESHaccess0000000000000bbbbbb-_bof'
+BOB_OFFICIAL_RT='sk-ant-ort01-BOBofficialFRESHrefresh000000000000bbbbbb-_bof'
+BOB_STALE_RT='sk-ant-ort01-BOBstaleVAULTrefresh00000000000000bbbbbb-_bst'
+FX31="$(make_fixture)"; REG31="$FX31/accounts.json"
+VFILE_BOB31="$FX31/accounts-bob.env"; VFILE_ALICE31="$FX31/accounts-alice.env"
+CRED31="$FX31/credentials.json"; CJSON31="$FX31/claude.json"
+cat > "$REG31" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"file","path":"$VFILE_BOB31","key":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE_ALICE31","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"new@y.com","accountUuid":"uuid-new","subscriptionType":"max"} }
+} }
+JSON
+umask 077
+# bob vault: STALE token line（其 refreshToken 早被服务端轮转吊销·这是 Finding #72 病根状态）。
+printf 'bob@y.com_TOKEN=%s\n' "{\"accessToken\":\"sk-ant-oat01-BOBstaleACCESS00000000000000000-_bs\",\"refreshToken\":\"$BOB_STALE_RT\",\"expiresAt\":1600000000000,\"subscriptionType\":\"max\"}" > "$VFILE_BOB31"; chmod 600 "$VFILE_BOB31"
+# alice vault: 完整 blob（供 refresh + 切入）。
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE_ALICE31"; chmod 600 "$VFILE_ALICE31"
+# 官方存储（credentials.json）= 切出号 bob 被 claude 自主 refresh 更新到最新的 blob（含已轮转的新 refreshToken）。
+cat > "$CRED31" <<JSON
+{"claudeAiOauth":{"accessToken":"$BOB_OFFICIAL_AT","refreshToken":"$BOB_OFFICIAL_RT","expiresAt":1700000000000,"subscriptionType":"max"},"keepKey":"k"}
+JSON
+# ~/.claude.json oauthAccount.emailAddress = bob（身份 guard：官方存储当前确属切出号 bob）。
+cat > "$CJSON31" <<'JSON'
+{"oauthAccount":{"emailAddress":"bob@y.com","subscriptionType":"max"},"numStartups":1,"theme":"dark"}
+JSON
+PORT31="$FX31/url.txt"; start_refresh_endpoint ok "$PORT31"; RURL31="$(cat "$PORT31")"
+out31="$(PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL31" CRED_PATH="$CRED31" CLAUDE_JSON_PATH="$CJSON31" \
+        bash "$SCRIPT" --registry "$REG31" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc31=$?
+assert_eq "0" "$rc31" "(31) switch with switch-out rescue exits 0"
+# CORE: bob vault 的 _TOKEN 行被刷新成官方存储里的 FRESH refreshToken（抢救生效）。
+if grep -q "$BOB_OFFICIAL_RT" "$VFILE_BOB31" 2>/dev/null; then PASS=$((PASS+1)); _green "(31) rescue: bob vault refreshed to官方存储's FRESH refreshToken (Finding #72 反向回流闭环)"; else FAILED=$((FAILED+1)); _red "FAIL: (31) rescue did NOT writeback official blob to bob vault (vault tail: $(tr -d '\n' < "$VFILE_BOB31" 2>/dev/null | tail -c 80))"; fi
+# STALE token 行已被替换（不再残留旧 refreshToken·只删 _TOKEN 行重写）。
+if grep -q "$BOB_STALE_RT" "$VFILE_BOB31" 2>/dev/null; then FAILED=$((FAILED+1)); _red "FAIL: (31) bob vault still carries STALE refreshToken (old _TOKEN line not replaced)"; else PASS=$((PASS+1)); _green "(31) rescue: bob vault STALE refreshToken replaced (no stale残留)"; fi
+# 恰一条 bob _TOKEN 行（无重复）。
+n31_tok="$(grep -c '^bob@y.com_TOKEN=' "$VFILE_BOB31" 2>/dev/null)"
+assert_eq "1" "$n31_tok" "(31) rescue: exactly one bob _TOKEN line after writeback (old replaced, no dup)"
+# 抢救成功消息透传（非密·无 token）。
+assert_contains "$out31" "回写切出号（bob@y.com）vault" "(31) rescue: success message surfaced (反向回流 done)"
+# token no-leak：官方/陈旧 refresh token 绝不出现在脚本输出（只该进 vault 文件·不进 stdout/stderr）。
+assert_not_contains "$out31" "$BOB_OFFICIAL_RT" "(31) rescue: official refresh token does NOT leak in switch output"
+assert_not_contains "$out31" "$BOB_STALE_RT"    "(31) rescue: stale refresh token does NOT leak in switch output"
+for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
+rm -rf "$FX31"
+
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (31b) **切出 token 抢救 身份 guard（防 mislabel·安全关键）**.
+#       同 (31)，但 ~/.claude.json oauthAccount.emailAddress = mallory（≠ 切出号 bob）——官方存储当前不是 bob（用户
+#       手动 /login 切过？）→ 身份 guard 必须拒绝、绝不把这份 token 写进 bob vault（否则污染号池）。断言：bob vault
+#       保持 STALE 不变 + 抢救跳过消息透传。换号本身照常成功（best-effort·绝不阻断）。
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+FX31B="$(make_fixture)"; REG31B="$FX31B/accounts.json"
+VFILE_BOB31B="$FX31B/accounts-bob.env"; VFILE_ALICE31B="$FX31B/accounts-alice.env"
+CRED31B="$FX31B/credentials.json"; CJSON31B="$FX31B/claude.json"
+cat > "$REG31B" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"file","path":"$VFILE_BOB31B","key":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE_ALICE31B","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"new@y.com","accountUuid":"uuid-new","subscriptionType":"max"} }
+} }
+JSON
+umask 077
+printf 'bob@y.com_TOKEN=%s\n' "{\"accessToken\":\"sk-ant-oat01-BOBstaleACCESS00000000000000000-_bs\",\"refreshToken\":\"$BOB_STALE_RT\",\"expiresAt\":1600000000000,\"subscriptionType\":\"max\"}" > "$VFILE_BOB31B"; chmod 600 "$VFILE_BOB31B"
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE_ALICE31B"; chmod 600 "$VFILE_ALICE31B"
+cat > "$CRED31B" <<JSON
+{"claudeAiOauth":{"accessToken":"$BOB_OFFICIAL_AT","refreshToken":"$BOB_OFFICIAL_RT","expiresAt":1700000000000,"subscriptionType":"max"}}
+JSON
+# 身份不匹配：官方存储 oauthAccount 标的是 mallory，不是切出号 bob → guard 拒绝。
+cat > "$CJSON31B" <<'JSON'
+{"oauthAccount":{"emailAddress":"mallory@evil.com","subscriptionType":"max"},"numStartups":1}
+JSON
+PORT31B="$FX31B/url.txt"; start_refresh_endpoint ok "$PORT31B"; RURL31B="$(cat "$PORT31B")"
+out31b="$(PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL31B" CRED_PATH="$CRED31B" CLAUDE_JSON_PATH="$CJSON31B" \
+         bash "$SCRIPT" --registry "$REG31B" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc31b=$?
+assert_eq "0" "$rc31b" "(31b) switch still exits 0 (rescue skip never blocks switch·best-effort)"
+# CORE: 身份不匹配 → bob vault 绝不被写入官方 token（保持 STALE·防 mislabel 污染号池）。
+if grep -q "$BOB_OFFICIAL_RT" "$VFILE_BOB31B" 2>/dev/null; then FAILED=$((FAILED+1)); _red "FAIL: (31b) identity guard BREACHED — official token written to bob vault despite oauthAccount≠bob (号池污染)"; else PASS=$((PASS+1)); _green "(31b) identity guard: official token NOT written to bob vault when oauthAccount≠切出号 (防 mislabel)"; fi
+if grep -q "$BOB_STALE_RT" "$VFILE_BOB31B" 2>/dev/null; then PASS=$((PASS+1)); _green "(31b) identity guard: bob vault stays STALE unchanged (rescue correctly skipped)"; else FAILED=$((FAILED+1)); _red "FAIL: (31b) bob vault STALE line unexpectedly altered"; fi
+assert_contains "$out31b" "≠ 切出号" "(31b) identity guard: skip message surfaced (官方存储身份≠切出号)"
+for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
+rm -rf "$FX31B"
+
 # kill any lingering stub endpoints.
 for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
 rm -rf "$SECSTUB" "$SECSTUB_CAPTURE" "$SECSTUB_FAIL" "$FX1" "$FX1B" "$FX2" "$FX3" "$FX4" "$FX5" "$STUB_ROOT5" "$FX5D" "$FX5E" "$FX6" "$FX8" "$FX9" "$STUB_ROOT9" "$FX10" "$FX11" "$FX11B" "$STUB_ROOT11B" "$FX15" "$STUB_ROOT15" "$FX16"
