@@ -656,6 +656,41 @@ export const REGISTRY: Registry = {
       handler: 'baseline.reset',
     },
   },
+
+  // ════════════════════ policy ══════════════════════════════════════════════════════════════════════
+  policy: {
+    show: {
+      summary: '只读 board.policy + effective 有效值（缺省 autonomous_account_switch=allow）',
+      read: true,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm policy show', 'ccm policy show --json'],
+      handler: 'policy.show',
+    },
+    set: {
+      summary:
+        '设 board.policy.autonomous_account_switch（allow|deny）；非 TTY 须 --user-authorized',
+      read: false,
+      positionals: [],
+      options: {
+        'autonomous-account-switch': {
+          type: 'string',
+          enum: E.accountSwitchPolicy,
+          required: true,
+          desc: 'allow（允许自主换号）| deny（禁止自主换号）',
+        },
+        'user-authorized': { type: 'boolean', desc: '非 TTY 时显式授权（破坏性授权操作）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm policy show',
+        'ccm policy set --autonomous-account-switch=deny --user-authorized',
+      ],
+      handler: 'policy.set',
+    },
+  },
 };
 
 // ── ALIASES：热路径顶层捷径（cli-design §3.4·只给最高频两个）。alias → [noun, verb]。──────────────

@@ -56,6 +56,8 @@ export const ENUMS = {
   iterationStatus: ['open', 'shipped'],
   // watchdog 自我唤醒机制（ADR-011 降级链）。
   watchdogMechanism: ['cron', 'loop', 'monitor', 'shell'],
+  // accountSwitchPolicy：board.policy.autonomous_account_switch 合法值（闭合枚举）。
+  accountSwitchPolicy: ['allow', 'deny'],
   // acceptance 目标函数 criterion 的 kind / status（spec §4.1）。
   acceptanceKind: ['test', 'metric', 'manual', 'review'],
   acceptanceStatus: ['pending', 'met', 'failed'],
@@ -204,6 +206,15 @@ export const FIELDS = {
       writers: 'baseline snapshot / reset',
       when: 'EVM 基线拍摄时',
       degrade: '缺→无 EVM baseline；形状坏→warn(FMT-BASELINE)',
+    },
+    policy: {
+      tier: '✎',
+      type: 'object{autonomous_account_switch:allow|deny}?',
+      default: '缺省(=allow·向后兼容)',
+      readers: 'switch-account.sh 机制硬闸 / SKILL A 建议层 / policy show',
+      writers: 'policy set',
+      when: '用户锁/放开自主权限时',
+      degrade: '缺→解析为 allow；形状坏→warn(FMT-POLICY)',
     },
   },
   task: {
@@ -770,6 +781,13 @@ export const INVARIANTS: Invariant[] = [
     family: 'FMT',
     scope: 'board',
     summary: 'baseline.captured_at/t0 须 ISO-8601 UTC、task_estimates/dag_snapshot 形状合法',
+  },
+  {
+    id: 'FMT-POLICY',
+    level: 'warn',
+    family: 'FMT',
+    scope: 'board',
+    summary: 'policy 非对象、或 autonomous_account_switch 不在 {allow,deny} 枚举',
   },
   {
     id: 'FMT-MODEL',

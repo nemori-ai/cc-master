@@ -182,6 +182,7 @@ export function lintBoard(text: string): LintResult {
   lintJudgmentCalls(b, emit);
   lintCadenceFormat(b, emit);
   lintBaseline(b, emit);
+  lintPolicy(b, emit);
 
   // FMT-TASKS（数组）——非数组无从遍历，板级检查已做，提前返回。
   const tasks = b.tasks;
@@ -654,6 +655,29 @@ function lintBaseline(board: BoardLike, emit: Emit): void {
         }
       }
     }
+  }
+}
+
+// FMT-POLICY：policy 对象形状（present 才校验）
+function lintPolicy(board: BoardLike, emit: Emit): void {
+  const pl = board.policy;
+  if (pl === undefined || pl === null) return;
+  if (typeof pl !== 'object' || Array.isArray(pl)) {
+    emit(
+      'FMT-POLICY',
+      `policy 若存在必须是对象（当前：${JSON.stringify(pl)}）。影响：switch-account.sh 机制硬闸读 policy.autonomous_account_switch——非对象则读不出、硬闸解析退化为 allow。`,
+    );
+    return;
+  }
+  const p = pl as Record<string, unknown>;
+  if (
+    p.autonomous_account_switch !== undefined &&
+    !isEnumMember('accountSwitchPolicy', p.autonomous_account_switch)
+  ) {
+    emit(
+      'FMT-POLICY',
+      `policy.autonomous_account_switch 是 ${JSON.stringify(p.autonomous_account_switch)}，应 ∈ {allow, deny}。影响：硬闸只认这两个值——未知值则开关判定失效。`,
+    );
   }
 }
 

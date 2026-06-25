@@ -17,7 +17,7 @@ import { ALIASES, REGISTRY, WRITABLE_FIELDS_COVERED } from '../src/registry.js';
 
 const model = { ENUMS, FIELDS, TIERS };
 
-// ── 覆盖全部 7 namespace 的全部 verb（cli-design §3）──────────────────────────────────────────────
+// ── 覆盖全部 8 namespace 的全部 verb（cli-design §3）──────────────────────────────────────────────
 const EXPECTED: Record<string, string[]> = {
   board: ['show', 'lint', 'graph', 'critical-path', 'next', 'init', 'update'],
   baseline: ['snapshot', 'show', 'reset'],
@@ -26,9 +26,10 @@ const EXPECTED: Record<string, string[]> = {
   jc: ['add', 'list', 'show', 'resolve'],
   cadence: ['update', 'open', 'ship', 'status'],
   watchdog: ['arm', 'disarm', 'status'],
+  policy: ['show', 'set'],
 };
 
-test('REGISTRY covers all 7 namespaces with all their verbs', () => {
+test('REGISTRY covers all 8 namespaces with all their verbs', () => {
   assert.deepEqual(Object.keys(REGISTRY).sort(), Object.keys(EXPECTED).sort());
   for (const noun of Object.keys(EXPECTED)) {
     assert.deepEqual(
@@ -150,6 +151,7 @@ const EXEMPT: Record<string, Set<string>> = {
     'git',
     'scheduling',
     'baseline',
+    'policy',
   ]),
   task: new Set([
     'id', // 经 `task add <id>` 的 positional 写入（🔒·非 flag·绝不 --set）

@@ -32,6 +32,7 @@ import * as boardHandler from './handlers/board.js';
 import * as cadenceHandler from './handlers/cadence.js';
 import * as jcHandler from './handlers/jc.js';
 import * as logHandler from './handlers/log.js';
+import * as policyHandler from './handlers/policy.js';
 import * as taskHandler from './handlers/task.js';
 import * as watchdogHandler from './handlers/watchdog.js';
 import * as help from './help.js';
@@ -70,6 +71,7 @@ const HANDLERS: Record<string, HandlerModule> = {
   cadence: cadenceHandler as unknown as HandlerModule,
   watchdog: watchdogHandler as unknown as HandlerModule,
   baseline: baselineHandler as unknown as HandlerModule,
+  policy: policyHandler as unknown as HandlerModule,
 };
 
 // node util.parseArgs 的 options 形态（带 short / multiple）——router 自有，独立于 registry 的 OptionSpec。
