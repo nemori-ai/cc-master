@@ -1,0 +1,137 @@
+{
+  "schema": "cc-master/v2",
+  "meta": { "template_version": 3, "created_at": "2026-05-16T10:00:00Z" },
+  "goal": "web-dashboard 加实时图表组件 + 可配置看板",
+  "owner": {
+    "active": false,
+    "session_id": "sid-dash-charts-2026-05",
+    "heartbeat": "2026-05-18T15:40:00Z"
+  },
+  "git": { "worktree": "/work/web-dashboard", "branch": "feat/realtime-charts" },
+  "scheduling": { "wip_limit": 2 },
+  "tasks": [
+    {
+      "id": "D1",
+      "title": "图表组件 API 设计 + 数据契约",
+      "status": "done",
+      "deps": [],
+      "type": "design",
+      "executor": "master-orchestrator",
+      "model": "claude-sonnet-4-5",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "组件 props 契约 + 数据流图评审过",
+      "created_at": "2026-05-16T10:00:00Z",
+      "started_at": "2026-05-16T10:10:00Z",
+      "finished_at": "2026-05-16T12:05:00Z",
+      "verified": true,
+      "artifact": "/work/web-dashboard/docs/chart-api.md",
+      "observability": { "tokens": { "input": 34000, "output": 8200 } }
+    },
+    {
+      "id": "D2",
+      "title": "折线/柱状图基础组件 + 自适应",
+      "status": "done",
+      "deps": ["D1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-dash-d2",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 4, "unit": "h" },
+      "acceptance": "组件渲染 + 自适应 + 快照测试绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/web-dashboard/docs/chart-api.md" },
+        { "kind": "plan", "ref": "/work/web-dashboard/docs/plan-charts.md" }
+      ],
+      "created_at": "2026-05-16T11:00:00Z",
+      "started_at": "2026-05-16T13:00:00Z",
+      "finished_at": "2026-05-16T17:10:00Z",
+      "verified": true,
+      "artifact": "/work/web-dashboard/src/charts/Line.tsx",
+      "observability": { "tokens": { "input": 96000, "output": 28000 } }
+    },
+    {
+      "id": "D3",
+      "title": "WebSocket 实时数据订阅 hook",
+      "status": "done",
+      "deps": ["D1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-dash-d3",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "断线重连 + 背压 + 单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/web-dashboard/docs/chart-api.md" },
+        { "kind": "plan", "ref": "/work/web-dashboard/docs/plan-charts.md" }
+      ],
+      "created_at": "2026-05-16T11:00:00Z",
+      "started_at": "2026-05-17T09:00:00Z",
+      "finished_at": "2026-05-17T11:50:00Z",
+      "verified": true,
+      "artifact": "/work/web-dashboard/src/hooks/useRealtime.ts",
+      "observability": { "tokens": { "input": 74000, "output": 19400 } }
+    },
+    {
+      "id": "D4",
+      "title": "可拖拽看板布局 + localStorage 持久化",
+      "status": "done",
+      "deps": ["D2", "D3"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-dash-d4",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "拖拽布局 + 刷新后恢复单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/web-dashboard/docs/chart-api.md" },
+        { "kind": "plan", "ref": "/work/web-dashboard/docs/plan-charts.md" }
+      ],
+      "created_at": "2026-05-17T09:00:00Z",
+      "started_at": "2026-05-17T13:00:00Z",
+      "finished_at": "2026-05-17T17:20:00Z",
+      "verified": true,
+      "artifact": "/work/web-dashboard/src/layout/Board.tsx",
+      "observability": { "tokens": { "input": 88000, "output": 25600 } }
+    },
+    {
+      "id": "D5",
+      "title": "组件库文档 + storybook 故事",
+      "status": "done",
+      "deps": ["D4"],
+      "type": "doc-alignment",
+      "executor": "subagent",
+      "handle": "bg-dash-d5",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 2, "unit": "h" },
+      "created_at": "2026-05-18T09:00:00Z",
+      "started_at": "2026-05-18T09:30:00Z",
+      "finished_at": "2026-05-18T11:10:00Z",
+      "verified": true,
+      "artifact": "/work/web-dashboard/src/charts/charts.stories.tsx",
+      "observability": { "tokens": { "input": 31000, "output": 14000 } }
+    },
+    {
+      "id": "D6",
+      "title": "可视化回归 + 开 PR",
+      "status": "done",
+      "deps": ["D5"],
+      "type": "pr",
+      "executor": "master-orchestrator",
+      "model": "claude-sonnet-4-5",
+      "estimate": { "value": 1, "unit": "h" },
+      "created_at": "2026-05-18T11:00:00Z",
+      "started_at": "2026-05-18T13:00:00Z",
+      "finished_at": "2026-05-18T14:05:00Z",
+      "verified": true,
+      "artifact": "https://github.com/acme/web-dashboard/pull/88"
+    }
+  ],
+  "log": [
+    { "ts": "2026-05-16T10:00:00Z", "kind": "note", "summary": "实时图表编排启动" },
+    { "ts": "2026-05-18T14:05:00Z", "kind": "handoff", "summary": "估值整体贴合，PR #88 收口" }
+  ]
+}

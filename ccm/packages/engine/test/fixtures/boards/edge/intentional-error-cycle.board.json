@@ -1,0 +1,75 @@
+{
+  "schema": "cc-master/v2",
+  "meta": { "template_version": 3, "created_at": "2026-06-25T11:00:00Z" },
+  "goal": "INTENTIONAL ERROR FIXTURE — deps 含有向环（故意触发 GRAPH-CYCLE，测算法错误处理）",
+  "owner": {
+    "active": true,
+    "session_id": "sid-cycle-2026-06",
+    "heartbeat": "2026-06-25T12:30:00Z"
+  },
+  "git": { "worktree": "/work/broken-board", "branch": "broken/cycle" },
+  "scheduling": { "wip_limit": 2 },
+  "tasks": [
+    {
+      "id": "X1",
+      "title": "节点 X1（环：X1→X3→X2→X1）",
+      "status": "ready",
+      "deps": ["X3"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-x1",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "占位（本板用于错误路径，不应被算法当合法 DAG 跑）",
+      "references": [
+        { "kind": "spec", "ref": "/work/broken-board/docs/spec.md" },
+        { "kind": "plan", "ref": "/work/broken-board/docs/plan.md" }
+      ],
+      "created_at": "2026-06-25T11:00:00Z"
+    },
+    {
+      "id": "X2",
+      "title": "节点 X2（环的一环）",
+      "status": "ready",
+      "deps": ["X1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-x2",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "占位",
+      "references": [
+        { "kind": "spec", "ref": "/work/broken-board/docs/spec.md" },
+        { "kind": "plan", "ref": "/work/broken-board/docs/plan.md" }
+      ],
+      "created_at": "2026-06-25T11:00:00Z"
+    },
+    {
+      "id": "X3",
+      "title": "节点 X3（环的一环·回指 X2）",
+      "status": "ready",
+      "deps": ["X2"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-x3",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "占位",
+      "references": [
+        { "kind": "spec", "ref": "/work/broken-board/docs/spec.md" },
+        { "kind": "plan", "ref": "/work/broken-board/docs/plan.md" }
+      ],
+      "created_at": "2026-06-25T11:00:00Z"
+    }
+  ],
+  "log": [
+    {
+      "ts": "2026-06-25T11:00:00Z",
+      "kind": "note",
+      "summary": "故意构造的含环板：X1→X3→X2→X1，预期 lint 报恰一条 GRAPH-CYCLE"
+    }
+  ]
+}

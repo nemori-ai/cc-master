@@ -1,0 +1,101 @@
+{
+  "schema": "cc-master/v2",
+  "meta": { "template_version": 3, "created_at": "2026-06-18T09:00:00Z" },
+  "goal": "ccm 加 board-lock CLI verb + 并发写防护",
+  "owner": {
+    "active": false,
+    "session_id": "sid-ccm-lock-2026-06",
+    "heartbeat": "2026-06-19T16:00:00Z"
+  },
+  "git": { "worktree": "/repo/.worktrees/board-v2-redesign", "branch": "feat/board-lock-cli" },
+  "scheduling": { "wip_limit": 2 },
+  "tasks": [
+    {
+      "id": "L1",
+      "title": "锁文件协议 + 过期回收设计",
+      "status": "done",
+      "deps": [],
+      "type": "design",
+      "executor": "master-orchestrator",
+      "model": "claude-sonnet-4-5",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "锁协议 + stale 回收策略评审过",
+      "created_at": "2026-06-18T09:00:00Z",
+      "started_at": "2026-06-18T09:10:00Z",
+      "finished_at": "2026-06-18T11:20:00Z",
+      "verified": true,
+      "artifact": "/repo/ccm/docs/board-lock.md",
+      "observability": { "tokens": { "input": 36000, "output": 8900 } }
+    },
+    {
+      "id": "L2",
+      "title": "board-lock 核心：acquire/release + flock",
+      "status": "done",
+      "deps": ["L1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-ccm-l2",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 4, "unit": "h" },
+      "acceptance": "acquire/release + 竞争重试单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/repo/ccm/docs/board-lock.md" },
+        { "kind": "plan", "ref": "/repo/ccm/docs/plan-lock.md" }
+      ],
+      "created_at": "2026-06-18T10:00:00Z",
+      "started_at": "2026-06-18T13:00:00Z",
+      "finished_at": "2026-06-18T18:30:00Z",
+      "verified": true,
+      "artifact": "/repo/ccm/packages/engine/src/board-lock.ts",
+      "observability": { "tokens": { "input": 142000, "output": 36000 } }
+    },
+    {
+      "id": "L3",
+      "title": "CLI verb：board lock/unlock + status",
+      "status": "done",
+      "deps": ["L2"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-ccm-l3",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "verb 注册 + --json 形状 + 退出码单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/repo/ccm/docs/board-lock.md" },
+        { "kind": "plan", "ref": "/repo/ccm/docs/plan-lock.md" }
+      ],
+      "created_at": "2026-06-18T10:00:00Z",
+      "started_at": "2026-06-19T09:00:00Z",
+      "finished_at": "2026-06-19T11:30:00Z",
+      "verified": true,
+      "artifact": "/repo/ccm/apps/cli/src/handlers/lock.ts",
+      "observability": { "tokens": { "input": 61000, "output": 18200 } }
+    },
+    {
+      "id": "L4",
+      "title": "并发写集成测试 + 文档对齐",
+      "status": "done",
+      "deps": ["L3"],
+      "type": "e2e-integration",
+      "executor": "subagent",
+      "handle": "bg-ccm-l4",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "并发写竞争 e2e 绿 + command-catalog 同步",
+      "references": [{ "kind": "spec", "ref": "/repo/ccm/docs/board-lock.md" }],
+      "created_at": "2026-06-19T09:00:00Z",
+      "started_at": "2026-06-19T13:00:00Z",
+      "finished_at": "2026-06-19T15:50:00Z",
+      "verified": true,
+      "artifact": "/repo/ccm/packages/engine/test/board-lock.test.ts",
+      "observability": { "tokens": { "input": 84000, "output": 21000 } }
+    }
+  ],
+  "log": [
+    { "ts": "2026-06-18T09:00:00Z", "kind": "note", "summary": "board-lock 编排启动" },
+    { "ts": "2026-06-19T15:50:00Z", "kind": "handoff", "summary": "锁 CLI 收口，估值整体贴合略偏" }
+  ]
+}

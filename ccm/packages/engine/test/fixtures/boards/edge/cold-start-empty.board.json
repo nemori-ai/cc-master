@@ -1,0 +1,51 @@
+{
+  "schema": "cc-master/v2",
+  "meta": { "template_version": 3, "created_at": "2026-06-25T12:00:00Z" },
+  "goal": "全新项目 greenfield-cli 起步（冷启动·无历史语料）",
+  "owner": {
+    "active": true,
+    "session_id": "sid-greenfield-2026-06",
+    "heartbeat": "2026-06-25T12:55:00Z"
+  },
+  "git": { "worktree": "/work/greenfield-cli", "branch": "main" },
+  "scheduling": { "wip_limit": 3 },
+  "tasks": [
+    {
+      "id": "G1",
+      "title": "项目骨架 + 命令路由设计",
+      "status": "ready",
+      "deps": [],
+      "type": "design",
+      "executor": "master-orchestrator",
+      "model": "claude-opus-4-5",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "骨架结构 + 路由方案评审过",
+      "created_at": "2026-06-25T12:00:00Z"
+    },
+    {
+      "id": "G2",
+      "title": "实现 init 命令 + 配置读写",
+      "status": "blocked",
+      "deps": ["G1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-greenfield-g2",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 4, "unit": "h" },
+      "acceptance": "init 命令 + 配置往返单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/greenfield-cli/docs/spec.md" },
+        { "kind": "plan", "ref": "/work/greenfield-cli/docs/plan.md" }
+      ],
+      "created_at": "2026-06-25T12:00:00Z"
+    }
+  ],
+  "log": [
+    {
+      "ts": "2026-06-25T12:00:00Z",
+      "kind": "note",
+      "summary": "greenfield-cli 起步，尚无任何 done 历史"
+    }
+  ]
+}

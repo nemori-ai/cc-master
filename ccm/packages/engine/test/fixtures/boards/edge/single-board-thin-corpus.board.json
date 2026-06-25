@@ -1,0 +1,62 @@
+{
+  "schema": "cc-master/v2",
+  "meta": { "template_version": 3, "created_at": "2026-06-24T10:00:00Z" },
+  "goal": "tiny-tool 加一个 CLI flag（语料极少·低置信路径）",
+  "owner": {
+    "active": true,
+    "session_id": "sid-tiny-2026-06",
+    "heartbeat": "2026-06-25T12:40:00Z"
+  },
+  "git": { "worktree": "/work/tiny-tool", "branch": "feat/verbose-flag" },
+  "scheduling": { "wip_limit": 2 },
+  "tasks": [
+    {
+      "id": "S1",
+      "title": "加 --verbose flag 解析",
+      "status": "done",
+      "deps": [],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-tiny-s1",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 1, "unit": "h" },
+      "acceptance": "flag 解析 + 默认值单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/tiny-tool/README.md" },
+        { "kind": "plan", "ref": "/work/tiny-tool/docs/plan.md" }
+      ],
+      "created_at": "2026-06-24T10:00:00Z",
+      "started_at": "2026-06-24T10:10:00Z",
+      "finished_at": "2026-06-24T11:05:00Z",
+      "verified": true,
+      "artifact": "/work/tiny-tool/src/cli.ts",
+      "observability": { "tokens": { "input": 22000, "output": 5400 } }
+    },
+    {
+      "id": "S2",
+      "title": "verbose 日志接入 + 文档",
+      "status": "done",
+      "deps": ["S1"],
+      "type": "doc-alignment",
+      "executor": "subagent",
+      "handle": "bg-tiny-s2",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 1, "unit": "h" },
+      "created_at": "2026-06-24T11:00:00Z",
+      "started_at": "2026-06-24T11:10:00Z",
+      "finished_at": "2026-06-24T12:20:00Z",
+      "verified": true,
+      "artifact": "/work/tiny-tool/README.md",
+      "observability": { "tokens": { "input": 18000, "output": 7100 } }
+    }
+  ],
+  "log": [
+    {
+      "ts": "2026-06-24T10:00:00Z",
+      "kind": "note",
+      "summary": "tiny-tool 极小编排，仅 2 个 done 任务"
+    }
+  ]
+}

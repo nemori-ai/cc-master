@@ -1,0 +1,143 @@
+{
+  "schema": "cc-master/v2",
+  "meta": { "template_version": 3, "created_at": "2026-05-27T08:00:00Z" },
+  "goal": "data-pipeline 加近实时去重 + 乱序事件重排",
+  "owner": {
+    "active": false,
+    "session_id": "sid-pipe-dedup-2026-05",
+    "heartbeat": "2026-05-29T19:00:00Z"
+  },
+  "git": { "worktree": "/work/data-pipeline", "branch": "feat/dedup-reorder" },
+  "scheduling": { "wip_limit": 3 },
+  "tasks": [
+    {
+      "id": "R1",
+      "title": "去重键 + 乱序窗口策略设计",
+      "status": "done",
+      "deps": [],
+      "type": "design",
+      "executor": "master-orchestrator",
+      "model": "claude-opus-4-5",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "去重键定义 + 水位线/窗口策略评审过",
+      "created_at": "2026-05-27T08:00:00Z",
+      "started_at": "2026-05-27T08:15:00Z",
+      "finished_at": "2026-05-27T10:30:00Z",
+      "verified": true,
+      "artifact": "/work/data-pipeline/docs/dedup-design.md",
+      "observability": { "tokens": { "input": 45000, "output": 11200 } }
+    },
+    {
+      "id": "R2",
+      "title": "布隆过滤器去重层 + 滚动窗口",
+      "status": "done",
+      "deps": ["R1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-pipe-r2",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 4, "unit": "h" },
+      "acceptance": "去重命中率 + 假阳率边界单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/data-pipeline/docs/dedup-design.md" },
+        { "kind": "plan", "ref": "/work/data-pipeline/docs/plan-dedup.md" }
+      ],
+      "created_at": "2026-05-27T10:00:00Z",
+      "started_at": "2026-05-27T11:00:00Z",
+      "finished_at": "2026-05-27T16:30:00Z",
+      "verified": true,
+      "artifact": "/work/data-pipeline/src/dedup/bloom.ts",
+      "observability": { "tokens": { "input": 102000, "output": 27000 } }
+    },
+    {
+      "id": "R3",
+      "title": "乱序事件重排缓冲 + 迟到处理",
+      "status": "done",
+      "deps": ["R1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-pipe-r3",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 4, "unit": "h" },
+      "acceptance": "乱序重排正确 + 迟到事件旁路单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/data-pipeline/docs/dedup-design.md" },
+        { "kind": "plan", "ref": "/work/data-pipeline/docs/plan-dedup.md" }
+      ],
+      "created_at": "2026-05-27T10:00:00Z",
+      "started_at": "2026-05-28T08:30:00Z",
+      "finished_at": "2026-05-28T19:00:00Z",
+      "verified": true,
+      "artifact": "/work/data-pipeline/src/dedup/reorder.ts",
+      "observability": { "tokens": { "input": 268000, "output": 71000 } }
+    },
+    {
+      "id": "R4",
+      "title": "去重指标 + 重排延迟仪表",
+      "status": "done",
+      "deps": ["R2"],
+      "type": "development",
+      "executor": "workflow",
+      "handle": "wf-pipe-r4",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "去重率/重排延迟指标上报生效",
+      "references": [
+        { "kind": "spec", "ref": "/work/data-pipeline/docs/dedup-design.md" },
+        { "kind": "plan", "ref": "/work/data-pipeline/docs/plan-dedup.md" }
+      ],
+      "created_at": "2026-05-27T10:00:00Z",
+      "started_at": "2026-05-28T09:00:00Z",
+      "finished_at": "2026-05-28T11:30:00Z",
+      "verified": true,
+      "artifact": "/work/data-pipeline/observability/dashboards/dedup.json",
+      "observability": { "tokens": { "input": 41000, "output": 12500 } }
+    },
+    {
+      "id": "R5",
+      "title": "演示：去重+重排端到端 demo 录制",
+      "status": "done",
+      "deps": ["R3", "R4"],
+      "type": "development-demo",
+      "executor": "subagent",
+      "handle": "bg-pipe-r5",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "可跑 demo + 录屏覆盖正常/乱序两路",
+      "references": [{ "kind": "spec", "ref": "/work/data-pipeline/docs/dedup-design.md" }],
+      "created_at": "2026-05-29T09:00:00Z",
+      "started_at": "2026-05-29T13:00:00Z",
+      "finished_at": "2026-05-29T15:45:00Z",
+      "verified": true,
+      "artifact": "/work/data-pipeline/demo/dedup-walkthrough.md",
+      "observability": { "tokens": { "input": 58000, "output": 16800 } }
+    },
+    {
+      "id": "R6",
+      "title": "整理回归 + 开 PR",
+      "status": "done",
+      "deps": ["R5"],
+      "type": "pr",
+      "executor": "master-orchestrator",
+      "model": "claude-sonnet-4-5",
+      "estimate": { "value": 1, "unit": "h" },
+      "created_at": "2026-05-29T15:00:00Z",
+      "started_at": "2026-05-29T17:30:00Z",
+      "finished_at": "2026-05-29T18:50:00Z",
+      "verified": true,
+      "artifact": "https://github.com/acme/data-pipeline/pull/132"
+    }
+  ],
+  "log": [
+    { "ts": "2026-05-27T08:00:00Z", "kind": "note", "summary": "去重/重排编排启动" },
+    {
+      "ts": "2026-05-28T19:00:00Z",
+      "kind": "finding",
+      "summary": "R3 重排缓冲迟到事件语义反复，估4h实10.5h（语料里最大长尾）"
+    }
+  ]
+}
