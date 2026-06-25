@@ -282,6 +282,86 @@ interface CoercedAnalysis {
   parallelism?: { T1?: number | null; Tinf?: number | null; parallelism?: number | null };
 }
 
+// advisory 三表面的归一形（impact / rollup / nesting·additive·见 renderGraph json 段）。
+interface GraphAdvisory {
+  impact: Record<string, { count: number; descendants: string[] }>;
+  rollup: {
+    owners: Record<string, { done: number; total: number; ratio: number; children: string[] }>;
+    inconsistencies: Array<{ owner: string; nonDoneChildren: string[] }>;
+  };
+  nesting: {
+    depth1: Array<{ owner: string; grandchild: string }>;
+    parentCycles: string[][];
+  };
+}
+
+// 空 advisory（传入的是纯 data 对象、无句柄方法时的缺省·json 形状只增不改）。
+function _emptyAdvisory(): GraphAdvisory {
+  return {
+    impact: {},
+    rollup: { owners: {}, inconsistencies: [] },
+    nesting: { depth1: [], parentCycles: [] },
+  };
+}
+
+// ── advisory 投影：只有传入的是带 per-id 方法的 analyzeGraph 句柄才能算 ─────────────────────────────
+//   per-id 方法（descendants/children/rollupProgress）不是无参 getter，_coerceAnalysis 的「调一次」模式
+//   不够——此处直接在句柄上遍历 ids 构造 impact/rollup，再用无参方法读 rollupConsistency/checkDepth1/
+//   parentCycles 填 nesting。纯 data 对象（无这些方法 / 无 ids）→ 返回空 advisory（退化不抛·保 render 纪律）。
+function _coerceAdvisory(analysis: any): GraphAdvisory {
+  const out = _emptyAdvisory();
+  if (!analysis || typeof analysis !== 'object') return out;
+  // 句柄探测：descendants 是 per-id 方法、ids 是节点全集；缺任一即认作纯 data 对象 → 空 advisory。
+  const hasHandle =
+    typeof analysis.descendants === 'function' &&
+    typeof analysis.children === 'function' &&
+    analysis.ids &&
+    typeof analysis.ids[Symbol.iterator] === 'function';
+  if (!hasHandle) return out;
+  try {
+    const ids: string[] = Array.from(analysis.ids as Iterable<string>);
+    // impact：每节点的传递后代闭包（descendants）。count = 后代数。
+    for (const id of ids) {
+      const desc = analysis.descendants(id);
+      const list = desc && typeof desc[Symbol.iterator] === 'function' ? Array.from(desc) : [];
+      out.impact[id] = { count: list.length, descendants: list as string[] };
+    }
+    // rollup.owners：有子的节点（children 非空）→ rollupProgress + children 列表。
+    for (const id of ids) {
+      const kids = analysis.children(id);
+      if (Array.isArray(kids) && kids.length > 0) {
+        const prog =
+          typeof analysis.rollupProgress === 'function'
+            ? analysis.rollupProgress(id)
+            : { done: 0, total: kids.length, ratio: 0 };
+        out.rollup.owners[id] = {
+          done: prog.done,
+          total: prog.total,
+          ratio: prog.ratio,
+          children: kids.slice(),
+        };
+      }
+    }
+    // rollup.inconsistencies / nesting：无参方法直接读。
+    if (typeof analysis.rollupConsistency === 'function') {
+      const inc = analysis.rollupConsistency();
+      if (Array.isArray(inc)) out.rollup.inconsistencies = inc;
+    }
+    if (typeof analysis.checkDepth1 === 'function') {
+      const d1 = analysis.checkDepth1();
+      if (Array.isArray(d1)) out.nesting.depth1 = d1;
+    }
+    if (typeof analysis.parentCycles === 'function') {
+      const pc = analysis.parentCycles();
+      if (Array.isArray(pc)) out.nesting.parentCycles = pc;
+    }
+  } catch (_e) {
+    // 句柄方法抛了（坏图）→ 退化为已积累的部分 + 空兜底，绝不向上抛（render 不抛纪律）。
+    return out;
+  }
+  return out;
+}
+
 // ── analysis 适配器：接受「analyzeGraph 句柄」或「已算好的 plain data 对象」两种形态 ───────────────────
 //   handler 既可直接传 analyzeGraph(board) 的句柄（含方法），也可传 { topoSort, readySet, criticalPath, wipStats }
 //   的纯数据。本层探测：有同名方法就调，否则读同名字段。这让 render 与调用方解耦（render 不依赖句柄实现）。
@@ -319,6 +399,8 @@ export function renderGraph(analysis: any, opts?: RenderOpts): string {
   const cp = a.criticalPath || {};
   const cpChain = Array.isArray(cp.chain) ? cp.chain : [];
   const para = a.parallelism || {};
+  // additive advisory（impact / rollup / nesting）——只有传入句柄才有值，纯 data 对象退化为空。
+  const adv = _coerceAdvisory(analysis);
 
   if (opts.json) {
     return jsonString({
@@ -335,6 +417,10 @@ export function renderGraph(analysis: any, opts?: RenderOpts): string {
         Tinf: para.Tinf == null ? null : para.Tinf,
         parallelism: para.parallelism == null ? null : para.parallelism,
       },
+      // ── additive（json 形状只增不改·上面五字段逐字不变）────────────────────────────────────────
+      impact: adv.impact,
+      rollup: adv.rollup,
+      nesting: adv.nesting,
     });
   }
 
@@ -353,6 +439,24 @@ export function renderGraph(analysis: any, opts?: RenderOpts): string {
   if (para.T1 != null) {
     const par = typeof para.parallelism === 'number' ? para.parallelism.toFixed(2) : 'n/a';
     lines.push(`parallelism: T1=${para.T1} T∞=${para.Tinf} ratio=${par}`);
+  }
+  // ── 高信号告警行（只增·不 dump 全量 per-node impact 噪音）──────────────────────────────────────
+  for (const inc of adv.rollup.inconsistencies) {
+    lines.push(
+      paint(
+        `⚠ rollup 不一致: ${inc.owner} → 非done子: ${(inc.nonDoneChildren || []).join(', ')}`,
+        'yellow',
+        color,
+      ),
+    );
+  }
+  for (const d of adv.nesting.depth1) {
+    lines.push(
+      paint(`⚠ nesting depth>1: ${d.owner} → 孙节点 ${d.grandchild}（违 depth=1）`, 'red', color),
+    );
+  }
+  for (const pc of adv.nesting.parentCycles) {
+    lines.push(paint(`⚠ parent 环: ${(pc || []).join(' -> ')}`, 'red', color));
   }
   return lines.join('\n');
 }

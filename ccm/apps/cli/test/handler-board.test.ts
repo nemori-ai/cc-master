@@ -322,6 +322,39 @@ test('board graph --json has topoOrder / readySet / criticalPath', () => {
   assert.ok(parsed.data.criticalPath && typeof parsed.data.criticalPath === 'object');
 });
 
+// board graph --json 暴露 impact / rollup / nesting advisory（additive·端到端经 handler → analyzeGraph 句柄）。
+test('board graph --json exposes impact / rollup / nesting advisory', () => {
+  // T1 → T2 依赖链（impact）；M1(done) 有子 M1.a(done)/M1.b(in_flight)（rollup 不一致·父done子未done）。
+  const tasks = [
+    task('T1'),
+    task('T2', { deps: ['T1'], status: 'blocked' }),
+    task('M1', { status: 'done', deps: [] }),
+    task('M1.a', { status: 'done', parent: 'M1', deps: [] }),
+    task('M1.b', { status: 'in_flight', parent: 'M1', deps: [] }),
+  ];
+  const { boardPath } = mkBoardHome({ tasks });
+  const ctx = mkCtx({ boardPath, flags: { json: true } });
+  boardHandler.graph(ctx);
+  const parsed = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(parsed.ok, true);
+  const d = parsed.data;
+  // impact：T1 的传递后代含 T2。
+  assert.ok(d.impact && d.impact.T1, 'impact 含 T1');
+  assert.ok(d.impact.T1.descendants.includes('T2'), 'T1 → T2');
+  assert.equal(d.impact.T1.count, d.impact.T1.descendants.length, 'impact count = descendants.length');
+  // rollup：M1 是 owner（{done:1,total:2,children:[M1.a,M1.b]}）+ inconsistencies 含 M1。
+  assert.ok(d.rollup && d.rollup.owners && d.rollup.owners.M1, 'rollup.owners 含 M1');
+  assert.equal(d.rollup.owners.M1.total, 2);
+  assert.equal(d.rollup.owners.M1.done, 1);
+  const inc = d.rollup.inconsistencies.find((i: { owner: string }) => i.owner === 'M1');
+  assert.ok(inc, 'M1 在 rollup.inconsistencies');
+  assert.ok(inc.nonDoneChildren.includes('M1.b'));
+  // nesting：本板无 depth>1 / 无 parent 环 → 两空数组（字段存在·形状稳定）。
+  assert.ok(d.nesting && Array.isArray(d.nesting.depth1) && Array.isArray(d.nesting.parentCycles));
+  assert.deepEqual(d.nesting.depth1, []);
+  assert.deepEqual(d.nesting.parentCycles, []);
+});
+
 // ══ board critical-path ════════════════════════════════════════════════════════════════════════════
 test('board critical-path: human prints chain + makespan + weight_source', () => {
   const { boardPath } = mkBoardHome({

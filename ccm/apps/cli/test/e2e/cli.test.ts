@@ -314,6 +314,36 @@ test('board show --json → JSON.parse 过、结构对（ok/data/goal/owner）',
   assert.equal(obj.data.owner.session_id, SID);
 });
 
+test('board graph --json（真二进制）→ impact / rollup / nesting advisory 字段齐 + 现有字段不变', () => {
+  const { home } = mkHome();
+  seedBoard(home, {
+    tasks: [
+      { id: 'T1', status: 'ready', type: 'development', deps: [], created_at: '2026-06-24T08:00:00Z' },
+      { id: 'T2', status: 'blocked', type: 'development', deps: ['T1'], created_at: '2026-06-24T08:00:00Z' },
+      { id: 'M1', status: 'done', type: 'development', deps: [], created_at: '2026-06-24T08:00:00Z' },
+      { id: 'M1.a', status: 'done', type: 'development', parent: 'M1', deps: [], created_at: '2026-06-24T08:00:00Z' },
+      { id: 'M1.b', status: 'in_flight', type: 'development', parent: 'M1', deps: [], created_at: '2026-06-24T08:00:00Z' },
+    ],
+  });
+  const r = runCcm(['board', 'graph', '--json'], { home });
+  assert.equal(r.status, 0, `stderr=${r.stderr}`);
+  const obj = JSON.parse(r.stdout);
+  assert.equal(obj.ok, true);
+  const d = obj.data;
+  // 现有字段不变。
+  assert.ok(Array.isArray(d.topoOrder) && Array.isArray(d.readySet));
+  assert.ok(d.criticalPath && 'makespan' in d.criticalPath && 'weight_source' in d.criticalPath);
+  assert.ok(d.parallelism && 'T1' in d.parallelism);
+  // 新增 advisory 三字段。
+  assert.ok(d.impact && d.impact.T1 && d.impact.T1.descendants.includes('T2'), 'impact T1→T2');
+  assert.ok(d.rollup && d.rollup.owners.M1 && d.rollup.owners.M1.total === 2, 'rollup owner M1');
+  assert.ok(
+    d.rollup.inconsistencies.some((i: { owner: string }) => i.owner === 'M1'),
+    'rollup inconsistency M1（父done子未done）',
+  );
+  assert.ok(d.nesting && Array.isArray(d.nesting.depth1) && Array.isArray(d.nesting.parentCycles));
+});
+
 test('task list --json → data 是任务数组（数据进 stdout）', () => {
   const { home } = mkHome();
   seedBoard(home, {

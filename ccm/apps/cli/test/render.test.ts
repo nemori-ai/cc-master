@@ -272,6 +272,98 @@ test('renderGraph 空 analysis 不崩', () => {
   assert.deepEqual(data.topoOrder, []);
 });
 
+// ── renderGraph advisory（impact / rollup / nesting·additive·T?-? 表面扩展）─────────────────────────
+// 一块带 owner 子任务（rollup）+ depth-1 嵌套违规（nesting）+ impact 链的板：
+//   M1(done) → 子 M1.a(done)/M1.b(in_flight)  →  M1 已 done 但有非 done 子 = rollup 不一致。
+//   M1.a 又被 G1 指为 parent（owner=M1 的子 M1.a 自己又当 owner）= depth>1 nesting 违规。
+//   T0 → T1 → T2 依赖链 = T0 impact 闭包 {T1,T2}。
+function nestedBoard(): any {
+  return {
+    schema: 'cc-master/v2',
+    goal: 'nested + impact + rollup fixture',
+    owner: { active: true, session_id: 'sid', heartbeat: '2026-06-24T10:00:00Z' },
+    tasks: [
+      { id: 'T0', status: 'done', deps: [] },
+      { id: 'T1', status: 'in_flight', deps: ['T0'] },
+      { id: 'T2', status: 'ready', deps: ['T1'] },
+      { id: 'M1', status: 'done', deps: [] },
+      { id: 'M1.a', status: 'done', parent: 'M1', deps: [] },
+      { id: 'M1.b', status: 'in_flight', parent: 'M1', deps: [] },
+      // M1.a 既是 M1 的子、又当 G1 的 owner → depth>1（checkDepth1 命中 {owner:M1, grandchild:G1}）。
+      { id: 'G1', status: 'ready', parent: 'M1.a', deps: [] },
+    ],
+  };
+}
+
+test('renderGraph json: 句柄 → impact/rollup/nesting 三表面正确 + 现有字段不变', () => {
+  const a = realAnalysis(nestedBoard());
+  const data = parseData(R.renderGraph(a, { json: true }));
+
+  // ── impact：T0 的传递后代闭包含 T1、T2（count≥2）；叶子 T2 后代 0。
+  assert.ok(data.impact.T0, 'impact 含 T0');
+  assert.ok(data.impact.T0.descendants.includes('T1'), 'T0 → T1');
+  assert.ok(data.impact.T0.descendants.includes('T2'), 'T0 → T2（传递闭包）');
+  assert.equal(data.impact.T0.count, data.impact.T0.descendants.length, 'count = descendants.length');
+  assert.equal(data.impact.T2.count, 0, '叶子 T2 后代为 0');
+
+  // ── rollup.owners：M1 是 owner（有子）→ {done,total,ratio,children}。
+  assert.ok(data.rollup.owners.M1, 'rollup.owners 含 M1');
+  assert.equal(data.rollup.owners.M1.total, 2, 'M1 直接子 = M1.a, M1.b（G1 的 parent 是 M1.a 不计入）');
+  assert.deepEqual(
+    data.rollup.owners.M1.children.slice().sort(),
+    ['M1.a', 'M1.b'],
+    'M1 直接子 = M1.a, M1.b',
+  );
+  assert.equal(data.rollup.owners.M1.done, 1, 'M1.a done = 1/2');
+  // M1.a 也是 owner（G1 的 parent）。
+  assert.ok(data.rollup.owners['M1.a'], 'M1.a 也是 owner（G1 的 parent）');
+  assert.deepEqual(data.rollup.owners['M1.a'].children, ['G1']);
+
+  // ── rollup.inconsistencies：M1 已 done 但有非 done 子 M1.b → 一条不一致。
+  const inc = data.rollup.inconsistencies.find((i: any) => i.owner === 'M1');
+  assert.ok(inc, 'M1 在 inconsistencies（已 done 但子未全 done）');
+  assert.ok(inc.nonDoneChildren.includes('M1.b'), '非done子含 M1.b');
+
+  // ── nesting.depth1：M1 的子 M1.a 又当 owner → {owner:M1, grandchild:G1}。
+  const d1 = data.nesting.depth1.find((d: any) => d.owner === 'M1' && d.grandchild === 'G1');
+  assert.ok(d1, 'depth1 命中 M1→G1（孙节点）');
+  assert.deepEqual(data.nesting.parentCycles, [], '无 parent 环');
+
+  // ── 现有字段逐字不变（agent 依赖稳定 parse）。
+  assert.ok(Array.isArray(data.topoOrder));
+  assert.ok(data.topoOrder.includes('T0'));
+  assert.ok(Array.isArray(data.readySet));
+  assert.ok(data.criticalPath && Array.isArray(data.criticalPath.chain));
+  assert.ok('makespan' in data.criticalPath && 'weight_source' in data.criticalPath);
+  assert.ok(data.parallelism && 'T1' in data.parallelism);
+});
+
+test('renderGraph human: rollup 不一致 / nesting depth1 出高信号告警行', () => {
+  const a = realAnalysis(nestedBoard());
+  const out = R.renderGraph(a, { color: false });
+  assert.ok(!ANSI_RE.test(out), '无 ANSI');
+  assert.match(out, /rollup 不一致.*M1/, 'rollup 不一致告警含 owner M1');
+  assert.match(out, /M1\.b/, '告警列出非done子 M1.b');
+  assert.match(out, /nesting depth>1.*M1/, 'nesting depth1 告警');
+  // 不 dump 全量 per-node impact 噪音：human 不逐节点列 impact descendants（只 advisory 告警）。
+  assert.ok(!out.includes('impact T0'), 'human 不 dump 逐节点 impact');
+});
+
+test('renderGraph json 纯 data 对象（非句柄）→ impact/rollup/nesting 空缺省（向后兼容）', () => {
+  const plain = {
+    topoSort: { order: ['A', 'B'], cycle: null },
+    readySet: ['A'],
+    criticalPath: { chain: ['A', 'B'], makespan: 6, weight_source: 'estimate' },
+    parallelism: { T1: 2, Tinf: 2, parallelism: 1 },
+  };
+  const data = parseData(R.renderGraph(plain, { json: true }));
+  assert.deepEqual(data.impact, {}, '纯 data → impact 空对象');
+  assert.deepEqual(data.rollup, { owners: {}, inconsistencies: [] }, '纯 data → rollup 缺省');
+  assert.deepEqual(data.nesting, { depth1: [], parentCycles: [] }, '纯 data → nesting 缺省');
+  // 现有字段仍正常。
+  assert.deepEqual(data.criticalPath.chain, ['A', 'B']);
+});
+
 // ════ renderCriticalPath ══════════════════════════════════════════════════════════════════════════
 test('renderCriticalPath json: chain + makespan + weight_source', () => {
   const a = realAnalysis(sampleBoard());

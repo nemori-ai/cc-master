@@ -14,22 +14,22 @@
 //   它是用户**显式手动跑**的脚本（非 hook），故 ccm 缺/坏时**明确友好报错退非 0**（不静默降级）。
 //   · 调用约定：`CCM_BIN`（绝对路径可执行）是 dev/test/自定义安装的覆写口；生产 `ccm` 在 PATH。
 //
-// ★ccm CLI 表面收窄（设计稿 board-cli-design §3 line65 有意为之）：ccm `board graph --json` 只暴露
-//   **拓扑 / 环 / readySet / 临界路径(chain·makespan·weight_source) / 并行度(T1·Tinf·ratio)**；`board show
-//   --json` 补 **statusCounts**（用来还原 WIP 计数）。ccm **未暴露**的三个旧表面——**逐节点 impact
-//   （descendants 传递闭包）/ 逐 owner rollup 进度 / nesting 检查（depth-1 · parent 环）**——引擎里有，但
-//   CLI 没渲染出来。本脚本对这三个 `--cmd` / 摘要段**不臆造、明确报「ccm 当前未暴露此能力」**（停下报告，
-//   等 ccm 决定是否扩表面；绝不 in-process 绕过红线1 进程边界自己算）。
+// ★ccm CLI 表面（设计稿 board-cli-design §3）：ccm `board graph --json` 现已暴露 **impact / rollup /
+//   nesting advisory**（本脚本消费之）——除拓扑 / 环 / readySet / 临界路径(chain·makespan·weight_source) /
+//   并行度(T1·Tinf·ratio) 外，新增：**逐节点 impact（descendants 传递闭包·{count,descendants}）/ 逐 owner
+//   rollup 进度（{done,total,ratio,children} + inconsistencies）/ nesting 检查（depth-1 · parent 环）**。
+//   `board show --json` 补 **statusCounts**（用来还原 WIP 计数）。这三个 advisory 与图算法同一份引擎 SSOT
+//   （`@ccm/engine`），经进程边界 shell 取数，绝不 in-process 自己算（红线1 进程边界）。
 //
 // 红线1 / ADR-006：node/JS only，纯 stdlib（fs/path/child_process），零 npm dep，零网络。
 //
 // CLI（契约保持，转译为 ccm 调用）：
-//   node board-graph.js <board-path>          人读摘要：临界链 / ready-set / WIP / 并行度
+//   node board-graph.js <board-path>          人读摘要：临界链 / ready-set / WIP / 并行度 / 最高 impact / owner rollup
 //   node board-graph.js                        无参 → home 下唯一 active 板（多块则提示传路径）
 //   node board-graph.js --json [<path>]        结构化 JSON（ccm board graph --json 的投影 + statusCounts）
 //   node board-graph.js --cmd <name> [<path>]  单项：critical | ready | wip | parallelism
-//     （impact <id> / rollup <owner> 当前 ccm 未暴露 → 明确报错退 2，不臆造）
-// 退出码：0 = 成功（含「有环但已报告」）；2 = usage/IO/ccm-不可用/未暴露能力。**不因「图坏」非零退出**。
+//     | impact <id>（该节点 gating 的下游闭包）| rollup <owner>（该 owner 的子完成度）
+// 退出码：0 = 成功（含「有环但已报告」）；2 = usage/IO/ccm-不可用。**不因「图坏」非零退出**。
 
 const path = require('path');
 const fs = require('fs');
@@ -143,6 +143,17 @@ function wipCounts(show) {
   };
 }
 
+// topImpact(graph) — 从 graph.impact 取 count 最大的节点（impact = gating 的下游闭包大小）。无 impact → null。
+function topImpact(graph) {
+  const impact = (graph && graph.impact) || {};
+  let best = null;
+  for (const id of Object.keys(impact)) {
+    const count = Number((impact[id] && impact[id].count) || 0);
+    if (best === null || count > best.count) best = { id, count, descendants: (impact[id] && impact[id].descendants) || [] };
+  }
+  return best;
+}
+
 function humanSummary(graph, show) {
   const lines = [];
   lines.push('cc-master board-graph 摘要');
@@ -158,11 +169,33 @@ function humanSummary(graph, show) {
   const Tinf = par.Tinf == null ? 0 : par.Tinf;
   const ratio = typeof par.parallelism === 'number' ? par.parallelism.toFixed(2) : 'n/a';
   lines.push(`并行度：T₁=${T1}（总节点）· T∞=${Tinf}（临界链长）· 加速比≈${ratio}（值得开几条道的上界）`);
-  // 逐节点 impact + owner rollup + nesting：ccm 当前未暴露（见文件头说明）——诚实标注，不臆造。
-  lines.push('');
-  lines.push('（逐节点 impact / 逐 owner rollup / nesting 检查：ccm `board graph` 当前未暴露这些表面——');
-  lines.push('  引擎里有但 CLI 未渲染。owner rollup 不一致这道 gate 仍由 hook〔verify-board / board-lint〕强制；');
-  lines.push('  此处摘要暂不提供这三项，待 ccm 扩 graph 表面后回填。）');
+  // 最高 impact（gating 最多下游的节点——优先派发的信号）。
+  const top = topImpact(graph);
+  if (top && top.count > 0) {
+    lines.push(`最高 impact：${top.id} gating ${top.count} 个下游（${top.descendants.join(', ')}）——优先解开它。`);
+  }
+  // owner rollup 段（逐 owner done/total/百分比）。
+  const owners = (graph && graph.rollup && graph.rollup.owners) || {};
+  const ownerIds = Object.keys(owners);
+  if (ownerIds.length) {
+    lines.push('');
+    lines.push('owner rollup（子任务完成度·advisory）：');
+    for (const o of ownerIds) {
+      const r = owners[o] || {};
+      const total = Number(r.total) || 0;
+      const done = Number(r.done) || 0;
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      lines.push(`  ${o}：${done}/${total}（${pct}%）· 子: ${(r.children || []).join(', ')}`);
+    }
+  }
+  // rollup 不一致告警（owner 已 done 但有非 done 子·verify-board / board-lint 仍强制 gate，此处只 advisory 提示）。
+  const inc = (graph && graph.rollup && graph.rollup.inconsistencies) || [];
+  if (inc.length) {
+    lines.push('');
+    for (const i of inc) {
+      lines.push(`⚠ rollup 不一致：${i.owner} 已 done 但子未全 done → ${(i.nonDoneChildren || []).join(', ')}`);
+    }
+  }
   return lines.join('\n');
 }
 
@@ -180,14 +213,14 @@ function fullJson(graph, show) {
     },
     parallelism: (graph && graph.parallelism) || {},
     statusCounts: (show && show.statusCounts) || {},
-    // ccm 未暴露的表面（见文件头）——明确以 null 标注「ccm 当前不提供」，不臆造数值。
-    impact: null,
-    rollup: null,
-    nesting: null,
+    // advisory 三表面：直接消费 ccm board graph --json 的 impact / rollup / nesting（引擎 SSOT·见文件头）。
+    impact: (graph && graph.impact) || {},
+    rollup: (graph && graph.rollup) || { owners: {}, inconsistencies: [] },
+    nesting: (graph && graph.nesting) || { depth1: [], parentCycles: [] },
   };
 }
 
-// runCmd(graph, show, cmd, arg) → 单项输出字符串（--cmd）。impact/rollup → ccm 未暴露，明确报错退 2。
+// runCmd(graph, show, cmd, arg) → 单项输出字符串（--cmd）。
 function runCmd(graph, show, cmd, arg) {
   switch (cmd) {
     case 'critical': return formatCritical(graph);
@@ -204,15 +237,27 @@ function runCmd(graph, show, cmd, arg) {
       const ratio = typeof p.parallelism === 'number' ? p.parallelism.toFixed(2) : 'n/a';
       return `T1=${p.T1 == null ? 0 : p.T1} Tinf=${p.Tinf == null ? 0 : p.Tinf} parallelism=${ratio}`;
     }
-    case 'impact':
-    case 'rollup':
-      die(`cc-master board-graph: --cmd ${cmd} 当前不可用——ccm \`board graph\` 未暴露逐节点 impact / 逐 owner rollup 表面\n` +
-          `  （引擎里有但 CLI 未渲染·设计稿有意收窄 graph 表面）。要按 owner rollup gate 把关请跑 board-lint（R7d）/ 看 verify-board 握手；\n` +
-          `  要 impact / rollup advisory 需先在 ccm 扩 \`board graph\` 表面。本脚本不 in-process 绕过红线1 进程边界自己算。`, 2);
-      break;
+    case 'impact': {
+      if (!arg) return 'impact 需要一个节点 id：node board-graph.js --cmd impact <id> [<board>]';
+      const impact = (graph && graph.impact) || {};
+      const e = impact[arg];
+      if (!e) return `节点 "${arg}" 不在图里（无 impact 数据）。`;
+      const desc = Array.isArray(e.descendants) ? e.descendants : [];
+      const count = Number(e.count) || 0;
+      return count ? `${arg} gating ${count} 个下游：${desc.join(', ')}` : `${arg} 无下游（叶子节点·gating 0 个）。`;
+    }
+    case 'rollup': {
+      if (!arg) return 'rollup 需要一个 owner id：node board-graph.js --cmd rollup <owner> [<board>]';
+      const owners = (graph && graph.rollup && graph.rollup.owners) || {};
+      const r = owners[arg];
+      if (!r) return `"${arg}" 不是 owner（无子任务·无 rollup 数据）。`;
+      const total = Number(r.total) || 0;
+      const done = Number(r.done) || 0;
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      return `${arg}：${done}/${total}（${pct}%）· 子: ${(r.children || []).join(', ')}`;
+    }
     default:
-      die(`cc-master board-graph: 未知 --cmd "${cmd}"。合法：critical | ready | wip | parallelism\n` +
-          `  （impact / rollup 当前 ccm 未暴露——见上）。`, 2);
+      die(`cc-master board-graph: 未知 --cmd "${cmd}"。合法：critical | ready | wip | parallelism | impact <id> | rollup <owner>`, 2);
   }
 }
 
@@ -241,9 +286,6 @@ function main() {
     boardPath = findSingleActiveBoard(home); // 内部失败 die(…,2)
   }
   boardPath = path.resolve(boardPath);
-
-  // impact / rollup 在取数前就拦（ccm 未暴露）——避免无谓 spawn。
-  if (cmd === 'impact' || cmd === 'rollup') runCmd(null, null, cmd, cmdArg);
 
   const graph = ccmJson('graph', boardPath);
   // statusCounts 来自 board show（WIP 计数）——只在需要时取（人读摘要 / --json / --cmd wip）。
