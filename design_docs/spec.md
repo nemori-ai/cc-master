@@ -7,6 +7,8 @@
 **对话史/草稿**：`docs/plans/cc-master-plugin-design.md`（本 spec 是它的干净定稿版）。
 **2026-06-08 修订（最终态）**：completion gate 由 **goal-hook** 承担——`verify-board.sh` 升级为确定性 Stop-hook 自检闸；`/loop` 由后台 shell 消解。（原"原生 `/goal` 整合"路线已废弃：agent 无法自设 native `/goal`。）本 spec 的 §3/§5/§10/§12 均为修订后的最终方案。决策史见 [`adrs/ADR-004-loop-dissolution-and-goal-hook.md`](../adrs/ADR-004-loop-dissolution-and-goal-hook.md)，设计细节见 `design_docs/2026-06-08-goal-hook-design.md`。
 
+**2026-06-24 修订（board 引擎解耦）**：board 状态逻辑（数据模型 / lint / 图分析 / 锁）已从「插件内 bash hook 直接读写」演进为**独立安装的 `ccm` CLI**（board 引擎 SSOT 归 `@ccm/engine`）；cc-master plugin 降为消费方之一——hook 经**进程边界** `spawn ccm` 访问 board（缺则优雅降级、静默不 block），webview 与 skill 脚本同走 `ccm`。下文 §3/§5 的「hook 直接读 board / 每回合 Write 整文件」是**契约级**心智（板仍是单一真相源、narrow waist 不变），但**访问形态**以 ADR-013/ADR-014 为准：board v2 三档建模（🔒/👁/✎）见 [`adrs/ADR-013-board-v2-data-model-and-cli.md`](../adrs/ADR-013-board-v2-data-model-and-cli.md)；CLI 解耦为独立产品 + ship-anywhere 改由「主机预置 per-OS SEA + 进程边界」守见 [`adrs/ADR-014-cli-decoupling-as-independent-product.md`](../adrs/ADR-014-cli-decoupling-as-independent-product.md)。
+
 ---
 
 ## 1. 目标
@@ -93,7 +95,7 @@ cc-master/ (plugin)
 
 **关键决策**：
 - **名**：board。**单一真理源**。**可配置 home + 每编排一个唯一命名 board 文件**：home = `$CC_MASTER_HOME`，否则 `${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/cc-master/`（位置是用户存储偏好，不再硬编码）；每次 `as-master-orchestrator` 在 home 下建 `<UTC时间戳>-<pid>.board.json`（如 `20260605T101821Z-54324.board.json`），可按时间排序、多个并发编排各得独立文件不冲突。bootstrap hook 建文件并把确切路径注入 agent。**agent 自己认领哪块 board 是它的**——compaction 后靠列 home + 匹配 `goal` 重新认回。gitignored。
-- **存储 = 可变快照（每编排一个命名 board 文件）**：每回合 Write 整文件（窄腰小→改不崩）；markdown 视图按需生成。
+- **存储 = 可变快照（每编排一个命名 board 文件）**：每回合 Write 整文件（窄腰小→改不崩）；markdown 视图按需生成。（**ADR-014 后**：校验这次写盘合不合契约的机械关卡是独立 `ccm` CLI——PostToolUse lint hook 经进程边界 `spawn ccm board lint`，缺 `ccm` 则静默降级；契约本身不变。）
 - **窄腰原则**（不钉死整表，只钉死 hook 依赖的极小契约 → 既给 agent 自由，又让手维护安全）：
   - **钉死的腰**（**扁平顶层字段，非 `header{}` 子对象**——对齐 board 文件实际布局，别让 agent 凭空造个 `header` key）：顶层 `schema` / `goal` / `owner-lease{active, session_id, heartbeat}` / `git{worktree, branch}` + `tasks[{ id, status, deps }]`。
   - **status 枚举**：`ready / in_flight / blocked(blocked_on:"user"|"<taskid>") / done / escalated / failed / stale / uncertain`（各状态在 DAG 里路由不同）。

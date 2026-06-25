@@ -4,6 +4,8 @@
 
 **本质**：编排者跑长任务时的"存档文件"——一张带状态的**任务依赖图（task dependency graph）**。它身兼两职：① 跨 compaction 存活的记忆，② hook 唯一能读到的那扇编排状态窗口（hook 是个 shell——它读不到 agent 的 context，也读不到内建的 `Task` 工具）。
 
+> **board 引擎已解耦为独立的 `ccm` CLI（ADR-014）——但下面这份 narrow-waist 契约本身没变。** board 状态逻辑（数据模型 / lint / 图分析 / 锁）的单一真相源现归独立安装的 `@ccm/engine`；plugin 降为消费方：hook（board-lint / verify-board）经**进程边界** `spawn ccm` 取数（`ccm` 缺则优雅降级、静默不 block），运行时图分析经 `ccm board graph`（或 skill 的 `board-graph.js` 封装）。变的只是「谁怎么访问 board」——契约（🔒/👁/✎ 三档、status enum、单一真相源、deps 图完整性）一字未动。
+
 ## 目录
 
 - [关键决策](#关键决策)
@@ -13,6 +15,7 @@
 - [Supersession —— 显式状态](#supersession--显式状态非隐式-gc)
 - [`log` 段 —— 轻量审计](#log-段--轻量审计)
 - [board lint —— 自检真相源](#board-lint--自检真相源)
+- [图分析 advisory —— 机器算的临界路径 / impact / rollup](#图分析-advisory--机器算的临界路径--impact--rollup只读永不回写-board)
 - [示例](#示例与-boardexamplejson-一致)
 
 ---
@@ -20,7 +23,7 @@
 ## 关键决策
 
 - **名字**：`board`。**单一真相源。** **可配置的 home + 每编排一份唯一命名的 board 文件。** home 取 `$CC_MASTER_HOME`（若设了），否则 `${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/cc-master/`——这是一个用户存储偏好，不再是硬编码路径。每场编排拿到自己那份可按时间排序的文件 `<UTC-timestamp>-<pid>.board.json`（如 `20260605T101821Z-54324.board.json`），这样多场并发编排永不相撞。bootstrap（UserPromptSubmit）hook 负责创建该文件、并注入它的精确路径；**哪个 board 是你的，由你自己认领**——compaction 之后，靠列出 home 并匹配 `goal` 把它重新找出来。Gitignored。
-- **存储 = 可变快照（每编排一份命名 board 文件）**：每一回合，把整个文件 `Write` 出去（narrow waist 很小，一次 edit 不会把它写坏）；markdown 视图按需生成。
+- **存储 = 可变快照（每编排一份命名 board 文件）**：每一回合，把整个文件 `Write` 出去（narrow waist 很小，一次 edit 不会把它写坏）；markdown 视图按需生成。校验这次写盘合不合契约的**机械关卡是 `ccm`**（PostToolUse lint hook 写盘后 `spawn ccm board lint`；缺 `ccm` 则静默降级、不 block）——见下方「board lint」段。
 
 ---
 
@@ -298,22 +301,37 @@ top-level `meta` 是一个 **agent-shaped 命名空间对象**，收纳未来的
 
 board 是单一真相源、也是 hook / viewer / resume 三条链路的共同输入。写坏它（不合法 JSON、缺窄腰字段、`status` 拼错、dep 指向不存在的 id、deps 成环）大多**静默**出问题——尤其 viewer 会永久冻结在上一帧好的渲染却不报错。一套 **board lint** 在 board 被写坏的那一刻（或你随时手动）校验它的结构 / 语法 / 格式正确性。
 
+> **lint 引擎 SSOT = `@ccm/engine`（ADR-014）**：下面两道自检的规则逻辑都不在 plugin 里——它们经**进程边界** `spawn ccm board lint` 取裁决（hook 与手动脚本都是 `ccm` 的薄封装）。`ccm` 缺失时：**hook** 优雅降级（静默 no-op、不 block），**手动脚本**明确报错退非 0（提示「需装 `ccm`」——显式跑就该让你知道少了什么）。
+
 **两道自检：**
 
-- **自动（PostToolUse lint hook）**：你用 `Write` / `Edit` 改本 session 的 active board 后，lint hook 自动校验；若发现结构 / 语法 / 格式错，会注入一条点名「违了哪条规则 + 哪个字段 / task + 怎么修」的非阻断提示——**看到就当回合修掉，别带病往下跑**。
+- **自动（PostToolUse lint hook）**：你用 `Write` / `Edit` 改本 session 的 active board 后，lint hook（经 `spawn ccm`）自动校验；若发现结构 / 语法 / 格式错，会注入一条点名「违了哪条规则 + 哪个字段 / task + 怎么修」的非阻断提示——**看到就当回合修掉，别带病往下跑**。
 - **手动（随时跑 lint 脚本）**：当你用 **`Bash`（`sed` / `echo` / `cat >` / 脚本）改了 board**（lint hook 看不见这类编辑），或任何想确认 board 健康的时刻，主动跑：
 
   ```
   node ${CLAUDE_SKILL_DIR}/scripts/board-lint.js <你的-board-路径>
   ```
 
-  无参时它 lint home 里那块唯一的 active 板（多块则要你传路径）；`--json` 出结构化 `{errors, warnings}`。退出码非 0 = 有 hard fail，按报告修。
+  无参时它 lint home 里那块唯一的 active 板（多块则要你传路径）；`--json` 出结构化 `{errors, warnings}`。退出码非 0 = 有 hard fail，按报告修。（脚本内部转译为 `ccm board lint`——契约不变。）
 
 **lint 校验什么**：合法 JSON、窄腰字段齐全且类型对（`schema` / `goal` / `owner{active,session_id}` / `git` / `tasks[]`）、每个 task 的 `{id,status,deps}` + `status` 在 enum 内、**deps 图完整（无悬挂引用 / 无自环 / 无环）**、**nesting 不变式（ADR-012 · `parent` 边）**：R7a `parent` 引用必须存在（hard error，类比悬挂 dep）/ R7b depth=1（owner 的子不能再有子，hard error）/ R7c parent 链无环（hard error）/ R7d rollup 一致性（status=done 的 owner 不应有非 done 子——**warn**，不 hard fail：容「父整合中、子刚标完」的瞬态）、**awaiting-user 完整性（采访闭环兜底）**：R8a awaiting-user 节点（`blocked_on:"user"` + status ∈ {blocked, in_flight}）**必须**有 `decision_package` 对象（hard error）/ R8b 包字段不全（`context_md`·`what_i_need`·`enter_cmd` 非空、`ask_type` ∈ enum、decision 型 `options` 非空、`inputs_hash` 为 `sha256:<hex>`）→ **warn**（详见上方 §decision_package「lint 强制」+ 红线 2 论证）。
 
 **lint 绝不约束你的自由（红线 2）**：你给 task 加任何柔性字段、省略任何柔性边（`title` / `artifact` / `wip_limit` / 三时间戳…）——lint 一律不报错（silent-on-unknown）。它只在窄腰被破、JSON 不合法、或 deps 图坏了时出 hard fail；柔性边（`blocked_on` 指向未知、时间戳格式不合、`wip_limit` 非数字…）至多 warn、从不 fail。
 
 **何时务必手动跑**：① 刚用 `sed` / `echo` 等 Bash 手段改过 board；② 大改 `tasks[]`（重规划 / supersession 批量改 status / 重接 deps）后；③ compaction 后重建模型、对 board 健康存疑时；④ `--resume` 认领一块旧板后（确认它没在归档期间被写坏）。
+
+## 图分析 advisory —— 机器算的临界路径 / impact / rollup（只读，永不回写 board）
+
+lint 守「board 写得对不对」；**图分析**则在 board 写对之后回答「这张 DAG 长什么样」——替你心算大图时易错的临界路径 / 并行度等。引擎同一份 SSOT（`@ccm/engine`，ADR-014）；你经 `ccm board graph`（或 skill 封装 `node ${CLAUDE_SKILL_DIR}/scripts/board-graph.js`）取数，**纯只读、只出 stdout/`--json`，绝不回写 board**（红线 2）。
+
+`ccm board graph --json` 现已**全表面暴露**（此前引擎有句柄但 CLI 未渲染、advisory 取不到——现已可用）：
+
+- **拓扑基本面**：`topoOrder` / `cycle`（环检测）/ `readySet`（依赖已满足可派的节点）/ `criticalPath`（机器算的临界链 + makespan）/ `parallelism`（理论并行度）。
+- **`impact`**：逐节点的下游传递闭包 `{ <id>: { count, descendants[] } }`——这个节点卡住会连累哪些下游、连累几个（决「先派哪个最解锁」）。
+- **`rollup`**：逐 owner 的子完成度 `{ owners: { <owner>: {done,total,ratio,children[]} }, inconsistencies: [...] }`——owner 容器进度条 + 「owner 标 done 但有子未 done」的不一致清单。
+- **`nesting`**：depth-1 越界（孙节点）+ parent 环检测。
+
+> **advisory ≠ gate**：图分析是**只读分析**，给编排决策当输入（机器算的临界路径胜过心算）；它**不**强制任何东西。owner rollup 一致性这道**关卡**仍由 hook 强制（verify-board Stop 软提醒 + board-lint R7d `GRAPH-ROLLUP` warn，见上方 lint 段）——「检测 + 提醒」是 lint/hook 的事，advisory 只把同一份事实摆给你看。
 
 ## 示例（与 `board.example.json` 一致）
 
