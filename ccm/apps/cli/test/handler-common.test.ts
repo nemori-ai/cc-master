@@ -255,7 +255,7 @@ test('runWrite --force overrides hard error and writes', () => {
   assert.equal(onDisk.goal, 999);
 });
 
-test('runWrite warnings surfaced to stderr but do not block write', () => {
+test('runWrite warnings → 默认只一行摘要（QA #6·不刷屏），不挡写', () => {
   // 加一个 type=development 但缺 spec/plan 引用的 task → BIZ-DEV-REFS warn（不挡）。
   const { boardPath } = mkBoardHome();
   const ctx = mkCtx(boardPath);
@@ -266,9 +266,25 @@ test('runWrite warnings surfaced to stderr but do not block write', () => {
   });
   assert.equal(code, EXIT.OK);
   assert.deepEqual(ctx.outBuf, ['written-with-warn']);
-  assert.ok(ctx.errBuf.join('\n').includes('[warn]'), 'warnings surfaced');
+  const errStr = ctx.errBuf.join('\n');
+  // QA #6：默认成功写**不**重打整板 warning 全文（不含 [warn] 段），只一行摘要（含 warning 计数 + 指路）。
+  assert.ok(!errStr.includes('[warn]'), '默认不打全量 warning 报告');
+  assert.ok(errStr.includes('warning') && errStr.includes('lint:'), '一行摘要含 warning 计数');
   const onDisk = JSON.parse(readFileSync(boardPath, 'utf8'));
   assert.ok(onDisk.tasks.find((t: { id: string }) => t.id === 'TW'));
+});
+
+test('runWrite warnings → --verbose 展开全量 [warn] 报告（QA #6）', () => {
+  const { boardPath } = mkBoardHome();
+  const ctx = mkCtx(boardPath, { flags: { verbose: true } });
+  const code = common.runWrite(ctx, {
+    mutate: (board) =>
+      mutations.addTask(board as common.BoardArg, { id: 'TW', type: 'development' }),
+    render: () => 'written-with-warn',
+  });
+  assert.equal(code, EXIT.OK);
+  // verbose 下恢复全量 warning 报告（含 [warn] 行）——给想看细节的人。
+  assert.ok(ctx.errBuf.join('\n').includes('[warn]'), 'verbose 下全量 warning surfaced');
 });
 
 test('runWrite does NOT catch mutation throw (bubbles to router)', () => {

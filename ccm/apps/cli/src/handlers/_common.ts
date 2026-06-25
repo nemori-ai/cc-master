@@ -188,7 +188,11 @@ export function parseKv(spec: unknown): SetOp {
 // runWrite / runRead 回调签名。render 的第三参（{dryRun}）只在 runWrite 传。
 type ResolveFn = (ctx: Ctx) => { boardPath: string; board: unknown };
 type MutateFn = (board: unknown, ctx: Ctx) => unknown;
-type WriteRenderFn = (next: unknown, ctx: Ctx, opts: { dryRun: boolean }) => string;
+type WriteRenderFn = (
+  next: unknown,
+  ctx: Ctx,
+  opts: { dryRun: boolean; boardPath: string },
+) => string;
 type ComputeFn = (board: unknown, ctx: Ctx) => unknown;
 type ReadRenderFn = (result: unknown, ctx: Ctx) => string;
 
@@ -246,17 +250,25 @@ export function runWrite(
       ctx.err(formatReport(res));
       return EXIT.VALIDATION;
     }
+    // QA #6：成功写不再每次重打整板 warning（多任务时刷屏、淹没确认）——默认只一行摘要 + 指路，
+    //   --verbose 才全量展开。hard error 仍走上方 EXIT.VALIDATION 分支全量打（那是写入闸要解释为何拒绝）。
     if (res.warnings.length > 0 && !flags.quiet) {
-      ctx.err(formatReport({ errors: [], warnings: res.warnings }));
+      if (flags.verbose) {
+        ctx.err(formatReport({ errors: [], warnings: res.warnings }));
+      } else {
+        ctx.err(
+          `lint: 0 hard error，${res.warnings.length} warning（\`ccm board lint\` 看详情；--verbose 展开）`,
+        );
+      }
     }
 
     if (flags.dryRun) {
-      ctx.out(render(next, ctx, { dryRun: true }));
+      ctx.out(render(next, ctx, { dryRun: true, boardPath }));
       return EXIT.OK;
     }
 
     io.writeFileAtomicSync(boardPath, `${JSON.stringify(next, null, 2)}\n`);
-    ctx.out(render(next, ctx, { dryRun: false }));
+    ctx.out(render(next, ctx, { dryRun: false, boardPath }));
     return EXIT.OK;
   });
 }

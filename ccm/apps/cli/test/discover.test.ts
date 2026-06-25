@@ -271,6 +271,44 @@ test('resolveBoard: sid given, only an INACTIVE board with that sid → NotFound
   );
 });
 
+// ── QA #1：sid given + 未认领板（session_id=""）兜底 ────────────────────────────────────────────────
+//   `ccm board init` 建的板 session_id=""（非 arming）。当 sid 给定（继承 CLAUDE_CODE_SESSION_ID）但无精确
+//   命中时，落「未认领」二档——这样 init→add 的 happy path 在 session 环境里也通（修复前必报 NotFound）。
+test('resolveBoard: sid given, unclaimed board (session_id="") → found (QA #1 fallback)', () => {
+  const { home } = mkHome();
+  const unclaimed = writeBoard(home, '01.board.json', { sessionId: '', active: true });
+  const xdg = mkXdg();
+  const { boardPath } = D.resolveBoard({
+    sid: 's-some-session',
+    env: { XDG_STATE_HOME: xdg, CC_MASTER_HOME: home },
+  });
+  assert.equal(boardPath, unclaimed, '未认领的 active 板应被任何 sid 安全取用');
+});
+
+test('resolveBoard: sid given, exact-sid board PREFERRED over unclaimed (QA #1 precedence)', () => {
+  const { home } = mkHome();
+  writeBoard(home, '01-unclaimed.board.json', { sessionId: '', active: true });
+  const mine = writeBoard(home, '02-mine.board.json', { sessionId: 's-me', active: true });
+  const xdg = mkXdg();
+  const { boardPath } = D.resolveBoard({
+    sid: 's-me',
+    env: { XDG_STATE_HOME: xdg, CC_MASTER_HOME: home },
+  });
+  // 本 session 已认领的板永远盖过未认领板（exact 档非空时不落 unclaimed 档）。
+  assert.equal(boardPath, mine);
+});
+
+test('resolveBoard: sid given, multiple unclaimed (no exact) → Ambiguous (QA #1)', () => {
+  const { home } = mkHome();
+  writeBoard(home, '01.board.json', { sessionId: '', active: true, goal: 'first' });
+  writeBoard(home, '02.board.json', { sessionId: '', active: true, goal: 'second' });
+  const xdg = mkXdg();
+  assert.throws(
+    () => D.resolveBoard({ sid: 's-x', env: { XDG_STATE_HOME: xdg, CC_MASTER_HOME: home } }),
+    (e: any) => e.errKind === 'Ambiguous',
+  );
+});
+
 // ── resolveBoard: home discovery, no sid (human terminal) ──────────────────────────────────────────
 test('resolveBoard: no sid → unique active board', () => {
   const { home } = mkHome();

@@ -234,21 +234,32 @@ export function resolveBoard({
   const files = listBoardFiles(home);
 
   if (sid) {
-    // sid 可用：boardMatches 精确锚（active && session_id===sid）。命中 0 → NotFound（绝不退化抓唯一 active）。
-    const hits: ResolvedBoard[] = [];
+    // sid 可用：两档匹配（QA #1·镜像 hook「绝不抢他 session 已认领板」精神，但容未认领板被取用）。
+    //   一档 exact —— active && session_id===sid（本 session 已 arm/认领的板·最优先）。
+    //   二档 unclaimed —— active && session_id===""（`ccm board init` 建的未认领板：没被任何 session
+    //     认领，任何 session 取用都安全；这不是「退化抓唯一 active」——绝不碰他 sid 已认领的板）。
+    //   仅当 exact 全空时才落 unclaimed——故本 session 的板永远盖过未认领板。
+    const exact: ResolvedBoard[] = [];
+    const unclaimed: ResolvedBoard[] = [];
     for (const f of files) {
       const b = readBoardFile(f);
-      if (b && boardMatches(b, sid) && goalMatches(b, goalSubstr)) {
-        hits.push({ boardPath: f, board: b });
-      }
+      if (!b || !goalMatches(b, goalSubstr)) continue;
+      const owner = b.owner;
+      if (!owner || typeof owner !== 'object' || owner.active !== true) continue;
+      if (owner.session_id === sid) exact.push({ boardPath: f, board: b });
+      else if (!owner.session_id) unclaimed.push({ boardPath: f, board: b });
     }
+    const hits = exact.length > 0 ? exact : unclaimed;
     if (hits.length === 0) {
-      throw discoverError(`No active board owned by session ${sid} found in ${home}`, 'NotFound');
+      throw discoverError(
+        `No active board owned by session ${sid}（也无未认领 active 板）found in ${home}；先 \`ccm board init\` 或传 --board <path>`,
+        'NotFound',
+      );
     }
     if (hits.length > 1) {
-      // 同一 sid 多块 active（异常但防御）：归 Ambiguous，让调用者用 --board/--goal 消歧。
+      const tier = exact.length > 0 ? `match session ${sid}` : 'unclaimed（session_id 空）';
       throw discoverError(
-        `Multiple active boards match session ${sid} in ${home}; pass --board or --goal to disambiguate`,
+        `Multiple active boards ${tier} in ${home}; pass --board or --goal to disambiguate`,
         'Ambiguous',
       );
     }

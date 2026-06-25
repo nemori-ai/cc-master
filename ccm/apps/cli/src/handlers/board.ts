@@ -161,11 +161,17 @@ export function init(ctx: Ctx): number {
       const goal = ctx.values && typeof ctx.values.goal === 'string' ? ctx.values.goal : '';
       return mutations.boardInit({ goal });
     },
-    render: (board, c, { dryRun }) => {
+    render: (board, c, { dryRun, boardPath }) => {
       const b = board as { goal?: string };
       if (c.flags.json) return render.renderBoardSummary(b, { json: true });
-      const prefix = dryRun ? '[dry-run] 将建板: ' : 'board 已建: ';
-      return prefix + (b.goal ? `goal="${b.goal}"` : '(无 goal)');
+      const goalStr = b.goal ? `goal="${b.goal}"` : '(无 goal)';
+      // QA #13：建板后打印板路径 + 下一步，免得用户不知道板在哪 / 怎么接着加任务（同 home 下后续命令自动发现）。
+      if (dryRun) return `[dry-run] 将建板: ${goalStr}`;
+      return (
+        `board 已建: ${goalStr}\n` +
+        `  路径: ${boardPath}\n` +
+        '  下一步: ccm task add <id> --type development --title <标题>（同 home 下自动发现，或 --board <上面路径>）'
+      );
     },
   });
 }

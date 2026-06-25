@@ -451,6 +451,10 @@ test('board init --board <path> writes to the explicit path', () => {
   assert.equal(code, EXIT.OK);
   const onDisk = JSON.parse(readFileSync(target, 'utf8'));
   assert.equal(onDisk.goal, 'g');
+  // QA #13：建板输出应含板路径 + 下一步提示（免得用户不知道板在哪 / 怎么接着加任务）。
+  const out = ctx.outBuf.join('');
+  assert.ok(out.includes(target), 'init 输出含板路径');
+  assert.ok(out.includes('下一步'), 'init 输出含下一步提示');
 });
 
 test('board init --dry-run does not create any file', () => {
