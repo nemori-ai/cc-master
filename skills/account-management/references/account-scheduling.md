@@ -8,6 +8,7 @@
 - [单窗口恢复度推算](#单窗口恢复度推算)
 - [单号可用度评分（7d 硬总闸）](#单号可用度评分7d-硬总闸)
 - [选号主流程](#选号主流程)
+- [policy 机制硬闸（切号前读 board.policy）](#policy-机制硬闸切号前读-boardpolicy)
 - [权重与阈值（可 env 覆写）](#权重与阈值可-env-覆写)
 - [source 信任分级（最大精度风险）](#source-信任分级最大精度风险)
 - [边界处理](#边界处理)
@@ -43,6 +44,21 @@
    - 候选空 → `NONE`（无备号 / 单账号场景），保持现状。
    - 最优分 ≤ `SCORE_UNUSABLE_FLOOR` → `NONE_ALL_EXHAUSTED`（全员逼顶/不可用），**surface 用户**别盲切（脚本 exit 3）。
    - 否则返回 best email（脚本 stdout 纯 email，exit 0）。
+
+## policy 机制硬闸（切号前读 board.policy）
+
+`switch-account.sh` 在**真正覆写官方凭证存储之前**多一道**机制硬闸**：读 active board 的 `policy.autonomous_account_switch`，显式 `deny` 即**拒绝本次换号**（ADR-016 的纵深防御机制侧）。这是**机制**——「怎么 gate」；换号**决策**（何时换、谁授权、deny 时怎么 surface 给用户）归 `orchestrating-to-completion`（建议层 + 「绝不自授权」红线），不在本文复述（红线 3）。
+
+机制流程：
+
+1. **读 policy（进程边界·不 import 引擎）**：`switch-account.sh` 经 `ccm policy show --json` 读 active board，解析契约路径 `.data.effective.autonomous_account_switch`（`ccm policy show --json` 钉死形状）。纯 bash + node 解析 JSON（红线 1，不用 jq/python）。
+2. **deny → 拒绝切号**：值显式为 `"deny"` → **exit 7**（policy-deny-blocked 专属码），并：
+   - **不取换号锁、不覆写任何官方凭证存储、registry 原封不动**——拦在覆写之前，零副作用。
+   - **越界响亮**：stderr 提示「机制层硬闸：deny，拒绝本次自主换号」+ best-effort 往 board.log 记一条 `decision`（「机制层按 board.policy=deny 拦下一次自主换号」），供用户审计（ccm log 调用失败无害）。
+   - 提示用户：如需换号，须先 `ccm policy set --autonomous-account-switch=allow --user-authorized` 改 board policy 再重试。
+3. **fail-open 放行（ADR-016 §2.3）**：以下情形一律解析为 `allow`、放行换号——**ccm 不在 PATH / `ccm policy show` 调用失败 / 输出非合法 JSON / 无 active board / `policy` 字段缺 / 值非 `"deny"`**。即**只有显式 `"deny"` 才拦**，读不出就放行（不把没接 ccm 的环境误锁，同既有「ccm 缺则优雅降级」模式）。
+
+> **诚实记账**：这是纵深防御的安全网，**不是硬锁**——agent 有 shell，理论上能 `--force` 绕过或直接改文件；价值在「让擅自换号从一句合理化变成要主动绕两道闸、且每次都在 log 留痕」。机制层只在 deny 时拦下并报响，不替编排做「换不换」的决策。
 
 ## 权重与阈值（可 env 覆写）
 

@@ -99,7 +99,10 @@
 | `watchdog` | board 顶层 | `ccm watchdog arm / disarm` | 无 watchdog 时 Stop hook 提醒你 arm |
 | `task.wip_limit` | task 级 | `ccm task add/update --wip-limit N` | 覆写 owner_wip_limit（per-owner cap） |
 
-**board 级 ✎ 字段（走专属 noun、不经 `--set`）：** `baseline`——EVM 计划基线（plan 基线 SSOT），用 `ccm baseline snapshot / show / reset` 维护；缺→无 EVM baseline，形状坏→`FMT-BASELINE` warn。命令详见 command-catalog 的 baseline namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-BASELINE`。
+**board 级 ✎ 字段（走专属 noun、不经 `--set`）：**
+
+- `baseline`——EVM 计划基线（plan 基线 SSOT），用 `ccm baseline snapshot / show / reset` 维护；缺→无 EVM baseline，形状坏→`FMT-BASELINE` warn。命令详见 command-catalog 的 baseline namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-BASELINE`。
+- `policy`——框定本块板 master-orchestrator 自主权限的**可扩展对象**（ADR-016），首条键 `autonomous_account_switch` ∈ `{'allow','deny'}`（门控是否允许 orchestrator 自主换号）；**缺省 = allow**（向后兼容旧板·读不到一律解析为 allow），形状坏→`FMT-POLICY` warn。用 `ccm policy show / set` 维护（`set` 写为用户所有、非 TTY 须 `--user-authorized`）；命令详见 command-catalog 的 policy namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-POLICY`。
 
 > **不要把 observed 字段写进硬 waist。** 这三档的边界由 `ccm` 引擎 `@ccm/engine` 的 board-model 权威定义（`FIELDS` 元数据标注每字段的 tier）；改边界需走 PR + hook + 测试同步（红线 2）。
 
@@ -775,6 +778,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `FMT-JUDGMENT-CALLS` | warn | `judgment_calls` 非数组，或条目 `summary` 空、`category`/`severity`/`status` 不在各枚举内、时间戳非 ISO | 用 `ccm jc add/resolve` 而非手拼——见 [H 节](#h-judgment_calljc何时建severity-怎么定) |
 | `FMT-CADENCE` | warn | `cadence` 非对象，或 iteration 的 `id` 空、`status` 不在 {open,shipped}、时间非 ISO、`members` 非字符串数组 | 用 `ccm cadence update/open/ship`；deadline 严格 UTC——见 [I 节](#i-cadence-与-iteration节奏怎么定) |
 | `FMT-BASELINE` | warn | `baseline` 非对象，或 `captured_at`/`t0`/`history[].reset_at` 非严格 ISO-8601 UTC、`task_estimates`/`dag_snapshot` 非对象、`bac_h` 非数字、`history` 非数组 | 用 `ccm baseline snapshot/reset` 维护、别手拼；时间严格 UTC（estimate evm 读它，格式不对则 EVM 时间轴错位） |
+| `FMT-POLICY` | warn | `policy` 非对象，或 `autonomous_account_switch` 不在 `{allow, deny}` 枚举内 | 用 `ccm policy set --autonomous-account-switch=allow\|deny`（缺省解析为 allow）；值仅这两个——非法值会让 switch-account.sh 机制硬闸的开关判定失效（退化为 allow） |
 | `FMT-ESTIMATE` | warn | `estimate` 不是 `{value:number, unit:string}` 对象 | `--estimate 3h`（ccm 自动解析成对象），别手拼——见 [E 节](#e-estimate-怎么估) |
 | `FMT-ACCEPTANCE` | warn | `acceptance` 既非字符串也非对象，或对象 `criteria` 空、`criterion.status` 不在 {pending,met,failed} | `--accept "一句话"` 或 `--set-json acceptance={criteria:[...]}`——见 [D 节](#d-acceptance-怎么写好) |
 | `FMT-TIME` | warn | 时间锚（`created_at`/`started_at`/`finished_at`/`owner.heartbeat`）存在却非严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`） | 用 ccm verb 自动盖戳（盖标准格式）；手填时严格 UTC 定宽、无时区偏移、无毫秒 |

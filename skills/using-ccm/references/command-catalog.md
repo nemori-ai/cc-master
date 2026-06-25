@@ -51,6 +51,9 @@
   - [baseline snapshot](#baseline-snapshot)
   - [baseline show](#baseline-show)
   - [baseline reset](#baseline-reset)
+- [namespace policy](#namespace-policy)
+  - [policy show](#policy-show)
+  - [policy set](#policy-set)
 - [--json 输出形状](#--json-输出形状)
 
 ---
@@ -77,6 +80,7 @@ ccm <alias> [args] [flags]
 | `cadence` | 节奏 / iteration 收口 |
 | `watchdog` | 自我唤醒 watchdog（ADR-011） |
 | `baseline` | EVM 计划基线快照（estimate 引擎的 plan SSOT·board 内唯一写 noun·ADR-015） |
+| `policy` | board 级 orchestrator 自主权限开关（首条 `autonomous_account_switch`·写 noun·用户所有·ADR-016） |
 
 ### Aliases
 
@@ -867,6 +871,46 @@ ccm baseline reset [flags]
 
 ---
 
+## namespace policy
+
+board 级 orchestrator 自主权限（ADR-016）：`board.policy` 是框定本块板 master-orchestrator 自主权限的可扩展对象，首条键 `autonomous_account_switch`（`allow`/`deny`）门控**是否允许 orchestrator 自主换号**。**写 noun**——`set` 改 board 状态，刻意置于只读 namespace 之外（同 baseline 定位）。policy 写**视权限为用户所有**（self-grant 防护）：非 TTY 须显式 `--user-authorized` 才能写。缺省 / 缺字段一律解析为 `allow`（向后兼容旧板）。
+
+### policy show
+
+**读**
+
+```
+ccm policy show [flags]
+```
+
+- positional：无
+- 行为：只读当前 active board 的 `policy` + 解析后的 `effective` 有效值（缺省 `autonomous_account_switch=allow`）；无 policy 段也 exit 0
+- flags：`--json`（结构化输出）
+- 例：`ccm policy show` · `ccm policy show --json`
+
+### policy set
+
+**写**
+
+```
+ccm policy set --autonomous-account-switch=allow|deny [flags]
+```
+
+- positional：无
+- 行为：设 `board.policy.autonomous_account_switch`；append 一条 `decision` 到 board.log（记 旧值→新值 + 是否 user-authorized·供审计）。**非 TTY 无 `--user-authorized` → exit 2（USAGE·授权闸）**——policy 为用户所有，agent 在非交互上下文不得自授权
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--autonomous-account-switch <v>` | | enum（必填） | `allow`（允许自主换号）\| `deny`（禁止自主换号） |
+| `--user-authorized` | | bool | 非 TTY 时显式授权（破坏性授权操作·缺则 exit 2） |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm policy set --autonomous-account-switch=deny --user-authorized`（锁死本板自主换号）
+- ⚠️ **绝不自授权**：orchestrator-agent 绝不自己加 `--user-authorized` 翻 policy（那是 self-grant·越权）——该标记只由用户给（决策纪律见 orchestrating-to-completion）。机制硬闸侧：`account-management` 的 `switch-account.sh` 在覆写凭证前也读 `policy.autonomous_account_switch`、`deny` 即拒并 exit 7（纵深防御兜底）
+
+---
+
 ## --json 输出形状
 
 通用信封：成功 `{"ok": true, "data": <below>}`，失败 `{"ok": false, "exit": N, "error": "…", "violations": []}`。以下只列 `data` 形状。
@@ -997,3 +1041,24 @@ id 不存在时 `data` = `null`，exit 0。
 ### watchdog status（`ccm watchdog status --json`）
 
 `data` = `null`（无 watchdog）或 watchdog 对象。
+
+### policy show（`ccm policy show --json`）
+
+`data` = `{ policy, effective }`——`policy` 是 board 上的原始对象（无 policy 段 → `null`），`effective` 是解析后的有效值（缺省补 `allow`）：
+
+```json
+{
+  "policy": { "autonomous_account_switch": "deny" },
+  "effective": { "autonomous_account_switch": "deny" }
+}
+```
+
+机制硬闸 / 编排建议层读 `.data.effective.autonomous_account_switch`（钉死路径）。
+
+### policy set（`ccm policy set --json`）
+
+`data` = `{ policy }`（写入后的 policy 对象）：
+
+```json
+{ "policy": { "autonomous_account_switch": "deny" } }
+```

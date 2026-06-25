@@ -126,7 +126,12 @@ Pacing 是双向的：墙迫近时**节流而不停**（减速侧），有余量
 
 上面的减速侧 lever（降档 / 降 WIP / 推迟 float）是**轻 lever**——它们在**同一份配额内**腾挪、不换底层容量。当一份配额真要在本窗口烧穿、而你手上还握着**未消费的备号**（effective-N>1，号池里有可切入的备号，见上 §多账号并行）时，有一根**最重的 lever**：**切到下一份配额（换号），把整张 board 续过去继续跑。** 它是 §多账号并行里「N>1 时撞 5h 墙是『切下一份配额』信号、不是减速信号」那句话的**落地机制**。
 
-> **lever 阶梯——换号永远排在最后。** 先用尽所有轻 lever（降档 / 降 WIP / 推迟高 float），只有当「本窗口的真实容量确实不够装完该装的活、**且** `num_account` 仍有未消费余号」时才上换号。换号现在是**无重启的凭证覆写**（switch 覆写官方共享凭证、运行中 claude 惰性 re-read 接管新号·见下），比从前的「exec 重启 + handoff」轻得多、无 session 边界、无上下文丢失风险——但它仍是**换底层容量**的动作（不是同一份配额内腾挪），故仍排在轻 lever 之后、不是日常节流手段。**7d≥85% 总闸下尤其注意**：换号会刷新新号的 7d 窗，所以它是「7d 逼顶 surface 给用户的那个决策」里**用户可选的一个响应**（与「暂停续耗」并列）——但**切不切由用户拍**（同 §目标走廊 的总闸纪律），编排器 surface 选项、不擅自跨这条不可逆消耗边界。
+> **换号前必先过 board-policy 闸（ADR-016）。** 在拍「要不要换号」之前，先确认这块板**是否被授权自主换号**：跑 `ccm policy show --json` 读 `.data.effective.autonomous_account_switch`（缺省 = `allow`，向后兼容旧板）。
+> - **`deny`** → **绝不自主换号**。把「是否授权这块板自主换号」当成一个 `blocked_on:"user"` 决策 surface 给用户、等用户拍板，绝不擅自切。
+> - **红线『绝不自授权』**：你**绝不**自己 `ccm policy set --autonomous-account-switch=allow ...` 去给自己放权——那是 self-grant，与擅自 merge 同属越权（policy 写是用户所有，非 TTY 须 `--user-authorized`，那个标记只该由用户给）。改 policy 的决策永远归用户。
+> - 机制层另有一道**硬闸兜底**（`account-management` 的 `switch-account.sh` 在覆写凭证前也会读 board.policy、`deny` 即拒并 exit 7 + log 留痕）——它是**纵深防御的安全网、不是许可绕过**：它存在不代表你可以省掉建议层这道判断，更不代表 `allow`-fail-open 时就该随手切（切不切仍要过上面的 lever 阶梯 + 用户拍板纪律）。机制细节单向引用 `account-management`（`${CLAUDE_PLUGIN_ROOT}/skills/account-management/`），本文不复述。
+
+> **lever 阶梯——换号永远排在最后。** 先用尽所有轻 lever（降档 / 降 WIP / 推迟高 float），只有当「本窗口的真实容量确实不够装完该装的活、**且** `num_account` 仍有未消费余号、**且** board-policy 授权自主换号（见上）」时才上换号。换号现在是**无重启的凭证覆写**（switch 覆写官方共享凭证、运行中 claude 惰性 re-read 接管新号·见下），比从前的「exec 重启 + handoff」轻得多、无 session 边界、无上下文丢失风险——但它仍是**换底层容量**的动作（不是同一份配额内腾挪），故仍排在轻 lever 之后、不是日常节流手段。**7d≥85% 总闸下尤其注意**：换号会刷新新号的 7d 窗，所以它是「7d 逼顶 surface 给用户的那个决策」里**用户可选的一个响应**（与「暂停续耗」并列）——但**切不切由用户拍**（同 §目标走廊 的总闸纪律），编排器 surface 选项、不擅自跨这条不可逆消耗边界。
 
 > **切换前/后注意事项（拍板前必权衡的约束）。** 换号不是免费的——surface 给用户拍板时，编排者该知道这几条真实约束（机制细节单向引用 `account-management`，本文只立编排须知）：
 > - **覆写的是全局登录**：switch 覆写 `$USER` 视角的官方共享凭证三存储 → **本机所有 claude session 一起切到新号**（不只本编排）。这是好处（pacing 口径变准）也是必须知道的副作用——多 session 并跑时换号会连带把别的 session 也切过去。
@@ -140,7 +145,7 @@ Pacing 是双向的：墙迫近时**节流而不停**（减速侧），有余量
 
 这里只留**编排决策序列**（无重启形态，4 步）：
 
-1. **探测** —— 在 pacing 决策点跑 `${CLAUDE_SKILL_DIR}/scripts/cc-usage.sh`，读账户权威 `used_percentage`。触发：5h 或 7d 逼顶（如 ≥95%）**且**号池里有可切入的备号（effective-N>1）。
+1. **探测 + policy 闸** —— 在 pacing 决策点跑 `${CLAUDE_SKILL_DIR}/scripts/cc-usage.sh`，读账户权威 `used_percentage`。触发：5h 或 7d 逼顶（如 ≥95%）**且**号池里有可切入的备号（effective-N>1）。**先过 board-policy 闸**（见上「换号前必先过 board-policy 闸」）：`ccm policy show --json` 的 `autonomous_account_switch==deny` → 不自主换号，把授权问题 surface 给用户（绝不自授权）。
 2. **拍板** —— 选号是机械的（`account-management` 的 `select-account.js` 按各号配额恢复度选最优切入号），但**切不切由用户拍**——尤其全员逼顶（select exit 3）必 surface 给用户、绝不盲切（对齐 7d 总闸纪律）。
 3. **切（机制归 account-management）** —— 跑 `switch-account.sh`：它续期新号 → 覆写官方三存储（`$USER` 视角·原子写·全或无回滚）→ 翻 registry `active`。token 全程经 vault 读 / refresh POST body / 三存储写，**绝不进 agent / 绝不进 registry**（写 keychain 的本机 `security` argv 是单一例外·机制见 `account-management`；确切命令 / 覆写顺序 / 失败模式见 `account-management`，含 `references/vault-security.md`）。
 4. **续跑** —— claude 进程惰性 re-read 接管新号后照常推进；board 没动、整张 DAG 没忘。账号切了，目标没忘。
