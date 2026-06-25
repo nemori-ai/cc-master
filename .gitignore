@@ -9,3 +9,5 @@ tests/**/.tmp-*/
 # working plans + build board — not version-controlled
 design_docs/plans/
 .gstack/
+# build cache (turborepo)
+.turbo/
