@@ -5,28 +5,38 @@
 // 落点为何在这（skills/orchestrating-to-completion/scripts/）：它是 agent/orchestrator 会在决策点主动跑的
 //   运行时带外脚本（红线5 / Finding #37 落点纪律）—— prose 引用用 ${CLAUDE_SKILL_DIR}/${CLAUDE_PLUGIN_ROOT}
 //   绝对路径，绝不裸相对路径。它**显式被调用**（非 plugin 自动 hook），故不需武装闸（与 board-lint.js /
-//   cc-usage.sh / codex-review.sh 同）。它给 orchestrator 提供「机器算的临界路径 / float / 并行度 / impact /
-//   ready-set / owner rollup」——替代 status agent 心算（但**永不回写 board**·红线2，只 stdout/--json）。
+//   cc-usage.sh / codex-review.sh 同）。它给 orchestrator 提供「机器算的临界路径 / float / 并行度 /
+//   ready-set」——替代 status agent 心算（但**永不回写 board**·红线2，只 stdout/--json）。
 //
-// 红线1 / ADR-006：node/JS only，零 npm dep。复用同一份图核心（DRY）——核心住
-//   ${CLAUDE_PLUGIN_ROOT}/cli/src/board-graph-core.js（它再 require board-lint-core 的 buildGraph）。
-//   两目录都随 plugin 分发、一起 ship，故这条 plugin 内相对路径装机后稳定（依赖方向 skill→cli 合法）。
+// ★ADR-014 解耦（T4-3b 完成态）：图核心的唯一 SSOT 是 ccm 引擎（解耦后 `@ccm/engine`）。本脚本经
+//   **进程边界 shell 调全局 `ccm` 二进制**（`ccm board graph --board <path> --json` + `ccm board show
+//   --board <path> --json`）取数，**绝不 in-process require 引擎源码**（红线1 进程边界；3b 已删整个 cli/）。
+//   它是用户**显式手动跑**的脚本（非 hook），故 ccm 缺/坏时**明确友好报错退非 0**（不静默降级）。
+//   · 调用约定：`CCM_BIN`（绝对路径可执行）是 dev/test/自定义安装的覆写口；生产 `ccm` 在 PATH。
 //
-// CLI：
-//   node board-graph.js <board-path>          人读摘要：临界链 / ready-set / bottleneck / 并行度 / owner rollup
+// ★ccm CLI 表面收窄（设计稿 board-cli-design §3 line65 有意为之）：ccm `board graph --json` 只暴露
+//   **拓扑 / 环 / readySet / 临界路径(chain·makespan·weight_source) / 并行度(T1·Tinf·ratio)**；`board show
+//   --json` 补 **statusCounts**（用来还原 WIP 计数）。ccm **未暴露**的三个旧表面——**逐节点 impact
+//   （descendants 传递闭包）/ 逐 owner rollup 进度 / nesting 检查（depth-1 · parent 环）**——引擎里有，但
+//   CLI 没渲染出来。本脚本对这三个 `--cmd` / 摘要段**不臆造、明确报「ccm 当前未暴露此能力」**（停下报告，
+//   等 ccm 决定是否扩表面；绝不 in-process 绕过红线1 进程边界自己算）。
+//
+// 红线1 / ADR-006：node/JS only，纯 stdlib（fs/path/child_process），零 npm dep，零网络。
+//
+// CLI（契约保持，转译为 ccm 调用）：
+//   node board-graph.js <board-path>          人读摘要：临界链 / ready-set / WIP / 并行度
 //   node board-graph.js                        无参 → home 下唯一 active 板（多块则提示传路径）
-//   node board-graph.js --json [<path>]        结构化全量 JSON（供编排读）
-//   node board-graph.js --cmd <name> [<path>]  单项：critical | ready | wip | impact <id> | parallelism | rollup <owner>
-// 退出码：0 = 成功（含「有环但已报告」）；2 = usage/IO 错。**不因「图坏」非零退出**（分析+报告，gate 是 lint 的事）。
+//   node board-graph.js --json [<path>]        结构化 JSON（ccm board graph --json 的投影 + statusCounts）
+//   node board-graph.js --cmd <name> [<path>]  单项：critical | ready | wip | parallelism
+//     （impact <id> / rollup <owner> 当前 ccm 未暴露 → 明确报错退 2，不臆造）
+// 退出码：0 = 成功（含「有环但已报告」）；2 = usage/IO/ccm-不可用/未暴露能力。**不因「图坏」非零退出**。
 
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
+const { spawnSync } = require('child_process');
 
-// 解析共享核心：本脚本在 ${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/scripts/，核心在
-//   ${CLAUDE_PLUGIN_ROOT}/cli/src/ —— 从 __dirname 上溯三级（scripts → skill-name → skills → root）
-//   再下到该 ${CLAUDE_PLUGIN_ROOT}/cli/src。这条 plugin 内相对路径装机后稳定（红线5：两目录都 ship）。
-const CORE_PATH = path.resolve(__dirname, '..', '..', '..', 'cli', 'src', 'board-graph-core.js');
-const { analyzeGraph } = require(CORE_PATH);
+// CCM_BIN：dev/test/自定义安装的覆写口（绝对路径可执行）；缺则用 PATH 上的 `ccm`（生产）。
+const CCM_BIN = process.env.CCM_BIN || 'ccm';
 
 function die(msg, code) {
   process.stderr.write(msg + '\n');
@@ -60,112 +70,149 @@ function findSingleActiveBoard(homeDir) {
   return active[0];
 }
 
-// idTitle(g, id) → "id" 或 "id（title）"（人读摘要点名用）。
-function idTitle(g, id) {
-  const t = g.taskById.get(id);
-  const title = t && typeof t.title === 'string' ? t.title.trim() : '';
-  return title ? `${id}（${title}）` : id;
+// ccmJson(verb, boardPath) → ccm `board <verb> --board <path> --json` 的 data 字段。
+//   ccm 不可用（ENOENT / 非有效 JSON / 错误信封 / 形状不符）→ die(…,2)（手动脚本：让用户知道需要 ccm）。
+function ccmJson(verb, boardPath) {
+  let r;
+  try {
+    r = spawnSync(CCM_BIN, ['board', verb, '--board', boardPath, '--json'], {
+      encoding: 'utf8',
+      timeout: 15000,
+    });
+  } catch (e) {
+    die(`cc-master board-graph: 无法调用 ccm（${CCM_BIN}）—— ${(e && e.message) ? e.message : String(e)}\n` +
+        `  本脚本经全局 ccm 二进制取图（ADR-014 解耦）。怎么修：装 ccm 并确保它在 PATH，或设 CCM_BIN 指向 ccm 可执行。`, 2);
+  }
+  if (!r || r.error || r.signal) {
+    const why = r && r.error && r.error.code === 'ENOENT' ? `找不到 ccm（${CCM_BIN}）` :
+                (r && r.signal) ? `ccm 被信号 ${r.signal} 终止` : 'ccm 调用失败';
+    die(`cc-master board-graph: ${why}。\n` +
+        `  本脚本经全局 ccm 二进制取图（ADR-014 解耦）。怎么修：装 ccm 并确保它在 PATH，或设 CCM_BIN 指向 ccm 可执行。`, 2);
+  }
+  const stdout = typeof r.stdout === 'string' ? r.stdout : '';
+  let parsed;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch (_e) {
+    const stderr = typeof r.stderr === 'string' ? r.stderr.trim() : '';
+    die(`cc-master board-graph: ccm 没有返回有效 JSON（退出码 ${r.status}）。${stderr ? '\n  ccm stderr：' + stderr : ''}\n` +
+        `  怎么修：确认路径存在、且是合法 board JSON（先跑 board-lint），并确认 ccm 版本支持 \`board ${verb} --json\`。`, 2);
+  }
+  if (parsed && parsed.ok === false) {
+    const msg = typeof parsed.error === 'string' && parsed.error ? parsed.error : `ccm 退出码 ${parsed.exit}`;
+    die(`cc-master board-graph: ${msg}\n  怎么修：确认路径存在、可读，且是合法 board JSON（先跑 board-lint）。`, 2);
+  }
+  const data = parsed && typeof parsed === 'object' ? parsed.data : undefined;
+  if (data === undefined) {
+    die(`cc-master board-graph: ccm JSON 形状不符（缺 data）。\n  怎么修：确认 ccm 版本支持 \`board ${verb} --json\`。`, 2);
+  }
+  return data;
 }
 
-// CPM 临界链人读：诚实标注 weight_source；mixed/unit 只报结构 + 节点数，不报小时级 makespan/float（§5.6）。
-function formatCritical(g) {
-  const cp = g.criticalPath();
-  if (cp.weight_source === 'cycle') {
-    return `临界路径：deps 图有环（${cp.cycle.join(' → ')} → ${cp.cycle[0]}），CPM 在环上未定义——先用 board-lint 解环。`;
+// ── 人读格式化（消费 ccm board graph --json + board show --json 的投影）──────────────────────────────
+
+// formatCritical(graph) — CPM 临界链人读；诚实标注 weight_source（mixed/unit 只报结构，measured 才报 makespan）。
+function formatCritical(graph) {
+  const cp = (graph && graph.criticalPath) || {};
+  const chain = Array.isArray(cp.chain) ? cp.chain : [];
+  const ws = cp.weight_source || 'unit';
+  const cycle = graph && Array.isArray(graph.cycle) ? graph.cycle : null;
+  if (ws === 'cycle' || (cycle && cycle.length)) {
+    const c = cycle && cycle.length ? cycle : chain;
+    return `临界路径：deps 图有环（${c.join(' → ')}${c.length ? ' → ' + c[0] : ''}），CPM 在环上未定义——先用 board-lint 解环。`;
   }
   const lines = [];
-  const chainStr = cp.chain.length ? cp.chain.join(' → ') : '（空——无任务）';
-  lines.push(`临界链（${cp.chain.length} 节点）：${chainStr}`);
-  if (cp.weight_source === 'measured') {
+  const chainStr = chain.length ? chain.join(' → ') : '（空——无任务）';
+  lines.push(`临界链（${chain.length} 节点）：${chainStr}`);
+  if (ws === 'measured' && typeof cp.makespan === 'number') {
     lines.push(`  权重来源：measured（全节点有 measured 时长）；makespan ≈ ${cp.makespan.toFixed(2)}h。`);
   } else {
-    lines.push(`  权重来源：${cp.weight_source}（部分/全部节点缺 measured 时长）——只报临界链结构 + 节点数，` +
+    lines.push(`  权重来源：${ws}（部分/全部节点缺 measured 时长）——只报临界链结构 + 节点数，` +
                `不报小时级 float/makespan（避免伪精确）。补全 started_at/finished_at 后可得真 CPM。`);
   }
   return lines.join('\n');
 }
 
-function humanSummary(g) {
-  const lines = [];
-  lines.push('cc-master board-graph 摘要');
-  lines.push('');
-  lines.push(formatCritical(g));
-  lines.push('');
-  const ready = g.readySet();
-  lines.push(`ready-set（deps 全 done ∧ status=ready，可派发）：${ready.length ? ready.join(', ') : '（空）'}`);
-  const wip = g.wipStats();
-  lines.push(`WIP：in_flight=${wip.in_flight} · blocked=${wip.blocked} · 等用户=${wip.userGates}`);
-  const par = g.parallelism();
-  lines.push(`并行度：T₁=${par.T1}（总节点）· T∞=${par.Tinf}（临界链长）· 加速比≈${par.parallelism.toFixed(2)}（值得开几条道的上界）`);
-  // 最高 impact 节点（gating 最多下游）
-  let impactNode = null, impactMax = -1;
-  for (const id of g.ids) {
-    const v = g.descendants(id).size;
-    if (v > impactMax) { impactMax = v; impactNode = id; }
-  }
-  if (impactNode != null && impactMax > 0) {
-    lines.push(`最高 impact：${idTitle(g, impactNode)} gating ${impactMax} 个下游任务`);
-  }
-  // owner rollup（有 owner 时）
-  const owners = [...new Set([...g.ids].filter((id) => g.children(id).length > 0))];
-  if (owners.length) {
-    lines.push('');
-    lines.push('owner rollup（子 done 占比·advisory）：');
-    for (const o of owners) {
-      const rp = g.rollupProgress(o);
-      lines.push(`  ${idTitle(g, o)}：${rp.done}/${rp.total}（${(rp.ratio * 100).toFixed(0)}%）`);
-    }
-    const incon = g.rollupConsistency();
-    if (incon.length) {
-      lines.push('  ⚠ rollup 不一致（owner 标 done 但有非 done 子）：');
-      for (const v of incon) lines.push(`    ${v.owner} → 非 done 子：${v.nonDoneChildren.join(', ')}`);
-    }
-  }
-  return lines.join('\n');
-}
-
-// fullJson(g) — --json 全量结构化输出。Map → 普通对象/数组，便于 JSON.stringify。
-function fullJson(g) {
-  const cp = g.criticalPath();
-  const schedule = {};
-  for (const [id, s] of cp.schedule) schedule[id] = s;
-  const owners = [...new Set([...g.ids].filter((id) => g.children(id).length > 0))];
-  const rollup = {};
-  for (const o of owners) rollup[o] = { ...g.rollupProgress(o), children: g.children(o) };
+// wipFromShow(show) — 从 ccm board show --json 的 statusCounts 还原 WIP 计数（in_flight / blocked / 等用户）。
+//   注：ccm show 的 statusCounts 不区分 blocked_on:"user"（无 userGates 维），故等用户位用 blocked 总数注脚标。
+function wipCounts(show) {
+  const sc = (show && show.statusCounts) || {};
   return {
-    nodes: [...g.ids],
-    topo: g.topoSort(),
-    critical: { chain: cp.chain, makespan: cp.makespan, weight_source: cp.weight_source, schedule },
-    longestPath: g.longestPath(),
-    parallelism: g.parallelism(),
-    readySet: g.readySet(),
-    wip: g.wipStats(),
-    rollup,
-    rollupConsistency: g.rollupConsistency(),
-    nesting: { checkDepth1: g.checkDepth1(), parentCycles: g.parentCycles() },
+    in_flight: Number(sc.in_flight) || 0,
+    blocked: Number(sc.blocked) || 0,
   };
 }
 
-// runCmd(g, cmd, arg) → 单项输出字符串（--cmd）。未知 cmd → die(…,2)。
-function runCmd(g, cmd, arg) {
+function humanSummary(graph, show) {
+  const lines = [];
+  lines.push('cc-master board-graph 摘要');
+  lines.push('');
+  lines.push(formatCritical(graph));
+  lines.push('');
+  const ready = Array.isArray(graph.readySet) ? graph.readySet : [];
+  lines.push(`ready-set（deps 全 done ∧ status=ready，可派发）：${ready.length ? ready.join(', ') : '（空）'}`);
+  const wip = wipCounts(show);
+  lines.push(`WIP：in_flight=${wip.in_flight} · blocked=${wip.blocked}`);
+  const par = (graph && graph.parallelism) || {};
+  const T1 = par.T1 == null ? 0 : par.T1;
+  const Tinf = par.Tinf == null ? 0 : par.Tinf;
+  const ratio = typeof par.parallelism === 'number' ? par.parallelism.toFixed(2) : 'n/a';
+  lines.push(`并行度：T₁=${T1}（总节点）· T∞=${Tinf}（临界链长）· 加速比≈${ratio}（值得开几条道的上界）`);
+  // 逐节点 impact + owner rollup + nesting：ccm 当前未暴露（见文件头说明）——诚实标注，不臆造。
+  lines.push('');
+  lines.push('（逐节点 impact / 逐 owner rollup / nesting 检查：ccm `board graph` 当前未暴露这些表面——');
+  lines.push('  引擎里有但 CLI 未渲染。owner rollup 不一致这道 gate 仍由 hook〔verify-board / board-lint〕强制；');
+  lines.push('  此处摘要暂不提供这三项，待 ccm 扩 graph 表面后回填。）');
+  return lines.join('\n');
+}
+
+// fullJson(graph, show) — --json 全量结构化输出（ccm board graph --json 投影 + statusCounts）。
+function fullJson(graph, show) {
+  const cp = (graph && graph.criticalPath) || {};
+  return {
+    topo: Array.isArray(graph.topoOrder) ? graph.topoOrder : [],
+    cycle: graph && graph.cycle ? graph.cycle : null,
+    readySet: Array.isArray(graph.readySet) ? graph.readySet : [],
+    critical: {
+      chain: Array.isArray(cp.chain) ? cp.chain : [],
+      makespan: cp.makespan === undefined ? null : cp.makespan,
+      weight_source: cp.weight_source || null,
+    },
+    parallelism: (graph && graph.parallelism) || {},
+    statusCounts: (show && show.statusCounts) || {},
+    // ccm 未暴露的表面（见文件头）——明确以 null 标注「ccm 当前不提供」，不臆造数值。
+    impact: null,
+    rollup: null,
+    nesting: null,
+  };
+}
+
+// runCmd(graph, show, cmd, arg) → 单项输出字符串（--cmd）。impact/rollup → ccm 未暴露，明确报错退 2。
+function runCmd(graph, show, cmd, arg) {
   switch (cmd) {
-    case 'critical': return formatCritical(g);
-    case 'ready': { const r = g.readySet(); return r.length ? r.join('\n') : '（ready-set 空）'; }
-    case 'wip': { const w = g.wipStats(); return `in_flight=${w.in_flight} blocked=${w.blocked} userGates=${w.userGates}`; }
-    case 'parallelism': { const p = g.parallelism(); return `T1=${p.T1} Tinf=${p.Tinf} parallelism=${p.parallelism.toFixed(2)} brent=${p.brent}`; }
-    case 'impact': {
-      if (!arg) die(`cc-master board-graph: --cmd impact 需要一个 task id：--cmd impact <id>`, 2);
-      const d = g.descendants(arg);
-      return `${arg} gating ${d.size} 个下游：${d.size ? [...d].join(', ') : '（无）'}`;
+    case 'critical': return formatCritical(graph);
+    case 'ready': {
+      const r = Array.isArray(graph.readySet) ? graph.readySet : [];
+      return r.length ? r.join('\n') : '（ready-set 空）';
     }
-    case 'rollup': {
-      if (!arg) die(`cc-master board-graph: --cmd rollup 需要一个 owner id：--cmd rollup <owner>`, 2);
-      const rp = g.rollupProgress(arg);
-      const kids = g.children(arg);
-      return `${arg}：${rp.done}/${rp.total}（${(rp.ratio * 100).toFixed(0)}%）子：${kids.length ? kids.join(', ') : '（无·非 owner）'}`;
+    case 'wip': {
+      const w = wipCounts(show);
+      return `in_flight=${w.in_flight} blocked=${w.blocked}`;
     }
+    case 'parallelism': {
+      const p = (graph && graph.parallelism) || {};
+      const ratio = typeof p.parallelism === 'number' ? p.parallelism.toFixed(2) : 'n/a';
+      return `T1=${p.T1 == null ? 0 : p.T1} Tinf=${p.Tinf == null ? 0 : p.Tinf} parallelism=${ratio}`;
+    }
+    case 'impact':
+    case 'rollup':
+      die(`cc-master board-graph: --cmd ${cmd} 当前不可用——ccm \`board graph\` 未暴露逐节点 impact / 逐 owner rollup 表面\n` +
+          `  （引擎里有但 CLI 未渲染·设计稿有意收窄 graph 表面）。要按 owner rollup gate 把关请跑 board-lint（R7d）/ 看 verify-board 握手；\n` +
+          `  要 impact / rollup advisory 需先在 ccm 扩 \`board graph\` 表面。本脚本不 in-process 绕过红线1 进程边界自己算。`, 2);
+      break;
     default:
-      die(`cc-master board-graph: 未知 --cmd "${cmd}"。合法：critical | ready | wip | impact <id> | parallelism | rollup <owner>`, 2);
+      die(`cc-master board-graph: 未知 --cmd "${cmd}"。合法：critical | ready | wip | parallelism\n` +
+          `  （impact / rollup 当前 ccm 未暴露——见上）。`, 2);
   }
 }
 
@@ -181,7 +228,6 @@ function main() {
     else rest.push(a);
   }
   // 位置参数分两类：像路径的（含 / 或 .board.json）当 board 路径，其余当 cmd arg（impact <id> / rollup <owner>）。
-  //   这样 `--cmd impact M1 /path/x.board.json` 与 `--cmd impact M1`（无路径走 home）都正确解析。
   const looksPath = (s) => typeof s === 'string' && (s.includes('/') || s.endsWith('.board.json'));
   const pathArgs = rest.filter(looksPath);
   const nonPathArgs = rest.filter((s) => !looksPath(s));
@@ -194,22 +240,22 @@ function main() {
       path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), '.claude', 'cc-master');
     boardPath = findSingleActiveBoard(home); // 内部失败 die(…,2)
   }
+  boardPath = path.resolve(boardPath);
 
-  let board;
-  try {
-    board = JSON.parse(fs.readFileSync(boardPath, 'utf8'));
-  } catch (_e) {
-    die(`cc-master board-graph: 读不到或解析失败（${boardPath}）。\n  怎么修：确认路径存在、且是合法 board JSON（先跑 board-lint）。`, 2);
-  }
+  // impact / rollup 在取数前就拦（ccm 未暴露）——避免无谓 spawn。
+  if (cmd === 'impact' || cmd === 'rollup') runCmd(null, null, cmd, cmdArg);
 
-  const g = analyzeGraph(board);
+  const graph = ccmJson('graph', boardPath);
+  // statusCounts 来自 board show（WIP 计数）——只在需要时取（人读摘要 / --json / --cmd wip）。
+  const needShow = asJson || !cmd || cmd === 'wip';
+  const show = needShow ? ccmJson('show', boardPath) : null;
 
   if (asJson) {
-    process.stdout.write(JSON.stringify(fullJson(g)) + '\n');
+    process.stdout.write(JSON.stringify(fullJson(graph, show)) + '\n');
   } else if (cmd) {
-    process.stdout.write(runCmd(g, cmd, cmdArg) + '\n');
+    process.stdout.write(runCmd(graph, show, cmd, cmdArg) + '\n');
   } else {
-    process.stdout.write(humanSummary(g) + '\n');
+    process.stdout.write(humanSummary(graph, show) + '\n');
   }
   process.exit(0); // 成功（含「有环已报告」）——不因图坏非零退出
 }

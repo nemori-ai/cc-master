@@ -1,6 +1,6 @@
-# 图分析 —— 用 board-graph CLI 机器算临界路径 / float / 并行度 / impact / rollup
+# 图分析 —— 用 board-graph 脚本机器算临界路径 / float / 并行度
 
-> **服务愿景：C4**（分解 / 规划）**· C5**（资源预算内高效调度）。**何时读：** 想把 board 的临界路径 / float / 并行度 / impact / owner rollup 从「心算估计」升级到「机器算」时——CLI 每个 `--cmd` 算什么、怎么调、CPM 诚实性（mixed/unit 只报结构）、以及**何时机器算 vs 何时心算够用**的决策判据。
+> **服务愿景：C4**（分解 / 规划）**· C5**（资源预算内高效调度）。**何时读：** 想把 board 的临界路径 / float / 并行度 从「心算估计」升级到「机器算」时——脚本每个 `--cmd` 算什么、怎么调、CPM 诚实性（mixed/unit 只报结构）、以及**何时机器算 vs 何时心算够用**的决策判据。脚本经 `ccm board graph/show --json` 取数（ADR-014 进程边界）；逐节点 impact / 逐 owner rollup 当前 ccm 未暴露（见 §2）。
 
 ## 目录
 
@@ -18,8 +18,8 @@
 
 `board-graph.js` 是一个**手动带外 CLI**（住在 `${CLAUDE_SKILL_DIR}/scripts/board-graph.js`）——agent 在决策点**显式跑**它，**不是 plugin 自动 hook**。故它无武装闸、无 hook 注入短语（与 `cc-usage.sh` / `codex-review.sh` / `board-lint.js` 同族：显式被调、非自动注入）。它就是 `/cc-master:status` 与 `decomposition.md` 里那句「要真算 float / 临界链请走带外脚本」中的**那个脚本**。
 
-- **只读、永不回写 board**（红线 2）——临界路径 / float / 并行度 / rollup 都是 ephemeral 的 stdout / `--json` 输出，**绝不是 board 字段**。board 上没有机器算出来的 float；CLI 每次现算、不落盘。
-- **零 npm dep、node-only**（红线 1 · ADR-006）——复用 `${CLAUDE_PLUGIN_ROOT}/cli/src/board-graph-core.js` 这一份图核心（它再 require board-lint-core 的 `buildGraph`），与 board-lint **同一份图**、口径字节对齐（ADR-012）。
+- **只读、永不回写 board**（红线 2）——临界路径 / float / 并行度都是 ephemeral 的 stdout / `--json` 输出，**绝不是 board 字段**。board 上没有机器算出来的 float；脚本每次现算、不落盘。
+- **零 npm dep、node-only**（红线 1 · ADR-006），且**经进程边界 shell 调全局 `ccm` 二进制**取图（`ccm board graph --json` + `ccm board show --json`·ADR-014 解耦），**绝不 in-process require 引擎源码**——图核心的唯一 SSOT 是 `@ccm/engine`，与 board-lint **同一份图**、口径字节对齐（ADR-012）。`ccm` 缺/坏 → 脚本明确友好报错退非 0（手动脚本不静默降级）。
 - **不是什么**：
   - **不是 gate**——「图坏」（缺窄腰 / dep 悬挂 / 成环）它也 exit 0、只分析 + 报告；gate 是 `board-lint.js` / `verify-board.sh` 的事。
   - **不是可视化**——节点 + 边的图形 webview 是 `/cc-master:view`。
@@ -31,7 +31,7 @@
 
 引用一律用 `${CLAUDE_SKILL_DIR}` / `${CLAUDE_PLUGIN_ROOT}` 绝对引用——**裸相对路径禁止**（装机后相对用户 cwd 解析、找不到脚本·Finding #38/#39）。
 
-- **人读摘要**（临界链 / ready / WIP / 并行度 / 最高 impact / owner rollup 一把抓）：
+- **人读摘要**（临界链 / ready / WIP / 并行度 一把抓；逐节点 impact / 逐 owner rollup 当前 ccm 未暴露·见 §2）：
 
   ```bash
   node ${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/scripts/board-graph.js
@@ -39,7 +39,7 @@
 
   无参 → 取 home 下**唯一** active 板（多块 active 则报错、提示传显式路径——与 status / view 的「认板」纪律一致）。要点某块板就传它的绝对路径作末位参数。
 
-- **结构化全量**（供编排程序化读：`nodes` / `topo` / `critical` / `longestPath` / `parallelism` / `readySet` / `wip` / `rollup` / `nesting`）：
+- **结构化全量**（供编排程序化读：`topo` / `cycle` / `readySet` / `critical`{chain·makespan·weight_source} / `parallelism`{T1·Tinf·ratio} / `statusCounts`）：
 
   ```bash
   node ${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/scripts/board-graph.js --json [<board-path>]
@@ -53,12 +53,12 @@
   |---|---|
   | `critical` | CPM 临界链 + `weight_source` 诚实标注（measured 态给小时级 makespan；mixed/unit 只报结构·见 §3）。 |
   | `ready` | deps 全 `done` ∧ `status=ready` 的可派发集（严格语义——与决策程序 q_ready 同口径）。 |
-  | `wip` | `in_flight` / `blocked` / 等用户（userGates）计数。 |
-  | `impact <id>` | 该节点的传递闭包：它 gating 多少下游（bottleneck 定位）。 |
-  | `parallelism` | T₁（总节点）/ T∞（临界链长）/ 加速比 / Brent 上界。 |
-  | `rollup <owner>` | 某 owner 的子 done 占比（advisory、不 gate · D3 套娃）。 |
+  | `wip` | `in_flight` / `blocked` 计数（从 `ccm board show` 的 statusCounts 还原）。 |
+  | `parallelism` | T₁（总节点）/ T∞（临界链长）/ 加速比。 |
 
-  调用形态：`node ${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/scripts/board-graph.js --cmd impact <id> [<board-path>]`（`impact` / `rollup` 后跟 id，board 路径可选、缺则走 home 唯一 active 板）。
+  调用形态：`node ${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/scripts/board-graph.js --cmd critical [<board-path>]`（board 路径可选、缺则走 home 唯一 active 板）。
+
+  > **ccm graph 表面当前收窄（ADR-014）**：逐节点 **impact**（descendants 传递闭包·bottleneck 定位）、逐 owner **rollup** 进度、**nesting** 检查（depth-1 / parent 环）这三项**引擎里有、但 `ccm board graph` 当前未渲染出来**。脚本对 `--cmd impact` / `--cmd rollup` **明确报「ccm 未暴露此能力」退非 0、绝不臆造**（脚本经进程边界调 ccm·不 in-process 绕过红线1 自己算）。owner rollup **不一致这道 gate 仍由 hook 强制**（`verify-board` 完成态握手 + `board-lint` R7d·见 §4），不受影响——这里少的只是 impact / rollup 的**只读 advisory**。要这些 advisory 需先在 ccm 扩 `board graph` 表面。
 
 ---
 
@@ -78,11 +78,11 @@ CPM 要节点时长；board 三个时间锚（`created_at` / `started_at` / `fin
 
 ## 4. 与 D3 套娃 owner rollup 衔接
 
-`--cmd rollup <owner>`（与人读摘要的 owner rollup 段）读 `done_children / total_children`，给一个 **advisory** 进度（status agent 渲染进度条用）。
+owner rollup 进度 advisory（子 done 占比）原由 `--cmd rollup <owner>` 提供——**当前 `ccm board graph` 未暴露这个表面**（见 §2 收窄说明），脚本对它明确报错退非 0、不臆造。这只影响**只读 advisory**，**不影响 gate**：
 
-- **gate 语义不在这**——「父 done = 全子 done ∧ 父端点验收过」的 **gate** 由 hook（`verify-board` rollup gate + `board-lint` R7d）机器强制，归 `board.md` D3 小节 / ADR-012。CLI 只读**进度 advisory**，不驱动任何 gate。
-- 摘要还会报 **rollup 不一致**（owner 标 `done` 却有非 done 子）——这与 board-lint R7d 是同一份实现（`rollupConsistency()`、字节对齐），CLI 帮你**提前看见**lint 会拦的东西。
-- 一句话边界：**rollup 的 gate 在 hook、advisory 读在 CLI、概念在 `board.md` D3 小节**。
+- **gate 语义在 hook，不在这**——「父 done = 全子 done ∧ 父端点验收过」的 **gate** 由 hook（`verify-board` 完成态握手把 rollup 不一致点名进 self-check + `board-lint` R7d）机器强制，归 `board.md` D3 小节 / ADR-012。这道 gate **与 graph 脚本无关、照常生效**——它经 `ccm board lint` 的 `GRAPH-ROLLUP` violation 触达，不依赖 graph 脚本。
+- 想看「owner 标 `done` 却有非 done 子」**直接跑 `board-lint`**（R7d / GRAPH-ROLLUP），它就是 gate 的同一份实现——比 graph 脚本的旧 advisory 更权威。
+- 一句话边界：**rollup 的 gate 在 hook（经 ccm lint）、概念在 `board.md` D3 小节**；graph 脚本的 rollup advisory 待 ccm 扩表面后回填。
 
 ---
 
@@ -92,10 +92,10 @@ CPM 要节点时长；board 三个时间锚（`created_at` / `started_at` / `fin
 
 **该机器算（升级触发）——拓扑非平凡、心算开始出错时**：
 
-- 图有**非平凡的交错 fork/join**（钻石依赖、多源多汇、入度/出度 >1 的 join/fork 叠在一起）——这种图心算临界链开始估错（人脑追不准多条交错路径哪条最长）。
-- 要定位 **bottleneck**——「哪个节点 gating 最多下游」用 `--cmd impact`：传递闭包人脑算不准，机器一遍扫准。
+- 图有**非平凡的交错 fork/join**（钻石依赖、多源多汇、入度/出度 >1 的 join/fork 叠在一起）——这种图心算临界链开始估错（人脑追不准多条交错路径哪条最长）。`--cmd critical` / 人读摘要的临界链一遍扫准。
+- 要定位 **bottleneck**（「哪个节点 gating 最多下游」）——这原是 `--cmd impact` 的活，但 `ccm board graph` 当前未暴露逐节点 impact（见 §2）。退而求其次：看人读摘要的临界链 + ready-set 锁定瓶颈段，或待 ccm 扩表面。
 - 节点带 measured 时间锚——`--cmd critical` 给真 makespan / float（心算给不出小时数）。
-- resume 接手一块**陌生的复杂板** / compaction 后重认领——机器一把扫出临界链 + ready + WIP + 最高 impact，比逐 task 心算重建快且不漏。
+- resume 接手一块**陌生的复杂板** / compaction 后重认领——机器一把扫出临界链 + ready + WIP，比逐 task 心算重建快且不漏。
 
 **心算够用（默认快路径）——拓扑平凡时**：
 

@@ -65,7 +65,7 @@ echo "== node tests (content) =="
 # read as a module to execute and errors). So enumerate explicit test files via find — this
 # is version-stable (Node 18-26) and avoids the "all three dirs must exist" fragility of a
 # multi-glob `ls`. Our paths contain no spaces, so the unquoted expansion is intentional.
-node_tests=$(find tests cli/test -name '*.test.mjs' 2>/dev/null | sort)
+node_tests=$(find tests -name '*.test.mjs' 2>/dev/null | sort)
 if [ -n "$node_tests" ]; then
   # shellcheck disable=SC2086
   node --test $node_tests || fail=1

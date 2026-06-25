@@ -3,18 +3,41 @@
 # (skills/orchestrating-to-completion/scripts/board-lint.js — a RUNTIME out-of-band script shipped with
 # the skill, 红线5 / Finding #37), is invoked EXPLICITLY by agent/user (so it needs NO armed gate — like
 # cc-usage.sh / codex-review.sh), and lints any board path you hand it (or, with no arg, auto-finds the
-# single active board in home). It shares ONE lint core with the hook (cli/src/board-lint-core.js
-# — same source of truth, no drift) which the content test asserts.
+# single active board in home).
+#
+# ★T4-3b: the script no longer in-process `require`s a lint core — the whole cli/ is deleted. It now
+# shells out to the global `ccm` binary (`ccm board lint --board <path> --raw --json`), the ONE lint
+# SSOT (@ccm/engine). Being an EXPLICIT manual script (not a hook), ccm-missing → friendly error rc 2
+# (it tells the user "needs ccm"), never silent-degrade. We point CCM_BIN at the dev-bin node shim so
+# these assertions run through real ccm; if ccm/dist isn't built we build it (else skip with a note).
 #
 # CLI contract:
 #   node board-lint.js <board-path>     → lint that file
 #   node board-lint.js                  → lint the single active board under CC_MASTER_HOME (else error)
-#   node board-lint.js --json <path>    → emit structured {errors,warnings} JSON
-# Exit code: 0 = no hard error (may have warnings); 1 = at least one hard error; 2 = usage/IO error.
+#   node board-lint.js --json <path>    → emit structured {errors,warnings} JSON (projected from ccm violations)
+# Exit code: 0 = no hard error (may have warnings); 1 = at least one hard error; 2 = usage/IO/ccm-unavailable.
 set -uo pipefail
 
 PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SCRIPT="$PLUGIN_ROOT/skills/orchestrating-to-completion/scripts/board-lint.js"
+
+# ── ccm dev-bin shim：让脚本测试真走 ccm 路径（ADR-014·T4-3b）──────────────────────────────────────
+# run-tests.sh 已 export CCM_BIN（指向 dev-bin shim·已 build dist）。本测试也可独立跑：CCM_BIN 未设时
+# 自指向 shim，dist 缺则尝试 build。无 pnpm / build 失败 → 跳过（ccm 是唯一路径，无它无法测）。
+SHIM="$PLUGIN_ROOT/ccm/apps/cli/dev-bin/ccm"
+if [ -z "${CCM_BIN:-}" ]; then
+  if [ -f "$SHIM" ] && [ -f "$PLUGIN_ROOT/ccm/apps/cli/dist/index.cjs" ]; then
+    export CCM_BIN="$SHIM"
+  elif [ -f "$SHIM" ] && command -v pnpm >/dev/null 2>&1 && \
+       (cd "$PLUGIN_ROOT" && pnpm -C ccm build) >/dev/null 2>&1 && \
+       [ -f "$PLUGIN_ROOT/ccm/apps/cli/dist/index.cjs" ]; then
+    export CCM_BIN="$SHIM"
+  else
+    echo "(ccm dist NOT available — board-lint.js needs ccm; skipping test_board-lint.sh)"
+    echo "passed=0 failed=0"
+    exit 0
+  fi
+fi
 PASS=0; FAILED=0
 _red()  { printf '\033[31m%s\033[0m\n' "$1"; }
 assert_eq() { if [ "$1" = "$2" ]; then PASS=$((PASS+1)); else FAILED=$((FAILED+1)); _red "FAIL: $3 (expected [$1] got [$2])"; fi; }
