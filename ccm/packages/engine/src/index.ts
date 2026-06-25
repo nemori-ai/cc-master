@@ -75,3 +75,101 @@ export {
   TIERS,
   taskTrulyDone,
 } from './board-model.js';
+// 校准（EWMA + Bayesian shrinkage ≅ RCF）
+export type { CalibrationOptions, CalibrationResult } from './estimate/calibration.js';
+export {
+  calibrate,
+  calibratedEstimate,
+  dispersionCv,
+} from './estimate/calibration.js';
+// CCPM fever / buffer_health
+export type {
+  BufferInput,
+  BufferZone,
+  FeverInput,
+  FeverResult,
+  ProjectBuffer,
+} from './estimate/ccpm.js';
+export { feverStatus, sizeProjectBuffer } from './estimate/ccpm.js';
+// conformal（split + Mondrian 分组）
+export type {
+  ConformalOptions,
+  ConformalResult,
+  Interval,
+  MondrianDim,
+} from './estimate/conformal.js';
+export {
+  conformalGroupKey,
+  conformalInterval,
+  empiricalCoverage,
+  empiricalQuantile,
+  quantilesOf,
+} from './estimate/conformal.js';
+// EVM + Earned Schedule（SPI(t)）
+export type { Baseline, EvmOptions, EvmResult } from './estimate/evm.js';
+export { computeEvm } from './estimate/evm.js';
+// k-NN 案例推理
+export type { KnnNeighbor, KnnOptions, KnnResult, QueryCase } from './estimate/knn.js';
+export { knnPredict } from './estimate/knn.js';
+// 双通道 MC 调度（估算-DAG + 吞吐 + CI/CRI/SSI + consistency）
+export type {
+  ConsistencyResult,
+  EstimateMcResult,
+  ForecastOptions,
+  NodeMcParam,
+  SensitivityEntry,
+  ThroughputMcResult,
+} from './estimate/mc-scheduler.js';
+export {
+  dailyThroughput,
+  dualChannelConsistency,
+  estimateDagMonteCarlo,
+  throughputMonteCarlo,
+} from './estimate/mc-scheduler.js';
+// ── estimate/（ADR-015 估算引擎算法层·plan §7）────────────────────────────────────────────────────
+// PRNG（seeded·sfc32）
+export { makePrng, Sfc32 } from './estimate/prng.js';
+// RCPSP（list-scheduling min-slack + LFT）
+export type { RcpspOptions, RcpspResult } from './estimate/rcpsp.js';
+export { rcpspSchedule } from './estimate/rcpsp.js';
+// 采样（Box-Muller log-normal）
+export type { LogNormalParams } from './estimate/sampling.js';
+export {
+  logNormalParamsFromMeanCv,
+  sampleLogNormalFromLogParams,
+  sampleNormal,
+  sampleTaskDuration,
+} from './estimate/sampling.js';
+// SLE + WIP-aging
+export type { AgingEntry, AgingStatus, Sle } from './estimate/sle.js';
+export { cycleTimeSle, wipAging } from './estimate/sle.js';
+// ── usage/（ADR-015 配速 + 历史语料·plan §7）──────────────────────────────────────────────────────
+// 历史语料 loader（home 跨板·多层收缩·recency）
+export type {
+  DoneRecord,
+  LoadOptions,
+  PoolLayer,
+  PoolQuery,
+} from './usage/history-loader.js';
+export {
+  boardRepo,
+  DEFAULT_MAX_BOARDS,
+  DEFAULT_MAX_DAYS_AGO,
+  extractDoneRecords,
+  loadCorpus,
+  loadHomeBoards,
+  poolLayers,
+  recencyWeight,
+  selectPoolLayer,
+} from './usage/history-loader.js';
+// pacing（双侧走廊数学 SSOT + effective-N）
+export type {
+  PacingAdvice,
+  PacingOptions,
+  PacingVerdict,
+  PoolAccount,
+  PoolStatus,
+  UsageSignal,
+  WindowSignal,
+} from './usage/pacing.js';
+export { effectiveN, pacingAdvice } from './usage/pacing.js';
