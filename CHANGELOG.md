@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-06-26
+
 > **board v2 数据模型地基 + board 引擎解耦为独立 `ccm` CLI（v0.10.0 · 敏捷开发 Epic #27 及子需求 + ADR-013/ADR-014）** —— 两步走：先把 board 从「被动 JSON + 各消费者各自 sed/awk/JS 解析」演进为「**完整 JS 数据模型 SSOT + 统一访问层**」（ADR-013），再把这套 board 状态逻辑（数据模型 / lint / graph / lock）**整体解耦为一个独立安装的 `ccm` CLI**（工业化 TS monorepo `@ccm/engine` + `ccm`·ADR-014），cc-master plugin 降为它的消费方之一——经进程边界 shell 调用、缺失则优雅降级。这是 v0.10.0 把敏捷能力（纵切可 ship 切片 / timebox / 估点 / 自决诚实台账）长进 board 的承重地基。schema `cc-master/v1` → `cc-master/v2`。
 
 ### Added
