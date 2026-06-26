@@ -52,12 +52,16 @@
 
 机制流程：
 
-1. **读 policy（进程边界·不 import 引擎）**：`switch-account.sh` 经 `ccm policy show --json` 读 active board，解析契约路径 `.data.effective.autonomous_account_switch`（`ccm policy show --json` 钉死形状）。纯 bash + node 解析 JSON（红线 1，不用 jq/python）。
+1. **读 policy（进程边界·不 import 引擎·确定性 board selector）**：`switch-account.sh` 经 `ccm policy show --json` 读**目标板**，解析契约路径 `.data.effective.autonomous_account_switch`（`ccm policy show --json` 钉死形状）。纯 bash + node 解析 JSON（红线 1，不用 jq/python）。**闸用确定性 board selector（`--board` / `$CC_MASTER_BOARD`）而非 ambient discovery**——orchestrator 触发换号时应经 `switch-account.sh --board <选定板>` 或 `$CC_MASTER_BOARD` 提供板上下文；否则**多 active board 共享 home 时 ccm 拿不到 sid → ambient discovery 可能读错板或歧义失败**，让 deny 被误判放行（codex P1·`ccm policy show --board <path>` 是 discover.ts ① 最高优先、与 cwd/sid 无关的全局发现 flag）。
 2. **deny → 拒绝切号**：值显式为 `"deny"` → **exit 7**（policy-deny-blocked 专属码），并：
    - **不取换号锁、不覆写任何官方凭证存储、registry 原封不动**——拦在覆写之前，零副作用。
    - **越界响亮**：stderr 提示「机制层硬闸：deny，拒绝本次自主换号」+ best-effort 往 board.log 记一条 `decision`（「机制层按 board.policy=deny 拦下一次自主换号」），供用户审计（ccm log 调用失败无害）。
    - 提示用户：如需换号，须先 `ccm policy set --autonomous-account-switch=allow --user-authorized` 改 board policy 再重试。
-3. **fail-open 放行（ADR-016 §2.3）**：以下情形一律解析为 `allow`、放行换号——**ccm 不在 PATH / `ccm policy show` 调用失败 / 输出非合法 JSON / 无 active board / `policy` 字段缺 / 值非 `"deny"`**。即**只有显式 `"deny"` 才拦**，读不出就放行（不把没接 ccm 的环境误锁，同既有「ccm 缺则优雅降级」模式）。
+3. **fail-open 分两类（ADR-016 §2.3·codex P1 收窄）**：读不出 policy 时**不再一律放行**——按「是否知道该看哪块板」分流：
+   - **(a) 真·无 ccm（CCM_BIN 未设且 PATH 无 ccm）→ 故意 fail-open `allow`**：环境根本没接 ccm 的 policy 机制，不该误锁（同既有「ccm 缺则优雅降级」模式）。值确实读到 `allow` / 缺 `policy` 字段 / 值非 `deny` 也照常放行。
+   - **(b) 有明确目标板上下文（`--board` / `$CC_MASTER_BOARD` 给了）但 `ccm policy show` 失败 / 歧义（`{"ok":false}`）/ 坏 JSON / 缺字段 → deny 侧保守拦截 `exit 7`**：我们知道该看哪块板却读不到，绝不静默放行（这正是 codex 揪的核心——deny 不能因 discovery 失败被绕过）。
+   
+   即：**只有 (a) 真·无 ccm / 确实读到非-deny 才放行；deny 或「有板上下文却读不到」一律拦 exit 7。**
 
 > **诚实记账**：这是纵深防御的安全网，**不是硬锁**——agent 有 shell，理论上能 `--force` 绕过或直接改文件；价值在「让擅自换号从一句合理化变成要主动绕两道闸、且每次都在 log 留痕」。机制层只在 deny 时拦下并报响，不替编排做「换不换」的决策。
 

@@ -540,14 +540,15 @@ assert_eq "0" "$rc6" "(6) cloud backend → no-op exit 0"
 assert_contains "$out6" "换号不适用" "(6) cloud backend prints no-op message"
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────────
-# (7) --board is now a DEPRECATED no-op (无重启换号不重启进程·不再 resume 板). Missing --board must NOT fail.
+# (7) --board no longer drives board resume (无重启换号不重启进程) and stays OPTIONAL; it is now repurposed
+#     as the policy 闸的确定性目标板 selector (codex P1·见下方 37 系列). Missing --board must NOT fail.
 # ──────────────────────────────────────────────────────────────────────────────────────────────────
 out7="$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" bash "$SCRIPT" --registry "$REG1" --now "2026-06-17T09:00:00Z" --dry-run --skip-token-check 2>&1)"; rc7=$?
-assert_eq "0" "$rc7" "(7) missing --board → still works (--board deprecated no-op, not required)"
-# and passing --board is harmless (only annotated as deprecated in dry-run plan).
+assert_eq "0" "$rc7" "(7) missing --board → still works (--board optional, not required)"
+# and passing --board is harmless (annotated as policy selector in dry-run plan; never resumes a board).
 out7b="$(CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" bash "$SCRIPT" --board "b.board.json" --registry "$REG1" --now "2026-06-17T09:00:00Z" --dry-run --skip-token-check 2>&1)"; rc7b=$?
-assert_eq "0" "$rc7b" "(7b) passing --board still exits 0 (harmless deprecated arg)"
-assert_contains "$out7b" "deprecated" "(7b) dry-run plan marks --board as deprecated"
+assert_eq "0" "$rc7b" "(7b) passing --board still exits 0 (harmless·policy selector·never resumes)"
+assert_contains "$out7b" "policy selector" "(7b) dry-run plan marks --board as policy selector (不再 resume·codex P1)"
 
 # ──────────────────────────────────────────────────────────────────────────────────────────────────
 # (8) **P2-1 teeth — blob 读失败时 registry active 绝不被翻转 + 三存储绝不被覆写**.
@@ -2160,6 +2161,166 @@ assert_eq "0" "$rc36b" "(36b) CONTROL fail-open: CCM_BIN unset + ccm not on PATH
 cred36b_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED36B" 2>/dev/null)"
 assert_eq "$FRESH_AT" "$cred36b_at" "(36b) CONTROL fail-open: credentials.json overwritten with FRESH token (换号完成·真·无 ccm 不误拦)"
 rm -rf "$FX36B" "$EMPTY36B"
+
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+# (37) **policy 机制硬闸 — 多 active board 下确定性 board selector enforce deny（codex P1·deny 被绕过）**.
+#      场景：home 里 2 块 active board 共享（一块目标板 policy=deny），ccm 在 switch-account.sh 子进程里拿不到
+#        orchestrator 的 hook-stdin sid → 无 board selector 的 `ccm policy show` 走 ambient discovery →
+#        Ambiguous/NotFound 失败 → 旧版 `|| true` 吞掉 → 空 JSON → fail-open allow → **目标板 deny 被绕过**（P1）.
+#      修复：switch-account.sh 把目标板经 `--board <path>` / `$CC_MASTER_BOARD` 确定性交给 ccm policy show →
+#        ccm discover.ts ① 直读指定板 → deny 正确 enforce exit 7。
+#      用一个 **discover-faithful 的 stub ccm**：带 `--board <path>` / 经 CC_MASTER_BOARD → 读该 path 的板 policy；
+#        无 selector + home 多 active → 输出 ambiguous 错误 JSON `{"ok":false,...}`（精确镜像 discover 失败形状）。
+#      **反向 teeth**：修前不带 board 上下文 → stub 出 ambiguous JSON → 旧 parse 取不到 .data.effective → 当 allow →
+#        rc=0 + 三存储被覆写 → 断言失败。修后即便不带 --board，只要 CC_MASTER_BOARD 指目标板就 enforce deny。
+# ══════════════════════════════════════════════════════════════════════════════════════════════════
+FX37="$(make_fixture)"; REG37="$FX37/accounts.json"; VFILE37="$FX37/accounts.env"
+CRED37="$FX37/credentials.json"; CJSON37="$FX37/claude.json"
+HOME37="$(make_project)"   # hermetic CC_MASTER_HOME with TWO active boards
+# 目标板（policy=deny）与另一块 active board（policy 缺省 allow）——共享 home，模拟 ambient 歧义。
+DENYBOARD37="$HOME37/20990101T000000Z-aaaa.board.json"
+OTHERBOARD37="$HOME37/20990101T000001Z-bbbb.board.json"
+cat > "$DENYBOARD37" <<'JSON'
+{"schema":"cc-master/board/v2","goal":"GOAL-DENY","owner":{"active":true,"session_id":""},"policy":{"autonomous_account_switch":"deny"},"tasks":[],"log":[]}
+JSON
+cat > "$OTHERBOARD37" <<'JSON'
+{"schema":"cc-master/board/v2","goal":"GOAL-OTHER","owner":{"active":true,"session_id":""},"tasks":[],"log":[]}
+JSON
+cat > "$REG37" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE37","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice","subscriptionType":"max"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE37"; chmod 600 "$VFILE37"
+OLD37_AT='sk-ant-oat01-OLDcred37AAA000000000000000000-_o'
+cat > "$CRED37" <<JSON
+{"claudeAiOauth":{"accessToken":"$OLD37_AT","refreshToken":"sk-ant-ort01-OLDcred37r00000000000000000-_o","expiresAt":1700000000000,"subscriptionType":"pro"}}
+JSON
+cat > "$CJSON37" <<'JSON'
+{"oauthAccount":{"emailAddress":"old@x.com","subscriptionType":"pro"},"numStartups":7}
+JSON
+PORT37="$FX37/url.txt"; start_refresh_endpoint ok "$PORT37"; RURL37="$(cat "$PORT37")"
+# discover-faithful stub ccm（不在 PATH·仅经 CCM_BIN）：
+#   `policy show --board <path>` / 经 $CC_MASTER_BOARD → 读该板 policy（deny/allow·镜像 discover ①·确定性）；
+#   `policy show` 无 selector + home 多 active → ambiguous 错误 JSON（镜像 discover「无 sid」分支 throw·exit 5）；
+#   `log add ...` → exit 0（含 --board·吞掉即可）。
+CCMDIR37="$(make_project)"
+cat > "$CCMDIR37/ccm-stub" <<'CCM'
+#!/usr/bin/env bash
+# discover-faithful policy-show stub. Reads board.policy.autonomous_account_switch from the resolved board path.
+# Resolution mirrors discover.ts ①: --board <path>  >  $CC_MASTER_BOARD  >  (no selector → ambient).
+if [ "${1:-}" = "policy" ] && [ "${2:-}" = "show" ]; then
+  shift 2
+  BPATH=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --board) BPATH="${2:-}"; shift 2;;
+      --json)  shift;;
+      *)       shift;;
+    esac
+  done
+  [ -z "$BPATH" ] && BPATH="${CC_MASTER_BOARD:-}"
+  if [ -z "$BPATH" ]; then
+    # No selector + multiple active boards in home → ambient discovery is ambiguous (discover.ts throws).
+    n=0
+    for f in "${CC_MASTER_HOME:-/nonexistent}"/*.board.json; do [ -f "$f" ] && n=$((n+1)); done
+    if [ "$n" -gt 1 ]; then
+      printf '%s\n' '{"ok":false,"exit":5,"error":"Multiple active boards; pass --board or --goal to disambiguate","violations":[]}'
+      exit 5
+    fi
+    # single active → would resolve, but for this test we only exercise multi-active; fall through to allow.
+    printf '%s\n' '{"ok":true,"data":{"policy":null,"effective":{"autonomous_account_switch":"allow"}}}'
+    exit 0
+  fi
+  # Read the named board's policy deterministically (mirrors discover ① --board / CC_MASTER_BOARD).
+  val="$(node -e 'try{const b=require(process.argv[1]);const p=b&&b.policy&&b.policy.autonomous_account_switch;process.stdout.write(typeof p==="string"?p:"allow")}catch(_e){process.stdout.write("MISSING")}' "$BPATH" 2>/dev/null)"
+  if [ "$val" = "MISSING" ]; then
+    printf '%s\n' '{"ok":false,"exit":5,"error":"--board path is missing or not valid board JSON","violations":[]}'
+    exit 5
+  fi
+  printf '%s\n' "{\"ok\":true,\"data\":{\"policy\":{\"autonomous_account_switch\":\"$val\"},\"effective\":{\"autonomous_account_switch\":\"$val\"}}}"
+  exit 0
+fi
+exit 0
+CCM
+chmod +x "$CCMDIR37/ccm-stub"
+
+# ── (37) — 多 active board·传 --board <目标 deny 板> → deny enforce exit 7（确定性 selector·不被 ambient 干扰）──
+out37="$(PATH="$SECSTUB:$PATH" CCM_BIN="$CCMDIR37/ccm-stub" CC_MASTER_HOME="$HOME37" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+        REFRESH_TOKEN_URL="$RURL37" CRED_PATH="$CRED37" CLAUDE_JSON_PATH="$CJSON37" \
+        env -u CC_MASTER_BOARD bash "$SCRIPT" --registry "$REG37" --email "alice@x.com" --board "$DENYBOARD37" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc37=$?
+assert_eq "7" "$rc37" "(37) multi-active + --board deny board: exit 7 — deterministic selector enforces deny (was ambient bypass)"
+cred37_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED37" 2>/dev/null)"
+assert_eq "$OLD37_AT" "$cred37_at" "(37) multi-active --board deny: credentials.json UNCHANGED (gate ran before overwrite)"
+alice37="$(node -e 'try{const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["alice@x.com"].active))}catch(_e){process.stdout.write("ERROR")}' "$LIB_JS" "$REG37" 2>/dev/null)"
+assert_eq "false" "$alice37" "(37) multi-active --board deny: registry alice active NOT flipped"
+assert_contains "$out37" "deny" "(37) multi-active --board deny: stderr surfaces deny"
+vault37_content="$(cat "$VFILE37" 2>/dev/null || true)"
+if echo "$vault37_content" | grep -qF "$FRESH_AT" 2>/dev/null; then
+  FAILED=$((FAILED+1)); _red "FAIL: (37) multi-active --board deny: vault refreshed (FRESH_AT present) — gate ran AFTER refresh"
+else
+  PASS=$((PASS+1)); _green "(37) multi-active --board deny: vault NOT refreshed (FRESH_AT absent — gate before credential ops)"
+fi
+
+# ── (37b) — 多 active board·经 $CC_MASTER_BOARD 指目标 deny 板（不传 --board）→ deny 仍 enforce exit 7 ──
+#   (反向 teeth：修前 ambient `ccm policy show` 无 selector → stub 出 ambiguous JSON → 旧 parse 当 allow → rc=0 放行。)
+# Re-seed stores to OLD (37 blocked so they're still OLD, but re-seed defensively + vault).
+cat > "$CRED37" <<JSON
+{"claudeAiOauth":{"accessToken":"$OLD37_AT","refreshToken":"sk-ant-ort01-OLDcred37r00000000000000000-_o","expiresAt":1700000000000,"subscriptionType":"pro"}}
+JSON
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE37"; chmod 600 "$VFILE37"
+PORT37B="$FX37/url37b.txt"; start_refresh_endpoint ok "$PORT37B"; RURL37B="$(cat "$PORT37B")"
+out37b="$(PATH="$SECSTUB:$PATH" CCM_BIN="$CCMDIR37/ccm-stub" CC_MASTER_HOME="$HOME37" CC_MASTER_BOARD="$DENYBOARD37" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+         REFRESH_TOKEN_URL="$RURL37B" CRED_PATH="$CRED37" CLAUDE_JSON_PATH="$CJSON37" \
+         bash "$SCRIPT" --registry "$REG37" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc37b=$?
+assert_eq "7" "$rc37b" "(37b) multi-active + CC_MASTER_BOARD=deny board (no --board): exit 7 — env selector enforces deny"
+cred37b_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED37" 2>/dev/null)"
+assert_eq "$OLD37_AT" "$cred37b_at" "(37b) multi-active CC_MASTER_BOARD deny: credentials.json UNCHANGED"
+
+# ── (37c) — 多 active board·**有板上下文却读不到目标板 policy**（坏路径）→ 保守拦截 exit 7（不静默放行·codex P1 核心）──
+#   场景：CC_MASTER_BOARD 指一个不存在/坏 board path → stub 出 {"ok":false,...} → switch 知道「该看哪块板」却读不到 →
+#     不当 allow，而是 deny 侧保守（与 a 类「真·无板上下文」的故意 fail-open 区分）。
+cat > "$CRED37" <<JSON
+{"claudeAiOauth":{"accessToken":"$OLD37_AT","refreshToken":"sk-ant-ort01-OLDcred37r00000000000000000-_o","expiresAt":1700000000000,"subscriptionType":"pro"}}
+JSON
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE37"; chmod 600 "$VFILE37"
+PORT37C="$FX37/url37c.txt"; start_refresh_endpoint ok "$PORT37C"; RURL37C="$(cat "$PORT37C")"
+out37c="$(PATH="$SECSTUB:$PATH" CCM_BIN="$CCMDIR37/ccm-stub" CC_MASTER_HOME="$HOME37" CC_MASTER_BOARD="$HOME37/does-not-exist.board.json" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+         REFRESH_TOKEN_URL="$RURL37C" CRED_PATH="$CRED37" CLAUDE_JSON_PATH="$CJSON37" \
+         bash "$SCRIPT" --registry "$REG37" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc37c=$?
+assert_eq "7" "$rc37c" "(37c) board ctx given but policy unreadable: exit 7 — conservative deny (NOT silent fail-open·codex P1)"
+cred37c_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED37" 2>/dev/null)"
+assert_eq "$OLD37_AT" "$cred37c_at" "(37c) board ctx unreadable: credentials.json UNCHANGED (conservative block before overwrite)"
+
+# ── (37d) — CONTROL: 真·无 ccm（CCM_BIN 未设 + PATH 无 ccm 二进制）+ 有 --board → 仍 fail-open allow（不误伤）──
+#   语义：fail-open 的存在理由是「不锁**未接 ccm** 的环境」——ccm 二进制根本不在场时，闸无从读任何 policy、
+#     该环境显然没在跑 cc-master 的 policy 机制 → fail-open allow（哪怕传了 --board）。保守拦截 (b 类) 只在
+#     **ccm 在场但读不到目标板 policy** 时触发（见 37c）。本控制证明二者不混淆。
+#   注意：本控制须**真**没有 ccm——空目录 prepend 仍会让 `command -v ccm` 命中系统真 ccm（如 ~/.local/bin/ccm）。
+#     故重建一条只含 node / security / secstub 目录、**剔除真 ccm 所在目录**的最小 PATH。
+cat > "$CRED37" <<JSON
+{"claudeAiOauth":{"accessToken":"$OLD37_AT","refreshToken":"sk-ant-ort01-OLDcred37r00000000000000000-_o","expiresAt":1700000000000,"subscriptionType":"pro"}}
+JSON
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000,\"subscriptionType\":\"max\"}" > "$VFILE37"; chmod 600 "$VFILE37"
+PORT37D="$FX37/url37d.txt"; start_refresh_endpoint ok "$PORT37D"; RURL37D="$(cat "$PORT37D")"
+# 最小 PATH：node 目录 + security 目录 + secstub（绝不含真 ccm 所在目录）→ command -v ccm 必空。
+NODE_DIR37="$(dirname "$(command -v node)")"
+SEC_DIR37="$(dirname "$(command -v security 2>/dev/null || echo /usr/bin/security)")"
+MINPATH37="$SECSTUB:$NODE_DIR37:$SEC_DIR37:/usr/bin:/bin"
+# sanity: 确认这条 PATH 下 ccm 确实不可达（否则本控制名不副实）。
+if PATH="$MINPATH37" command -v ccm >/dev/null 2>&1; then
+  FAILED=$((FAILED+1)); _red "FAIL: (37d) precondition: ccm still reachable on minimal PATH — control is not真·无 ccm"
+else
+  out37d="$(PATH="$MINPATH37" CC_MASTER_HOME="$HOME37" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+           REFRESH_TOKEN_URL="$RURL37D" CRED_PATH="$CRED37" CLAUDE_JSON_PATH="$CJSON37" \
+           env -u CCM_BIN bash "$SCRIPT" --registry "$REG37" --email "alice@x.com" --board "$DENYBOARD37" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc37d=$?
+  assert_eq "0" "$rc37d" "(37d) CONTROL no-ccm + --board: exit 0 — true no-ccm still fail-open allow (不误锁未接 ccm 的环境)"
+  cred37d_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED37" 2>/dev/null)"
+  assert_eq "$FRESH_AT" "$cred37d_at" "(37d) CONTROL no-ccm + --board: credentials.json overwritten with FRESH (true no-ccm fail-open 不误拦)"
+fi
+rm -rf "$FX37" "$HOME37" "$CCMDIR37"
 
 # ── (35-snap-degrade) cc-usage.sh 不存在（CLAUDE_PLUGIN_ROOT 无 cc-usage）→ 换号仍完成·snapshot 干净跳过 ──
 # 场景：用户未安装 orchestrating-to-completion skill（或 CLAUDE_PLUGIN_ROOT 路径无对应 cc-usage.sh）→ CC_USAGE_SH
