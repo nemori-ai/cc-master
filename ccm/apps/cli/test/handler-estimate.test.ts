@@ -419,6 +419,95 @@ test('show: task with no estimate → no-history (degrade, retain null)', () => 
   assert.ok(row.calibration.source === 'no-history' || row.calibration.history_n === 0);
 });
 
+test('show --as-of: done-after-as-of task stays a target (backtest not hidden·round6 #bug2)', () => {
+  // show 的 target 选择此前用裸 status !== 'done' → 一个「现在 done 但 finished_at > as-of」的任务
+  //   （as-of 当时本是 backlog）被错隐藏。修复后用 isDoneAsOf（!isDoneAsOf → 仍 target）·与 forecast/EVM/velocity 同口径。
+  // 板：F1 现在 done 但 finished_at=2026-06-24（> as-of 2026-06-20）→ as-of 时仍未完成 → 应仍在 target 集；
+  //     R1 ready（永远是 target·控制存在）；D1 现在 done 且 finished_at=2026-06-18（≤ as-of）→ as-of 时真已完成 → 排除。
+  const { home, targetBoard } = mkHomeWithCorpus(
+    [], // 空语料（无 home 收缩·target 选择与语料无关）
+    [
+      {
+        id: 'F1',
+        status: 'done',
+        deps: [],
+        type: 'development',
+        executor: 'subagent',
+        estimate: { value: 3, unit: 'h' },
+        started_at: '2026-06-23T00:00:00Z',
+        finished_at: '2026-06-24T00:00:00Z', // done-after-as-of（as-of=2026-06-20）
+      },
+      {
+        id: 'R1',
+        status: 'ready',
+        deps: [],
+        type: 'development',
+        executor: 'subagent',
+        estimate: { value: 2, unit: 'h' },
+      },
+      {
+        id: 'D1',
+        status: 'done',
+        deps: [],
+        type: 'development',
+        executor: 'subagent',
+        estimate: { value: 4, unit: 'h' },
+        started_at: '2026-06-17T00:00:00Z',
+        finished_at: '2026-06-18T00:00:00Z', // done-before-as-of → 真已完成
+      },
+    ],
+  );
+  const ctx = mkCtx(targetBoard, {
+    home,
+    values: { scope: 'this-board', 'as-of': '2026-06-20T00:00:00Z' },
+  });
+  const code = estimateHandler.show(ctx);
+  assert.equal(code, EXIT.OK);
+  const ids = dataOf(ctx)
+    .tasks.map((t: { id: string }) => t.id)
+    .sort();
+  assert.deepEqual(
+    ids,
+    ['F1', 'R1'],
+    'F1 (done-after-as-of) + R1 (ready) are targets; D1 (done-before-as-of) excluded',
+  );
+});
+
+test('show CONTROL as-of=now: genuinely-done task IS excluded from targets (#bug2 control)', () => {
+  // 控制组：as-of=now（默认或显式 now）→ 真 done 任务（finished_at ≤ now）正常排除（退化为 status!=='done'·行为不变）。
+  const { home, targetBoard } = mkHomeWithCorpus(
+    [],
+    [
+      {
+        id: 'F1',
+        status: 'done',
+        deps: [],
+        type: 'development',
+        executor: 'subagent',
+        estimate: { value: 3, unit: 'h' },
+        started_at: '2026-06-23T00:00:00Z',
+        finished_at: '2026-06-24T00:00:00Z',
+      },
+      {
+        id: 'R1',
+        status: 'ready',
+        deps: [],
+        type: 'development',
+        executor: 'subagent',
+        estimate: { value: 2, unit: 'h' },
+      },
+    ],
+  );
+  // as-of 远在两个 finished_at 之后 → 都是真 done → F1 排除，仅 R1 是 target。
+  const ctx = mkCtx(targetBoard, {
+    home,
+    values: { scope: 'this-board', 'as-of': '2026-06-30T00:00:00Z' },
+  });
+  estimateHandler.show(ctx);
+  const ids = dataOf(ctx).tasks.map((t: { id: string }) => t.id);
+  assert.deepEqual(ids, ['R1'], 'as-of after both finishes → F1 truly done → only R1 target');
+});
+
 // ══ estimate evm ═════════════════════════════════════════════════════════════════════════════════
 
 test('evm: consumes baseline → PV/EV/AC + SPI/CPI in domain (golden)', () => {

@@ -29,6 +29,7 @@ import {
   type PacingOptions,
   pacingAdvice,
   pctOf,
+  tokenExpired,
   type UsageSignal,
   type WindowSignal,
 } from '@ccm/engine';
@@ -42,7 +43,8 @@ interface WindowSnap {
 interface BackupAccount {
   email: string;
   active: boolean;
-  switchable: boolean;
+  switchable: boolean; // registry 意图：未显式 switchable:false（**不含**过期判定·见 token_expired）
+  token_expired: boolean; // token_expires_at 已过期（复用引擎 tokenExpired SSOT·过期号不可作 switch_candidate·bug1）
   as_of: string | null;
   five_hour: WindowSnap;
   seven_day: WindowSnap;
@@ -162,6 +164,12 @@ function readBackups(
       email,
       active: entry.active === true,
       switchable: entry.switchable !== false,
+      // token_expired：复用引擎 tokenExpired（effectiveN 同款 SSOT 谓词·token_expires_at < now → 过期）。
+      //   过期 token → 不可作 switch_candidate（advise）/ show 标记（bug1·sweep #2/#3）。
+      token_expired: tokenExpired(
+        (entry.token_expires_at ?? null) as string | number | null,
+        nowMs,
+      ),
       as_of: asOf,
       five_hour: snapWindow(snap, '5h'),
       seven_day: snapWindow(snap, '7d'),
@@ -341,7 +349,15 @@ export function show(ctx: Ctx): number {
         lines.push('  备号: registry 存在但无可列账号');
       } else {
         for (const a of accountList) {
-          const tag = a.active ? '[active]' : a.switchable ? '[backup]' : '[backup·不可切]';
+          // 备号可切性 = switchable!==false **且** token 未过期（与 advise switch_candidate / effectiveN 同口径·bug1）。
+          //   过期 token 的备号标 [backup·token过期] 而非 [backup]——别让用户以为它可切（sweep #3）。
+          const tag = a.active
+            ? '[active]'
+            : !a.switchable
+              ? '[backup·不可切]'
+              : a.token_expired
+                ? '[backup·token过期]'
+                : '[backup]';
           const stale = a.snapshot_stale ? '·stale' : '';
           lines.push(
             `  ${tag} ${a.email}: 5h=${fmtPct(a.five_hour.used_pct)} 7d=${fmtPct(a.seven_day.used_pct)} (as_of=${a.as_of ?? 'N/A'}${stale}·registry-snapshot)`,
@@ -379,12 +395,17 @@ export function advise(ctx: Ctx): number {
       const advice = pacingAdvice(sidecar, opts);
 
       // switch_candidate：仅当 verdict 含切号 lever 且 registry 有可切备号时给（选 7d used% 最低的可切备号·恢复最多）。
+      //   可切判据须与 effectiveN 同口径（bug1·sweep #2）：!active && switchable!==false && **token 未过期**——
+      //   否则 advise 可能推荐一个 token_expires_at 已过期的号当 switch_candidate，指向 switch 路径用不了的号。
+      //   token_expired 由引擎 tokenExpired SSOT 算（readBackups 投影）。纯过期备号 → switchable 集为空 → 无 candidate。
       let switchCandidate: string | null = null;
       const wantsSwitch =
         advice.levers.includes('switch_account') ||
         advice.levers.includes('switch_account_user_decision');
       if (wantsSwitch && backups != null) {
-        const switchable = backups.accounts.filter((a) => !a.active && a.switchable);
+        const switchable = backups.accounts.filter(
+          (a) => !a.active && a.switchable && !a.token_expired,
+        );
         switchable.sort((a, b) => sevenDayPctOrInf(a) - sevenDayPctOrInf(b));
         switchCandidate = switchable.length > 0 ? (switchable[0] as BackupAccount).email : null;
       }

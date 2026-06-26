@@ -203,9 +203,12 @@ export function show(ctx: Ctx): number {
       const repo = boardRepo(b);
       const taskId = c.positionals[0];
       const tasks = Array.isArray(b?.tasks) ? (b.tasks as Array<Record<string, unknown>>) : [];
+      // target 选择（无 task id 时）：用 isDoneAsOf 而非裸 status !== 'done'（round6 bug2·backtest 一致）——
+      //   否则 --as-of <过去> 时一个「现在 done 但 finished_at > as-of」的任务（as-of 当时本是 backlog）被错隐藏、
+      //   show 返回空/欠计 target，与 forecast/EVM/velocity 的 isDoneAsOf 口径分裂。as-of=now → 退化为 status!=='done'。
       const targets = taskId
         ? tasks.filter((t) => t.id === taskId)
-        : tasks.filter((t) => t.status !== 'done');
+        : tasks.filter((t) => !isDoneAsOf(t, nowMs));
 
       const rows = targets.map((t) => {
         const id = typeof t.id === 'string' ? t.id : '';

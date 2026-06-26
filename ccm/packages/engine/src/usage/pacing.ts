@@ -211,6 +211,15 @@ export interface PoolStatus {
   effective_n: number; // switchable + 1
 }
 
+// tokenExpired(token_expires_at, nowMs) → token 是否已过期（**号池可切入判据的单一 SSOT**·plan §5）。
+//   过期 ⟺ token_expires_at 可解析为时戳 **且** < nowMs。无/坏 token_expires_at → null 时戳 → 视作「未知过期」
+//   按未过期处理（保守·不因缺锚就排除一个号）。effectiveN（份数）与 usage handler 的 switchable/candidate 投影
+//   都复用它——「能 switch 的候选必须未过期」在一处定义，不让两路谓词漂移（codex round-6 bug1）。
+export function tokenExpired(v: string | number | null | undefined, nowMs: number): boolean {
+  const exp = parseExp(v);
+  return exp !== null && exp < nowMs;
+}
+
 // effectiveN(accounts, nowMs) → 号池有效配额份数（纯函数·accounts = registry 的 accounts map）。
 //   null/空 → effective_n=1（单账号·与 usage-pacing.js 降级一致）。
 export function effectiveN(
@@ -226,8 +235,7 @@ export function effectiveN(
     if (entry.active === true) continue; // 当前在用号不算备号
     backups += 1;
     if (entry.switchable === false) continue; // 显式残缺号 → 不计 switchable
-    const exp = parseExp(entry.token_expires_at);
-    if (exp !== null && exp < nowMs) continue; // token 过期 → 不可切入
+    if (tokenExpired(entry.token_expires_at, nowMs)) continue; // token 过期 → 不可切入（SSOT 谓词）
     switchable += 1;
   }
   return { backups, switchable, effective_n: switchable + 1 };

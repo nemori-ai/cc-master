@@ -172,4 +172,4 @@ export type {
   UsageSignal,
   WindowSignal,
 } from './usage/pacing.js';
-export { effectiveN, pacingAdvice, pctOf } from './usage/pacing.js';
+export { effectiveN, pacingAdvice, pctOf, tokenExpired } from './usage/pacing.js';

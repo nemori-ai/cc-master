@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { effectiveN, pacingAdvice } from '../dist/index.mjs';
+import { effectiveN, pacingAdvice, tokenExpired } from '../dist/index.mjs';
 
 const NOW_SEC = Math.floor(Date.parse('2026-06-25T13:00:00Z') / 1000);
 
@@ -199,6 +199,30 @@ test('effectiveN: counts switchable backups (excludes active/expired/switchable:
 test('effectiveN: null/empty → single account (effective_n=1)', () => {
   assert.equal(effectiveN(null, Date.now()).effective_n, 1);
   assert.equal(effectiveN({}, Date.now()).effective_n, 1);
+});
+
+// ── tokenExpired SSOT 谓词（effectiveN + usage handler switch_candidate 复用·codex round-6 #bug1）──────
+test('tokenExpired: SSOT predicate (parseable & < now → expired; else not)', () => {
+  const now = Date.parse('2026-06-25T13:00:00Z');
+  // 已过期（ISO 字符串 / epoch ms 数字，皆 < now）。
+  assert.equal(tokenExpired('2020-01-01T00:00:00Z', now), true, 'past ISO → expired');
+  assert.equal(
+    tokenExpired(Date.parse('2020-01-01T00:00:00Z'), now),
+    true,
+    'past epoch ms → expired',
+  );
+  // 未过期（未来时戳）。
+  assert.equal(tokenExpired('2030-01-01T00:00:00Z', now), false, 'future ISO → not expired');
+  assert.equal(
+    tokenExpired(Date.parse('2030-01-01T00:00:00Z'), now),
+    false,
+    'future epoch → not expired',
+  );
+  // 无/坏 token_expires_at → 无锚 → 保守按未过期处理（不因缺锚排除一个号）。
+  assert.equal(tokenExpired(null, now), false, 'null → unknown → not expired (conservative)');
+  assert.equal(tokenExpired(undefined, now), false, 'undefined → not expired');
+  assert.equal(tokenExpired('not-a-date', now), false, 'unparseable → not expired');
+  assert.equal(tokenExpired('', now), false, 'empty string → not expired');
 });
 
 // ── invariant: window pct echo + N≥1 ───────────────────────────────────────────────

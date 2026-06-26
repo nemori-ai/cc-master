@@ -437,6 +437,153 @@ test('usage advise --effective-n 1 override → throttle (single account, no swi
   assert.equal(out.data.switch_candidate, null);
 });
 
+// ── 过期 token 不可作 switch_candidate（codex round-6 #bug1·sweep #2/#3）─────────────────────────────
+// effectiveN 已按 token_expires_at 忽略过期备号；advise 的 switch_candidate 投影此前只看 switchable!==false，
+//   可能选中一个 token 已过期的号当 candidate（指向 switch 路径用不了的号）。修复后 switch_candidate 复用
+//   effectiveN 同款 tokenExpired SSOT 谓词——过期 token → 不可作 candidate。
+//   ★用过去/未来的 token_expires_at（恒 < / ≥ 真实 now），不注入固定时钟（handler 用 Date.now()）。
+const REGISTRY_EXPIRED_BACKUP = {
+  'a@c.com': {
+    active: true,
+    vault: { kind: 'keychain', service: 'x', account: 'a@c.com' },
+    last_observed_quota: {
+      at: '2026-06-25T07:00:00Z',
+      '5h': { used_pct: 92, resets_at: '2026-06-25T11:00:00Z' },
+      '7d': { used_pct: 50, resets_at: '2026-07-01T00:00:00Z' },
+    },
+  },
+  // 7d used% 最低（10·恢复最多）但 token 已过期（2020·恒过去）——绝不能被选为 candidate。
+  'expired@c.com': {
+    active: false,
+    switchable: true,
+    token_expires_at: '2020-01-01T00:00:00Z',
+    vault: { kind: 'keychain', service: 'x', account: 'expired@c.com' },
+    last_switch_out: {
+      at: '2026-06-24T09:00:00Z',
+      '5h': { used_pct: 1, resets_at: '2026-06-24T13:00:00Z' },
+      '7d': { used_pct: 10, resets_at: '2026-07-01T00:00:00Z' },
+    },
+  },
+  // 7d used% 较高（30）但 token 仍有效（2030·恒未来）——应被选为 candidate（过期者出局后唯一可切）。
+  'valid@c.com': {
+    active: false,
+    switchable: true,
+    token_expires_at: '2030-01-01T00:00:00Z',
+    vault: { kind: 'keychain', service: 'x', account: 'valid@c.com' },
+    last_switch_out: {
+      at: '2026-06-24T09:00:00Z',
+      '5h': { used_pct: 5, resets_at: '2026-06-24T13:00:00Z' },
+      '7d': { used_pct: 30, resets_at: '2026-07-01T00:00:00Z' },
+    },
+  },
+};
+// 全部备号 token 已过期（恒过去）——无任何可切候选。
+const REGISTRY_ALL_EXPIRED = {
+  'a@c.com': {
+    active: true,
+    vault: { kind: 'keychain', service: 'x', account: 'a@c.com' },
+    last_observed_quota: {
+      at: '2026-06-25T07:00:00Z',
+      '5h': { used_pct: 92, resets_at: '2026-06-25T11:00:00Z' },
+      '7d': { used_pct: 50, resets_at: '2026-07-01T00:00:00Z' },
+    },
+  },
+  'exp1@c.com': {
+    active: false,
+    switchable: true,
+    token_expires_at: '2020-01-01T00:00:00Z',
+    vault: { kind: 'keychain', service: 'x', account: 'exp1@c.com' },
+    last_switch_out: {
+      at: '2026-06-24T09:00:00Z',
+      '5h': { used_pct: 1, resets_at: '2026-06-24T13:00:00Z' },
+      '7d': { used_pct: 8, resets_at: '2026-07-01T00:00:00Z' },
+    },
+  },
+  'exp2@c.com': {
+    active: false,
+    switchable: true,
+    token_expires_at: '2019-06-01T00:00:00Z',
+    vault: { kind: 'keychain', service: 'x', account: 'exp2@c.com' },
+    last_switch_out: {
+      at: '2026-06-24T09:00:00Z',
+      '5h': { used_pct: 2, resets_at: '2026-06-24T13:00:00Z' },
+      '7d': { used_pct: 9, resets_at: '2026-07-01T00:00:00Z' },
+    },
+  },
+};
+
+test('usage advise switch_candidate skips EXPIRED-token backup, picks the VALID one (#bug1)', () => {
+  // expired@c.com 有最低 7d（10·本应「最优」）但 token 已过期 → 必须被跳过；valid@c.com（7d=30·有效）当选。
+  const { home, boardPath } = setupHome({
+    accounts: REGISTRY_EXPIRED_BACKUP,
+    sidecar: SIDECAR_CRITICAL,
+  });
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
+  const code = usageHandler.advise(ctx);
+  assert.equal(code, EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.verdict, 'accelerate', 'n>1 (1 valid backup) + 5h critical + 7d headroom');
+  assert.equal(
+    out.data.switch_candidate,
+    'valid@c.com',
+    'must NOT pick lowest-7d expired backup; valid (non-expired) backup wins',
+  );
+  assert.notEqual(
+    out.data.switch_candidate,
+    'expired@c.com',
+    'expired token never a switch target',
+  );
+  // effective_n 只数未过期备号：1 active + 1 valid backup = 2（过期号不计 switchable·引擎 SSOT 一致）。
+  assert.equal(
+    out.data.effective_n,
+    2,
+    'expired backup excluded from effective_n (effectiveN SSOT)',
+  );
+});
+
+test('usage advise with ONLY expired-token backups → no switch_candidate (#bug1)', () => {
+  // 纯过期备号 registry：effective_n 退 1（无可切）→ verdict throttle（单号·无切号 lever）→ switch_candidate null。
+  const { home, boardPath } = setupHome({
+    accounts: REGISTRY_ALL_EXPIRED,
+    sidecar: SIDECAR_CRITICAL,
+  });
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
+  usageHandler.advise(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.effective_n, 1, 'all backups expired → effective_n collapses to 1');
+  assert.equal(
+    out.data.switch_candidate,
+    null,
+    'no non-expired backup → never recommend an expired token',
+  );
+});
+
+test('usage show marks expired-token backup distinctly + carries token_expired flag (#bug1·sweep #3)', () => {
+  // show 列表里过期号该标记（token_expired:true·渲染 [backup·token过期]），别让用户以为可切。
+  const { home, boardPath } = setupHome({
+    accounts: REGISTRY_EXPIRED_BACKUP,
+    sidecar: SIDECAR_CRITICAL,
+  });
+  const jsonCtx = mkCtx(home, boardPath, { flags: { json: true } });
+  usageHandler.show(jsonCtx);
+  const out = JSON.parse(jsonCtx.outBuf.join('')).data;
+  const expired = out.accounts.find((a: { email: string }) => a.email === 'expired@c.com');
+  const valid = out.accounts.find((a: { email: string }) => a.email === 'valid@c.com');
+  assert.equal(expired.token_expired, true, 'expired backup flagged token_expired:true');
+  assert.equal(valid.token_expired, false, 'valid backup token_expired:false');
+  // effective_n 数未过期备号：1 active + 1 valid = 2（过期号不计）。
+  assert.equal(out.effective_n, 2, 'show effective_n excludes expired backup (effectiveN SSOT)');
+  // 文本面：过期号渲染独立标签。
+  const textCtx = mkCtx(home, boardPath, {});
+  usageHandler.show(textCtx);
+  const text = textCtx.outBuf.join('');
+  assert.match(
+    text,
+    /\[backup·token过期\] expired@c\.com/,
+    'expired backup gets distinct text tag',
+  );
+});
+
 // ══ usage task-cost ══════════════════════════════════════════════════════════════════════════════
 
 const COST_TASKS = [
