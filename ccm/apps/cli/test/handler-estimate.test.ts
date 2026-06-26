@@ -168,7 +168,9 @@ test('forecast: seeded golden snapshot (deterministic·seed 42·runs 2000)', () 
     p80: { value: 19.39, unit: 'h' },
     p95: { value: 23.72, unit: 'h' },
   });
-  assert.deepEqual(d.throughput_days, { p50: 4, p80: 4, p95: 5 });
+  // throughput 含闲置日后（#round9 P2#2）：稀疏 home 语料的零产出日纳入采样 → ETA 更大、更诚实
+  //   （旧 {4,4,5} 漏算闲置日、低估）。
+  assert.deepEqual(d.throughput_days, { p50: 10, p80: 15, p95: 21 });
   assert.equal(d.coverage_pct, 83);
   assert.equal(d.history_n, 40);
   assert.equal(d.seed, 42);
@@ -671,9 +673,12 @@ test('backtest: --as-of in the past changes EVM AT (Actual Time elapsed)', () =>
 });
 
 test('backtest: forecast treats done-after-as-of task as still-in-backlog (round5 sweep #1)', () => {
-  // 板：C0 done@06-02（两 as-of 之前·供吞吐历史），D1 done@06-08（as-of 之后），P1/P2 ready。
-  //   as-of=06-05 时 D1 当时尚未完成 → backtest 应把它当 backlog，而非裸 status==='done' 错当已完成。
-  //   两 as-of 都有 C0 当语料（throughput 可算）；唯一变量是 D1 是否计入 backlog。
+  // 板：C0 done@06-04（两 as-of 之前·供吞吐历史），D1 done@06-05T12（backtest as-of 之后），P1/P2 ready。
+  //   as-of=06-05T00 时 D1 当时尚未完成 → backtest 应把它当 backlog，而非裸 status==='done' 错当已完成。
+  //   两 as-of 都有吞吐语料；唯一变量是 D1 是否计入 backlog。
+  //   ★C0 完成日（06-04）紧邻 D1 完成日（06-05）——两 as-of 的吞吐语料都是**连续日**（无闲置日），
+  //     故 throughput rate 恒为 1 task/day（#round9 P2#2 的含闲置日采样在连续语料上不引入零产出日），
+  //     把 throughput_days 钉成 == backlog → backlog 差异成为天数的唯一驱动（隔离掉 rate 混淆）。
   const board = [
     {
       id: 'C0',
@@ -682,8 +687,8 @@ test('backtest: forecast treats done-after-as-of task as still-in-backlog (round
       type: 'development',
       executor: 'subagent',
       estimate: { value: 3, unit: 'h' },
-      started_at: '2026-06-01T00:00:00Z',
-      finished_at: '2026-06-02T00:00:00Z',
+      started_at: '2026-06-03T20:00:00Z',
+      finished_at: '2026-06-04T00:00:00Z',
     },
     {
       id: 'D1',
@@ -692,8 +697,8 @@ test('backtest: forecast treats done-after-as-of task as still-in-backlog (round
       type: 'development',
       executor: 'subagent',
       estimate: { value: 5, unit: 'h' },
-      started_at: '2026-06-07T00:00:00Z',
-      finished_at: '2026-06-08T04:00:00Z',
+      started_at: '2026-06-05T08:00:00Z',
+      finished_at: '2026-06-05T12:00:00Z',
     },
     {
       id: 'P1',
@@ -715,8 +720,9 @@ test('backtest: forecast treats done-after-as-of task as still-in-backlog (round
   const bp = mkInlineBoard(board);
   const before = readFileSync(bp, 'utf8');
   // 用 throughput 通道：backlog 是 as-of 截断的确定性信号（不被 MC 的 calibration 噪声混淆）。
-  //   backtest（as-of=06-05·D1 尚未完成）→ backlog=3（D1+P1+P2）；当前（as-of=06-10·D1 已完成）→ backlog=2（P1+P2）。
-  //   两 as-of 都有 C0 当吞吐语料 → throughput_days 非 null；随 backlog 单调 → backtest days 严格 > current days。
+  //   backtest（as-of=06-05T00·D1 尚未完成）→ backlog=3（D1+P1+P2）·语料=[C0@06-04]（rate 1/day）→ days=3；
+  //   当前（as-of=06-10·D1 已完成）→ backlog=2（P1+P2）·语料=[C0@06-04,D1@06-05]（连续日·rate 1/day）→ days=2。
+  //   rate 两侧都钉成 1/day → backlog 单调 → backtest days 严格 > current days。
   const back = mkCtx(bp, {
     home: EMPTY_HOME,
     values: {
@@ -739,8 +745,8 @@ test('backtest: forecast treats done-after-as-of task as still-in-backlog (round
   assert.equal(estimateHandler.forecast(now), EXIT.OK);
   const db = dataOf(back);
   const dn = dataOf(now);
-  // ★核心：backtest 把 D1 当 backlog（finished_at=06-08 > as-of=06-05）→ 吞吐天数严格大于「D1 已完成」时。
-  //   修复前裸 status==='done' → 两 as-of backlog 都=1（D1 永远当已完成）→ days 相等（backtest 泄漏未来）。
+  // ★核心：backtest 把 D1 当 backlog（finished_at=06-05T12 > as-of=06-05T00）→ 吞吐天数严格大于「D1 已完成」时。
+  //   修复前裸 status==='done' → 两 as-of backlog 都=2（D1 永远当已完成）→ days 相等（backtest 泄漏未来）。
   assert.ok(
     db.throughput_days.p50 > dn.throughput_days.p50,
     `backtest throughput days ${db.throughput_days.p50} > current ${dn.throughput_days.p50} (D1 counted as backlog at as-of)`,

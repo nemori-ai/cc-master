@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import type { DoneRecord } from '../dist/index.mjs';
 import {
   computeEvm,
   cycleTimeSle,
@@ -41,6 +42,27 @@ function paramsFromBoard(board: {
     m.set(t.id, { meanHours: est ?? 1, cv: 0.4 });
   }
   return m;
+}
+
+// 构造一条最小 DoneRecord（只 finishedAtMs 对吞吐采样有意义·其余填充占位）。
+function doneRec(finishedAtMs: number, taskId = 't'): DoneRecord {
+  return {
+    boardFile: 'x.board.json',
+    repo: 'r',
+    taskId,
+    type: 'feature',
+    executor: 'sub-agent',
+    model: 'sonnet',
+    tier: 'standard',
+    estimateHours: 1,
+    actualHours: 1,
+    ratio: 1,
+    depsCount: 0,
+    tokensIn: null,
+    tokensOut: null,
+    finishedAtMs,
+    boardTimeMs: null,
+  };
 }
 
 // ── 估算-DAG-MC（通道①·seeded·CI/CRI/SSI）─────────────────────────────────────────
@@ -125,11 +147,51 @@ test('throughputMonteCarlo: no history → low confidence, NaN days', () => {
   assert.ok(Number.isNaN(thr.days.p50));
 });
 
-test('dailyThroughput: buckets done tasks by completion day', () => {
+test('dailyThroughput: buckets done tasks across active day-span (incl idle days·#round9 P2#2)', () => {
   const corpus = loadCorpus(HOME, { nowMs: NOW });
   const daily = dailyThroughput(corpus);
   assert.ok(daily.length > 0);
-  assert.ok(daily.every((v) => v > 0));
+  // 总完成数守恒：每日 count 之和 == 有完成时戳的 done 记录数（含 idle 日不丢任何完成）。
+  const withTs = corpus.filter((r) => r.finishedAtMs != null).length;
+  assert.equal(
+    daily.reduce((a, b) => a + b, 0),
+    withTs,
+    'sum of daily counts == done records with finishedAtMs',
+  );
+  // length == first→last 完成日跨度（含中间零产出日）≥ 非零（高产）日数。
+  const activeDays = daily.filter((v) => v > 0).length;
+  assert.ok(daily.length >= activeDays, 'span may include idle (zero) days');
+});
+
+test('dailyThroughput: includes idle days between first and last completion (#round9 P2#2)', () => {
+  // 周一(06-01) + 周五(06-05) 各一个完成 → 跨 5 个 UTC 日（中间周二/三/四 = 3 个零产出闲置日）。
+  //   旧逻辑只回非空日 [1,1] → MC 误把「高产日」当全部、漏采闲置日 → 吞吐高估 / ETA 低估。
+  const recs = [
+    doneRec(Date.parse('2026-06-01T10:00:00Z'), 'mon'),
+    doneRec(Date.parse('2026-06-05T10:00:00Z'), 'fri'),
+  ];
+  const daily = dailyThroughput(recs);
+  assert.equal(daily.length, 5, 'span Mon→Fri = 5 UTC days (incl 3 idle)');
+  assert.equal(daily.filter((v) => v === 0).length, 3, '3 idle days counted as 0');
+  assert.equal(
+    daily.reduce((a, b) => a + b, 0),
+    2,
+    'total completions preserved = 2',
+  );
+});
+
+test('throughputMonteCarlo: sparse history ETA not under-estimated by missing idle days (#round9 P2#2)', () => {
+  // 同稀疏历史（Mon+Fri 各 1 完成·真实 rate ~0.4 task/day over 5 天）。清空 backlog=4：
+  //   含闲置日 → 期望 ~4/0.4 ≈ 10 天；漏算闲置日的旧 bug（~1 task/day）会算成 ~4 天（严重低估）。
+  const recs = [
+    doneRec(Date.parse('2026-06-01T10:00:00Z'), 'mon'),
+    doneRec(Date.parse('2026-06-05T10:00:00Z'), 'fri'),
+  ];
+  const thr = throughputMonteCarlo(4, recs, { seed: 42, runs: 4000 });
+  assert.ok(
+    thr.days.p50 >= 7,
+    `p50 ${thr.days.p50} must reflect idle days (not the ~4-day over-estimate)`,
+  );
 });
 
 // ── ①②consistency ─────────────────────────────────────────────────────────────────
@@ -248,6 +310,38 @@ test('evm: token AC source → coverage_pct reflects telemetry presence', () => 
   const evm = computeEvm(ACTIVE, ACTIVE.baseline, { asOfMs: NOW, acSource: 'token' });
   assert.equal(evm.ac.source, 'token');
   assert.ok((evm.ac.coverage_pct as number) >= 0 && (evm.ac.coverage_pct as number) <= 100);
+});
+
+test('evm: token AC → VAC null (BAC hours vs EAC tokens not same-unit·#round9 P2#1)', () => {
+  // token AC 下：AC 单位 = token，EAC=BAC/CPI（CPI=EV_hours/AC_tok → EAC 单位 token）。但 BAC 仍是小时——
+  //   VAC=BAC−EAC 等于「小时减 token」量纲错乱，旧码却给个标 'tok' 的错数。无同量纲 planned token budget →
+  //   诚实置 null（advisory：宁可不报也不给错数）。hours（duration）口径 BAC/EAC 同为小时 → VAC 不变。
+  const baseline = {
+    t0: '2026-06-01T00:00:00Z',
+    captured_at: '2026-06-01T00:00:00Z',
+    task_estimates: { A: { value: 10, unit: 'h' }, B: { value: 10, unit: 'h' } },
+    dag_snapshot: { A: { deps: [] }, B: { deps: ['A'] } },
+  };
+  const board = {
+    schema: 'cc-master/v2',
+    tasks: [
+      {
+        id: 'A',
+        status: 'done',
+        started_at: '2026-06-03T00:00:00Z',
+        finished_at: '2026-06-03T02:00:00Z',
+        observability: { tokens: { input: 1000, output: 2000 } },
+      },
+    ],
+  };
+  const AS_OF = Date.parse('2026-06-10T00:00:00Z');
+  const tok = computeEvm(board, baseline, { asOfMs: AS_OF, acSource: 'token' });
+  assert.ok((tok.ac.value as number) > 0, 'token AC accrued from observability telemetry');
+  assert.equal(tok.vac, null, 'token-AC VAC must be null (no same-unit planned token budget)');
+  // 控制：duration 口径 VAC 仍是同量纲小时·非 null——确认 hours 路径未被动。
+  const dur = computeEvm(board, baseline, { asOfMs: AS_OF, acSource: 'duration' });
+  assert.ok(dur.vac != null, 'duration-AC VAC stays non-null (BAC and EAC both in hours)');
+  assert.equal((dur.vac as { unit: string }).unit, 'h');
 });
 
 test('evm: baselineHours recognizes week unit — BAC same scale as PV/EV (#bug-B)', () => {

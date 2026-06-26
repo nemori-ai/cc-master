@@ -182,7 +182,15 @@ export function computeEvm(
   const eac = cpi && cpi > 0 ? { value: bac / cpi, unit: acUnit } : null;
   const ieacT = spiT && spiT > 0 ? { value: atHours / spiT, unit: 'h' } : null;
   const etc = eac ? { value: Math.max(0, eac.value - ac), unit: acUnit } : null;
-  const vac = eac ? { value: bac - eac.value, unit: acUnit } : null;
+  // VAC=BAC−EAC 须同量纲。token AC 下 BAC 仍是小时、EAC 是 token（CPI=EV_hours/AC_tok → EAC 单位 token），
+  //   缺同量纲 planned token budget 时 VAC 等于「小时减 token」量纲错乱——诚实置 null 而非给标 'tok' 的错数
+  //   （advisory：宁可省略也不报错数·#round9 P2#1）。duration 口径 BAC/EAC 同为小时 → VAC 行为不变。
+  const vac = eac && acSource !== 'token' ? { value: bac - eac.value, unit: acUnit } : null;
+  if (acSource === 'token' && eac) {
+    warnings.push(
+      'AC 口径为 token 但无同量纲 planned token budget——VAC（=BAC−EAC）量纲不可比，已省略',
+    );
+  }
 
   if (coverage < 100 && acTotal > 0) {
     warnings.push(`AC 覆盖 ${coverage}%（部分 done 任务缺 ${acSource} 数据）——CPI/EAC 偏乐观`);

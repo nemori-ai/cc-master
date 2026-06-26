@@ -249,15 +249,31 @@ export interface ThroughputMcResult {
   source: 'throughput-mc';
 }
 
-// dailyThroughput(records) → 每个有完成时戳的 done 任务按「完成日」分桶 → 每天完成数数组（仅非空日）。
+// dailyThroughput(records) → done 任务按「完成日」分桶，回 first→last 完成日**整段**跨度的每日完成数
+//   （含中间零产出的闲置日·#round9 P2#2）。**含闲置日**是关键：只回非空（高产）日会让 MC 把稀疏历史的
+//   高产日当全部、漏采零产出日 → 吞吐高估 / ETA 低估（例：周一+周五各一完成应算 ~0.4 task/day·跨 5 日，
+//   而非 ~1 task/day）。按 UTC 日推进（UTC 无 DST → 步长恒 86400000ms·边界稳定）。
 export function dailyThroughput(records: DoneRecord[]): number[] {
   const byDay = new Map<string, number>();
+  let minMs = Number.POSITIVE_INFINITY;
+  let maxMs = Number.NEGATIVE_INFINITY;
   for (const r of records) {
     if (r.finishedAtMs == null) continue;
     const day = new Date(r.finishedAtMs).toISOString().slice(0, 10); // YYYY-MM-DD（UTC）
     byDay.set(day, (byDay.get(day) ?? 0) + 1);
+    if (r.finishedAtMs < minMs) minMs = r.finishedAtMs;
+    if (r.finishedAtMs > maxMs) maxMs = r.finishedAtMs;
   }
-  return [...byDay.values()];
+  if (byDay.size === 0) return []; // 无完成时戳 → 空（调用方据此降级 low confidence）。
+  const DAY_MS = 86400000;
+  const firstDayMs = Date.parse(`${new Date(minMs).toISOString().slice(0, 10)}T00:00:00Z`);
+  const lastDayMs = Date.parse(`${new Date(maxMs).toISOString().slice(0, 10)}T00:00:00Z`);
+  const out: number[] = [];
+  for (let d = firstDayMs; d <= lastDayMs; d += DAY_MS) {
+    const key = new Date(d).toISOString().slice(0, 10);
+    out.push(byDay.get(key) ?? 0); // 闲置日 → 0（被 bootstrap 采样反映真实零产出节奏）。
+  }
+  return out;
 }
 
 export function throughputMonteCarlo(
@@ -267,7 +283,9 @@ export function throughputMonteCarlo(
 ): ThroughputMcResult {
   const seed = opts.seed ?? 42;
   const runs = Math.max(1, opts.runs ?? 2000);
-  const daily = dailyThroughput(records).filter((v) => v > 0);
+  // 不再 filter 掉零产出日——闲置日（count=0）必须留在 bootstrap 池里，否则又退回「只采高产日」的高估
+  //   （#round9 P2#2）。0-heavy 池的死循环风险由下方 `cap` 守。
+  const daily = dailyThroughput(records);
   const m = Math.max(0, Math.floor(backlog));
 
   if (daily.length === 0 || m === 0) {
