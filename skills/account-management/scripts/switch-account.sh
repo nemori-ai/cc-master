@@ -642,6 +642,105 @@ fetch_blob() {
   esac
 }
 
+# ═══════════════ 0) policy 机制硬闸（ADR-016 §2.2·codex round-8 P2：前移到 vault 读取之前·least-privilege）═══════════════
+# **任何凭证读写（含 vault 读 fetch_blob / refresh / vault 回写 / 官方存储覆写 / 取换号锁）之前**校验 board.policy。
+#   codex round-8 P2：旧版本闸跑在 fetch_blob（读 OAuth blob 进 VAULT_BLOB）之后——一次被拒的自主换号仍先做了
+#   一次 bearer 凭证 vault 读才 exit 7（违 least-privilege·deny 时本不该碰任何凭证，且可能先冒 vault 错而非干净 policy 拒绝）。
+#   故把本闸前移到此（**凭证类操作前最早安全点**）：选号已定、registry vault 引用已解析，但 vault **未读**、
+#   refresh / 回写 / 覆写 / 取锁均未发生。deny → exit 7（连 vault 都没读、未 refresh、未覆写任何官方存储、registry 原封·承诺真实成立）。
+# **dry-run 跳过本闸**：dry-run 是不变更性预览（不真换号·后面 exit 0），policy 闸只管真切——前移前本闸就只在真切路径执行，
+#   保持一致；且 (7b) 会在 dry-run 下传一个 bogus `--board`，不该被「有板上下文却读不到 → 保守 deny」拦成 exit 7。故仅 DRY_RUN!=1 执行。
+# 经进程边界 `ccm policy show --json` 读**目标板**的 policy；只有 "deny" 才拦——但 fail-open 分两类（ADR-016 §2.3）：
+#   (a) 真·无 ccm / 无任何 board 上下文 → 故意 fail-open allow（不锁未接 ccm 的环境）。
+#   (b) 有明确目标板上下文却读不到 / 歧义 / 坏 JSON → **deny 侧保守拦截**（exit 7），绝不静默放行。
+# 解析路径：`.data.effective.autonomous_account_switch`（`ccm policy show --json` 契约形状·钉死）。
+# 退出码 7（exit 7）：脚本现有码 0/1/2/3/4/5/6 均已占用（见脚本头注释·exit code 分配）；7 = policy-blocked（deny 或目标板读取失败的保守拦截·新码·语义清晰）。
+# 红线1：纯 bash + node 解析 JSON，不用 jq/python。
+# deny / 保守拦截时本段之后的 vault 读 / refresh / vault 回写 / 官方存储覆写 / 换号锁 / registry active 翻转——**一概未发生**。
+#
+# ── 确定性 board selector（codex P1·修「policy 闸读错/读不到目标板 → deny 被绕过」）──
+#   旧版 `ccm policy show --json`（无 board selector·ambient discovery）：ccm 在 switch-account.sh 子进程里拿不到
+#   orchestrator 的 hook-stdin sid，discover 落「无 sid」分支——多 active board 共享 home 时 → Ambiguous/NotFound
+#   throw → ccm 非 0 → `|| true` 吞掉 → 空 JSON → fail-open allow → **目标板 deny 被绕过**（这是 codex 揪的 P1）。
+#   修复：给 ccm **确定性目标板**（discover.ts ① `--board <path>`/`$CC_MASTER_BOARD` 是全局发现 flag·最高优先·
+#   与 cwd/sid 无关）——orchestrator 触发换号时应经 `--board <选定板>` 或 `$CC_MASTER_BOARD` 提供板上下文。
+#   有板上下文（BOARD_SEL 或 CC_MASTER_BOARD 非空）时：读不到该板 / 调用失败 / 坏 JSON → **不静默放行**（保守 deny）。
+# ── ccm 解析口径（codex round-4 #bug2）──
+#   优先 `CCM_BIN`（dev/test/自定义安装的覆写口·绝对路径可执行·与 usage-pacing.js / board-lint.js / verify-board.js
+#   的 `process.env.CCM_BIN || 'ccm'` 同约定），回退 PATH 上的 `ccm`。
+#   **保留 ADR-016 §2.3 故意 fail-open（a 类）**：CCM_BIN 未设且 PATH 无 ccm → 真·无 ccm → 仍 fail-open allow。
+if [ "$DRY_RUN" -ne 1 ]; then
+  _CCM_BIN="${CCM_BIN:-$(command -v ccm 2>/dev/null || true)}"
+  # 有无「明确目标板上下文」：显式 --board（BOARD_SEL）或 $CC_MASTER_BOARD 任一非空 = 知道该看哪块板。
+  _HAS_BOARD_CTX=0
+  if [ -n "$BOARD_SEL" ] || [ -n "${CC_MASTER_BOARD:-}" ]; then _HAS_BOARD_CTX=1; fi
+  _POLICY_SWITCH_ALLOWED="allow"  # fail-open default（a 类·真·无 ccm 时不被覆盖）
+  if [ -n "$_CCM_BIN" ]; then
+    # 把目标板确定性地交给 ccm：BOARD_SEL 非空 → 显式 `--board`；否则若 $CC_MASTER_BOARD 非空 → 显式传它（更稳·
+    #   避免被 ccm 自身 discover 的其它优先级干扰）；都没有 → 不带 selector（ambient·仅 a 类「无板上下文」走这条）。
+    if [ -n "$BOARD_SEL" ]; then
+      _POLICY_JSON="$("$_CCM_BIN" policy show --board "$BOARD_SEL" --json 2>/dev/null || true)"
+    elif [ -n "${CC_MASTER_BOARD:-}" ]; then
+      _POLICY_JSON="$("$_CCM_BIN" policy show --board "$CC_MASTER_BOARD" --json 2>/dev/null || true)"
+    else
+      _POLICY_JSON="$("$_CCM_BIN" policy show --json 2>/dev/null || true)"
+    fi
+    # ccm 出 JSON：解析 deny/allow/unknown（unknown = 调用失败/空/坏 JSON/缺字段·与「确实读到 allow」区分）。
+    _POLICY_PARSED="$(printf '%s' "$_POLICY_JSON" | node -e '
+      "use strict";
+      let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
+        try {
+          const o = JSON.parse(s);
+          // ccm 错误形状 {"ok":false,...}（如 Ambiguous/NotFound）→ unknown（读不到目标板·不可信）。
+          if (o && o.ok === false) { process.stdout.write("unknown"); return; }
+          // 契约路径: .data.effective.autonomous_account_switch（ccm policy show --json 钉死形状）
+          const val = o && o.data && o.data.effective && o.data.effective.autonomous_account_switch;
+          if (val === "deny") { process.stdout.write("deny"); return; }
+          if (val === "allow") { process.stdout.write("allow"); return; }
+          // 缺字段 / 非字符串 → unknown（没确实读到有效 policy）。
+          process.stdout.write("unknown");
+        } catch (_e) {
+          process.stdout.write("unknown");  // 空 / 非法 JSON → unknown（调用失败·不当 allow）
+        }
+      });
+    ' 2>/dev/null || printf '%s' "unknown")"
+    case "$_POLICY_PARSED" in
+      deny)  _POLICY_SWITCH_ALLOWED="deny";;
+      allow) _POLICY_SWITCH_ALLOWED="allow";;
+      *)
+        # unknown：ccm 在场但没给出可信 policy（失败 / 歧义 / 坏 JSON / 缺字段）。
+        #   (b) 有明确目标板上下文 → 这是真问题：deny 侧保守拦截（绝不静默放行·codex P1 核心）。
+        #   (a) 无板上下文（纯 ambient·没人告诉该看哪块板）→ 维持故意 fail-open allow（不锁环境）。
+        if [ "$_HAS_BOARD_CTX" -eq 1 ]; then _POLICY_SWITCH_ALLOWED="deny"; else _POLICY_SWITCH_ALLOWED="allow"; fi
+        ;;
+    esac
+  fi
+  if [ "${_POLICY_SWITCH_ALLOWED:-allow}" = "deny" ]; then
+    if [ "${_POLICY_PARSED:-}" = "deny" ]; then
+      err "switch-account: 机制层硬闸：board.policy.autonomous_account_switch=deny，**拒绝本次自主换号**（未读 vault、未 refresh、未覆写任何凭证存储·registry 原封不动）。"
+      err "  如需换号，须用户先 'ccm policy set --autonomous-account-switch=allow --user-authorized' 修改 board policy，再重试。"
+      _POLICY_LOG_MSG="机制层按 board.policy=deny 拦下一次自主换号（switch-account.sh exit 7）"
+    else
+      # 保守拦截（有目标板上下文却读不到 policy）——codex P1：deny 不能因 discovery 失败被绕过。
+      err "switch-account: 机制层硬闸：有明确目标板上下文（--board/CC_MASTER_BOARD）却**读不到该板 policy**（ccm 失败 / 歧义 / 坏 JSON）——保守拒绝本次自主换号（未读 vault、未 refresh、未覆写任何凭证存储·registry 原封不动）。"
+      err "  确认 --board/CC_MASTER_BOARD 指向正确的 active board 再重试；切勿在多 active board 共享 home 下不带板上下文触发换号。"
+      _POLICY_LOG_MSG="机制层因目标板 policy 读取失败/歧义保守拦下一次自主换号（switch-account.sh exit 7）"
+    fi
+    # best-effort log 留痕（ADR-016 §2.2 要求 board.log 记录一次越权拦截；ccm log 调用失败无害）。
+    #   有板上下文时把 selector 也带上，确保 log 落到目标板而非被 ambient discovery 引偏。
+    if [ -n "$BOARD_SEL" ]; then
+      "$_CCM_BIN" log add "$_POLICY_LOG_MSG" --kind decision --board "$BOARD_SEL" 2>/dev/null || true
+    elif [ -n "${CC_MASTER_BOARD:-}" ]; then
+      "$_CCM_BIN" log add "$_POLICY_LOG_MSG" --kind decision --board "$CC_MASTER_BOARD" 2>/dev/null || true
+    else
+      "$_CCM_BIN" log add "$_POLICY_LOG_MSG" --kind decision 2>/dev/null || true
+    fi
+    exit 7
+  fi
+  # policy 放行（确实读到 allow / a 类故意 fail-open）→ 继续读 vault + refresh + 取换号锁 + 覆写三存储
+  unset _CCM_BIN _POLICY_JSON _POLICY_SWITCH_ALLOWED _POLICY_PARSED _HAS_BOARD_CTX _POLICY_LOG_MSG
+fi
+
 TOKEN_OK=0
 if fetch_blob; then
   TOKEN_OK=1
@@ -1420,103 +1519,12 @@ fi
 
 # ═══════════════════════════ 真切（无重启换号·不 exec·token-blind 全程）═══════════════════════════
 # 到这里 TOKEN_OK 必为 1（非 dry-run 路径取不到 blob 已在上面 exit 1）。下半身（全 token-blind）：
-#   0) policy 机制硬闸（ADR-016 §2.2）——**任何凭证操作（refresh/vault回写/覆写/取锁）之前**校验 board.policy：
-#      deny → exit 7（未碰 vault、未 refresh、未覆写任何官方存储、registry 原封·承诺真实成立）。
+#   0) policy 机制硬闸（ADR-016 §2.2）——**已在 vault 读取（fetch_blob）之前执行完毕**（见上方「0) policy 机制硬闸」段·
+#      codex round-8 P2 前移·least-privilege：deny 时连 vault 凭证都不读就 exit 7）；到这里 policy 必为放行，故不再重复。
 #   1) 主动 refresh（非变更性 preflight）→ 失败则不覆写任何存储、registry 原封不动、surface 退非 0。
 #   2) 回写 cc-master vault（保 refresh token 新鲜）。
 #   3) 覆写官方三存储（先非权威后权威）。
 #   4) snapshot + setActive（覆写成功后才翻 registry active·P2-2 解耦）。
-
-# 0) policy 机制硬闸（ADR-016 §2.2·**凭证类操作前最早安全点**：选号已定、vault 已读、但 refresh/回写/覆写/取锁均未发生）
-# ─────────────────────────────────────────────────────────────────────────────────────────────────────
-# 经进程边界 `ccm policy show --json` 读**目标板**的 policy；只有 "deny" 才拦——但 fail-open 分两类（ADR-016 §2.3）：
-#   (a) 真·无 ccm / 无任何 board 上下文 → 故意 fail-open allow（不锁未接 ccm 的环境）。
-#   (b) 有明确目标板上下文却读不到 / 歧义 / 坏 JSON → **deny 侧保守拦截**（exit 7），绝不静默放行。
-# 解析路径：`.data.effective.autonomous_account_switch`（`ccm policy show --json` 契约形状·钉死）。
-# 退出码 7（exit 7）：脚本现有码 0/1/2/3/4/5/6 均已占用（见脚本头注释·exit code 分配）；7 = policy-blocked（deny 或目标板读取失败的保守拦截·新码·语义清晰）。
-# 红线1：纯 bash + node 解析 JSON，不用 jq/python。
-# deny / 保守拦截时本段之后的 refresh / vault 回写 / 官方存储覆写 / 换号锁 / registry active 翻转——**一概未发生**。
-#
-# ── 确定性 board selector（codex P1·修「policy 闸读错/读不到目标板 → deny 被绕过」）──
-#   旧版 `ccm policy show --json`（无 board selector·ambient discovery）：ccm 在 switch-account.sh 子进程里拿不到
-#   orchestrator 的 hook-stdin sid，discover 落「无 sid」分支——多 active board 共享 home 时 → Ambiguous/NotFound
-#   throw → ccm 非 0 → `|| true` 吞掉 → 空 JSON → fail-open allow → **目标板 deny 被绕过**（这是 codex 揪的 P1）。
-#   修复：给 ccm **确定性目标板**（discover.ts ① `--board <path>`/`$CC_MASTER_BOARD` 是全局发现 flag·最高优先·
-#   与 cwd/sid 无关）——orchestrator 触发换号时应经 `--board <选定板>` 或 `$CC_MASTER_BOARD` 提供板上下文。
-#   有板上下文（BOARD_SEL 或 CC_MASTER_BOARD 非空）时：读不到该板 / 调用失败 / 坏 JSON → **不静默放行**（保守 deny）。
-# ── ccm 解析口径（codex round-4 #bug2）──
-#   优先 `CCM_BIN`（dev/test/自定义安装的覆写口·绝对路径可执行·与 usage-pacing.js / board-lint.js / verify-board.js
-#   的 `process.env.CCM_BIN || 'ccm'` 同约定），回退 PATH 上的 `ccm`。
-#   **保留 ADR-016 §2.3 故意 fail-open（a 类）**：CCM_BIN 未设且 PATH 无 ccm → 真·无 ccm → 仍 fail-open allow。
-_CCM_BIN="${CCM_BIN:-$(command -v ccm 2>/dev/null || true)}"
-# 有无「明确目标板上下文」：显式 --board（BOARD_SEL）或 $CC_MASTER_BOARD 任一非空 = 知道该看哪块板。
-_HAS_BOARD_CTX=0
-if [ -n "$BOARD_SEL" ] || [ -n "${CC_MASTER_BOARD:-}" ]; then _HAS_BOARD_CTX=1; fi
-_POLICY_SWITCH_ALLOWED="allow"  # fail-open default（a 类·真·无 ccm 时不被覆盖）
-if [ -n "$_CCM_BIN" ]; then
-  # 把目标板确定性地交给 ccm：BOARD_SEL 非空 → 显式 `--board`；否则若 $CC_MASTER_BOARD 非空 → 显式传它（更稳·
-  #   避免被 ccm 自身 discover 的其它优先级干扰）；都没有 → 不带 selector（ambient·仅 a 类「无板上下文」走这条）。
-  if [ -n "$BOARD_SEL" ]; then
-    _POLICY_JSON="$("$_CCM_BIN" policy show --board "$BOARD_SEL" --json 2>/dev/null || true)"
-  elif [ -n "${CC_MASTER_BOARD:-}" ]; then
-    _POLICY_JSON="$("$_CCM_BIN" policy show --board "$CC_MASTER_BOARD" --json 2>/dev/null || true)"
-  else
-    _POLICY_JSON="$("$_CCM_BIN" policy show --json 2>/dev/null || true)"
-  fi
-  # ccm 出 JSON：解析 deny/allow/unknown（unknown = 调用失败/空/坏 JSON/缺字段·与「确实读到 allow」区分）。
-  _POLICY_PARSED="$(printf '%s' "$_POLICY_JSON" | node -e '
-    "use strict";
-    let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
-      try {
-        const o = JSON.parse(s);
-        // ccm 错误形状 {"ok":false,...}（如 Ambiguous/NotFound）→ unknown（读不到目标板·不可信）。
-        if (o && o.ok === false) { process.stdout.write("unknown"); return; }
-        // 契约路径: .data.effective.autonomous_account_switch（ccm policy show --json 钉死形状）
-        const val = o && o.data && o.data.effective && o.data.effective.autonomous_account_switch;
-        if (val === "deny") { process.stdout.write("deny"); return; }
-        if (val === "allow") { process.stdout.write("allow"); return; }
-        // 缺字段 / 非字符串 → unknown（没确实读到有效 policy）。
-        process.stdout.write("unknown");
-      } catch (_e) {
-        process.stdout.write("unknown");  // 空 / 非法 JSON → unknown（调用失败·不当 allow）
-      }
-    });
-  ' 2>/dev/null || printf '%s' "unknown")"
-  case "$_POLICY_PARSED" in
-    deny)  _POLICY_SWITCH_ALLOWED="deny";;
-    allow) _POLICY_SWITCH_ALLOWED="allow";;
-    *)
-      # unknown：ccm 在场但没给出可信 policy（失败 / 歧义 / 坏 JSON / 缺字段）。
-      #   (b) 有明确目标板上下文 → 这是真问题：deny 侧保守拦截（绝不静默放行·codex P1 核心）。
-      #   (a) 无板上下文（纯 ambient·没人告诉该看哪块板）→ 维持故意 fail-open allow（不锁环境）。
-      if [ "$_HAS_BOARD_CTX" -eq 1 ]; then _POLICY_SWITCH_ALLOWED="deny"; else _POLICY_SWITCH_ALLOWED="allow"; fi
-      ;;
-  esac
-fi
-if [ "${_POLICY_SWITCH_ALLOWED:-allow}" = "deny" ]; then
-  if [ "${_POLICY_PARSED:-}" = "deny" ]; then
-    err "switch-account: 机制层硬闸：board.policy.autonomous_account_switch=deny，**拒绝本次自主换号**（未 refresh、未覆写任何凭证存储·registry 原封不动）。"
-    err "  如需换号，须用户先 'ccm policy set --autonomous-account-switch=allow --user-authorized' 修改 board policy，再重试。"
-    _POLICY_LOG_MSG="机制层按 board.policy=deny 拦下一次自主换号（switch-account.sh exit 7）"
-  else
-    # 保守拦截（有目标板上下文却读不到 policy）——codex P1：deny 不能因 discovery 失败被绕过。
-    err "switch-account: 机制层硬闸：有明确目标板上下文（--board/CC_MASTER_BOARD）却**读不到该板 policy**（ccm 失败 / 歧义 / 坏 JSON）——保守拒绝本次自主换号（未 refresh、未覆写任何凭证存储·registry 原封不动）。"
-    err "  确认 --board/CC_MASTER_BOARD 指向正确的 active board 再重试；切勿在多 active board 共享 home 下不带板上下文触发换号。"
-    _POLICY_LOG_MSG="机制层因目标板 policy 读取失败/歧义保守拦下一次自主换号（switch-account.sh exit 7）"
-  fi
-  # best-effort log 留痕（ADR-016 §2.2 要求 board.log 记录一次越权拦截；ccm log 调用失败无害）。
-  #   有板上下文时把 selector 也带上，确保 log 落到目标板而非被 ambient discovery 引偏。
-  if [ -n "$BOARD_SEL" ]; then
-    "$_CCM_BIN" log add "$_POLICY_LOG_MSG" --kind decision --board "$BOARD_SEL" 2>/dev/null || true
-  elif [ -n "${CC_MASTER_BOARD:-}" ]; then
-    "$_CCM_BIN" log add "$_POLICY_LOG_MSG" --kind decision --board "$CC_MASTER_BOARD" 2>/dev/null || true
-  else
-    "$_CCM_BIN" log add "$_POLICY_LOG_MSG" --kind decision 2>/dev/null || true
-  fi
-  exit 7
-fi
-# policy 放行（确实读到 allow / a 类故意 fail-open）→ 继续 refresh + 取换号锁 + 覆写三存储
-unset _CCM_BIN _POLICY_JSON _POLICY_SWITCH_ALLOWED _POLICY_PARSED _HAS_BOARD_CTX _POLICY_LOG_MSG
 
 # 1) 主动 refresh（非变更性 preflight·失败不动任何存储）。新鲜 blob 进 NEW_BLOB（绝不打印）。
 #    refresh_blob 退出码（来自内嵌 node·语义化）：0=成功；2=blob 非法 JSON / URL 非法；3=blob 缺 refresh token；

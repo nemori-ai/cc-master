@@ -2322,6 +2322,90 @@ else
 fi
 rm -rf "$FX37" "$HOME37" "$CCMDIR37"
 
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (38) **policy 机制硬闸 — deny 时连 vault 凭证都不读（least-privilege·codex round-8 P2·闸前移到 fetch_blob 之前）**.
+#      codex round-8 P2：旧版 §0 policy 闸跑在 fetch_blob（读 OAuth blob 进 VAULT_BLOB）**之后**——一次被拒的自主
+#        换号仍先做了一次 bearer 凭证 vault 读才 exit 7（违 least-privilege·deny 时本不该碰任何凭证）。
+#      修复：把 §0 policy 闸前移到 vault 读取（fetch_blob）**之前**·deny → 直接 exit 7，连 vault 都不读。
+#      teeth（与 32/36/37 的「vault NOT *refreshed*」正交——那查回写·这查初次 **READ**）：
+#        用一个**记录 vault 读**的 security stub（`find-generic-password -w` → 落 marker + 吐 blob）；deny 下：
+#          · 前移前（闸在 fetch_blob 后）→ fetch_blob 已读 vault → marker 落地 → 断言「marker 不存在」**红**；
+#          · 前移后（闸在 fetch_blob 前）→ deny 先 exit 7、fetch_blob 未到达 → marker 缺 → **绿**。
+#        （blob 全程可读 → 两侧 rc 都是 7；唯一判别量是 marker——精确钉住「READ 发生在闸前」这一回归。）
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+echo "-- (38) policy deny: vault credential NOT read (fetch_blob never reached·gate moved before vault parse·codex round-8 P2) --"
+FX38="$(make_fixture)"; REG38="$FX38/accounts.json"
+CRED38="$FX38/credentials.json"; CJSON38="$FX38/claude.json"
+MARK38="$FX38/vault-read.marker"   # security stub touches this iff `find-generic-password -w`（vault READ）被调用
+# alice 用 **keychain** vault（service=cc-master-oauth）→ 读经 `security find-generic-password -a alice@x.com -s ... -w`.
+cat > "$REG38" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"alice@x.com"}, "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice","subscriptionType":"max"} }
+} }
+JSON
+# pre-seed OLD official stores — must remain unchanged after a deny block.
+OLD38_AT='sk-ant-oat01-OLDcred38AAA000000000000000000-_o'
+cat > "$CRED38" <<JSON
+{"claudeAiOauth":{"accessToken":"$OLD38_AT","refreshToken":"sk-ant-ort01-OLDcred38r00000000000000000-_o","expiresAt":1700000000000,"subscriptionType":"pro"}}
+JSON
+cat > "$CJSON38" <<'JSON'
+{"oauthAccount":{"emailAddress":"old@x.com","subscriptionType":"pro"},"numStartups":7}
+JSON
+PORT38="$FX38/url.txt"; start_refresh_endpoint ok "$PORT38"; RURL38="$(cat "$PORT38")"
+# ── vault-read-recording security stub: on `find-generic-password ... -w` (vault READ) → touch $MARK38 + 吐 alice blob
+#    （让 fetch_blob 成功·使两侧 rc 一致·把唯一差异收敛到 marker）；on `add-generic-password`（官方③/vault 回写）→
+#    consume stdin + exit 0；always consume stdin so a piped form never blocks. unquoted heredoc：$MARK38/$ALICE_* 写时展开，
+#    runtime 变量（$@/$a/...）转义留待 stub 运行时。
+SECSTUB38="$(make_project)"
+cat > "$SECSTUB38/security" <<SEC
+#!/usr/bin/env bash
+# records a vault READ (find-generic-password -w) by touching the marker, then emits a (fake) alice blob so fetch_blob succeeds.
+is_find=0; is_read=0
+for a in "\$@"; do
+  [ "\$a" = "find-generic-password" ] && is_find=1
+  [ "\$a" = "-w" ] && is_read=1
+done
+if [ "\$is_find" = "1" ] && [ "\$is_read" = "1" ]; then
+  : > "$MARK38"
+  printf '%s' '{"accessToken":"$ALICE_AT","refreshToken":"$ALICE_RT","expiresAt":1700000000000,"subscriptionType":"max"}'
+  exit 0
+fi
+# writes (add-generic-password) / other subcommands: consume any piped stdin and succeed.
+cat >/dev/null 2>&1
+exit 0
+SEC
+chmod +x "$SECSTUB38/security"
+# stub ccm: `policy show` → deny (mirrors 32); other subcommands → exit 0. Injected via CCM_BIN (canonical·bug2).
+CCM38="$(make_project)"
+cat > "$CCM38/ccm" <<'CCM'
+#!/usr/bin/env bash
+if [ "${1:-}" = "policy" ] && [ "${2:-}" = "show" ]; then
+  printf '%s\n' '{"ok":true,"data":{"policy":{"autonomous_account_switch":"deny"},"effective":{"autonomous_account_switch":"deny"}}}'
+fi
+exit 0
+CCM
+chmod +x "$CCM38/ccm"
+out38="$(PATH="$SECSTUB38:$CCM38:$PATH" CCM_BIN="$CCM38/ccm" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL38" CRED_PATH="$CRED38" CLAUDE_JSON_PATH="$CJSON38" \
+        bash "$SCRIPT" --registry "$REG38" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc38=$?
+# ① rc must be 7 (policy-deny). True both before & after the move (blob readable) — sanity, not the teeth.
+assert_eq "7" "$rc38" "(38) policy deny: exit code 7 (policy-deny blocked)"
+assert_contains "$out38" "deny" "(38) policy deny: stderr surfaces deny"
+# ② 官方 ① credentials.json unchanged (policy 闸拦在覆写之前).
+cred38_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERROR")}' "$CRED38" 2>/dev/null)"
+assert_eq "$OLD38_AT" "$cred38_at" "(38) policy deny: credentials.json UNCHANGED"
+# ③ **THE TEETH** — vault was NOT read: the `find-generic-password -w` (fetch_blob) marker must be ABSENT.
+#    前移前（闸在 fetch_blob 之后）→ marker 存在 → 此断言红；前移后（闸在 fetch_blob 之前）→ marker 缺 → 绿.
+if [ -f "$MARK38" ]; then
+  FAILED=$((FAILED+1)); _red "FAIL: (38) policy deny: vault credential WAS READ (find-generic-password -w marker present) — fetch_blob ran BEFORE the policy gate (codex round-8 P2 regression)"
+else
+  PASS=$((PASS+1)); _green "(38) policy deny: vault credential NOT read (no find-generic-password -w marker — policy gate runs before fetch_blob/vault parse·least-privilege)"
+fi
+# ④ deny is a clean policy block, NOT masked by a vault-read failure (blob was readable·we just never read it).
+assert_not_contains "$out38" "could not read OAuth blob" "(38) policy deny: no vault-read failure surfaced (clean policy block)"
+for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
+rm -rf "$FX38" "$SECSTUB38" "$CCM38"
+
 # ── (35-snap-degrade) cc-usage.sh 不存在（CLAUDE_PLUGIN_ROOT 无 cc-usage）→ 换号仍完成·snapshot 干净跳过 ──
 # 场景：用户未安装 orchestrating-to-completion skill（或 CLAUDE_PLUGIN_ROOT 路径无对应 cc-usage.sh）→ CC_USAGE_SH
 #   解析到一个不存在的文件 → switch-account.sh record_switch_out() 内 [ -f "$CC_USAGE_SH" ] 为假 → usage_json=""
