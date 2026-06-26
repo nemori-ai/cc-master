@@ -209,6 +209,41 @@ test('forecast --mode throughput skips estimate channel', () => {
   assert.equal(d.criticality_index.length, 0);
 });
 
+test('forecast --mode throughput on high-coverage board → forecast NON-null (round5 bug1)', () => {
+  // CURRENT 是高 coverage 板（active 任务 ~83% 有 estimate ≥50%）。--mode throughput 时 est=null（不算 DAG 通道）
+  //   但 thr 有值——修复前 useThroughputPrimary=coverage<50 → false（coverage≥50）→ forecastEta 落到
+  //   `if (est...)`(null) 分支 → 返 forecast:null（显式 throughput 模式对正常估值板失效·P2）。
+  //   修复：useThroughputPrimary=(mode==='throughput'||coverage<50)&&… → throughput 模式必走吞吐 ETA。
+  const ctx = mkCtx(CURRENT, {
+    values: { mode: 'throughput', scope: 'home', seed: '42', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  estimateHandler.forecast(ctx);
+  const d = dataOf(ctx);
+  assert.ok(
+    d.coverage_pct >= 50,
+    `CURRENT coverage ${d.coverage_pct} should be ≥50 (high-coverage board)`,
+  );
+  // ★核心：throughput 模式下 forecast 必非 null（吞吐 ETA·三分位 ISO 时刻），不再因 coverage≥50 意外塌成 null。
+  assert.ok(d.forecast, 'forecast must be non-null in throughput mode even at coverage≥50');
+  assert.match(d.forecast.p50, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.match(d.forecast.p95, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.ok(d.throughput_days, 'throughput days present (drives the ETA)');
+  assert.equal(d.makespan, null, 'no estimate-DAG makespan in throughput mode');
+});
+
+test('forecast --mode estimate still uses DAG makespan, not throughput (round5 bug1 control)', () => {
+  // 控制组：--mode estimate 强制 DAG 通道（thr 不算）→ forecast 走 makespan（小时 ETA），throughput_days=null。
+  const ctx = mkCtx(CURRENT, {
+    values: { mode: 'estimate', scope: 'home', seed: '42', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  estimateHandler.forecast(ctx);
+  const d = dataOf(ctx);
+  assert.ok(d.makespan, 'estimate mode produces DAG makespan');
+  assert.equal(d.throughput_days, null, 'no throughput channel in estimate mode');
+  assert.ok(d.forecast, 'forecast non-null (driven by DAG makespan)');
+  assert.match(d.forecast.p50, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+});
+
 test('forecast --effective-n scales throughput channel days (#bug3 regression)', () => {
   // --effective-n threading：N 份并行配额 → 吞吐通道天数 ÷N（资源型加速）。echo effective_n + note。
   const base = mkCtx(CURRENT, {
@@ -544,6 +579,85 @@ test('backtest: --as-of in the past changes EVM AT (Actual Time elapsed)', () =>
   const de = dataOf(early);
   const dl = dataOf(late);
   assert.ok(de.at_hours < dl.at_hours, 'earlier as-of → less elapsed time');
+});
+
+test('backtest: forecast treats done-after-as-of task as still-in-backlog (round5 sweep #1)', () => {
+  // 板：C0 done@06-02（两 as-of 之前·供吞吐历史），D1 done@06-08（as-of 之后），P1/P2 ready。
+  //   as-of=06-05 时 D1 当时尚未完成 → backtest 应把它当 backlog，而非裸 status==='done' 错当已完成。
+  //   两 as-of 都有 C0 当语料（throughput 可算）；唯一变量是 D1 是否计入 backlog。
+  const board = [
+    {
+      id: 'C0',
+      status: 'done',
+      deps: [],
+      type: 'development',
+      executor: 'subagent',
+      estimate: { value: 3, unit: 'h' },
+      started_at: '2026-06-01T00:00:00Z',
+      finished_at: '2026-06-02T00:00:00Z',
+    },
+    {
+      id: 'D1',
+      status: 'done',
+      deps: [],
+      type: 'development',
+      executor: 'subagent',
+      estimate: { value: 5, unit: 'h' },
+      started_at: '2026-06-07T00:00:00Z',
+      finished_at: '2026-06-08T04:00:00Z',
+    },
+    {
+      id: 'P1',
+      status: 'ready',
+      deps: [],
+      type: 'development',
+      executor: 'subagent',
+      estimate: { value: 5, unit: 'h' },
+    },
+    {
+      id: 'P2',
+      status: 'ready',
+      deps: [],
+      type: 'development',
+      executor: 'subagent',
+      estimate: { value: 5, unit: 'h' },
+    },
+  ];
+  const bp = mkInlineBoard(board);
+  const before = readFileSync(bp, 'utf8');
+  // 用 throughput 通道：backlog 是 as-of 截断的确定性信号（不被 MC 的 calibration 噪声混淆）。
+  //   backtest（as-of=06-05·D1 尚未完成）→ backlog=3（D1+P1+P2）；当前（as-of=06-10·D1 已完成）→ backlog=2（P1+P2）。
+  //   两 as-of 都有 C0 当吞吐语料 → throughput_days 非 null；随 backlog 单调 → backtest days 严格 > current days。
+  const back = mkCtx(bp, {
+    home: EMPTY_HOME,
+    values: {
+      mode: 'throughput',
+      scope: 'this-board',
+      seed: '42',
+      'as-of': '2026-06-05T00:00:00Z',
+    },
+  });
+  const now = mkCtx(bp, {
+    home: EMPTY_HOME,
+    values: {
+      mode: 'throughput',
+      scope: 'this-board',
+      seed: '42',
+      'as-of': '2026-06-10T00:00:00Z',
+    },
+  });
+  assert.equal(estimateHandler.forecast(back), EXIT.OK);
+  assert.equal(estimateHandler.forecast(now), EXIT.OK);
+  const db = dataOf(back);
+  const dn = dataOf(now);
+  // ★核心：backtest 把 D1 当 backlog（finished_at=06-08 > as-of=06-05）→ 吞吐天数严格大于「D1 已完成」时。
+  //   修复前裸 status==='done' → 两 as-of backlog 都=1（D1 永远当已完成）→ days 相等（backtest 泄漏未来）。
+  assert.ok(
+    db.throughput_days.p50 > dn.throughput_days.p50,
+    `backtest throughput days ${db.throughput_days.p50} > current ${dn.throughput_days.p50} (D1 counted as backlog at as-of)`,
+  );
+  // 零写不变式：forecast 只读，inline 板字节不变。
+  assert.equal(readFileSync(bp, 'utf8'), before, 'forecast never writes the board');
 });
 
 // ══ 零写不变式（estimate 纯只读·绝不落盘）═══════════════════════════════════════════════════════

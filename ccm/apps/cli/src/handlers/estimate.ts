@@ -54,16 +54,29 @@ function resolveHomeDir(env: Record<string, string | undefined>, homeFlag?: stri
   return path.join(os.homedir(), '.claude', 'cc-master');
 }
 
-// loadScopedCorpus(board, ctx) → 按 --scope 取历史语料（plan §4/行 69）。
+// corpusAsOf(records, nowMs) → backtest 截断历史语料：丢掉 finishedAtMs > nowMs 的记录（round5 sweep #1）。
+//   校准 / conformal / SLE 的历史先验**不能看见 as-of 之后才完成的记录**（否则 backtest 泄漏未来·
+//   `--as-of <过去>` 时算出的校准乘子用到了它本不该知道的数据）。无 finishedAtMs 锚的记录保守保留
+//   （无法证明它在 as-of 之后·同 isDoneAsOf「无锚→保守」哲学；velocity 的 --window 另有更严的丢锚口径）。
+//   as-of=now（默认）时所有真实记录 finishedAtMs ≤ now → 不丢任何 → 行为不变。
+function corpusAsOf(records: DoneRecord[], nowMs: number): DoneRecord[] {
+  return records.filter((r) => r.finishedAtMs == null || r.finishedAtMs <= nowMs);
+}
+
+// loadScopedCorpus(board, ctx, nowMs) → 按 --scope 取历史语料（plan §4/行 69）+ as-of backtest 截断。
 //   home（默认·全 home 跨板）/ this-repo（同 repo 过滤）/ this-board（仅当前板 done）。
-//   home 不存在 / 冷启动 → 空数组（下游降级 no-history）。
-function loadScopedCorpus(board: BoardArg, ctx: Ctx): { records: DoneRecord[]; scope: string } {
+//   home 不存在 / 冷启动 → 空数组（下游降级 no-history）。所有 scope 的语料都过 corpusAsOf（backtest 一致）。
+function loadScopedCorpus(
+  board: BoardArg,
+  ctx: Ctx,
+  nowMs: number,
+): { records: DoneRecord[]; scope: string } {
   const scope = (ctx.values.scope as string) || 'home';
   const homeDir = resolveHomeDir(ctx.env, ctx.values.home as string);
 
   if (scope === 'this-board') {
     // 仅当前板 done——extractDoneRecords 同口径（纯函数·零 fs·直接喂当前 board 对象）。
-    return { records: extractDoneRecords(board), scope };
+    return { records: corpusAsOf(extractDoneRecords(board), nowMs), scope };
   }
 
   let records: DoneRecord[] = [];
@@ -76,7 +89,7 @@ function loadScopedCorpus(board: BoardArg, ctx: Ctx): { records: DoneRecord[]; s
     const repo = boardRepo(board);
     records = records.filter((r) => r.repo === repo);
   }
-  return { records, scope };
+  return { records: corpusAsOf(records, nowMs), scope };
 }
 
 // windowFilter(records, windowDays, nowMs) → 按 --window <n> 天滑窗过滤 done 语料（codex round-3 #bug2）。
@@ -116,16 +129,28 @@ function asOfISO(ms: number): string {
   return new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
-// nonDoneTasks(board) → 未完成任务（forecast/risk 的 backlog·throughput 通道用）。
-function backlogCount(board: BoardArg): number {
-  const tasks = Array.isArray(board?.tasks) ? (board.tasks as Array<Record<string, unknown>>) : [];
-  return tasks.filter((t) => t.status !== 'done').length;
+// isDoneAsOf(task, nowMs) → 该任务在 as-of 时刻是否「已完成」（backtest 截断·与 EVM EV/AC〔bug2〕、
+//   velocity windowFilter 同口径·round5 sweep #1）。status==='done' **且**（finished_at 缺失 → 保守计为已完成、
+//   保原降级语义；或 finished_at ≤ nowMs）。一个「现在 done 但 finished_at > as-of」的任务在 as-of 当时
+//   其实尚未完成——backtest 里它仍应被当作 backlog（占工期、不计 coverage 的 done 分母）。
+//   as-of=now（默认）时所有 done 任务 finished_at ≤ now → 退化为「status==='done'」，行为不变。
+function isDoneAsOf(t: Record<string, unknown>, nowMs: number): boolean {
+  if (t.status !== 'done') return false;
+  const f = typeof t.finished_at === 'string' ? Date.parse(t.finished_at) : Number.NaN;
+  if (!Number.isFinite(f)) return true; // 无 finished_at 锚 → 保守计为已完成（保原降级语义）
+  return f <= nowMs;
 }
 
-// coveragePct(board, records) → done 任务里有 estimate 字段的占比（plan「coverage<50% ②主导」）。
-function estimateCoverage(board: BoardArg): number {
+// nonDoneTasks(board, nowMs) → 未完成任务数（forecast/risk 的 backlog·throughput 通道用·as-of 截断）。
+function backlogCount(board: BoardArg, nowMs: number): number {
   const tasks = Array.isArray(board?.tasks) ? (board.tasks as Array<Record<string, unknown>>) : [];
-  const active = tasks.filter((t) => t.status !== 'done');
+  return tasks.filter((t) => !isDoneAsOf(t, nowMs)).length;
+}
+
+// coveragePct(board, nowMs) → 未完成任务里有 estimate 字段的占比（plan「coverage<50% ②主导」·as-of 截断）。
+function estimateCoverage(board: BoardArg, nowMs: number): number {
+  const tasks = Array.isArray(board?.tasks) ? (board.tasks as Array<Record<string, unknown>>) : [];
+  const active = tasks.filter((t) => !isDoneAsOf(t, nowMs));
   if (active.length === 0) return 100;
   const withEst = active.filter((t) => estimateHours(t.estimate as never) != null).length;
   return Math.round((withEst / active.length) * 100);
@@ -145,8 +170,10 @@ function buildMcParams(
   for (const t of tasks) {
     const id = typeof t.id === 'string' ? t.id : '';
     if (!id) continue;
-    // done 任务对 forecast 不占工期（mean=0·已完成）。
-    if (t.status === 'done') {
+    // as-of 时刻已完成的任务对 forecast 不占工期（mean=0）。backtest 截断（round5 sweep #1）：
+    //   用 isDoneAsOf（finished_at ≤ nowMs）而非裸 status==='done'——否则 --as-of <过去> 时一个
+    //   done-after-as-of 的任务被错当 mean=0（虚报已完成、缩短 makespan），与 EVM/velocity 口径分裂。
+    if (isDoneAsOf(t, nowMs)) {
       params.set(id, { meanHours: 0, cv: 0.4 });
       continue;
     }
@@ -172,7 +199,7 @@ export function show(ctx: Ctx): number {
     render: (board, c) => {
       const b = board as BoardArg;
       const nowMs = nowMsOf(c);
-      const { records, scope } = loadScopedCorpus(b, c);
+      const { records, scope } = loadScopedCorpus(b, c, nowMs);
       const repo = boardRepo(b);
       const taskId = c.positionals[0];
       const tasks = Array.isArray(b?.tasks) ? (b.tasks as Array<Record<string, unknown>>) : [];
@@ -247,14 +274,14 @@ export function forecast(ctx: Ctx): number {
     render: (board, c) => {
       const b = board as BoardArg;
       const nowMs = nowMsOf(c);
-      const { records, scope } = loadScopedCorpus(b, c);
+      const { records, scope } = loadScopedCorpus(b, c, nowMs);
       const mode = (c.values.mode as string) || 'both';
       const runs = intFlag(c.values.runs, 2000);
       const seed = intFlag(c.values.seed, 42);
       // --effective-n：号池有效配额份数（默认 1·floor 1·仿 usage advise 读法·#bug3）。
       const effectiveN = effectiveNFlag(c.values['effective-n']);
-      const coverage = estimateCoverage(b);
-      const backlog = backlogCount(b);
+      const coverage = estimateCoverage(b, nowMs);
+      const backlog = backlogCount(b, nowMs);
 
       const notes: string[] = [];
       const params = buildMcParams(b, records, nowMs);
@@ -298,8 +325,13 @@ export function forecast(ctx: Ctx): number {
           : null;
       if (consistency?.warning) notes.push(consistency.note);
 
-      // 主 makespan/forecast：coverage<50% 且有吞吐 → 用吞吐天数折算；否则用估算-DAG makespan。
-      const useThroughputPrimary = coverage < 50 && thr != null && Number.isFinite(thr.days.p50);
+      // 主 makespan/forecast：用吞吐天数折算的条件——① 显式 --mode throughput（用户点名只走吞吐通道·
+      //   est 必为 null），或 ② coverage<50% 吞吐主导（#NoEstimates）。两情形都须 thr 有限。
+      //   修（round5 bug1）：原 `coverage < 50 && ...` 漏了 `mode === 'throughput'`——当 --mode throughput
+      //   且 coverage≥50% 时 est=null（mode 不算 DAG 通道）但 useThroughputPrimary=false（coverage≥50）→
+      //   forecastEta 落 `if (est...)` 分支(est 为 null)→ 返 forecast:null（显式 throughput 模式对正常估值板失效）。
+      const useThroughputPrimary =
+        (mode === 'throughput' || coverage < 50) && thr != null && Number.isFinite(thr.days.p50);
       const forecastEta = (() => {
         if (useThroughputPrimary && thr) {
           return {
@@ -423,13 +455,13 @@ export function velocity(ctx: Ctx): number {
     render: (board, c) => {
       const b = board as BoardArg;
       const nowMs = nowMsOf(c);
-      const { records: allRecords, scope } = loadScopedCorpus(b, c);
+      const { records: allRecords, scope } = loadScopedCorpus(b, c, nowMs);
       // --window <n>：按天滑窗过滤语料后再喂三处计算（SLE / throughput / tasksPerDay）·#bug2。
       //   缺省（无 --window）→ 不过滤（沿用现状·history_n 不变）。
       const windowDays = windowDaysFlag(c);
       const records = windowFilter(allRecords, windowDays, nowMs);
       const sle = cycleTimeSle(records);
-      const backlog = backlogCount(b);
+      const backlog = backlogCount(b, nowMs); // as-of 截断（round5 sweep #1·同 forecast/EVM 口径）
       const thr = throughputMonteCarlo(backlog, records, { nowMs });
 
       // 历史天吞吐：done 任务 / 跨越的天数（粗·诚实标 history_n）。
@@ -484,7 +516,7 @@ export function risk(ctx: Ctx): number {
     render: (board, c) => {
       const b = board as BoardArg;
       const nowMs = nowMsOf(c);
-      const { records, scope } = loadScopedCorpus(b, c);
+      const { records, scope } = loadScopedCorpus(b, c, nowMs);
       const seed = intFlag(c.values.seed, 42);
       const runs = intFlag(c.values.runs, 2000);
 
@@ -523,9 +555,9 @@ export function risk(ctx: Ctx): number {
           return { id: s.id, mean, sigma: mean * cv };
         });
       const buffer = sizeProjectBuffer({ chainTasks });
-      // chainProgress：临界链节点里 done 的比例。
+      // chainProgress：临界链节点里 done 的比例（as-of 截断·round5 sweep #1·同 buildMcParams 口径）。
       const tasks = Array.isArray(b?.tasks) ? (b.tasks as Array<Record<string, unknown>>) : [];
-      const doneSet = new Set(tasks.filter((t) => t.status === 'done').map((t) => t.id as string));
+      const doneSet = new Set(tasks.filter((t) => isDoneAsOf(t, nowMs)).map((t) => t.id as string));
       const chainIds = est.criticality_index.filter((s) => s.criticality >= 0.5).map((s) => s.id);
       const chainProgress =
         chainIds.length > 0 ? chainIds.filter((id) => doneSet.has(id)).length / chainIds.length : 0;

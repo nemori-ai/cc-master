@@ -205,3 +205,28 @@ test('policy set human render contains OK message', () => {
   policyHandler.set(ctx);
   assert.ok(ctx.outBuf.join('').includes('OK'), 'human render must contain OK');
 });
+
+test('policy set refreshes owner.heartbeat (round5 bug3)', () => {
+  // policy.set 走 inline mutate（直接写 b.policy/b.log）·不经会自动 touch 的 mutations.* helper——
+  //   修复前 heartbeat 停摆（watchdog 误判 owner 失联）。修复：显式 mutations.touch → heartbeat 刷成 now。
+  const boardPath = mkBoardHome(); // fixture heartbeat = 2026-06-25T08:00:00Z
+  const before = JSON.parse(readFileSync(boardPath, 'utf8'));
+  const beforeHb = before.owner.heartbeat;
+  const ctx = mkCtx(boardPath, {
+    values: { 'autonomous-account-switch': 'deny' },
+    isTTY: true,
+  });
+  assert.equal(policyHandler.set(ctx), EXIT.OK);
+  const after = JSON.parse(readFileSync(boardPath, 'utf8'));
+  const afterHb = after.owner.heartbeat;
+  // ★核心：heartbeat 被刷新（严格晚于写前值），且 owner 其它字段不被破坏。
+  assert.ok(
+    Date.parse(afterHb) > Date.parse(beforeHb),
+    `heartbeat ${afterHb} must be refreshed > ${beforeHb}`,
+  );
+  assert.match(afterHb, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/, 'heartbeat is ISO-8601 UTC sec');
+  assert.equal(after.owner.session_id, before.owner.session_id, 'session_id preserved');
+  assert.equal(after.owner.active, before.owner.active, 'active preserved');
+  // 自授权闸 + board.log 审计不变（log 仍有新条目）。
+  assert.ok(after.log.length > before.log.length, 'board.log still appended (audit unchanged)');
+});

@@ -134,6 +134,10 @@ export function computeEvm(
   const pv = pvAtTime(atHours);
 
   // EV：done 任务的 baseline 计划小时（挣到的计划价值）。
+  //   backtest as-of 截断（同 PV 口径）：done 任务仅当 finished_at 缺失 **或** finished_at ≤ as-of 才计入
+  //   EV/AC——一个「现在 done 但 finished_at > as-of」的任务在 as-of 时刻其实**尚未**完成，计入会虚报
+  //   「进度发生在它真发生之前」。PV 已经 baseline.dag_snapshot CPM 截断到 as-of；EV/AC 须同口径
+  //   （AC 的 duration/token 累计也只算 as-of 前完成的）。finished_at 缺失（无锚）→ 保守计入（保原降级语义）。
   let ev = 0;
   let ac = 0;
   let acCovered = 0;
@@ -142,6 +146,8 @@ export function computeEvm(
     const id = typeof t.id === 'string' ? t.id : '';
     if (!id || !(id in (baseline.task_estimates as object))) continue;
     if (t.status !== 'done') continue;
+    const fin = parseTs(t.finished_at);
+    if (fin != null && fin > asOfMs) continue; // as-of 之后才完成 → backtest 视作「尚未完成」，不计
     ev += baselineHours(baseline, id);
     acTotal += 1;
     if (acSource === 'duration') {

@@ -42,7 +42,9 @@ function clone(board: Board): Board {
 }
 
 // 盖 owner.heartbeat（每次写都调）。保证 owner 对象存在（防 template/手搓板缺 owner 时崩）。
-function touch(board: Board): Board {
+//   导出：让「inline mutate 而非走 mutations.* 专属 helper」的写 handler（如 policy.set 直接写 b.policy/b.log）
+//   也能复用这一 stampNow 逻辑刷 heartbeat，与其它写 verb 保持「任何写 → owner.heartbeat=now」一致（round5 bug3）。
+export function touch(board: Board): Board {
   if (!board.owner || typeof board.owner !== 'object')
     board.owner = { active: true, session_id: '', heartbeat: '' };
   board.owner.heartbeat = stampNow();

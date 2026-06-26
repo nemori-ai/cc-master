@@ -85,7 +85,11 @@ export function set(ctx: Ctx): number {
       };
       if (!Array.isArray(b.log)) b.log = [];
       (b.log as unknown[]).push(logEntry);
-      return b;
+      // 刷 owner.heartbeat（round5 bug3）：policy.set 走 inline mutate（直接写 b.policy/b.log），不经
+      //   会自动 touch 的 mutations.* 专属 helper——故显式调 mutations.touch 与其它写 verb 同口径
+      //   （「任何写 → owner.heartbeat=now」），否则换号心跳停摆 / watchdog 误判 owner 失联。
+      //   policy 写的自授权闸（上方非 TTY --user-authorized 检查）+ board.log 审计不变。
+      return mutations.touch(b);
     },
     render: (next, c) => {
       const n = next as BoardArg;

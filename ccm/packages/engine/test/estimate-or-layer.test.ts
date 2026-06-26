@@ -295,6 +295,90 @@ test('evm: baselineHours recognizes week unit — BAC same scale as PV/EV (#bug-
   assert.ok((evm.cpi as number) > 0.5 && (evm.cpi as number) < 2, `CPI ${evm.cpi} sane`);
 });
 
+test('evm: backtest --as-of excludes done tasks finished after as-of from EV/AC (round5 bug2)', () => {
+  // 板：A done@06-03（as-of 之前·应计），B done@06-08（as-of 之后·backtest 须排除·当时尚未完成）。
+  //   PV 已按 dag_snapshot CPM 截断到 as-of；EV/AC 须同口径——否则虚报「进度发生在它真发生之前」。
+  const baseline = {
+    t0: '2026-06-01T00:00:00Z',
+    captured_at: '2026-06-01T00:00:00Z',
+    task_estimates: {
+      A: { value: 10, unit: 'h' },
+      B: { value: 10, unit: 'h' },
+    },
+    dag_snapshot: { A: { deps: [] }, B: { deps: ['A'] } },
+  };
+  const board = {
+    schema: 'cc-master/v2',
+    tasks: [
+      // A：as-of(06-05) 之前完成 → 计入 EV/AC（duration 2h）。
+      {
+        id: 'A',
+        status: 'done',
+        started_at: '2026-06-03T00:00:00Z',
+        finished_at: '2026-06-03T02:00:00Z',
+      },
+      // B：现在 done 但 finished_at=06-08 > as-of → backtest 视作尚未完成，**不计** EV/AC。
+      {
+        id: 'B',
+        status: 'done',
+        started_at: '2026-06-07T00:00:00Z',
+        finished_at: '2026-06-08T04:00:00Z',
+      },
+    ],
+  };
+  const AS_OF = Date.parse('2026-06-05T00:00:00Z');
+  const NOW_FULL = Date.parse('2026-06-10T00:00:00Z');
+
+  const back = computeEvm(board, baseline, { asOfMs: AS_OF, acSource: 'duration' });
+  const full = computeEvm(board, baseline, { asOfMs: NOW_FULL, acSource: 'duration' });
+
+  // ★核心：backtest EV 只含 A（10h），全量 EV 含 A+B（20h）→ backtest EV < 全量 EV。
+  assert.equal(
+    back.ev.value,
+    10,
+    `backtest EV ${back.ev.value} must count only A (done before as-of)`,
+  );
+  assert.equal(full.ev.value, 20, `full EV ${full.ev.value} must count A+B`);
+  assert.ok(back.ev.value < full.ev.value, 'backtest EV < full EV (B excluded)');
+  // AC 同口径：backtest 只算 A 的 duration（06-03T00→T02=2h），全量算 A(2h)+B(06-07T00→06-08T04=28h)=30h。
+  assert.equal(back.ac.value, 2, `backtest AC ${back.ac.value} must be A duration only`);
+  assert.equal(full.ac.value, 30, `full AC ${full.ac.value} = A(2h)+B(28h)`);
+  assert.ok(back.ac.value < full.ac.value, 'backtest AC < full AC (B duration excluded)');
+});
+
+test('evm: control — as-of=now counts all done tasks (no spurious exclusion·round5 bug2)', () => {
+  // 控制组：as-of 在所有 finished_at 之后 → 全计（确认 as-of 截断不误伤正常路径）。
+  const baseline = {
+    t0: '2026-06-01T00:00:00Z',
+    captured_at: '2026-06-01T00:00:00Z',
+    task_estimates: { A: { value: 10, unit: 'h' }, B: { value: 10, unit: 'h' } },
+    dag_snapshot: { A: { deps: [] }, B: { deps: ['A'] } },
+  };
+  const board = {
+    schema: 'cc-master/v2',
+    tasks: [
+      {
+        id: 'A',
+        status: 'done',
+        started_at: '2026-06-03T00:00:00Z',
+        finished_at: '2026-06-03T02:00:00Z',
+      },
+      {
+        id: 'B',
+        status: 'done',
+        started_at: '2026-06-07T00:00:00Z',
+        finished_at: '2026-06-08T04:00:00Z',
+      },
+    ],
+  };
+  const evm = computeEvm(board, baseline, {
+    asOfMs: Date.parse('2026-06-10T00:00:00Z'),
+    acSource: 'duration',
+  });
+  assert.equal(evm.ev.value, 20, 'all done tasks counted when as-of is after all finishes');
+  assert.equal(evm.ac.value, 30, 'all durations counted (A 2h + B 28h)');
+});
+
 // ── SLE + WIP-aging ────────────────────────────────────────────────────────────────
 test('sle: cycle-time quantiles monotone P50 ≤ P85 ≤ P95', () => {
   const corpus = loadCorpus(HOME, { nowMs: NOW });
