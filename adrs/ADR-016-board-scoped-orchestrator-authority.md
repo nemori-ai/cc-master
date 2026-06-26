@@ -58,7 +58,14 @@ policy 同时被两层读取，缺一不可：
 
 新板默认 `policy.autonomous_account_switch = "allow"`——保持 v0.8.0「方案 A 无重启换号」的现状（自主 pacing 换号是已有能力，不因引入 policy 而被默默关掉）。权限是**想锁某账号时才关掉的 opt-out 开关**：用户显式 `ccm policy set --autonomous-account-switch=deny` 才锁。
 
-**缺省即 allow（向后兼容）**：旧板没有 `policy` 段，读取时 `autonomous_account_switch` 缺省解析为 `allow`——旧板行为一字不变（不引入沉默的行为回归）。`switch-account.sh` 读不到 policy（无 active board / ccm 缺失 / 字段缺）也**降级放行**（同既有「ccm 缺则优雅降级」模式·ADR-014）——deny 是显式声明才生效的硬闸，不是「读不到就保守拒绝」（那会把每个没接 ccm 的环境都误锁）。
+**缺省即 allow（向后兼容）**：旧板没有 `policy` 段，读取时 `autonomous_account_switch` 缺省解析为 `allow`——旧板行为一字不变（不引入沉默的行为回归）。deny 是显式声明才生效的硬闸。
+
+**`switch-account.sh` 读不到 policy 时的降级分两类**（codex round-6 P1 安全细化·凭有无「明确目标板上下文」分流——确定性 board selector `--board` / `$CC_MASTER_BOARD`）：
+
+- **(a) 真·无 ccm / 无任何板上下文**（`CCM_BIN` 未设且 PATH 无 `ccm`，或未给 `--board`/`$CC_MASTER_BOARD`）→ **fail-open allow**（同既有「ccm 缺则优雅降级」模式·ADR-014·保原意图：不把每个没接 ccm 的环境都误锁）。
+- **(b) 有明确目标板上下文却读不到 policy**（给了板 selector，但 ccm 调用失败 / 输出歧义即 `{"ok":false}`〔Ambiguous/NotFound〕/ 坏 JSON）→ **保守 deny、exit 7**（绝不静默放行）。
+
+（实现注·codex round-6 揪出的 P1：原设计「广义 fail-open」——读不到一律 allow——在**多 active board 共享 home** 下被攻破：`ccm policy show` 无 board selector 走 ambient discovery，子进程拿不到 orchestrator 的 hook-stdin sid → Ambiguous/NotFound throw → 空 JSON → fail-open allow → **目标板声明的 `deny` 被绕过**。修复给 ccm **确定性目标板**〔`discover.ts` 的全局 `--board`/`$CC_MASTER_BOARD` flag·与 cwd/sid 无关·最高优先〕，并把「有板上下文却读不到」从 allow 收紧为保守 deny。这是对 blessed 决策的**安全细化**：意图保留〔不锁未接 ccm 的环境〕、只 fail-closed 新暴露的安全洞——与 §2.2 exit 4→exit 7 同属落地期 micro-fixup。两类降级与 `switch-account.sh` §0 policy 机制硬闸的实现一致。）
 
 ### 2.4 命令面：新增顶层 `policy` noun（写 noun·刻意置于只读 namespace 之外）
 
