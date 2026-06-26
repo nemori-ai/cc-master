@@ -749,6 +749,77 @@ test('backtest: forecast treats done-after-as-of task as still-in-backlog (round
   assert.equal(readFileSync(bp, 'utf8'), before, 'forecast never writes the board');
 });
 
+test('backtest: --as-of anchors recency cutoff to as-of (>90d-old board still in corpus·round7 #P2)', () => {
+  // round5「--as-of sweep」的 sibling：sweep 修了 corpusAsOf 的 record 级过滤、漏了 loadCorpus 自身的 board 级 cutoff。
+  //   构造一块「板时戳 + done 记录都距今天 >90 天、但在 as-of（同样 >90 天前）当时仍在 recency 窗口内」的旧板：
+  //   · 旧代码 loadCorpus(homeDir) 用引擎内部 Date.now() 锚 90 天 cutoff → loadHomeBoards 提前把旧板丢弃 → history_n=0。
+  //   · 修后 loadCorpus(homeDir,{nowMs:asOf}) 把 board 级 recency 锚到 as-of → 旧板纳入 → corpusAsOf 仅按 as-of
+  //     相对截断 finishedAtMs → 6 条 done 全部进语料 → history_n=6。
+  //   日期相对 Date.now() 计算（不硬编码绝对日·对机器时钟稳健）。velocity 暴露 history_n 最直接（show/forecast/risk
+  //   同走 loadScopedCorpus·一并受益·穷尽 sweep）。
+  const day = 86400000;
+  const now = Date.now();
+  const iso = (ms: number): string => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const boardTsMs = now - 120 * day; // 旧板时戳：距今 120 天（> 90 天·旧代码会丢）
+  const finishedMs = now - 119 * day; // done 完成于 119 天前（≤ as-of）
+  const startedMs = finishedMs - 4 * 3600000; // actual = 4h
+  const asOfMs = now - 118 * day; // backtest 时刻：118 天前（旧板当时可用·但仍 > 90 天前）
+
+  const corpusDone = Array.from({ length: 6 }, (_, i) => ({
+    id: `OLD${i}`,
+    status: 'done',
+    deps: [],
+    type: 'development',
+    executor: 'subagent',
+    estimate: { value: 4, unit: 'h' },
+    started_at: iso(startedMs),
+    finished_at: iso(finishedMs),
+  }));
+
+  const root = mkdtempSync(join(tmpdir(), 'ccm-p2-'));
+  TMPDIRS.push(root);
+  const home = join(root, '.claude', 'cc-master');
+  mkdirSync(home, { recursive: true });
+  // 归档语料板：板时戳（heartbeat + created_at）都在 120 天前。
+  writeFileSync(
+    join(home, 'old-corpus.board.json'),
+    JSON.stringify({
+      schema: 'cc-master/v2',
+      meta: { template_version: 3, created_at: iso(boardTsMs) },
+      goal: 'old corpus archive',
+      owner: { active: false, session_id: 'sid-old', heartbeat: iso(boardTsMs) },
+      git: { worktree: '/repo/old', branch: 'main' },
+      tasks: corpusDone,
+      log: [],
+    }),
+  );
+  // active 目标板（今日时戳·只读取的板）：只含一个 ready 任务 → 自身贡献 0 条 done 记录。
+  const targetBoard = join(home, 'target.board.json');
+  writeFileSync(
+    targetBoard,
+    JSON.stringify({
+      schema: 'cc-master/v2',
+      meta: { template_version: 3, created_at: iso(now) },
+      goal: 'target estimate',
+      owner: { active: true, session_id: 'sid-target', heartbeat: iso(now) },
+      git: { worktree: '/repo/target', branch: 'feat' },
+      scheduling: { wip_limit: 4 },
+      tasks: [{ id: 'A1', status: 'ready', deps: [], type: 'development', executor: 'subagent' }],
+      log: [],
+    }),
+  );
+
+  const ctx = mkCtx(targetBoard, { home, values: { scope: 'home', 'as-of': iso(asOfMs) } });
+  assert.equal(estimateHandler.velocity(ctx), EXIT.OK);
+  const d = dataOf(ctx);
+  // ★核心：旧板的 6 条 done 在 as-of 当时可用 → 必须进语料（旧代码会因 today-锚 90 天 cutoff 丢成 0）。
+  assert.equal(
+    d.history_n,
+    6,
+    `old board within as-of recency window must be in corpus (got history_n=${d.history_n})`,
+  );
+});
+
 // ══ 零写不变式（estimate 纯只读·绝不落盘）═══════════════════════════════════════════════════════
 
 test('estimate handlers never write the board (zero-write invariant)', () => {

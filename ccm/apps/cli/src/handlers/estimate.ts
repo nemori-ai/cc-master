@@ -66,6 +66,12 @@ function corpusAsOf(records: DoneRecord[], nowMs: number): DoneRecord[] {
 // loadScopedCorpus(board, ctx, nowMs) → 按 --scope 取历史语料（plan §4/行 69）+ as-of backtest 截断。
 //   home（默认·全 home 跨板）/ this-repo（同 repo 过滤）/ this-board（仅当前板 done）。
 //   home 不存在 / 冷启动 → 空数组（下游降级 no-history）。所有 scope 的语料都过 corpusAsOf（backtest 一致）。
+//   ★as-of 锚定（round7 #P2·round5 sweep #1 的 sibling）：loadCorpus 的 recency cutoff（loadHomeBoards 默认 90 天·
+//   `DEFAULT_MAX_DAYS_AGO`）必须锚到 **nowMs（= as-of 时刻）** 而非引擎内部的 `Date.now()`——否则 `--as-of <过去>`
+//   时一块「板时戳距今天 >90 天、但在 as-of 当时仍在 recency 窗口内」的旧板会被 loadHomeBoards 提前丢弃（corpusAsOf
+//   还没来得及按 as-of 相对过滤就已经没了它）→ backtest 用了空的/有偏的语料。传 { nowMs } 让 board 级 recency 与
+//   record 级 corpusAsOf 同锚到 as-of；as-of=now（默认）时 nowMs≈Date.now() → 行为不变（无 --as-of 正常路径不动）。
+//   注：show/forecast/velocity/risk 四个 verb 都走本函数取语料（evm 不读语料），故此处单点修复对它们一致生效（穷尽 sweep）。
 function loadScopedCorpus(
   board: BoardArg,
   ctx: Ctx,
@@ -81,7 +87,7 @@ function loadScopedCorpus(
 
   let records: DoneRecord[] = [];
   try {
-    records = loadCorpus(homeDir);
+    records = loadCorpus(homeDir, { nowMs });
   } catch {
     records = [];
   }

@@ -193,6 +193,24 @@ test('usage show with registry lists all accounts with snapshot fields', () => {
   }
 });
 
+test('usage show: registry presence does NOT light up top-level available (round7 #P3)', () => {
+  // registry 存在但 sidecar 缺失（当前账户信号不可得）→ data.available 必须反映当前信号（false），
+  //   **不**被备号 registry 快照单独翻 true。registry 存在性由 registry_present + accounts 独立暴露（保持不变）。
+  //   旧代码：`available = current.available || (backups!=null && accounts.length>0)` → registry 在就 true（错·
+  //   把陈旧备号快照当成可用的「当前」配额信号）。修后 `available = current.available` → false。
+  const { home, boardPath } = setupHome({ accounts: REGISTRY_3 }); // 有 registry·无 sidecar
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
+  const code = usageHandler.show(ctx);
+  assert.equal(code, EXIT.OK, 'no-sidecar degrade is exit 0');
+  const out = JSON.parse(ctx.outBuf.join(''));
+  // ★核心：当前信号不可得 → 顶层 available false（不被 registry 快照点亮）。
+  assert.equal(out.data.available, false, 'no current signal → available:false (registry 不点亮)');
+  assert.equal(out.data.current.available, false, 'current signal genuinely unavailable');
+  // registry-存在性信号独立保持：registry_present:true + 3 个备号仍列出。
+  assert.equal(out.data.registry_present, true, 'registry_present stays an independent signal');
+  assert.equal(out.data.accounts.length, 3, 'backup accounts still listed independently');
+});
+
 // ── current 窗口过期闸（codex round-4 #bug1）─────────────────────────────────────────────────────
 // show 此前「sidecar 存在就 available:true」无脑放行——即便 sidecar 的 resets_at < now（窗口已 reset·used% 陈旧）。
 //   修复后 show 与 advise(pacingAdvice·引擎 pctOf) 口径一致：过期窗口（resets_at<now）used% 视 stale→null，

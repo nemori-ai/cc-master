@@ -318,7 +318,11 @@ export function show(ctx: Ctx): number {
             : backups.accounts;
 
       const data = {
-        available: current.available || (backups != null && backups.accounts.length > 0),
+        // available 反映**当前账户信号**（= current.available·≥1 个非过期窗口有有效 used%）——**不**被 registry
+        //   备号快照单独点亮（round7 #P3）：备号快照是生命周期投影（陈旧·非实时配额），若 registry 存在就把顶层
+        //   available 翻 true，调用方会把过期备号快照误当「当前」可用配额信号。registry 存在性已由 `registry_present`
+        //   + `accounts` 独立暴露（保持不变）；available 只回答「当前号配额信号现在可用吗」这一问题。
+        available: current.available,
         accounts_scope: accountsScope,
         effective_n: en,
         current,
