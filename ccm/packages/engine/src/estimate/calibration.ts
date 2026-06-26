@@ -32,6 +32,13 @@ export interface CalibrationOptions {
   minN?: number; // 选层最小样本数（默认 3）
 }
 
+// hasUsableRatio(r) → 该记录能否贡献一个有效 ratio（est+actual 皆有且 ratio>0）。
+//   层选择「够用」判定与 EWMA 加权都以此为准——数「可用 ratio 样本」而非原始记录数（SSOT·codex round-8 P2）。
+//   type predicate：过门后把 r.ratio 收窄为 number（供 ewmaWeightedRatio 直接用，无需再判 null）。
+function hasUsableRatio(r: DoneRecord): r is DoneRecord & { ratio: number } {
+  return r.ratio != null && r.ratio > 0;
+}
+
 // ewmaWeightedRatio(records, nowMs, halfLifeDays) → { mean, n }。
 //   按 recency 权重对各 record.ratio 加权平均（只计有 ratio 的记录）。无有效记录 → { mean:null, n:0 }。
 function ewmaWeightedRatio(
@@ -43,7 +50,7 @@ function ewmaWeightedRatio(
   let vsum = 0;
   let n = 0;
   for (const r of records) {
-    if (r.ratio == null || !(r.ratio > 0)) continue;
+    if (!hasUsableRatio(r)) continue;
     const w = recencyWeight(r, nowMs, halfLifeDays);
     wsum += w;
     vsum += w * r.ratio;
@@ -66,7 +73,8 @@ export function calibrate(
   const k = opts.priorStrength ?? 3;
   const minN = opts.minN ?? 3;
 
-  const { layer, confidence } = selectPoolLayer(records, query, minN);
+  // 选层按「可用 ratio 样本数」判够用：最具体层记录虽多但 ratio 全缺时下沉到更宽层（codex round-8 P2）。
+  const { layer, confidence } = selectPoolLayer(records, query, minN, hasUsableRatio);
   const { mean, n } = ewmaWeightedRatio(layer.records, nowMs, halfLifeDays);
 
   if (mean == null || n === 0) {
@@ -111,7 +119,8 @@ export function dispersionCv(
   fallbackCv = 0.4,
 ): number {
   const minN = opts.minN ?? 3;
-  const { layer } = selectPoolLayer(records, query, minN);
+  // 同 calibrate：按可用 ratio 样本数选层，最具体层 ratio 全缺时下沉更宽层（codex round-8 P2）。
+  const { layer } = selectPoolLayer(records, query, minN, hasUsableRatio);
   const ratios = layer.records.map((r) => r.ratio).filter((x): x is number => x != null && x > 0);
   if (ratios.length < 2) return fallbackCv;
   const mean = ratios.reduce((s, v) => s + v, 0) / ratios.length;

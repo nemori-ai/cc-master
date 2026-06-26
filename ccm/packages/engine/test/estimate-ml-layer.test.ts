@@ -275,3 +275,95 @@ test('edge: cold-start empty home → loadCorpus returns []', () => {
   const corpus = loadCorpus(join(BOARDS, 'no-such-dir-cold-start'), { nowMs: NOW });
   assert.deepEqual(corpus, []);
 });
+
+// 回归（codex round-8 P2）：最具体层记录数 ≥minN 但全缺可用 ratio（缺 estimate）时，
+//   层选择应基于「可用 ratio 样本数」而非原始记录数 → 下沉到含有效 ratio 的更宽层，
+//   而非误判最具体层「够用」后 ewma 拿 0 ratio 返回 no-history（忽略本可用的历史校准）。
+test('calibrate: specific layer has ≥minN records but no usable ratio → sinks to broader layer with ratios', () => {
+  // git.worktree → repo='/work/calib-fallback'。3 个 subagent+mid 的 dev 任务有时戳但缺 estimate（→ratio null）；
+  //   3 个 master-orchestrator 的 dev 任务带 estimate+时戳（→ratio=1.5）。
+  const mk = (
+    id: string,
+    executor: string,
+    tier: string,
+    estimate: { value: number; unit: string } | undefined,
+    started: string,
+    finished: string,
+  ) => ({
+    id,
+    status: 'done',
+    deps: [],
+    type: 'development',
+    executor,
+    ...(tier ? { tier } : {}),
+    ...(estimate ? { estimate } : {}),
+    started_at: started,
+    finished_at: finished,
+  });
+  const board = {
+    schema: 'cc-master/v2',
+    meta: { created_at: '2026-06-20T09:00:00Z' },
+    goal: 'calibration fallback regression fixture',
+    owner: { active: false, session_id: 'sid-calib', heartbeat: '2026-06-24T18:00:00Z' },
+    git: { worktree: '/work/calib-fallback', branch: 'main' },
+    tasks: [
+      // 最具体层（repo+type+executor+tier = subagent+mid）：3 条但全缺 estimate → ratio null。
+      mk('A1', 'subagent', 'mid', undefined, '2026-06-24T09:00:00Z', '2026-06-24T11:00:00Z'),
+      mk('A2', 'subagent', 'mid', undefined, '2026-06-23T09:00:00Z', '2026-06-23T12:00:00Z'),
+      mk('A3', 'subagent', 'mid', undefined, '2026-06-22T09:00:00Z', '2026-06-22T10:30:00Z'),
+      // 更宽 repo+type 层（executor 不同 → 不入最具体层）：带 estimate=2h、actual=3h → ratio=1.5。
+      mk(
+        'B1',
+        'master-orchestrator',
+        '',
+        { value: 2, unit: 'h' },
+        '2026-06-24T09:00:00Z',
+        '2026-06-24T12:00:00Z',
+      ),
+      mk(
+        'B2',
+        'master-orchestrator',
+        '',
+        { value: 2, unit: 'h' },
+        '2026-06-23T09:00:00Z',
+        '2026-06-23T12:00:00Z',
+      ),
+      mk(
+        'B3',
+        'master-orchestrator',
+        '',
+        { value: 2, unit: 'h' },
+        '2026-06-22T09:00:00Z',
+        '2026-06-22T12:00:00Z',
+      ),
+    ],
+  };
+  const corpus = extractDoneRecords(board);
+  assert.equal(corpus.length, 6);
+  const query = {
+    repo: '/work/calib-fallback',
+    type: 'development',
+    executor: 'subagent',
+    tier: 'mid',
+  };
+  // sanity：最具体层（subagent+mid）确有 3 条原始记录但 0 条带 ratio；repo+type 层带 3 条有效 ratio。
+  const layers = poolLayers(corpus, query);
+  const specific = (layers[0] as { records: Array<{ ratio: number | null }> }).records;
+  const broader = (layers[1] as { records: Array<{ ratio: number | null }> }).records;
+  assert.equal(specific.length, 3, 'specific layer: 3 raw records');
+  assert.equal(specific.filter((r) => r.ratio != null).length, 0, 'but 0 usable ratio');
+  assert.equal(
+    broader.filter((r) => r.ratio != null).length,
+    3,
+    'repo+type layer: 3 usable ratios',
+  );
+  // raw selectPoolLayer（默认全计）仍按原始记录数选最具体层——正是 bug 的成因。
+  assert.equal(selectPoolLayer(corpus, query, 3).layer.level, 'repo+type+executor+tier');
+  // 但 calibrate 按可用 ratio 样本数选层 → 下沉到 repo+type，用其 3 条 ratio 校准（而非 no-history）。
+  const cal = calibrate(corpus, query, { nowMs: NOW });
+  assert.notEqual(cal.source, 'no-history', 'should not ignore broader layer’s usable ratios');
+  assert.equal(cal.level, 'repo+type');
+  assert.equal(cal.confidence, 'medium');
+  assert.equal(cal.history_n, 3);
+  assert.ok(cal.multiplier > 1, `ratios=1.5 → multiplier ${cal.multiplier} should exceed 1`);
+});

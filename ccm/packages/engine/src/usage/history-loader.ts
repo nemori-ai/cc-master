@@ -209,17 +209,22 @@ export function poolLayers(records: DoneRecord[], query: PoolQuery): PoolLayer[]
   ];
 }
 
-// selectPoolLayer(records, query, minN) → 选 N≥minN 的最具体层（plan §4：每层 N≥3 才用，否则向上退化）。
+// selectPoolLayer(records, query, minN, isUsable?) → 选「可用样本数」≥minN 的最具体层（plan §4：每层 N≥3 才用，否则向上退化）。
 //   返回 { layer, confidence }——最具体层 → high；次层 → medium；type/home 兜底 → low。
+//   `isUsable` 定义一条记录对该消费场景是否「可用」（默认全计）；校准 / 离散度按 **可用 ratio 样本数**
+//   而非原始记录数判「够用」——否则最具体层记录虽多但 ratio 全缺时会被误选，错过更宽层里的有效 ratio（codex round-8 P2）。
 export function selectPoolLayer(
   records: DoneRecord[],
   query: PoolQuery,
   minN = 3,
+  isUsable: (r: DoneRecord) => boolean = () => true,
 ): { layer: PoolLayer; confidence: 'high' | 'medium' | 'low' } {
   const layers = poolLayers(records, query);
+  const usableCount = (layer: PoolLayer): number =>
+    layer.records.reduce((n, r) => n + (isUsable(r) ? 1 : 0), 0);
   for (let i = 0; i < layers.length; i++) {
     const layer = layers[i];
-    if (layer && layer.records.length >= minN) {
+    if (layer && usableCount(layer) >= minN) {
       const confidence = i === 0 ? 'high' : i === 1 ? 'medium' : 'low';
       return { layer, confidence };
     }
