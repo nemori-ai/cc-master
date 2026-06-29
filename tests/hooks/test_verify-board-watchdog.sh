@@ -9,7 +9,7 @@
 # back to recon it. An already-armed `wakeup` object silences it (graceful-degrade, like wip_limit).
 # Mirrors the verify-board.js test harness exactly (mkactive + run_stop_sid degraded/sid runners).
 
-mkactive() { mkdir -p "$1"; printf '%s' "$3" > "$1/$2.board.json"; }
+mkactive() { mkdir -p "$1/boards"; printf '%s' "$3" > "$1/boards/$2.board.json"; }
 run_stop() {
   HOOK_OUT="$(CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
              node "$PLUGIN_ROOT/hooks/scripts/verify-board.js" </dev/null 2>/dev/null)"; HOOK_RC=$?
@@ -155,7 +155,7 @@ old_fp() { # $1 = board path
 #            reminder fires (NOT silently skipped via the allow-early-exit path). This is the regression.
 H="$(make_project)"; SID="sess-wd-i"
 mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
-STALE_FP="$(old_fp "$H/b1.board.json")"
+STALE_FP="$(old_fp "$H/boards/b1.board.json")"
 printf '0 %s\n' "$STALE_FP" > "$H/.$SID.stopcheck"   # simulate a pre-upgrade handshake record
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "WD-i: stale old-formula fingerprint → NOT allowed early; forced fresh handshake block"

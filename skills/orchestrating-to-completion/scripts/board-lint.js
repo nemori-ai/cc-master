@@ -36,17 +36,19 @@ function die(msg, code) {
 }
 
 // findSingleActiveBoard(homeDir) → 唯一 active 板的绝对路径，或抛一个 agent-friendly 错。
+//   board 集中在 <home>/boards/（board-v2 布局·与 bootstrap-board.sh / ccm 同口径），入参传 home 根。
 function findSingleActiveBoard(homeDir) {
+  const boardsDir = path.join(homeDir, 'boards');
   let entries;
   try {
-    entries = fs.readdirSync(homeDir, { withFileTypes: true });
+    entries = fs.readdirSync(boardsDir, { withFileTypes: true });
   } catch (_e) {
-    die(`cc-master board lint: 找不到 board home（${homeDir}）。\n  怎么修：传一个显式 board 路径，或设 CC_MASTER_HOME。`, 2);
+    die(`cc-master board lint: 找不到 board home（${boardsDir}）。\n  怎么修：传一个显式 board 路径，或设 CC_MASTER_HOME。`, 2);
   }
   const active = [];
   for (const ent of entries) {
     if (!ent.isFile() || !ent.name.endsWith('.board.json')) continue;
-    const full = path.join(homeDir, ent.name);
+    const full = path.join(boardsDir, ent.name);
     try {
       const b = JSON.parse(fs.readFileSync(full, 'utf8'));
       if (b && b.owner && b.owner.active === true) active.push(full);
@@ -55,7 +57,7 @@ function findSingleActiveBoard(homeDir) {
     }
   }
   if (active.length === 0) {
-    die(`cc-master board lint: home（${homeDir}）里没有 active board。\n  怎么修：传一个显式 board 路径。`, 2);
+    die(`cc-master board lint: home（${boardsDir}）里没有 active board。\n  怎么修：传一个显式 board 路径。`, 2);
   }
   if (active.length > 1) {
     die(`cc-master board lint: home 里有 ${active.length} 块 active board，无法自动选。\n  请传一个显式 board 路径，例如：\n` +
@@ -118,9 +120,11 @@ function main() {
 
   let boardPath = rest[0];
   if (!boardPath) {
+    // 统一全局口径（与 hook-common.resolveHome / bootstrap-board.sh / ccm 同）：CC_MASTER_HOME 覆写，
+    // 否则 $HOME/.claude/cc-master；不再 per-repo（CLAUDE_PROJECT_DIR）或 cwd。board 在 <home>/boards/。
     const home =
       process.env.CC_MASTER_HOME ||
-      path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), '.claude', 'cc-master');
+      path.join(process.env.HOME || require('os').homedir(), '.claude', 'cc-master');
     boardPath = findSingleActiveBoard(home); // 内部失败会 die(…,2)
   }
   boardPath = path.resolve(boardPath);

@@ -117,6 +117,7 @@ export type {
   EstimateMcResult,
   ForecastOptions,
   NodeMcParam,
+  PctCostMcResult,
   SensitivityEntry,
   ThroughputMcResult,
 } from './estimate/mc-scheduler.js';
@@ -124,6 +125,7 @@ export {
   dailyThroughput,
   dualChannelConsistency,
   estimateDagMonteCarlo,
+  pctCostToCompleteMonteCarlo,
   throughputMonteCarlo,
 } from './estimate/mc-scheduler.js';
 // ── estimate/（ADR-015 估算引擎算法层·plan §7）────────────────────────────────────────────────────
@@ -173,3 +175,18 @@ export type {
   WindowSignal,
 } from './usage/pacing.js';
 export { effectiveN, pacingAdvice, pctOf, tokenExpired } from './usage/pacing.js';
+// solvency（配额%-计成本轴：burn-rate / runway / token 辅助 sizing·ADR-015 延伸·plan §4）
+export type {
+  BurnRateOptions,
+  BurnRateResult,
+  BurnSample,
+  RunwayOptions,
+  RunwayResult,
+} from './usage/solvency.js';
+export {
+  pctBurnRate,
+  pctRunway,
+  tokenWeightedShares,
+  WINDOW_5H_SEC,
+  WINDOW_7D_SEC,
+} from './usage/solvency.js';

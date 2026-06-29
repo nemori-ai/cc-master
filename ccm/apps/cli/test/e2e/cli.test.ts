@@ -65,7 +65,10 @@ function seedBoard(
     log = [] as unknown[],
   }: { goal?: string; tasks?: unknown[]; log?: unknown[] } = {},
 ): string {
-  const boardPath = join(home, '2026-06-24-e2e.board.json');
+  // board 集中落 <home>/boards/（board-v2 布局）。
+  const boardsDir = join(home, 'boards');
+  mkdirSync(boardsDir, { recursive: true });
+  const boardPath = join(boardsDir, '2026-06-24-e2e.board.json');
   const board = {
     schema: 'cc-master/v2',
     meta: { template_version: 3 },
@@ -219,9 +222,9 @@ test('board init --goal → 板文件生成（exit 0）', () => {
   const { home } = mkHome();
   const r = runCcm(['board', 'init', '--goal', 'fresh init'], { home });
   assert.equal(r.status, 0, `init stderr=${r.stderr}`);
-  const files = readdirSync(home).filter((n) => n.endsWith('.board.json'));
+  const files = readdirSync(join(home, 'boards')).filter((n) => n.endsWith('.board.json'));
   assert.equal(files.length, 1, 'init should create exactly one board file');
-  const b = readBoard(join(home, files[0] as string));
+  const b = readBoard(join(home, 'boards', files[0] as string));
   assert.equal(b.goal, 'fresh init');
   // 红线6：init 永不 arm——session_id 必为空串。
   assert.equal(b.owner.session_id, '', 'init must NOT stamp session_id (never arms)');
@@ -237,9 +240,9 @@ test('board init --home <不存在的多级目录> → 自建目录 + 板（QA #
   const r = runCcm(['board', 'init', '--goal', 'mkdir me'], { home: freshHome });
   assert.equal(r.status, 0, `init into fresh home should succeed; stderr=${r.stderr}`);
   assert.ok(existsSync(freshHome), 'init should have created the home dir');
-  const files = readdirSync(freshHome).filter((n) => n.endsWith('.board.json'));
+  const files = readdirSync(join(freshHome, 'boards')).filter((n) => n.endsWith('.board.json'));
   assert.equal(files.length, 1, 'exactly one board created in the freshly-made home');
-  assert.equal(readBoard(join(freshHome, files[0] as string)).goal, 'mkdir me');
+  assert.equal(readBoard(join(freshHome, 'boards', files[0] as string)).goal, 'mkdir me');
 });
 
 test('task add → 0 + 板含该 task；start → done 状态机走通', () => {

@@ -13,11 +13,12 @@
 // 红线1/ADR-006：node/JS only，纯 stdlib，零 spawn/网络/依赖。红线6：dormant-until-armed——未武装静默 exit 0。
 //   红线2：只读 narrow-waist（owner.active/session_id）判武装 + goal/tasks[].status/parent 列信息，不写 board。
 
-const { resolveHome, readStdin, parseStdin, listMatchingBoards, jsonEscape } = require('./hook-common.js');
+const { resolveHome, boardsDir, readStdin, parseStdin, listMatchingBoards, jsonEscape } = require('./hook-common.js');
 
 function main() {
   const { sid } = parseStdin(readStdin());
   const HOME_DIR = resolveHome();
+  const BOARDS_DIR = boardsDir(HOME_DIR); // 给注入文案指明 board 集中目录（listMatchingBoards 内部自走 boards/）
 
   // 本 session 的 active 板（武装闸 board_matches）。按文件名排序 = 与 v1 glob `*.board.json` 同序（确定性）。
   const boards = listMatchingBoards(HOME_DIR, sid).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -39,7 +40,7 @@ function main() {
     }
   }
 
-  let ctx = `You are a cc-master master orchestrator. Your orchestration board(s) live in ${HOME_DIR}. Active:${listing}. ` +
+  let ctx = `You are a cc-master master orchestrator. Your orchestration board(s) live in ${BOARDS_DIR}. Active:${listing}. ` +
     `Re-read the board for the task you are working on (recognise it by its goal), then invoke the orchestrating-to-completion skill ` +
     `and continue the decision program. Do not restart work already done/verified; integrate any completed background results first.`;
 

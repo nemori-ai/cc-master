@@ -1619,13 +1619,21 @@ fi
 
 # **跨进程换号锁（codex round#14 Finding A/B·串行化整个「覆写三存储 → setActive」临界段）**：registry 锁 / vault 锁
 #   只各自保护自己那个文件，挡不住两个并发 switch 的**官方三存储覆写交错**（A 写文件、B 写全三存储+翻 active B、A 再
-#   写 keychain+翻 active A → 文件 B、keychain/registry A·split-brain）。修：用一把**换号级锁**（键在官方 credentials.json
-#   路径上·所有 switcher 共同争用）罩住 step 3（覆写）+ step 4（setActive）整段——同一时刻只一个 switch 跑这段·消除交错。
+#   写 keychain+翻 active A → 文件 B、keychain/registry A·split-brain）。修：用一把**换号级锁**罩住 step 2.5（切出抢救）+
+#   step 3（覆写三存储）+ step 4（setActive）整段——同一时刻只一个 switch 跑这段·消除交错。
 #   锁也覆盖「覆写提交完成 → setActive 落盘」那个窗口（codex round#14 Finding B）：持锁到 setActive 完成才释放，期间
 #   被中断由 overwrite 的 INT/TERM trap 兜（窗口内回滚 ①②）。token-blind：锁文件零 token；锁键是非密路径。
+# **锁键 = 机器全局 credstore 锁（anchor 在 cc-master home·非 CRED_PATH·防 CRED_PATH 分叉绕过串行化）**：三存储里
+#   ② ~/.claude.json（$HOME 视角）+ ③ keychain "Claude Code-credentials"/$USER 是**真·机器全局**，不随 --vault/CRED_PATH 改；
+#   只有 ① credentials.json 的路径能被 CRED_PATH 覆写。锁键若挂在 CRED_PATH 上——两个并发 switch 一旦 CRED_PATH 分叉
+#   （测试注入 / 异常配置）就各拿**不同的** <cred>.lock、互不串行，却仍同写机器全局的 ②③ → 交错损坏。故锁 anchor 到与
+#   ②③ 同源的机器全局 cc-master home：${CC_MASTER_HOME:-~/.claude/cc-master}/credstore.lock——不论各进程 CRED_PATH /
+#   vault 形态如何，同机所有 switcher 都争**同一把** credstore 锁 → 真正串行化对机器全局凭证存储的写。CCM_CREDSTORE_LOCK
+#   可显式覆写锁 anchor（测试 hermetic 隔离 / 自定义安装）。锁原语不变（acquireFileLock = O_EXCL + owner token + stale
+#   回收·与 accounts.json.lock 同一把），fail-safe 不变（取不到 → 拒绝无锁覆写 + exit 1·绝不静默续写——那正是要防的）。
 # SWITCH_LOCK_TARGET / SWITCH_LOCK_OWNER / release_switch_lock 已在脚本上半身声明（供 EXIT/INT/TERM trap 统一释放·
 #   绝不在此另设 trap 覆盖掉 on_exit_or_interrupt·codex round#14 实现纪律）。这里只设 target + 取锁。
-SWITCH_LOCK_TARGET="${CRED_PATH:-${HOME}/.claude/.credentials.json}"
+SWITCH_LOCK_TARGET="${CCM_CREDSTORE_LOCK:-${CC_MASTER_HOME:-${HOME}/.claude/cc-master}/credstore}"
 SWITCH_LOCK_OWNER="$(node -e 'try{const l=require(process.argv[1]);const h=l.acquireFileLock(process.argv[2],{livePid:Number(process.argv[3])});process.stdout.write(h.owner||"")}catch(e){process.exit(1)}' "$LIB_JS" "$SWITCH_LOCK_TARGET" "$$" 2>/dev/null)" || SWITCH_LOCK_OWNER=""
 if [ -z "$SWITCH_LOCK_OWNER" ]; then
   err "error: 无法取得换号锁（${SWITCH_LOCK_TARGET}.lock·另有 switch 在跑 / node 不可用）——**拒绝无锁覆写官方存储**（防并发交错三存储损坏），未换号、registry 原封不动。"

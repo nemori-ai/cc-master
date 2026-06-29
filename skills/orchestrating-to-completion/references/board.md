@@ -23,7 +23,7 @@
 
 ## 关键决策
 
-- **名字**：`board`。**单一真相源。** **可配置的 home + 每编排一份唯一命名的 board 文件。** home 取 `$CC_MASTER_HOME`（若设了），否则 `${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/cc-master/`——这是一个用户存储偏好，不再是硬编码路径。每场编排拿到自己那份可按时间排序的文件 `<UTC-timestamp>-<pid>.board.json`（如 `20260605T101821Z-54324.board.json`），这样多场并发编排永不相撞。bootstrap（UserPromptSubmit）hook 负责创建该文件、并注入它的精确路径；**哪个 board 是你的，由你自己认领**——compaction 之后，靠列出 home 并匹配 `goal` 把它重新找出来。Gitignored。
+- **名字**：`board`。**单一真相源。** **可配置的 home + 每编排一份唯一命名的 board 文件。** home 取 `$CC_MASTER_HOME`（默认 `$HOME/.claude/cc-master/`，全局）；board 集中落 `<home>/boards/`，每场编排拿到自己那份可按时间排序的文件 `<UTC-timestamp>-<pid>.board.json`（如 `20260605T101821Z-54324.board.json`），这样多场并发编排永不相撞；旧 per-repo board（`$CLAUDE_PROJECT_DIR/.claude/cc-master/`）在 bootstrap 时自动迁入。bootstrap（UserPromptSubmit）hook 负责创建该文件、并注入它的精确路径；**哪个 board 是你的，由你自己认领**——compaction 之后，靠列出 home 的 `boards/` 并匹配 `goal` 把它重新找出来。全局 home 在 repo 外天然不入版本控制（in-repo 仍 gitignored）。
 - **存储 = 单一真相源的 board 文件（每编排一份命名文件）**：**改它首选 `ccm` 命令**——`ccm` 是写入关卡（持锁 / 落盘前校验不变式 / 守状态机 / 盖 derived 字段；怎么用见 `using-ccm` skill）。`ccm` 缺失（优雅降级）时才退回把整个文件 `Write` 出去（narrow waist 很小、一次 edit 不易写坏）+ 手动 lint 自检；markdown 视图按需生成。无论哪条路，校验这次写盘合不合契约的**机械关卡都是 `ccm`**（`ccm` 命令写时即校验；`Write` 降级路径由 PostToolUse lint hook 写盘后 `spawn ccm board lint` 兜，缺 `ccm` 则静默降级、不 block）——见下方「board lint」段。
 
 ---

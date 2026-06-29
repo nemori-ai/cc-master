@@ -743,6 +743,28 @@ export const REGISTRY: Registry = {
       examples: ['ccm usage task-cost T7', 'ccm usage task-cost --group-by executor --json'],
       handler: 'usage.taskCost',
     },
+    'burn-rate': {
+      summary: '配额%-burn-rate（Δused%/Δtime·账户权威·5h+7d·window-elapsed·%/h）',
+      read: true,
+      positionals: [],
+      options: {
+        'as-of': { type: 'string', desc: 'as-of 时刻（ISO-8601 UTC·backtest 用·默认 now）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm usage burn-rate', 'ccm usage burn-rate --json'],
+      handler: 'usage.burnRate',
+    },
+    runway: {
+      summary: '配额% runway（剩余走廊 ÷ burn → 距触顶 vs 距 reset·偿付力 headroom）',
+      read: true,
+      positionals: [],
+      options: {
+        'as-of': { type: 'string', desc: 'as-of 时刻（ISO-8601 UTC·backtest 用·默认 now）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm usage runway', 'ccm usage runway --json'],
+      handler: 'usage.runway',
+    },
   },
 
   // ════════════════════ estimate（只读 advisory·ADR-015）════════════════════════════════════════════
@@ -842,6 +864,28 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm estimate risk', 'ccm estimate risk --scope this-repo --json'],
       handler: 'estimate.risk',
+    },
+    'cost-to-complete': {
+      summary:
+        '%-cost-to-complete（剩余工作 × 每单位配额%增量·throughput-MC·偿付力）+ token 辅助 sizing',
+      read: true,
+      positionals: [],
+      options: {
+        scope: {
+          type: 'string',
+          enum: ['home', 'this-repo', 'this-board'],
+          desc: '历史语料范围（默认 home·跨板多层收缩）',
+        },
+        'as-of': { type: 'string', desc: 'as-of 时刻（ISO-8601 UTC·backtest 用·默认 now）' },
+        runs: { type: 'string', desc: 'MC trials（默认 2000）' },
+        seed: { type: 'string', desc: 'PRNG 种子（复现·默认 42）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm estimate cost-to-complete',
+        'ccm estimate cost-to-complete --scope this-repo --seed 42 --json',
+      ],
+      handler: 'estimate.costToComplete',
     },
   },
 };

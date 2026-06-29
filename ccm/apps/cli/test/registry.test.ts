@@ -27,8 +27,8 @@ const EXPECTED: Record<string, string[]> = {
   cadence: ['update', 'open', 'ship', 'status'],
   watchdog: ['arm', 'disarm', 'status'],
   policy: ['show', 'set'],
-  usage: ['show', 'advise', 'task-cost'],
-  estimate: ['show', 'forecast', 'evm', 'velocity', 'risk'],
+  usage: ['show', 'advise', 'task-cost', 'burn-rate', 'runway'],
+  estimate: ['show', 'forecast', 'evm', 'velocity', 'risk', 'cost-to-complete'],
 };
 
 test('REGISTRY covers all 10 namespaces with all their verbs', () => {

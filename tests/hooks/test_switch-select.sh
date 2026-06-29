@@ -36,6 +36,13 @@ if bash -n "$SCRIPT" 2>/dev/null; then PASS=$((PASS+1)); else FAILED=$((FAILED+1
 #   （专测白名单**拒绝**未授权端点的 case 会在自己作用域内 unset / 覆盖它·见 (23)。）
 export CCM_ALLOW_LOOPBACK_REFRESH=1
 
+# **cred-store 换号锁 hermetic 隔离（lock anchor 改为机器全局 cc-master home·见 switch-account.sh credstore 锁注释）**：
+#   换号锁键已从 CRED_PATH 改 anchor 到 ${CC_MASTER_HOME:-~/.claude/cc-master}/credstore.lock（真·机器全局·防 CRED_PATH 分叉
+#   绕过串行化）。套件默认不设 CC_MASTER_HOME → 锁会落到开发者**真 home**（破 hermetic + 并发 run 互串）。故套件级把
+#   CCM_CREDSTORE_LOCK 显式指到一次性 fixture（所有真切 case 共享一把·顺序跑天然不争；并发 (25) 仍同争这把·正是要测的
+#   串行化）。争用 case (39) 自带独立 anchor 显式覆盖它、pre-hold 自己那把 credstore 锁验 fail-safe。
+CREDSTORE_LOCK_DIR="$(make_project)"; export CCM_CREDSTORE_LOCK="$CREDSTORE_LOCK_DIR/credstore"
+
 # Fake (NON-REAL) OAuth blob tokens — sk-ant-oat/ort prefixes, well-formed-looking, NOT real credentials.
 ALICE_AT='sk-ant-oat01-ALICEoldACCESS000000000000000000000aaaaaa-_aaa'
 ALICE_RT='sk-ant-ort01-ALICErefresh00000000000000000000000aaaaaa-_aaa'
@@ -2452,8 +2459,73 @@ assert_not_contains "$out35" "$ALICE_RT" "(35-snap-degrade) alice refresh token 
 for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
 rm -rf "$FX35" "$STUB_ROOT35"
 
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+# (39) **机器全局 credstore 锁 — 争用 fail-safe（lock anchor 改 cc-master home·拿不到锁绝不无锁覆写凭证存储）**.
+#      锁键已从 CRED_PATH 改 anchor 到机器全局 ${CC_MASTER_HOME:-~/.claude/cc-master}/credstore.lock（防 CRED_PATH 分叉绕过
+#        串行化·见 switch-account.sh credstore 锁注释）。本 case 验**争用 + fail-safe**（与 (25) 串行化 happy-path 正交）：
+#        预占该 credstore 锁（LIVE holder·pid 活着 → 绝不被 stale 回收）→ 短超时跑 switch → 断言：
+#          ① rc=1（拒绝无锁覆写·exit 1·绝不静默续写）；② stderr「无法取得换号锁」+「拒绝无锁覆写」；
+#          ③ 官方 ① credentials.json **一字未改**（OLD token·机器全局凭证存储未被无锁交错覆写）；④ registry active **未翻**；
+#          ⑤ ② ~/.claude.json oauthAccount 未改；⑥ 持锁者那把锁**仍在**（switch 尊重 live 锁·没误判 stale 破锁）；⑦ no token leak.
+# ──────────────────────────────────────────────────────────────────────────────────────────────────
+echo "-- (39) machine-global credstore lock: contention fail-safe (refuse to overwrite stores when lock unavailable) --"
+FX39="$(make_fixture)"; REG39="$FX39/accounts.json"; VFILE39="$FX39/accounts.env"
+CRED39="$FX39/credentials.json"; CJSON39="$FX39/claude.json"
+CREDLOCK39_TARGET="$FX39/credstore"            # credstore 锁 anchor（isolated·本 case 独占·不碰套件级共享锁/真 home）
+CREDLOCK39="$CREDLOCK39_TARGET.lock"
+cat > "$REG39" <<JSON
+{ "schema": "cc-master/accounts/v1", "accounts": {
+  "bob@y.com":   { "vault": {"kind":"keychain","service":"cc-master-oauth","account":"bob@y.com"}, "active": true, "last_switch_out": null },
+  "alice@x.com": { "vault": {"kind":"file","path":"$VFILE39","key":"alice@x.com"}, "token_expires_at":"2027-06-17T10:40:00Z", "active": false, "last_switch_out": null, "identity": {"emailAddress":"alice@x.com","accountUuid":"uuid-alice"} }
+} }
+JSON
+umask 077
+printf 'alice@x.com_TOKEN=%s\n' "{\"accessToken\":\"$ALICE_AT\",\"refreshToken\":\"$ALICE_RT\",\"expiresAt\":1700000000000}" > "$VFILE39"; chmod 600 "$VFILE39"
+OLD39_AT='sk-ant-oat01-OLD39cred000000000000000000-_o'
+cat > "$CRED39" <<JSON
+{"claudeAiOauth":{"accessToken":"$OLD39_AT","refreshToken":"sk-ant-ort01-OLD39credr00000000000000-_o","expiresAt":1700000000000}}
+JSON
+printf '{"oauthAccount":{"emailAddress":"old@x.com"}}' > "$CJSON39"
+PORT39="$FX39/url.txt"; start_refresh_endpoint ok "$PORT39"; RURL39="$(cat "$PORT39")"
+# pre-hold the credstore 锁 with a LIVE holder (pid 活着 → 绝不被 stale 回收·switch 必须等不到、fail-safe 退 1).
+( sleep 30 ) & HOLDER39=$!
+printf '%s' "{\"pid\":$HOLDER39,\"at\":\"2099-01-01T00:00:00Z\",\"owner\":\"test-holder-39\"}" > "$CREDLOCK39"
+# run switch with the SAME credstore anchor (CCM_CREDSTORE_LOCK) + a short lock timeout → acquire times out → fail-safe exit 1.
+out39="$(PATH="$SECSTUB:$PATH" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" REFRESH_TOKEN_URL="$RURL39" CRED_PATH="$CRED39" CLAUDE_JSON_PATH="$CJSON39" \
+        CCM_CREDSTORE_LOCK="$CREDLOCK39_TARGET" CCM_REGISTRY_LOCK_TIMEOUT_MS=600 \
+        bash "$SCRIPT" --registry "$REG39" --email "alice@x.com" --now "2026-06-17T09:00:00Z" --no-snapshot 2>&1)"; rc39=$?
+kill "$HOLDER39" 2>/dev/null || true   # release the live holder now that the switch has finished contending.
+# ① fail-safe: rc=1 + 明确报错（绝不静默续写）.
+assert_eq "1" "$rc39" "(39) contention: switch refuses without the credstore lock → exit 1 (fail-safe·绝不无锁覆写)"
+assert_contains "$out39" "无法取得换号锁" "(39) contention: stderr surfaces 换号锁取不到"
+assert_contains "$out39" "拒绝无锁覆写" "(39) contention: stderr says 拒绝无锁覆写官方存储 (no silent continue)"
+# ② CORE: ① credentials.json UNCHANGED — the machine-global credential store was NOT overwritten under contention.
+cred39_at="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.claudeAiOauth.accessToken||"NONE")}catch(_e){process.stdout.write("ERR")}' "$CRED39" 2>/dev/null)"
+assert_eq "$OLD39_AT" "$cred39_at" "(39) CORE: ① credentials.json UNCHANGED (凭证存储未被无锁覆写·串行化 fail-safe 生效)"
+assert_not_contains "$cred39_at" "$FRESH_AT" "(39) ① is NOT the FRESH token (no overwrite under contention)"
+# ③ ② ~/.claude.json oauthAccount UNCHANGED (still old@x.com).
+cj39_email="$(node -e 'try{const j=require(process.argv[1]);process.stdout.write(j.oauthAccount&&j.oauthAccount.emailAddress||"NONE")}catch(_e){process.stdout.write("ERR")}' "$CJSON39" 2>/dev/null)"
+assert_eq "old@x.com" "$cj39_email" "(39) ② ~/.claude.json oauthAccount UNCHANGED (old@x.com·未被无锁覆写)"
+# ④ registry active NOT flipped — alice stays false, bob stays true.
+alice39="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["alice@x.com"].active))' "$LIB_JS" "$REG39" 2>/dev/null)"
+bob39="$(node -e 'const r=require(process.argv[1]).loadRegistry(process.argv[2]);process.stdout.write(String(r.accounts["bob@y.com"].active))' "$LIB_JS" "$REG39" 2>/dev/null)"
+assert_eq "false" "$alice39" "(39) registry alice active NOT flipped (switch aborted on lock contention)"
+assert_eq "true"  "$bob39"   "(39) registry bob still active=true"
+# ⑤ the LIVE holder's lock must SURVIVE — switch respected it (never falsely reclaimed a live lock·no stale-break bug).
+if [ -f "$CREDLOCK39" ] && grep -q 'test-holder-39' "$CREDLOCK39" 2>/dev/null; then
+  PASS=$((PASS+1)); _green "(39) live holder's credstore lock SURVIVED (switch respected live lock·did not stale-break it)"
+else
+  FAILED=$((FAILED+1)); _red "FAIL: (39) live holder's credstore lock broken/removed (false stale reclaim — switch stole a live lock)"
+fi
+# ⑥ no token leak even on the contention-abort path.
+assert_not_contains "$out39" "$ALICE_RT" "(39) alice refresh token does NOT leak on the lock-contention path"
+assert_not_contains "$out39" "$FRESH_RT" "(39) fresh refresh token does NOT leak on the lock-contention path"
+rm -f "$CREDLOCK39" 2>/dev/null || true
+for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
+rm -rf "$FX39"
+
 # kill any lingering stub endpoints.
 for p in "${ENDPOINT_PIDS[@]}"; do kill "$p" 2>/dev/null || true; done
-rm -rf "$SECSTUB" "$SECSTUB_CAPTURE" "$SECSTUB_FAIL" "$FX1" "$FX1B" "$FX2" "$FX3" "$FX4" "$FX5" "$STUB_ROOT5" "$FX5D" "$FX5E" "$FX6" "$FX8" "$FX9" "$STUB_ROOT9" "$FX10" "$FX11" "$FX11B" "$STUB_ROOT11B" "$FX15" "$STUB_ROOT15" "$FX16"
+rm -rf "$SECSTUB" "$SECSTUB_CAPTURE" "$SECSTUB_FAIL" "$FX1" "$FX1B" "$FX2" "$FX3" "$FX4" "$FX5" "$STUB_ROOT5" "$FX5D" "$FX5E" "$FX6" "$FX8" "$FX9" "$STUB_ROOT9" "$FX10" "$FX11" "$FX11B" "$STUB_ROOT11B" "$FX15" "$STUB_ROOT15" "$FX16" "$CREDSTORE_LOCK_DIR"
 
 finish

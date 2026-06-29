@@ -17,12 +17,11 @@
 //   source 枚举 account / local-derived-approx / registry-snapshot / observability。历史语料范围由
 //   --scope home|this-repo|this-board 控制（默认 home·跨板多层收缩）。
 //
-// 红线1 / ADR-006：node/JS only，零 npm 依赖、纯 stdlib（fs + path + os）。
+// 红线1 / ADR-006：node/JS only，零 npm 依赖、纯 stdlib。
 // 红线3：estimate 出数据/区间，**不替 orchestrator 决策**（真动作归 SKILL A·plan §2 不变式 2）。
 // 武装闸豁免：纯 handler 模块（无 hook 入口）。
+// home 解析收口到 discover.resolveHome（SSOT）后，本文件不再直接用 os/path（故已撤其 import）。
 
-import * as os from 'node:os';
-import * as path from 'node:path';
 import {
   type Baseline,
   boardRepo,
@@ -38,20 +37,25 @@ import {
   estimateHours,
   extractDoneRecords,
   feverStatus,
+  knnPredict,
   loadCorpus,
   type NodeMcParam,
+  pctCostToCompleteMonteCarlo,
+  type QueryCase,
   sizeProjectBuffer,
   throughputMonteCarlo,
+  tokenWeightedShares,
+  WINDOW_5H_SEC,
   wipAging,
 } from '@ccm/engine';
+import * as discover from '../discover.js';
 import { type BoardArg, type Ctx, runRead } from './_common.js';
+import { accountBurnRate } from './usage.js';
 
-// resolveHomeDir(env) → cc-master home（同 history-loader 解析口径·只读语料）。
+// resolveHomeDir(env, homeFlag) → cc-master home **根**（统一全局口径·收口到 discover.resolveHome SSOT：
+//   --home > $CC_MASTER_HOME > $HOME/.claude/cc-master；不再 per-repo CLAUDE_PROJECT_DIR）。跨板只读语料用。
 function resolveHomeDir(env: Record<string, string | undefined>, homeFlag?: string): string {
-  if (homeFlag) return path.resolve(homeFlag);
-  if (env.CC_MASTER_HOME) return path.resolve(env.CC_MASTER_HOME);
-  if (env.CLAUDE_PROJECT_DIR) return path.resolve(env.CLAUDE_PROJECT_DIR, '.claude', 'cc-master');
-  return path.join(os.homedir(), '.claude', 'cc-master');
+  return discover.resolveHome({ homeFlag, env });
 }
 
 // corpusAsOf(records, nowMs) → backtest 截断历史语料：丢掉 finishedAtMs > nowMs 的记录（round5 sweep #1）。
@@ -87,7 +91,8 @@ function loadScopedCorpus(
 
   let records: DoneRecord[] = [];
   try {
-    records = loadCorpus(homeDir, { nowMs });
+    // board 集中在 <home>/boards/——跨板语料从那里读（loadCorpus 是 layout-agnostic·读给定目录）。
+    records = loadCorpus(discover.boardsDir(homeDir), { nowMs });
   } catch {
     records = [];
   }
@@ -618,6 +623,148 @@ export function risk(ctx: Ctx): number {
       return `${lines.join('\n')}\n`;
     },
   });
+}
+
+// ── estimate cost-to-complete ──────────────────────────────────────────────────────────────
+//   %-cost-to-complete（偿付力维·plan §4）：剩余 backlog × 每单位工作的配额% 增量（throughput 式 MC·复用
+//   pctCostToCompleteMonteCarlo）→ 清空剩余工作的总配额% P50/P80/P95。**配额% 是权威预算账本**（plan §1.2）。
+//   每单位 %-增量 = 账户权威 burn-rate（%/h·window-elapsed）× 历史任务工期（duration-grounded·串行归因假设）。
+//   token 辅助 sizing（plan §4·接通 knnPredict.predictedTokens）：对每个 backlog 任务预测 token 作「派活多重」
+//   相对量计——**辅助·非账本**，只用来把总% 按相对重量切到各任务（tokenWeightedShares）。
+//   诚实降级：账户 burn 不可得 → available:false + cost null（非 exit 1）。--scope·--as-of·--runs·--seed。
+export function costToComplete(ctx: Ctx): number {
+  return runRead(ctx, {
+    render: (board, c) => {
+      const b = board as BoardArg;
+      const nowMs = nowMsOf(c);
+      const nowSec = Math.floor(nowMs / 1000);
+      const { records, scope } = loadScopedCorpus(b, c, nowMs);
+      const runs = intFlag(c.values.runs, 2000);
+      const seed = intFlag(c.values.seed, 42);
+      const backlog = backlogCount(b, nowMs); // as-of 截断（同 forecast/EVM 口径）
+      const repo = boardRepo(b);
+
+      // ── 账户权威 burn-rate（%/h·5h 窗口·复用 usage.accountBurnRate SSOT）──
+      const burnView = accountBurnRate(c.env, nowSec, WINDOW_5H_SEC, 'five_hour');
+      const burn = burnView.burn_pct_per_hour;
+
+      const notes: string[] = [];
+
+      // ── per-unit %-增量池：burn × 历史任务工期（duration-grounded·throughput 式·plan §4）──
+      const perUnitPct =
+        burn != null
+          ? records
+              .filter((r) => r.actualHours != null && (r.actualHours as number) > 0)
+              .map((r) => burn * (r.actualHours as number))
+          : [];
+      const mc = pctCostToCompleteMonteCarlo(backlog, perUnitPct, { seed, runs });
+
+      if (burn == null)
+        notes.push(
+          '账户 burn-rate 不可用（无 status-line sidecar）——%-cost 无法折算·available:false 降级',
+        );
+      else
+        notes.push(
+          'per-unit %-cost = burn-rate × 历史任务工期（假设串行归因·并行执行时偏高·advisory·plan §1.2）',
+        );
+      if (backlog === 0) notes.push('无 backlog（全部完成 / as-of 截断后）→ cost-to-complete 0%');
+      if (burn != null && perUnitPct.length === 0 && backlog > 0)
+        notes.push('无含实测工期的历史语料 → %-cost 池空·无法 MC（冷启动降级）');
+
+      // ── token 辅助 sizing（knnPredict.predictedTokens·相对量计·非账本·plan §4）──
+      const tasks = Array.isArray(b?.tasks) ? (b.tasks as Array<Record<string, unknown>>) : [];
+      const backlogTasks = tasks.filter((t) => !isDoneAsOf(t, nowMs));
+      const tokenRows = backlogTasks.map((t) => {
+        const query: QueryCase = {
+          repo,
+          type: typeof t.type === 'string' ? t.type : '',
+          executor: typeof t.executor === 'string' ? t.executor : '',
+          tier: typeof t.tier === 'string' ? t.tier : '',
+          model: typeof t.model === 'string' ? t.model : '',
+          depsCount: Array.isArray(t.deps) ? t.deps.length : 0,
+          estimateHours: estimateHours(t.estimate as never),
+        };
+        const knn = knnPredict(query, records, { nowMs });
+        return {
+          id: typeof t.id === 'string' ? t.id : '',
+          predicted_tokens: knn.predictedTokens != null ? Math.round(knn.predictedTokens) : null,
+          knn_confidence: knn.confidence,
+        };
+      });
+      const tokenCovered = tokenRows.filter((r) => r.predicted_tokens != null);
+      const totalPredictedTokens =
+        tokenCovered.length > 0
+          ? tokenCovered.reduce((s, r) => s + (r.predicted_tokens as number), 0)
+          : null;
+      // 把 MC 均值总% 按 token 相对权重切到各 backlog 任务（token=辅助权重·重活分得多）。
+      const meanPct = Number.isFinite(mc.mean) ? mc.mean : null;
+      const weights = tokenRows.map((r) => r.predicted_tokens ?? 0);
+      const perTaskShares = meanPct != null ? tokenWeightedShares(weights, meanPct) : [];
+      const perTaskPctShare = tokenRows.slice(0, 10).map((r, i) => ({
+        id: r.id,
+        predicted_tokens: r.predicted_tokens,
+        pct_share: perTaskShares[i] != null ? round2(perTaskShares[i] as number) : null,
+        knn_confidence: r.knn_confidence,
+      }));
+      if (totalPredictedTokens == null && backlog > 0)
+        notes.push(
+          '无可预测 token 的历史邻居 → token 辅助 sizing 不可得（仅 %-账本可用·诚实降级）',
+        );
+
+      const available = burn != null;
+      const confidence: 'high' | 'medium' | 'low' = burn == null ? 'low' : mc.confidence;
+
+      const data = {
+        cost_to_complete_pct: Number.isFinite(mc.pct.p50)
+          ? { p50: round2(mc.pct.p50), p80: round2(mc.pct.p80), p95: round2(mc.pct.p95) }
+          : null,
+        mean_pct: meanPct != null ? round2(meanPct) : null,
+        backlog,
+        burn_pct_per_hour: burn,
+        burn_used_pct: burnView.used_pct,
+        burn_method: burnView.method,
+        per_unit_samples: mc.per_unit_samples,
+        // token 辅助 sizing（**辅助·非预算账本**·plan §1.2/§4）。
+        token_sizing: {
+          total_predicted_tokens: totalPredictedTokens,
+          per_task: perTaskPctShare,
+          note: 'token 为派活相对 sizing（辅助·knnPredict.predictedTokens）·配额% 才是预算账本',
+        },
+        scope,
+        runs,
+        seed,
+        as_of: asOfISO(nowMs),
+        source:
+          burn == null ? 'local-derived-approx' : records.length > 0 ? 'calibrated' : 'account',
+        confidence,
+        available,
+        history_n: records.length,
+        notes,
+      };
+
+      if (c.flags.json) return JSON.stringify({ ok: true, data });
+      const lines = [
+        `estimate cost-to-complete（scope=${scope}·backlog=${backlog}·confidence=${confidence}）`,
+      ];
+      if (data.cost_to_complete_pct)
+        lines.push(
+          `  配额% to complete: p50=${data.cost_to_complete_pct.p50}% p80=${data.cost_to_complete_pct.p80}% p95=${data.cost_to_complete_pct.p95}%（5% 硬墙）`,
+        );
+      else lines.push('  配额% to complete: N/A（账户 burn 不可用 / 无历史工期语料 / backlog=0）');
+      lines.push(
+        `  burn-rate: ${burn != null ? `${burn}%/h（used=${fmtPct2(burnView.used_pct)}·${burnView.method}）` : 'N/A（账户信号不可用）'}`,
+      );
+      lines.push(
+        `  token sizing（辅助）: total≈${totalPredictedTokens ?? 'N/A'} tok（knnPredict·相对量计·非账本）`,
+      );
+      for (const n of notes) lines.push(`  note: ${n}`);
+      return `${lines.join('\n')}\n`;
+    },
+  });
+}
+
+function fmtPct2(p: number | null | undefined): string {
+  return typeof p === 'number' ? `${p}%` : 'N/A';
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

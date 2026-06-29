@@ -44,7 +44,7 @@ const GLOBAL_FLAGS: [string, string][] = [
   ['    --session-id <id>', '指定 session（特权调用者注入；默认读 $CLAUDE_CODE_SESSION_ID）'],
   [
     '    --home <dir>',
-    '指定 cc-master home（默认 $CC_MASTER_HOME → CLAUDE_PROJECT_DIR → 向上 walk）',
+    '指定 cc-master home 根（默认 $CC_MASTER_HOME → $HOME/.claude/cc-master·全局；board 在 <home>/boards/）',
   ],
   ['    --goal <substr>', '多 active 板时按 goal 子串消歧'],
   ['    --json', '机器可读 JSON 输出（非 TTY 时默认开）'],

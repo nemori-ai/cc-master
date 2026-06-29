@@ -49,6 +49,8 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+// ★home 解析 + 武装闸 isArmed 收口到共享 hook-common（node SSOT·取代本文件旧内联副本）。
+const { resolveHome, isArmed } = require('./hook-common.js');
 
 // ── 触发策略阈值（克制，避免每回合刷屏；见文件尾 README 块的完整论证）────────────────────────────
 //
@@ -61,23 +63,22 @@ const { spawnSync } = require('child_process');
 const USAGE_DIR =
   process.env.CC_MASTER_USAGE_DIR ||
   path.join(process.env.HOME || '', '.claude', 'projects');
-// HOME_DIR：armed 判定要扫的 board home（与 bash hooks 同口径：CC_MASTER_HOME 覆写，否则
-//   CLAUDE_PROJECT_DIR/.claude/cc-master，再否则 cwd/.claude/cc-master）。测试经 CC_MASTER_HOME 注入。
-const HOME_DIR =
-  process.env.CC_MASTER_HOME ||
-  path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), '.claude', 'cc-master');
-// ACCOUNTS_FILE（A2 T6）：号池 registry accounts.json 的固定路径。effective-N 与「号池有几个备号」
-//   注入从这里读，**不再**从 board top-level num_account / --num_account 来（A2 砍 --num_account）。
-//   路径必须**用户级**（CC_MASTER_HOME 覆写，否则 $HOME/.claude/cc-master）——与 accounts-lib.js
-//   defaultRegistryPath() 同口径。**绝不复用上面的 HOME_DIR**：HOME_DIR 的 fallback 是 CLAUDE_PROJECT_DIR
-//   /.claude/cc-master（**项目级**，跟着 repo 走），而号池是跨编排 / 跨 repo 的用户级资源（设计稿 §A.1）。
-//   CC_MASTER_ACCOUNTS_FILE 是测试注入点（直接指向 fixture 文件，绕开目录解析）。
+// HOME_DIR：armed 判定要扫的 board home **根**（hook-common.resolveHome 同口径：CC_MASTER_HOME 覆写，
+//   否则 $HOME/.claude/cc-master·全局）。isArmed 内部走 <home>/boards/ 扫板。测试经 CC_MASTER_HOME 注入。
+const HOME_DIR = resolveHome();
+// ACCOUNTS_FILE（A2 T6）：号池 registry accounts.json 的固定路径（home **根**·非 boards/ 子目录）。
+//   effective-N 与「号池有几个备号」注入从这里读，**不再**从 board top-level num_account / --num_account
+//   来（A2 砍 --num_account）。路径用户级（CC_MASTER_HOME 覆写，否则 $HOME/.claude/cc-master）——与
+//   accounts-lib.js defaultRegistryPath() 同口径。home 收口为全局后，它与 HOME_DIR 同根（accounts.json 本就
+//   是跨编排 / 跨 repo 的用户级资源·有意全局·不动）。CC_MASTER_ACCOUNTS_FILE 是测试注入点（直接指向 fixture
+//   文件，绕开目录解析）。
+// F3（codex）：home **走同一个 canonical 解析**（HOME_DIR = hook-common.resolveHome()）——不再用裸
+//   `process.env.HOME || ''`。旧写法在 HOME 未设 + CC_MASTER_HOME 未设时塌成 cwd 相对的
+//   `.claude/cc-master/accounts.json`，而 arming 走 resolveHome()→os.homedir() 的全局 home：两者静默分叉
+//   → 号池读不到 → effective-N 被误算成 1、丢号池建议。改为 path.join(HOME_DIR, …) 与 arming 同根，杜绝分叉。
 const ACCOUNTS_FILE =
   process.env.CC_MASTER_ACCOUNTS_FILE ||
-  path.join(
-    process.env.CC_MASTER_HOME || path.join(process.env.HOME || '', '.claude', 'cc-master'),
-    'accounts.json'
-  );
+  path.join(HOME_DIR, 'accounts.json');
 const NOW_OVERRIDE = process.env.CC_MASTER_NOW || '';
 const BUDGET_RAW = process.env.CC_MASTER_5H_BUDGET || '';
 const BURN_FLOOR_RAW = process.env.CC_MASTER_5H_BURN_FLOOR || '';
@@ -482,44 +483,11 @@ function formatWarning({ used, burn, remain, budget, projected, pctNow }) {
   return `${head} ${levers}`;
 }
 
-// ── ARMED GATE（node 版 board_matches）─────────────────────────────────────────────────────────────
-// isArmed(homeDir, sid) → 本 session 是否被武装：homeDir 里存在一个 *.board.json 满足
-//   owner.active === true 且 (stdin sid 空 → 降级：任一 active 板；否则 owner.session_id === sid)。降级是
-//   **非对称**的 —— 仅 stdin sid 空时触发（ADR-007 §2.3，owning session 跨 compaction 重锚）。board 的
-//   owner.session_id 为空串（bootstrap 在缺 sid 的 stdin 上建板、或迁移/手改板的异常）时**保持休眠**：它对
-//   任何非空 stdin sid 都不字面相等 → false → DORMANT（fail-safe）。对称收养空 board sid 曾试过（CODEX12）并
-//   回退（CODEX14）：会武装任意不相关 session，重新引入红线 6 要防的跨会话污染。合法续跑因 resume/compaction
-//   保留 session_id、板带原 session_id 故照常匹配；异常 blank 板由显式 re-arm 认领。board sid 非空且 ≠ stdin
-//   sid 当然也不匹配（红线 6）。→ ADR-007。
-// 只读 owner.active / owner.session_id 两个 narrow-waist pinned 字段（不读 tasks、不写 board）。
-// 任何读/解析失败都按「该板不匹配」处理（try/catch 兜住），整体绝不抛 —— 失败 → 视为未武装 → 静默。
-// 注意：用 JSON.parse 取结构化字段，不靠 grep/正则去 board 里捞 —— node hook 的既定做法（红线1 允许）。
-function isArmed(homeDir, sid) {
-  let entries;
-  try {
-    entries = fs.readdirSync(homeDir, { withFileTypes: true });
-  } catch (_e) {
-    return false; // home 不存在/不可读 → 没有任何板 → 未武装
-  }
-  for (const ent of entries) {
-    if (!ent.isFile() || !ent.name.endsWith('.board.json')) continue;
-    let board;
-    try {
-      board = JSON.parse(fs.readFileSync(path.join(homeDir, ent.name), 'utf8'));
-    } catch (_e) {
-      continue; // 坏板 → 跳过
-    }
-    const owner = (board && board.owner) || {};
-    if (owner.active !== true) continue; // 必须 active
-    if (!sid) return true; // 降级：stdin sid 空 → 任一 active 板即武装（compaction 边界鲁棒，ADR-007 §2.3）
-    // board 未盖 session_id（""/null/undefined）→ 字面 !== 非空 sid → 不武装（休眠，fail-safe）。
-    // 对称收养空 board sid 曾试过（CODEX12）并已回退（CODEX14）：它会武装任意不相关 session，重新引入红线 6
-    // 要防的跨会话污染。合法续跑因 resume/compaction 保留 session_id、板带原 session_id 故照常精确匹配；异常
-    // 的 blank 板由显式 re-arm（重跑 as-master-orchestrator → bootstrap 重盖 session_id）认领。→ ADR-007。
-    if (owner.session_id === sid) return true; // session-scoped 精确匹配（board sid 必须非空且 == stdin sid）
-  }
-  return false;
-}
+// ── ARMED GATE ──────────────────────────────────────────────────────────────────────────────────
+// isArmed(homeDir, sid) 现由 hook-common 提供（node SSOT·见文件顶 require），不再各自维护内联副本。
+//   语义与本文件旧内联副本字字相同（ADR-007 dormant-until-armed）：扫 <home>/boards/ 找 owner.active===true
+//   且（stdin sid 空 → 非对称降级匹配任一 active 板；否则 owner.session_id===sid·空 board sid 保持休眠
+//   fail-safe）的板。只读 narrow-waist owner.active/session_id，任何读/解析失败按未武装静默。
 
 // ── 号池 registry（A2 T6：effective-N + 号池注入的来源，替代 board num_account / --num_account）──────────
 // A2 砍了 --num_account：pacing 的「有效 N」不再从 board top-level num_account 来，改从号池 registry

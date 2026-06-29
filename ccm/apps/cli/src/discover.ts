@@ -44,10 +44,13 @@ function discoverError(message: string, errKind: string): KindedError {
   return e;
 }
 
-// ── home 解析 ─────────────────────────────────────────────────────────────────────────────────────
-// resolveHome({homeFlag, env}) → 绝对 home 目录（.claude/cc-master 那一级）。
-//   优先级：--home > $CC_MASTER_HOME > $CLAUDE_PROJECT_DIR/.claude/cc-master > 从 cwd 向上 walk-up > throw NotFound。
-//   walk-up：像 git 找 .git 那样，从 cwd 逐级向上找最近一个**存在的** .claude/cc-master 目录。
+// ── home 解析（统一全局口径·board-v2 home 收口）────────────────────────────────────────────────────
+// resolveHome({homeFlag, env}) → 绝对 home **根**目录（.claude/cc-master 那一级）。
+//   优先级：--home > $CC_MASTER_HOME > $HOME/.claude/cc-master（全局·默认）> throw NotFound（无 HOME 时）。
+//   **不再** per-repo（$CLAUDE_PROJECT_DIR/.claude/cc-master）或从 cwd walk-up——所有 orchestration 的 board
+//   集中到一个用户级 home，跨 repo 不再各起一份。这与 hook 侧 hook-common.resolveHome / bootstrap-board.sh
+//   的 cc_master_home 三处同口径。board 集中落 <home>/boards/（见 boardsDir）。
+//   env.HOME 缺时退 os.homedir()（生产稳健·测试可经 env.HOME 注入隔离 home）。
 export function resolveHome({ homeFlag, env }: { homeFlag?: string; env?: Env } = {}): string {
   env = env || {};
 
@@ -57,31 +60,22 @@ export function resolveHome({ homeFlag, env }: { homeFlag?: string; env?: Env } 
   // ② $CC_MASTER_HOME。
   if (env.CC_MASTER_HOME) return path.resolve(env.CC_MASTER_HOME);
 
-  // ③ $CLAUDE_PROJECT_DIR/.claude/cc-master（env 在时；Bash 子进程常无·设计稿 §6 实测）。
-  if (env.CLAUDE_PROJECT_DIR) {
-    return path.resolve(env.CLAUDE_PROJECT_DIR, '.claude', 'cc-master');
-  }
+  // ③ $HOME/.claude/cc-master（全局·默认）。env.HOME 缺 → os.homedir()（生产稳健）。
+  const home = env.HOME || os.homedir();
+  if (home) return path.join(home, '.claude', 'cc-master');
 
-  // ④ 从 cwd 向上 walk-up 找最近的 .claude/cc-master。
-  let dir = process.cwd();
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const candidate = path.join(dir, '.claude', 'cc-master');
-    try {
-      if (fs.statSync(candidate).isDirectory()) return candidate;
-    } catch (_) {
-      /* 不存在，继续上爬 */
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) break; // 到根（path.dirname('/') === '/'）
-    dir = parent;
-  }
-
-  // ⑤ 都没命中 → NotFound。
+  // ④ 连 HOME 都没有（极端环境）→ NotFound。
   throw discoverError(
-    'No cc-master home found (--home / $CC_MASTER_HOME / $CLAUDE_PROJECT_DIR / walk-up from cwd all missed)',
+    'No cc-master home found (--home / $CC_MASTER_HOME / $HOME all missed)',
     'NotFound',
   );
+}
+
+// ── boards 目录 ─────────────────────────────────────────────────────────────────────────────────
+// boardsDir(home) → home 下集中放所有 *.board.json 的子目录（<home>/boards/·board-v2 布局）。
+//   home 根另放 accounts.json（全局·不动）+ 预留 channel/；board 枚举 / init 落点一律走这里。
+export function boardsDir(home: string): string {
+  return path.join(home, 'boards');
 }
 
 // ── boardMatches（自带一份·守依赖反转）──────────────────────────────────────────────────────────
@@ -156,17 +150,18 @@ function readBoardFile(boardPath: string): DiscoveredBoard | null {
   }
 }
 
-// 列出 home 下所有 *.board.json 的绝对路径（home 不存在 / 读不到 → []）。
+// 列出 <home>/boards/ 下所有 *.board.json 的绝对路径（目录不存在 / 读不到 → []）。
 function listBoardFiles(home: string): string[] {
+  const dir = boardsDir(home);
   let names: string[];
   try {
-    names = fs.readdirSync(home);
+    names = fs.readdirSync(dir);
   } catch (_) {
     return [];
   }
   return names
     .filter((n) => n.endsWith('.board.json'))
-    .map((n) => path.join(home, n))
+    .map((n) => path.join(dir, n))
     .sort(); // 稳定顺序（time-sortable 文件名天然有序）
 }
 

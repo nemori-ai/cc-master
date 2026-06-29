@@ -340,6 +340,84 @@ export function throughputMonteCarlo(
   };
 }
 
+// ── %-cost-to-complete MC（偿付力·plan §4：复用吞吐-MC bootstrap 结构·改在「配额% 增量」上算）──────────
+// 不在 **task 计数** 上算（那是吞吐-MC 的天数维），而在「每单位工作的配额% 增量」上 bootstrap：从历史
+//   per-unit %-cost 样本里有放回采样 backlog 次并求和 → 清空剩余工作的**总配额%** 分布 P50/P80/P95。
+//   per-unit %-cost 由调用方（handler）从「观测 burn-rate × 历史任务工期」派生（duration-grounded %-增量·
+//   plan §4「每单位工作的 %-消耗·throughput 式」；token sizing 可在 handler 侧细化权重）——引擎只做 MC 结构，
+//   **agnostic 于样本来源**（同 throughputMonteCarlo 吃 daily-throughput 池一样吃 %-增量池·literal 复用）。
+// 配额% 是权威账本（plan §1.2）：此处算的是会真正耗尽的预算量，非 token 货币。
+export interface PctCostMcResult {
+  pct: Interval; // 清空 backlog 的总配额% {p50,p80,p95}（5% 硬墙·p95=0.95 分位·绝不 100%）
+  mean: number;
+  backlog: number; // 待清空任务数
+  per_unit_samples: number; // bootstrap 池的 %-增量样本量
+  runs: number;
+  seed: number;
+  confidence: 'high' | 'medium' | 'low';
+  source: 'pct-cost-mc';
+}
+
+// pctCostToCompleteMonteCarlo(backlog, perUnitPctSamples, opts) → 总 %-cost-to-complete 分布。
+//   空池 / backlog=0 → 降级（backlog=0 → 0%；池空 → NaN·confidence low）。seeded 确定性（Sfc32·独立 seed 派生）。
+export function pctCostToCompleteMonteCarlo(
+  backlog: number,
+  perUnitPctSamples: number[],
+  opts: ForecastOptions = {},
+): PctCostMcResult {
+  const seed = opts.seed ?? 42;
+  const runs = Math.max(1, opts.runs ?? 2000);
+  // 只取有限且 ≥0 的 %-增量样本（负 / NaN 噪声剔除；与吞吐池保留闲置日不同——% 增量无「闲置日」语义）。
+  const pool = (Array.isArray(perUnitPctSamples) ? perUnitPctSamples : []).filter(
+    (x) => Number.isFinite(x) && x >= 0,
+  );
+  const m = Math.max(0, Math.floor(backlog));
+
+  if (pool.length === 0 || m === 0) {
+    return {
+      pct: { p50: m === 0 ? 0 : NaN, p80: m === 0 ? 0 : NaN, p95: m === 0 ? 0 : NaN },
+      mean: m === 0 ? 0 : NaN,
+      backlog: m,
+      per_unit_samples: pool.length,
+      runs,
+      seed,
+      confidence: 'low',
+      source: 'pct-cost-mc',
+    };
+  }
+
+  const prng = new Sfc32(seed ^ 0x85ebca6b); // 与通道①②不同 seed 派生·避免共相
+  const samples = new Float64Array(runs);
+  for (let t = 0; t < runs; t++) {
+    let total = 0;
+    for (let i = 0; i < m; i++) total += pool[prng.nextInt(pool.length)] as number;
+    samples[t] = total;
+  }
+  const sorted = Float64Array.from(samples);
+  sorted.sort();
+  let mean = 0;
+  for (let t = 0; t < runs; t++) mean += samples[t] as number;
+  mean /= runs;
+
+  const confidence: 'high' | 'medium' | 'low' =
+    pool.length >= 10 ? 'high' : pool.length >= 4 ? 'medium' : 'low';
+
+  return {
+    pct: {
+      p50: quantileFromSorted(sorted, 0.5),
+      p80: quantileFromSorted(sorted, 0.8),
+      p95: quantileFromSorted(sorted, 0.95), // 5% 硬墙
+    },
+    mean,
+    backlog: m,
+    per_unit_samples: pool.length,
+    runs,
+    seed,
+    confidence,
+    source: 'pct-cost-mc',
+  };
+}
+
 // ── ①②consistency 比对（plan §3：偏差 > 20% 出 consistency warning）──────────────────────────────
 // 两通道度量不同（小时 vs 天）——比对前先把通道① makespan 折算成「天」（assume 工作日小时数·默认 8h/天）。
 export interface ConsistencyResult {

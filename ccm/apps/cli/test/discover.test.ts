@@ -9,15 +9,7 @@
 //   ported discover.ts。无引擎依赖（自包含发现层）。临时 home + XDG state 全程 afterEach 清。
 
 import assert from 'node:assert/strict';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
@@ -43,7 +35,7 @@ function mkHome(): { root: string; home: string } {
   return { root, home };
 }
 
-// 写一块假 board.json 到 home（time-sortable 文件名）；返回其绝对路径。
+// 写一块假 board.json 到 <home>/boards/（board-v2 布局·time-sortable 文件名）；返回其绝对路径。
 function writeBoard(
   home: string,
   name: string,
@@ -53,7 +45,9 @@ function writeBoard(
     goal = 'a goal',
   }: { active?: boolean; sessionId?: string; goal?: string } = {},
 ): string {
-  const p = join(home, name);
+  const dir = join(home, 'boards');
+  mkdirSync(dir, { recursive: true });
+  const p = join(dir, name);
   const board = {
     schema: 'cc-master/v2',
     goal,
@@ -75,6 +69,7 @@ test('exposes the contracted surface', () => {
   const surface = D as unknown as Record<string, unknown>;
   for (const fn of [
     'resolveHome',
+    'boardsDir',
     'boardMatches',
     'pointerPath',
     'readPointer',
@@ -108,47 +103,33 @@ test('resolveHome: --home wins over everything', () => {
   );
 });
 
-test('resolveHome: $CC_MASTER_HOME beats $CLAUDE_PROJECT_DIR', () => {
+test('resolveHome: $CC_MASTER_HOME beats $HOME default', () => {
   assert.equal(
-    D.resolveHome({ env: { CC_MASTER_HOME: '/env/home', CLAUDE_PROJECT_DIR: '/proj' } }),
+    D.resolveHome({ env: { CC_MASTER_HOME: '/env/home', HOME: '/h' } }),
     '/env/home',
   );
 });
 
-test('resolveHome: $CLAUDE_PROJECT_DIR → /.claude/cc-master', () => {
+test('resolveHome: no CC_MASTER_HOME → $HOME/.claude/cc-master (global default)', () => {
+  // 统一全局口径：无 --home / 无 $CC_MASTER_HOME → 默认 $HOME/.claude/cc-master。不再 per-repo
+  // （$CLAUDE_PROJECT_DIR 已不参与）、不再 walk-up。
   assert.equal(
-    D.resolveHome({ env: { CLAUDE_PROJECT_DIR: '/proj' } }),
-    join('/proj', '.claude', 'cc-master'),
+    D.resolveHome({ env: { HOME: '/h' } }),
+    join('/h', '.claude', 'cc-master'),
   );
 });
 
-test('resolveHome: walk-up from cwd finds nearest .claude/cc-master', () => {
-  const { home } = mkHome();
-  // home = <root>/.claude/cc-master；造一个 home 之下的深目录当 cwd。
-  const deep = join(home, 'nested', 'deeper');
-  mkdirSync(deep, { recursive: true });
-  const origCwd = process.cwd();
-  try {
-    process.chdir(deep);
-    // 无 --home / 无 env → walk-up 应找到 home。realpathSync 归一 macOS /var→/private/var symlink。
-    assert.equal(realpathSync(D.resolveHome({ env: {} })), realpathSync(home));
-  } finally {
-    process.chdir(origCwd);
-  }
+test('resolveHome: $CLAUDE_PROJECT_DIR is NO LONGER a factor (per-repo home removed)', () => {
+  // 旧 per-repo 优先级已废：CLAUDE_PROJECT_DIR 在场也只走全局默认（$HOME/.claude/cc-master）。
+  assert.equal(
+    D.resolveHome({ env: { CLAUDE_PROJECT_DIR: '/proj', HOME: '/h' } }),
+    join('/h', '.claude', 'cc-master'),
+  );
 });
 
-test('resolveHome: nothing found → throw .errKind=NotFound', () => {
-  const empty = mkTmp('ccm-empty-');
-  const origCwd = process.cwd();
-  try {
-    process.chdir(empty);
-    assert.throws(
-      () => D.resolveHome({ env: {} }),
-      (e: any) => e.errKind === 'NotFound',
-    );
-  } finally {
-    process.chdir(origCwd);
-  }
+// ── boardsDir ───────────────────────────────────────────────────────────────────────────────────
+test('boardsDir: <home>/boards', () => {
+  assert.equal(D.boardsDir('/some/home'), join('/some/home', 'boards'));
 });
 
 // ── pointer registry ─────────────────────────────────────────────────────────────────────────────
@@ -351,33 +332,18 @@ test('resolveBoard: no sid, no active board → throw NotFound', () => {
 // ── resolveBoard: bad / corrupt boards skipped ────────────────────────────────────────────────────
 test('resolveBoard: corrupt board.json is skipped (JSON.parse failure → skip, not throw)', () => {
   const { home } = mkHome();
-  writeFileSync(join(home, '01-corrupt.board.json'), '{ not valid json', 'utf8');
+  mkdirSync(join(home, 'boards'), { recursive: true });
+  writeFileSync(join(home, 'boards', '01-corrupt.board.json'), '{ not valid json', 'utf8');
   const good = writeBoard(home, '02-good.board.json', { active: true });
   const { boardPath } = D.resolveBoard({ env: { CC_MASTER_HOME: home } });
   assert.equal(boardPath, good, 'corrupt board skipped, falls through to the valid active one');
 });
 
-test('resolveBoard: home resolves but contains no *.board.json → NotFound', () => {
+test('resolveBoard: home resolves but <home>/boards/ has no *.board.json → NotFound', () => {
   const { home } = mkHome();
-  // home 存在但空。
+  // home 存在但 boards/ 为空（或不存在）。
   assert.throws(
     () => D.resolveBoard({ env: { CC_MASTER_HOME: home } }),
     (e: any) => e.errKind === 'NotFound',
   );
-});
-
-// ── resolveBoard: walk-up integration (no env home, cwd inside project) ────────────────────────────
-test('resolveBoard: walk-up finds upper .claude/cc-master when no env home', () => {
-  const { home } = mkHome();
-  const active = writeBoard(home, '01.board.json', { active: true });
-  const deep = join(home, '..', '..', 'src', 'pkg');
-  mkdirSync(deep, { recursive: true });
-  const origCwd = process.cwd();
-  try {
-    process.chdir(deep);
-    const { boardPath } = D.resolveBoard({ env: {} }); // 无 home env、无 sid → walk-up + 唯一 active
-    assert.equal(realpathSync(boardPath), realpathSync(active)); // 归一 macOS /var→/private/var symlink
-  } finally {
-    process.chdir(origCwd);
-  }
 });

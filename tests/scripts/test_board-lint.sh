@@ -106,15 +106,16 @@ assert_eq 0 "$RC" "(f) agent custom fields → rc 0"
 assert_contains "$OUT" "PASS" "(f) custom fields don't trip the lint"
 rm -rf "$D"
 
-# ── (g) no-arg → auto-find the single active board under CC_MASTER_HOME ──────────────────────────────
-D="$(mkproj)"; printf '%s' "$GOOD" > "$D/only.board.json"
+# ── (g) no-arg → auto-find the single active board under <CC_MASTER_HOME>/boards/ ─────────────────────
+# board-v2 布局：no-arg home-scan 在 <home>/boards/ 找唯一 active 板（与 bootstrap / ccm 同口径）。
+D="$(mkproj)"; mkdir -p "$D/boards"; printf '%s' "$GOOD" > "$D/boards/only.board.json"
 OUT="$(CC_MASTER_HOME="$D" node "$SCRIPT" 2>&1)"; RC=$?
 assert_eq 0 "$RC" "(g) no-arg single active board → rc 0"
 assert_contains "$OUT" "PASS" "(g) auto-found the one active board and linted it"
 rm -rf "$D"
 
 # ── (g2) no-arg with MULTIPLE active boards → usage error rc 2, tells user to pass a path ───────────
-D="$(mkproj)"; printf '%s' "$GOOD" > "$D/a.board.json"; printf '%s' "$GOOD" > "$D/b.board.json"
+D="$(mkproj)"; mkdir -p "$D/boards"; printf '%s' "$GOOD" > "$D/boards/a.board.json"; printf '%s' "$GOOD" > "$D/boards/b.board.json"
 OUT="$(CC_MASTER_HOME="$D" node "$SCRIPT" 2>&1)"; RC=$?
 assert_eq 2 "$RC" "(g2) multiple active boards no-arg → rc 2 (usage)"
 assert_contains "$OUT" "board" "(g2) message mentions board (asks for an explicit path)"

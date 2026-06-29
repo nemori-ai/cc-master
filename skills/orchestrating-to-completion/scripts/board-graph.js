@@ -44,17 +44,19 @@ function die(msg, code) {
 }
 
 // findSingleActiveBoard(homeDir) → 唯一 active 板的绝对路径，或 die(…,2)（与 board-lint.js 同口径）。
+//   board 集中在 <home>/boards/（board-v2 布局），入参传 home 根。
 function findSingleActiveBoard(homeDir) {
+  const boardsDir = path.join(homeDir, 'boards');
   let entries;
   try {
-    entries = fs.readdirSync(homeDir, { withFileTypes: true });
+    entries = fs.readdirSync(boardsDir, { withFileTypes: true });
   } catch (_e) {
-    die(`cc-master board-graph: 找不到 board home（${homeDir}）。\n  怎么修：传一个显式 board 路径，或设 CC_MASTER_HOME。`, 2);
+    die(`cc-master board-graph: 找不到 board home（${boardsDir}）。\n  怎么修：传一个显式 board 路径，或设 CC_MASTER_HOME。`, 2);
   }
   const active = [];
   for (const ent of entries) {
     if (!ent.isFile() || !ent.name.endsWith('.board.json')) continue;
-    const full = path.join(homeDir, ent.name);
+    const full = path.join(boardsDir, ent.name);
     try {
       const b = JSON.parse(fs.readFileSync(full, 'utf8'));
       if (b && b.owner && b.owner.active === true) active.push(full);
@@ -280,9 +282,11 @@ function main() {
   if (cmd === 'impact' || cmd === 'rollup') cmdArg = nonPathArgs.length ? nonPathArgs[0] : null;
 
   if (!boardPath) {
+    // 统一全局口径（与 hook-common.resolveHome / bootstrap-board.sh / ccm 同）：CC_MASTER_HOME 覆写，
+    // 否则 $HOME/.claude/cc-master；不再 per-repo（CLAUDE_PROJECT_DIR）或 cwd。board 在 <home>/boards/。
     const home =
       process.env.CC_MASTER_HOME ||
-      path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), '.claude', 'cc-master');
+      path.join(process.env.HOME || require('os').homedir(), '.claude', 'cc-master');
     boardPath = findSingleActiveBoard(home); // 内部失败 die(…,2)
   }
   boardPath = path.resolve(boardPath);

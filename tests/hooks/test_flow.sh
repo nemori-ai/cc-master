@@ -11,8 +11,8 @@ ENV=(CLAUDE_PROJECT_DIR="$PROJ" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME
 # 1. bootstrap creates exactly one board in the home
 printf '%s' '{"prompt":"/cc-master:as-master-orchestrator demo goal"}' \
   | env "${ENV[@]}" bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" >/dev/null 2>&1
-assert_eq 1 "$(ls "$H"/*.board.json 2>/dev/null | wc -l | tr -d ' ')" "bootstrap created exactly one board"
-BOARD="$(ls "$H"/*.board.json)"
+assert_eq 1 "$(ls "$H/boards"/*.board.json 2>/dev/null | wc -l | tr -d ' ')" "bootstrap created exactly one board"
+BOARD="$(ls "$H/boards"/*.board.json)"
 
 # 2. reinject finds the active board + re-anchors the role
 OUT="$(env "${ENV[@]}" node "$PLUGIN_ROOT/hooks/scripts/reinject.js" </dev/null 2>/dev/null)"

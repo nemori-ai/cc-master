@@ -153,7 +153,8 @@ function initResolve(ctx: Ctx): { boardPath: string; board: null } {
       .toISOString()
       .replace(/\.\d{3}Z$/, 'Z')
       .replace(/[:-]/g, '');
-    boardPath = path.join(home, `${stamp}-${process.pid}.board.json`);
+    // board 集中落 <home>/boards/（board-v2 布局，与 bootstrap-board.sh / discover.listBoardFiles 同口径）。
+    boardPath = path.join(discover.boardsDir(home), `${stamp}-${process.pid}.board.json`);
   }
   // QA #16：init 是「建板」命令——目标目录不存在时自建（否则 runWrite 抢锁 openSync('<board>.lock','wx')
   //   先撞 ENOENT 而非建板，`ccm board init --home <新目录>` 报错且不留痕）。只有 init 这么做：它创建板，

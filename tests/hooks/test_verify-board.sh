@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 . "$(dirname "$0")/helpers.sh"
 
-# mkactive HOME NAME JSON — drop a board file into the home
-mkactive() { mkdir -p "$1"; printf '%s' "$3" > "$1/$2.board.json"; }
+# mkactive HOME NAME JSON — drop a board file into <home>/boards/ (board-v2 layout)
+mkactive() { mkdir -p "$1/boards"; printf '%s' "$3" > "$1/boards/$2.board.json"; }
 # run_stop HOME — run the Stop hook against a home dir with EMPTY stdin (no session_id).
 # Empty sid → hook degrades to full-home scan (degraded-defense contract). Sets HOOK_OUT / HOOK_RC.
 run_stop() {
@@ -168,7 +168,7 @@ assert_contains "$HOOK_OUT" "self-check" "first completion → reason has self-c
 assert_contains "$HOOK_OUT" "original goal" "first completion → reason cites original goal"
 assert_file "$H/.$SID.stopcheck" "first completion → sidecar created"
 # sidecar now records last_handshook_fp = current fingerprint (second field)
-EXP_FP="$(fp_of "$H/b1.board.json")"
+EXP_FP="$(fp_of "$H/boards/b1.board.json")"
 GOT_FP="$(awk '{print $2}' "$H/.$SID.stopcheck")"
 assert_eq "$EXP_FP" "$GOT_FP" "first completion → last_handshook_fp set to current fingerprint"
 rm -rf "$H"
@@ -178,7 +178,7 @@ rm -rf "$H"
 H="$(make_project)"
 SID="sess-handshake-2"
 mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
-EXP_FP="$(fp_of "$H/b1.board.json")"
+EXP_FP="$(fp_of "$H/boards/b1.board.json")"
 printf '0 %s\n' "$EXP_FP" > "$H/.$SID.stopcheck"   # streak=0, fp already handshook
 run_stop_sid "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "second completion → rc 0"
@@ -210,7 +210,7 @@ rm -rf "$H"
 H="$(make_project)"
 SID="sess-swap"
 mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"deps\":[]}]}"
-printf '0 %s\n' "$(fp_of "$H/b1.board.json")" > "$H/.$SID.stopcheck"   # seed: this state already handshook
+printf '0 %s\n' "$(fp_of "$H/boards/b1.board.json")" > "$H/.$SID.stopcheck"   # seed: this state already handshook
 mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"blocked\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "status swap (same multiset, different identity) → re-handshake block (codex catch #21)"
@@ -220,10 +220,10 @@ rm -rf "$H"
 #  `"deps"`). A multi-line board whose flexible `log` entries use id/status as keys must NOT affect
 #  the fingerprint — only the task waist counts (narrow-waist contract). Two boards with identical
 #  tasks but different log id/status → SAME fingerprint.
-H="$(make_project)"
-printf '%s\n' '{"owner":{"active":true,"session_id":"s"},' '"tasks":[ {"id":"T1","status":"done","deps":[]} ],' '"log":[ {"id":"L1","status":"alpha"} ]}' > "$H/a.board.json"
-printf '%s\n' '{"owner":{"active":true,"session_id":"s"},' '"tasks":[ {"id":"T1","status":"done","deps":[]} ],' '"log":[ {"id":"L9","status":"omega"} ]}' > "$H/b.board.json"
-assert_eq "$(fp_of "$H/a.board.json")" "$(fp_of "$H/b.board.json")" "fingerprint scoped to task rows — log id/status does not change fp (codex catch #22)"
+H="$(make_project)"; mkdir -p "$H/boards"
+printf '%s\n' '{"owner":{"active":true,"session_id":"s"},' '"tasks":[ {"id":"T1","status":"done","deps":[]} ],' '"log":[ {"id":"L1","status":"alpha"} ]}' > "$H/boards/a.board.json"
+printf '%s\n' '{"owner":{"active":true,"session_id":"s"},' '"tasks":[ {"id":"T1","status":"done","deps":[]} ],' '"log":[ {"id":"L9","status":"omega"} ]}' > "$H/boards/b.board.json"
+assert_eq "$(fp_of "$H/boards/a.board.json")" "$(fp_of "$H/boards/b.board.json")" "fingerprint scoped to task rows — log id/status does not change fp (codex catch #22)"
 rm -rf "$H"
 
 # ─── SESSION FILTERING (Finding #4) ───────────────────────────────────────────────────────────────
@@ -238,7 +238,7 @@ mkactive "$H" "mine"  "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"
 mkactive "$H" "other" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"$OTHER\"},\"tasks\":[]}"
 # pre-mark MINE's completion state as already handshook (seed its fingerprint) so it allows
 # (isolate: we are testing it is NOT blocked by OTHER's empty board).
-printf '0 %s\n' "$(fp_of "$H/mine.board.json")" > "$H/.$MINE.stopcheck"
+printf '0 %s\n' "$(fp_of "$H/boards/mine.board.json")" > "$H/.$MINE.stopcheck"
 run_stop_sid "$H" "$MINE"
 assert_eq 0 "$HOOK_RC" "session filter → rc 0 (other session's empty board ignored)"
 assert_not_contains "$HOOK_OUT" "block" "session filter → my session not blocked by other's empty board"
@@ -316,8 +316,8 @@ rm -rf "$H"
 #                round fixes — previously the third would block again); then a CHANGED fingerprint
 #                re-blocks the handshake.
 H="$(make_project)"; SID="sess-fp"
-BOARD="$H/20260101T000000Z-1.board.json"
-mkdir -p "$H"
+BOARD="$H/boards/20260101T000000Z-1.board.json"
+mkdir -p "$H/boards"
 printf '%s' '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-fp"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$BOARD"
 # First completion-state Stop: should block (first handshake of this fingerprint)
 run_stop_sid "$H" "$SID"
@@ -381,10 +381,10 @@ assert_not_contains "$HOOK_OUT" "block" "structured task-local log → same comp
 rm -rf "$H"
 
 # Case U: SINGLE-LINE fingerprint scoped to tasks region — identical tasks, different log → SAME fp.
-H="$(make_project)"
-printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]}],"log":[{"id":"L1","status":"alpha"}]}' > "$H/a.board.json"
-printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]}],"log":[{"id":"L9","status":"omega"}]}' > "$H/b.board.json"
-assert_eq "$(fp_of "$H/a.board.json")" "$(fp_of "$H/b.board.json")" "single-line fingerprint scoped to tasks region (log excluded)"
+H="$(make_project)"; mkdir -p "$H/boards"
+printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]}],"log":[{"id":"L1","status":"alpha"}]}' > "$H/boards/a.board.json"
+printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]}],"log":[{"id":"L9","status":"omega"}]}' > "$H/boards/b.board.json"
+assert_eq "$(fp_of "$H/boards/a.board.json")" "$(fp_of "$H/boards/b.board.json")" "single-line fingerprint scoped to tasks region (log excluded)"
 rm -rf "$H"
 
 # ─── H3: COMPLETION HANDSHAKE NAMES UNANSWERED blocked_on:"user" DECISIONS ─────────────────────────
@@ -577,7 +577,7 @@ rm -rf "$H"
 #                child-in_flight state, then flip the child to done → fingerprint differs → re-block.
 H="$(make_project)"; SID="sess-rollup-fp"
 mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
-printf '0 %s\n' "$(fp_of "$H/b1.board.json")" > "$H/.$SID.stopcheck"   # seed: child-in_flight state handshook
+printf '0 %s\n' "$(fp_of "$H/boards/b1.board.json")" > "$H/.$SID.stopcheck"   # seed: child-in_flight state handshook
 # Flip the child in_flight → done: the parent-folded fingerprint must change → re-block the handshake.
 mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"done\",\"deps\":[],\"parent\":\"M1\"}]}"
 run_stop_sid "$H" "$SID"
@@ -590,8 +590,8 @@ rm -rf "$H"
 #                board.
 H="$(make_project)"
 mkactive "$H" "b1" '{"schema":"cc-master/v2","owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":[]}]}'
-PRE_D3_FP="$(tasks_region_t "$H/b1.board.json" | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | { printf 'watchdog_needed:1\n'; cat; } | cksum | awk '{print $1}')"
-NOW_FP="$(fp_of "$H/b1.board.json")"
+PRE_D3_FP="$(tasks_region_t "$H/boards/b1.board.json" | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | { printf 'watchdog_needed:1\n'; cat; } | cksum | awk '{print $1}')"
+NOW_FP="$(fp_of "$H/boards/b1.board.json")"
 assert_eq "$PRE_D3_FP" "$NOW_FP" "RU8 no-parent board → parent-folded fp == pre-D3 fp (graceful-degrade, no churn)"
 rm -rf "$H"
 

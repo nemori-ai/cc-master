@@ -88,13 +88,13 @@ say "UserPromptSubmit fires the bootstrap hook with the raw prompt on stdin."
 run_hook bootstrap-board.sh \
   "{\"prompt\":\"/cc-master:as-master-orchestrator $GOAL\"}"
 
-BOARD="$(ls "$HOME_DIR"/*.board.json 2>/dev/null | head -1)"
-what "a brand-new board file was created in the home, time-sortable + pid-stamped."
+BOARD="$(ls "$HOME_DIR"/boards/*.board.json 2>/dev/null | head -1)"   # board-v2: board 落 <home>/boards/
+what "a brand-new board file was created in the home (<home>/boards/), time-sortable + pid-stamped."
 deci "inject additionalContext naming that exact board path + the 'you are the orchestrator' role."
 say  "injected context (verbatim from the hook):"
 printf '   │ %s\n' "$OUT"
 
-[ -n "$BOARD" ] && check "bootstrap created exactly one board file" "$(ls "$HOME_DIR"/*.board.json | wc -l | tr -d ' ')" "1" \
+[ -n "$BOARD" ] && check "bootstrap created exactly one board file" "$(ls "$HOME_DIR"/boards/*.board.json | wc -l | tr -d ' ')" "1" \
                 || no "bootstrap created a board file"
 check "the board file actually exists on disk" "$( [ -f "$BOARD" ] && echo yes )" "yes"
 check "injected context carries the board path (agent learns which board is its own)" "$OUT" "$BOARD"

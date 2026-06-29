@@ -44,8 +44,10 @@ function mkBoardHome({
 } {
   const root = mkTmp('ccm-hboard-');
   const home = join(root, '.claude', 'cc-master');
-  mkdirSync(home, { recursive: true });
-  const boardPath = join(home, '2026-06-24-bh.board.json');
+  // board-v2 布局：board 集中落 <home>/boards/（discover.listBoardFiles 从那里扫·board init 也写那里）。
+  const boardsDir = join(home, 'boards');
+  mkdirSync(boardsDir, { recursive: true });
+  const boardPath = join(boardsDir, '2026-06-24-bh.board.json');
   const board = {
     schema: 'cc-master/v2',
     meta: { template_version: 3 },
@@ -430,9 +432,11 @@ test('board init: creates a new board file in home (owner.active:true / session_
   const ctx = mkCtx({ home, values: { goal: '试验性编排' } });
   const code = boardHandler.init(ctx);
   assert.equal(code, EXIT.OK);
-  const files = readdirSync(home).filter((n) => n.endsWith('.board.json'));
+  // board-v2 布局：init 把新板写进 <home>/boards/（非 home 根）。
+  const boardsDir = join(home, 'boards');
+  const files = readdirSync(boardsDir).filter((n) => n.endsWith('.board.json'));
   assert.equal(files.length, 1, 'one board file created');
-  const onDisk = JSON.parse(readFileSync(join(home, files[0] as string), 'utf8'));
+  const onDisk = JSON.parse(readFileSync(join(boardsDir, files[0] as string), 'utf8'));
   assert.equal(onDisk.goal, '试验性编排');
   assert.equal(onDisk.owner.active, true, 'owner.active:true');
   assert.equal(onDisk.owner.session_id, '', 'session_id empty (non-arming·红线6)');
@@ -464,8 +468,9 @@ test('board init --dry-run does not create any file', () => {
   const ctx = mkCtx({ home, values: { goal: 'g' }, flags: { dryRun: true } });
   const code = boardHandler.init(ctx);
   assert.equal(code, EXIT.OK);
+  // dry-run 不落盘——boards/ 目录可能已被 initResolve 预建，但里面绝无 *.board.json。
   assert.equal(
-    readdirSync(home).filter((n) => n.endsWith('.board.json')).length,
+    readdirSync(join(home, 'boards')).filter((n) => n.endsWith('.board.json')).length,
     0,
     'no file written',
   );

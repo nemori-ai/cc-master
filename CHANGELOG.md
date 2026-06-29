@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> phase-2 已验收增量（基于 `board-v2-redesign` worktree）：全局 home 迁移 + ccm 成本轴偿付力仪表 + hook→agent 标签化消息协议 + 换号凭证 vault 并发硬化 + 新增产品功能手册。
+
+### Added
+
+- **`ccm` 成本轴：偿付力仪表（ENG-B · ADR-015 §2.6 延伸 · 配额% = 唯一权威账本）** — 在已有 `usage`/`estimate` 只读 advisory namespace 上接入「成本流」维（把资源问题建成「时间存量 × 成本流」双变量受限优化的成本侧）：`usage burn-rate`（配额%-burn-rate · Δused%/Δtime · 账户权威 · 5h+7d 双窗口 · window-elapsed · %/h）· `usage runway`（剩余走廊空间 ÷ burn → 距触顶 vs 距 reset 的偿付力 headroom · verdict `ample`/`will-exhaust-before-reset`/`unknown`）· `estimate cost-to-complete`（%-cost-to-complete：剩余 backlog × 每单位工作的配额%增量 · throughput-MC · 回答「这目标的剩余预算装得下吗」）。引擎层落 `usage/solvency.ts` 纯函数原语（`pctBurnRate`/`pctRunway`/`tokenWeightedShares`），核心纪律 **配额% 是唯一权威单账本**（捕获全体消费含 master 前台 + cache 经济），token 仅作派活相对 sizing 辅助、非账本。三个 verb 全走 `runRead`、零写、不抢 board-lock（红线 3：ccm 出测量/预测数据，**不替 orchestrator 决策**）；账户信号不可得 → `available:false` 优雅降级（绝不算到 100% · 真上限是 session hard-stop）。
+- **Hook→Agent 标签化消息协议（ADR-018 Accepted + AGENTS.md §13）** — 立一套标签化消息协议约束**所有 hook 往 agent context 注入的文本**——洞察是「没有纯展示，凡注入即潜移默化塑造行为」：三类 taxonomy（`<ambient source>` 背景 · 决策归 agent · 最低力度但 ≠0 primes / `<advisory source strength="weak\|strong">` 建议 · 喂判断 · agent 最终拍 / `<directive source>` 指令闸 · 决策归 system · 绑定遵从且理解 why）+ 所有标签必带 `source`（可追溯到哪个 hook）+ P1–P6 作者纪律（没有中性注入 / 默认 advisory 慎用 directive / 标签即承诺 / 力度配 stakes / directive 内含 why）。落点二分：**作者侧**纪律落 **AGENTS.md §13**（新增段，原 ADR 约定章顺延为 §14）、**读者侧**契约（agent 怎么按 tag 分配注意力）进 SKILL A（须先跑 pressure baseline）。纯文本注入——不动 board narrow-waist、不改 hook 武装闸（红线 1/2/5/6 不破）；当前重构三处注入（pacing 双侧走廊 / 多-orchestrator coordination channel / verify-board 收口闸）首批照办，现有 hook（`reinject` 除外）渐进迁移。
+- **产品功能手册 `design_docs/feature-manual.md`** — 新增一份**面向人的功能索引 + 状态总账**：分层铺开 cc-master 各功能面（编排决策 / board 模型 / `ccm` 命令面 / pacing 成本轴 / 换号号池 / 武装闸 / webview …）+ 每项状态标记（✅ 已 ship / 🔨 实现中 / 📐 仅设计）+ 用户价值视角，并把「设计前沿 / 正在长成什么」单列一节诚实区分已 ship 与雄心方向。与权威源对齐（ccm 命令面以 `registry.ts` 为准 · charter 以 `spec.md §1.0` 为准 · 各机制以对应 ADR 为准），不复述算法细节（那在引擎源码 + ADR）；约定每个 PR 引入/改动功能时同步对应行 + 状态标记（与 CHANGELOG 同拍）。
+
+### Changed
+
+- **home 从 per-repo 迁到全局（HOME-A · 升级用户旧 board 自动迁移）** — cc-master 的 home 从 **per-repo**（旧默认 `$CLAUDE_PROJECT_DIR/.claude/cc-master/`）迁到**全局**：home = `$CC_MASTER_HOME`（默认 `$HOME/.claude/cc-master/`），所有 `*.board.json` 集中落 `<home>/boards/` 子目录，home 根另放全局的 `accounts.json` 号池 registry + decision sidecar + 预留 coordination channel。bootstrap 时做一次性、**非破坏**的最佳努力迁移：把旧 per-repo home（`$CLAUDE_PROJECT_DIR/.claude/cc-master/`）+ 旧布局直接放 home 根的 legacy flat 板**复制**进 `<home>/boards/`（保留原件 · 同名跳过 · 全程吞错），让升级用户的旧板在全局 home 里 `--resume` 仍找得到。全局 home 在 repo 外天然不入版本控制（仍用 in-repo `.claude/cc-master/` 也 gitignored）；hook 武装闸只读 narrow-waist `owner.active`/`session_id` 判 arming（红线 2/6 不变）。同步对账 AGENTS.md §2/§3/§12 + `feature-manual.md` §8 的 home 模型触点。
+
+### Fixed
+
+- **换号凭证 file vault 跨进程串行化锁（SWGAP · codex round#9 Finding C）** — 号池备号的 file vault 重写（`account-add` / `account-delete` / `switch-account` 回写）此前**跨进程不串行**：并发改同一 vault 文件时「筛 → 写 → rename」最后 mv 者赢，可复活已删 token / 丢别号刚写的 blob。修：把三个写路径的 vault 重写统一裹进 `accounts-lib` 通用文件锁（`with_vault_lock` · O_EXCL + owner token + stale 回收 · 锁文件 `<vf>.lock` 只含非密 pid/at/owner、绝不碰 token），跨进程串行化；取锁失败（另有进程长持锁 / node 不可用）→ **拒绝无锁重写 vault**（防并发互踩 · 未写入 · 诚实失败而非静默互踩）。token-blind 纪律不变（awk 只按前缀筛行不读值 · blob 经 printf 进 temp 不回显）。
+
 ## [0.10.0] — 2026-06-26
 
 > **board v2 数据模型地基 + board 引擎解耦为独立 `ccm` CLI（v0.10.0 · 敏捷开发 Epic #27 及子需求 + ADR-013/ADR-014）** —— 两步走：先把 board 从「被动 JSON + 各消费者各自 sed/awk/JS 解析」演进为「**完整 JS 数据模型 SSOT + 统一访问层**」（ADR-013），再把这套 board 状态逻辑（数据模型 / lint / graph / lock）**整体解耦为一个独立安装的 `ccm` CLI**（工业化 TS monorepo `@ccm/engine` + `ccm`·ADR-014），cc-master plugin 降为它的消费方之一——经进程边界 shell 调用、缺失则优雅降级。这是 v0.10.0 把敏捷能力（纵切可 ship 切片 / timebox / 估点 / 自决诚实台账）长进 board 的承重地基。schema `cc-master/v1` → `cc-master/v2`。

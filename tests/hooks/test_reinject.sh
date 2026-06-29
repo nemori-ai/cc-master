@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 . "$(dirname "$0")/helpers.sh"
 
-mkactive() { mkdir -p "$1"; printf '%s' "$3" > "$1/$2.board.json"; }
+mkactive() { mkdir -p "$1/boards"; printf '%s' "$3" > "$1/boards/$2.board.json"; }
 # run_ss HOME — run reinject with EMPTY stdin (no session_id → degraded: match any active board).
 run_ss() {
   HOOK_OUT="$(CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
@@ -44,7 +44,10 @@ run_ss "$H"
 assert_contains "$HOOK_OUT" "INTERNATIONALIZE THE APP TO 6 LOCALES" "re-injects the goal"
 assert_contains "$HOOK_OUT" "orchestrator" "re-anchors the role"
 assert_contains "$HOOK_OUT" "20260101T000000Z-1.board.json" "names the active board"
-assert_contains "$HOOK_OUT" "$H" "points at the home dir"
+# reinject now names the boards dir (<home>/boards) via node path.join, which normalizes any `//`
+# (macOS $TMPDIR carries a trailing slash) — so collapse `//`→`/` in the needle to match.
+HN="$(printf '%s' "$H/boards" | sed 's#//*#/#g')"
+assert_contains "$HOOK_OUT" "$HN" "points at the boards dir under the home"
 rm -rf "$H"
 
 # Case C: only an archived board (active:false) → no-op

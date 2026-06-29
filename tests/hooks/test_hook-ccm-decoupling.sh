@@ -56,8 +56,8 @@ run_verify() {
 # ════════════════════════════════════ board-lint.js ════════════════════════════════════
 # ── ① ccm path: armed + bad target → report injected (sourced from ccm) ──────────────────────────────
 if [ "$CCM_HAVE" -eq 1 ]; then
-  H="$(make_project)"; printf '%s' "$GOOD" > "$H/armed.board.json"; printf '%s' "$BADLINT" > "$H/bad.board.json"
-  run_lint "$SHIM" "$H" "$H/bad.board.json" "sess-x"
+  H="$(make_project)"; mkdir -p "$H/boards"; printf '%s' "$GOOD" > "$H/boards/armed.board.json"; printf '%s' "$BADLINT" > "$H/boards/bad.board.json"
+  run_lint "$SHIM" "$H" "$H/boards/bad.board.json" "sess-x"
   assert_eq 0 "$HOOK_RC" "lint①(ccm) rc 0"
   assert_contains "$HOOK_OUT" "additionalContext" "lint①(ccm) injects additionalContext"
   assert_contains "$HOOK_OUT" "GRAPH-DANGLING" "lint①(ccm) report names the rule (via ccm)"
@@ -70,8 +70,8 @@ fi
 # ── ② graceful degrade: ccm unavailable (CCM_BIN bogus → ENOENT) → silent (empty out, rc 0) ──────────
 # No require fallback (cli/ deleted): ccm missing → board-lint stays silent (lint is a SOFT PostToolUse
 # nudge, not a gate — a missed lint is harmless; the hook NEVER pollutes the agent stream).
-H="$(make_project)"; printf '%s' "$GOOD" > "$H/armed.board.json"; printf '%s' "$BADLINT" > "$H/bad.board.json"
-run_lint "$NOPE" "$H" "$H/bad.board.json" "sess-x"
+H="$(make_project)"; mkdir -p "$H/boards"; printf '%s' "$GOOD" > "$H/boards/armed.board.json"; printf '%s' "$BADLINT" > "$H/boards/bad.board.json"
+run_lint "$NOPE" "$H" "$H/boards/bad.board.json" "sess-x"
 assert_eq 0 "$HOOK_RC" "lint②(degrade) rc 0 (never crashes)"
 assert_eq "" "$HOOK_OUT" "lint②(degrade) ccm gone → silent (no require fallback; hook never pollutes agent stream)"
 rm -rf "$H"
@@ -79,7 +79,7 @@ rm -rf "$H"
 # ════════════════════════════════════ verify-board.js ═══════════════════════════════════
 # ── ① ccm path: rollup-inconsistent → completion handshake names rollup (sourced from ccm) ───────────
 if [ "$CCM_HAVE" -eq 1 ]; then
-  H="$(make_project)"; printf '%s' "$ROLLUP" > "$H/b1.board.json"
+  H="$(make_project)"; mkdir -p "$H/boards"; printf '%s' "$ROLLUP" > "$H/boards/b1.board.json"
   run_verify "$SHIM" "$H" "sess-rb"
   assert_eq 0 "$HOOK_RC" "verify①(ccm) rc 0"
   assert_contains "$HOOK_OUT" '"decision":"block"' "verify①(ccm) completion handshake blocks"
@@ -93,7 +93,7 @@ fi
 # ── ② graceful degrade: ccm unavailable (CCM_BIN bogus → ENOENT) → rollup skipped, rest of gate runs ──
 # No require fallback (cli/ deleted): ccm missing → the rollup PART is silently omitted (it's a SOFT
 # reminder), but the self-check handshake (the actual Stop gate) STILL blocks — degrade never crashes.
-H="$(make_project)"; printf '%s' "$ROLLUP" > "$H/b1.board.json"
+H="$(make_project)"; mkdir -p "$H/boards"; printf '%s' "$ROLLUP" > "$H/boards/b1.board.json"
 run_verify "$NOPE" "$H" "sess-rb"
 assert_eq 0 "$HOOK_RC" "verify②(degrade) rc 0 (never crashes)"
 assert_contains "$HOOK_OUT" '"decision":"block"' "verify②(degrade) rest of Stop gate still BLOCKS (handshake runs)"

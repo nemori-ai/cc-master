@@ -7,8 +7,8 @@
 # read-only on the board. v2 node 收编（ADR-013 §2.4）：board.scheduling.{wip_limit,owner_wip_limit}（缺则
 # 降级 fallback v1 根字段·兼容旧板）；per-task wip_limit 留在 task 上不变。schema 夹具 cc-master/v2。
 
-# mkactive HOME NAME JSON — drop a board file into the home
-mkactive() { mkdir -p "$1"; printf '%s' "$3" > "$1/$2.board.json"; }
+# mkactive HOME NAME JSON — drop a board file into <home>/boards/ (board-v2 layout)
+mkactive() { mkdir -p "$1/boards"; printf '%s' "$3" > "$1/boards/$2.board.json"; }
 # run_batch HOME SID — run the PostToolBatch hook with stdin JSON carrying session_id=SID.
 run_batch() {
   HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"PostToolBatch","tool_results":[]}' "$2" \

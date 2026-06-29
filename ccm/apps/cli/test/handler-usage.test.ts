@@ -39,8 +39,10 @@ interface SetupOpts {
 function setupHome(opts: SetupOpts = {}): { home: string; boardPath: string; rateCache: string } {
   const root = mkTmp('ccm-usage-');
   const home = join(root, '.claude', 'cc-master');
-  mkdirSync(home, { recursive: true });
-  const boardPath = join(home, '2026-06-25-usage.board.json');
+  // board-v2 布局：board 落 <home>/boards/（accounts.json + rate-cache sidecar 仍在 home 根·全局）。
+  const boardsDir = join(home, 'boards');
+  mkdirSync(boardsDir, { recursive: true });
+  const boardPath = join(boardsDir, '2026-06-25-usage.board.json');
   const board = {
     schema: 'cc-master/v2',
     meta: { template_version: 3 },
@@ -668,7 +670,7 @@ test('usage task-cost --scope home aggregates cross-board observability (#audit:
   const { home, boardPath } = setupHome({ tasks: COST_TASKS }); // current 板（T1 token=150·T2 token=280·T3 N/A）
   // 写一块归档 corpus 板（done 任务带 observability·喂 home 语料）。
   writeFileSync(
-    join(home, '2026-06-20-corpus.board.json'),
+    join(home, 'boards', '2026-06-20-corpus.board.json'),
     `${JSON.stringify({
       schema: 'cc-master/v2',
       meta: { created_at: '2026-06-20T00:00:00Z' },
@@ -724,7 +726,7 @@ test('usage task-cost --scope this-repo filters corpus to same repo (#audit)', (
   // corpus 含同 repo + 异 repo 各一 done·this-repo 只聚同 repo。
   const { home, boardPath } = setupHome({ tasks: [] }); // current 板 git.worktree=/repo/wt
   writeFileSync(
-    join(home, '2026-06-19-corpus.board.json'),
+    join(home, 'boards', '2026-06-19-corpus.board.json'),
     `${JSON.stringify({
       schema: 'cc-master/v2',
       meta: { created_at: '2026-06-19T00:00:00Z' },
@@ -745,7 +747,7 @@ test('usage task-cost --scope this-repo filters corpus to same repo (#audit)', (
     'utf8',
   );
   writeFileSync(
-    join(home, '2026-06-18-other.board.json'),
+    join(home, 'boards', '2026-06-18-other.board.json'),
     `${JSON.stringify({
       schema: 'cc-master/v2',
       meta: { created_at: '2026-06-18T00:00:00Z' },
@@ -793,6 +795,97 @@ test('usage task-cost <id> not found returns found:false', () => {
   assert.equal(out.data.found, false);
 });
 
+// ══ usage burn-rate（配额%-burn-rate·账户权威·window-elapsed）══════════════════════════════════════
+// 5h: used=60%·captured 13:00·resets 15:00 → windowStart 10:00·elapsed 3h → burn=20%/h。
+//   7d: used=30%·resets 2026-07-01T13:00 → windowStart 06-24T13:00·elapsed 24h → burn=1.25%/h。
+const T13 = Math.floor(Date.parse('2026-06-25T13:00:00Z') / 1000);
+const T15 = Math.floor(Date.parse('2026-06-25T15:00:00Z') / 1000);
+const T7D = Math.floor(Date.parse('2026-07-01T13:00:00Z') / 1000);
+const SIDECAR_BURN = {
+  five_hour: { used_percentage: 60, resets_at: T15 },
+  seven_day: { used_percentage: 30, resets_at: T7D },
+  captured_at: T13,
+};
+
+test('usage burn-rate computes window-elapsed %/h for 5h + 7d (account-authoritative)', () => {
+  const { home, boardPath } = setupHome({ sidecar: SIDECAR_BURN });
+  const ctx = mkCtx(home, boardPath, {
+    values: { 'as-of': '2026-06-25T13:00:00Z' },
+    flags: { json: true },
+  });
+  const code = usageHandler.burnRate(ctx);
+  assert.equal(code, EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, true);
+  assert.equal(out.data.source, 'account');
+  // 5h: 60% over 3h elapsed → 20%/h.
+  assert.equal(out.data.five_hour.used_pct, 60);
+  assert.equal(out.data.five_hour.burn_pct_per_hour, 20);
+  assert.equal(out.data.five_hour.method, 'window-elapsed');
+  // 7d: 30% over 24h elapsed → 1.25%/h.
+  assert.equal(out.data.seven_day.burn_pct_per_hour, 1.25);
+});
+
+test('usage burn-rate with no sidecar → available:false (degrade, exit 0)', () => {
+  const { home, boardPath } = setupHome();
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
+  const code = usageHandler.burnRate(ctx);
+  assert.equal(code, EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, false);
+  assert.equal(out.data.source, 'local-derived-approx');
+  assert.equal(out.data.five_hour.burn_pct_per_hour, null);
+});
+
+// ══ usage runway（剩余走廊 ÷ burn → 距触顶 vs 距 reset）═════════════════════════════════════════════
+const SIDECAR_RUNWAY_TIGHT = {
+  five_hour: { used_percentage: 80, resets_at: T15 }, // 80% → burn=80/3≈26.67%/h·remaining 10·to_ceiling≈0.37h<2h
+  seven_day: { used_percentage: 30, resets_at: T7D },
+  captured_at: T13,
+};
+const SIDECAR_RUNWAY_AMPLE = {
+  five_hour: { used_percentage: 20, resets_at: T15 }, // 20% → burn≈6.67%/h·remaining 70·to_ceiling≈10.5h>2h
+  seven_day: { used_percentage: 10, resets_at: T7D },
+  captured_at: T13,
+};
+
+test('usage runway: 5h fast burn near ceiling → will-exhaust-before-reset', () => {
+  const { home, boardPath } = setupHome({ sidecar: SIDECAR_RUNWAY_TIGHT });
+  const ctx = mkCtx(home, boardPath, {
+    values: { 'as-of': '2026-06-25T13:00:00Z' },
+    flags: { json: true },
+  });
+  const code = usageHandler.runway(ctx);
+  assert.equal(code, EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, true);
+  assert.equal(out.data.five_hour.remaining_corridor_pct, 10, '90 ceiling − 80 used');
+  assert.equal(out.data.five_hour.verdict, 'will-exhaust-before-reset');
+  assert.equal(out.data.five_hour.ceiling_pct, 90, '5h corridor high');
+  assert.equal(out.data.seven_day.ceiling_pct, 85, '7d hard-stop ceiling');
+});
+
+test('usage runway: 5h slow burn → ample (reset before ceiling)', () => {
+  const { home, boardPath } = setupHome({ sidecar: SIDECAR_RUNWAY_AMPLE });
+  const ctx = mkCtx(home, boardPath, {
+    values: { 'as-of': '2026-06-25T13:00:00Z' },
+    flags: { json: true },
+  });
+  usageHandler.runway(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.five_hour.remaining_corridor_pct, 70);
+  assert.equal(out.data.five_hour.verdict, 'ample');
+});
+
+test('usage runway with no sidecar → available:false (degrade)', () => {
+  const { home, boardPath } = setupHome();
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
+  usageHandler.runway(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, false);
+  assert.equal(out.data.five_hour.verdict, 'unknown');
+});
+
 // ══ 零写不变式（usage 纯只读·绝不落盘）═══════════════════════════════════════════════════════════
 
 test('usage handlers never write the board (zero-write invariant)', () => {
@@ -808,6 +901,8 @@ test('usage handlers never write the board (zero-write invariant)', () => {
   usageHandler.taskCost(
     mkCtx(home, boardPath, { values: { 'group-by': 'type' }, flags: { json: true } }),
   );
+  usageHandler.burnRate(mkCtx(home, boardPath, { flags: { json: true } }));
+  usageHandler.runway(mkCtx(home, boardPath, { flags: { json: true } }));
   assert.equal(readFileSync(boardPath, 'utf8'), before, 'board byte-identical after usage reads');
   assert.equal(
     readFileSync(join(home, 'accounts.json'), 'utf8'),

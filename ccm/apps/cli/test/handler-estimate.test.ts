@@ -12,7 +12,7 @@
 // 零写不变式：estimate 全 runRead·绝不落盘（fixture 板字节不变）。
 
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, test } from 'node:test';
@@ -27,9 +27,17 @@ const FIX = resolve(__dirname, '../../../packages/engine/test/fixtures/boards');
 
 const CURRENT = resolve(FIX, 'current/active-estimate-engine.board.json');
 const BASELINE_BOARD = resolve(FIX, 'current/baseline-example.board.json');
-const HOME_CORPUS = resolve(FIX, 'home-corpus');
+// board-v2 布局：CLI 的 scope=home 跨板语料读 <home>/boards/。共享 fixture（packages/engine/test/fixtures/
+//   boards/home-corpus·7 板）被 engine 测试**直接**当语料目录读，故不能就地搬进 boards/（会断 engine 测试）。
+//   这里把这 7 板原样 stage 进一个 temp home 的 boards/ 子目录、把 HOME_CORPUS 指向该 temp home 根——既守
+//   board-v2 布局、又不动共享 fixture / engine 测试（golden 值不变·读的是同一批板内容）。
+const HOME_CORPUS = (() => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-homecorpus-'));
+  cpSync(resolve(FIX, 'home-corpus'), join(root, 'boards'), { recursive: true });
+  return root;
+})();
 const COLD_START = resolve(FIX, 'edge/cold-start-empty.board.json');
-const EMPTY_HOME = resolve(FIX, 'edge'); // edge dir 当作「无对口语料」的近似 home（混杂边界板）
+const EMPTY_HOME = resolve(FIX, 'edge'); // edge dir 当作「无对口语料」的近似 home（其 boards/ 不存在 → 空语料）
 
 // 临时板工厂（构造「active 任务全缺 estimate」的 forecast 目标·edge/all-missing-estimate 是全 done 归档板
 //   〔throughput 语料〕·非 active forecast 目标，故 coverage<50% 路径用 inline 活动板测）。
@@ -65,9 +73,10 @@ function mkHomeWithCorpus(
   const root = mkdtempSync(join(tmpdir(), 'ccm-corpus-'));
   TMPDIRS.push(root);
   const home = join(root, '.claude', 'cc-master');
-  mkdirSync(home, { recursive: true });
+  // board-v2 布局：被发现的语料板落 <home>/boards/（target 板经显式 --board 引用·留 home 根）。
+  mkdirSync(join(home, 'boards'), { recursive: true });
   writeFileSync(
-    join(home, 'corpus.board.json'),
+    join(home, 'boards', 'corpus.board.json'),
     JSON.stringify({
       schema: 'cc-master/v2',
       meta: { created_at: '2026-06-20T00:00:00Z' },
@@ -785,10 +794,11 @@ test('backtest: --as-of anchors recency cutoff to as-of (>90d-old board still in
   const root = mkdtempSync(join(tmpdir(), 'ccm-p2-'));
   TMPDIRS.push(root);
   const home = join(root, '.claude', 'cc-master');
-  mkdirSync(home, { recursive: true });
+  // board-v2 布局：被发现的语料板落 <home>/boards/（target 板经显式 --board·留 home 根）。
+  mkdirSync(join(home, 'boards'), { recursive: true });
   // 归档语料板：板时戳（heartbeat + created_at）都在 120 天前。
   writeFileSync(
-    join(home, 'old-corpus.board.json'),
+    join(home, 'boards', 'old-corpus.board.json'),
     JSON.stringify({
       schema: 'cc-master/v2',
       meta: { template_version: 3, created_at: iso(boardTsMs) },
@@ -851,4 +861,175 @@ test('evm on baseline-example fixture: SPI/CPI computed (baseline bac_h=12)', ()
   assert.equal(d.has_baseline, true);
   assert.equal(d.bac.value, 12);
   assert.ok(d.pv.value >= 0 && d.pv.value <= 12);
+});
+
+// ══ estimate cost-to-complete（%-cost-to-complete·偿付力·plan §4）══════════════════════════════════
+//   配额% 是权威预算账本：%-cost = backlog × (burn-rate × 历史工期·throughput-MC)。token 辅助 sizing。
+//   端到端：临时 home（corpus done〔actualHours+tokens〕 + target backlog）+ 账户权威 sidecar（burn 可算）。
+
+const AS_OF_CTC = '2026-06-25T13:00:00Z';
+const T13 = Math.floor(Date.parse('2026-06-25T13:00:00Z') / 1000);
+const T15 = Math.floor(Date.parse('2026-06-25T15:00:00Z') / 1000); // 5h reset·2h future
+const T29 = Math.floor(Date.parse('2026-06-29T13:00:00Z') / 1000); // 7d reset future
+// 5h: used=60%·captured 13:00·resets 15:00 → windowStart=10:00·elapsed 3h → burn=20%/h（window-elapsed）。
+const SIDECAR_CTC = {
+  five_hour: { used_percentage: 60, resets_at: T15 },
+  seven_day: { used_percentage: 30, resets_at: T29 },
+  captured_at: T13,
+};
+
+// 每条 corpus done 任务 actualHours=2h（started/finished 2h 隔）+ tokens（喂 knn token sizing）。
+function corpusDone(id: string, tin: number, tout: number) {
+  return {
+    id,
+    status: 'done',
+    type: 'development',
+    executor: 'subagent',
+    tier: 'mid',
+    estimate: { value: 2, unit: 'h' },
+    started_at: '2026-06-20T00:00:00Z',
+    finished_at: '2026-06-20T02:00:00Z',
+    observability: { tokens: { input: tin, output: tout } },
+  };
+}
+
+// mkCtcCtx(home, board, rateCache) → ctx 带 CC_MASTER_RATE_CACHE（账户权威 sidecar 路径·estimate mkCtx 不设）。
+function mkCtcCtx(
+  home: string,
+  board: string,
+  rateCache: string | null,
+  extra: Record<string, unknown> = {},
+): TestCtx {
+  const outBuf: string[] = [];
+  const errBuf: string[] = [];
+  return {
+    values: { board, home, 'as-of': AS_OF_CTC, ...extra },
+    positionals: [],
+    flags: {
+      json: true,
+      dryRun: false,
+      force: false,
+      yes: false,
+      quiet: false,
+      verbose: false,
+      color: false,
+    },
+    sid: '',
+    // rateCache=null → 指向不存在文件（避免读宿主真 sidecar·测降级）；否则指向 fixture sidecar。
+    env: { CC_MASTER_HOME: home, CC_MASTER_RATE_CACHE: rateCache ?? join(home, 'NOPE.json') },
+    out: (s: string) => outBuf.push(s),
+    err: (s: string) => errBuf.push(s),
+    isTTY: true,
+    outBuf,
+    errBuf,
+  };
+}
+
+// mkCtcBoard(doneTasks, activeTasks) → 一块板（done 当 this-board 语料 + active 当 backlog）+ rate-cache sidecar。
+//   用 scope=this-board（读本板 done·extractDoneRecords·零 home/boards-layout 依赖·抗并行 home 迁移）。
+function mkCtcBoard(
+  doneTasks: unknown[],
+  activeTasks: unknown[],
+  withSidecar = true,
+): { home: string; board: string; rateCache: string } {
+  const board = mkInlineBoard([...doneTasks, ...activeTasks]);
+  const home = dirname(board); // mkInlineBoard 落在 <root>/.claude/cc-master
+  const rateCache = join(home, '.cc-master-rate-limits.json');
+  if (withSidecar) writeFileSync(rateCache, `${JSON.stringify(SIDECAR_CTC)}\n`, 'utf8');
+  return { home, board, rateCache };
+}
+
+test('cost-to-complete: burn × history → %-cost (uniform 2h corpus·backlog 2·seed 42)', () => {
+  const { home, board, rateCache } = mkCtcBoard(
+    [corpusDone('A1', 1000, 500), corpusDone('A2', 2000, 1000), corpusDone('A3', 800, 400)],
+    [
+      { id: 'T1', status: 'ready', type: 'development', executor: 'subagent', tier: 'mid' },
+      {
+        id: 'T2',
+        status: 'in_flight',
+        type: 'design',
+        executor: 'subagent',
+        tier: 'mid',
+        started_at: '2026-06-25T12:00:00Z',
+      },
+    ],
+  );
+  const ctx = mkCtcCtx(home, board, rateCache, {
+    scope: 'this-board',
+    seed: '42',
+    runs: '2000',
+  });
+  const code = estimateHandler.costToComplete(ctx);
+  assert.equal(code, EXIT.OK);
+  const d = dataOf(ctx);
+  // 账户权威 burn-rate = 60%/3h = 20%/h（window-elapsed）。
+  assert.equal(d.available, true);
+  assert.equal(d.burn_pct_per_hour, 20);
+  assert.equal(d.burn_method, 'window-elapsed');
+  assert.equal(d.backlog, 2);
+  // per-unit %-cost = 20%/h × 2h = 40% per task；uniform 池 → backlog 2 → 总 80%（p50=p80=p95·无方差）。
+  assert.equal(d.per_unit_samples, 3, '3 corpus done with actualHours');
+  assert.equal(d.cost_to_complete_pct.p50, 80);
+  assert.equal(d.cost_to_complete_pct.p95, 80, 'uniform pool → no variance → 5%硬墙仍 80');
+  assert.equal(d.mean_pct, 80);
+  // token 辅助 sizing（knnPredict.predictedTokens·辅助·非账本）。
+  assert.ok(d.token_sizing.total_predicted_tokens > 0, 'token sizing wired from knnPredict');
+  assert.equal(d.token_sizing.per_task.length, 2, 'per-task token sizing for 2 backlog tasks');
+  // per-task pct_share 之和 ≈ mean_pct（token 相对权重切分总账本%）。
+  const shareSum = d.token_sizing.per_task.reduce(
+    (s: number, r: { pct_share: number | null }) => s + (r.pct_share ?? 0),
+    0,
+  );
+  assert.ok(Math.abs(shareSum - d.mean_pct) < 0.05, `share sum ${shareSum} ≈ mean ${d.mean_pct}`);
+});
+
+test('cost-to-complete: deterministic for same seed (varied corpus → variance)', () => {
+  const doneTasks = [
+    { ...corpusDone('A1', 1000, 500), finished_at: '2026-06-20T01:00:00Z' }, // 1h
+    corpusDone('A2', 2000, 1000), // 2h
+    { ...corpusDone('A3', 800, 400), finished_at: '2026-06-20T05:00:00Z' }, // 5h
+  ];
+  const activeTasks = [
+    { id: 'T1', status: 'ready', type: 'development', executor: 'subagent', tier: 'mid' },
+    { id: 'T2', status: 'ready', type: 'development', executor: 'subagent', tier: 'mid' },
+    { id: 'T3', status: 'ready', type: 'development', executor: 'subagent', tier: 'mid' },
+  ];
+  const runOnce = () => {
+    const { home, board, rateCache } = mkCtcBoard(doneTasks, activeTasks);
+    const c = mkCtcCtx(home, board, rateCache, { scope: 'this-board', seed: '42' });
+    estimateHandler.costToComplete(c);
+    return dataOf(c);
+  };
+  const a = runOnce();
+  const b = runOnce();
+  assert.deepEqual(a.cost_to_complete_pct, b.cost_to_complete_pct, 'same seed → identical');
+  assert.ok(a.cost_to_complete_pct.p50 <= a.cost_to_complete_pct.p95, 'monotone p50≤p95');
+});
+
+test('cost-to-complete: no account sidecar → available:false + cost null (degrade, exit 0)', () => {
+  const { home, board } = mkCtcBoard(
+    [corpusDone('A1', 1000, 500)],
+    [{ id: 'T1', status: 'ready', type: 'development', executor: 'subagent', tier: 'mid' }],
+    false, // 不写 sidecar
+  );
+  // rateCache=null → 不存在的 sidecar 路径 → burn 不可算。
+  const ctx = mkCtcCtx(home, board, null, { scope: 'this-board' });
+  const code = estimateHandler.costToComplete(ctx);
+  assert.equal(code, EXIT.OK, 'degrade is exit 0 not error');
+  const d = dataOf(ctx);
+  assert.equal(d.available, false);
+  assert.equal(d.burn_pct_per_hour, null);
+  assert.equal(d.cost_to_complete_pct, null, 'no burn → no %-cost ledger');
+  assert.equal(d.source, 'local-derived-approx');
+  assert.equal(d.confidence, 'low');
+});
+
+test('cost-to-complete: zero-write invariant (board byte-identical)', () => {
+  const { home, board, rateCache } = mkCtcBoard(
+    [corpusDone('A1', 1000, 500)],
+    [{ id: 'T1', status: 'ready', type: 'development', executor: 'subagent', tier: 'mid' }],
+  );
+  const before = readFileSync(board, 'utf8');
+  estimateHandler.costToComplete(mkCtcCtx(home, board, rateCache, { scope: 'this-board' }));
+  assert.equal(readFileSync(board, 'utf8'), before, 'board byte-identical after cost reads');
 });

@@ -28,11 +28,16 @@ import {
   loadCorpus,
   type PacingOptions,
   pacingAdvice,
+  pctBurnRate,
   pctOf,
+  pctRunway,
   tokenExpired,
   type UsageSignal,
+  WINDOW_5H_SEC,
+  WINDOW_7D_SEC,
   type WindowSignal,
 } from '@ccm/engine';
+import * as discover from '../discover.js';
 import { type BoardArg, type Ctx, runRead } from './_common.js';
 
 // 备号窗口快照（registry SwitchSnapshot 投影）。
@@ -52,13 +57,11 @@ interface BackupAccount {
   source: 'registry-snapshot';
 }
 
-// resolveHomeDir(env, homeFlag) → cc-master home（同 estimate.ts resolveHomeDir 口径·task-cost --scope 跨板用）。
-//   --home flag 先于 CC_MASTER_HOME 先于 CLAUDE_PROJECT_DIR 先于默认 $HOME/.claude/cc-master。
+// resolveHomeDir(env, homeFlag) → cc-master home **根**（统一全局口径·收口到 discover.resolveHome SSOT：
+//   --home > $CC_MASTER_HOME > $HOME/.claude/cc-master；不再 per-repo CLAUDE_PROJECT_DIR）。task-cost --scope
+//   跨板用。注：accounts.json 的 registryPath 另有自己的 home 解析（home 根·全局·有意不动），不走本函数。
 function resolveHomeDir(env: Record<string, string | undefined>, homeFlag?: string): string {
-  if (homeFlag) return path.resolve(homeFlag);
-  if (env.CC_MASTER_HOME) return path.resolve(env.CC_MASTER_HOME);
-  if (env.CLAUDE_PROJECT_DIR) return path.resolve(env.CLAUDE_PROJECT_DIR, '.claude', 'cc-master');
-  return path.join(os.homedir(), '.claude', 'cc-master');
+  return discover.resolveHome({ homeFlag, env });
 }
 
 // ── accounts.json registry 解析（只读·绝不写）──────────────────────────────────────────────────────
@@ -253,6 +256,66 @@ function effectiveNFromRegistry(
   const accounts = readRegistry(env, homeFlag);
   if (!accounts) return 1;
   return effectiveN(accounts as never, nowMs).effective_n;
+}
+
+// asOfSec(ctx) → --as-of（ISO-8601 UTC）解析为 epoch 秒，否则 Date.now()/1000（backtest 用·仿 estimate nowMsOf）。
+function asOfSec(ctx: Ctx): number {
+  const asOf = ctx.values['as-of'];
+  if (typeof asOf === 'string' && asOf) {
+    const ms = Date.parse(asOf);
+    if (Number.isFinite(ms)) return Math.floor(ms / 1000);
+  }
+  return Math.floor(Date.now() / 1000);
+}
+
+// asOfISOFromSec(sec) → 严格 ISO-8601 UTC（去毫秒）。
+function asOfISOFromSec(sec: number): string {
+  return new Date(sec * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+// ── 偿付力：配额%-burn-rate / runway（账户权威·window-elapsed）─────────────────────────────────────
+// 一个窗口的 burn-rate 视图（show/advise 之外的成本流维·plan §4·ADR-015 延伸）。
+export interface WindowBurnView {
+  used_pct: number | null; // 当前已用%（过期/缺 → null·复用 pctOf SSOT）
+  resets_at: number | null; // 该窗口 reset 时刻（epoch 秒·透传）
+  burn_pct_per_hour: number | null; // %/小时（window-elapsed·不可算 → null）
+  method: string; // finite-diff | window-elapsed | none
+  confidence: 'high' | 'medium' | 'low';
+}
+
+// accountBurnRate(env, nowSec, windowSec, win) → 当前账户某窗口的 %-burn-rate（window-elapsed·账户权威）。
+//   **单一 SSOT**：usage burn-rate/runway handler 与 estimate cost-to-complete 都复用它（estimate 消费 usage
+//   融合·plan §5），不让窗口数学在两处漂移。读 sidecar（账户权威·Finding #37）→ pctOf 取非过期 used% →
+//   pctBurnRate(window-elapsed，窗口起点 = resets_at − windowSec)。used% 不可判 → 全 null（降级·标 available:false）。
+export function accountBurnRate(
+  env: Record<string, string | undefined>,
+  nowSec: number,
+  windowSec: number,
+  win: 'five_hour' | 'seven_day' = 'five_hour',
+): WindowBurnView {
+  const sidecar = readUsageSidecar(env);
+  const w = (win === 'five_hour' ? sidecar?.five_hour : sidecar?.seven_day) ?? null;
+  const used = pctOf(w, nowSec); // 过期/缺 → null
+  const resetsAt = w && typeof w.resets_at === 'number' ? w.resets_at : null;
+  if (used == null) {
+    return {
+      used_pct: null,
+      resets_at: resetsAt,
+      burn_pct_per_hour: null,
+      method: 'none',
+      confidence: 'low',
+    };
+  }
+  const windowStartSec = resetsAt != null ? resetsAt - windowSec : null;
+  const atSec = sidecar && typeof sidecar.captured_at === 'number' ? sidecar.captured_at : nowSec;
+  const br = pctBurnRate([{ atSec, usedPct: used }], { windowStartSec });
+  return {
+    used_pct: used,
+    resets_at: resetsAt,
+    burn_pct_per_hour: br.burn_pct_per_hour,
+    method: br.method,
+    confidence: br.confidence,
+  };
 }
 
 // ── usage show ──────────────────────────────────────────────────────────────
@@ -451,6 +514,125 @@ function sevenDayPctOrInf(a: BackupAccount): number {
   return typeof a.seven_day.used_pct === 'number' ? a.seven_day.used_pct : Number.POSITIVE_INFINITY;
 }
 
+// ── usage burn-rate ──────────────────────────────────────────────────────────────
+//   配额%-burn-rate（Δused%/Δtime·账户权威·window-elapsed）——成本流维（plan §4）。5h + 7d 各一个。
+//   信号不可得 = exit 0 + available:false（诚实降级·非 exit 1）。--as-of 支持（backtest·影响窗口已逝时间）。
+export function burnRate(ctx: Ctx): number {
+  return runRead(ctx, {
+    // 配额信号是用户级（跨板）——兜空板避免无板 exit 5（同 show/advise）。
+    resolve: () => ({ boardPath: '', board: {} }),
+    render: (_b, c) => {
+      const nowSec = asOfSec(c);
+      const fiveHour = accountBurnRate(c.env, nowSec, WINDOW_5H_SEC, 'five_hour');
+      const sevenDay = accountBurnRate(c.env, nowSec, WINDOW_7D_SEC, 'seven_day');
+      const available = fiveHour.used_pct != null || sevenDay.used_pct != null;
+      const capturedAt = readUsageSidecar(c.env)?.captured_at ?? null;
+      const confidence: 'high' | 'medium' | 'low' =
+        fiveHour.used_pct != null
+          ? fiveHour.confidence
+          : sevenDay.used_pct != null
+            ? sevenDay.confidence
+            : 'low';
+
+      const data = {
+        available,
+        five_hour: fiveHour,
+        seven_day: sevenDay,
+        source: available ? 'account' : 'local-derived-approx',
+        as_of:
+          typeof capturedAt === 'number'
+            ? asOfISOFromSec(capturedAt)
+            : available
+              ? asOfISOFromSec(nowSec)
+              : null,
+        confidence,
+      };
+
+      if (c.flags.json) return JSON.stringify({ ok: true, data });
+      const lines = [`usage burn-rate（账户权威·%/h·confidence=${confidence}）`];
+      const fmtBurn = (v: WindowBurnView): string =>
+        v.burn_pct_per_hour != null
+          ? `${v.burn_pct_per_hour}%/h（used=${fmtPct(v.used_pct)}·${v.method}）`
+          : `N/A（used=${fmtPct(v.used_pct)}）`;
+      lines.push(`  5h: ${fmtBurn(fiveHour)}`);
+      lines.push(`  7d: ${fmtBurn(sevenDay)}`);
+      if (!available)
+        lines.push('  （账户权威信号不可用·无 status-line sidecar·available:false·降级）');
+      return `${lines.join('\n')}\n`;
+    },
+  });
+}
+
+// ── usage runway ──────────────────────────────────────────────────────────────
+//   配额% runway：剩余走廊空间 ÷ burn → 距触顶 vs 距 reset（偿付力 headroom·plan §4）。
+//   5h 走廊上界 90（临界阈·pacing DEFAULTS）；7d 用 85（硬总闸）。--as-of 支持。信号缺 → available:false 降级。
+export function runway(ctx: Ctx): number {
+  return runRead(ctx, {
+    resolve: () => ({ boardPath: '', board: {} }),
+    render: (_b, c) => {
+      const nowSec = asOfSec(c);
+      const perWindow = (view: WindowBurnView, ceiling: number) => {
+        if (view.used_pct == null) {
+          return {
+            used_pct: null,
+            burn_pct_per_hour: null,
+            remaining_corridor_pct: null,
+            hours_to_ceiling: null,
+            hours_to_reset: null,
+            verdict: 'unknown' as const,
+            ceiling_pct: ceiling,
+          };
+        }
+        const rw = pctRunway({
+          usedPct: view.used_pct,
+          burnPctPerHour: view.burn_pct_per_hour,
+          ceilingPct: ceiling,
+          resetsAtSec: view.resets_at,
+          nowSec,
+        });
+        return { used_pct: view.used_pct, ...rw };
+      };
+
+      const fiveView = accountBurnRate(c.env, nowSec, WINDOW_5H_SEC, 'five_hour');
+      const sevenView = accountBurnRate(c.env, nowSec, WINDOW_7D_SEC, 'seven_day');
+      const fiveHour = perWindow(fiveView, 90);
+      const sevenDay = perWindow(sevenView, 85);
+      const available = fiveView.used_pct != null || sevenView.used_pct != null;
+      const capturedAt = readUsageSidecar(c.env)?.captured_at ?? null;
+
+      const data = {
+        available,
+        five_hour: fiveHour,
+        seven_day: sevenDay,
+        source: available ? 'account' : 'local-derived-approx',
+        as_of:
+          typeof capturedAt === 'number'
+            ? asOfISOFromSec(capturedAt)
+            : available
+              ? asOfISOFromSec(nowSec)
+              : null,
+        confidence: available ? (fiveView.used_pct != null ? fiveView.confidence : 'low') : 'low',
+      };
+
+      if (c.flags.json) return JSON.stringify({ ok: true, data });
+      const lines = [`usage runway（剩余走廊 ÷ burn → 距触顶 vs 距 reset）`];
+      const fmtRw = (r: ReturnType<typeof perWindow>): string =>
+        r.used_pct == null
+          ? `N/A（账户信号不可用）`
+          : `remaining=${fmtPct(r.remaining_corridor_pct)}（上界 ${r.ceiling_pct}%）·to_ceiling=${fmtH(r.hours_to_ceiling)}·to_reset=${fmtH(r.hours_to_reset)}·${r.verdict}`;
+      lines.push(`  5h: ${fmtRw(fiveHour)}`);
+      lines.push(`  7d: ${fmtRw(sevenDay)}`);
+      if (!available) lines.push('  （账户权威信号不可用·available:false·降级）');
+      return `${lines.join('\n')}\n`;
+    },
+  });
+}
+
+// fmtH(h) → "Nh" 或 N/A（runway 时间用·小时）。
+function fmtH(h: number | null | undefined): string {
+  return typeof h === 'number' && Number.isFinite(h) ? `${h}h` : 'N/A';
+}
+
 // ── usage task-cost ──────────────────────────────────────────────────────────────
 //   单/聚合任务 token（读 board observability·shell=N/A·coverage_pct·--group-by）。
 //   单任务：[<task-id>] positional；聚合：--group-by task|executor|type|tier。
@@ -483,7 +665,8 @@ export function taskCost(ctx: Ctx): number {
         // 跨板：从 home 语料抽 DoneRecord（已含 tokensIn/Out·executor/type/tier）；this-repo 过滤同 repo。
         let corpus: DoneRecord[] = [];
         try {
-          corpus = loadCorpus(resolveHomeDir(c.env, homeFlag));
+          // board 集中在 <home>/boards/（loadCorpus 读给定目录·layout-agnostic）。
+          corpus = loadCorpus(discover.boardsDir(resolveHomeDir(c.env, homeFlag)));
         } catch {
           corpus = [];
         }

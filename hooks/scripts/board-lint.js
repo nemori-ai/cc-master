@@ -35,7 +35,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 // ★v2 收编：HOME 解析 + 武装闸 isArmed 收口到共享 hook-common（取代旧内联副本·SSOT、四个 node hook 一份）。
-const { resolveHome, isArmed } = require('./hook-common.js');
+const { resolveHome, boardsDir, isArmed } = require('./hook-common.js');
 
 // ── lint 核心获取：经 ccm 二进制（进程边界）；不可用即优雅降级静默（3b 已删 cli/，无 require fallback）─────
 // CCM_BIN：dev/test/自定义安装的覆写口（绝对路径可执行）；缺则用 PATH 上的 `ccm`（生产）。
@@ -75,9 +75,11 @@ function lintViaCcm(resolvedFile) {
   return { report };
 }
 
-// HOME_DIR：与全 hook 同口径（CC_MASTER_HOME 覆写，否则 CLAUDE_PROJECT_DIR/.claude/cc-master，再否则
-//   cwd/.claude/cc-master）。测试经 CC_MASTER_HOME 注入。
+// HOME_DIR：home 根（CC_MASTER_HOME 覆写，否则 $HOME/.claude/cc-master·hook-common SSOT 同口径）。
+//   board 落 <home>/boards/，故闸2 的「在 home 内」判定锚到 BOARDS_DIR（只对 boards/ 下的真相源 board 把关，
+//   不对 home 根的 accounts.json / sidecar 出声）。测试经 CC_MASTER_HOME 注入。
 const HOME_DIR = resolveHome();
+const BOARDS_DIR = boardsDir(HOME_DIR);
 
 // targetIsMyActiveBoard(filePath, sid)：闸4 —— 被编辑文件是不是「本 session 拥有的那块 active
 //   board」。读该 board 的 owner.active === true 且（sid 非空时）owner.session_id === sid。
@@ -155,14 +157,14 @@ function main() {
   // 可靠判断它改没改 board（解析任意 shell 找输出重定向不可判定），交手动脚本补（设计稿 §5.1）。
   if (toolName !== 'Write' && toolName !== 'Edit' && toolName !== 'MultiEdit') return;
 
-  // ── 闸2：file_path 落在 home 内且匹配 *.board.json（纯字符串判断，无文件读）──────────────────────
+  // ── 闸2：file_path 落在 <home>/boards/ 内且匹配 *.board.json（纯字符串判断，无文件读）────────────
   if (!filePath) return;
   const resolvedFile = path.resolve(filePath);
-  const resolvedHome = path.resolve(HOME_DIR);
-  const inHome =
-    resolvedFile === resolvedHome ||
-    resolvedFile.startsWith(resolvedHome + path.sep);
-  if (!inHome) return;
+  const resolvedBoards = path.resolve(BOARDS_DIR);
+  const inBoards =
+    resolvedFile === resolvedBoards ||
+    resolvedFile.startsWith(resolvedBoards + path.sep);
+  if (!inBoards) return;
   if (!path.basename(resolvedFile).endsWith('.board.json')) return;
 
   // ── 闸3+闸4：武装 ∧「编辑的是本 session 的 active board」——但二者必须解耦（codex 逮到的 bug）─────

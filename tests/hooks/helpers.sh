@@ -33,8 +33,12 @@ assert_no_file() { [ ! -e "$1" ] && PASS=$((PASS+1)) || { FAILED=$((FAILED+1)); 
 make_project() { local d; d="$(mktemp -d "${TMPDIR:-/tmp}/.tmp-ccm.XXXXXX")"; echo "$d"; }
 
 # run_hook SCRIPT STDIN_JSON PROJECT_DIR -> sets HOOK_OUT / HOOK_RC
+# home 收口为全局后，home 不再从 CLAUDE_PROJECT_DIR 派生——故显式 pin CC_MASTER_HOME 到 PROJECT_DIR 下的
+# .claude/cc-master 隔离 home（① 不污染用户真实 ~/.claude/cc-master；② 保留断言里 "$P/.claude/cc-master"
+# 这个路径基准·board 落其 boards/ 子目录）。
 run_hook() {
   HOOK_OUT="$(printf '%s' "$2" | CLAUDE_PROJECT_DIR="$3" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+             CC_MASTER_HOME="$3/.claude/cc-master" \
              bash "$PLUGIN_ROOT/$1" 2>/dev/null)"; HOOK_RC=$?
 }
 

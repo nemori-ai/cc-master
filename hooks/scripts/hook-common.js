@@ -15,13 +15,25 @@
 //   的板**不被收养**（落到 "" === "<非空 sid>" → false → 休眠，fail-safe·红线6 防跨 session 污染·CODEX14）。
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
-// resolveHome() → HOME_DIR（CC_MASTER_HOME 覆写 → CLAUDE_PROJECT_DIR/.claude/cc-master → cwd/.claude/cc-master）。
-//   与全 hook 同口径（board-lint.js / 各 bash hook）。测试经 CC_MASTER_HOME 注入。
+// resolveHome() → HOME_DIR（cc-master home **根**·统一全局口径·ADR-board-v2 home 收口）。
+//   优先级：$CC_MASTER_HOME 覆写 → $HOME/.claude/cc-master（全局·默认）。**不再** per-repo
+//   （CLAUDE_PROJECT_DIR/.claude/cc-master）或 cwd fallback——所有 orchestration 的 board 集中到一个
+//   用户级 home，跨 repo 不再各起一份。**这是全 hook（node + bash）+ ccm discover 的 node SSOT**：
+//   board-lint / usage-pacing / reinject / verify-board / posttool-batch 都经本函数解析，不再各自内联。
+//   测试经 CC_MASTER_HOME 注入隔离 home。
 function resolveHome() {
   return process.env.CC_MASTER_HOME ||
-    path.join(process.env.CLAUDE_PROJECT_DIR || process.cwd(), '.claude', 'cc-master');
+    path.join(process.env.HOME || os.homedir(), '.claude', 'cc-master');
+}
+
+// boardsDir(homeDir) → home 下集中放所有 *.board.json 的子目录（<home>/boards/·board-v2 布局）。
+//   board 枚举 / 武装扫描一律走这里；home 根只放 accounts.json（全局·不动）+ hook sidecar（.stopcheck）
+//   + 预留 channel/。把「home 根」与「boards 目录」分开，使 home 根能承载非 board 的全局资源不互撞。
+function boardsDir(homeDir) {
+  return path.join(homeDir, 'boards');
 }
 
 // readStdin() → stdin 原始字符串（读不到 → ''）。
@@ -55,15 +67,17 @@ function boardMatches(board, sid) {
   return owner.session_id === sid;             // session-scoped 精确匹配（空 board sid 落 false → 不收养）
 }
 
-// listMatchingBoards(homeDir, sid) → [{ path, name, board }]——home 里所有能解析且 boardMatches 的 *.board.json。
-//   坏板（读/解析失败）跳过（按「不匹配」处理）。供需要遍历自己所有 active 板的 hook（reinject / verify-board）。
+// listMatchingBoards(homeDir, sid) → [{ path, name, board }]——<home>/boards/ 里所有能解析且 boardMatches
+//   的 *.board.json。坏板（读/解析失败）跳过（按「不匹配」处理）。供需要遍历自己所有 active 板的 hook
+//   （reinject / verify-board / posttool-batch）。入参是 home **根**，内部走 boardsDir 扫 boards/ 子目录。
 function listMatchingBoards(homeDir, sid) {
   const out = [];
+  const dir = boardsDir(homeDir);
   let entries;
-  try { entries = fs.readdirSync(homeDir, { withFileTypes: true }); } catch (_e) { return out; }
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_e) { return out; }
   for (const ent of entries) {
     if (!ent.isFile() || !ent.name.endsWith('.board.json')) continue;
-    const p = path.join(homeDir, ent.name);
+    const p = path.join(dir, ent.name);
     let board;
     try { board = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (_e) { continue; }
     if (boardMatches(board, sid)) out.push({ path: p, name: ent.name, board });
@@ -71,15 +85,17 @@ function listMatchingBoards(homeDir, sid) {
   return out;
 }
 
-// isArmed(homeDir, sid) → 本 session 是否武装（存在至少一块匹配的 active 板）。
-//   与 board-lint.js 旧内联 isArmed 语义字字相同（红线6 dormant-until-armed 的唯一判定）。
+// isArmed(homeDir, sid) → 本 session 是否武装（<home>/boards/ 里存在至少一块匹配的 active 板）。
+//   与 board-lint.js 旧内联 isArmed 语义字字相同（红线6 dormant-until-armed 的唯一判定）。入参是 home
+//   **根**，内部走 boardsDir 扫 boards/ 子目录。
 function isArmed(homeDir, sid) {
+  const dir = boardsDir(homeDir);
   let entries;
-  try { entries = fs.readdirSync(homeDir, { withFileTypes: true }); } catch (_e) { return false; }
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_e) { return false; }
   for (const ent of entries) {
     if (!ent.isFile() || !ent.name.endsWith('.board.json')) continue;
     let board;
-    try { board = JSON.parse(fs.readFileSync(path.join(homeDir, ent.name), 'utf8')); } catch (_e) { continue; }
+    try { board = JSON.parse(fs.readFileSync(path.join(dir, ent.name), 'utf8')); } catch (_e) { continue; }
     if (boardMatches(board, sid)) return true;
   }
   return false;
@@ -88,4 +104,4 @@ function isArmed(homeDir, sid) {
 // jsonEscape(str) → 安全注入进 JSON 字符串字面量的转义（hook 输出 additionalContext 用）。
 function jsonEscape(str) { return JSON.stringify(String(str)); }
 
-module.exports = { resolveHome, readStdin, parseStdin, boardMatches, listMatchingBoards, isArmed, jsonEscape };
+module.exports = { resolveHome, boardsDir, readStdin, parseStdin, boardMatches, listMatchingBoards, isArmed, jsonEscape };
