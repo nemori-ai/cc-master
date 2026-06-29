@@ -45,7 +45,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { resolveHome, readStdin, parseStdin, listMatchingBoards } = require('./hook-common.js');
+const { resolveHome, readStdin, parseStdin, listMatchingBoards, directive, advisory } = require('./hook-common.js');
 
 // CCM_BIN：dev/test/自定义安装的覆写口（绝对路径可执行）；缺则用 PATH 上的 `ccm`（生产）。
 const CCM_BIN = process.env.CCM_BIN || 'ccm';
@@ -245,18 +245,28 @@ function main() {
 
   // ── 决策动作 ───────────────────────────────────────────────────────────────────────────────────
   // emitBlock — bump streak、保险丝检查、写 sidecar、打印 decision 或强制 allow。
+  //
+  // ADR-018 标签（§13）：
+  //   · 真 block（decision:block）的 reason 是**系统硬闸**——Stop hook 把 agent 挡在 Stop 上、必须遵从才能停
+  //     → `<directive source="verify-board">`，内含 why（每条 block reason 文案已自带「为什么停不得」的理由·P5）。
+  //     这正是 ADR-018 §2.2 给的 verify-board 收口闸真实例子（罕见的 directive）。pending-user / watchdog / rollup
+  //     提醒是这同一条 block reason 的内部条款（都各自带 why），随其归入同一 directive、不另拆标签（保 reason 单字段）。
+  //   · fuse 跳闸**不是闸**（它在 RELEASE·放 agent 停）——只告知「连续 block N 次已释放，去检查卡住的 ready
+  //     task」，决策归 agent（去不去查是它的判断）→ `<advisory strength="strong">`（高 stakes:可能真卡死，应认真响应）。
   function emitBlock(reason) {
     blockStreak += 1;
     if (blockStreak >= FUSE) {
       // 保险丝跳闸：强制 allow + 警告，清 sidecar（streak 归零）。
       const warn = `cc-master: fuse tripped — blocked ${blockStreak} times in a row. Releasing the stop. ` +
         'If you are stuck, check the board for a `ready` task that cannot actually proceed (mark it `blocked`/`escalated`) before continuing.';
+      const wrappedWarn = advisory('verify-board', 'strong', warn);
       clearSidecar(SIDECAR);
-      process.stdout.write(`{"reason":${jsonStr(warn)}}\n`);   // 无 decision:block → 非 block；agent 停 + 显警告
+      process.stdout.write(`{"reason":${jsonStr(wrappedWarn)}}\n`);   // 无 decision:block → 非 block；agent 停 + 显警告
       return;
     }
     writeSidecar(SIDECAR, `${blockStreak} ${lastFp}\n`);
-    process.stdout.write(`{"decision":"block","reason":${jsonStr(reason)}}\n`);
+    const wrappedReason = directive('verify-board', reason);
+    process.stdout.write(`{"decision":"block","reason":${jsonStr(wrappedReason)}}\n`);
   }
   // allow → 清 sidecar（streak → 0）。
   function allow() { clearSidecar(SIDECAR); }

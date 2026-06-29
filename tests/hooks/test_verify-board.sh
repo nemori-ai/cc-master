@@ -36,6 +36,8 @@ H="$(make_project)"
 mkactive "$H" "20260101T000000Z-1" '{"schema":"cc-master/v2","goal":"g","owner":{"active":true},"tasks":[]}'
 run_stop "$H"
 assert_contains "$HOOK_OUT" "block" "empty active board → block"
+# ADR-018：真 block 的 reason 是系统硬闸 → directive（含 why·P5）。reason 经 JSON.stringify，标签 " → \"。
+assert_contains "$HOOK_OUT" '<directive source=\"verify-board\">' "empty board block → tag-wrapped directive (ADR-018)"
 rm -rf "$H"
 
 # Case E: an ARCHIVED board (owner.active:false) with 0 tasks → ignored → allow
@@ -166,6 +168,8 @@ run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "first completion → block"
 assert_contains "$HOOK_OUT" "self-check" "first completion → reason has self-check keyword"
 assert_contains "$HOOK_OUT" "original goal" "first completion → reason cites original goal"
+# ADR-018：self-check 握手 block reason 是系统硬闸 → directive（含 why·P5）。
+assert_contains "$HOOK_OUT" '<directive source=\"verify-board\">' "first completion handshake → tag-wrapped directive (ADR-018)"
 assert_file "$H/.$SID.stopcheck" "first completion → sidecar created"
 # sidecar now records last_handshook_fp = current fingerprint (second field)
 EXP_FP="$(fp_of "$H/boards/b1.board.json")"
@@ -279,6 +283,8 @@ assert_eq 0 "$HOOK_RC" "fuse → rc 0"
 # Force-allow = no block DECISION (the warning text itself legitimately contains the word "blocked").
 assert_not_contains "$HOOK_OUT" "\"decision\":\"block\"" "fuse tripped → force allow (no block decision)"
 assert_contains "$HOOK_OUT" "fuse" "fuse tripped → warning keyword present"
+# ADR-018：fuse 跳闸不是闸（在 RELEASE 放停）→ advisory strong（高 stakes·可能真卡死·决策归 agent，NOT directive）。
+assert_contains "$HOOK_OUT" '<advisory source=\"verify-board\" strength=\"strong\">' "fuse release → tag-wrapped advisory strong, NOT directive (ADR-018)"
 assert_no_file "$H/.$SID.stopcheck" "fuse tripped → sidecar cleared on force allow"
 rm -rf "$H"
 

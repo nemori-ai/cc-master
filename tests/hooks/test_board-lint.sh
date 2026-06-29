@@ -97,6 +97,8 @@ assert_contains "$HOOK_OUT" "FMT-JSON" "(h) names the violated rule (FMT-JSON in
 assert_contains "$HOOK_OUT" "board lint" "(h) carries the cc-master board lint prefix"
 assert_not_contains "$HOOK_OUT" '"decision":"block"' "(h) NEVER blocks — non-blocking only"
 assert_valid_json "$HOOK_OUT" "(h) the injected envelope itself is valid JSON (multi-line report escaped)"
+# ADR-018：含 hard error（FMT-JSON·结构破）→ advisory strong（应认真去修·P4 高 stakes）。注入经 jsonEscape，标签 " → \"。
+assert_contains "$HOOK_OUT" '<advisory source=\"board-lint\" strength=\"strong\">' "(h) hard error → tag-wrapped advisory strong (ADR-018)"
 rm -rf "$H"
 
 # ── (h2) HARD FAIL, SINGLE-ACTIVE-BOARD: the SOLE active board (this session's) is written to invalid
@@ -181,6 +183,8 @@ assert_eq 0 "$HOOK_RC" "(l) warn-only → rc 0"
 assert_contains "$HOOK_OUT" "FMT-BLOCKED-ON" "(l) warns on dangling blocked_on (FMT-BLOCKED-ON)"
 assert_contains "$HOOK_OUT" "FMT-TIME" "(l) warns on bad timestamp format (FMT-TIME)"
 assert_not_contains "$HOOK_OUT" '"decision":"block"' "(l) warn never blocks"
+# ADR-018：纯 warn（无 hard error）→ advisory weak（顺手权衡·P4 低 stakes）。
+assert_contains "$HOOK_OUT" '<advisory source=\"board-lint\" strength=\"weak\">' "(l) warn-only → tag-wrapped advisory weak (ADR-018)"
 rm -rf "$H"
 
 # ── (m) RED LINE 2: agent-shaped custom fields are NEVER flagged ──────────────────────────────────────

@@ -34,6 +34,9 @@ assert_contains "$HOOK_OUT" "5" "over-cap → warning carries N=5"
 assert_contains "$HOOK_OUT" "4" "over-cap → warning carries M=4"
 assert_contains "$HOOK_OUT" "additionalContext" "over-cap → injects additionalContext"
 assert_not_contains "$HOOK_OUT" "\"decision\":\"block\"" "over-cap → NEVER a block decision"
+# ADR-018：WIP 软警告归 advisory·weak（决策归 agent·非系统硬闸·低 stakes 可逆）。注入文本经 jsonEscape，
+# 故标签里的 " 在输出中是 \"（needle 用单引号字面 \"）。
+assert_contains "$HOOK_OUT" '<advisory source=\"posttool-batch\" strength=\"weak\">' "over-cap → tag-wrapped advisory weak (ADR-018)"
 rm -rf "$H"
 
 # Case 2: in_flight=2, wip_limit=4 → within cap → silent (empty out), rc 0.

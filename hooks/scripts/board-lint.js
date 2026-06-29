@@ -35,19 +35,22 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 // ★v2 收编：HOME 解析 + 武装闸 isArmed 收口到共享 hook-common（取代旧内联副本·SSOT、四个 node hook 一份）。
-const { resolveHome, boardsDir, isArmed } = require('./hook-common.js');
+const { resolveHome, boardsDir, isArmed, advisory } = require('./hook-common.js');
 
 // ── lint 核心获取：经 ccm 二进制（进程边界）；不可用即优雅降级静默（3b 已删 cli/，无 require fallback）─────
 // CCM_BIN：dev/test/自定义安装的覆写口（绝对路径可执行）；缺则用 PATH 上的 `ccm`（生产）。
 const CCM_BIN = process.env.CCM_BIN || 'ccm';
 
-// lintViaCcm(resolvedFile) → { report } | null。
+// lintViaCcm(resolvedFile) → { report, hasHard } | null。
 //   spawnSync ccm board lint --board <file> --raw --json → parse stdout JSON。
-//   · 有 violations（含 hard / warn）→ 返回 { report: data.report }（注入文本）。
-//   · 0 violations → 返回 { report: '' }（lint 净，调用方静默）。
+//   · 有 violations（含 hard / warn）→ 返回 { report: data.report, hasHard }（注入文本 + 是否含 hard error）。
+//   · 0 violations → 返回 { report: '', hasHard: false }（lint 净，调用方静默）。
 //   · spawn 失败 / stdout 非有效 JSON / 形状不对 → 返回 null（→ 优雅降级静默 exit 0；3b 无 fallback）。
 //   退出码契约（1a 定）：0 无 hard error（含只 warn）/ 3 有 hard error；--raw 坏 JSON 也走 lint（exit 3），
 //   故 0 与 3 都是「ccm 跑成功、有有效 JSON」的正常态，不据退出码判有无 finding——只扫 data.violations。
+//   ADR-018 strength 分档（§13/P4）：data.violations[].level ∈ {hard,warn}（render.ts 组装）。含任一 hard
+//   error（结构破·会让 viewer 挂 / resume 读垃圾）→ hasHard=true → advisory strength="strong"（应认真去修）；
+//   纯 warn → weak（顺手权衡）。这只决定标签力度、不改 report 文案（文案仍是引擎权威 SSOT）。
 function lintViaCcm(resolvedFile) {
   let r;
   try {
@@ -70,9 +73,11 @@ function lintViaCcm(resolvedFile) {
   // 形状校验：{ ok:true, data:{ violations:[...], report:<string> } }。形状不符 → 优雅降级。
   const data = parsed && typeof parsed === 'object' ? parsed.data : null;
   if (!data || typeof data !== 'object' || !Array.isArray(data.violations)) return null;
-  if (data.violations.length === 0) return { report: '' }; // lint 净
+  if (data.violations.length === 0) return { report: '', hasHard: false }; // lint 净
   const report = typeof data.report === 'string' ? data.report : '';
-  return { report };
+  // strength 分档：任一 violation.level==='hard' → hasHard（advisory strong）；否则纯 warn（weak）。
+  const hasHard = data.violations.some((v) => v && v.level === 'hard');
+  return { report, hasHard };
 }
 
 // HOME_DIR：home 根（CC_MASTER_HOME 覆写，否则 $HOME/.claude/cc-master·hook-common SSOT 同口径）。
@@ -198,11 +203,17 @@ function main() {
   const report = outcome.report;
   if (!report) return; // lint 净（0 finding）→ 静默（不刷屏）
 
+  // ADR-018：lint 报告归 **advisory**（§13）——决策归 agent（去不去修是它的编排判断·非系统硬闸，hook 绝不
+  //   decision:block：PostToolUse 编辑已落盘撤不回）。strength 按 stakes 分档（P4）：含 hard error（结构破·
+  //   会让 viewer 挂 / resume 读垃圾）→ strong（默认应去修）；纯 warn → weak（顺手权衡）。source=board-lint。
+  //   report 文案是 ccm 引擎权威 SSOT，本 hook 只套标签外壳、不改文案。
+  const wrapped = advisory('board-lint', outcome.hasHard ? 'strong' : 'weak', report);
+
   // 非阻断注入：仅 additionalContext，hookEventName "PostToolUse"。绝不 decision:block。
   const payload = {
     hookSpecificOutput: {
       hookEventName: 'PostToolUse',
-      additionalContext: report,
+      additionalContext: wrapped,
     },
   };
   process.stdout.write(JSON.stringify(payload) + '\n');

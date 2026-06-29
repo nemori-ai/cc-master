@@ -42,6 +42,49 @@ test('sentinel consistency: command body carries the exact string the bootstrap 
   assert.match(hook, /cc-master:as-master-orchestrator/, 'hook also greps command-name sentinel');
 });
 
+// ── ADR-018 标签注入防回潮 lint（AGENTS.md §13）──────────────────────────────────────────────────────
+// 所有 hook 往 agent context 注入的 transient 文本都须按 ADR-018 标签写（ambient/advisory/directive·closed
+//   set·source 必填）。reinject（魂重注）与 bootstrap（ARM 角色注入）是 agent 的操作 substrate（ADR-018 §2.5）
+//   ——**豁免**，不该被包成任一标签。这道 lint 防「裸 prose 注入」回潮：非-substrate hook 凡注入（emit
+//   additionalContext / Stop block reason），其文本必经共享标签包装器（hook-common 的 ambient/advisory/
+//   directive，语法 `<ambient|advisory|directive source="...">`）。
+test('ADR-018: non-substrate hooks tag-wrap their agent-context injection (anti-regression)', () => {
+  // 非-substrate 注入 hook：每个都必须用至少一个标签包装器（确凿引用 ADR-018 标签体系）。
+  const nonSubstrate = ['usage-pacing.js', 'posttool-batch.js', 'board-lint.js', 'verify-board.js'];
+  // 标签包装器调用（hook-common 暴露的三个）。匹配 `advisory(` / `ambient(` / `directive(` 或字面标签语法。
+  const TAG_CALL = /\b(ambient|advisory|directive)\s*\(/;
+  const TAG_LITERAL = /<(ambient|advisory|directive)\s+source=/;
+  for (const f of nonSubstrate) {
+    const src = read(`hooks/scripts/${f}`);
+    // 该 hook 确实会注入（emit additionalContext 或 Stop block reason）——否则这条断言不适用。
+    const injects = /additionalContext|"reason"|decision":"block/.test(src);
+    assert.ok(injects, `${f} is expected to inject into agent context (additionalContext / block reason)`);
+    assert.ok(
+      TAG_CALL.test(src) || TAG_LITERAL.test(src),
+      `${f} injects into agent context but does NOT tag-wrap it (ADR-018 §13: must use <ambient|advisory|directive>). ` +
+        `Raw-prose injection is forbidden — wrap via hook-common's ambient/advisory/directive.`,
+    );
+  }
+  // hook-common 的三个标签包装器：每个都必须带 source=（P6 source 必填）+ closed set（不膨胀）。
+  const common = read('hooks/scripts/hook-common.js');
+  for (const tag of ['ambient', 'advisory', 'directive']) {
+    assert.match(common, new RegExp(`function ${tag}\\(`), `hook-common exposes ${tag}() wrapper`);
+    assert.match(common, new RegExp(`<${tag} source=`), `hook-common ${tag}() emits source= attr (P6)`);
+  }
+  // strength 只给 advisory（ADR-018 §2.2 closed set：ambient 恒低 / directive 恒满，不开 strength）。
+  assert.match(common, /<advisory source="\$\{source\}" strength=/, 'advisory wrapper carries strength= (weak|strong)');
+  assert.doesNotMatch(common, /<ambient source="[^"]*" strength=/, 'ambient must NOT carry strength (恒低)');
+  assert.doesNotMatch(common, /<directive source="[^"]*" strength=/, 'directive must NOT carry strength (恒满)');
+
+  // substrate 豁免（ADR-018 §2.5）：reinject / bootstrap 是 substrate（角色重注 / ARM），不该被标签包装。
+  //   断言它们 NOT 引用标签包装器——豁免是有意的、非偶然遗漏（防有人误给 substrate 加标签、也防 lint 漏网）。
+  const reinject = read('hooks/scripts/reinject.js');
+  const bootstrap = read('hooks/scripts/bootstrap-board.sh');
+  assert.doesNotMatch(reinject, TAG_CALL, 'reinject is substrate (ADR-018 §2.5) — must NOT tag-wrap');
+  assert.doesNotMatch(reinject, TAG_LITERAL, 'reinject is substrate — no tag literals');
+  assert.doesNotMatch(bootstrap, TAG_LITERAL, 'bootstrap ARM injection is substrate — no tag literals');
+});
+
 test('every SKILL.md (distributed + project-internal) has YAML frontmatter with name + description', () => {
   // Validate BOTH the distributed plugin skills (skills/) and the project-internal dev skills
   // (.claude/skills/, e.g. cc-master-skillsmith) — the latter are not shipped but are still tracked

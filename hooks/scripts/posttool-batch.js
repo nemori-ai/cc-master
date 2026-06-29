@@ -23,7 +23,7 @@
 //   session_id 判武装 + tasks[].status/parent + scheduling.wip_limit）判断，不写 board。红线4：sub-agent 上下文
 //   （stdin 带顶层 agent_id）静默早退——指挥专属的 WIP 软警告绝不泄漏给 leaf worker。
 
-const { resolveHome, readStdin, listMatchingBoards, jsonEscape } = require('./hook-common.js');
+const { resolveHome, readStdin, listMatchingBoards, jsonEscape, advisory } = require('./hook-common.js');
 
 // numericCap(v) — 把一个值规整成「数值 cap」：仅接受非负整数（数字字面量或纯数字字符串），否则返回 null。
 //   v1 用 grep -oE '[0-9]+' + 整数 case 守护，等价于「值是数字且为非负整数」——"auto" / 非数字 → 无 cap（关）。
@@ -135,9 +135,12 @@ function main() {
   if (!overWarn) return;
 
   // ── 一块或多块板超 cap → 注入 NON-BLOCKING additionalContext（绝不 decision:block）────────────────────
+  // ADR-018：WIP 软警告归 **advisory·weak**（§13/P4）——决策归 agent（要不要降并发是它的编排判断·非系统硬闸），
+  //   低 stakes 且可逆（并行自由不剥夺·只软推 ~75% 利用率），故 weak 而非 strong/directive。source=posttool-batch。
   const warn = overWarn.replace(/ $/, ''); // 去尾随分隔空格（与 v1 `${over_warn% }` 等价）
+  const wrapped = advisory('posttool-batch', 'weak', warn);
   process.stdout.write(
-    `{"hookSpecificOutput":{"hookEventName":"PostToolBatch","additionalContext":${jsonEscape(warn)}}}\n`
+    `{"hookSpecificOutput":{"hookEventName":"PostToolBatch","additionalContext":${jsonEscape(wrapped)}}}\n`
   );
 }
 

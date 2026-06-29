@@ -104,4 +104,29 @@ function isArmed(homeDir, sid) {
 // jsonEscape(str) → 安全注入进 JSON 字符串字面量的转义（hook 输出 additionalContext 用）。
 function jsonEscape(str) { return JSON.stringify(String(str)); }
 
-module.exports = { resolveHome, boardsDir, readStdin, parseStdin, boardMatches, listMatchingBoards, isArmed, jsonEscape };
+// ── ADR-018 hook→agent 标签化消息协议（作者侧 SSOT·AGENTS.md §13）──────────────────────────────────
+// 所有 hook 往 agent context 注入的 transient 文本都按三类标签写（reinject/bootstrap 的角色 substrate 豁免，
+//   见 ADR-018 §2.5）。三类固定对应三个标签；`strength`（weak|strong）**只给 advisory**（ambient 恒低 /
+//   directive 恒满，保持最小集·P4）；**所有标签必带 `source`**（注的是哪个 hook·可追溯可审计·P6）。
+//   把包装收口到这一份共享 helper：① 各 hook 注入嗓音一致、不漂移；② tag/source 语法只有一处写法，
+//   防回潮 lint（structure.test.mjs）有唯一锚点对得上。纯字符串拼接、零依赖（红线1）。
+//
+//   ambient(source, body)             → <ambient source="...">…</ambient>     背景·塑模型·无 action
+//   advisory(source, strength, body)  → <advisory source="..." strength="weak|strong">…</advisory>  喂判断·action 可选
+//   directive(source, body)           → <directive source="...">…</directive>  硬约束·必须遵从·内含 why（P5 由调用方保证）
+// body 已含必要 why（directive）/ levers（advisory）的完整文案；helper 只负责套标签外壳，不改文案语义。
+function ambient(source, body) {
+  return `<ambient source="${source}">\n${String(body)}\n</ambient>`;
+}
+function advisory(source, strength, body) {
+  const s = (strength === 'strong') ? 'strong' : 'weak'; // 非法/缺 → weak（最低够用·P2）
+  return `<advisory source="${source}" strength="${s}">\n${String(body)}\n</advisory>`;
+}
+function directive(source, body) {
+  return `<directive source="${source}">\n${String(body)}\n</directive>`;
+}
+
+module.exports = {
+  resolveHome, boardsDir, readStdin, parseStdin, boardMatches, listMatchingBoards, isArmed, jsonEscape,
+  ambient, advisory, directive,
+};

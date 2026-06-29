@@ -305,6 +305,8 @@ assert_eq 0 "$HOOK_RC" "(acct-1) high 5h% → rc 0"
 assert_contains "$HOOK_OUT" "additionalContext" "(acct-1) high account 5h used% → warns"
 assert_contains "$HOOK_OUT" "90" "(acct-1) carries account 5h used_percentage (authoritative, not反推)"
 assert_not_contains "$HOOK_OUT" '"decision":"block"' "(acct-1) never blocks"
+# ADR-018：5h 临界减速 → advisory strong（临界侧·应认真权衡减速·P4 高风险→strong）。注入经 jsonEscape，标签 " → \"。
+assert_contains "$HOOK_OUT" '<advisory source=\"usage-pacing\" strength=\"strong\">' "(acct-1) 5h wall → tag-wrapped advisory strong (ADR-018)"
 
 # (acct-2) high 7d used% (88) while 5h low (10) → warns on 7d (Finding #31: 7d now in scope).
 run_pacing_acct "{\"five_hour\":{\"used_percentage\":10,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":88}}" \
@@ -353,6 +355,8 @@ assert_contains "$HOOK_OUT" "欠用" "(under-1) carries the underuse signal phra
 assert_contains "$HOOK_OUT" "加速" "(under-1) points at accelerate levers (加速)"
 assert_contains "$HOOK_OUT" "20" "(under-1) carries account 5h used_percentage (20)"
 assert_not_contains "$HOOK_OUT" '"decision":"block"' "(under-1) NEVER blocks — non-blocking only"
+# ADR-018：欠用加速 → advisory weak（低风险·可合理忽略·对齐 ADR-018 §2.2「欠用加速」例 = weak）。
+assert_contains "$HOOK_OUT" '<advisory source=\"usage-pacing\" strength=\"weak\">' "(under-1) underuse → tag-wrapped advisory weak (ADR-018)"
 
 # (under-fresh) 三条 AND 全真 + captured_at 新鲜（now-300s ≤ 15min）→ 仍出加速提示（新鲜度闸放行）。
 run_pacing_acct "{\"captured_at\":$U_FRESH,\"five_hour\":{\"used_percentage\":20,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":30}}" \
@@ -505,6 +509,9 @@ run_pacing_acct "{\"captured_at\":$U_FRESH,\"five_hour\":{\"used_percentage\":70
   "2026-06-10T12:00:00Z" "$N_HOME" "sess-acct"
 assert_eq 0 "$HOOK_RC" "(nacct-4) registry-sourced effective-N=3 → rc 0"
 assert_contains "$HOOK_OUT" "欠用" "(nacct-4) accounts.json pool (1 active + 2 backups) drives n=3 (no env) → accelerate fires"
+# ADR-018：号池粗粒度事实独立成块 → ambient（池/配额事实·塑模型·无 action·无 strength）。
+assert_contains "$HOOK_OUT" '<ambient source=\"usage-pacing\">' "(nacct-4) pool fact → separate ambient block (ADR-018, no strength)"
+assert_contains "$HOOK_OUT" "号池" "(nacct-4) ambient carries the pool fact (号池)"
 rm -f "$N_HOME/accounts.json"
 
 # (nacct-5) WALL FORK at n>1 — 5h 90% wall, 7d 20% (only 5h hits) + n=3 → 「切下一份配额」signal, NOT slowdown.
@@ -515,6 +522,8 @@ assert_eq 0 "$HOOK_RC" "(nacct-5) wall fork n>1 → rc 0"
 assert_contains "$HOOK_OUT" "切到下一份配额" "(nacct-5) n>1 + 5h wall → 切下一份配额 signal (not slowdown)"
 assert_not_contains "$HOOK_OUT" "降到更便宜的模型档" "(nacct-5) n>1 5h wall → NOT the slowdown levers"
 assert_not_contains "$HOOK_OUT" '"decision":"block"' "(nacct-5) never blocks"
+# ADR-018：n>1 切下一份配额 → advisory weak（机会信号·可逆·低 stakes）。
+assert_contains "$HOOK_OUT" '<advisory source=\"usage-pacing\" strength=\"weak\">' "(nacct-5) switch-account → tag-wrapped advisory weak (ADR-018)"
 
 # (nacct-6) 7d WALL not reframed by n — 7d 88% wall while 5h low (10%) + n=3 → 7d 总闸 still bites (n
 #           orthogonal to the cross-window total gate). Since 88 ≥ dispatch gate(85), it surfaces the
@@ -554,6 +563,9 @@ assert_contains "$HOOK_OUT" "surface 给用户" "(gate-1) surfaces the decision 
 assert_contains "$HOOK_OUT" "硬总闸" "(gate-1) names the 7d hard total gate"
 assert_contains "$HOOK_OUT" "87" "(gate-1) carries the authoritative 7d used_percentage"
 assert_not_contains "$HOOK_OUT" '"decision":"block"' "(gate-1) NEVER blocks — hook can't真 block dispatch, only software prompt"
+# ADR-018：7d 硬总闸 → advisory strong（stakes 最高·跨窗口不可逆·对齐 ADR-018 §2.2「7d 逼顶」例 = strong）。
+# 仍是 advisory 非 directive：hook 永不能真 block dispatch（红线4），决策最终归 orchestrator（活体印证·ADR-018 §3.1）。
+assert_contains "$HOOK_OUT" '<advisory source=\"usage-pacing\" strength=\"strong\">' "(gate-1) 7d hard gate → tag-wrapped advisory strong, NOT directive (ADR-018)"
 
 # (gate-2) 7d 84% (just UNDER gate) + 5h fine → NO wall at all (84 < floor 85) → silent. Proves the gate
 #          keys on ≥85, not below; sub-gate 7d does not surface the dispatch wording.

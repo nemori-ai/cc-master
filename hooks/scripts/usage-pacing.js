@@ -50,7 +50,21 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 // ★home 解析 + 武装闸 isArmed 收口到共享 hook-common（node SSOT·取代本文件旧内联副本）。
-const { resolveHome, isArmed } = require('./hook-common.js');
+//   ambient/advisory 是 ADR-018 标签包装器（§13·closed set·source 必填·strength 只给 advisory）。
+const { resolveHome, isArmed, ambient, advisory } = require('./hook-common.js');
+
+// ── ADR-018 标签力度映射（§13/P4：力度配 stakes）──────────────────────────────────────────────────
+// pacing 注入**绝大多数落 advisory**（ADR-018 §2.2 例子 + §3.1 活体印证：agent 把 pacing 当判断输入、推理
+//   其前提后自己拍——故是喂判断的 advisory 而非 system-bound directive；hook 永不能真 block dispatch·红线4）。
+//   各 warning 路径标注 kind，PACING_STRENGTH 把 kind 映射成 weak|strong（ambient 恒低·不在此表）：
+//     hard_stop  7d 硬总闸·暂停 dispatch + surface 用户：跨窗口不可逆消耗，stakes 最高 → strong（对齐 ADR-018 §2.2「7d 逼顶」例 = strong）
+//     throttle   5h 临界减速：临界侧、风险中高 → strong（认真权衡减速·P4 高风险→strong）
+//     switch     n>1 切到下一份配额：机会信号·可逆·低 stakes → weak（类比欠用加速）
+//     underuse   欠用加速：低风险·可合理忽略（手头无活就随它蒸发）→ weak（对齐 ADR-018 §2.2「欠用加速」例 = weak）
+const PACING_STRENGTH = { hard_stop: 'strong', throttle: 'strong', switch: 'weak', underuse: 'weak' };
+function pacingStrengthOf(kind) {
+  return PACING_STRENGTH[kind] || 'weak'; // 未知 kind → 最低够用（weak·P2）
+}
 
 // ── 触发策略阈值（克制，避免每回合刷屏；见文件尾 README 块的完整论证）────────────────────────────
 //
@@ -345,6 +359,7 @@ function decideAccountWarning(acct, nowSec, floor, n, dispatchGate) {
   //   被软 floor 架空（Finding 3）。
   const sdDispatchGate = sdGateHit;
   let warn;
+  let kind; // ADR-018 strength 映射用：hard_stop|switch|throttle（见 PACING_STRENGTH）
   if (sdDispatchGate) {
     // 7d 达 dispatch 闸:最硬措辞(无论 5h 是否也撞墙、无论 n)。7d 是跨窗口不可逆消耗边界 → 暂停派发 + surface 用户。
     const fhNote = fhHit ? `(5h 也已 ${p5}%)` : '';
@@ -358,6 +373,7 @@ function decideAccountWarning(acct, nowSec, floor, n, dispatchGate) {
       `按 ADR-010,7d 是加速硬总闸——**本回合起暂停 dispatch 新节点**,把「是否继续消耗 7d 配额」作为一个 ` +
       `blocked_on:"user" 决策 surface 给用户,等用户确认后再续派发。在飞任务可继续跑完、可端点验收,但不要再派新活。` +
       `${switchNote}这是非阻断提示,真正的暂停由你(orchestrator)在决策程序的 dispatch 节点执行,不替你决策。`;
+    kind = 'hard_stop'; // 7d 硬总闸 → advisory strong（stakes 最高·跨窗口不可逆）
   } else if (fhHit && nAcct > 1 && sdKnown && !sdHit) {
     // n>1 且只有 5h 撞墙、且 7d 信号**确认存在**并仍有余量(p7 已知 < floor、未达 dispatch 闸)：这是「切下一份
     //   配额」信号,不减速。**Finding 2**:加 sdKnown(p7!==null)守卫——7d 缺失时绝不走这条,以免在 7d 未知时假设
@@ -367,6 +383,7 @@ function decideAccountWarning(acct, nowSec, floor, n, dispatchGate) {
       `已达/超过 ${floor}% 阈值。你声明了 ${nAcct} 份可序列消费的配额且 7d 总闸仍有余量(7d 仅 ${p7}%)——当前账号这份 ` +
       `5h 烧满是**切到下一份配额**的触发信号,不是减速信号:理想是把这份烧满后顺势用下一份满配额的 5h 窗,` +
       `而非在总配额还有余时减速空耗。切换/续派由你的认知判断;这是非阻断提示,不替你决策。`;
+    kind = 'switch'; // n>1 切下一份配额 → advisory weak（机会信号·可逆·低 stakes）
   } else {
     // 保守减速分支，三种情形落这里：① n=1（回落减速）；② 7d 撞墙但未达 dispatch 闸（floor≤p7<gate,罕见——
     //   floor 默认即 gate）；③ **n>1 + 5h 撞墙但 7d 信号缺失（p7===null → !sdKnown）**（Finding 2）——7d 未知
@@ -375,8 +392,9 @@ function decideAccountWarning(acct, nowSec, floor, n, dispatchGate) {
     warn =
       `[cc-master pacing] 账户配额临界(权威口径,来自 status-line 捕获):${hits.join(' / ')} ` +
       `已达/超过 ${floor}% 阈值${nNote}。${slowdownLevers}这是非阻断提示,不替你决策。`;
+    kind = 'throttle'; // 临界减速 → advisory strong（应认真权衡减速）
   }
-  return { valid: true, warn };
+  return { valid: true, warn, kind };
 }
 
 // ── ACCOUNT-AUTHORITATIVE UNDERUSE pacing（对偶于 decideAccountWarning 的「欠用→加速」侧）──────────────
@@ -436,7 +454,7 @@ function decideAccountUnderuse(acct, nowSec, n) {
     `② 提并发 WIP、把已就绪的高 float 任务提前派发;③ 把原计划 defer 到下一窗口的就绪工作拉进本窗口。` +
     `注意:加速须先过 7d 总闸(别把 5h 余量烧成 7d 透支);且这不是制造 busywork——没有真正就绪的活就别硬凑。` +
     `这是非阻断提示,不替你决策。`;
-  return { warn };
+  return { warn, kind: 'underuse' }; // 欠用加速 → advisory weak（低风险·可合理忽略）
 }
 
 function parseBudget(raw) {
@@ -605,11 +623,13 @@ function adviseViaCcm(homeDir, rateCache, effN) {
   return data;
 }
 
-// ccmWarning(data, pool) → 把 ccm advise verdict 映射成本 skill 词汇的非阻断提示（或 null=静默）。
-//   词汇与本地路径（decideAccountWarning / decideAccountUnderuse）对齐，让 ccm 路径与 fallback 路径的
-//   注入嗓音一致：hard_stop → 「暂停 dispatch 新节点」+ blocked_on:"user" + surface 用户 + 硬总闸；
-//   throttle → 「降到更便宜的模型档」减速 levers（临界）；accelerate(切号) → 「切到下一份配额」；
-//   accelerate(欠用) → 「欠用」+「加速」levers；hold → 静默。号池粗粒度事实由调用方在尾部统一附加。
+// ccmWarning(data, pool) → 把 ccm advise verdict 映射成 { warn, kind }（warn=文案 / kind=ADR-018 strength 用·
+//   见 PACING_STRENGTH），或 null（hold·静默）。词汇与本地路径（decideAccountWarning / decideAccountUnderuse）
+//   对齐，让 ccm 路径与 fallback 路径的注入嗓音 + 标签力度一致：
+//   hard_stop → 「暂停 dispatch 新节点」+ blocked_on:"user" + surface 用户 + 硬总闸（kind hard_stop·strong）；
+//   throttle → 「降到更便宜的模型档」减速 levers（临界·kind throttle·strong）；
+//   accelerate(切号) → 「切到下一份配额」（kind switch·weak）；accelerate(欠用) → 「欠用」+「加速」（kind underuse·weak）；
+//   hold → 静默。号池粗粒度事实由调用方在尾部统一附加（ambient）。
 function ccmWarning(data, n) {
   const p5 = typeof data.window_5h_pct === 'number' ? data.window_5h_pct : null;
   const p7 = typeof data.window_7d_pct === 'number' ? data.window_7d_pct : null;
@@ -629,46 +649,54 @@ function ccmWarning(data, n) {
         ? `你声明了 ${nAcct} 份可序列消费的配额——「切到下一份配额(切账号会刷新 7d 窗)」是用户可选的一个响应,` +
           `与「暂停续耗」并列由用户拍;切换动作本身不由 hook/本提示执行。`
         : '';
-    return (
-      `[cc-master pacing] 7d 配额硬总闸(权威口径,来自 status-line 捕获):7d 已用 ${p7}%${fhNote}。` +
-      `按 ADR-010,7d 是加速硬总闸——**本回合起暂停 dispatch 新节点**,把「是否继续消耗 7d 配额」作为一个 ` +
-      `blocked_on:"user" 决策 surface 给用户,等用户确认后再续派发。在飞任务可继续跑完、可端点验收,但不要再派新活。` +
-      `${switchNote}这是非阻断提示,真正的暂停由你(orchestrator)在决策程序的 dispatch 节点执行,不替你决策。`
-    );
+    return {
+      warn:
+        `[cc-master pacing] 7d 配额硬总闸(权威口径,来自 status-line 捕获):7d 已用 ${p7}%${fhNote}。` +
+        `按 ADR-010,7d 是加速硬总闸——**本回合起暂停 dispatch 新节点**,把「是否继续消耗 7d 配额」作为一个 ` +
+        `blocked_on:"user" 决策 surface 给用户,等用户确认后再续派发。在飞任务可继续跑完、可端点验收,但不要再派新活。` +
+        `${switchNote}这是非阻断提示,真正的暂停由你(orchestrator)在决策程序的 dispatch 节点执行,不替你决策。`,
+      kind: 'hard_stop',
+    };
   }
   if (data.verdict === 'throttle') {
     const slowdownLevers =
       `pace 杠杆(怎么 pace 是你的认知判断,见 orchestrating-to-completion / cost-and-pacing):` +
       `① 把后续节点降到更便宜的模型档;② 降并发 WIP、暂缓新派工;③ defer 高 float 的非临界任务到窗口 reset 后。`;
-    return (
-      `[cc-master pacing] 账户配额临界(权威口径,来自 status-line 捕获):5h ${p5}% ` +
-      `已达/超过走廊上界。${slowdownLevers}这是非阻断提示,不替你决策。`
-    );
+    return {
+      warn:
+        `[cc-master pacing] 账户配额临界(权威口径,来自 status-line 捕获):5h ${p5}% ` +
+        `已达/超过走廊上界。${slowdownLevers}这是非阻断提示,不替你决策。`,
+      kind: 'throttle',
+    };
   }
   if (data.verdict === 'accelerate') {
     // ccm 在 n>1 且 5h 临界 + 7d 有余量时给 switch_account lever（「切到下一份配额」）；否则是欠用加速。
     const wantsSwitch = levers.includes('switch_account');
     if (wantsSwitch) {
-      return (
-        `[cc-master pacing] 账户 5h 配额临界(权威口径,来自 status-line 捕获):5h ${p5}% 已达/超过阈值。` +
-        `你声明了 ${nAcct} 份可序列消费的配额且 7d 总闸仍有余量(7d 仅 ${p7}%)——当前账号这份 ` +
-        `5h 烧满是**切到下一份配额**的触发信号,不是减速信号:理想是把这份烧满后顺势用下一份满配额的 5h 窗,` +
-        `而非在总配额还有余时减速空耗。切换/续派由你的认知判断;这是非阻断提示,不替你决策。`
-      );
+      return {
+        warn:
+          `[cc-master pacing] 账户 5h 配额临界(权威口径,来自 status-line 捕获):5h ${p5}% 已达/超过阈值。` +
+          `你声明了 ${nAcct} 份可序列消费的配额且 7d 总闸仍有余量(7d 仅 ${p7}%)——当前账号这份 ` +
+          `5h 烧满是**切到下一份配额**的触发信号,不是减速信号:理想是把这份烧满后顺势用下一份满配额的 5h 窗,` +
+          `而非在总配额还有余时减速空耗。切换/续派由你的认知判断;这是非阻断提示,不替你决策。`,
+        kind: 'switch',
+      };
     }
     // 欠用侧加速。
     const nAcctNote =
       nAcct > 1
         ? `(按 ${nAcct} 份可序列消费的配额理想节奏,此刻本该烧得更多——欠用判定线已据此抬高)`
         : '';
-    return (
-      `[cc-master pacing] 账户配额欠用(权威口径,来自 status-line 捕获):5h 仅用 ${p5}%${nAcctNote}、` +
-      `窗口临近 reset(7d 总闸余量充足,仅 ${p7}%)。当前窗口的配额若不用将随 reset 白白蒸发——` +
-      `可考虑加速以充分利用。加速杠杆(怎么加速是你的认知判断,见 orchestrating-to-completion / cost-and-pacing ` +
-      `的加速侧 lever):① 把临界路径节点升到更强的模型档以提质提速;② 提并发 WIP、把已就绪的高 float 任务提前派发;` +
-      `③ 把原计划 defer 到下一窗口的就绪工作拉进本窗口。注意:加速须先过 7d 总闸(别把 5h 余量烧成 7d 透支);` +
-      `且这不是制造 busywork——没有真正就绪的活就别硬凑。这是非阻断提示,不替你决策。`
-    );
+    return {
+      warn:
+        `[cc-master pacing] 账户配额欠用(权威口径,来自 status-line 捕获):5h 仅用 ${p5}%${nAcctNote}、` +
+        `窗口临近 reset(7d 总闸余量充足,仅 ${p7}%)。当前窗口的配额若不用将随 reset 白白蒸发——` +
+        `可考虑加速以充分利用。加速杠杆(怎么加速是你的认知判断,见 orchestrating-to-completion / cost-and-pacing ` +
+        `的加速侧 lever):① 把临界路径节点升到更强的模型档以提质提速;② 提并发 WIP、把已就绪的高 float 任务提前派发;` +
+        `③ 把原计划 defer 到下一窗口的就绪工作拉进本窗口。注意:加速须先过 7d 总闸(别把 5h 余量烧成 7d 透支);` +
+        `且这不是制造 busywork——没有真正就绪的活就别硬凑。这是非阻断提示,不替你决策。`,
+      kind: 'underuse',
+    };
   }
   return null; // hold → 走廊内 → 静默
 }
@@ -722,10 +750,12 @@ function main() {
   //   且给出权威走廊判定（available:true）→ **以 ccm verdict 为准**（hard_stop/throttle/accelerate → 映射成
   //   本 skill 词汇的提示;hold → 静默）。ccm 不可用（ENOENT / 失败 / 坏 JSON / available:false）→ ccmAdvice
   //   为 null → 落到下面既有的本地计算路径（account-authoritative sidecar + 本地反推），绝不丢失提示能力。
-  let warning;
+  let warning;  // pacing warning 主体文案（字符串）或空（静默）
+  let kind;     // ADR-018 strength 映射用 kind（hard_stop|throttle|switch|underuse）
   const ccmAdvice = adviseViaCcm(HOME_DIR, RATE_CACHE, numAccount);
   if (ccmAdvice) {
-    warning = ccmWarning(ccmAdvice, numAccount); // hold → null（静默）；其余 → 映射文案
+    const r = ccmWarning(ccmAdvice, numAccount); // hold → null（静默）；其余 → { warn, kind }
+    if (r) { warning = r.warn; kind = r.kind; }
   } else {
     // ── 本地降级路径（ccm 不可用时）：account-authoritative override (Finding #37) + 本地反推 ──
     // 优先用 status-line 捕获的账户权威 5h/7d used_percentage 判墙(脱钩会失真到数量级的本地反推
@@ -739,35 +769,46 @@ function main() {
     if (a.valid) {
       // 账户口径权威。撞墙优先：到墙就只发减速提示（a.warn 非空）；没到墙再问欠用 → 可能发对称的加速提示。
       // 撞墙(used%≥85)与欠用(used%<60)区间天然互斥，account 分支里同一 Stop 绝不同发两条。
-      if (a.warn) warning = a.warn;
-      else warning = decideAccountUnderuse(acct, nowSec, numAccount).warn;
+      if (a.warn) { warning = a.warn; kind = a.kind; }
+      else {
+        const u = decideAccountUnderuse(acct, nowSec, numAccount);
+        if (u.warn) { warning = u.warn; kind = u.kind; }
+      }
     } else {
       // 账户不可用 → 本地反推 fallback(approx)：维持现状只做撞墙判定。**本地反推路径禁欠用提示**——反推的
       // reset 倒计时会失真到数量级（Finding #37），据此催加速会乱催，故此路径不出欠用提示。
       const fh = computeFiveHour(USAGE_DIR, nowMs);
-      warning = decideWarning(fh);
+      warning = decideWarning(fh); // 本地反推只出撞墙减速 → kind throttle
+      if (warning) kind = 'throttle';
     }
   }
   if (!warning) return; // 余量充足 / 无数据 / 降级判定不临界 → 静默 exit 0
 
-  // ── 号池粗粒度事实注入（A2 T6 §F）──────────────────────────────────────────────────────────────
-  // 当 pacing 已要出声（warning 非空）**且**号池里确有可切入备号（switchable ≥ 1）时，在 pacing 提示尾部
-  //   附一句号池的**粗粒度事实**——让编排者在配额吃紧的此刻知道「换号」这个 lever 可用。**只注入事实、不在
-  //   hook 跑选号算法**（选哪个号是 switch-account.sh 带外的事，§B.7：hook 不跑完整选号、避免把调度逻辑塞进
-  //   hook）。无号池 / 无可切入备号 → 不附（switchable=0 时换号无意义，别加噪音）。这段全在 armed gate 之后
-  //   （红线 6）、纯读 accounts.json（红线 1/2）；措辞对齐现有 pacing 注入的「非阻断、决策归你」风格。
+  // ── ADR-018 标签包装：pacing warning 主体 → advisory（strength 按 kind 配 stakes·见 PACING_STRENGTH）──
+  // pacing 是喂判断的 advisory（§13/ADR-018 §3.1 活体印证：agent 把它当输入、推理前提后自己拍·非 system 硬闸）。
+  //   source=usage-pacing。kind 缺（极少·防御）→ pacingStrengthOf 默认 weak（最低够用·P2）。
+  const blocks = [advisory('usage-pacing', pacingStrengthOf(kind), warning)];
+
+  // ── 号池粗粒度事实注入（A2 T6 §F）→ ambient（§13:池/配额事实归 ambient·塑模型·无 action）─────────────
+  // 当 pacing 已要出声（warning 非空）**且**号池里确有可切入备号（switchable ≥ 1）时，附一块号池的**粗粒度
+  //   事实**——让编排者在配额吃紧的此刻知道「换号」这个 lever 可用。这是**事实告知**（你有几个备号 / 换号是
+  //   一个可用 lever），塑造世界模型而不替它决策，故归 **ambient**（独立成块·与 advisory 主体并列，正如
+  //   ADR-018 §2.2 coordination 例子的 ambient+advisory 两块并存）。**只注入事实、不在 hook 跑选号算法**
+  //   （选哪个号是 switch-account.sh 带外的事，§B.7）。无号池 / 无可切入备号 → 不附（switchable=0 时换号无
+  //   意义，别加噪音）。全在 armed gate 之后（红线 6）、纯读 accounts.json（红线 1/2）。
   if (pool.switchable >= 1) {
-    warning +=
-      ` [号池] 你有 ${pool.backups} 个备号(其中 ${pool.switchable} 个 token 未过期、可切入)——` +
+    const poolFact =
+      `[号池] 你有 ${pool.backups} 个备号(其中 ${pool.switchable} 个 token 未过期、可切入)——` +
       `配额逼顶时「换号」是一个可用的 pacing lever:切到一份恢复更多的配额。选哪个号 / 切不切由你的认知判断` +
       `(选号 + 切换是带外 /cc-master:accounts 与 switch 脚本的事,不在此 hook 执行);这是事实告知,不替你决策。`;
+    blocks.push(ambient('usage-pacing', poolFact));
   }
 
   // 非阻断注入：仅 additionalContext，hookEventName "Stop"。绝不 decision:block。
   const payload = {
     hookSpecificOutput: {
       hookEventName: 'Stop',
-      additionalContext: warning,
+      additionalContext: blocks.join('\n'),
     },
   };
   process.stdout.write(JSON.stringify(payload) + '\n');
