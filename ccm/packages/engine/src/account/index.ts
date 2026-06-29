@@ -8,4 +8,5 @@
 export * from './refresh.js';
 export * from './registry.js';
 export * from './select.js';
+export * from './switch.js';
 export * from './vault.js';

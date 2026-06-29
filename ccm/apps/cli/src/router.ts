@@ -173,7 +173,9 @@ function scanPositions(tokens: string[]): ScanResult {
 }
 
 // ── run(argv, {out, err, env, stdin}) → exitCode ──────────────────────────────────────────────────
-export function run(argv: string[], opts: Partial<RunOpts> = {}): number {
+//   返回 number（绝大多数 sync verb·同步落码）；`account switch`（唯一 async verb·await refresh）返回
+//   Promise<number>，由 bin await。sync verb 路径全程不变（仍同步 return number）。
+export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promise<number> {
   const out = opts.out as RunOpts['out'];
   const err = opts.err as RunOpts['err'];
   const env = opts.env || {};
@@ -361,8 +363,17 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number {
   }
 
   // ── ⑦ 调 handler + catch throw 映射退出码。──────────────────────────────────────────────────────
+  //   绝大多数 handler 全 sync 返回 number（run 同步返回·契约不变）。**唯一例外**：`account switch` 是 async
+  //   （要 await refresh https·复用 @ccm/engine refreshBlob）——它返回 Promise<number>，此处透传成 Promise，
+  //   由 bin/ccm.cjs await 后落 process.exitCode（sync 路径字节级不变·只多一条 thenable 分支）。
   try {
-    const code = fn(ctx);
+    const code = fn(ctx) as number | Promise<number>;
+    if (code && typeof (code as { then?: unknown }).then === 'function') {
+      return (code as Promise<number>).then(
+        (c) => (typeof c === 'number' ? c : EXIT.OK),
+        (e) => reportHandlerError(e as KindedError, err, ctx),
+      );
+    }
     return typeof code === 'number' ? code : EXIT.OK;
   } catch (e) {
     return reportHandlerError(e as KindedError, err, ctx);

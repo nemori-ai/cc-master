@@ -963,6 +963,37 @@ export const REGISTRY: Registry = {
       examples: ['ccm account list', 'ccm account list --probe-keychain --json'],
       handler: 'account.list',
     },
+    switch: {
+      summary:
+        '无重启换号：选最优切入号 → refresh → 覆写官方共享凭证三存储（运行中 claude 惰性重读接管·不重启进程·token-blind）',
+      read: false,
+      positionals: [],
+      options: {
+        email: {
+          type: 'string',
+          desc: '切入号 email（缺省=自动选号 select-account·选最优切入号）',
+        },
+        account: { type: 'string', desc: '--email 旧别名（同样跳过自动选号）' },
+        'vault-kind': {
+          type: 'string',
+          enum: ['keychain', 'file'],
+          desc: 'vault 形态（缺省从 registry 读）',
+        },
+        'vault-file': {
+          type: 'string',
+          desc: 'file vault 路径（缺省从 registry / <home>/accounts.env）',
+        },
+        'keychain-service': {
+          type: 'string',
+          desc: 'keychain service（缺省从 registry / cc-master-oauth）',
+        },
+        registry: { type: 'string', desc: 'accounts.json 路径（默认 <home>/accounts.json）' },
+        now: { type: 'string', desc: '选号「现在」时刻覆写（严格 ISO·确定性测试用）' },
+        json: { type: 'boolean', desc: '结构化输出（非密·绝不含 token）' },
+      },
+      examples: ['ccm account switch', 'ccm account switch --email next@x.com --board <path>'],
+      handler: 'account.switchAccount',
+    },
   },
 };
 

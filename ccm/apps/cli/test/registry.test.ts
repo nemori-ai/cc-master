@@ -29,7 +29,7 @@ const EXPECTED: Record<string, string[]> = {
   policy: ['show', 'set'],
   usage: ['show', 'advise', 'task-cost', 'burn-rate', 'runway'],
   estimate: ['show', 'forecast', 'evm', 'velocity', 'risk', 'cost-to-complete'],
-  account: ['add', 'refresh', 'delete', 'list'],
+  account: ['add', 'refresh', 'delete', 'list', 'switch'],
 };
 
 test('REGISTRY covers all 11 namespaces with all their verbs', () => {

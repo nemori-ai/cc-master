@@ -76,9 +76,26 @@ const err = (s) => process.stderr.write(`${s}\n`);
 const { run } = require('../dist/index.cjs');
 
 // 全文件唯一一处设 process.exitCode（run 返回码）。stdin: { fd: 0 }（io.readStdinSync 直读 fd 0）。
-process.exitCode = run(process.argv.slice(2), {
+//   run 绝大多数 verb 同步返回 number（直接落码·字节级不变）；`account switch` 唯一 async（返回 Promise<number>·
+//   await refresh）——thenable 时 await 后落码、拒绝时吐 stderr + 非零（与 uncaught 安全网同口径）。
+const _result = run(process.argv.slice(2), {
   out,
   err,
   env: process.env,
   stdin: { fd: 0 },
 });
+if (_result && typeof _result.then === 'function') {
+  _result.then(
+    (code) => {
+      process.exitCode = typeof code === 'number' ? code : 0;
+    },
+    (e) => {
+      try {
+        process.stderr.write(`fatal: ${(e && e.stack) || String(e)}\n`);
+      } catch (_) {}
+      process.exitCode = 1;
+    },
+  );
+} else {
+  process.exitCode = _result;
+}
