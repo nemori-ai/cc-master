@@ -113,7 +113,7 @@ const PCT_FLOOR_RAW = process.env.CC_MASTER_PCT_FLOOR || '';
 // 7d≥85% dispatch 闸 (need ②): 7d 是跨窗口加速硬总闸(ADR-010 §2.2/§2.6)。当账户权威 7d used% 达此闸(默认 85)
 //   时,撞墙提示从泛泛「减速」**升级措辞**为点名 dispatch 闸——「本回合起暂停 dispatch 新节点、把『是否续耗
 //   7d 配额』作为 blocked_on:"user" 决策 surface 给用户」。它仍只是软提示(hook 永不能真 block dispatch,红线4)——
-//   真正的暂停由 orchestrator 在决策程序 dispatch 节点执行(心智轨,见 SKILL.md / cost-and-pacing.md)。**只在账户
+//   真正的暂停由 orchestrator 在决策程序 dispatch 节点执行(心智轨,见 SKILL.md / pacing-and-estimation.md)。**只在账户
 //   口径生效**:本地反推算不出 7d used%(无分母),反推路径不触发此闸(与加速侧反推禁用同精神)。env 覆写测试注入。
 const SEVEN_DAY_DISPATCH_GATE_RAW = process.env.CC_MASTER_SEVEN_DAY_DISPATCH_GATE || '';
 // account-authoritative UNDERUSE pacing (对偶于撞墙侧): 当账户口径显示 5h 窗口**欠用**（used% 低）且
@@ -393,7 +393,7 @@ function decideAccountWarning(acct, nowSec, floor, n, dispatchGate) {
   // 7d 命中 warning floor 或 dispatch 闸任一即列入 hits（floor>gate 时 sdHit 可能为 false 但 sdGateHit 为 true）。
   if (sdHit || sdGateHit) hits.push(`7d ${p7}%`);
   const slowdownLevers =
-    `pace 杠杆(怎么 pace 是你的认知判断,见 orchestrating-to-completion / cost-and-pacing):` +
+    `pace 杠杆(怎么 pace 是你的认知判断,见 orchestrating-to-completion / pacing-and-estimation):` +
     `① 把后续节点降到更便宜的模型档;② 降并发 WIP、暂缓新派工;③ defer 高 float 的非临界任务到窗口 reset 后。`;
   // 7d≥dispatchGate：dispatch 闸升级段(need ②)。点名「暂停 dispatch 新节点、surface 用户确认」,比泛泛减速重。
   //   附带提及:握多份配额(n>1)时「切到下一份配额(切账号刷新 7d)」是用户的一个可能响应——但切换本身不在此实现。
@@ -466,7 +466,7 @@ function decideAccountUnderuse(acct, nowSec, n) {
   //   「欠用」判定线该更高。把欠用 ceil 抬成 effective_ceil = min(95, ceil × n)（封顶 95，避免误判「满了」）：
   //   n=1 → 60（原行为）；n≥2 → 基本「临 reset 还没烧满就催加速」。这是把用户「n 倍速」直觉翻译成当前信号
   //   物理上撑得住的形态（账户口径无绝对 token 分母 → 算不出 tok/min 精确速率，只能缩放无量纲的 used% 节奏，
-  //   见 cost-and-pacing.md 诚实天花板）。**撞墙侧不随 n 变**（见 decideAccountWarning 头注）。
+  //   见 pacing-and-estimation.md 诚实天花板）。**撞墙侧不随 n 变**（见 decideAccountWarning 头注）。
   const nAcct = Number.isInteger(n) && n >= 1 ? n : 1;
   const ceil = Math.min(95, parseUnderusePctCeil(UNDERUSE_PCT_CEIL_RAW) * nAcct);
   if (p5 === null || p5 >= ceil) return { warn: null };
@@ -492,7 +492,7 @@ function decideAccountUnderuse(acct, nowSec, n) {
     `[cc-master pacing] 账户配额欠用(权威口径,来自 status-line 捕获):5h 仅用 ${p5}%${nAcctNote}、` +
     `窗口约 ${Math.round(remainMin)} min 后 reset(7d 总闸余量充足,仅 ${p7}%)。当前窗口的配额若不用` +
     `将随 reset 白白蒸发——可考虑加速以充分利用。加速杠杆(怎么加速是你的认知判断,见 ` +
-    `orchestrating-to-completion / cost-and-pacing 的加速侧 lever):① 把临界路径节点升到更强的模型档以提质提速;` +
+    `orchestrating-to-completion / pacing-and-estimation 的加速侧 lever):① 把临界路径节点升到更强的模型档以提质提速;` +
     `② 提并发 WIP、把已就绪的高 float 任务提前派发;③ 把原计划 defer 到下一窗口的就绪工作拉进本窗口。` +
     `注意:加速须先过 7d 总闸(别把 5h 余量烧成 7d 透支);且这不是制造 busywork——没有真正就绪的活就别硬凑。` +
     `这是非阻断提示,不替你决策。`;
@@ -537,7 +537,7 @@ function formatWarning({ used, burn, remain, budget, projected, pctNow }) {
       : `[cc-master pacing] 5h 配额临界：当前已用 ${used} tok，burn ≈ ${burn} tok/min，窗口仅剩 ${remain} min ` +
         `且 burn 已过临界地板（未设 CC_MASTER_5H_BUDGET，按「贴墙 + 高速绝对 burn」判定为明显临界）。`;
   const levers =
-    `pace 杠杆（怎么 pace 是你的认知判断，见 orchestrating-to-completion / cost-and-pacing）：` +
+    `pace 杠杆（怎么 pace 是你的认知判断，见 orchestrating-to-completion / pacing-and-estimation）：` +
     `① 把后续节点降到更便宜的模型档（downgrade model）；② 降并发 WIP、暂缓新派工；` +
     `③ defer 高 float 的非临界路径任务到窗口 reset 后。这是非阻断提示，不替你决策。`;
   return `${head} ${levers}`;
@@ -703,7 +703,7 @@ function ccmWarning(data, n) {
   }
   if (data.verdict === 'throttle') {
     const slowdownLevers =
-      `pace 杠杆(怎么 pace 是你的认知判断,见 orchestrating-to-completion / cost-and-pacing):` +
+      `pace 杠杆(怎么 pace 是你的认知判断,见 orchestrating-to-completion / pacing-and-estimation):` +
       `① 把后续节点降到更便宜的模型档;② 降并发 WIP、暂缓新派工;③ defer 高 float 的非临界任务到窗口 reset 后。`;
     return {
       warn:
@@ -734,7 +734,7 @@ function ccmWarning(data, n) {
       warn:
         `[cc-master pacing] 账户配额欠用(权威口径,来自 status-line 捕获):5h 仅用 ${p5}%${nAcctNote}、` +
         `窗口临近 reset(7d 总闸余量充足,仅 ${p7}%)。当前窗口的配额若不用将随 reset 白白蒸发——` +
-        `可考虑加速以充分利用。加速杠杆(怎么加速是你的认知判断,见 orchestrating-to-completion / cost-and-pacing ` +
+        `可考虑加速以充分利用。加速杠杆(怎么加速是你的认知判断,见 orchestrating-to-completion / pacing-and-estimation ` +
         `的加速侧 lever):① 把临界路径节点升到更强的模型档以提质提速;② 提并发 WIP、把已就绪的高 float 任务提前派发;` +
         `③ 把原计划 defer 到下一窗口的就绪工作拉进本窗口。注意:加速须先过 7d 总闸(别把 5h 余量烧成 7d 透支);` +
         `且这不是制造 busywork——没有真正就绪的活就别硬凑。这是非阻断提示,不替你决策。`,
@@ -909,7 +909,7 @@ function body(ctx) {
           `[号池·已自动换号] usage-pacing 在 5h 配额临界(权威口径)机械切到下一份配额` +
           `${res.email ? `(当前 active = ${res.email})` : ''}——配额随新号满血 5h 窗恢复;号池现剩 ` +
           `${after.switchable} 个可切入备号。据此调你的配速 / 派发规模(怎么调是你的认知判断,见 ` +
-          `orchestrating-to-completion / cost-and-pacing);切号本身已机械完成(token-blind·在 ccm 子进程),不需你再操作。`;
+          `orchestrating-to-completion / pacing-and-estimation);切号本身已机械完成(token-blind·在 ccm 子进程),不需你再操作。`;
       } else if (res.outcome === 'denied') {
         // board.policy.autonomous_account_switch=deny 机制硬闸拦下（ADR-016 §2.2）→ 不自主切·surface 给用户。
         switchNote =
