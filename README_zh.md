@@ -94,7 +94,7 @@ claude --plugin-dir .
 
 ![它的实时活计划，在浏览器里随时看](docs/images/view-graph-dark.png)
 
-想更省心？给它配上几个备用账号（`/cc-master:accounts`），它就能在一个账号额度用紧时自己切到下一个满的接着干——你全程无感。装上独立的 `ccm` 引擎（推荐），它算账、估工期、画看板的本事会更全。
+想更省心？用 `ccm account` CLI（`ccm account add/list/switch`——你直接敲，token 全程 token-blind、绝不进 agent context）配上几个备用账号，它就能在一个账号额度用紧时自己切到下一个满的接着干——你全程无感。装上独立的 `ccm` 引擎（推荐），它算账、估工期、画看板的本事会更全。
 
 ---
 

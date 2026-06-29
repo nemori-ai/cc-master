@@ -94,7 +94,7 @@ Then give it a goal and watch it run:
 
 ![Its live plan, in the browser any time](docs/images/view-graph-dark.png)
 
-Want it even more hands-off? Give it a few backup accounts (`/cc-master:accounts`) and it'll switch to a full one when an account runs low — you won't feel a thing. Install the standalone `ccm` engine (recommended) and its accounting, forecasting, and dashboards get fuller.
+Want it even more hands-off? Pool a few backup accounts with the `ccm account` CLI (`ccm account add/list/switch` — you run it directly; tokens stay token-blind, never touching the agent's context) and it'll switch to a full one when an account runs low — you won't feel a thing. Install the standalone `ccm` engine (recommended) and its accounting, forecasting, and dashboards get fuller.
 
 ---
 

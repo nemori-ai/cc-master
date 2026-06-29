@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // statusline-capture.js — 把账户权威用量信号(5h/7d rate_limits)从 status-line stdin 捕获落盘。
 //
-// 为什么存在(账户权威 usage pacing,本 skill 内详见 references/cost-and-pacing.md):
+// 为什么存在(账户权威 usage pacing,消费指导详见 pacing-and-estimation skill 的 usage-signals):
 //   订阅账户的 5h/7d `used_percentage` + `resets_at` 是**权威**用量信号,但官方核实(claude-code-guide
 //   查 code.claude.com)结论是它**只**出现在 status-line 脚本的 stdin 里——所有 hook 的 stdin、transcript
 //   JSONL、任何 CLI 子命令(/usage /status /cost)、~/.claude 落盘**全都没有**;API `anthropic-ratelimit-*`
@@ -21,7 +21,7 @@
 //   statusLine.command = "<脚本绝对路径> --passthrough '<你原本的 status line 命令>'"
 //   ⚠️ ${CLAUDE_PLUGIN_ROOT}/${CLAUDE_SKILL_DIR} 在 statusLine.command 的展开**官方未文档化**(hooks.json command
 //      字段明确支持,statusLine.command 未说明;且 statusLine 是 user-scoped、不绑 plugin,变量很可能无定义)——
-//      保守用绝对路径;详见 cost-and-pacing.md「接法」段(Finding #39)。
+//      保守用绝对路径;详见 pacing-and-estimation skill 的 usage-signals「接法」段(Finding #39)。
 //   有 --passthrough 时:捕获 sidecar 后,把原始 stdin 透传给你原本的命令、原样输出它的 stdout(你的状态行不变)。
 //   无 --passthrough 时:输出一行 `5h:NN% 7d:NN%`。
 //

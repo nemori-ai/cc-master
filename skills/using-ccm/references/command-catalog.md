@@ -99,6 +99,7 @@ ccm <alias> [args] [flags]
 | `peers` | 多 orchestrator 协调**感知层**：跨板只读花名册（全体活+心跳新鲜 orchestrator 的 goal/workload/priority/liveness·COORD） |
 | `usage` | 配额侧**只读 advisory**：当前号/备号 5h/7d 用量 + 双侧走廊 pacing verdict + 任务 token 成本（ADR-015） |
 | `estimate` | 工作侧**只读 advisory**：双通道 MC 工期预测 / EVM / velocity / 风险（消费 OR/ML 引擎·ADR-015） |
+| `account` | 换号号池机制：备号 OAuth token 录入 / 选号 / 无重启切号（vault token-blind·**switch 读 board.policy·`deny`→exit 7**·ADR-016） |
 
 ### Aliases
 
@@ -110,12 +111,6 @@ ccm <alias> [args] [flags]
 | `ccm peers` | `ccm peers list` |
 
 （另：`task list` / `jc list` / `log list` 自身有子命令别名 `ls`，即 `ccm task ls` / `ccm jc ls` / `ccm log ls`。）
-
-### Reserved（占位·暂未实现）
-
-| 占位 | 计划 |
-|---|---|
-| `account` | 换号号池机制（skill C 收口） |
 
 ### Global flags
 
@@ -924,7 +919,7 @@ ccm policy set --autonomous-account-switch=allow|deny [flags]
 | `--json` | | bool | 结构化输出 |
 
 - 例：`ccm policy set --autonomous-account-switch=deny --user-authorized`（锁死本板自主换号）
-- ⚠️ **绝不自授权**：orchestrator-agent 绝不自己加 `--user-authorized` 翻 policy（那是 self-grant·越权）——该标记只由用户给（决策纪律见 orchestrating-to-completion）。机制硬闸侧：`account-management` 的 `switch-account.sh` 在覆写凭证前也读 `policy.autonomous_account_switch`、`deny` 即拒并 exit 7（纵深防御兜底）
+- ⚠️ **绝不自授权**：orchestrator-agent 绝不自己加 `--user-authorized` 翻 policy（那是 self-grant·越权）——该标记只由用户给（决策纪律见 orchestrating-to-completion）。机制硬闸侧：`ccm account switch` 在覆写凭证前也读 `policy.autonomous_account_switch`、`deny` 即拒并 exit 7（纵深防御兜底·见 namespace account）
 
 ---
 
@@ -960,7 +955,7 @@ ccm peers [list] [flags]
 
 配额侧只读 advisory（ADR-015·charter ②控制 token 消耗速度 + ⑤资源下最大化效率）：当前号/备号用量 + 双侧走廊 pacing verdict + 任务 token 成本。**纯只读**——全 verb query/compute，零写、不抢 board-lock、不落状态（与 `baseline`/`policy` 这俩写 noun 相反）。诚实降级：账户信号不可得 = **exit 0 + `data.available:false`**（非 exit 1）；无 `accounts.json` registry → 天然单账号·`effective_n=1`（不报错）。诚实字段贯穿：`source`（account / registry-snapshot / observability / local-derived-approx）/ `confidence`（high/medium/low）/ `as_of` / `snapshot_stale` / `coverage_pct`。ccm 出 verdict/数据，**不替 orchestrator 决策**（真动作归 SKILL A·红线3）。
 
-> 备号数据 = **只读** `${CC_MASTER_HOME:-$HOME/.claude/cc-master}/accounts.json` registry 的生命周期快照（每号取 `last_observed_quota`/`last_switch_out`/`switch_history[]` 里 `at` 最大那条）——usage **绝不写 registry、绝不碰 token**（registry 写/管归 account-management）。当前号 5h/7d 用量读 status-line sidecar（`${CC_MASTER_RATE_CACHE:-$HOME/.claude/.cc-master-rate-limits.json}`·statusline-capture.js 写、cc-usage.sh / usage-pacing.js hook 同读·账户权威·Finding #37），缺则 `available:false` 降级。
+> 备号数据 = **只读** `${CC_MASTER_HOME:-$HOME/.claude/cc-master}/accounts.json` registry 的生命周期快照（每号取 `last_observed_quota`/`last_switch_out`/`switch_history[]` 里 `at` 最大那条）——usage **绝不写 registry、绝不碰 token**（registry 写/管归 ccm `account` 引擎·概念见 account-pool.md）。当前号 5h/7d 用量读 status-line sidecar（`${CC_MASTER_RATE_CACHE:-$HOME/.claude/.cc-master-rate-limits.json}`·statusline-capture.js 写、cc-usage.sh / usage-pacing.js hook 同读·账户权威·Finding #37），缺则 `available:false` 降级。
 
 ### usage show
 
@@ -1193,6 +1188,119 @@ ccm estimate cost-to-complete [flags]
 | `--json` | | bool | | 结构化输出 |
 
 - 例：`ccm estimate cost-to-complete` · `ccm estimate cost-to-complete --scope this-repo --seed 42 --json`
+
+---
+
+## namespace account
+
+换号号池机制（ADR-016·换号 token-blind 录入 / 选号 / 无重启切号）。号池 = 用户级 registry `${CC_MASTER_HOME:-$HOME/.claude/cc-master}/accounts.json`（email→vault 非密指针 + 时间元信息·**零 token**）+ token 本体（macOS keychain / 非 mac 0600 file vault）。**token 全程活在 ccm 引擎子进程·绝不进 agent / registry / log**（vault token-blind）。换号是**无重启凭证覆写**：`switch` 续期新号 → 覆写官方共享凭证三存储 → 运行中 claude 惰性 re-read 接管（进程不重启 / board 不动）。**概念叙事**（号池模型 / 录号 why / refreshToken 硬要求 / 选号方法论 / vault 安全）见 [references/account-pool.md](references/account-pool.md)；**算法 / vault 实现 SSOT** 在 ccm 引擎 `@ccm/engine/account`；**换号决策**（何时换 / 谁拍板 / 绝不自授权）归 `orchestrating-to-completion`（不在本 skill）。
+
+> **录号 / refresh 的唯一前提：用户当前正登录在目标号**（引擎从 keychain「Claude Code-credentials」直读当前登录号完整 blob·身份 guard 要求当前登录 email == `<email>`，否则拒）。
+
+### account add
+
+**写**（录入备号 token 进号池·幂等 upsert）
+
+```
+ccm account add <email> [flags]
+```
+
+- positional：`<email>`（必填·账号唯一标识）
+- 行为：从 keychain「Claude Code-credentials」(`account=$USER`) 直读当前登录号完整 `claudeAiOauth` blob（含 refreshToken）→ 身份 guard（当前登录 email 须 == `<email>`）→ 校验三必需字段（accessToken `sk-ant-oat` / **refreshToken `sk-ant-ort`·非空** / expiresAt num）→ 存 vault → 写 registry entry（非密元信息·`active:true`）。非 mac 无 keychain → 降级读 `~/.claude/.credentials.json` 的 `.claudeAiOauth`
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--vault-kind <v>` | | enum | `keychain`（mac 默认）\| `file`（0600 文件 floor） |
+| `--vault-file <path>` | | string | file 形态的 vault 路径（默认 `${CC_MASTER_HOME}/accounts.env`） |
+| `--keychain-service <s>` | | string | keychain service 名（默认 `cc-master-oauth`） |
+| `--expires <iso>` | | ISO-8601 UTC | token 到期日（file 形态非密旁存·默认 now+365d） |
+| `--registry <path>` | | string | registry 文件路径（默认 `${CC_MASTER_HOME}/accounts.json`） |
+| `--json` | | bool | 结构化输出（非密结果·零 token） |
+
+- 例：`ccm account add alice@x.com` · `ccm account add bob@x.com --vault-kind file --json`
+- ⚠️ refreshToken 硬要求：取不到非空 refreshToken → FAIL（绝不存残缺 blob）。只有真 `/login` 走完整 OAuth 才在 keychain 写非空 refreshToken；`claude setup-token` 结构上不产生 refreshToken（换不进·见 account-pool.md）
+
+### account refresh
+
+**写**（续期某备号 token·= 对同一 email 重跑 add 的安全路）
+
+```
+ccm account refresh <email> [flags]
+```
+
+- positional：`<email>`（必填）
+- 行为：与 `add` 完全同路（幂等 upsert）——keychain `-U` 原地更新 / file 删旧行再 append / registry 保留首次 `token_added_at`、刷 `token_refreshed_at`/`token_expires_at`。前提同 add（用户当前登录在 `<email>`）
+- flags：同 `account add`（`--vault-kind` / `--vault-file` / `--keychain-service` / `--expires` / `--registry` / `--json`）
+- 例：`ccm account refresh alice@x.com`
+
+### account delete
+
+**写**（把备号从号池删干净·registry entry + vault token）
+
+```
+ccm account delete <email> [flags]
+```
+
+- positional：`<email>`（必填）
+- 行为：从 registry entry 推断 vault 形态删对地方（token-blind·按 email 前缀删·不读值）→ 删 registry entry（删 active 号要清 active）
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--vault-kind <v>` | | enum | 推断不出时显式指定（`keychain` \| `file`） |
+| `--vault-file <path>` | | string | file vault 路径 |
+| `--keychain-service <s>` | | string | keychain service 名 |
+| `--registry <path>` | | string | registry 文件路径 |
+| `--yes` | `-y` | bool | **非 TTY 必带**——跳过破坏性删除确认（非交互上下文无 `--yes` → exit 2） |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm account delete bob@x.com --yes`
+
+### account list
+
+**读**（只读对账·绝不取 token 值）
+
+```
+ccm account list [flags]
+```
+
+- positional：无
+- 行为：只读 registry 非密字段——列每个 email 的 vault 形态 / 到期日 / active / 是否过期 / 距各窗口 reset 推算。**绝不取 token**（keychain 探活只用 `find`、不带 `-w`）。空池 / 无 registry → 提示「天然单账号空池」
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--probe-keychain` | | bool | 顺带核对 keychain 项是否真在（只 `find`·不取值） |
+| `--registry <path>` | | string | registry 文件路径 |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm account list` · `ccm account list --probe-keychain --json`
+
+### account switch
+
+**写**（无重启切到选定备号·**ADR-016 policy 硬闸**）
+
+```
+ccm account switch [flags]
+```
+
+- positional：无（不给 `--email` → 引擎按各号配额恢复度选最优切入号）
+- 行为：**先过 board-policy 硬闸**——读目标 board 的 `policy.autonomous_account_switch`，显式 `deny` → 拒绝本次换号、**exit 7**（policy-deny·不取换号锁 / 不覆写任何凭证 / registry 原封不动）+ best-effort 往 board.log 记一条 `decision`。放行后：选号 → refreshToken 续期 → 覆写官方共享凭证三存储（原子写·全或无回滚）→ 翻 registry `active`。**fail-open/closed**：真·无 ccm 上下文（无 `--board`/`$CC_MASTER_BOARD`）→ fail-open `allow`；有明确目标板但 policy 读不到 / 歧义 → fail-closed `deny`（exit 7）
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--email <addr>` | | string | 指定切入号（别名 `--account`·旧名兼容）；不给则引擎选最优 |
+| `--vault-kind <v>` | | enum | `keychain` \| `file` |
+| `--vault-file <path>` | | string | file vault 路径 |
+| `--keychain-service <s>` | | string | keychain service 名 |
+| `--registry <path>` | | string | registry 文件路径 |
+| `--now <iso>` | | ISO-8601 UTC | 选号推算的 now（确定性测试·默认真实 now） |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm account switch --json`（引擎选号）· `ccm account switch --email alice@x.com`
+- ⚠️ **policy 硬闸是纵深防御兜底、不是许可**：`deny`→exit 7 拦在覆写之前；编排侧的「换号决策 + 绝不自授权」纪律在 `orchestrating-to-completion`（机制硬闸不替编排拍板）。全员逼顶 / 选不出号 → surface 用户（`blocked_on:"user"`），绝不盲切
 
 ---
 

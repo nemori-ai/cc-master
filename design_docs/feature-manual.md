@@ -147,7 +147,7 @@ hook 是 cc-master 的牙齿。**全部 ✅已落地**（board-v2 已从 v1 的 
 | `/cc-master:status` | 只读文字简报（目标/进度/分组任务/临界路径/健康检查/预算快照） | 终端里一眼看清"干到哪、卡哪、等不等我、配额剩多少"，像看晨会简报 |
 | `/cc-master:view` | 本地 webview 渲 board DAG（xyflow 图，2s 活轮询、只读、零联网） | **浏览器里实时看 AI 在干嘛，像盯一块活的项目看板** |
 | `/cc-master:discuss <node-id>` | 独立满血新 session 对一个待决策节点开"采访式讨论"（载 decision_package + 时效校验 + 写回 sidecar） | 另开窗口跟"有备而来、读过全部上下文"的助手把决策谈透，**主线同时继续干不被打断** |
-| `/cc-master:accounts --add/--delete/--refresh/--list` | 管换号号池备号 token（凭证全程活在脚本子进程、不进 agent context） | 攒备用账号池的安全录入口；`--list` 随时对账 |
+| `ccm account add/delete/refresh/list/switch`（CLI·用户直接敲） | 管换号号池备号 token（token-blind·全程活在 ccm 引擎子进程、不进 agent context）+ 无重启切号（switch·policy 硬闸 `deny`→exit 7） | 攒备用账号池的安全录入口；`list` 随时对账。概念叙事见 `using-ccm` 的 `references/account-pool.md`（旧 `/cc-master:accounts` 命令已退役·ADR-019） |
 | `/cc-master:handoff-to-new-session` | 旧 session 优雅交接（quiesce→drain 验收→写叙事 handoff→归档板→给 `--resume` 命令） | 换新窗口接力**不丢进度、不留烂摊子** |
 | `/cc-master:stop` | 归档板停用指挥（认板防停错 + 用户确认 + `owner.active:false`，**显式可逆非删除**） | 干净收工，所有后台 hook 安静，板留作审计、日后可复活 |
 

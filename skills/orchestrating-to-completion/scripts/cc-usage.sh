@@ -20,7 +20,7 @@
 #
 # Out-of-band like codex-review / eval: the orchestrator's MAIN THREAD runs this deliberately at a pacing
 # decision point. It is NOT a hook — it does NOT live in hooks/ and is NOT bound by red line 1 (bash+node/JS).
-# It informs usage-aware pacing (see references/cost-and-pacing.md). 红线3：ccm 出 verdict、A 决策——本脚本
+# It informs usage-aware pacing (see the pacing-and-estimation skill). 红线3：ccm 出 verdict、A 决策——本脚本
 # 只把账户状态 + 走廊 verdict 透出，不替编排者拍板。
 #
 # Requires: `ccm` on PATH (per-OS Node SEA binary·ADR-014 主机预置前置)。CCM_BIN overrides the binary
@@ -88,7 +88,7 @@ if (!available) {
     available: false,
     note: '账户权威信号不可用（无 status-line sidecar，或 ccm 不可用）。本地 JSONL 反推已撤（plan §10·' +
           '引擎不含反推·Finding #37 反推 reset 失真）——此带外信号现仅账户权威。接 statusline-capture.js ' +
-          '到 status line 以提供 sidecar（见 cost-and-pacing.md「接法」）。',
+          '到 status line 以提供 sidecar（见 pacing-and-estimation skill 的 usage-signals「接法」）。',
   }) + '\n');
   process.exit(0);
 }
