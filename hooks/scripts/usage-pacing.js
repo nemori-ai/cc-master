@@ -7,6 +7,14 @@
 // "Stop"）。**绝不 decision:block** —— hook 只感知+提示，怎么 pace 是认知（属 SKILL A，cost-and-
 // pacing.md），不在 hook 里替主线做调度决策（红线4：指挥不演奏，引擎不替它思考）。
 //
+// LBHOOK（LOADBAL §3.2/3.3 + ADR-016）：除了 pacing 提示，本 hook 在 pacing 决策已得出「该切到下一份配额」
+//   （kind==='switch'·5h 临界 + n>1 + 7d 有余量 + 有可切入备号）时，**机械**调 `ccm account switch`（切号执行
+//   归 ccm·agent 不做切号决策·设计 §1）+ 切号后注入 `<ambient source="usage-pacing">` 让 agent 调配速/规模。
+//   能不能切 / 切哪个 / board.policy 硬闸（deny→exit7）都委托 ccm；hook token-blind（换号在 ccm 子进程·不碰 token）。
+//   完整门控 / 红线 / kill-switch（CC_MASTER_AUTOSWITCH）见下方 LBHOOK 常量段。**这不破红线4**：切号是 LOADBAL
+//   引擎机械确定性执行（非 hook 替主线做「调度」判断）；agent 仍只收 ambient 信号、自己决定配速——「指挥不演奏」
+//   守的是「主线不亲手做单元工作」，机械换号是 token-blind 的资源轮换、与「演奏」正交（设计 §1 四纲）。
+//
 // 红线1 / ADR-006：node/JS only。JSON.parse 读 JSONL，零 spawn（不 spawn python/不靠 bash 算逻辑），
 //   零网络，零额外依赖。所有异常 try/catch 兜住 → 任何失败都静默 exit 0（hook 崩会污染 Stop）。
 //
@@ -130,6 +138,40 @@ const NUM_ACCOUNT_RAW = process.env.CC_MASTER_NUM_ACCOUNT || '';
 //   的路径即可强制走本地降级路径（测试用·与 board-lint.js 同口径）。
 const CCM_BIN = process.env.CCM_BIN || 'ccm';
 // RATE_CACHE 路径要透传给 ccm（advise 也读同一 sidecar）——下面 RATE_CACHE 已定义；HOME_DIR 透传作 --home。
+
+// ── LBHOOK（自主换号·LOADBAL §3.2/3.3 + ADR-016）：pacing 判定「该切到下一份配额」时机械调 ccm account switch ─────
+// 设计 SSOT：design_docs/plans/2026-06-29-loadbal-account-namespace-design.md §3.2/3.3 + adrs/ADR-016。
+// 触发（WHEN·hook 侧只做 token-blind 的水位/失衡触发，**切哪个号 + 能不能切 + policy 都委托 ccm**）：当 pacing
+//   决策已得出 kind==='switch'（= 5h 配额临界 + n>1 可序列配额 + 7d 总闸有余量 + 有可切入备号——LOADBAL §3.2 ①
+//   水位触发，已由 ccmWarning〔ccm usage advise verdict accelerate + switch_account lever〕/ decideAccountWarning
+//   〔本地权威路径〕产出）时，**机械**调 `ccm account switch`，而非只把「换号 lever」advisory 给 agent。
+//   **hook 机械触发执行·agent 不做切号决策**（设计 §1）；agent 只收切号后的 ambient 事实、据此调配速/规模。
+// ccm account switch 内部自 gate（不在 hook 重复）：重读最新 registry → 选最优切入号 → **board.policy 机制硬闸**
+//   （`autonomous_account_switch==deny` → 拒+exit7·ADR-016 §2.2）→ 池全员逼顶 exit3（幂等:无可切入号即 no-op）→
+//   覆写官方三存储（全或无 + trap）。**token-blind**：换号在 ccm 子进程，hook 只透传 `--board`/`--home`、只读
+//   ccm 非密 JSON 输出（{email,switched}）——绝不碰任何 token（红线·设计 §A.1）。
+// **绝不自授权**（ADR-016 §2.5 重映射到新语义）：participate 由 board.policy 控（用户所有）；hook 只「在 policy=allow
+//   时切」——它自己 policy-blind（红线2 不读 policy），靠把 `--board` 透传给 ccm、由 ccm 读 policy 硬闸兜底
+//   （deny→exit7）。hook **绝不**传 `--user-authorized`（那是 `ccm policy set` 的自授权信号·翻 policy 才用）。
+// 红线：① 红线1/ADR-006——spawn ccm 是 ADR-014 进程边界（与 adviseViaCcm 同模式·非新依赖）；② 红线2——只透传
+//   board 路径给 ccm，hook 不读 policy/不碰窄腰外字段；③ 红线6——换号在 armed gate 之后（body 内·harness 已武装）；
+//   ④ ship-anywhere——ccm 缺（ENOENT）则优雅降级回「只 advisory」既有行为，绝不 block。
+//
+// CC_MASTER_AUTOSWITCH（kill-switch）：默认**开**（=机械换号·对齐设计「hook 机械执行」+ board.policy 作 SSOT 控制面）；
+//   设 '0' 强制**关**（退回纯 advisory 既有行为·dogfood / 应急用）。**rollout 默认开/关是编排者的判类决策**——见报告。
+const AUTOSWITCH_ON = process.env.CC_MASTER_AUTOSWITCH !== '0';
+// 换号冷却（幂等·防每回合切）：切号成功后 cooldown 秒内不再自动切——堵「切号后 statusline 未刷新、sidecar 仍是切出号
+//   高 used% → 下一 Stop 又触发 kind:'switch' → 全池抖动」。默认 1800s（30min·对齐引擎 CCM_SELECT_MIN_SWITCH_INTERVAL_SEC
+//   滞回口径）。冷却时间戳落 SWITCH_STATE_FILE（hook 自管 sidecar·非 board·与「状态写 sidecar」纪律一致）。
+const SWITCH_COOLDOWN_RAW = process.env.CC_MASTER_SWITCH_COOLDOWN_SEC || '';
+const SWITCH_STATE_FILE =
+  process.env.CC_MASTER_SWITCH_STATE || path.join(HOME_DIR, '.cc-master-switch.json');
+// ccm account switch 子进程超时（含 refresh 的网络 POST）：默认 30s。换号被 cooldown + kind:'switch' 双门控、罕见
+//   （5h 水位约每几小时一次），阻塞 Stop 数秒可承受（设计 §3.2）。CC_MASTER_SWITCH_TIMEOUT_MS 覆写（测试注入）。
+const SWITCH_TIMEOUT_MS = (() => {
+  const n = Number(process.env.CC_MASTER_SWITCH_TIMEOUT_MS);
+  return Number.isFinite(n) && n > 0 ? n : 30000;
+})();
 
 // 「明显临界」启发式阈值（ceiling 未知时的保守降级，避免刷屏）：仅当**两条同时成立**才出声 ——
 //   (a) 5h 窗口剩余时间 ≤ HEUR_REMAIN_MIN（墙在不远处）；
@@ -702,6 +744,84 @@ function ccmWarning(data, n) {
   return null; // hold → 走廊内 → 静默
 }
 
+// ── LBHOOK helpers：换号冷却 sidecar + 机械调 ccm account switch（token-blind·失败必降级）──────────────────
+// switchCooldownSec() → 冷却秒数。缺/空（unset）→ 默认 1800；显式 '0' → 0（关冷却·honor）；非数/负 → 默认。
+//   **必须先判空串**：Number('') === 0（JS footgun·同 parseBudget 的 `if (!raw)` 模式），否则 unset 会塌成 0 = 永不冷却。
+function switchCooldownSec() {
+  if (!SWITCH_COOLDOWN_RAW) return 1800; // unset → 默认 30min
+  const n = Number(SWITCH_COOLDOWN_RAW);
+  return Number.isFinite(n) && n >= 0 ? n : 1800; // 显式 0 honor；垃圾 → 默认
+}
+// switchCooldownRemainingSec(file, nowMs, cooldownSec) → 距冷却结束的剩余秒（>0 = 仍在冷却·不再自动切）。
+//   读 hook 自管 sidecar { last_switch_at_ms }。缺/坏/无字段 → 0（不冷却·允许切）。纯只读、fail-silent。
+function switchCooldownRemainingSec(file, nowMs, cooldownSec) {
+  let obj;
+  try {
+    obj = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (_e) {
+    return 0; // 无 sidecar / 坏 JSON → 不冷却
+  }
+  const at = obj && typeof obj.last_switch_at_ms === 'number' ? obj.last_switch_at_ms : null;
+  if (at === null) return 0;
+  const remain = cooldownSec - (nowMs - at) / 1000;
+  return remain > 0 ? remain : 0;
+}
+// recordSwitchAt(file, nowMs) → 切号成功后落冷却时间戳（hook sidecar·非 board·非密只有时间戳）。fail-silent
+//   （写失败只是下次可能提前再切·非致命；绝不为它 throw 污染 Stop）。
+function recordSwitchAt(file, nowMs) {
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify({ last_switch_at_ms: nowMs })}\n`);
+  } catch (_e) {
+    /* fail-silent */
+  }
+}
+// parseSwitchJson(stdout) → ccm account switch 的 jsonOk data（{ email, switched, … }）或 null。
+//   switch 的 stdout 是「人类成功行 + 一行 jsonOk」混排（ctx.out 两条都到 stdout）→ 整体非合法 JSON，故**逐行**
+//   扫描首个能 JSON.parse 的对象，解包 .data（jsonOk = {ok:true,data:{…}}·io.ts）。非密（只取 email/switched）。
+function parseSwitchJson(stdout) {
+  if (typeof stdout !== 'string') return null;
+  for (const line of stdout.split('\n')) {
+    const t = line.trim();
+    if (!t.startsWith('{')) continue;
+    try {
+      const o = JSON.parse(t);
+      if (o && typeof o === 'object') return o.data && typeof o.data === 'object' ? o.data : o;
+    } catch (_e) {
+      /* 非 JSON 行 → 跳过 */
+    }
+  }
+  return null;
+}
+// attemptCcmSwitch(boardPath, homeDir, rateCache) → { outcome, email }。机械调 `ccm account switch --json
+//   --home <home> --board <boardPath>`（透传 CC_MASTER_HOME / CC_MASTER_RATE_CACHE 让 ccm 读同一 registry /
+//   切出快照 sidecar）。**token-blind**：换号在 ccm 子进程·hook 只读非密 JSON。退出码 → outcome 映射
+//   （account.ts SWITCH_EXIT）：0+switched → 'switched'；7 → 'denied'（board.policy=deny 硬闸）；3 → 'exhausted'
+//   （全池逼顶·无可切入号）；ENOENT/spawn 抛/error → 'absent'（ccm 不在·优雅降级）；其余（含 0 但未确认 switched·
+//   如 stub 空输出 / 信号）→ 'failed'。任何分支都不 throw（调用方据 outcome 决定注入·绝不污染 Stop）。
+function attemptCcmSwitch(boardPath, homeDir, rateCache) {
+  const args = ['account', 'switch', '--json', '--home', homeDir, '--board', boardPath];
+  const env = Object.assign({}, process.env, { CC_MASTER_HOME: homeDir });
+  if (rateCache) env.CC_MASTER_RATE_CACHE = rateCache;
+  let r;
+  try {
+    r = spawnSync(CCM_BIN, args, { encoding: 'utf8', timeout: SWITCH_TIMEOUT_MS, env });
+  } catch (_e) {
+    return { outcome: 'absent', email: null }; // spawn 本身抛（极少）→ 视为 ccm 不在
+  }
+  if (!r || r.error) return { outcome: 'absent', email: null }; // ENOENT（ccm 不在 PATH）→ 优雅降级
+  if (r.signal) return { outcome: 'failed', email: null }; // 被信号杀（如超时）→ 未确认切号
+  const code = typeof r.status === 'number' ? r.status : 1;
+  const data = parseSwitchJson(r.stdout);
+  const email = data && typeof data.email === 'string' ? data.email : null;
+  const switched = !!(data && data.switched === true);
+  if (code === 0 && switched) return { outcome: 'switched', email };
+  if (code === 0) return { outcome: 'failed', email }; // exit 0 但未确认 switched → 不当成功（保守）
+  if (code === 7) return { outcome: 'denied', email }; // board.policy 机制硬闸 deny（ADR-016 §2.2）
+  if (code === 3) return { outcome: 'exhausted', email }; // 全池逼顶·无可切入号
+  return { outcome: 'failed', email }; // 1/4/其它 → 换号未干净完成
+}
+
 // ── body：plumbing（stdin/home/isArmed 武装/fail-silent/exit 0）由 hook-common.runHook 提供（phase-1b）；
 //   body 只剩 usage-pacing 独有的「读 usage / 走廊 verdict / 拼 pacing advisory + 号池 ambient」。
 //   · stop_hook_active 重入闸放 preGate（须比武装更早静默）；· armed gate 由 harness arm:'isArmed' 统一做。
@@ -762,24 +882,71 @@ function body(ctx) {
   }
   if (!warning) return; // 余量充足 / 无数据 / 降级判定不临界 → 静默 exit 0
 
-  // ── ADR-018 标签包装：pacing warning 主体 → advisory（strength 按 kind 配 stakes·见 PACING_STRENGTH）──
-  // pacing 是喂判断的 advisory（§13/ADR-018 §3.1 活体印证：agent 把它当输入、推理前提后自己拍·非 system 硬闸）。
-  //   source=usage-pacing。kind 缺（极少·防御）→ pacingStrengthOf 默认 weak（最低够用·P2）。
-  const blocks = [advisory('usage-pacing', pacingStrengthOf(kind), warning)];
+  // ── LBHOOK：kind==='switch'（5h 配额临界 + n>1 + 7d 有余量 + 有可切入备号）→ 机械调 ccm account switch ──────
+  // 这是 LOADBAL §3.2 ① 水位触发已在 pacing 决策里成立的点：与其只把「换号 lever」advisory 给 agent，**hook
+  //   机械执行换号**（设计 §1·agent 不做切号决策）。门控（hook 侧·token-blind）：① AUTOSWITCH 未被 kill；
+  //   ② 确有可切入备号（pool.switchable≥1·env num_account 这种无真实备号的标量不触发）；③ **目标板唯一**
+  //   （ctx.boards 恰 1 块·多块 active 时板上下文歧义 → 保守不自动切、退回 advisory·避免对错板的 policy 切号）；
+  //   ④ 不在冷却内（防 statusline 未刷新导致的全池抖动）。能不能切 / 切哪个 / policy 都委托 ccm（见 attemptCcmSwitch）。
+  let switchAmbient = null; // 成功换号后的 ambient 文案（替代 advisory 主体·切号已机械完成、agent 只调配速）
+  let switchNote = ''; // deny/exhausted 时附到 advisory 尾部的说明（surface 给用户）
+  let switchStrength = null; // deny → 升 strong（surface 用户·高 stakes）；否则沿用 kind 的 strength
+  if (
+    AUTOSWITCH_ON &&
+    kind === 'switch' &&
+    pool.switchable >= 1 &&
+    ctx.boards &&
+    ctx.boards.length === 1
+  ) {
+    const boardPath = ctx.boards[0].path;
+    const cdRemain = switchCooldownRemainingSec(SWITCH_STATE_FILE, nowMs, switchCooldownSec());
+    if (cdRemain <= 0) {
+      const res = attemptCcmSwitch(boardPath, HOME_DIR, RATE_CACHE);
+      if (res.outcome === 'switched') {
+        recordSwitchAt(SWITCH_STATE_FILE, nowMs); // 落冷却·防下一 Stop 抖动
+        const after = poolStatus(readRegistryAccounts(ACCOUNTS_FILE), nowMs); // 切号后号池现状
+        switchAmbient =
+          `[号池·已自动换号] usage-pacing 在 5h 配额临界(权威口径)机械切到下一份配额` +
+          `${res.email ? `(当前 active = ${res.email})` : ''}——配额随新号满血 5h 窗恢复;号池现剩 ` +
+          `${after.switchable} 个可切入备号。据此调你的配速 / 派发规模(怎么调是你的认知判断,见 ` +
+          `orchestrating-to-completion / cost-and-pacing);切号本身已机械完成(token-blind·在 ccm 子进程),不需你再操作。`;
+      } else if (res.outcome === 'denied') {
+        // board.policy.autonomous_account_switch=deny 机制硬闸拦下（ADR-016 §2.2）→ 不自主切·surface 给用户。
+        switchNote =
+          ` 注:本板 policy.autonomous_account_switch=deny,机制层(ccm)已拒绝自主换号(exit 7)——把「是否换号」作 ` +
+          `blocked_on:"user" surface 给用户;经用户 'ccm policy set --autonomous-account-switch=allow --user-authorized' ` +
+          `授权后才会自主切(绝不自授权·ADR-016 §2.5)。`;
+        switchStrength = 'strong';
+      } else if (res.outcome === 'exhausted') {
+        // 全池逼顶·无可切入号（ccm exit 3）→ surface 给用户（等 reset 还是别的·用户拍）。
+        switchNote =
+          ` 注:号池所有可切入备号都已逼顶 / 不可用(ccm exit 3·NONE_ALL_EXHAUSTED)——无可切入号,把「等 reset 还是别的」` +
+          `作 blocked_on:"user" surface 给用户。`;
+      }
+      // failed / absent（ccm 不在 / 未确认切号）→ 无 note·落回既有 advisory（等同未接 LBHOOK 的旧「换号 lever」行为·优雅降级）。
+    }
+  }
 
-  // ── 号池粗粒度事实注入（A2 T6 §F）→ ambient（§13:池/配额事实归 ambient·塑模型·无 action）─────────────
-  // 当 pacing 已要出声（warning 非空）**且**号池里确有可切入备号（switchable ≥ 1）时，附一块号池的**粗粒度
-  //   事实**——让编排者在配额吃紧的此刻知道「换号」这个 lever 可用。这是**事实告知**（你有几个备号 / 换号是
-  //   一个可用 lever），塑造世界模型而不替它决策，故归 **ambient**（独立成块·与 advisory 主体并列，正如
-  //   ADR-018 §2.2 coordination 例子的 ambient+advisory 两块并存）。**只注入事实、不在 hook 跑选号算法**
-  //   （选哪个号是 switch-account.sh 带外的事，§B.7）。无号池 / 无可切入备号 → 不附（switchable=0 时换号无
-  //   意义，别加噪音）。全在 armed gate 之后（红线 6）、纯读 accounts.json（红线 1/2）。
-  if (pool.switchable >= 1) {
-    const poolFact =
-      `[号池] 你有 ${pool.backups} 个备号(其中 ${pool.switchable} 个 token 未过期、可切入)——` +
-      `配额逼顶时「换号」是一个可用的 pacing lever:切到一份恢复更多的配额。选哪个号 / 切不切由你的认知判断` +
-      `(选号 + 切换是带外 /cc-master:accounts 与 switch 脚本的事,不在此 hook 执行);这是事实告知,不替你决策。`;
-    blocks.push(ambient('usage-pacing', poolFact));
+  // ── ADR-018 标签包装 ─────────────────────────────────────────────────────────────────────────────
+  // 成功机械换号 → 整条注入降为一块 ambient（切号已完成·只更新世界模型 + 调配速·无 action·§13 池/配额事实归 ambient）。
+  // 否则 → pacing warning 主体仍是 advisory（喂判断·strength 按 kind 配 stakes；deny 升 strong·surface 用户）+ 号池 ambient。
+  let blocks;
+  if (switchAmbient) {
+    blocks = [ambient('usage-pacing', switchAmbient)];
+  } else {
+    const strength = switchStrength || pacingStrengthOf(kind); // kind 缺（极少·防御）→ 默认 weak（P2）
+    blocks = [advisory('usage-pacing', strength, warning + switchNote)];
+    // ── 号池粗粒度事实注入（A2 T6 §F）→ ambient（§13:池/配额事实归 ambient·塑模型·无 action）──────────────
+    // pacing 已出声且号池有可切入备号（switchable≥1）→ 附一块号池**粗粒度事实**，让编排者知道「换号」lever 可用
+    //   （LBHOOK 关 / deny / cooldown / 多板等没机械切的路径下，这条仍告知 agent 换号是 surface 给用户的可选项）。
+    //   ADR-018 ambient（事实告知·不替决策）；无号池 / 无可切入备号 → 不附。armed gate 之后（红线6）、纯读 accounts.json（红线1/2）。
+    if (pool.switchable >= 1) {
+      const poolFact =
+        `[号池] 你有 ${pool.backups} 个备号(其中 ${pool.switchable} 个 token 未过期、可切入)——` +
+        `配额逼顶时「换号」是一个可用的 pacing lever:切到一份恢复更多的配额。换号机制由 ccm account switch 机械执行` +
+        `(选号 + 切换 + policy 硬闸都在 ccm·token-blind);切不切的决策 / 配速由你的认知判断,这是事实告知,不替你决策。`;
+      blocks.push(ambient('usage-pacing', poolFact));
+    }
   }
 
   // 非阻断注入：仅 additionalContext，hookEventName "Stop"。绝不 decision:block。
@@ -793,7 +960,12 @@ function body(ctx) {
 //   （hook 崩绝不污染 Stop）。bootstrap-board.sh 仍是唯一豁免的 ARM 动作（bash·绝不进本 harness）。
 runHook({
   event: 'Stop',
-  arm: 'isArmed', // ARMED GATE：未武装（home 无匹配 active 板）→ 在读宿主全局 usage / 读 registry / 注入之前静默 exit 0（红线6）
+  // ARMED GATE：未武装（home 无匹配 active 板）→ 在读宿主全局 usage / 读 registry / 注入之前静默 exit 0（红线6）。
+  //   arm:'boards'（取代旧 'isArmed'）——武装门等价（listMatchingBoards 空 → 静默，与 isArmed 同语义），但额外把本
+  //   session 的匹配 active 板列表放进 ctx.boards，供 LBHOOK 把唯一目标板的路径透传给 `ccm account switch --board`
+  //   （ccm 据此读对板的 board.policy 硬闸·ADR-016 §2.3 确定性目标板）。只读 narrow-waist owner.active/session_id
+  //   判匹配（红线2 不变），不读 policy/tasks。
+  arm: 'boards',
   preGate(ctx) {
     // STOP RE-ENTRY GUARD：stop_hook_active:true ⟺ Claude Code 因「上次 Stop hook 续了对话 → agent 再次尝试
     //   Stop」而**重入**本 hook。立即静默（在任何 usage 计算 / 武装判定之前）。有它，警告对每个**真正的新
