@@ -709,7 +709,7 @@ export async function switchAccount(ctx: Ctx): Promise<number> {
     trap.commitWrappedBlob = ''; // 收尾·清 trap 前向补写 keychain 的 token 物料（token 清理）。
 
     // 5) 切出快照（best-effort·后置观测·active 已先翻·绝不阻断/绝不再留 split-brain 窗口）。
-    recordSwitchOutBestEffort(switchOut, email, ctx);
+    recordSwitchOutBestEffort(switchOut, email, ctx, regPath);
   } finally {
     process.removeListener('SIGINT', sigint);
     process.removeListener('SIGTERM', sigterm);
@@ -858,14 +858,106 @@ function setActiveInRegistry(regPath: string, email: string): { ok: boolean; mes
   }
 }
 
-// recordSwitchOutBestEffort — 切出快照（best-effort·后置观测）。ccm 引擎不带 cc-usage 配额探测（那是
-//   orchestrating-to-completion 的带外脚本）——本阶段无有效 used_pct 源 → 降级跳过（recordSwitchOut 会因 used_pct
-//   非 0-100 整数被拒写）。换号核心（三存储 + active）已先完成、绝不受影响（P2-2 解耦）。
-function recordSwitchOutBestEffort(switchOut: string, switchIn: string, ctx: Ctx): void {
+// ── SNAPWIRE — 切出 used_pct 快照喂 LOADBAL §2 inactive 预测 ────────────────────────────────────────
+// recordSwitchOutBestEffort — 切出快照（best-effort·后置观测）。引擎本身**配额源盲**（绝不读 sidecar/cc-usage）；
+//   caller（本 CLI 层）读 statusline sidecar 取**切出号**（=outgoing active）当前 5h/7d used_pct+resets_at，喂给
+//   引擎 recordSwitchOut 写进 outgoing 号的 last_switch_out——LOADBAL §2 inactive 预测正吃这快照（冻结切出
+//   used_pct → resets_at 归零）。读不到 / 解析失败 / 无有效 used_pct → 不传 → 降级跳过（维持旧行为·不崩）。
+//   换号核心（三存储 + active）已先完成、绝不受影响（P2-2 解耦）。token-blind：只进出 %/ISO（绝不碰 token）。
+function recordSwitchOutBestEffort(
+  switchOut: string,
+  switchIn: string,
+  ctx: Ctx,
+  regPath: string,
+): void {
   if (!switchOut || switchOut === switchIn) return;
-  ctx.err(
-    `switch: 切出快照（${switchOut}）降级跳过——ccm 引擎无 cc-usage 配额源（used_pct 无有效值）。换号不受影响（active 已先翻·P2-2 解耦）。`,
-  );
+  // CLI 侧 I/O：读 sidecar → 转成引擎 SnapshotInput（used_pct 取整 / resets_at epoch 秒→ISO）。
+  const snap = readSwitchOutUsageSnapshot(ctx.env);
+  if (!snap) {
+    ctx.err(
+      `switch: 切出快照（${switchOut}）降级跳过——无有效 used_pct 源（sidecar 缺/坏/无 5h 或 7d 权威 %）。换号不受影响（active 已先翻·P2-2 解耦）。`,
+    );
+    return;
+  }
+  try {
+    account.mutateRegistry(regPath, (reg) => {
+      if (reg.accounts && reg.accounts[switchOut]) {
+        account.recordSwitchOut(reg, switchOut, snap);
+      }
+    });
+    ctx.err(
+      `switch: 已记录切出快照（${switchOut}·5h=${snap.fiveHour?.used_pct ?? '?'}% 7d=${snap.sevenDay?.used_pct ?? '?'}%·source=sidecar）→ last_switch_out（喂 inactive 预测·LOADBAL §2）。`,
+    );
+  } catch (_e) {
+    // best-effort：snapshot 落盘失败（accounts.json 不可写 / 坏 JSON / 锁超时 / 校验拒写）绝不阻断换号——已生效。
+    ctx.err(
+      `switch: 切出快照（${switchOut}）记录失败（accounts.json 不可写 / 校验拒写 / 锁超时·best-effort）——换号已生效、不受影响。`,
+    );
+  }
+}
+
+// readSwitchOutUsageSnapshot — 读 statusline sidecar（与 usage-pacing hook 同一文件）取**当前 active（=outgoing）**
+//   号的 5h/7d used_pct + resets_at，转成引擎 recordSwitchOut 的 SnapshotInput。这是 SNAPWIRE 的 CLI 侧 I/O——
+//   引擎保持配额源盲（绝不读 sidecar），故读 + 转换都在这里做。
+//   · sidecar 路径：${CC_MASTER_RATE_CACHE:-$HOME/.claude/.cc-master-rate-limits.json}（与 usage.ts / usage-pacing.js 钉死同一路径）。
+//   · 真实形态（statusline-capture.js 写）：`{ five_hour:{used_percentage:<num>, resets_at?:<epoch秒>}, seven_day:{…} }`。
+//   · 引擎 last_switch_out schema 口径（与 predict.ts recoveredWindow 对齐）：used_pct 须 **0-100 整数**（取整）、
+//     resets_at 须 **严格 ISO-8601 UTC**（epoch 秒→ISO·剥毫秒，对齐 nowIso 口径）。
+//   · 缺/坏 sidecar、或 5h+7d 两窗口都拿不到有效 used%（数值）→ null（caller 降级跳过·不崩）。
+//   token-blind：sidecar 里只有 %/epoch（非密），本函数只读这些、产出 %/ISO，绝不触碰任何 token。
+function readSwitchOutUsageSnapshot(
+  env: Record<string, string | undefined>,
+): account.SnapshotInput | null {
+  const p =
+    env.CC_MASTER_RATE_CACHE || path.join(os.homedir(), '.claude', '.cc-master-rate-limits.json');
+  let obj: Record<string, unknown> | null = null;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(p, 'utf8'));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      obj = parsed as Record<string, unknown>;
+    }
+  } catch (_e) {
+    return null; // 缺/坏 sidecar → 账户口径不可用 → 降级跳过。
+  }
+  if (!obj) return null;
+  // 把一个窗口（five_hour / seven_day·容忍 5h/7d + used_pct 别名）投成引擎 WindowSnapshot 或 null。
+  const win = (
+    k1: string,
+    k2: string,
+  ): { used_pct: number; resets_at?: string; source: string } | null => {
+    const w = (obj?.[k1] ?? obj?.[k2]) as Record<string, unknown> | undefined;
+    if (!w || typeof w !== 'object') return null;
+    const upRaw =
+      typeof w.used_percentage === 'number'
+        ? w.used_percentage
+        : typeof w.used_pct === 'number'
+          ? w.used_pct
+          : null;
+    if (upRaw === null || !Number.isFinite(upRaw)) return null;
+    // schema：used_pct 须 0-100 整数 → 四舍五入 + clamp（防 sidecar 给浮点 / 越界值被引擎校验拒写）。
+    const used_pct = Math.min(100, Math.max(0, Math.round(upRaw)));
+    const out: { used_pct: number; resets_at?: string; source: string } = {
+      used_pct,
+      source: 'sidecar', // 信任分级：sidecar 是账户权威（区别于 local-derived-approx）。
+    };
+    // resets_at：epoch 秒（权威形态）或 ISO 字符串 → 统一转严格 ISO-8601 UTC（剥毫秒·对齐 nowIso）。
+    let ms: number | null = null;
+    if (typeof w.resets_at === 'number' && Number.isFinite(w.resets_at)) ms = w.resets_at * 1000;
+    else if (typeof w.resets_at === 'string') {
+      const parsedMs = Date.parse(w.resets_at);
+      if (Number.isFinite(parsedMs)) ms = parsedMs;
+    }
+    if (ms !== null) out.resets_at = new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+    return out;
+  };
+  const five = win('five_hour', '5h');
+  const seven = win('seven_day', '7d');
+  // 两窗口都拿不到有效 used% → 无可记录的快照（降级跳过·不写空快照让引擎校验拒写）。
+  if (!five && !seven) return null;
+  const snap: account.SnapshotInput = {};
+  if (five) snap.fiveHour = five;
+  if (seven) snap.sevenDay = seven;
+  return snap;
 }
 
 // rescueRotatedBlob — 轮转后回写失败时把 NEW_BLOB 抢救到 0600 recovery 文件（token-blind·直写 fs·绝不 echo）。

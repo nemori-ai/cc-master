@@ -480,3 +480,109 @@ test('switch: no registry identity → exit 0 but loud identity-degraded warning
     await close(server);
   }
 });
+
+// ══ SNAPWIRE — 切出 used_pct 快照（喂 LOADBAL §2 inactive 预测）══════════════════════════════════════════
+//   设计：CLI 切出前读 statusline sidecar（CC_MASTER_RATE_CACHE）取 outgoing(=active) 号 5h/7d used_pct+resets_at，
+//   转成引擎 SnapshotInput（used_pct 取整·resets_at epoch 秒→严格 ISO·source=sidecar）写进 outgoing 号 last_switch_out；
+//   读不到 → 降级跳过、换号不受影响。engine 保持配额源盲（只在 CLI 读 sidecar）。
+test('switch: sidecar present → records switch-out used_pct snapshot to last_switch_out (SNAPWIRE)', async () => {
+  const f = setupFixture();
+  // 真实 sidecar 形态（statusline-capture.js 写）：used_percentage 可为浮点、resets_at 为 epoch 秒。
+  const ratePath = join(f.home, 'rate-limits.json');
+  const resets5h = 4102444800; // 2100-01-01T00:00:00Z（epoch 秒）。
+  const resets7d = 4105123200; // 2100-02-01T00:00:00Z。
+  writeFileSync(
+    ratePath,
+    JSON.stringify({
+      captured_at: 1750000000,
+      five_hour: { used_percentage: 72.6, resets_at: resets5h },
+      seven_day: { used_percentage: 41.2, resets_at: resets7d },
+    }),
+  );
+  const server = await listen((req, res) => {
+    req.on('data', () => {});
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ access_token: 'sk-ant-oat-FRESH', expires_in: 28800 }));
+    });
+  });
+  try {
+    const ctx = mkCtx(
+      { email: 'new@x.com' },
+      {
+        ...f.baseEnv,
+        REFRESH_TOKEN_URL: `http://127.0.0.1:${port(server)}/token`,
+        CC_MASTER_RATE_CACHE: ratePath,
+      },
+    );
+    const rc = await accountHandler.switchAccount(ctx);
+    assert.equal(rc, 0, 'clean success → exit 0');
+    // 切出号 old@x.com 拿到 last_switch_out 快照——口径与 predict.ts recoveredWindow 对齐：
+    //   used_pct 是 0-100 整数（浮点取整：72.6→73, 41.2→41）、resets_at 严格 ISO-8601 UTC、source=sidecar。
+    const reg = JSON.parse(readFileSync(f.regPath, 'utf8'));
+    const lso = reg.accounts['old@x.com'].last_switch_out;
+    assert.ok(lso, 'switch-out account got a last_switch_out snapshot');
+    assert.equal(lso['5h'].used_pct, 73, '5h used_pct rounded to integer');
+    assert.equal(lso['5h'].resets_at, '2100-01-01T00:00:00Z', '5h resets_at epoch→strict ISO');
+    assert.equal(lso['5h'].source, 'sidecar', '5h trust tier = sidecar (account-authoritative)');
+    assert.equal(lso['7d'].used_pct, 41, '7d used_pct rounded to integer');
+    assert.equal(lso['7d'].resets_at, '2100-02-01T00:00:00Z', '7d resets_at epoch→strict ISO');
+    // switch_history 也 append（复盘留痕）。
+    assert.ok(
+      Array.isArray(reg.accounts['old@x.com'].switch_history) &&
+        reg.accounts['old@x.com'].switch_history.length >= 1,
+      'switch_history appended',
+    );
+    // 醒目记录提示（非降级措辞）。
+    assert.ok(
+      ctx.errBuf.some((s) => s.includes('已记录切出快照') && s.includes('old@x.com')),
+      'records-snapshot message surfaced',
+    );
+    // active 仍正常翻转（快照与换号核心解耦·P2-2）。
+    assert.equal(reg.accounts['new@x.com'].active, true);
+    assertTokenBlind(ctx);
+  } finally {
+    await close(server);
+  }
+});
+
+test('switch: sidecar absent → snapshot downgrade-skip, no last_switch_out, switch still succeeds (SNAPWIRE fallback)', async () => {
+  const f = setupFixture();
+  const server = await listen((req, res) => {
+    req.on('data', () => {});
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ access_token: 'sk-ant-oat-FRESH', expires_in: 28800 }));
+    });
+  });
+  try {
+    // CC_MASTER_RATE_CACHE 指向不存在的 sidecar → 读不到 → 降级跳过（不崩·维持旧行为）。
+    const ctx = mkCtx(
+      { email: 'new@x.com' },
+      {
+        ...f.baseEnv,
+        REFRESH_TOKEN_URL: `http://127.0.0.1:${port(server)}/token`,
+        CC_MASTER_RATE_CACHE: join(f.home, 'no-such-sidecar.json'),
+      },
+    );
+    const rc = await accountHandler.switchAccount(ctx);
+    assert.equal(rc, 0, 'switch still clean-succeeds without a usage source');
+    const reg = JSON.parse(readFileSync(f.regPath, 'utf8'));
+    // 切出号没有 last_switch_out（无有效 used_pct 源 → 不写空快照·避免引擎校验拒写）。
+    assert.equal(
+      reg.accounts['old@x.com'].last_switch_out,
+      undefined,
+      'no snapshot written when no usage source',
+    );
+    // 降级跳过提示做响（含「降级跳过」措辞）。
+    assert.ok(
+      ctx.errBuf.some((s) => s.includes('降级跳过') && s.includes('old@x.com')),
+      'downgrade-skip message surfaced',
+    );
+    // active 仍翻转（解耦）。
+    assert.equal(reg.accounts['new@x.com'].active, true);
+    assertTokenBlind(ctx);
+  } finally {
+    await close(server);
+  }
+});

@@ -395,6 +395,41 @@ test('recordSwitchOut: writes last_switch_out (5h/7d) + appends switch_history',
   assert.equal(e.switch_history?.length, 1);
 });
 
+test('recordSwitchOut: missing snap → does not throw, writes undefined used_pct (caller skips·SNAPWIRE engine contract)', () => {
+  // SNAPWIRE：引擎是 outgoing-usage 入参的消费方·配额源盲。caller 没传 usage（snap 缺省）→ 引擎不崩、
+  //   写出 used_pct=undefined 的占位快照（这正是为何 CLI 在无有效 usage 时**不调**本函数·而是降级跳过——
+  //   undefined used_pct 会被 saveRegistry 的 validateSnapshot 拒写，故 caller 必须自己先把关）。
+  const reg = account.emptyRegistry();
+  account.upsertAccount(reg, 'a@x.com', {
+    vault: { kind: 'keychain', service: 's', account: 'a@x.com' },
+  });
+  assert.doesNotThrow(() => account.recordSwitchOut(reg, 'a@x.com'));
+  const e = reg.accounts['a@x.com'];
+  assert.equal(e.last_switch_out?.['5h']?.used_pct, undefined, 'no usage → undefined used_pct');
+  assert.equal(e.switch_history?.length, 1, 'still appends a (placeholder) history entry');
+});
+
+test('recordSwitchOut: SNAPWIRE shape (integer used_pct + ISO resets_at + source=sidecar) records cleanly', () => {
+  // SNAPWIRE：CLI 侧把 sidecar 转好的形态（used_pct 整数·resets_at 严格 ISO·source=sidecar）喂进来——
+  //   引擎原样落 last_switch_out，且 saveRegistry 能干净落盘（不被 validateSnapshot 拒）。
+  const { reg: regPath } = tmpDir();
+  account.mutateRegistry(regPath, (reg) => {
+    account.upsertAccount(reg, 'out@x.com', {
+      vault: { kind: 'keychain', service: 's', account: 'out@x.com' },
+    });
+    account.recordSwitchOut(reg, 'out@x.com', {
+      fiveHour: { used_pct: 73, resets_at: ISO, source: 'sidecar' },
+      sevenDay: { used_pct: 41, resets_at: ISO, source: 'sidecar' },
+    });
+  });
+  const reloaded = account.loadRegistry(regPath);
+  const e = reloaded.accounts['out@x.com'];
+  assert.equal(e.last_switch_out?.['5h']?.used_pct, 73);
+  assert.equal(e.last_switch_out?.['5h']?.source, 'sidecar');
+  assert.equal(e.last_switch_out?.['5h']?.resets_at, ISO);
+  assert.equal(e.last_switch_out?.['7d']?.used_pct, 41);
+});
+
 test('recordObservedQuota: writes last_observed_quota, does NOT append history', () => {
   const reg = account.emptyRegistry();
   account.upsertAccount(reg, 'a@x.com', {
