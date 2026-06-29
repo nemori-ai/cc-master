@@ -58,12 +58,15 @@
   - [usage show](#usage-show)
   - [usage advise](#usage-advise)
   - [usage task-cost](#usage-task-cost)
+  - [usage burn-rate](#usage-burn-rate)
+  - [usage runway](#usage-runway)
 - [namespace estimate（只读 advisory）](#namespace-estimate只读-advisory)
   - [estimate show](#estimate-show)
   - [estimate forecast](#estimate-forecast)
   - [estimate evm](#estimate-evm)
   - [estimate velocity](#estimate-velocity)
   - [estimate risk](#estimate-risk)
+  - [estimate cost-to-complete](#estimate-cost-to-complete)
 - [--json 输出形状](#--json-输出形状)
 
 ---
@@ -986,6 +989,44 @@ ccm usage task-cost [<task-id>] [flags]
 
 - 例：`ccm usage task-cost C2` · `ccm usage task-cost --group-by executor --json`
 
+### usage burn-rate
+
+**读**
+
+```
+ccm usage burn-rate [flags]
+```
+
+- positional：无
+- 行为：当前号 5h + 7d 各算一个配额%-burn-rate（Δused%/Δtime·账户权威·`window-elapsed` = 已用% ÷ 窗口已逝小时·%/h）；读 status-line sidecar（账户权威·Finding #37），信号不可得 → `available:false`（exit 0·诚实降级·非 exit 1）。`burn_pct_per_hour` 不可算 → `null`
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--as-of <str>` | | ISO-8601 UTC | as-of 时刻（backtest 回放·影响窗口已逝时间·默认 now） |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm usage burn-rate` · `ccm usage burn-rate --json`
+
+### usage runway
+
+**读**
+
+```
+ccm usage runway [flags]
+```
+
+- positional：无
+- 行为：剩余走廊空间 ÷ burn-rate → 距触顶 vs 距 reset 的小时数（偿付力 headroom）；5h 走廊上界 `90`%（临界阈）、7d 上界 `85`%（硬总闸）；`verdict` ∈ `ample`（reset 先于触顶·会先回血）\| `will-exhaust-before-reset`（触顶先于 reset·偿付力吃紧）\| `unknown`（数据不足）。信号缺 → `available:false`（exit 0·降级）
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--as-of <str>` | | ISO-8601 UTC | as-of 时刻（backtest 回放·默认 now） |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm usage runway` · `ccm usage runway --json`
+
 ---
 
 ## namespace estimate（只读 advisory）
@@ -1098,6 +1139,28 @@ ccm estimate risk [flags]
 | `--json` | | bool | | 结构化输出 |
 
 - 例：`ccm estimate risk --json` · `ccm estimate risk --scope this-repo`
+
+### estimate cost-to-complete
+
+**读**
+
+```
+ccm estimate cost-to-complete [flags]
+```
+
+- positional：无
+- 行为：清空剩余 backlog 的总**配额%** P50/P80/P95（剩余工作 × 每单位配额%增量·throughput 式 MC·偿付力账本）——每单位 %-增量 = 账户权威 burn-rate（%/h）× 历史任务实测工期（duration-grounded·串行归因假设）；外加 **token 辅助 sizing**（`knnPredict` 预测各 backlog 任务 token·**辅助相对量计·非预算账本**，只把总% 按相对重量切到各任务）。账户 burn 不可得 → `available:false` + `cost_to_complete_pct:null`（exit 0·降级·非 exit 1）；`backlog:0` → cost `0%`。p95 = 5% 硬墙（引擎分位口径·绝不 100%）
+- flags：
+
+| flag | 短名 | 类型 | 取值 | 含义 |
+|---|---|---|---|---|
+| `--scope <v>` | | enum | `home`（默认·跨板多层收缩）\| `this-repo` \| `this-board` | 历史语料范围 |
+| `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（backtest 回放·默认 now） |
+| `--runs <n>` | | string | | MC trials（默认 2000） |
+| `--seed <n>` | | string | | PRNG 种子（复现·默认 42） |
+| `--json` | | bool | | 结构化输出 |
+
+- 例：`ccm estimate cost-to-complete` · `ccm estimate cost-to-complete --scope this-repo --seed 42 --json`
 
 ---
 
@@ -1322,6 +1385,42 @@ id 不存在时 `data` = `null`，exit 0。
 
 `--scope`（默认 `this-board`）切语料范围：`this-board` 读本板全 tasks 的 observability（含非 done → 标 N/A）；`home` / `this-repo` 跨板聚归档 done 任务的 token（`this-repo` 过滤同 repo）。回显 `scope`。
 
+### usage burn-rate（`ccm usage burn-rate --json`）
+
+```jsonc
+{
+  "available": true,
+  "five_hour": { "used_pct": 92, "resets_at": 1782385200,
+    "burn_pct_per_hour": 18.4, "method": "window-elapsed", "confidence": "low" },
+  "seven_day": { "used_pct": 50, "resets_at": 1782864000,
+    "burn_pct_per_hour": 3.1, "method": "window-elapsed", "confidence": "low" },
+  "source": "account",                  // sidecar 缺 → "local-derived-approx" + available:false
+  "as_of": "2026-06-25T09:00:00Z",
+  "confidence": "low"
+}
+```
+
+`method` ∈ `finite-diff`（多采样有限差分）\| `window-elapsed`（单点 ÷ 窗口已逝时长）\| `none`（不可算）；`burn_pct_per_hour` 不可算 → `null`。两窗 `used_pct` 全缺 → `available:false`。
+
+### usage runway（`ccm usage runway --json`）
+
+```jsonc
+{
+  "available": true,
+  "five_hour": { "used_pct": 92, "burn_pct_per_hour": 18.4,
+    "remaining_corridor_pct": 0, "hours_to_ceiling": null, "hours_to_reset": 1.94,
+    "verdict": "will-exhaust-before-reset", "ceiling_pct": 90 },   // 5h 走廊上界 90
+  "seven_day": { "used_pct": 50, "burn_pct_per_hour": 3.1,
+    "remaining_corridor_pct": 35, "hours_to_ceiling": 11.29, "hours_to_reset": 120,
+    "verdict": "ample", "ceiling_pct": 85 },                       // 7d 走廊上界 85
+  "source": "account",
+  "as_of": "2026-06-25T09:00:00Z",
+  "confidence": "low"
+}
+```
+
+`verdict` ∈ `ample`（reset 先于触顶）\| `will-exhaust-before-reset`（触顶先于 reset·偿付力吃紧）\| `unknown`（数据不足）；信号缺该窗 → `used_pct:null` + `verdict:"unknown"`。
+
 ### estimate show（`ccm estimate show [<id>] --json`）
 
 ```jsonc
@@ -1388,3 +1487,22 @@ id 不存在时 `data` = `null`，exit 0。
   "history_n": 40, "confidence": "medium", "source": "calibrated",
   "as_of": "ISO", "seed": 42, "runs": 2000 }
 ```
+
+### estimate cost-to-complete（`ccm estimate cost-to-complete --json`）
+
+```jsonc
+{ "cost_to_complete_pct": { "p50": 12.4, "p80": 18.9, "p95": 27.3 },  // 配额%·p95 = 5% 硬墙·burn 不可得 → null
+  "mean_pct": 13.7, "backlog": 6,
+  "burn_pct_per_hour": 18.4, "burn_used_pct": 92, "burn_method": "window-elapsed",
+  "per_unit_samples": 23,
+  "token_sizing": {                     // **辅助·非预算账本**（配额% 才是账本）
+    "total_predicted_tokens": 1170000,
+    "per_task": [ { "id": "C4", "predicted_tokens": 195000, "pct_share": 2.06, "knn_confidence": "medium" } ],  // 截断前 10 个 backlog 任务
+    "note": "token 为派活相对 sizing（辅助·knnPredict.predictedTokens）·配额% 才是预算账本" },
+  "scope": "home", "runs": 2000, "seed": 42, "as_of": "ISO",
+  "source": "calibrated",               // burn 不可得 → "local-derived-approx" + available:false
+  "confidence": "medium", "available": true, "history_n": 40,
+  "notes": ["per-unit %-cost = burn-rate × 历史任务工期（假设串行归因…）"] }
+```
+
+账户 burn 不可得 → `available:false`、`cost_to_complete_pct:null`、`mean_pct:null`（exit 0·降级）；`backlog:0` → cost `0%`。`token_sizing` 是辅助相对量计（非预算账本）。
