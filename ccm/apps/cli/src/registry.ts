@@ -888,6 +888,82 @@ export const REGISTRY: Registry = {
       handler: 'estimate.costToComplete',
     },
   },
+
+  // ════════════════════ account（换号号池 CRUD·Phase 2a·token-blind）═══════════════════════════════════
+  //   号池备号 OAuth token 的录入 / 删除 / 刷新 / 列号——**非 board 操作**（不抢 board-lock·自管 accounts.json
+  //   registry + vault）。token 全程经引擎安全层（keychain argv / file 0600 vault / 探测只回布尔），绝不进
+  //   stdout/log/registry 明文。vault-kind enum 是 CLI-local 字面量（非 board-model 概念·同 usage accounts 先例）。
+  account: {
+    add: {
+      summary: '录入当前登录号的完整 OAuth blob 进 vault + accounts.json（身份 guard·token-blind）',
+      read: false,
+      positionals: [{ name: 'email', required: true }],
+      options: {
+        'vault-kind': {
+          type: 'string',
+          enum: ['keychain', 'file'],
+          desc: 'vault 形态（默认 mac=keychain·非 mac=file 明文 floor）',
+        },
+        'vault-file': { type: 'string', desc: 'file vault 路径（默认 <home>/accounts.env）' },
+        'keychain-service': { type: 'string', desc: 'keychain service（默认 cc-master-oauth）' },
+        expires: { type: 'string', desc: 'token_expires_at（严格 ISO·默认 now+365d）' },
+        registry: { type: 'string', desc: 'accounts.json 路径（默认 <home>/accounts.json）' },
+        json: { type: 'boolean', desc: '结构化输出（非密·绝不含 token）' },
+      },
+      examples: ['ccm account add me@x.com', 'ccm account add me@x.com --vault-kind file'],
+      handler: 'account.add',
+    },
+    refresh: {
+      summary: '重捕获当前登录号 blob 并 upsert（= add 幂等·更新 token_refreshed_at）',
+      read: false,
+      positionals: [{ name: 'email', required: true }],
+      options: {
+        'vault-kind': { type: 'string', enum: ['keychain', 'file'], desc: 'vault 形态' },
+        'vault-file': { type: 'string', desc: 'file vault 路径' },
+        'keychain-service': { type: 'string', desc: 'keychain service' },
+        expires: { type: 'string', desc: 'token_expires_at（严格 ISO·默认 now+365d）' },
+        registry: { type: 'string', desc: 'accounts.json 路径' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm account refresh me@x.com'],
+      handler: 'account.refresh',
+    },
+    delete: {
+      summary: '从号池删一个备号（vault token + registry entry·破坏性·非 TTY 须 --yes）',
+      read: false,
+      positionals: [{ name: 'email', required: true }],
+      options: {
+        'vault-kind': {
+          type: 'string',
+          enum: ['keychain', 'file'],
+          desc: 'vault 形态（缺省从 registry 推断）',
+        },
+        'vault-file': { type: 'string', desc: 'file vault 路径' },
+        'keychain-service': { type: 'string', desc: 'keychain service' },
+        registry: { type: 'string', desc: 'accounts.json 路径' },
+        yes: { type: 'boolean', desc: '非 TTY 确认（破坏性）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm account delete old@x.com --yes'],
+      handler: 'account.deleteAccount',
+    },
+    list: {
+      summary:
+        '只读列号池：email · vault 形态 · 到期 · active · switchable · token 状态（绝不取 token 值）',
+      read: true,
+      positionals: [],
+      options: {
+        'probe-keychain': {
+          type: 'boolean',
+          desc: 'security find 探活 keychain 项（不带 -w·只验存在性）',
+        },
+        registry: { type: 'string', desc: 'accounts.json 路径' },
+        json: { type: 'boolean', desc: 'JSON 数组' },
+      },
+      examples: ['ccm account list', 'ccm account list --probe-keychain --json'],
+      handler: 'account.list',
+    },
+  },
 };
 
 // ── ALIASES：热路径顶层捷径（cli-design §3.4·只给最高频两个）。alias → [noun, verb]。──────────────

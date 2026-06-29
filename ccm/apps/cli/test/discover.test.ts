@@ -104,19 +104,13 @@ test('resolveHome: --home wins over everything', () => {
 });
 
 test('resolveHome: $CC_MASTER_HOME beats $HOME default', () => {
-  assert.equal(
-    D.resolveHome({ env: { CC_MASTER_HOME: '/env/home', HOME: '/h' } }),
-    '/env/home',
-  );
+  assert.equal(D.resolveHome({ env: { CC_MASTER_HOME: '/env/home', HOME: '/h' } }), '/env/home');
 });
 
 test('resolveHome: no CC_MASTER_HOME → $HOME/.claude/cc-master (global default)', () => {
   // 统一全局口径：无 --home / 无 $CC_MASTER_HOME → 默认 $HOME/.claude/cc-master。不再 per-repo
   // （$CLAUDE_PROJECT_DIR 已不参与）、不再 walk-up。
-  assert.equal(
-    D.resolveHome({ env: { HOME: '/h' } }),
-    join('/h', '.claude', 'cc-master'),
-  );
+  assert.equal(D.resolveHome({ env: { HOME: '/h' } }), join('/h', '.claude', 'cc-master'));
 });
 
 test('resolveHome: $CLAUDE_PROJECT_DIR is NO LONGER a factor (per-repo home removed)', () => {

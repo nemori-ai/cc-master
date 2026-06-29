@@ -27,6 +27,7 @@
 
 import { parseArgs } from 'node:util';
 import type { Ctx } from './handlers/_common.js';
+import * as accountHandler from './handlers/account.js';
 import * as baselineHandler from './handlers/baseline.js';
 import * as boardHandler from './handlers/board.js';
 import * as cadenceHandler from './handlers/cadence.js';
@@ -76,6 +77,7 @@ const HANDLERS: Record<string, HandlerModule> = {
   policy: policyHandler as unknown as HandlerModule,
   usage: usageHandler as unknown as HandlerModule,
   estimate: estimateHandler as unknown as HandlerModule,
+  account: accountHandler as unknown as HandlerModule,
 };
 
 // node util.parseArgs 的 options 形态（带 short / multiple）——router 自有，独立于 registry 的 OptionSpec。

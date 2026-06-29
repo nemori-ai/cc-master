@@ -6,6 +6,10 @@
 // 命名无冲突：buildGraph / findCycle 只在 board-lint-core 实际导出（graph-core import 它、不再导出），
 //   故 export * 安全。各模块的类型（interface / type alias）一并 re-export 供下游用。
 
+// ── account/（Phase 1 纯逻辑移植·registry 模型 + 校验 + 锁 + 选号）──────────────────────────────────
+//   整组以命名空间导出（account.selectAccount / account.validateRegistry / account.tokenExpired …），
+//   避免与 usage/pacing.ts 的 flat tokenExpired/effectiveN/PoolAccount 撞名（两个 tokenExpired 语义不同·见 account/index.ts）。
+export * as account from './account/index.js';
 export type {
   BoardLike,
   CriticalPathResult,

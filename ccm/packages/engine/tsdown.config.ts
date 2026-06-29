@@ -13,18 +13,30 @@ export default defineConfig({
   //   history-loader 的 loadHomeBoards/loadCorpus（读 home 的 fs/path 函数）。给 IIFE 把这三个 external 映射成
   //   banner 里定义的全局占位：有 require（node 跑 IIFE）→ 取真模块；无 require（浏览器）→ 退化成 {}（这些
   //   node 内建在浏览器路径不被调用，占位对象足够，绝不在浏览器路径上执行其逻辑）。这让 IIFE 在裸浏览器 realm
-  //   加载即发布 __ccmEngine 而不抛。node:path 是 ADR-015 history-loader 引入的第三个（同 fs/crypto 既有模式）。
+  //   加载即发布 __ccmEngine 而不抛。node:path 是 ADR-015 history-loader 引入的第三个（同 fs/crypto 既有模式）；
+  //   node:os 是 Phase 1 account 模块（registry defaultRegistryPath 的 os.homedir）引入的第四个（webview 不触碰）。
   outputOptions: (options, format) => {
     if (format === 'iife') {
+      // node:child_process / https / http 是 Phase 2a account/vault + account/refresh 引入的（同 fs/crypto/path/os
+      //   既有模式）：webview **永不**调 vault / refresh（它们读 keychain / 联网·浏览器路径不触碰），占位 {} 足够——
+      //   有 require（node 跑 IIFE）→ 取真模块；无 require（浏览器）→ 退化 {}·绝不在浏览器路径执行其逻辑。
       options.globals = {
         'node:fs': '__ccm_node_fs',
         'node:crypto': '__ccm_node_crypto',
         'node:path': '__ccm_node_path',
+        'node:os': '__ccm_node_os',
+        'node:child_process': '__ccm_node_child_process',
+        'node:https': '__ccm_node_https',
+        'node:http': '__ccm_node_http',
       };
       options.banner =
         "var __ccm_node_fs = (typeof require !== 'undefined') ? require('node:fs') : {};\n" +
         "var __ccm_node_crypto = (typeof require !== 'undefined') ? require('node:crypto') : {};\n" +
-        "var __ccm_node_path = (typeof require !== 'undefined') ? require('node:path') : {};";
+        "var __ccm_node_path = (typeof require !== 'undefined') ? require('node:path') : {};\n" +
+        "var __ccm_node_os = (typeof require !== 'undefined') ? require('node:os') : {};\n" +
+        "var __ccm_node_child_process = (typeof require !== 'undefined') ? require('node:child_process') : {};\n" +
+        "var __ccm_node_https = (typeof require !== 'undefined') ? require('node:https') : {};\n" +
+        "var __ccm_node_http = (typeof require !== 'undefined') ? require('node:http') : {};";
     }
     return options;
   },
