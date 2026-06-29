@@ -43,6 +43,26 @@ export const LOCAL_APPROX_TRUST = envNum('CCM_SELECT_LOCAL_APPROX_TRUST', 0.85);
 // last_observed_quota 信任折扣（弱信号兜底）：录号那刻 session 当前号的配额视角，比真正切出快照弱。默认 0.7。
 export const OBSERVED_QUOTA_TRUST = envNum('CCM_SELECT_OBSERVED_QUOTA_TRUST', 0.7);
 
+// ── LOADBAL §3.1 扩项（reset-proximity 权重 + reserve-floor 硬约束）─────────────────────────────────
+//   设计 SSOT：design_docs/plans/2026-06-29-loadbal-account-namespace-design.md §3.1。两项都**与现有 score 叠加、
+//   不破** 7d≥85% 硬闸 / 临到期降权 / source 信任。**默认关闭（0）以保留现有 select 契约不变**——非 LOADBAL 的
+//   单号 switch 仍走「选可用度最高的」(满血优先)；LOADBAL 调度层经 env / opts 开启这两项（「先给保守缺省、dogfood 调」
+//   §7·把保守落成「不改既有行为，operator/LOADBAL 显式开」）。
+//
+// ① reset-proximity 权重：体现「烧快回血的、留慢回血的」(use-it-or-lose-it)——近 reset 的号当前 headroom
+//   廉价易逝（不在 reset 前用掉就随窗口蒸发），该优先烧；远 reset 的号 headroom 持久，当储备。故给 earliestReset
+//   在未来 HORIZON 小时内的号加分：bonus = WEIGHT × (1 − hoursToReset/HORIZON)，clamp[0,WEIGHT]。
+//   已过 reset（已回血·不再易逝）或 reset 在 HORIZON 之外（不急）→ 0 加分。默认 WEIGHT=0（关闭）。
+export const RESET_PROXIMITY_WEIGHT = envNum('CCM_SELECT_RESET_PROXIMITY_WEIGHT', 0);
+export const RESET_PROXIMITY_HORIZON_H = envNum('CCM_SELECT_RESET_PROXIMITY_HORIZON_H', 24);
+
+// ② reserve-floor 硬约束：始终留 ≥ RESERVE_FLOOR 个「满血可切号」当储备（别把最后的满血后备烧掉）。
+//   「满血」= 非 gated 候选且预测 min(avail5h, avail7d) ≥ RESERVE_FULL_PCT。选号时若**最优解本身是满血储备**
+//   且选它会让剩余满血储备跌破 floor、而池中尚有非储备候选 → 改选最优**非储备**号（把满血号留作后备）。
+//   池中无非储备候选可退 → floor 让位（必须切到某处·告警）。默认 FLOOR=0（关闭·保留现有行为）。
+export const RESERVE_FLOOR = envNum('CCM_SELECT_RESERVE_FLOOR', 0);
+export const RESERVE_FULL_PCT = envNum('CCM_SELECT_RESERVE_FULL_PCT', 90);
+
 // 无历史新号视满血基准分（按当前权重算，保证「满血」始终是评分上界，即便用户调了权重）。
 function freshFullScore(): number {
   return W5 * 100 + W7 * 100;
@@ -193,6 +213,10 @@ export interface Candidate {
   trust: number | null;
   earliestReset: string | null;
   excludedReason?: string;
+  // LOADBAL §3.1 可观测字段（默认关闭时恒为 0/false·不影响既有行为）。
+  resetProximityBonus?: number; // 近 reset 易逝 headroom 加分（叠加进 score·不进 scoreForExhaustionFloor）
+  isReserve?: boolean; // 是否「满血可切号」(reserve-floor 储备分类)
+  reserveHeld?: boolean; // 本次选号因 reserve-floor 被留作储备、未被选中（仅当它本是最优解时标注）
 }
 
 export interface SelectResult {
@@ -204,6 +228,27 @@ export interface SelectResult {
 
 export interface SelectOptions {
   now?: string;
+  // LOADBAL §3.1 旋钮（缺省回退到 env 常量·缺 env 回退到默认 0=关闭，保留现有 select 契约）。
+  resetProximityWeight?: number;
+  resetProximityHorizonH?: number;
+  reserveFloor?: number;
+  reserveFullPct?: number;
+}
+
+// reset-proximity 加分：earliestReset 在未来 horizon 小时内 → 线性加分（越近越多·clamp[0,weight]）。
+//   已过 reset / 无 reset / 超 horizon → 0。weight≤0 → 关闭（恒 0）。
+export function resetProximityBonus(
+  earliestReset: string | null,
+  now: string,
+  weight: number,
+  horizonH: number,
+): number {
+  if (!(weight > 0) || !(horizonH > 0)) return 0;
+  const days = daysUntil(earliestReset, now);
+  if (days == null) return 0; // 无 / 非严格 ISO reset → 不加分
+  const hours = days * 24;
+  if (hours <= 0 || hours >= horizonH) return 0; // 已过 reset（已回血）或超出 horizon（不急）→ 不加分
+  return weight * (1 - hours / horizonH); // 越近 reset → 越接近满额 weight
 }
 
 // selectAccount(reg, nowIso?, opts?) → 结构化结果（纯函数，便于测试注入 now/registry）。
@@ -216,6 +261,18 @@ export function selectAccount(
   const o = opts || {};
   const now = o.now || nowArg || nowIso();
   const warnings: string[] = [];
+
+  // LOADBAL §3.1 旋钮解析（opts > env 常量 > 默认 0=关闭）。
+  const proxWeight = Number.isFinite(o.resetProximityWeight)
+    ? (o.resetProximityWeight as number)
+    : RESET_PROXIMITY_WEIGHT;
+  const proxHorizonH = Number.isFinite(o.resetProximityHorizonH)
+    ? (o.resetProximityHorizonH as number)
+    : RESET_PROXIMITY_HORIZON_H;
+  const reserveFloor = Number.isFinite(o.reserveFloor) ? (o.reserveFloor as number) : RESERVE_FLOOR;
+  const reserveFullPct = Number.isFinite(o.reserveFullPct)
+    ? (o.reserveFullPct as number)
+    : RESERVE_FULL_PCT;
 
   const registry = reg && typeof reg === 'object' ? reg : ({} as Registry);
   const accounts =
@@ -300,6 +357,13 @@ export function selectAccount(
       );
     }
 
+    // LOADBAL §3.1 ①：reset-proximity 加分（近 reset 易逝 headroom 该优先烧）。叠加进 finalScore（影响排序），
+    //   但**不进 scoreForExhaustionFloor**（地板判的是配额耗尽，不该被「近 reset」加分掩盖）。gated 号不加分。
+    const proxBonus = scoreInfo.gated
+      ? 0
+      : resetProximityBonus(scoreInfo.earliestReset, now, proxWeight, proxHorizonH);
+    if (proxBonus !== 0) finalScore = finalScore + proxBonus;
+
     // 弱信号兜底告警。
     if (observedFallback && !scoreInfo.gated) {
       warnings.push(
@@ -334,6 +398,12 @@ export function selectAccount(
       sources: scoreInfo.sources,
       trust: scoreInfo.trust,
       earliestReset: scoreInfo.earliestReset,
+      resetProximityBonus: proxBonus,
+      // 「满血可切号」分类（reserve-floor 用）：非 gated 且预测 min(avail5h,avail7d) ≥ reserveFullPct。
+      isReserve:
+        !scoreInfo.gated &&
+        scoreInfo.avail5h >= reserveFullPct &&
+        scoreInfo.avail7d >= reserveFullPct,
     });
   }
 
@@ -367,7 +437,7 @@ export function selectAccount(
 
   // 在可选候选（已排除 gated）里排序取最优。
   const sortedCandidates = candidates.slice().sort(cmpRows);
-  const best = sortedCandidates[0] as Candidate;
+  let best = sortedCandidates[0] as Candidate;
 
   // 全员逼顶 / 不可用：所有候选的配额分（到期降权之前）都 ≤ 地板 → NONE_ALL_EXHAUSTED。
   //   用 scoreForExhaustionFloor（配额分）而非 score（含到期降权）判地板；取候选里配额分的最大值判地板。
@@ -380,6 +450,21 @@ export function selectAccount(
       '所有可切换备号都已逼顶 / 不可用（候选配额评分全跌破地板）——这是 blocked_on:"user" 决策：等 reset 还是别的，请用户拍板。',
     );
     return { selected: null, reason: 'NONE_ALL_EXHAUSTED', candidates: sorted, warnings };
+  }
+
+  // LOADBAL §3.1 ②：reserve-floor 硬约束。若最优解本身是满血储备、且选它会让剩余满血储备跌破 floor、
+  //   而池中尚有非储备候选 → 改选最优非储备号（把满血号留作后备）。无非储备候选可退 → floor 让位（必须切·告警）。
+  if (reserveFloor > 0 && best.isReserve === true) {
+    const reserves = candidates.filter((r) => r.isReserve === true);
+    const nonReserves = candidates.filter((r) => r.isReserve !== true);
+    // 选这个满血储备会让剩余满血储备数 = reserves.length - 1 < reserveFloor → 跌破 floor。
+    if (reserves.length <= reserveFloor && nonReserves.length > 0) {
+      best.reserveHeld = true; // 标注：它本是最优解、被留作储备。
+      best = nonReserves.slice().sort(cmpRows)[0] as Candidate;
+      warnings.push(
+        `reserve-floor=${reserveFloor}：池中满血储备号仅 ${reserves.length} 个，为保留 ≥${reserveFloor} 个满血可切后备，本次改选非储备号 ${best.email} 切入（满血号留作储备）。`,
+      );
+    }
   }
 
   return { selected: best.email, reason: 'SELECTED', candidates: sorted, warnings };
