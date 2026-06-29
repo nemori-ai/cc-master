@@ -79,6 +79,15 @@ export {
   TIERS,
   taskTrulyDone,
 } from './board-model.js';
+// ── coordination/（COORD 多 orchestrator 感知通道·跨板只读花名册）──
+export type {
+  PeerCurrent,
+  PeerEntry,
+  PeerPlanned,
+  PeerRoster,
+  RosterOptions,
+} from './coordination/peers.js';
+export { buildPeerRoster, PEER_FRESHNESS_SEC } from './coordination/peers.js';
 // 校准（EWMA + Bayesian shrinkage ≅ RCF）
 export type { CalibrationOptions, CalibrationResult } from './estimate/calibration.js';
 export {

@@ -692,6 +692,28 @@ export const REGISTRY: Registry = {
     },
   },
 
+  // ════════════════════ peers（COORD 多 orchestrator 感知·只读跨板）════════════════════════════════════
+  //   感知通道（设计稿 §3.2）：扫 home/boards/ 全体 active+心跳新鲜板 → 花名册（goal/workload/priority/liveness），
+  //   喂价值感知的独立自我配速（不必协商即可合理让路 / 认领 slack）。**纯只读跨板**——零写、不抢 board-lock、
+  //   不需要 active board（自身可无板·号池/感知是用户级跨板）。token-blind：花名册无任何 secret。
+  peers: {
+    list: {
+      summary:
+        '跨板只读花名册：全体 active+心跳新鲜 orchestrator 的 goal/workload/priority/liveness（COORD 感知通道）',
+      read: true,
+      positionals: [],
+      options: {
+        'freshness-sec': {
+          type: 'string',
+          desc: '心跳判活窗口秒（默认 600=10min·与 bootstrap resume 同口径）',
+        },
+        json: { type: 'boolean', desc: '结构化花名册（否则人类表格）' },
+      },
+      examples: ['ccm peers', 'ccm peers --json', 'ccm peers --freshness-sec 300 --json'],
+      handler: 'peers.list',
+    },
+  },
+
   // ════════════════════ usage（只读 advisory·ADR-015）═══════════════════════════════════════════════
   //   配额侧只读 analysis namespace（纯只读·零写·不抢 board-lock）。enum 为 CLI-local 呈现枚举（scope /
   //   accounts / group-by）——非 board-model 概念，故同 `jc resolve` 的 ['upheld','overturned'] 字面量先例。
@@ -1002,6 +1024,7 @@ export const ALIASES: Record<string, [string, string]> = {
   next: ['board', 'next'],
   lint: ['board', 'lint'],
   ls: ['task', 'list'], // task ls 别名（cli-design §3.2，verb 级；router 在 task 域内识别）
+  peers: ['peers', 'list'], // `ccm peers` → `ccm peers list`（COORD·设计稿 §9 verb 面就这一个只读）
 };
 
 // ── WRITABLE_FIELDS_COVERED：反漂移门用（cli-design §3.5）────────────────────────────────────────

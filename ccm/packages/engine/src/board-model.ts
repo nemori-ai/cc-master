@@ -58,6 +58,9 @@ export const ENUMS = {
   watchdogMechanism: ['cron', 'loop', 'monitor', 'shell'],
   // accountSwitchPolicy：board.policy.autonomous_account_switch 合法值（闭合枚举）。
   accountSwitchPolicy: ['allow', 'deny'],
+  // coordPriority：board.coordination.priority 板级优先级五挡（COORD·跨板协调 hint·非板内任务排序·见 §5.1）。
+  //   有序高→低：urgent > high > normal（默认）> low > trivial。
+  coordPriority: ['urgent', 'high', 'normal', 'low', 'trivial'],
   // acceptance 目标函数 criterion 的 kind / status（spec §4.1）。
   acceptanceKind: ['test', 'metric', 'manual', 'review'],
   acceptanceStatus: ['pending', 'met', 'failed'],
@@ -215,6 +218,15 @@ export const FIELDS = {
       writers: 'policy set',
       when: '用户锁/放开自主权限时',
       degrade: '缺→解析为 allow；形状坏→warn(FMT-POLICY)',
+    },
+    coordination: {
+      tier: '✎',
+      type: 'object{priority?:enum coordPriority, state?:{current?:{active_tasks?:int, workload?:string, burn_contribution?:number}, planned?:{remaining_work?:string, cost_to_complete_pct?:number}}}?',
+      default: '缺省(无协调 publish·priority 解析为 normal)',
+      readers: 'ccm peers 跨板只读花名册 / SKILL A 多-orch pacing 推理（COORD·hook 不读·非窄腰）',
+      writers: 'agent 经 CLI(决策点 / Stop / wake 时刷)',
+      when: '多 orchestrator 并行抽同一配额缸时 publish 自身状态',
+      degrade: '缺→该 peer 不计入花名册对应维度(退单板·fail-safe)；形状坏→warn(FMT-COORD)',
     },
   },
   task: {
@@ -788,6 +800,14 @@ export const INVARIANTS: Invariant[] = [
     family: 'FMT',
     scope: 'board',
     summary: 'policy 非对象、或 autonomous_account_switch 不在 {allow,deny} 枚举',
+  },
+  {
+    id: 'FMT-COORD',
+    level: 'warn',
+    family: 'FMT',
+    scope: 'board',
+    summary:
+      'coordination 非对象、或 priority 不在 coordPriority 枚举、或 state.current/planned 形状/数字字段类型不合法',
   },
   {
     id: 'FMT-MODEL',

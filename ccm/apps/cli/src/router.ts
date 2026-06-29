@@ -34,6 +34,7 @@ import * as cadenceHandler from './handlers/cadence.js';
 import * as estimateHandler from './handlers/estimate.js';
 import * as jcHandler from './handlers/jc.js';
 import * as logHandler from './handlers/log.js';
+import * as peersHandler from './handlers/peers.js';
 import * as policyHandler from './handlers/policy.js';
 import * as taskHandler from './handlers/task.js';
 import * as usageHandler from './handlers/usage.js';
@@ -75,6 +76,7 @@ const HANDLERS: Record<string, HandlerModule> = {
   watchdog: watchdogHandler as unknown as HandlerModule,
   baseline: baselineHandler as unknown as HandlerModule,
   policy: policyHandler as unknown as HandlerModule,
+  peers: peersHandler as unknown as HandlerModule,
   usage: usageHandler as unknown as HandlerModule,
   estimate: estimateHandler as unknown as HandlerModule,
   account: accountHandler as unknown as HandlerModule,

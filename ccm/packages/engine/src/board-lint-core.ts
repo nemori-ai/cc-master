@@ -183,6 +183,7 @@ export function lintBoard(text: string): LintResult {
   lintCadenceFormat(b, emit);
   lintBaseline(b, emit);
   lintPolicy(b, emit);
+  lintCoordination(b, emit);
 
   // FMT-TASKS（数组）——非数组无从遍历，板级检查已做，提前返回。
   const tasks = b.tasks;
@@ -678,6 +679,88 @@ function lintPolicy(board: BoardLike, emit: Emit): void {
       'FMT-POLICY',
       `policy.autonomous_account_switch 是 ${JSON.stringify(p.autonomous_account_switch)}，应 ∈ {allow, deny}。影响：硬闸只认这两个值——未知值则开关判定失效。`,
     );
+  }
+}
+
+// FMT-COORD：coordination 块形状（COORD·present 才校验·全 warn·graceful）。
+//   coordination 是 ✎ agent-shaped 协调 hint（hook 不读·非窄腰）——形状坏不阻断写盘，只让 ccm peers
+//   跨板读时把该 peer 的对应维度降级（退单板·fail-safe）。校验：① 整块是对象；② priority ∈ coordPriority
+//   五挡；③ state / state.current / state.planned 若存在须是对象；④ 数字字段（active_tasks / burn_contribution
+//   / cost_to_complete_pct）若存在须是数字、人类可读字段（workload / remaining_work）若存在须是字符串。
+function lintCoordination(board: BoardLike, emit: Emit): void {
+  const co = board.coordination;
+  if (co === undefined || co === null) return;
+  if (typeof co !== 'object' || Array.isArray(co)) {
+    emit(
+      'FMT-COORD',
+      `coordination 若存在必须是对象（当前：${JSON.stringify(co)}）。影响：ccm peers 跨板读它出花名册——非对象则该 peer 整块降级、不计入感知（退单板 pacing·fail-safe）。`,
+    );
+    return;
+  }
+  const c = co as Record<string, unknown>;
+  if (c.priority !== undefined && !isEnumMember('coordPriority', c.priority)) {
+    emit(
+      'FMT-COORD',
+      `coordination.priority 是 ${JSON.stringify(c.priority)}，应 ∈ {urgent, high, normal, low, trivial}。影响：板级优先级是裁决主轴 + 机械 fair-share 权重源——未知值则该板优先级退化为默认 normal。`,
+    );
+  }
+  if (c.state !== undefined) {
+    if (typeof c.state !== 'object' || Array.isArray(c.state) || c.state === null) {
+      emit(
+        'FMT-COORD',
+        `coordination.state 若存在必须是对象 {current?, planned?}（当前：${JSON.stringify(c.state)}）。`,
+      );
+      return;
+    }
+    const st = c.state as Record<string, unknown>;
+    // current：{active_tasks?:int·数字, workload?:string, burn_contribution?:number}
+    if (st.current !== undefined) {
+      if (typeof st.current !== 'object' || Array.isArray(st.current) || st.current === null) {
+        emit(
+          'FMT-COORD',
+          `coordination.state.current 若存在必须是对象（当前：${JSON.stringify(st.current)}）。`,
+        );
+      } else {
+        const cur = st.current as Record<string, unknown>;
+        for (const k of ['active_tasks', 'burn_contribution']) {
+          if (cur[k] !== undefined && typeof cur[k] !== 'number') {
+            emit(
+              'FMT-COORD',
+              `coordination.state.current.${k} 若存在必须是数字（当前：${JSON.stringify(cur[k])}）。影响：数字喂机械 fair-share floor / headroom 估计——非数字则该维度降级忽略。`,
+            );
+          }
+        }
+        if (cur.workload !== undefined && typeof cur.workload !== 'string') {
+          emit(
+            'FMT-COORD',
+            `coordination.state.current.workload 若存在必须是字符串（人类可读·喂 peer 价值推理；当前：${JSON.stringify(cur.workload)}）。`,
+          );
+        }
+      }
+    }
+    // planned：{remaining_work?:string, cost_to_complete_pct?:number}
+    if (st.planned !== undefined) {
+      if (typeof st.planned !== 'object' || Array.isArray(st.planned) || st.planned === null) {
+        emit(
+          'FMT-COORD',
+          `coordination.state.planned 若存在必须是对象（当前：${JSON.stringify(st.planned)}）。`,
+        );
+      } else {
+        const pl = st.planned as Record<string, unknown>;
+        if (pl.cost_to_complete_pct !== undefined && typeof pl.cost_to_complete_pct !== 'number') {
+          emit(
+            'FMT-COORD',
+            `coordination.state.planned.cost_to_complete_pct 若存在必须是数字（当前：${JSON.stringify(pl.cost_to_complete_pct)}）。影响：偿付力信号喂价值/紧迫推理——非数字则降级忽略。`,
+          );
+        }
+        if (pl.remaining_work !== undefined && typeof pl.remaining_work !== 'string') {
+          emit(
+            'FMT-COORD',
+            `coordination.state.planned.remaining_work 若存在必须是字符串（人类可读·喂 peer 价值推理；当前：${JSON.stringify(pl.remaining_work)}）。`,
+          );
+        }
+      }
+    }
   }
 }
 

@@ -17,7 +17,7 @@ import { ALIASES, REGISTRY, WRITABLE_FIELDS_COVERED } from '../src/registry.js';
 
 const model = { ENUMS, FIELDS, TIERS };
 
-// ── 覆盖全部 11 namespace 的全部 verb（cli-design §3·ADR-015 加 usage/estimate·Phase 2a 加 account）──────
+// ── 覆盖全部 12 namespace 的全部 verb（cli-design §3·ADR-015 加 usage/estimate·Phase 2a 加 account·COORD 加 peers）──────
 const EXPECTED: Record<string, string[]> = {
   board: ['show', 'lint', 'graph', 'critical-path', 'next', 'init', 'update'],
   baseline: ['snapshot', 'show', 'reset'],
@@ -27,12 +27,13 @@ const EXPECTED: Record<string, string[]> = {
   cadence: ['update', 'open', 'ship', 'status'],
   watchdog: ['arm', 'disarm', 'status'],
   policy: ['show', 'set'],
+  peers: ['list'],
   usage: ['show', 'advise', 'task-cost', 'burn-rate', 'runway'],
   estimate: ['show', 'forecast', 'evm', 'velocity', 'risk', 'cost-to-complete'],
   account: ['add', 'refresh', 'delete', 'list', 'switch'],
 };
 
-test('REGISTRY covers all 11 namespaces with all their verbs', () => {
+test('REGISTRY covers all 12 namespaces with all their verbs', () => {
   assert.deepEqual(Object.keys(REGISTRY).sort(), Object.keys(EXPECTED).sort());
   for (const noun of Object.keys(EXPECTED)) {
     assert.deepEqual(

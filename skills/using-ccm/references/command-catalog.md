@@ -54,6 +54,8 @@
 - [namespace policy](#namespace-policy)
   - [policy show](#policy-show)
   - [policy set](#policy-set)
+- [namespace peers（COORD 感知·只读跨板）](#namespace-peerscoord-感知只读跨板)
+  - [peers list](#peers-list)
 - [namespace usage（只读 advisory）](#namespace-usage只读-advisory)
   - [usage show](#usage-show)
   - [usage advise](#usage-advise)
@@ -94,6 +96,7 @@ ccm <alias> [args] [flags]
 | `watchdog` | 自我唤醒 watchdog（ADR-011） |
 | `baseline` | EVM 计划基线快照（estimate 引擎的 plan SSOT·board 内唯一写 noun·ADR-015） |
 | `policy` | board 级 orchestrator 自主权限开关（首条 `autonomous_account_switch`·写 noun·用户所有·ADR-016） |
+| `peers` | 多 orchestrator 协调**感知层**：跨板只读花名册（全体活+心跳新鲜 orchestrator 的 goal/workload/priority/liveness·COORD） |
 | `usage` | 配额侧**只读 advisory**：当前号/备号 5h/7d 用量 + 双侧走廊 pacing verdict + 任务 token 成本（ADR-015） |
 | `estimate` | 工作侧**只读 advisory**：双通道 MC 工期预测 / EVM / velocity / 风险（消费 OR/ML 引擎·ADR-015） |
 
@@ -104,6 +107,7 @@ ccm <alias> [args] [flags]
 | `ccm next` | `ccm board next` |
 | `ccm lint` | `ccm board lint` |
 | `ccm ls` | `ccm task list` |
+| `ccm peers` | `ccm peers list` |
 
 （另：`task list` / `jc list` / `log list` 自身有子命令别名 `ls`，即 `ccm task ls` / `ccm jc ls` / `ccm log ls`。）
 
@@ -924,6 +928,34 @@ ccm policy set --autonomous-account-switch=allow|deny [flags]
 
 ---
 
+## namespace peers（COORD 感知·只读跨板）
+
+多 orchestrator 协调的**感知层**（COORD）：M 个 orchestrator 并行抽同一活跃配额缸，各自孤立 pacing 会公地悲剧——感知通道让每个 orchestrator 看见全体 peer 的 goal / workload / priority / 死活，喂价值感知的**独立**自我配速（不必双向协商即可单方面合理让路 / 认领 slack；通信通道**不存在**·只读感知 + 机械 fair-share floor 收口）。**纯只读跨板**——扫 `<home>/boards/` 全体板，零写、不抢 board-lock、**不需要 active board 自身**（感知是用户级跨板·同 usage/estimate）。**token-blind**：花名册只投影 goal / priority / workload / state% / liveness——**无任何 secret / token**。
+
+> 数据源 = **只读** `<home>/boards/` 下全部 `*.board.json` 的 `owner`（active / heartbeat / session_id）+ `goal` + ✎ `coordination` 块（priority + state.current/planned）。peers **绝不写任何板**。`coordination` 块由各 orchestrator 自己经 board 写命令 publish（决策点 / Stop / wake 时刷自身状态·写侧形态随 board 写命令面定），peers 只聚合读。
+
+### peers list
+
+**读**（别名 `ccm peers`）
+
+```
+ccm peers [list] [flags]
+```
+
+- positional：无
+- 行为：扫 `<home>/boards/` 全体 **`owner.active:true` 且心跳新鲜**（`owner.heartbeat` 距 now `< freshness-sec`·默认 600s=10min·与 bootstrap `--resume` live 判活同口径）的板 → 聚成花名册：每 peer 一行 `goal` / `priority`（缺省解析 `normal`）/ `current`（active_tasks/workload/burn_contribution）/ `planned`（remaining_work/cost_to_complete_pct）/ liveness（heartbeat + age）。`count` = M（活+新鲜板数·喂多-orch headroom/M 防过冲）。**fail-safe**：home 不存在 / 无活板 → 空花名册（`count:0`·exit 0·退单板 pacing·不报错）；某 peer `coordination` 缺 / 字段坏 → 该维度降级（`current`/`planned` 为 `null`·`priority` 退 `normal`）·仍计入（活+新鲜即在册）
+- 排序：`priority` 降序（`urgent` 先 → `trivial`）→ 心跳新→旧 → 文件名（稳定 tiebreak）
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--freshness-sec <n>` | | string | 心跳判活窗口秒（默认 600·正整数·非整数/缺则用默认） |
+| `--json` | | bool | 结构化花名册（否则人类表格） |
+
+- 例：`ccm peers` · `ccm peers --json` · `ccm peers --freshness-sec 300 --json`
+
+---
+
 ## namespace usage（只读 advisory）
 
 配额侧只读 advisory（ADR-015·charter ②控制 token 消耗速度 + ⑤资源下最大化效率）：当前号/备号用量 + 双侧走廊 pacing verdict + 任务 token 成本。**纯只读**——全 verb query/compute，零写、不抢 board-lock、不落状态（与 `baseline`/`policy` 这俩写 noun 相反）。诚实降级：账户信号不可得 = **exit 0 + `data.available:false`**（非 exit 1）；无 `accounts.json` registry → 天然单账号·`effective_n=1`（不报错）。诚实字段贯穿：`source`（account / registry-snapshot / observability / local-derived-approx）/ `confidence`（high/medium/low）/ `as_of` / `snapshot_stale` / `coverage_pct`。ccm 出 verdict/数据，**不替 orchestrator 决策**（真动作归 SKILL A·红线3）。
@@ -1315,6 +1347,34 @@ id 不存在时 `data` = `null`，exit 0。
 ```json
 { "policy": { "autonomous_account_switch": "deny" } }
 ```
+
+### peers list（`ccm peers --json` / `ccm peers list --json`）
+
+`data` = 花名册：`peers[]`（活+心跳新鲜 orchestrator）+ `count`（=M）+ `freshness_sec`（本次判活窗口）+ `as_of`（判活基准 ISO）：
+
+```jsonc
+{
+  "peers": [
+    {
+      "board_file": "20260629T120000Z-12345.board.json",
+      "goal": "prod incident fix",
+      "priority": "urgent",                 // coordination.priority·缺/坏 → "normal"
+      "session_id": "s1",                   // owner.session_id（"" = 未认领活板）
+      "heartbeat": "2026-06-29T11:59:00Z",
+      "heartbeat_age_sec": 60,
+      "current": {                          // coordination.state.current·缺 → null
+        "active_tasks": 1, "workload": "hotfix", "burn_contribution": 9 },
+      "planned": {                          // coordination.state.planned·缺 → null
+        "remaining_work": "verify+deploy", "cost_to_complete_pct": 4 }
+    }
+  ],
+  "count": 1,                               // = peers.length（M·喂 headroom/M 防过冲）
+  "freshness_sec": 600,                     // 本次判活心跳窗口（--freshness-sec 覆写后回显）
+  "as_of": "2026-06-29T12:00:00Z"
+}
+```
+
+无活+新鲜板 → `peers:[]`、`count:0`（exit 0·fail-safe 退单板）。各 peer 数字字段坏 / 人类可读字段坏 → 该字段 `null`（降级·不污染花名册）。**无任何 secret / token 字段**（token-blind）。
 
 ### usage show（`ccm usage show --json`）
 
