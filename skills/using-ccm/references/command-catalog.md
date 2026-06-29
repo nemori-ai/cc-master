@@ -20,6 +20,7 @@
   - [board next](#board-next)
   - [board init](#board-init)
   - [board update](#board-update)
+  - [board set-param](#board-set-param)
 - [namespace task](#namespace-task)
   - [task add](#task-add)
   - [task show](#task-show)
@@ -285,6 +286,21 @@ ccm board update [flags]
 | `--worktree <str>` | | string | `git.worktree` |
 
 - 例：`ccm board update --goal "v0.10.0 收尾"` · `ccm board update --wip-limit 4 --branch board-v2-redesign`
+
+### board set-param
+
+**写**（hook-owned 参数区·ADR-020·least-privilege·带锁）
+
+```
+ccm board set-param <key> <value> [flags]
+```
+
+- positional：`<key>`（必填·**白名单**：当前仅 `last_identity_remind`）、`<value>`（必填·按 key 声明类型校验）
+- 作用域**收窄到 `board.runtime.<白名单 key>`**——非白名单 key / 非法值 → `exit 2`（Usage）；**绝不触碰 🔒/👁 窄腰**。
+- 主要使用者是周期 hook（IDNUDGE）经进程边界 spawn 写 `runtime.last_identity_remind`（ISO-8601 UTC）；agent 也可经它写参数区。走 `runWrite` 带锁管线（与所有写 verb 同口径·刷 `owner.heartbeat`）。
+- flags：`--json`（结构化输出 `{ok,data:{runtime}}`）；`--dry-run` 跑完整校验不落盘。
+- 值类型：`last_identity_remind` 须严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`），否则 `exit 2`。
+- 例：`ccm board set-param last_identity_remind 2026-06-29T12:34:56Z` · `… --board <path>`
 
 ---
 

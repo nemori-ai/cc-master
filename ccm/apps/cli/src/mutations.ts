@@ -19,7 +19,13 @@
 //   SCHEMA_VERSION / isLegalTransition / STATUS_MACHINE；module.exports 换成命名导出。逻辑/数值/正则/
 //   报错文案/.errKind 逐字保持。board 用宽松结构类型（mutations 只机械写形状·不强 schema）。
 
-import { estimateHours, isLegalTransition, SCHEMA_VERSION, STATUS_MACHINE } from '@ccm/engine';
+import {
+  estimateHours,
+  isISOUTC,
+  isLegalTransition,
+  SCHEMA_VERSION,
+  STATUS_MACHINE,
+} from '@ccm/engine';
 
 // 带 .errKind 的 Error（router 据此映射退出码）。
 interface KindedError extends Error {
@@ -112,6 +118,40 @@ export function boardUpdate(
     if (args.branch !== undefined) b.git.branch = args.branch;
     if (args.worktree !== undefined) b.git.worktree = args.worktree;
   }
+  return touch(b);
+}
+
+// ── boardSetParam(board, {key, value}) → 写 board.runtime.<白名单 key>（ADR-020·hook-owned 参数区）。
+//   least-privilege 字段级 setter：作用域**收窄到 `runtime.*`**，verb 层（本函数）做 ① key 白名单（非白名单
+//   → throw .errKind='Usage'·exit 2）+ ② 值类型校验（按 key 的声明类型·如 ISO key 走 isISOUTC·非法 → Usage）。
+//   只允许写 `board.runtime.<白名单 key>`——绝不触碰 🔒/👁 窄腰（白名单是第一道闸，applySet 的 assertFlexible
+//   是第二道兜底·但本函数直写 runtime 不经 applySet）。touch 刷 owner.heartbeat（与所有写 verb 同口径）。
+//
+// RUNTIME_PARAM_KEYS：runtime 参数区的键白名单 + 每个键的值校验器（'iso' = 严格 ISO-8601 UTC）。
+//   开放扩展：未来加一个周期 hook 簿记键 = 在此加一条（+ board-model FIELDS.runtime 字段说明），复用 set-param。
+const RUNTIME_PARAM_KEYS: Record<string, 'iso'> = {
+  last_identity_remind: 'iso',
+};
+export function boardSetParam(board: Board, args?: { key?: string; value?: string }): Board {
+  const key = args && typeof args.key === 'string' ? args.key : '';
+  const value = args && typeof args.value === 'string' ? args.value : '';
+  const valKind = RUNTIME_PARAM_KEYS[key];
+  if (valKind === undefined) {
+    const allowed = Object.keys(RUNTIME_PARAM_KEYS).join(', ');
+    throw err(
+      `refused: "${key}" 不在 runtime 参数区白名单（仅允许：${allowed}）。set-param 作用域收窄到 board.runtime.<白名单 key>（ADR-020·least-privilege）。`,
+      'Usage',
+    );
+  }
+  if (valKind === 'iso' && !isISOUTC(value)) {
+    throw err(
+      `refused: runtime.${key} 须是严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ），收到 ${JSON.stringify(value)}。`,
+      'Usage',
+    );
+  }
+  const b = clone(board);
+  if (!b.runtime || typeof b.runtime !== 'object' || Array.isArray(b.runtime)) b.runtime = {};
+  b.runtime[key] = value;
   return touch(b);
 }
 

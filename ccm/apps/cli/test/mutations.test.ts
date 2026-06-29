@@ -472,6 +472,53 @@ test('applySetJson honors 🔒 gate too (refuses deps)', () => {
   );
 });
 
+// ── boardSetParam（ADR-020·hook-owned runtime 参数区·白名单 + 值校验）─────────────────────────────────
+test('boardSetParam: 白名单 key + 合法 ISO → 写 runtime.<key> + stamp heartbeat', () => {
+  const b = baseBoard();
+  const out = m.boardSetParam(b, { key: 'last_identity_remind', value: '2026-06-29T12:34:56Z' });
+  assert.equal(out.runtime.last_identity_remind, '2026-06-29T12:34:56Z');
+  assert.ok(ISO.test(out.owner.heartbeat), 'heartbeat stamped');
+  assert.notEqual(out, b, '返回新对象');
+});
+
+test('boardSetParam: 已有 runtime 时只覆写该 key（不抹其它键）', () => {
+  const b = baseBoard();
+  b.runtime = { some_future_hook_key: 'keep-me' };
+  const out = m.boardSetParam(b, { key: 'last_identity_remind', value: '2026-06-29T00:00:00Z' });
+  assert.equal(out.runtime.last_identity_remind, '2026-06-29T00:00:00Z');
+  assert.equal(out.runtime.some_future_hook_key, 'keep-me', '其它键保留');
+});
+
+test('boardSetParam: 非白名单 key → throw .errKind=Usage（exit 2）', () => {
+  const b = baseBoard();
+  assert.throws(
+    () => m.boardSetParam(b, { key: 'bogus_key', value: 'x' }),
+    (e: any) => {
+      assert.equal(e.errKind, 'Usage');
+      return /白名单/.test(e.message);
+    },
+  );
+});
+
+test('boardSetParam: 白名单 key 但非法 ISO 值 → throw .errKind=Usage（exit 2）', () => {
+  const b = baseBoard();
+  assert.throws(
+    () => m.boardSetParam(b, { key: 'last_identity_remind', value: 'not-iso' }),
+    (e: any) => {
+      assert.equal(e.errKind, 'Usage');
+      return /ISO/.test(e.message);
+    },
+  );
+});
+
+test('boardSetParam: runtime 是 ✎ 非窄腰——绝不触碰 🔒 字段（owner/goal/tasks 原样）', () => {
+  const b = baseBoard();
+  const out = m.boardSetParam(b, { key: 'last_identity_remind', value: '2026-06-29T12:34:56Z' });
+  assert.equal(out.goal, b.goal);
+  assert.equal(out.tasks.length, b.tasks.length);
+  assert.equal(out.owner.session_id, b.owner.session_id);
+});
+
 // ── 纯函数纪律全覆盖：每个 mutator 都不 alias / 不原地改输入 ─────────────────────────────────────────
 test('all mutators stamp heartbeat and leave input board structurally untouched', () => {
   const probes: ((b: AnyBoard) => AnyBoard)[] = [

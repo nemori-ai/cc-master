@@ -228,6 +228,15 @@ export const FIELDS = {
       when: '多 orchestrator 并行抽同一配额缸时 publish 自身状态',
       degrade: '缺→该 peer 不计入花名册对应维度(退单板·fail-safe)；形状坏→warn(FMT-COORD)',
     },
+    runtime: {
+      tier: '✎',
+      type: 'object{ last_identity_remind?: ISO, ... }?',
+      default: '缺省(无 runtime 参数)',
+      readers: 'IDNUDGE hook 读 last_identity_remind 判阈值；未来其它周期 hook/script',
+      writers: 'hook 经 ccm board set-param（带锁·hook-owned 参数区·ADR-020）/ agent 经 ccm',
+      when: '周期 hook 注入提示后刷簿记时间戳',
+      degrade: '缺→视为「从未提示」(首次必提示)；形状坏→warn(FMT-RUNTIME)·不拦写盘',
+    },
   },
   task: {
     id: {
@@ -815,6 +824,14 @@ export const INVARIANTS: Invariant[] = [
     family: 'FMT',
     scope: 'task',
     summary: 'task.model 若存在须为 string',
+  },
+  {
+    id: 'FMT-RUNTIME',
+    level: 'warn',
+    family: 'FMT',
+    scope: 'board',
+    summary:
+      'runtime 非对象、或已知键（last_identity_remind 等）类型不合法（时间锚须 ISO-8601 UTC）',
   },
 ];
 

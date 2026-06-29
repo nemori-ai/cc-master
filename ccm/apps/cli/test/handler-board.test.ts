@@ -8,7 +8,15 @@
 //
 // T2b port 注：原 .mjs 经 createRequire 加载 CJS，改成 ESM import ported .ts 源。断言逻辑逐字保持。
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
@@ -530,6 +538,78 @@ test('board update --dry-run does not write the board', () => {
   assert.equal(code, EXIT.OK);
   assert.equal(readFileSync(boardPath, 'utf8'), before, 'board unchanged on dry-run');
   assert.ok(ctx.outBuf.join('').includes('[dry-run]'));
+});
+
+// ══ board set-param（ADR-020·hook-owned runtime 参数区·带锁字段级 setter）══════════════════════════
+test('board set-param: 白名单 key + ISO → 写 board.runtime.<key> + EXIT.OK + render 出', () => {
+  const { boardPath } = mkBoardHome();
+  const ctx = mkCtx({ boardPath, positionals: ['last_identity_remind', '2026-06-29T12:34:56Z'] });
+  const code = boardHandler.setParam(ctx);
+  assert.equal(code, EXIT.OK);
+  const onDisk = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.equal(onDisk.runtime.last_identity_remind, '2026-06-29T12:34:56Z');
+  assert.ok(ctx.outBuf.join('').includes('runtime 参数已设'));
+});
+
+test('board set-param --json renders { ok:true, data:{ runtime } }', () => {
+  const { boardPath } = mkBoardHome();
+  const ctx = mkCtx({
+    boardPath,
+    positionals: ['last_identity_remind', '2026-06-29T12:34:56Z'],
+    flags: { json: true },
+  });
+  const code = boardHandler.setParam(ctx);
+  assert.equal(code, EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.ok, true);
+  assert.equal(out.data.runtime.last_identity_remind, '2026-06-29T12:34:56Z');
+});
+
+test('board set-param: 非白名单 key → throws Usage (router maps to exit 2)', () => {
+  const { boardPath } = mkBoardHome();
+  const ctx = mkCtx({ boardPath, positionals: ['bogus_key', 'x'] });
+  assert.throws(
+    () => boardHandler.setParam(ctx),
+    (e: { errKind?: string }) => e.errKind === 'Usage',
+  );
+});
+
+test('board set-param: 白名单 key 但非法 ISO → throws Usage (exit 2)', () => {
+  const { boardPath } = mkBoardHome();
+  const ctx = mkCtx({ boardPath, positionals: ['last_identity_remind', 'not-iso'] });
+  assert.throws(
+    () => boardHandler.setParam(ctx),
+    (e: { errKind?: string }) => e.errKind === 'Usage',
+  );
+});
+
+test('board set-param --dry-run does not write the board', () => {
+  const { boardPath } = mkBoardHome();
+  const before = readFileSync(boardPath, 'utf8');
+  const ctx = mkCtx({
+    boardPath,
+    positionals: ['last_identity_remind', '2026-06-29T12:34:56Z'],
+    flags: { dryRun: true },
+  });
+  const code = boardHandler.setParam(ctx);
+  assert.equal(code, EXIT.OK);
+  assert.equal(readFileSync(boardPath, 'utf8'), before, 'board unchanged on dry-run');
+  assert.ok(ctx.outBuf.join('').includes('[dry-run]'));
+});
+
+test('board set-param 走 runWrite 带锁管线：写后锁释放（不留 .lock 残骸）+ heartbeat 刷新', () => {
+  const { boardPath } = mkBoardHome();
+  const before = JSON.parse(readFileSync(boardPath, 'utf8'));
+  const ctx = mkCtx({ boardPath, positionals: ['last_identity_remind', '2026-06-29T12:34:56Z'] });
+  const code = boardHandler.setParam(ctx);
+  assert.equal(code, EXIT.OK);
+  // 带锁写后 .lock 应已在 finally 释放（runWrite → withBoardLock → 原子写 → 解锁）。
+  assert.equal(existsSync(`${boardPath}.lock`), false, 'lock released after locked write');
+  const after = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.ok(
+    Date.parse(after.owner.heartbeat) >= Date.parse(before.owner.heartbeat),
+    'owner.heartbeat refreshed (任何写 → heartbeat=now·与所有写 verb 同口径)',
+  );
 });
 
 // ══ 发现失败（read verb 解不出 active board）═══════════════════════════════════════════════════════

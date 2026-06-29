@@ -184,6 +184,7 @@ export function lintBoard(text: string): LintResult {
   lintBaseline(b, emit);
   lintPolicy(b, emit);
   lintCoordination(b, emit);
+  lintRuntime(b, emit);
 
   // FMT-TASKS（数组）——非数组无从遍历，板级检查已做，提前返回。
   const tasks = b.tasks;
@@ -761,6 +762,30 @@ function lintCoordination(board: BoardLike, emit: Emit): void {
         }
       }
     }
+  }
+}
+
+// FMT-RUNTIME：runtime 参数区形状（hook-owned ✎·present 才校验·全 warn·graceful·ADR-020）。
+//   runtime 装「周期 hook/script 运行时维护的瞬态簿记」（IDNUDGE 的 last_identity_remind 等）。形状坏不阻断
+//   写盘——只让消费方（IDNUDGE 读 last_identity_remind 判阈值）按缺失降级（首次必提示·fail-safe）。校验：
+//   ① 整块是对象；② 已知时间锚键（last_identity_remind）若存在须严格 ISO-8601 UTC。其余键 silent-on-unknown
+//   （未来同形成员复用本规则·扩展位无须改 lint）。
+function lintRuntime(board: BoardLike, emit: Emit): void {
+  const rt = board.runtime;
+  if (rt === undefined || rt === null) return;
+  if (typeof rt !== 'object' || Array.isArray(rt)) {
+    emit(
+      'FMT-RUNTIME',
+      `runtime 若存在必须是对象（当前：${JSON.stringify(rt)}）。影响：IDNUDGE 等周期 hook 读 runtime.<key> 判阈值——非对象则读不出、退化为「从未提示」(首次必提示·fail-safe)。`,
+    );
+    return;
+  }
+  const r = rt as Record<string, unknown>;
+  if (badTimestamp(r.last_identity_remind)) {
+    emit(
+      'FMT-RUNTIME',
+      `runtime.last_identity_remind 是 ${JSON.stringify(r.last_identity_remind)}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：IDNUDGE 读它判周期阈值——格式不对则退化为「从未提示」(首次必提示)。`,
+    );
   }
 }
 

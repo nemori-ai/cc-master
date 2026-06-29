@@ -146,6 +146,23 @@ export const REGISTRY: Registry = {
       ],
       handler: 'board.update',
     },
+    'set-param': {
+      summary:
+        '写 board.runtime.<白名单 key>（hook-owned 参数区·ADR-020·least-privilege·带锁）；非白名单 key / 非法值 → exit 2',
+      read: false,
+      positionals: [
+        { name: 'key', required: true },
+        { name: 'value', required: true },
+      ],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm board set-param last_identity_remind 2026-06-29T12:34:56Z',
+        'ccm board set-param last_identity_remind 2026-06-29T12:34:56Z --board <path>',
+      ],
+      handler: 'board.setParam',
+    },
   },
 
   // ════════════════════ task ═════════════════════════════════════════════════════════════════════

@@ -265,7 +265,8 @@ top-level `meta` 是一个 **agent-shaped 命名空间对象**，收纳未来的
 
 - **每回合写整个文件** —— 快照很小。
 - **在决策程序 step 7 flush**（每回合收尾），也可选在 PreCompact 时再 flush 一次。
-- hook 只读 board（它改不了编排状态），所以写这件事由 agent 独占。
+- hook **基本只读** board（不改编排状态），编排状态的写由 agent 独占。
+- **✎ `runtime.*` 是 hook-owned 例外（ADR-020）** —— IDNUDGE 等周期 hook 经 `ccm board set-param` 带锁写 `board.runtime.*`（如 `last_identity_remind`）。**你写 board 时须保留它**：走 `ccm` 命令 / field-local `Edit` 天然保留（只改你那一段）；**若整文件 `Write`（ccm 缺的降级路径）须先 re-read 盘上最新、合并后再写**，否则会用旧内存快照覆盖掉 hook 刚写的 `runtime.*`（lost update）。你自己**永不写 `runtime.*`**（那是 hook 的簿记区）。
 
 ---
 

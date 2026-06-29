@@ -227,6 +227,31 @@ export function update(ctx: Ctx): number {
   });
 }
 
+// ── 写 verb：set-param（写 board.runtime.<白名单 key>·hook-owned 参数区·ADR-020·照 update / policy.set 体例）─
+//   positionals = [key, value]（router 已校验 required·非空）。走 runWrite 带锁管线 → mutations.boardSetParam
+//   做白名单 + 值校验（非白名单 key / 非法值 → throw .errKind='Usage' 冒泡 router 映射 exit 2）→ lint → 原子写。
+//   作用域收窄到 runtime.*（least-privilege）：这是 ADR-020 松绑「hook 可经 ccm 写特定 ✎ board 字段」的落点，
+//   hook 经进程边界 spawn `ccm board set-param`、带锁写、绝不碰 🔒/👁 窄腰。
+export function setParam(ctx: Ctx): number {
+  return runWrite(ctx, {
+    mutate: (board) => {
+      const key = ctx.positionals[0] as string;
+      const value = ctx.positionals[1] as string;
+      return mutations.boardSetParam(board as BoardArg, { key, value });
+    },
+    render: (next, c, { dryRun }) => {
+      const n = next as { runtime?: Record<string, unknown> };
+      const key = ctx.positionals[0] as string;
+      const val = n.runtime ? n.runtime[key] : undefined;
+      if (c.flags.json) {
+        return JSON.stringify({ ok: true, data: { runtime: n.runtime || null } });
+      }
+      const prefix = dryRun ? '[dry-run] 将设 runtime' : 'runtime 参数已设';
+      return `${prefix}: ${key}=${val}`;
+    },
+  });
+}
+
 // parseIntFlag(raw, flagName) → 正整数；坏 → throw Usage（router 映射 exit 2）。
 //   multiple:false 的 string flag·raw 是单值；防御性取最后一次（若数组）。
 function parseIntFlag(raw: unknown, flagName: string): number {
