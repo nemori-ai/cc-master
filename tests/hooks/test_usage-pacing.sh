@@ -961,4 +961,152 @@ assert_contains "$HOOK_OUT" "切到下一份配额" "(F3b) accounts.json read fr
 assert_contains "$HOOK_OUT" "号池" "(F3b) pool fact appended (accounts.json found at HOME-derived home root, same root as arming)"
 rm -rf "$F3H" "$F3CDIR"
 
+# ── LBHOOK (LOADBAL §3.2/3.3 + ADR-016): kind==='switch' → 机械调 ccm account switch（policy 闸 + 幂等 + 注入）──
+# When pacing concludes kind==='switch' (5h critical + n>1 + 7d headroom + a switchable backup), the hook
+# MECHANICALLY calls `ccm account switch` instead of merely advising the agent. ccm self-gates: re-read
+# registry → select → board.policy hard gate (deny→exit7) → exhausted→exit3 → overwrite stores. The hook is
+# token-blind (switch runs in the ccm subprocess; hook only passes --board/--home + reads non-secret JSON).
+# These cases inject a STUB `ccm` answering BOTH `usage advise` (the accelerate+switch_account verdict that
+# yields kind:'switch') AND `account switch` (canned exit + JSON). AUTOSWITCH defaults ON; CC_MASTER_AUTOSWITCH=0
+# forces the old advise-only behavior. A cooldown sidecar prevents per-Stop thrash.
+
+# mk_lbhook_stub ADVISE_DATA_JSON SWITCH_EXIT SWITCH_STDOUT -> path to an executable stub `ccm` answering
+#   `usage advise` with the canned data, and `account switch` with SWITCH_STDOUT + exit SWITCH_EXIT.
+mk_lbhook_stub() {
+  local dir; dir="$(make_project)"; local stub="$dir/ccm"
+  local advise="$dir/advise.json"; printf '%s' "$1" > "$advise"
+  local swexit="${2:-0}"
+  local swout="$dir/switch.out"; printf '%s' "${3:-}" > "$swout"
+  cat > "$stub" <<STUB
+#!/usr/bin/env bash
+if [ "\$1" = "usage" ] && [ "\$2" = "advise" ]; then
+  printf '{"ok":true,"data":%s}\n' "\$(cat "$advise")"
+  exit 0
+fi
+if [ "\$1" = "account" ] && [ "\$2" = "switch" ]; then
+  cat "$swout"
+  exit $swexit
+fi
+exit 0
+STUB
+  chmod +x "$stub"
+  echo "$stub"
+}
+# seed_lb_home -> a fresh home with ONE active board (sess-lb) + accounts.json (1 active + 1 switchable backup
+#   token-unexpired 2027 → pool.switchable=1). echo the home path.
+seed_lb_home() {
+  local h; h="$(make_project)"; mkdir -p "$h/boards"
+  printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-lb"},"policy":{"autonomous_account_switch":"allow"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$h/boards/mine.board.json"
+  printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"}}}' > "$h/accounts.json"
+  echo "$h"
+}
+# The advise payload that drives kind:'switch' (verdict accelerate + switch_account lever, 7d headroom).
+LB_ADVISE='{"verdict":"accelerate","reason":"r","levers":["switch_account","continue_dispatch"],"hard_stop_7d":false,"window_5h_pct":92,"window_7d_pct":20,"effective_n":2,"switch_candidate":"b@x.com","confidence":"high","source":"account","available":true}'
+A_NOWMS=$((A_NOWEP*1000))  # epoch ms for CC_MASTER_NOW 2026-06-10T12:00:00Z (cooldown sidecar timestamps)
+
+# run_lbhook STUB HOME SID [EXTRA_ENV...] -> armed Stop driven through the stub (CCM_BIN=stub). EXTRA_ENV are
+#   passed as KEY=VAL before the hook (e.g. CC_MASTER_AUTOSWITCH=0 / CC_MASTER_SWITCH_STATE=<file>).
+run_lbhook() {
+  local stub="$1" home="$2" sid="$3"; shift 3
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$sid" \
+    | env CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="2026-06-10T12:00:00Z" CC_MASTER_HOME="$home" \
+        CC_MASTER_RATE_CACHE="/nonexistent-lbhook-rate-cache" CCM_BIN="$stub" "$@" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+}
+
+# (lbhook-1) SWITCH SUCCESS — stub switch exits 0 + {switched:true,email:b@x.com}. The hook mechanically switches
+#   → single ambient "已自动换号" naming the new active; NO advisory block at all; cooldown sidecar written; rc 0.
+LB_HOME="$(seed_lb_home)"
+LB_STUB="$(mk_lbhook_stub "$LB_ADVISE" 0 '{"ok":true,"data":{"email":"b@x.com","switched":true}}')"
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb"
+assert_eq 0 "$HOOK_RC" "(lbhook-1) mechanical switch success → rc 0"
+assert_contains "$HOOK_OUT" "已自动换号" "(lbhook-1) success → injects the auto-switch ambient (已自动换号)"
+assert_contains "$HOOK_OUT" "b@x.com" "(lbhook-1) ambient names the new active account (from ccm switch JSON)"
+assert_contains "$HOOK_OUT" '<ambient source=\"usage-pacing\">' "(lbhook-1) success → ambient block (ADR-018, no action)"
+assert_not_contains "$HOOK_OUT" "<advisory" "(lbhook-1) success → NO advisory block (switch already done, agent only adjusts pacing)"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(lbhook-1) NEVER blocks"
+assert_eq 0 "$([ -f "$LB_HOME/.cc-master-switch.json" ]; echo $?)" "(lbhook-1) success → cooldown sidecar written (anti-thrash)"
+# (lbhook-1b) COOLDOWN — a second identical Stop in the same home (cooldown sidecar now present, fresh) → must
+#   NOT switch again; falls back to the advise-only lever wording (切到下一份配额). Proves the anti-thrash guard.
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb"
+assert_eq 0 "$HOOK_RC" "(lbhook-1b) within cooldown → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-1b) within cooldown → does NOT auto-switch again (anti-thrash)"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(lbhook-1b) cooldown → falls back to advise-only lever wording"
+rm -rf "$LB_HOME" "$(dirname "$LB_STUB")"
+
+# (lbhook-2) POLICY DENY — stub switch exits 7 (board.policy.autonomous_account_switch=deny hard gate). The hook
+#   does NOT switch → advisory with the deny note (surface to user), strength STRONG, names exit 7. rc 0.
+LB_HOME="$(seed_lb_home)"
+LB_STUB="$(mk_lbhook_stub "$LB_ADVISE" 7 '')"
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb"
+assert_eq 0 "$HOOK_RC" "(lbhook-2) policy deny (exit 7) → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-2) deny → did NOT switch"
+assert_contains "$HOOK_OUT" "deny" "(lbhook-2) deny → advisory names the policy deny"
+assert_contains "$HOOK_OUT" "exit 7" "(lbhook-2) deny → names the ccm exit 7 hard gate"
+assert_contains "$HOOK_OUT" "blocked_on:" "(lbhook-2) deny → surfaces as a blocked_on:user decision"
+assert_contains "$HOOK_OUT" '<advisory source=\"usage-pacing\" strength=\"strong\">' "(lbhook-2) deny → advisory STRONG (surface to user, high stakes)"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(lbhook-2) NEVER blocks"
+rm -rf "$LB_HOME" "$(dirname "$LB_STUB")"
+
+# (lbhook-3) EXHAUSTED — stub switch exits 3 (NONE_ALL_EXHAUSTED·whole pool over the wall). No switch → advisory
+#   with the exhausted note (等 reset surface to user). rc 0.
+LB_HOME="$(seed_lb_home)"
+LB_STUB="$(mk_lbhook_stub "$LB_ADVISE" 3 '')"
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb"
+assert_eq 0 "$HOOK_RC" "(lbhook-3) exhausted (exit 3) → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-3) exhausted → did NOT switch"
+assert_contains "$HOOK_OUT" "exit 3" "(lbhook-3) exhausted → names the ccm exit 3 (NONE_ALL_EXHAUSTED)"
+assert_contains "$HOOK_OUT" "等 reset" "(lbhook-3) exhausted → surfaces 等 reset 决策 to user"
+rm -rf "$LB_HOME" "$(dirname "$LB_STUB")"
+
+# (lbhook-4) AUTOSWITCH=0 KILL-SWITCH — same success-capable stub but CC_MASTER_AUTOSWITCH=0 → the hook never
+#   attempts a switch; reverts to the advise-only lever wording (切到下一份配额). Proves the kill-switch.
+LB_HOME="$(seed_lb_home)"
+LB_STUB="$(mk_lbhook_stub "$LB_ADVISE" 0 '{"ok":true,"data":{"email":"b@x.com","switched":true}}')"
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb" CC_MASTER_AUTOSWITCH=0
+assert_eq 0 "$HOOK_RC" "(lbhook-4) AUTOSWITCH=0 → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-4) kill-switch → no mechanical switch"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(lbhook-4) kill-switch → advise-only lever wording (old behavior)"
+rm -rf "$LB_HOME" "$(dirname "$LB_STUB")"
+
+# (lbhook-5) AMBIGUOUS BOARD CONTEXT — TWO active boards for this session → board context ambiguous → conservatively
+#   do NOT auto-switch (which board's policy?) → advise-only fallback. (Single-board is the only auto-switch case.)
+LB_HOME="$(make_project)"; mkdir -p "$LB_HOME/boards"
+printf '{"schema":"cc-master/v1","goal":"g1","owner":{"active":true,"session_id":"sess-lb"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$LB_HOME/boards/a.board.json"
+printf '{"schema":"cc-master/v1","goal":"g2","owner":{"active":true,"session_id":"sess-lb"},"tasks":[{"id":"T2","status":"in_flight","deps":[]}]}' > "$LB_HOME/boards/b.board.json"
+printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"}}}' > "$LB_HOME/accounts.json"
+LB_STUB="$(mk_lbhook_stub "$LB_ADVISE" 0 '{"ok":true,"data":{"email":"b@x.com","switched":true}}')"
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb"
+assert_eq 0 "$HOOK_RC" "(lbhook-5) ambiguous (2 active boards) → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-5) ambiguous board context → conservatively does NOT auto-switch"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(lbhook-5) ambiguous → advise-only fallback (which board's policy is unclear)"
+rm -rf "$LB_HOME" "$(dirname "$LB_STUB")"
+
+# (lbhook-6) COOLDOWN PRE-SEEDED — switch-state sidecar with a recent last_switch_at_ms (= now) → within the
+#   default 1800s cooldown → no switch; advise-only fallback. Proves cooldown is honored from the sidecar.
+LB_HOME="$(seed_lb_home)"
+LB_STUB="$(mk_lbhook_stub "$LB_ADVISE" 0 '{"ok":true,"data":{"email":"b@x.com","switched":true}}')"
+LB_CDDIR="$(make_project)"; LB_CD="$LB_CDDIR/switch-state.json"
+printf '{"last_switch_at_ms":%d}' "$A_NOWMS" > "$LB_CD"
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb" CC_MASTER_SWITCH_STATE="$LB_CD"
+assert_eq 0 "$HOOK_RC" "(lbhook-6) pre-seeded cooldown → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-6) within pre-seeded cooldown → no switch"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(lbhook-6) cooldown → advise-only fallback"
+rm -rf "$LB_HOME" "$LB_CDDIR" "$(dirname "$LB_STUB")"
+
+# (lbhook-7) CCM ABSENT (local kind:'switch' path) — CCM_BIN nonexistent, but a local critical sidecar (5h 92%
+#   + 7d 20%) + accounts.json switchable backup → decideAccountWarning yields kind:'switch'; attemptCcmSwitch
+#   →ENOENT→absent→ graceful degrade to advise-only. Proves ccm-absent never blocks the switch path.
+LB_HOME="$(seed_lb_home)"
+LB_CDDIR="$(make_project)"; LB_CACHE="$LB_CDDIR/rate.json"
+printf '{"five_hour":{"used_percentage":92,"resets_at":%d},"seven_day":{"used_percentage":20}}' "$A_R5F" > "$LB_CACHE"
+HOOK_OUT="$(printf '{"session_id":"sess-lb","hook_event_name":"Stop"}' \
+  | env CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="2026-06-10T12:00:00Z" CC_MASTER_HOME="$LB_HOME" \
+        CC_MASTER_RATE_CACHE="$LB_CACHE" CCM_BIN="/nonexistent-lbhook-absent" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+assert_eq 0 "$HOOK_RC" "(lbhook-7) ccm absent + local kind:switch → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-7) ccm absent → could not switch (graceful degrade)"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(lbhook-7) ccm absent → advise-only fallback (the old behavior preserved)"
+rm -rf "$LB_HOME" "$LB_CDDIR"
+
 finish
