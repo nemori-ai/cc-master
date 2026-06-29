@@ -51,7 +51,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 // ★home 解析 + 武装闸 isArmed 收口到共享 hook-common（node SSOT·取代本文件旧内联副本）。
 //   ambient/advisory 是 ADR-018 标签包装器（§13·closed set·source 必填·strength 只给 advisory）。
-const { resolveHome, isArmed, ambient, advisory } = require('./hook-common.js');
+const { resolveHome, ambient, advisory, runHook } = require('./hook-common.js');
 
 // ── ADR-018 标签力度映射（§13/P4：力度配 stakes）──────────────────────────────────────────────────
 // pacing 注入**绝大多数落 advisory**（ADR-018 §2.2 例子 + §3.1 活体印证：agent 把 pacing 当判断输入、推理
@@ -502,7 +502,8 @@ function formatWarning({ used, burn, remain, budget, projected, pctNow }) {
 }
 
 // ── ARMED GATE ──────────────────────────────────────────────────────────────────────────────────
-// isArmed(homeDir, sid) 现由 hook-common 提供（node SSOT·见文件顶 require），不再各自维护内联副本。
+// isArmed(homeDir, sid) 现由 hook-common 提供（node SSOT），且武装闸已收口进 runHook harness（arm:'isArmed'·
+//   phase-1b）——本文件不再直接调 isArmed，由 harness 在 body 之前统一武装。
 //   语义与本文件旧内联副本字字相同（ADR-007 dormant-until-armed）：扫 <home>/boards/ 找 owner.active===true
 //   且（stdin sid 空 → 非对称降级匹配任一 active 板；否则 owner.session_id===sid·空 board sid 保持休眠
 //   fail-safe）的板。只读 narrow-waist owner.active/session_id，任何读/解析失败按未武装静默。
@@ -701,38 +702,15 @@ function ccmWarning(data, n) {
   return null; // hold → 走廊内 → 静默
 }
 
-// ── 主流程：全程 try/catch，任何异常 → 静默 exit 0 ──────────────────────────────────────────────
-function main() {
-  // 读 stdin，取 session_id —— armed gate 要用它做 session-scoped 判定。
-  let stdin = '';
-  try {
-    stdin = fs.readFileSync(0, 'utf8');
-  } catch (_e) {
-    stdin = '';
-  }
-  let sid = '';
-  let stopHookActive = false;
-  try {
-    const o = JSON.parse(stdin || '{}');
-    if (o && typeof o.session_id === 'string') sid = o.session_id;
-    // stop_hook_active:true ⟺ Claude Code 因「上一次 Stop hook 续了对话 → agent 再次尝试 Stop」而
-    // **重入**本 hook。同一 stdin 口径解析，零新依赖（红线1：node/JS only）。
-    if (o && o.stop_hook_active === true) stopHookActive = true;
-  } catch (_e) {
-    /* ignore — 非法 stdin 不致命；sid 留空 → 走降级 arming 判定 */
-  }
-
-  // ── STOP RE-ENTRY GUARD：stop_hook_active:true → 立即静默 exit 0（在任何 usage 计算/注入之前）。──
-  // 不加这道闸，usage 仍超预算时本 hook 会在**每一次** Stop 重注同一 pacing 警告——effect 等同
-  // 「session 永远停不下来」的循环（虽不 decision:block，但实质卡死），违背「never blocks」契约。
-  // 有了它，警告对每个**真正的新 Stop**最多出现一次，re-entry 一律静默（不破坏 unarmed→silent）。
-  if (stopHookActive) return;
-
-  // ── ARMED GATE：本 session 未被武装（home 无匹配的 active 板）→ 在读 usage 之前就静默 exit 0。──
-  // 这是本 hook 最关键的行为修复：不武装就不读宿主全局 usage、不注入 —— 不再污染无关 session。
-  // **红线 6**：下面读 accounts.json 算号池 / 注入号池事实**全在这道闸之后**——未武装一律静默，绝不在
-  //   未武装路径读 registry / 注入（与「不读宿主全局 usage」同精神）。
-  if (!isArmed(HOME_DIR, sid)) return;
+// ── body：plumbing（stdin/home/isArmed 武装/fail-silent/exit 0）由 hook-common.runHook 提供（phase-1b）；
+//   body 只剩 usage-pacing 独有的「读 usage / 走廊 verdict / 拼 pacing advisory + 号池 ambient」。
+//   · stop_hook_active 重入闸放 preGate（须比武装更早静默）；· armed gate 由 harness arm:'isArmed' 统一做。
+//   · 输出经 harness { additionalContext } 形态（JSON.stringify+'\n'·event 'Stop'）——与原 main 末尾的
+//     `JSON.stringify(payload)+'\n'` 字节等价；本 body 返回 { additionalContext: blocks.join('\n') }。
+//   · sid 由 harness 经 ctx 传入（armed gate 已在 harness 内据它判定）；HOME_DIR / 各 env override 仍用模块级
+//     常量（HOME_DIR === ctx.homeDir === resolveHome()，同值，arming 与计算一致）。
+function body(ctx) {
+  const sid = ctx.sid;
 
   const nowMs = NOW_OVERRIDE ? parseIso(NOW_OVERRIDE) : Date.now();
   if (nowMs === null) return; // --now 非法 → 静默（不猜）
@@ -805,18 +783,22 @@ function main() {
   }
 
   // 非阻断注入：仅 additionalContext，hookEventName "Stop"。绝不 decision:block。
-  const payload = {
-    hookSpecificOutput: {
-      hookEventName: 'Stop',
-      additionalContext: blocks.join('\n'),
-    },
-  };
-  process.stdout.write(JSON.stringify(payload) + '\n');
+  // harness 据 { additionalContext } 套 envelope（JSON.stringify+'\n'·event 'Stop'）——与原手写 payload 字节等价。
+  return { additionalContext: blocks.join('\n') };
 }
 
-try {
-  main();
-} catch (_e) {
-  // 兜底：任何未预期异常都不得污染 Stop —— 静默成功退出。
-}
-process.exit(0);
+// runHook：arm:'isArmed'（armed gate 统一在 harness）；preGate = STOP RE-ENTRY GUARD（stop_hook_active:true →
+//   立即静默，须先于武装——否则 usage 仍超预算时会在**每一次** Stop 重注同一 pacing 警告，effect 等同
+//   「session 永远停不下来」，违背 never-blocks 契约·见下注）。全程 try/catch + exit 0 由 harness 保证
+//   （hook 崩绝不污染 Stop）。bootstrap-board.sh 仍是唯一豁免的 ARM 动作（bash·绝不进本 harness）。
+runHook({
+  event: 'Stop',
+  arm: 'isArmed', // ARMED GATE：未武装（home 无匹配 active 板）→ 在读宿主全局 usage / 读 registry / 注入之前静默 exit 0（红线6）
+  preGate(ctx) {
+    // STOP RE-ENTRY GUARD：stop_hook_active:true ⟺ Claude Code 因「上次 Stop hook 续了对话 → agent 再次尝试
+    //   Stop」而**重入**本 hook。立即静默（在任何 usage 计算 / 武装判定之前）。有它，警告对每个**真正的新
+    //   Stop**最多出现一次，re-entry 一律静默（不破坏 unarmed→silent）。从 ctx.obj 读（parseStdin 已解析顶层）。
+    return !!(ctx.obj && ctx.obj.stop_hook_active === true);
+  },
+  body,
+});

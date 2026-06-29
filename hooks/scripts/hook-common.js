@@ -126,7 +126,77 @@ function directive(source, body) {
   return `<directive source="${source}">\n${String(body)}\n</directive>`;
 }
 
+// ── runHook harness（phase-1b·设计稿 §9 Q1=做）─────────────────────────────────────────────────────
+// 把五个 node hook 的同构样板收口成一个共享 runner，让每个 hook 只剩独有的 body 逻辑——新 hook
+//   correct-by-construction（武装闸 / stdin 解析 / fail-silent 包裹 / exit 0 由 harness 一处保证，不会
+//   各自漏掉）。**行为保持（behavior-preserving）**：与各 hook 原内联骨架字节级等价——武装语义（空 sid
+//   降级、不收养空 owner sid，全由 hook-common 的 boardMatches/isArmed/listMatchingBoards 提供，不变）、
+//   输出 envelope（additionalContext 经 JSON.stringify+'\n'，与旧手拼字节相同·已验证 key 序 + 转义一致）、
+//   ADR-018 标签（body 自己套 ambient/advisory/directive，harness 不碰文案）、全程 try/catch + exit 0。
+//
+// 红线1/ADR-006：纯 stdlib、零 spawn/网络/依赖（spawn ccm 仍在各 body 内·进程边界 ADR-014，不在 harness）。
+// 红线6（dormant-until-armed）：**武装闸是 harness 的固定环节**——unarmed 必静默（空 stdout、RC 0、不 block）。
+//   这把「每个 hook 入口都先过武装」从「各 hook 自觉」升级为「harness 结构性保证」（红线 6 只增强不弱化；
+//   bootstrap-board.sh 仍 bash·唯一豁免·绝不进本 harness）。
+//
+// spec 形状：
+//   { event, arm, preGate?, body }
+//   · event  : envelope 的 hookEventName（'SessionStart'|'Stop'|'PostToolBatch'|'PostToolUse'）；
+//              body 走 { raw } 自控输出时可省（verify-board 自拼 decision/reason envelope）。
+//   · arm    : 武装策略——
+//              'isArmed'  → harness 调 isArmed(home, sid)；未武装 return（board-lint/usage-pacing）。
+//              'boards'   → harness 调 listMatchingBoards(home, sid) 放进 ctx.boards（已按 name 升序排，
+//                           与 v1 glob `*.board.json` 同序）；空列表 return（reinject/verify-board/posttool-batch）。
+//              'custom'   → 不在 harness 武装；body 自己判武装（board-lint 的特殊四闸——它的武装是
+//                           targetIsMyActiveBoard + isArmed/容错认领的复合闸，必须在 body 内做）。
+//   · preGate: 可选 (ctx)=>bool；在**武装闸之前**跑，返回 true 即静默早退（posttool-batch 的 sub-agent
+//              闸、usage-pacing 的 stop_hook_active 重入闸——它们须比武装更早静默）。
+//   · body   : (ctx) => 输出意图。ctx = { raw, obj, sid, toolName, filePath, homeDir, boards }
+//              （raw = stdin 原始串，obj = parseStdin 解析对象〔非法 JSON → {}〕，供 body/preGate 自判）。
+//              返回值（输出意图，harness 据此写 stdout）：
+//                falsy（null/undefined/不返回） → 静默（不写 stdout）。
+//                { additionalContext } → 写 {"hookSpecificOutput":{"hookEventName":event,"additionalContext":…}}
+//                                        （JSON.stringify+'\n'，与旧手拼字节等价）。
+//                { raw }               → body 已自定整段 payload 字符串，harness 原样写（+ 不补 '\n'·
+//                                        body 自带；verify-board 的 decision/reason/fuse 三态走这条）。
+function runHook(spec) {
+  try {
+    const sp = spec || {};
+    const raw = readStdin();
+    const { obj, sid, toolName, filePath } = parseStdin(raw);
+    const homeDir = resolveHome();
+    const ctx = { raw, obj, sid, toolName, filePath, homeDir, boards: [] };
+
+    // preGate：武装之前的早退（sub-agent / stop_hook_active 重入须先于武装静默）。
+    if (typeof sp.preGate === 'function' && sp.preGate(ctx)) return;
+
+    // 武装闸（红线6·harness 固定环节）。
+    if (sp.arm === 'isArmed') {
+      if (!isArmed(homeDir, sid)) return;
+    } else if (sp.arm === 'boards') {
+      ctx.boards = listMatchingBoards(homeDir, sid)
+        .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      if (ctx.boards.length === 0) return; // dormant-until-armed：无匹配 active 板 → 静默
+    } // 'custom'：body 自判武装（不在此 gate）
+
+    const out = sp.body ? sp.body(ctx) : null;
+    if (!out) return;                       // 静默意图
+    if (typeof out.raw === 'string') {      // body 自控整段 payload（verify-board）
+      process.stdout.write(out.raw);
+      return;
+    }
+    if (typeof out.additionalContext === 'string') {
+      process.stdout.write(JSON.stringify({
+        hookSpecificOutput: { hookEventName: sp.event, additionalContext: out.additionalContext },
+      }) + '\n');
+    }
+  } catch (_e) {
+    // 兜底：任何异常都不得污染 agent 流 → 静默成功退出（fail-silent·全 hook 同纪律）。
+  }
+  process.exit(0);
+}
+
 module.exports = {
   resolveHome, boardsDir, readStdin, parseStdin, boardMatches, listMatchingBoards, isArmed, jsonEscape,
-  ambient, advisory, directive,
+  ambient, advisory, directive, runHook,
 };

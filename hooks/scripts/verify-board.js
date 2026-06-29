@@ -45,7 +45,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { resolveHome, readStdin, parseStdin, listMatchingBoards, directive, advisory } = require('./hook-common.js');
+const { listMatchingBoards, directive, advisory, runHook } = require('./hook-common.js');
 
 // CCM_BIN：dev/test/自定义安装的覆写口（绝对路径可执行）；缺则用 PATH 上的 `ccm`（生产）。
 const CCM_BIN = process.env.CCM_BIN || 'ccm';
@@ -181,9 +181,14 @@ function clearSidecar(scPath) {
 // ── JSON 转义（block reason 注入 JSON 字符串字面量）─────────────────────────────────────────────────
 function jsonStr(s) { return JSON.stringify(String(s)); }
 
-function main() {
-  const { sid } = parseStdin(readStdin());
-  const HOME_DIR = resolveHome();
+// ── body：plumbing（stdin/home/fail-silent/exit 0）由 hook-common.runHook 提供（phase-1b）；verify-board
+//   用 arm:'custom' 而非 'boards'——因为「无匹配 active 板」时它不是纯静默，而是 allow()=clearSidecar（清保险丝
+//   状态·真实副作用），必须 body 内自处理（harness 的 boards 空列表早退是纯静默、会吞掉这个 clearSidecar）。
+//   输出：Stop hook 只能 block（decision:block）或 allow（静默 exit 0），故 body 全程直接 process.stdout.write
+//   自控 envelope（decision/reason/fuse 三态·与原逐字相同），返回 null 告诉 harness「我已自写、别再套」。
+function body(ctx) {
+  const sid = ctx.sid;
+  const HOME_DIR = ctx.homeDir;
   const SIDECAR = sidecarPath(HOME_DIR, sid);
 
   let { blockStreak, lastFp } = readSidecar(SIDECAR);
@@ -382,11 +387,9 @@ function main() {
   }
 
   emitBlock(handshakeReason);
+  return null; // body 已自写 envelope（emitBlock）；harness 不再套（fail-silent + exit 0 由 harness 兜）。
 }
 
-try {
-  main();
-} catch (_e) {
-  // 兜底：任何异常都不得把 agent 永久卡在 Stop → 静默放行（exit 0，不 block）。
-}
-process.exit(0);
+// runHook：arm:'custom'（body 自判武装 + 自处理无匹配板的 clearSidecar）。全程 try/catch + exit 0 由 harness
+//   保证——异常静默放行（hook 崩绝不把 agent 永久卡在 Stop）。bootstrap-board.sh 仍是唯一豁免的 ARM 动作。
+runHook({ event: 'Stop', arm: 'custom', body });

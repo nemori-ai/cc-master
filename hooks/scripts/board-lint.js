@@ -35,7 +35,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 // ★v2 收编：HOME 解析 + 武装闸 isArmed 收口到共享 hook-common（取代旧内联副本·SSOT、四个 node hook 一份）。
-const { resolveHome, boardsDir, isArmed, advisory } = require('./hook-common.js');
+const { resolveHome, boardsDir, isArmed, advisory, runHook } = require('./hook-common.js');
 
 // ── lint 核心获取：经 ccm 二进制（进程边界）；不可用即优雅降级静默（3b 已删 cli/，无 require fallback）─────
 // CCM_BIN：dev/test/自定义安装的覆写口（绝对路径可执行）；缺则用 PATH 上的 `ccm`（生产）。
@@ -136,26 +136,16 @@ function targetOwnedByMeTolerant(filePath, sid) {
   return true;
 }
 
-function main() {
-  // 读 stdin，取 tool_name / tool_input.file_path / session_id。
-  let stdin = '';
-  try {
-    stdin = fs.readFileSync(0, 'utf8');
-  } catch (_e) {
-    return; // stdin 读不到 → 静默
-  }
-  let toolName = '';
-  let filePath = '';
-  let sid = '';
-  try {
-    const o = JSON.parse(stdin || '{}');
-    if (o && typeof o.tool_name === 'string') toolName = o.tool_name;
-    if (o && typeof o.session_id === 'string') sid = o.session_id;
-    const ti = (o && o.tool_input) || {};
-    if (typeof ti.file_path === 'string') filePath = ti.file_path;
-  } catch (_e) {
-    return; // 非法 stdin → 静默
-  }
+// ── body：plumbing（stdin 读取 + tool_name/file_path/session_id 解析 / fail-silent / exit 0）由
+//   hook-common.runHook 提供（phase-1b·parseStdin 取值口径 session_id/tool_name/tool_input.file_path 与原内联
+//   字字相同）；board-lint 用 arm:'custom'——它的武装不是纯 isArmed，而是「闸3 isArmed + 闸4
+//   targetIsMyActiveBoard / 坏-JSON 容错认领」的复合闸（必须在 body 内做，harness 的预设武装套不进）。
+//   输出经 harness { additionalContext } 形态（JSON.stringify+'\n'·event 'PostToolUse'）——与原手写 payload
+//   字节等价；body 返回 { additionalContext: wrapped } 或 null（静默）。
+function body(ctx) {
+  const toolName = ctx.toolName;
+  const filePath = ctx.filePath;
+  const sid = ctx.sid;
 
   // ── 闸1：tool_name ∈ {Write, Edit, MultiEdit}（最高频早退；其余 Read/Grep/Bash 立即静默）──────────
   // Bash 改 board（sed/echo/cat >）的 tool_input 是 command 字符串、无结构化 file_path —— 静态 hook 无法
@@ -210,18 +200,11 @@ function main() {
   const wrapped = advisory('board-lint', outcome.hasHard ? 'strong' : 'weak', report);
 
   // 非阻断注入：仅 additionalContext，hookEventName "PostToolUse"。绝不 decision:block。
-  const payload = {
-    hookSpecificOutput: {
-      hookEventName: 'PostToolUse',
-      additionalContext: wrapped,
-    },
-  };
-  process.stdout.write(JSON.stringify(payload) + '\n');
+  // harness 据 { additionalContext } 套 envelope（JSON.stringify+'\n'·event 'PostToolUse'）——与原手写 payload 字节等价。
+  return { additionalContext: wrapped };
 }
 
-try {
-  main();
-} catch (_e) {
-  // 兜底：任何未预期异常都不得污染 agent 流 —— 静默成功退出。
-}
-process.exit(0);
+// runHook：arm:'custom'（board-lint 武装是 body 内的四闸复合，非 harness 预设武装）。全程 try/catch + exit 0
+//   由 harness 保证——任何未预期异常静默成功退出（hook 崩绝不污染 agent 流，与 usage-pacing 同纪律）。
+//   bootstrap-board.sh 仍是唯一豁免的 ARM 动作（bash·绝不进本 harness）。
+runHook({ event: 'PostToolUse', arm: 'custom', body });
