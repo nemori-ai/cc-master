@@ -152,6 +152,16 @@ export const REGISTRY: Registry = {
       ],
       handler: 'board.update',
     },
+    archive: {
+      summary: '归档板（owner.active→false·停用即休眠·带锁·显式可逆·可经 --resume 复活）',
+      read: false,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm board archive', 'ccm board archive --board <path>'],
+      handler: 'board.archive',
+    },
     'set-param': {
       summary:
         '写 board.runtime.<白名单 key>（hook-owned 参数区·ADR-020·least-privilege·带锁）；非白名单 key / 非法值 → exit 2',

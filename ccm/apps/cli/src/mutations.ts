@@ -128,6 +128,20 @@ export function boardUpdate(
   return touch(b);
 }
 
+// ── boardArchive(board) → 归档板：翻 owner.active=false（停用即休眠·显式可逆）。
+//   带锁写 SSOT——给 stop / handoff 命令一条**经引擎、走 runWrite lock 管线**的归档路径，替代它们曾经
+//   手编辑 board JSON 翻 owner.active（手编辑与 ADR-020 的 Stop hook 带锁写并发会 torn-write·毁状态）。
+//   只动 owner.active（窄腰字段·红线2）+ touch 刷 heartbeat；tasks / log / goal / git 全留（**非破坏**·
+//   审计留痕·日后可经 `/cc-master:as-master-orchestrator --resume` 复活·ADR-009）。幂等：已 false 再 archive
+//   仍 false（无副作用）。归档判据是「翻 active」这一步本身——孤儿 / rollup 检查归命令体（在归档前做）。
+export function boardArchive(board: Board): Board {
+  const b = clone(board);
+  if (!b.owner || typeof b.owner !== 'object')
+    b.owner = { active: false, session_id: '', heartbeat: '' };
+  b.owner.active = false;
+  return touch(b);
+}
+
 // ── boardSetParam(board, {key, value}) → 写 board.runtime.<白名单 key>（ADR-020·hook-owned 参数区）。
 //   least-privilege 字段级 setter：作用域**收窄到 `runtime.*`**，verb 层（本函数）做 ① key 白名单（非白名单
 //   → throw .errKind='Usage'·exit 2）+ ② 值类型校验（按 key 的声明类型·如 ISO key 走 isISOUTC·非法 → Usage）。

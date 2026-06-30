@@ -178,6 +178,7 @@ export {
   autoInstallStatuslineOnce,
   captureRateLimits,
   installStatusline,
+  looksLikeDevInvocation,
   renderStatusline,
   settingsPath as statuslineSettingsPath,
   uninstallStatusline,

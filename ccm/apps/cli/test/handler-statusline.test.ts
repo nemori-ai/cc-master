@@ -87,10 +87,24 @@ test('run statusline install --json：结构化输出', () => {
 });
 
 // ── 无感知自动安装（任意非-statusline 命令触发）────────────────────────────────────────────────────
-test('auto-install：跑普通命令（--version）首次即立 status line', () => {
+//   DEV-GUARD（0.10.x）：autoInstall 用 resolveSelfBinPath(env) 判「是否从非安装位置〔worktree/仓库内〕跑」。
+//   这些 in-process 测试的 process.argv[1] 落在本仓内 → 默认会被判 dev 而 skip。要验「安装路径正常装」，
+//   注入 env.CCM_BIN 指向一个**无 dev 标记**的临时安装路径（在 temp config dir 下·非 worktree·无 .git/pnpm/turbo）。
+function installBin(dir: string): string {
+  return join(dir, 'ccm'); // temp config dir 下的裸路径·无 dev 标记 → looksLikeDevInvocation 判非 dev
+}
+
+test('auto-install：dev 路径（仓库内跑·无 CCM_BIN 覆写）→ skip·不污染 settings', () => {
+  const dir = mkdir();
+  // 不注入 CCM_BIN → resolveSelfBinPath 落到本仓内的 process.argv[1] → dev-guard skip。
+  runCcm(['--version'], dir);
+  assert.ok(!exists(join(dir, 'settings.json')), 'dev 路径下不自动安装（dev-guard skip）');
+});
+
+test('auto-install：安装路径（CCM_BIN 指向无 dev 标记路径）首次即立 status line', () => {
   const dir = mkdir();
   assert.ok(!exists(join(dir, 'settings.json')), '前置：无 settings');
-  runCcm(['--version'], dir);
+  runCcm(['--version'], dir, { extraEnv: { CCM_BIN: installBin(dir) } });
   assert.ok(exists(join(dir, 'settings.json')), 'settings 自动建');
   const sl = settings(dir).statusLine as { command: string };
   assert.match(sl.command, /statusline$/, '装的是 ccm statusline');
@@ -98,16 +112,17 @@ test('auto-install：跑普通命令（--version）首次即立 status line', ()
 
 test('auto-install：幂等（第二次不重复改）+ opt-out 后不再覆盖', () => {
   const dir = mkdir();
-  runCcm(['--version'], dir); // 首装
+  const env = { CCM_BIN: installBin(dir) }; // 模拟安装路径让 auto-install 真跑
+  runCcm(['--version'], dir, { extraEnv: env }); // 首装
   const after1 = readFileSync(join(dir, 'settings.json'), 'utf8');
-  runCcm(['board', 'show'], dir); // 第二条命令（board show 会因无板报错·但 auto-install 路径已先跑）
+  runCcm(['board', 'show'], dir, { extraEnv: env }); // 第二条命令（board show 会因无板报错·但 auto-install 路径已先跑）
   const after2 = readFileSync(join(dir, 'settings.json'), 'utf8');
   assert.equal(after1, after2, '第二次命令不再改 settings（marker 守）');
 
   // uninstall → opt-out；再跑普通命令不应重装。
-  runCcm(['statusline', 'uninstall'], dir);
+  runCcm(['statusline', 'uninstall'], dir, { extraEnv: env });
   const afterUninstall = readFileSync(join(dir, 'settings.json'), 'utf8');
-  runCcm(['--version'], dir);
+  runCcm(['--version'], dir, { extraEnv: env });
   assert.equal(
     readFileSync(join(dir, 'settings.json'), 'utf8'),
     afterUninstall,

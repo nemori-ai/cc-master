@@ -19,7 +19,17 @@ const model = { ENUMS, FIELDS, TIERS };
 
 // ── 覆盖全部 13 namespace 的全部 verb（cli-design §3·ADR-015 加 usage/estimate·Phase 2a 加 account·COORD 加 peers·0.10.0 加 statusline）──────
 const EXPECTED: Record<string, string[]> = {
-  board: ['show', 'lint', 'graph', 'critical-path', 'next', 'init', 'update', 'set-param'],
+  board: [
+    'show',
+    'lint',
+    'graph',
+    'critical-path',
+    'next',
+    'init',
+    'update',
+    'archive',
+    'set-param',
+  ],
   baseline: ['snapshot', 'show', 'reset'],
   task: ['add', 'show', 'list', 'update', 'start', 'done', 'block', 'set-status', 'rm'],
   log: ['add', 'list'],

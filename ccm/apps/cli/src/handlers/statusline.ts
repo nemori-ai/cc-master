@@ -22,7 +22,7 @@ import {
   uninstallStatusline,
 } from '@ccm/engine';
 import * as io from '../io.js';
-import { resolveStatuslineCommand } from '../self.js';
+import { resolveSelfBinPath, resolveStatuslineCommand } from '../self.js';
 import type { Ctx } from './_common.js';
 
 const EXIT = io.EXIT;
@@ -112,7 +112,10 @@ export function uninstall(ctx: Ctx): number {
 //   放这里让 handler 层统一拥有 statusline 接线；router 只调一次、不关心结果。
 export function autoInstall(env: Ctx['env']): void {
   try {
-    autoInstallStatuslineOnce(env, resolveStatuslineCommand());
+    // 第三参 binPath 注入 DEV-GUARD：从 worktree / 仓库内跑（dev 自测）时 autoInstall 自动 skip（reason
+    // `dev-invocation`），绝不污染真实 ~/.claude/settings.json；真实用户（稳定安装路径）不受影响。
+    // binPath 经 resolveSelfBinPath(env) 解析（honor env.CCM_BIN·见 self.ts）。
+    autoInstallStatuslineOnce(env, resolveStatuslineCommand(), resolveSelfBinPath(env));
   } catch {
     /* 绝不让自动安装影响任何命令 */
   }

@@ -3,7 +3,7 @@
 //   sidecar 捕获（缺 rate_limits 不抹旧值·原子写形态）。测 build 后的 dist barrel。
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
@@ -11,6 +11,7 @@ import {
   autoInstallStatuslineOnce,
   captureRateLimits,
   installStatusline,
+  looksLikeDevInvocation,
   uninstallStatusline,
 } from '../dist/index.mjs';
 
@@ -157,6 +158,65 @@ test('显式 install 清 opt-out（用户改主意）', () => {
   const r = installStatusline(envFor(dir), CMD); // 显式重装
   assert.equal(r.action, 'installed');
   assert.ok(!exists(join(dir, '.cc-master-statusline-optout')), 'opt-out 被显式 install 清除');
+});
+
+// ── DEV-GUARD：从非安装位置（worktree / 仓库内）跑 → autoInstall skip（不污染真实 ~/.claude）────────────
+test('looksLikeDevInvocation: 路径含 /worktrees/ → dev', () => {
+  assert.equal(
+    looksLikeDevInvocation('/Users/me/repo/.claude/worktrees/x/ccm/apps/cli/bin/ccm.cjs'),
+    true,
+  );
+});
+
+test('looksLikeDevInvocation: 向上 walk 命中 .git → dev', () => {
+  const repo = mkdir();
+  mkdirSync(join(repo, '.git'), { recursive: true });
+  mkdirSync(join(repo, 'ccm', 'apps', 'cli', 'bin'), { recursive: true });
+  const bin = join(repo, 'ccm', 'apps', 'cli', 'bin', 'ccm.cjs');
+  writeFileSync(bin, '// stub');
+  assert.equal(looksLikeDevInvocation(bin), true);
+});
+
+test('looksLikeDevInvocation: 向上 walk 命中 pnpm-workspace.yaml → dev', () => {
+  const root = mkdir();
+  mkdirSync(join(root, 'ccm', 'apps', 'cli', 'bin'), { recursive: true });
+  writeFileSync(join(root, 'ccm', 'pnpm-workspace.yaml'), 'packages:\n');
+  const bin = join(root, 'ccm', 'apps', 'cli', 'bin', 'ccm.cjs');
+  writeFileSync(bin, '// stub');
+  assert.equal(looksLikeDevInvocation(bin), true);
+});
+
+test('looksLikeDevInvocation: 安装路径（无 dev 标记·非 worktree）→ 非 dev', () => {
+  // 模拟 install.sh 落点 $HOME/.local/bin/ccm（稳定路径·无 .git/pnpm/turbo 邻居）。
+  const home = mkdir();
+  mkdirSync(join(home, '.local', 'bin'), { recursive: true });
+  const bin = join(home, '.local', 'bin', 'ccm');
+  writeFileSync(bin, 'SEA');
+  assert.equal(looksLikeDevInvocation(bin), false);
+});
+
+test('looksLikeDevInvocation: binPath undefined → 非 dev（向后兼容·不拦）', () => {
+  assert.equal(looksLikeDevInvocation(undefined), false);
+});
+
+test('autoInstall: dev 调用（binPath 落在 worktree）→ skip·不写 settings', () => {
+  const dir = mkdir();
+  const devBin = '/some/repo/.claude/worktrees/abc/ccm/apps/cli/bin/ccm.cjs';
+  const r = autoInstallStatuslineOnce(envFor(dir), CMD, devBin);
+  assert.equal(r.action, 'skipped');
+  assert.equal(r.reason, 'dev-invocation');
+  assert.ok(!exists(join(dir, 'settings.json')), '未写任何 settings');
+});
+
+test('autoInstall: 安装路径 binPath → 正常装（dev-guard 不误伤真实用户）', () => {
+  const dir = mkdir();
+  const home = mkdir();
+  mkdirSync(join(home, '.local', 'bin'), { recursive: true });
+  const realBin = join(home, '.local', 'bin', 'ccm');
+  writeFileSync(realBin, 'SEA');
+  const r = autoInstallStatuslineOnce(envFor(dir), CMD, realBin);
+  assert.equal(r.action, 'installed');
+  assert.deepEqual(readSettings(dir).statusLine, { type: 'command', command: CMD });
 });
 
 // ── 坏 JSON 安全：绝不覆写可能毁掉用户配置的 settings.json ──────────────────────────────────────────

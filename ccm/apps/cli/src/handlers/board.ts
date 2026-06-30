@@ -249,6 +249,26 @@ export function update(ctx: Ctx): number {
   });
 }
 
+// ── 写 verb：archive（归档板·翻 owner.active=false·带锁·停用即休眠·显式可逆）──────────────────────────
+//   走 runWrite 同一条 lock + lint + 原子写管线（与 update / set-param 同口径）——这是 stop / handoff 命令
+//   归档板的**唯一带锁路径**，替代它们手编辑 board JSON（手编辑与 ADR-020 Stop hook 带锁写并发会 torn-write）。
+//   发现忽略 --goal（与 update 同：archive 无 --goal payload，但复用同一条两层发现保持一致·避免 goalSubstr 误滤）。
+//   非破坏：tasks / log / goal / git 全留（mutations.boardArchive 只翻 active）；幂等。孤儿 / rollup 闸归命令体（归档前做）。
+export function archive(ctx: Ctx): number {
+  return runWrite(ctx, {
+    resolve: resolveBoardIgnoringGoal,
+    mutate: (board) => mutations.boardArchive(board as BoardArg),
+    render: (board, c, { dryRun }) => {
+      const b = board as { goal?: string };
+      if (c.flags.json) return render.renderBoardSummary(b, { json: true });
+      const prefix = dryRun
+        ? '[dry-run] 将归档板（owner.active→false）'
+        : '板已归档（owner.active=false·已停用·全套 hook 对它休眠·可经 --resume 复活）';
+      return `${prefix}: goal="${b.goal || ''}"`;
+    },
+  });
+}
+
 // ── 写 verb：set-param（写 board.runtime.<白名单 key>·hook-owned 参数区·ADR-020·照 update / policy.set 体例）─
 //   positionals = [key, value]（router 已校验 required·非空）。走 runWrite 带锁管线 → mutations.boardSetParam
 //   做白名单 + 值校验（非白名单 key / 非法值 → throw .errKind='Usage' 冒泡 router 映射 exit 2）→ lint → 原子写。

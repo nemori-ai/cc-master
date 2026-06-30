@@ -225,12 +225,65 @@ function killSwitch(env: PathEnv): boolean {
   return v !== undefined && v !== '' && v !== '0';
 }
 
-// ── autoInstallStatuslineOnce(env, command) ────────────────────────────────────────────────────
-//   marker 守 · 幂等 · 静默 · 绝不抛。首次（无 marker / 未 opt-out / 未 kill）才装一次。
-export function autoInstallStatuslineOnce(env: PathEnv, command: string): StatuslineActionResult {
+// ── DEV-GUARD：从「非安装位置」跑起来时不自动安装 ────────────────────────────────────────────────────
+//   背景：无感知自动安装会改写**全局** `<claudeConfigDir>/settings.json`。但开发本仓时 ccm 是从 git
+//   worktree / 仓库内（dev-bin shim → `ccm/apps/cli/bin/ccm.cjs`）跑的——若那时也自动安装，会拿 dev 树里的
+//   命令路径污染开发者真实的 `~/.claude/settings.json`（且 dev 命令路径随 worktree 销毁即失效）。所以：检测到
+//   ccm 是从非安装位置跑起来的 → **跳过**自动安装。真实用户经 install.sh 把 SEA 二进制装到稳定路径
+//   `$HOME/.local/bin/ccm`（无 dev 标记邻居·不含 `/worktrees/`）→ 不命中 → 自动安装照常。
+//
+//   `binPath` = 本次 ccm 进程的入口绝对路径（node-bin 形态 = `process.argv[1]`〔bin/ccm.cjs〕；SEA 形态 =
+//   `process.execPath`〔二进制自身〕；由 apps/cli 侧 self.resolveSelfBinPath() 注入·见 handler）。缺省
+//   `undefined`（如旧调用方 / 单元测试不注入）→ 视为「非 dev」（不阻止自动安装·保持向后兼容）。
+//
+//   检测信号（任一命中即判 dev·从严避免误判真实用户）：
+//     1. 路径含 `/worktrees/`——git worktree 约定目录（本仓 `.claude/worktrees/<id>/...`）。
+//     2. 从 binPath 所在目录**向上 walk**命中 monorepo / 仓库 dev 标记：`.git`（dir 或 file·worktree 用 file）/
+//        `pnpm-workspace.yaml` / `turbo.json`——后两者是 monorepo **根**专属、绝不出现在已发布的单包或 SEA 安装树里。
+//   **刻意不**把裸 `package.json` 当标记：全局 npm 安装的 ccm 自带 `package.json`，用它会误伤真实全局安装用户。
+//   纯 `fs.accessSync` 探活·全程吞错（探测异常 → 保守判「非 dev」·绝不因探测失败而拦住真实用户的自动安装）。
+const DEV_WALKUP_MARKERS = ['.git', 'pnpm-workspace.yaml', 'turbo.json'] as const;
+function hasMarker(dir: string, name: string): boolean {
+  try {
+    fs.accessSync(path.join(dir, name));
+    return true;
+  } catch {
+    return false;
+  }
+}
+export function looksLikeDevInvocation(binPath: string | undefined): boolean {
+  if (!binPath) return false;
+  try {
+    // 归一化分隔符做 substring（Windows 容错）。
+    if (binPath.replace(/\\/g, '/').includes('/worktrees/')) return true;
+    let dir = path.dirname(binPath);
+    for (let i = 0; i < 40; i++) {
+      for (const m of DEV_WALKUP_MARKERS) if (hasMarker(dir, m)) return true;
+      const parent = path.dirname(dir);
+      if (parent === dir) break; // 抵达文件系统根
+      dir = parent;
+    }
+    return false;
+  } catch {
+    return false; // 探测异常 → 保守判非 dev（不拦真实用户）。
+  }
+}
+
+// ── autoInstallStatuslineOnce(env, command, binPath?) ──────────────────────────────────────────
+//   marker 守 · 幂等 · 静默 · 绝不抛。首次（无 marker / 未 opt-out / 未 kill / 非 dev 调用）才装一次。
+//   `binPath`（可选）= 本次 ccm 进程入口绝对路径，注入给 DEV-GUARD（见 looksLikeDevInvocation）：从 git
+//   worktree / 仓库内跑（dev 自测）→ skip（reason `dev-invocation`），绝不污染真实 ~/.claude/settings.json。
+//   不注入 → 跳过 dev 判定（向后兼容·单元测试默认路径）。
+export function autoInstallStatuslineOnce(
+  env: PathEnv,
+  command: string,
+  binPath?: string,
+): StatuslineActionResult {
   const sFile = settingsPath(env);
   try {
     if (killSwitch(env)) return { action: 'skipped', reason: 'kill-switch', settingsPath: sFile };
+    if (looksLikeDevInvocation(binPath))
+      return { action: 'skipped', reason: 'dev-invocation', settingsPath: sFile };
     if (fileExists(optoutMarkerPath(env)))
       return { action: 'skipped', reason: 'opt-out', settingsPath: sFile };
     if (fileExists(installedMarkerPath(env)))

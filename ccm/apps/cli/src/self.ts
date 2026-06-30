@@ -39,3 +39,20 @@ export function resolveSelfCommand(): string {
 export function resolveStatuslineCommand(): string {
   return `${resolveSelfCommand()} statusline`;
 }
+
+// resolveSelfBinPath(env?) → 本次 ccm 进程**入口的裸（未引号包裹）绝对路径**，喂给 autoInstall 的 DEV-GUARD
+//   （@ccm/engine looksLikeDevInvocation）判定「是否从非安装位置〔worktree / 仓库内〕跑起来」。
+//   · `env.CCM_BIN`（最高优先）：复用本仓既有 CCM_BIN 约定（hook 用它指向真 ccm·dev-bin shim）——显式声明
+//     「本次 ccm 的真实二进制路径」，让 dev 检测有确定的探测点（也让 CLI 集成测试能注入一个安装路径模拟真实用户）。
+//   · node-bin（dev-shim / 全局 npm install·无 CCM_BIN）：execPath=node → 入口是 `process.argv[1]`（bin/ccm.cjs）。
+//   · SEA 二进制（生产分发）：execPath 即 ccm 自身。
+//   与 resolveSelfCommand 同源事实，但**不做 shell 引号包裹**（dev 检测要的是真实文件路径去 fs 探标记）。
+export function resolveSelfBinPath(env?: Record<string, string | undefined>): string | undefined {
+  const e = env || process.env;
+  if (e.CCM_BIN) return e.CCM_BIN;
+  const exec = process.execPath || '';
+  const base = path.basename(exec).toLowerCase();
+  const isNode = base === 'node' || base === 'node.exe';
+  if (isNode) return process.argv[1] || undefined; // 入口脚本 = bin/ccm.cjs 绝对路径
+  return exec || undefined; // SEA：二进制自身
+}

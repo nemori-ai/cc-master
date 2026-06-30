@@ -5,6 +5,7 @@ export { type CaptureResult, captureRateLimits } from './capture.js';
 export {
   autoInstallStatuslineOnce,
   installStatusline,
+  looksLikeDevInvocation,
   type StatuslineActionResult,
   settingsPath,
   uninstallStatusline,

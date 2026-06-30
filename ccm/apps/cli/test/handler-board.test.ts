@@ -530,6 +530,38 @@ test('board update: bad --wip-limit (non-int) → throws Usage', () => {
   );
 });
 
+// ══ board archive（带锁归档·翻 owner.active=false·非破坏·幂等）════════════════════════════════════════
+test('board archive: 翻 owner.active=false·保留 goal/tasks/log·刷 heartbeat', () => {
+  const { boardPath } = mkBoardHome({ tasks: [{ id: 'T1', status: 'ready', deps: [] }] });
+  const ctx = mkCtx({ boardPath });
+  const code = boardHandler.archive(ctx);
+  assert.equal(code, EXIT.OK);
+  const onDisk = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.equal(onDisk.owner.active, false, 'owner.active 翻 false');
+  assert.equal(onDisk.goal, 'board handler test', 'goal 保留');
+  assert.equal(onDisk.tasks.length, 1, 'tasks 保留（非破坏）');
+  assert.notEqual(onDisk.owner.heartbeat, '2026-06-24T10:00:00Z', 'heartbeat 已刷新');
+  assert.ok(ctx.outBuf.join('').includes('已归档'));
+});
+
+test('board archive --dry-run: 不落盘（owner.active 仍 true）', () => {
+  const { boardPath } = mkBoardHome();
+  const ctx = mkCtx({ boardPath, flags: { dryRun: true } });
+  const code = boardHandler.archive(ctx);
+  assert.equal(code, EXIT.OK);
+  const onDisk = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.equal(onDisk.owner.active, true, 'dry-run 不落盘');
+});
+
+test('board archive: 幂等（已 active:false 再 archive 仍 false·无副作用）', () => {
+  const { boardPath } = mkBoardHome();
+  boardHandler.archive(mkCtx({ boardPath }));
+  const code = boardHandler.archive(mkCtx({ boardPath }));
+  assert.equal(code, EXIT.OK);
+  const onDisk = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.equal(onDisk.owner.active, false);
+});
+
 test('board update --dry-run does not write the board', () => {
   const { boardPath } = mkBoardHome();
   const before = readFileSync(boardPath, 'utf8');
