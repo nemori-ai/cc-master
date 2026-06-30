@@ -76,27 +76,68 @@ We keep a clear line between "what it does today" and "what we're still building
 
 ## Get started
 
-**Install `ccm` first — it's a hard prerequisite.** cc-master drives its board through the standalone `ccm` engine; without it, an orchestration can't actually operate its board (the plugin will detect this at startup and tell you to install `ccm` before it does anything). Install the `ccm` engine for your OS, then install the plugin:
+Two steps — install the `ccm` engine, then the plugin. Both come from the **same cc-master GitHub release**; install matching versions (the engine and the plugin are built and shipped together, tag by tag).
+
+### 1. Install the `ccm` engine (required)
+
+cc-master drives its board through a standalone engine called `ccm`. It's a **hard prerequisite** — without `ccm` on your PATH the plugin won't start an orchestration; it detects this at startup and asks you to install `ccm` first ([ADR-021](adrs/ADR-021-ccm-install-presence-hard-precheck.md)). `ccm` ships as a per-OS native binary attached to each release.
+
+**a. Find your OS and architecture:**
 
 ```bash
-# 1. install the standalone ccm engine (required — per-OS binary; see ccm/ for build/install)
-# 2. install the plugin:
-git clone https://github.com/nemori-ai/cc-master.git
-cd cc-master
-claude --plugin-dir .
+uname -s   # Darwin = macOS,  Linux = Linux
+uname -m   # arm64 / aarch64 = arm64,  x86_64 = x64
 ```
 
-Then give it a goal and watch it run:
+That maps to the binary you want: **`ccm-darwin-arm64`** (Apple Silicon Mac) · **`ccm-darwin-x64`** (Intel Mac) · **`ccm-linux-x64`** · **`ccm-linux-arm64`** (when a release publishes it — check the release's Assets).
+
+**b. Download it, rename it to `ccm`, make it executable, and put it on your PATH.** Open the **Assets** of the release you want to run and download the `ccm-<os>-<arch>` that matches your machine, then:
+
+```bash
+mkdir -p ~/.local/bin
+mv ~/Downloads/ccm-darwin-arm64 ~/.local/bin/ccm   # use YOUR downloaded file; rename to plain `ccm`
+chmod +x ~/.local/bin/ccm                          # make it executable
+ccm --version                                       # verify it runs
+```
+
+Make sure `~/.local/bin` is on your PATH. If `ccm --version` says "command not found," add this to your `~/.zshrc` or `~/.bashrc` and reopen the shell:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### 2. Install the cc-master plugin
+
+From the **same release tag**, download `cc-master-plugin-<tag>.zip`, unzip it, and point Claude Code at the unzipped folder:
+
+```bash
+unzip ~/Downloads/cc-master-plugin-<tag>.zip -d ~/cc-master   # e.g. <tag> = v0.10.0
+claude --plugin-dir ~/cc-master
+```
+
+`claude --plugin-dir /abs/path/to/cc-master` works from inside any project, so you can run cc-master while working on something else. (Prefer to run from source? `git clone` the repo and `claude --plugin-dir .` instead — you'll still need a matching `ccm` binary on your PATH from step 1.)
+
+Now hand it a goal:
 
 ```
-/cc-master:as-master-orchestrator <your goal>      # hand it over, it starts
-/cc-master:status                                  # see where it is and what it's waiting on you for
-/cc-master:view                                     # watch its live plan in the browser (read-only)
+/cc-master:as-master-orchestrator <your goal>      # hand it over — it starts
 ```
 
-![Its live plan, in the browser any time](docs/images/view-graph-dark.png)
+---
 
-Want it even more hands-off? Pool a few backup accounts with the `ccm account` CLI (`ccm account add/list/switch` — you run it directly; tokens stay token-blind, never touching the agent's context) and it'll switch to a full one when an account runs low — you won't feel a thing. With `ccm` installed (required, see above), its accounting, forecasting, and dashboards are all there.
+## Everyday use
+
+The handful of commands you'll actually type. The `/cc-master:…` ones run **inside a Claude Code session**; `ccm …` runs in your **terminal**.
+
+- **`/cc-master:as-master-orchestrator <goal>`** — hand over a big goal; it builds the plan and starts working. This is how every run begins.
+- **`/cc-master:status`** — a quick read of where things stand: overall progress, what's blocked, and any decision waiting on **you**.
+- **`/cc-master:view`** — open its live plan as a read-only graph in your browser; it updates on its own and never touches the work.
+- **`/cc-master:discuss <decision>`** — when `status` flags a decision that's waiting on you, talk it through in a fresh session; your answer flows back into the plan.
+- **`/cc-master:stop`** — wrap up and archive the board. Reversible — you can pick the run back up later.
+- **`/cc-master:handoff-to-new-session`** — cleanly hand the run to a fresh session before this one ends; the new session takes over with `/cc-master:as-master-orchestrator --resume`.
+- **`ccm account add|list|switch <email>`** — build and steer a pool of backup accounts so it can switch to a full one when quota runs low. You run these directly in your terminal; your tokens stay token-blind and never reach the AI's context.
+
+> That's the everyday set. The full command surface (every `ccm` namespace and flag) is in the [command catalog](skills/using-ccm/references/command-catalog.md); what's shipped vs. still on the way is in the [Feature Manual](design_docs/feature-manual.md).
 
 ---
 
