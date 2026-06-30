@@ -6,7 +6,11 @@
 
 cc-master turns a Claude Code session into a project lead that never sleeps and actually watches the money. You bring the idea and make the handful of calls that truly need you; it handles the rest — breaking the work down, running it in parallel, tracking progress, keeping spend in check, checking its own work. You come back, and it's done. And it didn't blow your budget.
 
+And there's real machinery behind the warmth: it **runs the numbers thousands of times** to tell you when you'll ship and which step is most likely to slip; it **watches your quota and adjusts its pace** as it goes — easing off when you're tight, pressing when you've got room; and it **keeps a few accounts in rotation**, spreading the load and quietly switching before any one runs dry. So it breaks the work into parallel pieces and **delivers it, fast and steady**, all the way to done — no idling, no walls, no wasted spend.
+
 > **You stop being the one who has to watch everything.**
+
+But make no mistake — this is **not** "make a wish and the AI does it all." Taste, design, direction — the calls only you can make **stay yours**; what it takes off your plate is just the breakdown, scheduling, babysitting, and accounting that would otherwise bury you. It even **teaches the AI to stop and ask you when it should** — cc-master's skills are full of philosophy and method for *when to pull the human back in*, handing judgment back to you rather than making the call for you. At bottom it does one thing: in the age of AI-assisted coding, it **reallocates your attention to where it's actually worth spending**.
 
 ![The plan it keeps for you, at a glance](docs/images/view-graph-dark.png)
 
