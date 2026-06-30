@@ -18,7 +18,6 @@
 // 武装闸豁免：纯 handler 模块（无 hook 入口）。
 
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   boardRepo,
@@ -31,6 +30,8 @@ import {
   pctBurnRate,
   pctOf,
   pctRunway,
+  resolveClaudeConfigDir,
+  resolveRateCachePath,
   tokenExpired,
   type UsageSignal,
   WINDOW_5H_SEC,
@@ -73,7 +74,7 @@ function registryPath(env: Record<string, string | undefined>, homeFlag?: string
     ? path.resolve(homeFlag)
     : env.CC_MASTER_HOME
       ? path.resolve(env.CC_MASTER_HOME)
-      : path.join(os.homedir(), '.claude', 'cc-master');
+      : path.join(resolveClaudeConfigDir(env), 'cc-master');
   return path.join(home, 'accounts.json');
 }
 
@@ -193,9 +194,8 @@ function readBackups(
 //   resets_at?:<epoch秒>}, seven_day:{used_percentage,resets_at?} }`——`resets_at`/`captured_at` 是 epoch 秒。
 //   缺 → null（pacingAdvice 据此 available:false 降级·本地反推不归这俩只读 namespace·plan §4 性能边界）。
 function rateCachePath(env: Record<string, string | undefined>): string {
-  return (
-    env.CC_MASTER_RATE_CACHE || path.join(os.homedir(), '.claude', '.cc-master-rate-limits.json')
-  );
+  // CC_MASTER_RATE_CACHE 覆写 > <claudeConfigDir>/.cc-master-rate-limits.json（paths SSOT·跟随 CLAUDE_CONFIG_DIR）。
+  return resolveRateCachePath(env);
 }
 
 function readUsageSidecar(env: Record<string, string | undefined>): UsageSignal | null {

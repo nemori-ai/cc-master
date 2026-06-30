@@ -13,8 +13,8 @@
 // TS 移植差异（faithful 但有别处）：见各处 `// TS-port:` 注 + 模块尾导出，以及交付报告。
 
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { resolveCcMasterHome } from '../paths.js';
 
 // ── 常量 ────────────────────────────────────────────────────────────────────────────────────────
 export const SCHEMA = 'cc-master/accounts/v1';
@@ -98,10 +98,10 @@ export interface Registry {
 type ReportFn = (message: string, account?: string) => void;
 
 // ── 路径解析 ─────────────────────────────────────────────────────────────────────────────────────
-// accounts.json 固定路径：${CC_MASTER_HOME:-$HOME/.claude/cc-master}/accounts.json（用户级 home·绝不落 repo 树）。
+// accounts.json 固定路径：${CC_MASTER_HOME:-<claudeConfigDir>/cc-master}/accounts.json（用户级 home·绝不落 repo 树）。
+//   claudeConfigDir 跟随 CLAUDE_CONFIG_DIR（默认 ~/.claude·paths.resolveCcMasterHome SSOT）。
 export function defaultRegistryPath(): string {
-  const home = process.env.CC_MASTER_HOME || path.join(os.homedir(), '.claude', 'cc-master');
-  return path.join(home, 'accounts.json');
+  return path.join(resolveCcMasterHome(), 'accounts.json');
 }
 
 // ── 校验：validateRegistry(obj) → { errors, warnings } ────────────────────────────────────────────

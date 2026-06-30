@@ -32,17 +32,19 @@ stdin="$(cat)"
 sid="$(printf '%s' "$stdin" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
 
 # ── BASH SSOT: cc-master home 解析（统一全局口径·board-v2 home 收口）─────────────────────────────────
-# cc_master_home — cc-master home **根**目录。优先级：$CC_MASTER_HOME 覆写 → $HOME/.claude/cc-master
-#   （全局·默认）。**不再** per-repo（CLAUDE_PROJECT_DIR/.claude/cc-master）或 cwd fallback——所有
-#   orchestration 的 board 集中到一个用户级 home，跨 repo 不再各起一份。**这是 bash 侧唯一的 home 解析点**
-#   （本仓现仅 bootstrap-board.sh 一个 bash hook 解析 home；node 侧 SSOT 在 hooks/scripts/hook-common.js
-#   的 resolveHome，ccm 侧在 discover.ts 的 resolveHome——三处同口径）。纯 bash·ship-anywhere。
-# F2（codex）：`${HOME:-}` 守卫只保**函数自身在 `set -u` 下不崩**（裸 `$HOME` 在 nounset + HOME 未设时会以
-#   "HOME: unbound variable" 崩）。它**不**负责「都没有时给个合理 home」——CC_MASTER_HOME 与 HOME 都空时这里
-#   会塌成绝对根 `/.claude/cc-master`，那是个**无意义**的 home（在那建 board/mkdir 必失败、脚本无 set -e 行为
-#   不可预测）。真正的处置是**调用点的 fail-loud 闸**（见下方 HOME 解析处）：都空时清晰报错 + 干净退出 + 不建
-#   bogus board，绝不带着根路径继续。本函数只在「至少一个非空」时才被调用，故这里恒返回一个有意义的 home。
-cc_master_home() { printf '%s' "${CC_MASTER_HOME:-${HOME:-}/.claude/cc-master}"; }
+# claude_config_dir — claude 配置根（跟随 $CLAUDE_CONFIG_DIR·默认 $HOME/.claude）。与 node 侧
+#   hook-common.claudeConfigDir / ccm paths.resolveClaudeConfigDir 同口径。纯 bash·ship-anywhere。
+#   `${HOME:-}` 守卫只保函数自身在 `set -u` 下不崩；都空时塌成根 `/.claude`（无意义）由调用点 fail-loud 闸兜。
+claude_config_dir() { printf '%s' "${CLAUDE_CONFIG_DIR:-${HOME:-}/.claude}"; }
+# cc_master_home — cc-master home **根**目录。优先级：$CC_MASTER_HOME 覆写 → <claudeConfigDir>/cc-master
+#   （全局·默认·跟随 CLAUDE_CONFIG_DIR）。**不再** per-repo（CLAUDE_PROJECT_DIR/.claude/cc-master）或 cwd
+#   fallback——所有 orchestration 的 board 集中到一个用户级 home，跨 repo 不再各起一份。**这是 bash 侧唯一的
+#   home 解析点**（本仓现仅 bootstrap-board.sh 一个 bash hook 解析 home；node 侧 SSOT 在
+#   hooks/scripts/hook-common.js 的 resolveHome，ccm 侧在 discover.ts 的 resolveHome——三处同口径）。
+# F2（codex）：CC_MASTER_HOME 与 CLAUDE_CONFIG_DIR 与 HOME 都空时这里会塌成绝对根 `/.claude/cc-master`，那是个
+#   **无意义**的 home。真正的处置是**调用点的 fail-loud 闸**（见下方 HOME 解析处）：都空时清晰报错 + 干净退出 +
+#   不建 bogus board。本函数只在「至少一个非空」时才被调用，故这里恒返回一个有意义的 home。
+cc_master_home() { printf '%s' "${CC_MASTER_HOME:-$(claude_config_dir)/cc-master}"; }
 # cc_master_boards_dir — home 下集中放所有 *.board.json 的子目录（<home>/boards/）。home 根只放
 #   accounts.json（全局·不动）+ hook sidecar + 预留 channel/，与 board 枚举目录分开互不撞。
 cc_master_boards_dir() { printf '%s/boards' "$(cc_master_home)"; }
@@ -556,20 +558,20 @@ if [ "$ccm_present" -eq 0 ]; then
   # The directive tag is just a string (§13 author-side discipline: source必填·directive for a hard
   # constraint·ccm-missing IS a hard pre-requisite). Hand-built in bash (cannot require node's directive()
   # wrapper). inject_ctx escapes the whole payload to one valid JSON additionalContext envelope.
-  directive_body='<directive source="bootstrap">cc-master 依赖外部工具 `ccm`（per-OS Node SEA 二进制·ADR-014 主机安装前置），但当前环境的 PATH 上找不到它。没有 ccm，board v2 的写入关卡（ADR-013·agent 一律经 ccm 写 board）无法工作——即便建出 board 也无法正确操作，会是一场「看起来在跑、实则瘸腿」的 phantom orchestration。因此本次**不创建 board、不进入编排**。请你立即转告用户：先安装 ccm（cc-master 的硬前置依赖），装好后重新运行 /cc-master:as-master-orchestrator <goal> 即可正常起编排。在用户确认装好之前，不要继续编排——你没有可用的 board 操作能力。</directive>'
+  directive_body='<directive source="bootstrap">cc-master 依赖外部工具 `ccm`（per-OS Node SEA 二进制·ADR-014 主机安装前置），但当前环境的 PATH 上找不到它。没有 ccm，board v2 的写入关卡（ADR-013·agent 一律经 ccm 写 board）无法工作——即便建出 board 也无法正确操作，会是一场「看起来在跑、实则瘸腿」的 phantom orchestration。因此本次**不创建 board、不进入编排**。请你立即转告用户：先安装 ccm（cc-master 的硬前置依赖）——下载对应自己 OS/arch 的二进制 `ccm-<os>-<arch>`（os = darwin 或 linux、arch = arm64 或 x64，例如 Apple Silicon Mac 取 `ccm-darwin-arm64`、x86 Linux 取 `ccm-linux-x64`），重命名为 `ccm`、`chmod +x ccm`、放进 PATH（如 `~/.local/bin/ccm`），跑 `ccm --version` 确认可用（详见 README 安装段）。装好后重新运行 /cc-master:as-master-orchestrator <goal> 即可正常起编排。在用户确认装好之前，不要继续编排——你没有可用的 board 操作能力。</directive>'
   inject_ctx "$directive_body"
   exit 0
 fi
 
 # Home 解析（统一全局口径·BASH SSOT cc_master_home）：$CC_MASTER_HOME 覆写，否则 $HOME/.claude/cc-master。
 # board 集中落 <home>/boards/；home 根另放 accounts.json（全局·不动）+ sidecar + 预留 channel/。
-# F2（codex）FAIL-LOUD 闸：CC_MASTER_HOME 与 HOME **都为空**时无从解析出合理 home——绝不静默降级到绝对根
-#   `/.claude/cc-master`（在那建 board / mkdir 必失败、脚本无 set -e 行为不可预测、且会留下 bogus 痕迹）。
-#   改为 emit 一条清晰 stderr 提示 + 干净退出（rc 0、空 stdout、**不建任何 board**）。fail-loud 比脆弱的跨平台
-#   os.homedir bash 等价更 ship-anywhere 安全（bash 无可靠 os.homedir 兜底）。本闸在**触发门之后**（上方 case
-#   已过），故只有真要建/续板时才出声、不污染无关 prompt。
-if [ -z "${CC_MASTER_HOME:-}" ] && [ -z "${HOME:-}" ]; then
-  printf 'cc-master: 无法解析 home 目录（CC_MASTER_HOME 与 HOME 均未设）——请设置 CC_MASTER_HOME（或 HOME）后重试；本次未创建任何 board。\n' >&2
+# F2（codex）FAIL-LOUD 闸：CC_MASTER_HOME 与 CLAUDE_CONFIG_DIR 与 HOME **都为空**时无从解析出合理 home——绝不
+#   静默降级到绝对根 `/.claude/cc-master`（在那建 board / mkdir 必失败、脚本无 set -e 行为不可预测、且会留下
+#   bogus 痕迹）。改为 emit 一条清晰 stderr 提示 + 干净退出（rc 0、空 stdout、**不建任何 board**）。fail-loud 比
+#   脆弱的跨平台 os.homedir bash 等价更 ship-anywhere 安全（bash 无可靠 os.homedir 兜底）。本闸在**触发门之后**
+#   （上方 case 已过），故只有真要建/续板时才出声、不污染无关 prompt。CLAUDE_CONFIG_DIR 在场即可解析出 home。
+if [ -z "${CC_MASTER_HOME:-}" ] && [ -z "${CLAUDE_CONFIG_DIR:-}" ] && [ -z "${HOME:-}" ]; then
+  printf 'cc-master: 无法解析 home 目录（CC_MASTER_HOME / CLAUDE_CONFIG_DIR / HOME 均未设）——请设置 CC_MASTER_HOME（或 CLAUDE_CONFIG_DIR / HOME）后重试；本次未创建任何 board。\n' >&2
   exit 0
 fi
 HOME_DIR="$(cc_master_home)"

@@ -22,6 +22,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { resolveClaudeConfigDir } from '@ccm/engine';
 
 // 带 .errKind 的 Error（router 据此映射退出码）。
 interface KindedError extends Error {
@@ -60,13 +61,15 @@ export function resolveHome({ homeFlag, env }: { homeFlag?: string; env?: Env } 
   // ② $CC_MASTER_HOME。
   if (env.CC_MASTER_HOME) return path.resolve(env.CC_MASTER_HOME);
 
-  // ③ $HOME/.claude/cc-master（全局·默认）。env.HOME 缺 → os.homedir()（生产稳健）。
-  const home = env.HOME || os.homedir();
-  if (home) return path.join(home, '.claude', 'cc-master');
+  // ③ claudeConfigDir 派生 + /cc-master（claudeConfigDir 跟随 $CLAUDE_CONFIG_DIR·默认 $HOME/.claude·
+  //    HOME 缺退 os.homedir()·paths.resolveClaudeConfigDir SSOT）。
+  if (env.CLAUDE_CONFIG_DIR || env.HOME || os.homedir()) {
+    return path.join(resolveClaudeConfigDir(env), 'cc-master');
+  }
 
-  // ④ 连 HOME 都没有（极端环境）→ NotFound。
+  // ④ 连 CLAUDE_CONFIG_DIR / HOME / homedir 都没有（极端环境）→ NotFound。
   throw discoverError(
-    'No cc-master home found (--home / $CC_MASTER_HOME / $HOME all missed)',
+    'No cc-master home found (--home / $CC_MASTER_HOME / $CLAUDE_CONFIG_DIR / $HOME all missed)',
     'NotFound',
   );
 }

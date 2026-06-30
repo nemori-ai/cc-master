@@ -121,10 +121,13 @@ function main() {
   let boardPath = rest[0];
   if (!boardPath) {
     // 统一全局口径（与 hook-common.resolveHome / bootstrap-board.sh / ccm 同）：CC_MASTER_HOME 覆写，
-    // 否则 $HOME/.claude/cc-master；不再 per-repo（CLAUDE_PROJECT_DIR）或 cwd。board 在 <home>/boards/。
+    // 否则 <claudeConfigDir>/cc-master（claudeConfigDir 跟随 CLAUDE_CONFIG_DIR·默认 $HOME/.claude）；
+    // 不再 per-repo（CLAUDE_PROJECT_DIR）或 cwd。board 在 <home>/boards/。
+    const claudeConfigDir =
+      process.env.CLAUDE_CONFIG_DIR ||
+      path.join(process.env.HOME || require('os').homedir(), '.claude');
     const home =
-      process.env.CC_MASTER_HOME ||
-      path.join(process.env.HOME || require('os').homedir(), '.claude', 'cc-master');
+      process.env.CC_MASTER_HOME || path.join(claudeConfigDir, 'cc-master');
     boardPath = findSingleActiveBoard(home); // 内部失败会 die(…,2)
   }
   boardPath = path.resolve(boardPath);
