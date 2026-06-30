@@ -64,12 +64,11 @@ const GLOBAL_FLAGS: [string, string][] = [
 // ── EXIT CODES 一行（顶层全集；命令级只 hint「见 ccm --help」对齐 DRY）──────────────────────────────
 const EXIT_LINE = '  0 成功 · 1 未预期错 · 2 用法错 · 3 校验拒绝 · 4 锁超时 · 5 无 active board';
 
-// ── 顶层 namespace / 别名 / reserved 文案（help 草稿 §0；reserved 是占位·暂未实现）─────────────────────
-const RESERVED: [string, string][] = [
-  ['account', '换号号池机制（skill C 收口）'],
-  ['estimate', '运筹学 / ML 估算引擎（用时 / 关键路径 / 配速）'],
-  ['usage', '用量配速（usage-pacing 收口）'],
-];
+// ── 顶层 reserved 文案（help 草稿 §0；reserved 是占位·暂未实现）──────────────────────────────────────
+//   account / estimate / usage 此前是占位，现已全部在 registry 落地（account CRUD+switch·ADR-019 /
+//   estimate·usage 只读 advisory·ADR-015），故已升为 live namespace（_namespaceBlurb 给它们配了 blurb），
+//   RESERVED 现为空。后续若再有「占位·暂未实现」的 noun，列回此处即可（printHelp 已处理空 RESERVED 不渲染）。
+const RESERVED: [string, string][] = [];
 
 // ── printHelp(out, registry, noun?, verb?) ────────────────────────────────────────────────────────
 //   out 是 (s)=>void 写函数（router 注入 → stdout）。registry = REGISTRY（noun→verb→spec）+ 同模块的 ALIASES。
@@ -120,10 +119,12 @@ function _topLevel(reg: Reg, aliases: Aliases): string {
       lines.push(`  ${_padRight(a, 12)}↔ ccm ${n} ${v}`);
     }
   }
-  lines.push('');
-  lines.push('RESERVED (占位·暂未实现)');
-  for (const [name, desc] of RESERVED) {
-    lines.push(`  ${_padRight(name, 12)}${desc}`);
+  if (RESERVED.length) {
+    lines.push('');
+    lines.push('RESERVED (占位·暂未实现)');
+    for (const [name, desc] of RESERVED) {
+      lines.push(`  ${_padRight(name, 12)}${desc}`);
+    }
   }
   lines.push('');
   lines.push('LEARN MORE');
@@ -146,6 +147,12 @@ function _namespaceBlurb(noun: string): string {
     jc: 'judgment_calls 自决诚实台账',
     cadence: '节奏 / iteration 收口',
     watchdog: '自我唤醒 watchdog（ADR-011）',
+    baseline: 'EVM 计划基线快照 / 只读 / re-baseline',
+    policy: 'board.policy 自主权限（首条：自主换号·ADR-016）',
+    peers: '多-orchestrator 跨板只读花名册（ADR-017）',
+    usage: '配额用量 / 双侧走廊配速 advisory（只读·ADR-015）',
+    estimate: 'OR/ML 估算引擎：用时 / 关键路径 / EVM / 风险（只读·ADR-015）',
+    account: '换号号池：录号 / 刷新 / 删 / 列 / 无重启换号（token-blind·ADR-019）',
   };
   return M[noun] || '';
 }

@@ -2,7 +2,7 @@
 //
 // help.ts 导出 printHelp(out, registry, noun?, verb?) + printVersion(out)（技术栈契约 §二 help.js）。
 //   本测试用真 registry，端到端验证三层帮助文本各含关键命令名 / flag / section 标题，并验 version 形如 x.y.z：
-//     · 顶层（无 noun）：列全 6 namespace + 别名 next/lint + reserved + GLOBAL FLAGS + EXIT CODES。
+//     · 顶层（无 noun）：列全 namespace（含已升 live 的 account/usage/estimate）+ 别名 next/lint + GLOBAL FLAGS + EXIT CODES。
 //     · noun 层：列该域全 verb（summary）+ USAGE + 例子。
 //     · verb 层：USAGE / ARGUMENTS（有 positional 时）/ FLAGS（含 enum / required 标注）/ EXAMPLES。
 //     · printVersion：'ccm <ver>'，<ver> 形如 \d+.\d+.\d+（读 apps/cli/package.json version）。
@@ -22,21 +22,31 @@ function cap() {
 }
 
 // ══ printHelp 顶层（无 noun）══════════════════════════════════════════════════════════════════════
-test('printHelp top-level lists all 6 namespaces + aliases + reserved + global flags', () => {
+test('printHelp top-level lists all namespaces (incl now-live account/usage/estimate) + aliases + global flags', () => {
   const c = cap();
   help.printHelp(c.out, registry);
   const t = c.text();
-  // 6 namespace 全在。
-  for (const noun of ['board', 'task', 'log', 'jc', 'cadence', 'watchdog']) {
+  // 全 namespace 在（含已从 RESERVED 升为 live 的 account/usage/estimate·ADR-015/019）。
+  for (const noun of [
+    'board',
+    'task',
+    'log',
+    'jc',
+    'cadence',
+    'watchdog',
+    'account',
+    'usage',
+    'estimate',
+  ]) {
     assert.ok(t.includes(noun), `top-level mentions namespace ${noun}`);
   }
+  // account/usage/estimate 现是 live namespace（CORE NAMESPACES 带 blurb），不再列 RESERVED。
+  assert.ok(!t.includes('RESERVED'), 'no RESERVED section (all placeholders now live)');
+  assert.ok(t.includes('换号号池'), 'account namespace has a live blurb');
   // 别名 next / lint。
   assert.ok(t.includes('next'), 'mentions alias next');
   assert.ok(t.includes('lint'), 'mentions alias lint');
   assert.ok(t.includes('ALIASES'), 'has ALIASES section');
-  // reserved 占位。
-  assert.ok(t.includes('RESERVED'), 'has RESERVED section');
-  assert.ok(t.includes('account'), 'lists reserved account');
   // 全局 flag + 退出码。
   assert.ok(t.includes('GLOBAL FLAGS'), 'has GLOBAL FLAGS section');
   assert.ok(t.includes('--board'), 'lists --board global flag');
