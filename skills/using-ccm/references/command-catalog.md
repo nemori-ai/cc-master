@@ -122,7 +122,7 @@ ccm <alias> [args] [flags]
 | `--board <path>` | | string | 指定 board 文件（最高优先） |
 | `--session-id <id>` | | string | 指定 session（特权调用者注入；默认读 `$CLAUDE_CODE_SESSION_ID`） |
 | `--home <dir>` | | string | 指定 cc-master home（默认 `$CC_MASTER_HOME` → `CLAUDE_PROJECT_DIR` → 向上 walk） |
-| `--goal <substr>` | | string | 多 active 板时按 goal 子串消歧 |
+| `--goal <substr>` | | string | 多 active 板时按 goal 子串消歧（**例外**：`board update` / `board init` / `cadence open` 把 `--goal` 当 payload〔设 goal〕、**不**当发现过滤器——这三个 verb 的发现忽略 `--goal`，无歧义即命中唯一/未认领板·Finding #77） |
 | `--json` | | bool | 机器可读 JSON 输出（非 TTY 时默认开） |
 | `--dry-run` | `-n` | bool | 预览：跑完整校验但不落盘 |
 | `--force` | `-f` | bool | 越过 hard error / 非法状态转移闸（记 log） |
@@ -286,6 +286,7 @@ ccm board update [flags]
 | `--worktree <str>` | | string | `git.worktree` |
 
 - 例：`ccm board update --goal "v0.10.0 收尾"` · `ccm board update --wip-limit 4 --branch board-v2-redesign`
+- 发现：`--goal` 在此是 payload（重定 goal），**不**当发现过滤器——所有 flag 走同一条两层匹配（精确 sid → 未认领 `session_id:""` 兜底），与 `task add` 等一致；隐式发现（无 `--board`）在 `ccm board init` 建的未认领板上对 `--goal` 与 `--wip-limit` **行为一致**（Finding #77 修复前 `--goal` 会假报 NotFound）。多 active 板时用 `--board <path>` 消歧。
 
 ### board set-param
 

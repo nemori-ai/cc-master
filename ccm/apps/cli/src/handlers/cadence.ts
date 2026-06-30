@@ -20,7 +20,15 @@
 import * as mutations from '../mutations.js';
 import { REGISTRY } from '../registry.js';
 import * as render from '../render.js';
-import { type BoardArg, buildFields, type Ctx, runRead, runWrite, type SetOp } from './_common.js';
+import {
+  type BoardArg,
+  buildFields,
+  type Ctx,
+  resolveBoardIgnoringGoal,
+  runRead,
+  runWrite,
+  type SetOp,
+} from './_common.js';
 
 // iteration / cadence 的最小读形（渲染用）。
 interface IterLike {
@@ -77,6 +85,9 @@ export function update(ctx: Ctx): number {
 export function open(ctx: Ctx): number {
   const spec = REGISTRY.cadence?.open;
   return runWrite(ctx, {
+    // --goal 在 cadence open 是 iteration-local payload，非「发现哪块板」的过滤器——发现须忽略它，
+    //   否则按 board.goal 含 iteration goal 子串过滤会把目标板滤掉 → 假 NotFound（同 board update·Finding #77）。
+    resolve: resolveBoardIgnoringGoal,
     mutate: (board) => {
       const { fields, sets, setJsons } = buildFields(ctx.values, spec, { stdin: ctx.stdin });
       const iterId = ctx.positionals[0] as string;

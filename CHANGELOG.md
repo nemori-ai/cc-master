@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`ccm usage` 当前号信号读错 sidecar 路径（P4 sidecar bug）** — `usage show`/`advise` 当前号 5h/7d 信号此前读一条**任何 writer 都不写**的路径，致账户信号永远 `available:false`。修为读 `${CC_MASTER_RATE_CACHE:-$HOME/.claude/.cc-master-rate-limits.json}`，与 writer（`statusline-capture.js`）+ readers 三者钉死同一路径对齐；补两条回归测试。
 - **`ccm` 首跑可用性 + 命令面打磨（真人 QA 实测一批批修）** — ① board 发现两层匹配（精确 sid 命中，否则未认领 `session_id:""` 板兜底·#1）；② 写命令 lint warning 默认收敛为一行摘要（`--verbose` 展开·#6）；③ `board init` 建板后打印板路径 + 下一步提示（#13）；④ `task --type` 改开放枚举（未知 taskType 降 `FMT-TYPE` warn 不再硬拒 exit 2·#2）；⑤ `board init --home <不存在目录>` 自建目录（#16）。
 - **换号凭证 file vault 跨进程串行化锁（SWGAP·codex round#9 Finding C）** — 号池备号 file vault 重写（`account add`/`delete`/`switch` 回写）此前跨进程不串行，并发改同一 vault 时最后 mv 者赢、可复活已删 token / 丢别号刚写的 blob。修：三个写路径统一裹进通用文件锁（O_EXCL + owner token + stale 回收·锁文件只含非密 pid/at/owner），取锁失败 → 拒绝无锁重写（诚实失败而非静默互踩）。token-blind 纪律不变。
+- **`ccm board update` flag-dependent board-discovery 不一致（Finding #77）** — `--goal` 是全局消歧 flag，默认 resolve 把它当 goal 子串过滤器喂发现；但 `board update --goal` 的 `--goal` 是 payload（重定 goal）。隐式发现（无 `--board`）一块 `ccm board init` 建的未认领板（`session_id:""`·现有 goal 不含新串）时，过滤器把它滤掉 → 假 `NotFound`（"也无未认领 active 板"），而 `--wip-limit` 等无 `--goal` 的 flag 却成功——同一 verb 跨 flag 走了两条发现路径。修：`board update`（及同病的 `cadence open`）发现时忽略 payload `--goal`，统一走与 `task add` 等一致的两层匹配（精确 sid → 未认领兜底·收口到单一 `resolveBoard`）；并修 `NotFound` 文案在 goal 过滤所致时诚实标注「已按 goal 过滤」。补 CLI 回归测试守发现的 flag 一致性。
 
 ## [0.9.2] — 2026-06-25
 

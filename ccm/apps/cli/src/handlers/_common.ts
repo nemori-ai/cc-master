@@ -185,6 +185,25 @@ export function parseKv(spec: unknown): SetOp {
   return { path: s.slice(0, idx), value: s.slice(idx + 1) };
 }
 
+// ── resolveBoardIgnoringGoal(ctx) → { boardPath, board }（发现板时**忽略** --goal）─────────────────────
+//   `goal` 是全局 flag：对绝大多数 verb 它是「按 goal 子串发现哪块板」的消歧过滤器（goalSubstr），故默认
+//     resolve（runWrite/runRead）一律把 ctx.values.goal 当 goalSubstr 喂 resolveBoard。但少数写 verb
+//     （board update / cadence open）把 `--goal` 重载成 **payload 字段**（重定板 goal / 设 iteration goal）——
+//     此时它绝非发现过滤器。若仍把 payload `--goal` 漏进发现当 goalSubstr，会按「现有 goal 含新串」过滤，
+//     fresh-init 未认领板（现有 goal 不含新串）即被滤掉 → 假 NotFound（同 verb 跨 flag 发现不一致·Finding #77）。
+//   故这些 verb 改用本 resolve：除 goalSubstr 恒省略外，与默认 resolve **完全同一条**两层匹配
+//     （精确 sid → 未认领 session_id:"" 兜底·收口到单一 resolveBoard），保证 board update 的所有 flag
+//     （--goal / --wip-limit / --git…）走一致发现路径。board init 另有 initResolve（建新板·本就不发现）。
+export function resolveBoardIgnoringGoal(ctx: Ctx): { boardPath: string; board: unknown } {
+  return discover.resolveBoard({
+    boardFlag: ctx.values && (ctx.values.board as string),
+    sid: ctx.sid,
+    homeFlag: ctx.values && (ctx.values.home as string),
+    // goalSubstr 故意省略：本 verb 的 --goal 是 payload，非发现过滤器（Finding #77）。
+    env: ctx.env,
+  });
+}
+
 // runWrite / runRead 回调签名。render 的第三参（{dryRun}）只在 runWrite 传。
 type ResolveFn = (ctx: Ctx) => { boardPath: string; board: unknown };
 type MutateFn = (board: unknown, ctx: Ctx) => unknown;

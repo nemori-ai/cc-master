@@ -540,6 +540,50 @@ test('board update --dry-run does not write the board', () => {
   assert.ok(ctx.outBuf.join('').includes('[dry-run]'));
 });
 
+// ── Finding #77：board update 的 board-discovery 不得因 flag 不同而分叉 ──────────────────────────────
+//   旧坑：`--goal` 是全局消歧 flag，默认 resolve 把它当 goalSubstr 喂 discover；但 board update 的 `--goal`
+//   是 payload（重定 goal）。implicit 发现（无 --board）一块 fresh-init 未认领板（owner.session_id:""·现有
+//   goal 不含新串）时，goalSubstr 过滤把它滤掉 → 假 NotFound——而 `--wip-limit`（无 --goal）却成功。修复后
+//   update 全 flag 走同一条两层匹配（精确 sid → 未认领兜底），与 task add / board next 等一致。
+//
+//   未认领板工厂：owner.session_id:""（如 `ccm board init` 建的），命令 sid 故意不同（不精确命中→落未认领档）。
+function mkUnclaimedHome(goal = 'existing goal text') {
+  return mkBoardHome({ goal, extra: { owner: { active: true, session_id: '' } } });
+}
+// implicit 发现（home 而非 boardPath）+ 隔离 XDG（指针注册表不污染 / 不读真机陈旧指针）。
+function mkImplicitCtx(home: string, values: Record<string, unknown>) {
+  const xdg = mkTmp('ccm-hboard-xdg-');
+  return mkCtx({ home, values, sid: 'sid-runner', env: { XDG_STATE_HOME: xdg } });
+}
+
+test('board update --goal: implicit discovery on fresh-init unclaimed board → OK (Finding #77 repro)', () => {
+  const { boardPath, home } = mkUnclaimedHome('v0.9 旧目标');
+  // 新 goal 不含旧 goal 任何子串——旧坑下会被 goalSubstr 过滤滤掉 → 假 NotFound。
+  const ctx = mkImplicitCtx(home, { goal: 'v0.10.0 全新目标' });
+  const code = boardHandler.update(ctx);
+  assert.equal(
+    code,
+    EXIT.OK,
+    '未认领板上 implicit `update --goal` 必须成功（不再 flag-dependent NotFound）',
+  );
+  const onDisk = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.equal(onDisk.goal, 'v0.10.0 全新目标');
+});
+
+test('board update: --goal and --wip-limit discover the SAME board implicitly (flag-consistent)', () => {
+  // --goal 路径。
+  const goalHome = mkUnclaimedHome('某编排目标');
+  const gCode = boardHandler.update(mkImplicitCtx(goalHome.home, { goal: '改后目标' }));
+  // --wip-limit 路径（独立 home·同形未认领板）。
+  const wipHome = mkUnclaimedHome('某编排目标');
+  const wCode = boardHandler.update(mkImplicitCtx(wipHome.home, { 'wip-limit': '6' }));
+  assert.equal(gCode, EXIT.OK, '--goal 隐式发现成功');
+  assert.equal(wCode, EXIT.OK, '--wip-limit 隐式发现成功');
+  // 两 flag 都命中各自 home 里唯一的未认领板（发现路径一致·均落盘）。
+  assert.equal(JSON.parse(readFileSync(goalHome.boardPath, 'utf8')).goal, '改后目标');
+  assert.equal(JSON.parse(readFileSync(wipHome.boardPath, 'utf8')).scheduling.wip_limit, 6);
+});
+
 // ══ board set-param（ADR-020·hook-owned runtime 参数区·带锁字段级 setter）══════════════════════════
 test('board set-param: 白名单 key + ISO → 写 board.runtime.<key> + EXIT.OK + render 出', () => {
   const { boardPath } = mkBoardHome();

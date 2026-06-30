@@ -29,7 +29,7 @@ import * as discover from '../discover.js';
 import * as io from '../io.js';
 import * as mutations from '../mutations.js';
 import * as render from '../render.js';
-import { type BoardArg, type Ctx, runRead, runWrite } from './_common.js';
+import { type BoardArg, type Ctx, resolveBoardIgnoringGoal, runRead, runWrite } from './_common.js';
 
 const EXIT = io.EXIT;
 
@@ -191,6 +191,10 @@ export function init(ctx: Ctx): number {
 //   至少给一个可识别 flag——全无 → throw Usage（设计稿 update：「至少给一个 flag」）。
 export function update(ctx: Ctx): number {
   return runWrite(ctx, {
+    // --goal 在 update 是 payload（重定板 goal）而非发现过滤器——发现必须忽略它，否则 fresh-init 未认领板
+    //   会被「现有 goal 含新串」滤掉 → 假 NotFound（与 --wip-limit / task add 等发现路径不一致·Finding #77）。
+    //   resolveBoardIgnoringGoal 走与默认 resolve 同一条两层匹配，仅省 goalSubstr——统一 update 全 flag 的发现。
+    resolve: resolveBoardIgnoringGoal,
     mutate: (board) => {
       const v = ctx.values || {};
       const args: Record<string, unknown> = {};

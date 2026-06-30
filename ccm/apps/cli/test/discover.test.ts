@@ -284,6 +284,40 @@ test('resolveBoard: sid given, multiple unclaimed (no exact) → Ambiguous (QA #
   );
 });
 
+// Finding #77：sid given + goalSubstr 滤掉了本存在的未认领板时，NotFound 文案须诚实标注「已按 goal 过滤」
+//   （旧文案「也无未认领 active 板」是假信息——未认领板其实在，只是被 goal 过滤掉了）。
+test('resolveBoard: sid given, unclaimed exists but goalSubstr filters it → NotFound names the goal filter', () => {
+  const { home } = mkHome();
+  writeBoard(home, '01.board.json', { sessionId: '', active: true, goal: 'real goal here' });
+  const xdg = mkXdg();
+  assert.throws(
+    () =>
+      D.resolveBoard({
+        sid: 's-x',
+        goalSubstr: 'NONMATCH',
+        env: { XDG_STATE_HOME: xdg, CC_MASTER_HOME: home },
+      }),
+    (e: any) => e.errKind === 'NotFound' && /已按 goal "NONMATCH" 过滤/.test(e.message),
+    '过滤掉未认领板时，错误文案必须诚实标注 goal 过滤（不再假称「也无未认领板」）',
+  );
+});
+
+// 对照：同布局但无 goalSubstr → 未认领兜底命中（证明上面的 NotFound 纯由 goal 过滤所致·两层匹配本身没坏）。
+test('resolveBoard: sid given, same unclaimed board found when goalSubstr is absent (filter-only failure)', () => {
+  const { home } = mkHome();
+  const unclaimed = writeBoard(home, '01.board.json', {
+    sessionId: '',
+    active: true,
+    goal: 'real goal here',
+  });
+  const xdg = mkXdg();
+  const { boardPath } = D.resolveBoard({
+    sid: 's-x',
+    env: { XDG_STATE_HOME: xdg, CC_MASTER_HOME: home },
+  });
+  assert.equal(boardPath, unclaimed);
+});
+
 // ── resolveBoard: home discovery, no sid (human terminal) ──────────────────────────────────────────
 test('resolveBoard: no sid → unique active board', () => {
   const { home } = mkHome();

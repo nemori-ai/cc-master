@@ -246,8 +246,12 @@ export function resolveBoard({
     }
     const hits = exact.length > 0 ? exact : unclaimed;
     if (hits.length === 0) {
+      // 诚实记账：若 goalSubstr 过滤过 goal，未认领板可能本存在却被滤掉——「也无未认领 active 板」会是假信息，
+      //   故显式标注「已按 goal 过滤」让用户知道可能是过滤所致（Finding #77：board update 等 payload `--goal`
+      //   漏进发现的旧坑已在 handler 侧 resolveBoardIgnoringGoal 堵死，此处兜其余 goalSubstr 消歧路径的诚实性）。
+      const filterNote = goalSubstr ? `·已按 goal "${goalSubstr}" 过滤` : '';
       throw discoverError(
-        `No active board owned by session ${sid}（也无未认领 active 板）found in ${home}；先 \`ccm board init\` 或传 --board <path>`,
+        `No active board owned by session ${sid}（也无未认领 active 板${filterNote}）found in ${home}；先 \`ccm board init\` 或传 --board <path>`,
         'NotFound',
       );
     }
