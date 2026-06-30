@@ -2,7 +2,7 @@
 
 > 本文持续追踪 cc-master **六条产品愿景**在当前实现里的**落地 gap**。愿景 charter 的 SSOT 在 [`spec.md` §1.0](spec.md)——charter 说**目标**，本文量**差距**。
 > **这是 living 文档**：某条 gap 关闭就更新对应卡的 ③⑤ + 翻矩阵「追踪状态」+ 更 last-audited；charter 增删能力就同步增删卡。
-> **last-audited：2026-06-11** · 审计法：每条能力穿全产品面（command / hook / skill / board / script）追 trace（指到 file:line）、判落地真实性、找 adversarial 断点、诚实分「真 gap vs 设计意图」。
+> **last-audited：2026-06-30**（**C2/C4/C5/C6 四行定点翻新**·未重跑全审计法；C1/C3 卡体与矩阵沿用 2026-06-11 全审计）· 审计法：每条能力穿全产品面（command / hook / skill / board / script）追 trace（指到 file:line）、判落地真实性、找 adversarial 断点、诚实分「真 gap vs 设计意图」。
 
 ## 落地真实性图例
 
@@ -24,11 +24,11 @@
 | # | 能力 | 落地真实性 | 真 gap（一句话）| 严重度 | 追踪状态 |
 |---|---|---|---|---|---|
 | C1 | 异步并行多线程推进 + 完整落地 | 并行 🟢（借 harness 原生）· 完整闸 🟢（verify-board）| 闸只信 board status、读不到对话——**board 完整性零机制保障** | 中-高 | 🔴 open |
-| C2 | 控制 token 消耗速度 | sensing 🟢（cc-usage.sh）· pacing 决策 🟡 | 传感器是真的、**但 loop 从不调它**；budget 不跨 compaction 持久化 | 中-高 | 🔴 open |
+| C2 | 控制 token 消耗速度 | sensing 🟢 · pacing 决策 🟢（`usage-pacing.js` 每轮 Stop 调 `ccm usage advise` 双侧走廊判决·引擎收口）| 旧「loop 从不调传感器」**已闭**；余 budget 跨 compaction 持久化仍偏弱 | 中 | 🟡 主因闭·残留收敛中 |
 | C3 | 自主决策 vs 人类接入边界（HITL）| 🟡（行为红线靠端点守）| Stop 闸不分「未答用户终审」与「等上游」→ 挂着未答 merge 决策能**静默 Stop** | 中 | 🔴 open |
-| C4 | 目标分解 / 管理 / 更新 / 规划 | board 🟢 · 分解方法 🟡 | 计划更新 / supersession **无事务一致性**；`status.md`「critical path」轻度 overclaim | 中-高 | 🔴 open |
-| C5 | 资源合理下最大化效率调度 | scheduler 🟡（手跑 prose）| **单侧兜底**：兜了「欠调度 idle」却不兜「过调度顶满 utilization cliff」 | 中 | 🔴 open |
-| C6 | 按复杂度/难度/时长选模型 | 设模型 lever 🟢 · 选档判断 🟡 · **duration 维 🔴** | 愿景三因子只兑现 complexity/difficulty，**duration 维蒸发**且 README/spec overclaim | 低-中 | 🔴 open |
+| C4 | 目标分解 / 管理 / 更新 / 规划 | board 🟢 · 分解方法 🟡 · **临界路径已机器算 🟢**（`ccm board graph` / `board critical-path` 真算 float/CPM·只读 advisory）| 临界路径 overclaim **已闭**；supersession / 重规划仍**无事务一致性** | 中-高 | 🟡 临界路径闭·余 supersession open |
+| C5 | 资源合理下最大化效率调度 | scheduler 🟡（手跑 prose）· **过调度侧已有软兜底 🟢**（`posttool-batch.js` WIP 软警告 + `usage-pacing.js` PostToolBatch 中途采样）| 旧「过调度零兜底」**已闭**（软警告·非硬拦）；仍无引擎强制 WIP | 中 | 🟡 过调度侧闭·软兜底 |
+| C6 | 按复杂度/难度/时长选模型 | 设模型 lever 🟢 · 选档判断 🟡 · **duration 维已有承载 🟡**（`ccm estimate forecast` 出 P50/P80/P95 + makespan）| duration 维「完全蒸发」**已闭**（估算引擎接回时长轴）；接进选档规则仍 prose | 低-中 | 🟡 duration 接回·接选档 open |
 
 ---
 
