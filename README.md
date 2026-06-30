@@ -119,18 +119,11 @@ claude --plugin-dir ~/cc-master
 
 **Moved your Claude config?** If you run Claude Code with `CLAUDE_CONFIG_DIR` pointing somewhere other than `~/.claude`, `ccm` follows it automatically — its board home and account pool live under your configured directory, no extra flags needed.
 
-### 3. (Optional) Turn on quota-aware pacing
+### 3. Status line (automatic)
 
-cc-master's forecasting and pacing read your Claude usage (the 5h / 7d quota), which Claude Code only exposes through the **status line**. To feed it, point `statusLine.command` in your `settings.json` at the bundled capture script, wrapping your existing status-line command with `--passthrough`:
+cc-master ships its own status line — a context progress bar plus your 5h / 7d quota usage, color-coded by how full each is. The **first time you run any `ccm` command, cc-master configures it for you automatically** (it writes `statusLine.command` in your global `settings.json`). The same status line also feeds the 5h / 7d quota signal that powers forecasting and pacing.
 
-```json
-"statusLine": {
-  "type": "command",
-  "command": "~/cc-master/skills/orchestrating-to-completion/scripts/statusline-capture.js --passthrough '<your existing status-line command>'"
-}
-```
-
-It passes your status line through unchanged while capturing the quota signal to a sidecar that `ccm usage` reads. Use an **absolute path** to the script (`${CLAUDE_PLUGIN_ROOT}` isn't guaranteed to expand inside `statusLine.command`). Skip this and everything still works — pacing just reports `unavailable`.
+Heads-up: this **overwrites your existing `statusLine`** (your original is backed up first). To put yours back: `ccm statusline uninstall` (restores your original and stops cc-master from re-installing). To disable the auto-install entirely, set `CC_MASTER_NO_AUTOINSTALL=1`.
 
 Now hand it a goal:
 

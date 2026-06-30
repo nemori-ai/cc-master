@@ -70,6 +70,10 @@
   - [estimate velocity](#estimate-velocity)
   - [estimate risk](#estimate-risk)
   - [estimate cost-to-complete](#estimate-cost-to-complete)
+- [namespace statusline](#namespace-statusline)
+  - [statusline render](#statusline-render)
+  - [statusline install](#statusline-install)
+  - [statusline uninstall](#statusline-uninstall)
 - [--json 输出形状](#--json-输出形状)
 
 ---
@@ -972,7 +976,7 @@ ccm peers [list] [flags]
 
 配额侧只读 advisory（ADR-015·charter ②控制 token 消耗速度 + ⑤资源下最大化效率）：当前号/备号用量 + 双侧走廊 pacing verdict + 任务 token 成本。**纯只读**——全 verb query/compute，零写、不抢 board-lock、不落状态（与 `baseline`/`policy` 这俩写 noun 相反）。诚实降级：账户信号不可得 = **exit 0 + `data.available:false`**（非 exit 1）；无 `accounts.json` registry → 天然单账号·`effective_n=1`（不报错）。诚实字段贯穿：`source`（account / registry-snapshot / observability / local-derived-approx）/ `confidence`（high/medium/low）/ `as_of` / `snapshot_stale` / `coverage_pct`。ccm 出 verdict/数据，**不替 orchestrator 决策**（真动作归 SKILL A·红线3）。
 
-> 备号数据 = **只读** `${CC_MASTER_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cc-master}/accounts.json` registry 的生命周期快照（每号取 `last_observed_quota`/`last_switch_out`/`switch_history[]` 里 `at` 最大那条）——usage **绝不写 registry、绝不碰 token**（registry 写/管归 ccm `account` 引擎·概念见 account-pool.md）。当前号 5h/7d 用量读 status-line sidecar（`${CC_MASTER_RATE_CACHE:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.cc-master-rate-limits.json}`·路径跟随 `CLAUDE_CONFIG_DIR`（默认 `~/.claude`）·statusline-capture.js 写、cc-usage.sh / usage-pacing.js hook 同读·账户权威·Finding #37），缺则 `available:false` 降级。
+> 备号数据 = **只读** `${CC_MASTER_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cc-master}/accounts.json` registry 的生命周期快照（每号取 `last_observed_quota`/`last_switch_out`/`switch_history[]` 里 `at` 最大那条）——usage **绝不写 registry、绝不碰 token**（registry 写/管归 ccm `account` 引擎·概念见 account-pool.md）。当前号 5h/7d 用量读 status-line sidecar（`${CC_MASTER_RATE_CACHE:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.cc-master-rate-limits.json}`·路径跟随 `CLAUDE_CONFIG_DIR`（默认 `~/.claude`）·ccm 自带的 `ccm statusline`（自动安装）写、cc-usage.sh / usage-pacing.js hook 同读·账户权威·Finding #37），缺则 `available:false` 降级。
 
 ### usage show
 
@@ -1318,6 +1322,43 @@ ccm account switch [flags]
 
 - 例：`ccm account switch --json`（引擎选号）· `ccm account switch --email alice@x.com`
 - ⚠️ **policy 硬闸是纵深防御兜底、不是许可**：`deny`→exit 7 拦在覆写之前；编排侧的「换号决策 + 绝不自授权」纪律在 `orchestrating-to-completion`（机制硬闸不替编排拍板）。全员逼顶 / 选不出号 → surface 用户（`blocked_on:"user"`），绝不盲切
+
+---
+
+## namespace statusline
+
+> ccm **自带的 self-contained status line**（context 进度条 + 5h/7d 配额用量·按阈值变色）。**非 board 操作**——不读/写 board，写的是**全局** `settings.json`（跟随 `CLAUDE_CONFIG_DIR`）。`render` 是 status-line 命令本身（高频跑·读 stdin），`install`/`uninstall` 管它进/出 `settings.json`。**无感知自动安装**：首次跑任意**非**-`statusline` ccm 命令时，ccm 会幂等、静默地把 `ccm statusline` 装进 `settings.json`（marker 守·`CC_MASTER_NO_AUTOINSTALL=1` 或 `ccm statusline uninstall` 的 opt-out 标记即关）。
+
+### statusline render
+
+```
+ccm statusline           # = 默认 verb·status-line 命令本身（settings.json 里写的就是这条）
+ccm statusline render
+```
+
+- 读官方喂给 status-line 脚本的 **stdin JSON**（`context_window.used_percentage`〔0–100·首条消息前 null〕· `rate_limits.{five_hour,seven_day}.{used_percentage,resets_at}`〔均 Optional〕· `model.display_name`），渲染**单行 ANSI** 状态行到 stdout（context 进度条 10 格 + 5h/7d 用量·绿/黄/红按阈值·缺段优雅省略），**同时**把 `rate_limits` 落用量 sidecar（`${CC_MASTER_RATE_CACHE:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.cc-master-rate-limits.json}`·账户权威 pacing 信号源）
+- **铁律**：任何失败 / 缺字段一律静默 **exit 0**、绝不污染 UI（`NO_COLOR` / `--no-color` 关色·否则默认上色，非 TTY 也上）
+- 阈值：context 绿<60 黄60–85 红>85 · 5h 绿<70 黄70–90 红>90 · 7d 绿<70 黄70–85 红>85
+- 你**通常不手动跑这条**——它由 Claude Code 当 status line 自动调用
+
+### statusline install
+
+```
+ccm statusline install [--json]
+```
+
+- 幂等把 `ccm statusline`（**绝对路径**·绕过 `${CLAUDE_PLUGIN_ROOT}` 在 statusLine.command 不展开的 Finding #39）写进**全局** `settings.json` 的 `statusLine`；**你原有的 `statusLine` 先备份**（单独 state 文件·不污染 settings schema），`ccm statusline uninstall` 可恢复。已是 ours → noop / 仅更新命令。**显式 install 会清除 opt-out 标记**（用户改主意）
+- settings.json 坏 JSON → **绝不覆写**（避免毁配置）+ exit 1
+- flags：`--json`（结构化输出 `{action, settingsPath, backedUp, command}`）
+
+### statusline uninstall
+
+```
+ccm statusline uninstall [--json]
+```
+
+- 从备份**恢复**你原有的 `statusLine`（无备份则删该字段）+ 落 **opt-out 标记**让无感知自动安装不再覆盖回去（不跟用户较劲）
+- flags：`--json`（结构化输出）
 
 ---
 

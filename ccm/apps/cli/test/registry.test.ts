@@ -17,7 +17,7 @@ import { ALIASES, REGISTRY, WRITABLE_FIELDS_COVERED } from '../src/registry.js';
 
 const model = { ENUMS, FIELDS, TIERS };
 
-// ── 覆盖全部 12 namespace 的全部 verb（cli-design §3·ADR-015 加 usage/estimate·Phase 2a 加 account·COORD 加 peers）──────
+// ── 覆盖全部 13 namespace 的全部 verb（cli-design §3·ADR-015 加 usage/estimate·Phase 2a 加 account·COORD 加 peers·0.10.0 加 statusline）──────
 const EXPECTED: Record<string, string[]> = {
   board: ['show', 'lint', 'graph', 'critical-path', 'next', 'init', 'update', 'set-param'],
   baseline: ['snapshot', 'show', 'reset'],
@@ -31,9 +31,10 @@ const EXPECTED: Record<string, string[]> = {
   usage: ['show', 'advise', 'task-cost', 'burn-rate', 'runway'],
   estimate: ['show', 'forecast', 'evm', 'velocity', 'risk', 'cost-to-complete'],
   account: ['add', 'refresh', 'delete', 'list', 'switch'],
+  statusline: ['render', 'install', 'uninstall'],
 };
 
-test('REGISTRY covers all 12 namespaces with all their verbs', () => {
+test('REGISTRY covers all 13 namespaces with all their verbs', () => {
   assert.deepEqual(Object.keys(REGISTRY).sort(), Object.keys(EXPECTED).sort());
   for (const noun of Object.keys(EXPECTED)) {
     assert.deepEqual(

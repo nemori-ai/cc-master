@@ -39,6 +39,14 @@ else
   echo "== ccm dist build skipped (no pnpm / no shim) — hook tests use require fallback path =="
 fi
 
+# ── Disable ccm's no-touch status-line auto-install for the whole suite (0.10.0) ────────────────────
+# `ccm statusline` auto-installs itself into <claudeConfigDir>/settings.json on the first NON-statusline
+# ccm invocation. Hook/script tests spawn the real `ccm` (via CCM_BIN) WITHOUT pinning CLAUDE_CONFIG_DIR,
+# so an un-gated auto-install would mutate the developer's REAL ~/.claude/settings.json mid-suite. The
+# kill-switch makes every suite ccm spawn skip auto-install (the behavior itself is covered by the ccm
+# engine/CLI tests against temp config dirs). Exported → inherited by all hook/script subprocess ccm calls.
+export CC_MASTER_NO_AUTOINSTALL=1
+
 fail=0
 echo "== hook tests (bash) =="
 for t in tests/hooks/test_*.sh; do

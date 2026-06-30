@@ -280,7 +280,7 @@ assert_eq "" "$HOOK_OUT" "(h2) board sid=OTHER (non-empty) != stdin sid=MINE →
 rm -rf "$H"
 
 # ── ACCOUNT 口径 (Finding #37): sidecar 的权威 5h/7d used_percentage 判墙,脱钩失真反推,纳入 7d ──────────
-# 账户权威 used_percentage(+resets_at)由 statusline-capture.js 落到 sidecar(status-line 是唯一来源)。sidecar
+# 账户权威 used_percentage(+resets_at)由 ccm 自带的 `ccm statusline`(自动安装) 落到 sidecar(status-line 是唯一来源)。sidecar
 # 可用且窗口有效时,撞墙判据改用账户 % —— 不再依赖会失真到数量级的本地反推 window_remaining_min(Finding #37);
 # 并第一次把 7d 纳入(此前 hook 只看 5h、对 7d 全盲,Finding #31)。sidecar 不可用 → 降级本地反推(上面的 cases)。
 # run_pacing_acct SIDECAR_JSON NOW HOME SID -> drive an armed Stop carrying a rate-limit sidecar.
@@ -340,7 +340,7 @@ U_HOME="$(make_project)"
 mkdir -p "$U_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$U_HOME/boards/mine.board.json"
 U_NEAR=$((A_NOWEP+1800))   # 5h reset 30min in the future → nearReset 满足(≤60)
 U_FAR=$((A_NOWEP+9000))    # 5h reset 150min in the future → nearReset 不满足(>60)
-# Freshness gate (④): sidecar carries captured_at (epoch sec, written by statusline-capture.js). The
+# Freshness gate (④): sidecar carries captured_at (epoch sec, written by `ccm statusline` (auto-installed)). The
 # underuse→accelerate branch now requires captured_at fresh (≤ CC_MASTER_UNDERUSE_MAX_STALE_MIN, default
 # 15min) — stale/missing → silent (idle-waiting on background烧配额 → stale-low p5 不可信，绝不据陈值误催加速).
 U_FRESH=$((A_NOWEP-300))    # captured 5min ago → fresh (≤15min) → gate open

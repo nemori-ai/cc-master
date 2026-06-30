@@ -36,6 +36,7 @@ import * as jcHandler from './handlers/jc.js';
 import * as logHandler from './handlers/log.js';
 import * as peersHandler from './handlers/peers.js';
 import * as policyHandler from './handlers/policy.js';
+import * as statuslineHandler from './handlers/statusline.js';
 import * as taskHandler from './handlers/task.js';
 import * as usageHandler from './handlers/usage.js';
 import * as watchdogHandler from './handlers/watchdog.js';
@@ -80,6 +81,14 @@ const HANDLERS: Record<string, HandlerModule> = {
   usage: usageHandler as unknown as HandlerModule,
   estimate: estimateHandler as unknown as HandlerModule,
   account: accountHandler as unknown as HandlerModule,
+  statusline: statuslineHandler as unknown as HandlerModule,
+};
+
+// ── DEFAULT_VERBS：某些 noun 无 verb 时落到约定默认 verb（让 `ccm statusline` ≡ `ccm statusline render`）。──
+//   status-line 命令本身写进 settings.json 的是裸 `ccm statusline`，故 bare noun 必须能渲染——此表把它解析成 render。
+//   只此一处特例（statusline）：其余 noun 缺 verb 仍报「missing command」（不引入隐式默认改变既有行为）。
+const DEFAULT_VERBS: Record<string, string> = {
+  statusline: 'render',
 };
 
 // node util.parseArgs 的 options 形态（带 short / multiple）——router 自有，独立于 registry 的 OptionSpec。
@@ -187,6 +196,14 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
   // ── ① 先 flag-aware 扫一遍认出 noun/verb 与顶层 --help/--version（防 `--session-id X` 的 X 被误当 noun）。──
   const scan0 = scanPositions(args);
 
+  // ── 无感知自动安装（0.10.0·marker 守·幂等·静默·绝不抛）：除 `statusline` 子命令本身外，任意命令首次跑时
+  //   把 ccm 自带的 status line 立起来（status line 高频跑·绝不触发自身）。kill-switch / opt-out / installed
+  //   marker 任一在即 skip（详见 @ccm/engine autoInstallStatuslineOnce）。放在最前（no-noun 早退之前）让
+  //   `ccm --help` / `ccm --version` 等也算「首次被调用」。env 注入 → 测试用临时 CLAUDE_CONFIG_DIR 隔离。
+  if ((scan0.positionals[0] && scan0.positionals[0].token) !== 'statusline') {
+    statuslineHandler.autoInstall(env);
+  }
+
   if (scan0.positionals.length === 0) {
     // 无 noun：纯 flag（或空）。--version / -V → 版本；其余（含 --help/-h/空）→ 顶层帮助。
     if (scan0.hasVersion) {
@@ -238,18 +255,23 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
       help.printHelp(out, { REGISTRY, ALIASES }, nounStr);
       return EXIT.OK;
     }
-    // 缺 verb：列该 noun 的 verbs 当候选（无输入可纠错，直接列全集）。
-    err(`missing command for: ${noun}`);
-    err(`Available: ${Object.keys(nounSpec).join(', ')}`);
-    err(`Run \`ccm ${noun} --help\` for details.`);
-    return EXIT.USAGE;
+    // 缺 verb 但该 noun 有约定默认 verb（如 statusline→render）→ 不报错，落默认 verb 继续（见 resolvedVerb 初值）。
+    if (!Object.hasOwn(DEFAULT_VERBS, nounStr)) {
+      // 缺 verb：列该 noun 的 verbs 当候选（无输入可纠错，直接列全集）。
+      err(`missing command for: ${noun}`);
+      err(`Available: ${Object.keys(nounSpec).join(', ')}`);
+      err(`Run \`ccm ${noun} --help\` for details.`);
+      return EXIT.USAGE;
+    }
   }
 
   // ── verb 级别名解析（如 `ccm task ls` → `task list`）。──────────────────────────────────────────────
   //   ALIASES 里形如 `ls:['task','list']` 的条目同时是「verb 级别名」——当 verb 不是 noun 的真 verb，但等于某个
   //   ALIASES key 且该 alias 的 noun 段 === 当前 noun，则把 verb 解析成 alias 的 verb 段（registry §3.2 ls 注释）。
-  let resolvedVerb = verb;
+  //   verb 缺省时落 DEFAULT_VERBS（statusline→render）：bare `ccm statusline` 等价 `ccm statusline render`。
+  let resolvedVerb = (verb ?? DEFAULT_VERBS[nounStr]) as string;
   if (
+    verb !== undefined &&
     !Object.hasOwn(nounSpec, resolvedVerb) &&
     Object.hasOwn(ALIASES, verb) &&
     Array.isArray(ALIASES[verb]) &&

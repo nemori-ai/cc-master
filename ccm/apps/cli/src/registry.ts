@@ -1034,6 +1034,42 @@ export const REGISTRY: Registry = {
       handler: 'account.switchAccount',
     },
   },
+
+  // ════════════════════ statusline（self-contained status line·0.10.0）════════════════════════════
+  //   render = `ccm statusline` 的默认 verb（status-line 命令本身·读 stdin → 渲染单行 + 落 sidecar）；
+  //   install/uninstall = 把它幂等装进 settings.json / 从备份恢复。非 board 操作（不写窄腰·无 field flag）。
+  statusline: {
+    render: {
+      summary:
+        '渲染单行 ANSI 状态行（读 status-line stdin JSON·= `ccm statusline` 默认 verb）+ 落用量 sidecar',
+      read: true,
+      positionals: [],
+      options: {},
+      examples: ['ccm statusline', 'echo "$STDIN_JSON" | ccm statusline'],
+      handler: 'statusline.render',
+    },
+    install: {
+      summary:
+        '把 ccm status line 幂等装进全局 settings.json（备份你原有的·绝对路径·会覆盖现有 statusLine）',
+      read: false,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出安装结果' },
+      },
+      examples: ['ccm statusline install', 'ccm statusline install --json'],
+      handler: 'statusline.install',
+    },
+    uninstall: {
+      summary: '从备份恢复你原有的 statusLine（无则删字段）+ opt-out·让自动安装不再覆盖回去',
+      read: false,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出卸载结果' },
+      },
+      examples: ['ccm statusline uninstall', 'ccm statusline uninstall --json'],
+      handler: 'statusline.uninstall',
+    },
+  },
 };
 
 // ── ALIASES：热路径顶层捷径（cli-design §3.4·只给最高频两个）。alias → [noun, verb]。──────────────
