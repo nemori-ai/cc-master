@@ -59,7 +59,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 // ★home 解析 + 武装闸 isArmed 收口到共享 hook-common（node SSOT·取代本文件旧内联副本）。
 //   ambient/advisory 是 ADR-018 标签包装器（§13·closed set·source 必填·strength 只给 advisory）。
-const { resolveHome, ambient, advisory, runHook } = require('./hook-common.js');
+const { claudeConfigDir, resolveHome, ambient, advisory, runHook } = require('./hook-common.js');
 
 // ── ADR-018 标签力度映射（§13/P4：力度配 stakes）──────────────────────────────────────────────────
 // pacing 注入**绝大多数落 advisory**（ADR-018 §2.2 例子 + §3.1 活体印证：agent 把 pacing 当判断输入、推理
@@ -77,14 +77,14 @@ function pacingStrengthOf(kind) {
 // ── 触发策略阈值（克制，避免每回合刷屏；见文件尾 README 块的完整论证）────────────────────────────
 //
 // 环境覆写点（与 cc-usage.sh 的 --dir/--now 对偶，供测试注入 fixture + 锚定确定性时间）：
-//   CC_MASTER_USAGE_DIR  usage JSONL 根目录（默认 ~/.claude/projects），测试指向 fixture。
+//   CC_MASTER_USAGE_DIR  usage JSONL 根目录（默认 <claudeConfigDir>/projects·跟随 CLAUDE_CONFIG_DIR），测试指向 fixture。
 //   CC_MASTER_NOW        ISO-8601 覆写「现在」，让 rolling window 与撞墙预测确定可复现。
 //   CC_MASTER_5H_BUDGET  （可选）本 5h 窗口的 token 预算上限。给了就走「预测撞墙」分支；
 //                        未给则 ceiling 未知（真实约束）→ 退化到「明显临界」启发式，否则静默。
 //   CC_MASTER_5H_BURN_FLOOR （可选）无预算时启发式用的绝对 burn 地板（tok/min）。给了就覆写默认。
 const USAGE_DIR =
   process.env.CC_MASTER_USAGE_DIR ||
-  path.join(process.env.HOME || '', '.claude', 'projects');
+  path.join(claudeConfigDir(), 'projects');
 // HOME_DIR：armed 判定要扫的 board home **根**（hook-common.resolveHome 同口径：CC_MASTER_HOME 覆写，
 //   否则 $HOME/.claude/cc-master·全局）。isArmed 内部走 <home>/boards/ 扫板。测试经 CC_MASTER_HOME 注入。
 const HOME_DIR = resolveHome();
@@ -108,7 +108,7 @@ const BURN_FLOOR_RAW = process.env.CC_MASTER_5H_BURN_FLOOR || '';
 //   (落在 sidecar);只有 sidecar 缺/坏时才降级本地反推。PCT_FLOOR:某窗口 used% 到此即临界(默认 85)。
 const RATE_CACHE =
   process.env.CC_MASTER_RATE_CACHE ||
-  path.join(process.env.HOME || '', '.claude', '.cc-master-rate-limits.json');
+  path.join(claudeConfigDir(), '.cc-master-rate-limits.json');
 const PCT_FLOOR_RAW = process.env.CC_MASTER_PCT_FLOOR || '';
 // 7d≥85% dispatch 闸 (need ②): 7d 是跨窗口加速硬总闸(ADR-010 §2.2/§2.6)。当账户权威 7d used% 达此闸(默认 85)
 //   时,撞墙提示从泛泛「减速」**升级措辞**为点名 dispatch 闸——「本回合起暂停 dispatch 新节点、把『是否续耗

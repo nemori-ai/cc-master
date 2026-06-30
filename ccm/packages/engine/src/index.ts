@@ -158,6 +158,16 @@ export {
 // SLE + WIP-aging
 export type { AgingEntry, AgingStatus, Sle } from './estimate/sle.js';
 export { cycleTimeSle, wipAging } from './estimate/sle.js';
+// ── paths（CLAUDE_CONFIG_DIR 跟随 + 派生路径 SSOT·home/rate-cache/credentials/.claude.json/projects）──
+export type { PathEnv } from './paths.js';
+export {
+  resolveCcMasterHome,
+  resolveClaudeConfigDir,
+  resolveClaudeJsonPath,
+  resolveCredentialsPath,
+  resolveProjectsDir,
+  resolveRateCachePath,
+} from './paths.js';
 // ── usage/（ADR-015 配速 + 历史语料·plan §7）──────────────────────────────────────────────────────
 // 历史语料 loader（home 跨板·多层收缩·recency）
 export type {

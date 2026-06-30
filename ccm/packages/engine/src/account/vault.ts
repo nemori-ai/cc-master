@@ -22,8 +22,8 @@
 
 import { type SpawnSyncReturns, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { resolveCcMasterHome, resolveCredentialsPath } from '../paths.js';
 import {
   type AcquireLockOptions,
   acquireFileLock,
@@ -271,9 +271,8 @@ export function captureCurrentLoginBlob(opts?: CaptureOpts): string | null {
       if (blob) return blob;
     }
   }
-  // 非 mac fallback：credentials.json 的 .claudeAiOauth。
-  const cjPath =
-    (opts && opts.credentialsJsonPath) || path.join(os.homedir(), '.claude', '.credentials.json');
+  // 非 mac fallback：credentials.json 的 .claudeAiOauth（落点跟随 CLAUDE_CONFIG_DIR·CRED_PATH 覆写·paths SSOT）。
+  const cjPath = (opts && opts.credentialsJsonPath) || resolveCredentialsPath();
   let raw: string;
   try {
     raw = fs.readFileSync(cjPath, 'utf8');
@@ -291,10 +290,9 @@ export function defaultVaultKind(keychain?: KeychainProvider): 'keychain' | 'fil
 }
 
 // defaultVaultFile — file vault 默认路径（与 accounts.json 同一用户级 home）。env 可注入。
+//   home 跟随 CC_MASTER_HOME > CLAUDE_CONFIG_DIR 派生（paths.resolveCcMasterHome SSOT）。
 export function defaultVaultFile(env?: Record<string, string | undefined>): string {
-  const e = env || process.env;
-  const home = e.CC_MASTER_HOME || path.join(os.homedir(), '.claude', 'cc-master');
-  return path.join(home, 'accounts.env');
+  return path.join(resolveCcMasterHome(env), 'accounts.env');
 }
 
 // ── file vault 行操作（token-blind·`startsWith` 行首锚定·对 email 的 ./@ 元字符免疫）───────────────────

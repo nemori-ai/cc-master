@@ -19,15 +19,23 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+// claudeConfigDir() → claude 配置根（跟随 $CLAUDE_CONFIG_DIR·默认 $HOME/.claude·HOME 缺退 os.homedir()）。
+//   纯 env 读（红线1 安全·绝不 spawn ccm/claude）——hook 不能 import @ccm/engine（红线5），故各 node
+//   hook 共用 hook-common 这一份与 paths.resolveClaudeConfigDir 同口径的内联实现。
+function claudeConfigDir() {
+  return process.env.CLAUDE_CONFIG_DIR ||
+    path.join(process.env.HOME || os.homedir(), '.claude');
+}
+
 // resolveHome() → HOME_DIR（cc-master home **根**·统一全局口径·ADR-board-v2 home 收口）。
-//   优先级：$CC_MASTER_HOME 覆写 → $HOME/.claude/cc-master（全局·默认）。**不再** per-repo
-//   （CLAUDE_PROJECT_DIR/.claude/cc-master）或 cwd fallback——所有 orchestration 的 board 集中到一个
+//   优先级：$CC_MASTER_HOME 覆写 → <claudeConfigDir>/cc-master（全局·默认·跟随 CLAUDE_CONFIG_DIR）。**不再**
+//   per-repo（CLAUDE_PROJECT_DIR/.claude/cc-master）或 cwd fallback——所有 orchestration 的 board 集中到一个
 //   用户级 home，跨 repo 不再各起一份。**这是全 hook（node + bash）+ ccm discover 的 node SSOT**：
 //   board-lint / usage-pacing / reinject / verify-board / posttool-batch 都经本函数解析，不再各自内联。
-//   测试经 CC_MASTER_HOME 注入隔离 home。
+//   测试经 CC_MASTER_HOME / CLAUDE_CONFIG_DIR 注入隔离 home。
 function resolveHome() {
   return process.env.CC_MASTER_HOME ||
-    path.join(process.env.HOME || os.homedir(), '.claude', 'cc-master');
+    path.join(claudeConfigDir(), 'cc-master');
 }
 
 // boardsDir(homeDir) → home 下集中放所有 *.board.json 的子目录（<home>/boards/·board-v2 布局）。
@@ -279,7 +287,7 @@ function periodicNudge(spec) {
 }
 
 module.exports = {
-  resolveHome, boardsDir, readStdin, parseStdin, boardMatches, listMatchingBoards, isArmed, jsonEscape,
+  claudeConfigDir, resolveHome, boardsDir, readStdin, parseStdin, boardMatches, listMatchingBoards, isArmed, jsonEscape,
   ambient, advisory, directive, runHook,
   parseIsoMs, isoNow, spawnCcmSetParam, periodicNudge,
 };

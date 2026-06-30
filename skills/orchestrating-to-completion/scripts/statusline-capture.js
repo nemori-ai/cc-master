@@ -26,7 +26,7 @@
 //   无 --passthrough 时:输出一行 `5h:NN% 7d:NN%`。
 //
 // 环境覆写(测试注入 + 确定性):
-//   CC_MASTER_RATE_CACHE  sidecar 路径(默认 ~/.claude/.cc-master-rate-limits.json,账户级、跨 project 共享)。
+//   CC_MASTER_RATE_CACHE  sidecar 路径(默认 <claudeConfigDir>/.cc-master-rate-limits.json,跟随 CLAUDE_CONFIG_DIR·账户级、跨 project 共享)。
 //   CC_MASTER_NOW         ISO-8601 覆写「现在」,让 captured_at 确定可复现(否则 Date.now())。
 
 'use strict';
@@ -45,10 +45,13 @@ function nowEpoch() {
 }
 
 function cachePath() {
-  return (
-    process.env.CC_MASTER_RATE_CACHE ||
-    path.join(process.env.HOME || '', '.claude', '.cc-master-rate-limits.json')
-  );
+  // CC_MASTER_RATE_CACHE 覆写 > <claudeConfigDir>/.cc-master-rate-limits.json（claudeConfigDir 跟随
+  //   CLAUDE_CONFIG_DIR·默认 ~/.claude·与 ccm/hook 同口径）。
+  if (process.env.CC_MASTER_RATE_CACHE) return process.env.CC_MASTER_RATE_CACHE;
+  const claudeConfigDir =
+    process.env.CLAUDE_CONFIG_DIR ||
+    path.join(process.env.HOME || require('os').homedir(), '.claude');
+  return path.join(claudeConfigDir, '.cc-master-rate-limits.json');
 }
 
 // 只收一个「真出现且带数值 used_percentage」的窗口;resets_at 有就一并带上。其余一律视为缺失(返回 null)。

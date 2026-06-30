@@ -20,7 +20,13 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { account } from '@ccm/engine';
+import {
+  account,
+  resolveClaudeConfigDir,
+  resolveClaudeJsonPath,
+  resolveCredentialsPath,
+  resolveRateCachePath,
+} from '@ccm/engine';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
 import * as mutations from '../mutations.js';
@@ -42,7 +48,8 @@ const SWITCH_EXIT = {
 
 // ── 路径 / 形态解析（全从 ctx.env 注入·可测）────────────────────────────────────────────────────────
 function resolveHome(env: Record<string, string | undefined>): string {
-  return env.CC_MASTER_HOME || path.join(os.homedir(), '.claude', 'cc-master');
+  // CC_MASTER_HOME 覆写 > <claudeConfigDir>/cc-master（paths SSOT·跟随 CLAUDE_CONFIG_DIR·默认 ~/.claude）。
+  return env.CC_MASTER_HOME || path.join(resolveClaudeConfigDir(env), 'cc-master');
 }
 function resolveRegistryPath(ctx: Ctx): string {
   const explicit = ctx.values.registry as string | undefined;
@@ -88,8 +95,9 @@ function addOrRefresh(ctx: Ctx): number {
   const regPath = resolveRegistryPath(ctx);
   const expires = (ctx.values.expires as string) || account.defaultExpiresIso();
 
-  // 身份提取（非密·当前登录身份）。CLAUDE_JSON_PATH env 覆写（测试注入）。
-  const claudeJson = ctx.env.CLAUDE_JSON_PATH || path.join(os.homedir(), '.claude.json');
+  // 身份提取（非密·当前登录身份）。CLAUDE_JSON_PATH 覆写 > 双路径容错（<claudeConfigDir>/.claude.json
+  //   优先·缺退 $HOME/.claude.json·paths.resolveClaudeJsonPath SSOT·测试可经 env 注入）。
+  const claudeJson = resolveClaudeJsonPath(ctx.env);
   const identity = account.extractIdentity(claudeJson);
   const currentEmail = account.emailOfIdentity(identity);
 
@@ -624,8 +632,10 @@ export async function switchAccount(ctx: Ctx): Promise<number> {
 
   const user = env.USER || os.userInfo().username || '';
   const credService = env.KEYCHAIN_CRED_SERVICE || account.KEYCHAIN_CRED_SERVICE;
-  const credPath = env.CRED_PATH || path.join(os.homedir(), '.claude', '.credentials.json');
-  const claudeJson = env.CLAUDE_JSON_PATH || path.join(os.homedir(), '.claude.json');
+  // ① credentials.json（Linux/Windows 凭证存储·macOS 走 keychain③·此文件仍是机器全局存储①·CRED_PATH 覆写·
+  //    paths SSOT 跟随 CLAUDE_CONFIG_DIR）；② .claude.json oauthAccount（双路径容错·CLAUDE_JSON_PATH 覆写）。
+  const credPath = resolveCredentialsPath(env);
+  const claudeJson = resolveClaudeJsonPath(env);
   // 含 token 的 ①② 快照落 <home> 下一个 mkdtemp 造的**唯一 0700 私有目录**（snapParent=home·**绝不共享 /tmp 根**·
   //   mkdtemp 原子创建抗 symlink/竞态劫持·codex CRITICAL#1）；任何退出路径必清（清理失败会 surface 告警·codex CRITICAL#2）。
   const trap = account.newTrapState({ regPath, keychain: kc, user, credService, snapParent: home });
@@ -908,8 +918,7 @@ function recordSwitchOutBestEffort(
 function readSwitchOutUsageSnapshot(
   env: Record<string, string | undefined>,
 ): account.SnapshotInput | null {
-  const p =
-    env.CC_MASTER_RATE_CACHE || path.join(os.homedir(), '.claude', '.cc-master-rate-limits.json');
+  const p = resolveRateCachePath(env);
   let obj: Record<string, unknown> | null = null;
   try {
     const parsed = JSON.parse(fs.readFileSync(p, 'utf8'));

@@ -28,7 +28,7 @@
 # 不报错——与 hook 优雅降级同精神，调用方据 available 判断)。
 #
 # Usage: cc-usage.sh [--now <ISO8601>] [--rate-cache <path>] [--effective-n <N>]
-#   --rate-cache  status-line sidecar path (default ${CC_MASTER_RATE_CACHE:-~/.claude/.cc-master-rate-limits.json})
+#   --rate-cache  status-line sidecar path (default ${CC_MASTER_RATE_CACHE:-<claudeConfigDir>/.cc-master-rate-limits.json}, claudeConfigDir follows CLAUDE_CONFIG_DIR, default ~/.claude)
 #                 — passed through to ccm via CC_MASTER_RATE_CACHE; lets tests point at a fixture.
 #   --effective-n 号池有效配额份数覆写（默认从 registry 算·透传给 ccm usage advise --effective-n）。
 #   --now         accepted for back-compat but NO-OP (account-authoritative reset 倒计时是 ccm 从 sidecar
@@ -45,7 +45,9 @@
 set -uo pipefail
 
 NOW=""
-RATE_CACHE="${CC_MASTER_RATE_CACHE:-${HOME}/.claude/.cc-master-rate-limits.json}"
+# claudeConfigDir 跟随 CLAUDE_CONFIG_DIR（默认 $HOME/.claude·与 ccm/hook 同口径）；CC_MASTER_RATE_CACHE 覆写最高优先。
+CLAUDE_CONFIG_DIR_RESOLVED="${CLAUDE_CONFIG_DIR:-${HOME}/.claude}"
+RATE_CACHE="${CC_MASTER_RATE_CACHE:-${CLAUDE_CONFIG_DIR_RESOLVED}/.cc-master-rate-limits.json}"
 EFFECTIVE_N=""
 CCM_BIN="${CCM_BIN:-ccm}"
 while [ $# -gt 0 ]; do

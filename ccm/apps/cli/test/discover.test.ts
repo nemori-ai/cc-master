@@ -121,6 +121,21 @@ test('resolveHome: $CLAUDE_PROJECT_DIR is NO LONGER a factor (per-repo home remo
   );
 });
 
+test('resolveHome: $CLAUDE_CONFIG_DIR relocates the default home (between CC_MASTER_HOME and $HOME)', () => {
+  // 跟随 claude code 的 CLAUDE_CONFIG_DIR 重定位：无 --home / 无 CC_MASTER_HOME → <CLAUDE_CONFIG_DIR>/cc-master。
+  assert.equal(
+    D.resolveHome({ env: { CLAUDE_CONFIG_DIR: '/cfg/dir', HOME: '/h' } }),
+    join('/cfg/dir', 'cc-master'),
+  );
+  // CC_MASTER_HOME 仍盖过 CLAUDE_CONFIG_DIR（显式覆写优先级最高）。
+  assert.equal(
+    D.resolveHome({
+      env: { CC_MASTER_HOME: '/cc/home', CLAUDE_CONFIG_DIR: '/cfg/dir', HOME: '/h' },
+    }),
+    '/cc/home',
+  );
+});
+
 // ── boardsDir ───────────────────────────────────────────────────────────────────────────────────
 test('boardsDir: <home>/boards', () => {
   assert.equal(D.boardsDir('/some/home'), join('/some/home', 'boards'));

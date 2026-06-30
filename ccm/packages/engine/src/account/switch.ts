@@ -24,6 +24,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { resolveCredentialsPath } from '../paths.js';
 import type { AccountEntry, Registry } from './registry.js';
 import { loadRegistry, mutateRegistry, setActive } from './registry.js';
 import {
@@ -100,8 +101,7 @@ export function readOfficialBlob(opts?: ReadOfficialBlobOpts): string | null {
   }
   if (!validOfficial(blob)) {
     // fallback：credentials.json（非 mac 唯一源·mac 上 RT 可能空 → 由 validOfficial 把关）。
-    const cjPath =
-      (opts && opts.credentialsJsonPath) || path.join(os.homedir(), '.claude', '.credentials.json');
+    const cjPath = (opts && opts.credentialsJsonPath) || resolveCredentialsPath();
     try {
       blob = unwrapOfficial(fs.readFileSync(cjPath, 'utf8'));
     } catch (_e) {

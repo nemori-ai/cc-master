@@ -24,7 +24,9 @@ elif [ -n "${1:-}" ]; then
 fi
 MODEL="${CODEX_REVIEW_MODEL:-gpt-5.5}"
 
-OUT="$(mktemp -t codex-review.XXXXXX)"
+# mktemp 双 OS 安全形（不依赖 `-t` 的 BSD/GNU 分歧语义：BSD `-t PREFIX` 给前缀、GNU `-t` 把参数当模板·
+#   行为不一致）。显式给完整模板路径，BSD + GNU 同义：在 $TMPDIR（缺则 /tmp）下造唯一文件。
+OUT="$(mktemp "${TMPDIR:-/tmp}/codex-review.XXXXXX")"
 trap 'rm -f "$OUT"' EXIT
 
 # NOTE (Finding #20, found by running this very script at the PR gate): `codex exec review`
