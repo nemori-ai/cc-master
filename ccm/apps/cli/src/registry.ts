@@ -159,7 +159,7 @@ export const REGISTRY: Registry = {
       },
       examples: [
         'ccm board set-param last_identity_remind 2026-06-29T12:34:56Z',
-        'ccm board set-param last_identity_remind 2026-06-29T12:34:56Z --board <path>',
+        'ccm board set-param last_critpath_remind 2026-06-30T08:00:00Z --board <path>',
       ],
       handler: 'board.setParam',
     },

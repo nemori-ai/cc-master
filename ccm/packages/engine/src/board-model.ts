@@ -230,9 +230,10 @@ export const FIELDS = {
     },
     runtime: {
       tier: '✎',
-      type: 'object{ last_identity_remind?: ISO, ... }?',
+      type: 'object{ last_identity_remind?: ISO, last_critpath_remind?: ISO, ... }?',
       default: '缺省(无 runtime 参数)',
-      readers: 'IDNUDGE hook 读 last_identity_remind 判阈值；未来其它周期 hook/script',
+      readers:
+        'IDNUDGE hook 读 last_identity_remind / critpath-nudge hook 读 last_critpath_remind 判阈值；未来其它周期 hook/script',
       writers: 'hook 经 ccm board set-param（带锁·hook-owned 参数区·ADR-020）/ agent 经 ccm',
       when: '周期 hook 注入提示后刷簿记时间戳',
       degrade: '缺→视为「从未提示」(首次必提示)；形状坏→warn(FMT-RUNTIME)·不拦写盘',

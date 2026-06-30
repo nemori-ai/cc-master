@@ -529,6 +529,38 @@ case "$trimmed" in
     [ "$marker_hit" -eq 1 ] || exit 0 ;;          # not the marker first-line → silent no-op
 esac
 
+# ── ④ CCM HARD PRECHECK (ADR-021·install-presence gate)──────────────────────────────────────────────
+# ccm is a HOST INSTALL PRE-REQUISITE (ADR-014): board v2's write-gate (ADR-013) requires the agent to
+# mutate the board ONLY through `ccm`. If ccm is absent, a board could still be CREATED by this pure-bash
+# bootstrap, but the agent would then be unable to operate it (every `ccm` write silently degrades) — a
+# phantom orchestration that looks live but is crippled. So at the ARM entry (trigger gate just passed,
+# BEFORE any board is created) we hard-check install presence and, if ccm is missing, REFUSE TO ARM:
+#   · inject a `<directive source="bootstrap">` additionalContext telling the AGENT to relay an install
+#     reminder to the USER and to NOT orchestrate until ccm is installed (agent-relay is the only reliable
+#     channel to the user — UserPromptSubmit exit-2 stderr goes to the agent, not the user; §3.3);
+#   · EXIT 0 (NOT decision:block — block would stop the agent from receiving the directive; §3.4);
+#   · create NO board (so no hook arms → all runtime hooks stay dormant·red line 6 naturally holds).
+# Idempotent / retriable: once the user installs ccm, re-running the command passes this gate and arms.
+# This is the BOOTSTRAP HARD CHECK (install presence·binary in PATH·二元·一次性·user-fixable); it is
+# distinct from and does NOT remove the runtime hooks' graceful soft-degrade on a TRANSIENT ccm hiccup
+# (ADR-021 §3.5 boundary). Pure bash `command -v` (red line 1 floor·no jq/python/node·no ccm spawn).
+#   CCM_BIN override (absolute executable path·dev/test/custom install·same口径 as node hooks): when set,
+#   check `[ -x "$CCM_BIN" ]`; else check `command -v ccm` on PATH.
+ccm_present=0
+if [ -n "${CCM_BIN:-}" ]; then
+  [ -x "$CCM_BIN" ] && ccm_present=1
+else
+  command -v ccm >/dev/null 2>&1 && ccm_present=1
+fi
+if [ "$ccm_present" -eq 0 ]; then
+  # The directive tag is just a string (§13 author-side discipline: source必填·directive for a hard
+  # constraint·ccm-missing IS a hard pre-requisite). Hand-built in bash (cannot require node's directive()
+  # wrapper). inject_ctx escapes the whole payload to one valid JSON additionalContext envelope.
+  directive_body='<directive source="bootstrap">cc-master 依赖外部工具 `ccm`（per-OS Node SEA 二进制·ADR-014 主机安装前置），但当前环境的 PATH 上找不到它。没有 ccm，board v2 的写入关卡（ADR-013·agent 一律经 ccm 写 board）无法工作——即便建出 board 也无法正确操作，会是一场「看起来在跑、实则瘸腿」的 phantom orchestration。因此本次**不创建 board、不进入编排**。请你立即转告用户：先安装 ccm（cc-master 的硬前置依赖），装好后重新运行 /cc-master:as-master-orchestrator <goal> 即可正常起编排。在用户确认装好之前，不要继续编排——你没有可用的 board 操作能力。</directive>'
+  inject_ctx "$directive_body"
+  exit 0
+fi
+
 # Home 解析（统一全局口径·BASH SSOT cc_master_home）：$CC_MASTER_HOME 覆写，否则 $HOME/.claude/cc-master。
 # board 集中落 <home>/boards/；home 根另放 accounts.json（全局·不动）+ sidecar + 预留 channel/。
 # F2（codex）FAIL-LOUD 闸：CC_MASTER_HOME 与 HOME **都为空**时无从解析出合理 home——绝不静默降级到绝对根

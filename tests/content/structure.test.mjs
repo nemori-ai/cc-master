@@ -78,13 +78,31 @@ test('ADR-018: non-substrate hooks tag-wrap their agent-context injection (anti-
   assert.doesNotMatch(common, /<ambient source="[^"]*" strength=/, 'ambient must NOT carry strength (恒低)');
   assert.doesNotMatch(common, /<directive source="[^"]*" strength=/, 'directive must NOT carry strength (恒满)');
 
-  // substrate 豁免（ADR-018 §2.5）：reinject / bootstrap 是 substrate（角色重注 / ARM），不该被标签包装。
-  //   断言它们 NOT 引用标签包装器——豁免是有意的、非偶然遗漏（防有人误给 substrate 加标签、也防 lint 漏网）。
+  // substrate 豁免（ADR-018 §2.5）：reinject / bootstrap 的**角色重注 / ARM 上下文注入**是 substrate，不该被
+  //   标签包装。断言它们 NOT 引用标签包装器——豁免是有意的、非偶然遗漏（防有人误给 substrate 加标签）。
   const reinject = read('hooks/scripts/reinject.js');
   const bootstrap = read('hooks/scripts/bootstrap-board.sh');
   assert.doesNotMatch(reinject, TAG_CALL, 'reinject is substrate (ADR-018 §2.5) — must NOT tag-wrap');
   assert.doesNotMatch(reinject, TAG_LITERAL, 'reinject is substrate — no tag literals');
-  assert.doesNotMatch(bootstrap, TAG_LITERAL, 'bootstrap ARM injection is substrate — no tag literals');
+  // bootstrap 的例外（ADR-021）：其 ARM 角色注入（fresh / resume context）仍是 substrate·tag-free，但 ccm
+  //   install-presence 硬查失败时注入一条 **transient 硬约束 directive**（`<directive source="bootstrap">`·ccm
+  //   未装·agent-relay 提醒用户）——这 NOT substrate（substrate 是角色/魂重注·这是「硬前置缺失」的硬约束告警），
+  //   故合法带 directive 标签。契约收窄为：bootstrap 里**唯一允许**的 tag literal 是这条 ccm-missing directive；
+  //   其它 substrate 注入（inject_ctx 的 fresh/resume context）一律不带标签。
+  const bootstrapTagLiterals = bootstrap.match(/<(ambient|advisory|directive)\s+source=/g) || [];
+  for (const lit of bootstrapTagLiterals) {
+    assert.match(
+      lit,
+      /<directive source=/,
+      `bootstrap may only carry the ccm-missing <directive source="bootstrap"> (ADR-021); found a non-directive tag literal: ${lit}`,
+    );
+  }
+  // 且这条 directive 确实在场（ADR-021 实现存在性·防被误删回退到「无硬前置 fail-loud」）。
+  assert.match(
+    bootstrap,
+    /<directive source="bootstrap">/,
+    'bootstrap carries the ccm install-presence directive (ADR-021): ccm missing → agent-relay reminder',
+  );
 });
 
 test('every SKILL.md (distributed + project-internal) has YAML frontmatter with name + description', () => {

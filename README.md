@@ -76,9 +76,11 @@ We keep a clear line between "what it does today" and "what we're still building
 
 ## Get started
 
-One line to install:
+**Install `ccm` first — it's a hard prerequisite.** cc-master drives its board through the standalone `ccm` engine; without it, an orchestration can't actually operate its board (the plugin will detect this at startup and tell you to install `ccm` before it does anything). Install the `ccm` engine for your OS, then install the plugin:
 
 ```bash
+# 1. install the standalone ccm engine (required — per-OS binary; see ccm/ for build/install)
+# 2. install the plugin:
 git clone https://github.com/nemori-ai/cc-master.git
 cd cc-master
 claude --plugin-dir .
@@ -94,7 +96,7 @@ Then give it a goal and watch it run:
 
 ![Its live plan, in the browser any time](docs/images/view-graph-dark.png)
 
-Want it even more hands-off? Pool a few backup accounts with the `ccm account` CLI (`ccm account add/list/switch` — you run it directly; tokens stay token-blind, never touching the agent's context) and it'll switch to a full one when an account runs low — you won't feel a thing. Install the standalone `ccm` engine (recommended) and its accounting, forecasting, and dashboards get fuller.
+Want it even more hands-off? Pool a few backup accounts with the `ccm account` CLI (`ccm account add/list/switch` — you run it directly; tokens stay token-blind, never touching the agent's context) and it'll switch to a full one when an account runs low — you won't feel a thing. With `ccm` installed (required, see above), its accounting, forecasting, and dashboards are all there.
 
 ---
 

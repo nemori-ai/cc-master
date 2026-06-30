@@ -1,6 +1,22 @@
 #!/usr/bin/env bash
 . "$(dirname "$0")/helpers.sh"
 
+# ── ④ CCM PRECHECK (ADR-021)·present-ccm baseline for the EXISTING "happy" cases ─────────────────────
+# bootstrap now HARD-CHECKS ccm install presence at the ARM entry (ADR-021): missing ccm → refuse to arm
+# (no board + a <directive source="bootstrap"> agent-relay install reminder·exit 0). So every case below
+# that expects a board to be created needs ccm to be PRESENT. Tests own CCM_BIN (same口径 as
+# test_identity-nudge / test_hook-ccm-decoupling): if run-tests.sh already exported CCM_BIN (the dev-bin
+# shim), reuse it; otherwise point it at the shim so the gate sees ccm regardless of PATH. The gate is
+# `[ -x "$CCM_BIN" ]` — the shim is an executable wrapper, so existence is enough (the gate never spawns
+# ccm). The dedicated ccm-ABSENT cases (G-series, bottom) override CCM_BIN to a nonexistent path.
+if [ -z "${CCM_BIN:-}" ]; then
+  _SHIM="$PLUGIN_ROOT/ccm/apps/cli/dev-bin/ccm"
+  if [ -x "$_SHIM" ]; then export CCM_BIN="$_SHIM"; fi
+  # else: no shim → fall through; the gate's `command -v ccm` covers an on-PATH ccm. If neither exists
+  #   the happy cases would (correctly) refuse to arm; CI/dev環境 always has one of shim/ccm.
+fi
+NO_CCM="/no/such/ccm-binary-$$"   # nonexistent executable → CCM_BIN override → ccm-ABSENT gate path
+
 # board 集中落 <home>/boards/（board-v2 布局）；这些 helper 入参传 home **根**，内部扫 boards/ 子目录。
 count_boards() { ls "$1/boards"/*.board.json 2>/dev/null | wc -l | tr -d ' '; }
 # board_sid FILE — extract owner.session_id value (pure bash). owner precedes tasks[] in the pinned
@@ -707,5 +723,68 @@ rm -rf "$F2DIR"
 F4_SRC="$(cat "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh")"
 assert_not_contains "$F4_SRC" 'migrate_legacy_boards "${CLAUDE_PROJECT_DIR:-}/.claude/cc-master"' "F4: no UNGUARDED CLAUDE_PROJECT_DIR migration (empty → absolute-root /.claude footgun removed)"
 assert_contains "$F4_SRC" '[ -n "${CLAUDE_PROJECT_DIR:-}" ]' "F4: project-dir migration is guarded by a non-empty CLAUDE_PROJECT_DIR check"
+
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+# ④ CCM HARD PRECHECK (ADR-021): ccm install-presence gate at the ARM entry. Missing ccm → refuse to
+# arm: inject a <directive source="bootstrap"> agent-relay install reminder, create NO board, exit 0.
+# Present ccm → unchanged (board created — covered by every "happy" case above, which run under the
+# CCM_BIN baseline). Drive ccm-ABSENT via CCM_BIN → nonexistent executable.
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+
+# ── G1: raw command + ccm ABSENT → NO board + directive injected + rc 0 (refuse to arm, not block)
+P="$(make_project)"
+HOOK_OUT="$(printf '%s' '{"session_id":"sess-noccm","prompt":"/cc-master:as-master-orchestrator do the thing"}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" CCM_BIN="$NO_CCM" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"; G1_RC=$?
+assert_eq 0 "$G1_RC" "G1: ccm-absent bootstrap exits 0 (refuse to arm, NOT decision:block)"
+assert_eq 0 "$(count_boards "$P/.claude/cc-master")" "G1: ccm absent → NO board created (refuse to arm)"
+assert_contains "$HOOK_OUT" "<directive source=" "G1: injects a directive (agent-relay install reminder)"
+assert_contains "$HOOK_OUT" "ccm" "G1: directive names ccm as the missing pre-requisite"
+assert_valid_json "$HOOK_OUT" "G1: ccm-absent directive stdout is valid JSON"
+rm -rf "$P"
+
+# ── G2: body-sentinel path + ccm ABSENT → also refuses (the gate is after the trigger demux, before
+#    board creation, so BOTH trigger forms hit it)
+P="$(make_project)"
+HOOK_OUT="$(printf '%s' '{"session_id":"sess-noccm2","prompt":"<!-- cc-master:bootstrap:v1 -->\n..."}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" CCM_BIN="$NO_CCM" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"; G2_RC=$?
+assert_eq 0 "$G2_RC" "G2: body-sentinel + ccm-absent exits 0"
+assert_eq 0 "$(count_boards "$P/.claude/cc-master")" "G2: body-sentinel + ccm absent → NO board"
+assert_contains "$HOOK_OUT" "<directive source=" "G2: body-sentinel path also injects the directive"
+rm -rf "$P"
+
+# ── G3: ccm ABSENT does NOT arm — the home stays board-free, so every runtime hook stays dormant
+#    (dormant-until-armed naturally holds: no active board → nothing to match). Assert no board file at all.
+P="$(make_project)"
+HOOK_OUT="$(printf '%s' '{"session_id":"sess-noccm3","prompt":"/cc-master:as-master-orchestrator x"}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" CCM_BIN="$NO_CCM" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+assert_no_file "$P/.claude/cc-master/boards"/*.board.json "G3: ccm absent → no board file anywhere (no arming → hooks stay dormant)"
+rm -rf "$P"
+
+# ── G4: unrelated prompt + ccm ABSENT → STILL a silent no-op (the ccm gate is AFTER the trigger gate,
+#    so a non-triggering prompt never reaches it — no directive leaks onto unrelated prompts)
+P="$(make_project)"
+HOOK_OUT="$(printf '%s' '{"prompt":"what files changed today?"}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" CCM_BIN="$NO_CCM" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"; G4_RC=$?
+assert_eq 0 "$G4_RC" "G4: unrelated prompt + ccm-absent exits 0 (silent no-op)"
+assert_eq "" "$HOOK_OUT" "G4: unrelated prompt → NO directive (ccm gate is after the trigger gate)"
+rm -rf "$P"
+
+# ── G5: present-ccm regression via the explicit CCM_BIN override (the gate's CCM_BIN branch, not just
+#    the PATH branch) → board IS created (proves `[ -x "$CCM_BIN" ]` lets a real ccm through)
+P="$(make_project)"
+if [ -n "${CCM_BIN:-}" ] && [ -x "${CCM_BIN:-}" ]; then
+  HOOK_OUT="$(printf '%s' '{"session_id":"sess-ccm-ok","prompt":"/cc-master:as-master-orchestrator x"}' \
+    | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
+      bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+  assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "G5: present ccm (CCM_BIN -x) → board created (gate passes)"
+  assert_not_contains "$HOOK_OUT" '<directive source="bootstrap">' "G5: present ccm → no install directive"
+else
+  echo "(G5 skipped — no executable CCM_BIN/ccm available to prove the present-ccm gate branch)"
+fi
+rm -rf "$P"
 
 finish

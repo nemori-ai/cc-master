@@ -295,12 +295,12 @@ ccm board update [flags]
 ccm board set-param <key> <value> [flags]
 ```
 
-- positional：`<key>`（必填·**白名单**：当前仅 `last_identity_remind`）、`<value>`（必填·按 key 声明类型校验）
+- positional：`<key>`（必填·**白名单**：当前 `last_identity_remind`、`last_critpath_remind`）、`<value>`（必填·按 key 声明类型校验）
 - 作用域**收窄到 `board.runtime.<白名单 key>`**——非白名单 key / 非法值 → `exit 2`（Usage）；**绝不触碰 🔒/👁 窄腰**。
-- 主要使用者是周期 hook（IDNUDGE）经进程边界 spawn 写 `runtime.last_identity_remind`（ISO-8601 UTC）；agent 也可经它写参数区。走 `runWrite` 带锁管线（与所有写 verb 同口径·刷 `owner.heartbeat`）。
+- 主要使用者是周期 hook（IDNUDGE 写 `runtime.last_identity_remind`、critpath-nudge 写 `runtime.last_critpath_remind`）经进程边界 spawn 写 ISO-8601 UTC 时间戳；agent 也可经它写参数区。走 `runWrite` 带锁管线（与所有写 verb 同口径·刷 `owner.heartbeat`）。
 - flags：`--json`（结构化输出 `{ok,data:{runtime}}`）；`--dry-run` 跑完整校验不落盘。
-- 值类型：`last_identity_remind` 须严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`），否则 `exit 2`。
-- 例：`ccm board set-param last_identity_remind 2026-06-29T12:34:56Z` · `… --board <path>`
+- 值类型：`last_identity_remind` / `last_critpath_remind` 均须严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`），否则 `exit 2`。
+- 例：`ccm board set-param last_identity_remind 2026-06-29T12:34:56Z` · `ccm board set-param last_critpath_remind 2026-06-30T08:00:00Z --board <path>`
 
 ---
 

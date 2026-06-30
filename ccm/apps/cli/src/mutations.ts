@@ -131,6 +131,7 @@ export function boardUpdate(
 //   开放扩展：未来加一个周期 hook 簿记键 = 在此加一条（+ board-model FIELDS.runtime 字段说明），复用 set-param。
 const RUNTIME_PARAM_KEYS: Record<string, 'iso'> = {
   last_identity_remind: 'iso',
+  last_critpath_remind: 'iso', // critpath-nudge（周期临界路径提示·hooks-enhancements-v2 ②）写回时间戳
 };
 export function boardSetParam(board: Board, args?: { key?: string; value?: string }): Board {
   const key = args && typeof args.key === 'string' ? args.key : '';

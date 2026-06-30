@@ -76,9 +76,11 @@ cc-master 是 [Claude Code](https://code.claude.com/docs/en/workflows) 的一个
 
 ## 上手
 
-装上只要一行：
+**先装 `ccm`——这是硬前置。** cc-master 经独立的 `ccm` 引擎操作它的 board；没有它，一场编排根本无法正确操作 board（插件会在起点检测到并提醒你先装 `ccm`，在那之前它什么都不做）。先按你的操作系统装上 `ccm` 引擎，再装插件：
 
 ```bash
+# 1. 先装独立的 ccm 引擎（必需·per-OS 二进制·构建/安装见 ccm/）
+# 2. 再装插件：
 git clone https://github.com/nemori-ai/cc-master.git
 cd cc-master
 claude --plugin-dir .
@@ -94,7 +96,7 @@ claude --plugin-dir .
 
 ![它的实时活计划，在浏览器里随时看](docs/images/view-graph-dark.png)
 
-想更省心？用 `ccm account` CLI（`ccm account add/list/switch`——你直接敲，token 全程 token-blind、绝不进 agent context）配上几个备用账号，它就能在一个账号额度用紧时自己切到下一个满的接着干——你全程无感。装上独立的 `ccm` 引擎（推荐），它算账、估工期、画看板的本事会更全。
+想更省心？用 `ccm account` CLI（`ccm account add/list/switch`——你直接敲，token 全程 token-blind、绝不进 agent context）配上几个备用账号，它就能在一个账号额度用紧时自己切到下一个满的接着干——你全程无感。装好 `ccm` 引擎后（必需·见上），它算账、估工期、画看板的本事一应俱全。
 
 ---
 

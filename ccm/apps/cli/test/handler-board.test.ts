@@ -565,6 +565,16 @@ test('board set-param --json renders { ok:true, data:{ runtime } }', () => {
   assert.equal(out.data.runtime.last_identity_remind, '2026-06-29T12:34:56Z');
 });
 
+// last_critpath_remind 白名单第二成员（critpath-nudge·hooks-enhancements-v2 ②）：端到端经 router 写盘。
+test('board set-param: last_critpath_remind 白名单 key + ISO → 写盘 + EXIT.OK', () => {
+  const { boardPath } = mkBoardHome();
+  const ctx = mkCtx({ boardPath, positionals: ['last_critpath_remind', '2026-06-30T08:00:00Z'] });
+  const code = boardHandler.setParam(ctx);
+  assert.equal(code, EXIT.OK);
+  const onDisk = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.equal(onDisk.runtime.last_critpath_remind, '2026-06-30T08:00:00Z');
+});
+
 test('board set-param: 非白名单 key → throws Usage (router maps to exit 2)', () => {
   const { boardPath } = mkBoardHome();
   const ctx = mkCtx({ boardPath, positionals: ['bogus_key', 'x'] });

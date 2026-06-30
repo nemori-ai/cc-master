@@ -489,6 +489,33 @@ test('boardSetParam: 已有 runtime 时只覆写该 key（不抹其它键）', (
   assert.equal(out.runtime.some_future_hook_key, 'keep-me', '其它键保留');
 });
 
+// last_critpath_remind 是 runtime 白名单第二成员（critpath-nudge·hooks-enhancements-v2 ②）。
+test('boardSetParam: last_critpath_remind 白名单 key + 合法 ISO → 写 runtime.last_critpath_remind', () => {
+  const b = baseBoard();
+  const out = m.boardSetParam(b, { key: 'last_critpath_remind', value: '2026-06-30T08:00:00Z' });
+  assert.equal(out.runtime.last_critpath_remind, '2026-06-30T08:00:00Z');
+  assert.ok(ISO.test(out.owner.heartbeat), 'heartbeat stamped');
+});
+
+test('boardSetParam: last_critpath_remind 与 last_identity_remind 共存不互抹', () => {
+  const b = baseBoard();
+  b.runtime = { last_identity_remind: '2026-06-29T00:00:00Z' };
+  const out = m.boardSetParam(b, { key: 'last_critpath_remind', value: '2026-06-30T08:00:00Z' });
+  assert.equal(out.runtime.last_critpath_remind, '2026-06-30T08:00:00Z');
+  assert.equal(out.runtime.last_identity_remind, '2026-06-29T00:00:00Z', 'identity key 保留');
+});
+
+test('boardSetParam: last_critpath_remind 非法 ISO 值 → throw .errKind=Usage（exit 2）', () => {
+  const b = baseBoard();
+  assert.throws(
+    () => m.boardSetParam(b, { key: 'last_critpath_remind', value: 'not-iso' }),
+    (e: any) => {
+      assert.equal(e.errKind, 'Usage');
+      return /ISO/.test(e.message);
+    },
+  );
+});
+
 test('boardSetParam: 非白名单 key → throw .errKind=Usage（exit 2）', () => {
   const b = baseBoard();
   assert.throws(

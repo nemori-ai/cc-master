@@ -1,56 +1,76 @@
 #!/usr/bin/env bash
-# Tests for identity-nudge.js (IDNUDGE — node Stop hook, ADR-020). The hook periodically (default 6h)
-# re-asserts "you are a master orchestrator" via a NON-BLOCKING <advisory strength="weak"> additionalContext
-# (hookEventName "Stop"). It reads board.runtime.last_identity_remind to gate the interval, and on a due
-# Stop writes the timestamp BACK via `ccm board set-param` (process boundary) — injecting ONLY when the
-# write-back succeeds (no spam when ccm is absent). It is armed-gated (dormant until this session owns an
-# active board), silent on Stop re-entry (stop_hook_active), and degrades silently when ccm is unavailable.
+# Tests for identity-nudge.js (PERIODIC PROMPTS — node Stop hook, ADR-020 + hooks-enhancements-v2 ②). The
+# hook runs a periodic-prompt table [identity, critpath]:
+#   ① IDENTITY (default 6h): re-asserts "you are a master orchestrator" via a NON-BLOCKING
+#      <advisory source="identity-nudge" strength="weak"> additionalContext (hookEventName "Stop"). Reads
+#      board.runtime.last_identity_remind to gate the interval.
+#   ② CRITPATH (default 2h): reports the critical-path progress X/Y (+ ccm estimate on-track/behind verdict,
+#      degraded to no-verdict when no baseline) via <advisory source="critpath-nudge" strength="weak">. Reads
+#      board.runtime.last_critpath_remind to gate. X/Y = chain ∩ tasks[].status pure count (red line 2/3:
+#      ccm出图 critical-path, hook just counts). spawns ccm only when due.
+# Both write their timestamp BACK via `ccm board set-param` (process boundary) and inject ONLY when the
+# write-back succeeds (no spam when ccm absent). Both armed-gated, silent on Stop re-entry, ccm-absent silent.
 #
 # helpers.sh::run_hook is bash-only; we invoke the .js by its shebang and inject fixtures via the env
-# override points the hook exposes (CC_MASTER_NOW / CC_MASTER_IDNUDGE_INTERVAL_SEC / CCM_BIN). We do NOT
-# modify helpers.sh.
+# override points the hook exposes (CC_MASTER_NOW / CC_MASTER_IDNUDGE_INTERVAL_SEC /
+# CC_MASTER_CRITPATH_INTERVAL_SEC / CCM_BIN). We do NOT modify helpers.sh.
 . "$(dirname "$0")/helpers.sh"
 
 HOOK="$PLUGIN_ROOT/hooks/scripts/identity-nudge.js"
 
-# ── STUB ccm: a tiny shell that emulates `ccm board set-param <key> <value> --board <path> --home <home>`
-# by writing runtime.<key>=<value> into the board file (via node JSON read/modify/write) and exit 0. This
-# lets us drive the write-back path WITHOUT building the real ccm SEA. The default driver points CCM_BIN at
-# it; a dedicated "ccm-absent" case points CCM_BIN at a nonexistent path (→ spawn fails → no inject).
+# ── STUB ccm: a tiny shell emulating the THREE ccm verbs this hook spawns:
+#   · `ccm board set-param <key> <value> --board <path>` → write runtime.<key>=<value>, exit 0 (whitelist
+#     = last_identity_remind + last_critpath_remind; others exit 2 like the real verb).
+#   · `ccm board critical-path --json --board <path>` → emit {ok,data:{chain,...}} where chain = the board's
+#     task ids in dependency order (a deterministic stub: just lists tasks[].id). Empty tasks → empty chain.
+#   · `ccm estimate evm --json --board <path>` → emit {ok,data:{has_baseline:false,...}} (no baseline →
+#     critpath nudge degrades to no-verdict). A separate "behind" stub variant is built inline per-case.
+# Driving via this stub lets us exercise BOTH nudges WITHOUT building the real ccm SEA. ccm-absent cases
+# point CCM_BIN at a nonexistent path (→ spawn fails → no inject).
 STUB_DIR="$(make_project)"
 STUB_CCM="$STUB_DIR/ccm-stub.sh"
 cat > "$STUB_CCM" <<'STUB'
 #!/usr/bin/env bash
-# Emulate: ccm board set-param <key> <value> --board <path> [--home <home>]
-key=""; val=""; board=""
-# positionals: $1=board $2=set-param $3=key $4=value, then flags
-shift 2   # drop "board" "set-param"
-key="$1"; val="$2"; shift 2
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --board) board="$2"; shift 2;;
-    --home) shift 2;;
-    *) shift;;
-  esac
-done
-# only the whitelisted key is accepted (mirror exit 2 on others)
-if [ "$key" != "last_identity_remind" ]; then echo "error: not whitelisted" >&2; exit 2; fi
-node -e '
-  const fs=require("fs"); const [b,k,v]=process.argv.slice(1);
-  const o=JSON.parse(fs.readFileSync(b,"utf8")); o.runtime=o.runtime||{}; o.runtime[k]=v;
-  fs.writeFileSync(b, JSON.stringify(o,null,2)+"\n");
-' "$board" "$key" "$val"
-exit 0
+# Demux: $1=noun ($1=board|estimate), $2=verb.
+noun="$1"; verb="$2"
+if [ "$noun" = "board" ] && [ "$verb" = "set-param" ]; then
+  shift 2; key="$1"; val="$2"; shift 2; board=""
+  while [ $# -gt 0 ]; do case "$1" in --board) board="$2"; shift 2;; --home) shift 2;; *) shift;; esac; done
+  # whitelist mirrors the real verb (identity + critpath); others exit 2.
+  if [ "$key" != "last_identity_remind" ] && [ "$key" != "last_critpath_remind" ]; then
+    echo "error: not whitelisted" >&2; exit 2; fi
+  node -e 'const fs=require("fs");const [b,k,v]=process.argv.slice(1);const o=JSON.parse(fs.readFileSync(b,"utf8"));o.runtime=o.runtime||{};o.runtime[k]=v;fs.writeFileSync(b,JSON.stringify(o,null,2)+"\n");' "$board" "$key" "$val"
+  exit 0
+fi
+if [ "$noun" = "board" ] && [ "$verb" = "critical-path" ]; then
+  board=""; while [ $# -gt 0 ]; do case "$1" in --board) board="$2"; shift 2;; *) shift;; esac; done
+  # chain = the board's task ids (deterministic stub — exercises the X/Y count path).
+  node -e 'const fs=require("fs");const b=process.argv[1];let chain=[];try{const o=JSON.parse(fs.readFileSync(b,"utf8"));chain=(o.tasks||[]).map(t=>t&&t.id).filter(Boolean);}catch(e){}process.stdout.write(JSON.stringify({ok:true,data:{chain,makespan:null,weight_source:"unit"}}));' "$board"
+  exit 0
+fi
+if [ "$noun" = "estimate" ] && [ "$verb" = "evm" ]; then
+  # default: no baseline (critpath nudge degrades to no-verdict). CCM_STUB_EVM env overrides the data blob.
+  if [ -n "${CCM_STUB_EVM:-}" ]; then printf '%s' "$CCM_STUB_EVM"; else printf '%s' '{"ok":true,"data":{"has_baseline":false,"spi_t":null,"sv_t":null}}'; fi
+  exit 0
+fi
+echo "stub: unhandled $*" >&2; exit 2
 STUB
 chmod +x "$STUB_CCM"
 
-# seed_home SID [LAST_REMIND] -> echo a fresh home holding an active board owned by SID, with optional
-# runtime.last_identity_remind seeded. board-v2 layout: board lives under <home>/boards/.
+# seed_home SID [LAST_IDENTITY] [LAST_CRITPATH] -> echo a fresh home holding an active board owned by SID,
+# with optional runtime timestamps seeded. board-v2 layout: board under <home>/boards/. By default seeds a
+# RECENT last_critpath_remind (== NOW-ish baseline 2026-06-29T11:55:00Z) so critpath is NOT due in the
+# identity-focused cases (they only want to exercise the identity nudge). Pass an explicit 3rd arg to drive
+# critpath due/not-due deliberately.
 seed_home() {
   local h; h="$(make_project)"; mkdir -p "$h/boards"
+  local lastid="${2:-}" lastcp="${3:-2026-06-29T11:55:00Z}"   # default critpath: 5min ago < 2h → not due
   local rt=""
-  if [ -n "${2:-}" ]; then rt=",\"runtime\":{\"last_identity_remind\":\"$2\"}"; fi
-  printf '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"%s","heartbeat":"2026-06-01T00:00:00Z"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]%s}' "$1" "$rt" > "$h/boards/mine.board.json"
+  rt="$rt\"last_identity_remind\":\"$lastid\""
+  rt="$rt,\"last_critpath_remind\":\"$lastcp\""
+  # if lastid empty, drop the identity key entirely (first-time case wants it ABSENT).
+  if [ -z "$lastid" ]; then rt="\"last_critpath_remind\":\"$lastcp\""; fi
+  printf '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"%s","heartbeat":"2026-06-01T00:00:00Z"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T1","status":"in_flight","deps":[]}],"runtime":{%s}}' "$1" "$rt" > "$h/boards/mine.board.json"
   echo "$h"
 }
 
@@ -66,6 +86,10 @@ run_idnudge() {
 # board_runtime_remind HOME -> echo the persisted runtime.last_identity_remind (empty if absent).
 board_runtime_remind() {
   node -e 'const fs=require("fs");const b=process.argv[1];try{const o=JSON.parse(fs.readFileSync(b,"utf8"));process.stdout.write(String((o.runtime&&o.runtime.last_identity_remind)||""));}catch(e){}' "$1/boards/mine.board.json"
+}
+# board_runtime_critpath HOME -> echo the persisted runtime.last_critpath_remind (empty if absent).
+board_runtime_critpath() {
+  node -e 'const fs=require("fs");const b=process.argv[1];try{const o=JSON.parse(fs.readFileSync(b,"utf8"));process.stdout.write(String((o.runtime&&o.runtime.last_critpath_remind)||""));}catch(e){}' "$1/boards/mine.board.json"
 }
 
 NOW="2026-06-29T12:00:00Z"
@@ -152,6 +176,101 @@ HOOK_OUT="$(printf '{"session_id":"sess-i","hook_event_name":"Stop"}' \
     "$HOOK" 2>/dev/null)"; HOOK_RC=$?
 assert_eq 0 "$HOOK_RC" "(i) custom interval → rc 0"
 assert_contains "$HOOK_OUT" "additionalContext" "(i) 90min > 1h custom interval → due → nudges"
+rm -rf "$H"
+
+# ════════════════════════════════════════════════════════════════════════════════════════════════════
+# CRITPATH periodic nudge (hooks-enhancements-v2 ②) — runtime.last_critpath_remind gated, default 2h.
+# ════════════════════════════════════════════════════════════════════════════════════════════════════
+
+# ── (cp-a) DUE critpath (last_critpath_remind > 2h ago) + recent identity → ONLY critpath nudge fires.
+#    Reports X/Y (chain ∩ tasks[].status). seed: 1 task in_flight → chain [T1], X=0/Y=1. No baseline →
+#    no on-track/behind verdict (degraded). Writes last_critpath_remind BACK to now.
+H="$(seed_home "sess-cpa" "2026-06-29T11:55:00Z" "2026-06-29T09:00:00Z")"   # critpath 3h ago > 2h → due; identity 5min ago → not due
+run_idnudge "$H" "sess-cpa" "$NOW"
+assert_eq 0 "$HOOK_RC" "(cp-a) critpath due → rc 0"
+assert_contains "$HOOK_OUT" "临界路径周期提示" "(cp-a) critpath due → injects critpath advisory"
+assert_contains "$HOOK_OUT" "0/1 关键任务" "(cp-a) reports X/Y = 0/1 (chain ∩ tasks status, pure count)"
+assert_contains "$HOOK_OUT" '<advisory source=\"critpath-nudge\" strength=\"weak\">' "(cp-a) tag-wrapped advisory weak source=critpath-nudge"
+assert_not_contains "$HOOK_OUT" "master orchestrator" "(cp-a) identity not due → only critpath fired (no identity text)"
+assert_not_contains "$HOOK_OUT" "schedule" "(cp-a) no baseline → no on-track/behind verdict clause (degraded honestly)"
+assert_valid_json "$HOOK_OUT" "(cp-a) single well-formed JSON object"
+assert_eq "$NOW" "$(board_runtime_critpath "$H")" "(cp-a) writes last_critpath_remind BACK to now"
+assert_eq "2026-06-29T11:55:00Z" "$(board_runtime_remind "$H")" "(cp-a) identity timestamp untouched (not due)"
+rm -rf "$H"
+
+# ── (cp-b) NOT DUE critpath (recent) → no critpath nudge. With identity also not due → fully silent.
+H="$(seed_home "sess-cpb" "2026-06-29T11:50:00Z" "2026-06-29T11:50:00Z")"   # both 10min ago → neither due
+run_idnudge "$H" "sess-cpb" "$NOW"
+assert_eq 0 "$HOOK_RC" "(cp-b) neither due → rc 0"
+assert_eq "" "$HOOK_OUT" "(cp-b) both within interval → fully silent"
+assert_eq "2026-06-29T11:50:00Z" "$(board_runtime_critpath "$H")" "(cp-b) critpath timestamp unchanged"
+rm -rf "$H"
+
+# ── (cp-c) FIRST-TIME critpath (no last_critpath_remind) → due → nudges + seeds timestamp. Seed a board
+#    with NO critpath key but a recent identity key (identity not due).
+H="$(make_project)"; mkdir -p "$H/boards"
+printf '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-cpc","heartbeat":"2026-06-01T00:00:00Z"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":["T1"]}],"runtime":{"last_identity_remind":"2026-06-29T11:55:00Z"}}' > "$H/boards/mine.board.json"
+run_idnudge "$H" "sess-cpc" "$NOW"
+assert_eq 0 "$HOOK_RC" "(cp-c) first-time critpath → rc 0"
+assert_contains "$HOOK_OUT" "临界路径周期提示" "(cp-c) missing last_critpath_remind → first Stop nudges critpath"
+assert_contains "$HOOK_OUT" "1/2 关键任务" "(cp-c) X/Y = 1/2 (T1 done counts, T2 in_flight does not)"
+assert_eq "$NOW" "$(board_runtime_critpath "$H")" "(cp-c) first-time → seeds last_critpath_remind=now"
+rm -rf "$H"
+
+# ── (cp-d) BOTH due → both nudges injected in the same round (independent timers, weak each, orthogonal).
+H="$(seed_home "sess-cpd" "2026-06-29T05:00:00Z" "2026-06-29T09:00:00Z")"   # identity 7h ago + critpath 3h ago → both due
+run_idnudge "$H" "sess-cpd" "$NOW"
+assert_eq 0 "$HOOK_RC" "(cp-d) both due → rc 0"
+assert_contains "$HOOK_OUT" "master orchestrator" "(cp-d) identity advisory present"
+assert_contains "$HOOK_OUT" "临界路径周期提示" "(cp-d) critpath advisory present"
+assert_valid_json "$HOOK_OUT" "(cp-d) both advisories in one well-formed JSON object"
+assert_eq "$NOW" "$(board_runtime_remind "$H")" "(cp-d) identity timestamp written back"
+assert_eq "$NOW" "$(board_runtime_critpath "$H")" "(cp-d) critpath timestamp written back"
+rm -rf "$H"
+
+# ── (cp-e) BEHIND-schedule verdict (ccm estimate evm → spi_t<1) → critpath advisory carries the behind clause.
+H="$(seed_home "sess-cpe" "2026-06-29T11:55:00Z" "2026-06-29T09:00:00Z")"   # critpath due
+HOOK_OUT="$(printf '{"session_id":"sess-cpe","hook_event_name":"Stop"}' \
+  | CC_MASTER_HOME="$H" CC_MASTER_NOW="$NOW" CCM_BIN="$STUB_CCM" \
+    CCM_STUB_EVM='{"ok":true,"data":{"has_baseline":true,"spi_t":0.7,"sv_t":-3.2}}' \
+    "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+assert_eq 0 "$HOOK_RC" "(cp-e) behind verdict → rc 0"
+assert_contains "$HOOK_OUT" "behind schedule" "(cp-e) ccm estimate spi_t<1 → behind schedule verdict clause"
+assert_contains "$HOOK_OUT" "瓶颈" "(cp-e) behind → action clause (升档/补派/重排 float)"
+rm -rf "$H"
+
+# ── (cp-f) ON-TRACK verdict (spi_t≥1, sv_t≥0) → on-track clause, no behind action.
+H="$(seed_home "sess-cpf" "2026-06-29T11:55:00Z" "2026-06-29T09:00:00Z")"   # critpath due
+HOOK_OUT="$(printf '{"session_id":"sess-cpf","hook_event_name":"Stop"}' \
+  | CC_MASTER_HOME="$H" CC_MASTER_NOW="$NOW" CCM_BIN="$STUB_CCM" \
+    CCM_STUB_EVM='{"ok":true,"data":{"has_baseline":true,"spi_t":1.1,"sv_t":2.0}}' \
+    "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+assert_contains "$HOOK_OUT" "on-track" "(cp-f) spi_t≥1 → on-track verdict clause"
+rm -rf "$H"
+
+# ── (cp-g) EMPTY graph (no tasks → chain empty) → critpath build ABSTAINS → no critpath inject (but the
+#    timestamp WAS written back, so it won't re-fire next round — accepted: nothing to report this period).
+H="$(make_project)"; mkdir -p "$H/boards"
+printf '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-cpg","heartbeat":"2026-06-01T00:00:00Z"},"git":{"worktree":"","branch":""},"tasks":[],"runtime":{"last_identity_remind":"2026-06-29T11:55:00Z"}}' > "$H/boards/mine.board.json"
+run_idnudge "$H" "sess-cpg" "$NOW"
+assert_eq 0 "$HOOK_RC" "(cp-g) empty graph → rc 0"
+assert_not_contains "$HOOK_OUT" "临界路径周期提示" "(cp-g) empty chain → critpath build abstains → no inject"
+rm -rf "$H"
+
+# ── (cp-h) ccm ABSENT (CCM_BIN nonexistent) + critpath due → write-back fails → silent, no inject, no spam.
+H="$(seed_home "sess-cph" "2026-06-29T11:55:00Z" "2026-06-29T09:00:00Z")"   # critpath due
+run_idnudge "$H" "sess-cph" "$NOW" "" "/nonexistent-ccm-bin-xyz"
+assert_eq 0 "$HOOK_RC" "(cp-h) ccm absent → rc 0"
+assert_eq "" "$HOOK_OUT" "(cp-h) ccm absent → write-back fails → silent (no inject)"
+assert_eq "2026-06-29T09:00:00Z" "$(board_runtime_critpath "$H")" "(cp-h) ccm absent → critpath timestamp NOT changed"
+rm -rf "$H"
+
+# ── (cp-i) custom critpath interval (CC_MASTER_CRITPATH_INTERVAL_SEC) honored: 1h interval, last 90min ago → due.
+H="$(seed_home "sess-cpi" "2026-06-29T11:55:00Z" "2026-06-29T10:30:00Z")"   # critpath 90min ago
+HOOK_OUT="$(printf '{"session_id":"sess-cpi","hook_event_name":"Stop"}' \
+  | CC_MASTER_HOME="$H" CC_MASTER_NOW="$NOW" CCM_BIN="$STUB_CCM" CC_MASTER_CRITPATH_INTERVAL_SEC="3600" \
+    "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+assert_contains "$HOOK_OUT" "临界路径周期提示" "(cp-i) 90min > 1h custom critpath interval → due → nudges"
 rm -rf "$H"
 
 rm -rf "$STUB_DIR"

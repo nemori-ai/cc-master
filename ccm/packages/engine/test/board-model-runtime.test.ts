@@ -81,6 +81,25 @@ test('FMT-RUNTIME warns when last_identity_remind is a non-ISO string', () => {
   );
 });
 
+// last_critpath_remind 是 runtime 时间锚第二成员（critpath-nudge·hooks-enhancements-v2 ②）：合法 ISO 0 warn，
+//   非 ISO → FMT-RUNTIME warn（与 last_identity_remind 同口径）。
+test('valid runtime {last_critpath_remind: ISO} → 0 errors 0 FMT-RUNTIME warnings', () => {
+  const result = M.lintBoard(
+    JSON.stringify(makeBoard({ last_critpath_remind: '2026-06-30T08:00:00Z' })),
+  );
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.warnings.filter((w: { rule: string }) => w.rule === 'FMT-RUNTIME').length, 0);
+});
+
+test('FMT-RUNTIME warns when last_critpath_remind is a non-ISO string', () => {
+  const result = M.lintBoard(JSON.stringify(makeBoard({ last_critpath_remind: 'not-iso' })));
+  assert.equal(result.errors.length, 0);
+  assert.ok(
+    result.warnings.find((w: { rule: string }) => w.rule === 'FMT-RUNTIME'),
+    'non-ISO last_critpath_remind → FMT-RUNTIME warn',
+  );
+});
+
 // 未知键 silent-on-unknown：未来同形成员复用本规则·扩展位无须改 lint（只校验已知键）。
 test('unknown runtime key (silent-on-unknown) → no FMT-RUNTIME warning', () => {
   const result = M.lintBoard(JSON.stringify(makeBoard({ some_future_hook_key: 'whatever' })));

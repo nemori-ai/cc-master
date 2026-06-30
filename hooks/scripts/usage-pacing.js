@@ -166,6 +166,16 @@ const AUTOSWITCH_ON = process.env.CC_MASTER_AUTOSWITCH !== '0';
 const SWITCH_COOLDOWN_RAW = process.env.CC_MASTER_SWITCH_COOLDOWN_SEC || '';
 const SWITCH_STATE_FILE =
   process.env.CC_MASTER_SWITCH_STATE || path.join(HOME_DIR, '.cc-master-switch.json');
+
+// ── ③ PostToolBatch 中途采样（hooks-enhancements-v2 §1）─────────────────────────────────────────────
+// 把配速感知从「轮末（Stop）才知」前移到「回合中途（PostToolBatch）也查」。节流 sidecar（hook-owned·非 board·
+//   语义同换号冷却 sidecar：transient + home-global·与配额窗口绑定·跨编排）记 { last_inject_at, last_band,
+//   window_resets_at }。CC_MASTER_PACING_SAMPLE_STATE 覆写（测试注入）。
+const PACING_SAMPLE_FILE =
+  process.env.CC_MASTER_PACING_SAMPLE_STATE || path.join(HOME_DIR, '.cc-master-pacing-sample.json');
+// 中途采样冷却（秒·同带持续临界时距上次中途注入满此才再注·比 Stop 稀，因 Stop 每轮已兜底）。缺/空 → 默认
+//   15min；显式 '0' → 0（关冷却·honor）；非数/负 → 默认。先判空串（Number('')===0 footgun·同 switchCooldownSec）。
+const PACING_SAMPLE_COOLDOWN_RAW = process.env.CC_MASTER_PACING_SAMPLE_COOLDOWN_SEC || '';
 // ccm account switch 子进程超时（含 refresh 的网络 POST）：默认 30s。换号被 cooldown + kind:'switch' 双门控、罕见
 //   （5h 水位约每几小时一次），阻塞 Stop 数秒可承受（设计 §3.2）。CC_MASTER_SWITCH_TIMEOUT_MS 覆写（测试注入）。
 const SWITCH_TIMEOUT_MS = (() => {
@@ -822,6 +832,149 @@ function attemptCcmSwitch(boardPath, homeDir, rateCache) {
   return { outcome: 'failed', email }; // 1/4/其它 → 换号未干净完成
 }
 
+// ── ③ PostToolBatch 中途采样 helpers（band / 节流 sidecar / 轻路径 body）────────────────────────────────
+// 中途采样比 Stop 高频得多（一回合多次大 fan-out）。裸采样 = 通知风暴 + 「狼来了」稀释（违 ADR-018 P2）。必须
+//   节流：注入 ⟺（A 跨阈值升档）OR（B 距上次中途注入满冷却且仍在临界带以上）。先做廉价本地预闸（readRateCache
+//   算 band·零 spawn），只在该注入时才 spawn `ccm usage advise`。**中途只报临界侧（throttle/hard_stop）不报
+//   underuse**（欠用是慢信号·轮末 Stop 报足够·中途催加速无额外价值且增噪）。**不含 autoswitch**（换号留 Stop-only·
+//   §1.5：换号是带网络 POST 的重操作·放高频 PostToolBatch 会卡批解析后流程）。
+
+// pacingSampleCooldownSec() → 冷却秒（unset → 900=15min；显式 0 honor；垃圾 → 默认）。先判空串（footgun）。
+function pacingSampleCooldownSec() {
+  if (!PACING_SAMPLE_COOLDOWN_RAW) return 900; // unset → 默认 15min
+  const n = Number(PACING_SAMPLE_COOLDOWN_RAW);
+  return Number.isFinite(n) && n >= 0 ? n : 900; // 显式 0 honor；垃圾 → 默认
+}
+
+// bandOf(acct, floor, gate) → 'normal' | 'throttle' | 'hard_stop' | null。从账户权威 sidecar 算「带」（廉价
+//   本地预闸·零 spawn）。p7≥gate（默认 85）→ hard_stop（7d 跨窗口硬总闸·最高）；p5≥floor（默认 85·窗口仍有效）
+//   → throttle；否则 normal。账户口径不可用（缺/坏/空/无 5h+7d 信号）→ null（中途采样宁可漏报不刷屏·与 Stop
+//   「失败必静默」同纪律·中途不走本地反推 computeFiveHour——反推 remain 会失真到数量级·据此中途催减速也不可信）。
+function bandOf(acct, nowSec, floor, gate) {
+  if (!acct || typeof acct !== 'object') return null;
+  const p5 = pctOf(acct.five_hour);
+  const p7 = pctOf(acct.seven_day);
+  if (p5 === null && p7 === null) return null; // 账户信号不可用 → 中途静默
+  const f = acct.five_hour;
+  const fhValid = p5 !== null && (typeof f.resets_at !== 'number' || f.resets_at > nowSec);
+  if (p7 !== null && p7 >= gate) return 'hard_stop'; // 7d 硬总闸（跨窗口·最高带）
+  if (fhValid && p5 >= floor) return 'throttle'; // 5h 临界（窗口仍有效）
+  return 'normal';
+}
+// bandRank(b) → 数值序（normal<throttle<hard_stop）供「严格升档」比较。未知 → -1。
+function bandRank(b) {
+  return b === 'hard_stop' ? 2 : b === 'throttle' ? 1 : b === 'normal' ? 0 : -1;
+}
+// readSampleState(file) → { last_inject_at, last_band, window_resets_at } 或 {}（缺/坏 → 空·首次按未注入）。
+function readSampleState(file) {
+  try {
+    const o = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  } catch (_e) {
+    return {};
+  }
+}
+// writeSampleState(file, state) → 落节流状态（fail-silent·写失败只是下次可能提前再注·非致命·绝不 throw 污染批）。
+function writeSampleState(file, state) {
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify(state)}\n`);
+  } catch (_e) {
+    /* fail-silent */
+  }
+}
+
+// sampleBody(ctx) → PostToolBatch 中途采样轻路径。返回 { additionalContext } 或 falsy（静默）。
+function sampleBody(ctx) {
+  const nowMs = NOW_OVERRIDE ? parseIso(NOW_OVERRIDE) : Date.now();
+  if (nowMs === null) return; // --now 非法 → 静默
+  const nowSec = Math.floor(nowMs / 1000);
+
+  // ── 廉价本地预闸：readRateCache 读账户权威 sidecar（零 spawn）→ 算 band ──────────────────────────────
+  const acct = readRateCache(RATE_CACHE);
+  const floor = parsePctFloor(PCT_FLOOR_RAW);
+  const gate = parseSevenDayDispatchGate(SEVEN_DAY_DISPATCH_GATE_RAW);
+  const band = bandOf(acct, nowSec, floor, gate);
+  if (band === null) return; // 账户信号不可用 → 中途静默（宁可漏报不刷屏）
+
+  // ── 窗口重置：5h resets_at 翻新（新窗口）→ 清 last_band 记忆（band 从 normal 重新计，否则跨窗口残留压制升档）──
+  const state = readSampleState(PACING_SAMPLE_FILE);
+  const f = acct.five_hour;
+  const curResetsAt = f && typeof f.resets_at === 'number' ? f.resets_at : null;
+  let lastBand = typeof state.last_band === 'string' ? state.last_band : 'normal';
+  let lastInjectAt = typeof state.last_inject_at === 'number' ? state.last_inject_at : 0;
+  const prevResetsAt =
+    typeof state.window_resets_at === 'number' ? state.window_resets_at : null;
+  if (curResetsAt !== null && prevResetsAt !== null && curResetsAt !== prevResetsAt) {
+    lastBand = 'normal'; // 新窗口 → 清 band 记忆
+    lastInjectAt = 0; // 新窗口 → 清冷却（首次升档不被旧冷却压制）
+  }
+
+  // ── 节流判据：注入 ⟺（A 跨阈值升档·band 严格高于 last_band）OR（B 距上次中途注入满冷却且仍在临界带以上）──
+  // 中途只报临界侧（throttle/hard_stop）。normal 带永不出声（也据此刷新 band 记忆以便下次升档可被检出）。
+  const isCritical = band === 'throttle' || band === 'hard_stop';
+  const escalated = bandRank(band) > bandRank(lastBand); // A·跨阈值升档
+  const cooldownSec = pacingSampleCooldownSec();
+  const cooledDown = nowSec - lastInjectAt >= cooldownSec; // B·满冷却
+  const shouldInject = isCritical && (escalated || cooledDown);
+
+  if (!shouldInject) {
+    // 不注入：仍刷新 band / window 记忆（让下次升档检测准确·非临界带也要记 band·否则升档无基线）。
+    writeSampleState(PACING_SAMPLE_FILE, {
+      last_inject_at: lastInjectAt,
+      last_band: band,
+      window_resets_at: curResetsAt,
+    });
+    return;
+  }
+
+  // ── 该注入了：才（可选）spawn `ccm usage advise` 取权威 verdict 文案（ccm spawn 被绑定到实际注入·罕见）──
+  // num_account（effective-N）：与 Stop 路径同源（registry·零 spawn）。
+  const numAccount = readNumAccount(ACCOUNTS_FILE, nowMs) || 1;
+  let warning = null;
+  let kind = band; // 默认用本地算的 band 当 kind（throttle/hard_stop·PACING_STRENGTH 都 strong）
+  const ccmAdvice = adviseViaCcm(HOME_DIR, RATE_CACHE, numAccount);
+  if (ccmAdvice) {
+    const r = ccmWarning(ccmAdvice, numAccount); // ccm verdict → 文案 + kind
+    // 中途只报临界侧：ccm 的 underuse/switch（accelerate 侧）→ 中途丢弃（不报欠用加速·§1.4 方向性）。
+    if (r && (r.kind === 'throttle' || r.kind === 'hard_stop')) {
+      warning = r.warn;
+      kind = r.kind;
+    }
+  }
+  if (!warning) {
+    // ccm 不可用 / 给的是非临界 verdict → 用本地账户权威路径出临界文案（decideAccountWarning·只取临界侧）。
+    const a = decideAccountWarning(acct, nowSec, floor, numAccount, gate);
+    if (a.valid && a.warn && (a.kind === 'throttle' || a.kind === 'hard_stop')) {
+      warning = a.warn;
+      kind = a.kind;
+    }
+  }
+  if (!warning) {
+    // 极少：band 判临界但 decideAccountWarning 未出临界文案（floor/gate 口径细微差）→ 刷记忆后静默（不硬编文案）。
+    writeSampleState(PACING_SAMPLE_FILE, {
+      last_inject_at: lastInjectAt,
+      last_band: band,
+      window_resets_at: curResetsAt,
+    });
+    return;
+  }
+
+  // ── 落节流状态（注入这一刻·刷 last_inject_at + band + window）+ 拼中途语境 advisory ─────────────────────
+  writeSampleState(PACING_SAMPLE_FILE, {
+    last_inject_at: nowSec,
+    last_band: band,
+    window_resets_at: curResetsAt,
+  });
+  const midPrefix =
+    '[回合中途采样] 以下是回合中途的提前预警（非轮末 Stop）——便于你在本回合后续派发前就调整配速；' +
+    '非阻断提示，不替你决策。';
+  const strength = pacingStrengthOf(kind); // throttle/hard_stop → strong
+  return {
+    additionalContext: advisory('usage-pacing', strength, `${midPrefix} ${warning}`),
+  };
+}
+
 // ── body：plumbing（stdin/home/isArmed 武装/fail-silent/exit 0）由 hook-common.runHook 提供（phase-1b）；
 //   body 只剩 usage-pacing 独有的「读 usage / 走廊 verdict / 拼 pacing advisory + 号池 ambient」。
 //   · stop_hook_active 重入闸放 preGate（须比武装更早静默）；· armed gate 由 harness arm:'isArmed' 统一做。
@@ -829,7 +982,10 @@ function attemptCcmSwitch(boardPath, homeDir, rateCache) {
 //     `JSON.stringify(payload)+'\n'` 字节等价；本 body 返回 { additionalContext: blocks.join('\n') }。
 //   · sid 由 harness 经 ctx 传入（armed gate 已在 harness 内据它判定）；HOME_DIR / 各 env override 仍用模块级
 //     常量（HOME_DIR === ctx.homeDir === resolveHome()，同值，arming 与计算一致）。
-function body(ctx) {
+//   ★多事件（hooks-enhancements-v2 ③）：本文件同时挂 Stop + PostToolBatch。下面 dispatchBody 据 hook_event_name
+//     分流——Stop → stopBody（完整路径·含 LBHOOK 换号 + 完整 advisory + underuse + 号池 ambient）；PostToolBatch →
+//     sampleBody（中途采样轻路径·只报临界侧·不换号·节流）。
+function stopBody(ctx) {
   const sid = ctx.sid;
 
   const nowMs = NOW_OVERRIDE ? parseIso(NOW_OVERRIDE) : Date.now();
@@ -954,23 +1110,36 @@ function body(ctx) {
   return { additionalContext: blocks.join('\n') };
 }
 
-// runHook：arm:'isArmed'（armed gate 统一在 harness）；preGate = STOP RE-ENTRY GUARD（stop_hook_active:true →
-//   立即静默，须先于武装——否则 usage 仍超预算时会在**每一次** Stop 重注同一 pacing 警告，effect 等同
-//   「session 永远停不下来」，违背 never-blocks 契约·见下注）。全程 try/catch + exit 0 由 harness 保证
-//   （hook 崩绝不污染 Stop）。bootstrap-board.sh 仍是唯一豁免的 ARM 动作（bash·绝不进本 harness）。
+// ── dispatchBody：据 hook_event_name 分流 Stop（完整路径）/ PostToolBatch（中途采样轻路径）──────────────
+//   两事件都已过 harness 的 arm:'boards' 武装闸（红线6）+ 下面 preGate 的早退（Stop 重入 / sub-agent）。
+//   未知/缺事件 → 保守走 Stop 路径（向后兼容·历史只挂 Stop）。
+function dispatchBody(ctx) {
+  const ev = ctx.obj && typeof ctx.obj.hook_event_name === 'string' ? ctx.obj.hook_event_name : '';
+  if (ev === 'PostToolBatch') return sampleBody(ctx);
+  return stopBody(ctx); // Stop（或缺事件名·向后兼容）
+}
+
+// runHook（多事件·hooks-enhancements-v2 ③）：本文件同时登记到 hooks.json 的 Stop + PostToolBatch 两个数组。
+//   · event 为函数 → envelope 的 hookEventName 与实际触发事件一致（Stop / PostToolBatch）。
+//   · arm:'boards'（armed gate 统一在 harness·未武装静默·红线6）——额外把匹配 active 板放进 ctx.boards 供
+//     Stop 路径 LBHOOK 透传 --board（中途采样不换号·不依赖它）。
+//   · preGate（武装之前的早退·两事件各自的最早静默点）：
+//       ① Stop 重入闸：stop_hook_active:true ⟺ Claude Code 因「上次 Stop hook 续了对话 → 再次 Stop」重入 →
+//          立即静默（否则 usage 仍超预算时每次 Stop 重注同一警告·等同 session 停不下来·违 never-blocks）。
+//       ② PostToolBatch sub-agent 闸（红线4）：PostToolBatch 在 sub-agent 上下文也触发·stdin 带顶层 agent_id
+//          （主线缺席）→ 静默早退（指挥专属 pacing 绝不泄漏给 leaf worker·与 posttool-batch.js 同口径）。
+//   全程 try/catch + exit 0 由 harness 保证（hook 崩绝不污染 Stop / 批解析）。
 runHook({
-  event: 'Stop',
-  // ARMED GATE：未武装（home 无匹配 active 板）→ 在读宿主全局 usage / 读 registry / 注入之前静默 exit 0（红线6）。
-  //   arm:'boards'（取代旧 'isArmed'）——武装门等价（listMatchingBoards 空 → 静默，与 isArmed 同语义），但额外把本
-  //   session 的匹配 active 板列表放进 ctx.boards，供 LBHOOK 把唯一目标板的路径透传给 `ccm account switch --board`
-  //   （ccm 据此读对板的 board.policy 硬闸·ADR-016 §2.3 确定性目标板）。只读 narrow-waist owner.active/session_id
-  //   判匹配（红线2 不变），不读 policy/tasks。
+  event: (ctx) =>
+    ctx.obj && ctx.obj.hook_event_name === 'PostToolBatch' ? 'PostToolBatch' : 'Stop',
   arm: 'boards',
   preGate(ctx) {
-    // STOP RE-ENTRY GUARD：stop_hook_active:true ⟺ Claude Code 因「上次 Stop hook 续了对话 → agent 再次尝试
-    //   Stop」而**重入**本 hook。立即静默（在任何 usage 计算 / 武装判定之前）。有它，警告对每个**真正的新
-    //   Stop**最多出现一次，re-entry 一律静默（不破坏 unarmed→silent）。从 ctx.obj 读（parseStdin 已解析顶层）。
-    return !!(ctx.obj && ctx.obj.stop_hook_active === true);
+    const o = ctx.obj || {};
+    // ① Stop 重入闸（只在 Stop 事件相关·stop_hook_active 仅 Stop 带）。
+    if (o.stop_hook_active === true) return true;
+    // ② PostToolBatch sub-agent 闸：只认带引号的字符串 agent_id（"agent_id":null / 缺 → 主线 → 不早退）。
+    if (typeof o.agent_id === 'string' && o.agent_id) return true;
+    return false;
   },
-  body,
+  body: dispatchBody,
 });

@@ -17,6 +17,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 // resolveHome() → HOME_DIR（cc-master home **根**·统一全局口径·ADR-board-v2 home 收口）。
 //   优先级：$CC_MASTER_HOME 覆写 → $HOME/.claude/cc-master（全局·默认）。**不再** per-repo
@@ -179,6 +180,10 @@ function runHook(spec) {
       if (ctx.boards.length === 0) return; // dormant-until-armed：无匹配 active 板 → 静默
     } // 'custom'：body 自判武装（不在此 gate）
 
+    // event：envelope 的 hookEventName。支持函数形态——多事件 hook（usage-pacing 同时挂 Stop + PostToolBatch）
+    //   据 ctx（已解析 stdin 的 hook_event_name）解析触发事件，让 envelope 的 hookEventName 与实际触发事件一致。
+    const resolvedEvent = typeof sp.event === 'function' ? sp.event(ctx) : sp.event;
+
     const out = sp.body ? sp.body(ctx) : null;
     if (!out) return;                       // 静默意图
     if (typeof out.raw === 'string') {      // body 自控整段 payload（verify-board）
@@ -187,7 +192,7 @@ function runHook(spec) {
     }
     if (typeof out.additionalContext === 'string') {
       process.stdout.write(JSON.stringify({
-        hookSpecificOutput: { hookEventName: sp.event, additionalContext: out.additionalContext },
+        hookSpecificOutput: { hookEventName: resolvedEvent, additionalContext: out.additionalContext },
       }) + '\n');
     }
   } catch (_e) {
@@ -196,7 +201,85 @@ function runHook(spec) {
   process.exit(0);
 }
 
+// ── 周期提示共享地基（ADR-020·hooks-enhancements-v2 ②：IDNUDGE + critpath-nudge 收口同形机制）─────────
+// 两条周期提示（identity / critpath）都是「Stop·单 active 板守卫·读 board.runtime.<key> 判时间阈值·写回
+//   时间戳·写回成功才注入·advisory 注入」的同形结构，差异只有 {key, intervalSec, build} 三元组。把这套
+//   机制收口进本共享库，让一个 Stop hook 顺序跑一张「周期提示表」而非各起一个 Stop hook 文件（DRY + hook 薄）。
+//
+// 红线1/ADR-006：spawnSync ccm 是 ADR-014 进程边界（非 import 引擎·非 python）。红线2：只写 ✎ runtime.*（经
+//   ccm setter·窄腰一字不动）。红线6：调用方在 arm:'boards' 武装后才跑 body（harness 保证）。
+
+// parseIsoMs(s) → epoch ms 或 null（容错·非法当缺失）。Z → +00:00 让 Date 正确取 UTC。
+function parseIsoMs(s) {
+  if (typeof s !== 'string' || !s) return null;
+  const t = Date.parse(s.replace('Z', '+00:00'));
+  return Number.isNaN(t) ? null : t;
+}
+// isoNow(ms) → 严格 ISO-8601 UTC 秒级（YYYY-MM-DDTHH:MM:SSZ·与 mutations.stampNow / ISO_UTC_RE 同口径）。
+function isoNow(ms) {
+  return new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+// spawnCcmSetParam(ccmBin, boardPath, homeDir, key, value, timeoutMs) → true ⟺ 写回成功（ccm exit 0）。
+//   spawnSync `ccm board set-param <key> <value> --board <path> --home <home>`（透传 CC_MASTER_HOME 让 ccm
+//   解析同一 home）。**fail-silent**：ENOENT（ccm 不在 PATH）/ spawn 抛 / 被信号杀 / 非 0 退出（lint hard /
+//   lock timeout / Usage）→ false（调用方据此不注入·本回合不提示）。token-blind：参数区只有时间戳·绝无 secret。
+function spawnCcmSetParam(ccmBin, boardPath, homeDir, key, value, timeoutMs) {
+  const args = ['board', 'set-param', key, value, '--board', boardPath, '--home', homeDir];
+  const env = Object.assign({}, process.env, { CC_MASTER_HOME: homeDir });
+  let r;
+  try {
+    r = spawnSync(ccmBin, args, {
+      encoding: 'utf8',
+      timeout: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000,
+      env,
+    });
+  } catch (_e) {
+    return false; // spawn 本身抛（极少）→ 视为 ccm 不在·不注入
+  }
+  if (!r || r.error || r.signal) return false; // ENOENT（ccm 不在 PATH）/ 被信号杀（超时）→ 降级静默
+  return r.status === 0; // exit 0 = 写回成功；非 0（lint/lock/Usage）→ 不注入
+}
+
+// periodicNudge(spec) → advisory 字符串（要注入）或 null（未到阈值 / 写回失败 / build 弃权 → 静默）。
+//   spec = { board, boardPath, homeDir, ccmBin, key, intervalSec, nowMs, setparamTimeoutMs, build }
+//     · board / boardPath：单 active 目标板（调用方已守 ctx.boards.length===1）。
+//     · key：runtime 簿记时间戳键（白名单·last_identity_remind / last_critpath_remind）。
+//     · intervalSec：周期阈值（秒）。距上次满此即 due。
+//     · nowMs：当前 epoch ms（调用方解析·支持 CC_MASTER_NOW 测试注入）。
+//     · build(ctx)：() => advisory 字符串 或 null（弃权·如 critpath 当前无可报内容）。在「due 且写回成功」后才调。
+//   流程（与 IDNUDGE 原内联字字对齐）：读 runtime[key] 判 due（缺/非 ISO → 视「从未提示」首次必 due）→ 未到
+//   静默 → 先写回（写成功才注入·避免 ccm 缺时每回合 spam·进程边界 spawn·token-blind·带锁·fail-silent）→
+//   写回失败静默 → build() 出文案（弃权则静默·不白写时间戳？写回已发生·见下注）。
+//   ★写回与 build 顺序：与 IDNUDGE 同——**先写回再 build**（写回成功才有资格注入；build 弃权时本回合不注入，
+//     时间戳已前移到 now，下个 interval 后再 due——这与 IDNUDGE「写成功即 seed」同语义，可接受：弃权≈本周期无
+//     内容可报、跳过即可，不需要重试更早）。critpath 的 build 极少弃权（chain 空时才弃权），故影响可忽略。
+function periodicNudge(spec) {
+  const s = spec || {};
+  const rt =
+    s.board && typeof s.board.runtime === 'object' && s.board.runtime ? s.board.runtime : null;
+  const last = rt ? rt[s.key] : undefined;
+  const lastMs = parseIsoMs(last); // 缺 / 非 ISO → null → 视「从未提示」（首次必提示）
+  const intervalSec = Number.isFinite(s.intervalSec) && s.intervalSec > 0 ? s.intervalSec : 0;
+  const due = lastMs === null || s.nowMs - lastMs >= intervalSec * 1000;
+  if (!due) return null; // 未到阈值 → 静默
+  // 先写回（写成功才注入）。
+  const ok = spawnCcmSetParam(
+    s.ccmBin,
+    s.boardPath,
+    s.homeDir,
+    s.key,
+    isoNow(s.nowMs),
+    s.setparamTimeoutMs,
+  );
+  if (!ok) return null; // ccm 缺 / 失败 / lock timeout → 静默（本回合不提示·下回合再试）
+  const text = typeof s.build === 'function' ? s.build() : null;
+  if (!text) return null; // build 弃权（无内容可报）→ 本回合不注入
+  return text;
+}
+
 module.exports = {
   resolveHome, boardsDir, readStdin, parseStdin, boardMatches, listMatchingBoards, isArmed, jsonEscape,
   ambient, advisory, directive, runHook,
+  parseIsoMs, isoNow, spawnCcmSetParam, periodicNudge,
 };
