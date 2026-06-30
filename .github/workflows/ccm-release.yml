@@ -66,9 +66,12 @@ jobs:
         working-directory: ccm
         run: pnpm install --frozen-lockfile
 
-      # 先产常规 dist（build-sea.sh 内部还会跑 tsdown.sea.config，但 CLI build 是其前置形态）。
-      - name: Build CLI
-        run: pnpm -C ccm/apps/cli build
+      # 先产常规 dist——**必须 turbo 全量 `pnpm -C ccm build`**（非 `-C ccm/apps/cli build`）：
+      # apps/cli 的 build 仅跑 tsdown 自己、不建上游 @ccm/engine；CI fresh checkout 下 engine dist 不存在，
+      # SEA bundler 解析不到 @ccm/engine → 当外部依赖不 inline → 运行时 ERR_UNKNOWN_BUILTIN_MODULE 全挂。
+      # turbo build dependsOn ^build 会先建 engine 再建 cli，dist 齐全后 SEA 才能 inline 引擎（v0.10.0 首发踩此坑）。
+      - name: Build workspace (engine + CLI)
+        run: pnpm -C ccm build
 
       # build-sea.sh 自己 cd 到 apps/cli，CCM_SEA_OUT 相对该目录解析，
       # 故产物落 ccm/apps/cli/dist/${{ matrix.asset }}。
