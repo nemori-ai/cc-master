@@ -1,16 +1,21 @@
-# ccm-release —— 多平台 Node SEA 单文件二进制构建 + 随 GitHub release 附产物。
+# ccm-release —— 多平台 Node SEA 单文件二进制构建 + plugin 分发 zip + 随 GitHub release 附产物。
 #
 # 分发模型（ADR-014）：ccm 走 per-OS Node SEA 二进制，随 cc-master 的 GitHub release
 # 附带 `ccm-<os>-<arch>`（不走 npm optionalDeps 平台子包——已决策砍掉）。
+# 另附 cc-master plugin 本身的「解压即装」制品 `cc-master-plugin-<tag>.zip`（package-plugin 作业）。
 #
 # ⚠️ Node 版本（关键，CI 必读）：build-sea.sh 的 postject sentinel 注入只在 Node 22 上可靠工作；
 #    本地用 Node 25/26 实测 postject 报「Could not find the sentinel NODE_SEA_FUSE」而失败。
 #    故 matrix 全部 pin Node 22。setup-node 装的是 nodejs.org 官方静态 node——这同时满足
 #    build-sea.sh 头注的自包含前提（homebrew node 动态链接、不自包含；官方 node 才自包含）。
 #
+# ⚠️ Linux arm64 —— 已加（ubuntu-24.04-arm runner）：GitHub 托管 arm64 Linux runner 于
+#    2025-08-07 对公开仓库 GA（免费，4 vCPU Cobalt 100），label `ubuntu-24.04-arm`。
+#    setup-node 在 arm64 runner 上自动取 arm64 官方 node → SEA 即原生 arm64，无需交叉编译。
+#
 # ⚠️ Windows SEA —— 诚实 deferred（no-silent-cap）：build-sea.sh 是 bash + macOS codesign 链，
 #    Windows SEA 需另一套签名链（signtool / Authenticode，见 build-sea.sh 头注的平台坑）。
-#    本 workflow 当前只覆盖 macOS（arm64 + x64）+ Linux（x64）；Windows 待独立签名链落地后再加，
+#    本 workflow 当前覆盖 macOS（arm64 + x64）+ Linux（x64 + arm64）；Windows 待独立签名链落地后再加，
 #    不在此编一个跑不通的 Windows 步骤。
 name: ccm-release
 
@@ -27,7 +32,7 @@ jobs:
   build-sea:
     strategy:
       fail-fast: false
-      # 覆盖 macOS arm64 / macOS x64 / Linux x64；Windows deferred（见文件顶部注释）。
+      # 覆盖 macOS arm64 / macOS x64 / Linux x64 / Linux arm64；Windows deferred（见文件顶部注释）。
       matrix:
         include:
           - os: macos-14 # Apple Silicon
@@ -36,6 +41,8 @@ jobs:
             asset: ccm-darwin-x64
           - os: ubuntu-latest # Linux x64
             asset: ccm-linux-x64
+          - os: ubuntu-24.04-arm # Linux arm64（GA 2025-08-07·公开仓库免费）
+            asset: ccm-linux-arm64
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -89,3 +96,55 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ccm/apps/cli/dist/${{ matrix.asset }}
+
+  # cc-master plugin 本身的「解压即装」制品：cc-master-plugin-<tag>.zip。
+  # 与 ccm 二进制独立——plugin 是纯 prose/脚本分发物（无 build），由 dev-only 脚本
+  # scripts/package-plugin.sh 从 repo 根打包；attach 到同一 GH release。
+  package-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 仅为 `claude plugin validate` 提供 node 运行时（plugin validate 是纯本地 manifest 校验·不联网/不需认证）。
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      # tag 触发传 tag 名（产物名 cc-master-plugin-<tag>.zip）；
+      # 非 tag（workflow_dispatch）留空 → 脚本回退到 plugin.json version。
+      - name: Package plugin
+        id: pkg
+        run: |
+          TAG=""
+          case "${GITHUB_REF}" in
+            refs/tags/*) TAG="${GITHUB_REF_NAME}" ;;
+          esac
+          ZIP="$(bash scripts/package-plugin.sh "${TAG}")"
+          echo "zip=${ZIP}" >> "${GITHUB_OUTPUT}"
+
+      # 制品自证：解压后 `claude plugin validate` 须过（确保 zip 本身是合法可装 plugin）。
+      - name: Validate packaged plugin
+        run: |
+          DEST="$(mktemp -d)"
+          unzip -q "${{ steps.pkg.outputs.zip }}" -d "${DEST}"
+          claude plugin validate "${DEST}/cc-master"
+
+      # 上传 artifact（workflow_dispatch / 非 tag 触发时也留存可下载）。
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cc-master-plugin
+          path: ${{ steps.pkg.outputs.zip }}
+          if-no-files-found: error
+
+      # 仅 tag 触发时 attach 到 GitHub release。
+      - name: Attach to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.pkg.outputs.zip }}

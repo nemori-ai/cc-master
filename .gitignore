@@ -18,3 +18,5 @@ ccm/**/.turbo
 ccm/**/*.tsbuildinfo
 # build cache (turborepo)
 .turbo/
+# package-plugin.sh 产物（plugin 分发 zip，构建物不入版本控制）
+/dist/
