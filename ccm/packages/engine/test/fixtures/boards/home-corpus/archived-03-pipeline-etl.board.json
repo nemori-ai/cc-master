@@ -1,0 +1,153 @@
+{
+  "schema": "cc-master/v2",
+  "meta": { "template_version": 3, "created_at": "2026-05-06T07:45:00Z" },
+  "goal": "data-pipeline 把每日批 ETL 迁到增量 CDC 流",
+  "owner": {
+    "active": false,
+    "session_id": "sid-pipe-cdc-2026-05",
+    "heartbeat": "2026-05-09T18:20:00Z"
+  },
+  "git": { "worktree": "/work/data-pipeline", "branch": "feat/cdc-incremental" },
+  "scheduling": { "wip_limit": 3 },
+  "tasks": [
+    {
+      "id": "P1",
+      "title": "CDC 选型（Debezium vs 自研 binlog reader）+ 容量评估",
+      "status": "done",
+      "deps": [],
+      "type": "design",
+      "executor": "master-orchestrator",
+      "model": "claude-opus-4-5",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "选型 ADR + 吞吐/延迟容量预估表评审过",
+      "created_at": "2026-05-06T07:45:00Z",
+      "started_at": "2026-05-06T08:00:00Z",
+      "finished_at": "2026-05-06T11:20:00Z",
+      "verified": true,
+      "artifact": "/work/data-pipeline/docs/cdc-adr.md",
+      "observability": { "tokens": { "input": 62000, "output": 14800 } }
+    },
+    {
+      "id": "P2",
+      "title": "搭建本地 CDC 连接器 + schema registry（纯 shell 编排·无 token 遥测）",
+      "status": "done",
+      "deps": ["P1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-pipe-p2",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "连接器起得来，schema 注册成功",
+      "references": [
+        { "kind": "spec", "ref": "/work/data-pipeline/docs/cdc-adr.md" },
+        { "kind": "plan", "ref": "/work/data-pipeline/docs/plan-cdc.md" }
+      ],
+      "created_at": "2026-05-06T11:00:00Z",
+      "started_at": "2026-05-06T13:00:00Z",
+      "finished_at": "2026-05-06T15:40:00Z",
+      "verified": true,
+      "artifact": "/work/data-pipeline/infra/cdc-connector.yaml"
+    },
+    {
+      "id": "P3",
+      "title": "增量变更解析器 + upsert 落库",
+      "status": "done",
+      "deps": ["P2"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-pipe-p3",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 5, "unit": "h" },
+      "acceptance": "变更解析正确性 + 幂等 upsert 单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/data-pipeline/docs/cdc-adr.md" },
+        { "kind": "plan", "ref": "/work/data-pipeline/docs/plan-cdc.md" }
+      ],
+      "created_at": "2026-05-06T11:00:00Z",
+      "started_at": "2026-05-07T09:00:00Z",
+      "finished_at": "2026-05-07T15:10:00Z",
+      "verified": true,
+      "artifact": "/work/data-pipeline/src/cdc/parser.ts",
+      "observability": { "tokens": { "input": 152000, "output": 41000 } }
+    },
+    {
+      "id": "P4",
+      "title": "回填历史快照 + 与流对齐的水位线",
+      "status": "done",
+      "deps": ["P3"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-pipe-p4",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 4, "unit": "h" },
+      "acceptance": "回填+追平到流水位线，无重复无丢失单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/data-pipeline/docs/cdc-adr.md" },
+        { "kind": "plan", "ref": "/work/data-pipeline/docs/plan-cdc.md" }
+      ],
+      "created_at": "2026-05-07T09:00:00Z",
+      "started_at": "2026-05-08T09:30:00Z",
+      "finished_at": "2026-05-08T13:50:00Z",
+      "verified": true,
+      "artifact": "/work/data-pipeline/src/cdc/backfill.ts",
+      "observability": { "tokens": { "input": 118000, "output": 33500 } }
+    },
+    {
+      "id": "P5",
+      "title": "监控指标 + lag 告警面板",
+      "status": "done",
+      "deps": ["P3"],
+      "type": "development",
+      "executor": "workflow",
+      "handle": "wf-pipe-metrics",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "lag/吞吐指标上报 + 告警阈值生效",
+      "references": [
+        { "kind": "spec", "ref": "/work/data-pipeline/docs/cdc-adr.md" },
+        { "kind": "plan", "ref": "/work/data-pipeline/docs/plan-cdc.md" }
+      ],
+      "created_at": "2026-05-07T09:00:00Z",
+      "started_at": "2026-05-08T09:30:00Z",
+      "finished_at": "2026-05-08T11:25:00Z",
+      "verified": true,
+      "artifact": "/work/data-pipeline/observability/dashboards/cdc.json",
+      "observability": { "tokens": { "input": 48000, "output": 13200 } }
+    },
+    {
+      "id": "P6",
+      "title": "切流灰度 + 回滚预案演练",
+      "status": "done",
+      "deps": ["P4", "P5"],
+      "type": "e2e-integration",
+      "executor": "subagent",
+      "handle": "bg-pipe-p6",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "灰度 5% 流量稳定 24h + 回滚演练成功",
+      "references": [{ "kind": "spec", "ref": "/work/data-pipeline/docs/cdc-adr.md" }],
+      "created_at": "2026-05-08T09:00:00Z",
+      "started_at": "2026-05-09T10:00:00Z",
+      "finished_at": "2026-05-09T17:30:00Z",
+      "verified": true,
+      "artifact": "/work/data-pipeline/docs/cutover-runbook.md",
+      "observability": { "tokens": { "input": 94000, "output": 22800 } }
+    }
+  ],
+  "log": [
+    { "ts": "2026-05-06T07:45:00Z", "kind": "note", "summary": "CDC 迁移编排启动" },
+    {
+      "ts": "2026-05-07T15:10:00Z",
+      "kind": "finding",
+      "summary": "P3 解析器估5h实约6h，主键合并边界比预期多"
+    },
+    {
+      "ts": "2026-05-09T17:30:00Z",
+      "kind": "decision",
+      "summary": "灰度阈值定 5%，回滚 runbook 落盘"
+    }
+  ]
+}

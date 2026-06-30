@@ -16,7 +16,7 @@
 | `commands/stop.md` | 用户确认后把认准 board 的 owner.active 置 false（显式可逆归档、不删文件） | （无直接命名引用；`/stop` 概念见 board.md / handoff.md） | 2026-06-21 |
 | `commands/handoff-to-new-session.md` | 6 步：quiesce → drain 就地验收 → 写叙事 handoff 文档 → log+heartbeat → 归档 → 告诉用户续跑命令 | `orchestrating-to-completion/SKILL.md`、`.../references/handoff.md` | 2026-06-21 |
 | `commands/view.md` | 后台起 view-server.js、抓 `127.0.0.1:<port>` URL 交用户、只读每 2s 活轮询 | （无直接命名引用；功能自洽） | 2026-06-21 |
-| `commands/accounts.md` | 解析 `--add/--delete/--refresh/--list` 路由到 account-* 脚本，token 全程在脚本子进程不进 agent | `orchestrating-to-completion/references/cost-and-pacing.md`、`.../references/external-coordinates.md`（`/cc-master:accounts` 提及） | 2026-06-21 |
+| ~~`commands/accounts.md`~~ **（退役·ADR-019）** | 账号操作已全归 `ccm account` CLI（用户直接敲·token-blind）+ 自动切号在 usage-pacing hook；命令零增量零覆写 = 装饰，删除。概念叙事见 `using-ccm/references/account-pool.md` | — | 2026-06-29 |
 | **hooks** | | | |
 | `hooks/scripts/bootstrap-board.sh` | UserPromptSubmit：dual-sentinel 触发 → fresh 建板盖 sid / resume 选板 live-probe 后重盖 owner；唯一豁免武装闸者 | `orchestrating-to-completion/references/board.md`（+ DESIGN.md 设计性） | 2026-06-21 |
 | `hooks/scripts/reinject.sh` | SessionStart：武装闸过后注入 orchestrator 身份 + active 板 listing + dangling stale/escalated 节点 | `orchestrating-to-completion/references/board.md`、`.../references/external-coordinates.md`（+ DESIGN.md） | 2026-06-21 |

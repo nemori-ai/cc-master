@@ -1,0 +1,166 @@
+{
+  "schema": "cc-master/v2",
+  "meta": { "template_version": 3, "created_at": "2026-04-13T09:00:00Z" },
+  "goal": "为 auth-service 加上 OAuth2 PKCE 登录流 + 会话刷新",
+  "owner": {
+    "active": false,
+    "session_id": "sid-auth-2026-04",
+    "heartbeat": "2026-04-17T16:30:00Z"
+  },
+  "git": { "worktree": "/work/auth-service", "branch": "feat/oauth-pkce" },
+  "scheduling": { "wip_limit": 3 },
+  "tasks": [
+    {
+      "id": "A1",
+      "title": "设计 PKCE 授权流时序 + token schema",
+      "status": "done",
+      "deps": [],
+      "type": "design",
+      "executor": "master-orchestrator",
+      "model": "claude-opus-4-5",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "时序图 + token 字段表评审通过",
+      "created_at": "2026-04-13T09:00:00Z",
+      "started_at": "2026-04-13T09:10:00Z",
+      "finished_at": "2026-04-13T11:40:00Z",
+      "verified": true,
+      "artifact": "/work/auth-service/docs/pkce-flow.md",
+      "observability": { "tokens": { "input": 41200, "output": 8800 } }
+    },
+    {
+      "id": "A2",
+      "title": "实现 /authorize 端点 + code_challenge 校验",
+      "status": "done",
+      "deps": ["A1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-auth-a2",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 4, "unit": "h" },
+      "acceptance": "PKCE 单测覆盖正/反例，端点返回合规 code",
+      "references": [
+        { "kind": "spec", "ref": "/work/auth-service/docs/pkce-flow.md" },
+        { "kind": "plan", "ref": "/work/auth-service/docs/plan-oauth.md" }
+      ],
+      "created_at": "2026-04-13T11:45:00Z",
+      "started_at": "2026-04-13T12:00:00Z",
+      "finished_at": "2026-04-13T17:30:00Z",
+      "verified": true,
+      "artifact": "/work/auth-service/src/authorize.ts",
+      "observability": { "tokens": { "input": 88400, "output": 21300 } }
+    },
+    {
+      "id": "A3",
+      "title": "实现 /token 端点 + code 兑换 access/refresh",
+      "status": "done",
+      "deps": ["A2"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-auth-a3",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 4, "unit": "h" },
+      "acceptance": "token 兑换单测绿，refresh 旋转生效",
+      "references": [
+        { "kind": "spec", "ref": "/work/auth-service/docs/pkce-flow.md" },
+        { "kind": "plan", "ref": "/work/auth-service/docs/plan-oauth.md" }
+      ],
+      "created_at": "2026-04-13T11:45:00Z",
+      "started_at": "2026-04-14T09:15:00Z",
+      "finished_at": "2026-04-14T17:50:00Z",
+      "verified": true,
+      "artifact": "/work/auth-service/src/token.ts",
+      "observability": { "tokens": { "input": 134000, "output": 38600 } }
+    },
+    {
+      "id": "A4",
+      "title": "会话刷新中间件 + 滑动过期",
+      "status": "done",
+      "deps": ["A3"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-auth-a4",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "过期/续期边界单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/auth-service/docs/pkce-flow.md" },
+        { "kind": "plan", "ref": "/work/auth-service/docs/plan-oauth.md" }
+      ],
+      "created_at": "2026-04-14T09:00:00Z",
+      "started_at": "2026-04-15T10:00:00Z",
+      "finished_at": "2026-04-15T12:20:00Z",
+      "verified": true,
+      "artifact": "/work/auth-service/src/refresh-mw.ts",
+      "observability": { "tokens": { "input": 52000, "output": 14200 } }
+    },
+    {
+      "id": "A5",
+      "title": "跑 lint + 修 CI 配置",
+      "status": "done",
+      "deps": ["A4"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-auth-a5",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 1, "unit": "h" },
+      "acceptance": "lint 全绿 + CI 通过",
+      "references": [
+        { "kind": "spec", "ref": "/work/auth-service/docs/pkce-flow.md" },
+        { "kind": "plan", "ref": "/work/auth-service/docs/plan-oauth.md" }
+      ],
+      "created_at": "2026-04-15T09:00:00Z",
+      "started_at": "2026-04-16T09:00:00Z",
+      "finished_at": "2026-04-16T09:55:00Z",
+      "verified": true,
+      "artifact": "/work/auth-service/.github/workflows/ci.yml"
+    },
+    {
+      "id": "A6",
+      "title": "端到端集成 + 回归冒烟",
+      "status": "done",
+      "deps": ["A4", "A5"],
+      "type": "e2e-integration",
+      "executor": "subagent",
+      "handle": "bg-auth-a6",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "e2e 登录-刷新-登出全链路绿",
+      "references": [{ "kind": "spec", "ref": "/work/auth-service/docs/pkce-flow.md" }],
+      "created_at": "2026-04-16T09:00:00Z",
+      "started_at": "2026-04-16T13:00:00Z",
+      "finished_at": "2026-04-16T17:30:00Z",
+      "verified": true,
+      "artifact": "/work/auth-service/test/e2e/login.spec.ts",
+      "observability": { "tokens": { "input": 96500, "output": 18900 } }
+    },
+    {
+      "id": "A7",
+      "title": "开 PR 收口",
+      "status": "done",
+      "deps": ["A6"],
+      "type": "pr",
+      "executor": "master-orchestrator",
+      "model": "claude-sonnet-4-5",
+      "estimate": { "value": 1, "unit": "h" },
+      "created_at": "2026-04-17T11:00:00Z",
+      "started_at": "2026-04-17T14:00:00Z",
+      "finished_at": "2026-04-17T15:10:00Z",
+      "verified": true,
+      "artifact": "https://github.com/acme/auth-service/pull/214"
+    }
+  ],
+  "log": [
+    { "ts": "2026-04-13T09:00:00Z", "kind": "note", "summary": "OAuth PKCE 编排启动" },
+    {
+      "ts": "2026-04-14T17:50:00Z",
+      "kind": "finding",
+      "summary": "/token refresh 旋转踩了时钟漂移坑，比估时多 1h"
+    },
+    { "ts": "2026-04-17T15:10:00Z", "kind": "handoff", "summary": "PR #214 提交，编排收口" }
+  ]
+}

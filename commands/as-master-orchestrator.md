@@ -20,11 +20,17 @@ argument-hint: <goal> | --resume [选择器]
 
 bootstrap hook 已在你的 cc-master home 里建好一块全新的编排 board，并把它的确切路径注入了你的 context——**去找那行带 board 路径的 `cc-master:` 标记**（它可能在本消息之前或之后出现）。那个文件就是**你**这次任务的 board。如果找不到那行，列出 home（`$CC_MASTER_HOME`，否则 `<project>/.claude/cc-master/`），取其中 `goal` 为空且 `owner.active` 为 `true` 的最新 `<timestamp>-<pid>.board.json`——那就是 hook 刚为本次运行建好的 board（board 以 `<timestamp>-<pid>.board.json` 命名，故并发的多个 orchestration 永不相撞）。
 
-现在按顺序做这三步：
+现在按顺序做这几步：
 
 1. **调用 `orchestrating-to-completion` skill**——它承载你的身份、七镜头、红线、决策程序与 board 协议。动手前先把它内化。
-2. **把目标拆成依赖 DAG**，写进 board 的 `tasks[]`（每个 task 至少含 `id`、`status`、`deps`，外加一个 `title`）。填上 `goal` 与 `git`（worktree/branch 从运行环境读）；**`owner.session_id` 已由 bootstrap hook 盖好——原样保留、绝不覆写**（所有 hook 靠它精确匹配本 session 的 board，写成空值或猜的值会让 reinject / verify-board / posttool-batch / usage-pacing 对本 orchestration 集体休眠）。**你不用在这里声明账号数：pacing 用的「可序列消费配额份数」（effective-N）由 `usage-pacing` hook 自己从用户级号池 `accounts.json` 算（≥2 个号 = 真号池；无 registry / 空池 = 天然 effective-N=1 单账号），不来自任何命令参数。号池经 `/cc-master:accounts` 录入 / 删除 / 续期管理；换号决策的 pacing 含义见 `orchestrating-to-completion` 的 cost-and-pacing reference、机制层见 `account-management` skill。**
-3. **每回合跑一遍决策程序**：reconcile board → surface 任何须由用户拍板的事 → 在 WIP 限额内用三种后台机制（shell / sub-agent / workflow）派发就绪任务 → 在等待窗口里做合规的 fill-work → 在端点验收已完成的节点 → 让步前 flush board。
+2. **把目标拆成依赖 DAG**，写进 board 的 `tasks[]`（每个 task 至少含 `id`、`status`、`deps`，外加一个 `title`）。填上 `goal` 与 `git`（worktree/branch 从运行环境读）；**`owner.session_id` 已由 bootstrap hook 盖好——原样保留、绝不覆写**（所有 hook 靠它精确匹配本 session 的 board，写成空值或猜的值会让 reinject / verify-board / posttool-batch / usage-pacing 对本 orchestration 集体休眠）。**你不用在这里声明账号数：pacing 用的「可序列消费配额份数」（effective-N）由 `usage-pacing` hook 自己从用户级号池 `accounts.json` 算（≥2 个号 = 真号池；无 registry / 空池 = 天然 effective-N=1 单账号），不来自任何命令参数。号池经 `ccm account`（add/delete/refresh/list·用户直接敲 CLI·token-blind）录入 / 删除 / 续期管理；换号决策锚见 `orchestrating-to-completion`（`references/cost-decisions.md`）、pacing 消费见 `pacing-and-estimation` skill、号池/换号机制见 `using-ccm`（D）+ ccm `account` 引擎。**
+3. **捕获用户给的 init 参数、记到 board**——从上面的目标描述（及本次调用上下文）里识别用户为这次编排定的几个旋钮，用 `ccm` 写进 board。**识别即记，别让它们丢**；只有**关键的一个缺了、又会显著改变你怎么排期**时，才简短问用户一句（别啰嗦盘问、别为不重要的默认值打断）。能映射到下面的就映射，别自创字段：
+   - **板级优先级**（用户明点的「这个很急 / 低优先」）→ `ccm board update --priority <urgent|high|normal|low|trivial>`（落 ✎ `coordination.priority`，是 `ccm peers` 跨板花名册的裁决主轴；多 orchestrator 抢同一配额缸时喂价值感知配速）。
+   - **并发上限 WIP**（用户要你「别铺太开 / 一次最多 N 个」）→ `ccm board update --wip-limit <N>`（owner 级再加 `--owner-wip <N>`）；posttool-batch hook 据它发过调度软警告。
+   - **节奏 / deadline**（用户给了交付节奏或目标日期）→ `ccm cadence update`（如 `--ship-every 3h --min-unit "1 PR"`）落 `cadence`；Stop 收口闸据它逼增量交付。
+   - **自主换号偏好**（用户要「别自己换号 / 允许自主换号」）→ `ccm policy set --autonomous-account-switch <allow|deny>`（落 `policy`，默认 `allow`）。**policy 视权限为用户所有**：只在用户**明确**表态时设，且 `--user-authorized` 这类授权标记**只由用户给、你绝不自授权**（self-grant 是越权·见 `orchestrating-to-completion` 红线）。
+   - **没有的别硬塞**：① **token 预算/目标**——pacing 是**账户权威**（5h/7d `used_percentage`），board 没有、也不该有「板级 token 预算」字段；用户想省着烧就调 WIP / 配速 / 用换号 lever，不是写个数字进 board。② **模型档**——逐节点选档（主线固定档保 cache·见 `pacing-and-estimation`），没有板级默认模型字段。这两类只影响你的**决策**，不落 board。
+4. **每回合跑一遍决策程序**：reconcile board → surface 任何须由用户拍板的事 → 在 WIP 限额内用三种后台机制（shell / sub-agent / workflow）派发就绪任务 → 在等待窗口里做合规的 fill-work → 在端点验收已完成的节点 → 让步前 flush board。
 
 ## 若你处于 resume 形态
 

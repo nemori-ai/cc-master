@@ -1,6 +1,6 @@
-# 机制契约：`hooks/scripts/posttool-batch.sh`
+# 机制契约：`hooks/scripts/posttool-batch.js`
 
-> 类别：hook（`PostToolBatch`，纯 bash + awk）。源码：`hooks/scripts/posttool-batch.sh`。WIP 过调度软警告（H5）。**只软提示、永不 block。**
+> 类别：hook（`PostToolBatch`，node·require board-model + hook-common（board-v2 收编））。源码：`hooks/scripts/posttool-batch.js`。WIP 过调度软警告（H5）。**只软提示、永不 block。**
 
 ## 触发输入
 - `PostToolBatch` 事件（一批并行工具调用解析完后），stdin JSON 含顶层元数据（`session_id` / `agent_id` / ...）+ `tool_results[]`。

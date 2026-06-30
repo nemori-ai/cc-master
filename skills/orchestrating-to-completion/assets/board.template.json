@@ -1,11 +1,10 @@
 {
-  "schema": "cc-master/v1",
-  "meta": { "template_version": 2 },
+  "schema": "cc-master/v2",
+  "meta": { "template_version": 3 },
   "goal": "",
   "owner": { "active": true, "session_id": "", "heartbeat": "" },
   "git": { "worktree": "", "branch": "" },
-  "wip_limit": 4,
-  "num_account": 1,
+  "scheduling": { "wip_limit": 4 },
   "tasks": [],
   "log": []
 }

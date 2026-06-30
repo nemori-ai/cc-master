@@ -1,0 +1,243 @@
+{
+  "schema": "cc-master/v2",
+  "meta": { "template_version": 3, "created_at": "2026-06-22T08:00:00Z" },
+  "goal": "ccm 实现 OR/ML 估算 + 配速引擎（usage/estimate/baseline）",
+  "owner": {
+    "active": true,
+    "session_id": "sid-ccm-estimate-2026-06",
+    "heartbeat": "2026-06-25T12:50:00Z"
+  },
+  "git": { "worktree": "/repo/.worktrees/board-v2-redesign", "branch": "board-v2-redesign" },
+  "scheduling": { "wip_limit": 4 },
+  "baseline": {
+    "captured_at": "2026-06-22T08:30:00Z",
+    "t0": "2026-06-22T08:00:00Z",
+    "task_estimates": {
+      "C1": { "value": 3, "unit": "h" },
+      "C2": { "value": 4, "unit": "h" },
+      "C3": { "value": 3, "unit": "h" },
+      "C4": { "value": 5, "unit": "h" },
+      "C5": { "value": 4, "unit": "h" },
+      "C6": { "value": 3, "unit": "h" },
+      "C7": { "value": 2, "unit": "h" },
+      "C8": { "value": 3, "unit": "h" },
+      "C9": { "value": 2, "unit": "h" }
+    },
+    "dag_snapshot": {
+      "C1": { "deps": [] },
+      "C2": { "deps": ["C1"] },
+      "C3": { "deps": ["C1"] },
+      "C4": { "deps": ["C2", "C3"] },
+      "C5": { "deps": ["C2"] },
+      "C6": { "deps": ["C4"] },
+      "C7": { "deps": ["C3"] },
+      "C8": { "deps": ["C5", "C6"] },
+      "C9": { "deps": ["C8"] }
+    },
+    "bac_h": 29,
+    "history": []
+  },
+  "tasks": [
+    {
+      "id": "C1",
+      "title": "历史语料 loader 设计 + 多层收缩接口",
+      "status": "done",
+      "deps": [],
+      "type": "design",
+      "executor": "master-orchestrator",
+      "model": "claude-opus-4-5",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "loader 接口 + 收缩层级评审过",
+      "created_at": "2026-06-22T08:00:00Z",
+      "started_at": "2026-06-22T08:30:00Z",
+      "finished_at": "2026-06-22T11:50:00Z",
+      "verified": true,
+      "artifact": "/repo/ccm/docs/history-loader.md",
+      "observability": { "tokens": { "input": 52000, "output": 12800 } }
+    },
+    {
+      "id": "C2",
+      "title": "history-loader：读 home 板 + done 任务抽取",
+      "status": "done",
+      "deps": ["C1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-c2",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 4, "unit": "h" },
+      "acceptance": "跨板抽取 + recency cap + 多层桶单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/repo/ccm/docs/history-loader.md" },
+        { "kind": "plan", "ref": "/repo/ccm/docs/plan-estimate.md" }
+      ],
+      "created_at": "2026-06-22T09:00:00Z",
+      "started_at": "2026-06-22T13:00:00Z",
+      "finished_at": "2026-06-22T18:40:00Z",
+      "verified": true,
+      "artifact": "/repo/ccm/packages/engine/src/usage/history-loader.ts",
+      "observability": { "tokens": { "input": 156000, "output": 39000 } }
+    },
+    {
+      "id": "C3",
+      "title": "EWMA 分层校准 + Bayesian shrinkage",
+      "status": "done",
+      "deps": ["C1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-c3",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "分层校准 + 冷启动退化单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/repo/ccm/docs/history-loader.md" },
+        { "kind": "plan", "ref": "/repo/ccm/docs/plan-estimate.md" }
+      ],
+      "created_at": "2026-06-22T09:00:00Z",
+      "started_at": "2026-06-23T09:00:00Z",
+      "finished_at": "2026-06-23T13:30:00Z",
+      "verified": true,
+      "artifact": "/repo/ccm/packages/engine/src/estimate/calibration.ts",
+      "observability": { "tokens": { "input": 98000, "output": 26000 } }
+    },
+    {
+      "id": "C4",
+      "title": "估算-DAG Monte Carlo（seeded·log-normal·CI/CRI/SSI）",
+      "status": "in_flight",
+      "deps": ["C2", "C3"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-c4",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 5, "unit": "h" },
+      "acceptance": "P50/P80/P95 + 敏感度三件套 + seeded 复现单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/repo/ccm/docs/history-loader.md" },
+        { "kind": "plan", "ref": "/repo/ccm/docs/plan-estimate.md" }
+      ],
+      "created_at": "2026-06-23T09:00:00Z",
+      "started_at": "2026-06-25T09:00:00Z",
+      "observability": { "tokens": { "input": 88000, "output": 19500 } }
+    },
+    {
+      "id": "C5",
+      "title": "conformal 区间（split + Mondrian 分组）",
+      "status": "in_flight",
+      "deps": ["C2"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-c5",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 4, "unit": "h" },
+      "acceptance": "经验覆盖率 ≈ 名义 + 按 type/executor 分组单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/repo/ccm/docs/history-loader.md" },
+        { "kind": "plan", "ref": "/repo/ccm/docs/plan-estimate.md" }
+      ],
+      "created_at": "2026-06-23T09:00:00Z",
+      "started_at": "2026-06-23T14:00:00Z",
+      "observability": { "tokens": { "input": 64000, "output": 14200 } }
+    },
+    {
+      "id": "C6",
+      "title": "EVM + Earned Schedule（SPI(t)·消费 baseline）",
+      "status": "ready",
+      "deps": ["C4"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-c6",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "PV/EV/AC → CPI/EAC + SPI(t)/IEAC(t) 单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/repo/ccm/docs/history-loader.md" },
+        { "kind": "plan", "ref": "/repo/ccm/docs/plan-estimate.md" }
+      ],
+      "created_at": "2026-06-23T09:00:00Z"
+    },
+    {
+      "id": "C7",
+      "title": "搭建估算引擎本地基准床（无估值字段·测吞吐 fallback·纯 shell·无 token 遥测）",
+      "status": "ready",
+      "deps": ["C3"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-c7",
+      "acceptance": "基准脚本可跑出 P50/P80/P95 计时",
+      "references": [
+        { "kind": "spec", "ref": "/repo/ccm/docs/history-loader.md" },
+        { "kind": "plan", "ref": "/repo/ccm/docs/plan-estimate.md" }
+      ],
+      "created_at": "2026-06-23T09:00:00Z"
+    },
+    {
+      "id": "C8",
+      "title": "usage 融合：cost-to-complete vs 剩余配额（95% 硬墙）",
+      "status": "blocked",
+      "deps": ["C5", "C6"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-c8",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "「装得下吗」带概率输出 + 硬墙生效单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/repo/ccm/docs/history-loader.md" },
+        { "kind": "plan", "ref": "/repo/ccm/docs/plan-estimate.md" }
+      ],
+      "created_at": "2026-06-23T09:00:00Z"
+    },
+    {
+      "id": "C9",
+      "title": "选 PRNG：sfc32 vs 是否引入轻量库（需用户拍板）",
+      "status": "blocked",
+      "deps": ["C8"],
+      "type": "planning",
+      "executor": "user",
+      "blocked_on": "user",
+      "estimate": { "value": 2, "unit": "h" },
+      "created_at": "2026-06-23T09:00:00Z",
+      "decision_package": {
+        "prepared_at": "2026-06-24T18:00:00Z",
+        "inputs_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "freshness": "fresh",
+        "ask_type": "decision",
+        "context_md": "引擎当前零 runtime dep，sfc32 hand-roll 已通过 BigCrush/PractRand；是否为可读性引入一个轻量 PRNG 库需权衡 SEA 二进制体积与依赖面。",
+        "question": "PRNG 走 hand-roll sfc32 还是引入轻量库？",
+        "what_i_need": "在两个选项里拍板，决定 C8 之后的 prng.ts 落地方式",
+        "why_it_matters": "影响 0-dep 红线与二进制体积；定下来才能收口 estimate 模块",
+        "options": [
+          {
+            "id": "handroll",
+            "label": "hand-roll sfc32（0 dep）",
+            "rationale": "守 0-dep 红线、~14 行",
+            "tradeoffs": "自测负担在我方"
+          },
+          {
+            "id": "lib",
+            "label": "引入轻量 PRNG 库",
+            "rationale": "可读性 + 社区测试",
+            "tradeoffs": "破 0-dep、增二进制体积"
+          }
+        ],
+        "enter_cmd": "/cc-master:discuss C9"
+      }
+    }
+  ],
+  "log": [
+    { "ts": "2026-06-22T08:30:00Z", "kind": "note", "summary": "估算引擎编排启动，baseline 拍摄" },
+    { "ts": "2026-06-22T18:40:00Z", "kind": "verify", "summary": "C2 history-loader 端点验收过" },
+    { "ts": "2026-06-23T13:30:00Z", "kind": "verify", "summary": "C3 EWMA 校准端点验收过" },
+    { "ts": "2026-06-25T09:00:00Z", "kind": "dispatch", "summary": "C4 估算-DAG MC 派发 subagent" },
+    {
+      "ts": "2026-06-25T09:05:00Z",
+      "kind": "decision",
+      "summary": "C9 PRNG 选型挂为 awaiting-user 决策点"
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 > 本文持续追踪 cc-master **六条产品愿景**在当前实现里的**落地 gap**。愿景 charter 的 SSOT 在 [`spec.md` §1.0](spec.md)——charter 说**目标**，本文量**差距**。
 > **这是 living 文档**：某条 gap 关闭就更新对应卡的 ③⑤ + 翻矩阵「追踪状态」+ 更 last-audited；charter 增删能力就同步增删卡。
-> **last-audited：2026-06-11** · 审计法：每条能力穿全产品面（command / hook / skill / board / script）追 trace（指到 file:line）、判落地真实性、找 adversarial 断点、诚实分「真 gap vs 设计意图」。
+> **last-audited：2026-06-30**（**C2/C4/C5/C6 四行定点翻新**·未重跑全审计法；C1/C3 卡体与矩阵沿用 2026-06-11 全审计）· 审计法：每条能力穿全产品面（command / hook / skill / board / script）追 trace（指到 file:line）、判落地真实性、找 adversarial 断点、诚实分「真 gap vs 设计意图」。
 
 ## 落地真实性图例
 
@@ -14,6 +14,8 @@
 > **关键判读**：🟡 在本仓**大多是设计意图、不是缺陷**——cc-master 故意让很多东西是 prose 而非 hook（红线 4 指挥不演奏 / 红线 1+5 hooks 限 bash+node·JS · ship-anywhere，见 ADR-006 / §6 Iron Law 禁造 agent 不违反的红线）。所以每张卡第 ⑥ 栏专门区分「该是机制却只 prose = **真 gap**」与「按设计就该 prose = **非 gap**」。
 >
 > **注（ADR-006 更新）**：本 tracker 写于「hooks 纯 bash」假设下；现 hook 可用 **node/JS**——最大影响是 **C2 usage 感知可做成 node hook**（原判「注定 prose/script」翻盘）。详见 [`2026-06-11-orchestrator-as-program-redesign.md`](2026-06-11-orchestrator-as-program-redesign.md) §5.1 H8。下次重审本 tracker 时据此更新 C2 卡。
+>
+> **注（ADR-013/014 更新·2026-06-24）**：board 引擎已建并**解耦为独立安装的 `ccm` CLI**（board 逻辑 SSOT 归 `@ccm/engine`，hook 经进程边界 `spawn ccm`·见 [`adrs/ADR-014-cli-decoupling-as-independent-product.md`](../adrs/ADR-014-cli-decoupling-as-independent-product.md)）。对本 tracker 的直接影响落在 **C4**：**机器算的图分析（临界路径 / float / impact / rollup）现已全表面暴露**（`ccm board graph --json`，skill 封装 `board-graph.js`）——C4 旧断点「critical-path 是幻觉（无代码算 float）」已**部分关闭**（现有真算 float 的只读路径；status agent 心算不再是唯一手段）。下次全面重审本 tracker 时据此刷新 C4 卡 ③④⑤ + 矩阵行 + last-audited（本次只做定点对账，未重跑全审计法）。
 
 ---
 
@@ -22,11 +24,11 @@
 | # | 能力 | 落地真实性 | 真 gap（一句话）| 严重度 | 追踪状态 |
 |---|---|---|---|---|---|
 | C1 | 异步并行多线程推进 + 完整落地 | 并行 🟢（借 harness 原生）· 完整闸 🟢（verify-board）| 闸只信 board status、读不到对话——**board 完整性零机制保障** | 中-高 | 🔴 open |
-| C2 | 控制 token 消耗速度 | sensing 🟢（cc-usage.sh）· pacing 决策 🟡 | 传感器是真的、**但 loop 从不调它**；budget 不跨 compaction 持久化 | 中-高 | 🔴 open |
+| C2 | 控制 token 消耗速度 | sensing 🟢 · pacing 决策 🟢（`usage-pacing.js` 每轮 Stop 调 `ccm usage advise` 双侧走廊判决·引擎收口）| 旧「loop 从不调传感器」**已闭**；余 budget 跨 compaction 持久化仍偏弱 | 中 | 🟡 主因闭·残留收敛中 |
 | C3 | 自主决策 vs 人类接入边界（HITL）| 🟡（行为红线靠端点守）| Stop 闸不分「未答用户终审」与「等上游」→ 挂着未答 merge 决策能**静默 Stop** | 中 | 🔴 open |
-| C4 | 目标分解 / 管理 / 更新 / 规划 | board 🟢 · 分解方法 🟡 | 计划更新 / supersession **无事务一致性**；`status.md`「critical path」轻度 overclaim | 中-高 | 🔴 open |
-| C5 | 资源合理下最大化效率调度 | scheduler 🟡（手跑 prose）| **单侧兜底**：兜了「欠调度 idle」却不兜「过调度顶满 utilization cliff」 | 中 | 🔴 open |
-| C6 | 按复杂度/难度/时长选模型 | 设模型 lever 🟢 · 选档判断 🟡 · **duration 维 🔴** | 愿景三因子只兑现 complexity/difficulty，**duration 维蒸发**且 README/spec overclaim | 低-中 | 🔴 open |
+| C4 | 目标分解 / 管理 / 更新 / 规划 | board 🟢 · 分解方法 🟡 · **临界路径已机器算 🟢**（`ccm board graph` / `board critical-path` 真算 float/CPM·只读 advisory）| 临界路径 overclaim **已闭**；supersession / 重规划仍**无事务一致性** | 中-高 | 🟡 临界路径闭·余 supersession open |
+| C5 | 资源合理下最大化效率调度 | scheduler 🟡（手跑 prose）· **过调度侧已有软兜底 🟢**（`posttool-batch.js` WIP 软警告 + `usage-pacing.js` PostToolBatch 中途采样）| 旧「过调度零兜底」**已闭**（软警告·非硬拦）；仍无引擎强制 WIP | 中 | 🟡 过调度侧闭·软兜底 |
+| C6 | 按复杂度/难度/时长选模型 | 设模型 lever 🟢 · 选档判断 🟡 · **duration 维已有承载 🟡**（`ccm estimate forecast` 出 P50/P80/P95 + makespan）| duration 维「完全蒸发」**已闭**（估算引擎接回时长轴）；接进选档规则仍 prose | 低-中 | 🟡 duration 接回·接选档 open |
 
 ---
 
@@ -81,8 +83,8 @@
 - **① 愿景断言**：拆成依赖 DAG、把计划做成被持续管理 / 跨 compaction 存活 / 可重规划的真文件。
 - **② 落地 trace**：`bootstrap-board.sh:43-66`（从 goal 建空 board 骨架，hook 不写 tasks）；board schema `assets/board.template.json` + narrow waist `tasks[{id,status,deps}]`+status enum（`board.md:43-66`，ADR-003）；`verify-board.sh:67-114`（escape-aware awk 真解析 tasks region、数 id、grep status）🟢；分解方法 CPM/float **只在** `references/decomposition.md` + `commands/status.md:19`（grep 确认 hooks/commands **零**机器计算 float）；supersession = 把 status 写 escalated/stale（`board.md:97-102`），纯靠 agent 每回合 Write 整文件。
 - **③ 等级**：**board=被管理的持久计划 🟢** · **narrow-waist 契约 🟢（最硬一块）** · 完成度判定 🟢 · 分解方法（CPM/float）🟡（prose-only）· per-node 契约 🟡 · **更新/supersession 跨 compaction 续 🟡（关键断点）**。
-- **④ adversarial 断点**：critical-path 是幻觉（无代码算 float，大 DAG 上 agent 心算会错且无校验）；supersession 漏写即丢（compaction 卡在标完一个、没标完剩下之间，reinject 不提示「上次没标完」）；重规划无事务性（重写 tasks[] 半截 compaction → torn-plan）；per-node 契约可空（没 success predicate 也能 dispatch，端点验收无据）。**deps 图完整性已由 board lint 兑现**（T9）：`board-lint-core.js` 的 R4（悬挂引用 / 自环 / 无环 DFS）+ PostToolUse hook（写坏即反馈）+ 手动脚本（补 Bash 编辑盲区）——「hook 只数 id/status 不验 deps 图完整/无环」的旧断点已闭合（hook 仍只数 id/status，但 lint hook 现验 deps 图）。
-- **⑤ 严重度 + 处置**：**中-高**（supersession/重规划）。处置：~~`status.md` health-check 增「deps 图完整性」~~ **已由 board lint 落地**（T9，node 实现比原计划纯 bash 更稳——ADR-006 §3.0 deps-graph integrity 用 node 用例；双交付 hook 自动 + 手动脚本，覆盖比「只在 /status 时手算」更广、更即时）；**悬挂 stale 检测**仍归 reinject 续跑提示（「上次 board 有未消化的 stale/escalated 吗」——属语义判断非结构正确性，board lint 不越界吃它）；`status.md`「critical path」措辞标注「agent 心算」或提供带外 `scripts/` 真算 float 脚本（ship-anywhere 不进 hook）。
+- **④ adversarial 断点**：~~critical-path 是幻觉（无代码算 float，大 DAG 上 agent 心算会错且无校验）~~ **已部分关闭（ADR-013/014）**：`ccm board graph --json` 现机器算临界路径 / float / 并行度 + impact / rollup advisory（skill 封装 `board-graph.js`），status agent 心算不再是唯一手段（图分析仍是**只读 advisory**、不强制——故只是「有真算路径可用」、非「机制兜底强制用」）；supersession 漏写即丢（compaction 卡在标完一个、没标完剩下之间，reinject 不提示「上次没标完」）；重规划无事务性（重写 tasks[] 半截 compaction → torn-plan）；per-node 契约可空（没 success predicate 也能 dispatch，端点验收无据）。**deps 图完整性已由 board lint 兑现**（T9，引擎现归 `@ccm/engine`·经进程边界 `ccm board lint`）：R4（悬挂引用 / 自环 / 无环 DFS）+ PostToolUse hook（写坏即反馈）+ 手动脚本（补 Bash 编辑盲区）——「hook 只数 id/status 不验 deps 图完整/无环」的旧断点已闭合（hook 仍只数 id/status，但 lint hook 现验 deps 图）。
+- **⑤ 严重度 + 处置**：**中-高**（supersession/重规划）。处置：~~`status.md` health-check 增「deps 图完整性」~~ **已由 board lint 落地**（T9，node 实现比原计划纯 bash 更稳——ADR-006 §3.0 deps-graph integrity 用 node 用例；双交付 hook 自动 + 手动脚本，覆盖比「只在 /status 时手算」更广、更即时）；**悬挂 stale 检测**仍归 reinject 续跑提示（「上次 board 有未消化的 stale/escalated 吗」——属语义判断非结构正确性，board lint 不越界吃它）；~~`status.md`「critical path」措辞标注「agent 心算」或提供带外 `scripts/` 真算 float 脚本~~ **带外真算 float 已落地（ADR-013/014）**：`ccm board graph --json` + skill 封装 `board-graph.js` 机器算临界路径 / float（只读、不进 hook、ship-anywhere 经进程边界守）——status agent 可改读它而非心算（status.md 措辞若仍写「agent 心算 critical path」可校准为「可经 `ccm board graph` 机器算」）。
 - **⑥ gap vs 设计意图**：分解方法 prose = **非 gap**（红线 1 hook 读不了语义算不了语义化临界路径 + 红线 4 分解是指挥判断活，ADR-004 §2.2）；board/narrow-waist/goal-hook 🟢 = 真机制无虚标；**真张力** = supersession/重规划**无事务一致性**——ADR-003 §3.3 有意把 supersession 设计成显式 status 改（留痕在 board），但「靠 agent 记得 Write」零 hook 兜底是 ADR-004 已自承的 ceiling；该不该加 read-only deps 一致性守护是**未被现有 ADR 正面拍板**的开放张力。
 
 ### C5 — 在资源消耗速度合理前提下最大化实施效率的调度编排
@@ -111,7 +113,7 @@
 
 1. **C5 过调度无兜底**〔中，**廉价护栏·首推**〕→ Track B 加第 5 条断言「不过调度」（in_flight ≤ wip_limit、无巨型 fan-out）。不碰 waist，补上唯一机制兜底的非对称。
 2. **C3 HITL 对称缺口**〔中，**廉价护栏**〕→ `verify-board.sh` 完成态握手文案在存在 `blocked_on:"user"` 时列出其 title。纯 bash 只读 board。
-3. **C4 supersession 无事务性**〔中-高，**廉价护栏 + 措辞**〕→ ~~`status.md` 加 deps 图一致性~~ **deps 图一致性已由 board lint 兑现（T9，R4 悬挂/自环/无环 + 双交付 hook+手动脚本）**；悬挂 stale 检测仍归 reinject；`status.md`「critical path」措辞标注「agent 心算」或带外 `scripts/` 真算 float。
+3. **C4 supersession 无事务性**〔中-高，**廉价护栏 + 措辞**〕→ ~~`status.md` 加 deps 图一致性~~ **deps 图一致性已由 board lint 兑现（T9，R4 悬挂/自环/无环 + 双交付 hook+手动脚本；引擎现归 `@ccm/engine`·进程边界 `ccm board lint`）**；悬挂 stale 检测仍归 reinject；~~`status.md`「critical path」措辞标注「agent 心算」或带外 `scripts/` 真算 float~~ **带外真算 float 已落地（ADR-013/014：`ccm board graph` / `board-graph.js` 机器算临界路径 / float / impact / rollup，只读 advisory）**——余下只是 status.md 措辞校准（若仍写「agent 心算」）。
 4. **C2 传感器不被 loop 触发**〔中-高，**软 prose + 可选字段**〕→ 决策程序 reconcile 加软 sensing 节律提示（非红线）；board 加 agent-shaped budget 快照字段；Track B 加「长跑要 sense」断言。
 5. **C6 duration 维缺失 + overclaim**〔低-中，**措辞校准 or 接维**〕→ 二选一：把 duration 接进 `cost-and-pacing.md` 选档规则，或修 `README`/`spec` 措辞去掉 overclaim。
 6. **C1 board 完整性零机制保障**〔中-高，**最贵最慎**〕→ 候选 waist 字段 `done` 必带 `verified:true`+`artifact`（动 waist = 红线 2，须同 PR 改全部 hook + 测试 + ADR-003）；或显式接受为 ship-anywhere ceiling 并留痕。

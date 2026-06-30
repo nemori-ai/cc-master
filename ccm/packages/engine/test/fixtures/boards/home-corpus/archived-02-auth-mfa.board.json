@@ -1,0 +1,154 @@
+{
+  "schema": "cc-master/v2",
+  "meta": { "template_version": 3, "created_at": "2026-04-28T08:30:00Z" },
+  "goal": "auth-service 增加 TOTP 多因子认证 + 恢复码",
+  "owner": {
+    "active": false,
+    "session_id": "sid-auth-mfa-2026-04",
+    "heartbeat": "2026-05-01T17:00:00Z"
+  },
+  "git": { "worktree": "/work/auth-service", "branch": "feat/mfa-totp" },
+  "scheduling": { "wip_limit": 2 },
+  "tasks": [
+    {
+      "id": "M1",
+      "title": "TOTP 库选型 + 恢复码生成策略设计",
+      "status": "done",
+      "deps": [],
+      "type": "design",
+      "executor": "master-orchestrator",
+      "model": "claude-opus-4-5",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "选型 ADR + 恢复码熵分析评审过",
+      "created_at": "2026-04-28T08:30:00Z",
+      "started_at": "2026-04-28T08:40:00Z",
+      "finished_at": "2026-04-28T10:25:00Z",
+      "verified": true,
+      "artifact": "/work/auth-service/docs/mfa-adr.md",
+      "observability": { "tokens": { "input": 38900, "output": 9400 } }
+    },
+    {
+      "id": "M2",
+      "title": "TOTP 注册 + 二维码下发端点",
+      "status": "done",
+      "deps": ["M1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-mfa-m2",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "注册流单测绿，二维码可被标准 app 扫读",
+      "references": [
+        { "kind": "spec", "ref": "/work/auth-service/docs/mfa-adr.md" },
+        { "kind": "plan", "ref": "/work/auth-service/docs/plan-mfa.md" }
+      ],
+      "created_at": "2026-04-28T10:00:00Z",
+      "started_at": "2026-04-28T11:00:00Z",
+      "finished_at": "2026-04-28T15:50:00Z",
+      "verified": true,
+      "artifact": "/work/auth-service/src/mfa/enroll.ts",
+      "observability": { "tokens": { "input": 71200, "output": 17800 } }
+    },
+    {
+      "id": "M3",
+      "title": "TOTP 校验 + 时间窗容错 + 防重放",
+      "status": "done",
+      "deps": ["M2"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-mfa-m3",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "时间窗 ±1 容错 + 重放拒绝单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/auth-service/docs/mfa-adr.md" },
+        { "kind": "plan", "ref": "/work/auth-service/docs/plan-mfa.md" }
+      ],
+      "created_at": "2026-04-28T10:00:00Z",
+      "started_at": "2026-04-29T09:30:00Z",
+      "finished_at": "2026-04-29T18:40:00Z",
+      "verified": true,
+      "artifact": "/work/auth-service/src/mfa/verify.ts",
+      "observability": { "tokens": { "input": 168000, "output": 44200 } }
+    },
+    {
+      "id": "M4",
+      "title": "恢复码生成 / 兑换 / 单次失效",
+      "status": "done",
+      "deps": ["M1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-mfa-m4",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "恢复码单次失效 + 哈希存储单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/auth-service/docs/mfa-adr.md" },
+        { "kind": "plan", "ref": "/work/auth-service/docs/plan-mfa.md" }
+      ],
+      "created_at": "2026-04-28T10:00:00Z",
+      "started_at": "2026-04-29T09:30:00Z",
+      "finished_at": "2026-04-29T11:10:00Z",
+      "verified": true,
+      "artifact": "/work/auth-service/src/mfa/recovery.ts",
+      "observability": { "tokens": { "input": 44800, "output": 11600 } }
+    },
+    {
+      "id": "M5",
+      "title": "登录流接入 MFA 步骤门",
+      "status": "done",
+      "deps": ["M3", "M4"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-mfa-m5",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 4, "unit": "h" },
+      "acceptance": "MFA 步骤门集成 + 旁路关闭单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/auth-service/docs/mfa-adr.md" },
+        { "kind": "plan", "ref": "/work/auth-service/docs/plan-mfa.md" }
+      ],
+      "created_at": "2026-04-29T09:00:00Z",
+      "started_at": "2026-04-30T09:00:00Z",
+      "finished_at": "2026-04-30T18:30:00Z",
+      "verified": true,
+      "artifact": "/work/auth-service/src/login.ts",
+      "observability": { "tokens": { "input": 210000, "output": 58000 } }
+    },
+    {
+      "id": "M6",
+      "title": "更新登录文档 + API 参考",
+      "status": "done",
+      "deps": ["M5"],
+      "type": "doc-alignment",
+      "executor": "subagent",
+      "handle": "bg-mfa-m6",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 1, "unit": "h" },
+      "created_at": "2026-05-01T09:00:00Z",
+      "started_at": "2026-05-01T16:00:00Z",
+      "finished_at": "2026-05-01T16:50:00Z",
+      "verified": true,
+      "artifact": "/work/auth-service/docs/api.md",
+      "observability": { "tokens": { "input": 29800, "output": 12400 } }
+    }
+  ],
+  "log": [
+    { "ts": "2026-04-28T08:30:00Z", "kind": "note", "summary": "MFA 编排启动" },
+    {
+      "ts": "2026-04-29T18:40:00Z",
+      "kind": "finding",
+      "summary": "防重放窗口的 nonce 缓存语义比想象复杂，M3 严重超估（估3h实9h+）"
+    },
+    {
+      "ts": "2026-04-30T18:30:00Z",
+      "kind": "finding",
+      "summary": "M5 登录流旧代码耦合多，估4h实9.5h（长尾超估）"
+    }
+  ]
+}

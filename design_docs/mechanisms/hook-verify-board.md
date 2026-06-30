@@ -1,6 +1,6 @@
-# 机制契约：`hooks/scripts/verify-board.sh`
+# 机制契约：`hooks/scripts/verify-board.js`
 
-> 类别：hook（`Stop`，纯 bash + awk）。源码：`hooks/scripts/verify-board.sh`。**goal-hook**——据 board status 分布决定是否放行 agent 停下；唯一能 `decision:block` 的 cc-master hook。
+> 类别：hook（`Stop`，node·require board-model + hook-common（board-v2 收编））。源码：`hooks/scripts/verify-board.js`。**goal-hook**——据 board status 分布决定是否放行 agent 停下；唯一能 `decision:block` 的 cc-master hook。
 
 ## 触发输入
 - `Stop` 事件，stdin JSON 含 `session_id`。

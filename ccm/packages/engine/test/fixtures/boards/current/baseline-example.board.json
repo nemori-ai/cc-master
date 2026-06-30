@@ -1,0 +1,123 @@
+{
+  "schema": "cc-master/v2",
+  "meta": { "template_version": 3, "created_at": "2026-06-25T08:00:00Z" },
+  "goal": "P1 baseline fixture — EVM + estimate engine test corpus",
+  "owner": { "active": true, "session_id": "fixture-sid-01", "heartbeat": "2026-06-25T10:00:00Z" },
+  "git": { "worktree": "/repo/.worktrees/board-v2-redesign", "branch": "board-v2-redesign" },
+  "scheduling": { "wip_limit": 4 },
+  "baseline": {
+    "captured_at": "2026-06-25T08:05:00Z",
+    "t0": "2026-06-25T08:00:00Z",
+    "task_estimates": {
+      "T1": { "value": 2, "unit": "h" },
+      "T2": { "value": 3, "unit": "h" },
+      "T3": { "value": 1, "unit": "h" },
+      "T4": { "value": 4, "unit": "h" },
+      "T5": { "value": 2, "unit": "h" }
+    },
+    "dag_snapshot": {
+      "T1": { "deps": [] },
+      "T2": { "deps": ["T1"] },
+      "T3": { "deps": ["T1"] },
+      "T4": { "deps": ["T2", "T3"] },
+      "T5": { "deps": ["T4"] }
+    },
+    "bac_h": 12,
+    "history": []
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "status": "done",
+      "deps": [],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-1a",
+      "model": "claude-sonnet-4-5",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "framework tests green",
+      "references": [
+        { "kind": "spec", "ref": "/repo/docs/spec.md" },
+        { "kind": "plan", "ref": "/repo/docs/plan.md" }
+      ],
+      "created_at": "2026-06-25T08:00:00Z",
+      "started_at": "2026-06-25T08:05:00Z",
+      "finished_at": "2026-06-25T09:45:00Z",
+      "verified": true,
+      "artifact": "/repo/src/framework/index.ts"
+    },
+    {
+      "id": "T2",
+      "status": "done",
+      "deps": ["T1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-2b",
+      "model": "claude-haiku-4-5",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "all locale files validated",
+      "references": [
+        { "kind": "spec", "ref": "/repo/docs/spec.md" },
+        { "kind": "plan", "ref": "/repo/docs/plan.md" }
+      ],
+      "created_at": "2026-06-25T08:00:00Z",
+      "started_at": "2026-06-25T09:50:00Z",
+      "finished_at": "2026-06-25T12:30:00Z",
+      "verified": true,
+      "artifact": "/repo/src/locales/"
+    },
+    {
+      "id": "T3",
+      "status": "done",
+      "deps": ["T1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-3c",
+      "model": "claude-haiku-4-5",
+      "estimate": { "value": 1, "unit": "h" },
+      "acceptance": "routing table tests pass",
+      "references": [
+        { "kind": "spec", "ref": "/repo/docs/spec.md" },
+        { "kind": "plan", "ref": "/repo/docs/plan.md" }
+      ],
+      "created_at": "2026-06-25T08:00:00Z",
+      "started_at": "2026-06-25T09:50:00Z",
+      "finished_at": "2026-06-25T10:30:00Z",
+      "verified": true,
+      "artifact": "/repo/src/routing/table.ts"
+    },
+    {
+      "id": "T4",
+      "status": "in_flight",
+      "deps": ["T2", "T3"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-4d",
+      "model": "claude-sonnet-4-5",
+      "estimate": { "value": 4, "unit": "h" },
+      "acceptance": "integration tests green + PR opened",
+      "references": [
+        { "kind": "spec", "ref": "/repo/docs/spec.md" },
+        { "kind": "plan", "ref": "/repo/docs/plan.md" }
+      ],
+      "created_at": "2026-06-25T08:00:00Z",
+      "started_at": "2026-06-25T12:35:00Z"
+    },
+    {
+      "id": "T5",
+      "status": "ready",
+      "deps": ["T4"],
+      "type": "pr",
+      "executor": "master-orchestrator",
+      "estimate": { "value": 2, "unit": "h" },
+      "created_at": "2026-06-25T08:00:00Z"
+    }
+  ],
+  "log": [
+    {
+      "ts": "2026-06-25T08:05:00Z",
+      "kind": "note",
+      "summary": "baseline snapshot taken at sprint start"
+    }
+  ]
+}

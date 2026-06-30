@@ -1,0 +1,27 @@
+{
+  "name": "ccm",
+  "version": "0.10.0",
+  "type": "module",
+  "bin": {
+    "ccm": "./bin/ccm.cjs"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "build:sea": "bash scripts/build-sea.sh",
+    "test": "node --import tsx --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@ccm/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "postject": "1.0.0-alpha.6",
+    "tsx": "^4.20.6"
+  }
+}

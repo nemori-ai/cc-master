@@ -1,0 +1,17 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
+  "extends": "//",
+  "files": {
+    "includes": ["**", "!test/fixtures/", "!dist/"]
+  },
+  "linter": {
+    "rules": {
+      "complexity": {
+        "useOptionalChain": "off"
+      },
+      "style": {
+        "noNonNullAssertion": "off"
+      }
+    }
+  }
+}

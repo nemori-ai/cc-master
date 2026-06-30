@@ -1917,16 +1917,16 @@
   <!-- Import-map: every specifier resolves to a LOCAL /vendor/ file. React is mapped to a
        SINGLE file so react / react-dom / @xyflow/react all share ONE react instance
        (two copies => hooks crash). No esm.sh / CDN / external URL anywhere. -->
-  <!-- Shared graph-analysis core (the ONE source of truth — same module hooks + the
-       board-graph CLI use). Loaded as CLASSIC scripts (no type=module) so they run, in
-       order, BEFORE the module below: board-lint-core first (publishes buildGraph/findCycle
-       to globalThis.__ccmBoardLintCore), then board-graph-core (reads that global, publishes
-       analyzeGraph to globalThis.__ccmBoardGraphCore). The module's analyze() then DELEGATES
-       to analyzeGraph() instead of re-implementing the graph algorithms (DRY — design §5.8).
-       Served from /core/* by view-server (read-only, zero network). If either fails to load
-       (older server with no /core route), the module degrades to a built-in fallback. -->
-  <script src="/core/board-lint-core.js"></script>
-  <script src="/core/board-graph-core.js"></script>
+  <!-- Shared graph-analysis core (the ONE source of truth — same engine hooks + the CLI use).
+       Loaded as a single CLASSIC script (no type=module) so it runs BEFORE the module below.
+       ★v2: this is the @ccm/engine IIFE, vendored alongside this skill and served from /vendor/
+       by view-server (read-only, zero network). It publishes a SINGLE global —
+       globalThis.__ccmEngine — carrying every engine symbol (analyzeGraph / lintBoard / ENUMS / …),
+       replacing the old three-file board-model + board-lint-core + board-graph-core trio. The
+       module's analyze() then DELEGATES to __ccmEngine.analyzeGraph() instead of re-implementing the
+       graph algorithms (DRY — design §5.8). If it fails to load (older server without the vendored
+       IIFE), the module degrades to a built-in fallback so the viewer never goes dark. -->
+  <script src="/vendor/ccm-engine.iife.js"></script>
 
   <script type="importmap">
   {
@@ -2208,12 +2208,12 @@
     // VIEW-specific derivations (impact/convergence/bottleneck node picks + time-based
     // elapsed) on top of that core handle. No second copy of the graph algorithms.
     //
-    // Core access: board-graph-core.js was loaded as a classic <script> and published
-    // analyzeGraph to globalThis.__ccmBoardGraphCore. If it failed to load (older server
-    // with no /core route), graphCore() returns null and analyze() falls back to a small
-    // inline adjacency build so the viewer never goes dark.
+    // Core access: the @ccm/engine IIFE was loaded as a classic <script> and published every
+    // engine symbol to globalThis.__ccmEngine (including analyzeGraph). If it failed to load
+    // (older server without the vendored IIFE), graphCore() returns null and analyze() falls
+    // back to a small inline adjacency build so the viewer never goes dark.
     function graphCore() {
-      const c = (typeof globalThis !== 'undefined') ? globalThis.__ccmBoardGraphCore : null;
+      const c = (typeof globalThis !== 'undefined') ? globalThis.__ccmEngine : null;
       return (c && typeof c.analyzeGraph === 'function') ? c : null;
     }
     function analyze(tasks, owner) {

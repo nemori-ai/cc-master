@@ -13,6 +13,15 @@
 
 HOOK="$PLUGIN_ROOT/hooks/scripts/usage-pacing.js"
 
+# ── P4 收口: the hook now prefers `ccm usage advise --json` for the corridor verdict and falls back to
+# the local computation when ccm is unavailable. By DEFAULT we force the LOCAL fallback for every existing
+# case (export CCM_BIN to a nonexistent binary → adviseViaCcm returns null → local path) so all the local
+# account-authoritative / 本地反推 / num_account / registry cases below keep testing the FALLBACK exactly as
+# before. A dedicated "── CCM SHELL-OUT ──" section near the end injects a stub `ccm` (CCM_BIN=<stub>) to
+# test the ccm-driven path (present → use its verdict) and ccm-absent (→ fallback). The hook reads CCM_BIN
+# from its env (mirrors board-lint.js); exporting it here propagates to every $HOOK subprocess.
+export CCM_BIN="/nonexistent-ccm-bin-force-local-fallback"
+
 # run_pacing USAGE_DIR NOW [BUDGET] [BURN_FLOOR] -> sets HOOK_OUT / HOOK_RC.
 # ARMED: stdin carries a Stop event whose session_id (sess-x) OWNS an active board in CC_MASTER_HOME
 # (seeded below). The hook is now armed-gated — it only reads usage when this session is armed, so the
@@ -21,8 +30,8 @@ HOOK="$PLUGIN_ROOT/hooks/scripts/usage-pacing.js"
 ARMED_HOME=""
 _seed_armed_home() { # SID -> echo a fresh home dir holding an active board owned by SID
   local h; h="$(make_project)"
-  mkdir -p "$h"
-  printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"%s"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' "$1" > "$h/armed.board.json"
+  mkdir -p "$h/boards"   # board 落 <home>/boards/（board-v2 布局）
+  printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"%s"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' "$1" > "$h/boards/armed.board.json"
   echo "$h"
 }
 run_pacing() {
@@ -173,7 +182,7 @@ rm -rf "$H"
 
 # (f2) UNARMED — home has an active board owned by ANOTHER session → not mine → silent at critical.
 H="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-other"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/other.board.json"
+mkdir -p "$H/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-other"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/boards/other.board.json"
 run_pacing_home "$SAMPLE" "2026-06-10T12:00:00Z" "$H" "sess-mine" "3000"
 assert_eq 0 "$HOOK_RC" "(f2) other session's board → rc 0"
 assert_eq "" "$HOOK_OUT" "(f2) other session's active board → silent (not armed for me)"
@@ -181,7 +190,7 @@ rm -rf "$H"
 
 # (f3) UNARMED — home has only an ARCHIVED board (owner.active:false) for my session → not armed.
 H="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":false,"session_id":"sess-arch"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/arch.board.json"
+mkdir -p "$H/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":false,"session_id":"sess-arch"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/boards/arch.board.json"
 run_pacing_home "$SAMPLE" "2026-06-10T12:00:00Z" "$H" "sess-arch" "3000"
 assert_eq 0 "$HOOK_RC" "(f3) archived board → rc 0"
 assert_eq "" "$HOOK_OUT" "(f3) archived (inactive) board → silent (arming requires active)"
@@ -189,7 +198,7 @@ rm -rf "$H"
 
 # (f4) ARMED — home has an active board owned by THIS session → gate opens → critical usage warns.
 H="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-armed"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/mine.board.json"
+mkdir -p "$H/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-armed"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/boards/mine.board.json"
 run_pacing_home "$SAMPLE" "2026-06-10T12:00:00Z" "$H" "sess-armed" "3000"
 assert_eq 0 "$HOOK_RC" "(f4) armed session → rc 0"
 assert_contains "$HOOK_OUT" "additionalContext" "(f4) armed + critical usage → warns (gate open)"
@@ -200,7 +209,7 @@ rm -rf "$H"
 # (f5) DEGRADED — stdin carries NO session_id, but home has an active board → degraded gate matches
 #       any active board → armed → warns. (Compaction-boundary robustness, mirrors the bash hooks.)
 H="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-whatever"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/some.board.json"
+mkdir -p "$H/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-whatever"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/boards/some.board.json"
 run_pacing_stdin "$SAMPLE" "2026-06-10T12:00:00Z" "$H" '{"hook_event_name":"Stop"}' "3000"
 assert_eq 0 "$HOOK_RC" "(f5) no session_id, active board present → rc 0"
 assert_contains "$HOOK_OUT" "additionalContext" "(f5) degraded gate (no sid → any active) → armed → warns"
@@ -223,7 +232,7 @@ rm -rf "$H"
 
 # (g1) ARMED + CRITICAL (used 3400 > budget 3000) + stop_hook_active:true → MUST be silent (re-entry guard).
 H="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-re"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/mine.board.json"
+mkdir -p "$H/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-re"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/boards/mine.board.json"
 run_pacing_stdin "$SAMPLE" "2026-06-10T12:00:00Z" "$H" \
   '{"session_id":"sess-re","hook_event_name":"Stop","stop_hook_active":true}' "3000"
 assert_eq 0 "$HOOK_RC" "(g1) re-entry → rc 0"
@@ -234,7 +243,7 @@ rm -rf "$H"
 # (g2) CONTROL — identical armed+critical case but stop_hook_active:false (a genuine new Stop) → warns.
 #       Proves the guard keys on the re-entry flag, not on the armed/critical state itself.
 H="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-re"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/mine.board.json"
+mkdir -p "$H/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-re"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/boards/mine.board.json"
 run_pacing_stdin "$SAMPLE" "2026-06-10T12:00:00Z" "$H" \
   '{"session_id":"sess-re","hook_event_name":"Stop","stop_hook_active":false}' "3000"
 assert_eq 0 "$HOOK_RC" "(g2) genuine new Stop → rc 0"
@@ -253,7 +262,7 @@ rm -rf "$H"
 #       CRITICAL usage threshold. Strict match "" != "sess-adopt" → unarmed → silent. This is exactly the
 #       red line 6 fail-safe: a blank board does NOT auto-adopt an arbitrary session.
 H="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":""},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/empty.board.json"
+mkdir -p "$H/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":""},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/boards/empty.board.json"
 run_pacing_home "$SAMPLE" "2026-06-10T12:00:00Z" "$H" "sess-adopt" "3000"
 assert_eq 0 "$HOOK_RC" "(h1) blank-session board + non-empty stdin sid → rc 0"
 assert_eq "" "$HOOK_OUT" "(h1) blank-session active board (owner.session_id:\"\") + non-empty stdin sid → stays dormant, silent (CODEX14 revert, red line 6 fail-safe)"
@@ -264,14 +273,14 @@ rm -rf "$H"
 #       degrade did NOT collapse into "any active board arms"; the true cross-session pollution defence
 #       is unchanged.
 H="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"OTHER"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/other.board.json"
+mkdir -p "$H/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"OTHER"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$H/boards/other.board.json"
 run_pacing_home "$SAMPLE" "2026-06-10T12:00:00Z" "$H" "MINE" "3000"
 assert_eq 0 "$HOOK_RC" "(h2) board sid non-empty & != stdin sid → rc 0"
 assert_eq "" "$HOOK_OUT" "(h2) board sid=OTHER (non-empty) != stdin sid=MINE → still silent (red line 6 defence intact)"
 rm -rf "$H"
 
 # ── ACCOUNT 口径 (Finding #37): sidecar 的权威 5h/7d used_percentage 判墙,脱钩失真反推,纳入 7d ──────────
-# 账户权威 used_percentage(+resets_at)由 statusline-capture.js 落到 sidecar(status-line 是唯一来源)。sidecar
+# 账户权威 used_percentage(+resets_at)由 ccm 自带的 `ccm statusline`(自动安装) 落到 sidecar(status-line 是唯一来源)。sidecar
 # 可用且窗口有效时,撞墙判据改用账户 % —— 不再依赖会失真到数量级的本地反推 window_remaining_min(Finding #37);
 # 并第一次把 7d 纳入(此前 hook 只看 5h、对 7d 全盲,Finding #31)。sidecar 不可用 → 降级本地反推(上面的 cases)。
 # run_pacing_acct SIDECAR_JSON NOW HOME SID -> drive an armed Stop carrying a rate-limit sidecar.
@@ -284,7 +293,7 @@ run_pacing_acct() {
   rm -rf "$cdir"
 }
 ACCT_HOME="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$ACCT_HOME/mine.board.json"
+mkdir -p "$ACCT_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$ACCT_HOME/boards/mine.board.json"
 A_NOWEP="$(python3 -c 'import datetime as d;print(int(d.datetime(2026,6,10,12,0,0,tzinfo=d.timezone.utc).timestamp()))')"
 A_R5F=$((A_NOWEP+3600))  # 5h resets 1h in the future → window valid
 A_R5FAR=$((A_NOWEP+18000))  # 5h resets 5h out → window valid but NOT nearReset (keeps underuse branch quiet)
@@ -296,6 +305,8 @@ assert_eq 0 "$HOOK_RC" "(acct-1) high 5h% → rc 0"
 assert_contains "$HOOK_OUT" "additionalContext" "(acct-1) high account 5h used% → warns"
 assert_contains "$HOOK_OUT" "90" "(acct-1) carries account 5h used_percentage (authoritative, not反推)"
 assert_not_contains "$HOOK_OUT" '"decision":"block"' "(acct-1) never blocks"
+# ADR-018：5h 临界减速 → advisory strong（临界侧·应认真权衡减速·P4 高风险→strong）。注入经 jsonEscape，标签 " → \"。
+assert_contains "$HOOK_OUT" '<advisory source=\"usage-pacing\" strength=\"strong\">' "(acct-1) 5h wall → tag-wrapped advisory strong (ADR-018)"
 
 # (acct-2) high 7d used% (88) while 5h low (10) → warns on 7d (Finding #31: 7d now in scope).
 run_pacing_acct "{\"five_hour\":{\"used_percentage\":10,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":88}}" \
@@ -326,10 +337,10 @@ rm -rf "$ACCT_HOME"
 # SEVEN_DAY_HEADROOM(默认80)，**7d 缺失即静默**(总闸未知不开闸)。账户分支才有欠用提示——本地反推路径禁。
 # 用 run_pacing_acct（armed Stop + sidecar 注入）；nearReset 用「resets_at = now + 30min」(<60 默认窗)。
 U_HOME="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$U_HOME/mine.board.json"
+mkdir -p "$U_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$U_HOME/boards/mine.board.json"
 U_NEAR=$((A_NOWEP+1800))   # 5h reset 30min in the future → nearReset 满足(≤60)
 U_FAR=$((A_NOWEP+9000))    # 5h reset 150min in the future → nearReset 不满足(>60)
-# Freshness gate (④): sidecar carries captured_at (epoch sec, written by statusline-capture.js). The
+# Freshness gate (④): sidecar carries captured_at (epoch sec, written by `ccm statusline` (auto-installed)). The
 # underuse→accelerate branch now requires captured_at fresh (≤ CC_MASTER_UNDERUSE_MAX_STALE_MIN, default
 # 15min) — stale/missing → silent (idle-waiting on background烧配额 → stale-low p5 不可信，绝不据陈值误催加速).
 U_FRESH=$((A_NOWEP-300))    # captured 5min ago → fresh (≤15min) → gate open
@@ -344,6 +355,8 @@ assert_contains "$HOOK_OUT" "欠用" "(under-1) carries the underuse signal phra
 assert_contains "$HOOK_OUT" "加速" "(under-1) points at accelerate levers (加速)"
 assert_contains "$HOOK_OUT" "20" "(under-1) carries account 5h used_percentage (20)"
 assert_not_contains "$HOOK_OUT" '"decision":"block"' "(under-1) NEVER blocks — non-blocking only"
+# ADR-018：欠用加速 → advisory weak（低风险·可合理忽略·对齐 ADR-018 §2.2「欠用加速」例 = weak）。
+assert_contains "$HOOK_OUT" '<advisory source=\"usage-pacing\" strength=\"weak\">' "(under-1) underuse → tag-wrapped advisory weak (ADR-018)"
 
 # (under-fresh) 三条 AND 全真 + captured_at 新鲜（now-300s ≤ 15min）→ 仍出加速提示（新鲜度闸放行）。
 run_pacing_acct "{\"captured_at\":$U_FRESH,\"five_hour\":{\"used_percentage\":20,\"resets_at\":$U_NEAR},\"seven_day\":{\"used_percentage\":30}}" \
@@ -408,7 +421,7 @@ assert_eq "" "$HOOK_OUT" "(under-6) reset far out (>60min) → silent (nearReset
 #           反推的 reset 倒计时会失真到数量级 (Finding #37). Here SAMPLE @ 12:00Z has remaining 180min and
 #           low burn → local path stays silent and crucially emits no accelerate prompt.
 U_LH="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-local"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$U_LH/mine.board.json"
+mkdir -p "$U_LH/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-local"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$U_LH/boards/mine.board.json"
 run_pacing_home "$SAMPLE" "2026-06-10T12:00:00Z" "$U_LH" "sess-local"
 assert_eq 0 "$HOOK_RC" "(under-7) local fallback path → rc 0"
 assert_eq "" "$HOOK_OUT" "(under-7) no sidecar (local 反推 path) → silent"
@@ -439,7 +452,7 @@ rm -rf "$U_HOME"
 # 账户口径无绝对 token 分母 → 算不出 tok/min 精确速率,只缩放无量纲 used% 节奏(cost-and-pacing 诚实天花板)。
 # 用 run_pacing_acct（armed Stop + sidecar）；num_account 经 env CC_MASTER_NUM_ACCOUNT 注入(board 缺则 env 兜底)。
 N_HOME="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"num_account":3,"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$N_HOME/mine.board.json"
+mkdir -p "$N_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"num_account":3,"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$N_HOME/boards/mine.board.json"
 # run_pacing_nacct SIDECAR_JSON NOW HOME SID NUM_ACCOUNT -> drive armed Stop + sidecar + env num_account.
 run_pacing_nacct() {
   local cdir; cdir="$(make_project)"; local cache="$cdir/rate.json"
@@ -496,6 +509,9 @@ run_pacing_acct "{\"captured_at\":$U_FRESH,\"five_hour\":{\"used_percentage\":70
   "2026-06-10T12:00:00Z" "$N_HOME" "sess-acct"
 assert_eq 0 "$HOOK_RC" "(nacct-4) registry-sourced effective-N=3 → rc 0"
 assert_contains "$HOOK_OUT" "欠用" "(nacct-4) accounts.json pool (1 active + 2 backups) drives n=3 (no env) → accelerate fires"
+# ADR-018：号池粗粒度事实独立成块 → ambient（池/配额事实·塑模型·无 action·无 strength）。
+assert_contains "$HOOK_OUT" '<ambient source=\"usage-pacing\">' "(nacct-4) pool fact → separate ambient block (ADR-018, no strength)"
+assert_contains "$HOOK_OUT" "号池" "(nacct-4) ambient carries the pool fact (号池)"
 rm -f "$N_HOME/accounts.json"
 
 # (nacct-5) WALL FORK at n>1 — 5h 90% wall, 7d 20% (only 5h hits) + n=3 → 「切下一份配额」signal, NOT slowdown.
@@ -506,6 +522,8 @@ assert_eq 0 "$HOOK_RC" "(nacct-5) wall fork n>1 → rc 0"
 assert_contains "$HOOK_OUT" "切到下一份配额" "(nacct-5) n>1 + 5h wall → 切下一份配额 signal (not slowdown)"
 assert_not_contains "$HOOK_OUT" "降到更便宜的模型档" "(nacct-5) n>1 5h wall → NOT the slowdown levers"
 assert_not_contains "$HOOK_OUT" '"decision":"block"' "(nacct-5) never blocks"
+# ADR-018：n>1 切下一份配额 → advisory weak（机会信号·可逆·低 stakes）。
+assert_contains "$HOOK_OUT" '<advisory source=\"usage-pacing\" strength=\"weak\">' "(nacct-5) switch-account → tag-wrapped advisory weak (ADR-018)"
 
 # (nacct-6) 7d WALL not reframed by n — 7d 88% wall while 5h low (10%) + n=3 → 7d 总闸 still bites (n
 #           orthogonal to the cross-window total gate). Since 88 ≥ dispatch gate(85), it surfaces the
@@ -523,7 +541,7 @@ rm -rf "$N_HOME"
 # 『是否续耗 7d 配额』作 blocked_on:"user" surface 用户」,比泛泛的「降档/降WIP/defer」重得多。真正的暂停由
 # orchestrator 在决策程序 dispatch 节点执行(心智轨)。**只在账户口径生效**(本地反推算不出 7d used%,不触发此闸)。
 G_HOME="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$G_HOME/mine.board.json"
+mkdir -p "$G_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$G_HOME/boards/mine.board.json"
 # run_pacing_acct (re-defined fresh here: armed Stop + sidecar, no stop_hook_active, no num_account env).
 run_pacing_acct() {
   local cdir; cdir="$(make_project)"; local cache="$cdir/rate.json"
@@ -545,6 +563,9 @@ assert_contains "$HOOK_OUT" "surface 给用户" "(gate-1) surfaces the decision 
 assert_contains "$HOOK_OUT" "硬总闸" "(gate-1) names the 7d hard total gate"
 assert_contains "$HOOK_OUT" "87" "(gate-1) carries the authoritative 7d used_percentage"
 assert_not_contains "$HOOK_OUT" '"decision":"block"' "(gate-1) NEVER blocks — hook can't真 block dispatch, only software prompt"
+# ADR-018：7d 硬总闸 → advisory strong（stakes 最高·跨窗口不可逆·对齐 ADR-018 §2.2「7d 逼顶」例 = strong）。
+# 仍是 advisory 非 directive：hook 永不能真 block dispatch（红线4），决策最终归 orchestrator（活体印证·ADR-018 §3.1）。
+assert_contains "$HOOK_OUT" '<advisory source=\"usage-pacing\" strength=\"strong\">' "(gate-1) 7d hard gate → tag-wrapped advisory strong, NOT directive (ADR-018)"
 
 # (gate-2) 7d 84% (just UNDER gate) + 5h fine → NO wall at all (84 < floor 85) → silent. Proves the gate
 #          keys on ≥85, not below; sub-gate 7d does not surface the dispatch wording.
@@ -582,7 +603,7 @@ assert_contains "$HOOK_OUT" "用户" "(gate-4) still surfaces the decision to th
 # (gate-5) LOCAL-REVERSAL path (no sidecar) → never emits the 7d dispatch gate. The local反推 path can't
 #          compute 7d used% (no分母) so the gate is account-only (与加速侧反推禁用同精神). SAMPLE @12:00Z low burn.
 G_LH="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-local"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$G_LH/mine.board.json"
+mkdir -p "$G_LH/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-local"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$G_LH/boards/mine.board.json"
 run_pacing_home "$SAMPLE" "2026-06-10T12:00:00Z" "$G_LH" "sess-local"
 assert_eq 0 "$HOOK_RC" "(gate-5) local fallback path → rc 0"
 assert_not_contains "$HOOK_OUT" "暂停 dispatch 新节点" "(gate-5) local反推 path NEVER emits the 7d dispatch gate (account-only, no 7d%)"
@@ -638,7 +659,7 @@ run_pacing_acct_home() { # SIDECAR_JSON NOW HOME SID -> armed Stop + sidecar, ac
 #   7d 20% low → at effective-N=1 this is a SLOWDOWN (回落减速), NOT a 切下一份配额 signal. Proves an empty
 #   backup pool yields single-account pacing (the LAST/only quota does not falsely encourage切号).
 C_HOME="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+mkdir -p "$C_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/boards/mine.board.json"
 printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true}}}' > "$C_HOME/accounts.json"
 run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
   "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
@@ -651,7 +672,7 @@ rm -rf "$C_HOME"
 #   Same 5h wall → 切下一份配额 signal fires (a fresh quota exists to switch to). Proves the n>1 fork keys on
 #   the registry-derived effective-N. Also the pool fact (号池) rides along (switchable≥1).
 C_HOME="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+mkdir -p "$C_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/boards/mine.board.json"
 printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"}}}' > "$C_HOME/accounts.json"
 run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
   "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
@@ -666,7 +687,7 @@ rm -rf "$C_HOME"
 #   2025, < now 2026) → switchable=0 → effective-N=1 → SLOWDOWN, no切号. Proves token_expires_at gates
 #   switchable (an expired backup can't be switched into — auth would fail). Pool fact NOT appended (switchable=0).
 C_HOME="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+mkdir -p "$C_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/boards/mine.board.json"
 printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2025-06-17T10:40:00Z"},"c@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"c@x.com"},"active":false,"token_expires_at":"2025-06-17T10:40:00Z"}}}' > "$C_HOME/accounts.json"
 run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
   "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
@@ -679,7 +700,7 @@ rm -rf "$C_HOME"
 # (regn-4) NO registry at all → natural single account → effective-N=1 → SLOWDOWN (the --num_account砍 path:
 #   no accounts.json = single account, behavior identical to old --num_account default 1). Pool fact NOT appended.
 C_HOME="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+mkdir -p "$C_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/boards/mine.board.json"
 run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
   "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
 assert_eq 0 "$HOOK_RC" "(regn-4) no accounts.json → effective-N=1 (natural single account) → rc 0"
@@ -691,7 +712,7 @@ rm -rf "$C_HOME"
 # (regn-5) BAD JSON registry → graceful degrade to effective-N=1 (never crash; failure must be silent per the
 #   hook's总纪律). 5h wall → SLOWDOWN. Proves corrupt accounts.json degrades, not crashes.
 C_HOME="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+mkdir -p "$C_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/boards/mine.board.json"
 printf '%s' '{ this is not valid json ::: ' > "$C_HOME/accounts.json"
 run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
   "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
@@ -719,7 +740,7 @@ rm -rf "$C_HOME"
 #   falsely be 2 and the hook would dangle a容量 lever (切到下一份配额) the选号 algorithm actually excludes.
 #   Pool fact NOT appended (switchable=0).
 C_HOME="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+mkdir -p "$C_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/boards/mine.board.json"
 printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z","switchable":false}}}' > "$C_HOME/accounts.json"
 run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
   "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
@@ -733,7 +754,7 @@ rm -rf "$C_HOME"
 #   effective-N=2 (not 3). Proves the switchable:false号 is subtracted out of effective-N while the genuinely
 #   switchable号 still counts. 5h wall → 切号 signal fires naming「2 份」(not 3), pool fact names 1 switchable.
 C_HOME="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/mine.board.json"
+mkdir -p "$C_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$C_HOME/boards/mine.board.json"
 printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z","switchable":false},"c@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"c@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"}}}' > "$C_HOME/accounts.json"
 run_pacing_acct_home "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" \
   "2026-06-10T12:00:00Z" "$C_HOME" "sess-acct"
@@ -751,7 +772,7 @@ rm -rf "$C_HOME"
 # encouraging a switch could透支 an already-near-cap (but unmeasured) 7d. Fix: branch requires sdKnown
 # (p7!==null). 7d missing → fall through to conservative SLOWDOWN wording, never claim 7d headroom.
 S_HOME="$(make_project)"
-printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$S_HOME/mine.board.json"
+mkdir -p "$S_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$S_HOME/boards/mine.board.json"
 # run_pacing_nacct_g: armed Stop + sidecar + env num_account (board has no num_account here, env drives n).
 run_pacing_nacct_g() {
   local cdir; cdir="$(make_project)"; local cache="$cdir/rate.json"
@@ -781,5 +802,311 @@ assert_eq 0 "$HOOK_RC" "(sd-present-1) 7d present & low + n=3 + 5h wall → rc 0
 assert_contains "$HOOK_OUT" "切到下一份配额" "(sd-present-1) 7d present & low → 切下一份配额 DOES fire (7d confirmed余量)"
 assert_contains "$HOOK_OUT" "7d 仅 20%" "(sd-present-1) names the confirmed 7d headroom value"
 rm -rf "$S_HOME"
+
+# ── CCM SHELL-OUT (P4 收口): hook prefers `ccm usage advise --json`; present → use its verdict; absent → fallback ──
+# The corridor verdict math is收口'd into the ccm engine (pacing.ts SSOT); the hook shells out to it
+# (adviseViaCcm → spawnSync `ccm usage advise --json`) and maps the verdict to a本 skill-vocabulary prompt.
+# These cases inject a STUB `ccm` via CCM_BIN (hermetic — no real ccm binary needed): the stub echoes a fixed
+# {"ok":true,"data":{…}} for each verdict. ccm-absent (CCM_BIN→nonexistent) must gracefully fall back to local.
+# All cases run ARMED (the gate still runs BEFORE any shell-out) and assert NON-blocking.
+CCM_HOME="$(make_project)"
+mkdir -p "$CCM_HOME/boards"; printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-ccm"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$CCM_HOME/boards/mine.board.json"
+
+# mk_ccm_stub DATA_JSON -> path to an executable stub `ccm` that prints {"ok":true,"data":DATA_JSON} on
+#   `usage advise`. The DATA_JSON is written to a sibling payload file the stub `cat`s — no sed/interpolation
+#   fragility (DATA_JSON可含任意 JSON 字符). Mirrors the real `ccm usage advise --json` shape (ok+data).
+#   Any other subcommand → empty (defensive). The stub dir is the caller's to clean up.
+mk_ccm_stub() {
+  local dir; dir="$(make_project)"; local stub="$dir/ccm"; local payload="$dir/payload.json"
+  printf '%s' "$1" > "$payload"
+  cat > "$stub" <<STUB
+#!/usr/bin/env bash
+# stub ccm: only answers \`usage advise\` with the canned data payload next to this script.
+if [ "\$1" = "usage" ] && [ "\$2" = "advise" ]; then
+  printf '{"ok":true,"data":%s}\n' "\$(cat "$payload")"
+fi
+STUB
+  chmod +x "$stub"
+  echo "$stub"
+}
+
+# run_pacing_ccm STUB_DATA_JSON HOME SID -> armed Stop driven through a stub ccm (CCM_BIN=stub).
+run_pacing_ccm() {
+  local stub; stub="$(mk_ccm_stub "$1")"
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$3" \
+    | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="2026-06-10T12:00:00Z" CC_MASTER_HOME="$2" \
+      CC_MASTER_RATE_CACHE="/nonexistent-ccm-section-rate-cache" CCM_BIN="$stub" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+  rm -rf "$(dirname "$stub")"
+}
+
+# (ccm-1) THROTTLE verdict from ccm → SLOWDOWN prompt (降到更便宜的模型档), non-blocking. Proves the hook
+#         takes ccm's verdict (not local — local rate-cache is nonexistent here so local would be silent).
+run_pacing_ccm '{"verdict":"throttle","reason":"r","levers":["downgrade_model"],"hard_stop_7d":false,"window_5h_pct":92,"window_7d_pct":50,"effective_n":1,"switch_candidate":null,"confidence":"high","source":"account","available":true}' \
+  "$CCM_HOME" "sess-ccm"
+assert_eq 0 "$HOOK_RC" "(ccm-1) ccm throttle → rc 0"
+assert_contains "$HOOK_OUT" "additionalContext" "(ccm-1) ccm throttle → injects prompt"
+assert_contains "$HOOK_OUT" "降到更便宜的模型档" "(ccm-1) ccm throttle → SLOWDOWN levers (本 skill vocabulary)"
+assert_contains "$HOOK_OUT" "92" "(ccm-1) carries ccm window_5h_pct"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(ccm-1) NEVER blocks"
+
+# (ccm-2) HARD_STOP verdict (7d hard total gate) → 暂停 dispatch 新节点 + blocked_on:user + 硬总闸. The hardest framing.
+run_pacing_ccm '{"verdict":"hard_stop","reason":"r","levers":["pause_dispatch","surface_user"],"hard_stop_7d":true,"window_5h_pct":40,"window_7d_pct":87,"effective_n":1,"switch_candidate":null,"confidence":"high","source":"account","available":true}' \
+  "$CCM_HOME" "sess-ccm"
+assert_eq 0 "$HOOK_RC" "(ccm-2) ccm hard_stop → rc 0"
+assert_contains "$HOOK_OUT" "暂停 dispatch 新节点" "(ccm-2) ccm hard_stop → dispatch gate wording"
+assert_contains "$HOOK_OUT" "blocked_on:" "(ccm-2) frames blocked_on:user"
+assert_contains "$HOOK_OUT" "硬总闸" "(ccm-2) names the 7d hard total gate"
+assert_contains "$HOOK_OUT" "87" "(ccm-2) carries ccm window_7d_pct"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(ccm-2) NEVER blocks (hook can't真 block dispatch)"
+
+# (ccm-3) ACCELERATE+switch_account lever (n>1 + 5h critical + 7d headroom) → 切到下一份配额 signal.
+run_pacing_ccm '{"verdict":"accelerate","reason":"r","levers":["switch_account","continue_dispatch"],"hard_stop_7d":false,"window_5h_pct":92,"window_7d_pct":20,"effective_n":3,"switch_candidate":"b@x.com","confidence":"high","source":"account","available":true}' \
+  "$CCM_HOME" "sess-ccm"
+assert_eq 0 "$HOOK_RC" "(ccm-3) ccm accelerate-switch → rc 0"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(ccm-3) switch_account lever → 切下一份配额 signal"
+assert_contains "$HOOK_OUT" "3 份" "(ccm-3) names the effective_n (3 份)"
+
+# (ccm-4) ACCELERATE underuse (no switch lever) → 欠用 + 加速 prompt.
+run_pacing_ccm '{"verdict":"accelerate","reason":"r","levers":["upgrade_model_critical_path","increase_parallelism"],"hard_stop_7d":false,"window_5h_pct":20,"window_7d_pct":30,"effective_n":1,"switch_candidate":null,"confidence":"medium","source":"account","available":true}' \
+  "$CCM_HOME" "sess-ccm"
+assert_eq 0 "$HOOK_RC" "(ccm-4) ccm accelerate-underuse → rc 0"
+assert_contains "$HOOK_OUT" "欠用" "(ccm-4) underuse accelerate → carries 欠用 signal"
+assert_contains "$HOOK_OUT" "加速" "(ccm-4) points at accelerate levers (加速)"
+
+# (ccm-5) HOLD verdict → silent (corridor内·no prompt). Proves ccm hold suppresses output (no spam).
+run_pacing_ccm '{"verdict":"hold","reason":"r","levers":[],"hard_stop_7d":false,"window_5h_pct":78,"window_7d_pct":40,"effective_n":1,"switch_candidate":null,"confidence":"high","source":"account","available":true}' \
+  "$CCM_HOME" "sess-ccm"
+assert_eq 0 "$HOOK_RC" "(ccm-5) ccm hold → rc 0"
+assert_eq "" "$HOOK_OUT" "(ccm-5) ccm hold (corridor内) → silent (no prompt)"
+
+# (ccm-6) ccm available:false → degrade to LOCAL fallback. Stub returns available:false; local rate-cache
+#         is nonexistent + SAMPLE @12:00Z has 180min headroom → local path also silent. Proves available:false
+#         → adviseViaCcm returns null → local path runs (here silent), NOT ccm's (would've been hold anyway).
+run_pacing_ccm '{"verdict":"hold","reason":"r","levers":[],"hard_stop_7d":false,"window_5h_pct":null,"window_7d_pct":null,"effective_n":1,"switch_candidate":null,"confidence":"low","source":"local-derived-approx","available":false}' \
+  "$CCM_HOME" "sess-ccm"
+assert_eq 0 "$HOOK_RC" "(ccm-6) ccm available:false → rc 0"
+assert_eq "" "$HOOK_OUT" "(ccm-6) ccm available:false → degrade to local (here silent), not ccm verdict"
+
+# (ccm-7) ccm ABSENT (CCM_BIN→nonexistent) but a CRITICAL local account sidecar present → falls back to LOCAL
+#         account-authoritative path → still warns (proves graceful degrade preserves the local capability).
+CCM_CACHE_DIR="$(make_project)"; CCM_CACHE="$CCM_CACHE_DIR/rate.json"
+A_R5F_CCM=$((A_NOWEP+3600))
+printf '{"five_hour":{"used_percentage":90,"resets_at":%d},"seven_day":{"used_percentage":20}}' "$A_R5F_CCM" > "$CCM_CACHE"
+HOOK_OUT="$(printf '{"session_id":"sess-ccm","hook_event_name":"Stop"}' \
+  | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="2026-06-10T12:00:00Z" CC_MASTER_HOME="$CCM_HOME" \
+    CC_MASTER_RATE_CACHE="$CCM_CACHE" CCM_BIN="/nonexistent-ccm-absent" \
+    "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+assert_eq 0 "$HOOK_RC" "(ccm-7) ccm absent + critical local sidecar → rc 0"
+assert_contains "$HOOK_OUT" "additionalContext" "(ccm-7) ccm absent → LOCAL fallback path still warns (graceful degrade)"
+assert_contains "$HOOK_OUT" "降到更便宜的模型档" "(ccm-7) local fallback emits its account-authoritative SLOWDOWN"
+rm -rf "$CCM_CACHE_DIR"
+
+# (ccm-8) ccm GARBAGE JSON → degrade to local. Stub emits non-JSON; adviseViaCcm returns null → local path
+#         (nonexistent rate-cache + SAMPLE 180min headroom → silent). Proves bad JSON never crashes / never
+#         injects garbage, just degrades.
+GARBAGE_STUB_DIR="$(make_project)"; GARBAGE_STUB="$GARBAGE_STUB_DIR/ccm"
+printf '#!/usr/bin/env bash\nprintf "not json at all {{{\\n"\n' > "$GARBAGE_STUB"; chmod +x "$GARBAGE_STUB"
+HOOK_OUT="$(printf '{"session_id":"sess-ccm","hook_event_name":"Stop"}' \
+  | CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="2026-06-10T12:00:00Z" CC_MASTER_HOME="$CCM_HOME" \
+    CC_MASTER_RATE_CACHE="/nonexistent-ccm-section-rate-cache" CCM_BIN="$GARBAGE_STUB" \
+    "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+assert_eq 0 "$HOOK_RC" "(ccm-8) ccm garbage JSON → rc 0 (no crash)"
+assert_eq "" "$HOOK_OUT" "(ccm-8) ccm garbage JSON → degrade to local (silent here), never inject garbage"
+rm -rf "$GARBAGE_STUB_DIR"
+
+# (ccm-9) ARMED GATE still runs BEFORE shell-out — UNARMED + a hard_stop stub ccm → silent (no shell-out
+#         leakage on unarmed sessions·red line 6). Proves the gate short-circuits before adviseViaCcm.
+CCM_UNARMED="$(make_project)"  # no *.board.json → unarmed
+run_pacing_ccm '{"verdict":"hard_stop","reason":"r","levers":["pause_dispatch"],"hard_stop_7d":true,"window_5h_pct":99,"window_7d_pct":99,"effective_n":1,"switch_candidate":null,"confidence":"high","source":"account","available":true}' \
+  "$CCM_UNARMED" "sess-ccm-unarmed"
+assert_eq 0 "$HOOK_RC" "(ccm-9) unarmed + hard_stop stub ccm → rc 0"
+assert_eq "" "$HOOK_OUT" "(ccm-9) unarmed → silent even with a critical ccm verdict (armed gate before shell-out, red line 6)"
+rm -rf "$CCM_UNARMED"
+rm -rf "$CCM_HOME"
+
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+# F3 (codex second-perspective): ACCOUNTS_FILE must resolve via the CANONICAL home (HOME_DIR =
+# hook-common.resolveHome()), NOT a bare `process.env.HOME || ''`. When HOME AND CC_MASTER_HOME are both
+# unset, the old code resolved accounts.json to a CWD-RELATIVE path ('' + '/.claude/cc-master/...')
+# while arming used resolveHome()→os.homedir() (an absolute global home): a SILENT split → the registry
+# is read from the wrong place → effective-N forced to 1 → the pool suggestion is lost. The fix routes
+# ACCOUNTS_FILE through HOME_DIR so it is always the same root arming uses.
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+
+# (F3a) source guard (the hermetic discriminator — a HOME-unset behavioral trigger inherently points at
+#   the real os.homedir() and cannot be made hermetic): the hook derives ACCOUNTS_FILE from HOME_DIR and
+#   no longer from a bare `process.env.HOME`. Extract just the `const ACCOUNTS_FILE = … ;` block.
+F3_ACCT_BLOCK="$(awk '/const ACCOUNTS_FILE/{f=1} f{print} f&&/;/{exit}' "$HOOK")"
+assert_contains "$F3_ACCT_BLOCK" "HOME_DIR" "(F3a) ACCOUNTS_FILE resolves via canonical HOME_DIR (resolveHome), same root as arming"
+assert_not_contains "$F3_ACCT_BLOCK" "process.env.HOME" "(F3a) ACCOUNTS_FILE no longer built from a bare process.env.HOME (the cwd-relative footgun when HOME unset)"
+
+# (F3b) behavioral: with CC_MASTER_HOME UNSET and home derived from HOME, accounts.json is read end-to-end
+#   from <HOME>/.claude/cc-master/accounts.json — the SAME root arming used (proves HOME_DIR is actually
+#   consulted, not just shaped right). 1 active + 1 token-unexpired backup → effective-N=2 → 切下一份配额 +
+#   号池 fact. (The registry tests above all PIN CC_MASTER_HOME; this is the only one exercising the
+#   CC_MASTER_HOME-unset → HOME-derived path the F3 fix unifies.)
+F3H="$(make_project)"   # acts as a fake $HOME
+mkdir -p "$F3H/.claude/cc-master/boards"
+printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-acct"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$F3H/.claude/cc-master/boards/mine.board.json"
+printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"}}}' > "$F3H/.claude/cc-master/accounts.json"
+F3CDIR="$(make_project)"; F3CACHE="$F3CDIR/rate.json"
+printf '%s' "{\"five_hour\":{\"used_percentage\":90,\"resets_at\":$A_R5F},\"seven_day\":{\"used_percentage\":20}}" > "$F3CACHE"
+HOOK_OUT="$(printf '{"session_id":"sess-acct","hook_event_name":"Stop"}' \
+  | env -u CC_MASTER_HOME HOME="$F3H" CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="2026-06-10T12:00:00Z" \
+        CC_MASTER_RATE_CACHE="$F3CACHE" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+assert_eq 0 "$HOOK_RC" "(F3b) CC_MASTER_HOME-unset + HOME-derived home → rc 0"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(F3b) accounts.json read from <HOME>/.claude/cc-master (canonical home) → effective-N=2 → 切号 signal"
+assert_contains "$HOOK_OUT" "号池" "(F3b) pool fact appended (accounts.json found at HOME-derived home root, same root as arming)"
+rm -rf "$F3H" "$F3CDIR"
+
+# ── LBHOOK (LOADBAL §3.2/3.3 + ADR-016): kind==='switch' → 机械调 ccm account switch（policy 闸 + 幂等 + 注入）──
+# When pacing concludes kind==='switch' (5h critical + n>1 + 7d headroom + a switchable backup), the hook
+# MECHANICALLY calls `ccm account switch` instead of merely advising the agent. ccm self-gates: re-read
+# registry → select → board.policy hard gate (deny→exit7) → exhausted→exit3 → overwrite stores. The hook is
+# token-blind (switch runs in the ccm subprocess; hook only passes --board/--home + reads non-secret JSON).
+# These cases inject a STUB `ccm` answering BOTH `usage advise` (the accelerate+switch_account verdict that
+# yields kind:'switch') AND `account switch` (canned exit + JSON). AUTOSWITCH defaults ON; CC_MASTER_AUTOSWITCH=0
+# forces the old advise-only behavior. A cooldown sidecar prevents per-Stop thrash.
+
+# mk_lbhook_stub ADVISE_DATA_JSON SWITCH_EXIT SWITCH_STDOUT -> path to an executable stub `ccm` answering
+#   `usage advise` with the canned data, and `account switch` with SWITCH_STDOUT + exit SWITCH_EXIT.
+mk_lbhook_stub() {
+  local dir; dir="$(make_project)"; local stub="$dir/ccm"
+  local advise="$dir/advise.json"; printf '%s' "$1" > "$advise"
+  local swexit="${2:-0}"
+  local swout="$dir/switch.out"; printf '%s' "${3:-}" > "$swout"
+  cat > "$stub" <<STUB
+#!/usr/bin/env bash
+if [ "\$1" = "usage" ] && [ "\$2" = "advise" ]; then
+  printf '{"ok":true,"data":%s}\n' "\$(cat "$advise")"
+  exit 0
+fi
+if [ "\$1" = "account" ] && [ "\$2" = "switch" ]; then
+  cat "$swout"
+  exit $swexit
+fi
+exit 0
+STUB
+  chmod +x "$stub"
+  echo "$stub"
+}
+# seed_lb_home -> a fresh home with ONE active board (sess-lb) + accounts.json (1 active + 1 switchable backup
+#   token-unexpired 2027 → pool.switchable=1). echo the home path.
+seed_lb_home() {
+  local h; h="$(make_project)"; mkdir -p "$h/boards"
+  printf '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-lb"},"policy":{"autonomous_account_switch":"allow"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$h/boards/mine.board.json"
+  printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"}}}' > "$h/accounts.json"
+  echo "$h"
+}
+# The advise payload that drives kind:'switch' (verdict accelerate + switch_account lever, 7d headroom).
+LB_ADVISE='{"verdict":"accelerate","reason":"r","levers":["switch_account","continue_dispatch"],"hard_stop_7d":false,"window_5h_pct":92,"window_7d_pct":20,"effective_n":2,"switch_candidate":"b@x.com","confidence":"high","source":"account","available":true}'
+A_NOWMS=$((A_NOWEP*1000))  # epoch ms for CC_MASTER_NOW 2026-06-10T12:00:00Z (cooldown sidecar timestamps)
+
+# run_lbhook STUB HOME SID [EXTRA_ENV...] -> armed Stop driven through the stub (CCM_BIN=stub). EXTRA_ENV are
+#   passed as KEY=VAL before the hook (e.g. CC_MASTER_AUTOSWITCH=0 / CC_MASTER_SWITCH_STATE=<file>).
+run_lbhook() {
+  local stub="$1" home="$2" sid="$3"; shift 3
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$sid" \
+    | env CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="2026-06-10T12:00:00Z" CC_MASTER_HOME="$home" \
+        CC_MASTER_RATE_CACHE="/nonexistent-lbhook-rate-cache" CCM_BIN="$stub" "$@" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+}
+
+# (lbhook-1) SWITCH SUCCESS — stub switch exits 0 + {switched:true,email:b@x.com}. The hook mechanically switches
+#   → single ambient "已自动换号" naming the new active; NO advisory block at all; cooldown sidecar written; rc 0.
+LB_HOME="$(seed_lb_home)"
+LB_STUB="$(mk_lbhook_stub "$LB_ADVISE" 0 '{"ok":true,"data":{"email":"b@x.com","switched":true}}')"
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb"
+assert_eq 0 "$HOOK_RC" "(lbhook-1) mechanical switch success → rc 0"
+assert_contains "$HOOK_OUT" "已自动换号" "(lbhook-1) success → injects the auto-switch ambient (已自动换号)"
+assert_contains "$HOOK_OUT" "b@x.com" "(lbhook-1) ambient names the new active account (from ccm switch JSON)"
+assert_contains "$HOOK_OUT" '<ambient source=\"usage-pacing\">' "(lbhook-1) success → ambient block (ADR-018, no action)"
+assert_not_contains "$HOOK_OUT" "<advisory" "(lbhook-1) success → NO advisory block (switch already done, agent only adjusts pacing)"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(lbhook-1) NEVER blocks"
+assert_eq 0 "$([ -f "$LB_HOME/.cc-master-switch.json" ]; echo $?)" "(lbhook-1) success → cooldown sidecar written (anti-thrash)"
+# (lbhook-1b) COOLDOWN — a second identical Stop in the same home (cooldown sidecar now present, fresh) → must
+#   NOT switch again; falls back to the advise-only lever wording (切到下一份配额). Proves the anti-thrash guard.
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb"
+assert_eq 0 "$HOOK_RC" "(lbhook-1b) within cooldown → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-1b) within cooldown → does NOT auto-switch again (anti-thrash)"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(lbhook-1b) cooldown → falls back to advise-only lever wording"
+rm -rf "$LB_HOME" "$(dirname "$LB_STUB")"
+
+# (lbhook-2) POLICY DENY — stub switch exits 7 (board.policy.autonomous_account_switch=deny hard gate). The hook
+#   does NOT switch → advisory with the deny note (surface to user), strength STRONG, names exit 7. rc 0.
+LB_HOME="$(seed_lb_home)"
+LB_STUB="$(mk_lbhook_stub "$LB_ADVISE" 7 '')"
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb"
+assert_eq 0 "$HOOK_RC" "(lbhook-2) policy deny (exit 7) → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-2) deny → did NOT switch"
+assert_contains "$HOOK_OUT" "deny" "(lbhook-2) deny → advisory names the policy deny"
+assert_contains "$HOOK_OUT" "exit 7" "(lbhook-2) deny → names the ccm exit 7 hard gate"
+assert_contains "$HOOK_OUT" "blocked_on:" "(lbhook-2) deny → surfaces as a blocked_on:user decision"
+assert_contains "$HOOK_OUT" '<advisory source=\"usage-pacing\" strength=\"strong\">' "(lbhook-2) deny → advisory STRONG (surface to user, high stakes)"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "(lbhook-2) NEVER blocks"
+rm -rf "$LB_HOME" "$(dirname "$LB_STUB")"
+
+# (lbhook-3) EXHAUSTED — stub switch exits 3 (NONE_ALL_EXHAUSTED·whole pool over the wall). No switch → advisory
+#   with the exhausted note (等 reset surface to user). rc 0.
+LB_HOME="$(seed_lb_home)"
+LB_STUB="$(mk_lbhook_stub "$LB_ADVISE" 3 '')"
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb"
+assert_eq 0 "$HOOK_RC" "(lbhook-3) exhausted (exit 3) → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-3) exhausted → did NOT switch"
+assert_contains "$HOOK_OUT" "exit 3" "(lbhook-3) exhausted → names the ccm exit 3 (NONE_ALL_EXHAUSTED)"
+assert_contains "$HOOK_OUT" "等 reset" "(lbhook-3) exhausted → surfaces 等 reset 决策 to user"
+rm -rf "$LB_HOME" "$(dirname "$LB_STUB")"
+
+# (lbhook-4) AUTOSWITCH=0 KILL-SWITCH — same success-capable stub but CC_MASTER_AUTOSWITCH=0 → the hook never
+#   attempts a switch; reverts to the advise-only lever wording (切到下一份配额). Proves the kill-switch.
+LB_HOME="$(seed_lb_home)"
+LB_STUB="$(mk_lbhook_stub "$LB_ADVISE" 0 '{"ok":true,"data":{"email":"b@x.com","switched":true}}')"
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb" CC_MASTER_AUTOSWITCH=0
+assert_eq 0 "$HOOK_RC" "(lbhook-4) AUTOSWITCH=0 → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-4) kill-switch → no mechanical switch"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(lbhook-4) kill-switch → advise-only lever wording (old behavior)"
+rm -rf "$LB_HOME" "$(dirname "$LB_STUB")"
+
+# (lbhook-5) AMBIGUOUS BOARD CONTEXT — TWO active boards for this session → board context ambiguous → conservatively
+#   do NOT auto-switch (which board's policy?) → advise-only fallback. (Single-board is the only auto-switch case.)
+LB_HOME="$(make_project)"; mkdir -p "$LB_HOME/boards"
+printf '{"schema":"cc-master/v1","goal":"g1","owner":{"active":true,"session_id":"sess-lb"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$LB_HOME/boards/a.board.json"
+printf '{"schema":"cc-master/v1","goal":"g2","owner":{"active":true,"session_id":"sess-lb"},"tasks":[{"id":"T2","status":"in_flight","deps":[]}]}' > "$LB_HOME/boards/b.board.json"
+printf '%s' '{"schema":"cc-master/accounts/v1","accounts":{"a@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"a@x.com"},"active":true},"b@x.com":{"vault":{"kind":"keychain","service":"cc-master-oauth","account":"b@x.com"},"active":false,"token_expires_at":"2027-06-17T10:40:00Z"}}}' > "$LB_HOME/accounts.json"
+LB_STUB="$(mk_lbhook_stub "$LB_ADVISE" 0 '{"ok":true,"data":{"email":"b@x.com","switched":true}}')"
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb"
+assert_eq 0 "$HOOK_RC" "(lbhook-5) ambiguous (2 active boards) → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-5) ambiguous board context → conservatively does NOT auto-switch"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(lbhook-5) ambiguous → advise-only fallback (which board's policy is unclear)"
+rm -rf "$LB_HOME" "$(dirname "$LB_STUB")"
+
+# (lbhook-6) COOLDOWN PRE-SEEDED — switch-state sidecar with a recent last_switch_at_ms (= now) → within the
+#   default 1800s cooldown → no switch; advise-only fallback. Proves cooldown is honored from the sidecar.
+LB_HOME="$(seed_lb_home)"
+LB_STUB="$(mk_lbhook_stub "$LB_ADVISE" 0 '{"ok":true,"data":{"email":"b@x.com","switched":true}}')"
+LB_CDDIR="$(make_project)"; LB_CD="$LB_CDDIR/switch-state.json"
+printf '{"last_switch_at_ms":%d}' "$A_NOWMS" > "$LB_CD"
+run_lbhook "$LB_STUB" "$LB_HOME" "sess-lb" CC_MASTER_SWITCH_STATE="$LB_CD"
+assert_eq 0 "$HOOK_RC" "(lbhook-6) pre-seeded cooldown → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-6) within pre-seeded cooldown → no switch"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(lbhook-6) cooldown → advise-only fallback"
+rm -rf "$LB_HOME" "$LB_CDDIR" "$(dirname "$LB_STUB")"
+
+# (lbhook-7) CCM ABSENT (local kind:'switch' path) — CCM_BIN nonexistent, but a local critical sidecar (5h 92%
+#   + 7d 20%) + accounts.json switchable backup → decideAccountWarning yields kind:'switch'; attemptCcmSwitch
+#   →ENOENT→absent→ graceful degrade to advise-only. Proves ccm-absent never blocks the switch path.
+LB_HOME="$(seed_lb_home)"
+LB_CDDIR="$(make_project)"; LB_CACHE="$LB_CDDIR/rate.json"
+printf '{"five_hour":{"used_percentage":92,"resets_at":%d},"seven_day":{"used_percentage":20}}' "$A_R5F" > "$LB_CACHE"
+HOOK_OUT="$(printf '{"session_id":"sess-lb","hook_event_name":"Stop"}' \
+  | env CC_MASTER_USAGE_DIR="$SAMPLE" CC_MASTER_NOW="2026-06-10T12:00:00Z" CC_MASTER_HOME="$LB_HOME" \
+        CC_MASTER_RATE_CACHE="$LB_CACHE" CCM_BIN="/nonexistent-lbhook-absent" \
+      "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+assert_eq 0 "$HOOK_RC" "(lbhook-7) ccm absent + local kind:switch → rc 0"
+assert_not_contains "$HOOK_OUT" "已自动换号" "(lbhook-7) ccm absent → could not switch (graceful degrade)"
+assert_contains "$HOOK_OUT" "切到下一份配额" "(lbhook-7) ccm absent → advise-only fallback (the old behavior preserved)"
+rm -rf "$LB_HOME" "$LB_CDDIR"
 
 finish

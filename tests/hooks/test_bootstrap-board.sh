@@ -1,7 +1,24 @@
 #!/usr/bin/env bash
 . "$(dirname "$0")/helpers.sh"
 
-count_boards() { ls "$1"/*.board.json 2>/dev/null | wc -l | tr -d ' '; }
+# ── ④ CCM PRECHECK (ADR-021)·present-ccm baseline for the EXISTING "happy" cases ─────────────────────
+# bootstrap now HARD-CHECKS ccm install presence at the ARM entry (ADR-021): missing ccm → refuse to arm
+# (no board + a <directive source="bootstrap"> agent-relay install reminder·exit 0). So every case below
+# that expects a board to be created needs ccm to be PRESENT. Tests own CCM_BIN (same口径 as
+# test_identity-nudge / test_hook-ccm-decoupling): if run-tests.sh already exported CCM_BIN (the dev-bin
+# shim), reuse it; otherwise point it at the shim so the gate sees ccm regardless of PATH. The gate is
+# `[ -x "$CCM_BIN" ]` — the shim is an executable wrapper, so existence is enough (the gate never spawns
+# ccm). The dedicated ccm-ABSENT cases (G-series, bottom) override CCM_BIN to a nonexistent path.
+if [ -z "${CCM_BIN:-}" ]; then
+  _SHIM="$PLUGIN_ROOT/ccm/apps/cli/dev-bin/ccm"
+  if [ -x "$_SHIM" ]; then export CCM_BIN="$_SHIM"; fi
+  # else: no shim → fall through; the gate's `command -v ccm` covers an on-PATH ccm. If neither exists
+  #   the happy cases would (correctly) refuse to arm; CI/dev環境 always has one of shim/ccm.
+fi
+NO_CCM="/no/such/ccm-binary-$$"   # nonexistent executable → CCM_BIN override → ccm-ABSENT gate path
+
+# board 集中落 <home>/boards/（board-v2 布局）；这些 helper 入参传 home **根**，内部扫 boards/ 子目录。
+count_boards() { ls "$1/boards"/*.board.json 2>/dev/null | wc -l | tr -d ' '; }
 # board_sid FILE — extract owner.session_id value (pure bash). owner precedes tasks[] in the pinned
 # waist, so the FIRST "session_id" token is owner's. grep -o the first token BEFORE sed: a greedy
 # `.*"session_id"` on a single line bearing several session_id-shaped fields would otherwise capture
@@ -10,8 +27,8 @@ board_sid() {
   grep -oE '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' "$1" | head -1 \
     | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
 }
-# only_board HOME — echo the single board path in HOME (assumes exactly one).
-only_board() { ls "$1"/*.board.json 2>/dev/null | head -1; }
+# only_board HOME — echo the single board path in <HOME>/boards/ (assumes exactly one).
+only_board() { ls "$1/boards"/*.board.json 2>/dev/null | head -1; }
 # board_has_template_version FILE — grep the agent-shaped meta.template_version field (integer value).
 # Pure bash, no jq. Echoes the integer if present, empty otherwise.
 board_template_version() {
@@ -38,7 +55,7 @@ assert_contains "$HOOK_OUT" "orchestrator" "injects the orchestrator role"
 EXPECTED_TV="$(board_template_version "$PLUGIN_ROOT/skills/orchestrating-to-completion/assets/board.template.json")"
 P2="$(make_project)"
 HOOK_OUT="$(printf '%s' '{"prompt":"/cc-master:as-master-orchestrator x"}' \
-  | CLAUDE_PROJECT_DIR="$P2" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+  | CLAUDE_PROJECT_DIR="$P2" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P2/.claude/cc-master" \
     bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
 assert_eq "$EXPECTED_TV" "$(board_template_version "$(only_board "$P2/.claude/cc-master")")" "A: fresh board (template path) carries the template's meta.template_version ($EXPECTED_TV)"
 rm -rf "$P" "$P2"
@@ -47,10 +64,10 @@ rm -rf "$P" "$P2"
 # fallback builds the board — it must ALSO seed meta.template_version (parity with the template).
 P="$(make_project)"; EMPTY_ROOT="$(make_project)"
 HOOK_OUT="$(printf '%s' '{"session_id":"sess-fb","prompt":"/cc-master:as-master-orchestrator x"}' \
-  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$EMPTY_ROOT" \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$EMPTY_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
     bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
 assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "A0: fallback path created a board"
-assert_eq 1 "$(board_template_version "$(only_board "$P/.claude/cc-master")")" "A0: fallback printf seeds meta.template_version=1"
+assert_eq 3 "$(board_template_version "$(only_board "$P/.claude/cc-master")")" "A0: fallback printf seeds meta.template_version=3 (parity with v2 template)"
 rm -rf "$P" "$EMPTY_ROOT"
 
 # Case A1 (ARM = stamp session_id): bootstrap is the ARM action — the board it creates is born
@@ -59,7 +76,7 @@ rm -rf "$P" "$EMPTY_ROOT"
 # immediately satisfiable for the very session that armed it.
 P="$(make_project)"
 HOOK_OUT="$(printf '%s' '{"session_id":"sess-boot-1","prompt":"/cc-master:as-master-orchestrator do the thing"}' \
-  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
     bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
 assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "A1: board created"
 assert_eq "sess-boot-1" "$(board_sid "$(only_board "$P/.claude/cc-master")")" "A1: bootstrap stamps owner.session_id from stdin session_id"
@@ -69,7 +86,7 @@ rm -rf "$P"
 # as the expanded body marker (not the raw command), the created board still carries the real sid.
 P="$(make_project)"
 HOOK_OUT="$(printf '%s' '{"session_id":"sess-boot-2","prompt":"<!-- cc-master:bootstrap:v1 -->\n..."}' \
-  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
     bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
 assert_eq "sess-boot-2" "$(board_sid "$(only_board "$P/.claude/cc-master")")" "A2: body-sentinel path also stamps the sid"
 rm -rf "$P"
@@ -170,8 +187,8 @@ rm -rf "$P"
 # (the common case for stale/abandoned boards).
 seed_board() { # $1 home $2 sid $3 active $4 goal [$5 extra-tasks-json]
   local home="$1" sid="$2" active="$3" goal="$4" extra="${5:-}"
-  mkdir -p "$home"
-  local bp; bp="$(mktemp "$home/20260101T000000Z-seedXXXXXX")"; mv "$bp" "$bp.board.json"; bp="$bp.board.json"
+  mkdir -p "$home/boards"   # board 落 <home>/boards/（board-v2 布局）
+  local bp; bp="$(mktemp "$home/boards/20260101T000000Z-seedXXXXXX")"; mv "$bp" "$bp.board.json"; bp="$bp.board.json"
   local tasks='{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":["T1"]}'
   [ -n "$extra" ] && tasks="$tasks,$extra"
   printf '{"schema":"cc-master/v1","goal":"%s","owner":{"active":%s,"session_id":"%s","heartbeat":""},"git":{"worktree":"","branch":""},"wip_limit":4,"tasks":[%s],"log":[{"t":"2026-01-01","msg":"seeded"}]}\n' \
@@ -424,16 +441,16 @@ assert_eq "sess/a.b*c&d" "$(board_sid "$B")" "S15: metachar sid re-stamped exact
 rm -rf "$H"
 
 # ── S16: compact single-line vs pretty multi-line JSON → identical resume result (format-agnostic)
-H="$(make_project)"
-Bc="$H/20260101T010101Z-compact.board.json"
+H="$(make_project)"; mkdir -p "$H/boards"
+Bc="$H/boards/20260101T010101Z-compact.board.json"
 printf '{"schema":"cc-master/v1","goal":"compactfmt","owner":{"active":true,"session_id":"old-c","heartbeat":""},"git":{"worktree":"","branch":""},"tasks":[{"id":"T1","status":"done"}],"log":[]}\n' > "$Bc"
 touch_mtime "$Bc" 60
 run_resume "$H" "new-c" '/cc-master:as-master-orchestrator --resume compactfmt'
 assert_eq "new-c" "$(board_sid "$Bc")" "S16a: compact JSON re-stamped"
 assert_eq "true" "$(board_active "$Bc")" "S16a: compact JSON active stays true"
 rm -rf "$H"
-H="$(make_project)"
-Bm="$H/20260101T020202Z-multi.board.json"
+H="$(make_project)"; mkdir -p "$H/boards"
+Bm="$H/boards/20260101T020202Z-multi.board.json"
 printf '{\n  "schema": "cc-master/v1",\n  "goal": "prettyfmt",\n  "owner": {\n    "active": true,\n    "session_id": "old-m",\n    "heartbeat": ""\n  },\n  "git": { "worktree": "", "branch": "" },\n  "tasks": [ { "id": "T1", "status": "done" } ],\n  "log": []\n}\n' > "$Bm"
 touch_mtime "$Bm" 60
 run_resume "$H" "new-m" '/cc-master:as-master-orchestrator --resume prettyfmt'
@@ -656,5 +673,118 @@ run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume "minute p
 assert_eq "new-sess" "$(board_sid "$B")" "S24c: old minute-precision heartbeat datable → abandoned → taken over"
 assert_contains "$HOOK_OUT" "TAKEN OVER" "S24c: old minute-precision heartbeat → takeover context"
 rm -rf "$H"
+
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+# codex second-perspective findings on the global-home resolution / migration (2026-06-26)
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+
+# ── F1 (codex HIGH): a legacy board sitting FLAT under the resolved home ROOT (old layout, before the
+#    boards/ subdir existed — common when a user points CC_MASTER_HOME at an old flat-layout dir whose
+#    boards live directly inside it) must be migrated into <home>/boards/ so --resume (which only scans
+#    boards/) can find it. The old migration's over-broad dest-under-src guard (`"$src"|"$src"/*`)
+#    early-returned this LEGITIMATE direction (<home> → <home>/boards/), so the root board never reached
+#    boards/ and resume silently saw NO board (lost board). The fix migrates the home root too, even when
+#    CC_MASTER_HOME IS the home root. Force takeover so the assertion is deterministic regardless of the
+#    copy's fresh mtime (cp resets mtime to now → would otherwise read as "looks LIVE").
+H="$(make_project)"
+printf '{"schema":"cc-master/v1","goal":"legacy flat goal","owner":{"active":true,"session_id":"old-flat","heartbeat":""},"git":{"worktree":"","branch":""},"tasks":[{"id":"T1","status":"done","deps":[]}],"log":[]}\n' > "$H/20250101T000000Z-legacyflat.board.json"
+run_resume "$H" "new-sess" '/cc-master:as-master-orchestrator --resume --force-takeover'
+assert_file "$H/boards/20250101T000000Z-legacyflat.board.json" "F1: flat-layout root board migrated into boards/ (idempotent copy)"
+assert_file "$H/20250101T000000Z-legacyflat.board.json" "F1: original flat board preserved (non-destructive copy, not move)"
+assert_eq "new-sess" "$(board_sid "$H/boards/20250101T000000Z-legacyflat.board.json")" "F1: migrated board is now resumable (forced takeover re-stamped sid)"
+assert_eq "old-flat" "$(board_sid "$H/20250101T000000Z-legacyflat.board.json")" "F1: original flat board owner untouched (it was copied, not moved)"
+assert_contains "$HOOK_OUT" "TAKEN OVER" "F1: resume found & took over the migrated flat board (it was invisible before the fix)"
+rm -rf "$H"
+
+# ── F2 (codex medium): when CC_MASTER_HOME and HOME are BOTH unset (HOME-less env) the bootstrap must
+#    (1) NOT crash under `set -u` (the old bare `$HOME` → "HOME: unbound variable"), and — root cause, not
+#    just the symptom — (2) NOT silently degrade to the absolute-root "/.claude/cc-master" and emit a BOGUS
+#    "board was created" injection / write a board there. The fix FAILS LOUD: a clear stderr diagnostic +
+#    clean exit (rc 0) + NO board. Drive a TRIGGERING prompt (so home resolution past the trigger gate is
+#    actually reached) with BOTH unset; capture stdout and stderr SEPARATELY and assert all four.
+F2DIR="$(make_project)"
+printf '%s' '{"prompt":"/cc-master:as-master-orchestrator x"}' \
+  | env -u HOME -u CC_MASTER_HOME CLAUDE_PROJECT_DIR="$F2DIR" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" >"$F2DIR/out" 2>"$F2DIR/err"
+F2_RC=$?
+F2_OUT="$(cat "$F2DIR/out")"; F2_ERR="$(cat "$F2DIR/err")"
+assert_eq 0 "$F2_RC" "F2: HOME-less + CC_MASTER_HOME-less triggering bootstrap exits cleanly (rc 0)"
+assert_not_contains "$F2_ERR" "unbound variable" "F2: no set -u crash (symptom): home resolver guards HOME under nounset"
+assert_contains "$F2_ERR" "无法解析 home 目录" "F2: FAIL-LOUD — clear stderr diagnostic when home is unresolvable (root cause, not silent degrade)"
+assert_not_contains "$F2_OUT" "board was created" "F2: NO bogus board — does not degrade to /.claude/cc-master and claim a fresh board was created"
+rm -rf "$F2DIR"
+
+# ── F4 (codex low): the CLAUDE_PROJECT_DIR legacy-migration source must be SKIPPED when CLAUDE_PROJECT_DIR
+#    is empty — otherwise "${CLAUDE_PROJECT_DIR:-}/.claude/cc-master" collapses to the absolute ROOT
+#    "/.claude/cc-master" and could copy unrelated boards (migrate's internal `[ -n "$src" ]` does NOT
+#    catch it — src is non-empty there). A behavioral trigger needs a root-owned /.claude (not hermetic),
+#    so this is a source-shape regression: the call must be wrapped in a non-empty CLAUDE_PROJECT_DIR
+#    guard, and the old UNGUARDED form must be gone.
+F4_SRC="$(cat "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh")"
+assert_not_contains "$F4_SRC" 'migrate_legacy_boards "${CLAUDE_PROJECT_DIR:-}/.claude/cc-master"' "F4: no UNGUARDED CLAUDE_PROJECT_DIR migration (empty → absolute-root /.claude footgun removed)"
+assert_contains "$F4_SRC" '[ -n "${CLAUDE_PROJECT_DIR:-}" ]' "F4: project-dir migration is guarded by a non-empty CLAUDE_PROJECT_DIR check"
+
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+# ④ CCM HARD PRECHECK (ADR-021): ccm install-presence gate at the ARM entry. Missing ccm → refuse to
+# arm: inject a <directive source="bootstrap"> agent-relay install reminder, create NO board, exit 0.
+# Present ccm → unchanged (board created — covered by every "happy" case above, which run under the
+# CCM_BIN baseline). Drive ccm-ABSENT via CCM_BIN → nonexistent executable.
+# ────────────────────────────────────────────────────────────────────────────────────────────────
+
+# ── G1: raw command + ccm ABSENT → NO board + directive injected + rc 0 (refuse to arm, not block)
+P="$(make_project)"
+HOOK_OUT="$(printf '%s' '{"session_id":"sess-noccm","prompt":"/cc-master:as-master-orchestrator do the thing"}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" CCM_BIN="$NO_CCM" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"; G1_RC=$?
+assert_eq 0 "$G1_RC" "G1: ccm-absent bootstrap exits 0 (refuse to arm, NOT decision:block)"
+assert_eq 0 "$(count_boards "$P/.claude/cc-master")" "G1: ccm absent → NO board created (refuse to arm)"
+assert_contains "$HOOK_OUT" "<directive source=" "G1: injects a directive (agent-relay install reminder)"
+assert_contains "$HOOK_OUT" "ccm" "G1: directive names ccm as the missing pre-requisite"
+assert_valid_json "$HOOK_OUT" "G1: ccm-absent directive stdout is valid JSON"
+rm -rf "$P"
+
+# ── G2: body-sentinel path + ccm ABSENT → also refuses (the gate is after the trigger demux, before
+#    board creation, so BOTH trigger forms hit it)
+P="$(make_project)"
+HOOK_OUT="$(printf '%s' '{"session_id":"sess-noccm2","prompt":"<!-- cc-master:bootstrap:v1 -->\n..."}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" CCM_BIN="$NO_CCM" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"; G2_RC=$?
+assert_eq 0 "$G2_RC" "G2: body-sentinel + ccm-absent exits 0"
+assert_eq 0 "$(count_boards "$P/.claude/cc-master")" "G2: body-sentinel + ccm absent → NO board"
+assert_contains "$HOOK_OUT" "<directive source=" "G2: body-sentinel path also injects the directive"
+rm -rf "$P"
+
+# ── G3: ccm ABSENT does NOT arm — the home stays board-free, so every runtime hook stays dormant
+#    (dormant-until-armed naturally holds: no active board → nothing to match). Assert no board file at all.
+P="$(make_project)"
+HOOK_OUT="$(printf '%s' '{"session_id":"sess-noccm3","prompt":"/cc-master:as-master-orchestrator x"}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" CCM_BIN="$NO_CCM" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+assert_no_file "$P/.claude/cc-master/boards"/*.board.json "G3: ccm absent → no board file anywhere (no arming → hooks stay dormant)"
+rm -rf "$P"
+
+# ── G4: unrelated prompt + ccm ABSENT → STILL a silent no-op (the ccm gate is AFTER the trigger gate,
+#    so a non-triggering prompt never reaches it — no directive leaks onto unrelated prompts)
+P="$(make_project)"
+HOOK_OUT="$(printf '%s' '{"prompt":"what files changed today?"}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" CCM_BIN="$NO_CCM" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"; G4_RC=$?
+assert_eq 0 "$G4_RC" "G4: unrelated prompt + ccm-absent exits 0 (silent no-op)"
+assert_eq "" "$HOOK_OUT" "G4: unrelated prompt → NO directive (ccm gate is after the trigger gate)"
+rm -rf "$P"
+
+# ── G5: present-ccm regression via the explicit CCM_BIN override (the gate's CCM_BIN branch, not just
+#    the PATH branch) → board IS created (proves `[ -x "$CCM_BIN" ]` lets a real ccm through)
+P="$(make_project)"
+if [ -n "${CCM_BIN:-}" ] && [ -x "${CCM_BIN:-}" ]; then
+  HOOK_OUT="$(printf '%s' '{"session_id":"sess-ccm-ok","prompt":"/cc-master:as-master-orchestrator x"}' \
+    | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
+      bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+  assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "G5: present ccm (CCM_BIN -x) → board created (gate passes)"
+  assert_not_contains "$HOOK_OUT" '<directive source="bootstrap">' "G5: present ccm → no install directive"
+else
+  echo "(G5 skipped — no executable CCM_BIN/ccm available to prove the present-ccm gate branch)"
+fi
+rm -rf "$P"
 
 finish

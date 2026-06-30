@@ -31,6 +31,49 @@ stdin="$(cat)"
 # (active:true AND owner.session_id==sid) is immediately true for the session that armed it.
 sid="$(printf '%s' "$stdin" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
 
+# ── BASH SSOT: cc-master home 解析（统一全局口径·board-v2 home 收口）─────────────────────────────────
+# claude_config_dir — claude 配置根（跟随 $CLAUDE_CONFIG_DIR·默认 $HOME/.claude）。与 node 侧
+#   hook-common.claudeConfigDir / ccm paths.resolveClaudeConfigDir 同口径。纯 bash·ship-anywhere。
+#   `${HOME:-}` 守卫只保函数自身在 `set -u` 下不崩；都空时塌成根 `/.claude`（无意义）由调用点 fail-loud 闸兜。
+claude_config_dir() { printf '%s' "${CLAUDE_CONFIG_DIR:-${HOME:-}/.claude}"; }
+# cc_master_home — cc-master home **根**目录。优先级：$CC_MASTER_HOME 覆写 → <claudeConfigDir>/cc-master
+#   （全局·默认·跟随 CLAUDE_CONFIG_DIR）。**不再** per-repo（CLAUDE_PROJECT_DIR/.claude/cc-master）或 cwd
+#   fallback——所有 orchestration 的 board 集中到一个用户级 home，跨 repo 不再各起一份。**这是 bash 侧唯一的
+#   home 解析点**（本仓现仅 bootstrap-board.sh 一个 bash hook 解析 home；node 侧 SSOT 在
+#   hooks/scripts/hook-common.js 的 resolveHome，ccm 侧在 discover.ts 的 resolveHome——三处同口径）。
+# F2（codex）：CC_MASTER_HOME 与 CLAUDE_CONFIG_DIR 与 HOME 都空时这里会塌成绝对根 `/.claude/cc-master`，那是个
+#   **无意义**的 home。真正的处置是**调用点的 fail-loud 闸**（见下方 HOME 解析处）：都空时清晰报错 + 干净退出 +
+#   不建 bogus board。本函数只在「至少一个非空」时才被调用，故这里恒返回一个有意义的 home。
+cc_master_home() { printf '%s' "${CC_MASTER_HOME:-$(claude_config_dir)/cc-master}"; }
+# cc_master_boards_dir — home 下集中放所有 *.board.json 的子目录（<home>/boards/）。home 根只放
+#   accounts.json（全局·不动）+ hook sidecar + 预留 channel/，与 board 枚举目录分开互不撞。
+cc_master_boards_dir() { printf '%s/boards' "$(cc_master_home)"; }
+
+# migrate_legacy_boards SRC DEST — 旧 per-repo 布局（board 直接放 <repo>/.claude/cc-master/）→ 全局
+#   <home>/boards/ 的一次性、**非破坏**最佳努力迁移：把 SRC 下每个 *.board.json **复制**进 DEST（保留原
+#   文件，不删），同名已存在则跳过。只从 $CLAUDE_PROJECT_DIR/.claude/cc-master 迁（不扫 $(pwd)——pwd 在
+#   hook 里常是 repo 根，扫它会把无关 board 拖进来污染）。全程吞错（绝不让迁移失败拖垮 ARM 这条关键路径）。
+migrate_legacy_boards() { # $1 legacy-dir $2 boards-dest
+  local src="$1" dest="$2"
+  [ -n "$src" ] || return 0
+  [ -d "$src" ] || return 0
+  # F1（codex）：只当 SRC 与 DEST 是**同一目录**才不自迁（self-copy 无意义·且已被下面同名跳过兜住）。
+  #   DEST **严格在 SRC 之下**（如 <home> → <home>/boards/）是**合法迁移方向**——glob 只命中 SRC 的直接
+  #   子项 *.board.json（不递归），dest 子目录里的板不在其中，无环形复制。旧守卫 `"$src"|"$src"/*` 把这条
+  #   合法方向也一并 early-return，导致用户把 CC_MASTER_HOME 指到旧 flat-layout 根目录（板直接放 <home>/）时，
+  #   根目录下的既有 board 永不进 boards/、而 resume 只扫 boards/ → 静默丢板（codex F1）。
+  [ "$dest" = "$src" ] && return 0
+  local f bn
+  for f in "$src"/*.board.json; do
+    [ -e "$f" ] || continue
+    bn="$(basename "$f")"
+    [ -e "$dest/$bn" ] && continue          # 全局已有同名 → 跳过（幂等·不覆盖）
+    mkdir -p "$dest" 2>/dev/null || true
+    cp "$f" "$dest/$bn" 2>/dev/null || true  # 非破坏复制（保留旧 per-repo 原件）
+  done
+  return 0
+}
+
 # ════════════════════════════════════════════════════════════════════════════════════════════════
 # RESUME support (design 2026-06-15-resume-board-mechanism.md). bootstrap's SECOND ARM form: instead
 # of creating a fresh board, re-stamp owner onto a SELECTED pre-existing board (cross-session re-arm).
@@ -279,12 +322,13 @@ resume_main() {
     inject_ctx "cc-master resume: cannot resume without a session id (degraded hook environment — stdin carried no session_id) — the board was NOT modified. Re-invoke --resume from a session that carries a session_id."
     return 0
   fi
-  mkdir -p "$HOME_DIR"
-  # ── build the candidate set: ALL *.board.json (active AND archived), excluding boards already owned
-  #    by THIS session's sid (fork #4: any board is resumable; only self-owned boards are skipped). ──
+  mkdir -p "$BOARDS_DIR"
+  # ── build the candidate set: ALL *.board.json (active AND archived) in <home>/boards/, excluding
+  #    boards already owned by THIS session's sid (fork #4: any board is resumable; only self-owned
+  #    boards are skipped). ──
   cands=""
   any_board=0
-  for b in "$HOME_DIR"/*.board.json; do
+  for b in "$BOARDS_DIR"/*.board.json; do
     [ -e "$b" ] || continue
     any_board=1
     if [ -n "$sid" ]; then
@@ -487,8 +531,65 @@ case "$trimmed" in
     [ "$marker_hit" -eq 1 ] || exit 0 ;;          # not the marker first-line → silent no-op
 esac
 
-# Home is configurable (storage preference); default to the project's .claude/cc-master.
-HOME_DIR="${CC_MASTER_HOME:-${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/cc-master}"
+# ── ④ CCM HARD PRECHECK (ADR-021·install-presence gate)──────────────────────────────────────────────
+# ccm is a HOST INSTALL PRE-REQUISITE (ADR-014): board v2's write-gate (ADR-013) requires the agent to
+# mutate the board ONLY through `ccm`. If ccm is absent, a board could still be CREATED by this pure-bash
+# bootstrap, but the agent would then be unable to operate it (every `ccm` write silently degrades) — a
+# phantom orchestration that looks live but is crippled. So at the ARM entry (trigger gate just passed,
+# BEFORE any board is created) we hard-check install presence and, if ccm is missing, REFUSE TO ARM:
+#   · inject a `<directive source="bootstrap">` additionalContext telling the AGENT to relay an install
+#     reminder to the USER and to NOT orchestrate until ccm is installed (agent-relay is the only reliable
+#     channel to the user — UserPromptSubmit exit-2 stderr goes to the agent, not the user; §3.3);
+#   · EXIT 0 (NOT decision:block — block would stop the agent from receiving the directive; §3.4);
+#   · create NO board (so no hook arms → all runtime hooks stay dormant·red line 6 naturally holds).
+# Idempotent / retriable: once the user installs ccm, re-running the command passes this gate and arms.
+# This is the BOOTSTRAP HARD CHECK (install presence·binary in PATH·二元·一次性·user-fixable); it is
+# distinct from and does NOT remove the runtime hooks' graceful soft-degrade on a TRANSIENT ccm hiccup
+# (ADR-021 §3.5 boundary). Pure bash `command -v` (red line 1 floor·no jq/python/node·no ccm spawn).
+#   CCM_BIN override (absolute executable path·dev/test/custom install·same口径 as node hooks): when set,
+#   check `[ -x "$CCM_BIN" ]`; else check `command -v ccm` on PATH.
+ccm_present=0
+if [ -n "${CCM_BIN:-}" ]; then
+  [ -x "$CCM_BIN" ] && ccm_present=1
+else
+  command -v ccm >/dev/null 2>&1 && ccm_present=1
+fi
+if [ "$ccm_present" -eq 0 ]; then
+  # The directive tag is just a string (§13 author-side discipline: source必填·directive for a hard
+  # constraint·ccm-missing IS a hard pre-requisite). Hand-built in bash (cannot require node's directive()
+  # wrapper). inject_ctx escapes the whole payload to one valid JSON additionalContext envelope.
+  directive_body='<directive source="bootstrap">cc-master 依赖外部工具 `ccm`（per-OS Node SEA 二进制·ADR-014 主机安装前置），但当前环境的 PATH 上找不到它。没有 ccm，board v2 的写入关卡（ADR-013·agent 一律经 ccm 写 board）无法工作——即便建出 board 也无法正确操作，会是一场「看起来在跑、实则瘸腿」的 phantom orchestration。因此本次**不创建 board、不进入编排**。请你立即转告用户：先安装 ccm（cc-master 的硬前置依赖）——下载对应自己 OS/arch 的二进制 `ccm-<os>-<arch>`（os = darwin 或 linux、arch = arm64 或 x64，例如 Apple Silicon Mac 取 `ccm-darwin-arm64`、x86 Linux 取 `ccm-linux-x64`），重命名为 `ccm`、`chmod +x ccm`、放进 PATH（如 `~/.local/bin/ccm`），跑 `ccm --version` 确认可用（详见 README 安装段）。装好后重新运行 /cc-master:as-master-orchestrator <goal> 即可正常起编排。在用户确认装好之前，不要继续编排——你没有可用的 board 操作能力。</directive>'
+  inject_ctx "$directive_body"
+  exit 0
+fi
+
+# Home 解析（统一全局口径·BASH SSOT cc_master_home）：$CC_MASTER_HOME 覆写，否则 $HOME/.claude/cc-master。
+# board 集中落 <home>/boards/；home 根另放 accounts.json（全局·不动）+ sidecar + 预留 channel/。
+# F2（codex）FAIL-LOUD 闸：CC_MASTER_HOME 与 CLAUDE_CONFIG_DIR 与 HOME **都为空**时无从解析出合理 home——绝不
+#   静默降级到绝对根 `/.claude/cc-master`（在那建 board / mkdir 必失败、脚本无 set -e 行为不可预测、且会留下
+#   bogus 痕迹）。改为 emit 一条清晰 stderr 提示 + 干净退出（rc 0、空 stdout、**不建任何 board**）。fail-loud 比
+#   脆弱的跨平台 os.homedir bash 等价更 ship-anywhere 安全（bash 无可靠 os.homedir 兜底）。本闸在**触发门之后**
+#   （上方 case 已过），故只有真要建/续板时才出声、不污染无关 prompt。CLAUDE_CONFIG_DIR 在场即可解析出 home。
+if [ -z "${CC_MASTER_HOME:-}" ] && [ -z "${CLAUDE_CONFIG_DIR:-}" ] && [ -z "${HOME:-}" ]; then
+  printf 'cc-master: 无法解析 home 目录（CC_MASTER_HOME / CLAUDE_CONFIG_DIR / HOME 均未设）——请设置 CC_MASTER_HOME（或 CLAUDE_CONFIG_DIR / HOME）后重试；本次未创建任何 board。\n' >&2
+  exit 0
+fi
+HOME_DIR="$(cc_master_home)"
+BOARDS_DIR="$(cc_master_boards_dir)"
+# 一次性、非破坏的旧布局迁移：把旧 per-repo $CLAUDE_PROJECT_DIR/.claude/cc-master/*.board.json 复制进
+# 全局 boards/（保留原件·同名跳过·全程吞错）。只迁 CLAUDE_PROJECT_DIR 这个有据可查的旧 per-repo home，
+# 不扫 $(pwd)（hook 的 cwd 常是无关 repo 根）。让升级用户的旧 board 在全局 home 里 --resume 找得到。
+# F4（codex）：CLAUDE_PROJECT_DIR 为空时**跳过**——否则 "${CLAUDE_PROJECT_DIR:-}/.claude/cc-master" 塌成
+#   绝对根 "/.claude/cc-master"，可能 copy 进无关 board（migrate 内部的 `[ -n "$src" ]` 守不住——src 此时非空）。
+if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+  migrate_legacy_boards "$CLAUDE_PROJECT_DIR/.claude/cc-master" "$BOARDS_DIR"
+fi
+# F1（codex）：也迁「已解析 home **根**目录」下的 legacy flat 板（旧布局板直接放 <home>/ 而非 <home>/boards/，
+#   常见于升级用户把 CC_MASTER_HOME 指到旧 flat-layout 目录）。glob 只命中 home 根直接子项 *.board.json
+#   （不递归、不含 boards/ 里的板）→ copy 进 boards/，让 resume（只扫 boards/）看得见——否则根目录下既有 board
+#   静默不可见（丢板）。幂等·非破坏（同名跳过·保留原件）。即便 CC_MASTER_HOME 指的就是 home root 也生效。
+migrate_legacy_boards "$HOME_DIR" "$BOARDS_DIR"
+mkdir -p "$HOME_DIR/channel"   # 预留多-orchestrator 协调信道目录（本任务只建目录约定·不实现内容）
 
 # ── INTENT PARSE (resume vs fresh) — runs ONLY AFTER the trigger gate above already passed ──────────
 # This is a SECOND demux INSIDE an already-triggered prompt; it does NOT participate in triggering
@@ -552,11 +653,11 @@ fi
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 TEMPLATE="$PLUGIN_ROOT/skills/orchestrating-to-completion/assets/board.template.json"
 
-mkdir -p "$HOME_DIR"
+mkdir -p "$BOARDS_DIR"
 # Unique, time-sortable name: a UTC timestamp prefix + the pid keeps concurrent bootstraps
 # distinct (the human-readable identity lives in the board's "goal" field). Each invocation
-# starts a NEW orchestration; archive stale ones with /cc-master:stop.
-BOARD="$HOME_DIR/$(date -u +%Y%m%dT%H%M%SZ)-$$.board.json"
+# starts a NEW orchestration; archive stale ones with /cc-master:stop. board 落 <home>/boards/。
+BOARD="$BOARDS_DIR/$(date -u +%Y%m%dT%H%M%SZ)-$$.board.json"
 # Escape the sid for safe inclusion in the JSON string value (backslash + double-quote only; a
 # session id is otherwise printable). Empty sid → stamps "" — an ANOMALY (normal bootstrap stdin
 # carries a sid): such a blank board stays DORMANT for every non-empty stdin sid (it is NOT
@@ -583,7 +684,7 @@ else
   # this-release-or-later boards. Pure bash printf only — no jq/python/node (red line 1). A2 T6: no
   # num_account field is seeded here — usage-pacing.js no longer reads it (effective-N now comes from
   # accounts.json); an OLD board still carrying it is harmless, it is simply ignored.
-  printf '{"schema":"cc-master/v1","meta":{"template_version":1},"goal":"","owner":{"active":true,"session_id":"%s","heartbeat":""},"git":{"worktree":"","branch":""},"wip_limit":4,"tasks":[],"log":[]}\n' "$sid_esc" > "$BOARD"
+  printf '{"schema":"cc-master/v2","meta":{"template_version":3},"goal":"","owner":{"active":true,"session_id":"%s","heartbeat":""},"git":{"worktree":"","branch":""},"scheduling":{"wip_limit":4},"tasks":[],"log":[]}\n' "$sid_esc" > "$BOARD"
 fi
 
 ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. Decompose the goal into a dependency DAG and write tasks[] into that board file, set goal/owner/git, then invoke the orchestrating-to-completion skill and run the decision program."

@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
 . "$(dirname "$0")/helpers.sh"
 
-# mkactive HOME NAME JSON — drop a board file into the home
-mkactive() { mkdir -p "$1"; printf '%s' "$3" > "$1/$2.board.json"; }
+# mkactive HOME NAME JSON — drop a board file into <home>/boards/ (board-v2 layout)
+mkactive() { mkdir -p "$1/boards"; printf '%s' "$3" > "$1/boards/$2.board.json"; }
 # run_stop HOME — run the Stop hook against a home dir with EMPTY stdin (no session_id).
 # Empty sid → hook degrades to full-home scan (degraded-defense contract). Sets HOOK_OUT / HOOK_RC.
 run_stop() {
   HOOK_OUT="$(CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
-             bash "$PLUGIN_ROOT/hooks/scripts/verify-board.sh" </dev/null 2>/dev/null)"; HOOK_RC=$?
+             node "$PLUGIN_ROOT/hooks/scripts/verify-board.js" </dev/null 2>/dev/null)"; HOOK_RC=$?
 }
 # run_stop_sid HOME SID — run the Stop hook with stdin JSON carrying session_id=SID.
 run_stop_sid() {
   HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$2" \
              | CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
-               bash "$PLUGIN_ROOT/hooks/scripts/verify-board.sh" 2>/dev/null)"; HOOK_RC=$?
+               node "$PLUGIN_ROOT/hooks/scripts/verify-board.js" 2>/dev/null)"; HOOK_RC=$?
 }
 # run_stop_json HOME JSON — run the Stop hook with arbitrary stdin JSON (e.g. one WITHOUT session_id).
 run_stop_json() {
   HOOK_OUT="$(printf '%s' "$2" \
              | CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
-               bash "$PLUGIN_ROOT/hooks/scripts/verify-board.sh" 2>/dev/null)"; HOOK_RC=$?
+               node "$PLUGIN_ROOT/hooks/scripts/verify-board.js" 2>/dev/null)"; HOOK_RC=$?
 }
 
 # ─── RETAINED CONTRACTS (run with empty stdin → degraded full-home scan) ──────────────────────────
@@ -33,14 +33,16 @@ rm -rf "$H"
 
 # Case B: an active board with 0 tasks → hard block (bootstrap backstop)
 H="$(make_project)"
-mkactive "$H" "20260101T000000Z-1" '{"schema":"cc-master/v1","goal":"g","owner":{"active":true},"tasks":[]}'
+mkactive "$H" "20260101T000000Z-1" '{"schema":"cc-master/v2","goal":"g","owner":{"active":true},"tasks":[]}'
 run_stop "$H"
 assert_contains "$HOOK_OUT" "block" "empty active board → block"
+# ADR-018：真 block 的 reason 是系统硬闸 → directive（含 why·P5）。reason 经 JSON.stringify，标签 " → \"。
+assert_contains "$HOOK_OUT" '<directive source=\"verify-board\">' "empty board block → tag-wrapped directive (ADR-018)"
 rm -rf "$H"
 
 # Case E: an ARCHIVED board (owner.active:false) with 0 tasks → ignored → allow
 H="$(make_project)"
-mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":false},"tasks":[]}'
+mkactive "$H" "b1" '{"schema":"cc-master/v2","owner":{"active":false},"tasks":[]}'
 run_stop "$H"
 assert_eq 0 "$HOOK_RC" "archived empty board → rc 0"
 assert_not_contains "$HOOK_OUT" "block" "archived board ignored → no block"
@@ -48,8 +50,8 @@ rm -rf "$H"
 
 # Case F: two active boards — one filled (in_flight), one empty → still blocks (any empty active blocks)
 H="$(make_project)"
-mkactive "$H" "filled" '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
-mkactive "$H" "empty"  '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[]}'
+mkactive "$H" "filled" '{"schema":"cc-master/v2","owner":{"active":true},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}'
+mkactive "$H" "empty"  '{"schema":"cc-master/v2","owner":{"active":true},"tasks":[]}'
 run_stop "$H"
 assert_contains "$HOOK_OUT" "block" "an empty active board among others → block"
 rm -rf "$H"
@@ -58,14 +60,14 @@ rm -rf "$H"
 
 # Case C (CHANGED): active board WITH a ready task → BLOCK (still-ready work remains)
 H="$(make_project)"
-mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+mkactive "$H" "b1" '{"schema":"cc-master/v2","owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
 run_stop "$H"
 assert_contains "$HOOK_OUT" "block" "ready task → block"
 rm -rf "$H"
 
 # Case G (NEW): active board WITH an uncertain task → BLOCK (output pending verification)
 H="$(make_project)"
-mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[{"id":"T1","status":"uncertain","deps":[]}]}'
+mkactive "$H" "b1" '{"schema":"cc-master/v2","owner":{"active":true},"tasks":[{"id":"T1","status":"uncertain","deps":[]}]}'
 run_stop "$H"
 assert_contains "$HOOK_OUT" "block" "uncertain task → block"
 rm -rf "$H"
@@ -161,14 +163,16 @@ fp_of() { # $1 = board path
 #                checklist, AND sidecar's last_handshook_fp set to the current fingerprint.
 H="$(make_project)"
 SID="sess-handshake-1"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T3\",\"status\":\"blocked\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T3\",\"status\":\"blocked\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "first completion → block"
 assert_contains "$HOOK_OUT" "self-check" "first completion → reason has self-check keyword"
 assert_contains "$HOOK_OUT" "original goal" "first completion → reason cites original goal"
+# ADR-018：self-check 握手 block reason 是系统硬闸 → directive（含 why·P5）。
+assert_contains "$HOOK_OUT" '<directive source=\"verify-board\">' "first completion handshake → tag-wrapped directive (ADR-018)"
 assert_file "$H/.$SID.stopcheck" "first completion → sidecar created"
 # sidecar now records last_handshook_fp = current fingerprint (second field)
-EXP_FP="$(fp_of "$H/b1.board.json")"
+EXP_FP="$(fp_of "$H/boards/b1.board.json")"
 GOT_FP="$(awk '{print $2}' "$H/.$SID.stopcheck")"
 assert_eq "$EXP_FP" "$GOT_FP" "first completion → last_handshook_fp set to current fingerprint"
 rm -rf "$H"
@@ -177,8 +181,8 @@ rm -rf "$H"
 #                fingerprint is KEPT (streak reset to 0) so the SAME state keeps allowing on later Stops.
 H="$(make_project)"
 SID="sess-handshake-2"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
-EXP_FP="$(fp_of "$H/b1.board.json")"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
+EXP_FP="$(fp_of "$H/boards/b1.board.json")"
 printf '0 %s\n' "$EXP_FP" > "$H/.$SID.stopcheck"   # streak=0, fp already handshook
 run_stop_sid "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "second completion → rc 0"
@@ -195,7 +199,7 @@ rm -rf "$H"
 #                fingerprint; the next completion state must self-check anew.
 H="$(make_project)"
 SID="sess-reset"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[]}]}"
 printf '0 12345\n' > "$H/.$SID.stopcheck"   # pretend a previous completion-state handshake happened
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "actionable again → block"
@@ -209,9 +213,9 @@ rm -rf "$H"
 #  state; the id+status+blocked_on fingerprint changes → BLOCK anew.
 H="$(make_project)"
 SID="sess-swap"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"deps\":[]}]}"
-printf '0 %s\n' "$(fp_of "$H/b1.board.json")" > "$H/.$SID.stopcheck"   # seed: this state already handshook
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"blocked\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"deps\":[]}]}"
+printf '0 %s\n' "$(fp_of "$H/boards/b1.board.json")" > "$H/.$SID.stopcheck"   # seed: this state already handshook
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"blocked\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "status swap (same multiset, different identity) → re-handshake block (codex catch #21)"
 rm -rf "$H"
@@ -220,10 +224,10 @@ rm -rf "$H"
 #  `"deps"`). A multi-line board whose flexible `log` entries use id/status as keys must NOT affect
 #  the fingerprint — only the task waist counts (narrow-waist contract). Two boards with identical
 #  tasks but different log id/status → SAME fingerprint.
-H="$(make_project)"
-printf '%s\n' '{"owner":{"active":true,"session_id":"s"},' '"tasks":[ {"id":"T1","status":"done","deps":[]} ],' '"log":[ {"id":"L1","status":"alpha"} ]}' > "$H/a.board.json"
-printf '%s\n' '{"owner":{"active":true,"session_id":"s"},' '"tasks":[ {"id":"T1","status":"done","deps":[]} ],' '"log":[ {"id":"L9","status":"omega"} ]}' > "$H/b.board.json"
-assert_eq "$(fp_of "$H/a.board.json")" "$(fp_of "$H/b.board.json")" "fingerprint scoped to task rows — log id/status does not change fp (codex catch #22)"
+H="$(make_project)"; mkdir -p "$H/boards"
+printf '%s\n' '{"owner":{"active":true,"session_id":"s"},' '"tasks":[ {"id":"T1","status":"done","deps":[]} ],' '"log":[ {"id":"L1","status":"alpha"} ]}' > "$H/boards/a.board.json"
+printf '%s\n' '{"owner":{"active":true,"session_id":"s"},' '"tasks":[ {"id":"T1","status":"done","deps":[]} ],' '"log":[ {"id":"L9","status":"omega"} ]}' > "$H/boards/b.board.json"
+assert_eq "$(fp_of "$H/boards/a.board.json")" "$(fp_of "$H/boards/b.board.json")" "fingerprint scoped to task rows — log id/status does not change fp (codex catch #22)"
 rm -rf "$H"
 
 # ─── SESSION FILTERING (Finding #4) ───────────────────────────────────────────────────────────────
@@ -234,11 +238,11 @@ rm -rf "$H"
 H="$(make_project)"
 MINE="sess-mine"
 OTHER="sess-other"
-mkactive "$H" "mine"  "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$MINE\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
-mkactive "$H" "other" "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$OTHER\"},\"tasks\":[]}"
+mkactive "$H" "mine"  "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$MINE\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
+mkactive "$H" "other" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"$OTHER\"},\"tasks\":[]}"
 # pre-mark MINE's completion state as already handshook (seed its fingerprint) so it allows
 # (isolate: we are testing it is NOT blocked by OTHER's empty board).
-printf '0 %s\n' "$(fp_of "$H/mine.board.json")" > "$H/.$MINE.stopcheck"
+printf '0 %s\n' "$(fp_of "$H/boards/mine.board.json")" > "$H/.$MINE.stopcheck"
 run_stop_sid "$H" "$MINE"
 assert_eq 0 "$HOOK_RC" "session filter → rc 0 (other session's empty board ignored)"
 assert_not_contains "$HOOK_OUT" "block" "session filter → my session not blocked by other's empty board"
@@ -249,8 +253,8 @@ rm -rf "$H"
 H="$(make_project)"
 MINE="sess-mine2"
 OTHER="sess-other2"
-mkactive "$H" "mine"  "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$MINE\"},\"tasks\":[]}"
-mkactive "$H" "other" "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$OTHER\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]}]}"
+mkactive "$H" "mine"  "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"$MINE\"},\"tasks\":[]}"
+mkactive "$H" "other" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"$OTHER\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"in_flight\",\"deps\":[]}]}"
 run_stop_sid "$H" "$MINE"
 assert_contains "$HOOK_OUT" "block" "session filter → my own empty board blocks me"
 rm -rf "$H"
@@ -258,7 +262,7 @@ rm -rf "$H"
 # Case M (NEW): stdin has NO session_id → degrade to full-home scan, do not crash.
 #                Home has one empty active board → block (full scan finds it).
 H="$(make_project)"
-mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true,"session_id":"whatever"},"tasks":[]}'
+mkactive "$H" "b1" '{"schema":"cc-master/v2","owner":{"active":true,"session_id":"whatever"},"tasks":[]}'
 run_stop_json "$H" '{"hook_event_name":"Stop"}'
 assert_eq 0 "$HOOK_RC" "no session_id → does not crash (rc 0)"
 assert_contains "$HOOK_OUT" "block" "no session_id → full-home scan finds empty active board → block"
@@ -272,13 +276,15 @@ rm -rf "$H"
 #                streak to 5 (>= FUSE) → force allow + warning keyword.
 H="$(make_project)"
 SID="sess-fuse"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
 printf '4 0\n' > "$H/.$SID.stopcheck"   # block_streak=4, fp=0 (mismatch) — one more block trips the fuse
 run_stop_sid "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "fuse → rc 0"
 # Force-allow = no block DECISION (the warning text itself legitimately contains the word "blocked").
 assert_not_contains "$HOOK_OUT" "\"decision\":\"block\"" "fuse tripped → force allow (no block decision)"
 assert_contains "$HOOK_OUT" "fuse" "fuse tripped → warning keyword present"
+# ADR-018：fuse 跳闸不是闸（在 RELEASE 放停）→ advisory strong（高 stakes·可能真卡死·决策归 agent，NOT directive）。
+assert_contains "$HOOK_OUT" '<advisory source=\"verify-board\" strength=\"strong\">' "fuse release → tag-wrapped advisory strong, NOT directive (ADR-018)"
 assert_no_file "$H/.$SID.stopcheck" "fuse tripped → sidecar cleared on force allow"
 rm -rf "$H"
 
@@ -287,7 +293,7 @@ rm -rf "$H"
 #                warning rather than a normal block.
 H="$(make_project)"
 SID="sess-fuse2"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[]}]}"
 printf '4 0\n' > "$H/.$SID.stopcheck"
 run_stop_sid "$H" "$SID"
 assert_not_contains "$HOOK_OUT" "\"decision\":\"block\"" "fuse over ready task → not a block decision"
@@ -297,7 +303,7 @@ rm -rf "$H"
 #                session writes block_streak=1.
 H="$(make_project)"
 SID="sess-streak"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "fresh completion → block"
 STREAK="$(awk '{print $1}' "$H/.$SID.stopcheck")"
@@ -316,9 +322,9 @@ rm -rf "$H"
 #                round fixes — previously the third would block again); then a CHANGED fingerprint
 #                re-blocks the handshake.
 H="$(make_project)"; SID="sess-fp"
-BOARD="$H/20260101T000000Z-1.board.json"
-mkdir -p "$H"
-printf '%s' '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-fp"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$BOARD"
+BOARD="$H/boards/20260101T000000Z-1.board.json"
+mkdir -p "$H/boards"
+printf '%s' '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-fp"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' > "$BOARD"
 # First completion-state Stop: should block (first handshake of this fingerprint)
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "P4: first completion handshake → block"
@@ -329,7 +335,7 @@ assert_not_contains "$HOOK_OUT" "block" "P4: same fingerprint second Stop → al
 run_stop_sid "$H" "$SID"
 assert_not_contains "$HOOK_OUT" "block" "P4: same fingerprint third Stop → still allow (repeated self-check fixed)"
 # Fingerprint changes (T1 in_flight→done plus a new in_flight T2) → re-block the handshake
-printf '%s' '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"sess-fp"},"tasks":[{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":[]}]}' > "$BOARD"
+printf '%s' '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-fp"},"tasks":[{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":[]}]}' > "$BOARD"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "P4: fingerprint changed → re-block handshake"
 rm -rf "$H"
@@ -341,7 +347,7 @@ rm -rf "$H"
 # Case S: SINGLE-LINE board, empty tasks[] but log[] carries "id" entries → must still be detected
 #          as EMPTY and block. (Line-based grep -c '"id"' saw the whole line and miscounted.)
 H="$(make_project)"
-mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[],"log":[{"id":"L1","status":"note"}]}'
+mkactive "$H" "b1" '{"schema":"cc-master/v2","owner":{"active":true},"tasks":[],"log":[{"id":"L1","status":"note"}]}'
 run_stop "$H"
 assert_contains "$HOOK_OUT" "no tasks" "single-line: empty tasks + log ids → still detected EMPTY (not mistaken for a filled board)"
 rm -rf "$H"
@@ -350,10 +356,10 @@ rm -rf "$H"
 #          as actionable. First Stop = completion handshake (self-check), and a LOG APPEND between
 #          Stops must not change the fingerprint → second Stop allows.
 H="$(make_project)"; SID="sess-slog"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}],\"log\":[{\"id\":\"L1\",\"status\":\"ready\"}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}],\"log\":[{\"id\":\"L1\",\"status\":\"ready\"}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "self-check" "single-line: log status=ready ignored → completion handshake, not actionable block"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}],\"log\":[{\"id\":\"L1\",\"status\":\"ready\"},{\"id\":\"L2\",\"status\":\"appended\"}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}],\"log\":[{\"id\":\"L1\",\"status\":\"ready\"},{\"id\":\"L2\",\"status\":\"appended\"}]}"
 run_stop_sid "$H" "$SID"
 assert_not_contains "$HOOK_OUT" "block" "single-line: log append does not change fingerprint → same state allows"
 rm -rf "$H"
@@ -363,7 +369,7 @@ rm -rf "$H"
 #          still see T2 as actionable and block with the ACTIONABLE message (not a self-check
 #          handshake on a truncated prefix).
 H="$(make_project)"
-mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true},"tasks":[{"id":"T1","status":"done","deps":[],"log":["did x"]},{"id":"T2","status":"ready","deps":[]}],"log":[]}'
+mkactive "$H" "b1" '{"schema":"cc-master/v2","owner":{"active":true},"tasks":[{"id":"T1","status":"done","deps":[],"log":["did x"]},{"id":"T2","status":"ready","deps":[]}],"log":[]}'
 run_stop "$H"
 assert_contains "$HOOK_OUT" "still has" "task-local log field does not truncate region → later ready task still actionable (codex catch)"
 rm -rf "$H"
@@ -373,7 +379,7 @@ rm -rf "$H"
 #          first Stop must be the self-check handshake (not an actionable block), and the same
 #          state must allow on the second Stop instead of blocking until the fuse trips.
 H="$(make_project)"; SID="sess-tlog"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[],\"log\":[{\"id\":\"L1\",\"status\":\"ready\"}]}],\"log\":[]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[],\"log\":[{\"id\":\"L1\",\"status\":\"ready\"}]}],\"log\":[]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "self-check" "structured task-local log status=ready ignored → completion handshake (codex catch r2)"
 run_stop_sid "$H" "$SID"
@@ -381,10 +387,10 @@ assert_not_contains "$HOOK_OUT" "block" "structured task-local log → same comp
 rm -rf "$H"
 
 # Case U: SINGLE-LINE fingerprint scoped to tasks region — identical tasks, different log → SAME fp.
-H="$(make_project)"
-printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]}],"log":[{"id":"L1","status":"alpha"}]}' > "$H/a.board.json"
-printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]}],"log":[{"id":"L9","status":"omega"}]}' > "$H/b.board.json"
-assert_eq "$(fp_of "$H/a.board.json")" "$(fp_of "$H/b.board.json")" "single-line fingerprint scoped to tasks region (log excluded)"
+H="$(make_project)"; mkdir -p "$H/boards"
+printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]}],"log":[{"id":"L1","status":"alpha"}]}' > "$H/boards/a.board.json"
+printf '%s' '{"owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]}],"log":[{"id":"L9","status":"omega"}]}' > "$H/boards/b.board.json"
+assert_eq "$(fp_of "$H/boards/a.board.json")" "$(fp_of "$H/boards/b.board.json")" "single-line fingerprint scoped to tasks region (log excluded)"
 rm -rf "$H"
 
 # ─── H3: COMPLETION HANDSHAKE NAMES UNANSWERED blocked_on:"user" DECISIONS ─────────────────────────
@@ -395,7 +401,7 @@ rm -rf "$H"
 
 # Case X1 (H3): one blocked_on:user task WITH a title → reason names that title.
 H="$(make_project)"; SID="sess-h3-title"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"pick the deploy region\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"pick the deploy region\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "H3 one user decision → completion handshake block"
 assert_contains "$HOOK_OUT" "self-check" "H3 one user decision → still the self-check handshake"
@@ -405,7 +411,7 @@ rm -rf "$H"
 
 # Case X2 (H3): two blocked_on:user tasks WITH titles → both titles listed.
 H="$(make_project)"; SID="sess-h3-two"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"approve the migration\",\"deps\":[]},{\"id\":\"T3\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"confirm the rollback plan\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"approve the migration\",\"deps\":[]},{\"id\":\"T3\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"confirm the rollback plan\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "approve the migration" "H3 two user decisions → first title listed"
 assert_contains "$HOOK_OUT" "confirm the rollback plan" "H3 two user decisions → second title listed"
@@ -413,7 +419,7 @@ rm -rf "$H"
 
 # Case X3 (H3): blocked_on:user task WITHOUT a title → its id is listed instead.
 H="$(make_project)"; SID="sess-h3-noti"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"DECISION-9\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"DECISION-9\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "Unanswered user decisions still on this board" "H3 titleless user decision → still lists unanswered decisions"
 assert_contains "$HOOK_OUT" "DECISION-9" "H3 titleless user decision → falls back to task id"
@@ -423,7 +429,7 @@ rm -rf "$H"
 #               (must NOT contain the H3 sentence). A task blocked on something else (or a non-user
 #               blocked_on) must not trip it.
 H="$(make_project)"; SID="sess-h3-none"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"T1\",\"deps\":[]},{\"id\":\"T3\",\"status\":\"in_flight\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"T1\",\"deps\":[]},{\"id\":\"T3\",\"status\":\"in_flight\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "self-check" "H3 no user decision → still the self-check handshake"
 assert_not_contains "$HOOK_OUT" "Unanswered user decisions" "H3 no user decision → reason matches status quo (no H3 sentence)"
@@ -433,7 +439,7 @@ rm -rf "$H"
 #               per-object scan — the title is still read from the task's OWN top-level fields, and a
 #               nested log carrying its own "title"/"blocked_on" must not leak in.
 H="$(make_project)"; SID="sess-h3-nested"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"real top-level title\",\"deps\":[],\"log\":[{\"id\":\"L1\",\"title\":\"nested decoy\",\"blocked_on\":\"user\"}]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"real top-level title\",\"deps\":[],\"log\":[{\"id\":\"L1\",\"title\":\"nested decoy\",\"blocked_on\":\"user\"}]}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "real top-level title" "H3 nested log → reads the task's own top-level title"
 assert_not_contains "$HOOK_OUT" "nested decoy" "H3 nested log → nested log title does not leak into the list"
@@ -445,7 +451,7 @@ rm -rf "$H"
 #               re-warn forever. The predicate must require BOTH status:"blocked" AND blocked_on:"user"
 #               (the `blocked(blocked_on:"user")` contract). A genuinely pending blocked task IS listed.
 H="$(make_project)"; SID="sess-h3-stale"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"blocked_on\":\"user\",\"title\":\"already answered region pick\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"genuinely pending approval\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"blocked_on\":\"user\",\"title\":\"already answered region pick\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"title\":\"genuinely pending approval\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "H3 stale blocked_on → still completion handshake block"
 assert_contains "$HOOK_OUT" "genuinely pending approval" "H3 stale blocked_on → genuinely blocked+user decision IS listed"
@@ -461,7 +467,7 @@ rm -rf "$H"
 #          （若误判 armed 会触发 actionable block）+ log[] 嵌套对象塞 "active":true 与混淆 "session_id"。
 #          owner 子对象本身 active:false → 必须 allow（dormant，不 block）。修前全文 grep 命中 → 误 block。
 H="$(make_project)"; SID="sess-arch-stop"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":false,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[]}],\"log\":[{\"id\":\"L1\",\"snapshot\":{\"active\":true,\"session_id\":\"OTHER\"}}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":false,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[]}],\"log\":[{\"id\":\"L1\",\"snapshot\":{\"active\":true,\"session_id\":\"OTHER\"}}]}"
 run_stop_sid "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "Y: 归档板含嵌套 active:true → rc 0"
 assert_not_contains "$HOOK_OUT" "block" "Y: 归档板（owner.active:false）+ 嵌套 active:true → 休眠 allow（owner 子对象才算数，不 block stop）"
@@ -470,7 +476,7 @@ rm -rf "$H"
 # Case Z (反向保活)：真 active 板（owner.active:true、owner.session_id == sid）含一个 ready task，某 task
 #          嵌套 "active":false —— verify-board 仍照常 armed → ready 工作 → block。防过度修复。
 H="$(make_project)"; SID="sess-real-stop"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[],\"meta\":{\"active\":false}}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[],\"meta\":{\"active\":false}}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "Z: 真 active 板（owner.active:true）照常 armed → ready task → block stop"
 rm -rf "$H"
@@ -485,7 +491,7 @@ rm -rf "$H"
 #          ready task，stdin 带**非空** session_id。"" != "MINE" → 不武装 → 休眠 allow（不 block）。这正是红线 6
 #          要的 fail-safe：blank 板不收养任意 session。
 H="$(make_project)"; SID="sess-adopt-mine"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"ready\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "AA: blank-session 板 + 非空 stdin sid → rc 0"
 assert_not_contains "$HOOK_OUT" "block" "AA: blank-session 板（owner.session_id:\"\"）对非空 stdin sid → 休眠 allow，不 block（CODEX14 回退，红线 6 fail-safe）"
@@ -495,7 +501,7 @@ rm -rf "$H"
 #          （非空），含一个 ready task，stdin sid "MINE"（不同）→ 必须休眠 allow（不 block）。证明对称
 #          degrade **没有**退化成「任何 active 板即武装」—— 真跨会话污染防线（红线 6）原样保留。
 H="$(make_project)"; SID="MINE"
-mkactive "$H" "b1" '{"schema":"cc-master/v1","goal":"g","owner":{"active":true,"session_id":"OTHER"},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+mkactive "$H" "b1" '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"OTHER"},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
 run_stop_sid "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "AB: board sid 非空且 ≠ stdin sid → rc 0"
 assert_not_contains "$HOOK_OUT" "block" "AB: board sid=OTHER（非空）≠ stdin sid=MINE → 仍休眠 allow（红线 6 防线未退化）"
@@ -511,7 +517,7 @@ rm -rf "$H"
 #                inconsistency (owner done, child still in flight). Still a block (the handshake),
 #                exit code unchanged (rc 0 — block is emitted as JSON, hook exits 0).
 H="$(make_project)"; SID="sess-rollup-bad"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[],\"kind\":\"owner\"},{\"id\":\"M1.a\",\"status\":\"done\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[],\"kind\":\"owner\"},{\"id\":\"M1.a\",\"status\":\"done\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
 run_stop_sid "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "RU1 rollup violation → rc 0 (reminder is non-blocking JSON, hook exits 0)"
 assert_contains "$HOOK_OUT" "block" "RU1 rollup violation → completion-state handshake block"
@@ -523,7 +529,7 @@ rm -rf "$H"
 # Case RU2 (D3): ARMED + done owner + ALL children done → NO rollup reminder (consistent rollup).
 #                Still a completion handshake (self-check), just without the rollup sentence.
 H="$(make_project)"; SID="sess-rollup-ok"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.a\",\"status\":\"done\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.b\",\"status\":\"done\",\"deps\":[],\"parent\":\"M1\"}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.a\",\"status\":\"done\",\"deps\":[],\"parent\":\"M1\"},{\"id\":\"M1.b\",\"status\":\"done\",\"deps\":[],\"parent\":\"M1\"}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "self-check" "RU2 done owner + all done children → still the self-check handshake"
 assert_not_contains "$HOOK_OUT" "Rollup inconsistency" "RU2 done owner + all done children → NO rollup reminder (consistent)"
@@ -533,7 +539,7 @@ rm -rf "$H"
 #                violation (the gate only fires when the OWNER is `done` but a child is not — a
 #                still-working owner is legitimate). Mirrors graph-core: statusOf(owner)!=='done' → skip.
 H="$(make_project)"; SID="sess-rollup-owner-inflight"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"in_flight\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
 run_stop_sid "$H" "$SID"
 assert_not_contains "$HOOK_OUT" "Rollup inconsistency" "RU3 owner in_flight (not done) + child in_flight → NO rollup reminder (owner not done)"
 rm -rf "$H"
@@ -543,7 +549,7 @@ rm -rf "$H"
 #                completion-state self-check handshake still fires (block). Proves rollup never breaks
 #                a pre-D3 board.
 H="$(make_project)"; SID="sess-rollup-degrade"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
 run_stop_sid "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "RU4 degrade (no parent) → rc 0 (no crash)"
 assert_contains "$HOOK_OUT" "block" "RU4 degrade (no parent) → existing completion handshake still blocks"
@@ -555,7 +561,7 @@ rm -rf "$H"
 #                child against an owner that is BOTH a real task AND status:"done", exactly like
 #                graph-core statusOf(owner)===undefined). Malformed parent never breaks the Stop gate.
 H="$(make_project)"; SID="sess-rollup-dangling-parent"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"GHOST\"}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"GHOST\"}]}"
 run_stop_sid "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "RU5 dangling parent → rc 0 (no crash)"
 assert_not_contains "$HOOK_OUT" "Rollup inconsistency" "RU5 parent → non-existent owner → no rollup violation (degrade)"
@@ -565,7 +571,7 @@ rm -rf "$H"
 #                violation (done owner + in_flight child) → hook stays DORMANT: allow, NO block, and
 #                CRUCIALLY no rollup reminder is ever injected on an unarmed path.
 H="$(make_project)"; SID="sess-rollup-unarmed"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":false,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":false,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
 run_stop_sid "$H" "$SID"
 assert_eq 0 "$HOOK_RC" "RU6 unarmed (archived) → rc 0 (dormant)"
 assert_not_contains "$HOOK_OUT" "block" "RU6 unarmed → dormant allow (no block)"
@@ -576,10 +582,10 @@ rm -rf "$H"
 #                re-forces the self-check across Stops. Seed the sidecar with the fp of the
 #                child-in_flight state, then flip the child to done → fingerprint differs → re-block.
 H="$(make_project)"; SID="sess-rollup-fp"
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
-printf '0 %s\n' "$(fp_of "$H/b1.board.json")" > "$H/.$SID.stopcheck"   # seed: child-in_flight state handshook
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"in_flight\",\"deps\":[],\"parent\":\"M1\"}]}"
+printf '0 %s\n' "$(fp_of "$H/boards/b1.board.json")" > "$H/.$SID.stopcheck"   # seed: child-in_flight state handshook
 # Flip the child in_flight → done: the parent-folded fingerprint must change → re-block the handshake.
-mkactive "$H" "b1" "{\"schema\":\"cc-master/v1\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"done\",\"deps\":[],\"parent\":\"M1\"}]}"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"M1\",\"status\":\"done\",\"deps\":[]},{\"id\":\"M1.b\",\"status\":\"done\",\"deps\":[],\"parent\":\"M1\"}]}"
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "RU7 child status flip (in_flight→done) → fingerprint changes (parent folded) → re-block handshake"
 rm -rf "$H"
@@ -589,9 +595,9 @@ rm -rf "$H"
 #                majority. Verify fp_of (which now includes parent) equals the old formula on a no-parent
 #                board.
 H="$(make_project)"
-mkactive "$H" "b1" '{"schema":"cc-master/v1","owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":[]}]}'
-PRE_D3_FP="$(tasks_region_t "$H/b1.board.json" | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | { printf 'watchdog_needed:1\n'; cat; } | cksum | awk '{print $1}')"
-NOW_FP="$(fp_of "$H/b1.board.json")"
+mkactive "$H" "b1" '{"schema":"cc-master/v2","owner":{"active":true,"session_id":"s"},"tasks":[{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":[]}]}'
+PRE_D3_FP="$(tasks_region_t "$H/boards/b1.board.json" | grep -oE '"(id|status|blocked_on)"[[:space:]]*:[[:space:]]*"[^"]*"' | { printf 'watchdog_needed:1\n'; cat; } | cksum | awk '{print $1}')"
+NOW_FP="$(fp_of "$H/boards/b1.board.json")"
 assert_eq "$PRE_D3_FP" "$NOW_FP" "RU8 no-parent board → parent-folded fp == pre-D3 fp (graceful-degrade, no churn)"
 rm -rf "$H"
 

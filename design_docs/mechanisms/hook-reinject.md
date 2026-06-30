@@ -1,6 +1,6 @@
-# 机制契约：`hooks/scripts/reinject.sh`
+# 机制契约：`hooks/scripts/reinject.js`
 
-> 类别：hook（`SessionStart`，matcher `startup|resume|compact`，纯 bash + awk）。源码：`hooks/scripts/reinject.sh`。compaction 后从外部重注「我是 orchestrator」身份。
+> 类别：hook（`SessionStart`，matcher `startup|resume|compact`，node·require board-model + hook-common（board-v2 收编））。源码：`hooks/scripts/reinject.js`。compaction 后从外部重注「我是 orchestrator」身份。
 
 ## 触发输入
 - `SessionStart` 事件（startup / resume / compact），stdin JSON 含 `session_id`。

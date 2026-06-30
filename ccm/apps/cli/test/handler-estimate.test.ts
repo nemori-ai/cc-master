@@ -1,0 +1,1035 @@
+// handler-estimate.test.ts — estimate noun handler（handlers/estimate.ts）契约门（ADR-015 §2·plan §12）。
+//
+// estimate = 工作侧只读 advisory namespace（全 verb runRead·消费 @ccm/engine OR/ML 算法层）。三类断言
+//   （plan §12.2）：
+//   ① property/invariant（算法变了仍恒真）：P50≤P80≤P95、SPI/CPI ∈ 合理域、makespan≥0、source/confidence 齐全。
+//   ② golden snapshot（seeded·确定性）：固定 --seed + --as-of → 期望数值快照。算法改动 → golden diff 是有意的。
+//   ③ 降级 case：cold-start 空 home / 无 baseline / 全缺 estimate（throughput 主导）→ 退原估值 + low-confidence。
+//
+// 数据底座：engine fixtures（packages/engine/test/fixtures/boards·repo 资产·plan §12.1）——current 当前板、
+//   home-corpus 跨板语料、edge 边界。--board + --home 指 fixture，--as-of 固定让 forecast ETA 也确定。
+//
+// 零写不变式：estimate 全 runRead·绝不落盘（fixture 板字节不变）。
+
+import assert from 'node:assert/strict';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { afterEach, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+import type { Ctx } from '../src/handlers/_common.js';
+import * as estimateHandler from '../src/handlers/estimate.js';
+import * as io from '../src/io.js';
+
+const EXIT = io.EXIT;
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const FIX = resolve(__dirname, '../../../packages/engine/test/fixtures/boards');
+
+const CURRENT = resolve(FIX, 'current/active-estimate-engine.board.json');
+const BASELINE_BOARD = resolve(FIX, 'current/baseline-example.board.json');
+// board-v2 布局：CLI 的 scope=home 跨板语料读 <home>/boards/。共享 fixture（packages/engine/test/fixtures/
+//   boards/home-corpus·7 板）被 engine 测试**直接**当语料目录读，故不能就地搬进 boards/（会断 engine 测试）。
+//   这里把这 7 板原样 stage 进一个 temp home 的 boards/ 子目录、把 HOME_CORPUS 指向该 temp home 根——既守
+//   board-v2 布局、又不动共享 fixture / engine 测试（golden 值不变·读的是同一批板内容）。
+const HOME_CORPUS = (() => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-homecorpus-'));
+  cpSync(resolve(FIX, 'home-corpus'), join(root, 'boards'), { recursive: true });
+  return root;
+})();
+const COLD_START = resolve(FIX, 'edge/cold-start-empty.board.json');
+const EMPTY_HOME = resolve(FIX, 'edge'); // edge dir 当作「无对口语料」的近似 home（其 boards/ 不存在 → 空语料）
+
+// 临时板工厂（构造「active 任务全缺 estimate」的 forecast 目标·edge/all-missing-estimate 是全 done 归档板
+//   〔throughput 语料〕·非 active forecast 目标，故 coverage<50% 路径用 inline 活动板测）。
+let TMPDIRS: string[] = [];
+function mkInlineBoard(tasks: unknown[]): string {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-est-'));
+  TMPDIRS.push(root);
+  const home = join(root, '.claude', 'cc-master');
+  mkdirSync(home, { recursive: true });
+  const bp = join(home, 'inline.board.json');
+  writeFileSync(
+    bp,
+    JSON.stringify({
+      schema: 'cc-master/v2',
+      meta: { template_version: 3 },
+      goal: 'inline estimate test',
+      owner: { active: true, session_id: 'sid-est' },
+      git: { worktree: '/repo/wt', branch: 'feat' },
+      scheduling: { wip_limit: 4 },
+      tasks,
+      log: [],
+    }),
+  );
+  return bp;
+}
+// mkHomeWithCorpus(corpusTasks, targetTasks) → 写一个 home（语料板 + 目标板）并返回 { home, targetBoard }。
+//   corpus 板是 done 归档板（喂 calibrate/conformal 的历史 ratio）；target 板是 active forecast/show 目标。
+//   用于 #bug-A 回归：构造 ratio≈1.4 的语料 → 校准乘子 + conformal 残差都来自它。
+function mkHomeWithCorpus(
+  corpusTasks: unknown[],
+  targetTasks: unknown[],
+): { home: string; targetBoard: string } {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-corpus-'));
+  TMPDIRS.push(root);
+  const home = join(root, '.claude', 'cc-master');
+  // board-v2 布局：被发现的语料板落 <home>/boards/（target 板经显式 --board 引用·留 home 根）。
+  mkdirSync(join(home, 'boards'), { recursive: true });
+  writeFileSync(
+    join(home, 'boards', 'corpus.board.json'),
+    JSON.stringify({
+      schema: 'cc-master/v2',
+      meta: { created_at: '2026-06-20T00:00:00Z' },
+      goal: 'corpus archive',
+      owner: { active: false, session_id: 'sid-corpus', heartbeat: '2026-06-20T00:00:00Z' },
+      git: { worktree: '/repo/corpus', branch: 'main' },
+      tasks: corpusTasks,
+      log: [],
+    }),
+  );
+  const targetBoard = join(home, 'target.board.json');
+  writeFileSync(
+    targetBoard,
+    JSON.stringify({
+      schema: 'cc-master/v2',
+      meta: { template_version: 3, created_at: '2026-06-25T00:00:00Z' },
+      goal: 'target estimate',
+      owner: { active: true, session_id: 'sid-target' },
+      git: { worktree: '/repo/target', branch: 'feat' },
+      scheduling: { wip_limit: 4 },
+      tasks: targetTasks,
+      log: [],
+    }),
+  );
+  return { home, targetBoard };
+}
+afterEach(() => {
+  for (const d of TMPDIRS) rmSync(d, { recursive: true, force: true });
+  TMPDIRS = [];
+});
+
+type TestCtx = Ctx & { outBuf: string[]; errBuf: string[] };
+function mkCtx(
+  boardPath: string,
+  {
+    home = HOME_CORPUS,
+    values = {},
+    positionals = [],
+    json = true,
+  }: {
+    home?: string;
+    values?: Record<string, unknown>;
+    positionals?: string[];
+    json?: boolean;
+  } = {},
+): TestCtx {
+  const outBuf: string[] = [];
+  const errBuf: string[] = [];
+  return {
+    values: { board: boardPath, home, ...values },
+    positionals,
+    flags: {
+      json,
+      dryRun: false,
+      force: false,
+      yes: false,
+      quiet: false,
+      verbose: false,
+      color: false,
+    },
+    sid: '',
+    env: { CC_MASTER_HOME: home },
+    out: (s: string) => outBuf.push(s),
+    err: (s: string) => errBuf.push(s),
+    isTTY: true,
+    outBuf,
+    errBuf,
+  };
+}
+function dataOf(ctx: TestCtx): any {
+  return JSON.parse(ctx.outBuf.join('')).data;
+}
+
+// ══ estimate forecast ════════════════════════════════════════════════════════════════════════════
+
+test('forecast: P50 ≤ P80 ≤ P95 monotonic (5% 硬墙·property)', () => {
+  const ctx = mkCtx(CURRENT, { values: { scope: 'home', seed: '42', runs: '2000' } });
+  const code = estimateHandler.forecast(ctx);
+  assert.equal(code, EXIT.OK);
+  const d = dataOf(ctx);
+  const m = d.makespan;
+  assert.ok(m.p50.value <= m.p80.value, `p50 ${m.p50.value} ≤ p80 ${m.p80.value}`);
+  assert.ok(m.p80.value <= m.p95.value, `p80 ${m.p80.value} ≤ p95 ${m.p95.value}`);
+  // 5% 硬墙：makespan p95 是有限值（非 Infinity·非 100% 概念），ETA 字段是 ISO 串。
+  assert.ok(Number.isFinite(m.p95.value));
+  assert.match(d.forecast.p95, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+});
+
+test('forecast: seeded golden snapshot (deterministic·seed 42·runs 2000)', () => {
+  const ctx = mkCtx(CURRENT, {
+    values: { scope: 'home', seed: '42', runs: '2000', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  estimateHandler.forecast(ctx);
+  const d = dataOf(ctx);
+  // golden：算法改动 → 这些值会变（有意·需 review 更新·plan §12.2）。
+  assert.deepEqual(d.makespan, {
+    p50: { value: 16.16, unit: 'h' },
+    p80: { value: 19.39, unit: 'h' },
+    p95: { value: 23.72, unit: 'h' },
+  });
+  // throughput 含闲置日后（#round9 P2#2）：稀疏 home 语料的零产出日纳入采样 → ETA 更大、更诚实
+  //   （旧 {4,4,5} 漏算闲置日、低估）。
+  assert.deepEqual(d.throughput_days, { p50: 10, p80: 15, p95: 21 });
+  assert.equal(d.coverage_pct, 83);
+  assert.equal(d.history_n, 40);
+  assert.equal(d.seed, 42);
+  assert.equal(d.runs, 2000);
+  assert.equal(d.source, 'calibrated');
+  // consistency warning 真触发（估值 vs 吞吐偏差 > 20%）。
+  assert.equal(d.consistency.warning, true);
+  // 敏感度三件套齐全 + 按 CI 降序。
+  assert.ok(d.criticality_index.length > 0);
+  for (const s of d.criticality_index) {
+    assert.ok('criticality' in s && 'cruciality' in s && 'sensitivity' in s);
+  }
+});
+
+test('forecast same seed reproduces, different seed differs (determinism)', () => {
+  const a = mkCtx(CURRENT, {
+    values: { scope: 'home', seed: '7', runs: '1000', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  const b = mkCtx(CURRENT, {
+    values: { scope: 'home', seed: '7', runs: '1000', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  const c = mkCtx(CURRENT, {
+    values: { scope: 'home', seed: '99', runs: '1000', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  estimateHandler.forecast(a);
+  estimateHandler.forecast(b);
+  estimateHandler.forecast(c);
+  assert.deepEqual(dataOf(a).makespan, dataOf(b).makespan, 'same seed → identical');
+  assert.notDeepEqual(dataOf(a).makespan, dataOf(c).makespan, 'different seed → different');
+});
+
+test('forecast --mode throughput skips estimate channel', () => {
+  const ctx = mkCtx(CURRENT, { values: { mode: 'throughput', scope: 'home', seed: '42' } });
+  estimateHandler.forecast(ctx);
+  const d = dataOf(ctx);
+  assert.equal(d.makespan, null, 'no estimate-DAG makespan in throughput mode');
+  assert.ok(d.throughput_days, 'throughput days present');
+  assert.equal(d.criticality_index.length, 0);
+});
+
+test('forecast --mode throughput on high-coverage board → forecast NON-null (round5 bug1)', () => {
+  // CURRENT 是高 coverage 板（active 任务 ~83% 有 estimate ≥50%）。--mode throughput 时 est=null（不算 DAG 通道）
+  //   但 thr 有值——修复前 useThroughputPrimary=coverage<50 → false（coverage≥50）→ forecastEta 落到
+  //   `if (est...)`(null) 分支 → 返 forecast:null（显式 throughput 模式对正常估值板失效·P2）。
+  //   修复：useThroughputPrimary=(mode==='throughput'||coverage<50)&&… → throughput 模式必走吞吐 ETA。
+  const ctx = mkCtx(CURRENT, {
+    values: { mode: 'throughput', scope: 'home', seed: '42', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  estimateHandler.forecast(ctx);
+  const d = dataOf(ctx);
+  assert.ok(
+    d.coverage_pct >= 50,
+    `CURRENT coverage ${d.coverage_pct} should be ≥50 (high-coverage board)`,
+  );
+  // ★核心：throughput 模式下 forecast 必非 null（吞吐 ETA·三分位 ISO 时刻），不再因 coverage≥50 意外塌成 null。
+  assert.ok(d.forecast, 'forecast must be non-null in throughput mode even at coverage≥50');
+  assert.match(d.forecast.p50, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.match(d.forecast.p95, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.ok(d.throughput_days, 'throughput days present (drives the ETA)');
+  assert.equal(d.makespan, null, 'no estimate-DAG makespan in throughput mode');
+});
+
+test('forecast --mode estimate still uses DAG makespan, not throughput (round5 bug1 control)', () => {
+  // 控制组：--mode estimate 强制 DAG 通道（thr 不算）→ forecast 走 makespan（小时 ETA），throughput_days=null。
+  const ctx = mkCtx(CURRENT, {
+    values: { mode: 'estimate', scope: 'home', seed: '42', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  estimateHandler.forecast(ctx);
+  const d = dataOf(ctx);
+  assert.ok(d.makespan, 'estimate mode produces DAG makespan');
+  assert.equal(d.throughput_days, null, 'no throughput channel in estimate mode');
+  assert.ok(d.forecast, 'forecast non-null (driven by DAG makespan)');
+  assert.match(d.forecast.p50, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+});
+
+test('forecast --effective-n scales throughput channel days (#bug3 regression)', () => {
+  // --effective-n threading：N 份并行配额 → 吞吐通道天数 ÷N（资源型加速）。echo effective_n + note。
+  const base = mkCtx(CURRENT, {
+    values: { mode: 'both', scope: 'home', seed: '42', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  const n2 = mkCtx(CURRENT, {
+    values: {
+      mode: 'both',
+      scope: 'home',
+      seed: '42',
+      'as-of': '2026-06-25T12:00:00Z',
+      'effective-n': '2',
+    },
+  });
+  estimateHandler.forecast(base);
+  estimateHandler.forecast(n2);
+  const db = dataOf(base);
+  const dn = dataOf(n2);
+  // effective_n echo 反映 flag。
+  assert.equal(db.effective_n, 1, 'default effective_n=1');
+  assert.equal(dn.effective_n, 2, 'flag read → effective_n=2');
+  // ★核心：throughput_days 按 N=2 缩半（days/2）——证明 flag 真改变输出（非只塞 echo）。
+  assert.ok(db.throughput_days.p50 > 0, 'base throughput days finite');
+  assert.ok(
+    Math.abs(dn.throughput_days.p50 - db.throughput_days.p50 / 2) < 1e-9,
+    `n2 p50 ${dn.throughput_days.p50} ≈ base/2 ${db.throughput_days.p50 / 2}`,
+  );
+  assert.ok(
+    Math.abs(dn.throughput_days.p95 - db.throughput_days.p95 / 2) < 1e-9,
+    'p95 also halved by effective_n',
+  );
+  // 诚实 note：估算-DAG 通道① 不受 N 缩短（critical-path bound）——makespan 两次相同。
+  assert.deepEqual(dn.makespan, db.makespan, 'estimate-DAG makespan unchanged by effective_n');
+  assert.ok(
+    dn.notes.some((s: string) => s.includes('effective_n') || s.includes('临界路径')),
+    'has effective_n threading note',
+  );
+});
+
+test('forecast --effective-n 1 (default) is identical to omitting it (#bug3 no-op floor)', () => {
+  const omit = mkCtx(CURRENT, {
+    values: { mode: 'both', scope: 'home', seed: '42', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  const one = mkCtx(CURRENT, {
+    values: {
+      mode: 'both',
+      scope: 'home',
+      seed: '42',
+      'as-of': '2026-06-25T12:00:00Z',
+      'effective-n': '1',
+    },
+  });
+  estimateHandler.forecast(omit);
+  estimateHandler.forecast(one);
+  assert.deepEqual(dataOf(one).throughput_days, dataOf(omit).throughput_days);
+});
+
+test('forecast degrades when active tasks all miss estimate (coverage<50%·unit fallback note)', () => {
+  // 全 active 任务无 estimate → coverage 0% → 吞吐通道主导 + unit-time fallback note。
+  const bp = mkInlineBoard([
+    { id: 'M1', status: 'ready', deps: [], type: 'development', executor: 'subagent' },
+    { id: 'M2', status: 'ready', deps: ['M1'], type: 'development', executor: 'subagent' },
+  ]);
+  const ctx = mkCtx(bp, { home: EMPTY_HOME, values: { scope: 'this-board', seed: '42' } });
+  const code = estimateHandler.forecast(ctx);
+  assert.equal(code, EXIT.OK);
+  const d = dataOf(ctx);
+  assert.ok(d.coverage_pct < 50, `coverage ${d.coverage_pct} should be <50`);
+  assert.ok(
+    d.notes.some((n: string) => n.includes('coverage') || n.includes('unit-time')),
+    'has degradation note',
+  );
+});
+
+test('forecast cold-start (empty corpus) still produces estimate-channel makespan, low confidence', () => {
+  const ctx = mkCtx(COLD_START, { home: EMPTY_HOME, values: { scope: 'this-board', seed: '42' } });
+  const code = estimateHandler.forecast(ctx);
+  assert.equal(code, EXIT.OK);
+  const d = dataOf(ctx);
+  // this-board scope + cold board has 0 done tasks → no history → low confidence + source estimate.
+  assert.equal(d.confidence, 'low');
+  assert.equal(d.source, 'estimate');
+});
+
+// ══ estimate show ════════════════════════════════════════════════════════════════════════════════
+
+test('show <id>: calibrated estimate + conformal interval (golden·monotone)', () => {
+  const ctx = mkCtx(CURRENT, {
+    positionals: ['C6'],
+    values: { scope: 'home', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  const code = estimateHandler.show(ctx);
+  assert.equal(code, EXIT.OK);
+  const d = dataOf(ctx);
+  const row = d.tasks[0];
+  assert.equal(row.id, 'C6');
+  assert.equal(row.raw_estimate_h, 3);
+  // golden calibration（home-corpus·type-level 收缩）。
+  assert.equal(row.calibration.multiplier, 1.287);
+  assert.equal(row.calibrated_h, 3.86);
+  // conformal 区间单调（5% 硬墙）。
+  assert.ok(row.interval.p50 <= row.interval.p80);
+  assert.ok(row.interval.p80 <= row.interval.p95);
+  assert.equal(row.coverage_basis, 'mondrian-group');
+  assert.equal(row.confidence, 'high');
+});
+
+test('show: conformal interval feeds RAW estimate, not calibrated (no double-calibration·#bug-A)', () => {
+  // 历史语料：8 个 done dev/subagent 任务·est=10h actual=14h → ratio=1.4（乐观因子）。
+  //   calibrate 学到乘子（Bayesian 向 1.0 收缩·<1.4）；conformal 残差分位 = 1.4。
+  // 目标任务：raw=10h。
+  //   修复后（喂 rawHours）：interval p50 = 10 × ratio_p50(1.4) ≈ 14（乐观因子作用一次）。
+  //   bug（喂 calibrated）：p50 ≈ calibrated × 1.4 ≈ 18+（乐观因子被乘第二次·codex 的 10→19.6 例）。
+  const corpus = Array.from({ length: 8 }, (_, i) => ({
+    id: `D${i}`,
+    status: 'done',
+    type: 'development',
+    executor: 'subagent',
+    estimate: { value: 10, unit: 'h' },
+    started_at: '2026-06-20T00:00:00Z',
+    finished_at: '2026-06-20T14:00:00Z', // actual=14h → ratio=1.4
+  }));
+  const { home, targetBoard } = mkHomeWithCorpus(corpus, [
+    {
+      id: 'T1',
+      status: 'ready',
+      deps: [],
+      type: 'development',
+      executor: 'subagent',
+      estimate: { value: 10, unit: 'h' },
+    },
+  ]);
+  const ctx = mkCtx(targetBoard, {
+    home,
+    positionals: ['T1'],
+    values: { scope: 'home', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  const code = estimateHandler.show(ctx);
+  assert.equal(code, EXIT.OK);
+  const row = dataOf(ctx).tasks[0];
+  assert.equal(row.raw_estimate_h, 10);
+  // calibration 乘子学到 ~1.4 方向（Bayesian 收缩 → calibrated 落在 10~14·点估仍报 calibrated）。
+  assert.ok(
+    row.calibrated_h > 10 && row.calibrated_h < 15,
+    `calibrated ${row.calibrated_h} ∈ (10,15)`,
+  );
+  assert.equal(row.coverage_basis, 'mondrian-group');
+  // ★核心断言：p50 ≈ raw × 1.4 ≈ 14（乐观因子一次），而非 raw × 1.4 × 1.4 ≈ 19.6（双重 calibration·bug）。
+  assert.ok(
+    Math.abs(row.interval.p50 - 14) < 0.5,
+    `p50 ${row.interval.p50} should ≈ 14 (raw×1.4·once), NOT ~19.6 (double-applied)`,
+  );
+  // 区间整体不应被乐观因子乘两次：p95 远低于「双重 calibration」会产生的 ~27（10×1.4×1.4×1.4 量级）。
+  assert.ok(
+    row.interval.p95 < 18,
+    `p95 ${row.interval.p95} should not be inflated by double-calibration`,
+  );
+  // 单调性（5% 硬墙）仍成立。
+  assert.ok(row.interval.p50 <= row.interval.p80 && row.interval.p80 <= row.interval.p95);
+});
+
+test('show: task with no estimate → no-history (degrade, retain null)', () => {
+  // C7 在 fixture 无 estimate 字段？实际有；用 cold-start 板的 ready 任务（有 estimate 但无 home 语料）。
+  const ctx = mkCtx(COLD_START, {
+    home: EMPTY_HOME,
+    positionals: ['G1'],
+    values: { scope: 'this-board' },
+  });
+  estimateHandler.show(ctx);
+  const d = dataOf(ctx);
+  const row = d.tasks[0];
+  // no home corpus → multiplier 退 1.0（no-history shrink）。
+  assert.ok(row.calibration.source === 'no-history' || row.calibration.history_n === 0);
+});
+
+test('show --as-of: done-after-as-of task stays a target (backtest not hidden·round6 #bug2)', () => {
+  // show 的 target 选择此前用裸 status !== 'done' → 一个「现在 done 但 finished_at > as-of」的任务
+  //   （as-of 当时本是 backlog）被错隐藏。修复后用 isDoneAsOf（!isDoneAsOf → 仍 target）·与 forecast/EVM/velocity 同口径。
+  // 板：F1 现在 done 但 finished_at=2026-06-24（> as-of 2026-06-20）→ as-of 时仍未完成 → 应仍在 target 集；
+  //     R1 ready（永远是 target·控制存在）；D1 现在 done 且 finished_at=2026-06-18（≤ as-of）→ as-of 时真已完成 → 排除。
+  const { home, targetBoard } = mkHomeWithCorpus(
+    [], // 空语料（无 home 收缩·target 选择与语料无关）
+    [
+      {
+        id: 'F1',
+        status: 'done',
+        deps: [],
+        type: 'development',
+        executor: 'subagent',
+        estimate: { value: 3, unit: 'h' },
+        started_at: '2026-06-23T00:00:00Z',
+        finished_at: '2026-06-24T00:00:00Z', // done-after-as-of（as-of=2026-06-20）
+      },
+      {
+        id: 'R1',
+        status: 'ready',
+        deps: [],
+        type: 'development',
+        executor: 'subagent',
+        estimate: { value: 2, unit: 'h' },
+      },
+      {
+        id: 'D1',
+        status: 'done',
+        deps: [],
+        type: 'development',
+        executor: 'subagent',
+        estimate: { value: 4, unit: 'h' },
+        started_at: '2026-06-17T00:00:00Z',
+        finished_at: '2026-06-18T00:00:00Z', // done-before-as-of → 真已完成
+      },
+    ],
+  );
+  const ctx = mkCtx(targetBoard, {
+    home,
+    values: { scope: 'this-board', 'as-of': '2026-06-20T00:00:00Z' },
+  });
+  const code = estimateHandler.show(ctx);
+  assert.equal(code, EXIT.OK);
+  const ids = dataOf(ctx)
+    .tasks.map((t: { id: string }) => t.id)
+    .sort();
+  assert.deepEqual(
+    ids,
+    ['F1', 'R1'],
+    'F1 (done-after-as-of) + R1 (ready) are targets; D1 (done-before-as-of) excluded',
+  );
+});
+
+test('show CONTROL as-of=now: genuinely-done task IS excluded from targets (#bug2 control)', () => {
+  // 控制组：as-of=now（默认或显式 now）→ 真 done 任务（finished_at ≤ now）正常排除（退化为 status!=='done'·行为不变）。
+  const { home, targetBoard } = mkHomeWithCorpus(
+    [],
+    [
+      {
+        id: 'F1',
+        status: 'done',
+        deps: [],
+        type: 'development',
+        executor: 'subagent',
+        estimate: { value: 3, unit: 'h' },
+        started_at: '2026-06-23T00:00:00Z',
+        finished_at: '2026-06-24T00:00:00Z',
+      },
+      {
+        id: 'R1',
+        status: 'ready',
+        deps: [],
+        type: 'development',
+        executor: 'subagent',
+        estimate: { value: 2, unit: 'h' },
+      },
+    ],
+  );
+  // as-of 远在两个 finished_at 之后 → 都是真 done → F1 排除，仅 R1 是 target。
+  const ctx = mkCtx(targetBoard, {
+    home,
+    values: { scope: 'this-board', 'as-of': '2026-06-30T00:00:00Z' },
+  });
+  estimateHandler.show(ctx);
+  const ids = dataOf(ctx).tasks.map((t: { id: string }) => t.id);
+  assert.deepEqual(ids, ['R1'], 'as-of after both finishes → F1 truly done → only R1 target');
+});
+
+// ══ estimate evm ═════════════════════════════════════════════════════════════════════════════════
+
+test('evm: consumes baseline → PV/EV/AC + SPI/CPI in domain (golden)', () => {
+  const ctx = mkCtx(CURRENT, { values: { 'as-of': '2026-06-25T12:00:00Z' } });
+  const code = estimateHandler.evm(ctx);
+  assert.equal(code, EXIT.OK);
+  const d = dataOf(ctx);
+  assert.equal(d.has_baseline, true);
+  // golden EVM numbers (baseline bac_h=29, 3 done tasks C1/C2/C3 → EV=10h).
+  assert.deepEqual(d.pv, { value: 29, unit: 'h' });
+  assert.deepEqual(d.ev, { value: 10, unit: 'h' });
+  assert.equal(d.ac.value, 13.5);
+  assert.equal(d.ac.coverage_pct, 100);
+  assert.equal(d.spi, 0.345);
+  assert.equal(d.cpi, 0.741);
+  // SPI(t) / Earned Schedule 字段存在且在域内。
+  assert.ok(d.spi_t > 0 && d.spi_t < 2);
+  assert.equal(d.source, 'evm-earned-schedule');
+});
+
+test('evm: no baseline → graceful warn (has_baseline:false, exit 0)', () => {
+  const ctx = mkCtx(COLD_START, { home: EMPTY_HOME, values: { 'as-of': '2026-06-25T12:00:00Z' } });
+  const code = estimateHandler.evm(ctx);
+  assert.equal(code, EXIT.OK);
+  const d = dataOf(ctx);
+  assert.equal(d.has_baseline, false);
+  assert.ok(d.warnings.length > 0, 'has degradation warning');
+});
+
+test('evm --ac-source token uses token AC unit', () => {
+  const ctx = mkCtx(CURRENT, { values: { 'ac-source': 'token', 'as-of': '2026-06-25T12:00:00Z' } });
+  estimateHandler.evm(ctx);
+  const d = dataOf(ctx);
+  assert.equal(d.ac.source, 'token');
+  assert.equal(d.ac.unit, 'tok');
+});
+
+// ══ estimate velocity ════════════════════════════════════════════════════════════════════════════
+
+test('velocity: SLE quantiles monotone + history_n (golden)', () => {
+  const ctx = mkCtx(CURRENT, { values: { scope: 'home', 'as-of': '2026-06-25T12:00:00Z' } });
+  const code = estimateHandler.velocity(ctx);
+  assert.equal(code, EXIT.OK);
+  const d = dataOf(ctx);
+  assert.ok(d.sle.p50 <= d.sle.p85, `SLE p50 ${d.sle.p50} ≤ p85 ${d.sle.p85}`);
+  assert.ok(d.sle.p85 <= d.sle.p95, `SLE p85 ${d.sle.p85} ≤ p95 ${d.sle.p95}`);
+  // golden SLE（home-corpus cycle-time 分位）。
+  assert.deepEqual(d.sle, {
+    p50: 2.58,
+    p85: 5.6,
+    p95: 9.18,
+    unit: 'h',
+    confidence: 'high',
+    history_n: 40,
+  });
+  assert.equal(d.confidence, 'high');
+});
+
+test('velocity --window filters corpus by finish time → 7 vs 90 differ (#bug2 regression)', () => {
+  // 语料：1 个近期 done（as-of 前 3 天·落 window 7 内）+ 6 个久远 done（as-of 前 ~40 天·落 window 90 内、window 7 外）。
+  //   window 7 → 只见近期 1 条；window 90 → 见全部 7 条。history_n / SLE / tasksPerDay 都该因此不同。
+  const AS_OF = '2026-06-25T12:00:00Z';
+  const recentDone = {
+    id: 'R0',
+    status: 'done',
+    type: 'development',
+    executor: 'subagent',
+    estimate: { value: 2, unit: 'h' },
+    started_at: '2026-06-22T08:00:00Z',
+    finished_at: '2026-06-22T10:00:00Z', // 3 天前·actual 2h
+  };
+  const oldDone = Array.from({ length: 6 }, (_, i) => ({
+    id: `O${i}`,
+    status: 'done',
+    type: 'development',
+    executor: 'subagent',
+    estimate: { value: 5, unit: 'h' },
+    started_at: '2026-05-16T00:00:00Z',
+    finished_at: '2026-05-16T08:00:00Z', // ~40 天前·actual 8h（cycle-time 显著长于近期）
+  }));
+  const { home, targetBoard } = mkHomeWithCorpus(
+    [recentDone, ...oldDone],
+    [{ id: 'A1', status: 'ready', deps: [], type: 'development', executor: 'subagent' }],
+  );
+  const w7 = mkCtx(targetBoard, { home, values: { scope: 'home', window: '7', 'as-of': AS_OF } });
+  const w90 = mkCtx(targetBoard, { home, values: { scope: 'home', window: '90', 'as-of': AS_OF } });
+  assert.equal(estimateHandler.velocity(w7), EXIT.OK);
+  assert.equal(estimateHandler.velocity(w90), EXIT.OK);
+  const d7 = dataOf(w7);
+  const d90 = dataOf(w90);
+  // ★核心：窗口生效——7 天窗只见 1 条 done，90 天窗见全部 7 条。
+  assert.equal(d7.history_n, 1, 'window 7 → only the recent done in corpus');
+  assert.equal(d90.history_n, 7, 'window 90 → all 7 done in corpus');
+  // SLE 也不同（近期 cycle-time 2h vs 含久远 8h 任务的更高分位）。
+  assert.notDeepEqual(d7.sle, d90.sle, 'SLE differs because window changes the corpus');
+  // window_days 诚实回显实际生效窗口。
+  assert.equal(d7.window_days, 7);
+  assert.equal(d90.window_days, 90);
+});
+
+test('velocity with no --window does not filter (history_n unchanged·#bug2 default)', () => {
+  // 不传 --window → 不过滤（沿用现状）。golden 板全语料 history_n=40（同既有 golden 断言基线）。
+  const ctx = mkCtx(CURRENT, { values: { scope: 'home', 'as-of': '2026-06-25T12:00:00Z' } });
+  estimateHandler.velocity(ctx);
+  const d = dataOf(ctx);
+  assert.equal(d.history_n, 40, 'no window → full corpus (unfiltered)');
+  assert.equal(d.window_days, null, 'no window → window_days echoes null (not applied)');
+});
+
+test('velocity cold-start → no-history source, low confidence', () => {
+  const ctx = mkCtx(COLD_START, { home: EMPTY_HOME, values: { scope: 'this-board' } });
+  estimateHandler.velocity(ctx);
+  const d = dataOf(ctx);
+  assert.equal(d.source, 'no-history');
+  assert.equal(d.confidence, 'low');
+});
+
+// ══ estimate risk ════════════════════════════════════════════════════════════════════════════════
+
+test('risk: CI/CRI/SSI + WIP-aging SLE + CCPM buffer_health (golden)', () => {
+  const ctx = mkCtx(CURRENT, {
+    values: { scope: 'home', seed: '42', 'as-of': '2026-06-25T12:00:00Z' },
+  });
+  const code = estimateHandler.risk(ctx);
+  assert.equal(code, EXIT.OK);
+  const d = dataOf(ctx);
+  // 敏感度三件套（CI∈[0,1], SSI∈[0,1], CRI∈[-1,1]）。
+  for (const s of d.criticality_index) {
+    assert.ok(s.criticality >= 0 && s.criticality <= 1, `CI ${s.criticality} ∈ [0,1]`);
+    assert.ok(s.sensitivity >= 0 && s.sensitivity <= 1, `SSI ${s.sensitivity} ∈ [0,1]`);
+    assert.ok(s.cruciality >= -1 && s.cruciality <= 1, `CRI ${s.cruciality} ∈ [-1,1]`);
+  }
+  // WIP-aging：C5 critical（age 远超 SLE_P95）, C4 at_risk（age 介于 P85/P95·golden 取决于 as-of）。
+  const c5 = d.wip_aging.find((a: { id: string }) => a.id === 'C5');
+  assert.ok(c5, 'C5 in-flight should appear aged');
+  assert.equal(c5.status, 'critical');
+  // CCPM buffer_health 三区之一 + zone 字段。
+  assert.ok(['green', 'yellow', 'red'].includes(d.ccpm.zone));
+  assert.ok(typeof d.ccpm.buffer_health === 'number');
+});
+
+test('risk cold-start → empty/low (no crash)', () => {
+  const ctx = mkCtx(COLD_START, { home: EMPTY_HOME, values: { scope: 'this-board', seed: '42' } });
+  const code = estimateHandler.risk(ctx);
+  assert.equal(code, EXIT.OK);
+  const d = dataOf(ctx);
+  assert.equal(d.source, 'estimate');
+  assert.equal(d.confidence, 'low');
+});
+
+// ══ backtest hook（--as-of 回放·plan §12.2/§12.3）═══════════════════════════════════════════════
+
+test('backtest: --as-of in the past changes EVM AT (Actual Time elapsed)', () => {
+  const early = mkCtx(CURRENT, { values: { 'as-of': '2026-06-22T12:00:00Z' } });
+  const late = mkCtx(CURRENT, { values: { 'as-of': '2026-06-25T12:00:00Z' } });
+  estimateHandler.evm(early);
+  estimateHandler.evm(late);
+  const de = dataOf(early);
+  const dl = dataOf(late);
+  assert.ok(de.at_hours < dl.at_hours, 'earlier as-of → less elapsed time');
+});
+
+test('backtest: forecast treats done-after-as-of task as still-in-backlog (round5 sweep #1)', () => {
+  // 板：C0 done@06-04（两 as-of 之前·供吞吐历史），D1 done@06-05T12（backtest as-of 之后），P1/P2 ready。
+  //   as-of=06-05T00 时 D1 当时尚未完成 → backtest 应把它当 backlog，而非裸 status==='done' 错当已完成。
+  //   两 as-of 都有吞吐语料；唯一变量是 D1 是否计入 backlog。
+  //   ★C0 完成日（06-04）紧邻 D1 完成日（06-05）——两 as-of 的吞吐语料都是**连续日**（无闲置日），
+  //     故 throughput rate 恒为 1 task/day（#round9 P2#2 的含闲置日采样在连续语料上不引入零产出日），
+  //     把 throughput_days 钉成 == backlog → backlog 差异成为天数的唯一驱动（隔离掉 rate 混淆）。
+  const board = [
+    {
+      id: 'C0',
+      status: 'done',
+      deps: [],
+      type: 'development',
+      executor: 'subagent',
+      estimate: { value: 3, unit: 'h' },
+      started_at: '2026-06-03T20:00:00Z',
+      finished_at: '2026-06-04T00:00:00Z',
+    },
+    {
+      id: 'D1',
+      status: 'done',
+      deps: [],
+      type: 'development',
+      executor: 'subagent',
+      estimate: { value: 5, unit: 'h' },
+      started_at: '2026-06-05T08:00:00Z',
+      finished_at: '2026-06-05T12:00:00Z',
+    },
+    {
+      id: 'P1',
+      status: 'ready',
+      deps: [],
+      type: 'development',
+      executor: 'subagent',
+      estimate: { value: 5, unit: 'h' },
+    },
+    {
+      id: 'P2',
+      status: 'ready',
+      deps: [],
+      type: 'development',
+      executor: 'subagent',
+      estimate: { value: 5, unit: 'h' },
+    },
+  ];
+  const bp = mkInlineBoard(board);
+  const before = readFileSync(bp, 'utf8');
+  // 用 throughput 通道：backlog 是 as-of 截断的确定性信号（不被 MC 的 calibration 噪声混淆）。
+  //   backtest（as-of=06-05T00·D1 尚未完成）→ backlog=3（D1+P1+P2）·语料=[C0@06-04]（rate 1/day）→ days=3；
+  //   当前（as-of=06-10·D1 已完成）→ backlog=2（P1+P2）·语料=[C0@06-04,D1@06-05]（连续日·rate 1/day）→ days=2。
+  //   rate 两侧都钉成 1/day → backlog 单调 → backtest days 严格 > current days。
+  const back = mkCtx(bp, {
+    home: EMPTY_HOME,
+    values: {
+      mode: 'throughput',
+      scope: 'this-board',
+      seed: '42',
+      'as-of': '2026-06-05T00:00:00Z',
+    },
+  });
+  const now = mkCtx(bp, {
+    home: EMPTY_HOME,
+    values: {
+      mode: 'throughput',
+      scope: 'this-board',
+      seed: '42',
+      'as-of': '2026-06-10T00:00:00Z',
+    },
+  });
+  assert.equal(estimateHandler.forecast(back), EXIT.OK);
+  assert.equal(estimateHandler.forecast(now), EXIT.OK);
+  const db = dataOf(back);
+  const dn = dataOf(now);
+  // ★核心：backtest 把 D1 当 backlog（finished_at=06-05T12 > as-of=06-05T00）→ 吞吐天数严格大于「D1 已完成」时。
+  //   修复前裸 status==='done' → 两 as-of backlog 都=2（D1 永远当已完成）→ days 相等（backtest 泄漏未来）。
+  assert.ok(
+    db.throughput_days.p50 > dn.throughput_days.p50,
+    `backtest throughput days ${db.throughput_days.p50} > current ${dn.throughput_days.p50} (D1 counted as backlog at as-of)`,
+  );
+  // 零写不变式：forecast 只读，inline 板字节不变。
+  assert.equal(readFileSync(bp, 'utf8'), before, 'forecast never writes the board');
+});
+
+test('backtest: --as-of anchors recency cutoff to as-of (>90d-old board still in corpus·round7 #P2)', () => {
+  // round5「--as-of sweep」的 sibling：sweep 修了 corpusAsOf 的 record 级过滤、漏了 loadCorpus 自身的 board 级 cutoff。
+  //   构造一块「板时戳 + done 记录都距今天 >90 天、但在 as-of（同样 >90 天前）当时仍在 recency 窗口内」的旧板：
+  //   · 旧代码 loadCorpus(homeDir) 用引擎内部 Date.now() 锚 90 天 cutoff → loadHomeBoards 提前把旧板丢弃 → history_n=0。
+  //   · 修后 loadCorpus(homeDir,{nowMs:asOf}) 把 board 级 recency 锚到 as-of → 旧板纳入 → corpusAsOf 仅按 as-of
+  //     相对截断 finishedAtMs → 6 条 done 全部进语料 → history_n=6。
+  //   日期相对 Date.now() 计算（不硬编码绝对日·对机器时钟稳健）。velocity 暴露 history_n 最直接（show/forecast/risk
+  //   同走 loadScopedCorpus·一并受益·穷尽 sweep）。
+  const day = 86400000;
+  const now = Date.now();
+  const iso = (ms: number): string => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const boardTsMs = now - 120 * day; // 旧板时戳：距今 120 天（> 90 天·旧代码会丢）
+  const finishedMs = now - 119 * day; // done 完成于 119 天前（≤ as-of）
+  const startedMs = finishedMs - 4 * 3600000; // actual = 4h
+  const asOfMs = now - 118 * day; // backtest 时刻：118 天前（旧板当时可用·但仍 > 90 天前）
+
+  const corpusDone = Array.from({ length: 6 }, (_, i) => ({
+    id: `OLD${i}`,
+    status: 'done',
+    deps: [],
+    type: 'development',
+    executor: 'subagent',
+    estimate: { value: 4, unit: 'h' },
+    started_at: iso(startedMs),
+    finished_at: iso(finishedMs),
+  }));
+
+  const root = mkdtempSync(join(tmpdir(), 'ccm-p2-'));
+  TMPDIRS.push(root);
+  const home = join(root, '.claude', 'cc-master');
+  // board-v2 布局：被发现的语料板落 <home>/boards/（target 板经显式 --board·留 home 根）。
+  mkdirSync(join(home, 'boards'), { recursive: true });
+  // 归档语料板：板时戳（heartbeat + created_at）都在 120 天前。
+  writeFileSync(
+    join(home, 'boards', 'old-corpus.board.json'),
+    JSON.stringify({
+      schema: 'cc-master/v2',
+      meta: { template_version: 3, created_at: iso(boardTsMs) },
+      goal: 'old corpus archive',
+      owner: { active: false, session_id: 'sid-old', heartbeat: iso(boardTsMs) },
+      git: { worktree: '/repo/old', branch: 'main' },
+      tasks: corpusDone,
+      log: [],
+    }),
+  );
+  // active 目标板（今日时戳·只读取的板）：只含一个 ready 任务 → 自身贡献 0 条 done 记录。
+  const targetBoard = join(home, 'target.board.json');
+  writeFileSync(
+    targetBoard,
+    JSON.stringify({
+      schema: 'cc-master/v2',
+      meta: { template_version: 3, created_at: iso(now) },
+      goal: 'target estimate',
+      owner: { active: true, session_id: 'sid-target', heartbeat: iso(now) },
+      git: { worktree: '/repo/target', branch: 'feat' },
+      scheduling: { wip_limit: 4 },
+      tasks: [{ id: 'A1', status: 'ready', deps: [], type: 'development', executor: 'subagent' }],
+      log: [],
+    }),
+  );
+
+  const ctx = mkCtx(targetBoard, { home, values: { scope: 'home', 'as-of': iso(asOfMs) } });
+  assert.equal(estimateHandler.velocity(ctx), EXIT.OK);
+  const d = dataOf(ctx);
+  // ★核心：旧板的 6 条 done 在 as-of 当时可用 → 必须进语料（旧代码会因 today-锚 90 天 cutoff 丢成 0）。
+  assert.equal(
+    d.history_n,
+    6,
+    `old board within as-of recency window must be in corpus (got history_n=${d.history_n})`,
+  );
+});
+
+// ══ 零写不变式（estimate 纯只读·绝不落盘）═══════════════════════════════════════════════════════
+
+test('estimate handlers never write the board (zero-write invariant)', () => {
+  const before = readFileSync(CURRENT, 'utf8');
+  estimateHandler.forecast(mkCtx(CURRENT, { values: { scope: 'home', seed: '42' } }));
+  estimateHandler.evm(mkCtx(CURRENT, { values: {} }));
+  estimateHandler.velocity(mkCtx(CURRENT, { values: { scope: 'home' } }));
+  estimateHandler.risk(mkCtx(CURRENT, { values: { scope: 'home', seed: '42' } }));
+  estimateHandler.show(mkCtx(CURRENT, { positionals: ['C6'], values: { scope: 'home' } }));
+  assert.equal(
+    readFileSync(CURRENT, 'utf8'),
+    before,
+    'fixture board byte-identical after estimate reads',
+  );
+});
+
+// ══ baseline-example 板交叉验证（evm on the dedicated baseline fixture）════════════════════════════
+
+test('evm on baseline-example fixture: SPI/CPI computed (baseline bac_h=12)', () => {
+  const ctx = mkCtx(BASELINE_BOARD, { values: { 'as-of': '2026-06-25T12:00:00Z' } });
+  estimateHandler.evm(ctx);
+  const d = dataOf(ctx);
+  assert.equal(d.has_baseline, true);
+  assert.equal(d.bac.value, 12);
+  assert.ok(d.pv.value >= 0 && d.pv.value <= 12);
+});
+
+// ══ estimate cost-to-complete（%-cost-to-complete·偿付力·plan §4）══════════════════════════════════
+//   配额% 是权威预算账本：%-cost = backlog × (burn-rate × 历史工期·throughput-MC)。token 辅助 sizing。
+//   端到端：临时 home（corpus done〔actualHours+tokens〕 + target backlog）+ 账户权威 sidecar（burn 可算）。
+
+const AS_OF_CTC = '2026-06-25T13:00:00Z';
+const T13 = Math.floor(Date.parse('2026-06-25T13:00:00Z') / 1000);
+const T15 = Math.floor(Date.parse('2026-06-25T15:00:00Z') / 1000); // 5h reset·2h future
+const T29 = Math.floor(Date.parse('2026-06-29T13:00:00Z') / 1000); // 7d reset future
+// 5h: used=60%·captured 13:00·resets 15:00 → windowStart=10:00·elapsed 3h → burn=20%/h（window-elapsed）。
+const SIDECAR_CTC = {
+  five_hour: { used_percentage: 60, resets_at: T15 },
+  seven_day: { used_percentage: 30, resets_at: T29 },
+  captured_at: T13,
+};
+
+// 每条 corpus done 任务 actualHours=2h（started/finished 2h 隔）+ tokens（喂 knn token sizing）。
+function corpusDone(id: string, tin: number, tout: number) {
+  return {
+    id,
+    status: 'done',
+    type: 'development',
+    executor: 'subagent',
+    tier: 'mid',
+    estimate: { value: 2, unit: 'h' },
+    started_at: '2026-06-20T00:00:00Z',
+    finished_at: '2026-06-20T02:00:00Z',
+    observability: { tokens: { input: tin, output: tout } },
+  };
+}
+
+// mkCtcCtx(home, board, rateCache) → ctx 带 CC_MASTER_RATE_CACHE（账户权威 sidecar 路径·estimate mkCtx 不设）。
+function mkCtcCtx(
+  home: string,
+  board: string,
+  rateCache: string | null,
+  extra: Record<string, unknown> = {},
+): TestCtx {
+  const outBuf: string[] = [];
+  const errBuf: string[] = [];
+  return {
+    values: { board, home, 'as-of': AS_OF_CTC, ...extra },
+    positionals: [],
+    flags: {
+      json: true,
+      dryRun: false,
+      force: false,
+      yes: false,
+      quiet: false,
+      verbose: false,
+      color: false,
+    },
+    sid: '',
+    // rateCache=null → 指向不存在文件（避免读宿主真 sidecar·测降级）；否则指向 fixture sidecar。
+    env: { CC_MASTER_HOME: home, CC_MASTER_RATE_CACHE: rateCache ?? join(home, 'NOPE.json') },
+    out: (s: string) => outBuf.push(s),
+    err: (s: string) => errBuf.push(s),
+    isTTY: true,
+    outBuf,
+    errBuf,
+  };
+}
+
+// mkCtcBoard(doneTasks, activeTasks) → 一块板（done 当 this-board 语料 + active 当 backlog）+ rate-cache sidecar。
+//   用 scope=this-board（读本板 done·extractDoneRecords·零 home/boards-layout 依赖·抗并行 home 迁移）。
+function mkCtcBoard(
+  doneTasks: unknown[],
+  activeTasks: unknown[],
+  withSidecar = true,
+): { home: string; board: string; rateCache: string } {
+  const board = mkInlineBoard([...doneTasks, ...activeTasks]);
+  const home = dirname(board); // mkInlineBoard 落在 <root>/.claude/cc-master
+  const rateCache = join(home, '.cc-master-rate-limits.json');
+  if (withSidecar) writeFileSync(rateCache, `${JSON.stringify(SIDECAR_CTC)}\n`, 'utf8');
+  return { home, board, rateCache };
+}
+
+test('cost-to-complete: burn × history → %-cost (uniform 2h corpus·backlog 2·seed 42)', () => {
+  const { home, board, rateCache } = mkCtcBoard(
+    [corpusDone('A1', 1000, 500), corpusDone('A2', 2000, 1000), corpusDone('A3', 800, 400)],
+    [
+      { id: 'T1', status: 'ready', type: 'development', executor: 'subagent', tier: 'mid' },
+      {
+        id: 'T2',
+        status: 'in_flight',
+        type: 'design',
+        executor: 'subagent',
+        tier: 'mid',
+        started_at: '2026-06-25T12:00:00Z',
+      },
+    ],
+  );
+  const ctx = mkCtcCtx(home, board, rateCache, {
+    scope: 'this-board',
+    seed: '42',
+    runs: '2000',
+  });
+  const code = estimateHandler.costToComplete(ctx);
+  assert.equal(code, EXIT.OK);
+  const d = dataOf(ctx);
+  // 账户权威 burn-rate = 60%/3h = 20%/h（window-elapsed）。
+  assert.equal(d.available, true);
+  assert.equal(d.burn_pct_per_hour, 20);
+  assert.equal(d.burn_method, 'window-elapsed');
+  assert.equal(d.backlog, 2);
+  // per-unit %-cost = 20%/h × 2h = 40% per task；uniform 池 → backlog 2 → 总 80%（p50=p80=p95·无方差）。
+  assert.equal(d.per_unit_samples, 3, '3 corpus done with actualHours');
+  assert.equal(d.cost_to_complete_pct.p50, 80);
+  assert.equal(d.cost_to_complete_pct.p95, 80, 'uniform pool → no variance → 5%硬墙仍 80');
+  assert.equal(d.mean_pct, 80);
+  // token 辅助 sizing（knnPredict.predictedTokens·辅助·非账本）。
+  assert.ok(d.token_sizing.total_predicted_tokens > 0, 'token sizing wired from knnPredict');
+  assert.equal(d.token_sizing.per_task.length, 2, 'per-task token sizing for 2 backlog tasks');
+  // per-task pct_share 之和 ≈ mean_pct（token 相对权重切分总账本%）。
+  const shareSum = d.token_sizing.per_task.reduce(
+    (s: number, r: { pct_share: number | null }) => s + (r.pct_share ?? 0),
+    0,
+  );
+  assert.ok(Math.abs(shareSum - d.mean_pct) < 0.05, `share sum ${shareSum} ≈ mean ${d.mean_pct}`);
+});
+
+test('cost-to-complete: deterministic for same seed (varied corpus → variance)', () => {
+  const doneTasks = [
+    { ...corpusDone('A1', 1000, 500), finished_at: '2026-06-20T01:00:00Z' }, // 1h
+    corpusDone('A2', 2000, 1000), // 2h
+    { ...corpusDone('A3', 800, 400), finished_at: '2026-06-20T05:00:00Z' }, // 5h
+  ];
+  const activeTasks = [
+    { id: 'T1', status: 'ready', type: 'development', executor: 'subagent', tier: 'mid' },
+    { id: 'T2', status: 'ready', type: 'development', executor: 'subagent', tier: 'mid' },
+    { id: 'T3', status: 'ready', type: 'development', executor: 'subagent', tier: 'mid' },
+  ];
+  const runOnce = () => {
+    const { home, board, rateCache } = mkCtcBoard(doneTasks, activeTasks);
+    const c = mkCtcCtx(home, board, rateCache, { scope: 'this-board', seed: '42' });
+    estimateHandler.costToComplete(c);
+    return dataOf(c);
+  };
+  const a = runOnce();
+  const b = runOnce();
+  assert.deepEqual(a.cost_to_complete_pct, b.cost_to_complete_pct, 'same seed → identical');
+  assert.ok(a.cost_to_complete_pct.p50 <= a.cost_to_complete_pct.p95, 'monotone p50≤p95');
+});
+
+test('cost-to-complete: no account sidecar → available:false + cost null (degrade, exit 0)', () => {
+  const { home, board } = mkCtcBoard(
+    [corpusDone('A1', 1000, 500)],
+    [{ id: 'T1', status: 'ready', type: 'development', executor: 'subagent', tier: 'mid' }],
+    false, // 不写 sidecar
+  );
+  // rateCache=null → 不存在的 sidecar 路径 → burn 不可算。
+  const ctx = mkCtcCtx(home, board, null, { scope: 'this-board' });
+  const code = estimateHandler.costToComplete(ctx);
+  assert.equal(code, EXIT.OK, 'degrade is exit 0 not error');
+  const d = dataOf(ctx);
+  assert.equal(d.available, false);
+  assert.equal(d.burn_pct_per_hour, null);
+  assert.equal(d.cost_to_complete_pct, null, 'no burn → no %-cost ledger');
+  assert.equal(d.source, 'local-derived-approx');
+  assert.equal(d.confidence, 'low');
+});
+
+test('cost-to-complete: zero-write invariant (board byte-identical)', () => {
+  const { home, board, rateCache } = mkCtcBoard(
+    [corpusDone('A1', 1000, 500)],
+    [{ id: 'T1', status: 'ready', type: 'development', executor: 'subagent', tier: 'mid' }],
+  );
+  const before = readFileSync(board, 'utf8');
+  estimateHandler.costToComplete(mkCtcCtx(home, board, rateCache, { scope: 'this-board' }));
+  assert.equal(readFileSync(board, 'utf8'), before, 'board byte-identical after cost reads');
+});

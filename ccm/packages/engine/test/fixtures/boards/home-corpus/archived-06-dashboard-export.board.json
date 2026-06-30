@@ -1,0 +1,124 @@
+{
+  "schema": "cc-master/v2",
+  "meta": { "template_version": 3, "created_at": "2026-06-08T09:30:00Z" },
+  "goal": "web-dashboard 加报表导出（CSV/PDF）+ 定时邮件",
+  "owner": {
+    "active": false,
+    "session_id": "sid-dash-export-2026-06",
+    "heartbeat": "2026-06-09T17:10:00Z"
+  },
+  "git": { "worktree": "/work/web-dashboard", "branch": "feat/report-export" },
+  "scheduling": { "wip_limit": 2 },
+  "tasks": [
+    {
+      "id": "E1",
+      "title": "导出格式 + 定时调度设计",
+      "status": "done",
+      "deps": [],
+      "type": "design",
+      "executor": "master-orchestrator",
+      "model": "claude-sonnet-4-5",
+      "estimate": { "value": 2, "unit": "h" },
+      "acceptance": "导出契约 + 调度方案评审过",
+      "created_at": "2026-06-08T09:30:00Z",
+      "started_at": "2026-06-08T09:40:00Z",
+      "finished_at": "2026-06-08T11:00:00Z",
+      "verified": true,
+      "artifact": "/work/web-dashboard/docs/export-design.md",
+      "observability": { "tokens": { "input": 30000, "output": 7600 } }
+    },
+    {
+      "id": "E2",
+      "title": "CSV 导出 + 流式大数据集",
+      "status": "done",
+      "deps": ["E1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-dash-e2",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "10w 行流式导出不 OOM 单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/web-dashboard/docs/export-design.md" },
+        { "kind": "plan", "ref": "/work/web-dashboard/docs/plan-export.md" }
+      ],
+      "created_at": "2026-06-08T10:30:00Z",
+      "started_at": "2026-06-08T13:00:00Z",
+      "finished_at": "2026-06-08T15:10:00Z",
+      "verified": true,
+      "artifact": "/work/web-dashboard/src/export/csv.ts",
+      "observability": { "tokens": { "input": 58000, "output": 15000 } }
+    },
+    {
+      "id": "E3",
+      "title": "PDF 渲染导出 + 模板",
+      "status": "done",
+      "deps": ["E1"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-dash-e3",
+      "model": "claude-sonnet-4-5",
+      "tier": "mid",
+      "estimate": { "value": 4, "unit": "h" },
+      "acceptance": "PDF 排版 + 图表嵌入快照测试绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/web-dashboard/docs/export-design.md" },
+        { "kind": "plan", "ref": "/work/web-dashboard/docs/plan-export.md" }
+      ],
+      "created_at": "2026-06-08T10:30:00Z",
+      "started_at": "2026-06-08T15:30:00Z",
+      "finished_at": "2026-06-08T20:40:00Z",
+      "verified": true,
+      "artifact": "/work/web-dashboard/src/export/pdf.ts",
+      "observability": { "tokens": { "input": 124000, "output": 31000 } }
+    },
+    {
+      "id": "E4",
+      "title": "定时邮件投递 + 失败重试",
+      "status": "done",
+      "deps": ["E2", "E3"],
+      "type": "development",
+      "executor": "subagent",
+      "handle": "bg-dash-e4",
+      "model": "claude-haiku-4-5",
+      "tier": "cheap",
+      "estimate": { "value": 3, "unit": "h" },
+      "acceptance": "调度触发 + 投递重试 + 死信单测绿",
+      "references": [
+        { "kind": "spec", "ref": "/work/web-dashboard/docs/export-design.md" },
+        { "kind": "plan", "ref": "/work/web-dashboard/docs/plan-export.md" }
+      ],
+      "created_at": "2026-06-09T09:00:00Z",
+      "started_at": "2026-06-09T13:00:00Z",
+      "finished_at": "2026-06-09T15:00:00Z",
+      "verified": true,
+      "artifact": "/work/web-dashboard/src/export/mailer.ts",
+      "observability": { "tokens": { "input": 66000, "output": 17400 } }
+    },
+    {
+      "id": "E5",
+      "title": "回归 + 开 PR",
+      "status": "done",
+      "deps": ["E4"],
+      "type": "pr",
+      "executor": "master-orchestrator",
+      "model": "claude-sonnet-4-5",
+      "estimate": { "value": 1, "unit": "h" },
+      "created_at": "2026-06-09T15:00:00Z",
+      "started_at": "2026-06-09T16:00:00Z",
+      "finished_at": "2026-06-09T16:45:00Z",
+      "verified": true,
+      "artifact": "https://github.com/acme/web-dashboard/pull/97"
+    }
+  ],
+  "log": [
+    { "ts": "2026-06-08T09:30:00Z", "kind": "note", "summary": "报表导出编排启动" },
+    {
+      "ts": "2026-06-08T15:10:00Z",
+      "kind": "finding",
+      "summary": "E2 CSV 流式比想象快，估3h实约2h（欠估侧）"
+    },
+    { "ts": "2026-06-09T16:45:00Z", "kind": "handoff", "summary": "PR #97 收口" }
+  ]
+}

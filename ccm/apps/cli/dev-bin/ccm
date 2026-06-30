@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# ccm/apps/cli/dev-bin/ccm — dev/test node-bin shim（T4-1b·ADR-014 解耦的 dev 机制）。
+#
+# 这是一个**开发/测试用**的 `ccm` 可执行 wrapper：它直接 `exec node <repo>/ccm/apps/cli/bin/ccm.cjs "$@"`，
+# 把 `ccm <args>` 转译成跑本仓 cli 的 node 入口（bin/ccm.cjs 加载 tsdown 出的 dist/index.cjs）。
+#
+# 为什么要它（不直接建 SEA）：
+#   · SEA（per-OS Node single-executable）约 135MB，每次重建慢；T3 已证「二进制 ≡ node bin」（行为字节级一致）。
+#   · run-tests / dogfood 只需「一个名叫 ccm 的可执行、行为同生产二进制」——node-bin shim 完全够，且秒级可用。
+#   · 生产 / release 才测真 SEA（CI 那侧），本 shim 不进 ship 包（dev-only·红线5：不随 plugin 分发）。
+#
+# 用法（hook 调用约定）：hook 内 `spawnSync(process.env.CCM_BIN || 'ccm', args)`。把 CCM_BIN 指向本 shim 的
+#   绝对路径即让 hook（及任何消费方）走「真 ccm 路径」而非 require fallback：
+#       CCM_BIN="<repo>/ccm/apps/cli/dev-bin/ccm" bash run-tests.sh
+#   生产环境 `ccm` 在 PATH（global install / SEA），不设 CCM_BIN 即用 PATH 上的 ccm。
+#
+# 前置：先 `pnpm -F ccm build` 出 dist/index.cjs（dist 被 ccm/.gitignore 忽略，故须先构建）。dist 缺 → bin
+#   会 require 失败、非零退出 + stderr——消费方（hook）据此走 fallback / graceful-degrade，绝不静默错跑。
+#
+# 路径解析：本脚本自解析所在目录（dev-bin/），上溯到 bin/ccm.cjs——故在任何 worktree / clone 路径下都对，
+#   不硬编码绝对路径（worktree-portable）。
+set -euo pipefail
+SHIM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CCM_CJS="${SHIM_DIR}/../bin/ccm.cjs"
+exec node "$CCM_CJS" "$@"

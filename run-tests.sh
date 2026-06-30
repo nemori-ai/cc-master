@@ -19,6 +19,34 @@ sweep_ccm_tmp() {
 sweep_ccm_tmp
 trap sweep_ccm_tmp EXIT
 
+# ── ccm dev-bin shim：让 hook 测试**真走 ccm 路径**（ADR-014 解耦·T4-1b）────────────────────────────
+# 两个 node hook（board-lint / verify-board）首选经进程边界 shell 调全局 `ccm` 二进制读 board，失败才退回
+# require 旧 cli/。生产环境 `ccm` 在 PATH；本仓 dev/test 经 CCM_BIN 指向一个 node-bin shim
+# （ccm/apps/cli/dev-bin/ccm — exec node bin/ccm.cjs，免每次重建 135MB SEA·T3 已证二进制≡node bin）。
+# 故先 `pnpm -C ccm build` 出 dist（turbo 链 engine→cli），再 export CCM_BIN——使 hook 测试走真 ccm 路径
+# 而非 fallback。构建/找不到 pnpm 时**软失败、不中断**：CCM_BIN 不设 → hook 自动退回 require fallback
+# （仍全绿·已证字节级等价），让无 node toolchain 的环境照样跑完套件（CI/release 才在 SEA 上测真二进制）。
+CCM_SHIM="$PWD/ccm/apps/cli/dev-bin/ccm"
+if command -v pnpm >/dev/null 2>&1 && [ -f "$CCM_SHIM" ]; then
+  echo "== building ccm dist (so hook tests run through real ccm path) =="
+  if pnpm -C ccm build >/dev/null 2>&1 && [ -f ccm/apps/cli/dist/index.cjs ]; then
+    export CCM_BIN="$CCM_SHIM"
+    echo "   CCM_BIN=$CCM_BIN"
+  else
+    echo "   ccm build skipped/failed — hook tests fall back to require path (still green)"
+  fi
+else
+  echo "== ccm dist build skipped (no pnpm / no shim) — hook tests use require fallback path =="
+fi
+
+# ── Disable ccm's no-touch status-line auto-install for the whole suite (0.10.0) ────────────────────
+# `ccm statusline` auto-installs itself into <claudeConfigDir>/settings.json on the first NON-statusline
+# ccm invocation. Hook/script tests spawn the real `ccm` (via CCM_BIN) WITHOUT pinning CLAUDE_CONFIG_DIR,
+# so an un-gated auto-install would mutate the developer's REAL ~/.claude/settings.json mid-suite. The
+# kill-switch makes every suite ccm spawn skip auto-install (the behavior itself is covered by the ccm
+# engine/CLI tests against temp config dirs). Exported → inherited by all hook/script subprocess ccm calls.
+export CC_MASTER_NO_AUTOINSTALL=1
+
 fail=0
 echo "== hook tests (bash) =="
 for t in tests/hooks/test_*.sh; do

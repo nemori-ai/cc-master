@@ -3,14 +3,45 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const A = 'skills/orchestrating-to-completion/assets';
 const read = (p) => JSON.parse(readFileSync(join(ROOT, p), 'utf8'));
 
+// ★T4-3b: the lint ENGINE is no longer in-process require'd from cli/src — the whole cli/ is deleted and
+//   the lint SSOT is @ccm/engine, reached via the `ccm` binary (ADR-014 process boundary). The engine's
+//   own 82 tests cover lint LOGIC; this content test keeps only the CONTENT-LAYER assertion the engine
+//   package can't make — "the canonical SHIPPED assets (template/example) are valid v2 and lint clean".
+//   We reach lint through `ccm board lint --board <file> --raw --json` (run-tests sets CCM_BIN to the
+//   dev-bin shim; standalone it falls back to PATH `ccm`). Returns {errors,warnings} projected from
+//   ccm violations (level:'hard'→error / 'warn'→warning). Throws if ccm is unavailable (gap surfaces
+//   loudly rather than silently passing — gate-green ≠ passed).
+const CCM_BIN = process.env.CCM_BIN || 'ccm';
+function lintAsset(relPath) {
+  const file = join(ROOT, relPath);
+  const r = spawnSync(CCM_BIN, ['board', 'lint', '--board', file, '--raw', '--json'], {
+    encoding: 'utf8',
+    timeout: 15000,
+  });
+  assert.ok(!r.error, `ccm lint must be invokable (CCM_BIN=${CCM_BIN}); error: ${r.error && r.error.message}`);
+  let parsed;
+  try {
+    parsed = JSON.parse(r.stdout || '');
+  } catch (_e) {
+    assert.fail(`ccm board lint --raw --json must emit valid JSON (got rc ${r.status}, stderr: ${(r.stderr || '').trim()})`);
+  }
+  const data = parsed && parsed.data;
+  assert.ok(data && Array.isArray(data.violations), 'ccm lint JSON must carry data.violations[]');
+  return {
+    errors: data.violations.filter((v) => v && v.level === 'hard'),
+    warnings: data.violations.filter((v) => v && v.level === 'warn'),
+  };
+}
+
 test('board.template.json is the empty skeleton with the pinned schema + empty goal', () => {
   const b = read(`${A}/board.template.json`);
-  assert.equal(b.schema, 'cc-master/v1');
+  assert.equal(b.schema, 'cc-master/v2');
   assert.equal(b.goal, '');            // bootstrap leaves goal empty; agent fills it
   assert.equal(b.owner.active, true);
   assert.deepEqual(b.tasks, []);
@@ -27,19 +58,20 @@ test('board.template.json carries meta.template_version (integer ≥ 1) — agen
   assert.ok(b.meta.template_version >= 1, 'meta.template_version must be ≥ 1');
 });
 
-test('board.template.json carries num_account default 1 — soft-observed, NOT the pinned waist', () => {
+test('board.template.json aggregates WIP control under scheduling (v2) — num_account retired', () => {
   const b = read(`${A}/board.template.json`);
-  // num_account is the third soft-observed field (usage-pacing.js reads it to scale pacing cadence ×N).
-  // It is NOT the hook-required narrow waist (red line 2): missing/non-positive degrades to 1 in-hook.
-  // The template ships the default 1 so bootstrap's literal-anchored sed has an anchor to stamp the real
-  // --num_account value onto. Lock the default into the content contract to prevent regression.
-  assert.ok(Number.isInteger(b.num_account), 'board.template.json must carry an integer top-level num_account');
-  assert.equal(b.num_account, 1, 'template num_account default must be 1');
+  // v2 (ADR-013): WIP control aggregated into the `scheduling` module (was flat top-level wip_limit);
+  // posttool-batch reads scheduling.wip_limit (v1 top-level fallback). num_account is RETIRED — usage-pacing
+  // no longer reads the board (effective-N comes from accounts.json registry, A2 T6), so the template drops it.
+  assert.ok(b.scheduling && typeof b.scheduling === 'object', 'template carries a scheduling object');
+  assert.ok(Number.isInteger(b.scheduling.wip_limit), 'scheduling.wip_limit is an integer');
+  assert.ok(!('num_account' in b), 'num_account is retired (no longer shipped in the template)');
+  assert.ok(!('wip_limit' in b), 'flat top-level wip_limit is gone (moved under scheduling)');
 });
 
 test('board.example.json is a valid worked board with ≥1 task carrying id/status/deps', () => {
   const b = read(`${A}/board.example.json`);
-  assert.equal(b.schema, 'cc-master/v1');
+  assert.equal(b.schema, 'cc-master/v2');
   assert.ok(b.tasks.length >= 1);
   for (const t of b.tasks) { assert.ok(t.id && t.status); assert.ok(Array.isArray(t.deps)); }
 });
@@ -60,4 +92,30 @@ test('board.example.json demonstrates a per-task observability edge — agent-sh
   // bootstrap-seeded skeleton, tasks:[]) carries NO observability — it is filled per-node at runtime.
   const tmpl = read(`${A}/board.template.json`);
   assert.deepEqual(tmpl.tasks, [], 'template ships empty tasks[] — observability is filled per-node at runtime, never seeded');
+});
+
+// ── v2 内容契约：模板 + 示例都 lint 零 error；示例展示 v2 新模块 ────────────────────────────────────
+test('board.template.json + board.example.json lint with ZERO hard errors (canonical assets are valid v2)', () => {
+  const tmpl = lintAsset(`${A}/board.template.json`);
+  assert.equal(tmpl.errors.length, 0, `template hard errors: ${JSON.stringify(tmpl.errors)}`);
+  assert.equal(tmpl.warnings.length, 0, `template should also be warning-clean: ${JSON.stringify(tmpl.warnings)}`);
+  const ex = lintAsset(`${A}/board.example.json`);
+  assert.equal(ex.errors.length, 0, `example hard errors: ${JSON.stringify(ex.errors)}`);
+  // 示例容一条 BIZ-TIME-ORDER warn（legacy 节点 T2 故意无 finished_at，演示旧板 lint 轻推）——仅此一条。
+  assert.ok(ex.warnings.every((w) => w.rule === 'BIZ-TIME-ORDER'),
+    `example warnings should only be the intentional legacy-node nudge: ${JSON.stringify(ex.warnings)}`);
+});
+
+test('board.example.json demonstrates the v2 agile modules (executor / cadence / judgment_calls / references)', () => {
+  const b = read(`${A}/board.example.json`);
+  // executor 取代 v1 mechanism（5 值枚举）。
+  assert.ok(b.tasks.some((t) => t.executor === 'subagent'), 'example demonstrates executor=subagent (v2, replaces mechanism)');
+  assert.ok(!b.tasks.some((t) => 'mechanism' in t), 'no task carries the retired v1 mechanism field');
+  // cadence（节奏/timebox 策略层）。
+  assert.ok(b.cadence && Array.isArray(b.cadence.iterations) && b.cadence.iterations.length >= 1, 'example carries a cadence iteration');
+  // judgment_calls（自决诚实台账）。
+  assert.ok(Array.isArray(b.judgment_calls) && b.judgment_calls.length >= 1, 'example carries a judgment_call entry');
+  // references（取代 v1 links；ref 绝对路径/URL）。
+  const devTask = b.tasks.find((t) => t.type === 'development');
+  assert.ok(devTask && Array.isArray(devTask.references) && devTask.references.length >= 1, 'a development task demonstrates references');
 });
