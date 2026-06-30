@@ -340,7 +340,7 @@ function decideWarning(fh) {
 
 // ── ACCOUNT-AUTHORITATIVE pacing (Finding #37) ──────────────────────────────────────────────────────
 // 账户权威 5h/7d used_percentage(+resets_at)只在 status-line stdin 出现(官方核实:hook/JSONL/CLI 全无),由
-// statusline-capture.js 落到 sidecar。撞墙判据优先用它——账户 % 是权威,不像本地反推 window_remaining_min
+// ccm 自带的 `ccm statusline`(首次跑 ccm 即自动安装)落到 sidecar。撞墙判据优先用它——账户 % 是权威,不像本地反推 window_remaining_min
 // 会失真到数量级(Finding #37);并第一次把 7d 纳入(此前 hook 只看 5h、对 7d 全盲,Finding #31)。
 function readRateCache(p) {
   try {

@@ -89,8 +89,8 @@ if (!available) {
     source: 'unavailable',
     available: false,
     note: '账户权威信号不可用（无 status-line sidecar，或 ccm 不可用）。本地 JSONL 反推已撤（plan §10·' +
-          '引擎不含反推·Finding #37 反推 reset 失真）——此带外信号现仅账户权威。接 statusline-capture.js ' +
-          '到 status line 以提供 sidecar（见 pacing-and-estimation skill 的 usage-signals「接法」）。',
+          '引擎不含反推·Finding #37 反推 reset 失真）——此带外信号现仅账户权威。sidecar 由 ccm 自带的 ' +
+          '`ccm statusline`（首次跑 ccm 即自动安装）落；若已 `ccm statusline uninstall` opt-out 则不可用。',
   }) + '\n');
   process.exit(0);
 }

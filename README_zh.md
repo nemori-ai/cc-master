@@ -119,18 +119,11 @@ claude --plugin-dir ~/cc-master
 
 **把 Claude config 挪走了？** 如果你用 `CLAUDE_CONFIG_DIR` 把 Claude Code 的配置目录指到了 `~/.claude` 以外，`ccm` 会自动跟随——它的 board home 和号池都落在你配置的目录下，不用额外传参。
 
-### 3.（可选）打开配额感知配速
+### 3. 状态栏（自动）
 
-cc-master 的预测和配速要读你的 Claude 用量（5h / 7d 配额），而 Claude Code 只在**状态栏**里暴露它。要喂给 cc-master，在 `settings.json` 把 `statusLine.command` 指向随插件带的捕获脚本，用 `--passthrough` 包住你原本的状态栏命令：
+cc-master 自带一条状态栏——context 进度条 + 你的 5h / 7d 配额用量，按各自用得多满**变色**。**你第一次跑任意 `ccm` 命令时，cc-master 会自动帮你配好它**（在你的全局 `settings.json` 写入 `statusLine.command`）。这条状态栏同时把 5h / 7d 配额信号喂给预测与配速。
 
-```json
-"statusLine": {
-  "type": "command",
-  "command": "~/cc-master/skills/orchestrating-to-completion/scripts/statusline-capture.js --passthrough '<你原本的状态栏命令>'"
-}
-```
-
-它把你的状态栏原样透传、同时把配额信号落到 sidecar 供 `ccm usage` 读。脚本**用绝对路径**（`${CLAUDE_PLUGIN_ROOT}` 在 `statusLine.command` 里不保证展开）。不接也照样能用——配速只会报 `unavailable`。
+提示：它**会覆盖你现有的 `statusLine`**（已先备份你原来的）。想还原你自己的：`ccm statusline uninstall`（恢复原值，并让 cc-master 不再覆盖回去）。想彻底关掉自动安装：设 `CC_MASTER_NO_AUTOINSTALL=1`。
 
 然后给它一个目标：
 

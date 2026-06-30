@@ -34,7 +34,7 @@
 
 - **消费 ccm 只读 advisory** 的读法 + 字段解读 + 喂回 orchestrator 判断：`usage`（show/advise/task-cost/burn-rate/runway）· `estimate`（show/forecast/evm/velocity/risk/cost-to-complete）· `baseline` 生命周期。
 - **模型四档位事实**（Fable/Opus/Sonnet/Haiku 相对成本心智 + 当前可用性约束）+ 按难度选档的事实映射 + 为何主线固定一个模型（prompt-cache）。
-- **5h/7d 配额信号源链**（`ccm usage advise` 走廊 verdict 首选 / sidecar / statusline-capture 接法 / 诚实天花板）+ effective-N 缩放节奏的消费。
+- **5h/7d 配额信号源链**（`ccm usage advise` 走廊 verdict 首选 / sidecar 由 ccm 自带 `ccm statusline` 自动落 / 诚实天花板）+ effective-N 缩放节奏的消费。
 - **估算诚实字段怎么用**（coverage_pct / source / confidence / conformal 区间 → 何时降低对预测的信任权重）。
 
 ### 4.2 OUT of scope（明确移交给谁）

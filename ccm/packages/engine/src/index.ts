@@ -168,6 +168,20 @@ export {
   resolveProjectsDir,
   resolveRateCachePath,
 } from './paths.js';
+// ── statusline/（self-contained status line·0.10.0：渲染单行 ANSI + sidecar 捕获 + 安装/卸载/自动安装）──
+export type {
+  CaptureResult,
+  RenderOptions,
+  StatuslineActionResult,
+} from './statusline/index.js';
+export {
+  autoInstallStatuslineOnce,
+  captureRateLimits,
+  installStatusline,
+  renderStatusline,
+  settingsPath as statuslineSettingsPath,
+  uninstallStatusline,
+} from './statusline/index.js';
 // ── usage/（ADR-015 配速 + 历史语料·plan §7）──────────────────────────────────────────────────────
 // 历史语料 loader（home 跨板·多层收缩·recency）
 export type {
