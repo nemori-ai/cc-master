@@ -89,7 +89,7 @@ uname -s   # Darwin = macOS,  Linux = Linux
 uname -m   # arm64 / aarch64 = arm64,  x86_64 = x64
 ```
 
-据此挑对应的二进制：**`ccm-darwin-arm64`**（Apple Silicon Mac）·**`ccm-darwin-x64`**（Intel Mac）·**`ccm-linux-x64`**·**`ccm-linux-arm64`**（该 release 发布了才有——到 release 的 Assets 里看）。
+据此挑对应的二进制：**`ccm-darwin-arm64`**（Apple Silicon Mac）·**`ccm-darwin-x64`**（Intel Mac）·**`ccm-linux-x64`**·**`ccm-linux-arm64`**（ARM Linux）。每个 release 四个全发。
 
 **b. 下载它、重命名为 `ccm`、加可执行权限、放进 PATH。** 打开你想用的那个 release 的 **Assets**，下载与你机器匹配的 `ccm-<os>-<arch>`，然后：
 
@@ -116,6 +116,8 @@ claude --plugin-dir ~/cc-master
 ```
 
 `claude --plugin-dir /abs/path/to/cc-master` 在任何项目里都能用，所以你可以一边在别的项目里干活、一边跑 cc-master。（想从源码跑？改成 `git clone` 本仓再 `claude --plugin-dir .`——但你仍需第 1 步里一个版本配套的 `ccm` 二进制在 PATH 上。）
+
+**把 Claude config 挪走了？** 如果你用 `CLAUDE_CONFIG_DIR` 把 Claude Code 的配置目录指到了 `~/.claude` 以外，`ccm` 会自动跟随——它的 board home 和号池都落在你配置的目录下，不用额外传参。
 
 然后给它一个目标：
 

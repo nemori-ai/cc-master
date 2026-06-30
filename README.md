@@ -89,7 +89,7 @@ uname -s   # Darwin = macOS,  Linux = Linux
 uname -m   # arm64 / aarch64 = arm64,  x86_64 = x64
 ```
 
-That maps to the binary you want: **`ccm-darwin-arm64`** (Apple Silicon Mac) · **`ccm-darwin-x64`** (Intel Mac) · **`ccm-linux-x64`** · **`ccm-linux-arm64`** (when a release publishes it — check the release's Assets).
+That maps to the binary you want: **`ccm-darwin-arm64`** (Apple Silicon Mac) · **`ccm-darwin-x64`** (Intel Mac) · **`ccm-linux-x64`** · **`ccm-linux-arm64`** (ARM Linux). Every release ships all four.
 
 **b. Download it, rename it to `ccm`, make it executable, and put it on your PATH.** Open the **Assets** of the release you want to run and download the `ccm-<os>-<arch>` that matches your machine, then:
 
@@ -116,6 +116,8 @@ claude --plugin-dir ~/cc-master
 ```
 
 `claude --plugin-dir /abs/path/to/cc-master` works from inside any project, so you can run cc-master while working on something else. (Prefer to run from source? `git clone` the repo and `claude --plugin-dir .` instead — you'll still need a matching `ccm` binary on your PATH from step 1.)
+
+**Moved your Claude config?** If you run Claude Code with `CLAUDE_CONFIG_DIR` pointing somewhere other than `~/.claude`, `ccm` follows it automatically — its board home and account pool live under your configured directory, no extra flags needed.
 
 Now hand it a goal:
 
