@@ -122,7 +122,7 @@ export const REGISTRY: Registry = {
       handler: 'board.init',
     },
     update: {
-      summary: '改板级配置：goal / wip-limit / git',
+      summary: '改板级配置：goal / wip-limit / git / priority',
       read: false,
       positionals: [],
       options: {
@@ -139,10 +139,16 @@ export const REGISTRY: Registry = {
         },
         branch: { type: 'string', field: 'git.branch', desc: 'git.branch' },
         worktree: { type: 'string', field: 'git.worktree', desc: 'git.worktree' },
+        priority: {
+          type: 'string',
+          field: 'coordination.priority',
+          desc: 'coordination.priority（板级优先级·urgent|high|normal|low|trivial）',
+        },
       },
       examples: [
         'ccm board update --goal "v0.10.0 收尾"',
         'ccm board update --wip-limit 4 --branch board-v2-redesign',
+        'ccm board update --priority high',
       ],
       handler: 'board.update',
     },
