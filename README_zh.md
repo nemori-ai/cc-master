@@ -76,27 +76,68 @@ cc-master 是 [Claude Code](https://code.claude.com/docs/en/workflows) 的一个
 
 ## 上手
 
-**先装 `ccm`——这是硬前置。** cc-master 经独立的 `ccm` 引擎操作它的 board；没有它，一场编排根本无法正确操作 board（插件会在起点检测到并提醒你先装 `ccm`，在那之前它什么都不做）。先按你的操作系统装上 `ccm` 引擎，再装插件：
+两步——先装 `ccm` 引擎，再装插件。两者都来自**同一个 cc-master GitHub release**，请装版本配套的（引擎和插件按同一个 tag 一起构建、一起发布）。
+
+### 1. 装 `ccm` 引擎（必需）
+
+cc-master 经一个独立的引擎 `ccm` 操作它的 board。它是**硬前置**——PATH 里没有 `ccm`，插件就不会开工：它在起点就检测到并提醒你先装 `ccm`（[ADR-021](adrs/ADR-021-ccm-install-presence-hard-precheck.md)）。`ccm` 以 per-OS 原生二进制的形式，随每个 release 附带。
+
+**a. 先弄清你的操作系统和架构：**
 
 ```bash
-# 1. 先装独立的 ccm 引擎（必需·per-OS 二进制·构建/安装见 ccm/）
-# 2. 再装插件：
-git clone https://github.com/nemori-ai/cc-master.git
-cd cc-master
-claude --plugin-dir .
+uname -s   # Darwin = macOS,  Linux = Linux
+uname -m   # arm64 / aarch64 = arm64,  x86_64 = x64
 ```
 
-然后给它一个目标，剩下的看着它跑：
+据此挑对应的二进制：**`ccm-darwin-arm64`**（Apple Silicon Mac）·**`ccm-darwin-x64`**（Intel Mac）·**`ccm-linux-x64`**·**`ccm-linux-arm64`**（该 release 发布了才有——到 release 的 Assets 里看）。
+
+**b. 下载它、重命名为 `ccm`、加可执行权限、放进 PATH。** 打开你想用的那个 release 的 **Assets**，下载与你机器匹配的 `ccm-<os>-<arch>`，然后：
+
+```bash
+mkdir -p ~/.local/bin
+mv ~/Downloads/ccm-darwin-arm64 ~/.local/bin/ccm   # 换成你自己下载的那个文件；重命名为纯 `ccm`
+chmod +x ~/.local/bin/ccm                          # 加可执行权限
+ccm --version                                       # 验证能跑
+```
+
+确保 `~/.local/bin` 在你的 PATH 里。如果 `ccm --version` 报 "command not found"，把下面这行加进 `~/.zshrc` 或 `~/.bashrc`，再重开终端：
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### 2. 装 cc-master 插件
+
+从**同一个 release tag**下载 `cc-master-plugin-<tag>.zip`，解压，然后让 Claude Code 指向解压出的目录：
+
+```bash
+unzip ~/Downloads/cc-master-plugin-<tag>.zip -d ~/cc-master   # 例：<tag> = v0.10.0
+claude --plugin-dir ~/cc-master
+```
+
+`claude --plugin-dir /abs/path/to/cc-master` 在任何项目里都能用，所以你可以一边在别的项目里干活、一边跑 cc-master。（想从源码跑？改成 `git clone` 本仓再 `claude --plugin-dir .`——但你仍需第 1 步里一个版本配套的 `ccm` 二进制在 PATH 上。）
+
+然后给它一个目标：
 
 ```
-/cc-master:as-master-orchestrator <你的目标>     # 交给它，它就开工
-/cc-master:status                               # 一眼看现在干到哪、等你拍什么
-/cc-master:view                                 # 浏览器里实时看它的活计划（只看，不动）
+/cc-master:as-master-orchestrator <你的目标>     # 交给它——它就开工
 ```
 
-![它的实时活计划，在浏览器里随时看](docs/images/view-graph-dark.png)
+---
 
-想更省心？用 `ccm account` CLI（`ccm account add/list/switch`——你直接敲，token 全程 token-blind、绝不进 agent context）配上几个备用账号，它就能在一个账号额度用紧时自己切到下一个满的接着干——你全程无感。装好 `ccm` 引擎后（必需·见上），它算账、估工期、画看板的本事一应俱全。
+## 日常使用
+
+你真正会敲的就这几条命令。`/cc-master:…` 这些在 **Claude Code 会话里**敲；`ccm …` 在你的**终端**里敲。
+
+- **`/cc-master:as-master-orchestrator <目标>`** — 把一个大目标交给它，它拆好计划、开工。每场编排都从这条开始。
+- **`/cc-master:status`** — 一眼看现状：总进度、哪些卡住了、有没有**等你拍板**的决定。
+- **`/cc-master:view`** — 在浏览器里把它的实时活计划打开成一张只读图；自己刷新，绝不动手上的活。
+- **`/cc-master:discuss <决定>`** — 当 `status` 标出一个等你拍板的决定，开个新会话把它聊透；你的答复会回流进计划。
+- **`/cc-master:stop`** — 收尾并归档 board。可逆——以后还能把这场编排接着捡起来。
+- **`/cc-master:handoff-to-new-session`** — 在当前会话结束前，把这场编排干净地交接给一个新会话；新会话用 `/cc-master:as-master-orchestrator --resume` 接手。
+- **`ccm account add|list|switch <email>`** — 建一个备用账号池并调度它，好让它在某个账号额度用紧时切到一个满额的。这几条你直接在终端里敲；你的 token 全程 token-blind，绝不进 AI 的 context。
+
+> 日常就这一组。完整命令面（每个 `ccm` namespace 和 flag）在 [命令目录](skills/using-ccm/references/command-catalog.md)；哪些已落地、哪些还在路上，在 [产品功能手册](design_docs/feature-manual.md)。
 
 ---
 
