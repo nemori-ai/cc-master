@@ -18,7 +18,7 @@
 /cc-master:as-master-orchestrator 把我的想法做成能用的东西
 ```
 
-一句话，它就开工了。然后你可以走开。
+一句话，它就开工了——然后你尽管去忙别的。它自己干，只有真正该你拍板的事才回来找你。
 
 ---
 
@@ -80,50 +80,23 @@ cc-master 是 [Claude Code](https://code.claude.com/docs/en/workflows) 的一个
 
 ## 上手
 
-两步——先装 `ccm` 引擎，再装插件。两者都来自**同一个 cc-master GitHub release**，请装版本配套的（引擎和插件按同一个 tag 一起构建、一起发布）。
-
-### 1. 装 `ccm` 引擎（必需）
-
-cc-master 经一个独立的引擎 `ccm` 操作它的 board。它是**硬前置**——PATH 里没有 `ccm`，插件就不会开工：它在起点就检测到并提醒你先装 `ccm`（[ADR-021](adrs/ADR-021-ccm-install-presence-hard-precheck.md)）。`ccm` 以 per-OS 原生二进制的形式，随每个 release 附带。
-
-**a. 先弄清你的操作系统和架构：**
+一条命令，把两样东西——`ccm` 引擎和 cc-master 插件——按配套版本一起装好（它们按同一个 tag 一起构建、一起发布）：
 
 ```bash
-uname -s   # Darwin = macOS,  Linux = Linux
-uname -m   # arm64 / aarch64 = arm64,  x86_64 = x64
+# 装最新 release
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash
+
+# …或指定一个版本
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --version v0.10.0
 ```
 
-据此挑对应的二进制：**`ccm-darwin-arm64`**（Apple Silicon Mac）·**`ccm-darwin-x64`**（Intel Mac）·**`ccm-linux-x64`**·**`ccm-linux-arm64`**（ARM Linux）。每个 release 四个全发。
+它会探测你的操作系统和架构，下对应的 `ccm` 二进制、放进 PATH，再把插件装进 Claude Code。你只需本机已有 `curl`（或 `wget`）、`unzip`、和 `claude` CLI（≥ v2.1.195）。`ccm` 引擎是**硬前置**——没有它插件就不会开工（[ADR-021](adrs/ADR-021-ccm-install-presence-hard-precheck.md)）——所以安装器先把它就位。
 
-**b. 下载它、重命名为 `ccm`、加可执行权限、放进 PATH。** 打开你想用的那个 release 的 **Assets**，下载与你机器匹配的 `ccm-<os>-<arch>`，然后：
-
-```bash
-mkdir -p ~/.local/bin
-mv ~/Downloads/ccm-darwin-arm64 ~/.local/bin/ccm   # 换成你自己下载的那个文件；重命名为纯 `ccm`
-chmod +x ~/.local/bin/ccm                          # 加可执行权限
-ccm --version                                       # 验证能跑
-```
-
-确保 `~/.local/bin` 在你的 PATH 里。如果 `ccm --version` 报 "command not found"，把下面这行加进 `~/.zshrc` 或 `~/.bashrc`，再重开终端：
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-### 2. 装 cc-master 插件
-
-从**同一个 release tag**下载 `cc-master-plugin-<tag>.zip`，解压，然后让 Claude Code 指向解压出的目录：
-
-```bash
-unzip ~/Downloads/cc-master-plugin-<tag>.zip -d ~   # zip 内含一个 cc-master/ 目录，解到 ~ 即得 ~/cc-master/ （<tag> 例 v0.10.0）
-claude --plugin-dir ~/cc-master
-```
-
-`claude --plugin-dir /abs/path/to/cc-master` 在任何项目里都能用，所以你可以一边在别的项目里干活、一边跑 cc-master。（想从源码跑？改成 `git clone` 本仓再 `claude --plugin-dir .`——但你仍需第 1 步里一个版本配套的 `ccm` 二进制在 PATH 上。）
+> **想自己手动装，或从源码跑？** clone 本仓、让 Claude Code 直接指过去：`git clone https://github.com/nemori-ai/cc-master.git && claude --plugin-dir ./cc-master`。你仍需一个版本配套的 `ccm` 在 PATH 上——从 release 的 **Assets** 下 `ccm-<os>-<arch>`、重命名为 `ccm`、`chmod +x`、放进 `~/.local/bin`。
 
 **把 Claude config 挪走了？** 如果你用 `CLAUDE_CONFIG_DIR` 把 Claude Code 的配置目录指到了 `~/.claude` 以外，`ccm` 会自动跟随——它的 board home 和号池都落在你配置的目录下，不用额外传参。
 
-### 3. 状态栏（自动）
+### 状态栏（自动）
 
 cc-master 自带一条状态栏——context 进度条 + 你的 5h / 7d 配额用量，按各自用得多满**变色**。**你第一次跑任意 `ccm` 命令时，cc-master 会自动帮你配好它**（在你的全局 `settings.json` 写入 `statusLine.command`）。这条状态栏同时把 5h / 7d 配额信号喂给预测与配速。
 

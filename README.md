@@ -18,7 +18,7 @@ But make no mistake — this is **not** "make a wish and the AI does it all." Ta
 /cc-master:as-master-orchestrator turn my idea into something that works
 ```
 
-One line, and it's off. Then you can walk away.
+One line, and it's off — then you're free to step away. It works on its own and only comes back when a call is genuinely yours to make.
 
 ---
 
@@ -80,50 +80,23 @@ We keep a clear line between "what it does today" and "what we're still building
 
 ## Get started
 
-Two steps — install the `ccm` engine, then the plugin. Both come from the **same cc-master GitHub release**; install matching versions (the engine and the plugin are built and shipped together, tag by tag).
-
-### 1. Install the `ccm` engine (required)
-
-cc-master drives its board through a standalone engine called `ccm`. It's a **hard prerequisite** — without `ccm` on your PATH the plugin won't start an orchestration; it detects this at startup and asks you to install `ccm` first ([ADR-021](adrs/ADR-021-ccm-install-presence-hard-precheck.md)). `ccm` ships as a per-OS native binary attached to each release.
-
-**a. Find your OS and architecture:**
+One command installs both pieces — the `ccm` engine and the cc-master plugin — at matching versions (they're built and shipped together, tag by tag):
 
 ```bash
-uname -s   # Darwin = macOS,  Linux = Linux
-uname -m   # arm64 / aarch64 = arm64,  x86_64 = x64
+# install the latest release
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash
+
+# …or pin a specific version
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --version v0.10.0
 ```
 
-That maps to the binary you want: **`ccm-darwin-arm64`** (Apple Silicon Mac) · **`ccm-darwin-x64`** (Intel Mac) · **`ccm-linux-x64`** · **`ccm-linux-arm64`** (ARM Linux). Every release ships all four.
+It detects your OS and architecture, downloads the right `ccm` binary and puts it on your PATH, then installs the plugin into Claude Code. You just need `curl` (or `wget`), `unzip`, and the `claude` CLI (≥ v2.1.195) already on your machine. The `ccm` engine is a **hard prerequisite** — without it the plugin won't start an orchestration ([ADR-021](adrs/ADR-021-ccm-install-presence-hard-precheck.md)) — which is exactly why the installer puts it in place first.
 
-**b. Download it, rename it to `ccm`, make it executable, and put it on your PATH.** Open the **Assets** of the release you want to run and download the `ccm-<os>-<arch>` that matches your machine, then:
-
-```bash
-mkdir -p ~/.local/bin
-mv ~/Downloads/ccm-darwin-arm64 ~/.local/bin/ccm   # use YOUR downloaded file; rename to plain `ccm`
-chmod +x ~/.local/bin/ccm                          # make it executable
-ccm --version                                       # verify it runs
-```
-
-Make sure `~/.local/bin` is on your PATH. If `ccm --version` says "command not found," add this to your `~/.zshrc` or `~/.bashrc` and reopen the shell:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-### 2. Install the cc-master plugin
-
-From the **same release tag**, download `cc-master-plugin-<tag>.zip`, unzip it, and point Claude Code at the unzipped folder:
-
-```bash
-unzip ~/Downloads/cc-master-plugin-<tag>.zip -d ~   # the zip holds a cc-master/ folder, so this gives ~/cc-master/  (tag e.g. v0.10.0)
-claude --plugin-dir ~/cc-master
-```
-
-`claude --plugin-dir /abs/path/to/cc-master` works from inside any project, so you can run cc-master while working on something else. (Prefer to run from source? `git clone` the repo and `claude --plugin-dir .` instead — you'll still need a matching `ccm` binary on your PATH from step 1.)
+> **Rather do it by hand, or run from source?** Clone the repo and point Claude Code straight at it: `git clone https://github.com/nemori-ai/cc-master.git && claude --plugin-dir ./cc-master`. You'll still need a matching `ccm` on your PATH — download `ccm-<os>-<arch>` from the release **Assets**, rename it to `ccm`, `chmod +x`, and drop it in `~/.local/bin`.
 
 **Moved your Claude config?** If you run Claude Code with `CLAUDE_CONFIG_DIR` pointing somewhere other than `~/.claude`, `ccm` follows it automatically — its board home and account pool live under your configured directory, no extra flags needed.
 
-### 3. Status line (automatic)
+### Status line (automatic)
 
 cc-master ships its own status line — a context progress bar plus your 5h / 7d quota usage, color-coded by how full each is. The **first time you run any `ccm` command, cc-master configures it for you automatically** (it writes `statusLine.command` in your global `settings.json`). The same status line also feeds the 5h / 7d quota signal that powers forecasting and pacing.
 
