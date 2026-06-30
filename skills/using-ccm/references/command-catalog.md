@@ -972,7 +972,7 @@ ccm peers [list] [flags]
 
 配额侧只读 advisory（ADR-015·charter ②控制 token 消耗速度 + ⑤资源下最大化效率）：当前号/备号用量 + 双侧走廊 pacing verdict + 任务 token 成本。**纯只读**——全 verb query/compute，零写、不抢 board-lock、不落状态（与 `baseline`/`policy` 这俩写 noun 相反）。诚实降级：账户信号不可得 = **exit 0 + `data.available:false`**（非 exit 1）；无 `accounts.json` registry → 天然单账号·`effective_n=1`（不报错）。诚实字段贯穿：`source`（account / registry-snapshot / observability / local-derived-approx）/ `confidence`（high/medium/low）/ `as_of` / `snapshot_stale` / `coverage_pct`。ccm 出 verdict/数据，**不替 orchestrator 决策**（真动作归 SKILL A·红线3）。
 
-> 备号数据 = **只读** `${CC_MASTER_HOME:-$HOME/.claude/cc-master}/accounts.json` registry 的生命周期快照（每号取 `last_observed_quota`/`last_switch_out`/`switch_history[]` 里 `at` 最大那条）——usage **绝不写 registry、绝不碰 token**（registry 写/管归 ccm `account` 引擎·概念见 account-pool.md）。当前号 5h/7d 用量读 status-line sidecar（`${CC_MASTER_RATE_CACHE:-$HOME/.claude/.cc-master-rate-limits.json}`·statusline-capture.js 写、cc-usage.sh / usage-pacing.js hook 同读·账户权威·Finding #37），缺则 `available:false` 降级。
+> 备号数据 = **只读** `${CC_MASTER_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cc-master}/accounts.json` registry 的生命周期快照（每号取 `last_observed_quota`/`last_switch_out`/`switch_history[]` 里 `at` 最大那条）——usage **绝不写 registry、绝不碰 token**（registry 写/管归 ccm `account` 引擎·概念见 account-pool.md）。当前号 5h/7d 用量读 status-line sidecar（`${CC_MASTER_RATE_CACHE:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.cc-master-rate-limits.json}`·路径跟随 `CLAUDE_CONFIG_DIR`（默认 `~/.claude`）·statusline-capture.js 写、cc-usage.sh / usage-pacing.js hook 同读·账户权威·Finding #37），缺则 `available:false` 降级。
 
 ### usage show
 
@@ -1210,7 +1210,7 @@ ccm estimate cost-to-complete [flags]
 
 ## namespace account
 
-换号号池机制（ADR-016·换号 token-blind 录入 / 选号 / 无重启切号）。号池 = 用户级 registry `${CC_MASTER_HOME:-$HOME/.claude/cc-master}/accounts.json`（email→vault 非密指针 + 时间元信息·**零 token**）+ token 本体（macOS keychain / 非 mac 0600 file vault）。**token 全程活在 ccm 引擎子进程·绝不进 agent / registry / log**（vault token-blind）。换号是**无重启凭证覆写**：`switch` 续期新号 → 覆写官方共享凭证三存储 → 运行中 claude 惰性 re-read 接管（进程不重启 / board 不动）。**概念叙事**（号池模型 / 录号 why / refreshToken 硬要求 / 选号方法论 / vault 安全）见 [references/account-pool.md](references/account-pool.md)；**算法 / vault 实现 SSOT** 在 ccm 引擎 `@ccm/engine/account`；**换号决策**（何时换 / 谁拍板 / 绝不自授权）归 `orchestrating-to-completion`（不在本 skill）。
+换号号池机制（ADR-016·换号 token-blind 录入 / 选号 / 无重启切号）。号池 = 用户级 registry `${CC_MASTER_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cc-master}/accounts.json`（email→vault 非密指针 + 时间元信息·**零 token**）+ token 本体（macOS keychain / 非 mac 0600 file vault）。**token 全程活在 ccm 引擎子进程·绝不进 agent / registry / log**（vault token-blind）。换号是**无重启凭证覆写**：`switch` 续期新号 → 覆写官方共享凭证三存储 → 运行中 claude 惰性 re-read 接管（进程不重启 / board 不动）。**概念叙事**（号池模型 / 录号 why / refreshToken 硬要求 / 选号方法论 / vault 安全）见 [references/account-pool.md](references/account-pool.md)；**算法 / vault 实现 SSOT** 在 ccm 引擎 `@ccm/engine/account`；**换号决策**（何时换 / 谁拍板 / 绝不自授权）归 `orchestrating-to-completion`（不在本 skill）。
 
 > **录号 / refresh 的唯一前提：用户当前正登录在目标号**（引擎从 keychain「Claude Code-credentials」直读当前登录号完整 blob·身份 guard 要求当前登录 email == `<email>`，否则拒）。
 
@@ -1223,7 +1223,7 @@ ccm account add <email> [flags]
 ```
 
 - positional：`<email>`（必填·账号唯一标识）
-- 行为：从 keychain「Claude Code-credentials」(`account=$USER`) 直读当前登录号完整 `claudeAiOauth` blob（含 refreshToken）→ 身份 guard（当前登录 email 须 == `<email>`）→ 校验三必需字段（accessToken `sk-ant-oat` / **refreshToken `sk-ant-ort`·非空** / expiresAt num）→ 存 vault → 写 registry entry（非密元信息·`active:true`）。非 mac 无 keychain → 降级读 `~/.claude/.credentials.json` 的 `.claudeAiOauth`
+- 行为：从 keychain「Claude Code-credentials」(`account=$USER`) 直读当前登录号完整 `claudeAiOauth` blob（含 refreshToken）→ 身份 guard（当前登录 email 须 == `<email>`）→ 校验三必需字段（accessToken `sk-ant-oat` / **refreshToken `sk-ant-ort`·非空** / expiresAt num）→ 存 vault → 写 registry entry（非密元信息·`active:true`）。非 mac 无 keychain → 降级读 `${CLAUDE_CONFIG_DIR:-~/.claude}/.credentials.json` 的 `.claudeAiOauth`
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
