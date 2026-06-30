@@ -111,7 +111,7 @@ export PATH="$HOME/.local/bin:$PATH"
 From the **same release tag**, download `cc-master-plugin-<tag>.zip`, unzip it, and point Claude Code at the unzipped folder:
 
 ```bash
-unzip ~/Downloads/cc-master-plugin-<tag>.zip -d ~/cc-master   # e.g. <tag> = v0.10.0
+unzip ~/Downloads/cc-master-plugin-<tag>.zip -d ~   # the zip holds a cc-master/ folder, so this gives ~/cc-master/  (tag e.g. v0.10.0)
 claude --plugin-dir ~/cc-master
 ```
 

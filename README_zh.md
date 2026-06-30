@@ -111,7 +111,7 @@ export PATH="$HOME/.local/bin:$PATH"
 从**同一个 release tag**下载 `cc-master-plugin-<tag>.zip`，解压，然后让 Claude Code 指向解压出的目录：
 
 ```bash
-unzip ~/Downloads/cc-master-plugin-<tag>.zip -d ~/cc-master   # 例：<tag> = v0.10.0
+unzip ~/Downloads/cc-master-plugin-<tag>.zip -d ~   # zip 内含一个 cc-master/ 目录，解到 ~ 即得 ~/cc-master/ （<tag> 例 v0.10.0）
 claude --plugin-dir ~/cc-master
 ```
 
