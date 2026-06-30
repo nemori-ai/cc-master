@@ -119,6 +119,19 @@ claude --plugin-dir ~/cc-master
 
 **Moved your Claude config?** If you run Claude Code with `CLAUDE_CONFIG_DIR` pointing somewhere other than `~/.claude`, `ccm` follows it automatically — its board home and account pool live under your configured directory, no extra flags needed.
 
+### 3. (Optional) Turn on quota-aware pacing
+
+cc-master's forecasting and pacing read your Claude usage (the 5h / 7d quota), which Claude Code only exposes through the **status line**. To feed it, point `statusLine.command` in your `settings.json` at the bundled capture script, wrapping your existing status-line command with `--passthrough`:
+
+```json
+"statusLine": {
+  "type": "command",
+  "command": "~/cc-master/skills/orchestrating-to-completion/scripts/statusline-capture.js --passthrough '<your existing status-line command>'"
+}
+```
+
+It passes your status line through unchanged while capturing the quota signal to a sidecar that `ccm usage` reads. Use an **absolute path** to the script (`${CLAUDE_PLUGIN_ROOT}` isn't guaranteed to expand inside `statusLine.command`). Skip this and everything still works — pacing just reports `unavailable`.
+
 Now hand it a goal:
 
 ```
