@@ -73,7 +73,7 @@ tasks[ { id, status, deps, parent } ]
 ### 柔性边（agent 可自由塑形）
 
 `title / artifact / created_at / started_at / finished_at / hitl_rounds / observability / mechanism / handle / kind /
-justification / output_schema / dep_pins / notes / log` —— 外加示例字段 `verified`（**柔性边布尔**：是否经端点验收，与 `status` enum 正交、**非 status 值**，口径见上「Status enum」段的钉死注）、`blocked_on`，以及 top-level 的 `meta`（含 `meta.template_version`）、`wip_limit`、`wakeup`、`num_account`。
+justification / output_schema / dep_pins / notes / log` —— 外加示例字段 `verified`（**柔性边布尔**：是否经端点验收，与 `status` enum 正交、**非 status 值**，口径见上「Status enum」段的钉死注）、`blocked_on`，以及 top-level 的 `meta`（含 `meta.template_version`）、`wip_limit`、`wakeup`、`num_account`、`coordination`（含 `coordination.priority` 板级优先级·五挡 `urgent|high|normal|low|trivial`·**init 时可经 `ccm board update --priority` 由用户设**、是 `ccm peers` 跨板花名册裁决主轴；hook 不读·纯 agent-shaped）。
 
 > **旧时间戳别名（legacy）**：`started_at` ≡ 旧 `dispatched_at`、`finished_at` ≡ 旧 `completed_at`（语义等价、只是重命名）。**prose 一律用新名**；view.html 的读取层仍保留旧名 read-fallback（`started_at ?? dispatched_at`、`finished_at ?? completed_at`），让 `--resume` 复活的归档旧板 / 用户手写的旧戳照样渲染。新板别再盖旧名。
 

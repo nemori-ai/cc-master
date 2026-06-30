@@ -94,7 +94,9 @@ export function boardInit(args?: { goal?: string }): Board {
   return touch(board);
 }
 
-// ── boardUpdate(board, {goal?, wipLimit?, ownerWip?, branch?, worktree?}) → 改板级配置。
+// ── boardUpdate(board, {goal?, wipLimit?, ownerWip?, branch?, worktree?, priority?}) → 改板级配置。
+//   priority 写 ✎ coordination.priority（板级优先级·COORD 裁决主轴·hook 不读·非窄腰）——枚举合法性由调用方
+//   （handler isEnumMember 校验）/ lint FMT-COORD 守，此处只负责落字段（与 wipLimit 一样只写不校验）。
 export function boardUpdate(
   board: Board,
   args?: {
@@ -103,11 +105,16 @@ export function boardUpdate(
     ownerWip?: unknown;
     branch?: string;
     worktree?: string;
+    priority?: string;
   },
 ): Board {
   const b = clone(board);
   args = args || {};
   if (args.goal !== undefined) b.goal = args.goal;
+  if (args.priority !== undefined) {
+    if (!b.coordination || typeof b.coordination !== 'object') b.coordination = {};
+    b.coordination.priority = args.priority;
+  }
   if (args.wipLimit !== undefined || args.ownerWip !== undefined) {
     if (!b.scheduling || typeof b.scheduling !== 'object') b.scheduling = {};
     if (args.wipLimit !== undefined) b.scheduling.wip_limit = args.wipLimit;

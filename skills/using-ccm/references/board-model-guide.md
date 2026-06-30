@@ -104,7 +104,7 @@
 - `baseline`——EVM 计划基线（plan 基线 SSOT），用 `ccm baseline snapshot / show / reset` 维护；缺→无 EVM baseline，形状坏→`FMT-BASELINE` warn。命令详见 command-catalog 的 baseline namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-BASELINE`。
 - `policy`——框定本块板 master-orchestrator 自主权限的**可扩展对象**（ADR-016），首条键 `autonomous_account_switch` ∈ `{'allow','deny'}`（门控是否允许 orchestrator 自主换号）；**缺省 = allow**（向后兼容旧板·读不到一律解析为 allow），形状坏→`FMT-POLICY` warn。用 `ccm policy show / set` 维护（`set` 写为用户所有、非 TTY 须 `--user-authorized`）；命令详见 command-catalog 的 policy namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-POLICY`。
 - `coordination`——多 orchestrator 协调**感知**块（COORD），让 M 个并行 orchestrator 互相看见、各自独立配速（**hook 不读**·跨板只读读侧是 `ccm peers`）。可扩展对象，字段全 optional：
-  - `priority` ∈ `{'urgent','high','normal','low','trivial'}`（**板级**优先级·非板内任务排序·缺/坏 → 解析为 `normal`）——这是裁决主轴 + 机械 fair-share 权重源；与 board-v2「砍 per-task priority/rank」不冲突（那砍的是引擎据以调度的板内任务数字 rank，这是用户声明的跨板协调 hint·不喂引擎调度）。
+  - `priority` ∈ `{'urgent','high','normal','low','trivial'}`（**板级**优先级·非板内任务排序·缺/坏 → 解析为 `normal`）——这是裁决主轴 + 机械 fair-share 权重源；与 board-v2「砍 per-task priority/rank」不冲突（那砍的是引擎据以调度的板内任务数字 rank，这是用户声明的跨板协调 hint·不喂引擎调度）。**专属 flag：`ccm board update --priority <urgent|high|normal|low|trivial>`**（枚举校验在 update 端·非法值 → `exit 2`；init 时用户给的板级优先级经它落盘）。
   - `state.current`（此刻在烧什么·喂即时 fair-share）：`active_tasks`（int·数字）/ `workload`（string·人类可读）/ `burn_contribution`（number·对聚合配额% burn 的估计贡献）。
   - `state.planned`（还剩多少活·喂价值/紧迫推理）：`remaining_work`（string·人类可读）/ `cost_to_complete_pct`（number·偿付力）。
 

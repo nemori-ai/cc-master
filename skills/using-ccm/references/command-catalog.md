@@ -288,8 +288,10 @@ ccm board update [flags]
 | `--owner-wip <str>` | | int | `scheduling.owner_wip_limit` |
 | `--branch <str>` | | string | `git.branch` |
 | `--worktree <str>` | | string | `git.worktree` |
+| `--priority <enum>` | | enum `urgent\|high\|normal\|low\|trivial` | `coordination.priority`（板级优先级·COORD 裁决主轴·非法值 → exit 2） |
 
-- 例：`ccm board update --goal "v0.10.0 收尾"` · `ccm board update --wip-limit 4 --branch board-v2-redesign`
+- 例：`ccm board update --goal "v0.10.0 收尾"` · `ccm board update --wip-limit 4 --branch board-v2-redesign` · `ccm board update --priority high`
+- `--priority` 写 ✎ `coordination.priority`（板级优先级·`ccm peers` 跨板花名册的裁决主轴 + 机械 fair-share 权重源；缺/坏 → 解析为 `normal`）。枚举校验在 update 端（坏值 exit 2·不静默写非法值）；它是 agent-shaped ✎ 字段（hook 不读·非窄腰·红线 2 不破）。init 时用户给的板级优先级经此落盘（命令体 bootstrap 段指导 orchestrator 捕获并记入）。
 - 发现：`--goal` 在此是 payload（重定 goal），**不**当发现过滤器——所有 flag 走同一条两层匹配（精确 sid → 未认领 `session_id:""` 兜底），与 `task add` 等一致；隐式发现（无 `--board`）在 `ccm board init` 建的未认领板上对 `--goal` 与 `--wip-limit` **行为一致**（Finding #77 修复前 `--goal` 会假报 NotFound）。多 active 板时用 `--board <path>` 消歧。
 
 ### board set-param

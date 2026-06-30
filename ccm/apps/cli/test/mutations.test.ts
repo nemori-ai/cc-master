@@ -91,6 +91,22 @@ test('boardUpdate updates goal / scheduling / git; stamps heartbeat; does NOT mu
   assert.equal(snapshot(orig), snap, 'input board untouched (pure)');
 });
 
+test('boardUpdate sets coordination.priority (creates coordination if absent; preserves other coordination keys)', () => {
+  // 缺 coordination → 建块写 priority
+  const b1 = m.boardUpdate(baseBoard(), { priority: 'high' });
+  assert.equal(b1.coordination.priority, 'high');
+  // 已有 coordination.state → 写 priority 不擦掉 state
+  const seeded = baseBoard();
+  seeded.coordination = { state: { current: { active_tasks: 2 } } };
+  const b2 = m.boardUpdate(seeded, { priority: 'urgent' });
+  assert.equal(b2.coordination.priority, 'urgent');
+  assert.deepEqual(
+    b2.coordination.state.current,
+    { active_tasks: 2 },
+    'existing coordination.state preserved',
+  );
+});
+
 // ── addTask ──────────────────────────────────────────────────────────────────────────────────────
 test('addTask appends a task with defaults (status ready, deps [], created_at stamped)', () => {
   const orig = baseBoard();

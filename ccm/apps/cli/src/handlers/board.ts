@@ -24,7 +24,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyzeGraph, formatReport, lintBoard } from '@ccm/engine';
+import { analyzeGraph, formatReport, isEnumMember, lintBoard } from '@ccm/engine';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
 import * as mutations from '../mutations.js';
@@ -203,9 +203,21 @@ export function update(ctx: Ctx): number {
       if (v['owner-wip'] !== undefined) args.ownerWip = parseIntFlag(v['owner-wip'], '--owner-wip');
       if (v.branch !== undefined) args.branch = v.branch;
       if (v.worktree !== undefined) args.worktree = v.worktree;
+      // --priority 写 ✎ coordination.priority（板级优先级·COORD）——枚举校验在此（坏值 → throw Usage·exit 2），
+      //   不静默写非法值（否则 lint FMT-COORD warn + peers 跨板读时该板优先级退化为 normal）。
+      if (v.priority !== undefined) {
+        if (!isEnumMember('coordPriority', v.priority)) {
+          const e = new Error(
+            `--priority 须 ∈ {urgent, high, normal, low, trivial}（当前：${JSON.stringify(v.priority)}）`,
+          ) as KindedError;
+          e.errKind = 'Usage';
+          throw e;
+        }
+        args.priority = v.priority;
+      }
       if (Object.keys(args).length === 0) {
         const e = new Error(
-          'board update 至少须给一个 flag（--goal / --wip-limit / --owner-wip / --branch / --worktree）',
+          'board update 至少须给一个 flag（--goal / --wip-limit / --owner-wip / --branch / --worktree / --priority）',
         ) as KindedError;
         e.errKind = 'Usage';
         throw e;
@@ -218,13 +230,19 @@ export function update(ctx: Ctx): number {
       );
     },
     render: (board, c, { dryRun }) => {
-      const b = board as { goal?: string; scheduling?: { wip_limit?: unknown } };
+      const b = board as {
+        goal?: string;
+        scheduling?: { wip_limit?: unknown };
+        coordination?: { priority?: unknown };
+      };
       if (c.flags.json) return render.renderBoardSummary(b, { json: true });
       const prefix = dryRun ? '[dry-run] 将改板级配置' : 'board 配置已更新';
       const sc = b.scheduling && typeof b.scheduling === 'object' ? b.scheduling : {};
+      const co = b.coordination && typeof b.coordination === 'object' ? b.coordination : {};
       const parts = [
         `goal="${b.goal || ''}"`,
         `wip_limit=${sc.wip_limit !== undefined ? sc.wip_limit : '-'}`,
+        `priority=${co.priority !== undefined ? co.priority : '-'}`,
       ];
       return `${prefix}: ${parts.join('  ')}`;
     },
