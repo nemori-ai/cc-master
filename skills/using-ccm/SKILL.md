@@ -1,6 +1,6 @@
 ---
 name: using-ccm
-description: 'Use when you (orchestrator/agent) read or mutate a cc-master board through the ccm CLI —— 当你要用 ccm 操作 board:建板 / 加改任务 / 起跑·完成·阻塞 / 查 ready·DAG·临界路径 / 记 judgment_call·log / 收 cadence iteration / arm watchdog 时。它一体两面:面1=ccm 操作手册(命令面 + board 状态机心智 + 写入关卡纪律:status 走生命周期 verb 不用 --set、🔒 字段走专属命令、ccm 缺则降级 Write);面2=board 模型与字段取值指南(领域概念 task/status/executor/judgment_call/cadence/parent/watchdog 是什么 + 字段什么时候设什么值:acceptance 怎么写、estimate 怎么估、deps 怎么连、executor 怎么选 + 全部 FMT/GRAPH/BIZ 校验规则速查,一次写对不撞 exit 3)。Triggers: 敲 ccm task/board/account/jc/cadence/log/watchdog 命令、"怎么把任务标 done / 加依赖 / 查临界路径 / 阻塞等用户"、录备号 / 换号切配额 / 选号怎么敲 ccm account、什么是 judgment_call/cadence·acceptance 怎么写·executor 选哪个·status 何时转哪态·某字段填什么、任何 board 写操作、ccm 报 exit 3 / illegal transition / load-bearing 字段被拒。Do NOT use when 你在决定"该编排什么 / 怎么拆 DAG / 何时换号 / 该不该换号"(那是 orchestrating-to-completion)、读 usage/estimate verdict 怎么配速估算(那是 pacing-and-estimation)、写 workflow 脚本(authoring-workflows)——本 skill 只管"怎么用 ccm 这把工具(含 account 号池操作)",不管"该让 ccm 做什么"。'
+description: 'Use when you (orchestrator/agent) read or mutate a cc-master board through the ccm CLI —— 当你要用 ccm 操作 board:建板 / 加改任务 / 起跑·完成·阻塞 / 查 ready·DAG·临界路径 / 记 judgment_call·log / 收 cadence iteration / arm watchdog 时。它一体两面:面1=ccm 操作手册(命令面 + board 状态机心智 + 写入关卡纪律:status 走生命周期 verb 不用 --set、🔒 字段走专属命令、board 变更只走 ccm 不手改〔直接 file-edit 被 board-guard 拦〕);面2=board 模型与字段取值指南(领域概念 task/status/executor/judgment_call/cadence/parent/watchdog 是什么 + 字段什么时候设什么值:acceptance 怎么写、estimate 怎么估、deps 怎么连、executor 怎么选 + 全部 FMT/GRAPH/BIZ 校验规则速查,一次写对不撞 exit 3)。Triggers: 敲 ccm task/board/account/jc/cadence/log/watchdog 命令、"怎么把任务标 done / 加依赖 / 查临界路径 / 阻塞等用户"、录备号 / 换号切配额 / 选号怎么敲 ccm account、什么是 judgment_call/cadence·acceptance 怎么写·executor 选哪个·status 何时转哪态·某字段填什么、任何 board 写操作、ccm 报 exit 3 / illegal transition / load-bearing 字段被拒。Do NOT use when 你在决定"该编排什么 / 怎么拆 DAG / 何时换号 / 该不该换号"(那是 orchestrating-to-completion)、读 usage/estimate verdict 怎么配速估算(那是 pacing-and-estimation)、写 workflow 脚本(authoring-workflows)——本 skill 只管"怎么用 ccm 这把工具(含 account 号池操作)",不管"该让 ccm 做什么"。'
 ---
 
 # using-ccm — 用 ccm CLI 驱动 board
@@ -38,9 +38,10 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 
 这是本 skill 最容易踩、也最不能踩的一条。**task 的 `status` 不是一个你 `--set` 赋值的普通字段——它是一台状态机的当前态,只能经生命周期 verb 转移。**
 
-- 改 status **只有**这几条命令:`task start`(→ in_flight)、`task done`(→ done)、`task block --on`(→ blocked)、`task set-status <id> <status>`(通用转移)。
+- 改 status **只有**这几条命令:`task start`(→ in_flight)、`task done`(→ done)、`task block --on`(→ blocked)、`task unblock`(清 `blocked_on`·交回 deps 门控)、`task set-status <id> <status>`(通用转移)。
 - **没有** `task set`;`task update` **不接** `--status`;`--set tasks[T].status=…` 被 🔒 守门拒(exit 3);`--set status=done`(无 `tasks[]` 前缀)更坏——它静默写一个 board 顶层 junk 字段、exit 0 但**根本没碰任务**。
 - **`ready → done` 非法**:必须先 `task start`(ready → in_flight)再 `task done`。直接 done 撞 `illegal transition: ready → done`(exit 3)。
+- **`ready ↔ blocked` 由系统按 deps 自动归一(ADR-023)**:每次 ccm 写命令落盘前引擎跑一趟 `reconcileGating`——**无 `blocked_on`** 且 status∈{ready,blocked} 的 task 按 deps 完成度重定(deps 全 done→ready,否则→blocked)。所以你**几乎不用手搬 ready/blocked**:`task done` 掉上游后下游自动 ready、`task add --deps <未完成>` 自动落 blocked。**手动 `set-status <id> ready` 会被 deps 否决**(deps 未满足下一趟归回 blocked)。**有 `blocked_on`(等 user / 等某 task)= 语义阻塞,豁免自动门控**;解除用 **`task unblock <id>`**,别用 `set-status`。手改 board 造出的不一致态(ready 但 deps 未 done / blocked 无 blocked_on 但 deps 全 done)由 `BIZ-STATUS-DEPS` warn 兜。
 
 完整转移表:
 
@@ -79,14 +80,14 @@ board 字段分三档(权威定义在 **board 协议 SSOT = `ccm` 引擎 `@ccm/e
 
 ---
 
-## 心智锚 4:ccm 可选 —— 缺则优雅降级,不是硬前置
+## 心智锚 4:ccm 是 board 变更的唯一写路径 —— 不降级手改
 
-ccm 是**主机预置的增强项**,不是 orchestration 的硬依赖(ADR-014)。
+board 变更**只走 `ccm`**,没有 `Write`/`Edit`/`sed` 的降级退路——两道机制把这条钉死:
 
-- **`ccm` 在 PATH**(常态):一切 board 读写**首选 ccm**,拿全套写关卡保障。
-- **`ccm` 不在**(优雅降级):退回 `Write`/`Edit` 直接改 board JSON,**改完手动跑一次 lint**(`ccm board lint` 若还能跑;或本 session 的 PostToolUse lint hook 经 spawn ccm 自动校验)。降级是 ccm 缺席时的兜底,**不是**"嫌 ccm 麻烦"的借口——ccm 在就用 ccm。
+- **ADR-021 硬前置**:`ccm` 是**主机安装前置**;`as-master-orchestrator` 起板时 bootstrap 硬查 `command -v ccm`,缺则**拒 arm**(不建 board、注 directive 提醒用户装 ccm)。故一场已武装的 orchestration 里 `ccm` **必然在**——你不会遇到「ccm 没装、只好手改」。
+- **ADR-025 board-guard**:直接 file-edit 目标 board(`Write`/`Edit`/`MultiEdit`,或 `Bash` 用 `sed`/`echo`/`tee`/`cat >` 手改)会被 PreToolUse hook **当场 deny**。手改绕过写关卡会静默腐蚀 deps 图 / 状态机 / 窄腰——机制层直接不给你这条路。
 
-判断有没有 ccm:`command -v ccm`。
+**万一 `ccm` 跑起来这一下不响应**(装了但瞬态抽风):**暂停 board 变更、先修 `ccm`**——**绝不**退回手改 JSON 顶上去。运行时 hook(board-lint / usage-pacing)对这种瞬态各自优雅降级(静默不 block),但**你自己的 board 写永远等 `ccm` 恢复**,不自己动手。
 
 ---
 
