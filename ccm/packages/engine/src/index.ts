@@ -80,6 +80,8 @@ export {
   TIERS,
   taskTrulyDone,
 } from './board-model.js';
+// ── board-reconcile（reconcileGating·deps 驱动 ready↔blocked 门控归一·ADR-023）──
+export { reconcileGating } from './board-reconcile.js';
 // ── coordination/（COORD 多 orchestrator 感知通道·跨板只读花名册）──
 export type {
   PeerCurrent,
@@ -203,7 +205,7 @@ export {
   recencyWeight,
   selectPoolLayer,
 } from './usage/history-loader.js';
-// pacing（双侧走廊数学 SSOT + effective-N）
+// pacing（单侧配速数学 SSOT + effective-N）
 export type {
   PacingAdvice,
   PacingOptions,

@@ -393,6 +393,16 @@ export const REGISTRY: Registry = {
       ],
       handler: 'task.block',
     },
+    unblock: {
+      summary: '解除阻塞（清 blocked_on·交回 deps 门控定 ready/blocked）',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        log: { type: 'string', desc: '同时追一条 log' },
+      },
+      examples: ['ccm task unblock T7'],
+      handler: 'task.unblock',
+    },
     'set-status': {
       summary: '通用状态转移',
       read: false,
@@ -768,7 +778,7 @@ export const REGISTRY: Registry = {
       handler: 'usage.show',
     },
     advise: {
-      summary: '双侧走廊 verdict（throttle|accelerate|hold|hard_stop）+ lever + switch_candidate',
+      summary: '单侧 verdict（hold|throttle|switch|stop_5h|stop_7d）+ lever + switch_candidate',
       read: true,
       positionals: [],
       options: {
