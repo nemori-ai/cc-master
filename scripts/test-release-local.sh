@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# test-release-local.sh — 本地预演 release workflow（.github/workflows/ccm-release.yml）
+# test-release-local.sh — 本地预演两条 release workflow（版本线解耦·ADR-022 后二者独立）：
+#   .github/workflows/ccm-release.yml（build-sea·ccm 二进制线）+ plugin-release.yml（package-plugin·plugin zip 线）
 #   能正确**编译 + 打包出制品**的 dev-only harness。让 release 的破绽在打 tag 发版**之前**
 #   就暴露，而不是真打 tag 推上去、CI 在真 runner 上才第一次跑。
 #
@@ -15,11 +16,12 @@
 #         ~/.claude），macOS 上 otool -L 核自包含。这是 ccm-release.yml `build-sea` job 的**本机**
 #         那一档（macos-14 leg 的等价物）。
 #      2. plugin 打包 + 校验（STAGE 2）——跑 package-plugin.sh 产 zip，解压后 `claude plugin
-#         validate` 过。这是 ccm-release.yml `package-plugin` job 的核心。
+#         validate` 过。这是 plugin-release.yml `package-plugin` job 的核心（版本线解耦·ADR-022
+#         后 package-plugin 已从 ccm-release.yml 迁到独立的 plugin-release.yml）。
 #      3. Linux job wiring via act（STAGE 3·可选）——若装了 act + docker 在，用 act 在本地
-#         Docker 跑 ccm-release.yml 的 Linux job（`package-plugin` 默认，`--with-sea-linux`
-#         追加 linux-x64 的 build-sea），模拟 tag-push 事件，确认 workflow steps 真执行 + 产
-#         artifact。
+#         Docker 跑 Linux job（`package-plugin` 默认·来自 plugin-release.yml；`--with-sea-linux`
+#         追加 linux-x64 的 build-sea·来自 ccm-release.yml），模拟 push 事件，确认 workflow steps
+#         真执行 + 产 artifact。
 #
 #   ⚠️ 只能真 runner（本 harness **验不了**·诚实标注）：
 #      - macOS job（macos-14 / macos-13）——act 无 macOS 容器（GitHub-hosted macOS runner only）。
@@ -73,7 +75,7 @@ for arg in "$@"; do
     --with-act) WITH_ACT=1 ;;
     --with-sea-linux) WITH_SEA_LINUX=1; WITH_ACT=1 ;;
     --skip-sea) SKIP_SEA=1 ;;
-    -h|--help) sed -n '2,60p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,61p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "未知参数：${arg}（--help 看用法）" >&2; exit 2 ;;
   esac
 done
@@ -190,7 +192,7 @@ sea_stage() {
 }
 
 # ════════════════════════════════════════════════════════════════════════════════════════════════
-#  STAGE 2 —— plugin 打包 + 校验（ccm-release.yml `package-plugin` job 核心）
+#  STAGE 2 —— plugin 打包 + 校验（plugin-release.yml `package-plugin` job 核心）
 # ════════════════════════════════════════════════════════════════════════════════════════════════
 plugin_stage() {
   hdr "STAGE 2 — plugin 打包 + 解压 validate"
@@ -236,7 +238,7 @@ JSON
                --artifact-server-path "${artdir}" )
 
   printf "${C_BLUE}[act]${C_OFF} package-plugin job（linux/amd64·非-tag 事件·attach step 跳过）\n"
-  if act push -W .github/workflows/ccm-release.yml -j package-plugin "${SAFE[@]}"; then
+  if act push -W .github/workflows/plugin-release.yml -j package-plugin "${SAFE[@]}"; then
     ok "act package-plugin job 绿（checkout→setup→package→upload-artifact 真执行·attach 跳过）"
   else
     die "act package-plugin job 失败（看上面 act 输出）"
