@@ -195,6 +195,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
   - **改 `ccm/` 命令面**（命令 / flag / 状态机转移 / lint 规则 / 字段档位）的 PR 还须同 PR 同步 `using-ccm` skill（首当其冲 `references/command-catalog.md`）——见 §6「`ccm` ⟷ `using-ccm` 锁步」抗漂移约束。
 - **commit 末尾带** `Co-Authored-By: Claude <noreply@anthropic.com>`；type 前缀 `feat/fix/docs/chore/adr`。
 - **single-committer**——sub-agent 只写 + 自证测试绿，**绝不 commit**；orchestrator 端点验收（含 §7 codex 自审）后统一分组 commit。
+- **commit 卫生：每任务一 commit + 绝不 `git add -A` 盲提**——分组 commit 时**每个任务落一个独立 commit**（任一 commit 都是干净可回滚点，能单独 revert 而不牵连别处）；且**只 stage 该任务真正碰过的文件**（显式列路径），**绝不 `git add -A` / `git add .` 盲提**——自治的 per-task commit 一旦吞并 worktree 里的无关本地改动（残留脏文件、别处溢进来的改动），就把它们焊进了这次 commit，clean-rollback 保证当场破掉。
 - **README.md / README_zh.md 同步**——动 user-facing 文档时两份一起改；user-visible 改动加 `CHANGELOG.md ## [Unreleased]` 条目。
 - **outward-facing / irreversible（含 merge）先问用户**（红线 4 的延伸）。
 
