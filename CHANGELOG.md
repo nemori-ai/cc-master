@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.2] — 2026-07-01
+
+> **plugin 线 patch 收尾** —— 又一次版本线解耦演示：ccm 不动（保持 `ccm-v0.11.0`），仅 plugin 独立 bump。文档化一个此前「支持但不宣传」的启动 flag，并把 dev-only 发版预演脚本对解耦后 workflow 的引用修正到位。
+
+### Added
+
+- **文档化 `as-master-orchestrator` 的 `--owner-wip N` 启动 flag** — `--owner-wip N`（owner 级 WIP 上限·映射 `ccm board update --owner-wip`）此前已在 bootstrap hook 实现、测试也已断言，但从未在命令 argument-hint / 旋钮清单里宣传。本版补齐：加进 argument-hint（列于 `--wip N` 之后），并在 step 3 旋钮清单里与 `--priority` / `--wip` / `--policy-switch` 并列为启动 flag（点火即落板·原样保留别覆写）。
+
+### Fixed
+
+- **修 dev-only 发版预演脚本对解耦后 workflow 的引用（dev）** — 版本线解耦（ADR-022）后 `package-plugin` job 已从 `ccm-release.yml` 迁到独立的 `plugin-release.yml`，但 `scripts/test-release-local.sh`（dev-only 发版预演·不随 plugin 分发）里 STAGE 2/3 的注释与 `act` 调用仍指向旧的 `ccm-release.yml -j package-plugin`。改为指向 `plugin-release.yml`（build-sea 那半仍指 `ccm-release.yml` 不动），并把文件头「单一 workflow」假设更新为「两条独立 workflow」，让本地预演解耦后仍能正确跑两条线。
+
 ## [0.10.1] — 2026-07-01
 
 > **版本线解耦后 plugin 线首个独立发版** —— 这一版兑现 ADR-022：ccm 与 cc-master plugin 各自走独立版本号 + 独立 tag/触发，plugin 由本版起独立 bump（裸 `v0.10.1`），与 ccm 线（`ccm-v0.11.0`）解耦演进。面向用户的改动集中在编排启动体验、双线安装、与一条新的连通性 lint 提示。
