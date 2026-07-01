@@ -153,6 +153,7 @@ export function boardArchive(board: Board): Board {
 const RUNTIME_PARAM_KEYS: Record<string, 'iso'> = {
   last_identity_remind: 'iso',
   last_critpath_remind: 'iso', // critpath-nudge（周期临界路径提示·hooks-enhancements-v2 ②）写回时间戳
+  last_account_switch: 'iso', // 换号发生时刻（ADR-024·usage-pacing hook 每 Stop 读它注入 ambient·含手动 switch）
 };
 export function boardSetParam(board: Board, args?: { key?: string; value?: string }): Board {
   const key = args && typeof args.key === 'string' ? args.key : '';
@@ -300,6 +301,20 @@ export function blockTask(
   t.status = 'blocked';
   if (args.on !== undefined) t.blocked_on = args.on;
   if (args.decisionPackage !== undefined) t.decision_package = args.decisionPackage;
+  return touch(b);
+}
+
+// ── unblockTask(board, id) → 清除语义阻塞标记 blocked_on（+ decision_package）。ADR-023。
+//   只机械地删 blocked_on / decision_package，**不直接定 status**——status 由写入关卡的 reconcileGating
+//   按 deps 完成度归一（deps 全 done→ready，否则→blocked）。这是「blocked_on 作语义阻塞判别器」的解除侧：
+//   有 blocked_on 时该 task 豁免自动门控（在等 user / 等某 task）；unblock 后交回 deps 驱动的自动门控。
+//   目标 id 不存在 → requireTask throw NotFound（冒泡 router 映射 exit 5）。
+export function unblockTask(board: Board, id: string): Board {
+  const b = clone(board);
+  const t = requireTask(b, id);
+  delete t.blocked_on;
+  // decision_package 是 awaiting-user 节点的附属采访包——语义阻塞解除后它已无锚点，一并清（避免 BIZ 悬挂包）。
+  delete t.decision_package;
   return touch(b);
 }
 

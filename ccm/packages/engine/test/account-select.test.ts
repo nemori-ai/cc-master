@@ -159,6 +159,102 @@ test('selectAccount: all non-active backups 7d-gated → NONE_ALL_EXHAUSTED (exi
   assert.ok(r.candidates.every((c) => c.gated));
 });
 
+// ── 对称 5h 硬闸（default 90）：5h 逼顶 / 7d 健康 的号被排除，非双窗口健康即 gated ──────────
+test('accountScore: 5h ≥ 90% hard gate (7d healthy) → gated, score = SCORE_UNUSABLE', () => {
+  const s = account.accountScore(
+    {
+      last_switch_out: {
+        '5h': { used_pct: 99, resets_at: FUTURE },
+        '7d': { used_pct: 10, resets_at: FUTURE },
+      },
+    },
+    NOW,
+  );
+  assert.equal(s.gated, true, '5h≥90 即便 7d 满余量也 gated（落地即撞 5h 墙）');
+  assert.equal(s.score, -1);
+});
+
+test('accountScore: 5h=89 / 7d=84 (both just under gates) → NOT gated (双窗口健康)', () => {
+  const s = account.accountScore(
+    {
+      last_switch_out: {
+        '5h': { used_pct: 89, resets_at: FUTURE },
+        '7d': { used_pct: 84, resets_at: FUTURE },
+      },
+    },
+    NOW,
+  );
+  assert.equal(s.gated, false);
+});
+
+test('selectAccount: 5h高/7d低 candidate is EXCLUDED (红线·落地即撞墙不算能切)', () => {
+  const r = account.selectAccount(
+    reg({
+      wall5h: {
+        vault: vault('wall5h'),
+        active: false,
+        last_switch_out: {
+          '5h': { used_pct: 95, resets_at: FUTURE }, // 5h 逼顶
+          '7d': { used_pct: 20, resets_at: FUTURE }, // 7d 健康
+        },
+      },
+      healthy: {
+        vault: vault('healthy'),
+        active: false,
+        last_switch_out: {
+          '5h': { used_pct: 30, resets_at: FUTURE },
+          '7d': { used_pct: 30, resets_at: FUTURE },
+        },
+      },
+    }),
+    NOW,
+  );
+  assert.equal(r.selected, 'healthy', '双窗口健康的号才是合法切换目标');
+  assert.equal(r.candidates.find((c) => c.email === 'wall5h')?.gated, true);
+});
+
+test('selectAccount: recovered 5h (past reset) is NOT killed by 5h gate (刚 reset 回血的号)', () => {
+  // raw 5h=99 但 reset 已过 → recoveredWindow 归 0 → 不该被 5h 硬闸误杀。
+  const r = account.selectAccount(
+    reg({
+      recovered: {
+        vault: vault('recovered'),
+        active: false,
+        last_switch_out: {
+          '5h': { used_pct: 99, resets_at: PAST }, // reset 已过 → 回血
+          '7d': { used_pct: 20, resets_at: FUTURE },
+        },
+      },
+    }),
+    NOW,
+  );
+  assert.equal(r.selected, 'recovered', 'p5 用恢复后的值·别误杀刚 reset 的号');
+  assert.equal(r.candidates.find((c) => c.email === 'recovered')?.gated, false);
+});
+
+test('selectAccount: all backups 5h-walled / 7d-healthy → NONE_ALL_EXHAUSTED (对称·全池无双窗口健康)', () => {
+  const walled = (e: string) => ({
+    vault: vault(e),
+    active: false,
+    last_switch_out: {
+      '5h': { used_pct: 96, resets_at: FUTURE }, // 5h 逼顶
+      '7d': { used_pct: 15, resets_at: FUTURE }, // 7d 健康
+    },
+  });
+  const r = account.selectAccount(
+    reg({ 'a@x.com': walled('a@x.com'), 'b@x.com': walled('b@x.com') }),
+    NOW,
+  );
+  assert.equal(r.reason, 'NONE_ALL_EXHAUSTED', '5h 墙 + 7d 健康的全池也该 stop·非空切');
+  assert.ok(r.candidates.every((c) => c.gated));
+  assert.ok(r.warnings.some((w) => /5h 或 7d/.test(w)));
+});
+
+test('selectAccount: FIVE_HOUR_HARD_GATE default is 90 (对称锚·非 95)', () => {
+  assert.equal(account.FIVE_HOUR_HARD_GATE, 90);
+  assert.equal(account.SEVEN_DAY_HARD_GATE, 85);
+});
+
 test('selectAccount: mixed (gated + expired) → NONE_NO_CANDIDATES (fixable, not just wait-reset)', () => {
   const r = account.selectAccount(
     reg({

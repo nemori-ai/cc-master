@@ -230,10 +230,10 @@ export const FIELDS = {
     },
     runtime: {
       tier: '✎',
-      type: 'object{ last_identity_remind?: ISO, last_critpath_remind?: ISO, ... }?',
+      type: 'object{ last_identity_remind?: ISO, last_critpath_remind?: ISO, last_account_switch?: ISO, ... }?',
       default: '缺省(无 runtime 参数)',
       readers:
-        'IDNUDGE hook 读 last_identity_remind / critpath-nudge hook 读 last_critpath_remind 判阈值；未来其它周期 hook/script',
+        'IDNUDGE hook 读 last_identity_remind / critpath-nudge hook 读 last_critpath_remind 判阈值 / usage-pacing hook 读 last_account_switch 注入换号 ambient(ADR-024)；未来其它周期 hook/script',
       writers: 'hook 经 ccm board set-param（带锁·hook-owned 参数区·ADR-020）/ agent 经 ccm',
       when: '周期 hook 注入提示后刷簿记时间戳',
       degrade: '缺→视为「从未提示」(首次必提示)；形状坏→warn(FMT-RUNTIME)·不拦写盘',
@@ -795,6 +795,14 @@ export const INVARIANTS: Invariant[] = [
     family: 'BIZ',
     scope: 'cadence',
     summary: 'iteration.status=shipped ⇒ members 全 done+verified(收口完整性)',
+  },
+  {
+    id: 'BIZ-STATUS-DEPS',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'task',
+    summary:
+      'deps 门控不一致(手改造出·CLI 经 reconcileGating 永不产生):ready 但 deps 未全 done / blocked 无 blocked_on 但 deps 全 done(ADR-023)',
   },
   // ── 预留(登记在册·lint 暂不强制·待 ADR) ──────────────────────────────────────────────────────────
   {

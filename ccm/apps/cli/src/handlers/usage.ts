@@ -2,7 +2,7 @@
 //
 // usage = 配额侧只读 advisory namespace（charter ②控制 token 消耗速度 + ⑤资源下最大化效率）。
 //   · show       → runRead：当前号 + 全备号 5h/7d used%/resets_at（备号=accounts.json registry 生命周期快照）。
-//   · advise     → runRead：双侧走廊 verdict（throttle|accelerate|hold|hard_stop）+ 推荐 lever + switch_candidate。
+//   · advise     → runRead：单侧 verdict（hold|throttle|switch|stop_5h|stop_7d）+ 推荐 lever + switch_candidate。
 //   · task-cost  → runRead：单/聚合任务 token（读 board observability·shell=N/A·coverage_pct·--group-by）。
 //
 // 硬不变式（plan §2 不变式 1·硬约束）：**usage 纯只读** = query/compute，零写、不抢 board-lock、不落状态。
@@ -441,7 +441,7 @@ function fmtPct(p: number | null | undefined): string {
 }
 
 // ── usage advise ──────────────────────────────────────────────────────────────
-//   双侧走廊 verdict + 推荐 lever + switch_candidate（收口 usage-pacing 数学·引擎 pacingAdvice）。
+//   单侧 verdict + 推荐 lever + switch_candidate（收口 usage-pacing 数学·引擎 pacingAdvice）。
 export function advise(ctx: Ctx): number {
   return runRead(ctx, {
     resolve: () => ({ boardPath: '', board: {} }),
@@ -450,42 +450,37 @@ export function advise(ctx: Ctx): number {
       const nowSec = Math.floor(nowMs / 1000);
       const homeFlag = c.values.home as string | undefined;
       const sidecar = readUsageSidecar(c.env);
-      const backups = readBackups(c.env, nowMs, homeFlag);
       // --effective-n 覆写优先；否则从 registry 算。
       const enFlag = c.values['effective-n'];
+      const accountsMap = readRegistry(c.env, homeFlag);
       const en =
         typeof enFlag === 'string' && Number.isInteger(Number(enFlag)) && Number(enFlag) >= 1
           ? Number(enFlag)
-          : effectiveNFromRegistry(c.env, nowMs, homeFlag);
+          : accountsMap
+            ? effectiveN(accountsMap as never, nowMs).effective_n
+            : 1;
 
-      const opts: PacingOptions = { nowSec, effectiveN: en };
+      // 池感知 verdict（ADR-024）：把 registry 传进引擎，pacingAdvice 用 predictPoolUsage + selectAccount
+      //   算 switch/stop（全池聚合只在引擎·红线2/3）。switch_candidate / nearest_reset / stop_dimension /
+      //   strength 都由引擎返回，handler 只透传（不再本地重算 candidate——收口到引擎 select SSOT）。
+      const opts: PacingOptions = {
+        nowSec,
+        effectiveN: en,
+        registry: accountsMap ? ({ accounts: accountsMap } as never) : null,
+      };
       const advice = pacingAdvice(sidecar, opts);
-
-      // switch_candidate：仅当 verdict 含切号 lever 且 registry 有可切备号时给（选 7d used% 最低的可切备号·恢复最多）。
-      //   可切判据须与 effectiveN 同口径（bug1·sweep #2）：!active && switchable!==false && **token 未过期**——
-      //   否则 advise 可能推荐一个 token_expires_at 已过期的号当 switch_candidate，指向 switch 路径用不了的号。
-      //   token_expired 由引擎 tokenExpired SSOT 算（readBackups 投影）。纯过期备号 → switchable 集为空 → 无 candidate。
-      let switchCandidate: string | null = null;
-      const wantsSwitch =
-        advice.levers.includes('switch_account') ||
-        advice.levers.includes('switch_account_user_decision');
-      if (wantsSwitch && backups != null) {
-        const switchable = backups.accounts.filter(
-          (a) => !a.active && a.switchable && !a.token_expired,
-        );
-        switchable.sort((a, b) => sevenDayPctOrInf(a) - sevenDayPctOrInf(b));
-        switchCandidate = switchable.length > 0 ? (switchable[0] as BackupAccount).email : null;
-      }
 
       const data = {
         verdict: advice.verdict,
         reason: advice.reason,
         levers: advice.levers,
-        hard_stop_7d: advice.hard_stop_7d,
+        strength: advice.strength,
+        stop_dimension: advice.stop_dimension,
+        nearest_reset: advice.nearest_reset,
         window_5h_pct: advice.window_5h_pct,
         window_7d_pct: advice.window_7d_pct,
         effective_n: advice.effective_n,
-        switch_candidate: switchCandidate,
+        switch_candidate: advice.switch_candidate,
         confidence: advice.confidence,
         source: advice.available ? 'account' : 'local-derived-approx',
         as_of:
@@ -497,21 +492,19 @@ export function advise(ctx: Ctx): number {
 
       if (c.flags.json) return JSON.stringify({ ok: true, data });
       const lines = [
-        `usage advise: ${data.verdict}（effective_n=${data.effective_n}·confidence=${data.confidence}）`,
+        `usage advise: ${data.verdict}（effective_n=${data.effective_n}·strength=${data.strength}·confidence=${data.confidence}）`,
         `  reason: ${data.reason}`,
-        `  5h=${fmtPct(data.window_5h_pct)} 7d=${fmtPct(data.window_7d_pct)} hard_stop_7d=${data.hard_stop_7d}`,
+        `  5h=${fmtPct(data.window_5h_pct)} 7d=${fmtPct(data.window_7d_pct)}${data.stop_dimension ? `·stop=${data.stop_dimension}` : ''}`,
       ];
       if (data.levers.length) lines.push(`  levers: ${data.levers.join(', ')}`);
-      if (switchCandidate) lines.push(`  switch_candidate: ${switchCandidate}`);
+      if (data.switch_candidate) lines.push(`  switch_candidate: ${data.switch_candidate}`);
+      if (data.nearest_reset)
+        lines.push(`  nearest_reset: ${asOfISOFromSec(data.nearest_reset)}（arm wakeup）`);
       if (!data.available)
         lines.push('  （账户权威信号不可用·source=local-derived-approx·pacing 降级）');
       return `${lines.join('\n')}\n`;
     },
   });
-}
-
-function sevenDayPctOrInf(a: BackupAccount): number {
-  return typeof a.seven_day.used_pct === 'number' ? a.seven_day.used_pct : Number.POSITIVE_INFINITY;
 }
 
 // ── usage burn-rate ──────────────────────────────────────────────────────────────

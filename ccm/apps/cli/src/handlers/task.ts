@@ -183,6 +183,29 @@ export function block(ctx: Ctx): number {
   });
 }
 
+// ── task unblock：清除 blocked_on 语义阻塞标记（→ 交回 reconcileGating 按 deps 定 ready/blocked）。ADR-023。
+//   不直接定 status——写入关卡的 reconcileGating 据 deps 完成度归一（deps 全 done→ready，否则→blocked）。
+//   目标 id 不存在 → mutations.unblockTask throw NotFound（冒泡 router 映射 exit 5）。
+export function unblock(ctx: Ctx): number {
+  const id = ctx.positionals[0] as string;
+  return runWrite(ctx, {
+    mutate: (board) => {
+      let next = mutations.unblockTask(board as BoardArg, id);
+      next = maybeLog(next, ctx, `unblock ${id}`);
+      return next;
+    },
+    render: (next, c, { dryRun }) => {
+      if (c.flags.json) {
+        const t = findTask(next, id);
+        return render.renderTaskDetail(t, { json: true });
+      }
+      const t = findTask(next, id) as { status?: unknown } | undefined;
+      const st = t && t.status ? ` (→ ${t.status})` : '';
+      return dryRun ? `[dry-run] 将解除阻塞 task: ${id}` : `task ${id} 已解除 blocked_on${st}`;
+    },
+  });
+}
+
 // ── task set-status：通用状态转移（positionals = [id, status]）。非法转移 throw IllegalTransition（--force 越）。
 export function setStatus(ctx: Ctx): number {
   const id = ctx.positionals[0] as string;

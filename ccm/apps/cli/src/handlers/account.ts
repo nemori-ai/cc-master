@@ -750,6 +750,10 @@ export async function switchAccount(ctx: Ctx): Promise<number> {
       `⚠ 身份显示层未完整切换：token 已切到 ${email}（凭证主存已是新号 token·认证生效），但 ②~/.claude.json oauthAccount 未用 registry identity 完整替换（该号 registry 缺 identity / ② 文件缺损）——登录**显示**可能仍是上一号（不影响认证）。建议跑 \`ccm account add ${email}\` 在该号已登录环境补 identity，下次换号即可真切身份显示。`,
     );
   }
+  // ADR-024 切后通知：① 算切入号投影配额（predict 冻结投影·喂 --json 消费方）；② best-effort 写
+  //   ✎ board.runtime.last_account_switch（ISO·usage-pacing hook 每 Stop 读它注入 ambient·含手动 switch）。
+  const projection = computeSwitchInProjection(regPath, email);
+  bestEffortRuntimeSwitch(ctx, account.nowIso());
   if (ctx.flags.json) {
     ctx.out(
       io.jsonOk({
@@ -757,10 +761,62 @@ export async function switchAccount(ctx: Ctx): Promise<number> {
         switched: true,
         force_refresh_fallback: forceRefreshFallback,
         identity_degraded: identityDegraded,
+        projection, // 切入号投影配额（5h/7d used% + source·predict 冻结投影·非权威·切回后被 live 自愈）
       }),
     );
   }
   return SWITCH_EXIT.OK;
+}
+
+// computeSwitchInProjection — 切入号投影配额（ADR-024·切后通知）。读 registry entry → predict 冻结投影
+//   （无 live → 用 last_switch_out 冻结→归零·predict.ts SSOT）。token-blind（只进出 %/ISO）。失败 → null（best-effort）。
+function computeSwitchInProjection(
+  regPath: string,
+  email: string,
+): { five_hour_pct: number; seven_day_pct: number; source: string } | null {
+  try {
+    const reg = safeLoadRegistry(regPath);
+    const entry = reg.accounts && reg.accounts[email];
+    if (!entry) return null;
+    const pred = account.predictAccountUsage(entry, { now: account.nowIso() });
+    return {
+      five_hour_pct: pred.fiveHour.usedPct,
+      seven_day_pct: pred.sevenDay.usedPct,
+      source: pred.fiveHour.source,
+    };
+  } catch (_e) {
+    return null;
+  }
+}
+
+// bestEffortRuntimeSwitch — 换号成功后往目标板写 ✎ board.runtime.last_account_switch=iso（ADR-020 set-param 白名单键·
+//   ADR-024）。带 board-lock + 原子写（与 bestEffortDecisionLog 同模式）。无板上下文 / 失败 → 静默吞（best-effort·
+//   绝不阻断换号——换号已生效）。窄腰不动（runtime 是 ✎·红线2）。
+function bestEffortRuntimeSwitch(ctx: Ctx, iso: string): void {
+  try {
+    const resolved = discover.resolveBoard({
+      boardFlag: ctx.values.board as string,
+      sid: ctx.sid,
+      homeFlag: ctx.values.home as string,
+      goalSubstr: ctx.values.goal as string,
+      env: ctx.env,
+    });
+    io.withBoardLock(resolved.boardPath, () => {
+      let board: unknown;
+      try {
+        board = JSON.parse(fs.readFileSync(resolved.boardPath, 'utf8'));
+      } catch (_e) {
+        return;
+      }
+      const next = mutations.boardSetParam(board as BoardArg, {
+        key: 'last_account_switch',
+        value: iso,
+      });
+      io.writeFileAtomicSync(resolved.boardPath, `${JSON.stringify(next, null, 2)}\n`);
+    });
+  } catch (_e) {
+    /* best-effort·换号已生效·写簿记失败不阻断 */
+  }
 }
 
 // ── switch helpers ──────────────────────────────────────────────────────────────────────────────────

@@ -297,6 +297,89 @@ test('task block --on user with --decision (literal JSON) lands decision_package
   assert.equal(t.decision_package.question, '选哪个方案?');
 });
 
+// ══ task unblock ══════════════════════════════════════════════════════════════════════════════════
+test('task unblock clears blocked_on; reconcileGating → ready when deps all done', () => {
+  // T1 done, T2 blocked_on=user (deps [T1] done). unblock → reconcile flips to ready.
+  const tasks = [
+    { id: 'T1', status: 'done', deps: [], created_at: '2026-06-24T08:00:00Z' },
+    {
+      id: 'T2',
+      status: 'blocked',
+      deps: ['T1'],
+      blocked_on: 'user',
+      decision_package: { ask_type: 'advice', question: 'x' },
+      created_at: '2026-06-24T08:30:00Z',
+    },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, { positionals: ['T2'] });
+  const code = taskHandler.unblock(ctx);
+  assert.equal(code, EXIT.OK);
+  const t = findTask(readBoard(boardPath), 'T2');
+  assert.equal(t.blocked_on, undefined, 'blocked_on cleared');
+  assert.equal(t.decision_package, undefined, 'decision_package cleared');
+  assert.equal(t.status, 'ready', 'deps all done → reconcile to ready');
+});
+
+test('task unblock → reconcileGating → blocked when deps NOT all done', () => {
+  const tasks = [
+    { id: 'T1', status: 'in_flight', deps: [], created_at: '2026-06-24T08:00:00Z' },
+    {
+      id: 'T2',
+      status: 'blocked',
+      deps: ['T1'],
+      blocked_on: 'T1',
+      created_at: '2026-06-24T08:30:00Z',
+    },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, { positionals: ['T2'] });
+  const code = taskHandler.unblock(ctx);
+  assert.equal(code, EXIT.OK);
+  const t = findTask(readBoard(boardPath), 'T2');
+  assert.equal(t.blocked_on, undefined);
+  assert.equal(t.status, 'blocked', 'deps not done → reconcile keeps blocked');
+});
+
+test('task unblock on missing id → NotFound (router maps exit 5)', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, { positionals: ['NOPE'] });
+  assert.throws(() => taskHandler.unblock(ctx), /not found/i);
+});
+
+// ══ reconcileGating 接入 runWrite（所有写 verb 自动门控归一·ADR-023）═══════════════════════════════════
+test('task add with unmet deps → reconcile auto-blocks the new node', () => {
+  // T1 in_flight (not done); add T2 --deps T1 (addTask defaults status=ready) → reconcile → blocked.
+  const boardPath = mkBoardHome({
+    tasks: [{ id: 'T1', status: 'in_flight', deps: [], created_at: '2026-06-24T08:00:00Z' }],
+  });
+  const ctx = mkCtx(boardPath, { values: { deps: 'T1' }, positionals: ['T2'] });
+  const code = taskHandler.add(ctx);
+  assert.equal(code, EXIT.OK);
+  assert.equal(findTask(readBoard(boardPath), 'T2').status, 'blocked');
+});
+
+test('completing deps via task done → reconcile auto-readies the dependent', () => {
+  // T1 in_flight, T2 blocked (deps [T1]). Mark T1 done → reconcile flips T2 → ready.
+  const tasks = [
+    {
+      id: 'T1',
+      status: 'in_flight',
+      deps: [],
+      created_at: '2026-06-24T08:00:00Z',
+      started_at: '2026-06-24T08:10:00Z',
+    },
+    { id: 'T2', status: 'blocked', deps: ['T1'], created_at: '2026-06-24T08:30:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, { positionals: ['T1'] });
+  const code = taskHandler.done(ctx);
+  assert.equal(code, EXIT.OK);
+  const b = readBoard(boardPath);
+  assert.equal(findTask(b, 'T1').status, 'done');
+  assert.equal(findTask(b, 'T2').status, 'ready', 'dependent auto-readied by reconcile');
+});
+
 // ══ task set-status ════════════════════════════════════════════════════════════════════════════════
 test('task set-status legal transition (in_flight→escalated)', () => {
   const tasks = [{ id: 'T2', status: 'in_flight', deps: [], created_at: '2026-06-24T08:30:00Z' }];
