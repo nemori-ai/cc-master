@@ -25,6 +25,10 @@
 #      a skill name so they're never matched. NOTE: dev-only repo-root `scripts/`
 #      paths (e.g. in DESIGN.md) are intentionally NOT flagged — those scripts are not
 #      distributed (红线5) and the bare path is correct from repo root.
+#   5. terminology drift (design_docs/glossary.md) — delegated to the sibling
+#      scripts/glossary-lint.sh: greps the distributed tree + dev docs for any banned
+#      variant of a承重 term (canonical spelling SSOT in the glossary). Its exit code
+#      is aggregated into this script's overall verdict.
 #
 # Why node, not bash+jq/python: the repo's content tests are node-based, and node
 # is guaranteed present in any Claude Code host (AGENTS.md §3 红线1 / ADR-006).
@@ -41,6 +45,10 @@ command -v node >/dev/null 2>&1 || {
   exit 1
 }
 
+# checks (1)-(4) run in the node program below; check (5) runs after it. Disable
+# errexit around the node call so a check-(1)-(4) failure doesn't abort before we
+# also run check (5) — we aggregate both exit codes into the final verdict.
+set +e
 REPO="$REPO" node - "$@" <<'NODE'
 'use strict';
 const { readFileSync, readdirSync, existsSync, statSync } = require('node:fs');
@@ -225,3 +233,15 @@ for (const v of violations) {
 console.error(`\nskill-lint: FAILED — ${violations.length} violation(s) across ${fileCount} SKILL.md`);
 process.exit(1);
 NODE
+node_rc=$?
+
+# ---- check (5): terminology drift (delegated to glossary-lint.sh) ----
+echo "--- check (5): terminology drift (design_docs/glossary.md)"
+bash "$REPO/scripts/glossary-lint.sh"
+glossary_rc=$?
+
+# Aggregate: fail if either checks (1)-(4) or check (5) failed.
+if [ "$node_rc" -ne 0 ] || [ "$glossary_rc" -ne 0 ]; then
+  exit 1
+fi
+exit 0

@@ -140,6 +140,8 @@ cc-master/
 
 **`ccm` ⟷ `using-ccm` 锁步（抗漂移硬约束）**：`ccm` CLI（引擎 `@ccm/engine`）是命令面 / 状态机转移 / lint 规则 / 字段三档的**单一真相源**；分发 skill `using-ccm` 是它的**派生操作视图**（手册）。**`ccm/` 下任何命令 / flag / 状态机 / lint 规则 / 字段档位的增删改，必须在同一 PR 同步更新 `using-ccm`**——首当其冲两份 reference：① `references/command-catalog.md`（全量命令面，逐命令对得上——**含 namespace account 的 5 verb〔add/refresh/delete/list/switch〕逐条对 ccm `account` registry**·ADR-019 portfolio 重排后 account 操作面归 D）② **`references/board-model-guide.md`（board 模型 / 字段取值 / 全 48 条 FMT/GRAPH/BIZ 校验规则速查——引擎 `board-lint-core.ts` / `INVARIANTS` 改一条规则或字段 tier，它必同步一条，否则 agent 照旧表写仍撞 `exit 3`，「一次写对」承诺即破）**；外加受影响的 `SKILL.md` 心智锚 / footgun 速查 / `evals/trigger.json`。漂移即手册骗人：agent 照过时手册敲命令会踩 `exit 2/3`。判据：改 ccm 命令面 / lint 规则的 PR，审查者必查 `using-ccm` 两份 reference 是否同步（命令面 + 校验规则是机械事实，须逐条对得上；心智锚 / footgun 是语义，按改动性质判）。这是 ADR-014 解耦的代价之一——SSOT 在 `ccm`、操作视图在 skill，二者人工锁步（§11 的 ccm CI/release 段回指本条）。
 
+**术语表 ⟷ 措辞锁步（抗漂移硬约束）**：[`design_docs/glossary.md`](design_docs/glossary.md) 是承重术语 canonical 措辞的 dev-side 单一真相源（由 `scripts/glossary-lint.sh` 机械把关、接进 `skill-lint.sh` check(5)）。**新增 / 改一个 canonical 术语的措辞，必须在同一 PR 更新 `design_docs/glossary.md` 的「禁用变体」列**（同上「`ccm`⟷`using-ccm` 锁步」同型：改了措辞不同步禁用变体列，lint 就漏卡新漂移形、或对旧措辞假阳）——禁用变体列只收「零合法用法」的错形/漏字（closed-set 克制见 glossary 卷首）。
+
 ---
 
 ## 7. codex 作为 reviewer 范式
