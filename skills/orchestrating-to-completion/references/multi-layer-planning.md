@@ -23,13 +23,13 @@ cc-master 的调度是**两层正交**的。顶层是你的 board——跨任务
 
 指导的语义只有一句：当你作为编排者在为*某个项目*推进一个长程大任务时，让承接该任务的执行者去**发现并遵循那个项目自己约定的** planning 流程 / 规范，并维护那个项目约定位置的计划文档。「发现」= 让执行者去读那个项目的 `CONTRIBUTING` / `AGENTS.md` / `CLAUDE.md` / 既有 design docs 等，把它**自己**约定的 planning 规范挖出来再遵循——而不是套用任何外来的（更不是 cc-master 自己的）planning 规范。
 
-> 任何措辞都不能让读者误以为「套用 cc-master 自己的 planning 规范」。被编排项目怎么规划，由**它自己**说了算；编排者的活是把「去发现并遵循它」写进派发契约。
+> 任何措辞都不能让读者误以为「套用 cc-master 自己的 planning 规范」。被编排项目怎么规划，由**它自己**说了算；你的活是把「去发现并遵循它」写进派发契约。
 
 ---
 
 ## 两层正交：board ⊥ 项目 planning 层
 
-- **顶层 = cc-master 的 board** —— 跨任务的依赖 DAG、并行、派发、端点验收。board **不入被编排项目的版本控制**（gitignored 的 home），是编排者跨 compaction、跨 session 的记忆。它管的是「**哪些任务 / 依赖 / 并行**」。
+- **顶层 = cc-master 的 board** —— 跨任务的依赖 DAG、并行、派发、端点验收。board **不入被编排项目的版本控制**（gitignored 的 home），是你跨 compaction、跨 session 的记忆。它管的是「**哪些任务 / 依赖 / 并行**」。
 - **底层 = 被编排项目自身约定的 planning 层** —— 单个大节点*内部*怎么按那个项目的规范分步推进、产出并维护计划文档。它管的是「**这一个大任务内部怎么走**」。
 
 两层正交互补，不是同一件事的两种写法：board 是横向的（任务之间），项目计划文档是纵向的（一个任务之内）。一个大节点在 board 上是**一个** `in_flight` 节点；它内部那张分步计划活在被编排项目约定的位置，board 不去复刻它——board 只追踪这个节点的 status / artifact / 验收。**别把项目内部的分步塞进 board 的 `tasks`**（那会让 board 失去横向调度视角、且违背 narrow-waist 的简洁；board 协议见 `board.md`），也别指望项目计划文档去记跨任务依赖（那是 board 的活）。
@@ -65,7 +65,7 @@ cc-master 的调度是**两层正交**的。顶层是你的 board——跨任务
 这一层和 `dispatch.md` 的 escalation 机制**分工不同、不是替代**——别搞混什么时候纵深消化、什么时候 escalate。
 
 - **节点*内部*用「项目自己的 planning 层」纵深消化复杂度，是常态。** 执行者在节点内按项目规范分步、留计划文档，把复杂度在**这一个节点之内**走完。大多数够格的大节点走这条路。
-- **escalate 回 cc-master 的 workflow 层，只在复杂度高到值得把它拉回顶层做横向并行 fan-out 时。** 执行者发现自己其实是一张 sub-DAG → STOP + 返回 escalation map → 编排者 supersede 该节点、seed 一个 workflow（机制 SSOT 在 `dispatch.md`「靠 escalation 重新定位」，此处不复述）。
+- **escalate 回 cc-master 的 workflow 层，只在复杂度高到值得把它拉回顶层做横向并行 fan-out 时。** 执行者发现自己其实是一张 sub-DAG → STOP + 返回 escalation map → 你 supersede 该节点、seed 一个 workflow（机制 SSOT 在 `dispatch.md`「靠 escalation 重新定位」，此处不复述）。
 
 一句话区分：
 
@@ -86,6 +86,6 @@ cc-master 的调度是**两层正交**的。顶层是你的 board——跨任务
 | 管什么 | 跨任务：依赖 / 并行 / 派发 / 验收 | 任务内：一个大节点内部怎么分步走 |
 | 视角 | 横向（任务之间） | 纵向（一个任务之内） |
 | 落点 | gitignored home，**不入被编排项目版本控制** | 被编排项目约定的位置（多半入它的版本控制） |
-| 续跑用途 | 编排者跨 compaction / session 的记忆 | 执行者在单节点内续跑 / 换手的锚点 |
+| 续跑用途 | 你跨 compaction / session 的记忆 | 执行者在单节点内续跑 / 换手的锚点 |
 
-两者都服务「可续跑」，但尺度不同：board 让**编排者**记得整张图，项目计划文档让**执行者**记得这一个节点内部走到哪了。端点验收时，board 节点的 done 仍以**你自己端点的独立验收**为准（见 `resume-verify.md`），项目计划文档是执行者的工作记录、不替代你的验收。
+两者都服务「可续跑」，但尺度不同：board 让**你**记得整张图，项目计划文档让**执行者**记得这一个节点内部走到哪了。端点验收时，board 节点的 done 仍以**你自己端点的独立验收**为准（见 `resume-verify.md`），项目计划文档是执行者的工作记录、不替代你的验收。

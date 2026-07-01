@@ -2,7 +2,7 @@
 
 > **服务愿景：全部 C1–C6**（这是把魂接到外部坐标的导航表，不专属某一项能力）。**何时读：** ① 想沿愿景轴定位「哪条镜头 / 哪个 reference / 哪个决策程序节点服务哪项能力」时；② compaction 后 / 任意时刻看到一个 hook 从你 context 之外注入的短语，想顺着它回到对应的镜头或决策程序锚点时。
 
-这张表是**导航用的坐标系**，不是每回合要跑的决策输入——它把魂连到两类真相源：六项 charter 能力（C1–C6，即下方愿景索引表）和五个 hook（注入短语的 SSOT 在本 plugin 的 hook 脚本里）。**魂主文只留一句指针指向这里，详表不在魂里重复**——因为「常驻重注的魂里复述一张 hook / 愿景状态映射表」已被实证为 desync-prone（dogfood Finding #28：魂曾把一个已 live 的 hook 标作 TODO；Finding #7：魂内 SSOT 重复是 reinject 负担）。要核 hook 注入短语的当前真相，永远以本 plugin 的 hook 脚本为准；要核某 reference 服务哪项愿景，以各 reference header 的 `服务愿景：Cx` tag 为准——这张表只是把它们汇到一处方便定位。
+这张表是**导航用的坐标系**，不是每回合要跑的决策输入——它把魂连到两类真相源：六项 charter 能力（C1–C6，即下方愿景索引表）和五个 hook（注入短语的 SSOT 在本 plugin 的 hook 脚本里）。**魂主文只留一句指针指向这里，详表不在魂里重复**——因为「常驻重注的魂里复述一张 hook / 愿景状态映射表」容易 desync：魂一旦滞后就会把一个已 live 的 hook 误标成 TODO，且魂内 SSOT 重复本身就是 reinject 负担。要核 hook 注入短语的当前真相，永远以本 plugin 的 hook 脚本为准；要核某 reference 服务哪项愿景，以各 reference header 的 `服务愿景：Cx` tag 为准——这张表只是把它们汇到一处方便定位。
 
 ---
 
@@ -40,4 +40,4 @@
   - (H8 usage-pacing，多账号 `num_account` 缩放) "按 N 份可序列消费的配额理想节奏，此刻本该烧得更多" → **镜头 5（加速侧 ×N）**：effective-N 由 `usage-pacing.js` 从号池 registry `accounts.json` 算（数非 active 且 token 未过期的可切入备号 + 当前在用号；无 registry = 天然单账号 N=1）——**不是起跑 flag**（旧 `--num_account N` 起跑声明已砍·TR6，号池经 `ccm account` CLI 管理）。欠用催加速的判定线已据此 N 抬高（`effective_ceil = min(95, ceil×N)`）——N 越大越积极催加速。反向，5h 撞墙时看到 "切到下一份配额" → **镜头 5（撞墙侧按 N 分叉）**：N>1 且 7d 仍有余量时，当前账号 5h 烧满只是「切到下一份配额」的触发信号、不是减速信号（理想是顺势用下一份满配额的 5h 窗，而非在总配额还有余时减速空耗）；**7d 总闸不随 N 变**（与序列/并行度正交）。这是把「N 倍速」直觉翻译成无量纲的百分比节奏缩放（账户口径无绝对 token 分母，算不出 tok/min 精确速率），细节与诚实天花板见 `pacing-and-estimation` skill（pacing-levers / usage-signals）。怎么 pace / 切不切仍是认知判断，软提示不是 block。
   - (H8 usage-pacing，7d≥85% dispatch 闸) "7d 配额硬总闸 ... 暂停 dispatch 新节点 ... blocked_on:\"user\"" → **镜头 5（7d 总闸收紧）+ 决策程序 dispatch 节点 §(f) + 镜头 7**：7d `used%` 达 85%——总闸从「挡加速」收紧到「挡派发本身」：**停 dispatch 任何新节点**（含临界路径节点），把「是否继续消耗 7d 配额」作 `blocked_on:"user"` surface 用户拍板（在飞任务可跑完 / 验收，但不派新活）。注入里的「非阻断」只意味着 hook 物理上 block 不了你的 dispatch 工具调用，执行暂停是你的活——别读成「可忽略的 FYI」。N>1 时「切到下一份配额（切账号刷新 7d）」是用户可选的一个响应，与「暂停续耗」并列由用户拍，切换本身不由本闸执行。细节见 `pacing-and-estimation` skill（pacing-levers）+ 决策锚 `cost-decisions.md` + ADR-010 §2.6。
 
-*（H3/H5/H8 现均已 live。注入短语的当前真相以本 plugin 的 hook 脚本为准——本表与脚本漂移时信脚本，删/加 hook 的 PR 必带 `grep 'H[0-9]'` 全量核对，见 Finding #28。）*
+*（H3/H5/H8 现均已 live。注入短语的当前真相以本 plugin 的 hook 脚本为准——本表与脚本漂移时信脚本，删/加 hook 的 PR 必带 `grep 'H[0-9]'` 全量核对。）*

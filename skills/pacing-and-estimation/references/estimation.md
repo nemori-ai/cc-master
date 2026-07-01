@@ -2,7 +2,7 @@
 
 > **服务愿景：C4**（分解 / 管理 / 更新 / 规划）**· C5**（资源下最大化效率）。**何时读：** 要估目标 ETA、查进度/成本偏差（EVM）、看 velocity / 综合风险 / cost-to-complete，或要读懂 `ccm estimate` 的输出字段、判一个预测信不信时。**这是本 skill 相对旧 cost-and-pacing 的净增**——estimate 整轴此前在编排决策点**完全零提及**（前序报告 §3 根因 2），agent「该 forecast 工期 / 查 EVM 偏差 / 读 risk flag」时**默认想不到**。本文把消费操作化成「何时查 → 读哪个字段 → 据此判断什么」。**ccm 出区间/数据、你（A）决策**（红线 3）；估算 OR/ML 算法的实现 SSOT 在 `@ccm/engine` 的 `estimate/`，本文不复述数学。
 
-`ccm estimate` 是**只读 advisory**（ADR-015）：全 verb compute、零写、不抢 board-lock。历史语料范围 `--scope home|this-repo|this-board`（默认 `home`·跨板多层收缩）。seeded 确定性 `--seed`（默认 42·MC 复现）。**5% 硬墙**：所有 `p95` = 95% 分位，**绝不算到 100%**（真上限是 session hard-stop）。
+`ccm estimate` 是**只读 advisory**：全 verb compute、零写、不抢 board-lock。历史语料范围 `--scope home|this-repo|this-board`（默认 `home`·跨板多层收缩）。seeded 确定性 `--seed`（默认 42·MC 复现）。**5% 硬墙**：所有 `p95` = 95% 分位，**绝不算到 100%**（真上限是 session hard-stop）。
 
 ## 5 个 verb 的消费决策（query → read → judge）
 
@@ -18,7 +18,7 @@
 
 ## baseline 生命周期（EVM 的 plan 前置）
 
-`ccm baseline` 是 board 内**唯一的 estimate 写 noun**（ADR-015）——`estimate evm` 死依赖它作 plan 基线（PV 曲线的来源）：
+`ccm baseline` 是 board 内**唯一的 estimate 写 noun**——`estimate evm` 死依赖它作 plan 基线（PV 曲线的来源）：
 
 - **`ccm baseline snapshot`** —— 在一个 iteration / 里程碑**起点**冻结当前计划（任务集 + 校准工期）作 EVM 的 plan 基线。**没有它 `estimate evm` 出 `has_baseline:false`**（exit 0·降级 warn），CPI/SPI 无从算。
 - **何时 snapshot**：一个 cadence iteration 开工那刻、或一次重大 replan 后（范围变了，旧 baseline 失真）。`ccm baseline reset` 清旧基线重立。
