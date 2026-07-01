@@ -10,6 +10,8 @@
 
 ## 1. 目标 → 任务节点 → 依赖边 → DAG
 
+> 本文讲把一张 DAG **排**好期（CPM / float / 临界路径）；**怎么把目标切成这张 DAG**（纵切薄增量 / walking skeleton / 粒度品味）见 slicing-goals-into-dags skill——**切先于排**。
+
 任何可拆解的目标都是一张 **DAG**（节点 = 工作单元，边 = 依赖）。执行序合法与否由**拓扑排序（topological sort）**保证：一个节点只有在所有前驱都做完之后才 `ready`。这正是 dataflow"就绪即派"思想的图论根基——出度 > 1 的节点是 fork 点，入度 > 1 的节点是 join 点。
 
 步骤：

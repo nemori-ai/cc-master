@@ -17,7 +17,7 @@ description: 'Use when you (a coding/execution agent) are designing, building, o
 
 ## 核心论题：四个理论，一条脊椎
 
-DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一种工程良知在 design / build / test 三阶段的不同切面，从**同一组根**长出来。先握住下面五条根（这是本 skill 的灵魂），再到各 reference 取深度。**根对了，四个理论彼此印证；根没握住，它们就退化成四张互不相干的清单。**
+DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一种工程良知在 design / build / test 三阶段的不同切面，从**同一组根**长出来。这五根不止长出四理论的**手艺**，也贯穿**交付尺度**——顶层怎么敏捷切（=slicing-goals-into-dags）、任务内怎么迭代（=dev-as-ml-loop），指向下文接力段的三层范式：这是把五根从「四理论之根」提升为「delivery + craft 同根的 apex」（工程质量总纲的答案——非一套新原则，是 framing 提升）。先握住下面五条根（这是本 skill 的灵魂），再到各 reference 取深度。**根对了，四个理论彼此印证；根没握住，它们就退化成四张互不相干的清单。**
 
 ---
 
@@ -80,7 +80,9 @@ DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一
 | **测试** | TDD | test-first 这条纪律具体怎么执行？ | [references/tdd.md](references/tdd.md) |
 | **横跨三阶段** | 五条根 + 红线 | 始终成立的脊椎 | 本文 |
 
-**四理论是接力，不是并列**：SDD 冻结合约形状 → DDD 在其上划 bounded context 与不变式所有权 → OOP 实现到合约 → TDD 对着合约红绿。但这是「典型顺序」，**不是瀑布**——薄切一片端到端走完四棒、拿到反馈，再切下一片（与 slicing-goals-into-dags 的纵切薄增量、dev-as-ml-loop 的迭代同源）。
+**四理论是接力，不是并列**：SDD 冻结合约形状 → DDD 在其上划 bounded context 与不变式所有权 → OOP 实现到合约 → TDD 对着合约红绿。这条接力顺序管的是「哪种手艺在哪阶段**领跑** + 合约先行」，**不是**「相位闸、不许回头」——它是**典型领棒次序**，**不是瀑布**。
+
+把它放进三个尺度看得更清——**顶层敏捷 · 片内有序 · 任务内迭代**，同一种工程良知在三层反复出现，三层都反对『大设计先行、攒到最后才见反馈』的重型瀑布：①**顶层：敏捷迭代**（目标纵切薄增量 / walking skeleton / 按 cadence 交付·见 slicing-goals-into-dags）；②**片内：纪律化顺序**（每薄片端到端走 SDD→DDD→OOP→TDD 四棒·给典型领棒次序 + 合约先行，但**不锁相位、不禁回头**，故**不是瀑布**——『局部瀑布』直觉指的正是这份 order-ness，它与重型瀑布差在三轴：范围=一薄片非整个项目 / 反馈在每片边界就回来非攒到最末 / 与下一层任务内迭代共存）；③**任务内：迭代优化**（片里每个 dev 任务按 propose→measure→adjust 逼近验收·见 dev-as-ml-loop）。F 的迭代循环在每一棒**内部**跑，与接力的阶段次序不同尺度、不打架。
 
 ---
 
