@@ -47,7 +47,7 @@
 | `deps` | string[] | `task add --deps` / `task update --add-dep / --rm-dep` | 上游 dep 列表，驱动 readySet 计算 |
 | `parent` | string?（可缺） | `task add --parent` / `task update --parent` | 归属 owner 节点的容器边（嵌套深度=1） |
 
-**为什么 id/status/deps/parent 是 🔒？** 这四个字段被 hook、图算法、readySet、lint 机器读取。手改绕过写关卡，会造成悬挂引用、环、lint 拦不住的非法态转移——后果是 board 说谎，所有下游消费者（viewer / resume / hook）沿着错误输入跑。
+**为什么 id/status/deps/parent 是 🔒？** 这四个字段被 hook、图算法、readySet、lint 机器读取。手改绕过写关卡，会造成悬挂引用、环、lint 拦不住的非法态转移——后果是 board 说谎，所有下游消费者（viewer / resume / hook）沿着错误输入跑。**这正是为什么 board 变更根本不给手改的路**：直接 file-edit board（`Write`/`Edit`/`sed`/`echo`）会被 board-guard PreToolUse hook 当场 deny（ADR-025），从机制层逼你走 `ccm` 专属命令。
 
 > 如果 `--set tasks[T1].status=done` 写进去了却 exit 0、任务状态没变——说明你写了 board 顶层的 junk 字段。status 永远走 verb（锚 2·SKILL.md）。
 
@@ -109,7 +109,7 @@
   - `state.planned`（还剩多少活·喂价值/紧迫推理）：`remaining_work`（string·人类可读）/ `cost_to_complete_pct`（number·偿付力）。
 
   数字字段喂机械 floor、人类可读字段喂 agentic 价值推理；**缺即降级**（`ccm peers` 把该 peer 的对应维度退 null·配速退单板·fail-safe）。形状坏→`FMT-COORD` warn（永不 hard·advisory ✎）。读侧详见 command-catalog 的 peers namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-COORD`。**token-blind**：本块只含 goal/priority/workload/%——绝无任何 secret。
-- `runtime`——**hook-owned 运行时参数区**（ADR-020·✎ 非窄腰），装「周期 hook/script 跑起来后维护的瞬态簿记」。白名单键（均 ISO-8601 UTC）：`last_identity_remind`（IDNUDGE 周期身份提示 hook 读它判阈值）、`last_critpath_remind`（critpath-nudge 周期临界路径提示 hook 读它判阈值·hooks-enhancements-v2 ②）——周期 hook 注入后经 `ccm board set-param` 写回（带锁·进程边界）。**写法收窄**：唯一写口是 `ccm board set-param <白名单 key> <value>`（least-privilege·非白名单 key / 非法值 → `exit 2`）——agent 写 board 时**若用整文件 Write 须先 re-read 合并以保留它**（hook 独占的字段，field-local Edit/ccm 写天然保留·见 SKILL A board-写纪律）。缺/坏 → graceful-degrade（退化为「从未提示」·首次必提示）；形状坏→`FMT-RUNTIME` warn（永不 hard）。**token-blind**：参数区只有时间戳等簿记·绝无 secret。
+- `runtime`——**hook-owned 运行时参数区**（ADR-020·✎ 非窄腰），装「周期 hook/script 跑起来后维护的瞬态簿记」。白名单键（均 ISO-8601 UTC）：`last_identity_remind`（IDNUDGE 周期身份提示 hook 读它判阈值）、`last_critpath_remind`（critpath-nudge 周期临界路径提示 hook 读它判阈值·hooks-enhancements-v2 ②）、`last_account_switch`（`ccm account switch` 换号后写换号时刻·ADR-024·usage-pacing hook 读它做「检测到换号」ambient）——周期 hook / 换号写侧注入后经 `ccm board set-param` 写回（带锁·进程边界）。**写法收窄**：唯一写口是 `ccm board set-param <白名单 key> <value>`（least-privilege·非白名单 key / 非法值 → `exit 2`）——agent 走 `ccm` 命令改 board 天然保留它（`ccm` 字段级合并、不整盘覆写；agent 自己**永不写 `runtime.*`**·见 SKILL A board-写纪律）。缺/坏 → graceful-degrade（退化为「从未提示」·首次必提示）；形状坏→`FMT-RUNTIME` warn（永不 hard）。**token-blind**：参数区只有时间戳等簿记·绝无 secret。
 
 > **不要把 observed 字段写进硬 waist。** 这三档的边界由 `ccm` 引擎 `@ccm/engine` 的 board-model 权威定义（`FIELDS` 元数据标注每字段的 tier）；改边界需走 PR + hook + 测试同步（红线 2）。
 
@@ -123,7 +123,7 @@
 |---|---|---|---|
 | `ready` | deps 全 done，可以派发 | **在 readySet 里** | `task start` → in_flight |
 | `in_flight` | 已派发、正在跑 | 不在 readySet | 等完成 → `task done` / 失败处置 |
-| `blocked` | 在等某个阻塞源（user 或另一 task） | 不在 readySet | 阻塞解除 → `task set-status <id> ready` 或直接 `task block --on` 解锁 |
+| `blocked` | **两种来源**（见下）：① deps 门控（deps 未全 done·**系统自动**·无 `blocked_on`）② 语义阻塞（在等 user 或另一 task·**手动**·有 `blocked_on`） | 不在 readySet | ① deps 门控：**别手动改**——deps 全 done 时任意 ccm 写命令自动归回 ready（ADR-023）；② 语义阻塞：`task unblock <id>`（清 `blocked_on`·交回 deps 门控） |
 | `done` | 完成 | 解锁其他节点的 deps | 无须再动，除非上游产物变 → `stale` |
 | `escalated` | sub-agent 返回 escalation（超出能力范围） | 不在 readySet | 复盘后 supersede 节点，建新 task → escalated task 设 ready |
 | `failed` | 节点失败 | 不在 readySet | 重试 → `ready`，或升级处置 → `escalated` |
@@ -159,6 +159,15 @@ stale      → ready
 | 上游 artifact 变了 | `stale` | `task set-status <id> stale` |
 
 **`--force` 越闸是逃生口，不是捷径：** 正常流程用 verb，`--force` 留给真异常态（如复活 `stale` 节点做特殊处置）。用 `--force` 跳 `in_flight` 直接 `done` 会造成无 `started_at` 的 done 节点——伪造审计轨迹，影响 timeline 与 p95 估算。
+
+### ready ↔ blocked 由系统按 deps 自动门控（ADR-023）
+
+**每次 ccm 写命令落盘前，引擎自动跑一趟 `reconcileGating` 归一化**——把每个「**无 `blocked_on`**（非语义阻塞）且 status ∈ {ready, blocked}」的 task 按 deps 完成度重定：**deps 全 done → `ready`，否则 → `blocked`**。这意味着：
+
+- **你几乎不用手动在 ready/blocked 之间搬**——`task done` 掉某上游后，它下游那些「deps 现已全 done」的节点会在同一次（或下一次任意）写命令里自动翻成 `ready`；反之 `task add T --deps <未完成>` 建出的节点会被自动落成 `blocked`（哪怕 addTask 默认 status=ready）。
+- **手动 `task set-status <id> ready` 会被 deps 否决**——若该 task deps 未全 done 且无 `blocked_on`，下一趟归一化会把它打回 `blocked`。想让一个 deps 未满足的节点强行可派发，是设计味道问题（该先切依赖），不是状态问题。
+- **`blocked_on` 是「语义阻塞」判别器**：有 `blocked_on`（等 `user` / 等某 task）的节点**整体豁免**自动门控——即便 deps 全 done 也不会被翻成 ready（它在等的是人 / 另一件事，不是拓扑就绪）。解除语义阻塞用 **`task unblock <id>`**（清 `blocked_on`，交回 deps 门控按完成度定 ready/blocked），不要用 `set-status`。
+- **手改 board 造出的不一致态**（ready 但 deps 未全 done / blocked 无 blocked_on 但 deps 全 done）由 `BIZ-STATUS-DEPS` warn 兜（见 [N 节](#n-校验规则全集速查fmt--graph--biz)）——CLI 写路径经归一化**永不产生**这类态，看到它多半是手编辑的板。
 
 ### uncertain vs blocked_on 辨析
 
@@ -338,13 +347,15 @@ blocked_on = "user"     # 阻塞在用户决策 / 操作
 blocked_on = "<taskid>" # 阻塞在另一个 task（非 deps 关系的动态阻塞）
 ```
 
+**`blocked_on` 是「语义阻塞」判别器（ADR-023）：** 有 `blocked_on` 的 blocked 节点是在等**人 / 另一件事**（语义阻塞），与「deps 拓扑就绪」正交——它**豁免** deps 驱动的自动门控（`reconcileGating`），即便 deps 全 done 也不会被自动翻成 ready。无 `blocked_on` 的 blocked 节点则是纯 **deps 门控**（系统据 deps 完成度自动定 ready/blocked，见 [B 节](#ready--blocked-由系统按-deps-自动门控adr-023)）。**解除语义阻塞用 `task unblock <id>`**（清 `blocked_on`，交回 deps 门控），别手 `set-status`。
+
 **选择表：**
 
 | 情况 | 选 blocked_on | 备注 |
 |---|---|---|
-| 需要用户拍板 / 提供输入 / 审批 | `"user"` | 必须带 `decision_package`（否则 BIZ-AWAITING hard error） |
-| 等某个先决任务，但它不是 deps 里的静态依赖 | `"<taskid>"` | 动态阻塞；taskid 必须存在（否则 FMT-BLOCKED-ON warn） |
-| deps 里的 task 还没 done | 不用 block | deps 机制本身就是阻塞——让 readySet 处理，无需额外 block |
+| 需要用户拍板 / 提供输入 / 审批 | `"user"` | 必须带 `decision_package`（否则 BIZ-AWAITING hard error）；解除用 `task unblock` |
+| 等某个先决任务，但它不是 deps 里的静态依赖 | `"<taskid>"` | 动态阻塞；taskid 必须存在（否则 FMT-BLOCKED-ON warn）；解除用 `task unblock` |
+| deps 里的 task 还没 done | 不用 block | deps 门控本身就是阻塞——**系统自动**把它落成 `blocked`（无 `blocked_on`），deps 全 done 时自动归回 `ready`（ADR-023），无需手动 block/set-status |
 
 **awaiting-user 节点的 decision_package 必须提前备好：**
 
@@ -752,7 +763,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 
 | level | 后果 | 行动 |
 |---|---|---|
-| **hard** | **写不进去（exit 3）**——ccm 写命令在落盘前拒绝；`Write` 降级路径由 PostToolUse lint hook 报、`run-tests.sh` / CLI 端点闸真红 | **必须先满足才能写盘** |
+| **hard** | **写不进去（exit 3）**——ccm 写命令在落盘前拒绝；万一 `Bash` 手改漏过 board-guard 溜进来则 PostToolUse lint hook 事后报、`run-tests.sh` / CLI 端点闸真红 | **必须先满足才能写盘** |
 | **warn** | **能写进去，但有问题**——lint 报告里出现，多数是 graceful degrade（对应功能静默关闭）或可疑数据 | 当回合修掉，别带病往下跑 |
 | **reserved** | 登记在册、lint 暂不强制 | 操作上推荐满足，但不会被拦 |
 
@@ -790,7 +801,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `FMT-BASELINE` | warn | `baseline` 非对象，或 `captured_at`/`t0`/`history[].reset_at` 非严格 ISO-8601 UTC、`task_estimates`/`dag_snapshot` 非对象、`bac_h` 非数字、`history` 非数组 | 用 `ccm baseline snapshot/reset` 维护、别手拼；时间严格 UTC（estimate evm 读它，格式不对则 EVM 时间轴错位） |
 | `FMT-POLICY` | warn | `policy` 非对象，或 `autonomous_account_switch` 不在 `{allow, deny}` 枚举内 | 用 `ccm policy set --autonomous-account-switch=allow\|deny`（缺省解析为 allow）；值仅这两个——非法值会让 switch-account.sh 机制硬闸的开关判定失效（退化为 allow） |
 | `FMT-COORD` | warn | `coordination` 非对象，或 `priority` 不在 `{urgent,high,normal,low,trivial}` 枚举，或 `state`/`state.current`/`state.planned` 非对象、数字字段（`active_tasks`/`burn_contribution`/`cost_to_complete_pct`）非数字、人类可读字段（`workload`/`remaining_work`）非字符串 | 全 optional·缺即降级（`ccm peers` 把该维度退 null）；priority 仅五挡——非法值退化为 normal。永不 hard（advisory ✎·fail-safe）——见 [A 节](#a-task-字段速查) coordination 块 |
-| `FMT-RUNTIME` | warn | `runtime` 非对象，或已知键（`last_identity_remind` / `last_critpath_remind` 等）类型不合法（时间锚须严格 ISO-8601 UTC） | hook-owned ✎ 参数区（ADR-020）：用 `ccm board set-param <白名单 key> <ISO>` 写（白名单 + 值校验在 verb 层）；缺/坏一律 graceful-degrade（周期 hook 退化为「从未提示」·首次必提示）。未知键 silent-on-unknown。永不 hard |
+| `FMT-RUNTIME` | warn | `runtime` 非对象，或已知键（`last_identity_remind` / `last_critpath_remind` / `last_account_switch` 等）类型不合法（时间锚须严格 ISO-8601 UTC） | hook-owned ✎ 参数区（ADR-020）：用 `ccm board set-param <白名单 key> <ISO>` 写（白名单 + 值校验在 verb 层）；缺/坏一律 graceful-degrade（周期 hook 退化为「从未提示」·首次必提示）。未知键 silent-on-unknown。永不 hard |
 | `FMT-ESTIMATE` | warn | `estimate` 不是 `{value:number, unit:string}` 对象 | `--estimate 3h`（ccm 自动解析成对象），别手拼——见 [E 节](#e-estimate-怎么估) |
 | `FMT-ACCEPTANCE` | warn | `acceptance` 既非字符串也非对象，或对象 `criteria` 空、`criterion.status` 不在 {pending,met,failed} | `--accept "一句话"` 或 `--set-json acceptance={criteria:[...]}`——见 [D 节](#d-acceptance-怎么写好) |
 | `FMT-TIME` | warn | 时间锚（`created_at`/`started_at`/`finished_at`/`owner.heartbeat`）存在却非严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`） | 用 ccm verb 自动盖戳（盖标准格式）；手填时严格 UTC 定宽、无时区偏移、无毫秒 |
@@ -814,6 +825,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 |---|---|---|---|
 | `BIZ-AWAITING` | hard | awaiting-user 节点（`blocked_on:"user"` + status ∈ {blocked, in_flight}）缺 `decision_package` 对象 | `task block --on user --decision @file`，必须带采访包——见 [G 节](#g-blocked_on-怎么选) |
 | `BIZ-CADENCE-SHIPPED` | hard | iteration 标 `shipped` 但 members 未全部 done+verified（含不存在的 member） | 先把成员推到 done+verified 再 `ccm cadence ship`，或移出 members——见 [I 节](#i-cadence-与-iteration节奏怎么定) |
+| `BIZ-STATUS-DEPS` | warn | deps 门控不一致：`ready` 但 deps 未全 done / `blocked` 无 `blocked_on` 但 deps 全 done | **CLI 写路径经 `reconcileGating` 永不产生此态**——看到它多半是手改 board；跑任意 ccm 写命令触发归一，或 `task unblock`/`set-status` 手动对齐——见 [B 节](#ready--blocked-由系统按-deps-自动门控adr-023) |
 | `BIZ-DECISION-PACKAGE` | warn | `decision_package` 在但字段不全：`context_md`/`what_i_need`/`enter_cmd` 空、`ask_type` 不在枚举、decision 型 `options` 空、`inputs_hash` 非 `sha256:<64hex>` | 备齐采访包字段；decision 型必须有非空 options——见 [G 节](#g-blocked_on-怎么选) |
 | `BIZ-DEV-REFS` | warn | `type=development` 的 task 缺 `kind=spec`≥1 或 `kind=plan`≥1 引用 | development task 加 `--ref spec:/abs/spec.md --ref plan:/abs/plan.md`——见 [L 节](#l-referencesartifactverified-语义) |
 | `BIZ-ACCEPTANCE-REQUIRED` | warn | type ∈ {development, development-demo, acceptance, e2e-integration} 但 `acceptance` 为空 | 这些 type 必须带 `--accept`——见 [D 节](#d-acceptance-怎么写好) |

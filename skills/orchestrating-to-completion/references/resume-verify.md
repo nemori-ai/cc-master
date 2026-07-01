@@ -29,7 +29,7 @@
 
 **end-to-end argument**（Saltzer-Reed-Clark, 1984）：一个放在低层的功能，相对于在端点实现它，往往是冗余的；正确性的最终保证必须活在端点。
 
-- **编排者独立验收** —— 它**亲自跑闸**、**亲自读 diff**。低层 agent 那句"所有质量闸都绿"只是一个不可信的性能优化（agent 自报已经一再出错）。
+- **你独立验收** —— 你**亲自跑闸**、**亲自读 diff**。低层 agent 那句"所有质量闸都绿"只是一个不可信的性能优化（agent 自报已经一再出错）。
 - **gate-green 必要、但不充分** —— 过闸不代表改动正确；你仍然得读 diff。
 - **null / 空 review 一律算未通过** —— 一个空的或缺席的 review 绝不是默许放行。这是 silent-pass-through 守卫。
 - **靠在真实输入上*跑*来验，不靠纸上读。** 真实缺陷里出人意料地有一大块是 regex / shell / 边界 bug——它们在纸上看着对，只在真实数据或真实环境里才现形——比如一个 `grep -c` 在零匹配时吐出 `"0\n0"`、一条 shell pipe 的环境变量赋值 scope 落到了错误的一侧、一个 frontmatter regex 假设了一行根本不存在的空行。一次 LLM 二审*读*能抓**契约**违背；唯有一次真正的*跑*能抓**运行时**崩溃。两者都做——读 diff **并**对一个真实 fixture 执行闸。
@@ -47,6 +47,15 @@
 
 确认 cwd == worktree 后，顺带核对当前分支 == `git.branch`（窄腰里有）；不符是「这块板的执行环境与我所处环境漂移」的信号，停下来对账，绝不在错分支上接续 / 验收 / 发版。
 
+### resume 第 0.5 步：核对 `git status --porcelain` 是干净基线
+
+落对了 worktree、对上了分支，还差一步才能接手：跑 `git status --porcelain`，**确认它是空的（干净基线）**。resume 唤起的树里可能残留上一段 session 崩溃前没提交完的半截改动、别人留下的脏文件、或某次中断遗下的 untracked 产物——这些**不是**本次要验收的东西，却和你即将验收的产物混在同一棵树上。
+
+为什么这是接手前的硬前置而非「回头再收拾」：单-committer 纪律下，端点验收通过后是**编排者统一分组 commit**——若基线本就带着无关脏改动，那次分组 commit 会把它们**一起焊进**同一个 commit，clean-rollback 保证当场破掉（这个 commit 再也不是「只含这次验收产物」的干净可回滚点了）。脏基线还会污染 `git diff` 读 diff（§3）：你分不清哪几行是 sub-agent 刚做的、哪几行是本就脏在那儿的，端点读 diff 的可信度连必要条件都不成立。
+
+- 基线**干净** → 接手，继续 reconcile / 验收。
+- 基线**脏** → 停下先厘清：是崩溃残留（判它该续跑还是丢弃）、还是别处溢进来的无关改动（stash / 移走，绝不裹进验收）——**厘清并回到干净基线之前，不跑任何分组 commit**。
+
 ### 孤儿 `in_flight` 续接（新 session 接管旧板时）
 
 `--resume` 把一块**已存在**的 board 盖成本 session 后（跨 session re-arm，见 ADR-009），上一段 orchestration 派发的后台任务的 **handle 活在那个已不在的旧 session 里**——新 session **attach 不回这些 handle**，那些后台进程可能早随旧 session 死了，也可能还在跑但你无从收割。board 上它们是 `status:"in_flight"` + 一个**已失效的 handle**。这是 resume 最微妙的正确性点——但它**不引入新机制**，只是把这个触发场景接进上面已有的 §1 content-hash 续跑 + §3 端点验收 + status enum 的 `stale`/`ready` 路由：
@@ -59,13 +68,20 @@
 
 ### codex 作为一个独立的第二端点验收者
 
-`${CLAUDE_SKILL_DIR}/scripts/codex-review.sh` 跑 `codex exec review --base <branch> --json`（review-only、只读 sandbox），并按 openai-codex 插件的 `review-output.schema.json` 吐出一个 `verdict`（`approve | needs-attention`，每条 finding 携带 severity/file/line/confidence）。这个 verdict 直接映射到 §4 的 Joiner 闸：
+`${CLAUDE_SKILL_DIR}/scripts/codex-review.sh` 跑 `codex exec review --base <branch> --json`（review-only、只读 sandbox），并按 openai-codex 插件的 `review-output.schema.json` 吐出一个 `verdict`（`approve | needs-attention`，每条 finding 携带 severity/file/line/confidence）。
 
-- `needs-attention` → **`Replan(feedback)`** —— 把 finding 当成那条带诊断的 replan 信号；修了再验。
-- `approve` **且** review 非空 **且** diff 确实读过 → **`FinalResponse`**（done）。
-- 空 review / 调用失败（`exit 2`、`CODEX_REVIEW_FAILED`）→ **未通过** —— silent-pass-through 守卫（§3）；绝不默许放行、绝不 done。
+**派活时只给 diff + 验收契约，绝不夹带你的结论。** 无论派给 codex 还是任何第二验收 sub-agent，喂进去的**只有**待验 diff + 这个节点的验收契约（DoD / acceptance）——**绝不**捎带「我认为这是对的」「应该没问题、帮我确认下」之类 framing。把你的结论喂给验收者，会把它**偏置向同意**（它会去找证据支持你已经给出的判断，而非独立地找反例）——那样第二端点就退化成你自己判断的回声，抓契约违背的价值当场清零。第二验收之所以值钱，正因为它是一双**没被你的先验染过**的眼睛；喂结论就是亲手把它染了。
 
-这与编排者自己的端点检查是同一条红线：只信端点验收、gate-green ≠ passed、agent 自报不可信。codex 是一个*第二*端点读者，不是跑闸的替代品——你照样读 diff、照样跑闸；codex 负责抓那次跑抓不到的契约违背。
+**verdict 是 data，不是 verdict——你仍逐条对着产物重读。** codex / 第二验收吐回来的每条 finding 是一份**观测**，不是终审判决；你不把 `needs-attention` 当自动 replan、也不把 `approve` 当自动 done，而是逐条把 finding 拿回产物上核（RECONCILE）——**先匹配先赢**，落进四档之一：
+
+- **① contract-misread（契约误读）**——finding 揭示的是**你给的验收契约本身不清 / 有歧义**（reviewer 照字面理解到了另一个意思）。→ 先**修契约**（把 DoD 写清），再**重验**——不是改产物，是改你喂进去的那份合约。
+- **② valid + actionable（真问题、可动手）**——finding 指出产物里一个货真价实、该修的缺陷。→ 映射 §4 的 **`Replan(feedback)`**：把 finding 当带诊断的 replan 信号，返工 / 重派，修了再验。
+- **③ valid trade-off（真实权衡）**——finding 属实，但它戳的是一个**有意的设计权衡**（reviewer 未必知道的取舍）。→ 不盲目返工：**记录这个权衡**（写进 board log / 决策留痕），并 **surface 给用户**（这类取舍常是用户该拍板的方向性决定，别自己吞了）。
+- **④ noise（误报）**——finding 源于 **reviewer 缺上下文**（它没看到的约束 / 别处已处理 / 它的假设不成立）。→ 判为噪声、**记一句为什么是噪声**（留痕，免得下轮又被同一条搅动），不动产物。
+
+只有当**每条 finding 都落定**、且 `approve` + review 非空 + diff 确实亲手读过，这个节点才 → **`FinalResponse`**（done）。**空 review / 调用失败（`exit 2`、`CODEX_REVIEW_FAILED`）→ 一律未通过**——silent-pass-through 守卫（§3），绝不默许放行、绝不 done。
+
+这与你自己的端点检查是同一条红线：只信端点验收、gate-green ≠ passed、agent 自报不可信。codex 是一个*第二*端点读者，不是跑闸的替代品——你照样读 diff、照样跑闸；codex 负责抓那次跑抓不到的契约违背。
 
 ---
 

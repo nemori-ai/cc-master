@@ -5,7 +5,7 @@
 
 ## 1. One-liner
 
-在跑 long-horizon 目标、要把一场长跑对照 5h/7d 配额窗口配速、或要估算工期/风险/选模型档时调用——给 agent **消费 ccm 只读 advisory（usage/estimate/baseline）的机制知识**：怎么读双侧走廊 verdict、四档模型相对成本、配额信号源链、估算诚实字段；覆写「estimate 整轴 out-of-mind 从不被召回」的默认失败。**ccm 出 verdict、A 决策**——本 skill 只教消费层，决策回 orchestrating-to-completion。
+在跑 long-horizon 目标、要把一场长跑对照 5h/7d 配额窗口配速、或要估算工期/风险/选模型档时调用——给 agent **消费 ccm 只读 advisory（usage/estimate/baseline）的机制知识**：怎么读单侧走廊 verdict（ADR-024·hold/throttle/switch/stop_5h/stop_7d）、四档模型相对成本、配额信号源链、估算诚实字段；覆写「estimate 整轴 out-of-mind 从不被召回」的默认失败。**ccm 出 verdict、A 决策**——本 skill 只教消费层，决策回 orchestrating-to-completion。
 
 ## 2. Craft 自分类
 
@@ -22,7 +22,7 @@
 
 ### 3.2 Agent 视角 —— 对调用这个 skill 的 AI 而言
 
-在 pacing / 估算决策瞬间提供两样东西：① **A.1 新领域知识**——`ccm usage advise` / `ccm estimate forecast` 等全自研命令的输出 schema 与 verdict 语义（throttle/accelerate/hold/hard_stop、p50/p80/p95、CPI/SPI、风险指数）、四档模型相对 multiplier、5h/7d 信号源链、估算诚实字段——这些 agent 先验不携带、推不出来、必须教；② **B.2 触发召回**——顶层 description 让 agent 在「该 forecast 工期 / 查 EVM 偏差 / 读 risk flag」时被 router 主动召回，克服「estimate 整轴 out-of-mind」。不用它会怎样退化：estimate 整轴零消费（forecast/EVM/risk 工具空转）、pacing 凭感觉不读 verdict、模型档位乱选。
+在 pacing / 估算决策瞬间提供两样东西：① **A.1 新领域知识**——`ccm usage advise` / `ccm estimate forecast` 等全自研命令的输出 schema 与 verdict 语义（ADR-024 单侧 enum：hold/throttle/switch/stop_5h/stop_7d、p50/p80/p95、CPI/SPI、风险指数）、四档模型相对 multiplier、5h/7d 信号源链、估算诚实字段——这些 agent 先验不携带、推不出来、必须教；② **B.2 触发召回**——顶层 description 让 agent 在「该 forecast 工期 / 查 EVM 偏差 / 读 risk flag」时被 router 主动召回，克服「estimate 整轴 out-of-mind」。不用它会怎样退化：estimate 整轴零消费（forecast/EVM/risk 工具空转）、pacing 凭感觉不读 verdict、模型档位乱选。
 
 ### 3.3 Human 视角 —— 对最终落地的用户 / 维护者而言
 

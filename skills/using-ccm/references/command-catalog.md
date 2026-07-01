@@ -30,6 +30,7 @@
   - [task start](#task-start)
   - [task done](#task-done)
   - [task block](#task-block)
+  - [task unblock](#task-unblock)
   - [task set-status](#task-set-status)
   - [task rm](#task-rm)
 - [namespace log](#namespace-log)
@@ -103,13 +104,13 @@ ccm <alias> [args] [flags]
 | `log` | append-only 审计轨迹 |
 | `jc` | judgment_calls 自决诚实台账 |
 | `cadence` | 节奏 / iteration 收口 |
-| `watchdog` | 自我唤醒 watchdog（ADR-011） |
-| `baseline` | EVM 计划基线快照（estimate 引擎的 plan SSOT·board 内唯一写 noun·ADR-015） |
-| `policy` | board 级 orchestrator 自主权限开关（首条 `autonomous_account_switch`·写 noun·用户所有·ADR-016） |
+| `watchdog` | 自我唤醒 watchdog |
+| `baseline` | EVM 计划基线快照（estimate 引擎的 plan SSOT·board 内唯一写 noun） |
+| `policy` | board 级 orchestrator 自主权限开关（首条 `autonomous_account_switch`·写 noun·用户所有） |
 | `peers` | 多 orchestrator 协调**感知层**：跨板只读花名册（全体活+心跳新鲜 orchestrator 的 goal/workload/priority/liveness·COORD） |
-| `usage` | 配额侧**只读 advisory**：当前号/备号 5h/7d 用量 + 双侧走廊 pacing verdict + 任务 token 成本（ADR-015） |
-| `estimate` | 工作侧**只读 advisory**：双通道 MC 工期预测 / EVM / velocity / 风险（消费 OR/ML 引擎·ADR-015） |
-| `account` | 换号号池机制：备号 OAuth token 录入 / 选号 / 无重启切号（vault token-blind·**switch 读 board.policy·`deny`→exit 7**·ADR-016） |
+| `usage` | 配额侧**只读 advisory**：当前号/备号 5h/7d 用量 + 单侧走廊 pacing verdict（hold/throttle/switch/stop_5h/stop_7d）+ 任务 token 成本 |
+| `estimate` | 工作侧**只读 advisory**：双通道 MC 工期预测 / EVM / velocity / 风险（消费 OR/ML 引擎） |
+| `account` | 换号号池机制：备号 OAuth token 录入 / 选号 / 无重启切号（vault token-blind·**switch 读 board.policy·`deny`→exit 7**） |
 | `statusline` | self-contained status line：渲染单行状态行（ctx/5h/7d）+ 装/卸 `settings.json`（非 board 操作） |
 | `upgrade` | 自升级：把 **ccm 二进制 + cc-master 插件**升到各自发布线最新（非 board 操作·见 [namespace upgrade](#namespace-upgrade)） |
 
@@ -133,7 +134,7 @@ ccm <alias> [args] [flags]
 | `--board <path>` | | string | 指定 board 文件（最高优先） |
 | `--session-id <id>` | | string | 指定 session（特权调用者注入；默认读 `$CLAUDE_CODE_SESSION_ID`） |
 | `--home <dir>` | | string | 指定 cc-master home（默认 `$CC_MASTER_HOME` → `CLAUDE_PROJECT_DIR` → 向上 walk） |
-| `--goal <substr>` | | string | 多 active 板时按 goal 子串消歧（**例外**：`board update` / `board init` / `cadence open` 把 `--goal` 当 payload〔设 goal〕、**不**当发现过滤器——这三个 verb 的发现忽略 `--goal`，无歧义即命中唯一/未认领板·Finding #77） |
+| `--goal <substr>` | | string | 多 active 板时按 goal 子串消歧（**例外**：`board update` / `board init` / `cadence open` 把 `--goal` 当 payload〔设 goal〕、**不**当发现过滤器——这三个 verb 的发现忽略 `--goal`，无歧义即命中唯一/未认领板） |
 | `--json` | | bool | 机器可读 JSON 输出（非 TTY 时默认开） |
 | `--dry-run` | `-n` | bool | 预览：跑完整校验但不落盘 |
 | `--force` | `-f` | bool | 越过 hard error / 非法状态转移闸（记 log） |
@@ -299,7 +300,7 @@ ccm board update [flags]
 
 - 例：`ccm board update --goal "v0.10.0 收尾"` · `ccm board update --wip-limit 4 --branch board-v2-redesign` · `ccm board update --priority high`
 - `--priority` 写 ✎ `coordination.priority`（板级优先级·`ccm peers` 跨板花名册的裁决主轴 + 机械 fair-share 权重源；缺/坏 → 解析为 `normal`）。枚举校验在 update 端（坏值 exit 2·不静默写非法值）；它是 agent-shaped ✎ 字段（hook 不读·非窄腰·红线 2 不破）。init 时用户给的板级优先级经此落盘（命令体 bootstrap 段指导 orchestrator 捕获并记入）。
-- 发现：`--goal` 在此是 payload（重定 goal），**不**当发现过滤器——所有 flag 走同一条两层匹配（精确 sid → 未认领 `session_id:""` 兜底），与 `task add` 等一致；隐式发现（无 `--board`）在 `ccm board init` 建的未认领板上对 `--goal` 与 `--wip-limit` **行为一致**（Finding #77 修复前 `--goal` 会假报 NotFound）。多 active 板时用 `--board <path>` 消歧。
+- 发现：`--goal` 在此是 payload（重定 goal），**不**当发现过滤器——所有 flag 走同一条两层匹配（精确 sid → 未认领 `session_id:""` 兜底），与 `task add` 等一致；隐式发现（无 `--board`）在 `ccm board init` 建的未认领板上对 `--goal` 与 `--wip-limit` **行为一致**。多 active 板时用 `--board <path>` 消歧。
 
 ### board archive
 
@@ -310,7 +311,7 @@ ccm board archive [flags]
 ```
 
 - positional：无
-- 行为：经引擎**带锁**把 `owner.active` 翻 `false`（停用即休眠·全套 hook 对它休眠）；**非破坏**——`tasks`/`log`/`goal`/`git` 全留（审计留痕·文件不删）。给 `/cc-master:stop`、`/cc-master:handoff-to-new-session` 一条**走单写者带锁管线**的归档路径，替代手编辑 board JSON 翻 active（手编辑与 Stop hook 带锁写并发会 torn-write·ADR-020）。幂等：已 `false` 再 archive 仍 `false`（无副作用）。日后可经 `ccm`/`as-master-orchestrator --resume` 复活（ADR-009）。孤儿 / rollup 检查归调用方（命令体在归档前做）。
+- 行为：经引擎**带锁**把 `owner.active` 翻 `false`（停用即休眠·全套 hook 对它休眠）；**非破坏**——`tasks`/`log`/`goal`/`git` 全留（审计留痕·文件不删）。给 `/cc-master:stop`、`/cc-master:handoff-to-new-session` 一条**走单写者带锁管线**的归档路径，替代手编辑 board JSON 翻 active（手编辑与 Stop hook 带锁写并发会 torn-write）。幂等：已 `false` 再 archive 仍 `false`（无副作用）。日后可经 `ccm`/`as-master-orchestrator --resume` 复活。孤儿 / rollup 检查归调用方（命令体在归档前做）。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
@@ -322,18 +323,18 @@ ccm board archive [flags]
 
 ### board set-param
 
-**写**（hook-owned 参数区·ADR-020·least-privilege·带锁）
+**写**（hook-owned 参数区·least-privilege·带锁）
 
 ```
 ccm board set-param <key> <value> [flags]
 ```
 
-- positional：`<key>`（必填·**白名单**：当前 `last_identity_remind`、`last_critpath_remind`）、`<value>`（必填·按 key 声明类型校验）
+- positional：`<key>`（必填·**白名单**：当前 `last_identity_remind`、`last_critpath_remind`、`last_account_switch`）、`<value>`（必填·按 key 声明类型校验）
 - 作用域**收窄到 `board.runtime.<白名单 key>`**——非白名单 key / 非法值 → `exit 2`（Usage）；**绝不触碰 🔒/👁 窄腰**。
-- 主要使用者是周期 hook（IDNUDGE 写 `runtime.last_identity_remind`、critpath-nudge 写 `runtime.last_critpath_remind`）经进程边界 spawn 写 ISO-8601 UTC 时间戳；agent 也可经它写参数区。走 `runWrite` 带锁管线（与所有写 verb 同口径·刷 `owner.heartbeat`）。
+- 主要使用者是周期 hook（IDNUDGE 写 `runtime.last_identity_remind`、critpath-nudge 写 `runtime.last_critpath_remind`）+ `ccm account switch` 换号后写 `runtime.last_account_switch`（换号时刻·ADR-024·usage-pacing hook 读它做「检测到换号」ambient）经进程边界 spawn 写 ISO-8601 UTC 时间戳；agent 也可经它写参数区。走 `runWrite` 带锁管线（与所有写 verb 同口径·刷 `owner.heartbeat`）。
 - flags：`--json`（结构化输出 `{ok,data:{runtime}}`）；`--dry-run` 跑完整校验不落盘。
-- 值类型：`last_identity_remind` / `last_critpath_remind` 均须严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`），否则 `exit 2`。
-- 例：`ccm board set-param last_identity_remind 2026-06-29T12:34:56Z` · `ccm board set-param last_critpath_remind 2026-06-30T08:00:00Z --board <path>`
+- 值类型：`last_identity_remind` / `last_critpath_remind` / `last_account_switch` 均须严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`），否则 `exit 2`。
+- 例：`ccm board set-param last_identity_remind 2026-06-29T12:34:56Z` · `ccm board set-param last_account_switch 2026-06-30T08:00:00Z --board <path>`
 
 ---
 
@@ -538,6 +539,29 @@ ccm task block <id> --on <str> [flags]
 | `--log <str>` | | string | | 同时追一条 log |
 
 - 例：`ccm task block T7 --on T2` · `ccm task block T9 --on user --decision @/abs/decision.json`
+
+### task unblock
+
+**写**
+
+```
+ccm task unblock <id> [flags]
+```
+
+- positional：
+
+| 名 | 必填 | 含义 |
+|---|---|---|
+| `<id>` | 是 | task id |
+
+- 行为：清除 `blocked_on`（+ 附属 `decision_package`）语义阻塞标记，**不直接定 status**——交回写入关卡的 `reconcileGating` 按 deps 完成度归一（deps 全 done→`ready`，否则→`blocked`）。这是 `task block` 的解除侧、也是「不该手 `set-status` 解 deps 阻塞」的正解（ADR-023）。
+- flags：
+
+| flag | 短名 | 类型 | 必填 | 含义 |
+|---|---|---|---|---|
+| `--log <str>` | | string | | 同时追一条 log |
+
+- 例：`ccm task unblock T7`
 
 ### task set-status
 
@@ -816,7 +840,7 @@ ccm cadence status [flags]
 
 ## namespace watchdog
 
-自我唤醒 watchdog（ADR-011）。
+自我唤醒 watchdog。
 
 ### watchdog arm
 
@@ -872,7 +896,7 @@ ccm watchdog status [flags]
 
 ## namespace baseline
 
-EVM 计划基线（plan baseline·ADR-015）：从当前 tasks 的 `estimate` + `deps` 快照成 `board.baseline`（`task_estimates` + `dag_snapshot` + `bac_h`），供 estimate 引擎算 EVM / SPI。**board 内唯一写 noun**——`usage` / `estimate` 两 namespace 纯只读，baseline 刻意置于只读之外（写关卡）。
+EVM 计划基线（plan baseline）：从当前 tasks 的 `estimate` + `deps` 快照成 `board.baseline`（`task_estimates` + `dag_snapshot` + `bac_h`），供 estimate 引擎算 EVM / SPI。**board 内唯一写 noun**——`usage` / `estimate` 两 namespace 纯只读，baseline 刻意置于只读之外（写关卡）。
 
 ### baseline snapshot
 
@@ -934,7 +958,7 @@ ccm baseline reset [flags]
 
 ## namespace policy
 
-board 级 orchestrator 自主权限（ADR-016）：`board.policy` 是框定本块板 master-orchestrator 自主权限的可扩展对象，首条键 `autonomous_account_switch`（`allow`/`deny`）门控**是否允许 orchestrator 自主换号**。**写 noun**——`set` 改 board 状态，刻意置于只读 namespace 之外（同 baseline 定位）。policy 写**视权限为用户所有**（self-grant 防护）：非 TTY 须显式 `--user-authorized` 才能写。缺省 / 缺字段一律解析为 `allow`（向后兼容旧板）。
+board 级 orchestrator 自主权限：`board.policy` 是框定本块板 master-orchestrator 自主权限的可扩展对象，首条键 `autonomous_account_switch`（`allow`/`deny`）门控**是否允许 orchestrator 自主换号**。**写 noun**——`set` 改 board 状态，刻意置于只读 namespace 之外（同 baseline 定位）。policy 写**视权限为用户所有**（self-grant 防护）：非 TTY 须显式 `--user-authorized` 才能写。缺省 / 缺字段一律解析为 `allow`（向后兼容旧板）。
 
 ### policy show
 
@@ -1002,9 +1026,9 @@ ccm peers [list] [flags]
 
 ## namespace usage（只读 advisory）
 
-配额侧只读 advisory（ADR-015·charter ②控制 token 消耗速度 + ⑤资源下最大化效率）：当前号/备号用量 + 双侧走廊 pacing verdict + 任务 token 成本。**纯只读**——全 verb query/compute，零写、不抢 board-lock、不落状态（与 `baseline`/`policy` 这俩写 noun 相反）。诚实降级：账户信号不可得 = **exit 0 + `data.available:false`**（非 exit 1）；无 `accounts.json` registry → 天然单账号·`effective_n=1`（不报错）。诚实字段贯穿：`source`（account / registry-snapshot / observability / local-derived-approx）/ `confidence`（high/medium/low）/ `as_of` / `snapshot_stale` / `coverage_pct`。ccm 出 verdict/数据，**不替 orchestrator 决策**（真动作归 SKILL A·红线3）。
+配额侧只读 advisory（charter ②控制 token 消耗速度 + ⑤资源下最大化效率）：当前号/备号用量 + 单侧走廊 pacing verdict（hold/throttle/switch/stop_5h/stop_7d）+ 任务 token 成本。**纯只读**——全 verb query/compute，零写、不抢 board-lock、不落状态（与 `baseline`/`policy` 这俩写 noun 相反）。诚实降级：账户信号不可得 = **exit 0 + `data.available:false`**（非 exit 1）；无 `accounts.json` registry → 天然单账号·`effective_n=1`（不报错）。诚实字段贯穿：`source`（account / registry-snapshot / observability / local-derived-approx）/ `confidence`（high/medium/low）/ `as_of` / `snapshot_stale` / `coverage_pct`。ccm 出 verdict/数据，**不替 orchestrator 决策**（真动作归 SKILL A·红线3）。
 
-> 备号数据 = **只读** `${CC_MASTER_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cc-master}/accounts.json` registry 的生命周期快照（每号取 `last_observed_quota`/`last_switch_out`/`switch_history[]` 里 `at` 最大那条）——usage **绝不写 registry、绝不碰 token**（registry 写/管归 ccm `account` 引擎·概念见 account-pool.md）。当前号 5h/7d 用量读 status-line sidecar（`${CC_MASTER_RATE_CACHE:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.cc-master-rate-limits.json}`·路径跟随 `CLAUDE_CONFIG_DIR`（默认 `~/.claude`）·ccm 自带的 `ccm statusline`（自动安装）写、cc-usage.sh / usage-pacing.js hook 同读·账户权威·Finding #37），缺则 `available:false` 降级。
+> 备号数据 = **只读** `${CC_MASTER_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cc-master}/accounts.json` registry 的生命周期快照（每号取 `last_observed_quota`/`last_switch_out`/`switch_history[]` 里 `at` 最大那条）——usage **绝不写 registry、绝不碰 token**（registry 写/管归 ccm `account` 引擎·概念见 account-pool.md）。当前号 5h/7d 用量读 status-line sidecar（`${CC_MASTER_RATE_CACHE:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.cc-master-rate-limits.json}`·路径跟随 `CLAUDE_CONFIG_DIR`（默认 `~/.claude`）·ccm 自带的 `ccm statusline`（自动安装）写、cc-usage.sh / usage-pacing.js hook 同读·账户权威），缺则 `available:false` 降级。
 
 ### usage show
 
@@ -1035,7 +1059,7 @@ ccm usage advise [flags]
 ```
 
 - positional：无
-- 行为：双侧走廊 pacing verdict（`throttle` 临界减速 \| `accelerate` 欠用/切号加速 \| `hold` 走廊内 \| `hard_stop` 7d 硬总闸）+ 推荐 lever 类 + `switch_candidate`（号池 verdict 含切号 lever 时·选可切备号里 7d `used%` 最低的）。收口 usage-pacing 双侧走廊数学（引擎 `pacingAdvice` SSOT·ADR-010）。sidecar 缺 → `hold` + `available:false`（降级）
+- 行为：**单侧走廊 pacing verdict（ADR-024·翻转后 5 值 enum）**：`hold`（走廊内·静默）\| `throttle`（5h 临界减速）\| `switch`（5h 临界 + n>1 + 7d 有余量 → 切到下一份配额）\| `stop_5h`（5h 本窗口烧穿·无可切备号 / 7d 亦吃紧 → 引导 arm watchdog 守到 `nearest_reset` 回血）\| `stop_7d`（7d 跨窗口不可逆硬总闸 → 暂停 dispatch + surface 用户）。**去掉了旧的 `accelerate`（欠用侧加速）与 `hard_stop`**。附 `strength`（ADR-018 标签强度 weak\|strong·ccm 出、消费方直接用）+ 推荐 lever 类 + `stop_dimension`（哪个窗口驱动了 stop_*）+ `nearest_reset`（stop_* 时该窗 reset 时刻·引导 arm wakeup）+ `switch_candidate`（`switch` verdict 时·选可切备号里 7d `used%` 最低的）+ `pool`（号池粗粒度 { backups, switchable }）。收口 usage-pacing 走廊数学（引擎 `pacingAdvice` SSOT·ADR-010/ADR-024）。sidecar 缺 → `hold` + `available:false`（降级）
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
@@ -1074,7 +1098,7 @@ ccm usage burn-rate [flags]
 ```
 
 - positional：无
-- 行为：当前号 5h + 7d 各算一个配额%-burn-rate（Δused%/Δtime·账户权威·`window-elapsed` = 已用% ÷ 窗口已逝小时·%/h）；读 status-line sidecar（账户权威·Finding #37），信号不可得 → `available:false`（exit 0·诚实降级·非 exit 1）。`burn_pct_per_hour` 不可算 → `null`
+- 行为：当前号 5h + 7d 各算一个配额%-burn-rate（Δused%/Δtime·账户权威·`window-elapsed` = 已用% ÷ 窗口已逝小时·%/h）；读 status-line sidecar（账户权威），信号不可得 → `available:false`（exit 0·诚实降级·非 exit 1）。`burn_pct_per_hour` 不可算 → `null`
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
@@ -1107,7 +1131,7 @@ ccm usage runway [flags]
 
 ## namespace estimate（只读 advisory）
 
-工作侧只读 advisory（ADR-015·charter ④分解/规划 + ⑥按时长选档）：消费 `@ccm/engine` 的 OR/ML 算法层（双通道 Monte Carlo / EWMA 校准 / conformal 区间 / EVM+Earned Schedule / SLE / CCPM）。**纯只读**——全 verb compute、零写、不抢 board-lock。**5% 硬墙**：所有预测 `p95` = 95% 分位，**绝不算到 100%**（引擎分位口径保证·真上限是 session hard-stop）。历史语料范围由 `--scope home|this-repo|this-board`（默认 `home`·跨板多层收缩）控制。诚实降级：冷启动 / 数据不足 → 退原估值 + `low`-confidence / `no-history`。seeded 确定性：`--seed` 固定 → MC 复现（默认 42）。ccm 出区间/数据，**不替 orchestrator 决策**（红线3）。
+工作侧只读 advisory（charter ④分解/规划 + ⑥按时长选档）：消费 `@ccm/engine` 的 OR/ML 算法层（双通道 Monte Carlo / EWMA 校准 / conformal 区间 / EVM+Earned Schedule / SLE / CCPM）。**纯只读**——全 verb compute、零写、不抢 board-lock。**5% 硬墙**：所有预测 `p95` = 95% 分位，**绝不算到 100%**（引擎分位口径保证·真上限是 session hard-stop）。历史语料范围由 `--scope home|this-repo|this-board`（默认 `home`·跨板多层收缩）控制。诚实降级：冷启动 / 数据不足 → 退原估值 + `low`-confidence / `no-history`。seeded 确定性：`--seed` 固定 → MC 复现（默认 42）。ccm 出区间/数据，**不替 orchestrator 决策**（红线3）。
 
 ### estimate show
 
@@ -1242,7 +1266,7 @@ ccm estimate cost-to-complete [flags]
 
 ## namespace account
 
-换号号池机制（ADR-016·换号 token-blind 录入 / 选号 / 无重启切号）。号池 = 用户级 registry `${CC_MASTER_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cc-master}/accounts.json`（email→vault 非密指针 + 时间元信息·**零 token**）+ token 本体（macOS keychain / 非 mac 0600 file vault）。**token 全程活在 ccm 引擎子进程·绝不进 agent / registry / log**（vault token-blind）。换号是**无重启凭证覆写**：`switch` 续期新号 → 覆写官方共享凭证三存储 → 运行中 claude 惰性 re-read 接管（进程不重启 / board 不动）。**概念叙事**（号池模型 / 录号 why / refreshToken 硬要求 / 选号方法论 / vault 安全）见 [references/account-pool.md](references/account-pool.md)；**算法 / vault 实现 SSOT** 在 ccm 引擎 `@ccm/engine/account`；**换号决策**（何时换 / 谁拍板 / 绝不自授权）归 `orchestrating-to-completion`（不在本 skill）。
+换号号池机制（换号 token-blind 录入 / 选号 / 无重启切号）。号池 = 用户级 registry `${CC_MASTER_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cc-master}/accounts.json`（email→vault 非密指针 + 时间元信息·**零 token**）+ token 本体（macOS keychain / 非 mac 0600 file vault）。**token 全程活在 ccm 引擎子进程·绝不进 agent / registry / log**（vault token-blind）。换号是**无重启凭证覆写**：`switch` 续期新号 → 覆写官方共享凭证三存储 → 运行中 claude 惰性 re-read 接管（进程不重启 / board 不动）。**概念叙事**（号池模型 / 录号 why / refreshToken 硬要求 / 选号方法论 / vault 安全）见 [references/account-pool.md](references/account-pool.md)；**算法 / vault 实现 SSOT** 在 ccm 引擎 `@ccm/engine/account`；**换号决策**（何时换 / 谁拍板 / 绝不自授权）归 `orchestrating-to-completion`（不在本 skill）。
 
 > **录号 / refresh 的唯一前提：用户当前正登录在目标号**（引擎从 keychain「Claude Code-credentials」直读当前登录号完整 blob·身份 guard 要求当前登录 email == `<email>`，否则拒）。
 
@@ -1328,14 +1352,15 @@ ccm account list [flags]
 
 ### account switch
 
-**写**（无重启切到选定备号·**ADR-016 policy 硬闸**）
+**写**（无重启切到选定备号·**policy 硬闸**）
 
 ```
 ccm account switch [flags]
 ```
 
 - positional：无（不给 `--email` → 引擎按各号配额恢复度选最优切入号）
-- 行为：**先过 board-policy 硬闸**——读目标 board 的 `policy.autonomous_account_switch`，显式 `deny` → 拒绝本次换号、**exit 7**（policy-deny·不取换号锁 / 不覆写任何凭证 / registry 原封不动）+ best-effort 往 board.log 记一条 `decision`。放行后：选号 → refreshToken 续期 → 覆写官方共享凭证三存储（原子写·全或无回滚）→ 翻 registry `active`。**fail-open/closed**：真·无 ccm 上下文（无 `--board`/`$CC_MASTER_BOARD`）→ fail-open `allow`；有明确目标板但 policy 读不到 / 歧义 → fail-closed `deny`（exit 7）
+- 行为：**先过 board-policy 硬闸**——读目标 board 的 `policy.autonomous_account_switch`，显式 `deny` → 拒绝本次换号、**exit 7**（policy-deny·不取换号锁 / 不覆写任何凭证 / registry 原封不动）+ best-effort 往 board.log 记一条 `decision`。放行后：选号 → refreshToken 续期 → 覆写官方共享凭证三存储（原子写·全或无回滚）→ 翻 registry `active` → 有目标 board 时 best-effort 写 `runtime.last_account_switch`（换号时刻·ADR-024·供 usage-pacing hook 做「检测到换号」ambient）。**fail-open/closed**：真·无 ccm 上下文（无 `--board`/`$CC_MASTER_BOARD`）→ fail-open `allow`；有明确目标板但 policy 读不到 / 歧义 → fail-closed `deny`（exit 7）
+- `--json` 投影：`{ ok, data:{ email, switched, projected_5h_pct?, projected_7d_pct? } }`——`email`=切入号、`switched`=是否真切（幂等 no-op / 未切 → false）、`projected_*`=切后新号投影配额%（有 sidecar 时）。usage-pacing hook LBHOOK 逐行扫首个 JSON 对象取 `email`/`switched`（token-blind·只读非密字段）
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
@@ -1349,7 +1374,7 @@ ccm account switch [flags]
 | `--json` | | bool | 结构化输出 |
 
 - 例：`ccm account switch --json`（引擎选号）· `ccm account switch --email alice@x.com`
-- ⚠️ **policy 硬闸是纵深防御兜底、不是许可**：`deny`→exit 7 拦在覆写之前；编排侧的「换号决策 + 绝不自授权」纪律在 `orchestrating-to-completion`（机制硬闸不替编排拍板）。全员逼顶 / 选不出号 → surface 用户（`blocked_on:"user"`），绝不盲切
+- ⚠️ **policy 硬闸是纵深防御兜底、不是许可**：`deny`→exit 7 拦在覆写之前；编排侧的「换号决策 + 绝不自授权」纪律在 `orchestrating-to-completion`（机制硬闸不替编排拍板）。选号走**双窗口对称硬闸**（5h≥90% ∨ 7d≥85% 任一逼顶即排除·候选 ⟺ 双窗口都健康）；全池无双窗口健康号（`NONE_ALL_EXHAUSTED`·含全池 5h 墙 / 7d 健康）/ 选不出号 → surface 用户（`blocked_on:"user"`），绝不盲切
 
 ---
 
@@ -1375,7 +1400,7 @@ ccm statusline render
 ccm statusline install [--json]
 ```
 
-- 幂等把 `ccm statusline`（**绝对路径**·绕过 `${CLAUDE_PLUGIN_ROOT}` 在 statusLine.command 不展开的 Finding #39）写进**全局** `settings.json` 的 `statusLine`；**你原有的 `statusLine` 先备份**（单独 state 文件·不污染 settings schema），`ccm statusline uninstall` 可恢复。已是 ours → noop / 仅更新命令。**显式 install 会清除 opt-out 标记**（用户改主意）
+- 幂等把 `ccm statusline`（**绝对路径**·因 `${CLAUDE_PLUGIN_ROOT}` 在 statusLine.command 里不展开、故须绝对路径）写进**全局** `settings.json` 的 `statusLine`；**你原有的 `statusLine` 先备份**（单独 state 文件·不污染 settings schema），`ccm statusline uninstall` 可恢复。已是 ours → noop / 仅更新命令。**显式 install 会清除 opt-out 标记**（用户改主意）
 - settings.json 坏 JSON → **绝不覆写**（避免毁配置）+ exit 1
 - flags：`--json`（结构化输出 `{action, settingsPath, backedUp, command}`）
 
@@ -1669,19 +1694,24 @@ id 不存在时 `data` = `null`，exit 0。
 
 ```jsonc
 {
-  "verdict": "accelerate",              // throttle | accelerate | hold | hard_stop
+  "verdict": "switch",                  // hold | throttle | switch | stop_5h | stop_7d（ADR-024 单侧 enum·去 accelerate/hard_stop）
+  "strength": "weak",                   // ADR-018 标签强度 weak|strong（ccm 出·消费方直接用·throttle/stop_* → strong·switch → weak）
   "reason": "5h 已用 92%…当前 5h 烧满是切到下一份配额的触发信号",
   "levers": ["switch_account", "continue_dispatch"],
-  "hard_stop_7d": false,
-  "window_5h_pct": 92, "window_7d_pct": 50,
+  "stop_dimension": null,               // "5h" | "7d" | null（哪个窗口驱动了 stop_*·非 stop_* → null）
+  "nearest_reset": null,                // stop_* 时该窗 reset 时刻 ISO-8601（引导 arm wakeup 等 reset）·非 stop_* → null
+  "window_5h_pct": 92, "window_7d_pct": 20,
   "effective_n": 3,
-  "switch_candidate": "c@c.com",        // 可切备号里 7d used% 最低者（无切号 lever / 无备号 → null）
+  "switch_candidate": "c@c.com",        // switch verdict 时选可切备号里 7d used% 最低者（非 switch / 无备号 → null）
+  "pool": { "backups": 2, "switchable": 2 },  // 号池粗粒度事实（非 active 号数 / 其中 token 未过期可切入数）
   "confidence": "high",
   "source": "account",                  // sidecar 缺 → "local-derived-approx" + available:false
   "as_of": "2026-06-25T09:00:00Z",
   "available": true
 }
 ```
+
+verdict 语义（消费方映射·ADR-024）：`hold` 走廊内静默；`throttle` 5h 临界减速（降模型档 / 降 WIP / defer）；`switch` 5h 临界 + n>1 + 7d 有余量 → 切到下一份配额（usage-pacing hook LBHOOK 机械换号·消费方只调配速）；`stop_5h` 5h 本窗口烧穿 → arm watchdog 守到 `nearest_reset` 回血；`stop_7d` 7d 跨窗口硬总闸 → 暂停 dispatch + `blocked_on:"user"` surface 用户。
 
 ### usage task-cost（`ccm usage task-cost [<id>] --json`）
 

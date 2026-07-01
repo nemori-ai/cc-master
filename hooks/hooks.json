@@ -18,6 +18,10 @@
     "PostToolUse": [
       { "matcher": "Write|Edit|MultiEdit",
         "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/board-lint.js" }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "Write|Edit|MultiEdit|Bash",
+        "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/board-guard.js" }] }
     ]
   }
 }

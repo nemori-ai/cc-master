@@ -5,7 +5,7 @@
 # account-authoritative 5h/7d signal收口'd into the `ccm` engine: it reads the status-line sidecar
 # (the ONLY programmatic source of 5h/7d `used_percentage` + `resets_at`·Finding #37) plus the accounts.json
 # registry. cc-usage.sh is now a thin shell wrapper that delegates to `ccm usage show --json` (account
-# state) and `ccm usage advise --json` (双侧走廊 verdict·引擎 pacing.ts SSOT·ADR-010), reshapes them into
+# state) and `ccm usage advise --json` (单侧走廊 verdict·引擎 pacing.ts SSOT·ADR-010/ADR-024), reshapes them into
 # the normalized schema below, and — crucially — **去掉了 python3 依赖**（zero python3·red line 5 spirit:
 # this out-of-band script no longer needs a system python).
 #
@@ -39,7 +39,7 @@
 #   {"source":"account","available":true,
 #    "five_hour":{"used_percentage":N,"resets_at":E},"seven_day":{"used_percentage":N,"resets_at":E},
 #    "effective_n":N,"as_of":"ISO",
-#    "advise":{"verdict":"throttle|accelerate|hold|hard_stop","reason":"…","levers":[…],"switch_candidate":…}}
+#    "advise":{"verdict":"hold|throttle|switch|stop_5h|stop_7d","strength":"weak|strong","reason":"…","levers":[…],"nearest_reset":…,"switch_candidate":…,"pool":{…}}}
 #   When unavailable (no sidecar / ccm missing):
 #   {"source":"unavailable","available":false,"note":"账户权威信号不可用…本地反推已撤(plan §10)…"}
 set -uo pipefail
@@ -111,12 +111,17 @@ const out = {
   as_of: sd.as_of || null,
 };
 if (ad && typeof ad.verdict === 'string') {
+  // ADR-024 verdict 词汇：hold|throttle|switch|stop_5h|stop_7d（去 accelerate/hard_stop）+ strength /
+  //   stop_dimension / nearest_reset 直透（stop 侧的 nearest_reset 供 agent arm wakeup）。
   out.advise = {
     verdict: ad.verdict,
+    strength: typeof ad.strength === 'string' ? ad.strength : null,
     reason: ad.reason || '',
     levers: Array.isArray(ad.levers) ? ad.levers : [],
+    stop_dimension: ad.stop_dimension != null ? ad.stop_dimension : null,
+    nearest_reset: ad.nearest_reset != null ? ad.nearest_reset : null,
     switch_candidate: ad.switch_candidate != null ? ad.switch_candidate : null,
-    hard_stop_7d: ad.hard_stop_7d === true,
+    pool: ad.pool != null ? ad.pool : null,
   };
 }
 process.stdout.write(JSON.stringify(out) + '\n');

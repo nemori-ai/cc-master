@@ -11,9 +11,28 @@
 # ccm). The dedicated ccm-ABSENT cases (G-series, bottom) override CCM_BIN to a nonexistent path.
 if [ -z "${CCM_BIN:-}" ]; then
   _SHIM="$PLUGIN_ROOT/ccm/apps/cli/dev-bin/ccm"
-  if [ -x "$_SHIM" ]; then export CCM_BIN="$_SHIM"; fi
-  # else: no shim → fall through; the gate's `command -v ccm` covers an on-PATH ccm. If neither exists
-  #   the happy cases would (correctly) refuse to arm; CI/dev環境 always has one of shim/ccm.
+  # Adopt the shim ONLY if it is FUNCTIONAL (dist built → `--version` succeeds). The shim is a thin
+  # `exec node bin/ccm.cjs` wrapper that require()s ccm/apps/cli/dist/index.cjs — when the dist has not
+  # been built (no pnpm / version-mismatched pnpm / missing node_modules), the shim is executable but
+  # every spawn fails. Adopting a non-functional shim would make the arm gate (`[ -x ]`, existence-only)
+  # pass yet silently break `ccm board update` / `ccm policy set` in the INIT-FLAGS cases, so the flags
+  # never land (board keeps template defaults). Probing `--version` distinguishes "built shim" from
+  # "unbuilt shim"; when unbuilt we leave CCM_BIN unset so both the gate's `command -v ccm` AND
+  # bootstrap's CCM_CMD=${CCM_BIN:-ccm} fall through to a working on-PATH ccm. On CI the dist is built,
+  # so the functional shim is adopted; on a dev box with only PATH ccm, PATH ccm is used.
+  if [ -x "$_SHIM" ] && "$_SHIM" --version >/dev/null 2>&1; then
+    export CCM_BIN="$_SHIM"
+  else
+    # No functional shim (unbuilt dist) → resolve a working on-PATH ccm and point CCM_BIN at it. This
+    # matters beyond the arm gate: the INIT-FLAGS series itself gates on `[ -x "$CCM_BIN" ]` and spawns
+    # `$CCM_BIN board update` / `$CCM_BIN policy set`, so it needs CCM_BIN to name a FUNCTIONAL binary
+    # (leaving it unset would only skip the series, never exercise the flag-write path). On CI the shim
+    # is built (adopted above); on a dev box with only PATH ccm, that PATH ccm is used here.
+    _PATH_CCM="$(command -v ccm 2>/dev/null || true)"
+    if [ -n "$_PATH_CCM" ] && "$_PATH_CCM" --version >/dev/null 2>&1; then export CCM_BIN="$_PATH_CCM"; fi
+  fi
+  # else (neither functional shim nor on-PATH ccm): CCM_BIN stays unset → the happy cases correctly
+  #   refuse to arm and the INIT-FLAGS series skips; CI/dev環境 always has one of shim/ccm.
 fi
 NO_CCM="/no/such/ccm-binary-$$"   # nonexistent executable → CCM_BIN override → ccm-ABSENT gate path
 
