@@ -14,25 +14,29 @@ test('plugin.json is valid and well-formed', () => {
   assert.ok(typeof j.description === 'string' && j.description.length > 0);
 });
 
-test('hooks.json registers all 7 hook scripts across 5 events via plugin-root paths', () => {
+test('hooks.json registers all 8 hook scripts across 6 events via plugin-root paths', () => {
   const h = JSON.parse(read('hooks/hooks.json'));
   assert.ok(h.hooks.UserPromptSubmit, 'UserPromptSubmit registered');
   assert.ok(h.hooks.Stop, 'Stop registered');
   assert.ok(h.hooks.SessionStart, 'SessionStart registered');
   assert.ok(h.hooks.PostToolBatch, 'PostToolBatch registered');
   assert.ok(h.hooks.PostToolUse, 'PostToolUse registered (board-lint, T9)');
+  assert.ok(h.hooks.PreToolUse, 'PreToolUse registered (board-guard, ADR-025)');
   // Stop carries three hooks: goal-hook (verify-board) + usage-pacing + identity-nudge (IDNUDGE·ADR-020).
   assert.equal(h.hooks.Stop.length, 3, 'Stop has verify-board, usage-pacing, identity-nudge');
   // PostToolUse carries the board-lint hook, matcher-scoped to edit tools.
   assert.match(JSON.stringify(h.hooks.PostToolUse), /Write\|Edit\|MultiEdit/, 'PostToolUse matcher scopes to edit tools');
+  // PreToolUse carries the board-guard hook (ADR-025), matcher-scoped to edit + Bash tools.
+  assert.match(JSON.stringify(h.hooks.PreToolUse), /Write\|Edit\|MultiEdit\|Bash/, 'PreToolUse matcher scopes to edit + Bash tools');
   const all = JSON.stringify(h);
   // v2 收编（ADR-013 §2.4）：reinject / posttool-batch / verify-board 从 bash 收编为 node。
   // T4-1b 解耦（ADR-014）：board-lint / verify-board 改为优先经进程边界 shell 调 ccm 二进制读 board，旧
   //   require(board-lint-core/board-model) 降为 fallback（保留·stage3 才删）。bootstrap-board.sh 仍为 bash
   //   （唯一豁免的 ARM 动作）；usage-pacing.js / identity-nudge.js 本就是 node。
   // ADR-020：identity-nudge.js（IDNUDGE·Stop 周期身份提示·首个写 board 的 hook·经 ccm board set-param 写 runtime.*）。
-  //   本断言只验 7 个 hook 都在 hooks.json 里注册。
-  for (const s of ['bootstrap-board.sh', 'verify-board.js', 'reinject.js', 'posttool-batch.js', 'usage-pacing.js', 'board-lint.js', 'identity-nudge.js']) assert.match(all, new RegExp(s.replace(/\./g, '\\.')));
+  // ADR-025：board-guard.js（PreToolUse·deny agent 直接 file-edit board·硬化单一写路径·node/JS·复用 runHook）。
+  //   本断言只验 8 个 hook 都在 hooks.json 里注册。
+  for (const s of ['bootstrap-board.sh', 'verify-board.js', 'reinject.js', 'posttool-batch.js', 'usage-pacing.js', 'board-lint.js', 'identity-nudge.js', 'board-guard.js']) assert.match(all, new RegExp(s.replace(/\./g, '\\.')));
   assert.match(all, /CLAUDE_PLUGIN_ROOT/);
 });
 
@@ -52,14 +56,15 @@ test('sentinel consistency: command body carries the exact string the bootstrap 
 //   directive，语法 `<ambient|advisory|directive source="...">`）。
 test('ADR-018: non-substrate hooks tag-wrap their agent-context injection (anti-regression)', () => {
   // 非-substrate 注入 hook：每个都必须用至少一个标签包装器（确凿引用 ADR-018 标签体系）。
-  const nonSubstrate = ['usage-pacing.js', 'posttool-batch.js', 'board-lint.js', 'verify-board.js', 'identity-nudge.js'];
+  const nonSubstrate = ['usage-pacing.js', 'posttool-batch.js', 'board-lint.js', 'verify-board.js', 'identity-nudge.js', 'board-guard.js'];
   // 标签包装器调用（hook-common 暴露的三个）。匹配 `advisory(` / `ambient(` / `directive(` 或字面标签语法。
   const TAG_CALL = /\b(ambient|advisory|directive)\s*\(/;
   const TAG_LITERAL = /<(ambient|advisory|directive)\s+source=/;
   for (const f of nonSubstrate) {
     const src = read(`hooks/scripts/${f}`);
-    // 该 hook 确实会注入（emit additionalContext 或 Stop block reason）——否则这条断言不适用。
-    const injects = /additionalContext|"reason"|decision":"block/.test(src);
+    // 该 hook 确实会注入（emit additionalContext / Stop block reason / PreToolUse permissionDecisionReason）——
+    //   否则这条断言不适用。board-guard（ADR-025）经 permissionDecisionReason 注 directive，故纳入。
+    const injects = /additionalContext|"reason"|decision":"block|permissionDecisionReason/.test(src);
     assert.ok(injects, `${f} is expected to inject into agent context (additionalContext / block reason)`);
     assert.ok(
       TAG_CALL.test(src) || TAG_LITERAL.test(src),
