@@ -38,6 +38,7 @@ import * as peersHandler from './handlers/peers.js';
 import * as policyHandler from './handlers/policy.js';
 import * as statuslineHandler from './handlers/statusline.js';
 import * as taskHandler from './handlers/task.js';
+import * as upgradeHandler from './handlers/upgrade.js';
 import * as usageHandler from './handlers/usage.js';
 import * as watchdogHandler from './handlers/watchdog.js';
 import * as help from './help.js';
@@ -82,13 +83,16 @@ const HANDLERS: Record<string, HandlerModule> = {
   estimate: estimateHandler as unknown as HandlerModule,
   account: accountHandler as unknown as HandlerModule,
   statusline: statuslineHandler as unknown as HandlerModule,
+  upgrade: upgradeHandler as unknown as HandlerModule,
 };
 
 // ── DEFAULT_VERBS：某些 noun 无 verb 时落到约定默认 verb（让 `ccm statusline` ≡ `ccm statusline render`）。──
 //   status-line 命令本身写进 settings.json 的是裸 `ccm statusline`，故 bare noun 必须能渲染——此表把它解析成 render。
-//   只此一处特例（statusline）：其余 noun 缺 verb 仍报「missing command」（不引入隐式默认改变既有行为）。
+//   两处特例：statusline→render（status-line 命令本身写裸 `ccm statusline`）、upgrade→all（裸 `ccm upgrade`
+//   = 两件发布物各升各自线最新·见 handlers/upgrade.ts）。其余 noun 缺 verb 仍报「missing command」。
 const DEFAULT_VERBS: Record<string, string> = {
   statusline: 'render',
+  upgrade: 'all',
 };
 
 // node util.parseArgs 的 options 形态（带 short / multiple）——router 自有，独立于 registry 的 OptionSpec。

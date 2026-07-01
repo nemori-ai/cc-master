@@ -101,9 +101,19 @@ test('board.template.json + board.example.json lint with ZERO hard errors (canon
   assert.equal(tmpl.warnings.length, 0, `template should also be warning-clean: ${JSON.stringify(tmpl.warnings)}`);
   const ex = lintAsset(`${A}/board.example.json`);
   assert.equal(ex.errors.length, 0, `example hard errors: ${JSON.stringify(ex.errors)}`);
-  // 示例容一条 BIZ-TIME-ORDER warn（legacy 节点 T2 故意无 finished_at，演示旧板 lint 轻推）——仅此一条。
-  assert.ok(ex.warnings.every((w) => w.rule === 'BIZ-TIME-ORDER'),
-    `example warnings should only be the intentional legacy-node nudge: ${JSON.stringify(ex.warnings)}`);
+  // 示例的 warn 现在**只剩一条**「故意」的（GRAPH-CONNECTED cry-wolf 收尾后收紧）：
+  //   ① BIZ-TIME-ORDER —— legacy 节点 T2 故意无 finished_at，演示旧板 lint 轻推。
+  //   曾经的第二条 GRAPH-CONNECTED 已消除，示例现在是 GRAPH-CONNECTED-clean 的好示范（非靠放宽测试容忍）：
+  //     · F1（role=fill-work·故意独立的填闲并行工作）现被 GRAPH-CONNECTED **豁免**——fill-work 从连通性节点集
+  //       剔除，纯 fill-work 孤岛不再 warn（cry-wolf 修）。
+  //     · D1（awaiting-user 决策门）**不豁免**——按用户设计原则，决策门本应连进主图（是某工作节点的前驱/子/
+  //       子图/节点本身），故 D1 已接回主图：wrap-up 节点 M1.c 现 deps 含 D1（PR-split 决策 gate 下游 M1.c），
+  //       D1 不再是孤岛。示例板因此**不再触发** GRAPH-CONNECTED。
+  const ALLOWED_WARN = new Set(['BIZ-TIME-ORDER']);
+  assert.ok(ex.warnings.every((w) => ALLOWED_WARN.has(w.rule)),
+    `example warnings should only be the single intentional demo (BIZ-TIME-ORDER); GRAPH-CONNECTED must be gone (F1 exempt + D1 reconnected): ${JSON.stringify(ex.warnings)}`);
+  assert.ok(!ex.warnings.some((w) => w.rule === 'GRAPH-CONNECTED'),
+    `example must be GRAPH-CONNECTED-clean now (fill-work F1 exempt, awaiting-user D1 wired into main DAG via M1.c): ${JSON.stringify(ex.warnings)}`);
 });
 
 test('board.example.json demonstrates the v2 agile modules (executor / cadence / judgment_calls / references)', () => {

@@ -191,6 +191,116 @@ test('GRAPH-PARENT-EXISTS / DEPTH / CYCLE (hard) + GRAPH-ROLLUP (warn)', () => {
   assert.ok(ruleSet(roll.warnings).has('GRAPH-ROLLUP'));
 });
 
+test('GRAPH-CONNECTED (warn): 弱连通分量 > 1 → warn 且列出孤岛分组', () => {
+  // ① 全连通图（A←B←C 链 + 主图）→ 无 GRAPH-CONNECTED warn。
+  const connected = lintBoard(
+    J({
+      ...GOOD,
+      tasks: [
+        { id: 'A', status: 'ready', deps: [] },
+        { id: 'B', status: 'ready', deps: ['A'] },
+        { id: 'C', status: 'ready', deps: ['B'] },
+      ],
+    }),
+  );
+  assert.ok(!ruleSet(connected.warnings).has('GRAPH-CONNECTED'), J(connected.warnings));
+  assert.equal(model.levelOf('GRAPH-CONNECTED'), 'warn');
+
+  // ② 两个孤岛：{A→B} 一组、孤立 T8 一组 → warn，且消息含两分量的 task-id（A,B 与 T8）。
+  const split = lintBoard(
+    J({
+      ...GOOD,
+      tasks: [
+        { id: 'A', status: 'ready', deps: [] },
+        { id: 'B', status: 'ready', deps: ['A'] },
+        { id: 'T8', status: 'ready', deps: [] },
+      ],
+    }),
+  );
+  const w = split.warnings.find((x) => x.rule === 'GRAPH-CONNECTED');
+  assert.ok(w, 'GRAPH-CONNECTED 应落 warnings 桶');
+  assert.ok(ruleSet(split.warnings).has('GRAPH-CONNECTED'));
+  assert.match((w as { message: string }).message, /A, B/); // 主图（最大分量）
+  assert.match((w as { message: string }).message, /T8/); // 孤岛
+  assert.match((w as { message: string }).message, /2 个互不相连/); // 分量数
+
+  // ③ 单任务 → 不 warn（1 分量）。
+  const single = lintBoard(onlyTask({ id: 'X', status: 'ready', deps: [] }));
+  assert.ok(!ruleSet(single.warnings).has('GRAPH-CONNECTED'));
+
+  // ④ 空板（零任务）→ 不 warn。
+  const empty = lintBoard(J({ ...GOOD, tasks: [] }));
+  assert.ok(!ruleSet(empty.warnings).has('GRAPH-CONNECTED'));
+
+  // ⑤ parent 嵌套子任务 deps:[] → 不 warn（连通性 = deps ∪ parent 容器边·ADR-012）。
+  //   c 自身无 deps，但经 parent="M" 连进主图（A→M）——parent-edge refinement 前会被误判孤岛。
+  const nested = lintBoard(
+    J({
+      ...GOOD,
+      tasks: [
+        { id: 'A', status: 'ready', deps: [] },
+        { id: 'M', status: 'in_progress', deps: ['A'] },
+        { id: 'c', status: 'ready', deps: [], parent: 'M' },
+      ],
+    }),
+  );
+  assert.ok(
+    !ruleSet(nested.warnings).has('GRAPH-CONNECTED'),
+    `parent 嵌套子任务 deps:[] 不该被误判孤岛：${J(nested.warnings)}`,
+  );
+
+  // ⑥ fill-work 豁免：主图 {A→B} + 独立 F1(role=fill-work·deps:[]) → **不** warn。
+  //   fill-work 定义即「脱离主图的填闲并行工作」、故意独立，从连通性判定中剔除，不该 cry-wolf。
+  const fillWorkIsland = lintBoard(
+    J({
+      ...GOOD,
+      tasks: [
+        { id: 'A', status: 'ready', deps: [] },
+        { id: 'B', status: 'ready', deps: ['A'] },
+        { id: 'F1', status: 'ready', deps: [], role: 'fill-work' },
+      ],
+    }),
+  );
+  assert.ok(
+    !ruleSet(fillWorkIsland.warnings).has('GRAPH-CONNECTED'),
+    `纯 fill-work 孤岛应被豁免、不 warn：${J(fillWorkIsland.warnings)}`,
+  );
+
+  // ⑦ awaiting-user 不豁免：主图 {A→B} + 独立 D1(blocked_on=user 的决策门·deps:[]) → **仍** warn。
+  //   决策门本应连进主图（是某工作节点的子/子图/节点本身），孤立即真遗漏——照常计入（用户拍板·非 fill-work）。
+  const awaitingIsland = lintBoard(
+    J({
+      ...GOOD,
+      tasks: [
+        { id: 'A', status: 'ready', deps: [] },
+        { id: 'B', status: 'ready', deps: ['A'] },
+        { id: 'D1', status: 'blocked', deps: [], blocked_on: 'user' },
+      ],
+    }),
+  );
+  const wa = awaitingIsland.warnings.find((x) => x.rule === 'GRAPH-CONNECTED');
+  assert.ok(wa, `独立 awaiting-user 决策门不豁免、仍应 warn：${J(awaitingIsland.warnings)}`);
+  assert.match((wa as { message: string }).message, /D1/);
+
+  // ⑧ 混合：主图 {A→B} + fill-work F1（豁免）+ 真孤岛 T8（非 fill-work）→ warn，孤岛只列 T8、不列 F1。
+  const mixed = lintBoard(
+    J({
+      ...GOOD,
+      tasks: [
+        { id: 'A', status: 'ready', deps: [] },
+        { id: 'B', status: 'ready', deps: ['A'] },
+        { id: 'F1', status: 'ready', deps: [], role: 'fill-work' },
+        { id: 'T8', status: 'ready', deps: [] },
+      ],
+    }),
+  );
+  const wm = mixed.warnings.find((x) => x.rule === 'GRAPH-CONNECTED');
+  assert.ok(wm, `真孤岛 T8 应 warn（fill-work F1 被豁免）：${J(mixed.warnings)}`);
+  assert.match((wm as { message: string }).message, /T8/); // 真孤岛列出
+  assert.doesNotMatch((wm as { message: string }).message, /F1/); // fill-work 不出现（已从节点集剔除）
+  assert.match((wm as { message: string }).message, /2 个互不相连/); // 只有 {A,B} 与 {T8} 两分量
+});
+
 test('FMT-PARENT: malformed parent (key present, non-empty-string 违例) is hard', () => {
   assert.ok(
     ruleSet(lintBoard(onlyTask({ id: 'A', status: 'ready', deps: [], parent: ['M'] })).errors).has(

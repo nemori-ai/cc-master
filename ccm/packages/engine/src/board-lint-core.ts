@@ -376,6 +376,38 @@ export function lintBoard(text: string): LintResult {
     }
   }
 
+  // ── GRAPH-CONNECTED（弱连通分量 > 1 → warn·容多分量·目标聚焦提示）─────────────────────────────────
+  //   把 tasks 当节点、deps ∪ parent 容器边当无向边，算弱连通分量。分量>1 = 存在与主图无任何依赖/归属关系的
+  //   孤岛节点（规划失焦常见信号：漏连依赖 / 任务不属于本目标）。为目标聚焦希望图全通，但不强求——故 warn·非
+  //   hard。edge case：0/1 个（非 fill-work）任务、或全连通（1 分量）→ 不 warn。parent 容器边计入连通
+  //   （ADR-012 嵌套子任务 `deps:[]` 经 owner 连进主图·不误判孤岛·见函数注）。
+  //   ★fill-work 豁免（cry-wolf 修）：`role:fill-work` 节点定义即「脱离主图的填闲并行工作」、**故意独立**——把它
+  //   计入连通性判定会对每个 fill-work 节点常态误报孤岛。故连通性只在**非 fill-work 节点**上判：fill-work 节点
+  //   从节点集剔除（连同其边），纯 fill-work 的孤岛不再 warn。**awaiting-user / 决策门节点不豁免**：一个 gate
+  //   本应是某主图工作节点的子节点/子图/节点本身，无上下游的孤立决策门正是该 warn 的真遗漏，照常计入（用户拍板）。
+  const fillWorkIds = new Set<string>();
+  for (const [id, t] of taskById) {
+    if (t.role === 'fill-work') fillWorkIds.add(id);
+  }
+  if (validIds.size - fillWorkIds.size >= 2) {
+    const comps = weaklyConnectedComponents(g, fillWorkIds);
+    if (comps.length > 1) {
+      const [main, ...islands] = comps;
+      const mainComp = main as string[];
+      const islandLines = islands.map(
+        (c, i) => `  孤岛 #${i + 1}（${c.length} 个）：${c.join(', ')}`,
+      );
+      emit(
+        'GRAPH-CONNECTED',
+        `任务依赖图被切成 ${comps.length} 个互不相连的子图（弱连通分量·把 deps ∪ parent 容器边当无向边算）——存在与主图没有任何依赖/归属关系的孤岛节点。\n` +
+          `  主图（最大分量·${mainComp.length} 个）：${mainComp.join(', ')}\n` +
+          `${islandLines.join('\n')}\n` +
+          `  影响：不致命（warn）——为目标聚焦，规划出的图希望是全通图（但不强求）；孤岛节点和主目标无依赖联系，常是规划失焦（漏连依赖、或这个任务根本不属于本目标）。\n` +
+          `  怎么修：给孤岛节点补上指向主图的 deps（它依赖谁 / 谁依赖它），或确认它确实独立后忽略本 warning。`,
+      );
+    }
+  }
+
   // ── 每个 task 的 v2 字段 FMT（executor/role/type/references/estimate/acceptance/blocked_on/wip_limit/时间）──
   for (const [id, t] of taskById) {
     lintTaskFields(id, t, validIds, emit);
@@ -1264,6 +1296,65 @@ export function findCycle(graph: Map<string, string[]>): string[] | null {
     }
   }
   return null;
+}
+
+// weaklyConnectedComponents(g, exclude?) — 把 deps ∪ parent 当无向边，算 g 的弱连通分量（孤岛检测·GRAPH-CONNECTED 用）。
+//   返回分量数组：每个分量是 task-id 数组，分量内 id 升序、分量间按「大小降序、再首 id 升序」排（确定性·
+//   主图 = 第一个最大分量）。连通性 = **deps 边 ∪ parent 容器边**（upstream 已是去悬挂/去自环的合法 deps 邻接；
+//   parentOf 给 child→owner 的容器边）——cc-master 支持 parent 嵌套（ADR-012），一个 `deps:[]` 的 parent-attached
+//   子任务经其 owner 连进主图，不该被误判孤岛。孤立节点（既无 deps 边、又无 parent/子）才自成一分量。
+//   `exclude`（可选）：从节点集**整体剔除**的 id（连同其所有边一并忽略）——GRAPH-CONNECTED 用它豁免 `role:fill-work`
+//   节点（故意独立的填闲并行工作·计入会常态误报孤岛）。剔除的节点既不自成分量、也不作桥接。默认空集 = 全图判连通。
+export function weaklyConnectedComponents(
+  g: BoardGraph,
+  exclude: Set<string> = new Set<string>(),
+): string[][] {
+  const { ids, upstream, parentOf } = g;
+  const has = (id: string): boolean => ids.has(id) && !exclude.has(id);
+  const adj = new Map<string, Set<string>>();
+  for (const id of ids) if (!exclude.has(id)) adj.set(id, new Set<string>());
+  for (const [id, deps] of upstream) {
+    if (!has(id)) continue;
+    for (const d of deps) {
+      if (!has(d)) continue;
+      (adj.get(id) as Set<string>).add(d);
+      (adj.get(d) as Set<string>).add(id);
+    }
+  }
+  // parent 容器边：child↔owner 双向（两端 id 都须存在且未被 exclude，避免悬挂 parent / 已剔除节点引入幻影边）。
+  for (const [child, ownerId] of parentOf) {
+    if (!has(child) || !has(ownerId) || child === ownerId) continue;
+    (adj.get(child) as Set<string>).add(ownerId);
+    (adj.get(ownerId) as Set<string>).add(child);
+  }
+  const seen = new Set<string>();
+  const comps: string[][] = [];
+  for (const start of ids) {
+    if (exclude.has(start)) continue;
+    if (seen.has(start)) continue;
+    const comp: string[] = [];
+    const stack = [start];
+    seen.add(start);
+    while (stack.length) {
+      const n = stack.pop() as string;
+      comp.push(n);
+      for (const m of adj.get(n) || []) {
+        if (!seen.has(m)) {
+          seen.add(m);
+          stack.push(m);
+        }
+      }
+    }
+    comp.sort();
+    comps.push(comp);
+  }
+  comps.sort((a, b) => {
+    if (b.length !== a.length) return b.length - a.length;
+    const fa = a[0] ?? '';
+    const fb = b[0] ?? '';
+    return fa < fb ? -1 : fa > fb ? 1 : 0;
+  });
+  return comps;
 }
 
 // formatReport({errors,warnings}) → agent-friendly 多行报告字符串。无 error 无 warn → 返回 ''（静默）。

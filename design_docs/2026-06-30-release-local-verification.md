@@ -1,8 +1,14 @@
 # Release workflow 本地验证机制（`ccm-release.yml` 预演）
 
-> **这是什么**：一套 **dev-only** harness，让 `.github/workflows/ccm-release.yml`（tag `v*` 触发的多平台
-> SEA 二进制 + plugin zip 制品）能在**打 tag 发版之前**就在本地验出「能不能正确编译 + 打包出制品」，
-> 而不是真打 tag 推上去、CI 在真 runner 上第一次跑才暴露破绽。
+> **这是什么**：一套 **dev-only** harness，让两条 release workflow 的制品能在**打 tag 发版之前**就在本地
+> 验出「能不能正确编译 + 打包出制品」，而不是真打 tag 推上去、CI 在真 runner 上第一次跑才暴露破绽。
+>
+> **★版本线解耦后（ADR-022）的触发口径**：原本单一 `ccm-release.yml`（裸 `v*` 触发）同时产 SEA 二进制 +
+> plugin zip，现已拆成两条互斥 tag-filter 的 workflow——`ccm-release.yml`（**`ccm-v*`** 触发·只产多平台
+> SEA 二进制）+ `plugin-release.yml`（**裸 `v*`** 触发·只打 plugin zip）。本 harness 的 STAGE 1 验 SEA 编译
+> （现归 `ccm-release.yml`/`ccm-v*`）、STAGE 2 验 plugin 打包（现归 `plugin-release.yml`/`v*`）——两段本地
+> 验证逻辑不变，只是分属两条 workflow。下文若残留「`ccm-release.yml` 一并产 plugin zip / 由 `v*` 触发」的旧
+> 表述，按本段口径理解（`refs/tags/v0.10.0` 那次 act 实测仍是历史事实留痕·不改）。
 >
 > **入口**：[`scripts/test-release-local.sh`](../scripts/test-release-local.sh)（repo 根调用·裸路径·不随
 > plugin 分发·红线5）。本文是它的**验证分层 + footgun 留痕**；脚本头注是用法 SSOT，本文不复述命令细节。

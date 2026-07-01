@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-07-01
+
+> **版本线解耦后 plugin 线首个独立发版** —— 这一版兑现 ADR-022：ccm 与 cc-master plugin 各自走独立版本号 + 独立 tag/触发，plugin 由本版起独立 bump（裸 `v0.10.1`），与 ccm 线（`ccm-v0.11.0`）解耦演进。面向用户的改动集中在编排启动体验、双线安装、与一条新的连通性 lint 提示。
+
+### Added
+
+- **`as-master-orchestrator` 启动 flag（`--priority` / `--wip` / `--policy-switch`）** — 点火时即可声明本块板的协调优先级（`--priority`·喂多-orchestrator 协调）、WIP 上限（`--wip`·并行度护栏）、与自主换号 policy（`--policy-switch allow|deny`·ADR-016 写 `board.policy`），不必建板后再补设。
+- **`ccm upgrade` 命令** — ccm 自更新子命令：就地把本机 `ccm` 二进制升级到 ccm 线最新 release（按 `ccm-v*` tag 解析），免重跑 install.sh。
+- **`install.sh` 双版本 pin flag（`--ccm-version` / `--plugin-version`）** — 版本线解耦后两条线各自可独立钉版：`--ccm-version <ccm-vX.Y.Z>` 钉 ccm 二进制、`--plugin-version <vX.Y.Z>` 钉 plugin zip，二者各自可选、缺省解析为本线最新（旧单一 `--version` 已移除·解耦后无法同时钉两产物）。
+- **`GRAPH-CONNECTED` 连通性 lint 规则** — board lint 新增一条 warn 级规则：把 `deps` ∪ `parent` 容器边当无向边算弱连通分量，分量 > 1（图被切成互不相连的孤岛子图）时提示——目标聚焦的规划失焦信号（漏连依赖 / 任务不属于本目标），不强求故 warn 非 hard。
+
+### Changed
+
+- **版本线解耦：ccm 与 cc-master plugin 各自独立版本号 + 独立发版触发（ADR-022）** — 此前两者被单一 git tag `v*` 焊死耦合（一个 tag 同时触发 ccm 二进制构建 + 插件 zip 打包）。现解耦为**两条独立版本线**：plugin 延续裸 `vX.Y.Z` tag（手动门 + `CHANGELOG.md`·`plugin.json`/`marketplace.json` 归 plugin 线），ccm 改用 `ccm-vX.Y.Z` tag（changesets + CI·`ccm/apps/cli` 与 `ccm/packages/engine` `fixed` 锁步成单一 ccm 版本号）。`ccm-release.yml` 拆为只产 ccm 二进制（触发 `ccm-v*`）+ 新增 `plugin-release.yml` 只打插件 zip（触发 `v*`）；两个 tag glob 天然互斥（`ccm-v…` 以 `c` 开头不撞 `v*`），零交叉触发。兑现 `ccm/.changeset/README.md` 早已声明、却从未在机制层落地的「二者不共享版本号」意图。
+
+### Fixed
+
+- **`usage-pacing` 号池 ambient 措辞修** — 换号后注入的号池粗粒度事实措辞回归纯 `<ambient>` 口径（背景事实·决策归 agent），不再夹带 steer 配速的暗示——遵 ADR-018「没有中性注入·标签即承诺」。
+
 ## [0.10.0] — 2026-06-30
 
 > **board v2 大重构 Epic（board-v2-redesign·ADR-013..021）** —— 这一版把 cc-master 的 board 从「被动 JSON + 各消费者各自 sed/awk/JS 解析、只钉一小撮窄腰」整体推进到「**完整数据模型 SSOT + 独立 `ccm` 引擎 + OR/ML 估算配速引擎 + 多账号负载均衡 + 多-orchestrator 协调 + hook 标签注入协议**」。两步走地基：先把 board 演进为完整 JS 数据模型 + 三档建模（🔒load-bearing / 👁observed / ✎flexible·ADR-013），再把这套状态逻辑**解耦为独立安装的工业化 TS `ccm` CLI**（`@ccm/engine`·ADR-014），plugin 降为消费方之一——经进程边界 shell 调、缺则优雅降级。在此之上长出敏捷能力（纵切可 ship 切片 / timebox / 估点 / 自决诚实台账）、估算配速引擎、号池自主负载均衡、多板协调感知、hook→agent 标签化通信。schema `cc-master/v1` → `cc-master/v2`；分发 skill 4→7（退役 account-management、新增 using-ccm / slicing-goals-into-dags / dev-as-ml-loop / engineering-with-craft / pacing-and-estimation）；README EN+ZH 产品化重写。

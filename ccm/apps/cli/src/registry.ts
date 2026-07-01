@@ -1086,6 +1086,49 @@ export const REGISTRY: Registry = {
       handler: 'statusline.uninstall',
     },
   },
+
+  // ════════════════════ upgrade（自升级 ccm 二进制 + cc-master 插件·解耦双线）═══════════════════════════
+  //   非 board 操作（不写窄腰·不抢 board-lock）。三 verb：all（默认 verb·裸 `ccm upgrade`）/ ccm / plugin。
+  //   版本解析走 GitHub /releases 列表 + tag 前缀过滤 + semver 排序（ccm 线 ccm-v* / plugin 线裸 v*·见
+  //   handlers/upgrade.ts）。--to 指定具体 tag、--dry-run（全局）只查不升。async（同 account switch·router 透传 Promise）。
+  upgrade: {
+    all: {
+      summary: '把 ccm 二进制 + cc-master 插件都升到各自发布线最新（裸 `ccm upgrade` 的默认 verb）',
+      read: false,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm upgrade', 'ccm upgrade --dry-run'],
+      handler: 'upgrade.all',
+    },
+    ccm: {
+      summary: '只升 ccm 二进制（SEA 自替换·--to 指定 ccm-v* tag·默认线上最新）',
+      read: false,
+      positionals: [],
+      options: {
+        to: { type: 'string', desc: '指定 ccm-v* tag（默认线上最新·如 ccm-v0.1.0）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm upgrade ccm', 'ccm upgrade ccm --to ccm-v0.1.0 --dry-run'],
+      handler: 'upgrade.ccm',
+    },
+    plugin: {
+      summary:
+        '只升 cc-master 插件（claude CLI 经 marketplace 托管·--to 仅信息性·默认 marketplace 最新）',
+      read: false,
+      positionals: [],
+      options: {
+        to: {
+          type: 'string',
+          desc: '期望的 v* tag（信息性·claude plugin update 实际升到 marketplace 最新）',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm upgrade plugin', 'ccm upgrade plugin --dry-run'],
+      handler: 'upgrade.plugin',
+    },
+  },
 };
 
 // ── ALIASES：热路径顶层捷径（cli-design §3.4·只给最高频两个）。alias → [noun, verb]。──────────────

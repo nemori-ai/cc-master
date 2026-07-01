@@ -787,4 +787,76 @@ else
 fi
 rm -rf "$P"
 
+# ════════════════════════════════════════════════════════════════════════════════════════════════════
+# ── INIT-FLAGS series (方案A·ADR-020 §2.45)：fresh 路径据用户亲手敲的启动 flag（--priority / --wip /
+#    --owner-wip / --policy-switch）经 ccm board update / ccm policy set 把刚建的板预设好。需要一个真 ccm
+#    （CCM_BIN -x），否则跳过（flag 应用是 best-effort：ccm 缺时板照建·flag 不落地·只附 advisory）。
+# ════════════════════════════════════════════════════════════════════════════════════════════════════
+# board 字段读取（板被 ccm 写后是 pretty-printed 多行 JSON·纯 bash/sed·无 jq）。
+#   coordination.priority 是板上唯一 "priority"（fresh 无 task 覆写）；scheduling.wip_limit 是首个 "wip_limit"。
+board_priority() { sed -n 's/.*"priority"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1" | head -1; }
+board_wip_limit() { sed -n 's/.*"wip_limit"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p' "$1" | head -1; }
+board_owner_wip() { sed -n 's/.*"owner_wip_limit"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p' "$1" | head -1; }
+board_policy_switch() { sed -n 's/.*"autonomous_account_switch"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$1" | head -1; }
+
+if [ -n "${CCM_BIN:-}" ] && [ -x "${CCM_BIN:-}" ]; then
+  # ── IF1 (raw-command path): all four flags valid → board update + policy set applied to the new board.
+  P="$(make_project)"
+  HOOK_OUT="$(printf '%s' '{"session_id":"sess-if1","prompt":"/cc-master:as-master-orchestrator build the widget --priority high --wip 3 --owner-wip 2 --policy-switch deny"}' \
+    | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
+      bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+  IF1_BOARD="$(only_board "$P/.claude/cc-master")"
+  assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "IF1: board created (raw-command path)"
+  assert_eq "high" "$(board_priority "$IF1_BOARD")" "IF1: --priority high → coordination.priority"
+  assert_eq "3" "$(board_wip_limit "$IF1_BOARD")" "IF1: --wip 3 → scheduling.wip_limit"
+  assert_eq "2" "$(board_owner_wip "$IF1_BOARD")" "IF1: --owner-wip 2 → scheduling.owner_wip_limit"
+  assert_eq "deny" "$(board_policy_switch "$IF1_BOARD")" "IF1: --policy-switch deny → policy.autonomous_account_switch"
+  assert_valid_json "$HOOK_OUT" "IF1: ctx is valid JSON"
+  assert_contains "$HOOK_OUT" "原样保留" "IF1: ctx tells agent the preset knobs are already on the board (别覆写)"
+  rm -rf "$P"
+
+  # ── IF2 (body-sentinel path): args recovered from the <!-- cc-master:args: ... --> line apply too.
+  P="$(make_project)"
+  HOOK_OUT="$(printf '%s' '{"session_id":"sess-if2","prompt":"<!-- cc-master:bootstrap:v1 -->\n<!-- cc-master:args: ship it --priority urgent --wip 5 --policy-switch allow -->\nbody..."}' \
+    | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
+      bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+  IF2_BOARD="$(only_board "$P/.claude/cc-master")"
+  assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "IF2: board created (body-sentinel path)"
+  assert_eq "urgent" "$(board_priority "$IF2_BOARD")" "IF2: body-sentinel --priority urgent → coordination.priority"
+  assert_eq "5" "$(board_wip_limit "$IF2_BOARD")" "IF2: body-sentinel --wip 5 → scheduling.wip_limit"
+  assert_eq "allow" "$(board_policy_switch "$IF2_BOARD")" "IF2: body-sentinel --policy-switch allow → policy"
+  rm -rf "$P"
+
+  # ── IF3 (no flags): a plain goal leaves the template defaults untouched (no spurious writes).
+  P="$(make_project)"
+  HOOK_OUT="$(printf '%s' '{"session_id":"sess-if3","prompt":"/cc-master:as-master-orchestrator just a plain goal"}' \
+    | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
+      bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+  IF3_BOARD="$(only_board "$P/.claude/cc-master")"
+  assert_eq "4" "$(board_wip_limit "$IF3_BOARD")" "IF3: no --wip → template default wip_limit=4 untouched"
+  assert_eq "" "$(board_priority "$IF3_BOARD")" "IF3: no --priority → no coordination.priority written"
+  assert_not_contains "$HOOK_OUT" "原样保留" "IF3: no flags → no preset-knob note in ctx"
+  rm -rf "$P"
+
+  # ── IF4 (invalid values·best-effort): bad enum/int are SKIPPED + noted in an advisory, board still
+  #    created with template defaults, hook still exits 0 (illegal flag never blocks startup).
+  P="$(make_project)"
+  HOOK_OUT="$(printf '%s' '{"session_id":"sess-if4","prompt":"/cc-master:as-master-orchestrator do it --priority bogus --wip abc --policy-switch maybe"}' \
+    | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
+      bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"; IF4_RC=$?
+  IF4_BOARD="$(only_board "$P/.claude/cc-master")"
+  assert_eq 0 "$IF4_RC" "IF4: invalid flag values still exit 0 (best-effort·never block)"
+  assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "IF4: board still created despite invalid flags"
+  assert_eq "4" "$(board_wip_limit "$IF4_BOARD")" "IF4: invalid --wip abc skipped → wip_limit stays default 4"
+  assert_eq "" "$(board_priority "$IF4_BOARD")" "IF4: invalid --priority bogus skipped → no priority written"
+  assert_eq "" "$(board_policy_switch "$IF4_BOARD")" "IF4: invalid --policy-switch maybe skipped → no policy written"
+  # NB: the ctx is JSON-escaped on the way out (s/"/\\"/g), so the quote chars appear as \" in HOOK_OUT
+  #   — match on the quote-free prefix `<advisory source=` (same pattern the G-series uses for <directive).
+  assert_contains "$HOOK_OUT" "<advisory source=" "IF4: invalid values noted in a bootstrap advisory"
+  assert_valid_json "$HOOK_OUT" "IF4: ctx with advisory is still valid JSON"
+  rm -rf "$P"
+else
+  echo "(INIT-FLAGS series skipped — no executable CCM_BIN/ccm to apply board update/policy set)"
+fi
+
 finish

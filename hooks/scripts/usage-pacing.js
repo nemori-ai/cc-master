@@ -434,7 +434,7 @@ function decideAccountWarning(acct, nowSec, floor, n, dispatchGate) {
       `[cc-master pacing] 账户 5h 配额临界(权威口径,来自 status-line 捕获):${hits.join(' / ')} ` +
       `已达/超过 ${floor}% 阈值。你声明了 ${nAcct} 份可序列消费的配额且 7d 总闸仍有余量(7d 仅 ${p7}%)——当前账号这份 ` +
       `5h 烧满是**切到下一份配额**的触发信号,不是减速信号:理想是把这份烧满后顺势用下一份满配额的 5h 窗,` +
-      `而非在总配额还有余时减速空耗。切换/续派由你的认知判断;这是非阻断提示,不替你决策。`;
+      `而非在总配额还有余时减速空耗。配速/续派由你的认知判断;换号在配额墙由 hook 按 board.policy 自主机械执行+事后通知你(policy=deny 或 7d 硬总闸时作为用户决策 surface 给你拍),不由你逐次拍板。这是非阻断提示,不替你决策。`;
     kind = 'switch'; // n>1 切下一份配额 → advisory weak（机会信号·可逆·低 stakes）
   } else {
     // 保守减速分支，三种情形落这里：① n=1（回落减速）；② 7d 撞墙但未达 dispatch 闸（floor≤p7<gate,罕见——
@@ -731,7 +731,7 @@ function ccmWarning(data, n) {
           `[cc-master pacing] 账户 5h 配额临界(权威口径,来自 status-line 捕获):5h ${p5}% 已达/超过阈值。` +
           `你声明了 ${nAcct} 份可序列消费的配额且 7d 总闸仍有余量(7d 仅 ${p7}%)——当前账号这份 ` +
           `5h 烧满是**切到下一份配额**的触发信号,不是减速信号:理想是把这份烧满后顺势用下一份满配额的 5h 窗,` +
-          `而非在总配额还有余时减速空耗。切换/续派由你的认知判断;这是非阻断提示,不替你决策。`,
+          `而非在总配额还有余时减速空耗。配速/续派由你的认知判断;换号在配额墙由 hook 按 board.policy 自主机械执行+事后通知你(policy=deny 或 7d 硬总闸时作为用户决策 surface 给你拍),不由你逐次拍板。这是非阻断提示,不替你决策。`,
         kind: 'switch',
       };
     }
@@ -1099,8 +1099,9 @@ function stopBody(ctx) {
     if (pool.switchable >= 1) {
       const poolFact =
         `[号池] 你有 ${pool.backups} 个备号(其中 ${pool.switchable} 个 token 未过期、可切入)——` +
-        `配额逼顶时「换号」是一个可用的 pacing lever:切到一份恢复更多的配额。换号机制由 ccm account switch 机械执行` +
-        `(选号 + 切换 + policy 硬闸都在 ccm·token-blind);切不切的决策 / 配速由你的认知判断,这是事实告知,不替你决策。`;
+        `配额逼顶时还有「换号」这层容量:切到一份恢复更多的配额。换号机制由 ccm account switch 机械执行` +
+        `(选号 + 切换 + policy 硬闸都在 ccm·token-blind)。分工:配速(档/WIP/defer)由你的认知判断;` +
+        `换号在配额墙(5h 临界)时由 hook 按 board.policy 自主机械执行+事后通知你(policy=deny 或 7d 硬总闸时作为用户决策 surface 给你拍),不由你逐次拍板。这是事实告知,不替你决策。`;
       blocks.push(ambient('usage-pacing', poolFact));
     }
   }

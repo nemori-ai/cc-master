@@ -687,6 +687,97 @@ else
   printf '{"schema":"cc-master/v2","meta":{"template_version":3},"goal":"","owner":{"active":true,"session_id":"%s","heartbeat":""},"git":{"worktree":"","branch":""},"scheduling":{"wip_limit":4},"tasks":[],"log":[]}\n' "$sid_esc" > "$BOARD"
 fi
 
+# ── INIT FLAGS（方案A·ADR-020 board-init 写边界）─────────────────────────────────────────────────────
+# bootstrap 作为板的**创建者**，在 fresh 建板初始化时据用户在命令里**亲手敲的**显式旋钮 flag（priority /
+# wip / owner-wip / policy-switch）把 board 预设好——经进程边界 `ccm board update` / `ccm policy set` 写 ✎
+# 字段（coordination.priority / scheduling.wip_limit·owner_wip_limit / policy）。这是**建板初始化**写边界，
+# 与运行时 hook 的 `runtime.*` nudge side-channel 不同性质（那是 ADR-020 §2.1 的运行时簿记；本段是建板那一刻的
+# 一次性初始化）。守红线：① 红线1——纯 bash 解析 + 进程边界 spawn `ccm`（不 import 引擎）；② 红线6——写在
+# 「建板 + 盖 sid」之后（板此刻已存在、本 session 已武装）；③ 红线2——priority/wip/policy 皆 ✎ 非窄腰、hook
+# 不读窄腰；④ policy 授权语义——用户亲手敲 `--policy-switch` = 用户授权，hook 转 `--user-authorized` 的权来自
+# 用户输入、**非 hook 自授权**。**best-effort**：板已建好，flag 落地失败**绝不 block 编排起跑**（exit 0 仍走到
+# 下方 ctx 注入），失败/非法值在 ctx 附一句 advisory。**goal 不在此设**（模板 goal=""，由 agent 设）。
+#
+# CCM_CMD：进程边界 spawn 的 ccm 可执行（与 node hook 同口径）。上方 install precheck 已保证它在场（CCM_BIN
+# 可执行 OR `ccm` 在 PATH）；这里仍 best-effort 吞错（仿 migrate_legacy_boards）——任何失败只记 note、不崩。
+CCM_CMD="${CCM_BIN:-ccm}"
+# fresh_args：本回合 fresh 形态的**完整原始 arg 串**（含 goal + flag）。两条触发路径各取其源：raw-command 路径
+#   `rest`（已 ltrim·prefix 已剥）；body-sentinel 路径 `body_args`（从 <!-- cc-master:args: $ARGUMENTS --> 恢复）。
+#   `rest != trimmed` ⟺ raw-command 前缀真匹配过（剥掉了前缀）；否则走 body-sentinel 的 body_args（可能未设）。
+fresh_args=""
+if [ "$rest" != "$trimmed" ]; then
+  fresh_args="$rest"
+elif [ -n "${body_args:-}" ]; then
+  fresh_args="$body_args"
+fi
+
+flag_notes=""    # 非法值 / 应用失败的 advisory 文案（单行·无换行·下方 per-line sed 量化才安全）
+applied=""       # 成功落板的旋钮摘要（喂 agent「原样保留别覆写」）
+init_pri=""; init_wip=""; init_ownerwip=""; init_pol=""
+# 纯 bash token 循环抽 flag 值（enum/int 轻解析）。set -f 关 glob（goal 文本可能含 `*`·别让它扩成文件名）；
+#   `set -- $fresh_args` 按 IFS 词分割成 token（goal 词被下面 *) 分支跳过·只挑 flag）。扫完恢复 +f。
+set -f
+# shellcheck disable=SC2086
+set -- $fresh_args
+set +f
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --priority)        init_pri="${2:-}";      shift; [ "$#" -gt 0 ] && shift ;;
+    --priority=*)      init_pri="${1#--priority=}";           shift ;;
+    --wip)             init_wip="${2:-}";       shift; [ "$#" -gt 0 ] && shift ;;
+    --wip=*)           init_wip="${1#--wip=}";                shift ;;
+    --owner-wip)       init_ownerwip="${2:-}";  shift; [ "$#" -gt 0 ] && shift ;;
+    --owner-wip=*)     init_ownerwip="${1#--owner-wip=}";     shift ;;
+    --policy-switch)   init_pol="${2:-}";       shift; [ "$#" -gt 0 ] && shift ;;
+    --policy-switch=*) init_pol="${1#--policy-switch=}";      shift ;;
+    *) shift ;;
+  esac
+done
+
+# ── 校验取值（非法 → 跳过该 flag + 记 note·别 block）+ 攒一条合并的 board update ──────────────────────
+upd_flags=""
+case "$init_pri" in
+  "") : ;;
+  urgent|high|normal|low|trivial) upd_flags="$upd_flags --priority $init_pri"; applied="${applied} priority=$init_pri" ;;
+  *) flag_notes="${flag_notes} --priority 取值 '${init_pri}' 非法（须 urgent|high|normal|low|trivial）·已跳过；" ;;
+esac
+case "$init_wip" in
+  "") : ;;
+  *[!0-9]*|0) flag_notes="${flag_notes} --wip 取值 '${init_wip}' 非正整数·已跳过；" ;;
+  *) upd_flags="$upd_flags --wip-limit $init_wip"; applied="${applied} wip=$init_wip" ;;
+esac
+case "$init_ownerwip" in
+  "") : ;;
+  *[!0-9]*|0) flag_notes="${flag_notes} --owner-wip 取值 '${init_ownerwip}' 非正整数·已跳过；" ;;
+  *) upd_flags="$upd_flags --owner-wip $init_ownerwip"; applied="${applied} owner-wip=$init_ownerwip" ;;
+esac
+if [ -n "$upd_flags" ]; then
+  # --board "$BOARD" 精确定位刚建的板（消歧·消除打错板风险）。吞错——失败只记 note·不崩·不 block。
+  # shellcheck disable=SC2086
+  if ! "$CCM_CMD" board update --board "$BOARD" $upd_flags >/dev/null 2>&1; then
+    flag_notes="${flag_notes} ccm board update 应用失败（板已建·priority/wip 未落地·可手动补设）；"
+    applied=""   # update 整条失败 → 收回上面攒的 priority/wip applied 摘要（诚实记账）
+  fi
+fi
+# ── policy（allow|deny）经 ccm policy set·非 TTY 须 --user-authorized（权来自用户亲手敲 flag·非自授权）──
+case "$init_pol" in
+  "") : ;;
+  allow|deny)
+    if "$CCM_CMD" policy set --board "$BOARD" --autonomous-account-switch "$init_pol" --user-authorized >/dev/null 2>&1; then
+      applied="${applied} policy-switch=$init_pol"
+    else
+      flag_notes="${flag_notes} ccm policy set 应用失败（板已建·policy 未落地·可手动补设）；"
+    fi ;;
+  *) flag_notes="${flag_notes} --policy-switch 取值 '${init_pol}' 非法（须 allow|deny）·已跳过；" ;;
+esac
+
 ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. Decompose the goal into a dependency DAG and write tasks[] into that board file, set goal/owner/git, then invoke the orchestrating-to-completion skill and run the decision program."
+# applied / flag_notes 都是**单行**（无内嵌换行）——下方 per-line sed 量化（s/^/"/; s/$/"/）才不破 JSON。
+if [ -n "$applied" ]; then
+  ctx="${ctx} bootstrap 已据你启动命令里的显式 flag 预设了这些 board 旋钮：${applied}（已写入 board）。设 board.goal 时把这些 flag token 从 goal 里剔除；这些已落板的旋钮原样保留、别覆写。"
+fi
+if [ -n "$flag_notes" ]; then
+  ctx="${ctx} <advisory source=\"bootstrap\" strength=\"weak\">部分启动 flag 未落地：${flag_notes}这些旋钮你可用 ccm（board update / policy set）手动补设，或请用户重发一条带正确 flag 的命令。</advisory>"
+fi
 printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":%s}}\n' "$(printf '%s' "$ctx" | sed 's/\\/\\\\/g; s/"/\\"/g; s/^/"/; s/$/"/')"
 exit 0

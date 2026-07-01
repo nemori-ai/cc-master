@@ -54,6 +54,26 @@ IDNUDGE 经进程边界 `spawnSync('ccm', ['board','set-param',...,'--board',<pa
 5. **ccm 缺 / 失败 → 优雅降级静默**（ship-anywhere·红线5；不 block Stop）。
 6. **token-blind**（参数区无任何 secret·只有时间戳等簿记·与 LBHOOK 同纪律）。
 
+### 2.45 bootstrap 作为板的创建者的 board-init 写边界（方案 A·`as-master-orchestrator` 启动 flag）
+
+ADR-020 §2.2 给的是**运行时周期 hook**经 `ccm board set-param` 写 `runtime.*` 的 side-channel（least-privilege·收窄到簿记参数区）。`as-master-orchestrator` 的**启动期显式 board 参数 flag**（`--priority` / `--wip` / `--owner-wip` / `--policy-switch`）落在一个**不同性质**的写边界上，本节显式记录：
+
+**`bootstrap-board.sh` 作为板的创建者，在 fresh 建板初始化时可调完整 `ccm board update` / `ccm policy set` 写 coordination/scheduling/policy。** 它据用户在命令里**亲手敲的** flag，在「建板 + 盖 sid」之后、注入 ctx 之前，经进程边界 spawn：
+
+- `ccm board update --board <新板> --priority <v> [--wip-limit <N>] [--owner-wip <N>]` → 写 ✎ `coordination.priority` / `scheduling.wip_limit` / `scheduling.owner_wip_limit`；
+- `ccm policy set --board <新板> --autonomous-account-switch <allow|deny> --user-authorized` → 写 ✎ `policy`。
+
+**与 §2.2 运行时 `runtime.*` nudge 的区分**：§2.2 是 hook 在编排**运行中**周期维护自己的簿记（瞬态·side-channel·收窄到 `set-param` 白名单）；本节是 bootstrap 在**建板那一刻**据用户显式输入做的**一次性初始化**——板的创建者天然有权初始化板的配置（同一脚本本就在写 owner.session_id/git 等）。故这里**不收窄到 set-param scoped verb**，用完整 `board update`/`policy set` 写 noun（它们本就是 agent 初始化板用的写命令）。
+
+**为何不破红线**：
+
+1. **红线1**——flag 解析是纯 bash token 循环（enum/int 轻校验），落地经**进程边界 spawn `ccm`**（不 import 引擎·同 §2.3）。
+2. **红线6**——写在「建板 + 盖 sid」**之后**：板此刻已存在、本 session 已武装（bootstrap 是 ARM 动作本身）。绝不在未武装路径上写。
+3. **红线2**——`coordination.priority` / `scheduling.*` / `policy` 皆 **✎ 非窄腰**字段（hook 武装闸只读 `owner.active`/`owner.session_id`·不读它们）；窄腰一字不动。
+4. **best-effort 不 block 起跑**——板已建好；flag 应用失败（ccm 缺/报错/非法值）只在 ctx 附一句 `<advisory source="bootstrap">`，hook 仍 exit 0 走完 ctx 注入（ship-anywhere·红线5）。非法值（坏 priority/wip/policy）跳过该 flag、不 block。
+
+**policy 授权语义（关键）**：`ccm policy set` 在非 TTY 须 `--user-authorized`（policy 视权限为用户所有·ADR-016）。bootstrap 在非 TTY 环境跑，故转 `--user-authorized`——但这**不是 hook 自授权**：授权的源头是**用户亲手在命令里敲了 `--policy-switch <v>`**，hook 只是把「用户已表达的换号偏好」转译成 ccm 调用。hook 永不在用户**没敲 flag** 时替用户设 policy（那才是越权·SKILL A「绝不自授权」红线）；agent 侧亦然——command step-3 明确「未经显式 flag 的换号偏好只能留默认，或请用户重发带 flag 的命令」。
+
 ### 2.5 clobber 风险的处置（轻解·用户拍板）
 
 clobber（lost update）风险不在 ccm 之间（带锁串行化），而在 **agent 的「整文件 Write」模型**：agent 持旧整板内存快照 → hook 经 ccm 写 `runtime.last_identity_remind`（改盘上最新）→ agent 用 `Write` 整文件覆盖回盘 → hook 刚写的字段被冲掉。board-lock 是 advisory 锁，裸 `Write`/`Edit` 不抢它。
@@ -94,3 +114,4 @@ clobber（lost update）风险不在 ccm 之间（带锁串行化），而在 **
 
 ## 6. References
 - 落地物：`@ccm/engine` `board-model.ts`（FIELDS.board.runtime + FMT-RUNTIME）/ `board-lint-core.ts`（lintRuntime）·`ccm` `mutations.boardSetParam` / `handlers/board.setParam` / `registry` board set-param verb·`hooks/scripts/identity-nudge.js`·`skills/using-ccm/references/`（command-catalog + board-model-guide 锁步）。
+- §2.45 board-init 写边界落地物（方案 A·启动 flag）：`hooks/scripts/bootstrap-board.sh`（fresh 路径建板后的 INIT FLAGS 段·经 `ccm board update`/`ccm policy set` 写 coordination/scheduling/policy）·`commands/as-master-orchestrator.md`（argument-hint + step-3「flag 已落板·原样保留别覆写 + 绝不自授权」约束）·`tests/hooks/test_bootstrap-board.sh`（INIT-FLAGS 系列覆盖两条触发路径）。
