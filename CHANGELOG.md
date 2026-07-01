@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-07-01
+
+> **plugin 线 minor** —— 单侧 pacing 消费（ADR-024）+ board-write-guard 单一写路径（ADR-025）+ skill 迭代（doubt-driven 验收纪律 / 顶层敏捷-局部瀑布范式 / 全 skills 第二人称 + 术语表锁步）。`using-ccm` 手册同步承接 ccm-v0.12.0 命令面（`task unblock` verb / 单侧 verdict / 双窗口选号硬闸 / `runtime.last_account_switch` 白名单）。ccm 引擎侧改动走 `ccm-v0.12.0`（另线）。
+
+### Added
+
+- **pacing 单侧 verdict 收敛 + ccm-only 消费（ADR-024）** — `usage-pacing.js` hook 消费 `ccm usage advise` 翻转后的单侧 verdict enum `{hold, throttle, switch, stop_5h, stop_7d}`（去掉旧的 `accelerate` 欠用侧加速 + `hard_stop`）：新增显式 `switch`（切下一份配额·LBHOOK 机械换号）/ `stop_5h`（本窗烧穿·引导 arm watchdog 守到 `nearest_reset` 回血）/ `stop_7d`（7d 硬总闸·暂停 dispatch + surface 用户），消费方直接吃 ccm 出的 `strength`（ADR-018 标签强度）。**退役 ~200 行本地反推 fallback**（`computeFiveHour` / `decideAccountWarning` / `decideAccountUnderuse` 等）——ADR-021 让 ccm 硬前置后，ccm 缺 / sidecar 缺一律静默（不再本地反推·反推 reset 会失真到数量级·Finding #37）。新增读 `runtime.last_account_switch` 的「检测到换号（可能手动）」ambient。`using-ccm` / `pacing-and-estimation` / `orchestrating-to-completion` 三 skill 的 verdict 词汇 + `ccm usage advise` 字段表（strength/nearest_reset/switch_candidate/pool）+ `runtime.last_account_switch` 白名单键同步锁步（§6）。
+- **board-write-guard —— board 变更只走 `ccm`（ADR-025）** — 新增 `board-guard.js`（PreToolUse hook·matcher `Write|Edit|MultiEdit|Bash`），在工具**执行前**拦截 agent 直接 file-edit 本 home `boards/` 下的 `*.board.json`（`Write`/`Edit`/`MultiEdit` 目标 board 文件 → 路径判定 deny；`Bash` 用 `sed`/`echo`/`tee`/`cat >` 手改 → 启发式偏假阴 deny，命令含 `ccm` 调用则早放行），并注一条 `<directive source="board-guard">`（含 why + 该改用哪个 ccm verb）。把「board 变更只走 `ccm`」从纪律硬化为机制——写关卡从 ccm 内部延伸到工具入口。dormant-until-armed（未武装 session 自由 Write/Edit）+ fail-open（异常静默放行·崩溃 guard 绝不卡死 agent）。同步删掉 skills 里所有「ccm 缺则降级 Write/Edit 手改」的 fallback 指导（ADR-021 后 ccm 已硬前置，fallback 前提已死）；PostToolUse board-lint 降为事后 backstop。
+
 ## [0.10.2] — 2026-07-01
 
 > **plugin 线 patch 收尾** —— 又一次版本线解耦演示：ccm 不动（保持 `ccm-v0.11.0`），仅 plugin 独立 bump。文档化一个此前「支持但不宣传」的启动 flag，并把 dev-only 发版预演脚本对解耦后 workflow 的引用修正到位。
