@@ -84,19 +84,31 @@ test('ADR-018: non-substrate hooks tag-wrap their agent-context injection (anti-
   const bootstrap = read('hooks/scripts/bootstrap-board.sh');
   assert.doesNotMatch(reinject, TAG_CALL, 'reinject is substrate (ADR-018 §2.5) — must NOT tag-wrap');
   assert.doesNotMatch(reinject, TAG_LITERAL, 'reinject is substrate — no tag literals');
-  // bootstrap 的例外（ADR-021）：其 ARM 角色注入（fresh / resume context）仍是 substrate·tag-free，但 ccm
-  //   install-presence 硬查失败时注入一条 **transient 硬约束 directive**（`<directive source="bootstrap">`·ccm
-  //   未装·agent-relay 提醒用户）——这 NOT substrate（substrate 是角色/魂重注·这是「硬前置缺失」的硬约束告警），
-  //   故合法带 directive 标签。契约收窄为：bootstrap 里**唯一允许**的 tag literal 是这条 ccm-missing directive；
-  //   其它 substrate 注入（inject_ctx 的 fresh/resume context）一律不带标签。
+  // bootstrap 的例外：其 ARM 角色注入（fresh / resume context）仍是 substrate·tag-free，但有 TWO 个合法 tag
+  //   literal——都 NOT substrate（substrate 是角色/魂重注），都是带判断的 hook→agent 消息，故合法带标签：
+  //   ① ccm install-presence 硬查失败的 **硬约束 directive**（`<directive source="bootstrap">`·ADR-021·ccm 未装·
+  //      agent-relay 提醒用户·决策归 system）；
+  //   ② fresh 建板初始化时**启动 flag best-effort 应用失败/非法值**的 **advisory**（`<advisory source="bootstrap"
+  //      strength="weak">`·ADR-020 §2.45·哪些 --priority/--wip/--policy-switch 没吃下·决策归 agent·可合理忽略）。
+  //   契约：bootstrap 里**仅允许**这两条 tag literal；其它 substrate 注入（inject_ctx 的 fresh/resume context）
+  //   一律不带标签。
   const bootstrapTagLiterals = bootstrap.match(/<(ambient|advisory|directive)\s+source=/g) || [];
   for (const lit of bootstrapTagLiterals) {
     assert.match(
       lit,
-      /<directive source=/,
-      `bootstrap may only carry the ccm-missing <directive source="bootstrap"> (ADR-021); found a non-directive tag literal: ${lit}`,
+      /<directive source=|<advisory source=/,
+      `bootstrap may only carry the ccm-missing <directive source="bootstrap"> (ADR-021) or the init-flag ` +
+        `<advisory source="bootstrap"> (ADR-020 §2.45); found a disallowed tag literal: ${lit}`,
     );
   }
+  // 且这条 init-flag advisory 确实在场（ADR-020 §2.45 实现存在性·防被误删回退到「失败静默吞」）。
+  //   NB: bootstrap 用双引号 bash 串构造它（要插值 ${flag_notes}），故源码里引号是反斜杠转义的
+  //   `source=\"bootstrap\"`——正则容忍这个可选反斜杠（与 ccm-missing directive 的单引号串不同）。
+  assert.match(
+    bootstrap,
+    /<advisory source=\\?"bootstrap/,
+    'bootstrap carries the init-flag advisory (ADR-020 §2.45): invalid/failed --priority/--wip/--policy-switch noted',
+  );
   // 且这条 directive 确实在场（ADR-021 实现存在性·防被误删回退到「无硬前置 fail-loud」）。
   assert.match(
     bootstrap,

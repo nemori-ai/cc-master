@@ -80,19 +80,24 @@ We keep a clear line between "what it does today" and "what we're still building
 
 ## Get started
 
-One command installs both pieces — the `ccm` engine and the cc-master plugin — at matching versions (they're built and shipped together, tag by tag):
+One command installs both pieces — the `ccm` engine and the cc-master plugin. The two **version independently** ([ADR-022](adrs/ADR-022-version-line-decoupling.md)): the plugin ships under bare `vX.Y.Z` tags, `ccm` under `ccm-vX.Y.Z` tags, on separate release tracks. The installer resolves the latest of each line:
 
 ```bash
-# install the latest release
+# install the latest of each line (plugin + ccm)
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash
 
-# …or pin a specific version
-curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --version v0.10.0
+# …or pin a specific version of either line — each flag is optional and
+# independent; whichever you omit resolves to the latest of that line:
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- \
+  --ccm-version ccm-v0.11.0 --plugin-version v0.10.1
+
+# pin just one line, leave the other on latest (e.g. hold ccm, take latest plugin):
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.11.0
 ```
 
 It detects your OS and architecture, downloads the right `ccm` binary and puts it on your PATH, then installs the plugin into Claude Code. You just need `curl` (or `wget`), `unzip`, and the `claude` CLI (≥ v2.1.195) already on your machine. The `ccm` engine is a **hard prerequisite** — without it the plugin won't start an orchestration ([ADR-021](adrs/ADR-021-ccm-install-presence-hard-precheck.md)) — which is exactly why the installer puts it in place first.
 
-> **Rather do it by hand, or run from source?** Clone the repo and point Claude Code straight at it: `git clone https://github.com/nemori-ai/cc-master.git && claude --plugin-dir ./cc-master`. You'll still need a matching `ccm` on your PATH — download `ccm-<os>-<arch>` from the release **Assets**, rename it to `ccm`, `chmod +x`, and drop it in `~/.local/bin`.
+> **Rather do it by hand, or run from source?** Clone the repo and point Claude Code straight at it: `git clone https://github.com/nemori-ai/cc-master.git && claude --plugin-dir ./cc-master`. You'll still need `ccm` on your PATH — download `ccm-<os>-<arch>` from the latest `ccm-v*` release's **Assets** (ccm has its own release line now), rename it to `ccm`, `chmod +x`, and drop it in `~/.local/bin`.
 
 **Moved your Claude config?** If you run Claude Code with `CLAUDE_CONFIG_DIR` pointing somewhere other than `~/.claude`, `ccm` follows it automatically — its board home and account pool live under your configured directory, no extra flags needed.
 

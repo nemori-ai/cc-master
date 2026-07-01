@@ -6,10 +6,10 @@
 
 changesets 只管 **ccm 包**，**独立于** cc-master **插件**的发版流。两套并存、互不干扰：
 
-- **cc-master 插件**——手动门：版本号同步改 `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` 两处 manifest + `CHANGELOG.md`，再 `gh release create`（详见仓库根 `AGENTS.md` §11）。
-- **ccm 包**（本目录）——用 changesets：每个改动 ccm 包行为的 PR 附一份 changeset 文件声明 bump 级别（patch / minor / major），`changeset version` 据此聚合版本号 + 生成各包 changelog。
+- **cc-master 插件**——手动门：版本号同步改 `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` 两处 manifest + `CHANGELOG.md`，合并后打**裸 `vX.Y.Z`** tag（触发 `plugin-release.yml`）。详见仓库根 `AGENTS.md` §11。
+- **ccm 包**（本目录）——用 changesets：每个改动 ccm 包行为的 PR 附一份 changeset 文件声明 bump 级别（patch / minor / major），`changeset version` 据此聚合版本号 + 生成各包 changelog，再打 **`ccm-vX.Y.Z`** tag（触发 `ccm-release.yml`）。
 
-二者**不共享版本号**：插件版本（`plugin.json`）与 ccm 包版本（`packages/*/package.json`、`apps/*/package.json`）各自独立演进。
+二者**不共享版本号、不共享 tag**：插件走裸 `v*`、ccm 走 `ccm-v*`，两个 glob 天然互斥、各自触发独立 release workflow（ADR-022 版本线解耦）。插件版本（`plugin.json`）与 ccm 版本（`packages/*/package.json`、`apps/*/package.json`）各自独立演进。
 
 ## 日常用法
 
@@ -31,3 +31,4 @@ pnpm -C ccm exec changeset version
 - `baseBranch: "main"`——`changeset status` 的 diff 基线。
 - `updateInternalDependencies: "patch"`——`ccm` 依赖 `@ccm/engine`（`workspace:*`），后者 bump 时前者至少 patch。
 - `changelog: "@changesets/cli/changelog"`——用内置 changelog 生成器（不依赖 GitHub API token）。
+- `fixed: [["ccm", "@ccm/engine"]]`——`ccm`（CLI）与 `@ccm/engine`（引擎库）**锁步成单一「ccm 版本号」**：任一 bump 时另一个跟随同版本。二者一起打进同一 SEA 二进制、同生命周期，故「ccm 版本」是一个数字（= `ccm --version` 输出 = `ccm-vX.Y.Z` tag 数字 = 两个 package.json 的 version），install / 用户心智 / tag 三者一致（ADR-022 次级默认①）。

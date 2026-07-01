@@ -80,19 +80,24 @@ cc-master 是 [Claude Code](https://code.claude.com/docs/en/workflows) 的一个
 
 ## 上手
 
-一条命令，把两样东西——`ccm` 引擎和 cc-master 插件——按配套版本一起装好（它们按同一个 tag 一起构建、一起发布）：
+一条命令，把两样东西——`ccm` 引擎和 cc-master 插件——装好。两者**各自独立版本**（[ADR-022](adrs/ADR-022-version-line-decoupling.md)）：插件走裸 `vX.Y.Z` tag，`ccm` 走 `ccm-vX.Y.Z` tag，各自独立的发版线。安装器各取各线的最新版：
 
 ```bash
-# 装最新 release
+# 各取两条线（插件 + ccm）的最新版
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash
 
-# …或指定一个版本
-curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --version v0.10.0
+# …或分别 pin 某条线的版本——两个 flag 各自可选、各自独立，
+# 省掉哪个、哪个就解析为本线最新：
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- \
+  --ccm-version ccm-v0.11.0 --plugin-version v0.10.1
+
+# 只 pin 一条线、另一条留最新（例如锁住 ccm、插件取最新）：
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.11.0
 ```
 
 它会探测你的操作系统和架构，下对应的 `ccm` 二进制、放进 PATH，再把插件装进 Claude Code。你只需本机已有 `curl`（或 `wget`）、`unzip`、和 `claude` CLI（≥ v2.1.195）。`ccm` 引擎是**硬前置**——没有它插件就不会开工（[ADR-021](adrs/ADR-021-ccm-install-presence-hard-precheck.md)）——所以安装器先把它就位。
 
-> **想自己手动装，或从源码跑？** clone 本仓、让 Claude Code 直接指过去：`git clone https://github.com/nemori-ai/cc-master.git && claude --plugin-dir ./cc-master`。你仍需一个版本配套的 `ccm` 在 PATH 上——从 release 的 **Assets** 下 `ccm-<os>-<arch>`、重命名为 `ccm`、`chmod +x`、放进 `~/.local/bin`。
+> **想自己手动装，或从源码跑？** clone 本仓、让 Claude Code 直接指过去：`git clone https://github.com/nemori-ai/cc-master.git && claude --plugin-dir ./cc-master`。你仍需一个 `ccm` 在 PATH 上——从最新 `ccm-v*` release 的 **Assets** 下 `ccm-<os>-<arch>`（ccm 现在有自己独立的发版线）、重命名为 `ccm`、`chmod +x`、放进 `~/.local/bin`。
 
 **把 Claude config 挪走了？** 如果你用 `CLAUDE_CONFIG_DIR` 把 Claude Code 的配置目录指到了 `~/.claude` 以外，`ccm` 会自动跟随——它的 board home 和号池都落在你配置的目录下，不用额外传参。
 

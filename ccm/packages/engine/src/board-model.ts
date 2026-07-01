@@ -730,6 +730,13 @@ export const INVARIANTS: Invariant[] = [
     scope: 'graph',
     summary: 'done owner ⇒ 子全 done(容瞬态·warn)',
   },
+  {
+    id: 'GRAPH-CONNECTED',
+    level: 'warn',
+    family: 'GRAPH',
+    scope: 'graph',
+    summary: '任务图弱连通(deps 当无向边·分量>1=有孤岛子图·目标聚焦·容多分量·warn)',
+  },
   // ── BIZ 条件业务规则(warn·两条 hard) ────────────────────────────────────────────────────────────
   {
     id: 'BIZ-AWAITING',

@@ -154,6 +154,7 @@ function _namespaceBlurb(noun: string): string {
     estimate: 'OR/ML 估算引擎：用时 / 关键路径 / EVM / 风险（只读·ADR-015）',
     account: '换号号池：录号 / 刷新 / 删 / 列 / 无重启换号（token-blind·ADR-019）',
     statusline: 'status line：渲染单行状态行（ctx/5h/7d）+ 安装 / 卸载（self-contained·0.10.0）',
+    upgrade: '自升级：把 ccm 二进制 + cc-master 插件升到各自线最新（--to 指定 / --dry-run 预览）',
   };
   return M[noun] || '';
 }
@@ -334,6 +335,12 @@ function _padRight(s: string, width: number): string {
 //   两者都缺 → '0.0.0'（不崩）。输出 GNU 格式 'ccm <ver>'（版本号在末空格后·便于脚本解析）。
 export function printVersion(out: Out): void {
   out(`ccm ${_readVersion()}`);
+}
+
+// readVersion()：导出版（供 upgrade handler 读「当前 ccm/插件版本」做 current-vs-latest 比较·复用同一 SSOT
+//   读取链·避免 upgrade 端再造一份易漂移的版本读取）。形如 'x.y.z'（缺则 '0.0.0'）。
+export function readVersion(): string {
+  return _readVersion();
 }
 
 // _readVersion：process.env.CCM_VERSION → cli/package.json → .claude-plugin/plugin.json → '0.0.0'。

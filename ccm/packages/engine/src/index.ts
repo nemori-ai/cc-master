@@ -31,7 +31,7 @@ export type {
   LintEntry,
   LintResult,
 } from './board-lint-core.js';
-// ── board-lint-core（lintBoard / formatReport / buildGraph / findCycle / STATUS_ENUM / ISO_UTC_RE）──
+// ── board-lint-core（lintBoard / formatReport / buildGraph / findCycle / weaklyConnectedComponents / STATUS_ENUM / ISO_UTC_RE）──
 //   注：board-lint-core 也导出名为 ISO_UTC_RE 的常量（透传自 board-model 的同一正则）；board-model 的
 //   ISO_UTC_RE 已在上面 export，二者是同一个值，故此处不再重复导出（避免 re-export 名冲突），改为按需点名。
 export {
@@ -40,6 +40,7 @@ export {
   formatReport,
   lintBoard,
   STATUS_ENUM,
+  weaklyConnectedComponents,
 } from './board-lint-core.js';
 export type { LockOptions } from './board-lock.js';
 // ── board-lock（acquire / release / withLock / isLocked / lockPathFor）──

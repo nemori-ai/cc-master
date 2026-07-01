@@ -1,8 +1,13 @@
-# ccm-release —— 多平台 Node SEA 单文件二进制构建 + plugin 分发 zip + 随 GitHub release 附产物。
+# ccm-release —— 多平台 Node SEA 单文件二进制构建 + 随 GitHub release 附产物。
 #
-# 分发模型（ADR-014）：ccm 走 per-OS Node SEA 二进制，随 cc-master 的 GitHub release
+# 版本线解耦（ADR-022）：ccm 与 cc-master plugin 是**两条独立版本线**，各自独立的 tag
+# 触发各自独立的 release workflow——
+#   - 本文件（ccm-release.yml）只认 `ccm-v*` tag，只产 ccm 二进制（build-sea）。
+#   - plugin 的「解压即装」制品 `cc-master-plugin-<tag>.zip` 已搬去 `plugin-release.yml`，
+#     只认裸 `v*` tag。两个 glob 天然互斥（`ccm-v…` 以 `c` 开头，不撞 `v*`），零交叉触发。
+#
+# 分发模型（ADR-014）：ccm 走 per-OS Node SEA 二进制，随 ccm 自己的 GitHub release
 # 附带 `ccm-<os>-<arch>`（不走 npm optionalDeps 平台子包——已决策砍掉）。
-# 另附 cc-master plugin 本身的「解压即装」制品 `cc-master-plugin-<tag>.zip`（package-plugin 作业）。
 #
 # ⚠️ Node 版本（关键，CI 必读）：build-sea.sh 的 postject sentinel 注入只在 Node 22 上可靠工作；
 #    本地用 Node 25/26 实测 postject 报「Could not find the sentinel NODE_SEA_FUSE」而失败。
@@ -22,7 +27,7 @@ name: ccm-release
 on:
   push:
     tags:
-      - 'v*'
+      - 'ccm-v*'
   workflow_dispatch:
 
 permissions:
@@ -99,55 +104,3 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ccm/apps/cli/dist/${{ matrix.asset }}
-
-  # cc-master plugin 本身的「解压即装」制品：cc-master-plugin-<tag>.zip。
-  # 与 ccm 二进制独立——plugin 是纯 prose/脚本分发物（无 build），由 dev-only 脚本
-  # scripts/package-plugin.sh 从 repo 根打包；attach 到同一 GH release。
-  package-plugin:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # 仅为 `claude plugin validate` 提供 node 运行时（plugin validate 是纯本地 manifest 校验·不联网/不需认证）。
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install Claude Code CLI
-        run: npm install -g @anthropic-ai/claude-code
-
-      # tag 触发传 tag 名（产物名 cc-master-plugin-<tag>.zip）；
-      # 非 tag（workflow_dispatch）留空 → 脚本回退到 plugin.json version。
-      - name: Package plugin
-        id: pkg
-        run: |
-          TAG=""
-          case "${GITHUB_REF}" in
-            refs/tags/*) TAG="${GITHUB_REF_NAME}" ;;
-          esac
-          ZIP="$(bash scripts/package-plugin.sh "${TAG}")"
-          echo "zip=${ZIP}" >> "${GITHUB_OUTPUT}"
-
-      # 制品自证：解压后 `claude plugin validate` 须过（确保 zip 本身是合法可装 plugin）。
-      - name: Validate packaged plugin
-        run: |
-          DEST="$(mktemp -d)"
-          unzip -q "${{ steps.pkg.outputs.zip }}" -d "${DEST}"
-          claude plugin validate "${DEST}/cc-master"
-
-      # 上传 artifact（workflow_dispatch / 非 tag 触发时也留存可下载）。
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cc-master-plugin
-          path: ${{ steps.pkg.outputs.zip }}
-          if-no-files-found: error
-
-      # 仅 tag 触发时 attach 到 GitHub release。
-      - name: Attach to GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ steps.pkg.outputs.zip }}

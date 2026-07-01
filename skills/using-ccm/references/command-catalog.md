@@ -75,6 +75,10 @@
   - [statusline render](#statusline-render)
   - [statusline install](#statusline-install)
   - [statusline uninstall](#statusline-uninstall)
+- [namespace upgrade](#namespace-upgrade)
+  - [upgrade all](#upgrade-all)
+  - [upgrade ccm](#upgrade-ccm)
+  - [upgrade plugin](#upgrade-plugin)
 - [--json 输出形状](#--json-输出形状)
 
 ---
@@ -106,6 +110,8 @@ ccm <alias> [args] [flags]
 | `usage` | 配额侧**只读 advisory**：当前号/备号 5h/7d 用量 + 双侧走廊 pacing verdict + 任务 token 成本（ADR-015） |
 | `estimate` | 工作侧**只读 advisory**：双通道 MC 工期预测 / EVM / velocity / 风险（消费 OR/ML 引擎·ADR-015） |
 | `account` | 换号号池机制：备号 OAuth token 录入 / 选号 / 无重启切号（vault token-blind·**switch 读 board.policy·`deny`→exit 7**·ADR-016） |
+| `statusline` | self-contained status line：渲染单行状态行（ctx/5h/7d）+ 装/卸 `settings.json`（非 board 操作） |
+| `upgrade` | 自升级：把 **ccm 二进制 + cc-master 插件**升到各自发布线最新（非 board 操作·见 [namespace upgrade](#namespace-upgrade)） |
 
 ### Aliases
 
@@ -1381,6 +1387,73 @@ ccm statusline uninstall [--json]
 
 - 从备份**恢复**你原有的 `statusLine`（无备份则删该字段）+ 落 **opt-out 标记**让无感知自动安装不再覆盖回去（不跟用户较劲）
 - flags：`--json`（结构化输出）
+
+---
+
+## namespace upgrade
+
+> 让本机装了 ccm 的用户用 CLI 直接升级**两件解耦的发布物**：① **ccm 二进制**（per-OS Node SEA·随 GitHub `ccm-v*` 线发布·资产名 `ccm-<os>-<arch>`）；② **cc-master 插件**（zip·随 GitHub 裸 `v*` 线发布·由 claude CLI 经 marketplace 托管）。**非 board 操作**——不读/写 board，纯进程级动作（GitHub releases 列举 + 下载 + 自替换 + shell out `claude`）。三 verb：`all`（默认 verb·裸 `ccm upgrade`）/ `ccm` / `plugin`。
+>
+> **版本解析（关键坑·与 `install.sh` 同款）**：GitHub `/releases/latest` **不分前缀**——故走 `/releases` 列表 + tag 前缀过滤 + semver 排序取最新：ccm 线滤 `ccm-v*`、plugin 线滤裸 `v*` **且排除 `ccm-v*`**。某线暂无 release → 优雅报错（exit 1·不崩）。可选 `GITHUB_TOKEN`/`GH_TOKEN` 避匿名限流。
+>
+> **`--dry-run`（全局 flag）**：只查「当前 vs 最新」并打印计划、不真升。
+
+### upgrade all
+
+**写**（默认 verb：裸 `ccm upgrade` ≡ `ccm upgrade all`）
+
+```
+ccm upgrade [--json]
+ccm upgrade all [--json]
+```
+
+- positional：无
+- 行为：先升 ccm 二进制、再升插件（互不依赖·一个失败不挡另一个）；退出码取「先失败者」（都成才 `0`）
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm upgrade` · `ccm upgrade --dry-run`
+
+### upgrade ccm
+
+**写**（SEA 二进制原子自替换）
+
+```
+ccm upgrade ccm [--to <ccm-v*tag>] [--json]
+```
+
+- positional：无
+- 行为：探当前 SEA 自身路径（`process.execPath`）→ 下载新 `ccm-<plat>` 到同目录临时文件 → `chmod +x` → 验新二进制 `--version` 能跑 → 原子 `rename` 覆盖自身路径（macOS/Linux 运行中进程持旧 inode·覆盖安全）。**非 SEA**（node 脚本形态：dev / 全局 npm install）→ 拒绝自替换 + 清晰报错（exit 1）。未显式 `--to` 且本地核版本 ≥ 线上最新 tag 核版本 → 视为已最新、跳过（避免意外降级；ccm 二进制内部版本号与 `ccm-v*` 发布线**已解耦**，比较仅作参考门）
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--to <tag>` | | string | 指定 `ccm-v*` tag（默认线上最新·如 `ccm-v0.1.0`） |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm upgrade ccm` · `ccm upgrade ccm --to ccm-v0.1.0 --dry-run`
+
+### upgrade plugin
+
+**写**（claude CLI 经 marketplace 托管）
+
+```
+ccm upgrade plugin [--to <v*tag>] [--json]
+```
+
+- positional：无
+- 行为：shell out `claude plugin marketplace update cc-master`（best-effort）+ `claude plugin update cc-master@cc-master`。`claude` CLI 不在 → 清晰报错（exit 1）。**`--to` 仅信息性**——`claude plugin update` 只能升到 marketplace 当前指向版本（通常即最新），无法精确切任意历史 tag；给了 `--to` 会提示该局限并继续升到 marketplace 最新（要特定版本用 `install.sh --plugin-version <tag>`）
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--to <tag>` | | string | 期望的 `v*` tag（**信息性**·实际升到 marketplace 最新） |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm upgrade plugin` · `ccm upgrade plugin --dry-run`
 
 ---
 

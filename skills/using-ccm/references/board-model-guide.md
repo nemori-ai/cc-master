@@ -321,6 +321,9 @@ ccm task update T5 --rm-dep T3
 - 不能有悬挂引用（`GRAPH-DANGLING`·hard error）：被 deps 引用的 id 必须存在
 - 不能自环（`GRAPH-SELFLOOP`·hard error）
 - 不能有有向环（`GRAPH-CYCLE`·hard error）
+- 希望全图弱连通、无孤岛子图（`GRAPH-CONNECTED`·**warn 非 hard**）：连通性 = **deps 边 ∪ parent 容器边**（ADR-012），把二者都当无向边算，若分量数 > 1（某任务和主图没有任何依赖/归属关系、成了孤岛）发 warn，列出各分量的 task-id（主图 = 最大分量、其余 = 孤岛）。为目标聚焦希望图全通但不强求，故只 warn 不阻断；edge case：0/1 个（非 fill-work）任务或全连通不 warn。**parent 容器边计入连通**——一个 `deps:[]` 的嵌套子任务经其 owner 连进主图、不被误判孤岛。修法：给孤岛补 deps 连回主图（或挂到一个已连通的 owner 下），或确认它独立后忽略。
+  - **连通性只在「非 fill-work」节点上判——`role:fill-work` 豁免**：fill-work 定义即「脱离主图的填闲并行工作」、**故意独立**，把它计入会对每个 fill-work 节点常态误报孤岛（cry-wolf）。故连通性判定时 fill-work 节点整体从节点集剔除（连同其边），纯 fill-work 的孤岛不再 warn——无需给 fill-work 硬凑 deps 连回主图。
+  - **`awaiting-user` / 决策门节点**不**豁免**（用户拍板的设计原则）：一个 `blocked_on:user` 的决策门本应是**某主图工作节点的前驱 / 子 / 子图 / 节点本身**——它 gate 某段下游工作，故理应连进主图。一个无上下游的孤立决策门正是该 warn 的**真遗漏**（漏接了它 gate 的下游），照常计入 GRAPH-CONNECTED。修法不是豁免，而是把它接进主图：让它 gate 的那个下游工作节点 `deps` 含这个决策门（决策门 gate 下游），或给决策门本身合理 deps。
 
 deps 图的排期、临界路径计算（哪条链条最长、哪个 task 先派最解锁下游）属于 `orchestrating-to-completion` skill 的调度方法论范畴；本文给的是「怎么连对」，不复述排期。
 
@@ -803,6 +806,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `GRAPH-PARENT-DEPTH` | hard | owner 的子节点自己又是某些节点的 parent（违反 depth=1） | owner 只能含 leaf 子；孙节点改挂顶层 owner，或把中间节点升为顶层——见 [J 节](#j-parent--owner-嵌套语义) |
 | `GRAPH-PARENT-CYCLE` | hard | parent 链存在环（含自指 / 2-环） | parent 链回到「子单跳指向无 parent 的顶层 owner」 |
 | `GRAPH-ROLLUP` | warn | 标 `done` 的 owner 仍有非 done 子节点 | 确认子全 done + 父端点验收过再标父 done；容许「父整合中、子刚标完」的瞬态——见 [J 节](#j-parent--owner-嵌套语义) |
+| `GRAPH-CONNECTED` | warn | 把 `deps` ∪ `parent` 容器边当无向边算弱连通分量（**在非 fill-work 节点上**），分量 > 1（图被切成多个互不相连的子图 / 有孤岛节点） | 为目标聚焦希望图全通（但不强求·warn 非 hard）；给孤岛节点补上指向主图的 deps（它依赖谁 / 谁依赖它），或确认它确实独立后忽略本 warning。消息会列出各分量的 task-id（主图 = 最大分量、其余 = 孤岛）。**连通性 = deps ∪ parent 容器边**（ADR-012·嵌套子任务 `deps:[]` 经 owner 连进主图·不误判孤岛）。**`role:fill-work` 豁免**（故意独立·从节点集剔除·不 cry-wolf）；**`awaiting-user`/决策门不豁免**（本应 gate 某主图工作节点·孤立即真遗漏·用户拍板）——见 [F 节](#f-deps-怎么连) |
 
 ### BIZ 家族（条件业务规则）
 
