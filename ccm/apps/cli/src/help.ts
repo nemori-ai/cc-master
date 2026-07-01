@@ -150,7 +150,7 @@ function _namespaceBlurb(noun: string): string {
     baseline: 'EVM 计划基线快照 / 只读 / re-baseline',
     policy: 'board.policy 自主权限（首条：自主换号·ADR-016）',
     peers: '多-orchestrator 跨板只读花名册（ADR-017）',
-    usage: '配额用量 / 双侧走廊配速 advisory（只读·ADR-015）',
+    usage: '配额用量 / 单侧配速 advisory（只读·ADR-015）',
     estimate: 'OR/ML 估算引擎：用时 / 关键路径 / EVM / 风险（只读·ADR-015）',
     account: '换号号池：录号 / 刷新 / 删 / 列 / 无重启换号（token-blind·ADR-019）',
     statusline: 'status line：渲染单行状态行（ctx/5h/7d）+ 安装 / 卸载（self-contained·0.10.0）',

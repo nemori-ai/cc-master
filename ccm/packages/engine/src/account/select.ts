@@ -8,7 +8,8 @@
 //   安全命门：完全不碰 token——只读 accounts.json 的非密调度元信息（used_pct/resets_at/到期时刻）。
 //
 // 默认拍点：过 reset = 满血；未过 reset = 保守用原 used_pct；评分 W5*avail5h + W7*avail7d（W7=0.6/W5=0.4）；
-//   7d≥85% 硬闸；无历史新号视满血最优先；临近到期降权；全员逼顶返回 NONE_ALL_EXHAUSTED；source 信任分级。
+//   **双窗口对称硬闸 5h≥90% ∨ 7d≥85%**（任一逼顶即 gated·候选 ⟺ 双窗口健康）；无历史新号视满血最优先；
+//   临近到期降权；全员逼顶（无双窗口健康号）返回 NONE_ALL_EXHAUSTED；source 信任分级。
 
 import type { AccountEntry, Registry, WindowSnapshot } from './registry.js';
 import { ISO_UTC_RE, nowIso } from './registry.js';
@@ -28,6 +29,11 @@ export function envNum(name: string, dflt: number): number {
 
 // 7d 硬总闸：7d 估算 used% ≥ 此 → 该号视作几乎不可用。默认 85，对齐 usage-pacing 85% 闸。
 export const SEVEN_DAY_HARD_GATE = envNum('CCM_SELECT_7D_HARD_GATE', 85);
+
+// 5h 硬闸（对称）：5h 估算 used% ≥ 此 → 该号视作几乎不可用（切进去落地即撞 5h 墙）。默认 90——激进侧
+//   让 5h 快回血烧满点（比 7d 的 85 高 5·5h 是短窗、reset 快）。**注意 90 非 95**：95/5% buffer 是估算
+//   p95 那套预测区间约定、非 switch gate。与 SEVEN_DAY_HARD_GATE 对称，令「候选 ⟺ 双窗口健康」。
+export const FIVE_HOUR_HARD_GATE = envNum('CCM_SELECT_5H_HARD_GATE', 90);
 
 // 评分权重：avail = 100 - used_pct（剩余额度）。7d 加权更重（跨窗口总闸）。
 export const W5 = envNum('CCM_SELECT_W5', 0.4);
@@ -68,8 +74,8 @@ function freshFullScore(): number {
   return W5 * 100 + W7 * 100;
 }
 
-// 「全员逼顶 / 不可用」地板。7d 硬闸号被赋 SCORE_UNUSABLE（极低），地板取略高于它。
-const SCORE_UNUSABLE = -1; // 7d 硬闸命中的号的分（确保排在所有正常号之后）。
+// 「全员逼顶 / 不可用」地板。硬闸号（5h 或 7d 逼顶）被赋 SCORE_UNUSABLE（极低），地板取略高于它。
+const SCORE_UNUSABLE = -1; // 硬闸命中的号的分（确保排在所有正常号之后）。
 const SCORE_UNUSABLE_FLOOR = envNum('CCM_SELECT_UNUSABLE_FLOOR', 0); // 最优分 ≤ 0 = 全员不可用。
 
 // ── 时间比较（严格 ISO 字典序 == 时间序）──────────────────────────────────────────────────────────
@@ -148,8 +154,10 @@ export function accountScore(acct: AccountEntry, nowIsoStr: string): ScoreInfo {
   // tiebreak 用的「最早 reset」：两窗口 resets_at 取严格 ISO 中字典序更小者（越近越优）。
   const earliestReset = earliestOf(r5.resetsAt, r7.resetsAt);
 
-  // 7d 硬总闸：7d 已逼顶的号即便 5h 满血也几乎没用（切进去马上又被 7d 卡）。
-  if (p7 >= SEVEN_DAY_HARD_GATE) {
+  // 双窗口对称硬闸：5h 或 7d 任一逼顶 → 该号切进去落地即撞墙、几乎没用（7d 逼顶被 7d 卡；5h 逼顶被 5h 卡）。
+  //   p5/p7 都是 recoveredWindow 恢复后的值（过 reset 已回血 → 不误杀刚 reset 的号）。这一处对称令
+  //   「gated ⟺ 非双窗口健康」、「candidate ⟺ 双窗口健康」、「NONE_ALL_EXHAUSTED ⟺ 无双窗口健康号」。
+  if (p5 >= FIVE_HOUR_HARD_GATE || p7 >= SEVEN_DAY_HARD_GATE) {
     return {
       score: SCORE_UNUSABLE,
       avail5h,
@@ -416,20 +424,20 @@ export function selectAccount(
 
   if (candidates.length === 0) {
     // 无可切换号。区分退出语义：
-    //   · NONE_ALL_EXHAUSTED：仅当**非 active 备号全是 7d 硬闸**（纯配额逼顶·可操作的只有等 reset）。
+    //   · NONE_ALL_EXHAUSTED：仅当**非 active 备号全命中硬闸**（5h 或 7d 逼顶·纯配额逼顶·可操作的只有等 reset）。
     //   · NONE_NO_CANDIDATES：其余一切（无备号 / 全 active / 或混合——有 gated 但也有 expired/not_switchable）。
     const nonActiveBackups = ranked.filter((r) => !r.active);
     const allGated = nonActiveBackups.length > 0 && nonActiveBackups.every((r) => r.gated);
     if (allGated) {
       warnings.push(
-        '所有可切换备号都已 7d 逼顶（全部命中 7d 硬闸）——这是 blocked_on:"user" 决策：等 reset 还是别的，请用户拍板。',
+        '所有可切换备号都已逼顶（全部命中 5h 或 7d 硬闸·无双窗口健康号）——这是 blocked_on:"user" 决策：等 reset 还是别的，请用户拍板。',
       );
       return { selected: null, reason: 'NONE_ALL_EXHAUSTED', candidates: sorted, warnings };
     }
     // 混合排除或全 active / 无备号 → NONE_NO_CANDIDATES（可操作=修号池·非等 reset）。
     if (nonActiveBackups.some((r) => r.gated)) {
       warnings.push(
-        '无可切入备号：部分号 7d 逼顶、另一些因 token 过期 / 残缺（switchable:false）被排除——可操作的是 --refresh 过期号 / --add 补录残缺号，未必只能等 reset。',
+        '无可切入备号：部分号 5h 或 7d 逼顶、另一些因 token 过期 / 残缺（switchable:false）被排除——可操作的是 --refresh 过期号 / --add 补录残缺号，未必只能等 reset。',
       );
     }
     return { selected: null, reason: 'NONE_NO_CANDIDATES', candidates: sorted, warnings };

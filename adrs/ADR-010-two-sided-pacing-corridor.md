@@ -1,9 +1,11 @@
 # ADR-010 — pacing 从单边上限护栏改为双侧目标走廊（7d 当总闸）
 
-> Status: **Accepted**
+> Status: **Superseded by ADR-024**
 > Date: 2026-06-15
 > Scope: pacing 认知层（`references/cost-and-pacing.md`）+ 魂镜头5（`skills/orchestrating-to-completion/SKILL.md`）+ `hooks/scripts/usage-pacing.js`
 > Source: 本仓 Track B 行为 eval —— 欠 pace 探针下两个 agent 做出相反决策（一加速、一拒绝），暴露单边 pacing 无 setpoint 的结构缺陷
+
+> **已被 [`ADR-024`](ADR-024-single-sided-pacing-switch-stop.md) 取代**（单侧减速 + 换号 + 停·砍加速侧）——号池让单窗口「欠用」不再是真稀缺（一次 `switch` = 新窗口），pressure baseline 实证加速 advisory 是 capable agent 必须 overrule 的冗余噪声，故整个加速侧连同走廊 setpoint 一并退役。
 
 ---
 

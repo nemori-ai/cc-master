@@ -3,7 +3,7 @@
 // usage = 配额侧只读 advisory namespace（全 verb runRead·零写不变式）。本测试用 mkdtemp 临时 home +
 //   真 leaf + 临时板/registry/sidecar，端到端验证：
 //   · show     —— 无 registry → available:false 优雅降级（exit 0·非 1）；有 registry → 全备号快照 + as_of/snapshot_stale。
-//   · advise   —— sidecar 缺 → hold + available:false（降级）；sidecar 在 + n>1 + 5h 临界 + 7d 余量 → accelerate + switch_candidate。
+//   · advise   —— sidecar 缺 → hold + available:false（降级）；sidecar 在 + n>1 + 5h 临界 + 7d 余量 → switch + switch_candidate。
 //   · task-cost —— 单任务 token（in+out）；--group-by 聚合 + coverage_pct；无 token/shell → N/A。
 //   · 诚实字段齐全（source / confidence / available / as_of / coverage_pct / snapshot_stale）。
 //
@@ -152,7 +152,7 @@ const REGISTRY_3 = {
 };
 // 真实 sidecar 形态（statusline-capture.js 写）：epoch-秒 resets_at / captured_at + number used_percentage。
 //   captured_at 2026-06-25T09:00:00Z=1782378000；resets_at 取**远未来**（2030/2031），让窗口对 wall-clock now
-//   绝不过期——这些 case 测的是 throttle/accelerate 走廊逻辑，**非过期闸**（过期闸专测见末尾 #bug1 段，
+//   绝不过期——这些 case 测的是 throttle/switch 单侧 verdict 逻辑，**非过期闸**（过期闸专测见末尾 #bug1 段，
 //   注入固定 nowSec + resets_at<now）。否则 fixture reset 一旦落到运行时之前，过期闸正确地把 used% 判为 stale。
 const SIDECAR_CRITICAL = {
   five_hour: { used_percentage: 92, resets_at: 1893456000 }, // 2030-01-01T00:00:00Z（远未来·不过期）
@@ -371,10 +371,11 @@ test('usage advise honors --home for effective_n + switch_candidate (P2 regressi
     3,
     'effective_n from --home registry (not 1-account env home)',
   );
+  assert.equal(out.data.verdict, 'switch', '5h critical + healthy pool backup → switch (ADR-024)');
   assert.equal(
     out.data.switch_candidate,
-    'c@c.com',
-    'switch_candidate from --home registry backups',
+    'b@c.com',
+    'switch_candidate from --home registry backups (both recover past reset → email tiebreak b)',
   );
 });
 
@@ -391,18 +392,18 @@ test('usage advise with no sidecar holds + available:false (degrade, exit 0)', (
   assert.equal(out.data.source, 'local-derived-approx');
 });
 
-test('usage advise n>1 + 5h critical + 7d headroom → accelerate + switch_candidate (lowest 7d)', () => {
+test('usage advise n>1 + 5h critical + healthy backup → switch + switch_candidate (ADR-024)', () => {
   const { home, boardPath } = setupHome({ accounts: REGISTRY_3, sidecar: SIDECAR_CRITICAL });
   const ctx = mkCtx(home, boardPath, { flags: { json: true } });
   const code = usageHandler.advise(ctx);
   assert.equal(code, EXIT.OK);
   const out = JSON.parse(ctx.outBuf.join(''));
-  assert.equal(out.data.verdict, 'accelerate');
+  assert.equal(out.data.verdict, 'switch', '5h critical + healthy pool → switch (非减速·非加速)');
   assert.equal(out.data.effective_n, 3);
   assert.equal(
     out.data.switch_candidate,
-    'c@c.com',
-    'picks switchable backup with lowest 7d used%',
+    'b@c.com',
+    'engine select recovers past-reset backups to full → email tiebreak picks b',
   );
   assert.equal(out.data.window_5h_pct, 92);
   assert.equal(out.data.window_7d_pct, 50);
@@ -447,12 +448,15 @@ test('usage advise with sidecar at the OLD wrong path (usage-snapshot.json) stay
   assert.equal(out.data.source, 'local-derived-approx');
 });
 
-test('usage advise --effective-n 1 override → throttle (single account, no switch)', () => {
-  const { home, boardPath } = setupHome({ accounts: REGISTRY_3, sidecar: SIDECAR_CRITICAL });
-  const ctx = mkCtx(home, boardPath, { values: { 'effective-n': '1' }, flags: { json: true } });
+test('usage advise genuine single account + 5h critical → stop_5h (全池撞墙·无备号·ADR-024)', () => {
+  // 真单账号（无备号）5h 撞墙：换不了 → 全池（池=1）撞墙 → stop_5h（短停·arm wakeup 到 5h reset）。
+  const solo = { 'solo@c.com': { active: true, vault: { kind: 'keychain' } } };
+  const { home, boardPath } = setupHome({ accounts: solo, sidecar: SIDECAR_CRITICAL });
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
   usageHandler.advise(ctx);
   const out = JSON.parse(ctx.outBuf.join(''));
-  assert.equal(out.data.verdict, 'throttle');
+  assert.equal(out.data.verdict, 'stop_5h');
+  assert.equal(out.data.stop_dimension, '5h');
   assert.equal(out.data.effective_n, 1);
   assert.equal(out.data.switch_candidate, null);
 });
@@ -542,7 +546,7 @@ test('usage advise switch_candidate skips EXPIRED-token backup, picks the VALID 
   const code = usageHandler.advise(ctx);
   assert.equal(code, EXIT.OK);
   const out = JSON.parse(ctx.outBuf.join(''));
-  assert.equal(out.data.verdict, 'accelerate', 'n>1 (1 valid backup) + 5h critical + 7d headroom');
+  assert.equal(out.data.verdict, 'switch', 'n>1 (1 valid backup) + 5h critical → switch');
   assert.equal(
     out.data.switch_candidate,
     'valid@c.com',
