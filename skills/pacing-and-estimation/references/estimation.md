@@ -39,7 +39,7 @@
 
 ## usage ⊗ estimate 张力（典型 `blocked_on:"user"` 输入）
 
-配额侧 `ccm usage advise` 出 `throttle`/`hard_stop`，但工作侧 `ccm estimate forecast` 的 p80 ETA 还很长 / `cost-to-complete` 的 p80 配额% 装不下当前余量——这是一个典型张力：**容量不够装完该装的活**。
+配额侧 `ccm usage advise` 出 `throttle`/`stop_7d`，但工作侧 `ccm estimate forecast` 的 p80 ETA 还很长 / `cost-to-complete` 的 p80 配额% 装不下当前余量——这是一个典型张力：**容量不够装完该装的活**。
 
-- **识别它**（归本 skill·消费层）：读两个字段对比——usage verdict（`throttle`/`hard_stop`）✕ estimate `forecast.p80` 超期 或 `cost_to_complete_pct.p80` > 当前余量。
+- **识别它**（归本 skill·消费层）：读两个字段对比——usage verdict（`throttle`/`stop_7d`）✕ estimate `forecast.p80` 超期 或 `cost_to_complete_pct.p80` > 当前余量。
 - **怎么办**（归 A 镜头 7·决策）：这是一个典型的 `blocked_on:"user"` 决策——**范围（砍 scope）/ 期限（延 deadline）/ 加资源（换号补配额）三选一** surface 给用户。本文只教「怎么识别这个张力（读哪两个字段）」；surface 动作 + decision_package 采访包归 `orchestrating-to-completion`。
