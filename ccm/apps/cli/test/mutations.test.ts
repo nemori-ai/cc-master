@@ -259,6 +259,39 @@ test('blockTask on a task id (non-user) — no decision_package required at this
   assert.equal(t.decision_package, undefined);
 });
 
+// ── unblockTask ──────────────────────────────────────────────────────────────────────────────────
+test('unblockTask clears blocked_on + decision_package; does NOT set status (reconcile owns it)', () => {
+  let b = m.blockTask(baseBoard(), 'T1', {
+    on: 'user',
+    decisionPackage: { ask_type: 'advice' },
+  });
+  b = m.unblockTask(b, 'T1');
+  const t = b.tasks.find((x: AnyBoard) => x.id === 'T1');
+  assert.equal(t.blocked_on, undefined);
+  assert.equal(t.decision_package, undefined);
+  assert.equal(
+    t.status,
+    'blocked',
+    'mutation leaves status as-is; reconcileGating (write关卡) 定 ready/blocked',
+  );
+});
+
+test('unblockTask on missing id → NotFound', () => {
+  assert.throws(
+    () => m.unblockTask(baseBoard(), 'NOPE'),
+    (e: unknown) => {
+      return (e as { errKind?: string }).errKind === 'NotFound';
+    },
+  );
+});
+
+test('unblockTask is pure (input board untouched)', () => {
+  const orig = m.blockTask(baseBoard(), 'T1', { on: 'user' });
+  const snap = snapshot(orig);
+  m.unblockTask(orig, 'T1');
+  assert.deepEqual(snapshot(orig), snap);
+});
+
 // ── appendLog ────────────────────────────────────────────────────────────────────────────────────
 test('appendLog appends an entry with ts stamped; append-only; pure', () => {
   const orig = baseBoard();

@@ -31,7 +31,7 @@ const EXPECTED: Record<string, string[]> = {
     'set-param',
   ],
   baseline: ['snapshot', 'show', 'reset'],
-  task: ['add', 'show', 'list', 'update', 'start', 'done', 'block', 'set-status', 'rm'],
+  task: ['add', 'show', 'list', 'update', 'start', 'done', 'block', 'unblock', 'set-status', 'rm'],
   log: ['add', 'list'],
   jc: ['add', 'list', 'show', 'resolve'],
   cadence: ['update', 'open', 'ship', 'status'],

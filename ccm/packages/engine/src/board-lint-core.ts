@@ -28,6 +28,7 @@ import {
   ENUMS,
   isAbsolutePathOrUrl,
   isAwaitingUser,
+  isDoneStatus,
   isEnumMember,
   isISOUTC,
   levelOf,
@@ -416,6 +417,13 @@ export function lintBoard(text: string): LintResult {
   // ── BIZ 条件业务规则（per-task）+ awaiting-user 完整性 ───────────────────────────────────────────────
   for (const [id, t] of taskById) {
     lintTaskBiz(id, t, emit);
+  }
+
+  // ── BIZ-STATUS-DEPS（deps 门控不一致·warn·ADR-023）──────────────────────────────────────────────────
+  //   CLI 写路径经 reconcileGating 自动归一 ready↔blocked，永不产生这类不一致；此规则兜「手改 board」造出的。
+  //   用 lint 已建的图 g.upstream（排除 dangling/self·同 readySet / reconcile 口径）+ taskById 判 deps 完成度。
+  for (const [id, t] of taskById) {
+    lintStatusDeps(id, t, g.upstream, taskById, emit);
   }
 
   // ── BIZ-CADENCE-SHIPPED（iteration 收口完整性：shipped ⇒ members 全 done+verified·hard）───────────────
@@ -826,6 +834,12 @@ function lintRuntime(board: BoardLike, emit: Emit): void {
       `runtime.last_critpath_remind 是 ${JSON.stringify(r.last_critpath_remind)}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：critpath-nudge 读它判周期阈值——格式不对则退化为「从未提示」(首次必提示)。`,
     );
   }
+  if (badTimestamp(r.last_account_switch)) {
+    emit(
+      'FMT-RUNTIME',
+      `runtime.last_account_switch 是 ${JSON.stringify(r.last_account_switch)}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：usage-pacing hook 读它判「上次换号是否已 surface」——格式不对则退化为不注入换号 ambient（fail-safe·ADR-024）。`,
+    );
+  }
 }
 
 // ── 每个 task 的 v2 字段 FMT ────────────────────────────────────────────────────────────────────────
@@ -1055,6 +1069,46 @@ function lintTaskBiz(id: string, t: TaskLike, emit: Emit): void {
   }
   // BIZ-TIME-ORDER（warn）：时间序 created≤started≤finished;in_flight⇒started;done⇒finished。
   lintTimeOrder(id, t, emit);
+}
+
+// ── BIZ-STATUS-DEPS（warn·ADR-023）：deps 驱动的门控一致性——它精确等于「reconcileGating 本应改动此 task」。
+//   reconcile 只归一「无 blocked_on（非语义阻塞）且 status ∈ {ready, blocked}」的 task：deps 全 done→ready，
+//   否则→blocked。故不一致 ⟺ 无 blocked_on ∧ status∈{ready,blocked} ∧ 当前 status ≠ 该归一目标。两种形态：
+//     · ready 但 deps 未全 done（应 blocked）· blocked 但 deps 全 done（应 ready）。
+//   有 blocked_on（等 user / 等某 task）的整体豁免——语义阻塞与拓扑就绪正交，reconcile 不碰，此规则也不报。
+//   deps 完成度用 lint 已建图的 upstream（排除 dangling/self·同 readySet / reconcile 口径），isDoneStatus 判 done。
+function lintStatusDeps(
+  id: string,
+  t: TaskLike,
+  upstream: Map<string, string[]>,
+  taskById: Map<string, TaskLike>,
+  emit: Emit,
+): void {
+  const status = t.status;
+  if (status !== 'ready' && status !== 'blocked') return; // 只归一 ready/blocked，其余态豁免。
+  const bo = t.blocked_on;
+  if (typeof bo === 'string' && bo !== '') return; // 语义阻塞（blocked_on 非空）豁免。
+  const deps = upstream.get(id) || [];
+  const undone = deps.filter((d) => !isDoneStatus(taskById.get(d)?.status));
+  const target = undone.length === 0 ? 'ready' : 'blocked';
+  if (target === status) return; // 一致——无须报。
+  if (status === 'ready') {
+    emit(
+      'BIZ-STATUS-DEPS',
+      `${id} status=ready 但 deps 未全 done（未完成上游：${undone.join(', ')}）——门控不一致（应 blocked）。` +
+        `CLI 写路径经 reconcileGating 自动归一（ready⟺deps 全 done），此态多半来自手改 board。\n` +
+        `  怎么修：跑任意 ccm 写命令触发归一，或 \`ccm task set-status ${id} blocked\`（deps 未满足应 blocked）。`,
+      id,
+    );
+  } else {
+    emit(
+      'BIZ-STATUS-DEPS',
+      `${id} status=blocked 且无 blocked_on（非语义阻塞）但 deps 全 done——门控不一致（应已 ready）。` +
+        `CLI 写路径经 reconcileGating 自动归一，此态多半来自手改 board（或 deps 刚全部完成而未重跑写命令）。\n` +
+        `  怎么修：跑任意 ccm 写命令触发归一，或 \`ccm task unblock ${id}\` / \`ccm task set-status ${id} ready\`。`,
+      id,
+    );
+  }
 }
 
 // BIZ-DECISION-PACKAGE（warn）：包在但字段不全（每项不合 → 一条 warn）。

@@ -18,7 +18,7 @@
 //   逻辑/数值/正则/报错文案/.errKind 逐字保持。`fs` 由文件顶层 import（原在 runWrite 内 require）。
 
 import * as fs from 'node:fs';
-import { formatReport, lintBoard } from '@ccm/engine';
+import { formatReport, lintBoard, reconcileGating } from '@ccm/engine';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
 import type { OptionSpec, VerbSpec } from '../registry.js';
@@ -262,7 +262,10 @@ export function runWrite(
       // 文件不存在 / 坏 JSON：init 路径合法（raw 留 null，mutate 自建）；非 init 路径 resolve 已保证存在。
     }
 
-    const next = mutate(raw, ctx);
+    // mutate 产出后跑一趟 deps 驱动的门控归一（reconcileGating·ADR-023）：所有写 verb 自动获得
+    //   ready↔blocked 归一——status∈{ready,blocked} 且无 blocked_on 的 task 按 deps 完成度定 ready/blocked
+    //   （有 blocked_on 的语义阻塞豁免·不产生新 done·幂等）。lint 校验的是归一后的板（含 BIZ-STATUS-DEPS）。
+    const next = reconcileGating(mutate(raw, ctx));
     const res = lintBoard(JSON.stringify(next));
 
     if (res.errors.length > 0 && !flags.force) {
