@@ -1,8 +1,8 @@
 # Patterns——编排形状、何时用、住在哪
 
 > 每个 pattern 一节：*何时伸手够它*、一份最小骨架、以及由哪个 bundled 的
-> `assets/templates/` 骨架或 `assets/examples/` workflow 演示。这些 pattern 由工具契约和
-> 社区目录（ray-amjad、alexop.dev）确认；底层语义见 `mechanism.md`。**本页每个形状都有一个
+> `assets/templates/` 骨架或 `assets/examples/` workflow 演示。这些 pattern 的语义
+> 由 `Workflow` 工具契约确认；底层语义见 `mechanism.md`。**本页每个形状都有一个
 > bundled 文件演示**——没有只剩 prose 的空壳；每节都点名跑它的那个确切 `assets/templates/`
 > 或 `assets/examples/` 文件。
 
