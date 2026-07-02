@@ -7,7 +7,7 @@ description: 'Use when you are a coding agent driving a single dev task through 
 
 > **分发 skill。** 这是给**执行 agent**(在自己的 agentic loop 里把一个 dev 任务做到验收的那个 coding agent)的**心智模型**:开发不是"一次性把代码写对",是一个**优化过程**——有目标函数、有测量、有迭代、有收敛。换上这副框架,你推进 dev 的方式会变。
 >
-> **职责边界(红线3):** 本 skill 是**执行单个任务**的心法(inner loop),与 orchestrator 不同 plane——A(`master-orchestrator-guide`)协调 / 派发、**指挥不演奏**;`slicing-goals-into-dags` 把目标**切**成任务(在执行之前);`using-ccm` 把任务**写进** board。本 skill 只管:**拿到一个带验收标准的任务后,怎么把它优化到验收。**
+> **职责边界(各 skill 互不重叠):** 本 skill 是**执行单个任务**的心法(inner loop),与 orchestrator 不同 plane——`master-orchestrator-guide` 协调 / 派发、**指挥不演奏**;`slicing-goals-into-dags` 把目标**切**成任务(在执行之前);`using-ccm` 把任务**写进** board。本 skill 只管:**拿到一个带验收标准的任务后,怎么把它优化到验收。**
 
 ---
 
@@ -75,7 +75,7 @@ loss 到 0(验收每一条都绿)= **收敛,停**。继续"优化"就是**过拟
 
 判断"做完了"的唯一标准是**目标函数达标**,不是"代码我看着舒服 / 还能更完美"。"完美"不是验收里的词。
 
-> **board 接地**:收敛 = `ccm task done --verified --artifact <产物>`——`verified` 这一位的语义正是"loss 真到 0、端点测过",**不是**"我觉得差不多了"(呼应 A 的 gate-green≠passed)。loop 跑了一半、"做了但还没确认收敛"是 `uncertain` 这一档 status,**不是** `done`——别把未测的当收敛标出去。命令见 `using-ccm`。
+> **board 接地**:收敛 = `ccm task done --verified --artifact <产物>`——`verified` 这一位的语义正是"loss 真到 0、端点测过",**不是**"我觉得差不多了"(呼应 `master-orchestrator-guide` 的 gate-green≠passed)。loop 跑了一半、"做了但还没确认收敛"是 `uncertain` 这一档 status,**不是** `done`——别把未测的当收敛标出去。命令见 `using-ccm`。
 
 ---
 
@@ -116,8 +116,8 @@ loss 到 0(验收每一条都绿)= **收敛,停**。继续"优化"就是**过拟
 
 ## Pointers
 
-- **slicing-goals-into-dags**(#8)—— 在执行**之前**,目标怎么**切**成带验收的任务。本 skill 接手"一个已切好、带验收的任务"往下优化;它切、本 skill 执行。
-- **master-orchestrator-guide**(SKILL A)—— 协调 / 派发 / 端点验收(指挥不演奏)。A 把任务**派给**执行 agent;执行 agent 用本 skill 的框架把它做到验收。A 的"只信端点验收 / gate-green≠passed"与本 skill 的"收敛=目标函数达标"是同一条:绿了才算 loss=0。
+- **slicing-goals-into-dags** —— 在执行**之前**,目标怎么**切**成带验收的任务。本 skill 接手"一个已切好、带验收的任务"往下优化;它切、本 skill 执行。
+- **master-orchestrator-guide** —— 协调 / 派发 / 端点验收(指挥不演奏)。它把任务**派给**执行 agent;执行 agent 用本 skill 的框架把它做到验收。它的"只信端点验收 / gate-green≠passed"与本 skill 的"收敛=目标函数达标"是同一条:绿了才算 loss=0。
 - **using-ccm** —— 任务做到验收后,怎么用 `ccm task done --verified --artifact` 把结果写回 board。
-- **engineering-with-craft**(#G)—— 本 skill 给循环的**形状**(怎么迭代逼近验收);engineering-with-craft 给循环里那双手的**工程手艺内容**(领域怎么建模 / 类怎么写 / 要不要 spec-first / **test-first 这条纪律本身怎么执行**)。测试触点:本 skill 锚 3 讲「测试为何是循环里的梯度信号」,它的 `tdd.md` 讲「红绿铁律怎么执行」——不同 plane,互补。
-- board 的 `acceptance` 字段语义(两态 objective function:一句话 DoD / `{criteria}`)以 **board 协议 SSOT(`@ccm/engine` 的 board-model)** 为准——本 skill 是它在执行侧的心法。
+- **engineering-with-craft** —— 本 skill 给循环的**形状**(怎么迭代逼近验收);engineering-with-craft 给循环里那双手的**工程手艺内容**(领域怎么建模 / 类怎么写 / 要不要 spec-first / **test-first 这条纪律本身怎么执行**)。测试触点:本 skill 锚 3 讲「测试为何是循环里的梯度信号」,`engineering-with-craft` 讲「红绿铁律怎么执行」——不同 plane,互补。
+- board 的 `acceptance` 字段语义(两态 objective function:一句话 DoD / `{criteria}`)以 `using-ccm` 为准——本 skill 是它在执行侧的心法。
