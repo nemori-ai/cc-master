@@ -1,7 +1,6 @@
 # SDD — Spec-Driven Development（规约驱动开发）
 
 > 本文是 `engineering-with-craft` 的 SDD reference，供执行 agent 在 **design→build→test** 阶段使用。
-> SDD 没有单一权威渊源——本文从第一性原理 + 当代业界实践原创蒸馏。
 
 ---
 
