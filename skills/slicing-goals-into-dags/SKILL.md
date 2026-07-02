@@ -5,9 +5,9 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 # slicing-goals-into-dags —— 把目标切成一张好 board DAG
 
-> **分发 skill。** 这是把一个目标 / epic **切**成 board 任务依赖图的**敏捷方法论与品味**——回答"怎么拆出一张好图",不是"一张已成形的图怎么排期"(那是 [master-orchestrator-guide] 的 decomposition)。
+> 这是把一个目标 / epic **切**成 board 任务依赖图的**敏捷方法论与品味**——回答"怎么拆出一张好图",不是"一张已成形的图怎么排期"(那是 master-orchestrator-guide 的 decomposition 一段)。
 >
-> **职责边界(红线3):** **切**(carve)归本 skill;**排**(schedule:CPM / 临界路径 / 并行度计算)归 master-orchestrator-guide 的 board 协议 reference;**派**(dispatch)归 master-orchestrator-guide;**执行**单个 task 到验收归 dev-as-ml-loop;**写进** board 归 using-ccm。本 skill 只管"怎么把目标切成图"这一刀。
+> **职责边界:** **切**(carve)归本 skill;**排**(schedule:CPM / 临界路径 / 并行度计算)归 master-orchestrator-guide 的 board 协议 reference;**派**(dispatch)归 master-orchestrator-guide;**执行**单个 task 到验收归 dev-as-ml-loop;**写进** board 归 using-ccm。本 skill 只管"怎么把目标切成图"这一刀。
 
 ---
 
@@ -28,11 +28,11 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 横切为什么是默认、又为什么是错的:它**感觉**像工程严谨(地基先打牢),实则把地基做成 serial 瓶颈(并行度=1 直到它完成)、把任何可用价值推到最末、且那个"打牢的地基"是**投机的**(你还没切片,根本不知道下游真正需要什么)。
 
-### Rationalization Table —— 横切最常见的自我说服(pressure baseline 逐字捕获)
+### Rationalization Table —— 横切最常见的自我说服
 
 | 你会对自己说 | 现实 |
 |---|---|
-| "schema / 地基要**一次定干净**,不然下游 API 要返工。"(baseline 逐字第一反应) | 这正是横切的合理化。它把地基做成并行度=1 的 serial 瓶颈、把可 ship 推到最后,而"一次定全"是投机——你还没跑通一片纵切,不知道真需要哪些字段。返工风险用**薄切 + 早集成**对冲,不用"大设计先行"。 |
+| "schema / 地基要**一次定干净**,不然下游 API 要返工。" | 这正是横切的合理化。它把地基做成并行度=1 的 serial 瓶颈、把可 ship 推到最后,而"一次定全"是投机——你还没跑通一片纵切,不知道真需要哪些字段。返工风险用**薄切 + 早集成**对冲,不用"大设计先行"。 |
 | "按功能纵切,多个片会争抢同一个 schema,并发冲突 / 重复劳动。" | 真正共享的只有 schema 的**最小核心**(walking skeleton 的脊椎)。把**那一薄片**作为唯一前置(锚 3),其余纵切;不是把整个 schema/API 层都前置。共享的是脊椎,不是整层。 |
 | "先把骨架搭全了再往里填,效率高。" | "搭全骨架"= 横切伪装成"一次性基建"。骨架要的是**最薄的一条端到端线**(walking skeleton),不是一整层。薄线先跑通,后续纵切各自延展骨架。 |
 
@@ -93,14 +93,14 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 | **瀑布顺序**(先把全部设计 / schema 定完再实现) | 投机的大设计先行 + 推迟集成风险暴露。改 walking skeleton(锚 2)。 |
 | **镀金地基**(把共享 foundation 做到"完整完美"才往下) | 你还不知道下游要什么;前置只放最小脊椎(锚 2)。 |
 | **过度切碎**(几十个微任务) | 协调开销 > 干活。estimate trivial 的并回去(锚 3)。 |
-| **假串行边**(为"稳"给无真实数据依赖的片画依赖) | 人为掐死并行。只画真实数据依赖边(排期细节见 decomposition)。 |
+| **假串行边**(为"稳"给无真实数据依赖的片画依赖) | 人为掐死并行。只画真实数据依赖边(排期细节归 master-orchestrator-guide)。 |
 
 ---
 
 ## Pointers
 
-- **master-orchestrator-guide**(SKILL A)—— 切好的图怎么**排期**(CPM / float / 临界路径 / 并行度计算,在它的 board 协议 reference)、怎么**派发**(选 shell/subagent/workflow)。本 skill 是"切",它是"排 + 派"。
-- **dev-as-ml-loop**(#7)—— 切出来的**单个 task 怎么执行到验收**(把验收当 objective 迭代逼近)。本 skill 切出带验收的片,#7 把每片做到验收。
-- **engineering-with-craft**(#G)—— 切出的单 task 执行时,除 dev-as-ml-loop 的循环**形状**,还要 #G 的手艺**内容**(片内 SDD→DDD→OOP→TDD 怎么建模 / 写类 / 测试)。E 切片、#G 定义片内每一棒的手艺。
+- **master-orchestrator-guide** —— 切好的图怎么**排期**(CPM / float / 临界路径 / 并行度计算,在它的 board 协议 reference)、怎么**派发**(选 shell/subagent/workflow)。本 skill 是"切",它是"排 + 派"。
+- **dev-as-ml-loop** —— 切出来的**单个 task 怎么执行到验收**(把验收当 objective 迭代逼近)。本 skill 切出带验收的片,dev-as-ml-loop 把每片做到验收。
+- **engineering-with-craft** —— 切出的单 task 执行时,除 dev-as-ml-loop 的循环**形状**,还要 engineering-with-craft 的手艺**内容**(片内 SDD→DDD→OOP→TDD 怎么建模 / 写类 / 测试)。本 skill 切片、engineering-with-craft 定义片内每一棒的手艺。
 - **using-ccm** —— 怎么把切出的 task / deps / estimate / cadence **写进** board(`ccm task add` / `cadence open` ...)。
-- 切片 → board 字段的协议细节(task / parent 嵌套 / cadence / estimate schema)以 **board 协议 SSOT(`@ccm/engine` 的 board-model)** 为准;字段怎么取值的操作视图见 using-ccm 的 board-model-guide。
+- 切片 → board 字段的协议细节(task / parent 嵌套 / cadence / estimate schema)见 using-ccm 的 board-model-guide。
