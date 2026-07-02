@@ -29,6 +29,13 @@
 #      scripts/glossary-lint.sh: greps the distributed tree + dev docs for any banned
 #      variant of a承重 term (canonical spelling SSOT in the glossary). Its exit code
 #      is aggregated into this script's overall verdict.
+#   6. hooks ⊥ skill scripts/assets (架构红线) — a file under hooks/scripts/ must NEVER
+#      reference a skill's scripts/ or assets/ subtree. Hooks own their business logic and
+#      never reach sideways into a skill's private payload files (that couples the
+#      dormant-until-armed hook layer to distributed skill assets). Grep every hooks/scripts/
+#      file for a `skills/<name>/scripts` or `skills/<name>/assets` path → violation. A hook
+#      that legitimately points at a skill's SKILL.md is NOT flagged (this check matches only
+#      the /scripts and /assets subpaths, never SKILL.md).
 #
 # Why node, not bash+jq/python: the repo's content tests are node-based, and node
 # is guaranteed present in any Claude Code host (AGENTS.md §3 红线1 / ADR-006).
@@ -216,6 +223,33 @@ for (const base of DIST_DIRS) {
           `bare cross-skill ref \`${m[0].slice(1, -1)}\` — resolves relative to ` +
           `user cwd at install time (dead link). Use ` +
           `\${CLAUDE_PLUGIN_ROOT}/skills/${m[1]}/… (Finding #50 / AGENTS.md §12)`);
+      }
+    }
+  }
+}
+
+// ---- (6) hooks ⊥ skill scripts/assets (架构红线) ----
+// A hook (hooks/scripts/*) must NEVER reference a skill's scripts/ or assets/ subtree — hooks own
+// their business logic and never reach sideways into a skill's private files (that would couple the
+// dormant-until-armed hook layer to distributed skill payloads; e.g. bootstrap building a board
+// skeleton by cp'ing skills/.../assets/board.template.json — now built via ccm). The skill-name
+// segment is matched as a kebab-case token ([a-z][a-z0-9-]*) so prose ellipses (skills/.../assets)
+// in comments do NOT false-positive. Only /scripts and /assets subpaths match — a hook pointing at a
+// skill's SKILL.md (reinject's soul re-injection) is never touched.
+const hookSkillRe = /skills\/[a-z][a-z0-9-]*\/(scripts|assets)\b/;
+const HOOK_DIR = join(ROOT, 'hooks', 'scripts');
+if (existsSync(HOOK_DIR)) {
+  for (const name of readdirSync(HOOK_DIR).sort()) {
+    const p = join(HOOK_DIR, name);
+    if (!statSync(p).isFile()) continue;
+    const lines = readFileSync(p, 'utf8').split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const mm = lines[i].match(hookSkillRe);
+      if (mm) {
+        add(`hooks/scripts/${name}`, i + 1,
+          `hook references a skill scripts/assets path \`${mm[0]}\` — hooks ⊥ skill scripts/assets: ` +
+          `a hook must never reach into a skill's private files (keep hook business logic self-contained; ` +
+          `build board skeletons via ccm). AGENTS.md §2 关键不变式`);
       }
     }
   }
