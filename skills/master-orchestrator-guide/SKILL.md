@@ -255,14 +255,31 @@ digraph decision_program {
 - **min-max**：一次写对、不撞 `exit 2/3`；绝不手改 board。
 - 全量命令面 + `--json` 形状 + footgun → `using-ccm`（`references/command-catalog.md`）。
 
-### 4.2 用量检查 + 规划 / 预测（怎么 pace + forecast）
+### 4.2 executor 选择（min-max·派谁执行每个 task）
+
+每个 task 都带一个 `executor`——设它是一次**调度决策**（选谁执行），把你那份装着全图的稀缺注意力留在指挥台。min-max：
+
+- **派出去的实现工作 → `subagent`**（默认——指挥不演奏，把乐器交出去；独立、可并行的实现活）。
+- **你自己的调度 / 端点验收 / 整合 / replan → `master-orchestrator`**（只有这几件不可外包，才留给自己做）。
+- **对一个工作清单做结构化 fan-out → `workflow`**（带 stage 的确定性多-agent 编排）。
+- **需人判断 / 授权 / 拍板 → `user`**（surface 给用户，别越权替他决）。
+- **session 外追踪的活（CI run / issue）→ `external`**（用引用指过去、隔间追踪）。
+
+拿不准就回到默认：能派出去的实现工作一律 `subagent`，`master-orchestrator` 只收你亲手不可外包的那几件。
+
+- 详细机制选择（三种后台机制、parallel vs pipeline、escalation、派发卫生）见 `references/dispatch.md`。
+- executor 字段怎么写进 board（各值必填字段、选择决策树）见 `using-ccm`。
+
+边界：这里给**编排 min-max**（选哪个 executor 当调度决策）；`executor` 字段怎么落 board 的**机制**归 `using-ccm`。
+
+### 4.3 用量检查 + 规划 / 预测（怎么 pace + forecast）
 
 - **配速**：`ccm usage advise`（单侧 verdict）/ `usage show`（当前号 + 备号 5h/7d）/ `burn-rate` / `runway`。
 - **规划 / 预测**：`ccm estimate`（ETA / 临界路径 / EVM / 风险）+ `baseline`（EVM 计划基线）。
 - **ccm 出 verdict / 数，你决策**——靠数据排程、不靠手感。
 - **min-max**：在配额走廊内配速（非顶满）、forecast 基于数据而非拍脑袋；估算诚实字段（coverage / confidence / 区间）该降低信任时就降低。消费机制细则 → `pacing-and-estimation`。
 
-### 4.3 task 类型 + 不变式 + 校验规则（规划任务时守规矩）
+### 4.4 task 类型 + 不变式 + 校验规则（规划任务时守规矩）
 
 规划 = 往 board 加 task；**写对一次就不撞 `exit 3`**。你**最该内化**的几条（全集在 D）：
 - **窄腰 vs agent-shaped**：hook 依赖的窄腰只有 `schema` / `goal` / `owner` / `git` / `tasks[{id,status,deps}]` + status enum；其余 agent 自由塑形。字段三档 🔒 / 👁 / ✎。
@@ -271,7 +288,7 @@ digraph decision_program {
 - **board 变更只走 ccm**。
 - **min-max**：**动手规划前先读 `using-ccm` 的 board-model-guide**（task 类型 / `acceptance` 怎么写 / `estimate` 怎么估 / `deps` 怎么连 / `executor` 怎么选 + 全部 49 条 FMT/GRAPH/BIZ 规则速查）——一次写对、免 exit-3 反复。
 
-### 4.4 decision_package（给用户备一份采访包）
+### 4.5 decision_package（给用户备一份采访包）
 
 prefetch / surface 一个 `blocked_on:"user"` 决策时，**连判断依据一起备好**：
 - **schema**：`{ context_md, what_i_need, ask_type, (options), enter_cmd }`；经 `ccm task block --on user --decision @file` 设（**不用 `--set`**）。
