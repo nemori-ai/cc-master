@@ -28,7 +28,7 @@ CC_MASTER_BOARD="$(pwd)/examples/decision-briefing/fixture.board.json" \
 
 ## smoke.sh 的可机验链
 
-- **STEP 1** —— fixture 过真 `board-lint.js`（窄腰合法）+ `decision_package` 逐字段契约完整 + `enter_cmd` 即复制命令。
+- **STEP 1** —— `decision_package` 逐字段契约完整 + `enter_cmd` 即复制命令（board 窄腰合法性改由带外 `ccm board lint` 校验；skill 版 `board-lint.js` 已退役）。
 - **STEP 2 / 3** —— freshness-check：输入未变判 fresh（hash 一致）、上游 artifact 改变判 stale（hash 不一致）。
 - **STEP 4** —— 模拟讨论结束（聊 2 次）：版本化 append-only 写**两份** `D1--<STAMP>.decision.md` sidecar（round 1/2），断言两份并存（计数 == 2、不覆盖）+ board 逐字节未变（discuss 不碰 board，单写者纪律）。
 - **STEP 4b** —— webview 历史区：起真 `view-server.js`、`node` HTTP GET `/decisions.json`，断言返回 D1 的 2 条（round 顺序对、`tldr` 抽取对、`node_id` 对）——卡片「💬 已讨论 N 次」据此渲染。

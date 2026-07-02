@@ -28,7 +28,7 @@ P1 (done)  性能基线（解析/布局 p95）  ────┘         │ deps
 
 `D1` 是整条临界路径的根——`P2/P3/P4` 全 deps 在它上面。master 在 idle 时已经为它**准备好一份采访包**（`decision_package`，挂在 `D1` 节点上，agent-shaped、on-board），把「走到这一步、为什么卡这、三个候选方向各自取舍」整理成自说明上下文。这正是 SKILL A「准备 decision_package（as prefetch / fill-work）」纪律的产物。
 
-> **smoke 对应**：STEP 1 用真 `board-lint.js` 证这块 board 窄腰合法，并逐字段断言 `decision_package` 契约完整（`prepared_at` / `inputs_hash` / `freshness` / `ask_type` / `context_md` / `question` / `what_i_need` / `why_it_matters` / `enter_cmd` 全在；`ask_type:decision` → `options` 非空≥2、每项含 `id`+`label`）。
+> **smoke 对应**：STEP 1 逐字段断言 `decision_package` 契约完整（`prepared_at` / `inputs_hash` / `freshness` / `ask_type` / `context_md` / `question` / `what_i_need` / `why_it_matters` / `enter_cmd` 全在；`ask_type:decision` → `options` 非空≥2、每项含 `id`+`label`）。board 窄腰合法性的校验已归带外 `ccm board lint`（skill 版 `board-lint.js` 已退役），不在本 smoke 内跑。
 
 ---
 
@@ -148,7 +148,7 @@ bash examples/decision-briefing/smoke.sh
 
 | 闭环段 | smoke STEP | 证什么 |
 |---|---|---|
-| **网页触发** | STEP 1 | fixture board 窄腰合法 + `decision_package` 契约完整 + `enter_cmd` 即复制命令（富卡靠它渲染） |
+| **网页触发** | STEP 1 | `decision_package` 契约完整 + `enter_cmd` 即复制命令（富卡靠它渲染；窄腰合法性改由带外 `ccm board lint` 校验） |
 | **时效性底座** | STEP 2 / 3 | freshness-check fresh 正例 + stale 反例可区分 |
 | **模拟讨论结束（聊 2 次）** | STEP 4 | discuss 版本化 append-only 写**两份** sidecar、两份并存（计数 == 2）、**不碰 board**（单写者） |
 | **webview 历史区** | STEP 4b | 起真 view-server、GET `/decisions.json` 见 D1 的 2 条（round 顺序对、`tldr` 抽取对、`node_id` 对） |
@@ -161,7 +161,7 @@ bash examples/decision-briefing/smoke.sh
 | 红线 | 本 demo 如何不破 |
 |---|---|
 | R1 hooks 纯 bash/node | 不新增任何 hook；smoke 纯 bash + node，零 jq/python |
-| R2 narrow waist | `decision_package` 是 on-board 柔性边、`.decision.md` 是带外 sidecar——硬窄腰零改动（STEP 1 lint + STEP 4 逐字节断言坐实） |
+| R2 narrow waist | `decision_package` 是 on-board 柔性边、`.decision.md` 是带外 sidecar——硬窄腰零改动（STEP 4 逐字节断言坐实；窄腰合法性另由带外 `ccm board lint` 校验） |
 | R4 指挥不演奏 | master 只**准备 + 消化**，对话由独立 discuss session 承载（强化 R4） |
 | R5 ship-anywhere | 复制命令是客户端 clipboard 非 POST；view-server 这次只新增**只读 GET** `/decisions.json`（零 POST、仍绑 127.0.0.1、零联网）；无新运行时依赖 |
 | R6 dormant-until-armed | 无新 hook 可武装；discuss session 读 board 不写（只写 sidecar），是普通 CC session |
