@@ -30,8 +30,8 @@ const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 //   skill (replacing the old cli/src/ board-model + board-lint-core + board-graph-core trio). The
 //   viewer loads it as ONE classic <script> publishing globalThis.__ccmEngine. This test loads the
 //   SAME vendored artifact (not cli/src/) so it asserts against the migrated reality.
-const ENGINE_IIFE = 'skills/orchestrating-to-completion/scripts/vendor/ccm-engine.iife.js';
-const VIEW = 'skills/orchestrating-to-completion/scripts/view.html';
+const ENGINE_IIFE = 'skills/master-orchestrator-guide/scripts/vendor/ccm-engine.iife.js';
+const VIEW = 'skills/master-orchestrator-guide/scripts/view.html';
 
 // 在一个裸 realm 里加载 vendored @ccm/engine IIFE（模拟浏览器 classic <script>：无 require → banner
 // 把 node:fs/crypto 退化成 {}，webview 路径从不触碰 board-lock），拿到 __ccmEngine.analyzeGraph ——

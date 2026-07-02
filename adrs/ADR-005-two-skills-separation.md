@@ -2,7 +2,7 @@
 
 > Status: **Accepted**
 > Date: 2026-06-08 (extended 2026-06-17: two → three distributed skills)
-> Scope: The skill layer — `skills/orchestrating-to-completion/`,
+> Scope: The skill layer — `skills/master-orchestrator-guide/`,
 > `skills/authoring-workflows/`, and `skills/account-management/`. Constrains where
 > any new piece of guidance lives and forbids duplication between the skills.
 > Source: cc-master design invariant #3 (AGENTS.md §3 红线3); `design_docs/spec.md`
@@ -45,7 +45,7 @@ rule for where guidance lives.** As of 2026-06-17 there are **three** distribute
 skills (was two; account-management added) — the separation principle is unchanged,
 only the count grows.
 
-- **Skill A — `orchestrating-to-completion`** = main-thread orchestration: the
+- **Skill A — `master-orchestrator-guide`** = main-thread orchestration: the
   method the orchestrator runs (decompose, dispatch-on-ready, productive idle
   windows, endpoint verification, compaction survival via the board). Owns the
   account-switch *decision* (when to switch, whether it's worth it, who signs off).
@@ -114,7 +114,7 @@ rule prevents. Where the skills touch, the link is a pointer, not a copy.
 
 - [`../AGENTS.md`](../AGENTS.md) — §3 红线3 (the distributed-skill non-overlap red
   line, SSOT).
-- [`../skills/orchestrating-to-completion/SKILL.md`](../skills/orchestrating-to-completion/SKILL.md)
+- [`../skills/master-orchestrator-guide/SKILL.md`](../skills/master-orchestrator-guide/SKILL.md)
   — Skill A.
 - [`../skills/authoring-workflows/SKILL.md`](../skills/authoring-workflows/SKILL.md)
   — Skill B.

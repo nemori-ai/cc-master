@@ -992,7 +992,7 @@ ccm policy set --autonomous-account-switch=allow|deny [flags]
 | `--json` | | bool | 结构化输出 |
 
 - 例：`ccm policy set --autonomous-account-switch=deny --user-authorized`（锁死本板自主换号）
-- ⚠️ **绝不自授权**：orchestrator-agent 绝不自己加 `--user-authorized` 翻 policy（那是 self-grant·越权）——该标记只由用户给（决策纪律见 orchestrating-to-completion）。机制硬闸侧：`ccm account switch` 在覆写凭证前也读 `policy.autonomous_account_switch`、`deny` 即拒并 exit 7（纵深防御兜底·见 namespace account）
+- ⚠️ **绝不自授权**：orchestrator-agent 绝不自己加 `--user-authorized` 翻 policy（那是 self-grant·越权）——该标记只由用户给（决策纪律见 master-orchestrator-guide）。机制硬闸侧：`ccm account switch` 在覆写凭证前也读 `policy.autonomous_account_switch`、`deny` 即拒并 exit 7（纵深防御兜底·见 namespace account）
 
 ---
 
@@ -1266,7 +1266,7 @@ ccm estimate cost-to-complete [flags]
 
 ## namespace account
 
-换号号池机制（换号 token-blind 录入 / 选号 / 无重启切号）。号池 = 用户级 registry `${CC_MASTER_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cc-master}/accounts.json`（email→vault 非密指针 + 时间元信息·**零 token**）+ token 本体（macOS keychain / 非 mac 0600 file vault）。**token 全程活在 ccm 引擎子进程·绝不进 agent / registry / log**（vault token-blind）。换号是**无重启凭证覆写**：`switch` 续期新号 → 覆写官方共享凭证三存储 → 运行中 claude 惰性 re-read 接管（进程不重启 / board 不动）。**概念叙事**（号池模型 / 录号 why / refreshToken 硬要求 / 选号方法论 / vault 安全）见 [references/account-pool.md](references/account-pool.md)；**算法 / vault 实现 SSOT** 在 ccm 引擎 `@ccm/engine/account`；**换号决策**（何时换 / 谁拍板 / 绝不自授权）归 `orchestrating-to-completion`（不在本 skill）。
+换号号池机制（换号 token-blind 录入 / 选号 / 无重启切号）。号池 = 用户级 registry `${CC_MASTER_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cc-master}/accounts.json`（email→vault 非密指针 + 时间元信息·**零 token**）+ token 本体（macOS keychain / 非 mac 0600 file vault）。**token 全程活在 ccm 引擎子进程·绝不进 agent / registry / log**（vault token-blind）。换号是**无重启凭证覆写**：`switch` 续期新号 → 覆写官方共享凭证三存储 → 运行中 claude 惰性 re-read 接管（进程不重启 / board 不动）。**概念叙事**（号池模型 / 录号 why / refreshToken 硬要求 / 选号方法论 / vault 安全）见 [references/account-pool.md](references/account-pool.md)；**算法 / vault 实现 SSOT** 在 ccm 引擎 `@ccm/engine/account`；**换号决策**（何时换 / 谁拍板 / 绝不自授权）归 `master-orchestrator-guide`（不在本 skill）。
 
 > **录号 / refresh 的唯一前提：用户当前正登录在目标号**（引擎从 keychain「Claude Code-credentials」直读当前登录号完整 blob·身份 guard 要求当前登录 email == `<email>`，否则拒）。
 
@@ -1374,7 +1374,7 @@ ccm account switch [flags]
 | `--json` | | bool | 结构化输出 |
 
 - 例：`ccm account switch --json`（引擎选号）· `ccm account switch --email alice@x.com`
-- ⚠️ **policy 硬闸是纵深防御兜底、不是许可**：`deny`→exit 7 拦在覆写之前；编排侧的「换号决策 + 绝不自授权」纪律在 `orchestrating-to-completion`（机制硬闸不替编排拍板）。选号走**双窗口对称硬闸**（5h≥90% ∨ 7d≥85% 任一逼顶即排除·候选 ⟺ 双窗口都健康）；全池无双窗口健康号（`NONE_ALL_EXHAUSTED`·含全池 5h 墙 / 7d 健康）/ 选不出号 → surface 用户（`blocked_on:"user"`），绝不盲切
+- ⚠️ **policy 硬闸是纵深防御兜底、不是许可**：`deny`→exit 7 拦在覆写之前；编排侧的「换号决策 + 绝不自授权」纪律在 `master-orchestrator-guide`（机制硬闸不替编排拍板）。选号走**双窗口对称硬闸**（5h≥90% ∨ 7d≥85% 任一逼顶即排除·候选 ⟺ 双窗口都健康）；全池无双窗口健康号（`NONE_ALL_EXHAUSTED`·含全池 5h 墙 / 7d 健康）/ 选不出号 → surface 用户（`blocked_on:"user"`），绝不盲切
 
 ---
 

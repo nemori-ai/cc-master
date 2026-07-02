@@ -3,7 +3,7 @@
 > 类别：dev-only 带外脚本（NOT a hook·**不随 plugin 分发**·仅 repo 根调用·红线 5）。源码：`scripts/eval-trigger.sh`。跑 skill-creator Track A（触发准确率）eval 的薄包装——自身无 eval 逻辑。
 
 ## 触发输入
-- 开发者敲 `scripts/eval-trigger.sh <skill-name>`（如 `orchestrating-to-completion`）。
+- 开发者敲 `scripts/eval-trigger.sh <skill-name>`（如 `master-orchestrator-guide`）。
 - 依赖：`uv` + Python 3.12 + `claude` CLI（复用 session 认证，无需 API key）。
 - 读：`skills/<skill>/evals/trigger.json`（should-trigger + near-miss 查询集）+ `skills/<skill>/SKILL.md`。env `CC_MASTER_SKILL_CREATOR` 覆写 skill-creator 路径。
 

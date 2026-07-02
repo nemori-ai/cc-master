@@ -1,6 +1,6 @@
 # OBJECTIVE — pacing-and-estimation
 
-J_top: agent 在一场 long-horizon 跑里要消费 ccm 只读 advisory 做配速/估算判断的输入时，**把 verdict 与字段读对、并主动召回估算轴**——读 `ccm usage advise` 的 verdict 据它拍 lever 类（不自己拿 `used_percentage` 重算走廊）、在 dispatch/recon/replan 拍**主动 consult `ccm estimate`**（forecast/evm/risk·不让估算整轴 out-of-mind）、读诚实字段（coverage_pct/confidence/conformal 区间）对低覆盖预测**降低信任权重**（不拿点估当承诺）、按难度选模型档、识别 usage⊗estimate 张力——且读完之后的**动作**（该不该减速/加速/换号/surface）回 orchestrating-to-completion，不自己拍。
+J_top: agent 在一场 long-horizon 跑里要消费 ccm 只读 advisory 做配速/估算判断的输入时，**把 verdict 与字段读对、并主动召回估算轴**——读 `ccm usage advise` 的 verdict 据它拍 lever 类（不自己拿 `used_percentage` 重算走廊）、在 dispatch/recon/replan 拍**主动 consult `ccm estimate`**（forecast/evm/risk·不让估算整轴 out-of-mind）、读诚实字段（coverage_pct/confidence/conformal 区间）对低覆盖预测**降低信任权重**（不拿点估当承诺）、按难度选模型档、识别 usage⊗estimate 张力——且读完之后的**动作**（该不该减速/加速/换号/surface）回 master-orchestrator-guide，不自己拍。
 
 baseline_reference:
   user_task: 给 agent 一个具体的 pacing/估算决策处境（如"长跑跑了一半、想知道还要多久能完 + 当前配额节奏对不对"、"配额逼顶了、该怎么 pace"、"这个 forecast 给了个 ETA、我该信吗"），看它会不会消费 ccm advisory、读对 verdict/字段。

@@ -15,7 +15,7 @@
 
 - **hook 纯 bash,无 jq/node**,ship-anywhere(含 Bedrock/Vertex/Foundry)。codex reviewer / eval 脚本是**带外(out-of-band)手动调用**,不进 hook —— 故不受此约束,但须文档化其依赖(`uv` + Python 3.12 + `claude` CLI + `codex` CLI)。
 - **codex 绝不入 Stop hook**(要联网 / OAuth / 多分钟超时 / JSON 解析,违背纯 bash ship-anywhere;openai-codex 插件自己的 stop-gate 也是 opt-in + Node)。codex 以 **sub-agent 端点验收节点**形态接入。
-- **progressive disclosure**:AGENTS.md 不与 `orchestrating-to-completion` SKILL.md 重复编排哲学,只给指针;常驻 SKILL.md 越瘦越好。
+- **progressive disclosure**:AGENTS.md 不与 `master-orchestrator-guide` SKILL.md 重复编排哲学,只给指针;常驻 SKILL.md 越瘦越好。
 - 现有确定性骨架测试(`run-tests.sh`,~46+ 条)与本变更无关者**必须保持全绿**;`claude plugin validate .` 通过。
 - browse 一律走 gstack `/browse`;中文应答;commit/PR/merge 等 HITL 须先问。
 
@@ -34,21 +34,21 @@ R1 实证(我上轮 P2c-C 埋的回归):
 
 ### 1.2 [中] progressive disclosure 精修
 
-- **大 reference 加 TOC**:`orchestrating-to-completion/references/dispatch.md`(167)、`board.md`(122);`authoring-workflows/references/patterns.md`(272)、`mechanism.md`(198)。顶部加小节锚点 TOC(skill-creator:>300 行需 TOC,patterns.md 已逼近且一节一 pattern 最受益)。
-- **去 step-6 ledger 重复**(Finding #7 残留):`orchestrating-to-completion/SKILL.md:95-101` 与 `references/async-hitl.md:64-78` 重复整段。SKILL.md 收敛为一句指针,详述留 async-hitl 一处。
-- **按 `wc -w` 瘦身常驻 SKILL.md**:`orchestrating-to-completion/SKILL.md` 是 SessionStart 每次 compaction 全文重注的常驻手册。把 "Board protocol essentials" 等已有 references/board.md 兜底的细节收敛成指针,主文件只留路由表 + 红线 + 决策程序硬核。目标:主文件显著变短,每回合不稀释 7 步硬核。验证:`wc -w skills/*/SKILL.md` 前后对比。
+- **大 reference 加 TOC**:`master-orchestrator-guide/references/dispatch.md`(167)、`board.md`(122);`authoring-workflows/references/patterns.md`(272)、`mechanism.md`(198)。顶部加小节锚点 TOC(skill-creator:>300 行需 TOC,patterns.md 已逼近且一节一 pattern 最受益)。
+- **去 step-6 ledger 重复**(Finding #7 残留):`master-orchestrator-guide/SKILL.md:95-101` 与 `references/async-hitl.md:64-78` 重复整段。SKILL.md 收敛为一句指针,详述留 async-hitl 一处。
+- **按 `wc -w` 瘦身常驻 SKILL.md**:`master-orchestrator-guide/SKILL.md` 是 SessionStart 每次 compaction 全文重注的常驻手册。把 "Board protocol essentials" 等已有 references/board.md 兜底的细节收敛成指针,主文件只留路由表 + 红线 + 决策程序硬核。目标:主文件显著变短,每回合不稀释 7 步硬核。验证:`wc -w skills/*/SKILL.md` 前后对比。
 
-### 1.3 [纪律武器·借 superpowers] 给 orchestrating-to-completion 加封堵层
+### 1.3 [纪律武器·借 superpowers] 给 master-orchestrator-guide 加封堵层
 
 R2 提炼(superpowers 标志性结构,均有实测/baseline 背书):
 - **Rationalization Table(借口→现实两列)**:针对编排者最常见合理化("后台都在跑我闲着也是闲着先 review 一遍"→ fake-busy;"就改一行我自己上"→ 破"指挥不演奏";"gate 绿了就算过"→ 破 silent pass-through;"这次特殊我替用户定了 merge"→ 破越权)。
 - **Red Flags 自检清单("STOP and re-run the decision program")**:让编排者自查"我是不是正在空转/越权/把空 review 当通过/亲自下场"。
-- **description 剥离 workflow → 纯触发条件**:superpowers 实测——description 剧透流程会让 Claude 照 description 行事跳过正文。把 `orchestrating-to-completion` 与 `authoring-workflows` 的 description 瘦成 "Use when…" 触发条件(含中文锚点 + 即将违规的症状,如 "when you catch yourself idle-waiting or manufacturing busywork")。
+- **description 剥离 workflow → 纯触发条件**:superpowers 实测——description 剧透流程会让 Claude 照 description 行事跳过正文。把 `master-orchestrator-guide` 与 `authoring-workflows` 的 description 瘦成 "Use when…" 触发条件(含中文锚点 + 即将违规的症状,如 "when you catch yourself idle-waiting or manufacturing busywork")。
 - **覆盖性金句**:借 superpowers "违背字面就是违背精神",一句切断"我遵循精神"类合理化。
 
 ### 1.4 [结构性] decision-program 改 dot-graph
 
-`orchestrating-to-completion` 的 7 步决策程序(尤其 step-6 容易误判为可停)是"可能过早停止的循环",R2 判定为 dot-graph 标准候选。把 7 步 + step-6 ledger gate 画成带回边的流程图(graphviz),比纯文本更难被跳步。遵 superpowers graphviz 元规则:只画非显然决策点 / 易过早停止的循环 / A-vs-B 选择,不画线性步骤。
+`master-orchestrator-guide` 的 7 步决策程序(尤其 step-6 容易误判为可停)是"可能过早停止的循环",R2 判定为 dot-graph 标准候选。把 7 步 + step-6 ledger gate 画成带回边的流程图(graphviz),比纯文本更难被跳步。遵 superpowers graphviz 元规则:只画非显然决策点 / 易过早停止的循环 / A-vs-B 选择,不画线性步骤。
 
 ### 1.5 [结构性·新增] TDD-for-skills 元规范
 
@@ -66,7 +66,7 @@ R2 提炼(superpowers 标志性结构,均有实测/baseline 背书):
   - review 指令含 R4 提炼的"filesystem boundary"(忽略 `~/.claude/`、`.claude/skills/`、`agents/` 等别的 AI 的 skill 定义)+ skill 质量聚焦(description 触发力 / 指令是否歧义 / bash 块是否真能跑 / dead ref)。
   - 输出按插件自带 `review-output.schema.json` 解析 `verdict: approve|needs-attention` + 每条 finding 的 severity/file/line/confidence。
   - 失败(空 review / OAuth 过期)→ **按"未通过"处理**(silent-pass-through guard,resume-verify.md:52),不静默放行。
-- **文档化**:在 `orchestrating-to-completion/references/resume-verify.md` 的端点验收段补"codex 作为独立第二验收者"小节——`verdict` 直接映射现有 `FinalResponse` / `Replan(feedback)` Joiner 闸(`needs-attention` → Replan;`approve` + 非空 + 已读 diff → done)。
+- **文档化**:在 `master-orchestrator-guide/references/resume-verify.md` 的端点验收段补"codex 作为独立第二验收者"小节——`verdict` 直接映射现有 `FinalResponse` / `Replan(feedback)` Joiner 闸(`needs-attention` → Replan;`approve` + 非空 + 已读 diff → done)。
 - **批量**(评审多 skill):走 workflow stage,每 leaf `codex exec review --output-schema review-output.schema.json` 对一个 skill 的 diff,fan-in 成质量 scorecard。顺带沉淀为 `authoring-workflows/assets/examples/codex-review-fanout.js`。
 
 ### 2.B AGENTS.md + CLAUDE.md 迭代范式文档
@@ -113,7 +113,7 @@ R3 实证。运行钥匙:`uv run --python 3.12 python -m scripts.<x>`(系统 Pyt
 
 ### 3.B Track B —— 编排纪律 benchmark(codex 当第二评委)
 
-- **量什么**:`orchestrating-to-completion` 让编排者行为更好的端到端断言(行为型,从 transcript 评),with_skill vs without_skill 各 3 run,mean±stddev。fixture 用 `examples/sample-orchestration/`。
+- **量什么**:`master-orchestrator-guide` 让编排者行为更好的端到端断言(行为型,从 transcript 评),with_skill vs without_skill 各 3 run,mean±stddev。fixture 用 `examples/sample-orchestration/`。
 - **断言示例**:派活前先把 goal 拆成 DAG / board(查 board.json 合 schema)；等待窗口主线不空转(transcript 无前台 sleep)；声明 done 前端点验收;模拟 compaction 后能重读 board 续跑。
 - **跑法**:skill-creator Track-B workflow(with/without subagent → grader.md → `aggregate_benchmark.py` → eval-viewer)。
 - **codex 配对**:grader 写完 `grading.json` 后,跑 codex(review/challenge)对同一 transcript+断言出非-Claude 裁决;**两评委分歧 = 高信号**(grader.md 哲学:弱断言上的 pass 比没有更糟)。
@@ -159,7 +159,7 @@ R3 实证。运行钥匙:`uv run --python 3.12 python -m scripts.<x>`(系统 Pyt
 ## 六、实施分解(P1/P1b/P2/P2b/P3/P3b/P4)+ single-committer
 
 文件重叠分析(防并行写冲突):
-- P1 改 `orchestrating-to-completion/SKILL.md`+references/* 与 `authoring-workflows/SKILL.md`+references/*。
+- P1 改 `master-orchestrator-guide/SKILL.md`+references/* 与 `authoring-workflows/SKILL.md`+references/*。
 - P1b 新增 meta-skill 目录 或 改 CONTRIBUTING(若并入)——与 P1 可能在 CONTRIBUTING 重叠,需协调。
 - P2 新增 `scripts/codex-review.sh` + 改 `resume-verify.md`(与 P1 重叠 references!需串行或同一 agent)。
 - P2b 新增 `AGENTS.md`/`CLAUDE.md`(独立文件,无重叠)。

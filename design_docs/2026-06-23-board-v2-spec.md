@@ -3,7 +3,7 @@
 > 状态:**设计定稿 / 实现蓝图**(v0.10.0)
 > 决策依据:[`adrs/ADR-013-board-v2-data-model-and-cli.md`](../adrs/ADR-013-board-v2-data-model-and-cli.md)(架构 + narrow-waist 演进)· ADR-003(被演进)· ADR-006(node hook)· ADR-012(parent waist)
 > 需求来源:Epic #27 + #28/#29/#30/#31 + C1 #32 + C6 #34
-> 本文是 board v2 的**权威规格 SSOT**:实现(JS model / CLI / lint / graph / hook 收编)照此落地;落地后 `skills/orchestrating-to-completion/references/board.md` 按本文改写。
+> 本文是 board v2 的**权威规格 SSOT**:实现(JS model / CLI / lint / graph / hook 收编)照此落地;落地后 `skills/master-orchestrator-guide/references/board.md` 按本文改写。
 > 标记:🔒 load-bearing(hook 机器读)· 👁 observed(hook 若有则用、缺则降级)· ✎ flexible(agent 自由、silent-on-unknown)· ⚙️[实现期细化] · ❓[待确认]
 
 ---

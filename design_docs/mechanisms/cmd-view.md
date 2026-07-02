@@ -10,7 +10,7 @@
 1. 认准要可视化的 board（同 `/status`）：恰一块用它；多块按 `goal` 匹配；歧义 → 询问用户；零 active board → 提示先 `/cc-master:as-master-orchestrator <目标>`。
 2. **以后台 shell（`run_in_background`）启动 view server**，让它跨回合活着，把认准 board 的绝对路径塞进 `CC_MASTER_BOARD`：
    ```
-   CC_MASTER_BOARD="<board 绝对路径>" node "${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/scripts/view-server.js"
+   CC_MASTER_BOARD="<board 绝对路径>" node "${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/scripts/view-server.js"
    ```
    `CC_MASTER_BOARD` 值必须套双引号（路径可能含空格）；脚本路径必须 `${CLAUDE_PLUGIN_ROOT}/...` 绝对引用（裸相对会找不到·Finding #38/#39）。
 3. 抓 URL 交给用户：server 启动后往 stdout 打恰好一行 `cc-master board view: http://127.0.0.1:<port>`（端口 OS 分配），抓出呈现给用户。

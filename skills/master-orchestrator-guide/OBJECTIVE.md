@@ -1,4 +1,4 @@
-# OBJECTIVE — orchestrating-to-completion
+# OBJECTIVE — master-orchestrator-guide
 
 J_top: 编排者把一个 long-horizon 目标驱动到完成时，DAG 并行到真实数据依赖结构允许的程度（不画假串行边）、为每个就绪节点选对后台机制（shell / sub-agent / workflow + parallel/pipeline 形状，既不过度工程也不滥用 barrier）、且按 5h/7d 配额窗口做单侧 pacing（逼近上界就主动收紧：throttle 减速 / switch 换号 / stop 停派·不半截撞墙、不透支 7d 总闸·ADR-024），在资源预算内最大化推进效率，同时守住七镜头 / 红线（指挥不演奏、只信端点验收等）。
 

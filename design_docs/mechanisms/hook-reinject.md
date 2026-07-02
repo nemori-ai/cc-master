@@ -11,7 +11,7 @@
 2. **武装闸 `board_matches`**：board active AND（sid 空 → 降级匹配任一 active 板；否则 owner.session_id == sid）。`active`/`session_id` 只从 root owner 子对象读（`owner_region` awk 深度扫描），绝不全文 grep。
 3. 收集**本 session** 的 active 板进 `<name> [<goal>]` 单行 listing；同时用 `dangling_nodes` 收集它们里 `status` 为 `stale`/`escalated` 的 task `id`（per-object 扫描，nested log 不泄漏）。
 4. 无匹配的 active 板 → 静默 `exit 0`（无 active orchestration）。
-5. 有 → 注入 `SessionStart` additionalContext：「你是 cc-master master orchestrator，板在 <home>，Active:<listing>，重读 board、调 orchestrating-to-completion skill、续决策程序，别重启已 done/verified 的活」。
+5. 有 → 注入 `SessionStart` additionalContext：「你是 cc-master master orchestrator，板在 <home>，Active:<listing>，重读 board、调 master-orchestrator-guide skill、续决策程序，别重启已 done/verified 的活」。
 6. 有 dangling stale/escalated 节点 → context 追加一句点名这些节点，提示 reconcile 后再排新活（空则 context 字节级不变）。
 
 ## 输出副作用

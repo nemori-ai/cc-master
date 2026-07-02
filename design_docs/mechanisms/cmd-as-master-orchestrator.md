@@ -10,7 +10,7 @@
 ## 业务流
 1. `UserPromptSubmit` 触发 `bootstrap-board.sh`，它据 `--resume` 首-token 分流 **fresh** / **resume**，建板或重盖板，把板路径 + 角色注入 context。
 2. **命令体靠注入串的开头字样自判 mode**（不凭参数文本猜）：`cc-master: a fresh orchestration board was created at ...` = fresh；`cc-master resume: you have TAKEN OVER ...` = resume。
-3. **fresh 形态**：① 调用 `orchestrating-to-completion` skill 内化身份；② 把目标拆成依赖 DAG 写进 `tasks[]`（每 task 至少 `id`/`status`/`deps` + `title`），填 `goal`/`git`，**保留 hook 盖好的 `owner.session_id`、绝不覆写**；③ 每回合跑决策程序（reconcile → surface 用户决策 → WIP 内派发 → fill-work → 端点验收 → flush）。
+3. **fresh 形态**：① 调用 `master-orchestrator-guide` skill 内化身份；② 把目标拆成依赖 DAG 写进 `tasks[]`（每 task 至少 `id`/`status`/`deps` + `title`），填 `goal`/`git`，**保留 hook 盖好的 `owner.session_id`、绝不覆写**；③ 每回合跑决策程序（reconcile → surface 用户决策 → WIP 内派发 → fill-work → 端点验收 → flush）。
 4. **resume 形态**：0. 先 `cd` 进 `git.worktree` 并核对 cwd/branch；1. 调 skill；2. 绝不重拆 goal / 重置 tasks，reconcile 现有 status 分布；3. 把每个 `in_flight` 当孤儿走端点验收 + content-hash 判定（产物落地且验过 → done/verified，否则降回 ready/stale 重派）；4. 保留 `owner.session_id`，每次 flush 更新 `owner.heartbeat`。
 5. selector 省略且 hook 返回消歧串（含 `Candidates:`）时：把候选分 `active-but-abandoned` / `archived (will be revived)` 两组呈现，让用户重发更精确 `--resume`。
 

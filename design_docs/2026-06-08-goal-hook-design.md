@@ -155,7 +155,7 @@ board** —— board 仍是 agent 单一真相源):
 
 1. `verify-board.sh` 实现 §1 全部判据 + 握手 + fuse + session 过滤,纯 bash 无 jq/node。
 2. §2 拔除清单全部完成;全仓 `grep -rn '/goal\|phase /goal\|goal_condition\|ScheduleWakeup'`
-   在 `commands/`+`skills/orchestrating-to-completion/`+`hooks/` 下**零命中**(authoring-workflows 不计)。
+   在 `commands/`+`skills/master-orchestrator-guide/`+`hooks/` 下**零命中**(authoring-workflows 不计)。
 3. `board.goal` 字段、authoring-workflows 的 loop/phase **完好无损**。
 4. §3 测试全绿;`claude plugin validate .` 通过。
 5. 顺带收口:G2 遗留(补 CoC/SECURITY、核 README B 方案、CHANGELOG/CONTRIBUTING 调整)、G3 遗留

@@ -1,6 +1,6 @@
 # board-model-guide —— board 模型操作指南
 
-> **面向操作者的派生视图。** board 协议的**权威定义**（enums / 字段三档元数据 / 不变式注册表 / 状态机）在 `ccm` 引擎 `@ccm/engine` 的 board-model（机器 SSOT）——实时真相用 `ccm <namespace> --help` 取。`orchestrating-to-completion` skill 的 board 协议 reference 是 orchestrator 侧的**派生叙事视图、非 SSOT**。**本文只给操作侧：概念是什么、字段什么时候设什么值、场景怎么选。绝不复述权威定义。**
+> **面向操作者的派生视图。** board 协议的**权威定义**（enums / 字段三档元数据 / 不变式注册表 / 状态机）在 `ccm` 引擎 `@ccm/engine` 的 board-model（机器 SSOT）——实时真相用 `ccm <namespace> --help` 取。`master-orchestrator-guide` skill 的 board 协议 reference 是 orchestrator 侧的**派生叙事视图、非 SSOT**。**本文只给操作侧：概念是什么、字段什么时候设什么值、场景怎么选。绝不复述权威定义。**
 
 ---
 
@@ -334,7 +334,7 @@ ccm task update T5 --rm-dep T3
   - **连通性只在「非 fill-work」节点上判——`role:fill-work` 豁免**：fill-work 定义即「脱离主图的填闲并行工作」、**故意独立**，把它计入会对每个 fill-work 节点常态误报孤岛（cry-wolf）。故连通性判定时 fill-work 节点整体从节点集剔除（连同其边），纯 fill-work 的孤岛不再 warn——无需给 fill-work 硬凑 deps 连回主图。
   - **`awaiting-user` / 决策门节点**不**豁免**（用户拍板的设计原则）：一个 `blocked_on:user` 的决策门本应是**某主图工作节点的前驱 / 子 / 子图 / 节点本身**——它 gate 某段下游工作，故理应连进主图。一个无上下游的孤立决策门正是该 warn 的**真遗漏**（漏接了它 gate 的下游），照常计入 GRAPH-CONNECTED。修法不是豁免，而是把它接进主图：让它 gate 的那个下游工作节点 `deps` 含这个决策门（决策门 gate 下游），或给决策门本身合理 deps。
 
-deps 图的排期、临界路径计算（哪条链条最长、哪个 task 先派最解锁下游）属于 `orchestrating-to-completion` skill 的调度方法论范畴；本文给的是「怎么连对」，不复述排期。
+deps 图的排期、临界路径计算（哪条链条最长、哪个 task 先派最解锁下游）属于 `master-orchestrator-guide` skill 的调度方法论范畴；本文给的是「怎么连对」，不复述排期。
 
 ---
 

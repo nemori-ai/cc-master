@@ -1,6 +1,6 @@
 ---
 name: cc-master-skillsmith
-description: '当你创建、编辑或审查一个 cc-master skill 时用——尤其是那种纪律型（discipline-enforcing）skill（orchestrating-to-completion、authoring-workflows、本 skill），它的规则 agent 在压力下能合理化掉。Triggers: 新建/修改/审查本仓 skill、加 Rationalization Table / Red Flags / 决策程序、改 SKILL.md 的纪律段或 description；或当你发现自己正打算先动手写 skill 正文、却没先看一个 agent 失败。Do NOT use when 你只是要判断要不要建一个 skill / 这块该 skill 还是 reference / 两个 skill 重不重叠（那是 curating-skill-portfolios）；Do NOT use when 你要声明 J / 跑触发或行为 eval / 度量一个 skill（那是 grounding-skill-evals）。'
+description: '当你创建、编辑或审查一个 cc-master skill 时用——尤其是那种纪律型（discipline-enforcing）skill（master-orchestrator-guide、authoring-workflows、本 skill），它的规则 agent 在压力下能合理化掉。Triggers: 新建/修改/审查本仓 skill、加 Rationalization Table / Red Flags / 决策程序、改 SKILL.md 的纪律段或 description；或当你发现自己正打算先动手写 skill 正文、却没先看一个 agent 失败。Do NOT use when 你只是要判断要不要建一个 skill / 这块该 skill 还是 reference / 两个 skill 重不重叠（那是 curating-skill-portfolios）；Do NOT use when 你要声明 J / 跑触发或行为 eval / 度量一个 skill（那是 grounding-skill-evals）。'
 ---
 
 # cc-master-skillsmith — cc-master skill 纪律的 TDD

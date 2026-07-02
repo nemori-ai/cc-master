@@ -19,7 +19,7 @@ decided*, then a PASS/FAIL with an exit code — so it doubles as a CI smoke che
 
 > A note on self-driving. cc-master does **not** use any native `/goal` or `/loop`
 > machinery — there is none in this plugin. The orchestrator stays productive on its own by
-> running the **decision program** from the `orchestrating-to-completion` skill every turn,
+> running the **decision program** from the `master-orchestrator-guide` skill every turn,
 > and the **goal-hook** (the `Stop` hook) is the deterministic backstop that won't let it
 > quit early. That hook is the entire self-driving safety net; everything below shows it at
 > work.
@@ -69,7 +69,7 @@ cc-master: a fresh orchestration board was created at
 <home>/20260608T105439Z-98526.board.json. You are now the master orchestrator for this
 task — remember that path, it is YOUR board. Decompose the goal into a dependency DAG and
 write tasks[] into that board file, set goal/owner/git, then invoke the
-orchestrating-to-completion skill and run the decision program.
+master-orchestrator-guide skill and run the decision program.
 ```
 
 > **Why this matters.** The board exists *before* the agent does anything. Bootstrap is the
@@ -168,7 +168,7 @@ it scans the home, finds the active board, reads its goal back out, and re-injec
 You are a cc-master master orchestrator. Your orchestration board(s) live in <home>.
 Active: • 20260608T105439Z-98526.board.json [Internationalize the app to 6 locales (i18n
 framework + per-locale translation + locale routing)]. Re-read the board for the task you
-are working on (recognise it by its goal), then invoke the orchestrating-to-completion skill
+are working on (recognise it by its goal), then invoke the master-orchestrator-guide skill
 and continue the decision program. Do not restart work already done/verified; integrate any
 completed background results first.
 ```

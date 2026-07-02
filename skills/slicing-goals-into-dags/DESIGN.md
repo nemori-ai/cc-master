@@ -36,7 +36,7 @@ override 三个默认错误：① **横切分层**（serialize + 把价值推到
 
 | 不归本 skill | 归谁 |
 |---|---|
-| 一张**已切好**的 DAG 怎么排期（CPM / float / 临界路径 / 并行度计算） | `orchestrating-to-completion` 的 `decomposition.md` |
+| 一张**已切好**的 DAG 怎么排期（CPM / float / 临界路径 / 并行度计算） | `master-orchestrator-guide` 的 `decomposition.md` |
 | 切好后怎么**派发**（选 shell / subagent / workflow + parallel/pipeline 形状） | A（dispatch）+ `authoring-workflows`（workflow 写法） |
 | 单个 task 怎么**执行**到验收（dev loop） | `dev-as-ml-loop`（#7·ML 过程 dev loop） |
 | 怎么用 ccm 把这些 task **写进** board | `using-ccm` |

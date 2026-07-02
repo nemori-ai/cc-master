@@ -474,7 +474,7 @@ EOF
   rewrite_owner_field "$TARGET" active true > "$tmp" && mv -f "$tmp" "$TARGET"
   rewrite_owner_field "$TARGET" heartbeat "$ts" > "$tmp" && mv -f "$tmp" "$TARGET"
 
-  inject_ctx "cc-master resume: you have TAKEN OVER the existing orchestration board at ${TARGET}. This is a RESUME, not a fresh start — do NOT re-decompose the goal and do NOT reset tasks[]. Invoke the orchestrating-to-completion skill, then RECONCILE the existing tasks[]: rebuild your mental model from their statuses. Treat every in_flight task as an ORPHAN (its handle died with the prior session) — do not wait on it; run it through endpoint verification (resume-verify content-hash + endpoint check): if its artifact exists and passes, mark it done/verified; otherwise demote it to ready/stale and re-dispatch for a fresh handle. This board is your single source of truth; from now on update owner.heartbeat each time you flush it."
+  inject_ctx "cc-master resume: you have TAKEN OVER the existing orchestration board at ${TARGET}. This is a RESUME, not a fresh start — do NOT re-decompose the goal and do NOT reset tasks[]. Invoke the master-orchestrator-guide skill, then RECONCILE the existing tasks[]: rebuild your mental model from their statuses. Treat every in_flight task as an ORPHAN (its handle died with the prior session) — do not wait on it; run it through endpoint verification (resume-verify content-hash + endpoint check): if its artifact exists and passes, mark it done/verified; otherwise demote it to ready/stale and re-dispatch for a fresh handle. This board is your single source of truth; from now on update owner.heartbeat each time you flush it."
   return 0
 }
 
@@ -769,7 +769,7 @@ case "$init_pol" in
   *) flag_notes="${flag_notes} --policy-switch 取值 '${init_pol}' 非法（须 allow|deny）·已跳过；" ;;
 esac
 
-ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. Decompose the goal into a dependency DAG and write tasks[] into that board file, set goal/owner/git, then invoke the orchestrating-to-completion skill and run the decision program."
+ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. Decompose the goal into a dependency DAG and write tasks[] into that board file, set goal/owner/git, then invoke the master-orchestrator-guide skill and run the decision program."
 # applied / flag_notes 都是**单行**（无内嵌换行）——下方 per-line sed 量化（s/^/"/; s/$/"/）才不破 JSON。
 if [ -n "$applied" ]; then
   ctx="${ctx} bootstrap 已据你启动命令里的显式 flag 预设了这些 board 旋钮：${applied}（已写入 board）。设 board.goal 时把这些 flag token 从 goal 里剔除；这些已落板的旋钮原样保留、别覆写。"

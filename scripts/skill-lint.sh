@@ -16,7 +16,7 @@
 #   4. bare cross-skill path references (Finding #50, AGENTS.md §12) — inside any
 #      distributed markdown (skills/ commands/ hooks/), a backtick-wrapped path that
 #      starts with a sibling *distributed skill name* (authoring-workflows /
-#      orchestrating-to-completion / pacing-and-estimation / using-ccm) followed by `/…` is a dead
+#      master-orchestrator-guide / pacing-and-estimation / using-ccm) followed by `/…` is a dead
 #      link at install time:
 #      it resolves relative to the user's cwd, not the plugin root. Such refs MUST be
 #      ${CLAUDE_PLUGIN_ROOT}/skills/<name>/… absolute (or ${CLAUDE_SKILL_DIR}/… for
@@ -68,7 +68,7 @@ const SKILL_DIRS = ['skills', '.claude/skills'];
 // dirs that actually ship with the plugin — bare refs in here die at install time.
 const DIST_DIRS = ['skills', 'commands', 'hooks'];
 // Distributed skill names whose bare `<name>/…` path refs are install-time dead links.
-const DIST_SKILL_NAMES = ['authoring-workflows', 'orchestrating-to-completion', 'pacing-and-estimation', 'using-ccm', 'slicing-goals-into-dags', 'dev-as-ml-loop', 'engineering-with-craft'];
+const DIST_SKILL_NAMES = ['authoring-workflows', 'master-orchestrator-guide', 'pacing-and-estimation', 'using-ccm', 'slicing-goals-into-dags', 'dev-as-ml-loop', 'engineering-with-craft'];
 
 // Recursively collect every *.md file under a repo-relative base dir.
 function markdownFiles(base) {

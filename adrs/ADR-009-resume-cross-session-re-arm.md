@@ -2,7 +2,7 @@
 
 > Status: **Accepted**
 > Date: 2026-06-15
-> Scope: `bootstrap-board.sh` (the sole arming-exempt hook) gains a SECOND arm form; `commands/as-master-orchestrator.md` (resume narrative); `commands/stop.md` (the `/stop` end-state semantics softened to "explicitly reversible archive"); `skills/orchestrating-to-completion/references/{board.md,resume-verify.md}`. The other four hooks (`reinject.sh` / `verify-board.sh` / `posttool-batch.sh` / `usage-pacing.js`) and ADR-007's arming predicate are **unchanged byte-for-byte**.
+> Scope: `bootstrap-board.sh` (the sole arming-exempt hook) gains a SECOND arm form; `commands/as-master-orchestrator.md` (resume narrative); `commands/stop.md` (the `/stop` end-state semantics softened to "explicitly reversible archive"); `skills/master-orchestrator-guide/references/{board.md,resume-verify.md}`. The other four hooks (`reinject.sh` / `verify-board.sh` / `posttool-batch.sh` / `usage-pacing.js`) and ADR-007's arming predicate are **unchanged byte-for-byte**.
 > Source: 2026-06-15 resume-board mechanism design (forks #2 `--resume` flag + #4 any-board-takeover, both user-decided); the "no supported path lets an abandoned-active board be resumed by a new session" gap left open by ADR-007 §2.7.
 > Co-signed: user (owner)
 
@@ -133,8 +133,8 @@ The load-bearing distinction: what was rejected is *conditional rendering of a r
 - [`ADR-003-board-narrow-waist.md`](ADR-003-board-narrow-waist.md) — re-arm touches **only** the already-pinned `owner.session_id` / `owner.active` / `owner.heartbeat`; no new waist field, ADR-003 intact.
 - [`ADR-002-ship-anywhere-scope.md`](ADR-002-ship-anywhere-scope.md) — resume introduces no new background mechanism; selection + live-probe are local file reads (pure bash), consistent with ship-anywhere.
 - [`../AGENTS.md`](../AGENTS.md) §3 red line 6 / §12 hook arming discipline — the "bootstrap is the sole exempt ARM action" description now notes ARM has two forms (fresh / resume), without changing the red-line substance.
-- [`../skills/orchestrating-to-completion/references/board.md`](../skills/orchestrating-to-completion/references/board.md) — `owner.session_id` resume note + `owner.heartbeat` upgrade (first reader/writer).
-- [`../skills/orchestrating-to-completion/references/resume-verify.md`](../skills/orchestrating-to-completion/references/resume-verify.md) — the orphaned-`in_flight` reconcile discipline (content-hash + endpoint verification) the resume command body points to.
+- [`../skills/master-orchestrator-guide/references/board.md`](../skills/master-orchestrator-guide/references/board.md) — `owner.session_id` resume note + `owner.heartbeat` upgrade (first reader/writer).
+- [`../skills/master-orchestrator-guide/references/resume-verify.md`](../skills/master-orchestrator-guide/references/resume-verify.md) — the orphaned-`in_flight` reconcile discipline (content-hash + endpoint verification) the resume command body points to.
 
 ## 6. References
 

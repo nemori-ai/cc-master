@@ -25,7 +25,7 @@ set -uo pipefail
 
 # ── 定位 plugin 根（本文件在 <root>/examples/decision-briefing/）+ 真实脚本 ────────────────
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-VIEW_SERVER="$ROOT/skills/orchestrating-to-completion/scripts/view-server.js"
+VIEW_SERVER="$ROOT/skills/master-orchestrator-guide/scripts/view-server.js"
 FIXTURE="$ROOT/examples/decision-briefing/fixture.board.json"
 NODE_ID="D1"
 
@@ -283,7 +283,7 @@ board 主文件保持 narrow waist 不动，另写 \`<board>.index.json\` 缓存
 ## 对话记录指针
 
 - 翻过 \`design_docs/plans/persistence-recon.md\`（P0 产物）+ \`perf-baseline.md\`（P1 产物）对齐瓶颈定位。
-- 翻过 \`skills/orchestrating-to-completion/references/board.md\` §narrow-waist 确认 index 走柔性边 / 带外不破 waist。
+- 翻过 \`skills/master-orchestrator-guide/references/board.md\` §narrow-waist 确认 index 走柔性边 / 带外不破 waist。
 - 关键来回：用户最初倾向 split-shards，复述其底层 job（「>200 节点不卡」而非「拆文件」）后收敛到代价最小的 sidecar-index。
 EOF
 }

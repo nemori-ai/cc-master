@@ -2,7 +2,7 @@
 
 Track A asks one cheap, fully-automatic question: *does the description trigger
 at the right moment?* Track B asks the expensive, behavioral one: **once
-`orchestrating-to-completion` is in context, does it actually make the
+`master-orchestrator-guide` is in context, does it actually make the
 orchestrator behave better end-to-end?** It is the quantitative partner to the
 qualitative pressure-testing in `cc-master-skillsmith` — but unlike Track A it is
 **not** a single command. It is an agent-orchestrated, half-manual loop, so this
@@ -15,7 +15,7 @@ The unit under test is the *orchestrator's behavior*, judged from the run
 **transcript** — not a file artifact. We run the same fixture goal twice per
 configuration:
 
-- **with_skill** — the subagent has `orchestrating-to-completion` available.
+- **with_skill** — the subagent has `master-orchestrator-guide` available.
 - **without_skill** — same prompt, no skill (the baseline).
 
 Each configuration runs **3 times**; we report **mean ± stddev** of the
@@ -138,17 +138,17 @@ version:
 
    ```bash
    scripts/eval-benchmark.sh \
-     ./orchestrating-to-completion-workspace/iteration-1 \
-     orchestrating-to-completion
+     ./master-orchestrator-guide-workspace/iteration-1 \
+     master-orchestrator-guide
    ```
 
    It is a thin shell around (run from the skill-creator directory):
 
    ```bash
    uv run --python 3.12 python -m scripts.aggregate_benchmark \
-     <abs-path-to>/orchestrating-to-completion-workspace/iteration-1 \
-     --skill-name orchestrating-to-completion \
-     --skill-path <repo>/skills/orchestrating-to-completion
+     <abs-path-to>/master-orchestrator-guide-workspace/iteration-1 \
+     --skill-name master-orchestrator-guide \
+     --skill-path <repo>/skills/master-orchestrator-guide
    ```
 
    This emits `benchmark.json` + `benchmark.md` (pass_rate / time / tokens, each
@@ -165,10 +165,10 @@ version:
    ```bash
    uv run --python 3.12 python \
      "$HOME/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator/eval-viewer/generate_review.py" \
-     ./orchestrating-to-completion-workspace/iteration-1 \
-     --skill-name orchestrating-to-completion \
-     --benchmark ./orchestrating-to-completion-workspace/iteration-1/benchmark.json \
-     --static ./orchestrating-to-completion-workspace/iteration-1/review.html
+     ./master-orchestrator-guide-workspace/iteration-1 \
+     --skill-name master-orchestrator-guide \
+     --benchmark ./master-orchestrator-guide-workspace/iteration-1/benchmark.json \
+     --static ./master-orchestrator-guide-workspace/iteration-1/review.html
    ```
 
    Use `--static <path>` in headless environments (no display); it writes a
@@ -237,7 +237,7 @@ mean-ed in.
 
 ## When to run
 
-- **Before a release, and before/after any edit to `orchestrating-to-completion`'s
+- **Before a release, and before/after any edit to `master-orchestrator-guide`'s
   discipline layer** (decision program, Rationalization Table, Red Flags, the
   board protocol). Compare with_skill vs without_skill, and the new skill vs the
   old, to confirm a discipline edit moved the six behaviors in the right

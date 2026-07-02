@@ -1,5 +1,5 @@
 ---
-name: orchestrating-to-completion
+name: master-orchestrator-guide
 description: 'Use when running a long-horizon (>24h) goal as a master orchestrator, or coordinating several background agents / workflows toward one large goal — 当你在做总指挥协调多个后台任务时 — even if the user never said "orchestrate". 每次 compaction 之后都要用。一旦你抓到自己在以下任一情形——后台还有可派发的活却 idle-wait 空等、为显得忙而 manufacture busywork、亲手抄起乐器（亲自实现或 review）、把 green gate 或空 review 当 passed、或擅自决定一个本该用户拍板的 merge / 不可逆步骤——立刻调用。'
 ---
 

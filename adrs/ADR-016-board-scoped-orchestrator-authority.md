@@ -2,7 +2,7 @@
 
 > Status: **Accepted**（用户已 bless·2026-06-25）
 > Date: 2026-06-25
-> Scope: 新增 ✎ board 字段 `board.policy`（非 narrow-waist·hook 不读）+ `ccm` 新顶层 `policy` noun（`policy show` 只读 / `policy set` 写·自授权闸）+ `account-management` 的 `switch-account.sh` 加机制硬闸（读 active board policy）+ `orchestrating-to-completion`「绝不自授权」纪律段 + `using-ccm` 两份 reference 锁步（命令面 + board-model-guide，新增 `FMT-POLICY`·规则全集 45→46）。**hook 一字不动**（policy 是 ✎ 非窄腰、hook 不读它·红线2 不破）。
+> Scope: 新增 ✎ board 字段 `board.policy`（非 narrow-waist·hook 不读）+ `ccm` 新顶层 `policy` noun（`policy show` 只读 / `policy set` 写·自授权闸）+ `account-management` 的 `switch-account.sh` 加机制硬闸（读 active board policy）+ `master-orchestrator-guide`「绝不自授权」纪律段 + `using-ccm` 两份 reference 锁步（命令面 + board-model-guide，新增 `FMT-POLICY`·规则全集 45→46）。**hook 一字不动**（policy 是 ✎ 非窄腰、hook 不读它·红线2 不破）。
 > Source: 2026-06-25「board 框定 orchestrator 自主权限」需求发现（用户拍板三决策：强制力模型 = 建议层 + 机制硬闸；新板默认 allow opt-out；policy 写为用户所有 self-grant 防护）。
 > Co-signed: user (owner)
 
@@ -137,7 +137,7 @@ policy 同时被两层读取，缺一不可：
 - [`ADR-015-estimation-and-pacing-engine.md`](ADR-015-estimation-and-pacing-engine.md) — `policy` noun 复用 ADR-015 确立的「写 noun（baseline）vs 只读 advisory namespace（usage/estimate）」分界（§2.4 / §4.3）；policy 与 baseline 同构（✎ 顶层字段 + 专属写 noun + warn lint）。
 - [`ADR-010-two-sided-pacing-corridor.md`](ADR-010-two-sided-pacing-corridor.md) — policy 门控的是 cost-and-pacing 换号 lever 这个**决策**；ADR-010 的双侧走廊 / 7d 总闸 / effective-N pacing 数学不变，policy 只在「decide to switch」前加权限闸。
 - [`ADR-014-cli-decoupling-as-independent-product.md`](ADR-014-cli-decoupling-as-independent-product.md) — 机制硬闸经**进程边界** `ccm policy show --json` 读 board（绝不 import 引擎）+ ccm 缺则优雅降级，沿用 ADR-014 的进程边界 + 降级模式。
-- `account-management` skill — 换号**机制**的 SSOT；`switch-account.sh` 的 policy 机制硬闸是机制层的安全卫兵（不破红线 3：换号决策仍归 `orchestrating-to-completion`）。
+- `account-management` skill — 换号**机制**的 SSOT；`switch-account.sh` 的 policy 机制硬闸是机制层的安全卫兵（不破红线 3：换号决策仍归 `master-orchestrator-guide`）。
 - [`../AGENTS.md`](../AGENTS.md) §3 红线 2（窄腰）/ 红线 3（A=决策、C=机制）/ 红线 4（指挥不演奏·self-grant 防护是其延伸）/ 红线 §6（`ccm` ⟷ `using-ccm` 锁步）。
 - evergreen 实现计划（schema / 命令面 / 强制力流程 / lockstep / fixture / 实现排序）：`../design_docs/plans/2026-06-25-board-policy.md`。
 

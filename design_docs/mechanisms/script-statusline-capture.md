@@ -1,6 +1,6 @@
-# 机制契约：`skills/orchestrating-to-completion/scripts/statusline-capture.js`
+# 机制契约：`skills/master-orchestrator-guide/scripts/statusline-capture.js`
 
-> 类别：运行时带外 node 脚本（status-line 信号捕获·**NOT a hook**——是 settings.json 的 statusLine·随 skill 分发）。源码：`skills/orchestrating-to-completion/scripts/statusline-capture.js`。把账户权威 5h/7d rate_limits 从 status-line stdin 捕获落 sidecar。
+> 类别：运行时带外 node 脚本（status-line 信号捕获·**NOT a hook**——是 settings.json 的 statusLine·随 skill 分发）。源码：`skills/master-orchestrator-guide/scripts/statusline-capture.js`。把账户权威 5h/7d rate_limits 从 status-line stdin 捕获落 sidecar。
 
 ## 触发输入
 - 接进用户的 status line：`statusLine.command = "<脚本绝对路径> --passthrough '<原 status line 命令>'"`（用绝对路径——`${CLAUDE_PLUGIN_ROOT}` 在 statusLine.command 的展开官方未文档化·Finding #39）。

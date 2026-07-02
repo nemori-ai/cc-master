@@ -9,7 +9,7 @@
 # Requires: codex CLI, logged in (OAuth). Usage: codex-review.sh [--base <branch>]
 # Env: CODEX_REVIEW_MODEL overrides the review model (default gpt-5.5).
 #
-# Silent-pass-through guard (see skills/orchestrating-to-completion/references/
+# Silent-pass-through guard (see skills/master-orchestrator-guide/references/
 # resume-verify.md §3): an empty review or a failed call is treated as NOT passed.
 # A null/missing verdict is never silent approval — we exit 2 so the caller's
 # endpoint gate maps it to "not passed" (Replan), never to done.

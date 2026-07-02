@@ -2,7 +2,7 @@
 
 > Status: **Accepted**(设计已定 2026-06-23;数据模型地基 + lint/graph 重写 + 三 hook 收编 node + schema v1→v2 迁移已实现并通过 `run-tests.sh` 全绿 + `plugin validate` 验收·2026-06-23。统一 CLI 与三配套 skill 为后续阶段)。**CLI 定位被 [ADR-014](ADR-014-cli-decoupling-as-independent-product.md) 修订**:§2.2「零 npm 依赖纯 stdlib」→ 工业化 TS + npm(ship-anywhere 改由进程边界 + SEA 守)、§2.3「CLI = plugin 内部三消费者访问层」→ CLI 独立产品 + plugin 降为平行消费方之一、§2.4「hook require 同一份 board-model」→ hook 经进程边界 shell 调 `ccm`。**board 契约本身(narrow-waist 三档 / SSOT / 写入关卡 / 锁)不变。**
 > Date: 2026-06-23
-> Scope: board 契约的根形态——从「被动 JSON 文件 + 各消费者各自解析 + 只钉一小撮 waist」演进到「完整 JS 数据模型 SSOT + 统一 CLI 访问层」。约束全部 hook、CLI、viewer、`skills/orchestrating-to-completion/references/board.md`、`assets/board.template.json`,以及 v0.10.0 board 重构全部实现。**演进 ADR-003(narrow waist),不推翻其精神**。
+> Scope: board 契约的根形态——从「被动 JSON 文件 + 各消费者各自解析 + 只钉一小撮 waist」演进到「完整 JS 数据模型 SSOT + 统一 CLI 访问层」。约束全部 hook、CLI、viewer、`skills/master-orchestrator-guide/references/board.md`、`assets/board.template.json`,以及 v0.10.0 board 重构全部实现。**演进 ADR-003(narrow waist),不推翻其精神**。
 > Source: v0.10.0 board schema 重构需求发现(敏捷开发 Epic #27 / 子需求 #28-#31 + C1 #32 + C6 #34)+ 2026-06-23 设计对话(requirement-elicitation 闸 → 逐分叉裁决)。
 
 ---
@@ -82,4 +82,4 @@ agent invoke / web viewer / human shell 三消费者经同一 CLI;**agent / huma
 ## 6. References
 
 - `assets/board.template.json` / `board.example.json` —— v2 实物需与本 ADR 的字段三档一一对应。
-- `skills/orchestrating-to-completion/references/board.md` —— evergreen 协议描述,随 v2 改写。
+- `skills/master-orchestrator-guide/references/board.md` —— evergreen 协议描述,随 v2 改写。

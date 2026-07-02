@@ -23,7 +23,7 @@ What you expected to happen instead.
 ## Which part is affected
 
 - [ ] Command (`as-master-orchestrator` / `status` / `stop`)
-- [ ] Skill A (`orchestrating-to-completion`)
+- [ ] Skill A (`master-orchestrator-guide`)
 - [ ] Skill B (`authoring-workflows`)
 - [ ] Hook (`bootstrap-board` / `reinject` / `verify-board`)
 - [ ] Board file / narrow waist

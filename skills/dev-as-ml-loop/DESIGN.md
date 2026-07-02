@@ -36,7 +36,7 @@
 
 | 不归本 skill | 归谁 |
 |---|---|
-| 该编排什么 / 怎么派发 / 端点验收（指挥不演奏） | `orchestrating-to-completion`（A） |
+| 该编排什么 / 怎么派发 / 端点验收（指挥不演奏） | `master-orchestrator-guide`（A） |
 | 怎么把目标**切**成带验收的任务 DAG | `slicing-goals-into-dags`（#8，在执行**之前**） |
 | 怎么用 ccm 把任务 / 结果写进 board | `using-ccm` |
 | workflow 脚本怎么写 | `authoring-workflows`（B） |

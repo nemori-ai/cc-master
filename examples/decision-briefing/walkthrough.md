@@ -39,7 +39,7 @@ P1 (done)  性能基线（解析/布局 p95）  ────┘         │ deps
 ```bash
 # 从 repo 根跑（examples 是 dev-only，裸相对路径在此正确）
 CC_MASTER_BOARD="$(pwd)/examples/decision-briefing/fixture.board.json" \
-  node skills/orchestrating-to-completion/scripts/view-server.js
+  node skills/master-orchestrator-guide/scripts/view-server.js
 # 它打印一行： cc-master board view: http://127.0.0.1:<port>
 ```
 
@@ -122,7 +122,7 @@ round: 2
 
 ## D. master 消化 —— recon 拾取 → 解析 → 用上这份数据 → replan
 
-master 在下一次 recon / idle（决策程序 step 1）扫 awaiting-user 节点，发现 board home 同目录有该 node 的（可能多份）`<board-stem>--D1--<STAMP>.decision.md`，按 [`async-hitl.md`](../../skills/orchestrating-to-completion/references/async-hitl.md) §消化纪律——**读该 node 全部 sidecar、取最新一份（最大 STAMP = round 2）为准消化**（之前 round 留作历史 / 回溯）：
+master 在下一次 recon / idle（决策程序 step 1）扫 awaiting-user 节点，发现 board home 同目录有该 node 的（可能多份）`<board-stem>--D1--<STAMP>.decision.md`，按 [`async-hitl.md`](../../skills/master-orchestrator-guide/references/async-hitl.md) §消化纪律——**读该 node 全部 sidecar、取最新一份（最大 STAMP = round 2）为准消化**（之前 round 留作历史 / 回溯）：
 
 1. **先读 `## TL;DR` 再读全文**——TL;DR 是给 master 的快速摘要，全文供 replan 依据。
 2. **据此 replan DAG**——决策结论（选 `opt-sidecar-index`）解锁 / 重接下游：`D1` 不再 `blocked_on:user`，`P2/P3/P4` 从 `blocked` 转 `ready`，可派发。

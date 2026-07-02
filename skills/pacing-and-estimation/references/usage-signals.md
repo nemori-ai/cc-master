@@ -18,7 +18,7 @@
 
 **接法（已自动·无需手接）：** 不用再手动改 `settings.json`——ccm 首次被调用时自动把 `statusLine.command` 设成它自带的 `ccm statusline`（**绝对路径**写入·因 `${CLAUDE_PLUGIN_ROOT}` 在 statusLine.command 里不展开、故须绝对路径），并把你原有的 `statusLine` 备份起来。想关掉/恢复你自己的：`ccm statusline uninstall`（落 opt-out 标记·自动安装不再覆盖回去）；想手动重装：`ccm statusline install`；想全局禁用自动安装：设 `CC_MASTER_NO_AUTOINSTALL=1`。⚠️ status-line 在 idle 时安静——长等后台时配 `refreshInterval` 保持 sidecar 新鲜（`resets_at` 是绝对时刻，即使 sidecar 略旧倒计时仍准，除非已跨 reset）。
 
-**撞墙预测。** `ccm usage advise` 的走廊数学（引擎 `pacing.ts`）已替你判这一步：5h 逼近上界出 `throttle`（有可切备号 + 7d 余量则 `switch`、无则 7d 亦吃紧时 `stop_5h`）；7d≥85% 出 `stop_7d`（跨窗口硬总闸·**7d 尤其要看**，它窗口长、最易不知不觉逼顶——`usage-pacing.js` hook 也对 7d 出声）。你只需**读 verdict + 据它拍 lever**；不必自己拿 `used_percentage` 重算走廊（那是引擎的活·DRY）。账户口径不可用 → `available:false`，hook 此时**静默**（ADR-024 后无本地反推 fallback）。读到 `stop_7d` 后的**动作**（停派新节点 / surface 用户）归 `orchestrating-to-completion` 镜头 5/7 + 决策程序 §(f)，本文只教读 verdict。
+**撞墙预测。** `ccm usage advise` 的走廊数学（引擎 `pacing.ts`）已替你判这一步：5h 逼近上界出 `throttle`（有可切备号 + 7d 余量则 `switch`、无则 7d 亦吃紧时 `stop_5h`）；7d≥85% 出 `stop_7d`（跨窗口硬总闸·**7d 尤其要看**，它窗口长、最易不知不觉逼顶——`usage-pacing.js` hook 也对 7d 出声）。你只需**读 verdict + 据它拍 lever**；不必自己拿 `used_percentage` 重算走廊（那是引擎的活·DRY）。账户口径不可用 → `available:false`，hook 此时**静默**（ADR-024 后无本地反推 fallback）。读到 `stop_7d` 后的**动作**（停派新节点 / surface 用户）归 `master-orchestrator-guide` 镜头 5/7 + 决策程序 §(f)，本文只教读 verdict。
 
 诚实交代 scope：账户 `used_percentage` 仅 Pro/Max 交互式可见；API-key 用户没有滚动窗口、headless 拿不到 status-line（status line 虽自动安装，headless 不渲染它）——这些一律 `available:false` 降级（ADR-024 后 hook 静默·不再本地反推出声）。
 
@@ -35,4 +35,4 @@
 
 绝不承诺「reset 时配额精确归零」。
 
-> **与 per-node observability 口径正交（别混用）**：上面这套是**账户级 pacing**——只给 `used_percentage`（百分比、无绝对 token 分母）、混合所有在飞 node 与主线。**per-node 的 token 是另一条独立的精确路径**：每个 sub-agent / workflow 完成时 `<task-notification>` 自带 `<usage>` 块（`subagent_tokens` / `duration_ms` / `tool_uses`），orchestrator 标 done 那拍直接抄进该 task 的 `observability` 柔性边（schema 见 `orchestrating-to-completion` 的 `references/board.md`）。两者口径与用途正交：账户 pacing 管「整场长跑别撞墙」，observability 管「单个节点烧了多少、回喂自进化 / workflow 固化」。**切勿用账户级 delta（node start/finish 读两次 `used%` 取差）反推 per-node token**——并发多 node 在飞时 delta 把它们全混在一起、结构性无法归因到单 node（已有精确的 notification 路径，没理由退回污染路径）。
+> **与 per-node observability 口径正交（别混用）**：上面这套是**账户级 pacing**——只给 `used_percentage`（百分比、无绝对 token 分母）、混合所有在飞 node 与主线。**per-node 的 token 是另一条独立的精确路径**：每个 sub-agent / workflow 完成时 `<task-notification>` 自带 `<usage>` 块（`subagent_tokens` / `duration_ms` / `tool_uses`），orchestrator 标 done 那拍直接抄进该 task 的 `observability` 柔性边（schema 见 `master-orchestrator-guide` 的 `references/board.md`）。两者口径与用途正交：账户 pacing 管「整场长跑别撞墙」，observability 管「单个节点烧了多少、回喂自进化 / workflow 固化」。**切勿用账户级 delta（node start/finish 读两次 `used%` 取差）反推 per-node token**——并发多 node 在飞时 delta 把它们全混在一起、结构性无法归因到单 node（已有精确的 notification 路径，没理由退回污染路径）。

@@ -62,7 +62,7 @@ function intervalSecOf(raw, dflt) {
 const IDENTITY_TEXT =
   '[身份周期提示] 你是一个 cc-master master orchestrator，正在把某个长程目标编排到完成。' +
   '若你已偏离编排者姿态（开始亲手实现 / 亲自 review / 空转等待 / 把 green gate 当 passed），' +
-  '现在是重温 orchestrating-to-completion（SKILL A）七镜头 + 决策程序、回到指挥位的时机。' +
+  '现在是重温 master-orchestrator-guide（SKILL A）七镜头 + 决策程序、回到指挥位的时机。' +
   '若你确在编排轨道上，无需特定动作——继续推进。';
 
 // ── critpath：spawn ccm 读图 + estimate verdict（红线3：ccm 出数/verdict·hook 不算图）──────────────────

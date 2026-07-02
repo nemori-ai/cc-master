@@ -1,4 +1,4 @@
-# orchestrating-to-completion — 设计宪法（DESIGN.md）
+# master-orchestrator-guide — 设计宪法（DESIGN.md）
 
 > 本文回答「这 skill 是什么 / 为什么」。「怎么用」在 [`SKILL.md`](SKILL.md)（魂，本文不复述其七镜头 / 红线 / 决策程序）；深细节在 [`references/`](references/)。
 > 设计先于实现——任何对 SKILL.md 的实质改动，先在此更新对应段。

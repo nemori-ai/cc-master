@@ -1,13 +1,13 @@
 ---
 name: slicing-goals-into-dags
-description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —— 当你要把一个目标 / epic 切成 board 任务依赖图时:怎么拆、先做什么、任务多大粒度、纵切还是横切、怎么尽早 ship 可用增量 + 最大化并行。教敏捷切分的道与品味:纵切薄增量(非横切技术层)、walking skeleton、粒度为并行与验收而定、按价值/风险排序、切片映射到 cadence/iteration。Triggers: "这个目标怎么拆 / 先做什么后做什么"、把 epic 拆成 board、定任务粒度、纠结纵切 vs 横切、想尽早 ship 一个可用增量 / 想拉满并行度。Do NOT use when 一张已切好的 DAG 怎么排期 / 算临界路径(那是 orchestrating-to-completion 的 decomposition 一段)、切好后怎么派发(orchestrating-to-completion)、单个 task 怎么实现到验收(dev-as-ml-loop)、怎么用 ccm 把 task 写进 board(using-ccm)。'
+description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —— 当你要把一个目标 / epic 切成 board 任务依赖图时:怎么拆、先做什么、任务多大粒度、纵切还是横切、怎么尽早 ship 可用增量 + 最大化并行。教敏捷切分的道与品味:纵切薄增量(非横切技术层)、walking skeleton、粒度为并行与验收而定、按价值/风险排序、切片映射到 cadence/iteration。Triggers: "这个目标怎么拆 / 先做什么后做什么"、把 epic 拆成 board、定任务粒度、纠结纵切 vs 横切、想尽早 ship 一个可用增量 / 想拉满并行度。Do NOT use when 一张已切好的 DAG 怎么排期 / 算临界路径(那是 master-orchestrator-guide 的 decomposition 一段)、切好后怎么派发(master-orchestrator-guide)、单个 task 怎么实现到验收(dev-as-ml-loop)、怎么用 ccm 把 task 写进 board(using-ccm)。'
 ---
 
 # slicing-goals-into-dags —— 把目标切成一张好 board DAG
 
-> **分发 skill。** 这是把一个目标 / epic **切**成 board 任务依赖图的**敏捷方法论与品味**——回答"怎么拆出一张好图",不是"一张已成形的图怎么排期"(那是 [orchestrating-to-completion] 的 decomposition)。
+> **分发 skill。** 这是把一个目标 / epic **切**成 board 任务依赖图的**敏捷方法论与品味**——回答"怎么拆出一张好图",不是"一张已成形的图怎么排期"(那是 [master-orchestrator-guide] 的 decomposition)。
 >
-> **职责边界(红线3):** **切**(carve)归本 skill;**排**(schedule:CPM / 临界路径 / 并行度计算)归 orchestrating-to-completion 的 board 协议 reference;**派**(dispatch)归 orchestrating-to-completion;**执行**单个 task 到验收归 dev-as-ml-loop;**写进** board 归 using-ccm。本 skill 只管"怎么把目标切成图"这一刀。
+> **职责边界(红线3):** **切**(carve)归本 skill;**排**(schedule:CPM / 临界路径 / 并行度计算)归 master-orchestrator-guide 的 board 协议 reference;**派**(dispatch)归 master-orchestrator-guide;**执行**单个 task 到验收归 dev-as-ml-loop;**写进** board 归 using-ccm。本 skill 只管"怎么把目标切成图"这一刀。
 
 ---
 
@@ -70,7 +70,7 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 - **风险优先(去风险)**:把**最不确定 / 最可能翻车**的集成,用一根 spike / walking skeleton 早早穿过去——把"做不出来"的发现提前到便宜的时候。
 - 二者常合一:**最薄的那根线,往往既穿过最险的路径、又交付一小条可用价值**——这就是 walking skeleton 该选的方向。
 
-> **落地**:硬先后(脊椎必须先于依赖它的片)用 `--deps` 编码进 board;但**同为 ready 时先派哪片**(价值还是风险优先)是 **dispatch 决策、归 A**(`orchestrating-to-completion`),不是 board 上的某个字段。本 skill 负责切出"谁依赖谁"的结构,A 负责在就绪集里挑先后。
+> **落地**:硬先后(脊椎必须先于依赖它的片)用 `--deps` 编码进 board;但**同为 ready 时先派哪片**(价值还是风险优先)是 **dispatch 决策、归 A**(`master-orchestrator-guide`),不是 board 上的某个字段。本 skill 负责切出"谁依赖谁"的结构,A 负责在就绪集里挑先后。
 
 ---
 
@@ -80,7 +80,7 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 - **共享脊椎 → 那一个 foundation task**,纵切片依赖它;**死守它的依赖者最少**——只有真共享核心才连上去,别把半个 schema 层挂成全图前置。
 - **片分组进 `cadence`/`iteration` timebox**:每个 iteration 收口时至少 ship 一片可用增量(接 board 的 cadence 模块——节奏在这落地)。
 - **`estimate`** 回喂粒度调参(锚 3)。
-- 切好的图怎么**写进** board(`ccm task add --deps ...`)→ using-ccm;怎么**排期 / 算临界路径** → orchestrating-to-completion 的 board 协议 reference。
+- 切好的图怎么**写进** board(`ccm task add --deps ...`)→ using-ccm;怎么**排期 / 算临界路径** → master-orchestrator-guide 的 board 协议 reference。
 
 ---
 
@@ -99,7 +99,7 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ## Pointers
 
-- **orchestrating-to-completion**(SKILL A)—— 切好的图怎么**排期**(CPM / float / 临界路径 / 并行度计算,在它的 board 协议 reference)、怎么**派发**(选 shell/subagent/workflow)。本 skill 是"切",它是"排 + 派"。
+- **master-orchestrator-guide**(SKILL A)—— 切好的图怎么**排期**(CPM / float / 临界路径 / 并行度计算,在它的 board 协议 reference)、怎么**派发**(选 shell/subagent/workflow)。本 skill 是"切",它是"排 + 派"。
 - **dev-as-ml-loop**(#7)—— 切出来的**单个 task 怎么执行到验收**(把验收当 objective 迭代逼近)。本 skill 切出带验收的片,#7 把每片做到验收。
 - **engineering-with-craft**(#G)—— 切出的单 task 执行时,除 dev-as-ml-loop 的循环**形状**,还要 #G 的手艺**内容**(片内 SDD→DDD→OOP→TDD 怎么建模 / 写类 / 测试)。E 切片、#G 定义片内每一棒的手艺。
 - **using-ccm** —— 怎么把切出的 task / deps / estimate / cadence **写进** board(`ccm task add` / `cadence open` ...)。

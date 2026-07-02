@@ -37,7 +37,7 @@
 
 | 不归本 skill | 归谁 |
 |---|---|
-| 该编排什么 / 怎么派发 / 排期 / 端点验收 | `orchestrating-to-completion`（A） |
+| 该编排什么 / 怎么派发 / 排期 / 端点验收 | `master-orchestrator-guide`（A） |
 | 怎么把目标**切**成带验收的任务 DAG（交付计划轴） | `slicing-goals-into-dags`（E） |
 | 把一个任务**迭代优化到验收**的**循环形状本身** | `dev-as-ml-loop`（F·不同 plane） |
 | 怎么用 ccm 把任务 / 结果写进 board | `using-ccm`（D） |

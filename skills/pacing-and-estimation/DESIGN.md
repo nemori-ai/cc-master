@@ -5,7 +5,7 @@
 
 ## 1. One-liner
 
-在跑 long-horizon 目标、要把一场长跑对照 5h/7d 配额窗口配速、或要估算工期/风险/选模型档时调用——给 agent **消费 ccm 只读 advisory（usage/estimate/baseline）的机制知识**：怎么读单侧走廊 verdict（ADR-024·hold/throttle/switch/stop_5h/stop_7d）、四档模型相对成本、配额信号源链、估算诚实字段；覆写「estimate 整轴 out-of-mind 从不被召回」的默认失败。**ccm 出 verdict、A 决策**——本 skill 只教消费层，决策回 orchestrating-to-completion。
+在跑 long-horizon 目标、要把一场长跑对照 5h/7d 配额窗口配速、或要估算工期/风险/选模型档时调用——给 agent **消费 ccm 只读 advisory（usage/estimate/baseline）的机制知识**：怎么读单侧走廊 verdict（ADR-024·hold/throttle/switch/stop_5h/stop_7d）、四档模型相对成本、配额信号源链、估算诚实字段；覆写「estimate 整轴 out-of-mind 从不被召回」的默认失败。**ccm 出 verdict、A 决策**——本 skill 只教消费层，决策回 master-orchestrator-guide。
 
 ## 2. Craft 自分类
 
@@ -41,7 +41,7 @@
 
 | 关切 | 移交给 |
 |------|--------|
-| 该不该减速/加速/换号/replan（**编排决策**）+ 7d 总闸 surface 动作 + 换号 lever 阶梯 / policy 授权 / 绝不自授权 | `orchestrating-to-completion`（A·镜头 5/2/7 + 决策程序 §(f) + `references/cost-decisions.md`） |
+| 该不该减速/加速/换号/replan（**编排决策**）+ 7d 总闸 surface 动作 + 换号 lever 阶梯 / policy 授权 / 绝不自授权 | `master-orchestrator-guide`（A·镜头 5/2/7 + 决策程序 §(f) + `references/cost-decisions.md`） |
 | ccm 命令**怎么敲**（flag/positional/exit code）+ account 录号/换号/选号操作 + board 字段填什么 | `using-ccm`（D·command-catalog + account-pool.md） |
 | 号池机制实现 / vault 安全 / 选号算法（**实现**） | ccm 引擎 `@ccm/engine/account`（+ D 的 account-pool.md 概念叙事） |
 | pacing 走廊数学 / 估算 OR-ML 算法（**实现 SSOT**） | ccm 引擎 `@ccm/engine/usage`·`estimate`（H 只消费 verdict，不复述数学） |

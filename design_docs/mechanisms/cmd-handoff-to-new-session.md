@@ -4,7 +4,7 @@
 
 ## 触发输入
 - 用户敲 `/cc-master:handoff-to-new-session`。
-- 读：cc-master home 下每块 `owner.active:true` 的 board；动手前读 `${CLAUDE_PLUGIN_ROOT}/skills/orchestrating-to-completion/references/handoff.md`。
+- 读：cc-master home 下每块 `owner.active:true` 的 board；动手前读 `${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/references/handoff.md`。
 
 ## 业务流（6 步）
 1. **Quiesce**：立刻停止往 WIP 放新任务（本回合起不再有新任务进 in_flight）；已在飞的让它跑。

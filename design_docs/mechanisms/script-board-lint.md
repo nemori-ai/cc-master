@@ -1,8 +1,8 @@
-# 机制契约：`skills/orchestrating-to-completion/scripts/board-lint.js`
+# 机制契约：`skills/master-orchestrator-guide/scripts/board-lint.js`
 
 > **⚠️ 已退役（ADR-014 解耦后·被 `ccm board lint` 取代）。** 该 skill 版脚本已从仓库删除——board lint 引擎已迁入独立安装的 `@ccm/engine`，独立手动 lint 现走 `ccm board lint`（`--board <path> --raw --json` 直读指定 board）。本文正文保留作历史，**不再是 live 机制**。
 
-> 类别（历史）：运行时带外 node 脚本（独立手动 board lint·NOT a hook·随 skill 分发）。源码（已删）：`skills/orchestrating-to-completion/scripts/board-lint.js`。复用 hook 同一份 lint 核心（`hooks/scripts/board-lint-core.js`），补 PostToolUse hook 看不见的编辑路径（尤其 Bash 改 board）。
+> 类别（历史）：运行时带外 node 脚本（独立手动 board lint·NOT a hook·随 skill 分发）。源码（已删）：`skills/master-orchestrator-guide/scripts/board-lint.js`。复用 hook 同一份 lint 核心（`hooks/scripts/board-lint-core.js`），补 PostToolUse hook 看不见的编辑路径（尤其 Bash 改 board）。
 
 ## 触发输入
 - 主线/agent 显式调用。CLI：`node board-lint.js <board-path>` / 无参（lint home 下唯一 active 板）/ `--json [<path>]`。
