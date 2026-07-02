@@ -132,6 +132,8 @@ cc-master/
 
 **语言纪律**：本仓所有 skill 正文 + references 一律**中文**；例外仅 `name`（kebab-case 英文）、代码/路径/CLI/API 字段/工具名等技术术语；`description` 中文为主可含英文触发词。
 
+**受众纪律（skill .md = 写给 agent 的 prompt·第二人称）**：所有分发 skill 的 `SKILL.md` + `references/` 正文都是**注入 agent context 的 prompt**——用第二人称、imperative、agent-as-actor 写。**绝不夹带写作者留给自己 / 维护者看的「注释」性质文本**：文档自述（「这是 X 的魂」）、投递机制（「`SessionStart` hook 每次 compaction 重注」）、自述结构的 TOC（「本文分四模块…」，与紧邻的章节标题冗余）、设计理由旁白（「（显式化判定：…）」）、给评审的 meta 注。判据一句话：**这行字是在「对 agent 说话让它行动」，还是在「对人描述这份文档」？后者删。**（命令体同型原则见 §12 [[Finding #43]]——命令体正文用 imperative / 第二人称、别写成第三人称 reference；此为其 skill 版。）
+
 **TDD-for-skills（纪律型 skill 改前必跑 baseline）**：任何"纪律型 / judgment-bearing"的 skill prose（agent 在压力下能把它合理化掉的规则）——新建或编辑——都**必须先跑一遍 subagent pressure baseline 看它在没有该段时选错**，再写堵漏。完整 Iron Law + 三压（time + sunk cost + exhaustion）配方在 → [`.claude/skills/cc-master-skillsmith/SKILL.md`](.claude/skills/cc-master-skillsmith/SKILL.md)（指针 `superpowers:test-driven-development` + `superpowers:writing-skills` + 官方 `skill-creator`）。pressure baseline 是**定性**（哪条 rationalization 要堵）；§8 eval 是**定量**（堵了有没有用）——互补，不替代。
 
 **Frontmatter YAML 引号反模式（Finding #1，血泪）**：`description` 里只要含 `:` 或 `"`，**整个值必须用单引号包起来**——否则 YAML parser 误读、`plugin validate` / content 测试以非显然的方式失败。本仓所有 skill 的 frontmatter 都是单引号整包，照抄即可。**拿不准就加引号**——这是本仓最常见的 skill-authoring footgun。

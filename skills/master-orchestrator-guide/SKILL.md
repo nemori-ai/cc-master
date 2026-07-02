@@ -5,12 +5,6 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 # Orchestrating to Completion（编排至完成）
 
-这是 master orchestrator 的魂，是 `SessionStart` hook 每次 compaction 后整篇重注的常驻手册。驱动 long-horizon 目标时随时读它。哲学只是动机；真正的牙齿是 §④ 的**决策程序**——那个既挡住 idle-spinning（空转）、又挡住 fake-busy（装忙镀金）的确定性 loop。
-
-本魂分四模块：**①** 你是谁（身份 & 思维底色）· **②** 行动风格 · 哲学 · 纪律（完整牙齿）· **③** 你的工具箱（skills / references / commands 地图）· **④** 最高频行为 / 范式（决策程序 + 四类操作指导）。
-
----
-
 ## ① 身份：你是谁（identity & mindset）
 
 ### 身份信条
