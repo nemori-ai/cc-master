@@ -1,8 +1,8 @@
 # 派发 —— 选机制 + 编排并行
 
-> **服务愿景：C1**（异步并行 + 完整落地）**· C5**（在资源预算内高效调度）。**何时读：** 选后台机制并编排并行时——三机制（shell / sub-agent / workflow）、intra-vs-inter workflow、靠 escalation 重新定位（re-altitude）、admission control、**派发卫生 + watchdog/liveness 安全网（含 watchdog 工具降级链）**。
+> **何时读：** 选后台机制并编排并行时——三机制（shell / sub-agent / workflow）、intra-vs-inter workflow、靠 escalation 重新定位（re-altitude）、admission control、**派发卫生 + watchdog/liveness 安全网（含 watchdog 工具降级链）**。
 
-主线编排的核心：选每个节点*在哪*跑、再把这些道编排起来。来源：research report 3（LLM-Compiler TFU dataflow）+ codex 二审。
+主线编排的核心：选每个节点*在哪*跑、再把这些道编排起来。
 
 ## 目录
 
@@ -34,7 +34,7 @@
 
 学术根源是 LLM-Compiler 的 **Task Fetching Unit**（report 3）：一条依赖在它的输入就绪那一刻就被派出去；已经能跑的东西绝不等一个还没就绪的；而且 planner 流式地吐图，让 plan 和 execute overlap。cc-master 在两个尺度上跑的是同一套算法：
 
-- **宏观（主线）—— dataflow 作为一种内化的*心态*。** 决策程序*本身*就是一个手跑的 TFU：对账 board（observation 黑板）→ 派发就绪任务（fetch-when-ready）→ 在空隙里塞 fill-work（planner/executor overlap）→ 在端点验收（Joiner 闸）→ 唯有就绪集为空才等。这里**没有 `pipeline()` 原语**——主线 DAG 是动态的、异构的、里头还有个人，没有任何 compile-time 脚本能表达它。Dataflow 在这里以纪律存在（镜头 3 & 4），不是代码。
+- **宏观（主线）—— dataflow 作为一种内化的*心态*。** 决策程序*本身*就是一个手跑的 TFU：对账 board（observation 黑板）→ 派发就绪任务（fetch-when-ready）→ 在空隙里塞 fill-work（planner/executor overlap）→ 在端点验收（Joiner 闸）→ 唯有就绪集为空才等。这里**没有 `pipeline()` 原语**——主线 DAG 是动态的、异构的、里头还有个人，没有任何 compile-time 脚本能表达它。Dataflow 在这里以纪律存在（「就绪即发」「主观能动」两镜头），不是代码。
 - **微观（workflow 内部）—— dataflow 作为一个显式*原语*。** 这里 `pipeline()` 是真代码：确定性、有日志、可续。但它僵硬——workflow 一经启动结构就固定，没有运行中途的输入（`${CLAUDE_PLUGIN_ROOT}/skills/authoring-workflows/references/mechanism.md` §7）。微观尺度选 `parallel()`（barrier）还是 `pipeline()`（streaming）的判据，见 `${CLAUDE_PLUGIN_ROOT}/skills/authoring-workflows/references/mechanism.md` §3 的 parallel-vs-pipeline smell-test（默认 pipeline，只有下游真要整批集合才上 barrier）——此处不复述。
 
 **两个尺度之间的切线，就是按动态性切的。** 必须运行中途随机应变的工作——对一个外部完成做出反应、把一个 escalation 重新定位、吸收一个 HITL 回答——归宏观尺度（board + 决策程序，LLM 在 loop 里）。能在 compile time 就固定下来的工作——一批同构项目流过固定 stage——归一个 `pipeline()`。这正是把 LLM-Compiler 那条切线 *"LLM 吐图、代码调度它"* 从单个 agent 任务放大到整场 long-horizon 编排：主线 LLM 做动态规划（吐图 + replan），workflow 脚本做确定性调度。自相似——一个尺度嵌在另一个里。
@@ -135,9 +135,9 @@ HITL 只是诸多轴之一；失败隔离、优先级、整合时机同样重要
 
 **工具降级链（情境三件套 + universal floor，按优先级，缺则降级）**——ship-anywhere 诚实性：即便用户已开放 cron / ScheduleWakeup，不同宿主（Bedrock / Vertex / Foundry）可用性仍有别，故教法是降级链 + 显式可用性提示，background-shell 永为 floor，不假设新工具到处都在：
 
-1. **CronCreate `recurring:false`（首选 / 通用 watchdog）** —— 本地 session 调度器，**只在 REPL idle 时 fire**（正好在你空转时叫回、不打断干活）。间隔 ≈ 最长 `in_flight` 任务的 p95 + 余量。cache 心智：<270s 保温 / ≥1200s 长等（贴 ScheduleWakeup 的 cache-warmth 心智；见 `cost-and-pacing.md`）。重唤起处置完后 **CronDelete** 清掉待发 job 免重复 fire。注意 `durable:false` 是**本地 session 内存调度**、不需 claude.ai OAuth，故 ship-anywhere OK——区别于云 routines / RemoteTrigger（破 ship-anywhere，不教）。
+1. **CronCreate `recurring:false`（首选 / 通用 watchdog）** —— 本地 session 调度器，**只在 REPL idle 时 fire**（正好在你空转时叫回、不打断干活）。间隔 ≈ 最长 `in_flight` 任务的 p95 + 余量。cache 心智：<270s 保温 / ≥1200s 长等（贴 ScheduleWakeup 的 cache-warmth 心智）。重唤起处置完后 **CronDelete** 清掉待发 job 免重复 fire。注意 `durable:false` 是**本地 session 内存调度**、不需 claude.ai OAuth，故 ship-anywhere OK——区别于云 routines / RemoteTrigger（破 ship-anywhere，不教）。
 2. **ScheduleWakeup** —— 原生自定步长 + cache-warmth；已在 /loop dynamic 时用过。
 3. **Monitor** —— 某后台任务有可观测 liveness 信号（log 文件 / 进程）时用：`tail -f | grep -E --line-buffered '<进度>|<失败签名>'`，事件驱动、精准。**"silence ≠ success"**：filter 必须覆盖**失败终态**，不能只 grep happy path——否则一个吐了错误就死的任务，你的 filter 等不到它的 happy 行、反而以为还在跑。
-4. **background-shell `until <ready>; do sleep N; done` 丢进 `run_in_background`（universal ship-anywhere floor）** —— ADR-004 既有消解（见 §等待外部状态），**永远兜底**：上面三者在某宿主不可用时，这条恒可用（harness 完成重入）。ADR-011 在它之上**补充** timer primitives，不取代它。
+4. **background-shell `until <ready>; do sleep N; done` 丢进 `run_in_background`（universal ship-anywhere floor）** —— 既有的后台-shell 消解法（见 §等待外部状态），**永远兜底**：上面三者在某宿主不可用时，这条恒可用（harness 完成重入）。timer primitives 只是在它之上**补充**，不取代它。
 
 被唤醒后 recon 用的就是上面派发卫生那套地面真相验证法（handle / `git status` / 工具结果），处置完静默失败的、该 re-arm 的 re-arm——细节在 `async-hitl.md` §等待前 arm watchdog。

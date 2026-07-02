@@ -1,10 +1,8 @@
 # 续跑 + 端点验收
 
-> **服务愿景：C1**（异步并行 + 完整落地）。**何时读：** 让续跑变便宜 + 让验收可信时——content-hash action key、依赖 pinning / stale 检测、独立的端点验收、loop 收敛、codex 第二验收者。
+> **何时读：** 让续跑变便宜 + 让验收可信时——content-hash action key、依赖 pinning / stale 检测、独立的端点验收、loop 收敛、codex 第二验收者。
 
-让续跑变便宜（O(changeset)，而非 O(everything)）、让验收变可信（只在端点验、绝不信 agent 自报）。这是镜头 6——"只信端点验收；输出可记账、可续"——的可操作化。
-
-来源：research report 3（Joiner 的 loop-until-converged）+ report 4（content-addressable cache / end-to-end argument）。
+让续跑变便宜（O(changeset)，而非 O(everything)）、让验收变可信（只在端点验、绝不信 agent 自报）。这是「只信端点验收」镜头——"只信端点验收；输出可记账、可续"——的可操作化。
 
 ---
 
@@ -43,7 +41,7 @@
 为什么这是第 0 步而非「顺手」：resume 之后你做的每件事都隐式依赖 cwd——相对路径读写、`git status` / `git diff` / `git log`、端点验收的 `bash run-tests.sh` 与 `claude plugin validate .`、重派 sub-agent 给的工作目录。cwd ≠ worktree 时这些**全在错的地方跑**，而且是**静默错误**，两种后果都致命：
 
 - **挂掉**——命令在错目录找不到文件（`run-tests.sh: No such file`），还算好，至少炸得见。
-- **静默跑错树**（更阴险）——cwd 下恰好有另一个 checkout / 另一份产物，闸照样跑、照样绿，你把一个**根本不是 board 目标**的产物标成 `done`/`verified`。端点验收的全部可信度（镜头 6）建立在「验的是对的那棵树」之上；cwd 漂了，gate-green 连必要条件都不是。pressure baseline 实证：强模型在三压下默认信任 ambient cwd、直奔验收，跑绿纯靠运气恰好身处对的 repo，且**跑完闸才**注意到 board 的 `branch` 与实际不符——顺序正好反了。
+- **静默跑错树**（更阴险）——cwd 下恰好有另一个 checkout / 另一份产物，闸照样跑、照样绿，你把一个**根本不是 board 目标**的产物标成 `done`/`verified`。端点验收的全部可信度（「只信端点验收」镜头）建立在「验的是对的那棵树」之上；cwd 漂了，gate-green 连必要条件都不是。pressure baseline 实证：强模型在三压下默认信任 ambient cwd、直奔验收，跑绿纯靠运气恰好身处对的 repo，且**跑完闸才**注意到 board 的 `branch` 与实际不符——顺序正好反了。
 
 确认 cwd == worktree 后，顺带核对当前分支 == `git.branch`（窄腰里有）；不符是「这块板的执行环境与我所处环境漂移」的信号，停下来对账，绝不在错分支上接续 / 验收 / 发版。
 
@@ -58,13 +56,13 @@
 
 ### 孤儿 `in_flight` 续接（新 session 接管旧板时）
 
-`--resume` 把一块**已存在**的 board 盖成本 session 后（跨 session re-arm，见 ADR-009），上一段 orchestration 派发的后台任务的 **handle 活在那个已不在的旧 session 里**——新 session **attach 不回这些 handle**，那些后台进程可能早随旧 session 死了，也可能还在跑但你无从收割。board 上它们是 `status:"in_flight"` + 一个**已失效的 handle**。这是 resume 最微妙的正确性点——但它**不引入新机制**，只是把这个触发场景接进上面已有的 §1 content-hash 续跑 + §3 端点验收 + status enum 的 `stale`/`ready` 路由：
+`--resume` 把一块**已存在**的 board 盖成本 session 后（跨 session re-arm），上一段 orchestration 派发的后台任务的 **handle 活在那个已不在的旧 session 里**——新 session **attach 不回这些 handle**，那些后台进程可能早随旧 session 死了，也可能还在跑但你无从收割。board 上它们是 `status:"in_flight"` + 一个**已失效的 handle**。这是 resume 最微妙的正确性点——但它**不引入新机制**，只是把这个触发场景接进上面已有的 §1 content-hash 续跑 + §3 端点验收 + status enum 的 `stale`/`ready` 路由：
 
 - **旧 handle 一律当作【失效】**——绝不用它去查 / 收割后台输出（attach 不上）。
 - **走端点验收判它到底有没有真做完**：算该节点的 content-hash（§1：`spec + 上游产物 + key context`），查产物是否已落地（commit / PR / 文件已存在）。
   - 产物**存在且通过端点验收**（§3：亲跑闸 + 读 diff，不信任何自报）→ 标 `done`/`verified`。这正是 §1 的 content-hash 续跑：产物在且验过 = 不重跑（O(changeset)）。
   - 产物**不存在 / 验收不过** → 该 `in_flight` 是孤儿、未完成：降回 `ready`（或 `stale`，若它依赖的上游产物也可能变了，见 §2），**重新派发**拿到一个写回 board 的**新 handle**。
-- **绝不把旧 `in_flight` 当作「还在飞、继续等」**——旧 handle 已死，干等 = idle-wait 空等（七镜头第 4 的反模式）。在端点【验或重派】，二选一，不留薛定谔的 `in_flight`。
+- **绝不把旧 `in_flight` 当作「还在飞、继续等」**——旧 handle 已死，干等 = idle-wait 空等（「主观能动」镜头的反模式）。在端点【验或重派】，二选一，不留薛定谔的 `in_flight`。
 
 ### codex 作为一个独立的第二端点验收者
 

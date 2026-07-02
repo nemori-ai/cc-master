@@ -1,7 +1,7 @@
 # Cost decisions —— 换号 lever 的编排决策锚
 
-> **服务愿景：C2**（控制 token 消耗速度）**· C5**（资源下最大化效率）。**何时读：** 轻 lever（降档 / 降 WIP / 推迟 float）用尽、一份配额本窗口真要烧穿、而你还握着未消费备号时，要拍「换不换号、谁授权」这个**决策**。
-> **这是决策锚，不是机制手册。** 换号**决策**（何时换、谁拍板、policy 授权、绝不自授权）归这里（SKILL A）；换号**消费**（怎么读 `ccm usage advise` 的 `switch_candidate`、effective-N 缩放节奏）归 `pacing-and-estimation` skill；换号**机制**（`ccm account switch` 怎么切、policy 硬闸怎么 exit 7、vault token 安全）归 `using-ccm`（D·`references/account-pool.md` + command-catalog）+ ccm `account` 引擎。本文只立编排须知、单向引用机制（红线 3：渐进式披露、不复述）。
+> **何时读：** 轻 lever（降档 / 降 WIP / 推迟 float）用尽、一份配额本窗口真要烧穿、而你还握着未消费备号时，要拍「换不换号、谁授权」这个**决策**。
+> **这是决策锚，不是机制手册。** 换号**决策**（何时换、谁拍板、policy 授权、绝不自授权）归这里（master-orchestrator-guide）；换号**消费**（怎么读 `ccm usage advise` 的 `switch_candidate`、effective-N 缩放节奏）归 `pacing-and-estimation`；换号**机制**（`ccm account switch` 怎么切、policy 硬闸怎么 exit 7、vault token 安全）归 `using-ccm`（`references/account-pool.md` + command-catalog）+ ccm `account` 引擎。本文只立编排须知、单向引用机制（渐进式披露、不复述）。
 
 ## 换号 lever —— 最重的一根（本窗口真烧穿 + 还有备号）
 
@@ -22,11 +22,11 @@
 
 ## 编排决策序列（无重启形态，4 步）
 
-机制 SSOT 在 ccm `account` 引擎 + `using-ccm`（D）——本文只留**编排决策序列**：
+机制 SSOT 在 ccm `account` 引擎 + `using-ccm`——本文只留**编排决策序列**：
 
-1. **探测 + policy 闸** —— 在 pacing 决策点读 `ccm usage advise --json`：触发 = `verdict==="switch"`（ADR-024·= 5h 临界 + n>1 + 7d 有余量 + `switch_candidate` 非空）。**先过 board-policy 闸**（见上）：`ccm policy show --json` 的 `autonomous_account_switch==deny` → 不自主换号，把授权问题 surface 给用户（绝不自授权）。注：`usage-pacing.js` hook 在 `switch` + policy=allow 下已**机械换号**（切号执行归 hook·你只在事后调配速）；这里的编排决策只在 hook 未自动切（policy=deny / 全池逼顶 / 多板歧义）时接管。
+1. **探测 + policy 闸** —— 在 pacing 决策点读 `ccm usage advise --json`：触发 = `verdict==="switch"`（= 5h 临界 + n>1 + 7d 有余量 + `switch_candidate` 非空）。**先过 board-policy 闸**（见上）：`ccm policy show --json` 的 `autonomous_account_switch==deny` → 不自主换号，把授权问题 surface 给用户（绝不自授权）。注：`usage-pacing.js` hook 在 `switch` + policy=allow 下已**机械换号**（切号执行归 hook·你只在事后调配速）；这里的编排决策只在 hook 未自动切（policy=deny / 全池逼顶 / 多板歧义）时接管。
 2. **拍板** —— 选号是机械的（ccm `account` 引擎按各号配额恢复度选最优切入号，即 `usage advise` 的 `switch_candidate`），但**切不切由用户拍**——尤其全员逼顶必 surface 给用户、绝不盲切（对齐 7d 总闸纪律，是 `blocked_on:"user"` 决策）。
 3. **切（机制归 using-ccm / ccm 引擎）** —— 跑 `ccm account switch`：续期新号 → 覆写官方共享凭证三存储（`$USER` 视角·原子写·全或无回滚）→ 翻 registry `active`。token 全程经 vault 读 / refresh POST body / 三存储写，**绝不进 agent / 绝不进 registry**（机制 / 失败模式 / token 安全见 `using-ccm` 的 `references/account-pool.md`）。
 4. **续跑** —— claude 进程惰性 re-read 接管新号后照常推进；board 没动、整张 DAG 没忘。账号切了，目标没忘。无重启凭证覆写**不换进程、不换 session**——所以从前那套「换号前 drain 在飞 / 带飞切后孤儿 reconcile」**不再需要**：sub-agent / workflow 的 handle 不失效、board 连续性锚 `owner.session_id` 不变，在飞工作继续跑、照常在端点回收。
 
-> **ship-anywhere（红线 5）**：换号概念只在订阅口径（Pro/Max/Team/Enterprise）适用——Bedrock/Vertex/Foundry 云后端**无订阅 5h/7d 配额窗口**，探测拿不到订阅 `used_percentage` → 换号 lever **自然不触发**（`available:false`/switch no-op），不破 ship-anywhere。账号机制全在 ccm `account` 引擎 + 带外操作、**绝不进 hooks/**。
+> **ship-anywhere**：换号概念只在订阅口径（Pro/Max/Team/Enterprise）适用——Bedrock/Vertex/Foundry 云后端**无订阅 5h/7d 配额窗口**，探测拿不到订阅 `used_percentage` → 换号 lever **自然不触发**（`available:false`/switch no-op），不破 ship-anywhere。账号机制全在 ccm `account` 引擎 + 带外操作、**绝不进 hooks/**。

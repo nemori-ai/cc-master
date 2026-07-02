@@ -1,6 +1,6 @@
 # 交接给新 session（handoff —— 写侧）
 
-> **服务愿景：C1**（异步并行 + 完整落地）**· C3**（自主决策 vs 人类接入边界）。**何时读：** 当前 session 要把一场 orchestration 优雅交给一个新 session 时——quiesce / drain（+ straggler 兜底）/ 写一份叙事层 handoff 文档 / 归档换无摩擦 resume。这是**写侧**（旧 session 写交接）；它的**读侧**——新 session 用 `--resume` 接手、reconcile 孤儿 `in_flight`——在 `resume-verify.md` §3，本文交叉引用、绝不复述。
+> **何时读：** 当前 session 要把一场 orchestration 优雅交给一个新 session 时——quiesce / drain（+ straggler 兜底）/ 写一份叙事层 handoff 文档 / 归档换无摩擦 resume。这是**写侧**（旧 session 写交接）；它的**读侧**——新 session 用 `--resume` 接手、reconcile 孤儿 `in_flight`——在 `resume-verify.md` §3，本文交叉引用、绝不复述。
 
 一场长跑 orchestration 不总能在一个 session 里跑完——context 快耗尽、要跨机器、或人为切场。`handoff-to-new-session` 命令让**当前正在跑**的 orchestrator 把 board 干净地交给一个**新 session**（新 session 随后 `--resume` 接手）。本文是这次交接的方法论：什么时候停手、怎么把在飞任务排空、交接文档该装什么不该装什么、为什么归档反而让 resume 更顺。
 
@@ -104,7 +104,7 @@ board 里——`--resume` 会原样读到，本文件不复述它，只补 board
 
 交接的最后一步是把 board **归档**（`owner.active:false`，同 `/stop` 机制）。这看着反直觉——「我在交接，为什么要停用它」——但它正是让新 session 接手最顺的那一步：
 
-- **归档板的 `--resume` 走无摩擦路径**：`as-master-orchestrator --resume` 对一块 `owner.active:false` 的归档板**无需 `--force-takeover`**——直接复活（`false → true` + 重盖 `owner.session_id`），因为归档是「这块板当前没有活 owner」的显式信号，不存在跨 session 抢占活 owner 的风险（ADR-009 的「复活归档板」无摩擦路径）。反之，若你把板留成 `owner.active:true` 就切走，新 session resume 会撞上「这板看着仍有活 session」的接管安全闸（heartbeat + mtime 探测），要 `--force-takeover` 二次确认——平白给交接加一道摩擦。
+- **归档板的 `--resume` 走无摩擦路径**：`as-master-orchestrator --resume` 对一块 `owner.active:false` 的归档板**无需 `--force-takeover`**——直接复活（`false → true` + 重盖 `owner.session_id`），因为归档是「这块板当前没有活 owner」的显式信号，不存在跨 session 抢占活 owner 的风险（这正是「复活归档板」的无摩擦路径）。反之，若你把板留成 `owner.active:true` 就切走，新 session resume 会撞上「这板看着仍有活 session」的接管安全闸（heartbeat + mtime 探测），要 `--force-takeover` 二次确认——平白给交接加一道摩擦。
 - **归档是显式可逆，不是删除**：board 文件保留，`tasks`/`log`/`goal`/`git` 全留——归档只把 `owner.active` 翻成 `false`。新 session `--resume` 把它翻回 `true` 即满血复活。这也是 §1 第 4 步「log 留指针」要先于归档的原因：归档前把指向 handoff 文档的指针落进 board.log，新 session resume 读 board 时一眼看到「去读那份 handoff」。
 
 ---
