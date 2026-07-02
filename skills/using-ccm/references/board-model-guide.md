@@ -838,4 +838,4 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 
 ---
 
-> **实时真相永远以 `ccm <namespace> <cmd> --help` 为准**——本文是操作地图，`--help` 是当前领土。全量命令签名 / flag / `--json` 输出形状在 [command-catalog.md](command-catalog.md)。校验规则的权威实现在 `ccm` 引擎 `@ccm/engine`（board-model 注册表给每条规则的 level）。
+> **实时真相永远以 `ccm <namespace> <cmd> --help` 为准**——本文是操作地图，`--help` 是当前领土。全量命令签名 / flag / `--json` 输出形状在 [command-catalog.md](command-catalog.md)。校验规则的权威实现在 ccm 引擎（board-model 注册表给每条规则的 level）。

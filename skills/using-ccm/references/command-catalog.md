@@ -1087,7 +1087,7 @@ ccm usage task-cost [<task-id>] [flags]
 | `--scope <v>` | | enum | `home` \| `this-repo` \| `this-board`（默认本板 observability） | 历史语料范围 |
 | `--json` | | bool | | 结构化输出 |
 
-- 例：`ccm usage task-cost C2` · `ccm usage task-cost --group-by executor --json`
+- 例：`ccm usage task-cost T2` · `ccm usage task-cost --group-by executor --json`
 
 ### usage burn-rate
 
@@ -1131,7 +1131,7 @@ ccm usage runway [flags]
 
 ## namespace estimate（只读 advisory）
 
-工作侧只读 advisory（分解/规划 + 按时长选档）：消费 `@ccm/engine` 的 OR/ML 算法层（双通道 Monte Carlo / EWMA 校准 / conformal 区间 / EVM+Earned Schedule / SLE / CCPM）。**纯只读**——全 verb compute、零写、不抢 board-lock。**5% 硬墙**：所有预测 `p95` = 95% 分位，**绝不算到 100%**（引擎分位口径保证·真上限是 session hard-stop）。历史语料范围由 `--scope home|this-repo|this-board`（默认 `home`·跨板多层收缩）控制。诚实降级：冷启动 / 数据不足 → 退原估值 + `low`-confidence / `no-history`。seeded 确定性：`--seed` 固定 → MC 复现（默认 42）。ccm 出区间/数据，**不替 orchestrator 决策**。
+工作侧只读 advisory（分解/规划 + 按时长选档）：消费 ccm 引擎的 OR/ML 算法层（双通道 Monte Carlo / EWMA 校准 / conformal 区间 / EVM+Earned Schedule / SLE / CCPM）。**纯只读**——全 verb compute、零写、不抢 board-lock。**5% 硬墙**：所有预测 `p95` = 95% 分位，**绝不算到 100%**（引擎分位口径保证·真上限是 session hard-stop）。历史语料范围由 `--scope home|this-repo|this-board`（默认 `home`·跨板多层收缩）控制。诚实降级：冷启动 / 数据不足 → 退原估值 + `low`-confidence / `no-history`。seeded 确定性：`--seed` 固定 → MC 复现（默认 42）。ccm 出区间/数据，**不替 orchestrator 决策**。
 
 ### estimate show
 
@@ -1151,7 +1151,7 @@ ccm estimate show [<task-id>] [flags]
 | `--as-of <str>` | | ISO-8601 UTC | | as-of 时刻（backtest 回放·默认 now） |
 | `--json` | | bool | | 结构化输出 |
 
-- 例：`ccm estimate show C6 --json` · `ccm estimate show --scope this-repo`
+- 例：`ccm estimate show T6 --json` · `ccm estimate show --scope this-repo`
 
 ### estimate forecast
 
@@ -1266,7 +1266,7 @@ ccm estimate cost-to-complete [flags]
 
 ## namespace account
 
-换号号池机制（换号 token-blind 录入 / 选号 / 无重启切号）。号池 = 用户级 registry `${CC_MASTER_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cc-master}/accounts.json`（email→vault 非密指针 + 时间元信息·**零 token**）+ token 本体（macOS keychain / 非 mac 0600 file vault）。**token 全程活在 ccm 引擎子进程·绝不进 agent / registry / log**（vault token-blind）。换号是**无重启凭证覆写**：`switch` 续期新号 → 覆写官方共享凭证三存储 → 运行中 claude 惰性 re-read 接管（进程不重启 / board 不动）。**概念叙事**（号池模型 / 录号 why / refreshToken 硬要求 / 选号方法论 / vault 安全）见 [references/account-pool.md](references/account-pool.md)；**算法 / vault 实现 SSOT** 在 ccm 引擎 `@ccm/engine/account`；**换号决策**（何时换 / 谁拍板 / 绝不自授权）归 `master-orchestrator-guide`（不在本 skill）。
+换号号池机制（换号 token-blind 录入 / 选号 / 无重启切号）。号池 = 用户级 registry `${CC_MASTER_HOME:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/cc-master}/accounts.json`（email→vault 非密指针 + 时间元信息·**零 token**）+ token 本体（macOS keychain / 非 mac 0600 file vault）。**token 全程活在 ccm 引擎子进程·绝不进 agent / registry / log**（vault token-blind）。换号是**无重启凭证覆写**：`switch` 续期新号 → 覆写官方共享凭证三存储 → 运行中 claude 惰性 re-read 接管（进程不重启 / board 不动）。**概念叙事**（号池模型 / 录号 why / refreshToken 硬要求 / 选号方法论 / vault 安全）见 [references/account-pool.md](references/account-pool.md)；**算法 / vault 实现 SSOT** 在 ccm 引擎；**换号决策**（何时换 / 谁拍板 / 绝不自授权）归 `master-orchestrator-guide`（不在本 skill）。
 
 > **录号 / refresh 的唯一前提：用户当前正登录在目标号**（引擎从 keychain「Claude Code-credentials」直读当前登录号完整 blob·身份 guard 要求当前登录 email == `<email>`，否则拒）。
 
@@ -1718,7 +1718,7 @@ verdict 语义（消费方映射）：`hold` 走廊内静默；`throttle` 5h 临
 单任务（给 `<task-id>`）：
 
 ```jsonc
-{ "task": "C2", "scope": "this-board", "found": true,
+{ "task": "T2", "scope": "this-board", "found": true,
   "tokens": { "input": 156000, "output": 39000, "total": 195000 },
   "na": false, "source": "observability", "confidence": "high" }
 ```
@@ -1777,7 +1777,7 @@ verdict 语义（消费方映射）：`hold` 走廊内静默；`throttle` 5h 临
 ```jsonc
 { "scope": "home", "as_of": "ISO", "history_n": 40,
   "tasks": [ {
-    "id": "C6", "raw_estimate_h": 3,
+    "id": "T6", "raw_estimate_h": 3,
     "calibration": { "multiplier": 1.287, "source": "calibrated", "level": "type", "history_n": 23 },
     "calibrated_h": 3.86,
     "interval": { "p50": 4.83, "p80": 5.96, "p95": 10.04 },   // 5% 硬墙·单调
@@ -1791,8 +1791,8 @@ verdict 语义（消费方映射）：`hold` 走廊内静默；`throttle` 5h 临
 { "forecast": { "p50": "ISO", "p80": "ISO", "p95": "ISO" },   // ETA·p95 = 5% 硬墙
   "makespan": { "p50": {"value":16.16,"unit":"h"}, "p80": {...}, "p95": {...} },  // throughput-only mode → null
   "throughput_days": { "p50": 4, "p80": 4, "p95": 5 },
-  "criticality_index": [ {"id":"C4","criticality":0.906,"cruciality":0.713,"sensitivity":0.665} ],
-  "schedule_sensitivity": [ {"id":"C4","sensitivity":0.665} ],
+  "criticality_index": [ {"id":"T4","criticality":0.906,"cruciality":0.713,"sensitivity":0.665} ],
+  "schedule_sensitivity": [ {"id":"T4","sensitivity":0.665} ],
   "consistency": { "deviation": 0.495, "warning": true },     // ①②偏差>20% → warning
   "mode": "both", "coverage_pct": 83, "confidence": "medium", "history_n": 40,
   "scope": "home", "runs": 2000, "seed": 42, "effective_n": 1, "as_of": "ISO",
@@ -1830,8 +1830,8 @@ verdict 语义（消费方映射）：`hold` 走廊内静默；`throttle` 5h 临
 
 ```jsonc
 { "scope": "home",
-  "criticality_index": [ {"id":"C4","criticality":0.906,"cruciality":0.713,"sensitivity":0.665} ],
-  "wip_aging": [ {"id":"C5","age_hours":49.43,"status":"critical","sle_p85":5.6,"sle_p95":9.18} ],
+  "criticality_index": [ {"id":"T4","criticality":0.906,"cruciality":0.713,"sensitivity":0.665} ],
+  "wip_aging": [ {"id":"T5","age_hours":49.43,"status":"critical","sle_p85":5.6,"sle_p95":9.18} ],
   "ccpm": { "buffer_size_h": 1.97, "chain_mean_total_h": 16.61, "zone": "green",
             "buffer_health": 0.333, "chain_progress_pct": 0.333 },
   "sle": { "p85": 5.6, "p95": 9.18, "confidence": "high" },
@@ -1848,7 +1848,7 @@ verdict 语义（消费方映射）：`hold` 走廊内静默；`throttle` 5h 临
   "per_unit_samples": 23,
   "token_sizing": {                     // **辅助·非预算账本**（配额% 才是账本）
     "total_predicted_tokens": 1170000,
-    "per_task": [ { "id": "C4", "predicted_tokens": 195000, "pct_share": 2.06, "knn_confidence": "medium" } ],  // 截断前 10 个 backlog 任务
+    "per_task": [ { "id": "T4", "predicted_tokens": 195000, "pct_share": 2.06, "knn_confidence": "medium" } ],  // 截断前 10 个 backlog 任务
     "note": "token 为派活相对 sizing（辅助·knnPredict.predictedTokens）·配额% 才是预算账本" },
   "scope": "home", "runs": 2000, "seed": 42, "as_of": "ISO",
   "source": "calibrated",               // burn 不可得 → "local-derived-approx" + available:false

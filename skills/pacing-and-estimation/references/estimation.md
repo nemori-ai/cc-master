@@ -1,6 +1,6 @@
 # 估算消费 —— 5 个 estimate verb + baseline 生命周期 + 诚实字段
 
-> **何时读：** 要估目标 ETA、查进度/成本偏差（EVM）、看 velocity / 综合风险 / cost-to-complete，或要读懂 `ccm estimate` 的输出字段、判一个预测信不信时。模型**默认想不到**去查估算——能力就绪却不被召回，agent「该 forecast 工期 / 查 EVM 偏差 / 读 risk flag」时想不起来。本文把消费操作化成「何时查 → 读哪个字段 → 据此判断什么」。**ccm 出区间/数据、你（作为 orchestrator）决策**；估算 OR/ML 算法的实现 SSOT 在 `@ccm/engine` 的 `estimate/`，本文不复述数学。
+> **何时读：** 要估目标 ETA、查进度/成本偏差（EVM）、看 velocity / 综合风险 / cost-to-complete，或要读懂 `ccm estimate` 的输出字段、判一个预测信不信时。模型**默认想不到**去查估算——能力就绪却不被召回，agent「该 forecast 工期 / 查 EVM 偏差 / 读 risk flag」时想不起来。本文把消费操作化成「何时查 → 读哪个字段 → 据此判断什么」。**ccm 出区间/数据、你（作为 orchestrator）决策**；估算 OR/ML 算法的实现 SSOT 在 ccm 引擎，本文不复述数学。
 
 `ccm estimate` 是**只读 advisory**：全 verb compute、零写、不抢 board-lock。历史语料范围 `--scope home|this-repo|this-board`（默认 `home`·跨板多层收缩）。seeded 确定性 `--seed`（默认 42·MC 复现）。**5% 硬墙**：所有 `p95` = 95% 分位，**绝不算到 100%**（真上限是 session hard-stop）。
 

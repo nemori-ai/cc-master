@@ -36,6 +36,15 @@
 #      file for a `skills/<name>/scripts` or `skills/<name>/assets` path → violation. A hook
 #      that legitimately points at a skill's SKILL.md is NOT flagged (this check matches only
 #      the /scripts and /assets subpaths, never SKILL.md).
+#   7. internal-codename + repo-coupling leak in DISTRIBUTED skill prose (AGENTS.md §6 自包含).
+#      Distributed skills/ ship to end users with NO access to this repo's dev artifacts, so any
+#      cc-master-internal codename — ADR/Finding numbers, charter Cx / hook Hx / 镜头号 / 红线号 /
+#      SKILL 字母 — or any reference to a repo-internal location OUTSIDE the distributed skills/ tree
+#      (design_docs/, adrs/, hooks/scripts, the @ccm/engine package name, CHANGELOG) is meaningless
+#      (even harmful) to that reader and drifts the skill from "apply the substance, not the dev-side
+#      code". This check nails that down mechanically. SCOPE = agent-facing prose only: each distributed
+#      skill's SKILL.md + references/**/*.md — NOT .claude/skills/ dev meta-skills, and NOT
+#      DESIGN.md / OBJECTIVE.md / evals/ / scripts/ (dev artifacts/code, not shipped prose).
 #
 # Why node, not bash+jq/python: the repo's content tests are node-based, and node
 # is guaranteed present in any Claude Code host (AGENTS.md §3 红线1 / ADR-006).
@@ -250,6 +259,48 @@ if (existsSync(HOOK_DIR)) {
           `hook references a skill scripts/assets path \`${mm[0]}\` — hooks ⊥ skill scripts/assets: ` +
           `a hook must never reach into a skill's private files (keep hook business logic self-contained; ` +
           `build board skeletons via ccm). AGENTS.md §2 关键不变式`);
+      }
+    }
+  }
+}
+
+// ---- (7) internal-codename + repo-coupling leak in DISTRIBUTED skill prose (AGENTS.md §6 自包含) ----
+// Each check carries a fix hint in the style of checks (4)/(6). SCOPE = distributed skills/ agent-facing
+// prose only: a *.md is in-scope iff its basename is SKILL.md OR it sits under a references/ dir. This
+// allowlist naturally excludes DESIGN.md / OBJECTIVE.md (skill-root dev docs), evals/ + scripts/ +
+// assets/ (dev artifacts/code), and — because we only walk 'skills/' — the whole .claude/skills/ dev
+// meta-skill tree. Future dev artifacts under a skill are auto-excluded (allowlist, not blocklist).
+const codeLeakChecks = [
+  { re: /ADR-[0-9]/g,       fix: 'ADR 编号(dev 决策记录)——删号留实质' },
+  { re: /Finding #/g,       fix: 'Finding 台账编号——删号留实质' },
+  { re: /\bC[1-6]\b/g,      fix: 'charter 能力代号 Cx——删(讲能力实质，不引编号)' },
+  { re: /\bH[0-9]\b/g,      fix: 'hook 内部编号 Hx——用 hook 名/行为，不引编号' },
+  { re: /镜头 ?[0-9]/g,     fix: '镜头号——用镜头名(如「量力而行」)' },
+  { re: /红线 ?[0-9]/g,     fix: '红线号——用红线实质(如「指挥不演奏」)' },
+  { re: /\bSKILL [A-H]\b/g, fix: 'skill 字母代号——用 skill 名(如 using-ccm)' },
+  { re: /design_docs\//g,   fix: '指向 dev 文档树(不随 plugin 分发)——删或概念化' },
+  { re: /adrs\//g,          fix: '指向 ADR 树(不随 plugin 分发)——删或概念化' },
+  { re: /hooks\/scripts/g,  fix: '指向 hook 源路径(repo 内部)——概念提及即可，别给路径' },
+  { re: /@ccm\/engine/g,    fix: 'repo 内部 npm 包名(用户不可见)——改「ccm 引擎」' },
+  { re: /\bCHANGELOG\b/g,   fix: '指向 changelog(不随 plugin 分发)——删' },
+];
+function inScopeDistSkillMd() {
+  return markdownFiles('skills').filter((abs) => {
+    const parts = relative(ROOT, abs).split(/[\\/]/);
+    return parts[parts.length - 1] === 'SKILL.md' || parts.includes('references');
+  });
+}
+for (const abs of inScopeDistSkillMd()) {
+  const rel = relative(ROOT, abs);
+  const lines = readFileSync(abs, 'utf8').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    for (const c of codeLeakChecks) {
+      c.re.lastIndex = 0;
+      let m;
+      while ((m = c.re.exec(lines[i])) !== null) {
+        add(rel, i + 1,
+          `internal-codename/repo-coupling leak \`${m[0]}\` in distributed skill prose — ${c.fix} ` +
+          `(AGENTS.md §6 自包含: 分发 skills/ 无 cc-master 内部代号 + repo-无关)`);
       }
     }
   }
