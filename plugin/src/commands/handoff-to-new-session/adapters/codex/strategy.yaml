@@ -1,0 +1,15 @@
+host: codex
+command: handoff-to-new-session
+version: 1
+mode: adapter_guidance
+surface:
+  kind: user_prompt_ccm_cli_guided
+  user_prompt: plugin/src/skills/cc-master-handoff-to-new-session/canonical/SKILL.md
+  summary: "Quiesce, drain, write a handoff document, log it with ccm, archive the board, and tell the user to resume with the Codex prompt prefix."
+  primary_commands:
+    - "ccm log add <summary> --kind handoff --detail <handoff-path> --board <board-path>"
+    - "ccm board archive --board <board-path>"
+    - "$cc-master-as-master-orchestrator --resume <selector>"
+notes:
+  - Codex 目前的实现是 skill-first：无 native `/cc-master:handoff-to-new-session` slash command，命令行为通过 `plugin/src/skills/cc-master-handoff-to-new-session/canonical/SKILL.md` + ccm 引导流完成。
+  - Codex resume uses `$cc-master-as-master-orchestrator --resume` expanding to prompt-first hook detection, not a native distributed /cc-master:* slash command.

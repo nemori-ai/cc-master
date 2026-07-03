@@ -1,0 +1,1 @@
+> 让本机装了 ccm 的用户用 CLI 直接升级**两件解耦的发布物**：① **ccm 二进制**（per-OS Node SEA·随 GitHub `ccm-v*` 线发布）；② **cc-master 插件**（zip·随 GitHub 裸 `v*` 线发布，Claude Code 经 `claude plugin` marketplace 托管）。**非 board 操作**——不读/写 board，纯进程级动作。三 verb：`all` / `ccm` / `plugin`。

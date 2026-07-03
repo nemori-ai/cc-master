@@ -113,7 +113,7 @@ rm -rf "$H"
 # verify-board.js wrote into `.stopcheck` so we can simulate a stale handshake record surviving an upgrade.
 old_fp() { # $1 = board path
   bash -c '
-    . "'"$PLUGIN_ROOT"'/tests/hooks/helpers.sh" >/dev/null 2>&1 || true
+    . "'"$REPO_ROOT"'/tests/hooks/helpers.sh" >/dev/null 2>&1 || true
     tasks_region() {
       awk '"'"'
         { s = s $0 "\n" }

@@ -1,0 +1,9 @@
+host: codex
+skill: cc-master-view
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/cc-master-view/
+  include_adapter:
+    - agents/openai.yaml

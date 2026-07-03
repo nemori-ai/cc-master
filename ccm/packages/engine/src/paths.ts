@@ -1,13 +1,16 @@
-// paths.ts — claude 配置目录 + 派生路径解析（跟随 claude code 的 `CLAUDE_CONFIG_DIR` 重定位语义）。
+// paths.ts — cc-master home + harness host 配置路径解析。
 //
-// 背景（官方确证·claude-code-guide）：claude code 支持用 `CLAUDE_CONFIG_DIR` 把 `~/.claude/` 整体重定位。
-//   本模块把这条语义收成 `@ccm/engine` 的**单一真相源**：引擎内部（vault/switch/registry）与 apps/cli 的
-//   handlers/discover 都从这里派生 home / rate-cache / credentials / `.claude.json` / projects 路径，杜绝
-//   「15 处各自硬写 ~/.claude」在重定位下静默分叉。**hook（bash/node）不 import 本模块**（红线5：hook 经
-//   进程边界 shell 调 ccm·绝不 in-process require 引擎）——它们各自内联同口径的纯 env 读（红线1 安全）。
+// cc-master 自身状态必须是 harness-neutral：boards / accounts registry / file vault / rate-cache 默认落
+//   `$HOME/.cc_master`。Claude Code 的 host 配置仍按 `CLAUDE_CONFIG_DIR` 解析：settings.json、projects、
+//   `.credentials.json`、`.claude.json` 等属于 Claude Code backend，不跟 cc-master home 混放。
+//   本模块把两条路径语义拆开，避免把 cc-master home 绑死在某个 harness 的 config dir 下。
+//   **hook（bash/node）不 import 本模块**（红线5：hook 经进程边界 shell 调 ccm·绝不 in-process require 引擎）
+//   ——它们各自内联同口径的纯 env 读（红线1 安全）。
 //
-// 覆写优先级链（统一）：显式 flag/env（--home / CC_MASTER_HOME / CLAUDE_JSON_PATH / CRED_PATH /
-//   CC_MASTER_RATE_CACHE）> CLAUDE_CONFIG_DIR 派生 > $HOME/.claude 派生（HOME 缺退 os.homedir()）。
+// 覆写优先级链：
+//   cc-master home: --home（调用方处理）/ CC_MASTER_HOME > $HOME/.cc_master（HOME 缺退 os.homedir()）。
+//   Claude Code host paths: CLAUDE_CONFIG_DIR > $HOME/.claude（HOME 缺退 os.homedir()）。
+//   Explicit file envs（CLAUDE_JSON_PATH / CRED_PATH / CC_MASTER_RATE_CACHE）仍各自最高优先。
 //
 // 红线1 / ADR-006：node/JS only，纯 node stdlib（fs/os/path），零第三方依赖。
 //
@@ -20,29 +23,39 @@ import * as path from 'node:path';
 
 export type PathEnv = Record<string, string | undefined>;
 
-// resolveClaudeConfigDir(env) → claude 配置根目录（绝对路径）。
+// resolveClaudeCodeConfigDir(env) → 兼容 Claude Code 的 host config 目录（绝对路径）。
 //   = $CLAUDE_CONFIG_DIR（绝对化）|| $HOME/.claude（HOME 缺退 os.homedir()）。
-export function resolveClaudeConfigDir(env?: PathEnv): string {
+export function resolveClaudeCodeConfigDir(env?: PathEnv): string {
   const e = env || process.env;
   if (e.CLAUDE_CONFIG_DIR) return path.resolve(e.CLAUDE_CONFIG_DIR);
   const home = e.HOME || os.homedir();
   return path.join(home, '.claude');
 }
 
+// resolveHostConfigDir(env) → 与 host 配置目录的通用命名。
+// 目前仍映射到 resolveClaudeCodeConfigDir（仅 Claude-style host 有明确定义）。
+export function resolveHostConfigDir(env?: PathEnv): string {
+  return resolveClaudeCodeConfigDir(env);
+}
+
+// 兼容导出：历史命名沿用不变。
+export const resolveClaudeConfigDir = resolveClaudeCodeConfigDir;
+
 // resolveCcMasterHome(env) → cc-master home **根**默认（不含 --home flag·调用方自己叠 flag）。
-//   = $CC_MASTER_HOME || <claudeConfigDir>/cc-master。
+//   = $CC_MASTER_HOME || $HOME/.cc_master（HOME 缺退 os.homedir()）。
 export function resolveCcMasterHome(env?: PathEnv): string {
   const e = env || process.env;
   if (e.CC_MASTER_HOME) return path.resolve(e.CC_MASTER_HOME);
-  return path.join(resolveClaudeConfigDir(e), 'cc-master');
+  const home = e.HOME || os.homedir();
+  return path.join(home, '.cc_master');
 }
 
 // resolveRateCachePath(env) → status-line sidecar（账户权威 5h/7d used%·跨 project 共享）。
-//   = $CC_MASTER_RATE_CACHE || <claudeConfigDir>/.cc-master-rate-limits.json。
+//   = $CC_MASTER_RATE_CACHE || <cc-master-home>/.cc-master-rate-limits.json。
 export function resolveRateCachePath(env?: PathEnv): string {
   const e = env || process.env;
   if (e.CC_MASTER_RATE_CACHE) return e.CC_MASTER_RATE_CACHE;
-  return path.join(resolveClaudeConfigDir(e), '.cc-master-rate-limits.json');
+  return path.join(resolveCcMasterHome(e), '.cc-master-rate-limits.json');
 }
 
 // resolveCredentialsPath(env) → 官方明文凭证文件（**Linux/Windows** 凭证存储·macOS 走 keychain 不读此）。

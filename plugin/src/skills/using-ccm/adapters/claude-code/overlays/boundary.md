@@ -1,0 +1,1 @@
+**职责边界:** 编排决策归 `master-orchestrator-guide`、读 usage/estimate verdict 配速估算归 `pacing-and-estimation`、workflow 脚本归 `authoring-workflows`;**怎么用 ccm 这把工具操作 board + 号池(account 录号/换号/选号)** 归本 skill。`master-orchestrator-guide` 在它的决策点说"现在把 T7 标完成 / 派发 T3 / 阻塞等用户 / 该换号了",**怎么落成 ccm 命令**翻到这里;换号**机制 / 概念叙事**深入见 [references/account-pool.md](references/account-pool.md)。

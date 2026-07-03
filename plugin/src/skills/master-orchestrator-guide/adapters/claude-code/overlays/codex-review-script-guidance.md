@@ -1,0 +1,1 @@
+`${CLAUDE_SKILL_DIR}/scripts/codex-review.sh` 跑 `codex exec review --base <branch> --json`（review-only、只读 sandbox），并按 openai-codex 插件的 `review-output.schema.json` 吐出一个 `verdict`（`approve | needs-attention`，每条 finding 携带 severity/file/line/confidence）。

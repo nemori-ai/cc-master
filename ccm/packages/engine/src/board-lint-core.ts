@@ -840,6 +840,12 @@ function lintRuntime(board: BoardLike, emit: Emit): void {
       `runtime.last_account_switch 是 ${JSON.stringify(r.last_account_switch)}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：usage-pacing hook 读它判「上次换号是否已 surface」——格式不对则退化为不注入换号 ambient（fail-safe·ADR-024）。`,
     );
   }
+  if (badTimestamp(r.stop_allow_until)) {
+    emit(
+      'FMT-RUNTIME',
+      `runtime.stop_allow_until 是 ${JSON.stringify(r.stop_allow_until)}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：Codex Stop hook 读它判本次是否允许停止——格式不对则退化为继续阻止停止（fail-safe）。`,
+    );
+  }
 }
 
 // ── 每个 task 的 v2 字段 FMT ────────────────────────────────────────────────────────────────────────

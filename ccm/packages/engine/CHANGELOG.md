@@ -1,5 +1,14 @@
 # @ccm/engine
 
+## 0.13.0
+
+### Minor Changes
+
+- Host-adapter groundwork for Codex and multi-harness installs:
+  - Adds host-aware path helpers and harness-facing exports consumed by `ccm`.
+  - Extends board runtime parameter validation with `runtime.stop_allow_until`, the bounded release valve used by Codex Stop hooks.
+  - Keeps the board model and runtime whitelist in sync with the new Stop continuation gate.
+
 ## 0.12.0
 
 ### Minor Changes

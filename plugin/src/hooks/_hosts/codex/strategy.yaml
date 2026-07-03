@@ -1,0 +1,195 @@
+host: codex
+version: 1
+surface: hooks
+status: probe-required
+registration:
+  source: plugin-bundled
+  target: hooks/hooks.json
+  feature_key: hooks
+  manifest: .codex-plugin/plugin.json
+  implemented_events:
+    - UserPromptSubmit
+    - SessionStart
+    - Stop
+    - PreToolUse
+    - PostToolUse
+  notes:
+    - Source registration currently enables UserPromptSubmit (bootstrap-board), SessionStart (reinject), PreToolUse (board-guard), PostToolUse (board-lint), and Stop (verify-board/usage-pacing/identity-nudge).
+    - Additional hooks can be added after event mapping and output-envelope verification is complete.
+path_resolution:
+  status: verified-basic
+  forbidden_assumptions:
+    - "${CODEX_PLUGIN_ROOT}"
+  verified:
+    - absolute command path works in project-local hooks.json under Codex CLI 0.142.5.
+    - hook command runs from session cwd.
+    - CODEX_PLUGIN_ROOT is not expanded and is not present in hook env.
+    - plugin-bundled hooks load from hooks/hooks.json, or from the manifest hooks field.
+    - plugin-bundled hook command strings can use ${PLUGIN_ROOT}; Codex resolves it to the installed plugin cache path before execution.
+    - PLUGIN_ROOT, PLUGIN_DATA, CLAUDE_PLUGIN_ROOT, and CLAUDE_PLUGIN_DATA were not observed in the child process environment in the plugin install probe.
+  production_strategy:
+    - Put Codex plugin hooks at hooks/hooks.json and declare "hooks": "./hooks/hooks.json" in .codex-plugin/plugin.json.
+    - Use ${PLUGIN_ROOT}/... only in the hook command string.
+    - If hook runtime needs root/data paths, inject CC_MASTER_PLUGIN_ROOT="${PLUGIN_ROOT}" and CC_MASTER_PLUGIN_DATA="${PLUGIN_DATA}" explicitly in the command string, or derive root from argv/__dirname.
+payload_map:
+  status: verified-basic
+  verified_cli: "codex-cli 0.142.5"
+  fixtures:
+    SessionStart:
+      fields: [session_id, transcript_path, cwd, hook_event_name, model, permission_mode, source]
+    UserPromptSubmit:
+      fields: [session_id, turn_id, transcript_path, cwd, hook_event_name, model, permission_mode, prompt]
+    Stop:
+      fields: [session_id, turn_id, transcript_path, cwd, hook_event_name, model, permission_mode, stop_hook_active, last_assistant_message]
+    PreToolUse:
+      fields: [session_id, turn_id, transcript_path, cwd, hook_event_name, model, permission_mode, tool_name, tool_input, tool_use_id]
+    PostToolUse:
+      fields: [session_id, turn_id, transcript_path, cwd, hook_event_name, model, permission_mode, tool_name, tool_input, tool_response, tool_use_id]
+output_envelope:
+  status: verified-basic-with-stop-continuation
+  verified_cli: "codex-cli 0.142.5"
+  verified:
+    - silent allow works by emitting nothing.
+    - UserPromptSubmit advisory context is emitted as systemMessage.
+    - SessionStart advisory context is emitted as systemMessage.
+    - Claude-style decision:block blocks Bash during PreToolUse and surfaces the reason.
+    - Stop hook systemMessage completes normally.
+    - Official Codex Stop decision:block continues the turn and uses reason to auto-create the continuation prompt.
+    - Stop decision:block must have an explicit release condition; cc-master verify-board uses runtime.stop_allow_until as that release valve.
+    - Stop hook exit 2 causes repeated Stop re-entry; do not use for production Codex Stop guidance.
+    - Claude-style hookSpecificOutput.additionalContext is visible to the model for PostToolUse.
+  still_required:
+    - Verify additionalContext for Stop before production use.
+    - Verify block semantics for any event other than PreToolUse and Stop before production use.
+trust_model:
+  status: documented
+  notes:
+    - Codex requires review/trust for non-managed command hooks.
+    - Changed hook definitions are re-reviewed by hash.
+normalized_contract:
+  env: ../../_shared/contract.md
+  payload: ../../_shared/contract.md
+  result: ../../_shared/contract.md
+launcher:
+  source: launcher.js
+  status: implemented
+  responsibilities:
+    - parse Codex hook stdin JSON.
+    - normalize payload to the shared hook contract.
+    - inject CC_MASTER_HARNESS=codex and related standard env for shared core.
+    - resolve the active session board and inject CC_MASTER_BOARD / CC_MASTER_BOARD_STEM when the session is armed.
+    - convert normalized core result back to Codex hook output.
+    - optional diagnostics: set CC_MASTER_HOOK_DIAGNOSTIC=1 or CC_MASTER_HOOK_DIAGNOSTIC_DIR=<dir> to persist per-hook invocation records (raw stdin/payload/core stdout-stderr/exit status) for repro.
+  stop_policy:
+    - block results emit decision:block for Stop so Codex continues the turn; any Stop block producer must include a board/state release mechanism to avoid unbounded re-entry.
+bootstrap:
+  status: implemented
+  core: ../../bootstrap-board/implementations/codex/bootstrap-board-core.js
+  registration_event: UserPromptSubmit
+  validation:
+    cli: "codex-cli 0.142.5"
+    temp_plugin_install: passed
+    fixture_root: /tmp/cc-master-bootstrap-probe-20260703T102023Z-233105
+  supported:
+    - fresh board creation through cc-master:cc-master-as-master-orchestrator,
+      $cc-master:cc-master-as-master-orchestrator, cc-master-as-master-orchestrator,
+      cc-master:as-master-orchestrator, $cc-master-as-master-orchestrator, $cc-master:as-master-orchestrator
+      prompt prefix.
+    - resume existing board through --resume.
+    - owner arming with Codex session_id.
+    - session state under <home>/sessions/<session-id>.json for later hook env reconstruction.
+    - priority, wip, owner-wip, and policy-switch flags.
+  unsupported:
+    - plugin-distributed custom slash-command expansion
+reinject:
+  status: implemented
+  core: ../../reinject/implementations/codex/reinject-core.js
+  registration_event: SessionStart
+  validation:
+    cli: "codex-cli 0.142.5"
+    session_start_additional_context: passed
+    fixture_root: /tmp/cc-master-sessionstart-context-probe-20260703T102402Z-236263
+  behavior:
+    - dormant until a matching active board exists under CC_MASTER_HOME.
+    - exact session_id matching when present; empty session_id degrades to any active board.
+    - injects active board names, goals, and stale/escalated task ids.
+verify_board:
+  status: replacement-continuation-gate
+  core: ../../verify-board/implementations/codex/verify-board-core.js
+  registration_event: Stop
+  validation:
+    cli: "codex-cli 0.142.5"
+    stop_decision_block: official_continuation_semantics
+    release_param: runtime.stop_allow_until
+  behavior:
+    - dormant until a matching active board exists under CC_MASTER_HOME.
+    - emits decision:block for empty boards, ready/uncertain work, user-blocked decisions, in-flight tasks without watchdog, and final self-check so Codex continues instead of stopping early.
+    - includes a release instruction: ccm board set-param stop_allow_until <future-ISO-UTC> --board <board>.
+    - skips Stop blocking while runtime.stop_allow_until is a valid future ISO timestamp.
+    - does not implement Claude Code fingerprint sidecar because Codex uses an explicit runtime release param instead.
+board_guard:
+  status: implemented
+  core: ../../board-guard/implementations/codex/board-guard-core.js
+  registration_event: PreToolUse
+  matcher: "Bash|apply_patch|Edit|Write|MultiEdit"
+  validation:
+    cli: "codex-cli 0.142.5"
+    pre_tool_use_block: passed
+  behavior:
+    - dormant until a matching active board exists under CC_MASTER_HOME.
+    - blocks direct Write/Edit/MultiEdit board file writes.
+    - blocks obvious Bash file writes to .board.json unless the command segment is ccm.
+    - blocks apply_patch payloads that touch .board.json paths.
+board_lint:
+  status: implemented
+  core: ../../board-lint/implementations/codex/board-lint-core.js
+  registration_event: PostToolUse
+  matcher: "Write|Edit|MultiEdit|apply_patch"
+  validation:
+    cli: "codex-cli 0.142.5"
+    post_tool_use_additional_context: passed
+    fixture_root: /tmp/cc-master-posttool-context-probe-20260703T102841Z-240839
+  behavior:
+    - dormant unless the edited file is a matching active board for the current session.
+    - calls ccm board lint over a process boundary.
+    - emits non-blocking additionalContext advisory with strong/weak severity.
+    - extracts board paths from apply_patch payloads because Codex often edits through apply_patch.
+usage_pacing:
+  status: replacement-stop-advisory
+  core: ../../usage-pacing/implementations/codex/usage-pacing-core.js
+  registration_event: Stop
+  validation:
+    cli: "codex-cli 0.142.5"
+    stop_system_message: passed
+  behavior:
+    - dormant until a matching active board exists under CC_MASTER_HOME.
+    - reads ccm usage advise --json as the only pacing verdict source.
+    - emits non-blocking Stop systemMessage for throttle, switch, stop_5h, and stop_7d.
+    - treats switch as advisory only because Codex account-pool switching is not implemented.
+    - does not implement Claude Code PostToolBatch mid-turn sampling; Codex has no verified equivalent event.
+identity_nudge:
+  status: replacement-stop-system-message
+  core: ../../identity-nudge/implementations/codex/identity-nudge-core.js
+  registration_event: Stop
+  validation:
+    cli: "codex-cli 0.142.5"
+    stop_system_message: passed
+  behavior:
+    - dormant unless exactly one matching active board exists under CC_MASTER_HOME.
+    - writes runtime.last_identity_remind and runtime.last_critpath_remind through ccm board set-param before emitting.
+    - emits Stop systemMessage for identity and critical-path periodic nudges.
+    - uses ccm board critical-path and ccm estimate evm for critical-path facts.
+posttool_batch:
+  status: unsupported-no-equivalent
+  claude_code_event: PostToolBatch
+  codex_rejected_substitutes:
+    PostToolUse:
+      reason: "PostToolUse fires per tool and does not represent Claude Code's post batch scheduling boundary."
+    Stop:
+      reason: "Stop is too late for mid-turn WIP steering; verify-board, usage-pacing, and identity-nudge already own Stop advisories."
+  future_probe:
+    - Look for a Codex event that fires after a grouped tool batch with access to the main-agent context and not inside subagents.
+notes:
+  - Do not generate production Codex hooks until each hook's needed output semantics are verified against the target Codex CLI.
+  - Host launchers must inject CC_MASTER_HARNESS=codex and pass normalized payload to shared hook core.
+  - Codex Stop decision:block is allowed only with a bounded release mechanism such as runtime.stop_allow_until; exit 2 remains rejected.

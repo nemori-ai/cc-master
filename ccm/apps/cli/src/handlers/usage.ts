@@ -30,8 +30,6 @@ import {
   pctBurnRate,
   pctOf,
   pctRunway,
-  resolveClaudeConfigDir,
-  resolveRateCachePath,
   tokenExpired,
   type UsageSignal,
   WINDOW_5H_SEC,
@@ -39,6 +37,8 @@ import {
   type WindowSignal,
 } from '@ccm/engine';
 import * as discover from '../discover.js';
+import { resolveHarnessAdapter } from '../harnesses/registry.js';
+import type { UsageSignalSource } from '../harnesses/types.js';
 import { type BoardArg, type Ctx, runRead } from './_common.js';
 
 // 备号窗口快照（registry SwitchSnapshot 投影）。
@@ -59,7 +59,7 @@ interface BackupAccount {
 }
 
 // resolveHomeDir(env, homeFlag) → cc-master home **根**（统一全局口径·收口到 discover.resolveHome SSOT：
-//   --home > $CC_MASTER_HOME > $HOME/.claude/cc-master；不再 per-repo CLAUDE_PROJECT_DIR）。task-cost --scope
+//   --home > $CC_MASTER_HOME > $HOME/.cc_master；不再 per-repo CLAUDE_PROJECT_DIR）。task-cost --scope
 //   跨板用。注：accounts.json 的 registryPath 另有自己的 home 解析（home 根·全局·有意不动），不走本函数。
 function resolveHomeDir(env: Record<string, string | undefined>, homeFlag?: string): string {
   return discover.resolveHome({ homeFlag, env });
@@ -67,14 +67,10 @@ function resolveHomeDir(env: Record<string, string | undefined>, homeFlag?: stri
 
 // ── accounts.json registry 解析（只读·绝不写）──────────────────────────────────────────────────────
 //   home 解析口径同 estimate.ts 的 resolveHomeDir：--home flag 先于 CC_MASTER_HOME 先于默认
-//   $HOME/.claude/cc-master（multi-home/dev/test 下 --home 必须生效，否则 effective_n 错·选错号·P2）。
+//   $HOME/.cc_master（multi-home/dev/test 下 --home 必须生效，否则 effective_n 错·选错号·P2）。
 //   无文件 / 坏 JSON / 非对象 → null（天然单账号优雅降级·不抛）。
 function registryPath(env: Record<string, string | undefined>, homeFlag?: string): string {
-  const home = homeFlag
-    ? path.resolve(homeFlag)
-    : env.CC_MASTER_HOME
-      ? path.resolve(env.CC_MASTER_HOME)
-      : path.join(resolveClaudeConfigDir(env), 'cc-master');
+  const home = discover.resolveHome({ homeFlag, env });
   return path.join(home, 'accounts.json');
 }
 
@@ -186,64 +182,22 @@ function readBackups(
   return { accounts: out, raw: accounts };
 }
 
-// ── 当前号信号（status-line sidecar·account-authoritative·Finding #37）─────────────────────────────
-//   sidecar 落点：${CC_MASTER_RATE_CACHE:-$HOME/.claude/.cc-master-rate-limits.json}（账户级·跨 project
-//   共享）——这是 statusline-capture.js（writer）/ cc-usage.sh / usage-pacing.js hook（readers）三者钉死
-//   的同一路径。**绝非 ${home}/usage-snapshot.json**（旧错路径·永远找不到真 sidecar·P4 修复）。
-//   真实形态（statusline-capture.js 写）：`{ captured_at:<epoch秒>, five_hour:{used_percentage:<num>,
-//   resets_at?:<epoch秒>}, seven_day:{used_percentage,resets_at?} }`——`resets_at`/`captured_at` 是 epoch 秒。
-//   缺 → null（pacingAdvice 据此 available:false 降级·本地反推不归这俩只读 namespace·plan §4 性能边界）。
-function rateCachePath(env: Record<string, string | undefined>): string {
-  // CC_MASTER_RATE_CACHE 覆写 > <claudeConfigDir>/.cc-master-rate-limits.json（paths SSOT·跟随 CLAUDE_CONFIG_DIR）。
-  return resolveRateCachePath(env);
-}
-
-function readUsageSidecar(env: Record<string, string | undefined>): UsageSignal | null {
-  try {
-    const raw = fs.readFileSync(rateCachePath(env), 'utf8');
-    const obj = JSON.parse(raw);
-    if (obj && typeof obj === 'object') return normalizeSignal(obj as Record<string, unknown>);
-  } catch {
-    return null; // 缺/坏 sidecar → 账户口径不可用（降级 available:false）
-  }
-  return null;
-}
-
-// normalizeSignal(obj) → 把 sidecar 归一到 UsageSignal。**真实 sidecar 形态**（statusline-capture.js 写）是
-//   `five_hour`/`seven_day` + `used_percentage`(num) + `resets_at`/`captured_at`(epoch 秒·num)——
-//   number 分支直接采纳。容忍冗余别名（5h/used_pct）+ ISO 字符串 resets_at/captured_at（Date.parse→epoch 秒），
-//   兼容 registry 快照口径，但**权威路径是真实 sidecar 的 epoch-秒数字形态**。
-function normalizeSignal(obj: Record<string, unknown>): UsageSignal {
-  const win = (
-    k1: string,
-    k2: string,
-  ): { used_percentage: number | null; resets_at: number | null } => {
-    const w = (obj[k1] ?? obj[k2]) as Record<string, unknown> | undefined;
-    if (!w || typeof w !== 'object') return { used_percentage: null, resets_at: null };
-    const up =
-      typeof w.used_percentage === 'number'
-        ? w.used_percentage
-        : typeof w.used_pct === 'number'
-          ? w.used_pct
-          : null;
-    let ra: number | null = null;
-    if (typeof w.resets_at === 'number') ra = w.resets_at;
-    else if (typeof w.resets_at === 'string') {
-      const ms = Date.parse(w.resets_at);
-      ra = Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
-    }
-    return { used_percentage: up, resets_at: ra };
-  };
-  let capturedAt: number | null = null;
-  if (typeof obj.captured_at === 'number') capturedAt = obj.captured_at;
-  else if (typeof obj.captured_at === 'string') {
-    const ms = Date.parse(obj.captured_at);
-    capturedAt = Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
-  }
+function readCurrentUsageSignal(
+  env: Record<string, string | undefined>,
+  harnessFlag?: string,
+): {
+  signal: UsageSignal | null;
+  source: UsageSignalSource;
+  unavailableReason: string;
+  harnessLabel: string;
+} {
+  const adapter = resolveHarnessAdapter({ env, harnessFlag });
+  const reading = adapter.readCurrentUsage(env);
   return {
-    five_hour: win('five_hour', '5h'),
-    seven_day: win('seven_day', '7d'),
-    captured_at: capturedAt,
+    signal: reading.signal,
+    source: reading.source,
+    unavailableReason: reading.unavailableReason,
+    harnessLabel: adapter.displayName,
   };
 }
 
@@ -281,20 +235,25 @@ export interface WindowBurnView {
   burn_pct_per_hour: number | null; // %/小时（window-elapsed·不可算 → null）
   method: string; // finite-diff | window-elapsed | none
   confidence: 'high' | 'medium' | 'low';
+  source: UsageSignalSource;
+  unavailable_reason: string | null;
+  harness: string;
 }
 
 // accountBurnRate(env, nowSec, windowSec, win) → 当前账户某窗口的 %-burn-rate（window-elapsed·账户权威）。
 //   **单一 SSOT**：usage burn-rate/runway handler 与 estimate cost-to-complete 都复用它（estimate 消费 usage
-//   融合·plan §5），不让窗口数学在两处漂移。读 sidecar（账户权威·Finding #37）→ pctOf 取非过期 used% →
+//   融合·plan §5），不让窗口数学在两处漂移。读当前 harness 的账户用量信号 → pctOf 取非过期 used% →
 //   pctBurnRate(window-elapsed，窗口起点 = resets_at − windowSec)。used% 不可判 → 全 null（降级·标 available:false）。
 export function accountBurnRate(
   env: Record<string, string | undefined>,
   nowSec: number,
   windowSec: number,
   win: 'five_hour' | 'seven_day' = 'five_hour',
+  harnessFlag?: string,
 ): WindowBurnView {
-  const sidecar = readUsageSidecar(env);
-  const w = (win === 'five_hour' ? sidecar?.five_hour : sidecar?.seven_day) ?? null;
+  const reading = readCurrentUsageSignal(env, harnessFlag);
+  const usage = reading.signal;
+  const w = (win === 'five_hour' ? usage?.five_hour : usage?.seven_day) ?? null;
   const used = pctOf(w, nowSec); // 过期/缺 → null
   const resetsAt = w && typeof w.resets_at === 'number' ? w.resets_at : null;
   if (used == null) {
@@ -304,10 +263,13 @@ export function accountBurnRate(
       burn_pct_per_hour: null,
       method: 'none',
       confidence: 'low',
+      source: reading.source,
+      unavailable_reason: reading.unavailableReason,
+      harness: reading.harnessLabel,
     };
   }
   const windowStartSec = resetsAt != null ? resetsAt - windowSec : null;
-  const atSec = sidecar && typeof sidecar.captured_at === 'number' ? sidecar.captured_at : nowSec;
+  const atSec = usage && typeof usage.captured_at === 'number' ? usage.captured_at : nowSec;
   const br = pctBurnRate([{ atSec, usedPct: used }], { windowStartSec });
   return {
     used_pct: used,
@@ -315,6 +277,9 @@ export function accountBurnRate(
     burn_pct_per_hour: br.burn_pct_per_hour,
     method: br.method,
     confidence: br.confidence,
+    source: reading.source,
+    unavailable_reason: null,
+    harness: reading.harnessLabel,
   };
 }
 
@@ -330,7 +295,9 @@ export function show(ctx: Ctx): number {
       const nowSec = Math.floor(nowMs / 1000);
       const accountsScope = (c.values.accounts as string) || 'all';
       const homeFlag = c.values.home as string | undefined;
-      const sidecar = readUsageSidecar(c.env);
+      const harnessFlag = c.values.harness as string | undefined;
+      const currentUsage = readCurrentUsageSignal(c.env, harnessFlag);
+      const sidecar = currentUsage.signal;
       const backups = readBackups(c.env, nowMs, homeFlag);
       // --effective-n 覆写优先；否则从 registry 算（与 advise 一致·#audit：show 此前广告了 --effective-n 但忽略）。
       const enFlag = c.values['effective-n'];
@@ -359,14 +326,14 @@ export function show(ctx: Ctx): number {
         ((cur5h?.used_percentage ?? null) !== null || (cur7d?.used_percentage ?? null) !== null);
       const current = sidecar
         ? {
-            source: 'account' as const,
+            source: currentUsage.source,
             available: currentAvailable,
             five_hour: cur5h,
             seven_day: cur7d,
             captured_at: sidecar.captured_at ?? null,
           }
         : {
-            source: 'account' as const,
+            source: currentUsage.source,
             available: false,
             five_hour: null,
             seven_day: null,
@@ -395,7 +362,7 @@ export function show(ctx: Ctx): number {
           current.captured_at != null
             ? new Date(current.captured_at * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')
             : null,
-        source: backups != null ? 'registry-snapshot' : 'account',
+        source: backups != null ? 'registry-snapshot' : currentUsage.source,
         confidence: current.available ? 'high' : backups != null ? 'medium' : 'low',
       };
 
@@ -406,9 +373,13 @@ export function show(ctx: Ctx): number {
       if (current.available) {
         const p5 = current.five_hour?.used_percentage;
         const p7 = current.seven_day?.used_percentage;
-        lines.push(`  current（account 权威）: 5h=${fmtPct(p5)} 7d=${fmtPct(p7)}`);
+        const label =
+          currentUsage.source === 'codex-app-server' ? 'Codex app-server' : 'account 权威';
+        lines.push(`  current（${label}）: 5h=${fmtPct(p5)} 7d=${fmtPct(p7)}`);
       } else {
-        lines.push('  current: 账户权威信号不可用（无 status-line sidecar·available:false·降级）');
+        lines.push(
+          `  current: 账户权威信号不可用（${currentUsage.unavailableReason}·available:false·降级）`,
+        );
       }
       if (backups == null) {
         lines.push('  备号: 无 accounts.json registry（单账号·effective_n=1）');
@@ -449,7 +420,9 @@ export function advise(ctx: Ctx): number {
       const nowMs = Date.now();
       const nowSec = Math.floor(nowMs / 1000);
       const homeFlag = c.values.home as string | undefined;
-      const sidecar = readUsageSidecar(c.env);
+      const harnessFlag = c.values.harness as string | undefined;
+      const currentUsage = readCurrentUsageSignal(c.env, harnessFlag);
+      const sidecar = currentUsage.signal;
       // --effective-n 覆写优先；否则从 registry 算。
       const enFlag = c.values['effective-n'];
       const accountsMap = readRegistry(c.env, homeFlag);
@@ -482,7 +455,7 @@ export function advise(ctx: Ctx): number {
         effective_n: advice.effective_n,
         switch_candidate: advice.switch_candidate,
         confidence: advice.confidence,
-        source: advice.available ? 'account' : 'local-derived-approx',
+        source: advice.available ? currentUsage.source : 'local-derived-approx',
         as_of:
           sidecar && typeof sidecar.captured_at === 'number'
             ? new Date(sidecar.captured_at * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')
@@ -516,10 +489,12 @@ export function burnRate(ctx: Ctx): number {
     resolve: () => ({ boardPath: '', board: {} }),
     render: (_b, c) => {
       const nowSec = asOfSec(c);
-      const fiveHour = accountBurnRate(c.env, nowSec, WINDOW_5H_SEC, 'five_hour');
-      const sevenDay = accountBurnRate(c.env, nowSec, WINDOW_7D_SEC, 'seven_day');
+      const harnessFlag = c.values.harness as string | undefined;
+      const fiveHour = accountBurnRate(c.env, nowSec, WINDOW_5H_SEC, 'five_hour', harnessFlag);
+      const sevenDay = accountBurnRate(c.env, nowSec, WINDOW_7D_SEC, 'seven_day', harnessFlag);
       const available = fiveHour.used_pct != null || sevenDay.used_pct != null;
-      const capturedAt = readUsageSidecar(c.env)?.captured_at ?? null;
+      const currentUsage = readCurrentUsageSignal(c.env, harnessFlag);
+      const capturedAt = currentUsage.signal?.captured_at ?? null;
       const confidence: 'high' | 'medium' | 'low' =
         fiveHour.used_pct != null
           ? fiveHour.confidence
@@ -531,7 +506,7 @@ export function burnRate(ctx: Ctx): number {
         available,
         five_hour: fiveHour,
         seven_day: sevenDay,
-        source: available ? 'account' : 'local-derived-approx',
+        source: available ? currentUsage.source : 'local-derived-approx',
         as_of:
           typeof capturedAt === 'number'
             ? asOfISOFromSec(capturedAt)
@@ -550,7 +525,9 @@ export function burnRate(ctx: Ctx): number {
       lines.push(`  5h: ${fmtBurn(fiveHour)}`);
       lines.push(`  7d: ${fmtBurn(sevenDay)}`);
       if (!available)
-        lines.push('  （账户权威信号不可用·无 status-line sidecar·available:false·降级）');
+        lines.push(
+          `  （账户权威信号不可用·${currentUsage.unavailableReason}·available:false·降级）`,
+        );
       return `${lines.join('\n')}\n`;
     },
   });
@@ -586,18 +563,20 @@ export function runway(ctx: Ctx): number {
         return { used_pct: view.used_pct, ...rw };
       };
 
-      const fiveView = accountBurnRate(c.env, nowSec, WINDOW_5H_SEC, 'five_hour');
-      const sevenView = accountBurnRate(c.env, nowSec, WINDOW_7D_SEC, 'seven_day');
+      const harnessFlag = c.values.harness as string | undefined;
+      const fiveView = accountBurnRate(c.env, nowSec, WINDOW_5H_SEC, 'five_hour', harnessFlag);
+      const sevenView = accountBurnRate(c.env, nowSec, WINDOW_7D_SEC, 'seven_day', harnessFlag);
       const fiveHour = perWindow(fiveView, 90);
       const sevenDay = perWindow(sevenView, 85);
       const available = fiveView.used_pct != null || sevenView.used_pct != null;
-      const capturedAt = readUsageSidecar(c.env)?.captured_at ?? null;
+      const currentUsage = readCurrentUsageSignal(c.env, harnessFlag);
+      const capturedAt = currentUsage.signal?.captured_at ?? null;
 
       const data = {
         available,
         five_hour: fiveHour,
         seven_day: sevenDay,
-        source: available ? 'account' : 'local-derived-approx',
+        source: available ? currentUsage.source : 'local-derived-approx',
         as_of:
           typeof capturedAt === 'number'
             ? asOfISOFromSec(capturedAt)
@@ -615,7 +594,10 @@ export function runway(ctx: Ctx): number {
           : `remaining=${fmtPct(r.remaining_corridor_pct)}（上界 ${r.ceiling_pct}%）·to_ceiling=${fmtH(r.hours_to_ceiling)}·to_reset=${fmtH(r.hours_to_reset)}·${r.verdict}`;
       lines.push(`  5h: ${fmtRw(fiveHour)}`);
       lines.push(`  7d: ${fmtRw(sevenDay)}`);
-      if (!available) lines.push('  （账户权威信号不可用·available:false·降级）');
+      if (!available)
+        lines.push(
+          `  （账户权威信号不可用·${currentUsage.unavailableReason}·available:false·降级）`,
+        );
       return `${lines.join('\n')}\n`;
     },
   });

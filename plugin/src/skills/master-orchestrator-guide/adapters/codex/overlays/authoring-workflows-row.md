@@ -1,0 +1,1 @@
+| **authoring-workflows** | Claude Code Workflow API 手册；Codex 下当前不把 `Workflow` / `pipeline()` / `parallel()` 当 runtime 原语 | 只在你需要理解旧 workflow 语义或迁移到 Codex subagents / 后台 terminal / cloud task 时 drill；不要在 Codex 下调用 `Workflow` |

@@ -1,4 +1,4 @@
-# plugin-release —— cc-master plugin 的「解压即装」分发制品 `cc-master-plugin-<tag>.zip`。
+# plugin-release —— cc-master plugin 的 per-harness「解压即装」分发制品。
 #
 # 版本线解耦（ADR-022）：plugin 与 ccm 是**两条独立版本线**，各自独立的 tag 触发各自独立的
 # release workflow——
@@ -7,7 +7,9 @@
 #   - 两个 glob 天然互斥：裸 `v*` 不匹配 `ccm-v*`（后者以 `c` 开头），零交叉触发。
 #
 # plugin 是纯 prose/脚本分发物（无 build 步），由 dev-only 脚本 scripts/package-plugin.sh
-# 从 repo 根 allowlist 打包；asset 命名 `cc-master-plugin-<tag>.zip` 不变。
+# 从 repo 根 allowlist 打包；同一个裸 `v*` plugin tag 下发布按 harness 区分的 asset：
+#   - cc-master-plugin-claude-code-<tag>.zip
+#   - cc-master-plugin-codex-<tag>.zip
 name: plugin-release
 
 on:
@@ -35,7 +37,7 @@ jobs:
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code
 
-      # tag 触发传 tag 名（产物名 cc-master-plugin-<tag>.zip）；
+      # tag 触发传 tag 名（产物名 cc-master-plugin-<harness>-<tag>.zip）；
       # 非 tag（workflow_dispatch）留空 → 脚本回退到 plugin.json version。
       - name: Package plugin
         id: pkg
@@ -44,22 +46,37 @@ jobs:
           case "${GITHUB_REF}" in
             refs/tags/*) TAG="${GITHUB_REF_NAME}" ;;
           esac
-          ZIP="$(bash scripts/package-plugin.sh "${TAG}")"
-          echo "zip=${ZIP}" >> "${GITHUB_OUTPUT}"
+          mkdir -p dist
+          bash scripts/package-plugin.sh --all-hosts "${TAG}" > /tmp/cc-master-plugin-zips.txt
+          if [ -z "$TAG" ]; then
+            TAG="v$(node -e 'process.stdout.write(require("./plugin/src/.claude-plugin/plugin.json").version)')"
+          fi
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "zips<<EOF" >> "${GITHUB_OUTPUT}"
+          cat /tmp/cc-master-plugin-zips.txt >> "${GITHUB_OUTPUT}"
+          echo "EOF" >> "${GITHUB_OUTPUT}"
 
-      # 制品自证：解压后 `claude plugin validate` 须过（确保 zip 本身是合法可装 plugin）。
-      - name: Validate packaged plugin
+      # 制品自证：Claude Code zip 解压后 `claude plugin validate` 须过。
+      - name: Validate Claude Code packaged plugin
         run: |
           DEST="$(mktemp -d)"
-          unzip -q "${{ steps.pkg.outputs.zip }}" -d "${DEST}"
+          unzip -q "dist/cc-master-plugin-claude-code-${{ steps.pkg.outputs.tag }}.zip" -d "${DEST}"
           claude plugin validate "${DEST}/cc-master"
+
+      - name: Validate Codex packaged adapter
+        run: |
+          DEST="$(mktemp -d)"
+          unzip -q "dist/cc-master-plugin-codex-${{ steps.pkg.outputs.tag }}.zip" -d "${DEST}"
+          test -d "${DEST}/cc-master/skills"
+          test -d "${DEST}/cc-master/hooks"
+          test -f "${DEST}/cc-master/.codex-plugin/plugin.json"
 
       # 上传 artifact（workflow_dispatch / 非 tag 触发时也留存可下载）。
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: cc-master-plugin
-          path: ${{ steps.pkg.outputs.zip }}
+          path: dist/cc-master-plugin-*.zip
           if-no-files-found: error
 
       # 仅 tag 触发时 attach 到 GitHub release。
@@ -67,4 +84,4 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.pkg.outputs.zip }}
+          files: dist/cc-master-plugin-*.zip

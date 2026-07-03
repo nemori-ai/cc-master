@@ -4,12 +4,24 @@
 //   前缀去歧（plugin 排除 ccm-v*）；② semver 排序取最新（含 prerelease）；③ 某线暂无 release → null（优雅）。
 
 import assert from 'node:assert/strict';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
+import type { Ctx } from '../src/handlers/_common.js';
 import {
   compareSemver,
   detectAssetName,
   parseTag,
   pickLatestTag,
+  plugin,
 } from '../src/handlers/upgrade.js';
 
 // ── detectAssetName（与 install.sh detect_platform 同覆盖）──────────────────────────────────────────
@@ -79,3 +91,168 @@ test('pickLatestTag returns null when the line has no release（优雅·本线�
   assert.equal(pickLatestTag(onlyPlugin, 'plugin'), 'v0.10.0');
   assert.equal(pickLatestTag([], 'plugin'), null, '空列表 → null');
 });
+
+test('upgrade plugin: Codex harness dry-run updates marketplace registration plan', async () => {
+  const out: string[] = [];
+  const err: string[] = [];
+  const root = mkdtempSync(join(tmpdir(), 'ccm-upgrade-codex-dry-'));
+  const ctx: Ctx = {
+    values: {},
+    positionals: [],
+    flags: {
+      json: true,
+      dryRun: true,
+      force: false,
+      yes: false,
+      quiet: false,
+      verbose: false,
+      color: false,
+    },
+    sid: '',
+    env: { CC_MASTER_HARNESS: 'codex', HOME: root },
+    out: (s) => out.push(s),
+    err: (s) => err.push(s),
+  };
+
+  const code = await plugin(ctx);
+  assert.equal(code, 0, err.join('\n'));
+  const parsed = JSON.parse(out[out.length - 1] || '{}');
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.data.harness, 'codex');
+  assert.equal(parsed.data.dry_run, true);
+  assert.match(parsed.data.plugin_root, /cc-master-store|cc-master$/);
+  assert.match(parsed.data.marketplace_root, /codex-marketplace$/);
+  assert.equal(parsed.data.plugin_id, 'cc-master@cc-master');
+});
+
+test('upgrade plugin: Codex harness 注册本地 plugin', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-upgrade-codex-copy-'));
+  const pluginBase = join(root, 'cc-master-store');
+  const pluginRoot = join(pluginBase, 'codex', 'cc-master');
+  const source = join(pluginRoot, 'skills');
+  const codexHome = join(root, '.codex');
+  const fakeCodex = makeFakeCodex(root);
+  mkdirSync(source, { recursive: true });
+  mkdirSync(join(pluginRoot, '.codex-plugin'), { recursive: true });
+  mkdirSync(join(source, 'cc-master-as-master-orchestrator'), { recursive: true });
+  writeFileSync(join(source, 'cc-master-as-master-orchestrator', 'SKILL.md'), 'skill body\n');
+  writeFileSync(
+    join(pluginRoot, '.codex-plugin', 'plugin.json'),
+    '{"id":"cc-master","version":"0.0.0-test"}\n',
+  );
+  const out: string[] = [];
+  const err: string[] = [];
+  const ctx: Ctx = {
+    values: {},
+    positionals: [],
+    flags: {
+      json: true,
+      dryRun: false,
+      force: false,
+      yes: false,
+      quiet: false,
+      verbose: false,
+      color: false,
+    },
+    sid: '',
+    env: {
+      CC_MASTER_HARNESS: 'codex',
+      CC_MASTER_PLUGIN_DIR: pluginBase,
+      CODEX_HOME: codexHome,
+      HOME: root,
+      PATH: `${fakeCodex.binDir}:${process.env.PATH || ''}`,
+    },
+    out: (s) => out.push(s),
+    err: (s) => err.push(s),
+  };
+
+  const code = await plugin(ctx);
+  assert.equal(code, 0, err.join('\n'));
+  const parsed = JSON.parse(out[out.length - 1] || '{}');
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.data.action, 'updated');
+  assert.equal(parsed.data.plugin_installed, true);
+  assert.equal(parsed.data.plugin_id, 'cc-master@cc-master');
+  assert.equal(parsed.data.plugin_root, pluginRoot);
+
+  const marketplaceRoot = join(pluginBase, 'codex-marketplace');
+  const marketplaceJson = join(marketplaceRoot, '.agents', 'plugins', 'marketplace.json');
+  assert.equal(existsSync(marketplaceJson), true);
+  const marketplace = JSON.parse(readFileSync(marketplaceJson, 'utf8'));
+  assert.equal(marketplace.name, 'cc-master');
+  assert.equal(marketplace.plugins[0].source.path, './plugins/cc-master');
+  assert.equal(marketplace.plugins[0].policy.authentication, 'ON_USE');
+
+  const codexCalls = readFileSync(fakeCodex.log, 'utf8');
+  assert.match(codexCalls, /^--version$/m);
+  assert.match(codexCalls, /^plugin marketplace add .*codex-marketplace$/m);
+  assert.match(codexCalls, /^plugin add cc-master@cc-master$/m);
+  assert.match(codexCalls, /^plugin list --json$/m);
+});
+
+test('upgrade plugin --all-harnesses: Codex entry is included in dry-run without network', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-upgrade-all-harnesses-'));
+  const codexHome = join(root, '.codex');
+  const pluginRoot = join(root, 'cc-master');
+  mkdirSync(codexHome, { recursive: true });
+  mkdirSync(join(pluginRoot, 'skills'), { recursive: true });
+  const out: string[] = [];
+  const err: string[] = [];
+  const ctx: Ctx = {
+    values: { 'all-harnesses': true },
+    positionals: [],
+    flags: {
+      json: true,
+      dryRun: true,
+      force: false,
+      yes: false,
+      quiet: false,
+      verbose: false,
+      color: false,
+    },
+    sid: '',
+    env: {
+      HOME: root,
+      CODEX_HOME: codexHome,
+      CC_MASTER_PLUGIN_ROOT: pluginRoot,
+      PATH: '/does/not/exist',
+    },
+    out: (s) => out.push(s),
+    err: (s) => err.push(s),
+  };
+
+  const code = await plugin(ctx);
+  assert.equal(code, 0, err.join('\n'));
+  const parsed = JSON.parse(out[out.length - 1] || '{}');
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.data.action, 'all-harnesses');
+  assert.deepEqual(
+    parsed.data.results.map((r: { harness: string; action: string }) => [r.harness, r.action]),
+    [['codex', 'dry_run']],
+  );
+});
+
+function makeFakeCodex(root: string): { binDir: string; log: string } {
+  const binDir = join(root, 'bin');
+  const log = join(root, 'codex-args.log');
+  mkdirSync(binDir, { recursive: true });
+  const bin = join(binDir, 'codex');
+  writeFileSync(
+    bin,
+    `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$*" >> '${log}'
+if [ "$1" = "--version" ]; then
+  echo "codex 0.0.0-test"
+  exit 0
+fi
+if [ "$1" = "plugin" ] && [ "$2" = "list" ]; then
+  echo '{"installed":[{"pluginId":"cc-master@cc-master"}],"available":[]}'
+  exit 0
+fi
+exit 0
+`,
+  );
+  chmodSync(bin, 0o755);
+  return { binDir, log };
+}

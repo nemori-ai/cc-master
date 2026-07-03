@@ -1,0 +1,9 @@
+host: codex
+skill: engineering-with-craft
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/engineering-with-craft/
+notes:
+  - Host-neutral engineering craft method; safe to project to Codex.

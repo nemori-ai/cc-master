@@ -22,12 +22,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   account,
-  resolveClaudeConfigDir,
+  resolveCcMasterHome,
   resolveClaudeJsonPath,
   resolveCredentialsPath,
   resolveRateCachePath,
 } from '@ccm/engine';
 import * as discover from '../discover.js';
+import { resolveHarnessAdapter } from '../harnesses/registry.js';
 import * as io from '../io.js';
 import * as mutations from '../mutations.js';
 import type { BoardArg, Ctx } from './_common.js';
@@ -46,10 +47,22 @@ const SWITCH_EXIT = {
   POLICY_DENY: 7,
 } as const;
 
+function accountPoolNotImplemented(ctx: Ctx, verb: string): number | null {
+  const harness = resolveHarnessAdapter({
+    env: ctx.env,
+    harnessFlag: typeof ctx.values.harness === 'string' ? ctx.values.harness : undefined,
+  });
+  if (harness.accountPool.supported) return null;
+  ctx.err(
+    `NotImplemented: \`ccm account ${verb}\` is not supported on the ${harness.displayName} harness. ${harness.accountPool.reason || 'This harness has no registered account-pool adapter.'}`,
+  );
+  return EXIT.USAGE;
+}
+
 // ── 路径 / 形态解析（全从 ctx.env 注入·可测）────────────────────────────────────────────────────────
 function resolveHome(env: Record<string, string | undefined>): string {
-  // CC_MASTER_HOME 覆写 > <claudeConfigDir>/cc-master（paths SSOT·跟随 CLAUDE_CONFIG_DIR·默认 ~/.claude）。
-  return env.CC_MASTER_HOME || path.join(resolveClaudeConfigDir(env), 'cc-master');
+  // CC_MASTER_HOME 覆写 > $HOME/.cc_master（paths SSOT·harness-neutral 默认）。
+  return resolveCcMasterHome(env);
 }
 function resolveRegistryPath(ctx: Ctx): string {
   const explicit = ctx.values.registry as string | undefined;
@@ -220,9 +233,13 @@ function upsertRegistry(
 }
 
 export function add(ctx: Ctx): number {
+  const ni = accountPoolNotImplemented(ctx, 'add');
+  if (ni !== null) return ni;
   return addOrRefresh(ctx);
 }
 export function refresh(ctx: Ctx): number {
+  const ni = accountPoolNotImplemented(ctx, 'refresh');
+  if (ni !== null) return ni;
   // refresh = add upsert 幂等（重捕获当前登录 blob·重存·更新 token_refreshed_at）。
   return addOrRefresh(ctx);
 }
@@ -230,6 +247,8 @@ export function refresh(ctx: Ctx): number {
 // ── delete ────────────────────────────────────────────────────────────────────────────────────────
 //   先删 vault（token 痕迹·token-blind 按前缀/项）·再删 registry entry（非密）。vault 真删失败 → 不继续删 registry。
 export function deleteAccount(ctx: Ctx): number {
+  const ni = accountPoolNotImplemented(ctx, 'delete');
+  if (ni !== null) return ni;
   const email = ctx.positionals[0];
   if (!email) {
     ctx.err('error: 缺 email（用法：ccm account delete <email>）');
@@ -305,6 +324,8 @@ export function deleteAccount(ctx: Ctx): number {
 
 // ── list（fail-safe·token-blind 探测·绝不取 token 值）─────────────────────────────────────────────────
 export function list(ctx: Ctx): number {
+  const ni = accountPoolNotImplemented(ctx, 'list');
+  if (ni !== null) return ni;
   const regPath = resolveRegistryPath(ctx);
   const reg = safeLoadRegistry(regPath); // 坏 JSON / 缺文件 → 空池（fail-safe·exit 0）。
   const accounts = reg.accounts || {};
@@ -421,12 +442,17 @@ function pad(s: string, n: number): string {
 //   @ccm/engine account/switch.ts；本 handler 是编排层（选号 + policy 闸 + 锁 + refresh + 退出码）。
 //   **async**（唯一 async verb·await refreshBlob）——router 透传 Promise·bin await 落码。
 export async function switchAccount(ctx: Ctx): Promise<number> {
+  const ni = accountPoolNotImplemented(ctx, 'switch');
+  if (ni !== null) return ni;
   const env = ctx.env;
   // ── 0. 云后端自检（红线5·no-op·先于任何 token 读）─────────────────────────────────────────────────
-  if (env.CLAUDE_CODE_USE_BEDROCK || env.CLAUDE_CODE_USE_VERTEX || env.CLAUDE_CODE_USE_FOUNDRY) {
-    ctx.err(
-      'switch: 云后端（Bedrock/Vertex/Foundry）无订阅 5h/7d 配额窗口、无可换的订阅 OAuth token —— 换号不适用，no-op 退出。',
-    );
+  const harness = resolveHarnessAdapter({
+    env: ctx.env,
+    harnessFlag: typeof ctx.values.harness === 'string' ? ctx.values.harness : undefined,
+  });
+  const preflight = harness.accountSwitchPreflight(env);
+  if (preflight.action === 'noop') {
+    ctx.err(`switch: ${preflight.reason}`);
     return SWITCH_EXIT.OK;
   }
 
@@ -965,7 +991,7 @@ function recordSwitchOutBestEffort(
 // readSwitchOutUsageSnapshot — 读 statusline sidecar（与 usage-pacing hook 同一文件）取**当前 active（=outgoing）**
 //   号的 5h/7d used_pct + resets_at，转成引擎 recordSwitchOut 的 SnapshotInput。这是 SNAPWIRE 的 CLI 侧 I/O——
 //   引擎保持配额源盲（绝不读 sidecar），故读 + 转换都在这里做。
-//   · sidecar 路径：${CC_MASTER_RATE_CACHE:-$HOME/.claude/.cc-master-rate-limits.json}（与 usage.ts / usage-pacing.js 钉死同一路径）。
+//   · sidecar 路径：${CC_MASTER_RATE_CACHE:-<cc-master-home>/.cc-master-rate-limits.json}（与 usage.ts / usage-pacing.js 钉死同一路径）。
 //   · 真实形态（statusline-capture.js 写）：`{ five_hour:{used_percentage:<num>, resets_at?:<epoch秒>}, seven_day:{…} }`。
 //   · 引擎 last_switch_out schema 口径（与 predict.ts recoveredWindow 对齐）：used_pct 须 **0-100 整数**（取整）、
 //     resets_at 须 **严格 ISO-8601 UTC**（epoch 秒→ISO·剥毫秒，对齐 nowIso 口径）。

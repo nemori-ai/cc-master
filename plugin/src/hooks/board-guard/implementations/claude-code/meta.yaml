@@ -1,0 +1,9 @@
+hook: board-guard
+host: claude-code
+version: 1
+event: "PreToolUse"
+matcher: "Write|Edit|MultiEdit|Bash"
+projection:
+  target: hooks/scripts/
+notes:
+  - Phase 1 preserves the existing Claude Code hook script and registration semantics.

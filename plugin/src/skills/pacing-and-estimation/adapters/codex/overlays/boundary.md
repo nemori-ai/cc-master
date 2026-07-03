@@ -1,0 +1,1 @@
+**职责边界**：**消费机制**归本 skill；**决策**归 `master-orchestrator-guide`；**命令怎么敲 / board 字段怎么填**归 `using-ccm`；**走廊数学 / 估算算法的实现 SSOT** 在 ccm 引擎。Codex 下当前只消费当前账号 5h/7d 用量与 host-neutral 估算，不消费其他 harness 的账号池切号、statusline sidecar、模型档位表。

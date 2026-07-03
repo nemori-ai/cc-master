@@ -17,8 +17,9 @@
 //   chmod +x → 验新二进制 `--version` 能跑 → 原子 renameSync 覆盖自身路径（macOS/Linux：运行中进程持旧 inode·
 //   覆盖目录项安全）。非 SEA（node 脚本形态：dev / 全局 npm install）→ 拒绝自替换 + 清晰报错。
 //
-// 插件升级：shell out `claude plugin marketplace update cc-master` + `claude plugin update cc-master@cc-master`
-//   （插件由 claude CLI 经 marketplace 托管·update 即更新到 marketplace 当前指向版本）。claude CLI 不在 → 清晰报错。
+// 插件升级：按 HarnessAdapter 的 plugin distribution strategy 执行。Claude Code 策略走 claude plugin
+//   marketplace/update；Codex 策略走本地 marketplace/plugin registry 注册 plugin+skills（不再同步 prompts）；未来 harness 只需在
+//   adapter 内实现同一命令接口。
 //
 // 红线1 / ADR-006：node/JS only，零 npm 依赖、纯 stdlib（https/child_process/fs/os/path）。注：这是 CLI（非
 //   hook）——可自由用 node:https / child_process（同 account.ts spawnSync / engine refresh https 先例）。
@@ -28,6 +29,12 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as https from 'node:https';
 import * as path from 'node:path';
+import {
+  inspectKnownHarnesses,
+  knownHarnessAdapters,
+  resolveHarnessAdapter,
+} from '../harnesses/registry.js';
+import type { HarnessAdapter, PluginUpgradeResult } from '../harnesses/types.js';
 import { readVersion } from '../help.js';
 import * as io from '../io.js';
 import type { Ctx } from './_common.js';
@@ -39,9 +46,6 @@ const REPO = 'nemori-ai/cc-master';
 const API_BASE = 'https://api.github.com';
 const DL_BASE = 'https://github.com';
 const UA = 'ccm-upgrade'; // GitHub API 要求带 User-Agent，否则 403。
-const MARKETPLACE = 'cc-master';
-const PLUGIN_REF = 'cc-master@cc-master';
-
 // ════════════════════ 纯函数（无 IO·导出供单测）════════════════════════════════════════════════════
 // 平台探测：node process.platform/arch → `ccm-<os>-<arch>` 资产名；不支持组合 → null（与 install.sh detect_platform 同覆盖）。
 const OS_MAP: Record<string, string> = { darwin: 'darwin', linux: 'linux' };
@@ -367,83 +371,76 @@ export async function ccm(ctx: Ctx): Promise<number> {
 
 // ════════════════════ verb: plugin（claude CLI 托管）═══════════════════════════════════════════════════
 export async function plugin(ctx: Ctx): Promise<number> {
+  if (ctx.values['all-harnesses'] === true) return pluginAllHarnesses(ctx);
+
+  const env = ctx.env;
+  const harness = resolveHarnessAdapter({
+    env,
+    harnessFlag: ctx.values.harness as string | undefined,
+  });
+  const result = await pluginForHarness(ctx, harness, { emitJson: ctx.flags.json });
+  return result.exitCode;
+}
+
+async function pluginForHarness(
+  ctx: Ctx,
+  harness: HarnessAdapter,
+  opts: { emitJson: boolean },
+): Promise<PluginUpgradeResult> {
   const env = ctx.env;
   const to = (ctx.values.to as string) || '';
-
-  // 解析线上最新 plugin tag（裸 v*·仅供展示/记录·claude plugin update 实际版本由 marketplace 决定·取不到不致命）。
-  let latest: string | null = null;
-  try {
-    latest = pickLatestTag(await fetchReleaseTags(env), 'plugin');
-  } catch (e) {
-    ctx.err(
-      `upgrade(plugin): 取 release 列表失败（${(e as Error).message}）——继续走 claude plugin update（marketplace 驱动·不依赖 tag）。`,
-    );
-  }
-
-  // --to 局限性如实告知：claude plugin update 只能到 marketplace 当前指向版本，无法精确切任意历史 tag。
-  if (to) {
-    ctx.err(
-      `upgrade(plugin): 注意——\`claude plugin update\` 只能更新到 marketplace 当前指向版本（通常即最新${latest ? ` ${latest}` : ''}），无法精确切到任意历史 tag ${to}；将更新到 marketplace 最新。如需特定版本请用 install.sh --plugin-version ${to}。`,
-    );
-  }
-
-  if (ctx.flags.dryRun) {
-    ctx.out('── ccm upgrade plugin DRY-RUN（不执行 claude）──');
-    ctx.out(`latest tag : ${latest || '（暂无 plugin release tag）'}`);
-    ctx.out(`would run  : claude plugin marketplace update ${MARKETPLACE}`);
-    ctx.out(`           : claude plugin update ${PLUGIN_REF}`);
-    if (ctx.flags.json) ctx.out(io.jsonOk({ component: 'plugin', dry_run: true, latest }));
-    return EXIT.OK;
-  }
-
-  if (!hasClaude()) {
-    ctx.err(
-      'upgrade(plugin): 找不到 claude CLI——插件升级需要它（要求 ≥ v2.1.195）。装好 Claude Code 后重试。',
-    );
-    return EXIT.ERROR;
-  }
-
-  // ① 刷 marketplace（best-effort·失败不致命）；② 更新插件（限定名·失败则报错退出）。
-  ctx.err(`upgrade(plugin): 刷新 marketplace ${MARKETPLACE} …`);
-  if (!runClaude(['plugin', 'marketplace', 'update', MARKETPLACE], ctx)) {
-    ctx.err('  marketplace update 未成功（继续尝试 plugin update）。');
-  }
-  ctx.err(`upgrade(plugin): 更新插件 ${PLUGIN_REF} …`);
-  if (!runClaude(['plugin', 'update', PLUGIN_REF], ctx)) {
-    ctx.err(
-      `upgrade(plugin): \`claude plugin update ${PLUGIN_REF}\` 失败——插件未更新。请手动重跑该命令查看详情。`,
-    );
-    return EXIT.ERROR;
-  }
-  ctx.out(
-    `✓ cc-master 插件已更新（claude plugin update ${PLUGIN_REF}·marketplace 最新${latest ? `=${latest}` : ''}）。重开 Claude Code session 生效。`,
-  );
-  if (ctx.flags.json) ctx.out(io.jsonOk({ component: 'plugin', action: 'updated', latest }));
-  return EXIT.OK;
+  return harness.upgradePlugin({
+    env,
+    to,
+    dryRun: ctx.flags.dryRun,
+    json: opts.emitJson,
+    verbose: ctx.flags.verbose,
+    out: ctx.out,
+    err: ctx.err,
+    jsonOk: io.jsonOk,
+    resolveLatestPluginTag: async () => pickLatestTag(await fetchReleaseTags(env), 'plugin'),
+  });
 }
 
-// hasClaude — claude CLI 是否可用（`claude --version` 能跑）。
-function hasClaude(): boolean {
-  try {
-    execFileSync('claude', ['--version'], { stdio: 'ignore', timeout: 15000 });
-    return true;
-  } catch {
-    return false;
+async function pluginAllHarnesses(ctx: Ctx): Promise<number> {
+  const installed = inspectKnownHarnesses(ctx.env).filter((h) => h.installed);
+  const adapters = knownHarnessAdapters();
+  if (installed.length === 0) {
+    ctx.err(
+      'upgrade(plugin): 未发现本机已安装的 ccm-supported harness。可用 `ccm harness list` 查看探测结果。',
+    );
+    if (ctx.flags.json) ctx.out(io.jsonOk({ component: 'plugin', action: 'skipped', results: [] }));
+    return EXIT.USAGE;
   }
-}
 
-// runClaude — 跑一条 claude 子命令；成功 true / 失败 false（失败时把 stderr/stdout 前几行透出·便于诊断）。
-function runClaude(args: string[], ctx: Ctx): boolean {
-  try {
-    const out = execFileSync('claude', args, { encoding: 'utf8', timeout: 120000 });
-    if (ctx.flags.verbose && out.trim()) ctx.err(out.trim());
-    return true;
-  } catch (e) {
-    const err = e as { stdout?: string; stderr?: string };
-    const msg = (err.stderr || err.stdout || (e as Error).message || '').toString().trim();
-    if (msg) ctx.err(`  claude: ${msg.split('\n').slice(0, 4).join('\n  claude: ')}`);
-    return false;
+  const results: PluginUpgradeResult[] = [];
+  let supportedCount = 0;
+  let firstFailure: number = EXIT.OK;
+  for (const h of installed) {
+    const adapter = adapters.find((a) => a.id === h.id);
+    if (!adapter) continue;
+    if (adapter.pluginDistribution.supported) supportedCount++;
+    const result = await pluginForHarness(ctx, adapter, { emitJson: false });
+    results.push(result);
+    if (
+      adapter.pluginDistribution.supported &&
+      result.exitCode !== EXIT.OK &&
+      firstFailure === EXIT.OK
+    ) {
+      firstFailure = result.exitCode;
+    }
   }
+
+  if (ctx.flags.json) {
+    ctx.out(io.jsonOk({ component: 'plugin', action: 'all-harnesses', results }));
+  }
+  if (supportedCount === 0) {
+    ctx.err(
+      'upgrade(plugin): 已发现 harness，但没有任何已安装 harness 当前支持 plugin 分发/升级。',
+    );
+    return EXIT.USAGE;
+  }
+  return firstFailure;
 }
 
 // ════════════════════ verb: all（默认 verb·两者各升各自线最新）═══════════════════════════════════════

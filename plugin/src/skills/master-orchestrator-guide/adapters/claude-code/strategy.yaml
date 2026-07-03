@@ -1,0 +1,42 @@
+# cc-master SAP strategy: Claude Code adapter for master-orchestrator-guide
+host: claude-code
+skill: master-orchestrator-guide
+version: 1
+projection:
+  source: canonical/
+  target: skills/master-orchestrator-guide/
+  copy: true
+  exclude:
+    - AGENTS.md
+    - CLAUDE.md
+slot_replacements:
+  "{{BACKGROUND_DISPATCH_SUMMARY}}": adapters/claude-code/overlays/background-dispatch-summary.md
+  "{{BACKGROUND_DISPATCH_LENS}}": adapters/claude-code/overlays/background-dispatch-lens.md
+  "{{DISPATCH_REFERENCE_SUMMARY}}": adapters/claude-code/overlays/dispatch-reference-summary.md
+  "{{BACKGROUND_DISPATCH_MECHANISM_LIST}}": adapters/claude-code/overlays/background-dispatch-mechanism-list.md
+  "{{BACKGROUND_DISPATCH_EXECUTOR_MAPPING}}": adapters/claude-code/overlays/background-dispatch-executor-mapping.md
+  "{{BACKGROUND_DISPATCH_MECHANISMS}}": adapters/claude-code/overlays/background-dispatch-mechanisms.md
+  "{{BACKGROUND_EXTERNAL_WAIT_GUIDANCE}}": adapters/claude-code/overlays/background-external-wait-guidance.md
+  "{{WATCHDOG_WAKEUP_TOOL_CHAIN}}": adapters/claude-code/overlays/watchdog-wakeup-tool-chain.md
+  "{{WATCHDOG_WAKEUP_TOOL_CHAIN_INLINE}}": adapters/claude-code/overlays/watchdog-wakeup-tool-chain-inline.md
+  "{{CAPACITY_ACCOUNT_GUIDANCE}}": adapters/claude-code/overlays/capacity-account-guidance.md
+  "{{AUTHORING_WORKFLOWS_ROW}}": adapters/claude-code/overlays/authoring-workflows-row.md
+  "{{COST_DECISIONS_REFERENCE_ROW}}": adapters/claude-code/overlays/cost-decisions-reference-row.md
+  "{{COMMAND_SURFACE_GUIDANCE}}": adapters/claude-code/overlays/command-surface-guidance.md
+  "{{CCM_COMMAND_CATALOG_POINTER}}": adapters/claude-code/overlays/ccm-command-catalog-pointer.md
+  "{{USING_CCM_BOARD_MODEL_POINTER}}": adapters/claude-code/overlays/using-ccm-board-model-pointer.md
+  "{{DECISION_PACKAGE_CONSUMPTION}}": adapters/claude-code/overlays/decision_package-consumption.md
+  "{{DATAFLOW_MICRO_SCALE_GUIDANCE}}": adapters/claude-code/overlays/dataflow-micro-scale-guidance.md
+  "{{EXECUTOR_VALUE_GUIDANCE}}": adapters/claude-code/overlays/executor-value-guidance.md
+  "{{ASYNC_COMPLETION_INTEGRATION}}": adapters/claude-code/overlays/async-completion-integration.md
+  "{{DISCUSS_SESSION_GUIDANCE}}": adapters/claude-code/overlays/discuss-session-guidance.md
+  "{{WATCHDOG_RETIRE_SCHEDULER_GUIDANCE}}": adapters/claude-code/overlays/watchdog-retire-scheduler-guidance.md
+  "{{PLATFORM_RESUME_GUIDANCE}}": adapters/claude-code/overlays/platform-resume-guidance.md
+  "{{CODEX_REVIEW_SCRIPT_GUIDANCE}}": adapters/claude-code/overlays/codex-review-script-guidance.md
+  "{{HANDOFF_REFERENCE_ROW}}": adapters/claude-code/overlays/handoff-reference-row.md
+mechanisms:
+  declarative-patch:
+    enabled: false
+    patches: []
+notes:
+  - Claude Code projects the host-neutral canonical body plus strategy-defined dispatch and watchdog slots.

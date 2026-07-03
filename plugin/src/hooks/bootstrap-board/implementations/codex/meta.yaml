@@ -1,0 +1,11 @@
+hook: bootstrap-board
+host: codex
+version: 1
+event: "UserPromptSubmit"
+matcher: ""
+projection:
+  target: hooks/
+status: implemented
+notes:
+  - Implements fresh board creation and arming for Codex via the shared Codex launcher.
+  - Supports resume takeover through `--resume` on the as-master-orchestrator command.

@@ -1,0 +1,9 @@
+hook: reinject
+host: claude-code
+version: 1
+event: "SessionStart"
+matcher: "startup|resume|compact"
+projection:
+  target: hooks/scripts/
+notes:
+  - Phase 1 preserves the existing Claude Code hook script and registration semantics.

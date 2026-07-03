@@ -1,0 +1,9 @@
+hook: board-lint
+host: codex
+event: PostToolUse
+matcher: "Write|Edit|MultiEdit|apply_patch"
+mode: implemented
+notes:
+  - Uses Codex launcher normalized PostToolUse payload.
+  - Calls ccm board lint over a process boundary.
+  - Supports apply_patch by extracting board paths from patch payload text.

@@ -5,7 +5,7 @@
 //   任何 CLI 子命令落盘都没有。于是 `ccm statusline`（status-line 命令本身）在被调用时把它捕获到账户级 sidecar，
 //   下游（`ccm usage` / usage-pacing hook）再读 sidecar（权威优先，本地 JSONL 反推退为 fallback·Finding #37）。
 //
-// sidecar 落点：resolveRateCachePath(env)（`$CC_MASTER_RATE_CACHE` > `<claudeConfigDir>/.cc-master-rate-limits.json`·
+// sidecar 落点：resolveRateCachePath(env)（`$CC_MASTER_RATE_CACHE` > `<cc-master-home>/.cc-master-rate-limits.json`·
 //   账户级、跨 project 共享）——这是 usage handler / usage-pacing hook 钉死读的同一路径。
 //   落盘形态（与旧脚本逐字一致·下游 normalizeSignal 直接采纳）：
 //     `{ captured_at:<epoch秒>, five_hour:{used_percentage:<num>, resets_at?:<epoch秒>}, seven_day:{...} }`

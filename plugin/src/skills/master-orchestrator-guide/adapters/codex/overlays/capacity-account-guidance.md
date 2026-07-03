@@ -1,0 +1,1 @@
+Codex 当前只支持查看当前账户 5h/7d 用量，不支持 cc-master 账号池切换。若 `ccm usage advise` 出现 `switch` 语义，不要运行账号切换命令，而是按轻 lever（降档 / 降 WIP / 推迟 float）继续收紧；若本窗口真实烧穿或 7d 吃紧，就停派新活并 surface 给用户。Codex 下不要 drill `references/cost-decisions.md` 当换号手册。

@@ -6,16 +6,19 @@ import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
+const SRC = 'plugin/src';
+const CLAUDE_DIST = 'plugin/dist/claude-code';
+const hookSource = (file) => `${SRC}/hooks/${file.replace(/\.[^.]+$/, '')}/implementations/claude-code/${file}`;
 
 test('plugin.json is valid and well-formed', () => {
-  const j = JSON.parse(read('.claude-plugin/plugin.json'));
+  const j = JSON.parse(read(`${CLAUDE_DIST}/.claude-plugin/plugin.json`));
   assert.equal(j.name, 'cc-master');
   assert.ok(typeof j.version === 'string' && j.version.length > 0);
   assert.ok(typeof j.description === 'string' && j.description.length > 0);
 });
 
 test('hooks.json registers all 8 hook scripts across 6 events via plugin-root paths', () => {
-  const h = JSON.parse(read('hooks/hooks.json'));
+  const h = JSON.parse(read(`${CLAUDE_DIST}/hooks/hooks.json`));
   assert.ok(h.hooks.UserPromptSubmit, 'UserPromptSubmit registered');
   assert.ok(h.hooks.Stop, 'Stop registered');
   assert.ok(h.hooks.SessionStart, 'SessionStart registered');
@@ -41,8 +44,8 @@ test('hooks.json registers all 8 hook scripts across 6 events via plugin-root pa
 });
 
 test('sentinel consistency: command body carries the exact string the bootstrap hook greps', () => {
-  const cmd = read('commands/as-master-orchestrator.md');
-  const hook = read('hooks/scripts/bootstrap-board.sh');
+  const cmd = read(`${SRC}/commands/as-master-orchestrator/adapters/claude-code/body.md`);
+  const hook = read(hookSource('bootstrap-board.sh'));
   assert.match(cmd, /<!-- cc-master:bootstrap:v1 -->/, 'command embeds body sentinel');
   assert.match(hook, /cc-master:bootstrap:v1/, 'hook greps body sentinel');
   assert.match(hook, /cc-master:as-master-orchestrator/, 'hook also greps command-name sentinel');
@@ -61,7 +64,7 @@ test('ADR-018: non-substrate hooks tag-wrap their agent-context injection (anti-
   const TAG_CALL = /\b(ambient|advisory|directive)\s*\(/;
   const TAG_LITERAL = /<(ambient|advisory|directive)\s+source=/;
   for (const f of nonSubstrate) {
-    const src = read(`hooks/scripts/${f}`);
+    const src = read(hookSource(f));
     // 该 hook 确实会注入（emit additionalContext / Stop block reason / PreToolUse permissionDecisionReason）——
     //   否则这条断言不适用。board-guard（ADR-025）经 permissionDecisionReason 注 directive，故纳入。
     const injects = /additionalContext|"reason"|decision":"block|permissionDecisionReason/.test(src);
@@ -73,7 +76,7 @@ test('ADR-018: non-substrate hooks tag-wrap their agent-context injection (anti-
     );
   }
   // hook-common 的三个标签包装器：每个都必须带 source=（P6 source 必填）+ closed set（不膨胀）。
-  const common = read('hooks/scripts/hook-common.js');
+  const common = read(hookSource('hook-common.js'));
   for (const tag of ['ambient', 'advisory', 'directive']) {
     assert.match(common, new RegExp(`function ${tag}\\(`), `hook-common exposes ${tag}() wrapper`);
     assert.match(common, new RegExp(`<${tag} source=`), `hook-common ${tag}() emits source= attr (P6)`);
@@ -85,8 +88,8 @@ test('ADR-018: non-substrate hooks tag-wrap their agent-context injection (anti-
 
   // substrate 豁免（ADR-018 §2.5）：reinject / bootstrap 的**角色重注 / ARM 上下文注入**是 substrate，不该被
   //   标签包装。断言它们 NOT 引用标签包装器——豁免是有意的、非偶然遗漏（防有人误给 substrate 加标签）。
-  const reinject = read('hooks/scripts/reinject.js');
-  const bootstrap = read('hooks/scripts/bootstrap-board.sh');
+  const reinject = read(hookSource('reinject.js'));
+  const bootstrap = read(hookSource('bootstrap-board.sh'));
   assert.doesNotMatch(reinject, TAG_CALL, 'reinject is substrate (ADR-018 §2.5) — must NOT tag-wrap');
   assert.doesNotMatch(reinject, TAG_LITERAL, 'reinject is substrate — no tag literals');
   // bootstrap 的例外：其 ARM 角色注入（fresh / resume context）仍是 substrate·tag-free，但有 TWO 个合法 tag
@@ -126,15 +129,25 @@ test('every SKILL.md (distributed + project-internal) has YAML frontmatter with 
   // Validate BOTH the distributed plugin skills (skills/) and the project-internal dev skills
   // (.claude/skills/, e.g. cc-master-skillsmith) — the latter are not shipped but are still tracked
   // skills that must load, so they get the same structure gate (Finding #1 YAML footgun applies to both).
-  for (const label of ['skills', '.claude/skills']) {
-    const dir = join(ROOT, label);
-    if (!existsSync(dir)) continue;
-    for (const d of readdirSync(dir)) {
-      if (!statSync(join(dir, d)).isDirectory()) continue;
-      if (!existsSync(join(dir, d, 'SKILL.md'))) continue;
-      const md = read(`${label}/${d}/SKILL.md`);
-      assert.match(md, /^---\n[\s\S]*?^name:\s*\S+/m, `${label}/${d}/SKILL.md has name`);
-      assert.match(md, /\ndescription:\s*\S+/m, `${label}/${d}/SKILL.md has description`);
+  const distSkills = join(ROOT, SRC, 'skills');
+  for (const d of readdirSync(distSkills)) {
+    const skillDir = join(distSkills, d);
+    if (!statSync(skillDir).isDirectory() || d.startsWith('_')) continue;
+    const rel = `${SRC}/skills/${d}/canonical/SKILL.md`;
+    if (!existsSync(join(ROOT, rel))) continue;
+    const md = read(rel);
+    assert.match(md, /^---\n[\s\S]*?^name:\s*\S+/m, `${rel} has name`);
+    assert.match(md, /\ndescription:\s*\S+/m, `${rel} has description`);
+  }
+  const devSkills = join(ROOT, '.claude/skills');
+  if (existsSync(devSkills)) {
+    for (const d of readdirSync(devSkills)) {
+      if (!statSync(join(devSkills, d)).isDirectory()) continue;
+      const rel = `.claude/skills/${d}/SKILL.md`;
+      if (!existsSync(join(ROOT, rel))) continue;
+      const md = read(rel);
+      assert.match(md, /^---\n[\s\S]*?^name:\s*\S+/m, `${rel} has name`);
+      assert.match(md, /\ndescription:\s*\S+/m, `${rel} has description`);
     }
   }
 });

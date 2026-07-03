@@ -1097,6 +1097,30 @@ export const REGISTRY: Registry = {
     },
   },
 
+  // ════════════════════ harness（本机 supported harness inventory·install/upgrade 分发前置）═══════════
+  harness: {
+    list: {
+      summary: '列出本机 ccm 支持的 harness 安装状态、当前选择和能力矩阵',
+      read: true,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm harness list', 'ccm harness list --json'],
+      handler: 'harness.list',
+    },
+    current: {
+      summary: '显示当前 selected harness（--harness / env / auto-detect 后的结果）及其安装探测',
+      read: true,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm harness current', 'ccm --harness codex harness current --json'],
+      handler: 'harness.current',
+    },
+  },
+
   // ════════════════════ upgrade（自升级 ccm 二进制 + cc-master 插件·解耦双线）═══════════════════════════
   //   非 board 操作（不写窄腰·不抢 board-lock）。三 verb：all（默认 verb·裸 `ccm upgrade`）/ ccm / plugin。
   //   版本解析走 GitHub /releases 列表 + tag 前缀过滤 + semver 排序（ccm 线 ccm-v* / plugin 线裸 v*·见
@@ -1108,8 +1132,12 @@ export const REGISTRY: Registry = {
       positionals: [],
       options: {
         json: { type: 'boolean', desc: '结构化输出' },
+        'all-harnesses': {
+          type: 'boolean',
+          desc: '插件升级阶段枚举本机已安装的 ccm-supported harness 并逐个分发（不影响 ccm 二进制自升级）',
+        },
       },
-      examples: ['ccm upgrade', 'ccm upgrade --dry-run'],
+      examples: ['ccm upgrade', 'ccm upgrade --dry-run', 'ccm upgrade --all-harnesses --dry-run'],
       handler: 'upgrade.all',
     },
     ccm: {
@@ -1133,9 +1161,17 @@ export const REGISTRY: Registry = {
           type: 'string',
           desc: '期望的 v* tag（信息性·claude plugin update 实际升到 marketplace 最新）',
         },
+        'all-harnesses': {
+          type: 'boolean',
+          desc: '枚举本机已安装的 ccm-supported harness；支持 plugin 分发的执行升级，不支持的 skipped',
+        },
         json: { type: 'boolean', desc: '结构化输出' },
       },
-      examples: ['ccm upgrade plugin', 'ccm upgrade plugin --dry-run'],
+      examples: [
+        'ccm upgrade plugin',
+        'ccm upgrade plugin --dry-run',
+        'ccm upgrade plugin --all-harnesses --dry-run --json',
+      ],
       handler: 'upgrade.plugin',
     },
   },

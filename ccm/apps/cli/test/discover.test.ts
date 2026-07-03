@@ -27,7 +27,7 @@ afterEach(() => {
   TMPDIRS = [];
 });
 
-// 造一个 .claude/cc-master home 目录，返回其绝对路径。
+// 造一个 cc-master home 目录，返回其绝对路径。
 function mkHome(): { root: string; home: string } {
   const root = mkTmp('ccm-discover-');
   const home = join(root, '.claude', 'cc-master');
@@ -107,25 +107,25 @@ test('resolveHome: $CC_MASTER_HOME beats $HOME default', () => {
   assert.equal(D.resolveHome({ env: { CC_MASTER_HOME: '/env/home', HOME: '/h' } }), '/env/home');
 });
 
-test('resolveHome: no CC_MASTER_HOME → $HOME/.claude/cc-master (global default)', () => {
-  // 统一全局口径：无 --home / 无 $CC_MASTER_HOME → 默认 $HOME/.claude/cc-master。不再 per-repo
+test('resolveHome: no CC_MASTER_HOME → $HOME/.cc_master (global default)', () => {
+  // 统一全局口径：无 --home / 无 $CC_MASTER_HOME → 默认 $HOME/.cc_master。不再 per-repo
   // （$CLAUDE_PROJECT_DIR 已不参与）、不再 walk-up。
-  assert.equal(D.resolveHome({ env: { HOME: '/h' } }), join('/h', '.claude', 'cc-master'));
+  assert.equal(D.resolveHome({ env: { HOME: '/h' } }), join('/h', '.cc_master'));
 });
 
 test('resolveHome: $CLAUDE_PROJECT_DIR is NO LONGER a factor (per-repo home removed)', () => {
-  // 旧 per-repo 优先级已废：CLAUDE_PROJECT_DIR 在场也只走全局默认（$HOME/.claude/cc-master）。
+  // 旧 per-repo 优先级已废：CLAUDE_PROJECT_DIR 在场也只走全局默认（$HOME/.cc_master）。
   assert.equal(
     D.resolveHome({ env: { CLAUDE_PROJECT_DIR: '/proj', HOME: '/h' } }),
-    join('/h', '.claude', 'cc-master'),
+    join('/h', '.cc_master'),
   );
 });
 
-test('resolveHome: $CLAUDE_CONFIG_DIR relocates the default home (between CC_MASTER_HOME and $HOME)', () => {
-  // 跟随 claude code 的 CLAUDE_CONFIG_DIR 重定位：无 --home / 无 CC_MASTER_HOME → <CLAUDE_CONFIG_DIR>/cc-master。
+test('resolveHome: $CLAUDE_CONFIG_DIR does not relocate the cc-master default home', () => {
+  // CLAUDE_CONFIG_DIR 只影响 Claude Code host paths；cc-master home 默认仍是 $HOME/.cc_master。
   assert.equal(
     D.resolveHome({ env: { CLAUDE_CONFIG_DIR: '/cfg/dir', HOME: '/h' } }),
-    join('/cfg/dir', 'cc-master'),
+    join('/h', '.cc_master'),
   );
   // CC_MASTER_HOME 仍盖过 CLAUDE_CONFIG_DIR（显式覆写优先级最高）。
   assert.equal(

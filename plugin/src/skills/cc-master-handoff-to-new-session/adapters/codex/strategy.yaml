@@ -1,0 +1,9 @@
+host: codex
+skill: cc-master-handoff-to-new-session
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/cc-master-handoff-to-new-session/
+  include_adapter:
+    - agents/openai.yaml

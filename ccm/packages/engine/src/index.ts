@@ -165,9 +165,11 @@ export { cycleTimeSle, wipAging } from './estimate/sle.js';
 export type { PathEnv } from './paths.js';
 export {
   resolveCcMasterHome,
+  resolveClaudeCodeConfigDir,
   resolveClaudeConfigDir,
   resolveClaudeJsonPath,
   resolveCredentialsPath,
+  resolveHostConfigDir,
   resolveProjectsDir,
   resolveRateCachePath,
 } from './paths.js';

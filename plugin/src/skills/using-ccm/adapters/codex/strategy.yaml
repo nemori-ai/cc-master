@@ -1,0 +1,88 @@
+host: codex
+skill: using-ccm
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/using-ccm/
+exclude_canonical:
+  - references/account-pool.md
+unsupported:
+  - capability: account_switch
+    reason: "ccm account backend currently targets Claude Code OAuth credential stores."
+  - capability: statusline_install
+    reason: "Codex status line integration is not implemented by cc-master yet."
+supported:
+  - capability: board_operations
+    reason: "ccm board/task/log/jc/cadence/watchdog commands are harness-neutral."
+  - capability: current_quota_signal
+    reason: "ccm usage show/advise reads Codex current-account 5h/7d usage via `codex app-server --stdio` account/rateLimits/read."
+  - capability: plugin_upgrade
+    reason: "ccm upgrade plugin supports Codex by registering a local Codex marketplace/plugin entry for the installed package."
+  - capability: plugin_skills_distribution
+    reason: "Codex command-like入口与 hooks 通过本地 plugins/<name> 下分发的 skills 实现，命令动作以 `$cc-master-*` skill 调用为主。"
+slot_replacements:
+  "{{USING_CCM_DESCRIPTION}}": adapters/codex/overlays/description.md
+  "{{USING_CCM_BOUNDARY}}": adapters/codex/overlays/boundary.md
+  "{{USING_CCM_POINTERS_HOST}}": adapters/codex/overlays/pointers-host.md
+  "{{USING_CCM_EXECUTOR_TABLE_ROWS}}": adapters/codex/overlays/executor-table-rows.md
+  "{{USING_CCM_EXECUTOR_DECISION_TAIL}}": adapters/codex/overlays/executor-decision-tail.md
+  "{{USING_CCM_WATCHDOG_PROBLEM}}": adapters/codex/overlays/watchdog-problem.md
+  "{{USING_CCM_WATCHDOG_HOOK_REMINDER}}": adapters/codex/overlays/watchdog-hook-reminder.md
+  "{{USING_CCM_WATCHDOG_MECHANISM_ROWS}}": adapters/codex/overlays/watchdog-mechanism-rows.md
+  "{{USING_CCM_WATCHDOG_SHELL_GUIDANCE}}": adapters/codex/overlays/watchdog-shell-guidance.md
+  "{{USING_CCM_WATCHDOG_CANCEL_GUIDANCE}}": adapters/codex/overlays/watchdog-cancel-guidance.md
+  "{{USING_CCM_WATCHDOG_DISARM_WARNING}}": adapters/codex/overlays/watchdog-disarm-warning.md
+  "{{USING_CCM_BOARD_GUARD_GUIDANCE}}": adapters/codex/overlays/board-guard-guidance.md
+  "{{USING_CCM_TASK_ADD_EXAMPLE}}": adapters/codex/overlays/task-add-example.md
+  "{{USING_CCM_WATCHDOG_ARM_EXAMPLE}}": adapters/codex/overlays/watchdog-arm-example.md
+  "{{USING_CCM_SESSION_ID_FLAG}}": adapters/codex/overlays/session-id-flag.md
+  "{{USING_CCM_BOARD_ARCHIVE_BEHAVIOR}}": adapters/codex/overlays/board-archive-behavior.md
+  "{{USING_CCM_USAGE_SIGNAL_SOURCE}}": adapters/codex/overlays/usage-signal-source.md
+  "{{USING_CCM_USAGE_BURN_RATE_BEHAVIOR}}": adapters/codex/overlays/usage-burn-rate-behavior.md
+  "{{USING_CCM_ACCOUNT_NAMESPACE}}": adapters/codex/overlays/account-namespace.md
+  "{{USING_CCM_STATUSLINE_NAMESPACE}}": adapters/codex/overlays/statusline-namespace.md
+  "{{USING_CCM_STATUSLINE_NAMESPACE_ROW}}": adapters/codex/overlays/statusline-namespace-row.md
+  "{{USING_CCM_UPGRADE_NAMESPACE}}": adapters/codex/overlays/upgrade-namespace.md
+  "{{USING_CCM_UPGRADE_PLUGIN_BEHAVIOR}}": adapters/codex/overlays/upgrade-plugin-behavior.md
+  "{{USING_CCM_ACCOUNT_NAMESPACE_ROW}}": adapters/codex/overlays/account-namespace-row.md
+  "{{USING_CCM_OBSERVABILITY_SOURCE}}": adapters/codex/overlays/observability-source.md
+  "{{USING_CCM_DECISION_PACKAGE_ENTRYPOINT}}": adapters/codex/overlays/decision_package-entrypoint.md
+  "{{USING_CCM_JC_HOOK_GUIDANCE}}": adapters/codex/overlays/jc-hook-guidance.md
+  "{{USING_CCM_WATCHDOG_JOB_ID_GUIDANCE}}": adapters/codex/overlays/watchdog-job-id-guidance.md
+  "{{USING_CCM_WAKEUP_SELF_HEAL_GUIDANCE}}": adapters/codex/overlays/wakeup-self-heal-guidance.md
+host_slots:
+  "{{USING_CCM_EXECUTOR_TABLE_ROWS}}":
+    capability: background_dispatch
+    source: plugin/src/skills/_hosts/codex/capabilities.yaml
+    status: partial_source_uses_codex_specific_guidance
+  "{{USING_CCM_EXECUTOR_DECISION_TAIL}}":
+    capability: background_dispatch
+    source: plugin/src/skills/_hosts/codex/capabilities.yaml
+    status: partial_source_uses_codex_specific_guidance
+  "{{USING_CCM_WATCHDOG_PROBLEM}}":
+    capability: watchdog_wakeup
+    source: plugin/src/skills/_hosts/codex/capabilities.yaml
+    status: partial_source_uses_codex_specific_guidance
+  "{{USING_CCM_WATCHDOG_HOOK_REMINDER}}":
+    capability: hooks
+    source: plugin/src/skills/_hosts/codex/capabilities.yaml
+    status: partial_source_uses_codex_specific_guidance
+  "{{USING_CCM_WATCHDOG_MECHANISM_ROWS}}":
+    capability: watchdog_wakeup
+    source: plugin/src/skills/_hosts/codex/capabilities.yaml
+    status: no_verified_native_equivalent
+  "{{USING_CCM_WATCHDOG_SHELL_GUIDANCE}}":
+    capability: background_dispatch.shell
+    source: plugin/src/skills/_hosts/codex/capabilities.yaml
+    status: blocked_until_background_terminal_probe
+  "{{USING_CCM_WATCHDOG_CANCEL_GUIDANCE}}":
+    capability: watchdog_wakeup
+    source: plugin/src/skills/_hosts/codex/capabilities.yaml
+    status: no_verified_native_equivalent
+  "{{USING_CCM_WATCHDOG_DISARM_WARNING}}":
+    capability: watchdog_wakeup
+    source: plugin/src/skills/_hosts/codex/capabilities.yaml
+    status: partial_source_uses_codex_specific_guidance
+notes:
+  - Codex projects the canonical ccm guide plus host-specific account/statusline/upgrade and executor/watchdog slots.

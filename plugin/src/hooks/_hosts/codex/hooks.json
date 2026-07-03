@@ -1,0 +1,65 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CC_MASTER_PLUGIN_ROOT=\"${PLUGIN_ROOT}\" CC_MASTER_PLUGIN_DATA=\"${PLUGIN_DATA}\" node \"${PLUGIN_ROOT}/hooks/_hosts/codex/launcher.js\" --event SessionStart --core \"${PLUGIN_ROOT}/hooks/reinject/implementations/codex/reinject-core.js\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CC_MASTER_PLUGIN_ROOT=\"${PLUGIN_ROOT}\" CC_MASTER_PLUGIN_DATA=\"${PLUGIN_DATA}\" node \"${PLUGIN_ROOT}/hooks/_hosts/codex/launcher.js\" --event UserPromptSubmit --core \"${PLUGIN_ROOT}/hooks/bootstrap-board/implementations/codex/bootstrap-board-core.js\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CC_MASTER_PLUGIN_ROOT=\"${PLUGIN_ROOT}\" CC_MASTER_PLUGIN_DATA=\"${PLUGIN_DATA}\" node \"${PLUGIN_ROOT}/hooks/_hosts/codex/launcher.js\" --event Stop --core \"${PLUGIN_ROOT}/hooks/verify-board/implementations/codex/verify-board-core.js\""
+          },
+          {
+            "type": "command",
+            "command": "CC_MASTER_PLUGIN_ROOT=\"${PLUGIN_ROOT}\" CC_MASTER_PLUGIN_DATA=\"${PLUGIN_DATA}\" node \"${PLUGIN_ROOT}/hooks/_hosts/codex/launcher.js\" --event Stop --core \"${PLUGIN_ROOT}/hooks/usage-pacing/implementations/codex/usage-pacing-core.js\""
+          },
+          {
+            "type": "command",
+            "command": "CC_MASTER_PLUGIN_ROOT=\"${PLUGIN_ROOT}\" CC_MASTER_PLUGIN_DATA=\"${PLUGIN_DATA}\" node \"${PLUGIN_ROOT}/hooks/_hosts/codex/launcher.js\" --event Stop --core \"${PLUGIN_ROOT}/hooks/identity-nudge/implementations/codex/identity-nudge-core.js\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CC_MASTER_PLUGIN_ROOT=\"${PLUGIN_ROOT}\" CC_MASTER_PLUGIN_DATA=\"${PLUGIN_DATA}\" node \"${PLUGIN_ROOT}/hooks/_hosts/codex/launcher.js\" --event PreToolUse --core \"${PLUGIN_ROOT}/hooks/board-guard/implementations/codex/board-guard-core.js\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CC_MASTER_PLUGIN_ROOT=\"${PLUGIN_ROOT}\" CC_MASTER_PLUGIN_DATA=\"${PLUGIN_DATA}\" node \"${PLUGIN_ROOT}/hooks/_hosts/codex/launcher.js\" --event PostToolUse --core \"${PLUGIN_ROOT}/hooks/board-lint/implementations/codex/board-lint-core.js\""
+          }
+        ]
+      }
+    ]
+  }
+}

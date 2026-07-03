@@ -1,0 +1,8 @@
+hook: reinject
+host: codex
+event: SessionStart
+mode: implemented
+notes:
+  - Reads normalized Codex launcher payload.
+  - Injects context only for boards active for the current Codex session_id, with empty-session degraded matching.
+  - Uses launcher context converted to systemMessage; SessionStart visibility was verified on Codex CLI 0.142.5.

@@ -1,0 +1,9 @@
+host: codex
+skill: cc-master-stop
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/cc-master-stop/
+  include_adapter:
+    - agents/openai.yaml

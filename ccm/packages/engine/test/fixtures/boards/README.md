@@ -1,7 +1,7 @@
 # 估算 / 配速引擎验证集 board fixtures
 
 > 这是 ccm OR/ML 估算 + 配速引擎（`usage` / `estimate` / `baseline` namespace，ADR-015）的**版本控制持久化验证集**。三用途合一：① 算法端到端测试 ② 未来迭代回归 ③ backtest（`--as-of` 回放）验证。
-> **与运行时 board（gitignored `.claude/cc-master/`）严格分开**——这里的 board 是 repo 资产，手工构造、可读、可复现、可解释（非随机生成）。
+> **与运行时 board（gitignored cc-master home）严格分开**——这里的 board 是 repo 资产，手工构造、可读、可复现、可解释（非随机生成）。
 > 规格权威来源：`design_docs/plans/2026-06-25-estimate-usage-namespaces.md` §12（fixture 规格）+ §3/§4（算法层 / 历史语料）。数据模型 SSOT：`packages/engine/src/board-model.ts`；校验规则 SSOT：`packages/engine/src/board-lint-core.ts`。
 
 所有 fixture：`schema: "cc-master/v2"`，时间锚全部严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`）。基准「现在」≈ `2026-06-25T13:00:00Z`，归档板往前铺开约 10 周。

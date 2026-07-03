@@ -1,0 +1,14 @@
+host: claude-code
+version: 1
+surface: commands
+target: commands/
+native_surface: "Claude Code plugin slash commands"
+projection:
+  required_mode: host_native
+  output_extension: ".md"
+path_tokens:
+  plugin_root: "${CLAUDE_PLUGIN_ROOT}"
+  skill_dir: "${CLAUDE_SKILL_DIR}"
+notes:
+  - Each command projects to plugin/dist/claude-code/commands/<id>.md.
+  - Existing command bodies are preserved host-native until a second command surface is implemented.

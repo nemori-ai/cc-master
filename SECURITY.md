@@ -29,7 +29,7 @@ in your environment, so please read this before reporting.
   the model's context (role priming, board path, re-injection after compaction).
   Treat any plugin that can shape agent context as part of your trust boundary.
 
-Review the hook scripts under `hooks/scripts/` before installing if you run in a
+Review the hook scripts under `plugin/src/hooks/*/implementations/claude-code/` before installing if you run in a
 sensitive environment.
 
 ## Reporting a vulnerability

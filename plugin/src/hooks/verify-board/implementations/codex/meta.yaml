@@ -1,0 +1,8 @@
+hook: verify-board
+host: codex
+event: Stop
+mode: replacement-advisory
+notes:
+  - Codex Stop block and exit 2 repeatedly re-enter Stop under CLI 0.142.5, so this host implementation is non-blocking.
+  - Emits systemMessage advisory only after dormant-until-armed board matching succeeds.
+  - Does not implement Claude Code fingerprinted self-check sidecar gate.

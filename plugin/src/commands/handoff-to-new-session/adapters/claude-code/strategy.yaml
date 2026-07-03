@@ -1,0 +1,9 @@
+host: claude-code
+command: handoff-to-new-session
+version: 1
+mode: host_native
+projection:
+  source: body.md
+  target: commands/handoff-to-new-session.md
+notes:
+  - Preserves existing Claude Code slash-command body.

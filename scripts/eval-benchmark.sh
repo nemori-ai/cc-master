@@ -53,4 +53,4 @@ cd "$SC"
 uv run --python 3.12 python -m scripts.aggregate_benchmark \
   "$ITER_ABS" \
   --skill-name "$SKILL" \
-  --skill-path "$REPO/skills/$SKILL"
+  --skill-path "$REPO/plugin/src/skills/$SKILL/canonical"

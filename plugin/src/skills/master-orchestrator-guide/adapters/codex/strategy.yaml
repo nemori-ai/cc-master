@@ -1,0 +1,44 @@
+host: codex
+skill: master-orchestrator-guide
+version: 1
+projection:
+  source: canonical/
+  target: skills/master-orchestrator-guide/
+  copy: true
+  exclude:
+    - AGENTS.md
+    - CLAUDE.md
+mode: copy
+exclude_canonical:
+  - references/cost-decisions.md
+  - references/handoff.md
+  - scripts/codex-review.sh
+slot_replacements:
+  "{{BACKGROUND_DISPATCH_SUMMARY}}": adapters/codex/overlays/background-dispatch-summary.md
+  "{{BACKGROUND_DISPATCH_LENS}}": adapters/codex/overlays/background-dispatch-lens.md
+  "{{DISPATCH_REFERENCE_SUMMARY}}": adapters/codex/overlays/dispatch-reference-summary.md
+  "{{BACKGROUND_DISPATCH_MECHANISM_LIST}}": adapters/codex/overlays/background-dispatch-mechanism-list.md
+  "{{BACKGROUND_DISPATCH_EXECUTOR_MAPPING}}": adapters/codex/overlays/background-dispatch-executor-mapping.md
+  "{{BACKGROUND_DISPATCH_MECHANISMS}}": adapters/codex/overlays/background-dispatch-mechanisms.md
+  "{{BACKGROUND_EXTERNAL_WAIT_GUIDANCE}}": adapters/codex/overlays/background-external-wait-guidance.md
+  "{{WATCHDOG_WAKEUP_TOOL_CHAIN}}": adapters/codex/overlays/watchdog-wakeup-tool-chain.md
+  "{{WATCHDOG_WAKEUP_TOOL_CHAIN_INLINE}}": adapters/codex/overlays/watchdog-wakeup-tool-chain-inline.md
+  "{{CAPACITY_ACCOUNT_GUIDANCE}}": adapters/codex/overlays/capacity-account-guidance.md
+  "{{AUTHORING_WORKFLOWS_ROW}}": adapters/codex/overlays/authoring-workflows-row.md
+  "{{COST_DECISIONS_REFERENCE_ROW}}": adapters/codex/overlays/cost-decisions-reference-row.md
+  "{{COMMAND_SURFACE_GUIDANCE}}": adapters/codex/overlays/command-surface-guidance.md
+  "{{CCM_COMMAND_CATALOG_POINTER}}": adapters/codex/overlays/ccm-command-catalog-pointer.md
+  "{{USING_CCM_BOARD_MODEL_POINTER}}": adapters/codex/overlays/using-ccm-board-model-pointer.md
+  "{{DECISION_PACKAGE_CONSUMPTION}}": adapters/codex/overlays/decision_package-consumption.md
+  "{{DATAFLOW_MICRO_SCALE_GUIDANCE}}": adapters/codex/overlays/dataflow-micro-scale-guidance.md
+  "{{EXECUTOR_VALUE_GUIDANCE}}": adapters/codex/overlays/executor-value-guidance.md
+  "{{ASYNC_COMPLETION_INTEGRATION}}": adapters/codex/overlays/async-completion-integration.md
+  "{{DISCUSS_SESSION_GUIDANCE}}": adapters/codex/overlays/discuss-session-guidance.md
+  "{{WATCHDOG_RETIRE_SCHEDULER_GUIDANCE}}": adapters/codex/overlays/watchdog-retire-scheduler-guidance.md
+  "{{PLATFORM_RESUME_GUIDANCE}}": adapters/codex/overlays/platform-resume-guidance.md
+  "{{CODEX_REVIEW_SCRIPT_GUIDANCE}}": adapters/codex/overlays/codex-review-script-guidance.md
+  "{{HANDOFF_REFERENCE_ROW}}": adapters/codex/overlays/handoff-reference-row.md
+notes:
+  - Codex projection uses the host-neutral canonical body plus Codex-verified dispatch and watchdog slots.
+  - Verified in Codex CLI 0.142.5 and current Codex manual: subagents are explicit, codex exec resume is scriptable, codex cloud tasks are addressable, and app thread automations are app-side rather than a CLI CronCreate equivalent.
+  - In Codex API/tool sessions, multi-agent tools can be deferred; use tool_search to surface multi_agent_v1.spawn_agent before treating subagent dispatch as available.

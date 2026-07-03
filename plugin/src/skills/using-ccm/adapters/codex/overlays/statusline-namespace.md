@@ -1,0 +1,1 @@
+Codex host 当前没有 Claude Code 那种外部命令式 status-line hook。`ccm statusline install/uninstall` 在 Codex 下必须显式 `NotImplemented`，且不得写 Claude Code settings。当前 Codex 用量信号来自 `codex app-server --stdio` 的 rate limits，而不是 statusline sidecar。

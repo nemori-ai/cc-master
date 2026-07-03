@@ -1,0 +1,1 @@
+停止派发新工作，把当前在飞任务收敛到安全点，然后用 `ccm watchdog arm --mechanism external` 记录 reset 后要查的事项。Codex adapter 当前没有 verified in-thread wakeup primitive；如果没有真实 thread automation、cron、CI scheduler 或其它外部唤醒句柄，就把它作为 `blocked_on:"quota-reset"` 或 `blocked_on:"user"` 的可续状态记录下来，不要伪造自动唤醒。

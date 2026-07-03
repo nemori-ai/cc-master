@@ -1,0 +1,5 @@
+1. **后台 terminal session（当前 agent runtime 已验证）** —— 适合同一 session 内的长跑 shell / watch loop：启动后拿 session id，后续 poll 输出与退出码；board `wakeup` 记录 session id、命令、工作目录、predicate、取消方式。它是可用的 agent 能力，不是“用户产品面按钮”。
+2. **Codex app thread automation（若当前环境可用）** —— 官方支持 attached-to-thread 的 recurring wake-up，适合检查长命令、轮询连接源、继续 review loop。当前 agent runtime / CLI 没有稳定 automation 创建命令；若用户环境提供 Codex app automation，就记录 automation 名称 / cadence / 停止条件。
+3. **外部 scheduler + `codex exec resume`（脚本化 floor）** —— cron、systemd timer、CI scheduler、GitHub Actions 等调用 `codex exec resume <SESSION_ID>` 或 `codex exec resume --last`，提示它 recon board、检查 predicate、更新 task。适合跨 session 无人值守，但这是外部调度，不是 Codex-native in-thread timer。
+4. **Codex cloud status loop** —— 对 offloaded cloud work，记录 `codex cloud exec` 返回的 task id，后续用 `codex cloud status/list/diff/apply` recon；调度这个 recon 靠后台 terminal、thread automation 或外部 scheduler。
+5. **manual recon（诚实兜底）** —— 没有真实 wakeup handle 时，把 watchdog 写成 board 里的可续约定：下一次检查时间、predicate、负责人、取消条件。不要伪造自动唤醒。

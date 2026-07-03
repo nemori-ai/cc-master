@@ -17,8 +17,8 @@ SKILL="${1:?usage: eval-trigger.sh <skill-name>}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 SC="${CC_MASTER_SKILL_CREATOR:-$HOME/.claude/plugins/cache/claude-plugins-official/skill-creator/unknown/skills/skill-creator}"
 
-EVAL_SET="$REPO/skills/$SKILL/evals/trigger.json"
-SKILL_PATH="$REPO/skills/$SKILL"
+EVAL_SET="$REPO/plugin/src/skills/$SKILL/evals/trigger.json"
+SKILL_PATH="$REPO/plugin/src/skills/$SKILL/canonical"
 
 command -v uv >/dev/null 2>&1 || { echo "uv not found on PATH — install uv (https://docs.astral.sh/uv/) first" >&2; exit 1; }
 [ -d "$SC" ] || { echo "skill-creator not found at: $SC (set CC_MASTER_SKILL_CREATOR to override)" >&2; exit 1; }

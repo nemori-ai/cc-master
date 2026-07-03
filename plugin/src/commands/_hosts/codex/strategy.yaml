@@ -1,0 +1,40 @@
+host: codex
+version: 1
+surface: commands
+native_surface: "prompt-first-hook-detected"
+projection:
+  required_mode: adapter_guidance
+unsupported:
+  - capability: plugin_distributed_custom_slash_commands
+    reason: "Codex docs currently describe built-in slash commands and no plugin-distributed /cc-master:* commands."
+supported_alternatives:
+  - capability: built_in_slash_commands
+    status: codex_native_only
+    reason: "Codex CLI has built-in slash commands such as /status, /usage, /skills, /plugins, and /resume; plugins do not currently add entries to that built-in menu."
+  - capability: plugin_skills
+    status: supported
+    reason: "Codex plugins distribute skills; command-like non-init workflows run via `$cc-master-status`, `$cc-master-discuss`, etc.; bootstrap is handled separately via prompt-first hook trigger."
+  - capability: prompt_first_hook
+    status: supported
+    reason: "UserPromptSubmit hooks can detect a prompt prefix and inject bootstrap context before the agent turn."
+  init_surface:
+  chosen: user_prompt_and_skill_like_trigger
+  supported_prompt_prefixes:
+    - "$cc-master:cc-master-as-master-orchestrator <goal> [flags]"
+    - "cc-master:as-master-orchestrator <goal> [flags]"
+    - "$cc-master-as-master-orchestrator <goal> [flags]"
+    - "$cc-master:as-master-orchestrator <goal> [flags]"
+  user_prompt_entrypoint: "$cc-master:cc-master-as-master-orchestrator <goal> [flags]"
+  implemented_by: plugin/src/hooks/bootstrap-board/implementations/codex/bootstrap-board-core.js
+  reason: "The hook owns board arming from first-line prompt text; `$cc-master:cc-master-as-master-orchestrator` / `$cc-master-as-master-orchestrator` / `$cc-master:as-master-orchestrator` are treated as bootstrap triggers."
+  # 兼容 `$cc-master:...` 这类写法，避免首 token 少一个 - 导致的静默不触发。
+rejected:
+  skill-first:
+    reason: "A skill can teach initialization and can be invoked explicitly/implicitly, but bootstrap needs first-turn UserPromptSubmit context and cannot rely on skill-only initialization."
+  app-server-launcher:
+    reason: "Useful future harness path, but not needed for plugin-bundled bootstrap and would add an external driver surface."
+notes:
+  - Do not project Claude Code /cc-master:* command bodies to Codex.
+  - The Codex init surface is a prompt-first UserPromptSubmit hook path (`$cc-master:...` / `cc-master:...`).
+    Skills are the non-init command surface: users invoke `$cc-master-status`, `$cc-master-stop`, etc.
+  - Non-init command intents should run through `cc-master-*` skills plus ccm CLI / skill-script guidance.

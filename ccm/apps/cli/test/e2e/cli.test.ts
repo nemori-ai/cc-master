@@ -47,7 +47,7 @@ afterEach(() => {
   TMPDIRS = [];
 });
 
-// mkHome() → { root, home }：临时 home 目录（.claude/cc-master 那一级）。
+// mkHome() → { root, home }：临时 cc-master home 目录。
 function mkHome(): { root: string; home: string } {
   const root = mkdtempSync(join(tmpdir(), 'ccm-e2e-'));
   TMPDIRS.push(root);

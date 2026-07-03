@@ -230,12 +230,12 @@ export const FIELDS = {
     },
     runtime: {
       tier: '✎',
-      type: 'object{ last_identity_remind?: ISO, last_critpath_remind?: ISO, last_account_switch?: ISO, ... }?',
+      type: 'object{ last_identity_remind?: ISO, last_critpath_remind?: ISO, last_account_switch?: ISO, stop_allow_until?: ISO, ... }?',
       default: '缺省(无 runtime 参数)',
       readers:
-        'IDNUDGE hook 读 last_identity_remind / critpath-nudge hook 读 last_critpath_remind 判阈值 / usage-pacing hook 读 last_account_switch 注入换号 ambient(ADR-024)；未来其它周期 hook/script',
+        'IDNUDGE hook 读 last_identity_remind / critpath-nudge hook 读 last_critpath_remind 判阈值 / usage-pacing hook 读 last_account_switch 注入换号 ambient(ADR-024) / Codex Stop hook 读 stop_allow_until 判是否释放 decision:block；未来其它周期 hook/script',
       writers: 'hook 经 ccm board set-param（带锁·hook-owned 参数区·ADR-020）/ agent 经 ccm',
-      when: '周期 hook 注入提示后刷簿记时间戳',
+      when: '周期 hook 注入提示后刷簿记时间戳；agent 独立确认本板可停止后写短期 stop_allow_until',
       degrade: '缺→视为「从未提示」(首次必提示)；形状坏→warn(FMT-RUNTIME)·不拦写盘',
     },
   },

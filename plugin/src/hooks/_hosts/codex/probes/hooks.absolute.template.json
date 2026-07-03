@@ -1,0 +1,57 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CC_MASTER_CODEX_HOOK_PROBE_EVENT=UserPromptSubmit CC_MASTER_CODEX_HOOK_PROBE_MODE=silent CC_MASTER_CODEX_HOOK_PROBE_DIR=\"{{PROBE_DIR}}\" node \"{{PROBE_HOOK_JS}}\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CC_MASTER_CODEX_HOOK_PROBE_EVENT=SessionStart CC_MASTER_CODEX_HOOK_PROBE_MODE=silent CC_MASTER_CODEX_HOOK_PROBE_DIR=\"{{PROBE_DIR}}\" node \"{{PROBE_HOOK_JS}}\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CC_MASTER_CODEX_HOOK_PROBE_EVENT=Stop CC_MASTER_CODEX_HOOK_PROBE_MODE=silent CC_MASTER_CODEX_HOOK_PROBE_DIR=\"{{PROBE_DIR}}\" node \"{{PROBE_HOOK_JS}}\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CC_MASTER_CODEX_HOOK_PROBE_EVENT=PreToolUse CC_MASTER_CODEX_HOOK_PROBE_MODE=silent CC_MASTER_CODEX_HOOK_PROBE_DIR=\"{{PROBE_DIR}}\" node \"{{PROBE_HOOK_JS}}\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CC_MASTER_CODEX_HOOK_PROBE_EVENT=PostToolUse CC_MASTER_CODEX_HOOK_PROBE_MODE=silent CC_MASTER_CODEX_HOOK_PROBE_DIR=\"{{PROBE_DIR}}\" node \"{{PROBE_HOOK_JS}}\""
+          }
+        ]
+      }
+    ]
+  }
+}

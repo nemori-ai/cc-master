@@ -98,7 +98,7 @@ export interface Registry {
 type ReportFn = (message: string, account?: string) => void;
 
 // ── 路径解析 ─────────────────────────────────────────────────────────────────────────────────────
-// accounts.json 固定路径：${CC_MASTER_HOME:-<claudeConfigDir>/cc-master}/accounts.json（用户级 home·绝不落 repo 树）。
+// accounts.json 固定路径：${CC_MASTER_HOME:-$HOME/.cc_master}/accounts.json（用户级 home·绝不落 repo 树）。
 //   claudeConfigDir 跟随 CLAUDE_CONFIG_DIR（默认 ~/.claude·paths.resolveCcMasterHome SSOT）。
 export function defaultRegistryPath(): string {
   return path.join(resolveCcMasterHome(), 'accounts.json');

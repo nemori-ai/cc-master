@@ -1,0 +1,1 @@
+- **Codex resume / compaction 的 session 行为由 Codex host adapter 负责注入**。不要假设 Claude Code 的 resume flags；Codex 脚本化续跑用 `codex resume` 或 `codex exec resume <SESSION_ID>` / `--last`，并在 recon 第 0 步重新确认 worktree 与当前 board。

@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+. "$(dirname "$0")/helpers.sh"
+
+LAUNCHER="$REPO_ROOT/plugin/src/hooks/_hosts/codex/launcher.js"
+CORE="$REPO_ROOT/plugin/src/hooks/reinject/implementations/codex/reinject-core.js"
+
+mkactive() {
+  mkdir -p "$1/boards"
+  printf '%s' "$3" >"$1/boards/$2.board.json"
+}
+
+run_session_start() {
+  HOOK_OUT="$(
+    printf '{"session_id":"%s","hook_event_name":"SessionStart","source":"startup"}' "$2" |
+      CC_MASTER_HOME="$1" node "$LAUNCHER" --event SessionStart --core "$CORE" 2>/dev/null
+  )"
+  HOOK_RC=$?
+}
+
+dangling_segment() {
+  printf '%s' "$1" | sed -n 's/.*stale\/escalated:[[:space:]]*\(.*\)\. Reconcile.*/\1/p'
+}
+
+chmod +x "$CORE"
+
+# No active board: dormant.
+H="$(make_project)"
+run_session_start "$H" "sess-none"
+assert_eq 0 "$HOOK_RC" "no active board -> rc 0"
+assert_eq "" "$HOOK_OUT" "no active board -> no output"
+rm -rf "$H"
+
+# Matching session: inject role and goal through Codex launcher envelope.
+H="$(make_project)"
+mkactive "$H" "mine" '{"schema":"cc-master/v2","goal":"CODEX REINJECT GOAL","owner":{"active":true,"session_id":"sess-mine"},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_session_start "$H" "sess-mine"
+assert_contains "$HOOK_OUT" '"systemMessage"' "uses SessionStart systemMessage envelope"
+assert_contains "$HOOK_OUT" "CODEX REINJECT GOAL" "injects matching board goal"
+assert_contains "$HOOK_OUT" "master orchestrator" "re-anchors role"
+assert_contains "$HOOK_OUT" "mine.board.json" "names board"
+rm -rf "$H"
+
+# Matching empty board: SessionStart must force DAG creation before work.
+H="$(make_project)"
+mkactive "$H" "empty" '{"schema":"cc-master/v2","goal":"EMPTY CODEX GOAL","owner":{"active":true,"session_id":"sess-empty"},"tasks":[]}'
+run_session_start "$H" "sess-empty"
+assert_contains "$HOOK_OUT" "HARD STOP" "empty active board gets hard stop"
+assert_contains "$HOOK_OUT" "zero tasks are not runnable orchestration DAGs" "empty active board blocks ordinary progress"
+assert_contains "$HOOK_OUT" "ccm task add" "empty active board instructs ccm task add"
+rm -rf "$H"
+
+# Other session: do not leak another active board.
+H="$(make_project)"
+mkactive "$H" "other" '{"schema":"cc-master/v2","goal":"OTHER CODEX GOAL","owner":{"active":true,"session_id":"sess-other"},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_session_start "$H" "sess-fresh"
+assert_eq "" "$HOOK_OUT" "other session board stays dormant"
+rm -rf "$H"
+
+# Empty session id degrades to any active board.
+H="$(make_project)"
+mkactive "$H" "degraded" '{"schema":"cc-master/v2","goal":"DEGRADED CODEX GOAL","owner":{"active":true,"session_id":"sess-any"},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_session_start "$H" ""
+assert_contains "$HOOK_OUT" "DEGRADED CODEX GOAL" "empty session_id degrades to active board"
+rm -rf "$H"
+
+# Dangling stale/escalated note only names top-level task statuses.
+H="$(make_project)"
+mkactive "$H" "dangling" '{"schema":"cc-master/v2","goal":"DANGLING CODEX GOAL","owner":{"active":true,"session_id":"sess-d"},"tasks":[{"id":"T1","status":"stale","deps":[]},{"id":"T2","status":"in_flight","deps":[]},{"id":"T3","status":"escalated","deps":[],"parent":"P1"},{"id":"T4","status":"in_flight","deps":[],"log":[{"status":"stale","id":"L1"}]}]}'
+run_session_start "$H" "sess-d"
+assert_contains "$HOOK_OUT" "unresolved" "dangling note appears"
+DANGLE="$(dangling_segment "$HOOK_OUT")"
+assert_contains "$DANGLE" "T1" "names stale task"
+assert_contains "$DANGLE" "T3 (owner P1)" "names escalated child task"
+assert_not_contains "$DANGLE" "T2" "does not name in-flight task"
+assert_not_contains "$DANGLE" "L1" "does not scan nested log status"
+rm -rf "$H"
+
+finish

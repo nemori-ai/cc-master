@@ -10,7 +10,7 @@
 # `[ -x "$CCM_BIN" ]` — the shim is an executable wrapper, so existence is enough (the gate never spawns
 # ccm). The dedicated ccm-ABSENT cases (G-series, bottom) override CCM_BIN to a nonexistent path.
 if [ -z "${CCM_BIN:-}" ]; then
-  _SHIM="$PLUGIN_ROOT/ccm/apps/cli/dev-bin/ccm"
+  _SHIM="$REPO_ROOT/ccm/apps/cli/dev-bin/ccm"
   # Adopt the shim ONLY if it is FUNCTIONAL (dist built → `--version` succeeds). The shim is a thin
   # `exec node bin/ccm.cjs` wrapper that require()s ccm/apps/cli/dist/index.cjs — when the dist has not
   # been built (no pnpm / version-mismatched pnpm / missing node_modules), the shim is executable but
@@ -160,6 +160,10 @@ P="$(make_project)"
 run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"  /cc-master:as-master-orchestrator <goal>"}' "$P"
 assert_eq 0 "$HOOK_RC" "raw command exits 0"
 assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "board created for a raw command prompt (leading whitespace allowed)"
+assert_contains "$HOOK_OUT" "MANDATORY NEXT STEP" "fresh bootstrap requires DAG before work"
+assert_contains "$HOOK_OUT" "zero tasks is not a runnable orchestration" "fresh bootstrap rejects empty-board progress"
+BOARD_F="$(ls "$P/.claude/cc-master/boards"/*.board.json | head -n1)"
+assert_contains "$HOOK_OUT" "ccm task add --board $BOARD_F" "fresh bootstrap gives exact ccm board path"
 rm -rf "$P"
 
 # Case G (Finding #15): expanded-body — prompt opens with the bootstrap marker comment on its first

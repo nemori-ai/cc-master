@@ -1,0 +1,3 @@
+- [references/usage-signals.md](references/usage-signals.md) —— Codex 用量信号源和降级。
+- [references/pacing-levers.md](references/pacing-levers.md) —— 单侧 levers（减速 / 停）怎么做；Codex 下不要执行账号池切换。
+- [references/estimation.md](references/estimation.md) —— 估算消费方法和诚实字段。

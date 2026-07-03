@@ -1,0 +1,6 @@
+interface:
+  display_name: "cc-master-status"
+  short_description: "cc master-status 命令入口"
+  description: "Codex 主动调用命令入口"
+policy:
+  allow_implicit_invocation: false

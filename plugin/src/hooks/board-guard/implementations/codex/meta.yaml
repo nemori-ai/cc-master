@@ -1,0 +1,9 @@
+hook: board-guard
+host: codex
+event: PreToolUse
+matcher: "Bash|apply_patch|Edit|Write|MultiEdit"
+mode: implemented
+notes:
+  - Uses Codex launcher normalized PreToolUse payload.
+  - Blocks with Codex-compatible decision:block only for PreToolUse.
+  - Adds apply_patch payload scanning because Codex may edit files through apply_patch rather than Claude Code MultiEdit.
