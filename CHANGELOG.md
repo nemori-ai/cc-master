@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] — 2026-07-03
+
 > **plugin + ccm host-adapter groundwork** —— 把仓库从单一 Claude Code 插件形态推进到 paragoge-style `plugin/src` → `plugin/dist/<host>` 投影架构，并落地 Codex adapter 的首批可安装产物；`ccm` 同步抽出 host harness registry / Codex 用量信号 / upgrade plumbing，为多 harness 分发与本地验收闭环铺路。
 
 ### Added

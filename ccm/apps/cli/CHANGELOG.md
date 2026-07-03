@@ -1,5 +1,20 @@
 # ccm
 
+## 0.13.0
+
+### Minor Changes
+
+- Host-aware ccm plumbing for multi-harness installs:
+  - Adds Claude Code / Codex / generic harness registry support plus `ccm harness` discovery.
+  - Adds Codex app-server rate-limit consumption for `usage show` / `usage advise`.
+  - Updates `ccm upgrade` to report Codex plugin install roots and support host-specific plugin upgrade/install planning.
+  - Adds `runtime.stop_allow_until` support through `ccm board set-param` so Codex Stop hooks can intentionally release a bounded continuation block.
+
+### Patch Changes
+
+- Updated dependencies
+  - @ccm/engine@0.13.0
+
 ## 0.12.0
 
 ### Minor Changes
