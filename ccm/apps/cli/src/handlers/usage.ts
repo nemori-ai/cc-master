@@ -373,7 +373,8 @@ export function show(ctx: Ctx): number {
       if (current.available) {
         const p5 = current.five_hour?.used_percentage;
         const p7 = current.seven_day?.used_percentage;
-        const label = currentUsage.source === 'codex-app-server' ? 'Codex app-server' : 'account 权威';
+        const label =
+          currentUsage.source === 'codex-app-server' ? 'Codex app-server' : 'account 权威';
         lines.push(`  current（${label}）: 5h=${fmtPct(p5)} 7d=${fmtPct(p7)}`);
       } else {
         lines.push(

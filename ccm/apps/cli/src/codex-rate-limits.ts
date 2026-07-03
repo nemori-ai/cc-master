@@ -9,12 +9,6 @@ import type { UsageSignal, WindowSignal } from '@ccm/engine';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
-interface RpcMessage {
-  id?: number | string | null;
-  result?: unknown;
-  error?: unknown;
-}
-
 interface RateLimitWindow {
   usedPercent?: unknown;
   windowDurationMins?: unknown;
@@ -57,7 +51,9 @@ export function readCodexUsageSignal(
       transferList: [port2],
     });
     Atomics.wait(flag, 0, 0, timeoutMs + 1000);
-    const msg = receiveMessageOnPort(port1)?.message as { ok?: boolean; result?: unknown } | undefined;
+    const msg = receiveMessageOnPort(port1)?.message as
+      | { ok?: boolean; result?: unknown }
+      | undefined;
     if (!msg?.ok) return null;
     return normalizeCodexRateLimits(msg.result);
   } catch {

@@ -105,7 +105,10 @@ test('--harness 覆盖 env host：显式 claude-code 时 statusline install 生�
     extraEnv: { CC_MASTER_HARNESS: 'codex', CCM_BIN: installBin(dir) },
   });
   assert.equal(r.code, 0);
-  assert.ok(exists(join(dir, 'settings.json')), '--harness claude-code 覆盖 env codex 后会写 settings');
+  assert.ok(
+    exists(join(dir, 'settings.json')),
+    '--harness claude-code 覆盖 env codex 后会写 settings',
+  );
   const parsed = JSON.parse(r.out.join('\n'));
   assert.equal(parsed.ok, true);
   assert.equal(parsed.data.action, 'installed');

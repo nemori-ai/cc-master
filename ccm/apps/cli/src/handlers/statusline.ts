@@ -21,8 +21,8 @@ import {
   type StatuslineActionResult,
   uninstallStatusline,
 } from '@ccm/engine';
-import * as io from '../io.js';
 import { resolveHarnessAdapter } from '../harnesses/registry.js';
+import * as io from '../io.js';
 import { resolveSelfBinPath, resolveStatuslineCommand } from '../self.js';
 import type { Ctx } from './_common.js';
 

@@ -450,9 +450,7 @@ function buildCtx({
 }): Ctx {
   const harnessFlag = typeof values.harness === 'string' ? values.harness : undefined;
   const sid =
-    (values && (values['session-id'] as string)) ||
-    harnessSessionId({ env, harnessFlag }) ||
-    '';
+    (values && (values['session-id'] as string)) || harnessSessionId({ env, harnessFlag }) || '';
   const stream = (out && out._stream) || process.stdout;
   const color = io.resolveColor({ stream, argv, env });
 

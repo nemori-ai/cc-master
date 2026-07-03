@@ -9,15 +9,14 @@ export function probeExecutable(name: string, env: Env): HarnessCliProbe {
 
 function findExecutable(name: string, env: Env): string | null {
   if (!name) return null;
-  if (name.includes('/') || name.includes('\\')) return isExecutable(name) ? path.resolve(name) : null;
+  if (name.includes('/') || name.includes('\\'))
+    return isExecutable(name) ? path.resolve(name) : null;
 
   const pathEnv = env.PATH || process.env.PATH || '';
   const dirs = pathEnv.split(path.delimiter).filter(Boolean);
   const exts =
     process.platform === 'win32'
-      ? (env.PATHEXT || process.env.PATHEXT || '.EXE;.CMD;.BAT;.COM')
-          .split(';')
-          .filter(Boolean)
+      ? (env.PATHEXT || process.env.PATHEXT || '.EXE;.CMD;.BAT;.COM').split(';').filter(Boolean)
       : [''];
   for (const dir of dirs) {
     for (const ext of exts) {

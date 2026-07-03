@@ -9,8 +9,8 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import {
   resolveCcMasterHome,
-  resolveClaudeConfigDir,
   resolveClaudeCodeConfigDir,
+  resolveClaudeConfigDir,
   resolveClaudeJsonPath,
   resolveCredentialsPath,
   resolveHostConfigDir,
@@ -28,7 +28,10 @@ test('resolveClaudeConfigDir: no CLAUDE_CONFIG_DIR → $HOME/.claude', () => {
 });
 
 test('resolveClaudeCodeConfigDir: alias equals legacy resolveClaudeConfigDir', () => {
-  assert.equal(resolveClaudeCodeConfigDir({ CLAUDE_CONFIG_DIR: '/cfg/dir', HOME: '/h' }), '/cfg/dir');
+  assert.equal(
+    resolveClaudeCodeConfigDir({ CLAUDE_CONFIG_DIR: '/cfg/dir', HOME: '/h' }),
+    '/cfg/dir',
+  );
 });
 
 test('resolveHostConfigDir: defaults to host config directory', () => {

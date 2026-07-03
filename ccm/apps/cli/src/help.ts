@@ -41,7 +41,10 @@ interface RegistryModule {
 //   与 help 草稿 §0 GLOBAL FLAGS 逐字段对齐。short 在前缀里手标（parseArgs 的 short 在 registry 不覆盖全局）。
 const GLOBAL_FLAGS: [string, string][] = [
   ['    --board <path>', '指定 board 文件（最高优先）'],
-  ['    --harness <id>', '指定 agent harness（最高优先；否则 CC_MASTER_HARNESS / 旧 host env / 自动探测）'],
+  [
+    '    --harness <id>',
+    '指定 agent harness（最高优先；否则 CC_MASTER_HARNESS / 旧 host env / 自动探测）',
+  ],
   ['    --session-id <id>', '指定 session（特权调用者注入；否则由当前 harness adapter 解析）'],
   [
     '    --home <dir>',
