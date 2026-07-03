@@ -10,7 +10,7 @@
 // 零写不变式断言：handler 跑完后临时板内容字节不变（usage 绝不落盘）。
 
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
@@ -102,7 +102,7 @@ function mkCtx(
       ...flags,
     },
     sid: 'sid-u',
-    // CC_MASTER_RATE_CACHE 必传——否则 readUsageSidecar 会回落到真实 $HOME/.claude/.cc-master-rate-limits.json
+    // CC_MASTER_RATE_CACHE 必传——否则 readUsageSidecar 会回落到真实 cc-master home sidecar。
     //   （污染/读到宿主真 sidecar）。默认指向 home 下的真实文件名（setupHome 落盘处）。
     env: {
       CC_MASTER_HOME: home,
@@ -114,6 +114,25 @@ function mkCtx(
     outBuf,
     errBuf,
   };
+}
+
+function codexStub(root: string, result: unknown): string {
+  const p = join(root, 'codex-stub.mjs');
+  writeFileSync(
+    p,
+    `#!/usr/bin/env node
+import readline from 'node:readline';
+const rl = readline.createInterface({ input: process.stdin });
+rl.on('line', (line) => {
+  const msg = JSON.parse(line);
+  if (msg.id === 0) process.stdout.write(JSON.stringify({ id: 0, result: { protocolVersion: '0.1.0' } }) + '\\n');
+  if (msg.id === 6) process.stdout.write(JSON.stringify({ id: 6, result: ${JSON.stringify(result)} }) + '\\n');
+});
+`,
+    'utf8',
+  );
+  chmodSync(p, 0o755);
+  return p;
 }
 
 // 一个 critical 5h + 7d 余量的 registry（含 active + 2 备号·c 的 7d 最低）。
@@ -171,6 +190,46 @@ test('usage show with no registry degrades gracefully (available:false, exit 0)'
   assert.equal(out.ok, true);
   assert.equal(out.data.registry_present, false);
   assert.equal(out.data.effective_n, 1, 'no registry → single account effective_n=1');
+  assert.equal(out.data.current.available, false);
+});
+
+test('usage show on Codex reads current 5h/7d from app-server rate limits', () => {
+  const { home, boardPath } = setupHome();
+  const root = mkTmp('ccm-codex-usage-');
+  const codexBin = codexStub(root, {
+    rateLimits: {
+      limitId: 'codex',
+      primary: { usedPercent: 57, windowDurationMins: 300, resetsAt: 1893456000 },
+      secondary: { usedPercent: 15, windowDurationMins: 10080, resetsAt: 1925078400 },
+    },
+  });
+  const ctx = mkCtx(home, boardPath, {
+    flags: { json: true },
+  });
+  ctx.env.CC_MASTER_HOST = 'codex';
+  ctx.env.CCM_CODEX_BIN = codexBin;
+  const code = usageHandler.show(ctx);
+  assert.equal(code, EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, true);
+  assert.equal(out.data.current.source, 'codex-app-server');
+  assert.equal(out.data.current.five_hour.used_percentage, 57);
+  assert.equal(out.data.current.seven_day.used_percentage, 15);
+  assert.equal(out.data.current.five_hour.resets_at, 1893456000);
+  assert.equal(out.data.current.seven_day.resets_at, 1925078400);
+});
+
+test('usage show with explicit unknown harness does not fall back to Claude sidecar', () => {
+  const { home, boardPath } = setupHome({ sidecar: SIDECAR_CRITICAL });
+  const ctx = mkCtx(home, boardPath, {
+    values: { harness: 'future-agent' },
+    flags: { json: true },
+  });
+  const code = usageHandler.show(ctx);
+  assert.equal(code, EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, false);
+  assert.equal(out.data.current.source, 'unavailable');
   assert.equal(out.data.current.available, false);
 });
 
@@ -390,6 +449,31 @@ test('usage advise with no sidecar holds + available:false (degrade, exit 0)', (
   assert.equal(out.data.verdict, 'hold');
   assert.equal(out.data.available, false);
   assert.equal(out.data.source, 'local-derived-approx');
+});
+
+test('usage advise on Codex consumes app-server rate limits', () => {
+  const { home, boardPath } = setupHome();
+  const root = mkTmp('ccm-codex-advise-');
+  const codexBin = codexStub(root, {
+    rateLimits: {
+      limitId: 'codex',
+      primary: { usedPercent: 92, windowDurationMins: 300, resetsAt: 1893456000 },
+      secondary: { usedPercent: 50, windowDurationMins: 10080, resetsAt: 1925078400 },
+    },
+  });
+  const ctx = mkCtx(home, boardPath, {
+    flags: { json: true },
+  });
+  ctx.env.CC_MASTER_HOST = 'codex';
+  ctx.env.CCM_CODEX_BIN = codexBin;
+  const code = usageHandler.advise(ctx);
+  assert.equal(code, EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, true);
+  assert.equal(out.data.source, 'codex-app-server');
+  assert.equal(out.data.window_5h_pct, 92);
+  assert.equal(out.data.window_7d_pct, 50);
+  assert.equal(out.data.effective_n, 1);
 });
 
 test('usage advise n>1 + 5h critical + healthy backup → switch + switch_candidate (ADR-024)', () => {

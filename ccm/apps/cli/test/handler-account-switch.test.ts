@@ -129,6 +129,15 @@ function assertTokenBlind(ctx: TestCtx): void {
   }
 }
 
+test('codex harness: account switch is NotImplemented before touching vault or registry', async () => {
+  const ctx = mkCtx({}, { CC_MASTER_HOST: 'codex', HOME: '/tmp/no-touch' });
+  const rc = await accountHandler.switchAccount(ctx);
+  assert.equal(rc, 2);
+  assert.match(ctx.errBuf.join('\n'), /NotImplemented: `ccm account switch`/);
+  assert.match(ctx.errBuf.join('\n'), /Codex harness/);
+  assertTokenBlind(ctx);
+});
+
 // loopback refresh stub server。
 function listen(handler: Parameters<typeof createServer>[1]): Promise<Server> {
   return new Promise((resolve) => {

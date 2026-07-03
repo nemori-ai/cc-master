@@ -1,5 +1,5 @@
-// paths.test.ts — @ccm/engine·CLAUDE_CONFIG_DIR 跟随 + 派生路径解析契约门。
-//   钉住覆写优先级链（显式 flag/env > CLAUDE_CONFIG_DIR 派生 > $HOME/.claude 派生）+ .claude.json 双路径容错。
+// paths.test.ts — @ccm/engine·cc-master home / Claude Code host path 解析契约门。
+//   钉住覆写优先级链：cc-master home 默认 $HOME/.cc_master；Claude Code host path 仍跟随 CLAUDE_CONFIG_DIR。
 //   测 build 后的 dist 公开 API barrel（与其余 engine 测试同口径）。
 
 import assert from 'node:assert/strict';
@@ -10,8 +10,10 @@ import { test } from 'node:test';
 import {
   resolveCcMasterHome,
   resolveClaudeConfigDir,
+  resolveClaudeCodeConfigDir,
   resolveClaudeJsonPath,
   resolveCredentialsPath,
+  resolveHostConfigDir,
   resolveProjectsDir,
   resolveRateCachePath,
 } from '../dist/index.mjs';
@@ -25,7 +27,15 @@ test('resolveClaudeConfigDir: no CLAUDE_CONFIG_DIR → $HOME/.claude', () => {
   assert.equal(resolveClaudeConfigDir({ HOME: '/h' }), join('/h', '.claude'));
 });
 
-// ── resolveCcMasterHome（CC_MASTER_HOME > CLAUDE_CONFIG_DIR 派生 > $HOME/.claude 派生）────────────────
+test('resolveClaudeCodeConfigDir: alias equals legacy resolveClaudeConfigDir', () => {
+  assert.equal(resolveClaudeCodeConfigDir({ CLAUDE_CONFIG_DIR: '/cfg/dir', HOME: '/h' }), '/cfg/dir');
+});
+
+test('resolveHostConfigDir: defaults to host config directory', () => {
+  assert.equal(resolveHostConfigDir({ HOME: '/h' }), join('/h', '.claude'));
+});
+
+// ── resolveCcMasterHome（CC_MASTER_HOME > $HOME/.cc_master；不跟随 CLAUDE_CONFIG_DIR）────────────────
 test('resolveCcMasterHome: $CC_MASTER_HOME wins over CLAUDE_CONFIG_DIR', () => {
   assert.equal(
     resolveCcMasterHome({
@@ -37,12 +47,12 @@ test('resolveCcMasterHome: $CC_MASTER_HOME wins over CLAUDE_CONFIG_DIR', () => {
   );
 });
 
-test('resolveCcMasterHome: no CC_MASTER_HOME → <claudeConfigDir>/cc-master (follows CLAUDE_CONFIG_DIR)', () => {
+test('resolveCcMasterHome: no CC_MASTER_HOME → $HOME/.cc_master (ignores CLAUDE_CONFIG_DIR)', () => {
   assert.equal(
     resolveCcMasterHome({ CLAUDE_CONFIG_DIR: '/cfg', HOME: '/h' }),
-    join('/cfg', 'cc-master'),
+    join('/h', '.cc_master'),
   );
-  assert.equal(resolveCcMasterHome({ HOME: '/h' }), join('/h', '.claude', 'cc-master'));
+  assert.equal(resolveCcMasterHome({ HOME: '/h' }), join('/h', '.cc_master'));
 });
 
 // ── resolveRateCachePath ─────────────────────────────────────────────────────────────────────────
@@ -53,10 +63,14 @@ test('resolveRateCachePath: $CC_MASTER_RATE_CACHE override wins', () => {
   );
 });
 
-test('resolveRateCachePath: derives from claudeConfigDir', () => {
+test('resolveRateCachePath: derives from cc-master home', () => {
   assert.equal(
-    resolveRateCachePath({ CLAUDE_CONFIG_DIR: '/cfg' }),
-    join('/cfg', '.cc-master-rate-limits.json'),
+    resolveRateCachePath({ CLAUDE_CONFIG_DIR: '/cfg', HOME: '/h' }),
+    join('/h', '.cc_master', '.cc-master-rate-limits.json'),
+  );
+  assert.equal(
+    resolveRateCachePath({ CC_MASTER_HOME: '/cc/home', CLAUDE_CONFIG_DIR: '/cfg', HOME: '/h' }),
+    join('/cc/home', '.cc-master-rate-limits.json'),
   );
 });
 

@@ -53,7 +53,7 @@ import { type BoardArg, type Ctx, runRead } from './_common.js';
 import { accountBurnRate } from './usage.js';
 
 // resolveHomeDir(env, homeFlag) → cc-master home **根**（统一全局口径·收口到 discover.resolveHome SSOT：
-//   --home > $CC_MASTER_HOME > $HOME/.claude/cc-master；不再 per-repo CLAUDE_PROJECT_DIR）。跨板只读语料用。
+//   --home > $CC_MASTER_HOME > $HOME/.cc_master；不再 per-repo CLAUDE_PROJECT_DIR）。跨板只读语料用。
 function resolveHomeDir(env: Record<string, string | undefined>, homeFlag?: string): string {
   return discover.resolveHome({ homeFlag, env });
 }
@@ -645,7 +645,13 @@ export function costToComplete(ctx: Ctx): number {
       const repo = boardRepo(b);
 
       // ── 账户权威 burn-rate（%/h·5h 窗口·复用 usage.accountBurnRate SSOT）──
-      const burnView = accountBurnRate(c.env, nowSec, WINDOW_5H_SEC, 'five_hour');
+      const burnView = accountBurnRate(
+        c.env,
+        nowSec,
+        WINDOW_5H_SEC,
+        'five_hour',
+        c.values.harness as string | undefined,
+      );
       const burn = burnView.burn_pct_per_hour;
 
       const notes: string[] = [];
@@ -661,7 +667,7 @@ export function costToComplete(ctx: Ctx): number {
 
       if (burn == null)
         notes.push(
-          '账户 burn-rate 不可用（无 status-line sidecar）——%-cost 无法折算·available:false 降级',
+          `账户 burn-rate 不可用（${burnView.harness}: ${burnView.unavailable_reason || '当前 harness 未提供可用账户用量信号'}）——%-cost 无法折算·available:false 降级`,
         );
       else
         notes.push(

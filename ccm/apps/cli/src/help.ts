@@ -41,10 +41,11 @@ interface RegistryModule {
 //   与 help 草稿 §0 GLOBAL FLAGS 逐字段对齐。short 在前缀里手标（parseArgs 的 short 在 registry 不覆盖全局）。
 const GLOBAL_FLAGS: [string, string][] = [
   ['    --board <path>', '指定 board 文件（最高优先）'],
-  ['    --session-id <id>', '指定 session（特权调用者注入；默认读 $CLAUDE_CODE_SESSION_ID）'],
+  ['    --harness <id>', '指定 agent harness（最高优先；否则 CC_MASTER_HARNESS / 旧 host env / 自动探测）'],
+  ['    --session-id <id>', '指定 session（特权调用者注入；否则由当前 harness adapter 解析）'],
   [
     '    --home <dir>',
-    '指定 cc-master home 根（默认 $CC_MASTER_HOME → $HOME/.claude/cc-master·全局；board 在 <home>/boards/）',
+    '指定 cc-master home 根（默认 $CC_MASTER_HOME → $HOME/.cc_master·全局；board 在 <home>/boards/）',
   ],
   ['    --goal <substr>', '多 active 板时按 goal 子串消歧'],
   ['    --json', '机器可读 JSON 输出（非 TTY 时默认开）'],
@@ -152,6 +153,7 @@ function _namespaceBlurb(noun: string): string {
     peers: '多-orchestrator 跨板只读花名册（ADR-017）',
     usage: '配额用量 / 单侧配速 advisory（只读·ADR-015）',
     estimate: 'OR/ML 估算引擎：用时 / 关键路径 / EVM / 风险（只读·ADR-015）',
+    harness: '本机 supported harness inventory：探测安装状态 / 能力 / 当前选择',
     account: '换号号池：录号 / 刷新 / 删 / 列 / 无重启换号（token-blind·ADR-019）',
     statusline: 'status line：渲染单行状态行（ctx/5h/7d）+ 安装 / 卸载（self-contained·0.10.0）',
     upgrade: '自升级：把 ccm 二进制 + cc-master 插件升到各自线最新（--to 指定 / --dry-run 预览）',

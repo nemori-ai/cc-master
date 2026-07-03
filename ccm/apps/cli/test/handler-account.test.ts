@@ -186,6 +186,15 @@ test('account add (file vault): exit 0, registry active+switchable, vault has to
   assert.ok(ctx.outBuf.join('').includes('<redacted>'), 'blob shown redacted');
 });
 
+test('codex harness: account pool verbs are NotImplemented', () => {
+  const ctx = mkCtx([], { env: { CC_MASTER_HOST: 'codex', HOME: '/tmp/no-touch' } });
+  const rc = accountHandler.list(ctx);
+  assert.equal(rc, EXIT.USAGE);
+  assert.match(ctx.errBuf.join('\n'), /NotImplemented: `ccm account list`/);
+  assert.match(ctx.errBuf.join('\n'), /Codex harness/);
+  noToken(ctx, 'codex-not-implemented');
+});
+
 // ══ add 身份不匹配 → exit 1 ═════════════════════════════════════════════════════════════════════════
 test('account add: identity mismatch → exit 1 (no vault write)', () => {
   const { home, env } = mkEnvHome('someone-else@x.com'); // 当前登录 != --email。

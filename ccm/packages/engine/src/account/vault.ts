@@ -290,7 +290,7 @@ export function defaultVaultKind(keychain?: KeychainProvider): 'keychain' | 'fil
 }
 
 // defaultVaultFile — file vault 默认路径（与 accounts.json 同一用户级 home）。env 可注入。
-//   home 跟随 CC_MASTER_HOME > CLAUDE_CONFIG_DIR 派生（paths.resolveCcMasterHome SSOT）。
+//   home 跟随 CC_MASTER_HOME > $HOME/.cc_master（paths.resolveCcMasterHome SSOT）。
 export function defaultVaultFile(env?: Record<string, string | undefined>): string {
   return path.join(resolveCcMasterHome(env), 'accounts.env');
 }

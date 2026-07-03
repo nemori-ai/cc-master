@@ -22,6 +22,7 @@ import {
   uninstallStatusline,
 } from '@ccm/engine';
 import * as io from '../io.js';
+import { resolveHarnessAdapter } from '../harnesses/registry.js';
 import { resolveSelfBinPath, resolveStatuslineCommand } from '../self.js';
 import type { Ctx } from './_common.js';
 
@@ -93,6 +94,20 @@ function humanResult(r: StatuslineActionResult): string {
 
 // ── install ────────────────────────────────────────────────────────────────────────────────────
 export function install(ctx: Ctx): number {
+  const harness = resolveHarnessAdapter({
+    env: ctx.env,
+    harnessFlag: typeof ctx.values.harness === 'string' ? ctx.values.harness : undefined,
+  });
+  if (!harness.externalStatusline.supported) {
+    const r = {
+      action: 'skipped',
+      settingsPath: '',
+      reason: `NotImplemented: ${harness.externalStatusline.reason || `${harness.displayName} harness has no external status line adapter.`}`,
+    } as const;
+    if (ctx.flags.json) ctx.out(io.jsonOk(r));
+    else ctx.out(`未改动：${r.reason}\n`);
+    return EXIT.USAGE;
+  }
   const command = resolveStatuslineCommand();
   const r = installStatusline(ctx.env, command);
   if (ctx.flags.json) ctx.out(io.jsonOk(r));
@@ -102,6 +117,20 @@ export function install(ctx: Ctx): number {
 
 // ── uninstall ──────────────────────────────────────────────────────────────────────────────────
 export function uninstall(ctx: Ctx): number {
+  const harness = resolveHarnessAdapter({
+    env: ctx.env,
+    harnessFlag: typeof ctx.values.harness === 'string' ? ctx.values.harness : undefined,
+  });
+  if (!harness.externalStatusline.supported) {
+    const r = {
+      action: 'skipped',
+      settingsPath: '',
+      reason: `NotImplemented: ${harness.externalStatusline.reason || `${harness.displayName} harness has no external status line adapter.`}`,
+    } as const;
+    if (ctx.flags.json) ctx.out(io.jsonOk(r));
+    else ctx.out(`未改动：${r.reason}\n`);
+    return EXIT.USAGE;
+  }
   const r = uninstallStatusline(ctx.env);
   if (ctx.flags.json) ctx.out(io.jsonOk(r));
   else ctx.out(humanResult(r));
@@ -110,8 +139,10 @@ export function uninstall(ctx: Ctx): number {
 
 // autoInstall(env) — 供 router 在每条非-statusline 命令首次跑时无感知调用（marker 守·静默·绝不抛）。
 //   放这里让 handler 层统一拥有 statusline 接线；router 只调一次、不关心结果。
-export function autoInstall(env: Ctx['env']): void {
+export function autoInstall(env: Ctx['env'], harnessFlag?: string): void {
   try {
+    const harness = resolveHarnessAdapter({ env, harnessFlag });
+    if (!harness.externalStatusline.supported) return;
     // 第三参 binPath 注入 DEV-GUARD：从 worktree / 仓库内跑（dev 自测）时 autoInstall 自动 skip（reason
     // `dev-invocation`），绝不污染真实 ~/.claude/settings.json；真实用户（稳定安装路径）不受影响。
     // binPath 经 resolveSelfBinPath(env) 解析（honor env.CCM_BIN·见 self.ts）。

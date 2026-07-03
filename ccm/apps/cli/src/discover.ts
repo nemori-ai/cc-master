@@ -4,7 +4,7 @@
 //   优先级（设计稿 §6，显式注入 > 自动发现）：
 //     ① --board / $CC_MASTER_BOARD              — 显式指定文件，最高优先
 //     ② session→board 指针注册表                — bootstrap arm 时写的 sid→path 小指针（确定性、与 cwd 无关）
-//     ③ home 内扫 *.board.json                   — resolveHome 兜底（--home > $CC_MASTER_HOME > $CLAUDE_PROJECT_DIR/.. > walk-up）
+//     ③ home 内扫 *.board.json                   — resolveHome 兜底（--home > $CC_MASTER_HOME > $HOME/.cc_master）
 //          · sid 可用：boardMatches 精确锚（命中 0 → throw NotFound，**绝不退化抓唯一 active**·镜像 hook 武装语义）
 //          · sid 不可用：唯一 owner.active 板（多板 → throw Ambiguous，可用 goalSubstr 过滤 goal 消歧）
 //
@@ -22,7 +22,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { resolveClaudeConfigDir } from '@ccm/engine';
+import { resolveCcMasterHome } from '@ccm/engine';
 
 // 带 .errKind 的 Error（router 据此映射退出码）。
 interface KindedError extends Error {
@@ -46,10 +46,10 @@ function discoverError(message: string, errKind: string): KindedError {
 }
 
 // ── home 解析（统一全局口径·board-v2 home 收口）────────────────────────────────────────────────────
-// resolveHome({homeFlag, env}) → 绝对 home **根**目录（.claude/cc-master 那一级）。
-//   优先级：--home > $CC_MASTER_HOME > $HOME/.claude/cc-master（全局·默认）> throw NotFound（无 HOME 时）。
+// resolveHome({homeFlag, env}) → 绝对 home **根**目录（默认 ~/.cc_master）。
+//   优先级：--home > $CC_MASTER_HOME > $HOME/.cc_master（全局·默认）。
 //   **不再** per-repo（$CLAUDE_PROJECT_DIR/.claude/cc-master）或从 cwd walk-up——所有 orchestration 的 board
-//   集中到一个用户级 home，跨 repo 不再各起一份。这与 hook 侧 hook-common.resolveHome / bootstrap-board.sh
+//   集中到一个 harness-neutral 用户级 home，跨 repo 不再各起一份。这与 hook 侧 hook-common.resolveHome / bootstrap-board.sh
 //   的 cc_master_home 三处同口径。board 集中落 <home>/boards/（见 boardsDir）。
 //   env.HOME 缺时退 os.homedir()（生产稳健·测试可经 env.HOME 注入隔离 home）。
 export function resolveHome({ homeFlag, env }: { homeFlag?: string; env?: Env } = {}): string {
@@ -61,15 +61,12 @@ export function resolveHome({ homeFlag, env }: { homeFlag?: string; env?: Env } 
   // ② $CC_MASTER_HOME。
   if (env.CC_MASTER_HOME) return path.resolve(env.CC_MASTER_HOME);
 
-  // ③ claudeConfigDir 派生 + /cc-master（claudeConfigDir 跟随 $CLAUDE_CONFIG_DIR·默认 $HOME/.claude·
-  //    HOME 缺退 os.homedir()·paths.resolveClaudeConfigDir SSOT）。
-  if (env.CLAUDE_CONFIG_DIR || env.HOME || os.homedir()) {
-    return path.join(resolveClaudeConfigDir(env), 'cc-master');
-  }
+  // ③ harness-neutral 默认 home（$HOME/.cc_master·HOME 缺退 os.homedir()·paths.resolveCcMasterHome SSOT）。
+  if (env.HOME || os.homedir()) return resolveCcMasterHome(env);
 
-  // ④ 连 CLAUDE_CONFIG_DIR / HOME / homedir 都没有（极端环境）→ NotFound。
+  // ④ 连 HOME / homedir 都没有（极端环境）→ NotFound。
   throw discoverError(
-    'No cc-master home found (--home / $CC_MASTER_HOME / $CLAUDE_CONFIG_DIR / $HOME all missed)',
+    'No cc-master home found (--home / $CC_MASTER_HOME / $HOME all missed)',
     'NotFound',
   );
 }

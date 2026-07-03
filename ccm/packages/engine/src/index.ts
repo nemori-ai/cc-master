@@ -166,10 +166,12 @@ export type { PathEnv } from './paths.js';
 export {
   resolveCcMasterHome,
   resolveClaudeConfigDir,
+  resolveClaudeCodeConfigDir,
   resolveClaudeJsonPath,
   resolveCredentialsPath,
   resolveProjectsDir,
   resolveRateCachePath,
+  resolveHostConfigDir,
 } from './paths.js';
 // ── statusline/（self-contained status line·0.10.0：渲染单行 ANSI + sidecar 捕获 + 安装/卸载/自动安装）──
 export type {

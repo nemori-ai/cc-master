@@ -86,6 +86,31 @@ test('run statusline install --json：结构化输出', () => {
   assert.equal(parsed.data.action, 'installed');
 });
 
+test('Codex host：statusline install 不写 Claude Code settings', () => {
+  const dir = mkdir();
+  const r = runCcm(['statusline', 'install', '--json'], dir, {
+    extraEnv: { CC_MASTER_HOST: 'codex', CCM_BIN: installBin(dir) },
+  });
+  assert.equal(r.code, 2);
+  assert.ok(!exists(join(dir, 'settings.json')), 'Codex 下不写 Claude Code settings.json');
+  const parsed = JSON.parse(r.out.join('\n'));
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.data.action, 'skipped');
+  assert.match(parsed.data.reason, /NotImplemented: Codex/);
+});
+
+test('--harness 覆盖 env host：显式 claude-code 时 statusline install 生效', () => {
+  const dir = mkdir();
+  const r = runCcm(['--harness', 'claude-code', 'statusline', 'install', '--json'], dir, {
+    extraEnv: { CC_MASTER_HARNESS: 'codex', CCM_BIN: installBin(dir) },
+  });
+  assert.equal(r.code, 0);
+  assert.ok(exists(join(dir, 'settings.json')), '--harness claude-code 覆盖 env codex 后会写 settings');
+  const parsed = JSON.parse(r.out.join('\n'));
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.data.action, 'installed');
+});
+
 // ── 无感知自动安装（任意非-statusline 命令触发）────────────────────────────────────────────────────
 //   DEV-GUARD（0.10.x）：autoInstall 用 resolveSelfBinPath(env) 判「是否从非安装位置〔worktree/仓库内〕跑」。
 //   这些 in-process 测试的 process.argv[1] 落在本仓内 → 默认会被判 dev 而 skip。要验「安装路径正常装」，
@@ -108,6 +133,14 @@ test('auto-install：安装路径（CCM_BIN 指向无 dev 标记路径）首次�
   assert.ok(exists(join(dir, 'settings.json')), 'settings 自动建');
   const sl = settings(dir).statusLine as { command: string };
   assert.match(sl.command, /statusline$/, '装的是 ccm statusline');
+});
+
+test('auto-install：Codex host 不安装 Claude Code statusLine', () => {
+  const dir = mkdir();
+  runCcm(['--version'], dir, {
+    extraEnv: { CC_MASTER_HOST: 'codex', CCM_BIN: installBin(dir) },
+  });
+  assert.ok(!exists(join(dir, 'settings.json')), 'Codex 下普通命令不 auto-install statusLine');
 });
 
 test('auto-install：幂等（第二次不重复改）+ opt-out 后不再覆盖', () => {

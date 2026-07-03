@@ -32,6 +32,7 @@ import * as baselineHandler from './handlers/baseline.js';
 import * as boardHandler from './handlers/board.js';
 import * as cadenceHandler from './handlers/cadence.js';
 import * as estimateHandler from './handlers/estimate.js';
+import * as harnessHandler from './handlers/harness.js';
 import * as jcHandler from './handlers/jc.js';
 import * as logHandler from './handlers/log.js';
 import * as peersHandler from './handlers/peers.js';
@@ -41,6 +42,7 @@ import * as taskHandler from './handlers/task.js';
 import * as upgradeHandler from './handlers/upgrade.js';
 import * as usageHandler from './handlers/usage.js';
 import * as watchdogHandler from './handlers/watchdog.js';
+import { harnessSessionId } from './harnesses/registry.js';
 import * as help from './help.js';
 import * as io from './io.js';
 import { ALIASES, type NounSpec, type OptionSpec, REGISTRY, type VerbSpec } from './registry.js';
@@ -81,6 +83,7 @@ const HANDLERS: Record<string, HandlerModule> = {
   peers: peersHandler as unknown as HandlerModule,
   usage: usageHandler as unknown as HandlerModule,
   estimate: estimateHandler as unknown as HandlerModule,
+  harness: harnessHandler as unknown as HandlerModule,
   account: accountHandler as unknown as HandlerModule,
   statusline: statuslineHandler as unknown as HandlerModule,
   upgrade: upgradeHandler as unknown as HandlerModule,
@@ -109,6 +112,7 @@ interface ParseOption {
 //   注意：--json / --force 等若命令 spec.options 已声明（如各 read verb 的 json），合并时命令 spec 优先（不覆盖）。
 const GLOBAL_OPTIONS: Record<string, ParseOption> = {
   board: { type: 'string' },
+  harness: { type: 'string' },
   'session-id': { type: 'string' },
   home: { type: 'string' },
   goal: { type: 'string' },
@@ -187,6 +191,21 @@ function scanPositions(tokens: string[]): ScanResult {
   return { positionals, hasHelp, hasVersion };
 }
 
+function readGlobalStringFlag(tokens: string[], name: string): string | null {
+  const long = `--${name}`;
+  const prefix = `${long}=`;
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i] as string;
+    if (t === '--') return null;
+    if (t === long) {
+      const v = tokens[i + 1];
+      return typeof v === 'string' ? v : null;
+    }
+    if (t.startsWith(prefix)) return t.slice(prefix.length);
+  }
+  return null;
+}
+
 // ── run(argv, {out, err, env, stdin}) → exitCode ──────────────────────────────────────────────────
 //   返回 number（绝大多数 sync verb·同步落码）；`account switch`（唯一 async verb·await refresh）返回
 //   Promise<number>，由 bin await。sync verb 路径全程不变（仍同步 return number）。
@@ -199,13 +218,14 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
 
   // ── ① 先 flag-aware 扫一遍认出 noun/verb 与顶层 --help/--version（防 `--session-id X` 的 X 被误当 noun）。──
   const scan0 = scanPositions(args);
+  const harnessFlag0 = readGlobalStringFlag(args, 'harness');
 
   // ── 无感知自动安装（0.10.0·marker 守·幂等·静默·绝不抛）：除 `statusline` 子命令本身外，任意命令首次跑时
   //   把 ccm 自带的 status line 立起来（status line 高频跑·绝不触发自身）。kill-switch / opt-out / installed
   //   marker 任一在即 skip（详见 @ccm/engine autoInstallStatuslineOnce）。放在最前（no-noun 早退之前）让
   //   `ccm --help` / `ccm --version` 等也算「首次被调用」。env 注入 → 测试用临时 CLAUDE_CONFIG_DIR 隔离。
   if ((scan0.positionals[0] && scan0.positionals[0].token) !== 'statusline') {
-    statuslineHandler.autoInstall(env);
+    statuslineHandler.autoInstall(env, harnessFlag0 || undefined);
   }
 
   if (scan0.positionals.length === 0) {
@@ -409,7 +429,7 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
 }
 
 // ── buildCtx：组装 handler 契约要求的 ctx（契约 §三 ctx 形态）。────────────────────────────────────────
-//   color 经 io.resolveColor（stream=out._stream||process.stdout）；sid 取 --session-id > $CLAUDE_CODE_SESSION_ID。
+//   color 经 io.resolveColor（stream=out._stream||process.stdout）；sid 取 --session-id > selected harness session。
 //   isTTY = io.isTTY(process.stdin)（rm 等破坏性 verb 据此要求 --yes）。
 function buildCtx({
   values,
@@ -428,7 +448,11 @@ function buildCtx({
   stdin?: { fd?: number };
   argv: string[];
 }): Ctx {
-  const sid = (values && (values['session-id'] as string)) || env.CLAUDE_CODE_SESSION_ID || '';
+  const harnessFlag = typeof values.harness === 'string' ? values.harness : undefined;
+  const sid =
+    (values && (values['session-id'] as string)) ||
+    harnessSessionId({ env, harnessFlag }) ||
+    '';
   const stream = (out && out._stream) || process.stdout;
   const color = io.resolveColor({ stream, argv, env });
 
