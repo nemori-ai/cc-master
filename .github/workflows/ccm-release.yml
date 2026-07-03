@@ -42,7 +42,7 @@ jobs:
         include:
           - os: macos-14 # Apple Silicon
             asset: ccm-darwin-arm64
-          - os: macos-13 # Intel
+          - os: macos-15-intel # Intel (macOS 13 hosted image retired)
             asset: ccm-darwin-x64
           - os: ubuntu-latest # Linux x64
             asset: ccm-linux-x64
