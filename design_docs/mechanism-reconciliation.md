@@ -6,7 +6,7 @@
 >
 > **范围**：`design_docs/` 不随 plugin 分发，文档内引用仓内文件用裸相对路径即可（无 `${CLAUDE_*}` 要求）。
 >
-> **「被哪些 skill prose 引用」的口径**：`grep -rln <机制名> skills/`（排除 `skills/*/scripts/` 自身源码）。不含 `DESIGN.md`（那是 skill 设计稿、非 agent 指导 prose）的纯设计性提及——但保留它作交叉参考标注。
+> **「被哪些 skill prose 引用」的口径**：`grep -rln <机制名> skills/`（排除 `skills/*/scripts/` 自身源码与 `skills/*/.design/` 维护者设计文档）。不含 `.design/DESIGN.md` 的纯设计性提及——但保留它作交叉参考标注。
 
 | 机制 | 业务流一句话摘要 | 被哪些 skill prose 引用 | 上次同步日期 |
 |---|---|---|---|
@@ -18,10 +18,10 @@
 | `commands/view.md` | 后台起 view-server.js、抓 `127.0.0.1:<port>` URL 交用户、只读每 2s 活轮询 | （无直接命名引用；功能自洽） | 2026-06-21 |
 | ~~`commands/accounts.md`~~ **（退役·ADR-019）** | 账号操作已全归 `ccm account` CLI（用户直接敲·token-blind）+ 自动切号在 usage-pacing hook；命令零增量零覆写 = 装饰，删除。概念叙事见 `using-ccm/references/account-pool.md` | — | 2026-06-29 |
 | **hooks** | | | |
-| `hooks/scripts/bootstrap-board.sh` | UserPromptSubmit：dual-sentinel 触发 → fresh 建板盖 sid / resume 选板 live-probe 后重盖 owner；唯一豁免武装闸者 | `master-orchestrator-guide/references/board.md`（+ DESIGN.md 设计性） | 2026-06-21 |
-| `hooks/scripts/reinject.sh` | SessionStart：武装闸过后注入 orchestrator 身份 + active 板 listing + dangling stale/escalated 节点 | `master-orchestrator-guide/references/board.md`、`.../references/external-coordinates.md`（+ DESIGN.md） | 2026-06-21 |
-| `hooks/scripts/verify-board.sh` | Stop goal-hook：据 status 分布 + fingerprint 握手决定 block/allow，watchdog 提醒，fuse 防死锁 | `master-orchestrator-guide/references/board.md`、`.../references/async-hitl.md`（+ DESIGN.md） | 2026-06-21 |
-| `hooks/scripts/posttool-batch.sh` | PostToolBatch：sub-agent 闸 + 武装闸过后逐板独立 WIP 过调度软警告（永不 block） | `master-orchestrator-guide/references/board.md`（+ DESIGN.md） | 2026-06-21 |
+| `hooks/scripts/bootstrap-board.sh` | UserPromptSubmit：dual-sentinel 触发 → fresh 建板盖 sid / resume 选板 live-probe 后重盖 owner；唯一豁免武装闸者 | `master-orchestrator-guide/references/board.md`（+ `.design/DESIGN.md` 设计性） | 2026-06-21 |
+| `hooks/scripts/reinject.sh` | SessionStart：武装闸过后注入 orchestrator 身份 + active 板 listing + dangling stale/escalated 节点 | `master-orchestrator-guide/references/board.md`、`.../references/external-coordinates.md`（+ `.design/DESIGN.md`） | 2026-06-21 |
+| `hooks/scripts/verify-board.sh` | Stop goal-hook：据 status 分布 + fingerprint 握手决定 block/allow，watchdog 提醒，fuse 防死锁 | `master-orchestrator-guide/references/board.md`、`.../references/async-hitl.md`（+ `.design/DESIGN.md`） | 2026-06-21 |
+| `hooks/scripts/posttool-batch.sh` | PostToolBatch：sub-agent 闸 + 武装闸过后逐板独立 WIP 过调度软警告（永不 block） | `master-orchestrator-guide/references/board.md`（+ `.design/DESIGN.md`） | 2026-06-21 |
 | `hooks/scripts/usage-pacing.js` | Stop（node）：武装闸过后账户权威优先判 5h/7d 撞墙/欠用/7d dispatch 闸，effective-N 从 accounts.json 算，非阻断注入 | `master-orchestrator-guide/references/cost-and-pacing.md`、`.../references/board.md`、`.../references/external-coordinates.md`、`account-management/references/account-scheduling.md` | 2026-06-21 |
 | `hooks/scripts/board-lint.js` | PostToolUse（node）：四闸（工具/路径/武装/目标本 session active 板）过后跑共享核心、非阻断注入 lint 报告 | `master-orchestrator-guide/SKILL.md`、`.../references/board.md` | 2026-06-21 |
 | `hooks/scripts/board-lint-core.js` | 共享 lint 核心（R1-R6：合法 JSON / 窄腰 / task 契约 / deps 图完整性 / viewer 字段），被 hook + 运行时脚本共用 | （无直接命名引用；规则集语义见 board.md §board lint） | 2026-06-21 |

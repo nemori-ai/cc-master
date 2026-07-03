@@ -1,6 +1,6 @@
 # master-orchestrator-guide — 设计宪法（DESIGN.md）
 
-> 本文回答「这 skill 是什么 / 为什么」。「怎么用」在 [`SKILL.md`](SKILL.md)（魂，本文不复述其七镜头 / 红线 / 决策程序）；深细节在 [`references/`](references/)。
+> 本文回答「这 skill 是什么 / 为什么」。「怎么用」在 [`SKILL.md`](../SKILL.md)（魂，本文不复述其七镜头 / 红线 / 决策程序）；深细节在 [`references/`](../references/)。
 > 设计先于实现——任何对 SKILL.md 的实质改动，先在此更新对应段。
 > 这是 cc-master **分发**的两个 skill 之一（住 `skills/`，随插件 ship）。它是产品的**魂**：`SessionStart` hook 每次 compaction 全文重注。
 

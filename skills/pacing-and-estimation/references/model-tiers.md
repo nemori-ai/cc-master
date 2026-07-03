@@ -21,7 +21,7 @@
 
 ## 每节点模型选择（按难度选档的事实映射）
 
-给每节点契约一个 **model** 字段，按任务*难度*来定——不是按主线恰好跑在哪个模型上。这是**事实映射**；把强档集中到临界链、float 配便宜档的**调度判断**在 `master-orchestrator-guide`「目标即依赖图」镜头 + 其 `references/decomposition.md` 的「资源决策」：
+给每节点契约一个 **model** 字段，按任务*难度*来定——不是按主线恰好跑在哪个模型上。这是**事实映射**；把强档集中到临界链、float 配便宜档的**调度判断**在 `master-orchestrator-guide`「目标即依赖图」镜头 + 其 `${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/references/decomposition.md` 的「资源决策」：
 
 - **机械 / 可机械检查**（跑测试套件、grep 定位、批量格式化、改变量名）→ **Haiku**。无需推理。
 - **常规实现** → **Sonnet**。主力 workhorse。
@@ -42,4 +42,4 @@
 
 官方 Claude Code 的指导也是一样：把主对话固定在一个模型上；那些能跑在更便宜模型上的边角任务，交给一个 *subagent*。lever 是**每叶子的模型选择**——不是主线上的 `/model`。
 
-> **watchdog 间隔的 cache-warmth（一句指针）**：等待前 arm 一个 watchdog 时，唤醒间隔也吃这份 prompt-cache 心智——短间隔（<270s）保温、长间隔（≥1200s）当长等处理；间隔 ≈ 最长 `in_flight` 的 p95 + 余量，别短到把主线 cache 频繁失效又没活可干。完整降级链 + 间隔取法在 `master-orchestrator-guide` 的 `references/dispatch.md` §watchdog/liveness，此处不复述。
+> **watchdog 间隔的 cache-warmth（一句指针）**：等待前 arm 一个 watchdog 时，唤醒间隔也吃这份 prompt-cache 心智——短间隔（<270s）保温、长间隔（≥1200s）当长等处理；间隔 ≈ 最长 `in_flight` 的 p95 + 余量，别短到把主线 cache 频繁失效又没活可干。完整降级链 + 间隔取法在 `master-orchestrator-guide` 的 `${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/references/dispatch.md` §watchdog/liveness，此处不复述。

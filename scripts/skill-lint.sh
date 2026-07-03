@@ -11,8 +11,8 @@
 #      value containing `:` or `"` MUST be wrapped in single quotes as a whole;
 #      otherwise the YAML parser misreads it and validation fails non-obviously.
 #   2. required frontmatter fields — `name` + `description` both present & non-empty.
-#   3. dead relative links — every markdown link `](relpath)` to a repo-relative
-#      file (references/x.md, assets/..., DESIGN.md, …) must resolve on disk.
+#   3. dead relative links — every markdown link in SKILL.md `](relpath)` to a
+#      repo-relative file (references/x.md, assets/..., …) must resolve on disk.
 #   4. bare cross-skill path references (Finding #50, AGENTS.md §12) — inside any
 #      distributed markdown (skills/ commands/ hooks/), a backtick-wrapped path that
 #      starts with a sibling *distributed skill name* (authoring-workflows /
@@ -23,7 +23,7 @@
 #      same-skill assets). Bare skill-name mentions WITHOUT a `/` are fine (the name
 #      used as a noun), and same-skill self-refs (`references/x.md`) don't start with
 #      a skill name so they're never matched. NOTE: dev-only repo-root `scripts/`
-#      paths (e.g. in DESIGN.md) are intentionally NOT flagged — those scripts are not
+#      paths in dev-only files are intentionally NOT flagged — those scripts are not
 #      distributed (红线5) and the bare path is correct from repo root.
 #   5. terminology drift (design_docs/glossary.md) — delegated to the sibling
 #      scripts/glossary-lint.sh: greps the distributed tree + dev docs for any banned
@@ -44,7 +44,7 @@
 #      (even harmful) to that reader and drifts the skill from "apply the substance, not the dev-side
 #      code". This check nails that down mechanically. SCOPE = agent-facing prose only: each distributed
 #      skill's SKILL.md + references/**/*.md — NOT .claude/skills/ dev meta-skills, and NOT
-#      DESIGN.md / OBJECTIVE.md / evals/ / scripts/ (dev artifacts/code, not shipped prose).
+#      .design/ / evals/ / scripts/ (dev artifacts/code, not shipped prose).
 #
 # Why node, not bash+jq/python: the repo's content tests are node-based, and node
 # is guaranteed present in any Claude Code host (AGENTS.md §3 红线1 / ADR-006).
@@ -80,12 +80,15 @@ const DIST_DIRS = ['skills', 'commands', 'hooks'];
 const DIST_SKILL_NAMES = ['authoring-workflows', 'master-orchestrator-guide', 'pacing-and-estimation', 'using-ccm', 'slicing-goals-into-dags', 'dev-as-ml-loop', 'engineering-with-craft'];
 
 // Recursively collect every *.md file under a repo-relative base dir.
+// Skip skills/<name>/.design: those are co-located dev docs and are stripped from
+// release packages, so distributed-prose checks must not treat them as shipped prose.
 function markdownFiles(base) {
   const out = [];
   const abs = join(ROOT, base);
   if (!existsSync(abs)) return out;
   const walk = (dir) => {
     for (const name of readdirSync(dir)) {
+      if (name === '.design') continue;
       const p = join(dir, name);
       const st = statSync(p);
       if (st.isDirectory()) walk(p);
@@ -267,7 +270,7 @@ if (existsSync(HOOK_DIR)) {
 // ---- (7) internal-codename + repo-coupling leak in DISTRIBUTED skill prose (AGENTS.md §6 自包含) ----
 // Each check carries a fix hint in the style of checks (4)/(6). SCOPE = distributed skills/ agent-facing
 // prose only: a *.md is in-scope iff its basename is SKILL.md OR it sits under a references/ dir. This
-// allowlist naturally excludes DESIGN.md / OBJECTIVE.md (skill-root dev docs), evals/ + scripts/ +
+// allowlist naturally excludes .design/ (co-located dev docs), evals/ + scripts/ +
 // assets/ (dev artifacts/code), and — because we only walk 'skills/' — the whole .claude/skills/ dev
 // meta-skill tree. Future dev artifacts under a skill are auto-excluded (allowlist, not blocklist).
 const codeLeakChecks = [

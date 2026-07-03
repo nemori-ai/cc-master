@@ -253,7 +253,7 @@ digraph decision_program {
 - **status 走生命周期 verb**（`task start` / `done` / `block` / `unblock`），**绝不用 `--set` 改 status**；🔒 字段走专属命令。
 - 读就绪：`ccm next`；查图 / 临界路径：`ccm board`；append-only 记账：`ccm log add`；自决诚实台账：`ccm jc`；节奏 iteration 收口：`ccm cadence`。
 - **min-max**：一次写对、不撞 `exit 2/3`；绝不手改 board。
-- 全量命令面 + `--json` 形状 + footgun → `using-ccm`（`references/command-catalog.md`）。
+- 全量命令面 + `--json` 形状 + footgun → `using-ccm`（`${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/command-catalog.md`）。
 
 ### 4.2 executor 选择（min-max·派谁执行每个 task）
 
@@ -268,7 +268,7 @@ digraph decision_program {
 拿不准就回到默认：能派出去的实现工作一律 `subagent`，`master-orchestrator` 只收你亲手不可外包的那几件。
 
 - 详细机制选择（三种后台机制、parallel vs pipeline、escalation、派发卫生）见 `references/dispatch.md`。
-- executor 字段怎么写进 board（各值必填字段、选择决策树）见 `using-ccm`。
+- executor 字段怎么写进 board（各值必填字段、选择决策树）见 `using-ccm` 的 `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/board-model-guide.md`。
 
 边界：这里给**编排 min-max**（选哪个 executor 当调度决策）；`executor` 字段怎么落 board 的**机制**归 `using-ccm`。
 
@@ -286,7 +286,7 @@ digraph decision_program {
 - **status 生命周期走 verb**；**deps 驱动 `ready↔blocked` 自动门控**——有依赖的节点用默认 `ready` 靠 deps 自动 gate，**别手动 `--status blocked` 建有依赖节点**；`blocked_on` 只留给**语义阻塞**（`user` / 具体上游 taskid）。
 - **派发卫生**：每个 `in_flight` 必须有一次真实工具 handle 对应。
 - **board 变更只走 ccm**。
-- **min-max**：**动手规划前先读 `using-ccm` 的 board-model-guide**（task 类型 / `acceptance` 怎么写 / `estimate` 怎么估 / `deps` 怎么连 / `executor` 怎么选 + 全部 49 条 FMT/GRAPH/BIZ 规则速查）——一次写对、免 exit-3 反复。
+- **min-max**：**动手规划前先读 `using-ccm` 的 `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/board-model-guide.md`**（task 类型 / `acceptance` 怎么写 / `estimate` 怎么估 / `deps` 怎么连 / `executor` 怎么选 + 全部 49 条 FMT/GRAPH/BIZ 规则速查）——一次写对、免 exit-3 反复。
 
 ### 4.5 decision_package（给用户备一份采访包）
 

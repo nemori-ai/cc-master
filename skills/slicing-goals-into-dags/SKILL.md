@@ -99,6 +99,7 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 ## Pointers
 
+- **[references/worked-example.md](references/worked-example.md)** —— 同一个目标的横切 vs 纵切对照样例；当你脑中还只有"先 schema/API/UI"这种横切本能时，先看它校准切法。
 - **master-orchestrator-guide** —— 切好的图怎么**排期**(CPM / float / 临界路径 / 并行度计算,在它的 board 协议 reference)、怎么**派发**(选 shell/subagent/workflow)。本 skill 是"切",它是"排 + 派"。
 - **dev-as-ml-loop** —— 切出来的**单个 task 怎么执行到验收**(把验收当 objective 迭代逼近)。本 skill 切出带验收的片,dev-as-ml-loop 把每片做到验收。
 - **engineering-with-craft** —— 切出的单 task 执行时,除 dev-as-ml-loop 的循环**形状**,还要 engineering-with-craft 的手艺**内容**(片内 SDD→DDD→OOP→TDD 怎么建模 / 写类 / 测试)。本 skill 切片、engineering-with-craft 定义片内每一棒的手艺。

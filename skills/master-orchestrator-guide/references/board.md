@@ -2,7 +2,7 @@
 
 > **何时读：** 触碰 board 的**长程操作纪律**时——home 解析 / 每编排一份 board 文件 / snapshot·flush / 单一真相源 / supersession / `owner.heartbeat` 与续跑 / `decision_package` 采访协议。
 >
-> **本文是 orchestrator 侧的派生叙事视图，不是协议 SSOT。** board 协议的 canonical SSOT（narrow-waist schema / status enum / 字段三档 🔒👁✎ / `parent` 不变式 / 全部 FMT·GRAPH·BIZ 校验规则 / 状态机）归 **ccm 引擎的 board-model**；它的**操作视图**（每个字段何时填什么、撞哪条规则、一次写对不撞 exit 3）在 `using-ccm` 的 `board-model-guide.md`。**本文不复述 schema / enum / 字段三档 / 49 条校验规则的细节**——要查字段取值或规则去 `using-ccm`，本文只讲 orchestrator 特有的长程操作纪律。
+> **本文是 orchestrator 侧的派生叙事视图，不是协议 SSOT。** board 协议的 canonical SSOT（narrow-waist schema / status enum / 字段三档 🔒👁✎ / `parent` 不变式 / 全部 FMT·GRAPH·BIZ 校验规则 / 状态机）归 **ccm 引擎的 board-model**；它的**操作视图**（每个字段何时填什么、撞哪条规则、一次写对不撞 exit 3）在 `using-ccm` 的 `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/board-model-guide.md`。**本文不复述 schema / enum / 字段三档 / 49 条校验规则的细节**——要查字段取值或规则去 `using-ccm`，本文只讲 orchestrator 特有的长程操作纪律。
 
 **本质**：你跑长任务时的「存档文件」——一张带状态的**任务依赖图（task dependency graph）**。它身兼两职：① 跨 compaction 存活的记忆，② hook 唯一能读到的那扇编排状态窗口（hook 是个 shell——读不到 agent 的 context，也读不到内建的 `Task` 工具）。
 
@@ -36,7 +36,7 @@
 
 别把整张表都钉死——只钉死 hook 所依赖的那份最小契约。这既给了 agent 自由，又让手工维护保持安全。
 
-- **硬 waist = hook 机器读的那一小撮字段**：top-level `schema` / `goal` / `owner{active,session_id,heartbeat}` / `git{worktree,branch}`，以及 `tasks[{id,status,deps,parent}]` + status enum。动它是结构性改动：必须同步改全部 hook + 测试。**确切字段清单、status 八态语义与路由、`parent` 的 depth=1 / 无环 / rollup 不变式，全在 `using-ccm` 的 `board-model-guide.md`**（§A 字段三档 · §B status · §J parent/owner）——本文不复抄。
+- **硬 waist = hook 机器读的那一小撮字段**：top-level `schema` / `goal` / `owner{active,session_id,heartbeat}` / `git{worktree,branch}`，以及 `tasks[{id,status,deps,parent}]` + status enum。动它是结构性改动：必须同步改全部 hook + 测试。**确切字段清单、status 八态语义与路由、`parent` 的 depth=1 / 无环 / rollup 不变式，全在 `using-ccm` 的 `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/board-model-guide.md`**（§A 字段三档 · §B status · §J parent/owner）——本文不复抄。
 - **其余全 agent-shaped 柔性边**——你尽可按任务需要随意塑形（`title` / `artifact` / 三时间锚 / `observability` / `accounts[]` / `notes` / `log`…），hook 一概不读、lint 对未知字段 silent-on-unknown。
 - **少数柔性边是 soft-observed（hook「若有则用、缺则静默」）**：`wip_limit`（超 cap 注过调度软警告）/ `owner_wip_limit`（owner 级两级 WIP）/ `wakeup`（有 `in_flight` 却无 armed watchdog 时提醒 arm）。省掉某个 = 关掉它驱动的那条可观察行为，**不影响硬 waist**。这些字段的确切 schema 与降级口径见 D；watchdog 的 `wakeup` 心智见 `async-hitl.md` §等待前 arm watchdog + `dispatch.md` §watchdog/liveness。
 - **`verified` 是与 `status` 正交的柔性边布尔，不是 status 值**——「已验」写 `"verified": true`，**别写成 `"status":"verified"`**（那会被 lint 当非法 status 拒）。`status` 答「在 DAG 里哪一态、怎么路由」，`verified` 答「验没验过」，二者各表各的。
@@ -76,7 +76,7 @@
 
 board 是 hook / viewer / resume 三条链路的共同输入。写坏它（不合法 JSON、缺窄腰字段、`status` 拼错、dep 指向不存在的 id、deps 成环）大多**静默**出问题——尤其 viewer 会永久冻结在上一帧好的渲染却不报错。一套 board lint 在 board 被写坏的那一刻（或你随时手动）校验它的结构 / 语法 / 格式正确性。
 
-> **lint 引擎 SSOT = ccm 引擎，规则全集速查在 `using-ccm`**。下面几道自检的规则逻辑都不在 plugin 里——经**进程边界** `spawn ccm board lint` 取裁决。**全部 FMT / GRAPH / BIZ 规则（含 deps 图完整性、`parent` 嵌套 R7、awaiting-user 采访闭环 BIZ-AWAITING / BIZ-DECISION-PACKAGE）逐条速查在 `using-ccm` 的 `board-model-guide.md` §N**——本文不复述规则清单。
+> **lint 引擎 SSOT = ccm 引擎，规则全集速查在 `using-ccm`**。下面几道自检的规则逻辑都不在 plugin 里——经**进程边界** `spawn ccm board lint` 取裁决。**全部 FMT / GRAPH / BIZ 规则（含 deps 图完整性、`parent` 嵌套 R7、awaiting-user 采访闭环 BIZ-AWAITING / BIZ-DECISION-PACKAGE）逐条速查在 `using-ccm` 的 `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/board-model-guide.md` §N**——本文不复述规则清单。
 
 **一条正路 + 两道兜底（board 变更只走 `ccm`）：**
 
