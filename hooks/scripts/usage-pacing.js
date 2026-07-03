@@ -258,7 +258,7 @@ function ccmWarning(data, n) {
       warn:
         `[cc-master pacing] 5h 配额触硬停(权威口径,来自 status-line 捕获):5h 已用 ${p5}%,且无可切入备号 / 7d 亦吃紧。` +
         `${resetNote}这份 5h 配额本窗口已烧穿——与其空转,建议 **arm 一个 watchdog 自我唤醒**` +
-        `(background-shell until 轮询 floor·见 orchestrating-to-completion / authoring-workflows)守到 ` +
+        `(background-shell until 轮询 floor·见 master-orchestrator-guide / authoring-workflows)守到 ` +
         `${nearest || '5h reset'} 后配额回血再续派发;在飞任务可跑完 / 端点验收,不要再派需要大量 5h 配额的新活。` +
         `这是非阻断提示,真正的暂停 / 唤醒由你(orchestrator)执行,不替你决策。`,
       kind: 'stop_5h',
@@ -267,7 +267,7 @@ function ccmWarning(data, n) {
   }
   if (v === 'throttle') {
     const slowdownLevers =
-      `pace 杠杆(怎么 pace 是你的认知判断,见 orchestrating-to-completion / pacing-and-estimation):` +
+      `pace 杠杆(怎么 pace 是你的认知判断,见 master-orchestrator-guide / pacing-and-estimation):` +
       `① 把后续节点降到更便宜的模型档;② 降并发 WIP、暂缓新派工;③ defer 高 float 的非临界任务到窗口 reset 后。`;
     return {
       warn:
@@ -397,7 +397,7 @@ function detectAccountSwitchAmbient(ctx, nowMs, accounts) {
     return (
       `[号池·检测到换号] board.runtime 显示发生过一次账户切换(可能是手动 ccm account switch,非本 hook 自动切)——` +
       `当前 active = ${activeEmail || '未知'}。切号刷新了 5h 配额窗(投影配额随新号回血);据此重新校准你的配速 / ` +
-      `派发规模(见 orchestrating-to-completion / pacing-and-estimation)。这是事实告知,不替你决策。`
+      `派发规模(见 master-orchestrator-guide / pacing-and-estimation)。这是事实告知,不替你决策。`
     );
   } catch (_e) {
     return null;
@@ -583,7 +583,7 @@ function stopBody(ctx) {
           `[号池·已自动换号] usage-pacing 在 5h 配额临界(权威口径)机械切到下一份配额` +
           `${res.email ? `(当前 active = ${res.email})` : ''}——配额随新号满血 5h 窗恢复;号池现剩 ` +
           `${after.switchable} 个可切入备号。据此调你的配速 / 派发规模(怎么调是你的认知判断,见 ` +
-          `orchestrating-to-completion / pacing-and-estimation);切号本身已机械完成(token-blind·在 ccm 子进程),不需你再操作。`;
+          `master-orchestrator-guide / pacing-and-estimation);切号本身已机械完成(token-blind·在 ccm 子进程),不需你再操作。`;
       } else if (res.outcome === 'denied') {
         switchNote =
           ` 注:本板 policy.autonomous_account_switch=deny,机制层(ccm)已拒绝自主换号(exit 7)——把「是否换号」作 ` +

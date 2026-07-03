@@ -34,7 +34,7 @@ eval logic, only the eval sets and a thin path-resolving wrapper.
 ## Usage
 
 ```bash
-scripts/eval-trigger.sh orchestrating-to-completion
+scripts/eval-trigger.sh master-orchestrator-guide
 scripts/eval-trigger.sh authoring-workflows
 ```
 
@@ -57,7 +57,7 @@ A negative like "write a fibonacci function" tests nothing — it would never
 trigger anyway. The valuable negatives are *near-misses*: queries that share
 keywords or shape with the skill but genuinely belong elsewhere (e.g. shell-level
 parallelism that is **not** a dynamic workflow, or pure long-horizon coordination
-that belongs to `orchestrating-to-completion` rather than `authoring-workflows`).
+that belongs to `master-orchestrator-guide` rather than `authoring-workflows`).
 Read the numbers as **direction, not verdict** — they tell you whether a change
 helped or hurt, not whether the skill is "done".
 

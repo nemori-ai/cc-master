@@ -2,7 +2,7 @@
 
 > Status: **Accepted**（部分收窄 ADR-002 的 ScheduleWakeup/cron 排除；补充 ADR-004 的 background-shell 消解，非取代）
 > Date: 2026-06-16
-> Scope: 编排方法论（`skills/orchestrating-to-completion/SKILL.md` 决策程序 `wait` 边 + 镜头4/6 + `references/async-hitl.md`·`dispatch.md`·`board.md`·`external-coordinates.md`）+ `hooks/scripts/verify-board.sh`（完成态握手新增 watchdog 提醒 clause）+ board 柔性边 `wakeup` 字段 + 红线 5（AGENTS.md §3）+ `design_docs/spec.md` §12
+> Scope: 编排方法论（`skills/master-orchestrator-guide/SKILL.md` 决策程序 `wait` 边 + 镜头4/6 + `references/async-hitl.md`·`dispatch.md`·`board.md`·`external-coordinates.md`）+ `hooks/scripts/verify-board.sh`（完成态握手新增 watchdog 提醒 clause）+ board 柔性边 `wakeup` 字段 + 红线 5（AGENTS.md §3）+ `design_docs/spec.md` §12
 > Source: dogfood Finding #17 / Finding #46（幽灵任务——派发未真正发出 / 静默失败，无完成事件，orchestrator 永远等不到唤醒）+ 实现契约 `design_docs/plans/idle-self-wakeup-impl-contract.md`
 
 ---

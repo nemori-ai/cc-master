@@ -82,7 +82,7 @@ scripts — there is intentionally no separate workflow linter to maintain
    #   - 矩阵列了、grep 没命中 → 先换不带扩展名的机制名再搜一遍确认；仍无则该引用已失效，从矩阵删
    ```
 
-   口径与矩阵表头一致：`grep -v '/scripts/'` 排除 skill 自身的脚本源码；纯 `DESIGN.md` 的设计性
+   口径与矩阵表头一致：`grep -v '/scripts/'` 排除 skill 自身的脚本源码；纯 `.design/` 的设计性
    提及不算 agent 指导 prose（保留作交叉参考标注即可，不计入引用列）。
 
 If your change is behavioral, also **dogfood it**: start a real orchestration with

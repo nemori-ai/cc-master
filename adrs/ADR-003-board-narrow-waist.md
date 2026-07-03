@@ -4,7 +4,7 @@
 > Date: 2026-06-08
 > Scope: The board JSON contract — which fields are hook-dependent (pinned) vs.
 > agent-shaped (flexible). Constrains every hook, `assets/board.template.json`, and
-> `skills/orchestrating-to-completion/references/board.md`.
+> `skills/master-orchestrator-guide/references/board.md`.
 > Source: cc-master design invariant #2 (CONTRIBUTING.md); reinforced by Finding #9
 > (pinned-vs-flexible self-contradiction) in `design_docs/dogfood-findings.md`.
 
@@ -104,7 +104,7 @@ skeleton's purpose.
 - [`ADR-001-hooks-pure-bash.md`](ADR-001-hooks-pure-bash.md) — the small waist is
   what keeps shell-only parsing tractable.
 - [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — design invariant #2.
-- [`../skills/orchestrating-to-completion/references/board.md`](../skills/orchestrating-to-completion/references/board.md)
+- [`../skills/master-orchestrator-guide/references/board.md`](../skills/master-orchestrator-guide/references/board.md)
   — the evergreen description of the pinned waist + flexible edges.
 - [`../design_docs/dogfood-findings.md`](../design_docs/dogfood-findings.md) —
   Finding #9 (`wip_limit` pinned-vs-flexible contradiction); Finding #4 (session

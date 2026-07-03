@@ -40,7 +40,7 @@ skill 是按需调阅的深度手册，各自自洽、互不重叠。A 给指挥
 
 | Skill | 给谁 | 一句能力 | 对用户的价值 |
 |---|---|---|---|
-| **A. orchestrating-to-completion** | 指挥（魂） | 七镜头 + 红线 + 合理化对照表 + 决策程序，`SessionStart` 每次 compaction 后整篇重注 | 让 AI 真像个靠谱项目总监跨天扛目标：自己拆活、并行派、卡住主动问、不越权替你做不可逆的事、失忆后还记得自己是谁 |
+| **A. master-orchestrator-guide** | 指挥（魂） | 七镜头 + 红线 + 合理化对照表 + 决策程序，`SessionStart` 每次 compaction 后整篇重注 | 让 AI 真像个靠谱项目总监跨天扛目标：自己拆活、并行派、卡住主动问、不越权替你做不可逆的事、失忆后还记得自己是谁 |
 | **B. authoring-workflows** | 指挥 | 写 / 调试 dynamic-workflow 脚本（fan-out / pipeline / loop + 反过度工程护栏） | 任务真大时（批处理几百文件 / 多 agent 评审），用可恢复的确定性并行流水线跑，而非把中间垃圾塞爆对话 |
 | **D. using-ccm** | 指挥 | `ccm` CLI 操作手册 + board 模型/字段/48 条校验规则速查（含号池 `account` 操作面） | 底层保证 AI 写"项目看板"时走一道带校验的关卡，不写脏、不自相矛盾；备号录入/换号也走这道操作面 |
 | **E. slicing-goals-into-dags** | 指挥 | 把目标**切**成 DAG 的道与品味（纵切薄端到端增量 / walking skeleton / 按价值×风险排序） | AI 不会闷头打半月地基才给你看东西，而是尽早交付能用的薄切片、最大化并行 |

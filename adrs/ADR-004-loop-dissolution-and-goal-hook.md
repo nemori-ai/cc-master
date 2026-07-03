@@ -5,7 +5,7 @@
 > Date: 2026-06-08
 > Scope: How cc-master achieves "don't half-finish / self-drive across phases" —
 > the Stop hook (`verify-board.sh`), the bootstrap command, the
-> `orchestrating-to-completion` skill + references, and `reinject.sh`. Removes all
+> `master-orchestrator-guide` skill + references, and `reinject.sh`. Removes all
 > agent-facing `/goal`·`/loop`·`ScheduleWakeup`·cron·`phase` guidance.
 > Source: dogfood Finding #2 (native `/goal` is unexecutable by an agent), Finding
 > #4 (cross-session false block), Finding #14 (goal-hook caught a real early yield);

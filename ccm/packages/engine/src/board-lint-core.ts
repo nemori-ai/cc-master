@@ -2,7 +2,7 @@
 //
 // 这是 board lint 的纯逻辑：`lintBoard(text) → { errors, warnings }`。被两个薄包装消费——
 //   ① PostToolUse hook（hooks/scripts/board-lint.js，同目录 require './board-lint-core.js'）；
-//   ② 手动脚本（skills/orchestrating-to-completion/scripts/board-lint.js，经稳定的 plugin 内相对路径 require）。
+//   ② 手动脚本（skills/master-orchestrator-guide/scripts/board-lint.js，经稳定的 plugin 内相对路径 require）。
 //   两个消费者复用同一段规则，杜绝两份漂移（DRY）。
 //
 // ★v2 演进（ADR-013）：本文件不再内联硬编码 enums / 规则级别——**枚举、不变式级别、共享谓词全部从

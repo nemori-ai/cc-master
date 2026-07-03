@@ -2,7 +2,7 @@
 
 > Status: **Superseded by ADR-024**
 > Date: 2026-06-15
-> Scope: pacing 认知层（`references/cost-and-pacing.md`）+ 魂镜头5（`skills/orchestrating-to-completion/SKILL.md`）+ `hooks/scripts/usage-pacing.js`
+> Scope: pacing 认知层（`references/cost-and-pacing.md`）+ 魂镜头5（`skills/master-orchestrator-guide/SKILL.md`）+ `hooks/scripts/usage-pacing.js`
 > Source: 本仓 Track B 行为 eval —— 欠 pace 探针下两个 agent 做出相反决策（一加速、一拒绝），暴露单边 pacing 无 setpoint 的结构缺陷
 
 > **已被 [`ADR-024`](ADR-024-single-sided-pacing-switch-stop.md) 取代**（单侧减速 + 换号 + 停·砍加速侧）——号池让单窗口「欠用」不再是真稀缺（一次 `switch` = 新窗口），pressure baseline 实证加速 advisory 是 capable agent 必须 overrule 的冗余噪声，故整个加速侧连同走廊 setpoint 一并退役。
@@ -88,8 +88,8 @@ setpoint 直接设成「reset 时用到 ~100%」，最大化单窗口利用。**
 
 ## 5. Related
 - [`ADR-008`](ADR-008-account-authoritative-usage-and-script-placement.md)（账户权威 5h/7d `used_percentage` + `resets_at` 口径——本 ADR 加速侧决策的**信号前置**：没有账户权威口径，加速侧就没有可信依据，只能降级到禁加速的反推路径）
-- [`references/cost-and-pacing.md`](../skills/orchestrating-to-completion/references/cost-and-pacing.md)（pacing 认知层 evergreen SSOT——走廊 setpoint + 双向杠杆落点）
-- [`skills/orchestrating-to-completion/SKILL.md`](../skills/orchestrating-to-completion/SKILL.md) 镜头5（魂的双向 pacing 表述）
+- [`references/cost-and-pacing.md`](../skills/master-orchestrator-guide/references/cost-and-pacing.md)（pacing 认知层 evergreen SSOT——走廊 setpoint + 双向杠杆落点）
+- [`skills/master-orchestrator-guide/SKILL.md`](../skills/master-orchestrator-guide/SKILL.md) 镜头5（魂的双向 pacing 表述）
 - [`hooks/scripts/usage-pacing.js`](../hooks/scripts/usage-pacing.js)（`decideAccountUnderuse` 对称提示落点）
 
 ## 6. References

@@ -25,8 +25,8 @@
 #
 # Usage:  scripts/eval-benchmark.sh <iteration-dir> <skill-name>
 #   e.g.  scripts/eval-benchmark.sh \
-#           ./orchestrating-to-completion-workspace/iteration-1 \
-#           orchestrating-to-completion
+#           ./master-orchestrator-guide-workspace/iteration-1 \
+#           master-orchestrator-guide
 #
 # <iteration-dir> is the workspace iteration directory holding eval-*/ run trees
 # (eval-N/{with_skill,without_skill}/run-*/grading.json). Pass an ABSOLUTE path,

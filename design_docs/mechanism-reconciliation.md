@@ -6,37 +6,37 @@
 >
 > **范围**：`design_docs/` 不随 plugin 分发，文档内引用仓内文件用裸相对路径即可（无 `${CLAUDE_*}` 要求）。
 >
-> **「被哪些 skill prose 引用」的口径**：`grep -rln <机制名> skills/`（排除 `skills/*/scripts/` 自身源码）。不含 `DESIGN.md`（那是 skill 设计稿、非 agent 指导 prose）的纯设计性提及——但保留它作交叉参考标注。
+> **「被哪些 skill prose 引用」的口径**：`grep -rln <机制名> skills/`（排除 `skills/*/scripts/` 自身源码与 `skills/*/.design/` 维护者设计文档）。不含 `.design/DESIGN.md` 的纯设计性提及——但保留它作交叉参考标注。
 
 | 机制 | 业务流一句话摘要 | 被哪些 skill prose 引用 | 上次同步日期 |
 |---|---|---|---|
 | **commands** | | | |
-| `commands/as-master-orchestrator.md` | 据注入串开头自判 fresh/resume，fresh 拆 DAG、resume 接管 reconcile 孤儿，每回合跑决策程序；保留 hook 盖的 owner.session_id | `orchestrating-to-completion/references/board.md`、`.../references/handoff.md` | 2026-06-21 |
+| `commands/as-master-orchestrator.md` | 据注入串开头自判 fresh/resume，fresh 拆 DAG、resume 接管 reconcile 孤儿，每回合跑决策程序；保留 hook 盖的 owner.session_id | `master-orchestrator-guide/references/board.md`、`.../references/handoff.md` | 2026-06-21 |
 | `commands/status.md` | 只读渲染按状态分组的 board 视图 + 心算临界路径 + program-state 健康检查 | （无直接命名引用；`/status` 概念见 cost-and-pacing.md / handoff.md） | 2026-06-21 |
 | `commands/stop.md` | 用户确认后把认准 board 的 owner.active 置 false（显式可逆归档、不删文件） | （无直接命名引用；`/stop` 概念见 board.md / handoff.md） | 2026-06-21 |
-| `commands/handoff-to-new-session.md` | 6 步：quiesce → drain 就地验收 → 写叙事 handoff 文档 → log+heartbeat → 归档 → 告诉用户续跑命令 | `orchestrating-to-completion/SKILL.md`、`.../references/handoff.md` | 2026-06-21 |
+| `commands/handoff-to-new-session.md` | 6 步：quiesce → drain 就地验收 → 写叙事 handoff 文档 → log+heartbeat → 归档 → 告诉用户续跑命令 | `master-orchestrator-guide/SKILL.md`、`.../references/handoff.md` | 2026-06-21 |
 | `commands/view.md` | 后台起 view-server.js、抓 `127.0.0.1:<port>` URL 交用户、只读每 2s 活轮询 | （无直接命名引用；功能自洽） | 2026-06-21 |
 | ~~`commands/accounts.md`~~ **（退役·ADR-019）** | 账号操作已全归 `ccm account` CLI（用户直接敲·token-blind）+ 自动切号在 usage-pacing hook；命令零增量零覆写 = 装饰，删除。概念叙事见 `using-ccm/references/account-pool.md` | — | 2026-06-29 |
 | **hooks** | | | |
-| `hooks/scripts/bootstrap-board.sh` | UserPromptSubmit：dual-sentinel 触发 → fresh 建板盖 sid / resume 选板 live-probe 后重盖 owner；唯一豁免武装闸者 | `orchestrating-to-completion/references/board.md`（+ DESIGN.md 设计性） | 2026-06-21 |
-| `hooks/scripts/reinject.sh` | SessionStart：武装闸过后注入 orchestrator 身份 + active 板 listing + dangling stale/escalated 节点 | `orchestrating-to-completion/references/board.md`、`.../references/external-coordinates.md`（+ DESIGN.md） | 2026-06-21 |
-| `hooks/scripts/verify-board.sh` | Stop goal-hook：据 status 分布 + fingerprint 握手决定 block/allow，watchdog 提醒，fuse 防死锁 | `orchestrating-to-completion/references/board.md`、`.../references/async-hitl.md`（+ DESIGN.md） | 2026-06-21 |
-| `hooks/scripts/posttool-batch.sh` | PostToolBatch：sub-agent 闸 + 武装闸过后逐板独立 WIP 过调度软警告（永不 block） | `orchestrating-to-completion/references/board.md`（+ DESIGN.md） | 2026-06-21 |
-| `hooks/scripts/usage-pacing.js` | Stop（node）：武装闸过后账户权威优先判 5h/7d 撞墙/欠用/7d dispatch 闸，effective-N 从 accounts.json 算，非阻断注入 | `orchestrating-to-completion/references/cost-and-pacing.md`、`.../references/board.md`、`.../references/external-coordinates.md`、`account-management/references/account-scheduling.md` | 2026-06-21 |
-| `hooks/scripts/board-lint.js` | PostToolUse（node）：四闸（工具/路径/武装/目标本 session active 板）过后跑共享核心、非阻断注入 lint 报告 | `orchestrating-to-completion/SKILL.md`、`.../references/board.md` | 2026-06-21 |
+| `hooks/scripts/bootstrap-board.sh` | UserPromptSubmit：dual-sentinel 触发 → fresh 建板盖 sid / resume 选板 live-probe 后重盖 owner；唯一豁免武装闸者 | `master-orchestrator-guide/references/board.md`（+ `.design/DESIGN.md` 设计性） | 2026-06-21 |
+| `hooks/scripts/reinject.sh` | SessionStart：武装闸过后注入 orchestrator 身份 + active 板 listing + dangling stale/escalated 节点 | `master-orchestrator-guide/references/board.md`、`.../references/external-coordinates.md`（+ `.design/DESIGN.md`） | 2026-06-21 |
+| `hooks/scripts/verify-board.sh` | Stop goal-hook：据 status 分布 + fingerprint 握手决定 block/allow，watchdog 提醒，fuse 防死锁 | `master-orchestrator-guide/references/board.md`、`.../references/async-hitl.md`（+ `.design/DESIGN.md`） | 2026-06-21 |
+| `hooks/scripts/posttool-batch.sh` | PostToolBatch：sub-agent 闸 + 武装闸过后逐板独立 WIP 过调度软警告（永不 block） | `master-orchestrator-guide/references/board.md`（+ `.design/DESIGN.md`） | 2026-06-21 |
+| `hooks/scripts/usage-pacing.js` | Stop（node）：武装闸过后账户权威优先判 5h/7d 撞墙/欠用/7d dispatch 闸，effective-N 从 accounts.json 算，非阻断注入 | `master-orchestrator-guide/references/cost-and-pacing.md`、`.../references/board.md`、`.../references/external-coordinates.md`、`account-management/references/account-scheduling.md` | 2026-06-21 |
+| `hooks/scripts/board-lint.js` | PostToolUse（node）：四闸（工具/路径/武装/目标本 session active 板）过后跑共享核心、非阻断注入 lint 报告 | `master-orchestrator-guide/SKILL.md`、`.../references/board.md` | 2026-06-21 |
 | `hooks/scripts/board-lint-core.js` | 共享 lint 核心（R1-R6：合法 JSON / 窄腰 / task 契约 / deps 图完整性 / viewer 字段），被 hook + 运行时脚本共用 | （无直接命名引用；规则集语义见 board.md §board lint） | 2026-06-21 |
 | **运行时 scripts** | | | |
-| `account-management/scripts/switch-account.sh` | 选号 → refresh（REFRESH_TOKEN_URL host 白名单反 exfiltration）→ **取跨进程换号锁** → 覆写官方共享凭证三存储（无重启换号·全或无 + 中断两阶段恢复：未提交回滚 / 已提交 forward-align 补 keychain③）→ 先 setActive 后 snapshot 翻 registry active | `orchestrating-to-completion/SKILL.md`、`orchestrating-to-completion/references/cost-and-pacing.md`、`account-management/SKILL.md`、`account-management/references/account-scheduling.md`、`account-management/references/vault-security.md` | 2026-06-22 |
+| `account-management/scripts/switch-account.sh` | 选号 → refresh（REFRESH_TOKEN_URL host 白名单反 exfiltration）→ **取跨进程换号锁** → 覆写官方共享凭证三存储（无重启换号·全或无 + 中断两阶段恢复：未提交回滚 / 已提交 forward-align 补 keychain③）→ 先 setActive 后 snapshot 翻 registry active | `master-orchestrator-guide/SKILL.md`、`master-orchestrator-guide/references/cost-and-pacing.md`、`account-management/SKILL.md`、`account-management/references/account-scheduling.md`、`account-management/references/vault-security.md` | 2026-06-22 |
 | `account-management/scripts/account-add.sh` | 直读 keychain「Claude Code-credentials」完整 blob（含 refreshToken）→ 存 vault（file 全或无 + 精确前缀 + `with_vault_lock`）+ 写 registry entry（`mutateRegistry` 锁）；身份 guard + 手动恢复旁路（probe vault 已有有效 blob 升 switchable:true） | `account-management/SKILL.md`、`.../references/vault-security.md` | 2026-06-22 |
 | `account-management/scripts/account-delete.sh` | token-blind 按 email **精确前缀**删 vault（不带 -w·全或无 + `with_vault_lock`）+ 删 registry entry（`mutateRegistry` 锁） | `account-management/SKILL.md`、`.../references/vault-security.md` | 2026-06-22 |
 | `account-management/scripts/account-list.sh` | 只读列号池非密信息（永不取 token 值），file-token 存在性 **bash 层 token-blind awk 布尔预计算**（blob 不进 node 诊断进程）、`?`=无到期记录 unknown 口径，switchable:false 标 no-token | `account-management/SKILL.md`、`.../references/vault-security.md` | 2026-06-22 |
 | `account-management/scripts/accounts-lib.js` | accounts.json registry 读/写/校验核心（原子写 + token-leak 拒写 + active 唯一性 + **`mutateRegistry` 咨询文件锁 RMW** + 通用文件锁 + fileVaultLineMatch awk index 守卫），被各 account 脚本 require | `account-management/SKILL.md`、`.../references/vault-security.md` | 2026-06-22 |
-| `account-management/scripts/select-account.js` | 选号调度（W5/W7 评分 + **7d 硬闸排除候选** + switchable:false 排除 + 临到期降权 + 弱信号兜底），完全不碰 token | `account-management/SKILL.md`、`.../references/account-scheduling.md`、`orchestrating-to-completion/references/cost-and-pacing.md` | 2026-06-22 |
-| `orchestrating-to-completion/scripts/cc-usage.sh` | python 解析本地 JSONL 算 5h/7d，账户权威 sidecar 优先、本地反推 fallback（标 approx） | `orchestrating-to-completion/SKILL.md`、`.../references/board.md`、`.../references/cost-and-pacing.md`、`account-management/SKILL.md`、`.../references/account-scheduling.md`（+ DESIGN.md） | 2026-06-21 |
-| `orchestrating-to-completion/scripts/codex-review.sh` | 封装 `codex exec review` 出 verdict，空/失败 → 按未通过（exit 2）；read-only sandbox | `orchestrating-to-completion/references/resume-verify.md`、`.../references/cost-and-pacing.md` | 2026-06-21 |
-| `orchestrating-to-completion/scripts/statusline-capture.js` | status-line（非 hook）捕获账户权威 rate_limits 落 sidecar，原子写、失败静默 | `orchestrating-to-completion/references/cost-and-pacing.md`、`account-management/references/account-scheduling.md` | 2026-06-21 |
-| `orchestrating-to-completion/scripts/view-server.js` | 本地 127.0.0.1 http server 渲 board DAG，只读、零联网、每请求 fresh 读 board | （无直接命名引用；由 view.md 启动） | 2026-06-21 |
-| `orchestrating-to-completion/scripts/board-lint.js` | 独立手动 board lint（复用 hook 同一份核心），显式调用不需武装闸 | `orchestrating-to-completion/SKILL.md`、`.../references/board.md` | 2026-06-21 |
+| `account-management/scripts/select-account.js` | 选号调度（W5/W7 评分 + **7d 硬闸排除候选** + switchable:false 排除 + 临到期降权 + 弱信号兜底），完全不碰 token | `account-management/SKILL.md`、`.../references/account-scheduling.md`、`master-orchestrator-guide/references/cost-and-pacing.md` | 2026-06-22 |
+| ~~`master-orchestrator-guide/scripts/cc-usage.sh`~~ **（退役·被 `ccm usage advise` 取代·ADR-015/024）** | ~~python 解析本地 JSONL 算 5h/7d，账户权威 sidecar 优先、本地反推 fallback（标 approx）~~ 已删；usage 感知 + 配速数学收口进 `@ccm/engine`，主线改跑 `ccm usage advise --json`（单侧 verdict） | — | 2026-07-02 |
+| `master-orchestrator-guide/scripts/codex-review.sh` | 封装 `codex exec review` 出 verdict，空/失败 → 按未通过（exit 2）；read-only sandbox | `master-orchestrator-guide/references/resume-verify.md`、`.../references/cost-and-pacing.md` | 2026-06-21 |
+| `master-orchestrator-guide/scripts/statusline-capture.js` | status-line（非 hook）捕获账户权威 rate_limits 落 sidecar，原子写、失败静默 | `master-orchestrator-guide/references/cost-and-pacing.md`、`account-management/references/account-scheduling.md` | 2026-06-21 |
+| `master-orchestrator-guide/scripts/view-server.js` | 本地 127.0.0.1 http server 渲 board DAG，只读、零联网、每请求 fresh 读 board | （无直接命名引用；由 view.md 启动） | 2026-06-21 |
+| ~~`master-orchestrator-guide/scripts/board-lint.js`~~ **（退役·被 `ccm board lint` 取代·ADR-014）** | ~~独立手动 board lint（复用 hook 同一份核心），显式调用不需武装闸~~ 已删；lint 引擎迁入 `@ccm/engine`，独立手动 lint 改跑 `ccm board lint --board <path> --raw --json` | — | 2026-07-02 |
 | **dev-only scripts**（不随 plugin 分发·红线 5） | | | |
 | `scripts/eval-trigger.sh` | 跑 skill-creator Track A 触发准确率 eval 的薄包装 | （无 skill prose 引用；dev 流，见 AGENTS.md §8） | 2026-06-21 |
 | `scripts/eval-benchmark.sh` | 跑 skill-creator Track B benchmark 聚合步的薄包装 | （无 skill prose 引用；dev 流，见 AGENTS.md §8） | 2026-06-21 |

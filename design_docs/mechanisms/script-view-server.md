@@ -1,6 +1,6 @@
-# 机制契约：`skills/orchestrating-to-completion/scripts/view-server.js`
+# 机制契约：`skills/master-orchestrator-guide/scripts/view-server.js`
 
-> 类别：运行时带外 node 脚本（board DAG webview server·NOT a hook·随 skill 分发）。源码：`skills/orchestrating-to-completion/scripts/view-server.js`。`/cc-master:view` 启动的本地 http server。**只读、零联网。**
+> 类别：运行时带外 node 脚本（board DAG webview server·NOT a hook·随 skill 分发）。源码：`skills/master-orchestrator-guide/scripts/view-server.js`。`/cc-master:view` 启动的本地 http server。**只读、零联网。**
 
 ## 触发输入
 - `/cc-master:view` 以后台 shell 启动：`CC_MASTER_BOARD=/abs/path node view-server.js`。

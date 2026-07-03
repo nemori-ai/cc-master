@@ -1,6 +1,8 @@
-# 机制契约：`skills/orchestrating-to-completion/scripts/cc-usage.sh`
+# 机制契约：`skills/master-orchestrator-guide/scripts/cc-usage.sh`
 
-> 类别：运行时带外脚本（5h/7d usage 信号·NOT a hook·随 skill 分发）。源码：`skills/orchestrating-to-completion/scripts/cc-usage.sh`。主线在 pacing 决策点 deliberately 跑。
+> **⚠️ 已退役（ADR-015/024 后·被 `ccm usage advise` 取代）。** 该 skill 版脚本已从仓库删除——5h/7d usage 感知 + 配速数学已收口进独立安装的 `@ccm/engine`，主线在 pacing 决策点改跑 `ccm usage advise --json`（出单侧 verdict·ADR-024）。本文正文保留作历史，**不再是 live 机制**。
+
+> 类别（历史）：运行时带外脚本（5h/7d usage 信号·NOT a hook·随 skill 分发）。源码（已删）：`skills/master-orchestrator-guide/scripts/cc-usage.sh`。主线在 pacing 决策点 deliberately 跑。
 
 ## 触发输入
 - 主线 / account 脚本调用。用法 `cc-usage.sh [--dir <jsonl-root>] [--now <ISO8601>] [--rate-cache <path>]`。

@@ -1,17 +1,17 @@
 ---
 name: engineering-with-craft
-description: 'Use when you (a coding/execution agent) are designing, building, or testing actual code and want to apply established engineering theories well —— 当你(执行 agent)在动手设计 / 开发 / 测试代码、想遵循 DDD / SDD / TDD / OOP 的最佳实践与品味时:怎么给领域建模(bounded context / aggregate / 不变式)、怎么写好类(SOLID / 四柱 / 组合优于继承)、怎么 spec-first(契约即 SSOT)、怎么 test-first(红绿铁律 / constraint parity)。核心是工程心智模型 + 哲学 + 艺术品味 + 方法论,叠加 no-silent-failure / spec 不漂移 / 无 idle wrapper 等红线。五条共享根:不变式即锚 / 契约即 SSOT / 组合优于包装 / 分层思维 / 证据优于声称。Triggers: 要设计一个模块 / 给领域建模 / 划 bounded context / 写类纠结继承还是组合 / 要不要先写 spec / 先写测试还是先写实现 / 这个抽象值不值 / 怎么躲开贫血模型或 god class。Do NOT use when 你在决定该编排什么 / 怎么派发(orchestrating-to-completion)、怎么把目标切成任务 DAG(slicing-goals-into-dags)、把一个任务迭代优化到验收的循环形状本身(dev-as-ml-loop)、怎么用 ccm 写 board(using-ccm)、workflow 脚本怎么写(authoring-workflows)。'
+description: 'Use when you (a coding/execution agent) are designing, building, or testing actual code and want to apply established engineering theories well —— 当你(执行 agent)在动手设计 / 开发 / 测试代码、想遵循 DDD / SDD / TDD / OOP 的最佳实践与品味时:怎么给领域建模(bounded context / aggregate / 不变式)、怎么写好类(SOLID / 四柱 / 组合优于继承)、怎么 spec-first(契约即 SSOT)、怎么 test-first(红绿铁律 / constraint parity)。核心是工程心智模型 + 哲学 + 艺术品味 + 方法论,叠加 no-silent-failure / spec 不漂移 / 无 idle wrapper 等红线。五条共享根:不变式即锚 / 契约即 SSOT / 组合优于包装 / 分层思维 / 证据优于声称。Triggers: 要设计一个模块 / 给领域建模 / 划 bounded context / 写类纠结继承还是组合 / 要不要先写 spec / 先写测试还是先写实现 / 这个抽象值不值 / 怎么躲开贫血模型或 god class。Do NOT use when 你在决定该编排什么 / 怎么派发(master-orchestrator-guide)、怎么把目标切成任务 DAG(slicing-goals-into-dags)、把一个任务迭代优化到验收的循环形状本身(dev-as-ml-loop)、怎么用 ccm 写 board(using-ccm)、workflow 脚本怎么写(authoring-workflows)。'
 ---
 
 # engineering-with-craft —— 设计 / 开发 / 测试的工程手艺与红线
 
-> **分发 skill。** 给在 **design → build → test** 动手的**执行 agent** 的工程手艺：把 **DDD**（领域建模）/ **OOP**（写类品味）/ **SDD**（spec-first）/ **TDD**（test-first）的最佳实践、哲学与品味带进你的活里。核心是**心智模型 + 艺术品味 + 方法论**，叠加几条不可跨的**红线**。
+> 给在 **design → build → test** 动手的**执行 agent** 的工程手艺：把 **DDD**（领域建模）/ **OOP**（写类品味）/ **SDD**（spec-first）/ **TDD**（test-first）的最佳实践、哲学与品味带进你的活里。核心是**心智模型 + 艺术品味 + 方法论**，叠加几条不可跨的**红线**。
 >
-> **职责边界（红线3）：** 本 skill 是「循环里那双手该有的手艺」，与编排 / 切分 / 执行循环**不同 plane**——
-> - **orchestrating-to-completion**（SKILL A）协调 / 排期 / 派发（指挥不演奏）。
+> **职责边界：** 本 skill 是「循环里那双手该有的手艺」，与编排 / 切分 / 执行循环**不同 plane**——
+> - **master-orchestrator-guide** 协调 / 排期 / 派发（指挥不演奏）。
 > - **slicing-goals-into-dags** 把目标**切**成 board 纵切片（**交付计划**的轴）。
 > - **dev-as-ml-loop** 给执行单任务的**循环形状**（验收=objective / 迭代 / plateau→restart，**理论无关的元过程**）。
-> - **本 skill** 给循环里的**内容**：怎么建模、怎么写类、怎么 spec/test-first。**F 是循环的形状，本 skill 是带进循环的手艺。**
+> - **本 skill** 给循环里的**内容**：怎么建模、怎么写类、怎么 spec/test-first。**dev-as-ml-loop 是循环的形状，本 skill 是带进循环的手艺。**
 
 ---
 
@@ -67,7 +67,7 @@ DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一
 「做完了」是一个**关于世界的声称**，要**事后证据**——不是感觉、不是绿闸本身。
 
 - completion gate 看证据：测试**观察到**预期行为、约束被**真后端**拒绝、实现**对着 spec** 验收。
-- 这正是 cc-master「**gate-green ≠ passed**」红线在工艺层的同构：绿了不等于过了，过了要拿得出证据。
+- 这正是「**gate-green ≠ passed**（绿了不等于过了）」在工艺层的同构：过了要拿得出证据。
 
 ---
 
@@ -82,13 +82,13 @@ DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一
 
 **四理论是接力，不是并列**：SDD 冻结合约形状 → DDD 在其上划 bounded context 与不变式所有权 → OOP 实现到合约 → TDD 对着合约红绿。这条接力顺序管的是「哪种手艺在哪阶段**领跑** + 合约先行」，**不是**「相位闸、不许回头」——它是**典型领棒次序**，**不是瀑布**。
 
-把它放进三个尺度看得更清——**顶层敏捷 · 片内有序 · 任务内迭代**，同一种工程良知在三层反复出现，三层都反对『大设计先行、攒到最后才见反馈』的重型瀑布：①**顶层：敏捷迭代**（目标纵切薄增量 / walking skeleton / 按 cadence 交付·见 slicing-goals-into-dags）；②**片内：纪律化顺序**（每薄片端到端走 SDD→DDD→OOP→TDD 四棒·给典型领棒次序 + 合约先行，但**不锁相位、不禁回头**，故**不是瀑布**——『局部瀑布』直觉指的正是这份 order-ness，它与重型瀑布差在三轴：范围=一薄片非整个项目 / 反馈在每片边界就回来非攒到最末 / 与下一层任务内迭代共存）；③**任务内：迭代优化**（片里每个 dev 任务按 propose→measure→adjust 逼近验收·见 dev-as-ml-loop）。F 的迭代循环在每一棒**内部**跑，与接力的阶段次序不同尺度、不打架。
+把它放进三个尺度看得更清——**顶层敏捷 · 片内有序 · 任务内迭代**，同一种工程良知在三层反复出现，三层都反对『大设计先行、攒到最后才见反馈』的重型瀑布：①**顶层：敏捷迭代**（目标纵切薄增量 / walking skeleton / 按 cadence 交付·见 slicing-goals-into-dags）；②**片内：纪律化顺序**（每薄片端到端走 SDD→DDD→OOP→TDD 四棒·给典型领棒次序 + 合约先行，但**不锁相位、不禁回头**，故**不是瀑布**——『局部瀑布』直觉指的正是这份 order-ness，它与重型瀑布差在三轴：范围=一薄片非整个项目 / 反馈在每片边界就回来非攒到最末 / 与下一层任务内迭代共存）；③**任务内：迭代优化**（片里每个 dev 任务按 propose→measure→adjust 逼近验收·见 dev-as-ml-loop）。dev-as-ml-loop 的迭代循环在每一棒**内部**跑，与接力的阶段次序不同尺度、不打架。
 
 ---
 
 ## 红线（工程硬规则，违背字面就是违背精神）
 
-这几条是四个理论共同的底线，**跨语言跨项目成立**，也对齐 cc-master 既有红线。它们不在「品味可权衡」那一层——是不跨的线。深度展开见各 reference。
+这几条是四个理论共同的底线，**跨语言跨项目成立**。它们不在「品味可权衡」那一层——是不跨的线。深度展开见各 reference。
 
 | 红线 | 一句话 | 深度 |
 |---|---|---|
@@ -106,6 +106,6 @@ DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一
 - [references/oop.md](references/oop.md) —— 写类品味（四柱 / SOLID as judgment / 封装即词汇 / 组合优于继承 / 8 类反模式）。
 - [references/sdd.md](references/sdd.md) —— spec-first（契约即 SSOT / 三者对齐 / 何时值得 / spec 漂移红线）。
 - [references/tdd.md](references/tdd.md) —— test-first 纪律（红绿铁律 / verify by evidence / constraint parity / rationalizations）。
-- **dev-as-ml-loop** —— 执行单任务的**循环形状**（验收=objective / plateau→restart）。本 skill 是带进那个循环的手艺；F 是循环本身。测试触点：F 讲「测试为何是循环里的梯度信号」，本 skill 的 tdd.md 讲「test-first 纪律怎么执行」。
+- **dev-as-ml-loop** —— 执行单任务的**循环形状**（验收=objective / plateau→restart）。本 skill 是带进那个循环的手艺；dev-as-ml-loop 是循环本身。测试触点：dev-as-ml-loop 讲「测试为何是循环里的梯度信号」，本 skill 的 tdd.md 讲「test-first 纪律怎么执行」。
 - **slicing-goals-into-dags** —— 把目标**切**成 board 纵切片（交付计划轴，与 DDD 的领域建模轴正交：一个纵切片往往横穿多个 bounded context）。
-- **orchestrating-to-completion** / **using-ccm** —— 编排决策 / 怎么用 ccm 写 board（本 skill 不碰）。
+- **master-orchestrator-guide** / **using-ccm** —— 编排决策 / 怎么用 ccm 写 board（本 skill 不碰）。

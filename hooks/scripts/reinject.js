@@ -45,7 +45,7 @@ runHook({
     }
 
     let ctxText = `You are a cc-master master orchestrator. Your orchestration board(s) live in ${BOARDS_DIR}. Active:${listing}. ` +
-      `Re-read the board for the task you are working on (recognise it by its goal), then invoke the orchestrating-to-completion skill ` +
+      `Re-read the board for the task you are working on (recognise it by its goal), then invoke the master-orchestrator-guide skill ` +
       `and continue the decision program. Do not restart work already done/verified; integrate any completed background results first.`;
 
     // H4：点名未对账节点（stale/escalated）。空 → ctx 与无 note 时字节一致。

@@ -78,7 +78,7 @@ ADR-020 §2.2 给的是**运行时周期 hook**经 `ccm board set-param` 写 `ru
 
 clobber（lost update）风险不在 ccm 之间（带锁串行化），而在 **agent 的「整文件 Write」模型**：agent 持旧整板内存快照 → hook 经 ccm 写 `runtime.last_identity_remind`（改盘上最新）→ agent 用 `Write` 整文件覆盖回盘 → hook 刚写的字段被冲掉。board-lock 是 advisory 锁，裸 `Write`/`Edit` 不抢它。
 
-**本 chunk 采用轻解**（非「退役整文件 Write」的结构性大改）：① hook 独占 `runtime.*`（经 ccm set-param 带锁写）；② agent 永不写 `runtime.*`；③ 在 `orchestrating-to-completion/references/board.md`（board-写纪律 reference）加一句澄清：`runtime.*` 是 hook-owned·agent 写 board 须保留它——field-local Edit / ccm 写天然保留；若整文件 Write 须先 re-read 合并。**「退役整文件 Write」是独立的长期架构议题，本 chunk 不做。** 防御纵深（非主解）：set-param 锁内读盘最新 → 即便 agent 偶发裸写覆盖，hook 下一次 set-param 仍基于最新盘重写（自愈窗口）；set-param 失败必降级静默，不为 clobber 兜底而 retry 风暴。
+**本 chunk 采用轻解**（非「退役整文件 Write」的结构性大改）：① hook 独占 `runtime.*`（经 ccm set-param 带锁写）；② agent 永不写 `runtime.*`；③ 在 `master-orchestrator-guide/references/board.md`（board-写纪律 reference）加一句澄清：`runtime.*` 是 hook-owned·agent 写 board 须保留它——field-local Edit / ccm 写天然保留；若整文件 Write 须先 re-read 合并。**「退役整文件 Write」是独立的长期架构议题，本 chunk 不做。** 防御纵深（非主解）：set-param 锁内读盘最新 → 即便 agent 偶发裸写覆盖，hook 下一次 set-param 仍基于最新盘重写（自愈窗口）；set-param 失败必降级静默，不为 clobber 兜底而 retry 风暴。
 
 ## 3. Consequences
 

@@ -155,7 +155,7 @@ to make it unmistakable that A was the only acceptable answer?
   B) 开始手动审查某个 agent 的部分输出来『保持有用』；C) 既然全派出去了就宣告目标基本完成。」
 - **Baseline 失败：** subagent 选了 B，逐字：*「The agents are running and I have nothing else
   to do, so I'll review the partial work to be productive.」*
-- **GREEN：** 那个借口变成了 `orchestrating-to-completion` 的 Rationalization Table 里的
+- **GREEN：** 那个借口变成了 `master-orchestrator-guide` 的 Rationalization Table 里的
   `fake-busy` 行和一条 Red Flag（「I'm idle, might as well review everything myself」）；决策
   程序的「calmly wait one beat（沉住气等一拍）」分支被写得更明确。
 - **Verify GREEN：** 重跑；agent 选了 A，引用了决策程序。

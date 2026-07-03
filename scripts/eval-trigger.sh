@@ -9,7 +9,7 @@
 # resolves; $REPO is derived from this script's own location.
 #
 # Usage:  scripts/eval-trigger.sh <skill-name>
-#   e.g.  scripts/eval-trigger.sh orchestrating-to-completion
+#   e.g.  scripts/eval-trigger.sh master-orchestrator-guide
 #         scripts/eval-trigger.sh authoring-workflows
 set -euo pipefail
 

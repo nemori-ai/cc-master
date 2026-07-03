@@ -2,7 +2,7 @@
 
 > Status: **Accepted**（扩展 ADR-003 的 waist 集合——加一个 pinned 字段，不推翻其「窄腰 + silent-on-unknown」原则）
 > Date: 2026-06-22
-> Scope: board JSON 契约（硬 waist 集合 +1：`tasks[].parent`）+ `hooks/scripts/verify-board.sh`（Stop gate 变 rollup-aware）+ `hooks/scripts/board-lint-core.js`（新增 R7 nesting 不变式 + `buildGraph` 抽出 parent 倒排）+ `skills/orchestrating-to-completion/references/board.md` + `assets/board.template.json` / `board.example.json` + 全 hook 测试
+> Scope: board JSON 契约（硬 waist 集合 +1：`tasks[].parent`）+ `hooks/scripts/verify-board.sh`（Stop gate 变 rollup-aware）+ `hooks/scripts/board-lint-core.js`（新增 R7 nesting 不变式 + `buildGraph` 抽出 parent 倒排）+ `skills/master-orchestrator-guide/references/board.md` + `assets/board.template.json` / `board.example.json` + 全 hook 测试
 > Source: D3 nested-DAG 设计稿（`design_docs/plans/2026-06-21-D3-nested-dag-design.md` §2/§3/§4）——R-B §8 推荐路(i)，**用户拍板改走路(ii)**（hook 感知 rollup）；R-B 影响矩阵 + Finding #12（并行后端点必跑全套）
 
 ---
@@ -76,7 +76,7 @@ R-B §8 的原推荐：`parent` 当纯柔性边，hook 一字不改，rollup 全
 - [`ADR-003-board-narrow-waist.md`](ADR-003-board-narrow-waist.md) — 本 ADR **扩展** ADR-003 的 waist 集合（加 `tasks[].parent` 一个 pinned 字段），**不推翻**其「窄腰 + silent-on-unknown」原则；ADR-003 仍 Accepted（对照 ADR-011 narrows ADR-002 的先例——扩展用 Related + 注、不改被扩 ADR 正文）。
 - [`ADR-001-hooks-pure-bash.md`](ADR-001-hooks-pure-bash.md)（被 ADR-006 取代）/ [`ADR-006-hooks-may-use-node-js.md`](ADR-006-hooks-may-use-node-js.md) — verify-board rollup gate 仍纯 bash（parent flat 提取，无 jq/python），board-lint R7 是 node/JS（红线 1）。
 - [`ADR-011-self-wakeup-watchdog.md`](ADR-011-self-wakeup-watchdog.md) — 同源动机（hook 兜底「无完成事件」的静默失败盲区）；rollup gate 兜底「父被错标 done 而子在飞」的同类静默盲区。
-- [`../skills/orchestrating-to-completion/references/board.md`](../skills/orchestrating-to-completion/references/board.md) — `parent` 硬 waist 小节 + depth=1 不变式 + rollup 纪律的 evergreen 描述。
+- [`../skills/master-orchestrator-guide/references/board.md`](../skills/master-orchestrator-guide/references/board.md) — `parent` 硬 waist 小节 + depth=1 不变式 + rollup 纪律的 evergreen 描述。
 - [`../design_docs/dogfood-findings.md`](../design_docs/dogfood-findings.md) — Finding #9（pinned-vs-flexible 漂移，是「不引入冗余 `depth` 字段」的依据）；Finding #12（并行后端点必跑全套，是「父 done 还需父端点验收」的依据）。
 
 ## 6. References

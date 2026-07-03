@@ -62,31 +62,34 @@ assert_eq 0 "$HOOK_RC" "bootstrap exits 0"
 assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "exactly one board created in default home"
 assert_contains "$HOOK_OUT" ".board.json" "injects the board path"
 assert_contains "$HOOK_OUT" "orchestrator" "injects the orchestrator role"
-# fresh boards (template path) carry meta.template_version — agent-shaped versioning the timeline
-# reads to gate its real-time axis. The default run uses PLUGIN_ROOT's real board.template.json.
-# DERIVE THE EXPECTED VERSION FROM THE SHIPPED TEMPLATE (TF1): the assertion must read the version the
-# template ACTUALLY declares, not a hardcoded literal that silently lags a template bump (board.template.json
-# was bumped v1→v2 in this branch; a hardcoded `1` here breaks deterministically the moment the template
-# moves — and worse, masquerades as a flake because `ls -t | head -1` non-deterministically selects which
-# of this case's TWO bootstrapped boards is read when their second-granularity mtimes tie). The test's real
-# intent is "a template-path board carries THE TEMPLATE'S version" — so source that version from the SSOT.
-# Also create the board in a FRESH project home so there is exactly one board → no ls -t tie-break at all.
-EXPECTED_TV="$(board_template_version "$PLUGIN_ROOT/skills/orchestrating-to-completion/assets/board.template.json")"
+# fresh boards carry meta.template_version — agent-shaped versioning the timeline reads to gate its
+# real-time axis. The skeleton is now built by `ccm board init` (board.template.json was DELETED — a hook
+# must not reach into skill assets; bootstrap builds the skeleton via ccm·ADR-014), so ccm is the SSOT for
+# the version. DERIVE THE EXPECTED VERSION FROM THAT SSOT (TF1): run `ccm board init` into a throwaway home
+# and read the version off its product, so the assertion tracks whatever version ccm ships rather than a
+# hardcoded literal that would silently lag a bump. Also create the asserted board in a FRESH project home
+# so there is exactly one board (no ls -t tie-break at all).
+_TV_HOME="$(make_project)"
+CC_MASTER_HOME="$_TV_HOME" "${CCM_BIN:-ccm}" board init >/dev/null 2>&1
+EXPECTED_TV="$(board_template_version "$(only_board "$_TV_HOME")")"
+rm -rf "$_TV_HOME"
 P2="$(make_project)"
 HOOK_OUT="$(printf '%s' '{"prompt":"/cc-master:as-master-orchestrator x"}' \
   | CLAUDE_PROJECT_DIR="$P2" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P2/.claude/cc-master" \
     bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
-assert_eq "$EXPECTED_TV" "$(board_template_version "$(only_board "$P2/.claude/cc-master")")" "A: fresh board (template path) carries the template's meta.template_version ($EXPECTED_TV)"
+assert_eq "$EXPECTED_TV" "$(board_template_version "$(only_board "$P2/.claude/cc-master")")" "A: fresh board carries the ccm-init skeleton's meta.template_version ($EXPECTED_TV)"
 rm -rf "$P" "$P2"
 
-# Case A0 (template-missing fallback path): when board.template.json is absent the inline printf
-# fallback builds the board — it must ALSO seed meta.template_version (parity with the template).
+# Case A0 (no skill-asset dependency): bootstrap builds the skeleton via `ccm board init`, NOT by copying
+# a skill asset (board.template.json was DELETED; the inline printf fallback is gone too). Even with a
+# BOGUS/empty CLAUDE_PLUGIN_ROOT (no skills/ tree at all) the board is still created and carries
+# meta.template_version — proving the hooks ⊥ skill-assets decoupling (bootstrap no longer reads PLUGIN_ROOT).
 P="$(make_project)"; EMPTY_ROOT="$(make_project)"
 HOOK_OUT="$(printf '%s' '{"session_id":"sess-fb","prompt":"/cc-master:as-master-orchestrator x"}' \
   | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$EMPTY_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
     bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
-assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "A0: fallback path created a board"
-assert_eq 3 "$(board_template_version "$(only_board "$P/.claude/cc-master")")" "A0: fallback printf seeds meta.template_version=3 (parity with v2 template)"
+assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "A0: board built via ccm regardless of PLUGIN_ROOT (no skill-asset dependency)"
+assert_eq "$EXPECTED_TV" "$(board_template_version "$(only_board "$P/.claude/cc-master")")" "A0: ccm-built board carries meta.template_version=$EXPECTED_TV (no template file needed)"
 rm -rf "$P" "$EMPTY_ROOT"
 
 # Case A1 (ARM = stamp session_id): bootstrap is the ARM action — the board it creates is born

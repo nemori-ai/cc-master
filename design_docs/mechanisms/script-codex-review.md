@@ -1,6 +1,6 @@
-# 机制契约：`skills/orchestrating-to-completion/scripts/codex-review.sh`
+# 机制契约：`skills/master-orchestrator-guide/scripts/codex-review.sh`
 
-> 类别：运行时带外脚本（codex 第二端点验收者·NOT a hook·随 skill 分发）。源码：`skills/orchestrating-to-completion/scripts/codex-review.sh`。纯 shell 封装 `codex exec review`，对一段 diff 出 verdict。
+> 类别：运行时带外脚本（codex 第二端点验收者·NOT a hook·随 skill 分发）。源码：`skills/master-orchestrator-guide/scripts/codex-review.sh`。纯 shell 封装 `codex exec review`，对一段 diff 出 verdict。
 
 ## 触发输入
 - 主线在端点验收节点手动/编排调用。用法 `codex-review.sh [--base <branch>]`（默认 main）。

@@ -70,6 +70,8 @@ done
 # ── 清理任何混入的非分发噪声（保险，allowlist 内目录可能藏 .DS_Store / node_modules）──────────────────
 find "${PKG}" -name '.DS_Store' -delete 2>/dev/null || true
 find "${PKG}" -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
+# skills/<name>/.design/ 是仓库维护者用的 co-located 设计/J 文档，不是用户 agent 运行时 prose。
+find "${PKG}/skills" -type d -name .design -prune -exec rm -rf {} + 2>/dev/null || true
 
 # ── 打 zip ────────────────────────────────────────────────────────────────────────────────────────
 OUT_DIR="${CCM_PLUGIN_OUT_DIR:-dist}"

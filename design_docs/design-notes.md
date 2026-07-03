@@ -19,7 +19,7 @@ plugin `cc-master` = **命令 + 2 skills + hooks + board 文件**。通用、shi
 - `/cc-master:stop` —— 归档 / 置 board 非活跃。
 
 ## 3. 两个 skill（locked：2 个，自包含，建立在命令经 Skill A 植入的哲学之上）
-- **Skill A `orchestrating-to-completion`**：完整编排/调度方法论。**承载哲学权威副本** + 决策程序 + 目标→DAG + 分派纪律 + board 协议 + 异步 + HITL + resume + 端点验收 + fill-work 准入测试。
+- **Skill A `master-orchestrator-guide`**：完整编排/调度方法论。**承载哲学权威副本** + 决策程序 + 目标→DAG + 分派纪律 + board 协议 + 异步 + HITL + resume + 端点验收 + fill-work 准入测试。
 - **Skill B `authoring-workflows`**：两层——(1) **写法层**（范式选择决策树、稳定性铁律、效率规则、高并行、author 检查清单、lint ref）+ (2) **机制摊明层**（确认契约 vs 内部未知；七原语真义；parallel/pipeline 真相；determinism；resume 模型；硬上限 —— ≈ 研究报告 1）。
 
 ## 4. 哲学层（locked；权威副本在 Skill A；命令经唤起 Skill A 植入）

@@ -22,7 +22,7 @@
 
 **落地映射**（cc-master 具体）：
 - 维护者面 → 进 `.claude/skills/`（**不分发**，不进 marketplace）。meta-skill 三件套（skillsmith / curating / grounding）+ 它们发现层上游的 `requirement-elicitation` 全在此面。
-- 用户面 → 进 `skills/`（随插件 ship）。现有 `orchestrating-to-completion` / `authoring-workflows` 在此面。
+- 用户面 → 进 `skills/`（随插件 ship）。现有 `master-orchestrator-guide` / `authoring-workflows` 在此面。
 
 **评分**：二元 0/1。0 = 拒，无例外。
 

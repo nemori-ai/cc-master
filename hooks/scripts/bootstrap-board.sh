@@ -474,7 +474,7 @@ EOF
   rewrite_owner_field "$TARGET" active true > "$tmp" && mv -f "$tmp" "$TARGET"
   rewrite_owner_field "$TARGET" heartbeat "$ts" > "$tmp" && mv -f "$tmp" "$TARGET"
 
-  inject_ctx "cc-master resume: you have TAKEN OVER the existing orchestration board at ${TARGET}. This is a RESUME, not a fresh start — do NOT re-decompose the goal and do NOT reset tasks[]. Invoke the orchestrating-to-completion skill, then RECONCILE the existing tasks[]: rebuild your mental model from their statuses. Treat every in_flight task as an ORPHAN (its handle died with the prior session) — do not wait on it; run it through endpoint verification (resume-verify content-hash + endpoint check): if its artifact exists and passes, mark it done/verified; otherwise demote it to ready/stale and re-dispatch for a fresh handle. This board is your single source of truth; from now on update owner.heartbeat each time you flush it."
+  inject_ctx "cc-master resume: you have TAKEN OVER the existing orchestration board at ${TARGET}. This is a RESUME, not a fresh start — do NOT re-decompose the goal and do NOT reset tasks[]. Invoke the master-orchestrator-guide skill, then RECONCILE the existing tasks[]: rebuild your mental model from their statuses. Treat every in_flight task as an ORPHAN (its handle died with the prior session) — do not wait on it; run it through endpoint verification (resume-verify content-hash + endpoint check): if its artifact exists and passes, mark it done/verified; otherwise demote it to ready/stale and re-dispatch for a fresh handle. This board is your single source of truth; from now on update owner.heartbeat each time you flush it."
   return 0
 }
 
@@ -650,14 +650,27 @@ fi
 # simply no longer read by the hook), so no template change is required; we just stop WRITING it from a
 # CLI arg. → design_docs/plans/2026-06-17-A2-account-management-design.md §C-T6 / §F.
 
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
-TEMPLATE="$PLUGIN_ROOT/skills/orchestrating-to-completion/assets/board.template.json"
+# CCM_CMD：进程边界 spawn 的 ccm 可执行（与 node hook 同口径）。上方 install precheck 已保证它在场
+# （CCM_BIN 可执行 OR `ccm` 在 PATH）。下方建骨架 + INIT-FLAGS 段共用它。
+CCM_CMD="${CCM_BIN:-ccm}"
 
 mkdir -p "$BOARDS_DIR"
-# Unique, time-sortable name: a UTC timestamp prefix + the pid keeps concurrent bootstraps
-# distinct (the human-readable identity lives in the board's "goal" field). Each invocation
-# starts a NEW orchestration; archive stale ones with /cc-master:stop. board 落 <home>/boards/。
-BOARD="$BOARDS_DIR/$(date -u +%Y%m%dT%H%M%SZ)-$$.board.json"
+# ── FRESH board 骨架经 `ccm board init` 建（ADR-014 进程边界·红线：hooks ⊥ skill assets）───────────────
+# board 的**空骨架**现由 ccm（board-model SSOT·@ccm/engine）建，不再 `cp` 一个 skill asset——hook 绝不
+# 反向伸手够某个 skill 的 assets/ 或 scripts/ 目录（本任务消除的唯一违规）。ccm 上方已硬前置在场，故可依赖它。把 CC_MASTER_HOME
+# pin 到已解析的 HOME_DIR，让 ccm 写进本 hook 期望的**同一** boards/ 目录（三处 resolveHome 本已同口径·pin
+# 只为消除任何分歧）。ccm 自己挑一个唯一的 `<UTC-ts>-<pid>.board.json` 名（同样 time-sortable·并发不撞的
+# 约定），我们从它 stdout 里恢复所建路径（匹配 `.board.json` **路径 token**·与本地化标签无关——认路径不认
+# 「路径:」字样）。**ARMING（盖 session_id）仍是 bootstrap 自己的活**（见下）：owner 是 arming 窄腰、hook 所
+# 有、无 ccm setter，且 board-guard（ADR-025）只 gate agent 的工具调用、不管 hook 进程内的写。
+init_out="$(CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init 2>&1)"
+BOARD="$(printf '%s' "$init_out" | grep -oE '/[^[:space:]]*\.board\.json' | head -1)"
+if [ -z "$BOARD" ] || [ ! -f "$BOARD" ]; then
+  # ccm 在场（已前置）却没能建出可用 board 路径 → 宁可拒 arm，也不注入一个指向虚空的 phantom「board 已建」。
+  # 以 <directive source="bootstrap"> agent-relay·exit 0（不 block·否则 agent 收不到 directive）。
+  inject_ctx '<directive source="bootstrap">cc-master: `ccm board init` 未能建出 board（ccm 在场但建板失败）——本次不进入编排。请重试 /cc-master:as-master-orchestrator <goal>；若持续失败，检查 ccm 安装与 CC_MASTER_HOME 目录可写。</directive>'
+  exit 0
+fi
 # Escape the sid for safe inclusion in the JSON string value (backslash + double-quote only; a
 # session id is otherwise printable). Empty sid → stamps "" — an ANOMALY (normal bootstrap stdin
 # carries a sid): such a blank board stays DORMANT for every non-empty stdin sid (it is NOT
@@ -665,27 +678,13 @@ BOARD="$BOARDS_DIR/$(date -u +%Y%m%dT%H%M%SZ)-$$.board.json"
 # sid is empty). Claim it by re-running as-master-orchestrator (re-arm re-stamps owner.session_id).
 # Keep this pure bash (no jq) — ship-anywhere.
 sid_esc="$(printf '%s' "$sid" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-if [ -f "$TEMPLATE" ]; then
-  cp "$TEMPLATE" "$BOARD"
-  # Stamp owner.session_id with the creating session's id (the ARM identity). The template ships the
-  # field as `"session_id": ""`; replace ONLY that empty owner field. A literal-anchored sed on the
-  # empty value keeps the substitution from ever touching a non-empty value (none exists in a fresh
-  # template, but this stays safe if the template gains other session_id-shaped fields later).
-  tmp="$BOARD.tmp.$$"
-  sed "s/\"session_id\"[[:space:]]*:[[:space:]]*\"\"/\"session_id\": \"$sid_esc\"/" "$BOARD" > "$tmp" && mv -f "$tmp" "$BOARD"
-  # A2 T6: num_account is NO LONGER stamped from a CLI arg (--num_account is gone; pacing's effective-N is
-  # derived from the accounts.json pool registry by usage-pacing.js). The template still ships the
-  # harmless backward-compat default `"num_account": 1`; we leave it untouched (the hook no longer reads it).
-else
-  # Template-missing fallback: build the board inline, stamping the real sid into owner.session_id
-  # (was a hardcoded empty "" before — that left every bootstrapped board unowned). Seed the
-  # agent-shaped meta.template_version too, in parity with board.template.json — it is NOT the hook-read
-  # narrow waist `schema` (red line 2): no hook reads it; it lets the timeline gate its real-time axis on
-  # this-release-or-later boards. Pure bash printf only — no jq/python/node (red line 1). A2 T6: no
-  # num_account field is seeded here — usage-pacing.js no longer reads it (effective-N now comes from
-  # accounts.json); an OLD board still carrying it is harmless, it is simply ignored.
-  printf '{"schema":"cc-master/v2","meta":{"template_version":3},"goal":"","owner":{"active":true,"session_id":"%s","heartbeat":""},"git":{"worktree":"","branch":""},"scheduling":{"wip_limit":4},"tasks":[],"log":[]}\n' "$sid_esc" > "$BOARD"
-fi
+# Stamp owner.session_id with the creating session's id (the ARM identity). `ccm board init` ships the
+# field as `"session_id": ""`; a literal-anchored sed replaces ONLY that empty owner field (owner
+# precedes tasks[] in the pinned waist, and no fresh board carries any other session_id-shaped value).
+# Pure bash sed runs INSIDE the hook process (not an agent tool call), so board-guard (ADR-025·gates
+# agent tool calls only) does not apply; owner.session_id has no ccm setter (it is the arming waist).
+tmp="$BOARD.tmp.$$"
+sed "s/\"session_id\"[[:space:]]*:[[:space:]]*\"\"/\"session_id\": \"$sid_esc\"/" "$BOARD" > "$tmp" && mv -f "$tmp" "$BOARD"
 
 # ── INIT FLAGS（方案A·ADR-020 board-init 写边界）─────────────────────────────────────────────────────
 # bootstrap 作为板的**创建者**，在 fresh 建板初始化时据用户在命令里**亲手敲的**显式旋钮 flag（priority /
@@ -698,9 +697,8 @@ fi
 # 用户输入、**非 hook 自授权**。**best-effort**：板已建好，flag 落地失败**绝不 block 编排起跑**（exit 0 仍走到
 # 下方 ctx 注入），失败/非法值在 ctx 附一句 advisory。**goal 不在此设**（模板 goal=""，由 agent 设）。
 #
-# CCM_CMD：进程边界 spawn 的 ccm 可执行（与 node hook 同口径）。上方 install precheck 已保证它在场（CCM_BIN
-# 可执行 OR `ccm` 在 PATH）；这里仍 best-effort 吞错（仿 migrate_legacy_boards）——任何失败只记 note、不崩。
-CCM_CMD="${CCM_BIN:-ccm}"
+# CCM_CMD 已在上方建骨架处解析（进程边界 spawn 的 ccm·与 node hook 同口径·install precheck 已保证在场）。
+# 下方 INIT-FLAGS best-effort 吞错（仿 migrate_legacy_boards）——任何失败只记 note、不崩、不 block 起跑。
 # fresh_args：本回合 fresh 形态的**完整原始 arg 串**（含 goal + flag）。两条触发路径各取其源：raw-command 路径
 #   `rest`（已 ltrim·prefix 已剥）；body-sentinel 路径 `body_args`（从 <!-- cc-master:args: $ARGUMENTS --> 恢复）。
 #   `rest != trimmed` ⟺ raw-command 前缀真匹配过（剥掉了前缀）；否则走 body-sentinel 的 body_args（可能未设）。
@@ -771,7 +769,7 @@ case "$init_pol" in
   *) flag_notes="${flag_notes} --policy-switch 取值 '${init_pol}' 非法（须 allow|deny）·已跳过；" ;;
 esac
 
-ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. Decompose the goal into a dependency DAG and write tasks[] into that board file, set goal/owner/git, then invoke the orchestrating-to-completion skill and run the decision program."
+ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. Decompose the goal into a dependency DAG and write tasks[] into that board file, set goal/owner/git, then invoke the master-orchestrator-guide skill and run the decision program."
 # applied / flag_notes 都是**单行**（无内嵌换行）——下方 per-line sed 量化（s/^/"/; s/$/"/）才不破 JSON。
 if [ -n "$applied" ]; then
   ctx="${ctx} bootstrap 已据你启动命令里的显式 flag 预设了这些 board 旋钮：${applied}（已写入 board）。设 board.goal 时把这些 flag token 从 goal 里剔除；这些已落板的旋钮原样保留、别覆写。"

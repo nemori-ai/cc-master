@@ -50,7 +50,7 @@
 | 已确认需求后写一个 skill 的 body（craft 诊断 / 命名锚 / pressure baseline） | `cc-master-skillsmith` |
 | 判要不要建 skill / 放哪 / 会不会重叠（含「这请求该拆成几个 skill」的 skill-decomposition） | `curating-skill-portfolios` |
 | 度量一个已写好的 skill（J / Track A·B / 防自欺） | `grounding-skill-evals` |
-| 把已批准的 goal 拆图 / 派发 / 驱动到完成（编排 loop） | `orchestrating-to-completion` |
+| 把已批准的 goal 拆图 / 派发 / 驱动到完成（编排 loop） | `master-orchestrator-guide` |
 | 其中 workflow 脚本怎么写（parallel / pipeline / caps） | `authoring-workflows` |
 | 命名清晰的竞争方案之间的仲裁 | `/codex` 第二意见 / eng-review |
 
@@ -75,7 +75,7 @@
 - 在判「要不要为 X 建个 skill / 这两个会不会重叠」→ `curating-skill-portfolios`。
 - 在度量一个已写好的 skill（accuracy 涨没涨 / 行为差） → `grounding-skill-evals`。
 - 写 workflow 脚本怎么 parallel/pipeline → `authoring-workflows`。
-- 把一个**已批准**的 goal 拆图、派发、驱动到完成 → `orchestrating-to-completion`。
+- 把一个**已批准**的 goal 拆图、派发、驱动到完成 → `master-orchestrator-guide`。
 
 ### 5.3 Pre-flight gate（硬门，任一不满足就 STOP）
 

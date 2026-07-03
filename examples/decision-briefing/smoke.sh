@@ -6,7 +6,6 @@
 # 这条闭环里**可机验**的部分逐步跑出来、逐步断言，最后以 `DEMO E2E PASSED` / 非零退出收尾。
 #
 # 它跑的是真实产物，不是 mock：
-#   - 用真 board-lint.js 校验 fixture board 合法（红线 2 narrow waist）；
 #   - 按 board.md §decision_package 的 canonical 契约逐字段断言决策包完整；
 #   - 用真 inputs_hash 定义（每个直接 dep 串 <dep-id>\n<artifact 字节长度>\n<artifact>\n + 末尾 goal 同形，
 #     取 payload sha256；长度前缀 + dep-id 锁死依赖边界，commands/discuss.md §2）
@@ -26,8 +25,7 @@ set -uo pipefail
 
 # ── 定位 plugin 根（本文件在 <root>/examples/decision-briefing/）+ 真实脚本 ────────────────
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-LINT="$ROOT/skills/orchestrating-to-completion/scripts/board-lint.js"
-VIEW_SERVER="$ROOT/skills/orchestrating-to-completion/scripts/view-server.js"
+VIEW_SERVER="$ROOT/skills/master-orchestrator-guide/scripts/view-server.js"
 FIXTURE="$ROOT/examples/decision-briefing/fixture.board.json"
 NODE_ID="D1"
 
@@ -116,12 +114,11 @@ say "沙箱 home：$HOME_DIR"
 say "讨论节点：${NODE_ID}（blocked_on:user，挂 decision_package）"
 
 # =====================================================================================
-step "1 — fixture board 合法 + decision_package 契约完整（webview 才能渲染富决策卡）"
+step "1 — decision_package 契约完整（webview 才能渲染富决策卡）"
 # =====================================================================================
-say "master 在 idle 时为 D1 准备好 decision_package、挂节点上。先证这块 board 真合法、契约真完整。"
-LINT_OUT="$(node "$LINT" "$BOARD" 2>&1)"; LINT_RC=$?
-what "board-lint.js（真窄腰校验器）跑完 rc=${LINT_RC}：$LINT_OUT"
-assert "fixture board 过 board-lint（窄腰合法、红线 2）" "$( [ "$LINT_RC" -eq 0 ] && echo yes || echo no )"
+say "master 在 idle 时为 D1 准备好 decision_package、挂节点上。先证这块 board 的决策包契约真完整。"
+# 注：board 窄腰合法性的校验已归带外 `ccm board lint`（skill 版 board-lint.js 已退役）——
+#     本 smoke 不在此跑 lint（fixture 是 legacy cc-master/v1、待独立迁移到 v2），只逐字段断言决策包契约。
 
 # D1 是 blocked_on:user
 GATE="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1]));const t=b.tasks.find(x=>x.id===process.argv[2]);process.stdout.write((t&&t.status==="blocked"&&t.blocked_on==="user")?"yes":"no")' "$BOARD" "$NODE_ID")"
@@ -286,7 +283,7 @@ board 主文件保持 narrow waist 不动，另写 \`<board>.index.json\` 缓存
 ## 对话记录指针
 
 - 翻过 \`design_docs/plans/persistence-recon.md\`（P0 产物）+ \`perf-baseline.md\`（P1 产物）对齐瓶颈定位。
-- 翻过 \`skills/orchestrating-to-completion/references/board.md\` §narrow-waist 确认 index 走柔性边 / 带外不破 waist。
+- 翻过 \`skills/master-orchestrator-guide/references/board.md\` §narrow-waist 确认 index 走柔性边 / 带外不破 waist。
 - 关键来回：用户最初倾向 split-shards，复述其底层 job（「>200 节点不卡」而非「拆文件」）后收敛到代价最小的 sidecar-index。
 EOF
 }

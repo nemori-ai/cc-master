@@ -2,7 +2,7 @@
 
 > Status: **Accepted**
 > Date: 2026-06-12
-> Scope: `hooks/scripts/usage-pacing.js` · `skills/orchestrating-to-completion/scripts/{cc-usage.sh,statusline-capture.js,codex-review.sh}` · `references/cost-and-pacing.md` · 仓库脚本落点约定（AGENTS §2/§3 红线5）
+> Scope: `hooks/scripts/usage-pacing.js` · `skills/master-orchestrator-guide/scripts/{cc-usage.sh,statusline-capture.js,codex-review.sh}` · `references/cost-and-pacing.md` · 仓库脚本落点约定（AGENTS §2/§3 红线5）
 > Source: [[Finding #37]]（本地反推 5h reset 失真到数量级，误导 pacing）+ claude-code-guide 对 code.claude.com 的两轮官方核实
 
 ---
@@ -29,7 +29,7 @@ cc-master 的 usage pacing 原本**只有本地反推**一条路：`cc-usage.sh`
 
 ### 2.3 运行时带外脚本落 `skills/<skill>/scripts/`，dev-only 留顶层 `scripts/`
 
-- **运行时**带外脚本（终端用户在 orchestration 里会跑：`cc-usage.sh` / `codex-review.sh` / `statusline-capture.js`）→ 搬入 `skills/orchestrating-to-completion/scripts/`，随 skill 分发；分发 prose 用 `${CLAUDE_SKILL_DIR}/scripts/...`（skill 内）或 `${CLAUDE_PLUGIN_ROOT}/skills/.../scripts/...`（command 内）引用。
+- **运行时**带外脚本（终端用户在 orchestration 里会跑：`cc-usage.sh` / `codex-review.sh` / `statusline-capture.js`）→ 搬入 `skills/master-orchestrator-guide/scripts/`，随 skill 分发；分发 prose 用 `${CLAUDE_SKILL_DIR}/scripts/...`（skill 内）或 `${CLAUDE_PLUGIN_ROOT}/skills/.../scripts/...`（command 内）引用。
 - **dev-only** 脚本（仅开发本仓用：`eval-trigger.sh` / `eval-benchmark.sh` / `skill-lint.sh`）→ 留顶层 `scripts/`，只被 dev 文档 / dev skill / `run-tests.sh` 在 **repo 根**调用，裸相对路径在此**正确**——故不改。
 
 ## 3. Consequences
@@ -64,7 +64,7 @@ cc-master 的 usage pacing 原本**只有本地反推**一条路：`cc-usage.sh`
 - [[Finding #38]]（既存分发脚本裸路径 bug → 落点重构）
 - [`ADR-006`](ADR-006-hooks-may-use-node-js.md)（node/JS 解锁，`statusline-capture.js` 与 `usage-pacing.js` 用 node）
 - [`ADR-007`](ADR-007-hook-arming-gate.md)（dormant-until-armed；本 ADR §2.2 论证 capture 为何在其精神之外）
-- [`references/cost-and-pacing.md`](../skills/orchestrating-to-completion/references/cost-and-pacing.md)（信号优先级 evergreen SSOT）
+- [`references/cost-and-pacing.md`](../skills/master-orchestrator-guide/references/cost-and-pacing.md)（信号优先级 evergreen SSOT）
 
 ## 6. References
 - Status line JSON schema（`rate_limits.{five_hour,seven_day}.{used_percentage,resets_at}`）：https://code.claude.com/docs/en/statusline.md
