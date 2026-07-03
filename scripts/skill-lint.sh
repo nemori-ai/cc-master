@@ -2,7 +2,8 @@
 # skill-lint.sh — out-of-band static prose-lint for cc-master skill files.
 #
 # This is the *mechanically-checkable subset* of skill review: cheap static
-# checks over every SKILL.md (distributed skills/ + project-internal .claude/skills/).
+# checks over every SKILL.md (distributed plugin/src/skills/ source, including host adapter
+# stub/partial SKILL.md + project-internal .claude/skills/).
 # It is a CHECKER, not a fixer — it never edits any skill file. On a violation it
 # prints the offending file:line + reason and exits non-zero.
 #
@@ -14,7 +15,7 @@
 #   3. dead relative links — every markdown link in SKILL.md `](relpath)` to a
 #      repo-relative file (references/x.md, assets/..., …) must resolve on disk.
 #   4. bare cross-skill path references (Finding #50, AGENTS.md §12) — inside any
-#      distributed markdown (skills/ commands/ hooks/), a backtick-wrapped path that
+#      distributed markdown (plugin/src/skills/ commands/ hooks/), a backtick-wrapped path that
 #      starts with a sibling *distributed skill name* (authoring-workflows /
 #      master-orchestrator-guide / pacing-and-estimation / using-ccm) followed by `/…` is a dead
 #      link at install time:
@@ -26,7 +27,7 @@
 #      paths in dev-only files are intentionally NOT flagged — those scripts are not
 #      distributed (红线5) and the bare path is correct from repo root.
 #   5. terminology drift (design_docs/glossary.md) — delegated to the sibling
-#      scripts/glossary-lint.sh: greps the distributed tree + dev docs for any banned
+#      scripts/glossary-lint.sh: greps the distributed source tree + dev docs for any banned
 #      variant of a承重 term (canonical spelling SSOT in the glossary). Its exit code
 #      is aggregated into this script's overall verdict.
 #   6. hooks ⊥ skill scripts/assets (架构红线) — a file under hooks/scripts/ must NEVER
@@ -37,7 +38,7 @@
 #      that legitimately points at a skill's SKILL.md is NOT flagged (this check matches only
 #      the /scripts and /assets subpaths, never SKILL.md).
 #   7. internal-codename + repo-coupling leak in DISTRIBUTED skill prose (AGENTS.md §6 自包含).
-#      Distributed skills/ ship to end users with NO access to this repo's dev artifacts, so any
+#      Distributed plugin/src/skills/ ship to end users with NO access to this repo's dev artifacts, so any
 #      cc-master-internal codename — ADR/Finding numbers, charter Cx / hook Hx / 镜头号 / 红线号 /
 #      SKILL 字母 — or any reference to a repo-internal location OUTSIDE the distributed skills/ tree
 #      (design_docs/, adrs/, hooks/scripts, the @ccm/engine package name, CHANGELOG) is meaningless
@@ -45,6 +46,17 @@
 #      code". This check nails that down mechanically. SCOPE = agent-facing prose only: each distributed
 #      skill's SKILL.md + references/**/*.md — NOT .claude/skills/ dev meta-skills, and NOT
 #      .design/ / evals/ / scripts/ (dev artifacts/code, not shipped prose).
+#   8. frontmatter description routing discipline (AGENTS.md §6) — every source
+#      skill description, including adapter stubs/partials, must remain route-rich
+#      and Chinese-primary. Adapter descriptions must not degrade into English
+#      summaries just because the body is unsupported/partial.
+#   9. host adapter payload uniqueness — for each adapters/<host>/strategy.yaml,
+#      the only stub/partial SKILL.md payload allowed is the one referenced by
+#      projection.source. Unreferenced stale stub/partial dirs are forbidden because
+#      they become a second truth source during adapter work.
+#   10. partial_overlay explicit exception — mode: partial_overlay is allowed only
+#      with allow_partial_overlay: true and a partial_reason, because slot/overlay
+#      should be the default adapter shape.
 #
 # Why node, not bash+jq/python: the repo's content tests are node-based, and node
 # is guaranteed present in any Claude Code host (AGENTS.md §3 红线1 / ADR-006).
@@ -71,11 +83,13 @@ const { readFileSync, readdirSync, existsSync, statSync } = require('node:fs');
 const { join, dirname, relative } = require('node:path');
 
 const ROOT = process.env.REPO;
-const SKILL_DIRS = ['skills', '.claude/skills'];
+const DIST_ROOT = 'plugin/src';
+const DIST_SKILLS = `${DIST_ROOT}/skills`;
+const SKILL_DIRS = [DIST_SKILLS, '.claude/skills'];
 
 // Distributed-tree roots scanned by the bare-cross-skill-ref check (4). Only the
 // dirs that actually ship with the plugin — bare refs in here die at install time.
-const DIST_DIRS = ['skills', 'commands', 'hooks'];
+const DIST_DIRS = [`${DIST_ROOT}/skills`, `${DIST_ROOT}/commands`, `${DIST_ROOT}/hooks`];
 // Distributed skill names whose bare `<name>/…` path refs are install-time dead links.
 const DIST_SKILL_NAMES = ['authoring-workflows', 'master-orchestrator-guide', 'pacing-and-estimation', 'using-ccm', 'slicing-goals-into-dags', 'dev-as-ml-loop', 'engineering-with-craft'];
 
@@ -99,17 +113,61 @@ function markdownFiles(base) {
   return out.sort();
 }
 
-// Collect every <dir>/<name>/SKILL.md that exists.
-function skillFiles() {
+function distributedSkillRuntimeDirs() {
   const out = [];
-  for (const base of SKILL_DIRS) {
-    const abs = join(ROOT, base);
-    if (!existsSync(abs)) continue;
-    for (const name of readdirSync(abs)) {
-      const d = join(abs, name);
+  const abs = join(ROOT, DIST_SKILLS);
+  if (!existsSync(abs)) return out;
+  for (const name of readdirSync(abs)) {
+    if (name.startsWith('_')) continue;
+    const d = join(abs, name);
+    if (!statSync(d).isDirectory()) continue;
+    const canonical = join(d, 'canonical');
+    if (existsSync(canonical) && statSync(canonical).isDirectory()) {
+      out.push({ name, abs: canonical, rel: `${DIST_SKILLS}/${name}/canonical` });
+    }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function distributedMarkdownFiles() {
+  const out = [];
+  for (const d of distributedSkillRuntimeDirs()) {
+    out.push(...markdownFiles(d.rel));
+  }
+  return out;
+}
+
+function allSourceSkillFiles() {
+  const out = [];
+  const base = join(ROOT, DIST_SKILLS);
+  if (!existsSync(base)) return out;
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      if (name === '.design' || name === 'evals' || name === 'scripts' || name === 'assets') continue;
+      const p = join(dir, name);
+      const st = statSync(p);
+      if (st.isDirectory()) walk(p);
+      else if (st.isFile() && name === 'SKILL.md') {
+        out.push({ rel: relative(ROOT, p), abs: p, dir: dirname(p) });
+      }
+    }
+  };
+  walk(base);
+  return out.sort((a, b) => a.rel.localeCompare(b.rel));
+}
+
+// Collect every distributed source SKILL.md, including adapter stub/partial SKILL.md,
+// and every project-internal .claude/skills/<name>/SKILL.md that exists.
+function skillFiles() {
+  const out = allSourceSkillFiles();
+  const devBase = '.claude/skills';
+  const devAbs = join(ROOT, devBase);
+  if (existsSync(devAbs)) {
+    for (const name of readdirSync(devAbs)) {
+      const d = join(devAbs, name);
       if (!statSync(d).isDirectory()) continue;
       const f = join(d, 'SKILL.md');
-      if (existsSync(f)) out.push({ rel: `${base}/${name}/SKILL.md`, abs: f, dir: d });
+      if (existsSync(f)) out.push({ rel: `${devBase}/${name}/SKILL.md`, abs: f, dir: d });
     }
   }
   return out.sort((a, b) => a.rel.localeCompare(b.rel));
@@ -129,6 +187,203 @@ function frontmatter(text) {
 
 const violations = [];
 const add = (file, line, msg) => violations.push({ file, line, msg });
+
+function unwrapSingleQuoted(value) {
+  const trimmed = value.trim();
+  return trimmed.length >= 2 && trimmed.startsWith("'") && trimmed.endsWith("'")
+    ? trimmed.slice(1, -1)
+    : trimmed;
+}
+
+function chineseCount(text) {
+  return (text.match(/[\u4e00-\u9fff]/g) || []).length;
+}
+
+function descriptionRoutingDiscipline(rel, line, descRaw) {
+  const desc = unwrapSingleQuoted(descRaw);
+  const zh = chineseCount(desc);
+  const isDistributedSource = rel.startsWith(`${DIST_SKILLS}/`);
+  if (!isDistributedSource) return;
+
+  const slotOnly = desc.match(/^(\{\{[A-Z0-9_]+\}\})$/);
+  if (slotOnly) {
+    validateDescriptionSlot(rel, line, slotOnly[1]);
+    return;
+  }
+
+  if (zh < 20) {
+    add(rel, line,
+      `description is not Chinese-primary / route-rich enough (only ${zh} CJK chars). ` +
+      `Adapter stub/partial descriptions must not degrade into English summaries; keep Chinese triggers, ` +
+      `职责边界, and unsupported/Do NOT use guidance (AGENTS.md §6).`);
+  }
+
+  if (!/(Triggers:|当你|何时|Use when)/.test(desc)) {
+    add(rel, line,
+      `description lacks trigger/routing language. Keep "当你/Triggers/Use when" style routing so skill selection survives adapter projection (AGENTS.md §6).`);
+  }
+
+  const isAdapter = rel.includes('/adapters/');
+  if (isAdapter && !/(Do NOT use|不要|不支持|unsupported|不可用|阻止|stub|partial)/i.test(desc)) {
+    add(rel, line,
+      `adapter description lacks unsupported/partial boundary. Stub/partial adapter descriptions must say what not to use and why (AGENTS.md §6).`);
+  }
+}
+
+function validateDescriptionText(file, line, text, context) {
+  const zh = chineseCount(text);
+  if (zh < 20) {
+    add(file, line,
+      `${context} is not Chinese-primary / route-rich enough (only ${zh} CJK chars). ` +
+      `Description slot replacements must keep Chinese triggers and routing boundaries (AGENTS.md §6).`);
+  }
+  if (!/(Triggers:|当你|何时|Use when)/.test(text)) {
+    add(file, line,
+      `${context} lacks trigger/routing language. Keep "当你/Triggers/Use when" style routing in description slot replacements (AGENTS.md §6).`);
+  }
+}
+
+function readSlotReplacementMap(text) {
+  const replacements = new Map();
+  let inSection = false;
+  let sectionIndent = 0;
+  for (const line of text.split(/\r?\n/)) {
+    const section = line.match(/^(\s*)slot_replacements:\s*$/);
+    if (section) {
+      inSection = true;
+      sectionIndent = section[1].length;
+      continue;
+    }
+    if (!inSection) continue;
+    if (/^\s*$/.test(line) || /^\s*#/.test(line)) continue;
+    const indent = line.match(/^(\s*)/)[1].length;
+    if (indent <= sectionIndent) break;
+    const match = line.match(/^\s*["']?(\{\{[A-Z0-9_]+\}\})["']?\s*:\s*["']?([^"'\n]+)["']?\s*$/);
+    if (match) replacements.set(match[1], match[2].trim());
+  }
+  return replacements;
+}
+
+function validateDescriptionSlot(rel, line, token) {
+  const parts = rel.split(/[\\/]/);
+  const skillIdx = parts.indexOf('skills') + 1;
+  const skill = parts[skillIdx];
+  if (!skill) return;
+  const adaptersDir = join(ROOT, DIST_SKILLS, skill, 'adapters');
+  if (!existsSync(adaptersDir)) {
+    add(rel, line, `description slot ${token} has no adapters directory to provide replacements`);
+    return;
+  }
+  let replacementCount = 0;
+  for (const host of readdirSync(adaptersDir).sort()) {
+    const strategyPath = join(adaptersDir, host, 'strategy.yaml');
+    if (!existsSync(strategyPath)) continue;
+    const strategyText = readFileSync(strategyPath, 'utf8');
+    const replacements = readSlotReplacementMap(strategyText);
+    const replacementRel = replacements.get(token);
+    if (!replacementRel) {
+      add(relative(ROOT, strategyPath), 1, `missing description slot replacement for ${token}`);
+      continue;
+    }
+    const replacementPath = join(ROOT, DIST_SKILLS, skill, replacementRel);
+    if (!existsSync(replacementPath)) {
+      add(relative(ROOT, strategyPath), 1, `description slot replacement ${replacementRel} for ${token} does not exist`);
+      continue;
+    }
+    replacementCount++;
+    validateDescriptionText(relative(ROOT, replacementPath), 1, readFileSync(replacementPath, 'utf8'), `description slot ${token}`);
+  }
+  if (replacementCount === 0) {
+    add(rel, line, `description slot ${token} has no replacement in any adapter strategy`);
+  }
+}
+
+function readYamlScalar(text, key) {
+  const match = text.match(new RegExp(`^\\s*${key}:\\s*["']?([^"'\\n]+)["']?\\s*$`, 'm'));
+  return match ? match[1].trim() : null;
+}
+
+function readYamlList(text, key) {
+  const values = [];
+  let inSection = false;
+  let sectionIndent = 0;
+  for (const line of text.split(/\r?\n/)) {
+    const section = line.match(new RegExp(`^(\\s*)${key}:\\s*$`));
+    if (section) {
+      inSection = true;
+      sectionIndent = section[1].length;
+      continue;
+    }
+    if (!inSection) continue;
+    if (/^\s*$/.test(line) || /^\s*#/.test(line)) continue;
+    const indent = line.match(/^(\s*)/)[1].length;
+    if (indent <= sectionIndent) break;
+    const item = line.match(/^\s*-\s*["']?([^"'\n]+)["']?\s*$/);
+    if (item) values.push(item[1].trim());
+  }
+  return values;
+}
+
+function adapterProjectedLinkExists(skillRel, linkPath) {
+  const parts = skillRel.split(/[\\/]/);
+  const skillIdx = parts.indexOf('skills') + 1;
+  const adaptersIdx = parts.indexOf('adapters');
+  if (skillIdx <= 0 || adaptersIdx === -1) return false;
+  const skill = parts[skillIdx];
+  const host = parts[adaptersIdx + 1];
+  if (!skill || !host) return false;
+  const strategyPath = join(ROOT, DIST_SKILLS, skill, 'adapters', host, 'strategy.yaml');
+  if (!existsSync(strategyPath)) return false;
+  const strategyText = readFileSync(strategyPath, 'utf8');
+  const included = new Set(readYamlList(strategyText, 'include_canonical'));
+  if (!included.has(linkPath)) return false;
+  const canonicalTarget = join(ROOT, DIST_SKILLS, skill, 'canonical', linkPath);
+  return existsSync(canonicalTarget);
+}
+
+function adapterPayloadUniqueness() {
+  const skillsBase = join(ROOT, DIST_SKILLS);
+  if (!existsSync(skillsBase)) return;
+  for (const skill of readdirSync(skillsBase).sort()) {
+    if (skill.startsWith('_')) continue;
+    const adaptersDir = join(skillsBase, skill, 'adapters');
+    if (!existsSync(adaptersDir) || !statSync(adaptersDir).isDirectory()) continue;
+    for (const host of readdirSync(adaptersDir).sort()) {
+      const hostDir = join(adaptersDir, host);
+      if (!statSync(hostDir).isDirectory()) continue;
+      const strategyPath = join(hostDir, 'strategy.yaml');
+      if (!existsSync(strategyPath)) continue;
+      const strategyText = readFileSync(strategyPath, 'utf8');
+      const mode = readYamlScalar(strategyText, 'mode') || 'copy';
+      const strategyRel = relative(ROOT, strategyPath);
+      if (mode === 'partial_overlay') {
+        const allowed = readYamlScalar(strategyText, 'allow_partial_overlay');
+        const reason = readYamlScalar(strategyText, 'partial_reason');
+        if (allowed !== 'true' || !reason) {
+          add(strategyRel, 1,
+            `mode: partial_overlay requires allow_partial_overlay: true and partial_reason. ` +
+            `Default to canonical + slot/overlay; partial_overlay is a documented exception only (AGENTS.md §6).`);
+        }
+      }
+      let expected = null;
+      if (mode === 'unsupported_stub') expected = readYamlScalar(strategyText, 'source') || `adapters/${host}/stub/`;
+      else if (mode === 'partial_overlay') expected = readYamlScalar(strategyText, 'source') || `adapters/${host}/partial/`;
+      else expected = null;
+      const expectedAbs = expected ? join(skillsBase, skill, expected.replace(/\/+$/u, ''), 'SKILL.md') : null;
+      for (const payload of ['stub', 'partial']) {
+        const payloadSkill = join(hostDir, payload, 'SKILL.md');
+        if (!existsSync(payloadSkill)) continue;
+        if (!expectedAbs || payloadSkill !== expectedAbs) {
+          add(relative(ROOT, payloadSkill), 1,
+            `stale adapter payload: ${skill}/adapters/${host}/${payload}/SKILL.md is not referenced by ` +
+            `strategy mode=${mode}${expected ? ` source=${expected}` : ''}. Delete unused stub/partial dirs instead of keeping a second truth source.`);
+        }
+      }
+    }
+  }
+}
+
+adapterPayloadUniqueness();
 
 for (const s of skillFiles()) {
   const text = readFileSync(s.abs, 'utf8');
@@ -176,6 +431,7 @@ for (const s of skillFiles()) {
             `description ${why} but is not single-quote-wrapped as a whole ` +
             `(Finding #1 / AGENTS.md §6 — wrap the entire value in '…')`);
         }
+        descriptionRoutingDiscipline(s.rel, descLine, descRaw);
       }
     }
   }
@@ -201,6 +457,7 @@ for (const s of skillFiles()) {
       if (!path) continue;
       const resolved = join(s.dir, path);
       if (!existsSync(resolved)) {
+        if (adapterProjectedLinkExists(s.rel, path)) continue;
         add(s.rel, i + 1, `dead link → \`${target}\` (no file at ${path} relative to this skill)`);
       }
     }
@@ -214,7 +471,8 @@ const crossSkillRe = new RegExp(
   '`(' + DIST_SKILL_NAMES.join('|') + ')/[^`]*`', 'g');
 const seenMd = new Set();
 for (const base of DIST_DIRS) {
-  for (const abs of markdownFiles(base)) {
+  const files = base === DIST_SKILLS ? distributedMarkdownFiles() : markdownFiles(base);
+  for (const abs of files) {
     if (seenMd.has(abs)) continue; // skills/ overlaps nothing here, but be safe
     seenMd.add(abs);
     const rel = relative(ROOT, abs);
@@ -249,16 +507,24 @@ for (const base of DIST_DIRS) {
 // in comments do NOT false-positive. Only /scripts and /assets subpaths match — a hook pointing at a
 // skill's SKILL.md (reinject's soul re-injection) is never touched.
 const hookSkillRe = /skills\/[a-z][a-z0-9-]*\/(scripts|assets)\b/;
-const HOOK_DIR = join(ROOT, 'hooks', 'scripts');
-if (existsSync(HOOK_DIR)) {
-  for (const name of readdirSync(HOOK_DIR).sort()) {
-    const p = join(HOOK_DIR, name);
-    if (!statSync(p).isFile()) continue;
+const HOOK_ROOT = join(ROOT, DIST_ROOT, 'hooks');
+if (existsSync(HOOK_ROOT)) {
+  const hookFiles = [];
+  const walkHooks = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      const st = statSync(p);
+      if (st.isDirectory()) walkHooks(p);
+      else if (st.isFile() && /\.(js|sh)$/.test(name)) hookFiles.push(p);
+    }
+  };
+  walkHooks(HOOK_ROOT);
+  for (const p of hookFiles.sort()) {
     const lines = readFileSync(p, 'utf8').split('\n');
     for (let i = 0; i < lines.length; i++) {
       const mm = lines[i].match(hookSkillRe);
       if (mm) {
-        add(`hooks/scripts/${name}`, i + 1,
+        add(relative(ROOT, p), i + 1,
           `hook references a skill scripts/assets path \`${mm[0]}\` — hooks ⊥ skill scripts/assets: ` +
           `a hook must never reach into a skill's private files (keep hook business logic self-contained; ` +
           `build board skeletons via ccm). AGENTS.md §2 关键不变式`);
@@ -288,7 +554,7 @@ const codeLeakChecks = [
   { re: /\bCHANGELOG\b/g,   fix: '指向 changelog(不随 plugin 分发)——删' },
 ];
 function inScopeDistSkillMd() {
-  return markdownFiles('skills').filter((abs) => {
+  return distributedMarkdownFiles().filter((abs) => {
     const parts = relative(ROOT, abs).split(/[\\/]/);
     return parts[parts.length - 1] === 'SKILL.md' || parts.includes('references');
   });

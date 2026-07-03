@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-# package-plugin.sh — 把 cc-master plugin 的**可分发子集**打成 `cc-master-plugin-<tag>.zip`。
+# package-plugin.sh — 把 cc-master plugin 的**可分发子集**按 harness 打成 zip。
 #
-# 用途：发版时随 GitHub release 附一份「解压即装」的 plugin 制品，
-#   解压后即得 plugin 根目录 `cc-master/`，可直接 `claude --plugin-dir <解压目录>/cc-master` 本地安装。
+# 用途：发版时随 GitHub release 附「解压即装」的 per-harness plugin 制品，
+#   解压后即得 plugin 根目录 `cc-master/`；所有 harness 共享同一 plugin tag/version，只拆 asset。
 #
 # 落点（红线5）：这是 **dev-only** 构建脚本——只从 **repo 根**调用、**不随 plugin 分发**，
-#   故用裸相对路径（从 repo 根解析正确）。运行时脚本才进 `skills/<skill>/scripts/`。
+#   故用裸相对路径（从 repo 根解析正确）。运行时脚本才进 `plugin/src/skills/<skill>/canonical/scripts/`。
 #
 # allowlist 模型：只 ship 约定的分发目录 + 顶层 doc，**显式列入**而非排除——
 #   宁可漏装一个新目录（validate 会现形）也不误带 dev-only 物（ccm/ design_docs/ tests/ scripts/ adrs/ examples/）。
 #
 # 用法：
-#   bash scripts/package-plugin.sh            # tag 从 git/plugin.json 推导
-#   bash scripts/package-plugin.sh v0.10.0    # 显式指定 tag（CI 传 GITHUB_REF_NAME）
+#   bash scripts/package-plugin.sh --host claude-code          # tag 从 git/plugin.json 推导
+#   bash scripts/package-plugin.sh --host codex v0.10.0        # 显式指定 tag（CI 传 GITHUB_REF_NAME）
+#   bash scripts/package-plugin.sh --all-hosts v0.10.0         # 输出所有 supported host 制品
 #   CCM_PLUGIN_OUT_DIR=dist bash ...          # 自定义产物目录（默认 dist/）
 #
 # 产物路径打到 stdout 最后一行（CI 可 capture）。
@@ -27,60 +28,155 @@ cd "${REPO_ROOT}"
 log() { printf '\033[1;34m[package-plugin]\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31m[package-plugin] ERROR:\033[0m %s\n' "$*" >&2; exit 1; }
 
+zip_dir() {
+  local stage="$1" zip="$2"
+  if command -v zip >/dev/null 2>&1; then
+    ( cd "$stage" && zip -rqX "$zip" cc-master )
+    return
+  fi
+  command -v python3 >/dev/null 2>&1 || die "缺 zip；也找不到 python3 fallback 来生成 zip。"
+  STAGE="$stage" ZIP="$zip" python3 <<'PY'
+import os
+import stat
+import zipfile
+
+stage = os.environ["STAGE"]
+zip_path = os.environ["ZIP"]
+root = os.path.join(stage, "cc-master")
+
+with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames.sort()
+        filenames.sort()
+        rel_dir = os.path.relpath(dirpath, stage)
+        if rel_dir != ".":
+            info = zipfile.ZipInfo(rel_dir.rstrip("/") + "/")
+            mode = os.stat(dirpath).st_mode
+            info.external_attr = (mode & 0xFFFF) << 16
+            zf.writestr(info, b"")
+        for name in filenames:
+            full = os.path.join(dirpath, name)
+            rel = os.path.relpath(full, stage)
+            info = zipfile.ZipInfo(rel)
+            mode = os.stat(full).st_mode
+            info.external_attr = (mode & 0xFFFF) << 16
+            with open(full, "rb") as fh:
+                zf.writestr(info, fh.read())
+PY
+}
+
 # ── tag 推导：参数 > git exact tag > plugin.json version（前缀 v）──────────────────────────────────
-TAG="${1:-}"
+HOST="claude-code"
+ALL_HOSTS=0
+TAG=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --host)
+      HOST="${2:-}"
+      [ -n "${HOST}" ] || die "--host 需要一个值（claude-code / codex）"
+      shift 2
+      ;;
+    --host=*)
+      HOST="${1#*=}"
+      [ -n "${HOST}" ] || die "--host 需要一个值（claude-code / codex）"
+      shift
+      ;;
+    --all-hosts)
+      ALL_HOSTS=1
+      shift
+      ;;
+    -h|--help)
+      sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
+    *)
+      [ -z "${TAG}" ] || die "只能传一个 tag；多余参数：$1"
+      TAG="$1"
+      shift
+      ;;
+  esac
+done
+[ "${ALL_HOSTS}" = "1" ] && [ "${HOST}" != "claude-code" ] && die "--host 与 --all-hosts 不能同时使用。"
 if [ -z "${TAG}" ]; then
   TAG="$(git describe --tags --exact-match 2>/dev/null || true)"
 fi
 if [ -z "${TAG}" ]; then
-  VER="$(node -e 'process.stdout.write(require("./.claude-plugin/plugin.json").version)')" \
+  VER="$(node -e 'process.stdout.write(require("./plugin/src/.claude-plugin/plugin.json").version)')" \
     || die "读 plugin.json version 失败"
   TAG="v${VER}"
 fi
 log "tag: ${TAG}"
 
 # ── 可分发 allowlist ─────────────────────────────────────────────────────────────────────────────
-#   约定分发目录（红线·§12）：.claude-plugin / commands / skills / hooks（+ 未来 agents / bin）。
-#   docs/ 随附是为让 README 里的图片链接在解压后仍可解析（自包含制品）。
-INCLUDE_DIRS=( .claude-plugin commands skills hooks docs agents bin )
-INCLUDE_FILES=( README.md README_zh.md AGENTS.md CLAUDE.md CHANGELOG.md LICENSE )
+package_one() {
+  local host="$1" stage pkg plugin_root zip out_dir
+  case "$host" in
+    claude-code|codex) ;;
+    *) die "未知 host：${host}（支持：claude-code / codex）" ;;
+  esac
 
-# ── staging：制品顶层是 cc-master/（解压即得干净的 plugin 根目录）────────────────────────────────────
-STAGE="$(mktemp -d)"
-trap 'rm -rf "${STAGE}"' EXIT
-PKG="${STAGE}/cc-master"
-mkdir -p "${PKG}"
+  bash scripts/sync-plugin-dist.sh --host "$host" >/dev/null
+  plugin_root="plugin/dist/${host}"
+  [ -d "$plugin_root" ] || die "缺 ${plugin_root}"
 
-for d in "${INCLUDE_DIRS[@]}"; do
-  if [ -d "${d}" ]; then
-    cp -R "${d}" "${PKG}/${d}"
-    log "+ dir  ${d}/"
+  stage="$(mktemp -d)"
+  pkg="${stage}/cc-master"
+  mkdir -p "$pkg"
+
+  local include_dirs=( skills hooks docs agents bin )
+  if [ "$host" = "claude-code" ]; then
+    include_dirs=( .claude-plugin commands "${include_dirs[@]}" )
+  else
+    include_dirs=( .codex-plugin "${include_dirs[@]}" )
   fi
-done
-[ -d "${PKG}/.claude-plugin" ] || die "缺 .claude-plugin/——制品不会是合法 plugin"
-[ -d "${PKG}/skills" ] || die "缺 skills/"
+  local include_files=( README.md README_zh.md CHANGELOG.md LICENSE )
 
-for f in "${INCLUDE_FILES[@]}"; do
-  if [ -f "${f}" ]; then
-    cp "${f}" "${PKG}/${f}"
-    log "+ file ${f}"
+  log "host: ${host}"
+  for d in "${include_dirs[@]}"; do
+    if [ -d "${plugin_root}/${d}" ]; then
+      cp -R "${plugin_root}/${d}" "${pkg}/${d}"
+      log "+ dir  ${d}/"
+    elif [ -d "${d}" ]; then
+      cp -R "${d}" "${pkg}/${d}"
+      log "+ dir  ${d}/"
+    fi
+  done
+  [ -d "${pkg}/skills" ] || die "缺 skills/"
+  if [ "$host" = "claude-code" ]; then
+    [ -d "${pkg}/.claude-plugin" ] || die "缺 .claude-plugin/——Claude Code 制品不会是合法 plugin"
+    [ -d "${pkg}/commands" ] || die "缺 commands/"
+  else
+    [ -d "${pkg}/.codex-plugin" ] || die "缺 .codex-plugin/"
   fi
-done
 
-# ── 清理任何混入的非分发噪声（保险，allowlist 内目录可能藏 .DS_Store / node_modules）──────────────────
-find "${PKG}" -name '.DS_Store' -delete 2>/dev/null || true
-find "${PKG}" -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
-# skills/<name>/.design/ 是仓库维护者用的 co-located 设计/J 文档，不是用户 agent 运行时 prose。
-find "${PKG}/skills" -type d -name .design -prune -exec rm -rf {} + 2>/dev/null || true
+  for f in "${include_files[@]}"; do
+    if [ -f "${f}" ]; then
+      cp "${f}" "${pkg}/${f}"
+      log "+ file ${f}"
+    fi
+  done
 
-# ── 打 zip ────────────────────────────────────────────────────────────────────────────────────────
-OUT_DIR="${CCM_PLUGIN_OUT_DIR:-dist}"
-mkdir -p "${REPO_ROOT}/${OUT_DIR}"
-ZIP="${REPO_ROOT}/${OUT_DIR}/cc-master-plugin-${TAG}.zip"
-rm -f "${ZIP}"
-# -X 去除多余的扩展属性/uid-gid，制品跨机一致。
-( cd "${STAGE}" && zip -rqX "${ZIP}" cc-master )
-log "✔ 打包完成：${ZIP} ($(du -h "${ZIP}" | cut -f1))"
+  find "${pkg}" -name '.DS_Store' -delete 2>/dev/null || true
+  find "${pkg}" -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
+  find "${pkg}/skills" -type d -name .design -prune -exec rm -rf {} + 2>/dev/null || true
 
-# stdout 最后一行 = 产物绝对路径（CI capture 用）。
-printf '%s\n' "${ZIP}"
+  out_dir="${CCM_PLUGIN_OUT_DIR:-dist}"
+  case "$out_dir" in
+    /*) ;;
+    *) out_dir="${REPO_ROOT}/${out_dir}" ;;
+  esac
+  mkdir -p "${out_dir}"
+  zip="${out_dir}/cc-master-plugin-${host}-${TAG}.zip"
+  rm -f "$zip"
+  zip_dir "$stage" "$zip"
+  rm -rf "$stage"
+  log "✔ 打包完成：${zip} ($(du -h "${zip}" | cut -f1))"
+  printf '%s\n' "$zip"
+}
+
+if [ "$ALL_HOSTS" = "1" ]; then
+  package_one claude-code
+  package_one codex
+else
+  package_one "$HOST"
+fi

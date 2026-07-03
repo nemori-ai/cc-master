@@ -40,23 +40,38 @@ pnpm -C ccm install && pnpm -C ccm build   # 出 dist
 （node-bin shim，免每次重建 SEA）；无 pnpm/dist 时软失败、hook 测试走降级路径。hooks 解析
 `ccm` 的顺序：`$CCM_BIN`（绝对路径覆写）> PATH 上的 `ccm`。
 
+### Generated plugin adapters
+
+`plugin/src` is the semantic source. `plugin/dist/<harness>` is committed generated
+output and must be kept in the same commit as the source change that caused it.
+Install the repo-local pre-push hook once per clone:
+
+```bash
+bash scripts/install-git-hooks.sh
+```
+
+The hook runs `bash scripts/check-plugin-dist-sync.sh` before every `git push`.
+That script regenerates the Claude Code and Codex adapter trees; if `plugin/dist`
+changes, the push is blocked. Review and commit the generated diff, then push
+again.
+
 ## Before you open a PR
 
 Run both checks. They are the same two gates the maintainers run:
 
 ```bash
 ./run-tests.sh                 # hook tests (bash) + content contract (Node 22+)
-claude plugin validate .       # validates the plugin manifest, skills, commands
+bash scripts/check-plugin-dist-sync.sh
+claude plugin validate plugin/dist/claude-code
 ```
 
-`run-tests.sh` must end with `ALL TESTS PASSED`, and `claude plugin validate .`
-must report no errors. The harness is the authoritative validator for workflow
-scripts — there is intentionally no separate workflow linter to maintain
-(see [`skills/authoring-workflows/SKILL.md`](skills/authoring-workflows/SKILL.md) §3).
+`run-tests.sh` must end with `ALL TESTS PASSED`, `check-plugin-dist-sync.sh`
+must leave no `plugin/dist` diff, and `claude plugin validate plugin/dist/claude-code`
+must report no errors.
 
 ### 机制 ↔ skill 对账步（改了 command / hook / script 业务逻辑就做）
 
-如果你这次 PR 改动了任何 `commands/` / `hooks/scripts/` / `skills/*/scripts/`（或顶层
+如果你这次 PR 改动了任何 `plugin/src/commands/` / `plugin/src/hooks/*/implementations/claude-code/` / `plugin/src/skills/*/canonical/scripts/`（或顶层
 `scripts/`）里某个机制的**业务逻辑**（不只是注释 / 排版），开 PR 前做一遍**人工对账仪式**，
 确保 skill prose 没和实现脱节（语义漂移）。这是一道**轻量手工核对仪式（ritual），不是自动化
 门、也不接 CI**（T30 设计闸定的路线）——所以靠你照着下面三步走：
@@ -69,14 +84,14 @@ scripts — there is intentionally no separate workflow linter to maintain
    on-disk 实现相符。**不一致 = 语义漂移**——按矩阵把 prose 改对（落点就是矩阵列出的那个文件），
    并把该机制行的「上次同步日期」更新到今天。
 
-3. **grep 硬化（堵漏列病根）**：矩阵手维护、可能漏列引用——所以对你改的机制名 `grep skills/`
+3. **grep 硬化（堵漏列病根）**：矩阵手维护、可能漏列引用——所以对你改的机制名 `grep plugin/src/skills/`
    一遍，确认矩阵那一行没漏掉任何引用它的 prose 文件。这个 grep 是**一次性核对工具**，不是常驻
    脚本、也不是 lint 门。命令骨架（把 `<机制名>` 换成你改的那个，**优先用去扩展名的 basename**，
    因为 prose 常以不带 `.sh`/`.js` 的形式引用——例如 `verify-board` 而非 `verify-board.sh`）：
 
    ```bash
-   # 例：改了 hooks/scripts/verify-board.sh
-   grep -rln verify-board skills/ | grep -v '/scripts/'
+   # 例：改了 plugin/src/hooks/verify-board/implementations/claude-code/verify-board.js
+   grep -rln verify-board plugin/src/skills/ | grep -v '/canonical/scripts/'
    # 把输出和矩阵该行「被哪些 skill prose 引用」列逐一对照：
    #   - grep 命中、矩阵没列  → 矩阵漏列了，补进矩阵那一行
    #   - 矩阵列了、grep 没命中 → 先换不带扩展名的机制名再搜一遍确认；仍无则该引用已失效，从矩阵删

@@ -2,7 +2,7 @@
 # glossary-lint.sh — out-of-band static terminology-drift lint for cc-master.
 #
 # Reads the "禁用变体（lint 卡）" column of design_docs/glossary.md (the dev-side
-# terminology SSOT), then greps the distributed tree (skills/ commands/ hooks/) +
+# terminology SSOT), then greps the distributed source tree (plugin/src/skills, commands, hooks) +
 # dev docs (AGENTS.md adrs/ .claude/skills/) for every banned variant. A hit means
 # a承重 term drifted from its canonical spelling — the script prints the offending
 # file:line + which banned variant + its canonical form, and exits non-zero.
@@ -43,7 +43,7 @@ const GLOSSARY_ABS = join(ROOT, GLOSSARY_REL);
 
 // Scan targets: distributed tree + dev docs. Each entry is a repo-relative path
 // that may be a file (AGENTS.md) or a directory (recursively walked).
-const SCAN = ['skills', 'commands', 'hooks', 'AGENTS.md', 'adrs', '.claude/skills'];
+const SCAN = ['plugin/src/skills', 'plugin/src/commands', 'plugin/src/hooks', 'AGENTS.md', 'adrs', '.claude/skills'];
 
 if (!existsSync(GLOSSARY_ABS)) {
   console.error(`glossary-lint: ${GLOSSARY_REL} not found — cannot lint`);

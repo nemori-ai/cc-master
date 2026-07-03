@@ -4,7 +4,7 @@
 
 **Give it a big goal — and a budget. Then go do something else.**
 
-cc-master turns a Claude Code session into a project lead that never sleeps and actually watches the money. You bring the idea and make the handful of calls that truly need you; it handles the rest — breaking the work down, running it in parallel, tracking progress, keeping spend in check, checking its own work. You come back, and it's done. And it didn't blow your budget.
+cc-master turns a supported coding-agent session into a project lead that never sleeps and actually watches the money. You bring the idea and make the handful of calls that truly need you; it handles the rest — breaking the work down, running it in parallel, tracking progress, keeping spend in check, checking its own work. You come back, and it's done. And it didn't blow your budget.
 
 And there's real machinery behind the warmth: it **runs the numbers thousands of times** to tell you when you'll ship and which step is most likely to slip; it **watches your quota and adjusts its pace** as it goes — easing off when you're tight, pressing when you've got room; and it **keeps a few accounts in rotation**, spreading the load and quietly switching before any one runs dry. So it breaks the work into parallel pieces and **delivers it, fast and steady**, all the way to done — no idling, no walls, no wasted spend.
 
@@ -72,9 +72,28 @@ A one-or-two-line fix you can knock out in ten minutes? Just do it — don't bri
 
 ## What it actually is (for the curious)
 
-cc-master is a plugin for [Claude Code](https://code.claude.com/docs/en/workflows), built from three things: a thin layer of **orchestration logic** (teaching the AI how to be the lead), an **engine** that does operations-research forecasting and pacing, and a layer that **pools and schedules the quota** across several accounts.
+cc-master is a **multi-agent-harness plugin system** built from three things: a thin layer of **orchestration logic** (teaching the AI how to be the lead), an **engine** that does operations-research forecasting and pacing, and harness adapters that project that logic into the command, prompt, skill, hook, and settings surfaces each agent host actually supports.
 
-We keep a clear line between "what it does today" and "what we're still building." Most of it works now; smarter budget management and a coordinated *fleet* of AI leads are on the way. **Every mechanism, and whether each one is shipped or still on the drawing board, is written down honestly in the [Feature Manual](design_docs/feature-manual.md)** — we don't oversell it in the README.
+The source follows a paragoge-style `plugin/src -> plugin/dist/<host>` model: shared runtime skills live in canonical source, hooks are modeled as host-independent product contracts with host-native implementations, and each harness gets its own adapter artifact. The plugin version line is shared; release assets are split by harness, for example `cc-master-plugin-claude-code-<version>.zip` and `cc-master-plugin-codex-<version>.zip`.
+
+We keep a clear line between "what it does today" and "what we're still building." Current adapters include Claude Code and Codex, with different host surfaces and some different capability levels. **Every mechanism, and whether each one is shipped or still on the way, is written down honestly in the [Feature Manual](design_docs/feature-manual.md)** — we don't oversell it in the README.
+
+For contributors: edit `plugin/src`, not `plugin/dist`. Skills use SAP (`canonical/` plus `adapters/<host>/strategy.yaml`); hooks use PHIP (`_manifest/`, `_hosts/<host>/`, and `implementations/<host>/`). Regenerate adapters with:
+
+```bash
+bash scripts/sync-plugin-dist.sh              # Claude Code adapter
+bash scripts/sync-plugin-dist.sh --host codex # Codex adapter
+```
+
+Before pushing source changes that affect the plugin, install the repo hook once with `bash scripts/install-git-hooks.sh`. It runs `bash scripts/check-plugin-dist-sync.sh` before every push and blocks if `plugin/dist` needs to be regenerated and committed.
+
+Project meta-skills live in `.claude/skills`. Codex discovers repo skills from `.agents/skills`, so keep the Codex projection in sync with:
+
+```bash
+bash scripts/sync-codex-skills.sh
+```
+
+Harness compatibility notes live in [`design_docs/harnesses/`](design_docs/harnesses/). That directory is the local, corrected source for the paragoge-derived adapter model plus the current Claude Code and Codex facts.
 
 ---
 
@@ -89,17 +108,21 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 # …or pin a specific version of either line — each flag is optional and
 # independent; whichever you omit resolves to the latest of that line:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- \
-  --ccm-version ccm-v0.11.0 --plugin-version v0.10.1
+  --ccm-version ccm-v0.13.0 --plugin-version 0.12.1
 
 # pin just one line, leave the other on latest (e.g. hold ccm, take latest plugin):
-curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.11.0
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.13.0
+
+# target a harness explicitly, or fan out to every installed supported harness:
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness claude-code
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --all-harnesses
 ```
 
-It detects your OS and architecture, downloads the right `ccm` binary and puts it on your PATH, then installs the plugin into Claude Code. You just need `curl` (or `wget`), `unzip`, and the `claude` CLI (≥ v2.1.195) already on your machine. The `ccm` engine is a **hard prerequisite** — without it the plugin won't start an orchestration ([ADR-021](adrs/ADR-021-ccm-install-presence-hard-precheck.md)) — which is exactly why the installer puts it in place first.
+It detects your OS and architecture, downloads the right `ccm` binary and puts it on your PATH, then detects installed harnesses and distributes the matching adapter package to each supported target. Claude Code installation uses the `claude` CLI (≥ v2.1.195). Codex installation registers a local Codex marketplace/plugin entry for this local adapter; command entrypoints are exposed as skills (for example `$cc-master-as-master-orchestrator ...`). You just need `curl` (or `wget`) and `unzip`; each harness adapter may also need that harness's own CLI/config directory to be present. The `ccm` engine is a **hard prerequisite** — without it the plugin won't start an orchestration — which is exactly why the installer puts it in place first.
 
-> **Rather do it by hand, or run from source?** Clone the repo and point Claude Code straight at it: `git clone https://github.com/nemori-ai/cc-master.git && claude --plugin-dir ./cc-master`. You'll still need `ccm` on your PATH — download `ccm-<os>-<arch>` from the latest `ccm-v*` release's **Assets** (ccm has its own release line now), rename it to `ccm`, `chmod +x`, and drop it in `~/.local/bin`.
+> **Rather do it by hand, or run from source?** Clone the repo, generate the adapter you want with `bash scripts/sync-plugin-dist.sh --host <harness>`, then install that adapter through the harness-native route. Claude Code can point at `plugin/dist/claude-code`; Codex should be registered through a local marketplace that points at `plugin/dist/codex` (with only skill/hooks packaged there). You'll still need `ccm` on your PATH — download `ccm-<os>-<arch>` from the latest `ccm-v*` release's **Assets**, rename it to `ccm`, `chmod +x`, and drop it in `~/.local/bin`.
 
-**Moved your Claude config?** If you run Claude Code with `CLAUDE_CONFIG_DIR` pointing somewhere other than `~/.claude`, `ccm` follows it automatically — its board home and account pool live under your configured directory, no extra flags needed.
+**Moved your harness config?** `CLAUDE_CONFIG_DIR` still controls Claude Code's own settings, credentials, and transcript project files; `CODEX_HOME` controls Codex's home. cc-master's runtime state is harness-neutral: boards, account registry, file vault, and quota sidecar live under `${CC_MASTER_HOME:-$HOME/.cc_master}` unless you pass `--home`.
 
 ### Status line (automatic)
 
@@ -107,24 +130,28 @@ cc-master ships its own status line — a context progress bar plus your 5h / 7d
 
 Heads-up: this **overwrites your existing `statusLine`** (your original is backed up first). To put yours back: `ccm statusline uninstall` (restores your original and stops cc-master from re-installing). To disable the auto-install entirely, set `CC_MASTER_NO_AUTOINSTALL=1`.
 
-Now hand it a goal:
+Now hand it a goal through your harness's entrypoint:
 
 ```
-/cc-master:as-master-orchestrator <your goal>      # hand it over — it starts
+# Claude Code
+/cc-master:as-master-orchestrator <your goal>
+
+# Codex
+$cc-master-as-master-orchestrator <your goal>
 ```
 
 ---
 
 ## Everyday use
 
-The handful of commands you'll actually type. The `/cc-master:…` ones run **inside a Claude Code session**; `ccm …` runs in your **terminal**.
+The handful of commands you'll actually type. The in-session entrypoint is harness-specific; `ccm …` always runs in your **terminal**.
 
-- **`/cc-master:as-master-orchestrator <goal>`** — hand over a big goal; it builds the plan and starts working. This is how every run begins.
-- **`/cc-master:status`** — a quick read of where things stand: overall progress, what's blocked, and any decision waiting on **you**.
-- **`/cc-master:view`** — open its live plan as a read-only graph in your browser; it updates on its own and never touches the work.
-- **`/cc-master:discuss <decision>`** — when `status` flags a decision that's waiting on you, talk it through in a fresh session; your answer flows back into the plan.
-- **`/cc-master:stop`** — wrap up and archive the board. Reversible — you can pick the run back up later.
-- **`/cc-master:handoff-to-new-session`** — cleanly hand the run to a fresh session before this one ends; the new session takes over with `/cc-master:as-master-orchestrator --resume`.
+- **Start / resume** — Claude Code: `/cc-master:as-master-orchestrator <goal>` or `/cc-master:as-master-orchestrator --resume`; Codex: `$cc-master-as-master-orchestrator <goal>` or `$cc-master-as-master-orchestrator --resume`.
+- **Status** — Claude Code: `/cc-master:status`; Codex: `$cc-master-status`.
+- **View** — Claude Code: `/cc-master:view`; Codex: `$cc-master-view`. Opens the live plan as a read-only graph in your browser.
+- **Discuss** — Claude Code: `/cc-master:discuss <decision>`; Codex: `$cc-master-discuss <decision>`. Use it when a decision is waiting on you.
+- **Stop** — Claude Code: `/cc-master:stop`; Codex: `$cc-master-stop`. Wraps up and archives the board; you can resume later.
+- **Handoff** — Claude Code: `/cc-master:handoff-to-new-session`; Codex: `$cc-master-handoff-to-new-session`. Use it before moving the run to a fresh session.
 - **`ccm account add|list|switch <email>`** — build and steer a pool of backup accounts so it can switch to a full one when quota runs low. You run these directly in your terminal; your tokens stay token-blind and never reach the AI's context.
 
 > That's the everyday set. The full command surface (every `ccm` namespace and flag) is in the [command catalog](skills/using-ccm/references/command-catalog.md); what's shipped vs. still on the way is in the [Feature Manual](design_docs/feature-manual.md).

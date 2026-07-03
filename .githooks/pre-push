@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+bash scripts/check-plugin-dist-sync.sh
