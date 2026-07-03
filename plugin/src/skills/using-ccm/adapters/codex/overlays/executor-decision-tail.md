@@ -1,0 +1,1 @@
+Codex 下，`executor` 仍是 board 的领域字段，不是 Codex API 名。选择它时先问：这个任务是否已经有一个真实、可续查、可停止或可验收的工作句柄？没有句柄就不要标 `in_flight`。Codex 的 subagents、background terminals、cloud runs、automations 都需要按实际可追踪能力记录为 `subagent` 或 `external`；没有被 cc-master adapter 验证成等价派发原语前，不要套用 Claude Code 的完成通知或 workflow 语义。

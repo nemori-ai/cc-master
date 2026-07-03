@@ -1,0 +1,1 @@
+**职责边界**：**消费机制**归本 skill；**决策**归 `master-orchestrator-guide`（「量力而行」/「目标即依赖图」/「该问就问」三镜头 + 决策程序 + `${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/references/cost-decisions.md` 的换号决策锚）；**命令怎么敲 / account 操作**归 `using-ccm`；**走廊数学 / 估算算法的实现 SSOT** 在 ccm 引擎（本 skill 不复述数学）。

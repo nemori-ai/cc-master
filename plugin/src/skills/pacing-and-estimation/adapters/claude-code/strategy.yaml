@@ -1,0 +1,31 @@
+# cc-master SAP strategy: Claude Code adapter for pacing-and-estimation
+host: claude-code
+skill: pacing-and-estimation
+version: 1
+projection:
+  source: canonical/
+  target: skills/pacing-and-estimation/
+  copy: true
+  exclude:
+    - AGENTS.md
+    - CLAUDE.md
+slot_replacements:
+  "{{PACING_DESCRIPTION}}": adapters/claude-code/overlays/description.md
+  "{{PACING_BOUNDARY}}": adapters/claude-code/overlays/boundary.md
+  "{{PACING_REFERENCE_POINTERS_HEAD}}": adapters/claude-code/overlays/reference-pointers-head.md
+  "{{PACING_MODEL_TIER_ANCHOR}}": adapters/claude-code/overlays/model-tier-anchor.md
+  "{{PACING_COMMAND_CATALOG_POINTER}}": adapters/claude-code/overlays/command-catalog-pointer.md
+  "{{PACING_USAGE_FOOTGUN_ROWS}}": adapters/claude-code/overlays/usage-footgun-rows.md
+  "{{PACING_POINTERS_HOST}}": adapters/claude-code/overlays/pointers-host.md
+  "{{PACING_SIBLING_POINTERS}}": adapters/claude-code/overlays/sibling-pointers.md
+  "{{PACING_STOP_5H_WAKEUP_LEVER}}": adapters/claude-code/overlays/stop-5h-wakeup-lever.md
+  "{{PACING_STOP_5H_WAKEUP_GUIDANCE}}": adapters/claude-code/overlays/stop-5h-wakeup-guidance.md
+  "{{PACING_SWITCH_VERDICT_ROW}}": adapters/claude-code/overlays/switch-verdict-row.md
+  "{{PACING_USAGE_SIGNALS_REFERENCE}}": adapters/claude-code/overlays/usage-signals-reference.md
+  "{{PACING_LEVERS_REFERENCE}}": adapters/claude-code/overlays/levers-reference.md
+mechanisms:
+  declarative-patch:
+    enabled: false
+    patches: []
+notes:
+  - Claude Code projects the host-neutral canonical body plus strategy-defined wakeup slots.

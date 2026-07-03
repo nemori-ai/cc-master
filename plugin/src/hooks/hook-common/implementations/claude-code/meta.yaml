@@ -1,0 +1,9 @@
+hook: hook-common
+host: claude-code
+version: 1
+event: "helper"
+matcher: ""
+projection:
+  target: hooks/scripts/
+notes:
+  - Phase 1 preserves the existing Claude Code hook script and registration semantics.

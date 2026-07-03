@@ -1,0 +1,3 @@
+换号号池机制（换号 token-blind 录入 / 选号 / 无重启切号）。号池 = 用户级 registry `${CC_MASTER_HOME:-$HOME/.cc_master}/accounts.json`（email→vault 非密指针 + 时间元信息·**零 token**）+ token 本体（macOS keychain / 非 mac 0600 file vault）。**token 全程活在 ccm 引擎子进程·绝不进 agent / registry / log**（vault token-blind）。换号是**无重启凭证覆写**：`switch` 续期新号 → 覆写官方共享凭证三存储 → 运行中 claude 惰性 re-read 接管（进程不重启 / board 不动）。概念叙事见 [references/account-pool.md](references/account-pool.md)；**换号决策**归 `master-orchestrator-guide`。
+
+`account add/refresh/delete/list/switch` 是 Claude Code credential backend 的操作面；录号 / refresh 的前提是用户当前正登录在目标号。`switch` 先过 board-policy 硬闸，`deny` → exit 7，放行后选号、续期、覆写官方共享凭证并翻 registry `active`。

@@ -1,0 +1,7 @@
+- **`subagent`** —— 一个终端推理单元负责：单一证据面 + 单一推理链 + 单一交付物 + context-safe + 携带 escalation 路径。默认把独立、可并行的实现工作派给 Codex subagent；必须记录 agent id / thread / task 引用。
+- **`workflow`** —— board 字段可保留这个 executor 值表达“结构化 fan-out/fan-in 工作”，但 Codex adapter 当前不支持 Claude Code Workflow API。需要多叶子确定性控制时，用 Codex subagents / 后台 terminal / cloud task 组合实现，并记录每个 handle；不要调用 `Workflow`。
+- **`master-orchestrator`** —— **你自己**做的那几件不可外包的活：调度决策、replan、端点验收、整合。你不为它起后台机制——它就是你在指挥台上亲手做的。
+- **`user`** —— 人类操作者负责：需判断 / 授权 / 拍板的（merge / 不可逆 / 对外 / 方向性）。surface 给用户、把回答当一条 async 依赖，别越权替他决。
+- **`external`** —— session 外或 shell/session 中可追踪的工作：后台 terminal session、CI run、GitHub issue、Codex cloud task、系统 scheduler。用 session id / issue / CI URL / task id 指过去，靠 recon 查询它的完成。
+
+> **反过度工程的对称护栏**：fan-out/fan-in 有协调成本。只有一条推理链 / 一份交付物 / 没有真正的并行证据面时，一个 Codex subagent 或一个后台 terminal session 就够了；别为了“像 workflow”而制造多 worker。

@@ -1,0 +1,9 @@
+host: codex
+skill: cc-master-as-master-orchestrator
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/cc-master-as-master-orchestrator/
+  include_adapter:
+    - agents/openai.yaml

@@ -1,0 +1,19 @@
+host: codex
+command: status
+version: 1
+mode: adapter_guidance
+surface:
+  kind: user_prompt_ccm_cli_guided
+  user_prompt: plugin/src/skills/cc-master-status/canonical/SKILL.md
+  summary: "Use `$cc-master-status` or run/read ccm board/usage/usage/graph commands directly."
+  primary_commands:
+    - "ccm board show --json"
+    - "ccm board lint --json"
+    - "ccm board graph --json"
+    - "ccm usage advise --json"
+    - "ccm board next --json"
+notes:
+  - Codex 目前的实现是 skill-first：无 native `/cc-master:status` slash command，状态读取与指引交给 `plugin/src/skills/cc-master-status/canonical/SKILL.md` 与 ccm read-only 命令。
+  - Codex has a built-in /status command, so cc-master must not claim /status.
+  - The status intent is covered by the using-ccm skill and ccm read-only commands.
+  - Skills can guide this workflow, but they do not provide command-style structured args.

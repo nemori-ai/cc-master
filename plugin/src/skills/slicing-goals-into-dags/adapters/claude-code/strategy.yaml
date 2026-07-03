@@ -1,0 +1,19 @@
+# cc-master SAP strategy: Claude Code adapter for slicing-goals-into-dags
+host: claude-code
+skill: slicing-goals-into-dags
+version: 1
+projection:
+  source: canonical/
+  target: skills/slicing-goals-into-dags/
+  copy: true
+  exclude:
+    - AGENTS.md
+    - CLAUDE.md
+slot_replacements:
+  "{{SLICING_DISPATCH_POINTER}}": adapters/claude-code/overlays/dispatch-pointer.md
+mechanisms:
+  declarative-patch:
+    enabled: false
+    patches: []
+notes:
+  - Claude Code projects the host-neutral canonical body plus strategy-defined dispatch wording.

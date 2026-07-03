@@ -1,0 +1,16 @@
+host: codex
+command: stop
+version: 1
+mode: adapter_guidance
+surface:
+  kind: user_prompt_ccm_cli_guided
+  user_prompt: plugin/src/skills/cc-master-stop/canonical/SKILL.md
+  summary: "Confirm with the user, then archive the selected board through ccm."
+  primary_commands:
+    - "ccm board show --json"
+    - "ccm board lint --json"
+  - "ccm board archive --board <board-path>"
+notes:
+  - Codex 目前的实现是 skill-first：无 native `/cc-master:stop` slash command，停止行为通过 `plugin/src/skills/cc-master-stop/canonical/SKILL.md` 与 board archiving 命令引导。
+  - Codex has a built-in /stop command for background terminals, so cc-master must not claim /stop.
+  - Archiving is reversible through $cc-master-as-master-orchestrator --resume <selector>.

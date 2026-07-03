@@ -1,0 +1,12 @@
+host: codex
+skill: authoring-workflows
+version: 1
+mode: unsupported_stub
+projection:
+  source: adapters/codex/stub/
+  target: skills/authoring-workflows/
+unsupported:
+  - capability: dynamic_workflow
+    reason: "No verified Codex equivalent of Claude Code Workflow tool."
+notes:
+  - Do not copy the Claude Code Workflow API reference into Codex.

@@ -1,0 +1,8 @@
+hook: identity-nudge
+host: codex
+event: Stop
+mode: replacement-stop-system-message
+notes:
+  - Emits Codex Stop systemMessage instead of additionalContext.
+  - Preserves runtime timestamp throttling through ccm board set-param.
+  - Preserves identity and critical-path periodic reminders.

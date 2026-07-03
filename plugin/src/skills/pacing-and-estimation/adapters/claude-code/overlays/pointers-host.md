@@ -1,0 +1,4 @@
+- [references/model-tiers.md](references/model-tiers.md) —— 四档相对成本 + 按难度选档事实映射 + 为何主线固定一个模型。
+- [references/usage-signals.md](references/usage-signals.md) —— 5h/7d 窗口 + `ccm usage` 信号源链 + sidecar 接法 + 诚实天花板。
+- [references/pacing-levers.md](references/pacing-levers.md) —— 单侧 levers（减速 / 换号 / 停）怎么做 + 目标走廊上界 + effective-N 缩放节奏。
+- [references/estimation.md](references/estimation.md) —— 5 estimate verb 消费 + baseline 生命周期 + 诚实字段 + usage⊗estimate 张力。

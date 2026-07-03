@@ -1,0 +1,1 @@
+| `ccm usage advise` 出 `available:false` | 账户信号不可得（headless / 已 opt-out `ccm statusline` / API-key / 云后端）——pacing 不可判，别据空信号硬判 pacing（hook 此时也静默）。sidecar 来源见 usage-signals.md（ccm 自带 `ccm statusline` 自动落）。 |

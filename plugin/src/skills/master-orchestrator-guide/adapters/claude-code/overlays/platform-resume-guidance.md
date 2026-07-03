@@ -1,0 +1,1 @@
+- **平台 resume（`claude --resume` / `-c`）与 compaction 都保留原 `session_id`**——`SessionStart` 分别以 `source:"resume"` / `"compact"` 触发、`session_id` 不变。故武装与 reinject **跨平台 resume / compaction 照常工作**。

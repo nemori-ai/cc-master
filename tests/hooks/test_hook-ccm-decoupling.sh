@@ -18,15 +18,15 @@
 
 LINT_HOOK="$PLUGIN_ROOT/hooks/scripts/board-lint.js"
 VERIFY_HOOK="$PLUGIN_ROOT/hooks/scripts/verify-board.js"
-SHIM="$PLUGIN_ROOT/ccm/apps/cli/dev-bin/ccm"
+SHIM="$REPO_ROOT/ccm/apps/cli/dev-bin/ccm"
 
 # 确保 ccm dist 在（shim exec node bin/ccm.cjs→dist/index.cjs）。run-tests 已 build 过则复用；否则本测试 build。
 # pnpm / dist 不可得 → CCM_HAVE=0（state ① 跳过、只跑降级态，仍是有效覆盖）。
 CCM_HAVE=0
-if [ -f "$SHIM" ] && [ -f "$PLUGIN_ROOT/ccm/apps/cli/dist/index.cjs" ]; then
+if [ -f "$SHIM" ] && [ -f "$REPO_ROOT/ccm/apps/cli/dist/index.cjs" ]; then
   CCM_HAVE=1
 elif [ -f "$SHIM" ] && command -v pnpm >/dev/null 2>&1; then
-  if (cd "$PLUGIN_ROOT" && pnpm -C ccm build) >/dev/null 2>&1 && [ -f "$PLUGIN_ROOT/ccm/apps/cli/dist/index.cjs" ]; then
+  if (cd "$REPO_ROOT" && pnpm -C ccm build) >/dev/null 2>&1 && [ -f "$REPO_ROOT/ccm/apps/cli/dist/index.cjs" ]; then
     CCM_HAVE=1
   fi
 fi

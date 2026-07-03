@@ -1,0 +1,8 @@
+hook: usage-pacing
+host: codex
+event: Stop
+mode: replacement-stop-advisory
+notes:
+  - Uses ccm usage advise as the only pacing verdict source.
+  - Emits Stop systemMessage advisory only; Codex has no PostToolBatch equivalent.
+  - Does not run autonomous account switching for Codex.

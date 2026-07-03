@@ -1,0 +1,261 @@
+host: codex
+updated: 2026-07-03
+status: runtime_adapter_with_verified_dispatch_primitives
+capabilities:
+  project_skills:
+    location: ".agents/skills"
+    symlink_supported: true
+  path_tokens:
+    plugin_root:
+      token: "PLUGIN_ROOT"
+      scope: "plugin-bundled hook command token"
+      status: verified_command_expansion
+    skill_dir: null
+    plugin_data:
+      token: "PLUGIN_DATA"
+      scope: "plugin-bundled hook command token"
+      status: official_documented_env_not_observed_in_probe
+    notes:
+      - "Codex SKILL.md has no verified runtime path substitution."
+      - "Codex CLI 0.142.5 does not expose CODEX_PLUGIN_ROOT to hooks."
+      - "Plugin install probe on Codex CLI 0.142.5 verified `${PLUGIN_ROOT}` works inside plugin-bundled hook command strings and resolves to the installed cache path."
+      - "The same probe did not observe PLUGIN_ROOT, PLUGIN_DATA, CLAUDE_PLUGIN_ROOT, or CLAUDE_PLUGIN_DATA in the child process environment."
+      - "If a hook script needs these paths at runtime, inject cc-master-owned env vars in the command string or derive paths from argv/__dirname."
+  background_dispatch:
+    scope: "cc-master dispatch primitives usable by a Codex agent at runtime; not merely product UI inventory"
+    subagent:
+      available: true
+      candidate_official_surface: "Codex subagent workflows"
+      mapping_status: "runtime_verified_handle"
+      notes:
+        - "Official Codex supports subagent workflows in CLI and App, but they are user-explicit parallel agent workflows."
+        - "Probe on 2026-07-03 spawned a Codex subagent from the master agent and received agent id 019f27a9-6e6f-7493-bcb0-cc0e6701e78d; the subagent completed and saw repo cwd /data/qiwei/repos/cc-master."
+        - "This is not Claude Code run_in_background; record the Codex agent id/thread/task reference as the handle."
+        - "Codex only spawns subagents when explicitly asked for subagents or parallel agent work."
+    workflow:
+      available: false
+      mapping_status: "unsupported"
+      notes:
+        - "No verified equivalent of Claude Code Workflow tool."
+    shell:
+      available: true
+      candidate_official_surface: "Codex background terminal / exec session"
+      mapping_status: "runtime_verified_session_handle"
+      notes:
+        - "Probe on 2026-07-03 ran 'sleep 2; echo codex-background-terminal-ok' with yield_time_ms=250 and received session id 57849; polling returned output and exit code 0."
+        - "This is usable by the agent as a background terminal/session capability; record session id, command, cwd, predicate, and cancellation method."
+        - "Do not assume Claude Code task-notification semantics; poll/recon the session explicitly or pair it with an automation/scheduler."
+  command_surface:
+    status: prompt_first_hook_detected
+    plugin_distributed_slash_commands: unsupported
+    init_prompt_prefixes:
+      - "cc-master:as-master-orchestrator <goal> [flags]"
+      - "/cc-master:as-master-orchestrator <goal> [flags]"
+    supported:
+      - "fresh board creation"
+      - "priority/wip/owner-wip flags"
+    unsupported:
+      - "--resume"
+      - "policy-switch persistence"
+      - "Codex command artifact projection"
+    notes:
+      - "Initialization is handled by the UserPromptSubmit hook, not by a Codex slash command."
+  completion_notification:
+    status: no_claude_task_notification_equivalent
+    notes:
+      - "Codex subagent completion can be observed through agent lifecycle notifications in this runtime, and background terminal completion can be polled by session id."
+      - "There is no verified Codex equivalent of Claude Code <task-notification> injected into the master thread for arbitrary background shell/workflow handles."
+  official_background_surfaces:
+    scope: "Codex surfaces; a cc-master adapter may use only surfaces available to the agent runtime or explicitly configured by the user"
+    updated: "2026-07-03"
+    source: "Official Codex manual fetched 2026-07-03 plus local harness notes."
+    surfaces:
+      - name: "local_threads"
+        status: "official"
+        notes:
+          - "Multiple local Codex threads can run at once; avoid concurrent edits to the same files."
+      - name: "cloud_threads"
+        status: "official"
+        notes:
+          - "Cloud threads run in isolated Codex environments and are useful for parallel or delegated work."
+      - name: "codex_cloud_cli"
+        status: "official"
+        commands:
+          - "codex cloud exec"
+          - "codex cloud list"
+      - name: "app_thread_modes"
+        status: "official"
+        modes:
+          - "Local"
+          - "Worktree"
+          - "Cloud"
+      - name: "worktree_background"
+        status: "official"
+        notes:
+          - "Codex App worktrees isolate parallel tasks; automations can run in dedicated background worktrees for Git repositories."
+      - name: "automations"
+        status: "official"
+        types:
+          - "standalone"
+          - "project"
+          - "thread"
+        notes:
+          - "Standalone automations start fresh runs on a schedule; custom schedules can use cron syntax."
+          - "Thread automations are heartbeat-style wake-ups attached to the current thread."
+          - "Thread automations can use minute-based intervals, daily schedules, or weekly schedules."
+      - name: "subagents"
+        status: "official"
+        notes:
+          - "Codex only spawns subagents when explicitly asked for subagents or parallel agent work."
+      - name: "background_terminals"
+        status: "official_experimental"
+        commands:
+          - "/ps"
+          - "/stop"
+      - name: "codex_exec"
+        status: "official"
+        notes:
+          - "Non-interactive mode for scripts, CI, scheduled jobs, and pipelines."
+      - name: "github_action"
+        status: "official"
+        notes:
+          - "openai/codex-action@v1 runs Codex in GitHub Actions."
+      - name: "app_server"
+        status: "official"
+        notes:
+          - "JSON-RPC thread and turn API for clients and integrations."
+      - name: "mcp_server"
+        status: "official"
+        notes:
+          - "codex mcp-server exposes codex and codex-reply tools for external orchestration."
+      - name: "remote_connections"
+        status: "official"
+        notes:
+          - "Remote clients use the connected host's projects, threads, credentials, plugins, MCP servers, browser access, and local tools."
+      - name: "slack_linear_integrations"
+        status: "official"
+        notes:
+          - "Slack and Linear integrations create Codex Cloud tasks from external work items or messages."
+    adapter_boundary:
+      - "A capability is admissible for cc-master when the initialized Codex agent can use it at runtime and can record a recon handle."
+      - "Subagents and background terminal sessions are runtime-verified. Automations are official but not verified as agent-created CLI primitives. CronCreate, ScheduleWakeup, Workflow, and Claude task-notification semantics remain unsupported."
+  watchdog_wakeup:
+    chain:
+      - "background_terminal_session"
+      - "thread_automation_if_environment_provides_it"
+      - "external_scheduler_codex_exec_resume"
+      - "codex_cloud_status_loop"
+      - "manual_recon"
+    scope: "cc-master in-thread self-wakeup/watchdog primitive"
+    status: verified_alternatives_without_claude_tool_names
+    native_primitives:
+      CronCreate:
+        available: false
+        notes:
+          - "No Codex CLI 0.142.5 command, stable feature, or official manual entry for a CronCreate-like agent tool."
+      ScheduleWakeup:
+        available: false
+        notes:
+          - "No Codex CLI 0.142.5 command, stable feature, or official manual entry for a ScheduleWakeup-like agent tool."
+      sleep_tool:
+        available: false
+        notes:
+          - "codex features list reports sleep_tool as under development and disabled, so it is not a usable runtime dependency."
+    official_alternatives:
+      thread_automation:
+        status: official_app_surface_not_runtime_cli_created
+        fit: "Closest product analog for same-thread heartbeat wake-up."
+        notes:
+          - "Preserves the current thread context."
+          - "Supports minute-based intervals for active follow-up loops plus daily and weekly schedules."
+          - "Useful for checking long-running commands, polling connected sources, and continuing review loops."
+          - "Current agent runtime/CLI probe found no stable command for creating or updating automations; rely on it only if the current environment already provides or the user configures it."
+      background_terminal_session:
+        status: runtime_verified
+        fit: "Same-session watchdog/check loop and long-running command handle."
+        notes:
+          - "The agent can start a background shell and later poll the session by id."
+          - "Use for same-session watchdogs; record session id, command, cwd, predicate, and cancellation method."
+      standalone_project_automation:
+        status: official_app_surface
+        fit: "Cron-like recurring independent runs."
+        notes:
+          - "Standalone automations start fresh runs on a schedule and can use custom cron syntax."
+          - "Project automations can run in the local project or a dedicated background worktree."
+          - "Not equivalent to an in-thread watchdog because results appear as separate automation runs in Triage."
+      external_scheduler_codex_exec:
+        status: viable_external_pattern
+        fit: "Most scriptable portable substitute for CI/server scheduling."
+        notes:
+          - "Use cron, CI scheduler, systemd timer, or another external scheduler to run codex exec or codex exec resume <SESSION_ID>/--last."
+          - "This is external orchestration, not a Codex-native wakeup primitive."
+      background_terminal_plus_thread_automation:
+        status: candidate_app_pattern
+        fit: "Long-running command polling."
+        notes:
+          - "Use background terminals for long commands and thread automation to wake the same thread for status checks."
+          - "Needs host-native probe before cc-master can depend on it."
+      codex_cloud_status_loop:
+        status: candidate_external_or_app_pattern
+        fit: "Offloaded cloud work status checks."
+        notes:
+          - "codex cloud exec submits work; codex cloud list/status can inspect it."
+          - "Scheduling the check still requires automation or an external scheduler."
+    notes:
+      - "Official Codex has automations and thread automations, but current agent runtime does not expose a stable CLI primitive for creating them."
+      - "Do not project CronCreate, ScheduleWakeup, Monitor, or Claude task-notification semantics into Codex; use verified Codex handles instead."
+  hooks:
+    key: hooks
+    deprecated_alias: codex_hooks
+    plugin_root_token:
+      token: "PLUGIN_ROOT"
+      status: verified_command_expansion
+    plugin_data_token:
+      token: "PLUGIN_DATA"
+      status: official_documented_env_not_observed_in_probe
+    default_plugin_hook_path: "hooks/hooks.json"
+    manifest_override_field: "hooks"
+    implemented:
+      bootstrap-board:
+        event: UserPromptSubmit
+        mode: fresh_only
+      reinject:
+        event: SessionStart
+        mode: additional_context
+      verify-board:
+        event: Stop
+        mode: non_blocking_system_message
+      usage-pacing:
+        event: Stop
+        mode: non_blocking_system_message
+      identity-nudge:
+        event: Stop
+        mode: non_blocking_system_message
+      board-guard:
+        event: PreToolUse
+        mode: decision_block
+      board-lint:
+        event: PostToolUse
+        mode: additional_context
+    unsupported:
+      posttool-batch:
+        reason: "No verified Codex PostToolBatch-equivalent batch boundary event."
+    output_envelopes:
+      additional_context:
+        verified_events: [UserPromptSubmit, SessionStart, PostToolUse]
+      decision_block:
+        verified_events: [PreToolUse]
+        unsafe_events: [Stop]
+      system_message:
+        verified_events: [Stop]
+  quota_signal:
+    source: "ccm usage show/advise via Codex app-server account/rateLimits/read"
+    status: current_account_usage_supported
+    supported:
+      - "current account 5h and 7d usage"
+      - "ccm usage advise pacing verdict"
+    unsupported:
+      - "Codex account pool switching"
+  account_switch:
+    backend: null
+    status: unsupported

@@ -1,0 +1,9 @@
+host: claude-code
+command: view
+version: 1
+mode: host_native
+projection:
+  source: body.md
+  target: commands/view.md
+notes:
+  - Preserves existing Claude Code slash-command body.

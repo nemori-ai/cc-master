@@ -1,0 +1,12 @@
+host: codex
+command: discuss
+version: 1
+mode: adapter_guidance
+surface:
+  kind: user_prompt_conversational_guidance
+  user_prompt: plugin/src/skills/cc-master-discuss/canonical/SKILL.md
+  summary: "Discuss the task's decision_package in the current Codex thread or a new Codex thread, then write an append-only sidecar decision document."
+notes:
+  - Codex 目前的实现是 skill-first：无 native `/cc-master:discuss` slash command，命令入口通过 `plugin/src/skills/cc-master-discuss/canonical/SKILL.md` 的 skill 引导与参数约定完成。
+  - Codex has no native distributed /cc-master:discuss artifact; the adapter entry is `$cc-master-discuss`.
+  - The decision_package workflow remains valid; the entrypoint is natural-language prompt plus board/node selector, not a slash command.

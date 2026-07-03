@@ -1,0 +1,11 @@
+host: codex
+skill: slicing-goals-into-dags
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/slicing-goals-into-dags/
+slot_replacements:
+  "{{SLICING_DISPATCH_POINTER}}": adapters/codex/overlays/dispatch-pointer.md
+notes:
+  - Host-neutral DAG slicing method; Codex dispatch wording stays generic until background mapping is verified.

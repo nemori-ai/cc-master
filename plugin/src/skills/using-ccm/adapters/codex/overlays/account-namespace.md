@@ -1,0 +1,1 @@
+Codex host 当前**不支持账号池管理 / 换号**。`ccm account add/delete/refresh/list/switch` 走到时必须显式报 `NotImplemented` 或 unsupported；不要读取或覆写其他 harness 的 credential store，也不要把账号池当 Codex 可用容量。Codex 只保留 `ccm usage show/advise/burn-rate` 对**当前账户** 5h/7d 用量的只读能力。

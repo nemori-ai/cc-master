@@ -1,0 +1,9 @@
+host: codex
+skill: cc-master-discuss
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/cc-master-discuss/
+  include_adapter:
+    - agents/openai.yaml

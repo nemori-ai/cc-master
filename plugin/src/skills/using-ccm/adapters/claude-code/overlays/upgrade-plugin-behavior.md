@@ -1,0 +1,1 @@
+默认只升级 selected harness 的 plugin adapter。Claude Code adapter shell out `claude plugin marketplace update cc-master`（best-effort）+ `claude plugin update cc-master@cc-master`；传 `--all-harnesses` 时先跑本机 harness inventory，只对已安装且支持 `pluginDistribution` 的 harness 执行升级。**`--to` 仅信息性**——Claude Code 的 plugin update 只能升到 marketplace 当前指向版本。

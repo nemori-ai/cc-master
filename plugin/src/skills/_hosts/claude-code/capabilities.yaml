@@ -1,0 +1,38 @@
+host: claude-code
+updated: 2026-07-03
+capabilities:
+  project_skills:
+    location: ".claude/skills or plugin skills via .claude-plugin/plugin.json"
+  path_tokens:
+    plugin_root: "${CLAUDE_PLUGIN_ROOT}"
+    skill_dir: "${CLAUDE_SKILL_DIR}"
+    plugin_data: "${CLAUDE_PLUGIN_DATA}"
+  background_dispatch:
+    subagent:
+      available: true
+      launch: "Agent tool with run_in_background"
+      handle_name: "agentId"
+      completion_event: "task-notification"
+    workflow:
+      available: true
+      launch: "Workflow tool"
+      handle_name: "task ID"
+      completion_event: "task-notification"
+    shell:
+      available: true
+      launch: "Bash with run_in_background"
+      handle_name: "shell handle"
+  watchdog_wakeup:
+    chain:
+      - CronCreate
+      - ScheduleWakeup
+      - Monitor
+      - background-shell until
+  hooks:
+    goal_guard: "Stop/verify-board"
+    board_guard: "PreToolUse/board-guard"
+    pacing: "Stop + PostToolBatch/usage-pacing"
+  quota_signal:
+    source: "Claude Code statusLine stdin -> ccm sidecar"
+  account_switch:
+    backend: "Claude Code OAuth credential stores"

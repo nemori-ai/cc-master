@@ -1,0 +1,14 @@
+host: claude-code
+skill: cc-master-as-master-orchestrator
+version: 1
+mode: unsupported_stub
+projection:
+  source: adapters/claude-code/stub/
+  target: skills/cc-master-as-master-orchestrator/
+unsupported:
+  - capability: command_surface
+    reason: "Claude Code 的触发入口由 commands/as-master-orchestrator 提供，不是该 skill 的直接 command surface。"
+  - capability: direct_skill_invocation
+    reason: "这是 Codex 命令入口迁移产物，只用于 Codex 主动调用路径。"
+notes:
+  - 若需要恢复 Claude Code 直接 skill 入口，请在 strategy 切回 copy 后清理 stub。

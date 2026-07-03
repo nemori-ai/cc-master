@@ -1,0 +1,17 @@
+# cc-master SAP strategy: Claude Code adapter for authoring-workflows
+host: claude-code
+skill: authoring-workflows
+version: 1
+projection:
+  source: canonical/
+  target: skills/authoring-workflows/
+  copy: true
+  exclude:
+    - AGENTS.md
+    - CLAUDE.md
+mechanisms:
+  declarative-patch:
+    enabled: false
+    patches: []
+notes:
+  - Phase 1 preserves the existing Claude Code runtime body without host-specific patching.

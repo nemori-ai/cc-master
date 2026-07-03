@@ -1,0 +1,34 @@
+# Hook injection contracts are the product-level acceptance layer for host-native
+# hook implementations. A host may use a different envelope (`additionalContext`,
+# Codex `systemMessage`, block reason, etc.), but the agent-facing reminder must
+# carry the same product meaning.
+#
+# Keep this file centered on externally visible hook behavior. Host plumbing and
+# launcher mechanics belong in `_hosts/<host>/` docs or implementation comments.
+
+contracts:
+  - id: identity-periodic-reminder
+    hook: identity-nudge
+    surface: stop-reminder
+    required_hosts:
+      - claude-code
+      - codex
+    required_source_anchors:
+      - "[身份周期提示]"
+      - "cc-master master orchestrator"
+      - "亲手实现 / 亲自 review / 空转等待"
+      - "green gate"
+      - "继续推进"
+
+  - id: critical-path-periodic-reminder
+    hook: identity-nudge
+    surface: stop-reminder
+    required_hosts:
+      - claude-code
+      - codex
+    required_source_anchors:
+      - "[临界路径周期提示]"
+      - "当前临界路径"
+      - "关键任务已完成"
+      - "ccm estimate"
+      - "最终调度仍由你拍"

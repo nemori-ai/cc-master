@@ -1,0 +1,9 @@
+host: codex
+skill: dev-as-ml-loop
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/dev-as-ml-loop/
+notes:
+  - Host-neutral execution loop method; safe to project to Codex.

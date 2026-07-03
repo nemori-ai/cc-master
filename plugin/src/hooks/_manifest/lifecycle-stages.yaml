@@ -1,0 +1,30 @@
+version: 1
+stages:
+  user-prompt-submit:
+    claude-code: UserPromptSubmit
+    codex: UserPromptSubmit
+  stop:
+    claude-code: Stop
+    codex: Stop
+  stop-and-post-tool-batch:
+    claude-code:
+      - Stop
+      - PostToolBatch
+    codex:
+      - Stop
+      - unresolved-post-tool-batch-equivalent
+  session-start:
+    claude-code: SessionStart
+    codex: SessionStart
+  post-tool-batch:
+    claude-code: PostToolBatch
+    codex: unsupported
+  post-tool-use:
+    claude-code: PostToolUse
+    codex: PostToolUse
+  pre-tool-use:
+    claude-code: PreToolUse
+    codex: PreToolUse
+  shared-helper:
+    claude-code: script-only
+    codex: script-only

@@ -1,0 +1,56 @@
+version: 1
+hooks:
+  - id: bootstrap-board
+    stage: user-prompt-submit
+    required: true
+    host_coverage:
+      claude-code: implemented
+      codex: implemented-minimal-fresh
+  - id: verify-board
+    stage: stop
+    required: true
+    host_coverage:
+      claude-code: implemented
+      codex: implemented-advisory
+  - id: usage-pacing
+    stage: stop-and-post-tool-batch
+    required: true
+    host_coverage:
+      claude-code: implemented
+      codex: implemented-stop-advisory
+  - id: identity-nudge
+    stage: stop
+    required: true
+    host_coverage:
+      claude-code: implemented
+      codex: implemented-stop-system-message
+  - id: reinject
+    stage: session-start
+    required: true
+    host_coverage:
+      claude-code: implemented
+      codex: implemented
+  - id: posttool-batch
+    stage: post-tool-batch
+    required: true
+    host_coverage:
+      claude-code: implemented
+      codex: unsupported
+  - id: board-lint
+    stage: post-tool-use
+    required: true
+    host_coverage:
+      claude-code: implemented
+      codex: implemented
+  - id: board-guard
+    stage: pre-tool-use
+    required: true
+    host_coverage:
+      claude-code: implemented
+      codex: implemented
+  - id: hook-common
+    stage: shared-helper
+    required: true
+    host_coverage:
+      claude-code: implemented
+      codex: planned

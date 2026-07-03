@@ -1,0 +1,4 @@
+- `subagent` executor → 经 **sub-agent（`run_in_background`）机制**派，记下它返回的 agentId 当 handle。
+- `workflow` executor → 经 **Workflow 工具**跑，记下 workflow 句柄当 handle。
+- **后台 shell（`until` 轮询）不对应单一 executor**——它是你**等外部状态**的方式：等一个 `external` 的 CI run、或等一个你（`master-orchestrator`）自己要处置的远程队列 / 审批超时。轮询关进一个零 token 的后台 shell、骑完成通知重入。
+- **`user` / `external` 不是后台运行机制**——它们是「谁负责」而非「你怎么跑」：`user` 靠 surface 给用户 + 把他的回答当一条 async 依赖，`external` 靠一个引用（issue / CI URL）去外部系统查——两者你都不在本 session 里「跑」它。

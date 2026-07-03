@@ -1,0 +1,46 @@
+host: codex
+skill: pacing-and-estimation
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/pacing-and-estimation/
+exclude_canonical:
+  - references/model-tiers.md
+unsupported:
+  - capability: model_tier_provider
+    reason: "OpenAI/Codex model tier mapping is not yet encoded."
+  - capability: account_switch_pacing
+    reason: "Codex account switching is not implemented in ccm."
+  - capability: statusline_sidecar
+    reason: "Claude Code statusline sidecar does not exist in Codex adapter."
+supported:
+  - capability: current_quota_signal
+    reason: "ccm usage show/advise reads Codex current-account 5h/7d usage via `codex app-server --stdio` account/rateLimits/read."
+  - capability: estimation_method
+    reason: "Cost-to-complete estimation method is host-neutral when it consumes normalized board data."
+slot_replacements:
+  "{{PACING_DESCRIPTION}}": adapters/codex/overlays/description.md
+  "{{PACING_BOUNDARY}}": adapters/codex/overlays/boundary.md
+  "{{PACING_REFERENCE_POINTERS_HEAD}}": adapters/codex/overlays/reference-pointers-head.md
+  "{{PACING_MODEL_TIER_ANCHOR}}": adapters/codex/overlays/model-tier-anchor.md
+  "{{PACING_COMMAND_CATALOG_POINTER}}": adapters/codex/overlays/command-catalog-pointer.md
+  "{{PACING_USAGE_FOOTGUN_ROWS}}": adapters/codex/overlays/usage-footgun-rows.md
+  "{{PACING_POINTERS_HOST}}": adapters/codex/overlays/pointers-host.md
+  "{{PACING_SIBLING_POINTERS}}": adapters/codex/overlays/sibling-pointers.md
+  "{{PACING_STOP_5H_WAKEUP_LEVER}}": adapters/codex/overlays/stop-5h-wakeup-lever.md
+  "{{PACING_STOP_5H_WAKEUP_GUIDANCE}}": adapters/codex/overlays/stop-5h-wakeup-guidance.md
+  "{{PACING_SWITCH_VERDICT_ROW}}": adapters/codex/overlays/switch-verdict-row.md
+  "{{PACING_USAGE_SIGNALS_REFERENCE}}": adapters/codex/overlays/usage-signals-reference.md
+  "{{PACING_LEVERS_REFERENCE}}": adapters/codex/overlays/levers-reference.md
+host_slots:
+  "{{PACING_STOP_5H_WAKEUP_LEVER}}":
+    capability: watchdog_wakeup
+    source: plugin/src/skills/_hosts/codex/capabilities.yaml
+    status: partial_source_uses_codex_specific_guidance
+  "{{PACING_STOP_5H_WAKEUP_GUIDANCE}}":
+    capability: watchdog_wakeup
+    source: plugin/src/skills/_hosts/codex/capabilities.yaml
+    status: partial_source_uses_codex_specific_guidance
+notes:
+  - Codex projects the canonical pacing guide plus host-specific usage/model/account-switch slots.

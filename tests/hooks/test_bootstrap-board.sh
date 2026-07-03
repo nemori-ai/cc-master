@@ -10,7 +10,7 @@
 # `[ -x "$CCM_BIN" ]` — the shim is an executable wrapper, so existence is enough (the gate never spawns
 # ccm). The dedicated ccm-ABSENT cases (G-series, bottom) override CCM_BIN to a nonexistent path.
 if [ -z "${CCM_BIN:-}" ]; then
-  _SHIM="$PLUGIN_ROOT/ccm/apps/cli/dev-bin/ccm"
+  _SHIM="$REPO_ROOT/ccm/apps/cli/dev-bin/ccm"
   # Adopt the shim ONLY if it is FUNCTIONAL (dist built → `--version` succeeds). The shim is a thin
   # `exec node bin/ccm.cjs` wrapper that require()s ccm/apps/cli/dist/index.cjs — when the dist has not
   # been built (no pnpm / version-mismatched pnpm / missing node_modules), the shim is executable but

@@ -1,0 +1,47 @@
+# cc-master SAP strategy: Claude Code adapter for using-ccm
+host: claude-code
+skill: using-ccm
+version: 1
+projection:
+  source: canonical/
+  target: skills/using-ccm/
+  copy: true
+  exclude:
+    - AGENTS.md
+    - CLAUDE.md
+slot_replacements:
+  "{{USING_CCM_DESCRIPTION}}": adapters/claude-code/overlays/description.md
+  "{{USING_CCM_BOUNDARY}}": adapters/claude-code/overlays/boundary.md
+  "{{USING_CCM_POINTERS_HOST}}": adapters/claude-code/overlays/pointers-host.md
+  "{{USING_CCM_EXECUTOR_TABLE_ROWS}}": adapters/claude-code/overlays/executor-table-rows.md
+  "{{USING_CCM_EXECUTOR_DECISION_TAIL}}": adapters/claude-code/overlays/executor-decision-tail.md
+  "{{USING_CCM_WATCHDOG_PROBLEM}}": adapters/claude-code/overlays/watchdog-problem.md
+  "{{USING_CCM_WATCHDOG_HOOK_REMINDER}}": adapters/claude-code/overlays/watchdog-hook-reminder.md
+  "{{USING_CCM_WATCHDOG_MECHANISM_ROWS}}": adapters/claude-code/overlays/watchdog-mechanism-rows.md
+  "{{USING_CCM_WATCHDOG_SHELL_GUIDANCE}}": adapters/claude-code/overlays/watchdog-shell-guidance.md
+  "{{USING_CCM_WATCHDOG_CANCEL_GUIDANCE}}": adapters/claude-code/overlays/watchdog-cancel-guidance.md
+  "{{USING_CCM_WATCHDOG_DISARM_WARNING}}": adapters/claude-code/overlays/watchdog-disarm-warning.md
+  "{{USING_CCM_BOARD_GUARD_GUIDANCE}}": adapters/claude-code/overlays/board-guard-guidance.md
+  "{{USING_CCM_TASK_ADD_EXAMPLE}}": adapters/claude-code/overlays/task-add-example.md
+  "{{USING_CCM_WATCHDOG_ARM_EXAMPLE}}": adapters/claude-code/overlays/watchdog-arm-example.md
+  "{{USING_CCM_SESSION_ID_FLAG}}": adapters/claude-code/overlays/session-id-flag.md
+  "{{USING_CCM_BOARD_ARCHIVE_BEHAVIOR}}": adapters/claude-code/overlays/board-archive-behavior.md
+  "{{USING_CCM_USAGE_SIGNAL_SOURCE}}": adapters/claude-code/overlays/usage-signal-source.md
+  "{{USING_CCM_USAGE_BURN_RATE_BEHAVIOR}}": adapters/claude-code/overlays/usage-burn-rate-behavior.md
+  "{{USING_CCM_ACCOUNT_NAMESPACE}}": adapters/claude-code/overlays/account-namespace.md
+  "{{USING_CCM_STATUSLINE_NAMESPACE}}": adapters/claude-code/overlays/statusline-namespace.md
+  "{{USING_CCM_STATUSLINE_NAMESPACE_ROW}}": adapters/claude-code/overlays/statusline-namespace-row.md
+  "{{USING_CCM_UPGRADE_NAMESPACE}}": adapters/claude-code/overlays/upgrade-namespace.md
+  "{{USING_CCM_UPGRADE_PLUGIN_BEHAVIOR}}": adapters/claude-code/overlays/upgrade-plugin-behavior.md
+  "{{USING_CCM_ACCOUNT_NAMESPACE_ROW}}": adapters/claude-code/overlays/account-namespace-row.md
+  "{{USING_CCM_OBSERVABILITY_SOURCE}}": adapters/claude-code/overlays/observability-source.md
+  "{{USING_CCM_DECISION_PACKAGE_ENTRYPOINT}}": adapters/claude-code/overlays/decision_package-entrypoint.md
+  "{{USING_CCM_JC_HOOK_GUIDANCE}}": adapters/claude-code/overlays/jc-hook-guidance.md
+  "{{USING_CCM_WATCHDOG_JOB_ID_GUIDANCE}}": adapters/claude-code/overlays/watchdog-job-id-guidance.md
+  "{{USING_CCM_WAKEUP_SELF_HEAL_GUIDANCE}}": adapters/claude-code/overlays/wakeup-self-heal-guidance.md
+mechanisms:
+  declarative-patch:
+    enabled: false
+    patches: []
+notes:
+  - Claude Code projects the host-neutral canonical body plus strategy-defined executor/watchdog slots.

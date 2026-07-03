@@ -2,7 +2,8 @@
 # Source me: . "$(dirname "$0")/helpers.sh"
 set -uo pipefail
 
-PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PLUGIN_ROOT="${CC_MASTER_TEST_PLUGIN_ROOT:-$REPO_ROOT/plugin/dist/claude-code}"
 PASS=0; FAILED=0
 
 _red()  { printf '\033[31m%s\033[0m\n' "$1"; }
