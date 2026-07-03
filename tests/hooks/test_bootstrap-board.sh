@@ -160,6 +160,10 @@ P="$(make_project)"
 run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"  /cc-master:as-master-orchestrator <goal>"}' "$P"
 assert_eq 0 "$HOOK_RC" "raw command exits 0"
 assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "board created for a raw command prompt (leading whitespace allowed)"
+assert_contains "$HOOK_OUT" "MANDATORY NEXT STEP" "fresh bootstrap requires DAG before work"
+assert_contains "$HOOK_OUT" "zero tasks is not a runnable orchestration" "fresh bootstrap rejects empty-board progress"
+BOARD_F="$(ls "$P/.claude/cc-master/boards"/*.board.json | head -n1)"
+assert_contains "$HOOK_OUT" "ccm task add --board $BOARD_F" "fresh bootstrap gives exact ccm board path"
 rm -rf "$P"
 
 # Case G (Finding #15): expanded-body — prompt opens with the bootstrap marker comment on its first

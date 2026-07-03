@@ -30,10 +30,12 @@ runHook({
 
     let listing = '';
     const danglingEntries = [];
+    const emptyBoards = [];
     for (const { name, board } of boards) {
       const goal = (typeof board.goal === 'string' && board.goal) ? board.goal : '(goal not recorded yet)';
       listing += ` • ${name} [${goal}]`;
       const tasks = Array.isArray(board.tasks) ? board.tasks : [];
+      if (tasks.length === 0) emptyBoards.push(`${name} [${goal}]`);
       for (const t of tasks) {
         if (!t || typeof t !== 'object' || Array.isArray(t)) continue;
         if (t.status !== 'stale' && t.status !== 'escalated') continue; // 只看 top-level task 的 status
@@ -47,6 +49,12 @@ runHook({
     let ctxText = `You are a cc-master master orchestrator. Your orchestration board(s) live in ${BOARDS_DIR}. Active:${listing}. ` +
       `Re-read the board for the task you are working on (recognise it by its goal), then invoke the master-orchestrator-guide skill ` +
       `and continue the decision program. Do not restart work already done/verified; integrate any completed background results first.`;
+
+    if (emptyBoards.length) {
+      ctxText += ` HARD STOP: active board(s) with zero tasks are not runnable orchestration DAGs: ${emptyBoards.join(', ')}. ` +
+        `Before any implementation, tests, git, push, or PR work, decompose the goal and write tasks with acceptance criteria via ccm task add. ` +
+        `Do not treat an armed empty board as permission to proceed.`;
+    }
 
     // H4：点名未对账节点（stale/escalated）。空 → ctx 与无 note 时字节一致。
     if (danglingEntries.length) {

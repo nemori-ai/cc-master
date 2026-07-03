@@ -17,17 +17,19 @@ $ARGUMENTS
 
 你必须先看注入的 context 来判定当前是哪一种形态，不要只凭参数文本猜：
 
-- **fresh**：注入串以 `cc-master: a fresh orchestration board was created at ...` 开头。你要把目标从零拆成依赖 DAG，写入新 board，然后按主控决策程序推进。
-- **resume**：注入串以 `cc-master resume: you have TAKEN OVER the existing orchestration board at ...` 开头。board 已存在且已被本 session 接管；你是接手，不是重启。
+- **fresh**：注入串以 `cc-master fresh: created and armed Codex orchestration board at ...` 开头。你要先把目标从零拆成依赖 DAG，写入新 board，然后才能推进任何实现 / 测试 / git / PR 工作。
+- **resume**：注入串以 `cc-master resume: armed Codex orchestration board at ...` 开头。board 已存在且已被本 session 接管；你是接手，不是重启。
 - **候选消歧**：如果注入串列出候选 board 而没有接管成功，本回合不要写盘。把候选分组呈现给用户，让用户用更精确的 `--resume <selector>` 重新发起。
 
 ## fresh 形态
 
 1. 调用 `master-orchestrator-guide` skill，内化身份、红线、决策程序与 board 协议。
 2. 从参数里取出 goal，并剔除这些启动 flag：`--priority`、`--wip`、`--owner-wip`、`--policy-switch`。这些 flag 已按命令契约写入 board；不要把它们混进 `board.goal`。
-3. 把目标拆成依赖 DAG，写进 board 的 `tasks[]`。每个 task 至少有 `id`、`title`、`status`、`deps`。填上 `goal` 与 `git`；保留已写好的 `owner.session_id`、`owner.active` 和所有已落板的 policy / WIP / priority 字段。
-4. 只有当用户用自然语言明确补充了启动 flag 没表达的旋钮时，才用 `ccm` 写入对应字段。不要自创 board 字段；不要写“板级 token 预算”或“板级默认模型档”。
-5. 跑主循环：reconcile board → surface 用户闸 → 在 WIP 限额内派发 ready 任务 → 等待窗口里做合规 fill-work → 端点验收完成节点 → 让步前 flush board。
+3. **硬闸：在任何实现 / 测试 / git / PR / 发布动作之前，先把 goal 拆成依赖 DAG 并用 `ccm task add` 写进这块 board。** `tasks[]` 为空时不准继续推进用户目标；这不是建议，是 fresh 形态的启动条件。
+4. 每个 task 至少有 `id`、`title`、`status`、`deps`、`acceptance`。填上 `goal` 与 `git`；保留已写好的 `owner.session_id`、`owner.active` 和所有已落板的 policy / WIP / priority 字段。所有 board 写入都走 `ccm`，不要手改 JSON。
+5. 写完 DAG 后立刻 `ccm board graph` / `ccm board next` 对账：确认 readySet 非空或明确 blocked_on:user；若 graph/lint 不净，先修 board，不要开始执行。
+6. 只有当用户用自然语言明确补充了启动 flag 没表达的旋钮时，才用 `ccm` 写入对应字段。不要自创 board 字段；不要写“板级 token 预算”或“板级默认模型档”。
+7. 跑主循环：reconcile board → surface 用户闸 → 在 WIP 限额内派发 ready 任务 → 等待窗口里做合规 fill-work → 端点验收完成节点 → 让步前 flush board。每个推进节点都必须在 board 上有 task/log 证据。
 
 ## resume 形态
 

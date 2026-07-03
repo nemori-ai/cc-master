@@ -17,9 +17,12 @@ assert_eq 0 "$HOOK_RC" "codex bootstrap rc 0"
 assert_valid_json "$HOOK_OUT" "codex bootstrap context envelope valid JSON"
 assert_contains "$HOOK_OUT" '"systemMessage"' "codex bootstrap uses UserPromptSubmit systemMessage envelope"
 assert_contains "$HOOK_OUT" "cc-master fresh: created and armed Codex orchestration board" "codex bootstrap reports armed board"
+assert_contains "$HOOK_OUT" "MANDATORY NEXT STEP" "codex bootstrap requires DAG before work"
+assert_contains "$HOOK_OUT" "zero tasks is not a runnable orchestration" "codex bootstrap rejects empty-board progress"
 
 BOARD="$(find "$HOME_DIR/boards" -type f -name '*.board.json' | sort | head -n1)"
 assert_file "$BOARD" "codex bootstrap board created"
+assert_contains "$HOOK_OUT" "--board $BOARD" "codex bootstrap gives exact ccm board path"
 
 GOAL="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.goal||""));' "$BOARD")"
 SID="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String((b.owner&&b.owner.session_id)||""));' "$BOARD")"

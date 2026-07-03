@@ -780,7 +780,7 @@ case "$init_pol" in
   *) flag_notes="${flag_notes} --policy-switch 取值 '${init_pol}' 非法（须 allow|deny）·已跳过；" ;;
 esac
 
-ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. Decompose the goal into a dependency DAG and write tasks[] into that board file, set goal/owner/git, then invoke the master-orchestrator-guide skill and run the decision program."
+ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. MANDATORY NEXT STEP: before implementation, tests, git, push, or PR work, decompose the goal into a dependency DAG and write tasks with acceptance criteria via ccm task add --board ${BOARD}. An armed fresh board with zero tasks is not a runnable orchestration. Then invoke the master-orchestrator-guide skill and run the decision program."
 # applied / flag_notes 都是**单行**（无内嵌换行）——下方 per-line sed 量化（s/^/"/; s/$/"/）才不破 JSON。
 if [ -n "$applied" ]; then
   ctx="${ctx} bootstrap 已据你启动命令里的显式 flag 预设了这些 board 旋钮：${applied}（已写入 board）。设 board.goal 时把这些 flag token 从 goal 里剔除；这些已落板的旋钮原样保留、别覆写。"

@@ -40,6 +40,15 @@ assert_contains "$HOOK_OUT" "master orchestrator" "re-anchors role"
 assert_contains "$HOOK_OUT" "mine.board.json" "names board"
 rm -rf "$H"
 
+# Matching empty board: SessionStart must force DAG creation before work.
+H="$(make_project)"
+mkactive "$H" "empty" '{"schema":"cc-master/v2","goal":"EMPTY CODEX GOAL","owner":{"active":true,"session_id":"sess-empty"},"tasks":[]}'
+run_session_start "$H" "sess-empty"
+assert_contains "$HOOK_OUT" "HARD STOP" "empty active board gets hard stop"
+assert_contains "$HOOK_OUT" "zero tasks are not runnable orchestration DAGs" "empty active board blocks ordinary progress"
+assert_contains "$HOOK_OUT" "ccm task add" "empty active board instructs ccm task add"
+rm -rf "$H"
+
 # Other session: do not leak another active board.
 H="$(make_project)"
 mkactive "$H" "other" '{"schema":"cc-master/v2","goal":"OTHER CODEX GOAL","owner":{"active":true,"session_id":"sess-other"},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'

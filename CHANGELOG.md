@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **对齐 Codex hook 输出 envelope** — Codex `SessionStart` / `UserPromptSubmit` 的 advisory context 改为通过 `systemMessage` 输出，并在 strategy/meta 里记录验证结果，避免继续依赖对 Codex 不稳定的 Claude-style `hookSpecificOutput.additionalContext` 可见性。
 - **对齐 Codex 启动入口与触发文案** — 更新 `plugin/src` 与 `plugin/dist/codex` 的 `bootstrap-board` 触发逻辑与命令策略，`$cc-master-as-master-orchestrator` 启动口令现在统一支持真实用户入口
   `$cc-master:cc-master-as-master-orchestrator`，并兼容已有的兼容式变体。同步更新了 Codex 的 command/skill 示例文案与 hook 适配策略，避免用户提交时因命令前缀格式偏差而错过 `as-master-orchestrator` 会话初始化。
+- **强化 fresh board 必须先落 DAG 的入口硬闸** — `as-master-orchestrator` skill、Claude Code / Codex bootstrap context、以及两端 `SessionStart` reinject 都明确把 active board `tasks[]` 为空视为不可继续推进的硬停顿：实现 / 测试 / git / push / PR 之前必须先用 `ccm task add` 写入带 acceptance 的依赖 DAG，并在注入文案中给出精确 board 路径。补充双 host 回归测试，防止 board 已 arm 但 taskCount=0 的 session 继续交付。
 
 ## [0.11.0] — 2026-07-01
 

@@ -362,6 +362,8 @@ function main() {
 
   const bits = [
     `cc-master fresh: created and armed Codex orchestration board at ${boardPath}`,
+    'MANDATORY NEXT STEP: before implementation, tests, git, push, or PR work, decompose the goal into a dependency DAG and write tasks with acceptance criteria via ccm task add. An armed fresh board with zero tasks is not a runnable orchestration.',
+    `Use this exact board path for ccm writes: --board ${boardPath}`,
     `session_id=${sessionId || '(empty)'}`,
   ];
   if (goal) bits.push(`goal=${goal}`);
