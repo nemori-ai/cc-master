@@ -72,6 +72,8 @@ H="$(make_project)"; seed_board "$H" "mine" true "sess-x" "$GOOD"
 run_guard_bash "sess-x" "$H" "ccm task done T0 --board $H/boards/mine.board.json"
 assert_eq 0 "$HOOK_RC" "(d) Bash ccm → rc 0"
 assert_eq "" "$HOOK_OUT" "(d) Bash ccm invocation → allowed (never gate ccm itself)"
+run_guard_bash "sess-x" "$H" "CC_MASTER_HOME=$H ccm task done T0 --board $H/boards/mine.board.json"
+assert_eq "" "$HOOK_OUT" "(d) Bash env-prefixed ccm invocation → allowed"
 rm -rf "$H"
 
 # ── (e) ARMED + Bash `echo … > board.json` → DENY (write operator + board path, no ccm) ───────────────
@@ -83,6 +85,16 @@ assert_valid_json "$HOOK_OUT" "(e) Bash deny envelope is valid JSON"
 # sed -i on a board path → also deny.
 run_guard_bash "sess-x" "$H" "sed -i s/a/b/ $H/boards/mine.board.json"
 assert_contains "$HOOK_OUT" '"permissionDecision":"deny"' "(e) Bash sed -i board.json → deny"
+rm -rf "$H"
+
+# ── (e1) ARMED + Bash ccm appears only as data/comment → DENY (not a real ccm command segment) ───────
+H="$(make_project)"; seed_board "$H" "mine" true "sess-x" "$GOOD"
+run_guard_bash "sess-x" "$H" "echo ccm > $H/boards/mine.board.json"
+assert_contains "$HOOK_OUT" '"permissionDecision":"deny"' "(e1) Bash echo ccm > board.json → deny (ccm as data is not a ccm invocation)"
+run_guard_bash "sess-x" "$H" "echo '{}' > $H/boards/mine.board.json # ccm"
+assert_contains "$HOOK_OUT" '"permissionDecision":"deny"' "(e1) Bash comment mentions ccm after board write → deny"
+run_guard_bash "sess-x" "$H" "ccm board lint --board $H/boards/mine.board.json; echo '{}' > $H/boards/mine.board.json"
+assert_contains "$HOOK_OUT" '"permissionDecision":"deny"' "(e1) earlier ccm segment does not excuse later direct board write"
 rm -rf "$H"
 
 # ── (e2) ARMED + Bash read-only command mentioning a board path → ALLOWED (no write operator) ─────────
