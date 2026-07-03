@@ -109,7 +109,7 @@
   - `state.planned`（还剩多少活·喂价值/紧迫推理）：`remaining_work`（string·人类可读）/ `cost_to_complete_pct`（number·偿付力）。
 
   数字字段喂机械 floor、人类可读字段喂 agentic 价值推理；**缺即降级**（`ccm peers` 把该 peer 的对应维度退 null·配速退单板·fail-safe）。形状坏→`FMT-COORD` warn（永不 hard·advisory ✎）。读侧详见 command-catalog 的 peers namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-COORD`。**token-blind**：本块只含 goal/priority/workload/%——绝无任何 secret。
-- `runtime`——**hook-owned 运行时参数区**（✎ 非窄腰），装「周期 hook/script 跑起来后维护的瞬态簿记」。白名单键（均 ISO-8601 UTC）：`last_identity_remind`（周期身份提示 hook 读它判阈值）、`last_critpath_remind`（周期临界路径提示 hook 读它判阈值）、`last_account_switch`（账号切换机制写换号时刻·usage-pacing hook 读它做「检测到换号」ambient）——周期 hook / 换号写侧注入后经 `ccm board set-param` 写回（带锁·进程边界）。**写法收窄**：唯一写口是 `ccm board set-param <白名单 key> <value>`（least-privilege·非白名单 key / 非法值 → `exit 2`）——agent 走 `ccm` 命令改 board 天然保留它（`ccm` 字段级合并、不整盘覆写；agent 自己**永不写 `runtime.*`**·见 `master-orchestrator-guide` 的 board-写纪律）。缺/坏 → graceful-degrade（退化为「从未提示」·首次必提示）；形状坏→`FMT-RUNTIME` warn（永不 hard）。**token-blind**：参数区只有时间戳等簿记·绝无 secret。
+- `runtime`——**hook-owned 运行时参数区**（✎ 非窄腰），装「周期 hook/script 跑起来后维护的瞬态簿记」。白名单键（均 ISO-8601 UTC）：`last_identity_remind`（周期身份提示 hook 读它判阈值）、`last_critpath_remind`（周期临界路径提示 hook 读它判阈值）、`last_account_switch`（账号切换机制写换号时刻·usage-pacing hook 读它做「检测到换号」ambient）、`stop_allow_until`（Codex Stop hook 释放闸：agent 独立确认本板可停后写一个短期未来时刻）——周期 hook / 换号写侧注入 / Stop 释放确认后经 `ccm board set-param` 写回（带锁·进程边界）。**写法收窄**：唯一写口是 `ccm board set-param <白名单 key> <value>`（least-privilege·非白名单 key / 非法值 → `exit 2`）——agent 走 `ccm` 命令改 board 天然保留它（`ccm` 字段级合并、不整盘覆写；agent 自己**永不手写 `runtime.*`**·见 `master-orchestrator-guide` 的 board-写纪律）。缺/坏 → graceful-degrade（周期提示退化为「从未提示」；Stop 释放闸退化为继续阻止停止）；形状坏→`FMT-RUNTIME` warn（永不 hard）。**token-blind**：参数区只有时间戳等簿记·绝无 secret。
 
 > **不要把 observed 字段写进硬 waist。** 这三档的边界由 `ccm` 引擎权威定义（每字段的 tier 元数据）。
 
@@ -190,7 +190,7 @@ stale      → ready
 
 | executor | 谁来做 | 典型场景 | 必须的字段 |
 |---|---|---|---|
-| `subagent` | Codex 子代理或等价并行 worker | 只有在你已经真实启动了可 recon 的 Codex 并行工作时才写；当前 cc-master 不把 Claude Code `run_in_background` 语义投影成 Codex 原语。 | `handle` 必填：记录 thread/run/terminal/外部任务引用，足以让后续对账。 |
+| `subagent` | Codex 子代理或等价并行 worker | 只有在你已经真实启动了可 recon 的 Codex 并行工作时才写；CLI / App 里显式要求 Codex subagent，API / tool 会话里先 `tool_search` 发现并调用 `multi_agent_v1.spawn_agent`；当前 cc-master 不把 Claude Code `run_in_background` 语义投影成 Codex 原语。 | `handle` 必填：记录 spawn 返回的 agent id / thread / run 引用，足以让后续对账；不能用当前主会话 id 冒充。 |
 | `workflow` | 未支持 | Codex adapter 没有 verified `Workflow` 等价物；不要为了表达“复杂任务”写 workflow。 | 不应进入 `in_flight`；拆成可追踪 task 或用 `external`。 |
 | `external` | 外部系统 / 外部调度 | GitHub issue、CI job、人工任务、系统 cron、`codex cloud exec` 等不在当前 session 内的 work item。 | `handle` 或 `artifact` 必填：写可检查的外部 URL / run id / 文件路径。 |
 | `user` | 用户 | 等人拍板、提供凭据、确认策略或回答需求。 | `blocked_on:"user"` + `decision_package`。 |
@@ -211,7 +211,7 @@ stale      → ready
   ↓ 是 → executor: external  （必须带 reference kind=issue 指向外部 ticket）
   ↓ 否
 
-Codex 下，`executor` 仍是 board 的领域字段，不是 Codex API 名。选择它时先问：这个任务是否已经有一个真实、可续查、可停止或可验收的工作句柄？没有句柄就不要标 `in_flight`。Codex 的 subagents、background terminals、cloud runs、automations 都需要按实际可追踪能力记录为 `subagent` 或 `external`；没有被 cc-master adapter 验证成等价派发原语前，不要套用 Claude Code 的完成通知或 workflow 语义。
+Codex 下，`executor` 仍是 board 的领域字段，不是 Codex API 名。选择它时先问：这个任务是否已经有一个真实、可续查、可停止或可验收的工作句柄？没有句柄就不要标 `in_flight`。API / tool 会话里的 subagent 能力可能藏在 deferred tools 里，先 `tool_search`，看到并调用 `multi_agent_v1.spawn_agent` 后才写 `executor=subagent`；否则用 `master-orchestrator` 记调度动作，或用 `external` 记录真实外部 run。Codex 的 subagents、background terminals、cloud runs、automations 都需要按实际可追踪能力记录为 `subagent` 或 `external`；没有被 cc-master adapter 验证成等价派发原语前，不要套用 Claude Code 的完成通知或 workflow 语义。
 ```
 
 **executor 与 handle 的关系：** `subagent` 和 `workflow` 在派发后必须在 task 上记录 `handle`（`task update --handle <句柄>`），resume 时靠 handle recon 任务是否还活着。`external` 节点靠 `reference kind=issue` 的 URL 去外部系统查。`user` 和 `master-orchestrator` 没有后台句柄。
@@ -792,7 +792,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `FMT-BASELINE` | warn | `baseline` 非对象，或 `captured_at`/`t0`/`history[].reset_at` 非严格 ISO-8601 UTC、`task_estimates`/`dag_snapshot` 非对象、`bac_h` 非数字、`history` 非数组 | 用 `ccm baseline snapshot/reset` 维护、别手拼；时间严格 UTC（estimate evm 读它，格式不对则 EVM 时间轴错位） |
 | `FMT-POLICY` | warn | `policy` 非对象，或 `autonomous_account_switch` 不在 `{allow, deny}` 枚举内 | 用 `ccm policy set --autonomous-account-switch=allow\|deny`（缺省解析为 allow）；值仅这两个——非法值会让 switch-account.sh 机制硬闸的开关判定失效（退化为 allow） |
 | `FMT-COORD` | warn | `coordination` 非对象，或 `priority` 不在 `{urgent,high,normal,low,trivial}` 枚举，或 `state`/`state.current`/`state.planned` 非对象、数字字段（`active_tasks`/`burn_contribution`/`cost_to_complete_pct`）非数字、人类可读字段（`workload`/`remaining_work`）非字符串 | 全 optional·缺即降级（`ccm peers` 把该维度退 null）；priority 仅五挡——非法值退化为 normal。永不 hard（advisory ✎·fail-safe）——见 [A 节](#a-task-字段速查) coordination 块 |
-| `FMT-RUNTIME` | warn | `runtime` 非对象，或已知键（`last_identity_remind` / `last_critpath_remind` / `last_account_switch` 等）类型不合法（时间锚须严格 ISO-8601 UTC） | hook-owned ✎ 参数区：用 `ccm board set-param <白名单 key> <ISO>` 写（白名单 + 值校验在 verb 层）；缺/坏一律 graceful-degrade（周期 hook 退化为「从未提示」·首次必提示）。未知键 silent-on-unknown。永不 hard |
+| `FMT-RUNTIME` | warn | `runtime` 非对象，或已知键（`last_identity_remind` / `last_critpath_remind` / `last_account_switch` / `stop_allow_until` 等）类型不合法（时间锚须严格 ISO-8601 UTC） | hook-owned ✎ 参数区：用 `ccm board set-param <白名单 key> <ISO>` 写（白名单 + 值校验在 verb 层）；缺/坏一律 graceful-degrade（周期 hook 退化为「从未提示」·首次必提示；Stop 释放闸退化为继续阻止停止）。未知键 silent-on-unknown。永不 hard |
 | `FMT-ESTIMATE` | warn | `estimate` 不是 `{value:number, unit:string}` 对象 | `--estimate 3h`（ccm 自动解析成对象），别手拼——见 [E 节](#e-estimate-怎么估) |
 | `FMT-ACCEPTANCE` | warn | `acceptance` 既非字符串也非对象，或对象 `criteria` 空、`criterion.status` 不在 {pending,met,failed} | `--accept "一句话"` 或 `--set-json acceptance={criteria:[...]}`——见 [D 节](#d-acceptance-怎么写好) |
 | `FMT-TIME` | warn | 时间锚（`created_at`/`started_at`/`finished_at`/`owner.heartbeat`）存在却非严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`） | 用 ccm verb 自动盖戳（盖标准格式）；手填时严格 UTC 定宽、无时区偏移、无毫秒 |

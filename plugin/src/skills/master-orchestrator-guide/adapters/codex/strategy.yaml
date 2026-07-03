@@ -41,3 +41,4 @@ slot_replacements:
 notes:
   - Codex projection uses the host-neutral canonical body plus Codex-verified dispatch and watchdog slots.
   - Verified in Codex CLI 0.142.5 and current Codex manual: subagents are explicit, codex exec resume is scriptable, codex cloud tasks are addressable, and app thread automations are app-side rather than a CLI CronCreate equivalent.
+  - In Codex API/tool sessions, multi-agent tools can be deferred; use tool_search to surface multi_agent_v1.spawn_agent before treating subagent dispatch as available.

@@ -29,7 +29,7 @@
 
 两层怎么对上：
 
-- `subagent` executor → 明确要求 Codex spawn subagents / parallel agents，并记录可 recon 的 agent id / thread / task 引用。Codex agent runtime 已验证能返回可追踪 agent id；官方语义仍是只在你明确要求 subagents 或 parallel agent work 时 spawn，不要假设它会自动派发。
+- `subagent` executor → 明确要求 Codex spawn subagents / parallel agents，并记录可 recon 的 agent id / thread / task 引用。CLI / App 下这是官方产品能力；API / tool 会话下先用 `tool_search` 暴露 deferred multi-agent tools，看到并调用 `multi_agent_v1.spawn_agent` 后，才把返回的 agent id 当 handle。官方语义仍是只在你明确要求 subagents 或 parallel agent work 时 spawn，不要假设它会自动派发。
 - `workflow` executor → 当前 Codex adapter 不支持 Claude Code Workflow API；不要把 `Workflow` / `agent()` / `parallel()` / `pipeline()` 当成 Codex 原语。需要 fan-out 时，用 Codex subagents 并在 prompt 中要求“spawn one agent per item, wait for all, summarize with artifacts”，或把每个叶子建成独立 board task。
 - `external` executor → 后台 terminal session、CI run、GitHub issue、`codex cloud exec` task、系统 cron、systemd timer、Codex app automation 等可追踪工作。必须记录 session id / URL / run id / task id / automation 名称 / 日志路径，足以让后续 recon。
 - `user` executor → surface 给用户；用户回答是 async 依赖。
@@ -56,7 +56,7 @@
 学术根源是 LLM-Compiler 的 **Task Fetching Unit（TFU）**：一条依赖在它的输入就绪那一刻就被派出去；已经能跑的东西绝不等一个还没就绪的；而且 planner 流式地吐图，让 plan 和 execute overlap。cc-master 在两个尺度上跑的是同一套算法：
 
 - **宏观（主线）—— dataflow 作为一种内化的*心态*。** 决策程序*本身*就是一个手跑的 TFU：对账 board（observation 黑板）→ 派发就绪任务（fetch-when-ready）→ 在空隙里塞 fill-work（planner/executor overlap）→ 在端点验收（Joiner 闸）→ 唯有就绪集为空才等。这里**没有 `pipeline()` 原语**——主线 DAG 是动态的、异构的、里头还有个人，没有任何 compile-time 脚本能表达它。Dataflow 在这里以纪律存在（就绪即派、绝不在 barrier 干等），不是代码。
-- **微观（Codex agent runtime 内部）—— dataflow 作为可追踪派发纪律。** Codex 当前没有 Claude Code Workflow API 的 `pipeline()` / `parallel()` 原语；微观 fan-out 用 Codex subagents、后台 terminal session、Codex cloud task 或外部 CI 来表达。能固定成同构批处理时，要求每个 worker 返回统一 artifact / summary，并记录 agent id / session id / cloud task id / run URL；不要把 `Workflow` 代码示例当 Codex 可调用工具。
+- **微观（Codex agent runtime 内部）—— dataflow 作为可追踪派发纪律。** Codex 当前没有 Claude Code Workflow API 的 `pipeline()` / `parallel()` 原语；微观 fan-out 用 Codex subagents、后台 terminal session、Codex cloud task 或外部 CI 来表达。API / tool 会话里先用 `tool_search` 感知 deferred subagent 工具，只有真实 spawn 后才记录 `agent id`。能固定成同构批处理时，要求每个 worker 返回统一 artifact / summary，并记录 agent id / session id / cloud task id / run URL；不要把 `Workflow` 代码示例当 Codex 可调用工具。
 
 **两个尺度之间的切线，就是按动态性切的。** 必须运行中途随机应变的工作——对一个外部完成做出反应、把一个 escalation 重新定位、吸收一个 HITL 回答——归宏观尺度（board + 决策程序，LLM 在 loop 里）。能在 compile time 就固定下来的工作——一批同构项目流过固定 stage——归一个 `pipeline()`。这正是把 LLM-Compiler 那条切线 *"LLM 吐图、代码调度它"* 从单个 agent 任务放大到整场 long-horizon 编排：主线 LLM 做动态规划（吐图 + replan），workflow 脚本做确定性调度。自相似——一个尺度嵌在另一个里。
 
@@ -74,7 +74,7 @@
 
 给每个节点定一个 executor 值。高层 min-max（默认把派出去的实现工作当 `subagent`、`master-orchestrator` 只留调度 / 验收给自己）在编排魂的决策模块；这里给逐值的语义 + 什么样的活配它：
 
-- **`subagent`** —— 一个终端推理单元负责：单一证据面 + 单一推理链 + 单一交付物 + context-safe + 携带 escalation 路径。默认把独立、可并行的实现工作派给 Codex subagent；必须记录 agent id / thread / task 引用。
+- **`subagent`** —— 一个终端推理单元负责：单一证据面 + 单一推理链 + 单一交付物 + context-safe + 携带 escalation 路径。默认把独立、可并行的实现工作派给 Codex subagent；CLI / App 里显式要求 subagent，API / tool 会话里先 `tool_search` 发现并调用 `multi_agent_v1.spawn_agent`。必须记录真实返回的 agent id / thread / task 引用；没有真实 handle 就不能写 `subagent` / `in_flight`。
 - **`workflow`** —— board 字段可保留这个 executor 值表达“结构化 fan-out/fan-in 工作”，但 Codex adapter 当前不支持 Claude Code Workflow API。需要多叶子确定性控制时，用 Codex subagents / 后台 terminal / cloud task 组合实现，并记录每个 handle；不要调用 `Workflow`。
 - **`master-orchestrator`** —— **你自己**做的那几件不可外包的活：调度决策、replan、端点验收、整合。你不为它起后台机制——它就是你在指挥台上亲手做的。
 - **`user`** —— 人类操作者负责：需判断 / 授权 / 拍板的（merge / 不可逆 / 对外 / 方向性）。surface 给用户、把回答当一条 async 依赖，别越权替他决。
@@ -88,7 +88,7 @@
 
 executor 值定了“谁负责”；在 Codex 下，真把活跑起来用这些 **agent runtime 可用**机制，按可追踪性优先：
 
-- **Codex subagents / parallel agents** —— 默认并行派发方式。明确要求 Codex spawn subagents，并说明拆分方式、是否等待全部结果、每个 subagent 要返回什么 artifact / summary。记录 agent id / thread / run 引用作 handle。
+- **Codex subagents / parallel agents** —— 默认并行派发方式，但先感知当前 surface。CLI / App 里按官方 subagent 语义显式要求 Codex spawn subagents；API / tool 会话里先用 `tool_search` 查 `multi-agent subagent spawn agent parallel workers`，只有看到 `multi_agent_v1.spawn_agent` 这类可调用工具后才算当前会话可派 subagent。派发时说明拆分方式、是否等待全部结果、每个 subagent 要返回什么 artifact / summary；把 spawn 返回的 agent id / thread / run 引用记录为 handle。没有真实 spawn 返回值，就不要把 board task 标成 `subagent` / `in_flight`。
 - **后台 terminal session** —— 适合长跑 shell 命令、watch loop、构建/测试、轮询外部谓词。Codex agent runtime 已验证能启动后台 shell 并返回 session id，后续可 poll 输出与退出码；把 session id、命令、工作目录、停止条件、recon 方法写进 board。不要把“我发起了命令”当完成，只有 session 退出并经端点验收后才折回 `done`。
 - **Codex cloud task** —— 用 `codex cloud exec` 把独立工作 offload 到 Codex Cloud；用 `codex cloud list/status/diff/apply` recon。记录 cloud task id / env id / prompt 摘要。
 - **外部 scheduler / CI job** —— 用 cron、systemd timer、GitHub Actions、CI scheduler、issue/PR bot 等承担 session 外工作。记录 run id / URL / 取消方式。

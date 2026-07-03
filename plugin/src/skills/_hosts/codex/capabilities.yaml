@@ -26,11 +26,13 @@ capabilities:
     subagent:
       available: true
       candidate_official_surface: "Codex subagent workflows"
-      mapping_status: "runtime_verified_handle"
+      mapping_status: "runtime_verified_handle_with_surface_discovery"
       notes:
         - "Official Codex supports subagent workflows in CLI and App, but they are user-explicit parallel agent workflows."
+        - "In Codex API/tool sessions, multi-agent tools can be deferred; use tool_search for multi-agent/subagent/spawn before assuming spawn_agent is callable."
         - "Probe on 2026-07-03 spawned a Codex subagent from the master agent and received agent id 019f27a9-6e6f-7493-bcb0-cc0e6701e78d; the subagent completed and saw repo cwd /data/qiwei/repos/cc-master."
         - "This is not Claude Code run_in_background; record the Codex agent id/thread/task reference as the handle."
+        - "Do not record the current master session id, a local note, or an intended worker as a subagent handle; only a real spawn return or official thread/run id qualifies."
         - "Codex only spawns subagents when explicitly asked for subagents or parallel agent work."
     workflow:
       available: false
@@ -107,6 +109,7 @@ capabilities:
         status: "official"
         notes:
           - "Codex only spawns subagents when explicitly asked for subagents or parallel agent work."
+          - "API/tool sessions may expose subagent controls only after deferred tool discovery via tool_search."
       - name: "background_terminals"
         status: "official_experimental"
         commands:
@@ -138,7 +141,7 @@ capabilities:
           - "Slack and Linear integrations create Codex Cloud tasks from external work items or messages."
     adapter_boundary:
       - "A capability is admissible for cc-master when the initialized Codex agent can use it at runtime and can record a recon handle."
-      - "Subagents and background terminal sessions are runtime-verified. Automations are official but not verified as agent-created CLI primitives. CronCreate, ScheduleWakeup, Workflow, and Claude task-notification semantics remain unsupported."
+      - "Subagents and background terminal sessions are runtime-verified, but subagents in API/tool sessions require surface discovery before use. Automations are official but not verified as agent-created CLI primitives. CronCreate, ScheduleWakeup, Workflow, and Claude task-notification semantics remain unsupported."
   watchdog_wakeup:
     chain:
       - "background_terminal_session"

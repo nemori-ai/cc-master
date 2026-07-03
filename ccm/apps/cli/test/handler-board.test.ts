@@ -651,6 +651,15 @@ test('board set-param: last_critpath_remind 白名单 key + ISO → 写盘 + EXI
   assert.equal(onDisk.runtime.last_critpath_remind, '2026-06-30T08:00:00Z');
 });
 
+test('board set-param: stop_allow_until 白名单 key + ISO → 写盘 + EXIT.OK', () => {
+  const { boardPath } = mkBoardHome();
+  const ctx = mkCtx({ boardPath, positionals: ['stop_allow_until', '2026-07-03T15:30:00Z'] });
+  const code = boardHandler.setParam(ctx);
+  assert.equal(code, EXIT.OK);
+  const onDisk = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.equal(onDisk.runtime.stop_allow_until, '2026-07-03T15:30:00Z');
+});
+
 test('board set-param: 非白名单 key → throws Usage (router maps to exit 2)', () => {
   const { boardPath } = mkBoardHome();
   const ctx = mkCtx({ boardPath, positionals: ['bogus_key', 'x'] });

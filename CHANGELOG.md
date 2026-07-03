@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **对齐 Codex 启动入口与触发文案** — 更新 `plugin/src` 与 `plugin/dist/codex` 的 `bootstrap-board` 触发逻辑与命令策略，`$cc-master-as-master-orchestrator` 启动口令现在统一支持真实用户入口
   `$cc-master:cc-master-as-master-orchestrator`，并兼容已有的兼容式变体。同步更新了 Codex 的 command/skill 示例文案与 hook 适配策略，避免用户提交时因命令前缀格式偏差而错过 `as-master-orchestrator` 会话初始化。
 - **强化 fresh board 必须先落 DAG 的入口硬闸** — `as-master-orchestrator` skill、Claude Code / Codex bootstrap context、以及两端 `SessionStart` reinject 都明确把 active board `tasks[]` 为空视为不可继续推进的硬停顿：实现 / 测试 / git / push / PR 之前必须先用 `ccm task add` 写入带 acceptance 的依赖 DAG，并在注入文案中给出精确 board 路径。补充双 host 回归测试，防止 board 已 arm 但 taskCount=0 的 session 继续交付。
+- **收紧 Codex subagent 能力感知与 board 记账** — Codex 版 `master-orchestrator-guide` / `using-ccm` overlay 现在明确区分 CLI/App 产品级 subagent 支持与 API/tool 会话里的 deferred multi-agent tools：必须先通过 `tool_search` 暴露并调用 `multi_agent_v1.spawn_agent`，拿到真实 agent id / thread / run 引用后，才允许把 board task 标成 `executor=subagent` / `in_flight`；当前主会话 id 或意图描述不能冒充 handle。
+- **Codex Stop hook 改为 bounded continuation gate** — 按官方 Stop hook `decision:block` 语义，Codex `verify-board` 现在在 active board 为空、仍有 ready/uncertain/user-blocked/in-flight 无 watchdog、或只剩 final self-check 时用 `decision:block` 让 Codex 继续，而不是只发 advisory；新增 `runtime.stop_allow_until` + `ccm board set-param stop_allow_until <ISO>` 作为显式释放阀，防止该继续时停下，也允许 agent 独立确认后有界放行。
 
 ## [0.11.0] — 2026-07-01
 

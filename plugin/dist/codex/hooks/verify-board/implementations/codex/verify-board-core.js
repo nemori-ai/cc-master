@@ -39,7 +39,7 @@ function listMatchingBoards(home, sessionId) {
     } catch {
       continue;
     }
-    if (boardMatches(board, sessionId)) out.push({ name: entry.name, board });
+    if (boardMatches(board, sessionId)) out.push({ name: entry.name, path: boardPath, board });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -57,6 +57,27 @@ function system(message) {
   process.stdout.write(`${JSON.stringify({ kind: 'system', message })}\n`);
 }
 
+function block(message) {
+  process.stdout.write(`${JSON.stringify({ kind: 'block', message })}\n`);
+}
+
+function nowIso() {
+  return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function stopAllowed(board) {
+  const runtime = board && typeof board === 'object' && board.runtime && typeof board.runtime === 'object' && !Array.isArray(board.runtime)
+    ? board.runtime
+    : {};
+  const until = typeof runtime.stop_allow_until === 'string' ? runtime.stop_allow_until : '';
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(until)) return false;
+  return until >= nowIso();
+}
+
+function releaseHint(boardPath) {
+  return `If you have independently verified this board may stop, first run: ccm board set-param stop_allow_until <future-ISO-UTC> --board ${boardPath}`;
+}
+
 function main() {
   const payload = readJson();
   if (payload.event !== 'stop') return;
@@ -66,13 +87,15 @@ function main() {
   if (boards.length === 0) return;
 
   const notes = [];
-  for (const { name, board } of boards) {
+  for (const { name, path: boardPath, board } of boards) {
+    if (stopAllowed(board)) continue;
     const goal = typeof board.goal === 'string' && board.goal ? board.goal : '(goal not recorded yet)';
+    const hint = releaseHint(boardPath);
     const tasks = Array.isArray(board.tasks)
       ? board.tasks.filter((task) => task && typeof task === 'object' && !Array.isArray(task) && typeof task.id === 'string' && task.id)
       : [];
     if (tasks.length === 0) {
-      notes.push(`${name} [${goal}]: active board has no tasks; decompose the goal into tasks before treating it as complete.`);
+      notes.push(`${name} [${goal}]: active board has no tasks; decompose the goal into tasks before treating it as complete. ${hint}.`);
       continue;
     }
 
@@ -82,19 +105,19 @@ function main() {
       .filter((task) => task.status === 'blocked' && task.blocked_on === 'user')
       .map((task) => (typeof task.title === 'string' && task.title ? task.title : task.id));
     const inFlight = tasks.filter((task) => task.status === 'in_flight').map((task) => task.id);
-    if (ready.length > 0) notes.push(`${name} [${goal}]: ready tasks remain: ${ready.join(', ')}.`);
-    if (uncertain.length > 0) notes.push(`${name} [${goal}]: uncertain tasks need verification: ${uncertain.join(', ')}.`);
-    if (userBlocked.length > 0) notes.push(`${name} [${goal}]: user decisions are still open: ${userBlocked.join(', ')}.`);
+    if (ready.length > 0) notes.push(`${name} [${goal}]: ready tasks remain: ${ready.join(', ')}. ${hint}.`);
+    if (uncertain.length > 0) notes.push(`${name} [${goal}]: uncertain tasks need verification: ${uncertain.join(', ')}. ${hint}.`);
+    if (userBlocked.length > 0) notes.push(`${name} [${goal}]: user decisions are still open: ${userBlocked.join(', ')}. ${hint}.`);
     if (inFlight.length > 0 && !watchdogArmed(board)) {
-      notes.push(`${name} [${goal}]: in-flight tasks have no armed watchdog: ${inFlight.join(', ')}.`);
+      notes.push(`${name} [${goal}]: in-flight tasks have no armed watchdog: ${inFlight.join(', ')}. ${hint}.`);
     }
     if (ready.length === 0 && uncertain.length === 0 && userBlocked.length === 0 && inFlight.length === 0) {
-      notes.push(`${name} [${goal}]: before stopping, self-check against the original goal and confirm no missing task remains outside the board.`);
+      notes.push(`${name} [${goal}]: before stopping, self-check against the original goal and confirm no missing task remains outside the board. ${hint}.`);
     }
   }
 
   if (notes.length === 0) return;
-  system(`cc-master Codex Stop advisory (non-blocking):\n${notes.join('\n')}`);
+  block(`cc-master Codex Stop continuation required:\n${notes.join('\n')}`);
 }
 
 try {

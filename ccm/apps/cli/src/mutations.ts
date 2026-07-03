@@ -154,6 +154,7 @@ const RUNTIME_PARAM_KEYS: Record<string, 'iso'> = {
   last_identity_remind: 'iso',
   last_critpath_remind: 'iso', // critpath-nudge（周期临界路径提示·hooks-enhancements-v2 ②）写回时间戳
   last_account_switch: 'iso', // 换号发生时刻（ADR-024·usage-pacing hook 每 Stop 读它注入 ambient·含手动 switch）
+  stop_allow_until: 'iso', // Codex Stop decision:block 释放闸：agent 确认可停后写一个短期未来时间
 };
 export function boardSetParam(board: Board, args?: { key?: string; value?: string }): Board {
   const key = args && typeof args.key === 'string' ? args.key : '';

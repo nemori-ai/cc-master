@@ -194,6 +194,8 @@ function emitHostResult(result, event, hostEventName) {
   if (kind === 'block') {
     if (event === 'pre-tool-use') {
       process.stdout.write(`${JSON.stringify({ decision: 'block', reason: message })}\n`);
+    } else if (event === 'stop' || event === 'subagent-stop' || event === 'user-prompt-submit') {
+      process.stdout.write(`${JSON.stringify({ decision: 'block', reason: message })}\n`);
     } else {
       process.stdout.write(`${JSON.stringify({ systemMessage: message })}\n`);
     }

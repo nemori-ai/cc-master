@@ -33,19 +33,27 @@ run_stop "$H" "sess-mine"
 assert_eq "" "$HOOK_OUT" "other session active board ignored"
 rm -rf "$H"
 
-# Empty active board: non-blocking systemMessage, not decision:block.
+# Empty active board: Stop decision:block continues Codex with an explicit release valve.
 H="$(make_project)"
 mkactive "$H" "empty" '{"schema":"cc-master/v2","goal":"EMPTY CODEX BOARD","owner":{"active":true,"session_id":"sess-empty"},"tasks":[]}'
 run_stop "$H" "sess-empty"
-assert_contains "$HOOK_OUT" '"systemMessage"' "empty board emits systemMessage"
+assert_contains "$HOOK_OUT" '"decision":"block"' "empty board blocks Stop to continue Codex"
 assert_contains "$HOOK_OUT" "active board has no tasks" "empty board advisory"
-assert_not_contains "$HOOK_OUT" '"decision":"block"' "Codex Stop advisory is non-blocking"
+assert_contains "$HOOK_OUT" "ccm board set-param stop_allow_until" "empty board includes release command"
+rm -rf "$H"
+
+# Future stop_allow_until releases the Stop block after independent verification.
+H="$(make_project)"
+mkactive "$H" "released" '{"schema":"cc-master/v2","goal":"RELEASED CODEX BOARD","owner":{"active":true,"session_id":"sess-release"},"tasks":[],"runtime":{"stop_allow_until":"2999-01-01T00:00:00Z"}}'
+run_stop "$H" "sess-release"
+assert_eq "" "$HOOK_OUT" "future stop_allow_until releases Stop block"
 rm -rf "$H"
 
 # Actionable and uncertain work.
 H="$(make_project)"
 mkactive "$H" "work" '{"schema":"cc-master/v2","goal":"WORK CODEX BOARD","owner":{"active":true,"session_id":"sess-work"},"tasks":[{"id":"T1","status":"ready","deps":[]},{"id":"T2","status":"uncertain","deps":[]}]}'
 run_stop "$H" "sess-work"
+assert_contains "$HOOK_OUT" '"decision":"block"' "actionable work blocks Stop to continue Codex"
 assert_contains "$HOOK_OUT" "ready tasks remain: T1" "ready task advisory"
 assert_contains "$HOOK_OUT" "uncertain tasks need verification: T2" "uncertain task advisory"
 rm -rf "$H"
@@ -62,6 +70,7 @@ rm -rf "$H"
 H="$(make_project)"
 mkactive "$H" "done" '{"schema":"cc-master/v2","goal":"DONE CODEX BOARD","owner":{"active":true,"session_id":"sess-done"},"tasks":[{"id":"T5","status":"done","deps":[]}]}'
 run_stop "$H" "sess-done"
+assert_contains "$HOOK_OUT" '"decision":"block"' "done-only board blocks for final self-check"
 assert_contains "$HOOK_OUT" "self-check against the original goal" "completion self-check advisory"
 rm -rf "$H"
 

@@ -99,7 +99,7 @@ ccm board init --goal "目标一句话"        # 永不武装·session_id 留空
 ccm board show                            # goal/owner/任务统计/lint 是否净
 
 # 派发一个任务从生到完成(端点验收后才 done)
-ccm task add T3 --type development --executor subagent --handle <codex-agent-id-or-session-id> \
+ccm task add T3 --type development --executor subagent --handle <spawn-returned-codex-agent-id-or-thread-id> \
     --deps T1,T2 --estimate 3h --ref spec:/abs/spec.md --ref plan:/abs/plan.md --accept "DoD 一句话"
     --deps T1,T2 --estimate 3h --ref spec:/abs/spec.md --ref plan:/abs/plan.md --accept "DoD 一句话"
 ccm task start T3                         # ready → in_flight,盖 started_at
