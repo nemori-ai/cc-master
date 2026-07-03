@@ -20,8 +20,9 @@
 //
 // Bash 启发式（best-effort·偏假阴）：解析任意 shell 找输出重定向/原地改写是不可判定的；故只在命令**同时**
 //   含 `.board.json` 路径**与**一个写操作符（`>`/`>>`/`sed -i`/`tee`/`cp`/`mv`/`dd`/`truncate`）时 deny，
-//   且命令含 `ccm` 调用则**早放行**（别拦 ccm 自己去写 board）。漏网的 Bash 手改由 PostToolUse board-lint
-//   事后兜（软提示）——PreToolUse guard 挡结构化 Write/Edit（可靠）+ 明显的 Bash 写（启发式）。
+//   且写 board 的 shell command segment 本身是 `ccm ...` 调用才放行（别拦 ccm 自己去写 board）。注释里 /
+//   echo 内容里的 `ccm` 不算。漏网的 Bash 手改由 PostToolUse board-lint 事后兜（软提示）——PreToolUse guard
+//   挡结构化 Write/Edit（可靠）+ 明显的 Bash 写（启发式）。
 
 const path = require('path');
 const { resolveHome, boardsDir, isArmed, directive, runHook } = require('./hook-common.js');
@@ -73,16 +74,73 @@ function pathIsBoard(filePath) {
 // 写操作符启发式：命令里出现任一即视为「可能在写文件」。best-effort、偏假阴（宁可漏也别误伤只读命令）。
 const WRITE_OP_RE =
   />>?|(^|\s)sed\s+[^|]*-i|(^|\s)tee(\s|$)|(^|\s)cp(\s|$)|(^|\s)mv(\s|$)|(^|\s)dd(\s|$)|(^|\s)truncate(\s|$)/;
-const CCM_RE = /(^|\s)ccm(\s|$)/;
 const BOARD_PATH_RE = /\.board\.json/;
 
-// bashWritesBoard(command) → 该 Bash 命令是否**启发式命中**「手改 board」。命令含 ccm 调用 → 早放行（别拦
-//   ccm 自己）；否则须同时含 .board.json 路径 + 写操作符才判命中。
+// stripShellComments(command) → 删除未加引号的 # 注释尾部。只做 guard 启发式需要的最小 shell 扫描：
+//   保留单/双引号内的 #，不展开转义/变量。目的是避免 `echo ... > board # ccm` 被注释里的 ccm 伪装放行。
+function stripShellComments(command) {
+  let out = '';
+  let quote = null;
+  let escaped = false;
+  for (let i = 0; i < command.length; i++) {
+    const ch = command[i];
+    if (escaped) {
+      out += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\' && quote !== "'") {
+      out += ch;
+      escaped = true;
+      continue;
+    }
+    if ((ch === "'" || ch === '"') && !quote) {
+      quote = ch;
+      out += ch;
+      continue;
+    }
+    if (quote && ch === quote) {
+      quote = null;
+      out += ch;
+      continue;
+    }
+    if (!quote && ch === '#') break;
+    out += ch;
+  }
+  return out;
+}
+
+// shellSegments(command) → 以常见 shell command separators 拆成 command segments（; && || | 换行）。
+//   不做完整 shell parse；只为判断「写 board 的这一段是不是 ccm 命令」。
+function shellSegments(command) {
+  return stripShellComments(command)
+    .split(/(?:&&|\|\||[;|\n])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// isCcmCommandSegment(segment) → 该 command segment 的实际命令词是不是 ccm。
+//   允许前置 env assignment（`FOO=1 ccm ...`），但不把 `echo ccm` / `# ccm` / `foo ccm` 当 ccm 调用。
+function isCcmCommandSegment(segment) {
+  let s = segment.trim();
+  while (/^[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s]+)\s+/.test(s)) {
+    s = s.replace(/^[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s]+)\s+/, '');
+  }
+  return /^ccm(?:\s|$)/.test(s);
+}
+
+// bashWritesBoard(command) → 该 Bash 命令是否**启发式命中**「手改 board」。须同时含 .board.json 路径 + 写操作符。
+//   如果命中写 board 的 command segment 本身是 `ccm` 调用，则放行；其它 segment 里的 `ccm` 不可豁免。
 function bashWritesBoard(command) {
   if (typeof command !== 'string' || !command) return false;
-  if (CCM_RE.test(command)) return false; // ccm 调用 → 放行（ccm 才是合法写路径）
   if (!BOARD_PATH_RE.test(command)) return false;
-  return WRITE_OP_RE.test(command);
+  let sawBoardWrite = false;
+  for (const segment of shellSegments(command)) {
+    if (!BOARD_PATH_RE.test(segment) || !WRITE_OP_RE.test(segment)) continue;
+    sawBoardWrite = true;
+    if (!isCcmCommandSegment(segment)) return true;
+  }
+  return sawBoardWrite ? false : WRITE_OP_RE.test(stripShellComments(command));
 }
 
 // body(ctx)：Gate 0 武装 → Gate 1 工具/路径判定 → deny 或静默放行。
