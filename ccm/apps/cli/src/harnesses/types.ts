@@ -42,6 +42,7 @@ export interface PluginUpgradeResult {
   source?: string;
   target?: string;
   count?: number;
+  plugin_root?: string;
   marketplaceRoot?: string;
   pluginInstalled?: boolean;
 }
