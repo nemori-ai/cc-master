@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> **plugin + ccm host-adapter groundwork** —— 把仓库从单一 Claude Code 插件形态推进到 paragoge-style `plugin/src` → `plugin/dist/<host>` 投影架构，并落地 Codex adapter 的首批可安装产物；`ccm` 同步抽出 host harness registry / Codex 用量信号 / upgrade plumbing，为多 harness 分发与本地验收闭环铺路。
+
+### Added
+
+- **paragoge-style plugin source-to-adapter 投影架构** — 新增 `plugin/src` 作为语义源，按 host 投影到 `plugin/dist/claude-code` 与 `plugin/dist/codex`：commands 走 host strategy，skills 走 canonical + adapter strategy/overlay，hooks 走 PHIP 风格 manifest + host implementation。配套新增 `scripts/sync-plugin-dist.sh` / `scripts/check-plugin-dist-sync.sh`，让 dist 产物可提交、可检查、可 release。
+- **Codex adapter 首批 runtime 产物** — 新增 `plugin/dist/codex` 与对应 `plugin/src` 源：Codex plugin manifest、hook launcher、`bootstrap-board` / `reinject` / `identity-nudge` / `board-guard` / `board-lint` / `usage-pacing` / `verify-board` 的 Codex implementation，以及 `$cc-master-*` skill command surface。Codex adapter 使用 `systemMessage` 注入 `SessionStart` / `UserPromptSubmit` context，并保留 PreToolUse block 的 Codex envelope。
+- **Codex 项目级 dev/meta skill 投影** — 新增 `.agents/skills` 投影与 `scripts/sync-codex-skills.sh`，以 `.claude/skills` 为源同步 Codex 可发现的项目级 meta skills（默认 symlink，可 copy），避免 Codex 与 Claude Code 在本仓 dev skill 入口上分叉。
+- **harness 资料库与 host coupling 审计** — 新增 `design_docs/harnesses/`，沉淀 Claude Code / Codex host 机制资料、compatibility matrix、paragoge import audit、skill/ccm host coupling audit 与后续适配任务清单，后续 adapter 工作不再默认依赖仓外 paragoge 资料。
+- **ccm harness registry 与 Codex 用量信号** — `ccm` 新增 host harness 抽象（Claude Code / Codex / generic / probe）、`ccm harness` handler、Codex rate-limit 读取链路，并让 account / statusline / usage / estimate / upgrade 等 handler 通过 host plumbing 获取宿主事实。
+- **release / sync / lint 工具链补强** — `install.sh`、`scripts/package-plugin.sh`、`.github/workflows/plugin-release.yml`、`.githooks/pre-push` 与 `run-tests.sh` 接入 source/dist 同步检查、host adapter packaging、plugin manifest/package contents 校验、Codex skill lint 与 glossary/eval 脚本路径更新。
+
+### Changed
+
+- **Claude Code runtime 迁入 dist，repo docs 指向新架构** — 原 `.claude-plugin`、commands、hooks、runtime skills 迁入 `plugin/dist/claude-code`，源码迁入 `plugin/src`；`AGENTS.md`、`README.md`、`README_zh.md`、`CONTRIBUTING.md`、`SECURITY.md` 与 plugin 内 AGENTS/CLAUDE 导航同步改写为 CLI + source-to-adapter plugin projection 口径。
+- **分发 skills 改为 canonical + host adapter payload** — 七个 runtime skills 与 `$cc-master-*` command skills 在 `plugin/src/skills` 下建立 canonical / adapter strategy 结构，Claude Code 继续投影完整 runtime，Codex 对 workflow/account/statusline 等宿主差异用 adapter overlay 或 unsupported stub 明确边界。
+- **ccm upgrade / discover / registry 改为 host-aware** — `ccm upgrade`、discovery、registry 路径与相关测试改为通过 harness registry 和 host paths 判断当前宿主；Codex 下只消费当前账号用量与本地路径事实，不假设 Claude Code 的账号池切换能力。
+
+### Fixed
+
+- **对齐 Codex hook 输出 envelope** — Codex `SessionStart` / `UserPromptSubmit` 的 advisory context 改为通过 `systemMessage` 输出，并在 strategy/meta 里记录验证结果，避免继续依赖对 Codex 不稳定的 Claude-style `hookSpecificOutput.additionalContext` 可见性。
+- **对齐 Codex 启动入口与触发文案** — 更新 `plugin/src` 与 `plugin/dist/codex` 的 `bootstrap-board` 触发逻辑与命令策略，`$cc-master-as-master-orchestrator` 启动口令现在统一支持真实用户入口
+  `$cc-master:cc-master-as-master-orchestrator`，并兼容已有的兼容式变体。同步更新了 Codex 的 command/skill 示例文案与 hook 适配策略，避免用户提交时因命令前缀格式偏差而错过 `as-master-orchestrator` 会话初始化。
+
 ## [0.11.0] — 2026-07-01
 
 > **plugin 线 minor** —— 单侧 pacing 消费（ADR-024）+ board-write-guard 单一写路径（ADR-025）+ skill 迭代（doubt-driven 验收纪律 / 顶层敏捷-局部瀑布范式 / 全 skills 第二人称 + 术语表锁步）。`using-ccm` 手册同步承接 ccm-v0.12.0 命令面（`task unblock` verb / 单侧 verdict / 双窗口选号硬闸 / `runtime.last_account_switch` 白名单）。ccm 引擎侧改动走 `ccm-v0.12.0`（另线）。

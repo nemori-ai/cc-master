@@ -34,7 +34,7 @@ rm -rf "$H"
 H="$(make_project)"
 mkactive "$H" "mine" '{"schema":"cc-master/v2","goal":"CODEX REINJECT GOAL","owner":{"active":true,"session_id":"sess-mine"},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
 run_session_start "$H" "sess-mine"
-assert_contains "$HOOK_OUT" '"hookEventName":"SessionStart"' "uses SessionStart output envelope"
+assert_contains "$HOOK_OUT" '"systemMessage"' "uses SessionStart systemMessage envelope"
 assert_contains "$HOOK_OUT" "CODEX REINJECT GOAL" "injects matching board goal"
 assert_contains "$HOOK_OUT" "master orchestrator" "re-anchors role"
 assert_contains "$HOOK_OUT" "mine.board.json" "names board"

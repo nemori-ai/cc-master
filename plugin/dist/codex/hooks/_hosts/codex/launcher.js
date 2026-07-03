@@ -190,6 +190,7 @@ function emitHostResult(result, event, hostEventName) {
   if (kind === 'silent' || kind === 'allow') return;
   const message = String(result.context || result.message || '');
   if (!message) return;
+  const shouldSystemMessage = event === 'session-start' || event === 'user-prompt-submit';
   if (kind === 'block') {
     if (event === 'pre-tool-use') {
       process.stdout.write(`${JSON.stringify({ decision: 'block', reason: message })}\n`);
@@ -202,8 +203,12 @@ function emitHostResult(result, event, hostEventName) {
     process.stdout.write(`${JSON.stringify({ systemMessage: message })}\n`);
     return;
   }
+  if (shouldSystemMessage) {
+    process.stdout.write(`${JSON.stringify({ systemMessage: message })}\n`);
+    return;
+  }
   process.stdout.write(`${JSON.stringify({
-      hookSpecificOutput: {
+    hookSpecificOutput: {
       hookEventName: result.hookEventName || result.hostEventName || hostEventName || '',
       additionalContext: message,
     },

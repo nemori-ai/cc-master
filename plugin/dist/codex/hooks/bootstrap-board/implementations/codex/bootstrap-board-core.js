@@ -25,7 +25,7 @@ function parseInvocation(prompt) {
   const first = lines.find((line) => line.trim() !== '') || '';
 
   const commandMatch = first.match(
-    /^\s*(?:\/?(?:cc-master:as-master-orchestrator|cc-master-as-master-orchestrator)|\$(?:cc-master:as-master-orchestrator|cc-master-as-master-orchestrator))\b(.*)$/
+    /^\s*(?:\$(?:cc-master:cc-master-as-master-orchestrator|cc-master-as-master-orchestrator|cc-master:as-master-orchestrator)|cc-master:cc-master-as-master-orchestrator|cc-master:as-master-orchestrator|cc-master-as-master-orchestrator)\b(.*)$/
   );
   if (commandMatch) return { matched: true, args: commandMatch[1].trim(), marker: 'raw-command' };
 

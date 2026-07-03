@@ -50,8 +50,8 @@ output_envelope:
   verified_cli: "codex-cli 0.142.5"
   verified:
     - silent allow works by emitting nothing.
-    - Claude-style hookSpecificOutput.additionalContext is visible to the model for UserPromptSubmit.
-    - Claude-style hookSpecificOutput.additionalContext is visible to the model for SessionStart.
+    - UserPromptSubmit advisory context is emitted as systemMessage.
+    - SessionStart advisory context is emitted as systemMessage.
     - Claude-style decision:block blocks Bash during PreToolUse and surfaces the reason.
     - Stop hook systemMessage completes normally.
     - Stop hook decision:block causes repeated Stop re-entry; do not use for production Codex Stop guidance.
@@ -90,8 +90,9 @@ bootstrap:
     temp_plugin_install: passed
     fixture_root: /tmp/cc-master-bootstrap-probe-20260703T102023Z-233105
   supported:
-    - fresh board creation through /cc-master:as-master-orchestrator, /cc-master-as-master-orchestrator,
-      cc-master:as-master-orchestrator, $cc-master-as-master-orchestrator, or $cc-master:as-master-orchestrator
+    - fresh board creation through cc-master:cc-master-as-master-orchestrator,
+      $cc-master:cc-master-as-master-orchestrator, cc-master-as-master-orchestrator,
+      cc-master:as-master-orchestrator, $cc-master-as-master-orchestrator, $cc-master:as-master-orchestrator
       prompt prefix.
     - resume existing board through --resume.
     - owner arming with Codex session_id.

@@ -1,10 +1,10 @@
 ---
 name: cc-master-as-master-orchestrator
-description: 'Triggers: 当你在 Codex 收到 `$cc-master-as-master-orchestrator ...` 或 `$cc-master:as-master-orchestrator ...` 时，初始化或接管 orchestration board；仅作为会话入口，Do NOT 在这里写通用流程说明。'
+description: 'Triggers: 当你在 Codex 收到 `$cc-master:cc-master-as-master-orchestrator ...`（兼容 `$cc-master-as-master-orchestrator ...`、`$cc-master:as-master-orchestrator ...`）时，初始化或接管 orchestration board；仅作为会话入口，Do NOT 在这里写通用流程说明。'
 argument-hint: '<goal> [--priority urgent|high|normal|low|trivial] [--wip N] [--owner-wip N] [--policy-switch allow|deny] | --resume [selector]'
 ---
 
-$cc-master-as-master-orchestrator $ARGUMENTS
+$cc-master:cc-master-as-master-orchestrator $ARGUMENTS
 
 你正被初始化为一名 **master orchestrator（总指挥）**。本回合会收到一段 `cc-master:` / `cc-master resume:` 的 context；
 它会告诉你 board 是否已创建或已接管，以及 board 的确切路径。

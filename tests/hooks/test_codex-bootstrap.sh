@@ -8,14 +8,14 @@ CORE="$REPO_ROOT/plugin/src/hooks/bootstrap-board/implementations/codex/bootstra
 
 H="$(make_project)"
 HOME_DIR="$H/home"
-PAYLOAD='{"session_id":"codex-sess-1","hook_event_name":"UserPromptSubmit","prompt":"/cc-master:as-master-orchestrator Ship the slice --priority high --wip 2 --policy-switch deny","cwd":"/tmp/work"}'
+PAYLOAD='{"session_id":"codex-sess-1","hook_event_name":"UserPromptSubmit","prompt":"$cc-master:cc-master-as-master-orchestrator Ship the slice --priority high --wip 2 --policy-switch deny","cwd":"/tmp/work"}'
 
 HOOK_OUT="$(printf '%s' "$PAYLOAD" | CC_MASTER_HOME="$HOME_DIR" node "$LAUNCHER" --core "$CORE" 2>/dev/null)"
 HOOK_RC=$?
 
 assert_eq 0 "$HOOK_RC" "codex bootstrap rc 0"
 assert_valid_json "$HOOK_OUT" "codex bootstrap context envelope valid JSON"
-assert_contains "$HOOK_OUT" '"hookEventName":"UserPromptSubmit"' "codex bootstrap uses UserPromptSubmit envelope"
+assert_contains "$HOOK_OUT" '"systemMessage"' "codex bootstrap uses UserPromptSubmit systemMessage envelope"
 assert_contains "$HOOK_OUT" "cc-master fresh: created and armed Codex orchestration board" "codex bootstrap reports armed board"
 
 BOARD="$(find "$HOME_DIR/boards" -type f -name '*.board.json' | sort | head -n1)"
@@ -88,7 +88,7 @@ cat >"$RESUME_BOARD" <<'JSON'
   ]
 }
 JSON
-RESUME_PAYLOAD='{"session_id":"codex-sess-resume","hook_event_name":"UserPromptSubmit","prompt":"/cc-master:as-master-orchestrator --resume resume-one","cwd":"/tmp/work"}'
+RESUME_PAYLOAD='{"session_id":"codex-sess-resume","hook_event_name":"UserPromptSubmit","prompt":"$cc-master:cc-master-as-master-orchestrator --resume resume-one","cwd":"/tmp/work"}'
 RESUME_OUT="$(printf '%s' "$RESUME_PAYLOAD" | CC_MASTER_HOME="$RESUME_HOME" node "$LAUNCHER" --core "$CORE" 2>/dev/null)"
 RESUME_RC=$?
 
@@ -126,7 +126,7 @@ cat >"$BUSY_BOARD" <<'JSON'
   "log": []
 }
 JSON
-BUSY_PAYLOAD='{"session_id":"codex-sess-new","hook_event_name":"UserPromptSubmit","prompt":"/cc-master:as-master-orchestrator --resume busy","cwd":"/tmp/work"}'
+BUSY_PAYLOAD='{"session_id":"codex-sess-new","hook_event_name":"UserPromptSubmit","prompt":"$cc-master:cc-master-as-master-orchestrator --resume busy","cwd":"/tmp/work"}'
 BUSY_OUT="$(printf '%s' "$BUSY_PAYLOAD" | CC_MASTER_HOME="$BUSY_HOME" node "$LAUNCHER" --core "$CORE" 2>/dev/null)"
 BUSY_RC=$?
 BUSY_SID="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String((b.owner&&b.owner.session_id)||""));' "$BUSY_BOARD")"

@@ -8,10 +8,10 @@ unsupported:
 init_surface:
   status: implemented-through-skill-and-prompt-hook
   user_prompt: plugin/src/skills/cc-master-as-master-orchestrator/canonical/SKILL.md
-  user_prompt_entrypoint: "$cc-master-as-master-orchestrator <goal> [flags]"
+  user_prompt_entrypoint: "$cc-master:cc-master-as-master-orchestrator <goal> [flags]"
   prompt_prefixes:
+    - "$cc-master:cc-master-as-master-orchestrator <goal> [flags]"
     - "cc-master:as-master-orchestrator <goal> [flags]"
-    - "/cc-master:as-master-orchestrator <goal> [flags]"
     - "$cc-master-as-master-orchestrator <goal> [flags]"
     - "$cc-master:as-master-orchestrator <goal> [flags]"
   hook: bootstrap-board
@@ -30,4 +30,6 @@ init_surface:
 notes:
   - Codex 目前的实现是 skill-first：无 native `/cc-master:*` slash command，命令行为通过 `plugin/src/skills/cc-master-as-master-orchestrator/canonical/SKILL.md` + `UserPromptSubmit` hook 接力完成。
   - Do not copy the Claude Code bootstrap command body verbatim into Codex; maintain a Codex-specific hook trigger with equivalent command semantics and Codex paths.
-  - Keep mode adapter_guidance because Codex command triggering is still a hook-first path; a `$cc-master-as-master-orchestrator` / `$cc-master:as-master-orchestrator` / `/cc-master...` line is the bootstrap trigger.
+  - Keep mode adapter_guidance because Codex command triggering is still a hook-first path; a
+    `$cc-master:cc-master-as-master-orchestrator`, `$cc-master-as-master-orchestrator`, or
+    `$cc-master:as-master-orchestrator` line is the bootstrap trigger.
