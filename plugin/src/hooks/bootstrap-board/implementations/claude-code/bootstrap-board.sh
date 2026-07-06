@@ -661,6 +661,35 @@ fi
 # simply no longer read by the hook), so no template change is required; we just stop WRITING it from a
 # CLI arg. → design_docs/plans/2026-06-17-A2-account-management-design.md §C-T6 / §F.
 
+# fresh_args：本回合 fresh 形态的**完整原始 arg 串**（含 goal + flag）。两条触发路径各取其源：raw-command 路径
+#   `rest`（已 ltrim·prefix 已剥）；body-sentinel 路径 `body_args`（从 <!-- cc-master:args: $ARGUMENTS --> 恢复）。
+#   `rest != trimmed` ⟺ raw-command 前缀真匹配过（剥掉了前缀）；否则走 body-sentinel 的 body_args（可能未设）。
+fresh_args=""
+if [ "$rest" != "$trimmed" ]; then
+  fresh_args="$rest"
+elif [ -n "${body_args:-}" ]; then
+  fresh_args="$body_args"
+fi
+
+is_github_issue_url() {
+  case "$1" in
+    https://github.com/*/*/issues/[0-9]*|https://github.com/*/*/issues/[0-9]*\?*|https://github.com/*/*/issues/[0-9]*#*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+init_issue_for_board=""
+set -f
+# shellcheck disable=SC2086
+set -- $fresh_args
+set +f
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --github-issue)   init_issue_for_board="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
+    --github-issue=*) init_issue_for_board="${1#--github-issue=}"; shift ;;
+    *) shift ;;
+  esac
+done
+
 # CCM_CMD：进程边界 spawn 的 ccm 可执行（与 node hook 同口径）。上方 install precheck 已保证它在场
 # （CCM_BIN 可执行 OR `ccm` 在 PATH）。下方建骨架 + INIT-FLAGS 段共用它。
 CCM_CMD="${CCM_BIN:-ccm}"
@@ -674,7 +703,11 @@ mkdir -p "$BOARDS_DIR"
 # 约定），我们从它 stdout 里恢复所建路径（匹配 `.board.json` **路径 token**·与本地化标签无关——认路径不认
 # 「路径:」字样）。**ARMING（盖 session_id）仍是 bootstrap 自己的活**（见下）：owner 是 arming 窄腰、hook 所
 # 有、无 ccm setter，且 board-guard（ADR-025）只 gate agent 的工具调用、不管 hook 进程内的写。
-init_out="$(CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init 2>&1)"
+if [ -n "$init_issue_for_board" ] && is_github_issue_url "$init_issue_for_board"; then
+  init_out="$(CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init --github-issue "$init_issue_for_board" 2>&1)"
+else
+  init_out="$(CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init 2>&1)"
+fi
 BOARD="$(printf '%s' "$init_out" | grep -oE '/[^[:space:]]*\.board\.json' | head -1)"
 if [ -z "$BOARD" ] || [ ! -f "$BOARD" ]; then
   # ccm 在场（已前置）却没能建出可用 board 路径 → 宁可拒 arm，也不注入一个指向虚空的 phantom「board 已建」。
@@ -713,16 +746,9 @@ sed "s/\"session_id\"[[:space:]]*:[[:space:]]*\"\"/\"session_id\": \"$sid_esc\"/
 # fresh_args：本回合 fresh 形态的**完整原始 arg 串**（含 goal + flag）。两条触发路径各取其源：raw-command 路径
 #   `rest`（已 ltrim·prefix 已剥）；body-sentinel 路径 `body_args`（从 <!-- cc-master:args: $ARGUMENTS --> 恢复）。
 #   `rest != trimmed` ⟺ raw-command 前缀真匹配过（剥掉了前缀）；否则走 body-sentinel 的 body_args（可能未设）。
-fresh_args=""
-if [ "$rest" != "$trimmed" ]; then
-  fresh_args="$rest"
-elif [ -n "${body_args:-}" ]; then
-  fresh_args="$body_args"
-fi
-
 flag_notes=""    # 非法值 / 应用失败的 advisory 文案（单行·无换行·下方 per-line sed 量化才安全）
 applied=""       # 成功落板的旋钮摘要（喂 agent「原样保留别覆写」）
-init_pri=""; init_wip=""; init_ownerwip=""; init_pol=""
+init_pri=""; init_wip=""; init_ownerwip=""; init_pol=""; init_issue=""
 # 纯 bash token 循环抽 flag 值（enum/int 轻解析）。set -f 关 glob（goal 文本可能含 `*`·别让它扩成文件名）；
 #   `set -- $fresh_args` 按 IFS 词分割成 token（goal 词被下面 *) 分支跳过·只挑 flag）。扫完恢复 +f。
 set -f
@@ -739,6 +765,8 @@ while [ "$#" -gt 0 ]; do
     --owner-wip=*)     init_ownerwip="${1#--owner-wip=}";     shift ;;
     --policy-switch)   init_pol="${2:-}";       shift; [ "$#" -gt 0 ] && shift ;;
     --policy-switch=*) init_pol="${1#--policy-switch=}";      shift ;;
+    --github-issue)    init_issue="${2:-}";      shift; [ "$#" -gt 0 ] && shift ;;
+    --github-issue=*)  init_issue="${1#--github-issue=}";      shift ;;
     *) shift ;;
   esac
 done
@@ -779,6 +807,15 @@ case "$init_pol" in
     fi ;;
   *) flag_notes="${flag_notes} --policy-switch 取值 '${init_pol}' 非法（须 allow|deny）·已跳过；" ;;
 esac
+
+# ── board source：--github-issue 由 `ccm board init` 作为需求来源写进 board.source（best effort，不阻断）──
+if [ -n "$init_issue" ]; then
+  if is_github_issue_url "$init_issue"; then
+    applied="${applied} github-issue=board-source"
+  else
+    flag_notes="${flag_notes} --github-issue 取值 '${init_issue}' 非法（须 https://github.com/owner/repo/issues/N）·已跳过；"
+  fi
+fi
 
 ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. MANDATORY NEXT STEP: before implementation, tests, git, push, or PR work, decompose the goal into a dependency DAG and write tasks with acceptance criteria via ccm task add --board ${BOARD}. An armed fresh board with zero tasks is not a runnable orchestration. Then invoke the master-orchestrator-guide skill and run the decision program."
 # applied / flag_notes 都是**单行**（无内嵌换行）——下方 per-line sed 量化（s/^/"/; s/$/"/）才不破 JSON。

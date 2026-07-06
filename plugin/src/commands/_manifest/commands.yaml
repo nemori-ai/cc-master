@@ -3,7 +3,7 @@ commands:
   - id: as-master-orchestrator
     required: true
     intent: initialize_or_resume_master_orchestrator
-    argument_contract: "<goal> [--priority urgent|high|normal|low|trivial] [--wip N] [--owner-wip N] [--policy-switch allow|deny] | --resume [selector]"
+    argument_contract: "<goal> [--priority urgent|high|normal|low|trivial] [--wip N] [--owner-wip N] [--policy-switch allow|deny] [--github-issue <issue-url>] | --resume [selector]"
     host_coverage:
       claude-code: implemented
       codex: prompt_prefix_hook

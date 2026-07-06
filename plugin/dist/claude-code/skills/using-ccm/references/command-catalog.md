@@ -278,9 +278,11 @@ ccm board init [flags]
 | flag | 短名 | 类型 | default | 含义 |
 |---|---|---|---|---|
 | `--goal <str>` | | string | 空串 | 初始 goal |
+| `--github-issue <url>` | | URL | | 以 GitHub issue URL 作为 board 需求来源，写 `board.source.kind=github_issue` / `board.source.url`；若未给 `--goal`，goal 派生为 `GitHub issue: <url>` |
 
-- 例：`ccm board init --goal "试验性编排"`
+- 例：`ccm board init --goal "试验性编排"` · `ccm board init --github-issue https://github.com/o/r/issues/9`
 - 产物：`<home>/<YYYYMMDDThhmmssZ>-<pid>.board.json`
+- 注意：`--github-issue` 是 board source，不会创建 synthetic task；orchestrator 读取 issue 后再拆真实 DAG。
 
 ### board update
 

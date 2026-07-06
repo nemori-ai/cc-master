@@ -99,6 +99,8 @@ function parseArgs(args) {
         flags.ownerWip = value;
       } else if (name === 'policy-switch') {
         flags.policySwitch = value;
+      } else if (name === 'github-issue') {
+        flags.githubIssue = value;
       } else if (!name.startsWith('no-')) {
         const next = tokens[i + 1];
         if (next && !next.startsWith('--')) i += 1;
@@ -115,6 +117,8 @@ function parseArgs(args) {
       flags.ownerWip = tokens[++i] || '';
     } else if (token === '--policy-switch') {
       flags.policySwitch = tokens[++i] || '';
+    } else if (token === '--github-issue') {
+      flags.githubIssue = tokens[++i] || '';
     } else if (token === '-p') {
       flags.priority = tokens[++i] || '';
     } else if (token === '-w') {
@@ -157,6 +161,12 @@ function isPriority(value) {
 
 function isPolicySwitch(value) {
   return /^(allow|deny)$/.test(String(value || ''));
+}
+
+function isGithubIssueUrl(value) {
+  return /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/issues\/[0-9]+(?:[?#].*)?$/.test(
+    String(value || '').trim()
+  );
 }
 
 function restampOwner(boardPath, sessionId) {
@@ -326,7 +336,11 @@ function main() {
   const boardPath = path.join(boardsDir, `${stamp}-${process.pid}.board.json`);
   fs.mkdirSync(boardsDir, { recursive: true });
 
-  run('ccm', ['--board', boardPath, 'board', 'init', '--goal', goal, '--json', '--no-input']);
+  const initArgs = ['--board', boardPath, 'board', 'init', '--goal', goal, '--json', '--no-input'];
+  if (flags.githubIssue && isGithubIssueUrl(flags.githubIssue)) {
+    initArgs.push('--github-issue', String(flags.githubIssue).trim());
+  }
+  run('ccm', initArgs);
   restampOwner(boardPath, sessionId);
   writeSessionState(home, sessionId, boardPath, invocation, 'fresh');
 
@@ -380,10 +394,19 @@ function main() {
         ]);
         applied.push(`policy_switch=${flags.policySwitch}`);
       } catch (error) {
-        notes.push(`ccm policy set failed; policy flag may need manual repair: ${error.message}`);
+      notes.push(`ccm policy set failed; policy flag may need manual repair: ${error.message}`);
       }
     } else {
       notes.push(`--policy-switch value ${flags.policySwitch} is invalid; skipped`);
+    }
+  }
+
+  if (flags.githubIssue) {
+    const issueRef = String(flags.githubIssue || '').trim();
+    if (isGithubIssueUrl(issueRef)) {
+      applied.push('github_issue=board_source');
+    } else {
+      notes.push(`--github-issue value ${issueRef} is not a valid GitHub issue URL; skipped`);
     }
   }
 

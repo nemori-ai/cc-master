@@ -92,6 +92,7 @@ test('FIELDS models both board top-level and task entity', () => {
   for (const k of [
     'schema',
     'meta',
+    'source',
     'goal',
     'owner',
     'git',

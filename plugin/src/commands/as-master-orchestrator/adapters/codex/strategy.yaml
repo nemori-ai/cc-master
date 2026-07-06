@@ -22,6 +22,7 @@ init_surface:
     - priority flag
     - wip flag
     - owner-wip flag
+    - github issue board source flag
     - policy-switch flag persistence
     - session state for later hook environment reconstruction
   unsupported:

@@ -474,6 +474,38 @@ test('board init --board <path> writes to the explicit path', () => {
   assert.ok(out.includes('下一步'), 'init 输出含下一步提示');
 });
 
+test('board init --github-issue records issue source and derives default goal', () => {
+  const root = mkTmp('ccm-hinit-gh-');
+  const home = join(root, '.claude', 'cc-master');
+  mkdirSync(home, { recursive: true });
+  const issueUrl = 'https://github.com/owner/repo/issues/123';
+  const ctx = mkCtx({ home, values: { 'github-issue': issueUrl } });
+  const code = boardHandler.init(ctx);
+  assert.equal(code, EXIT.OK);
+  const boardsDir = join(home, 'boards');
+  const files = readdirSync(boardsDir).filter((n) => n.endsWith('.board.json'));
+  assert.equal(files.length, 1, 'one board file created');
+  const onDisk = JSON.parse(readFileSync(join(boardsDir, files[0] as string), 'utf8'));
+  assert.equal(onDisk.goal, `GitHub issue: ${issueUrl}`);
+  assert.deepEqual(onDisk.source, { kind: 'github_issue', url: issueUrl });
+  assert.deepEqual(onDisk.tasks, [], 'board init records source, not a synthetic task');
+});
+
+test('board init --github-issue rejects non-GitHub issue URLs', () => {
+  const root = mkTmp('ccm-hinit-gh-bad-');
+  const home = join(root, '.claude', 'cc-master');
+  mkdirSync(home, { recursive: true });
+  const ctx = mkCtx({ home, values: { 'github-issue': 'https://github.com/owner/repo/pull/123' } });
+  assert.throws(
+    () => boardHandler.init(ctx),
+    (err: unknown) => {
+      assert.equal((err as { errKind?: string }).errKind, 'Usage');
+      assert.match((err as Error).message, /--github-issue/);
+      return true;
+    },
+  );
+});
+
 test('board init --dry-run does not create any file', () => {
   const root = mkTmp('ccm-hinit3-');
   const home = join(root, '.claude', 'cc-master');
