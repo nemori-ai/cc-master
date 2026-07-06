@@ -25,8 +25,8 @@
 //   逻辑、规则码、报错文案、级别分流逐字保持（零行为变化）。浏览器形态由 tsdown 的 IIFE 产物承接。
 
 import {
-  ENUMS,
   durationHours,
+  ENUMS,
   isAbsolutePathOrUrl,
   isAwaitingUser,
   isDoneStatus,
@@ -1254,9 +1254,12 @@ function cadenceTimeboxHours(
   cadence: Record<string, unknown>,
   iteration: Record<string, unknown>,
 ): number | null {
-  const started = isISOUTC(iteration.started_at) ? Date.parse(iteration.started_at as string) : null;
+  const started = isISOUTC(iteration.started_at)
+    ? Date.parse(iteration.started_at as string)
+    : null;
   const deadline = isISOUTC(iteration.deadline) ? Date.parse(iteration.deadline as string) : null;
-  if (started != null && deadline != null && deadline > started) return (deadline - started) / 3600000;
+  if (started != null && deadline != null && deadline > started)
+    return (deadline - started) / 3600000;
   const target = cadence.target as Record<string, unknown> | undefined;
   return target && typeof target === 'object' ? durationHours(target.ship_every) : null;
 }
@@ -1321,7 +1324,8 @@ function lintCadenceAgileHealth(
   const c = board.cadence as Record<string, unknown> | undefined;
   if (!c || typeof c !== 'object' || Array.isArray(c) || !Array.isArray(c.iterations)) return;
   const target = c.target as Record<string, unknown> | undefined;
-  const targetHours = target && typeof target === 'object' ? durationHours(target.ship_every) : null;
+  const targetHours =
+    target && typeof target === 'object' ? durationHours(target.ship_every) : null;
   for (const itAny of c.iterations) {
     const it = itAny as Record<string, unknown>;
     if (!it || typeof it !== 'object') continue;
