@@ -56,7 +56,7 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 1. **它能和兄弟节点并行吗?** 太粗 → 一个巨型节点把本可并行的活吞成一条 serial 线(并行度坍成 1);切到"无真实数据依赖的片彼此独立"为止——但别为切而切。
 2. **它有一句清爽的验收(DoD)吗?** 一个节点若说不清"做到什么算完",它就太大 / 太糊,端点没法验收。一个节点 = 一个可独立验收的纵切片。
 
-太细也是病:微任务多到协调开销 > 干活本身。`estimate` 给手感反馈——某片估时畸大 → 考虑再切;碎到 trivial → 并回去。
+太细也是病:微任务多到协调开销 > 干活本身。`estimate` 给手感反馈——某片估时畸大 → 考虑再切;碎到 trivial → 并回去。**cadence target 是一把硬尺的软提醒**:如果一片的 estimate 超过本轮 `ship_every`,默认先再切,除非你能写清楚为什么这片不可再拆且仍值得独占一个 timebox。
 
 > **落地**:粒度的两把尺都是 board 字段——`--accept`(给不出一句清爽验收 = 太大 / 太糊)+ `--estimate`(`3h` / `2d`,畸大就再切)。这两个字段也正是 `dev-as-ml-loop` 接手该片时的目标函数与步长参考。命令见 `using-ccm`。
 
@@ -78,7 +78,7 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 - **一片纵切 → 一个 task**;若这片自身还需内部并行,做成一个 owner 父节点 + 若干 leaf 子节点(嵌套 depth=1)。
 - **共享脊椎 → 那一个 foundation task**,纵切片依赖它;**死守它的依赖者最少**——只有真共享核心才连上去,别把半个 schema 层挂成全图前置。
-- **片分组进 `cadence`/`iteration` timebox**:每个 iteration 收口时至少 ship 一片可用增量(接 board 的 cadence 模块——节奏在这落地)。
+- **片分组进 `cadence`/`iteration` timebox**:每个 iteration 收口时至少 ship 一片可用增量(接 board 的 cadence 模块——节奏在这落地)。一轮里的 members 估时总量与关键路径要能放进 timebox;放不进时先重切/移出,不要把超载当成排期问题留给后面。
 - **`estimate`** 回喂粒度调参(锚 3)。
 - 切好的图怎么**写进** board(`ccm task add --deps ...`)→ using-ccm;怎么**排期 / 算临界路径** → master-orchestrator-guide 的 board 协议 reference。
 
@@ -90,6 +90,7 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 |---|---|
 | **横切分层**(schema 层→API 层→UI 层) | serial 瓶颈 + 价值堆到最后。改纵切薄增量(锚 1)。 |
 | **大爆炸节点**(一个 task = 半个系统) | 并行度=1、没法验收。按"能并行 + 可验收"再切(锚 3)。 |
+| **单片吞掉 cadence**(一个 task 估时大于 `ship_every`) | 这通常不是薄纵切。默认拆成几个可验收切片;真不能拆时写明不可拆理由。 |
 | **瀑布顺序**(先把全部设计 / schema 定完再实现) | 投机的大设计先行 + 推迟集成风险暴露。改 walking skeleton(锚 2)。 |
 | **镀金地基**(把共享 foundation 做到"完整完美"才往下) | 你还不知道下游要什么;前置只放最小脊椎(锚 2)。 |
 | **过度切碎**(几十个微任务) | 协调开销 > 干活。estimate trivial 的并回去(锚 3)。 |

@@ -29,6 +29,8 @@ const GOOD = {
       id: 'T0',
       status: 'done',
       deps: [],
+      verified: true,
+      artifact: '/abs/t0.md',
       started_at: '2026-06-23T10:00:00Z',
       finished_at: '2026-06-23T11:00:00Z',
     },
@@ -63,7 +65,7 @@ test('rule levels are sourced from board-model (errors⇔hard, warnings⇔warn)'
     J({
       ...GOOD,
       tasks: [
-        { id: 'M', status: 'done', deps: [] },
+        { id: 'M', status: 'done', deps: [], verified: true, artifact: '/abs/m.md' },
         { id: 'c', status: 'ready', deps: [], parent: 'M' },
       ],
     }),
@@ -183,7 +185,7 @@ test('GRAPH-PARENT-EXISTS / DEPTH / CYCLE (hard) + GRAPH-ROLLUP (warn)', () => {
     J({
       ...GOOD,
       tasks: [
-        { id: 'M', status: 'done', deps: [] },
+        { id: 'M', status: 'done', deps: [], verified: true, artifact: '/abs/m.md' },
         { id: 'c', status: 'ready', deps: [], parent: 'M' },
       ],
     }),
@@ -602,7 +604,7 @@ test('BIZ-ACCEPTANCE-REQUIRED: dev-family type ⇒ acceptance 非空', () => {
   );
 });
 
-test('BIZ-EXECUTOR-HANDLE: subagent/workflow ⇒ handle; BIZ-EXTERNAL-ISSUE: external ⇒ issue ref', () => {
+test('BIZ-EXECUTOR-HANDLE: subagent/workflow ⇒ handle; external issue tracking rules', () => {
   assert.ok(
     ruleSet(
       lintBoard(
@@ -648,6 +650,41 @@ test('BIZ-EXECUTOR-HANDLE: subagent/workflow ⇒ handle; BIZ-EXTERNAL-ISSUE: ext
       ).warnings,
     ).has('BIZ-EXTERNAL-ISSUE'),
   );
+  const issueUrl = 'https://github.com/o/r/issues/9';
+  const doneWithIssueAsArtifact = lintBoard(
+    onlyTask({
+      id: 'X',
+      status: 'done',
+      deps: [],
+      executor: 'external',
+      references: [{ kind: 'issue', ref: issueUrl }],
+      artifact: issueUrl,
+      verified: true,
+      started_at: '2026-06-23T10:00:00Z',
+      finished_at: '2026-06-23T11:00:00Z',
+    }),
+  );
+  assert.ok(
+    ruleSet(doneWithIssueAsArtifact.warnings).has('BIZ-EXTERNAL-ARTIFACT'),
+    'external done artifact must not be only the issue tracking anchor',
+  );
+  const doneWithPrArtifact = lintBoard(
+    onlyTask({
+      id: 'X',
+      status: 'done',
+      deps: [],
+      executor: 'external',
+      references: [{ kind: 'issue', ref: issueUrl }],
+      artifact: 'https://github.com/o/r/pull/12',
+      verified: true,
+      started_at: '2026-06-23T10:00:00Z',
+      finished_at: '2026-06-23T11:00:00Z',
+    }),
+  );
+  assert.ok(
+    !ruleSet(doneWithPrArtifact.warnings).has('BIZ-EXTERNAL-ARTIFACT'),
+    'external done with a real PR artifact is clean',
+  );
 });
 
 test('BIZ-TIME-ORDER: done⇒finished, in_flight⇒started, ordering', () => {
@@ -689,6 +726,7 @@ test('BIZ-CADENCE-SHIPPED: shipped iteration with incomplete member is hard', ()
           status: 'done',
           deps: [],
           verified: true,
+          artifact: '/abs/t0.md',
           started_at: '2026-06-23T10:00:00Z',
           finished_at: '2026-06-23T11:00:00Z',
         },
@@ -699,10 +737,177 @@ test('BIZ-CADENCE-SHIPPED: shipped iteration with incomplete member is hard', ()
   assert.ok(!ruleSet(ok.errors).has('BIZ-CADENCE-SHIPPED'), J(ok.errors));
 });
 
-// ── BIZ-DONE-VERIFIED 是 reserved（登记在册·lint 暂不强制）──────────────────────────────────────────
-test('BIZ-DONE-VERIFIED is reserved: a done task without verified/artifact emits NO such error', () => {
-  assert.equal(model.levelOf('BIZ-DONE-VERIFIED'), 'reserved');
-  const r = lintBoard(
+test('BIZ-CADENCE agile health: clean 3h iteration with estimated accepted thin slices has no warnings', () => {
+  const ok = lintBoard(
+    J({
+      ...GOOD,
+      cadence: {
+        target: { ship_every: '3h', min_unit: '1 PR' },
+        iterations: [
+          {
+            id: 'I1',
+            status: 'open',
+            started_at: '2026-06-23T10:00:00Z',
+            deadline: '2026-06-23T13:00:00Z',
+            members: ['A', 'B'],
+          },
+        ],
+      },
+      tasks: [
+        {
+          id: 'A',
+          status: 'done',
+          deps: [],
+          verified: true,
+          artifact: '/abs/a.md',
+          estimate: { value: 1, unit: 'h' },
+          acceptance: 'A endpoint verified',
+          started_at: '2026-06-23T10:00:00Z',
+          finished_at: '2026-06-23T11:00:00Z',
+        },
+        {
+          id: 'B',
+          status: 'ready',
+          deps: ['A'],
+          estimate: { value: 2, unit: 'h' },
+          acceptance: { criteria: [{ desc: 'B endpoint verified', status: 'pending' }] },
+        },
+      ],
+    }),
+  );
+  assert.equal(ok.errors.length, 0, J(ok.errors));
+  for (const rule of [
+    'BIZ-CADENCE-MISSING-ESTIMATE',
+    'BIZ-CADENCE-OVERBOOKED',
+    'BIZ-CADENCE-CRITICAL-PATH-OVER',
+    'BIZ-TASK-OVERSIZED-FOR-CADENCE',
+    'BIZ-AGILE-ACCEPTANCE-MISSING',
+  ]) {
+    assert.ok(!ruleSet(ok.warnings).has(rule), `${rule} should not warn: ${J(ok.warnings)}`);
+  }
+});
+
+test('BIZ-CADENCE agile health warns for missing estimates, overbooked timebox, oversized task, missing acceptance, and critical path over', () => {
+  const bad = lintBoard(
+    J({
+      ...GOOD,
+      cadence: {
+        target: { ship_every: '3h', min_unit: '1 PR' },
+        iterations: [
+          {
+            id: 'I-bad',
+            status: 'open',
+            started_at: '2026-06-23T10:00:00Z',
+            deadline: '2026-06-23T13:00:00Z',
+            members: ['A', 'B', 'C'],
+          },
+        ],
+      },
+      tasks: [
+        {
+          id: 'A',
+          status: 'ready',
+          deps: [],
+          estimate: { value: 2, unit: 'h' },
+          acceptance: 'A thin slice ships',
+        },
+        {
+          id: 'B',
+          status: 'ready',
+          deps: ['A'],
+          estimate: { value: 2, unit: 'h' },
+          acceptance: 'B thin slice ships',
+        },
+        {
+          id: 'C',
+          status: 'ready',
+          deps: [],
+        },
+      ],
+    }),
+  );
+  const warnings = ruleSet(bad.warnings);
+  assert.ok(warnings.has('BIZ-CADENCE-MISSING-ESTIMATE'), J(bad.warnings));
+  assert.ok(warnings.has('BIZ-CADENCE-OVERBOOKED'), J(bad.warnings));
+  assert.ok(warnings.has('BIZ-CADENCE-CRITICAL-PATH-OVER'), J(bad.warnings));
+  assert.ok(warnings.has('BIZ-AGILE-ACCEPTANCE-MISSING'), J(bad.warnings));
+
+  const oversized = lintBoard(
+    J({
+      ...GOOD,
+      cadence: {
+        target: { ship_every: '3h / 1 PR' },
+        iterations: [{ id: 'I-big', status: 'open', members: ['BIG'] }],
+      },
+      tasks: [
+        {
+          id: 'BIG',
+          status: 'ready',
+          deps: [],
+          estimate: { value: 4, unit: 'h' },
+          acceptance: 'BIG ships a vertical slice',
+        },
+      ],
+    }),
+  );
+  assert.ok(
+    ruleSet(oversized.warnings).has('BIZ-TASK-OVERSIZED-FOR-CADENCE'),
+    J(oversized.warnings),
+  );
+});
+
+test('BIZ-ESTIMATE-STALE: measured drift on a done task suggests re-estimating not-started downstream', () => {
+  const stale = lintBoard(
+    J({
+      ...GOOD,
+      tasks: [
+        {
+          id: 'A',
+          status: 'done',
+          deps: [],
+          verified: true,
+          artifact: '/abs/a.md',
+          estimate: { value: 1, unit: 'h' },
+          started_at: '2026-06-23T10:00:00Z',
+          finished_at: '2026-06-23T13:30:00Z',
+        },
+        { id: 'B', status: 'blocked', deps: ['A'], estimate: { value: 1, unit: 'h' } },
+      ],
+    }),
+  );
+  assert.ok(ruleSet(stale.warnings).has('BIZ-ESTIMATE-STALE'), J(stale.warnings));
+
+  const alreadyStarted = lintBoard(
+    J({
+      ...GOOD,
+      tasks: [
+        {
+          id: 'A',
+          status: 'done',
+          deps: [],
+          verified: true,
+          artifact: '/abs/a.md',
+          estimate: { value: 1, unit: 'h' },
+          started_at: '2026-06-23T10:00:00Z',
+          finished_at: '2026-06-23T13:30:00Z',
+        },
+        {
+          id: 'B',
+          status: 'in_flight',
+          deps: ['A'],
+          estimate: { value: 1, unit: 'h' },
+          started_at: '2026-06-23T14:00:00Z',
+        },
+      ],
+    }),
+  );
+  assert.ok(!ruleSet(alreadyStarted.warnings).has('BIZ-ESTIMATE-STALE'));
+});
+
+// ── BIZ-DONE-VERIFIED（hard·done 真语义）──────────────────────────────────────────────────────────
+test('BIZ-DONE-VERIFIED: done task requires verified=true and non-empty artifact', () => {
+  assert.equal(model.levelOf('BIZ-DONE-VERIFIED'), 'hard');
+  const missingBoth = lintBoard(
     onlyTask({
       id: 'X',
       status: 'done',
@@ -711,7 +916,45 @@ test('BIZ-DONE-VERIFIED is reserved: a done task without verified/artifact emits
       finished_at: '2026-06-23T11:00:00Z',
     }),
   );
-  assert.ok(!has(r, 'BIZ-DONE-VERIFIED'), 'reserved rule is silently skipped by emit()');
+  assert.ok(has(missingBoth, 'BIZ-DONE-VERIFIED'), 'missing verified + artifact is hard');
+
+  const missingArtifact = lintBoard(
+    onlyTask({
+      id: 'X',
+      status: 'done',
+      deps: [],
+      verified: true,
+      started_at: '2026-06-23T10:00:00Z',
+      finished_at: '2026-06-23T11:00:00Z',
+    }),
+  );
+  assert.ok(has(missingArtifact, 'BIZ-DONE-VERIFIED'), 'missing artifact is hard');
+
+  const emptyArtifact = lintBoard(
+    onlyTask({
+      id: 'X',
+      status: 'done',
+      deps: [],
+      verified: true,
+      artifact: '',
+      started_at: '2026-06-23T10:00:00Z',
+      finished_at: '2026-06-23T11:00:00Z',
+    }),
+  );
+  assert.ok(has(emptyArtifact, 'BIZ-DONE-VERIFIED'), 'empty artifact is hard');
+
+  const ok = lintBoard(
+    onlyTask({
+      id: 'X',
+      status: 'done',
+      deps: [],
+      verified: true,
+      artifact: '/abs/out.md',
+      started_at: '2026-06-23T10:00:00Z',
+      finished_at: '2026-06-23T11:00:00Z',
+    }),
+  );
+  assert.ok(!has(ok, 'BIZ-DONE-VERIFIED'), 'done + verified + artifact is clean');
 });
 
 // ── 报告格式 ────────────────────────────────────────────────────────────────────────────────────────

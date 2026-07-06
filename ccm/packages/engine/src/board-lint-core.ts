@@ -26,6 +26,7 @@
 
 import {
   ENUMS,
+  durationHours,
   isAbsolutePathOrUrl,
   isAwaitingUser,
   isDoneStatus,
@@ -35,6 +36,7 @@ import {
   ISO_UTC_RE as MODEL_ISO_UTC_RE,
   SCHEMA_VERSION as MODEL_SCHEMA_VERSION,
   type TaskLike,
+  taskTrulyDone,
 } from './board-model.js';
 
 // ── lint 报告条目 / 结果类型 ───────────────────────────────────────────────────────────────────────
@@ -74,7 +76,7 @@ function acceptanceNonEmpty(a: unknown): boolean {
 
 // lintBoard(text) — text 是 board 文件的原始字符串。返回 { errors, warnings }，各为 [{ rule, message, task? }]。
 //   绝不抛（FMT-JSON 把 JSON.parse 失败收成一条 error）。每条经 emit() 按 levelOf(id) 分流到 errors/warnings；
-//   level==='reserved' 的规则 emit 时被静默丢弃（登记在册但暂不强制·如 BIZ-DONE-VERIFIED）。
+//   level==='reserved' 的规则 emit 时被静默丢弃（登记在册但暂不强制）。
 export function lintBoard(text: string): LintResult {
   const errors: LintEntry[] = [];
   const warnings: LintEntry[] = [];
@@ -428,6 +430,12 @@ export function lintBoard(text: string): LintResult {
 
   // ── BIZ-CADENCE-SHIPPED（iteration 收口完整性：shipped ⇒ members 全 done+verified·hard）───────────────
   lintCadenceShipped(b, taskById, emit);
+
+  // ── BIZ-CADENCE-* / BIZ-AGILE-*（duration + agile cadence health·warn）────────────────────────────
+  lintCadenceAgileHealth(b, taskById, g.upstream, emit);
+
+  // ── BIZ-ESTIMATE-STALE（实测漂移提示下游重估·warn）───────────────────────────────────────────────
+  lintEstimateStale(taskById, g.downstream, emit);
 
   return { errors, warnings };
 }
@@ -1058,6 +1066,22 @@ function lintTaskBiz(id: string, t: TaskLike, emit: Emit): void {
       id,
     );
   }
+  // BIZ-EXTERNAL-ARTIFACT（warn）：external done 的 artifact 不能只是同一个 issue 跟踪锚点。
+  if (t.executor === 'external' && t.status === 'done' && typeof t.artifact === 'string') {
+    const issueRefs = refs
+      .filter((r) => (r as Record<string, unknown>).kind === 'issue')
+      .map((r) => (r as Record<string, unknown>).ref)
+      .filter((ref): ref is string => typeof ref === 'string' && ref !== '');
+    if (issueRefs.includes(t.artifact)) {
+      emit(
+        'BIZ-EXTERNAL-ARTIFACT',
+        `${id}.executor=external 且 status=done，但 artifact 等于 kind=issue 的追踪锚点 ${JSON.stringify(t.artifact)}。` +
+          `影响：issue link 只是外部进度 tracking anchor；GitHub issue closed / 存在不等于 board done。` +
+          `artifact 应指向外部实际产出（PR / commit / release / report / CI run 等），再由 orchestrator 端点验收后 done --verified。`,
+        id,
+      );
+    }
+  }
   // BIZ-AWAITING（hard）+ BIZ-DECISION-PACKAGE（warn）：awaiting-user 完整性。
   if (isAwaitingUser(t)) {
     const dp = t.decision_package;
@@ -1072,6 +1096,16 @@ function lintTaskBiz(id: string, t: TaskLike, emit: Emit): void {
     } else {
       lintDecisionPackage(id, dp as Record<string, unknown>, emit);
     }
+  }
+  // BIZ-DONE-VERIFIED（hard）：done 必须同时具备端点验收标记与可追溯产物。
+  if (t.status === 'done' && !taskTrulyDone(t)) {
+    emit(
+      'BIZ-DONE-VERIFIED',
+      `${id} status=done 但缺少 true-done 证据（需要 verified=true 且 artifact 非空）。` +
+        `done 是对世界状态的完成声称，必须带端点验收与可追溯产物；否则 board 会把未验收/无证据的工作谎报为完成。\n` +
+        `  怎么修：用 \`ccm task done ${id} --verified --artifact <path-or-url>\`，或若尚未验收/无产物，把状态改回 uncertain / in_flight / stale 等真实状态。`,
+      id,
+    );
   }
   // BIZ-TIME-ORDER（warn）：时间序 created≤started≤finished;in_flight⇒started;done⇒finished。
   lintTimeOrder(id, t, emit);
@@ -1209,6 +1243,190 @@ function lintCadenceShipped(board: BoardLike, taskById: Map<string, TaskLike>, e
         `cadence iteration "${it.id}" 标 status=shipped，但其 members 未全部 done+verified：${bad.join(', ')}。` +
           `坏什么：iteration 收口（shipped）的语义就是「这一批纵切切片全交付并验过」——成员没到位却标 shipped = 收口完整性破，节奏台账谎报进度。\n` +
           `  怎么修：把未完成成员推到 done+verified 再标 shipped，或把它们移出本 iteration 的 members。`,
+      );
+    }
+  }
+}
+
+const CADENCE_GRACE = 1.1;
+
+function cadenceTimeboxHours(
+  cadence: Record<string, unknown>,
+  iteration: Record<string, unknown>,
+): number | null {
+  const started = isISOUTC(iteration.started_at) ? Date.parse(iteration.started_at as string) : null;
+  const deadline = isISOUTC(iteration.deadline) ? Date.parse(iteration.deadline as string) : null;
+  if (started != null && deadline != null && deadline > started) return (deadline - started) / 3600000;
+  const target = cadence.target as Record<string, unknown> | undefined;
+  return target && typeof target === 'object' ? durationHours(target.ship_every) : null;
+}
+
+function criticalPathHoursForMembers(
+  members: string[],
+  taskById: Map<string, TaskLike>,
+  upstream: Map<string, string[]>,
+): number | null {
+  const validMembers = members.filter((id) => {
+    const t = taskById.get(id);
+    return !!t && durationHours(t.estimate) != null;
+  });
+  if (validMembers.length === 0) return null;
+  const memberSet = new Set(validMembers);
+  const indeg = new Map<string, number>();
+  const downstream = new Map<string, string[]>();
+  const dist = new Map<string, number>();
+  for (const id of validMembers) {
+    const t = taskById.get(id);
+    if (!t) return null;
+    const h = durationHours(t.estimate);
+    if (h == null) return null;
+    indeg.set(id, 0);
+    downstream.set(id, []);
+    dist.set(id, h);
+  }
+  for (const id of validMembers) {
+    for (const dep of upstream.get(id) || []) {
+      if (!memberSet.has(dep)) continue;
+      indeg.set(id, (indeg.get(id) || 0) + 1);
+      downstream.get(dep)!.push(id);
+    }
+  }
+  const queue = validMembers.filter((id) => (indeg.get(id) || 0) === 0).sort();
+  let seen = 0;
+  while (queue.length) {
+    const id = queue.shift()!;
+    seen++;
+    const base = dist.get(id) || 0;
+    for (const next of downstream.get(id) || []) {
+      const nTask = taskById.get(next);
+      const nDur = durationHours(nTask?.estimate);
+      if (nDur == null) return null;
+      dist.set(next, Math.max(dist.get(next) || 0, base + nDur));
+      indeg.set(next, (indeg.get(next) || 0) - 1);
+      if (indeg.get(next) === 0) queue.push(next);
+    }
+    queue.sort();
+  }
+  if (seen !== validMembers.length) return null;
+  return Math.max(0, ...dist.values());
+}
+
+// BIZ-CADENCE-*（warn）：duration / cadence / agile health。只给 open iteration 出 capacity 类建议。
+function lintCadenceAgileHealth(
+  board: BoardLike,
+  taskById: Map<string, TaskLike>,
+  upstream: Map<string, string[]>,
+  emit: Emit,
+): void {
+  const c = board.cadence as Record<string, unknown> | undefined;
+  if (!c || typeof c !== 'object' || Array.isArray(c) || !Array.isArray(c.iterations)) return;
+  const target = c.target as Record<string, unknown> | undefined;
+  const targetHours = target && typeof target === 'object' ? durationHours(target.ship_every) : null;
+  for (const itAny of c.iterations) {
+    const it = itAny as Record<string, unknown>;
+    if (!it || typeof it !== 'object') continue;
+    const members = Array.isArray(it.members)
+      ? it.members.filter((m): m is string => typeof m === 'string')
+      : [];
+    if (members.length === 0) continue;
+    const label = typeof it.id === 'string' && it.id ? it.id : '<unknown>';
+
+    for (const id of members) {
+      const t = taskById.get(id);
+      if (!t) continue;
+      if (!acceptanceNonEmpty(t.acceptance)) {
+        emit(
+          'BIZ-AGILE-ACCEPTANCE-MISSING',
+          `${id} 是 cadence iteration "${label}" 的 member，但缺清晰 acceptance。` +
+            `影响：cadence member 应是一片可验收的纵向增量；缺 DoD 时 iteration 即便按时完成，也无法可靠 endpoint-verify。\n` +
+            `  怎么修：给该 task 补一句可验收 DoD（或 criteria），再决定是否仍归入本 iteration。`,
+          id,
+        );
+      }
+    }
+
+    if (it.status !== undefined && it.status !== 'open') continue;
+    const timebox = cadenceTimeboxHours(c, it);
+    let total = 0;
+    const missing: string[] = [];
+    for (const id of members) {
+      const t = taskById.get(id);
+      if (!t) continue;
+      const h = durationHours(t.estimate);
+      if (h == null) {
+        missing.push(id);
+      } else {
+        total += h;
+        if (targetHours != null && h > targetHours * CADENCE_GRACE) {
+          emit(
+            'BIZ-TASK-OVERSIZED-FOR-CADENCE',
+            `${id}.estimate≈${h.toFixed(2)}h 超过 cadence target ship_every≈${targetHours.toFixed(2)}h（grace ${(CADENCE_GRACE * 100).toFixed(0)}%）。` +
+              `影响：单片大于 ship cadence 时，它通常不是薄纵切，而是会吞掉整个 timebox 的大块工作。\n` +
+              `  怎么修：优先把 ${id} 再切成能在一个 cadence 目标内验收的薄片；若确实不能切，在 task 上写清理由并接受本 warning。`,
+            id,
+          );
+        }
+      }
+    }
+    if (missing.length) {
+      emit(
+        'BIZ-CADENCE-MISSING-ESTIMATE',
+        `cadence iteration "${label}" 有 member 缺有效 estimate：${missing.join(', ')}。` +
+          `影响：缺估时则无法判断 timebox 是否 overbooked、临界路径是否能在 cadence 内 ship。\n` +
+          `  怎么修：给这些 members 补 task.estimate（如 {value:2,unit:"h"} / ccm --estimate 2h），或移出本 iteration。`,
+      );
+    }
+    if (timebox == null) continue;
+    if (total > timebox * CADENCE_GRACE) {
+      emit(
+        'BIZ-CADENCE-OVERBOOKED',
+        `cadence iteration "${label}" 估时总量≈${total.toFixed(2)}h，超过 timebox≈${timebox.toFixed(2)}h（grace ${(CADENCE_GRACE * 100).toFixed(0)}%）。` +
+          `影响：iteration 装入的工作量超过节奏容量，默认会拖延 ship 或迫使未验收收口。\n` +
+          `  怎么修：拆小 / 移出非临界 member / 降 WIP 后重排，直到总量能放进 timebox。`,
+      );
+    }
+    const cp = criticalPathHoursForMembers(members, taskById, upstream);
+    if (cp != null && cp > timebox * CADENCE_GRACE) {
+      emit(
+        'BIZ-CADENCE-CRITICAL-PATH-OVER',
+        `cadence iteration "${label}" 的 member 内关键路径≈${cp.toFixed(2)}h，超过 timebox≈${timebox.toFixed(2)}h（grace ${(CADENCE_GRACE * 100).toFixed(0)}%）。` +
+          `影响：即使并行度拉满，依赖链本身也无法按 cadence 收口。\n` +
+          `  怎么修：重切临界链上的 oversized member、删假依赖边，或把 iteration timebox / scope surface 给用户裁决。`,
+      );
+    }
+  }
+}
+
+function measuredHours(t: TaskLike): number | null {
+  const started = isISOUTC(t.started_at) ? Date.parse(t.started_at as string) : null;
+  const finished = isISOUTC(t.finished_at) ? Date.parse(t.finished_at as string) : null;
+  if (started == null || finished == null || finished <= started) return null;
+  return (finished - started) / 3600000;
+}
+
+function lintEstimateStale(
+  taskById: Map<string, TaskLike>,
+  downstream: Map<string, string[]>,
+  emit: Emit,
+): void {
+  for (const [id, t] of taskById) {
+    if (t.status !== 'done') continue;
+    const est = durationHours(t.estimate);
+    const actual = measuredHours(t);
+    if (est == null || actual == null) continue;
+    const ratio = actual / est;
+    if (ratio < 0.5 || ratio > 2) {
+      const candidates = (downstream.get(id) || []).filter((d) => {
+        const dt = taskById.get(d);
+        return !!dt && dt.started_at === undefined && durationHours(dt.estimate) != null;
+      });
+      if (candidates.length === 0) continue;
+      emit(
+        'BIZ-ESTIMATE-STALE',
+        `${id} 实测 duration≈${actual.toFixed(2)}h，与 estimate≈${est.toFixed(2)}h 漂移 ${(ratio * 100).toFixed(0)}%。` +
+          `影响：依赖它的未开始任务仍沿用旧估时，forecast / cadence 装箱可能继续偏。` +
+          `建议重估下游：${candidates.join(', ')}。`,
+        candidates[0],
       );
     }
   }

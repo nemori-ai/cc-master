@@ -65,6 +65,12 @@ description: 'Use when 你（orchestrator/agent）在 Codex 下要消费 ccm 的
 
 配额 `throttle`/`stop_7d` 但 `forecast` 还很长 → 这是一个典型张力：容量不够装完该装的活。**识别它**（读 usage verdict 与 estimate forecast 两个字段对比）归本 skill；**怎么办**（典型 `blocked_on:"user"`：范围/期限/加资源三选一 surface 给用户）归 `master-orchestrator-guide`「该问就问」镜头。
 
+## duration ⊗ 模型档位（别把长任务自动升档）
+
+选模型档时同时看三轴：**复杂性**（问题结构有多难）、**不确定性 / 风险**（错了代价多大）、**duration**（预计会占用多久）。duration 是成本与排期信号，不是智力需求信号：一个 6h 的机械迁移通常该拆小、降 WIP 或外部化，而不是自动升到更强模型；一个 30m 的架构裁决可能反而需要强档。看到 cadence oversized / overbooked warning 时，先问「能不能切薄」和「能不能把非临界部分放到 float / background」，再谈升档。
+
+实测 duration 漂移要回流到估算：完成任务比 estimate 慢很多时，重估未开始下游；比 estimate 快很多时，也别立刻把全局 forecast 乐观化，先确认它不是特殊样本。
+
 ---
 
 ## 热路径速查

@@ -22,7 +22,7 @@
 //   CPM forward/backward pass、float 公式逐字保持（零行为变化）。浏览器形态由 tsdown 的 IIFE 产物承接。
 
 import { buildGraph, findCycle } from './board-lint-core.js';
-import type { TaskLike } from './board-model.js';
+import { durationHours, type EstimateLike, type TaskLike } from './board-model.js';
 
 // 终态状态（done 家族）。rollup「子全 done」判定用——只有 'done' 算真完成（与 verify-board / lint 口径一致）。
 const DONE = 'done';
@@ -37,36 +37,11 @@ function parseTs(v: unknown): number | null {
 }
 
 // estimate = {value:number, unit:string}（v2·喂 cadence 拆解校验 + CPM 预估时长·#29/#34）。
-export interface Estimate {
-  value?: unknown;
-  unit?: unknown;
-}
-
+export type Estimate = EstimateLike;
 // estimateHours(estimate) → 估点折算小时数（>0）或 null（缺/坏/未知单位）。
 //   支持单位：h/hour(s)·m/min/minute(s)·d/day(s)·w/week(s)（大小写不敏感）；未知单位 → null（降级 unit）。
-export function estimateHours(estimate: Estimate | null | undefined): number | null {
-  if (!estimate || typeof estimate !== 'object' || Array.isArray(estimate)) return null;
-  const v = estimate.value;
-  if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) return null;
-  const u = typeof estimate.unit === 'string' ? estimate.unit.trim().toLowerCase() : '';
-  const mult: number | undefined = (
-    {
-      h: 1,
-      hour: 1,
-      hours: 1,
-      m: 1 / 60,
-      min: 1 / 60,
-      minute: 1 / 60,
-      minutes: 1 / 60,
-      d: 24,
-      day: 24,
-      days: 24,
-      w: 168,
-      week: 168,
-      weeks: 168,
-    } as Record<string, number>
-  )[u];
-  return mult ? v * mult : null;
+export function estimateHours(estimate: EstimateLike | null | undefined): number | null {
+  return durationHours(estimate);
 }
 
 export type WeightSource = 'measured' | 'estimate' | 'unit' | 'mixed' | 'cycle';

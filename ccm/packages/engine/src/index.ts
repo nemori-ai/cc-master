@@ -54,6 +54,7 @@ export {
 export type {
   AcceptanceObject,
   EnumName,
+  EstimateLike,
   FieldMeta,
   Invariant,
   TaskLike,
@@ -61,6 +62,7 @@ export type {
 // ── board-model（数据模型 SSOT：enums / FIELDS / INVARIANTS / STATUS_MACHINE / predicates）──
 export {
   acceptanceConverged,
+  durationHours,
   ENUMS,
   FIELDS,
   INVARIANTS,

@@ -196,10 +196,11 @@ export const FIELDS = {
       tier: '👁',
       type: 'object{target?, iterations?}',
       default: '缺省(无节奏约束·纯 DAG)',
-      readers: 'Stop-block 收口逼 + CLI 拆解校验',
+      readers: 'Stop-block 收口逼 + CLI 拆解校验 + cadence health lint',
       writers: 'agent 经 CLI',
       when: '定节奏 / 开收 iteration',
-      degrade: '缺→无 cadence 牙齿;iteration 形状坏→warn(FMT-CADENCE)',
+      degrade:
+        '缺→无 cadence 牙齿;iteration 形状坏→warn(FMT-CADENCE);members 估时/验收/容量问题→warn(BIZ-CADENCE-*/BIZ-AGILE-*)',
     },
     baseline: {
       tier: '✎',
@@ -310,7 +311,8 @@ export const FIELDS = {
       readers: 'viewer 链接 / executor 上下文',
       writers: 'agent 经 CLI',
       when: '建 dev 类 task',
-      degrade: 'ref 相对路径→hard(FMT-REF);type=development 缺 spec/plan→warn(BIZ-DEV-REFS)',
+      degrade:
+        'ref 相对路径→hard(FMT-REF);type=development 缺 spec/plan→warn(BIZ-DEV-REFS);executor=external 缺 issue→warn(BIZ-EXTERNAL-ISSUE)',
     },
     created_at: {
       tier: '✎',
@@ -343,10 +345,11 @@ export const FIELDS = {
       tier: '✎',
       type: 'object{value:number, unit:string}',
       default: '缺省',
-      readers: 'cadence 拆解校验(estimate vs timebox) / CPM 喂时长降级',
+      readers: 'cadence health(estimate vs timebox) / CPM 喂时长降级 / estimate stale drift',
       writers: 'agent 经 CLI',
       when: '估点',
-      degrade: '缺→CPM 降级 unit;形状坏→warn(FMT-ESTIMATE)',
+      degrade:
+        '缺→CPM 降级 unit;open cadence member 缺→warn(BIZ-CADENCE-MISSING-ESTIMATE);形状坏→warn(FMT-ESTIMATE)',
     },
     blocked_on: {
       tier: '✎',
@@ -399,7 +402,7 @@ export const FIELDS = {
       default: '缺省',
       readers: 'resume 接驳后台句柄 / viewer',
       writers: 'agent 经 CLI',
-      when: '派发 subagent/workflow 时',
+      when: '派发 subagent/workflow 时；external 可记录 issue URL/number 或外部 run id',
       degrade: 'executor∈{subagent,workflow} 缺→warn(BIZ-EXECUTOR-HANDLE)',
     },
     justification: {
@@ -418,7 +421,8 @@ export const FIELDS = {
       readers: 'done 真语义(P3) / viewer 产物链接',
       writers: 'agent 经 CLI(产出落盘后)',
       when: '产出落盘后',
-      degrade: '缺→done 真语义不满足(BIZ-DONE-VERIFIED·P3 预留)',
+      degrade:
+        '缺→done 真语义不满足(BIZ-DONE-VERIFIED·hard);external 的 artifact 若只是 issue 跟踪锚点→warn(BIZ-EXTERNAL-ARTIFACT)',
     },
     output_schema: {
       tier: '✎',
@@ -783,6 +787,14 @@ export const INVARIANTS: Invariant[] = [
     summary: 'executor=external ⇒ references 含 kind=issue≥1',
   },
   {
+    id: 'BIZ-EXTERNAL-ARTIFACT',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'task',
+    summary:
+      'executor=external 且 done 时 artifact 不应只是 issue tracking anchor(issue closed ≠ board done)',
+  },
+  {
     id: 'BIZ-TIME-ORDER',
     level: 'warn',
     family: 'BIZ',
@@ -797,6 +809,48 @@ export const INVARIANTS: Invariant[] = [
     summary: 'iteration.status=shipped ⇒ members 全 done+verified(收口完整性)',
   },
   {
+    id: 'BIZ-CADENCE-MISSING-ESTIMATE',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'cadence',
+    summary: 'open iteration member 缺有效 estimate，无法判断 timebox 是否装得下',
+  },
+  {
+    id: 'BIZ-CADENCE-OVERBOOKED',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'cadence',
+    summary: 'open iteration 成员估时总量超过 cadence timebox(含小幅 grace)',
+  },
+  {
+    id: 'BIZ-CADENCE-CRITICAL-PATH-OVER',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'cadence',
+    summary: 'open iteration 的依赖关键路径估时超过 cadence timebox(含小幅 grace)',
+  },
+  {
+    id: 'BIZ-TASK-OVERSIZED-FOR-CADENCE',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'task',
+    summary: '单个 cadence member 的 estimate 超过 cadence ship_every 目标(提示再切片)',
+  },
+  {
+    id: 'BIZ-AGILE-ACCEPTANCE-MISSING',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'task',
+    summary: 'cadence member 缺清晰 acceptance，无法作为可验收薄切片收口',
+  },
+  {
+    id: 'BIZ-ESTIMATE-STALE',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'task',
+    summary: '实测 duration 与 estimate 明显漂移，提示重估未开始下游',
+  },
+  {
     id: 'BIZ-STATUS-DEPS',
     level: 'warn',
     family: 'BIZ',
@@ -804,13 +858,12 @@ export const INVARIANTS: Invariant[] = [
     summary:
       'deps 门控不一致(手改造出·CLI 经 reconcileGating 永不产生):ready 但 deps 未全 done / blocked 无 blocked_on 但 deps 全 done(ADR-023)',
   },
-  // ── 预留(登记在册·lint 暂不强制·待 ADR) ──────────────────────────────────────────────────────────
   {
     id: 'BIZ-DONE-VERIFIED',
-    level: 'reserved',
+    level: 'hard',
     family: 'BIZ',
     scope: 'task',
-    summary: 'status=done ⇒ verified ∧ artifact 非空(done 真语义·#32·P3·需 ADR)',
+    summary: 'status=done ⇒ verified ∧ artifact 非空(done 真语义·#32 true-done hard gate)',
   },
   {
     id: 'FMT-BASELINE',
@@ -879,6 +932,45 @@ export interface TaskLike {
   [key: string]: unknown;
 }
 
+export interface EstimateLike {
+  value?: unknown;
+  unit?: unknown;
+}
+
+const DURATION_UNITS: Record<string, number> = {
+  h: 1,
+  hour: 1,
+  hours: 1,
+  m: 1 / 60,
+  min: 1 / 60,
+  minute: 1 / 60,
+  minutes: 1 / 60,
+  d: 24,
+  day: 24,
+  days: 24,
+  w: 168,
+  week: 168,
+  weeks: 168,
+};
+
+// durationHours(v) → 小时数（>0）或 null。用于 task.estimate 与 cadence.target.ship_every。
+//   字符串只读开头的 "<number><unit>"，所以 "3h" 与 "3h / 1 PR" 都能取出 3h。
+export function durationHours(v: unknown): number | null {
+  if (typeof v === 'string') {
+    const m = v.trim().match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)\b/);
+    if (!m) return null;
+    const n = Number(m[1]);
+    const mult = DURATION_UNITS[m[2]!.toLowerCase()];
+    return Number.isFinite(n) && n > 0 && mult ? n * mult : null;
+  }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const e = v as EstimateLike;
+  if (typeof e.value !== 'number' || !Number.isFinite(e.value) || e.value <= 0) return null;
+  const unit = typeof e.unit === 'string' ? e.unit.trim().toLowerCase() : '';
+  const mult = DURATION_UNITS[unit];
+  return mult ? e.value * mult : null;
+}
+
 // isAwaitingUser：blocked_on==="user" 且 status ∈ {blocked, in_flight}（webview / discuss / lint 三端对齐）。
 export function isAwaitingUser(task: TaskLike | null | undefined): boolean {
   return (
@@ -911,8 +1003,8 @@ export function acceptanceConverged(acceptance: unknown): boolean | null {
   return c.every((cr) => cr && cr.status === 'met');
 }
 
-// taskTrulyDone(task) → done 真语义（#32·P3）：status==='done' ∧ verified===true ∧ artifact 非空。
-//   注：这是 BIZ-DONE-VERIFIED(reserved) 的语义实现，供 CLI/graph/viewer 用；lint 暂不据此 hard fail。
+// taskTrulyDone(task) → done 真语义（#32）：status==='done' ∧ verified===true ∧ artifact 非空。
+//   BIZ-DONE-VERIFIED 的 hard lint 复用这一谓词，避免 CLI / lint / viewer 漂移。
 export function taskTrulyDone(task: TaskLike | null | undefined): boolean {
   if (!task || typeof task !== 'object') return false;
   const hasArtifact = task.artifact !== undefined && task.artifact !== null && task.artifact !== '';

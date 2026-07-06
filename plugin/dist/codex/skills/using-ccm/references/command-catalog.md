@@ -105,7 +105,7 @@ ccm <alias> [args] [flags]
 | `board` | 板级：查看 / 校验 / DAG 分析 / 建板 / 改配置 |
 | `task` | 任务：增删改查 + 状态机（DAG 节点） |
 | `log` | append-only 审计轨迹 |
-| `jc` | judgment_calls 自决诚实台账 |
+| `jc` | judgment_calls 自驱决策记录 |
 | `cadence` | 节奏 / iteration 收口 |
 | `watchdog` | 自我唤醒 watchdog |
 | `baseline` | EVM 计划基线快照（estimate 引擎的 plan SSOT·board 内唯一写 noun） |
@@ -368,7 +368,7 @@ ccm task add <id> [flags]
 | `--description <str>` | | string | | | 详细描述 |
 | `--type <enum>` | | enum（开放·未知值 warn） | `design, planning, development, development-demo, acceptance, e2e-integration, doc-alignment, pr` | | 任务类型 |
 | `--executor <enum>` | | enum | `user, master-orchestrator, subagent, workflow, external` | | 执行者类型 |
-| `--handle <str>` | | string | | | 后台句柄（subagent/workflow 必给） |
+| `--handle <str>` | | string | | | 后台句柄（subagent/workflow 必给；external 可记录 issue URL/number/run id） |
 | `--deps <a,b>` | | csv | | `[]` | 依赖（逗号分隔） |
 | `--parent <str>` | | string | | 缺=顶层 | 归属 owner 节点（嵌套 depth=1） |
 | `--estimate <dur>` | | duration | `3h`/`90m`/`2d`/`1w` | | 估时 |
@@ -384,7 +384,8 @@ ccm task add <id> [flags]
 | `--set-json <path=json>` | | string（可重复） | | | 通用设 ✎ 对象/数组 |
 | `--log <str>` | | string | | | 同时追一条 log |
 
-- 例：`ccm task add T7 --type development --deps T1 --estimate 3h` · `ccm task add EXT3 --executor external --ref issue:https://github.com/o/r/issues/9`
+- 例：`ccm task add T7 --type development --deps T1 --estimate 3h` · `ccm task add EXT3 --executor external --ref issue:https://github.com/o/r/issues/9 --handle o/r#9`
+- external issue closed 但未端点验收：`ccm task set-status EXT3 uncertain`；验收外部 PR 后才：`ccm task done EXT3 --verified --artifact https://github.com/o/r/pull/12`
 
 ### task show
 
@@ -508,7 +509,7 @@ ccm task done <id> [flags]
 |---|---|---|
 | `<id>` | 是 | task id |
 
-- 行为：→ `done`·盖 `finished_at`
+- 行为：→ `done`·盖 `finished_at`;写入关卡要求同时带 `--verified` 与非空 `--artifact`,否则 `BIZ-DONE-VERIFIED` hard gate 拒绝落盘(exit 3)
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
@@ -656,7 +657,7 @@ ccm log list [flags]
 
 ## namespace jc
 
-judgment_calls 自决诚实台账。
+judgment_calls 自驱决策记录。
 
 ### jc add
 

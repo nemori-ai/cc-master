@@ -37,6 +37,7 @@ function doneTask(id: string): Record<string, unknown> {
     id,
     status: 'done',
     verified: true,
+    artifact: `/abs/${id}.md`,
     deps: [],
     created_at: '2026-06-24T08:00:00Z',
     started_at: '2026-06-24T08:30:00Z',
