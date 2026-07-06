@@ -219,13 +219,20 @@ test('INVARIANTS catalog covers the key v2 rules at the agreed levels (spec §5)
   assert.equal(lvl('BIZ-AWAITING'), 'hard');
   // cadence 收口完整性 → hard。
   assert.equal(lvl('BIZ-CADENCE-SHIPPED'), 'hard');
+  assert.equal(lvl('BIZ-CADENCE-MISSING-ESTIMATE'), 'warn');
+  assert.equal(lvl('BIZ-CADENCE-OVERBOOKED'), 'warn');
+  assert.equal(lvl('BIZ-CADENCE-CRITICAL-PATH-OVER'), 'warn');
+  assert.equal(lvl('BIZ-TASK-OVERSIZED-FOR-CADENCE'), 'warn');
+  assert.equal(lvl('BIZ-AGILE-ACCEPTANCE-MISSING'), 'warn');
+  assert.equal(lvl('BIZ-ESTIMATE-STALE'), 'warn');
   // 条件业务规则 → warn。
   assert.equal(lvl('BIZ-DEV-REFS'), 'warn');
   assert.equal(lvl('BIZ-ACCEPTANCE-REQUIRED'), 'warn');
   assert.equal(lvl('BIZ-EXECUTOR-HANDLE'), 'warn');
   assert.equal(lvl('BIZ-EXTERNAL-ISSUE'), 'warn');
-  // done 真语义 = P3 预留（#32，需 ADR）：登记在册但 reserved（lint 暂不强制）。
-  assert.equal(lvl('BIZ-DONE-VERIFIED'), 'reserved');
+  assert.equal(lvl('BIZ-EXTERNAL-ARTIFACT'), 'warn');
+  // done 真语义：status=done 必须有 verified + artifact 证据。
+  assert.equal(lvl('BIZ-DONE-VERIFIED'), 'hard');
 });
 
 test('invariant(id) looks up the full entry; unknown id → undefined', () => {

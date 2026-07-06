@@ -30,7 +30,7 @@ run_lint_bash() {
 seed_board() { mkdir -p "$1/boards"; printf '%s' "$5" > "$1/boards/$2.board.json"; }
 
 # A well-formed armed board owned by sess-x (used as both the arming board and the lint target).
-GOOD='{"schema":"cc-master/v2","meta":{"template_version":1},"goal":"g","owner":{"active":true,"session_id":"sess-x"},"git":{"worktree":"/w","branch":"b"},"tasks":[{"id":"T0","status":"done","deps":[],"started_at":"2026-06-23T10:00:00Z","finished_at":"2026-06-23T11:00:00Z"},{"id":"T1","status":"ready","deps":["T0"]}]}'
+GOOD='{"schema":"cc-master/v2","meta":{"template_version":1},"goal":"g","owner":{"active":true,"session_id":"sess-x"},"git":{"worktree":"/w","branch":"b"},"tasks":[{"id":"T0","status":"done","deps":[],"artifact":"commit T0","verified":true,"started_at":"2026-06-23T10:00:00Z","finished_at":"2026-06-23T11:00:00Z"},{"id":"T1","status":"ready","deps":["T0"]}]}'
 
 # ── (a) ARMED + good board edited via Write → lint passes → SILENT (no spam, rc 0) ───────────────────
 H="$(make_project)"; seed_board "$H" "mine" true "sess-x" "$GOOD"
@@ -191,7 +191,7 @@ rm -rf "$H"
 # A board crammed with arbitrary agent-invented top-level + per-task keys, but a clean waist + deps →
 # MUST pass silently. lint whitelists known fields, stays silent on unknown ones (no second waist).
 H="$(make_project)"
-seed_board "$H" "free" true "sess-x" '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-x"},"git":{"worktree":"","branch":""},"my_custom_top":42,"weird":{"nested":true},"tasks":[{"id":"T0","status":"done","deps":[],"artifact":"x","mechanism":"sub-agent","handle":"bg-1","whatever_i_want":["a","b"],"notes":"free text","started_at":"2026-06-23T10:00:00Z","finished_at":"2026-06-23T11:00:00Z"}]}'
+seed_board "$H" "free" true "sess-x" '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-x"},"git":{"worktree":"","branch":""},"my_custom_top":42,"weird":{"nested":true},"tasks":[{"id":"T0","status":"done","deps":[],"artifact":"x","verified":true,"mechanism":"sub-agent","handle":"bg-1","whatever_i_want":["a","b"],"notes":"free text","started_at":"2026-06-23T10:00:00Z","finished_at":"2026-06-23T11:00:00Z"}]}'
 run_lint "Write" "$H/boards/free.board.json" "sess-x" "$H"
 assert_eq 0 "$HOOK_RC" "(m) agent-shaped fields → rc 0"
 assert_eq "" "$HOOK_OUT" "(m) arbitrary custom fields → silent (红线2: lint never becomes a second waist)"

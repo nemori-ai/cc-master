@@ -10,6 +10,7 @@
 # 从 repo 根 allowlist 打包；同一个裸 `v*` plugin tag 下发布按 harness 区分的 asset：
 #   - cc-master-plugin-claude-code-<tag>.zip
 #   - cc-master-plugin-codex-<tag>.zip
+#   - SHA256SUMS（install.sh 安装前必须校验）
 name: plugin-release
 
 on:
@@ -55,6 +56,12 @@ jobs:
           echo "zips<<EOF" >> "${GITHUB_OUTPUT}"
           cat /tmp/cc-master-plugin-zips.txt >> "${GITHUB_OUTPUT}"
           echo "EOF" >> "${GITHUB_OUTPUT}"
+          test -f dist/SHA256SUMS
+
+      - name: Validate checksum manifest
+        run: |
+          cd dist
+          sha256sum --check SHA256SUMS
 
       # 制品自证：Claude Code zip 解压后 `claude plugin validate` 须过。
       - name: Validate Claude Code packaged plugin
@@ -76,7 +83,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cc-master-plugin
-          path: dist/cc-master-plugin-*.zip
+          path: |
+            dist/cc-master-plugin-*.zip
+            dist/SHA256SUMS
           if-no-files-found: error
 
       # 仅 tag 触发时 attach 到 GitHub release。
@@ -84,4 +93,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/cc-master-plugin-*.zip
+          files: |
+            dist/cc-master-plugin-*.zip
+            dist/SHA256SUMS

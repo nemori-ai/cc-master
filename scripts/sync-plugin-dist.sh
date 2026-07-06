@@ -82,6 +82,7 @@ const src = 'plugin/src';
 const host = process.env.SYNC_HOST || 'claude-code';
 const surface = process.env.SYNC_SURFACE || 'all';
 const dst = `plugin/dist/${host}`;
+const SKILL_DIST_EXCLUDES = ['AGENTS.md', 'CLAUDE.md', '.design', 'evals'];
 
 function copyDir(from, to, options = {}) {
   const exclude = new Set(options.exclude || []);
@@ -285,7 +286,7 @@ for (const skill of fs.readdirSync(skillsSrc).sort()) {
   const target = path.join(skillsDst, skill);
   if (mode === 'copy') {
     copyDir(canonical, target, {
-      exclude: ['AGENTS.md', 'CLAUDE.md'],
+      exclude: SKILL_DIST_EXCLUDES,
       replacements: slotReplacements,
     });
     removeProjectedPaths(target, readYamlList(strategy, 'exclude_canonical'));
@@ -294,14 +295,14 @@ for (const skill of fs.readdirSync(skillsSrc).sort()) {
     const stub = path.join(skillDir, 'adapters', host, 'stub');
     requireDir(stub);
     copyDir(stub, target, {
-      exclude: ['AGENTS.md', 'CLAUDE.md'],
+      exclude: SKILL_DIST_EXCLUDES,
     });
   } else if (mode === 'partial_overlay') {
     const sourceRel = readYamlString(strategy, 'source') || path.join('adapters', host, 'partial');
     const partial = path.join(skillDir, sourceRel);
     requireDir(partial);
     copyDir(partial, target, {
-      exclude: ['AGENTS.md', 'CLAUDE.md'],
+      exclude: SKILL_DIST_EXCLUDES,
     });
     copyCanonicalIncludes(canonical, target, readYamlList(strategy, 'include_canonical'), slotReplacements);
   } else {

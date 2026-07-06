@@ -20,6 +20,32 @@ function resolveHome(env) {
   return env.CC_MASTER_HOME || path.join(env.HOME || '', '.cc_master');
 }
 
+function resetStopAllowUntil(home) {
+  const boardPath = process.env.CC_MASTER_BOARD || '';
+  if (!boardPath || !path.isAbsolute(boardPath) || !boardPath.endsWith('.board.json')) return false;
+  try {
+    const res = spawnSync('ccm', [
+      'board',
+      'set-param',
+      'stop_allow_until',
+      '1970-01-01T00:00:00Z',
+      '--board',
+      boardPath,
+      '--home',
+      home,
+      '--json',
+      '--no-input',
+    ], {
+      encoding: 'utf8',
+      env: { ...process.env, CC_MASTER_HOME: home },
+      timeout: 10000,
+    });
+    return !!res && !res.error && !res.signal && res.status === 0;
+  } catch (_) {
+    return false;
+  }
+}
+
 function parseInvocation(prompt) {
   const lines = String(prompt || '').split(/\r?\n/);
   const first = lines.find((line) => line.trim() !== '') || '';
@@ -282,13 +308,14 @@ function resumeBoard(home, boardsDir, flags, sessionId, invocation) {
 function main() {
   const payload = readJson();
   if (payload.event !== 'user-prompt-submit') return;
+  const sessionId = payload.session && payload.session.id ? payload.session.id : '';
+  const home = resolveHome(process.env);
+  resetStopAllowUntil(home);
   const prompt = payload.prompt && payload.prompt.text ? payload.prompt.text : '';
   const invocation = parseInvocation(prompt);
   if (!invocation.matched) return;
 
   const { flags, goal } = parseArgs(invocation.args);
-  const sessionId = payload.session && payload.session.id ? payload.session.id : '';
-  const home = resolveHome(process.env);
   const boardsDir = path.join(home, 'boards');
   if (flags.resume) {
     resumeBoard(home, boardsDir, flags, sessionId, invocation);

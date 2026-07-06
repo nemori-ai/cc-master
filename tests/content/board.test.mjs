@@ -146,9 +146,29 @@ test('board.example.json demonstrates the v2 agile modules (executor / cadence /
   assert.ok(!b.tasks.some((t) => 'mechanism' in t), 'no task carries the retired v1 mechanism field');
   // cadence（节奏/timebox 策略层）。
   assert.ok(b.cadence && Array.isArray(b.cadence.iterations) && b.cadence.iterations.length >= 1, 'example carries a cadence iteration');
-  // judgment_calls（自决诚实台账）。
+  assert.equal(b.cadence.target?.ship_every, '3h', 'example demonstrates a 3h ship cadence target');
+  const iteration = b.cadence.iterations[0];
+  assert.ok(iteration.deadline && iteration.members?.length >= 1, 'cadence iteration carries a timebox deadline and members');
+  for (const id of iteration.members) {
+    const member = b.tasks.find((t) => t.id === id);
+    assert.ok(member?.estimate, `cadence member ${id} carries an estimate`);
+    assert.ok(member?.acceptance, `cadence member ${id} carries acceptance`);
+  }
+  // judgment_calls（自驱决策记录）与 awaiting-user decision_package 是不同结构。
   assert.ok(Array.isArray(b.judgment_calls) && b.judgment_calls.length >= 1, 'example carries a judgment_call entry');
+  const jc = b.judgment_calls[0];
+  assert.equal(jc.status, 'pending_review', 'judgment_call starts as pending review for user return');
+  assert.ok(jc.decision && jc.rationale && jc.impact, 'judgment_call explains decision/rationale/impact');
+  assert.ok(!('blocked_on' in jc) && !('decision_package' in jc), 'judgment_call is not an awaiting-user decision package');
+  const awaitingUser = b.tasks.find((t) => t.blocked_on === 'user');
+  assert.ok(awaitingUser?.decision_package, 'awaiting-user task carries decision_package instead of masquerading as a judgment_call');
   // references（取代 v1 links；ref 绝对路径/URL）。
   const devTask = b.tasks.find((t) => t.type === 'development');
   assert.ok(devTask && Array.isArray(devTask.references) && devTask.references.length >= 1, 'a development task demonstrates references');
+  const externalIssueTask = b.tasks.find((t) => t.executor === 'external');
+  assert.ok(externalIssueTask, 'example demonstrates executor=external for outside tracked work');
+  const issueRef = externalIssueTask.references?.find((r) => r.kind === 'issue')?.ref;
+  assert.ok(issueRef?.startsWith('https://github.com/'), 'external task carries a GitHub issue tracking anchor');
+  assert.notEqual(externalIssueTask.artifact, issueRef, 'external artifact is a real output link, not the issue tracking anchor');
+  assert.notEqual(externalIssueTask.status, 'done', 'external issue task is not done until orchestrator verifies the external artifact');
 });

@@ -73,6 +73,25 @@
       "created_at": "2026-06-05T11:00:00Z"
     },
     {
+      "id": "EXT1",
+      "status": "uncertain",
+      "deps": ["T0"],
+      "type": "development",
+      "executor": "external",
+      "handle": "acme/i18n-rollout#31",
+      "title": "External contributor: locale QA fixes",
+      "_comment": "external GitHub issue task — references.kind=issue is the tracking anchor; artifact is the external PR found from that issue. Issue closed alone does not make this board task done; it stays uncertain until orchestrator endpoint-verifies the PR.",
+      "references": [
+        { "kind": "issue", "ref": "https://github.com/acme/i18n-rollout/issues/31" },
+        { "kind": "spec", "ref": "/repo/docs/i18n-spec.md" },
+        { "kind": "plan", "ref": "/repo/docs/i18n-external-qa-plan.md" }
+      ],
+      "artifact": "https://github.com/acme/i18n-rollout/pull/44",
+      "acceptance": "Locale QA fixes are merged or otherwise available and pass endpoint i18n smoke tests",
+      "created_at": "2026-06-05T11:20:00Z",
+      "started_at": "2026-06-05T11:25:00Z"
+    },
+    {
       "id": "T9",
       "status": "blocked",
       "deps": ["T1"],
@@ -127,6 +146,8 @@
       "status": "done",
       "deps": ["T0"],
       "title": "Legacy task (pre-time-schema board) — old aliases still render",
+      "artifact": "legacy-completion-record:T2",
+      "verified": true,
       "dispatched_at": "11:50Z",
       "completed_at": "12:05Z"
     },
@@ -146,6 +167,7 @@
       "deps": [],
       "parent": "M1",
       "title": "Route table scaffold",
+      "artifact": "/repo/src/routing/table.ts",
       "verified": true,
       "created_at": "2026-06-05T12:00:00Z",
       "started_at": "2026-06-05T12:20:00Z",

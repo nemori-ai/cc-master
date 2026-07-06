@@ -117,7 +117,16 @@ const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 test('task add creates a node (status=ready default, deps, created_at stamped)', () => {
   // seed T1 (done) so the new T7 --deps T1 is a valid edge (no dangling-dep hard error).
   const boardPath = mkBoardHome({
-    tasks: [{ id: 'T1', status: 'done', deps: [], created_at: '2026-06-24T08:00:00Z' }],
+    tasks: [
+      {
+        id: 'T1',
+        status: 'done',
+        deps: [],
+        verified: true,
+        artifact: '/abs/t1.md',
+        created_at: '2026-06-24T08:00:00Z',
+      },
+    ],
   });
   const ctx = mkCtx(boardPath, {
     values: { type: 'development', deps: 'T1', title: '实现 estimate 接缝' },
@@ -189,7 +198,15 @@ test('task add with --log also appends a log entry', () => {
 
 // ══ task update ════════════════════════════════════════════════════════════════════════════════════
 const SEED_TASKS = [
-  { id: 'T1', status: 'done', deps: [], type: 'development', created_at: '2026-06-24T08:00:00Z' },
+  {
+    id: 'T1',
+    status: 'done',
+    deps: [],
+    verified: true,
+    artifact: '/abs/t1.md',
+    type: 'development',
+    created_at: '2026-06-24T08:00:00Z',
+  },
   {
     id: 'T2',
     status: 'ready',
@@ -265,6 +282,46 @@ test('task done transitions in_flight→done, stamps finished_at, lands artifact
   assert.equal(t.verified, true);
 });
 
+test('task done without verified/artifact is rejected by write validation and does not persist', () => {
+  const tasks = [
+    {
+      id: 'T2',
+      status: 'in_flight',
+      deps: [],
+      created_at: '2026-06-24T08:30:00Z',
+      started_at: '2026-06-24T09:00:00Z',
+    },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const before = readFileSync(boardPath, 'utf8');
+  const ctx = mkCtx(boardPath, { positionals: ['T2'] });
+  const code = taskHandler.done(ctx);
+  assert.equal(code, EXIT.VALIDATION);
+  assert.equal(readFileSync(boardPath, 'utf8'), before, 'board unchanged on validation failure');
+  assert.match(ctx.errBuf.join('\n'), /BIZ-DONE-VERIFIED/);
+});
+
+test('task done with only verified or only artifact is rejected by write validation', () => {
+  for (const values of [{ verified: true }, { artifact: '/abs/out.md' }]) {
+    const tasks = [
+      {
+        id: 'T2',
+        status: 'in_flight',
+        deps: [],
+        created_at: '2026-06-24T08:30:00Z',
+        started_at: '2026-06-24T09:00:00Z',
+      },
+    ];
+    const boardPath = mkBoardHome({ tasks });
+    const before = readFileSync(boardPath, 'utf8');
+    const ctx = mkCtx(boardPath, { values, positionals: ['T2'] });
+    const code = taskHandler.done(ctx);
+    assert.equal(code, EXIT.VALIDATION);
+    assert.equal(readFileSync(boardPath, 'utf8'), before, 'board unchanged on validation failure');
+    assert.match(ctx.errBuf.join('\n'), /BIZ-DONE-VERIFIED/);
+  }
+});
+
 test('task start on a missing id → NotFound(5)', () => {
   const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
   const ctx = mkCtx(boardPath, { positionals: ['NOPE'] });
@@ -301,7 +358,14 @@ test('task block --on user with --decision (literal JSON) lands decision_package
 test('task unblock clears blocked_on; reconcileGating → ready when deps all done', () => {
   // T1 done, T2 blocked_on=user (deps [T1] done). unblock → reconcile flips to ready.
   const tasks = [
-    { id: 'T1', status: 'done', deps: [], created_at: '2026-06-24T08:00:00Z' },
+    {
+      id: 'T1',
+      status: 'done',
+      deps: [],
+      verified: true,
+      artifact: '/abs/t1.md',
+      created_at: '2026-06-24T08:00:00Z',
+    },
     {
       id: 'T2',
       status: 'blocked',
@@ -372,7 +436,10 @@ test('completing deps via task done → reconcile auto-readies the dependent', (
     { id: 'T2', status: 'blocked', deps: ['T1'], created_at: '2026-06-24T08:30:00Z' },
   ];
   const boardPath = mkBoardHome({ tasks });
-  const ctx = mkCtx(boardPath, { positionals: ['T1'] });
+  const ctx = mkCtx(boardPath, {
+    values: { verified: true, artifact: '/abs/t1.md' },
+    positionals: ['T1'],
+  });
   const code = taskHandler.done(ctx);
   assert.equal(code, EXIT.OK);
   const b = readBoard(boardPath);
@@ -392,7 +459,16 @@ test('task set-status legal transition (in_flight→escalated)', () => {
 
 test('task set-status illegal transition throws → IllegalTransition (VALIDATION 3)', () => {
   // done→in_flight is not in STATUS_MACHINE; expect throw, router maps to VALIDATION.
-  const tasks = [{ id: 'T1', status: 'done', deps: [], created_at: '2026-06-24T08:00:00Z' }];
+  const tasks = [
+    {
+      id: 'T1',
+      status: 'done',
+      deps: [],
+      verified: true,
+      artifact: '/abs/t1.md',
+      created_at: '2026-06-24T08:00:00Z',
+    },
+  ];
   const boardPath = mkBoardHome({ tasks });
   const ctx = mkCtx(boardPath, { positionals: ['T1', 'in_flight'] });
   assert.throws(
@@ -402,7 +478,16 @@ test('task set-status illegal transition throws → IllegalTransition (VALIDATIO
 });
 
 test('task set-status --force crosses an illegal transition', () => {
-  const tasks = [{ id: 'T1', status: 'done', deps: [], created_at: '2026-06-24T08:00:00Z' }];
+  const tasks = [
+    {
+      id: 'T1',
+      status: 'done',
+      deps: [],
+      verified: true,
+      artifact: '/abs/t1.md',
+      created_at: '2026-06-24T08:00:00Z',
+    },
+  ];
   const boardPath = mkBoardHome({ tasks });
   const ctx = mkCtx(boardPath, { flags: { force: true }, positionals: ['T1', 'in_flight'] });
   const code = taskHandler.setStatus(ctx);
@@ -479,6 +564,8 @@ const LIST_TASKS = [
     id: 'T1',
     status: 'done',
     deps: [],
+    verified: true,
+    artifact: '/abs/t1.md',
     type: 'development',
     executor: 'subagent',
     created_at: '2026-06-24T08:00:00Z',

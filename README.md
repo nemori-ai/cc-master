@@ -108,17 +108,19 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 # …or pin a specific version of either line — each flag is optional and
 # independent; whichever you omit resolves to the latest of that line:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- \
-  --ccm-version ccm-v0.13.0 --plugin-version 0.12.1
+  --ccm-version ccm-v0.14.0 --plugin-version 0.13.0
 
 # pin just one line, leave the other on latest (e.g. hold ccm, take latest plugin):
-curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.13.0
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.14.0
 
 # target a harness explicitly, or fan out to every installed supported harness:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness claude-code
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --all-harnesses
 ```
 
-It detects your OS and architecture, downloads the right `ccm` binary and puts it on your PATH, then detects installed harnesses and distributes the matching adapter package to each supported target. Claude Code installation uses the `claude` CLI (≥ v2.1.195). Codex installation registers a local Codex marketplace/plugin entry for this local adapter; command entrypoints are exposed as skills (for example `$cc-master-as-master-orchestrator ...`). You just need `curl` (or `wget`) and `unzip`; each harness adapter may also need that harness's own CLI/config directory to be present. The `ccm` engine is a **hard prerequisite** — without it the plugin won't start an orchestration — which is exactly why the installer puts it in place first.
+It detects your OS and architecture, downloads the right `ccm` binary and puts it on your PATH, then detects installed harnesses and distributes the matching adapter package to each supported target. Before installing either downloaded asset, it fetches that release's `SHA256SUMS` and verifies the asset by exact filename; a missing manifest, missing entry, or digest mismatch stops the install. Claude Code installation uses the `claude` CLI (≥ v2.1.195). Codex installation registers a local Codex marketplace/plugin entry for this local adapter; command entrypoints are exposed as skills (for example `$cc-master-as-master-orchestrator ...`). You just need `curl` (or `wget`), `unzip`, and a SHA256 tool (`sha256sum`, `shasum`, or `openssl`); each harness adapter may also need that harness's own CLI/config directory to be present. The `ccm` engine is a **hard prerequisite** — without it the plugin won't start an orchestration — which is exactly why the installer puts it in place first.
+
+Checksum failures are treated as release integrity failures, not as prompts to bypass verification. Retry the install; if it still fails, inspect the GitHub release assets before proceeding. `CC_MASTER_INSTALL_LOCAL` remains offline: it verifies `<local-dir>/SHA256SUMS` when present, otherwise it explicitly trusts the local directory without contacting GitHub.
 
 > **Rather do it by hand, or run from source?** Clone the repo, generate the adapter you want with `bash scripts/sync-plugin-dist.sh --host <harness>`, then install that adapter through the harness-native route. Claude Code can point at `plugin/dist/claude-code`; Codex should be registered through a local marketplace that points at `plugin/dist/codex` (with only skill/hooks packaged there). You'll still need `ccm` on your PATH — download `ccm-<os>-<arch>` from the latest `ccm-v*` release's **Assets**, rename it to `ccm`, `chmod +x`, and drop it in `~/.local/bin`.
 

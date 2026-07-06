@@ -56,7 +56,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 | `failed` | ready, escalated |
 | `stale` | ready |
 
-> `verified` 是与 status **正交的布尔**(`--verified`),不是一个 status 值。`done` 且 `verified:true` 且 `artifact` 非空,才是真完成(端点验收过)。
+> `verified` 是与 status **正交的布尔**(`--verified`),不是一个 status 值。`done` 且 `verified:true` 且 `artifact` 非空,才是真完成(端点验收过);缺任一项会被 `BIZ-DONE-VERIFIED` hard gate 拒绝落盘(exit 3)。
 
 ### Rationalization Table —— status 这条最常见的自我说服
 
@@ -103,7 +103,7 @@ ccm task add T3 --type development --executor subagent --handle <spawn-returned-
     --deps T1,T2 --estimate 3h --ref spec:/abs/spec.md --ref plan:/abs/plan.md --accept "DoD 一句话"
     --deps T1,T2 --estimate 3h --ref spec:/abs/spec.md --ref plan:/abs/plan.md --accept "DoD 一句话"
 ccm task start T3                         # ready → in_flight,盖 started_at
-ccm task done  T3 --artifact /abs/out.md --verified   # in_flight → done,盖 finished_at
+ccm task done  T3 --artifact /abs/out.md --verified   # in_flight → done,盖 finished_at;两项证据必填
 
 # 阻塞等用户(必带 decision_package,否则 BIZ-AWAITING 硬闸 exit 3)
 ccm task block T9 --on user --decision @/abs/decision.json
@@ -114,7 +114,7 @@ ccm next                                  # 现在能派发什么(readySet)
 ccm board graph                           # 拓扑 / 环 / 临界路径 / makespan
 ccm board critical-path                   # 临界链 + 工期
 
-# 自决台账 / 节奏 / watchdog
+# 自驱决策记录 / 节奏 / watchdog
 ccm jc add "选 X 不选 Y" --category architecture --severity high
 ccm cadence open I1 --goal "ship 切片" --deadline 2026-06-05T14:00:00Z --members T0,T1
 ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism shell --checklist "poll Codex 后台 session / subagent handle 并 recon"
@@ -136,6 +136,7 @@ ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism shell --checklist "p
 | `block --on user` 写进去了却被 lint 挡 | awaiting-user 节点**必须**带 `decision_package`(`--decision @file`),否则 BIZ-AWAITING 硬闸。 |
 | ISO 时间字段被 lint warn | 一律严格 `YYYY-MM-DDTHH:MM:SSZ`(UTC 定宽),别用本地时区 / 带毫秒。 |
 | 多个 active 板时命令报 Ambiguous | 用 `--goal <子串>` 或 `--board <path>` 消歧。 |
+| open cadence iteration 出 overbooked / critical-path / oversized warn | 这不是 hard gate,但说明本轮节奏不健康。先拆小、移出 scope、删假依赖或重估;不要靠 `cadence ship` 把超载藏起来。 |
 
 ---
 

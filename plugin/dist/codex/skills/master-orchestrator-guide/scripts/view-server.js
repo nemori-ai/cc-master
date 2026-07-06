@@ -14,6 +14,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const BOARD_PATH = process.env.CC_MASTER_BOARD;
 if (!BOARD_PATH) {
@@ -45,13 +46,56 @@ const CONTENT_TYPES = {
   '.woff2': 'font/woff2',
 };
 
+const ACCESS_TOKEN = crypto.randomBytes(32).toString('base64url');
+const CSP_NONCE = crypto.randomBytes(16).toString('base64url');
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'nonce-" + CSP_NONCE + "'",
+  "style-src 'self' 'nonce-" + CSP_NONCE + "'",
+  "style-src-attr 'unsafe-inline'",
+  "font-src 'self'",
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+function securityHeaders(extra) {
+  return Object.assign({
+    'Content-Security-Policy': CSP,
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    'Cache-Control': 'no-store',
+    'Cross-Origin-Resource-Policy': 'same-origin',
+    'X-Frame-Options': 'DENY',
+  }, extra || {});
+}
+
 function contentType(file) {
   return CONTENT_TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream';
 }
 
 function sendNotFound(res, body) {
-  res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.writeHead(404, securityHeaders({ 'Content-Type': 'application/json; charset=utf-8' }));
   res.end(body !== undefined ? body : '{}');
+}
+
+function sendForbidden(res) {
+  res.writeHead(403, securityHeaders({ 'Content-Type': 'application/json; charset=utf-8' }));
+  res.end('{"error":"forbidden"}');
+}
+
+function hasAccessToken(url) {
+  return url.searchParams.get('token') === ACCESS_TOKEN;
+}
+
+function injectHtmlNonce(buf) {
+  return String(buf)
+    .replace('<style>', '<style nonce="' + CSP_NONCE + '">')
+    .replace('<script type="importmap">', '<script type="importmap" nonce="' + CSP_NONCE + '">')
+    .replace('<script type="module">', '<script type="module" nonce="' + CSP_NONCE + '">');
 }
 
 // Board home = directory containing the board file. discuss sidecars live alongside it.
@@ -221,14 +265,16 @@ function stampFromFilename(file) {
 const server = http.createServer((req, res) => {
   // Only GET is supported (read-only viewer).
   if (req.method !== 'GET') {
-    res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.writeHead(405, securityHeaders({ 'Content-Type': 'text/plain; charset=utf-8' }));
     res.end('Method Not Allowed');
     return;
   }
 
+  let parsedUrl;
   let urlPath;
   try {
-    urlPath = decodeURIComponent(new URL(req.url, 'http://127.0.0.1').pathname);
+    parsedUrl = new URL(req.url, 'http://127.0.0.1');
+    urlPath = decodeURIComponent(parsedUrl.pathname);
   } catch (_e) {
     sendNotFound(res);
     return;
@@ -236,13 +282,17 @@ const server = http.createServer((req, res) => {
 
   // GET / -> view.html
   if (urlPath === '/' || urlPath === '/index.html') {
+    if (!hasAccessToken(parsedUrl)) {
+      sendForbidden(res);
+      return;
+    }
     fs.readFile(HTML_PATH, (err, buf) => {
       if (err) {
         sendNotFound(res, 'view.html not found');
         return;
       }
-      res.writeHead(200, { 'Content-Type': CONTENT_TYPES['.html'], 'Cache-Control': 'no-store' });
-      res.end(buf);
+      res.writeHead(200, securityHeaders({ 'Content-Type': CONTENT_TYPES['.html'] }));
+      res.end(injectHtmlNonce(buf));
     });
     return;
   }
@@ -250,7 +300,7 @@ const server = http.createServer((req, res) => {
   // GET /favicon.ico -> 204 No Content. The viewer ships no icon; without this the
   // browser's automatic favicon request logs a lone 404 in the console. Silence it.
   if (urlPath === '/favicon.ico') {
-    res.writeHead(204, { 'Cache-Control': 'no-store' });
+    res.writeHead(204, securityHeaders());
     res.end();
     return;
   }
@@ -259,6 +309,10 @@ const server = http.createServer((req, res) => {
   // mid-write by the orchestrator; on any read/parse failure return 404 + {} so the
   // client just retries on its next poll (no crash, no stale cache).
   if (urlPath === '/board.json') {
+    if (!hasAccessToken(parsedUrl)) {
+      sendForbidden(res);
+      return;
+    }
     fs.readFile(BOARD_PATH, 'utf8', (err, txt) => {
       if (err) {
         sendNotFound(res);
@@ -270,10 +324,9 @@ const server = http.createServer((req, res) => {
         sendNotFound(res);
         return;
       }
-      res.writeHead(200, {
+      res.writeHead(200, securityHeaders({
         'Content-Type': CONTENT_TYPES['.json'],
-        'Cache-Control': 'no-store',
-      });
+      }));
       res.end(txt);
     });
     return;
@@ -284,16 +337,19 @@ const server = http.createServer((req, res) => {
   // follow-out (mirrors /vendor/* containment). Any unreadable/torn/unparseable file is
   // skipped; a missing home or zero sidecars yields [] (200) — graceful, never 500.
   if (urlPath === '/decisions.json') {
+    if (!hasAccessToken(parsedUrl)) {
+      sendForbidden(res);
+      return;
+    }
     let payload;
     try {
       payload = collectDecisions();
     } catch (_e) {
       payload = []; // defensive: any unexpected failure degrades to empty, not 500.
     }
-    res.writeHead(200, {
+    res.writeHead(200, securityHeaders({
       'Content-Type': CONTENT_TYPES['.json'],
-      'Cache-Control': 'no-store',
-    });
+    }));
     res.end(JSON.stringify(payload));
     return;
   }
@@ -315,10 +371,9 @@ const server = http.createServer((req, res) => {
         sendNotFound(res);
         return;
       }
-      res.writeHead(200, {
+      res.writeHead(200, securityHeaders({
         'Content-Type': contentType(resolved),
-        'Cache-Control': 'no-store',
-      });
+      }));
       res.end(buf);
     });
     return;
@@ -331,7 +386,7 @@ const server = http.createServer((req, res) => {
 server.listen(0, '127.0.0.1', () => {
   const { port } = server.address();
   // Exactly one machine-scrapeable line.
-  console.log('cc-master board view: http://127.0.0.1:' + port);
+  console.log('cc-master board view: http://127.0.0.1:' + port + '/?token=' + ACCESS_TOKEN);
 });
 
 server.on('error', (err) => {

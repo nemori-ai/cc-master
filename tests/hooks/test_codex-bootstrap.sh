@@ -64,6 +64,26 @@ assert_eq 0 "$NOOP_RC" "codex bootstrap no-op rc 0"
 assert_eq "" "$NOOP_OUT" "codex bootstrap no-op emits nothing"
 assert_no_file "$H/noop-home/boards" "codex bootstrap no-op creates no board dir"
 
+RESET_HOME="$H/reset-home"
+RESET_BOARD="$RESET_HOME/boards/reset.board.json"
+mkdir -p "$RESET_HOME/boards"
+CC_MASTER_HOME="$RESET_HOME" ccm --board "$RESET_BOARD" board init --goal "Reset stop release" --json --no-input >/dev/null
+node - "$RESET_BOARD" <<'NODE'
+const fs = require('fs');
+const boardPath = process.argv[2];
+const board = JSON.parse(fs.readFileSync(boardPath, 'utf8'));
+board.owner = { ...(board.owner || {}), active: true, session_id: 'codex-sess-reset' };
+board.runtime = { ...(board.runtime || {}), stop_allow_until: '2999-01-01T00:00:00Z' };
+fs.writeFileSync(boardPath, `${JSON.stringify(board, null, 2)}\n`);
+NODE
+RESET_PAYLOAD='{"session_id":"codex-sess-reset","hook_event_name":"UserPromptSubmit","prompt":"ordinary prompt after user input","cwd":"/tmp/work"}'
+RESET_OUT="$(printf '%s' "$RESET_PAYLOAD" | CC_MASTER_HOME="$RESET_HOME" node "$LAUNCHER" --core "$CORE" 2>/dev/null)"
+RESET_RC=$?
+RESET_UNTIL="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.runtime&&b.runtime.stop_allow_until||""));' "$RESET_BOARD")"
+assert_eq 0 "$RESET_RC" "codex bootstrap reset stop release rc 0"
+assert_eq "" "$RESET_OUT" "codex bootstrap reset stop release stays silent"
+assert_eq "1970-01-01T00:00:00Z" "$RESET_UNTIL" "ordinary UserPromptSubmit resets stop_allow_until for active session board"
+
 RESUME_HOME="$H/resume-home"
 mkdir -p "$RESUME_HOME/boards"
 RESUME_BOARD="$RESUME_HOME/boards/resume-one.board.json"

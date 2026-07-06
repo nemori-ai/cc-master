@@ -118,7 +118,7 @@ function mkCtx({
 
 // 一个 ready task 工厂（deps 空 + status ready → 进 readySet）。
 function task(id: string, over: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
+  const out: Record<string, unknown> = {
     id,
     status: 'ready',
     deps: [],
@@ -128,6 +128,11 @@ function task(id: string, over: Record<string, unknown> = {}): Record<string, un
     title: `task ${id}`,
     ...over,
   };
+  if (out.status === 'done') {
+    if (out.verified === undefined) out.verified = true;
+    if (out.artifact === undefined) out.artifact = `/abs/${id}.md`;
+  }
+  return out;
 }
 
 // ══ board show ═════════════════════════════════════════════════════════════════════════════════════

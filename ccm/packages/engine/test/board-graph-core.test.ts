@@ -59,7 +59,7 @@ test('pure-refactor: lint GRAPH-* (dangling/self-loop/cycle) reports use the sha
   const good = lintBoard(
     JSON.stringify(
       board([
-        { id: 'A', status: 'done', deps: [] },
+        { id: 'A', status: 'done', deps: [], verified: true, artifact: '/abs/a.md' },
         { id: 'B', status: 'ready', deps: ['A'] },
       ]),
     ),

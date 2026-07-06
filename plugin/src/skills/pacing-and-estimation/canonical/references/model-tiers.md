@@ -23,6 +23,7 @@
 
 给每节点契约一个 **model** 字段，按任务*难度*来定——不是按主线恰好跑在哪个模型上。这是**事实映射**；把强档集中到临界链、float 配便宜档的**调度判断**在 `master-orchestrator-guide`「目标即依赖图」镜头 + 其 `${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/references/decomposition.md` 的「资源决策」：
 
+- **duration 不是难度。** 长 estimate 首先是拆分 / cadence / WIP / background 信号；只有当长时长来自高复杂性或高风险判断时，才支持升档。host-specific model ID 与可用性仍以 adapter/官方真值为准。
 - **机械 / 可机械检查**（跑测试套件、grep 定位、批量格式化、改变量名）→ **Haiku**。无需推理。
 - **常规实现** → **Sonnet**。主力 workhorse。
 - **难实现 / correctness-critical / 临界路径**（agentic 实现、临界路径上难实现的活、复杂并发 bug 的根因）→ **Opus**；**常规 review**（日常代码审查，够重要不该降到 Sonnet）也走 **Opus**。

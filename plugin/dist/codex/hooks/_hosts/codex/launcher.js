@@ -1,10 +1,111 @@
 #!/usr/bin/env node
 const { spawnSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
+const DIAGNOSTIC_TEXT_LIMIT = 4096;
+const DIAGNOSTIC_RAW_LIMIT = 16384;
+
 function resolveHookDiagEnabled() {
   return process.env.CC_MASTER_HOOK_DIAGNOSTIC === '1' || !!process.env.CC_MASTER_HOOK_DIAGNOSTIC_DIR;
+}
+
+function resolveHookDiagUnsafeRawEnabled() {
+  return process.env.CC_MASTER_HOOK_DIAGNOSTIC_UNSAFE_RAW === '1';
+}
+
+function sha256Text(text) {
+  return crypto.createHash('sha256').update(String(text || ''), 'utf8').digest('hex');
+}
+
+function utf8ByteLength(text) {
+  return Buffer.byteLength(String(text || ''), 'utf8');
+}
+
+function truncateText(text, limit) {
+  const value = String(text || '');
+  if (value.length <= limit) return { text: value, truncated: false, chars: value.length, bytes: utf8ByteLength(value) };
+  const truncated = value.slice(0, limit);
+  return {
+    text: truncated,
+    truncated: true,
+    chars: value.length,
+    bytes: utf8ByteLength(value),
+    preview_chars: truncated.length,
+    preview_bytes: utf8ByteLength(truncated),
+  };
+}
+
+function redactSensitiveText(text) {
+  return String(text || '')
+    .replace(/(authorization\s*[:=]\s*bearer\s+)[^\s"',}]+/gi, '$1[REDACTED]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/g, 'Bearer [REDACTED]')
+    .replace(/\b(sk-[A-Za-z0-9_-]{8,})\b/g, '[REDACTED]')
+    .replace(/\b(ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{8,}\b/g, '[REDACTED]')
+    .replace(/\b([A-Za-z0-9_ -]*(?:password|passwd|token|api[_-]?key|secret)[A-Za-z0-9_ -]*\s*[:=]\s*)[^\s"',}]+/gi, '$1[REDACTED]')
+    .replace(/("(?:password|passwd|token|api[_-]?key|secret|authorization)"\s*:\s*")[^"]*(")/gi, '$1[REDACTED]$2');
+}
+
+function summarizeText(text, limit = DIAGNOSTIC_TEXT_LIMIT) {
+  const value = String(text || '');
+  const redacted = redactSensitiveText(value);
+  const truncated = truncateText(redacted, limit);
+  return {
+    bytes: utf8ByteLength(value),
+    chars: value.length,
+    sha256: sha256Text(value),
+    truncated: truncated.truncated,
+    preview: truncated.text,
+  };
+}
+
+function objectKeys(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  return Object.keys(value).sort();
+}
+
+function summarizePayload(raw, normalized, stdin, rawParseError) {
+  const tool = raw && typeof raw === 'object' && raw.tool_name
+    ? {
+        name: String(raw.tool_name),
+        id_present: !!raw.tool_use_id,
+        input_keys: objectKeys(raw.tool_input),
+        response_present: Object.prototype.hasOwnProperty.call(raw, 'tool_response'),
+      }
+    : null;
+  return {
+    stdin: {
+      bytes: utf8ByteLength(stdin),
+      sha256: sha256Text(stdin),
+      json_parse_ok: !rawParseError,
+    },
+    raw_parse_error: rawParseError ? summarizeText(rawParseError, 512) : '',
+    payload: {
+      top_level_keys: objectKeys(raw),
+      prompt_present: typeof (raw && raw.prompt) === 'string',
+      prompt_bytes: typeof (raw && raw.prompt) === 'string' ? utf8ByteLength(raw.prompt) : 0,
+      tool,
+    },
+    normalized: {
+      event: normalized.event,
+      host_event_name: normalized.host && normalized.host.eventName ? String(normalized.host.eventName) : '',
+      session_id_present: !!(normalized.session && normalized.session.id),
+      session_id_sha256: normalized.session && normalized.session.id ? sha256Text(normalized.session.id) : '',
+      tool_name: normalized.tool && normalized.tool.name ? normalized.tool.name : '',
+      board_present: !!normalized.board,
+    },
+  };
+}
+
+function unsafeRawDiagnostic(stdin, raw, normalized, coreStdout, coreStderr) {
+  return {
+    stdin_text: truncateText(stdin, DIAGNOSTIC_RAW_LIMIT),
+    payload_raw_json: truncateText(JSON.stringify(raw || {}), DIAGNOSTIC_RAW_LIMIT),
+    payload_normalized_json: truncateText(JSON.stringify(normalized || {}), DIAGNOSTIC_RAW_LIMIT),
+    core_stdout: truncateText(coreStdout, DIAGNOSTIC_RAW_LIMIT),
+    core_stderr: truncateText(coreStderr, DIAGNOSTIC_RAW_LIMIT),
+  };
 }
 
 function readStdin() {
@@ -20,14 +121,16 @@ function writeDiagnostic(fileBaseDir, payload) {
   let baseDir = process.env.CC_MASTER_HOOK_DIAGNOSTIC_DIR;
   if (!baseDir) baseDir = path.join(fileBaseDir, 'hooks', 'diagnostics');
   try {
-    fs.mkdirSync(baseDir, { recursive: true });
+    fs.mkdirSync(baseDir, { recursive: true, mode: 0o700 });
+    fs.chmodSync(baseDir, 0o700);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const file = path.join(baseDir, `${stamp}-${process.pid}.json`);
     const output = {
       ...payload,
       wrote_at: new Date().toISOString(),
     };
-    fs.writeFileSync(file, `${JSON.stringify(output, null, 2)}\n`);
+    fs.writeFileSync(file, `${JSON.stringify(output, null, 2)}\n`, { mode: 0o600 });
+    fs.chmodSync(file, 0o600);
   } catch {
     // Intentionally swallow diagnostics failures to avoid changing hook behavior.
   }
@@ -301,7 +404,10 @@ function main() {
     const coreStatus = child && Number.isInteger(child.status) ? child.status : null;
     const coreSignal = child && child.signal ? child.signal : null;
     const coreError = child && child.error ? (child.error.message || String(child.error)) : '';
+    const unsafeRaw = resolveHookDiagUnsafeRawEnabled();
     writeDiagnostic(home, {
+      schema: 'cc-master-codex-hook-diagnostic/v2',
+      raw_capture: unsafeRaw ? 'unsafe-opt-in' : 'disabled',
       invocation: {
         event: args.event,
         eventNormalized: normalized.event,
@@ -311,7 +417,7 @@ function main() {
         board: activeBoard
           ? {
               path: activeBoard.path,
-              stem: activeBoard.stem,
+              stem: boardStem(activeBoard.path),
               source: activeBoard.source,
             }
           : null,
@@ -323,17 +429,15 @@ function main() {
         CC_MASTER_HOME: env.CC_MASTER_HOME,
         CC_MASTER_PLUGIN_ROOT: env.CC_MASTER_PLUGIN_ROOT,
       },
-      stdin_text: stdin,
-      raw_parse_error: rawParseError,
-      payload_raw: raw,
-      payload_normalized: normalized,
+      summary: summarizePayload(raw, normalized, stdin, rawParseError),
       core: {
         status: coreStatus,
         signal: coreSignal,
-        error: coreError,
-        stdout: coreStdout,
-        stderr: coreStderr,
+        error: coreError ? summarizeText(coreError, 1024) : '',
+        stdout: summarizeText(coreStdout),
+        stderr: summarizeText(coreStderr),
       },
+      ...(unsafeRaw ? { unsafe_raw: unsafeRawDiagnostic(stdin, raw, normalized, coreStdout, coreStderr) } : {}),
     });
   }
 }
