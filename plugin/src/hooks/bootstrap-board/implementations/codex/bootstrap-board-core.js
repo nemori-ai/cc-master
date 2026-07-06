@@ -99,6 +99,8 @@ function parseArgs(args) {
         flags.ownerWip = value;
       } else if (name === 'policy-switch') {
         flags.policySwitch = value;
+      } else if (name === 'github-issue') {
+        flags.githubIssue = value;
       } else if (!name.startsWith('no-')) {
         const next = tokens[i + 1];
         if (next && !next.startsWith('--')) i += 1;
@@ -115,6 +117,8 @@ function parseArgs(args) {
       flags.ownerWip = tokens[++i] || '';
     } else if (token === '--policy-switch') {
       flags.policySwitch = tokens[++i] || '';
+    } else if (token === '--github-issue') {
+      flags.githubIssue = tokens[++i] || '';
     } else if (token === '-p') {
       flags.priority = tokens[++i] || '';
     } else if (token === '-w') {
@@ -157,6 +161,10 @@ function isPriority(value) {
 
 function isPolicySwitch(value) {
   return /^(allow|deny)$/.test(String(value || ''));
+}
+
+function isHttpUrl(value) {
+  return /^https?:\/\//.test(String(value || '').trim());
 }
 
 function restampOwner(boardPath, sessionId) {
@@ -380,10 +388,41 @@ function main() {
         ]);
         applied.push(`policy_switch=${flags.policySwitch}`);
       } catch (error) {
-        notes.push(`ccm policy set failed; policy flag may need manual repair: ${error.message}`);
+      notes.push(`ccm policy set failed; policy flag may need manual repair: ${error.message}`);
       }
     } else {
       notes.push(`--policy-switch value ${flags.policySwitch} is invalid; skipped`);
+    }
+  }
+
+  if (flags.githubIssue) {
+    const issueRef = String(flags.githubIssue || '').trim();
+    if (isHttpUrl(issueRef)) {
+      const issueTaskId = `EXT-${Date.now()}-${process.pid}`;
+      try {
+        run('ccm', [
+          '--board',
+          boardPath,
+          'task',
+          'add',
+          issueTaskId,
+          '--type',
+          'development',
+          '--executor',
+          'external',
+          '--ref',
+          `issue:${issueRef}`,
+          '--title',
+          `From GitHub issue: ${issueRef}`,
+          '--json',
+          '--no-input',
+        ]);
+        applied.push(`github_issue=${issueTaskId}`);
+      } catch (error) {
+        notes.push(`ccm task add for --github-issue failed; continuing bootstrap: ${error.message}`);
+      }
+    } else {
+      notes.push(`--github-issue value ${issueRef} is not a valid http(s) URL; skipped`);
     }
   }
 

@@ -722,9 +722,10 @@ fi
 
 flag_notes=""    # 非法值 / 应用失败的 advisory 文案（单行·无换行·下方 per-line sed 量化才安全）
 applied=""       # 成功落板的旋钮摘要（喂 agent「原样保留别覆写」）
-init_pri=""; init_wip=""; init_ownerwip=""; init_pol=""
+init_pri=""; init_wip=""; init_ownerwip=""; init_pol=""; init_issue=""
 # 纯 bash token 循环抽 flag 值（enum/int 轻解析）。set -f 关 glob（goal 文本可能含 `*`·别让它扩成文件名）；
 #   `set -- $fresh_args` 按 IFS 词分割成 token（goal 词被下面 *) 分支跳过·只挑 flag）。扫完恢复 +f。
+is_http_url() { case "$1" in http://*|https://*) return 0;; *) return 1;; esac; }
 set -f
 # shellcheck disable=SC2086
 set -- $fresh_args
@@ -739,6 +740,8 @@ while [ "$#" -gt 0 ]; do
     --owner-wip=*)     init_ownerwip="${1#--owner-wip=}";     shift ;;
     --policy-switch)   init_pol="${2:-}";       shift; [ "$#" -gt 0 ] && shift ;;
     --policy-switch=*) init_pol="${1#--policy-switch=}";      shift ;;
+    --github-issue)    init_issue="${2:-}";      shift; [ "$#" -gt 0 ] && shift ;;
+    --github-issue=*)  init_issue="${1#--github-issue=}";      shift ;;
     *) shift ;;
   esac
 done
@@ -779,6 +782,20 @@ case "$init_pol" in
     fi ;;
   *) flag_notes="${flag_notes} --policy-switch 取值 '${init_pol}' 非法（须 allow|deny）·已跳过；" ;;
 esac
+
+# ── 任务种子：--github-issue 仅用于 fresh bootstrap 任务起点（best effort，不阻断）──────────────────
+if [ -n "$init_issue" ]; then
+  if is_http_url "$init_issue"; then
+    issue_task_id="EXT-$(basename "$BOARD" .board.json | tr -cd '[:alnum:]-')"
+    if "$CCM_CMD" task add "$issue_task_id" --board "$BOARD" --type development --executor external --ref "issue:${init_issue}" --title "From GitHub issue: ${init_issue}" --no-input >/dev/null 2>&1; then
+      applied="${applied} github-issue=$issue_task_id"
+    else
+      flag_notes="${flag_notes} --github-issue 已指定但 issue 跟踪任务写入失败；已继续进入编排（请先确认 board task 是否写入）；"
+    fi
+  else
+    flag_notes="${flag_notes} --github-issue 取值 '${init_issue}' 非法（须 http:// 或 https:// 开头）·已跳过；"
+  fi
+fi
 
 ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. MANDATORY NEXT STEP: before implementation, tests, git, push, or PR work, decompose the goal into a dependency DAG and write tasks with acceptance criteria via ccm task add --board ${BOARD}. An armed fresh board with zero tasks is not a runnable orchestration. Then invoke the master-orchestrator-guide skill and run the decision program."
 # applied / flag_notes 都是**单行**（无内嵌换行）——下方 per-line sed 量化（s/^/"/; s/$/"/）才不破 JSON。

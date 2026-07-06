@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] — 2026-07-06
+
+> **plugin 线 patch 收口** — 为 `as-master-orchestrator` 增加 GitHub issue 启动种子能力：新增 `--github-issue` flag，支持在 fresh bootstrap 时自动创建 `executor=external` 的 issue 跟踪起点任务，帮助从现有 issue 一致性地接管编排。补充双宿主回归与文档约束，保持任务为空 hard stop 的启动纪律不变。
+
+### Added
+
+- **`as-master-orchestrator` 支持 `--github-issue` 入口参数** — 在 Claude Code 与 Codex 下，启动命令可携带 issue URL；fresh bootstrap 会把它写入 board 首条外部任务 `external`（`ref: issue:<url>` / `title: From GitHub issue: ...`），不阻断主流程，便于后续把外部进度信号映射到 board。
+- **启动参数适配与可观测性补齐** — 命令契约、Codex/Claude 两端 skill 文案、以及 strategy 声明同步承接 `github-issue` 参数；成功落盘会在 bootstrap 结果里回显 `github-issue=<seed-id>`，失败会写入 advisory 便于自检。
+
+### Changed
+
+- **`bootstrap-board` 入口链路收敛** — 为 `--github-issue` 做统一解析与合法性校验（HTTP(S) 网址），区分 fresh 与 resume 语义（仅 fresh 新建时可种子），无效值写 advisory 不阻断 boot。
+- **测试覆盖扩展** — 双宿主新增 `--github-issue` 的正向、无效 URL、resume 隔离路径回归案例，覆盖任务注入与 advisory 侧信号。
+
+### Fixed
+
+- **fresh startup 的任务初始化歧义收敛** — 防止 `--github-issue` 在 resume 路径误触发种子创建，保持 resume 行为与已有 `board init`/`owner.sess` 继承路径一致，避免新会话误增任务。
+
 ## [0.13.0] — 2026-07-06
 
 > **plugin 线 minor + ccm-v0.14.0 配套 release** —— 这一版收口 GitHub issue 处理线：`ccm` 引擎补上 true-done 硬闸、external issue tracking 语义与 cadence/duration agile health warnings；plugin 侧同步强化 Codex diagnostics、local board viewer、release checksum、orchestrator skills 与 Track B eval 设计。#37 retro command 线按用户指示 defer 到下一 PR，不包含在本版交付中。
@@ -499,7 +517,8 @@ advancing across context compaction and across sessions.
 - **Docs** — `README.md` (EN) and `README_zh.md` (中文); design specification,
   design notes, and four research reports under `design_docs/`.
 
-[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/nemori-ai/cc-master/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/nemori-ai/cc-master/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/nemori-ai/cc-master/compare/v0.11.0...v0.12.1
 [0.11.0]: https://github.com/nemori-ai/cc-master/compare/v0.10.2...v0.11.0
