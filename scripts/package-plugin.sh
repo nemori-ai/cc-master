@@ -16,7 +16,7 @@
 #   bash scripts/package-plugin.sh --all-hosts v0.10.0         # 输出所有 supported host 制品
 #   CCM_PLUGIN_OUT_DIR=dist bash ...          # 自定义产物目录（默认 dist/）
 #
-# 产物路径打到 stdout 最后一行（CI 可 capture）。
+# 产物路径打到 stdout；同时在输出目录生成 SHA256SUMS，供 install.sh fail-closed 校验 release asset。
 
 set -euo pipefail
 
@@ -27,6 +27,19 @@ cd "${REPO_ROOT}"
 
 log() { printf '\033[1;34m[package-plugin]\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31m[package-plugin] ERROR:\033[0m %s\n' "$*" >&2; exit 1; }
+
+sha256_file() {
+  local file="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$file" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$file" | awk '{print $1}'
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 "$file" | awk '{print $NF}'
+  else
+    die "缺 SHA256 工具：需要 sha256sum、shasum 或 openssl 之一。"
+  fi
+}
 
 zip_dir() {
   local stage="$1" zip="$2"
@@ -108,8 +121,9 @@ fi
 log "tag: ${TAG}"
 
 # ── 可分发 allowlist ─────────────────────────────────────────────────────────────────────────────
+PACKAGE_SEQ=0
 package_one() {
-  local host="$1" stage pkg plugin_root zip out_dir
+  local host="$1" stage pkg plugin_root zip out_dir manifest hash
   case "$host" in
     claude-code|codex) ;;
     *) die "未知 host：${host}（支持：claude-code / codex）" ;;
@@ -170,7 +184,15 @@ package_one() {
   rm -f "$zip"
   zip_dir "$stage" "$zip"
   rm -rf "$stage"
+  manifest="${out_dir}/SHA256SUMS"
+  if [ "$PACKAGE_SEQ" -eq 0 ]; then
+    rm -f "$manifest"
+  fi
+  hash="$(sha256_file "$zip")"
+  printf '%s  %s\n' "$hash" "${zip##*/}" >>"$manifest"
+  PACKAGE_SEQ=$((PACKAGE_SEQ + 1))
   log "✔ 打包完成：${zip} ($(du -h "${zip}" | cut -f1))"
+  log "✔ checksum：${manifest} ← ${zip##*/}"
   printf '%s\n' "$zip"
 }
 

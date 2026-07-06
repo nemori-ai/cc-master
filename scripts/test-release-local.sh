@@ -15,9 +15,8 @@
 #         二进制（macOS arm64 口径），执行它跑 board init/show（隔离 scratch home·绝不碰真
 #         ~/.claude），macOS 上 otool -L 核自包含。这是 ccm-release.yml `build-sea` job 的**本机**
 #         那一档（macos-14 leg 的等价物）。
-#      2. plugin 打包 + 校验（STAGE 2）——跑 package-plugin.sh 产 zip，解压后 `claude plugin
-#         validate` 过。这是 plugin-release.yml `package-plugin` job 的核心（版本线解耦·ADR-022
-#         后 package-plugin 已从 ccm-release.yml 迁到独立的 plugin-release.yml）。
+#      2. plugin 打包 + 校验（STAGE 2）——跑 package-plugin.sh 产 zip + SHA256SUMS，checksum
+#         自检、解压后 `claude plugin validate` 过。这是 plugin-release.yml `package-plugin` job 的核心。
 #      3. Linux job wiring via act（STAGE 3·可选）——若装了 act + docker 在，用 act 在本地
 #         Docker 跑 Linux job（`package-plugin` 默认·来自 plugin-release.yml；`--with-sea-linux`
 #         追加 linux-x64 的 build-sea·来自 ccm-release.yml），模拟 push 事件，确认 workflow steps
@@ -202,6 +201,18 @@ plugin_stage() {
   local zip; zip="$(bash scripts/package-plugin.sh 2>/dev/null)" || die "package-plugin.sh 失败"
   [ -f "${zip}" ] || die "zip 产物不存在：${zip}"
   ok "打包：${zip} ($(du -h "${zip}" | cut -f1))"
+  local manifest; manifest="$(dirname "${zip}")/SHA256SUMS"
+  [ -f "${manifest}" ] || die "checksum 清单不存在：${manifest}"
+  if command -v sha256sum >/dev/null 2>&1; then
+    ( cd "$(dirname "${zip}")" && sha256sum --check SHA256SUMS >/dev/null ) \
+      || die "SHA256SUMS 校验失败"
+  elif command -v shasum >/dev/null 2>&1; then
+    ( cd "$(dirname "${zip}")" && shasum -a 256 -c SHA256SUMS >/dev/null ) \
+      || die "SHA256SUMS 校验失败"
+  else
+    die "缺 SHA256 工具：需要 sha256sum 或 shasum 来校验 SHA256SUMS"
+  fi
+  ok "checksum：${manifest}"
 
   local dest; dest="$(mktemp -d -p "${WORK}")"
   unzip -q "${zip}" -d "${dest}" || die "解压失败"

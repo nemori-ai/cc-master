@@ -7,7 +7,7 @@
 #     只认裸 `v*` tag。两个 glob 天然互斥（`ccm-v…` 以 `c` 开头，不撞 `v*`），零交叉触发。
 #
 # 分发模型（ADR-014）：ccm 走 per-OS Node SEA 二进制，随 ccm 自己的 GitHub release
-# 附带 `ccm-<os>-<arch>`（不走 npm optionalDeps 平台子包——已决策砍掉）。
+# 附带 `ccm-<os>-<arch>` + SHA256SUMS（不走 npm optionalDeps 平台子包——已决策砍掉）。
 #
 # ⚠️ Node 版本（关键，CI 必读）：build-sea.sh 的 postject sentinel 注入只在 Node 22 上可靠工作；
 #    本地用 Node 25/26 实测 postject 报「Could not find the sentinel NODE_SEA_FUSE」而失败。
@@ -90,6 +90,12 @@ jobs:
           chmod +x "$BIN"
           "$BIN" --version
 
+      - name: Generate checksum
+        run: |
+          cd ccm/apps/cli/dist
+          sha256sum "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+          sha256sum --check "${{ matrix.asset }}.sha256"
+
       # 上传 artifact（workflow_dispatch / 非 tag 触发时也留存可下载）。
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -98,9 +104,45 @@ jobs:
           path: ccm/apps/cli/dist/${{ matrix.asset }}
           if-no-files-found: error
 
+      - name: Upload checksum part
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}-sha256
+          path: ccm/apps/cli/dist/${{ matrix.asset }}.sha256
+          if-no-files-found: error
+
       # 仅 tag 触发时 attach 到 GitHub release。
       - name: Attach to GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: ccm/apps/cli/dist/${{ matrix.asset }}
+
+  publish-checksums:
+    needs: build-sea
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download checksum parts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ccm-*-sha256
+          path: checksum-parts
+          merge-multiple: true
+
+      - name: Merge checksum manifest
+        run: |
+          mkdir -p dist
+          cat checksum-parts/*.sha256 | sort -k2 > dist/SHA256SUMS
+
+      - name: Upload checksum artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ccm-SHA256SUMS
+          path: dist/SHA256SUMS
+          if-no-files-found: error
+
+      - name: Attach checksums to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/SHA256SUMS
