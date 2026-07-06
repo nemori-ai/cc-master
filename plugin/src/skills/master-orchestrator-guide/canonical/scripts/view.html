@@ -1951,6 +1951,12 @@
     import dagre from 'dagre';
 
     const h = React.createElement;
+    const ACCESS_TOKEN = new URLSearchParams(window.location.search).get('token') || '';
+    function serverUrl(pathname) {
+      const u = new URL(pathname, window.location.href);
+      if (ACCESS_TOKEN) u.searchParams.set('token', ACCESS_TOKEN);
+      return u.pathname + u.search;
+    }
 
     // ---- status palette ----------------------------------------------------
     // Resolved from the OKLCH CSS custom properties so the JS-driven surfaces
@@ -2892,7 +2898,7 @@
         let alive = true;
         async function poll() {
           try {
-            const r = await fetch('/board.json', { cache: 'no-store' });
+            const r = await fetch(serverUrl('/board.json'), { cache: 'no-store' });
             if (!alive) return;
             if (!r.ok) { return; } // mid-write -> skip this tick, keep last good render
             const b = await r.json();
@@ -2932,7 +2938,7 @@
         let alive = true;
         async function pollDecisions() {
           try {
-            const r = await fetch('/decisions.json', { cache: 'no-store' });
+            const r = await fetch(serverUrl('/decisions.json'), { cache: 'no-store' });
             if (!alive) return;
             if (!r.ok) { return; } // 404 (old server) or mid-write -> silently skip
             const d = await r.json();
