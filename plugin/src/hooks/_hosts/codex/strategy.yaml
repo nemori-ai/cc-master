@@ -79,7 +79,7 @@ launcher:
     - inject CC_MASTER_HARNESS=codex and related standard env for shared core.
     - resolve the active session board and inject CC_MASTER_BOARD / CC_MASTER_BOARD_STEM when the session is armed.
     - convert normalized core result back to Codex hook output.
-    - optional diagnostics: set CC_MASTER_HOOK_DIAGNOSTIC=1 or CC_MASTER_HOOK_DIAGNOSTIC_DIR=<dir> to persist per-hook invocation records (raw stdin/payload/core stdout-stderr/exit status) for repro.
+    - optional diagnostics: set CC_MASTER_HOOK_DIAGNOSTIC=1 or CC_MASTER_HOOK_DIAGNOSTIC_DIR=<dir> to persist per-hook invocation summaries (non-sensitive payload/core stream summaries plus exit status). Unsafe bounded raw capture requires the separate CC_MASTER_HOOK_DIAGNOSTIC_UNSAFE_RAW=1 opt-in.
   stop_policy:
     - block results emit decision:block for Stop so Codex continues the turn; any Stop block producer must include a board/state release mechanism to avoid unbounded re-entry.
 bootstrap:
