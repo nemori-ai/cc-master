@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-07-06
+
+> **plugin 线 minor + ccm-v0.14.0 配套 release** —— 这一版收口 GitHub issue 处理线：`ccm` 引擎补上 true-done 硬闸、external issue tracking 语义与 cadence/duration agile health warnings；plugin 侧同步强化 Codex diagnostics、local board viewer、release checksum、orchestrator skills 与 Track B eval 设计。#37 retro command 线按用户指示 defer 到下一 PR，不包含在本版交付中。
+
+### Added
+
+- **`ccm-v0.14.0` true-done hard gate（ADR-026）** — `status=done` 现在必须同时具备 `verified=true` 与非空 `artifact`；`ccm task done` 若缺端点验收证据会在写入关卡被拒，避免 board 把未验收/无产物的工作报告成完成。
+- **external GitHub issue tracking 语义** — board model / lint / `using-ccm` 明确 `executor=external` 的 `references.kind=issue` 是进度 tracking anchor，不是完成 artifact；external task 只有在 orchestrator 验收 PR / commit / release / report 等实际产物后才能 `done --verified`。
+- **cadence/duration agile health warnings** — `ccm` 新增 `BIZ-CADENCE-MISSING-ESTIMATE`、`BIZ-CADENCE-OVERBOOKED`、`BIZ-CADENCE-CRITICAL-PATH-OVER`、`BIZ-TASK-OVERSIZED-FOR-CADENCE`、`BIZ-AGILE-ACCEPTANCE-MISSING`、`BIZ-ESTIMATE-STALE` 等 warn 级规则，让 estimate、实测 duration 与 cadence timebox 参与敏捷健康判断。
+- **Skill B Track B benchmark 设计** — 新增 `design_docs/eval/authoring-workflows-track-b.md` 与 `authoring-workflows` 的轻量 `.design/OBJECTIVE.md`，定义 Workflow 准入、primitive/pattern 选择、runtime contract、harness-as-endpoint 等行为断言，为后续 measured iteration 提供可执行评测设计。
+- **release checksum manifest** — ccm 二进制 release 与 plugin zip release 都会产出 `SHA256SUMS`；`install.sh` 联网安装前按精确文件名校验 release asset，缺清单、缺条目或 digest mismatch 都 fail-closed。
+
+### Changed
+
+- **分发 skills 消费新的 board health 信号** — `master-orchestrator-guide`、`using-ccm`、`slicing-goals-into-dags`、`pacing-and-estimation` 同步教 orchestrator 使用 cadence warnings：先拆 oversized slice、重估漂移下游、移出超载 scope、降低 WIP 或把 scope/timebox/resource 取舍 surface 给用户。
+- **local board viewer 安全硬化** — viewer 继续保持 127.0.0.1、本地只读、vendored assets 模型，同时增加 per-launch token、CSP nonce、安全响应头、`/board.json` / `/decisions.json` token gate 与对应 content test。
+- **Codex hook diagnostics 安全硬化** — Codex launcher diagnostics 默认只持久化脱敏摘要、hash、大小与退出状态；raw stdin/payload/core streams 需要单独 `CC_MASTER_HOOK_DIAGNOSTIC_UNSAFE_RAW=1` opt-in，并加 0700/0600 权限与截断上限。
+- **skill projection hygiene** — `scripts/sync-plugin-dist.sh` 现在默认排除 `.design/` 与 `evals/`，确保 dev-only J / eval 设计不会进入 runtime `plugin/dist` 或 release artifact。
+
+### Fixed
+
+- **install / release asset integrity** — package / release workflow、local release smoke 与 installer 校验链路现在锁步，避免用户安装未发布、未登记或被篡改的二进制/插件 zip。
+- **board worked fixtures and tests** — 更新 ccm engine / CLI / content / hook fixtures 与 tests，覆盖 true-done、external artifact、cadence health、estimate drift 和 viewer hardening。
+
 ## [0.12.1] — 2026-07-03
 
 > **plugin + ccm host-adapter groundwork** —— 把仓库从单一 Claude Code 插件形态推进到 paragoge-style `plugin/src` → `plugin/dist/<host>` 投影架构，并落地 Codex adapter 的首批可安装产物；`ccm` 同步抽出 host harness registry / Codex 用量信号 / upgrade plumbing，为多 harness 分发与本地验收闭环铺路。
@@ -475,6 +499,14 @@ advancing across context compaction and across sessions.
 - **Docs** — `README.md` (EN) and `README_zh.md` (中文); design specification,
   design notes, and four research reports under `design_docs/`.
 
-[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/nemori-ai/cc-master/compare/v0.12.1...v0.13.0
+[0.12.1]: https://github.com/nemori-ai/cc-master/compare/v0.11.0...v0.12.1
+[0.11.0]: https://github.com/nemori-ai/cc-master/compare/v0.10.2...v0.11.0
+[0.10.2]: https://github.com/nemori-ai/cc-master/compare/v0.10.1...v0.10.2
+[0.10.1]: https://github.com/nemori-ai/cc-master/compare/v0.10.0...v0.10.1
+[0.10.0]: https://github.com/nemori-ai/cc-master/compare/v0.9.2...v0.10.0
+[0.9.2]: https://github.com/nemori-ai/cc-master/compare/v0.9.1...v0.9.2
+[0.9.1]: https://github.com/nemori-ai/cc-master/compare/v0.9.0...v0.9.1
 [0.2.0]: https://github.com/nemori-ai/cc-master/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/nemori-ai/cc-master/releases/tag/v0.1.0
