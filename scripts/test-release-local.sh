@@ -86,9 +86,13 @@ hdr()  { printf "\n${C_BLUE}━━━ %s ━━━${C_OFF}\n" "$*"; }
 ok()   { printf "${C_GREEN}✔${C_OFF} %s\n" "$*"; }
 warn() { printf "${C_YEL}⚠${C_OFF} %s\n" "$*"; }
 die()  { printf "${C_RED}✗ %s${C_OFF}\n" "$*" >&2; exit 1; }
+mktemp_dir() {
+  local prefix="${1:-ccm-release-test}"
+  mktemp -d "${TMPDIR:-/tmp}/${prefix}.XXXXXX"
+}
 
 # 工作目录（产物 / scratch home / node22 缓存）——默认系统 tmp·**绝不入仓、绝不碰真 ~/.claude**。
-WORK="${CCM_RELEASE_TEST_WORK:-$(mktemp -d -t ccm-release-test)}"
+WORK="${CCM_RELEASE_TEST_WORK:-$(mktemp_dir ccm-release-test)}"
 mkdir -p "${WORK}"
 NODE22_CACHE="${CCM_NODE22_CACHE:-${WORK}/node22}"
 
