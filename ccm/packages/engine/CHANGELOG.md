@@ -1,5 +1,13 @@
 # @ccm/engine
 
+## 0.14.1
+
+### Patch Changes
+
+- 96e0f68: fix: expose board source for GitHub issue bootstrap
+
+  `ccm board init` now accepts `--github-issue <url>` and stores it as a board-level source (`board.source.kind=github_issue`, `board.source.url`) so issue-based bootstrap is treated as a requirement source rather than synthetic task seed.
+
 ## 0.14.0
 
 ### Minor Changes
