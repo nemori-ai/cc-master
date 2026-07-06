@@ -1,13 +1,18 @@
 # Eval — Track B: orchestration-discipline benchmark
 
 Track A asks one cheap, fully-automatic question: *does the description trigger
-at the right moment?* Track B asks the expensive, behavioral one: **once
-`master-orchestrator-guide` is in context, does it actually make the
-orchestrator behave better end-to-end?** It is the quantitative partner to the
+at the right moment?* Track B asks the expensive, behavioral one: **once a skill
+is in context, does it actually make the agent behave better on that skill's
+objective?** It is the quantitative partner to the
 qualitative pressure-testing in `cc-master-skillsmith` — but unlike Track A it is
 **not** a single command. It is an agent-orchestrated, half-manual loop, so this
 document is the procedure and `scripts/eval-benchmark.sh` is only the last
 mechanical step of it.
+
+This page is the original `master-orchestrator-guide` benchmark procedure and
+fixture. Track B is reusable: each skill owns its own J, fixtures, and assertion
+set. Skill B's Workflow authoring benchmark lives in
+`design_docs/eval/authoring-workflows-track-b.md`.
 
 ## What it measures
 

@@ -8,7 +8,10 @@ Claude sees when deciding whether to invoke the skill.
 
 This is the cheap-cheap quantitative gate that pairs with the qualitative
 pressure-testing in `cc-master-skillsmith`. Track B (behavioral benchmark) is a
-separate, heavier loop documented elsewhere.
+separate, heavier loop documented in `track-b-benchmark.md`; each measured skill
+owns its own J, fixtures, and assertions. The Skill B
+(`authoring-workflows`) Track B design is
+`authoring-workflows-track-b.md`.
 
 ## What it does
 
