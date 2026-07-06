@@ -180,8 +180,9 @@ expected_sha256_from_manifest() {
 }
 
 verify_sha256_manifest() {
-  local asset="$1" manifest="$2" expected actual base
-  base="${asset##*/}"
+  local asset="$1" manifest="$2" manifest_asset="${3:-}" expected actual base
+  base="${manifest_asset:-$asset}"
+  base="${base##*/}"
   expected="$(expected_sha256_from_manifest "$manifest" "$base")" \
     || die "checksum 清单 $manifest 里找不到 ${base}。为避免安装未发布/未登记的 asset，已停止。"
   printf '%s' "$expected" | grep -Eq '^[0-9a-fA-F]{64}$' \
@@ -205,7 +206,7 @@ verify_downloaded_release_asset() {
   local tag="$1" asset="$2" file="$3" manifest="$4"
   if [ -n "$LOCAL_SRC" ]; then
     if [ -f "$LOCAL_SRC/$CHECKSUM_MANIFEST" ]; then
-      verify_sha256_manifest "$file" "$LOCAL_SRC/$CHECKSUM_MANIFEST"
+      verify_sha256_manifest "$file" "$LOCAL_SRC/$CHECKSUM_MANIFEST" "$asset"
     else
       warn "CC_MASTER_INSTALL_LOCAL 本地源未提供 ${CHECKSUM_MANIFEST}；离线安装将信任本地目录中的 ${asset}。联网 GitHub release 安装不会跳过 checksum。"
     fi
@@ -213,7 +214,7 @@ verify_downloaded_release_asset() {
   fi
   fetch_release_manifest "$tag" "$manifest" \
     || die "无法下载 checksum 清单：${GITHUB}/${REPO}/releases/download/${tag}/${CHECKSUM_MANIFEST}。为避免未校验安装，已停止。"
-  verify_sha256_manifest "$file" "$manifest"
+  verify_sha256_manifest "$file" "$manifest" "$asset"
 }
 
 # ── 取一行 HTTP 文本（GitHub API）──────────────────────────────────────────────────────────────────

@@ -20,6 +20,13 @@ printf '%s  asset.bin\n' "$good_hash" >"$manifest"
 verify_sha256_manifest "$asset" "$manifest"
 pass "valid SHA256SUMS entry verifies"
 
+installed_name="$tmp/ccm"
+cp "$asset" "$installed_name"
+asset_named_manifest="$tmp/SHA256SUMS.asset-name"
+printf '%s  ccm-linux-x64\n' "$good_hash" >"$asset_named_manifest"
+verify_sha256_manifest "$installed_name" "$asset_named_manifest" "ccm-linux-x64"
+pass "release asset name can differ from installed temp filename"
+
 bad_manifest="$tmp/SHA256SUMS.bad"
 printf '%064d  asset.bin\n' 0 >"$bad_manifest"
 if ( verify_sha256_manifest "$asset" "$bad_manifest" ) >/dev/null 2>"$tmp/bad.err"; then
