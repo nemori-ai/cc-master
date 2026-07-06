@@ -472,7 +472,14 @@ resolve_latest_tag() {
 
 # ── ccm 线版本 tag ──────────────────────────────────────────────────────────────────────────────────
 resolve_ccm_tag() {
-  if [ -n "$CCM_VERSION" ]; then printf '%s\n' "$CCM_VERSION"; return; fi
+  if [ -n "$CCM_VERSION" ]; then
+    case "$CCM_VERSION" in
+      ccm-v*) printf '%s\n' "$CCM_VERSION" ;;
+      v*) printf 'ccm-%s\n' "$CCM_VERSION" ;;
+      *) printf 'ccm-v%s\n' "$CCM_VERSION" ;;
+    esac
+    return
+  fi
   # 本地源模式：ccm 二进制文件名是 ccm-<os>-<arch>（不含 tag），tag 仅作展示。
   if [ -n "$LOCAL_SRC" ]; then printf '%s\n' "local"; return; fi
   local tag
@@ -484,7 +491,13 @@ resolve_ccm_tag() {
 
 # ── plugin 线版本 tag ──────────────────────────────────────────────────────────────────────────────
 resolve_plugin_tag() {
-  if [ -n "$PLUGIN_VERSION" ]; then printf '%s\n' "$PLUGIN_VERSION"; return; fi
+  if [ -n "$PLUGIN_VERSION" ]; then
+    case "$PLUGIN_VERSION" in
+      v*) printf '%s\n' "$PLUGIN_VERSION" ;;
+      *) printf 'v%s\n' "$PLUGIN_VERSION" ;;
+    esac
+    return
+  fi
   if [ -n "$LOCAL_SRC" ]; then
     # 本地源模式：从 cc-master-plugin-<harness>-<tag>.zip 文件名推 tag（兼容旧 cc-master-plugin-<tag>.zip）。
     local zip
