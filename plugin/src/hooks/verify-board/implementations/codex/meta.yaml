@@ -1,8 +1,8 @@
 hook: verify-board
 host: codex
 event: Stop
-mode: replacement-advisory
+mode: blocking-continuation-gate
 notes:
-  - Codex Stop block and exit 2 repeatedly re-enter Stop under CLI 0.142.5, so this host implementation is non-blocking.
-  - Emits systemMessage advisory only after dormant-until-armed board matching succeeds.
-  - Does not implement Claude Code fingerprinted self-check sidecar gate.
+  - Emits Codex Stop decision:block when active boards still need continuation.
+  - Uses board runtime.stop_allow_until as the short-lived release valve after independent self-check.
+  - UserPromptSubmit resets the release valve for the current session board before processing new input.

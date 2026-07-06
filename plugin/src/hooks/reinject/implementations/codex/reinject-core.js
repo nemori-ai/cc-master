@@ -82,7 +82,9 @@ function main() {
 
   let context = `You are a cc-master master orchestrator. Your orchestration board(s) live in ${boardsDir(home)}. Active:${listing}. ` +
     'Re-read the board for the task you are working on (recognise it by its goal), then invoke the master-orchestrator-guide skill ' +
-    'and continue the decision program. Do not restart work already done/verified; integrate any completed background results first.';
+    'and continue the decision program. In Codex API/tool sessions, if you need subagent dispatch and the multi-agent tools are not visible, ' +
+    'use tool_search to surface them before treating subagent dispatch as unavailable; once discovered, use multi_agent_v1.spawn_agent and record the returned handle. ' +
+    'Do not restart work already done/verified; integrate any completed background results first.';
 
   if (emptyBoards.length > 0) {
     context += ` HARD STOP: active board(s) with zero tasks are not runnable orchestration DAGs: ${emptyBoards.join(', ')}. ` +

@@ -38,6 +38,8 @@ assert_contains "$HOOK_OUT" '"systemMessage"' "uses SessionStart systemMessage e
 assert_contains "$HOOK_OUT" "CODEX REINJECT GOAL" "injects matching board goal"
 assert_contains "$HOOK_OUT" "master orchestrator" "re-anchors role"
 assert_contains "$HOOK_OUT" "mine.board.json" "names board"
+assert_contains "$HOOK_OUT" "tool_search" "prompts Codex deferred tool discovery after compaction"
+assert_contains "$HOOK_OUT" "multi_agent_v1.spawn_agent" "prompts Codex multi-agent spawn handle discipline"
 rm -rf "$H"
 
 # Matching empty board: SessionStart must force DAG creation before work.
