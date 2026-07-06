@@ -163,8 +163,10 @@ function isPolicySwitch(value) {
   return /^(allow|deny)$/.test(String(value || ''));
 }
 
-function isHttpUrl(value) {
-  return /^https?:\/\//.test(String(value || '').trim());
+function isGithubIssueUrl(value) {
+  return /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/issues\/[0-9]+(?:[?#].*)?$/.test(
+    String(value || '').trim()
+  );
 }
 
 function restampOwner(boardPath, sessionId) {
@@ -334,7 +336,11 @@ function main() {
   const boardPath = path.join(boardsDir, `${stamp}-${process.pid}.board.json`);
   fs.mkdirSync(boardsDir, { recursive: true });
 
-  run('ccm', ['--board', boardPath, 'board', 'init', '--goal', goal, '--json', '--no-input']);
+  const initArgs = ['--board', boardPath, 'board', 'init', '--goal', goal, '--json', '--no-input'];
+  if (flags.githubIssue && isGithubIssueUrl(flags.githubIssue)) {
+    initArgs.push('--github-issue', String(flags.githubIssue).trim());
+  }
+  run('ccm', initArgs);
   restampOwner(boardPath, sessionId);
   writeSessionState(home, sessionId, boardPath, invocation, 'fresh');
 
@@ -397,32 +403,10 @@ function main() {
 
   if (flags.githubIssue) {
     const issueRef = String(flags.githubIssue || '').trim();
-    if (isHttpUrl(issueRef)) {
-      const issueTaskId = `EXT-${Date.now()}-${process.pid}`;
-      try {
-        run('ccm', [
-          '--board',
-          boardPath,
-          'task',
-          'add',
-          issueTaskId,
-          '--type',
-          'development',
-          '--executor',
-          'external',
-          '--ref',
-          `issue:${issueRef}`,
-          '--title',
-          `From GitHub issue: ${issueRef}`,
-          '--json',
-          '--no-input',
-        ]);
-        applied.push(`github_issue=${issueTaskId}`);
-      } catch (error) {
-        notes.push(`ccm task add for --github-issue failed; continuing bootstrap: ${error.message}`);
-      }
+    if (isGithubIssueUrl(issueRef)) {
+      applied.push('github_issue=board_source');
     } else {
-      notes.push(`--github-issue value ${issueRef} is not a valid http(s) URL; skipped`);
+      notes.push(`--github-issue value ${issueRef} is not a valid GitHub issue URL; skipped`);
     }
   }
 

@@ -74,13 +74,19 @@ function requireTask(board: Board, id: string): Task {
   return t;
 }
 
-// ── boardInit({goal}) → 从 template 形态产板。owner.active:true、session_id:""（非 arming·cli-design §7）。
+// ── boardInit({goal, githubIssue}) → 从 template 形态产板。owner.active:true、session_id:""（非 arming·cli-design §7）。
 //   不读 template 文件（mutations 零 IO）——把 template 形态硬编码在此（与 board.template.json 对齐：
 //   schema / meta.template_version / scheduling.wip_limit / tasks:[] / log:[]）。owner.heartbeat 盖戳。
 const TEMPLATE_VERSION = 3;
 const DEFAULT_WIP_LIMIT = 4;
-export function boardInit(args?: { goal?: string }): Board {
-  const goal = args && typeof args.goal === 'string' ? args.goal : '';
+export function boardInit(args?: { goal?: string; githubIssue?: string }): Board {
+  const githubIssue = args && typeof args.githubIssue === 'string' ? args.githubIssue : '';
+  const goal =
+    args && typeof args.goal === 'string' && args.goal
+      ? args.goal
+      : githubIssue
+        ? `GitHub issue: ${githubIssue}`
+        : '';
   const board: Board = {
     schema: SCHEMA_VERSION,
     meta: { template_version: TEMPLATE_VERSION },
@@ -91,6 +97,12 @@ export function boardInit(args?: { goal?: string }): Board {
     tasks: [],
     log: [],
   };
+  if (githubIssue) {
+    board.source = {
+      kind: 'github_issue',
+      url: githubIssue,
+    };
+  }
   return touch(board);
 }
 

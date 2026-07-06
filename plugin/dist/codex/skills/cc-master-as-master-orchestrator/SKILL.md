@@ -25,7 +25,7 @@ $ARGUMENTS
 
 1. 调用 `master-orchestrator-guide` skill，内化身份、红线、决策程序与 board 协议。
 2. 从参数里取出 goal，并剔除这些启动 flag：`--priority`、`--wip`、`--owner-wip`、`--policy-switch`、`--github-issue`。这些 flag 已按命令契约写入 board；不要把它们混进 `board.goal`。
-3. **硬闸：在任何实现 / 测试 / git / PR / 发布动作之前，先把 goal 拆成依赖 DAG 并用 `ccm task add` 写进这块 board。** `tasks[]` 为空时不准继续推进用户目标；这不是建议，是 fresh 形态的启动条件。若命令携带 `--github-issue`，`bootstrap` 先行种一条 `executor=external` 的 issue 跟踪任务，再由 orchestrator 补齐剩余 DAG。
+3. **硬闸：在任何实现 / 测试 / git / PR / 发布动作之前，先把 goal 拆成依赖 DAG 并用 `ccm task add` 写进这块 board。** `tasks[]` 为空时不准继续推进用户目标；这不是建议，是 fresh 形态的启动条件。若命令携带 `--github-issue`，`ccm board init` 已把它写成 `board.source.kind=github_issue` / `board.source.url`；先读取这个 issue，提炼 goal 与 acceptance，再拆出真实 DAG。issue source 不是一个 task，也不代表 `executor=external`。
 4. 每个 task 至少有 `id`、`title`、`status`、`deps`、`acceptance`。填上 `goal` 与 `git`；保留已写好的 `owner.session_id`、`owner.active` 和所有已落板的 policy / WIP / priority 字段。所有 board 写入都走 `ccm`，不要手改 JSON。
 5. 写完 DAG 后立刻 `ccm board graph` / `ccm board next` 对账：确认 readySet 非空或明确 blocked_on:user；若 graph/lint 不净，先修 board，不要开始执行。
 6. 只有当用户用自然语言明确补充了启动 flag 没表达的旋钮时，才用 `ccm` 写入对应字段。不要自创 board 字段；不要写“板级 token 预算”或“板级默认模型档”。

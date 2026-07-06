@@ -120,6 +120,15 @@ export const FIELDS = {
       when: '建板 / 模板升级',
       degrade: 'timeline 当旧板降级走拓扑轴',
     },
+    source: {
+      tier: '✎',
+      type: 'object{kind:string,url?:string,...}?',
+      default: '缺省(无外部需求来源)',
+      readers: 'orchestrator 初始化需求 / viewer 可追溯来源',
+      writers: 'board init / agent 经 CLI',
+      when: '从 GitHub issue / 外部 ticket / 文档入口初始化 board 时',
+      degrade: '缺→按普通 goal board 处理；形状坏 silent-on-unknown',
+    },
     goal: {
       tier: '🔒',
       type: 'string',

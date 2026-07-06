@@ -163,21 +163,40 @@ function initResolve(ctx: Ctx): { boardPath: string; board: null } {
   return { boardPath, board: null };
 }
 
+function parseGithubIssueUrl(value: unknown): string {
+  const url = typeof value === 'string' ? value.trim() : '';
+  if (!url) return '';
+  if (!/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/issues\/[0-9]+(?:[?#].*)?$/.test(url)) {
+    const e = new Error(
+      `--github-issue 须是 GitHub issue URL（形如 https://github.com/owner/repo/issues/123，当前：${JSON.stringify(value)}）`,
+    ) as KindedError;
+    e.errKind = 'Usage';
+    throw e;
+  }
+  return url;
+}
+
 export function init(ctx: Ctx): number {
   return runWrite(ctx, {
     resolve: initResolve,
     mutate: () => {
       const goal = ctx.values && typeof ctx.values.goal === 'string' ? ctx.values.goal : '';
-      return mutations.boardInit({ goal });
+      const githubIssue = parseGithubIssueUrl(ctx.values && ctx.values['github-issue']);
+      return mutations.boardInit({ goal, githubIssue });
     },
     render: (board, c, { dryRun, boardPath }) => {
-      const b = board as { goal?: string };
+      const b = board as { goal?: string; source?: { kind?: string; url?: string } };
       if (c.flags.json) return render.renderBoardSummary(b, { json: true });
       const goalStr = b.goal ? `goal="${b.goal}"` : '(无 goal)';
+      const sourceStr =
+        b.source && b.source.kind === 'github_issue' && b.source.url
+          ? `  来源: ${b.source.url}\n`
+          : '';
       // QA #13：建板后打印板路径 + 下一步，免得用户不知道板在哪 / 怎么接着加任务（同 home 下后续命令自动发现）。
       if (dryRun) return `[dry-run] 将建板: ${goalStr}`;
       return (
         `board 已建: ${goalStr}\n` +
+        sourceStr +
         `  路径: ${boardPath}\n` +
         '  下一步: ccm task add <id> --type development --title <标题>（同 home 下自动发现，或 --board <上面路径>）'
       );

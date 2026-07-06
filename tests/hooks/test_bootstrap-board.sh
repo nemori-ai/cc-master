@@ -827,9 +827,8 @@ board_policy_switch() { sed -n 's/.*"autonomous_account_switch"[[:space:]]*:[[:s
 board_task_count() {
   node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const tasks=Array.isArray(b.tasks)?b.tasks:[];process.stdout.write(String(tasks.length));' "$1";
 }
-board_external_issue_task_count() {
-  local needle="${2:-}"
-  node -e 'const fs=require("fs");const board=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const needle=process.argv[2]||"";const tasks=Array.isArray(board.tasks)?board.tasks:[];let c=0;for(const task of tasks){if(!task||task.executor!=="external") continue;const refs=Array.isArray(task.references)?task.references:[];const hasIssueRef=refs.some((r)=>r&&r.kind==="issue"&&typeof r.ref==="string"&&(needle?r.ref===needle:true));const refString=typeof task.ref==="string"?task.ref:"";if(hasIssueRef){c+=1;continue;} if(needle){ if(refString===`issue:${needle}`) c+=1;} else if(refString.startsWith("issue:")) c+=1; }process.stdout.write(String(c));' "$1" "$needle"
+board_github_issue_source() {
+  node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const s=b.source&&typeof b.source==="object"?b.source:{};process.stdout.write(s.kind==="github_issue"&&typeof s.url==="string"?s.url:"");' "$1";
 }
 
 if [ -n "${CCM_BIN:-}" ] && [ -x "${CCM_BIN:-}" ]; then
@@ -889,16 +888,16 @@ if [ -n "${CCM_BIN:-}" ] && [ -x "${CCM_BIN:-}" ]; then
   assert_valid_json "$HOOK_OUT" "IF4: ctx with advisory is still valid JSON"
   rm -rf "$P"
 
-  # ── IF5 (github issue seed): valid --github-issue in fresh bootstrap seeds one external issue task.
+  # ── IF5 (github issue source): valid --github-issue in fresh bootstrap records board source, not a task.
   P="$(make_project)"
   ISSUE_URL="https://github.com/example/repo/issues/123"
   HOOK_OUT="$(printf '%s' "{\"session_id\":\"sess-if5\",\"prompt\":\"/cc-master:as-master-orchestrator fix bug --github-issue ${ISSUE_URL}\"}" \
     | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
       bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
   IF5_BOARD="$(only_board "$P/.claude/cc-master")"
-  assert_eq "1" "$(board_external_issue_task_count "$IF5_BOARD" "$ISSUE_URL")" "IF5: --github-issue seeds one external issue task"
-  assert_eq 1 "$(board_task_count "$IF5_BOARD")" "IF5: issue seed is the only task in fresh bootstrap"
-  assert_contains "$HOOK_OUT" "github-issue=" "IF5: ctx notes the github-issue seed was applied"
+  assert_eq "$ISSUE_URL" "$(board_github_issue_source "$IF5_BOARD")" "IF5: --github-issue records board.source"
+  assert_eq 0 "$(board_task_count "$IF5_BOARD")" "IF5: issue source does not synthesize a task"
+  assert_contains "$HOOK_OUT" "github-issue=" "IF5: ctx notes the github-issue source was applied"
   rm -rf "$P"
 
   # ── IF6 (invalid github issue URL): non-HTTP(S) URL 被跳过并留下 advisory，不新增任务。
@@ -907,7 +906,7 @@ if [ -n "${CCM_BIN:-}" ] && [ -x "${CCM_BIN:-}" ]; then
     | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
       bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
   IF6_BOARD="$(only_board "$P/.claude/cc-master")"
-  assert_eq "0" "$(board_external_issue_task_count "$IF6_BOARD")" "IF6: invalid --github-issue does not seed issue task"
+  assert_eq "" "$(board_github_issue_source "$IF6_BOARD")" "IF6: invalid --github-issue does not record board source"
   assert_eq 0 "$(board_task_count "$IF6_BOARD")" "IF6: invalid --github-issue does not add any tasks"
   assert_contains "$HOOK_OUT" "<advisory source=" "IF6: invalid --github-issue emits advisory"
   rm -rf "$P"
@@ -918,7 +917,7 @@ if [ -n "${CCM_BIN:-}" ] && [ -x "${CCM_BIN:-}" ]; then
   # keep one board so resume can match by stem.
   run_resume "$P/resume" "new-sess" '/cc-master:as-master-orchestrator --resume existing --github-issue https://github.com/example/repo/issues/456'
   assert_eq 2 "$(board_task_count "$ISSUE_BOARD")" "IF7: resume path keeps existing tasks (including bootstrap seed from seed_board fixture)"
-  assert_eq 0 "$(board_external_issue_task_count "$ISSUE_BOARD" 'https://github.com/example/repo/issues/456')" "IF7: resume ignores --github-issue"
+  assert_eq "" "$(board_github_issue_source "$ISSUE_BOARD")" "IF7: resume ignores --github-issue"
   rm -rf "$P"
 else
   echo "(INIT-FLAGS series skipped — no executable CCM_BIN/ccm to apply board update/policy set)"

@@ -9,21 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.13.1] — 2026-07-06
 
-> **plugin 线 patch 收口** — 为 `as-master-orchestrator` 增加 GitHub issue 启动种子能力：新增 `--github-issue` flag，支持在 fresh bootstrap 时自动创建 `executor=external` 的 issue 跟踪起点任务，帮助从现有 issue 一致性地接管编排。补充双宿主回归与文档约束，保持任务为空 hard stop 的启动纪律不变。
+> **plugin + ccm patch 收口** — 为 `as-master-orchestrator` 增加 GitHub issue 启动来源能力：`ccm board init` 新增 `--github-issue`，fresh bootstrap 透传该 flag，把 issue URL 记录为 board 的需求来源，而不是合成一个任务。补充双宿主回归与文档约束，保持任务为空 hard stop 的启动纪律不变。
 
 ### Added
 
-- **`as-master-orchestrator` 支持 `--github-issue` 入口参数** — 在 Claude Code 与 Codex 下，启动命令可携带 issue URL；fresh bootstrap 会把它写入 board 首条外部任务 `external`（`ref: issue:<url>` / `title: From GitHub issue: ...`），不阻断主流程，便于后续把外部进度信号映射到 board。
-- **启动参数适配与可观测性补齐** — 命令契约、Codex/Claude 两端 skill 文案、以及 strategy 声明同步承接 `github-issue` 参数；成功落盘会在 bootstrap 结果里回显 `github-issue=<seed-id>`，失败会写入 advisory 便于自检。
+- **`ccm board init --github-issue <url>`** — 新增 board 初始化来源字段：写 `board.source.kind=github_issue` / `board.source.url`；若未给 `--goal`，默认 goal 派生为 `GitHub issue: <url>`。这是 board 需求来源，不是 synthetic task，也不是 `executor=external`。
+- **`as-master-orchestrator` 支持 `--github-issue` 入口参数** — Claude Code 与 Codex fresh bootstrap 透传到 `ccm board init --github-issue`；命令契约、Codex/Claude 两端 skill 文案、以及 strategy 声明同步承接该参数。
 
 ### Changed
 
-- **`bootstrap-board` 入口链路收敛** — 为 `--github-issue` 做统一解析与合法性校验（HTTP(S) 网址），区分 fresh 与 resume 语义（仅 fresh 新建时可种子），无效值写 advisory 不阻断 boot。
-- **测试覆盖扩展** — 双宿主新增 `--github-issue` 的正向、无效 URL、resume 隔离路径回归案例，覆盖任务注入与 advisory 侧信号。
+- **`bootstrap-board` 入口链路收敛** — 为 `--github-issue` 做统一解析与合法性校验（GitHub issue URL），区分 fresh 与 resume 语义（仅 fresh 新建时写 board source），无效值写 advisory 不阻断 boot。
+- **测试覆盖扩展** — ccm 与双宿主新增 `--github-issue` 的正向、无效 URL、resume 隔离路径回归案例，覆盖 board source 写入与 advisory 侧信号。
 
 ### Fixed
 
-- **fresh startup 的任务初始化歧义收敛** — 防止 `--github-issue` 在 resume 路径误触发种子创建，保持 resume 行为与已有 `board init`/`owner.sess` 继承路径一致，避免新会话误增任务。
+- **fresh startup 的需求来源歧义收敛** — 防止 `--github-issue` 被误建模成 external task，保持 resume 行为与已有 `board init`/`owner.sess` 继承路径一致，避免新会话误增任务。
 
 ## [0.13.0] — 2026-07-06
 

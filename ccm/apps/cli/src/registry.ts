@@ -117,8 +117,16 @@ export const REGISTRY: Registry = {
       positionals: [],
       options: {
         goal: { type: 'string', field: 'goal', desc: '初始 goal（默认空串）' },
+        'github-issue': {
+          type: 'string',
+          field: 'source.github_issue.url',
+          desc: '以 GitHub issue URL 作为 board 需求来源',
+        },
       },
-      examples: ['ccm board init --goal "试验性编排"'],
+      examples: [
+        'ccm board init --goal "试验性编排"',
+        'ccm board init --github-issue https://github.com/owner/repo/issues/123',
+      ],
       handler: 'board.init',
     },
     update: {

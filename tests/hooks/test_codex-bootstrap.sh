@@ -9,9 +9,8 @@ CORE="$REPO_ROOT/plugin/src/hooks/bootstrap-board/implementations/codex/bootstra
 board_task_count() {
   node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const tasks=Array.isArray(b.tasks)?b.tasks:[];process.stdout.write(String(tasks.length));' "$1";
 }
-board_external_issue_task_count() {
-  local needle="${2:-}"
-  node -e 'const b=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const needle=process.argv[2]||"";const tasks=Array.isArray(b.tasks)?b.tasks:[];let c=0;for(const t of tasks){if(!t||t.executor!=="external") continue; const refs=Array.isArray(t.references)?t.references:[]; const hasIssueRef=refs.some((r)=>r&&r.kind==="issue"&&typeof r.ref==="string"&&(needle?r.ref===needle:true)); const refString=typeof t.ref==="string"?t.ref:""; if(hasIssueRef){c+=1;continue;} if(needle){if(refString===`issue:${needle}`) c+=1;} else if(refString.startsWith("issue:")) c+=1;}process.stdout.write(String(c));' "$1" "$needle";
+board_github_issue_source() {
+  node -e 'const b=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const s=b.source&&typeof b.source==="object"?b.source:{};process.stdout.write(s.kind==="github_issue"&&typeof s.url==="string"?s.url:"");' "$1";
 }
 
 H="$(make_project)"
@@ -46,7 +45,7 @@ assert_eq "true" "$ACTIVE" "codex bootstrap arms owner.active"
 assert_eq "2" "$WIP" "codex bootstrap maps --wip"
 assert_eq "high" "$PRIORITY" "codex bootstrap maps --priority"
 assert_eq "deny" "$POLICY" "codex bootstrap maps --policy-switch"
-assert_eq "0" "$(board_external_issue_task_count "$BOARD")" "codex bootstrap fresh without --github-issue has zero external issue seed tasks"
+assert_eq "" "$(board_github_issue_source "$BOARD")" "codex bootstrap fresh without --github-issue has no github issue source"
 assert_file "$SESSION_STATE" "codex bootstrap writes session state"
 STATE_BOARD="$(node -e 'const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(s.board_path||""));' "$SESSION_STATE")"
 STATE_HARNESS="$(node -e 'const fs=require("fs");const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(s.harness||""));' "$SESSION_STATE")"
@@ -73,8 +72,8 @@ assert_eq 0 "$?" "codex bootstrap with --github-issue returns 0"
 assert_valid_json "$ISSUE_OUT" "codex bootstrap with issue context envelope valid JSON"
 ISSUE_BOARD="$(find "$HOME_DIR-issue/boards" -type f -name '*.board.json' | sort | head -n1)"
 assert_file "$ISSUE_BOARD" "codex bootstrap with issue creates board"
-assert_eq 1 "$(board_external_issue_task_count "$ISSUE_BOARD" "$ISSUE_URL")" "codex bootstrap with issue seeds one external issue task"
-assert_eq 1 "$(board_task_count "$ISSUE_BOARD")" "codex bootstrap with issue adds only seed task"
+assert_eq "$ISSUE_URL" "$(board_github_issue_source "$ISSUE_BOARD")" "codex bootstrap with issue records board source"
+assert_eq 0 "$(board_task_count "$ISSUE_BOARD")" "codex bootstrap with issue does not synthesize a task"
 assert_contains "$ISSUE_OUT" "bootstrap_applied" "codex bootstrap with issue reports applied flags"
 rm -rf "$HOME_DIR-issue"
 
@@ -83,7 +82,7 @@ INVALID_OUT="$(printf '%s' "$INVALID_PAYLOAD" | CC_MASTER_HOME="$HOME_DIR-invali
 assert_eq 0 "$?" "codex bootstrap with invalid issue returns 0"
 INVALID_BOARD="$(find "$HOME_DIR-invalid/boards" -type f -name '*.board.json' | sort | head -n1)"
 assert_file "$INVALID_BOARD" "codex bootstrap with invalid issue creates board"
-assert_eq 0 "$(board_external_issue_task_count "$INVALID_BOARD")" "codex bootstrap with invalid issue doesn't add external issue task"
+assert_eq "" "$(board_github_issue_source "$INVALID_BOARD")" "codex bootstrap with invalid issue doesn't record board source"
 assert_contains "$INVALID_OUT" "bootstrap_advisory" "codex bootstrap with invalid issue reports advisory"
 rm -rf "$HOME_DIR-invalid"
 
@@ -215,7 +214,7 @@ RESUME_IGNORE_OUT="$(printf '%s' '{"session_id":"codex-sess-resume-issue","hook_
 assert_eq 0 "$?" "codex bootstrap resume with --github-issue returns 0"
 assert_valid_json "$RESUME_IGNORE_OUT" "codex bootstrap resume with --github-issue returns valid JSON"
 assert_eq 1 "$(board_task_count "$RESUME_IGNORE_BOARD")" "codex resume ignores --github-issue (tasks preserved)"
-assert_eq 0 "$(board_external_issue_task_count "$RESUME_IGNORE_BOARD" 'https://github.com/example/repo/issues/111')" "codex resume does not add external issue task"
+assert_eq "" "$(board_github_issue_source "$RESUME_IGNORE_BOARD")" "codex resume does not record github issue source"
 assert_contains "$RESUME_IGNORE_OUT" "cc-master resume: armed Codex orchestration board" "codex resume still arms board"
 
 rm -rf "$H"
