@@ -93,8 +93,13 @@ jobs:
       - name: Generate checksum
         run: |
           cd ccm/apps/cli/dist
-          sha256sum "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
-          sha256sum --check "${{ matrix.asset }}.sha256"
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+            sha256sum --check "${{ matrix.asset }}.sha256"
+          else
+            shasum -a 256 "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+            shasum -a 256 -c "${{ matrix.asset }}.sha256"
+          fi
 
       # 上传 artifact（workflow_dispatch / 非 tag 触发时也留存可下载）。
       - name: Upload artifact
