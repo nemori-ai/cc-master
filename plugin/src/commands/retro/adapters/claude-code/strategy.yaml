@@ -1,0 +1,9 @@
+host: claude-code
+command: retro
+version: 1
+mode: host_native
+projection:
+  source: body.md
+  target: commands/retro.md
+notes:
+  - Preserves existing Claude Code slash-command body.
