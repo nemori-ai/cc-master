@@ -18,11 +18,14 @@
 //   session 必须能自由 Write/Edit 任意文件，含碰巧叫 *.board.json 的）。bootstrap-board.sh 仍是唯一豁免
 //   的 ARM 动作（它经 ccm 建板、不走 Write 工具，与本 guard 无冲突）。
 //
-// Bash 启发式（best-effort·偏假阴）：解析任意 shell 找输出重定向/原地改写是不可判定的；故只在命令**同时**
-//   含 `.board.json` 路径**与**一个写操作符（`>`/`>>`/`sed -i`/`tee`/`cp`/`mv`/`dd`/`truncate`）时 deny，
-//   且写 board 的 shell command segment 本身是 `ccm ...` 调用才放行（别拦 ccm 自己去写 board）。注释里 /
-//   echo 内容里的 `ccm` 不算。漏网的 Bash 手改由 PostToolUse board-lint 事后兜（软提示）——PreToolUse guard
-//   挡结构化 Write/Edit（可靠）+ 明显的 Bash 写（启发式）。
+// Bash 启发式（best-effort·偏假阴）：解析任意 shell 找输出重定向/原地改写是不可判定的；故只在**同一个
+//   command segment** 同时含 `.board.json` 路径**与**一个写操作符（`>`/`>>`/`sed -i`/`tee`/`cp`/`mv`/`dd`/
+//   `truncate`）时才继续判定，且该路径 token 须 resolve 到 BOARDS_DIR 下才算触碰**真板**（与 Write/Edit 分
+//   支的 pathIsBoard() 语义对齐——scratch 假板 / 文档示例 / /tmp 下的同名文件不算，见 segmentTouchesRealBoard；
+//   token 含变量展开〔`$B` 这类〕字面不可判定，保守偏拦不猜），且写 board 的 shell command segment 本身是
+//   `ccm ...` 调用才放行（别拦 ccm 自己去写 board）。注释里 / echo 内容里的 `ccm` 不算。漏网的 Bash 手改由
+//   PostToolUse board-lint 事后兜（软提示）——PreToolUse guard 挡结构化 Write/Edit（可靠）+ 明显的 Bash 写
+//   （启发式）。
 
 const path = require('path');
 const { resolveHome, boardsDir, isArmed, directive, runHook } = require('./hook-common.js');
@@ -75,6 +78,25 @@ function pathIsBoard(filePath) {
 const WRITE_OP_RE =
   />>?|(^|\s)sed\s+[^|]*-i|(^|\s)tee(\s|$)|(^|\s)cp(\s|$)|(^|\s)mv(\s|$)|(^|\s)dd(\s|$)|(^|\s)truncate(\s|$)/;
 const BOARD_PATH_RE = /\.board\.json/;
+
+// BOARD_TOKEN_RE — 从一个 command segment 里抓取形似路径的 token（含 `.board.json` 的非空白串，允许
+//   包一层引号）。best-effort：不做完整 shell 词法分析，只按空白/引号切。
+const BOARD_TOKEN_RE = /["']?[^\s"']*\.board\.json[^\s"']*["']?/g;
+
+// segmentTouchesRealBoard(segment) → 该 segment 里含 `.board.json` 的 token 是否指向一块**真板**
+//   （落在 BOARDS_DIR 下，对齐 Write/Edit 分支的 pathIsBoard() 语义），而不是任意同名字符串（scratch
+//   假板 / 文档示例 / /tmp 下的测试夹具）。
+//   - token 含 `$`（变量展开，如 `$B/x.board.json`）→ 字面路径不可判定，**保守偏拦**：当真板处理。
+//   - 否则 path.resolve() 后过 pathIsBoard()；命中任一 token 即视为触碰真板。
+function segmentTouchesRealBoard(segment) {
+  const tokens = segment.match(BOARD_TOKEN_RE) || [];
+  for (const raw of tokens) {
+    const token = raw.replace(/^["']|["']$/g, '');
+    if (token.includes('$')) return true; // 变量展开，拿不准就保守偏拦，维持现状判定
+    if (pathIsBoard(path.resolve(token))) return true;
+  }
+  return false;
+}
 
 // stripShellComments(command) → 删除未加引号的 # 注释尾部。只做 guard 启发式需要的最小 shell 扫描：
 //   保留单/双引号内的 #，不展开转义/变量。目的是避免 `echo ... > board # ccm` 被注释里的 ccm 伪装放行。
@@ -134,13 +156,12 @@ function isCcmCommandSegment(segment) {
 function bashWritesBoard(command) {
   if (typeof command !== 'string' || !command) return false;
   if (!BOARD_PATH_RE.test(command)) return false;
-  let sawBoardWrite = false;
   for (const segment of shellSegments(command)) {
     if (!BOARD_PATH_RE.test(segment) || !WRITE_OP_RE.test(segment)) continue;
-    sawBoardWrite = true;
+    if (!segmentTouchesRealBoard(segment)) continue; // board-looking token outside BOARDS_DIR → not a real board
     if (!isCcmCommandSegment(segment)) return true;
   }
-  return sawBoardWrite ? false : WRITE_OP_RE.test(stripShellComments(command));
+  return false;
 }
 
 // body(ctx)：Gate 0 武装 → Gate 1 工具/路径判定 → deny 或静默放行。
