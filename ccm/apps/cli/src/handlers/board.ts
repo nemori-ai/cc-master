@@ -13,7 +13,8 @@
 //   · next          → runRead + analyzeGraph().readySet() → render.renderNext。
 //   · init          → runWrite + 自定义 resolve（不发现既有板而新建文件·§7：owner.active:true / session_id:""）
 //                     + mutations.boardInit（忽略 raw 直接产板）。
-//   · update        → runWrite + mutations.boardUpdate（goal / wip-limit / owner-wip / branch / worktree）。
+//   · update        → runWrite + mutations.boardUpdate（goal / wip-limit / owner-wip / branch / worktree）
+//                     + applySet/applySetJson（--set/--set-json：板级顶层 ✎ 字段正门·Finding #83）。
 //
 // 红线1 / ADR-006：node/JS only，零 npm 依赖、纯 stdlib。
 // 武装闸豁免：纯 handler 模块（无 hook 入口，只被 router 经 registry.handler 调）——见 AGENTS.md §3 / §12。
@@ -28,8 +29,17 @@ import { analyzeGraph, formatReport, isEnumMember, lintBoard } from '@ccm/engine
 import * as discover from '../discover.js';
 import * as io from '../io.js';
 import * as mutations from '../mutations.js';
+import { REGISTRY } from '../registry.js';
 import * as render from '../render.js';
-import { type BoardArg, type Ctx, resolveBoardIgnoringGoal, runRead, runWrite } from './_common.js';
+import {
+  type BoardArg,
+  buildFields,
+  type Ctx,
+  resolveBoardIgnoringGoal,
+  runRead,
+  runWrite,
+  type SetOp,
+} from './_common.js';
 
 const EXIT = io.EXIT;
 
@@ -204,11 +214,15 @@ export function init(ctx: Ctx): number {
   });
 }
 
-// ── 写 verb：update（改板级配置：goal / wip-limit / owner-wip / branch / worktree）───────────────────
+// ── 写 verb：update（改板级配置：goal / wip-limit / owner-wip / branch / worktree / --set / --set-json）──
 //   registry 的 --wip-limit / --owner-wip 是 string（无 transform）——boardUpdate 期待 number，故在此显式 coerce。
 //   坏整数（非数字）→ throw Usage（router 映射 exit 2）；不静默写非数字（否则 FMT-SCHEDULING warn）。
 //   至少给一个可识别 flag——全无 → throw Usage（设计稿 update：「至少给一个 flag」）。
+//   --set/--set-json（Finding #83）：板级顶层 ✎ flexible 字段的正门——裸 dotpath 落 board 顶层
+//   （🔒 schema/goal/owner/git/tasks 由 applySet 守门拒·exit 3）；tasks[<id>].field 前缀仍按原契约
+//   作用于该 task。非 --json 输出回显实际写入的逻辑 path（消除静默错落点）。
 export function update(ctx: Ctx): number {
+  let echoOps: SetOp[] = []; // mutate 收集 → render 回显逻辑落点
   return runWrite(ctx, {
     // --goal 在 update 是 payload（重定板 goal）而非发现过滤器——发现必须忽略它，否则 fresh-init 未认领板
     //   会被「现有 goal 含新串」滤掉 → 假 NotFound（与 --wip-limit / task add 等发现路径不一致·Finding #77）。
@@ -234,19 +248,29 @@ export function update(ctx: Ctx): number {
         }
         args.priority = v.priority;
       }
-      if (Object.keys(args).length === 0) {
+      // --set / --set-json：buildFields 只用来收集 sets/setJsons 操作列表（具名 flag 仍走上面的手动
+      //   coerce 路径，fields 忽略）。board 语境不传 defaultTaskId——裸 path 落 board 顶层（正门语义）。
+      const { sets, setJsons } = buildFields(ctx.values, REGISTRY.board?.update, {
+        stdin: ctx.stdin,
+      });
+      echoOps = [...sets, ...setJsons];
+      if (Object.keys(args).length === 0 && sets.length === 0 && setJsons.length === 0) {
         const e = new Error(
-          'board update 至少须给一个 flag（--goal / --wip-limit / --owner-wip / --branch / --worktree / --priority）',
+          'board update 至少须给一个 flag（--goal / --wip-limit / --owner-wip / --branch / --worktree / --priority / --set / --set-json）',
         ) as KindedError;
         e.errKind = 'Usage';
         throw e;
       }
       // args 是动态拼的 Record<string,unknown>（与原 JS 同形）；boardUpdate 期望窄入参对象——
       //   窄断言搬运（不改逻辑：键名/coerce 已对齐其 {goal,wipLimit,ownerWip,branch,worktree}）。
-      return mutations.boardUpdate(
+      let next = mutations.boardUpdate(
         board as BoardArg,
         args as Parameters<typeof mutations.boardUpdate>[1],
       );
+      // 🔒 board 顶层（schema/goal/owner/git/tasks）由 applySet 守门拒（Validation 冒泡 → exit 3）。
+      for (const op of sets) next = mutations.applySet(next, op.path, op.value);
+      for (const op of setJsons) next = mutations.applySetJson(next, op.path, op.value);
+      return next;
     },
     render: (board, c, { dryRun }) => {
       const b = board as {
@@ -263,7 +287,9 @@ export function update(ctx: Ctx): number {
         `wip_limit=${sc.wip_limit !== undefined ? sc.wip_limit : '-'}`,
         `priority=${co.priority !== undefined ? co.priority : '-'}`,
       ];
-      return `${prefix}: ${parts.join('  ')}`;
+      // --set/--set-json 落点回显：逻辑 path（board 语境无 defaultTaskId·裸 path 即顶层）。
+      const setEcho = echoOps.map((op) => `\n  set ${mutations.logicalSetPath(op.path)}`).join('');
+      return `${prefix}: ${parts.join('  ')}${setEcho}`;
     },
   });
 }

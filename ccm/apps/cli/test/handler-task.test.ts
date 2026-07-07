@@ -301,6 +301,75 @@ test('task update --artifact + --verified together on a done+unverified task suc
   assert.equal(t.artifact, '/abs/out.md');
 });
 
+// ── Finding #83：task verb 的 --set/--set-json 裸 dotpath scope 到该 task + 落点回显 ──────────────────
+test('task update --set bare dotpath lands on THAT task (not board top-level) + echoes logical path', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, { values: { set: ['hitl_rounds=2'] }, positionals: ['T2'] });
+  const code = taskHandler.update(ctx);
+  assert.equal(code, EXIT.OK);
+  const board = readBoard(boardPath);
+  assert.equal(findTask(board, 'T2').hitl_rounds, '2', '值落在 T2 上');
+  assert.equal(board.hitl_rounds, undefined, 'board 顶层不被污染');
+  assert.ok(
+    ctx.outBuf.join('').includes('set tasks[T2].hitl_rounds'),
+    `render 回显实际写入的逻辑 path，got: ${ctx.outBuf.join('')}`,
+  );
+});
+
+test('task update --set-json bare decision_package lands on the task (Finding #83 repro)', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, {
+    values: { 'set-json': ['decision_package={"question":"merge?"}'] },
+    positionals: ['T2'],
+  });
+  const code = taskHandler.update(ctx);
+  assert.equal(code, EXIT.OK);
+  const board = readBoard(boardPath);
+  assert.deepEqual(findTask(board, 'T2').decision_package, { question: 'merge?' });
+  assert.equal(board.decision_package, undefined, 'board 根不再被静默污染');
+  assert.ok(ctx.outBuf.join('').includes('set tasks[T2].decision_package'), '回显逻辑落点');
+});
+
+test('task update --set with explicit tasks[<其它id>].field prefix still targets that task (逃生口)', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, {
+    values: { set: ['tasks[T1].hitl_rounds=9'] },
+    positionals: ['T2'],
+  });
+  const code = taskHandler.update(ctx);
+  assert.equal(code, EXIT.OK);
+  const board = readBoard(boardPath);
+  assert.equal(findTask(board, 'T1').hitl_rounds, '9', '显式前缀写 T1');
+  assert.equal(findTask(board, 'T2').hitl_rounds, undefined, 'T2 不受影响');
+  assert.ok(ctx.outBuf.join('').includes('set tasks[T1].hitl_rounds'), '回显显式目标');
+});
+
+test('task update --set status=done is now REFUSED by 🔒 gate (no more silent board-top junk)', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const before = readFileSync(boardPath, 'utf8');
+  const ctx = mkCtx(boardPath, { values: { set: ['status=done'] }, positionals: ['T2'] });
+  assert.throws(
+    () => taskHandler.update(ctx),
+    (e: { errKind?: string }) => e.errKind === 'Validation',
+    '裸 status 在 task 语境命中 LB_TASK 守门（曾静默写 board 顶层 junk + exit 0）',
+  );
+  assert.equal(readFileSync(boardPath, 'utf8'), before, 'board 未被改');
+});
+
+test('task add --set bare dotpath lands on the NEW task', () => {
+  const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
+  const ctx = mkCtx(boardPath, {
+    values: { title: '新任务', set: ['hitl_rounds=1'] },
+    positionals: ['T9'],
+  });
+  const code = taskHandler.add(ctx);
+  assert.equal(code, EXIT.OK);
+  const board = readBoard(boardPath);
+  assert.equal(findTask(board, 'T9').hitl_rounds, '1');
+  assert.equal(board.hitl_rounds, undefined);
+  assert.ok(ctx.outBuf.join('').includes('set tasks[T9].hitl_rounds'), '回显逻辑落点');
+});
+
 // ══ task start / done ════════════════════════════════════════════════════════════════════════════
 test('task start transitions ready→in_flight and stamps started_at', () => {
   const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
