@@ -149,6 +149,14 @@ function system(message) {
   process.stdout.write(`${JSON.stringify({ kind: 'system', message })}\n`);
 }
 
+// PARITY: rule-identity-nudge-tag-protocol — ADR-018 标签协议在 codex 侧的本地等价包装（无共享 hook-common
+// 可 require，故本文件本地复刻；与 claude-code identity-nudge.js 的 advisory('identity-nudge'|'critpath-nudge',
+// 'weak', body) 语义一致——两条周期提示都是 weak advisory：可合理忽略，但默认应顺手权衡）。
+function advisory(source, strength, body) {
+  const s = strength === 'strong' ? 'strong' : 'weak';
+  return `<advisory source="${source}" strength="${s}">\n${String(body)}\n</advisory>`;
+}
+
 function main() {
   const payload = readJson();
   if (payload.event !== 'stop') return;
@@ -165,13 +173,13 @@ function main() {
 
   if (due(board, 'last_identity_remind', nowMs, intervalSec(process.env.CC_MASTER_IDNUDGE_INTERVAL_SEC, DEFAULT_IDENTITY_INTERVAL_SEC))) {
     if (setParam(home, boardPath, 'last_identity_remind', nowIso)) {
-      messages.push(IDENTITY_TEXT);
+      messages.push(advisory('identity-nudge', 'weak', IDENTITY_TEXT));
     }
   }
   if (due(board, 'last_critpath_remind', nowMs, intervalSec(process.env.CC_MASTER_CRITPATH_INTERVAL_SEC, DEFAULT_CRITPATH_INTERVAL_SEC))) {
     if (setParam(home, boardPath, 'last_critpath_remind', nowIso)) {
       const text = critpathText(board, boardPath, home);
-      if (text) messages.push(text);
+      if (text) messages.push(advisory('critpath-nudge', 'weak', text));
     }
   }
   if (messages.length > 0) system(messages.join('\n'));

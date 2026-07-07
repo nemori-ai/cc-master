@@ -48,6 +48,7 @@ const DENY_BODY = [
 
 // denyPayload() → { raw }：PreToolUse deny envelope（body 自控整段 payload·runHook 原样写）。
 //   permissionDecision:"deny" 硬阻断该工具调用；reason 包成 <directive source="board-guard">（含 why+fix）。
+// PARITY: rule-board-guard-directive-tag
 function denyPayload() {
   return {
     raw:
@@ -88,6 +89,7 @@ const BOARD_TOKEN_RE = /["']?[^\s"']*\.board\.json[^\s"']*["']?/g;
 //   假板 / 文档示例 / /tmp 下的测试夹具）。
 //   - token 含 `$`（变量展开，如 `$B/x.board.json`）→ 字面路径不可判定，**保守偏拦**：当真板处理。
 //   - 否则 path.resolve() 后过 pathIsBoard()；命中任一 token 即视为触碰真板。
+// PARITY: rule-board-guard-segment-touches-real-board
 function segmentTouchesRealBoard(segment) {
   const tokens = segment.match(BOARD_TOKEN_RE) || [];
   for (const raw of tokens) {

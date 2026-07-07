@@ -105,6 +105,7 @@ function lintViaCcm(filePath) {
   return { report, hasHard };
 }
 
+// PARITY: rule-board-lint-tag-protocol
 function advisory(strength, body) {
   return `<advisory source="board-lint" strength="${strength === 'strong' ? 'strong' : 'weak'}">\n${body}\n</advisory>`;
 }

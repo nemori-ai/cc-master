@@ -113,6 +113,43 @@ function isArmed(homeDir, sid) {
 // jsonEscape(str) → 安全注入进 JSON 字符串字面量的转义（hook 输出 additionalContext 用）。
 function jsonEscape(str) { return JSON.stringify(String(str)); }
 
+// ── 归一化桥接（HOOKPAR-DEC·ADR-028）───────────────────────────────────────────────────────────────
+// eventSlug(name) → kebab-case 事件名（与 codex `_hosts/codex/launcher.js` 的 eventName() 同映射表），
+//   让两端 fixture 能用同一个「host-neutral 归一化 payload」形状做行为级 parity test。纯字符串映射，
+//   不改变任何既有 hook body 的判定输入——仅新增只读派生视图。
+const EVENT_SLUG = {
+  UserPromptSubmit: 'user-prompt-submit',
+  SessionStart: 'session-start',
+  PreToolUse: 'pre-tool-use',
+  PostToolUse: 'post-tool-use',
+  PostToolBatch: 'post-tool-batch',
+  Stop: 'stop',
+  SubagentStart: 'subagent-start',
+  SubagentStop: 'subagent-stop',
+};
+function eventSlug(name) {
+  const v = String(name || '');
+  if (EVENT_SLUG[v]) return EVENT_SLUG[v];
+  return v.replace(/([a-z0-9])([A-Z])/g, '$1-$2').replace(/_/g, '-').toLowerCase();
+}
+
+// normalizePayload(ctx, eventName) → host-neutral normalized payload，字段形状与 codex launcher.js 的
+//   normalize() 输出对齐（harness/event/session/tool/raw），供 parity fixture 与结构级测试比对用。
+//   **纯附加视图**：不替换 ctx 既有字段（raw/obj/sid/toolName/filePath），各 hook body 的判定逻辑
+//   一律仍读原字段，零业务行为变化——这是「收敛在 runHook harness 单点」的归一化桥接落点（HOOKPAR-DEC）。
+function normalizePayload(ctx, eventName) {
+  const out = {
+    harness: 'claude-code',
+    event: eventSlug(eventName),
+    session: { id: ctx.sid || '', role: 'unknown' },
+    raw: ctx.obj || {},
+  };
+  if (ctx.toolName) {
+    out.tool = { name: ctx.toolName, input: (ctx.obj && ctx.obj.tool_input) || {} };
+  }
+  return out;
+}
+
 // ── ADR-018 hook→agent 标签化消息协议（作者侧 SSOT·AGENTS.md §13）──────────────────────────────────
 // 所有 hook 往 agent context 注入的 transient 文本都按三类标签写（reinject/bootstrap 的角色 substrate 豁免，
 //   见 ADR-018 §2.5）。三类固定对应三个标签；`strength`（weak|strong）**只给 advisory**（ambient 恒低 /
@@ -175,6 +212,9 @@ function runHook(spec) {
     const { obj, sid, toolName, filePath } = parseStdin(raw);
     const homeDir = resolveHome();
     const ctx = { raw, obj, sid, toolName, filePath, homeDir, boards: [] };
+    // 归一化桥接（附加只读字段·HOOKPAR-DEC）：body 可选读 ctx.normalized 做 parity 对拍；不使用它的既有
+    // body 行为字节级不变（这就是「零业务行为变化」的证据——production body 全部继续读 raw/obj/sid/toolName/filePath）。
+    ctx.normalized = normalizePayload(ctx, typeof sp.event === 'function' ? sp.event(ctx) : sp.event);
 
     // preGate：武装之前的早退（sub-agent / stop_hook_active 重入须先于武装静默）。
     if (typeof sp.preGate === 'function' && sp.preGate(ctx)) return;
@@ -290,4 +330,5 @@ module.exports = {
   claudeConfigDir, resolveHome, boardsDir, readStdin, parseStdin, boardMatches, listMatchingBoards, isArmed, jsonEscape,
   ambient, advisory, directive, runHook,
   parseIsoMs, isoNow, spawnCcmSetParam, periodicNudge,
+  eventSlug, normalizePayload,
 };

@@ -2,6 +2,86 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
+
+// CCM_BIN：dev/test/自定义安装的覆写口（绝对路径可执行）；缺则用 PATH 上的 `ccm`（生产）。
+const CCM_BIN = process.env.CCM_BIN || 'ccm';
+
+// PARITY: rule-verify-board-tag-protocol — ADR-018 标签协议在 codex 侧的本地等价包装（无共享 hook-common
+// 可 require，故本文件本地复刻，与 claude-code verify-board.js 的 directive/advisory 语义一致）。
+function directive(source, body) {
+  return `<directive source="${source}">\n${String(body)}\n</directive>`;
+}
+function advisory(source, strength, body) {
+  const s = strength === 'strong' ? 'strong' : 'weak';
+  return `<advisory source="${source}" strength="${s}">\n${String(body)}\n</advisory>`;
+}
+
+// PARITY: rule-verify-board-fuse — 防死循环保险丝（HOOKPAR-DEC 分叉修复：codex 侧此前完全缺失，见
+// design_docs/plans/2026-07-07-hook-parity-system.md §2.4）。与 claude-code verify-board.js 语义一致：
+// 会话级（非按完成态指纹）连续 block 计数，达阈值即强制放行 + strong advisory 警告、并清零计数。
+// 与 claude-code 的差异（已声明·protocol-capability-gap）：claude 侧另有 fingerprint dedup（同一完成态
+// 只握手一次）；codex 侧的等价机制是显式 `runtime.stop_allow_until` 释放阀（stopAllowed()），FUSE 是叠加
+// 在其上的独立安全网，两端语义不要求逐字节相同，只要求「不会无限期卡住整个 session」这一目标都达成。
+const FUSE = 5;
+function fuseSidecarPath(home, sessionId) {
+  const name = sessionId ? `.codex-${sessionId}.stopfuse` : '.codex-nosession.stopfuse';
+  return path.join(home, name);
+}
+function readFuseStreak(scPath) {
+  try {
+    const raw = fs.readFileSync(scPath, 'utf8').trim();
+    return /^[0-9]+$/.test(raw) ? parseInt(raw, 10) : 0;
+  } catch {
+    return 0;
+  }
+}
+function writeFuseStreak(scPath, n) {
+  try {
+    const tmp = `${scPath}.tmp.${process.pid}`;
+    fs.writeFileSync(tmp, String(n));
+    fs.renameSync(tmp, scPath);
+  } catch {
+    /* best-effort sidecar write; failure just means fuse won't advance this round */
+  }
+}
+function clearFuseStreak(scPath) {
+  try {
+    fs.unlinkSync(scPath);
+  } catch {
+    /* not present is fine */
+  }
+}
+
+// rollupOwnersViaCcm(boardPath) → Set<ownerId> | null。PARITY: rule-verify-board-rollup-check（HOOKPAR-DEC
+// 分叉修复：codex 侧此前完全缺失，见 §2.2）。与 claude-code verify-board.js 的 rollupOwnersViaCcm 同语义：
+// spawn `ccm board lint --board <path> --json`，取 GRAPH-ROLLUP violations 的 owner 集；ccm 不可用/非 JSON/
+// 形状不符 → null（调用方跳过本板 rollup part，其余 Stop gate 逻辑照走·优雅降级）。
+function rollupOwnersViaCcm(boardPath) {
+  let r;
+  try {
+    r = spawnSync(CCM_BIN, ['board', 'lint', '--board', boardPath, '--json'], {
+      encoding: 'utf8',
+      timeout: 15000,
+    });
+  } catch {
+    return null;
+  }
+  if (!r || r.error || r.signal) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(typeof r.stdout === 'string' ? r.stdout : '');
+  } catch {
+    return null;
+  }
+  const data = parsed && typeof parsed === 'object' ? parsed.data : null;
+  if (!data || typeof data !== 'object' || !Array.isArray(data.violations)) return null;
+  const owners = new Set();
+  for (const v of data.violations) {
+    if (v && v.rule === 'GRAPH-ROLLUP' && typeof v.task === 'string' && v.task !== '') owners.add(v.task);
+  }
+  return owners;
+}
 
 function readJson() {
   const raw = fs.readFileSync(0, 'utf8');
@@ -58,7 +138,7 @@ function system(message) {
 }
 
 function block(message) {
-  process.stdout.write(`${JSON.stringify({ kind: 'block', message })}\n`);
+  process.stdout.write(`${JSON.stringify({ kind: 'block', message: directive('verify-board', message) })}\n`);
 }
 
 function nowIso() {
@@ -114,9 +194,42 @@ function main() {
     if (ready.length === 0 && uncertain.length === 0 && userBlocked.length === 0 && inFlight.length === 0) {
       notes.push(`${name} [${goal}]: before stopping, self-check against the original goal and confirm no missing task remains outside the board. ${hint}.`);
     }
+
+    // PARITY: rule-verify-board-rollup-check — owner done 而 child 未 done 的 rollup 不一致（SOFT 提醒，
+    // 与 claude-code verify-board.js 同语义）。ccm 不可用 → 跳过本板 rollup part（优雅降级，其余 notes 照写）。
+    const flaggedOwners = rollupOwnersViaCcm(boardPath);
+    if (flaggedOwners !== null) {
+      const rollupParts = [];
+      for (const t of tasks) {
+        const parent = typeof t.parent === 'string' ? t.parent : '';
+        if (!parent || !flaggedOwners.has(parent)) continue;
+        const childStatus = typeof t.status === 'string' ? t.status : '';
+        if (childStatus === 'done') continue;
+        rollupParts.push(`owner ${parent} is \`done\` but child ${t.id} is \`${childStatus}\``);
+      }
+      if (rollupParts.length) {
+        notes.push(`${name} [${goal}]: rollup inconsistency (${rollupParts.join('; ')}): a parent (owner) node should NOT be \`done\` while a child under its \`parent\` is still unfinished. ${hint}.`);
+      }
+    }
   }
 
-  if (notes.length === 0) return;
+  if (notes.length === 0) {
+    clearFuseStreak(fuseSidecarPath(home, sessionId));
+    return;
+  }
+
+  // PARITY: rule-verify-board-fuse — 会话级连续 block 计数；达阈值强制放行 + strong advisory（不是 block），
+  // 防止 Stop 门在判定持续为「需继续」时无限期卡住整个 session（与 claude-code verify-board.js 的 FUSE 同目标）。
+  const fusePath = fuseSidecarPath(home, sessionId);
+  const streak = readFuseStreak(fusePath) + 1;
+  if (streak >= FUSE) {
+    clearFuseStreak(fusePath);
+    const warn = `cc-master: fuse tripped — blocked ${streak} times in a row. Releasing the stop. ` +
+      'If you are stuck, check the board for a task that cannot actually proceed (mark it `blocked`/`escalated`) before continuing.';
+    system(advisory('verify-board', 'strong', warn));
+    return;
+  }
+  writeFuseStreak(fusePath, streak);
   block(`cc-master Codex Stop continuation required:\n${notes.join('\n')}`);
 }
 

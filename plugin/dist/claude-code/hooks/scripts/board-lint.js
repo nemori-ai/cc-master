@@ -197,6 +197,7 @@ function body(ctx) {
   //   decision:block：PostToolUse 编辑已落盘撤不回）。strength 按 stakes 分档（P4）：含 hard error（结构破·
   //   会让 viewer 挂 / resume 读垃圾）→ strong（默认应去修）；纯 warn → weak（顺手权衡）。source=board-lint。
   //   report 文案是 ccm 引擎权威 SSOT，本 hook 只套标签外壳、不改文案。
+  // PARITY: rule-board-lint-tag-protocol
   const wrapped = advisory('board-lint', outcome.hasHard ? 'strong' : 'weak', report);
 
   // 非阻断注入：仅 additionalContext，hookEventName "PostToolUse"。绝不 decision:block。
