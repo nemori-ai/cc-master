@@ -82,7 +82,7 @@
 
 | type | 触发的 BIZ 规则 |
 |---|---|
-| `development` | 必须有 `acceptance` + references 含 `spec`≥1 和 `plan`≥1 |
+| `development` | 必须有 `acceptance`（warn）+ references 含 `spec`≥1 和 `plan`≥1（**hard**，缺则拒写，`--force` 可越——`BIZ-DEV-REFS`） |
 | `development-demo` | 必须有 `acceptance` |
 | `acceptance` | 必须有 `acceptance` |
 | `e2e-integration` | 必须有 `acceptance` |
@@ -615,7 +615,7 @@ ccm task add T3 \
 
 `kind=issue` 的 URL 是 tracking anchor。它让 orchestrator 能回到同一个 GitHub issue / ticket 看外部进度、评论、链接出的 PR；它本身不是 artifact，也不是 done 证据。
 
-**lint 强制（BIZ-DEV-REFS）：** `type=development` 的 task 必须有 `kind=spec`≥1 且 `kind=plan`≥1。缺失是 warn（不 hard fail），但执行者拿到一个没有 spec/plan 链接的 development task，很可能就只是蒙着头开始做，而不是基于设计文档。
+**lint 强制（BIZ-DEV-REFS·hard）：** `type=development` 的 task 必须有 `kind=spec`≥1 且 `kind=plan`≥1。缺失会**拒绝落盘**（`exit 3`，`--force` 可越）——执行者不该拿到一个没有 spec/plan 链接的 development task 就蒙着头开始做，而不是基于设计文档。修法：`ccm task update <id> --add-ref spec:/abs/spec.md --add-ref plan:/abs/plan.md`。
 
 **ref 的格式约束（FMT-REF·hard error）：** `ref` 值必须是绝对路径（`/abs/path`）或 URL（`http(s)://...`）。**禁止相对路径**（如 `./docs/spec.md`），因为 board 会跟随编排 home 移动，相对路径解析基准会漂移。
 
@@ -842,7 +842,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `BIZ-ESTIMATE-STALE` | warn | 实测 duration 与 estimate 明显漂移，提示下游重估 | 用新的实测反馈重估未开始下游，必要时重开 baseline / replan |
 | `BIZ-STATUS-DEPS` | warn | deps 门控不一致：`ready` 但 deps 未全 done / `blocked` 无 `blocked_on` 但 deps 全 done | **CLI 写路径经 `reconcileGating` 永不产生此态**——看到它多半是手改 board；跑任意 ccm 写命令触发归一，或 `task unblock`/`set-status` 手动对齐——见 [B 节](#ready--blocked-由系统按-deps-自动门控) |
 | `BIZ-DECISION-PACKAGE` | warn | `decision_package` 在但字段不全：`context_md`/`what_i_need`/`enter_cmd` 空、`ask_type` 不在枚举、decision 型 `options` 空、`inputs_hash` 非 `sha256:<64hex>` | 备齐采访包字段；decision 型必须有非空 options——见 [G 节](#g-blocked_on-怎么选) |
-| `BIZ-DEV-REFS` | warn | `type=development` 的 task 缺 `kind=spec`≥1 或 `kind=plan`≥1 引用 | development task 加 `--ref spec:/abs/spec.md --ref plan:/abs/plan.md`——见 [L 节](#l-referencesartifactverified-语义) |
+| `BIZ-DEV-REFS` | **hard** | `type=development` 的 task 缺 `kind=spec`≥1 或 `kind=plan`≥1 引用 | development task 加 `--ref spec:/abs/spec.md --ref plan:/abs/plan.md`（`task add`）或 `--add-ref`（`task update`）；`--force` 可越——见 [L 节](#l-referencesartifactverified-语义) |
 | `BIZ-ACCEPTANCE-REQUIRED` | warn | type ∈ {development, development-demo, acceptance, e2e-integration} 但 `acceptance` 为空 | 这些 type 必须带 `--accept`——见 [D 节](#d-acceptance-怎么写好) |
 | `BIZ-EXECUTOR-HANDLE` | warn | `executor` ∈ {subagent, workflow} 但缺 `handle` | 派发后 `task update --handle <后台句柄>`；resume 靠它接驳——见 [C 节](#c-executor-五种语义--选择决策树) |
 | `BIZ-EXTERNAL-ISSUE` | warn | `executor=external` 但缺 `kind=issue` 引用 | external task 加 `--ref issue:https://github.com/o/r/issues/N` 做外部追踪锚点 |

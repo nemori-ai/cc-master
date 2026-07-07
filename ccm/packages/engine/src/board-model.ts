@@ -321,7 +321,7 @@ export const FIELDS = {
       writers: 'agent 经 CLI',
       when: '建 dev 类 task',
       degrade:
-        'ref 相对路径→hard(FMT-REF);type=development 缺 spec/plan→warn(BIZ-DEV-REFS);executor=external 缺 issue→warn(BIZ-EXTERNAL-ISSUE)',
+        'ref 相对路径→hard(FMT-REF);type=development 缺 spec/plan→hard(BIZ-DEV-REFS，--force 可越);executor=external 缺 issue→warn(BIZ-EXTERNAL-ISSUE)',
     },
     created_at: {
       tier: '✎',
@@ -750,7 +750,7 @@ export const INVARIANTS: Invariant[] = [
     scope: 'graph',
     summary: '任务图弱连通(deps 当无向边·分量>1=有孤岛子图·目标聚焦·容多分量·warn)',
   },
-  // ── BIZ 条件业务规则(warn·两条 hard) ────────────────────────────────────────────────────────────
+  // ── BIZ 条件业务规则(warn·四条 hard：BIZ-AWAITING/BIZ-CADENCE-SHIPPED/BIZ-DONE-VERIFIED/BIZ-DEV-REFS) ──
   {
     id: 'BIZ-AWAITING',
     level: 'hard',
@@ -768,10 +768,11 @@ export const INVARIANTS: Invariant[] = [
   },
   {
     id: 'BIZ-DEV-REFS',
-    level: 'warn',
+    level: 'hard',
     family: 'BIZ',
     scope: 'task',
-    summary: 'type=development ⇒ references 含 kind=spec≥1 且 kind=plan≥1',
+    summary:
+      'type=development ⇒ references 含 kind=spec≥1 且 kind=plan≥1（无锚点即拒写·--force 可越）',
   },
   {
     id: 'BIZ-ACCEPTANCE-REQUIRED',

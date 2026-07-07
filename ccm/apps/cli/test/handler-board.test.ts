@@ -117,6 +117,9 @@ function mkCtx({
 }
 
 // 一个 ready task 工厂（deps 空 + status ready → 进 readySet）。
+//   默认 type='development' 需要 spec/plan 引用锚点才 lint-clean（BIZ-DEV-REFS 已 C1 hard 化）——
+//   工厂默认带一对 spec/plan references，除非调用方显式覆写 references（如改 type 为非 development 的
+//   测试用例不需要它们，多余的 spec/plan ref 对非 development task 也无害，lint 只在 type=development 时判）。
 function task(id: string, over: Record<string, unknown> = {}): Record<string, unknown> {
   const out: Record<string, unknown> = {
     id,
@@ -126,6 +129,10 @@ function task(id: string, over: Record<string, unknown> = {}): Record<string, un
     executor: 'subagent',
     handle: 'h',
     title: `task ${id}`,
+    references: [
+      { kind: 'spec', ref: '/abs/spec.md' },
+      { kind: 'plan', ref: '/abs/plan.md' },
+    ],
     ...over,
   };
   if (out.status === 'done') {

@@ -249,7 +249,20 @@ test('task add → 0 + 板含该 task；start → done 状态机走通', () => {
   const { home } = mkHome();
   const boardPath = seedBoard(home, { goal: 'write path' });
 
-  const add = runCcm(['task', 'add', 'T1', '--type', 'development'], { home });
+  const add = runCcm(
+    [
+      'task',
+      'add',
+      'T1',
+      '--type',
+      'development',
+      '--ref',
+      'spec:/abs/spec.md',
+      '--ref',
+      'plan:/abs/plan.md',
+    ],
+    { home },
+  );
   assert.equal(add.status, 0, `add stderr=${add.stderr}`);
   let b = readBoard(boardPath);
   assert.ok(
@@ -316,7 +329,9 @@ test('task rm 非 TTY 缺 --yes → 2（USAGE·破坏性须确认）', () => {
 test('--dry-run 不落盘（add 后板仍无该 task）', () => {
   const { home } = mkHome();
   const boardPath = seedBoard(home);
-  const r = runCcm(['task', 'add', 'TDRY', '--type', 'development', '--dry-run'], { home });
+  // type 用 'design'（非 BIZ-DEV-REFS 判据 type=development）——本测试只关心 dry-run 不落盘语义，
+  //   不想在此顺带撞 development 缺 spec/plan 锚点的 hard 拒绝（该场景另有专测·见下方 C1 hard 化测试）。
+  const r = runCcm(['task', 'add', 'TDRY', '--type', 'design', '--dry-run'], { home });
   assert.equal(r.status, 0, `dry-run stderr=${r.stderr}`);
   const b = readBoard(boardPath);
   assert.ok(
@@ -502,11 +517,92 @@ test('--board 显式注入越过发现（sid 不匹配也能读）→ 0', () => 
 test('写命令的 lint warning 进 stderr，确认/数据进 stdout（分道）', () => {
   const { home } = mkHome();
   seedBoard(home);
-  // development task 无 spec/plan ref → BIZ-DEV-REFS warn（进 stderr）；确认进 stdout。
-  const r = runCcm(['task', 'add', 'TW', '--type', 'development'], { home });
-  assert.equal(r.status, 0);
+  // type=acceptance 缺 acceptance 字段 → BIZ-ACCEPTANCE-REQUIRED warn（仍 warn，不挡写；进 stderr）；
+  //   确认进 stdout。（BIZ-DEV-REFS 已被 C1 hard 化，不再适合当"warn 不挡写"的示例——见下方专测。）
+  const r = runCcm(['task', 'add', 'TW', '--type', 'acceptance'], { home });
+  assert.equal(r.status, 0, `add stderr=${r.stderr}`);
   assert.match(r.stdout, /TW/, 'confirmation on stdout');
-  assert.match(r.stderr, /warn|BIZ-DEV-REFS/i, 'lint warning on stderr');
+  assert.match(r.stderr, /warn|BIZ-ACCEPTANCE-REQUIRED/i, 'lint warning on stderr');
+});
+
+// ── C1（issue57-sk ADR-019 §14）：BIZ-DEV-REFS 由 warn 升级为 hard —— development task 缺 spec/plan
+//   锚点被拒写（exit 3），--force 可越（越过后仍落盘、仍报 warning/error 摘要供参考）。
+test('development task 缺 spec/plan ref 被拒写（BIZ-DEV-REFS hard），--force 可越', () => {
+  const { home } = mkHome();
+  const boardPath = seedBoard(home);
+  const denied = runCcm(['task', 'add', 'TDEV', '--type', 'development'], { home });
+  assert.equal(denied.status, 3, `expected VALIDATION(3); stderr=${denied.stderr}`);
+  assert.match(denied.stderr, /BIZ-DEV-REFS/);
+  let b = readBoard(boardPath);
+  assert.ok(
+    !(b.tasks || []).some((t: { id: string }) => t.id === 'TDEV'),
+    'denied write must not persist',
+  );
+
+  const forced = runCcm(['task', 'add', 'TDEV', '--type', 'development', '--force'], { home });
+  assert.equal(forced.status, 0, `--force should cross the hard gate; stderr=${forced.stderr}`);
+  b = readBoard(boardPath);
+  assert.ok(
+    (b.tasks || []).some((t: { id: string }) => t.id === 'TDEV'),
+    '--force write should persist',
+  );
+
+  // 补齐 spec/plan 锚点后不再需要 --force。
+  const withRefs = runCcm(
+    ['task', 'update', 'TDEV', '--add-ref', 'spec:/abs/spec.md', '--add-ref', 'plan:/abs/plan.md'],
+    { home },
+  );
+  assert.equal(withRefs.status, 0, `stderr=${withRefs.stderr}`);
+});
+
+// ── issue #57 问题3 方案3：批量回填死结 —— 逐条独立调用仍会撞死结（保留旧行为佐证问题真实存在），
+//   一次性批量调用（多个 positional id）根治它（design_docs/plans/2026-07-07-ccm-batch-verb-spec.md）。
+test('批量回填死结：逐条 done 各自撞见"其它 id 仍未合规"（3），一次性批量 done 全部落盘（0）', () => {
+  const { home } = mkHome();
+  // 模拟 issue #57 描述的"批量回填"存量违规场景：N1/N2/N3 都已是 status:done 但缺 verified/artifact
+  // （BIZ-DONE-VERIFIED hard error）——done→done 是幂等合法转移（无须 --force），只是缺 true-done 证据。
+  const boardPath = seedBoard(home, {
+    tasks: [
+      { id: 'N1', status: 'done', deps: [], created_at: '2026-06-24T08:00:00Z' },
+      { id: 'N2', status: 'done', deps: [], created_at: '2026-06-24T08:00:00Z' },
+      { id: 'N3', status: 'done', deps: [], created_at: '2026-06-24T08:00:00Z' },
+    ],
+  });
+
+  // 逐条独立调用：第一条把 N1 自己补齐 verified/artifact 合规了，但 N2/N3 仍缺证据——
+  //   全板 lint 因 N2/N3 的存量违规而拒绝整体写入，N1 的修复也不落盘（死结复现）。
+  const r1 = runCcm(['task', 'done', 'N1', '--verified', '--artifact', '/abs/out.md'], { home });
+  assert.equal(
+    r1.status,
+    3,
+    `expected VALIDATION(3) due to N2/N3 still non-compliant; stderr=${r1.stderr}`,
+  );
+  let b = readBoard(boardPath);
+  assert.equal(
+    b.tasks.find((t: { id: string }) => t.id === 'N1').verified,
+    undefined,
+    'N1 fix did NOT persist (death spiral)',
+  );
+
+  // 一次性批量调用：三个 id 一起带过 → 一次 mutate + 一次 lint + 一次落盘，全部合规、全部生效。
+  const rBatch = runCcm(
+    ['task', 'done', 'N1', 'N2', 'N3', '--verified', '--artifact', '/abs/out.md'],
+    { home },
+  );
+  assert.equal(rBatch.status, 0, `batch done stderr=${rBatch.stderr}`);
+  b = readBoard(boardPath);
+  for (const id of ['N1', 'N2', 'N3']) {
+    const t = b.tasks.find((x: { id: string }) => x.id === id);
+    assert.equal(t.status, 'done', `${id} should be done after batch`);
+    assert.equal(t.verified, true);
+    assert.equal(t.artifact, '/abs/out.md');
+  }
+  const lintAfter = runCcm(['board', 'lint'], { home });
+  assert.equal(
+    lintAfter.status,
+    0,
+    `board should be lint-clean after batch; stderr=${lintAfter.stderr}`,
+  );
 });
 
 test('task block --on user 经 stdin 喂 decision_package（-）', () => {

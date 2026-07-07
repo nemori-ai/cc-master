@@ -89,6 +89,37 @@ export function add(ctx: Ctx): number {
   });
 }
 
+// ── task update 的 --artifact 提前诊断（issue #57 问题2·体验性提前诊断，不替代 lint 校验权威）───────────
+//   目标 task 已是 status:"done" 且 verified 非 true 时，单独设 --artifact（不带 --verified）必然无法让它
+//   满足 done 真语义（BIZ-DONE-VERIFIED：verified===true 且 artifact 非空缺一不可）——mutate 后 lintBoard
+//   仍会因 verified 仍非 true 而 hard 拒、整条写入不落盘（exit 3），但那份诊断要绕一圈到全板 lint report
+//   才现形，容易被读成「静默忽略」。这里提前侦测这个必然失败的字段组合，直接给一个指路更直达的 Usage 错误
+//   （exit 2）——**不改变最终会不会失败**（真正的校验权威仍是 lintBoard；这只是把「为什么会失败 + 怎么修」
+//   提前说清楚，不是新增一条校验规则）。同时给了 --verified，或目标不是「已 done 且未 verified」，一律放行
+//   给 lint 去判（含目标 id 不存在——留给 updateTask 抛 NotFound）。
+function diagnoseArtifactOnlyOnAlreadyDoneTask(
+  board: BoardArg,
+  id: string,
+  fields: Record<string, unknown>,
+): void {
+  if (fields.artifact === undefined) return; // 没设 --artifact，不涉及本诊断
+  if (fields.verified !== undefined) return; // 同时给了 --verified，交给 lint 判是否已经足够
+  const b = board as { tasks?: TaskLike[] };
+  const tasks = Array.isArray(b.tasks) ? b.tasks : [];
+  const t = tasks.find((x) => x && x.id === id);
+  if (!t) return; // 目标不存在留给 updateTask 抛 NotFound
+  if (t.status === 'done' && t.verified !== true) {
+    const e = new Error(
+      `task ${id} 已是 status=done 但 verified 非 true；单独设 --artifact 不会满足 done 真语义` +
+        `（BIZ-DONE-VERIFIED 需要 verified===true 且 artifact 非空），写入会被 lint 拒绝（exit 3）。\n` +
+        `  怎么修：同时加 --verified（\`ccm task update ${id} --artifact <path-or-url> --verified\`），` +
+        `或改用 \`ccm task done ${id} --artifact <path-or-url> --verified\`。`,
+    ) as KindedError;
+    e.errKind = 'Usage';
+    throw e;
+  }
+}
+
 // ── task update ──────────────────────────────────────────────────────────────────────────────────
 //   id 必填 positional。普通字段覆写 + addDep/rmDep/addRef/rmRef（buildFields 的 field 名直接对齐 updateTask 特殊键）。
 //   目标 id 不存在 → mutations.updateTask throw NotFound（冒泡 router 映射 exit 5）。
@@ -98,6 +129,7 @@ export function update(ctx: Ctx): number {
     mutate: (board) => {
       const id = ctx.positionals[0] as string;
       const { fields, sets, setJsons } = buildFields(ctx.values, spec, { stdin: ctx.stdin });
+      diagnoseArtifactOnlyOnAlreadyDoneTask(board as BoardArg, id, fields);
       let next = mutations.updateTask(board as BoardArg, id, fields);
       next = applyOps(next, sets, setJsons);
       next = maybeLog(next, ctx, `update task ${id}`);
@@ -115,29 +147,48 @@ export function update(ctx: Ctx): number {
 }
 
 // ── task start / done：状态机语义糖（→ in_flight / → done，自动盖时间戳由 mutations.transition 管）──────────
+//   批量语义（issue #57 问题3 方案3·根治"批量回填死结"）：ctx.positionals 是**全部**非 flag token（router 层
+//   本就把它们悉数收进这个数组，registry 的单个必填 positional 声明只保证「至少一个」，不是解析上限）——
+//   这里遍历全部 id、在**同一次** mutate 回调里逐个转移 + 覆写字段，交给 runWrite 的既有管线只跑**一次**
+//   lintBoard + **一次**落盘。把 N 次独立 CLI 调用（各自一次 mutate+lint+write）坍缩成一次调用，天然规避
+//   "board 上还有其它任务的存量违规 → 每次单独调用都被全板 lint 拒绝、45 个只 1 个生效" 的死结（详见
+//   design_docs/plans/2026-07-07-ccm-batch-verb-spec.md）。--artifact/--verified 对本次调用的**每个** id
+//   一视同仁施加（批量回填典型诉求：这批 task 共享同一产物链接）。--force 对整批统一生效（既有全局语义，
+//   未新增细粒度控制）。任一 id 非法转移或不存在 → mutate() 内 throw 冒泡、runWrite 不落盘——
+//   all-or-nothing（批量里其它本来合法的 id 也不落盘，与单 id 语义一致地推广，不引入部分提交）。
+//   单 id 调用（positionals 长度 1）行为逐字不变；`--json` 输出形状从「单对象」统一为「数组」（长度恒等于
+//   传入 id 数，含单 id 情形——见 mini-spec「与 §6 锁步纪律的配套改动」一节记录的唯一形状变化）。
 function _transitionVerb(ctx: Ctx, toStatus: string, label: string): number {
-  const id = ctx.positionals[0] as string;
+  const ids = ctx.positionals as string[];
   return runWrite(ctx, {
     mutate: (board) => {
-      // done verb 还可带 --artifact / --verified（先转移盖时间戳，再覆写产物字段）。
-      let next = mutations.transition(board as BoardArg, id, toStatus, { force: ctx.flags.force });
-      if (toStatus === 'done') {
-        const fields: Record<string, unknown> = {};
-        if (ctx.values && ctx.values.artifact !== undefined) fields.artifact = ctx.values.artifact;
-        if (ctx.values && ctx.values.verified !== undefined) fields.verified = ctx.values.verified;
-        if (Object.keys(fields).length) next = mutations.updateTask(next, id, fields);
+      let next = board as BoardArg;
+      for (const id of ids) {
+        // done verb 还可带 --artifact / --verified（先转移盖时间戳，再覆写产物字段）。
+        next = mutations.transition(next, id, toStatus, { force: ctx.flags.force });
+        if (toStatus === 'done') {
+          const fields: Record<string, unknown> = {};
+          if (ctx.values && ctx.values.artifact !== undefined)
+            fields.artifact = ctx.values.artifact;
+          if (ctx.values && ctx.values.verified !== undefined)
+            fields.verified = ctx.values.verified;
+          if (Object.keys(fields).length) next = mutations.updateTask(next, id, fields);
+        }
       }
-      next = maybeLog(next, ctx, `${label} ${id}`);
+      next = maybeLog(next, ctx, `${label} ${ids.join(', ')}`);
       return next;
     },
     render: (next, c, { dryRun }) => {
       if (c.flags.json) {
-        const t = findTask(next, id);
-        return render.renderTaskDetail(t, { json: true });
+        // 完整 task JSON 数组（每元素同 renderTaskDetail 的单对象形状，不是 renderTaskList 的窄子集）——
+        //   `--json` 输出形状统一为数组（长度恒等于传入 id 数，含单 id 情形）。
+        const tasks = ids.map((id) => findTask(next, id) ?? null);
+        return render.jsonString(tasks);
       }
+      const idList = ids.join(', ');
       return dryRun
-        ? `[dry-run] 将 ${label} task: ${id} (→ ${toStatus})`
-        : `task ${id} → ${toStatus}`;
+        ? `[dry-run] 将 ${label} task: ${idList} (→ ${toStatus})`
+        : `task ${idList} → ${toStatus}`;
     },
   });
 }
