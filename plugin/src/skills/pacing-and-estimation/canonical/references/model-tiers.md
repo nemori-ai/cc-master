@@ -13,34 +13,51 @@
 | Sonnet 4.6 | `claude-sonnet-4-6` | $3 · $15 | **3×** | 平衡主力:常规实现 |
 | Haiku 4.5 | `claude-haiku-4-5` | $1 · $5 | **1×** | 快 & 便宜:机械活(跑测试 / grep / 格式化 / 改名),200K context |
 
-> **⚠️ 运行时可用性补充（2026-06，临时框——Fable 5 恢复即删本框、上表与下文不动）。** 当前账户层 **Claude Fable 5 不可用**：点名调用会被挡回 *"Claude Fable 5 is currently unavailable. Please use Opus 4.8 or another available model."* 在它恢复前，本文**每一处指派给 Fable 的节点——高杠杆判断与裁决（独立 review / 二审 · 端点验收 · 决策咨询 · 架构仲裁 / 方案选型）、最难的开放推理 / 创意 / 叙事——一律回退到次强档 Opus 4.8（`claude-opus-4-8`）。** 上表 Fable 行与下文每处 Fable 指派**一律保留不删**（它们记录的是「档位本应如何」这套稳定心智模型，可用性是一时的运行时约束、非档位重排）；只把落点临时从 Fable 改投 Opus。副作用：回退期 Opus 同时背「难实现」与「裁决」两副身份，下面那条「Fable 裁决 vs Opus 实现」的关键区分在*档位落点*上暂时合一——**但判断标准本身不变**，只是这两类活暂用同一档执行。Fable 恢复后照上表 / 下文原指派切回即可。
+> **⚠️ 运行时可用性（截至 2026-06）**：Claude Fable 5 当前不可用——点名调用会被挡回 *"Claude Fable 5 is currently unavailable. Please use Opus 4.8 or another available model."* **行动**：本表所有指派给 Fable 的节点（高杠杆判断与裁决——独立 review / 二审、端点验收、决策咨询、架构仲裁 / 方案选型——以及最难的开放推理 / 创意 / 叙事）一律改投次强档 Opus 4.8（`claude-opus-4-8`）。判断标准不变，只是裁决类与难实现类节点暂时共用同一档位执行；选档时以当前实测可用性为准。
 
 （绝对美元为截至 2026-06 的快照；现价以 API 官方文档 / `claude-api` skill 为准——见上方警告。）编排的花销由输出主导（agent 吐的远多于它读的），所以真正该拿来 pace 的数字是 **relative output multiplier**——Haiku 1× / Sonnet 3× / Opus 5× / Fable 10×：一个 Opus 叶子 ≈ 五个 Haiku 叶子，一个 Fable 叶子 ≈ 十个。这组**相对关系**（强档 ≈ 弱档的 N×）是这段真正稳定、可长期依赖的心智模型；档位重排或绝对单价变动时，更新上表数字即可，这组 multiplier 思路照旧。
 
-补一句 `effort`（`output_config: {effort: …}`）的事：它确实是一个 **API-layer** 的 token 旋钮，你的*主 session* 也遵循自己的 `effortLevel`。但 cc-master 的派发 API **不**把它往下穿透——workflow 的 `agent()` 只接受 label/phase/schema/model/isolation/agentType，Agent sub-agent 同样没有 effort 旋钮。所以你对*叶子*成本真正握得住的 lever 是它的**模型档位**，不是 effort——别给 `agent()` 传一个杜撰的 `effort` option（`authoring-workflows` 禁止杜撰 option）。
+补一句 `effort` 的事：它是 API 层的 token 旋钮，但 cc-master 的派发 API 不把它往下穿透给叶子——完整参数面见 `authoring-workflows`。所以你对*叶子*成本真正握得住的 lever 是它的**模型档位**，不是 effort。
 
-## 每节点模型选择（按难度选档的事实映射）
+## 档位差距不按价格单调——按任务轴选档，不按价格排序
 
-给每节点契约一个 **model** 字段，按任务*难度*来定——不是按主线恰好跑在哪个模型上。这是**事实映射**；把强档集中到临界链、float 配便宜档的**调度判断**在 `master-orchestrator-guide`「目标即依赖图」镜头 + 其 `${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/references/decomposition.md` 的「资源决策」：
+「更贵的档位在任何任务上都更好」是一个需要拆穿的迷信。档位间的实际差距因**任务轴**而异，且不总是单调：
+
+- **复杂多文件 / 有状态实现**（要跨文件维护架构一致性、需要长链条状态推理）是差距最大、最单调的一轴——降一档通常掉肉眼可见的一截,且返工成本会把这条轴上的质量差距进一步放大。这条轴上升档最有保障。
+- **终端操作 / agentic 执行类任务**（跑命令、驱动工具链、日常 agentic 操作）上,主力档常常不输旗舰,有时反而更快更准——把「贵」当「强」的直觉在这条轴上会失灵。
+- **知识工作 / 分析与方案产出类任务**（调研整合、方案文本、常规文档）上,主力档与旗舰档的水位经常接近打平——纯分析输出不必然需要最强档。
+
+**操作结论**：选档时先问「这属于哪条任务轴」，再决定要不要为它多付几倍钱——不要把「价格更高」当「难度需要更强模型」的代理指标。上面「每节点模型选择」的机械/常规/难实现/裁决四档分层,就是把这条判断落到具体节点上的操作化版本。
+
+## 每节点模型选择（按任务类型选档的两模式矩阵）
+
+给每节点契约一个 **model** 字段，按任务*类型*和*当前配额水位*两个维度来定——不是按主线恰好跑在哪个模型上。这是**事实映射**；把强档集中到临界链、float 配便宜档的**调度判断**在 `master-orchestrator-guide`「目标即依赖图」镜头 + 其 `${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/references/decomposition.md` 的「资源决策」：
 
 - **duration 不是难度。** 长 estimate 首先是拆分 / cadence / WIP / background 信号；只有当长时长来自高复杂性或高风险判断时，才支持升档。host-specific model ID 与可用性仍以 adapter/官方真值为准。
-- **机械 / 可机械检查**（跑测试套件、grep 定位、批量格式化、改变量名）→ **Haiku**。无需推理。
-- **常规实现** → **Sonnet**。主力 workhorse。
-- **难实现 / correctness-critical / 临界路径**（agentic 实现、临界路径上难实现的活、复杂并发 bug 的根因）→ **Opus**；**常规 review**（日常代码审查，够重要不该降到 Sonnet）也走 **Opus**。
-- **高杠杆判断与裁决**（verdict-bearing：决定「对不对 / 选哪个」的节点——独立 review / 二审、端点验收、决策咨询、架构仲裁 / 方案选型）→ **Fable**；最难的开放推理 / 创意 → 同样 **Fable**。一次错判下游成本极大、且这些节点低并发，值最强档。（⚠️ **Fable 当前不可用 → 这些节点回退 Opus 4.8**，见上「运行时可用性补充」。）
+- **机械 / 可机械检查**（跑测试套件、grep 定位、批量格式化、改变量名、大规模重复性小改动）→ **Haiku**。无需推理，且错误能被 diff / 编译 / 测试廉价捕获——这类任务几乎是**性价比模式与效果上限模式的交集**：两种模式下都该用最轻档 + 事后校验闸，升档在这里几乎买不到任何东西。
+- **调研摘要 / 信息抽取 / 常规文档写作** → **性价比模式下 Sonnet 够用，几乎无损**；只有当结论会驱动不可逆决策、或需要跨源深度交叉验证时，才值得为**这一次**产出升到 Opus。
+- **常规实现** → **Sonnet**。主力 workhorse，两种模式下都是默认落点。
+- **难实现 / correctness-critical / 临界路径**（agentic 实现、临界路径上难实现的活、复杂并发 bug 的根因）→ **Opus**；**常规 review**（日常代码审查，够重要不该降到 Sonnet）也走 **Opus**。**这是效果上限模式该优先投的一档**——性价比模式下也不建议再降,降档的返工成本通常抵不过省下的钱。
+- **高杠杆判断与裁决**（verdict-bearing：决定「对不对 / 选哪个」的节点——独立 review / 二审、端点验收、决策咨询、架构仲裁 / 方案选型）→ **Fable**；最难的开放推理 / 创意 → 同样 **Fable**。一次错判下游成本极大、且这些节点低并发，值最强档——**这类节点不建议因配额吃紧而降档**，配额紧张时应优先砍并发度或延后非临界节点，而不是让裁决节点降档误判。（⚠️ **Fable 当前不可用 → 这些节点回退 Opus 4.8**，见上「运行时可用性补充」。）
 
 > **关键区分**：判断 / 审查 / 咨询 / 裁决（决定「对不对 / 选哪个」的 verdict 节点）= **Fable**；做出那个被选定的难架构 / 复杂实现 = **Opus**——二者别混。常规 review 走 Opus；高杠杆的独立 review / 二审 / 端点验收走 Fable。（**Fable 不可用期**：这些 Fable 落点临时回退 Opus 4.8。判断标准照旧，只是档位落点暂与 Opus 合并；此时靠任务身份本身、而非档位差异来区分裁决 vs 实现。）
 
+**性价比模式（配额吃紧 / pacing 已发出临界预警时）该怎么收**：机械 transform、调研摘要、常规文档三类几乎可以整体降到 Haiku/Sonnet 而不掉质量；复杂实现与高杠杆裁决两类**不要降**——省下的配额买不回返工成本或误判成本。**效果上限模式（临界路径节点 / 高风险不可逆决策）该怎么投**：只值得为复杂多文件实现和裁决类节点上探到 Opus/Fable，机械与调研类升档几乎买不到额外质量，别把稀缺的强档配额浪费在这两类上。
+
 它在 workflow 一侧的对应物——随着某个 stage 变难、*在脚本内部*升级模型档位——是 `authoring-workflows` examples 里的 `staged-escalation.js`（`agent({model})`）；那里模型字面量是 resume cache key 的一部分，所以务必保持它是字面量。
+
+## 高杠杆裁决节点的备选 lever：换个模型家族二审
+
+除了升档，独立 review / 二审这类高杠杆裁决节点还有另一个可用 lever：**换一个不同的模型家族**做二审，而不是在同一家族内升档。不同家族在同一份代码 review 上倾向抓到不同类别的问题——这是一个**方向性信号**，目前证据还很薄（样本量小、未受控），不能当作「换家族二审已验证优于同家族升档」的结论来用。合理的落地姿态是：**继续实践**（cc-master 已有的独立 codex 端点验收就是这个形态）、边跑边**自建你自己的分歧率数据**（记录两家族在同一批 review 上的判断分歧频率），用自己的数据决定要不要把这个 lever 常态化，而不是直接采信一个薄证据的结论。
 
 ## 为何主线固定一个模型
 
 省钱靠给 leaf 配便宜模型，**不靠中途切主线模型**。在 session 中途切主对话的模型，从三方面看都是假节省：
 
-- **它扔掉整个 prompt cache。** KV cache 跨模型不可互换——一旦切换，整段缓存好的前缀都会在下一回合当作全新输入重新计费。
+- **它扔掉整个 prompt cache。** KV cache 跨模型不可互换——一旦切换，整段缓存好的前缀都会在下一回合当作全新输入重新计费；缓存命中价通常是标准输入价的一个零头（约 0.1x），切档意味着整段历史从这个折扣价被重新按全价计费一次。
 - **在这里更是双重昂贵。** cc-master 在每次 compaction 后会自动重注*整篇*常驻编排手册文本——一大段稳定、可缓存的前缀。切模型恰好把那份 cache 作废。
 - **它危及 board 连续性。** 一次模型切换可能正好骑在一次 compaction / session 边界上，而 `owner.session_id` 是 board 的连续性锚点。
 
-官方 Claude Code 的指导也是一样：把主对话固定在一个模型上；那些能跑在更便宜模型上的边角任务，交给一个 *subagent*。lever 是**每叶子的模型选择**——不是主线上的 `/model`。
+官方 Claude Code 的指导也是一样：把主对话固定在一个模型上；那些能跑在更便宜模型上的边角任务，交给一个 *subagent*。**subagent 拥有自己独立的 cache、不会动主线的 prefix**——「主线锁死一个档位 + 按每个 subagent 的任务分别给不同档位」正是这套 cache 机制下的正确形态，而不是权宜之计。lever 是**每叶子的模型选择**——不是主线上的 `/model`。
 
 > **watchdog 间隔的 cache-warmth（一句指针）**：等待前 arm 一个 watchdog 时，唤醒间隔也吃这份 prompt-cache 心智——短间隔（<270s）保温、长间隔（≥1200s）当长等处理；间隔 ≈ 最长 `in_flight` 的 p95 + 余量，别短到把主线 cache 频繁失效又没活可干。完整降级链 + 间隔取法在 `master-orchestrator-guide` 的 `${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/references/dispatch.md` §watchdog/liveness，此处不复述。

@@ -17,7 +17,7 @@ description: 'Use when you (a coding/execution agent) are designing, building, o
 
 ## 核心论题：四个理论，一条脊椎
 
-DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一种工程良知在 design / build / test 三阶段的不同切面，从**同一组根**长出来。这五根不止长出四理论的**手艺**，也贯穿**交付尺度**——顶层怎么敏捷切（=slicing-goals-into-dags）、任务内怎么迭代（=dev-as-ml-loop），指向下文接力段的三层范式：这是把五根从「四理论之根」提升为「delivery + craft 同根的 apex」（工程质量总纲的答案——非一套新原则，是 framing 提升）。先握住下面五条根（这是本 skill 的灵魂），再到各 reference 取深度。**根对了，四个理论彼此印证；根没握住，它们就退化成四张互不相干的清单。**
+DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一种工程良知在 design / build / test 三阶段的不同切面，从**同一组根**长出来。这五根同时管着四理论的**手艺**、也管着**交付尺度**——顶层怎么敏捷切（slicing-goals-into-dags）、任务内怎么迭代（dev-as-ml-loop）与本 skill 的手艺内容共享同一组根，三层范式见下文接力段。先握住下面五条根，再到各 reference 取深度：**根对了，四个理论彼此印证；根没握住，它们就退化成四张互不相干的清单。**
 
 ---
 
@@ -75,6 +75,7 @@ DDD、SDD、TDD、OOP 不是四套要分别背的 checklist——它们是同一
 
 | 阶段 | 主用理论 | 这一刀回答什么 | 深度 reference |
 |---|---|---|---|
+| **动手前（硬闸）** | SDD | 命中值得 SDD 的场景、且无已认可 spec → 停下先产出 / 先要 spec，再动手写产码 | [references/sdd.md](references/sdd.md) §硬闸 |
 | **设计** | DDD + SDD | 领域怎么划 / 建模？合约先长什么形？ | [references/ddd.md](references/ddd.md) · [references/sdd.md](references/sdd.md) |
 | **开发** | OOP + SDD | 类 / 对象怎么写到品味线？实现怎么对齐 spec？ | [references/oop.md](references/oop.md) · [references/sdd.md](references/sdd.md) |
 | **测试** | TDD | test-first 这条纪律具体怎么执行？ | [references/tdd.md](references/tdd.md) |

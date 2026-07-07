@@ -22,6 +22,7 @@
 
 - **`ccm baseline snapshot`** —— 在一个 iteration / 里程碑**起点**冻结当前计划（任务集 + 校准工期）作 EVM 的 plan 基线。**没有它 `estimate evm` 出 `has_baseline:false`**（exit 0·降级 warn），CPI/SPI 无从算。
 - **何时 snapshot**：一个 cadence iteration 开工那刻、或一次重大 replan 后（范围变了，旧 baseline 失真）。`ccm baseline reset` 清旧基线重立。
+- **反模式——对未真实拆解的计划 snapshot**：任务集还只是占位 / 粗粒度远期片（见 `slicing-goals-into-dags` 的 rolling-wave）时就 snapshot，PV 曲线会建在一个还会大改的计划上，后续 EVM 的 `spi`/`cpi` 偏差信号随之失真。先把这个 iteration 该精切的片切到位（`--accept` + `--estimate` 都落定），再 snapshot；粗粒度占位片进入 iteration 前应已被重切。
 - **`ccm baseline show`** —— 看当前基线快照（捕获时刻 + 任务集）。
 - 它是**写 noun**（改 board 状态），刻意置于 `usage`/`estimate` 只读 namespace 之外——所以它**不是** advisory consume，而是 advisory（EVM）的前置 setup。命令怎么敲见 `using-ccm` 的 command-catalog。
 

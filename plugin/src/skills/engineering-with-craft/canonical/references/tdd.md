@@ -1,7 +1,6 @@
 # TDD 纪律：测试驱动开发
 
-> 本文是 `engineering-with-craft` 的深度纪律 reference，聚焦 **test-first 这条纪律本身怎么执行**。
-> 测试为什么在执行循环里是梯度信号（验收=objective / 迭代-测量-收敛）那层心智模型，见 `dev-as-ml-loop`。
+> 写产码前，用这套纪律把 **test-first 本身怎么执行**走完整：铁律、红绿重构循环、验证失败原因、constraint-parity、completion gate。测试为什么在执行循环里是梯度信号（验收=objective / 迭代-测量-收敛）那层心智模型，见 `dev-as-ml-loop`。
 
 ---
 

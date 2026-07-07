@@ -1,10 +1,9 @@
 # Patterns——编排形状、何时用、住在哪
 
-> 每个 pattern 一节：*何时伸手够它*、一份最小骨架、以及由哪个 bundled 的
-> `assets/templates/` 骨架或 `assets/examples/` workflow 演示。这些 pattern 的语义
-> 由 `Workflow` 工具契约确认；底层语义见 `mechanism.md`。**本页每个形状都有一个
-> bundled 文件演示**——没有只剩 prose 的空壳；每节都点名跑它的那个确切 `assets/templates/`
-> 或 `assets/examples/` 文件。
+> 选 pattern 时看*何时伸手够它*、一份最小骨架、以及跑哪个 bundled 的 `assets/templates/`
+> 骨架或 `assets/examples/` workflow。这些 pattern 的语义由 `Workflow` 工具契约确认；底层
+> 语义见 `mechanism.md`。**每个形状都有一个 bundled 文件演示**——没有只剩 prose 的空壳；
+> 每节都点名跑它的那个确切 `assets/templates/` 或 `assets/examples/` 文件。
 
 本页引用到的每个 bundled template 和 example：要裸的控制流形状就从 template 抄，要完整、
 真实-prompt 的组合就从 example 抄。
@@ -225,6 +224,11 @@ phase 正是这个 critic）。
 **何时：** 一场迁移触及很多 site，你得 (1) 把它们发现出来、(2) 在隔离里逐个 transform，让
 并行编辑不冲突、(3) 用一道 gate 验证。这是唯一需要 `isolation: 'worktree'` 的形状——每个
 site 在自己的 worktree 里 transform，并发的文件编辑绝不撞车。
+
+**批量 transform 前先确认改动形状已定**：discover 阶段收的不该只是"改哪些 site"，还要能
+答"按什么方案改"——几十个 site 同时无 spec 下场改，等于让每个并行 leaf 各自即兴决定同一类
+决策（见 `engineering-with-craft` 的 sdd.md「动手前的硬闸」）。方案未定时先派一轮 scoping /
+产出改动的最小 spec，再 fan out transform。
 
 ```js
 const found = await agent('enumerate every migration site', { schema: SITES })

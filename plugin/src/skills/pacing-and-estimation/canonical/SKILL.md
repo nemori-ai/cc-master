@@ -13,13 +13,11 @@ description: '{{PACING_DESCRIPTION}}'
 
 ## 何时翻开本 skill
 
-你在一场长跑里要**消费 ccm 的只读 advisory** 做配速或估算判断的输入时——把长跑对照配额窗口 pace、选模型档、估工期/风险、读 `ccm usage advise` / `ccm estimate forecast` 的输出——就用本 skill 把 verdict 与字段读对。深度按轴分进 reference，按问题选读：
-
-{{PACING_REFERENCE_POINTERS_HEAD}}
+你在一场长跑里要**消费 ccm 的只读 advisory** 做配速或估算判断的输入时——把长跑对照配额窗口 pace、选模型档、估工期/风险、读 `ccm usage advise` / `ccm estimate forecast` 的输出——就用本 skill 把 verdict 与字段读对。深度按轴分进 reference：{{PACING_REFERENCE_POINTERS_HEAD}}
 
 ---
 
-## 心智锚 1：ccm 出 verdict，你（orchestrator）决策 ★这条定边界
+## 心智锚 1：ccm 出 verdict，你（orchestrator）决策
 
 `ccm usage` / `estimate` 是**只读 advisory**——它替你**算**（走廊数学、MC 工期仿真、EVM、风险指数），吐一个 `verdict` 或一组带诚实字段的数。它**不替你拍**「该不该减速 / 该不该 surface 用户 / 该不该换号」。本 skill 教你**读 verdict + 解读字段**；读完之后的**动作**永远回到 `master-orchestrator-guide`（「量力而行」镜头、「该问就问」镜头、决策程序的 7d 总闸）。
 
@@ -40,7 +38,7 @@ description: '{{PACING_DESCRIPTION}}'
 
 附字段：`strength`（标签强度 weak\|strong·ccm 出、注入方直接用）、`nearest_reset`（`stop_*` 时该窗 reset 时刻·引导 arm wakeup）、`switch_candidate`（`switch` verdict 时推荐切入的备号·**切不切由编排层 + 用户拍**）、`pool`（号池粗粒度 { backups, switchable }）。**`stop_7d` 是最该认真对待的 verdict**——7d 是不可逆的跨窗口消耗边界，读到它就把决策 surface 回编排层，绝不当 FYI 自行越过。`stop_5h` 则是「本窗口这份配额烧穿了」——不是终点、是 arm 一个自我唤醒守到 reset 回血的信号。
 
-## 心智锚 3：estimate 整轴别 out-of-mind ★这条是本 skill 的核心增量
+## 心智锚 3：estimate 整轴别 out-of-mind
 
 模型默认**想不到**去查估算——能力（`ccm estimate` 5 verb）就绪，消费层从不被召回。在三个拍子主动 consult estimate（操作化「何时查 → 读哪字段 → 判什么」详见 estimation.md）：
 
@@ -53,7 +51,7 @@ description: '{{PACING_DESCRIPTION}}'
 
 ## usage ⊗ estimate 张力（典型决策输入）
 
-配额 `throttle`/`stop_7d` 但 `forecast` 还很长 → 这是一个典型张力：容量不够装完该装的活。**识别它**（读 usage verdict 与 estimate forecast 两个字段对比）归本 skill；**怎么办**（典型 `blocked_on:"user"`：范围/期限/加资源三选一 surface 给用户）归 `master-orchestrator-guide`「该问就问」镜头。
+配额 `throttle`/`stop_7d` 但 `forecast` 还很长——容量不够装完该装的活，是本 skill 最常喂给编排决策的一种张力。怎么识别（读哪两个字段对比）+ 怎么办（surface 给用户三选一）的完整阐述见 estimation.md §usage ⊗ estimate 张力，本节不复述。
 
 ## duration ⊗ 模型档位（别把长任务自动升档）
 
