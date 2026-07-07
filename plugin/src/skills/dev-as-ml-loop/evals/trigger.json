@@ -27,5 +27,7 @@
   {"query": "纯概念问一下:机器学习里的「过拟合」到底是什么意思?", "should_trigger": false},
   {"query": "帮我给这个 PR 写一条规范的 commit message。", "should_trigger": false},
   {"query": "我要从零设计这个大系统的整体架构,该从哪入手规划?", "should_trigger": false},
-  {"query": "后台派了个 workflow 在跑,主线等待的空档我该干嘛才不算空转?", "should_trigger": false}
+  {"query": "后台派了个 workflow 在跑,主线等待的空档我该干嘛才不算空转?", "should_trigger": false},
+  {"query": "这个类该拆成两个吗?继承还是组合更合适、SOLID 怎么权衡?", "should_trigger": false},
+  {"query": "写这个跨服务接口之前,spec 该长什么样、先冻结哪些字段?", "should_trigger": false}
 ]

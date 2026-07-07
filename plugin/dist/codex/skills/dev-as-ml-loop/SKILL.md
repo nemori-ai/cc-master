@@ -1,6 +1,6 @@
 ---
 name: dev-as-ml-loop
-description: 'Use when dev work should be run as an ML-style optimization loop, either by a master orchestrator shaping dev-task handoffs/subagent roles or by an execution agent driving one task to acceptance —— 当你要把开发工作当成优化过程来跑:master orchestrator 用它设计外层 dev loop/objective/measurement/subagent 组件分工/restart-stop/board ledger 语义,执行 agent 用它把单个开发任务推进到验收。心智锚:验收=目标函数、loop=迭代优化(提议→测量→调整)、测试=测量仪器/梯度、explore vs exploit、局部最小值=钻牛角尖→restart、收敛即停别过拟合、拟合意图非用例、简单性=正则、持续用 board 维护优化状态以便 compact 后续接。Triggers: 派发或接手 dev 任务、要把 work order 改造成可测优化问题、要设计 subagent 分工/测量/验收/重启条件、要用 board 管理优化目标和迭代状态、compact 后续接 dev loop、卡住在一个方案上越改越深(钻牛角尖)、怎么判断"做完了"、要不要先写测试/测量、要不要换方案。Do NOT use when 你在决定顶层该编排什么 / WIP / 临界路径 / HITL / 配额(master-orchestrator-guide)、怎么把目标切成任务 DAG(slicing-goals-into-dags)、怎么用 ccm 写 board(using-ccm)、workflow 脚本怎么写(authoring-workflows)。'
+description: 'Use when dev work should be run as an ML-style optimization loop, either by a master orchestrator shaping dev-task handoffs/subagent roles or by an execution agent driving one task to acceptance —— 当你要把开发工作当成优化过程来跑:master orchestrator 用它设计外层 dev loop/objective/measurement/subagent 组件分工/restart-stop/board ledger 语义,执行 agent 用它把单个开发任务推进到验收。心智锚:验收=目标函数、loop=迭代优化(提议→测量→调整)、测试=测量仪器/梯度、explore vs exploit、局部最小值=钻牛角尖→restart、收敛即停别过拟合、拟合意图非用例、简单性=正则、持续用 board 维护优化状态以便 compact 后续接。Triggers: 派发或接手 dev 任务、要把 work order 改造成可测优化问题、要设计 subagent 分工/测量/验收/重启条件、要用 board 管理优化目标和迭代状态、compact 后续接 dev loop、卡住在一个方案上越改越深(钻牛角尖)、怎么判断"做完了"、要不要先写测试/测量、要不要换方案。Do NOT use when 你在决定顶层该编排什么 / WIP / 临界路径 / HITL / 配额(master-orchestrator-guide)、怎么把目标切成任务 DAG(slicing-goals-into-dags)、领域 / 类 / 合约 / 测试本身怎么建得好——DDD/OOP/SDD/TDD 手艺内容(engineering-with-craft)、怎么用 ccm 写 board(using-ccm)、workflow 脚本怎么写(authoring-workflows)。'
 ---
 
 # dev-as-ml-loop —— 把 dev loop 当成一个 ML 优化过程
@@ -13,7 +13,7 @@ description: 'Use when dev work should be run as an ML-style optimization loop, 
 
 ## 核心论题:dev work 本质是在跑一个优化过程
 
-每一轮 propose 一个改动、跑一下、看结果、再调——这不是"试错",这是**带测量的迭代优化**:目标函数是验收标准,每一轮在缩小"当前状态 ↔ 验收"的距离,直到收敛(验收达标)。**「一次性想清楚、写一大坨、跑一次祈祷它对」是非优化思维**——它放弃了每一轮本可拿到的梯度信息。下面八个命名锚,是这套优化框架的词汇表;它们一起换掉"线性把活干完"的默认心智。
+每一轮 propose 一个改动、跑一下、看结果、再调——这不是"试错",这是**带测量的迭代优化**:目标函数是验收标准,每一轮在缩小"当前状态 ↔ 验收"的距离,直到收敛(验收达标)。**「一次性想清楚、写一大坨、跑一次祈祷它对」是非优化思维**——它放弃了每一轮本可拿到的梯度信息。用下面八个命名锚换掉"线性把活干完"的默认心智。
 
 ## 两尺度 dev loop:外层编排,内层下降
 
@@ -46,7 +46,7 @@ description: 'Use when dev work should be run as an ML-style optimization loop, 
 
 整个 loop 只有一个朝向:**最小化"当前实现 ↔ 验收标准"的距离**。所以第一件事永远是**把目标函数看清楚**——这个任务的验收标准(DoD)到底是什么、怎么测。
 
-- 验收**清晰**(board 的 `acceptance` 字段就是这个"两态 objective function"):直接拿它当 loss,对着它优化。
+- 验收**清晰**(board 的 `acceptance` 字段就是这个"两态 objective function"):直接拿它当 loss,对着它优化。**但验收清晰不等于内部设计已定**——acceptance 锁的是外部可观察行为,锁不住存储选型 / 并发语义 / 失败模式这类决策。命中 `engineering-with-craft` sdd.md「值得 SDD」的场景时,先过它的动手前硬闸(先产出或引用已认可 spec),再开始 propose 第一个改动;别因为 acceptance 写得清楚就跳过这一步。
 - 验收**模糊 / 缺失**:先把它**锐化成可测的**(找 benchmark、定指标与目标值、跟编排者确认),**再**开始优化。**没有明确 objective 的优化是随机游走**——你会在一个没有 loss 的空间里乱走,改半天不知道在不在变好。模糊就先锐化,别带着模糊的目标硬下降。
 - 对 orchestrator 来说,模糊验收不是"派给强 agent 让它自己理解"——那是在把 loss function 外包给 worker。先派 objective owner / 问用户 / 写 spec delta,再派实现。
 
@@ -140,6 +140,9 @@ orchestrator 视角:绿灯只是训练读数,端点验收才是 validation。若
 ```
 读目标函数(验收)──► 它清楚吗?── 不清 ──► 先锐化(锚 1)
         │ 清楚
+        ▼
+   过 spec 硬闸了吗?(命中值得 SDD 的场景且无已认可 spec?)── 未过 ──► 先产出/引用 spec(engineering-with-craft sdd.md)
+        │ 已过或不命中
         ▼
    架/读测量(测试·锚 3)
         ▼

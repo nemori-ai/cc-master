@@ -5,7 +5,7 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 
 # slicing-goals-into-dags —— 把目标切成一张好 board DAG
 
-> 这是把一个目标 / epic **切**成 board 任务依赖图的**敏捷方法论与品味**——回答"怎么拆出一张好图",不是"一张已成形的图怎么排期"(那是 master-orchestrator-guide 的 decomposition 一段)。
+> 把一个目标 / epic **切**成 board 任务依赖图时，用这套敏捷方法论与品味回答"怎么拆出一张好图"；不覆盖"一张已成形的图怎么排期"(那是 master-orchestrator-guide 的 decomposition 一段)。
 >
 > **职责边界:** **切**(carve)归本 skill;**排**(schedule:CPM / 临界路径 / 并行度计算)归 master-orchestrator-guide 的 board 协议 reference;**派**(dispatch)归 master-orchestrator-guide;**执行**单个 task 到验收归 dev-as-ml-loop;**写进** board 归 using-ccm。本 skill 只管"怎么把目标切成图"这一刀。
 
@@ -77,7 +77,8 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 ## 落到 board
 
 - **一片纵切 → 一个 task**;若这片自身还需内部并行,做成一个 owner 父节点 + 若干 leaf 子节点(嵌套 depth=1)。
-- **共享脊椎 → 那一个 foundation task**,纵切片依赖它;**死守它的依赖者最少**——只有真共享核心才连上去,别把半个 schema 层挂成全图前置。
+- **共享脊椎 → 那一个 foundation task**,纵切片依赖它;**死守它的依赖者最少**——只有真共享核心才连上去,别把半个 schema 层挂成全图前置。这根脊椎的 `--accept` 除了"端到端跑通",还要能答"这根线的最小设计先确认过了吗"——命中 `engineering-with-craft` sdd.md 里"值得 SDD"的场景(跨边界合约 / 多方消费者等)时,脊椎片先出一份最小设计或先过一轮 scoping,再动手实现,别让地基片在无人认可的设计上直接下场写代码。
+- **远期的片先留粗粒度占位,不必一次切到底**:只有近期(下一个 cadence 窗口内要跑)的片才值得精切到"能并行 + 可验收"的粒度;远期 iteration 的需求大概率会变,现在精切等于投机——先占位(一个粗粒度 task 加一句意图描述),进了近期窗口再回来重切。这是 rolling-wave planning:粒度随时间距离渐进细化,不是一次性切完整个 epic。
 - **片分组进 `cadence`/`iteration` timebox**:每个 iteration 收口时至少 ship 一片可用增量(接 board 的 cadence 模块——节奏在这落地)。一轮里的 members 估时总量与关键路径要能放进 timebox;放不进时先重切/移出,不要把超载当成排期问题留给后面。
 - **`estimate`** 回喂粒度调参(锚 3)。
 - 切好的图怎么**写进** board(`ccm task add --deps ...`)→ using-ccm;怎么**排期 / 算临界路径** → master-orchestrator-guide 的 board 协议 reference。

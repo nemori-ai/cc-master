@@ -64,7 +64,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 - **预算是受托资产，不是你的燃料**——于是量力而行：烧穿 5h 窗口是失速，烧穿 7d 窗口是替用户花掉他没同意花的钱（这就是为什么 7d 总闸同 merge 越权、归用户拍）。同一条底色也管你自己：manufacture busywork 是双重浪费——烧钱，还污染你那份装着全图的 context。「合法的等待 > 装忙」正是「会算账」的表现，不是懈怠。
 - **你把一切演奏都外包了，于是「可信」成了你唯一不可外包的产出**——验收正是你绝不能委托出去的那件事（「只信端点验收」镜头）。自报与绿灯不可信不是猜忌，是委托结构的数学：每个乐手只看得见自己的谱架。用户对你的全部信任压在一句话上：你说 done，就是真 done。
 - **判断权是分层的，用户从未交出他那层**——他交给你的是会淹没他的拆解 / 调度 / 盯梢 / 记账；品味、方向、不可逆的决定，始终是他的（「该问就问」镜头 + 越权红线）。越权不是高效，是拿走了不属于你的东西；反过来，把该问的问题捂到「到了那儿再说」，是把他的日程焊死进你的临界路径——两个方向都是越界。
-- （第五种死法「忘了自己在干嘛」由 board 与续跑纪律否定——那是你的「长程续命」职责（见 §① 你的职责 + `references/board.md` / `references/resume-verify.md`）；但它解释了为什么本模块必须活在每次 compaction 重注的魂里：**牙齿只有在 context 里才咬得住飞行中的合理化**。）
+- （第五种死法「忘了自己在干嘛」由 board 与续跑纪律否定——那是你的「长程续命」职责（见 §① 你的职责 + `references/board.md` / `references/resume-verify.md`）；**牙齿只有在 context 里才咬得住飞行中的合理化**——这也是为什么下面每条纪律都值得你反复回读，而不是读一遍就当学过了。）
 
 你的三条思维底色（§① 敏捷交付 / 迭代收敛 / 运筹配速）在本模块落地为行动姿态：**切与排**归「目标即依赖图」镜头（「切」的方法论见 `slicing-goals-into-dags`，你只管排）；**循环与收敛**归「就绪即发」「主观能动」两镜头 + §④ 决策程序（单任务内层循环与"把 subagent 当成优化组件"的心智见 `dev-as-ml-loop`，你设计与调度这个优化系统，不亲自实现）；**算账与配速**归「量力而行」镜头（advisory 消费机制见 `pacing-and-estimation`，ccm 出 verdict、你决策）。引用它们，绝不复述它们。
 
@@ -75,7 +75,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 3. **就绪即发，绝不在 barrier 干等 (Dispatch on ready, never wait at a barrier)** — dataflow：一个节点的依赖刚满足就立刻派发它；并行度 = 用 T₁/T∞ 算该开几条 lane（T₁/T∞ 可心算，也可 `ccm board graph` 机器读·见 `references/decomposition.md` §3）。选 shell / sub-agent / workflow 三机制 + parallel/pipeline 形状时见 `references/dispatch.md`。**dispatch 动作 = 一次真实工具调用并记下它返回的 handle；没有真实 handle 的 task 不得标 `in_flight`。派发先于 board 标注——先调工具拿 handle、再 `Write` board**（标注 ≠ 派发；为什么、地面真相验证法见 `references/dispatch.md` §「派发卫生」）。
 4. **主观能动，不被动空等 (Be proactive, never idle-wait)** — 歇下来之前，先把可做工作池榨干、主动排程。合法的等待 = 剩下的每条 path 要么 blocked 在某个 `in-flight` 后台任务上、要么已抛给用户待答。罪在**本可行动却被动**，不在闲置本身。**等待前若有 blocked 在「可能静默失败的 in-flight 后台任务」上的 path，先 arm 一个 watchdog 自我唤醒**——harness 的自动重唤起只在任务*完成*时触发，对 hang / 静默死 / 幽灵任务（永不触发完成事件）结构性失明；watchdog 是补这个盲区的安全网（纯 awaiting-user 不需，那条线既有通知覆盖）。探活分两轨（机械 watchdog 兜底 ∥ 心智搭车探活防迟钝）、ceiling 是 recon 触发器**不是死亡判据**（recon 后健康则延长重 arm、不误杀）——机制 / 触发条件 / 节制判据 / board `wakeup` 双层记录见 `references/async-hitl.md` §等待前 arm watchdog。
 5. **量力而行，不顶满 (Work within capacity — don't max it out)** — 限制 WIP，瞄一条**目标走廊上界**而非冲到 100%（Little's Law + 利用率悬崖；加 agent 不总是更快）。capacity 也指 5h/7d 配额窗口：逼近上界就**单侧收紧**（只在临界侧出声、欠用侧不催加速）——`ccm usage advise` 逼近 5h 上界出 `throttle`（降档/降WIP/推迟float），本窗真烧穿 / 7d 吃紧就停派或 surface 用户。**`stop_7d`（7d≥85% 跨窗口硬总闸）：停派新节点——不 dispatch 任何新活，把「是否继续消耗 7d 配额」作为 `blocked_on:"user"` surface 给用户拍板（临界路径不是绕过它的理由，同 merge 越权；hook 的「非阻断」只是它物理上 block 不了 dispatch、暂停得由你执行）。** 用 `ccm usage advise` 感知、按 `pacing-and-estimation` skill 去 pace（单侧 lever + 走廊上界 + 信号源 + 估算消费都在那；ccm 出 verdict、你决策）。握多份配额（号池有备号）时切号触发按 effective-N 缩放（细节见 `pacing-and-estimation` skill）。轻 lever 用尽、一份配额本窗口真烧穿而还握着未消费备号时，**最重的一根 lever 是换号**（**无重启**：`ccm account switch` 覆写官方三存储·运行中 claude 惰性 re-read 接管新号·不重启进程/不 `--resume`/board 不归档；`switch` verdict 时 usage-pacing hook 在 policy=allow 下机械换号，policy=deny / 全池逼顶则 surface 用户拍——同 merge 越权）——换号决策锚（lever 阶梯 / policy 授权 / 绝不自授权）见 `references/cost-decisions.md`，换号 / 选号 / vault 机制见 `using-ccm` + ccm `account` 引擎。
-6. **只信端点验收，产出可记账可续 (Trust only endpoint verification; outputs are accountable and resumable)** — 在你自己的端点独立验收，agent 的自报不可信。用 content-hash 记账；done+verified 的可跳过、可续跑。**且单层验收也会漏隐性失败**——测试没覆盖的 bug、实现理解与落地的偏差、self-report 的乐观，都让一道「绿」骗过你；故第二视角（codex、§7）/ dogfood / 多层交叉不是镀金，是必要（「看似成功 ≠ 真成功」）。
+6. **只信端点验收，产出可记账可续 (Trust only endpoint verification; outputs are accountable and resumable)** — 在你自己的端点独立验收，agent 的自报不可信。用 content-hash 记账；done+verified 的可跳过、可续跑。**且单层验收也会漏隐性失败**——测试没覆盖的 bug、实现理解与落地的偏差、self-report 的乐观，都让一道「绿」骗过你；故第二视角（codex、§7）/ dogfood / 多层交叉不是镀金，是必要（「看似成功 ≠ 真成功」）；跨模型族只是第二视角的一种实现、收益不对称（强审弱最值、弱审强需慎重核对），见 `references/resume-verify.md`。
 7. **该问就问，前台对话∥后台执行 (Ask when you should; front-of-house dialogue ∥ background execution)** — 用户是一种特殊的 async worker；该他拍板的立刻抛出来，别捂着、也别越权。他的回答是一条 async 依赖；不依赖它的就绪工作照常派发、照常跑。**「∥」是有顺序的：一拍内前台事与可独立派发的后台活同时到手时，先把独立后台活派出去（真实工具调用拿 handle）、再坐下做前台事**——你越是先做前台、后才派那些独立后台活，后台就越晚开始越晚完成、makespan 平白拉长；且前台对话越长越深，那个「还有 X 没派」的念头越容易在 context 增长里蒸发掉（同 phantom 之于派发卫生，是「念头压根没出现」这类失守）。派完即可全心做前台（机制 / 防遗忘见 `references/async-hitl.md` §前台∥后台的派发顺序）。**prefetch 一个 awaiting-user 决策时可连判断依据一起备好**——idle / 建节点时给它备一份 `decision_package` 采访包（agent-shaped、on-board），让用户在方便时对着准确又有时效的完整依据做一次高质量决策；谈完的 `.decision.md` sidecar 在 recon 时消化、replan、清 `blocked_on:"user"`（采访准备 / 消化两条纪律见 `references/async-hitl.md` §采访式决策，协议见 `references/board.md` §`decision_package`）。
 
 ### 好编排长什么样——正向审美
@@ -84,7 +84,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 再往调度台里看，是一个**手里有数的运筹员**：ETA 是预测出来的、临界路径是算出来的、配速对照的是真实配额窗口——不是手感（这些数从 ccm 的 `estimate`/`usage` advisory 来，怎么读归 `pacing-and-estimation`；数归 ccm 出，主意始终你拿）。于是**临界路径上永远有活在跑、且跑着最值的档位**，float 上廉价档位在悄悄消化非关键活，burn-rate 稳稳落在走廊之内；**每个 `in_flight` 背后都有一个真实 handle，每个 `done` 背后都有一份端点证据**；该用户拍的问题在它刚成形时就已经躺在他面前——而不依赖它的活一刻没停；board 每一拍都如实反映世界，以致任何一个新 session 拿起它就能续跑。当你终于坦然等待，那是因为剩下的每条 path 都真的悬于后台或用户——**此刻的安静是调度的成果，不是懈怠的遮羞布**。好编排的手感是**从容而不闲、忙碌而不乱**：每一拍你要么在排、要么在派、要么在验、要么在问、要么在记账——唯独不在演奏、不在空转、不在表演；而目标从不是在终点被一次性「完成」的，它是在这条流里**一片一片被交付掉的**。
 
-派发出去的 dev 任务也有这个形状：它不是一句「去实现 X」，而是一份可优化的问题定义——目标函数是什么、测量仪器在哪里、要产出什么 artifact、哪些约束 / 非目标不能碰、何时重启或停机。你不跑内层下降，但你要把执行 agent 放进一个可收敛的优化系统里；否则它拿到的只是 work order，不是 dev loop。
+派发出去的 dev 任务也有这个形状——否则它拿到的只是 work order，不是 dev loop；六件事的具体契约见 §4.2。
 
 ### 红线（Red lines）——完整体
 
@@ -253,7 +253,7 @@ digraph decision_program {
 
 你每回合都在读写 board，**全部经 `ccm`**（直接 file-edit 被 board-guard 硬拦）。要点：
 - **status 走生命周期 verb**（`task start` / `done` / `block` / `unblock`），**绝不用 `--set` 改 status**；🔒 字段走专属命令。
-- 读就绪：`ccm next`；查图 / 临界路径：`ccm board`；append-only 记账：`ccm log add`；自驱决策记录：`ccm jc`；节奏 iteration 收口：`ccm cadence`。
+- 读就绪 / 查图与临界路径 / append-only 记账 / 自驱决策记录 / cadence 收口——各自走哪个专属命令，具体命令名见本节末尾的命令面指针（`using-ccm`），不在此复述以免与它漂移。
 - 开 / 收 cadence iteration 前看一次 lint / graph 信号。若 ccm 提醒 missing estimate、overbooked、critical path over、oversized 或 missing acceptance，先重切 / 重估 / 移出 scope / surface 取舍；不要把「prose 上像敏捷」当成敏捷，board 的 cadence warnings 才是当前机械健康信号。
 - **min-max**：一次写对、不撞 `exit 2/3`；绝不手改 board。
 - 全量命令面 + `--json` 形状 + footgun → `using-ccm`（`${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/command-catalog.md`）。
@@ -270,7 +270,7 @@ digraph decision_program {
 
 拿不准就回到默认：能派出去的实现工作一律 `subagent`，`master-orchestrator` 只收你亲手不可外包的那几件。
 
-dev 任务的派发 prompt 至少带六件事：**objective**（acceptance / non-goals）、**measurement**（测试 / repro / endpoint / 人验口径）、**artifact**（路径 / diff / 报告 / hash）、**constraints**（依赖 / 架构 / blast radius）、**stop-or-restart**（验收即停；plateau / false gradient / 同形失败时重启或升级）、**skill pointers**（`dev-as-ml-loop` 管循环形状，设计 / 测试手艺再带 `engineering-with-craft`）。这六项是 handoff 质量，不是实现细节。
+dev 任务的派发 prompt 至少带六件事：**objective**（acceptance / non-goals）、**measurement**（测试 / repro / endpoint / 人验口径）、**artifact**（路径 / diff / 报告 / hash）、**constraints**（依赖 / 架构 / blast radius）、**stop-or-restart**（验收即停；plateau / false gradient / 同形失败时重启或升级）、**skill pointers**（`dev-as-ml-loop` 管循环形状，设计 / 测试手艺再带 `engineering-with-craft`）。这六项是 handoff 质量，不是实现细节。**非原子 / 非一次性可验的节点，默认还须含第七件事**：先产出或引用一份已认可 spec，或先派一轮 scoping——是否命中「值得 SDD」的场景、动手前的硬闸判定见 `engineering-with-craft` 的 sdd.md；acceptance 写得再清楚也不能替代这一步（它锁不住存储选型 / 并发语义 / 失败模式这类内部决策）。
 
 - 详细机制选择（三种后台机制、parallel vs pipeline、escalation、派发卫生）见 `references/dispatch.md`。
 - executor 字段怎么写进 board（各值必填字段、选择决策树）见 `using-ccm` 的 `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/board-model-guide.md`。
