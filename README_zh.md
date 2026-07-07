@@ -154,6 +154,8 @@ $cc-master-as-master-orchestrator <你的目标>
 - **Discuss** — Claude Code：`/cc-master:discuss <决定>`；Codex：`$cc-master-discuss <决定>`。当有决定等你拍板时使用。
 - **Stop** — Claude Code：`/cc-master:stop`；Codex：`$cc-master-stop`。收尾并归档 board，以后可以继续 resume。
 - **Handoff** — Claude Code：`/cc-master:handoff-to-new-session`；Codex：`$cc-master-handoff-to-new-session`。在换新会话前交接。
+- **Retro** — Claude Code：`/cc-master:retro`；Codex：`$cc-master-retro`。对进行中或已归档的 board 做一次只读复盘，把经验写进被编排项目自己（不写 board、不碰 GitHub）。
+- **Distill** — Claude Code：`/cc-master:distill <retro-path...>`；Codex：`$cc-master-distill <retro-path...>`。把一份复盘文档里的候选经验蒸馏成目标项目的实际资产（纪律文档一句指针 / skill / workflow / subagent）——一律经用户批准的蒸馏计划把关，一律走 feature-branch PR 收口（非 git 项目降级为变更草稿目录）。绝不碰 board、不调用 `ccm`。
 - **`ccm account add|list|switch <email>`** — 建一个备用账号池并调度它，好让它在某个账号额度用紧时切到一个满额的。这几条你直接在终端里敲；你的 token 全程 token-blind，绝不进 AI 的 context。
 
 > 日常就这一组。完整命令面（每个 `ccm` namespace 和 flag）在 [命令目录](skills/using-ccm/references/command-catalog.md)；哪些已落地、哪些还在路上，在 [产品功能手册](design_docs/feature-manual.md)。

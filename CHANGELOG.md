@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`/cc-master:retro`** — new read-only distributed command: retrospects a board (in-progress or archived) by reading its `goal`/`log`/`judgment_calls`/task terminal states via `ccm`, and writes a narrative retrospective document into the orchestrated project itself (`design_docs/retros/` if present, else `.cc-master-retros/`). Never writes the board, never touches GitHub. Codex entry ships as the paired `cc-master-retro` skill (`$cc-master-retro`).
+- **`/cc-master:distill` + the eighth distributed skill `distilling-lessons-into-assets`** — retro Stage 2: distills one or more `retro.md` documents' candidate lessons into real target-project assets (discipline-doc note / skill / workflow / subagent). Single-agent global dedup/merge/routing plan → one user-approved distillation plan (the only hard HITL gate) → per-target-file fan-out → always a feature-branch PR (non-git projects, or explicit `--apply draft`, degrade to a `.cc-master-distill-drafts/<UTC-STAMP>/` draft directory instead of any silent direct edit). Never reads or writes the cc-master board, never calls `ccm`. The new skill carries the asset-routing taste (a three-question decision tree + per-asset-type landing craft/anti-patterns + the one hard constraint: written content must never generalize past its evidence — narrow the wording instead, and never silently drop a candidate lesson for weak evidence or missing target infrastructure). Codex entry ships as the paired `cc-master-distill` skill (`$cc-master-distill`). See `adrs/ADR-027-distill-stage2-and-eighth-skill.md`.
+- **Skills: spec-first hard gate** — `engineering-with-craft`'s sdd reference now carries a TDD-style "before the first line of implementation" hard gate as the single source of truth, with one-line decision anchors pointing to it from `master-orchestrator-guide` (dispatch contract gains a 7th default element: spec/plan precondition for non-atomic dev nodes), `slicing-goals-into-dags` (spine-slice design acceptance), `dev-as-ml-loop` (loop-entry gate), `authoring-workflows` (batch-transform shape confirmation), and `pacing-and-estimation` (no baselining placeholder plans).
+- **Skills: cross-family second-review guidance** — `master-orchestrator-guide`'s resume-verify reference now teaches the asymmetric-benefit rule for cross-model-family review (strong-reviews-weak pays most; weak-reviewing-strong lowers the prior on `needs-attention` but never skips per-finding reconciliation nor weakens the silent-pass-through guard) and that a finding's persuasiveness is not evidence of its correctness.
+
+### Fixed
+
+- **board-guard over-blocking (issue #57 problem 1)** — removed the whole-string fallback in `bashWritesBoard()`: a Bash call is now denied only when a single shell segment both references a board file and contains a write operator; unrelated redirects/`sed`/`tee` elsewhere in the same command no longer trigger false denials. Added regression tests for the cross-segment false-positive shapes.
+
+### Changed
+
+- **Skills audience/dedup cleanup (portfolio-wide)** — stripped maintainer-facing meta narration from runtime skill prose across five skills, collapsed duplicated passages to single-owner pointers (dev-dispatch contract, ccm command list in the orchestrator guide §4.1, pacing double pointers), added rolling-wave guidance to `slicing-goals-into-dags`, and sharpened `dev-as-ml-loop`/`pacing-and-estimation` descriptions with clearer Do-NOT-use boundaries.
+
 ## [0.13.1] — 2026-07-06
 
 > **plugin + ccm patch 收口** — 为 `as-master-orchestrator` 增加 GitHub issue 启动来源能力：`ccm board init` 新增 `--github-issue`，fresh bootstrap 透传该 flag，把 issue URL 记录为 board 的需求来源，而不是合成一个任务。补充双宿主回归与文档约束，保持任务为空 hard stop 的启动纪律不变。

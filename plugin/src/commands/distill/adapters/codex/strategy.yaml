@@ -1,0 +1,13 @@
+host: codex
+command: distill
+version: 1
+mode: adapter_guidance
+surface:
+  kind: user_prompt_ccm_cli_guided
+  user_prompt: plugin/src/skills/cc-master-distill/canonical/SKILL.md
+  summary: "Distill one or more retro documents' candidate lessons into target-project assets (discipline doc / skill / workflow / subagent), gated by a single user-approved distillation plan, collected via feature-branch + PR (or a draft directory for non-git projects). Never touches the cc-master board or ccm."
+  primary_commands: []
+notes:
+  - Codex 目前的实现是 skill-first：无 native `/cc-master:distill` slash command，蒸馏引导通过 `plugin/src/skills/cc-master-distill/canonical/SKILL.md`（它显式引导加载 `distilling-lessons-into-assets` skill）拼出蒸馏流程。
+  - This command intentionally has an empty ccm command list — distill never reads or writes the board/ccm by design (spec boundary A.4).
+  - Output is either a feature-branch PR (git projects) or a project-local `.cc-master-distill-drafts/<UTC-STAMP>/` draft directory (non-git projects, or explicit `--apply draft`).
