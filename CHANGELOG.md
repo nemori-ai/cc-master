@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-07-07
+
+> **retro/distill 两阶段复盘蒸馏 + hook parity contract 层 + skills 甲包** —— 这一版交付 GitHub issues #37/#57 的完整解决：新增 `/cc-master:retro`（只读复盘）与 `/cc-master:distill`（四类资产蒸馏）两条命令及第八个分发 skill `distilling-lessons-into-assets`；为 7 个双端 hook 建立 host-neutral CONTRACT.md parity 保障体系（ADR-028）并修复 Codex 侧四处实现分叉；board-guard 跨段误报根治；既有 skills 完成 spec-first 硬闸、跨族 review 指导与受众/去重清理。配套 ccm 线 `ccm-v0.15.0`（批量 task verb 等，见 ccm changelog）。
+
 ### Added
 
 - **`/cc-master:retro`** — new read-only distributed command: retrospects a board (in-progress or archived) by reading its `goal`/`log`/`judgment_calls`/task terminal states via `ccm`, and writes a narrative retrospective document into the orchestrated project itself (`design_docs/retros/` if present, else `.cc-master-retros/`). Never writes the board, never touches GitHub. Codex entry ships as the paired `cc-master-retro` skill (`$cc-master-retro`).
