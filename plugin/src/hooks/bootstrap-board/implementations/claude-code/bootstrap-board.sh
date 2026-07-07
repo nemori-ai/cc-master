@@ -548,6 +548,7 @@ esac
 # (ADR-021 §3.5 boundary). Pure bash `command -v` (red line 1 floor·no jq/python/node·no ccm spawn).
 #   CCM_BIN override (absolute executable path·dev/test/custom install·same口径 as node hooks): when set,
 #   check `[ -x "$CCM_BIN" ]`; else check `command -v ccm` on PATH.
+# PARITY: rule-bootstrap-ccm-hard-precheck (see CONTRACT.md — codex has no equivalent, declared divergence)
 ccm_present=0
 if [ -n "${CCM_BIN:-}" ]; then
   [ -x "$CCM_BIN" ] && ccm_present=1

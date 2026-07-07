@@ -86,12 +86,14 @@ function main() {
     'use tool_search to surface them before treating subagent dispatch as unavailable; once discovered, use multi_agent_v1.spawn_agent and record the returned handle. ' +
     'Do not restart work already done/verified; integrate any completed background results first.';
 
+  // PARITY: rule-reinject-empty-board-hard-stop
   if (emptyBoards.length > 0) {
     context += ` HARD STOP: active board(s) with zero tasks are not runnable orchestration DAGs: ${emptyBoards.join(', ')}. ` +
       'Before any implementation, tests, git, push, or PR work, decompose the goal and write tasks with acceptance criteria via ccm task add. ' +
       'Do not treat an armed empty board as permission to proceed.';
   }
 
+  // PARITY: rule-reinject-dangling-nodes
   if (dangling.length > 0) {
     context += ` Note on resume: your board has unresolved node(s) needing attention — stale/escalated: ${dangling.join(', ')}. ` +
       'Reconcile these (re-run stale, re-altitude escalated) before scheduling new work.';

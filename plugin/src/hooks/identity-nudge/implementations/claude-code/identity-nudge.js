@@ -151,6 +151,7 @@ function body(ctx) {
 
   const blocks = [];
 
+  // PARITY: rule-identity-nudge-tag-protocol
   // ① IDENTITY 周期提示（advisory weak·source identity-nudge）。
   const identityText = periodicNudge({
     board,

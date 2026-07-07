@@ -6,6 +6,16 @@ const path = require('path');
 
 const CCM_BIN = process.env.CCM_BIN || 'ccm';
 
+// PARITY: rule-usage-pacing-tag-protocol — ADR-018 标签协议在 codex 侧的本地等价包装（无共享 hook-common
+// 可 require，故本文件本地复刻；与 claude-code usage-pacing.js 的 advisory(source,strength,body) 语义一致）。
+function advisory(source, strength, body) {
+  const s = strength === 'strong' ? 'strong' : 'weak';
+  return `<advisory source="${source}" strength="${s}">\n${String(body)}\n</advisory>`;
+}
+// PACING_STRENGTH — 与 claude-code usage-pacing.js 的映射表字节级一致（PARITY:
+// rule-usage-pacing-tag-protocol）：stop_7d/stop_5h/throttle 高 stakes → strong；switch 可逆低 stakes → weak。
+const PACING_STRENGTH = { stop_7d: 'strong', stop_5h: 'strong', throttle: 'strong', switch: 'weak' };
+
 function readJson() {
   const raw = fs.readFileSync(0, 'utf8');
   return raw ? JSON.parse(raw) : {};
@@ -107,7 +117,12 @@ function main() {
   const data = advise(home);
   if (!data) return;
   const msg = messageFor(data);
-  if (msg) system(msg);
+  if (!msg) return;
+  const strength =
+    data.strength === 'strong' || data.strength === 'weak'
+      ? data.strength
+      : PACING_STRENGTH[data.verdict] || 'weak';
+  system(advisory('usage-pacing', strength, msg));
 }
 
 try {

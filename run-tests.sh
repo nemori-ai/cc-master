@@ -68,6 +68,9 @@ bash scripts/sync-codex-skills.sh --check || fail=1
 echo "== codex runtime skill adapter projection =="
 bash scripts/sync-plugin-dist.sh --host codex --skills-only || fail=1
 
+echo "== hook parity matrix sync (HOOKPAR-DEC / ADR-028) =="
+bash scripts/gen-hook-parity-matrix.sh --check || fail=1
+
 echo "== skill prose-lint (out-of-band, node) =="
 # Cheap static checks over every SKILL.md: frontmatter quote anti-pattern (Finding #1),
 # required name+description fields, and dead relative links. Checker only — never edits.

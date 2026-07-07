@@ -54,6 +54,7 @@ const CCM_BIN = process.env.CCM_BIN || 'ccm';
 //   spawnSync ccm board lint --board <path> --json → parse stdout JSON → 取 GRAPH-ROLLUP violations 的 task（=owner id）。
 //   GRAPH-ROLLUP 是 warn（exit 0），不据退出码判——只扫 violations[].rule（1a 契约）。spawn 失败 / 非有效
 //   JSON / 形状不符 → null（让调用方走 fallback 的内联 rollup 循环）。空违规 → 空 Set（一致 / 无 rollup 问题）。
+// PARITY: rule-verify-board-rollup-check
 function rollupOwnersViaCcm(boardPath) {
   let r;
   try {
@@ -77,6 +78,7 @@ function rollupOwnersViaCcm(boardPath) {
   return owners;
 }
 
+// PARITY: rule-verify-board-fuse
 const FUSE = 5;
 // ISO-8601-UTC 严格定宽（与 board-model.js 同口径）。定宽 + Z 后缀的串按字典序即时间序。
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
@@ -258,6 +260,7 @@ function body(ctx) {
   //     提醒是这同一条 block reason 的内部条款（都各自带 why），随其归入同一 directive、不另拆标签（保 reason 单字段）。
   //   · fuse 跳闸**不是闸**（它在 RELEASE·放 agent 停）——只告知「连续 block N 次已释放，去检查卡住的 ready
   //     task」，决策归 agent（去不去查是它的判断）→ `<advisory strength="strong">`（高 stakes:可能真卡死，应认真响应）。
+  // PARITY: rule-verify-board-tag-protocol
   function emitBlock(reason) {
     blockStreak += 1;
     if (blockStreak >= FUSE) {

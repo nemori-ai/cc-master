@@ -50,6 +50,7 @@ runHook({
       `Re-read the board for the task you are working on (recognise it by its goal), then invoke the master-orchestrator-guide skill ` +
       `and continue the decision program. Do not restart work already done/verified; integrate any completed background results first.`;
 
+    // PARITY: rule-reinject-empty-board-hard-stop
     if (emptyBoards.length) {
       ctxText += ` HARD STOP: active board(s) with zero tasks are not runnable orchestration DAGs: ${emptyBoards.join(', ')}. ` +
         `Before any implementation, tests, git, push, or PR work, decompose the goal and write tasks with acceptance criteria via ccm task add. ` +
@@ -57,6 +58,7 @@ runHook({
     }
 
     // H4：点名未对账节点（stale/escalated）。空 → ctx 与无 note 时字节一致。
+    // PARITY: rule-reinject-dangling-nodes
     if (danglingEntries.length) {
       ctxText += ` Note on resume: your board has unresolved node(s) needing attention — stale/escalated: ${danglingEntries.join(', ')}. ` +
         `Reconcile these (re-run stale, re-altitude escalated) before scheduling new work.`;
