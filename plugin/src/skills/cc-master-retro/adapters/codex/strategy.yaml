@@ -1,0 +1,9 @@
+host: codex
+skill: cc-master-retro
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/cc-master-retro/
+  include_adapter:
+    - agents/openai.yaml

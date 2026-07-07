@@ -14,10 +14,24 @@ commands:
     host_coverage:
       claude-code: implemented
       codex: conversational_guidance
+  - id: distill
+    required: true
+    intent: distill_candidate_lessons_into_project_assets
+    argument_contract: "<retro-path...> [--asset-type <disc,skill,workflow,subagent>] [--apply pr|draft] [--out-branch <name>]"
+    host_coverage:
+      claude-code: implemented
+      codex: ccm_guided
   - id: handoff-to-new-session
     required: true
     intent: archive_with_handoff_for_resume
     argument_contract: ""
+    host_coverage:
+      claude-code: implemented
+      codex: ccm_guided
+  - id: retro
+    required: true
+    intent: retrospect_board_and_capture_candidate_lessons
+    argument_contract: "[--home <path>] [--board <board-stem>] [--out <dir>]"
     host_coverage:
       claude-code: implemented
       codex: ccm_guided

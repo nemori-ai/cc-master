@@ -1,0 +1,11 @@
+# cc-master SAP strategy: Codex adapter for distilling-lessons-into-assets
+host: codex
+skill: distilling-lessons-into-assets
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/distilling-lessons-into-assets/
+notes:
+  - Host-neutral asset-routing taste; safe to project to Codex unchanged.
+  - Loaded explicitly by the cc-master-distill skill (Codex's ccm-guided distill surface).

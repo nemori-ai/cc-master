@@ -1,0 +1,23 @@
+[
+  {"query": "我从这份复盘文档里挖出一堆候选经验,这条该写进 AGENTS.md 还是该独立成一个 skill?", "should_trigger": true},
+  {"query": "这条经验只在这个项目的这次部署里踩过一次坑,还是该固化成一个通用 skill?", "should_trigger": true},
+  {"query": "怎么判断一条候选经验该归到纪律文档、skill、workflow 还是 subagent 里?", "should_trigger": true},
+  {"query": "这份候选内容草稿写得比证据支持的范围更普适,落地时该怎么收窄措辞?", "should_trigger": true},
+  {"query": "这个项目没有 skill 目录,这条判断力类的经验该怎么降级落地,而不是直接丢掉?", "should_trigger": true},
+  {"query": "两条候选经验都指向同一份文档的同一节,该怎么合并而不是分别追加造成重复?", "should_trigger": true},
+  {"query": "I have a batch of candidate lessons from a retro doc — how do I decide which ones become a new skill vs. just a note in the contributing guide?", "should_trigger": true},
+  {"query": "这条经验证据很弱、也说不准是不是通用做法,是不是应该直接不处理这条?", "should_trigger": true},
+  {"query": "蒸馏计划里这条候选经验的归宿判不清,三问都答不出来,该怎么兜底不让它凭空消失?", "should_trigger": true},
+  {"query": "怎么判断一套确定性的编排步骤该固化成 workflow,而不是写成一段判断力很重的 skill?", "should_trigger": true},
+
+  {"query": "这个领域该怎么建模,聚合根和不变式怎么设计比较好?", "should_trigger": false},
+  {"query": "我要把这个目标切成 board 任务依赖图,先做哪块后做哪块?", "should_trigger": false},
+  {"query": "我接手了这个已经切好的任务,该怎么一步步推进到验收标准?", "should_trigger": false},
+  {"query": "要不要给这个能力新建一个独立的 skill,还是塞进现有 skill 的一节就够了?", "should_trigger": false},
+  {"query": "怎么用 ccm 把这些任务和依赖写进 board?", "should_trigger": false},
+  {"query": "workflow 脚本里这段 fan-out 用 pipeline 还是 parallel 结构比较好?", "should_trigger": false},
+  {"query": "我快逼近 5 小时配额上限了,该不该现在换号?", "should_trigger": false},
+  {"query": "先写测试还是先写实现,这个改动要不要走 TDD?", "should_trigger": false},
+  {"query": "这个 PR 怎么用 gh CLI squash merge 并删除分支?", "should_trigger": false},
+  {"query": "给我讲讲梯度下降和过拟合的基本原理。", "should_trigger": false}
+]

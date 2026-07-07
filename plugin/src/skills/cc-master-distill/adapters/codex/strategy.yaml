@@ -1,0 +1,9 @@
+host: codex
+skill: cc-master-distill
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/cc-master-distill/
+  include_adapter:
+    - agents/openai.yaml

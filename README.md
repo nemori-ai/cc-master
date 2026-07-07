@@ -154,6 +154,8 @@ The handful of commands you'll actually type. The in-session entrypoint is harne
 - **Discuss** — Claude Code: `/cc-master:discuss <decision>`; Codex: `$cc-master-discuss <decision>`. Use it when a decision is waiting on you.
 - **Stop** — Claude Code: `/cc-master:stop`; Codex: `$cc-master-stop`. Wraps up and archives the board; you can resume later.
 - **Handoff** — Claude Code: `/cc-master:handoff-to-new-session`; Codex: `$cc-master-handoff-to-new-session`. Use it before moving the run to a fresh session.
+- **Retro** — Claude Code: `/cc-master:retro`; Codex: `$cc-master-retro`. Read-only retrospective on an in-progress or archived board — writes a lessons-learned document into the project itself (not the board, not GitHub).
+- **Distill** — Claude Code: `/cc-master:distill <retro-path...>`; Codex: `$cc-master-distill <retro-path...>`. Turns a retro's candidate lessons into real project assets (discipline-doc note, skill, workflow, or subagent) — always gated by a single user-approved plan, always collected via a feature-branch PR (or a draft directory for non-git projects). Never touches the board or `ccm`.
 - **`ccm account add|list|switch <email>`** — build and steer a pool of backup accounts so it can switch to a full one when quota runs low. You run these directly in your terminal; your tokens stay token-blind and never reach the AI's context.
 
 > That's the everyday set. The full command surface (every `ccm` namespace and flag) is in the [command catalog](skills/using-ccm/references/command-catalog.md); what's shipped vs. still on the way is in the [Feature Manual](design_docs/feature-manual.md).

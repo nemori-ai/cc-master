@@ -1,0 +1,18 @@
+# cc-master SAP strategy: Claude Code adapter for distilling-lessons-into-assets
+host: claude-code
+skill: distilling-lessons-into-assets
+version: 1
+projection:
+  source: canonical/
+  target: skills/distilling-lessons-into-assets/
+  copy: true
+  exclude:
+    - AGENTS.md
+    - CLAUDE.md
+mechanisms:
+  declarative-patch:
+    enabled: false
+    patches: []
+notes:
+  - Host-neutral asset-routing taste; no Claude Code-specific patching needed.
+  - Loaded explicitly by /cc-master:distill command body (Step 0).

@@ -91,7 +91,7 @@ const SKILL_DIRS = [DIST_SKILLS, '.claude/skills'];
 // dirs that actually ship with the plugin — bare refs in here die at install time.
 const DIST_DIRS = [`${DIST_ROOT}/skills`, `${DIST_ROOT}/commands`, `${DIST_ROOT}/hooks`];
 // Distributed skill names whose bare `<name>/…` path refs are install-time dead links.
-const DIST_SKILL_NAMES = ['authoring-workflows', 'master-orchestrator-guide', 'pacing-and-estimation', 'using-ccm', 'slicing-goals-into-dags', 'dev-as-ml-loop', 'engineering-with-craft'];
+const DIST_SKILL_NAMES = ['authoring-workflows', 'master-orchestrator-guide', 'pacing-and-estimation', 'using-ccm', 'slicing-goals-into-dags', 'dev-as-ml-loop', 'engineering-with-craft', 'distilling-lessons-into-assets'];
 
 // Recursively collect every *.md file under a repo-relative base dir.
 // Skip skills/<name>/.design: those are co-located dev docs and are stripped from

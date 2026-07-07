@@ -1,0 +1,19 @@
+host: codex
+command: retro
+version: 1
+mode: adapter_guidance
+surface:
+  kind: user_prompt_ccm_cli_guided
+  user_prompt: plugin/src/skills/cc-master-retro/canonical/SKILL.md
+  summary: "Retrospect a board (active or archived) via read-only ccm commands and write a narrative retro markdown into the target project."
+  primary_commands:
+    - "ccm board show --board <board-path> --json"
+    - "ccm log list --board <board-path> --json"
+    - "ccm jc list --board <board-path> --json"
+    - "ccm jc show <id> --board <board-path> --json"
+    - "ccm task list --board <board-path> --json"
+    - "ccm task show <id> --board <board-path> --json"
+notes:
+  - Codex 目前的实现是 skill-first：无 native `/cc-master:retro` slash command，复盘引导通过 `plugin/src/skills/cc-master-retro/canonical/SKILL.md` 与上述只读 ccm 命令拼出复盘。
+  - Retro accepts an archived (owner.active:false) board on purpose — this differs from status/stop's active-only board discovery.
+  - Output is a project-local markdown file (design_docs/retros/ or .cc-master-retros/), never board writes, never GitHub.
