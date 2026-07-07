@@ -129,7 +129,12 @@ test('task add creates a node (status=ready default, deps, created_at stamped)',
     ],
   });
   const ctx = mkCtx(boardPath, {
-    values: { type: 'development', deps: 'T1', title: '实现 estimate 接缝' },
+    values: {
+      type: 'development',
+      deps: 'T1',
+      title: '实现 estimate 接缝',
+      ref: ['spec:/abs/spec.md', 'plan:/abs/plan.md'],
+    },
     positionals: ['T7'],
   });
   const code = taskHandler.add(ctx);
@@ -197,6 +202,8 @@ test('task add with --log also appends a log entry', () => {
 });
 
 // ══ task update ════════════════════════════════════════════════════════════════════════════════════
+//   type='development' 需要 spec/plan 引用锚点才 lint-clean（BIZ-DEV-REFS 已 C1 hard 化）——两个 seed
+//   task 都带一对 spec/plan references，保持既有 happy-path 测试（不涉及本次诊断/hard 化本身）不变。
 const SEED_TASKS = [
   {
     id: 'T1',
@@ -205,6 +212,10 @@ const SEED_TASKS = [
     verified: true,
     artifact: '/abs/t1.md',
     type: 'development',
+    references: [
+      { kind: 'spec', ref: '/abs/t1-spec.md' },
+      { kind: 'plan', ref: '/abs/t1-plan.md' },
+    ],
     created_at: '2026-06-24T08:00:00Z',
   },
   {
@@ -212,6 +223,10 @@ const SEED_TASKS = [
     status: 'ready',
     deps: ['T1'],
     type: 'development',
+    references: [
+      { kind: 'spec', ref: '/abs/t2-spec.md' },
+      { kind: 'plan', ref: '/abs/t2-plan.md' },
+    ],
     created_at: '2026-06-24T08:30:00Z',
   },
 ];
@@ -247,6 +262,45 @@ test('task update on a missing id throws → NotFound(5)', () => {
   );
 });
 
+// ── issue #57 问题2：--artifact-only on an already-done-but-unverified task → early Usage diagnostic ──
+test('task update --artifact only on a done+unverified task → early Usage(2) diagnostic, board unchanged', () => {
+  const tasks = structuredClone(SEED_TASKS);
+  const doneTask = tasks.find((t: any) => t.id === 'T1');
+  if (!doneTask) throw new Error('T1 not found in SEED_TASKS');
+  doneTask.status = 'done';
+  doneTask.verified = false;
+  doneTask.artifact = '';
+  const boardPath = mkBoardHome({ tasks });
+  const before = readFileSync(boardPath, 'utf8');
+  const ctx = mkCtx(boardPath, { values: { artifact: '/abs/out.md' }, positionals: ['T1'] });
+  assert.throws(
+    () => taskHandler.update(ctx),
+    (e: { errKind?: string; message?: string }) =>
+      e.errKind === 'Usage' && /--verified/.test(e.message || ''),
+  );
+  // Board must be untouched (thrown before mutate ran / lock released without a write).
+  assert.equal(readFileSync(boardPath, 'utf8'), before);
+});
+
+test('task update --artifact + --verified together on a done+unverified task succeeds (diagnostic does not fire)', () => {
+  const tasks = structuredClone(SEED_TASKS);
+  const doneTask = tasks.find((t: any) => t.id === 'T1');
+  if (!doneTask) throw new Error('T1 not found in SEED_TASKS');
+  doneTask.status = 'done';
+  doneTask.verified = false;
+  doneTask.artifact = '';
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, {
+    values: { artifact: '/abs/out.md', verified: true },
+    positionals: ['T1'],
+  });
+  const code = taskHandler.update(ctx);
+  assert.equal(code, EXIT.OK);
+  const t = findTask(readBoard(boardPath), 'T1');
+  assert.equal(t.verified, true);
+  assert.equal(t.artifact, '/abs/out.md');
+});
+
 // ══ task start / done ════════════════════════════════════════════════════════════════════════════
 test('task start transitions ready→in_flight and stamps started_at', () => {
   const boardPath = mkBoardHome({ tasks: structuredClone(SEED_TASKS) });
@@ -280,6 +334,119 @@ test('task done transitions in_flight→done, stamps finished_at, lands artifact
   assert.match(t.finished_at, ISO_RE);
   assert.equal(t.artifact, '/abs/out.md');
   assert.equal(t.verified, true);
+});
+
+// ── 批量语义（issue #57 问题3 方案3·design_docs/plans/2026-07-07-ccm-batch-verb-spec.md）───────────────
+test('task done <id1> <id2> → 一次 mutate+lint+write，两个 id 都落 done + 共享 artifact/verified', () => {
+  const tasks = [
+    { id: 'B1', status: 'in_flight', deps: [], created_at: '2026-06-24T08:00:00Z' },
+    { id: 'B2', status: 'in_flight', deps: [], created_at: '2026-06-24T08:00:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, {
+    values: { artifact: '/abs/shared.md', verified: true },
+    positionals: ['B1', 'B2'],
+  });
+  const code = taskHandler.done(ctx);
+  assert.equal(code, EXIT.OK);
+  const board = readBoard(boardPath);
+  for (const id of ['B1', 'B2']) {
+    const t = findTask(board, id);
+    assert.equal(t.status, 'done');
+    assert.equal(t.artifact, '/abs/shared.md');
+    assert.equal(t.verified, true);
+  }
+});
+
+test('task done batch: one id illegal transition (still ready), no --force → throws, nothing persists (all-or-nothing)', () => {
+  const tasks = [
+    { id: 'B1', status: 'in_flight', deps: [], created_at: '2026-06-24T08:00:00Z' },
+    { id: 'B2', status: 'ready', deps: [], created_at: '2026-06-24T08:00:00Z' }, // never started
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const before = readFileSync(boardPath, 'utf8');
+  const ctx = mkCtx(boardPath, {
+    values: { artifact: '/abs/shared.md', verified: true },
+    positionals: ['B1', 'B2'],
+  });
+  assert.throws(
+    () => taskHandler.done(ctx),
+    (e: { errKind?: string }) => e.errKind === 'IllegalTransition',
+  );
+  assert.equal(
+    readFileSync(boardPath, 'utf8'),
+    before,
+    'B1 (which would have been legal on its own) must NOT persist either — all-or-nothing',
+  );
+});
+
+test('task done batch: one id illegal transition + --force → whole batch forced through and persists', () => {
+  const tasks = [
+    { id: 'B1', status: 'in_flight', deps: [], created_at: '2026-06-24T08:00:00Z' },
+    { id: 'B2', status: 'ready', deps: [], created_at: '2026-06-24T08:00:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, {
+    values: { artifact: '/abs/shared.md', verified: true },
+    positionals: ['B1', 'B2'],
+    flags: { force: true },
+  });
+  const code = taskHandler.done(ctx);
+  assert.equal(code, EXIT.OK);
+  const board = readBoard(boardPath);
+  for (const id of ['B1', 'B2']) {
+    const t = findTask(board, id);
+    assert.equal(t.status, 'done');
+  }
+});
+
+test('task done --json: data is an array (length = id count, incl. single-id calls)', () => {
+  const tasks = [
+    { id: 'B1', status: 'in_flight', deps: [], created_at: '2026-06-24T08:00:00Z' },
+    { id: 'B2', status: 'in_flight', deps: [], created_at: '2026-06-24T08:00:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const batchCtx = mkCtx(boardPath, {
+    values: { artifact: '/abs/x.md', verified: true },
+    positionals: ['B1', 'B2'],
+    flags: { json: true },
+  });
+  taskHandler.done(batchCtx);
+  const batchParsed = JSON.parse(batchCtx.outBuf.join(''));
+  assert.ok(Array.isArray(batchParsed.data), 'batch --json data is an array');
+  assert.equal(batchParsed.data.length, 2);
+  assert.deepEqual(batchParsed.data.map((t: { id: string }) => t.id).sort(), ['B1', 'B2']);
+
+  // Single-id call: shape is still an array of length 1 (documented shape change — see mini-spec).
+  const tasks2 = [{ id: 'S1', status: 'in_flight', deps: [], created_at: '2026-06-24T08:00:00Z' }];
+  const boardPath2 = mkBoardHome({ tasks: tasks2 });
+  const singleCtx = mkCtx(boardPath2, {
+    values: { artifact: '/abs/x.md', verified: true },
+    positionals: ['S1'],
+    flags: { json: true },
+  });
+  taskHandler.done(singleCtx);
+  const singleParsed = JSON.parse(singleCtx.outBuf.join(''));
+  assert.ok(Array.isArray(singleParsed.data), 'single-id --json data is still an array');
+  assert.equal(singleParsed.data.length, 1);
+  assert.equal(singleParsed.data[0].id, 'S1');
+});
+
+test('task start <id1> <id2> → batch ready→in_flight', () => {
+  const tasks = [
+    { id: 'B1', status: 'ready', deps: [], created_at: '2026-06-24T08:00:00Z' },
+    { id: 'B2', status: 'ready', deps: [], created_at: '2026-06-24T08:00:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, { positionals: ['B1', 'B2'] });
+  const code = taskHandler.start(ctx);
+  assert.equal(code, EXIT.OK);
+  const board = readBoard(boardPath);
+  for (const id of ['B1', 'B2']) {
+    const t = findTask(board, id);
+    assert.equal(t.status, 'in_flight');
+    assert.match(t.started_at, ISO_RE);
+  }
 });
 
 test('task done without verified/artifact is rejected by write validation and does not persist', () => {

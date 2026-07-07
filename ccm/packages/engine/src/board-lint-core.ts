@@ -1019,13 +1019,14 @@ function lintTaskBiz(id: string, t: TaskLike, emit: Emit): void {
     : [];
   const hasRefKind = (k: string) => refs.some((r) => (r as Record<string, unknown>).kind === k);
 
-  // BIZ-DEV-REFS（warn）：type=development ⇒ references 含 spec≥1 且 plan≥1。
+  // BIZ-DEV-REFS（hard）：type=development ⇒ references 含 spec≥1 且 plan≥1。
   if (t.type === 'development') {
     if (!hasRefKind('spec') || !hasRefKind('plan')) {
       emit(
         'BIZ-DEV-REFS',
         `${id} 是 development task，但 references 缺 ${!hasRefKind('spec') ? 'kind=spec ' : ''}${!hasRefKind('plan') ? 'kind=plan' : ''} 引用。` +
-          `影响：开发型节点至少要有 spec doc 与 plan doc 作为依据，缺则执行者/复盘者无锚点（用户定·warn 容渐进补全）。`,
+          `影响：开发型节点必须有 spec doc 与 plan doc 作为依据，缺则执行者/复盘者无锚点——写入被拒（用户定·hard，--force 可越）。\n` +
+          `  怎么修：\`ccm task update ${id} --add-ref spec:/abs/spec.md --add-ref plan:/abs/plan.md\`。`,
         id,
       );
     }

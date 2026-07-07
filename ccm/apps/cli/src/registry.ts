@@ -361,25 +361,37 @@ export const REGISTRY: Registry = {
       handler: 'task.update',
     },
     start: {
-      summary: '起跑（→ in_flight·盖 started_at）',
+      summary: '起跑（→ in_flight·盖 started_at；可批量：多个 id 一次 mutate+lint+write）',
       read: false,
-      positionals: [{ name: 'id', required: true }],
+      positionals: [{ name: 'id...', required: true }],
       options: {
         log: { type: 'string', desc: '同时追一条 log' },
       },
-      examples: ['ccm task start T7'],
+      examples: ['ccm task start T7', 'ccm task start T7 T8 T9'],
       handler: 'task.start',
     },
     done: {
-      summary: '完成（→ done·盖 finished_at）',
+      summary:
+        '完成（→ done·盖 finished_at；可批量：多个 id 一次 mutate+lint+write，根治批量回填死结）',
       read: false,
-      positionals: [{ name: 'id', required: true }],
+      positionals: [{ name: 'id...', required: true }],
       options: {
-        artifact: { type: 'string', field: 'artifact', desc: '产物链接（绝对路径 / URL）' },
-        verified: { type: 'boolean', field: 'verified', desc: '标记已端点验收' },
-        log: { type: 'string', desc: '同时追一条 log' },
+        artifact: {
+          type: 'string',
+          field: 'artifact',
+          desc: '产物链接（绝对路径 / URL；批量时对每个 id 一视同仁）',
+        },
+        verified: {
+          type: 'boolean',
+          field: 'verified',
+          desc: '标记已端点验收（批量时对每个 id 一视同仁）',
+        },
+        log: { type: 'string', desc: '同时追一条 log（批量只追一条，summary 含全部 id）' },
       },
-      examples: ['ccm task done T7 --artifact /abs/out.md --verified'],
+      examples: [
+        'ccm task done T7 --artifact /abs/out.md --verified',
+        'ccm task done T7 T8 T9 --artifact /abs/out.md --verified',
+      ],
       handler: 'task.done',
     },
     block: {

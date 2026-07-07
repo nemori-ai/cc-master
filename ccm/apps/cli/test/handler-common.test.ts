@@ -256,12 +256,13 @@ test('runWrite --force overrides hard error and writes', () => {
 });
 
 test('runWrite warnings → 默认只一行摘要（QA #6·不刷屏），不挡写', () => {
-  // 加一个 type=development 但缺 spec/plan 引用的 task → BIZ-DEV-REFS warn（不挡）。
+  // 加一个 type=acceptance 但缺 acceptance 字段的 task → BIZ-ACCEPTANCE-REQUIRED warn（不挡）。
+  //   （BIZ-DEV-REFS 已被 C1 hard 化——development 缺 spec/plan 现在会挡写，不再适合当"warn 不挡"示例。）
   const { boardPath } = mkBoardHome();
   const ctx = mkCtx(boardPath);
   const code = common.runWrite(ctx, {
     mutate: (board) =>
-      mutations.addTask(board as common.BoardArg, { id: 'TW', type: 'development' }),
+      mutations.addTask(board as common.BoardArg, { id: 'TW', type: 'acceptance' }),
     render: () => 'written-with-warn',
   });
   assert.equal(code, EXIT.OK);
@@ -279,7 +280,7 @@ test('runWrite warnings → --verbose 展开全量 [warn] 报告（QA #6）', ()
   const ctx = mkCtx(boardPath, { flags: { verbose: true } });
   const code = common.runWrite(ctx, {
     mutate: (board) =>
-      mutations.addTask(board as common.BoardArg, { id: 'TW', type: 'development' }),
+      mutations.addTask(board as common.BoardArg, { id: 'TW', type: 'acceptance' }),
     render: () => 'written-with-warn',
   });
   assert.equal(code, EXIT.OK);

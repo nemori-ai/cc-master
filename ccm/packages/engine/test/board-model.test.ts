@@ -226,8 +226,8 @@ test('INVARIANTS catalog covers the key v2 rules at the agreed levels (spec §5)
   assert.equal(lvl('BIZ-TASK-OVERSIZED-FOR-CADENCE'), 'warn');
   assert.equal(lvl('BIZ-AGILE-ACCEPTANCE-MISSING'), 'warn');
   assert.equal(lvl('BIZ-ESTIMATE-STALE'), 'warn');
-  // 条件业务规则 → warn。
-  assert.equal(lvl('BIZ-DEV-REFS'), 'warn');
+  // 条件业务规则 → warn（BIZ-DEV-REFS 例外：development 缺 spec/plan 锚点 → hard，--force 可越）。
+  assert.equal(lvl('BIZ-DEV-REFS'), 'hard');
   assert.equal(lvl('BIZ-ACCEPTANCE-REQUIRED'), 'warn');
   assert.equal(lvl('BIZ-EXECUTOR-HANDLE'), 'warn');
   assert.equal(lvl('BIZ-EXTERNAL-ISSUE'), 'warn');

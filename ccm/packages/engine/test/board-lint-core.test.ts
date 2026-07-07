@@ -555,7 +555,7 @@ test('#38: inputs_hash must be sha256:<64 hex> (loose/short now warns)', () => {
 });
 
 // ── BIZ 条件业务规则 ────────────────────────────────────────────────────────────────────────────────
-test('BIZ-DEV-REFS: type=development ⇒ refs 含 spec + plan', () => {
+test('BIZ-DEV-REFS: type=development ⇒ refs 含 spec + plan（hard，C1 ADR-019 §14 warn→hard）', () => {
   const bad = lintBoard(
     onlyTask({
       id: 'X',
@@ -566,7 +566,8 @@ test('BIZ-DEV-REFS: type=development ⇒ refs 含 spec + plan', () => {
       references: [{ kind: 'spec', ref: '/s' }],
     }),
   );
-  assert.ok(ruleSet(bad.warnings).has('BIZ-DEV-REFS'), 'missing plan ref warns');
+  assert.ok(ruleSet(bad.errors).has('BIZ-DEV-REFS'), 'missing plan ref → hard error');
+  assert.ok(!ruleSet(bad.warnings).has('BIZ-DEV-REFS'));
   const ok = lintBoard(
     onlyTask({
       id: 'X',
@@ -580,6 +581,7 @@ test('BIZ-DEV-REFS: type=development ⇒ refs 含 spec + plan', () => {
       ],
     }),
   );
+  assert.ok(!ruleSet(ok.errors).has('BIZ-DEV-REFS'));
   assert.ok(!ruleSet(ok.warnings).has('BIZ-DEV-REFS'));
 });
 

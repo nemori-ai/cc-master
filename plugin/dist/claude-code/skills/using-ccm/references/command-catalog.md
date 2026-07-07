@@ -164,6 +164,7 @@ ccm <alias> [args] [flags]
 | `3` | 校验拒绝（lint hard error / 非法状态转移 / `--set` 命中 🔒 字段） |
 | `4` | 锁超时 |
 | `5` | 无 active board |
+| `7` | policy-deny——`account switch` 的自主换号被目标板 `policy.autonomous_account_switch:deny` 拦下（机制硬闸，见 [account-pool.md](./account-pool.md)） |
 
 ### JSON 信封
 
@@ -473,54 +474,76 @@ ccm task update <id> [flags]
 
 - 例：`ccm task update T7 --estimate 5h --add-dep T2` · `ccm task update T7 --rm-dep T2 --verified --artifact /abs/out.md`
 - 注：`update` 无 `--deps`（用 `--add-dep` / `--rm-dep`）、无 `--status`（用 start / done / block / set-status）。
+- **`--artifact` 提前诊断（issue #57 问题2）**：若目标 task 已是 `status:done` 且 `verified` 非 `true`，单独设
+  `--artifact`（不带 `--verified`）必然无法满足 done 真语义（`BIZ-DONE-VERIFIED`）——handler 层提前给一个更
+  直达的 `Usage` 错误（**exit 2**，不是 exit 3），指路"同时加 `--verified` 或改用 `task done --verified
+  --artifact`"。这是体验性提前诊断（lint 仍是唯一校验权威），不是新增校验规则——同时给 `--verified` 或目标
+  不是"已 done 且未 verified"时不触发，正常交给 lint 判。
 
 ### task start
 
 **写**
 
 ```
-ccm task start <id> [flags]
+ccm task start <id> [<id2> <id3> ...] [flags]
 ```
 
 - positional：
 
 | 名 | 必填 | 含义 |
 |---|---|---|
-| `<id>` | 是 | task id |
+| `<id>` | 是 | task id（**可给多个**，空格分隔——批量起跑，见下方"批量语义"） |
 
 - 行为：→ `in_flight`·盖 `started_at`
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--log <str>` | | string | 同时追一条 log |
+| `--log <str>` | | string | 同时追一条 log（批量只追一条，summary 含全部 id） |
 
-- 例：`ccm task start T7`
+- 例：`ccm task start T7` · `ccm task start T7 T8 T9`（批量起跑）
 
 ### task done
 
 **写**
 
 ```
-ccm task done <id> [flags]
+ccm task done <id> [<id2> <id3> ...] [flags]
 ```
 
 - positional：
 
 | 名 | 必填 | 含义 |
 |---|---|---|
-| `<id>` | 是 | task id |
+| `<id>` | 是 | task id（**可给多个**，空格分隔——批量完成，见下方"批量语义"） |
 
 - 行为：→ `done`·盖 `finished_at`;写入关卡要求同时带 `--verified` 与非空 `--artifact`,否则 `BIZ-DONE-VERIFIED` hard gate 拒绝落盘(exit 3)
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--artifact <str>` | | string | 产物链接（绝对路径 / URL） |
-| `--verified` | | bool | 标记已端点验收 |
-| `--log <str>` | | string | 同时追一条 log |
+| `--artifact <str>` | | string | 产物链接（绝对路径 / URL；批量时对每个 id 一视同仁） |
+| `--verified` | | bool | 标记已端点验收（批量时对每个 id 一视同仁） |
+| `--log <str>` | | string | 同时追一条 log（批量只追一条，summary 含全部 id） |
 
-- 例：`ccm task done T7 --artifact /abs/out.md --verified`
+- 例：`ccm task done T7 --artifact /abs/out.md --verified` · `ccm task done T7 T8 T9 --artifact /abs/out.md --verified`（批量）
+
+**批量语义（`task start` / `task done` 共用·issue #57 问题3 方案3·根治批量回填死结）**：`runWrite` 的写入
+关卡是"mutate → 对整块 next 板跑一次 `lintBoard` → 有 hard error 就整体拒绝、不落盘"。逐条独立调用
+`ccm task done <id>`（N 次独立进程 = N 次独立 mutate+lint+write）时，只要 board 上**还有其它任务**违反某条
+hard 规则（哪怕与本次改的 id 无关），每一次单独调用都会因为**全局其它任务的存量违规**被拒——这正是"批量
+45 个 id 只 1 个生效"的死结根因。批量调用（一次传入多个 id）把 N 次独立调用坍缩成**一次**调用：内部对每个
+id 依次 `transition` + 覆写字段，但只跑**一次** `lintBoard` + **一次**落盘——只要这一批 id 本身在这次操作
+后都变得合规、且 board 上没有**第三方**（不在这批里的）存量违规，就能一次性全部落盘。
+
+- **all-or-nothing**：批量里任意一个 id 转移非法（如仍是 `ready` 没 `start` 就 `done`）或不存在，整批**都不
+  落盘**（包括批量里其它本来合法的 id）——没有"部分提交"，`runWrite` 从来没有这个概念。
+- **`--force`**：对整批统一生效（既有全局语义），越过非法转移 + lint hard error；不支持"这批里第 3 个不
+  force、其它 force"这种细粒度控制。
+- **`--json` 输出形状**：`data` 从「单任务对象」统一为**数组**（长度恒等于传入 id 数，**含单 id 调用**——
+  单 id 时 `data` 是长度为 1 的数组，这是本次改动唯一的向后不兼容点）。
+- 若 board 上还有本批之外的第三方违规 task，批量 verb 不解决那个更大的问题——那仍需 `--force` 或把那些 id
+  也纳入本次批量调用。
 
 ### task block
 
