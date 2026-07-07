@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-07-07
+
+> **using-ccm 锁步同步（配套 ccm-v0.16.0）** —— ccm 的 `--set/--set-json` scoping 根治（dogfood Finding #83：裸 dotpath 落 board 顶层而非该 task、零回显）随 `ccm-v0.16.0` 发布，本版按锁步纪律同步 `using-ccm` 操作手册，让 agent 照手册一次写对。
+
+### Changed
+
+- **`using-ccm` 手册同步 ccm-v0.16.0 的 `--set/--set-json` scoping 语义**：`references/command-catalog.md` 新增 scoping 语义总段（task 语境裸 path 落该 task / `tasks[<id>].` 前缀跨 task / `board update --set` 板级正门 / 落点回显）+ 逐 verb 落点说明 + 「给 task 挂 `decision_package`」正例；`SKILL.md` 心智锚与 footgun 速查改写（裸 `--set status=done` 由「静默 junk」改为「exit 3 被拒」）；`references/board-model-guide.md` footgun 条目同步。
+- **dogfood 台账**：Finding #83 落账并标注已修（机制层归 ccm-v0.16.0，文档层即本版）。
+
 ## [0.14.0] — 2026-07-07
 
 > **retro/distill 两阶段复盘蒸馏 + hook parity contract 层 + skills 甲包** —— 这一版交付 GitHub issues #37/#57 的完整解决：新增 `/cc-master:retro`（只读复盘）与 `/cc-master:distill`（四类资产蒸馏）两条命令及第八个分发 skill `distilling-lessons-into-assets`；为 7 个双端 hook 建立 host-neutral CONTRACT.md parity 保障体系（ADR-028）并修复 Codex 侧四处实现分叉；board-guard 跨段误报根治；既有 skills 完成 spec-first 硬闸、跨族 review 指导与受众/去重清理。配套 ccm 线 `ccm-v0.15.0`（批量 task verb 等，见 ccm changelog）。
