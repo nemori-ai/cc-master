@@ -39,7 +39,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 这是本 skill 最容易踩、也最不能踩的一条。**task 的 `status` 不是一个你 `--set` 赋值的普通字段——它是一台状态机的当前态,只能经生命周期 verb 转移。**
 
 - 改 status **只有**这几条命令:`task start`(→ in_flight)、`task done`(→ done)、`task block --on`(→ blocked)、`task unblock`(清 `blocked_on`·交回 deps 门控)、`task set-status <id> <status>`(通用转移)。
-- **没有** `task set`;`task update` **不接** `--status`;`--set tasks[T].status=…` 被 🔒 守门拒(exit 3);`--set status=done`(无 `tasks[]` 前缀)更坏——它静默写一个 board 顶层 junk 字段、exit 0 但**根本没碰任务**。
+- **没有** `task set`;`task update` **不接** `--status`;`--set tasks[T].status=…` 被 🔒 守门拒(exit 3);裸 `--set status=done` 同样被拒(exit 3)——task verb 的裸 path scope 到本 task,`status` 命中 🔒 守门,不会静默落 board 顶层。
 - **`ready → done` 非法**:必须先 `task start`(ready → in_flight)再 `task done`。直接 done 撞 `illegal transition: ready → done`(exit 3)。
 - **`ready ↔ blocked` 由系统按 deps 自动归一**:每次 ccm 写命令落盘前引擎跑一趟 `reconcileGating`——**无 `blocked_on`** 且 status∈{ready,blocked} 的 task 按 deps 完成度重定(deps 全 done→ready,否则→blocked)。所以你**几乎不用手搬 ready/blocked**:`task done` 掉上游后下游自动 ready、`task add --deps <未完成>` 自动落 blocked。**手动 `set-status <id> ready` 会被 deps 否决**(deps 未满足下一趟归回 blocked)。**有 `blocked_on`(等 user / 等某 task)= 语义阻塞,豁免自动门控**;解除用 **`task unblock <id>`**,别用 `set-status`。手改 board 造出的不一致态(ready 但 deps 未 done / blocked 无 blocked_on 但 deps 全 done)由 `BIZ-STATUS-DEPS` warn 兜。
 
@@ -62,7 +62,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 
 | 你会对自己说 | 现实 |
 |---|---|
-| "status 不过是个字段,改字段的通用 idiom 就是 `set --status <值>`,赋值就行,不用懂状态机。" | ccm **故意**不给 status 一个通用 field-setter。赋值绕过转移闸、不盖 `started_at`/`finished_at`、还可能落进静默 junk(`--set status=` 那条 exit 0 但没改任务)。verb 才是对的路:它校验转移合法 + 盖 derived 字段。 |
+| "status 不过是个字段,改字段的通用 idiom 就是 `set --status <值>`,赋值就行,不用懂状态机。" | ccm **故意**不给 status 一个通用 field-setter。赋值绕过转移闸、不盖 `started_at`/`finished_at`——所以 `--set status=…` 无论带不带 `tasks[]` 前缀都被 🔒 守门拒(exit 3)。verb 才是对的路:它校验转移合法 + 盖 derived 字段。 |
 | "我赶时间,`task update --status done` 一条搞定,省得 start 再 done 两步。" | `task update` 没有 `--status` flag(exit 2),`ready→done` 也非法(exit 3)——这条"省一步"两次都会失败,反而更慢。`start` 再 `done` 才是真正的两步到位。 |
 | "ccm 报 illegal transition,我加 `--force` 推过去得了。" | `--force` 是越闸逃生口、会记 log,留给真异常态(比如复活 stale)。正常完成一个任务用 `--force` 跳过 `in_flight`,等于亲手制造一个没 `started_at` 的"done"——你在伪造审计轨迹。 |
 
@@ -73,10 +73,10 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 board 字段分三档(权威定义在 `ccm` 引擎:enums / 字段元数据 / 不变式 / 状态机——实时真相用 `ccm <ns> --help`。每字段属哪档 + 怎么取值的操作视图见 [references/board-model-guide.md](references/board-model-guide.md) §A;这里只给**操作规则**):
 
 - **🔒 load-bearing**:`id` / `status` / `deps` / `parent`,以及 board 级 `goal` / `owner` / `git` / `tasks`。**`--set` 一律拒(exit 3)**,只能走专属命令(`task add`/`start`/`done`/`block`/`set-status`、`task update --add-dep/--rm-dep/--parent`、`board update --goal/--branch/...`)。
-- **✎ flexible**:`title` / `description` / `estimate` / `acceptance` / `justification` / `artifact` 等。**这些才用 `--set`**,且**必须带 task 作用域前缀**:`--set tasks[T1].title="新标题"`(裸 `--set title=…` 会落到 board 顶层,不是任务上)。长尾对象/数组用 `--set-json`。
+- **✎ flexible**:`title` / `description` / `estimate` / `acceptance` / `justification` / `artifact` 等。**这些才用 `--set`**,且 scoping 跟着命令语境走:`task add`/`task update <id>` 里**裸 path 作用于该 task**(`ccm task update T1 --set title="新标题"` 就落在 T1 上);板级顶层 ✎ 字段走 `board update --set`;要跨 task 写才用显式前缀 `--set tasks[T2].title=…`。长尾对象/数组用 `--set-json`。写入后非 `--json` 输出会回显实际落点(如 `set tasks[T1].title`),落点不对一眼可见。
 - **👁 observed**:`scheduling.wip_limit`、`watchdog`、`wip_limit` 等——hook 有则用、缺则降级,走各自具名 flag。
 
-一句话:**改 🔒 找专属命令,改 ✎ 用 `--set tasks[ID].field`,拿不准先 `ccm task update <id> --help` 看有没有具名 flag。**
+一句话:**改 🔒 找专属命令;改 task 的 ✎ 用 `task update <id> --set field=…`(裸 path 即本 task),改板级 ✎ 用 `board update --set`;拿不准先 `ccm task update <id> --help` 看有没有具名 flag。**
 
 ---
 
@@ -128,9 +128,9 @@ ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism shell --checklist "p
 
 | 现象 | 真相 / 怎么做 |
 |---|---|
-| `--set status=done` exit 0 却没改任务 | 它写了 board 顶层 junk。status 永远走 verb(锚 2)。 |
+| `task update --set status=done` 被拒 exit 3 | task 语境的裸 path scope 到本 task,`status` 是 🔒。status 永远走 verb(锚 2)。 |
 | `task done` 报 `illegal transition: ready → done` | 先 `task start`。`ready` 不能直接 `done`。 |
-| `board update` 报"unknown option `--set`" | `board update` **不接** `--set`,只认 `--goal/--wip-limit/--owner-wip/--branch/--worktree`。 |
+| `--set` 的值不知道落哪了 | 看非 `--json` 输出的 `set <path>` 回显行:task verb 裸 path=本 task,`board update` 裸 path=board 顶层,`jc add`/`cadence *` 裸 path=board 顶层。 |
 | `task show <id>` 返回 `data:null` 还 exit 0 | 读不存在的 id **不报错**——调用方自己判 null。 |
 | `board lint` exit 3 但 stdout 是 `{"ok":true,...}` | 外层信封 `ok` 恒 true;**lint 是否净看 `data.ok` 与 exit code**(3=有 hard error)。 |
 | `block --on user` 写进去了却被 lint 挡 | awaiting-user 节点**必须**带 `decision_package`(`--decision @file`),否则 BIZ-AWAITING 硬闸。 |

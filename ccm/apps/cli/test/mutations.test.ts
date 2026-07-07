@@ -521,6 +521,48 @@ test('applySetJson honors 🔒 gate too (refuses deps)', () => {
   );
 });
 
+// ── applySet / applySetJson 的 defaultTaskId scoping（Finding #83·task verb 语境）──────────────────
+test('applySet with defaultTaskId: bare dotpath lands on THAT task (not board top-level)', () => {
+  const b = m.applySet(baseBoard(), 'hitl_rounds', 3, { defaultTaskId: 'T1' });
+  assert.equal(b.tasks.find((x: AnyBoard) => x.id === 'T1').hitl_rounds, 3, '落在 task 上');
+  assert.equal(b.hitl_rounds, undefined, 'board 顶层不被污染');
+});
+
+test('applySet with defaultTaskId: explicit tasks[<其它id>].field prefix still targets that task', () => {
+  const b = m.applySet(baseBoard(), 'tasks[T0].hitl_rounds', 7, { defaultTaskId: 'T1' });
+  assert.equal(b.tasks.find((x: AnyBoard) => x.id === 'T0').hitl_rounds, 7, '显式前缀优先');
+  assert.equal(b.tasks.find((x: AnyBoard) => x.id === 'T1').hitl_rounds, undefined);
+});
+
+test('applySet with defaultTaskId: bare 🔒 task field (status/deps/parent/id) REFUSED (no silent junk)', () => {
+  for (const p of ['status', 'deps', 'parent', 'id']) {
+    assert.throws(
+      () => m.applySet(baseBoard(), p, 'x', { defaultTaskId: 'T1' }),
+      (e: any) => e.errKind === 'Validation',
+      `bare "${p}" in task scope must be refused (曾静默落 board 顶层 junk)`,
+    );
+  }
+});
+
+test('applySetJson with defaultTaskId: bare dotpath lands the JSON on that task', () => {
+  const b = m.applySetJson(baseBoard(), 'decision_package', '{"q":"?"}', {
+    defaultTaskId: 'T1',
+  });
+  assert.deepEqual(b.tasks.find((x: AnyBoard) => x.id === 'T1').decision_package, { q: '?' });
+});
+
+test('applySet without defaultTaskId: bare dotpath still lands board top-level (board update 语境)', () => {
+  const b = m.applySet(baseBoard(), 'notes', 'hello');
+  assert.equal(b.notes, 'hello');
+});
+
+test('logicalSetPath: 归一化逻辑落点（回显用）', () => {
+  assert.equal(m.logicalSetPath('foo.bar', { defaultTaskId: 'T1' }), 'tasks[T1].foo.bar');
+  assert.equal(m.logicalSetPath('tasks[T0].foo', { defaultTaskId: 'T1' }), 'tasks[T0].foo');
+  assert.equal(m.logicalSetPath('tasks.T0.foo', { defaultTaskId: 'T1' }), 'tasks[T0].foo');
+  assert.equal(m.logicalSetPath('foo.bar'), 'foo.bar');
+});
+
 // ── boardSetParam（ADR-020·hook-owned runtime 参数区·白名单 + 值校验）─────────────────────────────────
 test('boardSetParam: 白名单 key + 合法 ISO → 写 runtime.<key> + stamp heartbeat', () => {
   const b = baseBoard();

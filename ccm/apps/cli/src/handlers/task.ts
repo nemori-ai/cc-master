@@ -41,11 +41,22 @@ interface TaskLike {
 
 // ── 内部：把 buildFields 的 sets/setJsons 操作列表逐条 apply 到 board（通用 --set / --set-json 逃生口）。──
 //   applySet/applySetJson 命中 🔒 load-bearing path → throw Validation（冒泡 router 映射 exit 3）。
-function applyOps(board: BoardArg, sets: SetOp[], setJsons: SetOp[]): BoardArg {
+//   taskId：task verb 语境的默认作用域（Finding #83）——裸 dotpath scope 到该 task（与 --title 等普通 flag
+//   一致的直觉）；显式 tasks[<其它id>].field 前缀仍按原契约作用于指定 task（跨 task 逃生口）。
+function applyOps(board: BoardArg, sets: SetOp[], setJsons: SetOp[], taskId?: string): BoardArg {
   let b = board;
-  for (const op of sets) b = mutations.applySet(b, op.path, op.value);
-  for (const op of setJsons) b = mutations.applySetJson(b, op.path, op.value);
+  const scope = { defaultTaskId: taskId };
+  for (const op of sets) b = mutations.applySet(b, op.path, op.value, scope);
+  for (const op of setJsons) b = mutations.applySetJson(b, op.path, op.value, scope);
   return b;
+}
+
+// ── 内部：--set/--set-json 写入后的逻辑落点回显行（非 --json 输出用·Finding #83「零信号」修复）。
+//   回显实际写入的归一化 path（如 `  set tasks[T7].decision_package`），消除「报 task 已更新、值却落别处」。
+function echoSetPaths(ops: SetOp[], taskId?: string): string {
+  if (!ops.length) return '';
+  const scope = { defaultTaskId: taskId };
+  return ops.map((op) => `\n  set ${mutations.logicalSetPath(op.path, scope)}`).join('');
 }
 
 // ── 内部：若给了 --log 则追一条 log（与主写动作同一笔落盘·log.ts 范式外延）。
@@ -68,12 +79,14 @@ function findTask(next: unknown, id: string): TaskLike | undefined {
 //   addTask 缺省 status='ready'、deps=[]、盖 created_at；其余 ✎ 字段只在显式给出时落。
 export function add(ctx: Ctx): number {
   const spec = REGISTRY.task?.add;
+  let echoOps: SetOp[] = []; // mutate 收集 → render 回显逻辑落点（Finding #83）
   return runWrite(ctx, {
     mutate: (board) => {
       const { fields, sets, setJsons } = buildFields(ctx.values, spec, { stdin: ctx.stdin });
+      echoOps = [...sets, ...setJsons];
       const args = Object.assign({ id: ctx.positionals[0] }, fields);
       let next = mutations.addTask(board as BoardArg, args);
-      next = applyOps(next, sets, setJsons);
+      next = applyOps(next, sets, setJsons, ctx.positionals[0] as string);
       next = maybeLog(next, ctx, `add task ${ctx.positionals[0]}`);
       return next;
     },
@@ -84,7 +97,7 @@ export function add(ctx: Ctx): number {
         return render.renderTaskDetail(t, { json: true });
       }
       const prefix = dryRun ? `[dry-run] 将新建 task: ${id}` : `task 已新建: ${id}`;
-      return prefix;
+      return prefix + echoSetPaths(echoOps, id);
     },
   });
 }
@@ -125,13 +138,15 @@ function diagnoseArtifactOnlyOnAlreadyDoneTask(
 //   目标 id 不存在 → mutations.updateTask throw NotFound（冒泡 router 映射 exit 5）。
 export function update(ctx: Ctx): number {
   const spec = REGISTRY.task?.update;
+  let echoOps: SetOp[] = []; // mutate 收集 → render 回显逻辑落点（Finding #83）
   return runWrite(ctx, {
     mutate: (board) => {
       const id = ctx.positionals[0] as string;
       const { fields, sets, setJsons } = buildFields(ctx.values, spec, { stdin: ctx.stdin });
+      echoOps = [...sets, ...setJsons];
       diagnoseArtifactOnlyOnAlreadyDoneTask(board as BoardArg, id, fields);
       let next = mutations.updateTask(board as BoardArg, id, fields);
-      next = applyOps(next, sets, setJsons);
+      next = applyOps(next, sets, setJsons, id);
       next = maybeLog(next, ctx, `update task ${id}`);
       return next;
     },
@@ -141,7 +156,8 @@ export function update(ctx: Ctx): number {
         const t = findTask(next, id);
         return render.renderTaskDetail(t, { json: true });
       }
-      return dryRun ? `[dry-run] 将更新 task: ${id}` : `task 已更新: ${id}`;
+      const prefix = dryRun ? `[dry-run] 将更新 task: ${id}` : `task 已更新: ${id}`;
+      return prefix + echoSetPaths(echoOps, id);
     },
   });
 }

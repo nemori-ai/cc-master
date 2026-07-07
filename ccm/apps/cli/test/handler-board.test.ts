@@ -574,6 +574,51 @@ test('board update: bad --wip-limit (non-int) → throws Usage', () => {
   );
 });
 
+// ── Finding #83：board update 的 --set/--set-json 是板级顶层 ✎ 字段的正门 ─────────────────────────────
+test('board update --set bare dotpath lands board top-level + echoes logical path', () => {
+  const { boardPath } = mkBoardHome();
+  const ctx = mkCtx({ boardPath, values: { set: ['notes=收尾备注'] } });
+  const code = boardHandler.update(ctx);
+  assert.equal(code, EXIT.OK, '只给 --set（无其它 flag）也应被接受');
+  const onDisk = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.equal(onDisk.notes, '收尾备注');
+  assert.ok(
+    ctx.outBuf.join('').includes('set notes'),
+    `render 回显逻辑落点，got: ${ctx.outBuf.join('')}`,
+  );
+});
+
+test('board update --set-json writes a top-level ✎ object', () => {
+  const { boardPath } = mkBoardHome();
+  const ctx = mkCtx({ boardPath, values: { 'set-json': ['context={"links":["/abs/spec.md"]}'] } });
+  const code = boardHandler.update(ctx);
+  assert.equal(code, EXIT.OK);
+  const onDisk = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.deepEqual(onDisk.context, { links: ['/abs/spec.md'] });
+});
+
+test('board update --set on a 🔒 board field (goal/owner/git/tasks/schema) → Validation', () => {
+  for (const p of ['goal', 'owner.active', 'git.branch', 'tasks', 'schema']) {
+    const { boardPath } = mkBoardHome();
+    const ctx = mkCtx({ boardPath, values: { set: [`${p}=x`] } });
+    assert.throws(
+      () => boardHandler.update(ctx),
+      (e: { errKind?: string }) => e.errKind === 'Validation',
+      `--set ${p} 必须被 🔒 守门拒（专属 flag 才是正门）`,
+    );
+  }
+});
+
+test('board update --set with tasks[<id>].field prefix targets that task (语义同 task update 逃生口)', () => {
+  const { boardPath } = mkBoardHome({ tasks: [{ id: 'T1', status: 'ready', deps: [] }] });
+  const ctx = mkCtx({ boardPath, values: { set: ['tasks[T1].hitl_rounds=3'] } });
+  const code = boardHandler.update(ctx);
+  assert.equal(code, EXIT.OK);
+  const onDisk = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.equal(onDisk.tasks[0].hitl_rounds, '3');
+  assert.ok(ctx.outBuf.join('').includes('set tasks[T1].hitl_rounds'), '回显任务级落点');
+});
+
 // ══ board archive（带锁归档·翻 owner.active=false·非破坏·幂等）════════════════════════════════════════
 test('board archive: 翻 owner.active=false·保留 goal/tasks/log·刷 heartbeat', () => {
   const { boardPath } = mkBoardHome({ tasks: [{ id: 'T1', status: 'ready', deps: [] }] });

@@ -471,10 +471,14 @@ export function watchdogDisarm(board: Board): Board {
 //   throw .errKind='Validation'（提示用专属命令）。只允许 ✎ flexible path。
 //
 //   dotpath 解析：作用于「已定位的 task 对象」或「board 顶层」。签名设计（契约留给实现）：
-//     applySet(board, dotpath, value) —— dotpath 第一段决定作用域：
+//     applySet(board, dotpath, value, opts?) —— dotpath 第一段决定作用域：
 //       · 'tasks[<id>].<field>...' 或 'tasks.<id>.<field>...' → 定位到该 id 的 task，改其 <field>
-//       · 否则 → 作用于 board 顶层 dotpath
-//   🔒 拒绝判据：归一化后的「逻辑 path」落在 LOAD_BEARING_PATHS 集合（board 顶层五 + task 四）即拒。
+//       · 否则（裸 path）→ 由 opts.defaultTaskId 决定（Finding #83 根治）：
+//           · 给了 defaultTaskId（task verb 语境：`task update <id> --set foo=v`）→ scope 到该 task 的 foo
+//             （与 --title 等普通 flag 一致的直觉；跨 task 仍可用显式 tasks[<其它id>].field 前缀逃生）
+//           · 未给（board update / jc / cadence 语境）→ 作用于 board 顶层 dotpath
+//   🔒 拒绝判据：归一化后的「逻辑 path」落在 LOAD_BEARING_PATHS 集合（board 顶层五 + task 四）即拒——
+//     scoping 归一**先于**守门，故 task 语境下裸 `--set status=…` 现在命中 LB_TASK 被拒（不再静默落顶层 junk）。
 
 // board 顶层 🔒（FIELDS.board tier==='🔒'）：schema/goal/owner/git/tasks。
 const LB_BOARD = new Set(['schema', 'goal', 'owner', 'git', 'tasks']);
@@ -487,9 +491,15 @@ interface ParsedPath {
   segs: string[];
 }
 
+// applySet / applySetJson 的作用域选项：defaultTaskId 给出时，裸 dotpath scope 到该 task（task verb 语境）。
+export interface SetScope {
+  defaultTaskId?: string;
+}
+
 // 把 dotpath 拆成段，支持 tasks[<id>] 与 tasks.<id> 两式定位 task。返回 {scope, taskId?, segs}。
 //   scope: 'task' → 作用于某 task；'board' → 作用于 board 顶层。
-function parsePath(dotpath: string): ParsedPath {
+//   defaultTaskId 给出时，裸 path（不带 tasks[…]/tasks.<id> 前缀）归一为该 task 的字段 path（Finding #83）。
+function parsePath(dotpath: string, defaultTaskId?: string): ParsedPath {
   if (typeof dotpath !== 'string' || dotpath === '') {
     throw err(`invalid dotpath: ${JSON.stringify(dotpath)}`, 'Validation');
   }
@@ -507,7 +517,21 @@ function parsePath(dotpath: string): ParsedPath {
     const rest = segs.slice(2);
     return { scope: 'task', taskId, segs: rest };
   }
+  if (typeof defaultTaskId === 'string' && defaultTaskId !== '') {
+    // 裸 path + task verb 语境 → scope 到该 task（与 --title 等普通 flag 一致的直觉）。
+    return { scope: 'task', taskId: defaultTaskId, segs };
+  }
   return { scope: 'board', taskId: undefined, segs };
+}
+
+// 归一后的「逻辑 path」（render 回显用）：task scope → tasks[<id>].<segs>；board scope → <segs>。
+//   与 applySet 用同一 parsePath——回显的就是实际写入的落点，消除「报 task 已更新、值却落别处」的零信号。
+export function logicalSetPath(dotpath: string, opts?: SetScope): string {
+  const parsed = parsePath(dotpath, opts?.defaultTaskId);
+  if (parsed.scope === 'task') {
+    return `tasks[${parsed.taskId}]${parsed.segs.length ? `.${parsed.segs.join('.')}` : ''}`;
+  }
+  return parsed.segs.join('.');
 }
 
 // 🔒 守门：拒绝 load-bearing path。
@@ -551,9 +575,9 @@ function setDeep(root: Record<string, any>, segs: string[], value: unknown): voi
   cur[segs[segs.length - 1] as string] = value;
 }
 
-export function applySet(board: Board, dotpath: string, value: unknown): Board {
+export function applySet(board: Board, dotpath: string, value: unknown, opts?: SetScope): Board {
   const b = clone(board);
-  const parsed = parsePath(dotpath);
+  const parsed = parsePath(dotpath, opts?.defaultTaskId);
   assertFlexible(parsed);
   if (parsed.scope === 'task') {
     const t = requireTask(b, parsed.taskId as string);
@@ -564,8 +588,8 @@ export function applySet(board: Board, dotpath: string, value: unknown): Board {
   return touch(b);
 }
 
-// applySetJson(board, dotpath, json) — json 为字符串（待解析）或已解析对象/数组。同 🔒 守门。
-export function applySetJson(board: Board, dotpath: string, json: unknown): Board {
+// applySetJson(board, dotpath, json, opts?) — json 为字符串（待解析）或已解析对象/数组。同 🔒 守门 + 同 scoping。
+export function applySetJson(board: Board, dotpath: string, json: unknown, opts?: SetScope): Board {
   let value = json;
   if (typeof json === 'string') {
     try {
@@ -574,7 +598,7 @@ export function applySetJson(board: Board, dotpath: string, json: unknown): Boar
       throw err(`invalid JSON for --set-json ${dotpath}: ${(e as Error).message}`, 'Validation');
     }
   }
-  return applySet(board, dotpath, value);
+  return applySet(board, dotpath, value, opts);
 }
 
 // ── baselineSnapshot：从 tasks 快照写 board.baseline（新建·已有时调用者须先判断 force）。

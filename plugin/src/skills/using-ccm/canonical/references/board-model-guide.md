@@ -8,7 +8,7 @@
 
 - [A. task 字段速查](#a-task-字段速查)
   - [🔒 load-bearing 字段（走专属命令，不用 --set）](#-load-bearing-字段)
-  - [✎ flexible 字段（--set 改，带 tasks[ID] 前缀）](#-flexible-字段)
+  - [✎ flexible 字段（--set 改，task verb 裸 path 即本 task）](#-flexible-字段)
   - [👁 observed 字段（hook 若有则用，走具名 flag）](#-observed-字段)
 - [B. status 八态语义 + 生命周期](#b-status-八态语义--生命周期)
   - [各态语义速查](#各态语义速查)
@@ -49,11 +49,11 @@
 
 **为什么 id/status/deps/parent 是 🔒？** 这四个字段被 hook、图算法、readySet、lint 机器读取。手改绕过写关卡，会造成悬挂引用、环、lint 拦不住的非法态转移——后果是 board 说谎，所有下游消费者（viewer / resume / hook）沿着错误输入跑。**这正是为什么 board 变更根本不给手改的路**：{{USING_CCM_BOARD_GUARD_GUIDANCE}}
 
-> 如果 `--set tasks[T1].status=done` 写进去了却 exit 0、任务状态没变——说明你写了 board 顶层的 junk 字段。status 永远走 verb（锚 2·SKILL.md）。
+> `--set tasks[T1].status=done` 和裸 `--set status=done`（task verb 语境）都会被 🔒 守门拒（exit 3）。status 永远走 verb（锚 2·SKILL.md）。
 
 ### ✎ flexible 字段
 
-**这些字段用 `--set tasks[ID].field=value`，或各自的具名 flag。**
+**这些字段用 `--set`（`task add`/`task update <id>` 里裸 `--set field=value` 即作用于该 task；跨 task 用 `tasks[<id>].field` 前缀；板级顶层用 `board update --set`），或各自的具名 flag。写入后非 `--json` 输出回显实际落点（`set tasks[T1].field`）。**
 
 | 字段 | 何时设 | 操作侧要点 |
 |---|---|---|
@@ -76,7 +76,7 @@
 | `type` | 建 task 时 | 见下方 taskType 枚举说明 |
 | `output_schema` | 需约束结构化产出时（低频） | workflow 节点的产出契约 |
 | `dep_pins` | 钉依赖快照时（低频） | freshness / inputs_hash 用 |
-| `model` | 派发 / 完成时记录该 task 用的模型档 | `--set tasks[ID].model=<模型id>`（如 `claude-sonnet-4-5`，无具名 flag）；estimate 层按档分层校准读它，缺→无 tier 校准 |
+| `model` | 派发 / 完成时记录该 task 用的模型档 | `ccm task update <id> --set model=<模型id>`（如 `claude-sonnet-4-5`，无具名 flag·裸 path 即本 task）；estimate 层按档分层校准读它，缺→无 tier 校准 |
 
 **taskType 枚举参考**（开放枚举，未知值 warn 不 fail）：
 
@@ -657,14 +657,14 @@ verified = true   ← 端点验收通过
 
 ### footgun 深化（比 SKILL.md 更详细的操作原因分析）
 
-**footgun 1：`--set status=done` 静默写 junk 字段**
+**footgun 1：`--set status=done` 想绕状态机**
 
 ```bash
-# ❌ 错误（exit 0 但任务 status 没变）
+# ❌ 错误（exit 3：裸 path 在 task verb 语境 scope 到本 task，status 是 🔒 字段被守门拒）
 ccm task update T3 --set status=done
 
-# 发生了什么：没有 tasks[] 前缀，--set status=done 把 "status"="done" 写在了 board 顶层
-# 后果：board 顶层多了个 junk 字段（lint 会 warn FMT-STATUS 但 tasks 的 status 没变）
+# 历史注：旧版 ccm 裸 path 落 board 顶层——这条命令曾 exit 0 却写出一个顶层 junk 字段、
+# 任务 status 纹丝不动。现在裸 path 作用于本 task，🔒 守门当场拒，不再有静默错落点。
 
 # ✅ 正确
 ccm task done T3 --artifact /abs/output.md --verified
@@ -696,14 +696,17 @@ ccm task update PHASE1 --add-dep T_prev
 ccm task update T1 --add-dep T_prev    # 只有需要 T_prev 的那个子 task 等它
 ```
 
-**footgun 4：`board update` 不接 `--set`**
+**footgun 4：`board update --set goal=…` 想经通用逃生口改 🔒 字段**
 
 ```bash
-# ❌ 错误（exit 2: unknown option '--set'）
+# ❌ 错误（exit 3：goal 是 board 顶层 🔒 字段，--set 被守门拒）
 ccm board update --set goal="新目标"
 
-# ✅ 正确（board update 只接具名 flag）
+# ✅ 正确（🔒 走具名 flag）
 ccm board update --goal "新目标"
+
+# board update 的 --set/--set-json 是板级顶层 ✎ 字段的正门（裸 path 落 board 顶层）：
+ccm board update --set notes="收尾备注"
 ```
 
 **footgun 5：退役 watchdog 只做一件**
@@ -800,7 +803,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `FMT-REF-KIND` | warn | `references[].kind` 不在 refKind 枚举内（开放枚举） | kind ∈ {spec, plan, doc, web, code, issue, other}，未知值不致命 |
 | `FMT-BLOCKED-ON` | warn | `blocked_on` 既非 `"user"` 也非存在的 task id | `task block --on user` 或 `--on <存在的 taskid>`——见 [G 节](#g-blocked_on-怎么选) |
 | `FMT-WIP` | warn | task 级 `wip_limit` 非数字 | `--wip-limit N`（整数）；非数字会让 per-owner WIP 覆写静默失效 |
-| `FMT-MODEL` | warn | task `model` 存在却非字符串 | `--set tasks[ID].model=<模型id>`（如 `claude-sonnet-4-5`）；非 string → estimate 层 tier 分层校准降级忽略 |
+| `FMT-MODEL` | warn | task `model` 存在却非字符串 | `ccm task update <id> --set model=<模型id>`（如 `claude-sonnet-4-5`·裸 path 即本 task）；非 string → estimate 层 tier 分层校准降级忽略 |
 | `FMT-SCHEDULING` | warn | `scheduling.wip_limit` / `owner_wip_limit`（或旧板顶层 `wip_limit`）非数字 | `ccm board update --wip-limit N --owner-wip N`（整数）；非数字 → WIP 软警告静默关闭 |
 | `FMT-WATCHDOG` | warn | `watchdog.mechanism` 不在枚举内，或 `armed_at`/`fire_at` 非严格 ISO-8601 UTC | `ccm watchdog arm --mechanism <cron/loop/monitor/shell> --fire-at YYYY-MM-DDTHH:MM:SSZ`——见 [K 节](#k-watchdog何时-armwakeup-字段含义) |
 | `FMT-META` | warn | `meta.template_version` 非整数，或 `meta.created_at` 非 ISO-8601 UTC | meta 由 bootstrap 写，别手改；template_version 是整数 |

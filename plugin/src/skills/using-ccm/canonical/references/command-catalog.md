@@ -147,12 +147,20 @@ ccm <alias> [args] [flags]
 | `--verbose` | `-v` | bool | 详细输出（诊断走 stderr） |
 | `--no-color` | | bool | 禁用颜色（亦遵循 NO_COLOR / 非 TTY / TERM=dumb） |
 | `--no-input` | | bool | 绝不交互提示（脚本 / agent 模式） |
-| `--set <p>=<v>` | | string（可重复） | 通用设 ✎ 标量字段（仅写命令；🔒 字段不可） |
-| `--set-json <p>=<j>` | | string（可重复） | 通用设 ✎ 对象/数组（仅写命令；兜长尾 + 前向兼容） |
+| `--set <p>=<v>` | | string（可重复） | 通用设 ✎ 标量字段（仅写命令；🔒 字段不可；scoping 见下） |
+| `--set-json <p>=<j>` | | string（可重复） | 通用设 ✎ 对象/数组（仅写命令；兜长尾 + 前向兼容；scoping 见下） |
 | `--help` | `-h` | bool | 显示帮助 |
 | `--version` | | bool | 显示版本 |
 
-接受 `--set` / `--set-json` 的写命令实测为：`task add`、`task update`、`jc add`、`cadence update`、`cadence open`。`board update` 不接（只接其具名 flag）。
+接受 `--set` / `--set-json` 的写命令实测为：`task add`、`task update`、`board update`、`jc add`、`cadence update`、`cadence open`。
+
+**`--set`/`--set-json` 的 scoping 语义（裸 path 落哪里由命令语境决定）**：
+
+- **`task add <id>` / `task update <id>`**：裸 path（如 `--set 'decision_package=…'`）作用于**该 task**——与 `--title` 等具名 flag 一致的直觉。显式 `tasks[<其它id>].field` 前缀仍作用于指定 task（跨 task 逃生口）。task 🔒 字段（`id`/`status`/`deps`/`parent`）裸写同样被拒（exit 3），不会静默落 board 顶层。
+- **`board update`**：裸 path 落 **board 顶层**（板级 ✎ flexible 字段的正门；🔒 `schema`/`goal`/`owner`/`git`/`tasks` 被拒）；`tasks[<id>].field` 前缀也可用、作用于该 task。
+- **`jc add` / `cadence update` / `cadence open`**：裸 path 落 board 顶层（无 task 语境）；`tasks[<id>].field` 前缀作用于该 task。
+
+写入后非 `--json` 输出会逐条回显实际写入的逻辑 path（如 `set tasks[T7].decision_package`）——落点与你预期不符时一眼可见。
 
 ### Exit codes
 
@@ -294,7 +302,7 @@ ccm board update [flags]
 ```
 
 - positional：无
-- flags（不接 `--set` / `--set-json`）：
+- flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
@@ -304,8 +312,10 @@ ccm board update [flags]
 | `--branch <str>` | | string | `git.branch` |
 | `--worktree <str>` | | string | `git.worktree` |
 | `--priority <enum>` | | enum `urgent\|high\|normal\|low\|trivial` | `coordination.priority`（板级优先级·跨板协调裁决主轴·非法值 → exit 2） |
+| `--set <path=val>` | | string（可重复） | 设**板级顶层** ✎ 标量（裸 path 落 board 顶层；🔒 `schema`/`goal`/`owner`/`git`/`tasks` 被拒 exit 3；`tasks[<id>].path` 作用于该 task） |
+| `--set-json <path=json>` | | string（可重复） | 设**板级顶层** ✎ 对象/数组（scoping 同上） |
 
-- 例：`ccm board update --goal "收尾冲刺"` · `ccm board update --wip-limit 4 --branch feature-x` · `ccm board update --priority high`
+- 例：`ccm board update --goal "收尾冲刺"` · `ccm board update --wip-limit 4 --branch feature-x` · `ccm board update --priority high` · `ccm board update --set notes="收尾备注"`
 - `--priority` 写 ✎ `coordination.priority`（板级优先级·`ccm peers` 跨板花名册的裁决主轴 + 机械 fair-share 权重源；缺/坏 → 解析为 `normal`）。枚举校验在 update 端（坏值 exit 2·不静默写非法值）；它是 agent-shaped ✎ 字段（hook 不读·非窄腰）。init 时用户给的板级优先级经此落盘（命令体 bootstrap 段指导 orchestrator 捕获并记入）。
 - 发现：`--goal` 在此是 payload（重定 goal），**不**当发现过滤器——所有 flag 走同一条两层匹配（精确 sid → 未认领 `session_id:""` 兜底），与 `task add` 等一致；隐式发现（无 `--board`）在 `ccm board init` 建的未认领板上对 `--goal` 与 `--wip-limit` **行为一致**。多 active 板时用 `--board <path>` 消歧。
 
@@ -383,8 +393,8 @@ ccm task add <id> [flags]
 | `--verified` | | bool | | false | 标记已验收 |
 | `--artifact <str>` | | string | | | 产物链接 |
 | `--wip-limit <str>` | | int | | | 本 task WIP 覆写 |
-| `--set <path=val>` | | string（可重复） | | | 通用设 ✎ 标量 |
-| `--set-json <path=json>` | | string（可重复） | | | 通用设 ✎ 对象/数组 |
+| `--set <path=val>` | | string（可重复） | | | 设**本 task** 的 ✎ 标量（裸 path 作用于本 task；`tasks[<id>].path` 可写其它 task） |
+| `--set-json <path=json>` | | string（可重复） | | | 设**本 task** 的 ✎ 对象/数组（scoping 同上） |
 | `--log <str>` | | string | | | 同时追一条 log |
 
 - 例：`ccm task add T7 --type development --deps T1 --estimate 3h` · `ccm task add EXT3 --executor external --ref issue:https://github.com/o/r/issues/9 --handle o/r#9`
@@ -468,12 +478,13 @@ ccm task update <id> [flags]
 | `--add-ref <kind:ref>` | | string（可重复） | | 增引用 `kind:ref` |
 | `--rm-ref <a,b>` | | csv（可重复） | | 删引用（按 ref） |
 | `--parent <str>` | | string | | 改归属（`""`=升为顶层） |
-| `--set <path=val>` | | string（可重复） | | 通用设 ✎ 标量 |
-| `--set-json <path=json>` | | string（可重复） | | 通用设 ✎ 对象/数组 |
+| `--set <path=val>` | | string（可重复） | | 设**本 task** 的 ✎ 标量（裸 path 作用于本 task；`tasks[<id>].path` 可写其它 task） |
+| `--set-json <path=json>` | | string（可重复） | | 设**本 task** 的 ✎ 对象/数组（scoping 同上） |
 | `--log <str>` | | string | | 同时追一条 log |
 
 - 例：`ccm task update T7 --estimate 5h --add-dep T2` · `ccm task update T7 --rm-dep T2 --verified --artifact /abs/out.md`
-- 注：`update` 无 `--deps`（用 `--add-dep` / `--rm-dep`）、无 `--status`（用 start / done / block / set-status）。
+- **给 task 挂 `decision_package`（正例）**：`ccm task update T7 --set-json 'decision_package={"version":1,"ask_type":"decision","context_md":"…","what_i_need":"…","options":[…],"inputs_hash":"sha256:…","enter_cmd":"/cc-master:discuss T7"}'`——裸 path 直接落在 T7 上（无须再写 `tasks[T7].` 前缀）；成功输出回显 `set tasks[T7].decision_package` 供核对落点。
+- 注：`update` 无 `--deps`（用 `--add-dep` / `--rm-dep`）、无 `--status`（用 start / done / block / set-status）；裸 `--set status=…` 会被 🔒 守门拒（exit 3），不会静默落 board 顶层。
 - **`--artifact` 提前诊断（issue #57 问题2）**：若目标 task 已是 `status:done` 且 `verified` 非 `true`，单独设
   `--artifact`（不带 `--verified`）必然无法满足 done 真语义（`BIZ-DONE-VERIFIED`）——handler 层提前给一个更
   直达的 `Usage` 错误（**exit 2**，不是 exit 3），指路"同时加 `--verified` 或改用 `task done --verified
@@ -709,8 +720,8 @@ ccm jc add <summary> [flags]
 | `--impact <str>` | | string | | 影响面 / 反转代价 |
 | `--refs <a,b>` | | csv（可重复） | | 佐证引用 |
 | `--task-ref <str>` | | string | | 关联 task |
-| `--set <path=val>` | | string（可重复） | | 通用设 ✎ 标量 |
-| `--set-json <path=json>` | | string（可重复） | | 通用设 ✎ 对象/数组 |
+| `--set <path=val>` | | string（可重复） | | 通用设 ✎ 标量（裸 path 落 board 顶层；`tasks[<id>].path` 作用于该 task） |
+| `--set-json <path=json>` | | string（可重复） | | 通用设 ✎ 对象/数组（scoping 同左） |
 
 - 例：`ccm jc add "选 ICU MessageFormat" --category architecture --severity high`
 - 产物：新建 id 形如 `J1`、初始 `status: pending_review`、盖 `raised_at`。
@@ -800,8 +811,8 @@ ccm cadence update [flags]
 |---|---|---|---|
 | `--ship-every <dur>` | | duration | `target.ship_every`（如 `3h`） |
 | `--min-unit <str>` | | string | `target.min_unit`（如 `"1 PR"`） |
-| `--set <path=val>` | | string（可重复） | 通用设 ✎ 标量 |
-| `--set-json <path=json>` | | string（可重复） | 通用设 ✎ 对象/数组 |
+| `--set <path=val>` | | string（可重复） | 通用设 ✎ 标量（裸 path 落 board 顶层；`tasks[<id>].path` 作用于该 task） |
+| `--set-json <path=json>` | | string（可重复） | 通用设 ✎ 对象/数组（scoping 同左） |
 
 - 例：`ccm cadence update --ship-every 3h --min-unit "1 PR"`
 
@@ -826,8 +837,8 @@ ccm cadence open <iter-id> [flags]
 | `--goal <str>` | | string | 本 iteration 目标 |
 | `--deadline <str>` | | ISO-8601 UTC | 截止时刻（严格 `YYYY-MM-DDTHH:MM:SSZ`） |
 | `--members <a,b>` | | csv | 纳入本 iteration 的 task |
-| `--set <path=val>` | | string（可重复） | 通用设 ✎ 标量 |
-| `--set-json <path=json>` | | string（可重复） | 通用设 ✎ 对象/数组 |
+| `--set <path=val>` | | string（可重复） | 通用设 ✎ 标量（裸 path 落 board 顶层；`tasks[<id>].path` 作用于该 task） |
+| `--set-json <path=json>` | | string（可重复） | 通用设 ✎ 对象/数组（scoping 同左） |
 
 - 例：`ccm cadence open I1 --goal "ship 框架+翻译切片" --deadline 2026-06-05T14:00:00Z --members T0,T1`
 
