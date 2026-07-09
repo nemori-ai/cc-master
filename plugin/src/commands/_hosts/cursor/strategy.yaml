@@ -6,10 +6,9 @@ projection:
   required_mode: mixed
   modes:
     - host_native
-    - adapter_guidance
   output_extension: ".md"
 notes:
-  - as-master-orchestrator projects host_native to plugin/dist/cursor/commands/as-master-orchestrator.md.
-  - Non-init commands stay adapter_guidance (skill-first / ccm-guided), mirroring Codex until dedicated Cursor bodies are warranted.
+  - All required commands project host_native to plugin/dist/cursor/commands/.
+  - stop projects as commands/cc-master-stop.md (frontmatter name: cc-master-stop) to avoid Cursor built-in /stop.
   - Bootstrap dual channel: host_native command + beforeSubmitPrompt hook.
-  - Cursor plugin commands map to /name in Agent chat (no plugin: namespace).
+  - Cursor plugin commands map to /{frontmatter name} in Agent chat (no plugin: namespace).

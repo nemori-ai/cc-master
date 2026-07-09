@@ -66,23 +66,14 @@ test('required commands have adapters/<host>/strategy.yaml for all known hosts (
   }
 });
 
-test('Cursor command adapters are promoted off planned (host_native or adapter_guidance)', () => {
+test('Cursor command adapters are all host_native (full slash-command parity)', () => {
   const commands = parseYamlList(join(ROOT, 'plugin/src/commands/_manifest/commands.yaml'), 'commands').filter(
     (c) => c.required,
   );
-  const expected = {
-    'as-master-orchestrator': 'host_native',
-    discuss: 'adapter_guidance',
-    distill: 'adapter_guidance',
-    'handoff-to-new-session': 'adapter_guidance',
-    retro: 'adapter_guidance',
-    stop: 'adapter_guidance',
-  };
   for (const cmd of commands) {
     const p = commandStrategyPath(cmd.id, 'cursor');
     const mode = readMode(p);
-    assert.notEqual(mode, 'planned', `${cmd.id} cursor strategy must leave planned`);
-    assert.equal(mode, expected[cmd.id], `${cmd.id} cursor mode`);
+    assert.equal(mode, 'host_native', `${cmd.id} cursor mode must be host_native`);
   }
 });
 

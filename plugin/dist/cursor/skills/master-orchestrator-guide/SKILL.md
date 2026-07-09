@@ -186,13 +186,15 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 ### 你与用户之间的 commands（知道它们存在）
 
-Cursor 下 cc-master 的命令面是 **host-native command markdown + plugin skills + `ccm` CLI**（外加 beforeSubmitPrompt bootstrap）：
+用户在前台敲这些 Cursor slash commands；你该知道它们的存在与语义，好配合：
 
-- **初始化 / 续跑** — 用户触发 as-master-orchestrator 命令 / prompt；bootstrap hook 建板或 `--resume` 再武装。
-- **状态 / 图** — 用 `ccm board show/lint/graph/next --json`；用量用 `ccm usage advise --json`（billing_period）。
-- **停止 / 交接** — 用 `ccm board archive` 与 handoff 纪律；不要把 Cursor 内置 `/stop` 当成 cc-master 停用。
-- **可视化** — `ccm web-viewer open`。
-- **用户决策讨论** — `decision_package` 在当前线程 surface；不依赖 Claude Code discuss slash command。
+- **`ccm status-report show`** — 生成 board 状态报告（用户看进度 / 阻塞 / 待决策；CLI 与 viewer 共用同一 JSON schema）。
+- **`/discuss <决策>`** — 用户对一个 `blocked_on:"user"` 决策开采访式讨论、结论回流；**你 prefetch 的 `decision_package` 在这被消费**（「该问就问」镜头）。
+- **可视化** — 用 `ccm web-viewer open` 打开浏览器只读 DAG viewer。
+- **`/handoff-to-new-session`** — 把编排优雅交给新 conversation（与 `--resume` 配对；写侧纪律见 `references/handoff.md`）。
+- **`/cc-master-stop`** — 归档 board（可逆·可 `/as-master-orchestrator --resume` 复活）。**不要**把 Cursor 内置 `/stop`（结束 Agent 回合）当成 cc-master 停用。
+- **`/retro`** / **`/distill`** — 复盘与蒸馏候选教训。
+- （`/as-master-orchestrator` = 点火，你已在其中。）
 
 ---
 
@@ -299,7 +301,7 @@ external issue task 的编排纪律：派出去后它仍在你的 recon loop 里
 
 prefetch / surface 一个 `blocked_on:"user"` 决策时，**连判断依据一起备好**：
 - **schema**：`{ context_md, what_i_need, ask_type, (options), enter_cmd }`；经 `ccm task block --on user --decision @file` 设（**不用 `--set`**）。
-- **消费闭环**：用户围绕 `decision_package` 在当前线程或另起 Cursor 线程回答 → 你在 recon 时把结论消化进 board、replan、清 `blocked_on`
+- **消费闭环**：用户经 `/discuss` 谈透 → `.decision.md` sidecar 在你 recon 时消化、replan、清 `blocked_on`
 - **min-max**：一份好采访包 = 用户对着**准确又有时效**的完整依据，一次做出高质量决策、免来回。
 - 采访准备 / 消化两条纪律 → `references/async-hitl.md`；协议 → `references/board.md` §`decision_package`。
 

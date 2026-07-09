@@ -1,20 +1,10 @@
 host: cursor
 command: retro
 version: 1
-mode: adapter_guidance
-surface:
-  kind: user_prompt_ccm_cli_guided
-  user_prompt: plugin/src/skills/cc-master-retro/canonical/SKILL.md
-  summary: "Retrospect a board (active or archived) via read-only ccm commands and write a narrative retro markdown into the target project."
-  primary_commands:
-    - "ccm board show --board <board-path> --json"
-    - "ccm log list --board <board-path> --json"
-    - "ccm jc list --board <board-path> --json"
-    - "ccm jc show <id> --board <board-path> --json"
-    - "ccm task list --board <board-path> --json"
-    - "ccm task show <id> --board <board-path> --json"
+mode: host_native
+projection:
+  source: body.md
+  target: commands/retro.md
 notes:
-  - Cursor adapter mirrors Codex ccm_guided pattern: skill-first guidance, no projected slash-command body yet.
-  - Retro accepts an archived (owner.active:false) board on purpose.
-  - Output is a project-local markdown file, never board writes, never GitHub.
-  - See commands/_manifest/commands.yaml host_coverage.cursor for this command.
+  - Cursor plugin commands map to /retro in Agent chat (no plugin: namespace).
+  - Body adapted from Claude Code host_native; path tokens removed; Shell not Bash.

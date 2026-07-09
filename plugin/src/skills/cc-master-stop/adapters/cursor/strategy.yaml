@@ -1,9 +1,15 @@
 host: cursor
 skill: cc-master-stop
 version: 1
-mode: copy
+mode: unsupported_stub
 projection:
-  source: canonical/
+  source: adapters/cursor/stub/
   target: skills/cc-master-stop/
+unsupported:
+  - capability: command_surface
+    reason: "Cursor 的触发入口由 commands/ 提供，不是该 skill 的直接 command surface。"
+  - capability: direct_skill_invocation
+    reason: "命令入口已提升为 host_native slash command；本 skill 仅作兼容占位。"
 notes:
-  - Cursor projects command-skill canonical body; no Codex agents/openai.yaml sidecar.
+  - Mirrors Claude Code unsupported_stub pattern after Cursor command promotion.
+  - Slash entry: /cc-master-stop

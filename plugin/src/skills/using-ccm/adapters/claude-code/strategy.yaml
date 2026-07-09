@@ -36,6 +36,7 @@ slot_replacements:
   "{{USING_CCM_ACCOUNT_NAMESPACE_ROW}}": adapters/claude-code/overlays/account-namespace-row.md
   "{{USING_CCM_OBSERVABILITY_SOURCE}}": adapters/claude-code/overlays/observability-source.md
   "{{USING_CCM_DECISION_PACKAGE_ENTRYPOINT}}": adapters/claude-code/overlays/decision_package-entrypoint.md
+  "{{USING_CCM_ENTER_CMD_EXAMPLE}}": adapters/claude-code/overlays/enter-cmd-example.md
   "{{USING_CCM_JC_HOOK_GUIDANCE}}": adapters/claude-code/overlays/jc-hook-guidance.md
   "{{USING_CCM_WATCHDOG_JOB_ID_GUIDANCE}}": adapters/claude-code/overlays/watchdog-job-id-guidance.md
   "{{USING_CCM_WAKEUP_SELF_HEAL_GUIDANCE}}": adapters/claude-code/overlays/wakeup-self-heal-guidance.md

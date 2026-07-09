@@ -1,6 +1,6 @@
 # cc-master
 
-[![plugin](https://img.shields.io/badge/plugin-v0.17.0-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.17.0)
+[![plugin](https://img.shields.io/badge/plugin-v0.17.1-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.17.1)
 [![ccm](https://img.shields.io/badge/ccm-v0.18.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.18.0)
 [![harness](https://img.shields.io/badge/harness-Claude%20Code%20%7C%20Codex%20%7C%20Cursor-4B5563)](design_docs/harnesses/)
 [![ccm CI](https://img.shields.io/github/actions/workflow/status/nemori-ai/cc-master/ccm-ci.yml?branch=main&label=ccm%20CI)](https://github.com/nemori-ai/cc-master/actions/workflows/ccm-ci.yml)
@@ -115,7 +115,7 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 # …or pin a specific version of either line — each flag is optional and
 # independent; whichever you omit resolves to the latest of that line:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- \
-  --ccm-version ccm-v0.18.0 --plugin-version 0.17.0
+  --ccm-version ccm-v0.18.0 --plugin-version v0.17.1
 
 # pin just one line, leave the other on latest (e.g. hold ccm, take latest plugin):
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.18.0
@@ -172,7 +172,7 @@ The handful of commands you'll actually type. The in-session entrypoint is harne
 - **Start / resume** — Claude Code: `/cc-master:as-master-orchestrator <goal>` or `/cc-master:as-master-orchestrator --resume`; Codex: `$cc-master-as-master-orchestrator <goal>` or `$cc-master-as-master-orchestrator --resume`; Cursor: `/as-master-orchestrator <goal>` or `/as-master-orchestrator --resume` (reopen the Agent session after install so hooks/rules load).
 - **Status** — `ccm status-report show`. Generates the shared JSON-backed board status report for CLI and the web viewer.
 - **View** — `ccm web-viewer open`. Opens the live plan as a read-only graph in your browser; lifecycle commands are `ccm web-viewer start/open/status/stop/restart`.
-- **Discuss** — Claude Code: `/cc-master:discuss <decision>`; Codex: `$cc-master-discuss <decision>`. Use it when a decision is waiting on you.
+- **Discuss** — Claude Code: `/cc-master:discuss <decision>`; Cursor: `/discuss <decision>`; Codex: `$cc-master-discuss <decision>`. Use it when a decision is waiting on you.
 - **Stop** — Claude Code: `/cc-master:stop`; Codex: `$cc-master-stop`. Wraps up and archives the board; you can resume later.
 - **Handoff** — Claude Code: `/cc-master:handoff-to-new-session`; Codex: `$cc-master-handoff-to-new-session`. Use it before moving the run to a fresh session.
 - **Retro** — Claude Code: `/cc-master:retro`; Codex: `$cc-master-retro`. Read-only retrospective on an in-progress or archived board — writes a lessons-learned document into the project itself (not the board, not GitHub).

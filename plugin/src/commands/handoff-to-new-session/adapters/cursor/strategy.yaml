@@ -1,16 +1,10 @@
 host: cursor
 command: handoff-to-new-session
 version: 1
-mode: adapter_guidance
-surface:
-  kind: user_prompt_ccm_cli_guided
-  user_prompt: plugin/src/skills/cc-master-handoff-to-new-session/canonical/SKILL.md
-  summary: "Quiesce, drain, write a handoff document, log it with ccm, archive the board, and tell the user to resume with /as-master-orchestrator --resume."
-  primary_commands:
-    - "ccm log add <summary> --kind handoff --detail <handoff-path> --board <board-path>"
-    - "ccm board archive --board <board-path>"
-    - "/as-master-orchestrator --resume <selector>"
+mode: host_native
+projection:
+  source: body.md
+  target: commands/handoff-to-new-session.md
 notes:
-  - Cursor adapter mirrors Codex ccm_guided pattern: skill-first guidance, no projected slash-command body yet.
-  - Resume uses /as-master-orchestrator --resume (host_native command + beforeSubmitPrompt hook).
-  - See commands/_manifest/commands.yaml host_coverage.cursor for this command.
+  - Cursor plugin commands map to /handoff-to-new-session in Agent chat (no plugin: namespace).
+  - Body adapted from Claude Code host_native; path tokens removed; Shell not Bash.
