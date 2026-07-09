@@ -1,16 +1,11 @@
 host: cursor
 command: stop
 version: 1
-mode: adapter_guidance
-surface:
-  kind: user_prompt_ccm_cli_guided
-  user_prompt: plugin/src/skills/cc-master-stop/canonical/SKILL.md
-  summary: "Confirm with the user, then archive the selected board through ccm."
-  primary_commands:
-    - "ccm board show --json"
-    - "ccm board lint --json"
-    - "ccm board archive --board <board-path>"
+mode: host_native
+projection:
+  source: body.md
+  target: commands/cc-master-stop.md
 notes:
-  - Cursor has native /stop for Agent stop; do not claim that built-in. Prefer skill-first guidance until a dedicated host_native command body is warranted.
-  - Archiving is reversible through /as-master-orchestrator --resume <selector>.
-  - See commands/_manifest/commands.yaml host_coverage.cursor for this command.
+  - Cursor plugin commands map to /cc-master-stop in Agent chat (no plugin: namespace).
+  - Body adapted from Claude Code host_native; path tokens removed; Shell not Bash.
+  - Target filename/frontmatter name is cc-master-stop to avoid Cursor built-in /stop.

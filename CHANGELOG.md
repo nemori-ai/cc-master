@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.1] — 2026-07-09
+
+> **Cursor command surface full parity** —— 把 Cursor 剩余命令从 skill/guidance 提升为 host_native slash commands，与 Claude Code 命令面对齐；`stop` 用 `/cc-master-stop` 避开 Cursor 内置 `/stop`。
+
+### Changed
+
+- **Cursor command surface full parity** — promote `discuss` / `distill` / `handoff-to-new-session` / `retro` / `stop` from `adapter_guidance` to `host_native` slash commands under `plugin/dist/cursor/commands/`（`stop` → `/cc-master-stop`，避开 Cursor 内置 `/stop`）；六个 `cc-master-*` Cursor skills 改为 `unsupported_stub`（对齐 Claude Code）；`enter_cmd` 示例按 host slot 化（Cursor `/discuss`）；README×2 补 Cursor discuss 入口。
+
 ## [0.17.0] — 2026-07-09
 
 > **Cursor full host compatibility（配套 ccm-v0.18.0）** —— 把 Cursor 从 scaffold/planned 推到可安装、可配速、可发版的第三宿主：P0/P1 hooks、billing_period usage、Track B reinject、skills/commands 投影，以及 `install.sh --harness cursor` / per-host release zip。

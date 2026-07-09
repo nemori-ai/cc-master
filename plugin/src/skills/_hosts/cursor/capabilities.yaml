@@ -46,14 +46,24 @@ capabilities:
     plugin_distributed_slash_commands: host_native_markdown
     init_prompt_prefixes:
       - "cc-master:as-master-orchestrator <goal> [flags]"
-      - "/cc-master:as-master-orchestrator <goal> [flags]"
+      - "/as-master-orchestrator <goal> [flags]"
+    slash_commands:
+      - "/as-master-orchestrator"
+      - "/discuss"
+      - "/distill"
+      - "/handoff-to-new-session"
+      - "/retro"
+      - "/cc-master-stop"
     supported:
       - "fresh board creation via beforeSubmitPrompt bootstrap"
-      - "host-native command markdown projection"
+      - "host-native command markdown projection for all required commands"
     unsupported:
-      - "Claude Code slash-command packaging assumptions"
+      - "Claude Code /cc-master: namespace packaging"
+      - "bare /stop as cc-master archive (conflicts with Cursor built-in; use /cc-master-stop)"
     notes:
       - "Cursor projects commands as host-native markdown under the plugin commands surface."
+      - "stop projects as /cc-master-stop to avoid Cursor built-in /stop."
+      - "cc-master-* skills are unsupported_stub; slash commands are the entry."
   completion_notification:
     status: subagent_stop_and_shell_poll
     notes:

@@ -1,1 +1,1 @@
-用户围绕 `decision_package` 在当前线程或另起 Cursor 线程回答 → 你在 recon 时把结论消化进 board、replan、清 `blocked_on`
+用户经 `/discuss` 谈透 → `.decision.md` sidecar 在你 recon 时消化、replan、清 `blocked_on`

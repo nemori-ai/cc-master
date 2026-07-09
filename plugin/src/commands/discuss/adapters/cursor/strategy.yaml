@@ -1,12 +1,10 @@
 host: cursor
 command: discuss
 version: 1
-mode: adapter_guidance
-surface:
-  kind: user_prompt_conversational_guidance
-  user_prompt: plugin/src/skills/cc-master-discuss/canonical/SKILL.md
-  summary: "Discuss the task's decision_package in the current Cursor Agent conversation or a new one, then write an append-only sidecar decision document."
+mode: host_native
+projection:
+  source: body.md
+  target: commands/discuss.md
 notes:
-  - Cursor adapter mirrors Codex conversational_guidance pattern: skill-first entry, no projected slash-command body yet.
-  - The decision_package workflow remains valid; entry is natural-language / skill plus board/node selector.
-  - See commands/_manifest/commands.yaml host_coverage.cursor for this command.
+  - Cursor plugin commands map to /discuss in Agent chat (no plugin: namespace).
+  - Body adapted from Claude Code host_native; path tokens removed; Shell not Bash.

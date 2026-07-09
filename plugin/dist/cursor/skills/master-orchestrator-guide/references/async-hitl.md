@@ -54,7 +54,7 @@ Cursor 下不要等待其他 harness 的后台完成通知语义。当 Task suba
 
 ## 采访式决策 —— 为 awaiting-user 节点准备采访包 + 消化结论 sidecar
 
-把一个 `blocked_on:"user"` 节点从「干问题」升级成「**对着准确且仍有时效的完整依据，做一次高质量决策**」的闭环。它接在上面 prefetch / recon 两条纪律上——不复述、只补两个具体动作（准备 / 消化）；讨论可在当前 Cursor 线程或另起 Cursor 线程承载；master 不亲自替用户做决定，只把 `decision_package` 作为上下文 surface 给用户，等回答后 recon 消化。采访包 / sidecar 协议（字段、枚举、sidecar 结构）的 SSOT 在 `board.md` §`decision_package`，此处只讲方法论。
+把一个 `blocked_on:"user"` 节点从「干问题」升级成「**对着准确且仍有时效的完整依据，做一次高质量决策**」的闭环。它接在上面 prefetch / recon 两条纪律上——不复述、只补两个具体动作（准备 / 消化）；讨论本身由独立满血 Cursor Agent conversation 承载（命令 `/discuss <node-id>`），master 既不亲自陪聊（强化「指挥不演奏」镜头）也不被打断。采访包 / sidecar 协议（字段、枚举、sidecar 结构）的 SSOT 在 `board.md` §`decision_package`，此处只讲方法论。
 
 ### 准备 decision_package（as prefetch / fill-work）
 

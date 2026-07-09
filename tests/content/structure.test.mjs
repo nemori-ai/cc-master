@@ -62,13 +62,52 @@ test('Cursor as-master-orchestrator command embeds bootstrap sentinel and Cursor
   assert.match(hook, /cc-master:bootstrap:v1/, 'Cursor bootstrap greps body sentinel');
 });
 
-test('Cursor dist projects host_native as-master-orchestrator command', () => {
-  const distCmd = 'plugin/dist/cursor/commands/as-master-orchestrator.md';
-  assert.ok(existsSync(join(ROOT, distCmd)), `${distCmd} must exist after sync`);
-  const body = read(distCmd);
-  assert.match(body, /<!-- cc-master:bootstrap:v1 -->/);
+test('Cursor dist projects all required host_native commands (stop as cc-master-stop)', () => {
+  const expected = {
+    'as-master-orchestrator': 'plugin/dist/cursor/commands/as-master-orchestrator.md',
+    discuss: 'plugin/dist/cursor/commands/discuss.md',
+    distill: 'plugin/dist/cursor/commands/distill.md',
+    'handoff-to-new-session': 'plugin/dist/cursor/commands/handoff-to-new-session.md',
+    retro: 'plugin/dist/cursor/commands/retro.md',
+    stop: 'plugin/dist/cursor/commands/cc-master-stop.md',
+  };
+  for (const [id, distCmd] of Object.entries(expected)) {
+    assert.ok(existsSync(join(ROOT, distCmd)), `${id}: ${distCmd} must exist after sync`);
+    const body = read(distCmd);
+    assert.doesNotMatch(body, /\bBash\b/, `${id}: Cursor command must not name Bash`);
+    assert.doesNotMatch(body, /\$\{CLAUDE_PLUGIN_ROOT\}/, `${id}: no CLAUDE_PLUGIN_ROOT in Cursor body`);
+    assert.doesNotMatch(body, /\/cc-master:/, `${id}: no Claude /cc-master: namespace in Cursor body`);
+  }
+  const init = read(expected['as-master-orchestrator']);
+  assert.match(init, /<!-- cc-master:bootstrap:v1 -->/);
+  const stop = read(expected.stop);
+  assert.match(stop, /^name:\s*cc-master-stop\b/m, 'stop frontmatter name must be cc-master-stop');
+  assert.match(stop, /\/cc-master-stop/, 'stop body must teach /cc-master-stop slash');
+  assert.ok(!existsSync(join(ROOT, 'plugin/dist/cursor/commands/stop.md')), 'must not project bare stop.md (Cursor /stop conflict)');
   const manifest = JSON.parse(read('plugin/dist/cursor/.cursor-plugin/plugin.json'));
   assert.equal(manifest.commands, './commands/');
+});
+
+test('Cursor cc-master-* command-skills are unsupported_stub pointing at slash commands', () => {
+  const stubs = {
+    'cc-master-as-master-orchestrator': '/as-master-orchestrator',
+    'cc-master-discuss': '/discuss',
+    'cc-master-distill': '/distill',
+    'cc-master-handoff-to-new-session': '/handoff-to-new-session',
+    'cc-master-retro': '/retro',
+    'cc-master-stop': '/cc-master-stop',
+  };
+  for (const [skill, slash] of Object.entries(stubs)) {
+    const strat = read(`${SRC}/skills/${skill}/adapters/cursor/strategy.yaml`);
+    assert.match(strat, /mode:\s*unsupported_stub/, `${skill} cursor strategy must be unsupported_stub`);
+    const stub = read(`${SRC}/skills/${skill}/adapters/cursor/stub/SKILL.md`);
+    assert.match(stub, new RegExp(slash.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${skill} stub must point at ${slash}`);
+    const dist = `plugin/dist/cursor/skills/${skill}/SKILL.md`;
+    assert.ok(existsSync(join(ROOT, dist)), `${dist} must exist after sync`);
+    const distBody = read(dist);
+    assert.match(distBody, /Unsupported Stub/i, `${skill} dist must be stub, not Codex canonical`);
+    assert.doesNotMatch(distBody, /\$cc-master-/, `${skill} dist must not teach Codex $cc-master-*`);
+  }
 });
 
 // ── ADR-018 标签注入防回潮 lint（AGENTS.md §13）──────────────────────────────────────────────────────
