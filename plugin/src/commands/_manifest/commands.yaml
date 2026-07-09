@@ -7,6 +7,7 @@ commands:
     host_coverage:
       claude-code: implemented
       codex: prompt_prefix_hook
+      cursor: planned-host-native
   - id: discuss
     required: true
     intent: discuss_awaiting_user_decision
@@ -14,6 +15,7 @@ commands:
     host_coverage:
       claude-code: implemented
       codex: conversational_guidance
+      cursor: planned-adapter-guidance
   - id: distill
     required: true
     intent: distill_candidate_lessons_into_project_assets
@@ -21,6 +23,7 @@ commands:
     host_coverage:
       claude-code: implemented
       codex: ccm_guided
+      cursor: planned-ccm-guided
   - id: handoff-to-new-session
     required: true
     intent: archive_with_handoff_for_resume
@@ -28,6 +31,7 @@ commands:
     host_coverage:
       claude-code: implemented
       codex: ccm_guided
+      cursor: planned-ccm-guided
   - id: retro
     required: true
     intent: retrospect_board_and_capture_candidate_lessons
@@ -35,6 +39,7 @@ commands:
     host_coverage:
       claude-code: implemented
       codex: ccm_guided
+      cursor: planned-ccm-guided
   - id: stop
     required: true
     intent: archive_active_board
@@ -42,3 +47,4 @@ commands:
     host_coverage:
       claude-code: implemented
       codex: ccm_guided
+      cursor: planned-ccm-guided

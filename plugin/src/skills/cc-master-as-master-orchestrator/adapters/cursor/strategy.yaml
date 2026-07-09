@@ -1,0 +1,11 @@
+host: cursor
+skill: cc-master-as-master-orchestrator
+version: 1
+mode: planned
+planned_projection:
+  target_mode: copy
+  source: canonical/
+  target: skills/cc-master-as-master-orchestrator/
+notes:
+  - SAP Track A: copy + slot/overlay after probe D1 (path tokens). ADR-031.
+  - See design_docs/harnesses/cursor.md Track A table.

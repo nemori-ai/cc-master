@@ -1,0 +1,13 @@
+host: cursor
+skill: using-ccm
+version: 1
+mode: planned
+planned_projection:
+  target_mode: copy
+  source: canonical/
+  target: skills/using-ccm/
+notes:
+  - SAP Track A: copy + slot/overlay after probe D1 (path tokens). ADR-031.
+  - See design_docs/harnesses/cursor.md Track A table.
+slot_replacements:
+  "{{USING_CCM_DESCRIPTION}}": adapters/cursor/overlays/description.md
