@@ -1,5 +1,14 @@
 # ccm
 
+## 0.19.1
+
+### Patch Changes
+
+- fix: biome format/import lint in `@ccm/engine` coordination modules and CLI handlers/tests; exclude generated web-viewer asset map from CLI biome checks (restores `ccm-ci` green).
+
+- Updated dependencies
+  - @ccm/engine@0.19.1
+
 ## 0.19.0
 
 ### Minor Changes

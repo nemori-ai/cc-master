@@ -1,7 +1,7 @@
 # cc-master
 
-[![plugin](https://img.shields.io/badge/plugin-v0.18.0-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.18.0)
-[![ccm](https://img.shields.io/badge/ccm-v0.19.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.19.0)
+[![plugin](https://img.shields.io/badge/plugin-v0.18.1-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.18.1)
+[![ccm](https://img.shields.io/badge/ccm-v0.19.1-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.19.1)
 [![harness](https://img.shields.io/badge/harness-Claude%20Code%20%7C%20Codex%20%7C%20Cursor-4B5563)](design_docs/harnesses/)
 [![ccm CI](https://img.shields.io/github/actions/workflow/status/nemori-ai/cc-master/ccm-ci.yml?branch=main&label=ccm%20CI)](https://github.com/nemori-ai/cc-master/actions/workflows/ccm-ci.yml)
 [![license](https://img.shields.io/github/license/nemori-ai/cc-master)](LICENSE)
@@ -115,10 +115,10 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 # …or pin a specific version of either line — each flag is optional and
 # independent; whichever you omit resolves to the latest of that line:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- \
-  --ccm-version ccm-v0.19.0 --plugin-version v0.18.0
+  --ccm-version ccm-v0.19.1 --plugin-version v0.18.1
 
 # pin just one line, leave the other on latest (e.g. hold ccm, take latest plugin):
-curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.19.0
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.19.1
 
 # target a harness explicitly, or fan out to every installed supported harness:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness claude-code
