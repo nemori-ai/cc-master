@@ -1,5 +1,14 @@
 # @ccm/engine
 
+## 0.17.0
+
+### Minor Changes
+
+- feat: expose board read models needed by ccm web viewer and status reports
+
+  - Adds the stable data/model support consumed by `ccm status-report` and the `ccm web-viewer` service: board/task status grouping, DAG-friendly task metadata, progress calculation, critical path/status summaries, freshness hashes, and lint/health inputs for generated reports.
+  - Keeps board JSON as the single writable source of truth: status reports are derived artifacts, viewer routes are read-only, and board mutations continue to go through existing ccm write paths.
+
 ## 0.16.0
 
 ### Minor Changes

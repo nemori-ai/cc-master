@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] — 2026-07-09
+
+> **ccm-native web viewer + status-report 迁移（配套 ccm-v0.17.0）** —— board 可视化与状态报告从 plugin prompt/skill surface 迁到 `ccm`：`ccm web-viewer` 托管本地只读 React app，`ccm status-report` 生成可程序化报告；旧 `/cc-master:view` / `$cc-master-view` 与 `/cc-master:status` / `$cc-master-status` 入口直接删除，不保留 deprecated shim。
+
+### Added
+
+- **`ccm web-viewer` 正式成为 viewer 生命周期入口**：文档和 runtime guidance 改为使用 `ccm web-viewer start/open/status/stop/restart/serve`；viewer service 归 `ccm` 管理，按 home 扫描 boards，支持 board 切换、状态过滤、任务详情、Status 模块、只读 live refresh 和本地 token-gated URL。
+- **`ccm status-report` 成为 board 状态报告入口**：`render/write/show/watch` 输出稳定 `ccm/status-report/v1` schema，供 CLI、web viewer 和后续客户端复用，替代旧的 prompt-time status prose。
+- **web viewer 设计与验收文档**：新增 ADR-029、ADR-030、`design_docs/ccm-web-viewer.md`、concept contract、viewer performance fixture，记录 service 生命周期、app stack、status-report 集成、只读安全边界与验收口径。
+
+### Changed
+
+- **plugin guidance 全面改指 `ccm`**：`master-orchestrator-guide`、`using-ccm` command catalog、README / README_zh、feature manual 和机制文档都改为教 `ccm web-viewer open` 与 `ccm status-report show`。
+- **Codex / Claude plugin manifest 同步到同一 plugin 版本线**：Codex adapter manifest 从旧号补齐到 `0.16.0`，与 Claude Code adapter 同步打包发布。
+
+### Removed
+
+- **删除 legacy viewer/status plugin surface**：移除 `plugin/src/commands/view`、`plugin/src/commands/status`、`plugin/src/skills/cc-master-view`、`plugin/src/skills/cc-master-status` 及其 dist 产物。
+- **删除旧 plugin-era web viewer payload**：移除 `master-orchestrator-guide/scripts/view-server.js`、`view.html`、vendored React/xyflow/dagre/font assets 和对应旧 viewer content tests；viewer 资产改由 `ccm/apps/web-viewer` 构建并由 ccm service 托管。
+
 ## [0.15.0] — 2026-07-07
 
 > **using-ccm 锁步同步（配套 ccm-v0.16.0）** —— ccm 的 `--set/--set-json` scoping 根治（dogfood Finding #83：裸 dotpath 落 board 顶层而非该 task、零回显）随 `ccm-v0.16.0` 发布，本版按锁步纪律同步 `using-ccm` 操作手册，让 agent 照手册一次写对。
@@ -548,7 +568,10 @@ advancing across context compaction and across sessions.
 - **Docs** — `README.md` (EN) and `README_zh.md` (中文); design specification,
   design notes, and four research reports under `design_docs/`.
 
-[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/nemori-ai/cc-master/compare/v0.15.0...v0.16.0
+[0.15.0]: https://github.com/nemori-ai/cc-master/compare/v0.14.0...v0.15.0
+[0.14.0]: https://github.com/nemori-ai/cc-master/compare/v0.13.1...v0.14.0
 [0.13.1]: https://github.com/nemori-ai/cc-master/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/nemori-ai/cc-master/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/nemori-ai/cc-master/compare/v0.11.0...v0.12.1
