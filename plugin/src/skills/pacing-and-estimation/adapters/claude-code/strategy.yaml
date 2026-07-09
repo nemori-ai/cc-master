@@ -14,6 +14,7 @@ slot_replacements:
   "{{PACING_BOUNDARY}}": adapters/claude-code/overlays/boundary.md
   "{{PACING_REFERENCE_POINTERS_HEAD}}": adapters/claude-code/overlays/reference-pointers-head.md
   "{{PACING_MODEL_TIER_ANCHOR}}": adapters/claude-code/overlays/model-tier-anchor.md
+  "{{PACING_MODEL_TIERS_REFERENCE}}": adapters/claude-code/overlays/model-tiers-reference.md
   "{{PACING_COMMAND_CATALOG_POINTER}}": adapters/claude-code/overlays/command-catalog-pointer.md
   "{{PACING_USAGE_FOOTGUN_ROWS}}": adapters/claude-code/overlays/usage-footgun-rows.md
   "{{PACING_POINTERS_HOST}}": adapters/claude-code/overlays/pointers-host.md

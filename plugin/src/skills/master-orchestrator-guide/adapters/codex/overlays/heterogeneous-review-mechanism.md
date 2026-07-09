@@ -1,0 +1,1 @@
+**本 host 机制（Codex）**：主线 / 产出已是 GPT/Codex 族时，**再派一个 Codex subagent / `codex exec review` 不算异构第二视角**。高杠杆 / 临界强制第二读时，改派 **Claude 族**（独立 subagent、带外 Claude Code / Claude API，或当前环境可用的非 GPT 族模型），只给 diff + 验收契约，并记录 agent id / 输出文件作 handle。同族升档复读、同族 cloud task 复读，都不满足「产出族 ≠ 验收族」。

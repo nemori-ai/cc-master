@@ -36,7 +36,7 @@ slot_replacements:
   "{{DISCUSS_SESSION_GUIDANCE}}": adapters/codex/overlays/discuss-session-guidance.md
   "{{WATCHDOG_RETIRE_SCHEDULER_GUIDANCE}}": adapters/codex/overlays/watchdog-retire-scheduler-guidance.md
   "{{PLATFORM_RESUME_GUIDANCE}}": adapters/codex/overlays/platform-resume-guidance.md
-  "{{CODEX_REVIEW_SCRIPT_GUIDANCE}}": adapters/codex/overlays/codex-review-script-guidance.md
+  "{{HETEROGENEOUS_REVIEW_MECHANISM}}": adapters/codex/overlays/heterogeneous-review-mechanism.md
   "{{HANDOFF_REFERENCE_ROW}}": adapters/codex/overlays/handoff-reference-row.md
 notes:
   - Codex projection uses the host-neutral canonical body plus Codex-verified dispatch and watchdog slots.

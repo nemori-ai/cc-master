@@ -4,6 +4,6 @@ Use when 你（orchestrator/agent）在 Cursor IDE Agent 下要消费 ccm 的只
 - **无 5h / 7d 滚动窗**——不要对照 `window_5h_pct` / `window_7d_pct` / `stop_5h` / `stop_7d` 做 Cursor 配速（那些字段在 Cursor 上为 null）。
 - **无自动换号**——`verdict` 永不出现 `switch`；不要建议 `ccm account switch`。
 - 信号源：本机 Cursor 登录态 → dashboard `GetCurrentPeriodUsage`（`source: cursor-dashboard`）；读失败则 `available:false`，hook 应静默，勿编造百分比。
-- 配速 levers：降模型档 / 降 WIP / 推迟高 float / 等 `nearest_reset`（账期续费日）——不是换号。
+- 配速 levers：降模型档（Composer→主力→…；先 first-party 池）/ 降 WIP / 推迟高 float / 等 `nearest_reset`（账期续费日）——不是换号；档位表见本 skill `references/model-tiers.md`（含 Grok 4.5，不用 Fable）。
 
 ccm 出 verdict、决策归 master-orchestrator-guide——本 skill 只教消费层，不替编排做判断。

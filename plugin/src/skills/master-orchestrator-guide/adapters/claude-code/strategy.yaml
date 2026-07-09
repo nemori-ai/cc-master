@@ -32,7 +32,7 @@ slot_replacements:
   "{{DISCUSS_SESSION_GUIDANCE}}": adapters/claude-code/overlays/discuss-session-guidance.md
   "{{WATCHDOG_RETIRE_SCHEDULER_GUIDANCE}}": adapters/claude-code/overlays/watchdog-retire-scheduler-guidance.md
   "{{PLATFORM_RESUME_GUIDANCE}}": adapters/claude-code/overlays/platform-resume-guidance.md
-  "{{CODEX_REVIEW_SCRIPT_GUIDANCE}}": adapters/claude-code/overlays/codex-review-script-guidance.md
+  "{{HETEROGENEOUS_REVIEW_MECHANISM}}": adapters/claude-code/overlays/heterogeneous-review-mechanism.md
   "{{HANDOFF_REFERENCE_ROW}}": adapters/claude-code/overlays/handoff-reference-row.md
 mechanisms:
   declarative-patch:

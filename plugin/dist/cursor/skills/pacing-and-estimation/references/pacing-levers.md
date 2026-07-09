@@ -14,7 +14,7 @@ Cursor adapter **不支持**账号池切换；`verdict` 也不应出现 `switch`
 
 ## 减速 lever
 
-1. **降级模型** —— 在 Cursor 可用模型范围内，把 token 重的叶子路由到更便宜的配置；本 adapter 不投影 Claude 模型档位表。
+1. **降级模型** —— 按 model-tiers.md 阶梯下探：机械叶 → `Composer 2.5`；常规实现 → Sonnet 5 / GPT-5.3 Codex 或 Grok medium/low；**先榨 first-party 池再烧 API 池**。难实现与裁决不降（Grok high / xhigh）。`fast` 变体不是省钱档。
 2. **降 WIP** —— 让更少的并发叶子在飞。
 3. **推迟高 float 工作** —— 把非临界、token 重的叶子推到账期 reset 之后。
 
