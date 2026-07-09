@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.1] — 2026-07-09
+
+> **CI / lint hotfix** — restore `ccm-ci` green after #78; no functional behavior change.
+
+### Fixed
+
+- **ccm biome lint** — format/import fixes in `@ccm/engine` coordination modules and related CLI tests; exclude generated `web-viewer-assets.ts` from CLI biome checks.
+
 ## [0.18.0] — 2026-07-09
 
 > **Multi-orchestrator pool arbiter + inbox + monitor daemon + web-viewer upgrade co-lifecycle** — ADR-032/033 land on plugin + `ccm` lines together.
@@ -632,7 +640,8 @@ advancing across context compaction and across sessions.
 - **Docs** — `README.md` (EN) and `README_zh.md` (中文); design specification,
   design notes, and four research reports under `design_docs/`.
 
-[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.18.1...HEAD
+[0.18.1]: https://github.com/nemori-ai/cc-master/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/nemori-ai/cc-master/compare/v0.17.3...v0.18.0
 [0.17.3]: https://github.com/nemori-ai/cc-master/compare/v0.17.2...v0.17.3
 [0.16.0]: https://github.com/nemori-ai/cc-master/compare/v0.15.0...v0.16.0
