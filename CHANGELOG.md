@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.3] — 2026-07-09
+
+> **Cursor bootstrap slash trigger** —— 修复 Cursor `beforeSubmitPrompt` 传入原始 `/as-master-orchestrator` 时 bootstrap 静默 no-op。
+
+### Fixed
+
+- **Cursor bootstrap slash matching** — `bootstrap-board-core` 现识别 Cursor host-native `/as-master-orchestrator`（及 `/cc-master-as-master-orchestrator`）前缀；此前仅匹配 `cc-master:…` 与 HTML sentinel，导致真机 slash 命令永不 ARM。
+
 ## [0.17.2] — 2026-07-09
 
 > **Cursor hook envelope correctness** —— 修复 Cursor launcher 按官方事件契约映射输出信封：bootstrap ARM 通知走 `user_message`，Stop advisory/FUSE 走 `followup_message`；补 ADR-021 ccm 硬前置。
