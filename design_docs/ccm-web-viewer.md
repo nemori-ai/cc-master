@@ -605,7 +605,7 @@ Packaging decision:
 
 5. **WV13 — plugin guidance removal**
    - Update README / README_zh / feature manual / master-orchestrator-guide / using-ccm command catalog to point to `ccm web-viewer open`.
-   - Remove or deprecate `/cc-master:view` and `$cc-master-view`; if shims remain, they only redirect users to ccm and contain no lifecycle logic.
+   - Remove `/cc-master:view` and `$cc-master-view`; no plugin-level deprecated shim remains.
    - Run plugin projection and sync checks.
 
 6. **WV14 — status report module**
@@ -657,7 +657,7 @@ Minimum implementation tests:
 
 Documentation tests:
 
-- old `/cc-master:view` references are either removed from user-facing docs or explicitly marked deprecated with `ccm web-viewer open` as replacement.
+- old `/cc-master:view` references are removed from user-facing docs; remaining mentions are historical design / ADR context only.
 - old `/cc-master:status` / `$cc-master-status` references are removed from user-facing docs; remaining mentions are historical design / ADR context only.
 - plugin dist is regenerated from source after command / skill removal.
 

@@ -4,6 +4,7 @@
 > Date: 2026-07-08
 > Scope: board web viewer 的用户入口、生命周期归属、服务状态文件、frontend app stack、plugin command / Codex skill 退役路径、ccm packaging 边界。
 > Source: WV11-WEBVIEWER-DESIGN scope change：web viewer 不再由 `/cc-master:view` / `$cc-master-view` 指导启动，必须成为 ccm 正式 namespace，名字为 `ccm web-viewer`。
+> Implementation note（2026-07-09）：旧 plugin command / Codex skill 与 plugin-era `view-server.js` / `view.html` / `vendor/` 已删除；不再保留 deprecated shim。
 > Co-signed: 用户（scope change 显式指定 namespace 名称）
 
 ---

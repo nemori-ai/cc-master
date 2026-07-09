@@ -681,7 +681,14 @@ test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no b
       viewModel.body.graph.edges
         .filter((e: { type: string }) => e.type === 'dep')
         .map(
-          (e: { id: string; source: string; target: string; from: string; to: string; type: string }) => ({
+          (e: {
+            id: string;
+            source: string;
+            target: string;
+            from: string;
+            to: string;
+            type: string;
+          }) => ({
             id: e.id,
             source: e.source,
             target: e.target,
@@ -698,7 +705,10 @@ test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no b
       ],
     );
     assert.equal(viewModel.body.defaults.selected_task_id, 'D');
-    assert.equal(viewModel.body.status.buckets.find((b: { id: string }) => b.id === 'ready').count, 1);
+    assert.equal(
+      viewModel.body.status.buckets.find((b: { id: string }) => b.id === 'ready').count,
+      1,
+    );
 
     const task = await httpJson({
       port,
@@ -725,7 +735,10 @@ test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no b
     assert.deepEqual(task.body.task.decision_package, { question: 'approve launch' });
     assert.equal(task.body.raw_task.id, 'D');
     assert.deepEqual(task.body.task.parents, ['B', 'C']);
-    assert.deepEqual(task.body.dependencies.map((dep: { id: string }) => dep.id), ['B', 'C']);
+    assert.deepEqual(
+      task.body.dependencies.map((dep: { id: string }) => dep.id),
+      ['B', 'C'],
+    );
     assert.deepEqual(task.body.dependents, []);
     assert.ok(task.body.task.summary.includes('User decision'));
 

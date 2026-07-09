@@ -104,7 +104,7 @@ test('board.example.json demonstrates a per-task observability edge — agent-sh
   // observability is an OPTIONAL per-task agent-shaped flexible edge (red line 2): orchestrator copies
   // the completion notification's <usage> block (subagent_tokens/duration_ms/tool_uses) into it when it
   // marks a node done. NO hook reads it — board-lint is silent-on-unknown, so it ships zero hook/lint
-  // change. The example must demonstrate one shape so readers (view.html / retrospective) see the schema.
+  // change. The example must demonstrate one shape so downstream readers see the schema.
   const withObs = b.tasks.find((t) => t && typeof t.observability === 'object' && t.observability);
   assert.ok(withObs, 'board.example.json must demonstrate ≥1 task carrying an observability object');
   const o = withObs.observability;

@@ -4,13 +4,7 @@ import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  STATUS_ENUM,
-  analyzeGraph,
-  isAwaitingUser,
-  taskTrulyDone,
-  withLock,
-} from '@ccm/engine';
+import { analyzeGraph, isAwaitingUser, STATUS_ENUM, taskTrulyDone, withLock } from '@ccm/engine';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
 import type { Ctx } from './_common.js';
@@ -1002,8 +996,7 @@ function readBoardSnapshot(boardPath: string): {
 function tasksOf(board: JsonRecord): JsonRecord[] {
   return Array.isArray(board.tasks)
     ? board.tasks.filter(
-        (task): task is JsonRecord =>
-          !!task && typeof task === 'object' && !Array.isArray(task),
+        (task): task is JsonRecord => !!task && typeof task === 'object' && !Array.isArray(task),
       )
     : [];
 }
@@ -1064,7 +1057,10 @@ function topologyHashFor(board: JsonRecord): string {
     .map((task) => ({
       id: taskId(task),
       deps: Array.isArray(task.deps)
-        ? task.deps.filter((dep): dep is string => typeof dep === 'string').slice().sort()
+        ? task.deps
+            .filter((dep): dep is string => typeof dep === 'string')
+            .slice()
+            .sort()
         : [],
       parent: typeof task.parent === 'string' ? task.parent : '',
     }))
@@ -1138,19 +1134,24 @@ function graphEdges(tasks: JsonRecord[], criticalPath: string[] = []): ViewerEdg
   return edges;
 }
 
-function rankTasks(tasks: JsonRecord[], topoOrder: string[], upstream: Map<string, unknown>): RankInfo {
+function rankTasks(
+  tasks: JsonRecord[],
+  topoOrder: string[],
+  upstream: Map<string, unknown>,
+): RankInfo {
   const taskOrder = new Map(tasks.map((task, index) => [taskId(task), index]));
   const ids = topoOrder.length
     ? topoOrder
-    : tasks.map(taskId).filter((id): id is string => !!id).sort((a, b) => a.localeCompare(b));
+    : tasks
+        .map(taskId)
+        .filter((id): id is string => !!id)
+        .sort((a, b) => a.localeCompare(b));
   const rankById = new Map<string, number>();
   for (const id of ids) {
     const deps = Array.isArray(upstream.get(id))
       ? (upstream.get(id) as unknown[]).filter((dep): dep is string => typeof dep === 'string')
       : [];
-    const rank = deps.length
-      ? 1 + Math.max(...deps.map((dep) => rankById.get(dep) ?? 0))
-      : 0;
+    const rank = deps.length ? 1 + Math.max(...deps.map((dep) => rankById.get(dep) ?? 0)) : 0;
     rankById.set(id, rank);
   }
   const grouped = new Map<number, string[]>();
@@ -1201,7 +1202,8 @@ function statusBuckets(tasks: JsonRecord[]): Array<{
     ['done', 'Done / Verified', 'done'],
   ] as const;
   const counts = new Map<string, number>();
-  for (const task of tasks) counts.set(statusBucketId(task), (counts.get(statusBucketId(task)) || 0) + 1);
+  for (const task of tasks)
+    counts.set(statusBucketId(task), (counts.get(statusBucketId(task)) || 0) + 1);
   return defs.map(([id, label, tone]) => ({
     id,
     label,
@@ -1447,13 +1449,17 @@ function buildTaskDetail(boardPath: string, taskIdValue: string): JsonRecord | n
             : [],
     },
     raw_task: task,
-    dependencies: parents.map((id) => taskRef(byId.get(id))).filter((ref): ref is JsonRecord => !!ref),
-    dependents: children.map((id) => taskRef(byId.get(id))).filter((ref): ref is JsonRecord => !!ref),
+    dependencies: parents
+      .map((id) => taskRef(byId.get(id)))
+      .filter((ref): ref is JsonRecord => !!ref),
+    dependents: children
+      .map((id) => taskRef(byId.get(id)))
+      .filter((ref): ref is JsonRecord => !!ref),
     activity: taskActivity(board, task),
   };
 }
 
-function viewerShellHtml(): string {
+function _viewerShellHtml(): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -1851,7 +1857,11 @@ export function serve(ctx: Ctx): Promise<number> {
         const runtimeState = latestRuntimeState(state);
         const hasBoardParam = url.searchParams.has('board') || url.searchParams.has('board_file');
         const requestedBoardPath = hasBoardParam
-          ? resolveHttpBoard(runtimeState.home, runtimeState.current_selection?.board_path || null, url)
+          ? resolveHttpBoard(
+              runtimeState.home,
+              runtimeState.current_selection?.board_path || null,
+              url,
+            )
           : runtimeState.current_selection?.board_path || null;
         if (hasBoardParam && !requestedBoardPath) {
           sendJson(res, 404, { schema: BOARDS_SCHEMA, error: 'board not found' });

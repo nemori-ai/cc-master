@@ -15,7 +15,7 @@
 | `commands/status.md` | 只读渲染按状态分组的 board 视图 + 心算临界路径 + program-state 健康检查 | （无直接命名引用；`/status` 概念见 cost-and-pacing.md / handoff.md） | 2026-06-21 |
 | `commands/stop.md` | 用户确认后把认准 board 的 owner.active 置 false（显式可逆归档、不删文件） | （无直接命名引用；`/stop` 概念见 board.md / handoff.md） | 2026-06-21 |
 | `commands/handoff-to-new-session.md` | 6 步：quiesce → drain 就地验收 → 写叙事 handoff 文档 → log+heartbeat → 归档 → 告诉用户续跑命令 | `master-orchestrator-guide/SKILL.md`、`.../references/handoff.md` | 2026-06-21 |
-| `commands/view.md` | deprecated shim：提示用户改用 `ccm web-viewer open`，不再承载 viewer lifecycle | `master-orchestrator-guide` host command-surface overlays | 2026-07-08 |
+| `commands/view.md` | **已删除**：viewer 入口归 `ccm web-viewer open`，plugin 不再分发 deprecated shim | `ccm web-viewer` CLI namespace | 2026-07-09 |
 | ~~`commands/accounts.md`~~ **（退役·ADR-019）** | 账号操作已全归 `ccm account` CLI（用户直接敲·token-blind）+ 自动切号在 usage-pacing hook；命令零增量零覆写 = 装饰，删除。概念叙事见 `using-ccm/references/account-pool.md` | — | 2026-06-29 |
 | **hooks** | | | |
 | `hooks/scripts/bootstrap-board.sh` | UserPromptSubmit：dual-sentinel 触发 → fresh 建板盖 sid / resume 选板 live-probe 后重盖 owner；唯一豁免武装闸者 | `master-orchestrator-guide/references/board.md`（+ `.design/DESIGN.md` 设计性） | 2026-06-21 |
@@ -35,7 +35,7 @@
 | ~~`master-orchestrator-guide/scripts/cc-usage.sh`~~ **（退役·被 `ccm usage advise` 取代·ADR-015/024）** | ~~python 解析本地 JSONL 算 5h/7d，账户权威 sidecar 优先、本地反推 fallback（标 approx）~~ 已删；usage 感知 + 配速数学收口进 `@ccm/engine`，主线改跑 `ccm usage advise --json`（单侧 verdict） | — | 2026-07-02 |
 | `master-orchestrator-guide/scripts/codex-review.sh` | 封装 `codex exec review` 出 verdict，空/失败 → 按未通过（exit 2）；read-only sandbox | `master-orchestrator-guide/references/resume-verify.md`、`.../references/cost-and-pacing.md` | 2026-06-21 |
 | `master-orchestrator-guide/scripts/statusline-capture.js` | status-line（非 hook）捕获账户权威 rate_limits 落 sidecar，原子写、失败静默 | `master-orchestrator-guide/references/cost-and-pacing.md`、`account-management/references/account-scheduling.md` | 2026-06-21 |
-| `master-orchestrator-guide/scripts/view-server.js` | legacy viewer payload：只可作 ccm 迁移桥或测试资产；正式 lifecycle 归 `ccm web-viewer` | （运行时 prompt 不再指导直接调用；测试仍引用） | 2026-07-08 |
+| `master-orchestrator-guide/scripts/view-server.js` / `view.html` / `vendor/` | **已删除**：旧 plugin-era viewer payload 退役；正式 lifecycle 与 assets 归 `ccm web-viewer` / `ccm/apps/web-viewer` | `ccm web-viewer` CLI namespace + ccm-owned app build artifact | 2026-07-09 |
 | ~~`master-orchestrator-guide/scripts/board-lint.js`~~ **（退役·被 `ccm board lint` 取代·ADR-014）** | ~~独立手动 board lint（复用 hook 同一份核心），显式调用不需武装闸~~ 已删；lint 引擎迁入 `@ccm/engine`，独立手动 lint 改跑 `ccm board lint --board <path> --raw --json` | — | 2026-07-02 |
 | **dev-only scripts**（不随 plugin 分发·红线 5） | | | |
 | `scripts/eval-trigger.sh` | 跑 skill-creator Track A 触发准确率 eval 的薄包装 | （无 skill prose 引用；dev 流，见 AGENTS.md §8） | 2026-06-21 |

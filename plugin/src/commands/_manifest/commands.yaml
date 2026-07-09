@@ -42,10 +42,3 @@ commands:
     host_coverage:
       claude-code: implemented
       codex: ccm_guided
-  - id: view
-    required: true
-    intent: deprecated_view_shim_to_ccm_web_viewer
-    argument_contract: ""
-    host_coverage:
-      claude-code: deprecated_shim
-      codex: deprecated_shim
