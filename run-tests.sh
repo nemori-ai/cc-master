@@ -2,6 +2,11 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# Suite env hygiene: orchestration sessions may export CC_MASTER_HOME / CC_MASTER_BOARD into the
+# parent shell. Tests pin their own homes via run_hook; a stale CC_MASTER_BOARD makes `ccm board init`
+# target the live board instead of the isolated temp home (bootstrap-board regressions).
+unset CC_MASTER_BOARD CC_MASTER_HOME 2>/dev/null || true
+
 # Suite-level temp sweep: reap STALE leaked .tmp-ccm.* dirs from helpers.sh's make_project
 # (template "${TMPDIR:-/tmp}/.tmp-ccm.XXXXXX"). Run at startup + via trap EXIT.
 # AGE-FILTERED (mtime >60min) ON PURPOSE: a blanket `rm -rf ${TMPDIR}/.tmp-ccm.*` would delete

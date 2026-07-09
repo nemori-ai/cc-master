@@ -8,6 +8,10 @@ import * as webViewer from '../src/handlers/web-viewer.js';
 import { readVersion } from '../src/help.js';
 import * as io from '../src/io.js';
 import { run } from '../src/router.js';
+import {
+  __resetWebViewerAppDistTestHooks,
+  __setWebViewerAppDistTestHooks,
+} from '../src/web-viewer-app-dist.js';
 
 const EXIT = io.EXIT;
 const SID = 'wv-test-session';
@@ -16,6 +20,7 @@ let TMPDIRS: string[] = [];
 
 afterEach(() => {
   webViewer.__resetWebViewerTestHooks();
+  __resetWebViewerAppDistTestHooks();
   for (const d of TMPDIRS) rmSync(d, { recursive: true, force: true });
   TMPDIRS = [];
 });
@@ -839,6 +844,172 @@ test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no b
     );
   } finally {
     await httpJson({ port, path: '/_ccm/shutdown', token: 'route-token', method: 'POST' }).catch(
+      () => {},
+    );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});
+
+test('serve uses home materialized app-dist without relying on process cwd', async () => {
+  const home = mkHome();
+  const html =
+    '<!doctype html><html><head></head><body><div id="root"></div><script type="module" src="./assets/app.js"></script></body></html>';
+  __setWebViewerAppDistTestHooks({
+    bundled: true,
+    version: readVersion(),
+    files: {
+      'index.html': Buffer.from(html, 'utf8').toString('base64'),
+      'assets/app.js': Buffer.from('export {}', 'utf8').toString('base64'),
+    },
+  });
+
+  const root = join(home, 'services', 'web-viewer');
+  const statePath = join(root, 'instances', 'wv_materialized.json');
+  const tokenPath = join(root, 'tokens', 'wv_materialized.token');
+  mkdirSync(join(root, 'instances'), { recursive: true });
+  mkdirSync(join(root, 'tokens'), { recursive: true });
+  writeFileSync(tokenPath, 'materialized-token', 'utf8');
+  writeFileSync(
+    statePath,
+    `${JSON.stringify(
+      {
+        schema: 'ccm/web-viewer-service/v1',
+        id: 'wv_materialized',
+        pid: 0,
+        state_path: statePath,
+        token_file: tokenPath,
+        token_sha256: 'sha256:test',
+        home,
+        initial_board_path: null,
+        current_selection: null,
+        scope: { home, session_id: SID },
+        host: '127.0.0.1',
+        port: 0,
+        base_url: 'http://127.0.0.1:0',
+        url: 'http://127.0.0.1:0/?token=<redacted>',
+        server: { started_at: '2026-07-09T12:00:00Z', ccm_version: readVersion() },
+        log_path: join(root, 'logs', 'wv_materialized.log'),
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+
+  let ready!: () => void;
+  const readyPromise = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const prevCwd = process.cwd();
+  process.chdir(tmpdir());
+  const servePromise = webViewer.serve({
+    values: { state: statePath },
+    positionals: [],
+    flags: {
+      json: false,
+      dryRun: false,
+      force: false,
+      yes: false,
+      quiet: false,
+      verbose: false,
+      color: false,
+    },
+    sid: SID,
+    env: { CC_MASTER_HOME: home },
+    out: () => ready(),
+    err: () => {},
+  });
+  await readyPromise;
+  const runtimeState = JSON.parse(readFileSync(statePath, 'utf8'));
+  const port = runtimeState.port;
+
+  try {
+    const page = await httpText({ port, path: '/?token=materialized-token' });
+    assert.equal(page.status, 200);
+    assert.match(String(page.headers['content-type']), /text\/html/);
+    assert.match(page.body, /<div id="root"><\/div>/);
+    assert.ok(port > 0, 'serve binds an OS-assigned ephemeral port when state.port is 0');
+    assert.notEqual(port, 5173, 'must not default to a fixed dev-server port');
+  } finally {
+    process.chdir(prevCwd);
+    await httpJson({ port, path: '/_ccm/shutdown', token: 'materialized-token', method: 'POST' }).catch(
+      () => {},
+    );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});
+
+test('serve returns 503 when web-viewer assets are unavailable', async () => {
+  const home = mkHome();
+  __setWebViewerAppDistTestHooks({ bundled: false, files: {}, disableDevCandidates: true });
+
+  const root = join(home, 'services', 'web-viewer');
+  const statePath = join(root, 'instances', 'wv_missing.json');
+  const tokenPath = join(root, 'tokens', 'wv_missing.token');
+  mkdirSync(join(root, 'instances'), { recursive: true });
+  mkdirSync(join(root, 'tokens'), { recursive: true });
+  writeFileSync(tokenPath, 'missing-token', 'utf8');
+  writeFileSync(
+    statePath,
+    `${JSON.stringify(
+      {
+        schema: 'ccm/web-viewer-service/v1',
+        id: 'wv_missing',
+        pid: 0,
+        state_path: statePath,
+        token_file: tokenPath,
+        token_sha256: 'sha256:test',
+        home,
+        initial_board_path: null,
+        current_selection: null,
+        scope: { home, session_id: SID },
+        host: '127.0.0.1',
+        port: 0,
+        base_url: 'http://127.0.0.1:0',
+        url: 'http://127.0.0.1:0/?token=<redacted>',
+        server: { started_at: '2026-07-09T12:00:00Z', ccm_version: readVersion() },
+        log_path: join(root, 'logs', 'wv_missing.log'),
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+
+  let ready!: () => void;
+  const readyPromise = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const prevCwd = process.cwd();
+  process.chdir(tmpdir());
+  const servePromise = webViewer.serve({
+    values: { state: statePath },
+    positionals: [],
+    flags: {
+      json: false,
+      dryRun: false,
+      force: false,
+      yes: false,
+      quiet: false,
+      verbose: false,
+      color: false,
+    },
+    sid: SID,
+    env: { CC_MASTER_HOME: home },
+    out: () => ready(),
+    err: () => {},
+  });
+  await readyPromise;
+  const runtimeState = JSON.parse(readFileSync(statePath, 'utf8'));
+  const port = runtimeState.port;
+
+  try {
+    const page = await httpJson({ port, path: '/?token=missing-token' });
+    assert.equal(page.status, 503);
+    assert.match(String(page.body.error), /app dist is missing/i);
+  } finally {
+    process.chdir(prevCwd);
+    await httpJson({ port, path: '/_ccm/shutdown', token: 'missing-token', method: 'POST' }).catch(
       () => {},
     );
   }

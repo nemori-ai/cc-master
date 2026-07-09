@@ -147,7 +147,16 @@ function restartPlan(ctx: Ctx, plan: ServicePlan, home: string): ServicePlan {
         monitor.restart(silentCtx(ctx, { values: { home } }));
       }
     } else {
+      webViewer.ensureAppDistForHome(home);
       webViewer.restart(silentCtx(ctx, { values: { home }, positionals: [plan.id] }));
+      const probe = webViewer.probeRunningServiceHealth(home);
+      if (!probe.ok) {
+        return {
+          ...plan,
+          action: 'restart',
+          reason: `restart-failed: health probe: ${probe.error || 'unhealthy'}`,
+        };
+      }
     }
     return { ...plan, action: 'restart', reason: 'restarted' };
   } catch (e) {

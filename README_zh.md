@@ -1,7 +1,7 @@
 # cc-master
 
-[![plugin](https://img.shields.io/badge/plugin-v0.17.2-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.17.2)
-[![ccm](https://img.shields.io/badge/ccm-v0.18.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.18.0)
+[![plugin](https://img.shields.io/badge/plugin-v0.18.0-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.18.0)
+[![ccm](https://img.shields.io/badge/ccm-v0.19.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.19.0)
 [![harness](https://img.shields.io/badge/harness-Claude%20Code%20%7C%20Codex%20%7C%20Cursor-4B5563)](design_docs/harnesses/)
 [![ccm CI](https://img.shields.io/github/actions/workflow/status/nemori-ai/cc-master/ccm-ci.yml?branch=main&label=ccm%20CI)](https://github.com/nemori-ai/cc-master/actions/workflows/ccm-ci.yml)
 [![license](https://img.shields.io/github/license/nemori-ai/cc-master)](LICENSE)
@@ -82,7 +82,7 @@ cc-master 是一套**多 agent harness 兼容的插件系统**，背后是三样
 
 源码采用 paragoge 式 `plugin/src -> plugin/dist/<host>` 模型：共享 runtime skills 放在 canonical 源里，hooks 先建 host 无关的产品契约、再落各 host 的原生实现，每个 harness 都生成自己的 adapter 产物。插件版本线是一条；release asset 按 harness 拆分，例如 `cc-master-plugin-claude-code-<version>.zip`、`cc-master-plugin-codex-<version>.zip` 和 `cc-master-plugin-cursor-<version>.zip`。
 
-我们对"做到了什么"和"还在做什么"分得很清楚。当前 adapter 包含 Claude Code、Codex 和 Cursor；不同 host 的表面和能力层级不完全相同——例如 Claude Code 可以在 5h/7d 窗口间轮换账号，Cursor 则按单一订阅账单周期配速、不会自动换号。board 状态与实时图现在落在 `ccm` 上（`ccm status-report` / `ccm web-viewer`），不再是插件 slash command。**全部机制、以及每一项到底是已落地还是还在路上，都诚实写在 [产品功能手册](design_docs/feature-manual.md) 里**，不在 README 里夸大。
+我们对"做到了什么"和"还在做什么"分得很清楚。当前 adapter 包含 Claude Code、Codex 和 Cursor；不同 host 的表面和能力层级不完全相同——例如 Claude Code 可以在 5h/7d 窗口间轮换账号，Cursor 则按单一订阅账单周期配速、不会自动换号。board 状态与实时图现在落在 `ccm` 上（`ccm status-report` / `ccm web-viewer`），不再是插件 slash command；`ccm upgrade` 或 `install.sh` 之后，wanted 的 `web-viewer` / `monitor` 会随新二进制自动 reconcile（前端资产内嵌在 `ccm` 里，监听端口由系统分配）。**全部机制、以及每一项到底是已落地还是还在路上，都诚实写在 [产品功能手册](design_docs/feature-manual.md) 里**，不在 README 里夸大。
 
 给贡献者：改 `plugin/src`，不要手改 `plugin/dist`。Skills 走 SAP（`canonical/` + `adapters/<host>/strategy.yaml`）；hooks 走 PHIP（`_manifest/`、`_hosts/<host>/`、`implementations/<host>`）。重新生成 adapter：
 
@@ -115,10 +115,10 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 # …或分别 pin 某条线的版本——两个 flag 各自可选、各自独立，
 # 省掉哪个、哪个就解析为本线最新：
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- \
-  --ccm-version ccm-v0.18.0 --plugin-version v0.17.2
+  --ccm-version ccm-v0.19.0 --plugin-version v0.18.0
 
 # 只 pin 一条线、另一条留最新（例如锁住 ccm、插件取最新）：
-curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.18.0
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.19.0
 
 # 显式指定 harness，或分发到本机所有已安装且支持的 harness：
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness claude-code
@@ -171,7 +171,7 @@ $cc-master-as-master-orchestrator <你的目标>
 
 - **Start / resume** — Claude Code：`/cc-master:as-master-orchestrator <目标>` 或 `/cc-master:as-master-orchestrator --resume`；Codex：`$cc-master-as-master-orchestrator <目标>` 或 `$cc-master-as-master-orchestrator --resume`；Cursor：`/as-master-orchestrator <目标>` 或 `/as-master-orchestrator --resume`（装完后请重开 Agent session，让 hooks/rules 生效）。
 - **Status** — `ccm status-report show`。生成 CLI 和 web viewer 共用的 JSON-backed board 状态报告。
-- **View** — `ccm web-viewer open`。在浏览器里把实时计划打开成只读图；生命周期命令是 `ccm web-viewer start/open/status/stop/restart`。
+- **View** — `ccm web-viewer open`。在浏览器里把实时计划打开成只读图；生命周期命令是 `ccm web-viewer start/open/status/stop/restart`（默认系统分配端口；服务已 wanted 时 `ccm upgrade` 后会自动 reconcile）。
 - **Discuss** — Claude Code：`/cc-master:discuss <决定>`；Cursor：`/discuss <决定>`；Codex：`$cc-master-discuss <决定>`。当有决定等你拍板时使用。
 - **Stop** — Claude Code：`/cc-master:stop`；Codex：`$cc-master-stop`。收尾并归档 board，以后可以继续 resume。
 - **Handoff** — Claude Code：`/cc-master:handoff-to-new-session`；Codex：`$cc-master-handoff-to-new-session`。在换新会话前交接。

@@ -334,6 +334,10 @@ Rejected. Script paths are packaging details. Users and agents should not need t
 
 Rejected. It can prove a route or serve as a temporary smoke harness, but it is too brittle as the long-term board UI architecture. DAG interaction, board switching, Status module UX, responsive behavior, accessibility, graph layout, and visual regression need an app stack and browser QA workflow. The target is a built frontend artifact served by ccm, not a manually maintained static shell.
 
+### 4.6 Evolution note (2026-07-09)
+
+`ccm` release now builds a generated inline asset map (`apps/cli/src/generated/web-viewer-assets.ts`) from `@ccm/web-viewer/dist` into the SEA bundle. On `web-viewer start` / `services reconcile --after-binary-replace`, runtime materializes assets to `<home>/services/web-viewer/app-dist/<ccm_version>/` so serve works without repo cwd. Listener port remains OS-assigned (`--port 0` default; no fixed install port).
+
 ## 5. Related
 
 - [`ADR-014-cli-decoupling-as-independent-product.md`](ADR-014-cli-decoupling-as-independent-product.md) — ccm is an independent product / engine; plugin is one consumer.

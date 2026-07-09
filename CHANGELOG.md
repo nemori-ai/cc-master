@@ -7,18 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-07-09
+
+> **Multi-orchestrator pool arbiter + inbox + monitor daemon + web-viewer upgrade co-lifecycle** — ADR-032/033 land on plugin + `ccm` lines together.
+
 ### Changed
 - **`ccm upgrade plugin` defaults to all installed harnesses** — bare `ccm upgrade plugin` / `ccm upgrade` now enumerates machine-installed, plugin-distributable harnesses and upgrades each; use `--harness <id>` for a single target. `--all-harnesses` remains as a compatible alias (mutually exclusive with `--harness`).
 
 ### Added
+- **ccm web-viewer + monitor co-lifecycle on ccm upgrade** — SEA build inlines `@ccm/web-viewer` dist as a generated asset map; `start` / `services reconcile` materialize to `<home>/services/web-viewer/app-dist/<version>/` so serve works from any cwd; reconcile ensures assets, restarts wanted services, and probes web-viewer HTTP health without auto-opening the browser. Listener port defaults to `0` (OS-assigned ephemeral; no fixed install port).
 - **ADR-033 P5 monitor daemon + service reconcile** — add optional `ccm monitor start|stop|status|restart|serve|install-service|uninstall-service`, shared `ccm services reconcile --after-binary-replace` for monitor/web-viewer wanted services, and post-ccm-binary install/upgrade reconcile hooks.
 - **ADR-032 P4 pool-aware arbiter** — deterministic `PoolPressure` + priority-weighted fair-share (`urgent:high:normal:low:trivial = 8:4:2:1:0.5`); `ccm coordination arbitrate` appends complementary own-board inbox rows with edge/dedup; SKILL A/H consumer prose + using-ccm lockstep.
 - **ADR-032 P3 coordination-inbox hook** — read-only durable inbox surface across Claude Code / Codex / Cursor; usage-pacing dual-delivery routes decision-grade verdicts into `coordination.inbox` while keeping routine advisories direct; Stop order `usage-pacing` → `coordination-inbox`.
-
 - **Cursor model-tier mapping（`pacing-and-estimation`）** — Cursor adapter 编码 Composer / Grok 4.5 / Claude（不用 Fable）/ Codex·GPT 四档 + first-party vs API 两池心智；`model-tiers.md` 改为 host slot（Claude 保留原表，Codex 为 credit-ratio stub）。
 - **异构族系第二视角（`master-orchestrator-guide`）** — `resume-verify` 原则改为「产出族 ≠ 验收族」；高杠杆裁决 / 临界 correctness-critical `done` **强制**；slot `HETEROGENEOUS_REVIEW_MECHANISM`：Claude→Codex、Codex→Claude、Cursor 在已支持模型里换族（不绑死 Codex CLI）。
 - **ADR-032 P1 owner.harness** — stamp `owner.harness` from trusted harness env (`ccm board stamp-harness`), partition `ccm peers` into harness pools, warn-only `FMT-HARNESS`, and bootstrap ARM stamp on Claude Code / Codex / Cursor.
 - **ADR-032 P2 coordination inbox** — add `coordination.inbox` notification aggregate, `reconcileInbox` write-gate reconciliation, warn-only `FMT-INBOX`, and `ccm coordination inbox|notify|arbitrate` CLI skeleton (`arbitrate` is a deterministic no-op until P4).
+
+### Fixed
+- **Test suite env hygiene** — `run-tests.sh` unsets stale `CC_MASTER_BOARD` / `CC_MASTER_HOME` from orchestration sessions so bootstrap hook tests stay isolated.
 
 ## [0.17.3] — 2026-07-09
 
@@ -625,7 +632,9 @@ advancing across context compaction and across sessions.
 - **Docs** — `README.md` (EN) and `README_zh.md` (中文); design specification,
   design notes, and four research reports under `design_docs/`.
 
-[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/nemori-ai/cc-master/compare/v0.17.3...v0.18.0
+[0.17.3]: https://github.com/nemori-ai/cc-master/compare/v0.17.2...v0.17.3
 [0.16.0]: https://github.com/nemori-ai/cc-master/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/nemori-ai/cc-master/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/nemori-ai/cc-master/compare/v0.13.1...v0.14.0

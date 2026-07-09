@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
@@ -8,6 +8,11 @@ import * as webViewer from '../src/handlers/web-viewer.js';
 import { readVersion } from '../src/help.js';
 import * as io from '../src/io.js';
 import { run } from '../src/router.js';
+import {
+  __resetWebViewerAppDistTestHooks,
+  __setWebViewerAppDistTestHooks,
+  materializedAppDistDir,
+} from '../src/web-viewer-app-dist.js';
 
 const EXIT = io.EXIT;
 
@@ -16,6 +21,7 @@ let TMPDIRS: string[] = [];
 afterEach(() => {
   monitor.__resetMonitorTestHooks();
   webViewer.__resetWebViewerTestHooks();
+  __resetWebViewerAppDistTestHooks();
   for (const d of TMPDIRS) rmSync(d, { recursive: true, force: true });
   TMPDIRS = [];
 });
@@ -217,4 +223,81 @@ test('services reconcile restarts wanted web-viewer and reports version drift fi
   assert.equal(web.installed_ccm_version, readVersion());
   assert.equal(web.reason, 'restarted');
   assert.equal(spawnCount, 1);
+});
+
+test('services reconcile materializes web-viewer assets before restarting wanted service', () => {
+  const home = mkHome();
+  __setWebViewerAppDistTestHooks({
+    bundled: true,
+    version: readVersion(),
+    files: {
+      'index.html': Buffer.from('<html><body><div id="root"></div></body></html>', 'utf8').toString(
+        'base64',
+      ),
+    },
+  });
+  const wvRoot = join(home, 'services', 'web-viewer');
+  mkdirSync(join(wvRoot, 'instances'), { recursive: true });
+  mkdirSync(join(wvRoot, 'tokens'), { recursive: true });
+  writeFileSync(join(wvRoot, 'tokens', 'wv_wanted.token'), 'token', 'utf8');
+  const statePath = join(wvRoot, 'instances', 'wv_wanted.json');
+  writeFileSync(
+    statePath,
+    `${JSON.stringify(
+      {
+        schema: 'ccm/web-viewer-service/v1',
+        id: 'wv_wanted',
+        pid: 0,
+        wanted: true,
+        home,
+        state_path: statePath,
+        token_file: join(wvRoot, 'tokens', 'wv_wanted.token'),
+        token_sha256: 'sha256:test',
+        initial_board_path: null,
+        current_selection: null,
+        scope: { home, session_id: '' },
+        host: '127.0.0.1',
+        port: 0,
+        base_url: 'http://127.0.0.1:0',
+        url: 'http://127.0.0.1:0/?token=<redacted>',
+        server: { started_at: '2026-07-09T10:00:00Z', ccm_version: '0.0.1' },
+        log_path: join(wvRoot, 'logs', 'wv_wanted.log'),
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+
+  webViewer.__setWebViewerTestHooks({
+    randomToken: () => 'fresh-token',
+    spawnService: ({ statePath: nextStatePath }) => {
+      const state = JSON.parse(readFileSync(nextStatePath, 'utf8'));
+      writeFileSync(
+        nextStatePath,
+        `${JSON.stringify({ ...state, pid: 6001, port: 56001, base_url: 'http://127.0.0.1:56001' }, null, 2)}\n`,
+        'utf8',
+      );
+      return { pid: 6001 };
+    },
+    isPidAlive: (pid) => pid === 6001,
+    healthCheck: (service) => ({
+      ok: true,
+      body: {
+        schema: 'ccm/web-viewer-health/v1',
+        id: service.id,
+        pid: service.pid,
+        started_at: service.server.started_at,
+      },
+    }),
+  });
+
+  const r = invoke(['services', 'reconcile', '--after-binary-replace', '--json'], home);
+  assert.equal(r.code, EXIT.OK, r.stderr);
+  const web = json(r.stdout).data.services.find((s: { service: string }) => s.service === 'web-viewer');
+  assert.equal(web.reason, 'restarted');
+  assert.ok(
+    existsSync(join(materializedAppDistDir(home), 'index.html')),
+    'reconcile ensures versioned app-dist before restart',
+  );
 });
