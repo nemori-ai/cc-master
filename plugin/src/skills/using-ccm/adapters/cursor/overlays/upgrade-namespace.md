@@ -1,0 +1,1 @@
+> 让本机装了 ccm 的用户用 CLI 直接升级**两件解耦的发布物**：① **ccm 二进制**（per-OS Node SEA·随 GitHub `ccm-v*` 线发布）；② **cc-master 插件/入口面**（按 harness adapter 分发）。Cursor 下 `upgrade plugin` 用本机已安装的 cc-master 包刷新本地 Cursor marketplace/plugin 注册，更新的是 `plugin/dist/<harness>` 内的 skills/hook 打包资产与命令入口；它不触碰 Claude marketplace。**非 board 操作**——不读/写 board。

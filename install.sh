@@ -17,7 +17,7 @@
 #   # 各自 pin 指定版本（两 flag 均可选、各自缺省解析为本线最新）：
 #   curl -fsSL …/install.sh | bash -s -- --ccm-version ccm-v0.11.0 --plugin-version v0.10.1
 #   # 本地克隆后直接跑：
-#   bash install.sh [--ccm-version ccm-vX.Y.Z] [--plugin-version vX.Y.Z] [--harness claude-code|codex|auto] [--all-harnesses]
+#   bash install.sh [--ccm-version ccm-vX.Y.Z] [--plugin-version vX.Y.Z] [--harness claude-code|codex|cursor|auto] [--all-harnesses]
 #
 # 版本 flag（均可选）：
 #   --ccm-version <ccm-vX.Y.Z>    钉 ccm 二进制的版本（缺省 → 解析 ccm-v* 线最新）
@@ -38,6 +38,7 @@
 #   ② cc-master 插件 → 解压到 $CC_MASTER_PLUGIN_DIR，再按本机 supported harness inventory 分发：
 #      - Claude Code：用 claude CLI 持久安装（marketplace add/update + plugin install/update）
 #      - Codex：注册本地 Codex plugin marketplace。
+#      - Cursor：复制到 ~/.cursor/plugins/local/cc-master（local plugin 面，对齐 probe D9）。
 #
 # 设计纪律：dual-OS（macOS/Linux·BSD/GNU 都跑）· set -euo pipefail · 错误 trap ·
 #   幂等可重跑 · 失败有意义的中文报错。
@@ -86,8 +87,8 @@ while [ $# -gt 0 ]; do
     --ccm-version=*) CCM_VERSION="${1#*=}"; [ -n "$CCM_VERSION" ] || die "--ccm-version 需要一个值（如 ccm-v0.11.0）"; shift ;;
     --plugin-version) PLUGIN_VERSION="${2:-}"; [ -n "$PLUGIN_VERSION" ] || die "--plugin-version 需要一个值（如 v0.10.1）"; shift 2 ;;
     --plugin-version=*) PLUGIN_VERSION="${1#*=}"; [ -n "$PLUGIN_VERSION" ] || die "--plugin-version 需要一个值（如 v0.10.1）"; shift ;;
-    --harness) HARNESS_TARGET="${2:-}"; [ -n "$HARNESS_TARGET" ] || die "--harness 需要一个值（auto / claude-code / codex）"; shift 2 ;;
-    --harness=*) HARNESS_TARGET="${1#*=}"; [ -n "$HARNESS_TARGET" ] || die "--harness 需要一个值（auto / claude-code / codex）"; shift ;;
+    --harness) HARNESS_TARGET="${2:-}"; [ -n "$HARNESS_TARGET" ] || die "--harness 需要一个值（auto / claude-code / codex / cursor）"; shift 2 ;;
+    --harness=*) HARNESS_TARGET="${1#*=}"; [ -n "$HARNESS_TARGET" ] || die "--harness 需要一个值（auto / claude-code / codex / cursor）"; shift ;;
     --all-harnesses) ALL_HARNESSES=1; shift ;;
     --version|--version=*) die "$LEGACY_VERSION_HINT" ;;
     -h|--help) usage ;;
@@ -230,6 +231,7 @@ abspath_dir() { ( cd "$1" && pwd ); }
 # install.sh 不能假设只有 Claude Code。这里复刻 ccm CLI 的最小 host inventory：
 #   - Claude Code：可识别、支持 pluginDistribution（claude plugin marketplace/install）。
 #   - Codex：可识别、支持本地 Codex plugin 注册；命令入口由 plugin 分发的 skill（`$cc-master-*`）承载。
+#   - Cursor：可识别（~/.cursor 或 cursor CLI）、支持 local plugin 复制到 ~/.cursor/plugins/local/。
 normalize_harness() {
   local raw="${1:-auto}" h
   h="$(printf '%s' "$raw" | tr '[:upper:]_' '[:lower:]-')"
@@ -237,12 +239,14 @@ normalize_harness() {
     ""|auto) printf '%s\n' "auto" ;;
     claude|claude-code|claudecode) printf '%s\n' "claude-code" ;;
     codex|openai-codex) printf '%s\n' "codex" ;;
+    cursor|cursor-ide) printf '%s\n' "cursor" ;;
     *) return 1 ;;
   esac
 }
 
 claude_bin() { printf '%s\n' "${CCM_CLAUDE_BIN:-${CLAUDE_BIN:-claude}}"; }
 codex_bin() { printf '%s\n' "${CCM_CODEX_BIN:-${CODEX_BIN:-codex}}"; }
+cursor_bin() { printf '%s\n' "${CCM_CURSOR_BIN:-${CURSOR_BIN:-cursor}}"; }
 
 claude_config_dir() {
   if [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
@@ -264,6 +268,15 @@ codex_config_dir() {
   fi
 }
 
+# Honest heuristic (probe D9 / ccm cursorAdapter): ~/.cursor exists OR cursor CLI on PATH.
+cursor_config_dir() {
+  if [ -n "${HOME:-}" ] && [ -d "$HOME/.cursor" ]; then
+    printf '%s\n' "$HOME/.cursor"
+  else
+    printf '\n'
+  fi
+}
+
 is_harness_installed() {
   local id="$1" bin dir
   case "$id" in
@@ -279,17 +292,24 @@ is_harness_installed() {
       dir="$(codex_config_dir)"
       [ -n "$dir" ] && [ -d "$dir" ]
       ;;
+    cursor)
+      bin="$(cursor_bin)"
+      command -v "$bin" >/dev/null 2>&1 && return 0
+      dir="$(cursor_config_dir)"
+      [ -n "$dir" ] && [ -d "$dir" ]
+      ;;
     *) return 1 ;;
   esac
 }
 
 harness_supports_plugin_distribution() {
-  [ "$1" = "claude-code" ] || [ "$1" = "codex" ]
+  [ "$1" = "claude-code" ] || [ "$1" = "codex" ] || [ "$1" = "cursor" ]
 }
 
 detect_installed_harnesses() {
   is_harness_installed "claude-code" && printf '%s\n' "claude-code"
   is_harness_installed "codex" && printf '%s\n' "codex"
+  is_harness_installed "cursor" && printf '%s\n' "cursor"
 }
 
 selected_harnesses() {
@@ -299,7 +319,7 @@ selected_harnesses() {
     return
   fi
 
-  normalized="$(normalize_harness "$requested")" || die "未知 harness：$requested（支持：auto / claude-code / codex）。"
+  normalized="$(normalize_harness "$requested")" || die "未知 harness：$requested（支持：auto / claude-code / codex / cursor）。"
   if [ "$normalized" = "auto" ]; then
     detect_installed_harnesses
   else
@@ -308,10 +328,11 @@ selected_harnesses() {
 }
 
 log_harness_inventory() {
-  local cc_state codex_state
+  local cc_state codex_state cursor_state
   if is_harness_installed "claude-code"; then cc_state="installed"; else cc_state="missing"; fi
   if is_harness_installed "codex"; then codex_state="installed"; else codex_state="missing"; fi
-  log "harness inventory：claude-code=${cc_state}, plugin=yes; codex=${codex_state}, plugin=yes"
+  if is_harness_installed "cursor"; then cursor_state="installed"; else cursor_state="missing"; fi
+  log "harness inventory：claude-code=${cc_state}, plugin=yes; codex=${codex_state}, plugin=yes; cursor=${cursor_state}, plugin=yes"
 }
 
 install_plugin_claude_code() {
@@ -416,6 +437,26 @@ EOF
   else
     die "安装命令跑完，但 codex plugin list --json 里没看到 ${PLUGIN_NAME}@${MARKETPLACE_NAME}。请手动核查。"
   fi
+}
+
+# Cursor local plugin install (probe D9): copy unpacked adapter → ~/.cursor/plugins/local/cc-master.
+install_plugin_cursor() {
+  local plugin_root="$1" dest parent
+  [ -f "$plugin_root/.cursor-plugin/plugin.json" ] \
+    || die "Cursor adapter 缺失：$plugin_root/.cursor-plugin/plugin.json。请确认是合法的 cc-master Cursor 包。"
+  [ -n "${HOME:-}" ] || die "无法解析 Cursor local plugin 路径（需要 HOME）。"
+
+  dest="${CC_MASTER_CURSOR_PLUGIN_ROOT:-$HOME/.cursor/plugins/local/cc-master}"
+  parent="$(dirname "$dest")"
+  mkdir -p "$parent"
+  rm -rf "$dest"
+  mkdir -p "$dest"
+  # Copy contents (not the wrapper dir name) so dest is the plugin root with .cursor-plugin/.
+  cp -R "$plugin_root"/. "$dest"/
+
+  [ -f "$dest/.cursor-plugin/plugin.json" ] \
+    || die "Cursor 安装后校验失败：缺 $dest/.cursor-plugin/plugin.json。"
+  ok "Cursor 插件已安装：$dest。重开 Cursor Agent session 后 hooks/rules/skills 生效。"
 }
 
 # ── 双线版本 tag 解析 ──────────────────────────────────────────────────────────────────────────────
@@ -562,12 +603,12 @@ log "② 安装 cc-master 插件 …"
 log_harness_inventory
 
 REQUESTED_HARNESS_RAW="${HARNESS_TARGET:-${CC_MASTER_HARNESS:-${CC_MASTER_HOST:-${CCM_HOST:-${CC_MASTER_HARNESS_HOST:-auto}}}}}"
-REQUESTED_HARNESS_NORMALIZED="$(normalize_harness "$REQUESTED_HARNESS_RAW")" || die "未知 harness：$REQUESTED_HARNESS_RAW（支持：auto / claude-code / codex）。"
+REQUESTED_HARNESS_NORMALIZED="$(normalize_harness "$REQUESTED_HARNESS_RAW")" || die "未知 harness：$REQUESTED_HARNESS_RAW（支持：auto / claude-code / codex / cursor）。"
 EXPLICIT_SINGLE_HARNESS=0
 [ "$ALL_HARNESSES" = "0" ] && [ "$REQUESTED_HARNESS_NORMALIZED" != "auto" ] && EXPLICIT_SINGLE_HARNESS=1
 
 TARGET_HARNESSES="$(selected_harnesses | awk 'NF && !seen[$0]++')"
-[ -n "$TARGET_HARNESSES" ] || die "未发现已安装的 supported harness。请先安装 Claude Code 或 Codex。"
+[ -n "$TARGET_HARNESSES" ] || die "未发现已安装的 supported harness。请先安装 Claude Code、Codex 或 Cursor。"
 
 SUPPORTED_TARGETS=""
 UNSUPPORTED_TARGETS=""
@@ -596,7 +637,7 @@ $UNSUPPORTED_TARGETS
 EOF
 fi
 
-[ -n "$SUPPORTED_TARGETS" ] || die "本机未发现任何支持 cc-master plugin 分发的 harness。当前可安装目标：claude-code / codex。"
+[ -n "$SUPPORTED_TARGETS" ] || die "本机未发现任何支持 cc-master plugin 分发的 harness。当前可安装目标：claude-code / codex / cursor。"
 
 PLUGIN_TAG="$(resolve_plugin_tag)"         # 如 v0.10.1
 log "plugin：${PLUGIN_TAG}"
@@ -620,6 +661,10 @@ unpack_plugin_for_harness() {
     codex)
       [ -d "$root/.codex-plugin" ] || die "解压结果不是合法 Codex adapter（缺 $root/.codex-plugin）。"
       ;;
+    cursor)
+      [ -f "$root/.cursor-plugin/plugin.json" ] \
+        || die "解压结果不是合法 Cursor adapter（缺 $root/.cursor-plugin/plugin.json）。"
+      ;;
   esac
   abspath_dir "$root"
 }
@@ -638,6 +683,10 @@ while IFS= read -r harness; do
       install_plugin_codex "$PLUGIN_ROOT"
       INSTALLED_HARNESSES="${INSTALLED_HARNESSES}${INSTALLED_HARNESSES:+, }${harness}"
       ;;
+    cursor)
+      install_plugin_cursor "$PLUGIN_ROOT"
+      INSTALLED_HARNESSES="${INSTALLED_HARNESSES}${INSTALLED_HARNESSES:+, }${harness}"
+      ;;
     *)
       die "内部错误：$harness 被标记为支持 pluginDistribution，但 install.sh 没有对应 adapter。"
       ;;
@@ -648,4 +697,4 @@ EOF
 
 # ── 收尾 ────────────────────────────────────────────────────────────────────────────────────────────
 ok "完成 ✓  ccm（${CCM_TAG}）+ cc-master 插件（${PLUGIN_TAG}）已安装到：${INSTALLED_HARNESSES}。"
-log "下一步：Claude Code 跑 /cc-master:as-master-orchestrator <目标>；Codex 跑 \$cc-master-as-master-orchestrator <目标>。"
+log "下一步：Claude Code 跑 /cc-master:as-master-orchestrator <目标>；Codex 跑 \$cc-master-as-master-orchestrator <目标>；Cursor 装好后重开 Agent session（local plugin：~/.cursor/plugins/local/cc-master）。"

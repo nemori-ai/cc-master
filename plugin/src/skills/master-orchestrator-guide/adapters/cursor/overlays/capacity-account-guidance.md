@@ -1,0 +1,1 @@
+Cursor 当前只支持查看当前账户 **billing_period（~30d）** 用量（`source: cursor-dashboard`），**不支持** cc-master 账号池切换，也**没有** 5h/7d 滚动窗。若 `ccm usage advise` 出现 `switch` / `stop_5h` / `stop_7d` 残留语义，不要运行账号切换命令，也不要按双窗走廊行动——按轻 lever（降档 / 降 WIP / 推迟 float）继续收紧；若账期真实烧穿（`stop_billing_period`），就停派新活并 surface 给用户或等 `nearest_reset`。Cursor 下不要 drill `references/cost-decisions.md` 当换号手册。

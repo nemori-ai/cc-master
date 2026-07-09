@@ -1,0 +1,3 @@
+- **[references/usage-signals.md](references/usage-signals.md)** —— Cursor 当前账号 billing_period 信号源（`cursor-dashboard`）、`available:false` 降级、诚实边界；无 5h/7d。
+- **[references/pacing-levers.md](references/pacing-levers.md)** —— 单侧 levers（减速 / 停到账期 reset）；无换号；无 `stop_5h`/`stop_7d` 目标语义。
+- **[references/estimation.md](references/estimation.md)** —— estimate verb 的消费决策、baseline 生命周期、诚实字段、usage 与 estimate 的张力。

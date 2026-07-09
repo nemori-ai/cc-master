@@ -1,11 +1,11 @@
 host: cursor
 skill: slicing-goals-into-dags
 version: 1
-mode: planned
-planned_projection:
-  target_mode: copy
+mode: copy
+projection:
   source: canonical/
   target: skills/slicing-goals-into-dags/
+slot_replacements:
+  "{{SLICING_DISPATCH_POINTER}}": adapters/cursor/overlays/dispatch-pointer.md
 notes:
-  - SAP Track A: copy + slot/overlay after probe D1 (path tokens). ADR-031.
-  - See design_docs/harnesses/cursor.md Track A table.
+  - Host-neutral DAG slicing method; Cursor dispatch wording uses Task/Shell (no Workflow).

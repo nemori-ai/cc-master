@@ -1,0 +1,1 @@
+停止派发新工作，把当前在飞任务收敛到安全点，然后用 `ccm watchdog arm --mechanism external` 记录账期 reset 后要查的事项。Cursor adapter 没有 CronCreate / ScheduleWakeup；降级到 background Shell floor（`block_until_ms: 0` + AwaitShell）。没有真实 wakeup handle 时，记为 `blocked_on:"quota-reset"` 或 `blocked_on:"user"`，不要伪造自动唤醒。

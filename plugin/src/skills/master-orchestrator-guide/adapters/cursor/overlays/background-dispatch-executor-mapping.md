@@ -1,0 +1,5 @@
+- `subagent` executor → 用 **Task** tool 启动可 recon 的子代理，并记录返回的 subagent id。不要假设它会自动派发；没有真实 Task 返回值就不要标 `subagent` / `in_flight`。
+- `workflow` executor → 当前 Cursor adapter 不支持 Claude Code Workflow API；不要把 `Workflow` / `agent()` / `parallel()` / `pipeline()` 当成 Cursor 原语。需要 fan-out 时，用多个 Task 或把每个叶子建成独立 board task。
+- `external` executor → 后台 Shell session、CI run、GitHub issue、系统 cron 等可追踪工作。必须记录 shell id / URL / run id，足以让后续 recon。
+- `user` executor → surface 给用户；用户回答是 async 依赖。
+- `master-orchestrator` executor → 只用于你的调度 / recon / 端点验收 / 记账，不用于实现工作。

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **ADR-031 Accepted — N-host capability parity**：将 ADR-028 双端 hook 锁步升为 `claude-code | codex | cursor`；新增 Capability INTENT 层（`design_docs/harnesses/capabilities/` + `gen-capability-parity-matrix.sh`）与 Cursor 双轨（Track A SAP/PHIP / Track B 声明替代）；manifest 占位与 coverage 契约测试已落盘，Cursor runtime 实现另 PR。
 - **Cursor Phase B scaffold**：`.cursor-plugin` + `_hosts/cursor` launcher/hooks.json + P0 silent noop cores；`sync-plugin-dist.sh --host cursor` / package / dist-sync check 已支持；生产 hook body 仍属 Phase C。
+- **Cursor full compatibility (install + release + billing_period usage)**：P0/P1 Cursor hook cores（bootstrap / board-guard / board-lint / verify-board / usage-pacing / identity-nudge）+ Track B reinject（alwaysApply rule）；`ccm` Cursor harness adapter 与 dashboard `billing_period` usage（`CC_MASTER_HARNESS=cursor` → `ccm usage advise`）；`install.sh --harness cursor` 安装到 `~/.cursor/plugins/local/cc-master`；`package-plugin.sh --all-hosts` 与 `plugin-release.yml` 产出并校验 `cc-master-plugin-cursor-*.zip`。
 
 ## [0.16.0] — 2026-07-09
 

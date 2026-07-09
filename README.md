@@ -74,15 +74,16 @@ A one-or-two-line fix you can knock out in ten minutes? Just do it — don't bri
 
 cc-master is a **multi-agent-harness plugin system** built from three things: a thin layer of **orchestration logic** (teaching the AI how to be the lead), an **engine** that does operations-research forecasting and pacing, and harness adapters that project that logic into the command, prompt, skill, hook, and settings surfaces each agent host actually supports.
 
-The source follows a paragoge-style `plugin/src -> plugin/dist/<host>` model: shared runtime skills live in canonical source, hooks are modeled as host-independent product contracts with host-native implementations, and each harness gets its own adapter artifact. The plugin version line is shared; release assets are split by harness, for example `cc-master-plugin-claude-code-<version>.zip` and `cc-master-plugin-codex-<version>.zip`.
+The source follows a paragoge-style `plugin/src -> plugin/dist/<host>` model: shared runtime skills live in canonical source, hooks are modeled as host-independent product contracts with host-native implementations, and each harness gets its own adapter artifact. The plugin version line is shared; release assets are split by harness, for example `cc-master-plugin-claude-code-<version>.zip`, `cc-master-plugin-codex-<version>.zip`, and `cc-master-plugin-cursor-<version>.zip`.
 
-We keep a clear line between "what it does today" and "what we're still building." Current adapters include Claude Code and Codex, with different host surfaces and some different capability levels. **Every mechanism, and whether each one is shipped or still on the way, is written down honestly in the [Feature Manual](design_docs/feature-manual.md)** — we don't oversell it in the README.
+We keep a clear line between "what it does today" and "what we're still building." Current adapters include Claude Code, Codex, and Cursor, with different host surfaces and some different capability levels. **Every mechanism, and whether each one is shipped or still on the way, is written down honestly in the [Feature Manual](design_docs/feature-manual.md)** — we don't oversell it in the README.
 
 For contributors: edit `plugin/src`, not `plugin/dist`. Skills use SAP (`canonical/` plus `adapters/<host>/strategy.yaml`); hooks use PHIP (`_manifest/`, `_hosts/<host>/`, and `implementations/<host>/`). Regenerate adapters with:
 
 ```bash
 bash scripts/sync-plugin-dist.sh              # Claude Code adapter
 bash scripts/sync-plugin-dist.sh --host codex # Codex adapter
+bash scripts/sync-plugin-dist.sh --host cursor # Cursor adapter
 ```
 
 Before pushing source changes that affect the plugin, install the repo hook once with `bash scripts/install-git-hooks.sh`. It runs `bash scripts/check-plugin-dist-sync.sh` before every push and blocks if `plugin/dist` needs to be regenerated and committed.
@@ -93,7 +94,7 @@ Project meta-skills live in `.claude/skills`. Codex discovers repo skills from `
 bash scripts/sync-codex-skills.sh
 ```
 
-Harness compatibility notes live in [`design_docs/harnesses/`](design_docs/harnesses/). That directory is the local, corrected source for the paragoge-derived adapter model plus the current Claude Code and Codex facts.
+Harness compatibility notes live in [`design_docs/harnesses/`](design_docs/harnesses/). That directory is the local, corrected source for the paragoge-derived adapter model plus the current Claude Code, Codex, and Cursor facts.
 
 ---
 
@@ -115,16 +116,25 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 
 # target a harness explicitly, or fan out to every installed supported harness:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness claude-code
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness cursor
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --all-harnesses
 ```
 
-It detects your OS and architecture, downloads the right `ccm` binary and puts it on your PATH, then detects installed harnesses and distributes the matching adapter package to each supported target. Before installing either downloaded asset, it fetches that release's `SHA256SUMS` and verifies the asset by exact filename; a missing manifest, missing entry, or digest mismatch stops the install. Claude Code installation uses the `claude` CLI (≥ v2.1.195). Codex installation registers a local Codex marketplace/plugin entry for this local adapter; command entrypoints are exposed as skills (for example `$cc-master-as-master-orchestrator ...`). You just need `curl` (or `wget`), `unzip`, and a SHA256 tool (`sha256sum`, `shasum`, or `openssl`); each harness adapter may also need that harness's own CLI/config directory to be present. The `ccm` engine is a **hard prerequisite** — without it the plugin won't start an orchestration — which is exactly why the installer puts it in place first.
+It detects your OS and architecture, downloads the right `ccm` binary and puts it on your PATH, then detects installed harnesses and distributes the matching adapter package to each supported target. Before installing either downloaded asset, it fetches that release's `SHA256SUMS` and verifies the asset by exact filename; a missing manifest, missing entry, or digest mismatch stops the install. Claude Code installation uses the `claude` CLI (≥ v2.1.195). Codex installation registers a local Codex marketplace/plugin entry for this local adapter; command entrypoints are exposed as skills (for example `$cc-master-as-master-orchestrator ...`). Cursor installation copies the adapter into `~/.cursor/plugins/local/cc-master` (local plugin surface). You just need `curl` (or `wget`), `unzip`, and a SHA256 tool (`sha256sum`, `shasum`, or `openssl`); each harness adapter may also need that harness's own CLI/config directory to be present. The `ccm` engine is a **hard prerequisite** — without it the plugin won't start an orchestration — which is exactly why the installer puts it in place first.
 
 Checksum failures are treated as release integrity failures, not as prompts to bypass verification. Retry the install; if it still fails, inspect the GitHub release assets before proceeding. `CC_MASTER_INSTALL_LOCAL` remains offline: it verifies `<local-dir>/SHA256SUMS` when present, otherwise it explicitly trusts the local directory without contacting GitHub.
 
-> **Rather do it by hand, or run from source?** Clone the repo, generate the adapter you want with `bash scripts/sync-plugin-dist.sh --host <harness>`, then install that adapter through the harness-native route. Claude Code can point at `plugin/dist/claude-code`; Codex should be registered through a local marketplace that points at `plugin/dist/codex` (with only skill/hooks packaged there). You'll still need `ccm` on your PATH — download `ccm-<os>-<arch>` from the latest `ccm-v*` release's **Assets**, rename it to `ccm`, `chmod +x`, and drop it in `~/.local/bin`.
+> **Rather do it by hand, or run from source?** Clone the repo, generate the adapter you want with `bash scripts/sync-plugin-dist.sh --host <harness>`, then install that adapter through the harness-native route. Claude Code can point at `plugin/dist/claude-code`; Codex should be registered through a local marketplace that points at `plugin/dist/codex` (with only skill/hooks packaged there); Cursor can copy `plugin/dist/cursor` to `~/.cursor/plugins/local/cc-master`. You'll still need `ccm` on your PATH — download `ccm-<os>-<arch>` from the latest `ccm-v*` release's **Assets**, rename it to `ccm`, `chmod +x`, and drop it in `~/.local/bin`.
 
 **Moved your harness config?** `CLAUDE_CONFIG_DIR` still controls Claude Code's own settings, credentials, and transcript project files; `CODEX_HOME` controls Codex's home. cc-master's runtime state is harness-neutral: boards, account registry, file vault, and quota sidecar live under `${CC_MASTER_HOME:-$HOME/.cc_master}` unless you pass `--home`.
+
+### Cursor install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness cursor
+```
+
+`ccm` is still a hard prerequisite (the installer places it first). The Cursor adapter lands at `~/.cursor/plugins/local/cc-master` — reopen a Cursor Agent session after install so hooks/rules pick up. Cursor pacing uses the dashboard **billing-period** window (not Claude Code's 5h/7d + account switch): under `CC_MASTER_HARNESS=cursor`, `ccm usage advise` reads that signal and may return `hold` / `throttle` / `stop_billing_period` (never `switch`).
 
 ### Status line (automatic)
 

@@ -535,30 +535,31 @@ bash plugin/src/hooks/_hosts/cursor/probes/setup-local-plugin-probe.sh
 - [x] `verify-board` — stop → `followup_message` + FUSE=5 + `stop_allow_until`
 - [x] launcher: home default `.cc_master`, plugin root `../../..`, session-state discovery
 - [x] Track B reinject (alwaysApply rule; not sessionStart.additional_context)
-- [ ] usage-pacing / identity-nudge Cursor cores
+- [x] usage-pacing / identity-nudge Cursor cores（billing_period pacing；stop-path nudge）
 
 ### Phase 2 — 投影与打包
 
 - [x] 扩展 `scripts/sync-plugin-dist.sh --host cursor` 全量投影（skills `planned` 跳过；hooks + launcher + stub skill）。
-- [x] 扩展 `scripts/package-plugin.sh`：`cc-master-plugin-cursor-<tag>.zip`。
-- [ ] Release asset 命名对齐 ADR-022 per-harness zip（发版时再挂）。
+- [x] 扩展 `scripts/package-plugin.sh`：`cc-master-plugin-cursor-<tag>.zip`（含 `rules/`；`--all-hosts` 含 cursor）。
+- [x] Release asset 命名对齐 ADR-022 per-harness zip（`plugin-release.yml` 注释 + Validate Cursor packaged adapter 步）。
 - [x] `check-plugin-dist-sync.sh` 含 cursor regenerate。
 
 ### Phase 3 — ccm
 
-- `ccm/apps/cli/src/harnesses/cursor.ts` — `HarnessAdapter` 实现。
-- `ccm/apps/cli/src/harnesses/registry.ts` — 注册 `cursorAdapter`（detect 顺序：codex → claude-code → cursor 或按 env 优先级待定）。
-- `ccm harness list/current` 展示 Cursor 安装态。
+- [x] `ccm/apps/cli/src/harnesses/cursor.ts` — `HarnessAdapter` 实现（local plugin root + dashboard usage）。
+- [x] `ccm/apps/cli/src/harnesses/registry.ts` — 注册 `cursorAdapter`。
+- [x] Cursor `billing_period` usage：`cursor-usage` + pacing verdict `hold|throttle|stop_billing_period`（无 `switch`）。
+- [x] `ccm harness list/current` 展示 Cursor 安装态（`inspectKnownHarnesses` 含 `cursorAdapter`；registry 测试覆盖 CURSOR_* detect）。
 
 ### Phase 4 — install
 
-- `install.sh`：`--harness cursor`、`install_plugin_cursor`、local plugin 路径 `~/.cursor/plugins/local/` 或 marketplace。
-- README 安装段（用户审阅 MVP 后再改）。
+- [x] `install.sh`：`--harness cursor`、`install_plugin_cursor`、local plugin 路径 `~/.cursor/plugins/local/cc-master`。
+- [x] README / README_zh Cursor 安装段（`--harness cursor`、ccm 硬前置、billing_period 说明）。
 
 ### Phase 5 — 测试与 dogfood
 
-- P0 hooks parity fixture（若双端 implemented）：`tests/hooks/test_parity-fixtures.sh`。
-- 最小 dogfood：bootstrap → arm → guard/lint → stop gate（真 Cursor IDE session）。
+- [ ] P0 hooks parity fixture（若双端 implemented）：`tests/hooks/test_parity-fixtures.sh`。
+- [ ] 最小 dogfood：bootstrap → arm → guard/lint → stop gate（真 Cursor IDE session）。
 
 ### P0 hook 优先级
 

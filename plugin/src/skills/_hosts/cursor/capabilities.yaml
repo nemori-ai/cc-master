@@ -1,0 +1,155 @@
+host: cursor
+updated: 2026-07-09
+status: runtime_adapter_with_verified_dispatch_primitives
+capabilities:
+  project_skills:
+    location: "plugin skills via .cursor-plugin/plugin.json (Cursor plugin skills surface)"
+    symlink_supported: false
+  path_tokens:
+    plugin_root:
+      token: null
+      scope: "skill prose must not invent CURSOR_PLUGIN_ROOT / PLUGIN_ROOT substitution"
+      status: no_skill_prose_path_token
+    skill_dir: null
+    plugin_data: null
+    notes:
+      - "Cursor skills docs do not document ${CURSOR_PLUGIN_ROOT}, ${CURSOR_SKILL_DIR}, or runtime path variable substitution in SKILL.md."
+      - "Skill prose uses plain relative paths within the skill tree; do not project ${CLAUDE_PLUGIN_ROOT} or ${PLUGIN_ROOT} into Cursor skill bodies."
+      - "Hook commands use relative paths from the plugin install root plus launcher-injected CC_MASTER_PLUGIN_ROOT (probe D1: absolute/launcher path works; literal ${PLUGIN_ROOT} not proven)."
+      - "When a hook script needs the install root at runtime, read CC_MASTER_PLUGIN_ROOT from the launcher or derive from __dirname/argv."
+  background_dispatch:
+    scope: "cc-master dispatch primitives usable by a Cursor IDE Agent at runtime"
+    subagent:
+      available: true
+      candidate_official_surface: "Task tool"
+      mapping_status: "docs_and_runtime_tool_model"
+      notes:
+        - "Cursor Agent Task tool launches subagents (generalPurpose, explore, shell, etc.) with subagentStart/subagentStop hooks."
+        - "Record the Task/subagent id returned by the host as the recon handle; do not invent a handle."
+        - "Not Claude Code run_in_background Agent; not Codex spawn_agent."
+    workflow:
+      available: false
+      mapping_status: "unsupported"
+      notes:
+        - "No verified Cursor equivalent of Claude Code Workflow / dynamic-workflow. authoring-workflows stays unsupported_stub."
+        - "Substitute: Task subagent, background Shell, or /loop skill where appropriate."
+    shell:
+      available: true
+      candidate_official_surface: "Shell tool"
+      mapping_status: "docs_and_runtime_tool_model"
+      notes:
+        - "Background shell: Shell with block_until_ms: 0 plus notify_on_output / AwaitShell polling."
+        - "Record shell id, command, cwd, predicate, and cancellation method as the handle."
+        - "Tool name in hooks is Shell (not Bash)."
+  command_surface:
+    status: host_native_commands_md
+    plugin_distributed_slash_commands: host_native_markdown
+    init_prompt_prefixes:
+      - "cc-master:as-master-orchestrator <goal> [flags]"
+      - "/cc-master:as-master-orchestrator <goal> [flags]"
+    supported:
+      - "fresh board creation via beforeSubmitPrompt bootstrap"
+      - "host-native command markdown projection"
+    unsupported:
+      - "Claude Code slash-command packaging assumptions"
+    notes:
+      - "Cursor projects commands as host-native markdown under the plugin commands surface."
+  completion_notification:
+    status: subagent_stop_and_shell_poll
+    notes:
+      - "Subagent completion observable via subagentStop; background Shell completion via AwaitShell / notify_on_output."
+      - "No Claude Code <task-notification> equivalent assumed."
+  watchdog_wakeup:
+    chain:
+      - "background_shell_until_floor"
+      - "manual_recon"
+    scope: "cc-master in-thread self-wakeup/watchdog primitive"
+    status: degrade_to_shell_floor
+    native_primitives:
+      CronCreate:
+        available: false
+        notes:
+          - "No Cursor Agent CronCreate-equivalent tool documented for cc-master watchdog."
+      ScheduleWakeup:
+        available: false
+        notes:
+          - "No Cursor Agent ScheduleWakeup-equivalent tool documented for cc-master watchdog."
+      Monitor:
+        available: false
+        notes:
+          - "Do not project Claude Monitor semantics into Cursor."
+    official_alternatives:
+      background_shell_until:
+        status: runtime_tool_model
+        fit: "Universal floor for same-session watchdog/check loops."
+        notes:
+          - "Arm a background Shell that polls a predicate until true or timeout; record shell id as handle."
+          - "Pair with AwaitShell / notify_on_output rather than assuming Claude task-notification."
+      loop_skill:
+        status: optional_host_skill
+        fit: "Recurring prompt on an interval when the environment provides /loop."
+        notes:
+          - "Not a drop-in CronCreate; use only when the user/environment already supports it."
+    notes:
+      - "Watchdog degrades to the background-shell floor. Do not teach CronCreate / ScheduleWakeup / Monitor on Cursor."
+  hooks:
+    key: hooks
+    plugin_root_token:
+      token: "CC_MASTER_PLUGIN_ROOT"
+      status: launcher_injected_env
+    default_plugin_hook_path: "hooks/hooks.json"
+    implemented:
+      bootstrap-board:
+        event: beforeSubmitPrompt
+        mode: fresh_arm
+      reinject:
+        event: preCompact
+        mode: observe_plus_alwaysApply_rule
+      verify-board:
+        event: stop
+        mode: followup_message
+      usage-pacing:
+        event: stop
+        mode: additional_context_or_followup
+      identity-nudge:
+        event: stop
+        mode: additional_context
+      board-guard:
+        event: preToolUse
+        mode: permission_deny
+        matcher: "Shell|Write"
+      board-lint:
+        event: postToolUse
+        mode: additional_context
+        matcher: "Write"
+    unsupported:
+      posttool-batch:
+        reason: "No PostToolBatch-equivalent batch boundary event on Cursor."
+    output_envelopes:
+      additional_context:
+        verified_events: [sessionStart, postToolUse]
+      permission_deny:
+        verified_events: [preToolUse]
+      followup_message:
+        verified_events: [stop, subagentStop]
+  quota_signal:
+    source: "ccm usage show/advise via Cursor dashboard GetCurrentPeriodUsage (source: cursor-dashboard)"
+    status: billing_period_only
+    window: "billing_period (~30d subscription cycle)"
+    supported:
+      - "current account billing_period usage percent"
+      - "ccm usage advise with Cursor single-window verdicts (hold/throttle/stop_billing_period)"
+      - "nearest_reset as billing-period end"
+    unsupported:
+      - "5h rolling window (window_5h_pct is null on Cursor)"
+      - "7d rolling window (window_7d_pct is null on Cursor)"
+      - "stop_5h / stop_7d / switch verdicts as Cursor pacing targets"
+    notes:
+      - "Do not pace Cursor against 5h/7d corridors. Use window_billing_period_pct and billing-period levers."
+      - "Signal read failure → available:false; hooks should stay silent and not invent percentages."
+  account_switch:
+    backend: null
+    status: unsupported
+    notes:
+      - "ccm account pool capture/switch binds Claude OAuth stores; Cursor returns NotImplemented."
+      - "Never suggest ccm account switch as a Cursor pacing lever."
