@@ -1114,7 +1114,7 @@ ccm usage advise [flags]
 ```
 
 - positional：无
-- 行为：**单侧 pacing verdict**。Claude Code / Codex（5h+7d）：`hold` \| `throttle` \| `switch` \| `stop_5h` \| `stop_7d`（池感知·ADR-024）。**Cursor（单窗 `billing_period`·约 30 天订阅账期）**：`hold` \| `throttle` \| `stop_billing_period`——**永不** `switch` / `stop_5h` / `stop_7d`；`window_5h_pct`/`window_7d_pct` 为 null，看 `window_billing_period_pct`；`source` 为 `cursor-dashboard`。附 `strength` + levers + `stop_dimension`（含 `billing_period`）+ `nearest_reset` +（仅 Claude/Codex）`switch_candidate`。引擎 `pacingAdvice` 为准。信号缺 → `hold` + `available:false`（降级）
+- 行为：**单侧 pacing verdict**。Claude Code / Codex（5h+7d）：`hold` \| `throttle` \| `switch` \| `stop_5h` \| `stop_7d`（池感知）。**Cursor（单窗 `billing_period`·约 30 天订阅账期）**：`hold` \| `throttle` \| `stop_billing_period`——**永不** `switch` / `stop_5h` / `stop_7d`；`window_5h_pct`/`window_7d_pct` 为 null，看 `window_billing_period_pct`；`source` 为 `cursor-dashboard`。附 `strength` + levers + `stop_dimension`（含 `billing_period`）+ `nearest_reset` +（仅 Claude/Codex）`switch_candidate`。引擎 `pacingAdvice` 为准。信号缺 → `hold` + `available:false`（降级）
 - flags：
 
 | flag | 短名 | 类型 | 含义 |

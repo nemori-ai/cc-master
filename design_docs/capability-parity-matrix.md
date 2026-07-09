@@ -9,12 +9,12 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 
 | capability | claude-code | codex | cursor | card |
 | --- | --- | --- | --- | --- |
-| ccm-quota-account | implemented | partial | planned | [ccm-quota-account.md](harnesses/capabilities/ccm-quota-account.md) |
+| ccm-quota-account | implemented | partial | partial | [ccm-quota-account.md](harnesses/capabilities/ccm-quota-account.md) |
 | path-token-resolution | implemented | implemented | planned | [path-token-resolution.md](harnesses/capabilities/path-token-resolution.md) |
 | post-tool-batch-gate | implemented | unsupported | unsupported | [post-tool-batch-gate.md](harnesses/capabilities/post-tool-batch-gate.md) |
-| role-substrate-reinject | implemented | implemented | planned | [role-substrate-reinject.md](harnesses/capabilities/role-substrate-reinject.md) |
+| role-substrate-reinject | implemented | implemented | implemented | [role-substrate-reinject.md](harnesses/capabilities/role-substrate-reinject.md) |
 | stop-continuation-gate | implemented | implemented-blocking | planned | [stop-continuation-gate.md](harnesses/capabilities/stop-continuation-gate.md) |
-| usage-pacing-midflight | implemented | implemented-stop-advisory | planned | [usage-pacing-midflight.md](harnesses/capabilities/usage-pacing-midflight.md) |
+| usage-pacing-midflight | implemented | implemented-stop-advisory | implemented-stop-advisory | [usage-pacing-midflight.md](harnesses/capabilities/usage-pacing-midflight.md) |
 | workflow-authoring | implemented | unsupported_stub | planned | [workflow-authoring.md](harnesses/capabilities/workflow-authoring.md) |
 
 ## Declared divergences by kind
@@ -65,7 +65,7 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 | --- | --- | --- | --- |
 | usage-pacing-post-tool-batch-sampling | event-unavailable | codex, cursor | plugin/src/hooks/usage-pacing/CONTRACT.md |
 | usage-pacing-mechanical-switch | protocol-capability-gap | codex, cursor | design_docs/harnesses/ccm-host-coupling-audit.md |
-| usage-pacing-quota-signal-source | protocol-capability-gap | cursor | design_docs/harnesses/capabilities/ccm-quota-account.md |
+| usage-pacing-quota-signal-source | protocol-capability-gap | cursor | ccm/apps/cli/src/cursor-usage.ts + design_docs/harnesses/capabilities/ccm-quota-account.md |
 
 ### workflow-authoring
 
