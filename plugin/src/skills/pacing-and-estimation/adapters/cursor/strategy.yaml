@@ -5,11 +5,7 @@ mode: copy
 projection:
   source: canonical/
   target: skills/pacing-and-estimation/
-exclude_canonical:
-  - references/model-tiers.md
 unsupported:
-  - capability: model_tier_provider
-    reason: "Cursor model tier mapping is not yet encoded; do not project Claude tier tables."
   - capability: account_switch_pacing
     reason: "Cursor account switching is not implemented in ccm; no switch verdict."
   - capability: statusline_sidecar
@@ -19,11 +15,14 @@ supported:
     reason: "ccm usage show/advise reads Cursor billing_period (~30d) via dashboard GetCurrentPeriodUsage (source: cursor-dashboard)."
   - capability: estimation_method
     reason: "Cost-to-complete estimation method is host-neutral when it consumes normalized board data."
+  - capability: model_tier_provider
+    reason: "Cursor model tier mapping encoded for Composer + Grok 4.5 + Claude (no Fable) + Codex/GPT; see adapters/cursor/overlays/model-tiers-reference.md."
 slot_replacements:
   "{{PACING_DESCRIPTION}}": adapters/cursor/overlays/description.md
   "{{PACING_BOUNDARY}}": adapters/cursor/overlays/boundary.md
   "{{PACING_REFERENCE_POINTERS_HEAD}}": adapters/cursor/overlays/reference-pointers-head.md
   "{{PACING_MODEL_TIER_ANCHOR}}": adapters/cursor/overlays/model-tier-anchor.md
+  "{{PACING_MODEL_TIERS_REFERENCE}}": adapters/cursor/overlays/model-tiers-reference.md
   "{{PACING_COMMAND_CATALOG_POINTER}}": adapters/cursor/overlays/command-catalog-pointer.md
   "{{PACING_USAGE_FOOTGUN_ROWS}}": adapters/cursor/overlays/usage-footgun-rows.md
   "{{PACING_POINTERS_HOST}}": adapters/cursor/overlays/pointers-host.md
@@ -43,4 +42,4 @@ host_slots:
     source: plugin/src/skills/_hosts/cursor/capabilities.yaml
     status: partial_source_uses_cursor_specific_guidance
 notes:
-  - Cursor projects the canonical pacing guide plus billing_period usage/model slots; keep adapters/cursor/overlays/description.md (already rewritten).
+  - Cursor projects the canonical pacing guide plus billing_period usage and Cursor model-tier slots (Composer/Grok/Claude/Codex; no Fable).

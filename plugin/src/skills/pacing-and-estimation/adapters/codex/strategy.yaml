@@ -5,11 +5,9 @@ mode: copy
 projection:
   source: canonical/
   target: skills/pacing-and-estimation/
-exclude_canonical:
-  - references/model-tiers.md
 unsupported:
   - capability: model_tier_provider
-    reason: "OpenAI/Codex model tier mapping is not yet encoded."
+    reason: "OpenAI/Codex model tier mapping is not yet encoded; overlay is an honest stub with credit-ratio guidance only."
   - capability: account_switch_pacing
     reason: "Codex account switching is not implemented in ccm."
   - capability: statusline_sidecar
@@ -24,6 +22,7 @@ slot_replacements:
   "{{PACING_BOUNDARY}}": adapters/codex/overlays/boundary.md
   "{{PACING_REFERENCE_POINTERS_HEAD}}": adapters/codex/overlays/reference-pointers-head.md
   "{{PACING_MODEL_TIER_ANCHOR}}": adapters/codex/overlays/model-tier-anchor.md
+  "{{PACING_MODEL_TIERS_REFERENCE}}": adapters/codex/overlays/model-tiers-reference.md
   "{{PACING_COMMAND_CATALOG_POINTER}}": adapters/codex/overlays/command-catalog-pointer.md
   "{{PACING_USAGE_FOOTGUN_ROWS}}": adapters/codex/overlays/usage-footgun-rows.md
   "{{PACING_POINTERS_HOST}}": adapters/codex/overlays/pointers-host.md
@@ -44,3 +43,4 @@ host_slots:
     status: partial_source_uses_codex_specific_guidance
 notes:
   - Codex projects the canonical pacing guide plus host-specific usage/model/account-switch slots.
+  - model-tiers.md is projected via stub overlay (credit-ratio guidance); full OpenAI mapping still unsupported.

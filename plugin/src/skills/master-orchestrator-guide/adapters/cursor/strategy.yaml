@@ -36,9 +36,10 @@ slot_replacements:
   "{{DISCUSS_SESSION_GUIDANCE}}": adapters/cursor/overlays/discuss-session-guidance.md
   "{{WATCHDOG_RETIRE_SCHEDULER_GUIDANCE}}": adapters/cursor/overlays/watchdog-retire-scheduler-guidance.md
   "{{PLATFORM_RESUME_GUIDANCE}}": adapters/cursor/overlays/platform-resume-guidance.md
-  "{{CODEX_REVIEW_SCRIPT_GUIDANCE}}": adapters/cursor/overlays/codex-review-script-guidance.md
+  "{{HETEROGENEOUS_REVIEW_MECHANISM}}": adapters/cursor/overlays/heterogeneous-review-mechanism.md
   "{{HANDOFF_REFERENCE_ROW}}": adapters/cursor/overlays/handoff-reference-row.md
 notes:
   - Cursor projection uses the host-neutral canonical body plus Cursor Task/Shell dispatch and shell-floor watchdog slots.
   - Quota overlays teach billing_period only (no 5h/7d/account switch). Workflow remains unsupported.
   - Exclude cost-decisions.md and handoff.md like Codex; keep codex-review.sh excluded (optional external).
+  - Heterogeneous second-perspective review is host-slot: Cursor picks another supported model family, not Codex-CLI-only.

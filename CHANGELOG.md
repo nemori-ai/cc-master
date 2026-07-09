@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Cursor model-tier mapping（`pacing-and-estimation`）** — Cursor adapter 编码 Composer / Grok 4.5 / Claude（不用 Fable）/ Codex·GPT 四档 + first-party vs API 两池心智；`model-tiers.md` 改为 host slot（Claude 保留原表，Codex 为 credit-ratio stub）。
+- **异构族系第二视角（`master-orchestrator-guide`）** — `resume-verify` 原则改为「产出族 ≠ 验收族」；高杠杆裁决 / 临界 correctness-critical `done` **强制**；slot `HETEROGENEOUS_REVIEW_MECHANISM`：Claude→Codex、Codex→Claude、Cursor 在已支持模型里换族（不绑死 Codex CLI）。
+
 ## [0.17.3] — 2026-07-09
 
 > **Cursor bootstrap slash trigger** —— 修复 Cursor `beforeSubmitPrompt` 传入原始 `/as-master-orchestrator` 时 bootstrap 静默 no-op。
