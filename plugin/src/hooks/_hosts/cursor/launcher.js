@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Cursor host launcher (Phase B scaffold).
+ * Cursor host launcher (Phase C).
  * Parse Cursor stdin → normalize → spawn *-core.js → emit Cursor envelope.
  * Path root: __dirname → plugin root (probe D1: no PLUGIN_ROOT token assumed).
+ * Layout: hooks/_hosts/cursor/launcher.js → plugin root is ../../..
  */
 const { spawnSync } = require('child_process');
 const fs = require('fs');
@@ -17,11 +18,12 @@ function readStdin() {
 }
 
 function parseArgs(argv) {
-  const args = { core: '', event: '' };
+  const args = { core: '', event: '', echo: false };
   for (let i = 2; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--core') args.core = argv[++i] || '';
     else if (arg === '--event') args.event = argv[++i] || '';
+    else if (arg === '--echo-normalized') args.echo = true;
     else throw new Error(`unknown argument: ${arg}`);
   }
   return args;
@@ -49,12 +51,12 @@ function eventName(rawEvent) {
 function resolvePluginRoot() {
   const fromEnv = process.env.CC_MASTER_PLUGIN_ROOT || '';
   if (path.isAbsolute(fromEnv)) return fromEnv;
-  // launcher lives at hooks/_hosts/cursor/launcher.js → plugin root is ../..
-  return path.resolve(__dirname, '..', '..');
+  // launcher lives at hooks/_hosts/cursor/launcher.js → plugin root is ../../..
+  return path.resolve(__dirname, '..', '..', '..');
 }
 
 function resolveHome() {
-  return process.env.CC_MASTER_HOME || path.join(process.env.HOME || '', '.claude', 'cc-master');
+  return process.env.CC_MASTER_HOME || path.join(process.env.HOME || '', '.cc_master');
 }
 
 function boardStem(boardPath) {
@@ -76,7 +78,35 @@ function readBoard(boardPath) {
   }
 }
 
+function sessionStatePath(home, sessionId) {
+  if (!sessionId) return '';
+  const safe = encodeURIComponent(sessionId).replace(/%/g, '_');
+  return path.join(home, 'sessions', `${safe}.json`);
+}
+
+function boardFromSessionState(home, sessionId) {
+  const statePath = sessionStatePath(home, sessionId);
+  if (!statePath || !fs.existsSync(statePath)) return null;
+  let state;
+  try {
+    state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+  } catch {
+    return null;
+  }
+  if (!state || state.harness !== 'cursor' || state.session_id !== sessionId || typeof state.board_path !== 'string') {
+    return null;
+  }
+  const boardPath = path.resolve(state.board_path);
+  const boardsDir = path.resolve(path.join(home, 'boards'));
+  if (!boardPath.startsWith(`${boardsDir}${path.sep}`) || !boardPath.endsWith('.board.json')) return null;
+  const board = readBoard(boardPath);
+  if (!boardMatches(board, sessionId)) return null;
+  return { path: boardPath, board, source: 'session-state' };
+}
+
 function discoverActiveBoard(home, sessionId) {
+  const fromState = boardFromSessionState(home, sessionId);
+  if (fromState) return fromState;
   const boardsDir = path.join(home, 'boards');
   let entries;
   try {
@@ -89,7 +119,7 @@ function discoverActiveBoard(home, sessionId) {
     if (!entry.isFile() || !entry.name.endsWith('.board.json')) continue;
     const boardPath = path.join(boardsDir, entry.name);
     const board = readBoard(boardPath);
-    if (boardMatches(board, sessionId)) matches.push({ path: boardPath, board });
+    if (boardMatches(board, sessionId)) matches.push({ path: boardPath, board, source: 'board-scan' });
   }
   matches.sort((a, b) => a.path.localeCompare(b.path));
   return matches.length === 1 ? matches[0] : null;
@@ -182,11 +212,10 @@ function main() {
     normalized.board = {
       path: activeBoard.path,
       stem: boardStem(activeBoard.path),
-      source: 'board-scan',
+      source: activeBoard.source || 'board-scan',
     };
   }
 
-  const corePath = resolveCorePath(pluginRoot, args.core);
   const env = {
     ...process.env,
     CC_MASTER_HARNESS: 'cursor',
@@ -198,7 +227,28 @@ function main() {
   if (activeBoard) {
     env.CC_MASTER_BOARD = activeBoard.path;
     env.CC_MASTER_BOARD_STEM = boardStem(activeBoard.path);
+    env.CC_MASTER_BOARD_SOURCE = activeBoard.source || 'board-scan';
   }
+
+  if (args.echo) {
+    process.stdout.write(`${JSON.stringify({
+      env: {
+        CC_MASTER_HARNESS: env.CC_MASTER_HARNESS,
+        CC_MASTER_HOOK_EVENT: env.CC_MASTER_HOOK_EVENT,
+        CC_MASTER_SESSION_ID: env.CC_MASTER_SESSION_ID,
+        CC_MASTER_HOME: env.CC_MASTER_HOME,
+        CC_MASTER_PLUGIN_ROOT: env.CC_MASTER_PLUGIN_ROOT,
+        CC_MASTER_BOARD: env.CC_MASTER_BOARD || '',
+        CC_MASTER_BOARD_STEM: env.CC_MASTER_BOARD_STEM || '',
+        CC_MASTER_BOARD_SOURCE: env.CC_MASTER_BOARD_SOURCE || '',
+      },
+      payload: normalized,
+    }, null, 2)}\n`);
+    return;
+  }
+
+  if (!args.core) return;
+  const corePath = resolveCorePath(pluginRoot, args.core);
 
   if (!fs.existsSync(corePath)) {
     // Fail-open: missing core must not block the agent (scaffold / partial install).

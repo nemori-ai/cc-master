@@ -516,16 +516,26 @@ bash plugin/src/hooks/_hosts/cursor/probes/setup-local-plugin-probe.sh
 
 ### Phase 1 — plugin source
 
-| 路径 | 内容 | Phase B |
+| 路径 | 内容 | Status |
 | --- | --- | --- |
 | `plugin/src/.cursor-plugin/plugin.json` | manifest | **done** |
 | `plugin/src/hooks/_hosts/cursor/hooks.json` | 事件注册 | **done** (P0) |
-| `plugin/src/hooks/_hosts/cursor/launcher.js` | payload 归一化 | **done** (scaffold) |
-| `plugin/src/hooks/<hook>/implementations/cursor/` | P0 cores | **noop scaffold** — Phase C fills bodies |
+| `plugin/src/hooks/_hosts/cursor/launcher.js` | payload 归一化 + session-state board discovery | **done** (Phase C) |
+| `plugin/src/hooks/<hook>/implementations/cursor/` | P0 cores | **done** Phase C: bootstrap / board-guard / board-lint / verify-board |
 | `plugin/src/skills/_hosts/cursor/capabilities.yaml` | path token、dispatch | deferred (skills still `mode: planned`) |
 | `plugin/src/skills/<skill>/adapters/cursor/strategy.yaml` | 八个分发 skill + overlays | placeholders exist; projection waits `copy` |
 | `plugin/src/commands/<cmd>/adapters/cursor/strategy.yaml` | **已占位** `mode: planned` | unchanged |
-| `plugin/src/hooks/_manifest/hooks.yaml` | **已含** `cursor` host_coverage | unchanged |
+| `plugin/src/hooks/_manifest/hooks.yaml` | cursor P0 → `implemented*` | **updated** Phase C |
+
+### Phase C — P0 hook bodies (2026-07-09)
+
+- [x] `bootstrap-board` — beforeSubmitPrompt sentinel + ccm init/arm + session-state (`harness: cursor`)
+- [x] `board-guard` — preToolUse deny on Write/Shell hand-edits (`permission: deny`)
+- [x] `board-lint` — postToolUse Write → ccm lint → `additional_context`
+- [x] `verify-board` — stop → `followup_message` + FUSE=5 + `stop_allow_until`
+- [x] launcher: home default `.cc_master`, plugin root `../../..`, session-state discovery
+- [ ] Track B reinject (alwaysApply rule; not sessionStart.additional_context)
+- [ ] usage-pacing / identity-nudge Cursor cores
 
 ### Phase 2 — 投影与打包
 

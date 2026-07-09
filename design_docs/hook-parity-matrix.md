@@ -7,13 +7,13 @@
 
 | hook | claude-code | codex | cursor | contract |
 | --- | --- | --- | --- | --- |
-| board-guard | implemented | implemented | planned | [CONTRACT.md](../plugin/src/hooks/board-guard/CONTRACT.md) |
-| board-lint | implemented | implemented | planned | [CONTRACT.md](../plugin/src/hooks/board-lint/CONTRACT.md) |
-| bootstrap-board | implemented | implemented-minimal-fresh | planned | [CONTRACT.md](../plugin/src/hooks/bootstrap-board/CONTRACT.md) |
+| board-guard | implemented | implemented | implemented | [CONTRACT.md](../plugin/src/hooks/board-guard/CONTRACT.md) |
+| board-lint | implemented | implemented | implemented | [CONTRACT.md](../plugin/src/hooks/board-lint/CONTRACT.md) |
+| bootstrap-board | implemented | implemented-minimal-fresh | implemented-minimal-fresh | [CONTRACT.md](../plugin/src/hooks/bootstrap-board/CONTRACT.md) |
 | identity-nudge | implemented | implemented-stop-system-message | planned | [CONTRACT.md](../plugin/src/hooks/identity-nudge/CONTRACT.md) |
 | reinject | implemented | implemented | planned-partial | [CONTRACT.md](../plugin/src/hooks/reinject/CONTRACT.md) |
 | usage-pacing | implemented | implemented-stop-advisory | planned-stop-advisory | [CONTRACT.md](../plugin/src/hooks/usage-pacing/CONTRACT.md) |
-| verify-board | implemented | implemented-blocking | planned | [CONTRACT.md](../plugin/src/hooks/verify-board/CONTRACT.md) |
+| verify-board | implemented | implemented-blocking | implemented-followup | [CONTRACT.md](../plugin/src/hooks/verify-board/CONTRACT.md) |
 
 ## Declared divergences by kind
 

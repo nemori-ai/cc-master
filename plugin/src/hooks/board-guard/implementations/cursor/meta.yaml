@@ -5,6 +5,8 @@ event: preToolUse
 matcher: Shell|Write
 projection:
   target: hooks/
-status: scaffold-noop
+status: implemented
 notes:
-  - Phase B silent noop. Phase C mirrors Claude/Codex board-guard CONTRACT.
+  - Phase C: deny hand-edits to active board (Write path + Shell write heuristics).
+  - Cursor tool surface has no Edit/MultiEdit/apply_patch/Bash — Shell replaces Bash.
+  - Envelope: permission:deny via launcher (kind:block).

@@ -30,8 +30,16 @@ assert_valid_json() { # $1 json-string $2 msg
 assert_file() { [ -f "$1" ] && PASS=$((PASS+1)) || { FAILED=$((FAILED+1)); _red "FAIL: $2 (no file $1)"; }; }
 assert_no_file() { [ ! -e "$1" ] && PASS=$((PASS+1)) || { FAILED=$((FAILED+1)); _red "FAIL: $2 (file exists $1)"; }; }
 
-# make_project: create an isolated fake project dir, echo its path
-make_project() { local d; d="$(mktemp -d "${TMPDIR:-/tmp}/.tmp-ccm.XXXXXX")"; echo "$d"; }
+# make_project: create an isolated fake project dir, echo its path.
+# Normalize TMPDIR (macOS often ends with /) so paths never carry a double slash —
+# otherwise assert_eq against path.resolve()'d board paths from node/ccm fails.
+make_project() {
+  local tmpbase d
+  tmpbase="${TMPDIR:-/tmp}"
+  tmpbase="${tmpbase%/}"
+  d="$(mktemp -d "${tmpbase}/.tmp-ccm.XXXXXX")"
+  echo "$d"
+}
 
 # run_hook SCRIPT STDIN_JSON PROJECT_DIR -> sets HOOK_OUT / HOOK_RC
 # home 收口为全局后，home 不再从 CLAUDE_PROJECT_DIR 派生——故显式 pin CC_MASTER_HOME 到 PROJECT_DIR 下的
