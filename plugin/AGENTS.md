@@ -8,13 +8,13 @@ content-summary: |
 
 # plugin/
 
-`plugin/` 存放 cc-master 的 harness plugin。第一阶段只支持 `claude-code` adapter；Codex 适配留到第二阶段。
+`plugin/` 存放 cc-master 的 harness plugin。当前支持 `claude-code`、`codex`、`cursor` 三个 adapter host。
 
 ## 边界
 
-- `src/` 是唯一语义源：`.claude-plugin/`、`commands/`、`hooks/`、`skills/` 都从这里改。
-- `dist/claude-code/` 是当前可安装产物：由 `scripts/sync-plugin-dist.sh` 从 `src/` 投影生成。
-- 不手编 `dist/claude-code/{commands,hooks,skills,.claude-plugin}/`。需要改行为时先改 `src/`，再运行 `bash scripts/sync-plugin-dist.sh`。
+- `src/` 是唯一语义源：`.claude-plugin/` / `.codex-plugin/` / `.cursor-plugin/`、`commands/`、`hooks/`、`skills/` 都从这里改。
+- `dist/<host>/` 是可安装产物：由 `scripts/sync-plugin-dist.sh` 从 `src/` 按 host 投影生成。
+- 不手编 `dist/{claude-code,codex,cursor}/{commands,hooks,skills,*-plugin}/`。需要改行为时先改 `src/`，再运行 `bash scripts/sync-plugin-dist.sh`。
 
 ## Adapter path token 纪律
 

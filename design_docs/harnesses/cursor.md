@@ -7,7 +7,7 @@
 Cursor 事实按以下优先级维护：
 
 1. Cursor 官方文档（2026-07-09 抓取）：[Hooks](https://cursor.com/docs/hooks)、[Skills](https://cursor.com/docs/skills)、[Plugins reference](https://cursor.com/docs/reference/plugins)、[Rules](https://cursor.com/docs/rules)、[Third-party hooks](https://cursor.com/docs/reference/third-party-hooks)。
-2. 本仓对 Cursor IDE Agent 的实测结论（**本阶段尚未执行 probe**——见 §Dogfood Backlog）。
+2. 本仓对 Cursor IDE Agent 的实测结论（**probe 完成 2026-07-09，Cursor 3.10.20**——见 §Probe Results）。
 3. 本仓对 Claude Code / Codex adapter 的对照推导（`claude-code.md`、`codex.md`、`compatibility-matrix.md`）。
 4. paragoge 旧资料：**未覆盖 Cursor**；不得从 paragoge 复制 Cursor 机制。
 
@@ -336,14 +336,14 @@ session(env) => ({
 
 ## Dual-track delivery（ADR-031）
 
-Cursor 接入拆成两条轨；**契约 SSOT** 已落盘，实现未开始。
+Cursor 接入拆成两条轨；**契约 SSOT** 已落盘，**Phase C 实现已落地**（plugin v0.17.0+）。
 
 | Track | 范围 | 推进范式 | 契约落点 |
 | --- | --- | --- | --- |
 | **A** | 可 SAP/PHIP 1:1 的 surface | SDD → TDD → `implementations/cursor/` | hook `CONTRACT.md` + `adapters/cursor/strategy.yaml` |
 | **B** | 不可 1:1 的能力 | 业务意图 → 声明式替代 → fixture 锁等价类 | [`capabilities/`](capabilities/README.md) Capability Cards |
 
-### Track A — 可直接 SAP/PHIP（`hooks.yaml` 已标 `planned`）
+### Track A — 可直接 SAP/PHIP（`hooks.yaml` 已标 `implemented*`）
 
 | Surface | Cursor 落点 | 模式 |
 | --- | --- | --- |
@@ -385,13 +385,13 @@ Cursor 接入拆成两条轨；**契约 SSOT** 已落盘，实现未开始。
 
 | cc-master hook | `hooks.yaml` stage | Cursor 事件 | 输出改写 | 风险 |
 | --- | --- | --- | --- | --- |
-| `bootstrap-board` | user-prompt-submit | `beforeSubmitPrompt` (+ command) | `continue: false` 拦截 | 无 `UserPromptSubmit` 同名；sentinel 检测逻辑需改写 |
+| `bootstrap-board` | user-prompt-submit | `beforeSubmitPrompt` (+ command) | 成功 ARM → `{ continue: true, user_message }`；拒 arm → `{ continue: false, user_message }` | sentinel + ccm 硬前置（ADR-021） |
 | `reinject` | session-start | `preCompact` + `sessionStart` / alwaysApply rule | `additional_context` 或 rule | **硬缺口**：无 compaction 全文重注 |
 | `board-lint` | post-tool-use | `postToolUse` matcher `Write` | `additional_context` | Edit→Write；【待实测】注入可靠性 |
 | `board-guard` | pre-tool-use | `preToolUse` matcher `Shell\|Write` | `permission: deny` / exit 2 | Bash→Shell |
 | `verify-board` | stop | `stop` | **`followup_message`** 替代 `decision:block` | 续跑语义 + `loop_limit` + FUSE 释放阀 |
 | `usage-pacing` | stop-and-post-tool-batch | `stop` (+ debounced `postToolUse`?) | advisory 注入 | 无 PostToolBatch 采样段 |
-| `identity-nudge` | stop | `stop` | `followup_message` 或 advisory | 周期写 `runtime.*` 经 ccm 不变 |
+| `identity-nudge` | stop | `stop` | **`followup_message`**（周期 advisory） | 周期写 `runtime.*` 经 ccm 不变；续跑副作用靠冷却节流 |
 | `posttool-batch` | post-tool-batch | **无等价** | — | WIP cap 无 batch 边界；需 debounce/省略 |
 | `hook-common` | shared-helper | launcher 或内联 | — | 预期 `_hosts/cursor/launcher.js` 归一化 payload |
 
@@ -399,13 +399,13 @@ Cursor 接入拆成两条轨；**契约 SSOT** 已落盘，实现未开始。
 
 | hook | cursor 覆盖 |
 | --- | --- |
-| bootstrap-board | `planned` |
-| verify-board | `planned` |
-| board-guard | `planned` |
-| board-lint | `planned` |
-| reinject | `planned-partial` |
-| usage-pacing | `planned-stop-advisory` |
-| identity-nudge | `planned` |
+| bootstrap-board | `implemented-fresh-resume` |
+| verify-board | `implemented-followup` |
+| board-guard | `implemented-deny` |
+| board-lint | `implemented-lint` |
+| reinject | `implemented-track-b` |
+| usage-pacing | `implemented-stop-advisory` |
+| identity-nudge | `implemented-stop-advisory` |
 | posttool-batch | `unsupported` |
 | hook-common | `planned` |
 

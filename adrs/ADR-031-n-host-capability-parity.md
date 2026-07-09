@@ -122,6 +122,8 @@ pretending Track B is Track A (silent 1:1 assumption).
 
 ### 2.5 Scope exclusions (this ADR)
 
+> **Superseded (2026-07-09+):** Phase C landed `plugin/dist/cursor`, full `sync-plugin-dist.sh --host cursor`, `ccm/harnesses/cursor.ts`, and `install.sh --harness cursor`. The bullets below describe the ADR acceptance snapshot only.
+
 - No `plugin/dist/cursor` build, no `sync-plugin-dist.sh` full cursor projection, no
   `ccm/harnesses/cursor.ts`, no `install.sh` cursor path — follow-on implementation PRs.
 - Cursor Cloud Agents — out of scope; capability cards may note `event-unavailable` where official

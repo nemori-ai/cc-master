@@ -22,7 +22,9 @@ HOOK_RC=$?
 
 assert_eq 0 "$HOOK_RC" "cursor bootstrap rc 0"
 assert_valid_json "$HOOK_OUT" "cursor bootstrap context envelope valid JSON"
-assert_contains "$HOOK_OUT" '"additional_context"' "cursor bootstrap uses additional_context envelope"
+assert_contains "$HOOK_OUT" '"user_message"' "cursor bootstrap uses user_message envelope"
+assert_contains "$HOOK_OUT" '"continue":true' "cursor bootstrap continues prompt with ARM notice"
+assert_not_contains "$HOOK_OUT" '"additional_context"' "cursor bootstrap does not use additional_context"
 assert_contains "$HOOK_OUT" "cc-master fresh: created and armed Cursor orchestration board" "cursor bootstrap reports armed board"
 assert_contains "$HOOK_OUT" "MANDATORY NEXT STEP" "cursor bootstrap requires DAG before work"
 assert_contains "$HOOK_OUT" "zero tasks is not a runnable orchestration" "cursor bootstrap rejects empty-board progress"
@@ -116,7 +118,7 @@ RESUME_OUT="$(printf '%s' "$RESUME_PAYLOAD" | CC_MASTER_HOME="$RESUME_HOME" node
 RESUME_RC=$?
 
 assert_eq 0 "$RESUME_RC" "cursor bootstrap resume rc 0"
-assert_valid_json "$RESUME_OUT" "cursor bootstrap resume context envelope valid JSON"
+assert_contains "$RESUME_OUT" '"user_message"' "cursor bootstrap resume uses user_message envelope"
 assert_contains "$RESUME_OUT" "cc-master resume: armed Cursor orchestration board" "cursor bootstrap resume reports armed board"
 RESUME_SID="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String((b.owner&&b.owner.session_id)||""));' "$RESUME_BOARD")"
 RESUME_ACTIVE="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.owner&&b.owner.active));' "$RESUME_BOARD")"
@@ -124,6 +126,20 @@ RESUME_TASKS="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSy
 assert_eq "cursor-sess-resume" "$RESUME_SID" "cursor bootstrap resume restamps owner.session_id"
 assert_eq "true" "$RESUME_ACTIVE" "cursor bootstrap resume arms owner.active"
 assert_eq "1" "$RESUME_TASKS" "cursor bootstrap resume preserves tasks"
+
+# ccm missing: refuse arm, no board created.
+MISSING_HOME="$H/missing-ccm-home"
+FAKE_BIN="$H/fake-bin"
+mkdir -p "$FAKE_BIN"
+MISSING_PAYLOAD='{"conversation_id":"cursor-sess-missing","session_id":"cursor-sess-missing","hook_event_name":"beforeSubmitPrompt","prompt":"cc-master:as-master-orchestrator Missing ccm goal","cwd":"/tmp/work"}'
+MISSING_OUT="$(
+  printf '%s' "$MISSING_PAYLOAD" |
+    CC_MASTER_HOME="$MISSING_HOME" PATH="$FAKE_BIN" CCM_BIN= "$(command -v node)" "$LAUNCHER" --core "$CORE" 2>/dev/null
+)"
+assert_contains "$MISSING_OUT" '"continue":false' "cursor bootstrap ccm missing -> continue false"
+assert_contains "$MISSING_OUT" '"user_message"' "cursor bootstrap ccm missing -> user_message directive"
+assert_contains "$MISSING_OUT" 'source=\"bootstrap\"' "cursor bootstrap ccm missing -> bootstrap directive"
+assert_no_file "$MISSING_HOME/boards" "cursor bootstrap ccm missing creates no board dir"
 
 rm -rf "$H"
 finish

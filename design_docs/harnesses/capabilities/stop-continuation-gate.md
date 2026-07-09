@@ -26,7 +26,7 @@ unarmed watchdogs, check rollup consistency, and **bound infinite stop loops** (
 | --- | --- | --- | --- |
 | claude-code | implemented | `Stop` → `decision:block` + fingerprint dedup sidecar + FUSE | ADR-018 directive/advisory |
 | codex | implemented-blocking | `Stop` → `decision:block` + `runtime.stop_allow_until` release valve + streak FUSE | See verify-board CONTRACT |
-| cursor | planned | `stop` → **`followup_message`** auto-continue (not hard block) + `loop_limit` (default 5, docs) + `loop_count` in stdin + session FUSE sidecar aligned with Codex streak model | Track B; D6 closed by official docs 2026-07-09 |
+| cursor | implemented | `stop` → **`followup_message`** auto-continue (not hard block) + `loop_limit` (default 5, docs) + `loop_count` in stdin + session FUSE sidecar aligned with Codex streak model | Track B; D6 closed by official docs 2026-07-09 |
 
 ## Declared divergence
 

@@ -58,12 +58,14 @@ never touches the narrow waist.
   kind: host-convention-divergence
   affected_hosts: [cursor]
   reason: >
-    Cursor Stop advisories use snake_case `additional_context` (probe D5), not Claude Code's
-    camelCase `additionalContext` and not Codex `systemMessage`.
+    Cursor `stop` only documents `followup_message` (not inject-only `additional_context`). Stop
+    advisories must use `followup_message`, which auto-continues the agent (product requirement:
+    notifications must reach the agent).
   compensating_mechanism: >
-    Cursor identity-nudge-core.js emits kind:'system'; launcher maps to {additional_context}.
-    Cadence math and advisory tags match Codex/Claude Code.
-  tracked_by: "n/a — declared launcher-level envelope conversion; ADR-031 Track A"
+    Cursor identity-nudge-core.js emits kind:'system'; launcher maps all stop notifications to
+    `{ followup_message }`. Cadence math and advisory tags match Codex/Claude Code. Throttled by
+    periodic intervals and verify-board `loop_limit`.
+  tracked_by: "_hosts/cursor/ENVELOPE.md; plugin v0.17.2"
 
 - rule: identity-nudge-tag-protocol-missing-on-codex
   kind: host-convention-divergence

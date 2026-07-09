@@ -19,8 +19,8 @@
 
 - `claude-code` 是当前主要发布 adapter。
 - `codex` adapter 已有 dist（skills + hooks + prompt-first bootstrap）；发布策略仍逐版本明确。
-- `cursor` 仅调研落盘（`cursor.md`）；**未实现** `plugin/dist/cursor`、ccm cursor adapter 或 install 路径。目标运行时 = Cursor IDE Agent（非 Cloud Agents）。
-- `plugin/src -> plugin/dist/<host>` 是架构边界；`plugin/dist` 只作为生成产物。
+- `cursor` adapter 已发布（`plugin/dist/cursor`、ccm cursor harness、install `--harness cursor`）。目标运行时 = Cursor IDE Agent（非 Cloud Agents）。
+- `plugin/src -> plugin/dist/<host>` 是架构边界；`plugin/dist` 只作为生成产物（claude-code / codex / cursor）。
 
 ## 资料来源
 

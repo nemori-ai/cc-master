@@ -49,7 +49,7 @@ from AGENTS.md §12's `runHook`/`isArmed` grep door). Its own "gate" is the trig
 
 ```yaml
 - rule: rule-bootstrap-ccm-hard-precheck
-  required_hosts: [claude-code]
+  required_hosts: [claude-code, cursor]
 ```
 
 ## 降级行为
@@ -82,4 +82,17 @@ from AGENTS.md §12's `runHook`/`isArmed` grep door). Its own "gate" is the trig
     rather than refusing to arm at all.
   compensating_mechanism: "none yet — per-call spawn failures are caught and reported as notes, but arming still proceeds."
   tracked_by: "backlog — not in HOOKPAR-DEC's four-item fix scope (FUSE / rollup / board-guard fallback / ADR-018 tags); needs its own follow-up to port ADR-021's fail-loud precheck to Codex bootstrap"
+
+- rule: bootstrap-beforeSubmitPrompt-envelope
+  kind: protocol-capability-gap
+  affected_hosts: [cursor]
+  reason: >
+    Cursor `beforeSubmitPrompt` only accepts `continue` + `user_message` (not `additional_context`).
+    Bootstrap ARM notices must use `user_message` with `continue: true`; ccm-missing refusal uses
+    `continue: false` + directive in `user_message`.
+  compensating_mechanism: >
+    `_hosts/cursor/launcher.js` maps kind:context|system on user-prompt-submit to
+    `{ continue: true, user_message }`; kind:block|deny to `{ continue: false, user_message }`.
+    SSOT: `_hosts/cursor/ENVELOPE.md`.
+  tracked_by: "plugin v0.17.2 envelope fix"
 ```

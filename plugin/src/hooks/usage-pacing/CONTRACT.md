@@ -104,6 +104,17 @@ goes through `ccm account switch`, a process-boundary call, not a board write).
     copy cites billing_period pct / nearest_reset and never mentions 5h/7d/switch.
   tracked_by: "ccm packages/engine usage/pacing.ts billing_period path; ADR-031 Track A"
 
+- rule: usage-pacing-cursor-stop-envelope
+  kind: host-convention-divergence
+  affected_hosts: [cursor]
+  reason: >
+    Cursor `stop` only documents `followup_message`. Pacing advisories must reach the agent (product
+    requirement); launcher maps kind:system to `{ followup_message }`.
+  compensating_mechanism: >
+    usage-pacing-core.js emits kind:system on throttle/stop_billing_period; launcher maps stop
+    notifications per ENVELOPE.md. hold verdict stays silent; stop_hook_active guard unchanged.
+  tracked_by: "_hosts/cursor/ENVELOPE.md; plugin v0.17.2"
+
 - rule: usage-pacing-tag-protocol-missing-on-codex
   kind: host-convention-divergence
   affected_hosts: [codex]

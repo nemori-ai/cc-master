@@ -66,11 +66,11 @@ only proves "both hosts' source at least declares awareness of this rule."
 
 ```yaml
 - rule: rule-verify-board-fuse
-  required_hosts: [claude-code, codex]
+  required_hosts: [claude-code, codex, cursor]
 - rule: rule-verify-board-rollup-check
   required_hosts: [claude-code, codex]
 - rule: rule-verify-board-tag-protocol
-  required_hosts: [claude-code, codex]
+  required_hosts: [claude-code, codex, cursor]
 ```
 
 ## 降级行为
@@ -135,4 +135,16 @@ only proves "both hosts' source at least declares awareness of this rule."
     `advisory('verify-board', 'strong', body)` (local duplicates matching claude-code hook-common.js
     wrapper output shape byte-for-byte, since Codex has no shared hook-common to import).
   tracked_by: "adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR)"
+
+- rule: verify-board-cursor-stop-envelope
+  kind: protocol-capability-gap
+  affected_hosts: [cursor]
+  reason: >
+    Cursor has no Claude `decision:block` on Stop. Continuation gate uses `followup_message`
+    (auto-continue). FUSE release advisories also use `followup_message` (not `additional_context`).
+  compensating_mechanism: >
+    verify-board-core.js emits kind:block for gate reasons and kind:system for FUSE release;
+    launcher maps all stop kinds to `{ followup_message }`. FUSE sidecar + `stop_allow_until` +
+    hooks.json `loop_limit: 5` bound worst-case loops. SSOT: `_hosts/cursor/ENVELOPE.md`.
+  tracked_by: "plugin v0.17.2 envelope fix"
 ```

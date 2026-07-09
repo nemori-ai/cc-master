@@ -20,7 +20,7 @@ dispatch mechanism for complex fan-out.
 | --- | --- | --- | --- |
 | claude-code | implemented | `authoring-workflows` skill + Workflow tool | Full SAP |
 | codex | unsupported_stub | `adapters/codex/strategy.yaml` mode unsupported_stub | No Workflow equivalent |
-| cursor | planned | **Same as Codex**: `unsupported_stub` | Task tool + background shell + `/loop` |
+| cursor | implemented | `unsupported_stub` | Task tool + background shell + `/loop` |
 
 ## Declared divergence
 

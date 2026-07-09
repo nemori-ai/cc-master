@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.2] — 2026-07-09
+
+> **Cursor hook envelope correctness** —— 修复 Cursor launcher 按官方事件契约映射输出信封：bootstrap ARM 通知走 `user_message`，Stop advisory/FUSE 走 `followup_message`；补 ADR-021 ccm 硬前置。
+
+### Fixed
+
+- **Cursor hook output envelopes** — `emitHostResult` 按事件分流：`beforeSubmitPrompt` → `{ continue, user_message }`（不再误用 `additional_context`）；`stop` 上 identity-nudge / usage-pacing / verify-board FUSE → `followup_message`（产品通知必达）。SSOT：`_hosts/cursor/ENVELOPE.md`。
+- **Cursor bootstrap ccm hard-precheck** — 移植 ADR-021：`ccm` 缺失时拒 arm + directive；`resetStopAllowUntil` 仅在 bootstrap 匹配后执行。
+
+### Changed
+
+- **Harness docs / CONTRACT 锁步** — `cursor.md`、`compatibility-matrix.md`、hook CONTRACT、Capability Cards、parity matrix 同步 Phase C + 信封修复事实。
+
 ## [0.17.1] — 2026-07-09
 
 > **Cursor command surface full parity** —— 把 Cursor 剩余命令从 skill/guidance 提升为 host_native slash commands，与 Claude Code 命令面对齐；`stop` 用 `/cc-master-stop` 避开 Cursor 内置 `/stop`。

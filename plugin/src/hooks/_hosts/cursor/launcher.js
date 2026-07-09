@@ -169,23 +169,33 @@ function emitHostResult(result, event) {
   const kind = result && result.kind ? result.kind : 'silent';
   if (kind === 'silent' || kind === 'allow') return;
   const message = String(result.context || result.message || result.followup_message || '');
+  if (!message) return;
+
+  // Event-scoped envelope mapping — SSOT: ENVELOPE.md
+  if (event === 'stop') {
+    process.stdout.write(`${JSON.stringify({ followup_message: message })}\n`);
+    return;
+  }
   if (kind === 'block' || kind === 'deny') {
     if (event === 'pre-tool-use') {
       process.stdout.write(`${JSON.stringify({ permission: 'deny', user_message: message || 'denied' })}\n`);
     } else if (event === 'user-prompt-submit') {
       process.stdout.write(`${JSON.stringify({ continue: false, user_message: message || 'blocked' })}\n`);
-    } else if (event === 'stop') {
-      // Cursor Stop: continuation via followup_message (D6), not hard block.
-      if (message) process.stdout.write(`${JSON.stringify({ followup_message: message })}\n`);
     }
     return;
   }
-  if (kind === 'followup' || (kind === 'context' && event === 'stop')) {
-    if (message) process.stdout.write(`${JSON.stringify({ followup_message: message })}\n`);
+  if (kind === 'followup') {
+    if (event === 'user-prompt-submit') {
+      process.stdout.write(`${JSON.stringify({ continue: true, user_message: message })}\n`);
+    }
     return;
   }
   if (kind === 'context' || kind === 'system') {
-    if (message) process.stdout.write(`${JSON.stringify({ additional_context: message })}\n`);
+    if (event === 'user-prompt-submit') {
+      process.stdout.write(`${JSON.stringify({ continue: true, user_message: message })}\n`);
+    } else if (event === 'post-tool-use') {
+      process.stdout.write(`${JSON.stringify({ additional_context: message })}\n`);
+    }
   }
 }
 

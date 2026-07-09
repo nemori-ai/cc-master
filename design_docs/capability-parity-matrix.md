@@ -10,12 +10,12 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 | capability | claude-code | codex | cursor | card |
 | --- | --- | --- | --- | --- |
 | ccm-quota-account | implemented | partial | partial | [ccm-quota-account.md](harnesses/capabilities/ccm-quota-account.md) |
-| path-token-resolution | implemented | implemented | planned | [path-token-resolution.md](harnesses/capabilities/path-token-resolution.md) |
+| path-token-resolution | implemented | implemented | implemented | [path-token-resolution.md](harnesses/capabilities/path-token-resolution.md) |
 | post-tool-batch-gate | implemented | unsupported | unsupported | [post-tool-batch-gate.md](harnesses/capabilities/post-tool-batch-gate.md) |
 | role-substrate-reinject | implemented | implemented | implemented | [role-substrate-reinject.md](harnesses/capabilities/role-substrate-reinject.md) |
-| stop-continuation-gate | implemented | implemented-blocking | planned | [stop-continuation-gate.md](harnesses/capabilities/stop-continuation-gate.md) |
+| stop-continuation-gate | implemented | implemented-blocking | implemented | [stop-continuation-gate.md](harnesses/capabilities/stop-continuation-gate.md) |
 | usage-pacing-midflight | implemented | implemented-stop-advisory | implemented-stop-advisory | [usage-pacing-midflight.md](harnesses/capabilities/usage-pacing-midflight.md) |
-| workflow-authoring | implemented | unsupported_stub | planned | [workflow-authoring.md](harnesses/capabilities/workflow-authoring.md) |
+| workflow-authoring | implemented | unsupported_stub | implemented | [workflow-authoring.md](harnesses/capabilities/workflow-authoring.md) |
 
 ## Declared divergences by kind
 
