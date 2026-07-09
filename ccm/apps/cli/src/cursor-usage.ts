@@ -6,11 +6,15 @@
 // codex-rate-limits.ts). Fail-open: any error → null. Zero npm deps.
 
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
 import { MessageChannel, receiveMessageOnPort, Worker } from 'node:worker_threads';
 import type { UsageSignal } from '@ccm/engine';
+
+// Lazy-load node:sqlite — a top-level import emits ExperimentalWarning on every ccm
+// invocation (including --version / --json), which breaks e2e stderr/JSON contracts.
+const nodeRequire = createRequire(import.meta.url);
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_API_BASE = 'https://api2.cursor.sh';
@@ -212,6 +216,7 @@ function resolveStateDbPath(env: Record<string, string | undefined>): string | n
 function readAccessTokenFromStateDb(dbPath: string): string | null {
   try {
     // node:sqlite DatabaseSync (Node 22.5+); fail-open if unavailable.
+    const { DatabaseSync } = nodeRequire('node:sqlite') as typeof import('node:sqlite');
     const db = new DatabaseSync(dbPath, { readOnly: true });
     try {
       const row = db
