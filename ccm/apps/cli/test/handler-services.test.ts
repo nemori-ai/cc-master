@@ -216,7 +216,9 @@ test('services reconcile restarts wanted web-viewer and reports version drift fi
 
   const r = invoke(['services', 'reconcile', '--after-binary-replace', '--json'], home);
   assert.equal(r.code, EXIT.OK, r.stderr);
-  const web = json(r.stdout).data.services.find((s: { service: string }) => s.service === 'web-viewer');
+  const web = json(r.stdout).data.services.find(
+    (s: { service: string }) => s.service === 'web-viewer',
+  );
   assert.equal(web.wanted, true);
   assert.equal(web.binary_match, false);
   assert.equal(web.running_ccm_version, '0.0.1');
@@ -294,7 +296,9 @@ test('services reconcile materializes web-viewer assets before restarting wanted
 
   const r = invoke(['services', 'reconcile', '--after-binary-replace', '--json'], home);
   assert.equal(r.code, EXIT.OK, r.stderr);
-  const web = json(r.stdout).data.services.find((s: { service: string }) => s.service === 'web-viewer');
+  const web = json(r.stdout).data.services.find(
+    (s: { service: string }) => s.service === 'web-viewer',
+  );
   assert.equal(web.reason, 'restarted');
   assert.ok(
     existsSync(join(materializedAppDistDir(home), 'index.html')),

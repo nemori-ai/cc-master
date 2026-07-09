@@ -828,7 +828,11 @@ test('board stamp-harness no-ops without trusted detect and preserves existing h
   const ctx = mkCtx({ boardPath, flags: { json: true }, env: {} });
   const code = boardHandler.stampHarness(ctx);
   assert.equal(code, EXIT.OK);
-  assert.equal(readFileSync(boardPath, 'utf8'), before, 'no trusted detect leaves board byte-identical');
+  assert.equal(
+    readFileSync(boardPath, 'utf8'),
+    before,
+    'no trusted detect leaves board byte-identical',
+  );
   const out = JSON.parse(ctx.outBuf.join(''));
   assert.equal(out.data.stamped, false);
   assert.equal(out.data.trusted_harness, null);

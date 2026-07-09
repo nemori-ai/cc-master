@@ -119,7 +119,10 @@ function priorityRank(p: string): number {
   return _PRIORITY_RANK[p] ?? _PRIORITY_RANK.normal ?? 2;
 }
 
-function harnessOf(owner: Record<string, unknown>, boardFile: string): { harness: string; poolId: string } {
+function harnessOf(
+  owner: Record<string, unknown>,
+  boardFile: string,
+): { harness: string; poolId: string } {
   const raw = owner.harness;
   const harness = isEnumMember('harness', raw) ? (raw as string) : 'unknown';
   // Missing or bad harness is conservative: never mix it with known pools or other unknown boards.

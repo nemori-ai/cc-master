@@ -1,12 +1,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readVersion } from './help.js';
 import {
   WEB_VIEWER_APP_DIST_BUNDLED,
   WEB_VIEWER_APP_DIST_FILES,
   WEB_VIEWER_APP_DIST_VERSION,
 } from './generated/web-viewer-assets.js';
+import { readVersion } from './help.js';
 
 export interface AppDistTestHooks {
   bundled?: boolean;

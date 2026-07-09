@@ -1,6 +1,6 @@
+import { type PacingAdvice, pacingAdvice, pctOf, type UsageSignal } from '../usage/pacing.js';
 import type { Notification, NotificationKind } from './inbox.js';
 import type { PeerEntry } from './peers.js';
-import { type PacingAdvice, pacingAdvice, pctOf, type UsageSignal } from '../usage/pacing.js';
 
 export type QuotaModel = 'rolling-5h-7d' | 'billing-period' | 'primary-secondary';
 export type PoolPressureBand = 'healthy' | 'warn' | 'critical' | 'exhausted';
@@ -92,7 +92,10 @@ function clampPct(n: number): number {
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
-function nearestFutureReset(candidates: Array<number | null | undefined>, nowSec: number): number | null {
+function nearestFutureReset(
+  candidates: Array<number | null | undefined>,
+  nowSec: number,
+): number | null {
   let best: number | null = null;
   for (const c of candidates) {
     if (typeof c !== 'number' || !Number.isFinite(c) || c <= nowSec) continue;
@@ -123,7 +126,8 @@ function bandWithHysteresis(
       : POOL_ARBITER_POLICY.criticalUsedPct;
   const criticalExit = criticalEnter - POOL_ARBITER_POLICY.hysteresisPct;
   const warnExit = POOL_ARBITER_POLICY.warnUsedPct - POOL_ARBITER_POLICY.hysteresisPct;
-  if (previousBand === 'exhausted') return usedPct >= 100 ? 'exhausted' : rawBand(usedPct, quotaModel);
+  if (previousBand === 'exhausted')
+    return usedPct >= 100 ? 'exhausted' : rawBand(usedPct, quotaModel);
   if (previousBand === 'critical' && usedPct >= criticalExit) return 'critical';
   if (previousBand === 'warn' && usedPct >= warnExit && usedPct < criticalEnter) return 'warn';
   return rawBand(usedPct, quotaModel);
@@ -136,14 +140,21 @@ export function poolPressureFromUsage(
   const nowSec = opts.nowSec ?? Math.floor(Date.now() / 1000);
   const quotaModel = opts.quotaModel ?? 'rolling-5h-7d';
   const windows =
-    quotaModel === 'billing-period' ? [signal?.billing_period] : [signal?.five_hour, signal?.seven_day];
-  const pcts = windows.map((w) => pctOf(w, nowSec)).filter((pct): pct is number => typeof pct === 'number');
+    quotaModel === 'billing-period'
+      ? [signal?.billing_period]
+      : [signal?.five_hour, signal?.seven_day];
+  const pcts = windows
+    .map((w) => pctOf(w, nowSec))
+    .filter((pct): pct is number => typeof pct === 'number');
   const usedPct = pcts.length > 0 ? Math.max(...pcts) : null;
   const available = usedPct !== null;
   return {
     headroom_pct: available ? round2(100 - clampPct(usedPct)) : 100,
     used_pct: usedPct,
-    nearest_reset: nearestFutureReset(windows.map((w) => w?.resets_at), nowSec),
+    nearest_reset: nearestFutureReset(
+      windows.map((w) => w?.resets_at),
+      nowSec,
+    ),
     quota_model: quotaModel,
     pollable: opts.pollable !== false && available,
     available,
@@ -164,16 +175,38 @@ function peerBurn(peer: PeerEntry): number {
   return typeof burn === 'number' && Number.isFinite(burn) ? clampPct(burn) : 0;
 }
 function rosterSignature(peers: PeerEntry[]): string {
-  return peers.map((p) => `${p.board_file}:${p.priority}:${priorityWeight(p.priority)}`).sort().join('|');
+  return peers
+    .map((p) => `${p.board_file}:${p.priority}:${priorityWeight(p.priority)}`)
+    .sort()
+    .join('|');
 }
-function mapPacingVerdict(advice: PacingAdvice): { kind: PoolAllocationKind; notificationKind: NotificationKind | null } {
+function mapPacingVerdict(advice: PacingAdvice): {
+  kind: PoolAllocationKind;
+  notificationKind: NotificationKind | null;
+} {
   if (advice.verdict === 'hold') return { kind: 'hold', notificationKind: null };
-  if (advice.verdict === 'throttle') return { kind: 'pacing_throttle', notificationKind: 'pacing_throttle' };
-  if (advice.verdict === 'switch') return { kind: 'pacing_switch', notificationKind: 'pacing_switch' };
+  if (advice.verdict === 'throttle')
+    return { kind: 'pacing_throttle', notificationKind: 'pacing_throttle' };
+  if (advice.verdict === 'switch')
+    return { kind: 'pacing_switch', notificationKind: 'pacing_switch' };
   return { kind: 'pacing_stop', notificationKind: 'pacing_stop' };
 }
-function rowDedupKey(peer: AllocationPeer, kind: PoolAllocationKind, pressure: PoolPressure, rosterSig: string, target: number): string {
-  return ['pool-arbiter', peer.board_file, kind, pressure.quota_model, pressure.band, rosterSig, round2(target)].join('|');
+function rowDedupKey(
+  peer: AllocationPeer,
+  kind: PoolAllocationKind,
+  pressure: PoolPressure,
+  rosterSig: string,
+  target: number,
+): string {
+  return [
+    'pool-arbiter',
+    peer.board_file,
+    kind,
+    pressure.quota_model,
+    pressure.band,
+    rosterSig,
+    round2(target),
+  ].join('|');
 }
 
 export function allocatePool(
@@ -188,7 +221,11 @@ export function allocatePool(
     pollable: opts.pollable,
     previousBand: opts.previousBand,
   });
-  const baseAdvice = pacingAdvice(signal, { nowSec, effectiveN: opts.effectiveN, registry: opts.registry as never });
+  const baseAdvice = pacingAdvice(signal, {
+    nowSec,
+    effectiveN: opts.effectiveN,
+    registry: opts.registry as never,
+  });
   const rosterSig = rosterSignature([...peers]);
 
   if (peers.length <= 1) {
@@ -206,25 +243,42 @@ export function allocatePool(
       mode: 'single-board',
       pressure,
       base_advice: baseAdvice,
-      rows: [{
-        peer: allocationPeer,
-        kind: mapped.kind,
-        notification_kind: mapped.notificationKind,
-        strength: baseAdvice.strength,
-        target_headroom_pct: pressure.headroom_pct,
-        delta_headroom_pct: 0,
-        reason: baseAdvice.reason,
-        dedup_key: rowDedupKey(allocationPeer, mapped.kind, pressure, rosterSig, pressure.headroom_pct),
-      }],
+      rows: [
+        {
+          peer: allocationPeer,
+          kind: mapped.kind,
+          notification_kind: mapped.notificationKind,
+          strength: baseAdvice.strength,
+          target_headroom_pct: pressure.headroom_pct,
+          delta_headroom_pct: 0,
+          reason: baseAdvice.reason,
+          dedup_key: rowDedupKey(
+            allocationPeer,
+            mapped.kind,
+            pressure,
+            rosterSig,
+            pressure.headroom_pct,
+          ),
+        },
+      ],
       roster_signature: rosterSig,
       peer_count: peers.length,
     };
   }
 
-  const enriched = peers.map((peer) => ({ peer, weight: priorityWeight(peer.priority), burn: peerBurn(peer) }));
+  const enriched = peers.map((peer) => ({
+    peer,
+    weight: priorityWeight(peer.priority),
+    burn: peerBurn(peer),
+  }));
   const weightSum = enriched.reduce((sum, p) => sum + p.weight, 0) || 1;
   const targets = enriched.map((p) =>
-    round2(Math.max(POOL_ARBITER_POLICY.antiStarvationFloorPct, (pressure.headroom_pct * p.weight) / weightSum)),
+    round2(
+      Math.max(
+        POOL_ARBITER_POLICY.antiStarvationFloorPct,
+        (pressure.headroom_pct * p.weight) / weightSum,
+      ),
+    ),
   );
   const deltas = enriched.map((p, i) => round2((targets[i] ?? 0) - p.burn));
   const hasOver = deltas.some((d) => d < -POOL_ARBITER_POLICY.rowDeltaEpsilonPct);
@@ -251,12 +305,18 @@ export function allocatePool(
       notificationKind = 'pacing_stop';
       strength = 'strong';
       reason = baseAdvice.reason;
-    } else if (baseMapped.kind === 'pacing_switch' && delta < -POOL_ARBITER_POLICY.rowDeltaEpsilonPct) {
+    } else if (
+      baseMapped.kind === 'pacing_switch' &&
+      delta < -POOL_ARBITER_POLICY.rowDeltaEpsilonPct
+    ) {
       kind = 'pacing_switch';
       notificationKind = 'pacing_switch';
       strength = baseAdvice.strength;
       reason = `${baseAdvice.reason}；本板 burn≈${entry.burn}% 高于目标 ${target}%（delta=${delta}%），优先切换/让出当前池压力`;
-    } else if ((pressure.band === 'warn' || pressure.band === 'critical') && delta < -POOL_ARBITER_POLICY.rowDeltaEpsilonPct) {
+    } else if (
+      (pressure.band === 'warn' || pressure.band === 'critical') &&
+      delta < -POOL_ARBITER_POLICY.rowDeltaEpsilonPct
+    ) {
       kind = hasUnder ? 'pacing_yield' : 'pacing_throttle';
       notificationKind = kind;
       reason = hasUnder
@@ -279,7 +339,14 @@ export function allocatePool(
       dedup_key: rowDedupKey(allocationPeer, kind, pressure, rosterSig, target),
     };
   });
-  return { mode: 'pool', pressure, base_advice: baseAdvice, rows, roster_signature: rosterSig, peer_count: peers.length };
+  return {
+    mode: 'pool',
+    pressure,
+    base_advice: baseAdvice,
+    rows,
+    roster_signature: rosterSig,
+    peer_count: peers.length,
+  };
 }
 
 function parseMs(iso: unknown): number | null {
@@ -316,7 +383,10 @@ export function shouldAppendAllocationNotification(
   if (latestMs !== null && nowMs - latestMs < POOL_ARBITER_POLICY.notificationCooldownSec * 1000) {
     return { append: false, reason: 'cooldown', latest_id: latest.id };
   }
-  const prevTarget = typeof latest.payload?.target_headroom_pct === 'number' ? latest.payload.target_headroom_pct : null;
+  const prevTarget =
+    typeof latest.payload?.target_headroom_pct === 'number'
+      ? latest.payload.target_headroom_pct
+      : null;
   const edge =
     latest.payload?.pressure_band !== allocation.pressure.band ||
     latest.payload?.roster_signature !== allocation.roster_signature ||

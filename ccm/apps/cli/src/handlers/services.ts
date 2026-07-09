@@ -72,7 +72,14 @@ function monitorOsUnitInstalled(home: string): boolean {
   const suffix = Buffer.from(home).toString('hex').slice(0, 10);
   const candidates =
     process.platform === 'darwin'
-      ? [path.join(os.homedir(), 'Library', 'LaunchAgents', `ai.nemori.ccm.monitor.${suffix}.plist`)]
+      ? [
+          path.join(
+            os.homedir(),
+            'Library',
+            'LaunchAgents',
+            `ai.nemori.ccm.monitor.${suffix}.plist`,
+          ),
+        ]
       : [path.join(os.homedir(), '.config', 'systemd', 'user', `ccm-monitor-${suffix}.service`)];
   return candidates.some((candidate) => fs.existsSync(candidate));
 }
@@ -102,7 +109,10 @@ function webViewerPlans(home: string): ServicePlan[] {
   const dir = path.join(home, 'services', 'web-viewer', 'instances');
   let names: string[] = [];
   try {
-    names = fs.readdirSync(dir).filter((name) => name.endsWith('.json')).sort();
+    names = fs
+      .readdirSync(dir)
+      .filter((name) => name.endsWith('.json'))
+      .sort();
   } catch {
     return [];
   }

@@ -16,7 +16,7 @@ import type { HarnessDescriptor } from '../harnesses/types.js';
 import { readVersion } from '../help.js';
 import * as io from '../io.js';
 import type { Ctx } from './_common.js';
-import { arbitrateBoardForService, type ArbiterUsageOverride } from './coordination.js';
+import { type ArbiterUsageOverride, arbitrateBoardForService } from './coordination.js';
 
 const EXIT = io.EXIT;
 const SERVICE_SCHEMA = 'ccm/monitor-service/v1';
@@ -152,7 +152,8 @@ function readState(statePath: string): MonitorState | null {
     const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8'));
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
     const s = parsed as Partial<MonitorState>;
-    if (s.schema !== SERVICE_SCHEMA || s.id !== SERVICE_ID || typeof s.home !== 'string') return null;
+    if (s.schema !== SERVICE_SCHEMA || s.id !== SERVICE_ID || typeof s.home !== 'string')
+      return null;
     const paths = servicePaths(s.home);
     return {
       schema: SERVICE_SCHEMA,
@@ -266,7 +267,10 @@ function waitForRunning(statePath: string, startedAt: string): MonitorState {
     }
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 80);
   }
-  throw kinded(`monitor service did not become healthy${last ? ` (pid ${last.pid})` : ''}`, 'Validation');
+  throw kinded(
+    `monitor service did not become healthy${last ? ` (pid ${last.pid})` : ''}`,
+    'Validation',
+  );
 }
 
 function startService(ctx: Ctx): { service: MonitorState; reused: boolean } {
@@ -328,13 +332,20 @@ function output(ctx: Ctx, data: unknown, human: string): void {
 
 function humanLine(service: MonitorState | null): string {
   if (!service) return 'monitor: stopped';
-  const status = service.health === 'ok' && service.binary_match === false ? 'stale-binary' : service.health || 'stopped';
+  const status =
+    service.health === 'ok' && service.binary_match === false
+      ? 'stale-binary'
+      : service.health || 'stopped';
   return `monitor: ${status} pid=${service.pid || 'n/a'} home=${service.home}`;
 }
 
 export function start(ctx: Ctx): number {
   const { service, reused } = startService(ctx);
-  output(ctx, { ok: true, running: true, reused, service }, `${reused ? 'reusing' : 'started'} monitor pid=${service.pid}`);
+  output(
+    ctx,
+    { ok: true, running: true, reused, service },
+    `${reused ? 'reusing' : 'started'} monitor pid=${service.pid}`,
+  );
   return EXIT.OK;
 }
 
@@ -364,7 +375,11 @@ export function stop(ctx: Ctx): number {
   ensureServiceDirs(paths);
   return withLock(paths.lockTarget, () => {
     const result = stopOne(readState(paths.state));
-    output(ctx, { ok: true, stopped: result.stopped, service: result.service }, result.stopped ? 'stopped monitor' : 'monitor: stopped');
+    output(
+      ctx,
+      { ok: true, stopped: result.stopped, service: result.service },
+      result.stopped ? 'stopped monitor' : 'monitor: stopped',
+    );
     return EXIT.OK;
   });
 }
@@ -378,7 +393,11 @@ export function restart(ctx: Ctx): number {
     previous = stopOne(readState(paths.state)).service;
   });
   const started = startService(ctx);
-  output(ctx, { ok: true, previous, service: started.service }, `restarted monitor pid=${started.service.pid}`);
+  output(
+    ctx,
+    { ok: true, previous, service: started.service },
+    `restarted monitor pid=${started.service.pid}`,
+  );
   return EXIT.OK;
 }
 
@@ -451,7 +470,12 @@ function tickOnce(ctx: Ctx, state: MonitorState): TickResult {
           raw,
           {
             ...ctx,
-            values: { ...ctx.values, home: state.home, board: boardPath, ...(harness ? { harness } : {}) },
+            values: {
+              ...ctx.values,
+              home: state.home,
+              board: boardPath,
+              ...(harness ? { harness } : {}),
+            },
           },
           boardPath,
           { usage, accountsMap },
@@ -528,14 +552,22 @@ function serviceLabel(home: string): string {
   return `ai.nemori.ccm.monitor.${Buffer.from(home).toString('hex').slice(0, 10)}`;
 }
 
-function installPathForPlatform(home: string): { path: string; kind: 'launchd' | 'systemd'; label: string } {
+function installPathForPlatform(home: string): {
+  path: string;
+  kind: 'launchd' | 'systemd';
+  label: string;
+} {
   const label = serviceLabel(home);
   if (process.platform === 'darwin') {
     const base = path.join(os.homedir(), 'Library', 'LaunchAgents');
     return { path: path.join(base, `${label}.plist`), kind: 'launchd', label };
   }
   const base = path.join(os.homedir(), '.config', 'systemd', 'user');
-  return { path: path.join(base, `ccm-monitor-${Buffer.from(home).toString('hex').slice(0, 10)}.service`), kind: 'systemd', label };
+  return {
+    path: path.join(base, `ccm-monitor-${Buffer.from(home).toString('hex').slice(0, 10)}.service`),
+    kind: 'systemd',
+    label,
+  };
 }
 
 export function installService(ctx: Ctx): number {
@@ -622,7 +654,10 @@ function runUnitCommand(command: string, args: string[]): { ok: boolean; error: 
   return { ok: false, error: (r.stderr || r.stdout || `exit ${r.status}`).trim() };
 }
 
-function activateOsService(unit: { path: string; kind: 'launchd' | 'systemd'; label: string }): { ok: boolean; error: string | null } {
+function activateOsService(unit: { path: string; kind: 'launchd' | 'systemd'; label: string }): {
+  ok: boolean;
+  error: string | null;
+} {
   if (unit.kind === 'launchd') {
     const domain = `gui/${process.getuid?.() || ''}`;
     const boot = runUnitCommand('launchctl', ['bootstrap', domain, unit.path]);
@@ -634,9 +669,15 @@ function activateOsService(unit: { path: string; kind: 'launchd' | 'systemd'; la
   return runUnitCommand('systemctl', ['--user', 'enable', '--now', path.basename(unit.path)]);
 }
 
-function deactivateOsService(unit: { path: string; kind: 'launchd' | 'systemd'; label: string }): { ok: boolean; error: string | null } {
+function deactivateOsService(unit: { path: string; kind: 'launchd' | 'systemd'; label: string }): {
+  ok: boolean;
+  error: string | null;
+} {
   if (unit.kind === 'launchd') {
-    return runUnitCommand('launchctl', ['bootout', `gui/${process.getuid?.() || ''}/${unit.label}`]);
+    return runUnitCommand('launchctl', [
+      'bootout',
+      `gui/${process.getuid?.() || ''}/${unit.label}`,
+    ]);
   }
   return runUnitCommand('systemctl', ['--user', 'disable', '--now', path.basename(unit.path)]);
 }

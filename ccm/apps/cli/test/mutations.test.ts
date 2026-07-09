@@ -126,7 +126,11 @@ test('boardStampHarness no-ops when no trusted harness is detected', () => {
   const b = m.boardStampHarness(orig, { harnessId: null });
 
   assert.equal(b.owner.harness, 'codex');
-  assert.equal(b.owner.heartbeat, orig.owner.heartbeat, 'no trusted detect must not touch heartbeat');
+  assert.equal(
+    b.owner.heartbeat,
+    orig.owner.heartbeat,
+    'no trusted detect must not touch heartbeat',
+  );
   assert.notEqual(b, orig, 'returns a clone even on no-op');
 });
 
