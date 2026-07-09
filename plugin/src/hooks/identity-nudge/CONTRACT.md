@@ -38,7 +38,7 @@ never touches the narrow waist.
 
 ```yaml
 - rule: rule-identity-nudge-tag-protocol
-  required_hosts: [claude-code, codex]
+  required_hosts: [claude-code, codex, cursor]
 ```
 
 ## 降级行为
@@ -53,6 +53,17 @@ never touches the narrow waist.
     `systemMessage` instead.
   compensating_mechanism: "Codex launcher's emitHostResult() maps kind:'system' to systemMessage on Stop; content and cadence math are unchanged."
   tracked_by: "n/a — declared launcher-level envelope conversion, not a business-logic gap"
+
+- rule: identity-nudge-cursor-envelope
+  kind: host-convention-divergence
+  affected_hosts: [cursor]
+  reason: >
+    Cursor Stop advisories use snake_case `additional_context` (probe D5), not Claude Code's
+    camelCase `additionalContext` and not Codex `systemMessage`.
+  compensating_mechanism: >
+    Cursor identity-nudge-core.js emits kind:'system'; launcher maps to {additional_context}.
+    Cadence math and advisory tags match Codex/Claude Code.
+  tracked_by: "n/a — declared launcher-level envelope conversion; ADR-031 Track A"
 
 - rule: identity-nudge-tag-protocol-missing-on-codex
   kind: host-convention-divergence
