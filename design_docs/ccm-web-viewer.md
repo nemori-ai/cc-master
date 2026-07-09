@@ -27,14 +27,13 @@ ccm web-viewer open
 
 `web-viewer` is a static ccm namespace: implementation adds it to `ccm/apps/cli/src/registry.ts` `REGISTRY`, imports its handler in `router.ts`, and adds it to the static `HANDLERS` map. It is not dynamically discovered from a plugin.
 
-所有命令复用 ccm 全局 flags / context：`--home`、`--board`、`--goal`、`--session-id`、`--json`、`--no-input`。`--home` 决定 service scope；service 启动后扫描 `<home>/boards/`，viewer 内可列出 / 切换 boards。`--board` / `--goal` 只用于选择初始 board，不参与 service identity。Home / initial selection resolution must reuse `discover.ts` (`resolveHome`, `boardsDir`, `resolveBoard`) instead of creating a second selector.
+所有命令复用 ccm 全局 flags / context：`--home`、`--board`、`--goal`、`--session-id`、`--json`、`--no-input`。`--home` 决定 service scope；正常生命周期是一份 home 对应一个可复用 service，service 启动后扫描 `<home>/boards/`，viewer 内可列出 / 切换 boards。`--board` / `--goal` 只用于选择初始 board，不参与 service identity。Home / initial selection resolution must reuse `discover.ts` (`resolveHome`, `boardsDir`, `resolveBoard`) instead of creating a second selector.
 
 | Command | Human output | JSON output |
 |---|---|---|
 | `ccm web-viewer start [--board <path>\|--goal <substr>] [--home <dir>] [--host 127.0.0.1] [--port 0] [--reuse] [--no-open]` | 打印 home-scoped service URL 与初始 selection 摘要；已有同 home 健康实例则按 `--reuse` 复用。 | `{ok, service, reused, open_url?}` |
 | `ccm web-viewer open [<id>] [--board <path>\|--goal <substr>] [--home <dir>] [--no-start]` | 打开 / 聚焦 home-scoped service URL；默认可无实例时 start-then-open，`--no-start` 只打开既有实例；`--board` / `--goal` 只设置初始 selection URL/query/state。 | `{ok, service, opened, open_url?}` |
 | `ccm web-viewer status [<id>] [--home <dir>]` | 显示 running / stale / stopped、pid、redacted URL、home、current selection。 | `{ok, running, service}` |
-| `ccm web-viewer list [--home <dir>]` | 表格列所有 state：id / status / pid / home / current selection / URL。 | `{ok, services}` |
 | `ccm web-viewer stop [<id>] [--home <dir>] [--all] [--yes]` | 停掉 home-scoped 服务或清 stale state。 | `{ok, stopped, service}` |
 | `ccm web-viewer restart [<id>] [--board <path>\|--goal <substr>] [--home <dir>]` | 停旧启新，打印新 URL；`--board` / `--goal` 只设置新实例的初始 selection。 | `{ok, previous, service, open_url?}` |
 | `ccm web-viewer serve --state <path>` | internal daemon target；由 `start` spawn，用户不直接调用。 | `{ok}` only for diagnostics if needed |
@@ -43,7 +42,7 @@ ccm web-viewer open
 
 - `--host 127.0.0.1`：v1 只允许 `127.0.0.1`，不接受 `0.0.0.0`。
 - `--port <n>`：仅 `start` / `restart`；默认 `0` 让 OS 分配。固定端口碰撞必须 fail cleanly。
-- `--all`：`list` 默认已列全部；`stop --all` 批量停掉本 home 下所有 viewer。
+- `--all`：`stop --all` 批量停掉 / 清理本 home 下残留 viewer state；正常模型仍是一份 home 一个 service。
 - `--no-open`：`start` 不尝试打开浏览器。
 - `--no-start`：`open` 不自动启动服务，只打开 / 打印同 home 已有健康 service。
 
@@ -582,8 +581,8 @@ Packaging decision:
 
 1. **WV12 — ccm namespace**
    - Add registry/help entries for `web-viewer`; import handler in `router.ts` and add the static `HANDLERS` map entry.
-   - Implement `start/open/status/list/stop/restart`.
-   - Add unit tests for router parsing, `--json` shapes, stale PID cleanup, home discovery plus initial board selection via existing `discover.ts`, concurrent home-scoped start lock/reuse, fixed port collision, status/list token redaction, and restart token renewal.
+   - Implement `start/open/status/stop/restart`.
+   - Add unit tests for router parsing, `--json` shapes, stale PID cleanup, home discovery plus initial board selection via existing `discover.ts`, concurrent home-scoped start lock/reuse, fixed port collision, status token redaction, and restart token renewal.
 
 2. **WV8 — service packaging / hardening**
    - Move or wrap viewer server/assets under ccm ownership.

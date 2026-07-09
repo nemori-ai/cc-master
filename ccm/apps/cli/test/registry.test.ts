@@ -44,7 +44,7 @@ const EXPECTED: Record<string, string[]> = {
   'status-report': ['render', 'write', 'show', 'watch'],
   statusline: ['render', 'install', 'uninstall'],
   harness: ['list', 'current'],
-  'web-viewer': ['start', 'open', 'status', 'list', 'stop', 'restart', 'serve'],
+  'web-viewer': ['start', 'open', 'status', 'stop', 'restart', 'serve'],
   upgrade: ['all', 'ccm', 'plugin'],
 };
 

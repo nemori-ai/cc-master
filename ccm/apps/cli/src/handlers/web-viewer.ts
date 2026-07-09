@@ -700,25 +700,6 @@ export function status(ctx: Ctx): number {
   return EXIT.OK;
 }
 
-export function list(ctx: Ctx): number {
-  const home = canonicalHome(ctx);
-  ensureServiceDirs(servicePaths(home));
-  const services = allStatePaths(home).map((p): ServiceView => {
-    const state = readState(p);
-    return state
-      ? (serviceForOutput(classifyService(state)) as ServiceState)
-      : invalidServiceForOutput(p);
-  });
-  output(
-    ctx,
-    { ok: true, services },
-    services.length
-      ? services.map((s) => humanServiceLine('web-viewer', s)).join('\n')
-      : 'web-viewer: none',
-  );
-  return EXIT.OK;
-}
-
 function defaultShutdown(service: ServiceState, token: string | null): boolean {
   if (!token || !service.base_url) return false;
   const script = `

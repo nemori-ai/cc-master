@@ -150,7 +150,7 @@ The handful of commands you'll actually type. The in-session entrypoint is harne
 
 - **Start / resume** — Claude Code: `/cc-master:as-master-orchestrator <goal>` or `/cc-master:as-master-orchestrator --resume`; Codex: `$cc-master-as-master-orchestrator <goal>` or `$cc-master-as-master-orchestrator --resume`.
 - **Status** — `ccm status-report show`. Generates the shared JSON-backed board status report for CLI and the web viewer.
-- **View** — `ccm web-viewer open`. Opens the live plan as a read-only graph in your browser; lifecycle commands are `ccm web-viewer start/status/list/stop/restart`.
+- **View** — `ccm web-viewer open`. Opens the live plan as a read-only graph in your browser; lifecycle commands are `ccm web-viewer start/open/status/stop/restart`.
 - **Discuss** — Claude Code: `/cc-master:discuss <decision>`; Codex: `$cc-master-discuss <decision>`. Use it when a decision is waiting on you.
 - **Stop** — Claude Code: `/cc-master:stop`; Codex: `$cc-master-stop`. Wraps up and archives the board; you can resume later.
 - **Handoff** — Claude Code: `/cc-master:handoff-to-new-session`; Codex: `$cc-master-handoff-to-new-session`. Use it before moving the run to a fresh session.

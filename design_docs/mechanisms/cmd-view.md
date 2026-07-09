@@ -23,7 +23,7 @@
    ccm web-viewer open --board <board-path>
    ```
 
-4. 告诉用户 lifecycle 由 `ccm web-viewer start/status/list/stop/restart` 管理。
+4. 告诉用户 lifecycle 由 `ccm web-viewer start/open/status/stop/restart` 管理。
 
 ## 输出副作用
 

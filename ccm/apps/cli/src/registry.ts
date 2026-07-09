@@ -982,16 +982,6 @@ export const REGISTRY: Registry = {
       examples: ['ccm web-viewer status', 'ccm web-viewer status --json'],
       handler: 'webviewer.status',
     },
-    list: {
-      summary: '列出当前 home 下的 web viewer service state（token 脱敏，容忍 stale/坏 state）',
-      read: true,
-      positionals: [],
-      options: {
-        json: { type: 'boolean', desc: '结构化输出（不含 raw token）' },
-      },
-      examples: ['ccm web-viewer list', 'ccm web-viewer list --json'],
-      handler: 'webviewer.list',
-    },
     stop: {
       summary: '停止当前 home 的 web viewer service；stale state 会被清理',
       read: false,

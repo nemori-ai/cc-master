@@ -318,7 +318,7 @@ test('start cleans stale state before creating a replacement service', () => {
   assert.equal(JSON.parse(readFileSync(statePath, 'utf8')).pid, 222);
 });
 
-test('status and list redact raw tokens and mark stale services', () => {
+test('status redacts raw tokens and marks stale services', () => {
   const home = mkHome();
   seedBoard(home);
   webViewer.__setWebViewerTestHooks({
@@ -353,14 +353,9 @@ test('status and list redact raw tokens and mark stale services', () => {
   assert.equal(status.code, EXIT.OK);
   assert.ok(!status.stdout.includes('secret-token'), 'status does not leak token');
   assert.equal(json(status.stdout).service.stale, true);
-
-  const list = invoke(['web-viewer', 'list', '--json'], home);
-  assert.equal(list.code, EXIT.OK);
-  assert.ok(!list.stdout.includes('secret-token'), 'list does not leak token');
-  assert.equal(json(list.stdout).services[0].stale, true);
 });
 
-test('status and list tolerate malformed state files as invalid entries', () => {
+test('status tolerates malformed state files as invalid entries', () => {
   const home = mkHome();
   const dir = join(home, 'services', 'web-viewer', 'instances');
   mkdirSync(dir, { recursive: true });
@@ -372,11 +367,6 @@ test('status and list tolerate malformed state files as invalid entries', () => 
   assert.equal(json(status.stdout).running, false);
   assert.equal(json(status.stdout).service.health, 'invalid');
   assert.equal(json(status.stdout).service.state_path, badState);
-
-  const list = invoke(['web-viewer', 'list', '--json'], home);
-  assert.equal(list.code, EXIT.OK);
-  assert.equal(json(list.stdout).services[0].health, 'invalid');
-  assert.equal(json(list.stdout).services[0].error, 'invalid web-viewer state file');
 });
 
 test('open --no-start reports no service, while open degrades to printing URL when opener declines', () => {

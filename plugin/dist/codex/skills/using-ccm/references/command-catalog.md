@@ -74,7 +74,6 @@
   - [web-viewer start](#web-viewer-start)
   - [web-viewer open](#web-viewer-open)
   - [web-viewer status](#web-viewer-status)
-  - [web-viewer list](#web-viewer-list)
   - [web-viewer stop](#web-viewer-stop)
   - [web-viewer restart](#web-viewer-restart)
   - [web-viewer serve](#web-viewer-serve)
@@ -126,7 +125,7 @@ ccm <alias> [args] [flags]
 | `peers` | 多 orchestrator 协调**感知层**：跨板只读花名册（全体活+心跳新鲜 orchestrator 的 goal/workload/priority/liveness） |
 | `usage` | 配额侧**只读 advisory**：当前号/备号 5h/7d 用量 + 单侧走廊 pacing verdict（hold/throttle/switch/stop_5h/stop_7d）+ 任务 token 成本 |
 | `status-report` | 生成式 board 状态报告：`ccm/status-report/v1` JSON / artifact；只读 board，artifact 写 `<home>/reports/status-report/` |
-| `web-viewer` | 本地只读 board web viewer lifecycle：open/start/status/list/stop/restart；home-scoped service，127.0.0.1 + token |
+| `web-viewer` | 本地只读 board web viewer lifecycle：open/start/status/stop/restart；home-scoped service，127.0.0.1 + token |
 | `estimate` | 工作侧**只读 advisory**：双通道 MC 工期预测 / EVM / velocity / 风险（消费 OR/ML 引擎） |
 | `account` | 账号池 namespace 不对 Codex 可用：`ccm account add` / `refresh` / `list` / `switch` 统一走 `NotImplemented`；仅保留 `usage` 对当前账户 5h/7d 的只读 advisory。 |
 | `statusline` | statusline namespace 仅作兼容告知：Codex 无外部命令式 status-line hook；`statusline install/uninstall` 为 `NotImplemented`（当前用量来自 `codex` 侧速率源）。 |
@@ -1334,19 +1333,6 @@ ccm web-viewer status [id] [flags]
 - 行为：显示 running / stale / stopped、pid、home、当前 selection 与脱敏 URL；不暴露 raw token。
 - flags：`--json`
 - 例：`ccm web-viewer status` · `ccm web-viewer status --json`
-
-### web-viewer list
-
-**读**
-
-```
-ccm web-viewer list [flags]
-```
-
-- positional：无
-- 行为：列出当前 home 下 viewer service state；容忍 stale / 坏 state；不暴露 raw token。
-- flags：`--json`
-- 例：`ccm web-viewer list` · `ccm web-viewer list --json`
 
 ### web-viewer stop
 

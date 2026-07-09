@@ -16,4 +16,4 @@ ccm web-viewer open
 ccm web-viewer open --board <board-path>
 ```
 
-服务生命周期统一由 `ccm web-viewer start/status/list/stop/restart` 管理。旧 command 只做迁移提示，不再启动旧脚本。
+服务生命周期统一由 `ccm web-viewer start/open/status/stop/restart` 管理。旧 command 只做迁移提示，不再启动旧脚本。

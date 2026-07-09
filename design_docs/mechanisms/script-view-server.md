@@ -2,7 +2,7 @@
 
 > 迁移指针（2026-07-08）：[ADR-029](../../adrs/ADR-029-ccm-web-viewer-namespace.md) 将正式入口改为 home-scoped `ccm web-viewer` service：`--board` / `--goal` 只设初始 selection，service 扫描 `<home>/boards/` 并在 viewer 内列出 / 切换 boards。本页描述的是旧 plugin script payload；它只可作为短期迁移 / 测试资产，长期 SSOT 应迁到 ccm package。用户文档不应继续指导直接运行本脚本或通过旧 command 启动。
 
-> 类别：legacy runtime sidecar（board DAG web viewer server·NOT a hook·随 skill 分发）。正式 lifecycle 由 `ccm web-viewer start/open/status/list/stop/restart` 管理。
+> 类别：legacy runtime sidecar（board DAG web viewer server·NOT a hook·随 skill 分发）。正式 lifecycle 由 `ccm web-viewer start/open/status/stop/restart` 管理。
 
 ## 触发输入
 

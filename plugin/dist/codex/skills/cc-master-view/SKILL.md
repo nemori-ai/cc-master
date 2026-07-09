@@ -14,4 +14,4 @@ $cc-master-view $ARGUMENTS
 ccm web-viewer open
 ```
 
-如果需要指定初始 board，用 `ccm web-viewer open --board <board-path>`。服务生命周期统一由 `ccm web-viewer start/status/list/stop/restart` 管理；本 skill 只做迁移提示。
+如果需要指定初始 board，用 `ccm web-viewer open --board <board-path>`。服务生命周期统一由 `ccm web-viewer start/open/status/stop/restart` 管理；本 skill 只做迁移提示。
