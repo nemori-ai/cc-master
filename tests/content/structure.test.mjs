@@ -17,7 +17,7 @@ test('plugin.json is valid and well-formed', () => {
   assert.ok(typeof j.description === 'string' && j.description.length > 0);
 });
 
-test('hooks.json registers all 8 hook scripts across 6 events via plugin-root paths', () => {
+test('hooks.json registers all 9 hook scripts across 6 events via plugin-root paths', () => {
   const h = JSON.parse(read(`${CLAUDE_DIST}/hooks/hooks.json`));
   assert.ok(h.hooks.UserPromptSubmit, 'UserPromptSubmit registered');
   assert.ok(h.hooks.Stop, 'Stop registered');
@@ -25,8 +25,14 @@ test('hooks.json registers all 8 hook scripts across 6 events via plugin-root pa
   assert.ok(h.hooks.PostToolBatch, 'PostToolBatch registered');
   assert.ok(h.hooks.PostToolUse, 'PostToolUse registered (board-lint, T9)');
   assert.ok(h.hooks.PreToolUse, 'PreToolUse registered (board-guard, ADR-025)');
-  // Stop carries three hooks: goal-hook (verify-board) + usage-pacing + identity-nudge (IDNUDGE·ADR-020).
-  assert.equal(h.hooks.Stop.length, 3, 'Stop has verify-board, usage-pacing, identity-nudge');
+  // Stop carries verify-board, usage-pacing, coordination-inbox, and identity-nudge in that order.
+  assert.equal(h.hooks.Stop.length, 4, 'Stop has verify-board, usage-pacing, coordination-inbox, identity-nudge');
+  const stopCommands = h.hooks.Stop.map((entry) => entry.hooks[0].command).join('\n');
+  assert.match(
+    stopCommands,
+    /verify-board\.js[\s\S]*usage-pacing\.js[\s\S]*coordination-inbox\.js[\s\S]*identity-nudge\.js/,
+    'Stop order surfaces usage-pacing inbox writes before coordination-inbox reads',
+  );
   // PostToolUse carries the board-lint hook, matcher-scoped to edit tools.
   assert.match(JSON.stringify(h.hooks.PostToolUse), /Write\|Edit\|MultiEdit/, 'PostToolUse matcher scopes to edit tools');
   // PreToolUse carries the board-guard hook (ADR-025), matcher-scoped to edit + Bash tools.
@@ -38,8 +44,8 @@ test('hooks.json registers all 8 hook scripts across 6 events via plugin-root pa
   //   （唯一豁免的 ARM 动作）；usage-pacing.js / identity-nudge.js 本就是 node。
   // ADR-020：identity-nudge.js（IDNUDGE·Stop 周期身份提示·首个写 board 的 hook·经 ccm board set-param 写 runtime.*）。
   // ADR-025：board-guard.js（PreToolUse·deny agent 直接 file-edit board·硬化单一写路径·node/JS·复用 runHook）。
-  //   本断言只验 8 个 hook 都在 hooks.json 里注册。
-  for (const s of ['bootstrap-board.sh', 'verify-board.js', 'reinject.js', 'posttool-batch.js', 'usage-pacing.js', 'board-lint.js', 'identity-nudge.js', 'board-guard.js']) assert.match(all, new RegExp(s.replace(/\./g, '\\.')));
+  //   This assertion only checks that all 9 hooks are registered in hooks.json.
+  for (const s of ['bootstrap-board.sh', 'verify-board.js', 'reinject.js', 'posttool-batch.js', 'usage-pacing.js', 'coordination-inbox.js', 'board-lint.js', 'identity-nudge.js', 'board-guard.js']) assert.match(all, new RegExp(s.replace(/\./g, '\\.')));
   assert.match(all, /CLAUDE_PLUGIN_ROOT/);
 });
 

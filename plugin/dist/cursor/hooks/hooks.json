@@ -27,6 +27,9 @@
         "command": "node \"./hooks/_hosts/cursor/launcher.js\" --event stop --core \"./hooks/usage-pacing/implementations/cursor/usage-pacing-core.js\""
       },
       {
+        "command": "node \"./hooks/_hosts/cursor/launcher.js\" --event stop --core \"./hooks/coordination-inbox/implementations/cursor/coordination-inbox-core.js\""
+      },
+      {
         "command": "node \"./hooks/_hosts/cursor/launcher.js\" --event stop --core \"./hooks/identity-nudge/implementations/cursor/identity-nudge-core.js\""
       }
     ],

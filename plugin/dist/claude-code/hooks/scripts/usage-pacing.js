@@ -370,6 +370,84 @@ function attemptCcmSwitch(boardPath, homeDir, rateCache) {
   return { outcome: 'failed', email };
 }
 
+// ── ADR-032 P3：dual-delivery routing（direct inject vs coordination.inbox）────────────────────────────
+function isoUtcFromMs(ms) {
+  return new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function validFutureIso(value, nowMs) {
+  const t = parseIso(value);
+  return t !== null && t > nowMs;
+}
+
+function expiresFor(data, nowMs) {
+  const nearest = data && typeof data.nearest_reset === 'string' ? data.nearest_reset : '';
+  if (validFutureIso(nearest, nowMs)) return nearest;
+  return isoUtcFromMs(nowMs + 60 * 60 * 1000);
+}
+
+function durableKindFor(kind, strength, switchNote) {
+  if (kind === 'stop_5h' || kind === 'stop_7d') return 'pacing_stop';
+  if (kind === 'throttle' && strength === 'strong') return 'pacing_throttle';
+  if (kind === 'switch' && switchNote) return 'pacing_switch';
+  return null;
+}
+
+function spawnCoordinationNotify(ctx, spec) {
+  if (!ctx.boards || ctx.boards.length !== 1) return false;
+  const boardPath = ctx.boards[0].path;
+  const payload = JSON.stringify(spec.payload || {});
+  let result;
+  try {
+    result = spawnSync(CCM_BIN, [
+      'coordination',
+      'notify',
+      '--kind',
+      spec.kind,
+      '--summary',
+      spec.summary,
+      '--strength',
+      spec.strength,
+      '--payload',
+      payload,
+      '--expires',
+      spec.expires,
+      '--json',
+      '--home',
+      ctx.homeDir,
+      '--board',
+      boardPath,
+    ], {
+      encoding: 'utf8',
+      timeout: 10000,
+      env: Object.assign({}, process.env, { CC_MASTER_HOME: ctx.homeDir }),
+    });
+  } catch (_e) {
+    return false;
+  }
+  return !!result && !result.error && !result.signal && result.status === 0;
+}
+
+function deliverDurablePacing(ctx, data, kind, strength, summary, switchNote, nowMs) {
+  const durableKind = durableKindFor(kind, strength, switchNote);
+  if (!durableKind) return false;
+  // PARITY: rule-usage-pacing-dual-delivery
+  return spawnCoordinationNotify(ctx, {
+    kind: durableKind,
+    summary,
+    strength,
+    expires: expiresFor(data, nowMs),
+    payload: {
+      producer: 'usage-pacing',
+      p3_mode: 'single-board usage advise; P4 replaces this producer with pool-aware arbitrate',
+      verdict: data && typeof data.verdict === 'string' ? data.verdict : kind,
+      route: 'coordination-inbox',
+      switch_note: switchNote || '',
+      advice: data || {},
+    },
+  });
+}
+
 // ── 换号检测 ambient（ADR-024·task 1d）───────────────────────────────────────────────────────────────
 // detectAccountSwitchAmbient(ctx, nowMs, accounts) → ambient 文案（要注入）或 null（无换号 / 已 surface / 是 hook
 //   自己刚切）。读 board.runtime.last_account_switch（✎·由 ccm account switch 写侧落·hook 只读塑模型·红线2 不写窄腰），
@@ -525,6 +603,9 @@ function sampleBody(ctx) {
     '[回合中途采样] 以下是回合中途的提前预警（非轮末 Stop）——便于你在本回合后续派发前就调整配速；' +
     '非阻断提示，不替你决策。';
   const s = strength || pacingStrengthOf(kind);
+  // PostToolBatch has no same-event coordination-inbox reader, so keep the direct early warning while
+  // also writing decision-grade items into the durable inbox for later ack tracking.
+  deliverDurablePacing(ctx, ccmAdvice, kind, s, `${midPrefix} ${warning}`, '', nowMs);
   return {
     additionalContext: advisory('usage-pacing', s, `${midPrefix} ${warning}`),
   };
@@ -608,9 +689,21 @@ function stopBody(ctx) {
       blocks.push(ambient('usage-pacing', switchAmbient));
     } else {
       const strength = switchStrength || verdictStrength || pacingStrengthOf(kind);
-      blocks.push(advisory('usage-pacing', strength, warning + switchNote));
-      // 号池粗粒度事实注入（A2 T6 §F）→ ambient（池/配额事实·塑模型·无 action）。
-      if (pool.switchable >= 1) {
+      const delivered = deliverDurablePacing(
+        ctx,
+        ccmAdvice,
+        kind,
+        strength,
+        warning + switchNote,
+        switchNote,
+        nowMs,
+      );
+      if (!delivered) {
+        blocks.push(advisory('usage-pacing', strength, warning + switchNote));
+      }
+      // 号池粗粒度事实注入（A2 T6 §F）→ ambient（池/配额事实·塑模型·无 action）。当 durable pacing 已写入
+      // inbox 时不再重复直喷同一配速事件；仅在 direct fallback 时附带原有池事实。
+      if (!delivered && pool.switchable >= 1) {
         const poolFact =
           `[号池] 你有 ${pool.backups} 个备号(其中 ${pool.switchable} 个 token 未过期、可切入)——` +
           `配额逼顶时还有「换号」这层容量:切到一份恢复更多的配额。换号机制由 ccm account switch 机械执行` +

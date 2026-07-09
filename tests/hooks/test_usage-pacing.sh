@@ -45,7 +45,26 @@ if [ "\$1" = "account" ] && [ "\$2" = "switch" ]; then
   cat "$swout"
   exit $swexit
 fi
-exit 0
+exit 1
+STUB
+  chmod +x "$stub"
+  echo "$stub"
+}
+mk_ccm_notify_stub() {
+  local dir; dir="$(make_project)"; local stub="$dir/ccm"
+  local advise="$dir/advise.json"; printf '%s' "$1" > "$advise"
+  cat > "$stub" <<STUB
+#!/usr/bin/env bash
+if [ "\$1" = "usage" ] && [ "\$2" = "advise" ]; then
+  printf '{"ok":true,"data":%s}\n' "\$(cat "$advise")"
+  exit 0
+fi
+if [ "\$1" = "coordination" ] && [ "\$2" = "notify" ]; then
+  printf '%s\n' "\$*" > "$dir/notify.args"
+  printf '{"ok":true,"data":{"notification":{"id":"ntf-test"}}}\n'
+  exit 0
+fi
+exit 1
 STUB
   chmod +x "$stub"
   echo "$stub"
@@ -129,6 +148,20 @@ assert_not_contains "$HOOK_OUT" '"decision":"block"' "(A-stop7d) NEVER blocks"
 ADV_THROTTLE_WEAK='{"verdict":"throttle","strength":"weak","reason":"r","levers":["downgrade_model"],"window_5h_pct":91,"window_7d_pct":50,"effective_n":1,"switch_candidate":null,"confidence":"high","source":"account","available":true}'
 run_ccm "$AH" "sess-a" "$ADV_THROTTLE_WEAK"
 assert_contains "$HOOK_OUT" '<advisory source=\"usage-pacing\" strength=\"weak\">' "(A-strength) data.strength=weak overrides kind default → advisory weak (ccm 出 strength)"
+
+# (A-dual) Decision-grade throttle first writes coordination.inbox via ccm coordination notify; when that durable
+#   delivery succeeds, usage-pacing does not also direct-inject the same pacing event. coordination-inbox surfaces
+#   it later in the same Stop sequence because hooks.json registers usage-pacing before coordination-inbox.
+NSTUB="$(mk_ccm_notify_stub "$ADV_THROTTLE")"
+HOOK_OUT="$(printf '{"session_id":"sess-a","hook_event_name":"Stop"}' \
+  | env CC_MASTER_NOW="$NOW" CC_MASTER_HOME="$AH" CC_MASTER_RATE_CACHE="/nonexistent-rate-cache" \
+      CCM_BIN="$NSTUB" \
+    "$HOOK" 2>/dev/null)"; HOOK_RC=$?
+assert_eq 0 "$HOOK_RC" "(A-dual) durable throttle notify succeeds → rc 0"
+assert_eq "" "$HOOK_OUT" "(A-dual) durable throttle delivered to inbox → no duplicate direct injection"
+assert_file "$(dirname "$NSTUB")/notify.args" "(A-dual) ccm coordination notify called"
+assert_contains "$(cat "$(dirname "$NSTUB")/notify.args")" "pacing_throttle" "(A-dual) throttle maps to pacing_throttle"
+rm -rf "$(dirname "$NSTUB")"
 rm -rf "$AH"
 
 # ── (B) CCM-ONLY: absent / available:false / garbage → SILENT (no local fallback·ADR-024) ───────────────
