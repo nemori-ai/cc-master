@@ -65,8 +65,8 @@ own repeat-suppression sidecar under the cc-master home.
   kind: host-convention-divergence
   affected_hosts: [cursor]
   reason: >
-    Cursor Stop advisories use `additional_context`, not Claude Code's `additionalContext` and not
+    Cursor Stop advisories use `followup_message`, not Claude Code's `additionalContext` and not
     Codex `systemMessage`.
-  compensating_mechanism: "Cursor coordination-inbox-core.js emits kind:'system'; launcher maps it to {additional_context}. Read/list/tag/suppression semantics are unchanged."
+  compensating_mechanism: "Cursor coordination-inbox-core.js emits kind:'system'; launcher maps it to {followup_message}. Read/list/tag/suppression semantics are unchanged."
   tracked_by: "n/a — declared launcher-level envelope conversion; ADR-031 Track A"
 ```

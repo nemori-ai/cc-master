@@ -72,14 +72,14 @@ assert_contains "$HOOK_OUT" '"systemMessage"' "codex coordination-inbox -> syste
 assert_contains "$HOOK_OUT" 'source=\"coordination-inbox\"' "codex coordination-inbox -> tagged source"
 rm -rf "$H" "$(dirname "$STUB")"
 
-# Cursor: launcher maps core kind:system to additional_context.
+# Cursor: launcher maps core kind:system to followup_message.
 H="$(make_project)"
 seed_board "$H" "sess-cur"
 STUB="$(mk_ccm_stub "$INBOX_JSON")"
 HOOK_OUT="$(printf '{"conversation_id":"sess-cur","session_id":"sess-cur","hook_event_name":"stop"}' |
   CC_MASTER_HOME="$H" CC_MASTER_NOW="$NOW" CC_MASTER_INBOX_SURFACE_STATE="$H/state.json" CCM_BIN="$STUB" \
     node "$CURSOR_LAUNCHER" --event stop --core "$CURSOR_CORE" 2>/dev/null)"
-assert_contains "$HOOK_OUT" '"additional_context"' "cursor coordination-inbox -> additional_context"
+assert_contains "$HOOK_OUT" '"followup_message"' "cursor coordination-inbox -> followup_message"
 assert_contains "$HOOK_OUT" 'source=\"coordination-inbox\"' "cursor coordination-inbox -> tagged source"
 rm -rf "$H" "$(dirname "$STUB")"
 
