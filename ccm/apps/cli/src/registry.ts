@@ -873,7 +873,7 @@ export const REGISTRY: Registry = {
       handler: 'coordination.notify',
     },
     arbitrate: {
-      summary: '运行 deterministic pool arbiter（P2 为 no-op 骨架；P4 接入池分配）',
+      summary: '运行 deterministic pool arbiter，按同 harness 池计算 pacing 建议并按边沿写入本板 inbox',
       read: false,
       positionals: [],
       options: {

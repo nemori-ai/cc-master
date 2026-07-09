@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **ADR-032 P4 pool-aware arbiter** — deterministic `PoolPressure` + priority-weighted fair-share (`urgent:high:normal:low:trivial = 8:4:2:1:0.5`); `ccm coordination arbitrate` appends complementary own-board inbox rows with edge/dedup; SKILL A/H consumer prose + using-ccm lockstep.
 - **ADR-032 P3 coordination-inbox hook** — read-only durable inbox surface across Claude Code / Codex / Cursor; usage-pacing dual-delivery routes decision-grade verdicts into `coordination.inbox` while keeping routine advisories direct; Stop order `usage-pacing` → `coordination-inbox`.
 
 - **Cursor model-tier mapping（`pacing-and-estimation`）** — Cursor adapter 编码 Composer / Grok 4.5 / Claude（不用 Fable）/ Codex·GPT 四档 + first-party vs API 两池心智；`model-tiers.md` 改为 host slot（Claude 保留原表，Codex 为 credit-ratio stub）。

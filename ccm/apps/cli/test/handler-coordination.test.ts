@@ -41,6 +41,84 @@ function mkBoard({ inbox }: { inbox?: unknown[] } = {}): string {
   return boardPath;
 }
 
+const ISO = (offsetSec: number): string =>
+  new Date(Date.now() + offsetSec * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+function mkCoordinationHome(): {
+  home: string;
+  boardA: string;
+  boardB: string;
+  rateCache: string;
+} {
+  const root = mkTmp('ccm-hcoord-pool-');
+  const home = join(root, '.cc_master');
+  mkdirSync(join(home, 'boards'), { recursive: true });
+  const boardA = join(home, 'boards', '2026-07-09-a.board.json');
+  const boardB = join(home, 'boards', '2026-07-09-b.board.json');
+  const base = {
+    schema: 'cc-master/v2',
+    meta: { template_version: 3 },
+    git: { worktree: '', branch: '' },
+    tasks: [],
+    log: [],
+  };
+  writeFileSync(
+    boardA,
+    `${JSON.stringify(
+      {
+        ...base,
+        goal: 'normal over-burning board',
+        owner: {
+          active: true,
+          session_id: 'sid-a',
+          heartbeat: ISO(-20),
+          harness: 'claude-code',
+        },
+        coordination: {
+          priority: 'normal',
+          state: { current: { active_tasks: 1, burn_contribution: 12 } },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+  writeFileSync(
+    boardB,
+    `${JSON.stringify(
+      {
+        ...base,
+        goal: 'urgent under-served board',
+        owner: {
+          active: true,
+          session_id: 'sid-b',
+          heartbeat: ISO(-20),
+          harness: 'claude-code',
+        },
+        coordination: {
+          priority: 'urgent',
+          state: { current: { active_tasks: 1, burn_contribution: 3 } },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+  const rateCache = join(home, '.cc-master-rate-limits.json');
+  writeFileSync(
+    rateCache,
+    `${JSON.stringify({
+      five_hour: { used_percentage: 85, resets_at: Math.floor(Date.now() / 1000) + 1800 },
+      seven_day: { used_percentage: 30, resets_at: Math.floor(Date.now() / 1000) + 86400 },
+      captured_at: Math.floor(Date.now() / 1000),
+    })}\n`,
+    'utf8',
+  );
+  return { home, boardA, boardB, rateCache };
+}
+
 type TestCtx = Ctx & { outBuf: string[]; errBuf: string[] };
 function mkCtx(
   boardPath: string,
@@ -161,22 +239,102 @@ test('coordination notify supersedes older unconsumed notification of same kind 
   assert.equal((expired[0] as Record<string, unknown>).summary, 'Old yield');
 });
 
-test('coordination arbitrate is a P2 no-op stub over runWrite', () => {
-  const boardPath = mkBoard();
-  const before = readBoard(boardPath);
-  const ctx = mkCtx(boardPath, { flags: { json: true } });
+test('coordination arbitrate appends only own pool-aware inbox notification', () => {
+  const { home, boardA, boardB, rateCache } = mkCoordinationHome();
+  const peerBefore = readBoard(boardB);
+  const ctx = mkCtx(boardA, {
+    values: { home },
+    flags: { json: true },
+  });
+  ctx.sid = 'sid-a';
+  ctx.env = {
+    HOME: home,
+    CC_MASTER_HOME: home,
+    CC_MASTER_RATE_CACHE: rateCache,
+    CC_MASTER_HOST: 'claude-code',
+  };
   assert.equal(coordinationHandler.arbitrate(ctx), EXIT.OK);
   const out = JSON.parse(ctx.outBuf.join(''));
-  assert.equal(out.data.mode, 'p2-stub');
-  assert.equal(out.data.appended, 0);
-  assert.match(out.data.todo, /P4/);
-  const after = readBoard(boardPath);
-  assert.equal(after.coordination, undefined, 'P2 arbitrate does not append inbox entries');
-  const afterOwner = after.owner as Record<string, unknown>;
-  const beforeOwner = before.owner as Record<string, unknown>;
-  assert.notEqual(
-    afterOwner.heartbeat,
-    beforeOwner.heartbeat,
-    'runWrite path still touches heartbeat',
+  assert.equal(out.data.mode, 'pool');
+  assert.equal(out.data.appended, 1);
+  assert.equal(out.data.own_row.kind, 'pacing_yield');
+  assert.equal(out.data.own_row.target_headroom_pct, 3);
+  assert.equal(out.data.allocation.rows.length, 2);
+  assert.ok(
+    out.data.allocation.rows.some(
+      (row: { peer: { board_file: string }; kind: string }) =>
+        row.peer.board_file === '2026-07-09-b.board.json' && row.kind === 'pacing_claim',
+    ),
+    'sibling row complements own yield with claim',
   );
+
+  const after = readBoard(boardA);
+  const inbox = (after.coordination as { inbox: Array<Record<string, unknown>> }).inbox;
+  assert.equal(inbox.length, 1);
+  const item = inbox[0] as Record<string, unknown>;
+  const payload = item.payload as Record<string, unknown>;
+  assert.equal(item.kind, 'pacing_yield');
+  assert.equal(payload.producer, 'coordination-arbiter');
+  assert.equal(
+    (payload.own as Record<string, unknown>).board_file,
+    '2026-07-09-a.board.json',
+  );
+  assert.deepEqual(readBoard(boardB), peerBefore, 'arbitrate must not write peer boards');
+});
+
+test('coordination arbitrate dedups unchanged own notification', () => {
+  const { home, boardA, rateCache } = mkCoordinationHome();
+  const ctx = mkCtx(boardA, {
+    values: { home },
+    flags: { json: true },
+  });
+  ctx.sid = 'sid-a';
+  ctx.env = {
+    HOME: home,
+    CC_MASTER_HOME: home,
+    CC_MASTER_RATE_CACHE: rateCache,
+    CC_MASTER_HOST: 'claude-code',
+  };
+  assert.equal(coordinationHandler.arbitrate(ctx), EXIT.OK);
+  const again = mkCtx(boardA, {
+    values: { home },
+    flags: { json: true },
+  });
+  again.sid = 'sid-a';
+  again.env = ctx.env;
+  assert.equal(coordinationHandler.arbitrate(again), EXIT.OK);
+  const out = JSON.parse(again.outBuf.join(''));
+  assert.equal(out.data.appended, 0);
+  assert.equal(out.data.append_reason, 'dedup');
+  const inbox = ((readBoard(boardA).coordination as Record<string, unknown>).inbox as unknown[]) ?? [];
+  assert.equal(inbox.filter((item) => (item as Record<string, unknown>).status === 'unconsumed').length, 1);
+});
+
+test('coordination arbitrate keeps empty-session peers distinct in the same pool', () => {
+  const { home, boardA, boardB, rateCache } = mkCoordinationHome();
+  for (const boardPath of [boardA, boardB]) {
+    const board = readBoard(boardPath);
+    const owner = board.owner as Record<string, unknown>;
+    owner.session_id = '';
+    writeFileSync(boardPath, `${JSON.stringify(board, null, 2)}\n`, 'utf8');
+  }
+  const ctx = mkCtx(boardA, {
+    values: { home },
+    flags: { json: true },
+  });
+  ctx.sid = '';
+  ctx.env = {
+    HOME: home,
+    CC_MASTER_HOME: home,
+    CC_MASTER_RATE_CACHE: rateCache,
+    CC_MASTER_HOST: 'claude-code',
+  };
+  assert.equal(coordinationHandler.arbitrate(ctx), EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.allocation.peer_count, 2);
+  assert.equal(out.data.allocation.rows.length, 2);
+  const files = out.data.allocation.rows.map(
+    (row: { peer: { board_file: string } }) => row.peer.board_file,
+  );
+  assert.deepEqual(files.sort(), ['2026-07-09-a.board.json', '2026-07-09-b.board.json']);
 });

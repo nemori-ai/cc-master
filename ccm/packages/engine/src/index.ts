@@ -86,6 +86,24 @@ export {
 export { reconcileGating } from './board-reconcile.js';
 // ── coordination/（COORD 多 orchestrator 感知通道 + notification inbox）──
 export type {
+  AllocatePoolOptions,
+  AllocationPeer,
+  ArbiterAppendDecision,
+  PoolAllocation,
+  PoolAllocationKind,
+  PoolAllocationRow,
+  PoolPressure,
+  PoolPressureBand,
+  PoolPressureOptions,
+  QuotaModel,
+} from './coordination/arbiter.js';
+export {
+  allocatePool,
+  POOL_ARBITER_POLICY,
+  poolPressureFromUsage,
+  shouldAppendAllocationNotification,
+} from './coordination/arbiter.js';
+export type {
   InboxPolicy,
   NewNotification,
   Notification,

@@ -128,7 +128,7 @@ ccm <alias> [args] [flags]
 | `baseline` | EVM 计划基线快照（estimate 引擎的 plan SSOT·board 内唯一写 noun） |
 | `policy` | board 级 orchestrator 自主权限开关（首条 `autonomous_account_switch`·写 noun·用户所有） |
 | `peers` | 多 orchestrator 协调**感知层**：跨板只读花名册（全体活+心跳新鲜 orchestrator 的 goal/workload/priority/liveness） |
-| `coordination` | 多 orchestrator 协调**入站通知面**：读/消费 `coordination.inbox`，低层 append 通知，P2 `arbitrate` 骨架 |
+| `coordination` | 多 orchestrator 协调**入站通知面**：读/消费 `coordination.inbox`，低层 append 通知，运行 deterministic pool arbiter |
 | `usage` | 配额侧**只读 advisory**：当前号/备号 5h/7d 用量 + 单侧走廊 pacing verdict（hold/throttle/switch/stop_5h/stop_7d）+ 任务 token 成本 |
 | `status-report` | 生成式 board 状态报告：`ccm/status-report/v1` JSON / artifact；只读 board，artifact 写 `<home>/reports/status-report/` |
 | `web-viewer` | 本地只读 board web viewer lifecycle：open/start/status/stop/restart；home-scoped service，127.0.0.1 + token |
@@ -1101,7 +1101,7 @@ ccm peers [list] [flags]
 
 ## namespace coordination（通知收件箱）
 
-多 orchestrator 协调的**入站通知面**：中介 / producer 把需要 agent 拍板或显式消费的建议写入本板 ✎ `coordination.inbox`，agent 读完并执行后用 `ack` 标记 consumed。写路径全走 `runWrite`：锁 → mutate → `reconcileGating` + `reconcileInbox` → lint → 原子写；过期、同 kind supersede、终态 GC 都在写关卡自动处理。**P2 只提供收件箱机制与 `arbitrate` 骨架，不实现 P4 的 pool-aware 分配公式。**
+多 orchestrator 协调的**入站通知面**：中介 / producer 把需要 agent 拍板或显式消费的建议写入本板 ✎ `coordination.inbox`，agent 读完并执行后用 `ack` 标记 consumed。写路径全走 `runWrite`：锁 → mutate → `reconcileGating` + `reconcileInbox` → lint → 原子写；过期、同 kind supersede、终态 GC 都在写关卡自动处理。`arbitrate` 已接入 deterministic pool arbiter：读取同 harness 池的活+新鲜 peer、把 usage pressure 归一成 PoolPressure，按 priority-weighted fair-share 只把**本板 own row**写入本板 inbox（从不写 peer board）。
 
 通知 `kind` 闭集：`pacing_throttle` / `pacing_yield` / `pacing_claim` / `pacing_switch` / `pacing_stop` / `hitl_turn` / `artifact_serialize`。
 
@@ -1144,7 +1144,7 @@ ccm coordination notify --kind <kind> --summary <str> --expires <iso> [flags]
 |---|---|---|---|
 | `--kind <kind>` | | enum（必填） | 通知类型，取值见本节开头 kind 闭集 |
 | `--summary <str>` | | string（必填） | 人类可读摘要 |
-| `--strength <weak|strong>` | | enum | ADR-018 advisory strength（默认 `strong`） |
+| `--strength <weak|strong>` | | enum | 标签协议里的 advisory strength（默认 `strong`） |
 | `--payload <json>` | | JSON object string | 结构化 payload（默认 `{}`） |
 | `--expires <iso>` | | ISO-8601 UTC（必填） | `expires_at`，过期后写关卡标 `expired` |
 | `--json` | | bool | 结构化输出 |
@@ -1153,19 +1153,19 @@ ccm coordination notify --kind <kind> --summary <str> --expires <iso> [flags]
 
 ### coordination arbitrate
 
-**写**（P2 skeleton）
+**写**（deterministic pool arbiter）
 
 ```
 ccm coordination arbitrate [flags]
 ```
 
 - positional：无
-- 行为：P2 是 deterministic no-op stub：走完整 `runWrite` 写关卡并返回当前 unconsumed 通知，但不 append 新通知、不计算池分配。P4 会把这里替换为 pool-aware allocation（priority-weighted fair-share / yield / claim / switch / stop）。
+- 行为：运行 pool-aware allocation。流程：解析当前 board → 扫 `<home>/boards/` 的活+心跳新鲜 peer → 按 `owner.harness` 分池（只看当前板所在池）→ 读取当前 harness 的 usage signal / quota model / pollable → 归一为 `PoolPressure` → 按 priority-weighted fair-share 算每个 peer 的 row（`pacing_yield` / `pacing_claim` / `pacing_throttle` / `pacing_switch` / `pacing_stop` / `hold`）→ 只把当前 board 的 row 在命中边沿条件时 append 到**本板** `coordination.inbox`。M==1 时退化为 `ccm usage advise` 的单板 verdict 行为。边沿去重：同内容 dedup、不足冷却不刷屏；只有 band 跨越 / roster 变 / 本行目标份额 delta 超阈值 / kind 变化才追加。通知 payload 带 `producer:"coordination-arbiter"`、`dedup_key`、`pressure_band`、`roster_signature`、`target_headroom_pct`、`delta_headroom_pct`、`base_verdict` 和 own peer 摘要。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--json` | | bool | 结构化输出（含 `mode:"p2-stub"` / `appended:0` / `unconsumed` / P4 TODO） |
+| `--json` | | bool | 结构化输出（含 `mode` / `appended` / `append_reason` / `own_row` / `allocation` / `notification` / `unconsumed`） |
 
 - 例：`ccm coordination arbitrate --json`
 
@@ -1972,14 +1972,31 @@ id 不存在时 `data` = `null`，exit 0。
 
 ### coordination arbitrate（`ccm coordination arbitrate --json`）
 
-P2 stub 的 `data`：
+`data` = 本板 own row + 全池 allocation 摘要 + 本次 append 结果：
 
 ```jsonc
 {
-  "mode": "p2-stub",
-  "appended": 0,
-  "unconsumed": [],
-  "todo": "P4 will replace this deterministic no-op with pool-aware allocation."
+  "mode": "pool",                         // "single-board" | "pool"
+  "appended": 1,                           // 本次是否新写 inbox 通知
+  "append_reason": "first",                // first | edge | dedup | cooldown | no-notification
+  "notification": { "id": "ntf-...", "kind": "pacing_yield", "...": "..." },
+  "own_row": {
+    "kind": "pacing_yield",
+    "notification_kind": "pacing_yield",
+    "strength": "weak",
+    "target_headroom_pct": 3,
+    "delta_headroom_pct": -9,
+    "reason": "池压力 warn，本板 burn≈12% 高于加权目标 3%…",
+    "peer": { "board_file": "20260709T120000Z-a.board.json", "priority": "normal", "weight": 2 }
+  },
+  "allocation": {
+    "pressure": { "headroom_pct": 15, "quota_model": "rolling-5h-7d", "band": "warn" },
+    "base_advice": { "verdict": "throttle", "...": "..." },
+    "rows": [ /* own row + sibling rows；只用于解释，不写 sibling board */ ],
+    "roster_signature": "…",
+    "peer_count": 2
+  },
+  "unconsumed": [ /* 当前本板未消费通知 */ ]
 }
 ```
 
