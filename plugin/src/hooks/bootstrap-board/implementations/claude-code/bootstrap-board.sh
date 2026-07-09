@@ -473,8 +473,12 @@ EOF
   rewrite_owner_field "$TARGET" session_id "$sid" > "$tmp" && mv -f "$tmp" "$TARGET"
   rewrite_owner_field "$TARGET" active true > "$tmp" && mv -f "$tmp" "$TARGET"
   rewrite_owner_field "$TARGET" heartbeat "$ts" > "$tmp" && mv -f "$tmp" "$TARGET"
+  harness_note=""
+  if ! CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board stamp-harness --board "$TARGET" --json >/dev/null 2>&1; then
+    harness_note=" <advisory source=\"bootstrap\" strength=\"weak\">ccm board stamp-harness 未能写入 owner.harness；ccm peers 会把该 board 退到 unknown 单例池，可稍后重跑 ccm board stamp-harness --board ${TARGET} 修复。</advisory>"
+  fi
 
-  inject_ctx "cc-master resume: you have TAKEN OVER the existing orchestration board at ${TARGET}. This is a RESUME, not a fresh start — do NOT re-decompose the goal and do NOT reset tasks[]. Invoke the master-orchestrator-guide skill, then RECONCILE the existing tasks[]: rebuild your mental model from their statuses. Treat every in_flight task as an ORPHAN (its handle died with the prior session) — do not wait on it; run it through endpoint verification (resume-verify content-hash + endpoint check): if its artifact exists and passes, mark it done/verified; otherwise demote it to ready/stale and re-dispatch for a fresh handle. This board is your single source of truth; from now on update owner.heartbeat each time you flush it."
+  inject_ctx "cc-master resume: you have TAKEN OVER the existing orchestration board at ${TARGET}. This is a RESUME, not a fresh start — do NOT re-decompose the goal and do NOT reset tasks[]. Invoke the master-orchestrator-guide skill, then RECONCILE the existing tasks[]: rebuild your mental model from their statuses. Treat every in_flight task as an ORPHAN (its handle died with the prior session) — do not wait on it; run it through endpoint verification (resume-verify content-hash + endpoint check): if its artifact exists and passes, mark it done/verified; otherwise demote it to ready/stale and re-dispatch for a fresh handle. This board is your single source of truth; from now on update owner.heartbeat each time you flush it.${harness_note}"
   return 0
 }
 
@@ -646,6 +650,7 @@ if [ "$mode" = "fresh" ] && [ "$marker_hit" -eq 1 ]; then
 fi
 
 if [ "$mode" = "resume" ]; then
+  CCM_CMD="${CCM_BIN:-ccm}"
   # Delegate the whole resume flow (select → live-safety probe → owner re-stamp → inject context).
   # Keep the fresh path below BYTE-UNCHANGED (zero regression, design §1.1).
   resume_main
@@ -750,6 +755,9 @@ sed "s/\"session_id\"[[:space:]]*:[[:space:]]*\"\"/\"session_id\": \"$sid_esc\"/
 flag_notes=""    # 非法值 / 应用失败的 advisory 文案（单行·无换行·下方 per-line sed 量化才安全）
 applied=""       # 成功落板的旋钮摘要（喂 agent「原样保留别覆写」）
 init_pri=""; init_wip=""; init_ownerwip=""; init_pol=""; init_issue=""
+if ! CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board stamp-harness --board "$BOARD" --json >/dev/null 2>&1; then
+  flag_notes="${flag_notes} ccm board stamp-harness 未能写入 owner.harness（peers 将退 unknown 单例池·可手动重跑）；"
+fi
 # 纯 bash token 循环抽 flag 值（enum/int 轻解析）。set -f 关 glob（goal 文本可能含 `*`·别让它扩成文件名）；
 #   `set -- $fresh_args` 按 IFS 词分割成 token（goal 词被下面 *) 分支跳过·只挑 flag）。扫完恢复 +f。
 set -f

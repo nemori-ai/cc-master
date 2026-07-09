@@ -159,6 +159,13 @@ export function lintBoard(text: string): LintResult {
           `影响：resume 探测活 session 新鲜度读它——格式不对则换班判定退化（不致命，建议补全 UTC 时间戳）。`,
       );
     }
+    if (ow.harness !== undefined && !isEnumMember('harness', ow.harness)) {
+      emit(
+        'FMT-HARNESS',
+        `owner.harness 是 ${JSON.stringify(ow.harness)}，应 ∈ {claude-code, codex, cursor, unknown}。` +
+          `影响：ccm peers 按 harness 分配额池；未知值会退化为 unknown 单例池，避免跨 harness 混排。`,
+      );
+    }
   }
   // FMT-GIT
   const git = b.git;
@@ -187,6 +194,7 @@ export function lintBoard(text: string): LintResult {
   lintBaseline(b, emit);
   lintPolicy(b, emit);
   lintCoordination(b, emit);
+  lintInbox(b, emit);
   lintRuntime(b, emit);
 
   // FMT-TASKS（数组）——非数组无从遍历，板级检查已做，提前返回。
@@ -810,6 +818,109 @@ function lintCoordination(board: BoardLike, emit: Emit): void {
         }
       }
     }
+  }
+}
+
+// FMT-INBOX：coordination.inbox 通知收件箱（ADR-032·present 才校验·warn-only）。
+//   inbox 是 ✎ durable advisory 投递面；坏形态不阻断写盘，但会让 check-hook / agent 读取降级。
+//   校验：① coordination 是对象且 inbox 存在时必须是数组；② 每条 id 非空唯一；③ kind/status/strength 闭集；
+//   ④ created_at/expires_at/consumed_at 为严格 ISO；⑤ consumed_at 非空 iff status=consumed；⑥ payload 若存在须对象。
+function lintInbox(board: BoardLike, emit: Emit): void {
+  const co = board.coordination;
+  if (co === undefined || co === null || typeof co !== 'object' || Array.isArray(co)) return;
+  const inbox = (co as Record<string, unknown>).inbox;
+  if (inbox === undefined || inbox === null) return;
+  if (!Array.isArray(inbox)) {
+    emit(
+      'FMT-INBOX',
+      `coordination.inbox 若存在必须是数组（当前：${JSON.stringify(inbox)}）。影响：coordination inbox list / check-hook 无法读取通知，退化为空 inbox。`,
+    );
+    return;
+  }
+  const ids = new Set<string>();
+  const dup = new Set<string>();
+  for (let i = 0; i < inbox.length; i++) {
+    const item = inbox[i];
+    const label =
+      item &&
+      typeof item === 'object' &&
+      !Array.isArray(item) &&
+      typeof (item as Record<string, unknown>).id === 'string'
+        ? String((item as Record<string, unknown>).id)
+        : `coordination.inbox[${i}]`;
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      emit('FMT-INBOX', `${label} 应为对象（当前：${JSON.stringify(item)}）。`);
+      continue;
+    }
+    const n = item as Record<string, unknown>;
+    if (typeof n.id !== 'string' || n.id === '') {
+      emit('FMT-INBOX', `${label}.id 必须是非空字符串。`);
+    } else if (ids.has(n.id)) {
+      dup.add(n.id);
+    } else {
+      ids.add(n.id);
+    }
+    if (!isEnumMember('notificationKind', n.kind)) {
+      emit(
+        'FMT-INBOX',
+        `${label}.kind 是 ${JSON.stringify(n.kind)}，应 ∈ {pacing_throttle, pacing_yield, pacing_claim, pacing_switch, pacing_stop, hitl_turn, artifact_serialize}。`,
+      );
+    }
+    if (!['unconsumed', 'consumed', 'expired'].includes(n.status as string)) {
+      emit(
+        'FMT-INBOX',
+        `${label}.status 是 ${JSON.stringify(n.status)}，应 ∈ {unconsumed, consumed, expired}。`,
+      );
+    }
+    if (!['weak', 'strong'].includes(n.strength as string)) {
+      emit(
+        'FMT-INBOX',
+        `${label}.strength 是 ${JSON.stringify(n.strength)}，应 ∈ {weak, strong}。`,
+      );
+    }
+    if (typeof n.summary !== 'string' || n.summary === '') {
+      emit('FMT-INBOX', `${label}.summary 必须是非空字符串。`);
+    }
+    if (
+      n.payload !== undefined &&
+      (typeof n.payload !== 'object' || n.payload === null || Array.isArray(n.payload))
+    ) {
+      emit(
+        'FMT-INBOX',
+        `${label}.payload 若存在必须是对象（当前：${JSON.stringify(n.payload)}）。`,
+      );
+    }
+    for (const k of ['created_at', 'expires_at']) {
+      if (!isISOUTC(n[k])) {
+        emit(
+          'FMT-INBOX',
+          `${label}.${k} 必须是严格 ISO-8601 UTC（当前：${JSON.stringify(n[k])}）。`,
+        );
+      }
+    }
+    if (n.status === 'consumed') {
+      if (!isISOUTC(n.consumed_at)) {
+        emit(
+          'FMT-INBOX',
+          `${label}.consumed_at 在 status=consumed 时必须是严格 ISO-8601 UTC（当前：${JSON.stringify(n.consumed_at)}）。`,
+        );
+      }
+    } else if (n.consumed_at !== null && n.consumed_at !== undefined) {
+      emit(
+        'FMT-INBOX',
+        `${label}.consumed_at 只有 status=consumed 时可非空（当前 status=${JSON.stringify(n.status)} consumed_at=${JSON.stringify(n.consumed_at)}）。`,
+      );
+    }
+    if (
+      n.consumed_note !== undefined &&
+      n.consumed_note !== null &&
+      typeof n.consumed_note !== 'string'
+    ) {
+      emit('FMT-INBOX', `${label}.consumed_note 若存在必须是字符串或 null。`);
+    }
+  }
+  for (const id of dup) {
+    emit('FMT-INBOX', `coordination.inbox 通知 id "${id}" 重复；id 必须在 inbox 内唯一。`);
   }
 }
 

@@ -84,11 +84,21 @@ export {
 } from './board-model.js';
 // ── board-reconcile（reconcileGating·deps 驱动 ready↔blocked 门控归一·ADR-023）──
 export { reconcileGating } from './board-reconcile.js';
-// ── coordination/（COORD 多 orchestrator 感知通道·跨板只读花名册）──
+// ── coordination/（COORD 多 orchestrator 感知通道 + notification inbox）──
+export type {
+  InboxPolicy,
+  NewNotification,
+  Notification,
+  NotificationKind,
+  NotificationStatus,
+  NotificationStrength,
+} from './coordination/inbox.js';
+export { NotificationInbox, reconcileInbox } from './coordination/inbox.js';
 export type {
   PeerCurrent,
   PeerEntry,
   PeerPlanned,
+  PeerPool,
   PeerRoster,
   RosterOptions,
 } from './coordination/peers.js';

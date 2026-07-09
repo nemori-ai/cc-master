@@ -27,6 +27,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { analyzeGraph, formatReport, isEnumMember, lintBoard } from '@ccm/engine';
 import * as discover from '../discover.js';
+import { detectTrustedHarnessId } from '../harnesses/registry.js';
 import * as io from '../io.js';
 import * as mutations from '../mutations.js';
 import { REGISTRY } from '../registry.js';
@@ -335,6 +336,42 @@ export function setParam(ctx: Ctx): number {
       }
       const prefix = dryRun ? '[dry-run] 将设 runtime' : 'runtime 参数已设';
       return `${prefix}: ${key}=${val}`;
+    },
+  });
+}
+
+// ── 写 verb：stamp-harness（ARM-time owner.harness stamp·ADR-032 P1）───────────────────────────────
+//   The handler derives the trusted harness only from known adapter.detect(env). Transitional fallback
+//   (no env → claude-code) is intentionally ignored, so naked terminal writes cannot relabel a board.
+export function stampHarness(ctx: Ctx): number {
+  const trustedHarnessId = detectTrustedHarnessId(ctx.env);
+  return runWrite(ctx, {
+    resolve: resolveBoardIgnoringGoal,
+    mutate: (board) =>
+      mutations.boardStampHarness(board as BoardArg, { harnessId: trustedHarnessId }),
+    render: (next, c, { dryRun }) => {
+      const owner =
+        next && typeof next === 'object' && (next as { owner?: unknown }).owner
+          ? ((next as { owner?: unknown }).owner as { harness?: unknown })
+          : {};
+      const stamped = !!trustedHarnessId;
+      if (c.flags.json) {
+        return JSON.stringify({
+          ok: true,
+          data: {
+            stamped,
+            trusted_harness: trustedHarnessId,
+            owner: { harness: owner.harness },
+          },
+        });
+      }
+      if (!stamped) {
+        return dryRun
+          ? '[dry-run] 未检测到可信 harness env，owner.harness 将保持不变'
+          : '未检测到可信 harness env，owner.harness 保持不变';
+      }
+      const prefix = dryRun ? '[dry-run] 将 stamp owner.harness' : 'owner.harness 已 stamp';
+      return `${prefix}: ${trustedHarnessId}`;
     },
   });
 }

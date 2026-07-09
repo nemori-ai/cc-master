@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import {
+  detectTrustedHarnessId,
   harnessSessionId,
   inspectKnownHarnesses,
   MachineHarnessRegistry,
@@ -74,6 +75,14 @@ test('CURSOR_AGENT wins over CLAUDE_CODE_SSE_PORT', () => {
 
 test('no explicit harness and no detection keeps transitional Claude-compatible default', () => {
   assert.equal(resolveHarnessId({ env: {} }), 'claude-code');
+});
+
+test('trusted harness detection ignores transitional default and explicit flags', () => {
+  assert.equal(detectTrustedHarnessId({}), null);
+  assert.equal(detectTrustedHarnessId({ CC_MASTER_HARNESS: 'codex' }), null);
+  assert.equal(detectTrustedHarnessId({ CODEX_SESSION_ID: 'cx-sid' }), 'codex');
+  assert.equal(detectTrustedHarnessId({ CURSOR_AGENT: '1' }), 'cursor');
+  assert.equal(detectTrustedHarnessId({ CLAUDE_CODE_SESSION_ID: 'cc-sid' }), 'claude-code');
 });
 
 test('session id comes from selected adapter', () => {

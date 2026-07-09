@@ -58,9 +58,21 @@ export const ENUMS = {
   watchdogMechanism: ['cron', 'loop', 'monitor', 'shell'],
   // accountSwitchPolicy：board.policy.autonomous_account_switch 合法值（闭合枚举）。
   accountSwitchPolicy: ['allow', 'deny'],
+  // harness：owner.harness 观察字段（配额池分区键）。unknown 只作降级池，不参与武装闸。
+  harness: ['claude-code', 'codex', 'cursor', 'unknown'],
   // coordPriority：board.coordination.priority 板级优先级五挡（COORD·跨板协调 hint·非板内任务排序·见 §5.1）。
   //   有序高→低：urgent > high > normal（默认）> low > trivial。
   coordPriority: ['urgent', 'high', 'normal', 'low', 'trivial'],
+  // notificationKind：coordination.inbox[] 的闭合通知类型（ADR-032·池中介 + HITL / artifact Tier2）。
+  notificationKind: [
+    'pacing_throttle',
+    'pacing_yield',
+    'pacing_claim',
+    'pacing_switch',
+    'pacing_stop',
+    'hitl_turn',
+    'artifact_serialize',
+  ],
   // acceptance 目标函数 criterion 的 kind / status（spec §4.1）。
   acceptanceKind: ['test', 'metric', 'manual', 'review'],
   acceptanceStatus: ['pending', 'met', 'failed'],
@@ -140,12 +152,14 @@ export const FIELDS = {
     },
     owner: {
       tier: '🔒',
-      type: 'object{active:bool, session_id:string, heartbeat:ISO}',
+      type: 'object{active:bool, session_id:string, heartbeat:ISO, harness?:claude-code|codex|cursor|unknown}',
       default: '必填',
-      readers: '全 hook 武装闸(active/session_id) + bootstrap resume 探测(heartbeat)',
-      writers: 'bootstrap + 活 session 每回合 flush heartbeat',
-      when: '建板 / 每回合',
-      degrade: 'active·session_id 缺→hard;heartbeat 非 ISO→warn(FMT-TIME)',
+      readers:
+        '全 hook 武装闸(active/session_id) + bootstrap resume 探测(heartbeat) + ccm peers 按 harness 分区(owner.harness)',
+      writers: 'bootstrap + 活 session 每回合 flush heartbeat + ccm board stamp-harness',
+      when: '建板 / 每回合 / ARM 时记录当前 harness',
+      degrade:
+        'active·session_id 缺→hard;heartbeat 非 ISO→warn(FMT-TIME);harness 缺→unknown;非法→warn(FMT-HARNESS)',
     },
     git: {
       tier: '🔒',
@@ -231,12 +245,14 @@ export const FIELDS = {
     },
     coordination: {
       tier: '✎',
-      type: 'object{priority?:enum coordPriority, state?:{current?:{active_tasks?:int, workload?:string, burn_contribution?:number}, planned?:{remaining_work?:string, cost_to_complete_pct?:number}}}?',
+      type: 'object{priority?:enum coordPriority, state?:{current?:{active_tasks?:int, workload?:string, burn_contribution?:number}, planned?:{remaining_work?:string, cost_to_complete_pct?:number}}, inbox?:notification[]}?',
       default: '缺省(无协调 publish·priority 解析为 normal)',
-      readers: 'ccm peers 跨板只读花名册 / SKILL A 多-orch pacing 推理（COORD·hook 不读·非窄腰）',
-      writers: 'agent 经 CLI(决策点 / Stop / wake 时刷)',
-      when: '多 orchestrator 并行抽同一配额缸时 publish 自身状态',
-      degrade: '缺→该 peer 不计入花名册对应维度(退单板·fail-safe)；形状坏→warn(FMT-COORD)',
+      readers:
+        'ccm peers 跨板只读花名册 / ccm coordination inbox list / SKILL A 多-orch pacing 推理（COORD·hook 不读·非窄腰）',
+      writers: 'agent 经 CLI(决策点 / Stop / wake 时刷) / ccm coordination notify|ack|arbitrate',
+      when: '多 orchestrator 并行抽同一配额缸时 publish 自身状态；中介需 durable 投递建议时写 inbox',
+      degrade:
+        '缺→该 peer 不计入花名册对应维度(退单板·fail-safe)且 inbox 为空；形状坏→warn(FMT-COORD/FMT-INBOX)',
     },
     runtime: {
       tier: '✎',
@@ -569,6 +585,13 @@ export const INVARIANTS: Invariant[] = [
     scope: 'board',
     summary: 'git 对象 + worktree/branch 字符串或缺',
   },
+  {
+    id: 'FMT-HARNESS',
+    level: 'warn',
+    family: 'FMT',
+    scope: 'board',
+    summary: 'owner.harness 若存在须 ∈ {claude-code,codex,cursor,unknown}',
+  },
   { id: 'FMT-TASKS', level: 'hard', family: 'FMT', scope: 'board', summary: 'tasks 是数组' },
   {
     id: 'FMT-SCHEDULING',
@@ -896,6 +919,14 @@ export const INVARIANTS: Invariant[] = [
     scope: 'board',
     summary:
       'coordination 非对象、或 priority 不在 coordPriority 枚举、或 state.current/planned 形状/数字字段类型不合法',
+  },
+  {
+    id: 'FMT-INBOX',
+    level: 'warn',
+    family: 'FMT',
+    scope: 'board',
+    summary:
+      'coordination.inbox 若存在须为数组；条目 id 唯一、kind/status/strength 合法、时间字段为 ISO、consumed_at 与 consumed 状态一致',
   },
   {
     id: 'FMT-MODEL',

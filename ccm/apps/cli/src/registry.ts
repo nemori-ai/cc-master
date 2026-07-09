@@ -200,6 +200,17 @@ export const REGISTRY: Registry = {
       ],
       handler: 'board.setParam',
     },
+    'stamp-harness': {
+      summary:
+        'ARM 时从可信 harness env 盖 owner.harness（detect 命中才写；无 env 不覆盖既有值）',
+      read: false,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm board stamp-harness --board <path> --json'],
+      handler: 'board.stampHarness',
+    },
   },
 
   // ════════════════════ task ═════════════════════════════════════════════════════════════════════
@@ -808,6 +819,68 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm peers', 'ccm peers --json', 'ccm peers --freshness-sec 300 --json'],
       handler: 'peers.list',
+    },
+  },
+
+  // ════════════════════ coordination（ADR-032 notification inbox）═══════════════════════════════════
+  coordination: {
+    inbox: {
+      summary: '通知收件箱：coordination inbox list|ack（durable advisory 投递面）',
+      read: false,
+      positionals: [
+        { name: 'list|ack', required: true },
+        { name: 'id...', required: false },
+      ],
+      options: {
+        unconsumed: { type: 'boolean', desc: 'list 时只列 status=unconsumed 的通知' },
+        note: { type: 'string', desc: 'ack 时记录 consumed_note' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm coordination inbox list --unconsumed --json',
+        'ccm coordination inbox ack ntf-20260709T120000Z-a1b2 --note "降档并暂停 fill-work"',
+      ],
+      handler: 'coordination.inbox',
+    },
+    notify: {
+      summary: '低层 append 一条 coordination.inbox 通知（producer / Tier2 用）',
+      read: false,
+      positionals: [],
+      options: {
+        kind: {
+          type: 'string',
+          enum: E.notificationKind,
+          required: true,
+          desc: '通知类型（闭集）',
+        },
+        summary: { type: 'string', required: true, desc: '人类可读摘要' },
+        strength: {
+          type: 'string',
+          enum: ['weak', 'strong'],
+          desc: 'ADR-018 advisory strength（默认 strong）',
+        },
+        payload: { type: 'string', desc: 'JSON object payload（默认 {}）' },
+        expires: {
+          type: 'string',
+          required: true,
+          desc: 'expires_at，严格 ISO-8601 UTC',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm coordination notify --kind pacing_yield --summary "为高优 peer 让路" --strength strong --payload \'{"peer":"A"}\' --expires 2026-07-09T17:00:00Z',
+      ],
+      handler: 'coordination.notify',
+    },
+    arbitrate: {
+      summary: '运行 deterministic pool arbiter（P2 为 no-op 骨架；P4 接入池分配）',
+      read: false,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm coordination arbitrate --json'],
+      handler: 'coordination.arbitrate',
     },
   },
 

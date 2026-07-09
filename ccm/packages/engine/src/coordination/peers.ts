@@ -46,6 +46,7 @@ export interface PeerPlanned {
 export interface PeerEntry {
   board_file: string; // 来源板文件名（溯源·调试）
   goal: string; // 人类可读 goal（从 board.goal 取·喂相对价值推理）
+  harness: string; // owner.harness；缺/坏 → unknown（配额池分区键·不参与武装闸）
   priority: string; // 板级优先级（coordination.priority·缺省解析为 normal）
   session_id: string; // owner.session_id（哪个 session 在跑·"" = 未认领活板）
   heartbeat: string | null; // owner.heartbeat（ISO·新鲜度锚）
@@ -54,9 +55,17 @@ export interface PeerEntry {
   planned: PeerPlanned | null; // coordination.state.planned 投影（缺→null·降级）
 }
 
+export interface PeerPool {
+  pool_id: string; // known harness: harness id; unknown boards: unknown:<board_file>
+  harness: string; // claude-code | codex | cursor | unknown
+  peers: PeerEntry[];
+  count: number;
+}
+
 // 花名册聚合结果。
 export interface PeerRoster {
   peers: PeerEntry[]; // 活+新鲜 peer（按 priority 降序、再按 heartbeat 新→旧稳定排）
+  pools: PeerPool[]; // 按 harness 分区后的竞争池；unknown 每板单例池
   count: number; // = peers.length（M·头部数 active 板·喂 headroom/M 防过冲·设计稿 §8）
   freshness_sec: number; // 本次判活用的心跳窗口（回显·透明）
   as_of: string; // 判活基准时刻（ISO·now）
@@ -110,6 +119,14 @@ function priorityRank(p: string): number {
   return _PRIORITY_RANK[p] ?? _PRIORITY_RANK.normal ?? 2;
 }
 
+function harnessOf(owner: Record<string, unknown>, boardFile: string): { harness: string; poolId: string } {
+  const raw = owner.harness;
+  const harness = isEnumMember('harness', raw) ? (raw as string) : 'unknown';
+  // Missing or bad harness is conservative: never mix it with known pools or other unknown boards.
+  const poolId = harness === 'unknown' ? `unknown:${boardFile}` : harness;
+  return { harness, poolId };
+}
+
 export interface RosterOptions {
   nowMs?: number; // 判活基准（默认 Date.now()）
   freshnessSec?: number; // 心跳判活窗口（默认 PEER_FRESHNESS_SEC=600）
@@ -130,6 +147,7 @@ export function buildPeerRoster(
   const freshnessMs = freshnessSec * 1000;
 
   const peers: PeerEntry[] = [];
+  const poolIds = new Map<PeerEntry, string>();
   for (const { file, board } of boards) {
     if (!board || typeof board !== 'object' || Array.isArray(board)) continue;
     const b = board as Record<string, unknown>;
@@ -161,16 +179,20 @@ export function buildPeerRoster(
       ? (rawPriority as string)
       : 'normal';
 
-    peers.push({
+    const harness = harnessOf(owner, file);
+    const peer: PeerEntry = {
       board_file: file,
       goal: typeof b.goal === 'string' ? b.goal : '',
+      harness: harness.harness,
       priority,
       session_id: typeof owner.session_id === 'string' ? owner.session_id : '',
       heartbeat: hbStr,
       heartbeat_age_sec: Math.round(ageMs / 1000),
       current: projectCurrent(state),
       planned: projectPlanned(state),
-    });
+    };
+    peers.push(peer);
+    poolIds.set(peer, harness.poolId);
   }
 
   // 排序：priority 升秩（urgent 先）→ heartbeat 新→旧（age 小先）→ board_file 字典序（稳定 tiebreak）。
@@ -183,8 +205,28 @@ export function buildPeerRoster(
     return a.board_file.localeCompare(b.board_file);
   });
 
+  const byPool = new Map<string, { harness: string; peers: PeerEntry[] }>();
+  for (const peer of peers) {
+    const poolId = poolIds.get(peer) || `unknown:${peer.board_file}`;
+    let bucket = byPool.get(poolId);
+    if (!bucket) {
+      bucket = { harness: peer.harness, peers: [] };
+      byPool.set(poolId, bucket);
+    }
+    bucket.peers.push(peer);
+  }
+  const pools: PeerPool[] = Array.from(byPool.entries())
+    .map(([pool_id, bucket]) => ({
+      pool_id,
+      harness: bucket.harness,
+      peers: bucket.peers,
+      count: bucket.peers.length,
+    }))
+    .sort((a, b) => a.pool_id.localeCompare(b.pool_id));
+
   return {
     peers,
+    pools,
     count: peers.length,
     freshness_sec: freshnessSec,
     as_of: new Date(nowMs).toISOString().replace(/\.\d{3}Z$/, 'Z'),

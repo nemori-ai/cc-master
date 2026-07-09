@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Cursor model-tier mapping（`pacing-and-estimation`）** — Cursor adapter 编码 Composer / Grok 4.5 / Claude（不用 Fable）/ Codex·GPT 四档 + first-party vs API 两池心智；`model-tiers.md` 改为 host slot（Claude 保留原表，Codex 为 credit-ratio stub）。
 - **异构族系第二视角（`master-orchestrator-guide`）** — `resume-verify` 原则改为「产出族 ≠ 验收族」；高杠杆裁决 / 临界 correctness-critical `done` **强制**；slot `HETEROGENEOUS_REVIEW_MECHANISM`：Claude→Codex、Codex→Claude、Cursor 在已支持模型里换族（不绑死 Codex CLI）。
+- **ADR-032 P1 owner.harness** — stamp `owner.harness` from trusted harness env (`ccm board stamp-harness`), partition `ccm peers` into harness pools, warn-only `FMT-HARNESS`, and bootstrap ARM stamp on Claude Code / Codex / Cursor.
+- **ADR-032 P2 coordination inbox** — add `coordination.inbox` notification aggregate, `reconcileInbox` write-gate reconciliation, warn-only `FMT-INBOX`, and `ccm coordination inbox|notify|arbitrate` CLI skeleton (`arbitrate` is a deterministic no-op until P4).
 
 ## [0.17.3] — 2026-07-09
 

@@ -22,6 +22,7 @@
   - [board update](#board-update)
   - [board archive](#board-archive)
   - [board set-param](#board-set-param)
+  - [board stamp-harness](#board-stamp-harness)
 - [namespace task](#namespace-task)
   - [task add](#task-add)
   - [task show](#task-show)
@@ -59,6 +60,10 @@
   - [policy set](#policy-set)
 - [namespace peers（协调感知·只读跨板）](#namespace-peers协调感知只读跨板)
   - [peers list](#peers-list)
+- [namespace coordination（通知收件箱）](#namespace-coordination通知收件箱)
+  - [coordination inbox](#coordination-inbox)
+  - [coordination notify](#coordination-notify)
+  - [coordination arbitrate](#coordination-arbitrate)
 - [namespace usage（只读 advisory）](#namespace-usage只读-advisory)
   - [usage show](#usage-show)
   - [usage advise](#usage-advise)
@@ -123,6 +128,7 @@ ccm <alias> [args] [flags]
 | `baseline` | EVM 计划基线快照（estimate 引擎的 plan SSOT·board 内唯一写 noun） |
 | `policy` | board 级 orchestrator 自主权限开关（首条 `autonomous_account_switch`·写 noun·用户所有） |
 | `peers` | 多 orchestrator 协调**感知层**：跨板只读花名册（全体活+心跳新鲜 orchestrator 的 goal/workload/priority/liveness） |
+| `coordination` | 多 orchestrator 协调**入站通知面**：读/消费 `coordination.inbox`，低层 append 通知，P2 `arbitrate` 骨架 |
 | `usage` | 配额侧**只读 advisory**：当前号/备号 5h/7d 用量 + 单侧走廊 pacing verdict（hold/throttle/switch/stop_5h/stop_7d）+ 任务 token 成本 |
 | `status-report` | 生成式 board 状态报告：`ccm/status-report/v1` JSON / artifact；只读 board，artifact 写 `<home>/reports/status-report/` |
 | `web-viewer` | 本地只读 board web viewer lifecycle：open/start/status/stop/restart；home-scoped service，127.0.0.1 + token |
@@ -366,6 +372,20 @@ ccm board set-param <key> <value> [flags]
 - flags：`--json`（结构化输出 `{ok,data:{runtime}}`）；`--dry-run` 跑完整校验不落盘。
 - 值类型：`last_identity_remind` / `last_critpath_remind` / `last_account_switch` / `stop_allow_until` 均须严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`），否则 `exit 2`。
 - 例：`ccm board set-param last_identity_remind 2026-06-29T12:34:56Z` · `ccm board set-param last_account_switch 2026-06-30T08:00:00Z --board <path>` · `ccm board set-param stop_allow_until 2026-07-03T15:30:00Z --board <path>`
+
+### board stamp-harness
+
+**写**（ARM-time harness stamp·带锁·可信 detect guard）
+
+```
+ccm board stamp-harness [flags]
+```
+
+- positional：无
+- 行为：从当前进程 env 的已知 harness `detect(env)` 派生可信 harness id，写 `owner.harness`。只在 `claude-code` / `codex` / `cursor` 的真实 env 命中时写；无可信 env 时 no-op，**不**用历史兼容默认（无 env → Claude Code）覆盖既有值。
+- 作用域：只写 `owner.harness`（观察字段，非武装闸）。hook arming 仍只看 `owner.active` + `owner.session_id`。
+- flags：`--json`（结构化输出 `{ok,data:{stamped,trusted_harness,owner:{harness}}}`）；`--dry-run` 跑完整校验不落盘。
+- 例：`ccm board stamp-harness --board <path> --json`
 
 ---
 
@@ -1055,7 +1075,7 @@ ccm policy set --autonomous-account-switch=allow|deny [flags]
 
 多 orchestrator 协调的**感知层**：M 个 orchestrator 并行抽同一活跃配额缸，各自孤立 pacing 会公地悲剧——感知通道让每个 orchestrator 看见全体 peer 的 goal / workload / priority / 死活，喂价值感知的**独立**自我配速（不必双向协商即可单方面合理让路 / 认领 slack；通信通道**不存在**·只读感知 + 机械 fair-share floor 收口）。**纯只读跨板**——扫 `<home>/boards/` 全体板，零写、不抢 board-lock、**不需要 active board 自身**（感知是用户级跨板·同 usage/estimate）。**token-blind**：花名册只投影 goal / priority / workload / state% / liveness——**无任何 secret / token**。
 
-> 数据源 = **只读** `<home>/boards/` 下全部 `*.board.json` 的 `owner`（active / heartbeat / session_id）+ `goal` + ✎ `coordination` 块（priority + state.current/planned）。peers **绝不写任何板**。`coordination` 块由各 orchestrator 自己经 board 写命令 publish（决策点 / Stop / wake 时刷自身状态·写侧形态随 board 写命令面定），peers 只聚合读。
+> 数据源 = **只读** `<home>/boards/` 下全部 `*.board.json` 的 `owner`（active / heartbeat / session_id / harness）+ `goal` + ✎ `coordination` 块（priority + state.current/planned）。peers **绝不写任何板**。`coordination` 块由各 orchestrator 自己经 board 写命令 publish（决策点 / Stop / wake 时刷自身状态·写侧形态随 board 写命令面定），peers 只聚合读。
 
 ### peers list
 
@@ -1066,7 +1086,7 @@ ccm peers [list] [flags]
 ```
 
 - positional：无
-- 行为：扫 `<home>/boards/` 全体 **`owner.active:true` 且心跳新鲜**（`owner.heartbeat` 距 now `< freshness-sec`·默认 600s=10min·与 bootstrap `--resume` live 判活同口径）的板 → 聚成花名册：每 peer 一行 `goal` / `priority`（缺省解析 `normal`）/ `current`（active_tasks/workload/burn_contribution）/ `planned`（remaining_work/cost_to_complete_pct）/ liveness（heartbeat + age）。`count` = M（活+新鲜板数·喂多-orch headroom/M 防过冲）。**fail-safe**：home 不存在 / 无活板 → 空花名册（`count:0`·exit 0·退单板 pacing·不报错）；某 peer `coordination` 缺 / 字段坏 → 该维度降级（`current`/`planned` 为 `null`·`priority` 退 `normal`）·仍计入（活+新鲜即在册）
+- 行为：扫 `<home>/boards/` 全体 **`owner.active:true` 且心跳新鲜**（`owner.heartbeat` 距 now `< freshness-sec`·默认 600s=10min·与 bootstrap `--resume` live 判活同口径）的板 → 聚成花名册：每 peer 一行 `goal` / `harness` / `priority`（缺省解析 `normal`）/ `current`（active_tasks/workload/burn_contribution）/ `planned`（remaining_work/cost_to_complete_pct）/ liveness（heartbeat + age）。`count` = M（活+新鲜板数·喂多-orch headroom/M 防过冲）。同时按 `owner.harness` 生成 `pools[]`：同 harness 才在同一竞争池；缺失或坏值降为 `unknown`，且每块 unknown board 单独成池，避免不明来源互相混排。**fail-safe**：home 不存在 / 无活板 → 空花名册（`count:0`·exit 0·退单板 pacing·不报错）；某 peer `coordination` 缺 / 字段坏 → 该维度降级（`current`/`planned` 为 `null`·`priority` 退 `normal`）·仍计入（活+新鲜即在册）
 - 排序：`priority` 降序（`urgent` 先 → `trivial`）→ 心跳新→旧 → 文件名（稳定 tiebreak）
 - flags：
 
@@ -1076,6 +1096,78 @@ ccm peers [list] [flags]
 | `--json` | | bool | 结构化花名册（否则人类表格） |
 
 - 例：`ccm peers` · `ccm peers --json` · `ccm peers --freshness-sec 300 --json`
+
+---
+
+## namespace coordination（通知收件箱）
+
+多 orchestrator 协调的**入站通知面**：中介 / producer 把需要 agent 拍板或显式消费的建议写入本板 ✎ `coordination.inbox`，agent 读完并执行后用 `ack` 标记 consumed。写路径全走 `runWrite`：锁 → mutate → `reconcileGating` + `reconcileInbox` → lint → 原子写；过期、同 kind supersede、终态 GC 都在写关卡自动处理。**P2 只提供收件箱机制与 `arbitrate` 骨架，不实现 P4 的 pool-aware 分配公式。**
+
+通知 `kind` 闭集：`pacing_throttle` / `pacing_yield` / `pacing_claim` / `pacing_switch` / `pacing_stop` / `hitl_turn` / `artifact_serialize`。
+
+### coordination inbox
+
+**读 / 写**（一个 verb 承载 `list|ack` 子动作）
+
+```
+ccm coordination inbox list [flags]
+ccm coordination inbox ack <id...> [flags]
+```
+
+- positional：`list|ack`（必填）；`ack` 后跟一个或多个通知 id。
+- 行为：
+  - `list`：读取当前板 `coordination.inbox`；缺失 = 空 inbox；`--unconsumed` 只列未消费通知。
+  - `ack`：把给定 id 从 `unconsumed` 标记为 `consumed`，写 `consumed_at`，可选写 `consumed_note`；已 consumed/expired 的 id 幂等 no-op；未知 id → exit 2。
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--unconsumed` | | bool | `list` 时只列 status=unconsumed |
+| `--note <str>` | | string | `ack` 时记录 consumed_note |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm coordination inbox list --unconsumed --json` · `ccm coordination inbox ack ntf-20260709T120000Z-a1b2 --note "已降档并暂停 fill-work"`
+
+### coordination notify
+
+**写**（低层 append）
+
+```
+ccm coordination notify --kind <kind> --summary <str> --expires <iso> [flags]
+```
+
+- positional：无
+- 行为：append 一条 `unconsumed` 通知到当前板 `coordination.inbox`。写关卡随后自动执行：过期通知转 `expired`；同一 kind 只保留最新 unconsumed，旧 unconsumed 标 `expired` 并写 `superseded_by`；终态通知按 TTL / capacity GC。此命令是低层机制面，通常由 producer / Tier2 流程调用；普通 agent 消费通知用 `inbox list|ack`。
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--kind <kind>` | | enum（必填） | 通知类型，取值见本节开头 kind 闭集 |
+| `--summary <str>` | | string（必填） | 人类可读摘要 |
+| `--strength <weak|strong>` | | enum | ADR-018 advisory strength（默认 `strong`） |
+| `--payload <json>` | | JSON object string | 结构化 payload（默认 `{}`） |
+| `--expires <iso>` | | ISO-8601 UTC（必填） | `expires_at`，过期后写关卡标 `expired` |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm coordination notify --kind pacing_yield --summary "为高优 peer 让路" --strength strong --payload '{"peer":"A"}' --expires 2026-07-09T17:00:00Z`
+
+### coordination arbitrate
+
+**写**（P2 skeleton）
+
+```
+ccm coordination arbitrate [flags]
+```
+
+- positional：无
+- 行为：P2 是 deterministic no-op stub：走完整 `runWrite` 写关卡并返回当前 unconsumed 通知，但不 append 新通知、不计算池分配。P4 会把这里替换为 pool-aware allocation（priority-weighted fair-share / yield / claim / switch / stop）。
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--json` | | bool | 结构化输出（含 `mode:"p2-stub"` / `appended:0` / `unconsumed` / P4 TODO） |
+
+- 例：`ccm coordination arbitrate --json`
 
 ---
 
@@ -1531,12 +1623,14 @@ Cursor host 当前没有 Claude Code 那种外部命令式 status-line hook。`c
 ### harness list
 
 ```
-ccm harness list [--json]
+ccm harness list [--json] [--machine-wide]
 ```
 
 - 读所有 ccm 已知 harness 的安装探测结果。Claude Code 通过 `claude` CLI / Claude config dir 探测；Codex 通过 `codex` CLI / `CODEX_HOME` 或默认 config dir 探测。
 - 输出包含：`installed`、`active`、CLI 路径、config 路径、`accountPool` / `externalStatusline` / `pluginDistribution` 能力。
-- flags：`--json`（结构化输出）
+- 加 `--machine-wide` 时输出机器级 registry snapshot：遍历所有已知 adapter（不只当前 selected harness），并为每个 harness 附上 `sessionStoreRoots`、`usageSource`（`kind` / `pollable` / `quotaModel`）和 `accountPoolLocation`；Claude Code 的 account pool 当前指向 `<CC_MASTER_HOME>/accounts.json`，Codex / Cursor 为 `null`。
+- flags：`--json`（结构化输出） · `--machine-wide`（机器级 registry snapshot）
+- 例：`ccm harness list` · `ccm harness list --json` · `ccm harness list --machine-wide --json`
 
 ### harness current
 
@@ -1773,7 +1867,7 @@ id 不存在时 `data` = `null`，exit 0。
 
 ### peers list（`ccm peers --json` / `ccm peers list --json`）
 
-`data` = 花名册：`peers[]`（活+心跳新鲜 orchestrator）+ `count`（=M）+ `freshness_sec`（本次判活窗口）+ `as_of`（判活基准 ISO）：
+`data` = 花名册：`peers[]`（活+心跳新鲜 orchestrator 扁平视图）+ `pools[]`（按 harness 分区后的竞争池）+ `count`（=M）+ `freshness_sec`（本次判活窗口）+ `as_of`（判活基准 ISO）：
 
 ```jsonc
 {
@@ -1781,6 +1875,7 @@ id 不存在时 `data` = `null`，exit 0。
     {
       "board_file": "20260629T120000Z-12345.board.json",
       "goal": "prod incident fix",
+      "harness": "claude-code",              // owner.harness·缺/坏 → "unknown"
       "priority": "urgent",                 // coordination.priority·缺/坏 → "normal"
       "session_id": "s1",                   // owner.session_id（"" = 未认领活板）
       "heartbeat": "2026-06-29T11:59:00Z",
@@ -1791,13 +1886,102 @@ id 不存在时 `data` = `null`，exit 0。
         "remaining_work": "verify+deploy", "cost_to_complete_pct": 4 }
     }
   ],
+  "pools": [
+    {
+      "pool_id": "claude-code",              // known harness 同池；unknown 为 "unknown:<board_file>"
+      "harness": "claude-code",
+      "count": 1,
+      "peers": [ /* 同上 PeerEntry */ ]
+    }
+  ],
   "count": 1,                               // = peers.length（M·喂 headroom/M 防过冲）
   "freshness_sec": 600,                     // 本次判活心跳窗口（--freshness-sec 覆写后回显）
   "as_of": "2026-06-29T12:00:00Z"
 }
 ```
 
-无活+新鲜板 → `peers:[]`、`count:0`（exit 0·fail-safe 退单板）。各 peer 数字字段坏 / 人类可读字段坏 → 该字段 `null`（降级·不污染花名册）。**无任何 secret / token 字段**（token-blind）。
+无活+新鲜板 → `peers:[]`、`pools:[]`、`count:0`（exit 0·fail-safe 退单板）。各 peer 数字字段坏 / 人类可读字段坏 → 该字段 `null`（降级·不污染花名册）。缺失 / 非法 `owner.harness` → `harness:"unknown"` 且进入 `unknown:<board_file>` 单例池。**无任何 secret / token 字段**（token-blind）。
+
+### coordination inbox list（`ccm coordination inbox list --json`）
+
+`data` = `{ inbox, count }`；`--unconsumed` 后 `inbox` 只含未消费通知：
+
+```jsonc
+{
+  "inbox": [
+    {
+      "id": "ntf-20260709T120000Z-a1b2",
+      "kind": "pacing_yield",
+      "status": "unconsumed",
+      "created_at": "2026-07-09T12:00:00Z",
+      "expires_at": "2026-07-09T17:00:00Z",
+      "strength": "strong",
+      "summary": "为高优 peer 让路",
+      "payload": { "peer": "A" },
+      "consumed_at": null,
+      "consumed_note": null
+    }
+  ],
+  "count": 1
+}
+```
+
+### coordination inbox ack（`ccm coordination inbox ack <id...> --json`）
+
+`data` = `{ acked }`，只回显本次 id 对应的通知对象；未知 id → exit 2：
+
+```jsonc
+{
+  "acked": [
+    {
+      "id": "ntf-20260709T120000Z-a1b2",
+      "kind": "pacing_yield",
+      "status": "consumed",
+      "created_at": "2026-07-09T12:00:00Z",
+      "expires_at": "2026-07-09T17:00:00Z",
+      "strength": "strong",
+      "summary": "为高优 peer 让路",
+      "payload": { "peer": "A" },
+      "consumed_at": "2026-07-09T12:05:00Z",
+      "consumed_note": "已降档并暂停 fill-work"
+    }
+  ]
+}
+```
+
+### coordination notify（`ccm coordination notify --json`）
+
+`data` = `{ notification }`，即 append 后的新通知对象。同 kind 已有旧 `unconsumed` 时，写关卡会把旧条目标 `expired` 并写 `superseded_by`，新条目仍为当前唯一未消费通知。
+
+```jsonc
+{
+  "notification": {
+    "id": "ntf-20260709T120000Z-a1b2",
+    "kind": "pacing_yield",
+    "status": "unconsumed",
+    "created_at": "2026-07-09T12:00:00Z",
+    "expires_at": "2026-07-09T17:00:00Z",
+    "strength": "strong",
+    "summary": "为高优 peer 让路",
+    "payload": { "peer": "A" },
+    "consumed_at": null,
+    "consumed_note": null
+  }
+}
+```
+
+### coordination arbitrate（`ccm coordination arbitrate --json`）
+
+P2 stub 的 `data`：
+
+```jsonc
+{
+  "mode": "p2-stub",
+  "appended": 0,
+  "unconsumed": [],
+  "todo": "P4 will replace this deterministic no-op with pool-aware allocation."
+}
+```
 
 ### usage show（`ccm usage show --json`）
 

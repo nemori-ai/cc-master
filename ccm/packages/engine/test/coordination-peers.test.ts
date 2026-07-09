@@ -19,6 +19,7 @@ function mkBoard(
     active = true,
     hbOffsetSec = -60, // 默认 60s 前（新鲜）
     session_id = 'sid-x',
+    harness,
     priority,
     goal = 'g',
     coordination,
@@ -27,6 +28,7 @@ function mkBoard(
     active?: boolean;
     hbOffsetSec?: number;
     session_id?: string;
+    harness?: string;
     priority?: string;
     goal?: string;
     coordination?: unknown;
@@ -35,6 +37,7 @@ function mkBoard(
 ): { file: string; board: unknown } {
   const owner: Record<string, unknown> = { active, session_id };
   if (!noHeartbeat) owner.heartbeat = ISO(hbOffsetSec);
+  if (harness !== undefined) owner.harness = harness;
   const board: Record<string, unknown> = {
     schema: 'cc-master/v2',
     goal,
@@ -60,6 +63,65 @@ test('aggregates active+fresh peers from multiple boards', () => {
   assert.equal(r.peers.length, 2);
   assert.deepEqual(r.peers.map((p: { goal: string }) => p.goal).sort(), ['A', 'B']);
   assert.equal(r.freshness_sec, M.PEER_FRESHNESS_SEC);
+});
+
+test('partitions peer roster by owner.harness', () => {
+  const boards = [
+    mkBoard('claude-a.board.json', { harness: 'claude-code', goal: 'Claude A' }),
+    mkBoard('claude-b.board.json', { harness: 'claude-code', goal: 'Claude B' }),
+    mkBoard('cursor-a.board.json', { harness: 'cursor', goal: 'Cursor A' }),
+    mkBoard('codex-a.board.json', { harness: 'codex', goal: 'Codex A' }),
+  ];
+  const r = M.buildPeerRoster(boards, opts);
+  assert.equal(r.count, 4);
+  assert.deepEqual(
+    r.pools.map((p: { pool_id: string; count: number }) => [p.pool_id, p.count]),
+    [
+      ['claude-code', 2],
+      ['codex', 1],
+      ['cursor', 1],
+    ],
+  );
+  const claudePool = r.pools.find((p: { pool_id: string }) => p.pool_id === 'claude-code');
+  assert.deepEqual(
+    claudePool.peers.map((p: { harness: string; goal: string }) => [p.harness, p.goal]).sort(),
+    [
+      ['claude-code', 'Claude A'],
+      ['claude-code', 'Claude B'],
+    ],
+  );
+});
+
+test('missing or invalid owner.harness is isolated into unknown singleton pools', () => {
+  const boards = [
+    mkBoard('missing-a.board.json', { goal: 'missing A' }),
+    mkBoard('missing-b.board.json', { goal: 'missing B' }),
+    mkBoard('bad-a.board.json', { harness: 'future-harness', goal: 'bad A' }),
+    mkBoard('claude-a.board.json', { harness: 'claude-code', goal: 'Claude A' }),
+  ];
+  const r = M.buildPeerRoster(boards, opts);
+  assert.deepEqual(
+    r.pools.map((p: { pool_id: string; harness: string; count: number }) => [
+      p.pool_id,
+      p.harness,
+      p.count,
+    ]),
+    [
+      ['claude-code', 'claude-code', 1],
+      ['unknown:bad-a.board.json', 'unknown', 1],
+      ['unknown:missing-a.board.json', 'unknown', 1],
+      ['unknown:missing-b.board.json', 'unknown', 1],
+    ],
+  );
+  assert.deepEqual(
+    r.peers.map((p: { board_file: string; harness: string }) => [p.board_file, p.harness]).sort(),
+    [
+      ['bad-a.board.json', 'unknown'],
+      ['claude-a.board.json', 'claude-code'],
+      ['missing-a.board.json', 'unknown'],
+      ['missing-b.board.json', 'unknown'],
+    ],
+  );
 });
 
 // ── ② 过滤非活板 ─────────────────────────────────────────────────────────────────────────────────

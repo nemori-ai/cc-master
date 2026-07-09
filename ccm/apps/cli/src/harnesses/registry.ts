@@ -38,6 +38,17 @@ export function resolveHarnessId(selection: HarnessSelection = {}): string {
   return resolveHarnessAdapter(selection).id;
 }
 
+export function detectTrustedHarnessAdapter(env: Env = process.env): HarnessAdapter | null {
+  for (const adapter of KNOWN_ADAPTERS) {
+    if (adapter.detect(env)) return adapter;
+  }
+  return null;
+}
+
+export function detectTrustedHarnessId(env: Env = process.env): string | null {
+  return detectTrustedHarnessAdapter(env)?.id || null;
+}
+
 export function knownHarnessAdapters(): readonly HarnessAdapter[] {
   return KNOWN_ADAPTERS;
 }

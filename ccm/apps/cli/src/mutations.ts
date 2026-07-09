@@ -21,6 +21,7 @@
 
 import {
   estimateHours,
+  isEnumMember,
   isISOUTC,
   isLegalTransition,
   SCHEMA_VERSION,
@@ -188,6 +189,26 @@ export function boardSetParam(board: Board, args?: { key?: string; value?: strin
   const b = clone(board);
   if (!b.runtime || typeof b.runtime !== 'object' || Array.isArray(b.runtime)) b.runtime = {};
   b.runtime[key] = value;
+  return touch(b);
+}
+
+// ── boardStampHarness(board, {harnessId}) → ARM-time owner.harness stamp（ADR-032 P1）。
+//   Confidence guard is HARD: callers pass a harnessId only when a known adapter.detect(env) matched.
+//   No trusted id means no-op (preserve existing trusted values and do not refresh heartbeat).
+export function boardStampHarness(board: Board, args?: { harnessId?: string | null }): Board {
+  const harnessId = args && typeof args.harnessId === 'string' ? args.harnessId : '';
+  if (!harnessId) return clone(board);
+  if (!isEnumMember('harness', harnessId) || harnessId === 'unknown') {
+    throw err(
+      `refused: owner.harness stamp requires a trusted known harness id, got ${JSON.stringify(harnessId)}.`,
+      'Usage',
+    );
+  }
+  const b = clone(board);
+  if (!b.owner || typeof b.owner !== 'object' || Array.isArray(b.owner)) {
+    b.owner = { active: true, session_id: '', heartbeat: '' };
+  }
+  b.owner.harness = harnessId;
   return touch(b);
 }
 
