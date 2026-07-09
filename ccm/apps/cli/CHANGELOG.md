@@ -1,5 +1,21 @@
 # ccm
 
+## 0.17.0
+
+### Minor Changes
+
+- feat: add ccm-native web viewer and generated status reports
+
+  - `ccm web-viewer start/open/status/stop/restart/serve` manages a home-scoped localhost viewer service with PID/state files, token-gated URLs, stale process detection, read-only board/data routes, and no public `list` command.
+  - The viewer service scans the configured home boards directory, supports initial board selection with `--board` / `--goal`, and serves the built `@ccm/web-viewer` React app for board switching, DAG canvas, status-aware node rendering, task inspection, board filters, export/share actions, and live board refresh within two seconds of local board file changes.
+  - `ccm status-report render/write/show/watch` produces stable `ccm/status-report/v1` reports under `<home>/reports/status-report/` and powers the viewer Status module without writing board JSON.
+  - CLI help, registry, router tests, service hardening tests, status-report tests, and large-board performance smoke fixtures now cover the new web-viewer/status-report surface.
+
+### Patch Changes
+
+- Updated dependencies
+  - @ccm/engine@0.17.0
+
 ## 0.16.0
 
 ### Minor Changes

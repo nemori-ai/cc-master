@@ -24,7 +24,13 @@ export const codexAdapter: HarnessAdapter = {
   displayName: 'Codex',
   aliases: ['codex', 'openai-codex'],
   detect(env) {
-    return !!(env.CODEX_HOME || env.CODEX_SESSION_ID || env.CODEX_SANDBOX || env.CODEX_PROJECT_DIR);
+    return !!(
+      env.CODEX_HOME ||
+      env.CODEX_SESSION_ID ||
+      env.CODEX_THREAD_ID ||
+      env.CODEX_SANDBOX ||
+      env.CODEX_PROJECT_DIR
+    );
   },
   inspectInstallation(env) {
     const cli = probeExecutable(env.CCM_CODEX_BIN || env.CODEX_BIN || 'codex', env);
@@ -49,8 +55,13 @@ export const codexAdapter: HarnessAdapter = {
     };
   },
   session(env) {
-    const id = env.CODEX_SESSION_ID || '';
-    return { id, source: id ? 'env:CODEX_SESSION_ID' : 'none' };
+    const id = env.CODEX_SESSION_ID || env.CODEX_THREAD_ID || '';
+    const source = env.CODEX_SESSION_ID
+      ? 'env:CODEX_SESSION_ID'
+      : env.CODEX_THREAD_ID
+        ? 'env:CODEX_THREAD_ID'
+        : 'none';
+    return { id, source };
   },
   readCurrentUsage(env) {
     const signal = readCodexUsageSignal(env)?.signal ?? null;

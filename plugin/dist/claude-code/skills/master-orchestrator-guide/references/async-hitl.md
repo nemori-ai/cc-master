@@ -8,7 +8,7 @@
 
 ## In-flight 追踪 —— `started_at` → p95 → hedge / degrade
 
-每个已派发的节点在 board 上携带 `started_at`（起跑时刻，严格 ISO-8601 UTC；旧板的旧名 `dispatched_at` 仍被 view.html read-fallback 认出——见 `references/board.md`）。把它已耗的时间对照**这一类任务的 p95 时长**来追踪。一旦某个节点超过它那一类的 p95：
+每个已派发的节点在 board 上携带 `started_at`（起跑时刻，严格 ISO-8601 UTC；旧板的旧名 `dispatched_at` 仍被 viewer/read-model fallback 认出——见 `references/board.md`）。把它已耗的时间对照**这一类任务的 p95 时长**来追踪。一旦某个节点超过它那一类的 p95：
 
 - **hedge** —— 为同一任务再派一个备份 agent，谁先完成用谁；或
 - **degrade** —— 让它带着降级的结果通过。

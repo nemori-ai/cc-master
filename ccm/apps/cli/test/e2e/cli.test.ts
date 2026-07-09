@@ -95,12 +95,18 @@ function runCcm(
   { home, sid = SID, input }: { home?: string; sid?: string; input?: string } = {},
 ): RunResult {
   const env: NodeJS.ProcessEnv = { ...process.env };
+  env.CC_MASTER_HARNESS = 'claude-code';
   if (home !== undefined) env.CC_MASTER_HOME = home;
   if (sid !== undefined) env.CLAUDE_CODE_SESSION_ID = sid;
   else delete env.CLAUDE_CODE_SESSION_ID;
   // 防止外部 env 串扰发现层。
   delete env.CC_MASTER_BOARD;
   delete env.CLAUDE_PROJECT_DIR;
+  delete env.CODEX_HOME;
+  delete env.CODEX_SESSION_ID;
+  delete env.CODEX_THREAD_ID;
+  delete env.CODEX_SANDBOX;
+  delete env.CODEX_PROJECT_DIR;
   const r = spawnSync(process.execPath, [BIN, ...args], { encoding: 'utf8', input, env });
   return { status: r.status, stdout: r.stdout || '', stderr: r.stderr || '' };
 }

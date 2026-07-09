@@ -1,7 +1,7 @@
 # ccm 命令面机械参考（command catalog）
 
 > 纯机械参考：命令、positional、flag、例子、`--json` 形状、exit code。状态机转移语义、字段三档纪律、`--set` 用法判断等判断型内容见 SKILL.md，本文不复述。
-> 基准版本：`ccm 0.10.0`。
+> 基准版本：`ccm 0.16.0`。
 
 ## 目录（TOC）
 
@@ -65,6 +65,18 @@
   - [usage task-cost](#usage-task-cost)
   - [usage burn-rate](#usage-burn-rate)
   - [usage runway](#usage-runway)
+- [namespace status-report](#namespace-status-report)
+  - [status-report render](#status-report-render)
+  - [status-report write](#status-report-write)
+  - [status-report show](#status-report-show)
+  - [status-report watch](#status-report-watch)
+- [namespace web-viewer](#namespace-web-viewer)
+  - [web-viewer start](#web-viewer-start)
+  - [web-viewer open](#web-viewer-open)
+  - [web-viewer status](#web-viewer-status)
+  - [web-viewer stop](#web-viewer-stop)
+  - [web-viewer restart](#web-viewer-restart)
+  - [web-viewer serve](#web-viewer-serve)
 - [namespace estimate（只读 advisory）](#namespace-estimate只读-advisory)
   - [estimate show](#estimate-show)
   - [estimate forecast](#estimate-forecast)
@@ -112,6 +124,8 @@ ccm <alias> [args] [flags]
 | `policy` | board 级 orchestrator 自主权限开关（首条 `autonomous_account_switch`·写 noun·用户所有） |
 | `peers` | 多 orchestrator 协调**感知层**：跨板只读花名册（全体活+心跳新鲜 orchestrator 的 goal/workload/priority/liveness） |
 | `usage` | 配额侧**只读 advisory**：当前号/备号 5h/7d 用量 + 单侧走廊 pacing verdict（hold/throttle/switch/stop_5h/stop_7d）+ 任务 token 成本 |
+| `status-report` | 生成式 board 状态报告：`ccm/status-report/v1` JSON / artifact；只读 board，artifact 写 `<home>/reports/status-report/` |
+| `web-viewer` | 本地只读 board web viewer lifecycle：open/start/status/stop/restart；home-scoped service，127.0.0.1 + token |
 | `estimate` | 工作侧**只读 advisory**：双通道 MC 工期预测 / EVM / velocity / 风险（消费 OR/ML 引擎） |
 | `account` | 换号号池机制：备号 OAuth token 录入 / 选号 / 无重启切号（vault token-blind；`switch` 受 board.policy `autonomous_account_switch` 门控）。 |
 | `statusline` | self-contained status line：渲染单行状态行（ctx/5h/7d）+ 装/卸 `settings.json`（非 board 操作；`install`/`uninstall` 写全局 Claude Code hooks）。 |
@@ -1167,6 +1181,199 @@ ccm usage runway [flags]
 | `--json` | | bool | 结构化输出 |
 
 - 例：`ccm usage runway` · `ccm usage runway --json`
+
+---
+
+## namespace status-report
+
+生成式 board 状态报告。`render` 纯 stdout 计算；`write` / `show` / `watch` 只写 derived report artifact 到 `<home>/reports/status-report/boards/<board-file-stem>.status-report.json`，**不写 board JSON**。JSON schema 是 `ccm/status-report/v1`；freshness 由 board hash / topology hash / advisory hash / input hash / TTL 判定。web viewer 的 Status module 也读同一报告路径，不另造 status 模型。
+
+### status-report render
+
+**读**
+
+```
+ccm status-report render [flags]
+```
+
+- positional：无
+- 行为：读取目标 board，计算报告并输出到 stdout；不写 artifact，不抢 board lock，不写 board。
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--as-of <str>` | | ISO-8601 UTC | as-of 时刻（默认 now） |
+| `--max-age <dur>` | | duration | artifact TTL 计算参数（默认 `30s`；支持 `s/m/h/d`） |
+| `--json` | | bool | 输出完整 `ccm/status-report/v1` envelope；否则输出人类摘要 |
+
+- 例：`ccm status-report render --json` · `ccm status-report render --board <path>`
+
+### status-report write
+
+**写 report artifact，不写 board**
+
+```
+ccm status-report write [flags]
+```
+
+- positional：无
+- 行为：复用 fresh artifact；缺失 / 过期 / `--force` 时重新计算并原子写 report artifact。
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--as-of <str>` | | ISO-8601 UTC | as-of 时刻（默认 now） |
+| `--max-age <dur>` | | duration | artifact TTL（默认 `30s`；支持 `s/m/h/d`） |
+| `--json` | | bool | 输出完整 envelope（否则只回显 artifact path） |
+
+- 例：`ccm status-report write` · `ccm status-report write --json`
+
+### status-report show
+
+**读 / 按需写 report artifact，不写 board**
+
+```
+ccm status-report show [flags]
+```
+
+- positional：无
+- 行为：用户入口；fresh artifact 直接读，缺失 / 过期 / `--refresh` 时刷新后显示。
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--refresh` | | bool | 忽略现有 artifact，强制刷新 |
+| `--as-of <str>` | | ISO-8601 UTC | as-of 时刻（默认 now） |
+| `--max-age <dur>` | | duration | artifact TTL（默认 `30s`；支持 `s/m/h/d`） |
+| `--json` | | bool | 输出完整 envelope（否则输出人类摘要） |
+
+- 例：`ccm status-report show` · `ccm status-report show --json --refresh`
+
+### status-report watch
+
+**前台循环写 report artifact，不写 board**
+
+```
+ccm status-report watch [flags]
+```
+
+- positional：无
+- 行为：v1 是前台周期循环；每 tick 调用与 `write` 相同的 artifact 写路径。脚本 / 测试 / 一次性刷新用 `--iterations 1` 做有界 tick；没有 `--iterations` 时持续运行。
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--interval <dur>` | | duration | 刷新间隔（默认 `30s`；支持 `s/m/h/d`） |
+| `--iterations <n>` | | string | 迭代次数；缺省持续运行 |
+| `--as-of <str>` | | ISO-8601 UTC | as-of 时刻（默认 now） |
+| `--max-age <dur>` | | duration | artifact TTL（默认 `30s`；支持 `s/m/h/d`） |
+| `--json` | | bool | 每 tick 输出 artifact metadata JSON |
+
+- 例：`ccm status-report watch --interval 30s` · `ccm status-report watch --iterations 1 --json`
+
+---
+
+## namespace web-viewer
+
+本地只读 board web viewer lifecycle。service scope 是 cc-master home，默认扫描 `<home>/boards/`；`--board` / `--goal` 只设置初始 selection，不创建 per-board service。viewer 只读、绑定 `127.0.0.1`、token-gated；状态文件在 `<home>/services/web-viewer/`，不写 board。
+
+### web-viewer start
+
+**写 service state，不写 board**
+
+```
+ccm web-viewer start [flags]
+```
+
+- positional：无
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--host <str>` | | string | 监听地址（v1 只允许 `127.0.0.1`） |
+| `--port <n>` | | int | 监听端口（默认 `0` = 系统分配；固定端口冲突则失败） |
+| `--reuse` | | bool | 复用同 home 的健康 service（默认行为） |
+| `--no-open` | | bool | 只启动 / 复用，不尝试打开浏览器 |
+| `--board <path>` | | string | 全局 flag：只用于初始 board selection |
+| `--goal <substr>` | | string | 全局 flag：只用于初始 board selection |
+| `--json` | | bool | 结构化输出（含一次性 `open_url`） |
+
+- 例：`ccm web-viewer start` · `ccm web-viewer start --goal "Ship" --json`
+
+### web-viewer open
+
+**写 service state，不写 board**
+
+```
+ccm web-viewer open [id] [flags]
+```
+
+- positional：`[id]`（可选 service id）
+- 行为：打开当前 home 的 viewer；默认无健康 service 时 start-then-open，CI / 无 GUI 时打印 URL。
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--no-start` | | bool | 只打开已有健康 service；不存在则不启动 |
+| `--board <path>` | | string | 全局 flag：只用于初始 board selection |
+| `--goal <substr>` | | string | 全局 flag：只用于初始 board selection |
+| `--json` | | bool | 结构化输出（含一次性 `open_url`） |
+
+- 例：`ccm web-viewer open` · `ccm web-viewer open --board <path>` · `ccm web-viewer open --no-start --json`
+
+### web-viewer status
+
+**读**
+
+```
+ccm web-viewer status [id] [flags]
+```
+
+- positional：`[id]`（可选 service id）
+- 行为：显示 running / stale / stopped、pid、home、当前 selection 与脱敏 URL；不暴露 raw token。
+- flags：`--json`
+- 例：`ccm web-viewer status` · `ccm web-viewer status --json`
+
+### web-viewer stop
+
+**写 service state，不写 board**
+
+```
+ccm web-viewer stop [id] [flags]
+```
+
+- positional：`[id]`（可选 service id）
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--all` | | bool | 停止 / 清理当前 home 下全部 viewer state |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm web-viewer stop` · `ccm web-viewer stop --all --json`
+
+### web-viewer restart
+
+**写 service state，不写 board**
+
+```
+ccm web-viewer restart [id] [flags]
+```
+
+- positional：`[id]`（可选 service id）
+- 行为：停旧启新，生成新 token；`--board` / `--goal` 只影响新实例初始 selection。
+- flags：`--host <str>`、`--port <n>`、`--board <path>`、`--goal <substr>`、`--json`
+- 例：`ccm web-viewer restart` · `ccm web-viewer restart --board <path> --json`
+
+### web-viewer serve
+
+**内部 daemon target**
+
+```
+ccm web-viewer serve --state <path>
+```
+
+由 `start` 派生调用；用户通常不直接调用。
 
 ---
 

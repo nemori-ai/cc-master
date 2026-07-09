@@ -44,7 +44,17 @@ test('explicit unknown harness uses generic adapter, not Claude fallback', () =>
 
 test('auto-detect recognizes Codex and Claude Code markers', () => {
   assert.equal(resolveHarnessId({ env: { CODEX_SESSION_ID: 'cx-sid' } }), 'codex');
+  assert.equal(resolveHarnessId({ env: { CODEX_THREAD_ID: 'cx-thread' } }), 'codex');
   assert.equal(resolveHarnessId({ env: { CLAUDE_CODE_SESSION_ID: 'cc-sid' } }), 'claude-code');
+});
+
+test('Codex thread marker wins over Claude-compatible fallback and mixed local env', () => {
+  assert.equal(
+    resolveHarnessId({
+      env: { CODEX_THREAD_ID: 'cx-thread', CLAUDE_CODE_SSE_PORT: '32445' },
+    }),
+    'codex',
+  );
 });
 
 test('no explicit harness and no detection keeps transitional Claude-compatible default', () => {
@@ -58,6 +68,12 @@ test('session id comes from selected adapter', () => {
       env: { CODEX_SESSION_ID: 'cx-sid', CLAUDE_CODE_SESSION_ID: 'cc-sid' },
     }),
     'cx-sid',
+  );
+  assert.equal(
+    harnessSessionId({
+      env: { CODEX_THREAD_ID: 'cx-thread', CLAUDE_CODE_SSE_PORT: '32445' },
+    }),
+    'cx-thread',
   );
   assert.equal(harnessSessionId({ harnessFlag: 'future-agent', env: {} }), '');
 });

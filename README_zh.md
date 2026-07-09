@@ -149,8 +149,8 @@ $cc-master-as-master-orchestrator <你的目标>
 你真正会敲的就这几条命令。会话内入口按 harness 不同而不同；`ccm …` 一律在你的**终端**里敲。
 
 - **Start / resume** — Claude Code：`/cc-master:as-master-orchestrator <目标>` 或 `/cc-master:as-master-orchestrator --resume`；Codex：`$cc-master-as-master-orchestrator <目标>` 或 `$cc-master-as-master-orchestrator --resume`。
-- **Status** — Claude Code：`/cc-master:status`；Codex：`$cc-master-status`。
-- **View** — Claude Code：`/cc-master:view`；Codex：`$cc-master-view`。在浏览器里把实时计划打开成只读图。
+- **Status** — `ccm status-report show`。生成 CLI 和 web viewer 共用的 JSON-backed board 状态报告。
+- **View** — `ccm web-viewer open`。在浏览器里把实时计划打开成只读图；生命周期命令是 `ccm web-viewer start/open/status/stop/restart`。
 - **Discuss** — Claude Code：`/cc-master:discuss <决定>`；Codex：`$cc-master-discuss <决定>`。当有决定等你拍板时使用。
 - **Stop** — Claude Code：`/cc-master:stop`；Codex：`$cc-master-stop`。收尾并归档 board，以后可以继续 resume。
 - **Handoff** — Claude Code：`/cc-master:handoff-to-new-session`；Codex：`$cc-master-handoff-to-new-session`。在换新会话前交接。

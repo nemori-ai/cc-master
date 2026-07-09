@@ -1,8 +1,10 @@
 # board-view + DAG webview 设计 spec —— 让编排进度「看得见」
 
+> 2026-07-08 更新：本文保留为初版 `/cc-master:view` 设计闸记录。启动入口与生命周期归属已被 [ADR-029](../adrs/ADR-029-ccm-web-viewer-namespace.md) / [`ccm web-viewer` 设计规格](ccm-web-viewer.md) 取代：目标入口是 home-scoped `ccm web-viewer open`，不是 `/cc-master:view`、`$cc-master-view`、裸脚本或 `ccm view`；`--board` / `--goal` 只设初始 selection，service 扫描 `<home>/boards/` 并在 viewer 内列出 / 切换 boards。Status 文本入口也已被 [ADR-030](../adrs/ADR-030-ccm-status-report-and-viewer-module.md) 迁移为目标态 `ccm status-report show` + viewer Status 模块；本文中的 A1 `/cc-master:status` 方案是历史设计闸记录。本文中的只读、127.0.0.1、零联网、path containment 等 viewer 不变式仍作为后续实现约束保留。
+
 状态：已 brainstorm + 用户在设计闸 approve（2026-06-16）+ 已实现（分支 `feat/board-view-and-dag-webview`）。本文是该 feature 的**设计闸留痕**（design-gate 记录，对齐本仓 `requirement-elicitation` 范式：动手前/动手围着要有一份设计记录）。
 
-源起：cc-master 把一个目标拆成任务 DAG、跨 compaction 存活在一块 board JSON 里推进；但**编排进度对人是不可视的**——用户只能靠 `/cc-master:status` 读一段散文式状态汇报，没有「一眼看清整张依赖图、谁在飞、临界路径在哪、卡在哪个用户闸」的 glanceable 视图。用户要的是**把 orchestration 进度可视化**，并明确分两层都要。
+源起（历史）：cc-master 把一个目标拆成任务 DAG、跨 compaction 存活在一块 board JSON 里推进；但当时**编排进度对人是不可视的**——用户只能靠 `/cc-master:status` 读一段散文式状态汇报，没有「一眼看清整张依赖图、谁在飞、临界路径在哪、卡在哪个用户闸」的 glanceable 视图。用户要的是**把 orchestration 进度可视化**，并明确分两层都要。
 
 参照系：Claude Code 自带的 `/workflow` 进度大纲——分层、活的、glanceable。A1 在精神上对标它（文本侧），A2 把它升格成真正的图（DAG 侧）。
 
@@ -12,7 +14,7 @@
 
 用户在设计闸把范围定为**两层都做**——一轻一重，互补而非二选一：
 
-### A1 —— 轻量 board view（升级 `/cc-master:status` 的输出）
+### A1 —— 轻量 board view（历史：升级 `/cc-master:status` 的输出）
 
 **纯 prose 升级，零新增基建。** 把 `status` 命令体从「一段简洁散文汇报」改写成一份**可一眼扫完、按状态分组**的 board 视图：一行 header（goal 截断 · `done/total` 进度 · `git.branch` · 一条 pacing 备注）、按状态分组的任务区（Blocked-on-user 置顶醒目 → In flight → Blocked-on-task → Ready → Done → 需注意），再接原有的只读健康检查。空组直接略过。落点：`commands/status.md`（diff：`+16 -6`）。
 

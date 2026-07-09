@@ -13,7 +13,7 @@ supported_alternatives:
     reason: "Codex CLI has built-in slash commands such as /status, /usage, /skills, /plugins, and /resume; plugins do not currently add entries to that built-in menu."
   - capability: plugin_skills
     status: supported
-    reason: "Codex plugins distribute skills; command-like non-init workflows run via `$cc-master-status`, `$cc-master-discuss`, etc.; bootstrap is handled separately via prompt-first hook trigger."
+    reason: "Codex plugins distribute skills; command-like non-init workflows run via `$cc-master-discuss`, `$cc-master-stop`, etc.; generated status reports run through `ccm status-report show`."
   - capability: prompt_first_hook
     status: supported
     reason: "UserPromptSubmit hooks can detect a prompt prefix and inject bootstrap context before the agent turn."
@@ -36,5 +36,5 @@ rejected:
 notes:
   - Do not project Claude Code /cc-master:* command bodies to Codex.
   - The Codex init surface is a prompt-first UserPromptSubmit hook path (`$cc-master:...` / `cc-master:...`).
-    Skills are the non-init command surface: users invoke `$cc-master-status`, `$cc-master-stop`, etc.
-  - Non-init command intents should run through `cc-master-*` skills plus ccm CLI / skill-script guidance.
+    Skills are the non-init command surface: users invoke `$cc-master-stop`, `$cc-master-discuss`, etc.; status reports are `ccm status-report show`.
+  - Non-init command intents should run through `cc-master-*` skills plus ccm CLI / skill-script guidance; generated reports should prefer ccm namespaces directly.

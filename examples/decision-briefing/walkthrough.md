@@ -34,16 +34,14 @@ P1 (done)  性能基线（解析/布局 p95）  ────┘         │ deps
 
 ## A. 网页触发（webview 富决策卡 + 复制命令）—— 人验
 
-把 view-server 指向这块 fixture board，在浏览器里看富决策卡：
+用正式 viewer 入口打开这块 fixture board，在浏览器里看富决策卡：
 
 ```bash
 # 从 repo 根跑（examples 是 dev-only，裸相对路径在此正确）
-CC_MASTER_BOARD="$(pwd)/examples/decision-briefing/fixture.board.json" \
-  node skills/master-orchestrator-guide/scripts/view-server.js
-# 它打印一行： cc-master board view: http://127.0.0.1:<port>
+ccm web-viewer open --board <fixture-path>
 ```
 
-打开那个 URL，点开 `D1` 节点的 detail rail，**预期看到**：
+打开 ccm 打印 / 打开的 URL，点开 `D1` 节点的 detail rail，**预期看到**：
 
 - 顶部一枚 **ask-type 徽章** `◈ decision`（`DecisionCard` 按 `ask_type` 渲染 glyph）。
 - **question 头条** + **context_md 自说明叙事**（cc-master 为什么卡在这），不再是 amber 旗标下的 *no justification recorded*。
@@ -51,11 +49,11 @@ CC_MASTER_BOARD="$(pwd)/examples/decision-briefing/fixture.board.json" \
 - **三个 option**，每个有 `label` / `rationale` / `trade`（tradeoffs）。
 - 底部一个 **「复制命令」按钮**（`⧉`）——点它把 `enter_cmd`（`/cc-master:discuss D1 --board <board-stem>`，默认带 board 选择器防窜板）写进剪贴板。**纯客户端 `navigator.clipboard`，零 fetch / 零 POST / 零联网**（webview 是只读的，view-server 对非 GET 回 405）。点完按钮文案闪成「已复制」。
 
-这一步是整个设计的**入口取舍**：拒绝「按钮直接拉起 session」（要 webview 长 POST 端点，撞红线 1/2/5），改用纯客户端剪贴板 + 复制命令——零红线代价，`view-server.js` 这次只新增一条**只读 GET**（见下），不破只读。
+这一步是整个设计的**入口取舍**：拒绝「按钮直接拉起 session」（要 webview 长 POST 端点，撞红线 1/2/5），改用纯客户端剪贴板 + 复制命令——零红线代价；viewer 只新增只读 GET（见下），不破只读。
 
 卡片上还有一块 **「💬 已讨论 N 次」讨论历史区**：任何有 discuss sidecar 的节点（不止 awaiting-user），卡片都拉只读 `/decisions.json`（view-server 新增的只读 GET 路由——扫 board home 全部 `*.decision.md`、解析 frontmatter + 抽 `## TL;DR` 段首行，按 `node_id` 分组返回 `[{node_id,file,resolved_at,ask_type,round,tldr}]`），显示「💬 已讨论 N 次 · 最近结论 TL;DR:「…」· `<resolved_at>`」，可展开看逐次。**纯客户端 fetch（GET，与 `/board.json` 轮询同款），view-server 仍零联网零 POST**；优雅降级（无 sidecar → 不显示该区；路由 404 / 老 server → 静默跳过）。这正面解掉用户痛点：**discuss 完即使 master 还没消化，卡片也立刻能看到「聊过几次 / 最近结论」**——不等 master 那一拍。
 
-> **smoke 对应**：STEP 1 末尾断言 `enter_cmd` 含 `/cc-master:discuss D1`——即用户点「复制命令」会拿到的那条。STEP 4b 起真 `view-server.js`、`node` HTTP GET `/decisions.json`，断言它把（STEP 4 写的）两份 sidecar 扫成 **D1 的 2 条历史**（round 1/2 顺序对、各自 `tldr` 抽取正确、`node_id` 对）——卡片历史区据此渲染。富卡的视觉渲染本身靠这一步人验（webview 在浏览器里）。
+> **smoke 对应**：STEP 1 末尾断言 `enter_cmd` 含 `/cc-master:discuss D1`——即用户点「复制命令」会拿到的那条。STEP 4b 用 legacy viewer payload 做 HTTP 端点回归，断言它把（STEP 4 写的）两份 sidecar 扫成 **D1 的 2 条历史**（round 1/2 顺序对、各自 `tldr` 抽取正确、`node_id` 对）——卡片历史区据此渲染。富卡的视觉渲染本身靠这一步人验（webview 在浏览器里）。正式人工入口仍是 `ccm web-viewer open`。
 
 ---
 
@@ -151,7 +149,7 @@ bash examples/decision-briefing/smoke.sh
 | **网页触发** | STEP 1 | `decision_package` 契约完整 + `enter_cmd` 即复制命令（富卡靠它渲染；窄腰合法性改由带外 `ccm board lint` 校验） |
 | **时效性底座** | STEP 2 / 3 | freshness-check fresh 正例 + stale 反例可区分 |
 | **模拟讨论结束（聊 2 次）** | STEP 4 | discuss 版本化 append-only 写**两份** sidecar、两份并存（计数 == 2）、**不碰 board**（单写者） |
-| **webview 历史区** | STEP 4b | 起真 view-server、GET `/decisions.json` 见 D1 的 2 条（round 顺序对、`tldr` 抽取对、`node_id` 对） |
+| **webview 历史区** | STEP 4b | legacy viewer endpoint 回归：GET `/decisions.json` 见 D1 的 2 条（round 顺序对、`tldr` 抽取对、`node_id` 对）；正式人工入口是 `ccm web-viewer open` |
 | **master 消化最新 round** | STEP 5 | recon 拾取**最新**那份（round 2）→ 解析 → 选定 option 属于 board options（用得上） |
 
 ---

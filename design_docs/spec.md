@@ -47,7 +47,7 @@ cc-master 给 Claude Code agent 提供一套 plugin，**旨在让它能够化身
 
 plugin `cc-master` = **命令 + skills + hooks + board 文件**（外加 ADR-014 解耦出的独立 `ccm` 引擎）。
 
-> **裸计数以现状为准**：本 spec 是 2026-06-05 设计快照，下文 §2/§4/§5/§14 的「2 skills / Commands 3 条 / Hooks 3 个 / 两个 skill」是当时的形态数；**当前实际数（6 命令 / 7 hook / 7 skill / `ccm` 12 namespace·52 handler）以 [`AGENTS.md`](../AGENTS.md) §2 与 [`design_docs/feature-manual.md`](feature-manual.md) 为准**（feature-manual 是功能点 SSOT）。本 spec 不逐版追计数，保留快照性质。
+> **裸计数以现状为准**：本 spec 是 2026-06-05 设计快照，下文 §2/§4/§5/§14 的「2 skills / Commands 3 条 / Hooks 3 个 / 两个 skill」是当时的形态数；**当前实际数与正式入口以 [`AGENTS.md`](../AGENTS.md) §2 与 [`design_docs/feature-manual.md`](feature-manual.md) 为准**（feature-manual 是功能点 SSOT）。本 spec 不逐版追计数，保留快照性质。2026-07-08 补注：旧 `/cc-master:status` 已被 [ADR-030](../adrs/ADR-030-ccm-status-report-and-viewer-module.md) 迁移为目标态 `ccm status-report show`，本文出现的 slash status 属历史快照。
 
 ```
 cc-master/ (plugin)
@@ -86,7 +86,7 @@ cc-master/ (plugin)
         └─ 每回合收尾 flush board
    └─[24h 内反复 compaction]→ SessionStart hook 扫 home，重注角色 + home 路径 + 活跃 board 清单 → agent 凭 goal 认回自己的 board → 无缝续
    └─[Stop hook] 过早收尾 / board 未建 → 校验/兜底
-   └─ /cc-master:status 看进度 · /cc-master:stop 收尾归档（置 owner.active:false）
+   └─ ccm status-report show 看进度 · /cc-master:stop 收尾归档（置 owner.active:false）
 ```
 
 ---
@@ -135,7 +135,7 @@ cc-master/ (plugin)
 | 命令 | 作用 |
 |---|---|
 | `/cc-master:as-master-orchestrator [目标]` | **bootstrap**：开机引导。命令体埋一个稳定 **sentinel**（供 hook grep 检测）+ 指示 agent 把目标分解成依赖 DAG 填进已被 hook 建好的 board，并唤起 Skill A 进入编排循环。 |
-| `/cc-master:status` | 渲染 board 摘要：done/total、阻塞点、critical-path、超 p95 的 in-flight、待用户决策项；兼做一次 board 腰的合法性校验。 |
+| `/cc-master:status` | **历史快照入口**：当时用于渲染 board 摘要。目标态已由 ADR-030 迁到 `ccm status-report show`；slash command 只允许 deprecated shim 或删除。 |
 | `/cc-master:stop` | 把 board 置 `active:false`（归档），收尾。**不靠删文件**（删文件会丢审计）。 |
 
 ---
