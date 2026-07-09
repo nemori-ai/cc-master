@@ -37,11 +37,13 @@ import * as jcHandler from './handlers/jc.js';
 import * as logHandler from './handlers/log.js';
 import * as peersHandler from './handlers/peers.js';
 import * as policyHandler from './handlers/policy.js';
+import * as statusReportHandler from './handlers/status-report.js';
 import * as statuslineHandler from './handlers/statusline.js';
 import * as taskHandler from './handlers/task.js';
 import * as upgradeHandler from './handlers/upgrade.js';
 import * as usageHandler from './handlers/usage.js';
 import * as watchdogHandler from './handlers/watchdog.js';
+import * as webViewerHandler from './handlers/web-viewer.js';
 import { harnessSessionId } from './harnesses/registry.js';
 import * as help from './help.js';
 import * as io from './io.js';
@@ -82,9 +84,11 @@ const HANDLERS: Record<string, HandlerModule> = {
   policy: policyHandler as unknown as HandlerModule,
   peers: peersHandler as unknown as HandlerModule,
   usage: usageHandler as unknown as HandlerModule,
+  webviewer: webViewerHandler as unknown as HandlerModule,
   estimate: estimateHandler as unknown as HandlerModule,
   harness: harnessHandler as unknown as HandlerModule,
   account: accountHandler as unknown as HandlerModule,
+  statusreport: statusReportHandler as unknown as HandlerModule,
   statusline: statuslineHandler as unknown as HandlerModule,
   upgrade: upgradeHandler as unknown as HandlerModule,
 };

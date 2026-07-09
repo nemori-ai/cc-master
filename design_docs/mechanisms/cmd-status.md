@@ -1,9 +1,22 @@
-# 机制契约：`commands/status.md`
+# 机制契约：`commands/status.md`（deprecated）
 
-> 类别：command（只读 board 摘要渲染）。源码：`commands/status.md`。命令体是注入 agent context 的 prompt——指示 agent 渲染一份按状态分组的 board 视图。**纯只读，不改 board。**
+> 状态：**deprecated / historical**。这是旧 `/cc-master:status` prompt-time status 入口的机制记录。目标机制已由 [ADR-030](../adrs/ADR-030-ccm-status-report-and-viewer-module.md) 迁到 `ccm status-report show` + `ccm/status-report/v1` artifact；旧 command 若短期保留，只能作为 deprecated shim 指向 `ccm status-report show`，不再作为正式入口、也不再承载报告渲染逻辑。
+>
+> 类别：legacy command（只读 board 摘要渲染）。源码：`commands/status.md`。命令体是注入 agent context 的 prompt——指示 agent 渲染一份按状态分组的 board 视图。**纯只读，不改 board。**
+
+## 目标替代机制
+
+`ccm status-report` 负责生成静态、可程序化、可缓存的状态报告：
+
+- `render`：纯计算，输出稳定 JSON / human view，不写 artifact。
+- `write`：原子写 `<home>/reports/status-report/` 下的 report artifact。
+- `show`：用户入口，复用 fresh artifact 或按需刷新。
+- `watch`：可选周期刷新；web viewer 不能依赖 watch 才正确。
+
+Web viewer 的每块 board 页面通过 `/status-report.json?board=<file>` 读取同一 `ccm/status-report/v1` schema。下方旧 prompt 渲染流程只作为历史行为说明，供迁移时删除或压成 shim。
 
 ## 触发输入
-- 用户敲 `/cc-master:status`。
+- 历史入口：用户敲 `/cc-master:status`。目标入口是 `ccm status-report show`；Codex/Claude/plugin guidance 不应再把 `/cc-master:status` / `$cc-master-status` 作为正式入口。
 - 读：cc-master home（`$CC_MASTER_HOME`，否则 `<project>/.claude/cc-master/`）下每块 `owner.active:true` 的 `<ts>-<pid>.board.json`；可选一次 `cc-usage.sh` 调用。
 
 ## 业务流

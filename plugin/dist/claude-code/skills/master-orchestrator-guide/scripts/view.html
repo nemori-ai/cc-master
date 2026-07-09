@@ -285,6 +285,29 @@
     .readout.branch .rv { color: var(--ink-dim); max-width: 30ch;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+    .boardselect {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+      min-width: 154px; max-width: 220px;
+    }
+    .boardselect .bl {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .boardselect select {
+      width: 100%; height: 28px; min-width: 0;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--hair-soft);
+      background: var(--inset);
+      color: var(--ink-dim);
+      font: 500 10px/1.2 'Martian Mono', ui-monospace, monospace;
+      letter-spacing: 0;
+      padding: 0 8px;
+    }
+    .boardselect select:focus-visible {
+      outline: 2px solid oklch(0.70 0.115 244 / 0.7); outline-offset: 1px;
+    }
+
     /* slim progress meter sitting under the count */
     .meter {
       width: 96px; height: 3px; border-radius: 2px;
@@ -453,11 +476,138 @@
     .metric.flag .ml { color: var(--alert); }
     .metric.flag .mv { color: var(--alert); }
     .metric.warnwip .mv { color: var(--stale); }
+    .metric.dashboard .dashline {
+      display: flex; flex-wrap: wrap; gap: 5px 7px; align-items: center;
+    }
+    .metric.dashboard .dashpill {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 6px; border-radius: var(--r-sm);
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8.5px; letter-spacing: 0.04em;
+      color: var(--ink-dim); background: var(--chip-bg);
+      border: 1px solid var(--hair-soft);
+      max-width: 100%; min-width: 0;
+    }
+    .metric.dashboard .dashpill .dk {
+      color: var(--ink-faint); text-transform: uppercase; font-size: 7.5px;
+      letter-spacing: 0.12em;
+    }
+    .metric.dashboard .dashpill .dv {
+      color: var(--ink); overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; min-width: 0;
+    }
+    .metric.dashboard .dashpill.ok .dv { color: var(--done); }
+    .metric.dashboard .dashpill.warn .dv { color: var(--stale); }
+    .metric.dashboard .dashpill.bad .dv { color: var(--failed); }
+    .metric.dashboard .chain.compact .seg {
+      font-size: 9px; padding: 1px 4px;
+    }
+    .metric.dashboard .empty {
+      font-size: 11px; color: var(--ink-faint); font-style: italic;
+    }
+    .metric.peers .peerlist {
+      display: flex; flex-direction: column; gap: 7px;
+    }
+    .metric.peers .peerrow {
+      display: flex; flex-direction: column; gap: 5px;
+      padding: 8px 9px;
+      border-radius: var(--r-sm);
+      background: var(--inset);
+      border: 1px solid var(--hair-soft);
+    }
+    .metric.peers .peerrow.current {
+      border-color: oklch(0.70 0.115 244 / 0.42);
+      background: oklch(0.70 0.115 244 / 0.08);
+    }
+    .metric.peers .ptop, .metric.peers .pline {
+      display: flex; align-items: center; gap: 6px; min-width: 0;
+    }
+    .metric.peers .ptop {
+      justify-content: space-between;
+    }
+    .metric.peers .pfile {
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 10px; color: var(--ink); overflow: hidden;
+      white-space: nowrap; text-overflow: ellipsis; min-width: 0;
+    }
+    .metric.peers .pprio {
+      flex: 0 0 auto;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--ready);
+      padding: 1px 6px; border-radius: var(--r-sm);
+      background: oklch(0.70 0.115 244 / 0.10);
+      border: 1px solid oklch(0.70 0.115 244 / 0.28);
+    }
+    .metric.peers .pk {
+      flex: 0 0 auto;
+      font-family: 'Martian Mono', ui-monospace, monospace;
+      font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .metric.peers .pv {
+      flex: 1 1 auto; min-width: 0;
+      font-size: 11px; line-height: 1.35; color: var(--ink-dim);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .metric.peers .pfresh.fresh { color: var(--done); }
+    .metric.peers .pfresh.stale { color: var(--stale); }
 
     /* ---------------------------- CANVAS ---------------------------------- */
     #flow { flex: 1 1 auto; min-width: 0; min-height: 0; position: relative;
       background:
         radial-gradient(120% 80% at 50% -8%, var(--canvas-glow), var(--ground) 60%); }
+
+    .graphnav {
+      position: absolute; z-index: 6; top: 14px; left: 14px;
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px; border-radius: var(--r-md);
+      background: color-mix(in oklch, var(--panel) 86%, transparent);
+      border: 1px solid var(--hair);
+      box-shadow: 0 8px 24px oklch(0.08 0.01 255 / 0.34);
+      backdrop-filter: blur(8px);
+    }
+    .graphnav .searchbox {
+      width: clamp(150px, 19vw, 260px); min-width: 0;
+      height: 28px; padding: 0 9px;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--hair-soft);
+      background: var(--inset);
+      color: var(--ink);
+      font: 500 11px/1.2 'Martian Mono', ui-monospace, monospace;
+      letter-spacing: 0;
+    }
+    .graphnav .searchbox::placeholder { color: var(--ink-faint); }
+    .graphnav .searchbox:focus-visible {
+      outline: 2px solid oklch(0.70 0.115 244 / 0.7); outline-offset: 1px;
+    }
+    .graphnav .navbtn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; padding: 0;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--hair-soft);
+      background: var(--panel);
+      color: var(--ink-dim);
+      cursor: pointer;
+      font: 500 12px/1 'Martian Mono', ui-monospace, monospace;
+      transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+    }
+    .graphnav .navbtn:hover:not(:disabled) {
+      background: var(--panel-hi); color: var(--ink);
+    }
+    .graphnav .navbtn:disabled {
+      opacity: 0.38; cursor: default;
+    }
+    .graphnav .navbtn:focus-visible {
+      outline: 2px solid oklch(0.70 0.115 244 / 0.7); outline-offset: 1px;
+    }
+    .graphnav .hitcount {
+      min-width: 42px;
+      font: 500 9px/1 'Martian Mono', ui-monospace, monospace;
+      color: var(--ink-faint);
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+    }
 
     .react-flow__attribution { display: none; }
 
@@ -511,6 +661,12 @@
         0 0 0 2px oklch(0.70 0.115 244 / 0.30),
         0 1px 2px oklch(0.10 0.01 255 / 0.5),
         0 8px 20px oklch(0.30 0.06 244 / 0.18);
+    }
+    .cc-node.match {
+      box-shadow:
+        0 0 0 2px oklch(0.74 0.135 162 / 0.34),
+        0 1px 2px oklch(0.10 0.01 255 / 0.5),
+        0 10px 26px oklch(0.18 0.05 162 / 0.24);
     }
 
     /* the lamp row: a glowing status lamp + uppercase status readout */
@@ -994,7 +1150,7 @@
       font-size: 10.5px; line-height: 1.5; color: var(--ink-dim);
       background: var(--inset);
       border: 1px solid var(--hair-soft); border-radius: var(--r-sm);
-      padding: 8px 10px; word-break: break-word;
+      padding: 8px 10px; word-break: break-word; white-space: pre-wrap;
     }
 
     .badge-row { display: flex; gap: 7px; flex-wrap: wrap; }
@@ -1951,10 +2107,20 @@
     import dagre from 'dagre';
 
     const h = React.createElement;
-    const ACCESS_TOKEN = new URLSearchParams(window.location.search).get('token') || '';
+    const INITIAL_SEARCH = new URLSearchParams(window.location.search);
+    const ACCESS_TOKEN = INITIAL_SEARCH.get('token') || '';
+    const ACTIVE_BOARD_FILE = INITIAL_SEARCH.get('board') || INITIAL_SEARCH.get('board_file') || '';
     function serverUrl(pathname) {
       const u = new URL(pathname, window.location.href);
       if (ACCESS_TOKEN) u.searchParams.set('token', ACCESS_TOKEN);
+      if (ACTIVE_BOARD_FILE) u.searchParams.set('board', ACTIVE_BOARD_FILE);
+      return u.pathname + u.search;
+    }
+    function boardSwitchUrl(row) {
+      const u = new URL(window.location.href);
+      if (ACCESS_TOKEN) u.searchParams.set('token', ACCESS_TOKEN);
+      const file = row && (row.file || row.board_file);
+      if (file) u.searchParams.set('board', file);
       return u.pathname + u.search;
     }
 
@@ -2200,6 +2366,95 @@
       const s = fmtElapsed(d.ms);
       if (s == null) return null;
       return d.running ? 'running ' + s : s;
+    }
+
+    // ---- view-model normalization -----------------------------------------
+    // The server's /view-model.json is the v2 read-model for this viewer. Keep
+    // graph/list/timeline code board-shaped by normalizing the read-model into a
+    // board-compatible object with a non-schema __viewModel sidecar. /board.json
+    // remains a compatibility fallback only for older servers or transient
+    // view-model failures.
+    function normalizeViewModel(model) {
+      if (!model || typeof model !== 'object' || Array.isArray(model)) return null;
+      const mb = model.board && typeof model.board === 'object' ? model.board : {};
+      const tasks = Array.isArray(model.tasks) ? model.tasks : [];
+      const board = {
+        schema: mb.schema || model.schema || 'cc-master/v2',
+        goal: mb.goal || model.goal || '',
+        owner: mb.owner || null,
+        git: mb.git || null,
+        meta: mb.meta || null,
+        tasks,
+      };
+      for (const key of [
+        'policy', 'watchdog', 'cadence', 'baseline', 'judgment_calls',
+        'judgment', 'log', 'runtime', 'diagnostics', 'wip_limit',
+      ]) {
+        if (mb[key] !== undefined) board[key] = mb[key];
+        else if (model[key] !== undefined) board[key] = model[key];
+      }
+      board.__viewModel = model;
+      board.__source = 'view-model';
+      return board;
+    }
+    async function fetchBoardFallback() {
+      const r = await fetch(serverUrl('/board.json'), { cache: 'no-store' });
+      if (!r.ok) return null;
+      const b = await r.json();
+      if (b && typeof b === 'object') {
+        b.__source = 'board-fallback';
+        b.__viewModel = null;
+      }
+      return b;
+    }
+    async function fetchViewModelBoard() {
+      try {
+        const r = await fetch(serverUrl('/view-model.json'), { cache: 'no-store' });
+        if (r.ok) {
+          const model = await r.json();
+          const b = normalizeViewModel(model);
+          if (b) return b;
+        }
+      } catch (_e) {}
+      return fetchBoardFallback();
+    }
+    async function fetchBoardRoster() {
+      const r = await fetch(serverUrl('/boards.json'), { cache: 'no-store' });
+      if (!r.ok) return { available: false, boards: [], error: 'boards unavailable' };
+      const payload = await r.json();
+      const boards = Array.isArray(payload && payload.boards) ? payload.boards : [];
+      return { ...(payload || {}), boards };
+    }
+    async function fetchPeerRoster() {
+      const r = await fetch(serverUrl('/peers.json'), { cache: 'no-store' });
+      if (!r.ok) return { available: false, peers: [], error: 'peers unavailable' };
+      const payload = await r.json();
+      const peers = Array.isArray(payload && payload.peers) ? payload.peers : [];
+      return { ...(payload || {}), peers };
+    }
+    function viewModelOf(board) {
+      return board && board.__viewModel && typeof board.__viewModel === 'object' ? board.__viewModel : null;
+    }
+    function stableString(v) {
+      if (v == null || v === '') return null;
+      if (typeof v === 'string') return v;
+      if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+      try { return JSON.stringify(v, null, 2); } catch (_e) { return String(v); }
+    }
+    function shortValue(v, max = 44) {
+      const s = stableString(v);
+      if (!s) return null;
+      const flat = s.replace(/\s+/g, ' ').trim();
+      return flat.length > max ? flat.slice(0, max - 1) + '…' : flat;
+    }
+    function countEntries(v) {
+      if (Array.isArray(v)) return v.length;
+      if (v && typeof v === 'object') return Object.keys(v).length;
+      return v == null ? 0 : 1;
+    }
+    function renderObjectBox(value, key) {
+      const s = stableString(value);
+      return s ? h('div', { className: 'artifact-box', key }, s) : null;
     }
 
     // ---- derived analytics (ALL client-side, read-only — never written back) -
@@ -2474,6 +2729,7 @@
       if (data.bottleneck) cls.push('bottleneck');
       if (data.enter) cls.push('enter');
       if (data.lineage) cls.push('lin-' + data.lineage); // self | anc | desc
+      if (data.searchMatch) cls.push('match');
       if (data.isOwner) cls.push('owner');                // D3: container node
       if (data.collapsed) cls.push('collapsed');          // owner currently folded shut
       if (data.childOf) cls.push('child');                // belongs to an owner (has parent)
@@ -2600,24 +2856,26 @@
     // owner tile then shows a child-count + rollup-progress pill and a ▾/▸ caret. With no
     // nesting (legacy / flat boards) `an.owners` is empty and this is a no-op — every node
     // renders exactly as before (graceful degradation, backward compatible).
-    function buildGraph(board, an, sel, prevPositions, firstLayout, collapsed, onToggleCollapse) {
+    function buildGraph(board, an, sel, prevPositions, firstLayout, collapsed, onToggleCollapse, focusIds, searchMatches) {
       const tasks = Array.isArray(board.tasks) ? board.tasks : [];
       const collapsedSet = collapsed instanceof Set ? collapsed : new Set();
+      const focusSet = focusIds instanceof Set && focusIds.size ? focusIds : null;
+      const matchSet = searchMatches instanceof Set ? searchMatches : new Set();
       const owners = an.owners || new Set();
 
       // hidden = children of a COLLAPSED owner (only owners that are actually collapsed AND
       // genuinely own children). reroute(id) maps a hidden child up to its visible owner.
-      const hidden = new Set();
+      const collapseHidden = new Set();
       for (const t of tasks) {
         const par = an.parentOf(t.id);
-        if (par && collapsedSet.has(par) && owners.has(par)) hidden.add(t.id);
+        if (par && collapsedSet.has(par) && owners.has(par)) collapseHidden.add(t.id);
       }
       function reroute(id) {
-        if (!hidden.has(id)) return id;
+        if (!collapseHidden.has(id)) return id;
         const par = an.parentOf(id);
-        return (par && !hidden.has(par)) ? par : id; // owner is depth-1, always visible
+        return (par && !collapseHidden.has(par)) ? par : id; // owner is depth-1, always visible
       }
-      const visibleTasks = tasks.filter(t => !hidden.has(t.id));
+      const visibleTasks = tasks.filter(t => !collapseHidden.has(t.id) && (!focusSet || focusSet.has(t.id)));
       const visibleIds = new Set(visibleTasks.map(t => t.id));
 
       // rerouted edge pairs (deduped, no self/internal loops) — feeds both dagre layout and
@@ -2627,7 +2885,7 @@
       for (const t of tasks) {
         const deps = Array.isArray(t.deps) ? t.deps : [];
         for (const d of deps) {
-          if (!visibleIds.has(d) && !hidden.has(d)) continue; // dangling dep -> skip
+          if (!visibleIds.has(d) && !collapseHidden.has(d)) continue; // dangling dep -> skip
           const s = reroute(d), tg = reroute(t.id);
           if (s === tg || !visibleIds.has(s) || !visibleIds.has(tg)) continue;
           const key = s + '\u0000' + tg;
@@ -2695,6 +2953,7 @@
             // every second; null when absent/unparseable -> clock omitted.
             dispatchedAt: t.status === 'in_flight' ? startTs(t) : null,
             lineage,
+            searchMatch: matchSet.has(t.id),
             // staggered entrance fade — ONLY on the first paint (firstLayout), never on a
             // re-layout (topology change / collapse toggle), or the whole graph re-fades
             // from opacity:0 and high-stagger tiles read as "vanished" (#bug②).
@@ -2770,6 +3029,45 @@
       pedges.sort();
       return ids.join(',') + '|' + edges.join(',') + '|' + pedges.join(',');
     }
+    function topologyRev(board) {
+      const vm = viewModelOf(board);
+      const rev = vm && vm.rev && typeof vm.rev === 'object' ? vm.rev : null;
+      if (rev && typeof rev.topologyHash === 'string' && rev.topologyHash) {
+        return 'vm:' + rev.topologyHash;
+      }
+      return 'local:' + structSig(board);
+    }
+    function searchableText(task) {
+      if (!task || typeof task !== 'object') return '';
+      return [
+        task.id, task.title, task.status, task.type, task.executor,
+        task.blocked_on, task.artifact,
+      ].filter(x => x != null && x !== '').join(' ').toLowerCase();
+    }
+    function deriveSearchMatches(tasks, query) {
+      const q = (query || '').trim().toLowerCase();
+      if (!q) return [];
+      const terms = q.split(/\s+/).filter(Boolean);
+      return (Array.isArray(tasks) ? tasks : [])
+        .filter(t => terms.every(term => searchableText(t).includes(term)))
+        .map(t => t.id);
+    }
+    function deriveFocusIds(an, matchIds) {
+      if (!an || !Array.isArray(matchIds) || matchIds.length === 0) return null;
+      const ids = new Set();
+      for (const id of matchIds) {
+        if (!an.byId.has(id)) continue;
+        ids.add(id);
+        for (const up of an.ancestors(id)) ids.add(up);
+        for (const down of an.descendants(id)) ids.add(down);
+        const par = an.parentOf(id);
+        if (par) ids.add(par);
+        if (an.owners && an.owners.has(id)) {
+          for (const child of an.childrenOf(id)) ids.add(child);
+        }
+      }
+      return ids.size ? ids : null;
+    }
 
     // ---- main component ---------------------------------------------------
     function Board() {
@@ -2778,6 +3076,8 @@
       const [edges, setEdges] = useState([]);
       const [err, setErr] = useState(null);
       const [sel, setSel] = useState(null);  // selected task id (lineage anchor)
+      const [searchQuery, setSearchQuery] = useState('');
+      const [searchIndex, setSearchIndex] = useState(0);
       // collapsed owners (D3 nested-DAG): a Set of owner ids the user has folded shut.
       // Their children are hidden + their cross-group edges reroute to the owner. State,
       // not persisted (a fresh load shows the full graph). selRef-style ref so the stable
@@ -2789,6 +3089,8 @@
       // route (added by a newer view-server). Stays [] on any failure — an older
       // server returns 404 here and the whole history feature silently no-ops.
       const [decisions, setDecisions] = useState([]);
+      const [boardsInfo, setBoardsInfo] = useState({ available: null, boards: [], error: null });
+      const [peersInfo, setPeersInfo] = useState({ available: null, peers: [], error: null });
       // view mode: 'graph' (xyflow DAG) | 'board' (Kanban card board) | 'list'
       // (status-board) | 'timeline' (the time/gantt swimlanes). Persisted in
       // localStorage (key ccm-view); default 'graph'. Migrate gracefully: any
@@ -2812,6 +3114,8 @@
       const posRef = useRef(new Map());
       const boardRef = useRef(null);
       const selRef = useRef(null);
+      const focusIdsRef = useRef(null);
+      const searchMatchesRef = useRef(new Set());
       const rf = useReactFlow();
       const didFit = useRef(false);
 
@@ -2824,6 +3128,17 @@
       anRef.current = an;
       boardRef.current = board;
       selRef.current = sel;
+
+      const searchMatches = useMemo(() => {
+        const tasks = (board && Array.isArray(board.tasks)) ? board.tasks : [];
+        return deriveSearchMatches(tasks, searchQuery);
+      }, [board, searchQuery]);
+      const searchMatchSet = useMemo(() => new Set(searchMatches), [searchMatches]);
+      const focusIds = useMemo(() => deriveFocusIds(an, searchMatches), [an, searchMatches]);
+      const focusSig = focusIds ? [...focusIds].sort().join('\u0000') : '';
+      const searchMatchCount = searchMatches.length;
+      focusIdsRef.current = focusIds;
+      searchMatchesRef.current = searchMatchSet;
 
       // toggleCollapse(id) — fold/unfold an owner. Stable callback (functional setState);
       // it flips id in the collapsed Set and re-renders FRESH (collapse changes the visible
@@ -2851,7 +3166,7 @@
         const entrance = firstPaintRef.current;
         const { nodes: nn, edges: ee, positions } =
           buildGraph(b, analysis, selection, fresh ? null : posRef.current, entrance,
-            collapsedRef.current, toggleCollapse);
+            collapsedRef.current, toggleCollapse, focusIdsRef.current, searchMatchesRef.current);
         if (fresh) posRef.current = positions;
         firstPaintRef.current = false;
         setNodes(nn);
@@ -2874,13 +3189,13 @@
       }, [render]);
 
       const apply = useCallback((b) => {
-        const sig = structSig(b);
+        const sig = topologyRev(b);
         const analysis = analyze(b.tasks, b.owner);
         const fresh = sig !== sigRef.current;
         if (fresh) sigRef.current = sig;
         // keep selection only if the node still exists
         let s = selRef.current;
-        if (s && !analysis.byId.has(s)) s = null;
+        if (s && (!analysis.byId.has(s) || (focusIdsRef.current && !focusIdsRef.current.has(s)))) s = null;
         render(b, analysis, s, fresh);
         if (s !== selRef.current) setSel(s);
         if (fresh) {
@@ -2898,11 +3213,9 @@
         let alive = true;
         async function poll() {
           try {
-            const r = await fetch(serverUrl('/board.json'), { cache: 'no-store' });
+            const b = await fetchViewModelBoard();
             if (!alive) return;
-            if (!r.ok) { return; } // mid-write -> skip this tick, keep last good render
-            const b = await r.json();
-            if (!alive) return;
+            if (!b) { return; } // mid-write / old route unavailable -> skip tick
             setErr(null);
             apply(b);
           } catch (_e) { /* transient -> retry next tick */ }
@@ -2911,6 +3224,48 @@
         const iv = setInterval(poll, 2000);
         return () => { alive = false; clearInterval(iv); };
       }, [apply]);
+
+      useEffect(() => {
+        let alive = true;
+        async function pollBoards() {
+          try {
+            const payload = await fetchBoardRoster();
+            if (!alive) return;
+            setBoardsInfo(payload);
+          } catch (e) {
+            if (!alive) return;
+            setBoardsInfo({
+              available: false,
+              boards: [],
+              error: e && e.message ? e.message : 'boards unavailable',
+            });
+          }
+        }
+        pollBoards();
+        const iv = setInterval(pollBoards, 4000);
+        return () => { alive = false; clearInterval(iv); };
+      }, []);
+
+      useEffect(() => {
+        let alive = true;
+        async function pollPeers() {
+          try {
+            const payload = await fetchPeerRoster();
+            if (!alive) return;
+            setPeersInfo(payload);
+          } catch (e) {
+            if (!alive) return;
+            setPeersInfo({
+              available: false,
+              peers: [],
+              error: e && e.message ? e.message : 'peers unavailable',
+            });
+          }
+        }
+        pollPeers();
+        const iv = setInterval(pollPeers, 4000);
+        return () => { alive = false; clearInterval(iv); };
+      }, []);
 
       // ---- collapse-change re-render (D3 nested-DAG) ------------------------
       // Folding / unfolding an owner changes the VISIBLE node set, so the DAG must
@@ -2927,6 +3282,23 @@
         didFit.current = true;
         setTimeout(() => { try { rf.fitView({ padding: 0.16 }); } catch (_e) {} }, 30);
       }, [collapsed, render, rf]);
+
+      useEffect(() => {
+        if (searchIndex >= searchMatchCount) setSearchIndex(0);
+      }, [searchIndex, searchMatchCount]);
+
+      useEffect(() => {
+        const b = boardRef.current, a = anRef.current;
+        if (!b || !a) return;
+        let s = selRef.current;
+        if (s && focusIdsRef.current && !focusIdsRef.current.has(s)) {
+          s = [...searchMatchesRef.current][0] || null;
+          setSel(s);
+        }
+        render(b, a, s, true);
+        didFit.current = true;
+        setTimeout(() => { try { rf.fitView({ padding: focusSig ? 0.22 : 0.16 }); } catch (_e) {} }, 30);
+      }, [focusSig, render, rf]);
 
       // ---- discuss history poll — OPTIONAL, fail-silent ---------------------
       // Pull /decisions.json on the same 2s cadence as the board. This route is
@@ -2986,6 +3358,29 @@
         if (b && a) render(b, a, id, false);
       }, [render]);
 
+      const focusTask = useCallback((id) => {
+        if (!id) return;
+        select(id);
+        const p = posRef.current.get(id);
+        if (p && typeof rf.setCenter === 'function') {
+          try { rf.setCenter(p.x + NODE_W / 2, p.y + NODE_H / 2, { zoom: 0.95, duration: 220 }); } catch (_e) {}
+        }
+      }, [rf, select]);
+
+      const jumpSearch = useCallback((delta) => {
+        if (!searchMatches.length) return;
+        const selectedIndex = searchMatches.indexOf(selRef.current);
+        const base = selectedIndex >= 0 ? selectedIndex : (delta > 0 ? -1 : 0);
+        const next = (base + delta + searchMatches.length) % searchMatches.length;
+        setSearchIndex(next);
+        focusTask(searchMatches[next]);
+      }, [focusTask, searchMatches]);
+
+      const clearSearch = useCallback(() => {
+        setSearchQuery('');
+        setSearchIndex(0);
+      }, []);
+
       const onNodeClick = useCallback((_e, node) => { select(node.id); }, [select]);
       const onPaneClick = useCallback(() => { select(null); }, [select]);
 
@@ -3006,6 +3401,8 @@
       const branch = board && board.git && board.git.branch ? board.git.branch : null;
       const userGates = an ? an.userGateIds.length : 0;
       const nodeCount = progress.total;
+      const hasSearch = searchQuery.trim() !== '';
+      const hitLabel = hasSearch ? ((searchMatchCount ? (searchIndex + 1) : 0) + '/' + searchMatchCount) : '';
 
       const selTask = (board && sel) ? (board.tasks || []).find(t => t.id === sel) : null;
 
@@ -3027,6 +3424,8 @@
           ),
           // telemetry readouts
           h('div', { className: 'readouts' },
+            h(BoardSelector, { boardsInfo }),
+            h('div', { className: 'vrule' }),
             // view toggle — GRAPH (xyflow DAG) | BOARD (Kanban) | LIST (status-board) | TIMELINE (gantt)
             h('div', { className: 'viewtoggle', role: 'group', 'aria-label': 'view mode' },
               h('button', {
@@ -3095,7 +3494,7 @@
         ),
         h('div', { id: 'stage' },
           // left analytics rail
-          h(Insights, { an, board, progress, pct, nodeCount, onPick: select }),
+          h(Insights, { an, board, progress, pct, nodeCount, peersInfo, onPick: select }),
           // center: BOARD view (Kanban card board) — same live board, same
           // analyze(), same select(); lanes by workflow stage, cards between a
           // node and a row. Rails stay mounted (as in list view).
@@ -3118,6 +3517,51 @@
           // doesn't measure/animate while hidden; nodes/edges state still updates.
           view === 'graph' ? h('div', { id: 'flow', className: sel ? 'has-selection' : '' },
             err ? h('div', { className: 'err' }, err) : null,
+            h('div', { className: 'graphnav' },
+              h('input', {
+                className: 'searchbox',
+                value: searchQuery,
+                placeholder: 'find task',
+                'aria-label': 'find task',
+                onChange: (e) => {
+                  setSearchQuery(e.target.value);
+                  setSearchIndex(0);
+                },
+                onKeyDown: (e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    jumpSearch(e.shiftKey ? -1 : 1);
+                  } else if (e.key === 'Escape') {
+                    clearSearch();
+                  }
+                },
+              }),
+              h('button', {
+                type: 'button',
+                className: 'navbtn',
+                title: 'previous match',
+                'aria-label': 'previous match',
+                disabled: !searchMatchCount,
+                onClick: () => jumpSearch(-1),
+              }, '↑'),
+              h('button', {
+                type: 'button',
+                className: 'navbtn',
+                title: 'next match',
+                'aria-label': 'next match',
+                disabled: !searchMatchCount,
+                onClick: () => jumpSearch(1),
+              }, '↓'),
+              h('span', { className: 'hitcount', 'aria-live': 'polite' }, hitLabel),
+              h('button', {
+                type: 'button',
+                className: 'navbtn',
+                title: 'clear',
+                'aria-label': 'clear search',
+                disabled: !hasSearch,
+                onClick: clearSearch,
+              }, '×'),
+            ),
             h(ReactFlow, {
               nodes, edges, nodeTypes,
               fitView: true,
@@ -3166,8 +3610,214 @@
       );
     }
 
+    function BoardSelector({ boardsInfo }) {
+      const all = Array.isArray(boardsInfo && boardsInfo.boards) ? boardsInfo.boards : [];
+      const rows = all.filter((b) => b && (b.active || b.current || b.file === ACTIVE_BOARD_FILE));
+      const options = rows.length ? rows : all;
+      const current = options.find((b) => b.current)
+        || options.find((b) => b.file === ACTIVE_BOARD_FILE)
+        || null;
+      const currentValue = current && current.file ? current.file : '';
+      const labelFor = (b) => {
+        const goal = (b.goal || '').trim();
+        const file = b.file || b.board_file || 'board';
+        const prefix = b.current ? 'current' : (b.active ? 'active' : 'inactive');
+        return prefix + ' · ' + (goal || file);
+      };
+      return h('label', { className: 'boardselect', title: 'active/current boards' },
+        h('span', { className: 'bl' }, 'board'),
+        h('select', {
+          value: currentValue,
+          'aria-label': 'active/current boards',
+          disabled: !options.length,
+          onChange: (e) => {
+            const next = options.find((b) => b.file === e.target.value);
+            if (!next || next.current) return;
+            window.location.assign(boardSwitchUrl(next));
+          },
+        },
+          options.length
+            ? options.map((b) => h('option', { key: b.file || b.board_file, value: b.file || b.board_file }, labelFor(b)))
+            : h('option', { value: '' }, boardsInfo && boardsInfo.error ? 'boards unavailable' : 'no boards')),
+      );
+    }
+
+    function peerFile(peer) {
+      return (peer && (peer.board_file || peer.file || (peer.board && peer.board.file))) || 'board';
+    }
+    function peerPriority(peer) {
+      return (peer && (peer.priority || (peer.coordination && peer.coordination.priority))) || 'normal';
+    }
+    function peerWorkload(peer) {
+      const cur = peer && peer.current && typeof peer.current === 'object' ? peer.current : {};
+      return cur.workload || peer.workload || '—';
+    }
+    function peerActiveTasks(peer) {
+      const cur = peer && peer.current && typeof peer.current === 'object' ? peer.current : {};
+      const n = cur.active_tasks ?? peer.active_tasks;
+      return typeof n === 'number' && Number.isFinite(n) ? n : null;
+    }
+    function peerRemaining(peer) {
+      const planned = peer && peer.planned && typeof peer.planned === 'object' ? peer.planned : {};
+      return planned.remaining_work || peer.remaining_work || '—';
+    }
+    function peerHeartbeatAge(peer) {
+      const owner = peer && peer.owner && typeof peer.owner === 'object' ? peer.owner : {};
+      const raw = peer.heartbeat_age_sec ?? owner.heartbeat_age_sec;
+      return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
+    }
+    function peerHeartbeatFresh(peer) {
+      const owner = peer && peer.owner && typeof peer.owner === 'object' ? peer.owner : {};
+      const fresh = peer.heartbeat_fresh ?? owner.heartbeat_fresh;
+      return fresh === true;
+    }
+    function fmtHeartbeat(peer) {
+      const age = peerHeartbeatAge(peer);
+      const ageText = age == null ? 'unknown' : (fmtElapsed(age * 1000) || '<1m');
+      return (peerHeartbeatFresh(peer) ? 'fresh' : 'stale') + ' · ' + ageText;
+    }
+    function PeersDashboard({ peersInfo }) {
+      const peers = Array.isArray(peersInfo && peersInfo.peers) ? peersInfo.peers : [];
+      const unavailable = peersInfo && peersInfo.available === false;
+      return h('div', { className: 'metric peers', key: 'peers' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '⌁'), 'peers'),
+        unavailable
+          ? h('div', { className: 'empty' }, peersInfo.error || 'peers unavailable')
+          : (peers.length
+              ? h('div', { className: 'peerlist' },
+                  ...peers.slice(0, 8).map((peer) => {
+                    const active = peer.current === true || (peersInfo.current && peerFile(peer) === peersInfo.current.file);
+                    const activeTasks = peerActiveTasks(peer);
+                    const fresh = peerHeartbeatFresh(peer);
+                    return h('div', { className: 'peerrow' + (active ? ' current' : ''), key: peerFile(peer), title: peerFile(peer) },
+                      h('div', { className: 'ptop' },
+                        h('span', { className: 'pfile' }, peerFile(peer)),
+                        h('span', { className: 'pprio' }, peerPriority(peer))),
+                      h('div', { className: 'pline' },
+                        h('span', { className: 'pk' }, 'workload'),
+                        h('span', { className: 'pv' }, peerWorkload(peer) + (activeTasks != null ? ' · ' + activeTasks + ' active' : ''))),
+                      h('div', { className: 'pline' },
+                        h('span', { className: 'pk' }, 'remaining'),
+                        h('span', { className: 'pv' }, peerRemaining(peer))),
+                      h('div', { className: 'pline' },
+                        h('span', { className: 'pk' }, 'heartbeat'),
+                        h('span', { className: 'pv pfresh ' + (fresh ? 'fresh' : 'stale') }, fmtHeartbeat(peer))),
+                    );
+                  }))
+              : h('div', { className: 'empty' }, 'no active peers')),
+      );
+    }
+
+    // ---- BOARD-LEVEL DASHBOARD — server read-model + board v2 modules ------
+    function BoardDashboard({ board, an, onPick }) {
+      const vm = viewModelOf(board);
+      const summary = vm && vm.summary ? vm.summary : null;
+      const diag = (vm && vm.diagnostics) || board.diagnostics || null;
+      const rev = vm && vm.rev ? vm.rev : null;
+      const counts = summary && summary.statusCounts ? summary.statusCounts : null;
+      const readySet = summary && Array.isArray(summary.readySet) ? summary.readySet : [];
+      const cp = summary && summary.criticalPath ? summary.criticalPath : null;
+      const lint = summary && summary.lint ? summary.lint : null;
+      const modules = {
+        policy: board.policy,
+        watchdog: board.watchdog,
+        cadence: board.cadence,
+        baseline: board.baseline,
+        judgment: board.judgment_calls || board.judgment || (vm && vm.judgment),
+        log: board.log,
+      };
+      const pill = (k, v, cls) => {
+        const s = shortValue(v);
+        if (!s) return null;
+        return h('span', { className: 'dashpill' + (cls ? ' ' + cls : ''), key: k, title: stableString(v) || '' },
+          h('span', { className: 'dk' }, k),
+          h('span', { className: 'dv' }, s));
+      };
+      const idPill = (id, key) => h('span', {
+        className: 'dashpill',
+        key,
+        onClick: () => onPick(id),
+        title: (an && an.byId.has(id)) ? ((an.byId.get(id).title || '').trim() || id) : id,
+      }, h('span', { className: 'dk' }, 'task'), h('span', { className: 'dv' }, id));
+      const rows = [];
+
+      rows.push(h('div', { className: 'metric dashboard', key: 'board' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '▣'), 'board dashboard'),
+        h('div', { className: 'dashline' },
+          pill('source', board.__source || 'board'),
+          pill('schema', board.schema),
+          pill('goal', board.goal),
+        ),
+        h('div', { className: 'dashline' },
+          pill('owner', board.owner && (board.owner.session_id || board.owner.id || board.owner.active)),
+          pill('active', board.owner && board.owner.active === false ? 'false' : (board.owner ? 'true' : null), board.owner && board.owner.active === false ? 'warn' : 'ok'),
+          pill('git', board.git && (board.git.branch || board.git.worktree || board.git.sha)),
+        ),
+      ));
+
+      rows.push(h('div', { className: 'metric dashboard', key: 'status' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '◉'), 'status counts'),
+        counts && Object.keys(counts).length
+          ? h('div', { className: 'dashline' },
+              ...Object.keys(counts).sort().map((s) => pill(s, counts[s], counts[s] ? 'ok' : '')))
+          : h('div', { className: 'empty' }, 'no status summary'),
+      ));
+
+      rows.push(h('div', { className: 'metric dashboard', key: 'ready' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '◷'), 'ready set'),
+        readySet.length
+          ? h('div', { className: 'dashline' }, ...readySet.slice(0, 18).map((id, i) => idPill(id, 'r' + i)))
+          : h('div', { className: 'empty' }, 'no ready tasks'),
+      ));
+
+      rows.push(h('div', { className: 'metric dashboard', key: 'cplint' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '⟋'), 'critical path / lint'),
+        cp && Array.isArray(cp.chain) && cp.chain.length
+          ? h('div', { className: 'chain compact' },
+              cp.chain.flatMap((id, i) =>
+                i === 0 ? [idPill(id, 'c' + i)] : [h('span', { className: 'arrow', key: 'ca' + i }, '→'), idPill(id, 'c' + i)]))
+          : h('div', { className: 'empty' }, 'no critical path summary'),
+        h('div', { className: 'dashline' },
+          pill('makespan', cp && cp.makespan),
+          pill('weight', cp && cp.weight_source),
+          pill('lint', lint ? ((lint.ok ? 'ok' : 'issues') + ' · ' + (lint.errors || 0) + 'e/' + (lint.warnings || 0) + 'w') : null,
+            lint && lint.ok ? 'ok' : (lint ? 'warn' : '')),
+        ),
+      ));
+
+      rows.push(h('div', { className: 'metric dashboard', key: 'runtime' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '◌'), 'runtime / diagnostics'),
+        h('div', { className: 'dashline' },
+          pill('engine', diag ? (diag.engineLoaded ? 'loaded' : 'missing') : null, diag && diag.engineLoaded ? 'ok' : 'warn'),
+          pill('mtime', rev && rev.mtimeMs),
+          pill('size', rev && rev.size),
+          pill('generated', rev && rev.generatedAt),
+        ),
+        diag && diag.timingsMs ? h('div', { className: 'dashline' },
+          ...Object.entries(diag.timingsMs).slice(0, 5).map(([k, v]) => pill(k, typeof v === 'number' ? v.toFixed(1) + 'ms' : v)))
+          : h('div', { className: 'empty' }, 'no diagnostics'),
+      ));
+
+      rows.push(h('div', { className: 'metric dashboard', key: 'modules' },
+        h('div', { className: 'ml' }, h('span', { className: 'ic' }, '▤'), 'policy / watchdog / cadence / baseline / judgment / log'),
+        h('div', { className: 'dashline' },
+          pill('policy', modules.policy ? 'present' : null, 'ok'),
+          pill('watchdog', modules.watchdog ? 'present' : null, 'ok'),
+          pill('cadence', modules.cadence ? ((modules.cadence.iterations ? modules.cadence.iterations.length : countEntries(modules.cadence)) + ' entries') : null, 'ok'),
+          pill('baseline', modules.baseline ? (modules.baseline.captured_at || modules.baseline.t0 || 'present') : null, 'ok'),
+          pill('judgment', modules.judgment ? countEntries(modules.judgment) + ' entries' : null, 'ok'),
+          pill('log', modules.log ? countEntries(modules.log) + ' entries' : null, 'ok'),
+        ),
+        (!modules.policy && !modules.watchdog && !modules.cadence && !modules.baseline && !modules.judgment && !modules.log)
+          ? h('div', { className: 'empty' }, 'no optional board v2 modules present')
+          : null,
+      ));
+
+      return rows;
+    }
+
     // ---- INSIGHTS RAIL — derived analytics readout -------------------------
-    function Insights({ an, board, progress, pct, nodeCount, onPick }) {
+    function Insights({ an, board, progress, pct, nodeCount, peersInfo, onPick }) {
       if (!an || !board) {
         return h('div', { id: 'insights' },
           h('div', { className: 'ihead' }, 'analysis'),
@@ -3187,6 +3837,8 @@
       const overWip = (typeof board.wip_limit === 'number') && an.wip > board.wip_limit;
 
       const rows = [];
+      rows.push(...BoardDashboard({ board, an, onPick }));
+      rows.push(PeersDashboard({ peersInfo }));
 
       // critical path
       rows.push(h('div', { className: 'metric', key: 'cp' },
@@ -4140,6 +4792,24 @@
       return h('div', { className: 'deccard' }, ...bits);
     }
 
+    function normalizeRefs(value) {
+      if (!value) return [];
+      if (Array.isArray(value)) return value.filter(x => x != null && x !== '').map(String);
+      if (typeof value === 'object') {
+        return Object.entries(value)
+          .map(([k, v]) => k + ': ' + (shortValue(v, 120) || ''))
+          .filter(x => x.trim() !== ':');
+      }
+      return [String(value)];
+    }
+    function detailObjectSection(label, value, key) {
+      const box = renderObjectBox(value, key + '-box');
+      if (!box) return null;
+      return h('div', { className: 'dsect', key },
+        h('div', { className: 'sl' }, label),
+        box);
+    }
+
     // ---- DETAIL RAIL — full task readout -----------------------------------
     function Detail({ task, an, board, discussions, onClose, onPick }) {
       const open = !!task;
@@ -4169,11 +4839,14 @@
           if (v == null || v === '') return;
           idRows.push(h('div', { className: 'row', key: k },
             h('span', { className: 'k' }, k),
-            h('span', { className: 'v' + (mono ? ' mono' : '') }, v)));
+            h('span', { className: 'v' + (mono ? ' mono' : '') }, stableString(v))));
         };
+        addRow('type', task.type);
         addRow('kind', task.kind);
+        addRow('executor', task.executor, typeof task.executor === 'string');
         addRow('mechanism', task.mechanism, true);
         addRow('handle', task.handle, true);
+        addRow('owner', task.owner, true);
         addRow('impact', (an.impact.get(id) || 0) + ' downstream', false);
         addRow('fan-in', (an.inDeg.get(id) || 0) + ' direct deps', false);
         if (idRows.length) body.push(h('div', { className: 'dsect', key: 'ident' },
@@ -4220,6 +4893,38 @@
           whyBits.length ? whyBits : h('div', { className: 'mv dim', style: { fontSize: '11.5px', color: 'var(--ink-faint)' } }, 'no justification recorded'),
         ));
 
+        if (task.acceptance !== undefined) {
+          const sec = detailObjectSection('acceptance', task.acceptance, 'acceptance');
+          if (sec) body.push(sec);
+        }
+
+        const refs = normalizeRefs(task.references !== undefined ? task.references : task.refs);
+        if (refs.length) {
+          body.push(h('div', { className: 'dsect', key: 'references' },
+            h('div', { className: 'sl' }, 'references'),
+            h('div', { className: 'activity' },
+              ...refs.map((r, i) => h('div', { className: 'le', key: 'ref' + i }, r))),
+          ));
+        }
+
+        const childIds = an.childrenOf ? an.childrenOf(id) : [];
+        const structureRows = [];
+        const addStruct = (k, v) => {
+          if (v == null || v === '' || (Array.isArray(v) && !v.length)) return;
+          structureRows.push(h('div', { className: 'row', key: k },
+            h('span', { className: 'k' }, k),
+            h('span', { className: 'v mono' }, Array.isArray(v) ? v.join(', ') : String(v))));
+        };
+        addStruct('parent', an.parentOf ? an.parentOf(id) : task.parent);
+        addStruct('deps', Array.isArray(task.deps) ? task.deps : null);
+        addStruct('children', childIds);
+        if (structureRows.length) {
+          body.push(h('div', { className: 'dsect', key: 'structure' },
+            h('div', { className: 'sl' }, 'structure'),
+            h('div', { className: 'kv' }, ...structureRows),
+          ));
+        }
+
         // rich decision card — only when this node is genuinely awaiting the user
         // AND a decision_package has been prepared. When awaiting-user but the
         // package isn't ready yet, this is simply skipped (the tile/list amber
@@ -4229,6 +4934,9 @@
             h('div', { className: 'sl' }, '◈ decision needed'),
             h(DecisionCard, { pkg: task.decision_package }),
           ));
+        } else if (task.decision_package !== undefined) {
+          const sec = detailObjectSection('decision_package', task.decision_package, 'decision_package');
+          if (sec) body.push(sec);
         }
 
         // discuss history — any node (not just awaiting-user) that has ≥1 discuss

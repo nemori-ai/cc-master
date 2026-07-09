@@ -1,19 +1,17 @@
 ---
 name: cc-master-view
-description: 'Triggers: 当你在 Codex 收到 `$cc-master-view` 时，启动只读 board web viewer 展示 DAG 与节点状态；Do NOT 在本 skill 中直接改写 board。'
-argument-hint: '[--board <board-path-or-stem>]'
+description: 'Triggers: 当你在 Codex 收到 `$cc-master-view` 时，执行迁移提示：正式 viewer 入口已改为 `ccm web-viewer open`；Do NOT 启动旧 viewer 脚本或维护旧 lifecycle。'
+argument-hint: '[deprecated; use ccm web-viewer open]'
 ---
 
 $cc-master-view $ARGUMENTS
 
-启动本地只读 web viewer，展示当前 cc-master board 的 DAG。
+`$cc-master-view` 已废弃。不要定位 skill 目录，不要直接运行旧 viewer 脚本，也不要维护旧后台进程。
 
-参数：$ARGUMENTS
-
-定位目标 board。找到已安装的 `master-orchestrator-guide` skill 目录后，用后台终端启动只读 viewer：
+告诉用户正式入口已经迁到 ccm：
 
 ```bash
-CC_MASTER_BOARD="<board-path>" node "<master-orchestrator-guide-skill-dir>/scripts/view-server.js"
+ccm web-viewer open
 ```
 
-必须给 `CC_MASTER_BOARD` 和脚本路径加引号。抓取 stdout 中类似 `cc-master board view: http://127.0.0.1:<port>` 的 URL 并交给用户。viewer 每 2s 轮询 board，只读、不写 board；要停止就结束该后台会话。
+如果需要指定初始 board，用 `ccm web-viewer open --board <board-path>`。服务生命周期统一由 `ccm web-viewer start/status/list/stop/restart` 管理；本 skill 只做迁移提示。

@@ -886,6 +886,148 @@ export const REGISTRY: Registry = {
     },
   },
 
+  // ════════════════════ status-report（生成式 board 状态报告·ADR-030）══════════════════════════════
+  'status-report': {
+    render: {
+      summary: '纯计算生成 ccm/status-report/v1 到 stdout（不写 board、不写 artifact）',
+      read: true,
+      positionals: [],
+      options: {
+        'as-of': { type: 'string', desc: 'as-of 时刻（ISO-8601 UTC·默认 now）' },
+        'max-age': { type: 'string', desc: '报告 TTL（默认 30s；支持 s/m/h/d）' },
+        json: { type: 'boolean', desc: '输出稳定 JSON envelope（默认人类摘要）' },
+      },
+      examples: ['ccm status-report render --json', 'ccm status-report render --board <path>'],
+      handler: 'statusreport.render',
+    },
+    write: {
+      summary: '生成并原子写报告 artifact；fresh artifact 默认复用（--force 强制刷新）',
+      read: false,
+      positionals: [],
+      options: {
+        'as-of': { type: 'string', desc: 'as-of 时刻（ISO-8601 UTC·默认 now）' },
+        'max-age': { type: 'string', desc: '报告 TTL（默认 30s；支持 s/m/h/d）' },
+        json: { type: 'boolean', desc: '输出完整 JSON envelope' },
+      },
+      examples: ['ccm status-report write', 'ccm status-report write --json'],
+      handler: 'statusreport.write',
+    },
+    show: {
+      summary: '用户入口：读取 fresh artifact，缺失/过期/--refresh 时刷新后显示',
+      read: true,
+      positionals: [],
+      options: {
+        refresh: { type: 'boolean', desc: '忽略现有 artifact，强制刷新' },
+        'as-of': { type: 'string', desc: 'as-of 时刻（ISO-8601 UTC·默认 now）' },
+        'max-age': { type: 'string', desc: '报告 TTL（默认 30s；支持 s/m/h/d）' },
+        json: { type: 'boolean', desc: '输出完整 JSON envelope' },
+      },
+      examples: ['ccm status-report show', 'ccm status-report show --json --refresh'],
+      handler: 'statusreport.show',
+    },
+    watch: {
+      summary: '前台周期刷新报告 artifact（v1：用 --iterations 做有界 tick；同 write 路径）',
+      read: false,
+      positionals: [],
+      options: {
+        interval: { type: 'string', desc: '刷新间隔（默认 30s；支持 s/m/h/d）' },
+        iterations: { type: 'string', desc: '迭代次数；缺省持续运行，测试/脚本建议传 1' },
+        'as-of': { type: 'string', desc: 'as-of 时刻（ISO-8601 UTC·默认 now）' },
+        'max-age': { type: 'string', desc: '报告 TTL（默认 30s；支持 s/m/h/d）' },
+        json: { type: 'boolean', desc: '每次 tick 输出 artifact 元数据 JSON' },
+      },
+      examples: [
+        'ccm status-report watch --interval 30s',
+        'ccm status-report watch --iterations 1 --json',
+      ],
+      handler: 'statusreport.watch',
+    },
+  },
+
+  // ════════════════════ web-viewer（本地只读 board web viewer lifecycle·ADR-029）═══════════════════
+  'web-viewer': {
+    start: {
+      summary: '启动或复用当前 home 的本地只读 board web viewer service（127.0.0.1 + token）',
+      read: false,
+      positionals: [],
+      options: {
+        host: { type: 'string', desc: '监听地址（v1 只允许 127.0.0.1）' },
+        port: { type: 'string', desc: '监听端口（默认 0=系统分配；固定端口冲突则失败）' },
+        reuse: { type: 'boolean', desc: '复用同 home 的健康 service（默认行为）' },
+        'no-open': { type: 'boolean', desc: '只启动/复用，不尝试打开浏览器' },
+        json: { type: 'boolean', desc: '结构化输出（start/open 含一次性 open_url）' },
+      },
+      examples: ['ccm web-viewer start', 'ccm web-viewer start --goal "Ship" --json'],
+      handler: 'webviewer.start',
+    },
+    open: {
+      summary:
+        '打开当前 home 的 web viewer；默认无 service 时 start-then-open，CI/无 GUI 时打印 URL',
+      read: false,
+      positionals: [{ name: 'id', required: false }],
+      options: {
+        'no-start': { type: 'boolean', desc: '只打开已有健康 service；不存在则不启动' },
+        json: { type: 'boolean', desc: '结构化输出（含一次性 open_url）' },
+      },
+      examples: ['ccm web-viewer open', 'ccm web-viewer open --no-start --json'],
+      handler: 'webviewer.open',
+    },
+    status: {
+      summary: '显示当前 home 的 web viewer running/stale/stopped 状态（token 脱敏）',
+      read: true,
+      positionals: [{ name: 'id', required: false }],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出（不含 raw token）' },
+      },
+      examples: ['ccm web-viewer status', 'ccm web-viewer status --json'],
+      handler: 'webviewer.status',
+    },
+    list: {
+      summary: '列出当前 home 下的 web viewer service state（token 脱敏，容忍 stale/坏 state）',
+      read: true,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出（不含 raw token）' },
+      },
+      examples: ['ccm web-viewer list', 'ccm web-viewer list --json'],
+      handler: 'webviewer.list',
+    },
+    stop: {
+      summary: '停止当前 home 的 web viewer service；stale state 会被清理',
+      read: false,
+      positionals: [{ name: 'id', required: false }],
+      options: {
+        all: { type: 'boolean', desc: '停止/清理当前 home 下全部 web viewer state' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm web-viewer stop', 'ccm web-viewer stop --json'],
+      handler: 'webviewer.stop',
+    },
+    restart: {
+      summary:
+        '重启当前 home 的 web viewer service（新 token；--board/--goal 只影响初始 selection）',
+      read: false,
+      positionals: [{ name: 'id', required: false }],
+      options: {
+        host: { type: 'string', desc: '监听地址（v1 只允许 127.0.0.1）' },
+        port: { type: 'string', desc: '监听端口（默认 0=系统分配）' },
+        json: { type: 'boolean', desc: '结构化输出（含 previous/service/open_url）' },
+      },
+      examples: ['ccm web-viewer restart', 'ccm web-viewer restart --board <path> --json'],
+      handler: 'webviewer.restart',
+    },
+    serve: {
+      summary: '内部 daemon target：按 --state 启动 HTTP service（用户通常不直接调用）',
+      read: true,
+      positionals: [],
+      options: {
+        state: { type: 'string', required: true, desc: 'web-viewer service state path' },
+      },
+      examples: ['ccm web-viewer serve --state <path>'],
+      handler: 'webviewer.serve',
+    },
+  },
+
   // ════════════════════ estimate（只读 advisory·ADR-015）════════════════════════════════════════════
   //   工作侧只读 analysis namespace（消费 @ccm/engine OR/ML 算法层·纯只读·零写·不抢 board-lock）。
   //   p95=5% 硬墙永不取 max/不到 100%（引擎 conformal/MC 分位口径保证）。

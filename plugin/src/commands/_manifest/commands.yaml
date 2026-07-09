@@ -35,13 +35,6 @@ commands:
     host_coverage:
       claude-code: implemented
       codex: ccm_guided
-  - id: status
-    required: true
-    intent: render_board_status
-    argument_contract: ""
-    host_coverage:
-      claude-code: implemented
-      codex: ccm_guided
   - id: stop
     required: true
     intent: archive_active_board
@@ -51,8 +44,8 @@ commands:
       codex: ccm_guided
   - id: view
     required: true
-    intent: open_local_board_view
+    intent: deprecated_view_shim_to_ccm_web_viewer
     argument_contract: ""
     host_coverage:
-      claude-code: implemented
-      codex: skill_script_guided
+      claude-code: deprecated_shim
+      codex: deprecated_shim

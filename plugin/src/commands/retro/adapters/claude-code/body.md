@@ -13,7 +13,7 @@ argument-hint: '[--home <path>] [--board <board-stem>] [--out <dir>]'
 - **`--board <board-stem>`**——显式 board 选择器,`<board-stem>` = board 文件名去掉 `.board.json` 后缀。**先过 path-safe guard**：必须匹配 `^[A-Za-z0-9._-]+$`,且不是 `.` 也不是 `..`——不满足就清楚报错并停,绝不用不安全 stem 拼路径逃出 home。
 - **`--out <dir>`**——覆盖复盘文档的落盘目录（见下）。相对路径相对**项目根**解析（下面第 3 步定义项目根）。**给了 `--out` 就直接用它、不做任何存在性探测**——哪怕目录本不存在,创建即可（`mkdir -p` 语义）。
 
-## 1. 认板（这一步是本命令与 `/cc-master:status` / `/cc-master:stop` 的关键差异：接受已归档 board）
+## 1. 认板（这一步是本命令与 `ccm status-report show` / `/cc-master:stop` 的关键差异：接受已归档 board）
 
 复盘价值最大的时刻往往就是编排刚收尾之后,所以这一步**必须**能对一块 `owner.active:false`（已被 `/cc-master:stop` 或 `/cc-master:handoff-to-new-session` 归档）的 board 生成复盘。按下面顺序定位一块**确定的**目标 board：
 

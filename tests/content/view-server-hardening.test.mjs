@@ -105,7 +105,60 @@ test('view-server hardens responses and gates private JSON behind per-launch tok
   const boardWithToken = await fetch(new URL(`/board.json${parsed.search}`, parsed.origin));
   assert.equal(boardWithToken.status, 200);
   assertHardeningHeaders(boardWithToken.headers);
+  assert.match(boardWithToken.headers.get('etag') || '', /^"board-[a-f0-9]{32}"$/);
+  const boardEtag = boardWithToken.headers.get('etag');
   assert.deepEqual((await boardWithToken.json()).tasks.map((task) => task.id), ['T1']);
+
+  const boardNotModified = await fetch(new URL(`/board.json${parsed.search}`, parsed.origin), {
+    headers: { 'If-None-Match': boardEtag },
+  });
+  assert.equal(boardNotModified.status, 304);
+  assertHardeningHeaders(boardNotModified.headers);
+
+  const viewModelNoToken = await fetch(`${parsed.origin}/view-model.json`);
+  assert.equal(viewModelNoToken.status, 403);
+  assertHardeningHeaders(viewModelNoToken.headers);
+
+  const viewModelPost = await fetch(new URL(`/view-model.json${parsed.search}`, parsed.origin), {
+    method: 'POST',
+  });
+  assert.equal(viewModelPost.status, 405);
+  assertHardeningHeaders(viewModelPost.headers);
+
+  const viewModelWithToken = await fetch(new URL(`/view-model.json${parsed.search}`, parsed.origin));
+  assert.equal(viewModelWithToken.status, 200);
+  assertHardeningHeaders(viewModelWithToken.headers);
+  assert.match(viewModelWithToken.headers.get('etag') || '', /^"view-model-[a-f0-9]{32}"$/);
+  const viewModel = await viewModelWithToken.json();
+  assert.equal(viewModel.rev.boardHash.startsWith('sha256:'), true);
+  assert.equal(viewModel.rev.topologyHash.startsWith('sha256:'), true);
+  assert.equal(typeof viewModel.rev.mtimeMs, 'number');
+  assert.equal(typeof viewModel.rev.size, 'number');
+  assert.equal(typeof viewModel.rev.generatedAt, 'string');
+  assert.equal(viewModel.board.schema, 'cc-master/v2');
+  assert.equal(viewModel.board.goal, 'local view hardening');
+  assert.equal(viewModel.board.source, board);
+  assert.deepEqual(viewModel.summary.statusCounts.ready, 1);
+  assert.deepEqual(viewModel.summary.readySet, ['T1']);
+  assert.deepEqual(viewModel.summary.criticalPath.chain, ['T1']);
+  assert.equal(typeof viewModel.summary.lint.errors, 'number');
+  assert.equal(typeof viewModel.summary.lint.warnings, 'number');
+  assert.equal(viewModel.summary.awaitingUserCount, 0);
+  assert.deepEqual(viewModel.tasks.map((task) => task.id), ['T1']);
+  assert.equal(viewModel.graph.nodeCount, 1);
+  assert.equal(viewModel.graph.edgeCount, 0);
+  assert.deepEqual(viewModel.graph.topoOrder, ['T1']);
+  assert.equal(viewModel.decisions.count, 1);
+  assert.deepEqual(viewModel.decisions.countsByNode, { T1: 1 });
+  assert.equal(viewModel.decisions.latestByNode.T1.tldr, 'Proceed.');
+  assert.equal(viewModel.diagnostics.engineLoaded, true);
+  assert.equal(typeof viewModel.diagnostics.timingsMs.total, 'number');
+
+  const viewModelNotModified = await fetch(new URL(`/view-model.json${parsed.search}`, parsed.origin), {
+    headers: { 'If-None-Match': viewModelWithToken.headers.get('etag') },
+  });
+  assert.equal(viewModelNotModified.status, 304);
+  assertHardeningHeaders(viewModelNotModified.headers);
 
   const decisionsWithToken = await fetch(new URL(`/decisions.json${parsed.search}`, parsed.origin));
   assert.equal(decisionsWithToken.status, 200);

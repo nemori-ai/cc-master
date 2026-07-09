@@ -1,9 +1,0 @@
-host: codex
-skill: cc-master-status
-version: 1
-mode: copy
-projection:
-  source: canonical/
-  target: skills/cc-master-status/
-  include_adapter:
-    - agents/openai.yaml

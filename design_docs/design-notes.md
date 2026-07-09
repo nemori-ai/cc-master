@@ -4,6 +4,7 @@
 > **关联**：研究基线 `research/dynamic-workflow/`（4 报告，已 commit 9047592d）；本设计在 worktree `research-dynamic-workflow` 分支。
 >
 > ⚠ **/goal 集成方案已被 goal-hook 取代**（agent 无法自设 native `/goal`；改由 verify-board 升级为确定性 Stop-hook 自检闸）——见 `design_docs/2026-06-08-goal-hook-design.md` 与 `dogfood-findings.md` #2。
+> ⚠ **status 入口也已迁移为目标态 `ccm status-report show`**（ADR-030）；下方 `/cc-master:status` 属早期 brainstorming 的 historical locked list，不是当前正式入口。
 
 ## 0. 目标
 一个 Claude Code **plugin**，把任意 main-session agent 一键初始化成"master orchestrator"，服务 long-horizon（24h+）任务。两大能力：
@@ -15,7 +16,7 @@ plugin `cc-master` = **命令 + 2 skills + hooks + board 文件**。通用、shi
 
 ## 2. 命令（locked）
 - `/cc-master:as-master-orchestrator [goal]` —— bootstrap（开机引导）。
-- `/cc-master:status` —— 汇总 board 进度/健康。
+- 历史：`/cc-master:status` —— 当时用于汇总 board 进度/健康；目标态见 `ccm status-report show`。
 - `/cc-master:stop` —— 归档 / 置 board 非活跃。
 
 ## 3. 两个 skill（locked：2 个，自包含，建立在命令经 Skill A 植入的哲学之上）
