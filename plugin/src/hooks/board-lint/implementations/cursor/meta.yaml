@@ -5,6 +5,7 @@ event: postToolUse
 matcher: Write
 projection:
   target: hooks/
-status: scaffold-noop
+status: implemented
 notes:
-  - Phase B silent noop. Phase C uses additional_context (D5 PASS on 3.10.20).
+  - Phase C: ccm board lint advisory after Write to own active board.
+  - Envelope: additional_context via launcher (kind:context); never blocks.

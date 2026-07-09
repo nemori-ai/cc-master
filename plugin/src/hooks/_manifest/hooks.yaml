@@ -6,14 +6,14 @@ hooks:
     host_coverage:
       claude-code: implemented
       codex: implemented-minimal-fresh
-      cursor: planned
+      cursor: implemented-minimal-fresh
   - id: verify-board
     stage: stop
     required: true
     host_coverage:
       claude-code: implemented
       codex: implemented-blocking
-      cursor: planned
+      cursor: implemented-followup
   - id: usage-pacing
     stage: stop-and-post-tool-batch
     required: true
@@ -48,14 +48,14 @@ hooks:
     host_coverage:
       claude-code: implemented
       codex: implemented
-      cursor: planned
+      cursor: implemented
   - id: board-guard
     stage: pre-tool-use
     required: true
     host_coverage:
       claude-code: implemented
       codex: implemented
-      cursor: planned
+      cursor: implemented
   - id: hook-common
     stage: shared-helper
     required: true

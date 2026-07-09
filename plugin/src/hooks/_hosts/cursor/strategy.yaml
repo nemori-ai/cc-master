@@ -1,7 +1,7 @@
 host: cursor
 version: 1
 surface: hooks
-status: scaffold
+status: phase-c-p0
 registration:
   source: plugin-bundled
   target: hooks/hooks.json
@@ -17,7 +17,7 @@ registration:
   unsupported_events:
     - PostToolBatch
   notes:
-    - Phase B scaffold: P0 hooks registered with silent noop cores; production bodies land in Phase C.
+    - Phase C: P0 cores live (bootstrap / board-guard / board-lint / verify-board); reinject Track B still planned.
     - Path strategy (probe D1): relative commands from plugin cwd; launcher sets CC_MASTER_PLUGIN_ROOT from __dirname.
     - No ${PLUGIN_ROOT} / ${CLAUDE_PLUGIN_ROOT} assumed in Cursor (token unproven).
 path_resolution:
@@ -30,7 +30,9 @@ path_resolution:
     - Hook child env lacks CURSOR_*; use stdin conversation_id/session_id (D7/D8).
   production_strategy:
     - Register hooks with relative node ./hooks/_hosts/cursor/launcher.js paths.
-    - Launcher resolves plugin root via path.resolve(__dirname, '..', '..').
+    - Launcher resolves plugin root via path.resolve(__dirname, '..', '..', '..').
+    - Default home is $HOME/.cc_master (aligned with ccm / Codex); CC_MASTER_HOME overrides.
+    - Board discovery: session-state first, then unique active board-scan.
     - Inject CC_MASTER_PLUGIN_ROOT / CC_MASTER_HARNESS=cursor for cores.
 payload_map:
   status: verified-basic

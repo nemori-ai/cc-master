@@ -5,6 +5,8 @@ event: stop
 matcher: ""
 projection:
   target: hooks/
-status: scaffold-noop
+status: implemented-followup
 notes:
-  - Phase B silent noop. Phase C: followup_message + loop_count/loop_limit (D6) + FUSE.
+  - Phase C: Stop gate notes + FUSE=5 + stop_allow_until release valve.
+  - Cursor has no decision:block on Stop — launcher maps kind:block → followup_message (D6).
+  - loop_limit:5 in hooks.json aligns with app FUSE.
