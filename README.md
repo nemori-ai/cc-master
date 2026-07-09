@@ -1,5 +1,11 @@
 # cc-master
 
+[![plugin](https://img.shields.io/badge/plugin-v0.17.0-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.17.0)
+[![ccm](https://img.shields.io/badge/ccm-v0.18.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.18.0)
+[![harness](https://img.shields.io/badge/harness-Claude%20Code%20%7C%20Codex%20%7C%20Cursor-4B5563)](design_docs/harnesses/)
+[![ccm CI](https://img.shields.io/github/actions/workflow/status/nemori-ai/cc-master/ccm-ci.yml?branch=main&label=ccm%20CI)](https://github.com/nemori-ai/cc-master/actions/workflows/ccm-ci.yml)
+[![license](https://img.shields.io/github/license/nemori-ai/cc-master)](LICENSE)
+
 > 中文见 [README_zh.md](README_zh.md)。
 
 **Give it a big goal — and a budget. Then go do something else.**

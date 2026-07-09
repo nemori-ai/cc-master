@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **README / README_zh 入口同步**：pin 示例升到 `ccm-v0.18.0` / plugin `0.17.0`；补 Cursor `/as-master-orchestrator`；诚实区分 Claude Code 号池换号 vs Cursor billing_period 配速；status/view 指向 `ccm status-report` / `ccm web-viewer`；命令目录链接改到 `plugin/src/skills/using-ccm/canonical/references/command-catalog.md`。
+- **README / README_zh 入口同步**：pin 示例升到 `ccm-v0.18.0` / plugin `0.17.0`；顶部加 plugin / ccm / harness / CI / license 徽章；补 Cursor `/as-master-orchestrator`；诚实区分 Claude Code 号池换号 vs Cursor billing_period 配速；status/view 指向 `ccm status-report` / `ccm web-viewer`；命令目录链接改到 `plugin/src/skills/using-ccm/canonical/references/command-catalog.md`。
 
 ## [0.16.0] — 2026-07-09
 
