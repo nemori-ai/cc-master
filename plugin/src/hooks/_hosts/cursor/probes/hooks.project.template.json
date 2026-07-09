@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "CC_MASTER_CURSOR_HOOK_PROBE_EVENT=sessionStart CC_MASTER_CURSOR_HOOK_PROBE_MODE=context CC_MASTER_CURSOR_HOOK_PROBE_DIR=\"{{PROBE_DIR}}\" node \"{{PROBE_HOOK_JS}}\""
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "CC_MASTER_CURSOR_HOOK_PROBE_EVENT=beforeSubmitPrompt CC_MASTER_CURSOR_HOOK_PROBE_MODE=silent CC_MASTER_CURSOR_HOOK_PROBE_DIR=\"{{PROBE_DIR}}\" node \"{{PROBE_HOOK_JS}}\""
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "CC_MASTER_CURSOR_HOOK_PROBE_EVENT=preToolUse CC_MASTER_CURSOR_HOOK_PROBE_MODE=silent CC_MASTER_CURSOR_HOOK_PROBE_DIR=\"{{PROBE_DIR}}\" node \"{{PROBE_HOOK_JS}}\"",
+        "matcher": "Shell|Write|Read"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "CC_MASTER_CURSOR_HOOK_PROBE_EVENT=postToolUse CC_MASTER_CURSOR_HOOK_PROBE_MODE=context CC_MASTER_CURSOR_HOOK_PROBE_DIR=\"{{PROBE_DIR}}\" node \"{{PROBE_HOOK_JS}}\"",
+        "matcher": "Shell|Write|Read"
+      }
+    ],
+    "preCompact": [
+      {
+        "command": "CC_MASTER_CURSOR_HOOK_PROBE_EVENT=preCompact CC_MASTER_CURSOR_HOOK_PROBE_MODE=silent CC_MASTER_CURSOR_HOOK_PROBE_DIR=\"{{PROBE_DIR}}\" node \"{{PROBE_HOOK_JS}}\""
+      }
+    ],
+    "stop": [
+      {
+        "command": "CC_MASTER_CURSOR_HOOK_PROBE_EVENT=stop CC_MASTER_CURSOR_HOOK_PROBE_MODE=silent CC_MASTER_CURSOR_HOOK_PROBE_DIR=\"{{PROBE_DIR}}\" node \"{{PROBE_HOOK_JS}}\"",
+        "loop_limit": 3
+      }
+    ]
+  }
+}

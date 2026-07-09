@@ -445,7 +445,7 @@ Track B 缺口已迁入 [`capabilities/`](capabilities/README.md)；下列为速
 
 ## Dogfood Backlog
 
-进入 MVP adapter **前**必须实测的未知项（本阶段不执行）：
+进入 MVP adapter **前**必须实测的未知项。**Phase 0 工具已落地**：[`plugin/src/hooks/_hosts/cursor/probes/`](../../plugin/src/hooks/_hosts/cursor/probes/README.md)。
 
 | ID | 问题 | 影响面 |
 | --- | --- | --- |
@@ -462,15 +462,50 @@ Track B 缺口已迁入 [`capabilities/`](capabilities/README.md)；下列为速
 | D11 | `sessionStart.env` 注入的 `CURSOR_CONVERSATION_ID` 是否被后续 hook 和 subagent 继承 | ccm session + arming |
 | D12 | Enterprise 策略是否禁用 local plugins / third-party hooks | ship-anywhere |
 
-Probe 完成后，在本页新增 **§Probe Results** 小节，按 `current probe > official docs` 纪律回写。
+### 怎么跑（最短路径）
 
-## Future Adapter Sketch（非实现）
+```bash
+# 1) 项目级 hooks（先跑这个）
+bash plugin/src/hooks/_hosts/cursor/probes/setup-project-probe.sh
+# → 用 Cursor 打开打印出的 probe_root，按 notes/HOW_TO_RUN.md 聊几句
 
-若用户审阅后批准 MVP，预期落点（与 Codex 第二 host 同构）：
+# 2) 本地 plugin 安装面（D9）
+bash plugin/src/hooks/_hosts/cursor/probes/setup-local-plugin-probe.sh
+# → 在 Cursor Customize 里启用 local plugin，再聊几句
+```
+
+填 [`MANUAL_CHECKLIST.md`](../../plugin/src/hooks/_hosts/cursor/probes/MANUAL_CHECKLIST.md)，结果回写下面 **§Probe Results**（`current probe > official docs`）。
+
+## Probe Results
+
+> Status: **pending** — Phase 0 工具已就绪；等待本机 Cursor IDE 实测回填。  
+> 回写纪律：每条 D* 写 PASS/FAIL/BLOCKED + Cursor 版本 + fixture 路径或 Output→Hooks 证据。未测勿标 PASS。
+
+| ID | Result | Cursor version | Evidence / notes |
+| --- | --- | --- | --- |
+| D1 | pending | | |
+| D2 | pending | | |
+| D3 | pending | | |
+| D4 | pending | | |
+| D5 | pending | | |
+| D6 | pending | | |
+| D7 | pending | | |
+| D8 | pending | | |
+| D9 | pending | | |
+| D10 | pending | | |
+| D11 | pending | | |
+| D12 | pending | | |
+
+**Blocking for Phase B scaffold:** D1 + D2（path + node）至少要有结论；D4/D5/D6 强烈建议有结论再写 reinject / lint / verify-board。
+
+## Future Adapter Sketch
+
+实现顺序：Phase 0（本页）→ Phase B scaffold → Phase C P0 hooks。与 Codex 第二 host 同构。
 
 ### Phase 0 — Probe
 
-- 执行 §Dogfood Backlog D1–D12 → 回写本页 §Probe Results。
+- [x] Probe 脚本 + 清单：`plugin/src/hooks/_hosts/cursor/probes/`
+- [ ] 执行 §Dogfood Backlog D1–D12 → 回写本页 §Probe Results
 
 ### Phase 1 — plugin source
 
