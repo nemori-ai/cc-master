@@ -251,7 +251,11 @@ test('pacing: echoes window pct + effective_n always ≥ 1', () => {
 // ── Cursor billing_period (~30d subscription; no 5h/7d; never switch) ───────────────
 test('pacing: billing_period only within warn line → hold (no 5h/7d)', () => {
   const a = pacingAdvice(
-    { billing_period: { used_percentage: 40, resets_at: NOW_SEC + 86400 * 20 }, five_hour: null, seven_day: null },
+    {
+      billing_period: { used_percentage: 40, resets_at: NOW_SEC + 86400 * 20 },
+      five_hour: null,
+      seven_day: null,
+    },
     { nowSec: NOW_SEC, effectiveN: 3, registry: poolTwoFresh() },
   );
   assert.equal(a.verdict, 'hold');
@@ -287,7 +291,11 @@ test('pacing: billing_period critical → stop_billing_period (not stop_7d)', ()
 
 test('pacing: billing_period expired resets_at → unavailable degrade', () => {
   const a = pacingAdvice(
-    { billing_period: { used_percentage: 50, resets_at: NOW_SEC - 10 }, five_hour: null, seven_day: null },
+    {
+      billing_period: { used_percentage: 50, resets_at: NOW_SEC - 10 },
+      five_hour: null,
+      seven_day: null,
+    },
     { nowSec: NOW_SEC },
   );
   assert.equal(a.available, false);

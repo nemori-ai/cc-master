@@ -5,11 +5,7 @@ import { genericAdapter } from './generic.js';
 import type { Env, HarnessAdapter, HarnessInstallation, HarnessSelection } from './types.js';
 
 // Cursor after Codex, before Claude Code: CURSOR_AGENT must win over Claude-compatible fallback env.
-const KNOWN_ADAPTERS: readonly HarnessAdapter[] = [
-  codexAdapter,
-  cursorAdapter,
-  claudeCodeAdapter,
-];
+const KNOWN_ADAPTERS: readonly HarnessAdapter[] = [codexAdapter, cursorAdapter, claudeCodeAdapter];
 
 export function resolveHarnessAdapter(selection: HarnessSelection = {}): HarnessAdapter {
   const env = selection.env || process.env;

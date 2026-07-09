@@ -6,7 +6,7 @@
 
 cc-master turns a supported coding-agent session into a project lead that never sleeps and actually watches the money. You bring the idea and make the handful of calls that truly need you; it handles the rest — breaking the work down, running it in parallel, tracking progress, keeping spend in check, checking its own work. You come back, and it's done. And it didn't blow your budget.
 
-And there's real machinery behind the warmth: it **runs the numbers thousands of times** to tell you when you'll ship and which step is most likely to slip; it **watches your quota and adjusts its pace** as it goes — easing off when you're tight, pressing when you've got room; and it **keeps a few accounts in rotation**, spreading the load and quietly switching before any one runs dry. So it breaks the work into parallel pieces and **delivers it, fast and steady**, all the way to done — no idling, no walls, no wasted spend.
+And there's real machinery behind the warmth: it **runs the numbers thousands of times** to tell you when you'll ship and which step is most likely to slip; it **watches your quota and adjusts its pace** as it goes — easing off when you're tight, pressing when you've got room; and on hosts that support it, it **keeps a few accounts in rotation**, spreading the load and switching before any one runs dry. So it breaks the work into parallel pieces and **delivers it, fast and steady**, all the way to done — no idling, no walls, no wasted spend.
 
 > **You stop being the one who has to watch everything.**
 
@@ -41,7 +41,7 @@ cc-master takes all of that off your hands, like a project lead who can actually
 - **🧩 Break it down, put a crew on it.** It splits your big goal into ordered steps and runs the ones that can go at once in parallel. And it doesn't split blindly — it works out **which chain decides when the whole thing finishes** (the critical path) and leans on that.
 - **🔮 It tells you when you'll finish before it starts.** It runs thousands of simulations and gives you odds — *"50% chance Wednesday, 95% chance Friday"* — and flags which step is most likely to slip. That used to be a project manager with a spreadsheet for an afternoon. Now it's one command, milliseconds.
 - **💰 It manages your budget like a CFO.** It knows roughly what each step costs, how long you can keep going, and what pace spends best; when you're close to overspending it slows down — and hands *"do we keep spending?"* back to you to decide. **You won't wake up to a blown budget and a half-finished job.**
-- **⚡ It barely ever "stops."** Other AIs hit a usage limit and tell you to *"come back in a few hours."* This one doesn't — when one account runs low it quietly switches to a full one and keeps going. **You don't even notice.**
+- **⚡ It barely ever "stops."** Other AIs hit a usage limit and tell you to *"come back in a few hours."* On Claude Code it can switch to another account in the pool and keep going; on Cursor it paces against your subscription **billing period** instead (no account autoswitch). **Either way, the wall is managed — not ignored.**
 - **🧠 It doesn't forget.** Other AIs lose the thread after a long chat; this one remembers who it is, where it got to, and what's left — even across dozens of context resets and several sessions — and **picks up right where it left off.**
 - **🙋 It only asks you about the things that matter.** Small calls it makes itself; only when something genuinely needs you does it stop, lay out the context, and wait for your word.
 - **🏁 It won't fake being done.** Before it wraps, it checks itself against your original goal, point by point: is every piece actually done? did it ask you everything it should have? did anything quietly die in the background? **If it's not done, it won't pretend it is.**
@@ -57,7 +57,7 @@ All you do is the one idea at the start, and the few calls along the way.
 - **It figures out the order first**: the strings have to be pulled out and the framework wired up before any language can be translated. So it does the groundwork, then fans out all 6 languages **at once**.
 - **Groundwork gets the better (pricier, steadier) AI; the translations get the cheap one** — saving money without cutting quality. It does the math wherever the math matters.
 - Halfway through, **a question only you can answer comes up**: "Product terms — translate them, or keep them in English?" It **notes it for you and moves on**, while every other language keeps going.
-- As it runs, **quota gets tight** — it slows the pace, or switches to a full account and keeps going. **No wall, no overspend.**
+- As it runs, **quota gets tight** — it slows the pace, and on Claude Code it can switch to a fuller account; on Cursor it respects the billing-period window. **No silent overspend.**
 - **You come back in the morning**: all 6 languages done, every one checked, and your call on the product terms folded in.
 
 Start to finish, you said one sentence and made one decision.
@@ -76,7 +76,7 @@ cc-master is a **multi-agent-harness plugin system** built from three things: a 
 
 The source follows a paragoge-style `plugin/src -> plugin/dist/<host>` model: shared runtime skills live in canonical source, hooks are modeled as host-independent product contracts with host-native implementations, and each harness gets its own adapter artifact. The plugin version line is shared; release assets are split by harness, for example `cc-master-plugin-claude-code-<version>.zip`, `cc-master-plugin-codex-<version>.zip`, and `cc-master-plugin-cursor-<version>.zip`.
 
-We keep a clear line between "what it does today" and "what we're still building." Current adapters include Claude Code, Codex, and Cursor, with different host surfaces and some different capability levels. **Every mechanism, and whether each one is shipped or still on the way, is written down honestly in the [Feature Manual](design_docs/feature-manual.md)** — we don't oversell it in the README.
+We keep a clear line between "what it does today" and "what we're still building." Current adapters include Claude Code, Codex, and Cursor, with different host surfaces and some different capability levels — for example Claude Code can rotate accounts across 5h/7d windows, while Cursor paces a single subscription billing period and never autoswitches. Board status and the live graph now live on `ccm` (`ccm status-report` / `ccm web-viewer`), not as plugin slash commands. **Every mechanism, and whether each one is shipped or still on the way, is written down honestly in the [Feature Manual](design_docs/feature-manual.md)** — we don't oversell it in the README.
 
 For contributors: edit `plugin/src`, not `plugin/dist`. Skills use SAP (`canonical/` plus `adapters/<host>/strategy.yaml`); hooks use PHIP (`_manifest/`, `_hosts/<host>/`, and `implementations/<host>/`). Regenerate adapters with:
 
@@ -109,10 +109,10 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 # …or pin a specific version of either line — each flag is optional and
 # independent; whichever you omit resolves to the latest of that line:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- \
-  --ccm-version ccm-v0.14.0 --plugin-version 0.13.0
+  --ccm-version ccm-v0.17.2 --plugin-version 0.16.0
 
 # pin just one line, leave the other on latest (e.g. hold ccm, take latest plugin):
-curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.14.0
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.17.2
 
 # target a harness explicitly, or fan out to every installed supported harness:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness claude-code
@@ -136,11 +136,13 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 
 `ccm` is still a hard prerequisite (the installer places it first). The Cursor adapter lands at `~/.cursor/plugins/local/cc-master` — reopen a Cursor Agent session after install so hooks/rules pick up. Cursor pacing uses the dashboard **billing-period** window (not Claude Code's 5h/7d + account switch): under `CC_MASTER_HARNESS=cursor`, `ccm usage advise` reads that signal and may return `hold` / `throttle` / `stop_billing_period` (never `switch`).
 
-### Status line (automatic)
+### Status line (automatic · Claude Code)
 
-cc-master ships its own status line — a context progress bar plus your 5h / 7d quota usage, color-coded by how full each is. The **first time you run any `ccm` command, cc-master configures it for you automatically** (it writes `statusLine.command` in your global `settings.json`). The same status line also feeds the 5h / 7d quota signal that powers forecasting and pacing.
+On Claude Code, cc-master ships its own status line — a context progress bar plus your 5h / 7d quota usage, color-coded by how full each is. The **first time you run any `ccm` command, cc-master configures it for you automatically** (it writes `statusLine.command` in your global `settings.json`). The same status line also feeds the 5h / 7d quota signal that powers forecasting and pacing on that host.
 
 Heads-up: this **overwrites your existing `statusLine`** (your original is backed up first). To put yours back: `ccm statusline uninstall` (restores your original and stops cc-master from re-installing). To disable the auto-install entirely, set `CC_MASTER_NO_AUTOINSTALL=1`.
+
+Cursor does **not** use this 5h/7d status line for pacing — it reads the dashboard **billing-period** window via `ccm usage advise` under `CC_MASTER_HARNESS=cursor`.
 
 Now hand it a goal through your harness's entrypoint:
 
@@ -150,6 +152,9 @@ Now hand it a goal through your harness's entrypoint:
 
 # Codex
 $cc-master-as-master-orchestrator <your goal>
+
+# Cursor (Agent chat slash command)
+/as-master-orchestrator <your goal>
 ```
 
 ---
@@ -158,7 +163,7 @@ $cc-master-as-master-orchestrator <your goal>
 
 The handful of commands you'll actually type. The in-session entrypoint is harness-specific; `ccm …` always runs in your **terminal**.
 
-- **Start / resume** — Claude Code: `/cc-master:as-master-orchestrator <goal>` or `/cc-master:as-master-orchestrator --resume`; Codex: `$cc-master-as-master-orchestrator <goal>` or `$cc-master-as-master-orchestrator --resume`.
+- **Start / resume** — Claude Code: `/cc-master:as-master-orchestrator <goal>` or `/cc-master:as-master-orchestrator --resume`; Codex: `$cc-master-as-master-orchestrator <goal>` or `$cc-master-as-master-orchestrator --resume`; Cursor: `/as-master-orchestrator <goal>` or `/as-master-orchestrator --resume` (reopen the Agent session after install so hooks/rules load).
 - **Status** — `ccm status-report show`. Generates the shared JSON-backed board status report for CLI and the web viewer.
 - **View** — `ccm web-viewer open`. Opens the live plan as a read-only graph in your browser; lifecycle commands are `ccm web-viewer start/open/status/stop/restart`.
 - **Discuss** — Claude Code: `/cc-master:discuss <decision>`; Codex: `$cc-master-discuss <decision>`. Use it when a decision is waiting on you.
@@ -166,9 +171,9 @@ The handful of commands you'll actually type. The in-session entrypoint is harne
 - **Handoff** — Claude Code: `/cc-master:handoff-to-new-session`; Codex: `$cc-master-handoff-to-new-session`. Use it before moving the run to a fresh session.
 - **Retro** — Claude Code: `/cc-master:retro`; Codex: `$cc-master-retro`. Read-only retrospective on an in-progress or archived board — writes a lessons-learned document into the project itself (not the board, not GitHub).
 - **Distill** — Claude Code: `/cc-master:distill <retro-path...>`; Codex: `$cc-master-distill <retro-path...>`. Turns a retro's candidate lessons into real project assets (discipline-doc note, skill, workflow, or subagent) — always gated by a single user-approved plan, always collected via a feature-branch PR (or a draft directory for non-git projects). Never touches the board or `ccm`.
-- **`ccm account add|list|switch <email>`** — build and steer a pool of backup accounts so it can switch to a full one when quota runs low. You run these directly in your terminal; your tokens stay token-blind and never reach the AI's context.
+- **`ccm account add|list|switch <email>`** — on Claude Code, build and steer a pool of backup accounts so pacing can switch when one window runs low. You run these in your terminal; tokens stay token-blind and never reach the AI's context. Cursor has no account autoswitch — use billing-period pacing instead.
 
-> That's the everyday set. The full command surface (every `ccm` namespace and flag) is in the [command catalog](skills/using-ccm/references/command-catalog.md); what's shipped vs. still on the way is in the [Feature Manual](design_docs/feature-manual.md).
+> That's the everyday set. The full command surface (every `ccm` namespace and flag) is in the [command catalog](plugin/src/skills/using-ccm/canonical/references/command-catalog.md); what's shipped vs. still on the way is in the [Feature Manual](design_docs/feature-manual.md).
 
 ---
 

@@ -111,8 +111,7 @@ function isoToSec(iso: string | undefined): number | null {
 
 const DEGRADED: PacingAdvice = {
   verdict: 'hold',
-  reason:
-    '账户权威信号不可用（5h/7d/billing_period used% 均缺/过期）——降级，pacing 不可判',
+  reason: '账户权威信号不可用（5h/7d/billing_period used% 均缺/过期）——降级，pacing 不可判',
   levers: [],
   strength: 'weak',
   window_5h_pct: null,

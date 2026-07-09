@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cursor Phase B scaffold**：`.cursor-plugin` + `_hosts/cursor` launcher/hooks.json + P0 silent noop cores；`sync-plugin-dist.sh --host cursor` / package / dist-sync check 已支持；生产 hook body 仍属 Phase C。
 - **Cursor full compatibility (install + release + billing_period usage)**：P0/P1 Cursor hook cores（bootstrap / board-guard / board-lint / verify-board / usage-pacing / identity-nudge）+ Track B reinject（alwaysApply rule）；`ccm` Cursor harness adapter 与 dashboard `billing_period` usage（`CC_MASTER_HARNESS=cursor` → `ccm usage advise`）；`install.sh --harness cursor` 安装到 `~/.cursor/plugins/local/cc-master`；`package-plugin.sh --all-hosts` 与 `plugin-release.yml` 产出并校验 `cc-master-plugin-cursor-*.zip`。
 
+### Changed
+
+- **README / README_zh 入口同步近期发版事实**：pin 示例升到 `ccm-v0.17.2` / plugin `0.16.0`；补 Cursor `/as-master-orchestrator` 入口；诚实区分 Claude Code 号池换号 vs Cursor billing_period 配速；status/view 指向 `ccm status-report` / `ccm web-viewer`；命令目录链接改到 `plugin/src/skills/using-ccm/canonical/references/command-catalog.md`。
+
 ## [0.16.0] — 2026-07-09
 
 > **ccm-native web viewer + status-report 迁移（配套 ccm-v0.17.0）** —— board 可视化与状态报告从 plugin prompt/skill surface 迁到 `ccm`：`ccm web-viewer` 托管本地只读 React app，`ccm status-report` 生成可程序化报告；旧 `/cc-master:view` / `$cc-master-view` 与 `/cc-master:status` / `$cc-master-status` 入口直接删除，不保留 deprecated shim。

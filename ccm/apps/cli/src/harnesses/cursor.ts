@@ -66,7 +66,8 @@ export const cursorAdapter: HarnessAdapter = {
       return {
         signal: null,
         source: 'unavailable',
-        unavailableReason: 'Cursor dashboard GetCurrentPeriodUsage 不可用（未登录 / token 失效 / API 变更）',
+        unavailableReason:
+          'Cursor dashboard GetCurrentPeriodUsage 不可用（未登录 / token 失效 / API 变更）',
       };
     }
     return {

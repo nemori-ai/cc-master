@@ -103,7 +103,7 @@ export function readCursorUsageSignal(
   }
 }
 
-const WORKER_SOURCE = String.raw`
+const WORKER_SOURCE = `
 const { workerData } = require('node:worker_threads');
 
 const flag = new Int32Array(workerData.sab);
