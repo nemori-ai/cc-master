@@ -8,12 +8,7 @@ const NOW_SEC = Math.floor(Date.parse('2026-07-09T12:00:00Z') / 1000);
 const NOW = '2026-07-09T12:00:00Z';
 const LATER = '2026-07-09T12:10:00Z';
 
-function peer(
-  board_file: string,
-  priority: string,
-  burn: number,
-  goal = board_file,
-): M.PeerEntry {
+function peer(board_file: string, priority: string, burn: number, goal = board_file): M.PeerEntry {
   return {
     board_file,
     goal,

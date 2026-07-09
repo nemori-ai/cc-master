@@ -275,10 +275,7 @@ test('coordination arbitrate appends only own pool-aware inbox notification', ()
   const payload = item.payload as Record<string, unknown>;
   assert.equal(item.kind, 'pacing_yield');
   assert.equal(payload.producer, 'coordination-arbiter');
-  assert.equal(
-    (payload.own as Record<string, unknown>).board_file,
-    '2026-07-09-a.board.json',
-  );
+  assert.equal((payload.own as Record<string, unknown>).board_file, '2026-07-09-a.board.json');
   assert.deepEqual(readBoard(boardB), peerBefore, 'arbitrate must not write peer boards');
 });
 
@@ -306,8 +303,12 @@ test('coordination arbitrate dedups unchanged own notification', () => {
   const out = JSON.parse(again.outBuf.join(''));
   assert.equal(out.data.appended, 0);
   assert.equal(out.data.append_reason, 'dedup');
-  const inbox = ((readBoard(boardA).coordination as Record<string, unknown>).inbox as unknown[]) ?? [];
-  assert.equal(inbox.filter((item) => (item as Record<string, unknown>).status === 'unconsumed').length, 1);
+  const inbox =
+    ((readBoard(boardA).coordination as Record<string, unknown>).inbox as unknown[]) ?? [];
+  assert.equal(
+    inbox.filter((item) => (item as Record<string, unknown>).status === 'unconsumed').length,
+    1,
+  );
 });
 
 test('coordination arbitrate keeps empty-session peers distinct in the same pool', () => {

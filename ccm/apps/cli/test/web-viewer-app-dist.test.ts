@@ -3,16 +3,16 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
+import { readVersion } from '../src/help.js';
 import {
   __resetWebViewerAppDistTestHooks,
   __setWebViewerAppDistTestHooks,
   ensureWebViewerAppDist,
   hasIndexHtml,
-  materializeWebViewerAppDist,
   materializedAppDistDir,
+  materializeWebViewerAppDist,
   resolveAppDistDir,
 } from '../src/web-viewer-app-dist.js';
-import { readVersion } from '../src/help.js';
 
 let TMPDIRS: string[] = [];
 

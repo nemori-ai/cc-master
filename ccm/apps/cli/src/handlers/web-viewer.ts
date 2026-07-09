@@ -7,8 +7,8 @@ import { analyzeGraph, isAwaitingUser, STATUS_ENUM, taskTrulyDone, withLock } fr
 import * as discover from '../discover.js';
 import { readVersion } from '../help.js';
 import * as io from '../io.js';
-import type { Ctx } from './_common.js';
 import { ensureWebViewerAppDist, resolveAppDistDir } from '../web-viewer-app-dist.js';
+import type { Ctx } from './_common.js';
 import { writeReportForBoard } from './status-report.js';
 
 const EXIT = io.EXIT;
@@ -714,7 +714,7 @@ export function status(ctx: Ctx): number {
       ok: true,
       running: !!service && service.health === 'ok',
       binary_match: service ? service.binary_match !== false : null,
-      running_ccm_version: service ? service.running_ccm_version ?? null : null,
+      running_ccm_version: service ? (service.running_ccm_version ?? null) : null,
       installed_ccm_version: ccmVersion(),
       service: serviceView,
     },

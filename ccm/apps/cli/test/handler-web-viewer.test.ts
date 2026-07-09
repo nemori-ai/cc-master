@@ -932,9 +932,12 @@ test('serve uses home materialized app-dist without relying on process cwd', asy
     assert.notEqual(port, 5173, 'must not default to a fixed dev-server port');
   } finally {
     process.chdir(prevCwd);
-    await httpJson({ port, path: '/_ccm/shutdown', token: 'materialized-token', method: 'POST' }).catch(
-      () => {},
-    );
+    await httpJson({
+      port,
+      path: '/_ccm/shutdown',
+      token: 'materialized-token',
+      method: 'POST',
+    }).catch(() => {});
   }
   assert.equal(await servePromise, EXIT.OK);
 });

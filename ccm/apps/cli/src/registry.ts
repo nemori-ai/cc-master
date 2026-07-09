@@ -201,8 +201,7 @@ export const REGISTRY: Registry = {
       handler: 'board.setParam',
     },
     'stamp-harness': {
-      summary:
-        'ARM 时从可信 harness env 盖 owner.harness（detect 命中才写；无 env 不覆盖既有值）',
+      summary: 'ARM 时从可信 harness env 盖 owner.harness（detect 命中才写；无 env 不覆盖既有值）',
       read: false,
       positionals: [],
       options: {
@@ -873,7 +872,8 @@ export const REGISTRY: Registry = {
       handler: 'coordination.notify',
     },
     arbitrate: {
-      summary: '运行 deterministic pool arbiter，按同 harness 池计算 pacing 建议并按边沿写入本板 inbox',
+      summary:
+        '运行 deterministic pool arbiter，按同 harness 池计算 pacing 建议并按边沿写入本板 inbox',
       read: false,
       positionals: [],
       options: {
@@ -1094,7 +1094,8 @@ export const REGISTRY: Registry = {
   // ════════════════════ monitor（ADR-033 optional daemon）══════════════════════════════════════════
   monitor: {
     start: {
-      summary: '启动或复用当前 home 的 ccm monitor daemon（连续 usage sensing + pool arbiter edge writes）',
+      summary:
+        '启动或复用当前 home 的 ccm monitor daemon（连续 usage sensing + pool arbiter edge writes）',
       read: false,
       positionals: [],
       options: {
@@ -1172,7 +1173,8 @@ export const REGISTRY: Registry = {
   // ════════════════════ services（ADR-033 home service reconciliation）════════════════════════════
   services: {
     reconcile: {
-      summary: '按 wanted 语义重启 home 常驻服务（monitor + web-viewer），用于 ccm 二进制替换后收口',
+      summary:
+        '按 wanted 语义重启 home 常驻服务（monitor + web-viewer），用于 ccm 二进制替换后收口',
       read: false,
       positionals: [],
       options: {

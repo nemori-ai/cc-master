@@ -41,7 +41,10 @@ test('INVARIANTS includes FMT-HARNESS at warn level', () => {
 test('missing owner.harness is backward-compatible (no warning)', () => {
   const result = M.lintBoard(JSON.stringify(makeBoard()));
   assert.equal(result.errors.length, 0);
-  assert.equal(result.warnings.find((w: { rule: string }) => w.rule === 'FMT-HARNESS'), undefined);
+  assert.equal(
+    result.warnings.find((w: { rule: string }) => w.rule === 'FMT-HARNESS'),
+    undefined,
+  );
 });
 
 test('valid owner.harness values do not warn', () => {

@@ -1,8 +1,10 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   allocatePool,
   buildPeerRoster,
-  effectiveN,
   ENUMS,
+  effectiveN,
   isISOUTC,
   loadHomeBoards,
   type NewNotification,
@@ -11,15 +13,13 @@ import {
   type NotificationKind,
   type NotificationStrength,
   POOL_ARBITER_POLICY,
-  shouldAppendAllocationNotification,
   type PoolAllocation,
   type PoolAllocationRow,
   type PoolPressureBand,
   type QuotaModel,
+  shouldAppendAllocationNotification,
   type UsageSignal,
 } from '@ccm/engine';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import * as discover from '../discover.js';
 import { resolveHarnessAdapter } from '../harnesses/registry.js';
 import * as mutations from '../mutations.js';
@@ -251,7 +251,7 @@ export function arbitrate(ctx: Ctx): number {
       resolvedBoardPath = resolved.boardPath;
       return resolved;
     },
-    render: (next, c) => {
+    render: (_next, c) => {
       const data = result ?? {
         mode: 'pool-arbiter',
         appended: 0,
@@ -320,7 +320,8 @@ function arbitrateMutate(
     signal: adapter.readCurrentUsage(ctx.env).signal,
     ...adapter.usageSource(ctx.env),
   };
-  const accountsMap = opts.accountsMap === undefined ? readRegistry(ctx.env, homeFlag) : opts.accountsMap;
+  const accountsMap =
+    opts.accountsMap === undefined ? readRegistry(ctx.env, homeFlag) : opts.accountsMap;
 
   let boards: Array<{ file: string; board: unknown }> = [];
   try {
@@ -371,8 +372,8 @@ function arbitrateMutate(
   });
   const ownRow =
     ownPeer && allocation.rows.find((row) => row.peer.board_file === ownPeer.board_file)
-      ? allocation.rows.find((row) => row.peer.board_file === ownPeer.board_file) ?? null
-      : allocation.rows[0] ?? null;
+      ? (allocation.rows.find((row) => row.peer.board_file === ownPeer.board_file) ?? null)
+      : (allocation.rows[0] ?? null);
   const decision = ownRow
     ? shouldAppendAllocationNotification(ownRow, allocation, existing, nowMs)
     : { append: false, reason: 'no-notification' as const, latest_id: null };

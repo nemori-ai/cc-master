@@ -141,7 +141,12 @@ test('monitor serve runs bounded ticks and records tick state without touching r
   monitor.__setMonitorTestHooks({
     now: () => new Date('2026-07-09T10:00:01Z'),
     tick: () => ({
-      registry: { schema: 'ccm/machine-harness-registry/v1', installed: [], harnesses: [], pools: [] },
+      registry: {
+        schema: 'ccm/machine-harness-registry/v1',
+        installed: [],
+        harnesses: [],
+        pools: [],
+      },
       checked_boards: 0,
       writes: 0,
       errors: [],
@@ -152,7 +157,15 @@ test('monitor serve runs bounded ticks and records tick state without touching r
   const code = await monitor.serve({
     values: { state: statePath, iterations: '1' },
     positionals: [],
-    flags: { json: false, dryRun: false, force: false, yes: false, quiet: false, verbose: false, color: false },
+    flags: {
+      json: false,
+      dryRun: false,
+      force: false,
+      yes: false,
+      quiet: false,
+      verbose: false,
+      color: false,
+    },
     sid: '',
     env: { CC_MASTER_HOME: home },
     out: (s) => out.push(s),
