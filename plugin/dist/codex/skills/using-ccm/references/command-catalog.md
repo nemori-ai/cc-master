@@ -1792,20 +1792,21 @@ ccm --harness codex harness current [--json]
 **写**（默认 verb：裸 `ccm upgrade` ≡ `ccm upgrade all`）
 
 ```
-ccm upgrade [--json] [--all-harnesses]
-ccm upgrade all [--json] [--all-harnesses]
+ccm upgrade [--json] [--harness <id>] [--all-harnesses]
+ccm upgrade all [--json] [--harness <id>] [--all-harnesses]
 ```
 
 - positional：无
-- 行为：先升 ccm 二进制、再升插件（互不依赖·一个失败不挡另一个）；退出码取「先失败者」（都成才 `0`）
+- 行为：先升 ccm 二进制、再升插件（互不依赖·一个失败不挡另一个）；退出码取「先失败者」（都成才 `0`）。插件阶段**默认**枚举本机已安装且支持 plugin 分发的 harness 并逐个升级；`--harness` 收窄为单目标（与 `--all-harnesses` 互斥；后者现为默认行为的兼容别名）
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--json` | | bool | 结构化输出 |
-| `--all-harnesses` | | bool | 插件升级阶段枚举本机已安装的 ccm-supported harness 并逐个分发（不影响 ccm 二进制自升级） |
+| `--harness <id>` | | string | 插件升级阶段只升指定 harness（不影响 ccm 二进制自升级） |
+| `--all-harnesses` | | bool | 兼容别名：插件升级默认即升本机已安装 harness；与 `--harness` 互斥 |
 
-- 例：`ccm upgrade` · `ccm upgrade --dry-run` · `ccm upgrade --all-harnesses --dry-run`
+- 例：`ccm upgrade` · `ccm upgrade --dry-run` · `ccm upgrade --harness cursor --dry-run`
 
 ### upgrade ccm
 
@@ -1831,20 +1832,21 @@ ccm upgrade ccm [--to <ccm-v*tag>] [--json]
 **写**（harness-specific plugin manager）
 
 ```
-ccm upgrade plugin [--to <v*tag>] [--json] [--all-harnesses]
+ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
 ```
 
 - positional：无
-- 行为：Codex 的 plugin 升级 adapter 会从本机已安装的 cc-master 包读取 adapter 产物，刷新本地 Codex marketplace/plugin 注册，并按 `plugin/dist/codex` 中的 skills + hooks 进行更新；入口命令以 `\$cc-master-*` skill 调用为主。传 `--all-harnesses` 时先跑本机 harness inventory，只对已安装且支持 `pluginDistribution` 的 harness 执行各自 adapter；Codex adapter 不触碰 Claude Code settings / marketplace。
+- 行为：默认枚举本机已安装且支持 `pluginDistribution` 的 harness，并逐个执行各自 adapter 升级。Codex adapter 会从本机已安装的 cc-master 包读取 adapter 产物，刷新本地 Codex marketplace/plugin 注册，并按 `plugin/dist/codex` 中的 skills + hooks 进行更新；入口命令以 `$cc-master-*` skill 调用为主。需要只升 Codex 时传 `--harness codex`；`--all-harnesses` 现为默认行为的兼容别名（与 `--harness` 互斥）。Codex adapter 不触碰 Claude Code settings / marketplace。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--to <tag>` | | string | 期望的 `v*` tag（**信息性**·实际升到 marketplace 最新） |
-| `--all-harnesses` | | bool | 枚举本机已安装的 ccm-supported harness；支持 plugin 分发的执行升级，不支持的 skipped |
+| `--harness <id>` | | string | 只升指定 harness（与 `--all-harnesses` 互斥） |
+| `--all-harnesses` | | bool | 兼容别名：默认即枚举本机已安装 harness；与 `--harness` 互斥 |
 | `--json` | | bool | 结构化输出 |
 
-- 例：`ccm upgrade plugin` · `ccm upgrade plugin --dry-run` · `ccm upgrade plugin --all-harnesses --dry-run --json`
+- 例：`ccm upgrade plugin` · `ccm upgrade plugin --dry-run` · `ccm upgrade plugin --harness cursor --dry-run --json` · `ccm upgrade plugin --all-harnesses --dry-run --json`
 
 ---
 

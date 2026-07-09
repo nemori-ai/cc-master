@@ -1500,10 +1500,10 @@ export const REGISTRY: Registry = {
         json: { type: 'boolean', desc: '结构化输出' },
         'all-harnesses': {
           type: 'boolean',
-          desc: '插件升级阶段枚举本机已安装的 ccm-supported harness 并逐个分发（不影响 ccm 二进制自升级）',
+          desc: '兼容别名：插件升级阶段默认即升本机已安装 harness；与 --harness 互斥（不影响 ccm 二进制自升级）',
         },
       },
-      examples: ['ccm upgrade', 'ccm upgrade --dry-run', 'ccm upgrade --all-harnesses --dry-run'],
+      examples: ['ccm upgrade', 'ccm upgrade --dry-run', 'ccm upgrade --harness cursor --dry-run'],
       handler: 'upgrade.all',
     },
     ccm: {
@@ -1519,7 +1519,7 @@ export const REGISTRY: Registry = {
     },
     plugin: {
       summary:
-        '只升 cc-master 插件（claude CLI 经 marketplace 托管·--to 仅信息性·默认 marketplace 最新）',
+        '只升 cc-master 插件（默认升本机已安装且支持分发的全部 harness；--harness 单目标；--to 仅信息性）',
       read: false,
       positionals: [],
       options: {
@@ -1529,13 +1529,14 @@ export const REGISTRY: Registry = {
         },
         'all-harnesses': {
           type: 'boolean',
-          desc: '枚举本机已安装的 ccm-supported harness；支持 plugin 分发的执行升级，不支持的 skipped',
+          desc: '兼容别名：默认行为即枚举本机已安装 harness；与 --harness 互斥',
         },
         json: { type: 'boolean', desc: '结构化输出' },
       },
       examples: [
         'ccm upgrade plugin',
         'ccm upgrade plugin --dry-run',
+        'ccm upgrade plugin --harness cursor --dry-run --json',
         'ccm upgrade plugin --all-harnesses --dry-run --json',
       ],
       handler: 'upgrade.plugin',

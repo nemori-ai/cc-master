@@ -92,12 +92,12 @@ test('pickLatestTag returns null when the line has no release（优雅·本线�
   assert.equal(pickLatestTag([], 'plugin'), null, '空列表 → null');
 });
 
-test('upgrade plugin: Codex harness dry-run updates marketplace registration plan', async () => {
+test('upgrade plugin --harness codex: dry-run updates marketplace registration plan', async () => {
   const out: string[] = [];
   const err: string[] = [];
   const root = mkdtempSync(join(tmpdir(), 'ccm-upgrade-codex-dry-'));
   const ctx: Ctx = {
-    values: {},
+    values: { harness: 'codex' },
     positionals: [],
     flags: {
       json: true,
@@ -109,7 +109,7 @@ test('upgrade plugin: Codex harness dry-run updates marketplace registration pla
       color: false,
     },
     sid: '',
-    env: { CC_MASTER_HARNESS: 'codex', HOME: root },
+    env: { HOME: root },
     out: (s) => out.push(s),
     err: (s) => err.push(s),
   };
@@ -125,7 +125,7 @@ test('upgrade plugin: Codex harness dry-run updates marketplace registration pla
   assert.equal(parsed.data.plugin_id, 'cc-master@cc-master');
 });
 
-test('upgrade plugin: Codex harness 注册本地 plugin', async () => {
+test('upgrade plugin --harness codex: 注册本地 plugin', async () => {
   const root = mkdtempSync(join(tmpdir(), 'ccm-upgrade-codex-copy-'));
   const pluginBase = join(root, 'cc-master-store');
   const pluginRoot = join(pluginBase, 'codex', 'cc-master');
@@ -143,7 +143,7 @@ test('upgrade plugin: Codex harness 注册本地 plugin', async () => {
   const out: string[] = [];
   const err: string[] = [];
   const ctx: Ctx = {
-    values: {},
+    values: { harness: 'codex' },
     positionals: [],
     flags: {
       json: true,
@@ -156,7 +156,6 @@ test('upgrade plugin: Codex harness 注册本地 plugin', async () => {
     },
     sid: '',
     env: {
-      CC_MASTER_HARNESS: 'codex',
       CC_MASTER_PLUGIN_DIR: pluginBase,
       CODEX_HOME: codexHome,
       HOME: root,
@@ -190,7 +189,49 @@ test('upgrade plugin: Codex harness 注册本地 plugin', async () => {
   assert.match(codexCalls, /^plugin list --json$/m);
 });
 
-test('upgrade plugin --all-harnesses: Codex entry is included in dry-run without network', async () => {
+test('upgrade plugin default: enumerates installed harnesses (Codex dry-run without network)', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-upgrade-default-all-'));
+  const codexHome = join(root, '.codex');
+  const pluginRoot = join(root, 'cc-master');
+  mkdirSync(codexHome, { recursive: true });
+  mkdirSync(join(pluginRoot, 'skills'), { recursive: true });
+  const out: string[] = [];
+  const err: string[] = [];
+  const ctx: Ctx = {
+    values: {},
+    positionals: [],
+    flags: {
+      json: true,
+      dryRun: true,
+      force: false,
+      yes: false,
+      quiet: false,
+      verbose: false,
+      color: false,
+    },
+    sid: '',
+    env: {
+      HOME: root,
+      CODEX_HOME: codexHome,
+      CC_MASTER_PLUGIN_ROOT: pluginRoot,
+      PATH: '/does/not/exist',
+    },
+    out: (s) => out.push(s),
+    err: (s) => err.push(s),
+  };
+
+  const code = await plugin(ctx);
+  assert.equal(code, 0, err.join('\n'));
+  const parsed = JSON.parse(out[out.length - 1] || '{}');
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.data.action, 'all-harnesses');
+  assert.deepEqual(
+    parsed.data.results.map((r: { harness: string; action: string }) => [r.harness, r.action]),
+    [['codex', 'dry_run']],
+  );
+});
+
+test('upgrade plugin --all-harnesses: same as default inventory path', async () => {
   const root = mkdtempSync(join(tmpdir(), 'ccm-upgrade-all-harnesses-'));
   const codexHome = join(root, '.codex');
   const pluginRoot = join(root, 'cc-master');
@@ -230,6 +271,31 @@ test('upgrade plugin --all-harnesses: Codex entry is included in dry-run without
     parsed.data.results.map((r: { harness: string; action: string }) => [r.harness, r.action]),
     [['codex', 'dry_run']],
   );
+});
+
+test('upgrade plugin: --harness and --all-harnesses are mutually exclusive', async () => {
+  const out: string[] = [];
+  const err: string[] = [];
+  const ctx: Ctx = {
+    values: { harness: 'codex', 'all-harnesses': true },
+    positionals: [],
+    flags: {
+      json: false,
+      dryRun: true,
+      force: false,
+      yes: false,
+      quiet: false,
+      verbose: false,
+      color: false,
+    },
+    sid: '',
+    env: { HOME: mkdtempSync(join(tmpdir(), 'ccm-upgrade-mutex-')) },
+    out: (s) => out.push(s),
+    err: (s) => err.push(s),
+  };
+  const code = await plugin(ctx);
+  assert.equal(code, 2);
+  assert.match(err.join('\n'), /--harness.*--all-harnesses/);
 });
 
 function makeFakeCodex(root: string): { binDir: string; log: string } {

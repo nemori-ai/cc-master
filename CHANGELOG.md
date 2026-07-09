@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`ccm upgrade plugin` defaults to all installed harnesses** — bare `ccm upgrade plugin` / `ccm upgrade` now enumerates machine-installed, plugin-distributable harnesses and upgrades each; use `--harness <id>` for a single target. `--all-harnesses` remains as a compatible alias (mutually exclusive with `--harness`).
+
 ### Added
 - **ADR-033 P5 monitor daemon + service reconcile** — add optional `ccm monitor start|stop|status|restart|serve|install-service|uninstall-service`, shared `ccm services reconcile --after-binary-replace` for monitor/web-viewer wanted services, and post-ccm-binary install/upgrade reconcile hooks.
 - **ADR-032 P4 pool-aware arbiter** — deterministic `PoolPressure` + priority-weighted fair-share (`urgent:high:normal:low:trivial = 8:4:2:1:0.5`); `ccm coordination arbitrate` appends complementary own-board inbox rows with edge/dedup; SKILL A/H consumer prose + using-ccm lockstep.

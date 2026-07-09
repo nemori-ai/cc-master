@@ -4,7 +4,8 @@
 //   · ccm 二进制（per-OS Node SEA·ADR-014·随 GitHub `ccm-v*` 线发布·资产名 `ccm-<os>-<arch>`）；
 //   · cc-master 插件（「解压即装」zip·随 GitHub 裸 `v*` 线发布·由 claude CLI 经 marketplace 托管）。
 //   三 verb：`ccm upgrade`（默认 verb=all·两者各升各自线最新）/ `ccm upgrade ccm [--to <ccm-v*>]` /
-//            `ccm upgrade plugin [--to <v*>]`。`--dry-run`（全局 flag）只查「当前 vs 最新」并打印计划、不真升。
+//            `ccm upgrade plugin [--to <v*>]`（默认升本机已安装且支持分发的全部 harness；`--harness` 单目标）。
+//            `--dry-run`（全局 flag）只查「当前 vs 最新」并打印计划、不真升。
 //
 // **不是 board 操作**——不走 discover/runWrite/runRead；纯进程级动作（GitHub releases 列举 + 下载 + 自替换 +
 //   shell out claude CLI）。async（同 account switch·router 透传 Promise·bin/sea await 落码）。
@@ -379,17 +380,32 @@ export async function ccm(ctx: Ctx): Promise<number> {
   }
 }
 
-// ════════════════════ verb: plugin（claude CLI 托管）═══════════════════════════════════════════════════
+// ════════════════════ verb: plugin（按 harness adapter 分发）═══════════════════════════════════════════
+// 默认：枚举本机已安装且支持 plugin 分发的 harness，逐个升级。
+// 单目标：显式 `--harness <id>`（与 `--all-harnesses` 互斥；后者现为默认的兼容别名）。
 export async function plugin(ctx: Ctx): Promise<number> {
-  if (ctx.values['all-harnesses'] === true) return pluginAllHarnesses(ctx);
+  const harnessFlag =
+    typeof ctx.values.harness === 'string' && ctx.values.harness.trim()
+      ? String(ctx.values.harness).trim()
+      : '';
+  const wantAll = ctx.values['all-harnesses'] === true;
 
-  const env = ctx.env;
-  const harness = resolveHarnessAdapter({
-    env,
-    harnessFlag: ctx.values.harness as string | undefined,
-  });
-  const result = await pluginForHarness(ctx, harness, { emitJson: ctx.flags.json });
-  return result.exitCode;
+  if (harnessFlag && wantAll) {
+    ctx.err('upgrade(plugin): `--harness` 与 `--all-harnesses` 不能同时使用。');
+    return EXIT.USAGE;
+  }
+
+  if (harnessFlag) {
+    const harness = resolveHarnessAdapter({
+      env: ctx.env,
+      harnessFlag,
+    });
+    const result = await pluginForHarness(ctx, harness, { emitJson: ctx.flags.json });
+    return result.exitCode;
+  }
+
+  // Default (and explicit --all-harnesses): upgrade every installed, supported harness.
+  return pluginAllHarnesses(ctx);
 }
 
 async function pluginForHarness(
