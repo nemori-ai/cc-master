@@ -80,6 +80,73 @@ function advise(home) {
   return data;
 }
 
+function parseIsoMs(value) {
+  if (typeof value !== 'string' || !value) return null;
+  const t = Date.parse(value.replace('Z', '+00:00'));
+  return Number.isNaN(t) ? null : t;
+}
+
+function isoUtcFromMs(ms) {
+  return new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function expiresFor(data) {
+  const nearest = data && typeof data.nearest_reset === 'string' ? data.nearest_reset : '';
+  const nowMs = Date.now();
+  const nearestMs = parseIsoMs(nearest);
+  if (nearestMs !== null && nearestMs > nowMs) return nearest;
+  return isoUtcFromMs(nowMs + 60 * 60 * 1000);
+}
+
+function durableKindFor(verdict, strength) {
+  if (verdict === 'stop_5h' || verdict === 'stop_7d') return 'pacing_stop';
+  if (verdict === 'throttle' && strength === 'strong') return 'pacing_throttle';
+  if (verdict === 'switch') return 'pacing_switch';
+  return null;
+}
+
+function notifyCoordination(home, boardPath, data, strength, message) {
+  const kind = durableKindFor(data.verdict, strength);
+  if (!kind || !boardPath) return false;
+  // PARITY: rule-usage-pacing-dual-delivery
+  const payload = JSON.stringify({
+    producer: 'usage-pacing',
+    p3_mode: 'single-board usage advise; P4 replaces this producer with pool-aware arbitrate',
+    verdict: data.verdict,
+    route: 'coordination-inbox',
+    advice: data,
+  });
+  let result;
+  try {
+    result = spawnSync(CCM_BIN, [
+      'coordination',
+      'notify',
+      '--kind',
+      kind,
+      '--summary',
+      message,
+      '--strength',
+      strength,
+      '--payload',
+      payload,
+      '--expires',
+      expiresFor(data),
+      '--json',
+      '--home',
+      home,
+      '--board',
+      boardPath,
+    ], {
+      encoding: 'utf8',
+      timeout: 10000,
+      env: { ...process.env, CC_MASTER_HOME: home },
+    });
+  } catch {
+    return false;
+  }
+  return !!result && !result.error && !result.signal && result.status === 0;
+}
+
 function fmtPct(value) {
   return typeof value === 'number' ? `${value}%` : 'unknown';
 }
@@ -122,6 +189,8 @@ function main() {
     data.strength === 'strong' || data.strength === 'weak'
       ? data.strength
       : PACING_STRENGTH[data.verdict] || 'weak';
+  const boardPath = process.env.CC_MASTER_BOARD || (payload.board && payload.board.path) || '';
+  if (notifyCoordination(home, boardPath, data, strength, msg)) return;
   system(advisory('usage-pacing', strength, msg));
 }
 

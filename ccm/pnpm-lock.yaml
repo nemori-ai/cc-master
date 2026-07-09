@@ -33,6 +33,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/engine
     devDependencies:
+      '@ccm/web-viewer':
+        specifier: workspace:*
+        version: link:../web-viewer
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0

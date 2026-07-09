@@ -56,12 +56,15 @@ export function list(ctx: Ctx): number {
         lines.push('  （无活+新鲜 peer·单板 pacing·M=1 退化）');
         return `${lines.join('\n')}\n`;
       }
-      for (const p of roster.peers) {
-        lines.push(
-          `  [${p.priority}] ${fmtGoal(p.goal)}（hb 距今 ${fmtAge(p.heartbeat_age_sec)}）`,
-        );
-        const sub = fmtState(p);
-        if (sub) lines.push(`      ${sub}`);
+      for (const pool of roster.pools) {
+        lines.push(`  pool ${pool.pool_id}（harness=${pool.harness}·M=${pool.count}）`);
+        for (const p of pool.peers) {
+          lines.push(
+            `    [${p.priority}] ${fmtGoal(p.goal)}（hb 距今 ${fmtAge(p.heartbeat_age_sec)}）`,
+          );
+          const sub = fmtState(p);
+          if (sub) lines.push(`        ${sub}`);
+        }
       }
       return `${lines.join('\n')}\n`;
     },

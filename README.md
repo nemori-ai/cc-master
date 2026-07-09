@@ -1,7 +1,7 @@
 # cc-master
 
-[![plugin](https://img.shields.io/badge/plugin-v0.17.2-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.17.2)
-[![ccm](https://img.shields.io/badge/ccm-v0.18.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.18.0)
+[![plugin](https://img.shields.io/badge/plugin-v0.18.0-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.18.0)
+[![ccm](https://img.shields.io/badge/ccm-v0.19.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.19.0)
 [![harness](https://img.shields.io/badge/harness-Claude%20Code%20%7C%20Codex%20%7C%20Cursor-4B5563)](design_docs/harnesses/)
 [![ccm CI](https://img.shields.io/github/actions/workflow/status/nemori-ai/cc-master/ccm-ci.yml?branch=main&label=ccm%20CI)](https://github.com/nemori-ai/cc-master/actions/workflows/ccm-ci.yml)
 [![license](https://img.shields.io/github/license/nemori-ai/cc-master)](LICENSE)
@@ -82,7 +82,7 @@ cc-master is a **multi-agent-harness plugin system** built from three things: a 
 
 The source follows a paragoge-style `plugin/src -> plugin/dist/<host>` model: shared runtime skills live in canonical source, hooks are modeled as host-independent product contracts with host-native implementations, and each harness gets its own adapter artifact. The plugin version line is shared; release assets are split by harness, for example `cc-master-plugin-claude-code-<version>.zip`, `cc-master-plugin-codex-<version>.zip`, and `cc-master-plugin-cursor-<version>.zip`.
 
-We keep a clear line between "what it does today" and "what we're still building." Current adapters include Claude Code, Codex, and Cursor, with different host surfaces and some different capability levels — for example Claude Code can rotate accounts across 5h/7d windows, while Cursor paces a single subscription billing period and never autoswitches. Board status and the live graph now live on `ccm` (`ccm status-report` / `ccm web-viewer`), not as plugin slash commands. **Every mechanism, and whether each one is shipped or still on the way, is written down honestly in the [Feature Manual](design_docs/feature-manual.md)** — we don't oversell it in the README.
+We keep a clear line between "what it does today" and "what we're still building." Current adapters include Claude Code, Codex, and Cursor, with different host surfaces and some different capability levels — for example Claude Code can rotate accounts across 5h/7d windows, while Cursor paces a single subscription billing period and never autoswitches. Board status and the live graph now live on `ccm` (`ccm status-report` / `ccm web-viewer`), not as plugin slash commands; after `ccm upgrade` or `install.sh`, wanted `web-viewer` / `monitor` services reconcile to the new binary (frontend assets ship inside `ccm`, listener on an OS-assigned port). **Every mechanism, and whether each one is shipped or still on the way, is written down honestly in the [Feature Manual](design_docs/feature-manual.md)** — we don't oversell it in the README.
 
 For contributors: edit `plugin/src`, not `plugin/dist`. Skills use SAP (`canonical/` plus `adapters/<host>/strategy.yaml`); hooks use PHIP (`_manifest/`, `_hosts/<host>/`, and `implementations/<host>/`). Regenerate adapters with:
 
@@ -115,10 +115,10 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 # …or pin a specific version of either line — each flag is optional and
 # independent; whichever you omit resolves to the latest of that line:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- \
-  --ccm-version ccm-v0.18.0 --plugin-version v0.17.2
+  --ccm-version ccm-v0.19.0 --plugin-version v0.18.0
 
 # pin just one line, leave the other on latest (e.g. hold ccm, take latest plugin):
-curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.18.0
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.19.0
 
 # target a harness explicitly, or fan out to every installed supported harness:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness claude-code
@@ -171,7 +171,7 @@ The handful of commands you'll actually type. The in-session entrypoint is harne
 
 - **Start / resume** — Claude Code: `/cc-master:as-master-orchestrator <goal>` or `/cc-master:as-master-orchestrator --resume`; Codex: `$cc-master-as-master-orchestrator <goal>` or `$cc-master-as-master-orchestrator --resume`; Cursor: `/as-master-orchestrator <goal>` or `/as-master-orchestrator --resume` (reopen the Agent session after install so hooks/rules load).
 - **Status** — `ccm status-report show`. Generates the shared JSON-backed board status report for CLI and the web viewer.
-- **View** — `ccm web-viewer open`. Opens the live plan as a read-only graph in your browser; lifecycle commands are `ccm web-viewer start/open/status/stop/restart`.
+- **View** — `ccm web-viewer open`. Opens the live plan as a read-only graph in your browser; lifecycle commands are `ccm web-viewer start/open/status/stop/restart` (OS-assigned port by default; survives `ccm upgrade` when the service was already wanted).
 - **Discuss** — Claude Code: `/cc-master:discuss <decision>`; Cursor: `/discuss <decision>`; Codex: `$cc-master-discuss <decision>`. Use it when a decision is waiting on you.
 - **Stop** — Claude Code: `/cc-master:stop`; Codex: `$cc-master-stop`. Wraps up and archives the board; you can resume later.
 - **Handoff** — Claude Code: `/cc-master:handoff-to-new-session`; Codex: `$cc-master-handoff-to-new-session`. Use it before moving the run to a fresh session.

@@ -1,6 +1,6 @@
 {
   "name": "ccm",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "type": "module",
   "bin": {
     "ccm": "./bin/ccm.cjs"
@@ -10,8 +10,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsdown",
-    "build:sea": "bash scripts/build-sea.sh",
+    "build": "node scripts/gen-web-viewer-assets.mjs && tsdown",
+    "build:sea": "node scripts/gen-web-viewer-assets.mjs && bash scripts/build-sea.sh",
     "test": "node --import tsx --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "lint": "biome check ."
@@ -20,6 +20,7 @@
     "@ccm/engine": "workspace:*"
   },
   "devDependencies": {
+    "@ccm/web-viewer": "workspace:*",
     "@types/node": "^26.0.0",
     "postject": "1.0.0-alpha.6",
     "tsx": "^4.20.6"

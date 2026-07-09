@@ -3,6 +3,7 @@
 import {
   type HarnessInstallation,
   inspectKnownHarnesses,
+  MachineHarnessRegistry,
   resolveHarnessAdapter,
 } from '../harnesses/registry.js';
 import * as io from '../io.js';
@@ -15,6 +16,24 @@ export function list(ctx: Ctx): number {
     env: ctx.env,
     harnessFlag: ctx.values.harness as string | undefined,
   });
+  if (ctx.values['machine-wide']) {
+    const registry = MachineHarnessRegistry.sweep(ctx.env);
+    const snapshot = registry.toJSON();
+    if (ctx.flags.json) {
+      ctx.out(
+        io.jsonOk({
+          current: selected.id,
+          machineWide: true,
+          ...snapshot,
+        }),
+      );
+      return EXIT.OK;
+    }
+    ctx.out('MACHINE-WIDE HARNESS REGISTRY');
+    for (const h of snapshot.harnesses) ctx.out(formatMachineHarnessLine(h, selected.id));
+    return EXIT.OK;
+  }
+
   const harnesses = inspectKnownHarnesses(ctx.env);
   if (ctx.flags.json) {
     ctx.out(
@@ -60,4 +79,19 @@ function formatHarnessLine(h: HarnessInstallation, selectedId: string): string {
   const account = h.capabilities.accountPool.supported ? 'account=yes' : 'account=no';
   const reason = h.reason ? ` · ${h.reason}` : '';
   return `  ${h.id.padEnd(12)} ${marks.join(',') || '-'} · cli=${cli} · ${dist} ${statusline} ${account}${reason}`;
+}
+
+function formatMachineHarnessLine(
+  h: HarnessInstallation & {
+    sessionStoreRoots: readonly string[];
+    usageSource: { kind: string; pollable: boolean; quotaModel: string };
+    accountPoolLocation: string | null;
+  },
+  selectedId: string,
+): string {
+  const base = formatHarnessLine(h, selectedId);
+  const roots = h.sessionStoreRoots.length ? h.sessionStoreRoots.join(',') : '-';
+  const usage = `${h.usageSource.kind}/${h.usageSource.quotaModel}/${h.usageSource.pollable ? 'pollable' : 'not-pollable'}`;
+  const pool = h.accountPoolLocation || '-';
+  return `${base} · sessions=${roots} · usage=${usage} · accountPool=${pool}`;
 }

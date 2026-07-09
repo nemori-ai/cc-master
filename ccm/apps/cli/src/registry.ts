@@ -200,6 +200,17 @@ export const REGISTRY: Registry = {
       ],
       handler: 'board.setParam',
     },
+    'stamp-harness': {
+      summary:
+        'ARM 时从可信 harness env 盖 owner.harness（detect 命中才写；无 env 不覆盖既有值）',
+      read: false,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm board stamp-harness --board <path> --json'],
+      handler: 'board.stampHarness',
+    },
   },
 
   // ════════════════════ task ═════════════════════════════════════════════════════════════════════
@@ -811,6 +822,68 @@ export const REGISTRY: Registry = {
     },
   },
 
+  // ════════════════════ coordination（ADR-032 notification inbox）═══════════════════════════════════
+  coordination: {
+    inbox: {
+      summary: '通知收件箱：coordination inbox list|ack（durable advisory 投递面）',
+      read: false,
+      positionals: [
+        { name: 'list|ack', required: true },
+        { name: 'id...', required: false },
+      ],
+      options: {
+        unconsumed: { type: 'boolean', desc: 'list 时只列 status=unconsumed 的通知' },
+        note: { type: 'string', desc: 'ack 时记录 consumed_note' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm coordination inbox list --unconsumed --json',
+        'ccm coordination inbox ack ntf-20260709T120000Z-a1b2 --note "降档并暂停 fill-work"',
+      ],
+      handler: 'coordination.inbox',
+    },
+    notify: {
+      summary: '低层 append 一条 coordination.inbox 通知（producer / Tier2 用）',
+      read: false,
+      positionals: [],
+      options: {
+        kind: {
+          type: 'string',
+          enum: E.notificationKind,
+          required: true,
+          desc: '通知类型（闭集）',
+        },
+        summary: { type: 'string', required: true, desc: '人类可读摘要' },
+        strength: {
+          type: 'string',
+          enum: ['weak', 'strong'],
+          desc: 'ADR-018 advisory strength（默认 strong）',
+        },
+        payload: { type: 'string', desc: 'JSON object payload（默认 {}）' },
+        expires: {
+          type: 'string',
+          required: true,
+          desc: 'expires_at，严格 ISO-8601 UTC',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm coordination notify --kind pacing_yield --summary "为高优 peer 让路" --strength strong --payload \'{"peer":"A"}\' --expires 2026-07-09T17:00:00Z',
+      ],
+      handler: 'coordination.notify',
+    },
+    arbitrate: {
+      summary: '运行 deterministic pool arbiter，按同 harness 池计算 pacing 建议并按边沿写入本板 inbox',
+      read: false,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm coordination arbitrate --json'],
+      handler: 'coordination.arbitrate',
+    },
+  },
+
   // ════════════════════ usage（只读 advisory·ADR-015）═══════════════════════════════════════════════
   //   配额侧只读 analysis namespace（纯只读·零写·不抢 board-lock）。enum 为 CLI-local 呈现枚举（scope /
   //   accounts / group-by）——非 board-model 概念，故同 `jc resolve` 的 ['upheld','overturned'] 字面量先例。
@@ -1015,6 +1088,105 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm web-viewer serve --state <path>'],
       handler: 'webviewer.serve',
+    },
+  },
+
+  // ════════════════════ monitor（ADR-033 optional daemon）══════════════════════════════════════════
+  monitor: {
+    start: {
+      summary: '启动或复用当前 home 的 ccm monitor daemon（连续 usage sensing + pool arbiter edge writes）',
+      read: false,
+      positionals: [],
+      options: {
+        interval: { type: 'string', desc: 'tick 间隔秒（默认 45，范围 5..3600）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm monitor start', 'ccm monitor start --interval 30 --json'],
+      handler: 'monitor.start',
+    },
+    stop: {
+      summary: '停止当前 home 的 monitor daemon 并清除 wanted 标记',
+      read: false,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm monitor stop', 'ccm monitor stop --json'],
+      handler: 'monitor.stop',
+    },
+    status: {
+      summary: '显示 monitor running/stale/stopped 状态与 ccm binary_match',
+      read: true,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm monitor status', 'ccm monitor status --json'],
+      handler: 'monitor.status',
+    },
+    restart: {
+      summary: '重启当前 home 的 monitor daemon',
+      read: false,
+      positionals: [],
+      options: {
+        interval: { type: 'string', desc: 'tick 间隔秒（默认 45，范围 5..3600）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm monitor restart', 'ccm monitor restart --json'],
+      handler: 'monitor.restart',
+    },
+    serve: {
+      summary: '内部 daemon target：前台运行 monitor tick loop（用户通常不直接调用）',
+      read: true,
+      positionals: [],
+      options: {
+        state: { type: 'string', required: true, desc: 'monitor service state path' },
+        iterations: { type: 'string', desc: '测试/调试用有界 tick 次数；缺省持续运行' },
+      },
+      examples: ['ccm monitor serve --state <path>'],
+      handler: 'monitor.serve',
+    },
+    'install-service': {
+      summary: '安装用户级 launchd/systemd monitor service（可选；不引入 PM2）',
+      read: false,
+      positionals: [],
+      options: {
+        interval: { type: 'string', desc: 'tick 间隔秒（默认 45，范围 5..3600）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm monitor install-service', 'ccm monitor install-service --json'],
+      handler: 'monitor.installService',
+    },
+    'uninstall-service': {
+      summary: '卸载用户级 monitor service 并停止 monitor',
+      read: false,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm monitor uninstall-service', 'ccm monitor uninstall-service --json'],
+      handler: 'monitor.uninstallService',
+    },
+  },
+
+  // ════════════════════ services（ADR-033 home service reconciliation）════════════════════════════
+  services: {
+    reconcile: {
+      summary: '按 wanted 语义重启 home 常驻服务（monitor + web-viewer），用于 ccm 二进制替换后收口',
+      read: false,
+      positionals: [],
+      options: {
+        'after-binary-replace': {
+          type: 'boolean',
+          desc: '标记这是 install/upgrade ccm 二进制替换后的 best-effort reconcile',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm services reconcile --after-binary-replace',
+        'ccm services reconcile --after-binary-replace --json',
+      ],
+      handler: 'services.reconcile',
     },
   },
 
@@ -1291,8 +1463,16 @@ export const REGISTRY: Registry = {
       positionals: [],
       options: {
         json: { type: 'boolean', desc: '结构化输出' },
+        'machine-wide': {
+          type: 'boolean',
+          desc: '枚举所有已知 harness 并输出机器级 registry snapshot（含 session store / usage source / account pool 坐标）',
+        },
       },
-      examples: ['ccm harness list', 'ccm harness list --json'],
+      examples: [
+        'ccm harness list',
+        'ccm harness list --json',
+        'ccm harness list --machine-wide --json',
+      ],
       handler: 'harness.list',
     },
     current: {
@@ -1320,10 +1500,10 @@ export const REGISTRY: Registry = {
         json: { type: 'boolean', desc: '结构化输出' },
         'all-harnesses': {
           type: 'boolean',
-          desc: '插件升级阶段枚举本机已安装的 ccm-supported harness 并逐个分发（不影响 ccm 二进制自升级）',
+          desc: '兼容别名：插件升级阶段默认即升本机已安装 harness；与 --harness 互斥（不影响 ccm 二进制自升级）',
         },
       },
-      examples: ['ccm upgrade', 'ccm upgrade --dry-run', 'ccm upgrade --all-harnesses --dry-run'],
+      examples: ['ccm upgrade', 'ccm upgrade --dry-run', 'ccm upgrade --harness cursor --dry-run'],
       handler: 'upgrade.all',
     },
     ccm: {
@@ -1339,7 +1519,7 @@ export const REGISTRY: Registry = {
     },
     plugin: {
       summary:
-        '只升 cc-master 插件（claude CLI 经 marketplace 托管·--to 仅信息性·默认 marketplace 最新）',
+        '只升 cc-master 插件（默认升本机已安装且支持分发的全部 harness；--harness 单目标；--to 仅信息性）',
       read: false,
       positionals: [],
       options: {
@@ -1349,13 +1529,14 @@ export const REGISTRY: Registry = {
         },
         'all-harnesses': {
           type: 'boolean',
-          desc: '枚举本机已安装的 ccm-supported harness；支持 plugin 分发的执行升级，不支持的 skipped',
+          desc: '兼容别名：默认行为即枚举本机已安装 harness；与 --harness 互斥',
         },
         json: { type: 'boolean', desc: '结构化输出' },
       },
       examples: [
         'ccm upgrade plugin',
         'ccm upgrade plugin --dry-run',
+        'ccm upgrade plugin --harness cursor --dry-run --json',
         'ccm upgrade plugin --all-harnesses --dry-run --json',
       ],
       handler: 'upgrade.plugin',

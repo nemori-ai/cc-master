@@ -1,0 +1,6 @@
+hook: coordination-inbox
+host: codex
+event: Stop
+mode: stop-system-message
+notes:
+  - Lists unconsumed coordination.inbox notifications and emits a Codex Stop systemMessage.

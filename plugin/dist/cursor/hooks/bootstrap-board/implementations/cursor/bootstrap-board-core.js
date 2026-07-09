@@ -214,6 +214,10 @@ function restampOwner(boardPath, sessionId) {
   return board;
 }
 
+function stampHarness(boardPath) {
+  run('ccm', ['--board', boardPath, 'board', 'stamp-harness', '--json', '--no-input']);
+}
+
 function boardStem(boardPath) {
   return path.basename(boardPath).replace(/\.board\.json$/i, '');
 }
@@ -338,6 +342,12 @@ function resumeBoard(home, boardsDir, flags, sessionId, invocation) {
   }
 
   const resumed = restampOwner(boardPath, sessionId);
+  let harnessNote = '';
+  try {
+    stampHarness(boardPath);
+  } catch (error) {
+    harnessNote = `\nharness_stamp_advisory=ccm board stamp-harness failed: ${error.message}`;
+  }
   writeSessionState(home, sessionId, boardPath, invocation, 'resume');
   say(
     'context',
@@ -345,7 +355,7 @@ function resumeBoard(home, boardsDir, flags, sessionId, invocation) {
       `cc-master resume: armed Cursor orchestration board at ${boardPath}`,
       `session_id=${sessionId || '(empty)'}`,
       `goal=${compactGoal(resumed.goal)}`,
-      'Recon the board before dispatching new work: inspect current tasks, blocked items, decision_package entries, and latest log entries.',
+      `Recon the board before dispatching new work: inspect current tasks, blocked items, decision_package entries, and latest log entries.${harnessNote}`,
     ].join('\n')
   );
 }
@@ -383,6 +393,11 @@ function main() {
   }
   run('ccm', initArgs);
   restampOwner(boardPath, sessionId);
+  try {
+    stampHarness(boardPath);
+  } catch (error) {
+    // Keep ARM usable; ccm peers will treat missing harness as an unknown singleton pool.
+  }
   writeSessionState(home, sessionId, boardPath, invocation, 'fresh');
 
   const updateArgs = ['--board', boardPath, 'board', 'update', '--json', '--no-input'];

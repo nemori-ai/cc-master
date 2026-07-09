@@ -21,7 +21,29 @@ if [ "\$1" = "usage" ] && [ "\$2" = "advise" ]; then
   printf '{"ok":true,"data":%s}\\n' "\$(cat "$payload")"
   exit 0
 fi
-exit 0
+exit 1
+STUB
+  chmod +x "$stub"
+  echo "$stub"
+}
+mk_ccm_notify_stub() {
+  local dir stub payload
+  dir="$(make_project)"
+  stub="$dir/ccm"
+  payload="$dir/payload.json"
+  printf '%s' "$1" >"$payload"
+  cat >"$stub" <<STUB
+#!/usr/bin/env bash
+if [ "\$1" = "usage" ] && [ "\$2" = "advise" ]; then
+  printf '{"ok":true,"data":%s}\\n' "\$(cat "$payload")"
+  exit 0
+fi
+if [ "\$1" = "coordination" ] && [ "\$2" = "notify" ]; then
+  printf '%s\\n' "\$*" > "$dir/notify.args"
+  printf '{"ok":true,"data":{"notification":{"id":"ntf-test"}}}\\n'
+  exit 0
+fi
+exit 1
 STUB
   chmod +x "$stub"
   echo "$stub"
@@ -85,6 +107,16 @@ assert_eq "" "$HOOK_OUT" "available false -> silent"
 
 run_stop "$H" "sess-u" "$ADV_THROTTLE" "true"
 assert_eq "" "$HOOK_OUT" "stop_hook_active true -> silent"
+
+NSTUB="$(mk_ccm_notify_stub "$ADV_STOP_BP")"
+HOOK_OUT="$(
+  printf '{"conversation_id":"sess-u","session_id":"sess-u","hook_event_name":"stop","stop_hook_active":false}' |
+    CC_MASTER_HOME="$H" CCM_BIN="$NSTUB" node "$LAUNCHER" --event stop --core "$CORE" 2>/dev/null
+)"
+assert_eq "" "$HOOK_OUT" "durable stop_billing_period notify succeeds -> no duplicate Cursor additional_context"
+assert_file "$(dirname "$NSTUB")/notify.args" "durable stop_billing_period -> ccm coordination notify called"
+assert_contains "$(cat "$(dirname "$NSTUB")/notify.args")" "pacing_stop" "durable stop_billing_period -> pacing_stop"
+rm -rf "$(dirname "$NSTUB")"
 
 rm -rf "$H"
 

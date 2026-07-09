@@ -796,6 +796,44 @@ test('board set-param 走 runWrite 带锁管线：写后锁释放（不留 .lock
   );
 });
 
+// ══ board stamp-harness（ADR-032 P1·可信 detect guard）══════════════════════════════════════════════
+test('board stamp-harness writes owner.harness when known harness env is detected', () => {
+  const { boardPath } = mkBoardHome();
+  const ctx = mkCtx({
+    boardPath,
+    flags: { json: true },
+    env: { CODEX_SESSION_ID: 'cx-sid' },
+  });
+  const code = boardHandler.stampHarness(ctx);
+  assert.equal(code, EXIT.OK);
+  const onDisk = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.equal(onDisk.owner.harness, 'codex');
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.stamped, true);
+  assert.equal(out.data.trusted_harness, 'codex');
+});
+
+test('board stamp-harness no-ops without trusted detect and preserves existing harness', () => {
+  const { boardPath } = mkBoardHome({
+    extra: {
+      owner: {
+        active: true,
+        session_id: 'sid-bh',
+        heartbeat: '2026-06-24T10:00:00Z',
+        harness: 'cursor',
+      },
+    },
+  });
+  const before = readFileSync(boardPath, 'utf8');
+  const ctx = mkCtx({ boardPath, flags: { json: true }, env: {} });
+  const code = boardHandler.stampHarness(ctx);
+  assert.equal(code, EXIT.OK);
+  assert.equal(readFileSync(boardPath, 'utf8'), before, 'no trusted detect leaves board byte-identical');
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.stamped, false);
+  assert.equal(out.data.trusted_harness, null);
+});
+
 // ══ 发现失败（read verb 解不出 active board）═══════════════════════════════════════════════════════
 test('board show: no active board → throws NotFound (router maps to exit 5)', () => {
   const root = mkTmp('ccm-hnone-');

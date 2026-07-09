@@ -2,7 +2,15 @@ import { claudeCodeAdapter } from './claude-code.js';
 import { codexAdapter } from './codex.js';
 import { cursorAdapter } from './cursor.js';
 import { genericAdapter } from './generic.js';
-import type { Env, HarnessAdapter, HarnessInstallation, HarnessSelection } from './types.js';
+import type {
+  Env,
+  HarnessAdapter,
+  HarnessDescriptor,
+  HarnessId,
+  HarnessInstallation,
+  HarnessSelection,
+  PoolDescriptor,
+} from './types.js';
 
 // Cursor after Codex, before Claude Code: CURSOR_AGENT must win over Claude-compatible fallback env.
 const KNOWN_ADAPTERS: readonly HarnessAdapter[] = [codexAdapter, cursorAdapter, claudeCodeAdapter];
@@ -30,6 +38,17 @@ export function resolveHarnessId(selection: HarnessSelection = {}): string {
   return resolveHarnessAdapter(selection).id;
 }
 
+export function detectTrustedHarnessAdapter(env: Env = process.env): HarnessAdapter | null {
+  for (const adapter of KNOWN_ADAPTERS) {
+    if (adapter.detect(env)) return adapter;
+  }
+  return null;
+}
+
+export function detectTrustedHarnessId(env: Env = process.env): string | null {
+  return detectTrustedHarnessAdapter(env)?.id || null;
+}
+
 export function knownHarnessAdapters(): readonly HarnessAdapter[] {
   return KNOWN_ADAPTERS;
 }
@@ -40,6 +59,61 @@ export function inspectKnownHarnesses(env: Env = process.env): HarnessInstallati
 
 export function installedKnownHarnesses(env: Env = process.env): HarnessInstallation[] {
   return inspectKnownHarnesses(env).filter((h) => h.installed);
+}
+
+export class MachineHarnessRegistry {
+  private readonly descriptors: readonly HarnessDescriptor[];
+
+  private constructor(descriptors: readonly HarnessDescriptor[]) {
+    this.descriptors = deepFreezeArray(
+      descriptors.map((descriptor) => deepFreezeDescriptor(descriptor)),
+    );
+  }
+
+  static sweep(env: Env = process.env): MachineHarnessRegistry {
+    const descriptors = KNOWN_ADAPTERS.map((adapter) => {
+      const installation = adapter.inspectInstallation(env);
+      return {
+        ...installation,
+        sessionStoreRoots: freezeStrings(adapter.sessionStoreRoots(env)),
+        usageSource: Object.freeze({ ...adapter.usageSource(env) }),
+        accountPoolLocation: adapter.accountPoolLocation(env),
+      };
+    });
+    return new MachineHarnessRegistry(descriptors);
+  }
+
+  installed(): HarnessDescriptor[] {
+    return this.descriptors.filter((harness) => harness.installed).map((harness) => harness);
+  }
+
+  poolOf(harness: HarnessId | HarnessDescriptor): PoolDescriptor | null {
+    const id = typeof harness === 'string' ? harness : harness.id;
+    const descriptor = this.byId(id);
+    if (!descriptor?.accountPoolLocation) return null;
+    return Object.freeze({ harness: descriptor.id, location: descriptor.accountPoolLocation });
+  }
+
+  byId(id: HarnessId): HarnessDescriptor | null {
+    return this.descriptors.find((harness) => harness.id === id) || null;
+  }
+
+  toJSON(): {
+    schema: 'ccm/machine-harness-registry/v1';
+    installed: string[];
+    harnesses: readonly HarnessDescriptor[];
+    pools: readonly PoolDescriptor[];
+  } {
+    const pools = this.descriptors
+      .map((harness) => this.poolOf(harness))
+      .filter((pool): pool is PoolDescriptor => pool !== null);
+    return Object.freeze({
+      schema: 'ccm/machine-harness-registry/v1',
+      installed: deepFreezeArray(this.installed().map((harness) => harness.id)),
+      harnesses: this.descriptors,
+      pools: deepFreezeArray(pools),
+    });
+  }
 }
 
 export function harnessSessionId(selection: HarnessSelection = {}): string {
@@ -62,4 +136,31 @@ function normalizeHarnessId(raw: string): string | null {
   return s || null;
 }
 
-export type { Env, HarnessAdapter, HarnessInstallation, HarnessSelection } from './types.js';
+function freezeStrings(values: readonly string[]): string[] {
+  return deepFreezeArray([...new Set(values.filter(Boolean))]);
+}
+
+function deepFreezeDescriptor(descriptor: HarnessDescriptor): HarnessDescriptor {
+  Object.freeze(descriptor.cli);
+  Object.freeze(descriptor.configPaths);
+  Object.freeze(descriptor.capabilities.accountPool);
+  Object.freeze(descriptor.capabilities.externalStatusline);
+  Object.freeze(descriptor.capabilities.pluginDistribution);
+  Object.freeze(descriptor.capabilities);
+  Object.freeze(descriptor.sessionStoreRoots);
+  Object.freeze(descriptor.usageSource);
+  return Object.freeze(descriptor);
+}
+
+function deepFreezeArray<T>(values: T[]): T[] {
+  return Object.freeze(values) as T[];
+}
+
+export type {
+  Env,
+  HarnessAdapter,
+  HarnessDescriptor,
+  HarnessInstallation,
+  HarnessSelection,
+  PoolDescriptor,
+} from './types.js';

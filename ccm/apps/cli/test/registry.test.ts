@@ -29,6 +29,7 @@ const EXPECTED: Record<string, string[]> = {
     'update',
     'archive',
     'set-param',
+    'stamp-harness',
   ],
   baseline: ['snapshot', 'show', 'reset'],
   task: ['add', 'show', 'list', 'update', 'start', 'done', 'block', 'unblock', 'set-status', 'rm'],
@@ -38,6 +39,7 @@ const EXPECTED: Record<string, string[]> = {
   watchdog: ['arm', 'disarm', 'status'],
   policy: ['show', 'set'],
   peers: ['list'],
+  coordination: ['inbox', 'notify', 'arbitrate'],
   usage: ['show', 'advise', 'task-cost', 'burn-rate', 'runway'],
   estimate: ['show', 'forecast', 'evm', 'velocity', 'risk', 'cost-to-complete'],
   account: ['add', 'refresh', 'delete', 'list', 'switch'],
@@ -45,6 +47,8 @@ const EXPECTED: Record<string, string[]> = {
   statusline: ['render', 'install', 'uninstall'],
   harness: ['list', 'current'],
   'web-viewer': ['start', 'open', 'status', 'stop', 'restart', 'serve'],
+  monitor: ['start', 'stop', 'status', 'restart', 'serve', 'install-service', 'uninstall-service'],
+  services: ['reconcile'],
   upgrade: ['all', 'ccm', 'plugin'],
 };
 

@@ -34,11 +34,20 @@ math.
   board.
 - `rule-usage-pacing-stop-reentry-guard`: on a Stop-reentry (`stop_hook_active:true`) the hook is
   silent — it must not re-fire pacing advisories on the host's own Stop-block re-entry loop.
+- `rule-usage-pacing-dual-delivery`: routine output stays direct (`hold` silent; weak/light throttle
+  direct). Decision-grade output first writes a durable notification with
+  `ccm coordination notify` (`throttle` strong → `pacing_throttle`, stop verdicts →
+  `pacing_stop`, switch/user-action verdicts → `pacing_switch`). If the notify call fails, the hook
+  falls back to the direct advisory so a transient ccm write failure does not lose the pacing signal.
+  P3 still uses `ccm usage advise` as the verdict source; P4 replaces this producer path with the
+  pool-aware arbiter (`ccm coordination arbitrate`) while keeping the same delivery split.
 
 ## 注入 taxonomy
 
-- All pacing output is **advisory** (never a hard gate — pacing is a lever the orchestrator weighs,
-  not a system block), with strength per `rule-usage-pacing-strength-mapping`.
+- Direct pacing output is **advisory** (never a hard gate — pacing is a lever the orchestrator weighs,
+  not a system block), with strength per `rule-usage-pacing-strength-mapping`. Decision-grade durable
+  output is delivered through `coordination-inbox`, whose own contract decides advisory vs directive
+  wrapping from notification kind.
 
 ## 武装语义
 
@@ -50,6 +59,8 @@ goes through `ccm account switch`, a process-boundary call, not a board write).
 
 ```yaml
 - rule: rule-usage-pacing-tag-protocol
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-usage-pacing-dual-delivery
   required_hosts: [claude-code, codex, cursor]
 ```
 

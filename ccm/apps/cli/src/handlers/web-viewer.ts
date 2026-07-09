@@ -3,12 +3,12 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { analyzeGraph, isAwaitingUser, STATUS_ENUM, taskTrulyDone, withLock } from '@ccm/engine';
 import * as discover from '../discover.js';
 import { readVersion } from '../help.js';
 import * as io from '../io.js';
 import type { Ctx } from './_common.js';
+import { ensureWebViewerAppDist, resolveAppDistDir } from '../web-viewer-app-dist.js';
 import { writeReportForBoard } from './status-report.js';
 
 const EXIT = io.EXIT;
@@ -18,6 +18,8 @@ const BOARDS_SCHEMA = 'ccm/web-viewer-boards/v1';
 const VIEW_MODEL_SCHEMA = 'ccm/web-viewer-view-model/v1';
 const TASK_DETAIL_SCHEMA = 'ccm/web-viewer-task/v1';
 const DEFAULT_HOST = '127.0.0.1';
+/** 0 = OS-assigned ephemeral port (never hardcode a fixed listener port on install/start/restart). */
+const DEFAULT_LISTEN_PORT = 0;
 const REDACTED_TOKEN = '<redacted>';
 
 type JsonRecord = Record<string, unknown>;
@@ -36,6 +38,7 @@ interface ServiceState {
   schema: string;
   id: string;
   pid: number;
+  wanted?: boolean;
   state_path: string;
   token_file: string;
   token_sha256: string;
@@ -57,6 +60,9 @@ interface ServiceState {
   log_path: string;
   stale?: boolean;
   health?: 'ok' | 'stale' | 'stopped' | 'invalid';
+  binary_match?: boolean;
+  running_ccm_version?: string | null;
+  installed_ccm_version?: string;
 }
 
 interface InvalidServiceState {
@@ -138,11 +144,7 @@ function canonicalHome(ctx: Ctx): string {
     env: ctx.env,
   });
   fs.mkdirSync(home, { recursive: true, mode: 0o700 });
-  try {
-    return fs.realpathSync.native(home);
-  } catch {
-    return path.resolve(home);
-  }
+  return path.resolve(home);
 }
 
 function serviceId(home: string): string {
@@ -208,7 +210,7 @@ function openUrl(baseUrl: string, token: string, selection?: BoardSelection | nu
 }
 
 function parsePort(raw: unknown): number {
-  if (raw === undefined) return 0;
+  if (raw === undefined) return DEFAULT_LISTEN_PORT;
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 0 || n > 65535) {
     throw kinded(`invalid --port ${JSON.stringify(raw)} (must be 0..65535)`, 'Usage');
@@ -300,6 +302,7 @@ function buildState({
     schema: SERVICE_SCHEMA,
     id,
     pid: 0,
+    wanted: true,
     state_path: statePathFor(home, id),
     token_file: tokenPathFor(home, id),
     token_sha256: tokenSha(token),
@@ -352,6 +355,7 @@ function readState(filePath: string): ServiceState | null {
     return {
       ...s,
       pid: typeof s.pid === 'number' ? s.pid : 0,
+      wanted: s.wanted === true,
       port: typeof s.port === 'number' ? s.port : 0,
       state_path: typeof s.state_path === 'string' ? s.state_path : filePath,
       token_file: typeof s.token_file === 'string' ? s.token_file : '',
@@ -457,6 +461,12 @@ function healthCheck(service: ServiceState, token: string | null): HealthResult 
 function classifyService(service: ServiceState | null): ServiceState | null {
   if (!service) return null;
   const token = readToken(service.token_file);
+  const installedVersion = ccmVersion();
+  const runningVersion =
+    service.server && typeof service.server.ccm_version === 'string'
+      ? service.server.ccm_version
+      : null;
+  const binaryMatch = runningVersion === installedVersion;
   let stale = true;
   if (isPidAlive(service.pid)) {
     const health = healthCheck(service, token);
@@ -476,6 +486,9 @@ function classifyService(service: ServiceState | null): ServiceState | null {
     url: redactedUrl(baseUrl, service.current_selection),
     stale,
     health: stale ? 'stale' : 'ok',
+    binary_match: binaryMatch,
+    running_ccm_version: runningVersion,
+    installed_ccm_version: installedVersion,
   };
 }
 
@@ -569,9 +582,10 @@ function startService(ctx: Ctx): { service: ServiceState; token: string; reused:
   const home = canonicalHome(ctx);
   const paths = servicePaths(home);
   ensureServiceDirs(paths);
+  ensureWebViewerAppDist(home);
   return withLock(paths.lockTarget, () => {
     const existing = classifyService(readState(statePathFromCtx(ctx, home)));
-    if (existing && existing.health === 'ok') {
+    if (existing && existing.health === 'ok' && existing.binary_match !== false) {
       const selection = resolveInitialSelection(ctx, home);
       const service = selection ? updateServiceSelection(existing, selection) : existing;
       const token = readToken(existing.token_file) || '';
@@ -603,7 +617,11 @@ function output(ctx: Ctx, data: unknown, human: string): void {
 function humanServiceLine(prefix: string, service: ServiceView | null): string {
   if (!service) return `${prefix}: stopped`;
   if (service.health === 'invalid') return `${prefix}: invalid ${service.state_path}`;
-  const status = service.stale ? 'stale' : 'running';
+  const status = service.stale
+    ? 'stale'
+    : 'binary_match' in service && service.binary_match === false
+      ? 'stale-binary'
+      : 'running';
   return `${prefix}: ${status} ${service.id} ${service.url} home=${service.home}`;
 }
 
@@ -695,6 +713,9 @@ export function status(ctx: Ctx): number {
     {
       ok: true,
       running: !!service && service.health === 'ok',
+      binary_match: service ? service.binary_match !== false : null,
+      running_ccm_version: service ? service.running_ccm_version ?? null : null,
+      installed_ccm_version: ccmVersion(),
       service: serviceView,
     },
     humanServiceLine('web-viewer', serviceView),
@@ -829,18 +850,59 @@ function safeHeaders(extra: Record<string, string> = {}): Record<string, string>
   };
 }
 
-function appDistDir(): string | null {
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    path.resolve(here, '../../../web-viewer/dist'),
-    path.resolve(here, '../../../../web-viewer/dist'),
-    path.resolve(process.cwd(), 'ccm/apps/web-viewer/dist'),
-    path.resolve(process.cwd(), 'apps/web-viewer/dist'),
-  ];
-  for (const candidate of candidates) {
-    if (fs.existsSync(path.join(candidate, 'index.html'))) return candidate;
+function appDistDir(home?: string): string | null {
+  return resolveAppDistDir(home);
+}
+
+export function ensureAppDistForHome(home: string): void {
+  ensureWebViewerAppDist(home);
+}
+
+function defaultIndexProbe(service: ServiceState, token: string | null): HealthResult {
+  if (!token || !service.base_url) return { ok: false, error: 'missing token or base_url' };
+  const script = `
+    const http = require('node:http');
+    const url = process.argv[1];
+    const req = http.get(url, { timeout: 900 }, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (c) => { body += c; });
+      res.on('end', () => {
+        if (res.statusCode !== 200) {
+          process.stderr.write(String(res.statusCode));
+          process.exit(2);
+        }
+        if (String(res.headers['content-type'] || '').includes('application/json') && body.includes('dist is missing')) {
+          process.exit(3);
+        }
+        process.stdout.write(body.slice(0, 64));
+      });
+    });
+    req.on('timeout', () => { req.destroy(); process.exit(4); });
+    req.on('error', () => process.exit(5));
+  `;
+  const url = `${service.base_url}/?token=${encodeURIComponent(token)}`;
+  const r = spawnSync(nodeEvalCommand(), ['-e', script, url], {
+    encoding: 'utf8',
+    timeout: 1500,
+  });
+  if (r.status !== 0) {
+    return { ok: false, error: r.stderr || `index probe exited ${r.status}` };
   }
-  return null;
+  return { ok: true };
+}
+
+export function probeRunningServiceHealth(home: string, id?: string): HealthResult {
+  const statePath = statePathFor(home, id || serviceId(home));
+  const service = classifyService(readState(statePath));
+  if (!service || service.health !== 'ok') {
+    return { ok: false, error: 'service not healthy' };
+  }
+  const token = readToken(service.token_file);
+  const health = healthCheck(service, token);
+  if (!health.ok) return health;
+  if (testHooks.healthCheck) return health;
+  return defaultIndexProbe(service, token);
 }
 
 function mimeType(filePath: string): string {
@@ -2019,9 +2081,12 @@ export function serve(ctx: Ctx): Promise<number> {
         return;
       }
       if (url.pathname === '/' || url.pathname.startsWith('/assets/')) {
-        const distDir = appDistDir();
+        const distDir = appDistDir(state.home);
         if (!distDir) {
-          sendJson(res, 503, { error: 'web-viewer app dist is missing; run web-viewer build' });
+          sendJson(res, 503, {
+            error:
+              'web-viewer app dist is missing; ccm package may be corrupt or built without web-viewer assets',
+          });
           return;
         }
         const assetPath = resolveStaticAsset(distDir, url.pathname);

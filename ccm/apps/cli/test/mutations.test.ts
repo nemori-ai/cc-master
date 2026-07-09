@@ -107,6 +107,40 @@ test('boardUpdate sets coordination.priority (creates coordination if absent; pr
   );
 });
 
+// ── boardStampHarness ───────────────────────────────────────────────────────────────────────────
+test('boardStampHarness stamps trusted harness and overwrites prior trusted value', () => {
+  const orig = baseBoard();
+  orig.owner.harness = 'codex';
+  const snap = snapshot(orig);
+
+  const b = m.boardStampHarness(orig, { harnessId: 'cursor' });
+  assert.equal(b.owner.harness, 'cursor');
+  assert.ok(ISO.test(b.owner.heartbeat));
+  assert.notEqual(b.owner.heartbeat, orig.owner.heartbeat, 'trusted stamp refreshes heartbeat');
+  assert.equal(snapshot(orig), snap, 'input board untouched (pure)');
+});
+
+test('boardStampHarness no-ops when no trusted harness is detected', () => {
+  const orig = baseBoard();
+  orig.owner.harness = 'codex';
+  const b = m.boardStampHarness(orig, { harnessId: null });
+
+  assert.equal(b.owner.harness, 'codex');
+  assert.equal(b.owner.heartbeat, orig.owner.heartbeat, 'no trusted detect must not touch heartbeat');
+  assert.notEqual(b, orig, 'returns a clone even on no-op');
+});
+
+test('boardStampHarness rejects unknown or invalid harness ids', () => {
+  assert.throws(
+    () => m.boardStampHarness(baseBoard(), { harnessId: 'unknown' }),
+    /trusted known harness id/,
+  );
+  assert.throws(
+    () => m.boardStampHarness(baseBoard(), { harnessId: 'future-harness' }),
+    /trusted known harness id/,
+  );
+});
+
 // ── addTask ──────────────────────────────────────────────────────────────────────────────────────
 test('addTask appends a task with defaults (status ready, deps [], created_at stamped)', () => {
   const orig = baseBoard();

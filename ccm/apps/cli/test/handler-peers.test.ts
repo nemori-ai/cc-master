@@ -4,7 +4,7 @@
 //   · list 聚活+新鲜板 → 花名册（goal/workload/priority/liveness）。
 //   · 过滤非活 / 过期心跳板（不占 count）。
 //   · coordination 缺失 → 降级（priority=normal·current/planned=null）·仍计入。
-//   · --json 形状（{ peers, count, freshness_sec, as_of }）。
+//   · --json 形状（{ peers, pools, count, freshness_sec, as_of }）。
 //   · --freshness-sec 覆写。
 //   · 空 home → count:0 + exit 0（fail-safe·不报错）。
 //   · token-blind：花名册 JSON 无任何 secret 字段。
@@ -50,6 +50,7 @@ function writeBoard(
     active = true,
     hbOffsetSec = -60,
     session_id = 'sid-x',
+    harness,
     goal = 'g',
     priority,
     coordination,
@@ -57,6 +58,7 @@ function writeBoard(
     active?: boolean;
     hbOffsetSec?: number;
     session_id?: string;
+    harness?: string;
     goal?: string;
     priority?: string;
     coordination?: unknown;
@@ -66,7 +68,12 @@ function writeBoard(
     schema: 'cc-master/v2',
     meta: { template_version: 3 },
     goal,
-    owner: { active, session_id, heartbeat: ISO(hbOffsetSec) },
+    owner: {
+      active,
+      session_id,
+      heartbeat: ISO(hbOffsetSec),
+      ...(harness !== undefined ? { harness } : {}),
+    },
     git: { worktree: '', branch: '' },
     tasks: [],
     log: [],
@@ -161,7 +168,30 @@ test('peers list degrades gracefully when coordination missing', () => {
   assert.equal(out.data.peers[0].planned, null);
 });
 
-test('peers list --json shape: { peers, count, freshness_sec, as_of }', () => {
+test('peers list partitions JSON by harness pools', () => {
+  const home = mkHome();
+  writeBoard(home, 'claude-a.board.json', { harness: 'claude-code', goal: 'claude A' });
+  writeBoard(home, 'claude-b.board.json', { harness: 'claude-code', goal: 'claude B' });
+  writeBoard(home, 'cursor-a.board.json', { harness: 'cursor', goal: 'cursor A' });
+  writeBoard(home, 'unknown-a.board.json', { goal: 'unknown A' });
+  const ctx = mkCtx(home, { flags: { json: true } });
+  peersHandler.list(ctx);
+  const pools = JSON.parse(ctx.outBuf.join('')).data.pools;
+  assert.deepEqual(
+    pools.map((p: { pool_id: string; harness: string; count: number }) => [
+      p.pool_id,
+      p.harness,
+      p.count,
+    ]),
+    [
+      ['claude-code', 'claude-code', 2],
+      ['cursor', 'cursor', 1],
+      ['unknown:unknown-a.board.json', 'unknown', 1],
+    ],
+  );
+});
+
+test('peers list --json shape: { peers, pools, count, freshness_sec, as_of }', () => {
   const home = mkHome();
   writeBoard(home, 'a.board.json', {
     priority: 'urgent',
@@ -179,6 +209,7 @@ test('peers list --json shape: { peers, count, freshness_sec, as_of }', () => {
   const out = JSON.parse(ctx.outBuf.join(''));
   const d = out.data;
   assert.ok(Array.isArray(d.peers), 'peers is array');
+  assert.ok(Array.isArray(d.pools), 'pools is array');
   assert.equal(typeof d.count, 'number', 'count is number');
   assert.equal(d.freshness_sec, 600, 'default freshness 600');
   assert.match(d.as_of, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/, 'as_of is ISO-8601 UTC');
@@ -211,6 +242,7 @@ test('peers list empty home → count:0 + exit 0 (fail-safe)', () => {
   const out = JSON.parse(ctx.outBuf.join(''));
   assert.equal(out.data.count, 0);
   assert.deepEqual(out.data.peers, []);
+  assert.deepEqual(out.data.pools, []);
 });
 
 test('peers list human render shows roster lines', () => {
@@ -221,6 +253,7 @@ test('peers list human render shows roster lines', () => {
   assert.equal(code, EXIT.OK);
   const out = ctx.outBuf.join('');
   assert.ok(out.includes('peers'), 'human render mentions peers');
+  assert.ok(out.includes('pool unknown:a.board.json'), 'human render shows harness pool');
   assert.ok(out.includes('human-render-goal'), 'human render shows peer goal');
   assert.ok(out.includes('high'), 'human render shows priority');
 });

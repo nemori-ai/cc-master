@@ -1,0 +1,6 @@
+hook: coordination-inbox
+host: cursor
+event: stop
+mode: stop-followup-message
+notes:
+  - Lists unconsumed coordination.inbox notifications and emits Cursor followup_message.

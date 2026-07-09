@@ -50,7 +50,8 @@ log "platform: ${OS} ($(uname -m)) → 产物 ${OUT}"
 
 # ── ① tsdown：产自包含可执行 bundle dist/ccm-sea.cjs ───────────────────────────────────────────────
 if [ "${CCM_SEA_SKIP_BUNDLE:-0}" != "1" ]; then
-  log "① tsdown → ${BUNDLE}"
+  log "① gen web-viewer assets + tsdown → ${BUNDLE}"
+  node scripts/gen-web-viewer-assets.mjs
   npx tsdown --config tsdown.sea.config.mts
 else
   log "① 跳过 tsdown（CCM_SEA_SKIP_BUNDLE=1）"

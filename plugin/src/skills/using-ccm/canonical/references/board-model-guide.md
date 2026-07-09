@@ -96,6 +96,7 @@
 |---|---|---|---|
 | `scheduling.wip_limit` | board 顶层 | `ccm board update --wip-limit N` | 全局过调度软警告静默关闭 |
 | `scheduling.owner_wip_limit` | board 顶层 | `ccm board update --owner-wip N` | 每 owner 过调度软警告静默关闭 |
+| `owner.harness` | board owner 子字段 | `ccm board stamp-harness`（ARM 时 bootstrap 调用） | 缺失解析为 `unknown`；`ccm peers` 按它分配额池，hook 武装闸不读它 |
 | `watchdog` | board 顶层 | `ccm watchdog arm / disarm` | {{USING_CCM_WATCHDOG_HOOK_REMINDER}} |
 | `task.wip_limit` | task 级 | `ccm task add/update --wip-limit N` | 覆写 owner_wip_limit（per-owner cap） |
 
@@ -107,8 +108,10 @@
   - `priority` ∈ `{'urgent','high','normal','low','trivial'}`（**板级**优先级·非板内任务排序·缺/坏 → 解析为 `normal`）——这是跨板协调的裁决主轴 + 机械 fair-share 权重源（用户声明的协调 hint·不喂引擎的板内任务调度）。**专属 flag：`ccm board update --priority <urgent|high|normal|low|trivial>`**（枚举校验在 update 端·非法值 → `exit 2`；init 时用户给的板级优先级经它落盘）。
   - `state.current`（此刻在烧什么·喂即时 fair-share）：`active_tasks`（int·数字）/ `workload`（string·人类可读）/ `burn_contribution`（number·对聚合配额% burn 的估计贡献）。
   - `state.planned`（还剩多少活·喂价值/紧迫推理）：`remaining_work`（string·人类可读）/ `cost_to_complete_pct`（number·偿付力）。
+  - `inbox`（入站中介建议收件箱）：通知数组，缺失 = 空。每条通知有 `id` / `kind` / `status` / `created_at` / `expires_at` / `strength` / `summary` / `payload` / `consumed_at` / `consumed_note`；`kind` 闭集为 `pacing_throttle`、`pacing_yield`、`pacing_claim`、`pacing_switch`、`pacing_stop`、`hitl_turn`、`artifact_serialize`；`status` 是 `unconsumed → consumed|expired`。你用 `ccm coordination inbox list --unconsumed` 读取，消费后用 `ccm coordination inbox ack <id...> --note ...` 标记 consumed；低层 producer 用 `ccm coordination notify` append。每次 ccm 写盘前自动跑 `reconcileInbox`：过期未消费转 expired、同 kind 只保留最新 unconsumed、终态按 TTL/capacity GC。形状坏→`FMT-INBOX` warn（永不 hard）。
 
   数字字段喂机械 floor、人类可读字段喂 agentic 价值推理；**缺即降级**（`ccm peers` 把该 peer 的对应维度退 null·配速退单板·fail-safe）。形状坏→`FMT-COORD` warn（永不 hard·advisory ✎）。读侧详见 command-catalog 的 peers namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-COORD`。**token-blind**：本块只含 goal/priority/workload/%——绝无任何 secret。
+- `owner.harness`——当前 board 所属 harness 的观察字段，取值 `claude-code | codex | cursor | unknown`。它**不是武装闸**：hook arming 仍只看 `owner.active` + `owner.session_id`；`owner.harness` 只给 `ccm peers` / 后续池中介做配额池分区。ARM 时 bootstrap 通过 `ccm board stamp-harness` 从当前进程 env 的可信 harness detect 盖写；无可信 env 时不写、不覆盖已有值。缺失或坏值都按 `unknown` 降级；`ccm peers` 会把 unknown board 放进单例池，避免跨 harness 或不明来源 board 混排。坏值→`FMT-HARNESS` warn。
 - `runtime`——**hook-owned 运行时参数区**（✎ 非窄腰），装「周期 hook/script 跑起来后维护的瞬态簿记」。白名单键（均 ISO-8601 UTC）：`last_identity_remind`（周期身份提示 hook 读它判阈值）、`last_critpath_remind`（周期临界路径提示 hook 读它判阈值）、`last_account_switch`（账号切换机制写换号时刻·usage-pacing hook 读它做「检测到换号」ambient）、`stop_allow_until`（Codex Stop hook 释放闸：agent 独立确认本板可停后写一个短期未来时刻）——周期 hook / 换号写侧注入 / Stop 释放确认后经 `ccm board set-param` 写回（带锁·进程边界）。**写法收窄**：唯一写口是 `ccm board set-param <白名单 key> <value>`（least-privilege·非白名单 key / 非法值 → `exit 2`）——agent 走 `ccm` 命令改 board 天然保留它（`ccm` 字段级合并、不整盘覆写；agent 自己**永不手写 `runtime.*`**·见 `master-orchestrator-guide` 的 board-写纪律）。缺/坏 → graceful-degrade（周期提示退化为「从未提示」；Stop 释放闸退化为继续阻止停止）；形状坏→`FMT-RUNTIME` warn（永不 hard）。**token-blind**：参数区只有时间戳等簿记·绝无 secret。
 
 > **不要把 observed 字段写进硬 waist。** 这三档的边界由 `ccm` 引擎权威定义（每字段的 tier 元数据）。
@@ -789,6 +792,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `FMT-SCHEMA` | hard | `schema` 不是字符串字面量 `"cc-master/v2"` | 永远让 bootstrap / ccm 建板，别手写 schema；当前期望值 `cc-master/v2` |
 | `FMT-GOAL` | hard | `goal` 不是字符串 | `ccm board init --goal "..."` / `ccm board update --goal "..."`，goal 永远是字符串（空串也合法） |
 | `FMT-OWNER` | hard | `owner` 不是对象，或 `active` 非 bool，或 `session_id` 非字符串 | 别手改 owner——它是武装闸读的；session_id 空串 `""` 合法（待显式 re-arm 认领） |
+| `FMT-HARNESS` | warn | `owner.harness` 存在但不在 `{claude-code,codex,cursor,unknown}` | 不手填；ARM 时由 `ccm board stamp-harness` 从可信 harness env 写入。缺失向后兼容为 `unknown`；坏值只 warn，`ccm peers` 按 unknown 单例池降级 |
 | `FMT-GIT` | hard | `git` 不是对象，或 `worktree`/`branch` 存在却非字符串 | `ccm board update --branch / --worktree`，值都是字符串 |
 | `FMT-TASKS` | hard | `tasks` 不是数组 | tasks 永远是数组（`[]` 合法）；用 `task add` 而非手拼 |
 | `FMT-ID` | hard | task 不是对象，或 `id` 不是非空字符串 | `ccm task add <id>` 的 id 必填非空 |
@@ -813,6 +817,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `FMT-BASELINE` | warn | `baseline` 非对象，或 `captured_at`/`t0`/`history[].reset_at` 非严格 ISO-8601 UTC、`task_estimates`/`dag_snapshot` 非对象、`bac_h` 非数字、`history` 非数组 | 用 `ccm baseline snapshot/reset` 维护、别手拼；时间严格 UTC（estimate evm 读它，格式不对则 EVM 时间轴错位） |
 | `FMT-POLICY` | warn | `policy` 非对象，或 `autonomous_account_switch` 不在 `{allow, deny}` 枚举内 | 用 `ccm policy set --autonomous-account-switch=allow\|deny`（缺省解析为 allow）；值仅这两个——非法值会让 switch-account.sh 机制硬闸的开关判定失效（退化为 allow） |
 | `FMT-COORD` | warn | `coordination` 非对象，或 `priority` 不在 `{urgent,high,normal,low,trivial}` 枚举，或 `state`/`state.current`/`state.planned` 非对象、数字字段（`active_tasks`/`burn_contribution`/`cost_to_complete_pct`）非数字、人类可读字段（`workload`/`remaining_work`）非字符串 | 全 optional·缺即降级（`ccm peers` 把该维度退 null）；priority 仅五挡——非法值退化为 normal。永不 hard（advisory ✎·fail-safe）——见 [A 节](#a-task-字段速查) coordination 块 |
+| `FMT-INBOX` | warn | `coordination.inbox` 存在但非数组，或通知条目 id 非空唯一 / kind / status / strength / ISO 时间 / consumed_at 状态对应关系不合法 | 缺失 = 空 inbox；append 用 `ccm coordination notify`，消费用 `ccm coordination inbox ack <id...>`，不要手拼。`kind` 闭集、`status` 单调；坏形态只 warn，读取侧跳过坏条目 |
 | `FMT-RUNTIME` | warn | `runtime` 非对象，或已知键（`last_identity_remind` / `last_critpath_remind` / `last_account_switch` / `stop_allow_until` 等）类型不合法（时间锚须严格 ISO-8601 UTC） | hook-owned ✎ 参数区：用 `ccm board set-param <白名单 key> <ISO>` 写（白名单 + 值校验在 verb 层）；缺/坏一律 graceful-degrade（周期 hook 退化为「从未提示」·首次必提示；Stop 释放闸退化为继续阻止停止）。未知键 silent-on-unknown。永不 hard |
 | `FMT-ESTIMATE` | warn | `estimate` 不是 `{value:number, unit:string}` 对象 | `--estimate 3h`（ccm 自动解析成对象），别手拼——见 [E 节](#e-estimate-怎么估) |
 | `FMT-ACCEPTANCE` | warn | `acceptance` 既非字符串也非对象，或对象 `criteria` 空、`criterion.status` 不在 {pending,met,failed} | `--accept "一句话"` 或 `--set-json acceptance={criteria:[...]}`——见 [D 节](#d-acceptance-怎么写好) |

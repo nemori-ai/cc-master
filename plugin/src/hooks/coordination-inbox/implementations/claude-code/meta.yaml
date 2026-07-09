@@ -1,0 +1,9 @@
+hook: coordination-inbox
+host: claude-code
+version: 1
+event: Stop
+matcher: ""
+projection:
+  target: hooks/scripts/
+notes:
+  - Read-only Stop delivery surface for coordination.inbox notifications.

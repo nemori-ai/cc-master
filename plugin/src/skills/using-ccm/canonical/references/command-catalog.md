@@ -22,6 +22,7 @@
   - [board update](#board-update)
   - [board archive](#board-archive)
   - [board set-param](#board-set-param)
+  - [board stamp-harness](#board-stamp-harness)
 - [namespace task](#namespace-task)
   - [task add](#task-add)
   - [task show](#task-show)
@@ -59,6 +60,10 @@
   - [policy set](#policy-set)
 - [namespace peers（协调感知·只读跨板）](#namespace-peers协调感知只读跨板)
   - [peers list](#peers-list)
+- [namespace coordination（通知收件箱）](#namespace-coordination通知收件箱)
+  - [coordination inbox](#coordination-inbox)
+  - [coordination notify](#coordination-notify)
+  - [coordination arbitrate](#coordination-arbitrate)
 - [namespace usage（只读 advisory）](#namespace-usage只读-advisory)
   - [usage show](#usage-show)
   - [usage advise](#usage-advise)
@@ -77,6 +82,16 @@
   - [web-viewer stop](#web-viewer-stop)
   - [web-viewer restart](#web-viewer-restart)
   - [web-viewer serve](#web-viewer-serve)
+- [namespace monitor](#namespace-monitor)
+  - [monitor start](#monitor-start)
+  - [monitor stop](#monitor-stop)
+  - [monitor status](#monitor-status)
+  - [monitor restart](#monitor-restart)
+  - [monitor serve](#monitor-serve)
+  - [monitor install-service](#monitor-install-service)
+  - [monitor uninstall-service](#monitor-uninstall-service)
+- [namespace services](#namespace-services)
+  - [services reconcile](#services-reconcile)
 - [namespace estimate（只读 advisory）](#namespace-estimate只读-advisory)
   - [estimate show](#estimate-show)
   - [estimate forecast](#estimate-forecast)
@@ -123,9 +138,12 @@ ccm <alias> [args] [flags]
 | `baseline` | EVM 计划基线快照（estimate 引擎的 plan SSOT·board 内唯一写 noun） |
 | `policy` | board 级 orchestrator 自主权限开关（首条 `autonomous_account_switch`·写 noun·用户所有） |
 | `peers` | 多 orchestrator 协调**感知层**：跨板只读花名册（全体活+心跳新鲜 orchestrator 的 goal/workload/priority/liveness） |
+| `coordination` | 多 orchestrator 协调**入站通知面**：读/消费 `coordination.inbox`，低层 append 通知，运行 deterministic pool arbiter |
 | `usage` | 配额侧**只读 advisory**：当前号/备号 5h/7d 用量 + 单侧走廊 pacing verdict（hold/throttle/switch/stop_5h/stop_7d）+ 任务 token 成本 |
 | `status-report` | 生成式 board 状态报告：`ccm/status-report/v1` JSON / artifact；只读 board，artifact 写 `<home>/reports/status-report/` |
 | `web-viewer` | 本地只读 board web viewer lifecycle：open/start/status/stop/restart；home-scoped service，127.0.0.1 + token |
+| `monitor` | 可选本地 monitor daemon：连续扫 harness usage / active boards，复用 pool arbiter 边沿写 `coordination.inbox` |
+| `services` | home 常驻服务 reconcile：ccm 二进制替换后按 wanted 语义重启 monitor / web-viewer |
 | `estimate` | 工作侧**只读 advisory**：双通道 MC 工期预测 / EVM / velocity / 风险（消费 OR/ML 引擎） |
 | `account` | {{USING_CCM_ACCOUNT_NAMESPACE_ROW}} |
 | `statusline` | {{USING_CCM_STATUSLINE_NAMESPACE_ROW}} |
@@ -366,6 +384,20 @@ ccm board set-param <key> <value> [flags]
 - flags：`--json`（结构化输出 `{ok,data:{runtime}}`）；`--dry-run` 跑完整校验不落盘。
 - 值类型：`last_identity_remind` / `last_critpath_remind` / `last_account_switch` / `stop_allow_until` 均须严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`），否则 `exit 2`。
 - 例：`ccm board set-param last_identity_remind 2026-06-29T12:34:56Z` · `ccm board set-param last_account_switch 2026-06-30T08:00:00Z --board <path>` · `ccm board set-param stop_allow_until 2026-07-03T15:30:00Z --board <path>`
+
+### board stamp-harness
+
+**写**（ARM-time harness stamp·带锁·可信 detect guard）
+
+```
+ccm board stamp-harness [flags]
+```
+
+- positional：无
+- 行为：从当前进程 env 的已知 harness `detect(env)` 派生可信 harness id，写 `owner.harness`。只在 `claude-code` / `codex` / `cursor` 的真实 env 命中时写；无可信 env 时 no-op，**不**用历史兼容默认（无 env → Claude Code）覆盖既有值。
+- 作用域：只写 `owner.harness`（观察字段，非武装闸）。hook arming 仍只看 `owner.active` + `owner.session_id`。
+- flags：`--json`（结构化输出 `{ok,data:{stamped,trusted_harness,owner:{harness}}}`）；`--dry-run` 跑完整校验不落盘。
+- 例：`ccm board stamp-harness --board <path> --json`
 
 ---
 
@@ -1055,7 +1087,7 @@ ccm policy set --autonomous-account-switch=allow|deny [flags]
 
 多 orchestrator 协调的**感知层**：M 个 orchestrator 并行抽同一活跃配额缸，各自孤立 pacing 会公地悲剧——感知通道让每个 orchestrator 看见全体 peer 的 goal / workload / priority / 死活，喂价值感知的**独立**自我配速（不必双向协商即可单方面合理让路 / 认领 slack；通信通道**不存在**·只读感知 + 机械 fair-share floor 收口）。**纯只读跨板**——扫 `<home>/boards/` 全体板，零写、不抢 board-lock、**不需要 active board 自身**（感知是用户级跨板·同 usage/estimate）。**token-blind**：花名册只投影 goal / priority / workload / state% / liveness——**无任何 secret / token**。
 
-> 数据源 = **只读** `<home>/boards/` 下全部 `*.board.json` 的 `owner`（active / heartbeat / session_id）+ `goal` + ✎ `coordination` 块（priority + state.current/planned）。peers **绝不写任何板**。`coordination` 块由各 orchestrator 自己经 board 写命令 publish（决策点 / Stop / wake 时刷自身状态·写侧形态随 board 写命令面定），peers 只聚合读。
+> 数据源 = **只读** `<home>/boards/` 下全部 `*.board.json` 的 `owner`（active / heartbeat / session_id / harness）+ `goal` + ✎ `coordination` 块（priority + state.current/planned）。peers **绝不写任何板**。`coordination` 块由各 orchestrator 自己经 board 写命令 publish（决策点 / Stop / wake 时刷自身状态·写侧形态随 board 写命令面定），peers 只聚合读。
 
 ### peers list
 
@@ -1066,7 +1098,7 @@ ccm peers [list] [flags]
 ```
 
 - positional：无
-- 行为：扫 `<home>/boards/` 全体 **`owner.active:true` 且心跳新鲜**（`owner.heartbeat` 距 now `< freshness-sec`·默认 600s=10min·与 bootstrap `--resume` live 判活同口径）的板 → 聚成花名册：每 peer 一行 `goal` / `priority`（缺省解析 `normal`）/ `current`（active_tasks/workload/burn_contribution）/ `planned`（remaining_work/cost_to_complete_pct）/ liveness（heartbeat + age）。`count` = M（活+新鲜板数·喂多-orch headroom/M 防过冲）。**fail-safe**：home 不存在 / 无活板 → 空花名册（`count:0`·exit 0·退单板 pacing·不报错）；某 peer `coordination` 缺 / 字段坏 → 该维度降级（`current`/`planned` 为 `null`·`priority` 退 `normal`）·仍计入（活+新鲜即在册）
+- 行为：扫 `<home>/boards/` 全体 **`owner.active:true` 且心跳新鲜**（`owner.heartbeat` 距 now `< freshness-sec`·默认 600s=10min·与 bootstrap `--resume` live 判活同口径）的板 → 聚成花名册：每 peer 一行 `goal` / `harness` / `priority`（缺省解析 `normal`）/ `current`（active_tasks/workload/burn_contribution）/ `planned`（remaining_work/cost_to_complete_pct）/ liveness（heartbeat + age）。`count` = M（活+新鲜板数·喂多-orch headroom/M 防过冲）。同时按 `owner.harness` 生成 `pools[]`：同 harness 才在同一竞争池；缺失或坏值降为 `unknown`，且每块 unknown board 单独成池，避免不明来源互相混排。**fail-safe**：home 不存在 / 无活板 → 空花名册（`count:0`·exit 0·退单板 pacing·不报错）；某 peer `coordination` 缺 / 字段坏 → 该维度降级（`current`/`planned` 为 `null`·`priority` 退 `normal`）·仍计入（活+新鲜即在册）
 - 排序：`priority` 降序（`urgent` 先 → `trivial`）→ 心跳新→旧 → 文件名（稳定 tiebreak）
 - flags：
 
@@ -1076,6 +1108,78 @@ ccm peers [list] [flags]
 | `--json` | | bool | 结构化花名册（否则人类表格） |
 
 - 例：`ccm peers` · `ccm peers --json` · `ccm peers --freshness-sec 300 --json`
+
+---
+
+## namespace coordination（通知收件箱）
+
+多 orchestrator 协调的**入站通知面**：中介 / producer 把需要 agent 拍板或显式消费的建议写入本板 ✎ `coordination.inbox`，agent 读完并执行后用 `ack` 标记 consumed。写路径全走 `runWrite`：锁 → mutate → `reconcileGating` + `reconcileInbox` → lint → 原子写；过期、同 kind supersede、终态 GC 都在写关卡自动处理。`arbitrate` 已接入 deterministic pool arbiter：读取同 harness 池的活+新鲜 peer、把 usage pressure 归一成 PoolPressure，按 priority-weighted fair-share 只把**本板 own row**写入本板 inbox（从不写 peer board）。
+
+通知 `kind` 闭集：`pacing_throttle` / `pacing_yield` / `pacing_claim` / `pacing_switch` / `pacing_stop` / `hitl_turn` / `artifact_serialize`。
+
+### coordination inbox
+
+**读 / 写**（一个 verb 承载 `list|ack` 子动作）
+
+```
+ccm coordination inbox list [flags]
+ccm coordination inbox ack <id...> [flags]
+```
+
+- positional：`list|ack`（必填）；`ack` 后跟一个或多个通知 id。
+- 行为：
+  - `list`：读取当前板 `coordination.inbox`；缺失 = 空 inbox；`--unconsumed` 只列未消费通知。
+  - `ack`：把给定 id 从 `unconsumed` 标记为 `consumed`，写 `consumed_at`，可选写 `consumed_note`；已 consumed/expired 的 id 幂等 no-op；未知 id → exit 2。
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--unconsumed` | | bool | `list` 时只列 status=unconsumed |
+| `--note <str>` | | string | `ack` 时记录 consumed_note |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm coordination inbox list --unconsumed --json` · `ccm coordination inbox ack ntf-20260709T120000Z-a1b2 --note "已降档并暂停 fill-work"`
+
+### coordination notify
+
+**写**（低层 append）
+
+```
+ccm coordination notify --kind <kind> --summary <str> --expires <iso> [flags]
+```
+
+- positional：无
+- 行为：append 一条 `unconsumed` 通知到当前板 `coordination.inbox`。写关卡随后自动执行：过期通知转 `expired`；同一 kind 只保留最新 unconsumed，旧 unconsumed 标 `expired` 并写 `superseded_by`；终态通知按 TTL / capacity GC。此命令是低层机制面，通常由 producer / Tier2 流程调用；普通 agent 消费通知用 `inbox list|ack`。
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--kind <kind>` | | enum（必填） | 通知类型，取值见本节开头 kind 闭集 |
+| `--summary <str>` | | string（必填） | 人类可读摘要 |
+| `--strength <weak|strong>` | | enum | 标签协议里的 advisory strength（默认 `strong`） |
+| `--payload <json>` | | JSON object string | 结构化 payload（默认 `{}`） |
+| `--expires <iso>` | | ISO-8601 UTC（必填） | `expires_at`，过期后写关卡标 `expired` |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm coordination notify --kind pacing_yield --summary "为高优 peer 让路" --strength strong --payload '{"peer":"A"}' --expires 2026-07-09T17:00:00Z`
+
+### coordination arbitrate
+
+**写**（deterministic pool arbiter）
+
+```
+ccm coordination arbitrate [flags]
+```
+
+- positional：无
+- 行为：运行 pool-aware allocation。流程：解析当前 board → 扫 `<home>/boards/` 的活+心跳新鲜 peer → 按 `owner.harness` 分池（只看当前板所在池）→ 读取当前 harness 的 usage signal / quota model / pollable → 归一为 `PoolPressure` → 按 priority-weighted fair-share 算每个 peer 的 row（`pacing_yield` / `pacing_claim` / `pacing_throttle` / `pacing_switch` / `pacing_stop` / `hold`）→ 只把当前 board 的 row 在命中边沿条件时 append 到**本板** `coordination.inbox`。M==1 时退化为 `ccm usage advise` 的单板 verdict 行为。边沿去重：同内容 dedup、不足冷却不刷屏；只有 band 跨越 / roster 变 / 本行目标份额 delta 超阈值 / kind 变化才追加。通知 payload 带 `producer:"coordination-arbiter"`、`dedup_key`、`pressure_band`、`roster_signature`、`target_headroom_pct`、`delta_headroom_pct`、`base_verdict` 和 own peer 摘要。
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--json` | | bool | 结构化输出（含 `mode` / `appended` / `append_reason` / `own_row` / `allocation` / `notification` / `unconsumed`） |
+
+- 例：`ccm coordination arbitrate --json`
 
 ---
 
@@ -1275,7 +1379,7 @@ ccm status-report watch [flags]
 
 ## namespace web-viewer
 
-本地只读 board web viewer lifecycle。service scope 是 cc-master home，默认扫描 `<home>/boards/`；`--board` / `--goal` 只设置初始 selection，不创建 per-board service。viewer 只读、绑定 `127.0.0.1`、token-gated；状态文件在 `<home>/services/web-viewer/`，不写 board。
+本地只读 board web viewer lifecycle。service scope 是 cc-master home，默认扫描 `<home>/boards/`；`--board` / `--goal` 只设置初始 selection，不创建 per-board service。viewer 只读、绑定 `127.0.0.1`、token-gated；状态文件在 `<home>/services/web-viewer/`，不写 board。`start` / `restart` 默认 `--port 0`（系统分配随机 ephemeral 端口，安装/升级后 reconcile 重启同样走随机端口，不写死固定值）；仅显式 `--port <n>` 才固定监听。`start` / `status` 会检查 running service 的 `server.ccm_version` 是否等于当前安装的 `ccm --version`；不匹配时 `start` 强制重启，`status --json` 暴露 `binary_match:false`。web-viewer 前端资产随 ccm 二进制内联打包，首次 `start` / `services reconcile` 会物化到 `<home>/services/web-viewer/app-dist/<ccm_version>/`；升级后 wanted 服务自动收口，**不**自动打开浏览器（用 `open` 或复制 URL）。
 
 ### web-viewer start
 
@@ -1330,7 +1434,7 @@ ccm web-viewer status [id] [flags]
 ```
 
 - positional：`[id]`（可选 service id）
-- 行为：显示 running / stale / stopped、pid、home、当前 selection 与脱敏 URL；不暴露 raw token。
+- 行为：显示 running / stale / stopped、pid、home、当前 selection 与脱敏 URL；不暴露 raw token。`--json` 顶层回显 `binary_match`、`running_ccm_version`、`installed_ccm_version`，用于判断服务是否还握着旧 ccm 二进制。
 - flags：`--json`
 - 例：`ccm web-viewer status` · `ccm web-viewer status --json`
 
@@ -1374,6 +1478,129 @@ ccm web-viewer serve --state <path>
 ```
 
 由 `start` 派生调用；用户通常不直接调用。
+
+---
+
+## namespace monitor
+
+可选本地 monitor daemon。它是 out-of-process 连续传感层：周期性扫本机 supported harness registry，按 harness usageSource 读取 usage signal（Claude Code 读 statusline sidecar，Cursor/Codex 走 pollable source），再对 `<home>/boards/` 的 active boards 复用 `coordination arbitrate` 同一套 pool-aware arbiter / inbox API。monitor 只写 board 的 `coordination.inbox` 与自身 service state；**不**往 agent context 注入文本，不替 agent 决策。缺席时 hook 路径仍可工作。
+
+service state 落在 `<home>/services/monitor/`：`state.json` / `pid` / `log`。`start` / `status` 会检查 running daemon 的 `server.ccm_version` 是否等于当前安装的 `ccm --version`；不匹配时 `start` 强制重启，`status --json` 暴露 `binary_match:false`。
+
+### monitor start
+
+**写 service state，不写 board**
+
+```
+ccm monitor start [flags]
+```
+
+- positional：无
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--interval <sec>` | | int | tick 间隔秒（默认 `45`，范围 `5..3600`） |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm monitor start` · `ccm monitor start --interval 30 --json`
+
+### monitor stop
+
+**写 service state，不写 board**
+
+```
+ccm monitor stop [flags]
+```
+
+- positional：无
+- 行为：停止 daemon 并把 monitor `wanted:false`。后续 `ccm services reconcile --after-binary-replace` 不会把它重新拉起。
+- flags：`--json`
+- 例：`ccm monitor stop --json`
+
+### monitor status
+
+**读**
+
+```
+ccm monitor status [flags]
+```
+
+- positional：无
+- 行为：显示 running / stale / stopped、pid、home、last_tick、last_error。`--json` 顶层回显 `binary_match`、`running_ccm_version`、`installed_ccm_version`。
+- flags：`--json`
+- 例：`ccm monitor status` · `ccm monitor status --json`
+
+### monitor restart
+
+**写 service state，不写 board**
+
+```
+ccm monitor restart [flags]
+```
+
+- positional：无
+- flags：`--interval <sec>`、`--json`
+- 例：`ccm monitor restart --json`
+
+### monitor serve
+
+**内部 daemon target**
+
+```
+ccm monitor serve --state <path>
+```
+
+由 `start` / OS service 派生调用。用户通常不直接调用。前台运行 tick loop；测试/调试可用 `--iterations <n>` 做有界 tick。
+
+### monitor install-service
+
+**写用户级 OS service 文件，不写 board**
+
+```
+ccm monitor install-service [flags]
+```
+
+- 行为：在 macOS 写 LaunchAgent，在 Linux 写 `systemd --user` unit，并把 monitor state 标为 `wanted:true`。不依赖 PM2。
+- flags：`--interval <sec>`、`--json`
+- 例：`ccm monitor install-service --json`
+
+### monitor uninstall-service
+
+**写 service state，不写 board**
+
+```
+ccm monitor uninstall-service [flags]
+```
+
+- 行为：删除用户级 OS service 文件并停止 monitor。
+- flags：`--json`
+- 例：`ccm monitor uninstall-service --json`
+
+---
+
+## namespace services
+
+home 常驻服务 reconcile。它覆盖 `monitor` 与 `web-viewer`，用于 `ccm` 二进制被 `install.sh` 或 `ccm upgrade ccm` 替换后，把仍在跑或显式 wanted 的服务重启到新二进制。wanted 语义避免空白机升级后被动开服务：monitor wanted = 正在跑 / OS service 已装 / state.`wanted:true`；web-viewer wanted = 正在跑 / state.`wanted:true`。
+
+### services reconcile
+
+**写 service state，不写 board**
+
+```
+ccm services reconcile [flags]
+```
+
+- positional：无
+- 行为：扫描 `<home>/services/{monitor,web-viewer}/`；只重启 wanted 服务。未 wanted 的 service state 只报告 `skip`，不会自动 start。`--after-binary-replace` 是安装/升级路径的显式标记，语义同样是 best-effort reconcile。web-viewer 重启前会把内联 frontend 资产物化到 `<home>/services/web-viewer/app-dist/<ccm_version>/`，重启后探活 `/_ccm/health` 与 `/`（非 503）；监听端口默认 `0`（系统分配随机 ephemeral，不写死）。**不**自动打开浏览器。
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--after-binary-replace` | | bool | 标记调用来自 ccm 二进制安装/替换后 |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm services reconcile --after-binary-replace` · `ccm services reconcile --after-binary-replace --json`
 
 ---
 
@@ -1531,12 +1758,14 @@ ccm estimate cost-to-complete [flags]
 ### harness list
 
 ```
-ccm harness list [--json]
+ccm harness list [--json] [--machine-wide]
 ```
 
 - 读所有 ccm 已知 harness 的安装探测结果。Claude Code 通过 `claude` CLI / Claude config dir 探测；Codex 通过 `codex` CLI / `CODEX_HOME` 或默认 config dir 探测。
 - 输出包含：`installed`、`active`、CLI 路径、config 路径、`accountPool` / `externalStatusline` / `pluginDistribution` 能力。
-- flags：`--json`（结构化输出）
+- 加 `--machine-wide` 时输出机器级 registry snapshot：遍历所有已知 adapter（不只当前 selected harness），并为每个 harness 附上 `sessionStoreRoots`、`usageSource`（`kind` / `pollable` / `quotaModel`）和 `accountPoolLocation`；Claude Code 的 account pool 当前指向 `<CC_MASTER_HOME>/accounts.json`，Codex / Cursor 为 `null`。
+- flags：`--json`（结构化输出） · `--machine-wide`（机器级 registry snapshot）
+- 例：`ccm harness list` · `ccm harness list --json` · `ccm harness list --machine-wide --json`
 
 ### harness current
 
@@ -1563,20 +1792,21 @@ ccm --harness codex harness current [--json]
 **写**（默认 verb：裸 `ccm upgrade` ≡ `ccm upgrade all`）
 
 ```
-ccm upgrade [--json] [--all-harnesses]
-ccm upgrade all [--json] [--all-harnesses]
+ccm upgrade [--json] [--harness <id>] [--all-harnesses]
+ccm upgrade all [--json] [--harness <id>] [--all-harnesses]
 ```
 
 - positional：无
-- 行为：先升 ccm 二进制、再升插件（互不依赖·一个失败不挡另一个）；退出码取「先失败者」（都成才 `0`）
+- 行为：先升 ccm 二进制、再升插件（互不依赖·一个失败不挡另一个）；退出码取「先失败者」（都成才 `0`）。插件阶段**默认**枚举本机已安装且支持 plugin 分发的 harness 并逐个升级；`--harness` 收窄为单目标（与 `--all-harnesses` 互斥；后者现为默认行为的兼容别名）
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--json` | | bool | 结构化输出 |
-| `--all-harnesses` | | bool | 插件升级阶段枚举本机已安装的 ccm-supported harness 并逐个分发（不影响 ccm 二进制自升级） |
+| `--harness <id>` | | string | 插件升级阶段只升指定 harness（不影响 ccm 二进制自升级） |
+| `--all-harnesses` | | bool | 兼容别名：插件升级默认即升本机已安装 harness；与 `--harness` 互斥 |
 
-- 例：`ccm upgrade` · `ccm upgrade --dry-run` · `ccm upgrade --all-harnesses --dry-run`
+- 例：`ccm upgrade` · `ccm upgrade --dry-run` · `ccm upgrade --harness cursor --dry-run`
 
 ### upgrade ccm
 
@@ -1587,7 +1817,7 @@ ccm upgrade ccm [--to <ccm-v*tag>] [--json]
 ```
 
 - positional：无
-- 行为：探当前 SEA 自身路径（`process.execPath`）→ 下载新 `ccm-<plat>` 到同目录临时文件 → `chmod +x` → 验新二进制 `--version` 能跑 → 原子 `rename` 覆盖自身路径（macOS/Linux 运行中进程持旧 inode·覆盖安全）。**非 SEA**（node 脚本形态：dev / 全局 npm install）→ 拒绝自替换 + 清晰报错（exit 1）。未显式 `--to` 且本地核版本 ≥ 线上最新 tag 核版本 → 视为已最新、跳过（避免意外降级；ccm 二进制内部版本号与 `ccm-v*` 发布线**已解耦**，比较仅作参考门）
+- 行为：探当前 SEA 自身路径（`process.execPath`）→ 下载新 `ccm-<plat>` 到同目录临时文件 → `chmod +x` → 验新二进制 `--version` 能跑 → 原子 `rename` 覆盖自身路径（macOS/Linux 运行中进程持旧 inode·覆盖安全）。成功后 best-effort 跑 `ccm services reconcile --after-binary-replace`（wanted monitor/web-viewer 停旧起新；web-viewer 物化 frontend 资产并用系统分配随机端口，不自动 open 浏览器）。**非 SEA**（node 脚本形态：dev / 全局 npm install）→ 拒绝自替换 + 清晰报错（exit 1）。未显式 `--to` 且本地核版本 ≥ 线上最新 tag 核版本 → 视为已最新、跳过（避免意外降级；ccm 二进制内部版本号与 `ccm-v*` 发布线**已解耦**，比较仅作参考门）
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
@@ -1602,7 +1832,7 @@ ccm upgrade ccm [--to <ccm-v*tag>] [--json]
 **写**（harness-specific plugin manager）
 
 ```
-ccm upgrade plugin [--to <v*tag>] [--json] [--all-harnesses]
+ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
 ```
 
 - positional：无
@@ -1612,10 +1842,11 @@ ccm upgrade plugin [--to <v*tag>] [--json] [--all-harnesses]
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
 | `--to <tag>` | | string | 期望的 `v*` tag（**信息性**·实际升到 marketplace 最新） |
-| `--all-harnesses` | | bool | 枚举本机已安装的 ccm-supported harness；支持 plugin 分发的执行升级，不支持的 skipped |
+| `--harness <id>` | | string | 只升指定 harness（与 `--all-harnesses` 互斥） |
+| `--all-harnesses` | | bool | 兼容别名：默认即枚举本机已安装 harness；与 `--harness` 互斥 |
 | `--json` | | bool | 结构化输出 |
 
-- 例：`ccm upgrade plugin` · `ccm upgrade plugin --dry-run` · `ccm upgrade plugin --all-harnesses --dry-run --json`
+- 例：`ccm upgrade plugin` · `ccm upgrade plugin --dry-run` · `ccm upgrade plugin --harness cursor --dry-run --json` · `ccm upgrade plugin --all-harnesses --dry-run --json`
 
 ---
 
@@ -1773,7 +2004,7 @@ id 不存在时 `data` = `null`，exit 0。
 
 ### peers list（`ccm peers --json` / `ccm peers list --json`）
 
-`data` = 花名册：`peers[]`（活+心跳新鲜 orchestrator）+ `count`（=M）+ `freshness_sec`（本次判活窗口）+ `as_of`（判活基准 ISO）：
+`data` = 花名册：`peers[]`（活+心跳新鲜 orchestrator 扁平视图）+ `pools[]`（按 harness 分区后的竞争池）+ `count`（=M）+ `freshness_sec`（本次判活窗口）+ `as_of`（判活基准 ISO）：
 
 ```jsonc
 {
@@ -1781,6 +2012,7 @@ id 不存在时 `data` = `null`，exit 0。
     {
       "board_file": "20260629T120000Z-12345.board.json",
       "goal": "prod incident fix",
+      "harness": "claude-code",              // owner.harness·缺/坏 → "unknown"
       "priority": "urgent",                 // coordination.priority·缺/坏 → "normal"
       "session_id": "s1",                   // owner.session_id（"" = 未认领活板）
       "heartbeat": "2026-06-29T11:59:00Z",
@@ -1791,13 +2023,119 @@ id 不存在时 `data` = `null`，exit 0。
         "remaining_work": "verify+deploy", "cost_to_complete_pct": 4 }
     }
   ],
+  "pools": [
+    {
+      "pool_id": "claude-code",              // known harness 同池；unknown 为 "unknown:<board_file>"
+      "harness": "claude-code",
+      "count": 1,
+      "peers": [ /* 同上 PeerEntry */ ]
+    }
+  ],
   "count": 1,                               // = peers.length（M·喂 headroom/M 防过冲）
   "freshness_sec": 600,                     // 本次判活心跳窗口（--freshness-sec 覆写后回显）
   "as_of": "2026-06-29T12:00:00Z"
 }
 ```
 
-无活+新鲜板 → `peers:[]`、`count:0`（exit 0·fail-safe 退单板）。各 peer 数字字段坏 / 人类可读字段坏 → 该字段 `null`（降级·不污染花名册）。**无任何 secret / token 字段**（token-blind）。
+无活+新鲜板 → `peers:[]`、`pools:[]`、`count:0`（exit 0·fail-safe 退单板）。各 peer 数字字段坏 / 人类可读字段坏 → 该字段 `null`（降级·不污染花名册）。缺失 / 非法 `owner.harness` → `harness:"unknown"` 且进入 `unknown:<board_file>` 单例池。**无任何 secret / token 字段**（token-blind）。
+
+### coordination inbox list（`ccm coordination inbox list --json`）
+
+`data` = `{ inbox, count }`；`--unconsumed` 后 `inbox` 只含未消费通知：
+
+```jsonc
+{
+  "inbox": [
+    {
+      "id": "ntf-20260709T120000Z-a1b2",
+      "kind": "pacing_yield",
+      "status": "unconsumed",
+      "created_at": "2026-07-09T12:00:00Z",
+      "expires_at": "2026-07-09T17:00:00Z",
+      "strength": "strong",
+      "summary": "为高优 peer 让路",
+      "payload": { "peer": "A" },
+      "consumed_at": null,
+      "consumed_note": null
+    }
+  ],
+  "count": 1
+}
+```
+
+### coordination inbox ack（`ccm coordination inbox ack <id...> --json`）
+
+`data` = `{ acked }`，只回显本次 id 对应的通知对象；未知 id → exit 2：
+
+```jsonc
+{
+  "acked": [
+    {
+      "id": "ntf-20260709T120000Z-a1b2",
+      "kind": "pacing_yield",
+      "status": "consumed",
+      "created_at": "2026-07-09T12:00:00Z",
+      "expires_at": "2026-07-09T17:00:00Z",
+      "strength": "strong",
+      "summary": "为高优 peer 让路",
+      "payload": { "peer": "A" },
+      "consumed_at": "2026-07-09T12:05:00Z",
+      "consumed_note": "已降档并暂停 fill-work"
+    }
+  ]
+}
+```
+
+### coordination notify（`ccm coordination notify --json`）
+
+`data` = `{ notification }`，即 append 后的新通知对象。同 kind 已有旧 `unconsumed` 时，写关卡会把旧条目标 `expired` 并写 `superseded_by`，新条目仍为当前唯一未消费通知。
+
+```jsonc
+{
+  "notification": {
+    "id": "ntf-20260709T120000Z-a1b2",
+    "kind": "pacing_yield",
+    "status": "unconsumed",
+    "created_at": "2026-07-09T12:00:00Z",
+    "expires_at": "2026-07-09T17:00:00Z",
+    "strength": "strong",
+    "summary": "为高优 peer 让路",
+    "payload": { "peer": "A" },
+    "consumed_at": null,
+    "consumed_note": null
+  }
+}
+```
+
+### coordination arbitrate（`ccm coordination arbitrate --json`）
+
+`data` = 本板 own row + 全池 allocation 摘要 + 本次 append 结果：
+
+```jsonc
+{
+  "mode": "pool",                         // "single-board" | "pool"
+  "appended": 1,                           // 本次是否新写 inbox 通知
+  "append_reason": "first",                // first | edge | dedup | cooldown | no-notification
+  "notification": { "id": "ntf-...", "kind": "pacing_yield", "...": "..." },
+  "own_row": {
+    "kind": "pacing_yield",
+    "notification_kind": "pacing_yield",
+    "strength": "weak",
+    "target_headroom_pct": 3,
+    "delta_headroom_pct": -9,
+    "reason": "池压力 warn，本板 burn≈12% 高于加权目标 3%…",
+    "peer": { "board_file": "20260709T120000Z-a.board.json", "priority": "normal", "weight": 2 }
+  },
+  "allocation": {
+    "pressure": { "headroom_pct": 15, "quota_model": "rolling-5h-7d", "band": "warn" },
+    "base_advice": { "verdict": "throttle", "...": "..." },
+    "rows": [ /* own row + sibling rows；只用于解释，不写 sibling board */ ],
+    "roster_signature": "…",
+    "peer_count": 2
+  },
+  "unconsumed": [ /* 当前本板未消费通知 */ ]
+}
+```
 
 ### usage show（`ccm usage show --json`）
 

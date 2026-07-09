@@ -1,5 +1,19 @@
 # ccm
 
+## 0.19.0
+
+### Minor Changes
+
+- feat: multi-orchestrator coordination inbox + pool arbiter (`coordination.inbox`, `reconcileInbox`, `ccm coordination inbox|notify|arbitrate`, deterministic pool-pressure fair-share).
+- feat: optional `ccm monitor` daemon + `ccm services reconcile --after-binary-replace` for wanted monitor/web-viewer after binary install/upgrade.
+- feat: co-lifecycle web-viewer assets with ccm binary upgrade — build-time inline `@ccm/web-viewer` dist map, versioned materialization under `<home>/services/web-viewer/app-dist/<version>/`, reconcile ensure + HTTP probe; listener port defaults to OS-assigned ephemeral (`--port 0`).
+- feat: `ccm upgrade plugin` defaults to all installed plugin-distributable harnesses (`--harness` for single target).
+
+### Patch Changes
+
+- Updated dependencies
+  - @ccm/engine@0.19.0
+
 ## 0.18.0
 
 ### Minor Changes
@@ -7,6 +21,8 @@
 - 01dadc1: Add Cursor harness usage: billing_period window on UsageSignal / pacingAdvice (hold|throttle|stop_billing_period, never switch), plus cursor-dashboard GetCurrentPeriodUsage reader and harness adapter registration.
 
 ### Patch Changes
+
+- feat: co-lifecycle web-viewer assets with ccm binary upgrade — build-time inline `@ccm/web-viewer` dist map, versioned materialization under `<home>/services/web-viewer/app-dist/<version>/`, reconcile ensure + HTTP probe; listener port defaults to OS-assigned ephemeral (`--port 0`).
 
 - Updated dependencies [01dadc1]
   - @ccm/engine@0.18.0

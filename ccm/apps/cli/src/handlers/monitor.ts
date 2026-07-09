@@ -1,0 +1,655 @@
+import { spawn, spawnSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import {
+  formatReport,
+  lintBoard,
+  loadHomeBoards,
+  type QuotaModel,
+  type UsageSignal,
+  withLock,
+} from '@ccm/engine';
+import * as discover from '../discover.js';
+import { MachineHarnessRegistry, resolveHarnessAdapter } from '../harnesses/registry.js';
+import type { HarnessDescriptor } from '../harnesses/types.js';
+import { readVersion } from '../help.js';
+import * as io from '../io.js';
+import type { Ctx } from './_common.js';
+import { arbitrateBoardForService, type ArbiterUsageOverride } from './coordination.js';
+
+const EXIT = io.EXIT;
+const SERVICE_SCHEMA = 'ccm/monitor-service/v1';
+const DEFAULT_INTERVAL_SEC = 45;
+const SERVICE_ID = 'monitor';
+
+interface KindedError extends Error {
+  errKind?: string;
+}
+
+interface MonitorState {
+  schema: string;
+  id: string;
+  pid: number;
+  wanted: boolean;
+  home: string;
+  state_path: string;
+  pid_path: string;
+  log_path: string;
+  interval_sec: number;
+  server: {
+    started_at: string;
+    ccm_version: string;
+  };
+  last_tick_at: string | null;
+  last_error: string | null;
+  tick_count: number;
+  health?: 'ok' | 'stale' | 'stopped' | 'invalid';
+  stale?: boolean;
+  binary_match?: boolean;
+  running_ccm_version?: string | null;
+  installed_ccm_version?: string;
+}
+
+interface ServicePaths {
+  root: string;
+  state: string;
+  pid: string;
+  log: string;
+  lockTarget: string;
+}
+
+interface SpawnArgs {
+  statePath: string;
+  logPath: string;
+}
+
+interface SpawnResult {
+  pid: number;
+}
+
+interface TestHooks {
+  now?: () => Date;
+  isPidAlive?: (pid: number) => boolean;
+  spawnService?: (args: SpawnArgs) => SpawnResult;
+  kill?: (pid: number) => boolean;
+  tick?: (ctx: Ctx, state: MonitorState) => TickResult;
+}
+
+let testHooks: TestHooks = {};
+
+export function __setMonitorTestHooks(hooks: TestHooks): void {
+  testHooks = hooks;
+}
+
+export function __resetMonitorTestHooks(): void {
+  testHooks = {};
+}
+
+function kinded(message: string, kind: string): KindedError {
+  const e = new Error(message) as KindedError;
+  e.errKind = kind;
+  return e;
+}
+
+function nowIso(): string {
+  return (testHooks.now ? testHooks.now() : new Date()).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function ccmVersion(): string {
+  return readVersion();
+}
+
+function canonicalHome(ctx: Ctx): string {
+  const home = discover.resolveHome({
+    homeFlag: ctx.values.home as string | undefined,
+    env: ctx.env,
+  });
+  fs.mkdirSync(home, { recursive: true, mode: 0o700 });
+  try {
+    return fs.realpathSync.native(home);
+  } catch {
+    return path.resolve(home);
+  }
+}
+
+function servicePaths(home: string): ServicePaths {
+  const root = path.join(home, 'services', 'monitor');
+  return {
+    root,
+    state: path.join(root, 'state.json'),
+    pid: path.join(root, 'pid'),
+    log: path.join(root, 'log'),
+    lockTarget: path.join(root, 'registry'),
+  };
+}
+
+function ensureServiceDirs(paths: ServicePaths): void {
+  fs.mkdirSync(paths.root, { recursive: true, mode: 0o700 });
+  try {
+    fs.chmodSync(paths.root, 0o700);
+  } catch {
+    /* best-effort on non-POSIX filesystems */
+  }
+}
+
+function parseInterval(raw: unknown): number {
+  if (raw === undefined) return DEFAULT_INTERVAL_SEC;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 5 || n > 3600) {
+    throw kinded('monitor --interval must be an integer between 5 and 3600 seconds', 'Usage');
+  }
+  return n;
+}
+
+function writeJson(filePath: string, value: unknown): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+}
+
+function readState(statePath: string): MonitorState | null {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const s = parsed as Partial<MonitorState>;
+    if (s.schema !== SERVICE_SCHEMA || s.id !== SERVICE_ID || typeof s.home !== 'string') return null;
+    const paths = servicePaths(s.home);
+    return {
+      schema: SERVICE_SCHEMA,
+      id: SERVICE_ID,
+      pid: typeof s.pid === 'number' ? s.pid : 0,
+      wanted: s.wanted === true,
+      home: s.home,
+      state_path: typeof s.state_path === 'string' ? s.state_path : paths.state,
+      pid_path: typeof s.pid_path === 'string' ? s.pid_path : paths.pid,
+      log_path: typeof s.log_path === 'string' ? s.log_path : paths.log,
+      interval_sec:
+        typeof s.interval_sec === 'number' && Number.isFinite(s.interval_sec)
+          ? s.interval_sec
+          : DEFAULT_INTERVAL_SEC,
+      server:
+        s.server && typeof s.server === 'object'
+          ? (s.server as MonitorState['server'])
+          : { started_at: '', ccm_version: ccmVersion() },
+      last_tick_at: typeof s.last_tick_at === 'string' ? s.last_tick_at : null,
+      last_error: typeof s.last_error === 'string' ? s.last_error : null,
+      tick_count: typeof s.tick_count === 'number' ? s.tick_count : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isPidAlive(pid: number): boolean {
+  if (testHooks.isPidAlive) return testHooks.isPidAlive(pid);
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function classifyService(service: MonitorState | null): MonitorState | null {
+  if (!service) return null;
+  const runningVersion =
+    service.server && typeof service.server.ccm_version === 'string'
+      ? service.server.ccm_version
+      : null;
+  const installedVersion = ccmVersion();
+  const running = isPidAlive(service.pid);
+  return {
+    ...service,
+    health: running ? 'ok' : service.wanted ? 'stale' : 'stopped',
+    stale: !running && service.wanted,
+    binary_match: runningVersion === installedVersion,
+    running_ccm_version: runningVersion,
+    installed_ccm_version: installedVersion,
+  };
+}
+
+function buildState(home: string, intervalSec: number): MonitorState {
+  const paths = servicePaths(home);
+  return {
+    schema: SERVICE_SCHEMA,
+    id: SERVICE_ID,
+    pid: 0,
+    wanted: true,
+    home,
+    state_path: paths.state,
+    pid_path: paths.pid,
+    log_path: paths.log,
+    interval_sec: intervalSec,
+    server: { started_at: nowIso(), ccm_version: ccmVersion() },
+    last_tick_at: null,
+    last_error: null,
+    tick_count: 0,
+    health: 'stopped',
+    stale: false,
+  };
+}
+
+function spawnArgsForState(statePath: string): { command: string; args: string[] } {
+  const entry = process.argv[1];
+  if (entry && /\.(?:cjs|mjs|js|ts)$/.test(entry)) {
+    return { command: process.execPath, args: [entry, 'monitor', 'serve', '--state', statePath] };
+  }
+  return { command: process.execPath, args: ['monitor', 'serve', '--state', statePath] };
+}
+
+function defaultSpawnService({ statePath, logPath }: SpawnArgs): SpawnResult {
+  const { command, args } = spawnArgsForState(statePath);
+  const fd = fs.openSync(logPath, 'a');
+  const child = spawn(command, args, {
+    detached: true,
+    stdio: ['ignore', fd, fd],
+    env: { ...process.env },
+  });
+  child.unref();
+  fs.closeSync(fd);
+  return { pid: child.pid || 0 };
+}
+
+function spawnService(args: SpawnArgs): SpawnResult {
+  return testHooks.spawnService ? testHooks.spawnService(args) : defaultSpawnService(args);
+}
+
+function waitForRunning(statePath: string, startedAt: string): MonitorState {
+  const deadline = Date.now() + 3000;
+  let last: MonitorState | null = null;
+  while (Date.now() < deadline) {
+    last = readState(statePath);
+    if (last && last.server.started_at === startedAt) {
+      const checked = classifyService(last);
+      if (checked && checked.health === 'ok') return checked;
+    }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 80);
+  }
+  throw kinded(`monitor service did not become healthy${last ? ` (pid ${last.pid})` : ''}`, 'Validation');
+}
+
+function startService(ctx: Ctx): { service: MonitorState; reused: boolean } {
+  const home = canonicalHome(ctx);
+  const paths = servicePaths(home);
+  ensureServiceDirs(paths);
+  return withLock(paths.lockTarget, () => {
+    const existing = classifyService(readState(paths.state));
+    if (existing && existing.health === 'ok' && existing.binary_match !== false) {
+      return { service: existing, reused: true };
+    }
+    if (existing && existing.pid > 0) stopOne(existing);
+    const state = buildState(home, parseInterval(ctx.values.interval));
+    writeJson(paths.state, state);
+    fs.writeFileSync(paths.pid, '', 'utf8');
+    const child = spawnService({ statePath: state.state_path, logPath: state.log_path });
+    if (child.pid > 0) {
+      const latest = readState(state.state_path) || state;
+      writeJson(state.state_path, { ...latest, pid: child.pid });
+      fs.writeFileSync(state.pid_path, `${child.pid}\n`, 'utf8');
+    }
+    return { service: waitForRunning(state.state_path, state.server.started_at), reused: false };
+  });
+}
+
+function killPid(pid: number): boolean {
+  if (testHooks.kill) return testHooks.kill(pid);
+  try {
+    process.kill(pid, 'SIGTERM');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function stopOne(service: MonitorState | null): { stopped: boolean; service: MonitorState | null } {
+  if (!service) return { stopped: false, service: null };
+  const checked = classifyService(service) || service;
+  if (checked.pid > 0 && checked.health === 'ok') killPid(checked.pid);
+  const stopped = {
+    ...checked,
+    pid: 0,
+    wanted: false,
+    health: 'stopped' as const,
+    stale: false,
+  };
+  writeJson(stopped.state_path, stopped);
+  try {
+    fs.writeFileSync(stopped.pid_path, '', 'utf8');
+  } catch {
+    /* best-effort */
+  }
+  return { stopped: true, service: stopped };
+}
+
+function output(ctx: Ctx, data: unknown, human: string): void {
+  ctx.out(ctx.flags.json ? JSON.stringify(data) : human);
+}
+
+function humanLine(service: MonitorState | null): string {
+  if (!service) return 'monitor: stopped';
+  const status = service.health === 'ok' && service.binary_match === false ? 'stale-binary' : service.health || 'stopped';
+  return `monitor: ${status} pid=${service.pid || 'n/a'} home=${service.home}`;
+}
+
+export function start(ctx: Ctx): number {
+  const { service, reused } = startService(ctx);
+  output(ctx, { ok: true, running: true, reused, service }, `${reused ? 'reusing' : 'started'} monitor pid=${service.pid}`);
+  return EXIT.OK;
+}
+
+export function status(ctx: Ctx): number {
+  const home = canonicalHome(ctx);
+  const paths = servicePaths(home);
+  ensureServiceDirs(paths);
+  const service = classifyService(readState(paths.state));
+  output(
+    ctx,
+    {
+      ok: true,
+      running: service?.health === 'ok',
+      binary_match: service ? service.binary_match !== false : null,
+      running_ccm_version: service?.running_ccm_version ?? null,
+      installed_ccm_version: ccmVersion(),
+      service,
+    },
+    humanLine(service),
+  );
+  return EXIT.OK;
+}
+
+export function stop(ctx: Ctx): number {
+  const home = canonicalHome(ctx);
+  const paths = servicePaths(home);
+  ensureServiceDirs(paths);
+  return withLock(paths.lockTarget, () => {
+    const result = stopOne(readState(paths.state));
+    output(ctx, { ok: true, stopped: result.stopped, service: result.service }, result.stopped ? 'stopped monitor' : 'monitor: stopped');
+    return EXIT.OK;
+  });
+}
+
+export function restart(ctx: Ctx): number {
+  const home = canonicalHome(ctx);
+  const paths = servicePaths(home);
+  ensureServiceDirs(paths);
+  let previous: MonitorState | null = null;
+  withLock(paths.lockTarget, () => {
+    previous = stopOne(readState(paths.state)).service;
+  });
+  const started = startService(ctx);
+  output(ctx, { ok: true, previous, service: started.service }, `restarted monitor pid=${started.service.pid}`);
+  return EXIT.OK;
+}
+
+interface TickResult {
+  registry: ReturnType<MachineHarnessRegistry['toJSON']>;
+  checked_boards: number;
+  writes: number;
+  errors: string[];
+}
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
+function boardOwner(board: unknown): Record<string, unknown> {
+  return isObject(board) && isObject(board.owner) ? board.owner : {};
+}
+
+function readAccountsMap(home: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(path.join(home, 'accounts.json'), 'utf8'));
+    return isObject(parsed.accounts) ? (parsed.accounts as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function usageForHarness(
+  descriptor: HarnessDescriptor,
+  env: Record<string, string | undefined>,
+): ArbiterUsageOverride {
+  const adapter = resolveHarnessAdapter({ env, harnessFlag: descriptor.id });
+  const reading = adapter.readCurrentUsage(env);
+  const source = descriptor.usageSource;
+  return {
+    signal: reading.signal as UsageSignal | null,
+    quotaModel: source.quotaModel as QuotaModel,
+    pollable: source.pollable,
+  };
+}
+
+function tickOnce(ctx: Ctx, state: MonitorState): TickResult {
+  if (testHooks.tick) return testHooks.tick(ctx, state);
+  const registry = MachineHarnessRegistry.sweep(ctx.env);
+  const registryJson = registry.toJSON();
+  const usageByHarness = new Map<string, ArbiterUsageOverride>();
+  for (const descriptor of registry.installed()) {
+    usageByHarness.set(descriptor.id, usageForHarness(descriptor, ctx.env));
+  }
+  const accountsMap = readAccountsMap(state.home);
+  const boardsDir = discover.boardsDir(state.home);
+  const boards = loadHomeBoards(boardsDir, {
+    maxBoards: Number.POSITIVE_INFINITY,
+    maxDaysAgo: Number.POSITIVE_INFINITY,
+  });
+  let checkedBoards = 0;
+  let writes = 0;
+  const errors: string[] = [];
+  for (const entry of boards) {
+    const owner = boardOwner(entry.board);
+    if (owner.active !== true) continue;
+    checkedBoards += 1;
+    const boardPath = path.join(boardsDir, entry.file);
+    const harness = typeof owner.harness === 'string' ? owner.harness : undefined;
+    const usage = harness ? usageByHarness.get(harness) : undefined;
+    try {
+      withLock(boardPath, () => {
+        const raw = JSON.parse(fs.readFileSync(boardPath, 'utf8'));
+        const out = arbitrateBoardForService(
+          raw,
+          {
+            ...ctx,
+            values: { ...ctx.values, home: state.home, board: boardPath, ...(harness ? { harness } : {}) },
+          },
+          boardPath,
+          { usage, accountsMap },
+        );
+        const res = lintBoard(JSON.stringify(out.board));
+        if (res.errors.length > 0) {
+          errors.push(`${entry.file}: ${formatReport(res)}`);
+          return;
+        }
+        io.writeFileAtomicSync(boardPath, `${JSON.stringify(out.board, null, 2)}\n`);
+        writes += out.result.appended;
+      });
+    } catch (e) {
+      errors.push(`${entry.file}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  return { registry: registryJson, checked_boards: checkedBoards, writes, errors };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function serve(ctx: Ctx): Promise<number> {
+  const statePath = ctx.values.state as string;
+  let state = readState(statePath);
+  if (!state) throw kinded(`invalid monitor state: ${statePath}`, 'NotFound');
+  state = { ...state, pid: process.pid, wanted: true, health: 'ok', stale: false };
+  writeJson(state.state_path, state);
+  fs.writeFileSync(state.pid_path, `${process.pid}\n`, 'utf8');
+  const iterationsRaw = ctx.values.iterations;
+  const iterations =
+    typeof iterationsRaw === 'string' && Number.isInteger(Number(iterationsRaw))
+      ? Number(iterationsRaw)
+      : null;
+  let count = 0;
+  while (iterations === null || count < iterations) {
+    const latest = readState(state.state_path) || state;
+    if (!latest.wanted) break;
+    let next = latest;
+    try {
+      const tick = tickOnce(ctx, latest);
+      next = {
+        ...latest,
+        pid: process.pid,
+        wanted: true,
+        last_tick_at: nowIso(),
+        last_error: tick.errors.length ? tick.errors.join('\n') : null,
+        tick_count: latest.tick_count + 1,
+      };
+      ctx.out(JSON.stringify({ ok: true, tick }));
+    } catch (e) {
+      next = {
+        ...latest,
+        pid: process.pid,
+        wanted: true,
+        last_error: e instanceof Error ? e.message : String(e),
+      };
+    }
+    writeJson(next.state_path, next);
+    count += 1;
+    if (iterations !== null && count >= iterations) break;
+    await sleep(Math.max(5, next.interval_sec) * 1000);
+  }
+  return EXIT.OK;
+}
+
+function serviceFilePath(): string {
+  const exec = process.execPath;
+  return path.basename(exec).toLowerCase().startsWith('node') ? process.argv[1] || 'ccm' : exec;
+}
+
+function serviceLabel(home: string): string {
+  return `ai.nemori.ccm.monitor.${Buffer.from(home).toString('hex').slice(0, 10)}`;
+}
+
+function installPathForPlatform(home: string): { path: string; kind: 'launchd' | 'systemd'; label: string } {
+  const label = serviceLabel(home);
+  if (process.platform === 'darwin') {
+    const base = path.join(os.homedir(), 'Library', 'LaunchAgents');
+    return { path: path.join(base, `${label}.plist`), kind: 'launchd', label };
+  }
+  const base = path.join(os.homedir(), '.config', 'systemd', 'user');
+  return { path: path.join(base, `ccm-monitor-${Buffer.from(home).toString('hex').slice(0, 10)}.service`), kind: 'systemd', label };
+}
+
+export function installService(ctx: Ctx): number {
+  const home = canonicalHome(ctx);
+  const paths = servicePaths(home);
+  ensureServiceDirs(paths);
+  const state = readState(paths.state) || buildState(home, parseInterval(ctx.values.interval));
+  writeJson(paths.state, { ...state, wanted: true });
+  const unit = installPathForPlatform(home);
+  fs.mkdirSync(path.dirname(unit.path), { recursive: true });
+  const ccmPath = serviceFilePath();
+  if (unit.kind === 'launchd') {
+    writeJson(paths.state, { ...state, wanted: true });
+    fs.writeFileSync(
+      unit.path,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>${unit.label}</string>
+  <key>ProgramArguments</key><array><string>${ccmPath}</string><string>monitor</string><string>serve</string><string>--state</string><string>${paths.state}</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>${paths.log}</string>
+  <key>StandardErrorPath</key><string>${paths.log}</string>
+</dict></plist>
+`,
+      'utf8',
+    );
+  } else {
+    fs.writeFileSync(
+      unit.path,
+      `[Unit]
+Description=ccm monitor
+
+[Service]
+ExecStart=${ccmPath} monitor serve --state ${paths.state}
+Restart=always
+StandardOutput=append:${paths.log}
+StandardError=append:${paths.log}
+
+[Install]
+WantedBy=default.target
+`,
+      'utf8',
+    );
+  }
+  const activation = activateOsService(unit);
+  output(
+    ctx,
+    { ok: true, installed: true, kind: unit.kind, path: unit.path, activation },
+    activation.ok
+      ? `installed and started monitor ${unit.kind} unit: ${unit.path}`
+      : `installed monitor ${unit.kind} unit: ${unit.path}（activation failed: ${activation.error}）`,
+  );
+  return EXIT.OK;
+}
+
+export function uninstallService(ctx: Ctx): number {
+  const home = canonicalHome(ctx);
+  const paths = servicePaths(home);
+  const unit = installPathForPlatform(home);
+  const deactivation = deactivateOsService(unit);
+  try {
+    fs.rmSync(unit.path, { force: true });
+  } catch {
+    /* best-effort */
+  }
+  ensureServiceDirs(paths);
+  let stopped = false;
+  withLock(paths.lockTarget, () => {
+    stopped = stopOne(readState(paths.state)).stopped;
+  });
+  output(
+    ctx,
+    { ok: true, uninstalled: true, stopped, kind: unit.kind, path: unit.path, deactivation },
+    `uninstalled monitor ${unit.kind} unit: ${unit.path}`,
+  );
+  return EXIT.OK;
+}
+
+function runUnitCommand(command: string, args: string[]): { ok: boolean; error: string | null } {
+  const r = spawnSync(command, args, { encoding: 'utf8' });
+  if (r.status === 0) return { ok: true, error: null };
+  return { ok: false, error: (r.stderr || r.stdout || `exit ${r.status}`).trim() };
+}
+
+function activateOsService(unit: { path: string; kind: 'launchd' | 'systemd'; label: string }): { ok: boolean; error: string | null } {
+  if (unit.kind === 'launchd') {
+    const domain = `gui/${process.getuid?.() || ''}`;
+    const boot = runUnitCommand('launchctl', ['bootstrap', domain, unit.path]);
+    if (!boot.ok && !String(boot.error || '').includes('already bootstrapped')) return boot;
+    return runUnitCommand('launchctl', ['kickstart', '-k', `${domain}/${unit.label}`]);
+  }
+  const reload = runUnitCommand('systemctl', ['--user', 'daemon-reload']);
+  if (!reload.ok) return reload;
+  return runUnitCommand('systemctl', ['--user', 'enable', '--now', path.basename(unit.path)]);
+}
+
+function deactivateOsService(unit: { path: string; kind: 'launchd' | 'systemd'; label: string }): { ok: boolean; error: string | null } {
+  if (unit.kind === 'launchd') {
+    return runUnitCommand('launchctl', ['bootout', `gui/${process.getuid?.() || ''}/${unit.label}`]);
+  }
+  return runUnitCommand('systemctl', ['--user', 'disable', '--now', path.basename(unit.path)]);
+}
+
+export function restartOsServiceIfInstalled(ctx: Ctx): boolean {
+  const home = canonicalHome(ctx);
+  const unit = installPathForPlatform(home);
+  if (!fs.existsSync(unit.path)) return false;
+  const cmd = unit.kind === 'launchd' ? 'launchctl' : 'systemctl';
+  const args =
+    unit.kind === 'launchd'
+      ? ['kickstart', '-k', `gui/${process.getuid?.() || ''}/${unit.label}`]
+      : ['--user', 'restart', path.basename(unit.path)];
+  const r = spawnSync(cmd, args, { stdio: 'ignore' });
+  return r.status === 0;
+}

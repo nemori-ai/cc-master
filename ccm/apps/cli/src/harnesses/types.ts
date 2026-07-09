@@ -73,6 +73,26 @@ export interface HarnessInstallation {
   };
 }
 
+export type UsageSourceKind = 'statusline-sidecar' | 'app-server' | 'dashboard-api';
+export type QuotaModel = 'rolling-5h-7d' | 'billing-period' | 'primary-secondary';
+
+export interface HarnessUsageSource {
+  kind: UsageSourceKind;
+  pollable: boolean;
+  quotaModel: QuotaModel;
+}
+
+export interface HarnessDescriptor extends HarnessInstallation {
+  sessionStoreRoots: string[];
+  usageSource: HarnessUsageSource;
+  accountPoolLocation: string | null;
+}
+
+export interface PoolDescriptor {
+  harness: HarnessId;
+  location: string;
+}
+
 export type AccountSwitchPreflight = { action: 'continue' } | { action: 'noop'; reason: string };
 
 export interface HarnessAdapter {
@@ -82,6 +102,9 @@ export interface HarnessAdapter {
   detect(env: Env): boolean;
   inspectInstallation(env: Env): HarnessInstallation;
   session(env: Env): HarnessSession;
+  sessionStoreRoots(env: Env): string[];
+  usageSource(env: Env): HarnessUsageSource;
+  accountPoolLocation(env: Env): string | null;
   readCurrentUsage(env: Env): CurrentUsageReading;
   accountSwitchPreflight(env: Env): AccountSwitchPreflight;
   upgradePlugin(request: PluginUpgradeRequest): Promise<PluginUpgradeResult>;

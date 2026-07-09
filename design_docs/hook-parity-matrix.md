@@ -10,6 +10,7 @@
 | board-guard | implemented | implemented | implemented | [CONTRACT.md](../plugin/src/hooks/board-guard/CONTRACT.md) |
 | board-lint | implemented | implemented | implemented | [CONTRACT.md](../plugin/src/hooks/board-lint/CONTRACT.md) |
 | bootstrap-board | implemented | implemented-minimal-fresh | implemented-minimal-fresh | [CONTRACT.md](../plugin/src/hooks/bootstrap-board/CONTRACT.md) |
+| coordination-inbox | implemented | implemented-stop-system-message | implemented-stop-advisory | [CONTRACT.md](../plugin/src/hooks/coordination-inbox/CONTRACT.md) |
 | identity-nudge | implemented | implemented-stop-system-message | implemented-stop-advisory | [CONTRACT.md](../plugin/src/hooks/identity-nudge/CONTRACT.md) |
 | reinject | implemented | implemented | implemented-track-b | [CONTRACT.md](../plugin/src/hooks/reinject/CONTRACT.md) |
 | usage-pacing | implemented | implemented-stop-advisory | implemented-stop-advisory | [CONTRACT.md](../plugin/src/hooks/usage-pacing/CONTRACT.md) |
@@ -43,6 +44,13 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | bootstrap-slash-command-expansion | protocol-capability-gap | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md |
 | bootstrap-ccm-hard-precheck-missing-on-codex | host-convention-divergence | codex | backlog — not in HOOKPAR-DEC's four-item fix scope (FUSE / rollup / board-guard fallback / ADR-018 tags); needs its own follow-up to port ADR-021's fail-loud precheck to Codex bootstrap |
 | bootstrap-beforeSubmitPrompt-envelope | protocol-capability-gap | cursor | plugin v0.17.2 envelope fix |
+
+### coordination-inbox
+
+| rule | kind | affected hosts | tracked by |
+| --- | --- | --- | --- |
+| coordination-inbox-envelope-codex | protocol-capability-gap | codex | n/a — declared launcher-level envelope conversion, not a business-logic gap |
+| coordination-inbox-envelope-cursor | host-convention-divergence | cursor | n/a — declared launcher-level envelope conversion; ADR-031 Track A |
 
 ### identity-nudge
 
