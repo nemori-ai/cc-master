@@ -150,6 +150,7 @@ Lifecycle rules:
 - stale detection requires both PID liveness and tokened HTTP `GET /_ccm/health` matching `schema`, `id`, `pid`, and `started_at`. PID-only is unsafe because of PID reuse.
 - `stop` prefers authenticated shutdown when implemented, then SIGTERM, then stale cleanup. If an HTTP shutdown route exists, it is internal/local/token-gated and writes no board data.
 - `restart` stops the old process if live, removes stale state if not, then starts a new process with a **new token**.
+- **Binary co-lifecycle（演进·[ADR-033](ADR-033-ccm-monitor-daemon.md) D6）**：running 实例的 `server.ccm_version` 必须等于当前 `ccm --version`；`ccm upgrade ccm` / `install.sh` 换完二进制后经 `ccm services reconcile --after-binary-replace` 对 **wanted** web-viewer 实例强制 restart；`start` 若发现 version drift 不得「已健康则复用」。本 ADR 原文未规定 post-upgrade 收尾——实现缺口由 ADR-033 补齐，lifecycle verbs 本身不变。
 - The service scans `<home>/boards/` and exposes a board list / switcher to the viewer. `--board` / `--goal` follow existing ccm discovery only to choose `initial_board_path` / initial `current_selection`; after start, current selection is UI/runtime state, not lifecycle identity. Ambiguity with `--no-input` is exit 5 / not found-style failure only when a command explicitly requested an initial selection.
 
 ### 2.4 Security and invariants
