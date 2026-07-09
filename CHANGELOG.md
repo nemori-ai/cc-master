@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **ADR-031 Accepted — N-host capability parity**：将 ADR-028 双端 hook 锁步升为 `claude-code | codex | cursor`；新增 Capability INTENT 层（`design_docs/harnesses/capabilities/` + `gen-capability-parity-matrix.sh`）与 Cursor 双轨（Track A SAP/PHIP / Track B 声明替代）；manifest 占位与 coverage 契约测试已落盘，Cursor runtime 实现另 PR。
+
 ## [0.16.0] — 2026-07-09
 
 > **ccm-native web viewer + status-report 迁移（配套 ccm-v0.17.0）** —— board 可视化与状态报告从 plugin prompt/skill surface 迁到 `ccm`：`ccm web-viewer` 托管本地只读 React app，`ccm status-report` 生成可程序化报告；旧 `/cc-master:view` / `$cc-master-view` 与 `/cc-master:status` / `$cc-master-status` 入口直接删除，不保留 deprecated shim。

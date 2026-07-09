@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check-hook-parity-touch.sh — HOOKPAR-DEC / ADR-028 PR-diff existence check ("hook 双端锁步").
+# check-hook-parity-touch.sh — HOOKPAR-DEC / ADR-028 / ADR-031 PR-diff existence check ("hook N-host 锁步").
 #
 # For each dual-`implemented` hook (per plugin/src/hooks/_manifest/hooks.yaml host_coverage), if a PR
 # diff touches `implementations/<host-A>/` files but NOT `implementations/<host-B>/` files, this
