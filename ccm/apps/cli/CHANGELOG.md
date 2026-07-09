@@ -1,5 +1,16 @@
 # ccm
 
+## 0.17.2
+
+### Patch Changes
+
+- fix: make web-viewer health/shutdown helper work from the SEA binary
+
+  - `ccm web-viewer start/status/restart` no longer tries to run the SEA executable as `node -e`; it uses the current Node executable in dev and `node`/`CCM_NODE_BIN` as the helper runtime when launched from the packaged ccm binary.
+
+- Updated dependencies
+  - @ccm/engine@0.17.2
+
 ## 0.17.1
 
 ### Patch Changes

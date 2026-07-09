@@ -412,6 +412,13 @@ function isPidAlive(pid: number): boolean {
   }
 }
 
+function nodeEvalCommand(): string {
+  const exec = process.execPath || '';
+  const base = path.basename(exec).toLowerCase();
+  if (base === 'node' || base === 'node.exe') return exec;
+  return process.env.CCM_NODE_BIN || 'node';
+}
+
 function defaultHealthCheck(service: ServiceState, token: string | null): HealthResult {
   if (!token || !service.base_url) return { ok: false, error: 'missing token or base_url' };
   const script = `
@@ -430,7 +437,7 @@ function defaultHealthCheck(service: ServiceState, token: string | null): Health
     req.on('timeout', () => { req.destroy(); process.exit(3); });
     req.on('error', () => process.exit(4));
   `;
-  const r = spawnSync(process.execPath, ['-e', script, `${service.base_url}/_ccm/health`, token], {
+  const r = spawnSync(nodeEvalCommand(), ['-e', script, `${service.base_url}/_ccm/health`, token], {
     encoding: 'utf8',
     timeout: 1200,
   });
@@ -709,7 +716,7 @@ function defaultShutdown(service: ServiceState, token: string | null): boolean {
     req.on('error', () => process.exit(4));
     req.end();
   `;
-  const r = spawnSync(process.execPath, ['-e', script, service.base_url, token], {
+  const r = spawnSync(nodeEvalCommand(), ['-e', script, service.base_url, token], {
     timeout: 1200,
   });
   if (r.status === 0) return true;
