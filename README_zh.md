@@ -109,10 +109,10 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 # …或分别 pin 某条线的版本——两个 flag 各自可选、各自独立，
 # 省掉哪个、哪个就解析为本线最新：
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- \
-  --ccm-version ccm-v0.17.2 --plugin-version 0.16.0
+  --ccm-version ccm-v0.18.0 --plugin-version 0.17.0
 
 # 只 pin 一条线、另一条留最新（例如锁住 ccm、插件取最新）：
-curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.17.2
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --ccm-version ccm-v0.18.0
 
 # 显式指定 harness，或分发到本机所有已安装且支持的 harness：
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness claude-code

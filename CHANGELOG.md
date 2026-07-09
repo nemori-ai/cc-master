@@ -7,15 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-07-09
+
+> **Cursor full host compatibility（配套 ccm-v0.18.0）** —— 把 Cursor 从 scaffold/planned 推到可安装、可配速、可发版的第三宿主：P0/P1 hooks、billing_period usage、Track B reinject、skills/commands 投影，以及 `install.sh --harness cursor` / per-host release zip。
+
 ### Added
 
-- **ADR-031 Accepted — N-host capability parity**：将 ADR-028 双端 hook 锁步升为 `claude-code | codex | cursor`；新增 Capability INTENT 层（`design_docs/harnesses/capabilities/` + `gen-capability-parity-matrix.sh`）与 Cursor 双轨（Track A SAP/PHIP / Track B 声明替代）；manifest 占位与 coverage 契约测试已落盘，Cursor runtime 实现另 PR。
-- **Cursor Phase B scaffold**：`.cursor-plugin` + `_hosts/cursor` launcher/hooks.json + P0 silent noop cores；`sync-plugin-dist.sh --host cursor` / package / dist-sync check 已支持；生产 hook body 仍属 Phase C。
-- **Cursor full compatibility (install + release + billing_period usage)**：P0/P1 Cursor hook cores（bootstrap / board-guard / board-lint / verify-board / usage-pacing / identity-nudge）+ Track B reinject（alwaysApply rule）；`ccm` Cursor harness adapter 与 dashboard `billing_period` usage（`CC_MASTER_HARNESS=cursor` → `ccm usage advise`）；`install.sh --harness cursor` 安装到 `~/.cursor/plugins/local/cc-master`；`package-plugin.sh --all-hosts` 与 `plugin-release.yml` 产出并校验 `cc-master-plugin-cursor-*.zip`。
+- **ADR-031 Accepted — N-host capability parity**：将 ADR-028 双端 hook 锁步升为 `claude-code | codex | cursor`；新增 Capability INTENT 层（`design_docs/harnesses/capabilities/` + `gen-capability-parity-matrix.sh`）与 Cursor 双轨（Track A SAP/PHIP / Track B 声明替代）。
+- **Cursor Phase B scaffold → Phase C runtime**：`.cursor-plugin` + `_hosts/cursor` launcher/hooks.json；P0/P1 cores（bootstrap / board-guard / board-lint / verify-board / usage-pacing / identity-nudge）+ Track B reinject（`alwaysApply` rule）。
+- **Cursor billing_period usage（ccm-v0.18.0）**：`ccm` Cursor harness adapter 读 dashboard `GetCurrentPeriodUsage`；`UsageSignal.billing_period` + pacing verdict `hold` / `throttle` / `stop_billing_period`（永不 `switch`）。
+- **Cursor ship surface**：`install.sh --harness cursor` → `~/.cursor/plugins/local/cc-master`；`package-plugin.sh --all-hosts` 与 `plugin-release.yml` 产出并校验 `cc-master-plugin-cursor-*.zip`；skills `mode: copy` + overlays；`as-master-orchestrator` host_native 命令投影。
 
 ### Changed
 
-- **README / README_zh 入口同步近期发版事实**：pin 示例升到 `ccm-v0.17.2` / plugin `0.16.0`；补 Cursor `/as-master-orchestrator` 入口；诚实区分 Claude Code 号池换号 vs Cursor billing_period 配速；status/view 指向 `ccm status-report` / `ccm web-viewer`；命令目录链接改到 `plugin/src/skills/using-ccm/canonical/references/command-catalog.md`。
+- **README / README_zh 入口同步**：pin 示例升到 `ccm-v0.18.0` / plugin `0.17.0`；补 Cursor `/as-master-orchestrator`；诚实区分 Claude Code 号池换号 vs Cursor billing_period 配速；status/view 指向 `ccm status-report` / `ccm web-viewer`；命令目录链接改到 `plugin/src/skills/using-ccm/canonical/references/command-catalog.md`。
 
 ## [0.16.0] — 2026-07-09
 
