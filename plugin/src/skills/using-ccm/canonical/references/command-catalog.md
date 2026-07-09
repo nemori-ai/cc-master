@@ -1114,7 +1114,7 @@ ccm usage advise [flags]
 ```
 
 - positional：无
-- 行为：**单侧走廊 pacing verdict（5 值 enum）**：`hold`（走廊内·静默）\| `throttle`（5h 临界减速）\| `switch`（5h 临界 + n>1 + 7d 有余量 → 切到下一份配额）\| `stop_5h`（5h 本窗口烧穿·无可切备号 / 7d 亦吃紧 → 引导 arm watchdog 守到 `nearest_reset` 回血）\| `stop_7d`（7d 跨窗口不可逆硬总闸 → 暂停 dispatch + surface 用户）。附 `strength`（标签强度 weak\|strong·ccm 出、消费方直接用）+ 推荐 lever 类 + `stop_dimension`（哪个窗口驱动了 stop_*）+ `nearest_reset`（stop_* 时该窗 reset 时刻·引导 arm wakeup）+ `switch_candidate`（`switch` verdict 时·选可切备号里 7d `used%` 最低的）+ `pool`（号池粗粒度 { backups, switchable }）。收口 usage-pacing 走廊数学（引擎 `pacingAdvice` 为准）。sidecar 缺 → `hold` + `available:false`（降级）
+- 行为：**单侧 pacing verdict**。Claude Code / Codex（5h+7d）：`hold` \| `throttle` \| `switch` \| `stop_5h` \| `stop_7d`（池感知·ADR-024）。**Cursor（单窗 `billing_period`·约 30 天订阅账期）**：`hold` \| `throttle` \| `stop_billing_period`——**永不** `switch` / `stop_5h` / `stop_7d`；`window_5h_pct`/`window_7d_pct` 为 null，看 `window_billing_period_pct`；`source` 为 `cursor-dashboard`。附 `strength` + levers + `stop_dimension`（含 `billing_period`）+ `nearest_reset` +（仅 Claude/Codex）`switch_candidate`。引擎 `pacingAdvice` 为准。信号缺 → `hold` + `available:false`（降级）
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
@@ -1829,26 +1829,44 @@ id 不存在时 `data` = `null`，exit 0。
 
 ### usage advise（`ccm usage advise --json`）
 
+Claude Code / Codex 例：
+
 ```jsonc
 {
-  "verdict": "switch",                  // hold | throttle | switch | stop_5h | stop_7d（单侧 enum）
-  "strength": "weak",                   // 标签强度 weak|strong（ccm 出·消费方直接用·throttle/stop_* → strong·switch → weak）
+  "verdict": "switch",                  // hold | throttle | switch | stop_5h | stop_7d
+  "strength": "weak",
   "reason": "5h 已用 92%…当前 5h 烧满是切到下一份配额的触发信号",
   "levers": ["switch_account", "continue_dispatch"],
-  "stop_dimension": null,               // "5h" | "7d" | null（哪个窗口驱动了 stop_*·非 stop_* → null）
-  "nearest_reset": null,                // stop_* 时该窗 reset 时刻 ISO-8601（引导 arm wakeup 等 reset）·非 stop_* → null
+  "stop_dimension": null,               // "5h" | "7d" | "billing_period" | null
+  "nearest_reset": null,
   "window_5h_pct": 92, "window_7d_pct": 20,
+  "window_billing_period_pct": null,    // Cursor 账期 used%；Claude/Codex 为 null
   "effective_n": 3,
-  "switch_candidate": "c@c.com",        // switch verdict 时选可切备号里 7d used% 最低者（非 switch / 无备号 → null）
-  "pool": { "backups": 2, "switchable": 2 },  // 号池粗粒度事实（非 active 号数 / 其中 token 未过期可切入数）
+  "switch_candidate": "c@c.com",
   "confidence": "high",
-  "source": "account",                  // sidecar 缺 → "local-derived-approx" + available:false
+  "source": "account",                  // 或 "codex-app-server" | "cursor-dashboard" | "local-derived-approx"
   "as_of": "2026-06-25T09:00:00Z",
   "available": true
 }
 ```
 
-verdict 语义（消费方映射）：`hold` 走廊内静默；`throttle` 5h 临界减速（降模型档 / 降 WIP / defer）；`switch` 5h 临界 + n>1 + 7d 有余量 → 切到下一份配额（usage-pacing hook 机械换号·消费方只调配速）；`stop_5h` 5h 本窗口烧穿 → arm watchdog 守到 `nearest_reset` 回血；`stop_7d` 7d 跨窗口硬总闸 → 暂停 dispatch + `blocked_on:"user"` surface 用户。
+Cursor 例（单窗账期·无换号）：
+
+```jsonc
+{
+  "verdict": "hold",                    // hold | throttle | stop_billing_period（永不 switch）
+  "strength": "weak",
+  "window_5h_pct": null, "window_7d_pct": null,
+  "window_billing_period_pct": 5.5,
+  "stop_dimension": null,
+  "switch_candidate": null,
+  "effective_n": 1,
+  "source": "cursor-dashboard",
+  "available": true
+}
+```
+
+verdict 语义：`hold` 静默；`throttle` 减速（降模型档 / 降 WIP / defer）；`switch`（仅 Claude/Codex 号池）切号；`stop_5h`/`stop_7d`（仅 5h/7d host）停派 + wakeup；`stop_billing_period`（仅 Cursor）账期逼顶 → 停派 + 等订阅 reset（`nearest_reset`）。
 
 ### usage task-cost（`ccm usage task-cost [<id>] --json`）
 

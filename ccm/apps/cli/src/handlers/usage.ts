@@ -2,7 +2,7 @@
 //
 // usage = 配额侧只读 advisory namespace（charter ②控制 token 消耗速度 + ⑤资源下最大化效率）。
 //   · show       → runRead：当前号 + 全备号 5h/7d used%/resets_at（备号=accounts.json registry 生命周期快照）。
-//   · advise     → runRead：单侧 verdict（hold|throttle|switch|stop_5h|stop_7d）+ 推荐 lever + switch_candidate。
+//   · advise     → runRead：单侧 verdict（hold|throttle|switch|stop_5h|stop_7d|stop_billing_period）+ lever + switch_candidate。
 //   · task-cost  → runRead：单/聚合任务 token（读 board observability·shell=N/A·coverage_pct·--group-by）。
 //
 // 硬不变式（plan §2 不变式 1·硬约束）：**usage 纯只读** = query/compute，零写、不抢 board-lock、不落状态。
@@ -452,6 +452,7 @@ export function advise(ctx: Ctx): number {
         nearest_reset: advice.nearest_reset,
         window_5h_pct: advice.window_5h_pct,
         window_7d_pct: advice.window_7d_pct,
+        window_billing_period_pct: advice.window_billing_period_pct,
         effective_n: advice.effective_n,
         switch_candidate: advice.switch_candidate,
         confidence: advice.confidence,
@@ -464,10 +465,14 @@ export function advise(ctx: Ctx): number {
       };
 
       if (c.flags.json) return JSON.stringify({ ok: true, data });
+      const bpPart =
+        data.window_billing_period_pct != null
+          ? ` billing_period=${fmtPct(data.window_billing_period_pct)}`
+          : '';
       const lines = [
         `usage advise: ${data.verdict}（effective_n=${data.effective_n}·strength=${data.strength}·confidence=${data.confidence}）`,
         `  reason: ${data.reason}`,
-        `  5h=${fmtPct(data.window_5h_pct)} 7d=${fmtPct(data.window_7d_pct)}${data.stop_dimension ? `·stop=${data.stop_dimension}` : ''}`,
+        `  5h=${fmtPct(data.window_5h_pct)} 7d=${fmtPct(data.window_7d_pct)}${bpPart}${data.stop_dimension ? `·stop=${data.stop_dimension}` : ''}`,
       ];
       if (data.levers.length) lines.push(`  levers: ${data.levers.join(', ')}`);
       if (data.switch_candidate) lines.push(`  switch_candidate: ${data.switch_candidate}`);

@@ -20,7 +20,7 @@ account switch is policy-gated (ADR-016).
 | --- | --- | --- | --- |
 | claude-code | implemented | PostToolBatch sample + Stop; statusline sidecar; LBHOOK autoswitch | Full |
 | codex | implemented-stop-advisory | Stop-only; codex-app-server usage signal; account switch NI | See usage-pacing CONTRACT |
-| cursor | planned | **Stop-only** (same as Codex); `readCurrentUsage` unavailable until signal source found | Track B |
+| cursor | implemented-stop-advisory | **Stop-only**; `ccm usage advise` via `billing_period` (never 5h/7d/switch); signal = Cursor dashboard API | Track B + `cursor-usage.ts` |
 
 ## Declared divergence
 
@@ -42,10 +42,14 @@ account switch is policy-gated (ADR-016).
 - rule: usage-pacing-quota-signal-source
   kind: protocol-capability-gap
   affected_hosts: [cursor]
-  reason: No verified Cursor IDE quota sidecar equivalent to Claude statusline capture.
-  compensating_mechanism: readCurrentUsage unavailable; hook skips pacing math or emits weak
-    "signal unavailable" ambient once per cooldown.
-  tracked_by: design_docs/harnesses/capabilities/ccm-quota-account.md
+  reason: >
+    Cursor has no 5h/7d rolling windows and no statusline sidecar; quota is a ~30d subscription
+    billing cycle exposed via undocumented dashboard RPC GetCurrentPeriodUsage (Bearer from
+    state.vscdb). Autoswitch is impossible (single login).
+  compensating_mechanism: >
+    ccm maps planUsage.totalPercentUsed → UsageSignal.billing_period; pacingAdvice emits
+    hold/throttle/stop_billing_period only (never switch). Fail-open when token/API unavailable.
+  tracked_by: ccm/apps/cli/src/cursor-usage.ts + design_docs/harnesses/capabilities/ccm-quota-account.md
 ```
 
 ## Linked surfaces

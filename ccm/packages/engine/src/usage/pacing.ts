@@ -25,7 +25,13 @@ import { predictPoolUsage } from '../account/predict.js';
 import type { Registry } from '../account/registry.js';
 import { selectAccount } from '../account/select.js';
 
-export type PacingVerdict = 'hold' | 'throttle' | 'switch' | 'stop_5h' | 'stop_7d';
+export type PacingVerdict =
+  | 'hold'
+  | 'throttle'
+  | 'switch'
+  | 'stop_5h'
+  | 'stop_7d'
+  | 'stop_billing_period';
 
 // 一个配额窗口的账户权威信号（来自 status-line sidecar·account-authoritative·Finding #37）。
 export interface WindowSignal {
@@ -35,6 +41,8 @@ export interface WindowSignal {
 export interface UsageSignal {
   five_hour?: WindowSignal | null;
   seven_day?: WindowSignal | null;
+  /** Cursor (~30d) subscription billing cycle — used when 5h/7d are absent. */
+  billing_period?: WindowSignal | null;
   captured_at?: number | null; // sidecar 捕获时刻（epoch 秒·保留字段·当前无欠用新鲜度闸）
 }
 
@@ -55,9 +63,10 @@ export interface PacingAdvice {
   strength: 'weak' | 'strong'; // ADR-018 力度（hook 直接消费·5h→weak / 7d→strong / switch→weak / stop→strong）
   window_5h_pct: number | null;
   window_7d_pct: number | null;
+  window_billing_period_pct: number | null; // Cursor billing-cycle %（无 5h/7d 时的主信号）
   effective_n: number;
   switch_candidate: string | null; // verdict=switch 时的目标切入号 email（select 选出·全池探针）
-  stop_dimension: '5h' | '7d' | null; // verdict=stop_* 时撞的是哪个窗口
+  stop_dimension: '5h' | '7d' | 'billing_period' | null; // verdict=stop_* 时撞的是哪个窗口
   nearest_reset: number | null; // stop 时最近一个 reset 的 epoch 秒（供 agent arm wakeup）
   available: boolean; // 账户信号是否可用（false → 调用方降级 / hook 静默）
   confidence: 'high' | 'medium' | 'low';
@@ -102,11 +111,13 @@ function isoToSec(iso: string | undefined): number | null {
 
 const DEGRADED: PacingAdvice = {
   verdict: 'hold',
-  reason: '账户权威信号不可用（5h/7d used% 均缺/过期）——降级，pacing 不可判',
+  reason:
+    '账户权威信号不可用（5h/7d/billing_period used% 均缺/过期）——降级，pacing 不可判',
   levers: [],
   strength: 'weak',
   window_5h_pct: null,
   window_7d_pct: null,
+  window_billing_period_pct: null,
   effective_n: 1,
   switch_candidate: null,
   stop_dimension: null,
@@ -130,9 +141,58 @@ export function pacingAdvice(
 
   const p5 = pctOf(signal?.five_hour, nowSec);
   const p7 = pctOf(signal?.seven_day, nowSec);
+  const pBp = pctOf(signal?.billing_period, nowSec);
 
-  // 账户信号完全不可用（两窗口都无 used%）→ available:false（调用方降级 / hook 静默）。
-  if (p5 === null && p7 === null) return { ...DEGRADED, effective_n: n };
+  // 账户信号完全不可用（5h/7d/billing_period 都无 used%）→ available:false（调用方降级 / hook 静默）。
+  if (p5 === null && p7 === null && pBp === null) return { ...DEGRADED, effective_n: n };
+
+  // ── Cursor billing-period-only path（无 5h/7d·永不 switch·忽略号池）──────────────────────────────
+  //   Cursor 订阅是 ~30d 账单周期，没有 Claude/Codex 式 5h/7d 滚动窗，也没有 autoswitch 号池。
+  //   阈值复用 warnLine（throttle）+ sevenDayHardStop（stop_billing_period）；strength 一律 strong。
+  if (p5 === null && p7 === null && pBp !== null) {
+    const bpEcho = {
+      window_5h_pct: null as number | null,
+      window_7d_pct: null as number | null,
+      window_billing_period_pct: pBp,
+      effective_n: n,
+      available: true,
+      switch_candidate: null as string | null,
+    };
+    if (pBp >= o.sevenDayHardStop) {
+      return {
+        ...bpEcho,
+        verdict: 'stop_billing_period',
+        reason: `billing_period 已用 ${pBp}%（≥${o.sevenDayHardStop}%）——本账单周期配额临界，暂停 dispatch、把「是否续耗 / 升档」作 blocked_on:user surface 给用户；arm wakeup 到 billing cycle end`,
+        levers: ['pause_dispatch', 'surface_user', 'arm_wakeup'],
+        strength: 'strong',
+        stop_dimension: 'billing_period',
+        nearest_reset: nearestFutureReset([signal?.billing_period?.resets_at], nowSec),
+        confidence: 'high',
+      };
+    }
+    if (pBp >= o.warnLine) {
+      return {
+        ...bpEcho,
+        verdict: 'throttle',
+        reason: `billing_period 已用 ${pBp}%（≥${o.warnLine}% 警告线）——减速（Cursor 账单周期·无换号逃逸·strong）`,
+        levers: ['downgrade_model', 'reduce_parallelism', 'defer_high_float'],
+        strength: 'strong',
+        stop_dimension: null,
+        nearest_reset: null,
+        confidence: 'high',
+      };
+    }
+    return {
+      ...bpEcho,
+      verdict: 'hold',
+      reason: `billing_period 用量 ${pBp}% 在警告线内（<${o.warnLine}%）——保持当前节奏`,
+      levers: [],
+      strength: 'weak',
+      stop_dimension: null,
+      nearest_reset: null,
+      confidence: 'high',
+    };
+  }
 
   // ── 池感知：predictPoolUsage（备号冻结投影）+ selectAccount（选号 / 全池耗尽判定）───────────────────
   const registry = opts.registry ?? null;
@@ -177,6 +237,7 @@ export function pacingAdvice(
   const echo = {
     window_5h_pct: p5,
     window_7d_pct: p7,
+    window_billing_period_pct: pBp,
     effective_n: n,
     available: true,
   };
