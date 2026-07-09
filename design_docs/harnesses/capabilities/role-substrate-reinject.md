@@ -27,7 +27,7 @@ Fixture tests assert equivalence classes, not byte-identical reinject text.
 | --- | --- | --- | --- |
 | claude-code | implemented | `SessionStart` hook (`matcher: startup\|resume\|compact`) reinject.js full SKILL A re-injection | Substrate exemption |
 | codex | implemented | `SessionStart` reinject-core.js — same rules + optional subagent tool_search hint | See reinject CONTRACT divergence |
-| cursor | planned | **Layered substitute** (Track B): ① alwaysApply `.cursor/rules` slim pointer to master-orchestrator-guide (not full SKILL A); ② `preCompact` → `user_message` only (cannot inject agent context【官方】); ③ `sessionStart.additional_context` board list【待实测 D3/D4】 | Not 1:1 full reinject |
+| cursor | planned | **Layered substitute** (Track B): ① alwaysApply `.cursor/rules` slim pointer to master-orchestrator-guide (not full SKILL A); ② `preCompact` observe only (cannot inject【官方】); ③ **do not** rely on `sessionStart.additional_context` (staff-confirmed drop bug · D4 FAIL) | Not 1:1 full reinject; D3/D4 closed by docs+forum 2026-07-09 |
 
 ## Declared divergence
 
@@ -36,15 +36,16 @@ Fixture tests assert equivalence classes, not byte-identical reinject text.
   kind: protocol-capability-gap
   affected_hosts: [cursor]
   reason: >
-    Cursor preCompact cannot inject agent context; sessionStart.additional_context reliability
-    for compaction boundaries is unverified. Full SessionStart/compaction-triggered SKILL A
-    re-injection has no documented 1:1 equivalent.
+    Cursor preCompact cannot inject agent context; sessionStart does not re-fire after
+    compact (forum 158873); sessionStart.additional_context is a staff-confirmed drop bug
+    (forum 158452 · D4 FAIL). Full SessionStart/compaction-triggered SKILL A re-injection
+    has no documented 1:1 equivalent.
   compensating_mechanism: >
     Layered approach: (1) alwaysApply rule with navigation pointers + red-line summary under
-    token budget; (2) preCompact user_message reminding orchestrator to re-read guide; (3) optional
-    sessionStart additional_context listing active boards if probe D3/D4 confirms delivery.
+    token budget; (2) preCompact observational logging / optional user-visible reminder only;
+    (3) do NOT depend on sessionStart.additional_context for board list or role substrate.
     Acceptance targets equivalence classes 1–4 above, not full SKILL A text parity.
-  tracked_by: design_docs/harnesses/capabilities/role-substrate-reinject.md + cursor.md D3,D4
+  tracked_by: design_docs/harnesses/capabilities/role-substrate-reinject.md + cursor.md D3,D4 (closed 2026-07-09)
 
 - rule: reinject-subagent-dispatch-discovery-hint
   kind: host-convention-divergence
@@ -62,4 +63,5 @@ Fixture tests assert equivalence classes, not byte-identical reinject text.
 
 ## Probe deps
 
-cursor.md Dogfood Backlog: **D3** (sessionStart after compact), **D4** (additional_context delivery)
+cursor.md Dogfood Backlog: **D3** / **D4** — **closed 2026-07-09** via official docs + Cursor forum
+(staff-confirmed). Live compact re-fire not required before Track B implementation.
