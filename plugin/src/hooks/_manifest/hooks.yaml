@@ -6,51 +6,60 @@ hooks:
     host_coverage:
       claude-code: implemented
       codex: implemented-minimal-fresh
+      cursor: planned
   - id: verify-board
     stage: stop
     required: true
     host_coverage:
       claude-code: implemented
       codex: implemented-blocking
+      cursor: planned
   - id: usage-pacing
     stage: stop-and-post-tool-batch
     required: true
     host_coverage:
       claude-code: implemented
       codex: implemented-stop-advisory
+      cursor: planned-stop-advisory
   - id: identity-nudge
     stage: stop
     required: true
     host_coverage:
       claude-code: implemented
       codex: implemented-stop-system-message
+      cursor: planned
   - id: reinject
     stage: session-start
     required: true
     host_coverage:
       claude-code: implemented
       codex: implemented
+      cursor: planned-partial
   - id: posttool-batch
     stage: post-tool-batch
     required: true
     host_coverage:
       claude-code: implemented
       codex: unsupported
+      cursor: unsupported
   - id: board-lint
     stage: post-tool-use
     required: true
     host_coverage:
       claude-code: implemented
       codex: implemented
+      cursor: planned
   - id: board-guard
     stage: pre-tool-use
     required: true
     host_coverage:
       claude-code: implemented
       codex: implemented
+      cursor: planned
   - id: hook-common
     stage: shared-helper
     required: true
     host_coverage:
       claude-code: implemented
       codex: planned
+      cursor: planned

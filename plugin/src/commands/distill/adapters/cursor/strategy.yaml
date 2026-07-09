@@ -1,0 +1,9 @@
+host: cursor
+command: distill
+version: 1
+mode: planned
+planned_projection:
+  target_mode: adapter_guidance
+notes:
+  - Cursor adapter not implemented; mirror Codex ccm_guided / conversational_guidance pattern until MVP.
+  - See commands/_manifest/commands.yaml host_coverage.cursor for this command.

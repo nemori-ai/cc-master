@@ -19,6 +19,8 @@
 - `design_docs/harnesses/compatibility-matrix.md`
 - `design_docs/harnesses/claude-code.md`
 - `design_docs/harnesses/codex.md`
+- `design_docs/harnesses/cursor.md`
+- `design_docs/harnesses/capabilities/` — cross-surface Capability INTENT cards (ADR-031)
 - `design_docs/harnesses/paragoge-import-audit.md`
 
 这些文件已经吸收 paragoge 的可复用资料，并按本仓 Claude Code 研究与 Codex 实测修正。不要为了同一批事实默认回读 `../paragoge`。

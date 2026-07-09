@@ -1,0 +1,13 @@
+host: cursor
+skill: authoring-workflows
+version: 1
+mode: unsupported_stub
+projection:
+  source: adapters/cursor/stub/
+  target: skills/authoring-workflows/
+unsupported:
+  - capability: dynamic_workflow
+    reason: "No verified Cursor IDE Agent equivalent of Claude Code Workflow tool."
+notes:
+  - Track B event-unavailable — see design_docs/harnesses/capabilities/workflow-authoring.md
+  - Dispatch substitutes: Task subagent, background shell, /loop skill.

@@ -1,0 +1,13 @@
+host: cursor
+command: as-master-orchestrator
+version: 1
+mode: planned
+planned_projection:
+  target_mode: host_native
+  events:
+    - beforeSubmitPrompt
+  command_artifact: commands/as-master-orchestrator.md
+notes:
+  - Cursor plugin commands map to /name in Agent chat (ADR-031 Track A).
+  - Bootstrap dual channel: host_native command + beforeSubmitPrompt hook (see cursor.md).
+  - Capability: design_docs/harnesses/capabilities/path-token-resolution.md
