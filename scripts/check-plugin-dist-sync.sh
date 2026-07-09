@@ -23,6 +23,9 @@ bash scripts/sync-plugin-dist.sh --host claude-code >/dev/null
 log "regenerating plugin/dist/codex"
 bash scripts/sync-plugin-dist.sh --host codex >/dev/null
 
+log "regenerating plugin/dist/cursor"
+bash scripts/sync-plugin-dist.sh --host cursor >/dev/null
+
 if ! git diff --quiet -- plugin/dist; then
   cat >&2 <<'EOF'
 

@@ -1,0 +1,10 @@
+hook: board-lint
+host: cursor
+version: 1
+event: postToolUse
+matcher: Write
+projection:
+  target: hooks/
+status: scaffold-noop
+notes:
+  - Phase B silent noop. Phase C uses additional_context (D5 PASS on 3.10.20).

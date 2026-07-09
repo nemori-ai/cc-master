@@ -1,0 +1,11 @@
+hook: bootstrap-board
+host: cursor
+version: 1
+event: beforeSubmitPrompt
+matcher: ""
+projection:
+  target: hooks/
+status: scaffold-noop
+notes:
+  - Phase B silent noop. Phase C implements sentinel detect + ccm board init/arm.
+  - Probe: D1 absolute/relative paths; D7 conversation_id arming.

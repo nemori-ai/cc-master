@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **ADR-031 Accepted — N-host capability parity**：将 ADR-028 双端 hook 锁步升为 `claude-code | codex | cursor`；新增 Capability INTENT 层（`design_docs/harnesses/capabilities/` + `gen-capability-parity-matrix.sh`）与 Cursor 双轨（Track A SAP/PHIP / Track B 声明替代）；manifest 占位与 coverage 契约测试已落盘，Cursor runtime 实现另 PR。
+- **Cursor Phase B scaffold**：`.cursor-plugin` + `_hosts/cursor` launcher/hooks.json + P0 silent noop cores；`sync-plugin-dist.sh --host cursor` / package / dist-sync check 已支持；生产 hook body 仍属 Phase C。
 
 ## [0.16.0] — 2026-07-09
 

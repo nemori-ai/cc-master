@@ -50,7 +50,7 @@ DST="plugin/dist/${HOST}"
 
 [ -d "${SRC}" ] || { echo "sync-plugin-dist: missing ${SRC}" >&2; exit 1; }
 
-if [ "${SURFACE}" = "all" ] && [ "${HOST}" != "claude-code" ] && [ "${HOST}" != "codex" ]; then
+if [ "${SURFACE}" = "all" ] && [ "${HOST}" != "claude-code" ] && [ "${HOST}" != "codex" ] && [ "${HOST}" != "cursor" ]; then
   echo "sync-plugin-dist: full adapter generation for ${HOST} is not implemented. Use --skills-only for ${HOST}." >&2
   exit 2
 fi
@@ -65,6 +65,8 @@ mkdir -p "${DST}"
 if [ "${SURFACE}" = "all" ]; then
   if [ "${HOST}" = "codex" ]; then
     manifest_dirs=".codex-plugin"
+  elif [ "${HOST}" = "cursor" ]; then
+    manifest_dirs=".cursor-plugin"
   else
     manifest_dirs=".claude-plugin"
   fi
@@ -252,7 +254,7 @@ if (surface === 'all') {
     const strategy = path.join(commandDir, 'adapters', host, 'strategy.yaml');
     if (!fs.existsSync(strategy)) throw new Error(`missing ${strategy}`);
     const mode = readStrategyMode(strategy);
-    if (mode === 'unsupported' || mode === 'adapter_guidance') continue;
+    if (mode === 'unsupported' || mode === 'adapter_guidance' || mode === 'planned') continue;
     if (mode !== 'host_native') {
       throw new Error(`unsupported command projection mode "${mode}" in ${strategy}`);
     }
@@ -284,6 +286,10 @@ for (const skill of fs.readdirSync(skillsSrc).sort()) {
   const mode = readStrategyMode(strategy);
   const slotReplacements = readSlotReplacements(strategy, skillDir);
   const target = path.join(skillsDst, skill);
+  if (mode === 'planned') {
+    // Phase B: cursor (and future hosts) may declare planned until overlays exist.
+    continue;
+  }
   if (mode === 'copy') {
     copyDir(canonical, target, {
       exclude: SKILL_DIST_EXCLUDES,
@@ -322,10 +328,10 @@ else fs.mkdirSync(hooksDst, { recursive: true });
 fs.copyFileSync(hookRegistration, path.join(hooksDst, 'hooks.json'));
 
 const hooksSrc = path.join(src, 'hooks');
-if (host === 'codex') {
+if (host === 'codex' || host === 'cursor') {
   const launcher = path.join(hooksHost, 'launcher.js');
   if (!fs.existsSync(launcher)) throw new Error(`missing ${launcher}`);
-  copyFileWithMode(launcher, path.join(hooksDst, '_hosts', 'codex', 'launcher.js'));
+  copyFileWithMode(launcher, path.join(hooksDst, '_hosts', host, 'launcher.js'));
 }
 for (const hook of fs.readdirSync(hooksSrc).sort()) {
   if (hook.startsWith('_') || hook === 'AGENTS.md' || hook === 'CLAUDE.md') continue;
@@ -335,7 +341,7 @@ for (const hook of fs.readdirSync(hooksSrc).sort()) {
     if (!entry.isFile()) continue;
     if (entry.name === 'meta.yaml') continue;
     const sourcePath = path.join(implDir, entry.name);
-    const targetPath = host === 'codex'
+    const targetPath = (host === 'codex' || host === 'cursor')
       ? path.join(hooksDst, hook, 'implementations', host, entry.name)
       : path.join(hooksDst, 'scripts', entry.name);
     copyFileWithMode(sourcePath, targetPath);

@@ -1,0 +1,11 @@
+host: cursor
+version: 1
+surface: commands
+native_surface: "plugin-commands-plus-beforeSubmitPrompt"
+projection:
+  required_mode: planned
+notes:
+  - Phase B: command bodies not yet projected (adapters still mode: planned).
+  - Cursor plugin commands map to /name when host_native bodies exist (Phase C).
+  - Bootstrap dual channel: future host_native command + beforeSubmitPrompt hook.
+  - Do not invent slash commands until command adapter mode flips from planned → host_native.
