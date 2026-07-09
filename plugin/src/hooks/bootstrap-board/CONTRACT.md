@@ -14,9 +14,10 @@ under `<home>/boards/`. This hook is what creates that condition — either by w
 ## 业务规则
 
 - `rule-bootstrap-trigger-prefix`: the hook only acts when the user prompt begins (first non-empty
-  line, literal prefix match — no inline mention) with one of the recognized
-  `cc-master:as-master-orchestrator` / `cc-master-as-master-orchestrator` prompt-prefix spellings.
-  Anything else is silent (dormant, since arming hasn't happened yet).
+  line, literal prefix match — no inline mention) with one of the recognized trigger spellings:
+  `cc-master:as-master-orchestrator`, `cc-master-as-master-orchestrator`, or (Cursor host-native
+  slash commands) `/as-master-orchestrator` / `/cc-master-as-master-orchestrator`. Anything else is
+  silent (dormant, since arming hasn't happened yet).
 - `rule-bootstrap-fresh-arm`: on fresh trigger (no `--resume`), create a new `<home>/boards/*.board.json`
   and stamp `owner.session_id` = the current session id, `owner.active = true`. This is the ARM act.
 - `rule-bootstrap-resume-arm`: on `--resume [selector]`, select an existing board (by stem or the

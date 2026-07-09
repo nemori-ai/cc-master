@@ -76,6 +76,27 @@ assert_eq 0 "$NOOP_RC" "cursor bootstrap no-op rc 0"
 assert_eq "" "$NOOP_OUT" "cursor bootstrap no-op emits nothing"
 assert_no_file "$H/noop-home/boards" "cursor bootstrap no-op creates no board dir"
 
+SLASH_HOME="$H/slash-home"
+SLASH_PAYLOAD='{"conversation_id":"cursor-sess-slash","session_id":"cursor-sess-slash","hook_event_name":"beforeSubmitPrompt","prompt":"/as-master-orchestrator Slash goal from Cursor --priority normal","cwd":"/tmp/work"}'
+SLASH_OUT="$(printf '%s' "$SLASH_PAYLOAD" | CC_MASTER_HOME="$SLASH_HOME" node "$LAUNCHER" --core "$CORE" 2>/dev/null)"
+assert_eq 0 "$?" "cursor bootstrap slash command rc 0"
+assert_contains "$SLASH_OUT" "cc-master fresh: created and armed Cursor orchestration board" "cursor bootstrap slash command arms"
+assert_contains "$SLASH_OUT" '"user_message"' "cursor bootstrap slash command uses user_message envelope"
+SLASH_BOARD="$(find "$SLASH_HOME/boards" -type f -name '*.board.json' | sort | head -n1)"
+SLASH_GOAL="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.goal||""));' "$SLASH_BOARD")"
+SLASH_PRIORITY="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.coordination&&b.coordination.priority));' "$SLASH_BOARD")"
+assert_eq "Slash goal from Cursor" "$SLASH_GOAL" "cursor bootstrap slash command records goal"
+assert_eq "normal" "$SLASH_PRIORITY" "cursor bootstrap slash command maps --priority"
+
+GITHUB_SLASH_HOME="$H/github-slash-home"
+GITHUB_SLASH_PAYLOAD='{"conversation_id":"cursor-sess-github","session_id":"cursor-sess-github","hook_event_name":"beforeSubmitPrompt","prompt":"/as-master-orchestrator Triage issue --github-issue https://github.com/nemori-ai/cc-master/issues/65","cwd":"/tmp/work"}'
+GITHUB_SLASH_OUT="$(printf '%s' "$GITHUB_SLASH_PAYLOAD" | CC_MASTER_HOME="$GITHUB_SLASH_HOME" node "$LAUNCHER" --core "$CORE" 2>/dev/null)"
+assert_eq 0 "$?" "cursor bootstrap slash github-issue rc 0"
+assert_contains "$GITHUB_SLASH_OUT" "cc-master fresh: created and armed Cursor orchestration board" "cursor bootstrap slash github-issue arms"
+GITHUB_SLASH_BOARD="$(find "$GITHUB_SLASH_HOME/boards" -type f -name '*.board.json' | sort | head -n1)"
+GITHUB_ISSUE="$(board_github_issue_source "$GITHUB_SLASH_BOARD")"
+assert_eq "https://github.com/nemori-ai/cc-master/issues/65" "$GITHUB_ISSUE" "cursor bootstrap slash github-issue records board source"
+
 MARKER_PAYLOAD="$(printf '%s' '{"conversation_id":"cursor-sess-marker","session_id":"cursor-sess-marker","hook_event_name":"beforeSubmitPrompt","prompt":"<!-- cc-master:bootstrap:v1 -->\n<!-- cc-master:args: Marker goal --wip 3 -->\n","cwd":"/tmp/work"}')"
 MARKER_OUT="$(printf '%s' "$MARKER_PAYLOAD" | CC_MASTER_HOME="$H/marker-home" node "$LAUNCHER" --core "$CORE" 2>/dev/null)"
 assert_eq 0 "$?" "cursor bootstrap expanded marker rc 0"

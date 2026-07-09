@@ -82,8 +82,10 @@ function parseInvocation(prompt) {
   const lines = String(prompt || '').split(/\r?\n/);
   const first = lines.find((line) => line.trim() !== '') || '';
 
+  // Cursor beforeSubmitPrompt passes the raw slash command (e.g. `/as-master-orchestrator goal`)
+  // without expanding the command body sentinel; Claude/Codex use cc-master:… spellings instead.
   const commandMatch = first.match(
-    /^\s*(?:\$(?:cc-master:cc-master-as-master-orchestrator|cc-master-as-master-orchestrator|cc-master:as-master-orchestrator)|cc-master:cc-master-as-master-orchestrator|cc-master:as-master-orchestrator|cc-master-as-master-orchestrator)\b(.*)$/
+    /^\s*(?:\/as-master-orchestrator|\/cc-master-as-master-orchestrator|\$(?:cc-master:cc-master-as-master-orchestrator|cc-master-as-master-orchestrator|cc-master:as-master-orchestrator)|cc-master:cc-master-as-master-orchestrator|cc-master:as-master-orchestrator|cc-master-as-master-orchestrator)\b(.*)$/
   );
   if (commandMatch) return { matched: true, args: commandMatch[1].trim(), marker: 'raw-command' };
 
