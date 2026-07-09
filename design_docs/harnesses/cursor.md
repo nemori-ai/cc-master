@@ -516,22 +516,23 @@ bash plugin/src/hooks/_hosts/cursor/probes/setup-local-plugin-probe.sh
 
 ### Phase 1 — plugin source
 
-| 路径 | 内容 |
-| --- | --- |
-| `plugin/src/.cursor-plugin/plugin.json` | manifest |
-| `plugin/src/hooks/_hosts/cursor/hooks.json` | 事件注册 |
-| `plugin/src/hooks/_hosts/cursor/launcher.js` | payload 归一化（仿 Codex） |
-| `plugin/src/hooks/<hook>/implementations/cursor/` | P0: bootstrap, board-guard, board-lint, verify-board |
-| `plugin/src/skills/_hosts/cursor/capabilities.yaml` | path token、dispatch、command_surface |
-| `plugin/src/skills/<skill>/adapters/cursor/strategy.yaml` | 八个分发 skill + overlays |
-| `plugin/src/commands/<cmd>/adapters/cursor/strategy.yaml` | **已占位** `mode: planned` |
-| `plugin/src/hooks/_manifest/hooks.yaml` | **已含** `cursor` host_coverage |
+| 路径 | 内容 | Phase B |
+| --- | --- | --- |
+| `plugin/src/.cursor-plugin/plugin.json` | manifest | **done** |
+| `plugin/src/hooks/_hosts/cursor/hooks.json` | 事件注册 | **done** (P0) |
+| `plugin/src/hooks/_hosts/cursor/launcher.js` | payload 归一化 | **done** (scaffold) |
+| `plugin/src/hooks/<hook>/implementations/cursor/` | P0 cores | **noop scaffold** — Phase C fills bodies |
+| `plugin/src/skills/_hosts/cursor/capabilities.yaml` | path token、dispatch | deferred (skills still `mode: planned`) |
+| `plugin/src/skills/<skill>/adapters/cursor/strategy.yaml` | 八个分发 skill + overlays | placeholders exist; projection waits `copy` |
+| `plugin/src/commands/<cmd>/adapters/cursor/strategy.yaml` | **已占位** `mode: planned` | unchanged |
+| `plugin/src/hooks/_manifest/hooks.yaml` | **已含** `cursor` host_coverage | unchanged |
 
 ### Phase 2 — 投影与打包
 
-- 扩展 `scripts/sync-plugin-dist.sh --host cursor` 全量投影（当前仅 `--skills-only`）。
-- 扩展 `scripts/package-plugin.sh`：`cc-master-plugin-cursor-<tag>.zip`。
-- Release asset 命名对齐 ADR-022 per-harness zip。
+- [x] 扩展 `scripts/sync-plugin-dist.sh --host cursor` 全量投影（skills `planned` 跳过；hooks + launcher + stub skill）。
+- [x] 扩展 `scripts/package-plugin.sh`：`cc-master-plugin-cursor-<tag>.zip`。
+- [ ] Release asset 命名对齐 ADR-022 per-harness zip（发版时再挂）。
+- [x] `check-plugin-dist-sync.sh` 含 cursor regenerate。
 
 ### Phase 3 — ccm
 

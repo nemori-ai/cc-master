@@ -125,8 +125,8 @@ PACKAGE_SEQ=0
 package_one() {
   local host="$1" stage pkg plugin_root zip out_dir manifest hash
   case "$host" in
-    claude-code|codex) ;;
-    *) die "未知 host：${host}（支持：claude-code / codex）" ;;
+    claude-code|codex|cursor) ;;
+    *) die "未知 host：${host}（支持：claude-code / codex / cursor）" ;;
   esac
 
   bash scripts/sync-plugin-dist.sh --host "$host" >/dev/null
@@ -140,6 +140,8 @@ package_one() {
   local include_dirs=( skills hooks docs agents bin )
   if [ "$host" = "claude-code" ]; then
     include_dirs=( .claude-plugin commands "${include_dirs[@]}" )
+  elif [ "$host" = "cursor" ]; then
+    include_dirs=( .cursor-plugin "${include_dirs[@]}" )
   else
     include_dirs=( .codex-plugin "${include_dirs[@]}" )
   fi
@@ -159,6 +161,8 @@ package_one() {
   if [ "$host" = "claude-code" ]; then
     [ -d "${pkg}/.claude-plugin" ] || die "缺 .claude-plugin/——Claude Code 制品不会是合法 plugin"
     [ -d "${pkg}/commands" ] || die "缺 commands/"
+  elif [ "$host" = "cursor" ]; then
+    [ -d "${pkg}/.cursor-plugin" ] || die "缺 .cursor-plugin/"
   else
     [ -d "${pkg}/.codex-plugin" ] || die "缺 .codex-plugin/"
   fi

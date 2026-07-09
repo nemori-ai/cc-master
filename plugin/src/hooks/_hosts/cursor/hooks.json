@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "node \"./hooks/_hosts/cursor/launcher.js\" --event beforeSubmitPrompt --core \"./hooks/bootstrap-board/implementations/cursor/bootstrap-board-core.js\""
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "node \"./hooks/_hosts/cursor/launcher.js\" --event preToolUse --core \"./hooks/board-guard/implementations/cursor/board-guard-core.js\"",
+        "matcher": "Shell|Write"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "node \"./hooks/_hosts/cursor/launcher.js\" --event postToolUse --core \"./hooks/board-lint/implementations/cursor/board-lint-core.js\"",
+        "matcher": "Write"
+      }
+    ],
+    "stop": [
+      {
+        "command": "node \"./hooks/_hosts/cursor/launcher.js\" --event stop --core \"./hooks/verify-board/implementations/cursor/verify-board-core.js\"",
+        "loop_limit": 5
+      }
+    ]
+  }
+}

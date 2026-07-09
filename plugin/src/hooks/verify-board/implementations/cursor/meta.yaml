@@ -1,0 +1,10 @@
+hook: verify-board
+host: cursor
+version: 1
+event: stop
+matcher: ""
+projection:
+  target: hooks/
+status: scaffold-noop
+notes:
+  - Phase B silent noop. Phase C: followup_message + loop_count/loop_limit (D6) + FUSE.

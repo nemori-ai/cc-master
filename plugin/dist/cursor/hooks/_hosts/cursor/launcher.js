@@ -1,0 +1,230 @@
+#!/usr/bin/env node
+/**
+ * Cursor host launcher (Phase B scaffold).
+ * Parse Cursor stdin → normalize → spawn *-core.js → emit Cursor envelope.
+ * Path root: __dirname → plugin root (probe D1: no PLUGIN_ROOT token assumed).
+ */
+const { spawnSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+
+function readStdin() {
+  try {
+    return fs.readFileSync(0, 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+function parseArgs(argv) {
+  const args = { core: '', event: '' };
+  for (let i = 2; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--core') args.core = argv[++i] || '';
+    else if (arg === '--event') args.event = argv[++i] || '';
+    else throw new Error(`unknown argument: ${arg}`);
+  }
+  return args;
+}
+
+function eventName(rawEvent) {
+  const value = String(rawEvent || '');
+  const explicit = {
+    beforeSubmitPrompt: 'user-prompt-submit',
+    sessionStart: 'session-start',
+    preToolUse: 'pre-tool-use',
+    postToolUse: 'post-tool-use',
+    stop: 'stop',
+    preCompact: 'pre-compact',
+    subagentStart: 'subagent-start',
+    subagentStop: 'subagent-stop',
+  };
+  if (explicit[value]) return explicit[value];
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/_/g, '-')
+    .toLowerCase();
+}
+
+function resolvePluginRoot() {
+  const fromEnv = process.env.CC_MASTER_PLUGIN_ROOT || '';
+  if (path.isAbsolute(fromEnv)) return fromEnv;
+  // launcher lives at hooks/_hosts/cursor/launcher.js → plugin root is ../..
+  return path.resolve(__dirname, '..', '..');
+}
+
+function resolveHome() {
+  return process.env.CC_MASTER_HOME || path.join(process.env.HOME || '', '.claude', 'cc-master');
+}
+
+function boardStem(boardPath) {
+  return path.basename(boardPath).replace(/\.board\.json$/i, '');
+}
+
+function boardMatches(board, sessionId) {
+  const owner = board && typeof board === 'object' && board.owner && typeof board.owner === 'object' ? board.owner : {};
+  if (owner.active !== true) return false;
+  if (!sessionId) return true;
+  return owner.session_id === sessionId;
+}
+
+function readBoard(boardPath) {
+  try {
+    return JSON.parse(fs.readFileSync(boardPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function discoverActiveBoard(home, sessionId) {
+  const boardsDir = path.join(home, 'boards');
+  let entries;
+  try {
+    entries = fs.readdirSync(boardsDir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  const matches = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.board.json')) continue;
+    const boardPath = path.join(boardsDir, entry.name);
+    const board = readBoard(boardPath);
+    if (boardMatches(board, sessionId)) matches.push({ path: boardPath, board });
+  }
+  matches.sort((a, b) => a.path.localeCompare(b.path));
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function normalize(raw, fallbackEvent) {
+  const hostEvent = (raw && raw.hook_event_name) || fallbackEvent || '';
+  const event = eventName(hostEvent);
+  // Probe D7/D8: conversation_id == session_id; prefer conversation_id.
+  const sessionId = String((raw && (raw.conversation_id || raw.session_id)) || '');
+  const toolName = raw && raw.tool_name ? String(raw.tool_name) : '';
+  const normalized = {
+    harness: 'cursor',
+    event,
+    session: { id: sessionId, role: 'unknown' },
+    raw: raw || {},
+    host: { eventName: hostEvent },
+  };
+  if (toolName) {
+    normalized.tool = {
+      name: toolName,
+      input: raw.tool_input || {},
+      response: raw.tool_output,
+      id: raw.tool_use_id ? String(raw.tool_use_id) : '',
+    };
+  }
+  if (raw && typeof raw.prompt === 'string') {
+    normalized.prompt = { text: raw.prompt };
+  }
+  if (raw && typeof raw.loop_count === 'number') {
+    normalized.loop_count = raw.loop_count;
+  }
+  return normalized;
+}
+
+function parseCoreResult(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return { kind: 'silent' };
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return { kind: 'context', context: trimmed };
+  }
+}
+
+function emitHostResult(result, event) {
+  const kind = result && result.kind ? result.kind : 'silent';
+  if (kind === 'silent' || kind === 'allow') return;
+  const message = String(result.context || result.message || result.followup_message || '');
+  if (kind === 'block' || kind === 'deny') {
+    if (event === 'pre-tool-use') {
+      process.stdout.write(`${JSON.stringify({ permission: 'deny', user_message: message || 'denied' })}\n`);
+    } else if (event === 'user-prompt-submit') {
+      process.stdout.write(`${JSON.stringify({ continue: false, user_message: message || 'blocked' })}\n`);
+    } else if (event === 'stop') {
+      // Cursor Stop: continuation via followup_message (D6), not hard block.
+      if (message) process.stdout.write(`${JSON.stringify({ followup_message: message })}\n`);
+    }
+    return;
+  }
+  if (kind === 'followup' || (kind === 'context' && event === 'stop')) {
+    if (message) process.stdout.write(`${JSON.stringify({ followup_message: message })}\n`);
+    return;
+  }
+  if (kind === 'context' || kind === 'system') {
+    if (message) process.stdout.write(`${JSON.stringify({ additional_context: message })}\n`);
+  }
+}
+
+function resolveCorePath(pluginRoot, coreArg) {
+  if (!coreArg) throw new Error('missing --core');
+  if (path.isAbsolute(coreArg)) return coreArg;
+  return path.resolve(pluginRoot, coreArg.replace(/^\.\//, ''));
+}
+
+function main() {
+  const args = parseArgs(process.argv);
+  const stdin = readStdin();
+  let raw = {};
+  try {
+    raw = stdin ? JSON.parse(stdin) : {};
+  } catch {
+    raw = {};
+  }
+  const normalized = normalize(raw, args.event);
+  const pluginRoot = resolvePluginRoot();
+  const home = resolveHome();
+  const activeBoard = discoverActiveBoard(home, normalized.session.id);
+  if (activeBoard) {
+    normalized.board = {
+      path: activeBoard.path,
+      stem: boardStem(activeBoard.path),
+      source: 'board-scan',
+    };
+  }
+
+  const corePath = resolveCorePath(pluginRoot, args.core);
+  const env = {
+    ...process.env,
+    CC_MASTER_HARNESS: 'cursor',
+    CC_MASTER_HOOK_EVENT: normalized.event,
+    CC_MASTER_SESSION_ID: normalized.session.id,
+    CC_MASTER_PLUGIN_ROOT: pluginRoot,
+    CC_MASTER_HOME: home,
+  };
+  if (activeBoard) {
+    env.CC_MASTER_BOARD = activeBoard.path;
+    env.CC_MASTER_BOARD_STEM = boardStem(activeBoard.path);
+  }
+
+  if (!fs.existsSync(corePath)) {
+    // Fail-open: missing core must not block the agent (scaffold / partial install).
+    return;
+  }
+
+  const spawned = spawnSync(process.execPath, [corePath], {
+    input: `${JSON.stringify(normalized)}\n`,
+    encoding: 'utf8',
+    env,
+    cwd: pluginRoot,
+  });
+
+  if (spawned.error || (spawned.status !== 0 && spawned.status !== null)) {
+    // Fail-open on core crash (except intentional exit 2 deny — map if stderr present).
+    if (spawned.status === 2 && normalized.event === 'pre-tool-use') {
+      process.stdout.write(`${JSON.stringify({ permission: 'deny', user_message: String(spawned.stderr || 'denied') })}\n`);
+    }
+    return;
+  }
+
+  emitHostResult(parseCoreResult(spawned.stdout), normalized.event);
+}
+
+try {
+  main();
+} catch {
+  // Fail-open: never crash the Cursor agent loop from launcher bugs.
+}

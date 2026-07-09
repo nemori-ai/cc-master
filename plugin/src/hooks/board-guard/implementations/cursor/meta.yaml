@@ -1,0 +1,10 @@
+hook: board-guard
+host: cursor
+version: 1
+event: preToolUse
+matcher: Shell|Write
+projection:
+  target: hooks/
+status: scaffold-noop
+notes:
+  - Phase B silent noop. Phase C mirrors Claude/Codex board-guard CONTRACT.

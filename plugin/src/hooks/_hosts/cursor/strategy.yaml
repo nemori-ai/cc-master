@@ -1,0 +1,84 @@
+host: cursor
+version: 1
+surface: hooks
+status: scaffold
+registration:
+  source: plugin-bundled
+  target: hooks/hooks.json
+  manifest: .cursor-plugin/plugin.json
+  implemented_events:
+    - beforeSubmitPrompt
+    - preToolUse
+    - postToolUse
+    - stop
+  planned_events:
+    - sessionStart
+    - preCompact
+  unsupported_events:
+    - PostToolBatch
+  notes:
+    - Phase B scaffold: P0 hooks registered with silent noop cores; production bodies land in Phase C.
+    - Path strategy (probe D1): relative commands from plugin cwd; launcher sets CC_MASTER_PLUGIN_ROOT from __dirname.
+    - No ${PLUGIN_ROOT} / ${CLAUDE_PLUGIN_ROOT} assumed in Cursor (token unproven).
+path_resolution:
+  status: verified-basic
+  verified_cursor: "3.10.20"
+  verified:
+    - Absolute command paths work (project + local plugin probes).
+    - Local plugin hook cwd is the plugin install directory.
+    - Hook child has node on PATH (D2).
+    - Hook child env lacks CURSOR_*; use stdin conversation_id/session_id (D7/D8).
+  production_strategy:
+    - Register hooks with relative node ./hooks/_hosts/cursor/launcher.js paths.
+    - Launcher resolves plugin root via path.resolve(__dirname, '..', '..').
+    - Inject CC_MASTER_PLUGIN_ROOT / CC_MASTER_HARNESS=cursor for cores.
+payload_map:
+  status: verified-basic
+  verified_cursor: "3.10.20"
+  fixtures:
+    preToolUse:
+      fields: [conversation_id, session_id, generation_id, hook_event_name, tool_name, tool_input, tool_use_id, cursor_version, workspace_roots, transcript_path]
+    postToolUse:
+      fields: [conversation_id, session_id, generation_id, hook_event_name, tool_name, tool_input, tool_output, duration, tool_use_id, cursor_version, workspace_roots, transcript_path]
+  notes:
+    - conversation_id == session_id in live fixtures; use as board owner.session_id.
+    - Tool names: Shell | Write | Read (not Bash/Edit).
+output_envelope:
+  status: verified-partial
+  verified:
+    - postToolUse additional_context reaches the model (D5 PASS on 3.10.20).
+    - stop followup_message + loop_count + loop_limit documented (D6 docs).
+  known_gaps:
+    - sessionStart.additional_context staff-confirmed drop bug (D4 FAIL) — do not use for reinject.
+    - sessionStart does not re-fire after compact (D3 FAIL).
+normalized_contract:
+  env: ../../_shared/contract.md
+  payload: ../../_shared/contract.md
+  result: ../../_shared/contract.md
+launcher:
+  source: launcher.js
+  status: scaffold
+  responsibilities:
+    - parse Cursor hook stdin JSON
+    - normalize to shared contract (harness: cursor)
+    - inject CC_MASTER_* env for cores
+    - map core result kinds to Cursor envelopes (additional_context / followup_message / permission deny)
+hooks:
+  bootstrap-board:
+    event: beforeSubmitPrompt
+    status: scaffold-noop
+  board-guard:
+    event: preToolUse
+    matcher: Shell|Write
+    status: scaffold-noop
+  board-lint:
+    event: postToolUse
+    matcher: Write
+    status: scaffold-noop
+  verify-board:
+    event: stop
+    status: scaffold-noop
+    loop_limit: 5
+notes:
+  - See design_docs/harnesses/cursor.md Probe Results + ADR-031 Track A/B.
+  - Phase C replaces noop cores with CONTRACT-backed implementations.
