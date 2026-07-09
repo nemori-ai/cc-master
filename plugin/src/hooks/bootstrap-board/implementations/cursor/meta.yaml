@@ -9,4 +9,4 @@ status: implemented-minimal-fresh
 notes:
   - Phase C: sentinel detect + ccm board init/arm (fresh + resume), session-state write.
   - Probe: D1 absolute/relative paths; D7 conversation_id arming.
-  - Envelope: additional_context via launcher (kind:context).
+  - Envelope: user_message + continue:true via launcher (kind:context); ccm missing -> block (continue:false).

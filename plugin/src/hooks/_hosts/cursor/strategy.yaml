@@ -46,7 +46,18 @@ payload_map:
     - conversation_id == session_id in live fixtures; use as board owner.session_id.
     - Tool names: Shell | Write | Read (not Bash/Edit).
 output_envelope:
-  status: verified-partial
+  status: implemented
+  ssot: ENVELOPE.md
+  by_event:
+    beforeSubmitPrompt:
+      context_system: "{ continue: true, user_message }"
+      block_deny: "{ continue: false, user_message }"
+    postToolUse:
+      context_system: "{ additional_context }"
+    preToolUse:
+      block_deny: "{ permission: deny, user_message }"
+    stop:
+      all_notify_kinds: "{ followup_message }"
   verified:
     - postToolUse additional_context reaches the model (D5 PASS on 3.10.20).
     - stop followup_message + loop_count + loop_limit documented (D6 docs).
@@ -54,34 +65,44 @@ output_envelope:
     - sessionStart.additional_context staff-confirmed drop bug (D4 FAIL) — do not use for reinject.
     - sessionStart does not re-fire after compact (D3 FAIL).
     - preCompact cannot inject agent context — reinject core is silent no-op; alwaysApply rule carries role substrate.
+    - stop followup_message auto-continues the agent; throttle via cooldown + verify-board loop_limit.
 normalized_contract:
   env: ../../_shared/contract.md
   payload: ../../_shared/contract.md
   result: ../../_shared/contract.md
 launcher:
   source: launcher.js
-  status: scaffold
+  status: implemented
   responsibilities:
     - parse Cursor hook stdin JSON
     - normalize to shared contract (harness: cursor)
     - inject CC_MASTER_* env for cores
-    - map core result kinds to Cursor envelopes (additional_context / followup_message / permission deny)
+    - map core result kinds to Cursor envelopes per ENVELOPE.md (user_message / followup_message / permission deny / additional_context)
 hooks:
   bootstrap-board:
     event: beforeSubmitPrompt
-    status: scaffold-noop
+    status: implemented-fresh-resume
   board-guard:
     event: preToolUse
     matcher: Shell|Write
-    status: scaffold-noop
+    status: implemented-deny
   board-lint:
     event: postToolUse
     matcher: Write
-    status: scaffold-noop
+    status: implemented-lint
   verify-board:
     event: stop
-    status: scaffold-noop
+    status: implemented-followup
     loop_limit: 5
+  usage-pacing:
+    event: stop
+    status: implemented-followup-advisory
+  identity-nudge:
+    event: stop
+    status: implemented-followup-advisory
+  reinject:
+    event: preCompact
+    status: implemented-track-b-silent
 notes:
   - See design_docs/harnesses/cursor.md Probe Results + ADR-031 Track A/B.
   - Phase C replaces noop cores with CONTRACT-backed implementations.

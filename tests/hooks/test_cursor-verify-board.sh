@@ -74,7 +74,7 @@ assert_contains "$HOOK_OUT" '"followup_message"' "done-only board followup for f
 assert_contains "$HOOK_OUT" "self-check against the original goal" "completion self-check advisory"
 rm -rf "$H"
 
-# FUSE: 5 consecutive blocks → release with additional_context (kind:system).
+# FUSE: 5 consecutive blocks → release with followup_message (kind:system).
 H="$(make_project)"
 mkactive "$H" "fuse" '{"schema":"cc-master/v2","goal":"FUSE CURSOR BOARD","owner":{"active":true,"session_id":"sess-fuse"},"tasks":[]}'
 for i in 1 2 3 4; do
@@ -82,9 +82,8 @@ for i in 1 2 3 4; do
   assert_contains "$HOOK_OUT" '"followup_message"' "fuse streak $i still followup"
 done
 run_stop "$H" "sess-fuse"
-assert_contains "$HOOK_OUT" '"additional_context"' "fuse trip emits additional_context"
+assert_contains "$HOOK_OUT" '"followup_message"' "fuse trip emits followup_message"
 assert_contains "$HOOK_OUT" "fuse tripped" "fuse trip advisory"
-assert_not_contains "$HOOK_OUT" '"followup_message"' "fuse trip does not followup"
 rm -rf "$H"
 
 finish

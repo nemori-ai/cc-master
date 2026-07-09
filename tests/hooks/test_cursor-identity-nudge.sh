@@ -54,12 +54,12 @@ run_stop() {
 
 chmod +x "$CORE"
 
-# Both due: emits additional_context, writes both runtime timestamps, includes critpath.
+# Both due: emits followup_message, writes both runtime timestamps, includes critpath.
 H="$(make_project)"
 seed_board "$H" '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-i"},"tasks":[{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":["T1"]}],"runtime":{"last_identity_remind":"2026-07-03T00:00:00Z","last_critpath_remind":"2026-07-03T09:00:00Z"}}'
 run_stop "$H" "sess-i"
-assert_contains "$HOOK_OUT" '"additional_context"' "due -> additional_context"
-assert_not_contains "$HOOK_OUT" '"systemMessage"' "due -> not systemMessage"
+assert_contains "$HOOK_OUT" '"followup_message"' "due -> followup_message"
+assert_not_contains "$HOOK_OUT" '"additional_context"' "due -> not additional_context"
 assert_contains "$HOOK_OUT" "身份周期提示" "identity nudge present"
 assert_contains "$HOOK_OUT" "1/2 个任务" "critpath count present"
 assert_contains "$HOOK_OUT" "behind schedule" "estimate verdict present"

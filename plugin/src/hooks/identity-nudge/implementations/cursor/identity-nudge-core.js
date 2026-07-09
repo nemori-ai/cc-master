@@ -150,7 +150,7 @@ function system(message) {
 }
 
 // PARITY: rule-identity-nudge-tag-protocol — ADR-018 advisory wrapper for Cursor stop (kind:system →
-// launcher additional_context). Local copy: no shared hook-common require from Cursor cores.
+// launcher followup_message per ENVELOPE.md). Local copy: no shared hook-common require from Cursor cores.
 function advisory(source, strength, body) {
   const s = strength === 'strong' ? 'strong' : 'weak';
   return `<advisory source="${source}" strength="${s}">\n${String(body)}\n</advisory>`;

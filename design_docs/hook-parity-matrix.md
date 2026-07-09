@@ -42,13 +42,14 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | --- | --- | --- | --- |
 | bootstrap-slash-command-expansion | protocol-capability-gap | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md |
 | bootstrap-ccm-hard-precheck-missing-on-codex | host-convention-divergence | codex | backlog — not in HOOKPAR-DEC's four-item fix scope (FUSE / rollup / board-guard fallback / ADR-018 tags); needs its own follow-up to port ADR-021's fail-loud precheck to Codex bootstrap |
+| bootstrap-beforeSubmitPrompt-envelope | protocol-capability-gap | cursor | plugin v0.17.2 envelope fix |
 
 ### identity-nudge
 
 | rule | kind | affected hosts | tracked by |
 | --- | --- | --- | --- |
 | identity-nudge-envelope | protocol-capability-gap | codex | n/a — declared launcher-level envelope conversion, not a business-logic gap |
-| identity-nudge-cursor-envelope | host-convention-divergence | cursor | n/a — declared launcher-level envelope conversion; ADR-031 Track A |
+| identity-nudge-cursor-envelope | host-convention-divergence | cursor | _hosts/cursor/ENVELOPE.md; plugin v0.17.2 |
 | identity-nudge-tag-protocol-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
 
 ### reinject
@@ -66,6 +67,7 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | usage-pacing-post-tool-batch-sampling | event-unavailable | codex, cursor | _hosts/codex/strategy.yaml posttool_batch.future_probe; _hosts/cursor/strategy.yaml unsupported_events |
 | usage-pacing-account-switch-ambient | protocol-capability-gap | codex, cursor | n/a — downstream of usage-pacing-mechanical-switch |
 | usage-pacing-billing-period-cursor | host-convention-divergence | cursor | ccm packages/engine usage/pacing.ts billing_period path; ADR-031 Track A |
+| usage-pacing-cursor-stop-envelope | host-convention-divergence | cursor | _hosts/cursor/ENVELOPE.md; plugin v0.17.2 |
 | usage-pacing-tag-protocol-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
 
 ### verify-board
@@ -76,3 +78,4 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | verify-board-fuse-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
 | verify-board-rollup-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
 | verify-board-tag-protocol-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
+| verify-board-cursor-stop-envelope | protocol-capability-gap | cursor | plugin v0.17.2 envelope fix |

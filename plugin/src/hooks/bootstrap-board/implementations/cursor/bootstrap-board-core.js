@@ -20,6 +20,38 @@ function resolveHome(env) {
   return env.CC_MASTER_HOME || path.join(env.HOME || '', '.cc_master');
 }
 
+function ccmCommand() {
+  const override = process.env.CCM_BIN || '';
+  if (override) return override;
+  return 'ccm';
+}
+
+function ccmPresent() {
+  // PARITY: rule-bootstrap-ccm-hard-precheck (see CONTRACT.md — codex has no equivalent, declared divergence)
+  const override = process.env.CCM_BIN || '';
+  if (override) {
+    try {
+      fs.accessSync(override, fs.constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const res = spawnSync('command', ['-v', 'ccm'], { encoding: 'utf8', shell: true });
+  return !!res && !res.error && res.status === 0;
+}
+
+function ccmMissingDirective() {
+  return [
+    '<directive source="bootstrap">',
+    'cc-master depends on the external `ccm` CLI (per-OS Node SEA binary; ADR-014 host prerequisite), but it is not on PATH.',
+    'Without ccm, board v2 write gates cannot work — do not create a board or enter orchestration.',
+    'Tell the user to install ccm: download the binary for their OS/arch, rename to `ccm`, chmod +x, place on PATH, run `ccm --version`.',
+    'After install, re-run /as-master-orchestrator <goal>. Do not continue orchestration until ccm is available.',
+    '</directive>',
+  ].join(' ');
+}
+
 function resetStopAllowUntil(home) {
   const boardPath = process.env.CC_MASTER_BOARD || '';
   if (!boardPath || !path.isAbsolute(boardPath) || !boardPath.endsWith('.board.json')) return false;
@@ -138,7 +170,8 @@ function parseArgs(args) {
 }
 
 function run(cmd, args, options = {}) {
-  const res = spawnSync(cmd, args, {
+  const resolvedCmd = cmd === 'ccm' ? ccmCommand() : cmd;
+  const res = spawnSync(resolvedCmd, args, {
     encoding: 'utf8',
     env: process.env,
     ...options,
@@ -320,10 +353,16 @@ function main() {
   if (payload.event !== 'user-prompt-submit') return;
   const sessionId = payload.session && payload.session.id ? payload.session.id : '';
   const home = resolveHome(process.env);
-  resetStopAllowUntil(home);
   const prompt = payload.prompt && payload.prompt.text ? payload.prompt.text : '';
   const invocation = parseInvocation(prompt);
   if (!invocation.matched) return;
+
+  if (!ccmPresent()) {
+    say('block', ccmMissingDirective());
+    return;
+  }
+
+  resetStopAllowUntil(home);
 
   const { flags, goal } = parseArgs(invocation.args);
   const boardsDir = path.join(home, 'boards');

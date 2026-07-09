@@ -19,7 +19,7 @@ skill prose.
 | --- | --- | --- | --- |
 | claude-code | implemented | `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PLUGIN_DATA}` in hooks.json / skill rewrite | Documented |
 | codex | implemented | `${PLUGIN_ROOT}` in hook **command string** expands; inject `CC_MASTER_PLUGIN_ROOT="${PLUGIN_ROOT}"`; no env at runtime | codex.md probe |
-| cursor | planned | **TBD after probe D1**: launcher inject `CC_MASTER_PLUGIN_ROOT` or `__dirname`; no documented `${CURSOR_PLUGIN_ROOT}` | Track A/B boundary |
+| cursor | implemented | launcher injects `CC_MASTER_PLUGIN_ROOT` via `__dirname`; probe D1 PASS | Track A |
 
 ## Declared divergence
 
