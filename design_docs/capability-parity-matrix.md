@@ -49,7 +49,7 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 
 | rule | kind | affected hosts | tracked by |
 | --- | --- | --- | --- |
-| reinject-full-substrate-on-compact | protocol-capability-gap | cursor | design_docs/harnesses/capabilities/role-substrate-reinject.md + cursor.md D3,D4 |
+| reinject-full-substrate-on-compact | protocol-capability-gap | cursor | design_docs/harnesses/capabilities/role-substrate-reinject.md + cursor.md D3,D4 (closed 2026-07-09) |
 | reinject-subagent-dispatch-discovery-hint | host-convention-divergence | claude-code | plugin/src/hooks/reinject/CONTRACT.md |
 
 ### stop-continuation-gate

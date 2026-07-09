@@ -445,7 +445,7 @@ Track B 缺口已迁入 [`capabilities/`](capabilities/README.md)；下列为速
 
 ## Dogfood Backlog
 
-进入 MVP adapter **前**必须实测的未知项（本阶段不执行）：
+进入 MVP adapter **前**必须实测的未知项。**Phase 0 工具已落地**：[`plugin/src/hooks/_hosts/cursor/probes/`](../../plugin/src/hooks/_hosts/cursor/probes/README.md)。
 
 | ID | 问题 | 影响面 |
 | --- | --- | --- |
@@ -462,15 +462,57 @@ Track B 缺口已迁入 [`capabilities/`](capabilities/README.md)；下列为速
 | D11 | `sessionStart.env` 注入的 `CURSOR_CONVERSATION_ID` 是否被后续 hook 和 subagent 继承 | ccm session + arming |
 | D12 | Enterprise 策略是否禁用 local plugins / third-party hooks | ship-anywhere |
 
-Probe 完成后，在本页新增 **§Probe Results** 小节，按 `current probe > official docs` 纪律回写。
+### 怎么跑（最短路径）
 
-## Future Adapter Sketch（非实现）
+```bash
+# 1) 项目级 hooks（先跑这个）
+bash plugin/src/hooks/_hosts/cursor/probes/setup-project-probe.sh
+# → 用 Cursor 打开打印出的 probe_root，按 notes/HOW_TO_RUN.md 聊几句
 
-若用户审阅后批准 MVP，预期落点（与 Codex 第二 host 同构）：
+# 2) 本地 plugin 安装面（D9）
+bash plugin/src/hooks/_hosts/cursor/probes/setup-local-plugin-probe.sh
+# → 在 Cursor Customize 里启用 local plugin，再聊几句
+```
+
+填 [`MANUAL_CHECKLIST.md`](../../plugin/src/hooks/_hosts/cursor/probes/MANUAL_CHECKLIST.md)，结果回写下面 **§Probe Results**（`current probe > official docs`）。
+
+## Probe Results
+
+> Status: **complete enough for Phase B** — 2026-07-09. Mix of live dogfood (Cursor **3.10.20**) + official docs + Cursor forum (staff-confirmed bugs).  
+> Fixture samples (redacted): [`plugin/src/hooks/_hosts/cursor/probes/fixtures/samples/`](../../plugin/src/hooks/_hosts/cursor/probes/fixtures/samples/).  
+> 回写纪律：`current probe > official docs`；docs/forum 结论标来源；未测勿冒充 live PASS。
+
+| ID | Result | Cursor version | Evidence / notes |
+| --- | --- | --- | --- |
+| D1 | **PASS** (absolute) | 3.10.20 | Project `.cursor/hooks.json` with **absolute** `node …/probe-hook.js` works. Local plugin hooks also work when command embeds absolute plugin path. Hook `cwd` for local plugin = plugin install dir (`~/.cursor/plugins/local/cc-master-hook-probe`). **Token form** (`${PLUGIN_ROOT}` literal) not yet proven — keep absolute / launcher-injected `CC_MASTER_PLUGIN_ROOT` as default. |
+| D2 | **PASS** | 3.10.20 | Hook child runs `/opt/homebrew/.../node` v26; `node` on PATH. Red line 1 OK on this host. |
+| D3 | **FAIL (gap)** | docs+forum | Official: `sessionStart` = “new composer conversation”; `preCompact` is observational only (cannot inject). Forum [158873](https://forum.cursor.com/t/sessionstart-hook-should-fire-after-compact/158873): users report **no** `sessionStart` after `preCompact`; staff note prior `additional_context` may *survive* compaction as retained first-user-message content, which is **not** a re-fire. **Design:** do not depend on post-compact reinject via `sessionStart`; use alwaysApply rule + `preCompact` observe (Track B card). |
+| D4 | **FAIL (known bug)** | docs+forum | Docs claim `sessionStart.additional_context` → initial system context. Forum [158452](https://forum.cursor.com/t/sessionstart-hook-additional-context-is-never-injected-into-agents-initial-system-context/158452): Cursor staff (Dean Rie) confirmed bug — dropped due to composer-handle timing; **`env` works, `additional_context` does not**; no workaround. Contrast: our live **D5 PASS** on 3.10.20 for `postToolUse.additional_context`. **Design:** reinject must not rely on `sessionStart.additional_context`. |
+| D5 | **PASS** | 3.10.20 | `postToolUse` `{"additional_context":…}` reached the model as a system reminder (`[cc-master cursor probe] postToolUse: additional_context mode`). Samples: `fixtures/samples/postToolUse.sample.json`. |
+| D6 | **PASS (docs)** | official | [Hooks docs](https://cursor.com/docs/hooks.md): `stop` may return `followup_message` → auto-submit as next user message; stdin `loop_count` (starts 0); `loop_limit` default **5**, set `null` to uncap. Same for `subagentStop`. **Design:** verify-board = `followup_message` + app-level FUSE/`stop_allow_until` + respect `loop_count`/`loop_limit` (Codex-shaped release valve). Live followup hijack deferred; contract is sufficient to implement. |
+| D7 | **PASS** | 3.10.20 | Within one Agent chat: 18/18 fixtures share the same `conversation_id` == `session_id` (`0f51217b-…`), matching `CURSOR_CONVERSATION_ID` in Agent Shell and the transcript path. Treat as stable arming key for board `owner.session_id` (same role as Claude `session_id`). Close/reopen of the *same* chat not separately re-probed; accepted as stable per Cursor conversation identity + this evidence. |
+| D8 | **PASS** | 3.10.20 | Agent Shell exposes `CURSOR_AGENT=1`, `CURSOR_CONVERSATION_ID`, `CURSOR_WORKSPACE_LABEL`, etc. **Hook child env does not** include `CURSOR_*` — use stdin JSON (`conversation_id` / `session_id`) for arming, not hook `process.env`. |
+| D9 | **PASS** | 3.10.20 | `setup-local-plugin-probe.sh` → `~/.cursor/plugins/local/cc-master-hook-probe`; pre/postToolUse fixtures written under plugin probe dir **without** manual Customize click (auto-picked up). |
+| D10 | **PASS** (combine) | 3.10.20 | Logs show Claude user hooks loaded + project hooks + external `~/.orca/agent-hooks` `beforeShellExecution` all run. Treat as **union**, not exclusive override. |
+| D11 | **PASS w/ caveats** | docs+forum | Docs: `sessionStart.env` → “available to all subsequent hook executions” in that session. Staff: `env` path works (unlike `additional_context`). Forum caveats: may **not** survive chat close/reopen or Cursor restart; **subagents may not inherit**. **Design:** optional convenience only; arming SSOT remains stdin `conversation_id` (D7/D8), not injected env. |
+| D12 | **N/A** | 3.10.20 | No enterprise hooks config (`No enterprise hooks configuration found`). |
+
+**Payload facts (for launcher design):**
+
+- Events confirmed: `preToolUse`, `postToolUse` (matcher `Shell|Write|Read` — tool names are exactly `Shell` / `Write` / `Read`).
+- Common stdin fields: `conversation_id`, `session_id`, `generation_id`, `hook_event_name`, `cursor_version`, `workspace_roots`, `transcript_path`, `tool_name`, `tool_input`, `tool_use_id` (+ `tool_output`/`duration` on post).
+- **Unblocking Phase B scaffold:** D1+D2+D5+D6+D7+D8+D9 enough. **Track B locked by research:** reinject must assume D3/D4 failures (alwaysApply + preCompact observe; no sessionStart context reinject). Stop gate may implement against D6 docs contract.
+
+**Cleanup note:** live project `.cursor/hooks.json` removed after capture. Local probe plugin may still be at `~/.cursor/plugins/local/cc-master-hook-probe` — remove with `rm -rf` when done.
+
+## Future Adapter Sketch
+
+实现顺序：Phase 0（本页）→ Phase B scaffold → Phase C P0 hooks。与 Codex 第二 host 同构。
 
 ### Phase 0 — Probe
 
-- 执行 §Dogfood Backlog D1–D12 → 回写本页 §Probe Results。
+- [x] Probe 脚本 + 清单：`plugin/src/hooks/_hosts/cursor/probes/`
+- [x] 执行 §Dogfood Backlog D1–D12 → 回写本页 §Probe Results（live + docs/forum）
 
 ### Phase 1 — plugin source
 

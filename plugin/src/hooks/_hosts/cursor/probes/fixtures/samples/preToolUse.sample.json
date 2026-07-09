@@ -1,0 +1,42 @@
+{
+  "recorded_at": "2026-07-09T06:45:56.399Z",
+  "event": "preToolUse",
+  "mode": "silent",
+  "argv": [
+    "/opt/homebrew/Cellar/node/26.0.0/bin/node",
+    "/Users/panqiwei/Dev/repos/nemori-ai/cc-master/plugin/src/hooks/_hosts/cursor/probes/probe-hook.js"
+  ],
+  "cwd": "/Users/panqiwei/Dev/repos/nemori-ai/cc-master",
+  "node": "v26.0.0",
+  "which_node_hint": "/opt/homebrew/Cellar/node/26.0.0/bin/node",
+  "env_subset": {
+    "HOME": "/Users/panqiwei",
+    "PATH": "/Applications/Cursor.app/Contents/Resources/app/node_modules/@vscode/ripgrep/bin:/Users/panqiwei/.bun/bin:/Users/panqiwei/.bun/bin:/Users/panqiwei/.local/bin:/Users/panqiwei/Library/pnpm:/Users/panqiwei/.antigravity/antigravity/bin:/Users/panqiwei/.local/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/opt/homebrew/bin:/Applications/quarto/bin",
+    "PWD": "/Users/panqiwei/Dev/repos/nemori-ai/cc-master",
+    "SHELL": "/bin/zsh",
+    "TMPDIR": "/var/folders/xt/bn8ht8f10d93f8n1yhgzmlpc0000gn/T/",
+    "USER": "panqiwei"
+  },
+  "stdin_text": "{\"conversation_id\":\"0f51217b-34bb-4ba2-961b-d7cbf90ae38e\",\"generation_id\":\"e1730bb8-98ef-4f6b-ba79-a13132b62a59\",\"model\":\"grok-4.5\",\"tool_name\":\"Shell\",\"tool_input\":{\"command\":\"echo \\\"hello-from-probe $(date -u +%Y%m%dT%H%M%SZ)\\\" && pwd && echo \\\"CURSOR_CONVERSATION_ID=${CURSOR_CONVERSATION_ID:-}\\\" && echo \\\"CURSOR_AGENT=${CURSOR_AGENT:-}\\\" && source /tmp/cc-master-cursor-probe-live.env 2>/dev/null; cat /tmp/cc-master-cursor-probe-live.env; find /tmp/cc-master-cursor-probe-live-* -type f -name '\u2026",
+  "stdin_json": {
+    "conversation_id": "0f51217b-34bb-4ba2-961b-d7cbf90ae38e",
+    "generation_id": "e1730bb8-98ef-4f6b-ba79-a13132b62a59",
+    "model": "grok-4.5",
+    "tool_name": "Shell",
+    "tool_input": {
+      "command": "echo \"hello-from-probe $(date -u +%Y%m%dT%H%M%SZ)\" && pwd && echo \"CURSOR_CONVERSATION_ID=${CURSOR_CONVERSATION_ID:-}\" && echo \"CURSOR_AGENT=${CURSOR_AGENT:-}\" && source /tmp/cc-master-cursor-probe-li\u2026",
+      "cwd": "",
+      "timeout": 30000
+    },
+    "tool_use_id": "17486455-b775-43a2-b647-d922d28b8bec",
+    "cwd": "",
+    "session_id": "0f51217b-34bb-4ba2-961b-d7cbf90ae38e",
+    "hook_event_name": "preToolUse",
+    "cursor_version": "3.10.20",
+    "workspace_roots": [
+      "/Users/panqiwei/Dev/repos/nemori-ai/cc-master"
+    ],
+    "user_email": "REDACTED",
+    "transcript_path": "/Users/panqiwei/.cursor/projects/Users-panqiwei-Dev-repos-nemori-ai-cc-master/agent-transcripts/0f51217b-34bb-4ba2-961b-d7cbf90ae38e/0f51217b-34bb-4ba2-961b-d7cbf90ae38e.jsonl"
+  }
+}
