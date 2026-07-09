@@ -36,8 +36,10 @@ import * as estimateHandler from './handlers/estimate.js';
 import * as harnessHandler from './handlers/harness.js';
 import * as jcHandler from './handlers/jc.js';
 import * as logHandler from './handlers/log.js';
+import * as monitorHandler from './handlers/monitor.js';
 import * as peersHandler from './handlers/peers.js';
 import * as policyHandler from './handlers/policy.js';
+import * as servicesHandler from './handlers/services.js';
 import * as statusReportHandler from './handlers/status-report.js';
 import * as statuslineHandler from './handlers/statusline.js';
 import * as taskHandler from './handlers/task.js';
@@ -85,6 +87,8 @@ const HANDLERS: Record<string, HandlerModule> = {
   baseline: baselineHandler as unknown as HandlerModule,
   policy: policyHandler as unknown as HandlerModule,
   peers: peersHandler as unknown as HandlerModule,
+  monitor: monitorHandler as unknown as HandlerModule,
+  services: servicesHandler as unknown as HandlerModule,
   usage: usageHandler as unknown as HandlerModule,
   webviewer: webViewerHandler as unknown as HandlerModule,
   estimate: estimateHandler as unknown as HandlerModule,

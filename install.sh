@@ -591,6 +591,15 @@ else
   die "ccm 装好了但无法执行（$CCM_BIN --version 失败）。可能是平台二进制不匹配。输出：${CCM_VER:-<空>}"
 fi
 
+# ccm binary lifecycle hook (ADR-033): after replacing/verifying the ccm binary,
+# restart only services that were already wanted/running. This is best-effort:
+# plugin install failures and service reconciliation failures must stay separate.
+if "$CCM_BIN" services reconcile --after-binary-replace >/dev/null 2>&1; then
+  log "services reconcile OK（monitor / web-viewer wanted 服务已按需收口）"
+else
+  warn "ccm 已安装，但 services reconcile 未成功；如你有 monitor/web-viewer 常驻服务，可稍后手动运行：$CCM_BIN services reconcile --after-binary-replace"
+fi
+
 # PATH 提示。
 case ":$PATH:" in
   *":$PREFIX:"*) : ;;

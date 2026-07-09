@@ -36,6 +36,7 @@ interface ServiceState {
   schema: string;
   id: string;
   pid: number;
+  wanted?: boolean;
   state_path: string;
   token_file: string;
   token_sha256: string;
@@ -57,6 +58,9 @@ interface ServiceState {
   log_path: string;
   stale?: boolean;
   health?: 'ok' | 'stale' | 'stopped' | 'invalid';
+  binary_match?: boolean;
+  running_ccm_version?: string | null;
+  installed_ccm_version?: string;
 }
 
 interface InvalidServiceState {
@@ -138,11 +142,7 @@ function canonicalHome(ctx: Ctx): string {
     env: ctx.env,
   });
   fs.mkdirSync(home, { recursive: true, mode: 0o700 });
-  try {
-    return fs.realpathSync.native(home);
-  } catch {
-    return path.resolve(home);
-  }
+  return path.resolve(home);
 }
 
 function serviceId(home: string): string {
@@ -300,6 +300,7 @@ function buildState({
     schema: SERVICE_SCHEMA,
     id,
     pid: 0,
+    wanted: true,
     state_path: statePathFor(home, id),
     token_file: tokenPathFor(home, id),
     token_sha256: tokenSha(token),
@@ -352,6 +353,7 @@ function readState(filePath: string): ServiceState | null {
     return {
       ...s,
       pid: typeof s.pid === 'number' ? s.pid : 0,
+      wanted: s.wanted === true,
       port: typeof s.port === 'number' ? s.port : 0,
       state_path: typeof s.state_path === 'string' ? s.state_path : filePath,
       token_file: typeof s.token_file === 'string' ? s.token_file : '',
@@ -457,6 +459,12 @@ function healthCheck(service: ServiceState, token: string | null): HealthResult 
 function classifyService(service: ServiceState | null): ServiceState | null {
   if (!service) return null;
   const token = readToken(service.token_file);
+  const installedVersion = ccmVersion();
+  const runningVersion =
+    service.server && typeof service.server.ccm_version === 'string'
+      ? service.server.ccm_version
+      : null;
+  const binaryMatch = runningVersion === installedVersion;
   let stale = true;
   if (isPidAlive(service.pid)) {
     const health = healthCheck(service, token);
@@ -476,6 +484,9 @@ function classifyService(service: ServiceState | null): ServiceState | null {
     url: redactedUrl(baseUrl, service.current_selection),
     stale,
     health: stale ? 'stale' : 'ok',
+    binary_match: binaryMatch,
+    running_ccm_version: runningVersion,
+    installed_ccm_version: installedVersion,
   };
 }
 
@@ -571,7 +582,7 @@ function startService(ctx: Ctx): { service: ServiceState; token: string; reused:
   ensureServiceDirs(paths);
   return withLock(paths.lockTarget, () => {
     const existing = classifyService(readState(statePathFromCtx(ctx, home)));
-    if (existing && existing.health === 'ok') {
+    if (existing && existing.health === 'ok' && existing.binary_match !== false) {
       const selection = resolveInitialSelection(ctx, home);
       const service = selection ? updateServiceSelection(existing, selection) : existing;
       const token = readToken(existing.token_file) || '';
@@ -603,7 +614,11 @@ function output(ctx: Ctx, data: unknown, human: string): void {
 function humanServiceLine(prefix: string, service: ServiceView | null): string {
   if (!service) return `${prefix}: stopped`;
   if (service.health === 'invalid') return `${prefix}: invalid ${service.state_path}`;
-  const status = service.stale ? 'stale' : 'running';
+  const status = service.stale
+    ? 'stale'
+    : 'binary_match' in service && service.binary_match === false
+      ? 'stale-binary'
+      : 'running';
   return `${prefix}: ${status} ${service.id} ${service.url} home=${service.home}`;
 }
 
@@ -695,6 +710,9 @@ export function status(ctx: Ctx): number {
     {
       ok: true,
       running: !!service && service.health === 'ok',
+      binary_match: service ? service.binary_match !== false : null,
+      running_ccm_version: service ? service.running_ccm_version ?? null : null,
+      installed_ccm_version: ccmVersion(),
       service: serviceView,
     },
     humanServiceLine('web-viewer', serviceView),

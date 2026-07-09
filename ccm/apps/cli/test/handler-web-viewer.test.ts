@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import * as webViewer from '../src/handlers/web-viewer.js';
+import { readVersion } from '../src/help.js';
 import * as io from '../src/io.js';
 import { run } from '../src/router.js';
 
@@ -353,6 +354,52 @@ test('status redacts raw tokens and marks stale services', () => {
   assert.equal(status.code, EXIT.OK);
   assert.ok(!status.stdout.includes('secret-token'), 'status does not leak token');
   assert.equal(json(status.stdout).service.stale, true);
+});
+
+test('status exposes binary_match and running/installed ccm versions', () => {
+  const home = mkHome();
+  seedBoard(home);
+  webViewer.__setWebViewerTestHooks({
+    randomToken: () => 'version-token',
+    isPidAlive: (pid) => pid === 778,
+    spawnService: ({ statePath }) => {
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      writeFileSync(
+        statePath,
+        `${JSON.stringify(
+          {
+            ...state,
+            pid: 778,
+            port: 53001,
+            base_url: 'http://127.0.0.1:53001',
+            server: { ...state.server, ccm_version: '0.0.1' },
+          },
+          null,
+          2,
+        )}\n`,
+        'utf8',
+      );
+      return { pid: 778 };
+    },
+    healthCheck: (service) => ({
+      ok: true,
+      body: {
+        schema: 'ccm/web-viewer-health/v1',
+        id: service.id,
+        pid: 778,
+        started_at: service.server.started_at,
+      },
+    }),
+  });
+
+  assert.equal(invoke(['web-viewer', 'start', '--json'], home).code, EXIT.OK);
+  const status = invoke(['web-viewer', 'status', '--json'], home);
+  const parsed = json(status.stdout);
+  assert.equal(parsed.running, true);
+  assert.equal(parsed.binary_match, false);
+  assert.equal(parsed.running_ccm_version, '0.0.1');
+  assert.equal(parsed.installed_ccm_version, readVersion());
+  assert.equal(parsed.service.binary_match, false);
 });
 
 test('status tolerates malformed state files as invalid entries', () => {

@@ -1091,6 +1091,105 @@ export const REGISTRY: Registry = {
     },
   },
 
+  // ════════════════════ monitor（ADR-033 optional daemon）══════════════════════════════════════════
+  monitor: {
+    start: {
+      summary: '启动或复用当前 home 的 ccm monitor daemon（连续 usage sensing + pool arbiter edge writes）',
+      read: false,
+      positionals: [],
+      options: {
+        interval: { type: 'string', desc: 'tick 间隔秒（默认 45，范围 5..3600）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm monitor start', 'ccm monitor start --interval 30 --json'],
+      handler: 'monitor.start',
+    },
+    stop: {
+      summary: '停止当前 home 的 monitor daemon 并清除 wanted 标记',
+      read: false,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm monitor stop', 'ccm monitor stop --json'],
+      handler: 'monitor.stop',
+    },
+    status: {
+      summary: '显示 monitor running/stale/stopped 状态与 ccm binary_match',
+      read: true,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm monitor status', 'ccm monitor status --json'],
+      handler: 'monitor.status',
+    },
+    restart: {
+      summary: '重启当前 home 的 monitor daemon',
+      read: false,
+      positionals: [],
+      options: {
+        interval: { type: 'string', desc: 'tick 间隔秒（默认 45，范围 5..3600）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm monitor restart', 'ccm monitor restart --json'],
+      handler: 'monitor.restart',
+    },
+    serve: {
+      summary: '内部 daemon target：前台运行 monitor tick loop（用户通常不直接调用）',
+      read: true,
+      positionals: [],
+      options: {
+        state: { type: 'string', required: true, desc: 'monitor service state path' },
+        iterations: { type: 'string', desc: '测试/调试用有界 tick 次数；缺省持续运行' },
+      },
+      examples: ['ccm monitor serve --state <path>'],
+      handler: 'monitor.serve',
+    },
+    'install-service': {
+      summary: '安装用户级 launchd/systemd monitor service（可选；不引入 PM2）',
+      read: false,
+      positionals: [],
+      options: {
+        interval: { type: 'string', desc: 'tick 间隔秒（默认 45，范围 5..3600）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm monitor install-service', 'ccm monitor install-service --json'],
+      handler: 'monitor.installService',
+    },
+    'uninstall-service': {
+      summary: '卸载用户级 monitor service 并停止 monitor',
+      read: false,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm monitor uninstall-service', 'ccm monitor uninstall-service --json'],
+      handler: 'monitor.uninstallService',
+    },
+  },
+
+  // ════════════════════ services（ADR-033 home service reconciliation）════════════════════════════
+  services: {
+    reconcile: {
+      summary: '按 wanted 语义重启 home 常驻服务（monitor + web-viewer），用于 ccm 二进制替换后收口',
+      read: false,
+      positionals: [],
+      options: {
+        'after-binary-replace': {
+          type: 'boolean',
+          desc: '标记这是 install/upgrade ccm 二进制替换后的 best-effort reconcile',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm services reconcile --after-binary-replace',
+        'ccm services reconcile --after-binary-replace --json',
+      ],
+      handler: 'services.reconcile',
+    },
+  },
+
   // ════════════════════ estimate（只读 advisory·ADR-015）════════════════════════════════════════════
   //   工作侧只读 analysis namespace（消费 @ccm/engine OR/ML 算法层·纯只读·零写·不抢 board-lock）。
   //   p95=5% 硬墙永不取 max/不到 100%（引擎 conformal/MC 分位口径保证）。

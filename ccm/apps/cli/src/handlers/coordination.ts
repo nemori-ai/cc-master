@@ -15,6 +15,8 @@ import {
   type PoolAllocation,
   type PoolAllocationRow,
   type PoolPressureBand,
+  type QuotaModel,
+  type UsageSignal,
 } from '@ccm/engine';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -280,10 +282,31 @@ interface ArbitrateResult {
   unconsumed: Notification[];
 }
 
+export interface ArbiterUsageOverride {
+  signal: UsageSignal | null | undefined;
+  quotaModel: QuotaModel | undefined;
+  pollable: boolean;
+}
+
+export interface ArbitrateBoardOptions {
+  usage?: ArbiterUsageOverride;
+  accountsMap?: Record<string, unknown> | null;
+}
+
+export function arbitrateBoardForService(
+  board: BoardArg,
+  ctx: Ctx,
+  boardPath: string,
+  opts: ArbitrateBoardOptions = {},
+): { board: BoardArg; result: ArbitrateResult } {
+  return arbitrateMutate(board, ctx, boardPath, opts);
+}
+
 function arbitrateMutate(
   board: BoardArg,
   ctx: Ctx,
   boardPath: string,
+  opts: ArbitrateBoardOptions = {},
 ): { board: BoardArg; result: ArbitrateResult } {
   const b = mutations.touch(board);
   const now = nowIso();
@@ -293,9 +316,11 @@ function arbitrateMutate(
   const selfSession = boardOwner(b).session_id;
   const harnessFlag = boardHarness(b) ?? (ctx.values.harness as string | undefined);
   const adapter = resolveHarnessAdapter({ env: ctx.env, harnessFlag });
-  const usage = adapter.readCurrentUsage(ctx.env);
-  const usageSource = adapter.usageSource(ctx.env);
-  const accountsMap = readRegistry(ctx.env, homeFlag);
+  const usage = opts.usage ?? {
+    signal: adapter.readCurrentUsage(ctx.env).signal,
+    ...adapter.usageSource(ctx.env),
+  };
+  const accountsMap = opts.accountsMap === undefined ? readRegistry(ctx.env, homeFlag) : opts.accountsMap;
 
   let boards: Array<{ file: string; board: unknown }> = [];
   try {
@@ -338,8 +363,8 @@ function arbitrateMutate(
   const poolPeers = ownPool?.peers ?? (ownPeer ? [ownPeer] : []);
   const allocation = allocatePool(usage.signal, poolPeers, {
     nowSec: Math.floor(nowMs / 1000),
-    quotaModel: usageSource.quotaModel,
-    pollable: usageSource.pollable,
+    quotaModel: usage.quotaModel,
+    pollable: usage.pollable,
     effectiveN: accountsMap ? effectiveN(accountsMap as never, nowMs).effective_n : 1,
     registry: accountsMap ? ({ accounts: accountsMap } as never) : null,
     previousBand: latestArbiterBand(existing),

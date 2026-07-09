@@ -82,6 +82,16 @@
   - [web-viewer stop](#web-viewer-stop)
   - [web-viewer restart](#web-viewer-restart)
   - [web-viewer serve](#web-viewer-serve)
+- [namespace monitor](#namespace-monitor)
+  - [monitor start](#monitor-start)
+  - [monitor stop](#monitor-stop)
+  - [monitor status](#monitor-status)
+  - [monitor restart](#monitor-restart)
+  - [monitor serve](#monitor-serve)
+  - [monitor install-service](#monitor-install-service)
+  - [monitor uninstall-service](#monitor-uninstall-service)
+- [namespace services](#namespace-services)
+  - [services reconcile](#services-reconcile)
 - [namespace estimate（只读 advisory）](#namespace-estimate只读-advisory)
   - [estimate show](#estimate-show)
   - [estimate forecast](#estimate-forecast)
@@ -132,6 +142,8 @@ ccm <alias> [args] [flags]
 | `usage` | 配额侧**只读 advisory**：当前号/备号 5h/7d 用量 + 单侧走廊 pacing verdict（hold/throttle/switch/stop_5h/stop_7d）+ 任务 token 成本 |
 | `status-report` | 生成式 board 状态报告：`ccm/status-report/v1` JSON / artifact；只读 board，artifact 写 `<home>/reports/status-report/` |
 | `web-viewer` | 本地只读 board web viewer lifecycle：open/start/status/stop/restart；home-scoped service，127.0.0.1 + token |
+| `monitor` | 可选本地 monitor daemon：连续扫 harness usage / active boards，复用 pool arbiter 边沿写 `coordination.inbox` |
+| `services` | home 常驻服务 reconcile：ccm 二进制替换后按 wanted 语义重启 monitor / web-viewer |
 | `estimate` | 工作侧**只读 advisory**：双通道 MC 工期预测 / EVM / velocity / 风险（消费 OR/ML 引擎） |
 | `account` | {{USING_CCM_ACCOUNT_NAMESPACE_ROW}} |
 | `statusline` | {{USING_CCM_STATUSLINE_NAMESPACE_ROW}} |
@@ -1367,7 +1379,7 @@ ccm status-report watch [flags]
 
 ## namespace web-viewer
 
-本地只读 board web viewer lifecycle。service scope 是 cc-master home，默认扫描 `<home>/boards/`；`--board` / `--goal` 只设置初始 selection，不创建 per-board service。viewer 只读、绑定 `127.0.0.1`、token-gated；状态文件在 `<home>/services/web-viewer/`，不写 board。
+本地只读 board web viewer lifecycle。service scope 是 cc-master home，默认扫描 `<home>/boards/`；`--board` / `--goal` 只设置初始 selection，不创建 per-board service。viewer 只读、绑定 `127.0.0.1`、token-gated；状态文件在 `<home>/services/web-viewer/`，不写 board。`start` / `status` 会检查 running service 的 `server.ccm_version` 是否等于当前安装的 `ccm --version`；不匹配时 `start` 强制重启，`status --json` 暴露 `binary_match:false`。
 
 ### web-viewer start
 
@@ -1422,7 +1434,7 @@ ccm web-viewer status [id] [flags]
 ```
 
 - positional：`[id]`（可选 service id）
-- 行为：显示 running / stale / stopped、pid、home、当前 selection 与脱敏 URL；不暴露 raw token。
+- 行为：显示 running / stale / stopped、pid、home、当前 selection 与脱敏 URL；不暴露 raw token。`--json` 顶层回显 `binary_match`、`running_ccm_version`、`installed_ccm_version`，用于判断服务是否还握着旧 ccm 二进制。
 - flags：`--json`
 - 例：`ccm web-viewer status` · `ccm web-viewer status --json`
 
@@ -1466,6 +1478,129 @@ ccm web-viewer serve --state <path>
 ```
 
 由 `start` 派生调用；用户通常不直接调用。
+
+---
+
+## namespace monitor
+
+可选本地 monitor daemon。它是 out-of-process 连续传感层：周期性扫本机 supported harness registry，按 harness usageSource 读取 usage signal（Claude Code 读 statusline sidecar，Cursor/Codex 走 pollable source），再对 `<home>/boards/` 的 active boards 复用 `coordination arbitrate` 同一套 pool-aware arbiter / inbox API。monitor 只写 board 的 `coordination.inbox` 与自身 service state；**不**往 agent context 注入文本，不替 agent 决策。缺席时 hook 路径仍可工作。
+
+service state 落在 `<home>/services/monitor/`：`state.json` / `pid` / `log`。`start` / `status` 会检查 running daemon 的 `server.ccm_version` 是否等于当前安装的 `ccm --version`；不匹配时 `start` 强制重启，`status --json` 暴露 `binary_match:false`。
+
+### monitor start
+
+**写 service state，不写 board**
+
+```
+ccm monitor start [flags]
+```
+
+- positional：无
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--interval <sec>` | | int | tick 间隔秒（默认 `45`，范围 `5..3600`） |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm monitor start` · `ccm monitor start --interval 30 --json`
+
+### monitor stop
+
+**写 service state，不写 board**
+
+```
+ccm monitor stop [flags]
+```
+
+- positional：无
+- 行为：停止 daemon 并把 monitor `wanted:false`。后续 `ccm services reconcile --after-binary-replace` 不会把它重新拉起。
+- flags：`--json`
+- 例：`ccm monitor stop --json`
+
+### monitor status
+
+**读**
+
+```
+ccm monitor status [flags]
+```
+
+- positional：无
+- 行为：显示 running / stale / stopped、pid、home、last_tick、last_error。`--json` 顶层回显 `binary_match`、`running_ccm_version`、`installed_ccm_version`。
+- flags：`--json`
+- 例：`ccm monitor status` · `ccm monitor status --json`
+
+### monitor restart
+
+**写 service state，不写 board**
+
+```
+ccm monitor restart [flags]
+```
+
+- positional：无
+- flags：`--interval <sec>`、`--json`
+- 例：`ccm monitor restart --json`
+
+### monitor serve
+
+**内部 daemon target**
+
+```
+ccm monitor serve --state <path>
+```
+
+由 `start` / OS service 派生调用。用户通常不直接调用。前台运行 tick loop；测试/调试可用 `--iterations <n>` 做有界 tick。
+
+### monitor install-service
+
+**写用户级 OS service 文件，不写 board**
+
+```
+ccm monitor install-service [flags]
+```
+
+- 行为：在 macOS 写 LaunchAgent，在 Linux 写 `systemd --user` unit，并把 monitor state 标为 `wanted:true`。不依赖 PM2。
+- flags：`--interval <sec>`、`--json`
+- 例：`ccm monitor install-service --json`
+
+### monitor uninstall-service
+
+**写 service state，不写 board**
+
+```
+ccm monitor uninstall-service [flags]
+```
+
+- 行为：删除用户级 OS service 文件并停止 monitor。
+- flags：`--json`
+- 例：`ccm monitor uninstall-service --json`
+
+---
+
+## namespace services
+
+home 常驻服务 reconcile。它覆盖 `monitor` 与 `web-viewer`，用于 `ccm` 二进制被 `install.sh` 或 `ccm upgrade ccm` 替换后，把仍在跑或显式 wanted 的服务重启到新二进制。wanted 语义避免空白机升级后被动开服务：monitor wanted = 正在跑 / OS service 已装 / state.`wanted:true`；web-viewer wanted = 正在跑 / state.`wanted:true`。
+
+### services reconcile
+
+**写 service state，不写 board**
+
+```
+ccm services reconcile [flags]
+```
+
+- positional：无
+- 行为：扫描 `<home>/services/{monitor,web-viewer}/`；只重启 wanted 服务。未 wanted 的 service state 只报告 `skip`，不会自动 start。`--after-binary-replace` 是安装/升级路径的显式标记，语义同样是 best-effort reconcile。
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--after-binary-replace` | | bool | 标记调用来自 ccm 二进制安装/替换后 |
+| `--json` | | bool | 结构化输出 |
+
+- 例：`ccm services reconcile --after-binary-replace` · `ccm services reconcile --after-binary-replace --json`
 
 ---
 

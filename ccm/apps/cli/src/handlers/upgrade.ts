@@ -339,6 +339,16 @@ export async function ccm(ctx: Ctx): Promise<number> {
     fs.renameSync(tmp, execPath); // 原子替换运行中二进制（旧 inode 由本进程持有·安全）。
     tmp = '';
     ctx.out(`✓ ccm 已升级 → ${tag}（${ver}·已替换 ${execPath}）。`);
+    try {
+      execFileSync(execPath, ['services', 'reconcile', '--after-binary-replace'], {
+        stdio: 'ignore',
+        timeout: 15000,
+      });
+    } catch (e) {
+      ctx.err(
+        `upgrade(ccm): 注意——ccm 二进制已替换，但 services reconcile 未成功（可稍后手动跑 \`ccm services reconcile --after-binary-replace\`）：${(e as Error).message}`,
+      );
+    }
     if (ctx.flags.json) {
       ctx.out(
         io.jsonOk({
