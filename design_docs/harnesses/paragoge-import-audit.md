@@ -1,6 +1,6 @@
 # Paragoge Import Audit
 
-更新时间：2026-07-03。
+更新时间：2026-07-09。
 
 本文件记录从 `../paragoge` 迁移到 cc-master 的长期有效资料，以及迁移时做过的校对和修正。以后不要为了同一批资料反复读取 `../paragoge`；优先读 `design_docs/harnesses/`。
 
@@ -63,11 +63,19 @@ Claude Code hooks 以本仓 `design_docs/research/claude-code-hooks-reference.md
 - additionalContext、blocking 行为和事件字段按本仓 hooks research 维护；
 - cc-master hooks 还必须满足 dormant-until-armed。
 
+### Cursor harness
+
+paragoge **未覆盖** Cursor。本仓 2026-07-09 按 Cursor 官方文档（hooks / skills / plugins / rules / third-party hooks）+ 对 Claude Code / Codex adapter 的对照推导，新增 [`cursor.md`](cursor.md) 作为第三 harness 调研落盘。
+
+- 事实来源：官方 docs 2026-07-09；**无本仓 probe**（见 `cursor.md` §Dogfood Backlog）。
+- 未从 paragoge 复制任何 Cursor 机制。
+- MVP adapter（`plugin/dist/cursor`、ccm `cursor.ts`、install）**未实现**；用户审阅调研后再决定。
+
 ## Non-migrated Material
 
 未整体迁移 paragoge 的以下内容：
 
-- 与 cc-master 当前目标无关的 host 细节，例如 Cursor、opencode、Kimi CLI、OpenClaw 等。
+- 与 cc-master 当前目标无关的 host 细节，例如 opencode、Kimi CLI、OpenClaw 等。（Cursor 已单独调研落盘，见上节。）
 - paragoge 的技能优化、eval、论文 survey 全量资料。
 - paragoge 的具体 product positioning 和 requirement backlog。
 

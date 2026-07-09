@@ -1,13 +1,13 @@
 ---
 path: design_docs/harnesses/AGENTS.md
 version: v1.0
-last-edited: 2026-07-03
+last-edited: 2026-07-09
 agent-edit-policy: |
   本目录是 cc-master 的 agent harness 机制资料库。它吸收 paragoge 的可复用资料，
   但不是 paragoge 的镜像；任何事实都要按本仓当前目标校对后再落地。
 content-summary: |
-  记录 Claude Code / Codex 等 agent harness 的 plugin、skill、hook、command、
-  project memory 机制事实，以及 cc-master 的 source-to-adapter 投影决策。
+  记录 Claude Code / Codex / Cursor (IDE Agent) 等 agent harness 的 plugin、skill、hook、
+  command、project memory 机制事实，以及 cc-master 的 source-to-adapter 投影决策。
 ---
 
 # Harness 资料维护规则

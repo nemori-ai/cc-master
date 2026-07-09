@@ -1,6 +1,6 @@
 # ccm CLI Host-Coupling Audit
 
-更新时间：2026-07-03。
+更新时间：2026-07-09。
 
 本盘点覆盖 `ccm/apps/cli/src` 与 `ccm/packages/engine/src` 中当前绑定 Claude Code harness 或 Claude 账号机制的源码点。目标是给后续 `ccm host <host>` backend 拆分提供任务边界。
 
@@ -235,6 +235,49 @@ Required abstraction:
 | C7 | P1 | Help/registry host metadata | registry entries declare host support/unsupported reason |
 | C8 | P2 | Model fixture/provider cleanup | move Claude model IDs into provider fixtures or mark examples as Claude |
 
+## Cursor Expected Coupling (IDE Agent)
+
+调研落盘：[`cursor.md`](cursor.md)（2026-07-09）。**未实现** `ccm/apps/cli/src/harnesses/cursor.ts`。
+
+### Detect / Session
+
+| Surface | Expected behavior | Status |
+| --- | --- | --- |
+| `detect(env)` | `CURSOR_PROJECT_DIR` \|\| `CURSOR_VERSION`（hook 保证【官方】）；agent shell 是否带 `CURSOR_*` **待 probe** | 文档草图 |
+| `session(env)` | board `owner.session_id` 应对齐 hook JSON `conversation_id`【推导】；`conversation_id` 不在 `process.env`——需 `sessionStart` hook 经 `env` 注入 `CURSOR_CONVERSATION_ID` 或 sidecar | 待 probe |
+| `resolveHarnessAdapter` order | 注册后：codex → claude-code → cursor（或按 env 优先级；**待 MVP 定**） | 未实现 |
+
+Hook 保证 env【官方】：`CURSOR_PROJECT_DIR`、`CURSOR_VERSION`、`CURSOR_USER_EMAIL`、`CURSOR_TRANSCRIPT_PATH`、`CURSOR_CODE_REMOTE`、`CLAUDE_PROJECT_DIR`（兼容别名）。
+
+### Capabilities (expected honest defaults)
+
+| Capability | Cursor (IDE Agent) | Notes |
+| --- | --- | --- |
+| `accountPool` | `unsupported` | 无 Claude OAuth 号池 / keychain 等价物 |
+| `externalStatusline` | `unsupported` | IDE statusline ≠ Claude `settings.json.statusLine` schema |
+| `pluginDistribution` | `partial` | local `~/.cursor/plugins/local/` + marketplace【官方】；`upgradePlugin` 路径待 probe |
+| `readCurrentUsage` | `source: 'unavailable'` | 无 verified 5h/7d 配额 sidecar；`ccm usage advise` 应显式 unsupported |
+
+### Handler gating (same as Codex-first-pass)
+
+Until a Cursor backend exists:
+
+- `ccm statusline` → unsupported
+- `ccm account add/delete/refresh/list/switch` → `NotImplemented`
+- `ccm usage advise/show` → unavailable quota provider（或 generic unavailable reason）
+- `ccm upgrade plugin` → needs Cursor `PluginManagerBackend`（local reinstall vs marketplace update — **待 probe**）
+
+### Home / config
+
+- `resolveCcMasterHome` 保持 harness-neutral：`--home` > `CC_MASTER_HOME` > `$HOME/.cc_master`（已落地）。
+- **不要**从 `CURSOR_PROJECT_DIR` 推导 cc-master home；board home 与 IDE workspace 根分离。
+
+### Open questions (→ `cursor.md` §Dogfood Backlog)
+
+- D7/D8：`conversation_id` 稳定性 + agent shell `CURSOR_*` 可见性
+- D9/D11：local plugin install + `sessionStart.env` 继承
+- Plugin upgrade：marketplace vs manual zip 到 `~/.cursor/plugins/local/`
+
 ## Current Safe Position
 
 For multi-harness work today:
@@ -244,3 +287,4 @@ For multi-harness work today:
 - Treat home discovery as harness-neutral: `--home > CC_MASTER_HOME > $HOME/.cc_master`.
 - Treat Codex account-pool management as explicitly unsupported (`NotImplemented`); only current-account usage-style read surfaces are in scope for the first Codex pass.
 - Do not enable Codex runtime adapter features that depend on these ccm surfaces until the corresponding backend exists.
+- Treat Cursor the same as Codex for ccm account/statusline/plugin-upgrade until `cursor.ts` backend exists and probe validates distribution paths.
