@@ -1291,8 +1291,16 @@ export const REGISTRY: Registry = {
       positionals: [],
       options: {
         json: { type: 'boolean', desc: '结构化输出' },
+        'machine-wide': {
+          type: 'boolean',
+          desc: '枚举所有已知 harness 并输出机器级 registry snapshot（含 session store / usage source / account pool 坐标）',
+        },
       },
-      examples: ['ccm harness list', 'ccm harness list --json'],
+      examples: [
+        'ccm harness list',
+        'ccm harness list --json',
+        'ccm harness list --machine-wide --json',
+      ],
       handler: 'harness.list',
     },
     current: {

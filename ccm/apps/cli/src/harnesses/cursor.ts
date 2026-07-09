@@ -60,6 +60,16 @@ export const cursorAdapter: HarnessAdapter = {
     }
     return { id: '', source: 'none' };
   },
+  sessionStoreRoots(env) {
+    if (env.CCM_CURSOR_STATE_DB) return [path.dirname(path.resolve(env.CCM_CURSOR_STATE_DB))];
+    return [path.join(cursorConfigDir(env), 'User', 'globalStorage')];
+  },
+  usageSource: () => ({
+    kind: 'dashboard-api',
+    pollable: true,
+    quotaModel: 'billing-period',
+  }),
+  accountPoolLocation: () => null,
   readCurrentUsage(env) {
     const reading = readCursorUsageSignal(env);
     if (!reading?.signal) {

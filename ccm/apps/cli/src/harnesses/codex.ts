@@ -34,9 +34,7 @@ export const codexAdapter: HarnessAdapter = {
   },
   inspectInstallation(env) {
     const cli = probeExecutable(env.CCM_CODEX_BIN || env.CODEX_BIN || 'codex', env);
-    const configDir = env.CODEX_HOME
-      ? path.resolve(env.CODEX_HOME)
-      : path.join(env.HOME || os.homedir(), '.codex');
+    const configDir = codexConfigDir(env);
     const hasConfig = pathExists(configDir);
     const installed = cli.available || hasConfig;
     return {
@@ -63,6 +61,16 @@ export const codexAdapter: HarnessAdapter = {
         : 'none';
     return { id, source };
   },
+  sessionStoreRoots(env) {
+    return [path.join(codexConfigDir(env), 'sessions')];
+  },
+  usageSource: () => ({
+    kind: 'app-server',
+    pollable: true,
+    // Codex exposes app-server rateLimits buckets rather than Claude's rolling subscription windows.
+    quotaModel: 'primary-secondary',
+  }),
+  accountPoolLocation: () => null,
   readCurrentUsage(env) {
     const signal = readCodexUsageSignal(env)?.signal ?? null;
     return {
@@ -86,6 +94,12 @@ function pathExists(p: string): boolean {
   } catch {
     return false;
   }
+}
+
+function codexConfigDir(env: Env): string {
+  return env.CODEX_HOME
+    ? path.resolve(env.CODEX_HOME)
+    : path.join(env.HOME || os.homedir(), '.codex');
 }
 
 async function upgradeCodexPlugin(req: PluginUpgradeRequest): Promise<PluginUpgradeResult> {

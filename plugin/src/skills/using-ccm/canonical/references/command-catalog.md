@@ -1531,12 +1531,14 @@ ccm estimate cost-to-complete [flags]
 ### harness list
 
 ```
-ccm harness list [--json]
+ccm harness list [--json] [--machine-wide]
 ```
 
 - 读所有 ccm 已知 harness 的安装探测结果。Claude Code 通过 `claude` CLI / Claude config dir 探测；Codex 通过 `codex` CLI / `CODEX_HOME` 或默认 config dir 探测。
 - 输出包含：`installed`、`active`、CLI 路径、config 路径、`accountPool` / `externalStatusline` / `pluginDistribution` 能力。
-- flags：`--json`（结构化输出）
+- 加 `--machine-wide` 时输出机器级 registry snapshot：遍历所有已知 adapter（不只当前 selected harness），并为每个 harness 附上 `sessionStoreRoots`、`usageSource`（`kind` / `pollable` / `quotaModel`）和 `accountPoolLocation`；Claude Code 的 account pool 当前指向 `<CC_MASTER_HOME>/accounts.json`，Codex / Cursor 为 `null`。
+- flags：`--json`（结构化输出） · `--machine-wide`（机器级 registry snapshot）
+- 例：`ccm harness list` · `ccm harness list --json` · `ccm harness list --machine-wide --json`
 
 ### harness current
 

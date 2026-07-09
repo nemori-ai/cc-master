@@ -1,13 +1,14 @@
 // harness-registry.test.ts — HarnessAdapter selection contract.
 
 import assert from 'node:assert/strict';
-import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import {
   harnessSessionId,
   inspectKnownHarnesses,
+  MachineHarnessRegistry,
   resolveHarnessAdapter,
   resolveHarnessId,
 } from '../src/harnesses/registry.js';
@@ -109,4 +110,74 @@ test('inspectKnownHarnesses detects installed supported harnesses from PATH/conf
   assert.equal(codex?.active, true);
   assert.equal(codex?.cli.path, bin);
   assert.equal(codex?.capabilities.pluginDistribution.supported, true);
+});
+
+test('harness adapters expose machine-wide registry coordinates', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-harness-coords-'));
+  const claudeConfig = join(root, 'claude-config');
+  const ccmHome = join(root, 'ccm-home');
+  const codexHome = join(root, 'codex-home');
+  const cursorState = join(root, 'Cursor', 'User', 'globalStorage', 'state.vscdb');
+
+  const claude = resolveHarnessAdapter({ harnessFlag: 'claude-code', env: {} });
+  assert.deepEqual(claude.sessionStoreRoots({ HOME: root, CLAUDE_CONFIG_DIR: claudeConfig }), [
+    join(claudeConfig, 'projects'),
+  ]);
+  assert.deepEqual(claude.usageSource({}), {
+    kind: 'statusline-sidecar',
+    pollable: false,
+    quotaModel: 'rolling-5h-7d',
+  });
+  assert.equal(
+    claude.accountPoolLocation({ HOME: root, CC_MASTER_HOME: ccmHome }),
+    join(ccmHome, 'accounts.json'),
+  );
+
+  const codex = resolveHarnessAdapter({ harnessFlag: 'codex', env: {} });
+  assert.deepEqual(codex.sessionStoreRoots({ HOME: root, CODEX_HOME: codexHome }), [
+    join(codexHome, 'sessions'),
+  ]);
+  assert.deepEqual(codex.usageSource({}), {
+    kind: 'app-server',
+    pollable: true,
+    quotaModel: 'primary-secondary',
+  });
+  assert.equal(codex.accountPoolLocation({ HOME: root }), null);
+
+  const cursor = resolveHarnessAdapter({ harnessFlag: 'cursor', env: {} });
+  assert.deepEqual(cursor.sessionStoreRoots({ HOME: root, CCM_CURSOR_STATE_DB: cursorState }), [
+    join(root, 'Cursor', 'User', 'globalStorage'),
+  ]);
+  assert.deepEqual(cursor.usageSource({}), {
+    kind: 'dashboard-api',
+    pollable: true,
+    quotaModel: 'billing-period',
+  });
+  assert.equal(cursor.accountPoolLocation({ HOME: root }), null);
+});
+
+test('MachineHarnessRegistry.sweep walks all known adapters into an immutable snapshot', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-machine-harness-'));
+  mkdirSync(join(root, '.codex'), { recursive: true });
+  mkdirSync(join(root, '.claude'), { recursive: true });
+
+  const registry = MachineHarnessRegistry.sweep({
+    HOME: root,
+    CODEX_HOME: join(root, '.codex'),
+    CC_MASTER_HARNESS: 'codex',
+  });
+  const snapshot = registry.toJSON();
+
+  assert.equal(snapshot.schema, 'ccm/machine-harness-registry/v1');
+  assert.deepEqual(
+    snapshot.harnesses.map((h) => h.id),
+    ['codex', 'cursor', 'claude-code'],
+  );
+  assert.ok(snapshot.installed.includes('codex'));
+  assert.ok(snapshot.installed.includes('claude-code'));
+  assert.equal(registry.byId('cursor')?.usageSource.quotaModel, 'billing-period');
+  assert.equal(registry.poolOf('claude-code')?.location, join(root, '.cc_master', 'accounts.json'));
+  assert.equal(registry.poolOf('codex'), null);
+  assert.equal(Object.isFrozen(snapshot.harnesses), true);
+  assert.equal(Object.isFrozen(snapshot.harnesses[0]), true);
 });

@@ -31,6 +31,13 @@ export function genericAdapter(id: string): HarnessAdapter {
       },
     }),
     session: () => ({ id: '', source: 'none' }),
+    sessionStoreRoots: () => [],
+    usageSource: () => ({
+      kind: 'app-server',
+      pollable: false,
+      quotaModel: 'primary-secondary',
+    }),
+    accountPoolLocation: () => null,
     readCurrentUsage: () => ({
       signal: null,
       source: 'unavailable',

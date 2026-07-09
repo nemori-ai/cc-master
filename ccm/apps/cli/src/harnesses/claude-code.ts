@@ -1,6 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import { resolveClaudeConfigDir, resolveRateCachePath, type UsageSignal } from '@ccm/engine';
+import * as path from 'node:path';
+import {
+  resolveCcMasterHome,
+  resolveClaudeConfigDir,
+  resolveProjectsDir,
+  resolveRateCachePath,
+  type UsageSignal,
+} from '@ccm/engine';
 import { probeExecutable } from './probe.js';
 import type { Env, HarnessAdapter, PluginUpgradeRequest, PluginUpgradeResult } from './types.js';
 
@@ -48,6 +55,17 @@ export const claudeCodeAdapter: HarnessAdapter = {
   session(env) {
     const id = env.CLAUDE_CODE_SESSION_ID || '';
     return { id, source: id ? 'env:CLAUDE_CODE_SESSION_ID' : 'none' };
+  },
+  sessionStoreRoots(env) {
+    return [resolveProjectsDir(env)];
+  },
+  usageSource: () => ({
+    kind: 'statusline-sidecar',
+    pollable: false,
+    quotaModel: 'rolling-5h-7d',
+  }),
+  accountPoolLocation(env) {
+    return path.join(resolveCcMasterHome(env), 'accounts.json');
   },
   readCurrentUsage(env) {
     const signal = readClaudeCodeUsageSidecar(env);

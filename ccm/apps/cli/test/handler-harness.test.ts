@@ -28,3 +28,32 @@ test('ccm harness list --json reports installed supported harnesses and current 
   assert.equal(codex.installed, true);
   assert.equal(codex.capabilities.pluginDistribution.supported, true);
 });
+
+test('ccm harness list --machine-wide --json reports registry coordinates', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-harness-machine-list-'));
+  const codexHome = join(root, '.codex');
+  mkdirSync(codexHome, { recursive: true });
+  const out: string[] = [];
+  const err: string[] = [];
+
+  const code = run(['--harness', 'codex', 'harness', 'list', '--machine-wide', '--json'], {
+    out: (s) => out.push(s),
+    err: (s) => err.push(s),
+    env: { HOME: root, CODEX_HOME: codexHome, CC_MASTER_NO_AUTOINSTALL: '1' },
+  });
+
+  assert.equal(code, 0, err.join('\n'));
+  const parsed = JSON.parse(out[out.length - 1] || '{}');
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.data.current, 'codex');
+  assert.equal(parsed.data.machineWide, true);
+  assert.equal(parsed.data.schema, 'ccm/machine-harness-registry/v1');
+
+  const codex = parsed.data.harnesses.find((h: { id: string }) => h.id === 'codex');
+  assert.equal(codex.usageSource.kind, 'app-server');
+  assert.deepEqual(codex.sessionStoreRoots, [join(codexHome, 'sessions')]);
+
+  const claude = parsed.data.harnesses.find((h: { id: string }) => h.id === 'claude-code');
+  assert.equal(claude.usageSource.quotaModel, 'rolling-5h-7d');
+  assert.equal(claude.accountPoolLocation, join(root, '.cc_master', 'accounts.json'));
+});
