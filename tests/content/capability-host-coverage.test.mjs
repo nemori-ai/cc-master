@@ -47,6 +47,12 @@ function listSkillIds() {
     .sort();
 }
 
+function readMode(strategyPath) {
+  const text = readFileSync(strategyPath, 'utf8');
+  const match = text.match(/^\s*mode:\s*([A-Za-z0-9_-]+)\s*$/m);
+  return match ? match[1] : '';
+}
+
 test('required commands have adapters/<host>/strategy.yaml for all known hosts (ADR-031)', () => {
   const commands = parseYamlList(join(ROOT, 'plugin/src/commands/_manifest/commands.yaml'), 'commands').filter(
     (c) => c.required,
@@ -57,6 +63,26 @@ test('required commands have adapters/<host>/strategy.yaml for all known hosts (
       const p = commandStrategyPath(cmd.id, host);
       assert.ok(existsSync(p), `${cmd.id}: missing ${host} strategy at ${p}`);
     }
+  }
+});
+
+test('Cursor command adapters are promoted off planned (host_native or adapter_guidance)', () => {
+  const commands = parseYamlList(join(ROOT, 'plugin/src/commands/_manifest/commands.yaml'), 'commands').filter(
+    (c) => c.required,
+  );
+  const expected = {
+    'as-master-orchestrator': 'host_native',
+    discuss: 'adapter_guidance',
+    distill: 'adapter_guidance',
+    'handoff-to-new-session': 'adapter_guidance',
+    retro: 'adapter_guidance',
+    stop: 'adapter_guidance',
+  };
+  for (const cmd of commands) {
+    const p = commandStrategyPath(cmd.id, 'cursor');
+    const mode = readMode(p);
+    assert.notEqual(mode, 'planned', `${cmd.id} cursor strategy must leave planned`);
+    assert.equal(mode, expected[cmd.id], `${cmd.id} cursor mode`);
   }
 });
 

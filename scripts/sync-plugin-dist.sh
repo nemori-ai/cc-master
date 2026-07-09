@@ -318,6 +318,15 @@ for (const skill of fs.readdirSync(skillsSrc).sort()) {
 
 if (surface === 'skills') process.exit(0);
 
+// Cursor rules (Track B reinject substrate): plugin/src/rules/cursor/ → dist/cursor/rules/
+if (host === 'cursor') {
+  const rulesSrc = path.join(src, 'rules', 'cursor');
+  const rulesDst = path.join(dst, 'rules');
+  if (fs.existsSync(rulesSrc)) {
+    copyDir(rulesSrc, rulesDst);
+  }
+}
+
 // PHIP: project Claude Code host registration and per-hook native scripts.
 const hooksDst = path.join(dst, 'hooks');
 const hooksHost = path.join(src, 'hooks', '_hosts', host);

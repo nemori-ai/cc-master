@@ -1,9 +1,13 @@
 host: cursor
 command: distill
 version: 1
-mode: planned
-planned_projection:
-  target_mode: adapter_guidance
+mode: adapter_guidance
+surface:
+  kind: user_prompt_ccm_cli_guided
+  user_prompt: plugin/src/skills/cc-master-distill/canonical/SKILL.md
+  summary: "Distill one or more retro documents' candidate lessons into target-project assets (discipline doc / skill / workflow / subagent), gated by a single user-approved distillation plan, collected via feature-branch + PR (or a draft directory for non-git projects). Never touches the cc-master board or ccm."
+  primary_commands: []
 notes:
-  - Cursor adapter not implemented; mirror Codex ccm_guided / conversational_guidance pattern until MVP.
+  - Cursor adapter mirrors Codex ccm_guided pattern: skill-first guidance, no projected slash-command body yet.
+  - Empty ccm command list by design — distill never reads or writes the board/ccm.
   - See commands/_manifest/commands.yaml host_coverage.cursor for this command.

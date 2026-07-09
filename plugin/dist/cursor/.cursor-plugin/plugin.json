@@ -3,6 +3,8 @@
   "version": "0.16.0",
   "description": "Turn a Cursor IDE Agent session into a long-horizon master orchestrator through the cc-master adapter.",
   "skills": "./skills/",
+  "rules": "./rules/",
+  "commands": "./commands/",
   "hooks": "./hooks/hooks.json",
   "author": {
     "name": "cc-master contributors"

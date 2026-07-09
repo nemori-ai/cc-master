@@ -11,13 +11,13 @@ registration:
     - preToolUse
     - postToolUse
     - stop
+    - preCompact
   planned_events:
     - sessionStart
-    - preCompact
   unsupported_events:
     - PostToolBatch
   notes:
-    - Phase C: P0 cores live (bootstrap / board-guard / board-lint / verify-board); reinject Track B still planned.
+    - Phase C: P0 cores live; reinject Track B = alwaysApply rules/ + silent preCompact (no sessionStart context).
     - Path strategy (probe D1): relative commands from plugin cwd; launcher sets CC_MASTER_PLUGIN_ROOT from __dirname.
     - No ${PLUGIN_ROOT} / ${CLAUDE_PLUGIN_ROOT} assumed in Cursor (token unproven).
 path_resolution:
@@ -53,6 +53,7 @@ output_envelope:
   known_gaps:
     - sessionStart.additional_context staff-confirmed drop bug (D4 FAIL) — do not use for reinject.
     - sessionStart does not re-fire after compact (D3 FAIL).
+    - preCompact cannot inject agent context — reinject core is silent no-op; alwaysApply rule carries role substrate.
 normalized_contract:
   env: ../../_shared/contract.md
   payload: ../../_shared/contract.md

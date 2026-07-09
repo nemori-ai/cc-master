@@ -42,6 +42,10 @@ tagged ambient/advisory/directive message.
   required_hosts: [claude-code, codex]
 ```
 
+Cursor Track B does **not** claim PARITY anchors for empty-board / dangling-node reinject text —
+those rules stay Claude Code + Codex only. Cursor acceptance is equivalence-class coverage via
+alwaysApply rule + Capability Card (not byte-identical SessionStart substrate).
+
 ## 降级行为
 
 ```yaml
@@ -56,4 +60,20 @@ tagged ambient/advisory/directive message.
     no equivalent hidden-tool-discovery step, so it has no corresponding clause.
   compensating_mechanism: "n/a — Claude Code subagent dispatch (the Agent tool) is always visible; nothing to compensate."
   tracked_by: "n/a — legitimate host-capability difference, not a bug"
+
+- rule: reinject-full-substrate-on-compact
+  kind: protocol-capability-gap
+  affected_hosts: [cursor]
+  reason: >
+    Cursor preCompact cannot inject agent context; sessionStart does not re-fire after compact
+    (forum 158873); sessionStart.additional_context is a staff-confirmed drop bug (forum 158452 ·
+    D4 FAIL). Full SessionStart/compaction-triggered SKILL A re-injection has no documented 1:1
+    equivalent on Cursor.
+  compensating_mechanism: >
+    Track B layered substitute: (1) alwaysApply rule plugin/src/rules/cursor/cc-master-orchestrator.mdc
+    (projected to plugin/dist/cursor/rules/) — slim role pointer + red-line summary + empty-board
+    hard-stop, not full SKILL A; (2) preCompact core is a documented silent no-op (exit 0, empty
+    stdout) because injection is useless on that event; (3) do NOT register sessionStart
+    additional_context reinject. Acceptance = Capability Card equivalence classes, not full text parity.
+  tracked_by: design_docs/harnesses/capabilities/role-substrate-reinject.md + cursor.md D3,D4
 ```

@@ -534,7 +534,7 @@ bash plugin/src/hooks/_hosts/cursor/probes/setup-local-plugin-probe.sh
 - [x] `board-lint` — postToolUse Write → ccm lint → `additional_context`
 - [x] `verify-board` — stop → `followup_message` + FUSE=5 + `stop_allow_until`
 - [x] launcher: home default `.cc_master`, plugin root `../../..`, session-state discovery
-- [ ] Track B reinject (alwaysApply rule; not sessionStart.additional_context)
+- [x] Track B reinject (alwaysApply rule; not sessionStart.additional_context)
 - [ ] usage-pacing / identity-nudge Cursor cores
 
 ### Phase 2 — 投影与打包

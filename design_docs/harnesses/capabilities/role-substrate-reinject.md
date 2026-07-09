@@ -27,7 +27,7 @@ Fixture tests assert equivalence classes, not byte-identical reinject text.
 | --- | --- | --- | --- |
 | claude-code | implemented | `SessionStart` hook (`matcher: startup\|resume\|compact`) reinject.js full SKILL A re-injection | Substrate exemption |
 | codex | implemented | `SessionStart` reinject-core.js — same rules + optional subagent tool_search hint | See reinject CONTRACT divergence |
-| cursor | planned | **Layered substitute** (Track B): ① alwaysApply `.cursor/rules` slim pointer to master-orchestrator-guide (not full SKILL A); ② `preCompact` observe only (cannot inject【官方】); ③ **do not** rely on `sessionStart.additional_context` (staff-confirmed drop bug · D4 FAIL) | Not 1:1 full reinject; D3/D4 closed by docs+forum 2026-07-09 |
+| cursor | implemented | **Layered substitute** (Track B): ① alwaysApply `plugin/dist/cursor/rules/cc-master-orchestrator.mdc` slim pointer to master-orchestrator-guide (not full SKILL A); ② `preCompact` → silent no-op core (cannot inject【官方】·D3); ③ **do not** rely on `sessionStart.additional_context` (staff-confirmed drop bug · D4 FAIL) | Not 1:1 full reinject; D3/D4 closed by docs+forum 2026-07-09; hooks.yaml `implemented-track-b` |
 
 ## Declared divergence
 
@@ -59,7 +59,8 @@ Fixture tests assert equivalence classes, not byte-identical reinject text.
 
 - Hook: [`plugin/src/hooks/reinject/CONTRACT.md`](../../../plugin/src/hooks/reinject/CONTRACT.md)
 - Skill: `master-orchestrator-guide` (substrate source narrative)
-- Rules: future `plugin/dist/cursor/rules/` slim alwaysApply (not implemented)
+- Rules: `plugin/src/rules/cursor/cc-master-orchestrator.mdc` → sync → `plugin/dist/cursor/rules/` (alwaysApply; Track B main load)
+- Hook: `plugin/src/hooks/reinject/implementations/cursor/precompact-observe-core.js` (silent no-op on preCompact)
 
 ## Probe deps
 

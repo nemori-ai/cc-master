@@ -11,7 +11,7 @@
 | board-lint | implemented | implemented | implemented | [CONTRACT.md](../plugin/src/hooks/board-lint/CONTRACT.md) |
 | bootstrap-board | implemented | implemented-minimal-fresh | implemented-minimal-fresh | [CONTRACT.md](../plugin/src/hooks/bootstrap-board/CONTRACT.md) |
 | identity-nudge | implemented | implemented-stop-system-message | implemented-stop-advisory | [CONTRACT.md](../plugin/src/hooks/identity-nudge/CONTRACT.md) |
-| reinject | implemented | implemented | planned-partial | [CONTRACT.md](../plugin/src/hooks/reinject/CONTRACT.md) |
+| reinject | implemented | implemented | implemented-track-b | [CONTRACT.md](../plugin/src/hooks/reinject/CONTRACT.md) |
 | usage-pacing | implemented | implemented-stop-advisory | implemented-stop-advisory | [CONTRACT.md](../plugin/src/hooks/usage-pacing/CONTRACT.md) |
 | verify-board | implemented | implemented-blocking | implemented-followup | [CONTRACT.md](../plugin/src/hooks/verify-board/CONTRACT.md) |
 
@@ -56,6 +56,7 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | rule | kind | affected hosts | tracked by |
 | --- | --- | --- | --- |
 | reinject-subagent-dispatch-discovery-hint | host-convention-divergence | claude-code | n/a — legitimate host-capability difference, not a bug |
+| reinject-full-substrate-on-compact | protocol-capability-gap | cursor | design_docs/harnesses/capabilities/role-substrate-reinject.md + cursor.md D3,D4 |
 
 ### usage-pacing
 
