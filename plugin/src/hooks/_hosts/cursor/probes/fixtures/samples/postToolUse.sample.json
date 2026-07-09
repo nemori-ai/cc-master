@@ -1,0 +1,42 @@
+{
+  "recorded_at": "2026-07-09T06:45:56.523Z",
+  "event": "postToolUse",
+  "mode": "context",
+  "argv": [
+    "/opt/homebrew/Cellar/node/26.0.0/bin/node",
+    "/Users/panqiwei/Dev/repos/nemori-ai/cc-master/plugin/src/hooks/_hosts/cursor/probes/probe-hook.js"
+  ],
+  "cwd": "/Users/panqiwei/Dev/repos/nemori-ai/cc-master",
+  "node": "v26.0.0",
+  "which_node_hint": "/opt/homebrew/Cellar/node/26.0.0/bin/node",
+  "env_subset": {
+    "HOME": "/Users/panqiwei",
+    "PATH": "/Applications/Cursor.app/Contents/Resources/app/node_modules/@vscode/ripgrep/bin:/Users/panqiwei/.bun/bin:/Users/panqiwei/.bun/bin:/Users/panqiwei/.local/bin:/Users/panqiwei/Library/pnpm:/Users/panqiwei/.antigravity/antigravity/bin:/Users/panqiwei/.local/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/opt/homebrew/bin:/Applications/quarto/bin",
+    "PWD": "/Users/panqiwei/Dev/repos/nemori-ai/cc-master",
+    "SHELL": "/bin/zsh",
+    "TMPDIR": "/var/folders/xt/bn8ht8f10d93f8n1yhgzmlpc0000gn/T/",
+    "USER": "panqiwei"
+  },
+  "stdin_text": "{\"conversation_id\":\"0f51217b-34bb-4ba2-961b-d7cbf90ae38e\",\"generation_id\":\"e1730bb8-98ef-4f6b-ba79-a13132b62a59\",\"model\":\"grok-4.5\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"/Users/panqiwei/Dev/repos/nemori-ai/cc-master/notes/wrote-by-agent.txt\",\"content\":\"probe\\n\"},\"tool_output\":\"{\\\"file_path\\\":\\\"/Users/panqiwei/Dev/repos/nemori-ai/cc-master/notes/wrote-by-agent.txt\\\",\\\"success\\\":true}\",\"duration\":35.799,\"tool_use_id\":\"call-802df03f-0569-410c-85bf-3d4dd9401b50-125\\nfc_f4feaa35-0747-97b8-85\u2026",
+  "stdin_json": {
+    "conversation_id": "0f51217b-34bb-4ba2-961b-d7cbf90ae38e",
+    "generation_id": "e1730bb8-98ef-4f6b-ba79-a13132b62a59",
+    "model": "grok-4.5",
+    "tool_name": "Write",
+    "tool_input": {
+      "file_path": "/Users/panqiwei/Dev/repos/nemori-ai/cc-master/notes/wrote-by-agent.txt",
+      "content": "probe\n"
+    },
+    "tool_output": "{\"file_path\":\"/Users/panqiwei/Dev/repos/nemori-ai/cc-master/notes/wrote-by-agent.txt\",\"success\":true}",
+    "duration": 35.799,
+    "tool_use_id": "call-802df03f-0569-410c-85bf-3d4dd9401b50-125\nfc_f4feaa35-0747-97b8-8522-945393f5d54c_1",
+    "session_id": "0f51217b-34bb-4ba2-961b-d7cbf90ae38e",
+    "hook_event_name": "postToolUse",
+    "cursor_version": "3.10.20",
+    "workspace_roots": [
+      "/Users/panqiwei/Dev/repos/nemori-ai/cc-master"
+    ],
+    "user_email": "REDACTED",
+    "transcript_path": "/Users/panqiwei/.cursor/projects/Users-panqiwei-Dev-repos-nemori-ai-cc-master/agent-transcripts/0f51217b-34bb-4ba2-961b-d7cbf90ae38e/0f51217b-34bb-4ba2-961b-d7cbf90ae38e.jsonl"
+  }
+}
