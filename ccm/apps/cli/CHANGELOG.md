@@ -1,5 +1,17 @@
 # ccm
 
+## 0.17.1
+
+### Patch Changes
+
+- fix: derive web-viewer/status-report producer versions from the CLI version SSOT
+
+  - `ccm web-viewer` health/state now reports the installed CLI version instead of a stale hard-coded version.
+  - `ccm status-report` producer metadata now uses the same `readVersion()` path as `ccm --version`, including SEA `CCM_VERSION` injection.
+
+- Updated dependencies
+  - @ccm/engine@0.17.1
+
 ## 0.17.0
 
 ### Minor Changes

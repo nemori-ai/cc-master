@@ -9,13 +9,13 @@ import {
   withLock,
 } from '@ccm/engine';
 import * as discover from '../discover.js';
+import { readVersion } from '../help.js';
 import * as io from '../io.js';
 import type { Ctx } from './_common.js';
 
 const EXIT = io.EXIT;
 const REPORT_SCHEMA = 'ccm/status-report/v1';
 const DEFAULT_MAX_AGE_SECONDS = 30;
-const PRODUCER_VERSION = '0.16.0';
 
 interface KindedError extends Error {
   errKind?: string;
@@ -374,7 +374,7 @@ function computeReport(input: ResolvedInput, opts: ComputeOpts = {}): ReportEnve
       board_size: input.stat.size,
       topology_hash: topoHash,
       advisory_hash: advHash,
-      producer: { ccm_version: PRODUCER_VERSION },
+      producer: { ccm_version: readVersion() },
     },
   };
 }

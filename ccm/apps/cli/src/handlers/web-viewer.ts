@@ -6,6 +6,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { analyzeGraph, isAwaitingUser, STATUS_ENUM, taskTrulyDone, withLock } from '@ccm/engine';
 import * as discover from '../discover.js';
+import { readVersion } from '../help.js';
 import * as io from '../io.js';
 import type { Ctx } from './_common.js';
 import { writeReportForBoard } from './status-report.js';
@@ -128,7 +129,7 @@ function nowIso(): string {
 }
 
 function ccmVersion(): string {
-  return '0.16.0';
+  return readVersion();
 }
 
 function canonicalHome(ctx: Ctx): string {

@@ -1,5 +1,11 @@
 # @ccm/engine
 
+## 0.17.1
+
+### Patch Changes
+
+- Version-only lockstep patch for ccm-v0.17.1. Runtime behavior changes are in the `ccm` CLI package.
+
 ## 0.17.0
 
 ### Minor Changes
