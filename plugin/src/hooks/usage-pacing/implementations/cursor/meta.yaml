@@ -1,0 +1,14 @@
+hook: usage-pacing
+host: cursor
+version: 1
+event: stop
+matcher: ""
+projection:
+  target: hooks/
+status: implemented-stop-advisory
+notes:
+  - Cursor-specific billing_period pacing (NOT a Codex 5h/7d fork).
+  - Uses ccm usage advise as the only pacing verdict source.
+  - Emits Stop kind:system advisory → launcher additional_context; Cursor has no PostToolBatch.
+  - Handles hold / throttle / stop_billing_period only; switch/stop_5h/stop_7d stay silent.
+  - Never mentions 5h/7d/switch in agent-facing copy.

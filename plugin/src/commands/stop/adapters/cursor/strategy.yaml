@@ -1,9 +1,16 @@
 host: cursor
 command: stop
 version: 1
-mode: planned
-planned_projection:
-  target_mode: adapter_guidance
+mode: adapter_guidance
+surface:
+  kind: user_prompt_ccm_cli_guided
+  user_prompt: plugin/src/skills/cc-master-stop/canonical/SKILL.md
+  summary: "Confirm with the user, then archive the selected board through ccm."
+  primary_commands:
+    - "ccm board show --json"
+    - "ccm board lint --json"
+    - "ccm board archive --board <board-path>"
 notes:
-  - Cursor adapter not implemented; mirror Codex ccm_guided / conversational_guidance pattern until MVP.
+  - Cursor has native /stop for Agent stop; do not claim that built-in. Prefer skill-first guidance until a dedicated host_native command body is warranted.
+  - Archiving is reversible through /as-master-orchestrator --resume <selector>.
   - See commands/_manifest/commands.yaml host_coverage.cursor for this command.

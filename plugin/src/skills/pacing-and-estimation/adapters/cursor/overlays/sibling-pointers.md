@@ -1,0 +1,2 @@
+- **using-ccm** —— ccm 命令怎么敲、board 字段怎么写。
+- **master-orchestrator-guide** —— 决策层；Cursor adapter 只消费这里的 advisory，不把 Claude 的 account/statusline/5h-7d 机制投影过来。

@@ -51,6 +51,26 @@ test('sentinel consistency: command body carries the exact string the bootstrap 
   assert.match(hook, /cc-master:as-master-orchestrator/, 'hook also greps command-name sentinel');
 });
 
+test('Cursor as-master-orchestrator command embeds bootstrap sentinel and Cursor arming cues', () => {
+  const cmd = read(`${SRC}/commands/as-master-orchestrator/adapters/cursor/body.md`);
+  const hook = read(`${SRC}/hooks/bootstrap-board/implementations/cursor/bootstrap-board-core.js`);
+  assert.match(cmd, /<!-- cc-master:bootstrap:v1 -->/, 'Cursor command embeds body sentinel');
+  assert.match(cmd, /<!-- cc-master:args:/, 'Cursor command embeds args marker');
+  assert.match(cmd, /conversation_id/, 'Cursor command documents conversation_id arming');
+  assert.match(cmd, /\bShell\b/, 'Cursor command names Shell tool');
+  assert.doesNotMatch(cmd, /\bBash\b/, 'Cursor command must not name Bash tool');
+  assert.match(hook, /cc-master:bootstrap:v1/, 'Cursor bootstrap greps body sentinel');
+});
+
+test('Cursor dist projects host_native as-master-orchestrator command', () => {
+  const distCmd = 'plugin/dist/cursor/commands/as-master-orchestrator.md';
+  assert.ok(existsSync(join(ROOT, distCmd)), `${distCmd} must exist after sync`);
+  const body = read(distCmd);
+  assert.match(body, /<!-- cc-master:bootstrap:v1 -->/);
+  const manifest = JSON.parse(read('plugin/dist/cursor/.cursor-plugin/plugin.json'));
+  assert.equal(manifest.commands, './commands/');
+});
+
 // ── ADR-018 标签注入防回潮 lint（AGENTS.md §13）──────────────────────────────────────────────────────
 // 所有 hook 往 agent context 注入的 transient 文本都须按 ADR-018 标签写（ambient/advisory/directive·closed
 //   set·source 必填）。reinject（魂重注）与 bootstrap（ARM 角色注入）是 agent 的操作 substrate（ADR-018 §2.5）

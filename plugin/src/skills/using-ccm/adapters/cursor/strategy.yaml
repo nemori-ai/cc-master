@@ -1,13 +1,88 @@
 host: cursor
 skill: using-ccm
 version: 1
-mode: planned
-planned_projection:
-  target_mode: copy
+mode: copy
+projection:
   source: canonical/
   target: skills/using-ccm/
-notes:
-  - SAP Track A: copy + slot/overlay after probe D1 (path tokens). ADR-031.
-  - See design_docs/harnesses/cursor.md Track A table.
+exclude_canonical:
+  - references/account-pool.md
+unsupported:
+  - capability: account_switch
+    reason: "ccm account backend currently targets Claude Code OAuth credential stores."
+  - capability: statusline_install
+    reason: "Cursor has no Claude-style external statusline hook; statusline install/uninstall is NotImplemented."
+supported:
+  - capability: board_operations
+    reason: "ccm board/task/log/jc/cadence/watchdog commands are harness-neutral."
+  - capability: current_quota_signal
+    reason: "ccm usage show/advise reads Cursor current-account billing_period (~30d) via dashboard GetCurrentPeriodUsage (source: cursor-dashboard)."
+  - capability: plugin_upgrade
+    reason: "ccm upgrade plugin may refresh local Cursor plugin registration from plugin/dist/cursor when the Cursor upgrade adapter is available; otherwise manual reinstall."
+  - capability: plugin_skills_distribution
+    reason: "Cursor command-like入口与 hooks 通过 plugin skills + host-native commands 实现。"
 slot_replacements:
   "{{USING_CCM_DESCRIPTION}}": adapters/cursor/overlays/description.md
+  "{{USING_CCM_BOUNDARY}}": adapters/cursor/overlays/boundary.md
+  "{{USING_CCM_POINTERS_HOST}}": adapters/cursor/overlays/pointers-host.md
+  "{{USING_CCM_EXECUTOR_TABLE_ROWS}}": adapters/cursor/overlays/executor-table-rows.md
+  "{{USING_CCM_EXECUTOR_DECISION_TAIL}}": adapters/cursor/overlays/executor-decision-tail.md
+  "{{USING_CCM_WATCHDOG_PROBLEM}}": adapters/cursor/overlays/watchdog-problem.md
+  "{{USING_CCM_WATCHDOG_HOOK_REMINDER}}": adapters/cursor/overlays/watchdog-hook-reminder.md
+  "{{USING_CCM_WATCHDOG_MECHANISM_ROWS}}": adapters/cursor/overlays/watchdog-mechanism-rows.md
+  "{{USING_CCM_WATCHDOG_SHELL_GUIDANCE}}": adapters/cursor/overlays/watchdog-shell-guidance.md
+  "{{USING_CCM_WATCHDOG_CANCEL_GUIDANCE}}": adapters/cursor/overlays/watchdog-cancel-guidance.md
+  "{{USING_CCM_WATCHDOG_DISARM_WARNING}}": adapters/cursor/overlays/watchdog-disarm-warning.md
+  "{{USING_CCM_BOARD_GUARD_GUIDANCE}}": adapters/cursor/overlays/board-guard-guidance.md
+  "{{USING_CCM_TASK_ADD_EXAMPLE}}": adapters/cursor/overlays/task-add-example.md
+  "{{USING_CCM_WATCHDOG_ARM_EXAMPLE}}": adapters/cursor/overlays/watchdog-arm-example.md
+  "{{USING_CCM_SESSION_ID_FLAG}}": adapters/cursor/overlays/session-id-flag.md
+  "{{USING_CCM_BOARD_ARCHIVE_BEHAVIOR}}": adapters/cursor/overlays/board-archive-behavior.md
+  "{{USING_CCM_USAGE_SIGNAL_SOURCE}}": adapters/cursor/overlays/usage-signal-source.md
+  "{{USING_CCM_USAGE_BURN_RATE_BEHAVIOR}}": adapters/cursor/overlays/usage-burn-rate-behavior.md
+  "{{USING_CCM_ACCOUNT_NAMESPACE}}": adapters/cursor/overlays/account-namespace.md
+  "{{USING_CCM_STATUSLINE_NAMESPACE}}": adapters/cursor/overlays/statusline-namespace.md
+  "{{USING_CCM_STATUSLINE_NAMESPACE_ROW}}": adapters/cursor/overlays/statusline-namespace-row.md
+  "{{USING_CCM_UPGRADE_NAMESPACE}}": adapters/cursor/overlays/upgrade-namespace.md
+  "{{USING_CCM_UPGRADE_PLUGIN_BEHAVIOR}}": adapters/cursor/overlays/upgrade-plugin-behavior.md
+  "{{USING_CCM_ACCOUNT_NAMESPACE_ROW}}": adapters/cursor/overlays/account-namespace-row.md
+  "{{USING_CCM_OBSERVABILITY_SOURCE}}": adapters/cursor/overlays/observability-source.md
+  "{{USING_CCM_DECISION_PACKAGE_ENTRYPOINT}}": adapters/cursor/overlays/decision_package-entrypoint.md
+  "{{USING_CCM_JC_HOOK_GUIDANCE}}": adapters/cursor/overlays/jc-hook-guidance.md
+  "{{USING_CCM_WATCHDOG_JOB_ID_GUIDANCE}}": adapters/cursor/overlays/watchdog-job-id-guidance.md
+  "{{USING_CCM_WAKEUP_SELF_HEAL_GUIDANCE}}": adapters/cursor/overlays/wakeup-self-heal-guidance.md
+host_slots:
+  "{{USING_CCM_EXECUTOR_TABLE_ROWS}}":
+    capability: background_dispatch
+    source: plugin/src/skills/_hosts/cursor/capabilities.yaml
+    status: partial_source_uses_cursor_specific_guidance
+  "{{USING_CCM_EXECUTOR_DECISION_TAIL}}":
+    capability: background_dispatch
+    source: plugin/src/skills/_hosts/cursor/capabilities.yaml
+    status: partial_source_uses_cursor_specific_guidance
+  "{{USING_CCM_WATCHDOG_PROBLEM}}":
+    capability: watchdog_wakeup
+    source: plugin/src/skills/_hosts/cursor/capabilities.yaml
+    status: partial_source_uses_cursor_specific_guidance
+  "{{USING_CCM_WATCHDOG_HOOK_REMINDER}}":
+    capability: hooks
+    source: plugin/src/skills/_hosts/cursor/capabilities.yaml
+    status: partial_source_uses_cursor_specific_guidance
+  "{{USING_CCM_WATCHDOG_MECHANISM_ROWS}}":
+    capability: watchdog_wakeup
+    source: plugin/src/skills/_hosts/cursor/capabilities.yaml
+    status: degrade_to_shell_floor
+  "{{USING_CCM_WATCHDOG_SHELL_GUIDANCE}}":
+    capability: background_dispatch.shell
+    source: plugin/src/skills/_hosts/cursor/capabilities.yaml
+    status: degrade_to_shell_floor
+  "{{USING_CCM_WATCHDOG_CANCEL_GUIDANCE}}":
+    capability: watchdog_wakeup
+    source: plugin/src/skills/_hosts/cursor/capabilities.yaml
+    status: degrade_to_shell_floor
+  "{{USING_CCM_WATCHDOG_DISARM_WARNING}}":
+    capability: watchdog_wakeup
+    source: plugin/src/skills/_hosts/cursor/capabilities.yaml
+    status: partial_source_uses_cursor_specific_guidance
+notes:
+  - Cursor projects the canonical ccm guide plus host-specific account/statusline/upgrade and executor/watchdog slots (billing_period; Task/Shell; no account switch).

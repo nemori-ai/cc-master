@@ -10,6 +10,7 @@
 # 从 repo 根 allowlist 打包；同一个裸 `v*` plugin tag 下发布按 harness 区分的 asset：
 #   - cc-master-plugin-claude-code-<tag>.zip
 #   - cc-master-plugin-codex-<tag>.zip
+#   - cc-master-plugin-cursor-<tag>.zip
 #   - SHA256SUMS（install.sh 安装前必须校验）
 name: plugin-release
 
@@ -77,6 +78,15 @@ jobs:
           test -d "${DEST}/cc-master/skills"
           test -d "${DEST}/cc-master/hooks"
           test -f "${DEST}/cc-master/.codex-plugin/plugin.json"
+
+      - name: Validate Cursor packaged adapter
+        run: |
+          DEST="$(mktemp -d)"
+          unzip -q "dist/cc-master-plugin-cursor-${{ steps.pkg.outputs.tag }}.zip" -d "${DEST}"
+          test -f "${DEST}/cc-master/.cursor-plugin/plugin.json"
+          test -d "${DEST}/cc-master/hooks"
+          test -d "${DEST}/cc-master/skills"
+          test -d "${DEST}/cc-master/rules"
 
       # 上传 artifact（workflow_dispatch / 非 tag 触发时也留存可下载）。
       - name: Upload artifact

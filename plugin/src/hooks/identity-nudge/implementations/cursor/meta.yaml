@@ -1,0 +1,12 @@
+hook: identity-nudge
+host: cursor
+version: 1
+event: stop
+matcher: ""
+projection:
+  target: hooks/
+status: implemented-stop-advisory
+notes:
+  - Emits Cursor Stop kind:system → launcher additional_context (not Codex systemMessage).
+  - Preserves runtime timestamp throttling through ccm board set-param.
+  - Preserves identity and critical-path periodic reminders.

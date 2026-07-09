@@ -1,0 +1,1 @@
+> Cursor 当前只支持**当前账户**订阅账期（`billing_period`，约 30 天）用量：ccm 通过本机 Cursor 登录态调用 dashboard `GetCurrentPeriodUsage`（`source: cursor-dashboard`）读取账户权威信号。**无 5h / 7d 滚动窗**；账号池 registry / 备号快照在 Cursor 下不作为可切换容量使用；缺信号则 `available:false` 降级。

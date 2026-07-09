@@ -22,6 +22,17 @@
       {
         "command": "node \"./hooks/_hosts/cursor/launcher.js\" --event stop --core \"./hooks/verify-board/implementations/cursor/verify-board-core.js\"",
         "loop_limit": 5
+      },
+      {
+        "command": "node \"./hooks/_hosts/cursor/launcher.js\" --event stop --core \"./hooks/usage-pacing/implementations/cursor/usage-pacing-core.js\""
+      },
+      {
+        "command": "node \"./hooks/_hosts/cursor/launcher.js\" --event stop --core \"./hooks/identity-nudge/implementations/cursor/identity-nudge-core.js\""
+      }
+    ],
+    "preCompact": [
+      {
+        "command": "node \"./hooks/_hosts/cursor/launcher.js\" --event preCompact --core \"./hooks/reinject/implementations/cursor/precompact-observe-core.js\""
       }
     ]
   }

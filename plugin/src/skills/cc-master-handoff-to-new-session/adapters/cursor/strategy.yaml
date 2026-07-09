@@ -1,11 +1,9 @@
 host: cursor
 skill: cc-master-handoff-to-new-session
 version: 1
-mode: planned
-planned_projection:
-  target_mode: copy
+mode: copy
+projection:
   source: canonical/
   target: skills/cc-master-handoff-to-new-session/
 notes:
-  - SAP Track A: copy + slot/overlay after probe D1 (path tokens). ADR-031.
-  - See design_docs/harnesses/cursor.md Track A table.
+  - Cursor projects command-skill canonical body; no Codex agents/openai.yaml sidecar.

@@ -1,0 +1,1 @@
+当前 Cursor 账户按 **billing_period（~30d）** 算一个配额%-burn-rate（Δused%/Δtime·账户权威·`window-elapsed` = 已用% ÷ 账期已逝小时·%/h）；读 Cursor dashboard `GetCurrentPeriodUsage`，信号不可得 → `available:false`（exit 0·诚实降级·非 exit 1）。`burn_pct_per_hour` 不可算 → `null`。不要期望 5h/7d 双窗 burn-rate 字段。

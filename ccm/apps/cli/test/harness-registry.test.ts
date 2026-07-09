@@ -48,12 +48,26 @@ test('auto-detect recognizes Codex and Claude Code markers', () => {
   assert.equal(resolveHarnessId({ env: { CLAUDE_CODE_SESSION_ID: 'cc-sid' } }), 'claude-code');
 });
 
+test('auto-detect recognizes CURSOR_AGENT → cursor', () => {
+  assert.equal(resolveHarnessId({ env: { CURSOR_AGENT: '1' } }), 'cursor');
+  assert.equal(resolveHarnessId({ env: { CURSOR_CONVERSATION_ID: 'conv-1' } }), 'cursor');
+});
+
 test('Codex thread marker wins over Claude-compatible fallback and mixed local env', () => {
   assert.equal(
     resolveHarnessId({
       env: { CODEX_THREAD_ID: 'cx-thread', CLAUDE_CODE_SSE_PORT: '32445' },
     }),
     'codex',
+  );
+});
+
+test('CURSOR_AGENT wins over CLAUDE_CODE_SSE_PORT', () => {
+  assert.equal(
+    resolveHarnessId({
+      env: { CURSOR_AGENT: '1', CLAUDE_CODE_SSE_PORT: '32445' },
+    }),
+    'cursor',
   );
 });
 

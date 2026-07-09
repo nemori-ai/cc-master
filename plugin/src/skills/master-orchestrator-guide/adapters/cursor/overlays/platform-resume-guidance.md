@@ -1,0 +1,1 @@
+- **Cursor resume / compaction 的 session 行为由 Cursor host adapter 负责注入**。不要假设 Claude Code 的 resume flags；续跑时在 recon 第 0 步重新确认 worktree 与当前 board（`conversation_id` / `session_id` 作武装键）。

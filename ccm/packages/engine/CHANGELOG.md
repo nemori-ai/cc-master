@@ -1,5 +1,11 @@
 # @ccm/engine
 
+## 0.18.0
+
+### Minor Changes
+
+- 01dadc1: Add Cursor harness usage: billing_period window on UsageSignal / pacingAdvice (hold|throttle|stop_billing_period, never switch), plus cursor-dashboard GetCurrentPeriodUsage reader and harness adapter registration.
+
 ## 0.17.2
 
 ### Patch Changes

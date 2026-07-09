@@ -2,7 +2,12 @@ import type { UsageSignal } from '@ccm/engine';
 
 export type Env = Record<string, string | undefined>;
 export type HarnessId = string;
-export type UsageSignalSource = 'account' | 'codex-app-server' | 'unavailable' | string;
+export type UsageSignalSource =
+  | 'account'
+  | 'codex-app-server'
+  | 'cursor-dashboard'
+  | 'unavailable'
+  | string;
 
 export interface Capability {
   supported: boolean;

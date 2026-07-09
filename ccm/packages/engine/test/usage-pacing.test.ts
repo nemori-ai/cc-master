@@ -247,3 +247,57 @@ test('pacing: echoes window pct + effective_n always ≥ 1', () => {
   assert.equal(a.window_7d_pct, 33);
   assert.ok(a.effective_n >= 1);
 });
+
+// ── Cursor billing_period (~30d subscription; no 5h/7d; never switch) ───────────────
+test('pacing: billing_period only within warn line → hold (no 5h/7d)', () => {
+  const a = pacingAdvice(
+    {
+      billing_period: { used_percentage: 40, resets_at: NOW_SEC + 86400 * 20 },
+      five_hour: null,
+      seven_day: null,
+    },
+    { nowSec: NOW_SEC, effectiveN: 3, registry: poolTwoFresh() },
+  );
+  assert.equal(a.verdict, 'hold');
+  assert.equal(a.window_5h_pct, null);
+  assert.equal(a.window_7d_pct, null);
+  assert.equal(a.window_billing_period_pct, 40);
+  assert.equal(a.switch_candidate, null);
+  assert.equal(a.available, true);
+});
+
+test('pacing: billing_period at warn line → throttle (never switch even with pool)', () => {
+  const a = pacingAdvice(
+    { billing_period: { used_percentage: 82 }, five_hour: null, seven_day: null },
+    { nowSec: NOW_SEC, effectiveN: 3, registry: poolTwoFresh() },
+  );
+  assert.equal(a.verdict, 'throttle');
+  assert.equal(a.strength, 'strong');
+  assert.equal(a.switch_candidate, null);
+  assert.ok(!a.levers.includes('switch_account'));
+});
+
+test('pacing: billing_period critical → stop_billing_period (not stop_7d)', () => {
+  const reset = NOW_SEC + 86400 * 5;
+  const a = pacingAdvice(
+    { billing_period: { used_percentage: 90, resets_at: reset }, five_hour: null, seven_day: null },
+    { nowSec: NOW_SEC },
+  );
+  assert.equal(a.verdict, 'stop_billing_period');
+  assert.equal(a.stop_dimension, 'billing_period');
+  assert.equal(a.nearest_reset, reset);
+  assert.equal(a.switch_candidate, null);
+});
+
+test('pacing: billing_period expired resets_at → unavailable degrade', () => {
+  const a = pacingAdvice(
+    {
+      billing_period: { used_percentage: 50, resets_at: NOW_SEC - 10 },
+      five_hour: null,
+      seven_day: null,
+    },
+    { nowSec: NOW_SEC },
+  );
+  assert.equal(a.available, false);
+  assert.equal(a.verdict, 'hold');
+});

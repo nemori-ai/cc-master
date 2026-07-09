@@ -20,7 +20,7 @@ account switch is policy-gated on board.
 | --- | --- | --- | --- |
 | claude-code | implemented | statusline sidecar, account vault/keychain, plugin upgrade via claude CLI | ccm-host-coupling-audit |
 | codex | partial | `readCodexUsageSignal`; account NotImplemented; statusline unsupported | codex.ts adapter |
-| cursor | planned | **All unsupported/unavailable** until probe finds signal + plugin upgrade path | cursor.md §ccm |
+| cursor | partial | `readCursorUsageSignal` → dashboard `GetCurrentPeriodUsage` → `UsageSignal.billing_period` (~30d); account pool / statusline / autoswitch unsupported | `cursor-usage.ts` + `harnesses/cursor.ts` |
 
 ## Declared divergence
 

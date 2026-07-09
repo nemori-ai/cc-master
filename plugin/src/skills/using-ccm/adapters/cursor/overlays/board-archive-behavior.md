@@ -1,0 +1,1 @@
+经引擎**带锁**把 `owner.active` 翻 `false`（停用即休眠·全套 hook 对它休眠）；**非破坏**——`tasks`/`log`/`goal`/`git` 全留（审计留痕·文件不删）。给 Cursor adapter 的 stop / handoff / resume 流程一条**走单写者带锁管线**的归档路径，替代手编辑 board JSON 翻 active。幂等：已 `false` 再 archive 仍 `false`（无副作用）。日后可经 `ccm`/Cursor resume + board recon 复活。孤儿 / rollup 检查归调用方。

@@ -1,0 +1,13 @@
+hook: reinject
+host: cursor
+version: 1
+event: preCompact
+matcher: ""
+projection:
+  target: hooks/
+status: implemented-track-b
+notes:
+  - Track B (ADR-031): alwaysApply rule under plugin/src/rules/cursor/ is the main role substrate.
+  - preCompact core is a documented silent no-op — Cursor cannot inject agent context on preCompact (D3).
+  - Do NOT use sessionStart.additional_context for reinject (D4 staff-confirmed drop bug).
+  - Full SKILL A SessionStart reinject has no 1:1 Cursor equivalent (protocol-capability-gap).

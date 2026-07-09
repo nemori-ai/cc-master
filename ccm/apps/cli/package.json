@@ -1,6 +1,6 @@
 {
   "name": "ccm",
-  "version": "0.17.2",
+  "version": "0.18.0",
   "type": "module",
   "bin": {
     "ccm": "./bin/ccm.cjs"

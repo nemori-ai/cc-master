@@ -3,9 +3,13 @@ version: 1
 surface: commands
 native_surface: "plugin-commands-plus-beforeSubmitPrompt"
 projection:
-  required_mode: planned
+  required_mode: mixed
+  modes:
+    - host_native
+    - adapter_guidance
+  output_extension: ".md"
 notes:
-  - Phase B: command bodies not yet projected (adapters still mode: planned).
-  - Cursor plugin commands map to /name when host_native bodies exist (Phase C).
-  - Bootstrap dual channel: future host_native command + beforeSubmitPrompt hook.
-  - Do not invent slash commands until command adapter mode flips from planned → host_native.
+  - as-master-orchestrator projects host_native to plugin/dist/cursor/commands/as-master-orchestrator.md.
+  - Non-init commands stay adapter_guidance (skill-first / ccm-guided), mirroring Codex until dedicated Cursor bodies are warranted.
+  - Bootstrap dual channel: host_native command + beforeSubmitPrompt hook.
+  - Cursor plugin commands map to /name in Agent chat (no plugin: namespace).

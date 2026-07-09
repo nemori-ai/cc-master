@@ -1,6 +1,6 @@
 {
   "name": "cc-master",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Turn a Codex session into a long-horizon master orchestrator through the cc-master adapter.",
   "skills": "./skills/",
   "hooks": "./hooks/hooks.json",
@@ -14,6 +14,9 @@
     "longDescription": "cc-master provides skills and harness hooks for long-horizon orchestration.",
     "developerName": "cc-master contributors",
     "category": "Developer Tools",
-    "capabilities": ["Read", "Write"]
+    "capabilities": [
+      "Read",
+      "Write"
+    ]
   }
 }

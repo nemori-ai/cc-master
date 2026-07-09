@@ -1,0 +1,1 @@
+Cursor 下，`executor` 仍是 board 的领域字段，不是 Cursor API 名。选择它时先问：这个任务是否已经有一个真实、可续查、可停止或可验收的工作句柄？没有句柄就不要标 `in_flight`。用 **Task** 启 subagent 后才写 `executor=subagent`；用 **Shell**（可 `block_until_ms: 0`）启后台命令后记 shell id；否则用 `master-orchestrator` 记调度动作，或用 `external` 记录真实外部 run。没有被 cc-master adapter 验证成等价派发原语前，不要套用 Claude Code 的完成通知或 workflow 语义。

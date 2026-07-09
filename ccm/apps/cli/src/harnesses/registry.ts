@@ -1,9 +1,11 @@
 import { claudeCodeAdapter } from './claude-code.js';
 import { codexAdapter } from './codex.js';
+import { cursorAdapter } from './cursor.js';
 import { genericAdapter } from './generic.js';
 import type { Env, HarnessAdapter, HarnessInstallation, HarnessSelection } from './types.js';
 
-const KNOWN_ADAPTERS: readonly HarnessAdapter[] = [codexAdapter, claudeCodeAdapter];
+// Cursor after Codex, before Claude Code: CURSOR_AGENT must win over Claude-compatible fallback env.
+const KNOWN_ADAPTERS: readonly HarnessAdapter[] = [codexAdapter, cursorAdapter, claudeCodeAdapter];
 
 export function resolveHarnessAdapter(selection: HarnessSelection = {}): HarnessAdapter {
   const env = selection.env || process.env;

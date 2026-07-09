@@ -20,21 +20,21 @@ hooks:
     host_coverage:
       claude-code: implemented
       codex: implemented-stop-advisory
-      cursor: planned-stop-advisory
+      cursor: implemented-stop-advisory
   - id: identity-nudge
     stage: stop
     required: true
     host_coverage:
       claude-code: implemented
       codex: implemented-stop-system-message
-      cursor: planned
+      cursor: implemented-stop-advisory
   - id: reinject
     stage: session-start
     required: true
     host_coverage:
       claude-code: implemented
       codex: implemented
-      cursor: planned-partial
+      cursor: implemented-track-b
   - id: posttool-batch
     stage: post-tool-batch
     required: true

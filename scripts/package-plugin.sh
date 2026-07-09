@@ -13,7 +13,8 @@
 # 用法：
 #   bash scripts/package-plugin.sh --host claude-code          # tag 从 git/plugin.json 推导
 #   bash scripts/package-plugin.sh --host codex v0.10.0        # 显式指定 tag（CI 传 GITHUB_REF_NAME）
-#   bash scripts/package-plugin.sh --all-hosts v0.10.0         # 输出所有 supported host 制品
+#   bash scripts/package-plugin.sh --host cursor v0.10.0       # Cursor adapter zip
+#   bash scripts/package-plugin.sh --all-hosts v0.10.0         # 输出所有 supported host 制品（claude-code + codex + cursor）
 #   CCM_PLUGIN_OUT_DIR=dist bash ...          # 自定义产物目录（默认 dist/）
 #
 # 产物路径打到 stdout；同时在输出目录生成 SHA256SUMS，供 install.sh fail-closed 校验 release asset。
@@ -86,12 +87,12 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --host)
       HOST="${2:-}"
-      [ -n "${HOST}" ] || die "--host 需要一个值（claude-code / codex）"
+      [ -n "${HOST}" ] || die "--host 需要一个值（claude-code / codex / cursor）"
       shift 2
       ;;
     --host=*)
       HOST="${1#*=}"
-      [ -n "${HOST}" ] || die "--host 需要一个值（claude-code / codex）"
+      [ -n "${HOST}" ] || die "--host 需要一个值（claude-code / codex / cursor）"
       shift
       ;;
     --all-hosts)
@@ -141,7 +142,8 @@ package_one() {
   if [ "$host" = "claude-code" ]; then
     include_dirs=( .claude-plugin commands "${include_dirs[@]}" )
   elif [ "$host" = "cursor" ]; then
-    include_dirs=( .cursor-plugin "${include_dirs[@]}" )
+    # Track B reinject ships as alwaysApply rules/; commands are Cursor adapter stubs/bodies.
+    include_dirs=( .cursor-plugin commands rules "${include_dirs[@]}" )
   else
     include_dirs=( .codex-plugin "${include_dirs[@]}" )
   fi
@@ -163,6 +165,7 @@ package_one() {
     [ -d "${pkg}/commands" ] || die "缺 commands/"
   elif [ "$host" = "cursor" ]; then
     [ -d "${pkg}/.cursor-plugin" ] || die "缺 .cursor-plugin/"
+    [ -f "${pkg}/.cursor-plugin/plugin.json" ] || die "缺 .cursor-plugin/plugin.json"
   else
     [ -d "${pkg}/.codex-plugin" ] || die "缺 .codex-plugin/"
   fi
@@ -203,6 +206,7 @@ package_one() {
 if [ "$ALL_HOSTS" = "1" ]; then
   package_one claude-code
   package_one codex
+  package_one cursor
 else
   package_one "$HOST"
 fi
