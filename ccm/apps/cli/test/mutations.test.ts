@@ -462,8 +462,71 @@ test('generic setters and updateTask cannot overwrite dedicated planning/routing
     agent_routing_grandfathered_terminal: [],
   };
   enabled.tasks.find((task: AnyBoard) => task.id === 'T1').executor = 'subagent';
+  assert.throws(
+    () => m.applySetJson(enabled, 'meta', { template_version: 3 }),
+    (error: any) => error.errKind === 'Validation' && /dedicated/.test(error.message),
+    'an ancestor replacement must not erase meta.contracts activation',
+  );
+  assert.throws(
+    () => m.applySetJson(enabled, 'meta.contracts', {}),
+    (error: any) => error.errKind === 'Validation' && /dedicated/.test(error.message),
+  );
   assert.throws(() => m.updateTask(enabled, 'T1', { handle: 'fake' }));
   assert.throws(() => m.applySet(enabled, 'tasks[T1].handle', 'fake'));
+});
+
+test('contract executor is mutation-frozen and the subagent→user→start→subagent attack never persists', () => {
+  const enabled = baseBoard();
+  enabled.meta.contracts = {
+    task_planning: 'ccm/task-planning/v1',
+    agent_routing: 'ccm/agent-routing/v1',
+    agent_routing_activated_at: '2026-07-10T08:00:00Z',
+    agent_routing_grandfathered_terminal: [],
+  };
+  const routed = enabled.tasks.find((task: AnyBoard) => task.id === 'T1');
+  routed.executor = 'subagent';
+
+  assert.throws(
+    () => m.updateTask(enabled, 'T1', { executor: 'master-orchestrator' }),
+    (error: any) => error.errKind === 'Validation' && /executor/.test(error.message),
+    'the first disguise step is blocked once contracts are active',
+  );
+  assert.throws(
+    () => m.applySet(enabled, 'tasks[T1].executor', 'master-orchestrator'),
+    (error: any) => error.errKind === 'Validation' && /executor/.test(error.message),
+    'generic setters cannot provide a second executor mutation path',
+  );
+
+  const disguised = structuredClone(enabled);
+  disguised.tasks.find((task: AnyBoard) => task.id === 'T1').executor = 'master-orchestrator';
+  const flying = m.transition(disguised, 'T1', 'in_flight', { force: true });
+  assert.throws(
+    () => m.updateTask(flying, 'T1', { executor: 'subagent' }),
+    (error: any) => error.errKind === 'Validation' && /executor|route-bind/.test(error.message),
+    'the final reclassification step is blocked even if hostile state predates this mutation',
+  );
+  assert.throws(
+    () => m.addTask(enabled, { id: 'NEW', status: 'ready', executor: 'subagent' }),
+    (error: any) =>
+      error.errKind === 'Validation' && /executor|planning|routing/.test(error.message),
+    'new active-contract subagents must be prepared before executor assignment',
+  );
+});
+
+test('a prepared ready task may become subagent exactly once under the active contract', () => {
+  let board = baseBoard();
+  board.meta.contracts = {
+    task_planning: 'ccm/task-planning/v1',
+    agent_routing: 'ccm/agent-routing/v1',
+    agent_routing_activated_at: '2026-07-10T08:00:00Z',
+    agent_routing_grandfathered_terminal: [],
+  };
+  board.tasks.find((task: AnyBoard) => task.id === 'T1').executor = 'master-orchestrator';
+  board.tasks.find((task: AnyBoard) => task.id === 'T1').estimate = { value: 1, unit: 'h' };
+  board = m.setTaskPlanning(board, 'T1', routedPlanning());
+  board = m.setTaskRoutingPolicy(board, 'T1', routedPolicy());
+  const next = m.updateTask(board, 'T1', { executor: 'subagent' });
+  assert.equal(next.tasks.find((task: AnyBoard) => task.id === 'T1').executor, 'subagent');
 });
 
 test('enableRoutingContracts grandfathers exact historical terminal fingerprints; retry loses exemption', () => {

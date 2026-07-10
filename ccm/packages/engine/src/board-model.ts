@@ -419,9 +419,10 @@ export const FIELDS = {
       type: 'enum:executor',
       default: '缺省',
       readers: 'viewer / 派发 / CLI',
-      writers: 'agent 经 CLI',
-      when: '派发前',
-      degrade: '非法值→hard(FMT-EXECUTOR);subagent/workflow 缺 handle→warn(BIZ-EXECUTOR-HANDLE)',
+      writers: 'agent 经 CLI；routing contract 下走 executor mutation gate',
+      when: '派发前；contract prepared 后一次性定为 subagent，in-flight 冻结',
+      degrade:
+        '非法值→hard(FMT-EXECUTOR);subagent/workflow 缺 handle→warn(BIZ-EXECUTOR-HANDLE);contract 绕闸→mutation fail-closed',
     },
     type: {
       tier: '✎',

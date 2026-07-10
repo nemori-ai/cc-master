@@ -219,6 +219,65 @@ export function boardStampHarness(board: Board, args?: { harnessId?: string | nu
   return touch(b);
 }
 
+function hasRoutingContractState(task: Task): boolean {
+  return task.planning !== undefined || task.routing !== undefined;
+}
+
+function routedPreparationIssues(task: Task): Array<{ path: string; message: string }> {
+  const issues = [...validateTaskPlanning(task.planning), ...validateTaskRoutePolicy(task)];
+  if (
+    !task.estimate ||
+    typeof task.estimate !== 'object' ||
+    Array.isArray(task.estimate) ||
+    typeof task.estimate.value !== 'number' ||
+    task.estimate.value <= 0 ||
+    typeof task.estimate.unit !== 'string' ||
+    task.estimate.unit === ''
+  ) {
+    issues.push({
+      code: 'ROUTED-TASK-ESTIMATE',
+      path: 'estimate',
+      message: 'must be a positive {value:number,unit:string}',
+    });
+  }
+  return issues;
+}
+
+function assertExecutorMutation(board: Board, task: Task, nextExecutor: unknown): void {
+  if (nextExecutor === undefined || nextExecutor === task.executor) return;
+  const enabled = contractActivation(board) === 'enabled';
+  const routedState = hasRoutingContractState(task);
+
+  if (task.status === 'in_flight' && (enabled || routedState || nextExecutor === 'subagent')) {
+    throw err(
+      'refused: executor is frozen while a contract-related task is in_flight; finish/reconcile the attempt instead of reclassifying it',
+      'Validation',
+    );
+  }
+  if (task.executor === 'subagent' && (enabled || routedState)) {
+    throw err(
+      'refused: executor is frozen after a subagent enters the active/staged routing contract',
+      'Validation',
+    );
+  }
+  if (routedState && nextExecutor !== 'subagent') {
+    throw err(
+      'refused: a task with planning/routing contract state may only complete its one-way executor assignment to subagent',
+      'Validation',
+    );
+  }
+  if (nextExecutor === 'subagent' && (enabled || routedState)) {
+    const candidate = { ...task, executor: 'subagent' };
+    const issues = routedPreparationIssues(candidate);
+    if (issues.length) {
+      throw err(
+        `refused: executor=subagent requires complete planning/routing/estimate before assignment: ${issues.map((entry) => `${entry.path}: ${entry.message}`).join('; ')}`,
+        'Validation',
+      );
+    }
+  }
+}
+
 // ── addTask(board, fields) → 建 task。fields 已由 router 从 registry 映射好（字段名对齐 FIELDS.task）。
 //   必填语义：id（router 校验非空）。status 缺省 'ready'、deps 缺省 []、created_at 盖戳。其余 ✎ 字段
 //   只在 fields 显式给出时写入（silent-on-unknown：不臆造默认）。
@@ -242,6 +301,11 @@ export function addTask(board: Board, fields?: Record<string, any>): Board {
       'Validation',
     );
   }
+  assertExecutorMutation(
+    b,
+    { status: fields.status !== undefined ? fields.status : 'ready' },
+    fields.executor,
+  );
   const task: Task = {
     id: fields.id,
     status: fields.status !== undefined ? fields.status : 'ready',
@@ -304,6 +368,7 @@ export function updateTask(board: Board, id: string, fields?: Record<string, any
       'Validation',
     );
   }
+  assertExecutorMutation(b, t, fields.executor);
   // 增删 deps（去重）。
   if (Array.isArray(fields.addDep)) {
     if (!Array.isArray(t.deps)) t.deps = [];
@@ -805,6 +870,9 @@ export function applySet(board: Board, dotpath: string, value: unknown, opts?: S
   assertFlexible(b, parsed);
   if (parsed.scope === 'task') {
     const t = requireTask(b, parsed.taskId as string);
+    if (parsed.segs.length === 1 && parsed.segs[0] === 'executor') {
+      assertExecutorMutation(b, t, value);
+    }
     setDeep(t, parsed.segs, value);
   } else {
     setDeep(b, parsed.segs, value);

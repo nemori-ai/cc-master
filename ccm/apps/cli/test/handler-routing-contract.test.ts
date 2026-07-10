@@ -264,4 +264,24 @@ test('force and generic setters cannot bypass route-bind or dedicated writer pol
       ),
     (error: any) => error.errKind === 'Validation' && /dedicated/.test(error.message),
   );
+
+  const before = readFileSync(path, 'utf8');
+  assert.throws(
+    () =>
+      boardHandler.update(
+        ctx(path, [], { 'set-json': ['meta={"template_version":3}'] }, { force: true }),
+      ),
+    (error: any) => error.errKind === 'Validation' && /dedicated/.test(error.message),
+  );
+  assert.throws(
+    () =>
+      boardHandler.update(ctx(path, [], { 'set-json': ['meta.contracts={}'] }, { force: true })),
+    (error: any) => error.errKind === 'Validation' && /dedicated/.test(error.message),
+  );
+  assert.throws(
+    () =>
+      taskHandler.update(ctx(path, ['T1'], { executor: 'master-orchestrator' }, { force: true })),
+    (error: any) => error.errKind === 'Validation' && /executor/.test(error.message),
+  );
+  assert.equal(readFileSync(path, 'utf8'), before, '--force attacks leave board bytes unchanged');
 });

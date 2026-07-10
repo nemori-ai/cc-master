@@ -158,7 +158,7 @@ Selection must contain:
 - `candidate_id` present in its declared `chain` (`ample` or `tight`);
 - strict UTC `selected_at`;
 - evidence with strict UTC `observed_at` and `valid_until`, where `observed_at <= selected_at <= valid_until`;
-- one `qualification_results[]` entry for every candidate `requires[]` predicate, all with `status: "pass"`;
+- exactly one `qualification_results[]` entry for every candidate `requires[]` predicate, all with `status: "pass"`; duplicate, contradictory, malformed, or undeclared predicate rows are forbidden;
 - non-empty `reason_codes[]`; optional rationale and snapshot/revision refs.
 
 The attempt input must contain a unique `id`, matching `candidate_id`, `state: "running"`, a strict UTC `started_at`, and a non-empty `handle` claim. Its requested model/effort, when supplied, must match the candidate. The dedicated writer copies the entire selection—including qualification evidence, chain, reason codes, and rationale—into immutable `attempt.selection_snapshot`. The bind atomically:
@@ -171,6 +171,8 @@ The attempt input must contain a unique `id`, matching `candidate_id`, `state: "
 For legacy migration only, an already-`in_flight` task may be bound without changing its status; it must still pass the same planning/routing/selection/attempt checks. Updating `routing.selected` later never changes an earlier attempt snapshot, so fallback cannot erase the audit reason for a prior attempt.
 
 No generic setter, `task update`, `task start`, `task set-status`, `task add --status in_flight`, or `--force` may create this state. `--force` may bypass ordinary lint/transition policy, but never the routed-start mutation gate. Until a trusted attestation producer lands, this is called the **handle-claim gate**, not the real-handle gate.
+
+Executor reclassification cannot be used as a side door. On an enabled board, assigning `executor=subagent` requires complete planning/routing/positive-estimate preparation before the mutation; once an enabled or staged routed task is a subagent, executor is frozen. Any executor change while a contract-related task is `in_flight` is rejected. Thus `subagent -> user -> start --force -> subagent` fails at both reclassification boundaries and never persists an unbound routed flight.
 
 ## 6. Conditional invariants
 
@@ -190,12 +192,13 @@ The engine exposes writer policy independently from field tier:
 
 | Path | Policy |
 | --- | --- |
-| `board.meta.contracts` | dedicated |
+| `board.meta` whole-object replacement and `board.meta.contracts...` | dedicated |
 | `task.planning` | dedicated |
 | `task.routing` / `task.routing.policy` / `task.routing.selected` | dedicated |
 | `task.routing.attempts` | append-only |
+| `task.executor` on an enabled board | dedicated mutation gate |
 
-The generic `--set` and `--set-json` paths reject these roots before write/lint and cannot be restored by `--force`. Board lint remains a backstop for externally corrupted JSON, not the authority for constructing valid routed state.
+The generic `--set` and `--set-json` paths reject these roots and ancestor replacements before write/lint and cannot be restored by `--force`. Dedicated task update also enforces executor preparation/freeze rules at mutation time. Board lint remains a backstop for externally corrupted JSON, not the authority for constructing valid routed state.
 
 ## 8. Failure and rollback
 

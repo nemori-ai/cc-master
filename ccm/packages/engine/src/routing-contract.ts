@@ -129,8 +129,8 @@ export function contractWritePolicy(
   segments: string[],
   opts: { contractEnabled?: boolean } = {},
 ): ContractWritePolicy {
-  if (scope === 'board' && segments[0] === 'meta' && segments[1] === 'contracts') {
-    return 'dedicated';
+  if (scope === 'board' && segments[0] === 'meta') {
+    if (segments.length === 1 || segments[1] === 'contracts') return 'dedicated';
   }
   if (scope === 'task') {
     if (segments[0] === 'planning') return 'dedicated';
@@ -138,6 +138,7 @@ export function contractWritePolicy(
       return segments[1] === 'attempts' ? 'append-only' : 'dedicated';
     }
     if (segments[0] === 'handle' && opts.contractEnabled) return 'dedicated';
+    if (segments[0] === 'executor' && opts.contractEnabled) return 'dedicated';
   }
   return 'generic';
 }
@@ -706,16 +707,42 @@ function validateSelection(routing: RecordLike): ContractIssue[] {
         ),
       );
     } else if (candidate && stringArray(candidate.requires)) {
-      for (const predicate of candidate.requires) {
-        const result = evidence.qualification_results.find(
-          (entry: unknown) => record(entry) && entry.predicate === predicate,
-        );
-        if (!result || result.status !== 'pass') {
+      const required = candidate.requires;
+      const counts = new Map<string, number>();
+      evidence.qualification_results.forEach((entry: unknown, index: number) => {
+        const path = `routing.selected.evidence.qualification_results[${index}]`;
+        if (!record(entry) || !nonEmpty(entry.predicate)) {
+          out.push(issue('ROUTING-EVIDENCE', path, 'must name a non-empty predicate'));
+          return;
+        }
+        counts.set(entry.predicate, (counts.get(entry.predicate) ?? 0) + 1);
+        if (!required.includes(entry.predicate)) {
           out.push(
             issue(
               'ROUTING-EVIDENCE',
               'routing.selected.evidence.qualification_results',
-              `predicate ${predicate} must have status pass`,
+              `predicate ${entry.predicate} is not declared by the selected candidate`,
+            ),
+          );
+        }
+        if (entry.status !== 'pass') {
+          out.push(
+            issue(
+              'ROUTING-EVIDENCE',
+              'routing.selected.evidence.qualification_results',
+              `predicate ${entry.predicate} must have status pass`,
+            ),
+          );
+        }
+      });
+      for (const predicate of required) {
+        const count = counts.get(predicate) ?? 0;
+        if (count !== 1) {
+          out.push(
+            issue(
+              'ROUTING-EVIDENCE',
+              'routing.selected.evidence.qualification_results',
+              `predicate ${predicate} must occur exactly once with status pass; found ${count}`,
             ),
           );
         }

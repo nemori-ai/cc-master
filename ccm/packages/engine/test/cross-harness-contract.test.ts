@@ -234,6 +234,24 @@ test('candidate eligibility is a set contract, not independent field presence', 
   assert.ok(messages.some((x) => x.includes('account_mutation')));
 });
 
+test('qualification evidence is an exact required-predicate set with one pass per predicate', () => {
+  const source = fixture('same-harness-cli').task;
+  for (const injected of [
+    { predicate: 'runtime-healthy', status: 'pass', ref: 'duplicate://pass' },
+    { predicate: 'runtime-healthy', status: 'fail', ref: 'contradiction://fail' },
+    { predicate: 'undeclared-provider-claim', status: 'pass', ref: 'unknown://claim' },
+  ]) {
+    const broken = structuredClone(source);
+    broken.routing.selected.evidence.qualification_results.push(injected);
+    broken.routing.attempts[0].selection_snapshot = structuredClone(broken.routing.selected);
+    const issues = validateRoutedTaskForInFlight(broken);
+    assert.ok(
+      issues.some((entry) => entry.path === 'routing.selected.evidence.qualification_results'),
+      `must reject ${injected.predicate}:${injected.status}`,
+    );
+  }
+});
+
 test('attempt freezes selection evidence/rationale so selected projection cannot erase audit history', () => {
   const f = fixture('other-harness-cli');
   assert.deepEqual(validateRoutedTaskForInFlight(f.task), []);
