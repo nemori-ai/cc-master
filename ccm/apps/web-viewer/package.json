@@ -13,6 +13,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^1.1.8",
+    "@fontsource/archivo": "^5.2.8",
+    "@fontsource/martian-mono": "^5.2.7",
+    "@xyflow/react": "^12.10.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },

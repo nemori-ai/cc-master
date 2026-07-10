@@ -1,104 +1,199 @@
-import type { BoardsPayload, ViewModelPayload, WorkspaceData } from '../types';
-import { shortTime } from '../format';
+import { normalizeStatus, shortTime } from '../format';
+import type { ViewModelPayload, WorkspaceData } from '../types';
+
+export type ViewMode = 'graph' | 'board' | 'list' | 'timeline';
 
 interface TopBarProps {
-  boards: BoardsPayload;
   viewModel: ViewModelPayload;
   source: WorkspaceData['source'];
   currentBoardFilename?: string;
   query: string;
   feedback: string | null;
   shareFallbackUrl: string | null;
+  view: ViewMode;
+  theme: 'dark' | 'light';
+  onViewChange: (view: ViewMode) => void;
+  onToggleTheme: () => void;
   onQueryChange: (query: string) => void;
   onReset: () => void;
-  onSelectBoard: (boardFilename: string) => void;
   onShare: () => void;
   onExport: () => void;
+  searchRef?: React.RefObject<HTMLInputElement | null>;
 }
 
-function boardLabel(goal: string | undefined): string {
-  const trimmed = (goal ?? '').trim();
-  if (!trimmed) return '(untitled board)';
-  return trimmed.length > 20 ? `${trimmed.slice(0, 20)}...` : trimmed;
-}
+const VIEWS: Array<{ id: ViewMode; glyph: string; title: string }> = [
+  { id: 'graph', glyph: '⬡', title: 'graph view — the dependency DAG' },
+  { id: 'board', glyph: '▦', title: 'board view — the Kanban card board' },
+  { id: 'list', glyph: '☰', title: 'list view — the status-board' },
+  { id: 'timeline', glyph: '▤', title: 'timeline view — the time / gantt swimlanes' }
+];
 
+/**
+ * The header instrument rail: identity nameplate + mission line + telemetry readouts
+ * (view toggle / theme toggle / progress meter / board readout / branch / freshness /
+ * the ONE alarm) fused with search and Share/Export/Reset actions. Board SWITCHING
+ * lives solely in the left rail's boards list — up here the board is a readout, not
+ * a control.
+ */
 export function TopBar({
-  boards,
   viewModel,
   source,
   currentBoardFilename,
   query,
   feedback,
   shareFallbackUrl,
+  view,
+  theme,
+  onViewChange,
+  onToggleTheme,
   onQueryChange,
   onReset,
-  onSelectBoard,
   onShare,
-  onExport
+  onExport,
+  searchRef
 }: TopBarProps) {
-  const selectedBoard =
-    boards.boards.find((board) => board.filename === currentBoardFilename) ??
-    boards.boards.find((board) => board.id === viewModel.board.id) ??
-    boards.boards[0];
   const freshness = viewModel.freshness.state;
+  const boardFilename = viewModel.board.filename || currentBoardFilename || '';
+  const boardReadout = boardFilename.replace(/\.board\.json$/, '') || '—';
+
+  const total = viewModel.graph.nodes.length;
+  const done = viewModel.graph.nodes.filter((node) => {
+    const status = normalizeStatus(String(node.status ?? ''));
+    return status === 'done' || status === 'verified';
+  }).length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const branch = viewModel.board.git?.branch || null;
+  const userGates =
+    viewModel.insights?.awaiting?.count ?? viewModel.summary?.awaitingUserCount ?? 0;
 
   return (
-    <header className="topbar">
-      <div className="brand" aria-label="ccm web-viewer">
-        <span className="brand-mark">ccm</span>
-        <span>web-viewer</span>
+    <header className="bar topbar">
+      <div className="ident">
+        <span className="beacon" />
+        <div className="mark-wrap">
+          <span className="mark">cc-master</span>
+          <span className="sub">mission control</span>
+        </div>
       </div>
-      <div className="local-state" aria-label="service scope">
-        <span aria-hidden="true">lock</span>
-        <span>Local only / Read-only</span>
-      </div>
-      <label className="board-select">
-        <span>Board</span>
-        <select
-          value={selectedBoard?.filename ?? ''}
-          aria-label="Board"
-          onChange={(event) => onSelectBoard(event.target.value)}
-        >
-          {boards.boards.map((board) => (
-            <option key={board.filename} value={board.filename}>
-              {boardLabel(board.goal)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="search-box">
-        <span className="search-icon" aria-hidden="true">
-          search
+
+      <div className="goalwrap">
+        <span className="label">objective</span>
+        <span className="goal" title={viewModel.board.goal}>
+          {viewModel.board.goal || 'no goal set'}
         </span>
-        <input
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Search tasks by id, name, tags..."
-          type="search"
-        />
-        <kbd>/</kbd>
-      </label>
-      <div className="freshness" data-state={freshness}>
-        <span>Data freshness</span>
-        <strong>{shortTime(viewModel.freshness.last_read_at)}</strong>
-        <i aria-hidden="true" />
       </div>
-      <div className="top-actions">
-        <button type="button" aria-label="Share workspace URL" onClick={onShare}>
-          Share
+
+      <div className="readouts">
+        <label className="search-box">
+          <input
+            aria-label="Search tasks"
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder="search id · title · tags"
+            ref={searchRef}
+            type="search"
+            value={query}
+          />
+          <kbd>/</kbd>
+        </label>
+
+        <div aria-label="view mode" className="viewtoggle" role="group">
+          {VIEWS.map((entry) => (
+            <button
+              aria-pressed={view === entry.id}
+              className={view === entry.id ? 'on' : ''}
+              key={entry.id}
+              onClick={() => onViewChange(entry.id)}
+              title={entry.title}
+              type="button"
+            >
+              <span className="tg">{entry.glyph}</span>
+              {entry.id}
+            </button>
+          ))}
+        </div>
+
+        <button
+          aria-label={theme === 'light' ? 'switch to night (dark) theme' : 'switch to day (light) theme'}
+          aria-pressed={theme === 'light'}
+          className="themetoggle"
+          onClick={onToggleTheme}
+          title={theme === 'light' ? 'night theme' : 'day theme'}
+          type="button"
+        >
+          <span aria-hidden="true" className="glyph">
+            {theme === 'light' ? '☾' : '☀'}
+          </span>
         </button>
-        <button type="button" aria-label="Export JSON snapshot" onClick={onExport}>
-          Export
-        </button>
-        <button type="button" onClick={onReset}>
-          Reset Layout
-        </button>
+
+        <div className="vrule" />
+
+        <div className="readout">
+          <span className="rl">progress</span>
+          <span className="rv">
+            {done}
+            <span className="unit">/{total}</span>
+            <span className="unit"> {pct}%</span>
+          </span>
+          <div className="meter">
+            <i style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+
+        <div className="vrule" />
+        <div
+          className="readout board-readout"
+          title={`${viewModel.board.goal || '(untitled board)'} · ${boardFilename}`}
+        >
+          <span className="rl">board</span>
+          <span className="rv">{boardReadout}</span>
+        </div>
+
+        {branch ? (
+          <>
+            <div className="vrule" />
+            <div className="readout branch">
+              <span className="rl">branch</span>
+              <span className="rv">{branch}</span>
+            </div>
+          </>
+        ) : null}
+
+        <div className="vrule" />
+        <div className="readout freshness" data-state={freshness}>
+          <span className="rl">freshness</span>
+          <span className="rv">
+            <i aria-hidden="true" className="fdot" /> {shortTime(viewModel.freshness.last_read_at)}
+          </span>
+        </div>
+
+        {userGates > 0 ? (
+          <div className="alarm">
+            <span className="dot" />
+            <span className="n">{userGates}</span>
+            awaiting you
+          </div>
+        ) : null}
+
+        <div className="top-actions">
+          <button aria-label="Share workspace URL" onClick={onShare} type="button">
+            Share
+          </button>
+          <button aria-label="Export JSON snapshot" onClick={onExport} type="button">
+            Export
+          </button>
+          <button onClick={onReset} type="button">
+            Reset
+          </button>
+        </div>
       </div>
+
       {source === 'fixture' ? <div className="fixture-chip">Fixture fallback</div> : null}
       {feedback ? (
         <div className="top-feedback" role="status">
           <span>{feedback}</span>
-          {shareFallbackUrl ? <input readOnly aria-label="Workspace URL" value={shareFallbackUrl} /> : null}
+          {shareFallbackUrl ? (
+            <input aria-label="Workspace URL" readOnly value={shareFallbackUrl} />
+          ) : null}
         </div>
       ) : null}
     </header>

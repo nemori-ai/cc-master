@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { taskFilterOptions, type TaskFilterGroup } from '../taskFilters';
+import { fmtElapsed, normalizeStatus, statusText } from '../format';
+import { type TaskFilterGroup, taskFilterOptions } from '../taskFilters';
 import type { BoardSummary, BoardsPayload, ViewModelPayload } from '../types';
 
 type BoardStateFilter = 'all' | 'active' | 'archived';
@@ -25,16 +26,17 @@ function boardState(board: BoardSummary): Exclude<BoardStateFilter, 'all'> {
   return board.active === true ? 'active' : 'archived';
 }
 
-function boardMatchesState(board: BoardSummary, filter: BoardStateFilter): boolean {
-  return filter === 'all' || boardState(board) === filter;
-}
-
 const filterGroups: Array<{ id: TaskFilterGroup; label: string }> = [
   { id: 'status', label: 'Status' },
   { id: 'executor', label: 'Executor' },
   { id: 'type', label: 'Type' }
 ];
 
+/**
+ * The left analysis rail: the derived-telemetry readout column (seven insights, all
+ * clickable to jump-select) followed by the boards list, filter chips, and the ordered
+ * critical-path list.
+ */
 export function LeftRail({
   boards,
   viewModel,
@@ -48,24 +50,159 @@ export function LeftRail({
   const [boardStateFilter, setBoardStateFilter] = useState<BoardStateFilter>('all');
   const nodesById = new Map(viewModel.graph.nodes.map((node) => [node.id, node]));
   const criticalPath = viewModel.graph.critical_path ?? [];
-  const visibleBoards = boards.boards.filter((board) => boardMatchesState(board, boardStateFilter));
-  const taskFilterCount = activeFilters.size;
+  const insights = viewModel.insights ?? {};
+  const visibleBoards = boards.boards.filter(
+    (board) => boardStateFilter === 'all' || boardState(board) === boardStateFilter
+  );
   const boardCounts = {
     all: boards.boards.length,
     active: boards.boards.filter((board) => boardState(board) === 'active').length,
     archived: boards.boards.filter((board) => boardState(board) === 'archived').length
   } satisfies Record<BoardStateFilter, number>;
 
+  const idTitle = (id: string | null | undefined): string => {
+    if (!id) return '';
+    const node = nodesById.get(id);
+    const title = (node?.title ?? '').trim();
+    return title || id;
+  };
+
+  const total = viewModel.graph.nodes.length;
+  const done = viewModel.graph.nodes.filter((node) => {
+    const status = normalizeStatus(String(node.status ?? ''));
+    return status === 'done' || status === 'verified';
+  }).length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+
+  const impact = insights.impact ?? { id: null, count: 0 };
+  const convergence = insights.convergence ?? { id: null, in_deg: 0 };
+  const bottleneck = insights.bottleneck ?? null;
+  const wip = insights.wip ?? { count: 0, limit: null, over: false };
+  const awaiting = insights.awaiting ?? { count: 0, oldest_gate_elapsed_ms: null };
+  const makespan = viewModel.summary?.criticalPath?.makespan ?? null;
+  const oldestGate = fmtElapsed(awaiting.oldest_gate_elapsed_ms);
+  const age = fmtElapsed(insights.age_ms ?? null);
+
+  const pill = (id: string) => (
+    <button className="pill-id" onClick={() => onSelectTask(id)} title={idTitle(id)} type="button">
+      {id}
+    </button>
+  );
+
   return (
-    <aside className="left-rail" aria-label="Boards, filters, and critical path">
+    <aside aria-label="Analysis, boards, filters, and critical path" id="insights">
+      <div className="ihead">analysis · {total} tasks</div>
+
+      <div className="metric">
+        <div className="ml">
+          <span className="ic">⟋</span>critical path
+        </div>
+        <div className="mv mono">
+          {criticalPath.length ? `length ${criticalPath.length}` : '—'}
+        </div>
+        <div className="msub">
+          {makespan != null
+            ? `makespan ${fmtElapsed(makespan) ?? makespan} · longest dependency chain`
+            : 'longest dependency chain'}
+        </div>
+      </div>
+
+      <div className="metric">
+        <div className="ml">
+          <span className="ic">◈</span>highest impact
+        </div>
+        {impact.id && impact.count > 0 ? (
+          <div className="mv">
+            {pill(impact.id)} {idTitle(impact.id)}
+          </div>
+        ) : (
+          <div className="mv dim">no node gates others</div>
+        )}
+        {impact.count > 0 ? <div className="msub">gates {impact.count} downstream tasks</div> : null}
+      </div>
+
+      <div className="metric">
+        <div className="ml">
+          <span className="ic">⋈</span>top convergence
+        </div>
+        {convergence.id ? (
+          <div className="mv">
+            {pill(convergence.id)} {idTitle(convergence.id)}
+          </div>
+        ) : (
+          <div className="mv dim">no multi-dep join</div>
+        )}
+        {convergence.id ? (
+          <div className="msub">{convergence.in_deg} dependencies aggregate here</div>
+        ) : null}
+      </div>
+
+      <div className="metric flag">
+        <div className="ml">
+          <span className="ic">⚠</span>bottleneck
+        </div>
+        {bottleneck?.id ? (
+          <div className="mv">
+            {pill(bottleneck.id)} {idTitle(bottleneck.id)}
+          </div>
+        ) : (
+          <div className="mv dim">none — nothing stalling</div>
+        )}
+        {bottleneck?.id ? (
+          <div className="msub">
+            {statusText(bottleneck.status)}
+            {bottleneck.impact > 0 ? ` · gates ${bottleneck.impact}` : ''}
+            {fmtElapsed(bottleneck.elapsed_ms ?? null) != null
+              ? ` · ${fmtElapsed(bottleneck.elapsed_ms ?? null)}`
+              : ''}
+          </div>
+        ) : null}
+      </div>
+
+      <div className={`metric${wip.over ? ' warnwip' : ''}`}>
+        <div className="ml">
+          <span className="ic">≡</span>work in flight
+        </div>
+        <div className="mv mono">
+          {wip.count}
+          {wip.limit != null ? ` / ${wip.limit}` : ''}
+          {wip.over ? '  ⚠ over' : ''}
+        </div>
+        <div className="msub">
+          {wip.limit != null ? 'in_flight vs wip_limit' : 'in_flight (no wip_limit set)'}
+        </div>
+      </div>
+
+      <div className={`metric${awaiting.count ? ' flag' : ''}`}>
+        <div className="ml">
+          <span className="ic">◴</span>awaiting user
+        </div>
+        <div className="mv mono">{String(awaiting.count)}</div>
+        <div className="msub">
+          {awaiting.count && oldestGate != null
+            ? `oldest gate ${oldestGate} waiting`
+            : 'human decisions pending'}
+        </div>
+      </div>
+
+      <div className="metric">
+        <div className="ml">
+          <span className="ic">◷</span>orchestration age
+        </div>
+        <div className="mv mono">{age ?? '—'}</div>
+        <div className="msub">
+          {done}/{total} done · {pct}%
+        </div>
+      </div>
+
       <section className="rail-section">
         <div className="rail-heading">
-          <h2>Boards</h2>
+          <h2>boards</h2>
           <span>
             {visibleBoards.length}/{boards.boards.length}
           </span>
         </div>
-        <div className="board-state-tabs" aria-label="Board state filter">
+        <div aria-label="Board state filter" className="board-state-tabs">
           {(['all', 'active', 'archived'] satisfies BoardStateFilter[]).map((filter) => (
             <button
               aria-pressed={boardStateFilter === filter}
@@ -95,14 +232,16 @@ export function LeftRail({
               </small>
             </button>
           ))}
-          {visibleBoards.length === 0 ? <p className="rail-empty">No {boardStateFilter} boards</p> : null}
+          {visibleBoards.length === 0 ? (
+            <p className="rail-empty">No {boardStateFilter} boards</p>
+          ) : null}
         </div>
       </section>
 
       <section className="rail-section">
         <div className="rail-heading">
-          <h2>Filters ({taskFilterCount})</h2>
-          <button type="button" onClick={onClearFilters}>
+          <h2>filters ({activeFilters.size})</h2>
+          <button onClick={onClearFilters} type="button">
             Clear
           </button>
         </div>
@@ -110,7 +249,7 @@ export function LeftRail({
           <div className="filter-group-heading">
             <span>Path</span>
           </div>
-          <div className="filter-chips" aria-label="Critical path filter">
+          <div aria-label="Critical path filter" className="filter-chips">
             <button
               className="filter-chip"
               data-active={activeFilters.has('critical')}
@@ -131,7 +270,7 @@ export function LeftRail({
                 <span>{group.label}</span>
                 <small>{options.length}</small>
               </div>
-              <div className="filter-chips" aria-label={`${group.label} task filters`}>
+              <div aria-label={`${group.label} task filters`} className="filter-chips">
                 {options.map((option) => (
                   <button
                     className="filter-chip"
@@ -153,7 +292,7 @@ export function LeftRail({
 
       <section className="rail-section critical-section">
         <div className="rail-heading">
-          <h2>Critical Path</h2>
+          <h2>critical path</h2>
           <span>{criticalPath.length}</span>
         </div>
         <ol className="critical-list">

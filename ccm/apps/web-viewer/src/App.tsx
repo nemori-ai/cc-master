@@ -1,11 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { loadTaskDetail, loadWorkspace } from './api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { loadDecisions, loadPeers, loadTaskDetail, loadWorkspace } from './api';
+import { fixturePeers } from './fixtures';
+import { BoardView } from './components/BoardView';
 import { DagWorkspace } from './components/DagWorkspace';
 import { InspectorRail } from './components/InspectorRail';
 import { LeftRail } from './components/LeftRail';
-import { TopBar } from './components/TopBar';
+import { ListView } from './components/ListView';
+import { TimelineView } from './components/TimelineView';
+import { TopBar, type ViewMode } from './components/TopBar';
 import type { GraphOrientation } from './graphLayout';
-import type { TaskDetailPayload, WorkspaceData } from './types';
+import type { DecisionEntry, PeersPayload, TaskDetailPayload, WorkspaceData } from './types';
+
+const VIEW_KEY = 'ccm-view';
+const THEME_KEY = 'ccm-theme';
 
 function boardFromUrl(): string | undefined {
   if (typeof window === 'undefined') {
@@ -25,6 +32,32 @@ function setBoardInUrl(boardFilename: string | undefined): void {
     url.searchParams.delete('board');
   }
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function initialView(): ViewMode {
+  try {
+    const value = localStorage.getItem(VIEW_KEY);
+    return value === 'list' || value === 'board' || value === 'timeline' || value === 'graph'
+      ? value
+      : 'graph';
+  } catch {
+    return 'graph';
+  }
+}
+
+function initialTheme(): 'dark' | 'light' {
+  try {
+    const stored = localStorage.getItem(THEME_KEY);
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch {
+    /* storage unavailable */
+  }
+  try {
+    if (window.matchMedia?.('(prefers-color-scheme: light)').matches) return 'light';
+  } catch {
+    /* matchMedia unavailable */
+  }
+  return 'dark';
 }
 
 function taskErrorPayload(taskId: string, message: string): TaskDetailPayload {
@@ -63,21 +96,47 @@ function useMediaQuery(query: string): boolean {
 export function App() {
   const [workspace, setWorkspace] = useState<WorkspaceData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedBoardFilename, setSelectedBoardFilename] = useState<string | undefined>(() => boardFromUrl());
+  const [selectedBoardFilename, setSelectedBoardFilename] = useState<string | undefined>(() =>
+    boardFromUrl()
+  );
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<TaskDetailPayload | null>(null);
   const [taskLoading, setTaskLoading] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<Set<string>>(() => new Set(['critical']));
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(() => new Set());
   const [query, setQuery] = useState('');
-  const [zoom, setZoom] = useState(1);
+  const [view, setView] = useState<ViewMode>(() => initialView());
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => initialTheme());
+  const [decisions, setDecisions] = useState<DecisionEntry[]>([]);
+  const [peers, setPeers] = useState<PeersPayload | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [layoutResetKey, setLayoutResetKey] = useState(0);
+  const [boardSwitching, setBoardSwitching] = useState(false);
   const [topNotice, setTopNotice] = useState<string | null>(null);
   const [shareFallbackUrl, setShareFallbackUrl] = useState<string | null>(null);
   const workspaceRef = useRef<WorkspaceData | null>(null);
   const selectedTaskIdRef = useRef<string | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
   const isLandscapeTrace = useMediaQuery('(max-width: 900px) and (orientation: landscape)');
   const orientation: GraphOrientation = isLandscapeTrace ? 'horizontal' : 'vertical';
+
+  // Theme attribute lives on the document root so the CSS [data-theme] token sets flip.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      /* storage unavailable */
+    }
+  }, [theme]);
+
+  const setViewPersist = useCallback((value: ViewMode) => {
+    setView(value);
+    try {
+      localStorage.setItem(VIEW_KEY, value);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
 
   useEffect(() => {
     workspaceRef.current = workspace;
@@ -96,20 +155,57 @@ export function App() {
 
   useEffect(() => {
     const controller = new AbortController();
-    const backgroundRefresh = refreshNonce > 0 && workspaceRef.current !== null;
-    if (!backgroundRefresh) {
+    // The loading splash only ever gates the FIRST frame. Any later fetch (background
+    // poll or a board switch) keeps the current frame mounted — the shell must never
+    // unmount/remount on a switch (that reads as a full-page refresh).
+    const hasFrame = workspaceRef.current !== null;
+    if (!hasFrame) {
       setLoading(true);
     }
-    loadWorkspace(selectedBoardFilename, controller.signal, selectedTaskIdRef.current)
+    loadWorkspace(
+      selectedBoardFilename,
+      controller.signal,
+      selectedTaskIdRef.current,
+      workspaceRef.current
+    )
       .then((data) => {
-        const preferredTaskId = selectedTaskIdRef.current;
+        const previous = workspaceRef.current;
+        // rev.boardHash short-circuit: identical board bytes on a background poll -> skip
+        // the whole setState cascade (no re-render churn on an idle board). Never short-
+        // circuit across a client-stale (last-known-good) frame — the stale banner has to
+        // appear when the board tears and clear when it recovers, same hash or not.
+        if (
+          hasFrame &&
+          previous &&
+          previous.source === data.source &&
+          !previous.clientStale &&
+          !data.clientStale &&
+          previous.viewModel.rev?.boardHash &&
+          previous.viewModel.rev.boardHash === data.viewModel.rev?.boardHash &&
+          previous.viewModel.board.filename === data.viewModel.board.filename
+        ) {
+          return;
+        }
+        // Board switch lands here with the OLD frame still on screen (last-known-good):
+        // swap data + selection in one batch, drop the old board's sidecar rows, and
+        // re-fit the layout for the new topology.
+        const boardChanged =
+          previous !== null &&
+          previous.viewModel.board.filename !== data.viewModel.board.filename;
+        const preferredTaskId = boardChanged ? null : selectedTaskIdRef.current;
         const nextSelectedTaskId =
           preferredTaskId && data.viewModel.graph.nodes.some((node) => node.id === preferredTaskId)
             ? preferredTaskId
-            : data.viewModel.defaults?.selected_task_id ?? data.viewModel.graph.nodes[0]?.id ?? null;
+            : (data.viewModel.defaults?.selected_task_id ?? data.viewModel.graph.nodes[0]?.id ?? null);
         setWorkspace(data);
         setSelectedTask(data.selectedTask);
         setSelectedTaskId(nextSelectedTaskId);
+        if (boardChanged) {
+          setDecisions([]);
+          setPeers(null);
+          setLayoutResetKey((value) => value + 1);
+        }
+        setBoardSwitching(false);
         if (!selectedBoardFilename && data.viewModel.board.filename) {
           setBoardInUrl(data.viewModel.board.filename);
           setSelectedBoardFilename(data.viewModel.board.filename);
@@ -123,6 +219,34 @@ export function App() {
     return () => controller.abort();
   }, [refreshNonce, selectedBoardFilename]);
 
+  // Discuss-history poll — same 2s cadence as the board (sidecar files can change without
+  // the board bytes changing), fail-silent (loadDecisions never throws; an old server or a
+  // torn write just keeps the last good list).
+  useEffect(() => {
+    if (!workspace || workspace.source === 'fixture') return;
+    const controller = new AbortController();
+    loadDecisions(workspace.viewModel.board.filename, controller.signal).then((rows) => {
+      if (!controller.signal.aborted) setDecisions(rows);
+    });
+    return () => controller.abort();
+  }, [refreshNonce, workspace]);
+
+  // Peer-roster poll — same 2s cadence (other boards' heartbeats move without this board's
+  // bytes changing), fail-silent: null keeps the last good roster; the fixture fallback
+  // renders the deterministic fixture roster so the block is demoable offline.
+  useEffect(() => {
+    if (!workspace) return;
+    if (workspace.source === 'fixture') {
+      setPeers(fixturePeers);
+      return;
+    }
+    const controller = new AbortController();
+    loadPeers(workspace.viewModel.board.filename, controller.signal).then((payload) => {
+      if (!controller.signal.aborted && payload) setPeers(payload);
+    });
+    return () => controller.abort();
+  }, [refreshNonce, workspace]);
+
   useEffect(() => {
     if (!workspace || !selectedTaskId) {
       setSelectedTask(null);
@@ -135,7 +259,10 @@ export function App() {
     }
 
     if (workspace.source === 'fixture') {
-      const node = workspace.viewModel.graph.nodes.find((candidate) => candidate.id === selectedTaskId);
+      const node = workspace.viewModel.graph.nodes.find(
+        (candidate) => candidate.id === selectedTaskId
+      );
+      const compact = workspace.viewModel.tasks?.find((task) => task.id === selectedTaskId);
       setSelectedTask(
         node
           ? {
@@ -149,6 +276,7 @@ export function App() {
                 executor: node.executor,
                 handle: node.handle,
                 tags: node.tags,
+                ...(compact ?? {}),
                 summary: 'Fixture fallback does not include full task detail for this node.',
                 next_actions: []
               },
@@ -168,7 +296,10 @@ export function App() {
       .catch((error) => {
         if (!controller.signal.aborted) {
           setSelectedTask(
-            taskErrorPayload(selectedTaskId, error instanceof Error ? error.message : 'Task detail unavailable')
+            taskErrorPayload(
+              selectedTaskId,
+              error instanceof Error ? error.message : 'Task detail unavailable'
+            )
           );
         }
       })
@@ -180,16 +311,45 @@ export function App() {
     return () => controller.abort();
   }, [selectedTaskId, workspace]);
 
+  // Transient toast: readouts stay, notices fade — auto-dismiss unless it is carrying
+  // the visible share-URL fallback input.
+  useEffect(() => {
+    if (!topNotice || shareFallbackUrl) return;
+    const timer = window.setTimeout(() => setTopNotice(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [topNotice, shareFallbackUrl]);
+
+  // Keyboard reach: Esc closes the detail rail, `/` focuses search.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedTaskId(null);
+        return;
+      }
+      if (event.key === '/') {
+        const target = event.target as HTMLElement | null;
+        const tag = target?.tagName?.toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   const currentBoardFilename = workspace?.viewModel.board.filename ?? selectedBoardFilename;
 
+  // Board switch keeps the previous frame mounted (last-known-good) and lets the load
+  // effect swap in the new board's data when it arrives — no workspace teardown, no
+  // loading-shell flash. The sweep indicator on the stage covers the in-between.
   const selectBoard = useCallback((boardFilename: string) => {
+    if (boardFilename === workspaceRef.current?.viewModel.board.filename) {
+      return;
+    }
     setBoardInUrl(boardFilename);
     setSelectedBoardFilename(boardFilename);
-    setWorkspace(null);
-    setSelectedTask(null);
-    setSelectedTaskId(null);
-    setZoom(1);
-    setLayoutResetKey((value) => value + 1);
+    setBoardSwitching(true);
     setTopNotice(`Switched to ${boardFilename}`);
     setShareFallbackUrl(null);
   }, []);
@@ -198,11 +358,12 @@ export function App() {
     if (!workspace) {
       return;
     }
-    setZoom(1);
     setQuery('');
-    setActiveFilters(new Set(['critical']));
+    setActiveFilters(new Set());
     setLayoutResetKey((value) => value + 1);
-    setSelectedTaskId(workspace.viewModel.defaults?.selected_task_id ?? workspace.viewModel.graph.nodes[0]?.id ?? null);
+    setSelectedTaskId(
+      workspace.viewModel.defaults?.selected_task_id ?? workspace.viewModel.graph.nodes[0]?.id ?? null
+    );
     setTopNotice('Layout reset');
   }, [workspace]);
 
@@ -251,7 +412,15 @@ export function App() {
 
   const displayedTask = selectedTask ?? workspace?.selectedTask ?? null;
 
-  if (loading || !workspace || !displayedTask) {
+  const selectedDecisions = useMemo(() => {
+    if (!displayedTask) return [];
+    return decisions.filter((entry) => entry.node_id === displayedTask.task.id);
+  }, [decisions, displayedTask]);
+
+  // Gate only on the workspace itself — an EMPTY board (zero tasks -> no selectable task)
+  // must still render the shell with the canvas/inspector empty states, never a stuck
+  // loading screen.
+  if (loading || !workspace) {
     return (
       <div className="loading-shell">
         <span>ccm</span>
@@ -272,20 +441,26 @@ export function App() {
     });
   };
 
+  const staleErrors = workspace.viewModel.freshness.errors ?? [];
+  const isStale = workspace.viewModel.freshness.state !== 'live' || staleErrors.length > 0;
+
   return (
     <div className="app-shell">
       <TopBar
-        boards={workspace.boards}
         currentBoardFilename={currentBoardFilename}
         feedback={topNotice}
         onExport={exportSnapshot}
         onQueryChange={setQuery}
         onReset={resetWorkspace}
-        onSelectBoard={selectBoard}
         onShare={shareWorkspace}
+        onToggleTheme={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
+        onViewChange={setViewPersist}
         query={query}
+        searchRef={searchRef}
         shareFallbackUrl={shareFallbackUrl}
         source={workspace.source}
+        theme={theme}
+        view={view}
         viewModel={workspace.viewModel}
       />
 
@@ -294,8 +469,19 @@ export function App() {
           API unavailable: {workspace.error}. Rendering deterministic fixture fallback.
         </div>
       ) : null}
+      {!workspace.error && isStale ? (
+        <div className="api-banner stale-banner" role="status">
+          Board read is stale — showing the last known good frame.
+          {staleErrors.length ? ` ${staleErrors[0]?.message ?? ''}` : ''}
+        </div>
+      ) : null}
 
-      <div className="workspace-grid">
+      <div
+        aria-busy={boardSwitching || undefined}
+        className="workspace-grid"
+        data-board-switching={boardSwitching ? 'true' : undefined}
+        data-orientation={orientation}
+      >
         <LeftRail
           activeFilters={activeFilters}
           boards={workspace.boards}
@@ -306,27 +492,60 @@ export function App() {
           selectedTaskId={selectedTaskId}
           viewModel={workspace.viewModel}
         />
-        <DagWorkspace
-          activeFilters={activeFilters}
-          onReset={() => setZoom(1)}
-          onSelectTask={setSelectedTaskId}
-          onZoomChange={setZoom}
-          onZoomIn={() => setZoom((value) => Math.min(value + 0.1, 1.4))}
-          onZoomOut={() => setZoom((value) => Math.max(value - 0.1, 0.7))}
-          orientation={orientation}
-          query={query}
-          resetKey={layoutResetKey}
-          selectedTaskId={selectedTaskId}
-          viewModel={workspace.viewModel}
-          zoom={zoom}
-        />
-        <InspectorRail
-          onClose={() => setSelectedTaskId(null)}
-          statusReport={workspace.statusReport}
-          task={displayedTask}
-          taskLoading={taskLoading}
-          viewModel={workspace.viewModel}
-        />
+        {view === 'graph' ? (
+          <DagWorkspace
+            activeFilters={activeFilters}
+            onSelectTask={setSelectedTaskId}
+            onToggleFilter={toggleFilter}
+            orientation={orientation}
+            query={query}
+            resetKey={layoutResetKey}
+            selectedTaskId={selectedTaskId}
+            theme={theme}
+            viewModel={workspace.viewModel}
+          />
+        ) : null}
+        {view === 'board' ? (
+          <BoardView
+            onSelectTask={setSelectedTaskId}
+            selectedTaskId={selectedTaskId}
+            viewModel={workspace.viewModel}
+          />
+        ) : null}
+        {view === 'list' ? (
+          <ListView
+            onSelectTask={setSelectedTaskId}
+            selectedTaskId={selectedTaskId}
+            viewModel={workspace.viewModel}
+          />
+        ) : null}
+        {view === 'timeline' ? (
+          <TimelineView
+            onSelectTask={setSelectedTaskId}
+            selectedTaskId={selectedTaskId}
+            viewModel={workspace.viewModel}
+          />
+        ) : null}
+        {displayedTask ? (
+          <InspectorRail
+            decisions={selectedDecisions}
+            onClose={() => setSelectedTaskId(null)}
+            onSelectTask={setSelectedTaskId}
+            peers={peers}
+            statusReport={workspace.statusReport}
+            task={displayedTask}
+            taskLoading={taskLoading}
+            viewModel={workspace.viewModel}
+          />
+        ) : (
+          <aside aria-label="Selected task detail" className="dpanel-wrap" id="detail">
+            <div className="dpanel">
+              <div className="dsect">
+                <div className="dim-note">no tasks on this board — nothing to inspect yet</div>
+              </div>
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );
