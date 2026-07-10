@@ -1,10 +1,8 @@
-## 心智锚 4：模型档位需要 Codex provider mapping
+## 心智锚 4：family 选能力下限，effort 买边际深度
 
-不要套用 Claude model tier 表。Codex 的模型、reasoning effort、Fast tier 和价格/限额语义需要单独 provider mapping；本 adapter 当前没有编码这张表。但 Codex 官方按档给出了明确的 credit 消耗梯度——旗舰档 : 主力档 : 轻量档 ≈ **125 : 62.5 : 18.75**（每 MTok 输入 credit）。换算下来，同样 token 量下主力档约为旗舰档的一半消耗、轻量档约为旗舰档的 1/6.7——**档位选择直接映射配额消耗倍率**，选档前先按这个倍率估一下这次要花多少配额。
+Codex 选档是二维的：先按任务开放性 / 可验证性在 **Luna → Terra → Sol** 里选 family，再用**最低能稳定达标**的 reasoning effort。官方 headline coding eval 中，Sol/Terra/Luna 的 SWE-Bench Pro 为 **64.6/63.4/62.7**，Terminal-Bench 2.1 为 **88.8/87.4/84.7**；API token 价比约 **5:2.5:1**。能力差小于价格差，所以别把所有临界节点无脑推到 Sol max。
 
-按任务轴选档，不按价格排序（同 Claude 侧心智，不单调）：
+- **配额充足（效果优先）**：机械叶用 Luna medium；常规实现用 Terra high/xhigh；复杂开放实现用 Sol high/xhigh；不可逆裁决 / 端点验收才用 Sol max。`ultra` 只给能拆成独立 workstreams 的任务——它是多 agent 拓扑，不是 max 之后的普通 effort。
+- **配额紧张（性价比优先）**：机械叶用 Luna low/medium；清晰常规实现用 Luna high 或 Terra medium；复杂实现用 Terra high/xhigh；Sol high/max 只留给错误代价最高的裁决 / review。停用 `ultra`，先降可机械验收叶子的档位与 WIP。
 
-- 简单读扫、检索、格式化、批量机械改动：轻量档，几乎无损，且这类错误能被 diff/校验闸廉价捕获。
-- 复杂设计、端点验收、跨文件推理、有状态实现：高能力档——这是升档回报最确定的一条轴。
-- 终端操作 / agentic 执行类任务：主力档常不输旗舰档，别默认为它加钱。
-- 临界路径和不可逆决策：优先质量，不为省小成本牺牲正确性；配额吃紧时先降前两类，不降这一类。
+主线会话在开跑前选定：通常 Sol medium；配额紧张且目标边界清楚时可从 Terra medium/high 起步。运行中别因短时水位频繁切主线——省配额主要靠 leaf 分档。完整证据、任务矩阵和边界见 `references/model-tiers.md`。

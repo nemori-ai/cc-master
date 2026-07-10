@@ -10,7 +10,7 @@ Codex adapter 当前不支持账号池切换。读到 `switch` / `switch_candida
 
 ## 减速 lever
 
-1. **降级模型 / effort** —— 在 Codex 可用模型与 reasoning effort 范围内，把 token 重的叶子路由到更便宜的配置；具体模型档位需要 Codex provider mapping，当前 adapter 不使用 Claude 模型档位表。
+1. **降级模型 / effort** —— 切到 model-tiers.md 的「配额紧张」列：先降有强机械验收的叶子（Sol→Terra→Luna，xhigh/max→high→medium/low），再降 WIP；高错误代价裁决保留 Sol high/max。Fast mode会更快消耗 credits，**不是**省配额档；`ultra` 在 throttle 下停用。
 2. **降 WIP** —— 让更少的并发叶子在飞。
 3. **推迟高 float 工作** —— 把非临界、token 重的叶子推到下一个窗口。
 

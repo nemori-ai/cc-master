@@ -1,4 +1,4 @@
-- **[references/model-tiers.md](references/model-tiers.md)** —— Codex 侧档位心智（credit 倍率 stub；完整 OpenAI mapping 尚未编码）+ 按任务轴选档。**「该用哪档」先翻它，再对照官方模型表。**
+- **[references/model-tiers.md](references/model-tiers.md)** —— Codex GPT-5.6 Sol/Terra/Luna × effort mapping + 配额充足/紧张两套任务路由 + `max`/`ultra` 边界。**「该用哪档、怎么兼顾效果与性价比」翻它。**
 - **[references/usage-signals.md](references/usage-signals.md)** —— Codex 当前账号 5h / 7d 信号源、`available:false` 降级、诚实边界。
 - **[references/pacing-levers.md](references/pacing-levers.md)** —— 单侧 levers（减速 / 停）怎么做；Codex 下 `switch` 不执行账号池切换，降级为 throttle / 等待 / surface 用户。
 - **[references/estimation.md](references/estimation.md)** —— estimate verb 的消费决策、baseline 生命周期、诚实字段、usage 与 estimate 的张力。

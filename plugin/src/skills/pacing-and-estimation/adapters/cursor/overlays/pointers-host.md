@@ -1,4 +1,4 @@
-- **[references/model-tiers.md](references/model-tiers.md)** —— Cursor 四档（Composer / 主力 Sonnet·Codex / 旗舰 Grok high·Opus·GPT-5.5 / 裁决 Grok xhigh；不用 Fable）+ 两池心智 + 按难度选档 + 为何主线固定模型。**「该用哪档、先 first-party 还是 API」翻它。**
+- **[references/model-tiers.md](references/model-tiers.md)** —— Cursor 两池 + GPT-5.6 family×effort 的 CursorBench score/$ 映射 + 配额充足/紧张两套任务路由；不用 Fable。**「该用哪档、先 first-party 还是 API、怎么兼顾效果与性价比」翻它。**
 - **[references/usage-signals.md](references/usage-signals.md)** —— Cursor 当前账号 billing_period 信号源（`cursor-dashboard`）、`available:false` 降级、诚实边界；无 5h/7d。
 - **[references/pacing-levers.md](references/pacing-levers.md)** —— 单侧 levers（减速 / 停到账期 reset）；无换号；无 `stop_5h`/`stop_7d` 目标语义。
 - **[references/estimation.md](references/estimation.md)** —— estimate verb 的消费决策、baseline 生命周期、诚实字段、usage 与 estimate 的张力。

@@ -6,13 +6,13 @@ projection:
   source: canonical/
   target: skills/pacing-and-estimation/
 unsupported:
-  - capability: model_tier_provider
-    reason: "OpenAI/Codex model tier mapping is not yet encoded; overlay is an honest stub with credit-ratio guidance only."
   - capability: account_switch_pacing
     reason: "Codex account switching is not implemented in ccm."
   - capability: statusline_sidecar
     reason: "Claude Code statusline sidecar does not exist in Codex adapter."
 supported:
+  - capability: model_tier_provider
+    reason: "OpenAI/Codex GPT-5.6 Sol/Terra/Luna × reasoning-effort mapping is encoded with quota-ample and quota-tight routes."
   - capability: current_quota_signal
     reason: "ccm usage show/advise reads Codex current-account 5h/7d usage via `codex app-server --stdio` account/rateLimits/read."
   - capability: estimation_method
@@ -43,4 +43,4 @@ host_slots:
     status: partial_source_uses_codex_specific_guidance
 notes:
   - Codex projects the canonical pacing guide plus host-specific usage/model/account-switch slots.
-  - model-tiers.md is projected via stub overlay (credit-ratio guidance); full OpenAI mapping still unsupported.
+  - model-tiers.md maps GPT-5.6 family × effort from official OpenAI benchmark, Codex model, pricing, and availability guidance.
