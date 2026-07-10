@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useRef } from 'react';
 import {
   BOARD_LANES,
   CONV_MIN,
@@ -19,12 +19,14 @@ import {
   statusLampVar,
   taskDuration
 } from '../format';
+import { type LocateRequest, useLocateTask } from '../locate';
 import type { CompactTask, ViewModelPayload } from '../types';
 
 interface BoardViewProps {
   viewModel: ViewModelPayload;
   selectedTaskId: string | null;
   onSelectTask: (taskId: string) => void;
+  locateRequest: LocateRequest | null;
 }
 
 interface BoardCardProps {
@@ -146,6 +148,7 @@ function BoardCard({ task, viewModel, kind, gate, selected, onSelectTask }: Boar
   return (
     <button
       className={cls.join(' ')}
+      data-task-id={task.id}
       onClick={() => onSelectTask(task.id)}
       style={{ '--lamp': lamp } as CSSProperties}
       type="button"
@@ -166,7 +169,9 @@ function BoardCard({ task, viewModel, kind, gate, selected, onSelectTask }: Boar
  * in fixed order (AWAITING YOU → READY → IN FLIGHT → BLOCKED → DONE → NEEDS ATTENTION),
  * empty lanes omitted, each task in exactly one lane, cards sorted by downstream impact.
  */
-export function BoardView({ viewModel, selectedTaskId, onSelectTask }: BoardViewProps) {
+export function BoardView({ viewModel, selectedTaskId, onSelectTask, locateRequest }: BoardViewProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  useLocateTask(containerRef, locateRequest);
   const tasks = tasksOf(viewModel);
   const gateIds = awaitingIds(viewModel);
   const lanes = partitionTasks(tasks, gateIds, viewModel.insights);
@@ -195,7 +200,7 @@ export function BoardView({ viewModel, selectedTaskId, onSelectTask }: BoardView
   ));
 
   return (
-    <div id="boardview">
+    <div id="boardview" ref={containerRef}>
       {laneEls.length ? (
         <div className="bvlanes">{laneEls}</div>
       ) : (

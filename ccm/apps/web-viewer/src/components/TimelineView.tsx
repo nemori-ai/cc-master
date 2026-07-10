@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useRef } from 'react';
 import { type TimelineRow, awaitingIds, buildTimeline, isNotStarted, useSecondTick } from '../analytics';
 import {
   DONE_STATUSES,
@@ -10,12 +10,14 @@ import {
   statusText,
   taskDuration
 } from '../format';
+import { type LocateRequest, useLocateTask } from '../locate';
 import type { ViewModelPayload } from '../types';
 
 interface TimelineViewProps {
   viewModel: ViewModelPayload;
   selectedTaskId: string | null;
   onSelectTask: (taskId: string) => void;
+  locateRequest: LocateRequest | null;
 }
 
 interface TimelineLaneProps {
@@ -111,7 +113,11 @@ function TimelineLane({
     : ({ left: `${leftPct}%`, width: `${widthPct}%`, '--lamp': lamp } as CSSProperties);
 
   return (
-    <div className={laneCls.join(' ')} style={{ '--lamp': lamp } as CSSProperties}>
+    <div
+      className={laneCls.join(' ')}
+      data-task-id={task.id}
+      style={{ '--lamp': lamp } as CSSProperties}
+    >
       <button
         className="tllabel"
         onClick={() => onSelectTask(task.id)}
@@ -151,7 +157,14 @@ function TimelineLane({
  * parallelism. REAL-TIME axis when the board carries enough parseable start anchors (and a
  * version-gated time schema); TOPOLOGICAL depth axis (server rank) otherwise.
  */
-export function TimelineView({ viewModel, selectedTaskId, onSelectTask }: TimelineViewProps) {
+export function TimelineView({
+  viewModel,
+  selectedTaskId,
+  onSelectTask,
+  locateRequest
+}: TimelineViewProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  useLocateTask(containerRef, locateRequest);
   const timeline = buildTimeline(viewModel);
   const anyRunning = timeline.rows.some((row) => row.running && startTs(row.task) != null);
   useSecondTick(anyRunning && timeline.mode === 'time');
@@ -196,7 +209,7 @@ export function TimelineView({ viewModel, selectedTaskId, onSelectTask }: Timeli
   }
 
   return (
-    <div id="timelineview">
+    <div id="timelineview" ref={containerRef}>
       <div className="tlaxis">
         <div className="axhead">
           <span className="axl">timeline</span>

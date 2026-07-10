@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useRef } from 'react';
 import {
   CONV_MIN,
   IMPACT_HOT,
@@ -20,12 +20,14 @@ import {
   statusText,
   taskDuration
 } from '../format';
+import { type LocateRequest, useLocateTask } from '../locate';
 import type { CompactTask, ViewModelPayload } from '../types';
 
 interface ListViewProps {
   viewModel: ViewModelPayload;
   selectedTaskId: string | null;
   onSelectTask: (taskId: string) => void;
+  locateRequest: LocateRequest | null;
 }
 
 interface ListRowProps {
@@ -177,6 +179,7 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
   return (
     <button
       className={cls.join(' ')}
+      data-task-id={task.id}
       onClick={() => onSelectTask(task.id)}
       style={{ '--lamp': lamp } as CSSProperties}
       type="button"
@@ -199,7 +202,9 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
  * strip on top. Sections in fixed priority order (AWAITING YOU first), empty ones omitted,
  * unknown statuses land under NEEDS ATTENTION.
  */
-export function ListView({ viewModel, selectedTaskId, onSelectTask }: ListViewProps) {
+export function ListView({ viewModel, selectedTaskId, onSelectTask, locateRequest }: ListViewProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  useLocateTask(containerRef, locateRequest);
   const tasks = tasksOf(viewModel);
   const gateIds = awaitingIds(viewModel);
   const sections = partitionTasks(tasks, gateIds, viewModel.insights);
@@ -239,7 +244,7 @@ export function ListView({ viewModel, selectedTaskId, onSelectTask }: ListViewPr
   );
 
   return (
-    <div id="listview">
+    <div id="listview" ref={containerRef}>
       <div className="lvstrip">
         <div className="si grow">
           <span className="sl">objective</span>

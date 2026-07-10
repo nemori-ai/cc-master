@@ -28,7 +28,14 @@ export const fixtureBoards: BoardsPayload = {
       selected: true,
       health: 'ok',
       task_count: 20,
-      updated_at: now
+      updated_at: now,
+      status_counts: { done: 7, verified: 2, in_flight: 4, ready: 3, blocked: 3, failed: 1 },
+      done_count: 9,
+      awaiting_count: 2,
+      priority: 'high',
+      heartbeat_age_sec: 42,
+      branch: 'release/train-0516',
+      created_at: '2026-07-08T08:00:00Z'
     },
     {
       id: 'infra-migration',
@@ -36,21 +43,36 @@ export const fixtureBoards: BoardsPayload = {
       goal: 'Migrate deployment graph to new account pool',
       active: true,
       health: 'stale',
-      task_count: 28
+      task_count: 28,
+      status_counts: { done: 12, in_flight: 2, ready: 6, blocked: 8 },
+      done_count: 12,
+      awaiting_count: 1,
+      priority: 'normal',
+      heartbeat_age_sec: 60 * 42,
+      branch: 'feat/account-pool'
     },
     {
       id: 'data-pipeline-v2',
       filename: 'data-pipeline-v2.board.json',
       goal: 'Reconcile pipeline status reports',
       health: 'ok',
-      task_count: 34
+      task_count: 34,
+      status_counts: { done: 30, verified: 4 },
+      done_count: 34,
+      awaiting_count: 0,
+      priority: 'low',
+      updated_at: '2026-07-06T18:04:00Z'
     },
     {
       id: 'incident-2407',
       filename: 'incident-2407.board.json',
       goal: 'Close incident remediation tasks',
       health: 'error',
-      task_count: 11
+      task_count: 11,
+      status_counts: { done: 8, failed: 2, stale: 1 },
+      done_count: 8,
+      awaiting_count: 0,
+      updated_at: '2026-07-02T09:30:00Z'
     }
   ]
 };

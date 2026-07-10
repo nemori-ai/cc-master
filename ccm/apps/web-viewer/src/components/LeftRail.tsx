@@ -1,29 +1,14 @@
-import { useState } from 'react';
 import { fmtElapsed, normalizeStatus, statusText } from '../format';
 import { type TaskFilterGroup, taskFilterOptions } from '../taskFilters';
-import type { BoardSummary, BoardsPayload, ViewModelPayload } from '../types';
-
-type BoardStateFilter = 'all' | 'active' | 'archived';
+import type { ViewModelPayload } from '../types';
 
 interface LeftRailProps {
-  boards: BoardsPayload;
   viewModel: ViewModelPayload;
   selectedTaskId: string | null;
-  onSelectBoard: (boardFilename: string) => void;
   onSelectTask: (taskId: string) => void;
   activeFilters: Set<string>;
   onToggleFilter: (filter: string) => void;
   onClearFilters: () => void;
-}
-
-function boardLabel(goal: string | undefined): string {
-  const trimmed = (goal ?? '').trim();
-  if (!trimmed) return '(untitled board)';
-  return trimmed.length > 20 ? `${trimmed.slice(0, 20)}...` : trimmed;
-}
-
-function boardState(board: BoardSummary): Exclude<BoardStateFilter, 'all'> {
-  return board.active === true ? 'active' : 'archived';
 }
 
 const filterGroups: Array<{ id: TaskFilterGroup; label: string }> = [
@@ -33,32 +18,23 @@ const filterGroups: Array<{ id: TaskFilterGroup; label: string }> = [
 ];
 
 /**
- * The left analysis rail: the derived-telemetry readout column (seven insights, all
- * clickable to jump-select) followed by the boards list, filter chips, and the ordered
- * critical-path list.
+ * The left analysis rail: read the analysis -> narrow the stage -> walk the critical
+ * chain. Seven derived-telemetry insights (all clickable to jump-select), the filter
+ * chip groups (always-visible state, echoed on the stage toolbar), and the ordered
+ * critical-path list as the single unbounded list at the bottom (self-scrolling).
+ * Board SWITCHING lives on the mission line's board chip — not here.
  */
 export function LeftRail({
-  boards,
   viewModel,
   selectedTaskId,
-  onSelectBoard,
   onSelectTask,
   activeFilters,
   onToggleFilter,
   onClearFilters
 }: LeftRailProps) {
-  const [boardStateFilter, setBoardStateFilter] = useState<BoardStateFilter>('all');
   const nodesById = new Map(viewModel.graph.nodes.map((node) => [node.id, node]));
   const criticalPath = viewModel.graph.critical_path ?? [];
   const insights = viewModel.insights ?? {};
-  const visibleBoards = boards.boards.filter(
-    (board) => boardStateFilter === 'all' || boardState(board) === boardStateFilter
-  );
-  const boardCounts = {
-    all: boards.boards.length,
-    active: boards.boards.filter((board) => boardState(board) === 'active').length,
-    archived: boards.boards.filter((board) => boardState(board) === 'archived').length
-  } satisfies Record<BoardStateFilter, number>;
 
   const idTitle = (id: string | null | undefined): string => {
     if (!id) return '';
@@ -68,11 +44,6 @@ export function LeftRail({
   };
 
   const total = viewModel.graph.nodes.length;
-  const done = viewModel.graph.nodes.filter((node) => {
-    const status = normalizeStatus(String(node.status ?? ''));
-    return status === 'done' || status === 'verified';
-  }).length;
-  const pct = total ? Math.round((done / total) * 100) : 0;
 
   const impact = insights.impact ?? { id: null, count: 0 };
   const convergence = insights.convergence ?? { id: null, in_deg: 0 };
@@ -90,16 +61,14 @@ export function LeftRail({
   );
 
   return (
-    <aside aria-label="Analysis, boards, filters, and critical path" id="insights">
+    <aside aria-label="Analysis, filters, and critical path" id="insights">
       <div className="ihead">analysis · {total} tasks</div>
 
       <div className="metric">
         <div className="ml">
           <span className="ic">⟋</span>critical path
         </div>
-        <div className="mv mono">
-          {criticalPath.length ? `length ${criticalPath.length}` : '—'}
-        </div>
+        <div className="mv mono">{criticalPath.length ? `length ${criticalPath.length}` : '—'}</div>
         <div className="msub">
           {makespan != null
             ? `makespan ${fmtElapsed(makespan) ?? makespan} · longest dependency chain`
@@ -190,53 +159,8 @@ export function LeftRail({
           <span className="ic">◷</span>orchestration age
         </div>
         <div className="mv mono">{age ?? '—'}</div>
-        <div className="msub">
-          {done}/{total} done · {pct}%
-        </div>
+        <div className="msub">since the first task started</div>
       </div>
-
-      <section className="rail-section">
-        <div className="rail-heading">
-          <h2>boards</h2>
-          <span>
-            {visibleBoards.length}/{boards.boards.length}
-          </span>
-        </div>
-        <div aria-label="Board state filter" className="board-state-tabs">
-          {(['all', 'active', 'archived'] satisfies BoardStateFilter[]).map((filter) => (
-            <button
-              aria-pressed={boardStateFilter === filter}
-              data-active={boardStateFilter === filter}
-              key={filter}
-              onClick={() => setBoardStateFilter(filter)}
-              type="button"
-            >
-              <span>{filter}</span>
-              <small>{boardCounts[filter]}</small>
-            </button>
-          ))}
-        </div>
-        <div className="board-list">
-          {visibleBoards.map((board) => (
-            <button
-              className="board-row"
-              data-selected={board.id === viewModel.board.id}
-              key={board.id}
-              onClick={() => onSelectBoard(board.filename)}
-              title={`${board.goal || '(untitled board)'} (${board.id})`}
-              type="button"
-            >
-              <span>{boardLabel(board.goal)}</span>
-              <small>
-                {board.id} · {boardState(board)} · {board.health ?? 'unknown'}
-              </small>
-            </button>
-          ))}
-          {visibleBoards.length === 0 ? (
-            <p className="rail-empty">No {boardStateFilter} boards</p>
-          ) : null}
-        </div>
-      </section>
 
       <section className="rail-section">
         <div className="rail-heading">

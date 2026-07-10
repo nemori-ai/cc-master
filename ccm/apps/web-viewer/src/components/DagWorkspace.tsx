@@ -3,6 +3,7 @@ import {
   applyNodeChanges,
   Background,
   BackgroundVariant,
+  ControlButton,
   Controls,
   MiniMap,
   Panel,
@@ -11,9 +12,11 @@ import {
   useReactFlow,
   ViewportPortal,
 } from '@xyflow/react';
+import { RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { lineageFor, perNodeStructure, tasksOf } from '../analytics';
 import { minimapColor, normalizeStatus, startTs } from '../format';
+import { type LocateRequest, prefersReducedMotion } from '../locate';
 import {
   computeVisibleGraph,
   type GraphOrientation,
@@ -39,6 +42,8 @@ interface DagWorkspaceProps {
   onToggleFilter: (filter: string) => void;
   resetKey: number;
   theme: 'dark' | 'light';
+  locateRequest: LocateRequest | null;
+  onResetLayout: () => void;
 }
 
 const nodeTypes = { cc: CcNode };
@@ -110,6 +115,8 @@ function DagCanvas({
   onToggleFilter,
   resetKey,
   theme,
+  locateRequest,
+  onResetLayout,
 }: DagWorkspaceProps) {
   const rf = useReactFlow();
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
@@ -160,6 +167,31 @@ function DagCanvas({
     }, 30);
     return () => clearTimeout(timer);
   }, [topoKey, rf]);
+
+  // Click-to-locate (graph): pan/zoom so the clicked node sits centered in the canvas.
+  // Keyed solely on the locate nonce — poll-driven re-renders and topology refits never
+  // re-trigger it, and a view-switch remount doesn't replay the last click (mount guard).
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+  const locateMountRef = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fires per user click only (nonce); graph state is read through refs
+  useEffect(() => {
+    if (!locateMountRef.current) {
+      locateMountRef.current = true;
+      return;
+    }
+    if (!locateRequest) return;
+    const graph = visibleRef.current;
+    const targetId = graph.visibleIds.has(locateRequest.taskId)
+      ? locateRequest.taskId
+      : graph.reroute(locateRequest.taskId);
+    const position = posRef.current.get(targetId);
+    if (!position) return;
+    rf.setCenter(position.x + NODE_W / 2, position.y + NODE_H / 2, {
+      zoom: Math.max(rf.getZoom(), 0.85),
+      duration: prefersReducedMotion() ? 0 : 420,
+    });
+  }, [locateRequest, rf]);
 
   const filtersActive = activeFilters.size > 0 || query.trim() !== '';
 
@@ -376,7 +408,16 @@ function DagCanvas({
           <span className="zl">zoom</span>
           <span className="zv">{zoomPct}%</span>
         </Panel>
-        <Controls position="top-right" showInteractive={false} />
+        <Controls position="top-right" showInteractive={false}>
+          <ControlButton
+            aria-label="Reset layout"
+            className="ctl-reset-layout"
+            onClick={onResetLayout}
+            title="reset layout — clear manual node positions and refit"
+          >
+            <RotateCcw aria-hidden="true" strokeWidth={2} />
+          </ControlButton>
+        </Controls>
         {nodeCount > 10 ? (
           <MiniMap
             bgColor={theme === 'light' ? '#eef0f5' : '#13151c'}

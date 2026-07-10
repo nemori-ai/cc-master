@@ -678,6 +678,17 @@ test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no b
         },
       ],
     );
+    // Board-switcher card summary (additive): every roster row carries the per-board
+    // aggregates the mega dropdown renders (status buckets / done / awaiting counts).
+    for (const board of boards.body.boards as Array<Record<string, unknown>>) {
+      assert.equal(typeof board.task_count, 'number');
+      assert.ok(
+        board.status_counts && typeof board.status_counts === 'object',
+        'boards.json row carries status_counts',
+      );
+      assert.equal(typeof board.done_count, 'number');
+      assert.equal(typeof board.awaiting_count, 'number');
+    }
 
     const switchedBoards = await httpJson({
       port,

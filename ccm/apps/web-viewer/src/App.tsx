@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadDecisions, loadPeers, loadTaskDetail, loadWorkspace } from './api';
 import { fixturePeers } from './fixtures';
+import { BoardBrief } from './components/BoardBrief';
 import { BoardView } from './components/BoardView';
 import { DagWorkspace } from './components/DagWorkspace';
 import { InspectorRail } from './components/InspectorRail';
 import { LeftRail } from './components/LeftRail';
 import { ListView } from './components/ListView';
+import { MissionLine } from './components/MissionLine';
+import { StageToolbar, type ViewMode } from './components/StageToolbar';
+import { StatusStrip } from './components/StatusStrip';
 import { TimelineView } from './components/TimelineView';
-import { TopBar, type ViewMode } from './components/TopBar';
 import type { GraphOrientation } from './graphLayout';
+import type { LocateRequest } from './locate';
 import type { DecisionEntry, PeersPayload, TaskDetailPayload, WorkspaceData } from './types';
 
 const VIEW_KEY = 'ccm-view';
@@ -100,6 +104,7 @@ export function App() {
     boardFromUrl()
   );
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [locateRequest, setLocateRequest] = useState<LocateRequest | null>(null);
   const [selectedTask, setSelectedTask] = useState<TaskDetailPayload | null>(null);
   const [taskLoading, setTaskLoading] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(() => new Set());
@@ -111,6 +116,7 @@ export function App() {
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [layoutResetKey, setLayoutResetKey] = useState(0);
   const [boardSwitching, setBoardSwitching] = useState(false);
+  const [leftDrawerOpen, setLeftDrawerOpen] = useState(false);
   const [topNotice, setTopNotice] = useState<string | null>(null);
   const [shareFallbackUrl, setShareFallbackUrl] = useState<string | null>(null);
   const workspaceRef = useRef<WorkspaceData | null>(null);
@@ -209,10 +215,14 @@ export function App() {
           previous !== null &&
           previous.viewModel.board.filename !== data.viewModel.board.filename;
         const preferredTaskId = boardChanged ? null : selectedTaskIdRef.current;
+        // Dual-mode right rail: NO default auto-selection — no selection means the rail
+        // shows the board-level mission brief. A user's selection is retained across
+        // polls (when the task still exists); a board switch or a task that vanished
+        // lands back on the brief. Programmatic re-selection stays a bare state write.
         const nextSelectedTaskId =
           preferredTaskId && data.viewModel.graph.nodes.some((node) => node.id === preferredTaskId)
             ? preferredTaskId
-            : (data.viewModel.defaults?.selected_task_id ?? data.viewModel.graph.nodes[0]?.id ?? null);
+            : null;
         setWorkspace(data);
         setSelectedTask(data.selectedTask);
         setSelectedTaskId(nextSelectedTaskId);
@@ -354,8 +364,6 @@ export function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  const currentBoardFilename = workspace?.viewModel.board.filename ?? selectedBoardFilename;
-
   // Board switch keeps the previous frame mounted (last-known-good) and lets the load
   // effect swap in the new board's data when it arrives — no workspace teardown, no
   // loading-shell flash. The sweep indicator on the stage covers the in-between.
@@ -370,18 +378,22 @@ export function App() {
     setShareFallbackUrl(null);
   }, []);
 
-  const resetWorkspace = useCallback(() => {
-    if (!workspace) {
-      return;
+  // User-click selection: same state write as a programmatic selection PLUS a locate
+  // request (nonce bump) so the CURRENT view centers/scrolls to the task. Background
+  // polls go through setSelectedTaskId directly and can never mint a locate request.
+  const selectTaskFromClick = useCallback((taskId: string | null) => {
+    setSelectedTaskId(taskId);
+    if (taskId) {
+      setLocateRequest((previous) => ({ taskId, nonce: (previous?.nonce ?? 0) + 1 }));
     }
-    setQuery('');
-    setActiveFilters(new Set());
+  }, []);
+
+  // Zoom-cluster companion (graph stage): clear manual drag positions + refit only.
+  // Filter clearing stays with the left rail's Clear; selection is untouched.
+  const resetLayout = useCallback(() => {
     setLayoutResetKey((value) => value + 1);
-    setSelectedTaskId(
-      workspace.viewModel.defaults?.selected_task_id ?? workspace.viewModel.graph.nodes[0]?.id ?? null
-    );
     setTopNotice('Layout reset');
-  }, [workspace]);
+  }, []);
 
   const shareWorkspace = useCallback(async () => {
     const url = window.location.href;
@@ -426,7 +438,16 @@ export function App() {
     setShareFallbackUrl(null);
   }, [selectedTask, workspace]);
 
-  const displayedTask = selectedTask ?? workspace?.selectedTask ?? null;
+  // Dual-mode gate: the drill-down renders only for an EXPLICIT selection. The
+  // workspace preload is used only when it matches the selected id (never as an
+  // implicit default — deselected means mission brief).
+  const displayedTask = selectedTaskId
+    ? selectedTask?.task.id === selectedTaskId
+      ? selectedTask
+      : workspace?.selectedTask?.task.id === selectedTaskId
+        ? workspace.selectedTask
+        : selectedTask
+    : null;
 
   const selectedDecisions = useMemo(() => {
     if (!displayedTask) return [];
@@ -462,23 +483,20 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <TopBar
-        currentBoardFilename={currentBoardFilename}
-        feedback={topNotice}
-        onExport={exportSnapshot}
-        onQueryChange={setQuery}
-        onReset={resetWorkspace}
-        onShare={shareWorkspace}
-        onToggleTheme={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
-        onViewChange={setViewPersist}
-        query={query}
-        searchRef={searchRef}
-        shareFallbackUrl={shareFallbackUrl}
-        source={workspace.source}
-        theme={theme}
-        view={view}
-        viewModel={workspace.viewModel}
-      />
+      <div className="header-block">
+        <MissionLine
+          boards={workspace.boards}
+          onExport={exportSnapshot}
+          onLocateTask={selectTaskFromClick}
+          onNotice={setTopNotice}
+          onSelectBoard={selectBoard}
+          onShare={shareWorkspace}
+          onToggleTheme={() => setTheme((value) => (value === 'light' ? 'dark' : 'light'))}
+          theme={theme}
+          viewModel={workspace.viewModel}
+        />
+        <StatusStrip source={workspace.source} viewModel={workspace.viewModel} />
+      </div>
 
       {workspace.error ? (
         <div className="api-banner" role="status">
@@ -496,73 +514,109 @@ export function App() {
         aria-busy={boardSwitching || undefined}
         className="workspace-grid"
         data-board-switching={boardSwitching ? 'true' : undefined}
+        data-drawer={leftDrawerOpen ? 'open' : undefined}
         data-orientation={orientation}
       >
         <LeftRail
           activeFilters={activeFilters}
-          boards={workspace.boards}
           onClearFilters={() => setActiveFilters(new Set())}
-          onSelectBoard={selectBoard}
-          onSelectTask={setSelectedTaskId}
+          onSelectTask={selectTaskFromClick}
           onToggleFilter={toggleFilter}
           selectedTaskId={selectedTaskId}
           viewModel={workspace.viewModel}
         />
-        {view === 'graph' ? (
-          <DagWorkspace
-            activeFilters={activeFilters}
-            onSelectTask={setSelectedTaskId}
-            onToggleFilter={toggleFilter}
-            orientation={orientation}
+        {leftDrawerOpen ? (
+          <button
+            aria-label="Close the analysis rail"
+            className="drawer-scrim"
+            onClick={() => setLeftDrawerOpen(false)}
+            type="button"
+          />
+        ) : null}
+        <div className="centercol">
+          <StageToolbar
+            activeFilterCount={activeFilters.size}
+            onClearFilters={() => setActiveFilters(new Set())}
+            onQueryChange={setQuery}
+            onToggleDrawer={() => setLeftDrawerOpen((value) => !value)}
+            onViewChange={setViewPersist}
             query={query}
-            resetKey={layoutResetKey}
-            selectedTaskId={selectedTaskId}
-            theme={theme}
-            viewModel={workspace.viewModel}
+            searchRef={searchRef}
+            view={view}
           />
-        ) : null}
-        {view === 'board' ? (
-          <BoardView
-            onSelectTask={setSelectedTaskId}
-            selectedTaskId={selectedTaskId}
-            viewModel={workspace.viewModel}
-          />
-        ) : null}
-        {view === 'list' ? (
-          <ListView
-            onSelectTask={setSelectedTaskId}
-            selectedTaskId={selectedTaskId}
-            viewModel={workspace.viewModel}
-          />
-        ) : null}
-        {view === 'timeline' ? (
-          <TimelineView
-            onSelectTask={setSelectedTaskId}
-            selectedTaskId={selectedTaskId}
-            viewModel={workspace.viewModel}
-          />
-        ) : null}
-        {displayedTask ? (
-          <InspectorRail
-            decisions={selectedDecisions}
-            onClose={() => setSelectedTaskId(null)}
-            onSelectTask={setSelectedTaskId}
-            peers={peers}
-            statusReport={workspace.statusReport}
-            task={displayedTask}
-            taskLoading={taskLoading}
-            viewModel={workspace.viewModel}
-          />
-        ) : (
-          <aside aria-label="Selected task detail" className="dpanel-wrap" id="detail">
-            <div className="dpanel">
-              <div className="dsect">
-                <div className="dim-note">no tasks on this board — nothing to inspect yet</div>
-              </div>
-            </div>
-          </aside>
-        )}
+          {view === 'graph' ? (
+            <DagWorkspace
+              activeFilters={activeFilters}
+              locateRequest={locateRequest}
+              onResetLayout={resetLayout}
+              onSelectTask={selectTaskFromClick}
+              onToggleFilter={toggleFilter}
+              orientation={orientation}
+              query={query}
+              resetKey={layoutResetKey}
+              selectedTaskId={selectedTaskId}
+              theme={theme}
+              viewModel={workspace.viewModel}
+            />
+          ) : null}
+          {view === 'board' ? (
+            <BoardView
+              locateRequest={locateRequest}
+              onSelectTask={selectTaskFromClick}
+              selectedTaskId={selectedTaskId}
+              viewModel={workspace.viewModel}
+            />
+          ) : null}
+          {view === 'list' ? (
+            <ListView
+              locateRequest={locateRequest}
+              onSelectTask={selectTaskFromClick}
+              selectedTaskId={selectedTaskId}
+              viewModel={workspace.viewModel}
+            />
+          ) : null}
+          {view === 'timeline' ? (
+            <TimelineView
+              locateRequest={locateRequest}
+              onSelectTask={selectTaskFromClick}
+              selectedTaskId={selectedTaskId}
+              viewModel={workspace.viewModel}
+            />
+          ) : null}
+        </div>
+        <aside
+          aria-label={displayedTask ? 'Selected task detail' : 'Board mission brief'}
+          className="dpanel-wrap"
+          id="detail"
+        >
+          {displayedTask ? (
+            <InspectorRail
+              decisions={selectedDecisions}
+              onClose={() => setSelectedTaskId(null)}
+              onSelectTask={selectTaskFromClick}
+              task={displayedTask}
+              taskLoading={taskLoading}
+              viewModel={workspace.viewModel}
+            />
+          ) : (
+            <BoardBrief
+              onSelectTask={selectTaskFromClick}
+              peers={peers}
+              statusReport={workspace.statusReport}
+              viewModel={workspace.viewModel}
+            />
+          )}
+        </aside>
       </div>
+
+      {topNotice ? (
+        <div className="top-feedback" role="status">
+          <span>{topNotice}</span>
+          {shareFallbackUrl ? (
+            <input aria-label="Workspace URL" readOnly value={shareFallbackUrl} />
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

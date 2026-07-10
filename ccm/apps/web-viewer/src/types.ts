@@ -18,6 +18,14 @@ export interface BoardSummary {
   health?: 'ok' | 'stale' | 'error' | 'unknown';
   updated_at?: string;
   task_count?: number;
+  /** Board-switcher card summary (additive; absent on older servers). */
+  status_counts?: Record<string, number>;
+  done_count?: number;
+  awaiting_count?: number;
+  priority?: string;
+  heartbeat_age_sec?: number | null;
+  branch?: string;
+  created_at?: string;
 }
 
 export interface BoardsPayload {

@@ -338,6 +338,15 @@ export function fmtEstimate(estimate: unknown): string | null {
   return `${raw} (≈${rounded}h)`;
 }
 
+/** KV-row value renderer: absent/empty -> "Not recorded", objects -> JSON. */
+export function recorded(value: unknown): string {
+  if (value === undefined || value === null || value === '') return 'Not recorded';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'number') return String(value);
+  return JSON.stringify(value);
+}
+
 // ---- watchdog rendering ------------------------------------------------------------------
 export interface WatchdogReadout {
   mechanism: string;

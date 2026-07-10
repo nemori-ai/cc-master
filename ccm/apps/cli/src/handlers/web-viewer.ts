@@ -1009,17 +1009,51 @@ function listBoards(home: string, current: string | null): unknown[] {
       }
       const selected = current ? path.resolve(current) === path.resolve(boardPath) : false;
       const tasks = tasksOf(board);
+      // Board-switcher card summary (additive): the mega dropdown renders a complete
+      // per-board identity card (progress / status buckets / priority / heartbeat age /
+      // branch) without a second round-trip — this loop already parses every board.
+      const owner =
+        board.owner && typeof board.owner === 'object' && !Array.isArray(board.owner)
+          ? (board.owner as JsonRecord)
+          : null;
+      const coordination =
+        board.coordination &&
+        typeof board.coordination === 'object' &&
+        !Array.isArray(board.coordination)
+          ? (board.coordination as JsonRecord)
+          : null;
+      const git =
+        board.git && typeof board.git === 'object' && !Array.isArray(board.git)
+          ? (board.git as JsonRecord)
+          : null;
+      const statusCounts = countStatuses(tasks);
+      const doneCount = tasks.filter((task) => {
+        const status = statusOf(task);
+        return status === 'done' || status === 'verified';
+      }).length;
+      const awaitingCount = tasks.filter((task) => isAwaitingUser(task as never)).length;
+      const heartbeatMs = owner ? parseTsLoose(owner.heartbeat) : null;
       return {
         id: boardIdFromFilename(file),
         filename: file,
         selected,
-        active:
-          board.owner && typeof board.owner === 'object'
-            ? (board.owner as JsonRecord).active === true
-            : undefined,
+        active: owner ? owner.active === true : undefined,
         health: Object.keys(board).length ? 'ok' : 'error',
         updated_at: stat ? stat.mtime.toISOString() : undefined,
         task_count: tasks.length,
+        status_counts: statusCounts,
+        done_count: doneCount,
+        awaiting_count: awaitingCount,
+        priority:
+          coordination && typeof coordination.priority === 'string'
+            ? coordination.priority
+            : undefined,
+        heartbeat_age_sec:
+          heartbeatMs != null
+            ? Math.max(0, Math.round((Date.now() - heartbeatMs) / 1000))
+            : undefined,
+        branch: git && typeof git.branch === 'string' ? git.branch : undefined,
+        created_at: typeof board.created_at === 'string' ? board.created_at : undefined,
         file,
         path: boardPath,
         current: selected,
