@@ -18,7 +18,7 @@ And there's real machinery behind the warmth: it **runs the numbers thousands of
 
 But make no mistake — this is **not** "make a wish and the AI does it all." Taste, design, direction — the calls only you can make **stay yours**; what it takes off your plate is just the breakdown, scheduling, babysitting, and accounting that would otherwise bury you. It even **teaches the AI to stop and ask you when it should** — cc-master's skills are full of philosophy and method for *when to pull the human back in*, handing judgment back to you rather than making the call for you. At bottom it does one thing: in the age of AI-assisted coding, it **reallocates your attention to where it's actually worth spending**.
 
-![The plan it keeps for you, at a glance](docs/images/view-graph-dark.png)
+![The plan it keeps for you, at a glance](docs/images/viewer-graph-dark.png)
 
 ```
 /cc-master:as-master-orchestrator turn my idea into something that works
@@ -67,6 +67,8 @@ All you do is the one idea at the start, and the few calls along the way.
 - **You come back in the morning**: all 6 languages done, every one checked, and your call on the product terms folded in.
 
 Start to finish, you said one sentence and made one decision.
+
+![When a call is genuinely yours, it comes prepared — context, options, and tradeoffs](docs/images/viewer-decision-card.png)
 
 ---
 
@@ -178,6 +180,10 @@ The handful of commands you'll actually type. The in-session entrypoint is harne
 - **Retro** — Claude Code: `/cc-master:retro`; Codex: `$cc-master-retro`. Read-only retrospective on an in-progress or archived board — writes a lessons-learned document into the project itself (not the board, not GitHub).
 - **Distill** — Claude Code: `/cc-master:distill <retro-path...>`; Codex: `$cc-master-distill <retro-path...>`. Turns a retro's candidate lessons into real project assets (discipline-doc note, skill, workflow, or subagent) — always gated by a single user-approved plan, always collected via a feature-branch PR (or a draft directory for non-git projects). Never touches the board or `ccm`.
 - **`ccm account add|list|switch <email>`** — on Claude Code, build and steer a pool of backup accounts so pacing can switch when one window runs low. You run these in your terminal; tokens stay token-blind and never reach the AI's context. Cursor has no account autoswitch — use billing-period pacing instead.
+
+Running several orchestrations at once? Every live board in your home is one click away in the viewer:
+
+![The viewer's board switcher: every live board in your home, one click apart](docs/images/viewer-board-switcher.png)
 
 > That's the everyday set. The full command surface (every `ccm` namespace and flag) is in the [command catalog](plugin/src/skills/using-ccm/canonical/references/command-catalog.md); what's shipped vs. still on the way is in the [Feature Manual](design_docs/feature-manual.md).
 
