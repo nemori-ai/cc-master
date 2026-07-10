@@ -832,6 +832,44 @@ test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no b
         join(home, 'reports', 'status-report', 'boards', '20260708T120000Z-1.status-report.json'),
       ),
     );
+    // Client contract (App.tsx boardHash fast path): the boards roster and the status
+    // report move independently of the selected board's bytes, so the client must keep
+    // committing them even when view-model.json's rev.boardHash is unchanged. Assert the
+    // server-side halves: /boards.json re-enumerates on every request (a board seeded
+    // after start appears without the selected board changing), and
+    // /status-report.json?refresh=1 re-stamps the artifact.
+    seedBoard(home, {
+      file: '20260708T120000Z-3.board.json',
+      goal: 'Third board seeded mid-flight',
+      tasks: [{ id: 'Z', title: 'Late arrival', status: 'ready', deps: [] }],
+    });
+    const rosterAfterSeed = await httpJson({ port, path: '/boards.json', token: 'route-token' });
+    assert.equal(rosterAfterSeed.status, 200);
+    assert.deepEqual(
+      rosterAfterSeed.body.boards.map((board: { id: string }) => board.id).sort(),
+      ['20260708T120000Z-1', '20260708T120000Z-2', '20260708T120000Z-3'],
+      'boards.json reflects a board added while the service is live',
+    );
+    assert.equal(rosterAfterSeed.body.current_board_id, '20260708T120000Z-1');
+    assert.equal(
+      readFileSync(boardPath, 'utf8'),
+      before,
+      'roster growth leaves the selected board byte-identical (client hash unchanged)',
+    );
+
+    const refreshed = await httpJson({
+      port,
+      path: '/status-report.json?board=20260708T120000Z-1.board.json&refresh=1',
+      token: 'route-token',
+    });
+    assert.equal(refreshed.status, 200);
+    assert.equal(refreshed.body.ok, true);
+    assert.ok(refreshed.body.artifact?.created_at, 'refresh=1 returns a stamped artifact');
+    assert.ok(
+      Date.parse(refreshed.body.artifact.created_at) >= Date.parse(ok.body.artifact.created_at),
+      'refresh=1 re-stamps created_at at or after the cached artifact',
+    );
+
     assert.equal(
       readFileSync(boardPath, 'utf8'),
       before,

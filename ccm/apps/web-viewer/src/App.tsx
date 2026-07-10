@@ -171,9 +171,13 @@ export function App() {
       .then((data) => {
         const previous = workspaceRef.current;
         // rev.boardHash short-circuit: identical board bytes on a background poll -> skip
-        // the whole setState cascade (no re-render churn on an idle board). Never short-
-        // circuit across a client-stale (last-known-good) frame — the stale banner has to
-        // appear when the board tears and clear when it recovers, same hash or not.
+        // the expensive view-model/task/selection cascade (no re-render churn on an idle
+        // board). Never short-circuit across a client-stale (last-known-good) frame — the
+        // stale banner has to appear when the board tears and clear when it recovers, same
+        // hash or not. The hash only covers the SELECTED board's bytes: the boards roster
+        // (another board added/archived) and the status report (TTL refresh) move
+        // independently, so commit those cheap payloads even on a hash hit — with a JSON
+        // equality guard so an idle poll still causes zero re-renders.
         if (
           hasFrame &&
           previous &&
@@ -184,6 +188,18 @@ export function App() {
           previous.viewModel.rev.boardHash === data.viewModel.rev?.boardHash &&
           previous.viewModel.board.filename === data.viewModel.board.filename
         ) {
+          const boardsChanged = JSON.stringify(previous.boards) !== JSON.stringify(data.boards);
+          const reportChanged =
+            JSON.stringify(previous.statusReport) !== JSON.stringify(data.statusReport);
+          if (boardsChanged || reportChanged) {
+            // Keep viewModel/selectedTask references from the previous frame so the graph
+            // and inspector see stable props; only the light payloads swap.
+            setWorkspace({
+              ...previous,
+              boards: boardsChanged ? data.boards : previous.boards,
+              statusReport: reportChanged ? data.statusReport : previous.statusReport
+            });
+          }
           return;
         }
         // Board switch lands here with the OLD frame still on screen (last-known-good):
