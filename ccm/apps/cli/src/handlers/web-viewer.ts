@@ -914,7 +914,7 @@ export function probeRunningServiceHealth(home: string, id?: string): HealthResu
   return defaultIndexProbe(service, token);
 }
 
-function mimeType(filePath: string): string {
+export function mimeType(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.html') return 'text/html; charset=utf-8';
   if (ext === '.js' || ext === '.mjs') return 'text/javascript; charset=utf-8';
@@ -925,6 +925,7 @@ function mimeType(filePath: string): string {
   if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
   if (ext === '.webp') return 'image/webp';
   if (ext === '.woff2') return 'font/woff2';
+  if (ext === '.woff') return 'font/woff';
   return 'application/octet-stream';
 }
 
