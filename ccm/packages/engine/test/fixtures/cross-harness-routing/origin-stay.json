@@ -1,0 +1,168 @@
+{
+  "origin_harness": "cursor",
+  "task": {
+    "id": "T-origin-stay",
+    "status": "in_flight",
+    "deps": [],
+    "executor": "subagent",
+    "estimate": { "value": 1, "unit": "h" },
+    "handle": "native://cursor/agent-1",
+    "planning": {
+      "schema": "ccm/task-planning/v1",
+      "assessed_at": "2026-07-10T08:00:00Z",
+      "assessor": "master-orchestrator",
+      "dimensions": {
+        "reasoning": "routine",
+        "uncertainty": "low",
+        "risk": "low",
+        "scope": "local",
+        "context": "large",
+        "coordination": "none",
+        "reversibility": "reversible"
+      },
+      "estimate_confidence": "high",
+      "quality": { "effect_floor": "meets-required-capabilities" },
+      "budget": { "posture": "tight", "max_attempts": 1 },
+      "capabilities": {
+        "required": [{ "id": "workspace-context-locality" }],
+        "preferred": [],
+        "forbidden": [{ "id": "push-remote" }]
+      }
+    },
+    "routing": {
+      "schema": "ccm/agent-routing/v1",
+      "mode": "cross-harness",
+      "policy": {
+        "objective": "cost-first",
+        "constraints": {
+          "effect_floor": "meets-required-capabilities",
+          "quota_unknown": "ineligible",
+          "cross_harness_quota_admission": "ample-only"
+        },
+        "candidates": [
+          {
+            "id": "cursor-native",
+            "surface": "host-native",
+            "adapter": "cursor/native-v1",
+            "harness": "cursor",
+            "provider": "cursor",
+            "model": "host-default",
+            "effort": "medium",
+            "capabilities": ["workspace-context-locality"],
+            "effect_floors_met": ["meets-required-capabilities"],
+            "permission": {
+              "profile": "workspace-write",
+              "denies": ["push-remote", "account-mutation"]
+            },
+            "account_mutation": "forbidden",
+            "requires": [
+              "runtime-healthy",
+              "capability-match",
+              "effect-floor",
+              "permission-compatible",
+              "account-mutation-forbidden"
+            ]
+          }
+        ],
+        "chains": { "ample": ["cursor-native"], "tight": ["cursor-native"] },
+        "fallback": {
+          "on": [],
+          "never_on": [
+            "policy-blocked",
+            "permission-blocked",
+            "security-blocked",
+            "workspace-mismatch",
+            "task-blocked",
+            "acceptance-failed"
+          ],
+          "exhaustion": "fail-closed",
+          "same_harness": "explicit-candidate-only"
+        }
+      },
+      "selected": {
+        "candidate_id": "cursor-native",
+        "chain": "tight",
+        "selected_at": "2026-07-10T08:01:00Z",
+        "evidence": {
+          "observed_at": "2026-07-10T08:00:30Z",
+          "valid_until": "2026-07-10T08:05:00Z",
+          "qualification_results": [
+            {
+              "predicate": "runtime-healthy",
+              "status": "pass",
+              "ref": "capability://cursor/native"
+            },
+            {
+              "predicate": "capability-match",
+              "status": "pass",
+              "ref": "contract://planning/capabilities"
+            },
+            {
+              "predicate": "effect-floor",
+              "status": "pass",
+              "ref": "contract://planning/effect-floor"
+            },
+            {
+              "predicate": "permission-compatible",
+              "status": "pass",
+              "ref": "contract://planning/permissions"
+            },
+            {
+              "predicate": "account-mutation-forbidden",
+              "status": "pass",
+              "ref": "contract://planning/account-mutation"
+            }
+          ]
+        },
+        "reason_codes": ["origin-stay-context-cost"]
+      },
+      "attempts": [
+        {
+          "id": "A1",
+          "candidate_id": "cursor-native",
+          "state": "running",
+          "started_at": "2026-07-10T08:01:01Z",
+          "handle": "native://cursor/agent-1",
+          "requested": { "model": "host-default", "effort": "medium" },
+          "selection_snapshot": {
+            "candidate_id": "cursor-native",
+            "chain": "tight",
+            "selected_at": "2026-07-10T08:01:00Z",
+            "evidence": {
+              "observed_at": "2026-07-10T08:00:30Z",
+              "valid_until": "2026-07-10T08:05:00Z",
+              "qualification_results": [
+                {
+                  "predicate": "runtime-healthy",
+                  "status": "pass",
+                  "ref": "capability://cursor/native"
+                },
+                {
+                  "predicate": "capability-match",
+                  "status": "pass",
+                  "ref": "contract://planning/capabilities"
+                },
+                {
+                  "predicate": "effect-floor",
+                  "status": "pass",
+                  "ref": "contract://planning/effect-floor"
+                },
+                {
+                  "predicate": "permission-compatible",
+                  "status": "pass",
+                  "ref": "contract://planning/permissions"
+                },
+                {
+                  "predicate": "account-mutation-forbidden",
+                  "status": "pass",
+                  "ref": "contract://planning/account-mutation"
+                }
+              ]
+            },
+            "reason_codes": ["origin-stay-context-cost"]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -6,12 +6,25 @@
 //   行为断言（lintBoard 全集规则 + 级别 SSOT 一致）逐条保留。
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 // 测 build 后的 dist 公开 API barrel（见 board-model.test.ts 注：源 NodeNext `.js` specifier 直跑解析不了）。
 //   lintBoard / levelOf 都从 @ccm/engine 的统一面取——这正是下游消费方拿到的接口。
 import { levelOf, lintBoard } from '../dist/index.mjs';
 
 const model = { levelOf };
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ROUTED_TASK = JSON.parse(
+  readFileSync(join(HERE, 'fixtures', 'cross-harness-routing', 'same-harness-cli.json'), 'utf8'),
+).task;
+const ROUTING_CONTRACTS = {
+  task_planning: 'ccm/task-planning/v1',
+  agent_routing: 'ccm/agent-routing/v1',
+  agent_routing_activated_at: '2026-07-10T08:00:00Z',
+  agent_routing_grandfathered_terminal: [],
+};
 
 const ruleSet = (arr: { rule: string }[]) => new Set(arr.map((v) => v.rule));
 const has = (r: { errors: { rule: string }[]; warnings: { rule: string }[] }, rule: string) =>
@@ -957,6 +970,88 @@ test('BIZ-DONE-VERIFIED: done task requires verified=true and non-empty artifact
     }),
   );
   assert.ok(!has(ok, 'BIZ-DONE-VERIFIED'), 'done + verified + artifact is clean');
+});
+
+test('routing contracts are additive: legacy boards stay clean; partial activation is hard invalid', () => {
+  const legacy = lintBoard(
+    onlyTask({ id: 'L', status: 'ready', deps: [], executor: 'subagent', handle: 'legacy' }),
+  );
+  assert.ok(!ruleSet(legacy.errors).has('BIZ-ROUTED-PLANNING-REQUIRED'));
+  assert.ok(!ruleSet(legacy.errors).has('BIZ-ROUTE-POLICY-REQUIRED'));
+
+  const partial = lintBoard(
+    J({
+      ...GOOD,
+      meta: { template_version: 3, contracts: { task_planning: 'ccm/task-planning/v1' } },
+    }),
+  );
+  assert.ok(ruleSet(partial.errors).has('FMT-CONTRACTS'));
+});
+
+test('contract-enabled in-flight route enforces planning/policy/selection/attempt handle gates', () => {
+  const enabled = (task: unknown) =>
+    lintBoard(
+      J({
+        ...GOOD,
+        meta: { template_version: 3, contracts: ROUTING_CONTRACTS },
+        tasks: [task],
+      }),
+    );
+
+  const good = enabled(ROUTED_TASK);
+  for (const rule of [
+    'BIZ-ROUTED-PLANNING-REQUIRED',
+    'BIZ-ROUTE-POLICY-REQUIRED',
+    'BIZ-ROUTE-SELECTION-REQUIRED',
+    'BIZ-ROUTE-ATTEMPT-REQUIRED',
+  ]) {
+    assert.ok(!ruleSet(good.errors).has(rule), `${rule}: ${J(good.errors)}`);
+  }
+
+  const noPlanning = structuredClone(ROUTED_TASK);
+  delete noPlanning.planning;
+  assert.ok(ruleSet(enabled(noPlanning).errors).has('BIZ-ROUTED-PLANNING-REQUIRED'));
+
+  const noSelection = structuredClone(ROUTED_TASK);
+  noSelection.routing.selected = null;
+  assert.ok(ruleSet(enabled(noSelection).errors).has('BIZ-ROUTE-SELECTION-REQUIRED'));
+
+  const fakeHandle = structuredClone(ROUTED_TASK);
+  fakeHandle.handle = 'different-claim';
+  assert.ok(ruleSet(enabled(fakeHandle).errors).has('BIZ-ROUTE-ATTEMPT-REQUIRED'));
+});
+
+test('grandfather is fingerprinted terminal-only and disappears when a task retries', () => {
+  const historical = {
+    id: 'HIST',
+    status: 'failed',
+    deps: [],
+    executor: 'subagent',
+    created_at: '2026-07-01T08:00:00Z',
+  };
+  const meta = {
+    template_version: 3,
+    contracts: {
+      ...ROUTING_CONTRACTS,
+      agent_routing_grandfathered_terminal: [
+        { task_id: 'HIST', created_at: '2026-07-01T08:00:00Z' },
+      ],
+    },
+  };
+  const old = lintBoard(J({ ...GOOD, meta, tasks: [historical] }));
+  assert.ok(!ruleSet(old.errors).has('BIZ-ROUTED-PLANNING-REQUIRED'));
+
+  const retry = lintBoard(J({ ...GOOD, meta, tasks: [{ ...historical, status: 'ready' }] }));
+  assert.ok(ruleSet(retry.errors).has('BIZ-ROUTED-PLANNING-REQUIRED'));
+
+  const recreated = lintBoard(
+    J({
+      ...GOOD,
+      meta,
+      tasks: [{ ...historical, status: 'done', created_at: '2026-07-10T09:00:00Z' }],
+    }),
+  );
+  assert.ok(ruleSet(recreated.errors).has('BIZ-ROUTED-PLANNING-REQUIRED'));
 });
 
 // ── 报告格式 ────────────────────────────────────────────────────────────────────────────────────────

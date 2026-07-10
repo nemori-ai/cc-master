@@ -42,6 +42,103 @@ function snapshot(o: unknown): string {
   return JSON.stringify(o);
 }
 
+function routedPlanning(): AnyBoard {
+  return {
+    schema: 'ccm/task-planning/v1',
+    assessed_at: '2026-07-10T08:00:00Z',
+    assessor: 'master-orchestrator',
+    dimensions: {
+      reasoning: 'multi-step',
+      uncertainty: 'low',
+      risk: 'medium',
+      scope: 'multi-file',
+      context: 'medium',
+      coordination: 'none',
+      reversibility: 'reversible',
+    },
+    estimate_confidence: 'high',
+    quality: { effect_floor: 'meets-required-capabilities' },
+    budget: { posture: 'ample', max_attempts: 2 },
+    capabilities: {
+      required: [{ id: 'structured-output' }],
+      preferred: [],
+      forbidden: [{ id: 'push-remote' }],
+    },
+  };
+}
+
+function routedPolicy(): AnyBoard {
+  return {
+    objective: 'balanced',
+    constraints: {
+      effect_floor: 'meets-required-capabilities',
+      quota_unknown: 'ineligible',
+      cross_harness_quota_admission: 'ample-only',
+    },
+    candidates: [
+      {
+        id: 'codex-cli',
+        surface: 'cli-headless',
+        adapter: 'codex-cli/headless-v1',
+        harness: 'codex',
+        provider: 'openai',
+        model: 'gpt-future',
+        effort: 'high',
+        capabilities: ['structured-output'],
+        effect_floors_met: ['meets-required-capabilities'],
+        permission: { profile: 'workspace-write', denies: ['push-remote', 'account-mutation'] },
+        account_mutation: 'forbidden',
+        requires: [
+          'runtime-healthy',
+          'capability-match',
+          'effect-floor',
+          'permission-compatible',
+          'account-mutation-forbidden',
+        ],
+      },
+    ],
+    chains: { ample: ['codex-cli'], tight: ['codex-cli'] },
+    fallback: {
+      on: ['transport-error'],
+      never_on: [
+        'policy-blocked',
+        'permission-blocked',
+        'security-blocked',
+        'workspace-mismatch',
+        'task-blocked',
+        'acceptance-failed',
+      ],
+      exhaustion: 'fail-closed',
+      same_harness: 'explicit-candidate-only',
+    },
+  };
+}
+
+function routeSelection(): AnyBoard {
+  return {
+    candidate_id: 'codex-cli',
+    chain: 'ample',
+    selected_at: '2026-07-10T08:01:00Z',
+    evidence: {
+      observed_at: '2026-07-10T08:00:30Z',
+      valid_until: '2026-07-10T08:05:00Z',
+      qualification_results: [
+        { predicate: 'runtime-healthy', status: 'pass', ref: 'capability://codex/cli' },
+        { predicate: 'capability-match', status: 'pass', ref: 'contract://capabilities' },
+        { predicate: 'effect-floor', status: 'pass', ref: 'contract://effect' },
+        { predicate: 'permission-compatible', status: 'pass', ref: 'contract://permission' },
+        {
+          predicate: 'account-mutation-forbidden',
+          status: 'pass',
+          ref: 'contract://account-mutation',
+        },
+      ],
+    },
+    reason_codes: ['capability-best-fit'],
+    rationale: 'fixture-backed route',
+  };
+}
+
 // ── stampNow ───────────────────────────────────────────────────────────────────────────────────
 test('stampNow → strict ISO-8601 UTC seconds (no millis)', () => {
   const s = m.stampNow();
@@ -276,6 +373,178 @@ test('transition unknown task → NotFound', () => {
   assert.throws(
     () => m.transition(baseBoard(), 'NOPE', 'done', {}),
     (e: any) => e.errKind === 'NotFound',
+  );
+});
+
+test('routing contract dedicated writers bind selection + immutable attempt snapshot + handle claim atomically', () => {
+  let board = baseBoard();
+  board.tasks.find((task: AnyBoard) => task.id === 'T1').executor = 'subagent';
+  board.tasks.find((task: AnyBoard) => task.id === 'T1').estimate = { value: 1, unit: 'h' };
+  board = m.setTaskPlanning(board, 'T1', routedPlanning());
+  board = m.setTaskRoutingPolicy(board, 'T1', routedPolicy());
+  board = m.bindTaskRoute(board, 'T1', {
+    selection: routeSelection(),
+    attempt: {
+      id: 'A1',
+      candidate_id: 'codex-cli',
+      state: 'running',
+      started_at: '2026-07-10T08:01:01Z',
+      handle: 'run://codex/A1',
+      requested: { model: 'gpt-future', effort: 'high' },
+    },
+  });
+  const task = board.tasks.find((entry: AnyBoard) => entry.id === 'T1');
+  assert.equal(task.status, 'in_flight');
+  assert.equal(task.handle, 'run://codex/A1');
+  assert.deepEqual(task.routing.selected, routeSelection());
+  assert.deepEqual(task.routing.attempts[0].selection_snapshot, routeSelection());
+});
+
+test('route bind rejects an empty handle claim and never mutates input', () => {
+  let board = baseBoard();
+  board.tasks.find((task: AnyBoard) => task.id === 'T1').executor = 'subagent';
+  board.tasks.find((task: AnyBoard) => task.id === 'T1').estimate = { value: 1, unit: 'h' };
+  board = m.setTaskPlanning(board, 'T1', routedPlanning());
+  board = m.setTaskRoutingPolicy(board, 'T1', routedPolicy());
+  const before = snapshot(board);
+  assert.throws(
+    () =>
+      m.bindTaskRoute(board, 'T1', {
+        selection: routeSelection(),
+        attempt: {
+          id: 'A1',
+          candidate_id: 'codex-cli',
+          state: 'running',
+          started_at: '2026-07-10T08:01:01Z',
+          handle: '',
+        },
+      }),
+    (error: any) => error.errKind === 'Validation' && /handle/.test(error.message),
+  );
+  assert.equal(snapshot(board), before);
+});
+
+test('contract-enabled routed start cannot bypass bind gate, even with force or initial in_flight add', () => {
+  const board = baseBoard();
+  board.meta.contracts = {
+    task_planning: 'ccm/task-planning/v1',
+    agent_routing: 'ccm/agent-routing/v1',
+    agent_routing_activated_at: '2026-07-10T08:00:00Z',
+    agent_routing_grandfathered_terminal: [],
+  };
+  board.tasks.find((task: AnyBoard) => task.id === 'T1').executor = 'subagent';
+  assert.throws(
+    () => m.transition(board, 'T1', 'in_flight', { force: true }),
+    (error: any) => error.errKind === 'Validation' && /route-bind/.test(error.message),
+  );
+  assert.throws(
+    () => m.addTask(board, { id: 'NEW', status: 'in_flight', executor: 'subagent' }),
+    (error: any) => error.errKind === 'Validation' && /route-bind/.test(error.message),
+  );
+});
+
+test('generic setters and updateTask cannot overwrite dedicated planning/routing/contract/handle paths', () => {
+  const board = baseBoard();
+  assert.throws(() => m.applySetJson(board, 'tasks[T1].planning', routedPlanning()));
+  assert.throws(() => m.applySetJson(board, 'tasks[T1].routing', {}));
+  assert.throws(() =>
+    m.applySetJson(board, 'meta.contracts', {
+      task_planning: 'ccm/task-planning/v1',
+    }),
+  );
+  assert.throws(() => m.updateTask(board, 'T1', { planning: routedPlanning() }));
+
+  const enabled = structuredClone(board);
+  enabled.meta.contracts = {
+    task_planning: 'ccm/task-planning/v1',
+    agent_routing: 'ccm/agent-routing/v1',
+    agent_routing_activated_at: '2026-07-10T08:00:00Z',
+    agent_routing_grandfathered_terminal: [],
+  };
+  enabled.tasks.find((task: AnyBoard) => task.id === 'T1').executor = 'subagent';
+  assert.throws(
+    () => m.applySetJson(enabled, 'meta', { template_version: 3 }),
+    (error: any) => error.errKind === 'Validation' && /dedicated/.test(error.message),
+    'an ancestor replacement must not erase meta.contracts activation',
+  );
+  assert.throws(
+    () => m.applySetJson(enabled, 'meta.contracts', {}),
+    (error: any) => error.errKind === 'Validation' && /dedicated/.test(error.message),
+  );
+  assert.throws(() => m.updateTask(enabled, 'T1', { handle: 'fake' }));
+  assert.throws(() => m.applySet(enabled, 'tasks[T1].handle', 'fake'));
+});
+
+test('contract executor is mutation-frozen and the subagent→user→start→subagent attack never persists', () => {
+  const enabled = baseBoard();
+  enabled.meta.contracts = {
+    task_planning: 'ccm/task-planning/v1',
+    agent_routing: 'ccm/agent-routing/v1',
+    agent_routing_activated_at: '2026-07-10T08:00:00Z',
+    agent_routing_grandfathered_terminal: [],
+  };
+  const routed = enabled.tasks.find((task: AnyBoard) => task.id === 'T1');
+  routed.executor = 'subagent';
+
+  assert.throws(
+    () => m.updateTask(enabled, 'T1', { executor: 'master-orchestrator' }),
+    (error: any) => error.errKind === 'Validation' && /executor/.test(error.message),
+    'the first disguise step is blocked once contracts are active',
+  );
+  assert.throws(
+    () => m.applySet(enabled, 'tasks[T1].executor', 'master-orchestrator'),
+    (error: any) => error.errKind === 'Validation' && /executor/.test(error.message),
+    'generic setters cannot provide a second executor mutation path',
+  );
+
+  const disguised = structuredClone(enabled);
+  disguised.tasks.find((task: AnyBoard) => task.id === 'T1').executor = 'master-orchestrator';
+  const flying = m.transition(disguised, 'T1', 'in_flight', { force: true });
+  assert.throws(
+    () => m.updateTask(flying, 'T1', { executor: 'subagent' }),
+    (error: any) => error.errKind === 'Validation' && /executor|route-bind/.test(error.message),
+    'the final reclassification step is blocked even if hostile state predates this mutation',
+  );
+  assert.throws(
+    () => m.addTask(enabled, { id: 'NEW', status: 'ready', executor: 'subagent' }),
+    (error: any) =>
+      error.errKind === 'Validation' && /executor|planning|routing/.test(error.message),
+    'new active-contract subagents must be prepared before executor assignment',
+  );
+});
+
+test('a prepared ready task may become subagent exactly once under the active contract', () => {
+  let board = baseBoard();
+  board.meta.contracts = {
+    task_planning: 'ccm/task-planning/v1',
+    agent_routing: 'ccm/agent-routing/v1',
+    agent_routing_activated_at: '2026-07-10T08:00:00Z',
+    agent_routing_grandfathered_terminal: [],
+  };
+  board.tasks.find((task: AnyBoard) => task.id === 'T1').executor = 'master-orchestrator';
+  board.tasks.find((task: AnyBoard) => task.id === 'T1').estimate = { value: 1, unit: 'h' };
+  board = m.setTaskPlanning(board, 'T1', routedPlanning());
+  board = m.setTaskRoutingPolicy(board, 'T1', routedPolicy());
+  const next = m.updateTask(board, 'T1', { executor: 'subagent' });
+  assert.equal(next.tasks.find((task: AnyBoard) => task.id === 'T1').executor, 'subagent');
+});
+
+test('enableRoutingContracts grandfathers exact historical terminal fingerprints; retry loses exemption', () => {
+  const board = baseBoard();
+  const done = board.tasks.find((task: AnyBoard) => task.id === 'T0');
+  done.executor = 'subagent';
+  done.created_at = '2026-07-01T08:00:00Z';
+  const active = board.tasks.find((task: AnyBoard) => task.id === 'T1');
+  active.executor = 'master-orchestrator';
+
+  const enabled = m.enableRoutingContracts(board);
+  assert.deepEqual(enabled.meta.contracts.agent_routing_grandfathered_terminal, [
+    { task_id: 'T0', created_at: '2026-07-01T08:00:00Z' },
+  ]);
+  const retried = m.transition(m.transition(enabled, 'T0', 'stale', {}), 'T0', 'ready', {});
+  assert.throws(
+    () => m.transition(retried, 'T0', 'in_flight', { force: true }),
+    (error: any) => error.errKind === 'Validation' && /route-bind/.test(error.message),
   );
 });
 
