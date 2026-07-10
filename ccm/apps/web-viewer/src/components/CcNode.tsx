@@ -120,7 +120,9 @@ export function CcNode({ data }: NodeProps<CcFlowNode>) {
         </span>
         <span className="tid">{data.id}</span>
       </div>
-      <div className={`title${title ? '' : ' empty'}`}>{title || 'untitled'}</div>
+      <div className={`title${title ? '' : ' empty'}`} title={title || 'untitled'}>
+        {title || 'untitled'}
+      </div>
       {chips.length ? <div className="meta">{chips}</div> : null}
       {data.userGate ? (
         <div className="gateflag" title="paused — waiting on your decision">

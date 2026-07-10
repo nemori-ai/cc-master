@@ -1698,6 +1698,14 @@ header.missionline {
   font-weight: 500;
   color: var(--ink);
   word-break: break-word;
+  /* Instrument-tile discipline (legacy viewer): clamp to 2 lines so the tile
+     height stays bounded near NODE_H (graphLayout.ts) and never overflows its
+     rank-band swimlane — full text is on the title attribute for hover. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .cc-node .title.empty {
   color: var(--ink-faint);
