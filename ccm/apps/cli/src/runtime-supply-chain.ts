@@ -296,8 +296,33 @@ export function createDefaultRuntimeBackend(
       : 'platform security backend requires ACL/Authenticode and locked-SEA endpoint evidence',
     expectedAsset: asset,
     ensurePrivateDirectory(dirPath) {
-      fs.mkdirSync(dirPath, { recursive: true, mode: 0o700 });
-      if (supported) fs.chmodSync(dirPath, 0o700);
+      try {
+        fs.mkdirSync(dirPath, { mode: 0o700 });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      }
+      const pathStat = fs.lstatSync(dirPath);
+      if (pathStat.isSymbolicLink()) {
+        validation(`managed directory must not be a symlink: ${dirPath}`, 'RUNTIME_SYMLINK');
+      }
+      if (!pathStat.isDirectory()) {
+        validation(`managed path is not a directory: ${dirPath}`, 'RUNTIME_PATH_ESCAPE');
+      }
+      if (supported) {
+        const fd = fs.openSync(
+          dirPath,
+          fs.constants.O_RDONLY | (fs.constants.O_DIRECTORY || 0) | (fs.constants.O_NOFOLLOW || 0),
+        );
+        try {
+          const opened = fs.fstatSync(fd);
+          if (opened.dev !== pathStat.dev || opened.ino !== pathStat.ino) {
+            validation(`managed directory changed while opening: ${dirPath}`, 'RUNTIME_TOCTOU');
+          }
+          fs.fchmodSync(fd, 0o700);
+        } finally {
+          fs.closeSync(fd);
+        }
+      }
     },
     verifyOpenFile(_filePath, _fd, stat, purpose) {
       verifyPosixStat(stat, purpose, purpose === 'artifact' || purpose === 'managed-image');
@@ -312,10 +337,21 @@ export function createDefaultRuntimeBackend(
     publishUniqueFile,
     publishImage(stagingDir, finalDir) {
       requireSupported();
+      let claimed: fs.Stats;
       try {
         fs.mkdirSync(finalDir, { mode: 0o700 });
+        claimed = fs.lstatSync(finalDir);
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'EEXIST') return 'exists';
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+          const existing = fs.lstatSync(finalDir);
+          if (existing.isSymbolicLink()) {
+            validation(`image target must not be a symlink: ${finalDir}`, 'RUNTIME_SYMLINK');
+          }
+          if (!existing.isDirectory()) {
+            validation(`image target is not a directory: ${finalDir}`, 'RUNTIME_PATH_ESCAPE');
+          }
+          return 'exists';
+        }
         throw error;
       }
       try {
@@ -330,8 +366,16 @@ export function createDefaultRuntimeBackend(
         return 'published';
       } catch (error) {
         try {
-          fs.chmodSync(finalDir, 0o700);
-          fs.rmSync(finalDir, { recursive: true, force: true });
+          const current = fs.lstatSync(finalDir);
+          if (
+            !current.isSymbolicLink() &&
+            current.isDirectory() &&
+            current.dev === claimed.dev &&
+            current.ino === claimed.ino
+          ) {
+            fs.chmodSync(finalDir, 0o700);
+            fs.rmSync(finalDir, { recursive: true, force: true });
+          }
         } catch {
           // Preserve the primary publish failure.
         }
@@ -377,7 +421,9 @@ export function createRuntimeSupplyChain(
   const backend = options.backend || createDefaultRuntimeBackend();
   const now = options.now || (() => new Date());
   const randomId = options.randomId || (() => randomUUID().replaceAll('-', ''));
-  const root = path.join(resolveHome(env), 'runtimes', 'ccm', 'v1');
+  const home = resolveHome(env);
+  const managedParents = [path.join(home, 'runtimes'), path.join(home, 'runtimes', 'ccm')];
+  const root = path.join(managedParents[1] as string, 'v1');
 
   const dirs = {
     images: path.join(root, 'images'),
@@ -397,18 +443,72 @@ export function createRuntimeSupplyChain(
     }
   }
 
-  function ensureLayout(): void {
-    const existingRoot = (() => {
-      try {
-        return fs.lstatSync(root);
-      } catch {
-        return null;
-      }
-    })();
-    if (existingRoot?.isSymbolicLink())
-      validation(`runtime root must not be a symlink: ${root}`, 'RUNTIME_ROOT_SYMLINK');
-    backend.ensurePrivateDirectory(root);
-    for (const dir of Object.values(dirs)) backend.ensurePrivateDirectory(dir);
+  function inspectDirectoryNoFollow(
+    dirPath: string,
+    purpose: string,
+    verifyManaged: boolean,
+  ): boolean {
+    let stat: fs.Stats;
+    try {
+      stat = fs.lstatSync(dirPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+      throw error;
+    }
+    if (stat.isSymbolicLink())
+      validation(`${purpose} must not be a symlink: ${dirPath}`, 'RUNTIME_SYMLINK');
+    if (!stat.isDirectory())
+      validation(`${purpose} must be a directory: ${dirPath}`, 'RUNTIME_PATH_ESCAPE');
+    if (verifyManaged) backend.verifyManagedDirectory(dirPath, stat);
+    return true;
+  }
+
+  function managedPathComponents(candidate: string): string[] {
+    const relative = path.relative(root, candidate);
+    if (
+      relative === '' ||
+      relative.startsWith(`..${path.sep}`) ||
+      relative === '..' ||
+      path.isAbsolute(relative)
+    ) {
+      if (candidate === root) return [root];
+      validation(`managed path escapes runtime root: ${candidate}`, 'RUNTIME_PATH_ESCAPE');
+    }
+    const components = [root];
+    let cursor = root;
+    for (const part of relative.split(path.sep)) {
+      cursor = path.join(cursor, part);
+      components.push(cursor);
+    }
+    return components;
+  }
+
+  function preflightManagedPaths(candidates: string[]): void {
+    inspectDirectoryNoFollow(home, 'runtime home', false);
+    for (const dirPath of managedParents) {
+      inspectDirectoryNoFollow(dirPath, 'managed directory', true);
+    }
+    const paths = new Set<string>([root]);
+    for (const candidate of candidates) {
+      for (const component of managedPathComponents(candidate)) paths.add(component);
+    }
+    for (const dirPath of paths) {
+      inspectDirectoryNoFollow(dirPath, 'managed directory', true);
+    }
+  }
+
+  function ensureManagedDirectory(dirPath: string): void {
+    preflightManagedPaths([dirPath]);
+    backend.ensurePrivateDirectory(dirPath);
+  }
+
+  function ensureLayout(additionalTargets: string[] = []): void {
+    const layoutPaths = [...managedParents, root, ...Object.values(dirs)];
+    preflightManagedPaths([root, ...Object.values(dirs), ...additionalTargets]);
+    if (!inspectDirectoryNoFollow(home, 'runtime home', false)) {
+      backend.ensurePrivateDirectory(home);
+    }
+    for (const dir of layoutPaths) backend.ensurePrivateDirectory(dir);
     const marker = path.join(dirs.launcher, 'README.json');
     if (backend.activationSupported && !fs.existsSync(marker)) {
       try {
@@ -424,19 +524,8 @@ export function createRuntimeSupplyChain(
   }
 
   function inspectExistingLayout(): boolean {
-    let stat: fs.Stats;
-    try {
-      stat = fs.lstatSync(root);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
-      throw error;
-    }
-    if (stat.isSymbolicLink())
-      validation(`runtime root must not be a symlink: ${root}`, 'RUNTIME_ROOT_SYMLINK');
-    if (!stat.isDirectory())
-      validation(`runtime root must be a directory: ${root}`, 'RUNTIME_PATH_ESCAPE');
-    backend.verifyManagedDirectory(root, stat);
-    return true;
+    preflightManagedPaths([root]);
+    return inspectDirectoryNoFollow(root, 'runtime root', true);
   }
 
   function assertTrustedManagedPath(candidate: string, purpose: string): void {
@@ -469,7 +558,7 @@ export function createRuntimeSupplyChain(
   }
 
   function writeUniqueJson(finalPath: string, value: unknown): void {
-    backend.ensurePrivateDirectory(path.dirname(finalPath));
+    ensureManagedDirectory(path.dirname(finalPath));
     const tmp = tempPath(path.dirname(finalPath), path.basename(finalPath));
     try {
       fs.writeFileSync(tmp, jsonText(value), { flag: 'wx', mode: 0o600 });
@@ -722,7 +811,7 @@ export function createRuntimeSupplyChain(
     extra: Partial<RuntimeTransactionEvent> = {},
   ): string {
     const dir = transactionDir(transactionId);
-    backend.ensurePrivateDirectory(dir);
+    ensureManagedDirectory(dir);
     const seq =
       fs
         .readdirSync(dir)
@@ -866,11 +955,11 @@ export function createRuntimeSupplyChain(
     provenancePath: string;
   }): StageResult {
     ensureSupported();
-    ensureLayout();
     const provenance = parseProvenance(provenancePath);
     const expectedHash = provenance.sha256;
     const finalDir = path.join(dirs.images, expectedHash);
     const finalImage = path.join(finalDir, 'ccm');
+    ensureLayout([finalDir]);
     let reused = false;
     const stagingDir = fs.mkdtempSync(path.join(dirs.images, '.stage-'));
     backend.ensurePrivateDirectory(stagingDir);
@@ -1004,7 +1093,9 @@ export function createRuntimeSupplyChain(
 
   function resolve(): RuntimeResolution {
     ensureSupported();
-    ensureLayout();
+    if (!inspectExistingLayout()) {
+      notFound('no active runtime image', 'RUNTIME_CURRENT_MISSING');
+    }
     const latest = latestActivation();
     if (!latest) notFound('no active runtime image', 'RUNTIME_CURRENT_MISSING');
     const imagePath = resolveRef(latest.activation.current).imagePath;

@@ -841,3 +841,69 @@ test('runtime CLI dry-run is read-only and never silently executes mutation verb
   const invokeDryRun = invokeCli(['runtime', 'invoke', '--dry-run', '--', '--version'], first.home);
   assert.equal(invokeDryRun.code, 2, invokeDryRun.stderr);
 });
+
+test('resolve and doctor read paths never initialize or repair runtime layout', () => {
+  const empty = fixture('9.2.0');
+  expectRuntimeError(() => manager(empty.home).resolve(), 'RUNTIME_CURRENT_MISSING');
+  assert.equal(
+    existsSync(runtimeRoot(empty.home)),
+    false,
+    'empty resolve must perform zero writes',
+  );
+
+  const active = fixture('9.2.1');
+  const runtime = manager(active.home);
+  const staged = runtime.stage({
+    artifactPath: active.artifact,
+    provenancePath: active.provenance,
+  });
+  runtime.activate(staged.transaction_id);
+  const marker = join(runtimeRoot(active.home), 'launcher', 'README.json');
+  unlinkSync(marker);
+  const beforeEntries = readdirSync(runtimeRoot(active.home), { recursive: true })
+    .map(String)
+    .sort();
+
+  assert.equal(runtime.resolve().sha256, active.hash);
+  assert.equal(runtime.doctor().current?.sha256, active.hash);
+  const dryRun = invokeCli(['runtime', 'doctor', '--dry-run', '--json'], active.home);
+  assert.equal(dryRun.code, 0, dryRun.stderr);
+  assert.equal(JSON.parse(dryRun.stdout).data.current.sha256, active.hash);
+  assert.equal(existsSync(marker), false, 'read paths must not restore a deleted launcher marker');
+  assert.deepEqual(
+    readdirSync(runtimeRoot(active.home), { recursive: true }).map(String).sort(),
+    beforeEntries,
+    'read paths must not add managed entries',
+  );
+});
+
+test('stage rejects a managed child symlink before chmod, mkdir, staging, or publish', () => {
+  const f = fixture('9.3.0');
+  const root = runtimeRoot(f.home);
+  const external = join(f.root, 'external-images');
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  mkdirSync(external, { mode: 0o755 });
+  writeFileSync(join(external, 'sentinel.txt'), 'outside-must-not-change\n', { mode: 0o644 });
+  symlinkSync(external, join(root, 'images'));
+  const beforeMode = lstatSync(external).mode & 0o777;
+  const beforeEntries = readdirSync(external, { recursive: true }).map(String).sort();
+  const beforeSentinel = readFileSync(join(external, 'sentinel.txt'), 'utf8');
+
+  expectRuntimeError(
+    () => manager(f.home).stage({ artifactPath: f.artifact, provenancePath: f.provenance }),
+    'RUNTIME_SYMLINK',
+  );
+
+  assert.equal(lstatSync(external).mode & 0o777, beforeMode, 'external mode must not be chmodded');
+  assert.deepEqual(
+    readdirSync(external, { recursive: true }).map(String).sort(),
+    beforeEntries,
+    'external directory must not receive a staged or published image',
+  );
+  assert.equal(readFileSync(join(external, 'sentinel.txt'), 'utf8'), beforeSentinel);
+  assert.deepEqual(
+    readdirSync(root).sort(),
+    ['images'],
+    'preflight rejection must happen before any other managed directory is created',
+  );
+});
