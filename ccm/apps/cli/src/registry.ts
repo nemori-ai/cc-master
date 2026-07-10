@@ -1267,6 +1267,73 @@ export const REGISTRY: Registry = {
     },
   },
 
+  // ════════════════════ runtime（cross-harness immutable runtime supply chain·C1）═══════════════════
+  runtime: {
+    stage: {
+      summary:
+        '校验 official provenance + SHA-256 后写入 immutable runtime image store（不 activation）',
+      read: false,
+      positionals: [{ name: 'artifact', required: true }],
+      options: {
+        provenance: { type: 'string', required: true, desc: 'ccm/runtime-provenance/v1 JSON 文件' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm runtime stage ./ccm-linux-x64 --provenance ./provenance.json --json'],
+      handler: 'runtime.stage',
+    },
+    activate: {
+      summary: '锁内重验 staged image 并原子追加 current/previous activation commit',
+      read: false,
+      positionals: [{ name: 'transaction-id', required: true }],
+      options: { json: { type: 'boolean', desc: '结构化输出' } },
+      examples: ['ccm runtime activate tx_<id> --json'],
+      handler: 'runtime.activate',
+    },
+    resolve: {
+      summary: '重验并返回 current 的 exact immutable image path/hash（stable selector）',
+      read: true,
+      positionals: [],
+      options: { json: { type: 'boolean', desc: '结构化输出' } },
+      examples: ['ccm runtime resolve --json'],
+      handler: 'runtime.resolve',
+    },
+    invoke: {
+      summary: '通过已重验的 pinned image fd 启动 current runtime；其后参数原样传给 runtime',
+      read: false,
+      positionals: [{ name: 'runtime-arg', required: false }],
+      options: {},
+      examples: ['ccm runtime invoke -- --version'],
+      handler: 'runtime.invoke',
+    },
+    doctor: {
+      summary:
+        '审计 runtime store/crash transaction；可解释 legacy in-place migration，--repair 锁内收口',
+      read: false,
+      positionals: [],
+      options: {
+        'installed-path': { type: 'string', desc: '只读解释现有 in-place ccm binary 的迁移计划' },
+        repair: {
+          type: 'boolean',
+          desc: '锁内补 recovered/aborted event并清已证 dead 的 stale lock',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm runtime doctor --installed-path ~/.local/bin/ccm --json',
+        'ccm runtime doctor --repair --json',
+      ],
+      handler: 'runtime.doctor',
+    },
+    rollback: {
+      summary: '追加新 activation commit，把 previous 原子切为 current；不杀已启动旧 runtime',
+      read: false,
+      positionals: [],
+      options: { json: { type: 'boolean', desc: '结构化输出' } },
+      examples: ['ccm runtime rollback --json'],
+      handler: 'runtime.rollback',
+    },
+  },
+
   // ════════════════════ estimate（只读 advisory·ADR-015）════════════════════════════════════════════
   //   工作侧只读 analysis namespace（消费 @ccm/engine OR/ML 算法层·纯只读·零写·不抢 board-lock）。
   //   p95=5% 硬墙永不取 max/不到 100%（引擎 conformal/MC 分位口径保证）。

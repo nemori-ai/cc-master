@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Cross-harness routed-task contract spine** — adds opt-in `ccm/task-planning/v1` and `ccm/agent-routing/v1` board contracts plus dedicated `ccm task set-planning`, `set-routing`, `route-bind`, and `ccm board enable-contract` writers. Contract-enabled subagent tasks must declare multidimensional difficulty, effect/capability/permission floors, ample/tight candidate chains, mechanical fallback authority, and an immutable per-attempt selection snapshot before entering `in_flight`; legacy boards remain unchanged and historical terminal tasks are fingerprint-grandfathered at activation.
+- **Cross-harness immutable runtime C1** — add `ccm runtime stage/activate/resolve/invoke/doctor/rollback`: content-addressed official artifacts, no-replace append-only current/previous commits, pinned-fd verification/invocation, crash recovery and rollback without killing an active old image. POSIX is supported by scope; the public state contract is symlink-free and Windows stays fail-closed behind a testable platform backend seam until ACL/Authenticode/locked-SEA gates pass. `using-ccm` command catalog is locked to the new namespace.
 
 ## [0.19.0] — 2026-07-10
 

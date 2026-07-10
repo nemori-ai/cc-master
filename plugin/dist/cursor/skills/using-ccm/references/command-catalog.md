@@ -1,7 +1,7 @@
 # ccm 命令面机械参考（command catalog）
 
 > 纯机械参考：命令、positional、flag、例子、`--json` 形状、exit code。状态机转移语义、字段三档纪律、`--set` 用法判断等判断型内容见 SKILL.md，本文不复述。
-> 基准版本：`ccm 0.16.0`。
+> 基准版本：`ccm 0.20.0` + 当前 Unreleased runtime supply chain。
 
 ## 目录（TOC）
 
@@ -92,6 +92,13 @@
   - [monitor uninstall-service](#monitor-uninstall-service)
 - [namespace services](#namespace-services)
   - [services reconcile](#services-reconcile)
+- [namespace runtime](#namespace-runtime)
+  - [runtime stage](#runtime-stage)
+  - [runtime activate](#runtime-activate)
+  - [runtime resolve](#runtime-resolve)
+  - [runtime invoke](#runtime-invoke)
+  - [runtime doctor](#runtime-doctor)
+  - [runtime rollback](#runtime-rollback)
 - [namespace estimate（只读 advisory）](#namespace-estimate只读-advisory)
   - [estimate show](#estimate-show)
   - [estimate forecast](#estimate-forecast)
@@ -144,6 +151,7 @@ ccm <alias> [args] [flags]
 | `web-viewer` | 本地只读 board web viewer lifecycle：open/start/status/stop/restart；home-scoped service，127.0.0.1 + token |
 | `monitor` | 可选本地 monitor daemon：连续扫 harness usage / active boards，复用 pool arbiter 边沿写 `coordination.inbox` |
 | `services` | home 常驻服务 reconcile：ccm 二进制替换后按 wanted 语义重启 monitor / web-viewer |
+| `runtime` | cross-harness worker runtime 的 immutable image supply chain：stage / activate / exact resolve+invoke / doctor / rollback（非 board 操作） |
 | `estimate` | 工作侧**只读 advisory**：双通道 MC 工期预测 / EVM / velocity / 风险（消费 OR/ML 引擎） |
 | `account` | 账号池 namespace 不对 Cursor 可用：`ccm account add` / `refresh` / `list` / `switch` 统一走 `NotImplemented`；仅保留 `usage` 对当前账户 billing_period 的只读 advisory。 |
 | `statusline` | statusline namespace 仅作兼容告知：Cursor 无外部命令式 status-line hook；`statusline install/uninstall` 为 `NotImplemented`（当前用量来自 `cursor-dashboard` / `GetCurrentPeriodUsage`）。 |
@@ -1602,6 +1610,104 @@ ccm services reconcile [flags]
 | `--json` | | bool | 结构化输出 |
 
 - 例：`ccm services reconcile --after-binary-replace` · `ccm services reconcile --after-binary-replace --json`
+
+---
+
+## namespace runtime
+
+ccm-owned cross-harness worker runtime 的 immutable supply chain。它只管理已给出的 official ccm
+artifact，不下载 release、不派 provider、不写 board、不造中央 daemon。默认 root 是
+`<home>/runtimes/ccm/v1`；`current/previous` 由同一 append-only activation commit 原子表达。
+
+当前首版支持 Linux/macOS POSIX backend。Windows 公共合同不依赖 symlink，但真实 ACL /
+Authenticode / locked SEA backend gate 尚未通过，相关写 verb fail closed（`exit 3`）。
+
+### runtime stage
+
+**写 immutable image store；不 activation**
+
+```text
+ccm runtime stage <artifact> --provenance <file> [--json]
+```
+
+- `--provenance`（required）：`ccm/runtime-provenance/v1` JSON，包含 official repository、release
+  tag、platform asset 和 SHA-256。
+- 校验 non-symlink regular file、owner/security、permission、platform asset、pinned-fd hash 与
+  provenance identity；成功返回 `transaction_id`、`sha256`、`image_path`、`image_ref`、
+  normalized `provenance`、`reused`。
+- 相同 bytes 的不同 tag/asset 不能静默复用；校验失败 `exit 3`，activation 数不增加。
+- `--dry-run` 不适用于本写 verb，显式 `exit 2`；要只读解释旧安装布局，使用
+  `runtime doctor --installed-path <binary> --dry-run`。
+
+### runtime activate
+
+**写 append-only activation commit**
+
+```text
+ccm runtime activate <transaction-id> [--json]
+```
+
+- 锁内重验 staged event、READY、exact image hash、manifest/provenance digest 与 identity。
+- 成功返回 `sequence`、`transaction_id`、`current`、`previous`、`operation:"activate"`、
+  `activation_path`。同一已完成 transaction 重试幂等返回原 commit。
+- `CCM_RUNTIME_ACTIVATION_DISABLE=1`、aborted transaction 或坏 artifact → `exit 3`；锁冲突 →
+  `exit 4`。不会覆盖或杀死已启动 image。
+- `--dry-run` 不适用于本写 verb，显式 `exit 2`。
+
+### runtime resolve
+
+**读**
+
+```text
+ccm runtime resolve [--json]
+```
+
+返回当前 `sequence`、`transaction_id`、`sha256`、exact `image_path` / `image_ref` 和
+`activation_path`。每次读取都重验最新 commit 与 image；最新 commit 损坏时 fail closed，不静默
+退旧版本。无 current → `exit 5`。
+
+### runtime invoke
+
+**启动 current exact image；不写 board**
+
+```text
+ccm runtime invoke -- <runtime-argv...>
+```
+
+selector 重验并固定 image fd，再由 platform backend 直接启动该 fd 对应 image；后续 activation /
+rollback 不 hot-reload 这个 invocation。handler 透传 child exit code；该 verb 不提供 JSON envelope。
+`--dry-run` 显式 `exit 2`，不会启动 child。
+
+### runtime doctor
+
+**默认只读；`--repair` 写 append-only recovery event**
+
+```text
+ccm runtime doctor [--installed-path <legacy-binary>] [--repair] [--json]
+```
+
+- `--installed-path`：只解释现有 in-place file 的迁移计划；`mutates_source:false`、
+  `preserves_home:true`，不会移动旧 binary。
+- 无 `--repair`：报告 backend、current、transaction/activation 数、prepared/crash gap 和 stale lock。
+  正常 staged transaction 不算 incomplete。
+- `--repair`：已证 dead 的 stale installer lock 才可回收；随后重新拿 activation lock，把
+  prepared-no-commit 追加为 `aborted`，把 commit-published-event-missing 追加为 `recovered`。
+  live/unknown lock owner → `exit 4`，不修改 journal。
+- `--dry-run` 可与默认只读 doctor / `--installed-path` 同用且不会初始化 runtime layout；
+  `--repair --dry-run` 为避免伪预览显式 `exit 2`。
+
+### runtime rollback
+
+**写 append-only activation commit**
+
+```text
+ccm runtime rollback [--json]
+```
+
+重验 previous 后追加 `operation:"rollback"` 的新 commit：旧 previous 成为新 current，旧 current
+成为新 previous。无 previous → `exit 5`；activation disable → `exit 3`。只影响新 invocation，
+不删除 home/image/transaction，也不杀旧 run。
+`--dry-run` 不适用于本写 verb，显式 `exit 2`。
 
 ---
 
