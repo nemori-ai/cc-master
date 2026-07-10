@@ -1018,3 +1018,650 @@ test('serve returns 503 when web-viewer assets are unavailable', async () => {
   }
   assert.equal(await servePromise, EXIT.OK);
 });
+
+test('serve exposes additive insights block, decisions.json sidecars, and compact provenance fields', async () => {
+  const home = mkHome();
+  const hours = (n: number) => new Date(Date.now() - n * 3_600_000).toISOString();
+  const boardPath = seedBoard(home, {
+    tasks: [
+      {
+        id: 'root',
+        title: 'Root task',
+        status: 'done',
+        verified: true,
+        deps: [],
+        artifact: 'out/root.md',
+        started_at: hours(4),
+        finished_at: hours(3.5),
+        justification: 'gates the whole release',
+        dep_pins: { plan: 'sha256:abc' },
+        hitl_rounds: 2,
+        notes: 'root note',
+        tags: ['infra', 'release'],
+        role: 'lead',
+        references: ['design_docs/root.md'],
+      },
+      { id: 'mid', title: 'Mid task', status: 'in_flight', deps: ['root'], started_at: hours(2) },
+      {
+        id: 'gate',
+        title: 'Gate task',
+        status: 'blocked',
+        blocked_on: 'user',
+        deps: ['root'],
+        started_at: hours(3),
+      },
+      { id: 'join', title: 'Join task', status: 'ready', deps: ['mid', 'gate'] },
+      { id: 'leaf', title: 'Leaf task', status: 'ready', deps: ['join'] },
+    ],
+  });
+  seedBoard(home, {
+    file: '20260708T120000Z-2.board.json',
+    goal: 'Second insights board',
+    tasks: [{ id: 'X', title: 'Other board task', status: 'ready', deps: [] }],
+  });
+
+  // discuss sidecars in the board home: two rounds for `gate` on THIS board, one same-node
+  // sidecar under ANOTHER board stem (must not bleed), one non-matching junk file, and one
+  // stem-prefixed file whose shape yields no node id (skipped, never throws).
+  const boardsDir = join(home, 'boards');
+  const stem = '20260708T120000Z-1';
+  writeFileSync(
+    join(boardsDir, `${stem}--gate--20260708T100000Z.decision.md`),
+    '---\nnode_id: gate\nresolved_at: 2026-07-08T10:00:00Z\nask_type: decision\n---\n\n## TL;DR\nPicked option A\n',
+    'utf8',
+  );
+  writeFileSync(
+    join(boardsDir, `${stem}--gate--20260708T110000Z.decision.md`),
+    '---\nnode_id: gate\nresolved_at: 2026-07-08T11:00:00Z\nask_type: advice\n---\n\n## TL;DR\nRevisited after new data\n',
+    'utf8',
+  );
+  writeFileSync(
+    join(boardsDir, '20260708T120000Z-2--gate--20260708T090000Z.decision.md'),
+    '---\nnode_id: gate\nresolved_at: 2026-07-08T09:00:00Z\nask_type: decision\n---\n\n## TL;DR\nOther board conclusion\n',
+    'utf8',
+  );
+  writeFileSync(join(boardsDir, 'garbage.decision.md'), 'not a sidecar at all', 'utf8');
+  writeFileSync(join(boardsDir, `${stem}--broken.decision.md`), 'no frontmatter here', 'utf8');
+
+  const root = join(home, 'services', 'web-viewer');
+  const statePath = join(root, 'instances', 'wv_insights.json');
+  const tokenPath = join(root, 'tokens', 'wv_insights.token');
+  mkdirSync(join(root, 'instances'), { recursive: true });
+  mkdirSync(join(root, 'tokens'), { recursive: true });
+  writeFileSync(tokenPath, 'insights-token', 'utf8');
+  writeFileSync(
+    statePath,
+    `${JSON.stringify(
+      {
+        schema: 'ccm/web-viewer-service/v1',
+        id: 'wv_insights',
+        pid: 0,
+        state_path: statePath,
+        token_file: tokenPath,
+        token_sha256: 'sha256:test',
+        home,
+        initial_board_path: boardPath,
+        current_selection: { board_path: boardPath, goal: 'Ship viewer lifecycle' },
+        scope: { home, session_id: SID },
+        host: '127.0.0.1',
+        port: 0,
+        base_url: 'http://127.0.0.1:0',
+        url: 'http://127.0.0.1:0/?token=<redacted>',
+        server: { started_at: '2026-07-08T12:01:02Z', ccm_version: '0.16.0' },
+        log_path: join(root, 'logs', 'wv_insights.log'),
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+
+  let ready!: () => void;
+  const readyPromise = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const servePromise = webViewer.serve({
+    values: { state: statePath },
+    positionals: [],
+    flags: {
+      json: false,
+      dryRun: false,
+      force: false,
+      yes: false,
+      quiet: false,
+      verbose: false,
+      color: false,
+    },
+    sid: SID,
+    env: { CC_MASTER_HOME: home },
+    out: () => ready(),
+    err: () => {},
+  });
+  await readyPromise;
+  const runtimeState = JSON.parse(readFileSync(statePath, 'utf8'));
+  const port = runtimeState.port;
+
+  try {
+    // ---- insights block (additive, server-derived analytics) ----
+    const viewModel = await httpJson({
+      port,
+      path: '/view-model.json?board=20260708T120000Z-1.board.json',
+      token: 'insights-token',
+    });
+    assert.equal(viewModel.status, 200);
+    assert.equal(viewModel.body.schema, 'ccm/web-viewer-view-model/v1');
+    const insights = viewModel.body.insights;
+    assert.ok(insights, 'view-model carries an insights block');
+    assert.deepEqual(insights.impact, { id: 'root', count: 4 });
+    assert.equal(insights.convergence.id, 'join');
+    assert.equal(insights.convergence.in_deg, 2);
+    // both stallers gate 2 tasks; `gate` has been waiting longer -> elapsed tie-break wins
+    assert.equal(insights.bottleneck.id, 'gate');
+    assert.equal(insights.bottleneck.impact, 2);
+    assert.equal(insights.bottleneck.status, 'blocked');
+    assert.ok(insights.bottleneck.elapsed_ms > 2.9 * 3_600_000);
+    assert.deepEqual(insights.wip, { count: 1, limit: 4, over: false });
+    assert.equal(insights.awaiting.count, 1);
+    assert.ok(insights.awaiting.oldest_gate_elapsed_ms > 2.9 * 3_600_000);
+    assert.ok(insights.awaiting.oldest_gate_elapsed_ms < 3.1 * 3_600_000);
+    assert.ok(insights.age_ms > 3.9 * 3_600_000, 'age from earliest start anchor');
+    assert.equal(insights.per_node.root.impact, 4);
+    assert.equal(insights.per_node.root.in_deg, 0);
+    assert.equal(insights.per_node.join.in_deg, 2);
+    assert.equal(insights.per_node.mid.impact, 2);
+    assert.equal(insights.per_node.leaf.impact, 0);
+
+    // ---- compactTask whitelist additions surface on view-model tasks + /task.json ----
+    const compactRoot = viewModel.body.tasks.find((t: { id: string }) => t.id === 'root');
+    assert.equal(compactRoot.justification, 'gates the whole release');
+    assert.deepEqual(compactRoot.dep_pins, { plan: 'sha256:abc' });
+    assert.equal(compactRoot.hitl_rounds, 2);
+    assert.equal(compactRoot.notes, 'root note');
+    assert.deepEqual(compactRoot.tags, ['infra', 'release']);
+    assert.equal(compactRoot.role, 'lead');
+    assert.deepEqual(compactRoot.references, ['design_docs/root.md']);
+
+    const detail = await httpJson({
+      port,
+      path: '/task.json?board=20260708T120000Z-1.board.json&task=root',
+      token: 'insights-token',
+    });
+    assert.equal(detail.status, 200);
+    assert.equal(detail.body.task.justification, 'gates the whole release');
+    assert.equal(detail.body.task.hitl_rounds, 2);
+    assert.deepEqual(detail.body.task.dep_pins, { plan: 'sha256:abc' });
+
+    // ---- /decisions.json: pinned shape, round grouping, cross-board stem guard ----
+    const forbidden = await httpJson({ port, path: '/decisions.json' });
+    assert.equal(forbidden.status, 403);
+
+    const decisions = await httpJson({
+      port,
+      path: '/decisions.json?board=20260708T120000Z-1.board.json',
+      token: 'insights-token',
+    });
+    assert.equal(decisions.status, 200);
+    assert.deepEqual(decisions.body, [
+      {
+        node_id: 'gate',
+        file: `${stem}--gate--20260708T100000Z.decision.md`,
+        resolved_at: '2026-07-08T10:00:00Z',
+        ask_type: 'decision',
+        round: 1,
+        tldr: 'Picked option A',
+      },
+      {
+        node_id: 'gate',
+        file: `${stem}--gate--20260708T110000Z.decision.md`,
+        resolved_at: '2026-07-08T11:00:00Z',
+        ask_type: 'advice',
+        round: 2,
+        tldr: 'Revisited after new data',
+      },
+    ]);
+
+    // the other board sees ONLY its own stem-prefixed sidecar (no bleed either way)
+    const otherDecisions = await httpJson({
+      port,
+      path: '/decisions.json?board=20260708T120000Z-2.board.json',
+      token: 'insights-token',
+    });
+    assert.equal(otherDecisions.status, 200);
+    assert.equal(otherDecisions.body.length, 1);
+    assert.equal(otherDecisions.body[0].tldr, 'Other board conclusion');
+    assert.equal(otherDecisions.body[0].round, 1);
+
+    // missing board -> 404 (aligned with the other board-scoped endpoints)
+    const missing = await httpJson({
+      port,
+      path: '/decisions.json?board=nope.board.json',
+      token: 'insights-token',
+    });
+    assert.equal(missing.status, 404);
+  } finally {
+    await httpJson({ port, path: '/_ccm/shutdown', token: 'insights-token', method: 'POST' }).catch(
+      () => {},
+    );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});
+
+// ---- stage 2: board_extras additive block + /peers.json roster --------------------------
+
+function writeServeState(
+  home: string,
+  id: string,
+  token: string,
+  boardPath: string,
+): { statePath: string } {
+  const root = join(home, 'services', 'web-viewer');
+  const statePath = join(root, 'instances', `${id}.json`);
+  const tokenPath = join(root, 'tokens', `${id}.token`);
+  mkdirSync(join(root, 'instances'), { recursive: true });
+  mkdirSync(join(root, 'tokens'), { recursive: true });
+  writeFileSync(tokenPath, token, 'utf8');
+  writeFileSync(
+    statePath,
+    `${JSON.stringify(
+      {
+        schema: 'ccm/web-viewer-service/v1',
+        id,
+        pid: 0,
+        state_path: statePath,
+        token_file: tokenPath,
+        token_sha256: 'sha256:test',
+        home,
+        initial_board_path: boardPath,
+        current_selection: { board_path: boardPath, goal: 'Ship viewer lifecycle' },
+        scope: { home, session_id: SID },
+        host: '127.0.0.1',
+        port: 0,
+        base_url: 'http://127.0.0.1:0',
+        url: 'http://127.0.0.1:0/?token=<redacted>',
+        server: { started_at: '2026-07-08T12:01:02Z', ccm_version: '0.16.0' },
+        log_path: join(root, 'logs', `${id}.log`),
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+  return { statePath };
+}
+
+async function startServe(
+  statePath: string,
+  home: string,
+): Promise<{
+  port: number;
+  servePromise: Promise<number>;
+}> {
+  let ready!: () => void;
+  const readyPromise = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const servePromise = webViewer.serve({
+    values: { state: statePath },
+    positionals: [],
+    flags: {
+      json: false,
+      dryRun: false,
+      force: false,
+      yes: false,
+      quiet: false,
+      verbose: false,
+      color: false,
+    },
+    sid: SID,
+    env: { CC_MASTER_HOME: home },
+    out: () => ready(),
+    err: () => {},
+  });
+  await readyPromise;
+  const runtimeState = JSON.parse(readFileSync(statePath, 'utf8'));
+  return { port: runtimeState.port, servePromise };
+}
+
+// Strict ISO-8601 UTC without milliseconds (the engine's ISO_UTC_RE shape).
+function isoNoMs(msEpoch: number): string {
+  return new Date(msEpoch).toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function writeBoard(home: string, file: string, board: Record<string, unknown>): string {
+  const boardPath = join(home, 'boards', file);
+  writeFileSync(boardPath, `${JSON.stringify(board, null, 2)}\n`, 'utf8');
+  return boardPath;
+}
+
+test('serve exposes additive board_extras block with graceful absence and over-scheduling diagnostics', async () => {
+  const home = mkHome();
+  const judgmentCalls = [
+    {
+      id: 'jc-1',
+      ts: '2026-07-08T09:00:00Z',
+      category: 'architecture',
+      severity: 'high',
+      status: 'pending_review',
+      summary: 'Chose process-boundary shell over in-process import',
+    },
+    {
+      id: 'jc-2',
+      ts: '2026-07-08T10:00:00Z',
+      category: 'drift',
+      severity: 'medium',
+      status: 'upheld',
+      summary: 'Kept legacy field alias for archived boards',
+    },
+    {
+      id: 'jc-3',
+      ts: '2026-07-08T11:00:00Z',
+      category: 'other',
+      severity: 'low',
+      status: 'overturned',
+      summary: 'Reverted speculative cache layer',
+    },
+  ];
+  const cadence = {
+    target: { ship_every: '24h' },
+    iterations: [
+      {
+        id: 'it-2',
+        status: 'open',
+        started_at: '2026-07-08T08:00:00Z',
+        deadline: '2026-07-09T08:00:00Z',
+        goal: 'Ship cutover wave',
+        members: ['W1', 'W2'],
+      },
+      {
+        id: 'it-1',
+        status: 'shipped',
+        started_at: '2026-07-07T08:00:00Z',
+        members: ['R1'],
+      },
+    ],
+  };
+  const boardWatchdog = {
+    armed_at: '2026-07-08T11:00:00Z',
+    fire_at: '2027-01-01T00:00:00Z',
+    mechanism: 'cron',
+    job_id: 'wd-1',
+  };
+  const taskWatchdog = { mechanism: 'shell', fire_at: '2027-02-01T00:00:00Z' };
+  const boardPath = writeBoard(home, '20260708T120000Z-1.board.json', {
+    schema: 'cc-master/v2',
+    meta: { template_version: 3 },
+    goal: 'Extras board',
+    owner: { active: true, session_id: SID, heartbeat: '2026-07-08T12:00:00Z' },
+    git: { worktree: '', branch: '' },
+    scheduling: { wip_limit: 2 },
+    judgment_calls: judgmentCalls,
+    cadence,
+    watchdog: boardWatchdog,
+    policy: { autonomous_account_switch: 'deny' },
+    coordination: {
+      priority: 'high',
+      state: { current: { active_tasks: 3, workload: 'cutover' } },
+      inbox: [
+        { kind: 'pacing_throttle', ts: '2026-07-08T11:30:00Z', note: 'peer claimed headroom' },
+      ],
+    },
+    tasks: [
+      {
+        id: 'R1',
+        title: 'Shipped member',
+        status: 'done',
+        verified: true,
+        artifact: 'out/r1.md',
+        deps: [],
+      },
+      { id: 'W1', title: 'Wave member 1', status: 'in_flight', deps: [] },
+      { id: 'W2', title: 'Wave member 2', status: 'in_flight', deps: [], watchdog: taskWatchdog },
+      { id: 'W3', title: 'Wave member 3', status: 'in_flight', deps: [] },
+    ],
+    log: [],
+  });
+  seedBoard(home, {
+    file: '20260708T120000Z-2.board.json',
+    goal: 'Plain board without extras',
+    tasks: [{ id: 'X', title: 'Plain task', status: 'ready', deps: [] }],
+  });
+  // Bad-shaped extras must be dropped silently, never surfaced and never a 500.
+  writeBoard(home, '20260708T120000Z-3.board.json', {
+    schema: 'cc-master/v2',
+    goal: 'Bad-shaped extras board',
+    owner: { active: true, session_id: SID, heartbeat: '2026-07-08T12:00:00Z' },
+    git: { worktree: '', branch: '' },
+    judgment_calls: 'oops',
+    cadence: ['not', 'an', 'object'],
+    watchdog: 'oops',
+    policy: 42,
+    coordination: null,
+    tasks: [{ id: 'Y', title: 'Task', status: 'ready', deps: [] }],
+    log: [],
+  });
+
+  const { statePath } = writeServeState(home, 'wv_extras', 'extras-token', boardPath);
+  const { port, servePromise } = await startServe(statePath, home);
+
+  try {
+    const viewModel = await httpJson({
+      port,
+      path: '/view-model.json?board=20260708T120000Z-1.board.json',
+      token: 'extras-token',
+    });
+    assert.equal(viewModel.status, 200);
+    const extras = viewModel.body.board_extras;
+    assert.ok(extras, 'view-model carries board_extras when the board has extras');
+    assert.deepEqual(extras.judgment_calls, judgmentCalls);
+    assert.deepEqual(extras.cadence, cadence);
+    assert.deepEqual(extras.watchdog, boardWatchdog);
+    assert.deepEqual(extras.policy, { autonomous_account_switch: 'deny' });
+    assert.equal(extras.coordination.priority, 'high');
+    assert.equal(extras.coordination.inbox.length, 1);
+    assert.equal(extras.coordination.inbox[0].kind, 'pacing_throttle');
+
+    // task-level watchdog rides the compactTask whitelist (view-model + /task.json)
+    const w2 = viewModel.body.tasks.find((t: { id: string }) => t.id === 'W2');
+    assert.deepEqual(w2.watchdog, taskWatchdog);
+    const detail = await httpJson({
+      port,
+      path: '/task.json?board=20260708T120000Z-1.board.json&task=W2',
+      token: 'extras-token',
+    });
+    assert.equal(detail.status, 200);
+    assert.deepEqual(detail.body.task.watchdog, taskWatchdog);
+
+    // over-scheduling diagnostics: 3 in_flight vs wip_limit 2
+    assert.deepEqual(viewModel.body.diagnostics.over_scheduling, [
+      { severity: 'warning', message: 'wip 3 exceeds wip_limit 2' },
+    ]);
+
+    // absence tolerance: a board without any extras carries NO board_extras key
+    const plain = await httpJson({
+      port,
+      path: '/view-model.json?board=20260708T120000Z-2.board.json',
+      token: 'extras-token',
+    });
+    assert.equal(plain.status, 200);
+    assert.equal('board_extras' in plain.body, false);
+    assert.deepEqual(plain.body.diagnostics.over_scheduling, []);
+
+    // bad-shaped extras: dropped silently (no key, no error)
+    const bad = await httpJson({
+      port,
+      path: '/view-model.json?board=20260708T120000Z-3.board.json',
+      token: 'extras-token',
+    });
+    assert.equal(bad.status, 200);
+    assert.equal(bad.body.error, undefined);
+    assert.equal('board_extras' in bad.body, false);
+  } finally {
+    await httpJson({ port, path: '/_ccm/shutdown', token: 'extras-token', method: 'POST' }).catch(
+      () => {},
+    );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});
+
+test('serve implements peers.json: fresh roster, coordination projection, inbox summary, empty fallback', async () => {
+  const home = mkHome();
+  const nowMs = Date.now();
+  const fresh = isoNoMs(nowMs - 30_000); // 30s old heartbeat -> fresh
+  const stale = isoNoMs(nowMs - 3_600_000); // 1h old -> past the 600s freshness window
+  const currentPath = writeBoard(home, '20260708T120000Z-1.board.json', {
+    schema: 'cc-master/v2',
+    goal: 'Current orchestration',
+    owner: { active: true, session_id: SID, heartbeat: fresh, harness: 'claude-code' },
+    git: { worktree: '', branch: '' },
+    coordination: {
+      priority: 'normal',
+      inbox: [
+        { kind: 'pacing_yield', ts: isoNoMs(nowMs - 60_000), note: 'yielding to urgent peer' },
+        { kind: 'hitl_turn', ts: isoNoMs(nowMs - 120_000) },
+        'not-an-object-entry-is-dropped',
+      ],
+    },
+    tasks: [{ id: 'A', title: 'Current task', status: 'in_flight', deps: [] }],
+    log: [],
+  });
+  writeBoard(home, '20260708T120000Z-2.board.json', {
+    schema: 'cc-master/v2',
+    goal: 'Peer with coordination',
+    owner: { active: true, session_id: 'other-session', heartbeat: fresh, harness: 'claude-code' },
+    git: { worktree: '', branch: '' },
+    coordination: {
+      priority: 'high',
+      state: {
+        current: { active_tasks: 2, workload: 'migration wave', burn_contribution: 18 },
+        planned: { remaining_work: '3 tasks', cost_to_complete_pct: 22 },
+      },
+    },
+    tasks: [],
+    log: [],
+  });
+  writeBoard(home, '20260708T120000Z-3.board.json', {
+    schema: 'cc-master/v2',
+    goal: 'Peer without coordination',
+    owner: { active: true, session_id: 'third-session', heartbeat: fresh },
+    git: { worktree: '', branch: '' },
+    tasks: [],
+    log: [],
+  });
+  writeBoard(home, '20260708T120000Z-4.board.json', {
+    schema: 'cc-master/v2',
+    goal: 'Archived board stays out',
+    owner: { active: false, session_id: 'done-session', heartbeat: fresh },
+    git: { worktree: '', branch: '' },
+    tasks: [],
+    log: [],
+  });
+  writeBoard(home, '20260708T120000Z-5.board.json', {
+    schema: 'cc-master/v2',
+    goal: 'Stale heartbeat stays out',
+    owner: { active: true, session_id: 'gone-session', heartbeat: stale },
+    git: { worktree: '', branch: '' },
+    tasks: [],
+    log: [],
+  });
+
+  const { statePath } = writeServeState(home, 'wv_peers', 'peers-token', currentPath);
+  const { port, servePromise } = await startServe(statePath, home);
+
+  try {
+    const forbidden = await httpJson({ port, path: '/peers.json' });
+    assert.equal(forbidden.status, 403);
+
+    const payload = await httpJson({ port, path: '/peers.json', token: 'peers-token' });
+    assert.equal(payload.status, 200);
+    assert.equal(payload.body.schema, 'ccm/web-viewer-peers/v1');
+    assert.equal(payload.body.available, true);
+    assert.equal(payload.body.current.file, '20260708T120000Z-1.board.json');
+    assert.equal(payload.body.count, 2);
+    // priority ordering: high peer first, then normal-priority peer without coordination
+    assert.deepEqual(
+      payload.body.peers.map((p: { board_file: string; priority: string }) => ({
+        board_file: p.board_file,
+        priority: p.priority,
+      })),
+      [
+        { board_file: '20260708T120000Z-2.board.json', priority: 'high' },
+        { board_file: '20260708T120000Z-3.board.json', priority: 'normal' },
+      ],
+    );
+    const coordPeer = payload.body.peers[0];
+    assert.equal(coordPeer.goal, 'Peer with coordination');
+    assert.equal(coordPeer.active, true);
+    assert.deepEqual(coordPeer.current, {
+      active_tasks: 2,
+      workload: 'migration wave',
+      burn_contribution: 18,
+    });
+    assert.deepEqual(coordPeer.planned, { remaining_work: '3 tasks', cost_to_complete_pct: 22 });
+    const plainPeer = payload.body.peers[1];
+    assert.equal(plainPeer.goal, 'Peer without coordination');
+    assert.equal(plainPeer.current, null);
+    assert.equal(plainPeer.planned, null);
+    // inbox: current board's coordination.inbox, object entries only
+    assert.deepEqual(
+      payload.body.inbox.map((n: { kind: string }) => n.kind),
+      ['pacing_yield', 'hitl_turn'],
+    );
+    assert.equal(payload.body.roster.count, 3, 'roster counts every fresh board incl. current');
+
+    // board switch: the roster excludes the newly selected board instead
+    const switched = await httpJson({
+      port,
+      path: '/peers.json?board=20260708T120000Z-2.board.json',
+      token: 'peers-token',
+    });
+    assert.equal(switched.status, 200);
+    assert.equal(switched.body.current.file, '20260708T120000Z-2.board.json');
+    assert.deepEqual(switched.body.peers.map((p: { board_file: string }) => p.board_file).sort(), [
+      '20260708T120000Z-1.board.json',
+      '20260708T120000Z-3.board.json',
+    ]);
+    assert.deepEqual(switched.body.inbox, [], 'peer board has no inbox');
+
+    // unknown board param -> current:null, roster still served (fail-safe, never 500)
+    const missing = await httpJson({
+      port,
+      path: '/peers.json?board=nope.board.json',
+      token: 'peers-token',
+    });
+    assert.equal(missing.status, 200);
+    assert.equal(missing.body.available, true);
+    assert.equal(missing.body.current, null);
+    assert.equal(missing.body.count, 3);
+  } finally {
+    await httpJson({ port, path: '/_ccm/shutdown', token: 'peers-token', method: 'POST' }).catch(
+      () => {},
+    );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});
+
+test('serve peers.json degrades to an empty roster when no board is fresh (single-board home)', async () => {
+  const home = mkHome();
+  // seedBoard writes a fixed 2026-07-08 heartbeat: active but stale relative to the wall
+  // clock -> the roster is empty and the endpoint still answers available:true.
+  const boardPath = seedBoard(home, {
+    tasks: [{ id: 'A', title: 'Only task', status: 'ready', deps: [] }],
+  });
+  const { statePath } = writeServeState(home, 'wv_solo', 'solo-token', boardPath);
+  const { port, servePromise } = await startServe(statePath, home);
+  try {
+    const payload = await httpJson({ port, path: '/peers.json', token: 'solo-token' });
+    assert.equal(payload.status, 200);
+    assert.equal(payload.body.available, true);
+    assert.equal(payload.body.current.file, '20260708T120000Z-1.board.json');
+    assert.equal(payload.body.count, 0);
+    assert.deepEqual(payload.body.peers, []);
+    assert.deepEqual(payload.body.inbox, []);
+    assert.equal(payload.body.roster.count, 0);
+  } finally {
+    await httpJson({ port, path: '/_ccm/shutdown', token: 'solo-token', method: 'POST' }).catch(
+      () => {},
+    );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});

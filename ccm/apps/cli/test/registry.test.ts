@@ -167,6 +167,28 @@ test('usage/estimate CLI-local enums are present literal arrays (not ENUMS-sourc
   ]);
 });
 
+// web-viewer 的 --board/--goal 是 viewer 初始 selection 选择器（handler resolveInitialSelection 实际
+//   消费）——只有会走 startService 的 verb（start/open/restart）声明它们；status/stop/serve 不消费、不声明。
+test('web-viewer selection flags declared exactly on verbs that consume them', () => {
+  for (const verb of ['start', 'open', 'restart']) {
+    for (const flag of ['board', 'goal']) {
+      assert.equal(
+        REGISTRY['web-viewer']![verb]!.options[flag]?.type,
+        'string',
+        `web-viewer ${verb} declares --${flag}`,
+      );
+    }
+  }
+  for (const verb of ['status', 'stop', 'serve']) {
+    for (const flag of ['board', 'goal']) {
+      assert.ok(
+        !REGISTRY['web-viewer']![verb]!.options[flag],
+        `web-viewer ${verb} must not declare --${flag} (handler does not consume it)`,
+      );
+    }
+  }
+});
+
 // ── 别名 ─────────────────────────────────────────────────────────────────────────────────────────
 test('ALIASES exposes the hot-path aliases', () => {
   assert.deepEqual(ALIASES.next, ['board', 'next']);

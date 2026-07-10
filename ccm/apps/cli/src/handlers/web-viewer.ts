@@ -3,7 +3,15 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
-import { analyzeGraph, isAwaitingUser, STATUS_ENUM, taskTrulyDone, withLock } from '@ccm/engine';
+import {
+  analyzeGraph,
+  buildPeerRoster,
+  isAwaitingUser,
+  loadHomeBoards,
+  STATUS_ENUM,
+  taskTrulyDone,
+  withLock,
+} from '@ccm/engine';
 import * as discover from '../discover.js';
 import { readVersion } from '../help.js';
 import * as io from '../io.js';
@@ -17,6 +25,7 @@ const HEALTH_SCHEMA = 'ccm/web-viewer-health/v1';
 const BOARDS_SCHEMA = 'ccm/web-viewer-boards/v1';
 const VIEW_MODEL_SCHEMA = 'ccm/web-viewer-view-model/v1';
 const TASK_DETAIL_SCHEMA = 'ccm/web-viewer-task/v1';
+const PEERS_SCHEMA = 'ccm/web-viewer-peers/v1';
 const DEFAULT_HOST = '127.0.0.1';
 /** 0 = OS-assigned ephemeral port (never hardcode a fixed listener port on install/start/restart). */
 const DEFAULT_LISTEN_PORT = 0;
@@ -1100,6 +1109,14 @@ function compactTask(task: JsonRecord): JsonRecord | null {
     'finished_at',
     'updated_at',
     'acceptance',
+    'justification',
+    'dep_pins',
+    'hitl_rounds',
+    'notes',
+    'tags',
+    'role',
+    'references',
+    'watchdog',
   ]) {
     if (task[key] !== undefined) out[key] = task[key];
   }
@@ -1282,6 +1299,404 @@ function statusBuckets(tasks: JsonRecord[]): Array<{
   }));
 }
 
+// Lenient timestamp parse (mirrors the legacy viewer's parseTs): full/partial ISO at the
+// start of the string wins; bare date accepted; anything else -> null. Legacy boards may
+// carry dispatched_at/completed_at instead of started_at/finished_at — callers fall back.
+function parseTsLoose(value: unknown): number | null {
+  if (typeof value !== 'string' || !value) return null;
+  const iso = value.match(
+    /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/,
+  );
+  if (iso) {
+    const ms = Date.parse(iso[0]);
+    if (!Number.isNaN(ms)) return ms;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const ms = Date.parse(value);
+    if (!Number.isNaN(ms)) return ms;
+  }
+  return null;
+}
+
+function taskStartTs(task: JsonRecord): number | null {
+  return parseTsLoose(task.started_at) ?? parseTsLoose(task.dispatched_at);
+}
+
+const STALLING_STATUSES = new Set(['in_flight', 'blocked']);
+
+/**
+ * Server-side derived analytics (ADR-029: the client must not rebuild a second scheduling
+ * engine — transitive closures / longest chains live HERE). Additive `insights` block on the
+ * view-model; every field is a plain readout the UI renders verbatim.
+ */
+function buildInsights(
+  board: JsonRecord,
+  tasks: JsonRecord[],
+  graph: ReturnType<typeof analyzeGraph>,
+): JsonRecord {
+  const now = Date.now();
+  const ids = tasks.map(taskId).filter(Boolean);
+  const upstream = graph.upstream as Map<string, string[]>;
+  const perNode: Record<string, { impact: number; in_deg: number }> = {};
+  for (const id of ids) {
+    perNode[id] = {
+      impact: graph.descendants(id).size,
+      in_deg: Array.isArray(upstream.get(id)) ? (upstream.get(id) as string[]).length : 0,
+    };
+  }
+
+  // highest downstream impact
+  let impactNode: string | null = null;
+  let impactMax = -1;
+  for (const id of ids) {
+    const v = perNode[id]?.impact ?? 0;
+    if (v > impactMax) {
+      impactMax = v;
+      impactNode = id;
+    }
+  }
+
+  // top convergence (max in-degree, ties broken by impact)
+  let convNode: string | null = null;
+  let convMax = -1;
+  for (const id of ids) {
+    const v = perNode[id]?.in_deg ?? 0;
+    if (v > convMax) {
+      convMax = v;
+      convNode = id;
+    } else if (
+      v === convMax &&
+      convNode != null &&
+      (perNode[id]?.impact ?? 0) > (perNode[convNode]?.impact ?? 0)
+    ) {
+      convNode = id;
+    }
+  }
+
+  // bottleneck: stalling (in_flight/blocked) node with the highest impact; tie-break by
+  // elapsed-since-start; if the top-impact staller gates nothing, prefer the longest-running
+  // in_flight node (a slow node IS the bottleneck even with low fan-out).
+  let bneck: string | null = null;
+  let bneckImpact = -1;
+  let bneckElapsed = -1;
+  let longestInflight: string | null = null;
+  let longestMs = -1;
+  for (const task of tasks) {
+    const id = taskId(task);
+    if (!id || !STALLING_STATUSES.has(statusOf(task))) continue;
+    const imp = perNode[id]?.impact ?? 0;
+    const ts = taskStartTs(task);
+    const el = ts != null ? now - ts : -1;
+    if (statusOf(task) === 'in_flight' && el > longestMs) {
+      longestMs = el;
+      longestInflight = id;
+    }
+    if (imp > bneckImpact || (imp === bneckImpact && el > bneckElapsed)) {
+      bneck = id;
+      bneckImpact = imp;
+      bneckElapsed = el;
+    }
+  }
+  if (bneck != null && bneckImpact <= 0 && longestInflight != null) bneck = longestInflight;
+  const bneckTask = bneck ? tasks.find((task) => taskId(task) === bneck) : undefined;
+
+  // WIP vs wip_limit (v2 boards keep it under scheduling; legacy at the top level)
+  const wip = tasks.filter((task) => statusOf(task) === 'in_flight').length;
+  const scheduling =
+    board.scheduling && typeof board.scheduling === 'object'
+      ? (board.scheduling as JsonRecord)
+      : {};
+  const rawLimit = scheduling.wip_limit ?? board.wip_limit;
+  const wipLimit = typeof rawLimit === 'number' && Number.isFinite(rawLimit) ? rawLimit : null;
+
+  // awaiting-user gates + oldest gate age
+  const gates = tasks.filter((task) => isAwaitingUser(task as never));
+  let earliestGate = Number.POSITIVE_INFINITY;
+  for (const task of gates) {
+    const ts = taskStartTs(task);
+    if (ts != null && ts < earliestGate) earliestGate = ts;
+  }
+
+  // orchestration age: earliest task start, else owner.heartbeat
+  let earliest = Number.POSITIVE_INFINITY;
+  for (const task of tasks) {
+    const ts = taskStartTs(task);
+    if (ts != null && ts < earliest) earliest = ts;
+  }
+  if (earliest === Number.POSITIVE_INFINITY && board.owner && typeof board.owner === 'object') {
+    const hb = parseTsLoose((board.owner as JsonRecord).heartbeat);
+    if (hb != null) earliest = hb;
+  }
+
+  return {
+    impact: { id: impactMax > 0 ? impactNode : null, count: Math.max(impactMax, 0) },
+    convergence: { id: convMax >= 2 ? convNode : null, in_deg: Math.max(convMax, 0) },
+    bottleneck: bneck
+      ? {
+          id: bneck,
+          impact: perNode[bneck]?.impact ?? 0,
+          status: bneckTask ? statusOf(bneckTask) : '',
+          since:
+            bneckTask && typeof (bneckTask.started_at ?? bneckTask.dispatched_at) === 'string'
+              ? ((bneckTask.started_at ?? bneckTask.dispatched_at) as string)
+              : null,
+          elapsed_ms:
+            bneckTask && taskStartTs(bneckTask) != null
+              ? now - (taskStartTs(bneckTask) as number)
+              : null,
+        }
+      : null,
+    wip: { count: wip, limit: wipLimit, over: wipLimit != null && wip > wipLimit },
+    awaiting: {
+      count: gates.length,
+      oldest_gate_elapsed_ms: earliestGate === Number.POSITIVE_INFINITY ? null : now - earliestGate,
+    },
+    age_ms: earliest === Number.POSITIVE_INFINITY ? null : now - earliest,
+    per_node: perNode,
+  };
+}
+
+// ---- /decisions.json — discuss sidecar scan (ported from the legacy view-server) --------
+// Read-only, single directory level, no symlink follow-out. Any individual file that fails
+// to read/parse is skipped; a missing home or zero sidecars yields [] — graceful, never 500.
+
+function parseFlatYaml(block: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const rawLine of block.split(/\r?\n/)) {
+    const line = rawLine.replace(/\s+$/, '');
+    if (!line || line.startsWith('#')) continue;
+    const idx = line.indexOf(':');
+    if (idx <= 0) continue;
+    const key = line.slice(0, idx).trim();
+    if (!key) continue;
+    let val = line.slice(idx + 1).trim();
+    if (
+      (val.startsWith('"') && val.endsWith('"') && val.length >= 2) ||
+      (val.startsWith("'") && val.endsWith("'") && val.length >= 2)
+    ) {
+      val = val.slice(1, -1);
+    }
+    out[key] = val;
+  }
+  return out;
+}
+
+function parseFrontmatter(text: string): Record<string, string> {
+  const stripped = text.replace(/^﻿/, '');
+  const m = stripped.match(/^[ \t]*\r?\n?---[ \t]*\r?\n([\s\S]*?)(?:\r?\n---[ \t]*(?:\r?\n|$)|$)/);
+  if (m?.[1] != null) return parseFlatYaml(m[1]);
+  const m2 = stripped.match(/^---[ \t]*\r?\n([\s\S]*?)(?:\r?\n---[ \t]*(?:\r?\n|$)|$)/);
+  if (m2?.[1] != null) return parseFlatYaml(m2[1]);
+  return {};
+}
+
+function extractTldr(text: string): string {
+  let inSection = false;
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (/^#{1,6}\s/.test(line)) {
+      inSection = /^#{1,6}\s*TL;?\s*DR\b/i.test(line);
+      continue;
+    }
+    if (inSection && line) {
+      return line.length > 200 ? line.slice(0, 200) : line;
+    }
+  }
+  return '';
+}
+
+function decisionNodeIdFromFilename(file: string): string {
+  const base = file.replace(/\.decision\.md$/i, '');
+  const parts = base.split('--');
+  if (parts.length >= 3) return parts[parts.length - 2] ?? '';
+  return '';
+}
+
+function decisionStampFromFilename(file: string): string {
+  const base = file.replace(/\.decision\.md$/i, '');
+  const parts = base.split('--');
+  if (parts.length >= 3) return parts[parts.length - 1] ?? '';
+  return '';
+}
+
+interface DecisionRow {
+  node_id: string;
+  file: string;
+  resolved_at: string;
+  ask_type: string;
+  round: number;
+  tldr: string;
+}
+
+function collectDecisions(boardPath: string): DecisionRow[] {
+  const boardHome = path.dirname(boardPath);
+  // Cross-board bleed guard: sidecars are named `<board-stem>--<node-id>--<stamp>.decision.md`,
+  // so only files starting with THIS board's stem prefix belong here. A shared home can hold
+  // several boards; without this gate another board's same-named node would skew the counts.
+  const stemPrefix = `${path.basename(boardPath).replace(/\.board\.json$/i, '')}--`;
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(boardHome, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const rows: Array<Omit<DecisionRow, 'round'> & { round?: number; _stamp: string }> = [];
+  for (const ent of entries) {
+    if (!ent.isFile()) continue;
+    const file = ent.name;
+    if (!/\.decision\.md$/i.test(file)) continue;
+    if (!file.startsWith(stemPrefix)) continue;
+    const full = path.join(boardHome, file);
+    let text: string;
+    try {
+      const st = fs.lstatSync(full);
+      if (!st.isFile()) continue;
+      text = fs.readFileSync(full, 'utf8');
+    } catch {
+      continue;
+    }
+    let fm: Record<string, string>;
+    try {
+      fm = parseFrontmatter(text);
+    } catch {
+      continue;
+    }
+    const nodeId = (fm.node_id && String(fm.node_id).trim()) || decisionNodeIdFromFilename(file);
+    if (!nodeId) continue;
+    rows.push({
+      node_id: nodeId,
+      file,
+      resolved_at: fm.resolved_at ? String(fm.resolved_at) : '',
+      ask_type: fm.ask_type ? String(fm.ask_type) : '',
+      tldr: extractTldr(text),
+      _stamp: decisionStampFromFilename(file) || (fm.resolved_at ? String(fm.resolved_at) : ''),
+    });
+  }
+
+  const byNode = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const group = byNode.get(row.node_id) ?? [];
+    group.push(row);
+    byNode.set(row.node_id, group);
+  }
+  for (const group of byNode.values()) {
+    group.sort((a, b) =>
+      a._stamp < b._stamp
+        ? -1
+        : a._stamp > b._stamp
+          ? 1
+          : a.file < b.file
+            ? -1
+            : a.file > b.file
+              ? 1
+              : 0,
+    );
+    group.forEach((row, index) => {
+      row.round = index + 1;
+    });
+  }
+
+  rows.sort((a, b) =>
+    a.node_id < b.node_id ? -1 : a.node_id > b.node_id ? 1 : (a.round ?? 0) - (b.round ?? 0),
+  );
+
+  return rows.map((row) => ({
+    node_id: row.node_id,
+    file: row.file,
+    resolved_at: row.resolved_at,
+    ask_type: row.ask_type,
+    round: row.round ?? 1,
+    tldr: row.tldr,
+  }));
+}
+
+// ---- board_extras — additive passthrough of board-model blind-spot blocks --------------
+// Stage-2 additive block: judgment_calls / cadence / watchdog (board level) / policy /
+// coordination are carried verbatim for the UI to render. Semantics stay server/engine
+// side — this is passthrough only. A field missing on the board -> the key is absent
+// (never null, never an error); nothing present -> no `board_extras` key at all.
+function buildBoardExtras(board: JsonRecord): JsonRecord | null {
+  const out: JsonRecord = {};
+  if (Array.isArray(board.judgment_calls)) {
+    out.judgment_calls = board.judgment_calls.filter(
+      (entry) => !!entry && typeof entry === 'object' && !Array.isArray(entry),
+    );
+  }
+  for (const key of ['cadence', 'watchdog', 'policy', 'coordination'] as const) {
+    const value = board[key];
+    if (value && typeof value === 'object' && !Array.isArray(value)) out[key] = value;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+// ---- /peers.json — same-home peer roster (engine buildPeerRoster, `ccm peers` source) ---
+// Read-only cross-board awareness: every OTHER active + heartbeat-fresh board in the same
+// home, plus the current board's coordination.inbox as a notification summary. Fail-safe
+// throughout: unreadable home -> empty roster; torn board JSON is skipped by
+// loadHomeBoards; a missing current selection just yields current:null.
+function buildPeersPayload(home: string, currentBoardPath: string | null): JsonRecord {
+  let boards: Array<{ file: string; board: unknown }> = [];
+  try {
+    boards = loadHomeBoards(discover.boardsDir(home), { maxDaysAgo: Number.POSITIVE_INFINITY });
+  } catch {
+    boards = [];
+  }
+  const roster = buildPeerRoster(boards);
+  const currentFile = currentBoardPath ? path.basename(currentBoardPath) : null;
+  const peers = roster.peers
+    .filter((peer) => peer.board_file !== currentFile)
+    .map((peer) => ({
+      board_file: peer.board_file,
+      goal: peer.goal,
+      harness: peer.harness,
+      priority: peer.priority,
+      active: true,
+      health: 'ok',
+      heartbeat: peer.heartbeat,
+      heartbeat_age_sec: peer.heartbeat_age_sec,
+      current: peer.current,
+      planned: peer.planned,
+    }));
+
+  // Inbox summary: the CURRENT board's coordination.inbox notifications (object entries
+  // passed through verbatim; anything else dropped — silent-on-unknown).
+  let inbox: unknown[] = [];
+  if (currentBoardPath) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(currentBoardPath, 'utf8'));
+      const coordination =
+        parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? (parsed as JsonRecord).coordination
+          : null;
+      const rawInbox =
+        coordination && typeof coordination === 'object' && !Array.isArray(coordination)
+          ? (coordination as JsonRecord).inbox
+          : null;
+      if (Array.isArray(rawInbox)) {
+        inbox = rawInbox.filter(
+          (entry) => !!entry && typeof entry === 'object' && !Array.isArray(entry),
+        );
+      }
+    } catch {
+      inbox = [];
+    }
+  }
+
+  return {
+    schema: PEERS_SCHEMA,
+    available: true,
+    current: currentFile ? { file: currentFile, path: currentBoardPath } : null,
+    count: peers.length,
+    peers,
+    inbox,
+    roster: {
+      count: roster.count,
+      freshness_sec: roster.freshness_sec,
+      as_of: roster.as_of,
+    },
+  };
+}
+
 function buildViewModel(home: string, boardPath: string): JsonRecord {
   const snapshot = readBoardSnapshot(boardPath);
   const board = snapshot.board;
@@ -1302,6 +1717,9 @@ function buildViewModel(home: string, boardPath: string): JsonRecord {
     criticalPath[criticalPath.length - 1] || readySet[0] || compactTasks[0]?.id || null;
   const filename = path.basename(boardPath);
   const readAt = nowIso();
+  const insights = buildInsights(board, tasks, graph);
+  const boardExtras = buildBoardExtras(board);
+  const wipInsight = insights.wip as { count: number; limit: number | null; over: boolean };
   const nodeTasks = compactTasks.map((task) => {
     const id = taskId(task);
     const rankIndex = ranks.rankById.get(id) ?? 0;
@@ -1361,6 +1779,8 @@ function buildViewModel(home: string, boardPath: string): JsonRecord {
       awaitingUserCount: tasks.filter((task) => isAwaitingUser(task as never)).length,
       verifiedDone: tasks.filter((task) => taskTrulyDone(task as never)).length,
     },
+    insights,
+    ...(boardExtras ? { board_extras: boardExtras } : {}),
     tasks: compactTasks,
     graph: {
       family: 'task-dag',
@@ -1406,7 +1826,14 @@ function buildViewModel(home: string, boardPath: string): JsonRecord {
       lint: topo.cycle
         ? [{ severity: 'error', message: `dependency cycle: ${topo.cycle.join(' -> ')}` }]
         : [],
-      over_scheduling: [],
+      over_scheduling: wipInsight.over
+        ? [
+            {
+              severity: 'warning',
+              message: `wip ${wipInsight.count} exceeds wip_limit ${wipInsight.limit}`,
+            },
+          ]
+        : [],
       report_freshness: 'unknown',
     },
     defaults: {
@@ -2029,20 +2456,50 @@ export function serve(ctx: Ctx): Promise<number> {
         }
         return;
       }
+      if (url.pathname === '/decisions.json') {
+        const runtimeState = latestRuntimeState(state);
+        const boardPath = resolveHttpBoard(
+          runtimeState.home,
+          runtimeState.current_selection?.board_path || null,
+          url,
+        );
+        if (!boardPath) {
+          sendJson(res, 404, { error: 'board not found' });
+          return;
+        }
+        let payload: DecisionRow[];
+        try {
+          payload = collectDecisions(boardPath);
+        } catch {
+          payload = []; // defensive: any unexpected failure degrades to empty, not 500.
+        }
+        sendJson(res, 200, payload);
+        return;
+      }
       if (url.pathname === '/peers.json') {
         const runtimeState = latestRuntimeState(state);
-        sendJson(res, 200, {
-          available: false,
-          current: runtimeState.current_selection
-            ? {
-                file: path.basename(runtimeState.current_selection.board_path),
-                path: runtimeState.current_selection.board_path,
-              }
-            : null,
-          count: 0,
-          peers: [],
-          error: 'peer roster is not collected by ccm web-viewer service yet',
-        });
+        const hasBoardParam = url.searchParams.has('board') || url.searchParams.has('board_file');
+        const currentBoardPath = hasBoardParam
+          ? resolveHttpBoard(
+              runtimeState.home,
+              runtimeState.current_selection?.board_path || null,
+              url,
+            )
+          : runtimeState.current_selection?.board_path || null;
+        try {
+          sendJson(res, 200, buildPeersPayload(runtimeState.home, currentBoardPath));
+        } catch (e) {
+          // Defensive: any unexpected failure degrades to an empty roster, never a 500.
+          sendJson(res, 200, {
+            schema: PEERS_SCHEMA,
+            available: false,
+            current: null,
+            count: 0,
+            peers: [],
+            inbox: [],
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
         return;
       }
       if (url.pathname === '/status-report.json') {

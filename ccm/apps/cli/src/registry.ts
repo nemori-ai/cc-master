@@ -1027,6 +1027,8 @@ export const REGISTRY: Registry = {
         host: { type: 'string', desc: '监听地址（v1 只允许 127.0.0.1）' },
         port: { type: 'string', desc: '监听端口（默认 0=系统分配；固定端口冲突则失败）' },
         reuse: { type: 'boolean', desc: '复用同 home 的健康 service（默认行为）' },
+        board: { type: 'string', desc: '指定 board 文件作 viewer 初始 selection（最高优先）' },
+        goal: { type: 'string', desc: '多 active 板时按 goal 子串选初始 selection' },
         'no-open': { type: 'boolean', desc: '只启动/复用，不尝试打开浏览器' },
         json: { type: 'boolean', desc: '结构化输出（start/open 含一次性 open_url）' },
       },
@@ -1040,6 +1042,11 @@ export const REGISTRY: Registry = {
       positionals: [{ name: 'id', required: false }],
       options: {
         'no-start': { type: 'boolean', desc: '只打开已有健康 service；不存在则不启动' },
+        board: {
+          type: 'string',
+          desc: '指定 board 文件作 viewer 初始 selection（service 已在跑也会更新）',
+        },
+        goal: { type: 'string', desc: '多 active 板时按 goal 子串选初始 selection' },
         json: { type: 'boolean', desc: '结构化输出（含一次性 open_url）' },
       },
       examples: ['ccm web-viewer open', 'ccm web-viewer open --no-start --json'],
@@ -1074,6 +1081,8 @@ export const REGISTRY: Registry = {
       options: {
         host: { type: 'string', desc: '监听地址（v1 只允许 127.0.0.1）' },
         port: { type: 'string', desc: '监听端口（默认 0=系统分配）' },
+        board: { type: 'string', desc: '指定 board 文件作 viewer 初始 selection（最高优先）' },
+        goal: { type: 'string', desc: '多 active 板时按 goal 子串选初始 selection' },
         json: { type: 'boolean', desc: '结构化输出（含 previous/service/open_url）' },
       },
       examples: ['ccm web-viewer restart', 'ccm web-viewer restart --board <path> --json'],
