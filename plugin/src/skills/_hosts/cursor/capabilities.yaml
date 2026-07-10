@@ -137,7 +137,9 @@ capabilities:
         reason: "No PostToolBatch-equivalent batch boundary event on Cursor."
     output_envelopes:
       additional_context:
-        verified_events: [sessionStart, postToolUse]
+        documented_events: [sessionStart, postToolUse]
+        verified_events: [postToolUse]
+        known_broken_events: [sessionStart]
       permission_deny:
         verified_events: [preToolUse]
       followup_message:

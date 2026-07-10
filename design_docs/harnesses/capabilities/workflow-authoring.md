@@ -20,7 +20,7 @@ dispatch mechanism for complex fan-out.
 | --- | --- | --- | --- |
 | claude-code | implemented | `authoring-workflows` skill + Workflow tool | Full SAP |
 | codex | unsupported_stub | `adapters/codex/strategy.yaml` mode unsupported_stub | No Workflow equivalent |
-| cursor | implemented | `unsupported_stub` | Task tool + background shell + `/loop` |
+| cursor | unsupported_stub | `adapters/cursor/strategy.yaml` mode `unsupported_stub` | Task tool + background shell + `/loop` substitutes |
 
 ## Declared divergence
 
@@ -30,11 +30,9 @@ dispatch mechanism for complex fan-out.
   affected_hosts: [codex, cursor]
   reason: No verified Claude dynamic-workflow / Workflow tool equivalent on Codex or Cursor IDE Agent.
   compensating_mechanism: >
-    unsupported_stub skill body; master-orchestrator-guide dispatch slots point to Task subagent,
-    background shell (block_until_ms:0), Cursor /loop skill, Automations/SDK for external wakeups.
-    See master-orchestrator-guide cursor overlays (planned).
-  tracked_by: plugin/src/skills/authoring-workflows/adapters/codex/strategy.yaml,
-    plugin/src/skills/authoring-workflows/adapters/cursor/strategy.yaml
+    unsupported_stub skill body; current master-orchestrator-guide Cursor dispatch slots point to
+    Task subagent, background shell (block_until_ms:0), /loop where available, and external schedulers.
+  tracked_by: plugin/src/skills/authoring-workflows/adapters/codex/strategy.yaml + plugin/src/skills/authoring-workflows/adapters/cursor/strategy.yaml
 ```
 
 ## Linked surfaces

@@ -30,7 +30,8 @@ skill prose.
   reason: Hosts use different command-string tokens (PLUGIN_ROOT vs none documented for Cursor).
   compensating_mechanism: >
     Per-host hooks.json command prefix + launcher.js; never read PLUGIN_ROOT from env on Codex;
-    Cursor to follow same launcher pattern after D1 probe. Canonical uses slots only.
+    Cursor uses relative plugin-cwd commands plus launcher `__dirname` resolution and injected
+    CC_MASTER_PLUGIN_ROOT (D1 closed). Canonical uses slots only.
   tracked_by: design_docs/harnesses/codex.md, cursor.md D1
 
 - rule: skill-path-substitution
@@ -49,4 +50,5 @@ skill prose.
 
 ## Probe deps
 
-cursor.md Dogfood Backlog: **D1** (plugin hook command path resolution)
+Closed 2026-07-09: Cursor D1 verified absolute/local-plugin paths and the production launcher strategy.
+Literal `${PLUGIN_ROOT}` expansion remains deliberately unclaimed and is not a blocker.

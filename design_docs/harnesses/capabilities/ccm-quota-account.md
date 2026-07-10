@@ -11,8 +11,8 @@ account switch is policy-gated on board.
 1. `ccm usage advise` returns verdict only when host quota provider is available.
 2. `ccm account *` mutating commands fail with explicit NotImplemented on unsupported hosts.
 3. `ccm harness current` correctly identifies host when detection env is present.
-4. `ccm statusline` install/render remains Claude Code-only until another host documents
-   equivalent.
+4. `ccm statusline install/uninstall` remains Claude Code-only until another host documents an
+   equivalent external statusline surface; alternate quota providers do not imply that surface.
 
 ## Host mechanisms
 
@@ -20,7 +20,7 @@ account switch is policy-gated on board.
 | --- | --- | --- | --- |
 | claude-code | implemented | statusline sidecar, account vault/keychain, plugin upgrade via claude CLI | ccm-host-coupling-audit |
 | codex | partial | `readCodexUsageSignal`; account NotImplemented; statusline unsupported | codex.ts adapter |
-| cursor | partial | `readCursorUsageSignal` → dashboard `GetCurrentPeriodUsage` → `UsageSignal.billing_period` (~30d); account pool / statusline / autoswitch unsupported | `cursor-usage.ts` + `harnesses/cursor.ts` |
+| cursor | partial | `readCursorUsageSignal` → dashboard `GetCurrentPeriodUsage` → `UsageSignal.billing_period` (~30d); local-plugin upgrade implemented; account pool / statusline / autoswitch unsupported | `cursor-usage.ts` + `harnesses/cursor.ts` |
 
 ## Declared divergence
 
@@ -29,7 +29,7 @@ account switch is policy-gated on board.
   kind: protocol-capability-gap
   affected_hosts: [codex, cursor]
   reason: Claude Code settings.json statusLine schema has no verified equivalent on Codex/Cursor IDE.
-  compensating_mechanism: ccm statusline returns unsupported; usage reads alternate provider or unavailable.
+  compensating_mechanism: ccm statusline install/uninstall returns unsupported; usage reads alternate provider or unavailable.
   tracked_by: ccm-host-coupling-audit.md §Status Line
 
 - rule: ccm-account-pool
@@ -37,21 +37,7 @@ account switch is policy-gated on board.
   affected_hosts: [codex, cursor]
   reason: Account capture/switch binds Claude OAuth stores.
   compensating_mechanism: account handlers return NotImplemented under non-claude-code harness.
-  tracked_by: ccm/apps/cli/src/harnesses/codex.ts, future cursor.ts
-
-- rule: ccm-plugin-upgrade
-  kind: protocol-capability-gap
-  affected_hosts: [cursor]
-  reason: Cursor plugin install path (local vs marketplace) and upgrade CLI not verified.
-  compensating_mechanism: upgradePlugin skipped or manual reinstall documented until cursor.ts backend exists.
-  tracked_by: cursor.md D9, ccm-host-coupling-audit.md §Cursor Expected Coupling
-
-- rule: ccm-harness-detect-in-agent-shell
-  kind: protocol-capability-gap
-  affected_hosts: [cursor]
-  reason: CURSOR_* env in non-hook agent shell unverified — auto detect may fail outside hooks.
-  compensating_mechanism: CC_MASTER_HARNESS=cursor explicit flag; sessionStart hook injects CURSOR_CONVERSATION_ID.
-  tracked_by: cursor.md D8, D11
+  tracked_by: ccm/apps/cli/src/harnesses/codex.ts, ccm/apps/cli/src/harnesses/cursor.ts
 ```
 
 ## Linked surfaces
@@ -62,4 +48,5 @@ account switch is policy-gated on board.
 
 ## Probe deps
 
-cursor.md Dogfood Backlog: **D8**, **D9**, **D11**
+Closed 2026-07-09: D8 (Agent Shell detection), D9 (local plugin), D11 (session env caveats).
+Remaining divergence is structural: Cursor has no ccm account pool or Claude-style external statusline.

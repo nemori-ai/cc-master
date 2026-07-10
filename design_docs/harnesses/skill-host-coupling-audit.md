@@ -1,6 +1,6 @@
 # Runtime Skill Host-Coupling Audit
 
-更新时间：2026-07-03。
+更新时间：2026-07-10（保留 2026-07-03 baseline，新增 Cursor 已发布 adapter 增量）。
 
 本盘点覆盖 `plugin/src/skills/*/canonical` 的 runtime skill 正文与 references。目标是找出写死 Claude Code harness 的指导，并给出后续 adapter 化时应抽出的模块 / 变量 / overlay 面。
 
@@ -14,7 +14,7 @@
 | `domain-core` | master-orchestrator 方法论本身，不依赖 harness | 留在 canonical |
 | `ccm-host-binding` | ccm 当前实现绑定 Claude config、statusline、凭证 / marketplace | 保留为当前 product fact，但新增 host adapter 前要拆成 ccm host backend |
 
-## 总览
+## 总览（2026-07-03 baseline，现补齐八个分发 skill）
 
 | Skill | Host coupling level | 主要原因 | 建议 |
 | --- | --- | --- | --- |
@@ -25,6 +25,36 @@
 | `slicing-goals-into-dags` | Low | 主要是 DAG 方法论 | 留 canonical；少量 “派 subagent” 用 executor capability 词汇替代 |
 | `dev-as-ml-loop` | Low | 主要是执行侧 loop 方法论 | 留 canonical；若提到 subagent 仅作为 actor，改成 worker/leaf agent 抽象 |
 | `engineering-with-craft` | Low | 工程方法论 | 留 canonical |
+| `distilling-lessons-into-assets` | Low | 经验→资产路由方法论，本身不绑 host | 留 canonical；只由 command/dispatch adapter 解释宿主入口 |
+
+> 本表的“分发 skill”指 A/B/D/E/F/G/H/I 八个方法论 / 操作 skill。
+> `cc-master-as-master-orchestrator` / `cc-master-discuss` 等 command-entry shim skills 是 host
+> command surface 兼容层，不计入这八个 portfolio 槽位。
+
+## Cursor Adapter Delta（2026-07-10 当前态）
+
+2026-07-03 baseline 里的“建议抽出 / Codex adapter 前”是历史设计输入，不再代表
+Cursor 尚未实现。当前 tracked source 显示：
+
+| Skill | Cursor strategy | 当前 host delta |
+| --- | --- | --- |
+| `master-orchestrator-guide` | `copy` + slots/overlays | Task/Shell dispatch、shell-floor watchdog、host-native commands、billing-period quota；排除 Claude account/handoff/codex-review 资产 |
+| `authoring-workflows` | `unsupported_stub` | 无 Cursor Workflow API；明确降级到 Task / background Shell |
+| `using-ccm` | `copy` + exclusions/slots | 排除 Claude account-pool reference；Cursor account switch 明确 unsupported |
+| `pacing-and-estimation` | `copy` + overlays | 只读 dashboard `billing_period`；无 5h/7d / switch / statusline |
+| `slicing-goals-into-dags` | `copy` + dispatch pointer | leaf execution 映射 Cursor Task/Shell，不假设 Workflow |
+| `dev-as-ml-loop` | `copy` | host-neutral |
+| `engineering-with-craft` | `copy` | host-neutral |
+| `distilling-lessons-into-assets` | `copy` | host-neutral |
+
+Cursor command surface 另行管理：六个 command strategy 均为 `host_native`，对应
+`cc-master-*` shim skills 为 `unsupported_stub`，防止把 Claude namespace / skill invocation
+误当 Cursor 入口。
+
+当前剩余的真实 skill-level gap 是：`authoring-workflows` 无等价原语；Cursor
+reinject 是 alwaysApply + preCompact 的 Track B 降级；配额无 account pool / 5h / 7d。
+这些差异已在 strategy / overlays / Capability Cards 中显式表达，不是 `planned`
+placeholder。
 
 ## Capability Surface 建议
 

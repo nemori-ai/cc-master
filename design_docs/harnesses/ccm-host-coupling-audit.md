@@ -1,6 +1,6 @@
 # ccm CLI Host-Coupling Audit
 
-更新时间：2026-07-09。
+更新时间：2026-07-10。
 
 本盘点覆盖 `ccm/apps/cli/src` 与 `ccm/packages/engine/src` 中当前绑定 Claude Code harness 或 Claude 账号机制的源码点。目标是给后续 `ccm host <host>` backend 拆分提供任务边界。
 
@@ -21,9 +21,9 @@
 | --- | --- | --- | --- |
 | Home / config paths | High | `ccm/packages/engine/src/paths.ts`, `ccm/apps/cli/src/discover.ts` | 默认 home 从 `CLAUDE_CONFIG_DIR` / `$HOME/.claude` 推导；session id 读 `$CLAUDE_CODE_SESSION_ID` |
 | Status line install/render/capture | High | `ccm/packages/engine/src/statusline/*`, `ccm/apps/cli/src/handlers/statusline.ts`, `ccm/apps/cli/src/router.ts`, `ccm/apps/cli/src/self.ts` | 写 Claude Code `settings.json.statusLine`；读 Claude Code status-line stdin schema |
-| Usage / pacing signal | High | `ccm/apps/cli/src/handlers/usage.ts`, engine usage modules | `used_percentage` / `resets_at` 来自 statusline sidecar |
+| Usage / pacing signal | Medium | `ccm/apps/cli/src/handlers/usage.ts`, `ccm/apps/cli/src/harnesses/*`, engine usage modules | handler 已经 `HarnessAdapter.readCurrentUsage` 读 provider；Claude 仍用 statusline sidecar，Codex/Cursor 有各自信号源 |
 | Account registry / vault / switch | Very high | `ccm/apps/cli/src/handlers/account.ts`, `ccm/packages/engine/src/account/*` | 深度绑定 Claude OAuth blob、Claude Code keychain item、`.credentials.json`、`.claude.json`、Claude refresh endpoint |
-| Plugin upgrade | High | `ccm/apps/cli/src/handlers/upgrade.ts` | 直接调用 `claude plugin marketplace update` 和 `claude plugin update` |
+| Plugin upgrade | Medium | `ccm/apps/cli/src/handlers/upgrade.ts`, `ccm/apps/cli/src/harnesses/*` | handler 已按 `HarnessAdapter.upgradePlugin` 分派；各 host 仍有独立 distribution 约束 |
 | Help / registry prose | Medium | `ccm/apps/cli/src/help.ts`, `ccm/apps/cli/src/registry.ts` | 用户可见文案写死 Claude Code |
 | Board engine | Low | `ccm/packages/engine/src/board-*` | 基本 portable；个别 fixtures/model 字段是 Claude model ID |
 
@@ -116,13 +116,16 @@ Files:
 
 Current behavior:
 
-- `ccm usage show/advise` reads the statusline sidecar via `resolveRateCachePath`.
-- No sidecar means `available:false`; local JSONL fallback has been retired.
-- Registry effective-N is read from `accounts.json`, also under `resolveCcMasterHome`.
+- `ccm usage show/advise` resolves the active `HarnessAdapter` and calls `readCurrentUsage(env)`.
+- Claude Code reads the statusline sidecar; Codex reads its app-server signal; Cursor reads dashboard
+  `GetCurrentPeriodUsage` and maps it to `billing_period`.
+- Provider failure means `available:false`; no provider may invent quota precision.
+- Registry effective-N remains Claude account-pool data from `accounts.json`; unsupported hosts do not
+  acquire an account pool merely because they have a current-account usage signal.
 
-Required abstraction:
+Current boundary:
 
-- `usage` should consume a `QuotaSignalProvider`.
+- `usage` consumes the host adapter's quota provider.
 - Account-pool scaling should be optional and host backend gated.
 - Codex should not inherit Claude 5h/7d semantics without provider proof.
 
@@ -180,11 +183,10 @@ Files:
 Current behavior:
 
 - `ccm upgrade ccm` is host-neutral SEA self-upgrade.
-- `ccm upgrade plugin` is Claude Code-specific:
-  - checks `claude --version`;
-  - runs `claude plugin marketplace update cc-master`;
-  - runs `claude plugin update cc-master@cc-master`;
-  - tells the user to reopen Claude Code session.
+- `ccm upgrade plugin` dispatches through `HarnessAdapter.upgradePlugin` and, without an explicit host,
+  visits installed supported harnesses.
+- Claude Code uses its marketplace/plugin CLI; Codex refreshes its local marketplace/plugin registry;
+  Cursor copies the installed cc-master package into `~/.cursor/plugins/local/cc-master`.
 
 Required abstraction:
 
@@ -197,10 +199,12 @@ interface PluginManagerBackend {
 }
 ```
 
-Codex implication:
+Current implication:
 
-- Codex plugin install/update mechanism must be verified before `ccm upgrade plugin` supports `--host codex`.
-- Current command should be documented as Claude Code-only.
+- Plugin distribution remains host-specific even though dispatch is shared; each adapter must report an
+  honest installed/source/target result.
+- Cursor `--to` does not fetch a historical tag directly; install that package version first, then refresh
+  the local plugin.
 
 ### 6. Help / Registry / User-Facing Prose
 
@@ -230,53 +234,50 @@ Required abstraction:
 | C2 | P0 | Rename Claude path helpers | Keep compatibility exports, but introduce `claudeCodeConfigDir` / `hostConfigDir` naming to stop treating Claude as generic |
 | C3 | P0 | Gate statusline by host | `ccm statusline` remains Claude Code backend; Codex returns unsupported until verified |
 | C4 | P0 | Gate account commands by host | Done for Codex: `ccm account add/delete/refresh/list/switch` returns `NotImplemented`; current-account usage remains the only intended Codex surface |
-| C5 | P1 | Split usage provider | `usage advise/show` reads quota provider, not hardwired statusline sidecar |
-| C6 | P1 | Split plugin upgrade backend | `upgrade plugin` dispatches by host; only Claude Code backend implemented |
+| C5 | P1 | Split usage provider | **Done**: `usage advise/show` reads `HarnessAdapter.readCurrentUsage`, with host-specific providers |
+| C6 | P1 | Split plugin upgrade backend | **Done** for Claude Code / Codex / Cursor: `upgrade plugin` dispatches by host |
 | C7 | P1 | Help/registry host metadata | registry entries declare host support/unsupported reason |
 | C8 | P2 | Model fixture/provider cleanup | move Claude model IDs into provider fixtures or mark examples as Claude |
 
-## Cursor Expected Coupling (IDE Agent)
+## Cursor Current Coupling (IDE Agent)
 
-调研落盘：[`cursor.md`](cursor.md)（2026-07-09）。**未实现** `ccm/apps/cli/src/harnesses/cursor.ts`。
+调研与 probe 落盘：[`cursor.md`](cursor.md)（2026-07-09）。当前 backend 已实现于
+`ccm/apps/cli/src/harnesses/cursor.ts`，不再是 expected sketch。
 
 ### Detect / Session
 
-| Surface | Expected behavior | Status |
+| Surface | Current behavior | Evidence |
 | --- | --- | --- |
-| `detect(env)` | `CURSOR_PROJECT_DIR` \|\| `CURSOR_VERSION`（hook 保证【官方】）；agent shell 是否带 `CURSOR_*` **待 probe** | 文档草图 |
-| `session(env)` | board `owner.session_id` 应对齐 hook JSON `conversation_id`【推导】；`conversation_id` 不在 `process.env`——需 `sessionStart` hook 经 `env` 注入 `CURSOR_CONVERSATION_ID` 或 sidecar | 待 probe |
-| `resolveHarnessAdapter` order | 注册后：codex → claude-code → cursor（或按 env 优先级；**待 MVP 定**） | 未实现 |
+| `detect(env)` | 识别 `CURSOR_AGENT` / `CURSOR_VERSION` / `CURSOR_PROJECT_DIR` / `CURSOR_CONVERSATION_ID` | `cursor.ts`; D8 确认 Agent Shell 暴露 `CURSOR_*` |
+| `session(env)` | 优先 `CURSOR_CONVERSATION_ID`，其次 `CURSOR_AGENT`，否则空 identity | `cursor.ts`; hook 武装仍以 stdin `conversation_id` / `session_id` 为 SSOT |
+| `resolveHarnessAdapter` order | `codex → cursor → claude-code` | `harnesses/registry.ts`；Cursor 必须胜过 Claude-compatible fallback env |
 
-Hook 保证 env【官方】：`CURSOR_PROJECT_DIR`、`CURSOR_VERSION`、`CURSOR_USER_EMAIL`、`CURSOR_TRANSCRIPT_PATH`、`CURSOR_CODE_REMOTE`、`CLAUDE_PROJECT_DIR`（兼容别名）。
-
-### Capabilities (expected honest defaults)
+### Capabilities (honest current defaults)
 
 | Capability | Cursor (IDE Agent) | Notes |
 | --- | --- | --- |
-| `accountPool` | `unsupported` | 无 Claude OAuth 号池 / keychain 等价物 |
-| `externalStatusline` | `unsupported` | IDE statusline ≠ Claude `settings.json.statusLine` schema |
-| `pluginDistribution` | `partial` | local `~/.cursor/plugins/local/` + marketplace【官方】；`upgradePlugin` 路径待 probe |
-| `readCurrentUsage` | `source: 'unavailable'` | 无 verified 5h/7d 配额 sidecar；`ccm usage advise` 应显式 unsupported |
+| `accountPool` | `unsupported` | 无 Claude OAuth 号池 / keychain 等价物；mutating account commands 显式 `NotImplemented` |
+| `externalStatusline` | `unsupported` | IDE statusline ≠ Claude `settings.json.statusLine` schema；install/uninstall 显式 `NotImplemented` |
+| `pluginDistribution` | `supported` | local `~/.cursor/plugins/local/cc-master`；`upgradePlugin` 从本机 cc-master install 刷新 local plugin |
+| `readCurrentUsage` | `dashboard-api` / `billing_period` | `GetCurrentPeriodUsage` → `UsageSignal.billing_period`；无 5h/7d，API/token 不可用时诚实返回 unavailable |
 
-### Handler gating (same as Codex-first-pass)
+### Handler behavior
 
-Until a Cursor backend exists:
-
-- `ccm statusline` → unsupported
-- `ccm account add/delete/refresh/list/switch` → `NotImplemented`
-- `ccm usage advise/show` → unavailable quota provider（或 generic unavailable reason）
-- `ccm upgrade plugin` → needs Cursor `PluginManagerBackend`（local reinstall vs marketplace update — **待 probe**）
+- `ccm statusline install/uninstall --harness cursor` → explicit `NotImplemented`。
+- `ccm account add/delete/refresh/list/switch --harness cursor` → explicit `NotImplemented`；不会读写 Claude 凭据库。
+- `ccm usage advise/show --harness cursor` → 消费 Cursor dashboard 当前账期，只产生 `hold|throttle|stop_billing_period`，绝不产生 `switch` / `stop_5h` / `stop_7d`。
+- `ccm upgrade plugin --harness cursor` → 已实现 local-install copy；`--to` 不直接拉取历史 tag，需先用 `install.sh` 安装指定版本。
 
 ### Home / config
 
 - `resolveCcMasterHome` 保持 harness-neutral：`--home` > `CC_MASTER_HOME` > `$HOME/.cc_master`（已落地）。
 - **不要**从 `CURSOR_PROJECT_DIR` 推导 cc-master home；board home 与 IDE workspace 根分离。
 
-### Open questions (→ `cursor.md` §Dogfood Backlog)
+### Remaining true gaps
 
-- D7/D8：`conversation_id` 稳定性 + agent shell `CURSOR_*` 可见性
-- D9/D11：local plugin install + `sessionStart.env` 继承
-- Plugin upgrade：marketplace vs manual zip 到 `~/.cursor/plugins/local/`
+- 无 Cursor account pool / autoswitch backend；这是产品能力缺位，不是未接线的 TODO。
+- 无 Claude-style external statusline backend；配额直接读 dashboard provider。
+- Cursor marketplace 的远程指定版本更新不在当前 backend 内；当前只保证本机已安装包 → local plugin 刷新。
 
 ## Current Safe Position
 
@@ -287,4 +288,4 @@ For multi-harness work today:
 - Treat home discovery as harness-neutral: `--home > CC_MASTER_HOME > $HOME/.cc_master`.
 - Treat Codex account-pool management as explicitly unsupported (`NotImplemented`); only current-account usage-style read surfaces are in scope for the first Codex pass.
 - Do not enable Codex runtime adapter features that depend on these ccm surfaces until the corresponding backend exists.
-- Treat Cursor the same as Codex for ccm account/statusline/plugin-upgrade until `cursor.ts` backend exists and probe validates distribution paths.
+- Treat Cursor account pool / external statusline as explicitly unsupported, but do **not** describe all ccm surfaces as unavailable: current-account `billing_period` usage and local-plugin upgrade have implemented Cursor backends.
