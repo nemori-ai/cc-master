@@ -43,10 +43,14 @@ test('printHelp top-level lists all namespaces (incl now-live account/usage/esti
   // account/usage/estimate 现是 live namespace（CORE NAMESPACES 带 blurb），不再列 RESERVED。
   assert.ok(!t.includes('RESERVED'), 'no RESERVED section (all placeholders now live)');
   assert.ok(t.includes('换号号池'), 'account namespace has a live blurb');
-  // 别名 next / lint。
+  // 别名 next / lint（command 级）+ viewer（namespace 级 NOUN_ALIASES → web-viewer）。
   assert.ok(t.includes('next'), 'mentions alias next');
   assert.ok(t.includes('lint'), 'mentions alias lint');
   assert.ok(t.includes('ALIASES'), 'has ALIASES section');
+  assert.ok(
+    /viewer\s+↔ ccm web-viewer/.test(t),
+    'renders viewer namespace-alias row (↔ ccm web-viewer)',
+  );
   // 全局 flag + 退出码。
   assert.ok(t.includes('GLOBAL FLAGS'), 'has GLOBAL FLAGS section');
   assert.ok(t.includes('--board'), 'lists --board global flag');

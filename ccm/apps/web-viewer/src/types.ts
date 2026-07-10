@@ -18,6 +18,14 @@ export interface BoardSummary {
   health?: 'ok' | 'stale' | 'error' | 'unknown';
   updated_at?: string;
   task_count?: number;
+  /** Board-switcher card summary (additive; absent on older servers). */
+  status_counts?: Record<string, number>;
+  done_count?: number;
+  awaiting_count?: number;
+  priority?: string;
+  heartbeat_age_sec?: number | null;
+  branch?: string;
+  created_at?: string;
 }
 
 export interface BoardsPayload {
@@ -51,6 +59,7 @@ export interface GraphEdge {
   id?: string;
   source: string;
   target: string;
+  type?: 'dep' | 'parent' | string;
   critical?: boolean;
   selected?: boolean;
   stale?: boolean;
@@ -62,15 +71,215 @@ export interface GraphRank {
   node_ids: string[];
 }
 
+/** Compact task rows carried on the view-model (server `compactTask` whitelist). */
+export interface CompactTask {
+  id: string;
+  title?: string;
+  status?: string;
+  deps?: string[];
+  parent?: string;
+  type?: string;
+  executor?: string;
+  handle?: string;
+  mechanism?: string;
+  blocked_on?: string | string[];
+  estimate?: unknown;
+  artifact?: unknown;
+  verified?: boolean;
+  created_at?: string;
+  started_at?: string;
+  finished_at?: string;
+  updated_at?: string;
+  /** legacy read-fallback aliases (archived boards revived via --resume) */
+  dispatched_at?: string;
+  completed_at?: string;
+  log?: unknown[];
+  acceptance?: unknown;
+  justification?: string;
+  dep_pins?: Record<string, unknown>;
+  hitl_rounds?: number;
+  notes?: string;
+  tags?: string[];
+  role?: string;
+  references?: unknown;
+  watchdog?: WatchdogInfo;
+  decision_package?: unknown;
+  [key: string]: unknown;
+}
+
+/** One judgment-call ledger entry (board_extras.judgment_calls passthrough). */
+export interface JudgmentCall {
+  id?: string;
+  ts?: string;
+  category?: 'architecture' | 'drift' | 'spec-impl-misalignment' | 'other' | string;
+  severity?: 'low' | 'medium' | 'high' | 'critical' | string;
+  status?: 'pending_review' | 'upheld' | 'overturned' | string;
+  summary?: string;
+  detail?: string;
+  [key: string]: unknown;
+}
+
+/** One cadence iteration (board_extras.cadence.iterations passthrough). */
+export interface CadenceIteration {
+  id?: string;
+  status?: 'open' | 'shipped' | string;
+  started_at?: string;
+  deadline?: string;
+  shipped_at?: string;
+  goal?: string;
+  members?: string[];
+  [key: string]: unknown;
+}
+
+export interface CadencePayload {
+  target?: { ship_every?: string; [key: string]: unknown };
+  iterations?: CadenceIteration[];
+  [key: string]: unknown;
+}
+
+/** Self-wakeup watchdog (board level via board_extras, task level on compact tasks). */
+export interface WatchdogInfo {
+  armed_at?: string;
+  fire_at?: string;
+  mechanism?: 'cron' | 'loop' | 'monitor' | 'shell' | string;
+  job_id?: string;
+  checklist?: unknown;
+  [key: string]: unknown;
+}
+
+/** One coordination inbox notification (kind ∈ notificationKind enum, open at read time). */
+export interface InboxNotification {
+  kind?: string;
+  ts?: string;
+  from?: string;
+  note?: string;
+  [key: string]: unknown;
+}
+
+export interface CoordinationPayload {
+  priority?: 'urgent' | 'high' | 'normal' | 'low' | 'trivial' | string;
+  state?: {
+    current?: { active_tasks?: number; workload?: string; burn_contribution?: number };
+    planned?: { remaining_work?: string; cost_to_complete_pct?: number };
+  };
+  inbox?: InboxNotification[];
+  [key: string]: unknown;
+}
+
+/**
+ * Board-model blind-spot blocks (`view-model.board_extras`, additive passthrough).
+ * Every key is optional: a field missing on the board means the key is absent here.
+ */
+export interface BoardExtrasPayload {
+  judgment_calls?: JudgmentCall[];
+  cadence?: CadencePayload;
+  watchdog?: WatchdogInfo;
+  policy?: { autonomous_account_switch?: 'allow' | 'deny' | string; [key: string]: unknown };
+  coordination?: CoordinationPayload;
+}
+
+/** One same-home peer board row from `/peers.json` (read-only roster). */
+export interface PeerSummary {
+  board_file: string;
+  goal: string;
+  harness?: string;
+  priority: string;
+  active?: boolean;
+  health?: string;
+  heartbeat?: string | null;
+  heartbeat_age_sec?: number | null;
+  current?: { active_tasks?: number | null; workload?: string | null; burn_contribution?: number | null } | null;
+  planned?: { remaining_work?: string | null; cost_to_complete_pct?: number | null } | null;
+}
+
+export interface PeersPayload {
+  schema?: string;
+  available: boolean;
+  current?: { file: string; path?: string } | null;
+  count: number;
+  peers: PeerSummary[];
+  inbox?: InboxNotification[];
+  roster?: { count?: number; freshness_sec?: number; as_of?: string };
+  error?: string;
+}
+
+/** Structured acceptance criterion (acceptance object form, `criteria[]`). */
+export interface AcceptanceCriterion {
+  desc?: string;
+  kind?: 'test' | 'metric' | 'manual' | 'review' | string;
+  check?: string;
+  target?: unknown;
+  measured?: unknown;
+  status?: 'pending' | 'met' | 'failed' | string;
+  [key: string]: unknown;
+}
+
+/** Server-derived analytics readouts (`view-model.insights`, additive block). */
+export interface InsightsPayload {
+  impact?: { id: string | null; count: number };
+  convergence?: { id: string | null; in_deg: number };
+  bottleneck?: {
+    id: string;
+    impact: number;
+    status: string;
+    since?: string | null;
+    elapsed_ms?: number | null;
+  } | null;
+  wip?: { count: number; limit: number | null; over: boolean };
+  awaiting?: { count: number; oldest_gate_elapsed_ms: number | null };
+  age_ms?: number | null;
+  per_node?: Record<string, { impact: number; in_deg: number }>;
+}
+
+/** Decision-package schema (pinned; every field optional at read time). */
+export interface DecisionPackageOption {
+  id?: string | number;
+  label?: string;
+  rationale?: string;
+  tradeoffs?: string;
+}
+
+export interface DecisionPackage {
+  prepared_at?: string;
+  inputs_hash?: string;
+  freshness?: 'fresh' | 'stale' | string;
+  ask_type?: 'decision' | 'advice' | 'solution' | string;
+  context_md?: string;
+  question?: string;
+  what_i_need?: string;
+  why_it_matters?: string;
+  options?: DecisionPackageOption[];
+  enter_cmd?: string;
+}
+
+/** One discuss-sidecar row from `/decisions.json` (pinned shape). */
+export interface DecisionEntry {
+  node_id: string;
+  file: string;
+  resolved_at: string;
+  ask_type: string;
+  round: number;
+  tldr: string;
+}
+
 export interface ViewModelPayload {
   schema?: string;
+  rev?: {
+    boardHash?: string;
+    topologyHash?: string;
+    mtimeMs?: number;
+    size?: number;
+    generatedAt?: string;
+  };
   board: {
     id: string;
     filename: string;
     goal: string;
     mtime_ms?: number;
     hash?: string;
-    owner?: string;
+    owner?: unknown;
+    git?: { branch?: string; worktree?: string } | null;
+    meta?: { template_version?: number; [key: string]: unknown } | null;
   };
   freshness: {
     state: FreshnessState | string;
@@ -78,6 +287,20 @@ export interface ViewModelPayload {
     last_known_good_at?: string;
     errors?: Array<{ message: string; code?: string }>;
   };
+  summary?: {
+    statusCounts?: Record<string, number>;
+    readySet?: string[];
+    criticalPath?: {
+      chain?: string[];
+      makespan?: number | null;
+      weight_source?: string;
+    };
+    awaitingUserCount?: number;
+    verifiedDone?: number;
+  };
+  insights?: InsightsPayload;
+  board_extras?: BoardExtrasPayload;
+  tasks?: CompactTask[];
   graph: {
     family?: 'task-dag' | string;
     nodes: GraphNode[];
@@ -85,6 +308,9 @@ export interface ViewModelPayload {
     ranks?: GraphRank[];
     critical_path?: string[];
     ready_set?: string[];
+    upstream?: Record<string, string[]>;
+    downstream?: Record<string, string[]>;
+    parents?: Record<string, string | null>;
   };
   status?: {
     buckets?: Array<{ id: string; label: string; tone?: StatusTone | string; count: number }>;
@@ -132,6 +358,13 @@ export interface TaskDetailPayload {
     eta?: string;
     updated_at?: string;
     decision_package?: unknown;
+    justification?: string;
+    dep_pins?: Record<string, unknown>;
+    hitl_rounds?: number;
+    notes?: string;
+    role?: string;
+    references?: unknown;
+    watchdog?: WatchdogInfo;
     summary?: string;
     next_actions?: string[];
     [key: string]: unknown;
@@ -147,11 +380,58 @@ export interface TaskDetailPayload {
   error?: string;
 }
 
+/** One risk row from the full status-report body. */
+export interface StatusReportRisk {
+  kind?: string;
+  severity?: string;
+  count?: number;
+  in_flight?: number;
+  wip_limit?: number | null;
+  [key: string]: unknown;
+}
+
+/**
+ * The full report body as `/status-report.json` actually nests it (`payload.report`).
+ * The flat fields on StatusReportPayload below remain for fixture/older shapes; the UI
+ * reads the nested body first and falls back to the flat fields.
+ */
+export interface StatusReportBody {
+  board?: { path?: string; file?: string; goal?: string; [key: string]: unknown };
+  summary?: {
+    total?: number;
+    done?: number;
+    verified_done?: number;
+    in_flight?: number;
+    ready?: number;
+    blocked_on_user?: number;
+    blocked_on_task?: number;
+    attention?: number;
+  };
+  risks?: StatusReportRisk[];
+  next_actions?: {
+    ready_to_dispatch?: Array<{ id?: string; title?: string; [key: string]: unknown }>;
+    awaiting_user?: Array<{ id?: string; title?: string; [key: string]: unknown }>;
+    recommended_operator_actions?: string[];
+  };
+  health?: {
+    lint?: { ok?: boolean; violations?: unknown[] };
+    over_scheduling?: { in_flight?: number; wip_limit?: number | null; state?: string };
+    usage?: { available?: boolean; verdict?: unknown; source?: string };
+  };
+  [key: string]: unknown;
+}
+
 export interface StatusReportPayload {
   schema?: 'ccm/status-report/v1' | string;
+  ok?: boolean;
+  report?: StatusReportBody;
+  risks?: StatusReportRisk[];
+  error?: string;
   artifact?: {
     freshness?: 'fresh' | 'stale' | 'missing' | string;
     generated_at?: string;
+    /** The real ccm artifact stamps `created_at` (generated_at is the fixture-era alias). */
+    created_at?: string;
     expires_at?: string;
   };
   progress?: {
@@ -176,4 +456,10 @@ export interface WorkspaceData {
   selectedTask: TaskDetailPayload | null;
   statusReport: StatusReportPayload;
   error?: string;
+  /**
+   * True when this frame is a client-side last-known-good patch: the server reported a
+   * board read error (torn write) and the previous good frame is shown with freshness
+   * forced to stale. Disables the boardHash short-circuit so recovery re-renders.
+   */
+  clientStale?: boolean;
 }

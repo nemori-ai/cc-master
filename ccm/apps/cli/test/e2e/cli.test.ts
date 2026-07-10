@@ -492,6 +492,14 @@ test('ccm task ls --json（verb 级别名 → task list）→ 0 + JSON 数组', 
   assert.ok(Array.isArray(obj.data));
 });
 
+test('ccm viewer status --json（namespace 级别名 → web-viewer status）与 ccm web-viewer status --json 等价', () => {
+  const { home } = mkHome(); // 无板也可：viewer status 只读 home-scoped service state
+  const alias = runCcm(['viewer', 'status', '--json'], { home });
+  const real = runCcm(['web-viewer', 'status', '--json'], { home });
+  assert.equal(alias.status, real.status);
+  assert.deepEqual(JSON.parse(alias.stdout), JSON.parse(real.stdout));
+});
+
 // ══════════════════════════════════════════════════════════════════════════════════════════════════
 // 6. 板缺失（无 active 板 + 无 --board → 5 NOT_FOUND）
 // ══════════════════════════════════════════════════════════════════════════════════════════════════

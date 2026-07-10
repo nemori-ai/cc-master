@@ -29,10 +29,12 @@ type Out = (s: string) => void;
 
 type Reg = Registry;
 type Aliases = Record<string, [string, string]>;
-// 容忍传整模块（{ REGISTRY, ALIASES }）或裸 REGISTRY。
+type NounAliases = Record<string, string>;
+// 容忍传整模块（{ REGISTRY, ALIASES, NOUN_ALIASES }）或裸 REGISTRY。
 interface RegistryModule {
   REGISTRY?: Reg;
   ALIASES?: Aliases;
+  NOUN_ALIASES?: NounAliases;
   // 容忍整模块命名空间（含 WRITABLE_FIELDS_COVERED / 类型导出等额外成员）也能当 registry 传入。
   [k: string]: unknown;
 }
@@ -87,9 +89,10 @@ export function printHelp(
   const mod = registry as RegistryModule;
   const reg = mod && mod.REGISTRY ? mod.REGISTRY : (registry as Reg); // 容忍传整模块或裸 REGISTRY
   const aliases = mod && mod.ALIASES ? mod.ALIASES : {};
+  const nounAliases = mod && mod.NOUN_ALIASES ? mod.NOUN_ALIASES : {};
 
   if (!noun || !reg[noun]) {
-    out(_topLevel(reg, aliases));
+    out(_topLevel(reg, aliases, nounAliases));
     return;
   }
   if (!verb || !reg[noun][verb]) {
@@ -100,7 +103,7 @@ export function printHelp(
 }
 
 // ── 顶层（无 noun）────────────────────────────────────────────────────────────────────────────────
-function _topLevel(reg: Reg, aliases: Aliases): string {
+function _topLevel(reg: Reg, aliases: Aliases, nounAliases: NounAliases = {}): string {
   const lines: string[] = [];
   lines.push('ccm —— cc-master board 命令行（数据模型 SSOT 的唯一写入关卡）');
   lines.push('');
@@ -112,15 +115,22 @@ function _topLevel(reg: Reg, aliases: Aliases): string {
   for (const noun of Object.keys(reg)) {
     lines.push(`  ${_padRight(noun, 12)}${_namespaceBlurb(noun)}`);
   }
-  // ALIASES：alias → [noun, verb]，渲染成 ccm <noun> <verb>。
+  // ALIASES：command 级 alias → [noun, verb]（渲染成 ccm <noun> <verb>）+ namespace 级 NOUN_ALIASES
+  //   → 真实 noun（渲染成 ccm <noun> <command>，覆盖该 noun 全部子命令）。
   const aliasKeys = Object.keys(aliases || {});
-  if (aliasKeys.length) {
+  const nounAliasKeys = Object.keys(nounAliases || {});
+  if (aliasKeys.length || nounAliasKeys.length) {
     lines.push('');
     lines.push('ALIASES (热路径捷径)');
     for (const a of aliasKeys) {
       // a 源自 Object.keys(aliases)·必命中（as 窄断言·不改逻辑）。
       const [n, v] = aliases[a] as [string, string];
       lines.push(`  ${_padRight(a, 12)}↔ ccm ${n} ${v}`);
+    }
+    for (const a of nounAliasKeys) {
+      // a 源自 Object.keys(nounAliases)·必命中（as 窄断言·不改逻辑）。
+      const n = nounAliases[a] as string;
+      lines.push(`  ${_padRight(a, 12)}↔ ccm ${n} <command>（覆盖全部 ${n} 子命令）`);
     }
   }
   if (RESERVED.length) {

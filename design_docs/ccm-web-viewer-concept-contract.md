@@ -17,7 +17,7 @@ It is a semantic UI contract, not a moodboard. Implementation can tune component
 ## Locked Elements
 
 - **Product shape**: dense operational tool, not a landing page, static JSON browser, or decorative dashboard.
-- **Desktop shell**: compact top command/status bar; left board/filter/outline rail; dominant central DAG viewport; right selected-task/status/diagnostics inspector.
+- **Desktop shell**: two-line top — mission line (identity / objective / current-board chip + mega board switcher / the one alarm slot / utilities / theme) + status strip (pure board-level readouts); stage-scoped controls (view toggle / filter echo / search) live on the stage toolbar of the central column; left analysis/filter/critical-path rail (board switching lives on the mission line's board chip, not the rail); dominant central DAG viewport; right dual-mode inspector (board mission brief by default, selected-task drill-down on selection).
 - **Primary evidence**: layered task DAG remains the central surface. Critical path, selected task, task status, and stale/error states are visible without hover.
 - **Read-model boundary**: the app renders `/view-model.json` for graph/status and `/task.json` for inspector detail; raw `/board.json` is not the main UI loop.
 - **Mobile portrait**: graph visible on first screen; filters and detail use compact controls / bottom-sheet behavior; active filters and freshness stay visible.
@@ -32,7 +32,7 @@ It is a semantic UI contract, not a moodboard. Implementation can tune component
 - Whether DAG flow is top-to-bottom or left-to-right per viewport, as long as dependency direction and rank are obvious.
 - React Flow / XYFlow node anatomy, provided labels, badges, handles, and hit targets stay readable.
 - Exact rail widths and breakpoint mechanics.
-- Whether Status is a rail tab or split module, provided it remains visible and synchronized with selection.
+- Whether Status is a rail tab or split module, provided it remains visible and synchronized with selection. (Fulfilled by the right rail's default board-level mission brief: status report / diagnostics / judgment calls / cadence / peers render whenever no task is selected, so the rail is never empty.)
 
 ## Interaction Contract
 

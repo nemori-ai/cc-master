@@ -50,7 +50,14 @@ import * as webViewerHandler from './handlers/web-viewer.js';
 import { harnessSessionId } from './harnesses/registry.js';
 import * as help from './help.js';
 import * as io from './io.js';
-import { ALIASES, type NounSpec, type OptionSpec, REGISTRY, type VerbSpec } from './registry.js';
+import {
+  ALIASES,
+  NOUN_ALIASES,
+  type NounSpec,
+  type OptionSpec,
+  REGISTRY,
+  type VerbSpec,
+} from './registry.js';
 import * as suggest from './suggest.js';
 
 const EXIT = io.EXIT;
@@ -230,6 +237,17 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
   const scan0 = scanPositions(args);
   const harnessFlag0 = readGlobalStringFlag(args, 'harness');
 
+  // ── NOUN_ALIASES 展开（namespace 级·先于 ALIASES/自动安装判断）：只换 noun 那一个 token，verb token
+  //   原样透传——如 `ccm viewer start` → `ccm web-viewer start`；`ccm viewer`（裸敲）→ `ccm web-viewer`
+  //   （裸敲，含相同的「missing command」提示）。原地改写 `args`（flag-aware 定位到的 index），下游 scan /
+  //   ALIASES / REGISTRY 查找全部按改写后的真实 noun 走，无需另开一条分支。
+  if (scan0.positionals.length > 0) {
+    const first0 = scan0.positionals[0] as { token: string; index: number };
+    if (Object.hasOwn(NOUN_ALIASES, first0.token)) {
+      args[first0.index] = NOUN_ALIASES[first0.token] as string;
+    }
+  }
+
   // ── 无感知自动安装（0.10.0·marker 守·幂等·静默·绝不抛）：除 `statusline` 子命令本身外，任意命令首次跑时
   //   把 ccm 自带的 status line 立起来（status line 高频跑·绝不触发自身）。kill-switch / opt-out / installed
   //   marker 任一在即 skip（详见 @ccm/engine autoInstallStatuslineOnce）。放在最前（no-noun 早退之前）让
@@ -244,7 +262,7 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
       help.printVersion(out);
       return EXIT.OK;
     }
-    help.printHelp(out, { REGISTRY, ALIASES });
+    help.printHelp(out, { REGISTRY, ALIASES, NOUN_ALIASES });
     return EXIT.OK;
   }
 
@@ -286,7 +304,7 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
   // `ccm <noun> --help`（无 verb 或 wantsHelp 且 verb 未知）。
   if (!verb) {
     if (wantsHelp) {
-      help.printHelp(out, { REGISTRY, ALIASES }, nounStr);
+      help.printHelp(out, { REGISTRY, ALIASES, NOUN_ALIASES }, nounStr);
       return EXIT.OK;
     }
     // 缺 verb 但该 noun 有约定默认 verb（如 statusline→render）→ 不报错，落默认 verb 继续（见 resolvedVerb 初值）。
@@ -318,7 +336,7 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
   if (!Object.hasOwn(nounSpec, resolvedVerb)) {
     // `ccm <noun> <unknown> --help` → 降级到 noun 级 help（help.js 容忍未知 verb）。
     if (wantsHelp) {
-      help.printHelp(out, { REGISTRY, ALIASES }, nounStr);
+      help.printHelp(out, { REGISTRY, ALIASES, NOUN_ALIASES }, nounStr);
       return EXIT.OK;
     }
     const cands = suggest.suggestSimilar(verb, Object.keys(nounSpec));
@@ -333,7 +351,7 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
 
   // `ccm <noun> <verb> --help` → verb 级 help（用解析后的 canonical verb）。
   if (wantsHelp) {
-    help.printHelp(out, { REGISTRY, ALIASES }, nounStr, resolvedVerb);
+    help.printHelp(out, { REGISTRY, ALIASES, NOUN_ALIASES }, nounStr, resolvedVerb);
     return EXIT.OK;
   }
 

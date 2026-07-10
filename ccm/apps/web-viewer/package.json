@@ -13,13 +13,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^1.1.8",
+    "@fontsource/archivo": "^5.2.8",
+    "@fontsource/martian-mono": "^5.2.7",
+    "@xyflow/react": "^12.10.0",
+    "lucide-react": "^1.24.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^5.1.2",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.2",
     "vite": "^7.3.1"
   }
 }
