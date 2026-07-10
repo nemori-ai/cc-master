@@ -30,6 +30,8 @@ plugin/src/skills/<skill>/
       strategy.yaml
     codex/
       strategy.yaml
+    cursor/
+      strategy.yaml
 ```
 
 规则：
@@ -60,6 +62,17 @@ plugin/src/hooks/
 - `_hosts/<host>/` 写 host-wide registration、templates、stage map、validator 约束。
 - `<hook>/implementations/<host>/` 写 host-native 实现。
 - 生成到 `dist/<host>/hooks/` 的形状由 host 决定。
+
+## Capability INTENT：非 1:1 与跨 surface 能力
+
+SAP / PHIP 处理能落到单一 skill 或 hook surface 的适配；一项能力若横跨 hooks、commands、skills
+和 / 或 ccm，或目标 host 没有 1:1 机制，则以
+`design_docs/harnesses/capabilities/<capability-id>.md` 承载 host-neutral intent、testable acceptance、
+host mechanism 与 declared divergence。单 hook 规则仍由该 hook 的 `CONTRACT.md` 承载。
+
+Track A / Track B、artifact 分工与 N+1 host touch set 见
+[`n-host-capability-parity.md`](n-host-capability-parity.md)。Cursor 的 rules、host-native commands 与
+Capability Cards 属于 adapter 输入，不应为了维持统一 dist 外观而抹平。
 
 ## Projection 脚本要求
 
