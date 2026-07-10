@@ -347,6 +347,14 @@ header.missionline {
   white-space: nowrap;
   font-weight: 600;
 }
+.board-chip .chip-count {
+  flex: 0 0 auto;
+  color: var(--ink-faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
 .board-chip .caret {
   display: inline-flex;
   color: var(--ink-faint);
@@ -3861,6 +3869,9 @@ header.missionline {
   }
   .missionline .board-chip {
     max-width: 17ch;
+  }
+  .missionline .board-chip .chip-count {
+    display: none;
   }
   .missionline .desktop-only {
     display: none;

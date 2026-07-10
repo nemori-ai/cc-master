@@ -192,8 +192,11 @@ export function BoardSwitcher({ boards, viewModel, onSelectBoard, onNotice }: Bo
         setOpen(false);
       }
     };
-    document.addEventListener('mousedown', onPointerDown);
-    return () => document.removeEventListener('mousedown', onPointerDown);
+    // Capture phase: the xyflow canvas (d3-zoom pan-start) calls stopImmediatePropagation
+    // on its own mousedown handler, which would otherwise swallow a bubble-phase listener
+    // before it ever reaches document. Capturing at document fires first, ahead of that.
+    document.addEventListener('mousedown', onPointerDown, true);
+    return () => document.removeEventListener('mousedown', onPointerDown, true);
   }, [open]);
 
   const pick = useCallback(
@@ -253,6 +256,9 @@ export function BoardSwitcher({ boards, viewModel, onSelectBoard, onNotice }: Bo
       >
         <span className="bdot" data-tone={chipTone} />
         <span className="bname">{chipName}</span>
+        <span className="chip-count">
+          {activeBoards.length} active
+        </span>
         <span aria-hidden="true" className="caret">
           <ChevronDown size={12} strokeWidth={1.75} />
         </span>

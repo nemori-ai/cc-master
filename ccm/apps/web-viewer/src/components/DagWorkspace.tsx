@@ -160,7 +160,9 @@ function DagCanvas({
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        rf.fitView({ padding: 0.16 });
+        // Auto refit (topology change / reset layout / board switch) caps at 150% so a
+        // 2-node board doesn't blow up to fill the canvas; manual zoom still reaches 200%.
+        rf.fitView({ padding: 0.16, maxZoom: 1.5 });
       } catch {
         /* canvas not measured yet — the next topology change refits */
       }
@@ -188,7 +190,9 @@ function DagCanvas({
     const position = posRef.current.get(targetId);
     if (!position) return;
     rf.setCenter(position.x + NODE_W / 2, position.y + NODE_H / 2, {
-      zoom: Math.max(rf.getZoom(), 0.85),
+      // Same 150% ceiling as the auto-fit paths, floor stays 0.85 so a locate never lands
+      // too zoomed-out to read the tile.
+      zoom: Math.min(Math.max(rf.getZoom(), 0.85), 1.5),
       duration: prefersReducedMotion() ? 0 : 420,
     });
   }, [locateRequest, rf]);
@@ -386,6 +390,7 @@ function DagCanvas({
         edges={built.edges}
         elementsSelectable
         fitView
+        fitViewOptions={{ padding: 0.16, maxZoom: 1.5 }}
         minZoom={0.1}
         nodeTypes={nodeTypes}
         nodes={nodes}
