@@ -165,7 +165,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | **slicing-goals-into-dags** | 怎么把目标**切**成 DAG（纵切薄增量 / walking skeleton / 粒度 / 价值风险排序） | 「这目标怎么拆 / 先做什么」——「切」先于你「目标即依赖图」镜头的「排」 |
 | **dev-as-ml-loop** | 把 dev 工作当优化系统：你设计外层 loop 与 handoff，执行 agent 跑单任务内层 loop | 派发 dev 任务前用它塑形 objective / measurement / artifact / restart；执行者用它把任务优化到验收 |
 | **engineering-with-craft** | 领域 / 类 / 合约 / 测试**本身**怎么建得好（DDD/OOP/SDD/TDD 五根 + 工程红线） | 派发的任务涉及设计/建模/写测试的手艺**内容**时（同 F，多由执行者用） |
-| **pacing-and-estimation** | 读 ccm `usage`/`estimate` 只读 advisory 配速 + 估算（verdict / 四档模型 / EVM / 诚实字段） | 读 usage/estimate 输出、判降档/换号、拿不准 forecast 信不信时（**ccm 出 verdict、你决策**） |
+| **pacing-and-estimation** | 读 ccm `usage`/`estimate` 只读 advisory 配速 + 估算（verdict / host 模型档位 / EVM / 诚实字段） | 读 usage/estimate 输出、判降档/换号、拿不准 forecast 信不信时（**ccm 出 verdict、你决策**） |
 
 > **分工红线**：**你 = 决策 + 排期 + 换号决策锚**；切分归 `slicing-goals-into-dags`、执行循环形状归 `dev-as-ml-loop`、手艺内容归 `engineering-with-craft`、读 advisory 消费归 `pacing-and-estimation`、ccm 操作机制归 `using-ccm`、workflow 写法归 `authoring-workflows`。越界复述会破坏 skill 间互不重叠的边界。
 

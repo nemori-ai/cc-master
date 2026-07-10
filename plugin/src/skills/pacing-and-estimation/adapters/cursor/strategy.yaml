@@ -16,7 +16,7 @@ supported:
   - capability: estimation_method
     reason: "Cost-to-complete estimation method is host-neutral when it consumes normalized board data."
   - capability: model_tier_provider
-    reason: "Cursor model tier mapping encoded for Composer + Grok 4.5 + Claude (no Fable) + Codex/GPT; see adapters/cursor/overlays/model-tiers-reference.md."
+    reason: "Cursor model tier mapping encodes two-pool routing plus GPT-5.6 Sol/Terra/Luna × effort for quota-ample and quota-tight operation; no Fable."
 slot_replacements:
   "{{PACING_DESCRIPTION}}": adapters/cursor/overlays/description.md
   "{{PACING_BOUNDARY}}": adapters/cursor/overlays/boundary.md
@@ -42,4 +42,4 @@ host_slots:
     source: plugin/src/skills/_hosts/cursor/capabilities.yaml
     status: partial_source_uses_cursor_specific_guidance
 notes:
-  - Cursor projects the canonical pacing guide plus billing_period usage and Cursor model-tier slots (Composer/Grok/Claude/Codex; no Fable).
+  - Cursor projects the canonical pacing guide plus billing_period usage and Cursor model-tier slots (Composer/Grok/Claude/GPT-5.6; no Fable).
