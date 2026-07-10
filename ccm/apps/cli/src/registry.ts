@@ -210,6 +210,17 @@ export const REGISTRY: Registry = {
       examples: ['ccm board stamp-harness --board <path> --json'],
       handler: 'board.stampHarness',
     },
+    'enable-contract': {
+      summary: '预检/启用 task-planning/v1 + agent-routing/v1（历史 terminal 精确 grandfather）',
+      read: false,
+      positionals: [],
+      options: {
+        preflight: { type: 'boolean', desc: '只读列出 activation gaps 与 grandfathered terminal' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm board enable-contract --preflight --json', 'ccm board enable-contract'],
+      handler: 'board.enableContract',
+    },
   },
 
   // ════════════════════ task ═════════════════════════════════════════════════════════════════════
@@ -422,6 +433,61 @@ export const REGISTRY: Registry = {
         'ccm task done T7 T8 T9 --artifact /abs/out.md --verified',
       ],
       handler: 'task.done',
+    },
+    'set-planning': {
+      summary: '经 dedicated writer 写 task-planning/v1 多维任务画像',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        profile: {
+          type: 'string',
+          field: 'planning',
+          required: true,
+          desc: 'planning JSON（@/absolute/file.json、- 或 JSON 字面量）',
+        },
+        json: { type: 'boolean', desc: '输出完整 task JSON' },
+      },
+      examples: ['ccm task set-planning T7 --profile @/abs/planning.json'],
+      handler: 'task.setPlanning',
+    },
+    'set-routing': {
+      summary: '经 dedicated writer 写 agent-routing/v1 policy（不 selection / 不 spawn）',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        policy: {
+          type: 'string',
+          field: 'routing',
+          required: true,
+          desc: 'routing policy JSON（objective/constraints/candidates/ample+tight/fallback）',
+        },
+        json: { type: 'boolean', desc: '输出完整 task JSON' },
+      },
+      examples: ['ccm task set-routing T7 --policy @/abs/routing-policy.json'],
+      handler: 'task.setRouting',
+    },
+    'route-bind': {
+      summary:
+        '原子写 selection + append running attempt snapshot + opaque handle claim + in_flight',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        selection: {
+          type: 'string',
+          required: true,
+          desc: 'qualified selection JSON（@file / - / 字面量）',
+        },
+        attempt: {
+          type: 'string',
+          required: true,
+          desc: 'running attempt JSON；writer 自动冻结 selection_snapshot',
+        },
+        json: { type: 'boolean', desc: '输出完整 task JSON' },
+      },
+      examples: [
+        'ccm task route-bind T7 --selection @/abs/selection.json --attempt @/abs/attempt.json',
+      ],
+      handler: 'task.routeBind',
     },
     block: {
       summary: '阻塞（→ blocked·设 blocked_on）',

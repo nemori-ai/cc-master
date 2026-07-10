@@ -20,12 +20,19 @@
 //   报错文案/.errKind 逐字保持。board 用宽松结构类型（mutations 只机械写形状·不强 schema）。
 
 import {
+  contractActivation,
+  contractWritePolicy,
+  createRoutingEnvelope,
   estimateHours,
   isEnumMember,
   isISOUTC,
   isLegalTransition,
+  routingContractPreflight,
   SCHEMA_VERSION,
   STATUS_MACHINE,
+  validateRoutedTaskForInFlight,
+  validateTaskPlanning,
+  validateTaskRoutePolicy,
 } from '@ccm/engine';
 
 // 带 .errKind 的 Error（router 据此映射退出码）。
@@ -219,6 +226,22 @@ export function addTask(board: Board, fields?: Record<string, any>): Board {
   const b = clone(board);
   if (!Array.isArray(b.tasks)) b.tasks = [];
   fields = fields || {};
+  if (fields.planning !== undefined || fields.routing !== undefined) {
+    throw err(
+      'refused: planning/routing use dedicated commands (`task set-planning` / `task set-routing`), not task add fields',
+      'Validation',
+    );
+  }
+  if (
+    contractActivation(b) === 'enabled' &&
+    fields.executor === 'subagent' &&
+    fields.status === 'in_flight'
+  ) {
+    throw err(
+      'refused: contract-enabled subagent cannot be added directly in_flight; obtain an opaque handle claim and use `ccm task route-bind`',
+      'Validation',
+    );
+  }
   const task: Task = {
     id: fields.id,
     status: fields.status !== undefined ? fields.status : 'ready',
@@ -265,6 +288,22 @@ export function updateTask(board: Board, id: string, fields?: Record<string, any
   const b = clone(board);
   const t = requireTask(b, id);
   fields = fields || {};
+  if (fields.planning !== undefined || fields.routing !== undefined) {
+    throw err(
+      'refused: planning/routing are dedicated-writer fields; use `task set-planning` / `task set-routing` / `task route-bind`',
+      'Validation',
+    );
+  }
+  if (
+    fields.handle !== undefined &&
+    contractActivation(b) === 'enabled' &&
+    t.executor === 'subagent'
+  ) {
+    throw err(
+      'refused: task.handle is a route-bind projection on contract-enabled subagents; use `task route-bind`',
+      'Validation',
+    );
+  }
   // 增删 deps（去重）。
   if (Array.isArray(fields.addDep)) {
     if (!Array.isArray(t.deps)) t.deps = [];
@@ -306,6 +345,19 @@ export function transition(
   const b = clone(board);
   const t = requireTask(b, id);
   const from = t.status;
+  if (
+    toStatus === 'in_flight' &&
+    contractActivation(b) === 'enabled' &&
+    t.executor === 'subagent'
+  ) {
+    const issues = validateRoutedTaskForInFlight(t);
+    if (issues.length) {
+      throw err(
+        `refused: contract-enabled subagent enters in_flight only through \`ccm task route-bind\` after a syntactic opaque handle claim; ${issues.map((entry) => `${entry.path}: ${entry.message}`).join('; ')}`,
+        'Validation',
+      );
+    }
+  }
   if (!isLegalTransition(from, toStatus) && !force) {
     const outs = STATUS_MACHINE.transitions[from] || [];
     throw err(
@@ -316,6 +368,148 @@ export function transition(
   t.status = toStatus;
   if (toStatus === 'in_flight') t.started_at = stampNow();
   if (toStatus === 'done') t.finished_at = stampNow();
+  return touch(b);
+}
+
+function assertNoContractIssues(
+  label: string,
+  issues: Array<{ path: string; message: string }>,
+): void {
+  if (!issues.length) return;
+  throw err(
+    `refused: invalid ${label}: ${issues.map((entry) => `${entry.path}: ${entry.message}`).join('; ')}`,
+    'Validation',
+  );
+}
+
+export function setTaskPlanning(board: Board, id: string, planning: unknown): Board {
+  assertNoContractIssues('task planning', validateTaskPlanning(planning));
+  const b = clone(board);
+  const t = requireTask(b, id);
+  t.planning = structuredClone(planning);
+  return touch(b);
+}
+
+export function setTaskRoutingPolicy(board: Board, id: string, policy: unknown): Board {
+  const b = clone(board);
+  const t = requireTask(b, id);
+  const existingAttempts =
+    t.routing && typeof t.routing === 'object' && Array.isArray(t.routing.attempts)
+      ? t.routing.attempts
+      : [];
+  if (existingAttempts.length > 0 || (t.routing && t.routing.selected)) {
+    throw err(
+      'refused: set-routing cannot replace a selected route or attempt history; attempts are append-only',
+      'Validation',
+    );
+  }
+  const routing = createRoutingEnvelope(policy);
+  assertNoContractIssues('task routing policy', validateTaskRoutePolicy({ ...t, routing }));
+  t.routing = routing;
+  return touch(b);
+}
+
+export function bindTaskRoute(
+  board: Board,
+  id: string,
+  args: { selection?: unknown; attempt?: unknown },
+): Board {
+  const b = clone(board);
+  const t = requireTask(b, id);
+  if (t.executor !== 'subagent') {
+    throw err('refused: route-bind is only valid for executor=subagent', 'Validation');
+  }
+  if (!t.routing || typeof t.routing !== 'object' || !Array.isArray(t.routing.attempts)) {
+    throw err('refused: route-bind requires `task set-routing` first', 'Validation');
+  }
+  if (!args || !args.selection || !args.attempt || typeof args.attempt !== 'object') {
+    throw err('refused: route-bind requires selection and attempt objects', 'Validation');
+  }
+  const attemptInput = args.attempt as Record<string, any>;
+  if (attemptInput.state !== 'running') {
+    throw err('refused: C1 route-bind accepts only state=running attempt claims', 'Validation');
+  }
+  if (typeof attemptInput.handle !== 'string' || attemptInput.handle.trim() === '') {
+    throw err(
+      'refused: route-bind requires a non-empty opaque handle claim (C1 syntactic claim; not real/live attestation)',
+      'Validation',
+    );
+  }
+  if (t.status !== 'ready' && t.status !== 'in_flight') {
+    throw err(
+      `refused: route-bind requires task status ready or legacy in_flight (current: ${String(t.status)})`,
+      'Validation',
+    );
+  }
+  if (
+    t.routing.attempts.some(
+      (attempt: unknown) =>
+        !!attempt &&
+        typeof attempt === 'object' &&
+        (attempt as Record<string, unknown>).state === 'running',
+    )
+  ) {
+    throw err('refused: route-bind cannot create a second running attempt', 'Validation');
+  }
+  if (
+    t.routing.attempts.some(
+      (attempt: unknown) =>
+        !!attempt &&
+        typeof attempt === 'object' &&
+        (attempt as Record<string, unknown>).id === attemptInput.id,
+    )
+  ) {
+    throw err(`refused: duplicate attempt id ${String(attemptInput.id)}`, 'Validation');
+  }
+
+  const selection = structuredClone(args.selection);
+  const attempt: Record<string, any> = {
+    ...structuredClone(attemptInput),
+    selection_snapshot: structuredClone(selection),
+  };
+  t.routing.selected = selection;
+  t.routing.attempts.push(attempt);
+  t.handle = attempt.handle;
+  const wasReady = t.status === 'ready';
+  t.status = 'in_flight';
+  if (wasReady) t.started_at = stampNow();
+  assertNoContractIssues('routed in-flight task', validateRoutedTaskForInFlight(t));
+  return touch(b);
+}
+
+export function enableRoutingContracts(board: Board): Board {
+  if (contractActivation(board) === 'enabled') return clone(board);
+  const report = routingContractPreflight(board);
+  if (report.tasks.length) {
+    throw err(
+      `refused: routing contract preflight has ${report.tasks.length} task gap(s): ${report.tasks.map((task) => `${task.task_id}[${task.issues.map((entry) => entry.path).join(',')}]`).join('; ')}`,
+      'Validation',
+    );
+  }
+  const b = clone(board);
+  if (!b.meta || typeof b.meta !== 'object' || Array.isArray(b.meta)) b.meta = {};
+  if (
+    !b.meta.contracts ||
+    typeof b.meta.contracts !== 'object' ||
+    Array.isArray(b.meta.contracts)
+  ) {
+    b.meta.contracts = {};
+  }
+  const grandfathered = (Array.isArray(b.tasks) ? b.tasks : [])
+    .filter(
+      (task: Task) =>
+        task &&
+        task.executor === 'subagent' &&
+        ['done', 'failed', 'escalated'].includes(task.status),
+    )
+    .map((task: Task) => ({
+      task_id: task.id,
+      created_at: typeof task.created_at === 'string' ? task.created_at : null,
+    }));
+  b.meta.contracts.task_planning = 'ccm/task-planning/v1';
+  b.meta.contracts.agent_routing = 'ccm/agent-routing/v1';
+  b.meta.contracts.agent_routing_activated_at = stampNow();
+  b.meta.contracts.agent_routing_grandfathered_terminal = grandfathered;
   return touch(b);
 }
 
@@ -556,7 +750,7 @@ export function logicalSetPath(dotpath: string, opts?: SetScope): string {
 }
 
 // 🔒 守门：拒绝 load-bearing path。
-function assertFlexible(parsed: ParsedPath): void {
+function assertFlexible(board: Board, parsed: ParsedPath): void {
   if (parsed.scope === 'board') {
     // 作用于 board 顶层：首段落在 LB_BOARD 即拒（含直接改 tasks 数组本身或 tasks 越界写 🔒 子字段）。
     //   board scope 的 segs 来自 dotpath.split('.')·必 ≥1 段·head 定值；as string 窄断言（不改逻辑·
@@ -582,6 +776,15 @@ function assertFlexible(parsed: ParsedPath): void {
       );
     }
   }
+  const policy = contractWritePolicy(parsed.scope, parsed.segs, {
+    contractEnabled: contractActivation(board) === 'enabled',
+  });
+  if (policy !== 'generic') {
+    throw err(
+      `refused: "${parsed.segs.join('.')}" has ${policy} writer policy; use board enable-contract / task set-planning / task set-routing / task route-bind instead of --set`,
+      'Validation',
+    );
+  }
 }
 
 // 沿 segs 设值（中途缺对象则建空对象）。返回根（已定位的 task 或 board）。
@@ -599,7 +802,7 @@ function setDeep(root: Record<string, any>, segs: string[], value: unknown): voi
 export function applySet(board: Board, dotpath: string, value: unknown, opts?: SetScope): Board {
   const b = clone(board);
   const parsed = parsePath(dotpath, opts?.defaultTaskId);
-  assertFlexible(parsed);
+  assertFlexible(b, parsed);
   if (parsed.scope === 'task') {
     const t = requireTask(b, parsed.taskId as string);
     setDeep(t, parsed.segs, value);

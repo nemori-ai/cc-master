@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Cross-harness routed-task contract spine** — adds opt-in `ccm/task-planning/v1` and `ccm/agent-routing/v1` board contracts plus dedicated `ccm task set-planning`, `set-routing`, `route-bind`, and `ccm board enable-contract` writers. Contract-enabled subagent tasks must declare multidimensional difficulty, effect/capability/permission floors, ample/tight candidate chains, mechanical fallback authority, and an immutable per-attempt selection snapshot before entering `in_flight`; legacy boards remain unchanged and historical terminal tasks are fingerprint-grandfathered at activation.
+
 ## [0.19.0] — 2026-07-10
 
 > **Mission-control web-viewer + GPT-5.6 model-tier guidance** — ships with **ccm-v0.20.0**.

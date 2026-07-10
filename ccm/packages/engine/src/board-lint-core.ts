@@ -38,6 +38,14 @@ import {
   type TaskLike,
   taskTrulyDone,
 } from './board-model.js';
+import {
+  contractActivation,
+  routingContractAppliesToTask,
+  validateRoutedTaskForInFlight,
+  validateRoutingEnvelope,
+  validateTaskPlanning,
+  validateTaskRoutePolicy,
+} from './routing-contract.js';
 
 // ── lint 报告条目 / 结果类型 ───────────────────────────────────────────────────────────────────────
 export interface LintEntry {
@@ -188,6 +196,7 @@ export function lintBoard(text: string): LintResult {
   lintScheduling(b, emit);
   lintWatchdog(b, emit);
   lintMeta(b, emit);
+  lintContracts(b, emit);
   lintLog(b, emit);
   lintJudgmentCalls(b, emit);
   lintCadenceFormat(b, emit);
@@ -427,6 +436,7 @@ export function lintBoard(text: string): LintResult {
   // ── BIZ 条件业务规则（per-task）+ awaiting-user 完整性 ───────────────────────────────────────────────
   for (const [id, t] of taskById) {
     lintTaskBiz(id, t, emit);
+    lintTaskRoutingContract(b, id, t, emit);
   }
 
   // ── BIZ-STATUS-DEPS（deps 门控不一致·warn·ADR-023）──────────────────────────────────────────────────
@@ -522,6 +532,45 @@ function lintMeta(board: BoardLike, emit: Emit): void {
       'FMT-META',
       `meta.created_at 是 ${JSON.stringify(mt.created_at)}，非严格 ISO-8601 UTC。影响：viewer 建板时刻渲染退化（不致命）。`,
     );
+  }
+}
+
+function lintContracts(board: BoardLike, emit: Emit): void {
+  const activation = contractActivation(board);
+  if (activation === 'invalid') {
+    emit(
+      'FMT-CONTRACTS',
+      'meta.contracts 的 routing activation 必须成对精确写入 task_planning="ccm/task-planning/v1"、agent_routing="ccm/agent-routing/v1"、严格 UTC agent_routing_activated_at 与 grandfathered terminal 数组；请用 `ccm board enable-contract`，不要手写。',
+    );
+    return;
+  }
+  if (activation !== 'enabled') return;
+  const meta = board.meta as Record<string, unknown>;
+  const contracts = meta.contracts as Record<string, unknown>;
+  const fingerprints = contracts.agent_routing_grandfathered_terminal;
+  if (!Array.isArray(fingerprints)) return;
+  const seen = new Set<string>();
+  for (let index = 0; index < fingerprints.length; index += 1) {
+    const entry = fingerprints[index] as Record<string, unknown>;
+    if (
+      !entry ||
+      typeof entry !== 'object' ||
+      Array.isArray(entry) ||
+      typeof entry.task_id !== 'string' ||
+      entry.task_id === '' ||
+      !(entry.created_at === null || entry.created_at === undefined || isISOUTC(entry.created_at))
+    ) {
+      emit(
+        'FMT-CONTRACTS',
+        `meta.contracts.agent_routing_grandfathered_terminal[${index}] 必须是 {task_id:非空字符串,created_at:ISO|null}。`,
+      );
+      continue;
+    }
+    const key = `${entry.task_id}\u0000${entry.created_at ?? ''}`;
+    if (seen.has(key)) {
+      emit('FMT-CONTRACTS', `grandfathered terminal fingerprint 重复：${entry.task_id}。`);
+    }
+    seen.add(key);
   }
 }
 
@@ -1221,6 +1270,91 @@ function lintTaskBiz(id: string, t: TaskLike, emit: Emit): void {
   }
   // BIZ-TIME-ORDER（warn）：时间序 created≤started≤finished;in_flight⇒started;done⇒finished。
   lintTimeOrder(id, t, emit);
+}
+
+function formatContractIssues(issues: Array<{ path: string; message: string }>): string {
+  return issues.map((entry) => `${entry.path}: ${entry.message}`).join('; ');
+}
+
+function lintTaskRoutingContract(board: BoardLike, id: string, t: TaskLike, emit: Emit): void {
+  if (t.planning !== undefined) {
+    const issues = validateTaskPlanning(t.planning);
+    if (issues.length) {
+      emit(
+        'FMT-TASK-PLANNING',
+        `${id}.planning 不满足 ccm/task-planning/v1：${formatContractIssues(issues)}`,
+        id,
+      );
+    }
+  }
+  if (t.routing !== undefined) {
+    const issues = validateRoutingEnvelope(t.routing);
+    if (issues.length) {
+      emit(
+        'FMT-TASK-ROUTING',
+        `${id}.routing 不满足 ccm/agent-routing/v1：${formatContractIssues(issues)}`,
+        id,
+      );
+    }
+  }
+  if (!routingContractAppliesToTask(board, t)) return;
+
+  const planningIssues = validateTaskPlanning(t.planning);
+  const estimate = t.estimate as Record<string, unknown> | undefined;
+  if (
+    !estimate ||
+    typeof estimate !== 'object' ||
+    Array.isArray(estimate) ||
+    typeof estimate.value !== 'number' ||
+    estimate.value <= 0 ||
+    typeof estimate.unit !== 'string' ||
+    estimate.unit === ''
+  ) {
+    planningIssues.push({
+      code: 'ROUTED-TASK-ESTIMATE',
+      path: 'estimate',
+      message: 'must be a positive {value:number,unit:string}',
+    });
+  }
+  if (planningIssues.length) {
+    emit(
+      'BIZ-ROUTED-PLANNING-REQUIRED',
+      `${id} 在 routing contract activation 下必须有完整多维 planning + 正 estimate：${formatContractIssues(planningIssues)}`,
+      id,
+    );
+  }
+
+  const policyIssues = validateTaskRoutePolicy(t);
+  if (policyIssues.length) {
+    emit(
+      'BIZ-ROUTE-POLICY-REQUIRED',
+      `${id} 在 routing contract activation 下必须有 brand-neutral policy、ample/tight chains 与机械资格集合：${formatContractIssues(policyIssues)}`,
+      id,
+    );
+  }
+  if (t.status !== 'in_flight') return;
+
+  const inFlightIssues = validateRoutedTaskForInFlight(t);
+  const selectionIssues = inFlightIssues.filter((entry) =>
+    entry.path.startsWith('routing.selected'),
+  );
+  if (selectionIssues.length) {
+    emit(
+      'BIZ-ROUTE-SELECTION-REQUIRED',
+      `${id} 已 in_flight 但 current selection 缺失/无资格：${formatContractIssues(selectionIssues)}`,
+      id,
+    );
+  }
+  const attemptIssues = inFlightIssues.filter(
+    (entry) => entry.path.startsWith('routing.attempts') || entry.path === 'handle',
+  );
+  if (attemptIssues.length) {
+    emit(
+      'BIZ-ROUTE-ATTEMPT-REQUIRED',
+      `${id} 已 in_flight 但缺恰一条 running attempt/一致 opaque handle claim/冻结 selection snapshot：${formatContractIssues(attemptIssues)}`,
+      id,
+    );
+  }
 }
 
 // ── BIZ-STATUS-DEPS（warn·ADR-023）：deps 驱动的门控一致性——它精确等于「reconcileGating 本应改动此 task」。

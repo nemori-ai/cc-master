@@ -1,0 +1,61 @@
+{
+  "origin_harness": "claude-code",
+  "task": {
+    "id": "T-no-route",
+    "status": "ready",
+    "deps": [],
+    "executor": "subagent",
+    "estimate": { "value": 1, "unit": "h" },
+    "planning": {
+      "schema": "ccm/task-planning/v1",
+      "assessed_at": "2026-07-10T08:00:00Z",
+      "assessor": "master-orchestrator",
+      "dimensions": {
+        "reasoning": "frontier",
+        "uncertainty": "high",
+        "risk": "critical",
+        "scope": "cross-repo",
+        "context": "oversized",
+        "coordination": "multi-boundary",
+        "reversibility": "irreversible"
+      },
+      "estimate_confidence": "low",
+      "quality": { "effect_floor": "expert-human-review-required" },
+      "budget": { "posture": "tight", "max_attempts": 1 },
+      "capabilities": {
+        "required": [{ "id": "unavailable-capability" }],
+        "preferred": [],
+        "forbidden": [{ "id": "external-write" }]
+      }
+    },
+    "routing": {
+      "schema": "ccm/agent-routing/v1",
+      "mode": "cross-harness",
+      "policy": {
+        "objective": "quality-first",
+        "constraints": {
+          "effect_floor": "expert-human-review-required",
+          "quota_unknown": "ineligible",
+          "cross_harness_quota_admission": "ample-only"
+        },
+        "candidates": [],
+        "chains": { "ample": [], "tight": [] },
+        "fallback": {
+          "on": [],
+          "never_on": [
+            "policy-blocked",
+            "permission-blocked",
+            "security-blocked",
+            "workspace-mismatch",
+            "task-blocked",
+            "acceptance-failed"
+          ],
+          "exhaustion": "fail-closed",
+          "same_harness": "explicit-candidate-only"
+        }
+      },
+      "selected": null,
+      "attempts": []
+    }
+  }
+}

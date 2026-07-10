@@ -125,7 +125,7 @@ export const FIELDS = {
     },
     meta: {
       tier: '✎',
-      type: 'object{template_version:int, created_at?:ISO}',
+      type: 'object{template_version:int, created_at?:ISO, contracts?:object}',
       default: '{template_version:N}',
       readers: 'viewer timeline 版本门',
       writers: 'bootstrap / agent 经 CLI',
@@ -375,6 +375,26 @@ export const FIELDS = {
       when: '估点',
       degrade:
         '缺→CPM 降级 unit;open cadence member 缺→warn(BIZ-CADENCE-MISSING-ESTIMATE);形状坏→warn(FMT-ESTIMATE)',
+    },
+    planning: {
+      tier: '✎',
+      type: 'object{schema:"ccm/task-planning/v1",dimensions,quality,budget,capabilities}',
+      default: '缺省(legacy task)；contract-enabled subagent 必填',
+      readers: '@ccm/engine routing contract / ccm dedicated writers / viewer read model',
+      writers: 'ccm task set-planning（dedicated whole-object writer）',
+      when: 'task profile 已评估、进入 route 之前',
+      degrade: 'legacy 缺→现状不变；contract-enabled 缺/坏→hard(BIZ-ROUTED-PLANNING-REQUIRED)',
+    },
+    routing: {
+      tier: '✎',
+      type: 'object{schema:"ccm/agent-routing/v1",mode,policy,selected?,attempts[]}',
+      default: '缺省(legacy task)；contract-enabled subagent 必填',
+      readers: '@ccm/engine routing contract / ccm dedicated writers / viewer read model',
+      writers:
+        'ccm task set-routing（policy）+ route-bind（selected / append-only attempts / handle projection）',
+      when: 'candidate chain 已规划；opaque handle claim 取得后 bind',
+      degrade:
+        'legacy 缺→现状不变；contract-enabled 缺/坏或 in-flight 无 selection/attempt/handle→hard(BIZ-ROUTE-*)',
     },
     blocked_on: {
       tier: '✎',
@@ -722,6 +742,28 @@ export const INVARIANTS: Invariant[] = [
     scope: 'task',
     summary: 'acceptance string 或 {criteria 非空, criterion.status ∈ enum}',
   },
+  {
+    id: 'FMT-CONTRACTS',
+    level: 'hard',
+    family: 'FMT',
+    scope: 'board',
+    summary:
+      'routing contract activation 缺省为 legacy；出现时须 task-planning/v1 + agent-routing/v1 成对精确启用',
+  },
+  {
+    id: 'FMT-TASK-PLANNING',
+    level: 'warn',
+    family: 'FMT',
+    scope: 'task',
+    summary: 'task.planning 若存在须满足 ccm/task-planning/v1 形状',
+  },
+  {
+    id: 'FMT-TASK-ROUTING',
+    level: 'warn',
+    family: 'FMT',
+    scope: 'task',
+    summary: 'task.routing 若存在须满足 ccm/agent-routing/v1 形状',
+  },
   // ── GRAPH 图(hard·rollup 除外) ──────────────────────────────────────────────────────────────────
   {
     id: 'GRAPH-DANGLING',
@@ -811,6 +853,37 @@ export const INVARIANTS: Invariant[] = [
     family: 'BIZ',
     scope: 'task',
     summary: 'executor ∈ {subagent, workflow} ⇒ handle 存在',
+  },
+  {
+    id: 'BIZ-ROUTED-PLANNING-REQUIRED',
+    level: 'hard',
+    family: 'BIZ',
+    scope: 'task',
+    summary: 'contract-enabled subagent ⇒ valid planning + positive estimate',
+  },
+  {
+    id: 'BIZ-ROUTE-POLICY-REQUIRED',
+    level: 'hard',
+    family: 'BIZ',
+    scope: 'task',
+    summary:
+      'contract-enabled subagent ⇒ valid provider-neutral routing policy with ample/tight chains',
+  },
+  {
+    id: 'BIZ-ROUTE-SELECTION-REQUIRED',
+    level: 'hard',
+    family: 'BIZ',
+    scope: 'task',
+    summary:
+      'contract-enabled in-flight subagent ⇒ qualified current selection inside declared chain',
+  },
+  {
+    id: 'BIZ-ROUTE-ATTEMPT-REQUIRED',
+    level: 'hard',
+    family: 'BIZ',
+    scope: 'task',
+    summary:
+      'contract-enabled in-flight subagent ⇒ exactly one running attempt + matching projected opaque handle claim',
   },
   {
     id: 'BIZ-EXTERNAL-ISSUE',

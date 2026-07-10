@@ -1,0 +1,168 @@
+{
+  "origin_harness": "codex",
+  "task": {
+    "id": "T-native",
+    "status": "in_flight",
+    "deps": [],
+    "executor": "subagent",
+    "estimate": { "value": 1, "unit": "h" },
+    "handle": "native://codex/agent-1",
+    "planning": {
+      "schema": "ccm/task-planning/v1",
+      "assessed_at": "2026-07-10T08:00:00Z",
+      "assessor": "master-orchestrator",
+      "dimensions": {
+        "reasoning": "multi-step",
+        "uncertainty": "low",
+        "risk": "medium",
+        "scope": "multi-file",
+        "context": "medium",
+        "coordination": "none",
+        "reversibility": "reversible"
+      },
+      "estimate_confidence": "high",
+      "quality": { "effect_floor": "meets-required-capabilities" },
+      "budget": { "posture": "ample", "max_attempts": 2 },
+      "capabilities": {
+        "required": [{ "id": "structured-output" }],
+        "preferred": [],
+        "forbidden": [{ "id": "push-remote" }]
+      }
+    },
+    "routing": {
+      "schema": "ccm/agent-routing/v1",
+      "mode": "cross-harness",
+      "policy": {
+        "objective": "balanced",
+        "constraints": {
+          "effect_floor": "meets-required-capabilities",
+          "quota_unknown": "ineligible",
+          "cross_harness_quota_admission": "ample-only"
+        },
+        "candidates": [
+          {
+            "id": "codex-native",
+            "surface": "host-native",
+            "adapter": "codex/native-v1",
+            "harness": "codex",
+            "provider": "openai",
+            "model": "host-default",
+            "effort": "medium",
+            "capabilities": ["structured-output"],
+            "effect_floors_met": ["meets-required-capabilities"],
+            "permission": {
+              "profile": "workspace-write",
+              "denies": ["push-remote", "account-mutation"]
+            },
+            "account_mutation": "forbidden",
+            "requires": [
+              "runtime-healthy",
+              "capability-match",
+              "effect-floor",
+              "permission-compatible",
+              "account-mutation-forbidden"
+            ]
+          }
+        ],
+        "chains": { "ample": ["codex-native"], "tight": ["codex-native"] },
+        "fallback": {
+          "on": ["transport-error"],
+          "never_on": [
+            "policy-blocked",
+            "permission-blocked",
+            "security-blocked",
+            "workspace-mismatch",
+            "task-blocked",
+            "acceptance-failed"
+          ],
+          "exhaustion": "fail-closed",
+          "same_harness": "explicit-candidate-only"
+        }
+      },
+      "selected": {
+        "candidate_id": "codex-native",
+        "chain": "ample",
+        "selected_at": "2026-07-10T08:01:00Z",
+        "evidence": {
+          "observed_at": "2026-07-10T08:00:30Z",
+          "valid_until": "2026-07-10T08:05:00Z",
+          "qualification_results": [
+            {
+              "predicate": "runtime-healthy",
+              "status": "pass",
+              "ref": "capability://codex/native"
+            },
+            {
+              "predicate": "capability-match",
+              "status": "pass",
+              "ref": "contract://planning/capabilities"
+            },
+            {
+              "predicate": "effect-floor",
+              "status": "pass",
+              "ref": "contract://planning/effect-floor"
+            },
+            {
+              "predicate": "permission-compatible",
+              "status": "pass",
+              "ref": "contract://planning/permissions"
+            },
+            {
+              "predicate": "account-mutation-forbidden",
+              "status": "pass",
+              "ref": "contract://planning/account-mutation"
+            }
+          ]
+        },
+        "reason_codes": ["capability-best-fit"]
+      },
+      "attempts": [
+        {
+          "id": "A1",
+          "candidate_id": "codex-native",
+          "state": "running",
+          "started_at": "2026-07-10T08:01:01Z",
+          "handle": "native://codex/agent-1",
+          "requested": { "model": "host-default", "effort": "medium" },
+          "selection_snapshot": {
+            "candidate_id": "codex-native",
+            "chain": "ample",
+            "selected_at": "2026-07-10T08:01:00Z",
+            "evidence": {
+              "observed_at": "2026-07-10T08:00:30Z",
+              "valid_until": "2026-07-10T08:05:00Z",
+              "qualification_results": [
+                {
+                  "predicate": "runtime-healthy",
+                  "status": "pass",
+                  "ref": "capability://codex/native"
+                },
+                {
+                  "predicate": "capability-match",
+                  "status": "pass",
+                  "ref": "contract://planning/capabilities"
+                },
+                {
+                  "predicate": "effect-floor",
+                  "status": "pass",
+                  "ref": "contract://planning/effect-floor"
+                },
+                {
+                  "predicate": "permission-compatible",
+                  "status": "pass",
+                  "ref": "contract://planning/permissions"
+                },
+                {
+                  "predicate": "account-mutation-forbidden",
+                  "status": "pass",
+                  "ref": "contract://planning/account-mutation"
+                }
+              ]
+            },
+            "reason_codes": ["capability-best-fit"]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -25,7 +25,13 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyzeGraph, formatReport, isEnumMember, lintBoard } from '@ccm/engine';
+import {
+  analyzeGraph,
+  formatReport,
+  isEnumMember,
+  lintBoard,
+  routingContractPreflight,
+} from '@ccm/engine';
 import * as discover from '../discover.js';
 import { detectTrustedHarnessId } from '../harnesses/registry.js';
 import * as io from '../io.js';
@@ -142,6 +148,38 @@ export function next(ctx: Ctx): number {
     compute: (board) =>
       analyzeGraph((board || {}) as Parameters<typeof analyzeGraph>[0]).readySet(),
     render: (ready, c) => render.renderNext(ready, { json: !!c.flags.json, color: c.flags.color }),
+  });
+}
+
+export function enableContract(ctx: Ctx): number {
+  if (ctx.values && ctx.values.preflight) {
+    return runRead(ctx, {
+      compute: (board) => routingContractPreflight(board),
+      render: (report, c) => {
+        if (c.flags.json) return render.jsonString(report);
+        const r = report as ReturnType<typeof routingContractPreflight>;
+        const lines = [
+          `routing contract preflight: ${r.ready ? 'READY' : 'NOT READY'}`,
+          `  activation: ${r.activation}`,
+          `  task gaps: ${r.tasks.length}`,
+          `  grandfathered terminal: ${r.grandfathered_terminal_task_ids.length}`,
+        ];
+        for (const task of r.tasks) {
+          lines.push(`  - ${task.task_id}: ${task.issues.map((entry) => entry.path).join(', ')}`);
+        }
+        return lines.join('\n');
+      },
+    });
+  }
+  return runWrite(ctx, {
+    mutate: (board) => mutations.enableRoutingContracts(board as BoardArg),
+    render: (board, c, { dryRun }) => {
+      const report = routingContractPreflight(board);
+      if (c.flags.json) return render.jsonString(report);
+      return dryRun
+        ? '[dry-run] 将启用 task-planning/v1 + agent-routing/v1'
+        : `routing contracts 已启用；grandfathered terminal=${report.grandfathered_terminal_task_ids.length}`;
+    },
   });
 }
 

@@ -203,6 +203,34 @@ export {
   resolveProjectsDir,
   resolveRateCachePath,
 } from './paths.js';
+// ── routing-contract（cross-harness C1/S0 additive contracts·provider-neutral pure rules）──
+export type {
+  ContractActivation,
+  ContractIssue,
+  ContractPreflightReport,
+  ContractPreflightTask,
+  ContractWritePolicy,
+  RouteOutcomeClass,
+} from './routing-contract.js';
+export {
+  AGENT_ROUTING_CONTRACT,
+  AUTOMATIC_FALLBACK_FAILURES,
+  contractActivation,
+  contractWritePolicy,
+  createRoutingEnvelope,
+  NEVER_FALLBACK_FAILURES,
+  ROUTE_CHAINS,
+  ROUTE_OBJECTIVES,
+  ROUTE_SURFACES,
+  routeOutcomeClass,
+  routingContractAppliesToTask,
+  routingContractPreflight,
+  TASK_PLANNING_CONTRACT,
+  validateRoutedTaskForInFlight,
+  validateRoutingEnvelope,
+  validateTaskPlanning,
+  validateTaskRoutePolicy,
+} from './routing-contract.js';
 // ── statusline/（self-contained status line·0.10.0：渲染单行 ANSI + sidecar 捕获 + 安装/卸载/自动安装）──
 export type {
   CaptureResult,

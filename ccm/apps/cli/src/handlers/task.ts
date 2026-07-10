@@ -74,6 +74,19 @@ function findTask(next: unknown, id: string): TaskLike | undefined {
   return (nb.tasks || []).find((x) => x && x.id === id);
 }
 
+function readJsonInput(ctx: Ctx, value: unknown, label: string): unknown {
+  const text = io.readInputSpec(value as string, { stdin: ctx.stdin });
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const e = new Error(
+      `${label} 必须是合法 JSON（@/absolute/file.json、- 或 JSON 字面量）：${(error as Error).message}`,
+    ) as KindedError;
+    e.errKind = 'Usage';
+    throw e;
+  }
+}
+
 // ── task add ───────────────────────────────────────────────────────────────────────────────────────
 //   id 是必填 positional（router 已校验非空）；其余字段经 buildFields 从 registry 的 field/transform 映射。
 //   addTask 缺省 status='ready'、deps=[]、盖 created_at；其余 ✎ 字段只在显式给出时落。
@@ -213,6 +226,62 @@ export function start(ctx: Ctx): number {
 }
 export function done(ctx: Ctx): number {
   return _transitionVerb(ctx, 'done', 'done');
+}
+
+export function setPlanning(ctx: Ctx): number {
+  const id = ctx.positionals[0] as string;
+  return runWrite(ctx, {
+    mutate: (board) =>
+      mutations.setTaskPlanning(
+        board as BoardArg,
+        id,
+        readJsonInput(ctx, ctx.values && ctx.values.profile, '--profile'),
+      ),
+    render: (next, c, { dryRun }) => {
+      const task = findTask(next, id);
+      if (c.flags.json) return render.renderTaskDetail(task, { json: true });
+      return dryRun
+        ? `[dry-run] 将写入 task ${id} planning contract`
+        : `task ${id} planning contract 已写入`;
+    },
+  });
+}
+
+export function setRouting(ctx: Ctx): number {
+  const id = ctx.positionals[0] as string;
+  return runWrite(ctx, {
+    mutate: (board) =>
+      mutations.setTaskRoutingPolicy(
+        board as BoardArg,
+        id,
+        readJsonInput(ctx, ctx.values && ctx.values.policy, '--policy'),
+      ),
+    render: (next, c, { dryRun }) => {
+      const task = findTask(next, id);
+      if (c.flags.json) return render.renderTaskDetail(task, { json: true });
+      return dryRun
+        ? `[dry-run] 将写入 task ${id} routing policy`
+        : `task ${id} routing policy 已写入（未 selection / 未 attempt / 未 spawn）`;
+    },
+  });
+}
+
+export function routeBind(ctx: Ctx): number {
+  const id = ctx.positionals[0] as string;
+  return runWrite(ctx, {
+    mutate: (board) =>
+      mutations.bindTaskRoute(board as BoardArg, id, {
+        selection: readJsonInput(ctx, ctx.values && ctx.values.selection, '--selection'),
+        attempt: readJsonInput(ctx, ctx.values && ctx.values.attempt, '--attempt'),
+      }),
+    render: (next, c, { dryRun }) => {
+      const task = findTask(next, id);
+      if (c.flags.json) return render.renderTaskDetail(task, { json: true });
+      return dryRun
+        ? `[dry-run] 将 bind task ${id} opaque handle claim`
+        : `task ${id} route 已 bind（opaque handle claim；非 real/live attestation）`;
+    },
+  });
 }
 
 // ── task block：→ blocked，设 blocked_on（+ --on user 时 decision_package）──────────────────────────
