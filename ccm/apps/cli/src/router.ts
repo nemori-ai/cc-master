@@ -39,6 +39,7 @@ import * as logHandler from './handlers/log.js';
 import * as monitorHandler from './handlers/monitor.js';
 import * as peersHandler from './handlers/peers.js';
 import * as policyHandler from './handlers/policy.js';
+import * as runtimeHandler from './handlers/runtime.js';
 import * as servicesHandler from './handlers/services.js';
 import * as statusReportHandler from './handlers/status-report.js';
 import * as statuslineHandler from './handlers/statusline.js';
@@ -93,6 +94,7 @@ const HANDLERS: Record<string, HandlerModule> = {
   watchdog: watchdogHandler as unknown as HandlerModule,
   baseline: baselineHandler as unknown as HandlerModule,
   policy: policyHandler as unknown as HandlerModule,
+  runtime: runtimeHandler as unknown as HandlerModule,
   peers: peersHandler as unknown as HandlerModule,
   monitor: monitorHandler as unknown as HandlerModule,
   services: servicesHandler as unknown as HandlerModule,

@@ -64,6 +64,7 @@ const EXPECTED: Record<string, string[]> = {
   'web-viewer': ['start', 'open', 'status', 'stop', 'restart', 'serve'],
   monitor: ['start', 'stop', 'status', 'restart', 'serve', 'install-service', 'uninstall-service'],
   services: ['reconcile'],
+  runtime: ['stage', 'activate', 'resolve', 'invoke', 'doctor', 'rollback'],
   upgrade: ['all', 'ccm', 'plugin'],
 };
 
