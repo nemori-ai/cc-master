@@ -64,5 +64,5 @@ Fixture tests assert equivalence classes, not byte-identical reinject text.
 
 ## Probe deps
 
-cursor.md Dogfood Backlog: **D3** / **D4** — **closed 2026-07-09** via official docs + Cursor forum
+cursor.md Probe Catalog / Results: **D3** / **D4** — **closed 2026-07-09** via official docs + Cursor forum
 (staff-confirmed). Live compact re-fire not required before Track B implementation.

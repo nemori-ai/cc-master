@@ -60,4 +60,5 @@ account switch is policy-gated (ADR-016).
 
 ## Probe deps
 
-cursor.md: quota signal discovery (future); no blocker for Stop-only stub.
+Closed by current implementation: `cursor-usage.ts` reads dashboard `GetCurrentPeriodUsage` and maps
+it to a billing-period-only signal. API/token failure remains an intentional fail-open path.

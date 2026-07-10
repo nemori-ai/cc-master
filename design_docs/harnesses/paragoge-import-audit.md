@@ -67,9 +67,9 @@ Claude Code hooks 以本仓 `design_docs/research/claude-code-hooks-reference.md
 
 paragoge **未覆盖** Cursor。本仓 2026-07-09 按 Cursor 官方文档（hooks / skills / plugins / rules / third-party hooks）+ 对 Claude Code / Codex adapter 的对照推导，新增 [`cursor.md`](cursor.md) 作为第三 harness 调研落盘。
 
-- 事实来源：官方 docs 2026-07-09；**无本仓 probe**（见 `cursor.md` §Dogfood Backlog）。
+- 事实来源：官方 docs 2026-07-09；后续本仓 probe 已完成（见 `cursor.md` §Probe Catalog / Results）。本行的“无 probe”是 superseded baseline。
 - 未从 paragoge 复制任何 Cursor 机制。
-- MVP adapter（`plugin/dist/cursor`、ccm `cursor.ts`、install）**未实现**；用户审阅调研后再决定。
+- 早期“MVP adapter 未实现”结论已被后续交付 supersede；当前 `plugin/dist/cursor`、ccm `cursor.ts` 与 install 均已落地，详见 [`cursor.md`](cursor.md) §Adapter Delivery Record。
 
 ## Non-migrated Material
 

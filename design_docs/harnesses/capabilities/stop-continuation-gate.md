@@ -58,5 +58,5 @@ unarmed watchdogs, check rollup consistency, and **bound infinite stop loops** (
 
 ## Probe deps
 
-cursor.md Dogfood Backlog: **D6** — **closed 2026-07-09** via official Hooks docs
+cursor.md Probe Catalog / Results: **D6** — **closed 2026-07-09** via official Hooks docs
 (`followup_message` + `loop_count` + `loop_limit` default 5). Live followup hijack optional.

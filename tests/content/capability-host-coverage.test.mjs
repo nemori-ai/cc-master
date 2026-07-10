@@ -98,3 +98,27 @@ test('hooks.yaml lists host_coverage for all known hosts on each hook (ADR-031)'
     }
   }
 });
+
+test('host capability envelopes never mark a known-broken event as verified', () => {
+  let checkedKnownBroken = 0;
+  for (const host of KNOWN_HOSTS) {
+    const p = join(ROOT, 'plugin/src/skills/_hosts', host, 'capabilities.yaml');
+    if (!existsSync(p)) continue;
+    const yaml = readFileSync(p, 'utf8');
+    for (const match of yaml.matchAll(/^ {6}([a-z_]+):\n((?: {8}.+\n?)*)/gm)) {
+      const envelope = match[1];
+      const body = match[2];
+      const parseInlineList = (key) => {
+        const value = body.match(new RegExp(`^ {8}${key}:\\s*\\[([^\\]]*)\\]\\s*$`, 'm'))?.[1] ?? '';
+        return value.split(',').map((item) => item.trim()).filter(Boolean);
+      };
+      const verified = new Set(parseInlineList('verified_events'));
+      const broken = parseInlineList('known_broken_events');
+      for (const event of broken) {
+        checkedKnownBroken += 1;
+        assert.ok(!verified.has(event), `${host}.${envelope}: ${event} cannot be both verified and known-broken`);
+      }
+    }
+  }
+  assert.ok(checkedKnownBroken > 0, 'expected at least one declared known-broken capability event');
+});

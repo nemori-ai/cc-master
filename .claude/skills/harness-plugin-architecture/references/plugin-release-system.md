@@ -50,6 +50,18 @@ claude plugin validate plugin/dist/claude-code
 - hook registration check
 - package contents check
 
+Cursor 当前没有与 `claude plugin validate` 对等的官方 validator。其可执行门至少包括：
+
+```bash
+bash scripts/sync-plugin-dist.sh --host cursor
+bash scripts/check-plugin-dist-sync.sh
+node --test tests/content/capability-host-coverage.test.mjs tests/content/structure.test.mjs
+bash scripts/package-plugin.sh --host cursor <tag>
+```
+
+package 必须保留 `.cursor-plugin/plugin.json`、`commands/`、`skills/`、`rules/`、`hooks/` 与 launcher；
+能力等价仍由 Cursor hook / capability fixture 和真实 IDE probe 验收，不能用 package shape 替代。
+
 ## Drift 防线
 
 - `dist` generated，不手改。

@@ -1,7 +1,7 @@
 ---
 path: AGENTS.md
 version: v1.0
-last-edited: 2026-07-09
+last-edited: 2026-07-10
 agent-edit-policy: |
   仓库根 AGENTS.md——agent / 贡献者进入 cc-master 的着陆页与导航地图。三类编辑分级：
   - 自主刷新（无需 PR 人审）：§12 目录/文件约定在子目录增减时刷新行级；§N 触发式深入阅读表新增行；§9 findings 台账新增条目的指针；frontmatter 的 last-edited / version 字段；命令或脚本落地后在对应表追加行。
@@ -134,7 +134,7 @@ cc-master/
 - **`adapter-projection-engineering`** — 实现 / 修改 / 调试 source-to-adapter 投影脚本：strategy/meta 检查、slot/placeholder rewrite、dist 生成、sync check、path token 验证。
 - **`plugin-release-engineering`** — 打包 / 分发 / 发布 CLI+plugin：source/dist/package 边界、host-native artifact、版本线、release checks、marketplace metadata。
 
-**路由**：**还没搞清用户真需求 / 动手实现之前 → `requirement-elicitation`；要不要建 skill / 边界 / 重叠 → `curating-skill-portfolios`；写或改一个 skill 的 body → `cc-master-skillsmith`；声明 J / 跑触发或行为 eval / 度量一个 skill → `grounding-skill-evals`；改多 harness 架构 → `harness-plugin-architecture`；改 sync/projection → `adapter-projection-engineering`；改打包/发布 → `plugin-release-engineering`**。它们触发时机正交，靠 description 识别，不设路由器 skill。
+**路由**：**还没搞清用户真需求 / 动手实现之前 → `requirement-elicitation`；要不要建 skill / 边界 / 重叠 → `curating-skill-portfolios`；写或改一个 skill 的 body → `cc-master-skillsmith`；声明 J / 跑触发或行为 eval / 度量一个 skill → `grounding-skill-evals`；改 origin 多 harness plugin adapter / N-host parity → `harness-plugin-architecture`；改 sync/projection → `adapter-projection-engineering`；改打包/发布 → `plugin-release-engineering`**。它们触发时机正交，靠 description 识别，不设路由器 skill。
 
 **Codex 项目级 meta-skill 同步**：Codex 不读取 `.claude/skills`，项目级 skills 的官方目录是 `.agents/skills`。本仓以 `.claude/skills` 为 dev/meta-skill 源，`.agents/skills` 由 [`scripts/sync-codex-skills.sh`](scripts/sync-codex-skills.sh) 生成（默认 symlink，Codex 支持 symlinked skill folders；不能用 symlink 的环境跑 `--copy`）。新增 / 删除 / 重命名 `.claude/skills/*` 后必须运行：
 
@@ -308,6 +308,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 | 写 / 改任何本仓 skill（尤其纪律型）/ 跑 pressure baseline | [`.claude/skills/cc-master-skillsmith/SKILL.md`](.claude/skills/cc-master-skillsmith/SKILL.md)（TDD-for-skills，项目自用 dev skill）|
 | 判断要不要建 skill / 该 skill 还是 reference / 一组 skill 边界与重叠 | [`.claude/skills/curating-skill-portfolios/SKILL.md`](.claude/skills/curating-skill-portfolios/SKILL.md)（Counterfactual Probe A/B + 裁剪七维 + DESIGN 宪法，项目自用 dev skill）|
 | 声明 J（成功契约）/ 度量一个 skill / 跑触发或行为 eval | [`.claude/skills/grounding-skill-evals/SKILL.md`](.claude/skills/grounding-skill-evals/SKILL.md)（轻量 J 写法 + Track A/B + holdout / predict-then-validate，项目自用 dev skill）|
+| 梳理 / 规划 / 审查 ccm-owned cross-harness headless worker control plane（planning/routing/attempt/run 合同、machine facts/quota admission、provider driver、supervisor/journal/attach、active-run upgrade lifecycle） | [`design_docs/cross-harness-orchestration-capability-model.md`](design_docs/cross-harness-orchestration-capability-model.md)（current / partial / target、owner、工业化 gate 的持续 SSOT；不是独立 dev skill） |
 | 设计 / 重构多 agent harness 兼容架构（paragoge-style CLI + plugin source-to-adapter、SAP/PHIP、host adapter 边界） | [`.claude/skills/harness-plugin-architecture/SKILL.md`](.claude/skills/harness-plugin-architecture/SKILL.md) + [`plugin/src/AGENTS.md`](plugin/src/AGENTS.md) + [`design_docs/harnesses/`](design_docs/harnesses/) |
 | 查 Claude Code / Codex 的 plugin、skill、hook、command、project memory 机制，或校对 paragoge 旧结论 | [`design_docs/harnesses/README.md`](design_docs/harnesses/README.md) + [`design_docs/harnesses/compatibility-matrix.md`](design_docs/harnesses/compatibility-matrix.md) + [`design_docs/harnesses/paragoge-import-audit.md`](design_docs/harnesses/paragoge-import-audit.md) |
 | 盘点 runtime skills 里的 Claude Code 专有指导，决定哪些该模块化 / 变量化 / adapter overlay | [`design_docs/harnesses/skill-host-coupling-audit.md`](design_docs/harnesses/skill-host-coupling-audit.md) + [`.claude/skills/harness-plugin-architecture/references/host-adapter-boundaries.md`](.claude/skills/harness-plugin-architecture/references/host-adapter-boundaries.md) |

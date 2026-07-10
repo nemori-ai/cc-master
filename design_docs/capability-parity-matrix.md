@@ -15,7 +15,7 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 | role-substrate-reinject | implemented | implemented | implemented | [role-substrate-reinject.md](harnesses/capabilities/role-substrate-reinject.md) |
 | stop-continuation-gate | implemented | implemented-blocking | implemented | [stop-continuation-gate.md](harnesses/capabilities/stop-continuation-gate.md) |
 | usage-pacing-midflight | implemented | implemented-stop-advisory | implemented-stop-advisory | [usage-pacing-midflight.md](harnesses/capabilities/usage-pacing-midflight.md) |
-| workflow-authoring | implemented | unsupported_stub | implemented | [workflow-authoring.md](harnesses/capabilities/workflow-authoring.md) |
+| workflow-authoring | implemented | unsupported_stub | unsupported_stub | [workflow-authoring.md](harnesses/capabilities/workflow-authoring.md) |
 
 ## Declared divergences by kind
 
@@ -27,9 +27,7 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 | rule | kind | affected hosts | tracked by |
 | --- | --- | --- | --- |
 | ccm-external-statusline | protocol-capability-gap | codex, cursor | ccm-host-coupling-audit.md §Status Line |
-| ccm-account-pool | protocol-capability-gap | codex, cursor | ccm/apps/cli/src/harnesses/codex.ts, future cursor.ts |
-| ccm-plugin-upgrade | protocol-capability-gap | cursor | cursor.md D9, ccm-host-coupling-audit.md §Cursor Expected Coupling |
-| ccm-harness-detect-in-agent-shell | protocol-capability-gap | cursor | cursor.md D8, D11 |
+| ccm-account-pool | protocol-capability-gap | codex, cursor | ccm/apps/cli/src/harnesses/codex.ts, ccm/apps/cli/src/harnesses/cursor.ts |
 
 ### path-token-resolution
 
@@ -71,4 +69,4 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 
 | rule | kind | affected hosts | tracked by |
 | --- | --- | --- | --- |
-| dynamic-workflow-tool | event-unavailable | codex, cursor | plugin/src/skills/authoring-workflows/adapters/codex/strategy.yaml, |
+| dynamic-workflow-tool | event-unavailable | codex, cursor | plugin/src/skills/authoring-workflows/adapters/codex/strategy.yaml + plugin/src/skills/authoring-workflows/adapters/cursor/strategy.yaml |
