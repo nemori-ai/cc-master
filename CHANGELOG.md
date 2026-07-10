@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-07-10
+
+> **Mission-control web-viewer + GPT-5.6 model-tier guidance** — ships with **ccm-v0.20.0**.
+
+### Added
+
+- **ccm mission-control web-viewer** — legacy MISSION CONTROL visual system lands in `ccm web-viewer` (OKLCH dual theme, instrument tiles, Graph/Board/List/Timeline, DecisionCard / DiscussHistory, five-zone shell, mega board switcher, dual-mode inspector). Additive server read-model: `insights`, `board_extras`, `GET /decisions.json`, real `GET /peers.json`, boards aggregate fields; rank-band layout from server `graph.ranks`.
+- **`ccm viewer` namespace alias** — `viewer` is a noun-level alias of `web-viewer` (all verbs + bare invoke equivalent); `using-ccm` command-catalog lockstep.
+
+### Changed
+
+- **GPT-5.6 model-tier guidance** (`pacing-and-estimation` Cursor / Codex adapters) — route by GPT-5.6 family × effort (Luna / Terra / Sol) and CursorBench score/$; dual “效果优先 / 性价比优先” tables; Codex adapter graduates from stub to full family×effort guidance.
+- **README screenshots** — refresh viewer hero / board switcher / decision-card images for the new UI.
+
 ## [0.18.1] — 2026-07-09
 
 > **CI / lint hotfix** — restore `ccm-ci` green after #78; no functional behavior change.
@@ -640,7 +654,8 @@ advancing across context compaction and across sessions.
 - **Docs** — `README.md` (EN) and `README_zh.md` (中文); design specification,
   design notes, and four research reports under `design_docs/`.
 
-[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.18.1...HEAD
+[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/nemori-ai/cc-master/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/nemori-ai/cc-master/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/nemori-ai/cc-master/compare/v0.17.3...v0.18.0
 [0.17.3]: https://github.com/nemori-ai/cc-master/compare/v0.17.2...v0.17.3

@@ -1,6 +1,6 @@
 {
   "name": "cc-master",
-  "version": "0.18.1",
+  "version": "0.19.0",
   "description": "Turn a Codex session into a long-horizon master orchestrator through the cc-master adapter.",
   "skills": "./skills/",
   "hooks": "./hooks/hooks.json",
