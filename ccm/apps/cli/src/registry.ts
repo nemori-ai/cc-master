@@ -1556,11 +1556,19 @@ export const REGISTRY: Registry = {
 };
 
 // ── ALIASES：热路径顶层捷径（cli-design §3.4·只给最高频两个）。alias → [noun, verb]。──────────────
+//   这是 **command 级**别名——固定映到某个 noun 的某一个 verb（bare 敲入即已确定 [noun,verb] 全貌）。
 export const ALIASES: Record<string, [string, string]> = {
   next: ['board', 'next'],
   lint: ['board', 'lint'],
   ls: ['task', 'list'], // task ls 别名（cli-design §3.2，verb 级；router 在 task 域内识别）
-  peers: ['peers', 'list'], // `ccm peers` → `ccm peers list`（COORD·设计稿 §9 verb 面就这一个只读）
+  peers: ['peers', 'list'], // `ccm peers` → `ccm peers list`（COORD·设计稿 §9 只读）
+};
+
+// ── NOUN_ALIASES：**namespace 级**别名——alias noun → 真实 noun，覆盖该 noun 全部 verb（含裸敲行为），
+//   与上面 ALIASES 的「command 级」单点 [noun,verb] 映射不同：这里只换 noun token，verb token 原样透传，
+//   router 据此重写整个 namespace（见 router.ts run() 顶部的 NOUN_ALIASES 展开）。
+export const NOUN_ALIASES: Record<string, string> = {
+  viewer: 'web-viewer', // `ccm viewer <verb>` ≡ `ccm web-viewer <verb>`（含裸敲 `ccm viewer`）
 };
 
 // ── WRITABLE_FIELDS_COVERED：反漂移门用（cli-design §3.5）────────────────────────────────────────

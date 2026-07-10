@@ -154,6 +154,24 @@ test('router exposes web-viewer namespace and status --json reports stopped with
   assert.equal(parsed.service, null);
 });
 
+// ── `ccm viewer` namespace alias (NOUN_ALIASES → web-viewer) ─────────────────────────────────────
+test('ccm viewer <verb> is equivalent to ccm web-viewer <verb> for every verb', () => {
+  const home = mkHome();
+  const alias = invoke(['viewer', 'status', '--json'], home);
+  const real = invoke(['web-viewer', 'status', '--json'], home);
+  assert.equal(alias.code, real.code);
+  assert.deepEqual(json(alias.stdout), json(real.stdout));
+});
+
+test('bare ccm viewer behaves identically to bare ccm web-viewer (missing-command usage error)', () => {
+  const home = mkHome();
+  const alias = invoke(['viewer'], home);
+  const real = invoke(['web-viewer'], home);
+  assert.equal(alias.code, real.code);
+  // 错误提示走 err()（usage 层未走 --json 壳），直接对齐 stderr 文案。
+  assert.equal(alias.stderr, real.stderr);
+});
+
 test('start creates a home-scoped service, records initial selection, and reuses a healthy instance', () => {
   const home = mkHome();
   const boardPath = seedBoard(home, { goal: 'Viewer Goal' });

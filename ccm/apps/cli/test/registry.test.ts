@@ -13,7 +13,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ENUMS, FIELDS, TIERS } from '@ccm/engine';
-import { ALIASES, REGISTRY, WRITABLE_FIELDS_COVERED } from '../src/registry.js';
+import { ALIASES, NOUN_ALIASES, REGISTRY, WRITABLE_FIELDS_COVERED } from '../src/registry.js';
 
 const model = { ENUMS, FIELDS, TIERS };
 
@@ -193,6 +193,14 @@ test('web-viewer selection flags declared exactly on verbs that consume them', (
 test('ALIASES exposes the hot-path aliases', () => {
   assert.deepEqual(ALIASES.next, ['board', 'next']);
   assert.deepEqual(ALIASES.lint, ['board', 'lint']);
+});
+
+test('NOUN_ALIASES exposes viewer → web-viewer covering the whole namespace', () => {
+  assert.equal(NOUN_ALIASES.viewer, 'web-viewer');
+  // 目标 noun 必须真实存在于 REGISTRY，且别名不得跟任何已有 noun / command-level alias 撞名。
+  assert.ok(Object.hasOwn(REGISTRY, NOUN_ALIASES.viewer as string));
+  assert.ok(!Object.hasOwn(REGISTRY, 'viewer'), 'viewer must stay alias-only, not a real noun');
+  assert.ok(!Object.hasOwn(ALIASES, 'viewer'), 'viewer must not double as a command-level alias');
 });
 
 // ── transform 值合法 ─────────────────────────────────────────────────────────────────────────────
