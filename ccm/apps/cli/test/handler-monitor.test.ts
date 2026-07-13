@@ -144,6 +144,7 @@ test('monitor serve runs bounded ticks and records tick state without touching r
       registry: {
         schema: 'ccm/machine-harness-registry/v1',
         installed: [],
+        installedSurfaces: [],
         harnesses: [],
         pools: [],
       },

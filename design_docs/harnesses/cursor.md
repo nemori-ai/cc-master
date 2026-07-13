@@ -30,7 +30,7 @@ Cursor 事实按以下优先级维护：
 - **Cursor Cloud Agents**（cursor.com/agents）：官方明确多个 hook 无等价触发点（`sessionStart`/`sessionEnd`、`beforeSubmitPrompt`、`stop`、Tab hooks、部分 MCP hooks 等）。
 - Cursor Tab 补全专用 hooks（`beforeTabFileRead`/`afterTabFileEdit`）。
 - Cursor SDK / Cloud Agents API（`@cursor/sdk`、`CURSOR_API_KEY`）——编排 dispatch 的 CI/外部面，不是 IDE Agent runtime。
-- Cursor Agent CLI / headless one-shot **worker transport**——它是 cross-harness 调用面，不等于本页的 IDE plugin / hook adapter；本页只新增 C1 read-only machine-surface discovery 合同，尚未定义 spawn / poll / cancel / resume transport。
+- Cursor Agent CLI / headless one-shot **worker transport**——它是 cross-harness 调用面，不等于本页的 IDE plugin / hook adapter；本页记录 presence-only `harnesses[].surfaces` 与严格 C1 `surfaceInventory` 两层只读发现合同，尚未定义 spawn / poll / cancel / resume transport。
 
 ## Cursor execution surfaces【官方 + 本仓实测】
 
@@ -359,6 +359,15 @@ session(env) => ({
 | `pluginDistribution` | `supported` — local plugin 位于 `~/.cursor/plugins/local/cc-master`；`ccm upgrade plugin --harness cursor` 从已安装的本地包刷新 |
 | `readCurrentUsage` | `dashboard-api` — `GetCurrentPeriodUsage` 投影为 `UsageSignal.billing_period`；不伪造 5h/7d |
 
+`ccm harness list` 的安装探测另将同品牌切成两个独立 descriptor【本仓】：
+
+| Surface | 本地发现契约 | 不做的推断 |
+| --- | --- | --- |
+| `cursor-ide-plugin` / `ide-plugin` | 继续沿用 `cursor` executable、Cursor config dir 或 cc-master local plugin dir；同时保持顶层 harness `installed` 语义，供 plugin install/upgrade 消费 | 不由 `cursor-agent` 存在推出 IDE / plugin 已安装 |
+| `cursor-agent` / `cli-headless` | 只探可执行 `cursor-agent` binary（或 `CCM_CURSOR_AGENT_BIN` / `CURSOR_AGENT_BIN`），报 binary name + PATH 命中绝对路径；symlink 合法，非可执行文件不算 | auth / quota = `unknown` + `not-probed`；account mutation = `forbidden`；autoswitch / plugin distribution = `unsupported` |
+
+这条 inventory 路径只读 PATH / 本地目录，不调 Cursor provider、不读写 credential、不 login/logout/switch。手工 auth 是用户管理的外部事实，inventory 不把它伪报成已知。
+
 ## Dispatch Primitives
 
 | cc-master 机制 | Cursor IDE Agent 等价 | 备注 |
@@ -588,7 +597,7 @@ bash plugin/src/hooks/_hosts/cursor/probes/setup-local-plugin-probe.sh
 - [x] `ccm/apps/cli/src/harnesses/cursor.ts` — `HarnessAdapter` 实现（local plugin root + dashboard usage）。
 - [x] `ccm/apps/cli/src/harnesses/registry.ts` — 注册 `cursorAdapter`。
 - [x] Cursor `billing_period` usage：`cursor-usage` + pacing verdict `hold|throttle|stop_billing_period`（无 `switch`）。
-- [x] `ccm harness list/current` 展示 Cursor 安装态（`inspectKnownHarnesses` 含 `cursorAdapter`；registry 测试覆盖 CURSOR_* detect）。
+- [x] `ccm harness list/current` 分开展示 Cursor IDE plugin 与 `cursor-agent` headless 安装态；registry / render 测试覆盖 only-agent / only-IDE / both / neither / symlink / non-executable。
 
 ### Phase 4 — install
 

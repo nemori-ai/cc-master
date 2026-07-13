@@ -15,6 +15,7 @@ export function genericAdapter(id: string): HarnessAdapter {
       reason: `${displayName} harness has no registered installation probe`,
       cli: { name: displayName, path: null, available: false },
       configPaths: [],
+      surfaces: [],
       capabilities: {
         accountPool: {
           supported: false,

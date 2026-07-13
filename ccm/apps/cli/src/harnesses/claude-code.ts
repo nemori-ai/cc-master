@@ -45,6 +45,7 @@ export const claudeCodeAdapter: HarnessAdapter = {
         : 'claude CLI not found and Claude Code config directory not present',
       cli,
       configPaths: [configDir],
+      surfaces: [],
       capabilities: {
         accountPool: this.accountPool,
         externalStatusline: this.externalStatusline,
