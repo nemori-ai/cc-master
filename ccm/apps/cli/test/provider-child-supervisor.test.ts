@@ -224,6 +224,69 @@ function fakeUnstartedChild(): ChildProcess & { signals: NodeJS.Signals[] } {
   return child as ChildProcess & { signals: NodeJS.Signals[] };
 }
 
+interface ReentrantTreeFixture {
+  ownedChild: ProviderOwnedChild;
+  stdout: PassThrough;
+  signals: NodeJS.Signals[];
+  close(exitCode: number | null, signal: NodeJS.Signals | null): void;
+  isAliveCalls(): number;
+}
+
+function reentrantTreeFixture(
+  options: { closeOnSignal?: boolean; signalResult?: boolean } = {},
+): ReentrantTreeFixture {
+  const child = new EventEmitter();
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  const signals: NodeJS.Signals[] = [];
+  let exitCode: number | null = null;
+  let signalCode: NodeJS.Signals | null = null;
+  let closed = false;
+  let aliveChecks = 0;
+
+  const close = (nextExitCode: number | null, nextSignal: NodeJS.Signals | null): void => {
+    if (closed) return;
+    closed = true;
+    exitCode = nextExitCode;
+    signalCode = nextSignal;
+    child.emit('exit', exitCode, signalCode);
+    child.emit('close', exitCode, signalCode);
+  };
+
+  Object.defineProperties(child, {
+    stdout: { value: stdout },
+    stderr: { value: stderr },
+    stdin: { value: null },
+    pid: { value: undefined },
+    exitCode: { get: () => exitCode },
+    signalCode: { get: () => signalCode },
+  });
+
+  return {
+    ownedChild: {
+      child: child as ChildProcess,
+      tree: {
+        schema: PROVIDER_PROCESS_TREE_SCHEMA,
+        kind: 'posix-process-group',
+        groupId: 1,
+        signal: (signal) => {
+          signals.push(signal);
+          if (options.closeOnSignal) close(null, signal);
+          return options.signalResult ?? true;
+        },
+        isAlive: () => {
+          aliveChecks += 1;
+          return !closed;
+        },
+      },
+    },
+    stdout,
+    signals,
+    close,
+    isAliveCalls: () => aliveChecks,
+  };
+}
+
 interface FakeTimerRecord {
   id: number;
   dueAtMs: number;
@@ -579,6 +642,88 @@ test('a long hard deadline remains owned across rearm and still fails closed', a
     const error = await expectSupervisorError(supervised, 'hard_timeout', 'long-hard-timeout');
     assert.equal(error.termination?.reaped, true);
     assert.equal(clock.activeCount(), 0, 'hard-timeout cleanup must clear every owned timer');
+  });
+});
+
+for (const signalResult of [true, false]) {
+  test(`synchronous close from SIGTERM cannot late-arm cleanup (signal=${signalResult})`, async () => {
+    await withFakeTimerClock(async (clock) => {
+      const fixture = reentrantTreeFixture({ closeOnSignal: true, signalResult });
+      const supervised = superviseProviderChild(fixture.ownedChild, {
+        operation: 'sync-close-from-term',
+        deadline: createProviderRequestDeadline(1_000),
+        limits: { ...DEFAULT_LIMITS, startupTimeoutMs: 20 },
+      });
+
+      clock.advanceTo(20);
+      const error = await expectSupervisorError(
+        supervised,
+        'startup_timeout',
+        'sync-close-from-term',
+      );
+
+      assert.equal(error.termination?.reaped, true);
+      assert.deepEqual(fixture.signals, ['SIGTERM']);
+      assert.equal(clock.activeCount(), 0, 'terminal reject must not leave a grace timer');
+      const aliveChecksAtSettlement = fixture.isAliveCalls();
+
+      clock.advanceTo(1_000);
+      assert.deepEqual(fixture.signals, ['SIGTERM'], 'settlement must prevent a late SIGKILL');
+      assert.equal(
+        fixture.isAliveCalls(),
+        aliveChecksAtSettlement,
+        'settlement must prevent a late cleanup poll',
+      );
+    });
+  });
+}
+
+test('successful onClose finalization leaves no timer or late cleanup effect', async () => {
+  await withFakeTimerClock(async (clock) => {
+    const fixture = reentrantTreeFixture();
+    const supervised = superviseProviderChild(fixture.ownedChild, {
+      operation: 'sync-success-close',
+      deadline: createProviderRequestDeadline(1_000),
+      limits: DEFAULT_LIMITS,
+    });
+
+    fixture.stdout.write(Buffer.from('ok'));
+    fixture.close(0, null);
+    const result = await supervised;
+
+    assert.equal(result.stdout, 'ok');
+    assert.equal(result.reaped, true);
+    assert.equal(clock.activeCount(), 0);
+    const aliveChecksAtSettlement = fixture.isAliveCalls();
+
+    clock.advanceTo(1_000);
+    assert.deepEqual(fixture.signals, []);
+    assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+  });
+});
+
+test('onClose finalizer failure cannot late-arm after cleanup poll settles', async () => {
+  await withFakeTimerClock(async (clock) => {
+    const fixture = reentrantTreeFixture();
+    const supervised = superviseProviderChild(fixture.ownedChild, {
+      operation: 'sync-finalizer-failure',
+      deadline: createProviderRequestDeadline(1_000),
+      limits: DEFAULT_LIMITS,
+    });
+
+    fixture.stdout.write(Buffer.from([0xe2]));
+    fixture.close(0, null);
+    const error = await expectSupervisorError(supervised, 'invalid_utf8', 'sync-finalizer-failure');
+
+    assert.equal(error.stream, 'stdout');
+    assert.equal(error.termination?.reaped, true);
+    assert.deepEqual(fixture.signals, ['SIGTERM']);
+    assert.equal(fixture.isAliveCalls(), 1, 'cleanup poll must observe the closed tree');
+    assert.equal(clock.activeCount(), 0, 'typed reject must not leave a grace timer');
+
+    clock.advanceTo(1_000);
+    assert.deepEqual(fixture.signals, ['SIGTERM'], 'typed reject must prevent a late SIGKILL');
+    assert.equal(fixture.isAliveCalls(), 1, 'typed reject must prevent a late cleanup poll');
   });
 });
 

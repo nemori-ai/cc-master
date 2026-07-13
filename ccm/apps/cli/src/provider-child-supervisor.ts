@@ -264,7 +264,9 @@ export function superviseProviderChild(
       } catch {
         // A failed TERM attempt still advances to the bounded KILL step.
       }
-      pollForCleanup();
+      // A custom tree may synchronously close the child from signal(). Do not arm after that
+      // terminal clear; arm before polling so a synchronous poll settlement can clear this timer.
+      if (settled) return;
       terminationTimer = setTimeout(() => {
         if (maybeRejectAfterCleanup()) return;
         try {
@@ -275,6 +277,7 @@ export function superviseProviderChild(
         armReapWatchdog();
         pollForCleanup();
       }, options.limits.terminationGraceMs);
+      pollForCleanup();
     };
 
     const fail = (error: ProviderChildSupervisorError): void => {
