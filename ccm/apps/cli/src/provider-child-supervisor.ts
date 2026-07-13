@@ -180,7 +180,9 @@ export function superviseProviderChild(
     let consumerCallbackDepth = 0;
     const pendingTerminalEffects: PendingSupervisorTerminalEffect[] = [];
 
-    const canContinueProviderWork = (): boolean => !settled && !primaryFailure && !closed;
+    const canContinueProviderWork = (): boolean =>
+      !settled && !primaryFailure && !closed && pendingTerminalEffects.length === 0;
+    const canDrainTerminalEffects = (): boolean => consumerCallbackDepth === 0 && !settled;
 
     // A pending promise does not keep Node alive. These timers intentionally remain ref'ed until
     // clearAllTimers() so timeout and process-tree cleanup still reach a bounded terminal state
@@ -407,8 +409,8 @@ export function superviseProviderChild(
     }
 
     function drainPendingTerminalEffects(): void {
-      if (consumerCallbackDepth !== 0) return;
-      while (consumerCallbackDepth === 0 && pendingTerminalEffects.length > 0 && !settled) {
+      if (!canDrainTerminalEffects()) return;
+      while (canDrainTerminalEffects() && pendingTerminalEffects.length > 0) {
         const event = pendingTerminalEffects.shift();
         if (!event) break;
         if (event.type === 'close') processClose(event.exitCode, event.signal);
@@ -530,6 +532,14 @@ export function superviseProviderChild(
       }
     };
 
+    const finalizeProviderStream = (
+      stream: ProviderChildStream,
+      collector: StreamCollector,
+    ): void => {
+      if (!canContinueProviderWork()) return;
+      finalizeCollector(stream, collector);
+    };
+
     const processClose = (exitCode: number | null, signal: NodeJS.Signals | null): void => {
       if (closed) return;
       closed = true;
@@ -617,8 +627,8 @@ export function superviseProviderChild(
     child.once('close', onClose);
     child.stdout?.on('data', (chunk: unknown) => collect('stdout', stdout, chunk));
     child.stderr?.on('data', (chunk: unknown) => collect('stderr', stderr, chunk));
-    child.stdout?.once('end', () => finalizeCollector('stdout', stdout));
-    child.stderr?.once('end', () => finalizeCollector('stderr', stderr));
+    child.stdout?.once('end', () => finalizeProviderStream('stdout', stdout));
+    child.stderr?.once('end', () => finalizeProviderStream('stderr', stderr));
 
     if (options.signal) {
       options.signal.addEventListener('abort', onAbort, { once: true });

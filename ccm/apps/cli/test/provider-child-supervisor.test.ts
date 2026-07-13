@@ -996,6 +996,158 @@ for (const signalResult of [true, false]) {
   }
 }
 
+function emitLateOrdinaryProviderWork(fixture: ReentrantTreeFixture, clock: FakeTimerClock): void {
+  fixture.stdout.write(Buffer.from('late-stdout'));
+  fixture.stdout.write(Buffer.from([0xff]));
+  const stderr = fixture.ownedChild.child.stderr as PassThrough;
+  stderr.write(Buffer.from('late-stderr'));
+  stderr.write(Buffer.from([0xff]));
+  fixture.stdout.emit('end');
+  stderr.emit('end');
+  fixture.ownedChild.child.emit('spawn');
+  clock.advanceTo(50);
+}
+
+for (const signalResult of [true, false]) {
+  for (const callbackKind of ['onStarted', 'onStdoutText'] as const) {
+    for (const callbackThrows of [false, true]) {
+      test(`pending close freezes late ordinary work from ${callbackKind} (${callbackThrows ? 'throw' : 'return'}, signal=${signalResult})`, async () => {
+        await withFakeTimerClock(async (clock) => {
+          const fixture = reentrantTreeFixture({ signalResult });
+          const callbackFailure = new Error(`controlled frozen ${callbackKind} failure`);
+          const observedStdout: string[] = [];
+          const observedStderr: string[] = [];
+          let terminalCallbackCalls = 0;
+          const terminalCallback = () => {
+            terminalCallbackCalls += 1;
+            fixture.close(0, null);
+            emitLateOrdinaryProviderWork(fixture, clock);
+            if (callbackThrows) throw callbackFailure;
+          };
+          const supervised = superviseProviderChild(fixture.ownedChild, {
+            operation: `pending-close-${callbackKind}-${callbackThrows ? 'throw' : 'return'}`,
+            deadline: createProviderRequestDeadline(1_000),
+            limits: { ...DEFAULT_LIMITS, startupTimeoutMs: 20, idleTimeoutMs: 20 },
+            onStarted: callbackKind === 'onStarted' ? terminalCallback : undefined,
+            onStdoutText: (text) => {
+              observedStdout.push(text);
+              if (callbackKind === 'onStdoutText' && observedStdout.length === 1)
+                terminalCallback();
+            },
+            onStderrText: (text) => observedStderr.push(text),
+          });
+
+          if (callbackKind === 'onStarted') fixture.ownedChild.child.emit('spawn');
+          else fixture.stdout.write(Buffer.from('.'));
+
+          if (callbackThrows) {
+            const error = await expectSupervisorError(
+              supervised,
+              'consumer_error',
+              `pending-close-${callbackKind}-throw`,
+            );
+            assert.equal(error.cause, callbackFailure);
+            assert.equal(error.stream, callbackKind === 'onStdoutText' ? 'stdout' : undefined);
+            assert.equal(error.termination?.reaped, true);
+            assert.deepEqual(fixture.signals, ['SIGTERM']);
+          } else {
+            const result = await supervised;
+            const expectedStdout = callbackKind === 'onStdoutText' ? '.' : '';
+            assert.equal(result.stdout, expectedStdout);
+            assert.equal(result.stdoutBytes, Buffer.byteLength(expectedStdout));
+            assert.equal(result.stderr, '');
+            assert.equal(result.stderrBytes, 0);
+            assert.deepEqual(fixture.signals, []);
+          }
+
+          assert.equal(terminalCallbackCalls, 1);
+          assert.deepEqual(observedStdout, callbackKind === 'onStdoutText' ? ['.'] : []);
+          assert.deepEqual(observedStderr, []);
+          assert.equal(clock.activeCount(), 0);
+          const signalsAtSettlement = [...fixture.signals];
+          const aliveChecksAtSettlement = fixture.isAliveCalls();
+          clock.advanceTo(1_000);
+          assert.deepEqual(fixture.signals, signalsAtSettlement);
+          assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+        });
+      });
+    }
+  }
+}
+
+for (const signalResult of [true, false]) {
+  for (const terminalKind of ['error', 'abort', 'parser'] as const) {
+    for (const callbackThrows of [false, true]) {
+      test(`pending ${terminalKind} freezes late ordinary work (${callbackThrows ? 'throw' : 'return'}, signal=${signalResult})`, async () => {
+        await withFakeTimerClock(async (clock) => {
+          const fixture = reentrantTreeFixture({ signalResult });
+          const cancellation = new AbortController();
+          const terminalCause = new Error(`controlled ${terminalKind} terminal`);
+          const callbackFailure = new Error(`controlled ${terminalKind} consumer failure`);
+          const observedStdout: string[] = [];
+          const observedStderr: string[] = [];
+          let startedCalls = 0;
+          const supervised = superviseProviderChild(fixture.ownedChild, {
+            operation: `pending-${terminalKind}-${callbackThrows ? 'throw' : 'return'}`,
+            deadline: createProviderRequestDeadline(1_000),
+            limits: { ...DEFAULT_LIMITS, startupTimeoutMs: 20, idleTimeoutMs: 20 },
+            signal: cancellation.signal,
+            onStarted: () => {
+              startedCalls += 1;
+              if (terminalKind === 'error') {
+                fixture.ownedChild.child.emit('error', terminalCause);
+              } else if (terminalKind === 'abort') {
+                cancellation.abort(terminalCause);
+              } else {
+                fixture.stdout.write(Buffer.from([0xff]));
+              }
+              emitLateOrdinaryProviderWork(fixture, clock);
+              fixture.close(0, null);
+              if (callbackThrows) throw callbackFailure;
+            },
+            onStdoutText: (text) => observedStdout.push(text),
+            onStderrText: (text) => observedStderr.push(text),
+          });
+
+          fixture.ownedChild.child.emit('spawn');
+
+          const expectedCode = callbackThrows
+            ? 'consumer_error'
+            : terminalKind === 'error'
+              ? 'spawn_error'
+              : terminalKind === 'abort'
+                ? 'cancelled'
+                : 'invalid_utf8';
+          const error = await expectSupervisorError(
+            supervised,
+            expectedCode,
+            `pending-${terminalKind}-${callbackThrows ? 'throw' : 'return'}`,
+          );
+          if (!callbackThrows && terminalKind === 'parser') {
+            assert.ok(error.cause instanceof TypeError);
+          } else {
+            assert.equal(error.cause, callbackThrows ? callbackFailure : terminalCause);
+          }
+          assert.equal(
+            error.stream,
+            !callbackThrows && terminalKind === 'parser' ? 'stdout' : undefined,
+          );
+          assert.equal(error.termination?.reaped, true);
+          assert.equal(startedCalls, 1);
+          assert.deepEqual(observedStdout, []);
+          assert.deepEqual(observedStderr, []);
+          assert.deepEqual(fixture.signals, ['SIGTERM']);
+          assert.equal(clock.activeCount(), 0);
+          const aliveChecksAtSettlement = fixture.isAliveCalls();
+          clock.advanceTo(1_000);
+          assert.deepEqual(fixture.signals, ['SIGTERM']);
+          assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+        });
+      });
+    }
+  }
+}
+
 test('reentrant tree probe preserves the primary error and cannot repeat termination', async () => {
   await withFakeTimerClock(async (clock) => {
     const callbackFailure = new Error('controlled tree-probe failure');
