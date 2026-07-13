@@ -7,6 +7,7 @@
  */
 const { spawnSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 function readStdin() {
@@ -56,7 +57,9 @@ function resolvePluginRoot() {
 }
 
 function resolveHome() {
-  return process.env.CC_MASTER_HOME || path.join(process.env.HOME || '', '.cc_master');
+  const cwd = process.cwd();
+  if (process.env.CC_MASTER_HOME) return path.resolve(cwd, process.env.CC_MASTER_HOME);
+  return path.resolve(cwd, process.env.HOME || os.homedir(), '.cc_master');
 }
 
 function boardStem(boardPath) {

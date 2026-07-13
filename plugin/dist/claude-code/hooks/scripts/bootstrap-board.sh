@@ -14,7 +14,8 @@
 #                     substring anywhere in stdin — otherwise prose that merely *mentions* the marker
 #                     mid-sentence (a sub-agent report quoting the command-file convention) would
 #                     false-trigger an empty board (Finding #16).
-# Pure bash extraction of the JSON prompt field — no jq/node (ship-anywhere).
+# Prompt extraction stays pure bash; structured ccm responses use the host-guaranteed Node runtime
+# (ADR-006). No jq/Python dependency is introduced.
 #
 # ARMING NOTE (hook armed-gate discipline): every OTHER cc-master hook stays fully dormant until this
 # session is "armed" — armed ⟺ home holds a *.board.json with owner.active:true AND owner.session_id
@@ -581,6 +582,62 @@ if [ -z "${CC_MASTER_HOME:-}" ] && [ -z "${HOME:-}" ]; then
 fi
 HOME_DIR="$(cc_master_home)"
 BOARDS_DIR="$(cc_master_boards_dir)"
+
+# Parse fresh versus resume before any legacy migration or directory creation. Resume keeps its
+# established migration behavior; fresh must negotiate its process-boundary capability first.
+mode=fresh
+selector=""
+rest="${trimmed#/cc-master:as-master-orchestrator}"
+rest="${rest#"${rest%%[![:space:]]*}"}"
+case "$rest" in
+  --resume|--resume\ *)
+    mode=resume
+    selector="${rest#--resume}"
+    selector="${selector#"${selector%%[![:space:]]*}"}" ;;
+esac
+if [ "$mode" = "fresh" ] && [ "$marker_hit" -eq 1 ]; then
+  args_line="$(printf '%s' "$prompt" | sed -e 's/\\n/\n/g' | grep -m1 -E '^[[:space:]]*<!--[[:space:]]*cc-master:args:' || true)"
+  if [ -n "$args_line" ]; then
+    body_args="$(printf '%s' "$args_line" \
+      | sed -e 's/^[[:space:]]*<!--[[:space:]]*cc-master:args://' -e 's/[[:space:]]*-->[[:space:]]*$//' \
+            -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    case "$body_args" in
+      --resume|--resume\ *)
+        mode=resume
+        selector="${body_args#--resume}"
+        selector="${selector#"${selector%%[![:space:]]*}"}" ;;
+    esac
+  fi
+fi
+
+CCM_CMD="${CCM_BIN:-ccm}"
+# PARITY: rule-bootstrap-structured-path-capability
+CCM_BOARD_PATH_CAPABILITY='board-init/structured-board-path-v1'
+CCM_BOARD_PATH_MIN_VERSION='0.21.0'
+if [ "$mode" = "fresh" ]; then
+  # This negotiation endpoint is intentionally distinct from --dry-run: an older ccm rejects the
+  # unknown flag during argument parsing, before its legacy init resolver can create a parent directory.
+  capability_out="$(CC_MASTER_NO_AUTOINSTALL=1 CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init --capabilities --json --no-input 2>/dev/null)"
+  capability_ok="$(printf '%s' "$capability_out" | CCM_REQUIRED_CAPABILITY="$CCM_BOARD_PATH_CAPABILITY" node -e '
+    let input = "";
+    process.stdin.on("data", (chunk) => { input += chunk; });
+    process.stdin.on("end", () => {
+      try {
+        const envelope = JSON.parse(input);
+        const capabilities = envelope && envelope.ok === true && envelope.data && envelope.data.capabilities;
+        if (Array.isArray(capabilities) && capabilities.includes(process.env.CCM_REQUIRED_CAPABILITY)) {
+          process.stdout.write("yes");
+        }
+      } catch (_) {}
+    });
+  ')"
+  if [ "$capability_ok" != 'yes' ]; then
+    ccm_version="$(CC_MASTER_NO_AUTOINSTALL=1 "$CCM_CMD" --version 2>/dev/null | head -1)"
+    [ -n "$ccm_version" ] || ccm_version='unknown'
+    inject_ctx "<directive source=\"bootstrap\">cc-master: 当前 ccm 不支持 fresh ARM 所需的结构化建板路径能力（installed: $ccm_version；required capability: $CCM_BOARD_PATH_CAPABILITY；minimum release: ccm $CCM_BOARD_PATH_MIN_VERSION）。本次已在任何 legacy migration、目录创建或真实 init 前拒绝，cc-master home 与 Claude config home 均保持不变。请升级 ccm 后重试 /cc-master:as-master-orchestrator &lt;goal&gt;。</directive>"
+    exit 0
+  fi
+fi
 # 一次性、非破坏的旧布局迁移：把旧 per-repo $CLAUDE_PROJECT_DIR/.claude/cc-master/*.board.json 复制进
 # 全局 boards/（保留原件·同名跳过·全程吞错）。只迁 CLAUDE_PROJECT_DIR 这个有据可查的旧 per-repo home，
 # 不扫 $(pwd)（hook 的 cwd 常是无关 repo 根）。让升级用户的旧 board 在全局 home 里 --resume 找得到。
@@ -607,50 +664,9 @@ fi
 migrate_legacy_boards "$HOME_DIR" "$BOARDS_DIR"
 mkdir -p "$HOME_DIR/channel"   # 预留多-orchestrator 协调信道目录（本任务只建目录约定·不实现内容）
 
-# ── INTENT PARSE (resume vs fresh) — runs ONLY AFTER the trigger gate above already passed ──────────
-# This is a SECOND demux INSIDE an already-triggered prompt; it does NOT participate in triggering
-# (the sentinel/prefix gate is untouched). Detect whether the FIRST token after the command prefix is
-# `--resume`. If so → mode=resume + selector (the remaining arg string, possibly empty). Otherwise →
-# mode=fresh, the original byte-unchanged path. A `--resume` appearing mid-goal (not the first token)
-# stays fresh (Finding-style false-trigger avoidance). → design §1.1/§2.1.
-mode=fresh
-selector=""
-# raw-command path: strip the prefix, ltrim, then test the leading token.
-rest="${trimmed#/cc-master:as-master-orchestrator}"
-rest="${rest#"${rest%%[![:space:]]*}"}"          # ltrim the arg string
-case "$rest" in
-  --resume|--resume\ *)
-    mode=resume
-    selector="${rest#--resume}"
-    selector="${selector#"${selector%%[![:space:]]*}"}" ;;   # remaining = selector (may be empty)
-esac
-# body-sentinel path: the expanded command body cannot conditionally render on $ARGUMENTS (it is
-# static markdown), so it UNCONDITIONALLY carries a machine-readable args line right after the
-# sentinel: `<!-- cc-master:args: <raw $ARGUMENTS> -->`. When we triggered via the marker (not the raw
-# prefix), recover the original args from THAT line and run them through the SAME --resume first-token
-# demux as the raw-command path — so fresh/resume routing is identical on both paths (design §2.2;
-# codex Finding 2: the old `cc-master:resume` line was never rendered, so --resume fell through to a
-# spurious fresh board). The args line must be the SECOND machine-readable line (an HTML comment),
-# matched standalone like the sentinel (Finding #16 discipline) — a mid-prose `cc-master:args:`
-# mention won't false-route because we anchor on the line and strip the comment wrapper.
-if [ "$mode" = "fresh" ] && [ "$marker_hit" -eq 1 ]; then
-  args_line="$(printf '%s' "$prompt" | sed -e 's/\\n/\n/g' | grep -m1 -E '^[[:space:]]*<!--[[:space:]]*cc-master:args:' || true)"
-  if [ -n "$args_line" ]; then
-    # strip the `<!-- cc-master:args:` opener and the trailing ` -->`, then trim → the raw $ARGUMENTS.
-    body_args="$(printf '%s' "$args_line" \
-      | sed -e 's/^[[:space:]]*<!--[[:space:]]*cc-master:args://' -e 's/[[:space:]]*-->[[:space:]]*$//' \
-            -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-    case "$body_args" in
-      --resume|--resume\ *)
-        mode=resume
-        selector="${body_args#--resume}"
-        selector="${selector#"${selector%%[![:space:]]*}"}" ;;   # remaining = selector (may be empty)
-    esac
-  fi
-fi
+# Intent was parsed before the capability gate above; do not parse it again after migrations.
 
 if [ "$mode" = "resume" ]; then
-  CCM_CMD="${CCM_BIN:-ccm}"
   # Delegate the whole resume flow (select → live-safety probe → owner re-stamp → inject context).
   # Keep the fresh path below BYTE-UNCHANGED (zero regression, design §1.1).
   resume_main
@@ -696,11 +712,8 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-# CCM_CMD：进程边界 spawn 的 ccm 可执行（与 node hook 同口径）。上方 install precheck 已保证它在场
-# （CCM_BIN 可执行 OR `ccm` 在 PATH）。下方建骨架 + INIT-FLAGS 段共用它。
-CCM_CMD="${CCM_BIN:-ccm}"
-
 mkdir -p "$BOARDS_DIR"
+
 # ── FRESH board 骨架经 `ccm board init` 建（ADR-014 进程边界·红线：hooks ⊥ skill assets）───────────────
 # board 的**空骨架**现由 ccm（board-model SSOT·@ccm/engine）建，不再 `cp` 一个 skill asset——hook 绝不
 # 反向伸手够某个 skill 的 assets/ 或 scripts/ 目录（本任务消除的唯一违规）。ccm 上方已硬前置在场，故可依赖它。把 CC_MASTER_HOME
@@ -709,12 +722,29 @@ mkdir -p "$BOARDS_DIR"
 # 约定），我们从它 stdout 里恢复所建路径（匹配 `.board.json` **路径 token**·与本地化标签无关——认路径不认
 # 「路径:」字样）。**ARMING（盖 session_id）仍是 bootstrap 自己的活**（见下）：owner 是 arming 窄腰、hook 所
 # 有、无 ccm setter，且 board-guard（ADR-025）只 gate agent 的工具调用、不管 hook 进程内的写。
+# Portability contract: “恢复所建路径”具体只指解析 `--json` 的 schema-owned
+# `data.board_path`；不得扫描或匹配人读 stdout。路径整体作为 opaque data 传递。
 if [ -n "$init_issue_for_board" ] && is_github_issue_url "$init_issue_for_board"; then
-  init_out="$(CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init --github-issue "$init_issue_for_board" 2>&1)"
+  init_out="$(CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init --github-issue "$init_issue_for_board" --json)"
 else
-  init_out="$(CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init 2>&1)"
+  init_out="$(CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init --json)"
 fi
-BOARD="$(printf '%s' "$init_out" | grep -oE '/[^[:space:]]*\.board\.json' | head -1)"
+# Node is an allowed hook runtime (ADR-006). Parse the schema-owned path as opaque data and validate
+# its absolute-path contract before using it as the ARM target. Malformed JSON reaches the fail-loud relay.
+BOARD="$(printf '%s' "$init_out" | node -e '
+  let input = "";
+  process.stdin.on("data", (chunk) => { input += chunk; });
+  process.stdin.on("end", () => {
+    try {
+      const envelope = JSON.parse(input);
+      const boardPath = envelope && envelope.ok === true && envelope.data && envelope.data.board_path;
+      const suffix = ".board" + ".json";
+      if (typeof boardPath === "string" && require("path").isAbsolute(boardPath) && boardPath.endsWith(suffix)) {
+        process.stdout.write(boardPath);
+      }
+    } catch (_) {}
+  });
+')"
 if [ -z "$BOARD" ] || [ ! -f "$BOARD" ]; then
   # ccm 在场（已前置）却没能建出可用 board 路径 → 宁可拒 arm，也不注入一个指向虚空的 phantom「board 已建」。
   # 以 <directive source="bootstrap"> agent-relay·exit 0（不 block·否则 agent 收不到 directive）。

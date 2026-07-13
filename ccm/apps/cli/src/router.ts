@@ -232,6 +232,22 @@ function readGlobalStringFlag(tokens: string[], name: string): string | null {
   return null;
 }
 
+function hasExactFlagBeforeDoubleDash(tokens: string[], flag: string): boolean {
+  for (const token of tokens) {
+    if (token === '--') return false;
+    if (token === flag) return true;
+  }
+  return false;
+}
+
+function isReadOnlyCapabilityNegotiation(args: string[], scan: ScanResult): boolean {
+  return (
+    scan.positionals[0]?.token === 'board' &&
+    scan.positionals[1]?.token === 'init' &&
+    hasExactFlagBeforeDoubleDash(args, '--capabilities')
+  );
+}
+
 // ── run(argv, {out, err, env, stdin}) → exitCode ──────────────────────────────────────────────────
 //   返回 number（绝大多数 sync verb·同步落码）；`account switch`（唯一 async verb·await refresh）返回
 //   Promise<number>，由 bin await。sync verb 路径全程不变（仍同步 return number）。
@@ -257,11 +273,17 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
     }
   }
 
-  // ── 无感知自动安装（0.10.0·marker 守·幂等·静默·绝不抛）：除 `statusline` 子命令本身外，任意命令首次跑时
+  // ── 无感知自动安装（0.10.0·marker 守·幂等·静默·绝不抛）：除 `statusline` 子命令本身和纯只读
+  //   `board init --capabilities` 协商端点外，任意命令首次跑时
   //   把 ccm 自带的 status line 立起来（status line 高频跑·绝不触发自身）。kill-switch / opt-out / installed
   //   marker 任一在即 skip（详见 @ccm/engine autoInstallStatuslineOnce）。放在最前（no-noun 早退之前）让
   //   `ccm --help` / `ccm --version` 等也算「首次被调用」。env 注入 → 测试用临时 CLAUDE_CONFIG_DIR 隔离。
-  if ((scan0.positionals[0] && scan0.positionals[0].token) !== 'statusline') {
+  //   capability discovery 必须在任何 init 路径解析/持久化前安全运行；它的零写契约不能要求每个 caller
+  //   记住一个无关 statusline kill switch，所以 router 自身显式免除 auto-install。
+  if (
+    (scan0.positionals[0] && scan0.positionals[0].token) !== 'statusline' &&
+    !isReadOnlyCapabilityNegotiation(args, scan0)
+  ) {
     statuslineHandler.autoInstall(env, harnessFlag0 || undefined);
   }
 

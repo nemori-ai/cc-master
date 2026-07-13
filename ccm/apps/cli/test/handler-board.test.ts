@@ -481,6 +481,65 @@ test('board init --board <path> writes to the explicit path', () => {
   assert.ok(out.includes('下一步'), 'init 输出含下一步提示');
 });
 
+test('board init --json exposes the schema-owned absolute board_path without scraping human output', () => {
+  const root = mkTmp('ccm-hinit-json-');
+  const home = join(root, 'My Project 收件人', '.cc_master');
+  const ctx = mkCtx({ home, values: { goal: 'structured init' }, flags: { json: true } });
+  const code = boardHandler.init(ctx);
+  assert.equal(code, EXIT.OK);
+
+  const payload = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(payload.ok, true);
+  assert.deepEqual(payload.data.capabilities, ['board-init/structured-board-path-v1']);
+  assert.equal(typeof payload.data.board_path, 'string');
+  assert.equal(payload.data.board_path.startsWith(home), true);
+  assert.equal(payload.data.board_path.endsWith('.board.json'), true);
+  assert.equal(
+    existsSync(payload.data.board_path),
+    true,
+    'structured path names the board actually written',
+  );
+});
+
+test('board init --dry-run --json does not claim that a board_path was written', () => {
+  const root = mkTmp('ccm-hinit-dry-json-');
+  const home = join(root, '.cc_master');
+  const ctx = mkCtx({
+    home,
+    values: { goal: 'dry structured init' },
+    flags: { json: true, dryRun: true },
+  });
+  const code = boardHandler.init(ctx);
+  assert.equal(code, EXIT.OK);
+
+  const payload = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(payload.ok, true);
+  assert.deepEqual(
+    payload.data.capabilities,
+    ['board-init/structured-board-path-v1'],
+    'dry-run advertises the output capability without claiming an artifact exists',
+  );
+  assert.equal(Object.hasOwn(payload.data, 'board_path'), false);
+  assert.equal(existsSync(home), false, 'dry-run must not create the home or boards parent');
+});
+
+test('board init --capabilities --json negotiates without resolving or writing a path', () => {
+  const root = mkTmp('ccm-hinit-capabilities-');
+  const home = join(root, 'never-created', '.cc_master');
+  const ctx = mkCtx({
+    home,
+    values: { capabilities: true },
+    flags: { json: true },
+  });
+
+  const code = boardHandler.init(ctx);
+  assert.equal(code, EXIT.OK);
+  assert.deepEqual(JSON.parse(ctx.outBuf.join('')).data.capabilities, [
+    'board-init/structured-board-path-v1',
+  ]);
+  assert.equal(existsSync(join(root, 'never-created')), false);
+});
+
 test('board init --github-issue records issue source and derives default goal', () => {
   const root = mkTmp('ccm-hinit-gh-');
   const home = join(root, '.claude', 'cc-master');
@@ -516,16 +575,19 @@ test('board init --github-issue rejects non-GitHub issue URLs', () => {
 test('board init --dry-run does not create any file', () => {
   const root = mkTmp('ccm-hinit3-');
   const home = join(root, '.claude', 'cc-master');
-  mkdirSync(home, { recursive: true });
   const ctx = mkCtx({ home, values: { goal: 'g' }, flags: { dryRun: true } });
   const code = boardHandler.init(ctx);
   assert.equal(code, EXIT.OK);
-  // dry-run 不落盘——boards/ 目录可能已被 initResolve 预建，但里面绝无 *.board.json。
-  assert.equal(
-    readdirSync(join(home, 'boards')).filter((n) => n.endsWith('.board.json')).length,
-    0,
-    'no file written',
-  );
+  const homeCreated = existsSync(home);
+  if (existsSync(join(home, 'boards'))) {
+    // dry-run 不落盘——boards/ 目录可能已被 initResolve 预建，但里面绝无 *.board.json。
+    assert.equal(
+      readdirSync(join(home, 'boards')).filter((n) => n.endsWith('.board.json')).length,
+      0,
+      'no file written',
+    );
+  }
+  assert.equal(homeCreated, false, 'dry-run does not create its parent directory');
   assert.ok(ctx.outBuf.join('').includes('[dry-run]'));
 });
 

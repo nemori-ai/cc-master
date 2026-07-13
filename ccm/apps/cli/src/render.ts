@@ -25,6 +25,11 @@ interface RenderOpts {
   json?: boolean;
   color?: boolean;
   lint?: { errors?: unknown[]; warnings?: unknown[] } | null;
+  // boardPath（board init 专用·additive）：结构化创建结果携带实际写入路径，hook 不抓人类文本。
+  // 其它 summary 消费方不传，因此既有 show --json 形状保持不变。
+  boardPath?: string;
+  // board init 的版本化输出能力；dry-run 与真实写入都声明，专用 --capabilities 端点做写前握手。
+  capabilities?: readonly string[];
   // report（renderLintReport 专用·additive）：调用方传入的 formatReport 文本——--json 时折进 data.report，
   //   让 board-lint hook 一次 `ccm board lint --raw --json` 既拿 violations（判有无）又拿 report（注入文本）。
   //   不传 → data 不带 report 字段（json 形状只增不改·向后兼容）。
@@ -122,6 +127,8 @@ export function renderBoardSummary(board: any, opts?: RenderOpts): string {
 
   if (opts.json) {
     return jsonString({
+      ...(opts.capabilities ? { capabilities: [...opts.capabilities] } : {}),
+      ...(opts.boardPath ? { board_path: opts.boardPath } : {}),
       goal: typeof b.goal === 'string' ? b.goal : '',
       owner: {
         active: owner.active === true,
