@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   captureRuntimeEnvironment,
+  durableWriteFileSync,
   formatReport,
   launchAgentsDir,
   launchdInstallCommands,
@@ -164,8 +165,10 @@ function parseInterval(raw: unknown): number {
 }
 
 function writeJson(filePath: string, value: unknown): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  // state.json carries wanted/liveness continuity across service restarts, so it is durable authority.
+  // pid/log remain ephemeral operational files and intentionally do not pay this fsync protocol.
+  fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });
+  durableWriteFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 function readState(statePath: string): MonitorState | null {

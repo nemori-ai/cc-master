@@ -156,6 +156,21 @@ export type {
   RosterOptions,
 } from './coordination/peers.js';
 export { buildPeerRoster, PEER_FRESHNESS_SEC } from './coordination/peers.js';
+// ── durable-write（owner-only state 的单一 crash-durable publish primitive）──
+export type {
+  DurableDirectorySyncDisposition,
+  DurableFileSyncDisposition,
+  DurableWriteCheckpoint,
+  DurableWriteFilesystem,
+  DurableWriteOptions,
+  DurableWriteOutcome,
+  DurableWriteStage,
+} from './durable-write.js';
+export {
+  DurableWriteError,
+  directorySyncUnsupported,
+  durableWriteFileSync,
+} from './durable-write.js';
 // 校准（EWMA + Bayesian shrinkage ≅ RCF）
 export type { CalibrationOptions, CalibrationResult } from './estimate/calibration.js';
 export {
