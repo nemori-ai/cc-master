@@ -312,7 +312,10 @@ function DagCanvas({
     });
 
     return { nodes, edges };
-    // dragNonce re-derives node positions after a manual drag is persisted into posRef
+    // dragNonce re-derives node positions after a manual drag is persisted into posRef;
+    // resetKey does the same after `onResetLayout` re-lays-out posRef via the topoKey
+    // mismatch above — without it this memo stays cached on the pre-reset (dragged)
+    // positions since neither is otherwise read inside the callback body.
   }, [
     viewModel,
     visible,
@@ -324,6 +327,7 @@ function DagCanvas({
     toggleCollapse,
     filtersActive,
     dragNonce,
+    resetKey,
   ]);
 
   useEffect(() => {
