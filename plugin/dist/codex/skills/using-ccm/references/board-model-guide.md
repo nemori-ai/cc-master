@@ -193,7 +193,7 @@ stale      → ready
 
 | executor | 谁来做 | 典型场景 | 必须的字段 |
 |---|---|---|---|
-| `subagent` | Codex 子代理或等价并行 worker | 只有在你已经真实启动了可 recon 的 Codex 并行工作时才写；CLI / App 里显式要求 Codex subagent，API / tool 会话里先 `tool_search` 发现并调用 `multi_agent_v1.spawn_agent`；当前 cc-master 不把 Claude Code `run_in_background` 语义投影成 Codex 原语。 | `in_flight` 时 `handle` 必填：记录 spawn 返回的 agent id / thread / run 引用，足以让后续对账；`ready` / `blocked` future task 不预填，也不能用当前主会话 id 冒充。 |
+| `subagent` | Codex 子代理或等价并行 worker | `ready` / `blocked` future task 可先写 `executor=subagent`，表达将由 Codex subagent 执行的计划；真实派发时，CLI / App 里显式要求 Codex subagent，API / tool 会话里先 `tool_search` 发现并调用 `multi_agent_v1.spawn_agent`。当前 cc-master 不把 Claude Code `run_in_background` 语义投影成 Codex 原语。 | 只有真实 spawn 返回的 agent id / thread / run 引用才是 `handle`；先回填该真实 handle，再转 `in_flight`。future task 不预填 placeholder，也不能用当前主会话 id 冒充。 |
 | `workflow` | 未支持 | Codex adapter 没有 verified `Workflow` 等价物；不要为了表达“复杂任务”写 workflow。 | 不应进入 `in_flight`；拆成可追踪 task 或用 `external`。 |
 | `external` | 外部系统 / 外部调度 | GitHub issue、CI job、人工任务、系统 cron、`codex cloud exec` 等不在当前 session 内的 work item。 | references 含 `kind=issue`≥1；`handle` 可记录 issue URL / run id；`artifact` 只在外部实际产出（PR / commit / report / run）可验时填写。 |
 | `user` | 用户 | 等人拍板、提供凭据、确认策略或回答需求。 | `blocked_on:"user"` + `decision_package`。 |
@@ -214,7 +214,7 @@ stale      → ready
   ↓ 是 → executor: external  （必须带 reference kind=issue 指向外部 ticket）
   ↓ 否
 
-Codex 下，`executor` 仍是 board 的领域字段，不是 Codex API 名。选择它时先问：这个任务是否已经有一个真实、可续查、可停止或可验收的工作句柄？没有句柄就不要标 `in_flight`。API / tool 会话里的 subagent 能力可能藏在 deferred tools 里，先 `tool_search`，看到并调用 `multi_agent_v1.spawn_agent` 后才写 `executor=subagent`；否则用 `master-orchestrator` 记调度动作，或用 `external` 记录真实外部 run。Codex 的 subagents、background terminals、cloud runs、automations 都需要按实际可追踪能力记录为 `subagent` 或 `external`；没有被 cc-master adapter 验证成等价派发原语前，不要套用 Claude Code 的完成通知或 workflow 语义。
+Codex 下，`executor` 仍是 board 的领域字段，不是 Codex API 名。`ready` / `blocked` future task 可先写 `executor=subagent`（host 已验证等价物时也可先选 `workflow`），表达执行计划，但此时不造 handle。真实派发时，API / tool 会话里的 subagent 能力可能藏在 deferred tools 里：先 `tool_search`，再实际调用 `multi_agent_v1.spawn_agent`；只有真实 spawn 结果能提供 handle，先把它回填，再转 `in_flight`。未验证的派发原语或当前主会话 id 都不能代替 worker handle；没有真实句柄就不要标 `in_flight`。否则用 `master-orchestrator` 记调度动作，或用 `external` 记录真实外部 run。Codex 的 subagents、background terminals、cloud runs、automations 都需要按实际可追踪能力记录为 `subagent` 或 `external`；没有被 cc-master adapter 验证成等价派发原语前，不要套用 Claude Code 的完成通知或 workflow 语义。
 ```
 
 **executor 与 handle 的关系：** `executor` 是谁来执行的计划，因此 `ready` / `blocked` future task 可先选 `subagent` 或 `workflow`，**不要预填 placeholder / phantom handle**。真实调用派发工具后，立即把其返回的真实句柄写入 task（`task update --handle <句柄>`），再转 `in_flight`；只有 `status=in_flight` 且 `executor∈{subagent,workflow}` 时，缺 handle 才触发 `BIZ-EXECUTOR-HANDLE`，因为 resume 要靠它 recon 任务是否还活着。`external` 节点靠 `reference kind=issue` 的 URL 去外部系统查；`handle` 可选地记录 issue URL / issue number / 外部 run id，方便 recon。`user` 和 `master-orchestrator` 没有后台句柄。
