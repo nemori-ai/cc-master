@@ -101,6 +101,7 @@ export class MachineHarnessRegistry {
   toJSON(): {
     schema: 'ccm/machine-harness-registry/v1';
     installed: string[];
+    installedSurfaces: string[];
     harnesses: readonly HarnessDescriptor[];
     pools: readonly PoolDescriptor[];
   } {
@@ -110,6 +111,7 @@ export class MachineHarnessRegistry {
     return Object.freeze({
       schema: 'ccm/machine-harness-registry/v1',
       installed: deepFreezeArray(this.installed().map((harness) => harness.id)),
+      installedSurfaces: deepFreezeArray(installedSurfaceIds(this.descriptors)),
       harnesses: this.descriptors,
       pools: deepFreezeArray(pools),
     });
@@ -147,9 +149,28 @@ function deepFreezeDescriptor(descriptor: HarnessDescriptor): HarnessDescriptor 
   Object.freeze(descriptor.capabilities.externalStatusline);
   Object.freeze(descriptor.capabilities.pluginDistribution);
   Object.freeze(descriptor.capabilities);
+  for (const surface of descriptor.surfaces) {
+    Object.freeze(surface.binary);
+    Object.freeze(surface.configPaths);
+    Object.freeze(surface.facts.authentication);
+    Object.freeze(surface.facts.quota);
+    Object.freeze(surface.facts);
+    Object.freeze(surface.capabilities.accountMutation);
+    Object.freeze(surface.capabilities.accountAutoswitch);
+    Object.freeze(surface.capabilities.pluginDistribution);
+    Object.freeze(surface.capabilities);
+    Object.freeze(surface);
+  }
+  Object.freeze(descriptor.surfaces);
   Object.freeze(descriptor.sessionStoreRoots);
   Object.freeze(descriptor.usageSource);
   return Object.freeze(descriptor);
+}
+
+export function installedSurfaceIds(harnesses: readonly HarnessInstallation[]): string[] {
+  return harnesses.flatMap((harness) =>
+    harness.surfaces.filter((surface) => surface.installed).map((surface) => surface.id),
+  );
 }
 
 function deepFreezeArray<T>(values: T[]): T[] {

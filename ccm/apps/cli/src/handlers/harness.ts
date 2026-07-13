@@ -3,6 +3,7 @@
 import {
   type HarnessInstallation,
   inspectKnownHarnesses,
+  installedSurfaceIds,
   MachineHarnessRegistry,
   resolveHarnessAdapter,
 } from '../harnesses/registry.js';
@@ -30,7 +31,10 @@ export function list(ctx: Ctx): number {
       return EXIT.OK;
     }
     ctx.out('MACHINE-WIDE HARNESS REGISTRY');
-    for (const h of snapshot.harnesses) ctx.out(formatMachineHarnessLine(h, selected.id));
+    for (const h of snapshot.harnesses) {
+      ctx.out(formatMachineHarnessLine(h, selected.id));
+      for (const surface of h.surfaces) ctx.out(formatSurfaceLine(surface));
+    }
     return EXIT.OK;
   }
 
@@ -40,6 +44,7 @@ export function list(ctx: Ctx): number {
       io.jsonOk({
         current: selected.id,
         installed: harnesses.filter((h) => h.installed).map((h) => h.id),
+        installedSurfaces: installedSurfaceIds(harnesses),
         harnesses,
       }),
     );
@@ -47,7 +52,10 @@ export function list(ctx: Ctx): number {
   }
 
   ctx.out('HARNESS INVENTORY');
-  for (const h of harnesses) ctx.out(formatHarnessLine(h, selected.id));
+  for (const h of harnesses) {
+    ctx.out(formatHarnessLine(h, selected.id));
+    for (const surface of h.surfaces) ctx.out(formatSurfaceLine(surface));
+  }
   return EXIT.OK;
 }
 
@@ -62,23 +70,32 @@ export function current(ctx: Ctx): number {
     return EXIT.OK;
   }
   ctx.out(formatHarnessLine(info, selected.id));
+  for (const surface of info.surfaces) ctx.out(formatSurfaceLine(surface));
   return EXIT.OK;
 }
 
 function formatHarnessLine(h: HarnessInstallation, selectedId: string): string {
   const marks = [
     h.id === selectedId ? 'current' : '',
-    h.installed ? 'installed' : 'missing',
+    h.installed ? 'plugin-target=installed' : 'plugin-target=missing',
     h.active ? 'active-env' : '',
   ].filter(Boolean);
   const cli = h.cli.available ? h.cli.path || h.cli.name : `missing:${h.cli.name}`;
-  const dist = h.capabilities.pluginDistribution.supported ? 'plugin=yes' : 'plugin=no';
+  const dist = h.capabilities.pluginDistribution.supported ? 'plugin-dist=yes' : 'plugin-dist=no';
   const statusline = h.capabilities.externalStatusline.supported
     ? 'statusline=yes'
     : 'statusline=no';
-  const account = h.capabilities.accountPool.supported ? 'account=yes' : 'account=no';
+  const account = h.capabilities.accountPool.supported ? 'account-pool=yes' : 'account-pool=no';
   const reason = h.reason ? ` · ${h.reason}` : '';
   return `  ${h.id.padEnd(12)} ${marks.join(',') || '-'} · cli=${cli} · ${dist} ${statusline} ${account}${reason}`;
+}
+
+function formatSurfaceLine(surface: HarnessInstallation['surfaces'][number]): string {
+  const state = `${surface.installed ? 'installed' : 'missing'}/${surface.available ? 'available' : 'unavailable'}`;
+  const binary = surface.binary.available
+    ? surface.binary.path || surface.binary.name
+    : `missing:${surface.binary.name}`;
+  return `    ${surface.id.padEnd(22)} ${surface.kind.padEnd(12)} ${state} · binary=${binary} · auth=${surface.facts.authentication.state} quota=${surface.facts.quota.state} account-mutation=${surface.capabilities.accountMutation.state} autoswitch=${surface.capabilities.accountAutoswitch.state} plugin-dist=${surface.capabilities.pluginDistribution.state}`;
 }
 
 function formatMachineHarnessLine(

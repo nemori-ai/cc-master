@@ -1866,7 +1866,7 @@ ccm estimate cost-to-complete [flags]
 
 ## namespace harness
 
-> 本机 supported harness inventory。它回答两个不同问题：① 当前命令选择的是哪个 harness（`--harness` > `CC_MASTER_HARNESS` / 旧 host env > 自动探测 > 兼容默认）；② 这台机器上安装了哪些 ccm 已知 harness，以及它们是否支持 plugin 分发、statusline config、account pool。install / upgrade 类命令应消费这里的 inventory，而不是各自猜 `claude` / `codex` 是否存在。
+> 本机 supported harness inventory。它回答三个不同问题：① 当前命令选择的是哪个 harness（`--harness` > `CC_MASTER_HARNESS` / 旧 host env > 自动探测 > 兼容默认）；② 这台机器上安装了哪些 ccm 已知 harness，以及它们是否支持 plugin 分发、statusline config、account pool；③ 同一品牌下哪个 execution surface 真的存在。install / upgrade 类命令应消费顶层 harness `installed`（plugin 目标语义），worker routing 才消费 `surfaces[]`；两者不可互推。
 
 ### harness list
 
@@ -1874,9 +1874,11 @@ ccm estimate cost-to-complete [flags]
 ccm harness list [--json] [--machine-wide]
 ```
 
-- 读所有 ccm 已知 harness 的安装探测结果。Claude Code 通过 `claude` CLI / Claude config dir 探测；Codex 通过 `codex` CLI / `CODEX_HOME` 或默认 config dir 探测。
-- 输出包含：`installed`、`active`、CLI 路径、config 路径、`accountPool` / `externalStatusline` / `pluginDistribution` 能力。
-- 加 `--machine-wide` 时输出机器级 registry snapshot：遍历所有已知 adapter（不只当前 selected harness），并为每个 harness 附上 `sessionStoreRoots`、`usageSource`（`kind` / `pollable` / `quotaModel`）和 `accountPoolLocation`；Claude Code 的 account pool 当前指向 `<CC_MASTER_HOME>/accounts.json`，Codex / Cursor 为 `null`。
+- 读所有 ccm 已知 harness 的本机安装探测结果。Claude Code 通过 `claude` CLI / Claude config dir 探测；Codex 通过 `codex` CLI / `CODEX_HOME` 或默认 config dir 探测；Cursor 分开报 `cursor-ide-plugin` (`ide-plugin`) 和 `cursor-agent` (`cli-headless`)。
+- 顶层 harness 输出包含：`installed`、`active`、CLI 路径、config 路径、`accountPool` / `externalStatusline` / `pluginDistribution` 能力。`installed[]` 保持 plugin-target 语义：只有 `cursor-agent` 时不把 Cursor IDE 报成 installed、也不触发 IDE plugin upgrade；文本相应显式写 `plugin-target=installed|missing`，不以裸 `Cursor missing` 掩掉已安装的 headless surface。
+- `surfaces[]` 是独立 descriptor：`id`、`kind`、`installed`、`available`、`binary{name,path,available}`、`configPaths`、`facts`、`capabilities`。顶层 `installedSurfaces[]` 列已安装 surface id。`cursor-agent` 仅以可执行 binary presence 翻真（支持 `CCM_CURSOR_AGENT_BIN` / `CURSOR_AGENT_BIN`）；symlink 报 PATH 命中的入口绝对路径，非可执行文件不算。
+- inventory 只读本地文件系统 / PATH，不发 provider call、不读写 credential、不 login/logout/switch。因此 Cursor surface 的 `facts.authentication` / `facts.quota` 诚实报 `state:"unknown", source:"not-probed"`；`accountMutation=forbidden`、`accountAutoswitch=unsupported`，headless `pluginDistribution=unsupported`。用户曾手工 auth 不改变这些 inventory 声明。
+- 加 `--machine-wide` 时输出机器级 registry snapshot：遍历所有已知 adapter（不只当前 selected harness），保留同一份 `surfaces[]` / `installedSurfaces[]`，并为每个 harness 附上 `sessionStoreRoots`、`usageSource`（`kind` / `pollable` / `quotaModel`）和 `accountPoolLocation`；Claude Code 的 account pool 当前指向 `<CC_MASTER_HOME>/accounts.json`，Codex / Cursor 为 `null`。
 - flags：`--json`（结构化输出） · `--machine-wide`（机器级 registry snapshot）
 - 例：`ccm harness list` · `ccm harness list --json` · `ccm harness list --machine-wide --json`
 
@@ -1887,7 +1889,7 @@ ccm harness current [--json]
 ccm --harness codex harness current [--json]
 ```
 
-- 显示当前 selected harness 及其安装探测。显式 `--harness` 可用于检查某个目标 harness 的能力，而不改变全局环境。
+- 显示当前 selected harness 及其安装 / surface 探测。显式 `--harness` 可用于检查某个目标 harness 的能力，而不改变全局环境。
 - flags：`--json`（结构化输出）
 
 ---

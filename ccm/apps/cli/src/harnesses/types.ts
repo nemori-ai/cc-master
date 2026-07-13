@@ -58,6 +58,40 @@ export interface HarnessCliProbe {
   available: boolean;
 }
 
+export type HarnessSurfaceKind = 'ide-plugin' | 'cli-headless';
+export type SurfaceFactState = 'unknown' | 'available' | 'unavailable';
+export type SurfaceCapabilityState = 'supported' | 'unsupported' | 'forbidden' | 'unknown';
+
+export interface SurfaceFact {
+  state: SurfaceFactState;
+  source: 'not-probed';
+}
+
+export interface SurfaceCapability {
+  state: SurfaceCapabilityState;
+  reason?: string;
+}
+
+export interface HarnessSurfaceDescriptor {
+  id: string;
+  displayName: string;
+  kind: HarnessSurfaceKind;
+  installed: boolean;
+  available: boolean;
+  reason: string | null;
+  binary: HarnessCliProbe;
+  configPaths: string[];
+  facts: {
+    authentication: SurfaceFact;
+    quota: SurfaceFact;
+  };
+  capabilities: {
+    accountMutation: SurfaceCapability;
+    accountAutoswitch: SurfaceCapability;
+    pluginDistribution: SurfaceCapability;
+  };
+}
+
 export interface HarnessInstallation {
   id: HarnessId;
   displayName: string;
@@ -66,6 +100,7 @@ export interface HarnessInstallation {
   reason: string | null;
   cli: HarnessCliProbe;
   configPaths: string[];
+  surfaces: HarnessSurfaceDescriptor[];
   capabilities: {
     accountPool: Capability;
     externalStatusline: Capability;

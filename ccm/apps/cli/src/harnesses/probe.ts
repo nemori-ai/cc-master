@@ -9,8 +9,10 @@ export function probeExecutable(name: string, env: Env): HarnessCliProbe {
 
 function findExecutable(name: string, env: Env): string | null {
   if (!name) return null;
-  if (name.includes('/') || name.includes('\\'))
-    return isExecutable(name) ? path.resolve(name) : null;
+  if (name.includes('/') || name.includes('\\')) {
+    const candidate = path.resolve(name);
+    return isExecutable(candidate) ? candidate : null;
+  }
 
   const pathEnv = env.PATH || process.env.PATH || '';
   const dirs = pathEnv.split(path.delimiter).filter(Boolean);
@@ -20,7 +22,7 @@ function findExecutable(name: string, env: Env): string | null {
       : [''];
   for (const dir of dirs) {
     for (const ext of exts) {
-      const candidate = path.join(dir, `${name}${ext}`);
+      const candidate = path.resolve(dir, `${name}${ext}`);
       if (isExecutable(candidate)) return candidate;
     }
   }
@@ -29,6 +31,7 @@ function findExecutable(name: string, env: Env): string | null {
 
 function isExecutable(p: string): boolean {
   try {
+    if (!fs.statSync(p).isFile()) return false;
     fs.accessSync(p, fs.constants.X_OK);
     return true;
   } catch {

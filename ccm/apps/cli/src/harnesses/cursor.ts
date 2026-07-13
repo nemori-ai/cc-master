@@ -3,7 +3,14 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { readCursorUsageSignal } from '../cursor-usage.js';
 import { probeExecutable } from './probe.js';
-import type { Env, HarnessAdapter, PluginUpgradeRequest, PluginUpgradeResult } from './types.js';
+import type {
+  Env,
+  HarnessAdapter,
+  HarnessCliProbe,
+  HarnessSurfaceDescriptor,
+  PluginUpgradeRequest,
+  PluginUpgradeResult,
+} from './types.js';
 
 const EXIT_OK = 0;
 const EXIT_ERROR = 1;
@@ -14,6 +21,12 @@ const STATUSLINE_REASON =
   'Cursor has no Claude Code-style external statusLine.command hook; usage is read from the dashboard API.';
 const PLUGIN_DISTRIBUTION_REASON =
   'Cursor installs cc-master as a local plugin under ~/.cursor/plugins/local/cc-master.';
+const ACCOUNT_MUTATION_REASON =
+  'Cursor account login/logout/session mutation is forbidden; ccm only observes the current identity.';
+const ACCOUNT_AUTOSWITCH_REASON =
+  'Cursor account-pool mutation and automatic account switching are unsupported.';
+const HEADLESS_PLUGIN_REASON =
+  'Cursor Agent headless CLI is a worker surface, not the Cursor IDE plugin distribution target.';
 
 export const cursorAdapter: HarnessAdapter = {
   id: 'cursor',
@@ -34,6 +47,10 @@ export const cursorAdapter: HarnessAdapter = {
     const hasPlugin = pathExists(pluginRoot);
     const hasConfig = pathExists(configDir);
     const installed = cli.available || hasPlugin || hasConfig;
+    const headlessCli = probeExecutable(
+      env.CCM_CURSOR_AGENT_BIN || env.CURSOR_AGENT_BIN || 'cursor-agent',
+      env,
+    );
     return {
       id: 'cursor',
       displayName: 'Cursor',
@@ -44,6 +61,12 @@ export const cursorAdapter: HarnessAdapter = {
         : 'cursor CLI not found and Cursor config/plugin directories not present',
       cli,
       configPaths: [configDir, pluginRoot],
+      surfaces: cursorSurfaces({
+        ideCli: cli,
+        ideInstalled: installed,
+        ideConfigPaths: [configDir, pluginRoot],
+        headlessCli,
+      }),
       capabilities: {
         accountPool: this.accountPool,
         externalStatusline: this.externalStatusline,
@@ -97,6 +120,55 @@ export const cursorAdapter: HarnessAdapter = {
   externalStatusline: { supported: false, reason: STATUSLINE_REASON },
   pluginDistribution: { supported: true, reason: PLUGIN_DISTRIBUTION_REASON },
 };
+
+function cursorSurfaces(input: {
+  ideCli: HarnessCliProbe;
+  ideInstalled: boolean;
+  ideConfigPaths: string[];
+  headlessCli: HarnessCliProbe;
+}): HarnessSurfaceDescriptor[] {
+  return [
+    {
+      id: 'cursor-ide-plugin',
+      displayName: 'Cursor IDE Agent plugin',
+      kind: 'ide-plugin',
+      installed: input.ideInstalled,
+      available: input.ideInstalled,
+      reason: input.ideInstalled ? null : 'Cursor IDE CLI/config/plugin directories not found',
+      binary: input.ideCli,
+      configPaths: input.ideConfigPaths,
+      facts: unprobedFacts(),
+      capabilities: {
+        accountMutation: { state: 'forbidden', reason: ACCOUNT_MUTATION_REASON },
+        accountAutoswitch: { state: 'unsupported', reason: ACCOUNT_AUTOSWITCH_REASON },
+        pluginDistribution: { state: 'supported', reason: PLUGIN_DISTRIBUTION_REASON },
+      },
+    },
+    {
+      id: 'cursor-agent',
+      displayName: 'Cursor Agent headless CLI',
+      kind: 'cli-headless',
+      installed: input.headlessCli.available,
+      available: input.headlessCli.available,
+      reason: input.headlessCli.available ? null : 'cursor-agent executable not found',
+      binary: input.headlessCli,
+      configPaths: [],
+      facts: unprobedFacts(),
+      capabilities: {
+        accountMutation: { state: 'forbidden', reason: ACCOUNT_MUTATION_REASON },
+        accountAutoswitch: { state: 'unsupported', reason: ACCOUNT_AUTOSWITCH_REASON },
+        pluginDistribution: { state: 'unsupported', reason: HEADLESS_PLUGIN_REASON },
+      },
+    },
+  ];
+}
+
+function unprobedFacts(): HarnessSurfaceDescriptor['facts'] {
+  return {
+    authentication: { state: 'unknown', source: 'not-probed' },
+    quota: { state: 'unknown', source: 'not-probed' },
+  };
+}
 
 function pathExists(p: string): boolean {
   try {
