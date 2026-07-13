@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { captureRuntimeEnvironment, ccMasterHome } from '@ccm/engine';
 
 const PROVENANCE_SCHEMA = 'ccm/runtime-provenance/v1';
 const IMAGE_SCHEMA = 'ccm/runtime-image/v1';
@@ -188,9 +188,10 @@ function jsonText(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
+// home 解析直接消费 @ccm/engine 的 RuntimeEnvironment/PathResolver SSOT；本文件不再持有
+// CC_MASTER_HOME > HOME/.cc_master 的第二份优先级实现。
 function resolveHome(env: PathEnv): string {
-  if (env.CC_MASTER_HOME) return path.resolve(env.CC_MASTER_HOME);
-  return path.join(path.resolve(env.HOME || os.homedir()), '.cc_master');
+  return ccMasterHome(captureRuntimeEnvironment({ env }));
 }
 
 function expectedAsset(platform: string, arch: string): string | null {

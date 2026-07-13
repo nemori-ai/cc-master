@@ -20,6 +20,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { captureRuntimeEnvironment, ccMasterHome, homeBase, hostConfig } from './runtime-env.js';
 
 export type PathEnv = Record<string, string | undefined>;
 
@@ -27,9 +28,7 @@ export type PathEnv = Record<string, string | undefined>;
 //   = $CLAUDE_CONFIG_DIR（绝对化）|| $HOME/.claude（HOME 缺退 os.homedir()）。
 export function resolveClaudeCodeConfigDir(env?: PathEnv): string {
   const e = env || process.env;
-  if (e.CLAUDE_CONFIG_DIR) return path.resolve(e.CLAUDE_CONFIG_DIR);
-  const home = e.HOME || os.homedir();
-  return path.join(home, '.claude');
+  return hostConfig(captureRuntimeEnvironment({ env: e }), 'claude-code')[0] as string;
 }
 
 // resolveHostConfigDir(env) → 与 host 配置目录的通用命名。
@@ -45,9 +44,7 @@ export const resolveClaudeConfigDir = resolveClaudeCodeConfigDir;
 //   = $CC_MASTER_HOME || $HOME/.cc_master（HOME 缺退 os.homedir()）。
 export function resolveCcMasterHome(env?: PathEnv): string {
   const e = env || process.env;
-  if (e.CC_MASTER_HOME) return path.resolve(e.CC_MASTER_HOME);
-  const home = e.HOME || os.homedir();
-  return path.join(home, '.cc_master');
+  return ccMasterHome(captureRuntimeEnvironment({ env: e }));
 }
 
 // resolveRateCachePath(env) → status-line sidecar（账户权威 5h/7d used%·跨 project 共享）。
@@ -78,7 +75,7 @@ export function resolveClaudeJsonPath(env?: PathEnv): string {
   } catch {
     /* fall through to $HOME/.claude.json */
   }
-  const home = e.HOME || os.homedir();
+  const home = homeBase(e, os.homedir());
   return path.join(home, '.claude.json');
 }
 

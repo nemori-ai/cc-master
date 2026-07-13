@@ -280,6 +280,27 @@ export {
   validateTaskPlanning,
   validateTaskRoutePolicy,
 } from './routing-contract.js';
+// ── runtime-env（RuntimeEnvironment / PathResolver 纯契约 SSOT·home/pointer/host-config/plugin-root/exec discovery）──
+export type {
+  ResolvedExecutable,
+  RuntimeArch,
+  RuntimeEnvironment,
+  RuntimeEnvironmentInput,
+  RuntimeHost,
+  RuntimePlatform,
+  RuntimeRoots,
+} from './runtime-env.js';
+export {
+  boardSessionPointer,
+  captureRuntimeEnvironment,
+  ccMasterHome,
+  createRuntimeEnvironment,
+  homeBase,
+  hostConfig,
+  localPluginBase,
+  pluginInstallRoot,
+  resolveExecutable,
+} from './runtime-env.js';
 // ── shadow-routing（C1 cached machine context + pure advisory route；零 IO/spawn/mutation）──
 export type {
   CachedCandidateFact,

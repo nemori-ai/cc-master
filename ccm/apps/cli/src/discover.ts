@@ -20,9 +20,8 @@
 //   换成命名导出。逻辑/报错文案/.errKind 逐字保持。
 
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
-import { resolveCcMasterHome } from '@ccm/engine';
+import { boardSessionPointer, captureRuntimeEnvironment, ccMasterHome } from '@ccm/engine';
 
 // 带 .errKind 的 Error（router 据此映射退出码）。
 interface KindedError extends Error {
@@ -54,21 +53,10 @@ function discoverError(message: string, errKind: string): KindedError {
 //   env.HOME 缺时退 os.homedir()（生产稳健·测试可经 env.HOME 注入隔离 home）。
 export function resolveHome({ homeFlag, env }: { homeFlag?: string; env?: Env } = {}): string {
   env = env || {};
-
-  // ① --home：显式指定，直接用（不要求存在——调用者负责，镜像 hook 注入语义）。
-  if (homeFlag) return path.resolve(homeFlag);
-
-  // ② $CC_MASTER_HOME。
-  if (env.CC_MASTER_HOME) return path.resolve(env.CC_MASTER_HOME);
-
-  // ③ harness-neutral 默认 home（$HOME/.cc_master·HOME 缺退 os.homedir()·paths.resolveCcMasterHome SSOT）。
-  if (env.HOME || os.homedir()) return resolveCcMasterHome(env);
-
-  // ④ 连 HOME / homedir 都没有（极端环境）→ NotFound。
-  throw discoverError(
-    'No cc-master home found (--home / $CC_MASTER_HOME / $HOME all missed)',
-    'NotFound',
-  );
+  // --home 是 CLI 层最高优先级，把它投影为中央契约的显式 CC_MASTER_HOME 输入；
+  // 其余 CC_MASTER_HOME > HOME/.cc_master 优先级与绝对化只由 RuntimeEnvironment 拥有。
+  const contractEnv = homeFlag ? { ...env, CC_MASTER_HOME: homeFlag } : env;
+  return ccMasterHome(captureRuntimeEnvironment({ env: contractEnv }));
 }
 
 // ── boards 目录 ─────────────────────────────────────────────────────────────────────────────────
@@ -91,17 +79,13 @@ export function boardMatches(board: unknown, sid: string | null | undefined): bo
 }
 
 // ── session→board 指针注册表（user-global XDG state·设计稿 §6/§7）────────────────────────────────
-// pointerPath(sid, env) → ($XDG_STATE_HOME || ~/.local/state)/cc-master/boards/<sid>.path。
-function pointerDir(env?: Env): string {
-  env = env || {};
-  const base = env.XDG_STATE_HOME
-    ? path.resolve(env.XDG_STATE_HOME)
-    : path.join(os.homedir(), '.local', 'state');
-  return path.join(base, 'cc-master', 'boards');
-}
-
+// pointerPath(sid, env) → ($XDG_STATE_HOME || <home>/.local/state)/cc-master/boards/<sid>.path。
+//   落点收口进 RuntimeEnvironment/PathResolver 契约（boardSessionPointer）：state 根缺 XDG_STATE_HOME 时
+//   回落**注入的 env.HOME**（缺才退 os.homedir()），与 home/board 解析同口径——修掉「board 落一个 home、
+//   指针落另一个 home」的 split-home 缺陷（此前 fallback 直读 os.homedir()）。
 export function pointerPath(sid: string, env?: Env): string {
-  return path.join(pointerDir(env), `${sid}.path`);
+  const rt = captureRuntimeEnvironment({ env: env || {} });
+  return boardSessionPointer(rt, sid);
 }
 
 // readPointer(sid, env) → 指针指向的 board 绝对路径，读不到 / 空 → null（best-effort）。
