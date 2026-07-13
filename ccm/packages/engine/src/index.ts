@@ -302,10 +302,31 @@ export {
   createRuntimeEnvironment,
   homeBase,
   hostConfig,
+  launchAgentsDir,
   localPluginBase,
   pluginInstallRoot,
   resolveExecutable,
+  systemdUserDir,
 } from './runtime-env.js';
+// ── service-serializers（launchd plist / systemd unit 独立序列化 adapter + parser·可移植性 slice 5）──
+export type {
+  ParsedLaunchdService,
+  ParsedSystemdService,
+  ServiceCommand,
+  ServiceDefinition,
+  ServiceProgram,
+} from './service-serializers.js';
+export {
+  launchdInstallCommands,
+  launchdUninstallCommands,
+  parseLaunchdPlist,
+  parseSystemdUnit,
+  serializeLaunchdPlist,
+  serializeSystemdUnit,
+  systemdEscapeUnitName,
+  systemdInstallCommands,
+  systemdUninstallCommands,
+} from './service-serializers.js';
 // ── shadow-routing（C1 cached machine context + pure advisory route；零 IO/spawn/mutation）──
 export type {
   CachedCandidateFact,

@@ -15,9 +15,11 @@ import {
   createRuntimeEnvironment,
   homeBase,
   hostConfig,
+  launchAgentsDir,
   localPluginBase,
   pluginInstallRoot,
   resolveExecutable,
+  systemdUserDir,
 } from '../dist/index.mjs';
 
 let TMPDIRS: string[] = [];
@@ -433,4 +435,24 @@ test('captureRuntimeEnvironment: overrides.env is injected while cwd/platform co
   assert.equal(snap.env.HOME, '/injected');
   assert.equal(typeof snap.cwd, 'string');
   assert.ok(isAbsolute(snap.cwd));
+});
+
+// ── service unit locations（launchd LaunchAgents / systemd user·经 contract 派生·无硬编码 home）─────
+test('launchAgentsDir: derives <home>/Library/LaunchAgents from the contract home, not process HOME', () => {
+  const dir = launchAgentsDir(rt({ HOME: '/home/alice' }));
+  assert.equal(dir, join('/home/alice', 'Library', 'LaunchAgents'));
+  assert.ok(isAbsolute(dir));
+});
+
+test('systemdUserDir: default is <home>/.config/systemd/user; honors XDG_CONFIG_HOME override', () => {
+  const dflt = systemdUserDir(rt({ HOME: '/home/alice' }));
+  assert.equal(dflt, join('/home/alice', '.config', 'systemd', 'user'));
+  const xdg = systemdUserDir(rt({ HOME: '/home/alice', XDG_CONFIG_HOME: '/xdg cfg/α' }));
+  assert.equal(xdg, join('/xdg cfg/α', 'systemd', 'user'));
+});
+
+test('systemdUserDir / launchAgentsDir: spaces + Unicode in home are data, never delimiters', () => {
+  const home = '/home/用户/My Home';
+  assert.equal(launchAgentsDir(rt({ HOME: home })), join(home, 'Library', 'LaunchAgents'));
+  assert.equal(systemdUserDir(rt({ HOME: home })), join(home, '.config', 'systemd', 'user'));
 });

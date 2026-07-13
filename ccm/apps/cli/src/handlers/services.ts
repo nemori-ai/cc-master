@@ -1,5 +1,4 @@
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import * as discover from '../discover.js';
 import { readVersion } from '../help.js';
@@ -68,29 +67,14 @@ function versionOf(state: JsonRecord | null): string | null {
   return typeof server?.ccm_version === 'string' ? server.ccm_version : null;
 }
 
-function monitorOsUnitInstalled(home: string): boolean {
-  const suffix = Buffer.from(home).toString('hex').slice(0, 10);
-  const candidates =
-    process.platform === 'darwin'
-      ? [
-          path.join(
-            os.homedir(),
-            'Library',
-            'LaunchAgents',
-            `ai.nemori.ccm.monitor.${suffix}.plist`,
-          ),
-        ]
-      : [path.join(os.homedir(), '.config', 'systemd', 'user', `ccm-monitor-${suffix}.service`)];
-  return candidates.some((candidate) => fs.existsSync(candidate));
-}
-
-function monitorPlan(home: string): ServicePlan {
+function monitorPlan(ctx: Ctx, home: string): ServicePlan {
   const statePath = path.join(home, 'services', 'monitor', 'state.json');
   const state = readJson(statePath);
   const running = isPidAlive(state?.pid);
   const runningVersion = versionOf(state);
   const installed = readVersion();
-  const wanted = running || state?.wanted === true || monitorOsUnitInstalled(home);
+  // Reuse monitor's contract-derived unit location (single source of truth; honors XDG / injected env).
+  const wanted = running || state?.wanted === true || monitor.monitorUnitInstalled(ctx.env, home);
   return {
     service: 'monitor',
     id: 'monitor',
@@ -180,7 +164,7 @@ function restartPlan(ctx: Ctx, plan: ServicePlan, home: string): ServicePlan {
 
 export function reconcile(ctx: Ctx): number {
   const home = canonicalHome(ctx);
-  const plans = [monitorPlan(home), ...webViewerPlans(home)];
+  const plans = [monitorPlan(ctx, home), ...webViewerPlans(home)];
   const results = plans.map((plan) => (plan.wanted ? restartPlan(ctx, plan, home) : plan));
   const data = {
     after_binary_replace: ctx.values['after-binary-replace'] === true,
