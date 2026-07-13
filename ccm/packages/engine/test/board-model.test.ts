@@ -210,6 +210,8 @@ test('isRetryTransition names every legal new-attempt boundary without widening 
     false,
     'dependency unblocking is not a retry',
   );
+  assert.equal(M.isRetryTransition('done', 'ready'), false, 'retry does not add done → ready');
+  assert.equal(M.isRetryTransition('stale', 'in_flight'), false, 'retry target is exactly ready');
 });
 
 // ── INVARIANTS 注册表：规则 id/级别/家族 的 SSOT（spec §5）─────────────────────────────────────────

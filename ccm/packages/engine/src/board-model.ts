@@ -577,7 +577,8 @@ export const STATUS_MACHINE = {
 };
 
 // retry / reactivation 是既有合法状态边的具名子集，不新增 status 或 transition。
-// 调用方用这一份声明识别「开始新 attempt」的边，并重置 attempt-scoped evidence；具体写入仍归 mutation。
+// 调用方用这一份类型化声明识别「开始新 attempt」的边，并施加 attempt evidence reset；
+// 具体写入/审计仍归 CLI mutation，engine 只拥有状态机声明与纯判定。
 export const RETRYABLE_STATUSES = ['stale', 'failed', 'escalated'] as const;
 export type RetryableStatus = (typeof RETRYABLE_STATUSES)[number];
 const RETRYABLE_STATUS_SET = new Set<string>(RETRYABLE_STATUSES);

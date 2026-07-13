@@ -460,6 +460,70 @@ test('transition unknown task → NotFound', () => {
   );
 });
 
+test('retryTask stale→ready archives prior evidence and resets the current attempt atomically', () => {
+  const orig = baseBoard();
+  const t0 = orig.tasks.find((x: AnyBoard) => x.id === 'T0');
+  t0.started_at = '2019-12-31T23:00:00Z';
+  t0.artifact = '/abs/old.md';
+  t0.verified = true;
+  const stale = m.transition(orig, 'T0', 'stale', {});
+  const retried = m.retryTask(stale, 'T0');
+  const task = retried.tasks.find((x: AnyBoard) => x.id === 'T0');
+
+  assert.equal(task.status, 'ready');
+  assert.equal(task.started_at, undefined);
+  assert.equal(task.finished_at, undefined);
+  assert.equal(task.artifact, undefined);
+  assert.equal(task.verified, false);
+  assert.equal(typeof task.verified, 'boolean', 'verified reset is typed, never string "false"');
+
+  const entry = retried.log.at(-1);
+  assert.equal(entry.kind, 'replan');
+  assert.equal(entry.task, 'T0');
+  const detail = JSON.parse(entry.detail);
+  assert.equal(detail.schema, 'ccm/task-retry/v1');
+  assert.equal(detail.from_status, 'stale');
+  assert.deepEqual(detail.prior_evidence, {
+    started_at: '2019-12-31T23:00:00Z',
+    finished_at: '2020-01-01T00:00:00Z',
+    artifact: '/abs/old.md',
+    verified: true,
+  });
+  assert.equal(snapshot(stale).includes('/abs/old.md'), true, 'input board remains untouched');
+});
+
+test('generic legal stale→ready transition shares retry reset semantics before start', () => {
+  const orig = baseBoard();
+  const t0 = orig.tasks.find((x: AnyBoard) => x.id === 'T0');
+  t0.artifact = '/abs/old.md';
+  t0.verified = true;
+  let board = m.transition(orig, 'T0', 'stale', {});
+  board = m.transition(board, 'T0', 'ready', {});
+  board = m.transition(board, 'T0', 'in_flight', {});
+  const task = board.tasks.find((x: AnyBoard) => x.id === 'T0');
+  assert.equal(task.status, 'in_flight');
+  assert.match(task.started_at, ISO);
+  assert.equal(task.finished_at, undefined);
+  assert.equal(task.artifact, undefined);
+  assert.equal(task.verified, false);
+  assert.equal(board.log.filter((entry: AnyBoard) => entry.task === 'T0').length, 1);
+});
+
+test('retryTask rejects non-retryable statuses and leaves ordinary first start/done unchanged', () => {
+  assert.throws(
+    () => m.retryTask(baseBoard(), 'T1'),
+    (e: any) => e.errKind === 'IllegalTransition' && /ready/.test(e.message),
+  );
+
+  let board = m.transition(baseBoard(), 'T1', 'in_flight', {});
+  board = m.transition(board, 'T1', 'done', {});
+  const task = board.tasks.find((x: AnyBoard) => x.id === 'T1');
+  assert.equal(task.status, 'done');
+  assert.match(task.started_at, ISO);
+  assert.match(task.finished_at, ISO);
+  assert.equal(board.log.length, 0, 'ordinary first attempt emits no retry audit');
+});
+
 test('routing contract dedicated writers bind selection + immutable attempt snapshot + handle claim atomically', () => {
   let board = baseBoard();
   board.tasks.find((task: AnyBoard) => task.id === 'T1').executor = 'subagent';

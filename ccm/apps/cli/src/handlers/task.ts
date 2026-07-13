@@ -233,6 +233,30 @@ export function done(ctx: Ctx): number {
   return _transitionVerb(ctx, 'done', 'done');
 }
 
+// ── task retry：stale|failed|escalated → ready，并原子归档/清理上一 attempt evidence。──────────────
+//   与 start/done 同样支持批量：一笔 runWrite 内逐个 retry，任一 id 非法/不存在则整批零落盘。
+export function retry(ctx: Ctx): number {
+  const ids = ctx.positionals as string[];
+  return runWrite(ctx, {
+    mutate: (board) => {
+      let next = board as BoardArg;
+      for (const id of ids) next = mutations.retryTask(next, id);
+      next = maybeLog(next, ctx, `retry ${ids.join(', ')}`);
+      return next;
+    },
+    render: (next, c, { dryRun }) => {
+      if (c.flags.json) {
+        const tasks = ids.map((id) => findTask(next, id) ?? null);
+        return render.jsonString(tasks);
+      }
+      const idList = ids.join(', ');
+      return dryRun
+        ? `[dry-run] 将 retry task: ${idList} (→ ready，归档并清理旧 attempt evidence)`
+        : `task ${idList} → ready (旧 attempt evidence 已归档)`;
+    },
+  });
+}
+
 export function setPlanning(ctx: Ctx): number {
   const id = ctx.positionals[0] as string;
   return runWrite(ctx, {

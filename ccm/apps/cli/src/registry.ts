@@ -549,6 +549,17 @@ export const REGISTRY: Registry = {
       ],
       handler: 'task.done',
     },
+    retry: {
+      summary:
+        '重试（stale|failed|escalated → ready；原子归档旧 attempt evidence 并清时间/产物、verified=false）',
+      read: false,
+      positionals: [{ name: 'id...', required: true }],
+      options: {
+        log: { type: 'string', desc: '除自动 retry 审计外再追一条自定义 log' },
+      },
+      examples: ['ccm task retry T7', 'ccm task retry T7 T8 T9'],
+      handler: 'task.retry',
+    },
     'set-planning': {
       summary: '经 dedicated writer 写 task-planning/v1 多维任务画像',
       read: false,

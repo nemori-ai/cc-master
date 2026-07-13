@@ -43,7 +43,7 @@
 | 字段 | 类型 | 专属命令 | 含义一句话 |
 |---|---|---|---|
 | `id` | string（唯一非空） | `task add <id>` | DAG 节点标识符，被 deps/parent 引用 |
-| `status` | enum（8 个值） | `task start / done / block / set-status` | 状态机当前态，只能经 verb 转移 |
+| `status` | enum（8 个值） | `task start / done / retry / block / set-status` | 状态机当前态，只能经 verb 转移 |
 | `deps` | string[] | `task add --deps` / `task update --add-dep / --rm-dep` | 上游 dep 列表，驱动 readySet 计算 |
 | `parent` | string?（可缺） | `task add --parent` / `task update --parent` | 归属 owner 节点的容器边（嵌套深度=1） |
 
@@ -64,14 +64,14 @@
 | `estimate` | 估点时 | 见 [E. estimate 怎么估](#e-estimate-怎么估) |
 | `executor` | 派发前必须设 | 见 [C. executor 五种语义](#c-executor-五种语义--选择决策树) |
 | `handle` | 真实派发后、任务进入 `in_flight` 前必须 | 记录派发工具返回的真实句柄，resume 靠它 recon；`ready` / `blocked` future task 不预填 |
-| `artifact` | 产出落盘后（`task done` 时带 `--artifact`） | 绝对路径或 URL；done 真语义（verified+artifact）靠它 |
-| `verified` | 端点验收通过后 | `task done --verified` 一步到位，或 `task update --verified` |
+| `artifact` | 产出落盘后（`task done` 时带 `--artifact`） | 绝对路径或 URL；done 真语义（verified+artifact）靠它；`task retry` 会归档旧值并从当前 attempt 清除 |
+| `verified` | 端点验收通过后 | `task done --verified` 一步到位，或 `task update --verified`；`task retry` 原子复位为布尔 `false` |
 | `dependency_gate` | review task 必须明确批准后才允许下游开始时 | `task add|update --review-gate APPROVE`；缺省保持旧板的 status-only 依赖语义 |
-| `review_verdict` | 当前 review attempt 产出明确结论时 | `task done --review-verdict APPROVE|REQUEST-CHANGES`；只有当前 attempt 的 APPROVE 满足显式 review gate；retry 自动清旧值 |
+| `review_verdict` | 当前 review attempt 产出明确结论时 | `task done --review-verdict APPROVE|REQUEST-CHANGES`；只有当前 attempt 的 APPROVE 满足显式 review gate；`task retry` 先归档旧值、再从当前 attempt 清除 |
 | `blocked_on` | `task block --on` 时自动设 | `"user"` 或某 task id；见 [G. blocked_on 怎么选](#g-blocked_on-怎么选) |
 | `justification` | 需记录决策理由时 | 解释「为什么建这个 task / 用这个方法」 |
 | `observability` | 后台任务完成 / recon 时，从 Codex subagent result、后台 terminal session、cloud task 或外部 run 的可得 telemetry 抄取 | 可选遥测；缺失优雅降级，不影响派发逻辑 |
-| `created_at` / `started_at` / `finished_at` | `task add` / `task start` / `task done` 时自动盖 | 严格 `YYYY-MM-DDTHH:MM:SSZ`；viewer timeline 靠它 |
+| `created_at` / `started_at` / `finished_at` | `task add` / `task start` / `task done` 时自动盖 | 严格 `YYYY-MM-DDTHH:MM:SSZ`；viewer timeline 靠它；retry 开新 attempt 时清后两者并归档旧值 |
 | `hitl_rounds` | 每次 `blocked_on:user` 往返 + 1 | 量化人工介入成本；缺省 = 0 |
 | `decision_package` | 建 `blocked_on:user` 节点时**必须**（BIZ-AWAITING hard error） | 见 [G. blocked_on 怎么选](#g-blocked_on-怎么选) 里的 awaiting-user 小节 |
 | `role` | 标 fill-work 时 | `normal`（默认）或 `fill-work`（临界路径等待窗口的填充活） |
@@ -130,9 +130,9 @@
 | `in_flight` | 已派发、正在跑 | 不在 readySet | 等完成 → `task done` / 失败处置 |
 | `blocked` | **两种来源**（见下）：① deps 门控（deps 未全满足·**系统自动**·无 `blocked_on`）② 语义阻塞（在等 user 或另一 task·**手动**·有 `blocked_on`） | 不在 readySet | ① deps 门控：**别手动改**——deps 全满足时任意 ccm 写命令自动归回 ready；② 语义阻塞：`task unblock <id>`（清 `blocked_on`·交回 deps 门控） |
 | `done` | 执行完成 | 普通/旧 task 满足 deps；显式 review gate 还须 `review_verdict=APPROVE` | 无须再动，除非上游产物变 → `stale` |
-| `escalated` | sub-agent 返回 escalation（超出能力范围） | 不在 readySet | 复盘后 supersede 节点，建新 task → escalated task 设 ready |
-| `failed` | 节点失败 | 不在 readySet | 重试 → `ready`，或升级处置 → `escalated` |
-| `stale` | 上游产物变了、需重跑 | 不在 readySet | 重确认输入后 → `ready`（开新 attempt；旧 review verdict 失效） |
+| `escalated` | sub-agent 返回 escalation（超出能力范围） | 不在 readySet | 仍沿用本节点时 `task retry`，或 supersede 后建新 task |
+| `failed` | 节点失败 | 不在 readySet | `task retry` 开新 attempt，或升级处置 → `escalated` |
+| `stale` | 上游产物变了、需重跑 | 不在 readySet | 重确认输入后 `task retry`（先归档旧 evidence，再开干净新 attempt；旧 review verdict 不参与当前 gate） |
 | `uncertain` | 做了但未验（验证节点尚未派出） | 不在 readySet | 验收通过 → `done`，失败 → `failed`，重做 → `in_flight` |
 
 ### status 何时转向哪态
@@ -162,8 +162,11 @@ stale      → ready
 | sub-agent 返回说超出能力 | `escalated` | `task set-status <id> escalated` |
 | 任务失败 | `failed` | `task set-status <id> failed` |
 | 上游 artifact 变了 | `stale` | `task set-status <id> stale` |
+| stale / failed / escalated 节点确认重跑 | `ready`（新 attempt） | `task retry <id>` |
 
-**`--force` 越闸是逃生口，不是捷径：** 正常流程用 verb，`--force` 留给真异常态（如复活 `stale` 节点做特殊处置）。用 `--force` 跳 `in_flight` 直接 `done` 会造成无 `started_at` 的 done 节点——伪造审计轨迹，影响 timeline 与 p95 估算。
+**retry 是 attempt 边界，不是 status setter：** `task retry` 先把来源 status 与旧 `started_at` / `finished_at` / `artifact` / `verified` 归档为 `ccm/task-retry/v1` log detail，再清空当前 attempt 的三个证据字段、把 `verified` 设为布尔 `false`，最后落 `ready`。这四步在同一持锁写入里原子发生；批量任一 id 不可 retry 时整批不落盘。合法的通用 `set-status <id> ready` 也走同一 reset，避免旧入口泄漏旧证据。
+
+**`--force` 越闸是逃生口，不是捷径：** 正常流程用 verb；重跑 stale/failed/escalated 用 `task retry`。用 `--force` 跳 `in_flight` 直接 `done` 会造成无 `started_at` 的 done 节点——伪造审计轨迹，影响 timeline 与 p95 估算。
 
 ### ready ↔ blocked 由系统按 deps 自动门控
 
@@ -677,6 +680,8 @@ verified = true   ← 端点验收通过
 
 两者正交：一个 task 可以 `status=done`（结束了）但 `verified=false`（没有端点验收过）。
 
+重跑时 `task retry` 会把旧 `verified`（包括 `true`）归档后将当前值设为真正的布尔 `false`；不要用 `task update --set verified=false`，通用 `--set` 的值是字符串，且它不能替代完整的 attempt reset。
+
 **什么时候设 verified：**
 - sub-agent 跑完、你作为 orchestrator 做了独立的端点验收（不信 leaf 的自报）之后
 - `run-tests.sh` 全绿 + `plugin validate` 过了之后
@@ -714,7 +719,19 @@ ccm task start T3          # ready → in_flight，盖 started_at
 ccm task done T3 --verified --artifact /abs/output.md   # in_flight → done，盖 finished_at，带 true-done 证据
 ```
 
-**footgun 3：给 parent 节点加真实的子级 deps**
+**footgun 3：重跑只改 status，沿用旧完成证据**
+
+```bash
+# ❌ 错误：字段 setter 不能原子清时间、artifact、verified，也可能把 false 写成字符串
+ccm task update T3 --set verified=false
+
+# ✅ 正确：旧证据进 append-only log，当前 attempt 从干净的 ready 开始
+ccm task set-status T3 stale
+ccm task retry T3
+ccm task start T3
+```
+
+**footgun 4：给 parent 节点加真实的子级 deps**
 
 ```bash
 # ❌ 反模式：PHASE1 依赖 T_prev（另一个 owner 的子节点）

@@ -224,6 +224,22 @@ cadence?: {                          👁
 | `failed` | 失败 → 按 escalation 路由 | in_flight |
 | `stale` | 上游产物变 → 重跑 | done |
 
+### 6.1 retry / reactivation 合约
+
+`stale|failed|escalated → ready` 是**新 attempt 的边界**，不是普通 status setter。所有合法 retry
+transition（含通用 `task set-status <id> ready` 走到这些边时）必须共享同一原子后置条件；CLI 另提供
+具名正门 `ccm task retry <id...>`，调用者不需手工拼字段 reset：
+
+1. 在同一笔 mutation 内，把旧 attempt 的来源 status 与已存在的
+   `started_at`/`finished_at`/`artifact`/`verified` 序列化进 append-only `board.log`（`kind:replan`、
+   `task:<id>`、detail schema=`ccm/task-retry/v1`），先留审计证据再重置当前视图。
+2. task 转为 `ready`，删除旧 `started_at`/`finished_at`/`artifact`，并把 `verified` 重置为**布尔**
+   `false`（不得写字符串 `"false"`）。因此当前 attempt 永不携带上一轮 terminal evidence。
+3. 批量 `task retry <id...>` 是一次 mutate + 一次 lint + 一次落盘；任一 id 不存在或当前 status
+   不是 `stale|failed|escalated`，整批拒绝、零部分写。
+4. 普通首次 `ready → in_flight → done` 语义不变；非法状态边仍按既有状态机拒绝。`done` 要重跑仍先
+   `done → stale`，再 `task retry`，不新增 `done → ready` 边、不改 status enum/deps/narrow-waist。
+
 ## 7. 机械约束总图 + 写入 + 并发
 - **真机械 🔩**:CLI 写入校验(违 FMT/GRAPH/BIZ-hard 拒绝)+ lint 端点闸。
 - **半机械 🔧**:Stop-block(goal-hook)——还有活/cadence 到点未收口,不让 agent 停 + 注入。

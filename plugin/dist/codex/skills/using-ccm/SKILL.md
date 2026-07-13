@@ -28,7 +28,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 1. **持锁**(`.lock`·O_EXCL 原子抢占)——串行化写入,防两个写者撕裂文件。
 2. **校验不变式**——FMT/GRAPH/BIZ 规则在落盘前跑;有 hard error 直接 exit 3 拒绝,坏 board 写不进去。
 3. **守状态机**——非法状态转移(见锚 2)当场挡下。
-4. **盖 derived 字段**——`task start` 自动盖 `started_at`、`task done` 盖 `finished_at`;手改 status 这些字段会被你漏掉,board 就此说谎。
+4. **守 attempt 边界**——`task start` 自动盖 `started_at`、`task done` 盖 `finished_at`;`task retry` 把旧 attempt 证据归档到 log 后清空当前态的 `started_at` / `finished_at` / `artifact`,并把 `verified` 复位为布尔 `false`。手改 status 会漏掉这些联动,board 就此说谎。
 
 手改 JSON 把这四道全绕过。**别因为"就改一个字段、Write 更快"在 ccm 可用时绕开它**——那一下省的几秒,换来的是绕锁、跳校验、derived 字段失真。
 
@@ -38,7 +38,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 
 这是本 skill 最容易踩、也最不能踩的一条。**task 的 `status` 不是一个你 `--set` 赋值的普通字段——它是一台状态机的当前态,只能经生命周期 verb 转移。**
 
-- 改 status **只有**这几条命令:`task start`(→ in_flight)、`task done`(→ done)、`task block --on`(→ blocked)、`task unblock`(清 `blocked_on`·交回 deps 门控)、`task set-status <id> <status>`(通用转移)。
+- 改 status **只有**这几条命令:`task start`(→ in_flight)、`task done`(→ done)、`task retry`(stale/failed/escalated → ready,开启新 attempt)、`task block --on`(→ blocked)、`task unblock`(清 `blocked_on`·交回 deps 门控)、`task set-status <id> <status>`(通用转移)。
 - **没有** `task set`;`task update` **不接** `--status`;`--set tasks[T].status=…` 被 🔒 守门拒(exit 3);裸 `--set status=done` 同样被拒(exit 3)——task verb 的裸 path scope 到本 task,`status` 命中 🔒 守门,不会静默落 board 顶层。
 - **`ready → done` 非法**:必须先 `task start`(ready → in_flight)再 `task done`。直接 done 撞 `illegal transition: ready → done`(exit 3)。
 - **`ready ↔ blocked` 由系统按 deps 自动归一**:每次 ccm 写命令落盘前引擎跑一趟 `reconcileGating`——**无 `blocked_on`** 且 status∈{ready,blocked} 的 task 按 deps 满足度重定(deps 全满足→ready,否则→blocked)。普通/旧 task 仍以 `status=done` 满足依赖；用 `task add|update --review-gate APPROVE` 显式声明的 review gate 则必须同时有 `review_verdict=APPROVE`，`REQUEST-CHANGES`、缺失、空或 null 都保持下游 blocked。review 的 `status=done` 只表示审查工作执行完，不等于批准。**手动 `set-status <id> ready` 会被 deps 否决**(deps 未满足下一趟归回 blocked)。**有 `blocked_on`(等 user / 等某 task)= 语义阻塞,豁免自动门控**;解除用 **`task unblock <id>`**,别用 `set-status`。手改 board 造出的不一致态由 `BIZ-STATUS-DEPS` warn 兜。
@@ -59,13 +59,15 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 > `verified` 是与 status **正交的布尔**(`--verified`),不是一个 status 值。`done` 且 `verified:true` 且 `artifact` 非空,才是真完成(端点验收过);缺任一项会被 `BIZ-DONE-VERIFIED` hard gate 拒绝落盘(exit 3)。
 > 对显式 review gate，`verified:true` 只验收「review 工作与报告已完成」，是否批准由**当前 attempt** 的 `review_verdict` 单独表达；只有 `APPROVE` 满足下游 deps。`stale|failed|escalated → ready` 开新 attempt 时旧 verdict 自动失效，重跑后必须产出新 verdict。
 
+> `stale` / `failed` / `escalated` 要重跑时优先用 `task retry <id>`。它把旧 attempt 的时间、artifact、verified 以 `ccm/task-retry/v1` 结构归档进 append-only log,再原子复位当前 attempt;合法的通用 `set-status <id> ready` 也共享同一 reset,不会把旧验收证据带进新一轮。
+
 ### Rationalization Table —— status 这条最常见的自我说服
 
 | 你会对自己说 | 现实 |
 |---|---|
 | "status 不过是个字段,改字段的通用 idiom 就是 `set --status <值>`,赋值就行,不用懂状态机。" | ccm **故意**不给 status 一个通用 field-setter。赋值绕过转移闸、不盖 `started_at`/`finished_at`——所以 `--set status=…` 无论带不带 `tasks[]` 前缀都被 🔒 守门拒(exit 3)。verb 才是对的路:它校验转移合法 + 盖 derived 字段。 |
 | "我赶时间,`task update --status done` 一条搞定,省得 start 再 done 两步。" | `task update` 没有 `--status` flag(exit 2),`ready→done` 也非法(exit 3)——这条"省一步"两次都会失败,反而更慢。`start` 再 `done` 才是真正的两步到位。 |
-| "ccm 报 illegal transition,我加 `--force` 推过去得了。" | `--force` 是越闸逃生口、会记 log,留给真异常态(比如复活 stale)。正常完成一个任务用 `--force` 跳过 `in_flight`,等于亲手制造一个没 `started_at` 的"done"——你在伪造审计轨迹。 |
+| "ccm 报 illegal transition,我加 `--force` 推过去得了。" | `--force` 是越闸逃生口、会记 log,留给真异常态。重跑 stale/failed/escalated 有 `task retry`;正常完成一个任务用 `--force` 跳过 `in_flight`,等于亲手制造一个没 `started_at` 的"done"——你在伪造审计轨迹。 |
 
 ---
 
@@ -73,7 +75,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 
 board 字段分三档(权威定义在 `ccm` 引擎:enums / 字段元数据 / 不变式 / 状态机——实时真相用 `ccm <ns> --help`。每字段属哪档 + 怎么取值的操作视图见 [references/board-model-guide.md](references/board-model-guide.md) §A;这里只给**操作规则**):
 
-- **🔒 load-bearing**:`id` / `status` / `deps` / `parent`,以及 board 级 `goal` / `owner` / `git` / `tasks`。**`--set` 一律拒(exit 3)**,只能走专属命令(`task add`/`start`/`done`/`block`/`set-status`、`task update --add-dep/--rm-dep/--parent`、`board update --goal/--branch/...`)。
+- **🔒 load-bearing**:`id` / `status` / `deps` / `parent`,以及 board 级 `goal` / `owner` / `git` / `tasks`。**`--set` 一律拒(exit 3)**,只能走专属命令(`task add`/`start`/`done`/`retry`/`block`/`set-status`、`task update --add-dep/--rm-dep/--parent`、`board update --goal/--branch/...`)。
 - **✎ flexible**:`title` / `description` / `estimate` / `acceptance` / `justification` / `artifact` 等。**这些才用 `--set`**,且 scoping 跟着命令语境走:`task add`/`task update <id>` 里**裸 path 作用于该 task**(`ccm task update T1 --set title="新标题"` 就落在 T1 上);板级顶层 ✎ 字段走 `board update --set`;要跨 task 写才用显式前缀 `--set tasks[T2].title=…`。长尾对象/数组用 `--set-json`。写入后非 `--json` 输出会回显实际落点(如 `set tasks[T1].title`),落点不对一眼可见。
 - **👁 observed**:`scheduling.wip_limit`、`watchdog`、`wip_limit` 等——hook 有则用、缺则降级,走各自具名 flag。
 
@@ -106,6 +108,8 @@ ccm task add T3 --type development --executor subagent \
 ccm task update T3 --handle <spawn-returned-codex-agent-id-or-thread-id>
 ccm task start T3                         # ready → in_flight,盖 started_at
 ccm task done  T3 --artifact /abs/out.md --verified   # in_flight → done,盖 finished_at;两项证据必填
+ccm task set-status T3 stale              # 上游变更使旧产物失效
+ccm task retry T3                         # stale → ready;旧证据归档,当前 attempt 原子复位
 
 # review gate:执行完成与批准分开;只有 APPROVE 解锁下游
 ccm task add R1 --type review --review-gate APPROVE
@@ -137,6 +141,7 @@ ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism shell --checklist "p
 |---|---|
 | `task update --set status=done` 被拒 exit 3 | task 语境的裸 path scope 到本 task,`status` 是 🔒。status 永远走 verb(锚 2)。 |
 | `task done` 报 `illegal transition: ready → done` | 先 `task start`。`ready` 不能直接 `done`。 |
+| 重跑后 task 还显示旧 artifact / verified | 用 `task retry <id>` 开新 attempt,不要用字段 setter 拼 reset。合法的 `set-status <id> ready` 也会走同一原子 reset。 |
 | `--set` 的值不知道落哪了 | 看非 `--json` 输出的 `set <path>` 回显行:task verb 裸 path=本 task,`board update` 裸 path=board 顶层,`jc add`/`cadence *` 裸 path=board 顶层。 |
 | `task show <id>` 返回 `data:null` 还 exit 0 | 读不存在的 id **不报错**——调用方自己判 null。 |
 | `board lint` exit 3 但 stdout 是 `{"ok":true,...}` | 外层信封 `ok` 恒 true;**lint 是否净看 `data.ok` 与 exit code**(3=有 hard error)。 |

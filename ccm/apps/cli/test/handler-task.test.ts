@@ -531,6 +531,51 @@ test('task start <id1> <id2> → batch ready→in_flight', () => {
   }
 });
 
+test('task retry stale→ready clears terminal evidence with a typed boolean and preserves it in audit log', () => {
+  const tasks = [
+    {
+      id: 'R1',
+      status: 'stale',
+      deps: [],
+      created_at: '2026-06-24T08:00:00Z',
+      started_at: '2026-06-24T09:00:00Z',
+      finished_at: '2026-06-24T10:00:00Z',
+      artifact: '/abs/old.md',
+      verified: true,
+    },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, { positionals: ['R1'] });
+  const code = taskHandler.retry(ctx);
+  assert.equal(code, EXIT.OK);
+  const board = readBoard(boardPath);
+  const task = findTask(board, 'R1');
+  assert.equal(task.status, 'ready');
+  assert.equal(task.started_at, undefined);
+  assert.equal(task.finished_at, undefined);
+  assert.equal(task.artifact, undefined);
+  assert.equal(task.verified, false);
+  assert.equal(typeof task.verified, 'boolean');
+  const detail = JSON.parse(board.log.at(-1).detail);
+  assert.equal(detail.prior_evidence.artifact, '/abs/old.md');
+  assert.equal(detail.prior_evidence.verified, true);
+});
+
+test('task retry batch is all-or-nothing when one task is not retryable', () => {
+  const tasks = [
+    { id: 'R1', status: 'stale', deps: [], artifact: '/abs/old.md', verified: true },
+    { id: 'R2', status: 'ready', deps: [] },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const before = readFileSync(boardPath, 'utf8');
+  const ctx = mkCtx(boardPath, { positionals: ['R1', 'R2'] });
+  assert.throws(
+    () => taskHandler.retry(ctx),
+    (e: { errKind?: string }) => e.errKind === 'IllegalTransition',
+  );
+  assert.equal(readFileSync(boardPath, 'utf8'), before);
+});
+
 test('task done without verified/artifact is rejected by write validation and does not persist', () => {
   const tasks = [
     {

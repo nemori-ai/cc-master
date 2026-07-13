@@ -482,11 +482,60 @@ export function transition(
       'IllegalTransition',
     );
   }
-  if (isRetryTransition(from, toStatus)) clearAttemptScopedReviewVerdictInPlace(t);
+  if (isRetryTransition(from, toStatus)) {
+    reactivateTaskInPlace(b, t, from);
+    return touch(b);
+  }
   t.status = toStatus;
   if (toStatus === 'in_flight') t.started_at = stampNow();
   if (toStatus === 'done') t.finished_at = stampNow();
   return touch(b);
+}
+
+// retryTask(board,id) → 开一个干净的新 attempt（stale|failed|escalated → ready）。
+// 与 generic transition 的 retry 边共用 reactivateTaskInPlace，避免 `task set-status ... ready` 成为绕过 reset 的第二写路。
+export function retryTask(board: Board, id: string): Board {
+  const b = clone(board);
+  const t = requireTask(b, id);
+  const from = t.status;
+  if (!isRetryTransition(from, 'ready')) {
+    const outs = STATUS_MACHINE.transitions[from] || [];
+    throw err(
+      `illegal retry: ${from} → ready. retryable statuses: stale, failed, escalated; legal next from "${from}": ${outs.length ? outs.join(', ') : '(none)'}`,
+      'IllegalTransition',
+    );
+  }
+  reactivateTaskInPlace(b, t, from);
+  return touch(b);
+}
+
+function reactivateTaskInPlace(board: Board, task: Task, fromStatus: string): void {
+  const priorEvidence: Record<string, unknown> = {};
+  // Snapshot every attempt-scoped completion/review fact before clearing current state. The
+  // archived verdict is audit evidence only; dependency gates read only task.review_verdict.
+  for (const key of ['started_at', 'finished_at', 'artifact', 'verified', 'review_verdict']) {
+    if (Object.hasOwn(task, key)) priorEvidence[key] = structuredClone(task[key]);
+  }
+
+  if (!Array.isArray(board.log)) board.log = [];
+  board.log.push({
+    ts: stampNow(),
+    summary: `retry task ${String(task.id)}: ${fromStatus} → ready; archived prior attempt evidence`,
+    kind: 'replan',
+    task: task.id,
+    detail: JSON.stringify({
+      schema: 'ccm/task-retry/v1',
+      from_status: fromStatus,
+      prior_evidence: priorEvidence,
+    }),
+  });
+
+  task.status = 'ready';
+  delete task.started_at;
+  delete task.finished_at;
+  delete task.artifact;
+  task.verified = false;
+  clearAttemptScopedReviewVerdictInPlace(task);
 }
 
 function assertNoContractIssues(

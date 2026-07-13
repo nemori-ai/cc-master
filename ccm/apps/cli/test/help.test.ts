@@ -92,6 +92,7 @@ test('printHelp task lists all task verbs (incl ls alias mark)', () => {
     'update',
     'start',
     'done',
+    'retry',
     'block',
     'set-status',
     'rm',
