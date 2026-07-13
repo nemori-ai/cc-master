@@ -1117,3 +1117,11 @@
 - **影响**:并发 full suite 存在跨 test-file 假红,且测试结果取决于共享主机的瞬时文件系统状态;同类环境下还会让本应自动安装 statusline 的稳定安装路径被误 suppress。真实 worktree 或 temp root **子目录内**的真仓库仍需继续 suppress,不能为治假红把 DEV-GUARD 拆掉。
 - **处置(含蒸馏判定)**:已做领域边界修正:`looksLikeDevInvocation` 仍扫描系统 temp root 的所有子目录,但到达 `os.tmpdir()` 本身时先停、不采信该共享目录的 marker,也不继续扫更广祖先;`/worktrees/` 快路与真实子仓库判定保持。回归用私有 `TMPDIR` 模拟共享 root 上的瞬态 `.git`,使 RED 不再依赖真 `/tmp` 此刻是否被污染,并单独钉住「共享 root 不采信」与「其下真实 repo 仍采信」。**蒸馏判定=不回流 runtime skill prose**:这是 ccm 内部 DEV-GUARD 的证据边界 + 并发测试仪器问题,已由源码注释与 deterministic 回归测试承载;向面向用户 orchestrator 的 skill 加这一实现细节只会增噪。
 - **严重度 / 来源**:中(并发测试稳定性·安装判定·不破坏数据)/ 一手(2026-07-13 full engine suite 复现 + 空 `/tmp/.git` 地面证据 + deterministic RED)。
+
+## Finding #88 — `BIZ-EXECUTOR-HANDLE` 对 future `ready` / `blocked` subagent/workflow task 也报缺 handle，把「在飞接驳证据」误写成「执行者类型必填字段」并诱导 phantom handle · should-fix(高信号 warning 假阳性·已修)
+
+- **现象**:一块板为未来工作提前选了 `executor:subagent|workflow`，任务仍在 `ready` 或 `blocked`、尚未调用任何派发工具时，旧 `BIZ-EXECUTOR-HANDLE` 已发 warn。此时根本没有可记录的真实 handle，操作手册又写成「subagent/workflow 必给」并在 `task add` 示例预填 `<句柄>`，会把 agent 推向 placeholder / 主会话 id 等 phantom handle。
+- **根因**:rule 只看 `executor ∈ {subagent,workflow}` + handle 空，没有把 handle 的真实不变式与任务生命周期绑定。`executor` 是 future 计划；`handle` 是真实派发后才存在的 resume 接驳证据。只有 `status=in_flight` 才声称后台工作已在跑，旧谓词把两个不同时刻压成了同一条件。
+- **影响**:warning 从「在飞任务换 session 后可能接不回」的高信号退化为 future DAG 常态噪声；更坏的是，为消 warn 预填的 phantom handle 会让 resume recon 相信一份虚假证据，比缺字段更难诊断。
+- **处置(含蒸馏判定)**:**已修**——引擎谓词收窄为 `status=in_flight ∧ executor∈{subagent,workflow} ∧ handle 空`，保持 warn level，不改 executor enum / 状态机，不自动填 handle。RED/GREEN 用 `blocked|ready|in_flight × subagent|workflow|external|user|master-orchestrator × handle|空` 30 格矩阵固化；同步 `INVARIANTS`/rule message/字段元数据与 `using-ccm` 的 board-model-guide、command catalog、三 host 示例，明示「先真实派发 → 回填返回的真实 handle → 再转 in_flight」。**蒸馏判=回流引擎契约 + 派生操作手册，不新增 skill 纪律**：这是已有 resume/dispatch 不变式的机械事实校准，不需要新 Rationalization Table / Red Flag。
+- **严重度 / 来源**:should-fix(高信号 warning 假阳性·已修)/ 一手(board task `fix_ccm_executor_handle_state_scope`·本 worktree RED 首个失败格为 `blocked/subagent/missing handle`)。

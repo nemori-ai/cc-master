@@ -99,9 +99,10 @@ ccm board init --goal "目标一句话"        # 永不武装·session_id 留空
 ccm board show                            # goal/owner/任务统计/lint 是否净
 
 # 派发一个任务从生到完成(端点验收后才 done)
-ccm task add T3 --type development --executor subagent --handle <Task-returned-subagent-id> \
+ccm task add T3 --type development --executor subagent \
     --deps T1,T2 --estimate 3h --ref spec:/abs/spec.md --ref plan:/abs/plan.md --accept "DoD 一句话"
-    --deps T1,T2 --estimate 3h --ref spec:/abs/spec.md --ref plan:/abs/plan.md --accept "DoD 一句话"
+# 真实 Task 启动后再回填返回的 subagent id；不预填 phantom handle
+ccm task update T3 --handle <Task-returned-subagent-id>
 ccm task start T3                         # ready → in_flight,盖 started_at
 ccm task done  T3 --artifact /abs/out.md --verified   # in_flight → done,盖 finished_at;两项证据必填
 

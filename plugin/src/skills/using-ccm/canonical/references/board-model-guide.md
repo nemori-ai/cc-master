@@ -63,7 +63,7 @@
 | `references` | 开发类 task 必须，其余推荐 | ref 只能绝对路径或 URL，禁相对（FMT-REF·exit 3） |
 | `estimate` | 估点时 | 见 [E. estimate 怎么估](#e-estimate-怎么估) |
 | `executor` | 派发前必须设 | 见 [C. executor 五种语义](#c-executor-五种语义--选择决策树) |
-| `handle` | executor∈{subagent, workflow} 时必须 | 后台派发的句柄，resume 靠它 recon |
+| `handle` | 真实派发后、任务进入 `in_flight` 前必须 | 记录派发工具返回的真实句柄，resume 靠它 recon；`ready` / `blocked` future task 不预填 |
 | `artifact` | 产出落盘后（`task done` 时带 `--artifact`） | 绝对路径或 URL；done 真语义（verified+artifact）靠它 |
 | `verified` | 端点验收通过后 | `task done --verified` 一步到位，或 `task update --verified` |
 | `blocked_on` | `task block --on` 时自动设 | `"user"` 或某 task id；见 [G. blocked_on 怎么选](#g-blocked_on-怎么选) |
@@ -213,7 +213,7 @@ stale      → ready
 {{USING_CCM_EXECUTOR_DECISION_TAIL}}
 ```
 
-**executor 与 handle 的关系：** `subagent` 和 `workflow` 在派发后必须在 task 上记录 `handle`（`task update --handle <句柄>`），resume 时靠 handle recon 任务是否还活着。`external` 节点靠 `reference kind=issue` 的 URL 去外部系统查；`handle` 可选地记录 issue URL / issue number / 外部 run id，方便 recon。`user` 和 `master-orchestrator` 没有后台句柄。
+**executor 与 handle 的关系：** `executor` 是谁来执行的计划，因此 `ready` / `blocked` future task 可先选 `subagent` 或 `workflow`，**不要预填 placeholder / phantom handle**。真实调用派发工具后，立即把其返回的真实句柄写入 task（`task update --handle <句柄>`），再转 `in_flight`；只有 `status=in_flight` 且 `executor∈{subagent,workflow}` 时，缺 handle 才触发 `BIZ-EXECUTOR-HANDLE`，因为 resume 要靠它 recon 任务是否还活着。`external` 节点靠 `reference kind=issue` 的 URL 去外部系统查；`handle` 可选地记录 issue URL / issue number / 外部 run id，方便 recon。`user` 和 `master-orchestrator` 没有后台句柄。
 
 ### external + issue tracking 语义
 
@@ -230,7 +230,7 @@ stale      → ready
 
 **反模式：**
 - 把 `user` 任务标成 `subagent`——看起来在跑、其实没人做。
-- `executor: subagent` 不带 `handle`——会触发 `BIZ-EXECUTOR-HANDLE` warn；更重要的是 resume 时找不到后台任务。
+- 真实派发后把 `executor: subagent` 任务标成 `in_flight`，却不带派发工具返回的真实 `handle`——会触发 `BIZ-EXECUTOR-HANDLE` warn，resume 时也找不到后台任务。反之，future `ready` / `blocked` 任务不应为了消 warning 预填 phantom handle。
 - 把 orchestrator 自己的整合工作标 `subagent`——指挥不演奏（orchestrator 协调、不亲手做单元工作），orchestrator 的工作应标 `master-orchestrator`。
 
 ---
@@ -852,7 +852,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `BIZ-DECISION-PACKAGE` | warn | `decision_package` 在但字段不全：`context_md`/`what_i_need`/`enter_cmd` 空、`ask_type` 不在枚举、decision 型 `options` 空、`inputs_hash` 非 `sha256:<64hex>` | 备齐采访包字段；decision 型必须有非空 options——见 [G 节](#g-blocked_on-怎么选) |
 | `BIZ-DEV-REFS` | **hard** | `type=development` 的 task 缺 `kind=spec`≥1 或 `kind=plan`≥1 引用 | development task 加 `--ref spec:/abs/spec.md --ref plan:/abs/plan.md`（`task add`）或 `--add-ref`（`task update`）；`--force` 可越——见 [L 节](#l-referencesartifactverified-语义) |
 | `BIZ-ACCEPTANCE-REQUIRED` | warn | type ∈ {development, development-demo, acceptance, e2e-integration} 但 `acceptance` 为空 | 这些 type 必须带 `--accept`——见 [D 节](#d-acceptance-怎么写好) |
-| `BIZ-EXECUTOR-HANDLE` | warn | `executor` ∈ {subagent, workflow} 但缺 `handle` | 派发后 `task update --handle <后台句柄>`；resume 靠它接驳——见 [C 节](#c-executor-五种语义--选择决策树) |
+| `BIZ-EXECUTOR-HANDLE` | warn | `status=in_flight` 且 `executor` ∈ {subagent, workflow}，但缺真实 `handle` | 派发工具返回句柄后 `task update --handle <后台句柄>`，再转 `in_flight`；`ready` / `blocked` future task 不预填——见 [C 节](#c-executor-五种语义--选择决策树) |
 | `BIZ-EXTERNAL-ISSUE` | warn | `executor=external` 但缺 `kind=issue` 引用 | external task 加 `--ref issue:https://github.com/o/r/issues/N` 做外部追踪锚点 |
 | `BIZ-EXTERNAL-ARTIFACT` | warn | `executor=external` 且 `status=done`，但 `artifact` 等于同一个 `kind=issue` tracking URL | 把 artifact 改成外部实际产出（PR / commit / release / report / CI run）；若 issue closed 但尚未验收，别标 done，先用 `uncertain` / `in_flight` / `stale` |
 | `BIZ-TIME-ORDER` | warn | 时间序乱：`started_at` 早于 `created_at` / `finished_at` 早于 `started_at` / 有 finished 无 started / `in_flight` 无 started / `done` 无 finished | 用 ccm verb（`start`/`done`）按序盖戳，别手填出乱序时间 |

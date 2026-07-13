@@ -619,34 +619,41 @@ test('BIZ-ACCEPTANCE-REQUIRED: dev-family type ⇒ acceptance 非空', () => {
   );
 });
 
-test('BIZ-EXECUTOR-HANDLE: subagent/workflow ⇒ handle; external issue tracking rules', () => {
-  assert.ok(
-    ruleSet(
-      lintBoard(
-        onlyTask({
-          id: 'X',
-          status: 'in_flight',
-          deps: [],
-          executor: 'subagent',
-          started_at: '2026-06-23T10:00:00Z',
-        }),
-      ).warnings,
-    ).has('BIZ-EXECUTOR-HANDLE'),
-  );
-  assert.ok(
-    !ruleSet(
-      lintBoard(
-        onlyTask({
-          id: 'X',
-          status: 'in_flight',
-          deps: [],
-          executor: 'subagent',
-          handle: 'bg-1',
-          started_at: '2026-06-23T10:00:00Z',
-        }),
-      ).warnings,
-    ).has('BIZ-EXECUTOR-HANDLE'),
-  );
+test('BIZ-EXECUTOR-HANDLE: only in_flight subagent/workflow tasks require a handle', () => {
+  const statuses = ['blocked', 'ready', 'in_flight'] as const;
+  const executors = ['subagent', 'workflow', 'external', 'user', 'master-orchestrator'] as const;
+
+  for (const status of statuses) {
+    for (const executor of executors) {
+      for (const hasHandle of [false, true]) {
+        const expectedWarning =
+          status === 'in_flight' &&
+          (executor === 'subagent' || executor === 'workflow') &&
+          !hasHandle;
+        const warnings = ruleSet(
+          lintBoard(
+            onlyTask({
+              id: 'X',
+              status,
+              deps: [],
+              executor,
+              ...(status === 'in_flight' ? { started_at: '2026-06-23T10:00:00Z' } : {}),
+              ...(hasHandle ? { handle: 'bg-1' } : {}),
+            }),
+          ).warnings,
+        );
+
+        assert.equal(
+          warnings.has('BIZ-EXECUTOR-HANDLE'),
+          expectedWarning,
+          `${status}/${executor}/${hasHandle ? 'handle' : 'missing handle'}`,
+        );
+      }
+    }
+  }
+});
+
+test('external executor issue tracking rules', () => {
   assert.ok(
     ruleSet(
       lintBoard(onlyTask({ id: 'X', status: 'ready', deps: [], executor: 'external' })).warnings,
