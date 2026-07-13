@@ -117,6 +117,8 @@
 - [namespace harness](#namespace-harness)
   - [harness list](#harness-list)
   - [harness current](#harness-current)
+- [namespace attempt](#namespace-attempt)
+  - [attempt write-set](#attempt-write-set)
 - [namespace upgrade](#namespace-upgrade)
   - [upgrade all](#upgrade-all)
   - [upgrade ccm](#upgrade-ccm)
@@ -162,6 +164,7 @@ ccm <alias> [args] [flags]
 | `account` | 换号号池机制：备号 OAuth token 录入 / 选号 / 无重启切号（vault token-blind；`switch` 受 board.policy `autonomous_account_switch` 门控）。 |
 | `statusline` | self-contained status line：渲染单行状态行（ctx/5h/7d）+ 装/卸 `settings.json`（非 board 操作；`install`/`uninstall` 写全局 Claude Code hooks）。 |
 | `harness` | 本机 supported harness inventory：探测安装状态 / 当前选择 / install-upgrade 能力矩阵 |
+| `attempt` | cross-harness managed worker 的本地 write-set 预检：安全解析隔离 worktree + lease，编译最小授权根；当前不启动 worker |
 | `upgrade` | 自升级：把 **ccm 二进制 + cc-master 插件**升到各自发布线最新（非 board 操作·见 [namespace upgrade](#namespace-upgrade)） |
 
 ### Aliases
@@ -1912,6 +1915,28 @@ ccm estimate cost-to-complete [flags]
 - `ccm statusline uninstall`：从备份恢复原有 `statusLine`，并落 opt-out 标记。
 
 ---
+
+## namespace attempt
+
+> cross-harness managed worker 的独立本地 write-set preflight。它从 `ccm/worktree-write-lease/v1` 和本机文件系统重新解析 linked-worktree 的 `.git` gitfile、per-worktree gitdir、commondir/backlink，先只读拒绝无效 layout / lease / artifact，再只对 engine 批准的精确 roots 用真实临时文件探针验证写权限；调用方不能注入预制 facts。成功也固定返回 `launch_ready:false`，因为 trusted lease store、provider driver 权限映射和 **preflight-before-only-spawn** 的生产 dispatcher seam 尚未接入。
+
+### attempt write-set
+
+```bash
+ccm attempt write-set \
+  --lease @lease.json \
+  --profile codex-managed-workspace \
+  --artifact-root /absolute/declared/report/root \
+  --json
+```
+
+- `--lease` 必填：JSON 字面量、`@file` 或 `-`；schema 必须是 `ccm/worktree-write-lease/v1`。当前 public CLI 只能做诊断性 preflight，caller-supplied lease **不等于** manager-trusted lease。
+- `--profile` 必填：`codex-managed-workspace` 或 `claude-managed-workspace`。两者当前是 executable fixture mapping，统一编译为 `workspace-write` + 显式 roots，且硬拒 account mutation、credential read、network、push、PR、merge、release 与 undeclared path。
+- `--artifact-root` / `--artifact-root-ro` 可重复；每一项都必须已由 lease 显式声明，并且不得是 symlink、逃逸或 Git metadata。
+- 只接受 isolated linked worktree；main worktree、缺失/只读的 gitdir、symlink/escape、未声明 artifact 一律 exit `3`，且拒绝结果不返回任何可用 root。
+- Git 授权只覆盖 worktree content、per-worktree gitdir、common objects/refs/logs；**绝不授权整个 common `.git`**。
+
+成功 JSON 的 `data` 是 `ccm/attempt-write-set/v1`；`ok:true` 表示 preflight facts 成立，不表示 worker 已可启动。生产 dispatcher 接线完成前，`integration_status` 固定为 `preflight-only-dispatcher-missing`、`launch_ready:false`。
 
 ## namespace harness
 

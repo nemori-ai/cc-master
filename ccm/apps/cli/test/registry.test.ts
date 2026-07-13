@@ -67,6 +67,7 @@ const EXPECTED: Record<string, string[]> = {
   monitor: ['start', 'stop', 'status', 'restart', 'serve', 'install-service', 'uninstall-service'],
   services: ['reconcile'],
   runtime: ['stage', 'activate', 'resolve', 'invoke', 'doctor', 'rollback'],
+  attempt: ['write-set'],
   upgrade: ['all', 'ccm', 'plugin'],
 };
 

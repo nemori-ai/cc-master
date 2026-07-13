@@ -11,6 +11,35 @@
 //   避免与 usage/pacing.ts 的 flat tokenExpired/effectiveN/PoolAccount 撞名（两个 tokenExpired 语义不同·见 account/index.ts）。
 export * as account from './account/index.js';
 export type {
+  ArtifactMode,
+  AttemptPermissionSnapshot,
+  DeclaredArtifactRoot,
+  GitLayoutFacts,
+  ManagedProfilePlan,
+  ManagedWriteProfile,
+  ManagedWriteProfileId,
+  PathResolution,
+  WorktreeWriteLease,
+  WritabilityFact,
+  WriteReason,
+  WriteSetAuthorization,
+  WriteSetPlan,
+  WriteSetProbePreparation,
+  WriteSetRequest,
+} from './attempt-write-set.js';
+export {
+  ATTEMPT_WRITE_SET,
+  ATTEMPT_WRITE_SET_REQUEST,
+  compileAttemptWriteSet,
+  isWorktreeWriteLease,
+  MANAGED_WRITE_PROFILES,
+  permissionSnapshotSatisfies,
+  prepareAttemptWriteSetProbe,
+  REQUIRED_ATTEMPT_DENIES,
+  UNDECLARED_PATH_DENY,
+  WORKTREE_WRITE_LEASE,
+} from './attempt-write-set.js';
+export type {
   BoardLike,
   CriticalPathResult,
   Estimate,

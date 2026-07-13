@@ -28,6 +28,7 @@
 import { parseArgs } from 'node:util';
 import type { Ctx } from './handlers/_common.js';
 import * as accountHandler from './handlers/account.js';
+import * as attemptHandler from './handlers/attempt.js';
 import * as baselineHandler from './handlers/baseline.js';
 import * as boardHandler from './handlers/board.js';
 import * as cadenceHandler from './handlers/cadence.js';
@@ -88,6 +89,7 @@ type HandlerModule = Record<string, (ctx: Ctx) => number>;
 // ── 静态 HANDLERS 表：noun → handler 模块（取代原 require('./handlers/'+hnoun)·见文件头偏离注记）。──────
 //   key 与 spec.handler 字符串的首段（hnoun）对齐：'task.setStatus' → HANDLERS.task.setStatus。
 const HANDLERS: Record<string, HandlerModule> = {
+  attempt: attemptHandler as unknown as HandlerModule,
   board: boardHandler as unknown as HandlerModule,
   task: taskHandler as unknown as HandlerModule,
   log: logHandler as unknown as HandlerModule,

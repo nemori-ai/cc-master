@@ -1,0 +1,221 @@
+{
+  "schema": "ccm/attempt-write-set-fixture/v1",
+  "contract": "ccm/attempt-write-set/v1",
+  "native_attempt_candidate_permission": {
+    "profile": "workspace-write",
+    "denies": ["account-mutation", "push-remote"]
+  },
+  "positive_profiles": ["codex-managed-workspace", "claude-managed-workspace"],
+  "base_request": {
+    "schema": "ccm/attempt-write-set-request/v1",
+    "profile": "codex-managed-workspace",
+    "lease": {
+      "schema": "ccm/worktree-write-lease/v1",
+      "lease_ref": "worktree-lease:fixture-wt-1",
+      "worktree_root": "/repo/.worktrees/wt-1",
+      "baseline_commit": "0123456789abcdef0123456789abcdef01234567",
+      "artifact_write_roots": ["/repo/design_docs/plans"]
+    },
+    "git_layout": {
+      "kind": "linked-worktree",
+      "resolution": "resolved",
+      "dot_git_file": "/repo/.worktrees/wt-1/.git",
+      "git_dir": "/repo/.git/worktrees/wt-1",
+      "common_dir": "/repo/.git",
+      "objects_dir": "/repo/.git/objects",
+      "refs_dir": "/repo/.git/refs",
+      "logs_dir": "/repo/.git/logs"
+    },
+    "declared_artifact_roots": [
+      {
+        "path": "/repo/design_docs/plans",
+        "mode": "read-write",
+        "purpose": "worker-report",
+        "resolution": "resolved"
+      }
+    ],
+    "writability": [
+      { "path": "/repo/.worktrees/wt-1", "writable": true },
+      { "path": "/repo/.git/worktrees/wt-1", "writable": true },
+      { "path": "/repo/.git/objects", "writable": true },
+      { "path": "/repo/.git/refs", "writable": true },
+      { "path": "/repo/.git/logs", "writable": true },
+      { "path": "/repo/design_docs/plans", "writable": true }
+    ],
+    "requested_writes": [
+      "/repo/.worktrees/wt-1/src/x.ts",
+      "/repo/.git/worktrees/wt-1/index.lock",
+      "/repo/.git/objects/aa/bbccdd",
+      "/repo/.git/refs/heads/feat.lock",
+      "/repo/.git/logs/refs/heads/feat",
+      "/repo/design_docs/plans/fix-report.md"
+    ]
+  },
+  "expected_authorized": [
+    {
+      "path": "/repo/.worktrees/wt-1",
+      "mode": "read-write",
+      "scope": "tree",
+      "reason": "worktree-content"
+    },
+    {
+      "path": "/repo/.git/worktrees/wt-1",
+      "mode": "read-write",
+      "scope": "tree",
+      "reason": "git-worktree-metadata"
+    },
+    {
+      "path": "/repo/.git/objects",
+      "mode": "read-write",
+      "scope": "tree",
+      "reason": "git-common-objects"
+    },
+    {
+      "path": "/repo/.git/refs",
+      "mode": "read-write",
+      "scope": "tree",
+      "reason": "git-common-refs"
+    },
+    {
+      "path": "/repo/.git/logs",
+      "mode": "read-write",
+      "scope": "tree",
+      "reason": "git-common-logs"
+    },
+    {
+      "path": "/repo/design_docs/plans",
+      "mode": "read-write",
+      "scope": "tree",
+      "reason": "declared-artifact-root"
+    }
+  ],
+  "negative_cases": [
+    {
+      "id": "gitdir-not-writable-erofs-class",
+      "mutation": { "op": "replace", "path": "/writability/1/writable", "value": false },
+      "issue": "WRITESET-PATH-NOT-WRITABLE"
+    },
+    {
+      "id": "objects-writability-unknown",
+      "mutation": { "op": "replace", "path": "/writability/2/writable", "value": null },
+      "issue": "WRITESET-PATH-NOT-WRITABLE"
+    },
+    {
+      "id": "artifact-root-not-writable",
+      "mutation": { "op": "replace", "path": "/writability/5/writable", "value": false },
+      "issue": "WRITESET-PATH-NOT-WRITABLE"
+    },
+    {
+      "id": "git-layout-symlink",
+      "mutation": { "op": "replace", "path": "/git_layout/resolution", "value": "symlink" },
+      "issue": "WRITESET-GIT-LAYOUT-SYMLINK"
+    },
+    {
+      "id": "git-layout-escape",
+      "mutation": { "op": "replace", "path": "/git_layout/resolution", "value": "escape" },
+      "issue": "WRITESET-GIT-LAYOUT-ESCAPE"
+    },
+    {
+      "id": "git-layout-missing",
+      "mutation": { "op": "replace", "path": "/git_layout/resolution", "value": "missing" },
+      "issue": "WRITESET-GIT-LAYOUT-MISSING"
+    },
+    {
+      "id": "git-layout-not-worktree",
+      "mutation": { "op": "replace", "path": "/git_layout/resolution", "value": "not-a-worktree" },
+      "issue": "WRITESET-GIT-LAYOUT-NOT-WORKTREE"
+    },
+    {
+      "id": "main-worktree-not-isolated",
+      "mutation": { "op": "replace", "path": "/git_layout/kind", "value": "main-worktree" },
+      "issue": "WRITESET-WORKTREE-NOT-ISOLATED"
+    },
+    {
+      "id": "gitdir-not-direct-child",
+      "mutation": {
+        "op": "replace",
+        "path": "/git_layout/git_dir",
+        "value": "/repo/.git/elsewhere/wt-1"
+      },
+      "issue": "WRITESET-GIT-LAYOUT-ESCAPE"
+    },
+    {
+      "id": "objects-dir-mismatch",
+      "mutation": {
+        "op": "replace",
+        "path": "/git_layout/objects_dir",
+        "value": "/repo/.git/not-objects"
+      },
+      "issue": "WRITESET-GIT-LAYOUT-ESCAPE"
+    },
+    {
+      "id": "profile-unknown",
+      "mutation": { "op": "replace", "path": "/profile", "value": "cursor-yolo" },
+      "issue": "WRITESET-PROFILE-UNKNOWN"
+    },
+    {
+      "id": "lease-root-relative",
+      "mutation": { "op": "replace", "path": "/lease/worktree_root", "value": "relative/worktree" },
+      "issue": "WRITESET-LEASE"
+    },
+    {
+      "id": "lease-baseline-invalid",
+      "mutation": { "op": "replace", "path": "/lease/baseline_commit", "value": "HEAD" },
+      "issue": "WRITESET-LEASE"
+    },
+    {
+      "id": "artifact-outside-lease",
+      "mutation": {
+        "op": "replace",
+        "path": "/declared_artifact_roots/0/path",
+        "value": "/repo/undeclared"
+      },
+      "issue": "WRITESET-ARTIFACT-OUTSIDE-LEASE"
+    },
+    {
+      "id": "artifact-root-symlink",
+      "mutation": {
+        "op": "replace",
+        "path": "/declared_artifact_roots/0/resolution",
+        "value": "symlink"
+      },
+      "issue": "WRITESET-ARTIFACT-ROOT-SYMLINK"
+    },
+    {
+      "id": "artifact-root-in-git-metadata",
+      "mutation": {
+        "op": "replace",
+        "path": "/declared_artifact_roots/0/path",
+        "value": "/repo/.git/hooks"
+      },
+      "issue": "WRITESET-ARTIFACT-GIT-METADATA"
+    },
+    {
+      "id": "duplicate-artifact-root",
+      "mutation": {
+        "op": "add",
+        "path": "/declared_artifact_roots/-",
+        "value": {
+          "path": "/repo/design_docs/plans",
+          "mode": "read-write",
+          "resolution": "resolved"
+        }
+      },
+      "issue": "WRITESET-ROOT-DUPLICATE"
+    },
+    {
+      "id": "conflicting-writability-fact",
+      "mutation": {
+        "op": "add",
+        "path": "/writability/-",
+        "value": { "path": "/repo/.git/objects", "writable": false }
+      },
+      "issue": "WRITESET-WRITABILITY-CONFLICT"
+    },
+    {
+      "id": "undeclared-external-write",
+      "mutation": { "op": "add", "path": "/requested_writes/-", "value": "/etc/cron.d/evil" },
+      "issue": "WRITESET-UNDECLARED-WRITE"
+    }
+  ]
+}
