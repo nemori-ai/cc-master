@@ -51,11 +51,15 @@ run_pretool "$(json_write_payload "sess-x" "Write" "$H/notes.txt")" "$H"
 assert_eq "" "$HOOK_OUT" "non-board write -> allow"
 rm -rf "$H"
 
-# Shell ccm is allowed; Shell echo/sed to board is blocked.
+# Plain Shell ccm --board is allowed; ccm with shell redirection and echo/sed writes are blocked.
 H="$(make_project)"
 seed_board "$H" "mine" "$GOOD"
 run_pretool "$(json_shell_payload "sess-x" "ccm task done T0 --board $H/boards/mine.board.json")" "$H"
 assert_eq "" "$HOOK_OUT" "ccm command touching board -> allow"
+run_pretool "$(json_shell_payload "sess-x" "ccm --help > $H/boards/mine.board.json")" "$H"
+assert_contains "$HOOK_OUT" '"permission":"deny"' "Shell ccm > board -> deny"
+run_pretool "$(json_shell_payload "sess-x" "ccm board show --board $H/boards/mine.board.json >> $H/boards/mine.board.json")" "$H"
+assert_contains "$HOOK_OUT" '"permission":"deny"' "Shell ccm >> board -> deny"
 run_pretool "$(json_shell_payload "sess-x" "echo '{}' > $H/boards/mine.board.json")" "$H"
 assert_contains "$HOOK_OUT" '"permission":"deny"' "Shell echo board write -> deny"
 run_pretool "$(json_shell_payload "sess-x" "sed -i s/a/b/ $H/boards/mine.board.json")" "$H"

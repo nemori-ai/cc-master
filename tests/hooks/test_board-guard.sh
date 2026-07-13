@@ -67,13 +67,17 @@ run_guard "Write" "$OUT/stray.board.json" "sess-x" "$H"
 assert_eq "" "$HOOK_OUT" "(c) board-looking file outside home/boards → allowed (path-scoped)"
 rm -rf "$H" "$OUT"
 
-# ── (d) ARMED + Bash `ccm task …` touching a board path → ALLOWED (ccm is the legit write path) ───────
+# ── (d) ARMED + plain Bash `ccm task … --board` → ALLOWED; ccm + shell redirect → DENY ───────────────
 H="$(make_project)"; seed_board "$H" "mine" true "sess-x" "$GOOD"
 run_guard_bash "sess-x" "$H" "ccm task done T0 --board $H/boards/mine.board.json"
 assert_eq 0 "$HOOK_RC" "(d) Bash ccm → rc 0"
-assert_eq "" "$HOOK_OUT" "(d) Bash ccm invocation → allowed (never gate ccm itself)"
+assert_eq "" "$HOOK_OUT" "(d) Bash plain ccm --board invocation → allowed"
 run_guard_bash "sess-x" "$H" "CC_MASTER_HOME=$H ccm task done T0 --board $H/boards/mine.board.json"
 assert_eq "" "$HOOK_OUT" "(d) Bash env-prefixed ccm invocation → allowed"
+run_guard_bash "sess-x" "$H" "ccm --help > $H/boards/mine.board.json"
+assert_contains "$HOOK_OUT" '"permissionDecision":"deny"' "(d) Bash ccm > board → deny (shell owns redirection)"
+run_guard_bash "sess-x" "$H" "ccm board show --board $H/boards/mine.board.json >> $H/boards/mine.board.json"
+assert_contains "$HOOK_OUT" '"permissionDecision":"deny"' "(d) Bash ccm >> board → deny (shell owns append)"
 rm -rf "$H"
 
 # ── (e) ARMED + Bash `echo … > board.json` → DENY (write operator + board path, no ccm) ───────────────

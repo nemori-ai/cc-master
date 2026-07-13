@@ -141,13 +141,14 @@ board_guard:
   registration_event: PreToolUse
   matcher: "Bash|apply_patch|Edit|Write|MultiEdit"
   validation:
-    cli: "codex-cli 0.142.5"
+    cli: "codex-cli 0.144.2"
     pre_tool_use_block: passed
   behavior:
     - dormant until a matching active board exists under CC_MASTER_HOME.
     - blocks direct Write/Edit/MultiEdit board file writes.
-    - blocks obvious Bash file writes to .board.json unless the command segment is ccm.
-    - blocks apply_patch payloads that touch .board.json paths.
+    - blocks obvious Bash file writes to .board.json, including ccm commands whose shell redirection writes a board; ordinary ccm --board calls remain allowed.
+    - blocks apply_patch when a structured file header targets a real board; an explicit state-aware lexer mirrors exact Rust Unicode whitespace (including U+0085, excluding U+FEFF), at-most-two suffix-CR physical-line handling, two-sided top-level versus trailing-only Update controls, post-End-of-File whitespace, and raw rootedness classification before TAB/CR filesystem-effect cleanup, while raw hunk text remains non-target data and malformed or ambiguous structure fails closed.
+    - inspects every file_path/path/filename alias; any board target or conflicting/invalid multi-alias payload fails closed.
 board_lint:
   status: implemented
   core: ../../board-lint/implementations/codex/board-lint-core.js

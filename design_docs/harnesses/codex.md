@@ -142,9 +142,9 @@ Codex `identity-nudge` 保留周期提示，但输出也走 `systemMessage`：
 Codex `PreToolUse` 已实测接受 Claude-style `decision:block`。因此 `board-guard` 在 Codex 下保留硬阻断语义，但工具映射是 Codex-native：
 
 - matcher：`Bash|apply_patch|Edit|Write|MultiEdit`
-- 结构化 `Write` / `Edit` / `MultiEdit`：若 `tool_input.file_path`（或同义 path 字段）指向 `<CC_MASTER_HOME>/boards/*.board.json`，阻断。
-- `Bash`：沿用“`.board.json` + 写操作符 + 非 ccm command segment”的启发式。
-- `apply_patch`：扫描 patch payload，只要触碰 `.board.json` 路径即阻断。Codex 常用 `apply_patch` 写文件，不能只拦 Claude Code 的 `MultiEdit`。
+- 结构化 `Write` / `Edit` / `MultiEdit`：同时检查 `tool_input.file_path` / `path` / `filename`；任一 alias 指向 `<CC_MASTER_HOME>/boards/*.board.json` 即阻断，多 alias 值无效或归一化后冲突也 fail closed，单个合法非 board alias 继续兼容。
+- `Bash`：同一 segment 同时出现真实 board token 与写操作符即阻断。command word 是 `ccm` 也不豁免 `>` / `>>`——重定向由 shell 在 ccm 写关卡外打开/截断 board；普通无重定向的 `ccm ... --board <board>` 继续放行。
+- `apply_patch`：接受真实 parser 在 `Begin Patch` 后、首个 file header 前支持的单个非空 `Environment ID` control directive（它不是 target），并只从 patch envelope 的 `Add/Delete/Update File` 与 `Move to` 结构化 header 收集路径。Codex 0.144.2 filesystem-effect probe 证明 whitespace grammar 是上下文相关的：envelope 外层空白被忽略；envelope marker 与 top-level file header 去两侧空白；Update state 内的 `Move to` / `End of File` 只去尾空白；所用集合精确对齐 Rust Unicode White_Space（含 `U+0085`、不含 `U+FEFF`）。物理行最多消费两枚尾 CR（CRLF pipeline 的有界行为），第三枚保留并使空 hunk line 非法；hunk line 始终按 raw prefix 解析，因此 leading-space header-looking line 仍是 context data。合法 `End of File` 后可有 Rust-whitespace-only 物理行，非空内容仍须先开新 `@@`。任一 source/destination 的 filesystem-effect path 落进 `<CC_MASTER_HOME>/boards/*.board.json` 即阻断；路径效果先按 raw target 判 rootedness，再删除实测的 embedded TAB/CR：因此以 raw TAB/CR 开头、随后是 `/absolute-looking-path` 的 target 仍是 patch-cwd 下的相对 shadow，不能先删控制字节后误升格为绝对路径；header colon 后第二个普通空格则保留为 literal leading-space path。分类不删除 `FEFF` 或其他字符。parser 同时校验 section body：Add 的现有 body 行必须 `+` 前缀（空 Add 合法），Delete 不得有 body，Update 至少一个合法 hunk 行。hunk body 中的 `.board.json` / header-looking 文本永不作为 target path 证据；空/重复/晚到 `Environment ID`、header 缺失/未知/冲突、body/marker 次序非法或 envelope 不完整时 fail closed。Codex 常用 `apply_patch` 写文件，不能只拦 Claude Code 的 `MultiEdit`。
 
 ## PostToolUse Lint Policy
 
