@@ -1,0 +1,38 @@
+# Installer publication contract: exercise the same target-adjacent fault matrix on Linux and both
+# supported Darwin architectures. This is an installer/filesystem gate, not the broader macOS
+# runtime-supply-chain qualification gate.
+name: installer-portability
+
+on:
+  pull_request:
+    paths:
+      - 'install.sh'
+      - 'tests/scripts/test_install_integrity.sh'
+      - '.github/workflows/installer-portability.yml'
+  push:
+    paths:
+      - 'install.sh'
+      - 'tests/scripts/test_install_integrity.sh'
+      - '.github/workflows/installer-portability.yml'
+
+jobs:
+  transactional-publish:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            contract: linux-x64
+          - os: macos-15-intel
+            contract: darwin-x64
+          - os: macos-14
+            contract: darwin-arm64
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.contract }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Transactional installer fault matrix
+        run: bash tests/scripts/test_install_integrity.sh
