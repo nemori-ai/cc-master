@@ -186,6 +186,45 @@ test('looksLikeDevInvocation: 向上 walk 命中 pnpm-workspace.yaml → dev', (
   assert.equal(looksLikeDevInvocation(bin), true);
 });
 
+test('looksLikeDevInvocation: 共享 temp root 的瞬态 .git 不污染独立安装目录', () => {
+  const sandbox = mkdir();
+  const sharedTempRoot = join(sandbox, 'shared-tmp');
+  mkdirSync(join(sharedTempRoot, '.git'), { recursive: true });
+  const installDir = join(sharedTempRoot, 'worker-a', 'home', '.local', 'bin');
+  mkdirSync(installDir, { recursive: true });
+  const bin = join(installDir, 'ccm');
+  writeFileSync(bin, 'SEA');
+
+  const previous = process.env.TMPDIR;
+  process.env.TMPDIR = sharedTempRoot;
+  try {
+    assert.equal(looksLikeDevInvocation(bin), false);
+  } finally {
+    if (previous === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = previous;
+  }
+});
+
+test('looksLikeDevInvocation: 共享 temp root 下的真实子仓库仍判 dev', () => {
+  const sandbox = mkdir();
+  const sharedTempRoot = join(sandbox, 'shared-tmp');
+  const repo = join(sharedTempRoot, 'worker-b', 'repo');
+  mkdirSync(join(repo, '.git'), { recursive: true });
+  const binDir = join(repo, 'ccm', 'apps', 'cli', 'bin');
+  mkdirSync(binDir, { recursive: true });
+  const bin = join(binDir, 'ccm.cjs');
+  writeFileSync(bin, '// stub');
+
+  const previous = process.env.TMPDIR;
+  process.env.TMPDIR = sharedTempRoot;
+  try {
+    assert.equal(looksLikeDevInvocation(bin), true);
+  } finally {
+    if (previous === undefined) delete process.env.TMPDIR;
+    else process.env.TMPDIR = previous;
+  }
+});
+
 test('looksLikeDevInvocation: 安装路径（无 dev 标记·非 worktree）→ 非 dev', () => {
   // 模拟 install.sh 落点 $HOME/.local/bin/ccm（稳定路径·无 .git/pnpm/turbo 邻居）。
   const home = mkdir();
