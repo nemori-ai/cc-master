@@ -8,6 +8,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import {
+  captureRuntimeEnvironment,
+  ccMasterHome,
   resolveCcMasterHome,
   resolveClaudeCodeConfigDir,
   resolveClaudeConfigDir,
@@ -56,6 +58,25 @@ test('resolveCcMasterHome: no CC_MASTER_HOME → $HOME/.cc_master (ignores CLAUD
     join('/h', '.cc_master'),
   );
   assert.equal(resolveCcMasterHome({ HOME: '/h' }), join('/h', '.cc_master'));
+});
+
+test('resolveCcMasterHome compatibility facade is byte-equal to the central contract matrix', () => {
+  const cases = [
+    {},
+    { HOME: '/home/alice' },
+    { HOME: '/Users/收件人/My Project' },
+    { HOME: '/home/alice', CC_MASTER_HOME: '/opt/cc master' },
+    { HOME: 'relative-home' },
+    { HOME: '/home/alice', CC_MASTER_HOME: 'relative-cc-master' },
+  ];
+
+  for (const env of cases) {
+    assert.equal(
+      resolveCcMasterHome(env),
+      ccMasterHome(captureRuntimeEnvironment({ env })),
+      `legacy facade drifted from RuntimeEnvironment contract for ${JSON.stringify(env)}`,
+    );
+  }
 });
 
 // ── resolveRateCachePath ─────────────────────────────────────────────────────────────────────────

@@ -108,12 +108,118 @@ test('roots: explicit XDG overrides win and are absolutized', () => {
 
 test('roots: every root is absolute even under relative env inputs', () => {
   const r = rt({
-    HOME: '/home/alice',
+    HOME: 'relative-user-home',
     CC_MASTER_HOME: 'rel/home',
     XDG_STATE_HOME: 'rel/state',
+    XDG_CONFIG_HOME: 'rel/config',
+    XDG_DATA_HOME: 'rel/data',
+    XDG_CACHE_HOME: 'rel/cache',
+    XDG_RUNTIME_DIR: 'rel/runtime',
   }).roots;
   assert.ok(isAbsolute(r.ccMasterHome));
   assert.ok(isAbsolute(r.state));
+  assert.ok(isAbsolute(r.config));
+  assert.ok(isAbsolute(r.data));
+  assert.ok(isAbsolute(r.cache));
+  assert.ok(isAbsolute(r.runtimePersistent));
+  assert.ok(isAbsolute(r.runtimeEphemeral ?? ''));
+  assert.equal(r.ccMasterHome, '/work/dir/rel/home');
+  assert.equal(r.state, '/work/dir/rel/state');
+});
+
+test('pure snapshot: relative HOME and path overrides are anchored only to captured cwd', () => {
+  const realCwdA = mkTmp('ccm-rte-real-cwd-a-');
+  const realCwdB = mkTmp('ccm-rte-real-cwd-b-');
+  const capturedCwd = '/captured/runtime-cwd';
+  const input = {
+    platform: 'linux',
+    arch: 'x64',
+    cwd: capturedCwd,
+    homeDir: 'relative-homedir-fallback',
+    tempDir: 'relative-temp',
+    env: {
+      HOME: 'relative-home',
+      CC_MASTER_HOME: 'relative-cc-master',
+      XDG_STATE_HOME: 'relative-state',
+      XDG_CONFIG_HOME: 'relative-config',
+      XDG_DATA_HOME: 'relative-data',
+      XDG_CACHE_HOME: 'relative-cache',
+      XDG_RUNTIME_DIR: 'relative-runtime',
+      CLAUDE_CONFIG_DIR: 'relative-claude',
+      CODEX_HOME: 'relative-codex',
+      CC_MASTER_PLUGIN_ROOT: 'relative-plugin-root',
+      CC_MASTER_PLUGIN_DIR: 'relative-plugin-base',
+      CC_MASTER_CURSOR_PLUGIN_ROOT: 'relative-cursor-plugin',
+    },
+  };
+
+  const observe = () => {
+    const snapshot = createRuntimeEnvironment(input);
+    return {
+      cwd: snapshot.cwd,
+      homeDir: snapshot.homeDir,
+      tempDir: snapshot.tempDir,
+      roots: snapshot.roots,
+      claude: hostConfig(snapshot, 'claude-code'),
+      codex: hostConfig(snapshot, 'codex'),
+      codexPlugin: pluginInstallRoot(snapshot, 'codex'),
+      cursorPlugin: pluginInstallRoot(snapshot, 'cursor'),
+      pluginBase: localPluginBase(snapshot),
+    };
+  };
+
+  const originalCwd = process.cwd();
+  let fromA: ReturnType<typeof observe>;
+  let fromB: ReturnType<typeof observe>;
+  try {
+    process.chdir(realCwdA);
+    fromA = observe();
+    process.chdir(realCwdB);
+    fromB = observe();
+  } finally {
+    process.chdir(originalCwd);
+  }
+
+  assert.deepEqual(fromA, fromB, 'real process cwd must not influence a pure snapshot');
+  assert.equal(fromA.cwd, capturedCwd);
+  assert.equal(fromA.homeDir, `${capturedCwd}/relative-homedir-fallback`);
+  assert.equal(fromA.tempDir, `${capturedCwd}/relative-temp`);
+  assert.equal(fromA.roots.ccMasterHome, `${capturedCwd}/relative-cc-master`);
+  assert.equal(fromA.roots.state, `${capturedCwd}/relative-state`);
+  assert.deepEqual(fromA.claude, [`${capturedCwd}/relative-claude`]);
+  assert.deepEqual(fromA.codex, [`${capturedCwd}/relative-codex`]);
+  assert.equal(fromA.codexPlugin, `${capturedCwd}/relative-plugin-root`);
+  assert.equal(fromA.cursorPlugin, `${capturedCwd}/relative-cursor-plugin`);
+  assert.equal(fromA.pluginBase, `${capturedCwd}/relative-plugin-base`);
+});
+
+test('pure snapshot: relative and empty HOME cannot produce relative public paths', () => {
+  const relativeHome = rt({ HOME: 'relative-home' });
+  assert.equal(ccMasterHome(relativeHome), '/work/dir/relative-home/.cc_master');
+  assert.deepEqual(hostConfig(relativeHome, 'codex'), ['/work/dir/relative-home/.codex']);
+  assert.equal(
+    pluginInstallRoot(relativeHome, 'cursor'),
+    '/work/dir/relative-home/.cursor/plugins/local/cc-master',
+  );
+
+  const emptyHome = rt({ HOME: '' }, { homeDir: 'relative-fallback-home' });
+  assert.equal(ccMasterHome(emptyHome), '/work/dir/relative-fallback-home/.cc_master');
+  assert.ok(isAbsolute(boardSessionPointer(emptyHome, 'sid-relative-home')));
+});
+
+test('pure snapshot: a relative captured cwd is rejected instead of consulting process.cwd', () => {
+  assert.throws(
+    () =>
+      createRuntimeEnvironment({
+        platform: 'linux',
+        arch: 'x64',
+        env: { HOME: '/home/alice' },
+        cwd: 'relative-cwd',
+        homeDir: '/home/alice',
+        tempDir: '/tmp',
+      }),
+    /cwd.*absolute/i,
+  );
 });
 
 // ── session pointer：跟 state 根（P2-1 split-home 修复）────────────────────────────────────────
