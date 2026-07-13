@@ -162,9 +162,9 @@ stale      → ready
 | sub-agent 返回说超出能力 | `escalated` | `task set-status <id> escalated` |
 | 任务失败 | `failed` | `task set-status <id> failed` |
 | 上游 artifact 变了 | `stale` | `task set-status <id> stale` |
-| stale / failed / escalated 节点确认重跑 | `ready`（新 attempt） | `task retry <id>` |
+| stale / failed / escalated 节点确认重跑 | 请求 `ready`（新 attempt）；deps 未全 done 时最终归一为 `blocked` | `task retry <id>` |
 
-**retry 是 attempt 边界，不是 status setter：** `task retry` 先把来源 status 与旧 `started_at` / `finished_at` / `artifact` / `verified` 归档为 `ccm/task-retry/v1` log detail，再清空当前 attempt 的三个证据字段、把 `verified` 设为布尔 `false`，最后落 `ready`。这四步在同一持锁写入里原子发生；批量任一 id 不可 retry 时整批不落盘。合法的通用 `set-status <id> ready` 也走同一 reset，避免旧入口泄漏旧证据。
+**retry 是 attempt 边界，不是 status setter：** `task retry` 先把来源 status 与旧 `started_at` / `finished_at` / `artifact` / `verified` 归档为 `ccm/task-retry/v1` log detail，再清空当前 attempt 的三个证据字段、把 `verified` 设为布尔 `false`，并请求落 `ready`。这些步骤在同一持锁写入里原子发生；随后既有 deps 门控仍会归一最终态（deps 未全 done→`blocked`，否则→`ready`），human/JSON 输出逐 task 报这个最终态。批量任一 id 不可 retry 时整批不落盘。合法的通用 `set-status <id> ready` 也走同一 reset，避免旧入口泄漏旧证据。
 
 **`--force` 越闸是逃生口，不是捷径：** 正常流程用 verb；重跑 stale/failed/escalated 用 `task retry`。用 `--force` 跳 `in_flight` 直接 `done` 会造成无 `started_at` 的 done 节点——伪造审计轨迹，影响 timeline 与 p95 估算。
 

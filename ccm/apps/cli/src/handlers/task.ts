@@ -249,10 +249,10 @@ export function retry(ctx: Ctx): number {
         const tasks = ids.map((id) => findTask(next, id) ?? null);
         return render.jsonString(tasks);
       }
-      const idList = ids.join(', ');
+      const outcomes = ids.map((id) => `${id} → ${String(findTask(next, id)?.status)}`).join(', ');
       return dryRun
-        ? `[dry-run] 将 retry task: ${idList} (→ ready，归档并清理旧 attempt evidence)`
-        : `task ${idList} → ready (旧 attempt evidence 已归档)`;
+        ? `[dry-run] 将 retry task: ${outcomes} (归档并清理旧 attempt evidence)`
+        : `task retry: ${outcomes} (旧 attempt evidence 已归档)`;
     },
   });
 }

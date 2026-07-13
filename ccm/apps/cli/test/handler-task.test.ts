@@ -561,6 +561,49 @@ test('task retry stale→ready clears terminal evidence with a typed boolean and
   assert.equal(detail.prior_evidence.verified, true);
 });
 
+test('task retry renders each reconcile-final status consistently in human, dry-run, and JSON output', () => {
+  const makeTasks = () => [
+    { id: 'D0', status: 'stale', deps: [] },
+    { id: 'GATED', status: 'stale', deps: ['D0'], artifact: '/abs/gated-old.md', verified: true },
+    { id: 'FREE', status: 'stale', deps: [], artifact: '/abs/free-old.md', verified: true },
+  ];
+
+  const humanBoardPath = mkBoardHome({ tasks: makeTasks() });
+  const humanCtx = mkCtx(humanBoardPath, { positionals: ['GATED', 'FREE'] });
+  assert.equal(taskHandler.retry(humanCtx), EXIT.OK);
+  const persisted = readBoard(humanBoardPath);
+  assert.equal(findTask(persisted, 'GATED').status, 'blocked');
+  assert.equal(findTask(persisted, 'FREE').status, 'ready');
+  assert.match(humanCtx.outBuf.join(''), /GATED → blocked/);
+  assert.match(humanCtx.outBuf.join(''), /FREE → ready/);
+
+  const dryRunBoardPath = mkBoardHome({ tasks: makeTasks() });
+  const dryRunBefore = readFileSync(dryRunBoardPath, 'utf8');
+  const dryRunCtx = mkCtx(dryRunBoardPath, {
+    flags: { dryRun: true },
+    positionals: ['GATED', 'FREE'],
+  });
+  assert.equal(taskHandler.retry(dryRunCtx), EXIT.OK);
+  assert.equal(readFileSync(dryRunBoardPath, 'utf8'), dryRunBefore);
+  assert.match(dryRunCtx.outBuf.join(''), /GATED → blocked/);
+  assert.match(dryRunCtx.outBuf.join(''), /FREE → ready/);
+
+  const jsonBoardPath = mkBoardHome({ tasks: makeTasks() });
+  const jsonCtx = mkCtx(jsonBoardPath, {
+    flags: { json: true },
+    positionals: ['GATED', 'FREE'],
+  });
+  assert.equal(taskHandler.retry(jsonCtx), EXIT.OK);
+  const parsed = JSON.parse(jsonCtx.outBuf.join(''));
+  assert.deepEqual(
+    parsed.data.map((task: { id: string; status: string }) => [task.id, task.status]),
+    [
+      ['GATED', 'blocked'],
+      ['FREE', 'ready'],
+    ],
+  );
+});
+
 test('task retry batch is all-or-nothing when one task is not retryable', () => {
   const tasks = [
     { id: 'R1', status: 'stale', deps: [], artifact: '/abs/old.md', verified: true },

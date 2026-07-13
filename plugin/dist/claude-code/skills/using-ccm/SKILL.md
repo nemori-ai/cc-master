@@ -59,7 +59,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 > `verified` 是与 status **正交的布尔**(`--verified`),不是一个 status 值。`done` 且 `verified:true` 且 `artifact` 非空,才是真完成(端点验收过);缺任一项会被 `BIZ-DONE-VERIFIED` hard gate 拒绝落盘(exit 3)。
 > 对显式 review gate，`verified:true` 只验收「review 工作与报告已完成」，是否批准由**当前 attempt** 的 `review_verdict` 单独表达；只有 `APPROVE` 满足下游 deps。`stale|failed|escalated → ready` 开新 attempt 时旧 verdict 自动失效，重跑后必须产出新 verdict。
 
-> `stale` / `failed` / `escalated` 要重跑时优先用 `task retry <id>`。它把旧 attempt 的时间、artifact、verified 以 `ccm/task-retry/v1` 结构归档进 append-only log,再原子复位当前 attempt;合法的通用 `set-status <id> ready` 也共享同一 reset,不会把旧验收证据带进新一轮。
+> `stale` / `failed` / `escalated` 要重跑时优先用 `task retry <id>`。它把旧 attempt 的时间、artifact、verified 以 `ccm/task-retry/v1` 结构归档进 append-only log,再原子复位当前 attempt;合法的通用 `set-status <id> ready` 也共享同一 reset,不会把旧验收证据带进新一轮。retry 的 lifecycle 目标是 `ready`,但写入关卡随后仍按 deps 归一:deps 未全 done 的 task 最终落 `blocked`;human/JSON 输出按每个 task 的最终态回显。
 
 ### Rationalization Table —— status 这条最常见的自我说服
 
