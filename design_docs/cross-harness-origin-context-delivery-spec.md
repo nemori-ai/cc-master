@@ -55,6 +55,20 @@ whole ambient string, not merely its inner JSON, is at most 4096 UTF-8 bytes. Bo
 warnings, then tail route summaries, then whole tail candidates; it never partially truncates a
 load-bearing fact. Omission can only reduce information and never creates eligibility.
 
+The origin boundary rebuilds the complete allowlisted payload and requires the raw inner JSON to be
+the byte-exact canonical `JSON.stringify` form of that rebuilt object. A duplicate key, alternate
+raw representation, or private value hidden in bytes discarded by parsing rejects the whole
+delivery; the boundary never validates one representation and emits another. Its high-signal token
+guard has constraint parity with the ccm producer and includes `sk-`, GitHub token, JWT, Bearer, and
+explicit credential-assignment forms.
+
+A route may be `eligible:true` and carry `selected` only when the delivery itself is available and
+fresh, contract activation is enabled, and the selected candidate cross-reference agrees on id,
+harness, and surface. The candidate must be available, authenticated, model-available,
+runtime-healthy, non-unknown/non-exhausted on quota, and all published qualifications must pass;
+`cli-headless` additionally requires `quota:ample`. These are delivery-consistency checks, not an
+origin-side policy rerank: the adapter never changes order, reasons, or selection.
+
 The delivery hash covers the exact ambient content. The agent payload omits `as_of`; therefore
 routine calls remain stable inside one freshness state, while a board revision, machine revision,
 freshness boundary, candidate fact, or route judgment change produces a new hash.
@@ -108,7 +122,9 @@ difference.
 6. A sleeping fake collector, provider/network/process/account spies, missing/corrupt cache, and a
    malicious correctly hashed fake ccm output produce zero forbidden calls and never leak data.
    Origin adapters accept only the exact allowlisted `ccm/origin-context/v1` structure and reject
-   unknown nested fields or private-shaped values without echoing them.
+   unknown nested fields, duplicate-key/non-canonical JSON, private-shaped values, or a selected
+   route that contradicts availability/freshness/candidate/quota/runtime/qualification facts,
+   without echoing them.
 7. Existing raw `ccm/orchestrator-context/v1` and `ccm route advise` behavior remains unchanged;
    `--agent-visible` is additive and shadow-only.
 

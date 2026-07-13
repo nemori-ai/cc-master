@@ -57,8 +57,8 @@ ineligible, not silently normalized.
 The cache carries no credential, identity, token, argv, environment, transcript, balance, or
 provider raw response. Producers remain responsible for redaction before atomic cache publication,
 but the public boundary also recursively rejects secret/private-shaped keys and high-signal
-credential/token-shaped values without echoing them. Value detection covers `sk-` tokens, bearer
-values, JWTs, and explicit API-key/credential assignments while allowing ordinary operational prose
+credential/token-shaped values without echoing them. Value detection covers `sk-` tokens, GitHub
+tokens, bearer values, JWTs, and explicit API-key/credential assignments while allowing ordinary operational prose
 such as “token budget”, “API key is not configured”, or “credential: unavailable”. The
 agent-visible projection is built from an explicit candidate/qualification allowlist; unknown benign
 extension fields are stripped rather than cloned.

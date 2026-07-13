@@ -39,6 +39,8 @@ const SECRET_KEY =
 const SECRET_SK_VALUE = /(?:^|[^A-Za-z0-9])(sk-[A-Za-z0-9_-]{16,})(?=$|[^A-Za-z0-9_-])/i;
 const SECRET_JWT_VALUE =
   /(?:^|[^A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?=$|[^A-Za-z0-9_-])/;
+const SECRET_GITHUB_VALUE =
+  /(?:^|[^A-Za-z0-9_])(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{8,}(?=$|[^A-Za-z0-9_])/i;
 const SECRET_ASSIGNMENT_VALUE =
   /\b(?:api[\s_-]*key|credentials?|(?:access|refresh)[\s_-]*token|client[\s_-]*secret|secret[\s_-]*key)\b\s*[:=]\s*["']?([A-Za-z0-9._~+/=-]{8,})/i;
 const BEARER_VALUE = /\bBearer\s+([A-Za-z0-9._~+/=-]{8,})(?=$|[^A-Za-z0-9._~+/=-])/i;
@@ -256,6 +258,7 @@ function duplicateValues(values: string[]): string[] {
 function secretShapedValue(value: string): boolean {
   if (SECRET_SK_VALUE.test(value)) return true;
   if (SECRET_JWT_VALUE.test(value)) return true;
+  if (SECRET_GITHUB_VALUE.test(value)) return true;
   const assignment = SECRET_ASSIGNMENT_VALUE.exec(value)?.[1]?.toLowerCase();
   if (assignment !== undefined && !NON_SECRET_ASSIGNMENT_VALUES.has(assignment)) return true;
   for (const match of value.matchAll(new RegExp(BEARER_VALUE.source, 'gi'))) {

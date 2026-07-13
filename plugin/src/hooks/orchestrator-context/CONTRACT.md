@@ -19,9 +19,12 @@ to refresh facts, choose a route, or authorize dispatch.
   commands.
 - `rule-orchestrator-context-bounded-redacted`: emit only ccm's ambient `content` after checking its
   exact allowlisted outer/inner schema, nested value domains, hash, and byte count; unknown nested
-  fields or private-shaped values fail open with empty stdout. Complete agent-visible content is
-  <=4096 bytes and contains no ref/path, credential, identity, balance, argv/env, transcript, or
-  provider raw response.
+  fields, duplicate-key/non-canonical JSON, or private-shaped values fail open with empty stdout.
+  Validation rebuilds the canonical payload and never emits raw bytes that differ from the validated
+  representation. A selected route must agree with the referenced candidate and with the delivery's
+  available/fresh/enabled, auth/model/runtime/quota/qualification facts; adapters only reject a
+  contradiction and never rerank policy. Complete agent-visible content is <=4096 bytes and contains
+  no ref/path, credential, identity, balance, argv/env, transcript, or provider raw response.
 - `rule-orchestrator-context-dedup`: hook-owned sidecar suppresses an unchanged delivery hash on
   delta events. The sidecar is disposable and never authoritative.
 - `rule-orchestrator-context-fail-open`: no/ambiguous active board, cache/ccm failure, malformed

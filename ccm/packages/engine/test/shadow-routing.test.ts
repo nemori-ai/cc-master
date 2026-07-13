@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   adviseShadowRoute,
@@ -8,6 +9,19 @@ import {
 } from '../dist/index.mjs';
 
 const AS_OF = '2026-07-13T03:05:00Z';
+
+interface SecretConformanceVector {
+  id: string;
+  value: string;
+  private: boolean;
+}
+
+const SECRET_CONFORMANCE = JSON.parse(
+  readFileSync(
+    new URL('../../../../tests/fixtures/orchestrator-context-secret-vectors.json', import.meta.url),
+    'utf8',
+  ),
+) as { schema: string; sk: SecretConformanceVector[] };
 
 interface MutableContextEnvelope extends Record<string, unknown> {
   freshness: Record<string, unknown>;
@@ -779,6 +793,7 @@ test('public context rejects recursive secret-bearing fields and never echoes se
 
   const secretValues = [
     'sk-ant-api03-FAKE-SENTINEL-NOT-A-REAL-SECRET',
+    'ghp_FAKE_SENTINEL_NOT_A_REAL_SECRET',
     'Bearer FAKE0123456789TOKEN',
     'eyJmYWtlIjoidGVzdCJ9.eyJzdWIiOiJmYWtlIn0.FAKE_SIGNATURE_12345',
     'api_key=FAKE0123456789TOKEN',
@@ -945,6 +960,43 @@ test('public context rejects recursive secret-bearing fields and never echoes se
       asOf: AS_OF,
     }),
   );
+});
+
+test('sk token boundary follows the shared producer/consumer conformance vectors', () => {
+  assert.equal(SECRET_CONFORMANCE.schema, 'ccm/orchestrator-context-secret-conformance/v1');
+  assert.ok(SECRET_CONFORMANCE.sk.some((vector) => vector.id === 'underscore-prefixed'));
+  assert.ok(SECRET_CONFORMANCE.sk.some((vector) => vector.private === false));
+
+  for (const vector of SECRET_CONFORMANCE.sk) {
+    assert.match(
+      vector.value,
+      /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/,
+      `${vector.id}: the vector must isolate secret detection from public-id shape validation`,
+    );
+    if (vector.private) {
+      assert.throws(
+        () => context([fact(vector.value, 'cli-headless')]),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.match(error.message, /forbidden|secret/i, vector.id);
+          assert.equal(error.message.includes(vector.value), false, vector.id);
+          return true;
+        },
+      );
+      continue;
+    }
+
+    const publicContext = context([fact(vector.value, 'cli-headless')]);
+    const delivery = buildOriginContextContent({
+      board: activatedBoard([]),
+      context: publicContext,
+      originHarness: 'codex',
+      boardRevision: 'board-r8',
+      asOf: AS_OF,
+    });
+    assert.equal(delivery.payload.candidates[0]?.candidate_id, vector.value, vector.id);
+    assert.match(delivery.content, new RegExp(vector.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
 });
 
 test('runtime-healthy qualification preserves fail/unknown/missing and rejects contradictions', () => {
