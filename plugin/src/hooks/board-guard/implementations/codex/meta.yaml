@@ -6,4 +6,5 @@ mode: implemented
 notes:
   - Uses Codex launcher normalized PreToolUse payload.
   - Blocks with Codex-compatible decision:block only for PreToolUse.
-  - Adds apply_patch payload scanning because Codex may edit files through apply_patch rather than Claude Code MultiEdit.
+  - Uses a state-aware apply_patch lexer/parser with exact Rust Unicode whitespace (U+0085 yes, U+FEFF no), bounded two-CR physical-line normalization, trailing-only Update controls, post-End-of-File whitespace, and raw-rootedness-before-TAB/CR effect-path classification; raw hunk content is never path evidence and malformed or ambiguous structure fails closed.
+  - Inspects all file_path/path/filename aliases and fails closed on conflicting or invalid multi-alias targets.

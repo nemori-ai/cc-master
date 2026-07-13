@@ -74,51 +74,120 @@ const BOARD_PATH_RE = /\.board\.json/;
 // 包一层引号）。与 claude-code board-guard.js 的 BOARD_TOKEN_RE 字节级一致（PARITY: rule-board-guard-segment-touches-real-board）。
 const BOARD_TOKEN_RE = /["']?[^\s"']*\.board\.json[^\s"']*["']?/g;
 
-function stripShellComments(command) {
-  let out = '';
+const SHELL_WRITE_COMMANDS = new Set(['tee', 'cp', 'mv', 'dd', 'truncate']);
+const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/;
+const MAX_NESTED_SHELL_DEPTH = 4;
+
+// PARITY: rule-board-guard-nested-shell-command
+// A bounded shell-word lexer: quotes produce one argv word, while only unquoted separators and
+// redirections are syntax. This is intentionally not an expansion engine or a general shell AST.
+function lexShellCommands(command) {
+  const commands = [];
+  let words = [];
+  let word = '';
+  let wordStarted = false;
+  let hasRedirection = false;
   let quote = null;
   let escaped = false;
+
+  const pushWord = () => {
+    if (!wordStarted) return;
+    words.push(word);
+    word = '';
+    wordStarted = false;
+  };
+  const pushCommand = () => {
+    pushWord();
+    if (words.length > 0 || hasRedirection) commands.push({ words, hasRedirection });
+    words = [];
+    hasRedirection = false;
+  };
+
   for (let i = 0; i < command.length; i += 1) {
     const ch = command[i];
     if (escaped) {
-      out += ch;
+      word += ch;
+      wordStarted = true;
       escaped = false;
       continue;
     }
-    if (ch === '\\' && quote !== "'") {
-      out += ch;
+    if (quote) {
+      if (ch === quote) {
+        quote = null;
+      } else if (ch === '\\' && quote === '"') {
+        escaped = true;
+      } else {
+        word += ch;
+      }
+      wordStarted = true;
+      continue;
+    }
+    if (ch === '\\') {
       escaped = true;
+      wordStarted = true;
       continue;
     }
-    if ((ch === "'" || ch === '"') && !quote) {
+    if (ch === "'" || ch === '"') {
       quote = ch;
-      out += ch;
+      wordStarted = true;
       continue;
     }
-    if (quote && ch === quote) {
-      quote = null;
-      out += ch;
+    if (ch === '#' && !wordStarted) {
+      while (i + 1 < command.length && command[i + 1] !== '\n') i += 1;
       continue;
     }
-    if (!quote && ch === '#') break;
-    out += ch;
+    if (ch === ';' || ch === '\n' || ch === '|'
+      || (ch === '&' && command[i + 1] === '&')) {
+      pushCommand();
+      if ((ch === '|' && command[i + 1] === '|') || ch === '&') i += 1;
+      continue;
+    }
+    if (/\s/u.test(ch)) {
+      pushWord();
+      continue;
+    }
+    if (ch === '>') {
+      pushWord();
+      hasRedirection = true;
+      if (command[i + 1] === '>') i += 1;
+      continue;
+    }
+    word += ch;
+    wordStarted = true;
   }
-  return out;
+  if (quote || escaped) return null;
+  pushCommand();
+  return commands;
 }
 
-function shellSegments(command) {
-  return stripShellComments(command)
-    .split(/(?:&&|\|\||[;|\n])/)
-    .map((segment) => segment.trim())
-    .filter(Boolean);
+function commandWordIndex(words) {
+  let index = 0;
+  while (index < words.length && SHELL_ASSIGNMENT_RE.test(words[index])) index += 1;
+  return index;
 }
 
-function isCcmCommandSegment(segment) {
-  let s = segment.trim();
-  while (/^[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s]+)\s+/.test(s)) {
-    s = s.replace(/^[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s]+)\s+/, '');
-  }
-  return /^ccm(?:\s|$)/.test(s);
+function nestedShellCommand(command) {
+  const index = commandWordIndex(command.words);
+  const executable = command.words[index];
+  if (!executable || !['bash', 'sh'].includes(path.basename(executable))) return null;
+  const optionIndex = command.words.indexOf('-c', index + 1);
+  if (optionIndex < 0 || optionIndex + 1 >= command.words.length) return null;
+  const optionPrefix = command.words.slice(index + 1, optionIndex);
+  if (!optionPrefix.every((arg) => arg.startsWith('-') && arg !== '--')) return null;
+  return command.words[optionIndex + 1];
+}
+
+function commandWritesBoard(command, home) {
+  const index = commandWordIndex(command.words);
+  const executable = command.words[index];
+  if (!executable) return false;
+  const name = path.basename(executable);
+  const writes = command.hasRedirection
+    || (name !== 'ccm' && (
+      SHELL_WRITE_COMMANDS.has(name)
+      || (name === 'sed' && command.words.slice(index + 1).some((arg) => /^-i(?:$|.)/u.test(arg)))
+    ));
+  return writes && segmentTouchesRealBoard(command.words, home);
 }
 
 // segmentTouchesRealBoard(segment, home) → 该 segment 里含 `.board.json` 的 token 是否指向一块**真板**
@@ -127,8 +196,10 @@ function isCcmCommandSegment(segment) {
 // rule-board-guard-segment-touches-real-board·HOOKPAR-DEC 分叉修复：codex 侧此前缺失该检查，且额外带一条
 // 「整条命令兜底」fallback 分支，两者叠加会对形似 `echo hi > /tmp/scratch.txt; cat notes.board.json` 这类
 // 命令误报 deny——本轮对齐 claude-code 逻辑，删除兜底分支）。
-function segmentTouchesRealBoard(segment, home) {
-  const tokens = segment.match(BOARD_TOKEN_RE) || [];
+function segmentTouchesRealBoard(segmentOrWords, home) {
+  const tokens = Array.isArray(segmentOrWords)
+    ? segmentOrWords.filter((word) => BOARD_PATH_RE.test(word))
+    : (segmentOrWords.match(BOARD_TOKEN_RE) || []);
   for (const raw of tokens) {
     const token = raw.replace(/^["']|["']$/g, '');
     if (token.includes('$')) return true; // 变量展开，拿不准就保守偏拦
@@ -138,16 +209,26 @@ function segmentTouchesRealBoard(segment, home) {
 }
 
 // bashWritesBoard(command, home) → 该 Bash 命令是否**启发式命中**「手改 board」。须同一个 command segment
-// 内同时含 .board.json 路径（且 resolve 到真板）+ 写操作符，且该 segment 不是 `ccm ...` 调用。
+// 内同时含 .board.json 路径（且 resolve 到真板）+ 写操作符。ccm 只在没有 shell 写操作符时自然放行；
+// ccm > board / >> board 的文件打开与截断由 shell 执行，不能豁免。
 // PARITY: rule-board-guard-segment-touches-real-board — 与 claude-code board-guard.js 的 bashWritesBoard()
 // 判定表字节级对齐；不再有「整条命令」兜底分支（该分支是 HOOKPAR §2.5 host-convention-divergence 的根因）。
-function bashWritesBoard(command, home) {
+// PARITY: rule-board-guard-bash-heuristic
+function bashWritesBoard(command, home, depth = 0) {
   if (typeof command !== 'string' || !command) return false;
   if (!BOARD_PATH_RE.test(command)) return false;
-  for (const segment of shellSegments(command)) {
-    if (!BOARD_PATH_RE.test(segment) || !WRITE_OP_RE.test(segment)) continue;
-    if (!segmentTouchesRealBoard(segment, home)) continue; // board-looking token outside boardsDir → not a real board
-    if (!isCcmCommandSegment(segment)) return true;
+  const commands = lexShellCommands(command);
+  if (!commands) return false;
+  for (const candidate of commands) {
+    const nested = nestedShellCommand(candidate);
+    if (nested !== null) {
+      if (depth >= MAX_NESTED_SHELL_DEPTH) {
+        if (BOARD_PATH_RE.test(nested) && WRITE_OP_RE.test(nested)) return true;
+      } else if (bashWritesBoard(nested, home, depth + 1)) {
+        return true;
+      }
+    }
+    if (commandWritesBoard(candidate, home)) return true;
   }
   return false;
 }

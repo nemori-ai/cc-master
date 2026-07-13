@@ -30,8 +30,10 @@
 . "$(dirname "$0")/helpers.sh"
 
 CODEX_LAUNCHER="$REPO_ROOT/plugin/src/hooks/_hosts/codex/launcher.js"
+CURSOR_LAUNCHER="$REPO_ROOT/plugin/src/hooks/_hosts/cursor/launcher.js"
 BOARD_GUARD_CLAUDE="$PLUGIN_ROOT/hooks/scripts/board-guard.js"
 BOARD_GUARD_CODEX_CORE="$REPO_ROOT/plugin/src/hooks/board-guard/implementations/codex/board-guard-core.js"
+BOARD_GUARD_CURSOR_CORE="$REPO_ROOT/plugin/src/hooks/board-guard/implementations/cursor/board-guard-core.js"
 VERIFY_BOARD_CLAUDE="$PLUGIN_ROOT/hooks/scripts/verify-board.js"
 VERIFY_BOARD_CODEX_CORE="$REPO_ROOT/plugin/src/hooks/verify-board/implementations/codex/verify-board-core.js"
 
@@ -52,6 +54,18 @@ run_board_guard_claude() {
 }
 run_board_guard_codex() {
   HOOK_OUT="$(printf '%s' "$1" | CC_MASTER_HOME="$2" node "$CODEX_LAUNCHER" --event PreToolUse --core "$BOARD_GUARD_CODEX_CORE" 2>/dev/null)"; HOOK_RC=$?
+}
+run_board_guard_cursor() {
+  local cursor_payload
+  cursor_payload="$(printf '%s' "$1" | node -e '
+    const fs = require("fs");
+    const obj = JSON.parse(fs.readFileSync(0, "utf8"));
+    obj.conversation_id = obj.session_id || "";
+    obj.hook_event_name = "preToolUse";
+    if (obj.tool_name === "Bash") obj.tool_name = "Shell";
+    process.stdout.write(JSON.stringify(obj));
+  ')"
+  HOOK_OUT="$(printf '%s' "$cursor_payload" | CC_MASTER_HOME="$2" node "$CURSOR_LAUNCHER" --event preToolUse --core "$BOARD_GUARD_CURSOR_CORE" 2>/dev/null)"; HOOK_RC=$?
 }
 run_verify_board_claude() {
   HOOK_OUT="$(printf '%s' "$1" | CC_MASTER_HOME="$2" node "$VERIFY_BOARD_CLAUDE" 2>/dev/null)"; HOOK_RC=$?
@@ -80,12 +94,42 @@ run_board_guard_claude "$FIXTURE1" "$H"
 assert_eq "" "$HOOK_OUT" "fixture1 (scratch write, board-looking token outside boards/) claude-code -> allow (silent)"
 run_board_guard_codex "$FIXTURE1" "$H"
 assert_eq "" "$HOOK_OUT" "fixture1 (scratch write, board-looking token outside boards/) codex -> allow (silent)"
+run_board_guard_cursor "$FIXTURE1" "$H"
+assert_eq "" "$HOOK_OUT" "fixture1 (scratch write, board-looking token outside boards/) cursor -> allow (silent)"
 
 FIXTURE1B="$(bash_payload "sess-x" "echo '{}' > $H/boards/mine.board.json")"
 run_board_guard_claude "$FIXTURE1B" "$H"
 assert_contains "$HOOK_OUT" '"permissionDecision":"deny"' "fixture1b (real board write) claude-code -> deny"
 run_board_guard_codex "$FIXTURE1B" "$H"
 assert_contains "$HOOK_OUT" '"decision":"block"' "fixture1b (real board write) codex -> block"
+run_board_guard_cursor "$FIXTURE1B" "$H"
+assert_contains "$HOOK_OUT" '"permission":"deny"' "fixture1b (real board write) cursor -> deny"
+
+FIXTURE1C="$(bash_payload "sess-x" "ccm task ls --board $H/boards/mine.board.json")"
+run_board_guard_claude "$FIXTURE1C" "$H"
+assert_eq "" "$HOOK_OUT" "fixture1c (plain ccm --board) claude-code -> allow"
+run_board_guard_codex "$FIXTURE1C" "$H"
+assert_eq "" "$HOOK_OUT" "fixture1c (plain ccm --board) codex -> allow"
+run_board_guard_cursor "$FIXTURE1C" "$H"
+assert_eq "" "$HOOK_OUT" "fixture1c (plain ccm --board) cursor -> allow"
+
+FIXTURE1C2="$(bash_payload "sess-x" "ccm task update T0 --set 'note=a>b' --board $H/boards/mine.board.json")"
+run_board_guard_claude "$FIXTURE1C2" "$H"
+assert_eq "" "$HOOK_OUT" "fixture1c2 (quoted greater-than data, no redirect) claude-code -> allow"
+run_board_guard_codex "$FIXTURE1C2" "$H"
+assert_eq "" "$HOOK_OUT" "fixture1c2 (quoted greater-than data, no redirect) codex -> allow"
+run_board_guard_cursor "$FIXTURE1C2" "$H"
+assert_eq "" "$HOOK_OUT" "fixture1c2 (quoted greater-than data, no redirect) cursor -> allow"
+
+for REDIRECT in '>' '>>'; do
+  FIXTURE1D="$(bash_payload "sess-x" "ccm board show --board $H/boards/mine.board.json $REDIRECT $H/boards/mine.board.json")"
+  run_board_guard_claude "$FIXTURE1D" "$H"
+  assert_contains "$HOOK_OUT" '"permissionDecision":"deny"' "fixture1d (ccm $REDIRECT real board) claude-code -> deny"
+  run_board_guard_codex "$FIXTURE1D" "$H"
+  assert_contains "$HOOK_OUT" '"decision":"block"' "fixture1d (ccm $REDIRECT real board) codex -> block"
+  run_board_guard_cursor "$FIXTURE1D" "$H"
+  assert_contains "$HOOK_OUT" '"permission":"deny"' "fixture1d (ccm $REDIRECT real board) cursor -> deny"
+done
 rm -rf "$H"
 
 # =====================================================================================================

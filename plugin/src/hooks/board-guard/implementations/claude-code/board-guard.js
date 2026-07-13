@@ -22,8 +22,9 @@
 //   command segment** 同时含 `.board.json` 路径**与**一个写操作符（`>`/`>>`/`sed -i`/`tee`/`cp`/`mv`/`dd`/
 //   `truncate`）时才继续判定，且该路径 token 须 resolve 到 BOARDS_DIR 下才算触碰**真板**（与 Write/Edit 分
 //   支的 pathIsBoard() 语义对齐——scratch 假板 / 文档示例 / /tmp 下的同名文件不算，见 segmentTouchesRealBoard；
-//   token 含变量展开〔`$B` 这类〕字面不可判定，保守偏拦不猜），且写 board 的 shell command segment 本身是
-//   `ccm ...` 调用才放行（别拦 ccm 自己去写 board）。注释里 / echo 内容里的 `ccm` 不算。漏网的 Bash 手改由
+//   token 含变量展开〔`$B` 这类〕字面不可判定，保守偏拦不猜）。一旦同段已有真实 board 目标与 shell 写操作，
+//   即使 command word 是 `ccm` 也 deny：重定向由 shell 打开/截断目标，绕过 ccm 写关卡。普通无重定向的
+//   `ccm ... --board <path>` 没有写操作符，继续放行。漏网的 Bash 手改由
 //   PostToolUse board-lint 事后兜（软提示）——PreToolUse guard 挡结构化 Write/Edit（可靠）+ 明显的 Bash 写
 //   （启发式）。
 
@@ -84,14 +85,132 @@ const BOARD_PATH_RE = /\.board\.json/;
 //   包一层引号）。best-effort：不做完整 shell 词法分析，只按空白/引号切。
 const BOARD_TOKEN_RE = /["']?[^\s"']*\.board\.json[^\s"']*["']?/g;
 
+const SHELL_WRITE_COMMANDS = new Set(['tee', 'cp', 'mv', 'dd', 'truncate']);
+const SHELL_ASSIGNMENT_RE = /^[A-Za-z_][A-Za-z0-9_]*=/;
+const MAX_NESTED_SHELL_DEPTH = 4;
+
+// PARITY: rule-board-guard-nested-shell-command
+// A bounded shell-word lexer: quotes produce one argv word, while only unquoted separators and
+// redirections are syntax. This is intentionally not an expansion engine or a general shell AST.
+function lexShellCommands(command) {
+  const commands = [];
+  let words = [];
+  let word = '';
+  let wordStarted = false;
+  let hasRedirection = false;
+  let quote = null;
+  let escaped = false;
+
+  const pushWord = () => {
+    if (!wordStarted) return;
+    words.push(word);
+    word = '';
+    wordStarted = false;
+  };
+  const pushCommand = () => {
+    pushWord();
+    if (words.length > 0 || hasRedirection) commands.push({ words, hasRedirection });
+    words = [];
+    hasRedirection = false;
+  };
+
+  for (let i = 0; i < command.length; i += 1) {
+    const ch = command[i];
+    if (escaped) {
+      word += ch;
+      wordStarted = true;
+      escaped = false;
+      continue;
+    }
+    if (quote) {
+      if (ch === quote) {
+        quote = null;
+      } else if (ch === '\\' && quote === '"') {
+        escaped = true;
+      } else {
+        word += ch;
+      }
+      wordStarted = true;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      wordStarted = true;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      quote = ch;
+      wordStarted = true;
+      continue;
+    }
+    if (ch === '#' && !wordStarted) {
+      while (i + 1 < command.length && command[i + 1] !== '\n') i += 1;
+      continue;
+    }
+    if (ch === ';' || ch === '\n' || ch === '|'
+      || (ch === '&' && command[i + 1] === '&')) {
+      pushCommand();
+      if ((ch === '|' && command[i + 1] === '|') || ch === '&') i += 1;
+      continue;
+    }
+    if (/\s/u.test(ch)) {
+      pushWord();
+      continue;
+    }
+    if (ch === '>') {
+      pushWord();
+      hasRedirection = true;
+      if (command[i + 1] === '>') i += 1;
+      continue;
+    }
+    word += ch;
+    wordStarted = true;
+  }
+  if (quote || escaped) return null;
+  pushCommand();
+  return commands;
+}
+
+function commandWordIndex(words) {
+  let index = 0;
+  while (index < words.length && SHELL_ASSIGNMENT_RE.test(words[index])) index += 1;
+  return index;
+}
+
+function nestedShellCommand(command) {
+  const index = commandWordIndex(command.words);
+  const executable = command.words[index];
+  if (!executable || !['bash', 'sh'].includes(path.basename(executable))) return null;
+  const optionIndex = command.words.indexOf('-c', index + 1);
+  if (optionIndex < 0 || optionIndex + 1 >= command.words.length) return null;
+  const optionPrefix = command.words.slice(index + 1, optionIndex);
+  if (!optionPrefix.every((arg) => arg.startsWith('-') && arg !== '--')) return null;
+  return command.words[optionIndex + 1];
+}
+
+function commandWritesBoard(command) {
+  const index = commandWordIndex(command.words);
+  const executable = command.words[index];
+  if (!executable) return false;
+  const name = path.basename(executable);
+  const writes = command.hasRedirection
+    || (name !== 'ccm' && (
+      SHELL_WRITE_COMMANDS.has(name)
+      || (name === 'sed' && command.words.slice(index + 1).some((arg) => /^-i(?:$|.)/u.test(arg)))
+    ));
+  return writes && segmentTouchesRealBoard(command.words);
+}
+
 // segmentTouchesRealBoard(segment) → 该 segment 里含 `.board.json` 的 token 是否指向一块**真板**
 //   （落在 BOARDS_DIR 下，对齐 Write/Edit 分支的 pathIsBoard() 语义），而不是任意同名字符串（scratch
 //   假板 / 文档示例 / /tmp 下的测试夹具）。
 //   - token 含 `$`（变量展开，如 `$B/x.board.json`）→ 字面路径不可判定，**保守偏拦**：当真板处理。
 //   - 否则 path.resolve() 后过 pathIsBoard()；命中任一 token 即视为触碰真板。
 // PARITY: rule-board-guard-segment-touches-real-board
-function segmentTouchesRealBoard(segment) {
-  const tokens = segment.match(BOARD_TOKEN_RE) || [];
+function segmentTouchesRealBoard(segmentOrWords) {
+  const tokens = Array.isArray(segmentOrWords)
+    ? segmentOrWords.filter((word) => BOARD_PATH_RE.test(word))
+    : (segmentOrWords.match(BOARD_TOKEN_RE) || []);
   for (const raw of tokens) {
     const token = raw.replace(/^["']|["']$/g, '');
     if (token.includes('$')) return true; // 变量展开，拿不准就保守偏拦，维持现状判定
@@ -100,68 +219,24 @@ function segmentTouchesRealBoard(segment) {
   return false;
 }
 
-// stripShellComments(command) → 删除未加引号的 # 注释尾部。只做 guard 启发式需要的最小 shell 扫描：
-//   保留单/双引号内的 #，不展开转义/变量。目的是避免 `echo ... > board # ccm` 被注释里的 ccm 伪装放行。
-function stripShellComments(command) {
-  let out = '';
-  let quote = null;
-  let escaped = false;
-  for (let i = 0; i < command.length; i++) {
-    const ch = command[i];
-    if (escaped) {
-      out += ch;
-      escaped = false;
-      continue;
-    }
-    if (ch === '\\' && quote !== "'") {
-      out += ch;
-      escaped = true;
-      continue;
-    }
-    if ((ch === "'" || ch === '"') && !quote) {
-      quote = ch;
-      out += ch;
-      continue;
-    }
-    if (quote && ch === quote) {
-      quote = null;
-      out += ch;
-      continue;
-    }
-    if (!quote && ch === '#') break;
-    out += ch;
-  }
-  return out;
-}
-
-// shellSegments(command) → 以常见 shell command separators 拆成 command segments（; && || | 换行）。
-//   不做完整 shell parse；只为判断「写 board 的这一段是不是 ccm 命令」。
-function shellSegments(command) {
-  return stripShellComments(command)
-    .split(/(?:&&|\|\||[;|\n])/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-// isCcmCommandSegment(segment) → 该 command segment 的实际命令词是不是 ccm。
-//   允许前置 env assignment（`FOO=1 ccm ...`），但不把 `echo ccm` / `# ccm` / `foo ccm` 当 ccm 调用。
-function isCcmCommandSegment(segment) {
-  let s = segment.trim();
-  while (/^[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s]+)\s+/.test(s)) {
-    s = s.replace(/^[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s]+)\s+/, '');
-  }
-  return /^ccm(?:\s|$)/.test(s);
-}
-
 // bashWritesBoard(command) → 该 Bash 命令是否**启发式命中**「手改 board」。须同时含 .board.json 路径 + 写操作符。
-//   如果命中写 board 的 command segment 本身是 `ccm` 调用，则放行；其它 segment 里的 `ccm` 不可豁免。
-function bashWritesBoard(command) {
+//   `ccm` 只在没有 shell write operator 时自然放行；重定向由 shell 执行，不能豁免。
+// PARITY: rule-board-guard-bash-heuristic
+function bashWritesBoard(command, depth = 0) {
   if (typeof command !== 'string' || !command) return false;
   if (!BOARD_PATH_RE.test(command)) return false;
-  for (const segment of shellSegments(command)) {
-    if (!BOARD_PATH_RE.test(segment) || !WRITE_OP_RE.test(segment)) continue;
-    if (!segmentTouchesRealBoard(segment)) continue; // board-looking token outside BOARDS_DIR → not a real board
-    if (!isCcmCommandSegment(segment)) return true;
+  const commands = lexShellCommands(command);
+  if (!commands) return false;
+  for (const candidate of commands) {
+    const nested = nestedShellCommand(candidate);
+    if (nested !== null) {
+      if (depth >= MAX_NESTED_SHELL_DEPTH) {
+        if (BOARD_PATH_RE.test(nested) && WRITE_OP_RE.test(nested)) return true;
+      } else if (bashWritesBoard(nested, depth + 1)) {
+        return true;
+      }
+    }
+    if (commandWritesBoard(candidate)) return true;
   }
   return false;
 }
@@ -185,7 +260,7 @@ function body(ctx) {
         ? obj.tool_input.command
         : '';
     if (bashWritesBoard(cmd)) return denyPayload();
-    return; // 非手改-board 的 Bash（含所有 ccm 调用）→ 放行
+    return; // 非手改-board 的 Bash（含无 shell 写操作符的普通 ccm 调用）→ 放行
   }
   return; // 其余工具 → 放行
 }
