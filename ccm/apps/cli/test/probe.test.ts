@@ -8,11 +8,30 @@
 //   深层纯契约矩阵在 @ccm/engine 的 runtime-env.test.ts；本门只证适配器保真。
 
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
-import { test } from 'node:test';
+import { afterEach, test } from 'node:test';
 import { probeExecutable } from '../src/harnesses/probe.js';
+
+let TMPDIRS: string[] = [];
+function mkTmp(prefix: string): string {
+  const root = mkdtempSync(join(tmpdir(), prefix));
+  TMPDIRS.push(root);
+  return root;
+}
+
+afterEach(() => {
+  for (const root of TMPDIRS) rmSync(root, { recursive: true, force: true });
+  TMPDIRS = [];
+});
+
+if (process.env.CCM_PROBE_LIFECYCLE_FORCE_FAILURE === '1') {
+  test('probe lifecycle failure fixture', () => {
+    mkTmp('ccm-probe-failure-');
+    assert.fail('intentional probe lifecycle failure');
+  });
+}
 
 function mkExec(p: string): void {
   writeFileSync(p, '#!/bin/sh\nexit 0\n');
@@ -35,7 +54,7 @@ test('probeExecutable: injected env without PATH key finds nothing (no process.e
 
 // ② 相对 PATH 命中 → 绝对路径。
 test('probeExecutable: relative PATH entry returns an absolute hit', () => {
-  const root = mkdtempSync(join(tmpdir(), 'ccm-probe-rel-'));
+  const root = mkTmp('ccm-probe-rel-');
   const bin = join(root, 'bin');
   mkdirSync(bin, { recursive: true });
   mkExec(join(bin, 'tool-x'));
@@ -46,7 +65,7 @@ test('probeExecutable: relative PATH entry returns an absolute hit', () => {
 
 // ② symlink 命中 → 回报 lexical 符号链接路径（保持既有 harness 语义）。
 test('probeExecutable: symlink hit reports the lexical symlink path', () => {
-  const root = mkdtempSync(join(tmpdir(), 'ccm-probe-link-'));
+  const root = mkTmp('ccm-probe-link-');
   mkdirSync(join(root, 'versions'), { recursive: true });
   mkdirSync(join(root, 'bin'), { recursive: true });
   const target = join(root, 'versions', 'tool-real');
@@ -60,7 +79,7 @@ test('probeExecutable: symlink hit reports the lexical symlink path', () => {
 
 // ③ 非可执行文件 / 目录 → 拒。
 test('probeExecutable: non-executable file and directory are rejected', () => {
-  const root = mkdtempSync(join(tmpdir(), 'ccm-probe-reject-'));
+  const root = mkTmp('ccm-probe-reject-');
   const bin = join(root, 'bin');
   mkdirSync(bin, { recursive: true });
   writeFileSync(join(bin, 'tool-noexec'), '#!/bin/sh\n');
