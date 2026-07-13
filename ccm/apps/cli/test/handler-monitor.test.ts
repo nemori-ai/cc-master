@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
+import { parseSystemdUnit } from '@ccm/engine';
 import * as monitor from '../src/handlers/monitor.js';
 import { readVersion } from '../src/help.js';
 import * as io from '../src/io.js';
@@ -178,4 +179,113 @@ test('monitor serve runs bounded ticks and records tick state without touching r
   assert.equal(state.pid, process.pid);
   assert.equal(state.tick_count, 1);
   assert.equal(state.last_error, null);
+});
+
+function mkHomeUnder(dirName: string): string {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-monitor-'));
+  TMPDIRS.push(root);
+  const home = join(root, dirName, '.cc_master');
+  mkdirSync(join(home, 'boards'), { recursive: true });
+  return home;
+}
+
+test('monitor install-service: activation truth from executor result → ok:true only when all steps pass', () => {
+  const home = mkHome();
+  const seen: string[] = [];
+  monitor.__setMonitorTestHooks({
+    runServiceCommand: (cmd) => {
+      seen.push(cmd.id);
+      return { status: 0, stdout: 'active', stderr: '' };
+    },
+  });
+  const r = invoke(['monitor', 'install-service', '--json'], home);
+  assert.equal(r.code, EXIT.OK, r.stderr);
+  const j = json(r.stdout);
+  assert.equal(j.ok, true);
+  assert.equal(j.installed, true);
+  assert.equal(j.activated, true);
+  assert.equal(j.kind, 'systemd');
+  assert.equal(j.activation.state, 'active');
+  // On Linux the systemd sequence runs daemon-reload → enable → is-active (status truth is the last step).
+  assert.deepEqual(seen, ['daemon-reload', 'enable', 'status']);
+  const unit = readFileSync(j.path, 'utf8');
+  assert.match(unit, /ExecStart=/);
+  assert.match(unit, /StandardOutput=append:/);
+});
+
+test('monitor install-service: is-active failure → nonzero exit + activated:false, no false success', () => {
+  const home = mkHome();
+  monitor.__setMonitorTestHooks({
+    runServiceCommand: (cmd) => {
+      // daemon-reload + enable succeed, but the unit did not actually come up.
+      if (cmd.id === 'status') return { status: 3, stdout: 'inactive', stderr: '' };
+      return { status: 0, stdout: '', stderr: '' };
+    },
+  });
+  const r = invoke(['monitor', 'install-service', '--json'], home);
+  assert.notEqual(r.code, EXIT.OK, 'written-but-not-activated must be a nonzero result');
+  const j = json(r.stdout);
+  assert.equal(j.ok, false);
+  assert.equal(j.installed, true, 'the unit file was still written');
+  assert.equal(j.activated, false);
+  assert.equal(j.activation.state, 'written-not-activated');
+  const statusStep = j.activation.steps.find((s: { id: string }) => s.id === 'status');
+  assert.equal(statusStep.ok, false);
+  // The unit file exists on disk even though activation failed.
+  assert.match(readFileSync(j.path, 'utf8'), /\[Service\]/);
+});
+
+test('monitor install-service: first-step (daemon-reload) failure fails loudly and stops early', () => {
+  const home = mkHome();
+  const seen: string[] = [];
+  monitor.__setMonitorTestHooks({
+    runServiceCommand: (cmd) => {
+      seen.push(cmd.id);
+      if (cmd.id === 'daemon-reload') return { status: 1, stdout: '', stderr: 'no user bus' };
+      return { status: 0, stdout: '', stderr: '' };
+    },
+  });
+  const r = invoke(['monitor', 'install-service', '--json'], home);
+  assert.notEqual(r.code, EXIT.OK);
+  const j = json(r.stdout);
+  assert.equal(j.activated, false);
+  assert.deepEqual(seen, ['daemon-reload'], 'stops at the first hard failure');
+  assert.match(j.activation.steps[0].error, /no user bus/);
+});
+
+test('monitor install-service: paths with spaces round-trip through the written systemd unit', () => {
+  const home = mkHomeUnder('My Project α');
+  monitor.__setMonitorTestHooks({
+    runServiceCommand: () => ({ status: 0, stdout: 'active', stderr: '' }),
+  });
+  const r = invoke(['monitor', 'install-service', '--json'], home);
+  assert.equal(r.code, EXIT.OK, r.stderr);
+  const j = json(r.stdout);
+  const unit = readFileSync(j.path, 'utf8');
+  const parsed = parseSystemdUnit(unit);
+  // The --state argument (a path with a space) must survive as a single atomic argv token.
+  const stateIdx = parsed.argv.indexOf('--state');
+  assert.ok(stateIdx >= 0);
+  const statePath = parsed.argv[stateIdx + 1] ?? '';
+  assert.match(statePath, /My Project α/);
+  assert.match(statePath, /state\.json$/);
+  assert.equal(parsed.stdoutPath, join(home, 'services', 'monitor', 'log'));
+});
+
+test('monitor install-service → uninstall-service deactivates via structured commands', () => {
+  const home = mkHome();
+  const ids: string[] = [];
+  monitor.__setMonitorTestHooks({
+    runServiceCommand: (cmd) => {
+      ids.push(cmd.id);
+      return { status: 0, stdout: '', stderr: '' };
+    },
+  });
+  invoke(['monitor', 'install-service', '--json'], home);
+  const r = invoke(['monitor', 'uninstall-service', '--json'], home);
+  assert.equal(r.code, EXIT.OK, r.stderr);
+  const j = json(r.stdout);
+  assert.equal(j.uninstalled, true);
+  assert.equal(j.deactivation.kind, 'systemd');
+  assert.ok(ids.includes('disable'));
 });
