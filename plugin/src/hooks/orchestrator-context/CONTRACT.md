@@ -11,13 +11,17 @@ to refresh facts, choose a route, or authorize dispatch.
 
 - `rule-orchestrator-context-ccm-owned`: every host consumes
   `ccm/origin-context-delivery/v1`; adapters do not recompute candidate eligibility, order, reason,
-  freshness, or selection.
+  freshness, or selection. Frozen candidate facts and CLI judgments remain identical; an
+  origin-local `host-native` candidate may differ only through the ccm-owned
+  `host-native-origin-mismatch` rule and the corresponding native selection equivalence class.
 - `rule-orchestrator-context-cached-only`: invoke only `ccm orchestrator context --cached-only
   --agent-visible`; never invoke collector, provider, reservation, attempt, account, or board-write
   commands.
 - `rule-orchestrator-context-bounded-redacted`: emit only ccm's ambient `content` after checking its
-  schema/hash/byte count; complete agent-visible content is <=4096 bytes and contains no ref/path,
-  credential, identity, balance, argv/env, transcript, or provider raw response.
+  exact allowlisted outer/inner schema, nested value domains, hash, and byte count; unknown nested
+  fields or private-shaped values fail open with empty stdout. Complete agent-visible content is
+  <=4096 bytes and contains no ref/path, credential, identity, balance, argv/env, transcript, or
+  provider raw response.
 - `rule-orchestrator-context-dedup`: hook-owned sidecar suppresses an unchanged delivery hash on
   delta events. The sidecar is disposable and never authoritative.
 - `rule-orchestrator-context-fail-open`: no/ambiguous active board, cache/ccm failure, malformed
@@ -33,7 +37,8 @@ permission, or dispatch directive.
 
 ## 武装语义
 
-The core accepts exactly one active board matching the current session. Zero or multiple matches are
+The core accepts exactly one active, regular, non-symlink board whose resolved path remains under the
+resolved home `boards/` directory and matches the current session. Zero or multiple matches are
 silent. Claude Code discovers through the same narrow-waist predicate; Codex/Cursor consume the
 launcher-provided, containment-checked board and revalidate it.
 

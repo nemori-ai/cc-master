@@ -67,10 +67,16 @@ freshness boundary, candidate fact, or route judgment change produces a new hash
 | Codex | verified `SessionStart` system/additional context substrate | no fake PostToolBatch; next SessionStart / durable inbox is the floor | no equivalent batch event is declared, not simulated |
 | Cursor IDE | no dynamic SessionStart registration (D4 is a confirmed drop bug) | verified `postToolUse.additional_context`, first delivery then hash deltas only | before first tool, static alwaysApply role substrate + on-demand ccm read; no full reinject claim |
 
-All three parse the same ccm delivery. Semantic equivalence ignores only the explicit
-`origin_harness` and the descriptive `same-*` versus `other-harness-cli` outcome label; eligibility,
-candidate order, selected candidate, rejection reasons, revisions, authority, and headroom must be
-identical for the same frozen input.
+All three parse one ccm-owned delivery schema. Semantic equivalence keeps the frozen board, cached
+candidate facts, candidate order, policy, revisions, authority, headroom, and non-origin-dependent
+eligibility/reason codes identical. A `host-native` candidate is origin-local by definition, so its
+eligibility may differ only by the mechanical `host-native-origin-mismatch` reason, and selection may
+resolve to the corresponding origin-local native candidate. After normalizing `origin_harness`,
+descriptive `same-*` versus `other-harness-cli` outcomes, and an eligible origin-local native
+candidate to the `origin-native` equivalence class, the route judgment must be identical. CLI
+candidates—including same-harness CLI—remain common candidates and must retain identical
+eligibility/reasons/order across origins; the origin adapter may not create any additional
+difference.
 
 ## 4. Failure matrix
 
@@ -87,8 +93,11 @@ identical for the same frozen input.
 
 ## 5. Acceptance oracle
 
-1. One frozen board/cache fixture projected for all three origins is equal after normalizing origin
-   and descriptive same/other labels; selected candidate and reason codes are identical.
+1. One frozen board/cache fixture projected for all three origins has identical authority,
+   revisions, cached candidate facts/order, policy-derived CLI eligibility/reasons, and route
+   judgment after normalizing origin-descriptive labels plus the origin-local native equivalence
+   class. An all-native fixture selects each origin's own eligible native candidate; common CLI,
+   rejected-native, origin-stay, and no-route fixtures remain equal under the same rule.
 2. Same-harness CLI remains `cli-headless`; it is never folded into host-native.
 3. Ambient payload and each host-native context field are at most 4096 UTF-8 bytes and contain no
    ref/path/credential/private-shaped data.
@@ -97,7 +106,9 @@ identical for the same frozen input.
 5. Cursor hooks contain no SessionStart dynamic-context registration. Claude/Codex/Cursor envelope
    differences are tested as one semantic equivalence class.
 6. A sleeping fake collector, provider/network/process/account spies, missing/corrupt cache, and a
-   malicious fake ccm output produce zero forbidden calls and never leak data.
+   malicious correctly hashed fake ccm output produce zero forbidden calls and never leak data.
+   Origin adapters accept only the exact allowlisted `ccm/origin-context/v1` structure and reject
+   unknown nested fields or private-shaped values without echoing them.
 7. Existing raw `ccm/orchestrator-context/v1` and `ccm route advise` behavior remains unchanged;
    `--agent-visible` is additive and shadow-only.
 

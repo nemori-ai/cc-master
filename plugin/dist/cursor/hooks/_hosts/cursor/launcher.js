@@ -78,6 +78,20 @@ function readBoard(boardPath) {
   }
 }
 
+function containedBoardPath(home, candidate) {
+  try {
+    const boardsDir = fs.realpathSync(path.join(home, 'boards'));
+    if (!fs.statSync(boardsDir).isDirectory()) return '';
+    const lexical = path.resolve(candidate);
+    if (!lexical.endsWith('.board.json') || !fs.lstatSync(lexical).isFile()) return '';
+    const real = fs.realpathSync(lexical);
+    if (!real.startsWith(`${boardsDir}${path.sep}`) || !fs.statSync(real).isFile()) return '';
+    return real;
+  } catch {
+    return '';
+  }
+}
+
 function sessionStatePath(home, sessionId) {
   if (!sessionId) return '';
   const safe = encodeURIComponent(sessionId).replace(/%/g, '_');
@@ -96,9 +110,8 @@ function boardFromSessionState(home, sessionId) {
   if (!state || state.harness !== 'cursor' || state.session_id !== sessionId || typeof state.board_path !== 'string') {
     return null;
   }
-  const boardPath = path.resolve(state.board_path);
-  const boardsDir = path.resolve(path.join(home, 'boards'));
-  if (!boardPath.startsWith(`${boardsDir}${path.sep}`) || !boardPath.endsWith('.board.json')) return null;
+  const boardPath = containedBoardPath(home, state.board_path);
+  if (!boardPath) return null;
   const board = readBoard(boardPath);
   if (!boardMatches(board, sessionId)) return null;
   return { path: boardPath, board, source: 'session-state' };
@@ -117,7 +130,8 @@ function discoverActiveBoard(home, sessionId) {
   const matches = [];
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.endsWith('.board.json')) continue;
-    const boardPath = path.join(boardsDir, entry.name);
+    const boardPath = containedBoardPath(home, path.join(boardsDir, entry.name));
+    if (!boardPath) continue;
     const board = readBoard(boardPath);
     if (boardMatches(board, sessionId)) matches.push({ path: boardPath, board, source: 'board-scan' });
   }

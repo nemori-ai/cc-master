@@ -117,10 +117,11 @@ function fact(
   candidateId: string,
   surface: 'host-native' | 'cli-headless',
   availability: 'available' | 'unavailable' | 'unknown' = 'available',
+  harness = 'codex',
 ): Record<string, unknown> {
   return {
     candidate_id: candidateId,
-    harness: 'codex',
+    harness,
     surface,
     availability,
     quota: 'ample',
@@ -141,6 +142,19 @@ function fact(
       },
     ],
   };
+}
+
+function threeOriginTask(
+  order = ['claude-native', 'codex-native', 'cursor-native', 'codex-cli'],
+): Record<string, unknown> {
+  const value = task(order);
+  value.routing.policy.candidates = [
+    candidate('claude-native', 'host-native', 'claude-code'),
+    candidate('codex-native', 'host-native', 'codex'),
+    candidate('cursor-native', 'host-native', 'cursor'),
+    candidate('codex-cli', 'cli-headless', 'codex'),
+  ];
+  return value;
 }
 
 function cache(facts: Record<string, unknown>[]): Record<string, unknown> {
@@ -179,7 +193,7 @@ function activatedBoard(tasks: Record<string, unknown>[]) {
   };
 }
 
-test('origin content is bounded, redacted, and semantically equivalent across three origins', () => {
+test('origin content is bounded, redacted, and common-CLI equivalent across three origins', () => {
   const board = activatedBoard([task()]);
   const facts = [
     fact('codex-native', 'host-native', 'unavailable'),
@@ -216,6 +230,149 @@ test('origin content is bounded, redacted, and semantically equivalent across th
   });
   assert.deepEqual(normalize(deliveries[0].payload), normalize(deliveries[1].payload));
   assert.deepEqual(normalize(deliveries[1].payload), normalize(deliveries[2].payload));
+});
+
+test('origin equivalence preserves shared policy truth while selecting each origin-local native', () => {
+  const origins = ['claude-code', 'codex', 'cursor'];
+  const expectedNative = ['claude-native', 'codex-native', 'cursor-native'];
+  const board = activatedBoard([threeOriginTask()]);
+  const facts = [
+    fact('claude-native', 'host-native', 'available', 'claude-code'),
+    fact('codex-native', 'host-native', 'available', 'codex'),
+    fact('cursor-native', 'host-native', 'available', 'cursor'),
+    fact('codex-cli', 'cli-headless', 'available', 'codex'),
+  ];
+  const deliveries = origins.map((originHarness) =>
+    buildOriginContextContent({
+      board,
+      context: context(facts, originHarness),
+      originHarness,
+      boardRevision: 'board-r8',
+      asOf: AS_OF,
+    }),
+  );
+
+  deliveries.forEach((delivery, index) => {
+    assert.equal(delivery.payload.routes[0]?.selected?.candidate_id, expectedNative[index]);
+    assert.equal(delivery.payload.routes[0]?.selected?.surface, 'host-native');
+    assert.equal(delivery.payload.routes[0]?.outcome, 'same-native');
+    assert.deepEqual(delivery.payload.routes[0]?.reason_codes, ['shadow-first-eligible']);
+    assert.deepEqual(delivery.payload.candidates, deliveries[0]?.payload.candidates);
+  });
+
+  const normalized = deliveries.map(({ payload }) => ({
+    ...payload,
+    origin_harness: '<origin>',
+    routes: payload.routes.map((route) => ({
+      ...route,
+      outcome: route.selected?.surface === 'host-native' ? '<origin-native>' : route.outcome,
+      selected:
+        route.selected?.surface === 'host-native'
+          ? { candidate_id: '<origin-native>', harness: '<origin>', surface: 'host-native' }
+          : route.selected,
+    })),
+  }));
+  assert.deepEqual(normalized[0], normalized[1]);
+  assert.deepEqual(normalized[1], normalized[2]);
+
+  const advices = origins.map((originHarness) =>
+    adviseShadowRoute({
+      task: threeOriginTask(),
+      context: context(facts, originHarness),
+      originHarness,
+      boardRevision: 'board-r8',
+      asOf: AS_OF,
+    }),
+  );
+  const normalizeEvaluations = (advice: (typeof advices)[number]) =>
+    advice.evaluations.map((evaluation) => ({
+      candidate_id: evaluation.candidate_id,
+      harness: evaluation.harness,
+      surface: evaluation.surface,
+      base_reason_codes: evaluation.reason_codes.filter(
+        (reason) => reason !== 'host-native-origin-mismatch' && reason !== 'candidate-eligible',
+      ),
+      qualification_results: evaluation.qualification_results,
+    }));
+  advices.forEach((advice, originIndex) => {
+    assert.equal(advice.selected?.candidate_id, expectedNative[originIndex]);
+    assert.deepEqual(normalizeEvaluations(advice), normalizeEvaluations(advices[0]));
+    for (const evaluation of advice.evaluations) {
+      if (evaluation.surface === 'cli-headless') {
+        assert.equal(evaluation.eligible, true);
+        assert.deepEqual(evaluation.reason_codes, ['candidate-eligible']);
+      } else if (evaluation.harness === origins[originIndex]) {
+        assert.equal(evaluation.eligible, true);
+        assert.deepEqual(evaluation.reason_codes, ['candidate-eligible']);
+      } else {
+        assert.equal(evaluation.eligible, false);
+        assert.deepEqual(evaluation.reason_codes, ['host-native-origin-mismatch']);
+      }
+    }
+  });
+});
+
+test('origin equivalence covers rejected native, same/other CLI, origin-stay, and no-route', () => {
+  const origins = ['claude-code', 'codex', 'cursor'];
+  const cases = [
+    {
+      name: 'rejected-native-to-cli',
+      task: threeOriginTask(),
+      facts: [
+        fact('claude-native', 'host-native', 'unavailable', 'claude-code'),
+        fact('codex-native', 'host-native', 'unavailable', 'codex'),
+        fact('cursor-native', 'host-native', 'unavailable', 'cursor'),
+        fact('codex-cli', 'cli-headless', 'available', 'codex'),
+      ],
+      selected: 'codex-cli',
+      outcomes: ['other-harness-cli', 'same-harness-cli', 'other-harness-cli'],
+    },
+    {
+      name: 'origin-stay',
+      task: threeOriginTask(['codex-cli', 'claude-native', 'codex-native', 'cursor-native']),
+      facts: [
+        fact('claude-native', 'host-native', 'available', 'claude-code'),
+        fact('codex-native', 'host-native', 'available', 'codex'),
+        fact('cursor-native', 'host-native', 'available', 'cursor'),
+        fact('codex-cli', 'cli-headless', 'unavailable', 'codex'),
+      ],
+      selected: '<origin-native>',
+      outcomes: ['origin-stay', 'origin-stay', 'origin-stay'],
+    },
+    {
+      name: 'no-route',
+      task: threeOriginTask(),
+      facts: [
+        fact('claude-native', 'host-native', 'unavailable', 'claude-code'),
+        fact('codex-native', 'host-native', 'unavailable', 'codex'),
+        fact('cursor-native', 'host-native', 'unavailable', 'cursor'),
+        fact('codex-cli', 'cli-headless', 'unavailable', 'codex'),
+      ],
+      selected: null,
+      outcomes: ['no-route', 'no-route', 'no-route'],
+    },
+  ];
+
+  for (const fixture of cases) {
+    const board = activatedBoard([fixture.task]);
+    origins.forEach((originHarness, index) => {
+      const delivery = buildOriginContextContent({
+        board,
+        context: context(fixture.facts, originHarness),
+        originHarness,
+        boardRevision: 'board-r8',
+        asOf: AS_OF,
+      });
+      const route = delivery.payload.routes[0];
+      assert.equal(route?.outcome, fixture.outcomes[index], fixture.name);
+      if (fixture.selected === '<origin-native>') {
+        assert.equal(route?.selected?.harness, originHarness, fixture.name);
+        assert.equal(route?.selected?.surface, 'host-native', fixture.name);
+      } else {
+        assert.equal(route?.selected?.candidate_id ?? null, fixture.selected, fixture.name);
+      }
+    });
+  }
 });
 
 test('origin content bounds ready route summaries without partial load-bearing truncation', () => {

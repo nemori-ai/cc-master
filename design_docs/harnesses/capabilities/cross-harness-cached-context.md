@@ -7,9 +7,14 @@ Codex, or Cursor without allowing the origin adapter to probe providers or recom
 
 ## Acceptance（可测等价类）
 
-1. The same frozen board and machine revisions produce identical authority, candidate facts,
-   eligibility, selection, and reason codes after normalizing origin-descriptive fields.
-2. The complete ambient payload is sanitized and at most 4096 UTF-8 bytes.
+1. The same frozen board and machine revisions produce identical authority, candidate facts/order,
+   policy, CLI eligibility/reasons, and route judgment after normalizing origin-descriptive fields
+   and the origin-local native equivalence class. Native eligibility may differ only by the
+   mechanical `host-native-origin-mismatch` rule; all-native input selects the matching native
+   candidate for each origin.
+2. The complete ambient payload is sanitized, exact-schema validated at the origin boundary, and at
+   most 4096 UTF-8 bytes; correctly hashed unknown fields and private-shaped nested values are
+   rejected without disclosure.
 3. Missing/corrupt/stale/unknown cache is explicit or silent, RC0, and never causes a live probe.
 4. Delta events emit only when the ccm delivery hash changes; routine telemetry does not create a
    new Cursor round.
