@@ -806,6 +806,196 @@ for (const signalResult of [true, false]) {
   }
 }
 
+for (const signalResult of [true, false]) {
+  for (const callbackKind of ['onStarted', 'onStdoutText'] as const) {
+    for (const callbackThrows of [false, true]) {
+      test(`atomic ${callbackKind} sync close ${callbackThrows ? 'then throw' : 'and return'} (signal=${signalResult})`, async () => {
+        await withFakeTimerClock(async (clock) => {
+          const fixture = reentrantTreeFixture({ closeOnSignal: true, signalResult });
+          const callbackFailure = new Error(`controlled ${callbackKind} failure`);
+          let callbackCalls = 0;
+          const callback = () => {
+            callbackCalls += 1;
+            fixture.close(0, null);
+            fixture.ownedChild.child.emit('close', 0, null);
+            if (callbackThrows) throw callbackFailure;
+          };
+          const supervised = superviseProviderChild(fixture.ownedChild, {
+            operation: `atomic-${callbackKind}-${callbackThrows ? 'throw' : 'return'}`,
+            deadline: createProviderRequestDeadline(1_000),
+            limits: DEFAULT_LIMITS,
+            onStarted: callbackKind === 'onStarted' ? callback : undefined,
+            onStdoutText: callbackKind === 'onStdoutText' ? callback : undefined,
+          });
+
+          if (callbackKind === 'onStarted') fixture.ownedChild.child.emit('spawn');
+          else fixture.stdout.write(Buffer.from('.'));
+
+          if (callbackThrows) {
+            const error = await expectSupervisorError(
+              supervised,
+              'consumer_error',
+              `atomic-${callbackKind}-throw`,
+            );
+            assert.equal(error.cause, callbackFailure);
+            assert.equal(error.stream, callbackKind === 'onStdoutText' ? 'stdout' : undefined);
+            assert.equal(error.termination?.reaped, true);
+            assert.deepEqual(fixture.signals, ['SIGTERM']);
+          } else {
+            const result = await supervised;
+            assert.equal(result.exitCode, 0);
+            assert.equal(result.signal, null);
+            assert.equal(result.reaped, true);
+            assert.equal(result.stdout, callbackKind === 'onStdoutText' ? '.' : '');
+            assert.deepEqual(fixture.signals, []);
+          }
+
+          assert.equal(callbackCalls, 1, 'duplicate close must not repeat the consumer callback');
+          assert.equal(clock.activeCount(), 0);
+          const signalsAtSettlement = [...fixture.signals];
+          const aliveChecksAtSettlement = fixture.isAliveCalls();
+          clock.advanceTo(1_000);
+          assert.deepEqual(fixture.signals, signalsAtSettlement);
+          assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+        });
+      });
+    }
+  }
+}
+
+for (const signalResult of [true, false]) {
+  for (const nestedThrows of [false, true]) {
+    test(`nested consumer callback drains terminal events after outer return (${nestedThrows ? 'throw' : 'return'}, signal=${signalResult})`, async () => {
+      await withFakeTimerClock(async (clock) => {
+        const fixture = reentrantTreeFixture({ closeOnSignal: true, signalResult });
+        const callbackFailure = new Error('controlled nested stdout failure');
+        let outerCalls = 0;
+        let innerCalls = 0;
+        const supervised = superviseProviderChild(fixture.ownedChild, {
+          operation: `nested-callback-${nestedThrows ? 'throw' : 'return'}`,
+          deadline: createProviderRequestDeadline(1_000),
+          limits: DEFAULT_LIMITS,
+          onStarted: () => {
+            outerCalls += 1;
+            fixture.stdout.write(Buffer.from('nested'));
+          },
+          onStdoutText: () => {
+            innerCalls += 1;
+            fixture.close(0, null);
+            if (nestedThrows) throw callbackFailure;
+          },
+        });
+
+        fixture.ownedChild.child.emit('spawn');
+
+        if (nestedThrows) {
+          const error = await expectSupervisorError(
+            supervised,
+            'consumer_error',
+            'nested-callback-throw',
+          );
+          assert.equal(error.cause, callbackFailure);
+          assert.equal(error.stream, 'stdout');
+          assert.equal(error.termination?.reaped, true);
+          assert.deepEqual(fixture.signals, ['SIGTERM']);
+        } else {
+          const result = await supervised;
+          assert.equal(result.stdout, 'nested');
+          assert.equal(result.reaped, true);
+          assert.deepEqual(fixture.signals, []);
+        }
+
+        assert.equal(outerCalls, 1);
+        assert.equal(innerCalls, 1);
+        assert.equal(clock.activeCount(), 0);
+        const signalsAtSettlement = [...fixture.signals];
+        const aliveChecksAtSettlement = fixture.isAliveCalls();
+        clock.advanceTo(1_000);
+        assert.deepEqual(fixture.signals, signalsAtSettlement);
+        assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+      });
+    });
+  }
+}
+
+for (const signalResult of [true, false]) {
+  for (const callbackThrows of [false, true]) {
+    test(`callback terminal precedence: ${callbackThrows ? 'consumer throw' : 'first queued child error'} wins (signal=${signalResult})`, async () => {
+      await withFakeTimerClock(async (clock) => {
+        const fixture = reentrantTreeFixture({ signalResult });
+        const childFailure = new Error('controlled child error');
+        const callbackFailure = new Error('controlled consumer failure');
+        const supervised = superviseProviderChild(fixture.ownedChild, {
+          operation: `callback-precedence-${callbackThrows ? 'consumer' : 'child'}`,
+          deadline: createProviderRequestDeadline(1_000),
+          limits: DEFAULT_LIMITS,
+          onStarted: () => {
+            fixture.ownedChild.child.emit('error', childFailure);
+            fixture.close(0, null);
+            if (callbackThrows) throw callbackFailure;
+          },
+        });
+
+        fixture.ownedChild.child.emit('spawn');
+
+        const error = await expectSupervisorError(
+          supervised,
+          callbackThrows ? 'consumer_error' : 'spawn_error',
+          `callback-precedence-${callbackThrows ? 'consumer' : 'child'}`,
+        );
+        assert.equal(error.cause, callbackThrows ? callbackFailure : childFailure);
+        assert.equal(error.termination?.reaped, true);
+        assert.deepEqual(fixture.signals, ['SIGTERM']);
+        assert.equal(clock.activeCount(), 0);
+        const aliveChecksAtSettlement = fixture.isAliveCalls();
+        clock.advanceTo(1_000);
+        assert.deepEqual(fixture.signals, ['SIGTERM']);
+        assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+      });
+    });
+  }
+}
+
+for (const signalResult of [true, false]) {
+  for (const callbackThrows of [false, true]) {
+    test(`callback terminal precedence: ${callbackThrows ? 'consumer throw' : 'queued abort'} wins over callback-induced cancel (signal=${signalResult})`, async () => {
+      await withFakeTimerClock(async (clock) => {
+        const fixture = reentrantTreeFixture({ signalResult });
+        const cancellation = new AbortController();
+        const cancelReason = new Error('controlled callback cancellation');
+        const callbackFailure = new Error('controlled callback failure after cancel');
+        const supervised = superviseProviderChild(fixture.ownedChild, {
+          operation: `callback-abort-precedence-${callbackThrows ? 'consumer' : 'cancel'}`,
+          deadline: createProviderRequestDeadline(1_000),
+          limits: DEFAULT_LIMITS,
+          signal: cancellation.signal,
+          onStarted: () => {
+            cancellation.abort(cancelReason);
+            fixture.close(0, null);
+            if (callbackThrows) throw callbackFailure;
+          },
+        });
+
+        fixture.ownedChild.child.emit('spawn');
+
+        const error = await expectSupervisorError(
+          supervised,
+          callbackThrows ? 'consumer_error' : 'cancelled',
+          `callback-abort-precedence-${callbackThrows ? 'consumer' : 'cancel'}`,
+        );
+        assert.equal(error.cause, callbackThrows ? callbackFailure : cancelReason);
+        assert.equal(error.termination?.reaped, true);
+        assert.deepEqual(fixture.signals, ['SIGTERM']);
+        assert.equal(clock.activeCount(), 0);
+        const aliveChecksAtSettlement = fixture.isAliveCalls();
+        clock.advanceTo(1_000);
+        assert.deepEqual(fixture.signals, ['SIGTERM']);
+        assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+      });
+    });
+  }
+}
+
 test('reentrant tree probe preserves the primary error and cannot repeat termination', async () => {
   await withFakeTimerClock(async (clock) => {
     const callbackFailure = new Error('controlled tree-probe failure');

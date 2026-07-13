@@ -110,6 +110,10 @@ interface StreamCollector {
   ended: boolean;
 }
 
+type PendingSupervisorTerminalEffect =
+  | { type: 'close'; exitCode: number | null; signal: NodeJS.Signals | null }
+  | { type: 'failure'; error: ProviderChildSupervisorError };
+
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 export function createProviderRequestDeadline(hardTimeoutMs: number): ProviderRequestDeadline {
@@ -171,6 +175,10 @@ export function superviseProviderChild(
     let terminationTimer: NodeJS.Timeout | null = null;
     let reapTimer: NodeJS.Timeout | null = null;
     let reapPollTimer: NodeJS.Timeout | null = null;
+    // Child events are normally immediate. Only a consumer callback opens an atomic boundary:
+    // terminal effects queue until the outermost callback returns and fixes its own outcome.
+    let consumerCallbackDepth = 0;
+    const pendingTerminalEffects: PendingSupervisorTerminalEffect[] = [];
 
     const canContinueProviderWork = (): boolean => !settled && !primaryFailure && !closed;
 
@@ -286,11 +294,19 @@ export function superviseProviderChild(
       pollForCleanup();
     };
 
-    const fail = (error: ProviderChildSupervisorError): void => {
+    const failImmediately = (error: ProviderChildSupervisorError): void => {
       if (settled || primaryFailure) return;
       primaryFailure = error;
       clearOperationalTimers();
       beginTermination();
+    };
+
+    const fail = (error: ProviderChildSupervisorError): void => {
+      if (consumerCallbackDepth > 0) {
+        pendingTerminalEffects.push({ type: 'failure', error });
+        return;
+      }
+      failImmediately(error);
     };
 
     const timeoutFailure = (requested: ProviderChildTimeoutCode): void => {
@@ -359,21 +375,47 @@ export function superviseProviderChild(
       spawned = true;
       startedAtMs = Date.now();
       if (options.onStarted) {
-        try {
-          options.onStarted();
-        } catch (cause) {
-          fail(
+        invokeConsumerCallback(
+          options.onStarted,
+          (cause) =>
             new ProviderChildSupervisorError({
               code: 'consumer_error',
               operation: options.operation,
               message: `${options.operation}: onStarted callback failed`,
               cause,
             }),
-          );
-        }
+        );
       }
       return canContinueProviderWork();
     };
+
+    function invokeConsumerCallback(
+      callback: () => void,
+      errorFromCause: (cause: unknown) => ProviderChildSupervisorError,
+    ): void {
+      consumerCallbackDepth += 1;
+      try {
+        callback();
+      } catch (cause) {
+        // A callback exception outranks child terminal events caused inside that callback. Freeze
+        // the typed primary first; the outermost boundary then drains close/error proof in order.
+        failImmediately(errorFromCause(cause));
+      } finally {
+        consumerCallbackDepth -= 1;
+        if (consumerCallbackDepth === 0) drainPendingTerminalEffects();
+      }
+    }
+
+    function drainPendingTerminalEffects(): void {
+      if (consumerCallbackDepth !== 0) return;
+      while (consumerCallbackDepth === 0 && pendingTerminalEffects.length > 0 && !settled) {
+        const event = pendingTerminalEffects.shift();
+        if (!event) break;
+        if (event.type === 'close') processClose(event.exitCode, event.signal);
+        else failImmediately(event.error);
+      }
+      if (settled) pendingTerminalEffects.length = 0;
+    }
 
     const observeActivity = (): void => {
       if (!canContinueProviderWork()) return;
@@ -390,10 +432,9 @@ export function superviseProviderChild(
       if (!text || settled || primaryFailure) return;
       const callback = stream === 'stdout' ? options.onStdoutText : options.onStderrText;
       if (!callback) return;
-      try {
-        callback(text);
-      } catch (cause) {
-        fail(
+      invokeConsumerCallback(
+        () => callback(text),
+        (cause) =>
           new ProviderChildSupervisorError({
             code: 'consumer_error',
             operation: options.operation,
@@ -401,8 +442,7 @@ export function superviseProviderChild(
             message: `${options.operation}: ${stream} consumer failed`,
             cause,
           }),
-        );
-      }
+      );
     };
 
     const collect = (
@@ -490,7 +530,7 @@ export function superviseProviderChild(
       }
     };
 
-    const onClose = (exitCode: number | null, signal: NodeJS.Signals | null): void => {
+    const processClose = (exitCode: number | null, signal: NodeJS.Signals | null): void => {
       if (closed) return;
       closed = true;
       clearOperationalTimers();
@@ -536,7 +576,7 @@ export function superviseProviderChild(
       });
     };
 
-    const onError = (cause: Error): void => {
+    const processError = (cause: Error): void => {
       fail(
         new ProviderChildSupervisorError({
           code: 'spawn_error',
@@ -546,6 +586,18 @@ export function superviseProviderChild(
         }),
       );
     };
+
+    function onClose(exitCode: number | null, signal: NodeJS.Signals | null): void {
+      if (consumerCallbackDepth > 0) {
+        pendingTerminalEffects.push({ type: 'close', exitCode, signal });
+        return;
+      }
+      processClose(exitCode, signal);
+    }
+
+    function onError(cause: Error): void {
+      processError(cause);
+    }
 
     function onAbort(): void {
       fail(
