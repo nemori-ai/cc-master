@@ -1660,14 +1660,14 @@ export const REGISTRY: Registry = {
   // ════════════════════ harness（本机 supported harness inventory·install/upgrade 分发前置）═══════════
   harness: {
     list: {
-      summary: '列出本机 ccm 支持的 harness 安装状态、当前选择和能力矩阵',
+      summary: '列出本机 ccm 支持的 harness 与 execution surface 安装状态、当前选择和能力矩阵',
       read: true,
       positionals: [],
       options: {
         json: { type: 'boolean', desc: '结构化输出' },
         'machine-wide': {
           type: 'boolean',
-          desc: '枚举所有已知 harness 并输出机器级 registry snapshot（含 session store / usage source / account pool 坐标）',
+          desc: '枚举所有已知 harness / surface 并输出机器级 registry snapshot（含 session store / usage source / account pool 坐标）',
         },
       },
       examples: [
@@ -1678,7 +1678,8 @@ export const REGISTRY: Registry = {
       handler: 'harness.list',
     },
     current: {
-      summary: '显示当前 selected harness（--harness / env / auto-detect 后的结果）及其安装探测',
+      summary:
+        '显示当前 selected harness（--harness / env / auto-detect 后的结果）及其安装 / surface 探测',
       read: true,
       positionals: [],
       options: {

@@ -1,0 +1,149 @@
+{
+  "processCases": [
+    {
+      "name": "apparmor-pre-exec-sandbox-unavailable",
+      "request": { "mode": "ask", "sandbox": "required" },
+      "process": {
+        "exitCode": 1,
+        "signal": null,
+        "stdout": "",
+        "stderr": "cursor-agent: sandbox pre-exec failed: AppArmor user namespace capability unavailable",
+        "failure": { "phase": "pre-exec", "kind": "sandbox-unavailable" }
+      },
+      "expected": {
+        "sandbox": "unavailable",
+        "result_schema": "unknown",
+        "task_acceptance": "unknown",
+        "terminated": true,
+        "exit_code": 1,
+        "schedulable": false
+      }
+    },
+    {
+      "name": "rc0-empty-plan-result",
+      "request": { "mode": "plan", "sandbox": "required" },
+      "process": {
+        "exitCode": 0,
+        "signal": null,
+        "stdout": "",
+        "stderr": ""
+      },
+      "expected": {
+        "sandbox": "supported",
+        "result_schema": "invalid-empty",
+        "task_acceptance": "unknown",
+        "terminated": true,
+        "exit_code": 0,
+        "schedulable": false
+      }
+    },
+    {
+      "name": "rc0-invalid-ask-shape",
+      "request": { "mode": "ask", "sandbox": "not-requested" },
+      "process": {
+        "exitCode": 0,
+        "signal": null,
+        "stdout": "{\"ok\":true,\"message\":\"not a Cursor terminal result\"}",
+        "stderr": ""
+      },
+      "expected": {
+        "sandbox": "not-requested",
+        "result_schema": "invalid-shape",
+        "task_acceptance": "unknown",
+        "terminated": true,
+        "exit_code": 0,
+        "schedulable": false
+      }
+    },
+    {
+      "name": "valid-ask-json",
+      "request": { "mode": "ask", "sandbox": "not-requested" },
+      "process": {
+        "exitCode": 0,
+        "signal": null,
+        "stdout": "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"duration_ms\":17,\"result\":\"fixture answer\",\"session_id\":\"fixture-session\"}",
+        "stderr": ""
+      },
+      "expected": {
+        "sandbox": "not-requested",
+        "result_schema": "valid",
+        "task_acceptance": "accepted",
+        "terminated": true,
+        "exit_code": 0,
+        "schedulable": true
+      }
+    }
+  ],
+  "admissionCases": [
+    {
+      "name": "all-required-capabilities-proven",
+      "override": {},
+      "expected": true
+    },
+    {
+      "name": "binary-unavailable",
+      "override": { "binary": { "available": false, "path": null } },
+      "expected": false
+    },
+    {
+      "name": "authentication-unknown",
+      "override": { "authentication": { "state": "unknown" } },
+      "expected": false
+    },
+    {
+      "name": "authentication-unavailable",
+      "override": { "authentication": { "state": "unavailable" } },
+      "expected": false
+    },
+    {
+      "name": "quota-unknown",
+      "override": { "quota": { "state": "unknown" } },
+      "expected": false
+    },
+    {
+      "name": "quota-unavailable",
+      "override": { "quota": { "state": "unavailable" } },
+      "expected": false
+    },
+    {
+      "name": "sandbox-unknown",
+      "override": { "sandbox": "unknown" },
+      "expected": false
+    },
+    {
+      "name": "sandbox-unavailable",
+      "override": { "sandbox": "unavailable" },
+      "expected": false
+    },
+    {
+      "name": "result-schema-unknown",
+      "override": { "result_schema": "unknown" },
+      "expected": false
+    },
+    {
+      "name": "result-schema-invalid-empty",
+      "override": { "result_schema": "invalid-empty" },
+      "expected": false
+    },
+    {
+      "name": "result-schema-invalid-shape",
+      "override": { "result_schema": "invalid-shape" },
+      "expected": false
+    },
+    {
+      "name": "task-acceptance-unknown",
+      "override": { "task_acceptance": "unknown" },
+      "expected": false
+    },
+    {
+      "name": "task-acceptance-rejected",
+      "override": { "task_acceptance": "rejected" },
+      "expected": false
+    },
+    {
+      "name": "transport-not-terminated",
+      "override": { "transport": { "terminated": false, "exit_code": null } },
+      "expected": false
+    }
+  ]
+}

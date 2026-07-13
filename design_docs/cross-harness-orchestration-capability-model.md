@@ -259,6 +259,16 @@ Task profile 必须先于模型品牌，至少覆盖 reasoning、uncertainty、r
 
 必须分别发现 Claude native/CLI、Codex native/CLI、Cursor IDE plugin、`agent|cursor-agent` headless。PATH 只有其中任一种的正反 fixture 都要正确。
 
+Cursor 的首个发现切片先收口在 `ccm harness list` 的本机只读 inventory：
+
+- `cursor-ide-plugin` / `ide-plugin` 与 `cursor-agent` / `cli-headless` 是两个独立 surface descriptor；顶层 Cursor harness 的 `installed` 仍只回答 IDE/plugin 分发目标是否存在，不因 `cursor-agent` 单独存在而翻真。
+- 结构化 inventory 用加法字段 `surfaces[]` 载两个 descriptor，用 `installedSurfaces[]` 给出已安装 surface id；不改现有 `installed[]` 的 plugin-target 语义，避免 headless-only 机器触发 IDE plugin install/upgrade。
+- `cursor-agent` 只在可执行的 `cursor-agent` binary（或显式 `CCM_CURSOR_AGENT_BIN` / `CURSOR_AGENT_BIN`）存在时才是 `installed:true` + `available:true`；descriptor 保留 binary name 和 PATH 命中的绝对路径，symlink 按可执行入口路径报告，非可执行文件不算发现。
+- 本切片只证明 local binary presence；`authentication` / `quota` 固定报 `unknown` + `not-probed`，不读 credential、不调 provider。`accountMutation` 报 `forbidden`，`accountAutoswitch` 与 `pluginDistribution` 报 `unsupported`；这些负能力不因用户已手工 auth 而改变。
+- 这是 machine-fact discovery 切片，不晋升 headless invocation / structured result / cancel / resume / model / quota admission 的 target 状态。
+
+Cursor Agent admission 合同已有一个 **partial** 落点：[`harnesses/cursor-agent-admission-contract.md`](harnesses/cursor-agent-admission-contract.md) 定义 `ccm/cursor-agent-admission/v1`，把 `binary.available`、`authentication.state`、`quota.state`、sandbox、result schema、task acceptance 和 transport termination 独立建模。inventory 只挂 unprobed、fail-closed snapshot，不执行 provider process；fixture-only evaluator 已证明 RC0-empty/invalid 不 accepted、AppArmor pre-exec 不污染 auth、mode/profile evidence 不跨用。真实 auth/quota collectors、production driver、reservation 与 dispatcher 接线仍为 `target`，不能据此宣称 Cursor headless dispatch current。
+
 ### 7.2 Auth、account 与 pool 固定边界
 
 - Codex/Cursor 只读当前认证 identity；login/logout/account/session switch、credential import/copy/write 永久 forbidden，并以 process/fs spy 验收。

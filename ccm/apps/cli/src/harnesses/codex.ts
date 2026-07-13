@@ -45,6 +45,7 @@ export const codexAdapter: HarnessAdapter = {
       reason: installed ? null : 'codex CLI not found and Codex config directory not present',
       cli,
       configPaths: [configDir],
+      surfaces: [],
       capabilities: {
         accountPool: this.accountPool,
         externalStatusline: this.externalStatusline,

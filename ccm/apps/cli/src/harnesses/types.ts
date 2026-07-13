@@ -58,6 +58,75 @@ export interface HarnessCliProbe {
   available: boolean;
 }
 
+export type HarnessSurfaceKind = 'ide-plugin' | 'cli-headless';
+export type SurfaceFactState = 'unknown' | 'available' | 'unavailable';
+export type SurfaceCapabilityState = 'supported' | 'unsupported' | 'forbidden' | 'unknown';
+
+export interface SurfaceFact {
+  state: SurfaceFactState;
+  source: string;
+}
+
+export interface SurfaceCapability {
+  state: SurfaceCapabilityState;
+  reason?: string;
+}
+
+export type CursorAgentMode = 'ask' | 'plan' | 'agent';
+export type CursorAgentSandboxRequest = 'required' | 'not-requested';
+export type CursorAgentSandboxState = 'supported' | 'unavailable' | 'not-requested' | 'unknown';
+export type CursorAgentResultSchemaState = 'valid' | 'invalid-empty' | 'invalid-shape' | 'unknown';
+export type CursorAgentTaskAcceptanceState = 'accepted' | 'rejected' | 'unknown';
+
+export interface CursorAgentAdmissionRequest {
+  mode: CursorAgentMode;
+  sandbox: CursorAgentSandboxRequest;
+}
+
+export interface CursorAgentTransportState {
+  terminated: boolean;
+  exit_code: number | null;
+  signal: string | null;
+}
+
+export interface CursorAgentAdmissionEvidence {
+  request: CursorAgentAdmissionRequest | null;
+  binary: HarnessCliProbe;
+  authentication: SurfaceFact;
+  quota: SurfaceFact;
+  sandbox: CursorAgentSandboxState;
+  result_schema: CursorAgentResultSchemaState;
+  task_acceptance: CursorAgentTaskAcceptanceState;
+  transport: CursorAgentTransportState;
+}
+
+export interface CursorAgentAdmission extends CursorAgentAdmissionEvidence {
+  schema: 'ccm/cursor-agent-admission/v1';
+  schedulable: boolean;
+  blockers: string[];
+}
+
+export interface HarnessSurfaceDescriptor {
+  id: string;
+  displayName: string;
+  kind: HarnessSurfaceKind;
+  installed: boolean;
+  available: boolean;
+  reason: string | null;
+  binary: HarnessCliProbe;
+  configPaths: string[];
+  facts: {
+    authentication: SurfaceFact;
+    quota: SurfaceFact;
+  };
+  admission: CursorAgentAdmission | null;
+  capabilities: {
+    accountMutation: SurfaceCapability;
+    accountAutoswitch: SurfaceCapability;
+    pluginDistribution: SurfaceCapability;
+  };
+}
+
 export interface HarnessInstallation {
   id: HarnessId;
   displayName: string;
@@ -66,6 +135,7 @@ export interface HarnessInstallation {
   reason: string | null;
   cli: HarnessCliProbe;
   configPaths: string[];
+  surfaces: HarnessSurfaceDescriptor[];
   capabilities: {
     accountPool: Capability;
     externalStatusline: Capability;
