@@ -19,9 +19,10 @@
 //
 // 安全：settings.json 存在但**坏 JSON** → 绝不覆写（可能毁掉用户配置）；install 返回 error、autoInstall skip。
 //
-// 红线1 / ADR-006：node/JS only，纯 node stdlib（fs/path），零网络、零第三方依赖。
+// 红线1 / ADR-006：node/JS only，纯 node stdlib（fs/path/os），零网络、零第三方依赖。
 
 import * as fs from 'node:fs';
+import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { type PathEnv, resolveClaudeConfigDir } from '../paths.js';
 
@@ -240,8 +241,11 @@ function killSwitch(env: PathEnv): boolean {
 //     1. 路径含 `/worktrees/`——git worktree 约定目录（本仓 `.claude/worktrees/<id>/...`）。
 //     2. 从 binPath 所在目录**向上 walk**命中 monorepo / 仓库 dev 标记：`.git`（dir 或 file·worktree 用 file）/
 //        `pnpm-workspace.yaml` / `turbo.json`——后两者是 monorepo **根**专属、绝不出现在已发布的单包或 SEA 安装树里。
+//   walk 的信任边界 = 系统共享 temp root：扫描它的**子目录**（真实 temp repo 仍能命中），但不采信
+//   temp root 本身的 marker。该目录被多进程 / test worker 共享，别的进程瞬时创建 `.git` 不能证明
+//   `<temp>/<isolated-install>/ccm` 属于那个仓库。这个边界不改变仓库内 / worktree 的 dev suppression。
 //   **刻意不**把裸 `package.json` 当标记：全局 npm 安装的 ccm 自带 `package.json`，用它会误伤真实全局安装用户。
-//   纯 `fs.accessSync` 探活·全程吞错（探测异常 → 保守判「非 dev」·绝不因探测失败而拦住真实用户的自动安装）。
+//   纯 node fs 探活·全程吞错（探测异常 → 保守判「非 dev」·绝不因探测失败而拦住真实用户的自动安装）。
 const DEV_WALKUP_MARKERS = ['.git', 'pnpm-workspace.yaml', 'turbo.json'] as const;
 function hasMarker(dir: string, name: string): boolean {
   try {
@@ -251,13 +255,25 @@ function hasMarker(dir: string, name: string): boolean {
     return false;
   }
 }
+function comparablePath(input: string): string {
+  let resolved = path.resolve(input);
+  try {
+    resolved = fs.realpathSync.native(resolved);
+  } catch {
+    // 路径可能在探测瞬间消失；退回 lexical resolve，不让 DEV-GUARD 抛错。
+  }
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
 export function looksLikeDevInvocation(binPath: string | undefined): boolean {
   if (!binPath) return false;
   try {
     // 归一化分隔符做 substring（Windows 容错）。
     if (binPath.replace(/\\/g, '/').includes('/worktrees/')) return true;
+    const sharedTempRoot = comparablePath(tmpdir());
     let dir = path.dirname(binPath);
     for (let i = 0; i < 40; i++) {
+      // 共享 temp root 不是项目拥有的仓库边界；不采信其 marker，也不继续向更广的共享祖先走。
+      if (comparablePath(dir) === sharedTempRoot) break;
       for (const m of DEV_WALKUP_MARKERS) if (hasMarker(dir, m)) return true;
       const parent = path.dirname(dir);
       if (parent === dir) break; // 抵达文件系统根

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterEach, test } from 'node:test';
 import {
   autoInstallStatuslineOnce,
@@ -39,6 +39,29 @@ function exists(p: string): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+const TMP_ENV_KEYS = ['TMPDIR', 'TMP', 'TEMP'] as const;
+function comparableTestPath(input: string): string {
+  const resolved = resolve(input);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+function withSimulatedTempRoot<T>(root: string, run: () => T): T {
+  const previous = TMP_ENV_KEYS.map((key) => ({ key, value: process.env[key] }));
+  for (const key of TMP_ENV_KEYS) process.env[key] = root;
+  try {
+    assert.equal(
+      comparableTestPath(tmpdir()),
+      comparableTestPath(root),
+      'fixture must make node:os.tmpdir() resolve to the simulated shared temp root',
+    );
+    return run();
+  } finally {
+    for (const { key, value } of previous) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   }
 }
 
@@ -184,6 +207,35 @@ test('looksLikeDevInvocation: 向上 walk 命中 pnpm-workspace.yaml → dev', (
   const bin = join(root, 'ccm', 'apps', 'cli', 'bin', 'ccm.cjs');
   writeFileSync(bin, '// stub');
   assert.equal(looksLikeDevInvocation(bin), true);
+});
+
+test('looksLikeDevInvocation: 共享 temp root 的瞬态 .git 不污染独立安装目录', () => {
+  const sandbox = mkdir();
+  const sharedTempRoot = join(sandbox, 'shared-tmp');
+  mkdirSync(join(sharedTempRoot, '.git'), { recursive: true });
+  const installDir = join(sharedTempRoot, 'worker-a', 'home', '.local', 'bin');
+  mkdirSync(installDir, { recursive: true });
+  const bin = join(installDir, 'ccm');
+  writeFileSync(bin, 'SEA');
+
+  withSimulatedTempRoot(sharedTempRoot, () => {
+    assert.equal(looksLikeDevInvocation(bin), false);
+  });
+});
+
+test('looksLikeDevInvocation: 共享 temp root 下的真实子仓库仍判 dev', () => {
+  const sandbox = mkdir();
+  const sharedTempRoot = join(sandbox, 'shared-tmp');
+  const repo = join(sharedTempRoot, 'worker-b', 'repo');
+  mkdirSync(join(repo, '.git'), { recursive: true });
+  const binDir = join(repo, 'ccm', 'apps', 'cli', 'bin');
+  mkdirSync(binDir, { recursive: true });
+  const bin = join(binDir, 'ccm.cjs');
+  writeFileSync(bin, '// stub');
+
+  withSimulatedTempRoot(sharedTempRoot, () => {
+    assert.equal(looksLikeDevInvocation(bin), true);
+  });
 });
 
 test('looksLikeDevInvocation: 安装路径（无 dev 标记·非 worktree）→ 非 dev', () => {
