@@ -217,6 +217,10 @@ export const REGISTRY: Registry = {
           field: 'source.github_issue.url',
           desc: '以 GitHub issue URL 作为 board 需求来源',
         },
+        capabilities: {
+          type: 'boolean',
+          desc: '只读返回 board init 能力列表（不解析路径、不加锁、不写盘）',
+        },
       },
       examples: [
         'ccm board init --goal "试验性编排"',

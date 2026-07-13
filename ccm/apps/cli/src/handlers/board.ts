@@ -187,6 +187,8 @@ export function enableContract(ctx: Ctx): number {
 //   自定义 resolve：--board 显式路径优先，否则在 resolveHome 内生成时间序文件名（与 bootstrap-board.sh 同口径）。
 //     resolve 返回 { boardPath, board:null }——mutate 忽略 raw 直接 boardInit 产板（owner.active:true / session_id:""）。
 //   仍走 runWrite 的 lock + lint + 原子写同一管线（模板含 hard error → EXIT.VALIDATION）。
+export const BOARD_INIT_STRUCTURED_PATH_CAPABILITY = 'board-init/structured-board-path-v1';
+
 function initResolve(ctx: Ctx): { boardPath: string; board: null } {
   const explicit =
     (ctx.values && (ctx.values.board as string)) || (ctx.env && ctx.env.CC_MASTER_BOARD);
@@ -208,7 +210,7 @@ function initResolve(ctx: Ctx): { boardPath: string; board: null } {
   // QA #16：init 是「建板」命令——目标目录不存在时自建（否则 runWrite 抢锁 openSync('<board>.lock','wx')
   //   先撞 ENOENT 而非建板，`ccm board init --home <新目录>` 报错且不留痕）。只有 init 这么做：它创建板，
   //   故得负责让承载目录就位；其它写命令的板已由 discover 找到、父目录必然在，无需 mkdir。
-  fs.mkdirSync(path.dirname(boardPath), { recursive: true });
+  if (!ctx.flags.dryRun) fs.mkdirSync(path.dirname(boardPath), { recursive: true });
   return { boardPath, board: null };
 }
 
@@ -226,6 +228,11 @@ function parseGithubIssueUrl(value: unknown): string {
 }
 
 export function init(ctx: Ctx): number {
+  if (ctx.values && ctx.values.capabilities) {
+    const data = { capabilities: [BOARD_INIT_STRUCTURED_PATH_CAPABILITY] };
+    ctx.out(ctx.flags.json ? render.jsonString(data) : data.capabilities.join('\n'));
+    return EXIT.OK;
+  }
   return runWrite(ctx, {
     resolve: initResolve,
     mutate: () => {
@@ -235,7 +242,12 @@ export function init(ctx: Ctx): number {
     },
     render: (board, c, { dryRun, boardPath }) => {
       const b = board as { goal?: string; source?: { kind?: string; url?: string } };
-      if (c.flags.json) return render.renderBoardSummary(b, { json: true });
+      if (c.flags.json)
+        return render.renderBoardSummary(b, {
+          json: true,
+          boardPath: dryRun ? undefined : boardPath,
+          capabilities: [BOARD_INIT_STRUCTURED_PATH_CAPABILITY],
+        });
       const goalStr = b.goal ? `goal="${b.goal}"` : '(无 goal)';
       const sourceStr =
         b.source && b.source.kind === 'github_issue' && b.source.url

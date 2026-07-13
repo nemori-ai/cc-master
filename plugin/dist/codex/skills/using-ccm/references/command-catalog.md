@@ -382,9 +382,16 @@ ccm board init [flags]
 |---|---|---|---|---|
 | `--goal <str>` | | string | 空串 | 初始 goal |
 | `--github-issue <url>` | | URL | | 以 GitHub issue URL 作为 board 需求来源，写 `board.source.kind=github_issue` / `board.source.url`；若未给 `--goal`，goal 派生为 `GitHub issue: <url>` |
+| `--json` | | bool | | 返回 board 摘要；真实写入含 `data.board_path`，并声明 `data.capabilities` |
+| `--dry-run` | `-n` | bool | false | 跑完整建板校验但不落盘；仍声明 capability，但输出不含 `data.board_path` |
+| `--capabilities` | | bool | false | 只读返回 init 能力列表；不解析路径、不加锁、不建目录，供独立发版的 plugin 写前握手 |
 
 - 例：`ccm board init --goal "试验性编排"` · `ccm board init --github-issue https://github.com/o/r/issues/9`
 - 产物：`<home>/<YYYYMMDDThhmmssZ>-<pid>.board.json`
+- 结构化路径合同：真实 `--json` 输出含绝对 `data.board_path` 和
+  `data.capabilities:["board-init/structured-board-path-v1"]`。用 `--capabilities --json` 做写前握手；
+  旧 ccm 会在参数解析阶段拒绝该 flag，不会触发 init resolver。`--dry-run --json` 仍声明
+  同一 capability，但**省略 `data.board_path`**，因为没有产物被写出；它自身也是零写。
 - 注意：`--github-issue` 是 board source，不会创建 synthetic task；orchestrator 读取 issue 后再拆真实 DAG。
 
 ### board update
@@ -2150,6 +2157,28 @@ id 不存在时 `data` = `null`，exit 0。
   "lint": { "ok": true, "errors": 0, "warnings": 3 }
 }
 ```
+
+### board init（`ccm board init --json`）
+
+真实写入的 `data` 是 board 摘要，并额外携带实际产物路径与命令级 capability：
+
+```json
+{
+  "capabilities": ["board-init/structured-board-path-v1"],
+  "board_path": "/abs/home/boards/<generated-board-name>",
+  "goal": "catalog probe demo",
+  "owner": { "active": true, "session_id": "", "heartbeat": "2026-07-13T12:00:00Z" },
+  "taskCount": 0,
+  "statusCounts": {},
+  "lint": null
+}
+```
+
+示例里的 `board_path` 代表实际绝对 board artifact 路径。`ccm board init --dry-run --json`
+的 `data.capabilities` 相同，但输出**不含 `data.board_path`**：dry-run 没有写出可命名的
+artifact。消费者应先用 `ccm board init --capabilities --json` 做兼容性握手；该只读端点返回
+`{"ok":true,"data":{"capabilities":["board-init/structured-board-path-v1"]}}`，不解析或创建任何路径。
+不得从人读 stdout 抓路径，也不得把 dry-run 当成已创建。
 
 ### board lint（`ccm board lint --json` / `ccm lint --json`）
 

@@ -20,6 +20,23 @@ under `<home>/boards/`. This hook is what creates that condition — either by w
   silent (dormant, since arming hasn't happened yet).
 - `rule-bootstrap-fresh-arm`: on fresh trigger (no `--resume`), create a new `<home>/boards/*.board.json`
   and stamp `owner.session_id` = the current session id, `owner.active = true`. This is the ARM act.
+- `rule-bootstrap-structured-created-path`: fresh bootstrap obtains the created artifact path only
+  from `ccm board init --json`'s schema-owned `data.board_path` field. The path must be absolute and
+  identify a board artifact; hook implementations must not scrape human-readable CLI output.
+  Spaces, Unicode, and symlinked homes are opaque path data and do not change ARM semantics.
+- `rule-bootstrap-structured-path-capability`: before the Claude Code implementation performs the
+  mutating init, legacy migration, or directory creation, it runs the read-only
+  `CC_MASTER_NO_AUTOINSTALL=1 ccm board init --capabilities --json --no-input` endpoint and requires capability
+  `board-init/structured-board-path-v1`. Capability is authoritative because independently released
+  plugin/ccm builds may share version `0.20.0`. Missing or malformed capability output fails loudly
+  before any persistent effect. The first planned compatible release is ccm `0.21.0`; an older ccm
+  rejects the unknown flag during argument parsing, before its legacy init resolver can create a
+  parent directory. The hook also sets `CC_MASTER_NO_AUTOINSTALL=1` on its fallback `ccm --version`
+  probe, so both probes leave `CC_MASTER_HOME` and `CLAUDE_CONFIG_DIR` byte-identical. Current ccm
+  independently exempts this capability endpoint from statusline auto-install, so its public read-only
+  contract does not depend on caller discipline. Capability discovery is deliberately separate from
+  `--dry-run`: discovery must happen before any init-path resolution or persistence in legacy binaries;
+  `--dry-run` remains zero-write and omits `data.board_path` because no artifact exists.
 - `rule-bootstrap-resume-arm`: on `--resume [selector]`, select an existing board (by stem or the
   unique-match rule when no selector given), refuse to steal a board that is currently
   `owner.active:true` for a *different* session, otherwise re-stamp `owner.session_id` to the current
@@ -51,6 +68,8 @@ from AGENTS.md §12's `runHook`/`isArmed` grep door). Its own "gate" is the trig
 ```yaml
 - rule: rule-bootstrap-ccm-hard-precheck
   required_hosts: [claude-code, cursor]
+- rule: rule-bootstrap-structured-path-capability
+  required_hosts: [claude-code]
 ```
 
 ## 降级行为

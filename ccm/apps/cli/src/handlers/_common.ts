@@ -252,16 +252,7 @@ export function runWrite(
         });
   const boardPath = resolved.boardPath;
 
-  return io.withBoardLock(boardPath, () => {
-    // 读盘（以盘上最新为准）。resolve 已读过一份，但加锁后重读防 TOCTOU。init 路径盘上可能没文件 → null。
-    let raw: unknown = resolved.board || null;
-    try {
-      const text = fs.readFileSync(boardPath, 'utf8');
-      raw = JSON.parse(text);
-    } catch (_e) {
-      // 文件不存在 / 坏 JSON：init 路径合法（raw 留 null，mutate 自建）；非 init 路径 resolve 已保证存在。
-    }
-
+  const execute = (raw: unknown): number => {
     // mutate 后跑写关卡 reconcile（mutate → reconcile → lint）：
     //   ① reconcileGating：deps 驱动 ready↔blocked 归一（ADR-023）。
     //   ② reconcileInbox：通知收件箱过期 / supersede / GC（ADR-032）。
@@ -294,6 +285,22 @@ export function runWrite(
     io.writeFileAtomicSync(boardPath, `${JSON.stringify(next, null, 2)}\n`);
     ctx.out(render(next, ctx, { dryRun: false, boardPath }));
     return EXIT.OK;
+  };
+
+  // dry-run 是真正的零写操作：不创建锁、临时文件或父目录。resolve 已给出只读快照，
+  // 预览在该快照上做 mutate + lint；真实写入仍在锁内重读，保留 TOCTOU 防护。
+  if (flags.dryRun) return execute(resolved.board || null);
+
+  return io.withBoardLock(boardPath, () => {
+    // 读盘（以盘上最新为准）。resolve 已读过一份，但加锁后重读防 TOCTOU。init 路径盘上可能没文件 → null。
+    let raw: unknown = resolved.board || null;
+    try {
+      const text = fs.readFileSync(boardPath, 'utf8');
+      raw = JSON.parse(text);
+    } catch (_e) {
+      // 文件不存在 / 坏 JSON：init 路径合法（raw 留 null，mutate 自建）；非 init 路径 resolve 已保证存在。
+    }
+    return execute(raw);
   });
 }
 

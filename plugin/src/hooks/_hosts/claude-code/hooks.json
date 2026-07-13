@@ -1,30 +1,30 @@
 {
   "hooks": {
     "UserPromptSubmit": [
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/bootstrap-board.sh" }] }
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/bootstrap-board.sh\"" }] }
     ],
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-board.js" }] },
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/usage-pacing.js" }] },
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/coordination-inbox.js" }] },
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/identity-nudge.js" }] }
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-board.js\"" }] },
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/usage-pacing.js\"" }] },
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/coordination-inbox.js\"" }] },
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/identity-nudge.js\"" }] }
     ],
     "SessionStart": [
-      { "matcher": "startup|resume|compact", "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/reinject.js" }] },
-      { "matcher": "startup|resume|compact", "hooks": [{ "type": "command", "command": "CC_MASTER_HARNESS=claude-code ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/orchestrator-context-core.js" }] }
+      { "matcher": "startup|resume|compact", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/reinject.js\"" }] },
+      { "matcher": "startup|resume|compact", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/orchestrator-context-core.js\"" }] }
     ],
     "PostToolBatch": [
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/posttool-batch.js" }] },
-      { "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/usage-pacing.js" }] },
-      { "hooks": [{ "type": "command", "command": "CC_MASTER_HARNESS=claude-code ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/orchestrator-context-core.js" }] }
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/posttool-batch.js\"" }] },
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/usage-pacing.js\"" }] },
+      { "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/orchestrator-context-core.js\"" }] }
     ],
     "PostToolUse": [
       { "matcher": "Write|Edit|MultiEdit",
-        "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/board-lint.js" }] }
+        "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/board-lint.js\"" }] }
     ],
     "PreToolUse": [
       { "matcher": "Write|Edit|MultiEdit|Bash",
-        "hooks": [{ "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/board-guard.js" }] }
+        "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/board-guard.js\"" }] }
     ]
   }
 }

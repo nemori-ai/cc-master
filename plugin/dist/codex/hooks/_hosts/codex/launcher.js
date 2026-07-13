@@ -2,6 +2,7 @@
 const { spawnSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const DIAGNOSTIC_TEXT_LIMIT = 4096;
@@ -174,11 +175,14 @@ function eventName(rawEvent) {
 function resolvePluginRoot() {
   const fromEnv = process.env.CC_MASTER_PLUGIN_ROOT || process.env.PLUGIN_ROOT || '';
   if (path.isAbsolute(fromEnv)) return fromEnv;
-  return path.resolve(__dirname, '..', '..');
+  // Installed layout: hooks/_hosts/codex/launcher.js → plugin root is ../../..
+  return path.resolve(__dirname, '..', '..', '..');
 }
 
 function resolveHome() {
-  return process.env.CC_MASTER_HOME || path.join(process.env.HOME || '', '.cc_master');
+  const cwd = process.cwd();
+  if (process.env.CC_MASTER_HOME) return path.resolve(cwd, process.env.CC_MASTER_HOME);
+  return path.resolve(cwd, process.env.HOME || os.homedir(), '.cc_master');
 }
 
 function boardStem(boardPath) {
