@@ -1,0 +1,1527 @@
+import assert from 'node:assert/strict';
+import { type ChildProcess, spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
+import { afterEach, test } from 'node:test';
+import {
+  createProviderRequestDeadline,
+  type ProviderChildLimits,
+  ProviderChildSupervisorError,
+  type ProviderChildSupervisorErrorCode,
+  superviseProviderChild,
+} from '../src/provider-child-supervisor.js';
+import {
+  createPosixProcessGroup,
+  PROVIDER_PROCESS_TREE_SCHEMA,
+  type ProviderOwnedChild,
+} from '../src/provider-runtime.js';
+
+const CHILDREN = new Set<ChildProcess>();
+const DESCENDANT_PIDS = new Set<number>();
+const NODE_MAX_TIMER_DELAY_MS = 2_147_483_647;
+
+const DEFAULT_LIMITS: ProviderChildLimits = {
+  startupTimeoutMs: 1_000,
+  idleTimeoutMs: 1_000,
+  stdoutLimitBytes: 16 * 1024,
+  stderrLimitBytes: 16 * 1024,
+  terminationGraceMs: 30,
+  reapTimeoutMs: 500,
+};
+
+afterEach(() => {
+  for (const child of CHILDREN) {
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+  }
+  for (const pid of DESCENDANT_PIDS) {
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+    }
+  }
+  CHILDREN.clear();
+  DESCENDANT_PIDS.clear();
+});
+
+function spawnNode(source: string): ChildProcess {
+  const child = spawn(process.execPath, ['-e', source], {
+    detached: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  CHILDREN.add(child);
+  child.once('close', () => CHILDREN.delete(child));
+  return child;
+}
+
+async function spawnReadyNode(source: string, detached = false): Promise<ChildProcess> {
+  const child = spawn(process.execPath, ['-e', source], {
+    detached,
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+  });
+  CHILDREN.add(child);
+  child.once('close', () => CHILDREN.delete(child));
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => finish(new Error('child readiness handshake timed out')), 2_000);
+    const onMessage = (message: unknown) => {
+      if (message === 'ready') finish();
+    };
+    const onError = (error: Error) => finish(error);
+    const onClose = (exitCode: number | null, signal: NodeJS.Signals | null) =>
+      finish(new Error(`child closed before ready: exit=${exitCode} signal=${signal}`));
+    const finish = (error?: Error) => {
+      clearTimeout(timer);
+      child.off('message', onMessage);
+      child.off('error', onError);
+      child.off('close', onClose);
+      if (error) reject(error);
+      else resolve();
+    };
+    child.on('message', onMessage);
+    child.once('error', onError);
+    child.once('close', onClose);
+  });
+  return child;
+}
+
+function ownChild(child: ChildProcess): ProviderOwnedChild {
+  if (typeof child.pid === 'number') return { child, tree: createPosixProcessGroup(child) };
+  return {
+    child,
+    tree: {
+      schema: PROVIDER_PROCESS_TREE_SCHEMA,
+      kind: 'posix-process-group',
+      groupId: 1,
+      signal: (signal) => child.kill(signal),
+      isAlive: () => child.exitCode === null && child.signalCode === null,
+    },
+  };
+}
+
+interface LauncherTreeFixture {
+  launcher: ChildProcess;
+  launcherPid: number;
+  grandchildPid: number;
+}
+
+async function spawnLauncherTree(
+  options: { cooperative?: boolean; launcherCooperative?: boolean; emitParserInput?: boolean } = {},
+): Promise<LauncherTreeFixture> {
+  const grandchildSource = `
+    ${options.cooperative ? '' : "process.on('SIGTERM', () => {});"}
+    setInterval(() => {}, 1_000);
+  `;
+  const launcherSource = `
+    const { spawn } = require('node:child_process');
+    ${options.cooperative || options.launcherCooperative ? '' : "process.on('SIGTERM', () => {});"}
+    if (typeof process.send !== 'function') process.exit(70);
+    process.send({ type: 'launcher-ready', pid: process.pid });
+    const grandchild = spawn(process.execPath, ['-e', ${JSON.stringify(grandchildSource)}], {
+      stdio: 'ignore',
+    });
+    grandchild.once('spawn', () => {
+      process.send({ type: 'grandchild-ready', pid: grandchild.pid });
+      ${options.emitParserInput ? "process.stdout.write('parser-input');" : ''}
+    });
+    setInterval(() => {}, 1_000);
+  `;
+  const launcher = spawn(process.execPath, ['-e', launcherSource], {
+    detached: true,
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+  });
+  CHILDREN.add(launcher);
+  launcher.once('close', () => CHILDREN.delete(launcher));
+
+  return await new Promise<LauncherTreeFixture>((resolve, reject) => {
+    let launcherPid: number | null = null;
+    let grandchildPid: number | null = null;
+    const timer = setTimeout(() => finish(new Error('launcher tree readiness timed out')), 2_000);
+    const onMessage = (message: unknown) => {
+      if (typeof message !== 'object' || message === null) return;
+      const record = message as { type?: unknown; pid?: unknown };
+      if (!Number.isSafeInteger(record.pid) || Number(record.pid) <= 0) return;
+      if (record.type === 'launcher-ready') launcherPid = Number(record.pid);
+      if (record.type === 'grandchild-ready') {
+        grandchildPid = Number(record.pid);
+        DESCENDANT_PIDS.add(grandchildPid);
+      }
+      if (launcherPid !== null && grandchildPid !== null) {
+        finish(undefined, { launcher, launcherPid, grandchildPid });
+      }
+    };
+    const onError = (error: Error) => finish(error);
+    const onClose = (exitCode: number | null, signal: NodeJS.Signals | null) =>
+      finish(new Error(`launcher closed before tree ready: exit=${exitCode} signal=${signal}`));
+    const finish = (error?: Error, fixture?: LauncherTreeFixture) => {
+      clearTimeout(timer);
+      launcher.off('message', onMessage);
+      launcher.off('error', onError);
+      launcher.off('close', onClose);
+      if (error) reject(error);
+      else resolve(fixture as LauncherTreeFixture);
+    };
+    launcher.on('message', onMessage);
+    launcher.once('error', onError);
+    launcher.once('close', onClose);
+  });
+}
+
+function pidExists(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false;
+    throw error;
+  }
+}
+
+function traceTreeLifecycle(
+  label: string,
+  fixture: LauncherTreeFixture,
+  elapsedMs: number,
+  sentinelPid?: number,
+): void {
+  if (process.env.CCM_PROVIDER_TREE_TRACE !== '1') return;
+  console.log(
+    `TREE_LIFECYCLE ${JSON.stringify({
+      label,
+      launcher_pid: fixture.launcherPid,
+      grandchild_pid: fixture.grandchildPid,
+      sentinel_pid: sentinelPid ?? null,
+      elapsed_ms: elapsedMs,
+      launcher_alive_after_return: pidExists(fixture.launcherPid),
+      grandchild_alive_after_return: pidExists(fixture.grandchildPid),
+      sentinel_alive_after_return: sentinelPid === undefined ? null : pidExists(sentinelPid),
+    })}`,
+  );
+}
+
+function fakeUnstartedChild(): ChildProcess & { signals: NodeJS.Signals[] } {
+  const child = new EventEmitter();
+  const signals: NodeJS.Signals[] = [];
+  let signalCode: NodeJS.Signals | null = null;
+  Object.defineProperties(child, {
+    stdout: { value: new PassThrough() },
+    stderr: { value: new PassThrough() },
+    stdin: { value: null },
+    pid: { value: undefined },
+    exitCode: { get: () => null },
+    signalCode: { get: () => signalCode },
+    signals: { value: signals },
+  });
+  Object.defineProperty(child, 'kill', {
+    value: (signal: NodeJS.Signals = 'SIGTERM') => {
+      signals.push(signal);
+      queueMicrotask(() => {
+        signalCode = signal;
+        child.emit('exit', null, signal);
+        child.emit('close', null, signal);
+      });
+      return true;
+    },
+  });
+  return child as ChildProcess & { signals: NodeJS.Signals[] };
+}
+
+interface ReentrantTreeFixture {
+  ownedChild: ProviderOwnedChild;
+  stdout: PassThrough;
+  signals: NodeJS.Signals[];
+  close(exitCode: number | null, signal: NodeJS.Signals | null): void;
+  isAliveCalls(): number;
+}
+
+function reentrantTreeFixture(
+  options: {
+    closeOnSignal?: boolean;
+    signalResult?: boolean;
+    isAliveResults?: boolean[];
+    onIsAlive?: (child: EventEmitter, call: number) => void;
+  } = {},
+): ReentrantTreeFixture {
+  const child = new EventEmitter();
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  const signals: NodeJS.Signals[] = [];
+  let exitCode: number | null = null;
+  let signalCode: NodeJS.Signals | null = null;
+  let closed = false;
+  let aliveChecks = 0;
+
+  const close = (nextExitCode: number | null, nextSignal: NodeJS.Signals | null): void => {
+    if (closed) return;
+    closed = true;
+    exitCode = nextExitCode;
+    signalCode = nextSignal;
+    child.emit('exit', exitCode, signalCode);
+    child.emit('close', exitCode, signalCode);
+  };
+
+  Object.defineProperties(child, {
+    stdout: { value: stdout },
+    stderr: { value: stderr },
+    stdin: { value: null },
+    pid: { value: undefined },
+    exitCode: { get: () => exitCode },
+    signalCode: { get: () => signalCode },
+  });
+
+  return {
+    ownedChild: {
+      child: child as ChildProcess,
+      tree: {
+        schema: PROVIDER_PROCESS_TREE_SCHEMA,
+        kind: 'posix-process-group',
+        groupId: 1,
+        signal: (signal) => {
+          signals.push(signal);
+          if (options.closeOnSignal) close(null, signal);
+          return options.signalResult ?? true;
+        },
+        isAlive: () => {
+          aliveChecks += 1;
+          const call = aliveChecks;
+          options.onIsAlive?.(child, call);
+          return options.isAliveResults?.[call - 1] ?? !closed;
+        },
+      },
+    },
+    stdout,
+    signals,
+    close,
+    isAliveCalls: () => aliveChecks,
+  };
+}
+
+interface FakeTimerRecord {
+  id: number;
+  dueAtMs: number;
+  active: boolean;
+  callback: (...args: unknown[]) => void;
+  args: unknown[];
+}
+
+interface FakeTimerClock {
+  advanceTo(nowMs: number): void;
+  activeCount(): number;
+}
+
+async function withFakeTimerClock<T>(run: (clock: FakeTimerClock) => Promise<T>): Promise<T> {
+  const originalNow = Date.now;
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+  let nowMs = 0;
+  let nextId = 0;
+  const timers: FakeTimerRecord[] = [];
+
+  Date.now = () => nowMs;
+  globalThis.setTimeout = ((
+    callback: (...args: unknown[]) => void,
+    delayMs = 0,
+    ...args: unknown[]
+  ) => {
+    const timer: FakeTimerRecord = {
+      id: nextId++,
+      dueAtMs: nowMs + Number(delayMs),
+      active: true,
+      callback,
+      args,
+    };
+    timers.push(timer);
+    return timer as unknown as NodeJS.Timeout;
+  }) as typeof globalThis.setTimeout;
+  globalThis.clearTimeout = ((handle: NodeJS.Timeout | string | number | undefined) => {
+    if (handle && typeof handle === 'object') {
+      (handle as unknown as FakeTimerRecord).active = false;
+    }
+  }) as typeof globalThis.clearTimeout;
+
+  const clock: FakeTimerClock = {
+    advanceTo(targetMs) {
+      assert.ok(targetMs >= nowMs, 'fake clock cannot move backwards');
+      nowMs = targetMs;
+      while (true) {
+        const timer = timers
+          .filter((candidate) => candidate.active && candidate.dueAtMs <= nowMs)
+          .sort((left, right) => left.dueAtMs - right.dueAtMs || left.id - right.id)[0];
+        if (!timer) return;
+        timer.active = false;
+        timer.callback(...timer.args);
+      }
+    },
+    activeCount() {
+      return timers.filter((timer) => timer.active).length;
+    },
+  };
+
+  try {
+    return await run(clock);
+  } finally {
+    Date.now = originalNow;
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.clearTimeout = originalClearTimeout;
+  }
+}
+
+async function expectSupervisorError(
+  promise: Promise<unknown>,
+  code: ProviderChildSupervisorErrorCode,
+  operation: string,
+): Promise<ProviderChildSupervisorError> {
+  try {
+    await promise;
+  } catch (error) {
+    assert.ok(error instanceof ProviderChildSupervisorError);
+    assert.equal(error.code, code);
+    assert.equal(error.operation, operation);
+    return error;
+  }
+  assert.fail(`expected ${operation} to fail with ${code}`);
+}
+
+test('collects raw bytes with incremental fatal UTF-8 and preserves a nonzero exit', async () => {
+  const observed: string[] = [];
+  const child = spawnNode(`
+    process.stdout.write(Buffer.from([0x41, 0xe2]));
+    setTimeout(() => process.stdout.write(Buffer.from([0x82])), 5);
+    setTimeout(() => process.stdout.write(Buffer.from([0xac, 0x5a])), 10);
+    setTimeout(() => { process.stderr.write('diagnostic'); process.exit(42); }, 15);
+  `);
+
+  const result = await superviseProviderChild(ownChild(child), {
+    operation: 'version',
+    deadline: createProviderRequestDeadline(1_000),
+    limits: DEFAULT_LIMITS,
+    onStdoutText: (text) => observed.push(text),
+  });
+
+  assert.equal(result.stdout, 'A€Z');
+  assert.equal(observed.join(''), 'A€Z');
+  assert.equal(result.stderr, 'diagnostic');
+  assert.equal(result.stdoutBytes, 5);
+  assert.equal(result.stderrBytes, 10);
+  assert.equal(result.exitCode, 42);
+  assert.equal(result.signal, null);
+  assert.equal(result.reaped, true);
+});
+
+test('fails closed on a raw invalid UTF-8 byte and reaps the terminated child', async () => {
+  const child = spawnNode(`
+    process.on('SIGTERM', () => {});
+    process.stdout.write(Buffer.from([0x7b, 0x22, 0x78, 0x22, 0x3a, 0x80, 0x7d, 0x0a]));
+    setInterval(() => {}, 1_000);
+  `);
+
+  const error = await expectSupervisorError(
+    superviseProviderChild(ownChild(child), {
+      operation: 'exec',
+      deadline: createProviderRequestDeadline(1_000),
+      limits: DEFAULT_LIMITS,
+    }),
+    'invalid_utf8',
+    'exec',
+  );
+
+  assert.equal(error.stream, 'stdout');
+  assert.deepEqual(error.termination, {
+    exitCode: null,
+    signal: 'SIGKILL',
+    reaped: true,
+  });
+});
+
+test('rejects a stream that was put in lossy string-decoding mode before supervision', async () => {
+  const child = spawnNode(`
+    process.on('SIGTERM', () => {});
+    setInterval(() => {}, 1_000);
+  `);
+  child.stdout?.setEncoding('utf8');
+
+  const error = await expectSupervisorError(
+    superviseProviderChild(ownChild(child), {
+      operation: 'app-server',
+      deadline: createProviderRequestDeadline(1_000),
+      limits: DEFAULT_LIMITS,
+    }),
+    'byte_stream_required',
+    'app-server',
+  );
+
+  assert.equal(error.termination?.reaped, true);
+  assert.ok(error.termination?.signal === 'SIGTERM' || error.termination?.signal === 'SIGKILL');
+});
+
+test('enforces a strict byte limit before decoding', async () => {
+  const child = spawnNode(`
+    process.stdout.write(Buffer.alloc(33, 0x61));
+    setInterval(() => {}, 1_000);
+  `);
+
+  const error = await expectSupervisorError(
+    superviseProviderChild(ownChild(child), {
+      operation: 'help',
+      deadline: createProviderRequestDeadline(1_000),
+      limits: { ...DEFAULT_LIMITS, stdoutLimitBytes: 32 },
+    }),
+    'output_limit',
+    'help',
+  );
+
+  assert.equal(error.stream, 'stdout');
+  assert.equal(error.limitBytes, 32);
+  assert.equal(error.observedBytes, 33);
+});
+
+test('reports startup timeout with the exact operation and waits for close', async () => {
+  const child = fakeUnstartedChild();
+  const error = await expectSupervisorError(
+    superviseProviderChild(ownChild(child), {
+      operation: 'help',
+      deadline: createProviderRequestDeadline(1_000),
+      limits: { ...DEFAULT_LIMITS, startupTimeoutMs: 20 },
+    }),
+    'startup_timeout',
+    'help',
+  );
+
+  assert.deepEqual(child.signals, ['SIGTERM']);
+  assert.deepEqual(error.termination, {
+    exitCode: null,
+    signal: 'SIGTERM',
+    reaped: true,
+  });
+});
+
+test('supervision keeps its timeout lifecycle alive without unrelated refed handles', async () => {
+  const supervisorUrl = new URL('../src/provider-child-supervisor.ts', import.meta.url).href;
+  const runtime = `
+    import { EventEmitter } from 'node:events';
+    import { PassThrough } from 'node:stream';
+    import {
+      createProviderRequestDeadline,
+      superviseProviderChild,
+    } from ${JSON.stringify(supervisorUrl)};
+
+    const child = new EventEmitter();
+    let signalCode = null;
+    Object.defineProperties(child, {
+      stdout: { value: new PassThrough() },
+      stderr: { value: new PassThrough() },
+      stdin: { value: null },
+      pid: { value: undefined },
+      exitCode: { get: () => null },
+      signalCode: { get: () => signalCode },
+    });
+    Object.defineProperty(child, 'kill', {
+      value: (signal = 'SIGTERM') => {
+        queueMicrotask(() => {
+          signalCode = signal;
+          child.emit('exit', null, signal);
+          child.emit('close', null, signal);
+        });
+        return true;
+      },
+    });
+
+    const tree = {
+      schema: 'ccm/provider-process-tree/v1',
+      kind: 'posix-process-group',
+      groupId: 1,
+      signal: (signal) => child.kill(signal),
+      isAlive: () => signalCode === null,
+    };
+
+    try {
+      await superviseProviderChild({ child, tree }, {
+        operation: 'liveness-probe',
+        deadline: createProviderRequestDeadline(1_000),
+        limits: {
+          startupTimeoutMs: 20,
+          idleTimeoutMs: 1_000,
+          stdoutLimitBytes: 1_024,
+          stderrLimitBytes: 1_024,
+          terminationGraceMs: 30,
+          reapTimeoutMs: 100,
+        },
+      });
+      process.exitCode = 91;
+    } catch (error) {
+      if (error?.code !== 'startup_timeout' || error?.termination?.reaped !== true) {
+        console.error(error);
+        process.exitCode = 92;
+      } else {
+        process.stdout.write('startup_timeout:reaped\\n');
+      }
+    }
+  `;
+  const probe = spawn(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', runtime], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const stdout: Buffer[] = [];
+  const stderr: Buffer[] = [];
+  probe.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
+  probe.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+
+  const [exitCode, signal] = await new Promise<[number | null, NodeJS.Signals | null]>((resolve) =>
+    probe.once('close', (code, closedSignal) => resolve([code, closedSignal])),
+  );
+
+  assert.equal(signal, null);
+  assert.equal(
+    exitCode,
+    0,
+    `isolated liveness probe exited ${exitCode}: ${Buffer.concat(stderr).toString('utf8')}`,
+  );
+  assert.equal(Buffer.concat(stdout).toString('utf8'), 'startup_timeout:reaped\n');
+});
+
+test('clears a long startup timer after it rearms beyond the Node timer limit', async () => {
+  await withFakeTimerClock(async (clock) => {
+    const child = fakeUnstartedChild();
+    const supervised = superviseProviderChild(
+      { child, tree: null },
+      {
+        operation: 'long-startup-cleanup',
+        deadline: createProviderRequestDeadline(NODE_MAX_TIMER_DELAY_MS * 2 + 2_000),
+        limits: {
+          ...DEFAULT_LIMITS,
+          startupTimeoutMs: NODE_MAX_TIMER_DELAY_MS + 1_000,
+        },
+      },
+    );
+
+    clock.advanceTo(NODE_MAX_TIMER_DELAY_MS);
+    assert.equal(clock.activeCount(), 2, 'hard and startup timers should both rearm');
+
+    child.emit('close', 0, null);
+    const result = await supervised;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(clock.activeCount(), 0, 'success must clear the rearmed startup timer');
+  });
+});
+
+test('clears a long idle timer after it rearms beyond the Node timer limit', async () => {
+  await withFakeTimerClock(async (clock) => {
+    const child = fakeUnstartedChild();
+    const supervised = superviseProviderChild(
+      { child, tree: null },
+      {
+        operation: 'long-idle-cleanup',
+        deadline: createProviderRequestDeadline(NODE_MAX_TIMER_DELAY_MS * 2 + 2_000),
+        limits: {
+          ...DEFAULT_LIMITS,
+          startupTimeoutMs: NODE_MAX_TIMER_DELAY_MS + 1_000,
+          idleTimeoutMs: NODE_MAX_TIMER_DELAY_MS + 1_000,
+        },
+      },
+    );
+
+    (child.stdout as PassThrough).write(Buffer.from('.'));
+    clock.advanceTo(NODE_MAX_TIMER_DELAY_MS);
+    assert.equal(clock.activeCount(), 2, 'hard and idle timers should both rearm');
+
+    child.emit('close', 0, null);
+    const result = await supervised;
+
+    assert.equal(result.stdout, '.');
+    assert.equal(clock.activeCount(), 0, 'success must clear the rearmed idle timer');
+  });
+});
+
+test('a long hard deadline remains owned across rearm and still fails closed', async () => {
+  await withFakeTimerClock(async (clock) => {
+    const child = fakeUnstartedChild();
+    const supervised = superviseProviderChild(ownChild(child), {
+      operation: 'long-hard-timeout',
+      deadline: createProviderRequestDeadline(NODE_MAX_TIMER_DELAY_MS + 1_000),
+      limits: {
+        ...DEFAULT_LIMITS,
+        startupTimeoutMs: NODE_MAX_TIMER_DELAY_MS * 2,
+      },
+    });
+
+    clock.advanceTo(NODE_MAX_TIMER_DELAY_MS);
+    assert.equal(clock.activeCount(), 2, 'hard and startup timers should both rearm');
+    clock.advanceTo(NODE_MAX_TIMER_DELAY_MS + 1_000);
+
+    const error = await expectSupervisorError(supervised, 'hard_timeout', 'long-hard-timeout');
+    assert.equal(error.termination?.reaped, true);
+    assert.equal(clock.activeCount(), 0, 'hard-timeout cleanup must clear every owned timer');
+  });
+});
+
+for (const signalResult of [true, false]) {
+  test(`synchronous close from SIGTERM cannot late-arm cleanup (signal=${signalResult})`, async () => {
+    await withFakeTimerClock(async (clock) => {
+      const fixture = reentrantTreeFixture({ closeOnSignal: true, signalResult });
+      const supervised = superviseProviderChild(fixture.ownedChild, {
+        operation: 'sync-close-from-term',
+        deadline: createProviderRequestDeadline(1_000),
+        limits: { ...DEFAULT_LIMITS, startupTimeoutMs: 20 },
+      });
+
+      clock.advanceTo(20);
+      const error = await expectSupervisorError(
+        supervised,
+        'startup_timeout',
+        'sync-close-from-term',
+      );
+
+      assert.equal(error.termination?.reaped, true);
+      assert.deepEqual(fixture.signals, ['SIGTERM']);
+      assert.equal(clock.activeCount(), 0, 'terminal reject must not leave a grace timer');
+      const aliveChecksAtSettlement = fixture.isAliveCalls();
+
+      clock.advanceTo(1_000);
+      assert.deepEqual(fixture.signals, ['SIGTERM'], 'settlement must prevent a late SIGKILL');
+      assert.equal(
+        fixture.isAliveCalls(),
+        aliveChecksAtSettlement,
+        'settlement must prevent a late cleanup poll',
+      );
+    });
+  });
+}
+
+test('successful onClose finalization leaves no timer or late cleanup effect', async () => {
+  await withFakeTimerClock(async (clock) => {
+    const fixture = reentrantTreeFixture();
+    const supervised = superviseProviderChild(fixture.ownedChild, {
+      operation: 'sync-success-close',
+      deadline: createProviderRequestDeadline(1_000),
+      limits: DEFAULT_LIMITS,
+    });
+
+    fixture.stdout.write(Buffer.from('ok'));
+    fixture.close(0, null);
+    const result = await supervised;
+
+    assert.equal(result.stdout, 'ok');
+    assert.equal(result.reaped, true);
+    assert.equal(clock.activeCount(), 0);
+    const aliveChecksAtSettlement = fixture.isAliveCalls();
+
+    clock.advanceTo(1_000);
+    assert.deepEqual(fixture.signals, []);
+    assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+  });
+});
+
+test('onClose finalizer failure cannot late-arm after cleanup poll settles', async () => {
+  await withFakeTimerClock(async (clock) => {
+    const fixture = reentrantTreeFixture();
+    const supervised = superviseProviderChild(fixture.ownedChild, {
+      operation: 'sync-finalizer-failure',
+      deadline: createProviderRequestDeadline(1_000),
+      limits: DEFAULT_LIMITS,
+    });
+
+    fixture.stdout.write(Buffer.from([0xe2]));
+    fixture.close(0, null);
+    const error = await expectSupervisorError(supervised, 'invalid_utf8', 'sync-finalizer-failure');
+
+    assert.equal(error.stream, 'stdout');
+    assert.equal(error.termination?.reaped, true);
+    assert.deepEqual(fixture.signals, ['SIGTERM']);
+    assert.equal(fixture.isAliveCalls(), 1, 'cleanup poll must observe the closed tree');
+    assert.equal(clock.activeCount(), 0, 'typed reject must not leave a grace timer');
+
+    clock.advanceTo(1_000);
+    assert.deepEqual(fixture.signals, ['SIGTERM'], 'typed reject must prevent a late SIGKILL');
+    assert.equal(fixture.isAliveCalls(), 1, 'typed reject must prevent a late cleanup poll');
+  });
+});
+
+const REENTRANT_CALLBACK_SCENARIOS = [
+  { name: 'first-byte-onStarted', expectedCode: 'consumer_error' },
+  { name: 'spawn-onStarted', expectedCode: 'consumer_error' },
+  { name: 'stdout-parser', expectedCode: 'consumer_error' },
+  { name: 'abort', expectedCode: 'cancelled' },
+  { name: 'child-error', expectedCode: 'spawn_error' },
+] as const;
+
+for (const signalResult of [true, false]) {
+  for (const scenario of REENTRANT_CALLBACK_SCENARIOS) {
+    test(`reentrant ${scenario.name} terminal has no post-callback effects (signal=${signalResult})`, async () => {
+      await withFakeTimerClock(async (clock) => {
+        const fixture = reentrantTreeFixture({ closeOnSignal: true, signalResult });
+        const cancellation = new AbortController();
+        const callbackFailure = new Error(`controlled ${scenario.name} failure`);
+        const supervised = superviseProviderChild(fixture.ownedChild, {
+          operation: scenario.name,
+          deadline: createProviderRequestDeadline(1_000),
+          limits: { ...DEFAULT_LIMITS, idleTimeoutMs: 700 },
+          signal: cancellation.signal,
+          onStarted:
+            scenario.name === 'first-byte-onStarted' || scenario.name === 'spawn-onStarted'
+              ? () => {
+                  throw callbackFailure;
+                }
+              : undefined,
+          onStdoutText:
+            scenario.name === 'stdout-parser'
+              ? () => {
+                  throw callbackFailure;
+                }
+              : undefined,
+        });
+
+        if (scenario.name === 'first-byte-onStarted' || scenario.name === 'stdout-parser') {
+          fixture.stdout.write(Buffer.from('.'));
+        } else if (scenario.name === 'spawn-onStarted') {
+          fixture.ownedChild.child.emit('spawn');
+        } else if (scenario.name === 'abort') {
+          cancellation.abort(callbackFailure);
+        } else {
+          fixture.ownedChild.child.emit('error', callbackFailure);
+        }
+
+        const error = await expectSupervisorError(supervised, scenario.expectedCode, scenario.name);
+        assert.equal(error.cause, callbackFailure);
+        assert.equal(error.stream, scenario.name === 'stdout-parser' ? 'stdout' : undefined);
+        assert.equal(error.termination?.reaped, true);
+        assert.deepEqual(fixture.signals, ['SIGTERM']);
+        assert.equal(
+          clock.activeCount(),
+          0,
+          'terminal callback must not leave an operational timer',
+        );
+        const aliveChecksAtSettlement = fixture.isAliveCalls();
+
+        clock.advanceTo(1_000);
+        assert.deepEqual(
+          fixture.signals,
+          ['SIGTERM'],
+          'terminal callback must prevent late SIGKILL',
+        );
+        assert.equal(
+          fixture.isAliveCalls(),
+          aliveChecksAtSettlement,
+          'terminal callback must prevent late cleanup polling',
+        );
+      });
+    });
+  }
+}
+
+for (const signalResult of [true, false]) {
+  for (const callbackKind of ['onStarted', 'onStdoutText'] as const) {
+    for (const callbackThrows of [false, true]) {
+      test(`atomic ${callbackKind} sync close ${callbackThrows ? 'then throw' : 'and return'} (signal=${signalResult})`, async () => {
+        await withFakeTimerClock(async (clock) => {
+          const fixture = reentrantTreeFixture({ closeOnSignal: true, signalResult });
+          const callbackFailure = new Error(`controlled ${callbackKind} failure`);
+          let callbackCalls = 0;
+          const callback = () => {
+            callbackCalls += 1;
+            fixture.close(0, null);
+            fixture.ownedChild.child.emit('close', 0, null);
+            if (callbackThrows) throw callbackFailure;
+          };
+          const supervised = superviseProviderChild(fixture.ownedChild, {
+            operation: `atomic-${callbackKind}-${callbackThrows ? 'throw' : 'return'}`,
+            deadline: createProviderRequestDeadline(1_000),
+            limits: DEFAULT_LIMITS,
+            onStarted: callbackKind === 'onStarted' ? callback : undefined,
+            onStdoutText: callbackKind === 'onStdoutText' ? callback : undefined,
+          });
+
+          if (callbackKind === 'onStarted') fixture.ownedChild.child.emit('spawn');
+          else fixture.stdout.write(Buffer.from('.'));
+
+          if (callbackThrows) {
+            const error = await expectSupervisorError(
+              supervised,
+              'consumer_error',
+              `atomic-${callbackKind}-throw`,
+            );
+            assert.equal(error.cause, callbackFailure);
+            assert.equal(error.stream, callbackKind === 'onStdoutText' ? 'stdout' : undefined);
+            assert.equal(error.termination?.reaped, true);
+            assert.deepEqual(fixture.signals, ['SIGTERM']);
+          } else {
+            const result = await supervised;
+            assert.equal(result.exitCode, 0);
+            assert.equal(result.signal, null);
+            assert.equal(result.reaped, true);
+            assert.equal(result.stdout, callbackKind === 'onStdoutText' ? '.' : '');
+            assert.deepEqual(fixture.signals, []);
+          }
+
+          assert.equal(callbackCalls, 1, 'duplicate close must not repeat the consumer callback');
+          assert.equal(clock.activeCount(), 0);
+          const signalsAtSettlement = [...fixture.signals];
+          const aliveChecksAtSettlement = fixture.isAliveCalls();
+          clock.advanceTo(1_000);
+          assert.deepEqual(fixture.signals, signalsAtSettlement);
+          assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+        });
+      });
+    }
+  }
+}
+
+for (const signalResult of [true, false]) {
+  for (const nestedThrows of [false, true]) {
+    test(`nested consumer callback drains terminal events after outer return (${nestedThrows ? 'throw' : 'return'}, signal=${signalResult})`, async () => {
+      await withFakeTimerClock(async (clock) => {
+        const fixture = reentrantTreeFixture({ closeOnSignal: true, signalResult });
+        const callbackFailure = new Error('controlled nested stdout failure');
+        let outerCalls = 0;
+        let innerCalls = 0;
+        const supervised = superviseProviderChild(fixture.ownedChild, {
+          operation: `nested-callback-${nestedThrows ? 'throw' : 'return'}`,
+          deadline: createProviderRequestDeadline(1_000),
+          limits: DEFAULT_LIMITS,
+          onStarted: () => {
+            outerCalls += 1;
+            fixture.stdout.write(Buffer.from('nested'));
+          },
+          onStdoutText: () => {
+            innerCalls += 1;
+            fixture.close(0, null);
+            if (nestedThrows) throw callbackFailure;
+          },
+        });
+
+        fixture.ownedChild.child.emit('spawn');
+
+        if (nestedThrows) {
+          const error = await expectSupervisorError(
+            supervised,
+            'consumer_error',
+            'nested-callback-throw',
+          );
+          assert.equal(error.cause, callbackFailure);
+          assert.equal(error.stream, 'stdout');
+          assert.equal(error.termination?.reaped, true);
+          assert.deepEqual(fixture.signals, ['SIGTERM']);
+        } else {
+          const result = await supervised;
+          assert.equal(result.stdout, 'nested');
+          assert.equal(result.reaped, true);
+          assert.deepEqual(fixture.signals, []);
+        }
+
+        assert.equal(outerCalls, 1);
+        assert.equal(innerCalls, 1);
+        assert.equal(clock.activeCount(), 0);
+        const signalsAtSettlement = [...fixture.signals];
+        const aliveChecksAtSettlement = fixture.isAliveCalls();
+        clock.advanceTo(1_000);
+        assert.deepEqual(fixture.signals, signalsAtSettlement);
+        assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+      });
+    });
+  }
+}
+
+for (const signalResult of [true, false]) {
+  for (const callbackThrows of [false, true]) {
+    test(`callback terminal precedence: ${callbackThrows ? 'consumer throw' : 'first queued child error'} wins (signal=${signalResult})`, async () => {
+      await withFakeTimerClock(async (clock) => {
+        const fixture = reentrantTreeFixture({ signalResult });
+        const childFailure = new Error('controlled child error');
+        const callbackFailure = new Error('controlled consumer failure');
+        const supervised = superviseProviderChild(fixture.ownedChild, {
+          operation: `callback-precedence-${callbackThrows ? 'consumer' : 'child'}`,
+          deadline: createProviderRequestDeadline(1_000),
+          limits: DEFAULT_LIMITS,
+          onStarted: () => {
+            fixture.ownedChild.child.emit('error', childFailure);
+            fixture.close(0, null);
+            if (callbackThrows) throw callbackFailure;
+          },
+        });
+
+        fixture.ownedChild.child.emit('spawn');
+
+        const error = await expectSupervisorError(
+          supervised,
+          callbackThrows ? 'consumer_error' : 'spawn_error',
+          `callback-precedence-${callbackThrows ? 'consumer' : 'child'}`,
+        );
+        assert.equal(error.cause, callbackThrows ? callbackFailure : childFailure);
+        assert.equal(error.termination?.reaped, true);
+        assert.deepEqual(fixture.signals, ['SIGTERM']);
+        assert.equal(clock.activeCount(), 0);
+        const aliveChecksAtSettlement = fixture.isAliveCalls();
+        clock.advanceTo(1_000);
+        assert.deepEqual(fixture.signals, ['SIGTERM']);
+        assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+      });
+    });
+  }
+}
+
+for (const signalResult of [true, false]) {
+  for (const callbackThrows of [false, true]) {
+    test(`callback terminal precedence: ${callbackThrows ? 'consumer throw' : 'queued abort'} wins over callback-induced cancel (signal=${signalResult})`, async () => {
+      await withFakeTimerClock(async (clock) => {
+        const fixture = reentrantTreeFixture({ signalResult });
+        const cancellation = new AbortController();
+        const cancelReason = new Error('controlled callback cancellation');
+        const callbackFailure = new Error('controlled callback failure after cancel');
+        const supervised = superviseProviderChild(fixture.ownedChild, {
+          operation: `callback-abort-precedence-${callbackThrows ? 'consumer' : 'cancel'}`,
+          deadline: createProviderRequestDeadline(1_000),
+          limits: DEFAULT_LIMITS,
+          signal: cancellation.signal,
+          onStarted: () => {
+            cancellation.abort(cancelReason);
+            fixture.close(0, null);
+            if (callbackThrows) throw callbackFailure;
+          },
+        });
+
+        fixture.ownedChild.child.emit('spawn');
+
+        const error = await expectSupervisorError(
+          supervised,
+          callbackThrows ? 'consumer_error' : 'cancelled',
+          `callback-abort-precedence-${callbackThrows ? 'consumer' : 'cancel'}`,
+        );
+        assert.equal(error.cause, callbackThrows ? callbackFailure : cancelReason);
+        assert.equal(error.termination?.reaped, true);
+        assert.deepEqual(fixture.signals, ['SIGTERM']);
+        assert.equal(clock.activeCount(), 0);
+        const aliveChecksAtSettlement = fixture.isAliveCalls();
+        clock.advanceTo(1_000);
+        assert.deepEqual(fixture.signals, ['SIGTERM']);
+        assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+      });
+    });
+  }
+}
+
+function emitLateOrdinaryProviderWork(fixture: ReentrantTreeFixture, clock: FakeTimerClock): void {
+  fixture.stdout.write(Buffer.from('late-stdout'));
+  fixture.stdout.write(Buffer.from([0xff]));
+  const stderr = fixture.ownedChild.child.stderr as PassThrough;
+  stderr.write(Buffer.from('late-stderr'));
+  stderr.write(Buffer.from([0xff]));
+  fixture.stdout.emit('end');
+  stderr.emit('end');
+  fixture.ownedChild.child.emit('spawn');
+  clock.advanceTo(50);
+}
+
+for (const signalResult of [true, false]) {
+  for (const callbackKind of ['onStarted', 'onStdoutText'] as const) {
+    for (const callbackThrows of [false, true]) {
+      test(`pending close freezes late ordinary work from ${callbackKind} (${callbackThrows ? 'throw' : 'return'}, signal=${signalResult})`, async () => {
+        await withFakeTimerClock(async (clock) => {
+          const fixture = reentrantTreeFixture({ signalResult });
+          const callbackFailure = new Error(`controlled frozen ${callbackKind} failure`);
+          const observedStdout: string[] = [];
+          const observedStderr: string[] = [];
+          let terminalCallbackCalls = 0;
+          const terminalCallback = () => {
+            terminalCallbackCalls += 1;
+            fixture.close(0, null);
+            emitLateOrdinaryProviderWork(fixture, clock);
+            if (callbackThrows) throw callbackFailure;
+          };
+          const supervised = superviseProviderChild(fixture.ownedChild, {
+            operation: `pending-close-${callbackKind}-${callbackThrows ? 'throw' : 'return'}`,
+            deadline: createProviderRequestDeadline(1_000),
+            limits: { ...DEFAULT_LIMITS, startupTimeoutMs: 20, idleTimeoutMs: 20 },
+            onStarted: callbackKind === 'onStarted' ? terminalCallback : undefined,
+            onStdoutText: (text) => {
+              observedStdout.push(text);
+              if (callbackKind === 'onStdoutText' && observedStdout.length === 1)
+                terminalCallback();
+            },
+            onStderrText: (text) => observedStderr.push(text),
+          });
+
+          if (callbackKind === 'onStarted') fixture.ownedChild.child.emit('spawn');
+          else fixture.stdout.write(Buffer.from('.'));
+
+          if (callbackThrows) {
+            const error = await expectSupervisorError(
+              supervised,
+              'consumer_error',
+              `pending-close-${callbackKind}-throw`,
+            );
+            assert.equal(error.cause, callbackFailure);
+            assert.equal(error.stream, callbackKind === 'onStdoutText' ? 'stdout' : undefined);
+            assert.equal(error.termination?.reaped, true);
+            assert.deepEqual(fixture.signals, ['SIGTERM']);
+          } else {
+            const result = await supervised;
+            const expectedStdout = callbackKind === 'onStdoutText' ? '.' : '';
+            assert.equal(result.stdout, expectedStdout);
+            assert.equal(result.stdoutBytes, Buffer.byteLength(expectedStdout));
+            assert.equal(result.stderr, '');
+            assert.equal(result.stderrBytes, 0);
+            assert.deepEqual(fixture.signals, []);
+          }
+
+          assert.equal(terminalCallbackCalls, 1);
+          assert.deepEqual(observedStdout, callbackKind === 'onStdoutText' ? ['.'] : []);
+          assert.deepEqual(observedStderr, []);
+          assert.equal(clock.activeCount(), 0);
+          const signalsAtSettlement = [...fixture.signals];
+          const aliveChecksAtSettlement = fixture.isAliveCalls();
+          clock.advanceTo(1_000);
+          assert.deepEqual(fixture.signals, signalsAtSettlement);
+          assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+        });
+      });
+    }
+  }
+}
+
+for (const signalResult of [true, false]) {
+  for (const terminalKind of ['error', 'abort', 'parser'] as const) {
+    for (const callbackThrows of [false, true]) {
+      test(`pending ${terminalKind} freezes late ordinary work (${callbackThrows ? 'throw' : 'return'}, signal=${signalResult})`, async () => {
+        await withFakeTimerClock(async (clock) => {
+          const fixture = reentrantTreeFixture({ signalResult });
+          const cancellation = new AbortController();
+          const terminalCause = new Error(`controlled ${terminalKind} terminal`);
+          const callbackFailure = new Error(`controlled ${terminalKind} consumer failure`);
+          const observedStdout: string[] = [];
+          const observedStderr: string[] = [];
+          let startedCalls = 0;
+          const supervised = superviseProviderChild(fixture.ownedChild, {
+            operation: `pending-${terminalKind}-${callbackThrows ? 'throw' : 'return'}`,
+            deadline: createProviderRequestDeadline(1_000),
+            limits: { ...DEFAULT_LIMITS, startupTimeoutMs: 20, idleTimeoutMs: 20 },
+            signal: cancellation.signal,
+            onStarted: () => {
+              startedCalls += 1;
+              if (terminalKind === 'error') {
+                fixture.ownedChild.child.emit('error', terminalCause);
+              } else if (terminalKind === 'abort') {
+                cancellation.abort(terminalCause);
+              } else {
+                fixture.stdout.write(Buffer.from([0xff]));
+              }
+              emitLateOrdinaryProviderWork(fixture, clock);
+              fixture.close(0, null);
+              if (callbackThrows) throw callbackFailure;
+            },
+            onStdoutText: (text) => observedStdout.push(text),
+            onStderrText: (text) => observedStderr.push(text),
+          });
+
+          fixture.ownedChild.child.emit('spawn');
+
+          const expectedCode = callbackThrows
+            ? 'consumer_error'
+            : terminalKind === 'error'
+              ? 'spawn_error'
+              : terminalKind === 'abort'
+                ? 'cancelled'
+                : 'invalid_utf8';
+          const error = await expectSupervisorError(
+            supervised,
+            expectedCode,
+            `pending-${terminalKind}-${callbackThrows ? 'throw' : 'return'}`,
+          );
+          if (!callbackThrows && terminalKind === 'parser') {
+            assert.ok(error.cause instanceof TypeError);
+          } else {
+            assert.equal(error.cause, callbackThrows ? callbackFailure : terminalCause);
+          }
+          assert.equal(
+            error.stream,
+            !callbackThrows && terminalKind === 'parser' ? 'stdout' : undefined,
+          );
+          assert.equal(error.termination?.reaped, true);
+          assert.equal(startedCalls, 1);
+          assert.deepEqual(observedStdout, []);
+          assert.deepEqual(observedStderr, []);
+          assert.deepEqual(fixture.signals, ['SIGTERM']);
+          assert.equal(clock.activeCount(), 0);
+          const aliveChecksAtSettlement = fixture.isAliveCalls();
+          clock.advanceTo(1_000);
+          assert.deepEqual(fixture.signals, ['SIGTERM']);
+          assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+        });
+      });
+    }
+  }
+}
+
+async function withCloseFinalizerText<T>(run: () => Promise<T>): Promise<T> {
+  const OriginalTextDecoder = globalThis.TextDecoder;
+  let decoderIndex = 0;
+  class FinalizerTextDecoder {
+    private readonly emitOnFinalize = decoderIndex++ === 0;
+
+    decode(input?: Uint8Array): string {
+      if (input !== undefined) return '';
+      return this.emitOnFinalize ? 'flush-from-close-finalizer' : '';
+    }
+  }
+  globalThis.TextDecoder = FinalizerTextDecoder as unknown as typeof TextDecoder;
+  try {
+    return await run();
+  } finally {
+    globalThis.TextDecoder = OriginalTextDecoder;
+  }
+}
+
+for (const signalResult of [true, false]) {
+  for (const laterEffects of ['error', 'abort', 'multiple'] as const) {
+    for (const callbackThrows of [false, true]) {
+      test(`close-first drain is non-reentrant with later ${laterEffects} (${callbackThrows ? 'throw' : 'return'}, signal=${signalResult})`, async () => {
+        await withFakeTimerClock(async (clock) => {
+          await withCloseFinalizerText(async () => {
+            const fixture = reentrantTreeFixture({ signalResult });
+            const cancellation = new AbortController();
+            const laterFailure = new Error(`later ${laterEffects} terminal`);
+            const callbackFailure = new Error(`finalizer ${laterEffects} consumer failure`);
+            const observedText: string[] = [];
+            const seed = Buffer.from('seed-decoder');
+            const supervised = superviseProviderChild(fixture.ownedChild, {
+              operation: `close-first-${laterEffects}-${callbackThrows ? 'throw' : 'return'}`,
+              deadline: createProviderRequestDeadline(1_000),
+              limits: DEFAULT_LIMITS,
+              signal: cancellation.signal,
+              onStarted: () => {
+                fixture.stdout.write(seed);
+                fixture.close(0, null);
+              },
+              onStdoutText: (text) => {
+                observedText.push(text);
+                if (laterEffects === 'error' || laterEffects === 'multiple') {
+                  fixture.ownedChild.child.emit('error', laterFailure);
+                }
+                if (laterEffects === 'abort' || laterEffects === 'multiple') {
+                  cancellation.abort(laterFailure);
+                }
+                fixture.ownedChild.child.emit('close', 0, null);
+                if (callbackThrows) throw callbackFailure;
+              },
+            });
+
+            fixture.ownedChild.child.emit('spawn');
+
+            if (callbackThrows) {
+              const error = await expectSupervisorError(
+                supervised,
+                'consumer_error',
+                `close-first-${laterEffects}-throw`,
+              );
+              assert.equal(error.cause, callbackFailure);
+              assert.equal(error.stream, 'stdout');
+              assert.equal(error.termination?.reaped, true);
+              assert.deepEqual(fixture.signals, ['SIGTERM']);
+            } else {
+              const result = await supervised;
+              assert.equal(result.exitCode, 0);
+              assert.equal(result.signal, null);
+              assert.equal(result.stdout, 'flush-from-close-finalizer');
+              assert.equal(result.stdoutBytes, seed.byteLength);
+              assert.deepEqual(fixture.signals, []);
+            }
+
+            assert.deepEqual(observedText, ['flush-from-close-finalizer']);
+            assert.equal(clock.activeCount(), 0);
+            const signalsAtSettlement = [...fixture.signals];
+            const aliveChecksAtSettlement = fixture.isAliveCalls();
+            clock.advanceTo(1_000);
+            assert.deepEqual(fixture.signals, signalsAtSettlement);
+            assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+          });
+        });
+      });
+    }
+  }
+}
+
+for (const signalResult of [true, false]) {
+  for (const callbackThrows of [false, true]) {
+    test(`failure-first drain keeps error ahead of queued close (${callbackThrows ? 'throw' : 'return'}, signal=${signalResult})`, async () => {
+      await withFakeTimerClock(async (clock) => {
+        await withCloseFinalizerText(async () => {
+          const fixture = reentrantTreeFixture({ signalResult });
+          const childFailure = new Error('first queued child error');
+          const callbackFailure = new Error('failure-first consumer failure');
+          const observedText: string[] = [];
+          const supervised = superviseProviderChild(fixture.ownedChild, {
+            operation: `failure-first-${callbackThrows ? 'throw' : 'return'}`,
+            deadline: createProviderRequestDeadline(1_000),
+            limits: DEFAULT_LIMITS,
+            onStarted: () => {
+              fixture.stdout.write(Buffer.from('seed-decoder'));
+              fixture.ownedChild.child.emit('error', childFailure);
+              fixture.close(0, null);
+              if (callbackThrows) throw callbackFailure;
+            },
+            onStdoutText: (text) => observedText.push(text),
+          });
+
+          fixture.ownedChild.child.emit('spawn');
+
+          const error = await expectSupervisorError(
+            supervised,
+            callbackThrows ? 'consumer_error' : 'spawn_error',
+            `failure-first-${callbackThrows ? 'throw' : 'return'}`,
+          );
+          assert.equal(error.cause, callbackThrows ? callbackFailure : childFailure);
+          assert.equal(error.termination?.reaped, true);
+          assert.deepEqual(observedText, []);
+          assert.deepEqual(fixture.signals, ['SIGTERM']);
+          assert.equal(clock.activeCount(), 0);
+          const aliveChecksAtSettlement = fixture.isAliveCalls();
+          clock.advanceTo(1_000);
+          assert.deepEqual(fixture.signals, ['SIGTERM']);
+          assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+        });
+      });
+    });
+  }
+}
+
+test('reentrant tree probe preserves the primary error and cannot repeat termination', async () => {
+  await withFakeTimerClock(async (clock) => {
+    const callbackFailure = new Error('controlled tree-probe failure');
+    const fixture = reentrantTreeFixture({
+      isAliveResults: [true, false],
+      onIsAlive: (child, call) => {
+        if (call === 1) child.emit('error', callbackFailure);
+      },
+    });
+    const supervised = superviseProviderChild(fixture.ownedChild, {
+      operation: 'reentrant-tree-probe',
+      deadline: createProviderRequestDeadline(1_000),
+      limits: DEFAULT_LIMITS,
+    });
+
+    fixture.close(0, null);
+    const error = await expectSupervisorError(supervised, 'spawn_error', 'reentrant-tree-probe');
+
+    assert.equal(error.cause, callbackFailure);
+    assert.equal(error.termination?.reaped, true);
+    assert.deepEqual(fixture.signals, ['SIGTERM'], 'terminal tree probe must not repeat TERM');
+    assert.equal(clock.activeCount(), 0);
+    const aliveChecksAtSettlement = fixture.isAliveCalls();
+
+    clock.advanceTo(1_000);
+    assert.deepEqual(fixture.signals, ['SIGTERM']);
+    assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+  });
+});
+
+test('reports startup timeout when a real spawned child produces no provider bytes', async () => {
+  const child = spawnNode('setInterval(() => {}, 1_000);');
+  const error = await expectSupervisorError(
+    superviseProviderChild(ownChild(child), {
+      operation: 'app-server',
+      deadline: createProviderRequestDeadline(1_000),
+      limits: { ...DEFAULT_LIMITS, startupTimeoutMs: 30, idleTimeoutMs: 500 },
+    }),
+    'startup_timeout',
+    'app-server',
+  );
+
+  assert.equal(error.termination?.reaped, true);
+  assert.equal(error.termination?.signal, 'SIGTERM');
+});
+
+test('reports idle timeout only after the first provider byte then silence', async () => {
+  const child = spawnNode(`
+    process.stdout.write('.');
+    setInterval(() => {}, 1_000);
+  `);
+  const error = await expectSupervisorError(
+    superviseProviderChild(ownChild(child), {
+      operation: 'exec',
+      deadline: createProviderRequestDeadline(1_000),
+      limits: { ...DEFAULT_LIMITS, startupTimeoutMs: 250, idleTimeoutMs: 30 },
+    }),
+    'idle_timeout',
+    'exec',
+  );
+
+  assert.equal(error.termination?.reaped, true);
+  assert.equal(error.termination?.signal, 'SIGTERM');
+});
+
+test('hard=100ms escalates a real SIGTERM-ignoring child to SIGKILL and settles below 1s', {
+  timeout: 4_000,
+}, async () => {
+  const child = await spawnReadyNode(
+    `
+      process.on('SIGTERM', () => {});
+      if (typeof process.send !== 'function') process.exit(70);
+      process.send('ready');
+      setInterval(() => {}, 1_000);
+    `,
+    true,
+  );
+  const startedAt = Date.now();
+  const error = await expectSupervisorError(
+    superviseProviderChild(ownChild(child), {
+      operation: 'exec',
+      deadline: createProviderRequestDeadline(100),
+      limits: { ...DEFAULT_LIMITS, idleTimeoutMs: 500 },
+    }),
+    'hard_timeout',
+    'exec',
+  );
+  const elapsedMs = Date.now() - startedAt;
+
+  assert.ok(elapsedMs < 1_000, `hard timeout settled after ${elapsedMs}ms`);
+  assert.ok(elapsedMs >= 90, `hard timeout fired too early after ${elapsedMs}ms`);
+  assert.deepEqual(error.termination, {
+    exitCode: null,
+    signal: 'SIGKILL',
+    reaped: true,
+  });
+});
+
+test('hard timeout does not return until an uncooperative launcher and grandchild are both gone', {
+  timeout: 4_000,
+}, async () => {
+  const sentinel = await spawnReadyNode(`
+    process.on('SIGTERM', () => {});
+    if (typeof process.send !== 'function') process.exit(70);
+    process.send('ready');
+    setInterval(() => {}, 1_000);
+  `);
+  const fixture = await spawnLauncherTree();
+  const startedAt = Date.now();
+  const error = await expectSupervisorError(
+    superviseProviderChild(ownChild(fixture.launcher), {
+      operation: 'exec',
+      deadline: createProviderRequestDeadline(100),
+      limits: { ...DEFAULT_LIMITS, idleTimeoutMs: 500 },
+    }),
+    'hard_timeout',
+    'exec',
+  );
+  const elapsedMs = Date.now() - startedAt;
+  traceTreeLifecycle('hard-timeout-uncooperative', fixture, elapsedMs, sentinel.pid);
+
+  assert.ok(elapsedMs < 1_000, `owned tree cleanup settled after ${elapsedMs}ms`);
+  assert.equal(pidExists(fixture.launcherPid), false, 'launcher survived supervisor return');
+  assert.equal(pidExists(fixture.grandchildPid), false, 'grandchild survived supervisor return');
+  assert.equal(pidExists(sentinel.pid as number), true, 'unrelated sentinel entered kill scope');
+  assert.equal(error.termination?.reaped, true);
+});
+
+test('cancellation shares the owned-tree terminator and waits for descendant cleanup', {
+  timeout: 4_000,
+}, async () => {
+  const fixture = await spawnLauncherTree();
+  const cancellation = new AbortController();
+  const startedAt = Date.now();
+  const supervised = superviseProviderChild(ownChild(fixture.launcher), {
+    operation: 'exec',
+    deadline: createProviderRequestDeadline(1_000),
+    limits: DEFAULT_LIMITS,
+    signal: cancellation.signal,
+  });
+  cancellation.abort(new Error('controlled cancellation'));
+  const error = await expectSupervisorError(supervised, 'cancelled', 'exec');
+  const elapsedMs = Date.now() - startedAt;
+  traceTreeLifecycle('cancel-uncooperative', fixture, elapsedMs);
+
+  assert.ok(elapsedMs < 1_000, `cancel cleanup settled after ${elapsedMs}ms`);
+  assert.equal(pidExists(fixture.launcherPid), false, 'launcher survived cancellation');
+  assert.equal(pidExists(fixture.grandchildPid), false, 'grandchild survived cancellation');
+  assert.equal(error.termination?.reaped, true);
+});
+
+test('a SIGTERM-cooperative launcher tree exits during grace without force-kill', {
+  timeout: 4_000,
+}, async () => {
+  const fixture = await spawnLauncherTree({ cooperative: true });
+  const startedAt = Date.now();
+  const error = await expectSupervisorError(
+    superviseProviderChild(ownChild(fixture.launcher), {
+      operation: 'exec',
+      deadline: createProviderRequestDeadline(100),
+      limits: { ...DEFAULT_LIMITS, idleTimeoutMs: 500 },
+    }),
+    'hard_timeout',
+    'exec',
+  );
+  const elapsedMs = Date.now() - startedAt;
+  traceTreeLifecycle('hard-timeout-cooperative', fixture, elapsedMs);
+
+  assert.ok(elapsedMs < 1_000, `cooperative cleanup settled after ${elapsedMs}ms`);
+  assert.equal(pidExists(fixture.launcherPid), false);
+  assert.equal(pidExists(fixture.grandchildPid), false);
+  assert.equal(error.termination?.signal, 'SIGTERM');
+  assert.equal(error.termination?.reaped, true);
+});
+
+test('launcher close cannot resolve while its uncooperative grandchild remains alive', {
+  timeout: 4_000,
+}, async () => {
+  const fixture = await spawnLauncherTree({ launcherCooperative: true });
+  const startedAt = Date.now();
+  const error = await expectSupervisorError(
+    superviseProviderChild(ownChild(fixture.launcher), {
+      operation: 'exec',
+      deadline: createProviderRequestDeadline(100),
+      limits: { ...DEFAULT_LIMITS, idleTimeoutMs: 500 },
+    }),
+    'hard_timeout',
+    'exec',
+  );
+  const elapsedMs = Date.now() - startedAt;
+  traceTreeLifecycle('launcher-close-grandchild-uncooperative', fixture, elapsedMs);
+
+  assert.ok(elapsedMs < 1_000, `post-launcher cleanup settled after ${elapsedMs}ms`);
+  assert.equal(pidExists(fixture.launcherPid), false);
+  assert.equal(pidExists(fixture.grandchildPid), false, 'grandchild survived launcher close');
+  assert.equal(error.termination?.signal, 'SIGTERM');
+  assert.equal(error.termination?.reaped, true);
+});
+
+test('parser failure uses the same bounded owned-tree terminator as timeout paths', {
+  timeout: 4_000,
+}, async () => {
+  const fixture = await spawnLauncherTree({ emitParserInput: true });
+  const startedAt = Date.now();
+  const error = await expectSupervisorError(
+    superviseProviderChild(ownChild(fixture.launcher), {
+      operation: 'exec',
+      deadline: createProviderRequestDeadline(1_000),
+      limits: DEFAULT_LIMITS,
+      onStdoutText: () => {
+        throw new Error('controlled parser failure');
+      },
+    }),
+    'consumer_error',
+    'exec',
+  );
+  const elapsedMs = Date.now() - startedAt;
+  traceTreeLifecycle('parser-failure-uncooperative', fixture, elapsedMs);
+
+  assert.ok(elapsedMs < 1_000, `parser cleanup settled after ${elapsedMs}ms`);
+  assert.equal(pidExists(fixture.launcherPid), false, 'launcher survived parser failure');
+  assert.equal(pidExists(fixture.grandchildPid), false, 'grandchild survived parser failure');
+  assert.equal(error.termination?.reaped, true);
+});
+
+test('an expired shared absolute deadline is not reset for the next child', async () => {
+  const deadline = createProviderRequestDeadline(15);
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const child = fakeUnstartedChild();
+  const startedAt = Date.now();
+
+  const error = await expectSupervisorError(
+    superviseProviderChild(ownChild(child), {
+      operation: 'version',
+      deadline,
+      limits: DEFAULT_LIMITS,
+    }),
+    'hard_timeout',
+    'version',
+  );
+
+  assert.ok(Date.now() - startedAt < 50, 'expired request budget must fail immediately');
+  assert.deepEqual(child.signals, ['SIGTERM']);
+  assert.equal(error.termination?.reaped, true);
+});

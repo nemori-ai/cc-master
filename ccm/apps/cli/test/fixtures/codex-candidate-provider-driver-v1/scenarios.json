@@ -1,0 +1,1845 @@
+{
+  "schema": "ccm/codex-candidate-provider-driver-fixture-catalog/v1",
+  "contract": "ccm/codex-candidate-provider-driver/v1",
+  "result_schema": "ccm/codex-provider-inspection/v1",
+  "planned_endpoint": ["provider", "inspect", "codex"],
+  "defaults": {
+    "request": {
+      "schema": "ccm/codex-provider-inspect-request/v1",
+      "provider": "codex",
+      "model": "gpt-contract-fixture",
+      "effort": "high",
+      "prompt": "Return the contract fixture result without changing the workspace.",
+      "permission": {
+        "sandbox": "read-only",
+        "approval": "never",
+        "network": "provider-only",
+        "account_mutation": "forbidden",
+        "credential_write": "forbidden"
+      },
+      "timeouts_ms": { "startup": 1000, "idle": 1000, "hard": 8000 }
+    },
+    "probe": {
+      "binary": {
+        "available": true,
+        "version": "codex-cli 0.144.2-fixture.1",
+        "behavioral_capabilities": [
+          "exec",
+          "exec-jsonl",
+          "output-schema",
+          "output-last-message",
+          "explicit-model",
+          "explicit-effort",
+          "sandbox-read-only",
+          "approval-never",
+          "ephemeral",
+          "explicit-cwd",
+          "app-server-account-read",
+          "app-server-model-list",
+          "app-server-rate-limits-read"
+        ]
+      },
+      "auth": {
+        "revision": "codex-account-read-fixture-rev-1",
+        "state": "authenticated",
+        "account_id": "acct-fixture-opaque",
+        "credential_id": "cred-fixture-opaque",
+        "plan_type": "fixture-plan",
+        "observed_at": "2026-07-13T08:00:00Z",
+        "valid_until": "2026-07-13T08:05:00Z",
+        "freshness": "fresh",
+        "completeness": "complete"
+      },
+      "entitlement": {
+        "revision": "codex-model-list-fixture-rev-1",
+        "freshness": "fresh",
+        "completeness": "complete",
+        "observed_at": "2026-07-13T08:00:00Z",
+        "valid_until": "2026-07-13T08:05:00Z",
+        "models": [
+          {
+            "id": "gpt-contract-fixture",
+            "model": "gpt-contract-fixture",
+            "supportedReasoningEfforts": [
+              { "reasoningEffort": "medium", "description": "fixture medium" },
+              { "reasoningEffort": "high", "description": "fixture high" }
+            ],
+            "defaultReasoningEffort": "medium",
+            "hidden": false,
+            "isDefault": false
+          }
+        ]
+      },
+      "registry": {
+        "schema": "ccm/codex-model-registry-snapshot/v1",
+        "version": "codex-contract-fixture-registry-v1",
+        "source": "fixture-local-registry",
+        "observed_at": "2026-07-13T08:00:00Z",
+        "valid_until": "2026-07-20T08:00:00Z",
+        "freshness": "fresh",
+        "completeness": "complete",
+        "allowed": [{ "model": "gpt-contract-fixture", "efforts": ["medium", "high"] }]
+      },
+      "quota": {
+        "revision": "codex-rate-limits-fixture-rev-1",
+        "freshness": "fresh",
+        "completeness": "complete",
+        "admission_7d": "ample",
+        "observed_at": "2026-07-13T08:00:00Z",
+        "valid_until": "2026-07-13T08:05:00Z",
+        "payload": {
+          "rateLimits": {
+            "limitId": "legacy-single",
+            "limitName": "legacy compatibility view",
+            "credentialId": "cred-fixture-opaque",
+            "accountId": "acct-fixture-opaque",
+            "payerId": "payer-fixture-opaque",
+            "poolId": "pool-codex-fixture",
+            "sharedScope": "account",
+            "unit": "percent_used",
+            "primary": {
+              "usedPercent": 99,
+              "windowDurationMins": 300,
+              "resetsAt": 1783933200
+            },
+            "secondary": {
+              "usedPercent": 40,
+              "windowDurationMins": 10080,
+              "resetsAt": 1784534400
+            }
+          },
+          "rateLimitsByLimitId": {
+            "codex-fixture": {
+              "limitId": "codex-fixture",
+              "limitName": "Codex fixture",
+              "credentialId": "cred-fixture-opaque",
+              "accountId": "acct-fixture-opaque",
+              "payerId": "payer-fixture-opaque",
+              "poolId": "pool-codex-fixture",
+              "sharedScope": "account",
+              "unit": "percent_used",
+              "primary": {
+                "usedPercent": 99,
+                "windowDurationMins": 300,
+                "resetsAt": 1783933200
+              },
+              "secondary": {
+                "usedPercent": 40,
+                "windowDurationMins": 10080,
+                "resetsAt": 1784534400
+              }
+            },
+            "other-pool-fixture": {
+              "limitId": "other-pool-fixture",
+              "limitName": "Other preserved pool",
+              "credentialId": "cred-fixture-opaque",
+              "accountId": "acct-fixture-opaque",
+              "payerId": "payer-other-fixture",
+              "poolId": "pool-other-fixture",
+              "sharedScope": "organization",
+              "unit": "percent_used",
+              "primary": {
+                "usedPercent": 12,
+                "windowDurationMins": 1440,
+                "resetsAt": 1784016000
+              },
+              "secondary": null
+            }
+          },
+          "credits": { "hasCredits": true, "unlimited": false, "balance": "fixture-redacted" },
+          "planType": "fixture-plan"
+        },
+        "seven_day_history": [
+          { "observed_at": "2026-07-12T08:00:00Z", "used_percent": 32 },
+          { "observed_at": "2026-07-13T08:00:00Z", "used_percent": 40 }
+        ]
+      }
+    },
+    "execution": {
+      "resolved": { "model": "gpt-contract-fixture", "effort": "high" },
+      "actual": { "model": "gpt-contract-fixture", "effort": "high" },
+      "jsonl": [
+        { "type": "thread.started", "thread_id": "thr_fixture" },
+        { "type": "turn.started", "turn_id": "turn_fixture" },
+        {
+          "type": "ccm.fixture.provider_metadata",
+          "schema": "ccm/codex-provider-identity-event/v1",
+          "model": "gpt-contract-fixture",
+          "effort": "high",
+          "synthetic_contract_evidence": true
+        },
+        {
+          "type": "item.completed",
+          "item": { "id": "item_fixture", "type": "agent_message", "text": "fixture complete" }
+        },
+        {
+          "type": "turn.completed",
+          "turn_id": "turn_fixture",
+          "usage": { "input_tokens": 10, "output_tokens": 5 }
+        }
+      ],
+      "structured_output": {
+        "summary": "controlled fixture completed",
+        "acceptance": "not-evaluated",
+        "provider_proof": "injected-per-run"
+      },
+      "hang_ms": 0,
+      "fixture_control": { "cancel_after_ms": null, "write_credential_sentinel": false }
+    }
+  },
+  "scenarios": [
+    {
+      "id": "CXD-001",
+      "title": "binary unavailable",
+      "overrides": {
+        "probe": {
+          "binary": { "available": false, "version": null, "behavioral_capabilities": [] }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "binary_unavailable",
+        "execution_attempted": false,
+        "required_spawn_kinds": [],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-002",
+      "title": "authentication unknown",
+      "overrides": {
+        "probe": { "auth": { "state": "unknown", "freshness": "unknown", "valid_until": null } }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "auth_unknown",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-003",
+      "title": "model auto is forbidden before probing",
+      "overrides": { "request": { "model": "auto" } },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "model_auto_forbidden",
+        "execution_attempted": false,
+        "required_spawn_kinds": [],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-004",
+      "title": "seven-day quota unknown",
+      "overrides": {
+        "probe": {
+          "quota": { "freshness": "unknown", "admission_7d": "unknown", "valid_until": null }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "quota_unknown",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-005",
+      "title": "seven-day quota tight",
+      "overrides": {
+        "probe": {
+          "quota": {
+            "admission_7d": "tight",
+            "payload": {
+              "rateLimitsByLimitId": {
+                "codex-fixture": {
+                  "limitId": "codex-fixture",
+                  "limitName": "Codex fixture",
+                  "primary": {
+                    "usedPercent": 2,
+                    "windowDurationMins": 300,
+                    "resetsAt": 1783933200
+                  },
+                  "secondary": {
+                    "usedPercent": 82,
+                    "windowDurationMins": 10080,
+                    "resetsAt": 1784534400
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "quota_tight",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-006",
+      "title": "seven-day quota hard stale",
+      "overrides": {
+        "probe": {
+          "quota": {
+            "freshness": "hard-stale",
+            "admission_7d": "hard-stale",
+            "observed_at": "2026-07-13T06:00:00Z",
+            "valid_until": "2026-07-13T07:00:00Z"
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "quota_hard_stale",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-007",
+      "title": "five-hour saturation is ignored while seven-day is ample",
+      "overrides": {},
+      "expect": {
+        "automatic_eligible": true,
+        "status": "succeeded",
+        "error_code": null,
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "five_hour_effect": "ignored",
+        "rolling_24h": "advisory-only",
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-008",
+      "title": "seven-day hard ceiling rejects",
+      "overrides": {
+        "probe": {
+          "quota": {
+            "admission_7d": "exhausted",
+            "payload": {
+              "rateLimitsByLimitId": {
+                "codex-fixture": {
+                  "limitId": "codex-fixture",
+                  "limitName": "Codex fixture",
+                  "primary": {
+                    "usedPercent": 1,
+                    "windowDurationMins": 300,
+                    "resetsAt": 1783933200
+                  },
+                  "secondary": {
+                    "usedPercent": 90,
+                    "windowDurationMins": 10080,
+                    "resetsAt": 1784534400
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "quota_7d_exhausted",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-009",
+      "title": "actual model mismatch fails closed",
+      "overrides": {
+        "execution": {
+          "actual": { "model": "gpt-contract-other", "effort": "high" },
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "schema": "ccm/codex-provider-identity-event/v1",
+              "model": "gpt-contract-other",
+              "effort": "high",
+              "synthetic_contract_evidence": true
+            },
+            { "type": "turn.completed", "turn_id": "turn_fixture" }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "model_mismatch",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-010",
+      "title": "structured output malformed",
+      "overrides": {
+        "execution": { "structured_output": { "summary": 42, "acceptance": "wrong" } }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "structured_output_malformed",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-011",
+      "title": "hard timeout terminates the child",
+      "overrides": {
+        "request": { "timeouts_ms": { "startup": 1000, "idle": 8000, "hard": 6500 } },
+        "execution": { "hang_ms": 10000, "prelude_event_count": 1 }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "timed_out",
+        "error_code": "hard_timeout",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-012",
+      "title": "supervisor cancellation is normalized",
+      "overrides": {
+        "execution": { "hang_ms": 2000, "fixture_control": { "cancel_after_ms": 750 } }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "cancelled",
+        "error_code": "cancelled",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-013",
+      "title": "actual model evidence missing",
+      "overrides": {
+        "execution": {
+          "actual": null,
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            { "type": "turn.completed", "turn_id": "turn_fixture" }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "actual_model_missing",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-014",
+      "title": "account mutation request rejected before probing",
+      "overrides": { "request": { "permission": { "account_mutation": "allow" } } },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "account_mutation_forbidden",
+        "execution_attempted": false,
+        "required_spawn_kinds": [],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-015",
+      "title": "credential sentinel remains immutable on success",
+      "overrides": {},
+      "expect": {
+        "automatic_eligible": true,
+        "status": "succeeded",
+        "error_code": null,
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0,
+        "credential_sentinel_unchanged": true
+      }
+    },
+    {
+      "id": "CXD-016",
+      "title": "version string cannot replace capability probe",
+      "overrides": { "probe": { "binary": { "behavioral_capabilities": ["exec"] } } },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "binary_capability_unproven",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-017",
+      "title": "live entitlement missing",
+      "overrides": { "probe": { "entitlement": { "models": [] } } },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "model_unavailable",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-018",
+      "title": "requested and catalog-resolved effort mismatch fails closed",
+      "overrides": {
+        "probe": {
+          "entitlement": {
+            "models": [
+              {
+                "id": "gpt-contract-fixture",
+                "model": "gpt-contract-fixture",
+                "supportedReasoningEfforts": [
+                  { "reasoningEffort": "medium", "description": "fixture medium only" }
+                ],
+                "defaultReasoningEffort": "medium",
+                "hidden": false,
+                "isDefault": false
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "effort_mismatch",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-019",
+      "title": "requested and catalog-resolved model mismatch fails closed",
+      "overrides": {
+        "probe": {
+          "entitlement": {
+            "models": [
+              {
+                "id": "gpt-contract-resolved",
+                "model": "gpt-contract-fixture",
+                "supportedReasoningEfforts": [
+                  { "reasoningEffort": "high", "description": "fixture high" }
+                ],
+                "defaultReasoningEffort": "high",
+                "hidden": false,
+                "isDefault": false
+              }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "model_mismatch",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-020",
+      "title": "authentication evidence hard stale",
+      "overrides": {
+        "probe": {
+          "auth": {
+            "freshness": "hard-stale",
+            "observed_at": "2026-07-13T06:00:00Z",
+            "valid_until": "2026-07-13T07:00:00Z"
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "auth_unknown",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-021",
+      "title": "live model catalog evidence hard stale",
+      "overrides": {
+        "probe": {
+          "entitlement": {
+            "freshness": "hard-stale",
+            "observed_at": "2026-07-13T06:00:00Z",
+            "valid_until": "2026-07-13T07:00:00Z"
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "entitlement_unknown",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-022",
+      "title": "model registry evidence hard stale",
+      "overrides": {
+        "probe": {
+          "registry": {
+            "freshness": "hard-stale",
+            "observed_at": "2026-07-13T06:00:00Z",
+            "valid_until": "2026-07-13T07:00:00Z"
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "registry_hard_stale",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-023",
+      "title": "model registry evidence unknown",
+      "overrides": {
+        "probe": {
+          "registry": {
+            "freshness": "unknown",
+            "completeness": "unknown",
+            "valid_until": null
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "registry_unknown",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-024",
+      "title": "actual effort mismatch fails closed",
+      "overrides": {
+        "execution": {
+          "actual": { "model": "gpt-contract-fixture", "effort": "medium" },
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "schema": "ccm/codex-provider-identity-event/v1",
+              "model": "gpt-contract-fixture",
+              "effort": "medium",
+              "synthetic_contract_evidence": true
+            },
+            { "type": "turn.completed", "turn_id": "turn_fixture" }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "effort_mismatch",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-025",
+      "title": "actual effort evidence missing",
+      "overrides": {
+        "execution": {
+          "actual": { "model": "gpt-contract-fixture", "effort": null },
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "schema": "ccm/codex-provider-identity-event/v1",
+              "model": "gpt-contract-fixture",
+              "synthetic_contract_evidence": true
+            },
+            { "type": "turn.completed", "turn_id": "turn_fixture" }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "actual_effort_missing",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-026",
+      "title": "malformed JSONL line fails the stream parser",
+      "overrides": {
+        "execution": {
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            "not-json-from-provider",
+            { "type": "turn.completed", "turn_id": "turn_fixture" }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "stream_malformed",
+        "execution_attempted": true,
+        "actual_retained": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-027",
+      "title": "rolling twenty-four-hour overrun stays advisory while seven-day is ample",
+      "overrides": {
+        "probe": {
+          "quota": {
+            "seven_day_history": [
+              { "observed_at": "2026-07-12T08:00:00Z", "used_percent": 20 },
+              { "observed_at": "2026-07-13T08:00:00Z", "used_percent": 40 }
+            ]
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "succeeded",
+        "error_code": null,
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "five_hour_effect": "ignored",
+        "rolling_24h": "advisory-only",
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-028",
+      "title": "missing terminal outcome fails closed",
+      "overrides": {
+        "execution": {
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "schema": "ccm/codex-provider-identity-event/v1",
+              "model": "gpt-contract-fixture",
+              "effort": "high",
+              "synthetic_contract_evidence": true
+            },
+            {
+              "type": "item.completed",
+              "item": { "id": "item_fixture", "type": "agent_message", "text": "no terminal" }
+            }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "terminal_missing",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-029",
+      "title": "duplicate terminal outcomes fail closed",
+      "overrides": {
+        "execution": {
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "schema": "ccm/codex-provider-identity-event/v1",
+              "model": "gpt-contract-fixture",
+              "effort": "high",
+              "synthetic_contract_evidence": true
+            },
+            { "type": "turn.completed", "turn_id": "turn_fixture" },
+            { "type": "turn.completed", "turn_id": "turn_fixture" }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "terminal_duplicate",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-030",
+      "title": "invalid thread and turn lifecycle fails closed",
+      "overrides": {
+        "execution": {
+          "jsonl": [
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "schema": "ccm/codex-provider-identity-event/v1",
+              "model": "gpt-contract-fixture",
+              "effort": "high",
+              "synthetic_contract_evidence": true
+            },
+            { "type": "turn.completed", "turn_id": "turn_fixture" }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "stream_malformed",
+        "execution_attempted": true,
+        "actual_retained": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-031",
+      "title": "top-level provider error overrides apparent success",
+      "overrides": {
+        "execution": {
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "schema": "ccm/codex-provider-identity-event/v1",
+              "model": "gpt-contract-fixture",
+              "effort": "high",
+              "synthetic_contract_evidence": true
+            },
+            { "type": "turn.completed", "turn_id": "turn_fixture" },
+            {
+              "type": "error",
+              "code": "fixture-provider-error",
+              "message": "provider failed after output"
+            }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "provider_failed",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-032",
+      "title": "structured output must satisfy the requested schema",
+      "overrides": {
+        "request": {
+          "output_schema": {
+            "type": "object",
+            "required": ["summary"],
+            "properties": { "summary": { "const": "schema-specific-summary" } }
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "structured_output_malformed",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-033",
+      "title": "overlong stdout is bounded and rejected",
+      "overrides": { "execution": { "stdout_padding_bytes": 1048577 } },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "stream_malformed",
+        "execution_attempted": true,
+        "actual_retained": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "stdout_truncated": true,
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-034",
+      "title": "overlong stderr is bounded redacted and provider failure wins",
+      "overrides": {
+        "execution": {
+          "stderr": {
+            "prefix": "token=fixture-super-secret-token email=fixture@example.com ",
+            "bytes": 70000
+          },
+          "exit_code": 1
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "provider_failed",
+        "execution_attempted": true,
+        "actual_retained": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "stderr_truncated": true,
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-035",
+      "title": "idle timeout terminates a spawned silent child",
+      "overrides": {
+        "request": { "timeouts_ms": { "startup": 1000, "idle": 100, "hard": 10000 } },
+        "execution": { "hang_ms": 1000, "prelude_event_count": 1 }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "timed_out",
+        "error_code": "idle_timeout",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-036",
+      "title": "startup timeout terminates a child before first provider activity",
+      "overrides": {
+        "request": { "timeouts_ms": { "startup": 500, "idle": 1000, "hard": 10000 } },
+        "execution": { "hang_ms": 1000 }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "timed_out",
+        "error_code": "startup_timeout",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-037",
+      "title": "malformed UTF-8 in an otherwise valid JSONL lifecycle fails closed",
+      "overrides": {
+        "execution": {
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            {
+              "fixture_raw_hex": "7b2274797065223a226974656d2e636f6d706c65746564222c226974656d223a7b226964223a226974656d5f75746638222c2274797065223a226167656e745f6d657373616765222c2274657874223a2262616420802062797465227d7d"
+            },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "schema": "ccm/codex-provider-identity-event/v1",
+              "model": "gpt-contract-fixture",
+              "effort": "high",
+              "synthetic_contract_evidence": true
+            },
+            { "type": "turn.completed", "turn_id": "turn_fixture" }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "stream_malformed",
+        "execution_attempted": true,
+        "actual_retained": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-038",
+      "title": "local ref and defs constraints are executed against structured output",
+      "overrides": {
+        "request": {
+          "output_schema": {
+            "$defs": {
+              "requiredShape": {
+                "type": "object",
+                "required": ["must_exist"],
+                "properties": { "must_exist": { "type": "string" } }
+              }
+            },
+            "$ref": "#/$defs/requiredShape"
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "structured_output_malformed",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-039",
+      "title": "unsupported output schema vocabulary rejects before provider authority",
+      "overrides": {
+        "request": {
+          "output_schema": {
+            "type": "object",
+            "dependentRequired": { "summary": ["must_exist"] }
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "request_schema_invalid",
+        "execution_attempted": false,
+        "required_spawn_kinds": [],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-040",
+      "title": "nonzero version probe fails closed at version",
+      "overrides": {
+        "probe": {
+          "binary": { "qualification_control": { "exit_phase": "version", "exit_code": 42 } }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "binary_capability_unproven",
+        "error_reason": "version_probe_failed",
+        "error_detail": "version",
+        "execution_attempted": false,
+        "required_spawn_kinds": ["version"],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-041",
+      "title": "nonzero root help probe fails closed and stops",
+      "overrides": {
+        "probe": {
+          "binary": { "qualification_control": { "exit_phase": "root-help", "exit_code": 42 } }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "binary_capability_unproven",
+        "error_reason": "root_help_probe_failed",
+        "error_detail": "root-help",
+        "execution_attempted": false,
+        "required_spawn_kinds": ["version", "root-help"],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-042",
+      "title": "nonzero exec help probe fails closed and stops",
+      "overrides": {
+        "probe": {
+          "binary": { "qualification_control": { "exit_phase": "exec-help", "exit_code": 42 } }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "binary_capability_unproven",
+        "error_reason": "exec_help_probe_failed",
+        "error_detail": "exec-help",
+        "execution_attempted": false,
+        "required_spawn_kinds": ["version", "root-help", "exec-help"],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-043",
+      "title": "nonzero app server help probe fails closed and stops",
+      "overrides": {
+        "probe": {
+          "binary": {
+            "qualification_control": { "exit_phase": "app-server-help", "exit_code": 42 }
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "binary_capability_unproven",
+        "error_reason": "app_server_help_probe_failed",
+        "error_detail": "app-server-help",
+        "execution_attempted": false,
+        "required_spawn_kinds": ["version", "root-help", "exec-help", "app-server-help"],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-044",
+      "title": "nonzero app server schema probe fails closed and stops",
+      "overrides": {
+        "probe": {
+          "binary": {
+            "qualification_control": { "exit_phase": "app-server-schema", "exit_code": 42 }
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "binary_capability_unproven",
+        "error_reason": "app_server_schema_probe_failed",
+        "error_detail": "app-server-schema",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-045",
+      "title": "nonzero parse only probe fails closed and stops",
+      "overrides": {
+        "probe": {
+          "binary": {
+            "qualification_control": { "exit_phase": "exec-parse-only", "exit_code": 42 }
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "binary_capability_unproven",
+        "error_reason": "exec_parse_only_probe_failed",
+        "error_detail": "exec-parse-only",
+        "execution_attempted": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-046",
+      "title": "hanging version probe is force bounded by the request deadline",
+      "overrides": {
+        "request": { "timeouts_ms": { "startup": 500, "idle": 500, "hard": 100 } },
+        "probe": {
+          "binary": { "qualification_control": { "hang_phase": "version", "ignore_sigterm": true } }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "hard_timeout",
+        "error_phase": "version",
+        "elapsed_lt_ms": 1000,
+        "execution_attempted": false,
+        "required_spawn_kinds": [],
+        "expected_process_phases": ["version"],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-047",
+      "title": "qualification probes share one cumulative hard deadline",
+      "overrides": {
+        "request": { "timeouts_ms": { "startup": 1000, "idle": 1000, "hard": 650 } },
+        "probe": {
+          "binary": {
+            "qualification_control": { "delay_ms_by_phase": { "version": 300, "root-help": 400 } }
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": false,
+        "status": "rejected",
+        "error_code": "hard_timeout",
+        "error_phase": "root-help",
+        "execution_attempted": false,
+        "required_spawn_kinds": ["version"],
+        "expected_process_phases": ["version", "root-help"],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-048",
+      "title": "shared diagnostics redact Basic Cookie and Set-Cookie before retention",
+      "overrides": {
+        "execution": {
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "schema": "ccm/codex-provider-identity-event/v1",
+              "model": "gpt-contract-fixture",
+              "effort": "high",
+              "synthetic_contract_evidence": true
+            },
+            {
+              "type": "fixture.diagnostic",
+              "schema": "ccm/codex-diagnostic-fixture/v1",
+              "message": "benign normalized diagnostic remains\n  aUtHoRiZaTiOn \t:\t bAsIc BASIC-NORMALIZED-CANARY\ncOoKiE \t: session=COOKIE-NORMALIZED-CANARY; secondary=COOKIE-TAIL-NORMALIZED-CANARY\nsEt-CoOkIe:\tsession=SET-COOKIE-NORMALIZED-CANARY; secondary=SET-COOKIE-TAIL-NORMALIZED-CANARY"
+            },
+            { "type": "turn.completed", "turn_id": "turn_fixture" },
+            {
+              "type": "error",
+              "code": "fixture-provider-error",
+              "message": "benign normalized diagnostic remains\n  aUtHoRiZaTiOn \t:\t bAsIc BASIC-NORMALIZED-CANARY\ncOoKiE \t: session=COOKIE-NORMALIZED-CANARY; secondary=COOKIE-TAIL-NORMALIZED-CANARY\nsEt-CoOkIe:\tsession=SET-COOKIE-NORMALIZED-CANARY; secondary=SET-COOKIE-TAIL-NORMALIZED-CANARY"
+            }
+          ],
+          "stderr": {
+            "prefix": "benign normalized diagnostic remains\n  aUtHoRiZaTiOn \t:\t bAsIc BASIC-NORMALIZED-CANARY\ncOoKiE \t: session=COOKIE-NORMALIZED-CANARY; secondary=COOKIE-TAIL-NORMALIZED-CANARY\nsEt-CoOkIe:\tsession=SET-COOKIE-NORMALIZED-CANARY; secondary=SET-COOKIE-TAIL-NORMALIZED-CANARY"
+          }
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "provider_failed",
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-049",
+      "title": "NO_COLOR uses the deterministic compiler value instead of parent input",
+      "overrides": {},
+      "expect": {
+        "automatic_eligible": true,
+        "status": "succeeded",
+        "error_code": null,
+        "execution_attempted": true,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-050",
+      "title": "identity metadata schema omission fails closed",
+      "overrides": {
+        "execution": {
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "model": "gpt-contract-fixture",
+              "effort": "high",
+              "synthetic_contract_evidence": true
+            },
+            { "type": "turn.completed", "turn_id": "turn_fixture" }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "actual_model_missing",
+        "execution_attempted": true,
+        "actual_retained": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-051",
+      "title": "null identity metadata schema fails closed",
+      "overrides": {
+        "execution": {
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "schema": null,
+              "model": "gpt-contract-fixture",
+              "effort": "high",
+              "synthetic_contract_evidence": true
+            },
+            { "type": "turn.completed", "turn_id": "turn_fixture" }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "actual_model_missing",
+        "execution_attempted": true,
+        "actual_retained": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-052",
+      "title": "empty identity metadata schema fails closed",
+      "overrides": {
+        "execution": {
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "schema": "",
+              "model": "gpt-contract-fixture",
+              "effort": "high",
+              "synthetic_contract_evidence": true
+            },
+            { "type": "turn.completed", "turn_id": "turn_fixture" }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "actual_model_missing",
+        "execution_attempted": true,
+        "actual_retained": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-053",
+      "title": "non-string identity metadata schema fails closed",
+      "overrides": {
+        "execution": {
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "schema": 1,
+              "model": "gpt-contract-fixture",
+              "effort": "high",
+              "synthetic_contract_evidence": true
+            },
+            { "type": "turn.completed", "turn_id": "turn_fixture" }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "actual_model_missing",
+        "execution_attempted": true,
+        "actual_retained": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    },
+    {
+      "id": "CXD-054",
+      "title": "unknown-major identity metadata schema fails closed",
+      "overrides": {
+        "execution": {
+          "jsonl": [
+            { "type": "thread.started", "thread_id": "thr_fixture" },
+            { "type": "turn.started", "turn_id": "turn_fixture" },
+            {
+              "type": "ccm.fixture.provider_metadata",
+              "schema": "ccm/codex-provider-identity-event/v2",
+              "model": "gpt-contract-fixture",
+              "effort": "high",
+              "synthetic_contract_evidence": true
+            },
+            { "type": "turn.completed", "turn_id": "turn_fixture" }
+          ]
+        }
+      },
+      "expect": {
+        "automatic_eligible": true,
+        "status": "failed",
+        "error_code": "actual_model_missing",
+        "execution_attempted": true,
+        "actual_retained": false,
+        "required_spawn_kinds": [
+          "version",
+          "root-help",
+          "exec-help",
+          "app-server-help",
+          "app-server-schema",
+          "exec-parse-probe",
+          "app-server-spawn",
+          "exec-spawn"
+        ],
+        "credential_writes": 0,
+        "account_mutations": 0
+      }
+    }
+  ]
+}
