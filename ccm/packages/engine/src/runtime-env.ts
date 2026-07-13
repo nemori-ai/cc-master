@@ -230,6 +230,19 @@ export function localPluginBase(rt: RuntimeEnvironment): string {
   return path.join(home, '.local', 'share', 'cc-master');
 }
 
+// launchAgentsDir(rt) → <user-home>/Library/LaunchAgents（launchd per-user agent 落点）。
+//   home 取契约 home（env.HOME 非空否则 homeDir）——绝不硬编码 os.homedir()，保 test/container 可注入。
+export function launchAgentsDir(rt: RuntimeEnvironment): string {
+  const home = resolveCapturedPath(rt.cwd, homeBase(rt.env, rt.homeDir));
+  return path.join(home, 'Library', 'LaunchAgents');
+}
+
+// systemdUserDir(rt) → <config>/systemd/user（systemd --user 单元落点）。
+//   config 根来自契约 roots.config（XDG_CONFIG_HOME 覆写否则 <home>/.config）——不硬编码 ~/.config。
+export function systemdUserDir(rt: RuntimeEnvironment): string {
+  return path.join(rt.roots.config, 'systemd', 'user');
+}
+
 // ── 可执行发现（resolveExecutable·纯·取 rt.env / rt.cwd / rt.platform）────────────────────────────
 
 function statifyExecutable(

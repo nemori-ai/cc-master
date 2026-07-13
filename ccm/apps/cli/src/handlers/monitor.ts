@@ -1,12 +1,22 @@
 import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import {
+  captureRuntimeEnvironment,
   formatReport,
+  launchAgentsDir,
+  launchdInstallCommands,
+  launchdUninstallCommands,
   lintBoard,
   loadHomeBoards,
   type QuotaModel,
+  type ServiceCommand,
+  type ServiceDefinition,
+  serializeLaunchdPlist,
+  serializeSystemdUnit,
+  systemdInstallCommands,
+  systemdUninstallCommands,
+  systemdUserDir,
   type UsageSignal,
   withLock,
 } from '@ccm/engine';
@@ -68,12 +78,23 @@ interface SpawnResult {
   pid: number;
 }
 
+// Result of running one OS service-manager command (launchctl/systemctl). Injectable so Linux CI can
+//   exercise both launchd and systemd activation paths deterministically without a live service manager
+//   (a fake executor contract) — and so activation truth is driven by a real command result, not by
+//   having written the unit file.
+interface ServiceCommandResult {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+}
+
 interface TestHooks {
   now?: () => Date;
   isPidAlive?: (pid: number) => boolean;
   spawnService?: (args: SpawnArgs) => SpawnResult;
   kill?: (pid: number) => boolean;
   tick?: (ctx: Ctx, state: MonitorState) => TickResult;
+  runServiceCommand?: (cmd: ServiceCommand) => ServiceCommandResult;
 }
 
 let testHooks: TestHooks = {};
@@ -548,26 +569,142 @@ function serviceFilePath(): string {
   return path.basename(exec).toLowerCase().startsWith('node') ? process.argv[1] || 'ccm' : exec;
 }
 
-function serviceLabel(home: string): string {
-  return `ai.nemori.ccm.monitor.${Buffer.from(home).toString('hex').slice(0, 10)}`;
-}
-
-function installPathForPlatform(home: string): {
-  path: string;
+// Where the OS service manager expects the monitor unit + how launchd names its domain/service.
+//   Directories come from the central RuntimeEnvironment contract (no hardcoded HOME / ~/.config); label
+//   and unit file name are derived from the cc-master home hash (identical default naming as before).
+interface MonitorUnitTarget {
   kind: 'launchd' | 'systemd';
   label: string;
-} {
-  const label = serviceLabel(home);
-  if (process.platform === 'darwin') {
-    const base = path.join(os.homedir(), 'Library', 'LaunchAgents');
-    return { path: path.join(base, `${label}.plist`), kind: 'launchd', label };
+  unitName: string;
+  unitPath: string;
+  domainTarget: string; // launchd only: gui/<uid>; empty for systemd
+}
+
+function monitorUnitTarget(
+  env: Record<string, string | undefined>,
+  home: string,
+): MonitorUnitTarget {
+  const rt = captureRuntimeEnvironment({ env });
+  const suffix = Buffer.from(home).toString('hex').slice(0, 10);
+  const label = `ai.nemori.ccm.monitor.${suffix}`;
+  if (rt.platform === 'darwin') {
+    const unitName = `${label}.plist`;
+    return {
+      kind: 'launchd',
+      label,
+      unitName,
+      unitPath: path.join(launchAgentsDir(rt), unitName),
+      domainTarget: `gui/${process.getuid?.() ?? ''}`,
+    };
   }
-  const base = path.join(os.homedir(), '.config', 'systemd', 'user');
+  const unitName = `ccm-monitor-${suffix}.service`;
   return {
-    path: path.join(base, `ccm-monitor-${Buffer.from(home).toString('hex').slice(0, 10)}.service`),
     kind: 'systemd',
     label,
+    unitName,
+    unitPath: path.join(systemdUserDir(rt), unitName),
+    domainTarget: '',
   };
+}
+
+// Exposed so `services reconcile` derives the exact same unit location (single source of truth).
+export function monitorUnitInstalled(
+  env: Record<string, string | undefined>,
+  home: string,
+): boolean {
+  return fs.existsSync(monitorUnitTarget(env, home).unitPath);
+}
+
+function buildServiceDefinition(target: MonitorUnitTarget, paths: ServicePaths): ServiceDefinition {
+  return {
+    label: target.label,
+    systemdUnitName: target.unitName,
+    description: 'ccm monitor',
+    program: {
+      executable: serviceFilePath(),
+      args: ['monitor', 'serve', '--state', paths.state],
+    },
+    workingDirectory: null,
+    environment: {},
+    stdoutPath: paths.log,
+    stderrPath: paths.log,
+    runAtLoad: true,
+    keepAlive: true,
+  };
+}
+
+interface ActivationStep {
+  id: string;
+  command: string;
+  args: string[];
+  code: number | null;
+  ok: boolean;
+  error: string | null;
+}
+
+interface ActivationOutcome {
+  ok: boolean;
+  kind: 'launchd' | 'systemd';
+  state: 'active' | 'written-not-activated';
+  steps: ActivationStep[];
+}
+
+function runServiceCommand(cmd: ServiceCommand): ServiceCommandResult {
+  if (testHooks.runServiceCommand) return testHooks.runServiceCommand(cmd);
+  const r = spawnSync(cmd.command, cmd.args, { encoding: 'utf8' });
+  return { status: r.status, stdout: r.stdout || '', stderr: r.stderr || '' };
+}
+
+// Run an ordered command sequence; the LAST command is the status/liveness truth (launchctl print /
+//   systemctl is-active). Stop at the first hard failure. launchd `bootstrap` tolerates an
+//   already-bootstrapped domain. Activation is "active" only when every step (including status) passed.
+function runActivation(kind: 'launchd' | 'systemd', cmds: ServiceCommand[]): ActivationOutcome {
+  const steps: ActivationStep[] = [];
+  let ok = true;
+  for (const cmd of cmds) {
+    const r = runServiceCommand(cmd);
+    let stepOk = r.status === 0;
+    if (
+      !stepOk &&
+      cmd.id === 'bootstrap' &&
+      /already bootstrapped/i.test(`${r.stderr}${r.stdout}`)
+    ) {
+      stepOk = true;
+    }
+    steps.push({
+      id: cmd.id,
+      command: cmd.command,
+      args: cmd.args,
+      code: r.status,
+      ok: stepOk,
+      error: stepOk ? null : (r.stderr || r.stdout || `exit ${r.status}`).trim(),
+    });
+    if (!stepOk) {
+      ok = false;
+      break;
+    }
+  }
+  return { ok, kind, state: ok ? 'active' : 'written-not-activated', steps };
+}
+
+function activateOsService(target: MonitorUnitTarget): ActivationOutcome {
+  const cmds =
+    target.kind === 'launchd'
+      ? launchdInstallCommands({
+          plistPath: target.unitPath,
+          domainTarget: target.domainTarget,
+          label: target.label,
+        })
+      : systemdInstallCommands({ unitName: target.unitName });
+  return runActivation(target.kind, cmds);
+}
+
+function deactivateOsService(target: MonitorUnitTarget): ActivationOutcome {
+  const cmds =
+    target.kind === 'launchd'
+      ? launchdUninstallCommands({ domainTarget: target.domainTarget, label: target.label })
+      : systemdUninstallCommands({ unitName: target.unitName });
+  return runActivation(target.kind, cmds);
 }
 
 export function installService(ctx: Ctx): number {
@@ -576,62 +713,40 @@ export function installService(ctx: Ctx): number {
   ensureServiceDirs(paths);
   const state = readState(paths.state) || buildState(home, parseInterval(ctx.values.interval));
   writeJson(paths.state, { ...state, wanted: true });
-  const unit = installPathForPlatform(home);
-  fs.mkdirSync(path.dirname(unit.path), { recursive: true });
-  const ccmPath = serviceFilePath();
-  if (unit.kind === 'launchd') {
-    writeJson(paths.state, { ...state, wanted: true });
-    fs.writeFileSync(
-      unit.path,
-      `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>${unit.label}</string>
-  <key>ProgramArguments</key><array><string>${ccmPath}</string><string>monitor</string><string>serve</string><string>--state</string><string>${paths.state}</string></array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>${paths.log}</string>
-  <key>StandardErrorPath</key><string>${paths.log}</string>
-</dict></plist>
-`,
-      'utf8',
-    );
-  } else {
-    fs.writeFileSync(
-      unit.path,
-      `[Unit]
-Description=ccm monitor
-
-[Service]
-ExecStart=${ccmPath} monitor serve --state ${paths.state}
-Restart=always
-StandardOutput=append:${paths.log}
-StandardError=append:${paths.log}
-
-[Install]
-WantedBy=default.target
-`,
-      'utf8',
-    );
-  }
-  const activation = activateOsService(unit);
+  const target = monitorUnitTarget(ctx.env, home);
+  fs.mkdirSync(path.dirname(target.unitPath), { recursive: true });
+  const def = buildServiceDefinition(target, paths);
+  const content =
+    target.kind === 'launchd' ? serializeLaunchdPlist(def) : serializeSystemdUnit(def);
+  fs.writeFileSync(target.unitPath, content, 'utf8');
+  const activation = activateOsService(target);
+  const failed = activation.steps.find((step) => !step.ok);
   output(
     ctx,
-    { ok: true, installed: true, kind: unit.kind, path: unit.path, activation },
+    {
+      ok: activation.ok,
+      installed: true,
+      activated: activation.ok,
+      kind: target.kind,
+      path: target.unitPath,
+      activation,
+    },
     activation.ok
-      ? `installed and started monitor ${unit.kind} unit: ${unit.path}`
-      : `installed monitor ${unit.kind} unit: ${unit.path}（activation failed: ${activation.error}）`,
+      ? `installed and activated monitor ${target.kind} unit: ${target.unitPath}`
+      : `installed monitor ${target.kind} unit but activation failed at ${failed?.id ?? 'status'}: ${failed?.error ?? 'unknown'}`,
   );
-  return EXIT.OK;
+  // Activation truth is the OS command result, not the written file: a written-but-not-activated unit is
+  //   a distinct nonzero state, never ok:true (no-silent-failure).
+  return activation.ok ? EXIT.OK : EXIT.ERROR;
 }
 
 export function uninstallService(ctx: Ctx): number {
   const home = canonicalHome(ctx);
   const paths = servicePaths(home);
-  const unit = installPathForPlatform(home);
-  const deactivation = deactivateOsService(unit);
+  const target = monitorUnitTarget(ctx.env, home);
+  const deactivation = deactivateOsService(target);
   try {
-    fs.rmSync(unit.path, { force: true });
+    fs.rmSync(target.unitPath, { force: true });
   } catch {
     /* best-effort */
   }
@@ -642,55 +757,34 @@ export function uninstallService(ctx: Ctx): number {
   });
   output(
     ctx,
-    { ok: true, uninstalled: true, stopped, kind: unit.kind, path: unit.path, deactivation },
-    `uninstalled monitor ${unit.kind} unit: ${unit.path}`,
+    {
+      ok: true,
+      uninstalled: true,
+      stopped,
+      kind: target.kind,
+      path: target.unitPath,
+      deactivation,
+    },
+    `uninstalled monitor ${target.kind} unit: ${target.unitPath}`,
   );
   return EXIT.OK;
 }
 
-function runUnitCommand(command: string, args: string[]): { ok: boolean; error: string | null } {
-  const r = spawnSync(command, args, { encoding: 'utf8' });
-  if (r.status === 0) return { ok: true, error: null };
-  return { ok: false, error: (r.stderr || r.stdout || `exit ${r.status}`).trim() };
-}
-
-function activateOsService(unit: { path: string; kind: 'launchd' | 'systemd'; label: string }): {
-  ok: boolean;
-  error: string | null;
-} {
-  if (unit.kind === 'launchd') {
-    const domain = `gui/${process.getuid?.() || ''}`;
-    const boot = runUnitCommand('launchctl', ['bootstrap', domain, unit.path]);
-    if (!boot.ok && !String(boot.error || '').includes('already bootstrapped')) return boot;
-    return runUnitCommand('launchctl', ['kickstart', '-k', `${domain}/${unit.label}`]);
-  }
-  const reload = runUnitCommand('systemctl', ['--user', 'daemon-reload']);
-  if (!reload.ok) return reload;
-  return runUnitCommand('systemctl', ['--user', 'enable', '--now', path.basename(unit.path)]);
-}
-
-function deactivateOsService(unit: { path: string; kind: 'launchd' | 'systemd'; label: string }): {
-  ok: boolean;
-  error: string | null;
-} {
-  if (unit.kind === 'launchd') {
-    return runUnitCommand('launchctl', [
-      'bootout',
-      `gui/${process.getuid?.() || ''}/${unit.label}`,
-    ]);
-  }
-  return runUnitCommand('systemctl', ['--user', 'disable', '--now', path.basename(unit.path)]);
-}
-
 export function restartOsServiceIfInstalled(ctx: Ctx): boolean {
   const home = canonicalHome(ctx);
-  const unit = installPathForPlatform(home);
-  if (!fs.existsSync(unit.path)) return false;
-  const cmd = unit.kind === 'launchd' ? 'launchctl' : 'systemctl';
-  const args =
-    unit.kind === 'launchd'
-      ? ['kickstart', '-k', `gui/${process.getuid?.() || ''}/${unit.label}`]
-      : ['--user', 'restart', path.basename(unit.path)];
-  const r = spawnSync(cmd, args, { stdio: 'ignore' });
-  return r.status === 0;
+  const target = monitorUnitTarget(ctx.env, home);
+  if (!fs.existsSync(target.unitPath)) return false;
+  const cmd: ServiceCommand =
+    target.kind === 'launchd'
+      ? {
+          id: 'kickstart',
+          command: 'launchctl',
+          args: ['kickstart', '-k', `${target.domainTarget}/${target.label}`],
+        }
+      : {
+          id: 'restart',
+          command: 'systemctl',
+          args: ['--user', 'restart', target.unitName],
+        };
+  return runServiceCommand(cmd).status === 0;
 }

@@ -248,10 +248,31 @@ export {
   createRuntimeEnvironment,
   homeBase,
   hostConfig,
+  launchAgentsDir,
   localPluginBase,
   pluginInstallRoot,
   resolveExecutable,
+  systemdUserDir,
 } from './runtime-env.js';
+// ── service-serializers（launchd plist / systemd unit 独立序列化 adapter + parser·可移植性 slice 5）──
+export type {
+  ParsedLaunchdService,
+  ParsedSystemdService,
+  ServiceCommand,
+  ServiceDefinition,
+  ServiceProgram,
+} from './service-serializers.js';
+export {
+  launchdInstallCommands,
+  launchdUninstallCommands,
+  parseLaunchdPlist,
+  parseSystemdUnit,
+  serializeLaunchdPlist,
+  serializeSystemdUnit,
+  systemdEscapeUnitName,
+  systemdInstallCommands,
+  systemdUninstallCommands,
+} from './service-serializers.js';
 // ── statusline/（self-contained status line·0.10.0：渲染单行 ANSI + sidecar 捕获 + 安装/卸载/自动安装）──
 export type {
   CaptureResult,
