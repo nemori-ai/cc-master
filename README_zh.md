@@ -128,7 +128,7 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --all-harnesses
 ```
 
-它会探测你的操作系统和架构，下对应的 `ccm` 二进制、放进 PATH，再识别本机已安装的 harness，并把对应 adapter 包分发到每个受支持目标。每个联网下载的 release asset 在安装前都会先下载同一 release 的 `SHA256SUMS`，按精确文件名校验；清单缺失、条目缺失或 digest 不匹配都会停止安装。Claude Code 安装走 `claude` CLI（≥ v2.1.195）。Codex 安装会注册本地 Codex marketplace/plugin，命令入口走插件分发的 `$cc-master-*` 技能（如 `$cc-master-as-master-orchestrator ...`）。Cursor 安装会把 adapter 复制到 `~/.cursor/plugins/local/cc-master`（local plugin 面）。你只需本机已有 `curl`（或 `wget`）、`unzip` 和一个 SHA256 工具（`sha256sum` / `shasum` / `openssl`）；每个 harness adapter 还可能需要对应 harness 的 CLI 或 config 目录已经存在。`ccm` 引擎是**硬前置**——没有它插件就不会开工——所以安装器先把它就位。
+它会探测你的操作系统和架构，下对应的 `ccm` 二进制、放进 PATH，再识别本机已安装的 harness，并把对应 adapter 包分发到每个受支持目标。每个联网下载的 release asset 在安装前都会先下载同一 release 的 `SHA256SUMS`，按精确文件名校验；清单缺失、条目缺失或 digest 不匹配都会停止安装。Claude Code 安装走 `claude` CLI（≥ v2.1.195）。Codex 安装会注册本地 Codex marketplace/plugin，命令入口走插件分发的 `$cc-master-*` 技能（如 `$cc-master-as-master-orchestrator ...`）。Cursor 安装通过 local plugin 面把 adapter 发布到 `~/.cursor/plugins/local/cc-master`。安装器在**所有模式**下都强制需要 Node.js 22 或更高版本，包括 pin 版本和 `CC_MASTER_INSTALL_LOCAL` 本地离线安装；此外还需 `unzip` 和一个 SHA256 工具（`sha256sum` / `shasum` / `openssl`），联网安装另需 `curl` 或 `wget`。每个 harness adapter 还可能需要对应 harness 的 CLI 或 config 目录已经存在。`ccm` 引擎是**硬前置**——没有它插件就不会开工——所以安装器先把它就位。
 
 checksum 失败按 release 完整性失败处理，不提供绕过安装。请重试；若仍失败，先检查 GitHub release assets 再继续。`CC_MASTER_INSTALL_LOCAL` 仍保持离线路径：本地目录有 `SHA256SUMS` 就校验，没有则明确改为信任该本地目录，不联网取清单。
 

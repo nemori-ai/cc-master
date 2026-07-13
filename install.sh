@@ -26,6 +26,10 @@
 #   --all-harnesses               枚举本机已安装的 ccm-supported harness，对支持 plugin 分发者逐个安装
 #   （旧的单一 --version 已移除——解耦后它无法同时钉两产物；传它会报错指向上面两 flag。）
 #
+# 运行依赖：
+#   Node.js 22+（联网、pin 和本地离线模式都必需）、unzip、chmod，以及一个 SHA256 工具
+#   （sha256sum / shasum / openssl）；联网模式另需 curl 或 wget。
+#
 # 环境变量（覆写默认）：
 #   PREFIX=<dir>                  ccm 二进制装到 <dir>/ccm（默认 $HOME/.local/bin）
 #   CC_MASTER_PLUGIN_DIR=<dir>    plugin 解压目标根（默认 $HOME/.local/share/cc-master）
@@ -35,7 +39,8 @@
 #
 # 装什么：
 #   ① ccm 二进制（per-OS Node SEA·ADR-014）→ $PREFIX/ccm（chmod +x·验 `ccm --version`）
-#   ② cc-master 插件 → 解压到 $CC_MASTER_PLUGIN_DIR，再按本机 supported harness inventory 分发：
+#   ② cc-master 插件 → 在 $CC_MASTER_PLUGIN_DIR target-adjacent stage 后原子发布，再按本机
+#      supported harness inventory 分发：
 #      - Claude Code：用 claude CLI 持久安装（marketplace add/update + plugin install/update）
 #      - Codex：注册本地 Codex plugin marketplace。
 #      - Cursor：复制到 ~/.cursor/plugins/local/cc-master（local plugin 面，对齐 probe D9）。
@@ -70,7 +75,7 @@ on_err() { local rc=$?; printf '%s[install] 安装中断%s（退出码 %d，行 
 trap on_err ERR
 
 usage() {
-  sed -n '2,41p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//' >&2
+  sed -n '2,49p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//' >&2
   exit 0
 }
 
@@ -107,6 +112,9 @@ need() { command -v "$1" >/dev/null 2>&1 || die "缺少必需命令：$1。请�
 need uname
 need unzip
 need chmod
+need node
+node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)' \
+  || die "需要 Node.js 22 或更高版本（联网、pin 和本地离线模式都必需）。"
 
 DL=""   # 下载器（仅联网模式需要）
 if [ -z "$LOCAL_SRC" ]; then
@@ -216,6 +224,556 @@ verify_downloaded_release_asset() {
   fetch_release_manifest "$tag" "$manifest" \
     || die "无法下载 checksum 清单：${GITHUB}/${REPO}/releases/download/${tag}/${CHECKSUM_MANIFEST}。为避免未校验安装，已停止。"
   verify_sha256_manifest "$file" "$manifest" "$asset"
+}
+
+# ── Target-adjacent transactional publisher ──────────────────────────────────────────────────────
+# Usage: transactional_publish <binary|plugin:claude-code|plugin:codex|plugin:cursor> <source> <target>
+#
+# Source acquisition may cross filesystems. Publication never does: the candidate is copied into a
+# target-adjacent stage, re-checksummed/validated there, fsync'd, then activated by rename. Binary
+# replacement keeps a same-filesystem backup inode until the installed path executes. Plugin trees
+# are immutable versions selected by a relative symlink pointer; after the one-time migration of a
+# legacy real directory, every activation is one atomic pointer rename. Failures emit one JSON object
+# on stderr and return nonzero; success emits one JSON object on stdout. The private fault hook is
+# accepted only by tests. Comma-separated faults can exercise primary, rollback and cleanup failures
+# in one transaction (`copy|checksum|exec|rename|exdev|activation|backup-barrier|rollback|
+# rollback-barrier|cleanup`).
+transactional_publish() {
+  local kind="$1" source="$2" target="$3"
+  command -v node >/dev/null 2>&1 || die "事务发布需要 PATH 上可用的 Node.js 22+。"
+  node - "$kind" "$source" "$target" <<'CC_MASTER_TRANSACTIONAL_PUBLISH_NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const { spawnSync } = require('node:child_process');
+
+const [kind, sourceInput, targetInput] = process.argv.slice(2);
+const faultNames = String(process.env.CC_MASTER_PUBLISH_FAULT || '').split(',').filter(Boolean);
+const faults = new Set(faultNames);
+const allowedFaults = new Set([
+  'copy',
+  'checksum',
+  'exec',
+  'rename',
+  'exdev',
+  'activation',
+  'backup-barrier',
+  'rollback',
+  'rollback-barrier',
+  'cleanup',
+]);
+let phase = 'input';
+let stageDir = '';
+let publishedVersion = '';
+let legacyBackup = '';
+let binaryBackup = '';
+let failedCandidate = '';
+let rollbackLink = '';
+let oldLink = null;
+let targetExisted = false;
+let activated = false;
+let committed = false;
+let targetRealPath = '';
+let previousEndpoint = '';
+let previousDigest = '';
+let cleanupAttempted = false;
+let cleanupOk = null;
+let cleanupError = null;
+let cleanupErrorCode = null;
+
+function fail(message, code, cause) {
+  const error = cause instanceof Error ? cause : new Error(message);
+  error.message = message;
+  error.publishCode = code;
+  throw error;
+}
+
+function inject(name) {
+  if (!faults.has(name)) return;
+  const durabilityFault = name.endsWith('-barrier');
+  const code = name === 'exdev'
+    ? 'EXDEV'
+    : ['rollback', 'cleanup'].includes(name) || durabilityFault
+      ? 'EIO'
+      : `FAULT_${name.toUpperCase()}`;
+  const error = new Error(`injected ${name} failure`);
+  error.code = code;
+  error.publishCode = name === 'exdev' ? code : `FAULT_${name.toUpperCase().replaceAll('-', '_')}`;
+  throw error;
+}
+
+function lstatIfPresent(entry) {
+  try {
+    return fs.lstatSync(entry);
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+function within(root, candidate) {
+  const rel = path.relative(root, candidate);
+  return rel === '' || (!rel.startsWith(`..${path.sep}`) && rel !== '..' && !path.isAbsolute(rel));
+}
+
+function walk(root, visit, rel = '') {
+  const here = rel ? path.join(root, rel) : root;
+  const stat = fs.lstatSync(here);
+  visit(here, rel, stat);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) return;
+  for (const name of fs.readdirSync(here).sort()) walk(root, visit, path.join(rel, name));
+}
+
+function treeDigest(root) {
+  const hash = crypto.createHash('sha256');
+  walk(root, (entry, rel, stat) => {
+    const logical = rel.split(path.sep).join('/');
+    const type = stat.isDirectory() ? 'd' : stat.isSymbolicLink() ? 'l' : stat.isFile() ? 'f' : 'o';
+    hash.update(`${type}\0${logical}\0${(stat.mode & 0o7777).toString(8)}\0`);
+    if (stat.isSymbolicLink()) hash.update(`${fs.readlinkSync(entry)}\0`);
+    else if (stat.isFile()) hash.update(fs.readFileSync(entry));
+  });
+  return hash.digest('hex');
+}
+
+function fileDigest(file) {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+function fsyncEntry(entry, stat) {
+  if (!stat.isFile() && !stat.isDirectory()) return;
+  let fd;
+  try {
+    fd = fs.openSync(entry, 'r');
+    fs.fsyncSync(fd);
+  } catch (error) {
+    // Linux/macOS differ on directory fsync. These codes mean the filesystem does not expose it;
+    // every regular file is still fsync'd and activation remains fail-closed for all other errors.
+    if (!stat.isDirectory() || !['EINVAL', 'ENOTSUP', 'EOPNOTSUPP', 'EBADF', 'EPERM'].includes(error.code)) {
+      throw error;
+    }
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
+function fsyncTree(root) {
+  const directories = [];
+  walk(root, (entry, _rel, stat) => {
+    if (stat.isDirectory()) directories.push([entry, stat]);
+    else fsyncEntry(entry, stat);
+  });
+  for (const [entry, stat] of directories.reverse()) fsyncEntry(entry, stat);
+}
+
+function durabilityBarrier(directory, faultName) {
+  try {
+    inject(faultName);
+    fsyncEntry(directory, fs.statSync(directory));
+  } catch (error) {
+    error.durabilityBarrier = faultName;
+    throw error;
+  }
+}
+
+function validateSafeSymlinks(root) {
+  walk(root, (entry, _rel, stat) => {
+    if (!stat.isSymbolicLink()) return;
+    const link = fs.readlinkSync(entry);
+    if (path.isAbsolute(link)) fail(`plugin contains absolute symlink: ${entry}`, 'PLUGIN_SYMLINK');
+    const resolved = path.resolve(path.dirname(entry), link);
+    if (!within(root, resolved)) fail(`plugin symlink escapes tree: ${entry}`, 'PLUGIN_SYMLINK');
+  });
+}
+
+function validatePlugin(root, host) {
+  const manifests = {
+    'claude-code': '.claude-plugin/marketplace.json',
+    codex: '.codex-plugin/plugin.json',
+    cursor: '.cursor-plugin/plugin.json',
+  };
+  const relative = manifests[host];
+  if (!relative) fail(`unsupported plugin host: ${host}`, 'KIND');
+  const manifest = path.join(root, relative);
+  const stat = fs.lstatSync(root);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) fail('plugin candidate root must be a real directory', 'PLUGIN_TYPE');
+  if (!fs.existsSync(manifest) || !fs.statSync(manifest).isFile()) {
+    fail(`plugin manifest missing: ${relative}`, 'PLUGIN_MANIFEST');
+  }
+  try {
+    JSON.parse(fs.readFileSync(manifest, 'utf8'));
+  } catch (error) {
+    fail(`plugin manifest is not valid JSON: ${relative}`, 'PLUGIN_MANIFEST', error);
+  }
+  validateSafeSymlinks(root);
+}
+
+function runBinary(file) {
+  const result = spawnSync(file, ['--version'], { encoding: 'utf8', timeout: 15000 });
+  if (result.error || result.status !== 0 || !String(result.stdout || '').trim()) {
+    fail(
+      `binary validation failed: ${result.error?.message || `exit ${result.status}; stdout=${JSON.stringify(result.stdout || '')}`}`,
+      'BINARY_EXEC',
+      result.error,
+    );
+  }
+  return String(result.stdout).trim();
+}
+
+function removeIfPresent(entry) {
+  if (entry && lstatIfPresent(entry)) fs.rmSync(entry, { recursive: true, force: true });
+}
+
+function restoreAfterFailure(target) {
+  const targetPresent = lstatIfPresent(target) !== null;
+  const needsRestore = activated || Boolean(legacyBackup && !targetPresent && lstatIfPresent(legacyBackup));
+  if (!needsRestore) return false;
+  if (!activated) {
+    if (legacyBackup && !targetPresent && lstatIfPresent(legacyBackup)) {
+      inject('rollback');
+      fs.renameSync(legacyBackup, target);
+      previousEndpoint = target;
+      durabilityBarrier(path.dirname(target), 'rollback-barrier');
+    }
+    return true;
+  }
+  if (kind === 'binary') {
+    if (targetPresent) {
+      failedCandidate = path.join(stageDir, 'failed-candidate');
+      try {
+        fs.linkSync(target, failedCandidate);
+      } catch (error) {
+        if (error && error.code === 'EXDEV') fail('failed-candidate link crossed filesystems', 'EXDEV', error);
+        fs.copyFileSync(target, failedCandidate, fs.constants.COPYFILE_EXCL);
+        fs.chmodSync(failedCandidate, fs.lstatSync(target).mode & 0o7777);
+      }
+      fsyncEntry(failedCandidate, fs.statSync(failedCandidate));
+      fsyncEntry(stageDir, fs.statSync(stageDir));
+    }
+    inject('rollback');
+    if (binaryBackup && lstatIfPresent(binaryBackup)) fs.renameSync(binaryBackup, target);
+    else removeIfPresent(target);
+    activated = false;
+    durabilityBarrier(path.dirname(target), 'rollback-barrier');
+    return true;
+  }
+  rollbackLink = path.join(path.dirname(target), `.${path.basename(target)}.rollback-${process.pid}-${crypto.randomBytes(4).toString('hex')}`);
+  if (oldLink !== null) {
+    fs.symlinkSync(oldLink, rollbackLink, 'dir');
+    inject('rollback');
+    fs.renameSync(rollbackLink, target);
+    rollbackLink = '';
+    durabilityBarrier(path.dirname(target), 'rollback-barrier');
+  } else if (legacyBackup && fs.existsSync(legacyBackup)) {
+    inject('rollback');
+    removeIfPresent(target);
+    fs.renameSync(legacyBackup, target);
+    previousEndpoint = target;
+    durabilityBarrier(path.dirname(target), 'rollback-barrier');
+  } else {
+    inject('rollback');
+    removeIfPresent(target);
+    durabilityBarrier(path.dirname(target), 'rollback-barrier');
+  }
+  activated = false;
+  return true;
+}
+
+function verifyActiveEndpoint(target) {
+  try {
+    const stat = lstatIfPresent(target);
+    if (!stat) return { ok: false, error: 'active endpoint is absent' };
+    if (kind === 'binary') {
+      if (!stat.isFile() || stat.isSymbolicLink()) {
+        return { ok: false, error: 'binary endpoint is not a real regular file' };
+      }
+      const version = runBinary(target);
+      return { ok: true, resolved: target, digest: fileDigest(target), version };
+    }
+    if (!stat.isDirectory() && !stat.isSymbolicLink()) {
+      return { ok: false, error: 'plugin endpoint is neither a directory nor a symlink pointer' };
+    }
+    const resolved = fs.realpathSync(target);
+    validatePlugin(resolved, kind.slice('plugin:'.length));
+    return { ok: true, resolved, digest: treeDigest(resolved) };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function recoveryPaths() {
+  const paths = {};
+  if (binaryBackup && lstatIfPresent(binaryBackup)) paths.binary_backup = binaryBackup;
+  if (failedCandidate && lstatIfPresent(failedCandidate)) paths.failed_candidate = failedCandidate;
+  if (kind !== 'binary' && previousEndpoint && lstatIfPresent(previousEndpoint)) {
+    paths.previous_endpoint = previousEndpoint;
+  }
+  if (publishedVersion && lstatIfPresent(publishedVersion)) paths.published_version = publishedVersion;
+  if (legacyBackup && lstatIfPresent(legacyBackup)) paths.legacy_backup = legacyBackup;
+  if (rollbackLink && lstatIfPresent(rollbackLink)) paths.rollback_pointer = rollbackLink;
+  if (stageDir && lstatIfPresent(stageDir)) paths.stage_dir = stageDir;
+  return paths;
+}
+
+function cleanupFailedPublication() {
+  cleanupAttempted = true;
+  inject('cleanup');
+  removeIfPresent(publishedVersion);
+  removeIfPresent(binaryBackup);
+  removeIfPresent(rollbackLink);
+  removeIfPresent(stageDir);
+  stageDir = '';
+  cleanupOk = true;
+}
+
+try {
+  if (!kind || !sourceInput || !targetInput) fail('kind, source and target are required', 'USAGE');
+  const unknownFault = faultNames.find((name) => !allowedFaults.has(name));
+  if (unknownFault) fail(`unknown CC_MASTER_PUBLISH_FAULT: ${unknownFault}`, 'FAULT_NAME');
+  if (kind !== 'binary' && !kind.startsWith('plugin:')) fail(`unsupported publish kind: ${kind}`, 'KIND');
+
+  const source = fs.realpathSync(path.resolve(sourceInput));
+  const target = path.resolve(targetInput);
+  const lexicalParent = path.dirname(target);
+  fs.mkdirSync(lexicalParent, { recursive: true });
+  const targetParent = fs.realpathSync(lexicalParent);
+  targetRealPath = path.join(targetParent, path.basename(target));
+  const uid = typeof process.getuid === 'function' ? process.getuid() : null;
+  const gid = typeof process.getgid === 'function' ? process.getgid() : null;
+
+  const existingTarget = lstatIfPresent(targetRealPath);
+  targetExisted = existingTarget !== null;
+  if (existingTarget && kind === 'binary') {
+    if (!existingTarget.isFile() || existingTarget.isSymbolicLink()) {
+      fail('binary target must be a real regular file or absent', 'TARGET_TYPE');
+    }
+    previousEndpoint = targetRealPath;
+    runBinary(previousEndpoint);
+    previousDigest = fileDigest(previousEndpoint);
+  } else if (existingTarget) {
+    if (existingTarget.isSymbolicLink()) {
+      oldLink = fs.readlinkSync(targetRealPath);
+      try {
+        previousEndpoint = fs.realpathSync(targetRealPath);
+      } catch (error) {
+        fail('plugin target symlink must resolve to a valid plugin tree', 'TARGET_TYPE', error);
+      }
+    } else if (existingTarget.isDirectory()) {
+      previousEndpoint = targetRealPath;
+    } else {
+      fail('plugin target must be a directory, symlink pointer, or absent', 'TARGET_TYPE');
+    }
+    validatePlugin(previousEndpoint, kind.slice('plugin:'.length));
+    previousDigest = treeDigest(previousEndpoint);
+  }
+
+  stageDir = fs.mkdtempSync(path.join(targetParent, `.${path.basename(target)}.publish-`));
+  const candidate = path.join(stageDir, 'candidate');
+
+  phase = 'copy';
+  inject('copy');
+  let sourceDigest;
+  if (kind === 'binary') {
+    const stat = fs.statSync(source);
+    if (!stat.isFile()) fail('binary source must be a regular file', 'BINARY_TYPE');
+    sourceDigest = fileDigest(source);
+    fs.copyFileSync(source, candidate, fs.constants.COPYFILE_EXCL);
+    fs.chmodSync(candidate, 0o755);
+  } else {
+    if (!fs.statSync(source).isDirectory()) fail('plugin source must be a directory', 'PLUGIN_TYPE');
+    sourceDigest = treeDigest(source);
+    fs.cpSync(source, candidate, {
+      recursive: true,
+      errorOnExist: true,
+      force: false,
+      dereference: false,
+      preserveTimestamps: true,
+      verbatimSymlinks: true,
+    });
+  }
+
+  phase = 'checksum';
+  inject('checksum');
+  const stagedDigest = kind === 'binary' ? fileDigest(candidate) : treeDigest(candidate);
+  if (sourceDigest !== stagedDigest) fail('target-adjacent copy checksum mismatch', 'CHECKSUM');
+
+  phase = 'validate';
+  let version = null;
+  if (kind === 'binary') {
+    inject('exec');
+    version = runBinary(candidate);
+  } else {
+    validatePlugin(candidate, kind.slice('plugin:'.length));
+  }
+  const candidateStat = fs.lstatSync(candidate);
+  if (uid !== null && candidateStat.uid !== uid) fail('staged artifact owner differs from publisher', 'OWNER');
+  fsyncTree(candidate);
+  fsyncEntry(stageDir, fs.statSync(stageDir));
+
+  phase = 'activate';
+  inject('exdev');
+  inject('rename');
+  if (kind === 'binary') {
+    if (targetExisted) {
+      const old = fs.lstatSync(targetRealPath);
+      binaryBackup = path.join(stageDir, 'previous');
+      try {
+        fs.linkSync(targetRealPath, binaryBackup);
+      } catch (error) {
+        if (error.code === 'EXDEV') fail('backup link crossed filesystems', 'EXDEV', error);
+        fs.copyFileSync(targetRealPath, binaryBackup, fs.constants.COPYFILE_EXCL);
+        fs.chmodSync(binaryBackup, old.mode & 0o7777);
+        fsyncEntry(binaryBackup, fs.statSync(binaryBackup));
+      }
+      durabilityBarrier(stageDir, 'backup-barrier');
+    }
+    fs.renameSync(candidate, targetRealPath);
+    activated = true;
+    inject('activation');
+    version = runBinary(targetRealPath);
+    fsyncEntry(targetParent, fs.statSync(targetParent));
+  } else {
+    const versionsRoot = path.join(targetParent, `.${path.basename(target)}.versions`);
+    fs.mkdirSync(versionsRoot, { recursive: true, mode: 0o700 });
+    const tx = `${Date.now()}-${process.pid}-${crypto.randomBytes(6).toString('hex')}`;
+    publishedVersion = path.join(versionsRoot, tx);
+    fs.renameSync(candidate, publishedVersion);
+    fsyncEntry(versionsRoot, fs.statSync(versionsRoot));
+
+    if (targetExisted) {
+      const old = fs.lstatSync(targetRealPath);
+      if (old.isDirectory() && !old.isSymbolicLink()) {
+        legacyBackup = path.join(versionsRoot, `legacy-${tx}`);
+        fs.renameSync(targetRealPath, legacyBackup);
+        previousEndpoint = legacyBackup;
+        durabilityBarrier(versionsRoot, 'backup-barrier');
+      }
+    }
+
+    const linkTmp = path.join(targetParent, `.${path.basename(target)}.next-${tx}`);
+    const relativeVersion = path.relative(targetParent, publishedVersion);
+    fs.symlinkSync(relativeVersion, linkTmp, 'dir');
+    fs.renameSync(linkTmp, targetRealPath);
+    activated = true;
+    inject('activation');
+    fsyncEntry(targetParent, fs.statSync(targetParent));
+  }
+
+  const committedEndpoint = verifyActiveEndpoint(targetRealPath);
+  if (!committedEndpoint.ok) {
+    fail(`active endpoint verification failed: ${committedEndpoint.error}`, 'ENDPOINT_VERIFY');
+  }
+  committed = true;
+  phase = 'cleanup';
+  cleanupAttempted = true;
+  inject('cleanup');
+  removeIfPresent(binaryBackup);
+  removeIfPresent(stageDir);
+  stageDir = '';
+  cleanupOk = true;
+  process.stdout.write(`${JSON.stringify({
+    ok: true,
+    action: 'published',
+    kind,
+    target,
+    source_digest: sourceDigest,
+    version,
+    owner: uid === null ? null : { uid, gid },
+    activation: kind === 'binary' ? 'atomic-rename' : 'atomic-version-pointer',
+    endpoint: committedEndpoint,
+  })}\n`);
+} catch (error) {
+  const target = targetRealPath || (targetInput ? path.resolve(targetInput) : '');
+  let rollbackAttempted = false;
+  let rollbackOk = null;
+  let rollbackError = null;
+  let rollbackErrorCode = null;
+  let rollbackDurabilityBarrier = null;
+  if (!committed && target) {
+    const targetPresent = lstatIfPresent(target) !== null;
+    const shouldRollback = activated || Boolean(legacyBackup && !targetPresent && lstatIfPresent(legacyBackup));
+    if (shouldRollback) {
+      rollbackAttempted = true;
+      try {
+        restoreAfterFailure(target);
+        rollbackOk = true;
+      } catch (rollback) {
+        rollbackOk = false;
+        rollbackError = rollback instanceof Error ? rollback.message : String(rollback);
+        rollbackErrorCode = rollback && typeof rollback.code === 'string' ? rollback.code : 'ROLLBACK_FAILED';
+        rollbackDurabilityBarrier = rollback && typeof rollback.durabilityBarrier === 'string'
+          ? rollback.durabilityBarrier
+          : null;
+      }
+    }
+  }
+
+  const endpoint = target ? verifyActiveEndpoint(target) : { ok: false, error: 'target unavailable' };
+  const previousPreserved = Boolean(previousDigest && endpoint.ok && endpoint.digest === previousDigest);
+  const noPriorEndpointPreserved = !targetExisted && (!target || lstatIfPresent(target) === null);
+
+  if (cleanupAttempted && cleanupOk !== true) {
+    cleanupOk = false;
+    cleanupError = error instanceof Error ? error.message : String(error);
+    cleanupErrorCode = error && typeof error.code === 'string' ? error.code : 'CLEANUP_FAILED';
+  }
+  const failedDurabilityBarrier = error && typeof error.durabilityBarrier === 'string'
+    ? error.durabilityBarrier
+    : rollbackDurabilityBarrier;
+  const safeToCleanup = !committed
+    && !failedDurabilityBarrier
+    && rollbackOk !== false
+    && (previousPreserved || noPriorEndpointPreserved);
+  if (safeToCleanup && !cleanupAttempted) {
+    try {
+      cleanupFailedPublication();
+    } catch (cleanup) {
+      cleanupOk = false;
+      cleanupError = cleanup instanceof Error ? cleanup.message : String(cleanup);
+      cleanupErrorCode = cleanup && typeof cleanup.code === 'string' ? cleanup.code : 'CLEANUP_FAILED';
+    }
+  }
+
+  let action;
+  if (failedDurabilityBarrier) {
+    action = endpoint.ok ? 'recovery-required' : 'endpoint-unusable-recovery-required';
+  } else if (committed) {
+    action = endpoint.ok ? 'published-recovery-required' : 'endpoint-unusable-recovery-required';
+  } else if (previousPreserved && rollbackOk !== false) {
+    action = 'preserved-last-known-good';
+  } else if (noPriorEndpointPreserved) {
+    action = 'not-published';
+  } else {
+    action = endpoint.ok ? 'recovery-required' : 'endpoint-unusable-recovery-required';
+  }
+  const rawCode = error && (error.publishCode || error.code);
+  const code = typeof rawCode === 'string' ? rawCode : 'PUBLISH_FAILED';
+  process.stderr.write(`${JSON.stringify({
+    ok: false,
+    action,
+    kind: kind || null,
+    target: target || null,
+    phase,
+    code,
+    message: error instanceof Error ? error.message : String(error),
+    faults: faultNames,
+    committed,
+    endpoint_ok: endpoint.ok,
+    endpoint,
+    rollback_attempted: rollbackAttempted,
+    rollback_ok: rollbackOk,
+    rollback_error: rollbackError,
+    rollback_error_code: rollbackErrorCode,
+    cleanup_attempted: cleanupAttempted,
+    cleanup_ok: cleanupOk,
+    cleanup_error: cleanupError,
+    cleanup_error_code: cleanupErrorCode,
+    durability_barrier: failedDurabilityBarrier,
+    recovery_paths: recoveryPaths(),
+  })}\n`);
+  process.exitCode = 1;
+}
+CC_MASTER_TRANSACTIONAL_PUBLISH_NODE
 }
 
 # ── 取一行 HTTP 文本（GitHub API）──────────────────────────────────────────────────────────────────
@@ -441,7 +999,7 @@ EOF
 
 # Cursor local plugin install (probe D9): copy unpacked adapter → ~/.cursor/plugins/local/cc-master.
 install_plugin_cursor() {
-  local plugin_root="$1" dest parent
+  local plugin_root="$1" dest parent publish_state
   [ -f "$plugin_root/.cursor-plugin/plugin.json" ] \
     || die "Cursor adapter 缺失：$plugin_root/.cursor-plugin/plugin.json。请确认是合法的 cc-master Cursor 包。"
   [ -n "${HOME:-}" ] || die "无法解析 Cursor local plugin 路径（需要 HOME）。"
@@ -449,10 +1007,9 @@ install_plugin_cursor() {
   dest="${CC_MASTER_CURSOR_PLUGIN_ROOT:-$HOME/.cursor/plugins/local/cc-master}"
   parent="$(dirname "$dest")"
   mkdir -p "$parent"
-  rm -rf "$dest"
-  mkdir -p "$dest"
-  # Copy contents (not the wrapper dir name) so dest is the plugin root with .cursor-plugin/.
-  cp -R "$plugin_root"/. "$dest"/
+  publish_state="$(transactional_publish "plugin:cursor" "$plugin_root" "$dest")" \
+    || die "Cursor plugin 事务发布失败（旧版本已保留）。"
+  log "Cursor plugin publish：$publish_state"
 
   [ -f "$dest/.cursor-plugin/plugin.json" ] \
     || die "Cursor 安装后校验失败：缺 $dest/.cursor-plugin/plugin.json。"
@@ -581,8 +1138,10 @@ fetch "$BIN_ASSET" "$TMP/ccm" "$GITHUB/$REPO/releases/download/$CCM_TAG/$BIN_ASS
 verify_downloaded_release_asset "$CCM_TAG" "$BIN_ASSET" "$TMP/ccm" "$TMP/${CCM_TAG}-${CHECKSUM_MANIFEST}"
 chmod +x "$TMP/ccm"
 mkdir -p "$PREFIX"
-mv -f "$TMP/ccm" "$PREFIX/ccm"
 CCM_BIN="$PREFIX/ccm"
+CCM_PUBLISH_STATE="$(transactional_publish binary "$TMP/ccm" "$CCM_BIN")" \
+  || die "ccm 事务发布失败（旧二进制已保留）。"
+log "ccm publish：$CCM_PUBLISH_STATE"
 
 # 验证二进制能跑（用绝对路径，绕开 PATH 未配的情况）。
 if CCM_VER="$("$CCM_BIN" --version 2>&1)"; then
@@ -652,16 +1211,22 @@ PLUGIN_TAG="$(resolve_plugin_tag)"         # 如 v0.10.1
 log "plugin：${PLUGIN_TAG}"
 
 unpack_plugin_for_harness() {
-  local harness="$1" asset zip dest root
+  local harness="$1" asset zip dest root unpack_root candidate publish_state
   asset="cc-master-plugin-${harness}-${PLUGIN_TAG}.zip"
   zip="$TMP/plugin-${harness}.zip"
   fetch "$asset" "$zip" "$GITHUB/$REPO/releases/download/$PLUGIN_TAG/$asset"
   verify_downloaded_release_asset "$PLUGIN_TAG" "$asset" "$zip" "$TMP/${PLUGIN_TAG}-${CHECKSUM_MANIFEST}"
   dest="$PLUGIN_DIR/$harness"
   mkdir -p "$dest"
-  rm -rf "$dest/cc-master"
-  unzip -q -o "$zip" -d "$dest" || die "解压失败：$asset"
+  unpack_root="$TMP/unpack-$harness"
+  rm -rf "$unpack_root"
+  mkdir -p "$unpack_root"
+  unzip -q "$zip" -d "$unpack_root" || die "解压失败：$asset"
+  candidate="$unpack_root/cc-master"
   root="$dest/cc-master"
+  publish_state="$(transactional_publish "plugin:$harness" "$candidate" "$root")" \
+    || die "$harness plugin 事务发布失败（旧版本已保留）。"
+  log "$harness plugin publish：$publish_state"
   case "$harness" in
     claude-code)
       [ -f "$root/.claude-plugin/marketplace.json" ] \
@@ -682,7 +1247,7 @@ INSTALLED_HARNESSES=""
 while IFS= read -r harness; do
   [ -n "$harness" ] || continue
   PLUGIN_ROOT="$(unpack_plugin_for_harness "$harness")"
-  log "插件已解压（${harness}）：$PLUGIN_ROOT"
+  log "插件已事务发布（${harness}）：$PLUGIN_ROOT"
   case "$harness" in
     claude-code)
       install_plugin_claude_code "$PLUGIN_ROOT"
