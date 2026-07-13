@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   closeSync,
@@ -18,7 +19,11 @@ import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import { compileAttemptWriteSet, type WorktreeWriteLease, type WriteSetPlan } from '@ccm/engine';
 import * as attemptWriteSet from '../src/attempt-write-set.js';
-import { buildWriteSetRequest, resolveWorktreeGitLayout } from '../src/attempt-write-set.js';
+import {
+  buildWriteSetRequest,
+  defaultProbeWritable,
+  resolveWorktreeGitLayout,
+} from '../src/attempt-write-set.js';
 import * as io from '../src/io.js';
 import { REGISTRY } from '../src/registry.js';
 import { run } from '../src/router.js';
@@ -442,6 +447,115 @@ test('a valid request probes exactly the engine-approved read-write roots before
   const plan = compileAttemptWriteSet(request);
   assert.equal(plan.ok, true, JSON.stringify(plan.issues));
   assert.deepEqual(calls, plan.profile_plan.writable_roots);
+});
+
+test('default probe preserves a pre-existing exclusive-name collision byte-for-byte', () => {
+  const fixture = makeLinkedWorktree();
+  const moduleUrl = new URL('../src/attempt-write-set.ts', import.meta.url).href;
+  const child = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      '--input-type=module',
+      '-e',
+      `
+        import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+        import { join } from 'node:path';
+        const fixture = JSON.parse(process.env.CCM_WRITE_SET_FIXTURE);
+        const { buildWriteSetRequest } = await import(process.env.CCM_WRITE_SET_MODULE_URL);
+        const candidate = join(
+          fixture.lease.worktree_root,
+          \`.ccm-write-probe-\${process.pid}-0\`,
+        );
+        writeFileSync(candidate, 'DO NOT DELETE');
+        const request = buildWriteSetRequest({
+          lease: fixture.lease,
+          profile: 'codex-managed-workspace',
+          artifactRootsRw: [fixture.artifactRoot],
+        });
+        const exists = existsSync(candidate);
+        process.stdout.write(JSON.stringify({
+          writable: request.writability.find(
+            (entry) => entry.path === fixture.lease.worktree_root,
+          )?.writable,
+          exists,
+          content: exists ? readFileSync(candidate, 'utf8') : null,
+        }));
+      `,
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        CCM_WRITE_SET_FIXTURE: JSON.stringify(fixture),
+        CCM_WRITE_SET_MODULE_URL: moduleUrl,
+      },
+    },
+  );
+  assert.equal(child.status, 0, child.stderr);
+  assert.deepEqual(JSON.parse(child.stdout), {
+    writable: false,
+    exists: true,
+    content: 'DO NOT DELETE',
+  });
+});
+
+test('default probe cleanup syscalls are paired with ownership from a successful exclusive open', () => {
+  const root = realTmp('ccm-write-probe-oracle-');
+
+  const successfulEvents: Array<
+    | { kind: 'open'; candidate: string; flags: number; mode: number }
+    | { kind: 'close'; fd: number }
+    | { kind: 'unlink'; candidate: string }
+  > = [];
+  assert.equal(
+    defaultProbeWritable(root, {
+      open: (candidate, flags, mode) => {
+        successfulEvents.push({ kind: 'open', candidate, flags, mode });
+        return 41;
+      },
+      close: (fd) => successfulEvents.push({ kind: 'close', fd }),
+      unlink: (candidate) => successfulEvents.push({ kind: 'unlink', candidate }),
+    }),
+    true,
+  );
+  assert.equal(successfulEvents[0]?.kind, 'open');
+  assert.deepEqual(successfulEvents.slice(1), [
+    { kind: 'close', fd: 41 },
+    {
+      kind: 'unlink',
+      candidate:
+        successfulEvents[0]?.kind === 'open' ? successfulEvents[0].candidate : 'unreachable',
+    },
+  ]);
+  const openEvent = successfulEvents[0];
+  assert.equal(openEvent?.kind, 'open');
+  if (openEvent?.kind === 'open') {
+    assert.equal(openEvent.flags, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL);
+    assert.equal(openEvent.mode, 0o600);
+  }
+
+  for (const code of ['EEXIST', 'EACCES']) {
+    const failedEvents: Array<{ kind: 'open' | 'close' | 'unlink'; value: string | number }> = [];
+    const openFailure = Object.assign(new Error(code), { code });
+    assert.equal(
+      defaultProbeWritable(root, {
+        open: (candidate) => {
+          failedEvents.push({ kind: 'open', value: candidate });
+          throw openFailure;
+        },
+        close: (fd) => failedEvents.push({ kind: 'close', value: fd }),
+        unlink: (candidate) => failedEvents.push({ kind: 'unlink', value: candidate }),
+      }),
+      false,
+    );
+    assert.deepEqual(
+      failedEvents.map((event) => event.kind),
+      ['open'],
+      code,
+    );
+  }
 });
 
 test('real CLI rejects equal, child, and ancestor artifact overlap with common Git metadata', () => {

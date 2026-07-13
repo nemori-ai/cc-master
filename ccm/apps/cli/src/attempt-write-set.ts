@@ -188,24 +188,48 @@ function resolveArtifactRoot(
   };
 }
 
-function defaultProbeWritable(directory: string): boolean {
+export interface WriteProbeOperations {
+  open: (candidate: string, flags: number, mode: number) => number;
+  close: (fd: number) => void;
+  unlink: (candidate: string) => void;
+}
+
+const DEFAULT_WRITE_PROBE_OPERATIONS: WriteProbeOperations = {
+  open: openSync,
+  close: closeSync,
+  unlink: unlinkSync,
+};
+
+export function defaultProbeWritable(
+  directory: string,
+  operations: WriteProbeOperations = DEFAULT_WRITE_PROBE_OPERATIONS,
+): boolean {
   const candidate = join(directory, `.ccm-write-probe-${process.pid}-${probeSequence++}`);
   let fd: number | null = null;
+  let owned = false;
   try {
-    fd = openSync(candidate, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, 0o600);
-    closeSync(fd);
+    fd = operations.open(
+      candidate,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+      0o600,
+    );
+    owned = true;
+    operations.close(fd);
     fd = null;
-    unlinkSync(candidate);
+    operations.unlink(candidate);
+    owned = false;
     return true;
   } catch {
     if (fd !== null) {
       try {
-        closeSync(fd);
+        operations.close(fd);
       } catch {}
     }
-    try {
-      unlinkSync(candidate);
-    } catch {}
+    if (owned) {
+      try {
+        operations.unlink(candidate);
+      } catch {}
+    }
     return false;
   }
 }
