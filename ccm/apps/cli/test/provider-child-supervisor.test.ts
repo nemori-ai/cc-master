@@ -352,6 +352,89 @@ test('reports startup timeout with the exact operation and waits for close', asy
   });
 });
 
+test('supervision keeps its timeout lifecycle alive without unrelated refed handles', async () => {
+  const supervisorUrl = new URL('../src/provider-child-supervisor.ts', import.meta.url).href;
+  const runtime = `
+    import { EventEmitter } from 'node:events';
+    import { PassThrough } from 'node:stream';
+    import {
+      createProviderRequestDeadline,
+      superviseProviderChild,
+    } from ${JSON.stringify(supervisorUrl)};
+
+    const child = new EventEmitter();
+    let signalCode = null;
+    Object.defineProperties(child, {
+      stdout: { value: new PassThrough() },
+      stderr: { value: new PassThrough() },
+      stdin: { value: null },
+      pid: { value: undefined },
+      exitCode: { get: () => null },
+      signalCode: { get: () => signalCode },
+    });
+    Object.defineProperty(child, 'kill', {
+      value: (signal = 'SIGTERM') => {
+        queueMicrotask(() => {
+          signalCode = signal;
+          child.emit('exit', null, signal);
+          child.emit('close', null, signal);
+        });
+        return true;
+      },
+    });
+
+    const tree = {
+      schema: 'ccm/provider-process-tree/v1',
+      kind: 'posix-process-group',
+      groupId: 1,
+      signal: (signal) => child.kill(signal),
+      isAlive: () => signalCode === null,
+    };
+
+    try {
+      await superviseProviderChild({ child, tree }, {
+        operation: 'liveness-probe',
+        deadline: createProviderRequestDeadline(1_000),
+        limits: {
+          startupTimeoutMs: 20,
+          idleTimeoutMs: 1_000,
+          stdoutLimitBytes: 1_024,
+          stderrLimitBytes: 1_024,
+          terminationGraceMs: 30,
+          reapTimeoutMs: 100,
+        },
+      });
+      process.exitCode = 91;
+    } catch (error) {
+      if (error?.code !== 'startup_timeout' || error?.termination?.reaped !== true) {
+        console.error(error);
+        process.exitCode = 92;
+      } else {
+        process.stdout.write('startup_timeout:reaped\\n');
+      }
+    }
+  `;
+  const probe = spawn(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', runtime], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const stdout: Buffer[] = [];
+  const stderr: Buffer[] = [];
+  probe.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
+  probe.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+
+  const [exitCode, signal] = await new Promise<[number | null, NodeJS.Signals | null]>((resolve) =>
+    probe.once('close', (code, closedSignal) => resolve([code, closedSignal])),
+  );
+
+  assert.equal(signal, null);
+  assert.equal(
+    exitCode,
+    0,
+    `isolated liveness probe exited ${exitCode}: ${Buffer.concat(stderr).toString('utf8')}`,
+  );
+  assert.equal(Buffer.concat(stdout).toString('utf8'), 'startup_timeout:reaped\n');
+});
+
 test('reports startup timeout when a real spawned child produces no provider bytes', async () => {
   const child = spawnNode('setInterval(() => {}, 1_000);');
   const error = await expectSupervisorError(

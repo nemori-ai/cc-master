@@ -172,6 +172,10 @@ export function superviseProviderChild(
     let reapTimer: NodeJS.Timeout | null = null;
     let reapPollTimer: NodeJS.Timeout | null = null;
 
+    // A pending promise does not keep Node alive. These timers intentionally remain ref'ed until
+    // clearAllTimers() so timeout and process-tree cleanup still reach a bounded terminal state
+    // when the caller has no unrelated active handle.
+
     const clearTimer = (timer: NodeJS.Timeout | null): void => {
       if (timer) clearTimeout(timer);
     };
@@ -236,7 +240,6 @@ export function superviseProviderChild(
       if (settled || !primaryFailure || maybeRejectAfterCleanup()) return;
       clearTimer(reapPollTimer);
       reapPollTimer = setTimeout(pollForCleanup, 5);
-      reapPollTimer.unref();
     };
 
     const armReapWatchdog = (): void => {
@@ -247,7 +250,6 @@ export function superviseProviderChild(
         primaryFailure.termination = terminationSnapshot(false);
         rejectPrimaryFailure();
       }, options.limits.reapTimeoutMs);
-      reapTimer.unref();
     };
 
     const beginTermination = (): void => {
@@ -273,7 +275,6 @@ export function superviseProviderChild(
         armReapWatchdog();
         pollForCleanup();
       }, options.limits.terminationGraceMs);
-      terminationTimer.unref();
     };
 
     const fail = (error: ProviderChildSupervisorError): void => {
@@ -313,11 +314,9 @@ export function superviseProviderChild(
           return;
         }
         const timer = setTimeout(run, Math.min(remainingMs, MAX_TIMER_DELAY_MS));
-        timer.unref();
         if (action === hardTimeoutAction) hardTimer = timer;
       };
       const timer = setTimeout(run, Math.min(Math.max(0, atMs - Date.now()), MAX_TIMER_DELAY_MS));
-      timer.unref();
       return timer;
     };
 
