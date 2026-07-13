@@ -1148,6 +1148,138 @@ for (const signalResult of [true, false]) {
   }
 }
 
+async function withCloseFinalizerText<T>(run: () => Promise<T>): Promise<T> {
+  const OriginalTextDecoder = globalThis.TextDecoder;
+  let decoderIndex = 0;
+  class FinalizerTextDecoder {
+    private readonly emitOnFinalize = decoderIndex++ === 0;
+
+    decode(input?: Uint8Array): string {
+      if (input !== undefined) return '';
+      return this.emitOnFinalize ? 'flush-from-close-finalizer' : '';
+    }
+  }
+  globalThis.TextDecoder = FinalizerTextDecoder as unknown as typeof TextDecoder;
+  try {
+    return await run();
+  } finally {
+    globalThis.TextDecoder = OriginalTextDecoder;
+  }
+}
+
+for (const signalResult of [true, false]) {
+  for (const laterEffects of ['error', 'abort', 'multiple'] as const) {
+    for (const callbackThrows of [false, true]) {
+      test(`close-first drain is non-reentrant with later ${laterEffects} (${callbackThrows ? 'throw' : 'return'}, signal=${signalResult})`, async () => {
+        await withFakeTimerClock(async (clock) => {
+          await withCloseFinalizerText(async () => {
+            const fixture = reentrantTreeFixture({ signalResult });
+            const cancellation = new AbortController();
+            const laterFailure = new Error(`later ${laterEffects} terminal`);
+            const callbackFailure = new Error(`finalizer ${laterEffects} consumer failure`);
+            const observedText: string[] = [];
+            const seed = Buffer.from('seed-decoder');
+            const supervised = superviseProviderChild(fixture.ownedChild, {
+              operation: `close-first-${laterEffects}-${callbackThrows ? 'throw' : 'return'}`,
+              deadline: createProviderRequestDeadline(1_000),
+              limits: DEFAULT_LIMITS,
+              signal: cancellation.signal,
+              onStarted: () => {
+                fixture.stdout.write(seed);
+                fixture.close(0, null);
+              },
+              onStdoutText: (text) => {
+                observedText.push(text);
+                if (laterEffects === 'error' || laterEffects === 'multiple') {
+                  fixture.ownedChild.child.emit('error', laterFailure);
+                }
+                if (laterEffects === 'abort' || laterEffects === 'multiple') {
+                  cancellation.abort(laterFailure);
+                }
+                fixture.ownedChild.child.emit('close', 0, null);
+                if (callbackThrows) throw callbackFailure;
+              },
+            });
+
+            fixture.ownedChild.child.emit('spawn');
+
+            if (callbackThrows) {
+              const error = await expectSupervisorError(
+                supervised,
+                'consumer_error',
+                `close-first-${laterEffects}-throw`,
+              );
+              assert.equal(error.cause, callbackFailure);
+              assert.equal(error.stream, 'stdout');
+              assert.equal(error.termination?.reaped, true);
+              assert.deepEqual(fixture.signals, ['SIGTERM']);
+            } else {
+              const result = await supervised;
+              assert.equal(result.exitCode, 0);
+              assert.equal(result.signal, null);
+              assert.equal(result.stdout, 'flush-from-close-finalizer');
+              assert.equal(result.stdoutBytes, seed.byteLength);
+              assert.deepEqual(fixture.signals, []);
+            }
+
+            assert.deepEqual(observedText, ['flush-from-close-finalizer']);
+            assert.equal(clock.activeCount(), 0);
+            const signalsAtSettlement = [...fixture.signals];
+            const aliveChecksAtSettlement = fixture.isAliveCalls();
+            clock.advanceTo(1_000);
+            assert.deepEqual(fixture.signals, signalsAtSettlement);
+            assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+          });
+        });
+      });
+    }
+  }
+}
+
+for (const signalResult of [true, false]) {
+  for (const callbackThrows of [false, true]) {
+    test(`failure-first drain keeps error ahead of queued close (${callbackThrows ? 'throw' : 'return'}, signal=${signalResult})`, async () => {
+      await withFakeTimerClock(async (clock) => {
+        await withCloseFinalizerText(async () => {
+          const fixture = reentrantTreeFixture({ signalResult });
+          const childFailure = new Error('first queued child error');
+          const callbackFailure = new Error('failure-first consumer failure');
+          const observedText: string[] = [];
+          const supervised = superviseProviderChild(fixture.ownedChild, {
+            operation: `failure-first-${callbackThrows ? 'throw' : 'return'}`,
+            deadline: createProviderRequestDeadline(1_000),
+            limits: DEFAULT_LIMITS,
+            onStarted: () => {
+              fixture.stdout.write(Buffer.from('seed-decoder'));
+              fixture.ownedChild.child.emit('error', childFailure);
+              fixture.close(0, null);
+              if (callbackThrows) throw callbackFailure;
+            },
+            onStdoutText: (text) => observedText.push(text),
+          });
+
+          fixture.ownedChild.child.emit('spawn');
+
+          const error = await expectSupervisorError(
+            supervised,
+            callbackThrows ? 'consumer_error' : 'spawn_error',
+            `failure-first-${callbackThrows ? 'throw' : 'return'}`,
+          );
+          assert.equal(error.cause, callbackThrows ? callbackFailure : childFailure);
+          assert.equal(error.termination?.reaped, true);
+          assert.deepEqual(observedText, []);
+          assert.deepEqual(fixture.signals, ['SIGTERM']);
+          assert.equal(clock.activeCount(), 0);
+          const aliveChecksAtSettlement = fixture.isAliveCalls();
+          clock.advanceTo(1_000);
+          assert.deepEqual(fixture.signals, ['SIGTERM']);
+          assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
+        });
+      });
+    });
+  }
+}
+
 test('reentrant tree probe preserves the primary error and cannot repeat termination', async () => {
   await withFakeTimerClock(async (clock) => {
     const callbackFailure = new Error('controlled tree-probe failure');

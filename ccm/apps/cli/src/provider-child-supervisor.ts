@@ -176,8 +176,10 @@ export function superviseProviderChild(
     let reapTimer: NodeJS.Timeout | null = null;
     let reapPollTimer: NodeJS.Timeout | null = null;
     // Child events are normally immediate. Only a consumer callback opens an atomic boundary:
-    // terminal effects queue until the outermost callback returns and fixes its own outcome.
+    // terminal effects queue until the outermost callback returns and fixes its own outcome. One
+    // drain transaction owns that FIFO even when processing an effect invokes another callback.
     let consumerCallbackDepth = 0;
+    let drainingTerminalEffects = false;
     const pendingTerminalEffects: PendingSupervisorTerminalEffect[] = [];
 
     const canContinueProviderWork = (): boolean =>
@@ -409,14 +411,19 @@ export function superviseProviderChild(
     }
 
     function drainPendingTerminalEffects(): void {
-      if (!canDrainTerminalEffects()) return;
-      while (canDrainTerminalEffects() && pendingTerminalEffects.length > 0) {
-        const event = pendingTerminalEffects.shift();
-        if (!event) break;
-        if (event.type === 'close') processClose(event.exitCode, event.signal);
-        else failImmediately(event.error);
+      if (!canDrainTerminalEffects() || drainingTerminalEffects) return;
+      drainingTerminalEffects = true;
+      try {
+        while (canDrainTerminalEffects() && pendingTerminalEffects.length > 0) {
+          const event = pendingTerminalEffects.shift();
+          if (!event) break;
+          if (event.type === 'close') processClose(event.exitCode, event.signal);
+          else failImmediately(event.error);
+        }
+      } finally {
+        drainingTerminalEffects = false;
+        if (settled) pendingTerminalEffects.length = 0;
       }
-      if (settled) pendingTerminalEffects.length = 0;
     }
 
     const observeActivity = (): void => {
