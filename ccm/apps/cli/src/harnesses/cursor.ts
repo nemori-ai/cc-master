@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { readCursorUsageSignal } from '../cursor-usage.js';
+import { createUnprobedCursorAgentAdmission } from './cursor-agent-admission.js';
 import { probeExecutable } from './probe.js';
 import type {
   Env,
@@ -127,6 +128,8 @@ function cursorSurfaces(input: {
   ideConfigPaths: string[];
   headlessCli: HarnessCliProbe;
 }): HarnessSurfaceDescriptor[] {
+  const ideFacts = unprobedFacts();
+  const headlessFacts = unprobedFacts();
   return [
     {
       id: 'cursor-ide-plugin',
@@ -137,7 +140,8 @@ function cursorSurfaces(input: {
       reason: input.ideInstalled ? null : 'Cursor IDE CLI/config/plugin directories not found',
       binary: input.ideCli,
       configPaths: input.ideConfigPaths,
-      facts: unprobedFacts(),
+      facts: ideFacts,
+      admission: null,
       capabilities: {
         accountMutation: { state: 'forbidden', reason: ACCOUNT_MUTATION_REASON },
         accountAutoswitch: { state: 'unsupported', reason: ACCOUNT_AUTOSWITCH_REASON },
@@ -153,7 +157,12 @@ function cursorSurfaces(input: {
       reason: input.headlessCli.available ? null : 'cursor-agent executable not found',
       binary: input.headlessCli,
       configPaths: [],
-      facts: unprobedFacts(),
+      facts: headlessFacts,
+      admission: createUnprobedCursorAgentAdmission(
+        input.headlessCli,
+        headlessFacts.authentication,
+        headlessFacts.quota,
+      ),
       capabilities: {
         accountMutation: { state: 'forbidden', reason: ACCOUNT_MUTATION_REASON },
         accountAutoswitch: { state: 'unsupported', reason: ACCOUNT_AUTOSWITCH_REASON },

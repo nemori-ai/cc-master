@@ -156,6 +156,14 @@ test('Cursor inventory keeps IDE plugin and headless agent as independent surfac
     assert.equal(agent.binary.path, fixture.agent ? join(bin, 'cursor-agent') : null);
     assert.deepEqual(agent.facts.authentication, { state: 'unknown', source: 'not-probed' });
     assert.deepEqual(agent.facts.quota, { state: 'unknown', source: 'not-probed' });
+    assert.ok(agent.admission, fixture.name);
+    assert.equal(agent.admission.binary.available, fixture.agent);
+    assert.equal(agent.admission.authentication.state, 'unknown');
+    assert.equal(agent.admission.quota.state, 'unknown');
+    assert.equal(agent.admission.sandbox, 'unknown');
+    assert.equal(agent.admission.result_schema, 'unknown');
+    assert.equal(agent.admission.task_acceptance, 'unknown');
+    assert.equal(agent.admission.schedulable, false);
     assert.equal(agent.capabilities.accountMutation.state, 'forbidden');
     assert.equal(agent.capabilities.accountAutoswitch.state, 'unsupported');
     assert.equal(agent.capabilities.pluginDistribution.state, 'unsupported');

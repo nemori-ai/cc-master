@@ -113,7 +113,10 @@ function formatHarnessSurfaceLine(surface: HarnessInstallation['surfaces'][numbe
   const binary = surface.binary.available
     ? surface.binary.path || surface.binary.name
     : `missing:${surface.binary.name}`;
-  return `    ${surface.id.padEnd(22)} ${surface.kind.padEnd(12)} ${state} · binary=${binary} · auth=${surface.facts.authentication.state} quota=${surface.facts.quota.state} account-mutation=${surface.capabilities.accountMutation.state} autoswitch=${surface.capabilities.accountAutoswitch.state} plugin-dist=${surface.capabilities.pluginDistribution.state}`;
+  const admission = surface.admission
+    ? ` · admission=${surface.admission.schedulable ? 'schedulable' : 'blocked'} sandbox=${surface.admission.sandbox} result=${surface.admission.result_schema} acceptance=${surface.admission.task_acceptance}`
+    : '';
+  return `    ${surface.id.padEnd(22)} ${surface.kind.padEnd(12)} ${state} · binary=${binary} · auth=${surface.facts.authentication.state} quota=${surface.facts.quota.state} account-mutation=${surface.capabilities.accountMutation.state} autoswitch=${surface.capabilities.accountAutoswitch.state} plugin-dist=${surface.capabilities.pluginDistribution.state}${admission}`;
 }
 
 function formatMachineHarnessLine(

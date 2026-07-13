@@ -267,6 +267,8 @@ Cursor 的首个发现切片先收口在 `ccm harness list` 的本机只读 inve
 - 本切片只证明 local binary presence；`authentication` / `quota` 固定报 `unknown` + `not-probed`，不读 credential、不调 provider。`accountMutation` 报 `forbidden`，`accountAutoswitch` 与 `pluginDistribution` 报 `unsupported`；这些负能力不因用户已手工 auth 而改变。
 - 这是 machine-fact discovery 切片，不晋升 headless invocation / structured result / cancel / resume / model / quota admission 的 target 状态。
 
+Cursor Agent admission 合同已有一个 **partial** 落点：[`harnesses/cursor-agent-admission-contract.md`](harnesses/cursor-agent-admission-contract.md) 定义 `ccm/cursor-agent-admission/v1`，把 `binary.available`、`authentication.state`、`quota.state`、sandbox、result schema、task acceptance 和 transport termination 独立建模。inventory 只挂 unprobed、fail-closed snapshot，不执行 provider process；fixture-only evaluator 已证明 RC0-empty/invalid 不 accepted、AppArmor pre-exec 不污染 auth、mode/profile evidence 不跨用。真实 auth/quota collectors、production driver、reservation 与 dispatcher 接线仍为 `target`，不能据此宣称 Cursor headless dispatch current。
+
 ### 7.2 Auth、account 与 pool 固定边界
 
 - Codex/Cursor 只读当前认证 identity；login/logout/account/session switch、credential import/copy/write 永久 forbidden，并以 process/fs spy 验收。

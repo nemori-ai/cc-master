@@ -30,7 +30,7 @@ Cursor 事实按以下优先级维护：
 - **Cursor Cloud Agents**（cursor.com/agents）：官方明确多个 hook 无等价触发点（`sessionStart`/`sessionEnd`、`beforeSubmitPrompt`、`stop`、Tab hooks、部分 MCP hooks 等）。
 - Cursor Tab 补全专用 hooks（`beforeTabFileRead`/`afterTabFileEdit`）。
 - Cursor SDK / Cloud Agents API（`@cursor/sdk`、`CURSOR_API_KEY`）——编排 dispatch 的 CI/外部面，不是 IDE Agent runtime。
-- Cursor Agent CLI / headless one-shot **worker transport**——它是 cross-harness 调用面，不等于本页的 IDE plugin / hook adapter；本页记录 presence-only `harnesses[].surfaces` 与严格 C1 `surfaceInventory` 两层只读发现合同，尚未定义 spawn / poll / cancel / resume transport。
+- Cursor Agent CLI / headless one-shot 的完整 **调用 / quota / cancel / supervisor 契约**——它是 cross-harness 调用面，不等于本页的 IDE plugin / hook adapter；本页记录 presence-only `harnesses[].surfaces` 与严格 C1 `surfaceInventory` 两层只读发现合同，已落地的 mode-specific admission/result 子合同见 [`cursor-agent-admission-contract.md`](cursor-agent-admission-contract.md)，但尚未定义完整 spawn / poll / cancel / resume transport。
 
 ## Cursor execution surfaces【官方 + 本仓实测】
 
@@ -364,9 +364,9 @@ session(env) => ({
 | Surface | 本地发现契约 | 不做的推断 |
 | --- | --- | --- |
 | `cursor-ide-plugin` / `ide-plugin` | 继续沿用 `cursor` executable、Cursor config dir 或 cc-master local plugin dir；同时保持顶层 harness `installed` 语义，供 plugin install/upgrade 消费 | 不由 `cursor-agent` 存在推出 IDE / plugin 已安装 |
-| `cursor-agent` / `cli-headless` | 只探可执行 `cursor-agent` binary（或 `CCM_CURSOR_AGENT_BIN` / `CURSOR_AGENT_BIN`），报 binary name + PATH 命中绝对路径；symlink 合法，非可执行文件不算 | auth / quota = `unknown` + `not-probed`；account mutation = `forbidden`；autoswitch / plugin distribution = `unsupported` |
+| `cursor-agent` / `cli-headless` | 只探可执行 `cursor-agent` binary（或 `CCM_CURSOR_AGENT_BIN` / `CURSOR_AGENT_BIN`），报 binary name + PATH 命中绝对路径；symlink 合法，非可执行文件不算；附 `ccm/cursor-agent-admission/v1` unprobed snapshot | auth / quota / sandbox / result / acceptance = unknown，故 `schedulable:false`；account mutation = `forbidden`；autoswitch / plugin distribution = `unsupported` |
 
-这条 inventory 路径只读 PATH / 本地目录，不调 Cursor provider、不读写 credential、不 login/logout/switch。手工 auth 是用户管理的外部事实，inventory 不把它伪报成已知。
+这条 inventory 路径只读 PATH / 本地目录，不注入 process effect、不调 Cursor provider、不读写 credential、不 login/logout/switch。手工 auth 是用户管理的外部事实，inventory 不把它伪报成已知。admission 的 AppArmor/RC0/result fixture 与 mode/profile 合取语义以 [`cursor-agent-admission-contract.md`](cursor-agent-admission-contract.md) 为准；它不改变本页 IDE/plugin-target 的 `installed` 语义。
 
 ## Dispatch Primitives
 

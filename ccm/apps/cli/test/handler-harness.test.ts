@@ -187,6 +187,13 @@ test('ccm harness list renders a headless-only cursor-agent without claiming Cur
   assert.equal(agent.binary.path, agentPath);
   assert.equal(agent.facts.authentication.state, 'unknown');
   assert.equal(agent.facts.quota.state, 'unknown');
+  assert.equal(agent.admission.binary.available, true);
+  assert.equal(agent.admission.authentication.state, 'unknown');
+  assert.equal(agent.admission.quota.state, 'unknown');
+  assert.equal(agent.admission.sandbox, 'unknown');
+  assert.equal(agent.admission.result_schema, 'unknown');
+  assert.equal(agent.admission.task_acceptance, 'unknown');
+  assert.equal(agent.admission.schedulable, false);
   assert.equal(agent.capabilities.accountMutation.state, 'forbidden');
   assert.equal(JSON.stringify(parsed).includes('credential'), false);
 

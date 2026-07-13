@@ -155,6 +155,15 @@ function deepFreezeDescriptor(descriptor: HarnessDescriptor): HarnessDescriptor 
     Object.freeze(surface.facts.authentication);
     Object.freeze(surface.facts.quota);
     Object.freeze(surface.facts);
+    if (surface.admission) {
+      Object.freeze(surface.admission.request);
+      Object.freeze(surface.admission.binary);
+      Object.freeze(surface.admission.authentication);
+      Object.freeze(surface.admission.quota);
+      Object.freeze(surface.admission.transport);
+      Object.freeze(surface.admission.blockers);
+      Object.freeze(surface.admission);
+    }
     Object.freeze(surface.capabilities.accountMutation);
     Object.freeze(surface.capabilities.accountAutoswitch);
     Object.freeze(surface.capabilities.pluginDistribution);
