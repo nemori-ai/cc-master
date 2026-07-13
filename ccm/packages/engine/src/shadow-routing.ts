@@ -36,6 +36,7 @@ const SAFE_PUBLIC_CODE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const SAFE_PUBLIC_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 const SECRET_KEY =
   /credential|token|(?:^|_)argv(?:_|$)|(?:^|_)env(?:ironment)?(?:_|$)|raw.*response|transcript|balance/i;
+// BEGIN ORIGIN_PRIVATE_VALUE_LANGUAGE
 const SECRET_SK_VALUE = /(?:^|[^A-Za-z0-9])(sk-[A-Za-z0-9_-]{16,})(?=$|[^A-Za-z0-9_-])/i;
 const SECRET_JWT_VALUE =
   /(?:^|[^A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?=$|[^A-Za-z0-9_-])/;
@@ -64,6 +65,7 @@ const NON_SECRET_BEARER_VALUES = new Set([
 ]);
 const NON_SECRET_BEARER_AUTH_STATUS =
   /^(?:(?:\s+is)?\s+|:\s*)(?:unknown|unavailable|missing|not[- ]configured|forbidden)\b/i;
+// END ORIGIN_PRIVATE_VALUE_LANGUAGE
 const CONTRACT_PREDICATES = new Set([
   'capability-match',
   'effect-floor',
@@ -256,11 +258,15 @@ function duplicateValues(values: string[]): string[] {
 }
 
 function secretShapedValue(value: string): boolean {
+  // BEGIN ORIGIN_PRIVATE_VALUE_ALGORITHM
   if (SECRET_SK_VALUE.test(value)) return true;
   if (SECRET_JWT_VALUE.test(value)) return true;
   if (SECRET_GITHUB_VALUE.test(value)) return true;
-  const assignment = SECRET_ASSIGNMENT_VALUE.exec(value)?.[1]?.toLowerCase();
-  if (assignment !== undefined && !NON_SECRET_ASSIGNMENT_VALUES.has(assignment)) return true;
+  for (const match of value.matchAll(new RegExp(SECRET_ASSIGNMENT_VALUE.source, 'gi'))) {
+    const assignment = match[1]?.toLowerCase();
+    if (assignment === undefined || NON_SECRET_ASSIGNMENT_VALUES.has(assignment)) continue;
+    return true;
+  }
   for (const match of value.matchAll(new RegExp(BEARER_VALUE.source, 'gi'))) {
     const bearer = match[1]?.toLowerCase();
     if (bearer === undefined || NON_SECRET_BEARER_VALUES.has(bearer)) continue;
@@ -274,6 +280,7 @@ function secretShapedValue(value: string): boolean {
     return true;
   }
   return false;
+  // END ORIGIN_PRIVATE_VALUE_ALGORITHM
 }
 
 function scanSecrets(value: unknown, path: string, out: ContractIssue[]): void {

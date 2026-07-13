@@ -12,15 +12,13 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { secretShapedValue } = require('./orchestrator-context-private-value.js');
 
 const MAX_BYTES = 4096;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 const SAFE_HARNESS = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const SAFE_CODE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
-const SECRET_SK_VALUE = /(?:^|[^A-Za-z0-9])(sk-[A-Za-z0-9_-]{16,})(?=$|[^A-Za-z0-9_-])/i;
-const SECRET_JWT_VALUE =
-  /(?:^|[^A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?=$|[^A-Za-z0-9_-])/;
 
 const ENUMS = {
   surface: new Set(['host-native', 'cli-headless']),
@@ -107,11 +105,7 @@ function strictIso(value) {
 
 function privateShapedString(value) {
   if (value === 'ccm/origin-context/v1') return false;
-  if (SECRET_SK_VALUE.test(value)) return true;
-  if (/\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{8,}\b/i.test(value)) return true;
-  if (SECRET_JWT_VALUE.test(value)) return true;
-  if (/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}\b/i.test(value)) return true;
-  if (/\b(?:api[\s_-]*key|credentials?|(?:access|refresh)[\s_-]*token|client[\s_-]*secret|secret[\s_-]*key)\b\s*[:=]/i.test(value)) return true;
+  if (secretShapedValue(value)) return true;
   if (/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(value)) return true;
   return value.includes('/') || value.includes('\\');
 }

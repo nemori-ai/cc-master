@@ -19,6 +19,9 @@ const crypto = require('crypto');
 const fs = require('fs');
 const args = process.argv.slice(2);
 const tokenVectors = JSON.parse(fs.readFileSync(`${__dirname}/token-vectors.json`, 'utf8'));
+const allTokenVectors = Object.entries(tokenVectors.families).flatMap(([family, vectors]) =>
+  vectors.map((vector) => ({ family, ...vector })),
+);
 fs.appendFileSync(`${__dirname}/calls.jsonl`, `${JSON.stringify(args)}\n`);
 if (fs.existsSync(`${__dirname}/slow`)) {
   const until = Date.now() + 2000;
@@ -56,12 +59,14 @@ if (fs.existsSync(`${__dirname}/malicious-jwt`)) {
   payload.candidates[0].candidate_id = jwt;
   payload.routes[0].selected.candidate_id = jwt;
 }
-const skVector = tokenVectors.sk.find((vector) =>
-  fs.existsSync(`${__dirname}/${vector.private ? 'malicious' : 'positive'}-sk-${vector.id}`),
+const tokenVector = allTokenVectors.find((vector) =>
+  fs.existsSync(
+    `${__dirname}/${vector.private ? 'malicious' : 'positive'}-secret-${vector.family}-${vector.id}`,
+  ),
 );
-if (skVector) {
-  payload.candidates[0].candidate_id = skVector.value;
-  payload.routes[0].selected.candidate_id = skVector.value;
+if (tokenVector) {
+  payload.candidates[0].candidate_id = tokenVector.value;
+  payload.routes[0].selected.candidate_id = tokenVector.value;
 }
 if (fs.existsSync(`${__dirname}/malicious-stale-selected`)) {
   payload.available = false;
@@ -179,11 +184,14 @@ test -s "$TMP/dist-cursor"
 # A correctly hashed delivery still fails closed at the content boundary for both unknown nested
 # fields and private-shaped values in an otherwise allowlisted field. Exercise all three origins and
 # the registered Codex/Cursor launcher envelopes.
-mapfile -t SK_PRIVATE_MODES < <(node - "$TMP/token-vectors.json" <<'NODE'
+mapfile -t PRIVATE_VALUE_MODES < <(node - "$TMP/token-vectors.json" <<'NODE'
 const fs = require('fs');
 const vectors = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-for (const vector of vectors.sk.filter((entry) => entry.private)) {
-  process.stdout.write(`malicious-sk-${vector.id}\n`);
+const safeId = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
+for (const [family, entries] of Object.entries(vectors.families)) {
+  for (const vector of entries.filter((entry) => entry.private && safeId.test(entry.value))) {
+    process.stdout.write(`malicious-secret-${family}-${vector.id}\n`);
+  }
 }
 NODE
 )
@@ -194,7 +202,7 @@ NEGATIVE_MODES=( \
   malicious-model-unavailable malicious-runtime-unhealthy malicious-qualification-fail \
   malicious-effect-fail malicious-permission-fail malicious-selected-missing-candidate \
 )
-for MODE in "${NEGATIVE_MODES[@]}" "${SK_PRIVATE_MODES[@]}"; do
+for MODE in "${NEGATIVE_MODES[@]}" "${PRIVATE_VALUE_MODES[@]}"; do
   rm -f "$HOME_DIR/hooks/orchestrator-context"/*.json 2>/dev/null || true
   touch "$TMP/$MODE"
   "$CCM_BIN" orchestrator context --cached-only --agent-visible --harness codex >"$TMP/$MODE-fixture.json"
@@ -213,10 +221,12 @@ if (mode === 'malicious-duplicate') {
 if (mode === 'malicious-jwt') {
   assert.match(outer.content, /eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiJzZW50aW5lbCJ9\.signature_1234567890/);
 }
-if (mode.startsWith('malicious-sk-')) {
+if (mode.startsWith('malicious-secret-')) {
   const vectors = JSON.parse(fs.readFileSync(path.join(path.dirname(process.argv[3]), 'token-vectors.json'), 'utf8'));
-  const vector = vectors.sk.find((entry) => mode === `malicious-sk-${entry.id}`);
-  assert(vector && vector.private === true);
+  const vector = Object.entries(vectors.families)
+    .flatMap(([family, entries]) => entries.map((entry) => ({ family, ...entry })))
+    .find((entry) => mode === `malicious-secret-${entry.family}-${entry.id}`);
+  assert(vector && vector.private === true, mode);
   assert.match(vector.value, /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/);
   const payload = JSON.parse(outer.content.replace(/^<ambient source="orchestrator-context">/, '').replace(/<\/ambient>$/, ''));
   assert.strictEqual(payload.candidates[0].candidate_id, vector.value);
@@ -318,16 +328,19 @@ rm -f "$TMP/positive-native-tight"
 
 # Counterexamples from the same producer/consumer conformance table must stay public. Each vector is
 # self-checked, then crosses Claude additionalContext, Codex systemMessage, and Cursor
-# additional_context so boundary hardening cannot become a blanket `sk-` substring ban.
-mapfile -t SK_PUBLIC_MODES < <(node - "$TMP/token-vectors.json" <<'NODE'
+# additional_context so boundary hardening cannot become a blanket token-family ban.
+mapfile -t PUBLIC_VALUE_MODES < <(node - "$TMP/token-vectors.json" <<'NODE'
 const fs = require('fs');
 const vectors = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-for (const vector of vectors.sk.filter((entry) => !entry.private)) {
-  process.stdout.write(`positive-sk-${vector.id}\n`);
+const safeId = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
+for (const [family, entries] of Object.entries(vectors.families)) {
+  for (const vector of entries.filter((entry) => !entry.private && safeId.test(entry.value))) {
+    process.stdout.write(`positive-secret-${family}-${vector.id}\n`);
+  }
 }
 NODE
 )
-for MODE in "${SK_PUBLIC_MODES[@]}"; do
+for MODE in "${PUBLIC_VALUE_MODES[@]}"; do
   rm -f "$HOME_DIR/hooks/orchestrator-context"/*.json 2>/dev/null || true
   touch "$TMP/$MODE"
   printf '%s\n' '{"hook_event_name":"SessionStart","session_id":"sid-context"}' |
@@ -345,7 +358,9 @@ const assert = require('assert');
 const mode = process.argv[2];
 const root = process.argv[3];
 const vectors = JSON.parse(fs.readFileSync(`${root}/token-vectors.json`, 'utf8'));
-const vector = vectors.sk.find((entry) => mode === `positive-sk-${entry.id}`);
+const vector = Object.entries(vectors.families)
+  .flatMap(([family, entries]) => entries.map((entry) => ({ family, ...entry })))
+  .find((entry) => mode === `positive-secret-${entry.family}-${entry.id}`);
 assert(vector && vector.private === false);
 assert.match(vector.value, /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/);
 const contexts = [
@@ -362,6 +377,28 @@ for (const content of contexts) {
 NODE
   rm -f "$TMP/$MODE"
 done
+
+# The shared executable classifier is the one consumer used by all three origin envelopes. The
+# same family table also drives producer and endpoint cases above, so a new family cannot silently
+# acquire a second expected-value list.
+node - "$ROOT" "$TMP/token-vectors.json" <<'NODE'
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const root = process.argv[2];
+const vectors = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+const { secretShapedValue } = require(path.join(
+  root,
+  'plugin/src/hooks/_shared/orchestrator-context-private-value.js',
+));
+for (const [family, entries] of Object.entries(vectors.families)) {
+  assert(entries.some((entry) => entry.private), `${family}: private boundary missing`);
+  assert(entries.some((entry) => !entry.private), `${family}: public boundary missing`);
+  for (const vector of entries) {
+    assert.strictEqual(secretShapedValue(vector.value), vector.private, `${family}/${vector.id}`);
+  }
+}
+NODE
 
 # A session-state board symlink that resolves outside home/boards is never read as an armed board.
 SYMLINK_HOME="$TMP/symlink-home"

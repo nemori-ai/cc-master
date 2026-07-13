@@ -21,7 +21,11 @@ const SECRET_CONFORMANCE = JSON.parse(
     new URL('../../../../tests/fixtures/orchestrator-context-secret-vectors.json', import.meta.url),
     'utf8',
   ),
-) as { schema: string; sk: SecretConformanceVector[] };
+) as { schema: string; families: Record<string, SecretConformanceVector[]> };
+
+const SECRET_CONFORMANCE_VECTORS = Object.entries(SECRET_CONFORMANCE.families).flatMap(
+  ([family, vectors]) => vectors.map((vector) => ({ family, ...vector })),
+);
 
 interface MutableContextEnvelope extends Record<string, unknown> {
   freshness: Record<string, unknown>;
@@ -962,31 +966,50 @@ test('public context rejects recursive secret-bearing fields and never echoes se
   );
 });
 
-test('sk token boundary follows the shared producer/consumer conformance vectors', () => {
-  assert.equal(SECRET_CONFORMANCE.schema, 'ccm/orchestrator-context-secret-conformance/v1');
-  assert.ok(SECRET_CONFORMANCE.sk.some((vector) => vector.id === 'underscore-prefixed'));
-  assert.ok(SECRET_CONFORMANCE.sk.some((vector) => vector.private === false));
+test('private-value language follows the shared producer/consumer conformance vectors', () => {
+  assert.equal(SECRET_CONFORMANCE.schema, 'ccm/orchestrator-context-secret-conformance/v2');
+  assert.deepEqual(Object.keys(SECRET_CONFORMANCE.families).sort(), [
+    'assignment',
+    'bearer',
+    'github',
+    'jwt',
+    'sk',
+  ]);
+  assert.ok(SECRET_CONFORMANCE.families.sk?.some((vector) => vector.id === 'underscore-prefixed'));
+  assert.ok(
+    SECRET_CONFORMANCE.families.assignment?.some(
+      (vector) => vector.value === 'api_key:redacted' && vector.private === false,
+    ),
+  );
 
-  for (const vector of SECRET_CONFORMANCE.sk) {
-    assert.match(
-      vector.value,
-      /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/,
-      `${vector.id}: the vector must isolate secret detection from public-id shape validation`,
-    );
+  for (const vector of SECRET_CONFORMANCE_VECTORS) {
+    const endpointSafe = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(vector.value);
+    const testContext = () => {
+      if (endpointSafe) return context([fact(vector.value, 'cli-headless')]);
+      const vectorCache = cache([fact('codex-cli', 'cli-headless')]);
+      vectorCache.warnings = [vector.value];
+      return buildCachedOrchestratorContext({
+        originHarness: 'codex',
+        boardRevision: 'board-r8',
+        snapshot: vectorCache,
+        asOf: AS_OF,
+      });
+    };
     if (vector.private) {
-      assert.throws(
-        () => context([fact(vector.value, 'cli-headless')]),
-        (error: unknown) => {
-          assert.ok(error instanceof Error);
-          assert.match(error.message, /forbidden|secret/i, vector.id);
-          assert.equal(error.message.includes(vector.value), false, vector.id);
-          return true;
-        },
-      );
+      assert.throws(testContext, (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /forbidden|secret/i, `${vector.family}/${vector.id}`);
+        assert.equal(error.message.includes(vector.value), false, `${vector.family}/${vector.id}`);
+        return true;
+      });
       continue;
     }
 
-    const publicContext = context([fact(vector.value, 'cli-headless')]);
+    const publicContext = testContext();
+    if (!endpointSafe) {
+      assert.deepEqual(publicContext.warnings, [vector.value], `${vector.family}/${vector.id}`);
+      continue;
+    }
     const delivery = buildOriginContextContent({
       board: activatedBoard([]),
       context: publicContext,
@@ -994,9 +1017,41 @@ test('sk token boundary follows the shared producer/consumer conformance vectors
       boardRevision: 'board-r8',
       asOf: AS_OF,
     });
-    assert.equal(delivery.payload.candidates[0]?.candidate_id, vector.value, vector.id);
+    assert.equal(
+      delivery.payload.candidates[0]?.candidate_id,
+      vector.value,
+      `${vector.family}/${vector.id}`,
+    );
     assert.match(delivery.content, new RegExp(vector.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+});
+
+test('producer and shared consumer mechanically declare the same private-value language', () => {
+  const extract = (source: string, name: string) => {
+    const start = `// BEGIN ${name}`;
+    const end = `// END ${name}`;
+    const from = source.indexOf(start);
+    const to = source.indexOf(end);
+    assert.notEqual(from, -1, `missing ${start}`);
+    assert.notEqual(to, -1, `missing ${end}`);
+    return source.slice(from + start.length, to).trim();
+  };
+  const producer = readFileSync(new URL('../src/shadow-routing.ts', import.meta.url), 'utf8');
+  const consumer = readFileSync(
+    new URL(
+      '../../../../plugin/src/hooks/_shared/orchestrator-context-private-value.js',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  assert.equal(
+    extract(producer, 'ORIGIN_PRIVATE_VALUE_LANGUAGE'),
+    extract(consumer, 'ORIGIN_PRIVATE_VALUE_LANGUAGE'),
+  );
+  assert.equal(
+    extract(producer, 'ORIGIN_PRIVATE_VALUE_ALGORITHM'),
+    extract(consumer, 'ORIGIN_PRIVATE_VALUE_ALGORITHM'),
+  );
 });
 
 test('runtime-healthy qualification preserves fail/unknown/missing and rejects contradictions', () => {
