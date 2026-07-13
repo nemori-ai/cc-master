@@ -24,6 +24,8 @@ import {
   systemdUninstallCommands,
 } from '../dist/index.mjs';
 
+const BRACED_HOME = `\${HOME}`;
+
 // A representative definition whose fields deliberately carry hostile / awkward data.
 function nastyDef(): ServiceDefinition {
   return {
@@ -111,6 +113,34 @@ test('systemd: round-trips hostile argv/env/paths + specifier escaping without i
   assert.equal(parsed.stderrPath, def.stderrPath);
   assert.equal(parsed.restartAlways, true);
   assert.equal(parsed.description, def.description);
+});
+
+test('systemd: ExecStart escapes literal dollars while Environment keeps them literal', () => {
+  const def: ServiceDefinition = {
+    ...goldenDef(),
+    program: {
+      executable: '/bin/echo',
+      args: [BRACED_HOME, '$SPLIT', '$UNSET', '$$'],
+    },
+    environment: {
+      SPLIT: 'one two',
+      RAW_DOLLARS: `${BRACED_HOME} $SPLIT $UNSET $$`,
+    },
+  };
+
+  const unit = serializeSystemdUnit(def);
+  const execStart = unit.split('\n').find((line) => line.startsWith('ExecStart='));
+
+  // systemd.service expands ${NAME}, whitespace-splits a standalone $NAME, drops an unset $NAME,
+  // and requires $$ for one literal dollar. Assert the host grammar itself, not only our inverse.
+  assert.equal(execStart, 'ExecStart=/bin/echo $${HOME} $$SPLIT $$UNSET $$$$');
+  // systemd.exec gives Environment= a different grammar: '$' is already literal there.
+  assert.match(unit, /^Environment="SPLIT=one two"$/m);
+  assert.match(unit, /^Environment="RAW_DOLLARS=\$\{HOME\} \$SPLIT \$UNSET \$\$"$/m);
+
+  const parsed = parseSystemdUnit(unit);
+  assert.deepEqual(parsed.argv, ['/bin/echo', BRACED_HOME, '$SPLIT', '$UNSET', '$$']);
+  assert.deepEqual(parsed.environment, def.environment);
 });
 
 test('systemd golden: Linux fixture serializes to an exact expected unit', () => {

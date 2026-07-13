@@ -10,6 +10,7 @@ import * as io from '../src/io.js';
 import { run } from '../src/router.js';
 
 const EXIT = io.EXIT;
+const BRACED_HOME = `\${HOME}`;
 
 let TMPDIRS: string[] = [];
 
@@ -253,8 +254,8 @@ test('monitor install-service: first-step (daemon-reload) failure fails loudly a
   assert.match(j.activation.steps[0].error, /no user bus/);
 });
 
-test('monitor install-service: paths with spaces round-trip through the written systemd unit', () => {
-  const home = mkHomeUnder('My Project α');
+test('monitor install-service: spaces and a braced HOME variable stay literal in ExecStart', () => {
+  const home = mkHomeUnder(`${BRACED_HOME} Project α`);
   monitor.__setMonitorTestHooks({
     runServiceCommand: () => ({ status: 0, stdout: 'active', stderr: '' }),
   });
@@ -262,12 +263,19 @@ test('monitor install-service: paths with spaces round-trip through the written 
   assert.equal(r.code, EXIT.OK, r.stderr);
   const j = json(r.stdout);
   const unit = readFileSync(j.path, 'utf8');
+  const execStart = unit.split('\n').find((line) => line.startsWith('ExecStart='));
+  assert.match(execStart ?? '', /\$\$\{HOME\}/, 'systemd grammar requires $$ for literal $');
+  assert.doesNotMatch(
+    execStart ?? '',
+    /(^|[^$])\$\{HOME\}/,
+    'no active braced HOME variable may remain',
+  );
   const parsed = parseSystemdUnit(unit);
   // The --state argument (a path with a space) must survive as a single atomic argv token.
   const stateIdx = parsed.argv.indexOf('--state');
   assert.ok(stateIdx >= 0);
   const statePath = parsed.argv[stateIdx + 1] ?? '';
-  assert.match(statePath, /My Project α/);
+  assert.match(statePath, /\$\{HOME\} Project α/);
   assert.match(statePath, /state\.json$/);
   assert.equal(parsed.stdoutPath, join(home, 'services', 'monitor', 'log'));
 });

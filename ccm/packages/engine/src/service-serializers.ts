@@ -5,9 +5,9 @@
 //   · argv / env / working directory / label / paths are serialized STRUCTURALLY — a single argv element
 //     is always one launchd <string> / one systemd token, so shell metacharacters cannot inject or split;
 //   · every text value round-trips through parse∘serialize regardless of spaces, Unicode, XML-significant
-//     characters (& < > " '), or systemd specifier/escape characters (%);
-//   · launchd values are XML-entity escaped; systemd values use systemd's real quoting + C-escape + '%%'
-//     specifier escaping (the documented mechanisms), so parse is the exact inverse of serialize.
+//     characters (& < > " '), or systemd substitution/specifier characters ($, %);
+//   · launchd values are XML-entity escaped; systemd values use real quoting + C escapes, '%%' for a
+//     literal specifier, and ExecStart-only '$$' for a literal dollar, so parse exactly inverts serialize.
 //   · activation is expressed as structured argv commands (ServiceCommand[]) executed elsewhere — activation
 //     truth comes from the executor's real result, never from having written the unit file.
 //
@@ -197,9 +197,9 @@ export function parseLaunchdPlist(xml: string): ParsedLaunchdService {
 
 // ── systemd (INI-style user unit) ──────────────────────────────────────────────────────────────────
 
-// Escape a value that lives in a multi-token context (ExecStart argv element, Environment assignment).
-//   Quote when it contains whitespace / quotes / backslash / control chars / is empty; always double '%'.
-function escapeSystemdArg(s: string): string {
+// Shared quoting / C-escape / specifier layer for systemd word contexts. Dollar handling deliberately
+//   stays outside this helper because ExecStart= expands '$' while Environment= defines it as literal.
+function escapeSystemdWord(s: string): string {
   const pct = s.replace(/%/g, '%%');
   const needsQuote = s === '' || /[\s"'\\\n\r\t]/.test(s);
   if (!needsQuote) return pct;
@@ -210,6 +210,16 @@ function escapeSystemdArg(s: string): string {
     .replace(/\r/g, '\\r')
     .replace(/\t/g, '\\t');
   return `"${inner}"`;
+}
+
+// systemd.service command lines require '$$' for one literal '$'. Apply this only to ExecStart argv;
+//   using it for Environment= would change an already-literal environment value.
+function escapeSystemdExecArg(s: string): string {
+  return escapeSystemdWord(s.replaceAll('$', () => '$$'));
+}
+
+function escapeSystemdEnvironmentAssignment(s: string): string {
+  return escapeSystemdWord(s);
 }
 
 // Escape a value that is the entire remainder of a line (Description, WorkingDirectory, path settings).
@@ -251,6 +261,11 @@ function unescapeSystemdToken(tok: string): string {
   return out.replace(/%%/g, '%');
 }
 
+// Exact inverse of escapeSystemdExecArg. Environment= must continue using unescapeSystemdToken directly.
+function unescapeSystemdExecToken(tok: string): string {
+  return unescapeSystemdToken(tok).replaceAll('$$', () => '$');
+}
+
 // Split a systemd command-line value into tokens, honoring double-quoted regions (whitespace-separated).
 function tokenizeSystemd(value: string): string[] {
   const tokens: string[] = [];
@@ -286,14 +301,16 @@ function tokenizeSystemd(value: string): string[] {
 }
 
 export function serializeSystemdUnit(def: ServiceDefinition): string {
-  const execTokens = [def.program.executable, ...def.program.args].map(escapeSystemdArg);
+  const execTokens = [def.program.executable, ...def.program.args].map(escapeSystemdExecArg);
   const lines: string[] = ['[Unit]', `Description=${escapeSystemdLineValue(def.description)}`, ''];
   lines.push('[Service]', `ExecStart=${execTokens.join(' ')}`);
   if (def.workingDirectory !== null) {
     lines.push(`WorkingDirectory=${escapeSystemdLineValue(def.workingDirectory)}`);
   }
   for (const k of Object.keys(def.environment)) {
-    lines.push(`Environment=${escapeSystemdArg(`${k}=${def.environment[k] ?? ''}`)}`);
+    lines.push(
+      `Environment=${escapeSystemdEnvironmentAssignment(`${k}=${def.environment[k] ?? ''}`)}`,
+    );
   }
   if (def.keepAlive) lines.push('Restart=always');
   lines.push(`StandardOutput=append:${escapeSystemdLineValue(def.stdoutPath)}`);
@@ -330,7 +347,7 @@ export function parseSystemdUnit(text: string): ParsedSystemdService {
         out.description = parseSystemdLineValue(value);
         break;
       case 'ExecStart':
-        out.argv = tokenizeSystemd(value.trim()).map(unescapeSystemdToken);
+        out.argv = tokenizeSystemd(value.trim()).map(unescapeSystemdExecToken);
         break;
       case 'WorkingDirectory':
         out.workingDirectory = parseSystemdLineValue(value);
