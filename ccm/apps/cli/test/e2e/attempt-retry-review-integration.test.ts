@@ -1,13 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, before, test } from 'node:test';
@@ -121,7 +114,9 @@ test('old APPROVE is archived before reset and only a new-attempt APPROVE unlock
 
   const archived = archivedRetryDetails(board, 'REVIEW');
   assert.equal(archived.length, 1);
-  assert.deepEqual(archived[0].prior_evidence, {
+  const archivedAttempt = archived[0];
+  assert.ok(archivedAttempt);
+  assert.deepEqual(archivedAttempt.prior_evidence, {
     started_at: '2026-07-12T10:00:00Z',
     finished_at: '2026-07-12T11:00:00Z',
     artifact: '/abs/review-v1.md',
@@ -204,7 +199,7 @@ test('batch retry archives each verdict, preserves legacy deps, and rolls back a
   let board = readBoard(boardPath);
   for (const id of ['R1', 'R2']) {
     assert.equal(Object.hasOwn(task(board, id), 'review_verdict'), false);
-    assert.equal(archivedRetryDetails(board, id)[0].prior_evidence.review_verdict, 'APPROVE');
+    assert.equal(archivedRetryDetails(board, id).at(0)?.prior_evidence?.review_verdict, 'APPROVE');
   }
   assert.equal(task(board, 'BOTH').status, 'blocked');
   assert.equal(task(board, 'LEGACY-DOWNSTREAM').status, 'ready');
@@ -212,7 +207,11 @@ test('batch retry archives each verdict, preserves legacy deps, and rolls back a
   const beforeInvalid = readFileSync(boardPath, 'utf8');
   const invalid = run(home, ['task', 'retry', 'ROLLBACK', 'NOT-RETRYABLE']);
   assert.equal(invalid.status, 3, invalid.stderr);
-  assert.equal(readFileSync(boardPath, 'utf8'), beforeInvalid, 'mixed invalid batch is byte-stable');
+  assert.equal(
+    readFileSync(boardPath, 'utf8'),
+    beforeInvalid,
+    'mixed invalid batch is byte-stable',
+  );
   board = readBoard(boardPath);
   assert.equal(task(board, 'ROLLBACK').review_verdict, 'APPROVE');
   assert.equal(archivedRetryDetails(board, 'ROLLBACK').length, 0);
