@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import * as http from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -299,6 +307,89 @@ test('healthy reuse applies a new board/goal selection without creating a new se
   assert.equal(
     JSON.parse(readFileSync(reusedJson.service.state_path, 'utf8')).current_selection.board_path,
     firstBoard,
+  );
+});
+
+test('authoritative state publish fault preserves the complete prior revision and token secrecy', () => {
+  const home = mkHome();
+  const firstBoard = seedBoard(home, {
+    file: '20260708T120000Z-durable-a.board.json',
+    goal: 'Durable state A',
+  });
+  const secondBoard = seedBoard(home, {
+    file: '20260708T120000Z-durable-b.board.json',
+    goal: 'Durable state B',
+  });
+  const secretToken = 'state-durability-secret-token';
+  webViewer.__setWebViewerTestHooks({
+    now: () => new Date('2026-07-08T12:01:02Z'),
+    randomToken: () => secretToken,
+    spawnService: ({ statePath }) => {
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      writeFileSync(
+        statePath,
+        `${JSON.stringify({ ...state, pid: 24681, port: 51236, base_url: 'http://127.0.0.1:51236' }, null, 2)}\n`,
+        'utf8',
+      );
+      return { pid: 24681 };
+    },
+    isPidAlive: (pid) => pid === 24681,
+    healthCheck: (service) => ({
+      ok: true,
+      body: {
+        schema: 'ccm/web-viewer-health/v1',
+        id: service.id,
+        pid: 24681,
+        started_at: service.server.started_at,
+      },
+    }),
+  });
+
+  const started = invoke(['web-viewer', 'start', '--board', firstBoard, '--json'], home);
+  assert.equal(started.code, EXIT.OK, started.stderr);
+  const service = json(started.stdout).service;
+  const before = readFileSync(service.state_path, 'utf8');
+  assert.equal(JSON.parse(before).current_selection.board_path, firstBoard);
+  assert.ok(!before.includes(secretToken), 'authoritative state never stores the raw token');
+  assert.equal(statSync(service.state_path).mode & 0o777, 0o600, 'state is owner-only');
+  assert.equal(statSync(service.token_file).mode & 0o777, 0o600, 'token file stays owner-only');
+
+  const checkpoints: string[] = [];
+  webViewer.__setWebViewerTestHooks({
+    isPidAlive: (pid) => pid === 24681,
+    healthCheck: (candidate) => ({
+      ok: true,
+      body: {
+        schema: 'ccm/web-viewer-health/v1',
+        id: candidate.id,
+        pid: 24681,
+        started_at: candidate.server.started_at,
+      },
+    }),
+    durableWriteFault: (checkpoint) => {
+      checkpoints.push(checkpoint);
+      if (checkpoint === 'data-written') {
+        throw Object.assign(new Error('injected state publish fault'), { code: 'EIO' });
+      }
+    },
+  });
+
+  const failed = invoke(['web-viewer', 'start', '--board', secondBoard, '--json'], home);
+  assert.equal(failed.code, EXIT.ERROR, failed.stderr);
+  assert.ok(checkpoints.includes('data-written'), 'web-viewer reached the durable publish seam');
+  assert.ok(!failed.stderr.includes(secretToken), 'fault reporting never exposes the raw token');
+
+  const after = readFileSync(service.state_path, 'utf8');
+  assert.equal(
+    after,
+    before,
+    'failed publish leaves the prior authoritative revision byte-complete',
+  );
+  assert.equal(JSON.parse(after).current_selection.board_path, firstBoard);
+  assert.equal(
+    readFileSync(service.token_file, 'utf8'),
+    secretToken,
+    'token remains in its 0600 file',
   );
 });
 

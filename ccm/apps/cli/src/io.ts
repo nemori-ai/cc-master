@@ -13,8 +13,7 @@
 //   正则/报错文案/.errKind 逐字保持。
 
 import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { type LockOptions, withLock } from '@ccm/engine';
+import { durableWriteFileSync, type LockOptions, withLock } from '@ccm/engine';
 
 // 带 .errKind / .kind 的 Error（router 据此映射退出码）。
 interface KindedError extends Error {
@@ -124,57 +123,11 @@ function readStdinSync(stdin?: { fd?: number }): string {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-// ── writeFileAtomicSync：原子写（契约 §一.8 / §三）──────────────────────────────────────────────
-//   同目录 mkdtemp → temp 文件 openSync/writeSync/fsyncSync/closeSync → renameSync（POSIX 原子）
-//   → best-effort dir fsync（落元数据）。任一步失败 → unlinkSync 清 temp 再 throw（不留半截文件）。
-//   同目录建 temp 避免跨设备 rename 的 EXDEV。
+// ── writeFileAtomicSync：兼容 facade（durability SSOT 在 @ccm/engine）────────────────────────────
+//   保留 CLI 调用面，机制统一委托 durableWriteFileSync：target-adjacent 0600 temp → file fsync →
+//   rename → directory fsync attempt。soft unsupported 可观测于底层结果；硬错抛出、绝不静默吞。
 export function writeFileAtomicSync(filePath: string, data: string): void {
-  const dir = path.dirname(filePath);
-  let tmpDir: string | null = null;
-  let tmpFile: string | null = null;
-  let fd: number | null = null;
-  try {
-    tmpDir = fs.mkdtempSync(path.join(dir, '.ccm-tmp-'));
-    tmpFile = path.join(tmpDir, 'board.tmp');
-    fd = fs.openSync(tmpFile, 'w');
-    fs.writeSync(fd, typeof data === 'string' ? data : String(data));
-    fs.fsyncSync(fd);
-    fs.closeSync(fd);
-    fd = null;
-    fs.renameSync(tmpFile, filePath);
-    tmpFile = null;
-    // best-effort 目录 fsync（落 rename 的目录项；部分平台 dir 不可 fsync → 吞）。
-    try {
-      const dfd = fs.openSync(dir, 'r');
-      try {
-        fs.fsyncSync(dfd);
-      } finally {
-        fs.closeSync(dfd);
-      }
-    } catch (_) {
-      /* 目录 fsync 非关键，best-effort */
-    }
-  } catch (e) {
-    // 失败清理：关 fd、删半截 temp 文件、删 temp 目录，再抛原错。
-    if (fd !== null) {
-      try {
-        fs.closeSync(fd);
-      } catch (_) {}
-    }
-    if (tmpFile) {
-      try {
-        fs.unlinkSync(tmpFile);
-      } catch (_) {}
-    }
-    throw e;
-  } finally {
-    // 成功路径下 temp 文件已被 rename 走，只剩空 temp 目录待清；失败路径上面已删 temp 文件。
-    if (tmpDir) {
-      try {
-        fs.rmdirSync(tmpDir);
-      } catch (_) {}
-    }
-  }
+  durableWriteFileSync(filePath, typeof data === 'string' ? data : String(data));
 }
 
 // ── withBoardLock：board-lock.withLock 的薄包装（契约 §三·串行化写入防 torn-write）。

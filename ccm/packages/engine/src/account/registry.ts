@@ -14,6 +14,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { durableWriteFileSync } from '../durable-write.js';
 import { resolveCcMasterHome } from '../paths.js';
 
 // ── 常量 ────────────────────────────────────────────────────────────────────────────────────────
@@ -715,24 +716,12 @@ export function saveRegistry(reg: Registry, p?: string | null): string {
     throw new Error(`${head}\n  - ${detail}`);
   }
 
-  // 原子写：写 tmp（同目录、0600）→ rename 覆盖。显式 mode 0o600 + 写后再 chmod 兜底。
+  // 持久写：共享 primitive 统一执行 adjacent tmp(0700/0600) → file fsync → rename → dir fsync。
+  // registry 是非密但持久的账号调度权威；credential/vault 写路径不在这里，也不受本改动影响。
   const dir = path.dirname(filePath);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const tmp = path.join(dir, `.accounts.json.tmp-${process.pid}-${Date.now()}`);
   const json = `${JSON.stringify(out, null, 2)}\n`;
-  fs.writeFileSync(tmp, json, { mode: 0o600 });
-  try {
-    fs.chmodSync(tmp, 0o600); // 兜底：writeFileSync 的 mode 受 umask 影响，显式再钉一次。
-    fs.renameSync(tmp, filePath);
-    fs.chmodSync(filePath, 0o600); // 目标若先存在则可能保留旧 mode——再钉一次。
-  } catch (e) {
-    try {
-      fs.unlinkSync(tmp);
-    } catch (_) {
-      /* tmp 清理 best-effort */
-    }
-    throw e;
-  }
+  durableWriteFileSync(filePath, json);
   return filePath;
 }
 

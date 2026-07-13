@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
@@ -180,6 +180,7 @@ test('monitor serve runs bounded ticks and records tick state without touching r
   assert.equal(state.pid, process.pid);
   assert.equal(state.tick_count, 1);
   assert.equal(state.last_error, null);
+  assert.equal(statSync(statePath).mode & 0o777, 0o600, 'durable service state is owner-only');
 });
 
 function mkHomeUnder(dirName: string): string {
