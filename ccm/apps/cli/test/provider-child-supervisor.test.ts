@@ -18,6 +18,7 @@ import {
 
 const CHILDREN = new Set<ChildProcess>();
 const DESCENDANT_PIDS = new Set<number>();
+const NODE_MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 const DEFAULT_LIMITS: ProviderChildLimits = {
   startupTimeoutMs: 1_000,
@@ -221,6 +222,76 @@ function fakeUnstartedChild(): ChildProcess & { signals: NodeJS.Signals[] } {
     },
   });
   return child as ChildProcess & { signals: NodeJS.Signals[] };
+}
+
+interface FakeTimerRecord {
+  id: number;
+  dueAtMs: number;
+  active: boolean;
+  callback: (...args: unknown[]) => void;
+  args: unknown[];
+}
+
+interface FakeTimerClock {
+  advanceTo(nowMs: number): void;
+  activeCount(): number;
+}
+
+async function withFakeTimerClock<T>(run: (clock: FakeTimerClock) => Promise<T>): Promise<T> {
+  const originalNow = Date.now;
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+  let nowMs = 0;
+  let nextId = 0;
+  const timers: FakeTimerRecord[] = [];
+
+  Date.now = () => nowMs;
+  globalThis.setTimeout = ((
+    callback: (...args: unknown[]) => void,
+    delayMs = 0,
+    ...args: unknown[]
+  ) => {
+    const timer: FakeTimerRecord = {
+      id: nextId++,
+      dueAtMs: nowMs + Number(delayMs),
+      active: true,
+      callback,
+      args,
+    };
+    timers.push(timer);
+    return timer as unknown as NodeJS.Timeout;
+  }) as typeof globalThis.setTimeout;
+  globalThis.clearTimeout = ((handle: NodeJS.Timeout | string | number | undefined) => {
+    if (handle && typeof handle === 'object') {
+      (handle as unknown as FakeTimerRecord).active = false;
+    }
+  }) as typeof globalThis.clearTimeout;
+
+  const clock: FakeTimerClock = {
+    advanceTo(targetMs) {
+      assert.ok(targetMs >= nowMs, 'fake clock cannot move backwards');
+      nowMs = targetMs;
+      while (true) {
+        const timer = timers
+          .filter((candidate) => candidate.active && candidate.dueAtMs <= nowMs)
+          .sort((left, right) => left.dueAtMs - right.dueAtMs || left.id - right.id)[0];
+        if (!timer) return;
+        timer.active = false;
+        timer.callback(...timer.args);
+      }
+    },
+    activeCount() {
+      return timers.filter((timer) => timer.active).length;
+    },
+  };
+
+  try {
+    return await run(clock);
+  } finally {
+    Date.now = originalNow;
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.clearTimeout = originalClearTimeout;
+  }
 }
 
 async function expectSupervisorError(
@@ -433,6 +504,82 @@ test('supervision keeps its timeout lifecycle alive without unrelated refed hand
     `isolated liveness probe exited ${exitCode}: ${Buffer.concat(stderr).toString('utf8')}`,
   );
   assert.equal(Buffer.concat(stdout).toString('utf8'), 'startup_timeout:reaped\n');
+});
+
+test('clears a long startup timer after it rearms beyond the Node timer limit', async () => {
+  await withFakeTimerClock(async (clock) => {
+    const child = fakeUnstartedChild();
+    const supervised = superviseProviderChild(
+      { child, tree: null },
+      {
+        operation: 'long-startup-cleanup',
+        deadline: createProviderRequestDeadline(NODE_MAX_TIMER_DELAY_MS * 2 + 2_000),
+        limits: {
+          ...DEFAULT_LIMITS,
+          startupTimeoutMs: NODE_MAX_TIMER_DELAY_MS + 1_000,
+        },
+      },
+    );
+
+    clock.advanceTo(NODE_MAX_TIMER_DELAY_MS);
+    assert.equal(clock.activeCount(), 2, 'hard and startup timers should both rearm');
+
+    child.emit('close', 0, null);
+    const result = await supervised;
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(clock.activeCount(), 0, 'success must clear the rearmed startup timer');
+  });
+});
+
+test('clears a long idle timer after it rearms beyond the Node timer limit', async () => {
+  await withFakeTimerClock(async (clock) => {
+    const child = fakeUnstartedChild();
+    const supervised = superviseProviderChild(
+      { child, tree: null },
+      {
+        operation: 'long-idle-cleanup',
+        deadline: createProviderRequestDeadline(NODE_MAX_TIMER_DELAY_MS * 2 + 2_000),
+        limits: {
+          ...DEFAULT_LIMITS,
+          startupTimeoutMs: NODE_MAX_TIMER_DELAY_MS + 1_000,
+          idleTimeoutMs: NODE_MAX_TIMER_DELAY_MS + 1_000,
+        },
+      },
+    );
+
+    (child.stdout as PassThrough).write(Buffer.from('.'));
+    clock.advanceTo(NODE_MAX_TIMER_DELAY_MS);
+    assert.equal(clock.activeCount(), 2, 'hard and idle timers should both rearm');
+
+    child.emit('close', 0, null);
+    const result = await supervised;
+
+    assert.equal(result.stdout, '.');
+    assert.equal(clock.activeCount(), 0, 'success must clear the rearmed idle timer');
+  });
+});
+
+test('a long hard deadline remains owned across rearm and still fails closed', async () => {
+  await withFakeTimerClock(async (clock) => {
+    const child = fakeUnstartedChild();
+    const supervised = superviseProviderChild(ownChild(child), {
+      operation: 'long-hard-timeout',
+      deadline: createProviderRequestDeadline(NODE_MAX_TIMER_DELAY_MS + 1_000),
+      limits: {
+        ...DEFAULT_LIMITS,
+        startupTimeoutMs: NODE_MAX_TIMER_DELAY_MS * 2,
+      },
+    });
+
+    clock.advanceTo(NODE_MAX_TIMER_DELAY_MS);
+    assert.equal(clock.activeCount(), 2, 'hard and startup timers should both rearm');
+    clock.advanceTo(NODE_MAX_TIMER_DELAY_MS + 1_000);
+
+    const error = await expectSupervisorError(supervised, 'hard_timeout', 'long-hard-timeout');
+    assert.equal(error.termination?.reaped, true);
+    assert.equal(clock.activeCount(), 0, 'hard-timeout cleanup must clear every owned timer');
+  });
 });
 
 test('reports startup timeout when a real spawned child produces no provider bytes', async () => {

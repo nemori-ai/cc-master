@@ -306,25 +306,34 @@ export function superviseProviderChild(
       );
     };
 
-    const scheduleAt = (atMs: number, action: () => void): NodeJS.Timeout => {
+    const scheduleAt = (
+      atMs: number,
+      action: () => void,
+      setCurrentTimer: (timer: NodeJS.Timeout | null) => void,
+    ): void => {
       const run = (): void => {
         const remainingMs = atMs - Date.now();
         if (remainingMs <= 0) {
+          setCurrentTimer(null);
           action();
           return;
         }
-        const timer = setTimeout(run, Math.min(remainingMs, MAX_TIMER_DELAY_MS));
-        if (action === hardTimeoutAction) hardTimer = timer;
+        setCurrentTimer(setTimeout(run, Math.min(remainingMs, MAX_TIMER_DELAY_MS)));
       };
-      const timer = setTimeout(run, Math.min(Math.max(0, atMs - Date.now()), MAX_TIMER_DELAY_MS));
-      return timer;
+      setCurrentTimer(
+        setTimeout(run, Math.min(Math.max(0, atMs - Date.now()), MAX_TIMER_DELAY_MS)),
+      );
     };
 
     const armIdleTimer = (): void => {
       if (!activityObserved) return;
       clearTimer(idleTimer);
-      idleTimer = scheduleAt(lastActivityAtMs + options.limits.idleTimeoutMs, () =>
-        timeoutFailure('idle_timeout'),
+      scheduleAt(
+        lastActivityAtMs + options.limits.idleTimeoutMs,
+        () => timeoutFailure('idle_timeout'),
+        (timer) => {
+          idleTimer = timer;
+        },
       );
     };
 
@@ -538,9 +547,15 @@ export function superviseProviderChild(
       options.signal.addEventListener('abort', onAbort, { once: true });
     }
 
-    hardTimer = scheduleAt(options.deadline.expiresAtMs, hardTimeoutAction);
-    startupTimer = scheduleAt(supervisionStartedAtMs + options.limits.startupTimeoutMs, () =>
-      timeoutFailure('startup_timeout'),
+    scheduleAt(options.deadline.expiresAtMs, hardTimeoutAction, (timer) => {
+      hardTimer = timer;
+    });
+    scheduleAt(
+      supervisionStartedAtMs + options.limits.startupTimeoutMs,
+      () => timeoutFailure('startup_timeout'),
+      (timer) => {
+        startupTimer = timer;
+      },
     );
 
     if (child.stdout === null || child.stderr === null) {
