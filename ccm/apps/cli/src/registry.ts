@@ -358,6 +358,12 @@ export const REGISTRY: Registry = {
           desc: '验收：一句话 DoD 或 @file',
         },
         role: { type: 'string', field: 'role', enum: E.role, desc: '调度角色（默认 normal）' },
+        'review-gate': {
+          type: 'string',
+          field: 'reviewGate',
+          enum: ['APPROVE'],
+          desc: '声明 review 依赖门：仅 APPROVE 才满足下游 deps',
+        },
         justification: { type: 'string', field: 'justification', desc: '决策理由' },
         status: {
           type: 'string',
@@ -384,6 +390,7 @@ export const REGISTRY: Registry = {
       },
       examples: [
         'ccm task add T7 --type development --deps T1 --estimate 3h',
+        'ccm task add REVIEW --type review --review-gate APPROVE',
         'ccm task add EXT3 --executor external --ref issue:https://github.com/o/r/issues/9',
       ],
       handler: 'task.add',
@@ -435,6 +442,12 @@ export const REGISTRY: Registry = {
           desc: '估时 3h/90m/2d/1w',
         },
         role: { type: 'string', field: 'role', enum: E.role, desc: '调度角色' },
+        'review-gate': {
+          type: 'string',
+          field: 'reviewGate',
+          enum: ['APPROVE'],
+          desc: '声明 review 依赖门：仅 APPROVE 才满足下游 deps',
+        },
         justification: { type: 'string', field: 'justification', desc: '决策理由' },
         artifact: { type: 'string', field: 'artifact', desc: '产物链接' },
         verified: { type: 'boolean', field: 'verified', desc: '标记已验收' },
@@ -521,10 +534,17 @@ export const REGISTRY: Registry = {
           field: 'verified',
           desc: '标记已端点验收（批量时对每个 id 一视同仁）',
         },
+        'review-verdict': {
+          type: 'string',
+          field: 'reviewVerdict',
+          enum: E.reviewVerdict,
+          desc: 'review 结论（APPROVE 才开门；REQUEST-CHANGES 保持下游 blocked）',
+        },
         log: { type: 'string', desc: '同时追一条 log（批量只追一条，summary 含全部 id）' },
       },
       examples: [
         'ccm task done T7 --artifact /abs/out.md --verified',
+        'ccm task done REVIEW --artifact /abs/review.md --verified --review-verdict APPROVE',
         'ccm task done T7 T8 T9 --artifact /abs/out.md --verified',
       ],
       handler: 'task.done',

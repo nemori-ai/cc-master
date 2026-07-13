@@ -91,6 +91,7 @@ export type {
 // ── board-model（数据模型 SSOT：enums / FIELDS / INVARIANTS / STATUS_MACHINE / predicates）──
 export {
   acceptanceConverged,
+  dependencySatisfied,
   durationHours,
   ENUMS,
   FIELDS,
@@ -104,6 +105,7 @@ export {
   isEnumMember,
   isISOUTC,
   isLegalTransition,
+  isReviewDependencyGate,
   levelOf,
   OPEN_ENUMS,
   SCHEMA_VERSION,

@@ -114,6 +114,7 @@ test('printHelp task add shows USAGE/ARGUMENTS/FLAGS/EXAMPLES with id positional
   assert.ok(t.includes('--type'), 'lists --type flag');
   assert.ok(t.includes('--deps'), 'lists --deps flag');
   assert.ok(t.includes('--estimate'), 'lists --estimate flag');
+  assert.ok(t.includes('--review-gate'), 'lists --review-gate flag');
   assert.ok(t.includes('EXAMPLES'), 'has EXAMPLES');
   // 例子原文（从 registry.examples 直出）。
   assert.ok(t.includes('ccm task add T7'), 'shows registry example verbatim');

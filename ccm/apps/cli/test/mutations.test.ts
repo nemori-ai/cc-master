@@ -283,6 +283,23 @@ test('addTask does NOT alias deps/references arrays from input fields', () => {
   assert.deepEqual(t.deps, ['T0'], 'task.deps not aliased to caller array');
 });
 
+test('addTask/updateTask declare a review gate through the dedicated reviewGate input', () => {
+  let b = m.addTask(baseBoard(), { id: 'R1', reviewGate: 'APPROVE' });
+  assert.deepEqual(b.tasks.find((x: AnyBoard) => x.id === 'R1').dependency_gate, {
+    kind: 'review',
+    required_verdict: 'APPROVE',
+  });
+  b = m.updateTask(b, 'T1', { reviewGate: 'APPROVE' });
+  assert.deepEqual(b.tasks.find((x: AnyBoard) => x.id === 'T1').dependency_gate, {
+    kind: 'review',
+    required_verdict: 'APPROVE',
+  });
+  assert.throws(
+    () => m.addTask(baseBoard(), { id: 'BAD', reviewGate: 'REQUEST-CHANGES' }),
+    (e: any) => e.errKind === 'Validation',
+  );
+});
+
 // ── updateTask ───────────────────────────────────────────────────────────────────────────────────
 test('updateTask overwrites flexible fields; stamps heartbeat; pure', () => {
   const orig = baseBoard();
@@ -324,6 +341,25 @@ test('updateTask never changes id; unknown task → NotFound throw', () => {
   assert.throws(
     () => m.updateTask(baseBoard(), 'NOPE', { title: 'x' }),
     (e: any) => e.errKind === 'NotFound',
+  );
+});
+
+test('recordTaskReviewVerdict requires an explicit gate and validates the verdict', () => {
+  let b = m.addTask(baseBoard(), { id: 'R1', reviewGate: 'APPROVE' });
+  b = m.recordTaskReviewVerdict(b, 'R1', 'REQUEST-CHANGES');
+  assert.equal(b.tasks.find((x: AnyBoard) => x.id === 'R1').review_verdict, 'REQUEST-CHANGES');
+  assert.throws(
+    () => m.recordTaskReviewVerdict(baseBoard(), 'T1', 'APPROVE'),
+    (e: any) => e.errKind === 'Validation' && /review gate/i.test(e.message),
+  );
+  assert.throws(
+    () =>
+      m.recordTaskReviewVerdict(
+        m.addTask(baseBoard(), { id: 'R1', reviewGate: 'APPROVE' }),
+        'R1',
+        'MAYBE',
+      ),
+    (e: any) => e.errKind === 'Validation' && /review verdict/i.test(e.message),
   );
 });
 

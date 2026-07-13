@@ -39,6 +39,68 @@ test('blocked 无 blocked_on 但 deps 全 done → 归一为 ready', () => {
   assert.equal(byId(out).T2, 'ready');
 });
 
+test('legacy done dep without dependency_gate remains satisfied', () => {
+  const out = reconcileGating(
+    board([
+      { id: 'R1', status: 'done', deps: [], verified: true, artifact: '/abs/review.md' },
+      { id: 'I1', status: 'blocked', deps: ['R1'] },
+    ]),
+  );
+  assert.equal(byId(out).I1, 'ready');
+});
+
+test('review-gated dep with REQUEST-CHANGES keeps downstream blocked', () => {
+  const out = reconcileGating(
+    board([
+      {
+        id: 'R1',
+        status: 'done',
+        deps: [],
+        verified: true,
+        artifact: '/abs/review.md',
+        dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+        review_verdict: 'REQUEST-CHANGES',
+      },
+      { id: 'I1', status: 'blocked', deps: ['R1'] },
+    ]),
+  );
+  assert.equal(byId(out).I1, 'blocked');
+});
+
+test('review-gated dep with missing/empty/null verdict keeps downstream blocked', () => {
+  for (const review_verdict of [undefined, '', null]) {
+    const review: Record<string, unknown> = {
+      id: 'R1',
+      status: 'done',
+      deps: [],
+      verified: true,
+      artifact: '/abs/review.md',
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+    };
+    if (review_verdict !== undefined) review.review_verdict = review_verdict;
+    const out = reconcileGating(board([review, { id: 'I1', status: 'blocked', deps: ['R1'] }]));
+    assert.equal(byId(out).I1, 'blocked', `verdict=${String(review_verdict)}`);
+  }
+});
+
+test('review-gated dep with APPROVE readies downstream', () => {
+  const out = reconcileGating(
+    board([
+      {
+        id: 'R1',
+        status: 'done',
+        deps: [],
+        verified: true,
+        artifact: '/abs/review.md',
+        dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+        review_verdict: 'APPROVE',
+      },
+      { id: 'I1', status: 'blocked', deps: ['R1'] },
+    ]),
+  );
+  assert.equal(byId(out).I1, 'ready');
+});
+
 test('ready 且 deps 全 done → 保持 ready（幂等·无变化）', () => {
   const out = reconcileGating(
     board([

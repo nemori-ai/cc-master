@@ -41,7 +41,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 - 改 status **只有**这几条命令:`task start`(→ in_flight)、`task done`(→ done)、`task block --on`(→ blocked)、`task unblock`(清 `blocked_on`·交回 deps 门控)、`task set-status <id> <status>`(通用转移)。
 - **没有** `task set`;`task update` **不接** `--status`;`--set tasks[T].status=…` 被 🔒 守门拒(exit 3);裸 `--set status=done` 同样被拒(exit 3)——task verb 的裸 path scope 到本 task,`status` 命中 🔒 守门,不会静默落 board 顶层。
 - **`ready → done` 非法**:必须先 `task start`(ready → in_flight)再 `task done`。直接 done 撞 `illegal transition: ready → done`(exit 3)。
-- **`ready ↔ blocked` 由系统按 deps 自动归一**:每次 ccm 写命令落盘前引擎跑一趟 `reconcileGating`——**无 `blocked_on`** 且 status∈{ready,blocked} 的 task 按 deps 完成度重定(deps 全 done→ready,否则→blocked)。所以你**几乎不用手搬 ready/blocked**:`task done` 掉上游后下游自动 ready、`task add --deps <未完成>` 自动落 blocked。**手动 `set-status <id> ready` 会被 deps 否决**(deps 未满足下一趟归回 blocked)。**有 `blocked_on`(等 user / 等某 task)= 语义阻塞,豁免自动门控**;解除用 **`task unblock <id>`**,别用 `set-status`。手改 board 造出的不一致态(ready 但 deps 未 done / blocked 无 blocked_on 但 deps 全 done)由 `BIZ-STATUS-DEPS` warn 兜。
+- **`ready ↔ blocked` 由系统按 deps 自动归一**:每次 ccm 写命令落盘前引擎跑一趟 `reconcileGating`——**无 `blocked_on`** 且 status∈{ready,blocked} 的 task 按 deps 满足度重定(deps 全满足→ready,否则→blocked)。普通/旧 task 仍以 `status=done` 满足依赖；用 `task add|update --review-gate APPROVE` 显式声明的 review gate 则必须同时有 `review_verdict=APPROVE`，`REQUEST-CHANGES`、缺失、空或 null 都保持下游 blocked。review 的 `status=done` 只表示审查工作执行完，不等于批准。**手动 `set-status <id> ready` 会被 deps 否决**(deps 未满足下一趟归回 blocked)。**有 `blocked_on`(等 user / 等某 task)= 语义阻塞,豁免自动门控**;解除用 **`task unblock <id>`**,别用 `set-status`。手改 board 造出的不一致态由 `BIZ-STATUS-DEPS` warn 兜。
 
 完整转移表:
 
@@ -57,6 +57,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 | `stale` | ready |
 
 > `verified` 是与 status **正交的布尔**(`--verified`),不是一个 status 值。`done` 且 `verified:true` 且 `artifact` 非空,才是真完成(端点验收过);缺任一项会被 `BIZ-DONE-VERIFIED` hard gate 拒绝落盘(exit 3)。
+> 对显式 review gate，`verified:true` 只验收「review 工作与报告已完成」，是否批准由 `review_verdict` 单独表达；只有 `APPROVE` 满足下游 deps。
 
 ### Rationalization Table —— status 这条最常见的自我说服
 
@@ -106,6 +107,11 @@ ccm task update T3 --handle <spawn-returned-codex-agent-id-or-thread-id>
 ccm task start T3                         # ready → in_flight,盖 started_at
 ccm task done  T3 --artifact /abs/out.md --verified   # in_flight → done,盖 finished_at;两项证据必填
 
+# review gate:执行完成与批准分开;只有 APPROVE 解锁下游
+ccm task add R1 --type review --review-gate APPROVE
+ccm task start R1
+ccm task done R1 --artifact /abs/review.md --verified --review-verdict REQUEST-CHANGES
+
 # 阻塞等用户(必带 decision_package,否则 BIZ-AWAITING 硬闸 exit 3)
 ccm task block T9 --on user --decision @/abs/decision.json
 ccm task block T5 --on T2                 # 阻塞在另一个 task 上
@@ -135,6 +141,7 @@ ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism shell --checklist "p
 | `task show <id>` 返回 `data:null` 还 exit 0 | 读不存在的 id **不报错**——调用方自己判 null。 |
 | `board lint` exit 3 但 stdout 是 `{"ok":true,...}` | 外层信封 `ok` 恒 true;**lint 是否净看 `data.ok` 与 exit code**(3=有 hard error)。 |
 | `block --on user` 写进去了却被 lint 挡 | awaiting-user 节点**必须**带 `decision_package`(`--decision @file`),否则 BIZ-AWAITING 硬闸。 |
+| review task 已 `done`，下游仍 blocked | 若它声明了 `--review-gate APPROVE`，这是正确行为：检查 `review_verdict`；只有 `task done ... --review-verdict APPROVE` 开门，REQUEST-CHANGES/缺 verdict 都不开门。 |
 | ISO 时间字段被 lint warn | 一律严格 `YYYY-MM-DDTHH:MM:SSZ`(UTC 定宽),别用本地时区 / 带毫秒。 |
 | 多个 active 板时命令报 Ambiguous | 用 `--goal <子串>` 或 `--board <path>` 消歧。 |
 | open cadence iteration 出 overbooked / critical-path / oversized warn | 这不是 hard gate,但说明本轮节奏不健康。先拆小、移出 scope、删假依赖或重估;不要靠 `cadence ship` 把超载藏起来。 |

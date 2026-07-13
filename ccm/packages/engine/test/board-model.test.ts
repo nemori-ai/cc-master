@@ -306,3 +306,53 @@ test('taskTrulyDone (P3 #32 语义): status=done ∧ verified ∧ artifact 非�
   assert.equal(M.taskTrulyDone({ status: 'done', verified: false, artifact: 'x' }), false); // 未验
   assert.equal(M.taskTrulyDone({ status: 'in_flight', verified: true, artifact: 'x' }), false);
 });
+
+test('dependencySatisfied separates review execution completion from approval (Finding #84)', () => {
+  const legacyDone = { status: 'done' };
+  const reviewGate = { kind: 'review', required_verdict: 'APPROVE' };
+
+  assert.equal(M.dependencySatisfied(legacyDone), true, 'legacy done task remains compatible');
+  assert.equal(
+    M.dependencySatisfied({
+      status: 'done',
+      dependency_gate: reviewGate,
+      review_verdict: 'APPROVE',
+    }),
+    true,
+    'only APPROVE satisfies an explicit review gate',
+  );
+  assert.equal(
+    M.dependencySatisfied({
+      status: 'done',
+      dependency_gate: reviewGate,
+      review_verdict: 'REQUEST-CHANGES',
+    }),
+    false,
+    'negative review completed execution but does not approve downstream consumption',
+  );
+  for (const review_verdict of [undefined, '', null]) {
+    assert.equal(
+      M.dependencySatisfied({ status: 'done', dependency_gate: reviewGate, review_verdict }),
+      false,
+      `silent verdict ${String(review_verdict)} must fail closed`,
+    );
+  }
+  assert.equal(
+    M.dependencySatisfied({
+      status: 'done',
+      dependency_gate: { kind: 'review', required_verdict: 'MERGE' },
+      review_verdict: 'APPROVE',
+    }),
+    false,
+    'malformed explicit gate fails closed',
+  );
+  assert.equal(
+    M.dependencySatisfied({
+      status: 'in_flight',
+      dependency_gate: reviewGate,
+      review_verdict: 'APPROVE',
+    }),
+    false,
+    'approval does not replace execution completion',
+  );
+});

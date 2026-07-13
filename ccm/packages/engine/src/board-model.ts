@@ -76,6 +76,8 @@ export const ENUMS = {
   // acceptance 目标函数 criterion 的 kind / status（spec §4.1）。
   acceptanceKind: ['test', 'metric', 'manual', 'review'],
   acceptanceStatus: ['pending', 'met', 'failed'],
+  // review dependency gate 的闭合 outcome。保持与 reviewer 产物词汇逐字一致，不做大小写猜测。
+  reviewVerdict: ['APPROVE', 'REQUEST-CHANGES'],
 } satisfies Record<string, string[]>;
 
 // 枚举名（ENUMS 的 key）——isEnumMember 的 name 形参类型。
@@ -329,6 +331,25 @@ export const FIELDS = {
       when: '建 dev 类 task',
       degrade: '特定 type 缺→warn(BIZ-ACCEPTANCE-REQUIRED);obj 则 criteria 非空(FMT-ACCEPTANCE)',
     },
+    dependency_gate: {
+      tier: '✎',
+      type: 'object{kind:"review",required_verdict:"APPROVE"}?',
+      default: '缺省(legacy task 仍以 status=done 满足 deps)',
+      readers: 'ccm reconcileGating / graph readySet / BIZ-STATUS-DEPS',
+      writers: 'agent 经 ccm task add|update --review-gate',
+      when: '该 task 是必须明确 APPROVE 才能放行下游的 review gate',
+      degrade: '缺→legacy status-only；存在但形状坏→hard(FMT-DEPENDENCY-GATE)+依赖 fail closed',
+    },
+    review_verdict: {
+      tier: '✎',
+      type: 'enum:reviewVerdict?',
+      default: '缺省(尚无 review 结论·gate 保持关闭)',
+      readers: 'ccm dependencySatisfied / viewer',
+      writers: 'agent 经 ccm task done --review-verdict',
+      when: 'review execution 产出明确 verdict 时',
+      degrade:
+        '缺/null→gate 未批准；非法→hard(FMT-REVIEW-VERDICT)；非空且无 dependency_gate→hard(BIZ-REVIEW-VERDICT-GATE)',
+    },
     references: {
       tier: '✎',
       type: 'array<{kind, ref, note?}>',
@@ -541,7 +562,7 @@ export const FIELDS = {
 //   verified 与 status 正交（非 status 值）。
 export const STATUS_MACHINE = {
   transitions: {
-    ready: ['in_flight', 'blocked'], // deps 全 done 可派发 → in_flight;撞阻塞 → blocked
+    ready: ['in_flight', 'blocked'], // deps 全满足可派发 → in_flight;撞阻塞 → blocked
     in_flight: ['done', 'uncertain', 'escalated', 'failed', 'blocked'], // 执行中的各出口
     blocked: ['ready', 'in_flight'], // 解锁 → ready / 直接接力 in_flight
     done: ['stale'], // 上游产物变 → stale 重跑
@@ -742,6 +763,20 @@ export const INVARIANTS: Invariant[] = [
     family: 'FMT',
     scope: 'task',
     summary: 'acceptance string 或 {criteria 非空, criterion.status ∈ enum}',
+  },
+  {
+    id: 'FMT-DEPENDENCY-GATE',
+    level: 'hard',
+    family: 'FMT',
+    scope: 'task',
+    summary: 'dependency_gate 若存在须为 {kind:"review",required_verdict:"APPROVE"}',
+  },
+  {
+    id: 'FMT-REVIEW-VERDICT',
+    level: 'hard',
+    family: 'FMT',
+    scope: 'task',
+    summary: 'review_verdict 若非空须 ∈ {APPROVE,REQUEST-CHANGES}',
   },
   {
     id: 'FMT-CONTRACTS',
@@ -963,7 +998,7 @@ export const INVARIANTS: Invariant[] = [
     family: 'BIZ',
     scope: 'task',
     summary:
-      'deps 门控不一致(手改造出·CLI 经 reconcileGating 永不产生):ready 但 deps 未全 done / blocked 无 blocked_on 但 deps 全 done(ADR-023)',
+      'deps 门控不一致(手改造出·CLI 经 reconcileGating 永不产生):ready 但 deps 未全满足 / blocked 无 blocked_on 但 deps 全满足(ADR-023)',
   },
   {
     id: 'BIZ-DONE-VERIFIED',
@@ -971,6 +1006,13 @@ export const INVARIANTS: Invariant[] = [
     family: 'BIZ',
     scope: 'task',
     summary: 'status=done ⇒ verified ∧ artifact 非空(done 真语义·#32 true-done hard gate)',
+  },
+  {
+    id: 'BIZ-REVIEW-VERDICT-GATE',
+    level: 'hard',
+    family: 'BIZ',
+    scope: 'task',
+    summary: '非空 review_verdict 必须有合法 dependency_gate 声明其下游门控语义',
   },
   {
     id: 'FMT-BASELINE',
@@ -1044,6 +1086,8 @@ export interface TaskLike {
   blocked_on?: unknown;
   verified?: unknown;
   artifact?: unknown;
+  dependency_gate?: unknown;
+  review_verdict?: unknown;
   [key: string]: unknown;
 }
 
@@ -1124,6 +1168,24 @@ export function taskTrulyDone(task: TaskLike | null | undefined): boolean {
   if (!task || typeof task !== 'object') return false;
   const hasArtifact = task.artifact !== undefined && task.artifact !== null && task.artifact !== '';
   return task.status === 'done' && task.verified === true && hasArtifact;
+}
+
+// isReviewDependencyGate(value) → v1 review gate 的唯一合法声明形状。
+//   只检查承重键，保留 ✎ 对象对未来附加元数据的 silent-on-unknown 兼容。
+export function isReviewDependencyGate(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const gate = value as Record<string, unknown>;
+  return gate.kind === 'review' && gate.required_verdict === 'APPROVE';
+}
+
+// dependencySatisfied(task) → 一个上游 task 是否满足 deps 边。
+//   execution completion 与 approval 正交：legacy 无 gate 仍认 status=done；显式 review gate 只有精确
+//   APPROVE 才放行。任何 malformed gate / negative / silent verdict 一律 fail closed。
+export function dependencySatisfied(task: TaskLike | null | undefined): boolean {
+  if (!task || task.status !== STATUS_MACHINE.doneStatus) return false;
+  if (task.dependency_gate === undefined) return true; // additive legacy compatibility
+  if (!isReviewDependencyGate(task.dependency_gate)) return false;
+  return task.review_verdict === 'APPROVE';
 }
 
 // isAbsolutePathOrUrl(ref) → references[].ref 合法性（绝对路径 / http(s) URL，禁相对·FMT-REF）。

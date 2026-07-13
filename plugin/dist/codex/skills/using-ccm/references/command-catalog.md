@@ -495,6 +495,7 @@ ccm task add <id> [flags]
 | `--ref <kind:ref>` | | string（可重复） | kind ∈ refKind 开放枚举 | | 引用 `kind:ref` |
 | `--accept <str\|@file>` | | string/@file | | | 验收：一句话 DoD 或 `@file` |
 | `--role <enum>` | | enum | `normal, fill-work` | `normal` | 调度角色 |
+| `--review-gate <enum>` | | enum | `APPROVE` | | 声明显式 review 依赖门；只有 APPROVE 满足下游 deps |
 | `--justification <str>` | | string | | | 决策理由 |
 | `--status <enum>` | | enum | status 枚举（见 board show data） | `ready` | 初始 status |
 | `--verified` | | bool | | false | 标记已验收 |
@@ -504,7 +505,7 @@ ccm task add <id> [flags]
 | `--set-json <path=json>` | | string（可重复） | | | 设**本 task** 的 ✎ 对象/数组（scoping 同上） |
 | `--log <str>` | | string | | | 同时追一条 log |
 
-- 例：`ccm task add T7 --type development --deps T1 --estimate 3h` · `ccm task add EXT3 --executor external --ref issue:https://github.com/o/r/issues/9 --handle o/r#9`
+- 例：`ccm task add T7 --type development --deps T1 --estimate 3h` · `ccm task add R1 --type review --review-gate APPROVE` · `ccm task add EXT3 --executor external --ref issue:https://github.com/o/r/issues/9 --handle o/r#9`
 - external issue closed 但未端点验收：`ccm task set-status EXT3 uncertain`；验收外部 PR 后才：`ccm task done EXT3 --verified --artifact https://github.com/o/r/pull/12`
 
 ### task show
@@ -575,6 +576,7 @@ ccm task update <id> [flags]
 | `--handle <str>` | | string | | 后台句柄 |
 | `--estimate <dur>` | | duration | `3h`/`90m`/`2d`/`1w` | 估时 |
 | `--role <enum>` | | enum | `normal, fill-work` | 调度角色 |
+| `--review-gate <enum>` | | enum | `APPROVE` | 声明显式 review 依赖门；只有 APPROVE 满足下游 deps |
 | `--justification <str>` | | string | | 决策理由 |
 | `--artifact <str>` | | string | | 产物链接 |
 | `--verified` | | bool | | 标记已验收 |
@@ -642,9 +644,11 @@ ccm task done <id> [<id2> <id3> ...] [flags]
 |---|---|---|---|
 | `--artifact <str>` | | string | 产物链接（绝对路径 / URL；批量时对每个 id 一视同仁） |
 | `--verified` | | bool | 标记已端点验收（批量时对每个 id 一视同仁） |
+| `--review-verdict <enum>` | | enum | `APPROVE, REQUEST-CHANGES`；只用于已声明 `--review-gate APPROVE` 的 task。APPROVE 开门，REQUEST-CHANGES/缺失不开门 |
 | `--log <str>` | | string | 同时追一条 log（批量只追一条，summary 含全部 id） |
 
-- 例：`ccm task done T7 --artifact /abs/out.md --verified` · `ccm task done T7 T8 T9 --artifact /abs/out.md --verified`（批量）
+- 例：`ccm task done T7 --artifact /abs/out.md --verified` · `ccm task done R1 --artifact /abs/review.md --verified --review-verdict REQUEST-CHANGES`（审查执行完成但不开门）· `ccm task done T7 T8 T9 --artifact /abs/out.md --verified`（批量）
+- review task 的 `status=done` / `verified=true` 表示 review 工作和报告已完成；审批结论单独写在 `review_verdict`。只有精确 `APPROVE` 满足显式 review gate；未声明 gate 却传 `--review-verdict` 会以 exit 3 拒绝且不落盘。
 
 **批量语义（`task start` / `task done` 共用·issue #57 问题3 方案3·根治批量回填死结）**：`runWrite` 的写入
 关卡是"mutate → 对整块 next 板跑一次 `lintBoard` → 有 hard error 就整体拒绝、不落盘"。逐条独立调用
@@ -702,7 +706,7 @@ ccm task unblock <id> [flags]
 |---|---|---|
 | `<id>` | 是 | task id |
 
-- 行为：清除 `blocked_on`（+ 附属 `decision_package`）语义阻塞标记，**不直接定 status**——交回写入关卡的 `reconcileGating` 按 deps 完成度归一（deps 全 done→`ready`，否则→`blocked`）。这是 `task block` 的解除侧、也是「不该手 `set-status` 解 deps 阻塞」的正解。
+- 行为：清除 `blocked_on`（+ 附属 `decision_package`）语义阻塞标记，**不直接定 status**——交回写入关卡的 `reconcileGating` 按 deps 满足度归一（deps 全满足→`ready`，否则→`blocked`）。这是 `task block` 的解除侧、也是「不该手 `set-status` 解 deps 阻塞」的正解。
 - flags：
 
 | flag | 短名 | 类型 | 必填 | 含义 |

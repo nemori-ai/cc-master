@@ -201,6 +201,19 @@ test('task add with --log also appends a log entry', () => {
   assert.equal(board.log[0].summary, '建了 T7');
 });
 
+test('task add --review-gate APPROVE declares an explicit review dependency gate', () => {
+  const boardPath = mkBoardHome();
+  const ctx = mkCtx(boardPath, {
+    values: { 'review-gate': 'APPROVE' },
+    positionals: ['R1'],
+  });
+  assert.equal(taskHandler.add(ctx), EXIT.OK);
+  assert.deepEqual(findTask(readBoard(boardPath), 'R1').dependency_gate, {
+    kind: 'review',
+    required_verdict: 'APPROVE',
+  });
+});
+
 // ══ task update ════════════════════════════════════════════════════════════════════════════════════
 //   type='development' 需要 spec/plan 引用锚点才 lint-clean（BIZ-DEV-REFS 已 C1 hard 化）——两个 seed
 //   task 都带一对 spec/plan references，保持既有 happy-path 测试（不涉及本次诊断/hard 化本身）不变。
@@ -681,6 +694,101 @@ test('completing deps via task done → reconcile auto-readies the dependent', (
   const b = readBoard(boardPath);
   assert.equal(findTask(b, 'T1').status, 'done');
   assert.equal(findTask(b, 'T2').status, 'ready', 'dependent auto-readied by reconcile');
+});
+
+test('task done records REQUEST-CHANGES but keeps review-gated downstream blocked', () => {
+  const tasks = [
+    {
+      id: 'R1',
+      status: 'in_flight',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+      created_at: '2026-06-24T08:00:00Z',
+      started_at: '2026-06-24T08:10:00Z',
+    },
+    { id: 'I1', status: 'blocked', deps: ['R1'], created_at: '2026-06-24T08:30:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, {
+    values: {
+      verified: true,
+      artifact: '/abs/review.md',
+      'review-verdict': 'REQUEST-CHANGES',
+    },
+    positionals: ['R1'],
+  });
+  assert.equal(taskHandler.done(ctx), EXIT.OK);
+  const b = readBoard(boardPath);
+  assert.equal(findTask(b, 'R1').status, 'done', 'review execution completed');
+  assert.equal(findTask(b, 'R1').review_verdict, 'REQUEST-CHANGES');
+  assert.equal(findTask(b, 'I1').status, 'blocked', 'approval gate remains closed');
+});
+
+test('task done without a verdict completes review execution but keeps gate closed', () => {
+  const tasks = [
+    {
+      id: 'R1',
+      status: 'in_flight',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+      created_at: '2026-06-24T08:00:00Z',
+      started_at: '2026-06-24T08:10:00Z',
+    },
+    { id: 'I1', status: 'blocked', deps: ['R1'], created_at: '2026-06-24T08:30:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, {
+    values: { verified: true, artifact: '/abs/review.md' },
+    positionals: ['R1'],
+  });
+  assert.equal(taskHandler.done(ctx), EXIT.OK);
+  const b = readBoard(boardPath);
+  assert.equal(findTask(b, 'R1').status, 'done');
+  assert.equal(findTask(b, 'R1').review_verdict, undefined);
+  assert.equal(findTask(b, 'I1').status, 'blocked');
+});
+
+test('task done records APPROVE and auto-readies review-gated downstream', () => {
+  const tasks = [
+    {
+      id: 'R1',
+      status: 'in_flight',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+      created_at: '2026-06-24T08:00:00Z',
+      started_at: '2026-06-24T08:10:00Z',
+    },
+    { id: 'I1', status: 'blocked', deps: ['R1'], created_at: '2026-06-24T08:30:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, {
+    values: { verified: true, artifact: '/abs/review.md', 'review-verdict': 'APPROVE' },
+    positionals: ['R1'],
+  });
+  assert.equal(taskHandler.done(ctx), EXIT.OK);
+  const b = readBoard(boardPath);
+  assert.equal(findTask(b, 'R1').review_verdict, 'APPROVE');
+  assert.equal(findTask(b, 'I1').status, 'ready');
+});
+
+test('task done --review-verdict without an explicit review gate fails loud and does not persist', () => {
+  const tasks = [
+    {
+      id: 'R1',
+      status: 'in_flight',
+      deps: [],
+      created_at: '2026-06-24T08:00:00Z',
+      started_at: '2026-06-24T08:10:00Z',
+    },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const before = readFileSync(boardPath, 'utf8');
+  const ctx = mkCtx(boardPath, {
+    values: { verified: true, artifact: '/abs/review.md', 'review-verdict': 'APPROVE' },
+    positionals: ['R1'],
+  });
+  assert.throws(() => taskHandler.done(ctx), /review gate/i);
+  assert.equal(readFileSync(boardPath, 'utf8'), before);
 });
 
 // ══ task set-status ════════════════════════════════════════════════════════════════════════════════

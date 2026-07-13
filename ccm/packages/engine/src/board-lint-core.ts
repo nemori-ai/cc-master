@@ -25,13 +25,14 @@
 //   逻辑、规则码、报错文案、级别分流逐字保持（零行为变化）。浏览器形态由 tsdown 的 IIFE 产物承接。
 
 import {
+  dependencySatisfied,
   durationHours,
   ENUMS,
   isAbsolutePathOrUrl,
   isAwaitingUser,
-  isDoneStatus,
   isEnumMember,
   isISOUTC,
+  isReviewDependencyGate,
   levelOf,
   ISO_UTC_RE as MODEL_ISO_UTC_RE,
   SCHEMA_VERSION as MODEL_SCHEMA_VERSION,
@@ -441,7 +442,7 @@ export function lintBoard(text: string): LintResult {
 
   // ── BIZ-STATUS-DEPS（deps 门控不一致·warn·ADR-023）──────────────────────────────────────────────────
   //   CLI 写路径经 reconcileGating 自动归一 ready↔blocked，永不产生这类不一致；此规则兜「手改 board」造出的。
-  //   用 lint 已建的图 g.upstream（排除 dangling/self·同 readySet / reconcile 口径）+ taskById 判 deps 完成度。
+  //   用 lint 已建的图 g.upstream（排除 dangling/self·同 readySet / reconcile 口径）+ taskById 判 deps 满足度。
   for (const [id, t] of taskById) {
     lintStatusDeps(id, t, g.upstream, taskById, emit);
   }
@@ -1131,6 +1132,25 @@ function lintTaskFields(id: string, t: TaskLike, validIds: Set<string>, emit: Em
       }
     }
   }
+  // FMT-DEPENDENCY-GATE / FMT-REVIEW-VERDICT：review outcome 是与 execution completion 正交的明确 gate。
+  if (t.dependency_gate !== undefined && !isReviewDependencyGate(t.dependency_gate)) {
+    emit(
+      'FMT-DEPENDENCY-GATE',
+      `${id}.dependency_gate 若存在必须为 {kind:"review", required_verdict:"APPROVE"}（当前：${JSON.stringify(t.dependency_gate)}）。影响：非法 gate 一律 fail closed，不满足任何 deps。`,
+      id,
+    );
+  }
+  if (
+    t.review_verdict !== undefined &&
+    t.review_verdict !== null &&
+    !isEnumMember('reviewVerdict', t.review_verdict)
+  ) {
+    emit(
+      'FMT-REVIEW-VERDICT',
+      `${id}.review_verdict 是 ${JSON.stringify(t.review_verdict)}，应 ∈ {APPROVE, REQUEST-CHANGES}；缺失/null 表示尚无 verdict。`,
+      id,
+    );
+  }
   // FMT-BLOCKED-ON（warn·"user" 或存在 id）
   if (t.blocked_on !== undefined && t.blocked_on !== 'user') {
     if (typeof t.blocked_on !== 'string' || !validIds.has(t.blocked_on)) {
@@ -1269,6 +1289,17 @@ function lintTaskBiz(id: string, t: TaskLike, emit: Emit): void {
       id,
     );
   }
+  if (
+    t.review_verdict !== undefined &&
+    t.review_verdict !== null &&
+    !isReviewDependencyGate(t.dependency_gate)
+  ) {
+    emit(
+      'BIZ-REVIEW-VERDICT-GATE',
+      `${id}.review_verdict 有值但没有合法 dependency_gate——review outcome 没有声明其下游门控语义。请先用 --review-gate APPROVE 显式声明 gate。`,
+      id,
+    );
+  }
   // BIZ-TIME-ORDER（warn）：时间序 created≤started≤finished;in_flight⇒started;done⇒finished。
   lintTimeOrder(id, t, emit);
 }
@@ -1359,11 +1390,11 @@ function lintTaskRoutingContract(board: BoardLike, id: string, t: TaskLike, emit
 }
 
 // ── BIZ-STATUS-DEPS（warn·ADR-023）：deps 驱动的门控一致性——它精确等于「reconcileGating 本应改动此 task」。
-//   reconcile 只归一「无 blocked_on（非语义阻塞）且 status ∈ {ready, blocked}」的 task：deps 全 done→ready，
+//   reconcile 只归一「无 blocked_on（非语义阻塞）且 status ∈ {ready, blocked}」的 task：deps 全满足→ready，
 //   否则→blocked。故不一致 ⟺ 无 blocked_on ∧ status∈{ready,blocked} ∧ 当前 status ≠ 该归一目标。两种形态：
-//     · ready 但 deps 未全 done（应 blocked）· blocked 但 deps 全 done（应 ready）。
+//     · ready 但 deps 未全满足（应 blocked）· blocked 但 deps 全满足（应 ready）。
 //   有 blocked_on（等 user / 等某 task）的整体豁免——语义阻塞与拓扑就绪正交，reconcile 不碰，此规则也不报。
-//   deps 完成度用 lint 已建图的 upstream（排除 dangling/self·同 readySet / reconcile 口径），isDoneStatus 判 done。
+//   deps 满足度用 lint 已建图的 upstream（排除 dangling/self）+ dependencySatisfied（同 readySet/reconcile 口径）。
 function lintStatusDeps(
   id: string,
   t: TaskLike,
@@ -1376,21 +1407,21 @@ function lintStatusDeps(
   const bo = t.blocked_on;
   if (typeof bo === 'string' && bo !== '') return; // 语义阻塞（blocked_on 非空）豁免。
   const deps = upstream.get(id) || [];
-  const undone = deps.filter((d) => !isDoneStatus(taskById.get(d)?.status));
+  const undone = deps.filter((d) => !dependencySatisfied(taskById.get(d)));
   const target = undone.length === 0 ? 'ready' : 'blocked';
   if (target === status) return; // 一致——无须报。
   if (status === 'ready') {
     emit(
       'BIZ-STATUS-DEPS',
-      `${id} status=ready 但 deps 未全 done（未完成上游：${undone.join(', ')}）——门控不一致（应 blocked）。` +
-        `CLI 写路径经 reconcileGating 自动归一（ready⟺deps 全 done），此态多半来自手改 board。\n` +
+      `${id} status=ready 但 deps 未全满足（未满足上游：${undone.join(', ')}）——门控不一致（应 blocked）。` +
+        `CLI 写路径经 reconcileGating 自动归一（ready⟺deps 全满足），此态多半来自手改 board。\n` +
         `  怎么修：跑任意 ccm 写命令触发归一，或 \`ccm task set-status ${id} blocked\`（deps 未满足应 blocked）。`,
       id,
     );
   } else {
     emit(
       'BIZ-STATUS-DEPS',
-      `${id} status=blocked 且无 blocked_on（非语义阻塞）但 deps 全 done——门控不一致（应已 ready）。` +
+      `${id} status=blocked 且无 blocked_on（非语义阻塞）但 deps 全满足——门控不一致（应已 ready）。` +
         `CLI 写路径经 reconcileGating 自动归一，此态多半来自手改 board（或 deps 刚全部完成而未重跑写命令）。\n` +
         `  怎么修：跑任意 ccm 写命令触发归一，或 \`ccm task unblock ${id}\` / \`ccm task set-status ${id} ready\`。`,
       id,

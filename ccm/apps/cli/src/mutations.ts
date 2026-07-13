@@ -27,6 +27,7 @@ import {
   isEnumMember,
   isISOUTC,
   isLegalTransition,
+  isReviewDependencyGate,
   routingContractPreflight,
   SCHEMA_VERSION,
   STATUS_MACHINE,
@@ -80,6 +81,16 @@ function requireTask(board: Board, id: string): Task {
   const t = findTask(board, id);
   if (!t) throw err(`task not found: ${id}`, 'NotFound');
   return t;
+}
+
+function reviewDependencyGate(value: unknown): Record<string, string> {
+  if (value !== 'APPROVE') {
+    throw err(
+      `refused: review gate currently requires APPROVE, got ${JSON.stringify(value)}`,
+      'Validation',
+    );
+  }
+  return { kind: 'review', required_verdict: 'APPROVE' };
 }
 
 // ── boardInit({goal, githubIssue}) → 从 template 形态产板。owner.active:true、session_id:""（非 arming·cli-design §7）。
@@ -311,6 +322,9 @@ export function addTask(board: Board, fields?: Record<string, any>): Board {
     status: fields.status !== undefined ? fields.status : 'ready',
     deps: Array.isArray(fields.deps) ? fields.deps.slice() : [],
   };
+  if (fields.reviewGate !== undefined) {
+    task.dependency_gate = reviewDependencyGate(fields.reviewGate);
+  }
   // ✎ / 🔒 其余字段：只在显式给出时落（不臆造默认值，degrade 由 lint/缺省语义处理）。
   for (const k of [
     'parent',
@@ -369,6 +383,9 @@ export function updateTask(board: Board, id: string, fields?: Record<string, any
     );
   }
   assertExecutorMutation(b, t, fields.executor);
+  if (fields.reviewGate !== undefined) {
+    t.dependency_gate = reviewDependencyGate(fields.reviewGate);
+  }
   // 增删 deps（去重）。
   if (Array.isArray(fields.addDep)) {
     if (!Array.isArray(t.deps)) t.deps = [];
@@ -387,12 +404,34 @@ export function updateTask(board: Board, id: string, fields?: Record<string, any
       t.references = t.references.filter((r: any) => !fields.rmRef.includes(r && r.ref));
   }
   // 普通字段覆写（排除已处理的特殊键 + id 不可改）。
-  const SPECIAL = new Set(['addDep', 'rmDep', 'addRef', 'rmRef', 'id']);
+  const SPECIAL = new Set(['addDep', 'rmDep', 'addRef', 'rmRef', 'reviewGate', 'id']);
   for (const [k, v] of Object.entries(fields)) {
     if (SPECIAL.has(k)) continue;
     if (v === undefined) continue;
     t[k] = v;
   }
+  return touch(b);
+}
+
+// ── recordTaskReviewVerdict(board, id, verdict) → 记录 review 结论，不改变执行状态。──────────────
+//   review task 的 status=done 只表示 review 工作已经执行；只有显式 APPROVE 才满足下游 deps。
+//   verdict 必须依附于显式 review gate，避免一个无门控语义的普通 task 静默长出 review outcome。
+export function recordTaskReviewVerdict(board: Board, id: string, verdict: unknown): Board {
+  const b = clone(board);
+  const t = requireTask(b, id);
+  if (!isReviewDependencyGate(t.dependency_gate)) {
+    throw err(
+      `refused: task ${id} has no explicit review gate; declare it with --review-gate APPROVE before recording a verdict`,
+      'Validation',
+    );
+  }
+  if (!isEnumMember('reviewVerdict', verdict)) {
+    throw err(
+      `refused: invalid review verdict ${JSON.stringify(verdict)}; expected APPROVE or REQUEST-CHANGES`,
+      'Validation',
+    );
+  }
+  t.review_verdict = verdict;
   return touch(b);
 }
 

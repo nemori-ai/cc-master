@@ -202,6 +202,9 @@ function _transitionVerb(ctx: Ctx, toStatus: string, label: string): number {
           if (ctx.values && ctx.values.verified !== undefined)
             fields.verified = ctx.values.verified;
           if (Object.keys(fields).length) next = mutations.updateTask(next, id, fields);
+          if (ctx.values && ctx.values['review-verdict'] !== undefined) {
+            next = mutations.recordTaskReviewVerdict(next, id, ctx.values['review-verdict']);
+          }
         }
       }
       next = maybeLog(next, ctx, `${label} ${ids.join(', ')}`);

@@ -236,6 +236,13 @@ export function renderTaskDetail(task: any, opts?: RenderOpts): string {
   if (t.estimate && typeof t.estimate === 'object')
     push('estimate', `${t.estimate.value}${t.estimate.unit || ''}`);
   push('verified', t.verified === true ? 'true' : undefined);
+  if (t.dependency_gate !== undefined && t.dependency_gate !== null) {
+    push(
+      'dependency_gate',
+      typeof t.dependency_gate === 'string' ? t.dependency_gate : JSON.stringify(t.dependency_gate),
+    );
+  }
+  push('review_verdict', t.review_verdict);
   // artifact 可能是对象
   if (t.artifact !== undefined && t.artifact !== null && t.artifact !== '') {
     push('artifact', typeof t.artifact === 'string' ? t.artifact : JSON.stringify(t.artifact));
