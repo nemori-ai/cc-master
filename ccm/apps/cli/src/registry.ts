@@ -113,6 +113,43 @@ export const REGISTRY: Registry = {
       handler: 'route.advise',
     },
   },
+  // ════════════════════ attempt（cross-harness managed worker 的本地 write-set 预检）══════════════
+  attempt: {
+    'write-set': {
+      summary: '解析隔离 worktree + lease，编译最小本地写集（仅 preflight；尚不启动 worker）',
+      read: false,
+      positionals: [],
+      options: {
+        lease: {
+          type: 'string',
+          required: true,
+          transform: 'input',
+          desc: 'ccm/worktree-write-lease/v1 JSON：字面量、@file 或 -',
+        },
+        profile: {
+          type: 'string',
+          required: true,
+          enum: ['codex-managed-workspace', 'claude-managed-workspace'],
+          desc: 'managed harness permission mapping（fixture-only）',
+        },
+        'artifact-root': {
+          type: 'string',
+          multiple: true,
+          desc: '显式声明的 read-write artifact root（可重复；必须在 lease 内）',
+        },
+        'artifact-root-ro': {
+          type: 'string',
+          multiple: true,
+          desc: '显式声明的 read-only artifact root（可重复；必须在 lease 内）',
+        },
+        json: { type: 'boolean', desc: '结构化输出 write-set plan' },
+      },
+      examples: [
+        'ccm attempt write-set --lease @lease.json --profile codex-managed-workspace --artifact-root /abs/repo/design_docs/plans --json',
+      ],
+      handler: 'attempt.writeSet',
+    },
+  },
   // ════════════════════ board ════════════════════════════════════════════════════════════════════
   board: {
     show: {
