@@ -101,6 +101,8 @@ cc-master/ (plugin)
 - **窄腰原则**（不钉死整表，只钉死 hook 依赖的极小契约 → 既给 agent 自由，又让手维护安全）：
   - **钉死的腰**（**扁平顶层字段，非 `header{}` 子对象**——对齐 board 文件实际布局，别让 agent 凭空造个 `header` key）：顶层 `schema` / `goal` / `owner-lease{active, session_id, heartbeat}` / `git{worktree, branch}` + `tasks[{ id, status, deps }]`。
   - **status 枚举**：`ready / in_flight / blocked(blocked_on:"user"|"<taskid>") / done / escalated / failed / stale / uncertain`（各状态在 DAG 里路由不同）。
+  - **依赖满足合约**：是否进入 `ready` 以 `@ccm/engine` 的 `dependencySatisfied` 为 SSOT，不等价于“所有上游 status 都是 done”。普通/旧 task 以 `status=done` 满足；显式 review gate 必须同时有当前 attempt 的精确 `review_verdict=APPROVE`，缺失、空、null 或 `REQUEST-CHANGES` 一律 fail closed。
+  - **attempt 重跑合约**：`stale|failed|escalated → ready` 会先把来源 status 及旧 `started_at` / `finished_at` / `artifact` / `verified` / `review_verdict` 归档进 append-only log（detail schema=`ccm/task-retry/v1`），再清除 current-attempt evidence；旧批准只留审计、不参与新 attempt 的依赖门控。完整字段与状态机 SSOT 见 [`2026-06-23-board-v2-spec.md` §6.1](2026-06-23-board-v2-spec.md#61-retry--reactivation-合约)。
   - **柔性边**（agent 自由塑形，hook 忽略）：`title / artifact / dispatched_at / mechanism / handle / kind / justification / output_schema / dep_pins / notes / log`；**（2026-06-08 增补）`phase` 段**——记当前自驱区段，`{ "current": "<阶段名>", "goal_condition": "<阶段 /goal 条件原文>", "task_ids": [...] }`，供 reinject 跨 compaction 带出、agent 认回阶段并自核 `/goal` 是否还挂着。
 - **内建 Task\* 工具**：顶多 in-session 草稿镜像，**非权威**；home 里的 board 文件才是断电/关机/hook 都认的存档。
 - **复盘/审计**：靠柔性边的轻量 `log` 段承载（不上完整事件溯源——YAGNI）。

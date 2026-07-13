@@ -28,7 +28,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 1. **持锁**(`.lock`·O_EXCL 原子抢占)——串行化写入,防两个写者撕裂文件。
 2. **校验不变式**——FMT/GRAPH/BIZ 规则在落盘前跑;有 hard error 直接 exit 3 拒绝,坏 board 写不进去。
 3. **守状态机**——非法状态转移(见锚 2)当场挡下。
-4. **守 attempt 边界**——`task start` 自动盖 `started_at`、`task done` 盖 `finished_at`;`task retry` 把旧 attempt 证据归档到 log 后清空当前态的 `started_at` / `finished_at` / `artifact`,并把 `verified` 复位为布尔 `false`。手改 status 会漏掉这些联动,board 就此说谎。
+4. **守 attempt 边界**——`task start` 自动盖 `started_at`、`task done` 盖 `finished_at`;`task retry` 把旧 attempt 证据归档到 log 后清空当前态的 `started_at` / `finished_at` / `artifact` / `review_verdict`,并把 `verified` 复位为布尔 `false`。手改 status 会漏掉这些联动,board 就此说谎。
 
 手改 JSON 把这四道全绕过。**别因为"就改一个字段、Write 更快"在 ccm 可用时绕开它**——那一下省的几秒,换来的是绕锁、跳校验、derived 字段失真。
 
@@ -59,7 +59,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 > `verified` 是与 status **正交的布尔**(`--verified`),不是一个 status 值。`done` 且 `verified:true` 且 `artifact` 非空,才是真完成(端点验收过);缺任一项会被 `BIZ-DONE-VERIFIED` hard gate 拒绝落盘(exit 3)。
 > 对显式 review gate，`verified:true` 只验收「review 工作与报告已完成」，是否批准由**当前 attempt** 的 `review_verdict` 单独表达；只有 `APPROVE` 满足下游 deps。`stale|failed|escalated → ready` 开新 attempt 时旧 verdict 自动失效，重跑后必须产出新 verdict。
 
-> `stale` / `failed` / `escalated` 要重跑时优先用 `task retry <id>`。它把旧 attempt 的时间、artifact、verified 以 `ccm/task-retry/v1` 结构归档进 append-only log,再原子复位当前 attempt;合法的通用 `set-status <id> ready` 也共享同一 reset,不会把旧验收证据带进新一轮。retry 的 lifecycle 目标是 `ready`,但写入关卡随后仍按 deps 归一:deps 未全 done 的 task 最终落 `blocked`;human/JSON 输出按每个 task 的最终态回显。
+> `stale` / `failed` / `escalated` 要重跑时优先用 `task retry <id>`。它把旧 attempt 的 `started_at`、`finished_at`、`artifact`、`verified`、`review_verdict` 以 `ccm/task-retry/v1` 结构归档进 append-only log,再原子复位当前 attempt;合法的通用 `set-status <id> ready` 也共享同一 reset,不会把旧验收证据带进新一轮。retry 的 lifecycle 目标是 `ready`,但写入关卡随后仍按 `dependencySatisfied` 归一:只有 deps 全满足的 task 才落 `ready`,否则最终落 `blocked`;human/JSON 输出按每个 task 的最终态回显。
 
 ### Rationalization Table —— status 这条最常见的自我说服
 

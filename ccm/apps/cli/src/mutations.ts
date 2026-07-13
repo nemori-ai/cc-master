@@ -701,7 +701,7 @@ export function blockTask(
 
 // ── unblockTask(board, id) → 清除语义阻塞标记 blocked_on（+ decision_package）。ADR-023。
 //   只机械地删 blocked_on / decision_package，**不直接定 status**——status 由写入关卡的 reconcileGating
-//   按 deps 完成度归一（deps 全 done→ready，否则→blocked）。这是「blocked_on 作语义阻塞判别器」的解除侧：
+//   按 dependencySatisfied 归一（deps 全满足→ready，否则→blocked）。这是「blocked_on 作语义阻塞判别器」的解除侧：
 //   有 blocked_on 时该 task 豁免自动门控（在等 user / 等某 task）；unblock 后交回 deps 驱动的自动门控。
 //   目标 id 不存在 → requireTask throw NotFound（冒泡 router 映射 exit 5）。
 export function unblockTask(board: Board, id: string): Board {

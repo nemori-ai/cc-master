@@ -665,7 +665,7 @@ ccm task retry <id> [<id2> <id3> ...] [flags]
 |---|---|---|
 | `<id>` | 是 | task id（**可给多个**，空格分隔——批量开启新 attempt） |
 
-- 行为：仅允许 `stale` / `failed` / `escalated` → `ready`。每个 task 的旧 `started_at` / `finished_at` / `artifact` / `verified` 连同来源 status 先以 `ccm/task-retry/v1` 结构归档到 append-only log，再清空当前 attempt 的三个证据字段并把 `verified` 设为布尔 `false`。归档与复位同一次持锁写入，不能只成功一半。随后写入关卡照常按 deps 归一：deps 未全 done 的 task 最终落 `blocked`，否则落 `ready`；human 与 JSON 输出都逐项回显这个 reconcile 后的最终态（批量可同时出现 `blocked` / `ready`）。
+- 行为：仅允许 `stale` / `failed` / `escalated` → `ready`。每个 task 的旧 `started_at` / `finished_at` / `artifact` / `verified` / `review_verdict` 连同来源 status 先以 `ccm/task-retry/v1` 结构归档到 append-only log，再清空当前 attempt 的 `started_at` / `finished_at` / `artifact` / `review_verdict` 并把 `verified` 设为布尔 `false`。归档与复位同一次持锁写入，不能只成功一半。随后写入关卡照常按 `dependencySatisfied` 归一：只有 deps 全满足的 task 最终落 `ready`，否则落 `blocked`；普通依赖以 `status=done` 满足，显式 review gate 还要求当前 attempt 的精确 `review_verdict=APPROVE`。human 与 JSON 输出都逐项回显这个 reconcile 后的最终态（批量可同时出现 `blocked` / `ready`）。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |

@@ -349,7 +349,7 @@ export function block(ctx: Ctx): number {
 }
 
 // ── task unblock：清除 blocked_on 语义阻塞标记（→ 交回 reconcileGating 按 deps 定 ready/blocked）。ADR-023。
-//   不直接定 status——写入关卡的 reconcileGating 据 deps 完成度归一（deps 全 done→ready，否则→blocked）。
+//   不直接定 status——写入关卡的 reconcileGating 据 dependencySatisfied 归一（deps 全满足→ready，否则→blocked）。
 //   目标 id 不存在 → mutations.unblockTask throw NotFound（冒泡 router 映射 exit 5）。
 export function unblock(ctx: Ctx): number {
   const id = ctx.positionals[0] as string;
