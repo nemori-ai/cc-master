@@ -979,6 +979,50 @@ test('BIZ-DONE-VERIFIED: done task requires verified=true and non-empty artifact
   assert.ok(!has(ok, 'BIZ-DONE-VERIFIED'), 'done + verified + artifact is clean');
 });
 
+test('review dependency gate fields are validated and orphan verdict is rejected', () => {
+  assert.equal(model.levelOf('FMT-DEPENDENCY-GATE'), 'hard');
+  assert.equal(model.levelOf('FMT-REVIEW-VERDICT'), 'hard');
+  assert.equal(model.levelOf('BIZ-REVIEW-VERDICT-GATE'), 'hard');
+
+  const malformedGate = lintBoard(
+    onlyTask({
+      id: 'R1',
+      status: 'ready',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'MERGE' },
+    }),
+  );
+  assert.ok(ruleSet(malformedGate.errors).has('FMT-DEPENDENCY-GATE'));
+
+  const invalidVerdict = lintBoard(
+    onlyTask({
+      id: 'R1',
+      status: 'ready',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+      review_verdict: '',
+    }),
+  );
+  assert.ok(ruleSet(invalidVerdict.errors).has('FMT-REVIEW-VERDICT'));
+
+  const orphanVerdict = lintBoard(
+    onlyTask({ id: 'R1', status: 'ready', deps: [], review_verdict: 'REQUEST-CHANGES' }),
+  );
+  assert.ok(ruleSet(orphanVerdict.errors).has('BIZ-REVIEW-VERDICT-GATE'));
+
+  const pendingGate = lintBoard(
+    onlyTask({
+      id: 'R1',
+      status: 'ready',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+      review_verdict: null,
+    }),
+  );
+  assert.ok(!has(pendingGate, 'FMT-REVIEW-VERDICT'), 'null means no verdict yet');
+  assert.ok(!has(pendingGate, 'BIZ-REVIEW-VERDICT-GATE'));
+});
+
 test('routing contracts are additive: legacy boards stay clean; partial activation is hard invalid', () => {
   const legacy = lintBoard(
     onlyTask({ id: 'L', status: 'ready', deps: [], executor: 'subagent', handle: 'legacy' }),

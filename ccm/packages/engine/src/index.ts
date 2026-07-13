@@ -86,11 +86,13 @@ export type {
   EstimateLike,
   FieldMeta,
   Invariant,
+  RetryableStatus,
   TaskLike,
 } from './board-model.js';
 // ── board-model（数据模型 SSOT：enums / FIELDS / INVARIANTS / STATUS_MACHINE / predicates）──
 export {
   acceptanceConverged,
+  dependencySatisfied,
   durationHours,
   ENUMS,
   FIELDS,
@@ -104,8 +106,11 @@ export {
   isEnumMember,
   isISOUTC,
   isLegalTransition,
+  isRetryTransition,
+  isReviewDependencyGate,
   levelOf,
   OPEN_ENUMS,
+  RETRYABLE_STATUSES,
   SCHEMA_VERSION,
   STATUS_MACHINE,
   TIERS,

@@ -203,6 +203,21 @@ test('renderTaskDetail 缺省字段跳过（无 description 行）', () => {
   assert.match(out, /id: X/);
 });
 
+test('renderTaskDetail human shows review gate and verdict', () => {
+  const out = R.renderTaskDetail(
+    {
+      id: 'R1',
+      status: 'done',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+      review_verdict: 'REQUEST-CHANGES',
+    },
+    { color: false },
+  );
+  assert.match(out, /dependency_gate: .*required_verdict.*APPROVE/);
+  assert.match(out, /review_verdict: REQUEST-CHANGES/);
+});
+
 test('renderTaskDetail null/缺 task 不崩', () => {
   assert.doesNotThrow(() => R.renderTaskDetail(null, { color: false }));
   const data = parseData(R.renderTaskDetail(null, { json: true }));

@@ -27,6 +27,8 @@ import {
   isEnumMember,
   isISOUTC,
   isLegalTransition,
+  isRetryTransition,
+  isReviewDependencyGate,
   routingContractPreflight,
   SCHEMA_VERSION,
   STATUS_MACHINE,
@@ -80,6 +82,16 @@ function requireTask(board: Board, id: string): Task {
   const t = findTask(board, id);
   if (!t) throw err(`task not found: ${id}`, 'NotFound');
   return t;
+}
+
+function reviewDependencyGate(value: unknown): Record<string, string> {
+  if (value !== 'APPROVE') {
+    throw err(
+      `refused: review gate currently requires APPROVE, got ${JSON.stringify(value)}`,
+      'Validation',
+    );
+  }
+  return { kind: 'review', required_verdict: 'APPROVE' };
 }
 
 // ── boardInit({goal, githubIssue}) → 从 template 形态产板。owner.active:true、session_id:""（非 arming·cli-design §7）。
@@ -311,6 +323,9 @@ export function addTask(board: Board, fields?: Record<string, any>): Board {
     status: fields.status !== undefined ? fields.status : 'ready',
     deps: Array.isArray(fields.deps) ? fields.deps.slice() : [],
   };
+  if (fields.reviewGate !== undefined) {
+    task.dependency_gate = reviewDependencyGate(fields.reviewGate);
+  }
   // ✎ / 🔒 其余字段：只在显式给出时落（不臆造默认值，degrade 由 lint/缺省语义处理）。
   for (const k of [
     'parent',
@@ -369,6 +384,9 @@ export function updateTask(board: Board, id: string, fields?: Record<string, any
     );
   }
   assertExecutorMutation(b, t, fields.executor);
+  if (fields.reviewGate !== undefined) {
+    t.dependency_gate = reviewDependencyGate(fields.reviewGate);
+  }
   // 增删 deps（去重）。
   if (Array.isArray(fields.addDep)) {
     if (!Array.isArray(t.deps)) t.deps = [];
@@ -387,12 +405,46 @@ export function updateTask(board: Board, id: string, fields?: Record<string, any
       t.references = t.references.filter((r: any) => !fields.rmRef.includes(r && r.ref));
   }
   // 普通字段覆写（排除已处理的特殊键 + id 不可改）。
-  const SPECIAL = new Set(['addDep', 'rmDep', 'addRef', 'rmRef', 'id']);
+  const SPECIAL = new Set(['addDep', 'rmDep', 'addRef', 'rmRef', 'reviewGate', 'id']);
   for (const [k, v] of Object.entries(fields)) {
     if (SPECIAL.has(k)) continue;
     if (v === undefined) continue;
     t[k] = v;
   }
+  return touch(b);
+}
+
+// ── recordTaskReviewVerdict(board, id, verdict) → 记录 review 结论，不改变执行状态。──────────────
+//   review task 的 status=done 只表示 review 工作已经执行；只有显式 APPROVE 才满足下游 deps。
+//   verdict 只属于当前 attempt，且必须依附于显式 review gate，避免普通 task 静默长出 review outcome。
+export function recordTaskReviewVerdict(board: Board, id: string, verdict: unknown): Board {
+  const b = clone(board);
+  const t = requireTask(b, id);
+  if (!isReviewDependencyGate(t.dependency_gate)) {
+    throw err(
+      `refused: task ${id} has no explicit review gate; declare it with --review-gate APPROVE before recording a verdict`,
+      'Validation',
+    );
+  }
+  if (!isEnumMember('reviewVerdict', verdict)) {
+    throw err(
+      `refused: invalid review verdict ${JSON.stringify(verdict)}; expected APPROVE or REQUEST-CHANGES`,
+      'Validation',
+    );
+  }
+  t.review_verdict = verdict;
+  return touch(b);
+}
+
+// review_verdict 是 attempt-scoped current evidence。所有新 attempt writer 与 done-without-verdict
+// 都复用这一处清理；若 retry writer 要归档旧值，必须先 snapshot，再调用本 helper。
+function clearAttemptScopedReviewVerdictInPlace(task: Task): void {
+  delete task.review_verdict;
+}
+
+export function clearTaskReviewVerdict(board: Board, id: string): Board {
+  const b = clone(board);
+  clearAttemptScopedReviewVerdictInPlace(requireTask(b, id));
   return touch(b);
 }
 
@@ -430,10 +482,60 @@ export function transition(
       'IllegalTransition',
     );
   }
+  if (isRetryTransition(from, toStatus)) {
+    reactivateTaskInPlace(b, t, from);
+    return touch(b);
+  }
   t.status = toStatus;
   if (toStatus === 'in_flight') t.started_at = stampNow();
   if (toStatus === 'done') t.finished_at = stampNow();
   return touch(b);
+}
+
+// retryTask(board,id) → 开一个干净的新 attempt（stale|failed|escalated → ready）。
+// 与 generic transition 的 retry 边共用 reactivateTaskInPlace，避免 `task set-status ... ready` 成为绕过 reset 的第二写路。
+export function retryTask(board: Board, id: string): Board {
+  const b = clone(board);
+  const t = requireTask(b, id);
+  const from = t.status;
+  if (!isRetryTransition(from, 'ready')) {
+    const outs = STATUS_MACHINE.transitions[from] || [];
+    throw err(
+      `illegal retry: ${from} → ready. retryable statuses: stale, failed, escalated; legal next from "${from}": ${outs.length ? outs.join(', ') : '(none)'}`,
+      'IllegalTransition',
+    );
+  }
+  reactivateTaskInPlace(b, t, from);
+  return touch(b);
+}
+
+function reactivateTaskInPlace(board: Board, task: Task, fromStatus: string): void {
+  const priorEvidence: Record<string, unknown> = {};
+  // Snapshot every attempt-scoped completion/review fact before clearing current state. The
+  // archived verdict is audit evidence only; dependency gates read only task.review_verdict.
+  for (const key of ['started_at', 'finished_at', 'artifact', 'verified', 'review_verdict']) {
+    if (Object.hasOwn(task, key)) priorEvidence[key] = structuredClone(task[key]);
+  }
+
+  if (!Array.isArray(board.log)) board.log = [];
+  board.log.push({
+    ts: stampNow(),
+    summary: `retry task ${String(task.id)}: ${fromStatus} → ready; archived prior attempt evidence`,
+    kind: 'replan',
+    task: task.id,
+    detail: JSON.stringify({
+      schema: 'ccm/task-retry/v1',
+      from_status: fromStatus,
+      prior_evidence: priorEvidence,
+    }),
+  });
+
+  task.status = 'ready';
+  delete task.started_at;
+  delete task.finished_at;
+  delete task.artifact;
+  task.verified = false;
+  clearAttemptScopedReviewVerdictInPlace(task);
 }
 
 function assertNoContractIssues(
@@ -599,7 +701,7 @@ export function blockTask(
 
 // ── unblockTask(board, id) → 清除语义阻塞标记 blocked_on（+ decision_package）。ADR-023。
 //   只机械地删 blocked_on / decision_package，**不直接定 status**——status 由写入关卡的 reconcileGating
-//   按 deps 完成度归一（deps 全 done→ready，否则→blocked）。这是「blocked_on 作语义阻塞判别器」的解除侧：
+//   按 dependencySatisfied 归一（deps 全满足→ready，否则→blocked）。这是「blocked_on 作语义阻塞判别器」的解除侧：
 //   有 blocked_on 时该 task 豁免自动门控（在等 user / 等某 task）；unblock 后交回 deps 驱动的自动门控。
 //   目标 id 不存在 → requireTask throw NotFound（冒泡 router 映射 exit 5）。
 export function unblockTask(board: Board, id: string): Board {

@@ -283,6 +283,23 @@ test('addTask does NOT alias deps/references arrays from input fields', () => {
   assert.deepEqual(t.deps, ['T0'], 'task.deps not aliased to caller array');
 });
 
+test('addTask/updateTask declare a review gate through the dedicated reviewGate input', () => {
+  let b = m.addTask(baseBoard(), { id: 'R1', reviewGate: 'APPROVE' });
+  assert.deepEqual(b.tasks.find((x: AnyBoard) => x.id === 'R1').dependency_gate, {
+    kind: 'review',
+    required_verdict: 'APPROVE',
+  });
+  b = m.updateTask(b, 'T1', { reviewGate: 'APPROVE' });
+  assert.deepEqual(b.tasks.find((x: AnyBoard) => x.id === 'T1').dependency_gate, {
+    kind: 'review',
+    required_verdict: 'APPROVE',
+  });
+  assert.throws(
+    () => m.addTask(baseBoard(), { id: 'BAD', reviewGate: 'REQUEST-CHANGES' }),
+    (e: any) => e.errKind === 'Validation',
+  );
+});
+
 // ── updateTask ───────────────────────────────────────────────────────────────────────────────────
 test('updateTask overwrites flexible fields; stamps heartbeat; pure', () => {
   const orig = baseBoard();
@@ -325,6 +342,73 @@ test('updateTask never changes id; unknown task → NotFound throw', () => {
     () => m.updateTask(baseBoard(), 'NOPE', { title: 'x' }),
     (e: any) => e.errKind === 'NotFound',
   );
+});
+
+test('recordTaskReviewVerdict requires an explicit gate and validates the verdict', () => {
+  let b = m.addTask(baseBoard(), { id: 'R1', reviewGate: 'APPROVE' });
+  b = m.recordTaskReviewVerdict(b, 'R1', 'REQUEST-CHANGES');
+  assert.equal(b.tasks.find((x: AnyBoard) => x.id === 'R1').review_verdict, 'REQUEST-CHANGES');
+  assert.throws(
+    () => m.recordTaskReviewVerdict(baseBoard(), 'T1', 'APPROVE'),
+    (e: any) => e.errKind === 'Validation' && /review gate/i.test(e.message),
+  );
+  assert.throws(
+    () =>
+      m.recordTaskReviewVerdict(
+        m.addTask(baseBoard(), { id: 'R1', reviewGate: 'APPROVE' }),
+        'R1',
+        'MAYBE',
+      ),
+    (e: any) => e.errKind === 'Validation' && /review verdict/i.test(e.message),
+  );
+});
+
+function completedReview(verdict: unknown): AnyBoard {
+  const b = baseBoard();
+  b.tasks = [
+    {
+      id: 'R1',
+      status: 'done',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+      review_verdict: verdict,
+      verified: true,
+      artifact: '/abs/review-v1.md',
+      finished_at: '2026-07-13T01:00:00Z',
+    },
+  ];
+  return b;
+}
+
+test('every named retry boundary clears attempt-scoped review verdicts, including malformed legacy residue', () => {
+  for (const from of ['stale', 'failed', 'escalated']) {
+    for (const verdict of ['APPROVE', 'REQUEST-CHANGES', '', null]) {
+      const input = completedReview(verdict);
+      input.tasks[0].status = from;
+      const next = m.transition(input, 'R1', 'ready', {});
+      assert.equal(
+        Object.hasOwn(next.tasks[0], 'review_verdict'),
+        false,
+        `${from}→ready must clear prior ${String(verdict)} verdict`,
+      );
+      assert.equal(input.tasks[0].review_verdict, verdict, 'transition remains pure');
+    }
+  }
+});
+
+test('APPROVE → stale → ready → in_flight → done without a new verdict cannot reuse old approval', () => {
+  let b = completedReview('APPROVE');
+  b = m.transition(b, 'R1', 'stale', {});
+  assert.equal(b.tasks[0].review_verdict, 'APPROVE', 'stale still describes the old attempt');
+  b = m.transition(b, 'R1', 'ready', {});
+  assert.equal(
+    b.tasks[0].review_verdict,
+    undefined,
+    'new attempt starts without a current verdict',
+  );
+  b = m.transition(b, 'R1', 'in_flight', {});
+  b = m.transition(b, 'R1', 'done', {});
+  assert.equal(b.tasks[0].review_verdict, undefined, 'done writer cannot resurrect prior approval');
 });
 
 // ── transition ───────────────────────────────────────────────────────────────────────────────────
@@ -374,6 +458,70 @@ test('transition unknown task → NotFound', () => {
     () => m.transition(baseBoard(), 'NOPE', 'done', {}),
     (e: any) => e.errKind === 'NotFound',
   );
+});
+
+test('retryTask stale→ready archives prior evidence and resets the current attempt atomically', () => {
+  const orig = baseBoard();
+  const t0 = orig.tasks.find((x: AnyBoard) => x.id === 'T0');
+  t0.started_at = '2019-12-31T23:00:00Z';
+  t0.artifact = '/abs/old.md';
+  t0.verified = true;
+  const stale = m.transition(orig, 'T0', 'stale', {});
+  const retried = m.retryTask(stale, 'T0');
+  const task = retried.tasks.find((x: AnyBoard) => x.id === 'T0');
+
+  assert.equal(task.status, 'ready');
+  assert.equal(task.started_at, undefined);
+  assert.equal(task.finished_at, undefined);
+  assert.equal(task.artifact, undefined);
+  assert.equal(task.verified, false);
+  assert.equal(typeof task.verified, 'boolean', 'verified reset is typed, never string "false"');
+
+  const entry = retried.log.at(-1);
+  assert.equal(entry.kind, 'replan');
+  assert.equal(entry.task, 'T0');
+  const detail = JSON.parse(entry.detail);
+  assert.equal(detail.schema, 'ccm/task-retry/v1');
+  assert.equal(detail.from_status, 'stale');
+  assert.deepEqual(detail.prior_evidence, {
+    started_at: '2019-12-31T23:00:00Z',
+    finished_at: '2020-01-01T00:00:00Z',
+    artifact: '/abs/old.md',
+    verified: true,
+  });
+  assert.equal(snapshot(stale).includes('/abs/old.md'), true, 'input board remains untouched');
+});
+
+test('generic legal stale→ready transition shares retry reset semantics before start', () => {
+  const orig = baseBoard();
+  const t0 = orig.tasks.find((x: AnyBoard) => x.id === 'T0');
+  t0.artifact = '/abs/old.md';
+  t0.verified = true;
+  let board = m.transition(orig, 'T0', 'stale', {});
+  board = m.transition(board, 'T0', 'ready', {});
+  board = m.transition(board, 'T0', 'in_flight', {});
+  const task = board.tasks.find((x: AnyBoard) => x.id === 'T0');
+  assert.equal(task.status, 'in_flight');
+  assert.match(task.started_at, ISO);
+  assert.equal(task.finished_at, undefined);
+  assert.equal(task.artifact, undefined);
+  assert.equal(task.verified, false);
+  assert.equal(board.log.filter((entry: AnyBoard) => entry.task === 'T0').length, 1);
+});
+
+test('retryTask rejects non-retryable statuses and leaves ordinary first start/done unchanged', () => {
+  assert.throws(
+    () => m.retryTask(baseBoard(), 'T1'),
+    (e: any) => e.errKind === 'IllegalTransition' && /ready/.test(e.message),
+  );
+
+  let board = m.transition(baseBoard(), 'T1', 'in_flight', {});
+  board = m.transition(board, 'T1', 'done', {});
+  const task = board.tasks.find((x: AnyBoard) => x.id === 'T1');
+  assert.equal(task.status, 'done');
+  assert.match(task.started_at, ISO);
+  assert.match(task.finished_at, ISO);
+  assert.equal(board.log.length, 0, 'ordinary first attempt emits no retry audit');
 });
 
 test('routing contract dedicated writers bind selection + immutable attempt snapshot + handle claim atomically', () => {

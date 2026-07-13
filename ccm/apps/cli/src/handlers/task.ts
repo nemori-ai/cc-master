@@ -202,6 +202,11 @@ function _transitionVerb(ctx: Ctx, toStatus: string, label: string): number {
           if (ctx.values && ctx.values.verified !== undefined)
             fields.verified = ctx.values.verified;
           if (Object.keys(fields).length) next = mutations.updateTask(next, id, fields);
+          if (ctx.values && ctx.values['review-verdict'] !== undefined) {
+            next = mutations.recordTaskReviewVerdict(next, id, ctx.values['review-verdict']);
+          } else {
+            next = mutations.clearTaskReviewVerdict(next, id);
+          }
         }
       }
       next = maybeLog(next, ctx, `${label} ${ids.join(', ')}`);
@@ -226,6 +231,30 @@ export function start(ctx: Ctx): number {
 }
 export function done(ctx: Ctx): number {
   return _transitionVerb(ctx, 'done', 'done');
+}
+
+// ── task retry：stale|failed|escalated → ready，并原子归档/清理上一 attempt evidence。──────────────
+//   与 start/done 同样支持批量：一笔 runWrite 内逐个 retry，任一 id 非法/不存在则整批零落盘。
+export function retry(ctx: Ctx): number {
+  const ids = ctx.positionals as string[];
+  return runWrite(ctx, {
+    mutate: (board) => {
+      let next = board as BoardArg;
+      for (const id of ids) next = mutations.retryTask(next, id);
+      next = maybeLog(next, ctx, `retry ${ids.join(', ')}`);
+      return next;
+    },
+    render: (next, c, { dryRun }) => {
+      if (c.flags.json) {
+        const tasks = ids.map((id) => findTask(next, id) ?? null);
+        return render.jsonString(tasks);
+      }
+      const outcomes = ids.map((id) => `${id} → ${String(findTask(next, id)?.status)}`).join(', ');
+      return dryRun
+        ? `[dry-run] 将 retry task: ${outcomes} (归档并清理旧 attempt evidence)`
+        : `task retry: ${outcomes} (旧 attempt evidence 已归档)`;
+    },
+  });
 }
 
 export function setPlanning(ctx: Ctx): number {
@@ -320,7 +349,7 @@ export function block(ctx: Ctx): number {
 }
 
 // ── task unblock：清除 blocked_on 语义阻塞标记（→ 交回 reconcileGating 按 deps 定 ready/blocked）。ADR-023。
-//   不直接定 status——写入关卡的 reconcileGating 据 deps 完成度归一（deps 全 done→ready，否则→blocked）。
+//   不直接定 status——写入关卡的 reconcileGating 据 dependencySatisfied 归一（deps 全满足→ready，否则→blocked）。
 //   目标 id 不存在 → mutations.unblockTask throw NotFound（冒泡 router 映射 exit 5）。
 export function unblock(ctx: Ctx): number {
   const id = ctx.positionals[0] as string;

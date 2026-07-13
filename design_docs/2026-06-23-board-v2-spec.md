@@ -215,7 +215,7 @@ cadence?: {                          👁
 `verified` 是与 status **正交的布尔**,非 status 值。
 | status | 路由 | 主要转入 |
 |---|---|---|
-| `ready` | deps 全 done,可派发 | (建)/blocked 解锁/failed 重试/stale 重跑 |
+| `ready` | deps 按 `dependencySatisfied` 全满足,可派发 | (建)/blocked 解锁/failed 重试/stale 重跑 |
 | `in_flight` | 已派发执行中 | ready 派发 |
 | `blocked` | 等 blocked_on(user/task) | (建)/ready |
 | `done` | 完成并验 | in_flight/uncertain 验过 |
@@ -223,6 +223,26 @@ cadence?: {                          👁
 | `escalated` | sub-agent 返回 escalation → supersede | in_flight |
 | `failed` | 失败 → 按 escalation 路由 | in_flight |
 | `stale` | 上游产物变 → 重跑 | done |
+
+### 6.1 retry / reactivation 合约
+
+`stale|failed|escalated → ready` 是**新 attempt 的边界**，不是普通 status setter。所有合法 retry
+transition（含通用 `task set-status <id> ready` 走到这些边时）必须共享同一原子后置条件；CLI 另提供
+具名正门 `ccm task retry <id...>`，调用者不需手工拼字段 reset：
+
+1. 在同一笔 mutation 内，把旧 attempt 的来源 status 与已存在的
+   `started_at`/`finished_at`/`artifact`/`verified`/`review_verdict` 序列化进 append-only `board.log`（`kind:replan`、
+   `task:<id>`、detail schema=`ccm/task-retry/v1`），先留审计证据再重置当前视图。
+2. retry mutation 把 task 转为 `ready`，删除旧 `started_at`/`finished_at`/`artifact`/`review_verdict`，
+   并把 `verified` 重置为**布尔** `false`（不得写字符串 `"false"`）。随后既有写入关卡仍执行
+   `reconcileGating`：只有 deps 按 `dependencySatisfied` 全满足时最终持久态才为 `ready`，否则为
+   `blocked`；普通依赖以 `status=done` 满足，显式 review gate 还要求当前 attempt 的精确
+   `review_verdict=APPROVE`，缺失、空、null 或 `REQUEST-CHANGES` 均 fail closed。human/JSON 输出都必须按
+   reconcile 后逐 task 的最终态渲染。因此当前 attempt 永不携带上一轮 terminal evidence，也不谎报可派发性。
+3. 批量 `task retry <id...>` 是一次 mutate + 一次 lint + 一次落盘；任一 id 不存在或当前 status
+   不是 `stale|failed|escalated`，整批拒绝、零部分写。
+4. 普通首次 `ready → in_flight → done` 语义不变；非法状态边仍按既有状态机拒绝。`done` 要重跑仍先
+   `done → stale`，再 `task retry`，不新增 `done → ready` 边、不改 status enum/deps/narrow-waist。
 
 ## 7. 机械约束总图 + 写入 + 并发
 - **真机械 🔩**:CLI 写入校验(违 FMT/GRAPH/BIZ-hard 拒绝)+ lint 端点闸。

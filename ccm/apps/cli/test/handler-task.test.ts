@@ -201,6 +201,19 @@ test('task add with --log also appends a log entry', () => {
   assert.equal(board.log[0].summary, '建了 T7');
 });
 
+test('task add --review-gate APPROVE declares an explicit review dependency gate', () => {
+  const boardPath = mkBoardHome();
+  const ctx = mkCtx(boardPath, {
+    values: { 'review-gate': 'APPROVE' },
+    positionals: ['R1'],
+  });
+  assert.equal(taskHandler.add(ctx), EXIT.OK);
+  assert.deepEqual(findTask(readBoard(boardPath), 'R1').dependency_gate, {
+    kind: 'review',
+    required_verdict: 'APPROVE',
+  });
+});
+
 // ══ task update ════════════════════════════════════════════════════════════════════════════════════
 //   type='development' 需要 spec/plan 引用锚点才 lint-clean（BIZ-DEV-REFS 已 C1 hard 化）——两个 seed
 //   task 都带一对 spec/plan references，保持既有 happy-path 测试（不涉及本次诊断/hard 化本身）不变。
@@ -518,6 +531,94 @@ test('task start <id1> <id2> → batch ready→in_flight', () => {
   }
 });
 
+test('task retry stale→ready clears terminal evidence with a typed boolean and preserves it in audit log', () => {
+  const tasks = [
+    {
+      id: 'R1',
+      status: 'stale',
+      deps: [],
+      created_at: '2026-06-24T08:00:00Z',
+      started_at: '2026-06-24T09:00:00Z',
+      finished_at: '2026-06-24T10:00:00Z',
+      artifact: '/abs/old.md',
+      verified: true,
+    },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, { positionals: ['R1'] });
+  const code = taskHandler.retry(ctx);
+  assert.equal(code, EXIT.OK);
+  const board = readBoard(boardPath);
+  const task = findTask(board, 'R1');
+  assert.equal(task.status, 'ready');
+  assert.equal(task.started_at, undefined);
+  assert.equal(task.finished_at, undefined);
+  assert.equal(task.artifact, undefined);
+  assert.equal(task.verified, false);
+  assert.equal(typeof task.verified, 'boolean');
+  const detail = JSON.parse(board.log.at(-1).detail);
+  assert.equal(detail.prior_evidence.artifact, '/abs/old.md');
+  assert.equal(detail.prior_evidence.verified, true);
+});
+
+test('task retry renders each reconcile-final status consistently in human, dry-run, and JSON output', () => {
+  const makeTasks = () => [
+    { id: 'D0', status: 'stale', deps: [] },
+    { id: 'GATED', status: 'stale', deps: ['D0'], artifact: '/abs/gated-old.md', verified: true },
+    { id: 'FREE', status: 'stale', deps: [], artifact: '/abs/free-old.md', verified: true },
+  ];
+
+  const humanBoardPath = mkBoardHome({ tasks: makeTasks() });
+  const humanCtx = mkCtx(humanBoardPath, { positionals: ['GATED', 'FREE'] });
+  assert.equal(taskHandler.retry(humanCtx), EXIT.OK);
+  const persisted = readBoard(humanBoardPath);
+  assert.equal(findTask(persisted, 'GATED').status, 'blocked');
+  assert.equal(findTask(persisted, 'FREE').status, 'ready');
+  assert.match(humanCtx.outBuf.join(''), /GATED → blocked/);
+  assert.match(humanCtx.outBuf.join(''), /FREE → ready/);
+
+  const dryRunBoardPath = mkBoardHome({ tasks: makeTasks() });
+  const dryRunBefore = readFileSync(dryRunBoardPath, 'utf8');
+  const dryRunCtx = mkCtx(dryRunBoardPath, {
+    flags: { dryRun: true },
+    positionals: ['GATED', 'FREE'],
+  });
+  assert.equal(taskHandler.retry(dryRunCtx), EXIT.OK);
+  assert.equal(readFileSync(dryRunBoardPath, 'utf8'), dryRunBefore);
+  assert.match(dryRunCtx.outBuf.join(''), /GATED → blocked/);
+  assert.match(dryRunCtx.outBuf.join(''), /FREE → ready/);
+
+  const jsonBoardPath = mkBoardHome({ tasks: makeTasks() });
+  const jsonCtx = mkCtx(jsonBoardPath, {
+    flags: { json: true },
+    positionals: ['GATED', 'FREE'],
+  });
+  assert.equal(taskHandler.retry(jsonCtx), EXIT.OK);
+  const parsed = JSON.parse(jsonCtx.outBuf.join(''));
+  assert.deepEqual(
+    parsed.data.map((task: { id: string; status: string }) => [task.id, task.status]),
+    [
+      ['GATED', 'blocked'],
+      ['FREE', 'ready'],
+    ],
+  );
+});
+
+test('task retry batch is all-or-nothing when one task is not retryable', () => {
+  const tasks = [
+    { id: 'R1', status: 'stale', deps: [], artifact: '/abs/old.md', verified: true },
+    { id: 'R2', status: 'ready', deps: [] },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const before = readFileSync(boardPath, 'utf8');
+  const ctx = mkCtx(boardPath, { positionals: ['R1', 'R2'] });
+  assert.throws(
+    () => taskHandler.retry(ctx),
+    (e: { errKind?: string }) => e.errKind === 'IllegalTransition',
+  );
+  assert.equal(readFileSync(boardPath, 'utf8'), before);
+});
+
 test('task done without verified/artifact is rejected by write validation and does not persist', () => {
   const tasks = [
     {
@@ -681,6 +782,152 @@ test('completing deps via task done → reconcile auto-readies the dependent', (
   const b = readBoard(boardPath);
   assert.equal(findTask(b, 'T1').status, 'done');
   assert.equal(findTask(b, 'T2').status, 'ready', 'dependent auto-readied by reconcile');
+});
+
+test('task done records REQUEST-CHANGES but keeps review-gated downstream blocked', () => {
+  const tasks = [
+    {
+      id: 'R1',
+      status: 'in_flight',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+      created_at: '2026-06-24T08:00:00Z',
+      started_at: '2026-06-24T08:10:00Z',
+    },
+    { id: 'I1', status: 'blocked', deps: ['R1'], created_at: '2026-06-24T08:30:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, {
+    values: {
+      verified: true,
+      artifact: '/abs/review.md',
+      'review-verdict': 'REQUEST-CHANGES',
+    },
+    positionals: ['R1'],
+  });
+  assert.equal(taskHandler.done(ctx), EXIT.OK);
+  const b = readBoard(boardPath);
+  assert.equal(findTask(b, 'R1').status, 'done', 'review execution completed');
+  assert.equal(findTask(b, 'R1').review_verdict, 'REQUEST-CHANGES');
+  assert.equal(findTask(b, 'I1').status, 'blocked', 'approval gate remains closed');
+});
+
+test('task done without a verdict completes review execution but keeps gate closed', () => {
+  const tasks = [
+    {
+      id: 'R1',
+      status: 'in_flight',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+      created_at: '2026-06-24T08:00:00Z',
+      started_at: '2026-06-24T08:10:00Z',
+    },
+    { id: 'I1', status: 'blocked', deps: ['R1'], created_at: '2026-06-24T08:30:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, {
+    values: { verified: true, artifact: '/abs/review.md' },
+    positionals: ['R1'],
+  });
+  assert.equal(taskHandler.done(ctx), EXIT.OK);
+  const b = readBoard(boardPath);
+  assert.equal(findTask(b, 'R1').status, 'done');
+  assert.equal(findTask(b, 'R1').review_verdict, undefined);
+  assert.equal(findTask(b, 'I1').status, 'blocked');
+});
+
+test('task done records APPROVE and auto-readies review-gated downstream', () => {
+  const tasks = [
+    {
+      id: 'R1',
+      status: 'in_flight',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+      created_at: '2026-06-24T08:00:00Z',
+      started_at: '2026-06-24T08:10:00Z',
+    },
+    { id: 'I1', status: 'blocked', deps: ['R1'], created_at: '2026-06-24T08:30:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const ctx = mkCtx(boardPath, {
+    values: { verified: true, artifact: '/abs/review.md', 'review-verdict': 'APPROVE' },
+    positionals: ['R1'],
+  });
+  assert.equal(taskHandler.done(ctx), EXIT.OK);
+  const b = readBoard(boardPath);
+  assert.equal(findTask(b, 'R1').review_verdict, 'APPROVE');
+  assert.equal(findTask(b, 'I1').status, 'ready');
+});
+
+function retryApprovedReview(verdict?: 'APPROVE' | 'REQUEST-CHANGES'): {
+  boardPath: string;
+  board: any;
+} {
+  const tasks = [
+    {
+      id: 'R1',
+      status: 'done',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+      review_verdict: 'APPROVE',
+      verified: true,
+      artifact: '/abs/review-v1.md',
+      created_at: '2026-06-24T08:00:00Z',
+      started_at: '2026-06-24T08:10:00Z',
+      finished_at: '2026-06-24T08:20:00Z',
+    },
+    { id: 'I1', status: 'ready', deps: ['R1'], created_at: '2026-06-24T08:30:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  assert.equal(taskHandler.setStatus(mkCtx(boardPath, { positionals: ['R1', 'stale'] })), EXIT.OK);
+  assert.equal(findTask(readBoard(boardPath), 'I1').status, 'blocked');
+  assert.equal(taskHandler.setStatus(mkCtx(boardPath, { positionals: ['R1', 'ready'] })), EXIT.OK);
+  assert.equal(taskHandler.start(mkCtx(boardPath, { positionals: ['R1'] })), EXIT.OK);
+  const values: Record<string, unknown> = {
+    verified: true,
+    artifact: '/abs/review-v2.md',
+  };
+  if (verdict !== undefined) values['review-verdict'] = verdict;
+  assert.equal(taskHandler.done(mkCtx(boardPath, { values, positionals: ['R1'] })), EXIT.OK);
+  return { boardPath, board: readBoard(boardPath) };
+}
+
+test('retry completed without a new verdict does not preserve old APPROVE or unlock downstream', () => {
+  const { board } = retryApprovedReview();
+  assert.equal(findTask(board, 'R1').status, 'done');
+  assert.equal(findTask(board, 'R1').review_verdict, undefined);
+  assert.equal(findTask(board, 'I1').status, 'blocked');
+});
+
+test('retry uses only the current attempt verdict: REQUEST-CHANGES blocks and a new APPROVE unlocks', () => {
+  for (const [verdict, expected] of [
+    ['REQUEST-CHANGES', 'blocked'],
+    ['APPROVE', 'ready'],
+  ] as const) {
+    const { board } = retryApprovedReview(verdict);
+    assert.equal(findTask(board, 'R1').review_verdict, verdict);
+    assert.equal(findTask(board, 'I1').status, expected);
+  }
+});
+
+test('task done --review-verdict without an explicit review gate fails loud and does not persist', () => {
+  const tasks = [
+    {
+      id: 'R1',
+      status: 'in_flight',
+      deps: [],
+      created_at: '2026-06-24T08:00:00Z',
+      started_at: '2026-06-24T08:10:00Z',
+    },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  const before = readFileSync(boardPath, 'utf8');
+  const ctx = mkCtx(boardPath, {
+    values: { verified: true, artifact: '/abs/review.md', 'review-verdict': 'APPROVE' },
+    positionals: ['R1'],
+  });
+  assert.throws(() => taskHandler.done(ctx), /review gate/i);
+  assert.equal(readFileSync(boardPath, 'utf8'), before);
 });
 
 // ══ task set-status ════════════════════════════════════════════════════════════════════════════════

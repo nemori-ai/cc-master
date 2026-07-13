@@ -42,6 +42,7 @@ const EXPECTED: Record<string, string[]> = {
     'update',
     'start',
     'done',
+    'retry',
     'set-planning',
     'set-routing',
     'route-bind',

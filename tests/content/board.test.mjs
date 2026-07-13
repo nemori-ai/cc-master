@@ -12,6 +12,21 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // content 测试的 worked-board fixture + references/board.md 的示例来源。
 const FIXTURES = 'tests/fixtures';
 const read = (p) => JSON.parse(readFileSync(join(ROOT, p), 'utf8'));
+const readText = (p) => readFileSync(join(ROOT, p), 'utf8');
+
+function section(text, start, end) {
+  const from = text.indexOf(start);
+  assert.notEqual(from, -1, `missing section start: ${start}`);
+  const to = end ? text.indexOf(end, from + start.length) : text.length;
+  assert.notEqual(to, -1, `missing section end: ${end}`);
+  return text.slice(from, to);
+}
+
+function lineContaining(text, needle) {
+  const line = text.split('\n').find((candidate) => candidate.includes(needle));
+  assert.ok(line, `missing line containing: ${needle}`);
+  return line;
+}
 
 // ★T4-3b: the lint ENGINE is no longer in-process require'd from cli/src — the whole cli/ is deleted and
 //   the lint SSOT is @ccm/engine, reached via the `ccm` binary (ADR-014 process boundary). The engine's
@@ -90,6 +105,30 @@ test('ccm board init skeleton aggregates WIP control under scheduling (v2) — n
   assert.ok(Number.isInteger(b.scheduling.wip_limit), 'scheduling.wip_limit is an integer');
   assert.ok(!('num_account' in b), 'num_account is retired (no longer seeded)');
   assert.ok(!('wip_limit' in b), 'flat top-level wip_limit is gone (moved under scheduling)');
+});
+
+test('retry prose preserves attempt-scoped review evidence and dependencySatisfied fail-closed semantics', () => {
+  const skill = readText('plugin/src/skills/using-ccm/canonical/SKILL.md');
+  const modelGuide = readText('plugin/src/skills/using-ccm/canonical/references/board-model-guide.md');
+  const commandCatalog = readText('plugin/src/skills/using-ccm/canonical/references/command-catalog.md');
+  const boardV2Spec = readText('design_docs/2026-06-23-board-v2-spec.md');
+  const productSpec = readText('design_docs/spec.md');
+
+  const retryContracts = [
+    ['using-ccm SKILL', lineContaining(skill, 'ccm/task-retry/v1')],
+    ['board-model guide', section(modelGuide, '**retry 是 attempt 边界，不是 status setter：**', '\n\n')],
+    ['command catalog', lineContaining(commandCatalog, '- 行为：仅允许 `stale` / `failed` / `escalated`')],
+    ['board v2 spec', section(boardV2Spec, '### 6.1 retry / reactivation 合约', '\n## ')],
+  ];
+  for (const [label, prose] of retryContracts) {
+    assert.match(prose, /review_verdict/, `${label} must list review_verdict in archived attempt evidence`);
+    assert.match(prose, /deps[^。\n]{0,40}全满足|依赖全部满足/, `${label} must describe dependencySatisfied semantics, not status-only done`);
+  }
+
+  const boardContract = section(productSpec, '## 3. Board（编排的持久存档）', '\n## 4. Commands');
+  assert.match(boardContract, /dependencySatisfied/, 'product spec must name the dependency contract SSOT');
+  assert.match(boardContract, /review_verdict/, 'product spec must preserve fail-closed review-gate semantics');
+  assert.match(boardContract, /ccm\/task-retry\/v1/, 'product spec must preserve the retry audit schema contract');
 });
 
 test('board.example.json is a valid worked board with ≥1 task carrying id/status/deps', () => {

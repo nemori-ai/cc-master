@@ -67,6 +67,54 @@ test('pure-refactor: lint GRAPH-* (dangling/self-loop/cycle) reports use the sha
   assert.equal(good.errors.length, 0, JSON.stringify(good.errors));
 });
 
+test('readySet applies the same review dependency gate as reconcileGating', () => {
+  const gate = { kind: 'review', required_verdict: 'APPROVE' };
+  const negative = analyzeGraph(
+    board([
+      {
+        id: 'R1',
+        status: 'done',
+        deps: [],
+        dependency_gate: gate,
+        review_verdict: 'REQUEST-CHANGES',
+      },
+      { id: 'I1', status: 'ready', deps: ['R1'] },
+    ]),
+  );
+  assert.deepEqual(negative.readySet(), [], 'REQUEST-CHANGES must not appear ready on read path');
+  assert.deepEqual(
+    analyzeGraph(
+      board([
+        { id: 'OWNER', status: 'done', deps: [] },
+        {
+          id: 'R1',
+          status: 'done',
+          deps: [],
+          parent: 'OWNER',
+          dependency_gate: gate,
+          review_verdict: 'REQUEST-CHANGES',
+        },
+      ]),
+    ).rollupConsistency(),
+    [],
+    'review execution completion remains done for rollup even when its dependency gate is closed',
+  );
+
+  const approved = analyzeGraph(
+    board([
+      {
+        id: 'R1',
+        status: 'done',
+        deps: [],
+        dependency_gate: gate,
+        review_verdict: 'APPROVE',
+      },
+      { id: 'I1', status: 'ready', deps: ['R1'] },
+    ]),
+  );
+  assert.deepEqual(approved.readySet(), ['I1']);
+});
+
 test('lint enforces GRAPH-PARENT-* nesting rules (parent is 硬 waist) — full coverage lives in board-lint-core.test.ts', () => {
   // parent 升入硬 waist（ADR-012）：parent 指向不存在 id 现在是 GRAPH-PARENT-EXISTS hard error。
   const r = lintBoard(

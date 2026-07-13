@@ -189,6 +189,31 @@ test('STATUS_MACHINE defines transitions for all 8 statuses + classifications', 
   assert.equal(M.isLegalTransition('done', 'in_flight'), false);
 });
 
+test('isRetryTransition names every legal new-attempt boundary without widening the state machine', () => {
+  assert.deepEqual(M.RETRYABLE_STATUSES, ['stale', 'failed', 'escalated']);
+  for (const from of M.RETRYABLE_STATUSES) {
+    assert.equal(M.isLegalTransition(from, 'ready'), true, `${from}→ready remains a legal edge`);
+    assert.equal(M.isRetryTransition(from, 'ready'), true, `${from}→ready starts a new attempt`);
+  }
+  assert.equal(
+    M.isRetryTransition('done', 'stale'),
+    false,
+    'marking old output stale is not a new attempt',
+  );
+  assert.equal(
+    M.isRetryTransition('ready', 'in_flight'),
+    false,
+    'ordinary start is inside the new attempt',
+  );
+  assert.equal(
+    M.isRetryTransition('blocked', 'ready'),
+    false,
+    'dependency unblocking is not a retry',
+  );
+  assert.equal(M.isRetryTransition('done', 'ready'), false, 'retry does not add done → ready');
+  assert.equal(M.isRetryTransition('stale', 'in_flight'), false, 'retry target is exactly ready');
+});
+
 // ── INVARIANTS 注册表：规则 id/级别/家族 的 SSOT（spec §5）─────────────────────────────────────────
 test('INVARIANTS is a registry of {id, level, family, scope, summary}, ids unique', () => {
   assert.ok(Array.isArray(M.INVARIANTS) && M.INVARIANTS.length > 0);
@@ -305,4 +330,54 @@ test('taskTrulyDone (P3 #32 语义): status=done ∧ verified ∧ artifact 非�
   assert.equal(M.taskTrulyDone({ status: 'done', verified: true }), false); // 缺 artifact
   assert.equal(M.taskTrulyDone({ status: 'done', verified: false, artifact: 'x' }), false); // 未验
   assert.equal(M.taskTrulyDone({ status: 'in_flight', verified: true, artifact: 'x' }), false);
+});
+
+test('dependencySatisfied separates review execution completion from approval (Finding #84)', () => {
+  const legacyDone = { status: 'done' };
+  const reviewGate = { kind: 'review', required_verdict: 'APPROVE' };
+
+  assert.equal(M.dependencySatisfied(legacyDone), true, 'legacy done task remains compatible');
+  assert.equal(
+    M.dependencySatisfied({
+      status: 'done',
+      dependency_gate: reviewGate,
+      review_verdict: 'APPROVE',
+    }),
+    true,
+    'only APPROVE satisfies an explicit review gate',
+  );
+  assert.equal(
+    M.dependencySatisfied({
+      status: 'done',
+      dependency_gate: reviewGate,
+      review_verdict: 'REQUEST-CHANGES',
+    }),
+    false,
+    'negative review completed execution but does not approve downstream consumption',
+  );
+  for (const review_verdict of [undefined, '', null]) {
+    assert.equal(
+      M.dependencySatisfied({ status: 'done', dependency_gate: reviewGate, review_verdict }),
+      false,
+      `silent verdict ${String(review_verdict)} must fail closed`,
+    );
+  }
+  assert.equal(
+    M.dependencySatisfied({
+      status: 'done',
+      dependency_gate: { kind: 'review', required_verdict: 'MERGE' },
+      review_verdict: 'APPROVE',
+    }),
+    false,
+    'malformed explicit gate fails closed',
+  );
+  assert.equal(
+    M.dependencySatisfied({
+      status: 'in_flight',
+      dependency_gate: reviewGate,
+      review_verdict: 'APPROVE',
+    }),
+    false,
+    'approval does not replace execution completion',
+  );
 });

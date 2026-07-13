@@ -22,7 +22,12 @@
 //   CPM forward/backward pass、float 公式逐字保持（零行为变化）。浏览器形态由 tsdown 的 IIFE 产物承接。
 
 import { buildGraph, findCycle } from './board-lint-core.js';
-import { durationHours, type EstimateLike, type TaskLike } from './board-model.js';
+import {
+  dependencySatisfied,
+  durationHours,
+  type EstimateLike,
+  type TaskLike,
+} from './board-model.js';
 
 // 终态状态（done 家族）。rollup「子全 done」判定用——只有 'done' 算真完成（与 verify-board / lint 口径一致）。
 const DONE = 'done';
@@ -139,6 +144,7 @@ export function analyzeGraph(board: BoardLike | null | undefined): GraphHandle {
     return t ? t.status : undefined;
   };
   const isDone = (id: string): boolean => statusOf(id) === DONE;
+  const satisfiesDependency = (id: string): boolean => dependencySatisfied(taskById.get(id));
 
   // ── cheap 子集（O(V+E)，hook 可 require）─────────────────────────────────────────────────────
 
@@ -176,13 +182,13 @@ export function analyzeGraph(board: BoardLike | null | undefined): GraphHandle {
     return ids.has(id) ? (downstream.get(id) as string[]).slice() : [];
   }
 
-  // readySet() → deps 全 done ∧ status==='ready' 的 id（严格语义·设计稿 Q-G6）。
+  // readySet() → deps 全满足 ∧ status==='ready' 的 id。legacy dep 以 done 满足；显式 review gate 还须 APPROVE。
   function readySet(): string[] {
     const out: string[] = [];
     for (const id of ids) {
       if (statusOf(id) !== 'ready') continue;
       const deps = upstream.get(id) as string[];
-      if (deps.every((d) => isDone(d))) out.push(id);
+      if (deps.every((d) => satisfiesDependency(d))) out.push(id);
     }
     return out;
   }
