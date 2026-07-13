@@ -1,7 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import {
+  captureRuntimeEnvironment,
+  hostConfig,
+  localPluginBase as resolvePluginBase,
+} from '@ccm/engine';
 import { readCodexUsageSignal } from '../codex-rate-limits.js';
 import { probeExecutable } from './probe.js';
 import type { Env, HarnessAdapter, PluginUpgradeRequest, PluginUpgradeResult } from './types.js';
@@ -97,10 +101,9 @@ function pathExists(p: string): boolean {
   }
 }
 
+// host config 收口进 RuntimeEnvironment/PathResolver 契约（CODEX_HOME > <home>/.codex）。
 function codexConfigDir(env: Env): string {
-  return env.CODEX_HOME
-    ? path.resolve(env.CODEX_HOME)
-    : path.join(env.HOME || os.homedir(), '.codex');
+  return hostConfig(captureRuntimeEnvironment({ env }), 'codex')[0] as string;
 }
 
 async function upgradeCodexPlugin(req: PluginUpgradeRequest): Promise<PluginUpgradeResult> {
@@ -202,10 +205,10 @@ function localPluginRoot(env: Env): string {
   return path.join(base, 'cc-master');
 }
 
+// 本地插件安装基座收口进契约（CC_MASTER_PLUGIN_DIR > <home>/.local/share/cc-master·首轮不迁移 XDG_DATA_HOME）；
+//   per-harness `<base>/codex/cc-master` 的 existsSync 精化仍留适配器（localPluginRoot）。
 function localPluginBase(env: Env): string {
-  return env.CC_MASTER_PLUGIN_DIR
-    ? path.resolve(env.CC_MASTER_PLUGIN_DIR)
-    : path.join(env.HOME || os.homedir(), '.local', 'share', 'cc-master');
+  return resolvePluginBase(captureRuntimeEnvironment({ env }));
 }
 
 function codexMarketplaceRoot(env: Env, pluginRoot: string): string {

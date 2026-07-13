@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { resolveCcMasterHome } from '@ccm/engine';
 
 const PROVENANCE_SCHEMA = 'ccm/runtime-provenance/v1';
 const IMAGE_SCHEMA = 'ccm/runtime-image/v1';
@@ -188,9 +188,10 @@ function jsonText(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
+// home 解析收口进 @ccm/engine 的 SSOT（paths.resolveCcMasterHome）——此前本文件重实现同口径逻辑，
+//   属 P2-1「home 策略碎片化」的重复源之一，现删重实现、单一真相由引擎 RuntimeEnvironment/PathResolver 提供。
 function resolveHome(env: PathEnv): string {
-  if (env.CC_MASTER_HOME) return path.resolve(env.CC_MASTER_HOME);
-  return path.join(path.resolve(env.HOME || os.homedir()), '.cc_master');
+  return resolveCcMasterHome(env);
 }
 
 function expectedAsset(platform: string, arch: string): string | null {

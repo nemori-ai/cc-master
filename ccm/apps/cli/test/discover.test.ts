@@ -150,6 +150,17 @@ test('pointerPath: ($XDG_STATE_HOME||~/.local/state)/cc-master/boards/<sid>.path
   );
 });
 
+test('pointerPath: no XDG_STATE_HOME → honors injected env.HOME (not process homedir)', () => {
+  // P2-1 split-home fix: boards resolve under injected home, so pointers must too. Before the
+  //   RuntimeEnvironment contract the fallback read process os.homedir() and stranded pointers
+  //   under a different home than the board when env.HOME was injected.
+  const injectedHome = join(mkTmp('ccm-pointer-home-'), 'injected-home');
+  assert.equal(
+    D.pointerPath('sid-h', { HOME: injectedHome }),
+    join(injectedHome, '.local', 'state', 'cc-master', 'boards', 'sid-h.path'),
+  );
+});
+
 test('writePointer creates parent dirs + readPointer round-trips; deletePointer removes', () => {
   const xdg = mkXdg();
   const env = { XDG_STATE_HOME: xdg };
