@@ -80,36 +80,54 @@ function normalizeArch(raw: string): RuntimeArch {
   return raw === 'x64' || raw === 'arm64' ? raw : 'other';
 }
 
-// homeBase(env, homeDir) → 用户 home 基座 = env.HOME（非空）否则显式 homeDir。
-//   HOME 用 truthiness（空 HOME 不是可用 home），但**回落对象是显式输入 homeDir**、非隐藏 os.homedir()。
+// homeBase(env, homeDir) → 只选择用户 home 原始值：env.HOME（非空）否则显式 homeDir。
+//   绝对化必须由持有 captured cwd 的 RuntimeEnvironment 边界完成；本 helper 不自行读取 cwd。
 export function homeBase(env: Record<string, string | undefined>, homeDir: string): string {
   return env.HOME ? env.HOME : homeDir;
+}
+
+// 所有相对 path-like 输入只允许锚到显式 captured cwd。cwd 自身必须绝对；否则没有任何
+// 不读取 process.cwd() 的合法绝对化基准，故 fail loud 而非偷偷使用真实进程状态。
+function normalizeCapturedCwd(raw: string): string {
+  if (!path.isAbsolute(raw)) {
+    throw new TypeError(`RuntimeEnvironment cwd must be absolute: ${raw || '<empty>'}`);
+  }
+  return path.normalize(raw);
+}
+
+function resolveCapturedPath(cwd: string, raw: string): string {
+  return path.resolve(cwd, raw);
 }
 
 // 覆写根：env.<KEY>（presence·非空）→ 绝对化；否则 join(base...)。
 function xdgRoot(
   env: Record<string, string | undefined>,
   key: string,
+  cwd: string,
   base: string,
   ...segments: string[]
 ): string {
   const raw = env[key];
-  if (raw) return path.resolve(raw);
+  if (raw) return resolveCapturedPath(cwd, raw);
   return path.join(base, ...segments);
 }
 
-function computeRoots(env: Record<string, string | undefined>, home: string): RuntimeRoots {
+function computeRoots(
+  env: Record<string, string | undefined>,
+  cwd: string,
+  home: string,
+): RuntimeRoots {
   const ccMasterHome = env.CC_MASTER_HOME
-    ? path.resolve(env.CC_MASTER_HOME)
+    ? resolveCapturedPath(cwd, env.CC_MASTER_HOME)
     : path.join(home, '.cc_master');
   return {
     ccMasterHome,
-    state: xdgRoot(env, 'XDG_STATE_HOME', home, '.local', 'state'),
-    config: xdgRoot(env, 'XDG_CONFIG_HOME', home, '.config'),
-    data: xdgRoot(env, 'XDG_DATA_HOME', home, '.local', 'share'),
-    cache: xdgRoot(env, 'XDG_CACHE_HOME', home, '.cache'),
+    state: xdgRoot(env, 'XDG_STATE_HOME', cwd, home, '.local', 'state'),
+    config: xdgRoot(env, 'XDG_CONFIG_HOME', cwd, home, '.config'),
+    data: xdgRoot(env, 'XDG_DATA_HOME', cwd, home, '.local', 'share'),
+    cache: xdgRoot(env, 'XDG_CACHE_HOME', cwd, home, '.cache'),
     runtimePersistent: path.join(ccMasterHome, 'runtimes'),
-    runtimeEphemeral: env.XDG_RUNTIME_DIR ? path.resolve(env.XDG_RUNTIME_DIR) : null,
+    runtimeEphemeral: env.XDG_RUNTIME_DIR ? resolveCapturedPath(cwd, env.XDG_RUNTIME_DIR) : null,
   };
 }
 
@@ -117,15 +135,18 @@ function computeRoots(env: Record<string, string | undefined>, home: string): Ru
 export function createRuntimeEnvironment(input: RuntimeEnvironmentInput): RuntimeEnvironment {
   // 防御性浅拷贝 + freeze：契约消费方拿到的是只读快照，改不动源 env。
   const env = Object.freeze({ ...input.env });
-  const home = homeBase(env, input.homeDir);
+  const cwd = normalizeCapturedCwd(input.cwd);
+  const homeDir = resolveCapturedPath(cwd, input.homeDir);
+  const tempDir = resolveCapturedPath(cwd, input.tempDir);
+  const home = resolveCapturedPath(cwd, homeBase(env, homeDir));
   return Object.freeze({
     platform: normalizePlatform(input.platform),
     arch: normalizeArch(input.arch),
     env,
-    cwd: input.cwd,
-    homeDir: input.homeDir,
-    tempDir: input.tempDir,
-    roots: Object.freeze(computeRoots(env, home)),
+    cwd,
+    homeDir,
+    tempDir,
+    roots: Object.freeze(computeRoots(env, cwd, home)),
   });
 }
 
@@ -158,16 +179,20 @@ export function boardSessionPointer(rt: RuntimeEnvironment, sessionId: string): 
 
 // host 配置目录（有序·首项为该 host 的主配置根；win32 分支不在本契约·other 降级为 Linux 口径）。
 export function hostConfig(rt: RuntimeEnvironment, host: RuntimeHost): string[] {
-  const home = homeBase(rt.env, rt.homeDir);
+  const home = resolveCapturedPath(rt.cwd, homeBase(rt.env, rt.homeDir));
   switch (host) {
     case 'claude-code':
       return [
         rt.env.CLAUDE_CONFIG_DIR
-          ? path.resolve(rt.env.CLAUDE_CONFIG_DIR)
+          ? resolveCapturedPath(rt.cwd, rt.env.CLAUDE_CONFIG_DIR)
           : path.join(home, '.claude'),
       ];
     case 'codex':
-      return [rt.env.CODEX_HOME ? path.resolve(rt.env.CODEX_HOME) : path.join(home, '.codex')];
+      return [
+        rt.env.CODEX_HOME
+          ? resolveCapturedPath(rt.cwd, rt.env.CODEX_HOME)
+          : path.join(home, '.codex'),
+      ];
     case 'cursor':
       return [
         rt.platform === 'darwin'
@@ -183,15 +208,16 @@ export function hostConfig(rt: RuntimeEnvironment, host: RuntimeHost): string[] 
 //     · cursor → host-native ~/.cursor/plugins/local/cc-master，只认 CC_MASTER_CURSOR_PLUGIN_ROOT；
 //     · codex/claude-code → 本地安装根 <base>/cc-master，认通用 CC_MASTER_PLUGIN_ROOT（否则 CC_MASTER_PLUGIN_DIR 定 base）。
 export function pluginInstallRoot(rt: RuntimeEnvironment, host: RuntimeHost): string {
-  const home = homeBase(rt.env, rt.homeDir);
+  const home = resolveCapturedPath(rt.cwd, homeBase(rt.env, rt.homeDir));
   if (host === 'cursor') {
     if (rt.env.CC_MASTER_CURSOR_PLUGIN_ROOT)
-      return path.resolve(rt.env.CC_MASTER_CURSOR_PLUGIN_ROOT);
+      return resolveCapturedPath(rt.cwd, rt.env.CC_MASTER_CURSOR_PLUGIN_ROOT);
     return path.join(home, '.cursor', 'plugins', 'local', 'cc-master');
   }
-  if (rt.env.CC_MASTER_PLUGIN_ROOT) return path.resolve(rt.env.CC_MASTER_PLUGIN_ROOT);
+  if (rt.env.CC_MASTER_PLUGIN_ROOT)
+    return resolveCapturedPath(rt.cwd, rt.env.CC_MASTER_PLUGIN_ROOT);
   const base = rt.env.CC_MASTER_PLUGIN_DIR
-    ? path.resolve(rt.env.CC_MASTER_PLUGIN_DIR)
+    ? resolveCapturedPath(rt.cwd, rt.env.CC_MASTER_PLUGIN_DIR)
     : path.join(home, '.local', 'share', 'cc-master');
   return path.join(base, 'cc-master');
 }
@@ -199,8 +225,9 @@ export function pluginInstallRoot(rt: RuntimeEnvironment, host: RuntimeHost): st
 // localPluginBase(rt) → codex/cursor 本地安装的**基座**（per-host 子目录之上一层）；供适配器叠 <host>/cc-master。
 //   与 pluginInstallRoot 同前身（.local/share/cc-master·非 XDG），显式抽出供适配器复用而不各自内联 env.HOME。
 export function localPluginBase(rt: RuntimeEnvironment): string {
-  if (rt.env.CC_MASTER_PLUGIN_DIR) return path.resolve(rt.env.CC_MASTER_PLUGIN_DIR);
-  return path.join(homeBase(rt.env, rt.homeDir), '.local', 'share', 'cc-master');
+  if (rt.env.CC_MASTER_PLUGIN_DIR) return resolveCapturedPath(rt.cwd, rt.env.CC_MASTER_PLUGIN_DIR);
+  const home = resolveCapturedPath(rt.cwd, homeBase(rt.env, rt.homeDir));
+  return path.join(home, '.local', 'share', 'cc-master');
 }
 
 // ── 可执行发现（resolveExecutable·纯·取 rt.env / rt.cwd / rt.platform）────────────────────────────
