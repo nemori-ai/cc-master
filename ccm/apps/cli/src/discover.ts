@@ -22,7 +22,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { resolveCcMasterHome } from '@ccm/engine';
+import { boardSessionPointer, captureRuntimeEnvironment, resolveCcMasterHome } from '@ccm/engine';
 
 // 带 .errKind 的 Error（router 据此映射退出码）。
 interface KindedError extends Error {
@@ -91,17 +91,13 @@ export function boardMatches(board: unknown, sid: string | null | undefined): bo
 }
 
 // ── session→board 指针注册表（user-global XDG state·设计稿 §6/§7）────────────────────────────────
-// pointerPath(sid, env) → ($XDG_STATE_HOME || ~/.local/state)/cc-master/boards/<sid>.path。
-function pointerDir(env?: Env): string {
-  env = env || {};
-  const base = env.XDG_STATE_HOME
-    ? path.resolve(env.XDG_STATE_HOME)
-    : path.join(os.homedir(), '.local', 'state');
-  return path.join(base, 'cc-master', 'boards');
-}
-
+// pointerPath(sid, env) → ($XDG_STATE_HOME || <home>/.local/state)/cc-master/boards/<sid>.path。
+//   落点收口进 RuntimeEnvironment/PathResolver 契约（boardSessionPointer）：state 根缺 XDG_STATE_HOME 时
+//   回落**注入的 env.HOME**（缺才退 os.homedir()），与 home/board 解析同口径——修掉「board 落一个 home、
+//   指针落另一个 home」的 split-home 缺陷（此前 fallback 直读 os.homedir()）。
 export function pointerPath(sid: string, env?: Env): string {
-  return path.join(pointerDir(env), `${sid}.path`);
+  const rt = captureRuntimeEnvironment({ env: env || {} });
+  return boardSessionPointer(rt, sid);
 }
 
 // readPointer(sid, env) → 指针指向的 board 绝对路径，读不到 / 空 → null（best-effort）。

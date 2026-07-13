@@ -231,6 +231,27 @@ export {
   validateTaskPlanning,
   validateTaskRoutePolicy,
 } from './routing-contract.js';
+// ── runtime-env（RuntimeEnvironment / PathResolver 纯契约 SSOT·home/pointer/host-config/plugin-root/exec discovery）──
+export type {
+  ResolvedExecutable,
+  RuntimeArch,
+  RuntimeEnvironment,
+  RuntimeEnvironmentInput,
+  RuntimeHost,
+  RuntimePlatform,
+  RuntimeRoots,
+} from './runtime-env.js';
+export {
+  boardSessionPointer,
+  captureRuntimeEnvironment,
+  ccMasterHome,
+  createRuntimeEnvironment,
+  homeBase,
+  hostConfig,
+  localPluginBase,
+  pluginInstallRoot,
+  resolveExecutable,
+} from './runtime-env.js';
 // ── statusline/（self-contained status line·0.10.0：渲染单行 ANSI + sidecar 捕获 + 安装/卸载/自动安装）──
 export type {
   CaptureResult,

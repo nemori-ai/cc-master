@@ -1,6 +1,12 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import {
+  captureRuntimeEnvironment,
+  hostConfig,
+  pluginInstallRoot,
+  localPluginBase as resolvePluginBase,
+} from '@ccm/engine';
 import { readCursorUsageSignal } from '../cursor-usage.js';
 import { probeExecutable } from './probe.js';
 import type {
@@ -178,28 +184,27 @@ function pathExists(p: string): boolean {
   }
 }
 
+// Cursor host config：darwin/Linux 收口进 RuntimeEnvironment/PathResolver 契约（Linux 现按 XDG_CONFIG_HOME
+//   解析·host config 属外部 OS 约定·默认 <home>/.config/Cursor 不变）；win32（APPDATA）不在契约承诺内、留适配器。
 function cursorConfigDir(env: Env): string {
-  const home = env.HOME || os.homedir();
-  if (process.platform === 'darwin') {
-    return path.join(home, 'Library', 'Application Support', 'Cursor');
-  }
   if (process.platform === 'win32') {
+    const home = env.HOME || os.homedir();
     const appData = env.APPDATA || path.join(home, 'AppData', 'Roaming');
     return path.join(appData, 'Cursor');
   }
-  return path.join(home, '.config', 'Cursor');
+  return hostConfig(captureRuntimeEnvironment({ env }), 'cursor')[0] as string;
 }
 
+// Cursor host-native 插件根收口进契约（CC_MASTER_CURSOR_PLUGIN_ROOT > <home>/.cursor/plugins/local/cc-master）。
 function cursorPluginRoot(env: Env): string {
-  if (env.CC_MASTER_CURSOR_PLUGIN_ROOT) return path.resolve(env.CC_MASTER_CURSOR_PLUGIN_ROOT);
-  return path.join(env.HOME || os.homedir(), '.cursor', 'plugins', 'local', 'cc-master');
+  return pluginInstallRoot(captureRuntimeEnvironment({ env }), 'cursor');
 }
 
 function localInstallPluginRoot(env: Env): string {
   if (env.CC_MASTER_PLUGIN_ROOT) return path.resolve(env.CC_MASTER_PLUGIN_ROOT);
-  const base = env.CC_MASTER_PLUGIN_DIR
-    ? path.resolve(env.CC_MASTER_PLUGIN_DIR)
-    : path.join(env.HOME || os.homedir(), '.local', 'share', 'cc-master');
+  // 基座收口进契约（CC_MASTER_PLUGIN_DIR > <home>/.local/share/cc-master·首轮不迁移 XDG_DATA_HOME）；
+  //   per-harness `<base>/cursor/cc-master` 的 existsSync 精化留适配器。
+  const base = resolvePluginBase(captureRuntimeEnvironment({ env }));
   const perHarness = path.join(base, 'cursor', 'cc-master');
   if (fs.existsSync(perHarness)) return perHarness;
   return path.join(base, 'cc-master');

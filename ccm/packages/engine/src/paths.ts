@@ -20,6 +20,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { homeBase } from './runtime-env.js';
 
 export type PathEnv = Record<string, string | undefined>;
 
@@ -28,7 +29,7 @@ export type PathEnv = Record<string, string | undefined>;
 export function resolveClaudeCodeConfigDir(env?: PathEnv): string {
   const e = env || process.env;
   if (e.CLAUDE_CONFIG_DIR) return path.resolve(e.CLAUDE_CONFIG_DIR);
-  const home = e.HOME || os.homedir();
+  const home = homeBase(e, os.homedir());
   return path.join(home, '.claude');
 }
 
@@ -46,7 +47,7 @@ export const resolveClaudeConfigDir = resolveClaudeCodeConfigDir;
 export function resolveCcMasterHome(env?: PathEnv): string {
   const e = env || process.env;
   if (e.CC_MASTER_HOME) return path.resolve(e.CC_MASTER_HOME);
-  const home = e.HOME || os.homedir();
+  const home = homeBase(e, os.homedir());
   return path.join(home, '.cc_master');
 }
 
@@ -78,7 +79,7 @@ export function resolveClaudeJsonPath(env?: PathEnv): string {
   } catch {
     /* fall through to $HOME/.claude.json */
   }
-  const home = e.HOME || os.homedir();
+  const home = homeBase(e, os.homedir());
   return path.join(home, '.claude.json');
 }
 
