@@ -233,7 +233,12 @@ interface ReentrantTreeFixture {
 }
 
 function reentrantTreeFixture(
-  options: { closeOnSignal?: boolean; signalResult?: boolean } = {},
+  options: {
+    closeOnSignal?: boolean;
+    signalResult?: boolean;
+    isAliveResults?: boolean[];
+    onIsAlive?: (child: EventEmitter, call: number) => void;
+  } = {},
 ): ReentrantTreeFixture {
   const child = new EventEmitter();
   const stdout = new PassThrough();
@@ -276,7 +281,9 @@ function reentrantTreeFixture(
         },
         isAlive: () => {
           aliveChecks += 1;
-          return !closed;
+          const call = aliveChecks;
+          options.onIsAlive?.(child, call);
+          return options.isAliveResults?.[call - 1] ?? !closed;
         },
       },
     },
@@ -724,6 +731,108 @@ test('onClose finalizer failure cannot late-arm after cleanup poll settles', asy
     clock.advanceTo(1_000);
     assert.deepEqual(fixture.signals, ['SIGTERM'], 'typed reject must prevent a late SIGKILL');
     assert.equal(fixture.isAliveCalls(), 1, 'typed reject must prevent a late cleanup poll');
+  });
+});
+
+const REENTRANT_CALLBACK_SCENARIOS = [
+  { name: 'first-byte-onStarted', expectedCode: 'consumer_error' },
+  { name: 'spawn-onStarted', expectedCode: 'consumer_error' },
+  { name: 'stdout-parser', expectedCode: 'consumer_error' },
+  { name: 'abort', expectedCode: 'cancelled' },
+  { name: 'child-error', expectedCode: 'spawn_error' },
+] as const;
+
+for (const signalResult of [true, false]) {
+  for (const scenario of REENTRANT_CALLBACK_SCENARIOS) {
+    test(`reentrant ${scenario.name} terminal has no post-callback effects (signal=${signalResult})`, async () => {
+      await withFakeTimerClock(async (clock) => {
+        const fixture = reentrantTreeFixture({ closeOnSignal: true, signalResult });
+        const cancellation = new AbortController();
+        const callbackFailure = new Error(`controlled ${scenario.name} failure`);
+        const supervised = superviseProviderChild(fixture.ownedChild, {
+          operation: scenario.name,
+          deadline: createProviderRequestDeadline(1_000),
+          limits: { ...DEFAULT_LIMITS, idleTimeoutMs: 700 },
+          signal: cancellation.signal,
+          onStarted:
+            scenario.name === 'first-byte-onStarted' || scenario.name === 'spawn-onStarted'
+              ? () => {
+                  throw callbackFailure;
+                }
+              : undefined,
+          onStdoutText:
+            scenario.name === 'stdout-parser'
+              ? () => {
+                  throw callbackFailure;
+                }
+              : undefined,
+        });
+
+        if (scenario.name === 'first-byte-onStarted' || scenario.name === 'stdout-parser') {
+          fixture.stdout.write(Buffer.from('.'));
+        } else if (scenario.name === 'spawn-onStarted') {
+          fixture.ownedChild.child.emit('spawn');
+        } else if (scenario.name === 'abort') {
+          cancellation.abort(callbackFailure);
+        } else {
+          fixture.ownedChild.child.emit('error', callbackFailure);
+        }
+
+        const error = await expectSupervisorError(supervised, scenario.expectedCode, scenario.name);
+        assert.equal(error.cause, callbackFailure);
+        assert.equal(error.stream, scenario.name === 'stdout-parser' ? 'stdout' : undefined);
+        assert.equal(error.termination?.reaped, true);
+        assert.deepEqual(fixture.signals, ['SIGTERM']);
+        assert.equal(
+          clock.activeCount(),
+          0,
+          'terminal callback must not leave an operational timer',
+        );
+        const aliveChecksAtSettlement = fixture.isAliveCalls();
+
+        clock.advanceTo(1_000);
+        assert.deepEqual(
+          fixture.signals,
+          ['SIGTERM'],
+          'terminal callback must prevent late SIGKILL',
+        );
+        assert.equal(
+          fixture.isAliveCalls(),
+          aliveChecksAtSettlement,
+          'terminal callback must prevent late cleanup polling',
+        );
+      });
+    });
+  }
+}
+
+test('reentrant tree probe preserves the primary error and cannot repeat termination', async () => {
+  await withFakeTimerClock(async (clock) => {
+    const callbackFailure = new Error('controlled tree-probe failure');
+    const fixture = reentrantTreeFixture({
+      isAliveResults: [true, false],
+      onIsAlive: (child, call) => {
+        if (call === 1) child.emit('error', callbackFailure);
+      },
+    });
+    const supervised = superviseProviderChild(fixture.ownedChild, {
+      operation: 'reentrant-tree-probe',
+      deadline: createProviderRequestDeadline(1_000),
+      limits: DEFAULT_LIMITS,
+    });
+
+    fixture.close(0, null);
+    const error = await expectSupervisorError(supervised, 'spawn_error', 'reentrant-tree-probe');
+
+    assert.equal(error.cause, callbackFailure);
+    assert.equal(error.termination?.reaped, true);
+    assert.deepEqual(fixture.signals, ['SIGTERM'], 'terminal tree probe must not repeat TERM');
+    assert.equal(clock.activeCount(), 0);
+    const aliveChecksAtSettlement = fixture.isAliveCalls();
+
+    clock.advanceTo(1_000);
+    assert.deepEqual(fixture.signals, ['SIGTERM']);
+    assert.equal(fixture.isAliveCalls(), aliveChecksAtSettlement);
   });
 });
 

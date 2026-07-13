@@ -172,6 +172,8 @@ export function superviseProviderChild(
     let reapTimer: NodeJS.Timeout | null = null;
     let reapPollTimer: NodeJS.Timeout | null = null;
 
+    const canContinueProviderWork = (): boolean => !settled && !primaryFailure && !closed;
+
     // A pending promise does not keep Node alive. These timers intentionally remain ref'ed until
     // clearAllTimers() so timeout and process-tree cleanup still reach a bounded terminal state
     // when the caller has no unrelated active handle.
@@ -220,17 +222,20 @@ export function superviseProviderChild(
         return true;
       }
       try {
-        treeGone = !tree.isAlive();
+        if (!tree.isAlive()) treeGone = true;
       } catch {
         // Losing kill/probe authority is not proof of termination. The bounded reap watchdog will
         // report the original failure without silently claiming tree cleanup.
-        treeGone = false;
       }
       return treeGone;
     };
 
     const maybeRejectAfterCleanup = (): boolean => {
-      if (!primaryFailure || !closed || !observeTreeGone()) return false;
+      if (settled) return true;
+      if (!primaryFailure || !closed) return false;
+      const gone = observeTreeGone();
+      if (settled) return true;
+      if (!primaryFailure || !gone) return false;
       primaryFailure.termination = terminationSnapshot(true);
       rejectPrimaryFailure();
       return true;
@@ -253,6 +258,7 @@ export function superviseProviderChild(
     };
 
     const beginTermination = (): void => {
+      if (settled) return;
       if (tree === null) {
         treeGone = true;
         armReapWatchdog();
@@ -315,6 +321,10 @@ export function superviseProviderChild(
       setCurrentTimer: (timer: NodeJS.Timeout | null) => void,
     ): void => {
       const run = (): void => {
+        if (!canContinueProviderWork()) {
+          setCurrentTimer(null);
+          return;
+        }
         const remainingMs = atMs - Date.now();
         if (remainingMs <= 0) {
           setCurrentTimer(null);
@@ -323,13 +333,17 @@ export function superviseProviderChild(
         }
         setCurrentTimer(setTimeout(run, Math.min(remainingMs, MAX_TIMER_DELAY_MS)));
       };
+      if (!canContinueProviderWork()) {
+        setCurrentTimer(null);
+        return;
+      }
       setCurrentTimer(
         setTimeout(run, Math.min(Math.max(0, atMs - Date.now()), MAX_TIMER_DELAY_MS)),
       );
     };
 
     const armIdleTimer = (): void => {
-      if (!activityObserved) return;
+      if (!activityObserved || !canContinueProviderWork()) return;
       clearTimer(idleTimer);
       scheduleAt(
         lastActivityAtMs + options.limits.idleTimeoutMs,
@@ -340,8 +354,8 @@ export function superviseProviderChild(
       );
     };
 
-    const markSpawned = (): void => {
-      if (spawned || settled || closed) return;
+    const markSpawned = (): boolean => {
+      if (spawned || !canContinueProviderWork()) return canContinueProviderWork();
       spawned = true;
       startedAtMs = Date.now();
       if (options.onStarted) {
@@ -358,9 +372,11 @@ export function superviseProviderChild(
           );
         }
       }
+      return canContinueProviderWork();
     };
 
     const observeActivity = (): void => {
+      if (!canContinueProviderWork()) return;
       if (!activityObserved) {
         activityObserved = true;
         clearTimer(startupTimer);
@@ -371,7 +387,7 @@ export function superviseProviderChild(
     };
 
     const emitText = (stream: ProviderChildStream, text: string): void => {
-      if (!text || primaryFailure) return;
+      if (!text || settled || primaryFailure) return;
       const callback = stream === 'stdout' ? options.onStdoutText : options.onStderrText;
       if (!callback) return;
       try {
@@ -394,8 +410,7 @@ export function superviseProviderChild(
       collector: StreamCollector,
       chunk: unknown,
     ): void => {
-      if (settled || primaryFailure) return;
-      markSpawned();
+      if (!canContinueProviderWork() || !markSpawned()) return;
       if (typeof chunk === 'string') {
         fail(
           new ProviderChildSupervisorError({
@@ -456,7 +471,7 @@ export function superviseProviderChild(
     };
 
     const finalizeCollector = (stream: ProviderChildStream, collector: StreamCollector): void => {
-      if (collector.ended || primaryFailure) return;
+      if (collector.ended || settled || primaryFailure) return;
       collector.ended = true;
       try {
         const text = collector.decoder.decode();
@@ -480,22 +495,29 @@ export function superviseProviderChild(
       closed = true;
       clearOperationalTimers();
       finalizeCollector('stdout', stdout);
-      finalizeCollector('stderr', stderr);
+      if (!settled && !primaryFailure) finalizeCollector('stderr', stderr);
       const closedAtMs = Date.now();
+      if (settled) return;
       if (primaryFailure) {
         maybeRejectAfterCleanup();
         return;
       }
-      if (!observeTreeGone()) {
-        primaryFailure = new ProviderChildSupervisorError({
-          code: 'owned_tree_survived',
-          operation: options.operation,
-          message: `${options.operation}: launcher closed while its owned process tree remained alive`,
-        });
-        beginTermination();
+      const gone = observeTreeGone();
+      if (settled) return;
+      if (primaryFailure) {
+        maybeRejectAfterCleanup();
         return;
       }
-      if (settled) return;
+      if (!gone) {
+        fail(
+          new ProviderChildSupervisorError({
+            code: 'owned_tree_survived',
+            operation: options.operation,
+            message: `${options.operation}: launcher closed while its owned process tree remained alive`,
+          }),
+        );
+        return;
+      }
       settled = true;
       clearAllTimers();
       options.signal?.removeEventListener('abort', onAbort);
