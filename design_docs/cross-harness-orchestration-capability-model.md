@@ -410,13 +410,13 @@ direction ─┬─> S0 ─┬─> S1 ─┬─> S4 ─┬─> S6 ─> S7 ─> S
 | Usage/pacing | 三路 reader、engine pacing/forecast、monitor sweep | 单 origin 窄 signal；monitor非持久store；multi-bucket/pool语义不足 | home machine quota read model + honest derivation | S1/S4 |
 | Reservation | 无 | pacing 不是 reservation | account+pool lease/live recheck/orphan retention | S4 |
 | Model guidance | skills 中已有 per-host 模型档/选型 prose | 无 live entitlement × versioned evidence registry | registry/provenance/generator/outcome calibration | S5/S10 |
-| Cross route policy | origin pacing；Claude既有account policy | 无 cross authority/chains/scorer/fallback taxonomy | approved deny-by-default direction、mechanical advice、master rationale；implementation target | S0/S4/S5 |
+| Cross route policy | additive task planning/routing contract、ample/tight 明示 chain、cached-only pure shadow advice（同 harness CLI 不折叠 native） | 无 live quota admission/reservation/attempt/spawn；当前 advice 不授权 dispatch | deny-by-default mechanical admission、master rationale、可恢复 attempt | S0/S4/S5 |
 | Worktree/permission | board记录worktree；已有安全范式 | 无 lease/env/profile/provider enforcement | isolated writer + permission compiler + redaction | S7 |
 | Provider execution | 无 cross driver | CLI research 是设计事实，不是 runtime | driver facets + structured result/error fixtures | S3/S6/S8 |
 | Supervisor/run store | monitor有 detached service 技术片段 | detached/unref 不等于 attempt supervisor | per-run journal/lease/process tree/control/artifacts | S3 |
 | Attach/handoff | board可re-arm；legacy handoff/drain | 无run manager/control；叙事偏session-bound | 四类handle分流 + same-run attach/reconcile | S3/S9 |
 | Runtime lifecycle | Unix SEA原路径替换；singleton reconcile | 无immutable/lease/protocol/Windows工业合同 | stable launcher + side-by-side + drain/GC/provenance | S2/S3 |
-| Plugin substrate | 三host packages、SAP/PHIP/commands/hooks | cross-machine context/native ledger无；Cursor有Track B/probe gap | canonical policy + host landing + worker role + equivalence | S9 |
+| Plugin substrate | 三host packages、SAP/PHIP/commands/hooks；三 origin 已消费同一 `ccm/origin-context-delivery/v1`（≤4KiB、脱敏、shadow-only），Claude/Codex SessionStart、Cursor verified postToolUse Track B | 无 native ledger/真实 dispatch；Codex 无 mid-turn batch event，Cursor dynamic SessionStart 仍是已确认 gap | canonical policy + host landing + worker role + equivalence | S9 |
 | Native subagent | 三host已有各自指导/工具面 | handle/result/cancel durability未统一 | native attempt create/bind/heartbeat/result/cancel | S0/S9 |
 | Coordination/HITL | inbox、discuss、Stop continuation、judgment logs | route-loss/run attention taxonomy未接入 | decision-grade notification + fresh package | S9 |
 | Viewer/report | board status/report/web viewer | 无planning/route/quota-at-selection/attempt/operator attention | one read model；frontend render-only | S9 |

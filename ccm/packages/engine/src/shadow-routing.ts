@@ -5,6 +5,7 @@
 
 import {
   type ContractIssue,
+  contractActivation,
   routeOutcomeClass,
   validateTaskPlanning,
   validateTaskRoutePolicy,
@@ -13,6 +14,7 @@ import {
 export const MACHINE_CONTEXT_CACHE_SCHEMA = 'ccm/machine-context-cache/v1';
 export const ORCHESTRATOR_CONTEXT_SCHEMA = 'ccm/orchestrator-context/v1';
 export const SHADOW_ROUTE_ADVICE_SCHEMA = 'ccm/shadow-route-advice/v1';
+export const ORIGIN_CONTEXT_SCHEMA = 'ccm/origin-context/v1';
 
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const AVAILABILITY = ['available', 'unavailable', 'unknown'] as const;
@@ -29,6 +31,9 @@ const MAX_HARNESS_LENGTH = 64;
 const MAX_PREDICATE_LENGTH = 128;
 const MAX_REF_LENGTH = 256;
 const MAX_WARNING_LENGTH = 256;
+const MAX_AGENT_ROUTE_SUMMARIES = 12;
+const SAFE_PUBLIC_CODE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const SAFE_PUBLIC_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 const SECRET_KEY =
   /credential|token|(?:^|_)argv(?:_|$)|(?:^|_)env(?:ironment)?(?:_|$)|raw.*response|transcript|balance/i;
 const SECRET_SK_VALUE = /(?:^|[^A-Za-z0-9])(sk-[A-Za-z0-9_-]{16,})(?=$|[^A-Za-z0-9_-])/i;
@@ -156,6 +161,59 @@ export interface ShadowRouteAdvice {
     rejected_before_selection: string[];
   };
   warnings: string[];
+}
+
+export interface OriginContextCandidate {
+  candidate_id: string;
+  harness: string;
+  surface: 'host-native' | 'cli-headless';
+  availability: Availability;
+  quota: Quota;
+  auth: (typeof AUTH)[number];
+  model: (typeof MODEL)[number];
+  runtime: (typeof RUNTIME)[number];
+  qualifications: Array<{ predicate: string; status: QualificationStatus }>;
+}
+
+export interface OriginContextRouteSummary {
+  task_id: string;
+  status: 'ready';
+  eligible: boolean;
+  outcome: ShadowRouteAdvice['outcome'];
+  selected: null | {
+    candidate_id: string;
+    harness: string;
+    surface: 'host-native' | 'cli-headless';
+  };
+  reason_codes: string[];
+}
+
+export interface OriginContextPayload {
+  schema: typeof ORIGIN_CONTEXT_SCHEMA;
+  cached_only: true;
+  shadow_only: true;
+  dispatch_enabled: false;
+  origin_harness: string;
+  available: boolean;
+  revisions: { board: string; machine: string };
+  freshness: { state: 'fresh' | 'stale' | 'unknown'; valid_until: string };
+  contract_activation: 'legacy' | 'enabled' | 'invalid';
+  candidates: OriginContextCandidate[];
+  routes: OriginContextRouteSummary[];
+  warnings: string[];
+  truncation: {
+    applied: boolean;
+    omitted_candidates: number;
+    omitted_routes: number;
+    omitted_warnings: number;
+    max_bytes: typeof ORCHESTRATOR_CONTEXT_MAX_BYTES;
+  };
+}
+
+export interface OriginContextContent {
+  payload: OriginContextPayload;
+  content: string;
+  content_bytes: number;
 }
 
 function record(value: unknown): value is RecordLike {
@@ -944,4 +1002,208 @@ export function adviseShadowRoute(input: {
     },
     warnings: [...new Set(warnings)],
   };
+}
+
+function safePublicId(value: unknown): value is string {
+  return typeof value === 'string' && SAFE_PUBLIC_ID.test(value) && !secretShapedValue(value);
+}
+
+function safePublicHarness(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length <= MAX_HARNESS_LENGTH &&
+    /^[a-z0-9][a-z0-9-]*$/.test(value)
+  );
+}
+
+function safeWarningCodes(values: string[]): string[] {
+  return [...new Set(values.filter((value) => SAFE_PUBLIC_CODE.test(value)))];
+}
+
+function originAmbient(payload: OriginContextPayload): string {
+  return `<ambient source="orchestrator-context">${JSON.stringify(payload)}</ambient>`;
+}
+
+function agentCandidate(candidate: CachedCandidateFact): OriginContextCandidate | null {
+  if (!safePublicId(candidate.candidate_id) || !safePublicHarness(candidate.harness)) return null;
+  return {
+    candidate_id: candidate.candidate_id,
+    harness: candidate.harness,
+    surface: candidate.surface,
+    availability: candidate.availability,
+    quota: candidate.quota,
+    auth: candidate.auth,
+    model: candidate.model,
+    runtime: candidate.runtime,
+    qualifications: candidate.qualifications
+      .filter((entry) => SAFE_PUBLIC_CODE.test(entry.predicate))
+      .map((entry) => ({ predicate: entry.predicate, status: entry.status })),
+  };
+}
+
+/**
+ * Build the complete agent-visible ambient payload for every origin adapter.
+ *
+ * This is deliberately pure and stricter than the raw context endpoint: refs, arbitrary warning
+ * prose, route policy internals, model names and provider data never cross this boundary.
+ */
+export function buildOriginContextContent(input: {
+  board: unknown;
+  context: unknown;
+  originHarness: string;
+  boardRevision: string;
+  asOf: string;
+}): OriginContextContent {
+  const contextIssues = validateContext(input.context);
+  if (contextIssues.length) throw contractError('invalid origin context input', contextIssues);
+  if (!safePublicHarness(input.originHarness)) {
+    throw contractError('invalid origin context input', [
+      issue('ORIGIN-CONTEXT-ORIGIN', 'origin_harness', 'must be a safe harness id'),
+    ]);
+  }
+  if (!strictIso(input.asOf)) {
+    throw contractError('invalid origin context input', [
+      issue('ORIGIN-CONTEXT-TIME', 'as_of', 'must be strict ISO-8601 UTC'),
+    ]);
+  }
+
+  const context = input.context as OrchestratorContext;
+  const board = record(input.board) ? input.board : {};
+  const tasks = Array.isArray(board.tasks) ? board.tasks : [];
+  const activation = contractActivation(board);
+  const warnings = safeWarningCodes(context.warnings);
+  const projectedCandidates = context.candidates
+    .map(agentCandidate)
+    .filter((entry): entry is OriginContextCandidate => entry !== null);
+  if (projectedCandidates.length !== context.candidates.length) {
+    warnings.push('unsafe-candidate-omitted');
+  }
+
+  const readyTasks =
+    activation === 'enabled' ? tasks.filter((task) => record(task) && task.status === 'ready') : [];
+  const routes: OriginContextRouteSummary[] = [];
+  for (const task of readyTasks.slice(0, MAX_AGENT_ROUTE_SUMMARIES)) {
+    if (!record(task) || !safePublicId(task.id)) {
+      warnings.push('unsafe-task-omitted');
+      continue;
+    }
+    try {
+      const advice = adviseShadowRoute({
+        task,
+        context,
+        originHarness: input.originHarness,
+        boardRevision: input.boardRevision,
+        asOf: input.asOf,
+      });
+      if (
+        advice.selected !== null &&
+        (!safePublicId(advice.selected.candidate_id) || !safePublicHarness(advice.selected.harness))
+      ) {
+        warnings.push('unsafe-route-omitted');
+        continue;
+      }
+      routes.push({
+        task_id: task.id,
+        status: 'ready',
+        eligible: advice.eligible,
+        outcome: advice.outcome,
+        selected: advice.selected
+          ? {
+              candidate_id: advice.selected.candidate_id,
+              harness: advice.selected.harness,
+              surface: advice.selected.surface,
+            }
+          : null,
+        reason_codes: safeWarningCodes(advice.reason_codes),
+      });
+    } catch {
+      warnings.push('route-contract-invalid');
+    }
+  }
+
+  const safeBoardRevision = safePublicId(context.revisions.board)
+    ? context.revisions.board
+    : 'unknown';
+  const safeMachineRevision = safePublicId(context.revisions.machine)
+    ? context.revisions.machine
+    : 'unknown';
+  if (safeBoardRevision === 'unknown' && context.revisions.board !== 'unknown') {
+    warnings.push('unsafe-board-revision-redacted');
+  }
+  if (safeMachineRevision === 'unknown' && context.revisions.machine !== 'unknown') {
+    warnings.push('unsafe-machine-revision-redacted');
+  }
+
+  const payload: OriginContextPayload = {
+    schema: ORIGIN_CONTEXT_SCHEMA,
+    cached_only: true,
+    shadow_only: true,
+    dispatch_enabled: false,
+    origin_harness: input.originHarness,
+    available: context.available,
+    revisions: { board: safeBoardRevision, machine: safeMachineRevision },
+    freshness: {
+      state: context.freshness.state,
+      valid_until: context.freshness.valid_until,
+    },
+    contract_activation: activation,
+    candidates: projectedCandidates,
+    routes,
+    warnings: safeWarningCodes(warnings),
+    truncation: {
+      applied: readyTasks.length > routes.length,
+      omitted_candidates: 0,
+      omitted_routes: Math.max(0, readyTasks.length - routes.length),
+      omitted_warnings: 0,
+      max_bytes: ORCHESTRATOR_CONTEXT_MAX_BYTES,
+    },
+  };
+
+  const originalCandidateCount = payload.candidates.length;
+  const originalRouteCount = payload.routes.length;
+  const originalWarningCount = payload.warnings.length;
+  let content = originAmbient(payload);
+  while (
+    new TextEncoder().encode(content).byteLength > ORCHESTRATOR_CONTEXT_MAX_BYTES &&
+    payload.warnings.length > 0
+  ) {
+    payload.warnings.pop();
+    payload.truncation.omitted_warnings = originalWarningCount - payload.warnings.length;
+    payload.truncation.applied = true;
+    content = originAmbient(payload);
+  }
+  while (
+    new TextEncoder().encode(content).byteLength > ORCHESTRATOR_CONTEXT_MAX_BYTES &&
+    payload.routes.length > 0
+  ) {
+    payload.routes.pop();
+    payload.truncation.omitted_routes = readyTasks.length - payload.routes.length;
+    payload.truncation.applied = true;
+    content = originAmbient(payload);
+  }
+  while (
+    new TextEncoder().encode(content).byteLength > ORCHESTRATOR_CONTEXT_MAX_BYTES &&
+    payload.candidates.length > 0
+  ) {
+    payload.candidates.pop();
+    payload.truncation.omitted_candidates = originalCandidateCount - payload.candidates.length;
+    payload.truncation.applied = true;
+    content = originAmbient(payload);
+  }
+  // Keep the explicit route cap visible even when no byte-bound truncation was needed.
+  payload.truncation.omitted_routes = Math.max(
+    payload.truncation.omitted_routes,
+    readyTasks.length - originalRouteCount,
+  );
+  payload.truncation.applied =
+    payload.truncation.applied ||
+    payload.truncation.omitted_routes > 0 ||
+    payload.truncation.omitted_candidates > 0 ||
+    payload.truncation.omitted_warnings > 0;
+  content = originAmbient(payload);
+  const contentBytes = new TextEncoder().encode(content).byteLength;
+  if (contentBytes > ORCHESTRATOR_CONTEXT_MAX_BYTES) {
+    throw new Error('origin context load-bearing envelope exceeds 4096 bytes');
+  }
+  return { payload, content, content_bytes: contentBytes };
 }

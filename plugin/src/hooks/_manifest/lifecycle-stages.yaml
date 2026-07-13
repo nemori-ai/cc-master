@@ -28,3 +28,14 @@ stages:
   shared-helper:
     claude-code: script-only
     codex: script-only
+    cursor: script-only
+  session-start-and-context-delta:
+    claude-code:
+      - SessionStart
+      - PostToolBatch
+    codex:
+      - SessionStart
+      - no-verified-midturn-batch-event
+    cursor:
+      - postToolUse.additional_context
+      - no-dynamic-SessionStart-context

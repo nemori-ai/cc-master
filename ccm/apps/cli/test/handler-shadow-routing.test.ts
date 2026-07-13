@@ -310,6 +310,56 @@ test('cached-only context preserves an explicit other-harness CLI outcome', () =
   assert.equal(advice.selected.harness, 'codex');
 });
 
+test('agent-visible context emits bounded shadow-only delivery without route refs or side effects', () => {
+  const f = fixture();
+  const board = JSON.parse(readFileSync(f.board, 'utf8'));
+  board.meta.contracts = {
+    task_planning: 'ccm/task-planning/v1',
+    agent_routing: 'ccm/agent-routing/v1',
+    agent_routing_activated_at: '2026-07-13T03:00:00Z',
+    agent_routing_grandfathered_terminal: [],
+  };
+  writeFileSync(f.board, `${JSON.stringify(board, null, 2)}\n`);
+  const revision = `sha256:${createHash('sha256').update(canonicalJson(board)).digest('hex')}`;
+  const snapshot = JSON.parse(readFileSync(f.snapshot, 'utf8'));
+  snapshot.board_revision = revision;
+  snapshot.warnings = ['safe-code', '/home/private/credential.json'];
+  writeFileSync(f.snapshot, JSON.stringify(snapshot));
+  const before = treeState(f.root);
+  const result = call([
+    'orchestrator',
+    'context',
+    '--cached-only',
+    '--agent-visible',
+    '--snapshot',
+    `@${f.snapshot}`,
+    '--as-of',
+    AS_OF,
+    '--harness',
+    'cursor',
+    '--board',
+    f.board,
+    '--json',
+  ]);
+  assert.equal(result.code, 0, result.err.join('\n'));
+  const delivery = JSON.parse(result.out.join('')).data;
+  assert.equal(delivery.schema, 'ccm/origin-context-delivery/v1');
+  assert.equal(delivery.dispatch_enabled, false);
+  assert.equal(delivery.shadow_only, true);
+  assert.equal(Buffer.byteLength(delivery.content, 'utf8'), delivery.content_bytes);
+  assert.equal(delivery.content_bytes <= 4096, true);
+  assert.match(delivery.content_sha256, /^sha256:[a-f0-9]{64}$/);
+  assert.doesNotMatch(delivery.content, /cache:\/\/|\/home\/|credential/i);
+  const payload = JSON.parse(
+    delivery.content
+      .replace(/^<ambient source="orchestrator-context">/, '')
+      .replace(/<\/ambient>$/, ''),
+  );
+  assert.equal(payload.routes[0].selected.candidate_id, 'codex-cli');
+  assert.equal(payload.routes[0].outcome, 'other-harness-cli');
+  assert.deepEqual(treeState(f.root), before);
+});
+
 test('cached-only context reports origin-stay only after an earlier CLI rejection', () => {
   const f = fixture({
     chain: ['codex-cli', 'codex-native'],

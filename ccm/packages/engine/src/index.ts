@@ -257,15 +257,21 @@ export type {
   CachedQualification,
   MachineContextCache,
   OrchestratorContext,
+  OriginContextCandidate,
+  OriginContextContent,
+  OriginContextPayload,
+  OriginContextRouteSummary,
   ShadowCandidateEvaluation,
   ShadowRouteAdvice,
 } from './shadow-routing.js';
 export {
   adviseShadowRoute,
   buildCachedOrchestratorContext,
+  buildOriginContextContent,
   MACHINE_CONTEXT_CACHE_SCHEMA,
   ORCHESTRATOR_CONTEXT_MAX_BYTES,
   ORCHESTRATOR_CONTEXT_SCHEMA,
+  ORIGIN_CONTEXT_SCHEMA,
   SHADOW_ROUTE_ADVICE_SCHEMA,
   validateMachineContextCache,
 } from './shadow-routing.js';

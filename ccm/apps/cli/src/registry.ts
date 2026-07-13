@@ -71,6 +71,10 @@ export const REGISTRY: Registry = {
           type: 'string',
           desc: 'ccm/machine-context-cache/v1 JSON（@file / - / 字面量）',
         },
+        'agent-visible': {
+          type: 'boolean',
+          desc: '输出三路 origin 共用的脱敏、限长、shadow-only ambient delivery',
+        },
         'as-of': {
           type: 'string',
           required: true,
@@ -79,7 +83,7 @@ export const REGISTRY: Registry = {
         json: { type: 'boolean', desc: '结构化输出' },
       },
       examples: [
-        'ccm orchestrator context --cached-only --snapshot @/abs/machine.json --as-of 2026-07-13T03:05:00Z --harness codex --json',
+        'ccm orchestrator context --cached-only --agent-visible --snapshot @/abs/machine.json --as-of 2026-07-13T03:05:00Z --harness codex --json',
       ],
       handler: 'orchestrator.context',
     },

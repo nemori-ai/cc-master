@@ -14,7 +14,7 @@ registration:
     - PreToolUse
     - PostToolUse
   notes:
-    - Source registration currently enables UserPromptSubmit (bootstrap-board), SessionStart (reinject), PreToolUse (board-guard), PostToolUse (board-lint), and Stop (verify-board/usage-pacing/identity-nudge).
+    - Source registration currently enables UserPromptSubmit (bootstrap-board), SessionStart (reinject + cached orchestrator-context), PreToolUse (board-guard), PostToolUse (board-lint), and Stop (verify-board/usage-pacing/identity-nudge).
     - Additional hooks can be added after event mapping and output-envelope verification is complete.
 path_resolution:
   status: verified-basic
@@ -113,6 +113,14 @@ reinject:
     - dormant until a matching active board exists under CC_MASTER_HOME.
     - exact session_id matching when present; empty session_id degrades to any active board.
     - injects active board names, goals, and stale/escalated task ids.
+orchestrator_context:
+  status: implemented-session-start
+  core: ../../orchestrator-context/implementations/codex/orchestrator-context-core.js
+  registration_event: SessionStart
+  behavior:
+    - consumes only ccm/origin-context-delivery/v1 from the fixed local cache path.
+    - maps the shared <=4KiB shadow-only ambient payload through the verified SessionStart systemMessage envelope.
+    - does not simulate an unverified PostToolBatch-equivalent event.
 verify_board:
   status: replacement-continuation-gate
   core: ../../verify-board/implementations/codex/verify-board-core.js

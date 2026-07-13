@@ -7,6 +7,10 @@
           {
             "type": "command",
             "command": "CC_MASTER_PLUGIN_ROOT=\"${PLUGIN_ROOT}\" CC_MASTER_PLUGIN_DATA=\"${PLUGIN_DATA}\" node \"${PLUGIN_ROOT}/hooks/_hosts/codex/launcher.js\" --event SessionStart --core \"${PLUGIN_ROOT}/hooks/reinject/implementations/codex/reinject-core.js\""
+          },
+          {
+            "type": "command",
+            "command": "CC_MASTER_PLUGIN_ROOT=\"${PLUGIN_ROOT}\" CC_MASTER_PLUGIN_DATA=\"${PLUGIN_DATA}\" node \"${PLUGIN_ROOT}/hooks/_hosts/codex/launcher.js\" --event SessionStart --core \"${PLUGIN_ROOT}/hooks/orchestrator-context/implementations/codex/orchestrator-context-core.js\""
           }
         ]
       }

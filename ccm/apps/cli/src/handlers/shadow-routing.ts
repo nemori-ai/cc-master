@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import {
   adviseShadowRoute,
   buildCachedOrchestratorContext,
+  buildOriginContextContent,
   canonicalJson,
   ORCHESTRATOR_CONTEXT_MAX_BYTES,
   type OrchestratorContext,
@@ -22,6 +23,18 @@ interface KindedError extends Error {
   errKind?: string;
   violations?: unknown[];
   issues?: unknown[];
+}
+
+interface OriginContextDelivery {
+  schema: 'ccm/origin-context-delivery/v1';
+  cached_only: true;
+  shadow_only: true;
+  dispatch_enabled: false;
+  origin_harness: string;
+  revisions: { board: string; machine: string };
+  content_sha256: string;
+  content_bytes: number;
+  content: string;
 }
 
 export interface ShadowRoutingBoundary {
@@ -160,25 +173,63 @@ function contextWithBoundary(ctx: Ctx, boundary: ShadowRoutingBoundary): number 
       const originHarness = String(ctx.values.harness || '');
       const revision = boardRevision(board);
       const asOf = String(ctx.values['as-of'] || '');
+      let context: OrchestratorContext;
       if (typeof ctx.values.snapshot !== 'string' || ctx.values.snapshot.trim() === '') {
-        return unavailableContext(originHarness, revision, asOf, 'machine-context-cache-missing');
+        context = unavailableContext(
+          originHarness,
+          revision,
+          asOf,
+          'machine-context-cache-missing',
+        );
+      } else {
+        try {
+          context = buildCachedOrchestratorContext({
+            originHarness,
+            boardRevision: revision,
+            snapshot: parseJsonInput(ctx.values.snapshot, '--snapshot', ctx, boundary),
+            asOf,
+          });
+        } catch {
+          context = unavailableContext(
+            originHarness,
+            revision,
+            asOf,
+            'machine-context-cache-corrupt',
+          );
+        }
       }
+      if (ctx.values['agent-visible'] !== true) return context;
       try {
-        return buildCachedOrchestratorContext({
+        const projected = buildOriginContextContent({
+          board,
+          context,
           originHarness,
           boardRevision: revision,
-          snapshot: parseJsonInput(ctx.values.snapshot, '--snapshot', ctx, boundary),
           asOf,
         });
+        const delivery: OriginContextDelivery = {
+          schema: 'ccm/origin-context-delivery/v1',
+          cached_only: true,
+          shadow_only: true,
+          dispatch_enabled: false,
+          origin_harness: originHarness,
+          revisions: projected.payload.revisions,
+          content_sha256: `sha256:${createHash('sha256').update(projected.content).digest('hex')}`,
+          content_bytes: projected.content_bytes,
+          content: projected.content,
+        };
+        return delivery;
       } catch {
-        return unavailableContext(originHarness, revision, asOf, 'machine-context-cache-corrupt');
+        throw error('Validation', 'cannot build bounded agent-visible context');
       }
     },
     (rawResult) => {
-      const result = rawResult as OrchestratorContext;
+      const result = rawResult as OrchestratorContext | OriginContextDelivery;
       return ctx.flags.json
         ? io.jsonOk(result)
-        : `cached context ${result.revisions.machine} · ${result.freshness.state} · candidates=${result.candidates.length}`;
+        : result.schema === 'ccm/origin-context-delivery/v1'
+          ? `agent-visible context ${result.revisions.machine} · ${result.content_bytes} bytes · shadow-only`
+          : `cached context ${result.revisions.machine} · ${result.freshness.state} · candidates=${result.candidates.length}`;
     },
   );
 }

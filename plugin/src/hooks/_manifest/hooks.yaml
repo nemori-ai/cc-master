@@ -42,6 +42,13 @@ hooks:
       claude-code: implemented
       codex: implemented
       cursor: implemented-track-b
+  - id: orchestrator-context
+    stage: session-start-and-context-delta
+    required: true
+    host_coverage:
+      claude-code: implemented-session-start-and-post-tool-batch
+      codex: implemented-session-start
+      cursor: implemented-post-tool-use-track-b
   - id: posttool-batch
     stage: post-tool-batch
     required: true

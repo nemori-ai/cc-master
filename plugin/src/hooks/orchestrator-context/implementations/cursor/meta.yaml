@@ -1,0 +1,10 @@
+hook: orchestrator-context
+host: cursor
+version: 1
+event: postToolUse
+projection:
+  target: hooks/
+status: implemented-track-b
+notes:
+  - Cursor launcher maps the shared context to verified postToolUse.additional_context.
+  - Hash dedupe emits first context and decision deltas only; no SessionStart dynamic context claim.

@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   adviseShadowRoute,
   buildCachedOrchestratorContext,
+  buildOriginContextContent,
   validateMachineContextCache,
 } from '../dist/index.mjs';
 
@@ -162,6 +163,80 @@ function context(facts: Record<string, unknown>[], originHarness = 'codex') {
     asOf: AS_OF,
   });
 }
+
+function activatedBoard(tasks: Record<string, unknown>[]) {
+  return {
+    schema: 'cc-master/v2',
+    meta: {
+      contracts: {
+        task_planning: 'ccm/task-planning/v1',
+        agent_routing: 'ccm/agent-routing/v1',
+        agent_routing_activated_at: '2026-07-13T03:00:00Z',
+        agent_routing_grandfathered_terminal: [],
+      },
+    },
+    tasks,
+  };
+}
+
+test('origin content is bounded, redacted, and semantically equivalent across three origins', () => {
+  const board = activatedBoard([task()]);
+  const facts = [
+    fact('codex-native', 'host-native', 'unavailable'),
+    fact('codex-cli', 'cli-headless'),
+  ];
+  const deliveries = ['claude-code', 'codex', 'cursor'].map((originHarness) =>
+    buildOriginContextContent({
+      board,
+      context: context(facts, originHarness),
+      originHarness,
+      boardRevision: 'board-r8',
+      asOf: AS_OF,
+    }),
+  );
+  for (const delivery of deliveries) {
+    assert.equal(Buffer.byteLength(delivery.content, 'utf8') <= 4096, true);
+    assert.match(delivery.content, /^<ambient source="orchestrator-context">/);
+    assert.doesNotMatch(delivery.content, /cache:\/\/|credential|token|\/home\//i);
+    assert.equal(delivery.payload.dispatch_enabled, false);
+    assert.equal(delivery.payload.shadow_only, true);
+    assert.equal(delivery.payload.routes[0]?.selected?.candidate_id, 'codex-cli');
+    assert.equal(delivery.payload.routes[0]?.selected?.surface, 'cli-headless');
+  }
+  const normalize = (payload: (typeof deliveries)[number]['payload']) => ({
+    ...payload,
+    origin_harness: '<origin>',
+    routes: payload.routes.map((route) => ({
+      ...route,
+      outcome: route.outcome.replace(
+        /^(?:same-native|same-harness-cli|other-harness-cli)$/,
+        '<origin-relative>',
+      ),
+    })),
+  });
+  assert.deepEqual(normalize(deliveries[0].payload), normalize(deliveries[1].payload));
+  assert.deepEqual(normalize(deliveries[1].payload), normalize(deliveries[2].payload));
+});
+
+test('origin content bounds ready route summaries without partial load-bearing truncation', () => {
+  const tasks = Array.from({ length: 40 }, (_, index) => ({
+    ...task(),
+    id: `T-${String(index).padStart(2, '0')}`,
+  }));
+  const delivery = buildOriginContextContent({
+    board: activatedBoard(tasks),
+    context: context([
+      fact('codex-native', 'host-native', 'unavailable'),
+      fact('codex-cli', 'cli-headless'),
+    ]),
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    asOf: AS_OF,
+  });
+  assert.equal(delivery.payload.routes.length <= 12, true);
+  assert.equal(delivery.payload.truncation.omitted_routes >= 28, true);
+  assert.equal(Buffer.byteLength(delivery.content, 'utf8') <= 4096, true);
+});
 
 test('machine cache validates opaque revisions, exact candidate facts, and unknown as data', () => {
   assert.deepEqual(

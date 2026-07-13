@@ -342,6 +342,18 @@ if (host === 'codex' || host === 'cursor') {
   if (!fs.existsSync(launcher)) throw new Error(`missing ${launcher}`);
   copyFileWithMode(launcher, path.join(hooksDst, '_hosts', host, 'launcher.js'));
 }
+// PHIP runtime helpers are host-neutral implementation code. Maintainer prose in _shared stays
+// source-only; only JS helpers cross the projection boundary.
+const hookShared = path.join(hooksSrc, '_shared');
+if (fs.existsSync(hookShared)) {
+  for (const entry of fs.readdirSync(hookShared, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    copyFileWithMode(
+      path.join(hookShared, entry.name),
+      path.join(hooksDst, '_shared', entry.name),
+    );
+  }
+}
 for (const hook of fs.readdirSync(hooksSrc).sort()) {
   if (hook.startsWith('_') || hook === 'AGENTS.md' || hook === 'CLAUDE.md') continue;
   const implDir = path.join(hooksSrc, hook, 'implementations', host);

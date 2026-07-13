@@ -235,7 +235,7 @@ ccm <alias> [args] [flags]
 ### orchestrator context
 
 ```bash
-ccm orchestrator context --cached-only [--snapshot <json|@file|->] --as-of <UTC> \
+ccm orchestrator context --cached-only [--agent-visible] [--snapshot <json|@file|->] --as-of <UTC> \
   --harness <origin> [--board <path>] [--json]
 ```
 
@@ -247,6 +247,14 @@ ccm orchestrator context --cached-only [--snapshot <json|@file|->] --as-of <UTC>
 只投影 allowlist 字段，递归 secret/private-shaped key 及高信号 credential/token-shaped value
 都会被无回显拒绝；普通 token budget / credential unavailable 文案不误伤。输出确定性限制在
 4096 UTF-8 bytes 内，并用 `truncation` 显式报告缩短/省略数量。
+
+加 `--agent-visible` 时，ccm 进一步把 raw context 与当前板上最多 12 个合约化 `ready`
+task 的 pure-shadow route advice 合成 `ccm/origin-context-delivery/v1`。完整 `content` 是
+`<ambient source="orchestrator-context">`，仍受 4096 UTF-8 bytes 硬上限；资格 `ref`、路径、
+任意 warning 文本、model/provider 私有信息均不进入投影。delivery 明示 `shadow_only:true`、
+`dispatch_enabled:false`，只供 Claude Code / Codex / Cursor origin adapter 注入上下文；它不
+reserve、不 spawn、不写 attempt/board。三路只允许 `origin_harness` 与 same/other 描述标签差异，
+同 harness CLI 仍为 `cli-headless`。
 
 ## namespace route（shadow advisory）
 

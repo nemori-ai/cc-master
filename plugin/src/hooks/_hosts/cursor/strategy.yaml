@@ -90,6 +90,10 @@ hooks:
     event: postToolUse
     matcher: Write
     status: implemented-lint
+  orchestrator-context:
+    event: postToolUse
+    status: implemented-track-b
+    behavior: first cached ccm/origin-context-delivery/v1 plus content-hash deltas via additional_context; no sessionStart context claim
   verify-board:
     event: stop
     status: implemented-followup
