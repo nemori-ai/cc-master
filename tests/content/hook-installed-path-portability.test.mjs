@@ -217,6 +217,11 @@ function invokeLauncher(host, fixture, env, event, core, payload) {
 }
 
 function bootstrap(host, fixture, env, sessionId, prompt) {
+  assert.equal(
+    Object.hasOwn(env, 'CC_MASTER_NO_AUTOINSTALL'),
+    false,
+    'outer bootstrap environment must not suppress auto-install; only hook-local probes may do so',
+  );
   const payload = hostPayload(host, sessionId, prompt);
   if (host === 'claude-code') return invokeClaude(fixture, env, 'bootstrap-board.sh', payload);
   const event = host === 'cursor' ? 'beforeSubmitPrompt' : 'UserPromptSubmit';
