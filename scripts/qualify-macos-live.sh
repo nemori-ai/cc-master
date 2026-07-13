@@ -97,10 +97,14 @@ capture_environment() {
 }
 
 assert_apfs() {
-  local fs_type
-  fs_type="$(stat -f '%T' /)" || return 17
-  [ "${fs_type}" = apfs ] || {
-    printf 'expected APFS root filesystem, observed %s\n' "${fs_type}" >&2
+  local device info
+  device="$(df "${EVIDENCE_DIR}" | awk 'NR == 2 { print $1 }')" || return 17
+  [ -n "${device}" ] || return 17
+  info="$(diskutil info "${device}")" || return 17
+  printf 'qualification_workspace=%s\ndevice=%s\n%s\n' "${EVIDENCE_DIR}" "${device}" "${info}"
+  printf '%s\n' "${info}" | grep -Eiq \
+    '^[[:space:]]*Type \(Bundle\):[[:space:]]*apfs[[:space:]]*$' || {
+    printf 'expected APFS qualification workspace, observed device %s\n' "${device}" >&2
     return 18
   }
 }
@@ -138,6 +142,33 @@ validate_installer_matrix_log() {
   local log="${EVIDENCE_DIR}/installer_apfs_fault_matrix.log"
   grep -q 'binary fault matrix preserves last-known-good executable' "${log}" || return 26
   grep -q 'all host plugin trees use recoverable atomic pointers' "${log}" || return 27
+}
+
+validate_launchd_install_log() {
+  node - "${EVIDENCE_DIR}/launchd_install.log" <<'NODE'
+const fs = require('node:fs');
+const doc = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+if (doc.ok !== true || doc.installed !== true || doc.activated !== true) process.exit(2);
+if (doc.kind !== 'launchd' || doc.activation?.kind !== 'launchd') process.exit(3);
+if (doc.activation?.ok !== true || doc.activation?.state !== 'active') process.exit(4);
+const steps = doc.activation?.steps ?? [];
+if (steps.map((step) => step.id).join(',') !== 'bootstrap,kickstart,status') process.exit(5);
+if (steps.some((step) => step.ok !== true || step.code !== 0 || !Array.isArray(step.args))) process.exit(6);
+process.stdout.write(`${JSON.stringify(doc, null, 2)}\n`);
+NODE
+}
+
+validate_launchd_uninstall_log() {
+  node - "${EVIDENCE_DIR}/launchd_uninstall.log" <<'NODE'
+const fs = require('node:fs');
+const doc = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+if (doc.ok !== true || doc.uninstalled !== true || doc.stopped !== true) process.exit(2);
+if (doc.kind !== 'launchd' || doc.deactivation?.kind !== 'launchd') process.exit(3);
+const steps = doc.deactivation?.steps ?? [];
+if (steps.map((step) => step.id).join(',') !== 'bootout') process.exit(4);
+if (steps.some((step) => step.ok !== true || step.code !== 0 || !Array.isArray(step.args))) process.exit(5);
+process.stdout.write(`${JSON.stringify(doc, null, 2)}\n`);
+NODE
 }
 
 write_provenance() {
@@ -272,12 +303,14 @@ run_required installer_apfs_fault_matrix bash tests/scripts/test_install_integri
 run_required installer_matrix_coverage validate_installer_matrix_log
 run_required service_serializer_contract \
   pnpm -C ccm/packages/engine exec node --test test/service-serializers.test.ts
-run_required service_handler_contract \
-  pnpm -C ccm/apps/cli exec node --import tsx --test test/handler-monitor.test.ts
+run_required monitor_platform_neutral_contract \
+  pnpm -C ccm/apps/cli exec node --import tsx --test \
+  --test-name-pattern='monitor (start/status|start forces|serve runs)' test/handler-monitor.test.ts
 
 PLIST_DIR="${QUAL_HOME}/Library/LaunchAgents"
 run_required launchd_install env HOME="${QUAL_HOME}" CC_MASTER_HOME="${CCM_HOME}" \
   "${SEA}" monitor install-service --json
+run_required launchd_activation_truth validate_launchd_install_log
 PLIST="$(find "${PLIST_DIR}" -maxdepth 1 -name '*.plist' -print 2>/dev/null | head -n 1)"
 if [ -n "${PLIST}" ]; then
   run_required launchd_plutil plutil -lint "${PLIST}"
@@ -289,6 +322,7 @@ else
 fi
 run_required launchd_uninstall env HOME="${QUAL_HOME}" CC_MASTER_HOME="${CCM_HOME}" \
   "${SEA}" monitor uninstall-service --json
+run_required launchd_deactivation_truth validate_launchd_uninstall_log
 
 mkdir -p "${EVIDENCE_DIR}/plugins"
 run_required plugin_package env CCM_PLUGIN_OUT_DIR="${EVIDENCE_DIR}/plugins" \
