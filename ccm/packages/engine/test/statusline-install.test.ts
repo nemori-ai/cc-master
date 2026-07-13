@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterEach, test } from 'node:test';
 import {
   autoInstallStatuslineOnce,
@@ -39,6 +39,29 @@ function exists(p: string): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+const TMP_ENV_KEYS = ['TMPDIR', 'TMP', 'TEMP'] as const;
+function comparableTestPath(input: string): string {
+  const resolved = resolve(input);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+function withSimulatedTempRoot<T>(root: string, run: () => T): T {
+  const previous = TMP_ENV_KEYS.map((key) => ({ key, value: process.env[key] }));
+  for (const key of TMP_ENV_KEYS) process.env[key] = root;
+  try {
+    assert.equal(
+      comparableTestPath(tmpdir()),
+      comparableTestPath(root),
+      'fixture must make node:os.tmpdir() resolve to the simulated shared temp root',
+    );
+    return run();
+  } finally {
+    for (const { key, value } of previous) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   }
 }
 
@@ -195,14 +218,9 @@ test('looksLikeDevInvocation: 共享 temp root 的瞬态 .git 不污染独立安
   const bin = join(installDir, 'ccm');
   writeFileSync(bin, 'SEA');
 
-  const previous = process.env.TMPDIR;
-  process.env.TMPDIR = sharedTempRoot;
-  try {
+  withSimulatedTempRoot(sharedTempRoot, () => {
     assert.equal(looksLikeDevInvocation(bin), false);
-  } finally {
-    if (previous === undefined) delete process.env.TMPDIR;
-    else process.env.TMPDIR = previous;
-  }
+  });
 });
 
 test('looksLikeDevInvocation: 共享 temp root 下的真实子仓库仍判 dev', () => {
@@ -215,14 +233,9 @@ test('looksLikeDevInvocation: 共享 temp root 下的真实子仓库仍判 dev',
   const bin = join(binDir, 'ccm.cjs');
   writeFileSync(bin, '// stub');
 
-  const previous = process.env.TMPDIR;
-  process.env.TMPDIR = sharedTempRoot;
-  try {
+  withSimulatedTempRoot(sharedTempRoot, () => {
     assert.equal(looksLikeDevInvocation(bin), true);
-  } finally {
-    if (previous === undefined) delete process.env.TMPDIR;
-    else process.env.TMPDIR = previous;
-  }
+  });
 });
 
 test('looksLikeDevInvocation: 安装路径（无 dev 标记·非 worktree）→ 非 dev', () => {
