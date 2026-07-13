@@ -3,7 +3,7 @@
 > 状态:**设计定稿 / 实现蓝图**(v0.10.0)
 > 决策依据:[`adrs/ADR-013-board-v2-data-model-and-cli.md`](../adrs/ADR-013-board-v2-data-model-and-cli.md)(架构 + narrow-waist 演进)· ADR-003(被演进)· ADR-006(node hook)· ADR-012(parent waist)
 > 需求来源:Epic #27 + #28/#29/#30/#31 + C1 #32 + C6 #34
-> 本文是 board v2 的**权威规格 SSOT**:实现(JS model / CLI / lint / graph / hook 收编)照此落地;落地后 `skills/master-orchestrator-guide/references/board.md` 按本文改写。
+> 本文是 board v2 在 v0.10.0 设计定稿时的**历史实现蓝图**，不再是当前协议 SSOT。当前权威定义在 `@ccm/engine` 的 `board-model`（enums / 字段档位 / 不变式注册表 / 状态机）；本文与引擎冲突时一律以引擎为准。
 > 标记:🔒 load-bearing(hook 机器读)· 👁 observed(hook 若有则用、缺则降级)· ✎ flexible(agent 自由、silent-on-unknown)· ⚙️[实现期细化] · ❓[待确认]
 
 ---
@@ -201,7 +201,7 @@ cadence?: {                          👁
 |---|---|
 | `type=development` ⇒ references 含 kind=spec≥1 且 kind=plan≥1 | warn |
 | `type`∈{development, development-demo, acceptance, e2e-integration} ⇒ acceptance 非空 | warn |
-| `executor`∈{subagent, workflow} ⇒ handle 存在 | warn |
+| status=`in_flight` ∧ `executor`∈{subagent, workflow} ⇒ handle 存在 | warn |
 | `executor=external` ⇒ references 含 kind=issue≥1 | warn |
 | awaiting-user(blocked_on:"user" + status∈{blocked,in_flight}) ⇒ decision_package 对象 | **hard** |
 | `status=done` ⇒ verified ∧ artifact 非空 | **P3 预留**(#32,ADR) |

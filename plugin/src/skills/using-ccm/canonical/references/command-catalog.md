@@ -488,7 +488,7 @@ ccm task add <id> [flags]
 | `--description <str>` | | string | | | 详细描述 |
 | `--type <enum>` | | enum（开放·未知值 warn） | `design, planning, development, development-demo, acceptance, e2e-integration, doc-alignment, pr` | | 任务类型 |
 | `--executor <enum>` | | enum | `user, master-orchestrator, subagent, workflow, external` | | 执行者类型 |
-| `--handle <str>` | | string | | | 后台句柄（subagent/workflow 必给；external 可记录 issue URL/number/run id） |
+| `--handle <str>` | | string | | | 真实后台句柄（`in_flight` subagent/workflow 必须有；`ready`/`blocked` future task 不预填；external 可记录 issue URL/number/run id） |
 | `--deps <a,b>` | | csv | | `[]` | 依赖（逗号分隔） |
 | `--parent <str>` | | string | | 缺=顶层 | 归属 owner 节点（嵌套 depth=1） |
 | `--estimate <dur>` | | duration | `3h`/`90m`/`2d`/`1w` | | 估时 |

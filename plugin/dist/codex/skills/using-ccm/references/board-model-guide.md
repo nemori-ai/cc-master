@@ -63,7 +63,7 @@
 | `references` | 开发类 task 必须，其余推荐 | ref 只能绝对路径或 URL，禁相对（FMT-REF·exit 3） |
 | `estimate` | 估点时 | 见 [E. estimate 怎么估](#e-estimate-怎么估) |
 | `executor` | 派发前必须设 | 见 [C. executor 五种语义](#c-executor-五种语义--选择决策树) |
-| `handle` | executor∈{subagent, workflow} 时必须 | 后台派发的句柄，resume 靠它 recon |
+| `handle` | 真实派发后、任务进入 `in_flight` 前必须 | 记录派发工具返回的真实句柄，resume 靠它 recon；`ready` / `blocked` future task 不预填 |
 | `artifact` | 产出落盘后（`task done` 时带 `--artifact`） | 绝对路径或 URL；done 真语义（verified+artifact）靠它 |
 | `verified` | 端点验收通过后 | `task done --verified` 一步到位，或 `task update --verified` |
 | `blocked_on` | `task block --on` 时自动设 | `"user"` 或某 task id；见 [G. blocked_on 怎么选](#g-blocked_on-怎么选) |
@@ -193,7 +193,7 @@ stale      → ready
 
 | executor | 谁来做 | 典型场景 | 必须的字段 |
 |---|---|---|---|
-| `subagent` | Codex 子代理或等价并行 worker | 只有在你已经真实启动了可 recon 的 Codex 并行工作时才写；CLI / App 里显式要求 Codex subagent，API / tool 会话里先 `tool_search` 发现并调用 `multi_agent_v1.spawn_agent`；当前 cc-master 不把 Claude Code `run_in_background` 语义投影成 Codex 原语。 | `handle` 必填：记录 spawn 返回的 agent id / thread / run 引用，足以让后续对账；不能用当前主会话 id 冒充。 |
+| `subagent` | Codex 子代理或等价并行 worker | `ready` / `blocked` future task 可先写 `executor=subagent`，表达将由 Codex subagent 执行的计划；真实派发时，CLI / App 里显式要求 Codex subagent，API / tool 会话里先 `tool_search` 发现并调用 `multi_agent_v1.spawn_agent`。当前 cc-master 不把 Claude Code `run_in_background` 语义投影成 Codex 原语。 | 只有真实 spawn 返回的 agent id / thread / run 引用才是 `handle`；先回填该真实 handle，再转 `in_flight`。future task 不预填 placeholder，也不能用当前主会话 id 冒充。 |
 | `workflow` | 未支持 | Codex adapter 没有 verified `Workflow` 等价物；不要为了表达“复杂任务”写 workflow。 | 不应进入 `in_flight`；拆成可追踪 task 或用 `external`。 |
 | `external` | 外部系统 / 外部调度 | GitHub issue、CI job、人工任务、系统 cron、`codex cloud exec` 等不在当前 session 内的 work item。 | references 含 `kind=issue`≥1；`handle` 可记录 issue URL / run id；`artifact` 只在外部实际产出（PR / commit / report / run）可验时填写。 |
 | `user` | 用户 | 等人拍板、提供凭据、确认策略或回答需求。 | `blocked_on:"user"` + `decision_package`。 |
@@ -214,10 +214,10 @@ stale      → ready
   ↓ 是 → executor: external  （必须带 reference kind=issue 指向外部 ticket）
   ↓ 否
 
-Codex 下，`executor` 仍是 board 的领域字段，不是 Codex API 名。选择它时先问：这个任务是否已经有一个真实、可续查、可停止或可验收的工作句柄？没有句柄就不要标 `in_flight`。API / tool 会话里的 subagent 能力可能藏在 deferred tools 里，先 `tool_search`，看到并调用 `multi_agent_v1.spawn_agent` 后才写 `executor=subagent`；否则用 `master-orchestrator` 记调度动作，或用 `external` 记录真实外部 run。Codex 的 subagents、background terminals、cloud runs、automations 都需要按实际可追踪能力记录为 `subagent` 或 `external`；没有被 cc-master adapter 验证成等价派发原语前，不要套用 Claude Code 的完成通知或 workflow 语义。
+Codex 下，`executor` 仍是 board 的领域字段，不是 Codex API 名。`ready` / `blocked` future task 可先写 `executor=subagent`（host 已验证等价物时也可先选 `workflow`），表达执行计划，但此时不造 handle。真实派发时，API / tool 会话里的 subagent 能力可能藏在 deferred tools 里：先 `tool_search`，再实际调用 `multi_agent_v1.spawn_agent`；只有真实 spawn 结果能提供 handle，先把它回填，再转 `in_flight`。未验证的派发原语或当前主会话 id 都不能代替 worker handle；没有真实句柄就不要标 `in_flight`。否则用 `master-orchestrator` 记调度动作，或用 `external` 记录真实外部 run。Codex 的 subagents、background terminals、cloud runs、automations 都需要按实际可追踪能力记录为 `subagent` 或 `external`；没有被 cc-master adapter 验证成等价派发原语前，不要套用 Claude Code 的完成通知或 workflow 语义。
 ```
 
-**executor 与 handle 的关系：** `subagent` 和 `workflow` 在派发后必须在 task 上记录 `handle`（`task update --handle <句柄>`），resume 时靠 handle recon 任务是否还活着。`external` 节点靠 `reference kind=issue` 的 URL 去外部系统查；`handle` 可选地记录 issue URL / issue number / 外部 run id，方便 recon。`user` 和 `master-orchestrator` 没有后台句柄。
+**executor 与 handle 的关系：** `executor` 是谁来执行的计划，因此 `ready` / `blocked` future task 可先选 `subagent` 或 `workflow`，**不要预填 placeholder / phantom handle**。真实调用派发工具后，立即把其返回的真实句柄写入 task（`task update --handle <句柄>`），再转 `in_flight`；只有 `status=in_flight` 且 `executor∈{subagent,workflow}` 时，缺 handle 才触发 `BIZ-EXECUTOR-HANDLE`，因为 resume 要靠它 recon 任务是否还活着。`external` 节点靠 `reference kind=issue` 的 URL 去外部系统查；`handle` 可选地记录 issue URL / issue number / 外部 run id，方便 recon。`user` 和 `master-orchestrator` 没有后台句柄。
 
 ### external + issue tracking 语义
 
@@ -234,7 +234,7 @@ Codex 下，`executor` 仍是 board 的领域字段，不是 Codex API 名。选
 
 **反模式：**
 - 把 `user` 任务标成 `subagent`——看起来在跑、其实没人做。
-- `executor: subagent` 不带 `handle`——会触发 `BIZ-EXECUTOR-HANDLE` warn；更重要的是 resume 时找不到后台任务。
+- 真实派发后把 `executor: subagent` 任务标成 `in_flight`，却不带派发工具返回的真实 `handle`——会触发 `BIZ-EXECUTOR-HANDLE` warn，resume 时也找不到后台任务。反之，future `ready` / `blocked` 任务不应为了消 warning 预填 phantom handle。
 - 把 orchestrator 自己的整合工作标 `subagent`——指挥不演奏（orchestrator 协调、不亲手做单元工作），orchestrator 的工作应标 `master-orchestrator`。
 
 ---
@@ -859,7 +859,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `BIZ-DECISION-PACKAGE` | warn | `decision_package` 在但字段不全：`context_md`/`what_i_need`/`enter_cmd` 空、`ask_type` 不在枚举、decision 型 `options` 空、`inputs_hash` 非 `sha256:<64hex>` | 备齐采访包字段；decision 型必须有非空 options——见 [G 节](#g-blocked_on-怎么选) |
 | `BIZ-DEV-REFS` | **hard** | `type=development` 的 task 缺 `kind=spec`≥1 或 `kind=plan`≥1 引用 | development task 加 `--ref spec:/abs/spec.md --ref plan:/abs/plan.md`（`task add`）或 `--add-ref`（`task update`）；`--force` 可越——见 [L 节](#l-referencesartifactverified-语义) |
 | `BIZ-ACCEPTANCE-REQUIRED` | warn | type ∈ {development, development-demo, acceptance, e2e-integration} 但 `acceptance` 为空 | 这些 type 必须带 `--accept`——见 [D 节](#d-acceptance-怎么写好) |
-| `BIZ-EXECUTOR-HANDLE` | warn | `executor` ∈ {subagent, workflow} 但缺 `handle` | 派发后 `task update --handle <后台句柄>`；resume 靠它接驳——见 [C 节](#c-executor-五种语义--选择决策树) |
+| `BIZ-EXECUTOR-HANDLE` | warn | `status=in_flight` 且 `executor` ∈ {subagent, workflow}，但缺真实 `handle` | 派发工具返回句柄后 `task update --handle <后台句柄>`，再转 `in_flight`；`ready` / `blocked` future task 不预填——见 [C 节](#c-executor-五种语义--选择决策树) |
 | `BIZ-EXTERNAL-ISSUE` | warn | `executor=external` 但缺 `kind=issue` 引用 | external task 加 `--ref issue:https://github.com/o/r/issues/N` 做外部追踪锚点 |
 | `BIZ-EXTERNAL-ARTIFACT` | warn | `executor=external` 且 `status=done`，但 `artifact` 等于同一个 `kind=issue` tracking URL | 把 artifact 改成外部实际产出（PR / commit / release / report / CI run）；若 issue closed 但尚未验收，别标 done，先用 `uncertain` / `in_flight` / `stale` |
 | `BIZ-TIME-ORDER` | warn | 时间序乱：`started_at` 早于 `created_at` / `finished_at` 早于 `started_at` / 有 finished 无 started / `in_flight` 无 started / `done` 无 finished | 用 ccm verb（`start`/`done`）按序盖戳，别手填出乱序时间 |

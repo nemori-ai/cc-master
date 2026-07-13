@@ -1206,15 +1206,16 @@ function lintTaskBiz(id: string, t: TaskLike, emit: Emit): void {
       id,
     );
   }
-  // BIZ-EXECUTOR-HANDLE（warn）：executor ∈ {subagent, workflow} ⇒ handle 存在。
+  // BIZ-EXECUTOR-HANDLE（warn）：status=in_flight 且 executor ∈ {subagent, workflow} ⇒ handle 存在。
   if (
+    t.status === 'in_flight' &&
     (t.executor === 'subagent' || t.executor === 'workflow') &&
     (typeof t.handle !== 'string' || t.handle === '')
   ) {
     emit(
       'BIZ-EXECUTOR-HANDLE',
-      `${id}.executor=${JSON.stringify(t.executor)} 但缺 handle（后台句柄）。` +
-        `影响：resume 接驳在飞后台任务靠 handle，缺则换 session 后接不回（warn 容刚派发未回填的瞬态）。`,
+      `${id}.status=in_flight 且 executor=${JSON.stringify(t.executor)}，但缺 handle（真实后台句柄）。` +
+        `影响：resume 接驳在飞后台任务靠 handle，缺则换 session 后接不回；ready/blocked future task 不需、也不应预填 phantom handle。`,
       id,
     );
   }
