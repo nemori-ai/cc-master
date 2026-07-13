@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ccm/codex-provider-fixture-output/v1",
+  "type": "object",
+  "required": ["summary", "acceptance", "provider_proof"],
+  "properties": {
+    "summary": { "type": "string", "minLength": 1 },
+    "acceptance": { "const": "not-evaluated" },
+    "provider_proof": { "type": "string", "minLength": 16 }
+  },
+  "additionalProperties": false
+}

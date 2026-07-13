@@ -19,7 +19,7 @@ account switch is policy-gated on board.
 | host | status | mechanism | notes |
 | --- | --- | --- | --- |
 | claude-code | implemented | statusline sidecar, account vault/keychain, plugin upgrade via claude CLI | ccm-host-coupling-audit |
-| codex | partial | `readCodexUsageSignal`; account NotImplemented; statusline unsupported | codex.ts adapter |
+| codex | partial; read-only provider candidate implemented, usage migration pending | `ccm provider inspect codex` preserves multi-bucket provenance and uses 7d-only hard ceiling + rolling-24h advisory; current `readCodexUsageSignal` migration remains pending; account NotImplemented; statusline unsupported | codex.ts adapter + Codex provider contract v1 |
 | cursor | partial | `readCursorUsageSignal` → dashboard `GetCurrentPeriodUsage` → `UsageSignal.billing_period` (~30d); local-plugin upgrade implemented; account pool / statusline / autoswitch unsupported | `cursor-usage.ts` + `harnesses/cursor.ts` |
 
 ## Declared divergence
@@ -50,3 +50,13 @@ account switch is policy-gated on board.
 
 Closed 2026-07-09: D8 (Agent Shell detection), D9 (local plugin), D11 (session env caveats).
 Remaining divergence is structural: Cursor has no ccm account pool or Claude-style external statusline.
+
+## Codex contract target（2026-07-13）
+
+[`../../2026-07-13-codex-candidate-provider-driver-contract-v1.md`](../../2026-07-13-codex-candidate-provider-driver-contract-v1.md)
+冻结并由 `ccm provider inspect codex` 实现了 provider qualification boundary。Codex 的历史/意外 5h 字段不参与 eligibility、
+pacing、fallback 或 wakeup；现有 7d hard ceiling 保持，rolling-24h burn 只 advisory。multi-bucket
+identity/provenance 不可折叠。quota unknown/tight/hard-stale 均不可 automatic eligible。
+
+这不是 `ccm usage` current implementation 的完成声明。Codex/Cursor account mutation 与自动切号仍为
+unsupported，合同要求 login/logout/switch/auth-write/credential mutation 全部为零。

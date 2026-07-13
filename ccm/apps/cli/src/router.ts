@@ -40,6 +40,7 @@ import * as logHandler from './handlers/log.js';
 import * as monitorHandler from './handlers/monitor.js';
 import * as peersHandler from './handlers/peers.js';
 import * as policyHandler from './handlers/policy.js';
+import * as providerHandler from './handlers/provider.js';
 import * as runtimeHandler from './handlers/runtime.js';
 import * as servicesHandler from './handlers/services.js';
 import type { ShadowRoutingBoundary } from './handlers/shadow-routing.js';
@@ -54,6 +55,7 @@ import * as webViewerHandler from './handlers/web-viewer.js';
 import { harnessSessionId } from './harnesses/registry.js';
 import * as help from './help.js';
 import * as io from './io.js';
+import { createDefaultProviderRuntime, type ProviderRuntime } from './provider-runtime.js';
 import {
   ALIASES,
   NOUN_ALIASES,
@@ -81,10 +83,11 @@ interface RunOpts {
   env?: Record<string, string | undefined>;
   stdin?: { fd?: number };
   shadowRoutingBoundary?: ShadowRoutingBoundary;
+  providerRuntime?: ProviderRuntime;
 }
 
 // 一个 handler 模块 = 名字 → handler(ctx) 函数（动态派发·hkey 在运行期定）。
-type HandlerModule = Record<string, (ctx: Ctx) => number>;
+type HandlerModule = Record<string, (ctx: Ctx) => number | Promise<number>>;
 
 // ── 静态 HANDLERS 表：noun → handler 模块（取代原 require('./handlers/'+hnoun)·见文件头偏离注记）。──────
 //   key 与 spec.handler 字符串的首段（hnoun）对齐：'task.setStatus' → HANDLERS.task.setStatus。
@@ -113,6 +116,7 @@ const HANDLERS: Record<string, HandlerModule> = {
   statusreport: statusReportHandler as unknown as HandlerModule,
   statusline: statuslineHandler as unknown as HandlerModule,
   upgrade: upgradeHandler as unknown as HandlerModule,
+  provider: providerHandler as unknown as HandlerModule,
 };
 
 // ── DEFAULT_VERBS：某些 noun 无 verb 时落到约定默认 verb（让 `ccm statusline` ≡ `ccm statusline render`）。──
@@ -453,7 +457,16 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
   }
 
   // ── ⑥ 建 ctx + 分发。────────────────────────────────────────────────────────────────────────────
-  const ctx = buildCtx({ values, positionals, env, out, err, stdin, argv: working });
+  const ctx = buildCtx({
+    values,
+    positionals,
+    env,
+    out,
+    err,
+    stdin,
+    argv: working,
+    providerRuntime: opts.providerRuntime || createDefaultProviderRuntime(env),
+  });
 
   const [hnoun, hkey] = String(spec.handler).split('.');
   // hnoun/hkey 是 split 结果（string | undefined）·下方 !handlerMod / typeof fn 守门已覆盖 undefined；
@@ -503,6 +516,7 @@ function buildCtx({
   err,
   stdin,
   argv,
+  providerRuntime,
 }: {
   values: Record<string, unknown>;
   positionals: string[];
@@ -511,6 +525,7 @@ function buildCtx({
   err: RunOpts['err'];
   stdin?: { fd?: number };
   argv: string[];
+  providerRuntime?: ProviderRuntime;
 }): Ctx {
   const harnessFlag = typeof values.harness === 'string' ? values.harness : undefined;
   const sid =
@@ -538,6 +553,7 @@ function buildCtx({
     err,
     stdin,
     isTTY: io.isTTY(process.stdin),
+    providerRuntime,
   };
 }
 

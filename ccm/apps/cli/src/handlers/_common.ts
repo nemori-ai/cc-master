@@ -21,6 +21,7 @@ import * as fs from 'node:fs';
 import { formatReport, lintBoard, reconcileGating, reconcileInbox } from '@ccm/engine';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
+import type { ProviderRuntime } from '../provider-runtime.js';
 import type { OptionSpec, VerbSpec } from '../registry.js';
 
 const EXIT = io.EXIT;
@@ -55,6 +56,9 @@ export interface Ctx {
   err: (s: string) => void;
   stdin?: { fd?: number };
   isTTY?: boolean;
+  // Optional host capability injection used exclusively by provider handlers.  Production creates
+  // it at the router seam; tests replace it with a controlled transport.
+  providerRuntime?: ProviderRuntime;
 }
 
 // buildFields 收集的 --set / --set-json 操作项。

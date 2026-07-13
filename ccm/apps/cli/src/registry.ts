@@ -55,6 +55,24 @@ export type Registry = Record<string, NounSpec>;
 
 // ── REGISTRY：noun → verb → spec。read:true 的 verb 用 runRead，read:false 用 runWrite（_common.js）。──
 export const REGISTRY: Registry = {
+  // ════════════════════ provider ══════════════════════════════════════════════════════════════════
+  provider: {
+    inspect: {
+      summary: '以冻结 env、只读 Codex 探测与一次受资格门控的执行检查 candidate',
+      read: true,
+      positionals: [{ name: 'provider', required: true }],
+      options: {
+        request: {
+          type: 'string',
+          required: true,
+          desc: 'ccm/codex-provider-inspect-request/v1 JSON（@file / 字面量）',
+        },
+        json: { type: 'boolean', desc: '输出 ccm/codex-provider-inspection/v1 JSON' },
+      },
+      examples: ['ccm provider inspect codex --request @/abs/request.json --json'],
+      handler: 'provider.inspect',
+    },
+  },
   // ════════════════════ orchestrator / route (C1 shadow-only) ════════════════════════════════════
   orchestrator: {
     context: {
