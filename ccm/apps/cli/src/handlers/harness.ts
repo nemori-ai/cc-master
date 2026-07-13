@@ -1,6 +1,11 @@
 // handlers/harness.ts — local supported-harness inventory.
 
 import {
+  buildCursorSurfaceInventory,
+  type CursorExecutionSurfaceDescriptor,
+  inspectCursorExecutionSurfaces,
+} from '../harnesses/cursor-surfaces.js';
+import {
   type HarnessInstallation,
   inspectKnownHarnesses,
   MachineHarnessRegistry,
@@ -19,18 +24,23 @@ export function list(ctx: Ctx): number {
   if (ctx.values['machine-wide']) {
     const registry = MachineHarnessRegistry.sweep(ctx.env);
     const snapshot = registry.toJSON();
+    const surfaces = inspectCursorExecutionSurfaces(ctx.env);
+    const surfaceInventory = buildCursorSurfaceInventory(surfaces);
     if (ctx.flags.json) {
       ctx.out(
         io.jsonOk({
           current: selected.id,
           machineWide: true,
           ...snapshot,
+          surfaceInventory,
         }),
       );
       return EXIT.OK;
     }
     ctx.out('MACHINE-WIDE HARNESS REGISTRY');
     for (const h of snapshot.harnesses) ctx.out(formatMachineHarnessLine(h, selected.id));
+    ctx.out('EXECUTION SURFACES');
+    for (const surface of surfaces) ctx.out(formatSurfaceLine(surface));
     return EXIT.OK;
   }
 
@@ -49,6 +59,14 @@ export function list(ctx: Ctx): number {
   ctx.out('HARNESS INVENTORY');
   for (const h of harnesses) ctx.out(formatHarnessLine(h, selected.id));
   return EXIT.OK;
+}
+
+function formatSurfaceLine(surface: CursorExecutionSurfaceDescriptor): string {
+  const binary = surface.binary.path || `missing:${surface.binary.name || surface.surface_id}`;
+  const model = surface.model.state;
+  const quota = surface.quota.state;
+  const eligible = surface.eligibility.automatic ? 'eligible' : 'ineligible';
+  return `  ${surface.surface_id.padEnd(20)} ${surface.surface_kind} · binary=${binary} · auth=${surface.auth.state} model=${model} quota=${quota} · ${eligible}`;
 }
 
 export function current(ctx: Ctx): number {

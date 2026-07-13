@@ -1,0 +1,8 @@
+hook: orchestrator-context
+host: claude-code
+event: SessionStart+PostToolBatch
+mode: implemented
+notes:
+  - Injects only ccm/origin-context-delivery/v1 from the fixed local cache.
+  - SessionStart emits initial context; PostToolBatch emits hash deltas.
+  - Missing, ambiguous, malformed, or slow dependencies fail open with RC0.

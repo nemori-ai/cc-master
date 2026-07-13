@@ -16,6 +16,9 @@
       {
         "command": "node \"./hooks/_hosts/cursor/launcher.js\" --event postToolUse --core \"./hooks/board-lint/implementations/cursor/board-lint-core.js\"",
         "matcher": "Write"
+      },
+      {
+        "command": "node \"./hooks/_hosts/cursor/launcher.js\" --event postToolUse --core \"./hooks/orchestrator-context/implementations/cursor/orchestrator-context-core.js\""
       }
     ],
     "stop": [

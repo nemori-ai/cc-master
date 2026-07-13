@@ -41,6 +41,8 @@ import * as peersHandler from './handlers/peers.js';
 import * as policyHandler from './handlers/policy.js';
 import * as runtimeHandler from './handlers/runtime.js';
 import * as servicesHandler from './handlers/services.js';
+import type { ShadowRoutingBoundary } from './handlers/shadow-routing.js';
+import * as shadowRoutingHandler from './handlers/shadow-routing.js';
 import * as statusReportHandler from './handlers/status-report.js';
 import * as statuslineHandler from './handlers/statusline.js';
 import * as taskHandler from './handlers/task.js';
@@ -77,6 +79,7 @@ interface RunOpts {
   err: (s: string) => void;
   env?: Record<string, string | undefined>;
   stdin?: { fd?: number };
+  shadowRoutingBoundary?: ShadowRoutingBoundary;
 }
 
 // 一个 handler 模块 = 名字 → handler(ctx) 函数（动态派发·hkey 在运行期定）。
@@ -95,6 +98,8 @@ const HANDLERS: Record<string, HandlerModule> = {
   baseline: baselineHandler as unknown as HandlerModule,
   policy: policyHandler as unknown as HandlerModule,
   runtime: runtimeHandler as unknown as HandlerModule,
+  orchestrator: shadowRoutingHandler as unknown as HandlerModule,
+  route: shadowRoutingHandler as unknown as HandlerModule,
   peers: peersHandler as unknown as HandlerModule,
   monitor: monitorHandler as unknown as HandlerModule,
   services: servicesHandler as unknown as HandlerModule,
@@ -429,7 +434,12 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
   const [hnoun, hkey] = String(spec.handler).split('.');
   // hnoun/hkey 是 split 结果（string | undefined）·下方 !handlerMod / typeof fn 守门已覆盖 undefined；
   //   索引处窄断言为 string（不改逻辑·原 JS 直接 require('./handlers/'+hnoun)[hkey]）。
-  const handlerMod = HANDLERS[hnoun as string];
+  const handlerMod =
+    (hnoun === 'orchestrator' || hnoun === 'route') && opts.shadowRoutingBoundary
+      ? (shadowRoutingHandler.createShadowRoutingHandlers(
+          opts.shadowRoutingBoundary,
+        ) as unknown as HandlerModule)
+      : HANDLERS[hnoun as string];
   if (!handlerMod) {
     err(`internal error: cannot load handler module for ${noun} (${hnoun})`);
     return EXIT.ERROR;

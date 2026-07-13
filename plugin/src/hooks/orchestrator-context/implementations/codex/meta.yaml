@@ -1,0 +1,7 @@
+hook: orchestrator-context
+host: codex
+event: SessionStart
+mode: implemented
+notes:
+  - Codex launcher maps the shared context to systemMessage at SessionStart.
+  - No unsupported mid-turn event is simulated.

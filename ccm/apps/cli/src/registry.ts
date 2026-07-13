@@ -55,6 +55,64 @@ export type Registry = Record<string, NounSpec>;
 
 // ── REGISTRY：noun → verb → spec。read:true 的 verb 用 runRead，read:false 用 runWrite（_common.js）。──
 export const REGISTRY: Registry = {
+  // ════════════════════ orchestrator / route (C1 shadow-only) ════════════════════════════════════
+  orchestrator: {
+    context: {
+      summary: '从显式本地 cache 构建 frozen orchestrator context（只读、零 probe）',
+      read: true,
+      positionals: [],
+      options: {
+        'cached-only': {
+          type: 'boolean',
+          required: true,
+          desc: '强制只读 cache；本命令没有 live fallback',
+        },
+        snapshot: {
+          type: 'string',
+          desc: 'ccm/machine-context-cache/v1 JSON（@file / - / 字面量）',
+        },
+        'agent-visible': {
+          type: 'boolean',
+          desc: '输出三路 origin 共用的脱敏、限长、shadow-only ambient delivery',
+        },
+        'as-of': {
+          type: 'string',
+          required: true,
+          desc: '冻结求值时间（严格 UTC）',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm orchestrator context --cached-only --agent-visible --snapshot @/abs/machine.json --as-of 2026-07-13T03:05:00Z --harness codex --json',
+      ],
+      handler: 'orchestrator.context',
+    },
+  },
+  route: {
+    advise: {
+      summary: '对 frozen task + cached context 生成纯 shadow route advice（spawned=false）',
+      read: true,
+      positionals: [{ name: 'task-id', required: true }],
+      options: {
+        context: {
+          type: 'string',
+          required: true,
+          desc: 'ccm/orchestrator-context/v1 JSON（@file / - / 字面量）',
+        },
+        origin: { type: 'string', required: true, desc: 'origin harness id' },
+        'as-of': {
+          type: 'string',
+          required: true,
+          desc: '冻结求值时间（严格 UTC）',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm route advise T7 --context @/abs/context.json --origin codex --as-of 2026-07-13T03:05:00Z --json',
+      ],
+      handler: 'route.advise',
+    },
+  },
   // ════════════════════ board ════════════════════════════════════════════════════════════════════
   board: {
     show: {

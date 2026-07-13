@@ -12,6 +12,7 @@
 | bootstrap-board | implemented | implemented-minimal-fresh | implemented-minimal-fresh | [CONTRACT.md](../plugin/src/hooks/bootstrap-board/CONTRACT.md) |
 | coordination-inbox | implemented | implemented-stop-system-message | implemented-stop-advisory | [CONTRACT.md](../plugin/src/hooks/coordination-inbox/CONTRACT.md) |
 | identity-nudge | implemented | implemented-stop-system-message | implemented-stop-advisory | [CONTRACT.md](../plugin/src/hooks/identity-nudge/CONTRACT.md) |
+| orchestrator-context | implemented-session-start-and-post-tool-batch | implemented-session-start | implemented-post-tool-use-track-b | [CONTRACT.md](../plugin/src/hooks/orchestrator-context/CONTRACT.md) |
 | reinject | implemented | implemented | implemented-track-b | [CONTRACT.md](../plugin/src/hooks/reinject/CONTRACT.md) |
 | usage-pacing | implemented | implemented-stop-advisory | implemented-stop-advisory | [CONTRACT.md](../plugin/src/hooks/usage-pacing/CONTRACT.md) |
 | verify-board | implemented | implemented-blocking | implemented-followup | [CONTRACT.md](../plugin/src/hooks/verify-board/CONTRACT.md) |
@@ -59,6 +60,13 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | identity-nudge-envelope | protocol-capability-gap | codex | n/a — declared launcher-level envelope conversion, not a business-logic gap |
 | identity-nudge-cursor-envelope | host-convention-divergence | cursor | _hosts/cursor/ENVELOPE.md; plugin v0.17.2 |
 | identity-nudge-tag-protocol-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
+
+### orchestrator-context
+
+| rule | kind | affected hosts | tracked by |
+| --- | --- | --- | --- |
+| orchestrator-context-codex-midturn | event-unavailable | codex | design_docs/harnesses/capabilities/cross-harness-cached-context.md |
+| orchestrator-context-cursor-start | protocol-capability-gap | cursor | design_docs/harnesses/capabilities/cross-harness-cached-context.md |
 
 ### reinject
 
