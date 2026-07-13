@@ -84,6 +84,7 @@ export {
 } from './board-model.js';
 // ── board-reconcile（reconcileGating·deps 驱动 ready↔blocked 门控归一·ADR-023）──
 export { reconcileGating } from './board-reconcile.js';
+export { canonicalJson } from './canonical-json.js';
 // ── coordination/（COORD 多 orchestrator 感知通道 + notification inbox）──
 export type {
   AllocatePoolOptions,
@@ -191,6 +192,25 @@ export {
 // SLE + WIP-aging
 export type { AgingEntry, AgingStatus, Sle } from './estimate/sle.js';
 export { cycleTimeSle, wipAging } from './estimate/sle.js';
+// ── machine-surface（cross-harness C1 machine fact / candidate-domain eligibility）──
+export type {
+  AuthFactState,
+  BinaryFactState,
+  CapabilityFactState,
+  CompatibilityState,
+  MachineSurfaceEligibility,
+  MachineSurfaceEligibilityInput,
+  MachineSurfaceEligibilityReason,
+  MachineSurfaceKind,
+  ModelEntitlementState,
+  NegativeCapabilityState,
+  QuotaFactState,
+} from './machine-surface.js';
+export {
+  evaluateMachineSurfaceEligibility,
+  MACHINE_SURFACE_CONTRACT,
+  MACHINE_SURFACE_INVENTORY_CONTRACT,
+} from './machine-surface.js';
 // ── paths（CLAUDE_CONFIG_DIR 跟随 + 派生路径 SSOT·home/rate-cache/credentials/.claude.json/projects）──
 export type { PathEnv } from './paths.js';
 export {
@@ -231,6 +251,24 @@ export {
   validateTaskPlanning,
   validateTaskRoutePolicy,
 } from './routing-contract.js';
+// ── shadow-routing（C1 cached machine context + pure advisory route；零 IO/spawn/mutation）──
+export type {
+  CachedCandidateFact,
+  CachedQualification,
+  MachineContextCache,
+  OrchestratorContext,
+  ShadowCandidateEvaluation,
+  ShadowRouteAdvice,
+} from './shadow-routing.js';
+export {
+  adviseShadowRoute,
+  buildCachedOrchestratorContext,
+  MACHINE_CONTEXT_CACHE_SCHEMA,
+  ORCHESTRATOR_CONTEXT_MAX_BYTES,
+  ORCHESTRATOR_CONTEXT_SCHEMA,
+  SHADOW_ROUTE_ADVICE_SCHEMA,
+  validateMachineContextCache,
+} from './shadow-routing.js';
 // ── statusline/（self-contained status line·0.10.0：渲染单行 ANSI + sidecar 捕获 + 安装/卸载/自动安装）──
 export type {
   CaptureResult,

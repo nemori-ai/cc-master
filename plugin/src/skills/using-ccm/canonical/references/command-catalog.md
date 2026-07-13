@@ -12,6 +12,10 @@
   - [Global flags](#global-flags)
   - [Exit codes](#exit-codes)
   - [JSON 信封](#json-信封)
+- [namespace orchestrator（cached context）](#namespace-orchestratorcached-context)
+  - [orchestrator context](#orchestrator-context)
+- [namespace route（shadow advisory）](#namespace-routeshadow-advisory)
+  - [route advise](#route-advise)
 - [namespace board](#namespace-board)
   - [board show](#board-show)
   - [board lint](#board-lint)
@@ -136,6 +140,8 @@ ccm <alias> [args] [flags]
 
 | ns | 职责 |
 |---|---|
+| `orchestrator` | 从显式本地 cache 构造 frozen orchestrator context；cached-only、零 live probe |
+| `route` | 对 frozen task + context 给纯 shadow route advice；永远 `spawned:false`、不写 board |
 | `board` | 板级：查看 / 校验 / DAG 分析 / 建板 / 改配置 |
 | `task` | 任务：增删改查 + 状态机（DAG 节点） |
 | `log` | append-only 审计轨迹 |
@@ -221,6 +227,41 @@ ccm <alias> [args] [flags]
 - 失败：`{"ok": false, "exit": <code>, "error": "<msg>", "violations": [...]}`
 
 `data` 形状随命令而变，见 [--json 输出形状](#--json-输出形状)。
+
+---
+
+## namespace orchestrator（cached context）
+
+### orchestrator context
+
+```bash
+ccm orchestrator context --cached-only [--snapshot <json|@file|->] --as-of <UTC> \
+  --harness <origin> [--board <path>] [--json]
+```
+
+只读显式 cache，绝不 live probe。`--cached-only`、`--as-of`、`--harness` 必填；snapshot
+缺失/坏 JSON 时 exit 0，返回 `available:false`、`freshness.state:"unknown"` 和 warning，绝不
+隐式刷新。board revision 由当前 board canonical content 的 SHA-256 导出，不是手填字段。
+这里的 canonical 是递归 key-sort 后的 parsed JSON；只改 key 顺序不改 revision。所有时间须为
+可精确 round-trip 的 canonical UTC，非法日期/闰日不会被 runtime 归一化后放行。公开 context
+只投影 allowlist 字段，递归 secret/private-shaped key 及高信号 credential/token-shaped value
+都会被无回显拒绝；普通 token budget / credential unavailable 文案不误伤。输出确定性限制在
+4096 UTF-8 bytes 内，并用 `truncation` 显式报告缩短/省略数量。
+
+## namespace route（shadow advisory）
+
+### route advise
+
+```bash
+ccm route advise <task-id> --context <json|@file|-> --origin <harness> --as-of <UTC> \
+  [--board <path>] [--json]
+```
+
+只读 planned task 与 `ccm/orchestrator-context/v1`，沿该 task 明示的 ample/tight chain 给建议。
+context origin 必须等于 `--origin`；`available:false`、unknown/stale/revision mismatch 均 fail closed
+为 no-route。advice 会按自己的 `--as-of` 重算 freshness，旧的 fresh context 过期后不能 replay。
+同 harness CLI 保持 `cli-headless`，不会折叠为 native；品牌/crossness 不参与排序。该命令不
+reserve、不 spawn、不建 attempt、不写 board。
 
 ---
 
@@ -1870,7 +1911,7 @@ ccm harness list [--json] [--machine-wide]
 
 - 读所有 ccm 已知 harness 的安装探测结果。Claude Code 通过 `claude` CLI / Claude config dir 探测；Codex 通过 `codex` CLI / `CODEX_HOME` 或默认 config dir 探测。
 - 输出包含：`installed`、`active`、CLI 路径、config 路径、`accountPool` / `externalStatusline` / `pluginDistribution` 能力。
-- 加 `--machine-wide` 时输出机器级 registry snapshot：遍历所有已知 adapter（不只当前 selected harness），并为每个 harness 附上 `sessionStoreRoots`、`usageSource`（`kind` / `pollable` / `quotaModel`）和 `accountPoolLocation`；Claude Code 的 account pool 当前指向 `<CC_MASTER_HOME>/accounts.json`，Codex / Cursor 为 `null`。
+- 加 `--machine-wide` 时输出机器级 registry snapshot：遍历所有已知 adapter（不只当前 selected harness），并为每个 harness 附上 `sessionStoreRoots`、`usageSource`（`kind` / `pollable` / `quotaModel`）和 `accountPoolLocation`；Claude Code 的 account pool 当前指向 `<CC_MASTER_HOME>/accounts.json`，Codex / Cursor 为 `null`。JSON 另带 `surfaceInventory`（`ccm/machine-surface-inventory/v1`）：Cursor IDE plugin 与 `agent|cursor-agent` headless CLI 是两个独立 descriptor；只做 `--version` / `--help` / `status --help` / `status --format json` 的只读探测，不转发 API key、不触发登录/换号/模型请求。auth、model、quota 任一 unknown 都保真并令 `eligibility.automatic=false`。Cursor Agent 的 supported-version contract 是经实测冻结的精确 allowlist，未知版本 fail closed；collector 时间窗必须覆盖当前 as-of 且 TTL 有界。`surfaceInventory` 的 UTF-8 JSON 硬上限为 4096 bytes；开放字符串发生有界投影时回显 `truncation.{applied,max_bytes,fields,fields_omitted}`，受影响 surface automatic ineligible，并保留 account/credential mutation 等负能力事实。
 - flags：`--json`（结构化输出） · `--machine-wide`（机器级 registry snapshot）
 - 例：`ccm harness list` · `ccm harness list --json` · `ccm harness list --machine-wide --json`
 

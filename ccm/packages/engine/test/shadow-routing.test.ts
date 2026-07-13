@@ -1,0 +1,826 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import {
+  adviseShadowRoute,
+  buildCachedOrchestratorContext,
+  validateMachineContextCache,
+} from '../dist/index.mjs';
+
+const AS_OF = '2026-07-13T03:05:00Z';
+
+interface MutableContextEnvelope extends Record<string, unknown> {
+  freshness: Record<string, unknown>;
+}
+
+interface SecretInjectableEnvelope extends Record<string, unknown> {
+  warnings: string[];
+  candidates: Array<{
+    reason?: string;
+    qualifications: Array<{ ref?: string }>;
+  }>;
+}
+
+function candidate(
+  id: string,
+  surface: 'host-native' | 'cli-headless',
+  harness = 'codex',
+): Record<string, unknown> {
+  return {
+    id,
+    surface,
+    adapter: `${harness}/${surface}-v1`,
+    harness,
+    provider: harness === 'codex' ? 'openai' : harness,
+    model: surface === 'host-native' ? 'host-default' : 'gpt-future',
+    effort: 'high',
+    capabilities: ['structured-output'],
+    effect_floors_met: ['meets-required-capabilities'],
+    permission: { profile: 'read-only', denies: ['push-remote', 'account-mutation'] },
+    account_mutation: 'forbidden',
+    requires: [
+      'runtime-healthy',
+      'capability-match',
+      'effect-floor',
+      'permission-compatible',
+      'account-mutation-forbidden',
+    ],
+  };
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: fixture is deliberately traversed as dynamic board JSON.
+function task(order = ['codex-native', 'codex-cli']): Record<string, any> {
+  const candidates = [
+    candidate('codex-native', 'host-native'),
+    candidate('codex-cli', 'cli-headless'),
+  ];
+  return {
+    id: 'T-shadow',
+    status: 'ready',
+    executor: 'subagent',
+    estimate: { value: 1, unit: 'h' },
+    planning: {
+      schema: 'ccm/task-planning/v1',
+      assessed_at: '2026-07-13T03:00:00Z',
+      assessor: 'master-orchestrator',
+      dimensions: {
+        reasoning: 'multi-step',
+        uncertainty: 'low',
+        risk: 'medium',
+        scope: 'multi-file',
+        context: 'medium',
+        coordination: 'none',
+        reversibility: 'reversible',
+      },
+      estimate_confidence: 'high',
+      quality: { effect_floor: 'meets-required-capabilities' },
+      budget: { posture: 'ample', max_attempts: 2 },
+      capabilities: {
+        required: [{ id: 'structured-output' }],
+        preferred: [],
+        forbidden: [{ id: 'push-remote' }],
+      },
+    },
+    routing: {
+      schema: 'ccm/agent-routing/v1',
+      mode: 'cross-harness',
+      policy: {
+        objective: 'balanced',
+        constraints: {
+          effect_floor: 'meets-required-capabilities',
+          quota_unknown: 'ineligible',
+          cross_harness_quota_admission: 'ample-only',
+        },
+        candidates,
+        chains: { ample: order, tight: order },
+        fallback: {
+          on: ['transport-error'],
+          never_on: [
+            'policy-blocked',
+            'permission-blocked',
+            'security-blocked',
+            'workspace-mismatch',
+            'task-blocked',
+            'acceptance-failed',
+          ],
+          exhaustion: 'fail-closed',
+          same_harness: 'explicit-candidate-only',
+        },
+      },
+      selected: null,
+      attempts: [],
+    },
+  };
+}
+
+function fact(
+  candidateId: string,
+  surface: 'host-native' | 'cli-headless',
+  availability: 'available' | 'unavailable' | 'unknown' = 'available',
+): Record<string, unknown> {
+  return {
+    candidate_id: candidateId,
+    harness: 'codex',
+    surface,
+    availability,
+    quota: 'ample',
+    auth: 'authenticated',
+    model: 'available',
+    runtime:
+      availability === 'available'
+        ? 'healthy'
+        : availability === 'unknown'
+          ? 'unknown'
+          : 'unhealthy',
+    qualifications: [
+      {
+        predicate: 'runtime-healthy',
+        status:
+          availability === 'available' ? 'pass' : availability === 'unknown' ? 'unknown' : 'fail',
+        ref: `cache://runtime/${candidateId}`,
+      },
+    ],
+  };
+}
+
+function cache(facts: Record<string, unknown>[]): Record<string, unknown> {
+  return {
+    schema: 'ccm/machine-context-cache/v1',
+    revision: 'machine-r17',
+    board_revision: 'board-r8',
+    observed_at: '2026-07-13T03:00:00Z',
+    valid_until: '2026-07-13T03:10:00Z',
+    candidates: facts,
+    warnings: [],
+  };
+}
+
+function context(facts: Record<string, unknown>[], originHarness = 'codex') {
+  return buildCachedOrchestratorContext({
+    originHarness,
+    boardRevision: 'board-r8',
+    snapshot: cache(facts),
+    asOf: AS_OF,
+  });
+}
+
+test('machine cache validates opaque revisions, exact candidate facts, and unknown as data', () => {
+  assert.deepEqual(
+    validateMachineContextCache(cache([fact('codex-native', 'host-native', 'unknown')])),
+    [],
+  );
+
+  // biome-ignore lint/suspicious/noExplicitAny: negative fixture is deliberately corrupted in-place.
+  const broken = cache([fact('codex-native', 'host-native')]) as any;
+  broken.candidates.push(structuredClone(broken.candidates[0]));
+  broken.candidates[0].qualifications.push({ predicate: 'runtime-healthy', status: 'pass' });
+  const paths = validateMachineContextCache(broken).map((entry) => entry.path);
+  assert.ok(paths.includes('snapshot.candidates'));
+  assert.ok(paths.includes('snapshot.candidates[0].qualifications'));
+
+  // biome-ignore lint/suspicious/noExplicitAny: negative fixture is deliberately corrupted in-place.
+  const collapsed = cache([fact('codex-native', 'host-native')]) as any;
+  delete collapsed.candidates[0].auth;
+  delete collapsed.candidates[0].model;
+  delete collapsed.candidates[0].runtime;
+  const collapsedPaths = validateMachineContextCache(collapsed).map((entry) => entry.path);
+  assert.ok(collapsedPaths.includes('snapshot.candidates[0].auth'));
+  assert.ok(collapsedPaths.includes('snapshot.candidates[0].model'));
+  assert.ok(collapsedPaths.includes('snapshot.candidates[0].runtime'));
+});
+
+test('cached context preserves frozen revisions, freshness, and unknown without probing', () => {
+  const result = context([
+    fact('codex-native', 'host-native', 'unknown'),
+    fact('codex-cli', 'cli-headless'),
+  ]);
+  assert.equal(result.schema, 'ccm/orchestrator-context/v1');
+  assert.equal(result.cached_only, true);
+  assert.equal(result.revisions.machine, 'machine-r17');
+  assert.equal(result.revisions.board, 'board-r8');
+  assert.equal(result.freshness.state, 'fresh');
+  assert.equal(result.candidates[0].availability, 'unknown');
+});
+
+test('shadow advice replays same-native, same-harness CLI, other-harness CLI, origin-stay, and no-route', () => {
+  const nativeFirst = context([
+    fact('codex-native', 'host-native'),
+    fact('codex-cli', 'cli-headless'),
+  ]);
+  const sameNative = adviseShadowRoute({
+    task: task(),
+    context: nativeFirst,
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    asOf: AS_OF,
+  });
+  assert.equal(sameNative.outcome, 'same-native');
+  assert.equal(sameNative.selected?.candidate_id, 'codex-native');
+
+  const cliOnly = context([
+    fact('codex-native', 'host-native', 'unavailable'),
+    fact('codex-cli', 'cli-headless'),
+  ]);
+  const sameCli = adviseShadowRoute({
+    task: task(),
+    context: cliOnly,
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    asOf: AS_OF,
+  });
+  assert.equal(sameCli.outcome, 'same-harness-cli');
+  assert.equal(
+    sameCli.selected?.surface,
+    'cli-headless',
+    'same-harness CLI never folds into native',
+  );
+
+  const cursorContext = context(
+    [fact('codex-native', 'host-native', 'unavailable'), fact('codex-cli', 'cli-headless')],
+    'cursor',
+  );
+  const otherCli = adviseShadowRoute({
+    task: task(),
+    context: cursorContext,
+    originHarness: 'cursor',
+    boardRevision: 'board-r8',
+    asOf: AS_OF,
+  });
+  assert.equal(otherCli.outcome, 'other-harness-cli');
+  assert.equal(otherCli.selected?.candidate_id, sameCli.selected?.candidate_id);
+  assert.deepEqual(
+    otherCli.evaluations.map((entry) => [entry.candidate_id, entry.eligible]),
+    sameCli.evaluations.map((entry) => [entry.candidate_id, entry.eligible]),
+    'origin brand changes the descriptive outcome, not eligibility or ordering',
+  );
+
+  assert.throws(
+    () =>
+      adviseShadowRoute({
+        task: task(),
+        context: cliOnly,
+        originHarness: 'cursor',
+        boardRevision: 'board-r8',
+        asOf: AS_OF,
+      }),
+    /origin/i,
+    'a context frozen for one origin cannot be relabeled by route advice',
+  );
+
+  const originStayContext = context([
+    fact('codex-cli', 'cli-headless', 'unavailable'),
+    fact('codex-native', 'host-native'),
+  ]);
+  const originStay = adviseShadowRoute({
+    task: task(['codex-cli', 'codex-native']),
+    context: originStayContext,
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    asOf: AS_OF,
+  });
+  assert.equal(originStay.outcome, 'origin-stay');
+  assert.ok(originStay.reason_codes.includes('origin-stay-cli-ineligible'));
+
+  const noRoute = adviseShadowRoute({
+    task: task(),
+    context: context([
+      fact('codex-native', 'host-native', 'unknown'),
+      fact('codex-cli', 'cli-headless', 'unknown'),
+    ]),
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    asOf: AS_OF,
+  });
+  assert.equal(noRoute.eligible, false);
+  assert.equal(noRoute.selected, null);
+  assert.equal(noRoute.outcome, 'no-route');
+  assert.equal(noRoute.spawned, false);
+});
+
+test('stale or revision-mismatched context fails closed and keeps the cause visible', () => {
+  const stale = buildCachedOrchestratorContext({
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    snapshot: cache([fact('codex-native', 'host-native')]),
+    asOf: '2026-07-13T03:11:00Z',
+  });
+  const staleAdvice = adviseShadowRoute({
+    task: task(),
+    context: stale,
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    asOf: '2026-07-13T03:11:00Z',
+  });
+  assert.equal(staleAdvice.eligible, false);
+  assert.ok(staleAdvice.warnings.includes('machine-context-stale'));
+
+  const mismatch = adviseShadowRoute({
+    task: task(),
+    context: context([fact('codex-native', 'host-native')]),
+    originHarness: 'codex',
+    boardRevision: 'board-r9',
+    asOf: AS_OF,
+  });
+  assert.equal(mismatch.eligible, false);
+  assert.ok(mismatch.warnings.includes('board-revision-mismatch'));
+
+  const notYetObserved = buildCachedOrchestratorContext({
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    snapshot: cache([fact('codex-native', 'host-native')]),
+    asOf: '2026-07-13T02:59:59Z',
+  });
+  assert.equal(notYetObserved.freshness.state, 'unknown');
+  assert.ok(notYetObserved.warnings.includes('machine-context-not-yet-observed'));
+
+  const replayedAfterExpiry = adviseShadowRoute({
+    task: task(),
+    context: context([fact('codex-native', 'host-native')]),
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    asOf: '2026-07-13T04:00:00Z',
+  });
+  assert.equal(replayedAfterExpiry.eligible, false);
+  assert.equal(replayedAfterExpiry.outcome, 'no-route');
+  assert.ok(replayedAfterExpiry.warnings.includes('machine-context-stale'));
+
+  const unavailable = structuredClone(context([fact('codex-native', 'host-native')]));
+  unavailable.available = false;
+  const unavailableAdvice = adviseShadowRoute({
+    task: task(),
+    context: unavailable,
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    asOf: AS_OF,
+  });
+  assert.equal(unavailableAdvice.eligible, false);
+  assert.ok(unavailableAdvice.evaluations[0]?.reason_codes.includes('context-unavailable'));
+});
+
+test('public freshness envelope is complete, ordered, and state-coherent', () => {
+  const baseline = context([fact('codex-native', 'host-native')]);
+  for (const mutate of [
+    (value: MutableContextEnvelope) => delete value.freshness.as_of,
+    (value: MutableContextEnvelope) => {
+      value.freshness.as_of = 'not-a-time';
+    },
+    (value: MutableContextEnvelope) => {
+      value.freshness.observed_at = '2026-07-13T03:12:00Z';
+    },
+    (value: MutableContextEnvelope) => {
+      value.freshness.state = 'fresh';
+      value.freshness.as_of = '2026-07-13T04:00:00Z';
+    },
+  ]) {
+    const corrupted = structuredClone(baseline) as unknown as MutableContextEnvelope;
+    mutate(corrupted);
+    assert.throws(
+      () =>
+        adviseShadowRoute({
+          task: task(),
+          context: corrupted,
+          originHarness: 'codex',
+          boardRevision: 'board-r8',
+          asOf: AS_OF,
+        }),
+      /invalid shadow route input/,
+    );
+  }
+});
+
+test('impossible calendar UTC values fail closed at context-build and route-advice boundaries', () => {
+  const impossible = '2026-02-31T03:05:00Z';
+  const marchCache = cache([fact('codex-native', 'host-native')]);
+  marchCache.observed_at = '2026-03-01T00:00:00Z';
+  marchCache.valid_until = '2026-03-10T00:00:00Z';
+
+  assert.throws(
+    () =>
+      buildCachedOrchestratorContext({
+        originHarness: 'codex',
+        boardRevision: 'board-r8',
+        snapshot: marchCache,
+        asOf: impossible,
+      }),
+    /strict ISO|invalid cached machine context/i,
+  );
+
+  const invalidLeapDay = structuredClone(marchCache);
+  invalidLeapDay.observed_at = '2025-02-29T00:00:00Z';
+  assert.throws(
+    () =>
+      buildCachedOrchestratorContext({
+        originHarness: 'codex',
+        boardRevision: 'board-r8',
+        snapshot: invalidLeapDay,
+        asOf: '2026-03-03T03:05:00Z',
+      }),
+    /strict ISO|invalid cached machine context/i,
+  );
+
+  const validLeapDay = structuredClone(marchCache);
+  validLeapDay.observed_at = '2024-02-29T00:00:00Z';
+  validLeapDay.valid_until = '2024-03-01T00:00:00Z';
+  const leapContext = buildCachedOrchestratorContext({
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    snapshot: validLeapDay,
+    asOf: '2024-02-29T12:00:00Z',
+  });
+  assert.equal(leapContext.freshness.state, 'fresh');
+
+  const impossibleObservation = structuredClone(marchCache);
+  impossibleObservation.observed_at = impossible;
+  assert.throws(
+    () =>
+      buildCachedOrchestratorContext({
+        originHarness: 'codex',
+        boardRevision: 'board-r8',
+        snapshot: impossibleObservation,
+        asOf: '2026-03-03T03:05:00Z',
+      }),
+    /strict ISO|invalid cached machine context/i,
+  );
+
+  const valid = context([fact('codex-native', 'host-native')]);
+  assert.throws(
+    () =>
+      adviseShadowRoute({
+        task: task(),
+        context: valid,
+        originHarness: 'codex',
+        boardRevision: 'board-r8',
+        asOf: impossible,
+      }),
+    /strict ISO|invalid shadow route input/i,
+  );
+
+  const impossiblePublicContext = structuredClone(valid) as unknown as MutableContextEnvelope;
+  impossiblePublicContext.freshness.observed_at = '2026-03-01T00:00:00Z';
+  impossiblePublicContext.freshness.valid_until = '2026-03-10T00:00:00Z';
+  impossiblePublicContext.freshness.as_of = impossible;
+  impossiblePublicContext.freshness.state = 'fresh';
+  assert.throws(
+    () =>
+      adviseShadowRoute({
+        task: task(),
+        context: impossiblePublicContext,
+        originHarness: 'codex',
+        boardRevision: 'board-r8',
+        asOf: '2026-03-03T03:05:00Z',
+      }),
+    /strict ISO|invalid shadow route input/i,
+  );
+});
+
+test('all CLI-headless candidates require ample quota, including same-harness CLI', () => {
+  const tightFacts = [
+    fact('codex-native', 'host-native', 'unavailable'),
+    { ...fact('codex-cli', 'cli-headless'), quota: 'tight' },
+  ];
+  const advice = adviseShadowRoute({
+    task: task(),
+    context: context(tightFacts),
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    asOf: AS_OF,
+  });
+  assert.equal(advice.eligible, false);
+  assert.ok(
+    advice.evaluations
+      .find((entry) => entry.candidate_id === 'codex-cli')
+      ?.reason_codes.includes('cli-quota-not-ample'),
+  );
+});
+
+test('route advice deeply rejects corrupted context candidates instead of trusting the envelope', () => {
+  const corrupted = structuredClone(context([fact('codex-native', 'host-native')]));
+  // biome-ignore lint/suspicious/noExplicitAny: negative fixture is deliberately corrupted in-place.
+  (corrupted.candidates[0] as any).auth = 'definitely-authenticated';
+  assert.throws(
+    () =>
+      adviseShadowRoute({
+        task: task(),
+        context: corrupted,
+        originHarness: 'codex',
+        boardRevision: 'board-r8',
+        asOf: AS_OF,
+      }),
+    /invalid shadow route input/,
+  );
+});
+
+test('public context rejects recursive secret-bearing fields and never echoes sentinel values', () => {
+  const sentinel = 'SECRET-MUST-NOT-ENTER-PROMPT';
+  const secretFields = [
+    ['credential', sentinel],
+    ['token', sentinel],
+    ['argv', [sentinel]],
+    ['env', { SECRET: sentinel }],
+    ['raw_private_response', { body: sentinel }],
+    ['transcript', sentinel],
+    ['balance', sentinel],
+  ] as const;
+  for (const [key, value] of secretFields) {
+    const secretFact = fact('codex-native', 'host-native');
+    (secretFact as Record<string, unknown>)[key] = value;
+    assert.throws(
+      () => context([secretFact]),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /forbidden|secret/i);
+        assert.doesNotMatch(error.message, new RegExp(sentinel));
+        return true;
+      },
+    );
+  }
+
+  const nested = fact('codex-native', 'host-native');
+  const qualifications = nested.qualifications as Array<Record<string, unknown>>;
+  qualifications[0]!.raw_response = sentinel;
+  assert.throws(() => context([nested]), /forbidden|secret/i);
+
+  const benignExtra = fact('codex-native', 'host-native');
+  benignExtra.future_extension = { harmless: true };
+  const projected = context([benignExtra]);
+  assert.equal('future_extension' in projected.candidates[0]!, false);
+  assert.doesNotMatch(JSON.stringify(projected), new RegExp(sentinel));
+
+  const secretValues = [
+    'sk-ant-api03-FAKE-SENTINEL-NOT-A-REAL-SECRET',
+    'Bearer FAKE0123456789TOKEN',
+    'eyJmYWtlIjoidGVzdCJ9.eyJzdWIiOiJmYWtlIn0.FAKE_SIGNATURE_12345',
+    'api_key=FAKE0123456789TOKEN',
+    'credential: FAKE0123456789TOKEN',
+  ];
+  for (const secretValue of secretValues) {
+    const secretCache = cache([fact('codex-native', 'host-native')]);
+    secretCache.warnings = [secretValue];
+    const secretCandidate = (secretCache.candidates as Array<Record<string, unknown>>)[0]!;
+    secretCandidate.reason = secretValue;
+    const secretQualifications = secretCandidate.qualifications as Array<Record<string, unknown>>;
+    secretQualifications[0]!.ref = secretValue;
+    assert.throws(
+      () =>
+        buildCachedOrchestratorContext({
+          originHarness: 'codex',
+          boardRevision: 'board-r8',
+          snapshot: secretCache,
+          asOf: AS_OF,
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /forbidden|secret/i);
+        assert.equal(error.message.includes(secretValue), false);
+        return true;
+      },
+    );
+  }
+
+  const alphabeticHighSignalValues = [
+    'sk-proj-ABCDEFGHIJKLMNOPQRSTUVWX',
+    'Bearer ABCDEFGHIJKLMNOPQRSTUVWX',
+    ...['!', '?', ')', ':'].map((suffix) => `Bearer ABCDEFGHIJKLMNOPQRSTUVWX${suffix}`),
+  ];
+  const cacheLocations: Array<{
+    name: string;
+    inject: (snapshot: SecretInjectableEnvelope, secretValue: string) => void;
+  }> = [
+    {
+      name: 'warning',
+      inject: (snapshot, secretValue) => {
+        snapshot.warnings = [secretValue];
+      },
+    },
+    {
+      name: 'candidate reason',
+      inject: (snapshot, secretValue) => {
+        snapshot.candidates[0].reason = secretValue;
+      },
+    },
+    {
+      name: 'qualification ref',
+      inject: (snapshot, secretValue) => {
+        snapshot.candidates[0].qualifications[0].ref = secretValue;
+      },
+    },
+  ];
+  for (const secretValue of alphabeticHighSignalValues) {
+    for (const location of cacheLocations) {
+      const secretCache = cache([
+        fact('codex-native', 'host-native'),
+      ]) as unknown as SecretInjectableEnvelope;
+      location.inject(secretCache, secretValue);
+      assert.throws(
+        () =>
+          buildCachedOrchestratorContext({
+            originHarness: 'codex',
+            boardRevision: 'board-r8',
+            snapshot: secretCache,
+            asOf: AS_OF,
+          }),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.match(error.message, /forbidden|secret/i, location.name);
+          assert.equal(error.message.includes(secretValue), false, location.name);
+          return true;
+        },
+      );
+    }
+  }
+
+  const publicWithSecret = context([fact('codex-native', 'host-native')]);
+  publicWithSecret.warnings = [secretValues[1]!];
+  assert.throws(
+    () =>
+      adviseShadowRoute({
+        task: task(),
+        context: publicWithSecret,
+        originHarness: 'codex',
+        boardRevision: 'board-r8',
+        asOf: AS_OF,
+      }),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /forbidden|secret/i);
+      assert.equal(error.message.includes(secretValues[1]!), false);
+      return true;
+    },
+  );
+
+  for (const secretValue of alphabeticHighSignalValues) {
+    for (const location of cacheLocations) {
+      const publicContext = context([
+        fact('codex-native', 'host-native'),
+      ]) as unknown as SecretInjectableEnvelope;
+      location.inject(publicContext, secretValue);
+      assert.throws(
+        () =>
+          adviseShadowRoute({
+            task: task(),
+            context: publicContext,
+            originHarness: 'codex',
+            boardRevision: 'board-r8',
+            asOf: AS_OF,
+          }),
+        (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.match(error.message, /forbidden|secret/i, location.name);
+          assert.equal(error.message.includes(secretValue), false, location.name);
+          return true;
+        },
+      );
+    }
+  }
+
+  const benignCache = cache([fact('codex-native', 'host-native')]);
+  benignCache.warnings = [
+    'token budget is tight',
+    'Bearer authentication is unavailable',
+    'api key is not configured',
+    'credential access is forbidden',
+    'credential: unavailable',
+    'api_key=REDACTED',
+    'Bearer REDACTED',
+    'Bearer authentication is unavailable!',
+    'Bearer authentication: unavailable',
+    'Bearer auth: unavailable',
+    'task-sketch remains pending',
+    'docs describe the sk-token-format placeholder',
+    'sk-short',
+    'Bearer status',
+    'Bearer status: unavailable',
+  ];
+  const benignCandidate = (benignCache.candidates as Array<Record<string, unknown>>)[0]!;
+  const benignQualifications = benignCandidate.qualifications as Array<Record<string, unknown>>;
+  benignQualifications[0]!.ref = 'docs://credential-and-token-policy';
+  const benignProjection = buildCachedOrchestratorContext({
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    snapshot: benignCache,
+    asOf: AS_OF,
+  });
+  assert.equal(benignProjection.warnings.length, benignCache.warnings.length);
+  assert.equal(
+    benignProjection.candidates[0]?.qualifications[0]?.ref,
+    'docs://credential-and-token-policy',
+  );
+  assert.doesNotThrow(() =>
+    adviseShadowRoute({
+      task: task(),
+      context: benignProjection,
+      originHarness: 'codex',
+      boardRevision: 'board-r8',
+      asOf: AS_OF,
+    }),
+  );
+});
+
+test('runtime-healthy qualification preserves fail/unknown/missing and rejects contradictions', () => {
+  const failed = fact('codex-native', 'host-native');
+  failed.runtime = 'unhealthy';
+  failed.qualifications = [
+    { predicate: 'runtime-healthy', status: 'fail', ref: 'cache://runtime/fail' },
+  ];
+  const failedAdvice = adviseShadowRoute({
+    task: task(),
+    context: context([failed]),
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    asOf: AS_OF,
+  });
+  assert.equal(failedAdvice.eligible, false);
+  assert.equal(failedAdvice.evaluations[0]?.qualification_results[0]?.status, 'fail');
+
+  const unknown = fact('codex-native', 'host-native');
+  unknown.runtime = 'unknown';
+  unknown.qualifications = [
+    { predicate: 'runtime-healthy', status: 'unknown', ref: 'cache://runtime/unknown' },
+  ];
+  const unknownAdvice = adviseShadowRoute({
+    task: task(),
+    context: context([unknown]),
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    asOf: AS_OF,
+  });
+  assert.equal(unknownAdvice.eligible, false);
+  assert.equal(unknownAdvice.evaluations[0]?.qualification_results[0]?.status, 'unknown');
+
+  const missing = fact('codex-native', 'host-native');
+  missing.qualifications = [];
+  const missingAdvice = adviseShadowRoute({
+    task: task(),
+    context: context([missing]),
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    asOf: AS_OF,
+  });
+  assert.equal(missingAdvice.eligible, false);
+  assert.equal(missingAdvice.evaluations[0]?.qualification_results[0]?.status, 'unknown');
+
+  const contradiction = fact('codex-native', 'host-native');
+  contradiction.qualifications = [
+    { predicate: 'runtime-healthy', status: 'fail', ref: 'cache://runtime/contradiction' },
+  ];
+  assert.throws(() => context([contradiction]), /runtime-healthy|contradict/i);
+});
+
+test('public context is deterministically bounded to 4096 bytes with explicit truncation metadata', () => {
+  const small = context([fact('codex-native', 'host-native')]);
+  assert.ok(Buffer.byteLength(JSON.stringify(small), 'utf8') <= 4096);
+  assert.equal(small.truncation.applied, false);
+
+  const atLimitCache = cache([fact('codex-native', 'host-native')]);
+  atLimitCache.warnings = Array.from(
+    { length: 13 },
+    (_, index) => `${String(index).padStart(2, '0')}-${'x'.repeat(251)}`,
+  );
+  const atLimitFact = (atLimitCache.candidates as Array<Record<string, unknown>>)[0]!;
+  const atLimitQualification = (atLimitFact.qualifications as Array<Record<string, unknown>>)[0]!;
+  const buildAtLimit = () =>
+    buildCachedOrchestratorContext({
+      originHarness: 'codex',
+      boardRevision: 'board-r8',
+      snapshot: structuredClone(atLimitCache),
+      asOf: AS_OF,
+    });
+  const initialSize = Buffer.byteLength(JSON.stringify(buildAtLimit()), 'utf8');
+  const exactPadding = 4096 - initialSize;
+  assert.ok(exactPadding > 0 && exactPadding < 128);
+  atLimitQualification.ref = `${String(atLimitQualification.ref)}${'r'.repeat(exactPadding)}`;
+  const exact = buildAtLimit();
+  assert.equal(Buffer.byteLength(JSON.stringify(exact), 'utf8'), 4096);
+  assert.equal(exact.truncation.applied, false);
+
+  atLimitQualification.ref = `${String(atLimitQualification.ref)}r`;
+  const oneByteOver = buildAtLimit();
+  assert.ok(Buffer.byteLength(JSON.stringify(oneByteOver), 'utf8') <= 4096);
+  assert.equal(oneByteOver.truncation.applied, true);
+  assert.equal(oneByteOver.truncation.omitted_warnings, 1);
+  assert.equal(oneByteOver.revisions.board, 'board-r8');
+  assert.equal(oneByteOver.freshness.state, 'fresh');
+
+  const oversizedCache = cache([fact('codex-native', 'host-native')]);
+  oversizedCache.warnings = [
+    'W'.repeat(5000),
+    ...Array.from({ length: 64 }, (_, i) => `warning-${i}-${'x'.repeat(240)}`),
+  ];
+  const build = () =>
+    buildCachedOrchestratorContext({
+      originHarness: 'codex',
+      boardRevision: 'board-r8',
+      snapshot: structuredClone(oversizedCache),
+      asOf: AS_OF,
+    });
+  const first = build();
+  const second = build();
+  assert.deepEqual(first, second);
+  assert.ok(Buffer.byteLength(JSON.stringify(first), 'utf8') <= 4096);
+  assert.equal(first.truncation.applied, true);
+  assert.ok(first.truncation.omitted_warnings > 0);
+  assert.ok(first.truncation.shortened_fields > 0);
+  assert.equal(first.revisions.board, 'board-r8');
+  assert.equal(first.revisions.machine, 'machine-r17');
+  assert.equal(first.freshness.state, 'fresh');
+  assert.equal(first.candidates[0]?.availability, 'available');
+});

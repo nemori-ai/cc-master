@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import {
   analyzeGraph,
   type CriticalPathResult,
+  canonicalJson,
   lintBoard,
   taskTrulyDone,
   withLock,
@@ -95,16 +96,6 @@ function kinded(message: string, kind: string): KindedError {
 
 function sha(value: string | Buffer): string {
   return `sha256:${crypto.createHash('sha256').update(value).digest('hex')}`;
-}
-
-function stableJson(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map((v) => stableJson(v)).join(',')}]`;
-  const obj = value as Record<string, unknown>;
-  return `{${Object.keys(obj)
-    .sort()
-    .map((k) => `${JSON.stringify(k)}:${stableJson(obj[k])}`)
-    .join(',')}}`;
 }
 
 function isoNoMs(d: Date): string {
@@ -233,11 +224,11 @@ function topologyHash(board: BoardRecord): string {
     verified: t.verified ?? null,
     artifact: t.artifact ?? null,
   }));
-  return sha(stableJson({ scheduling: board.scheduling ?? null, tasks }));
+  return sha(canonicalJson({ scheduling: board.scheduling ?? null, tasks }));
 }
 
 function advisoryHash(): string {
-  return sha(stableJson({ usage: null, estimate: null }));
+  return sha(canonicalJson({ usage: null, estimate: null }));
 }
 
 function criticalPathView(cp: CriticalPathResult): Record<string, unknown> {
@@ -258,7 +249,7 @@ function computeReport(input: ResolvedInput, opts: ComputeOpts = {}): ReportEnve
   const topoHash = topologyHash(input.board);
   const advHash = advisoryHash();
   const inputHash = sha(
-    stableJson({
+    canonicalJson({
       schema: REPORT_SCHEMA,
       board_hash: boardHash,
       topology_hash: topoHash,

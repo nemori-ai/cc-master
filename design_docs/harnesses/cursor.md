@@ -1,6 +1,6 @@
 # Cursor Harness Facts
 
-更新时间：2026-07-10。
+更新时间：2026-07-13。
 
 ## Source Hierarchy
 
@@ -30,7 +30,34 @@ Cursor 事实按以下优先级维护：
 - **Cursor Cloud Agents**（cursor.com/agents）：官方明确多个 hook 无等价触发点（`sessionStart`/`sessionEnd`、`beforeSubmitPrompt`、`stop`、Tab hooks、部分 MCP hooks 等）。
 - Cursor Tab 补全专用 hooks（`beforeTabFileRead`/`afterTabFileEdit`）。
 - Cursor SDK / Cloud Agents API（`@cursor/sdk`、`CURSOR_API_KEY`）——编排 dispatch 的 CI/外部面，不是 IDE Agent runtime。
-- Cursor Agent CLI / headless one-shot worker transport——它是 cross-harness 调用面，不等于本页的 IDE plugin / hook adapter；当前 tracked harness 资料尚未定义该调用契约。
+- Cursor Agent CLI / headless one-shot **worker transport**——它是 cross-harness 调用面，不等于本页的 IDE plugin / hook adapter；本页只新增 C1 read-only machine-surface discovery 合同，尚未定义 spawn / poll / cancel / resume transport。
+
+## Cursor execution surfaces【官方 + 本仓实测】
+
+Cursor IDE plugin 与 Cursor Agent CLI 是两个独立 surface；任一侧的安装、认证、model 或 quota 状态都不得推出另一侧状态。C1 只做 read-only discovery / shadow eligibility，不执行模型请求。
+
+### CLI 名称与发现顺序
+
+- Cursor 当前 CLI 产品页（2026-07-13 抓取）以 `agent` 展示入口；官方 CLI reference / installation 页面仍以 `cursor-agent` 展示安装、`--print`、`--output-format`、`--model` 与 `status`。两者因此都是可接受 binary name，不能把 Cursor IDE 的 `cursor` launcher 当作 headless CLI。
+- 本仓在 Linux 对 `agent` 与 `cursor-agent` 做了 read-only probe：二者均解析到 `2026.07.09-a3815c0` 的同一 executable；`agent --help` 暴露 `--print`、`--output-format`、`--model`、`--workspace` 与 `status|whoami`，`agent status --help` 暴露 `--format json`。
+- C1 冻结的 supported-version contract **仅包含精确版本 `2026.07.09-a3815c0`**；空值、非规范输出、非此版本或 `--version` 非零退出，即使 help flags 看似齐全也必须标为 unsupported。新版本需先重跑只读契约实测并显式更新 allowlist，不能按版本格式或大小关系自动放行。
+- `ccm` 的确定性 precedence 是显式 `CCM_CURSOR_AGENT_BIN` → `agent` → `cursor-agent`。这是本仓 policy，不冒充 Cursor 官方保证；显式 override 缺失时 fail closed，不静默 fallback。
+
+官方证据：[CLI landing](https://cursor.com/en-US/cli)、[installation](https://docs.cursor.com/en/cli/installation)、[parameters](https://docs.cursor.com/en/cli/reference/parameters)、[authentication](https://docs.cursor.com/en/cli/reference/authentication)、[output format](https://docs.cursor.com/en/cli/reference/output-format)。
+
+### C1 read-only probe contract
+
+| Fact | 许可 probe / source | TTL | Schema drift / degradation |
+| --- | --- | --- | --- |
+| binary/version | `--version` | 24h | 只有冻结 allowlist 的精确版本可 supported；command 失败、空/异常输出或未验证版本 → unsupported，不能入 candidate |
+| headless flags | `--help`、`status --help` | 24h | 必须证明 `--print`、`--output-format`、`--workspace`、`--model`、`status` 与 status JSON；缺任一 → unsupported |
+| auth | `status --format json` | 15m | 当前实测字段为 `isAuthenticated:boolean`；兼容早期 fixture 的 `authenticated:boolean`，其他 schema → unknown；原始 email/token/user id 永不进入 read model |
+| model entitlement | C1 无公开、零请求的可靠来源 | unknown | help 中存在 `--model` 不证明当前 identity 有任一 model；unknown → automatic ineligible |
+| quota/pool | C1 无公开个人 quota command | unknown | auth、model visibility 与 subscription 文案都不证明 headroom；unknown → automatic ineligible |
+
+只有以上四条固定 argv 允许被 inventory probe 调用；禁止 `login` / `logout` / `update` / `upgrade` / `--api-key` / model prompt。Codex/Cursor account switch、credential import/copy/write 永久 forbidden；probe 子进程不转发 `CURSOR_API_KEY`。实现若将来接入独立 model/quota collector，其事实必须带有界、非空的 source / refs / reason，并使用 canonical UTC 的 `observed_at` / `valid_until`；必须满足 `observed_at <= as_of < valid_until`，positive quota TTL 不超过 5m、positive model TTL 不超过 24h。未来时间、倒置窗口、过期/超长 TTL、非规范时间或 schema 越界一律降为 unknown；`auth=true, quota=unknown` 或 `model=unknown` 始终不能 automatic eligible。
+
+`surfaceInventory` 的 UTF-8 JSON 投影硬上限为 4096 bytes。path/version/reason/ref 等开放字符串采用确定性有界投影；发生截断时返回 `truncation.{applied,max_bytes,fields,fields_omitted}`，受影响 surface 必须 fail closed 为 automatic ineligible，同时保留 account/credential mutation 等 load-bearing negative facts。若普通投影仍超限，使用最小 fail-closed descriptor，不能靠删除负能力事实换取体积。
 
 ## Plugin Shape
 
