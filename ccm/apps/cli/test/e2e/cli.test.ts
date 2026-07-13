@@ -294,7 +294,7 @@ test('task add → 0 + 板含该 task；start → done 状态机走通', () => {
   assert.ok(t1.finished_at, 'finished_at stamped');
 });
 
-test('review gate CLI：REQUEST-CHANGES 不开门，APPROVE 才满足下游 deps', () => {
+test('review gate CLI：旧 APPROVE 不跨 retry，当前 attempt APPROVE 才满足下游 deps', () => {
   const { home } = mkHome();
   const boardPath = seedBoard(home, { goal: 'review gate' });
 
@@ -306,7 +306,7 @@ test('review gate CLI：REQUEST-CHANGES 不开门，APPROVE 才满足下游 deps
   assert.equal(addDownstream.status, 0, `add downstream stderr=${addDownstream.stderr}`);
   assert.equal(runCcm(['task', 'start', 'R1'], { home }).status, 0);
 
-  const requestChanges = runCcm(
+  const firstApprove = runCcm(
     [
       'task',
       'done',
@@ -315,12 +315,53 @@ test('review gate CLI：REQUEST-CHANGES 不开门，APPROVE 才满足下游 deps
       '--artifact',
       '/abs/review.md',
       '--review-verdict',
+      'APPROVE',
+    ],
+    { home },
+  );
+  assert.equal(firstApprove.status, 0, `first APPROVE stderr=${firstApprove.stderr}`);
+  let b = readBoard(boardPath);
+  assert.equal(b.tasks.find((t: { id: string }) => t.id === 'R1').review_verdict, 'APPROVE');
+  assert.equal(b.tasks.find((t: { id: string }) => t.id === 'D1').status, 'ready');
+
+  assert.equal(runCcm(['task', 'set-status', 'R1', 'stale'], { home }).status, 0);
+  assert.equal(runCcm(['task', 'set-status', 'R1', 'ready'], { home }).status, 0);
+  assert.equal(runCcm(['task', 'start', 'R1'], { home }).status, 0);
+
+  const noVerdict = runCcm(
+    ['task', 'done', 'R1', '--verified', '--artifact', '/abs/review-v2.md'],
+    { home },
+  );
+  assert.equal(noVerdict.status, 0, `retry without verdict stderr=${noVerdict.stderr}`);
+  b = readBoard(boardPath);
+  assert.equal(
+    Object.hasOwn(
+      b.tasks.find((t: { id: string }) => t.id === 'R1'),
+      'review_verdict',
+    ),
+    false,
+  );
+  assert.equal(b.tasks.find((t: { id: string }) => t.id === 'D1').status, 'blocked');
+
+  assert.equal(runCcm(['task', 'set-status', 'R1', 'stale'], { home }).status, 0);
+  assert.equal(runCcm(['task', 'set-status', 'R1', 'ready'], { home }).status, 0);
+  assert.equal(runCcm(['task', 'start', 'R1'], { home }).status, 0);
+
+  const requestChanges = runCcm(
+    [
+      'task',
+      'done',
+      'R1',
+      '--verified',
+      '--artifact',
+      '/abs/review-v3.md',
+      '--review-verdict',
       'REQUEST-CHANGES',
     ],
     { home },
   );
   assert.equal(requestChanges.status, 0, `REQUEST-CHANGES stderr=${requestChanges.stderr}`);
-  let b = readBoard(boardPath);
+  b = readBoard(boardPath);
   assert.equal(
     b.tasks.find((t: { id: string }) => t.id === 'R1').review_verdict,
     'REQUEST-CHANGES',
@@ -338,7 +379,7 @@ test('review gate CLI：REQUEST-CHANGES 不开门，APPROVE 才满足下游 deps
       'R1',
       '--verified',
       '--artifact',
-      '/abs/review.md',
+      '/abs/review-v4.md',
       '--review-verdict',
       'APPROVE',
     ],

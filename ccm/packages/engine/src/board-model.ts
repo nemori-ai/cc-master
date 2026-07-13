@@ -343,10 +343,10 @@ export const FIELDS = {
     review_verdict: {
       tier: '✎',
       type: 'enum:reviewVerdict?',
-      default: '缺省(尚无 review 结论·gate 保持关闭)',
+      default: '缺省(当前 attempt 尚无 review 结论·gate 保持关闭)',
       readers: 'ccm dependencySatisfied / viewer',
-      writers: 'agent 经 ccm task done --review-verdict',
-      when: 'review execution 产出明确 verdict 时',
+      writers: 'agent 经 ccm task done --review-verdict；retry boundary 自动清旧值',
+      when: '当前 review attempt 产出明确 verdict 时',
       degrade:
         '缺/null→gate 未批准；非法→hard(FMT-REVIEW-VERDICT)；非空且无 dependency_gate→hard(BIZ-REVIEW-VERDICT-GATE)',
     },
@@ -575,6 +575,16 @@ export const STATUS_MACHINE = {
   doneStatus: 'done',
   activeStatuses: ['in_flight'],
 };
+
+// retry / reactivation 是既有合法状态边的具名子集，不新增 status 或 transition。
+// 调用方用这一份声明识别「开始新 attempt」的边，并重置 attempt-scoped evidence；具体写入仍归 mutation。
+export const RETRYABLE_STATUSES = ['stale', 'failed', 'escalated'] as const;
+export type RetryableStatus = (typeof RETRYABLE_STATUSES)[number];
+const RETRYABLE_STATUS_SET = new Set<string>(RETRYABLE_STATUSES);
+
+export function isRetryTransition(from: unknown, to: unknown): from is RetryableStatus {
+  return to === 'ready' && typeof from === 'string' && RETRYABLE_STATUS_SET.has(from);
+}
 
 // isLegalTransition(from, to) — to 是否是 from 的合法后继。from===to 视为合法(幂等重写/no-op)。
 export function isLegalTransition(from: string, to: string): boolean {

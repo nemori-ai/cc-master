@@ -363,6 +363,54 @@ test('recordTaskReviewVerdict requires an explicit gate and validates the verdic
   );
 });
 
+function completedReview(verdict: unknown): AnyBoard {
+  const b = baseBoard();
+  b.tasks = [
+    {
+      id: 'R1',
+      status: 'done',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+      review_verdict: verdict,
+      verified: true,
+      artifact: '/abs/review-v1.md',
+      finished_at: '2026-07-13T01:00:00Z',
+    },
+  ];
+  return b;
+}
+
+test('every named retry boundary clears attempt-scoped review verdicts, including malformed legacy residue', () => {
+  for (const from of ['stale', 'failed', 'escalated']) {
+    for (const verdict of ['APPROVE', 'REQUEST-CHANGES', '', null]) {
+      const input = completedReview(verdict);
+      input.tasks[0].status = from;
+      const next = m.transition(input, 'R1', 'ready', {});
+      assert.equal(
+        Object.hasOwn(next.tasks[0], 'review_verdict'),
+        false,
+        `${from}→ready must clear prior ${String(verdict)} verdict`,
+      );
+      assert.equal(input.tasks[0].review_verdict, verdict, 'transition remains pure');
+    }
+  }
+});
+
+test('APPROVE → stale → ready → in_flight → done without a new verdict cannot reuse old approval', () => {
+  let b = completedReview('APPROVE');
+  b = m.transition(b, 'R1', 'stale', {});
+  assert.equal(b.tasks[0].review_verdict, 'APPROVE', 'stale still describes the old attempt');
+  b = m.transition(b, 'R1', 'ready', {});
+  assert.equal(
+    b.tasks[0].review_verdict,
+    undefined,
+    'new attempt starts without a current verdict',
+  );
+  b = m.transition(b, 'R1', 'in_flight', {});
+  b = m.transition(b, 'R1', 'done', {});
+  assert.equal(b.tasks[0].review_verdict, undefined, 'done writer cannot resurrect prior approval');
+});
+
 // ── transition ───────────────────────────────────────────────────────────────────────────────────
 test('transition ready→in_flight stamps started_at (legal)', () => {
   const orig = baseBoard();

@@ -189,6 +189,29 @@ test('STATUS_MACHINE defines transitions for all 8 statuses + classifications', 
   assert.equal(M.isLegalTransition('done', 'in_flight'), false);
 });
 
+test('isRetryTransition names every legal new-attempt boundary without widening the state machine', () => {
+  assert.deepEqual(M.RETRYABLE_STATUSES, ['stale', 'failed', 'escalated']);
+  for (const from of M.RETRYABLE_STATUSES) {
+    assert.equal(M.isLegalTransition(from, 'ready'), true, `${from}→ready remains a legal edge`);
+    assert.equal(M.isRetryTransition(from, 'ready'), true, `${from}→ready starts a new attempt`);
+  }
+  assert.equal(
+    M.isRetryTransition('done', 'stale'),
+    false,
+    'marking old output stale is not a new attempt',
+  );
+  assert.equal(
+    M.isRetryTransition('ready', 'in_flight'),
+    false,
+    'ordinary start is inside the new attempt',
+  );
+  assert.equal(
+    M.isRetryTransition('blocked', 'ready'),
+    false,
+    'dependency unblocking is not a retry',
+  );
+});
+
 // ── INVARIANTS 注册表：规则 id/级别/家族 的 SSOT（spec §5）─────────────────────────────────────────
 test('INVARIANTS is a registry of {id, level, family, scope, summary}, ids unique', () => {
   assert.ok(Array.isArray(M.INVARIANTS) && M.INVARIANTS.length > 0);

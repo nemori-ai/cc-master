@@ -25,9 +25,15 @@ review task 的 `status=done` 只表示 **review execution completion**：review
 ```
 
 - `dependency_gate` 是声明；v1 只支持精确形状 `{kind:"review", required_verdict:"APPROVE"}`。
-- `review_verdict` 是执行结果；合法非空值为 `APPROVE | REQUEST-CHANGES`。
+- `review_verdict` 是**当前 attempt** 的执行结果；合法非空值为 `APPROVE | REQUEST-CHANGES`，不得跨 attempt 复用。
 - `review_verdict` 缺失、空串、`null`、未知值都不满足 review gate。
 - `status`、`verified`、`artifact` 的既有真完成契约不变；负向 review 可以诚实地 `done + verified + artifact + review_verdict:"REQUEST-CHANGES"`，因为 review 工作本身确已完成。
+
+### Attempt 生命周期
+
+`review_verdict` 是 attempt-scoped acceptance evidence，不是 task-scoped 永久属性。既有状态机把 `stale|failed|escalated → ready` 定义为 retry / reactivation 边；跨过这条边即开始一个新 attempt，writer 必须清除 current `review_verdict`。旧 verdict 可以在 retry 审计记录中归档，但归档值绝不能被 `dependencySatisfied` 当作 current verdict。
+
+具名 retry writer 与通用 `task set-status <id> ready` 必须复用同一个 retry-transition 谓词和 attempt reset helper，不能让通用合法状态转移成为保留旧 approval 的绕路。此契约不要求本改动新增 retry 命令；任何后续 retry 命令都必须接入同一边界。
 
 ## 共享判定
 
@@ -48,6 +54,7 @@ task.dependency_gate 存在但形状非法           => false  (fail closed)
 - `ccm task done <id> --review-verdict APPROVE|REQUEST-CHANGES --verified --artifact <ref>` 在完成 review execution 时原子记录 outcome。
 - 对没有合法 review gate 的 task 使用 `--review-verdict` 必须 fail loud，避免孤儿 verdict 被误当成有约束力的审批结论。
 - 已声明 review gate 的 task 可以不带 verdict 完成 execution；写入合法，但 gate 保持关闭。这样空 review 不会被伪装成失败的 execution，也绝不放行下游。
+- retry 后的 `task done` 若未提供 `--review-verdict`，必须保持 current verdict 缺失；writer 不得保留或恢复上一 attempt 的 verdict。当前 attempt 新提供 `APPROVE` 时仍可正常放行，新提供 `REQUEST-CHANGES` 时保持关闭。
 
 ## 校验与兼容
 
@@ -73,4 +80,7 @@ task.dependency_gate 存在但形状非法           => false  (fail closed)
 | negative | 合法 gate + `REQUEST-CHANGES` | blocked |
 | silent | 合法 gate + verdict 缺失/空/`null` | blocked |
 | approved | 合法 gate + `APPROVE` | ready |
+| retry silent | attempt 1 `APPROVE`；retry；attempt 2 done 且无 verdict | current verdict 缺失；blocked |
+| retry negative | attempt 1 `APPROVE`；retry；attempt 2 done + `REQUEST-CHANGES` | current verdict 为负向；blocked |
+| retry approved | attempt 1 `APPROVE`；retry；attempt 2 done + 新 `APPROVE` | ready |
 | malformed | gate / verdict 非法 | lint hard；谓词 fail closed |

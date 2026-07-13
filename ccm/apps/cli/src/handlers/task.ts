@@ -204,6 +204,8 @@ function _transitionVerb(ctx: Ctx, toStatus: string, label: string): number {
           if (Object.keys(fields).length) next = mutations.updateTask(next, id, fields);
           if (ctx.values && ctx.values['review-verdict'] !== undefined) {
             next = mutations.recordTaskReviewVerdict(next, id, ctx.values['review-verdict']);
+          } else {
+            next = mutations.clearTaskReviewVerdict(next, id);
           }
         }
       }

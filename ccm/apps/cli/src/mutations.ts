@@ -27,6 +27,7 @@ import {
   isEnumMember,
   isISOUTC,
   isLegalTransition,
+  isRetryTransition,
   isReviewDependencyGate,
   routingContractPreflight,
   SCHEMA_VERSION,
@@ -415,7 +416,7 @@ export function updateTask(board: Board, id: string, fields?: Record<string, any
 
 // ── recordTaskReviewVerdict(board, id, verdict) → 记录 review 结论，不改变执行状态。──────────────
 //   review task 的 status=done 只表示 review 工作已经执行；只有显式 APPROVE 才满足下游 deps。
-//   verdict 必须依附于显式 review gate，避免一个无门控语义的普通 task 静默长出 review outcome。
+//   verdict 只属于当前 attempt，且必须依附于显式 review gate，避免普通 task 静默长出 review outcome。
 export function recordTaskReviewVerdict(board: Board, id: string, verdict: unknown): Board {
   const b = clone(board);
   const t = requireTask(b, id);
@@ -432,6 +433,18 @@ export function recordTaskReviewVerdict(board: Board, id: string, verdict: unkno
     );
   }
   t.review_verdict = verdict;
+  return touch(b);
+}
+
+// review_verdict 是 attempt-scoped current evidence。所有新 attempt writer 与 done-without-verdict
+// 都复用这一处清理；若 retry writer 要归档旧值，必须先 snapshot，再调用本 helper。
+function clearAttemptScopedReviewVerdictInPlace(task: Task): void {
+  delete task.review_verdict;
+}
+
+export function clearTaskReviewVerdict(board: Board, id: string): Board {
+  const b = clone(board);
+  clearAttemptScopedReviewVerdictInPlace(requireTask(b, id));
   return touch(b);
 }
 
@@ -469,6 +482,7 @@ export function transition(
       'IllegalTransition',
     );
   }
+  if (isRetryTransition(from, toStatus)) clearAttemptScopedReviewVerdictInPlace(t);
   t.status = toStatus;
   if (toStatus === 'in_flight') t.started_at = stampNow();
   if (toStatus === 'done') t.finished_at = stampNow();

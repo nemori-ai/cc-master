@@ -644,11 +644,11 @@ ccm task done <id> [<id2> <id3> ...] [flags]
 |---|---|---|---|
 | `--artifact <str>` | | string | 产物链接（绝对路径 / URL；批量时对每个 id 一视同仁） |
 | `--verified` | | bool | 标记已端点验收（批量时对每个 id 一视同仁） |
-| `--review-verdict <enum>` | | enum | `APPROVE, REQUEST-CHANGES`；只用于已声明 `--review-gate APPROVE` 的 task。APPROVE 开门，REQUEST-CHANGES/缺失不开门 |
+| `--review-verdict <enum>` | | enum | `APPROVE, REQUEST-CHANGES`；只用于已声明 `--review-gate APPROVE` 的 task。当前 attempt 的 APPROVE 开门，REQUEST-CHANGES/缺失不开门 |
 | `--log <str>` | | string | 同时追一条 log（批量只追一条，summary 含全部 id） |
 
 - 例：`ccm task done T7 --artifact /abs/out.md --verified` · `ccm task done R1 --artifact /abs/review.md --verified --review-verdict REQUEST-CHANGES`（审查执行完成但不开门）· `ccm task done T7 T8 T9 --artifact /abs/out.md --verified`（批量）
-- review task 的 `status=done` / `verified=true` 表示 review 工作和报告已完成；审批结论单独写在 `review_verdict`。只有精确 `APPROVE` 满足显式 review gate；未声明 gate 却传 `--review-verdict` 会以 exit 3 拒绝且不落盘。
+- review task 的 `status=done` / `verified=true` 表示 review 工作和报告已完成；审批结论单独写在当前 attempt 的 `review_verdict`。只有精确 `APPROVE` 满足显式 review gate；未声明 gate 却传 `--review-verdict` 会以 exit 3 拒绝且不落盘。`stale|failed|escalated → ready` 开新 attempt 时清旧 verdict；本次 `task done` 不带 `--review-verdict` 也会显式保持 current verdict 缺失，不复用上轮批准。
 
 **批量语义（`task start` / `task done` 共用·issue #57 问题3 方案3·根治批量回填死结）**：`runWrite` 的写入
 关卡是"mutate → 对整块 next 板跑一次 `lintBoard` → 有 hard error 就整体拒绝、不落盘"。逐条独立调用

@@ -67,7 +67,7 @@
 | `artifact` | 产出落盘后（`task done` 时带 `--artifact`） | 绝对路径或 URL；done 真语义（verified+artifact）靠它 |
 | `verified` | 端点验收通过后 | `task done --verified` 一步到位，或 `task update --verified` |
 | `dependency_gate` | review task 必须明确批准后才允许下游开始时 | `task add|update --review-gate APPROVE`；缺省保持旧板的 status-only 依赖语义 |
-| `review_verdict` | review 执行产出明确结论时 | `task done --review-verdict APPROVE|REQUEST-CHANGES`；只有 APPROVE 满足显式 review gate |
+| `review_verdict` | 当前 review attempt 产出明确结论时 | `task done --review-verdict APPROVE|REQUEST-CHANGES`；只有当前 attempt 的 APPROVE 满足显式 review gate；retry 自动清旧值 |
 | `blocked_on` | `task block --on` 时自动设 | `"user"` 或某 task id；见 [G. blocked_on 怎么选](#g-blocked_on-怎么选) |
 | `justification` | 需记录决策理由时 | 解释「为什么建这个 task / 用这个方法」 |
 | `observability` | {{USING_CCM_OBSERVABILITY_SOURCE}} | 可选遥测；缺失优雅降级，不影响派发逻辑 |
@@ -132,7 +132,7 @@
 | `done` | 执行完成 | 普通/旧 task 满足 deps；显式 review gate 还须 `review_verdict=APPROVE` | 无须再动，除非上游产物变 → `stale` |
 | `escalated` | sub-agent 返回 escalation（超出能力范围） | 不在 readySet | 复盘后 supersede 节点，建新 task → escalated task 设 ready |
 | `failed` | 节点失败 | 不在 readySet | 重试 → `ready`，或升级处置 → `escalated` |
-| `stale` | 上游产物变了、需重跑 | 不在 readySet | 重确认输入后 → `ready` |
+| `stale` | 上游产物变了、需重跑 | 不在 readySet | 重确认输入后 → `ready`（开新 attempt；旧 review verdict 失效） |
 | `uncertain` | 做了但未验（验证节点尚未派出） | 不在 readySet | 验收通过 → `done`，失败 → `failed`，重做 → `in_flight` |
 
 ### status 何时转向哪态
@@ -337,14 +337,14 @@ ccm task start R1
 # 审查执行完成，但要求修改：R1=done；IMPLEMENT 仍 blocked
 ccm task done R1 --artifact /abs/review.md --verified --review-verdict REQUEST-CHANGES
 
-# 修改完成后复活并执行新一轮审查；批准时记录 APPROVE，只有此 verdict 满足依赖
+# 修改完成后复活并执行新一轮审查；stale→ready 自动清旧 verdict
 ccm task set-status R1 stale
 ccm task set-status R1 ready
 ccm task start R1
 ccm task done R1 --artifact /abs/review-v2.md --verified --review-verdict APPROVE
 ```
 
-`review_verdict` 缺失、空、null、非法值或 `REQUEST-CHANGES` 都不会开门（非法形状还会被 lint hard gate 拒绝）。没有 `dependency_gate` 的旧板/普通 task 继续按 status-only 语义运行，不需要迁移。
+`review_verdict` 只属于当前 attempt。`stale|failed|escalated → ready` 是统一 retry 边界，会清除 current verdict；旧值即使进入 retry 审计也不参与门控。retry 后 `task done` 不带 verdict 时仍保持缺失，绝不会复用上轮 `APPROVE`。缺失、空、null、非法值或 `REQUEST-CHANGES` 都不会开门（非法形状还会被 lint hard gate 拒绝）。没有 `dependency_gate` 的旧板/普通 task 继续按 status-only 语义运行，不需要迁移。
 
 **真实数据依赖 vs 虚假保险边：**
 

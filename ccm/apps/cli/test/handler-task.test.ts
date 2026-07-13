@@ -771,6 +771,57 @@ test('task done records APPROVE and auto-readies review-gated downstream', () =>
   assert.equal(findTask(b, 'I1').status, 'ready');
 });
 
+function retryApprovedReview(verdict?: 'APPROVE' | 'REQUEST-CHANGES'): {
+  boardPath: string;
+  board: any;
+} {
+  const tasks = [
+    {
+      id: 'R1',
+      status: 'done',
+      deps: [],
+      dependency_gate: { kind: 'review', required_verdict: 'APPROVE' },
+      review_verdict: 'APPROVE',
+      verified: true,
+      artifact: '/abs/review-v1.md',
+      created_at: '2026-06-24T08:00:00Z',
+      started_at: '2026-06-24T08:10:00Z',
+      finished_at: '2026-06-24T08:20:00Z',
+    },
+    { id: 'I1', status: 'ready', deps: ['R1'], created_at: '2026-06-24T08:30:00Z' },
+  ];
+  const boardPath = mkBoardHome({ tasks });
+  assert.equal(taskHandler.setStatus(mkCtx(boardPath, { positionals: ['R1', 'stale'] })), EXIT.OK);
+  assert.equal(findTask(readBoard(boardPath), 'I1').status, 'blocked');
+  assert.equal(taskHandler.setStatus(mkCtx(boardPath, { positionals: ['R1', 'ready'] })), EXIT.OK);
+  assert.equal(taskHandler.start(mkCtx(boardPath, { positionals: ['R1'] })), EXIT.OK);
+  const values: Record<string, unknown> = {
+    verified: true,
+    artifact: '/abs/review-v2.md',
+  };
+  if (verdict !== undefined) values['review-verdict'] = verdict;
+  assert.equal(taskHandler.done(mkCtx(boardPath, { values, positionals: ['R1'] })), EXIT.OK);
+  return { boardPath, board: readBoard(boardPath) };
+}
+
+test('retry completed without a new verdict does not preserve old APPROVE or unlock downstream', () => {
+  const { board } = retryApprovedReview();
+  assert.equal(findTask(board, 'R1').status, 'done');
+  assert.equal(findTask(board, 'R1').review_verdict, undefined);
+  assert.equal(findTask(board, 'I1').status, 'blocked');
+});
+
+test('retry uses only the current attempt verdict: REQUEST-CHANGES blocks and a new APPROVE unlocks', () => {
+  for (const [verdict, expected] of [
+    ['REQUEST-CHANGES', 'blocked'],
+    ['APPROVE', 'ready'],
+  ] as const) {
+    const { board } = retryApprovedReview(verdict);
+    assert.equal(findTask(board, 'R1').review_verdict, verdict);
+    assert.equal(findTask(board, 'I1').status, expected);
+  }
+});
+
 test('task done --review-verdict without an explicit review gate fails loud and does not persist', () => {
   const tasks = [
     {

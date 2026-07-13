@@ -57,7 +57,7 @@ description: '{{USING_CCM_DESCRIPTION}}'
 | `stale` | ready |
 
 > `verified` 是与 status **正交的布尔**(`--verified`),不是一个 status 值。`done` 且 `verified:true` 且 `artifact` 非空,才是真完成(端点验收过);缺任一项会被 `BIZ-DONE-VERIFIED` hard gate 拒绝落盘(exit 3)。
-> 对显式 review gate，`verified:true` 只验收「review 工作与报告已完成」，是否批准由 `review_verdict` 单独表达；只有 `APPROVE` 满足下游 deps。
+> 对显式 review gate，`verified:true` 只验收「review 工作与报告已完成」，是否批准由**当前 attempt** 的 `review_verdict` 单独表达；只有 `APPROVE` 满足下游 deps。`stale|failed|escalated → ready` 开新 attempt 时旧 verdict 自动失效，重跑后必须产出新 verdict。
 
 ### Rationalization Table —— status 这条最常见的自我说服
 
@@ -139,6 +139,7 @@ ccm cadence open I1 --goal "ship 切片" --deadline 2026-06-05T14:00:00Z --membe
 | `board lint` exit 3 但 stdout 是 `{"ok":true,...}` | 外层信封 `ok` 恒 true;**lint 是否净看 `data.ok` 与 exit code**(3=有 hard error)。 |
 | `block --on user` 写进去了却被 lint 挡 | awaiting-user 节点**必须**带 `decision_package`(`--decision @file`),否则 BIZ-AWAITING 硬闸。 |
 | review task 已 `done`，下游仍 blocked | 若它声明了 `--review-gate APPROVE`，这是正确行为：检查 `review_verdict`；只有 `task done ... --review-verdict APPROVE` 开门，REQUEST-CHANGES/缺 verdict 都不开门。 |
+| review 上轮已 `APPROVE`，retry 后下游又 blocked | verdict 只属于当前 attempt；`stale|failed|escalated → ready` 会清旧 verdict。新一轮 `task done` 必须显式给新的 `--review-verdict APPROVE` 才重新开门。 |
 | ISO 时间字段被 lint warn | 一律严格 `YYYY-MM-DDTHH:MM:SSZ`(UTC 定宽),别用本地时区 / 带毫秒。 |
 | 多个 active 板时命令报 Ambiguous | 用 `--goal <子串>` 或 `--board <path>` 消歧。 |
 | open cadence iteration 出 overbooked / critical-path / oversized warn | 这不是 hard gate,但说明本轮节奏不健康。先拆小、移出 scope、删假依赖或重估;不要靠 `cadence ship` 把超载藏起来。 |
