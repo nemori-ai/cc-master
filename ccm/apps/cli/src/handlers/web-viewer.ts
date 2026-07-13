@@ -6,6 +6,8 @@ import * as path from 'node:path';
 import {
   analyzeGraph,
   buildPeerRoster,
+  type DurableWriteCheckpoint,
+  durableWriteFileSync,
   isAwaitingUser,
   loadHomeBoards,
   STATUS_ENUM,
@@ -120,6 +122,7 @@ interface TestHooks {
   spawnService?: (args: SpawnArgs) => SpawnResult;
   openUrl?: (url: string) => OpenResult;
   shutdown?: (service: ServiceState, token: string | null) => boolean;
+  durableWriteFault?: (point: DurableWriteCheckpoint) => void;
 }
 
 let testHooks: TestHooks = {};
@@ -331,8 +334,11 @@ function buildState({
 }
 
 function writeJson(filePath: string, value: unknown): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  // Instance JSON is authoritative across start/reuse/serve; token bytes remain isolated in writeToken.
+  fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });
+  durableWriteFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, {
+    fault: testHooks.durableWriteFault,
+  });
 }
 
 function writeToken(filePath: string, token: string): void {
