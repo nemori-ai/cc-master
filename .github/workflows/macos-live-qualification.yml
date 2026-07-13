@@ -1,0 +1,223 @@
+name: macos-live-qualification
+
+on:
+  push:
+    branches:
+      - "qualify/portability-macos-live"
+    paths:
+      - ".github/workflows/macos-live-qualification.yml"
+      - "scripts/qualify-macos-live.sh"
+      - "ccm/**"
+      - "install.sh"
+      - "scripts/package-plugin.sh"
+      - "scripts/sync-plugin-dist.sh"
+      - "plugin/**"
+      - "tests/scripts/test_install_integrity.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-sea:
+    name: build / ${{ matrix.contract }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            contract: darwin-arm64
+            uname_arch: arm64
+            node_arch: arm64
+            asset: ccm-darwin-arm64
+          - runner: macos-15-intel
+            contract: darwin-x64
+            uname_arch: x86_64
+            node_arch: x64
+            asset: ccm-darwin-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ccm/pnpm-lock.yaml
+      - name: Assert real runner identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = Darwin
+          test "$(uname -m)" = "${{ matrix.uname_arch }}"
+          test "$(node -p 'process.arch')" = "${{ matrix.node_arch }}"
+      - name: Install dependencies and build workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm -C ccm install --frozen-lockfile
+          pnpm -C ccm build
+      - name: Build and attest SEA
+        shell: bash
+        env:
+          ASSET: ${{ matrix.asset }}
+        run: |
+          set -euo pipefail
+          OUT="${RUNNER_TEMP}/macos-sea/${ASSET}"
+          EVIDENCE="${RUNNER_TEMP}/macos-sea/build-evidence"
+          mkdir -p "$(dirname "${OUT}")" "${EVIDENCE}"
+          {
+            printf 'commit=%s\n' "$(git rev-parse HEAD)"
+            printf 'runner_label=%s\n' '${{ matrix.runner }}'
+            printf 'expected_contract=%s\n' '${{ matrix.contract }}'
+            printf 'uname_s=%s\n' "$(uname -s)"
+            printf 'uname_m=%s\n' "$(uname -m)"
+            printf 'node_arch=%s\n' "$(node -p 'process.arch')"
+            uname -a
+            sw_vers
+            node --version
+            pnpm --version
+            diskutil info / || true
+            mount
+          } >"${EVIDENCE}/runner.txt" 2>&1
+          CCM_SEA_NODE="$(command -v node)" CCM_SEA_OUT="${OUT}" \
+            bash ccm/apps/cli/scripts/build-sea.sh >"${EVIDENCE}/build-sea.log" 2>&1
+          chmod 755 "${OUT}"
+          "${OUT}" --version >"${EVIDENCE}/sea-version.log" 2>&1
+          codesign --verify --strict --verbose=4 "${OUT}" >"${EVIDENCE}/codesign-verify.log" 2>&1
+          codesign -dvvv "${OUT}" >"${EVIDENCE}/codesign-display.log" 2>&1
+          otool -L "${OUT}" >"${EVIDENCE}/otool.log" 2>&1
+          if grep -Eq '/opt/homebrew|/usr/local/(opt|Cellar)|libnode' "${EVIDENCE}/otool.log"; then
+            printf '%s\n' 'non-system dynamic dependency found' >&2
+            exit 1
+          fi
+          (
+            cd "$(dirname "${OUT}")"
+            shasum -a 256 "${ASSET}" >"${ASSET}.sha256"
+            shasum -a 256 -c "${ASSET}.sha256"
+          ) >"${EVIDENCE}/checksum.log" 2>&1
+      - name: Upload non-release SEA evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-sea-${{ matrix.contract }}
+          path: |
+            ${{ runner.temp }}/macos-sea/${{ matrix.asset }}
+            ${{ runner.temp }}/macos-sea/${{ matrix.asset }}.sha256
+            ${{ runner.temp }}/macos-sea/build-evidence
+          if-no-files-found: error
+          retention-days: 14
+
+  qualify:
+    name: qualify / ${{ matrix.contract }}
+    needs: build-sea
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            contract: darwin-arm64
+            uname_arch: arm64
+            node_arch: arm64
+            asset: ccm-darwin-arm64
+          - runner: macos-15-intel
+            contract: darwin-x64
+            uname_arch: x86_64
+            node_arch: x64
+            asset: ccm-darwin-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ccm/pnpm-lock.yaml
+      - name: Download SEA as a fresh workflow artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-sea-${{ matrix.contract }}
+          path: ${{ runner.temp }}/downloaded-sea
+      - name: Install qualification dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm -C ccm install --frozen-lockfile
+          pnpm -C ccm build
+          npm install --global @anthropic-ai/claude-code
+      - name: Run live qualification
+        id: live
+        continue-on-error: true
+        shell: bash
+        env:
+          EXPECTED_UNAME_ARCH: ${{ matrix.uname_arch }}
+          EXPECTED_NODE_ARCH: ${{ matrix.node_arch }}
+        run: |
+          chmod 755 "${RUNNER_TEMP}/downloaded-sea/${{ matrix.asset }}"
+          bash scripts/qualify-macos-live.sh \
+            "${RUNNER_TEMP}/downloaded-sea/${{ matrix.asset }}" \
+            '${{ matrix.contract }}' \
+            "${RUNNER_TEMP}/macos-qualification-${{ matrix.contract }}"
+      - name: Upload raw qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-live-evidence-${{ matrix.contract }}
+          path: ${{ runner.temp }}/macos-qualification-${{ matrix.contract }}
+          if-no-files-found: error
+          retention-days: 14
+      - name: Enforce qualification verdict
+        if: steps.live.outcome != 'success'
+        shell: bash
+        run: |
+          printf '%s\n' 'live qualification reported one or more required failures; inspect the uploaded raw evidence' >&2
+          exit 1
+
+  evidence-index:
+    name: evidence index
+    if: always()
+    needs: qualify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: macos-live-evidence-*
+          path: evidence
+      - name: Hash every evidence file
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const crypto = require('node:crypto');
+          const root = path.resolve('evidence');
+          const files = [];
+          function walk(dir) {
+            for (const name of fs.readdirSync(dir).sort()) {
+              const entry = path.join(dir, name);
+              const stat = fs.lstatSync(entry);
+              if (stat.isDirectory()) walk(entry);
+              else if (stat.isFile()) files.push(entry);
+            }
+          }
+          if (fs.existsSync(root)) walk(root);
+          const lines = files.map((file) => {
+            const hash = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+            return `${hash}  ${path.relative(root, file)}`;
+          });
+          fs.writeFileSync('EVIDENCE_SHA256SUMS', `${lines.join('\n')}\n`);
+          NODE
+          cat EVIDENCE_SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-live-evidence-index
+          path: EVIDENCE_SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
