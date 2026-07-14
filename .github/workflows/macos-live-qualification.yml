@@ -16,6 +16,13 @@ on:
       - "tests/scripts/test_install_integrity.sh"
       - "tests/scripts/test_macos_evidence_artifact.sh"
       - "tests/content/macos-qualification-workflow.test.mjs"
+  pull_request:
+    paths:
+      - ".github/workflows/macos-live-qualification.yml"
+      - "scripts/qualify-macos-live.sh"
+      - "scripts/macos-evidence-manifest.mjs"
+      - "ccm/**"
+      - "tests/content/macos-qualification-workflow.test.mjs"
   workflow_dispatch:
 
 permissions:
@@ -88,6 +95,27 @@ jobs:
           } >"${EVIDENCE}/runner.txt" 2>&1
           CCM_SEA_NODE="$(command -v node)" CCM_SEA_OUT="${OUT}" \
             bash ccm/apps/cli/scripts/build-sea.sh >"${EVIDENCE}/build-sea.log" 2>&1
+          if grep -Eq 'fexecve|execveat|/dev/fd|/proc/self/fd' \
+            ccm/apps/cli/native/runtime-invoke-helper-darwin.c; then
+            printf '%s\n' 'Darwin helper source contains a forbidden fd-exec claim' >&2
+            exit 1
+          fi
+          node - ccm/apps/cli/.native-build/runtime-invoke-helper.json '${{ matrix.node_arch }}' \
+            >"${EVIDENCE}/runtime-helper-contract.log" <<'NODE'
+          const fs = require('node:fs');
+          const [file, expectedArch] = process.argv.slice(2);
+          const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+          if (doc.contract !== 'darwin-path-attested-v1') process.exit(2);
+          if (doc.platform !== 'darwin' || doc.arch !== expectedArch) process.exit(3);
+          process.stdout.write(`${JSON.stringify(doc, null, 2)}\n`);
+          NODE
+          nm -u ccm/apps/cli/.native-build/runtime-invoke-helper \
+            >"${EVIDENCE}/runtime-helper-symbols.log"
+          if grep -Eq '_fexecve|_execveat' "${EVIDENCE}/runtime-helper-symbols.log"; then
+            printf '%s\n' 'Darwin helper imports a forbidden descriptor-exec symbol' >&2
+            exit 1
+          fi
+          grep -Eq '[[:space:]]_execve$' "${EVIDENCE}/runtime-helper-symbols.log"
           chmod 755 "${OUT}"
           "${OUT}" --version >"${EVIDENCE}/sea-version.log" 2>&1
           codesign --verify --strict --verbose=4 "${OUT}" >"${EVIDENCE}/codesign-verify.log" 2>&1

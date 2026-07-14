@@ -45,9 +45,34 @@ const expectedStrategy = `    strategy:
             asset: ccm-darwin-x64
 `;
 
+test('runtime-affecting pull requests require both real macOS architecture qualification jobs', () => {
+  assert.match(workflow, /^  pull_request:\n    paths:\n/m);
+  assert.match(workflow, /^      - "ccm\/\*\*"$/m);
+  assert.match(workflow, /^      - "scripts\/qualify-macos-live\.sh"$/m);
+  assert.match(workflow, /^permissions:\n  contents: read$/m);
+  assert.match(workflow, /runner: macos-14\n            contract: darwin-arm64/);
+  assert.match(workflow, /runner: macos-15-intel\n            contract: darwin-x64/);
+});
+
 test('build and qualification jobs retain the exact arm64/x64 contracts', () => {
   assert.equal(strategyBlock(jobBlock('build-sea')), expectedStrategy);
   assert.equal(strategyBlock(jobBlock('qualify')), expectedStrategy);
+});
+
+test('Darwin build and live operator attest the path-attested invoke contract without fd-exec claims', () => {
+  const build = namedStep(jobBlock('build-sea'), 'Build and attest SEA');
+  assert.match(build, /runtime-invoke-helper-darwin\.c/);
+  assert.match(build, /runtime-invoke-helper\.json/);
+  assert.match(build, /darwin-path-attested-v1/);
+  assert.match(build, /nm -u .*runtime-invoke-helper/);
+  assert.match(build, /_fexecve\|_execveat/);
+
+  assert.match(operator, /validate_darwin_runtime_assurance/);
+  assert.match(operator, /object_binding.*path-attested-v1/);
+  assert.match(operator, /active_same_uid_replacement.*residual/);
+  assert.match(operator, /runtime_exact_object_denial/);
+  assert.match(operator, /RUNTIME_INVOKE_ASSURANCE/);
+  assert.match(operator, /runtime-verified-exec-contract\.test\.ts/);
 });
 
 test('raw evidence upload intentionally includes hidden members only within the evidence root', () => {

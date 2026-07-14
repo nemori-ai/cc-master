@@ -1446,11 +1446,21 @@ export const REGISTRY: Registry = {
       handler: 'runtime.resolve',
     },
     invoke: {
-      summary: '通过已重验的 pinned image fd 启动 current runtime；其后参数原样传给 runtime',
+      summary:
+        '按平台执行已重验 runtime：Linux exact-fd；Darwin final path-attested（显式 same-UID residual）',
       read: false,
       positionals: [{ name: 'runtime-arg', required: false }],
-      options: {},
-      examples: ['ccm runtime invoke -- --version'],
+      options: {
+        'require-assurance': {
+          type: 'string',
+          enum: ['exact-object'],
+          desc: '要求 exact-object；当前 Darwin path-attested 后端会在创建子进程前 typed fail-closed',
+        },
+      },
+      examples: [
+        'ccm runtime invoke -- --version',
+        'ccm runtime invoke --require-assurance exact-object -- --version',
+      ],
       handler: 'runtime.invoke',
     },
     doctor: {
