@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
@@ -19,20 +18,8 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const row = value as Record<string, unknown>;
-    return `{${Object.keys(row)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonical(row[key])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
 function digest(value: unknown): string {
-  return `sha256:${createHash('sha256').update(canonical(value)).digest('hex')}`;
+  return engine.canonicalSha256Digest(value);
 }
 
 function r2Create(): { board: Json; command: Json } {

@@ -28,18 +28,17 @@
     "channel": "ccm-private-adapter/v1",
     "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
     "public_key_id": "ed25519:fixture-codex-origin-adapter",
-    "public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
-    "public_key_fingerprint": "sha256:a2b3d46f1a3ef275c9e599498a7058d25634f61c079565628fd00baf68c2917c",
+    "public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
+    "public_key_fingerprint": "sha256:6f60a5c6733c38b14c7f4d4da1cc7556ffeaca1c96e05893bb20b77a51f09f7f",
     "revoked": false,
     "trust_scope": {
+      "contract": "ccm/native-attempt/v1",
       "origin": "codex",
+      "harness": "codex",
+      "adapter": "codex/api-tool-multi-agent-v1",
+      "surface": "host-native",
       "transport": "codex-api-tool-multi-agent",
       "origin_session_ref": "session-ref:fixture-origin"
-    },
-    "storage": {
-      "record_visibility": "owner-only",
-      "raw_evidence_visibility": "owner-only",
-      "board_projection": "hash-and-ref-only"
     }
   },
   "initial_board": {
@@ -273,7 +272,8 @@
         "state": "starting",
         "created_at": "2026-07-13T08:00:00Z",
         "dispatch": {
-          "key": "dispatch-fixture-001",
+          "key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "run_ref": "ccm-run:v1:native-fixture-001",
           "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
           "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
           "launch_claim_id": "launch-claim-fixture-001",
@@ -380,6 +380,12 @@
           "request": {
             "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
           },
+          "dispatch": {
+            "run_ref": "ccm-run:v1:native-fixture-001",
+            "idempotency_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+            "launch_nonce": "launch-claim-fixture-001",
+            "claim_id": "launch-claim-fixture-001"
+          },
           "runtime": {
             "image_sha256": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
             "selector": {
@@ -389,7 +395,7 @@
             }
           }
         },
-        "canonical_identity_digest": "sha256:d5dd5ab7296eb76930995946e7bf4d5cf48ea671b530edd04cfb7cb67a9662d8",
+        "canonical_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab",
         "reservation": {
           "schema": "ccm/quota-reservation/v1",
           "reservation_id": "qres-native-fixture-001",
@@ -401,7 +407,7 @@
           "account_id": "account-native-fixture",
           "pool_id": "pool-native-fixture",
           "identity_fingerprint": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
-          "ticket_digest": "sha256:5d3129d773114de50566e38836000365565a552d63736e85aa2975e5a6ea6095"
+          "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17"
         },
         "ticket": {
           "schema": "ccm/quota-admission-ticket/v1",
@@ -410,7 +416,7 @@
           "reservation_request_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
           "reservation_expires_at": "2099-07-13T08:15:00Z",
           "attempt_id": "attempt-native-fixture-001",
-          "run_ref": "run-ref:native-fixture-001",
+          "run_ref": "ccm-run:v1:native-fixture-001",
           "account_id": "account-native-fixture",
           "pool_id": "pool-native-fixture",
           "identity_fingerprint": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
@@ -418,12 +424,12 @@
           "live_source_revision": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
           "runtime_sha256": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
           "launch_idempotency_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
-          "launch_nonce": "launch-nonce-native-fixture-001",
+          "launch_nonce": "launch-claim-fixture-001",
           "issued_at": "2026-07-13T07:59:58Z",
           "committed_at": "2026-07-13T07:59:59Z",
           "launch_by": "2099-07-13T08:14:00Z"
         },
-        "ticket_digest": "sha256:5d3129d773114de50566e38836000365565a552d63736e85aa2975e5a6ea6095"
+        "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17"
       },
       "admission_snapshot": {
         "current_lineage": {
@@ -506,7 +512,8 @@
         "state": "starting",
         "created_at": "2026-07-13T08:10:00Z",
         "dispatch": {
-          "key": "dispatch-fixture-002",
+          "key": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "run_ref": "ccm-run:v1:native-fixture-002",
           "input_hash": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
           "request_hash": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
           "launch_claim_id": "launch-claim-fixture-002",
@@ -612,6 +619,12 @@
           "request": {
             "digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
           },
+          "dispatch": {
+            "run_ref": "ccm-run:v1:native-fixture-002",
+            "idempotency_key": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+            "launch_nonce": "launch-claim-fixture-002",
+            "claim_id": "launch-claim-fixture-002"
+          },
           "runtime": {
             "image_sha256": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
             "selector": {
@@ -621,7 +634,7 @@
             }
           }
         },
-        "canonical_identity_digest": "sha256:83a31c0c541448fc45555a89fa66ea8162ecb0a6bdd6c0568987b3c2ec0740b4",
+        "canonical_identity_digest": "sha256:cc55aa1ef9c42b76e3466472eadf6cc8943315f84dce554ca6bf4b8d6ff1bac2",
         "reservation": {
           "schema": "ccm/quota-reservation/v1",
           "reservation_id": "qres-native-fixture-002",
@@ -633,7 +646,7 @@
           "account_id": "account-native-fixture",
           "pool_id": "pool-native-fixture",
           "identity_fingerprint": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
-          "ticket_digest": "sha256:17b9e39a6048804bdc04c42e4023402a9a03d1737b1aa8d8df6f93dd2179e194"
+          "ticket_digest": "sha256:bcdb740a977471b88ddc1723be4148eb9aae2b36490978e1a7fdbef698957130"
         },
         "ticket": {
           "schema": "ccm/quota-admission-ticket/v1",
@@ -642,7 +655,7 @@
           "reservation_request_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333334",
           "reservation_expires_at": "2099-07-13T08:15:00Z",
           "attempt_id": "attempt-native-fixture-002",
-          "run_ref": "run-ref:native-fixture-002",
+          "run_ref": "ccm-run:v1:native-fixture-002",
           "account_id": "account-native-fixture",
           "pool_id": "pool-native-fixture",
           "identity_fingerprint": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
@@ -650,12 +663,12 @@
           "live_source_revision": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
           "runtime_sha256": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
           "launch_idempotency_key": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
-          "launch_nonce": "launch-nonce-native-fixture-002",
+          "launch_nonce": "launch-claim-fixture-002",
           "issued_at": "2026-07-13T08:09:58Z",
           "committed_at": "2026-07-13T08:09:59Z",
           "launch_by": "2099-07-13T08:14:00Z"
         },
-        "ticket_digest": "sha256:17b9e39a6048804bdc04c42e4023402a9a03d1737b1aa8d8df6f93dd2179e194"
+        "ticket_digest": "sha256:bcdb740a977471b88ddc1723be4148eb9aae2b36490978e1a7fdbef698957130"
       },
       "admission_snapshot": {
         "current_lineage": {
@@ -705,9 +718,13 @@
           "task_id": "T-native-v1",
           "attempt_id": "attempt-native-fixture-001",
           "candidate_id": "codex-native",
-          "dispatch_key": "dispatch-fixture-001",
+          "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
           "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-          "launch_claim_id": "launch-claim-fixture-001"
+          "launch_claim_id": "launch-claim-fixture-001",
+          "reservation_id": "qres-native-fixture-001",
+          "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+          "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
         },
         "expected": {
           "transport": "codex-api-tool-multi-agent",
@@ -745,7 +762,7 @@
             }
           }
         },
-        "record_hash": "sha256:95b8ae0ab81d8a3ca9959db61388888c9cfd0768f67b7729b3c633cdcfbb06b4",
+        "record_hash": "sha256:727fdb68f6a4b529df9f90f809c408029d1aa247bf4ea6c527a0c21ef685fb4c",
         "resolved_context": {
           "account": "current",
           "permission_profile": "compatible",
@@ -1296,18 +1313,17 @@
         "channel": "ccm-private-adapter/v1",
         "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
         "public_key_id": "ed25519:fixture-codex-origin-adapter",
-        "public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
-        "public_key_fingerprint": "sha256:a2b3d46f1a3ef275c9e599498a7058d25634f61c079565628fd00baf68c2917c",
+        "public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
+        "public_key_fingerprint": "sha256:6f60a5c6733c38b14c7f4d4da1cc7556ffeaca1c96e05893bb20b77a51f09f7f",
         "revoked": false,
         "trust_scope": {
+          "contract": "ccm/native-attempt/v1",
           "origin": "codex",
+          "harness": "codex",
+          "adapter": "codex/api-tool-multi-agent-v1",
+          "surface": "host-native",
           "transport": "codex-api-tool-multi-agent",
           "origin_session_ref": "session-ref:fixture-origin"
-        },
-        "storage": {
-          "record_visibility": "owner-only",
-          "raw_evidence_visibility": "owner-only",
-          "board_projection": "hash-and-ref-only"
         }
       },
       "private-producer-registration:fixture-codex-wrong-scope-adapter": {
@@ -1316,18 +1332,17 @@
         "channel": "ccm-private-adapter/v1",
         "registration_ref": "private-producer-registration:fixture-codex-wrong-scope-adapter",
         "public_key_id": "ed25519:fixture-codex-wrong-scope-adapter",
-        "public_key_spki_base64": "MCowBQYDK2VwAyEAM4tdY8dElgWRzxzjg704dKxuejgS5j8cxjECrysepjs=",
-        "public_key_fingerprint": "sha256:d1a42e3d19166c25056795a43f2cb8d51c2c3bd24caa07fe0853a5dff3e53ab9",
+        "public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
+        "public_key_fingerprint": "sha256:6f60a5c6733c38b14c7f4d4da1cc7556ffeaca1c96e05893bb20b77a51f09f7f",
         "revoked": false,
         "trust_scope": {
+          "contract": "ccm/native-attempt/v1",
           "origin": "codex",
+          "harness": "codex",
+          "adapter": "codex/api-tool-multi-agent-v1",
+          "surface": "host-native",
           "transport": "codex-api-tool-multi-agent",
           "origin_session_ref": "session-ref:other-origin"
-        },
-        "storage": {
-          "record_visibility": "owner-only",
-          "raw_evidence_visibility": "owner-only",
-          "board_projection": "hash-and-ref-only"
         }
       }
     },
@@ -1349,20 +1364,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-001",
-            "record_hash": "sha256:95b8ae0ab81d8a3ca9959db61388888c9cfd0768f67b7729b3c633cdcfbb06b4",
+            "record_hash": "sha256:727fdb68f6a4b529df9f90f809c408029d1aa247bf4ea6c527a0c21ef685fb4c",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:DOBRR1nZy/IQszhNwhSIf3xOC+Boe94JKBvGlY7bLHuZGkVA5FU3/jOcbiVw2y64y0en9Dm7McLiLD6NX198Bg=="
+              "signature": "ed25519:9wpSYPAYO2PB72ppwE8DuuapkffUy8SNsWIOOMVRlXGnI1Rje5m6fsqUIkJpjZSrc/7WrmvSnDtbzSDVyC7ZDg=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -1412,7 +1431,7 @@
         "id": "bind-owner-store-provenance",
         "issue": "NATIVE-EVIDENCE-OWNER-STORE-PROVENANCE",
         "record_ref": "evidence:fixture-bind-owner-provenance",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "workspace-staged-evidence/v1",
@@ -1428,20 +1447,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-owner-provenance",
-            "record_hash": "sha256:b9602bedf8445b978e5f6f30ccdeec8541f6e97b5231bcd483ad907fdd95df05",
+            "record_hash": "sha256:20ef507334b87ac8ddf1d69c663aac39093f27d3c06f098cec166dca256e6fec",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:xnc8mgFhTFnJ4C00oquZO6qM6W5JUEFnHrUbdZGGqOptjO+HrxMe5bkKckmCHI/XHAR/x8tYFXBLzEN0ubUgBw=="
+              "signature": "ed25519:yWCTsnPvlvBS1ZhyJO6PqxXy4AmSdkKtW74AEpQN25Che+jeybQQSyphhxtStMDDIm2M5jg/X02sir4PN0VWCw=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -1491,7 +1514,7 @@
         "id": "bind-bad-signature",
         "issue": "NATIVE-EVIDENCE-SIGNATURE-INVALID",
         "record_ref": "evidence:fixture-bind-bad-signature",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -1507,20 +1530,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-bad-signature",
-            "record_hash": "sha256:1e45b0d7094a6b1bbdecc85fc3c6bd135dd74d014fbadfe4e8ad38174c8b7c15",
+            "record_hash": "sha256:6bcc724d068ee494bbcc9c8cbd72d622feac6397928bc64eb5de06a784d9d3b5",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:FuHUuSYn4CO5H5Ikt25YVv16BTr82VLiRy6dJzZU6enJuyhLWMQ6eEF1uzxV/3Gd+m6uMzdiqTQE3XgtarnADw=="
+              "signature": "ed25519:BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -1570,7 +1597,7 @@
         "id": "bind-bad-canonical-hash",
         "issue": "NATIVE-EVIDENCE-CANONICAL-HASH-MISMATCH",
         "record_ref": "evidence:fixture-bind-bad-canonical-hash",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -1591,15 +1618,19 @@
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:rE2OywSpAx5kkrwPo0VKU0w3HAciVW2sTyQu3hW6sWN1PqlChQIj0Z9Gnd/qNIFLEPwy2QVTRDhkFSgif2XSBg=="
+              "signature": "ed25519:THi4HbMjS5TF/86A8yt5VWI1U6QXoShIl6JR2o5WetQJJV4iX32MsVRwFAtJxkYsAG1Fi/awv3jnS5fXK0Y6Bg=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -1649,7 +1680,7 @@
         "id": "bind-unknown-registration",
         "issue": "NATIVE-EVIDENCE-REGISTRATION-UNKNOWN",
         "record_ref": "evidence:fixture-bind-unknown-registration",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAlKQmiZICCnf8EF35kSgMyrPfvTaFrHnTAdfLaTftu08=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -1665,20 +1696,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-unknown-registration",
-            "record_hash": "sha256:382507f433e62a0a1f206cd7ed3ca85587ddb7ea9ecc1e3dd8ce35b2caa638d5",
+            "record_hash": "sha256:97a658ef62ea305a6c3373442c7cade970a494e6b378fa12505edf591c64cba4",
             "producer": {
               "producer_id": "producer:fixture-codex-unregistered-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-unregistered-adapter",
-              "signature": "ed25519:KitmBu0zyjtfm+vBrVoED8QV2gEag6zpVQb5vAFDH+IteawRFhJttp2KZjqLpnRhqmdturYZ4juILclX1ySTBQ=="
+              "signature": "ed25519:PdBE//Kmj8m4odEWyOzH9rcORGNY4ZbZFtgzOxYcAwP1wjuBTACQdOXlX3acZ6Qhqmn3BiejxjNFxjlJnBVlBw=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -1728,7 +1763,7 @@
         "id": "bind-wrong-trust-scope",
         "issue": "NATIVE-EVIDENCE-TRUST-SCOPE-MISMATCH",
         "record_ref": "evidence:fixture-bind-wrong-trust-scope",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAM4tdY8dElgWRzxzjg704dKxuejgS5j8cxjECrysepjs=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -1744,20 +1779,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-wrong-trust-scope",
-            "record_hash": "sha256:663021c210e44bd97a842cc8cb6e14f223bfba428b2b77622391ae66cbfeda2f",
+            "record_hash": "sha256:480d15be4c0274b11e9cbf61e7dcf08c03d6e8296cb4ba089efc7ea8febd5e3f",
             "producer": {
               "producer_id": "producer:fixture-codex-wrong-scope-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-wrong-scope-adapter",
-              "signature": "ed25519:rU0+UxrSD7vfg1O4x1GExRcNSWjfcpDHW52otOC2kiiO/8K+sgHpKDFoNCytmoFa5hn0+3zDDpwEjKGLWSglAw=="
+              "signature": "ed25519:lV6L0Kxu15G3lNE9431PEOdfHOXPku7sjtGy+d6VN38QtBzeNn5byrQgJgIXl2J1HTmFgweRZxOfW3TxlS2SAQ=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -1807,7 +1846,7 @@
         "id": "bind-reused-claim",
         "issue": "NATIVE-EVIDENCE-CLAIM-REUSED",
         "record_ref": "evidence:fixture-bind-reused-claim",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -1823,20 +1862,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-reused-claim",
-            "record_hash": "sha256:d11b31301bd0836ea837e8c51570d97545e9dd3f2ac3dd407eb5d45af6a8490f",
+            "record_hash": "sha256:f82514990e7e9adb2732eb34f1ba72f76ccee7f48f1ab1f7bcd64c0a13fe73a2",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:ezGPll+eYLnvHcTSEU6zCFq9mfe0FvLA1Ii6TLFNZ7GYTjdDdlCUjvlwUqjp7Kse3aCo94NLTDTO9L3uRb2EDQ=="
+              "signature": "ed25519:KdLUtKl2Wo3SFo/raS2LTy/HgP+cc8RcK5cEW8xTMFGcscrHT8ziV0v2bTW71Uq1GvdVQABiisZ1c16JBzOHDw=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -1887,7 +1930,7 @@
         "id": "bind-caller-verified-by-ccm",
         "issue": "NATIVE-EVIDENCE-CALLER-VERIFICATION-FORBIDDEN",
         "record_ref": "evidence:fixture-bind-caller-verified-by-ccm",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -1903,20 +1946,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-caller-verified-by-ccm",
-            "record_hash": "sha256:54c596721cdf7c6cca3e8ff97868577f4fccc618384191fc2a4ebea1ed5af6fe",
+            "record_hash": "sha256:a283e4d07b95c98d632c917eb20cef2304b3f6c1f79e80c35cab64a9376214b1",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:HoCNoSn1IEI8tB/6TNnLIsw1jmdePIbi1XCgvPuDN/QQHuLzHsMowAPz+3Gjl1XOCKG7kKFgWa2xmYZUKONUAg=="
+              "signature": "ed25519:pf46C5A5pO1x7Kctw2yyOI1/e7dv+QaPQWm6OK7xnvihpFZWPA/5jZp/e0yGnC7tpBsPIfmSoRAlt4imwgH/Ag=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -1969,7 +2016,7 @@
         "id": "bind-account-fingerprint-drift",
         "issue": "NATIVE-ACCOUNT-FINGERPRINT-MISMATCH",
         "record_ref": "evidence:fixture-bind-account-drift",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -1985,20 +2032,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-account-drift",
-            "record_hash": "sha256:10811d0b95a776926cd77ec2b29612cc76c977b36fe7a8b0ed38e4077d0ca222",
+            "record_hash": "sha256:b2d6dc113fe76ee89ce342dbefb7ea047be8047e725c0085d0e31d7cb07b2c26",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:7Rk5buWcTzoyOk2WJT0+doYr87O88dw7HmOf39mNVRECcgARhxTjS+0XbibziMMenVajncI3bAYYh64LobT8CA=="
+              "signature": "ed25519:X800yqWuloWqBtEUlAw5VKIA4esVGhy6zfJBBD9hj9nF4ZyXXRd4CvwwFbTTImKO2f9NNL+FM79rJxBf7PeNBA=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -2048,7 +2099,7 @@
         "id": "bind-account-fingerprint-unknown",
         "issue": "NATIVE-ACCOUNT-FINGERPRINT-UNKNOWN",
         "record_ref": "evidence:fixture-bind-account-unknown",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -2064,20 +2115,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-account-unknown",
-            "record_hash": "sha256:a53aeeaafcf8e9bb092db8284f960cc96d5f12db72899c628811120bc9fbf187",
+            "record_hash": "sha256:63d850b7df75ba98d17bbb8765c8df74cc4a27324946416d48ea29b9ca08bb15",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:upSIPbkLXLxkzdeUbvc2oI2wdUMa9oi1LUXOd9PjwZfNaoDMeuXi5zoxzUPIuFouzwEqYqO4oPr52DXOd5OhCg=="
+              "signature": "ed25519:aiaJC5KInMcCl4GhhJ+ERSE8kBHe60wC7nsBtXNhr6H4oxFWZhV8zi+qGPxssKe0SmuS7qEzmuq7mDEiXanQAQ=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -2127,7 +2182,7 @@
         "id": "bind-permission-profile-incompatible",
         "issue": "NATIVE-PERMISSION-PROFILE-INCOMPATIBLE",
         "record_ref": "evidence:fixture-bind-permission-profile",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -2143,20 +2198,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-permission-profile",
-            "record_hash": "sha256:a6888b519f12c4ee98db2cf59b65bbb6e54eca0a019bf057b54d6b9633629402",
+            "record_hash": "sha256:c11922cb0ac72cbe510c9934aa588955803889d43e1f880954879e31d988671e",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:EyclaUZdI5DMUWUOy4whnSoFOArNdCWs0Ub6sWcCoRkxRiBTeRJ97+azBQhJS3tVktheluxJXCerDyPyfQo5Bg=="
+              "signature": "ed25519:mCQ3yylyOLBVLtsnfgS55nATn1xU+my9mwQPwb2pPIVpd6oSsE8pZOfKBYh2+7bOAU6rcaIU/9es0lOrv8qGDg=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -2206,7 +2265,7 @@
         "id": "bind-permission-deny-incompatible",
         "issue": "NATIVE-PERMISSION-DENY-INCOMPATIBLE",
         "record_ref": "evidence:fixture-bind-permission-deny",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -2222,20 +2281,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-permission-deny",
-            "record_hash": "sha256:16228cb0e07d2bea409ba2c36092c779745b2d804fb5fdf7e2a3faa6d441cf26",
+            "record_hash": "sha256:599f55c8833fa12030ca544420b1fdc45a6b59cc6d0af2ae872452f8f191d3df",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:bj/zs17zFrsxRHw9CqxxDg7s1F5DAaBhmVvO8/Kv8H+mhkiqNtw1JqufC/tg9Vqpr466YMM3iKV9bQurxu44CA=="
+              "signature": "ed25519:jk3bPI4i/a/MFT0VqqoADcfgyjCCdkNgEKJxzq9HoJ4cDADAFZTjdCKazKWdVX/RBXhwgXqxACgL9P3N4ycfCg=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -2287,7 +2350,7 @@
         "id": "bind-without-handle",
         "issue": "NATIVE-HANDLE-MISSING",
         "record_ref": "evidence:fixture-bind-without-handle",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -2303,20 +2366,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-without-handle",
-            "record_hash": "sha256:a4c9ac0fdc6f581303d5b4c38b0551b6358555bb11cf4588095493566d48e577",
+            "record_hash": "sha256:5649cd645b4f91d086d0a16132d7d8cb7fc72d8f6631428b73e9697807a64e0b",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:GmsBs04VtZmPfWZt57CXWV3+LTrkanfphvmUzSKtva1G4Sk4ei50FWMCzlPsePUg5cTtfNvIt7+8aor6fnWIBg=="
+              "signature": "ed25519:iaZfe0XpX62eclYlatA4mV8KkDHGbpVkxeBw4+VBcgYIMSY+qXPOhc+4dtjduoyOgc8FyhAG7KTFXFbxw4ySBQ=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -2325,6 +2392,7 @@
             },
             "observed": {
               "handle_kind": "codex-agent-id",
+              "handle": "",
               "canonical_target": "/root/fixture-parent/fixture-worker",
               "spawn": {
                 "observed_at": "2026-07-13T08:00:01Z",
@@ -2365,7 +2433,7 @@
         "id": "bind-without-roster-corroboration",
         "issue": "NATIVE-HANDLE-UNATTESTED",
         "record_ref": "evidence:fixture-bind-without-roster",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -2381,20 +2449,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-without-roster",
-            "record_hash": "sha256:53917f1bb4126804db7cc1ed225ec690d30c8ca39a1a7c20260aaed4a447c56f",
+            "record_hash": "sha256:4bc17ed948dd80537debcc538d13952efb2a00f4028f9c2f20bbfc33ff39529c",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:y9N7t3dhHBA3l2kqiyZCpy4AgOq+WUYdIPPgpxkE/7Vx+9xjUCQgn1mguMRLht5Uc9gzOYj5ULcL8dbH2CzeCg=="
+              "signature": "ed25519:vWndtf8EeqFQ9T2OtRfrfPoGBjON+YG5zH1wzeojE0Q55CLEtO+UbD+lr9Cmef+16oc2oGq2C3UqHPPDtbn2DA=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -2409,6 +2481,13 @@
                 "observed_at": "2026-07-13T08:00:01Z",
                 "owner_record_ref": "owner-evidence://fixture/spawn-001",
                 "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
               },
               "current_lineage": {
                 "origin_session_ref": "session-ref:fixture-origin",
@@ -2437,7 +2516,7 @@
         "id": "bind-parent-session-id-as-handle",
         "issue": "NATIVE-HANDLE-PARENT-SESSION",
         "record_ref": "evidence:fixture-bind-parent-as-handle",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -2453,20 +2532,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-parent-as-handle",
-            "record_hash": "sha256:188baf75c1cc4dd3a5b75d7d6434ff9b211d9f3c0bf5ba297d36fd31ed7ffd42",
+            "record_hash": "sha256:8d3657f7915f9de8abe6228af8ea46bdd87c586a2c332fc948e1196a28b145ad",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:7NjXlx3w5s3RfdeTmO9JlrU6a9kCpor5brDFjB1Of+sH9Ba08e9yQw9I+QSKIbYp4Dz+ZasoJA3MTyag1v6dDQ=="
+              "signature": "ed25519:xbvwKAk3jbOMM5K+OvQYyTNOAhnfRXFx5ecblMRy9Rrqryc0o/Yjs1scRwFARHMAntS7poYvVLOm3EhrtvX2DA=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -2516,7 +2599,7 @@
         "id": "bind-lineage-drift",
         "issue": "NATIVE-LINEAGE-MISMATCH",
         "record_ref": "evidence:fixture-bind-worktree-drift",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -2532,20 +2615,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-worktree-drift",
-            "record_hash": "sha256:12d85bf0abb64532ff0b9d9d381fc8f7674a78e1cbaae2a08bdfd2b56be72209",
+            "record_hash": "sha256:8567d99c9bd05ccd062ee93490fff473b652d8c35fe1e919730ef73e70a44a28",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:wCLpdJcRY8qSRVOyaC7qLrpXieL/Hf99wuNp2JMcx7lJCHXmdPX/cTinfhHpNvXdh9mTeMWcqaqqvIryTU5aAw=="
+              "signature": "ed25519:xkW3AJAg88wYfFKhReqVByXpH9KaDftg/C6dDNILbiqBRG5VIUH69Q1/wP4GULFwyG+CTaHzo4ORRdkpH9GKBg=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -2595,7 +2682,7 @@
         "id": "bind-wrong-expected-child",
         "issue": "NATIVE-EXPECTED-CHILD-MISMATCH",
         "record_ref": "evidence:fixture-bind-wrong-child",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -2611,20 +2698,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-wrong-child",
-            "record_hash": "sha256:559fdde50115e1cb99b2e8c94d71b664c1dbf4bd61394813163b6f1d4631eeda",
+            "record_hash": "sha256:5b6c5431ba2fe8126f34dd84de3080c5254dde9ad44f2101cc8906f19d15b6a4",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:1lVbJia16HIItUtvgo167N9l2Kp/MoAZUrWPn4JKUXMbw34uZn1hdkn3y5zKtATOZZkRQ8KR63GegqZ28/oVBA=="
+              "signature": "ed25519:o9GSUWnYGgvuQVgjMKCZL29FdOezRWhhOHIuZqNW8q4egWcK7eLS/Q8wQLi+PVqLY+tvjLcccNApPXNKpt5iCQ=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-fixture-001"
+              "launch_claim_id": "launch-claim-fixture-001",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",
@@ -2674,7 +2765,7 @@
         "id": "bind-wrong-create-link",
         "issue": "NATIVE-EVIDENCE-CREATE-LINK-MISMATCH",
         "record_ref": "evidence:fixture-bind-wrong-create-link",
-        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAXTZkXHsB1rueJ/NMogh6+47lNPsO99E6t9oeBrZ1570=",
         "owner_store_entry": {
           "provenance": {
             "store": "ccm-owner-evidence/v1",
@@ -2690,20 +2781,24 @@
           "record": {
             "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
             "record_id": "evidence:fixture-bind-wrong-create-link",
-            "record_hash": "sha256:53871a2132d0e6f56702322da1d40a90cf411ec4bec6015b3beb5c58016b8f80",
+            "record_hash": "sha256:9eaf18a337c94c3ce02ca2bbf81f1bffba34c2bf9a1bdc0b2ca2da85af69fb3a",
             "producer": {
               "producer_id": "producer:fixture-codex-origin-adapter",
               "channel": "ccm-private-adapter/v1",
               "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
-              "signature": "ed25519:OD47vGWEzdvvi5hGkjg35EG5qJJWsJkqCslE89TBGJvWTXCAq9zqMxO/WMArpCXSvVfA03AR9Dhk1OEM0RlyDQ=="
+              "signature": "ed25519:fbU2rXroARhVF8S3xNufd4SzXkUIkgC3FQZYw2EHdtPeX0uNY1Dlgml5oKfaOUnp4PPPcbrRWV2NiSih04A0DQ=="
             },
             "create_link": {
               "task_id": "T-native-v1",
               "attempt_id": "attempt-native-fixture-001",
               "candidate_id": "codex-native",
-              "dispatch_key": "dispatch-fixture-001",
+              "dispatch_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+              "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
               "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-              "launch_claim_id": "launch-claim-forged"
+              "launch_claim_id": "launch-claim-forged",
+              "reservation_id": "qres-native-fixture-001",
+              "ticket_digest": "sha256:8d6bdc95afd86cd407af0a8d3bae933543f7fc072f17289044a981cf1d414a17",
+              "launch_identity_digest": "sha256:37d7918e0a556c877e3b91c154d8f2c44b6c6c277040b535662d379d4536dbab"
             },
             "expected": {
               "transport": "codex-api-tool-multi-agent",

@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
@@ -19,20 +18,8 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const row = value as Record<string, unknown>;
-    return `{${Object.keys(row)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonical(row[key])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
 function digest(value: unknown): string {
-  return `sha256:${createHash('sha256').update(canonical(value)).digest('hex')}`;
+  return engine.canonicalSha256Digest(value);
 }
 
 function authority(command: Json): Json {
@@ -48,16 +35,15 @@ function authority(command: Json): Json {
       'sha256:3333333333333333333333333333333333333333333333333333333333333333',
     reservation_expires_at: '2099-07-13T08:05:00Z',
     attempt_id: attempt.id,
-    run_ref: 'run-ref:native-fixture-001',
+    run_ref: attempt.dispatch.run_ref,
     account_id: 'account-native-fixture',
     pool_id: 'pool-native-fixture',
     identity_fingerprint: 'sha256:4444444444444444444444444444444444444444444444444444444444444444',
     aggregation_key: 'sha256:5555555555555555555555555555555555555555555555555555555555555555',
     live_source_revision: 'sha256:6666666666666666666666666666666666666666666666666666666666666666',
     runtime_sha256: 'sha256:7777777777777777777777777777777777777777777777777777777777777777',
-    launch_idempotency_key:
-      'sha256:8888888888888888888888888888888888888888888888888888888888888888',
-    launch_nonce: 'launch-nonce-native-fixture-001',
+    launch_idempotency_key: attempt.dispatch.key,
+    launch_nonce: attempt.dispatch.launch_claim_id,
     issued_at: '2026-07-13T07:59:58Z',
     committed_at: '2026-07-13T07:59:59Z',
     launch_by: '2099-07-13T08:04:00Z',
@@ -88,6 +74,12 @@ function authority(command: Json): Json {
     permission: clone(lineage.permission),
     input: { digest: inputHash },
     request: { digest: attempt.dispatch.request_hash },
+    dispatch: {
+      run_ref: attempt.dispatch.run_ref,
+      idempotency_key: attempt.dispatch.key,
+      launch_nonce: attempt.dispatch.launch_claim_id,
+      claim_id: attempt.dispatch.launch_claim_id,
+    },
     runtime: {
       image_sha256: ticket.runtime_sha256,
       selector: { kind: 'exact', model_id: 'host-default', effort: 'medium' },

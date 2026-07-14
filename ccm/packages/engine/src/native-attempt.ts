@@ -1,12 +1,12 @@
 import { taskTrulyDone } from './board-model.js';
 import { reconcileGating } from './board-reconcile.js';
+import { canonicalSha256Digest } from './canonical-digest.js';
 import { canonicalJson } from './canonical-json.js';
 import {
   CANONICAL_LAUNCH_IDENTITY_SCHEMA,
   canonicalLaunchIdentityDigest,
   normalizeCanonicalLaunchIdentity,
 } from './canonical-launch-identity.js';
-import { sha256Hex } from './sha256.js';
 
 export const NATIVE_ATTEMPT_CONTRACT = 'ccm/native-attempt/v1';
 export const NATIVE_VERIFIED_EVIDENCE_CONTRACT = 'ccm/native-verified-evidence/v1';
@@ -139,7 +139,7 @@ function canonicalCreateSnapshot(command: JsonObject): JsonObject {
 }
 
 function createHashFor(snapshot: JsonObject): string {
-  return `sha256:${sha256Hex(canonicalJson(snapshot))}`;
+  return canonicalSha256Digest(snapshot);
 }
 
 function findTask(board: JsonObject, taskId: unknown): JsonObject {
@@ -253,7 +253,9 @@ function requireAttemptBaseStructure(
     !ATTEMPT_STATES.has(attempt.state) ||
     !isUtcSecond(attempt.created_at) ||
     !isJsonObject(attempt.dispatch) ||
-    !isNonEmptyString(attempt.dispatch.key) ||
+    !SHA256_RE.test(attempt.dispatch.key) ||
+    !isNonEmptyString(attempt.dispatch.run_ref) ||
+    !String(attempt.dispatch.run_ref).startsWith('ccm-run:v1:') ||
     !SHA256_RE.test(attempt.dispatch.input_hash) ||
     !SHA256_RE.test(attempt.dispatch.request_hash) ||
     !isNonEmptyString(attempt.dispatch.launch_claim_id) ||
@@ -319,7 +321,7 @@ function timestamp(value: unknown): number {
 }
 
 function canonicalDigest(value: unknown): string {
-  return `sha256:${sha256Hex(canonicalJson(value))}`;
+  return canonicalSha256Digest(value);
 }
 
 function selectedCandidate(task: JsonObject, attempt: JsonObject): JsonObject {
@@ -370,6 +372,12 @@ function expectedLaunchIdentity(
       permission: clone(attempt.lineage?.permission),
       input: { digest: attempt.dispatch?.input_hash },
       request: { digest: attempt.dispatch?.request_hash },
+      dispatch: {
+        run_ref: attempt.dispatch?.run_ref,
+        idempotency_key: attempt.dispatch?.key,
+        launch_nonce: attempt.dispatch?.launch_claim_id,
+        claim_id: attempt.dispatch?.launch_claim_id,
+      },
       runtime: {
         image_sha256: ticket.runtime_sha256,
         selector: { kind: 'exact', model_id: candidate.model, effort: candidate.effort },
@@ -421,6 +429,9 @@ function requireLaunchAuthority(task: JsonObject, attempt: JsonObject, value: un
     ticket.account_id !== reservation.account_id ||
     ticket.pool_id !== reservation.pool_id ||
     ticket.identity_fingerprint !== reservation.identity_fingerprint ||
+    ticket.run_ref !== attempt.dispatch?.run_ref ||
+    ticket.launch_idempotency_key !== attempt.dispatch?.key ||
+    ticket.launch_nonce !== attempt.dispatch?.launch_claim_id ||
     authority.ticket_digest !== canonicalDigest(ticket) ||
     reservation.ticket_digest !== authority.ticket_digest
   ) {

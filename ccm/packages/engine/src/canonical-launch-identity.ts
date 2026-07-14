@@ -1,5 +1,4 @@
-import { canonicalJson } from './canonical-json.js';
-import { sha256Hex } from './sha256.js';
+import { canonicalSha256Digest } from './canonical-digest.js';
 
 export const CANONICAL_LAUNCH_IDENTITY_SCHEMA = 'ccm/canonical-launch-identity/v1';
 
@@ -14,6 +13,7 @@ export const CANONICAL_LAUNCH_IDENTITY_FIELD_REGISTRY = Object.freeze({
     'permission',
     'input',
     'request',
+    'dispatch',
     'runtime',
   ]),
   origin: Object.freeze(['harness', 'session_ref']),
@@ -23,6 +23,7 @@ export const CANONICAL_LAUNCH_IDENTITY_FIELD_REGISTRY = Object.freeze({
   workspace: Object.freeze(['workspace_ref', 'worktree_ref', 'baseline_commit']),
   permission: Object.freeze(['snapshot_ref', 'profile', 'denies']),
   digest: Object.freeze(['digest']),
+  dispatch: Object.freeze(['run_ref', 'idempotency_key', 'launch_nonce', 'claim_id']),
   runtime: Object.freeze(['image_sha256', 'selector']),
   selector: Object.freeze(['kind', 'model_id', 'effort']),
 });
@@ -63,6 +64,7 @@ export function normalizeCanonicalLaunchIdentity(value: unknown): Json {
   const permission = object(row?.permission);
   const input = object(row?.input);
   const request = object(row?.request);
+  const dispatch = object(row?.dispatch);
   const runtime = object(row?.runtime);
   const selector = object(runtime?.selector);
   const fields = CANONICAL_LAUNCH_IDENTITY_FIELD_REGISTRY;
@@ -89,6 +91,11 @@ export function normalizeCanonicalLaunchIdentity(value: unknown): Json {
     !SHA256_RE.test(String(input.digest)) ||
     !exact(request, fields.digest) ||
     !SHA256_RE.test(String(request.digest)) ||
+    !exact(dispatch, fields.dispatch) ||
+    !strings(dispatch, fields.dispatch) ||
+    !SHA256_RE.test(String(dispatch.idempotency_key)) ||
+    !String(dispatch.run_ref).startsWith('ccm-run:v1:') ||
+    dispatch.launch_nonce !== dispatch.claim_id ||
     !exact(runtime, fields.runtime) ||
     !SHA256_RE.test(String(runtime.image_sha256)) ||
     !exact(selector, fields.selector) ||
@@ -129,6 +136,12 @@ export function normalizeCanonicalLaunchIdentity(value: unknown): Json {
     },
     input: { digest: input.digest },
     request: { digest: request.digest },
+    dispatch: {
+      run_ref: dispatch.run_ref,
+      idempotency_key: dispatch.idempotency_key,
+      launch_nonce: dispatch.launch_nonce,
+      claim_id: dispatch.claim_id,
+    },
     runtime: {
       image_sha256: runtime.image_sha256,
       selector: { kind: 'exact', model_id: selector.model_id, effort: selector.effort },
@@ -137,5 +150,5 @@ export function normalizeCanonicalLaunchIdentity(value: unknown): Json {
 }
 
 export function canonicalLaunchIdentityDigest(value: unknown): string {
-  return `sha256:${sha256Hex(canonicalJson(normalizeCanonicalLaunchIdentity(value)))}`;
+  return canonicalSha256Digest(normalizeCanonicalLaunchIdentity(value));
 }

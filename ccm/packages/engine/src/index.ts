@@ -118,6 +118,7 @@ export {
 } from './board-model.js';
 // ── board-reconcile（reconcileGating·deps 驱动 ready↔blocked 门控归一·ADR-023）──
 export { reconcileGating } from './board-reconcile.js';
+export { canonicalSha256Digest } from './canonical-digest.js';
 export { canonicalJson } from './canonical-json.js';
 export {
   CANONICAL_LAUNCH_IDENTITY_FIELD_REGISTRY,
@@ -399,6 +400,7 @@ export {
   systemdInstallCommands,
   systemdUninstallCommands,
 } from './service-serializers.js';
+export { sha256Hex } from './sha256.js';
 // ── shadow-routing（C1 cached machine context + pure advisory route；零 IO/spawn/mutation）──
 export type {
   CachedCandidateFact,
