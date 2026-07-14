@@ -33,6 +33,14 @@ elif [[ $input == *'"objective":"fixture:output-malformed"'* ]]; then
   printf '{"type":"result","session_id":"fixture-session-fixture-request","modelUsage":{"%s":{"inputTokens":1,"outputTokens":1}},"provider_metadata":{"model":"%s","effort":"%s","identity_fingerprint":"fixture-identity"},"subtype":"success","is_error":false,"structured_output":"not-an-object"}\n' "$model" "$model" "$effort"
 elif [[ $input == *'"objective":"fixture:terminal-missing-session"'* ]]; then
   printf '{"type":"result","modelUsage":{"%s":{"inputTokens":1,"outputTokens":1}},"provider_metadata":{"model":"%s","effort":"%s","identity_fingerprint":"fixture-identity"},"subtype":"success","is_error":false,"structured_output":{"outcome":"done","summary":"missing session"}}\n' "$model" "$model" "$effort"
+elif [[ $input == *'"objective":"fixture:terminal-malformed-json"'* ]]; then
+  printf '{"type":"result"\n'
+elif [[ $input == *'"objective":"fixture:actual-model-missing"'* ]]; then
+  printf '{"type":"result","session_id":"fixture-session-fixture-request","provider_metadata":{"effort":"%s","identity_fingerprint":"fixture-identity"},"subtype":"success","is_error":false,"structured_output":{"outcome":"done","summary":"missing model"}}\n' "$effort"
+elif [[ $input == *'"objective":"fixture:actual-effort-missing"'* ]]; then
+  printf '{"type":"result","session_id":"fixture-session-fixture-request","modelUsage":{"%s":{"inputTokens":1,"outputTokens":1}},"provider_metadata":{"model":"%s","identity_fingerprint":"fixture-identity"},"subtype":"success","is_error":false,"structured_output":{"outcome":"done","summary":"missing effort"}}\n' "$model" "$model"
+elif [[ $input == *'"objective":"fixture:actual-identity-missing"'* ]]; then
+  printf '{"type":"result","session_id":"fixture-session-fixture-request","modelUsage":{"%s":{"inputTokens":1,"outputTokens":1}},"provider_metadata":{"model":"%s","effort":"%s"},"subtype":"success","is_error":false,"structured_output":{"outcome":"done","summary":"missing identity"}}\n' "$model" "$model" "$effort"
 else
   printf '{"type":"result","session_id":"fixture-session-fixture-request","modelUsage":{"%s":{"inputTokens":1,"outputTokens":1}},"provider_metadata":{"model":"%s","effort":"%s","identity_fingerprint":"fixture-identity"},"subtype":"success","is_error":false,"structured_output":{"outcome":"done","summary":"controlled success"}}\n' "$model" "$model" "$effort"
 fi

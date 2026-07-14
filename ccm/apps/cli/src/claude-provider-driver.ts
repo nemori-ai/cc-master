@@ -4,6 +4,7 @@
 // and reconciliation. It accepts a supervisor-issued run_ref and an injected runtime; it does not
 // create durable runs, probe accounts/quota, mutate credentials, or request provider/network APIs.
 
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import {
   createProviderRequestDeadline,
@@ -12,7 +13,11 @@ import {
   ProviderChildSupervisorError,
   superviseProviderChild,
 } from './provider-child-supervisor.js';
-import type { ProviderRuntime } from './provider-runtime.js';
+import {
+  type ProviderOwnedChild,
+  ProviderProcessTreeOwnershipError,
+  type ProviderRuntime,
+} from './provider-runtime.js';
 
 export const CLAUDE_PROVIDER_REQUEST_SCHEMA = 'ccm/claude-provider-request/v1' as const;
 export const CLAUDE_PROVIDER_PREFLIGHT_SCHEMA = 'ccm/claude-provider-preflight/v1' as const;
@@ -30,6 +35,72 @@ type ModelState = 'available' | 'unavailable' | 'unknown';
 type PoolKind = 'subscription' | 'api' | 'cloud';
 type ProviderStatus = 'rejected' | 'succeeded' | 'failed' | 'cancelled' | 'timed_out';
 
+export const CLAUDE_PROVIDER_PARSE_REASON_CODES = Object.freeze([
+  'request_not_object',
+  'request_fields_invalid',
+  'request_schema_invalid',
+  'provider_invalid',
+  'origin_harness_invalid',
+  'effort_invalid',
+  'permission_invalid',
+  'admission_fields_invalid',
+  'policy_fact_invalid',
+  'auth_fact_invalid',
+  'quota_fact_invalid',
+  'quota_pool_invalid',
+  'quota_reservation_invalid',
+  'quota_preflight_invalid',
+  'quota_ticket_invalid',
+  'model_fact_invalid',
+  'timeouts_fields_invalid',
+] as const);
+
+export const CLAUDE_PROVIDER_VALIDATION_REASON_CODES = Object.freeze([
+  'clock_invalid',
+  'request_id_invalid',
+  'run_ref_invalid',
+  'attempt_id_invalid',
+  'workspace_invalid',
+  'objective_invalid',
+  'model_invalid',
+  'runtime_sha256_invalid',
+  'launch_idempotency_key_invalid',
+  'launch_nonce_invalid',
+  'timeouts_invalid',
+  'startup_exceeds_hard_timeout',
+  'policy_not_allowed',
+  'auth_not_authenticated',
+  'quota_not_ample',
+  'quota_preflight_not_allowed',
+  'quota_preflight_stale',
+  'quota_preflight_effect_invalid',
+  'model_not_available',
+  'model_mismatch',
+  'quota_pool_kind_mismatch',
+  'quota_authority_invalid',
+  'quota_ticket_digest_mismatch',
+  'quota_ticket_time_invalid',
+  'quota_ticket_expired',
+  'quota_ticket_mismatch',
+  'policy_stale_or_invalid',
+  'auth_stale_or_invalid',
+  'quota_stale_or_invalid',
+  'model_stale_or_invalid',
+] as const);
+
+export const CLAUDE_PROVIDER_TERMINAL_FAILURE_CODES = Object.freeze([
+  'terminal_malformed',
+  'terminal_invalid',
+  'provider_failed',
+  'actual_model_missing',
+  'actual_model_mismatch',
+  'actual_effort_missing',
+  'actual_effort_mismatch',
+  'actual_identity_missing',
+  'actual_identity_mismatch',
+  'structured_output_malformed',
+] as const);
+
 interface TimedFact {
   observed_at: string;
   valid_until: string;
@@ -40,12 +111,16 @@ export interface ClaudeProviderRequest {
   request_id: string;
   /** Issued upstream. The provider must preserve it and must never manufacture a durable run. */
   run_ref: string;
+  attempt_id: string;
   origin_harness: ClaudeOriginHarness;
   provider: 'claude';
   workspace: string;
   objective: string;
   model: string;
   effort: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  runtime_sha256: string;
+  launch_idempotency_key: string;
+  launch_nonce: string;
   permission: {
     mode: 'dontAsk';
     account_mutation: 'forbidden';
@@ -58,7 +133,19 @@ export interface ClaudeProviderRequest {
     quota: TimedFact & {
       state: QuotaState;
       /** Pool kinds remain disjoint; this fixture slice admits only subscription evidence. */
-      pool: { kind: PoolKind; pool_id: string };
+      pool: {
+        kind: PoolKind;
+        pool_id: string;
+        account_id: string;
+        identity_fingerprint: string;
+      };
+      reservation: {
+        reservation_id: string;
+        request_hash: string;
+        expires_at: string;
+        aggregation_key: string;
+        source_revision: string;
+      };
       preflight: {
         decision: 'allow' | 'reject' | 'unknown';
         freshness: 'fresh' | 'soft-stale' | 'hard-stale' | 'unknown' | 'conflict';
@@ -66,12 +153,25 @@ export interface ClaudeProviderRequest {
       };
       ticket: {
         schema: 'ccm/quota-admission-ticket/v1';
+        ticket_id: string;
+        reservation_id: string;
+        reservation_request_hash: string;
+        reservation_expires_at: string;
+        attempt_id: string;
         run_ref: string;
         account_id: string;
         pool_id: string;
         identity_fingerprint: string;
+        aggregation_key: string;
+        live_source_revision: string;
+        runtime_sha256: string;
+        launch_idempotency_key: string;
+        launch_nonce: string;
+        issued_at: string;
+        committed_at: string;
         launch_by: string;
       };
+      ticket_digest: string;
     };
     model: TimedFact & {
       state: ModelState;
@@ -95,11 +195,12 @@ export interface ClaudeProviderSelection {
 
 export interface ClaudeProviderPreflight {
   schema: typeof CLAUDE_PROVIDER_PREFLIGHT_SCHEMA;
-  request_id: string;
-  run_ref: string;
-  selection: ClaudeProviderSelection;
+  request_id: string | null;
+  run_ref: string | null;
+  selection: ClaudeProviderSelection | null;
   decision: 'allow' | 'reject';
   reason_codes: string[];
+  claim_count: 0;
   process_effects: 0;
 }
 
@@ -116,7 +217,7 @@ export interface CompiledClaudeProviderInvocation {
 
 export interface ClaudeProviderReconciliation {
   schema: typeof CLAUDE_PROVIDER_RECONCILIATION_SCHEMA;
-  run_ref: string;
+  run_ref: string | null;
   attempt_state: 'terminal';
   task_state: 'unproven';
   needs_independent_acceptance: true;
@@ -124,11 +225,11 @@ export interface ClaudeProviderReconciliation {
 
 export interface ClaudeProviderResult {
   schema: typeof CLAUDE_PROVIDER_RESULT_SCHEMA;
-  request_id: string;
-  run_ref: string;
+  request_id: string | null;
+  run_ref: string | null;
   status: ProviderStatus;
-  selection: ClaudeProviderSelection;
-  preflight: { decision: 'allow' | 'reject'; reason_codes: string[] };
+  selection: ClaudeProviderSelection | null;
+  preflight: { decision: 'allow' | 'reject'; reason_codes: string[]; claim_count: 0 };
   process: {
     spawn_count: 0 | 1;
     exit_code: number | null;
@@ -141,7 +242,7 @@ export interface ClaudeProviderResult {
     subtype: string | null;
     session_id: string | null;
   };
-  requested_model: string;
+  requested_model: string | null;
   actual_models: string[];
   actual_identity: {
     model: string;
@@ -174,6 +275,254 @@ function isNonEmpty(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function plain(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const allowed = new Set(keys);
+  return (
+    Object.keys(value).length === keys.length && Object.keys(value).every((key) => allowed.has(key))
+  );
+}
+
+function stringFields(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  return keys.every((key) => typeof value[key] === 'string');
+}
+
+function member(value: unknown, values: readonly string[]): boolean {
+  return typeof value === 'string' && values.includes(value);
+}
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonical(entry)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function digest(value: unknown): string {
+  return `sha256:${createHash('sha256').update(canonical(value)).digest('hex')}`;
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+type ParseReason = (typeof CLAUDE_PROVIDER_PARSE_REASON_CODES)[number];
+type ParsedRequest =
+  | { ok: true; request: ClaudeProviderRequest }
+  | {
+      ok: false;
+      reason: ParseReason;
+      request_id: string | null;
+      run_ref: string | null;
+      requested_model: string | null;
+    };
+
+function parseFailure(input: unknown, reason: ParseReason): ParsedRequest {
+  const object = plain(input) ? input : {};
+  return {
+    ok: false,
+    reason,
+    request_id: typeof object.request_id === 'string' ? object.request_id : null,
+    run_ref: typeof object.run_ref === 'string' ? object.run_ref : null,
+    requested_model: typeof object.model === 'string' ? object.model : null,
+  };
+}
+
+export function parseClaudeProviderRequest(input: unknown): ParsedRequest {
+  if (!plain(input)) return parseFailure(input, 'request_not_object');
+  const topKeys = [
+    'schema',
+    'request_id',
+    'run_ref',
+    'attempt_id',
+    'origin_harness',
+    'provider',
+    'workspace',
+    'objective',
+    'model',
+    'effort',
+    'runtime_sha256',
+    'launch_idempotency_key',
+    'launch_nonce',
+    'permission',
+    'admission',
+    'timeouts_ms',
+  ] as const;
+  if (
+    !exactKeys(input, topKeys) ||
+    !stringFields(input, [
+      'schema',
+      'request_id',
+      'run_ref',
+      'attempt_id',
+      'origin_harness',
+      'provider',
+      'workspace',
+      'objective',
+      'model',
+      'effort',
+      'runtime_sha256',
+      'launch_idempotency_key',
+      'launch_nonce',
+    ])
+  )
+    return parseFailure(input, 'request_fields_invalid');
+  if (input.schema !== CLAUDE_PROVIDER_REQUEST_SCHEMA)
+    return parseFailure(input, 'request_schema_invalid');
+  if (input.provider !== 'claude') return parseFailure(input, 'provider_invalid');
+  if (!member(input.origin_harness, ['claude-code', 'codex', 'cursor']))
+    return parseFailure(input, 'origin_harness_invalid');
+  if (!member(input.effort, ['low', 'medium', 'high', 'xhigh', 'max']))
+    return parseFailure(input, 'effort_invalid');
+
+  const permission = input.permission;
+  if (
+    !plain(permission) ||
+    !exactKeys(permission, ['mode', 'account_mutation', 'credential_write', 'remote_mutation']) ||
+    permission.mode !== 'dontAsk' ||
+    permission.account_mutation !== 'forbidden' ||
+    permission.credential_write !== 'forbidden' ||
+    permission.remote_mutation !== 'forbidden'
+  )
+    return parseFailure(input, 'permission_invalid');
+
+  const admission = input.admission;
+  if (!plain(admission) || !exactKeys(admission, ['policy', 'auth', 'quota', 'model']))
+    return parseFailure(input, 'admission_fields_invalid');
+  const policy = admission.policy;
+  if (
+    !plain(policy) ||
+    !exactKeys(policy, ['decision', 'observed_at', 'valid_until']) ||
+    !member(policy.decision, ['allow', 'deny', 'unknown']) ||
+    !stringFields(policy, ['observed_at', 'valid_until'])
+  )
+    return parseFailure(input, 'policy_fact_invalid');
+  const auth = admission.auth;
+  if (
+    !plain(auth) ||
+    !exactKeys(auth, ['state', 'observed_at', 'valid_until']) ||
+    !member(auth.state, ['authenticated', 'unauthenticated', 'unknown']) ||
+    !stringFields(auth, ['observed_at', 'valid_until'])
+  )
+    return parseFailure(input, 'auth_fact_invalid');
+  const quota = admission.quota;
+  if (
+    !plain(quota) ||
+    !exactKeys(quota, [
+      'state',
+      'pool',
+      'reservation',
+      'preflight',
+      'ticket',
+      'ticket_digest',
+      'observed_at',
+      'valid_until',
+    ]) ||
+    !member(quota.state, ['ample', 'tight', 'exhausted', 'unknown']) ||
+    !stringFields(quota, ['ticket_digest', 'observed_at', 'valid_until'])
+  )
+    return parseFailure(input, 'quota_fact_invalid');
+  const pool = quota.pool;
+  if (
+    !plain(pool) ||
+    !exactKeys(pool, ['kind', 'pool_id', 'account_id', 'identity_fingerprint']) ||
+    !member(pool.kind, ['subscription', 'api', 'cloud']) ||
+    !stringFields(pool, ['pool_id', 'account_id', 'identity_fingerprint'])
+  )
+    return parseFailure(input, 'quota_pool_invalid');
+  const reservation = quota.reservation;
+  if (
+    !plain(reservation) ||
+    !exactKeys(reservation, [
+      'reservation_id',
+      'request_hash',
+      'expires_at',
+      'aggregation_key',
+      'source_revision',
+    ]) ||
+    !stringFields(reservation, [
+      'reservation_id',
+      'request_hash',
+      'expires_at',
+      'aggregation_key',
+      'source_revision',
+    ])
+  )
+    return parseFailure(input, 'quota_reservation_invalid');
+  const quotaPreflight = quota.preflight;
+  if (
+    !plain(quotaPreflight) ||
+    !exactKeys(quotaPreflight, ['decision', 'freshness', 'spawn_count']) ||
+    !member(quotaPreflight.decision, ['allow', 'reject', 'unknown']) ||
+    !member(quotaPreflight.freshness, [
+      'fresh',
+      'soft-stale',
+      'hard-stale',
+      'unknown',
+      'conflict',
+    ]) ||
+    typeof quotaPreflight.spawn_count !== 'number'
+  )
+    return parseFailure(input, 'quota_preflight_invalid');
+  const ticket = quota.ticket;
+  const ticketFields = [
+    'schema',
+    'ticket_id',
+    'reservation_id',
+    'reservation_request_hash',
+    'reservation_expires_at',
+    'attempt_id',
+    'run_ref',
+    'account_id',
+    'pool_id',
+    'identity_fingerprint',
+    'aggregation_key',
+    'live_source_revision',
+    'runtime_sha256',
+    'launch_idempotency_key',
+    'launch_nonce',
+    'issued_at',
+    'committed_at',
+    'launch_by',
+  ] as const;
+  if (
+    !plain(ticket) ||
+    !exactKeys(ticket, ticketFields) ||
+    !stringFields(ticket, ticketFields) ||
+    ticket.schema !== 'ccm/quota-admission-ticket/v1'
+  )
+    return parseFailure(input, 'quota_ticket_invalid');
+  const model = admission.model;
+  if (
+    !plain(model) ||
+    !exactKeys(model, ['state', 'requested', 'resolved', 'observed_at', 'valid_until']) ||
+    !member(model.state, ['available', 'unavailable', 'unknown']) ||
+    !stringFields(model, ['requested', 'resolved', 'observed_at', 'valid_until'])
+  )
+    return parseFailure(input, 'model_fact_invalid');
+  const timeouts = input.timeouts_ms;
+  if (
+    !plain(timeouts) ||
+    !exactKeys(timeouts, ['startup', 'idle', 'hard']) ||
+    !['startup', 'idle', 'hard'].every((key) => typeof timeouts[key] === 'number')
+  )
+    return parseFailure(input, 'timeouts_fields_invalid');
+
+  const cloned = structuredClone(input) as unknown as ClaudeProviderRequest;
+  return { ok: true, request: deepFreeze(cloned) };
+}
+
 function isFresh(fact: TimedFact, nowMs: number): boolean {
   const observedAt = Date.parse(fact.observed_at);
   const validUntil = Date.parse(fact.valid_until);
@@ -203,23 +552,16 @@ function validationReasons(request: ClaudeProviderRequest, now: string): string[
   const reasons: string[] = [];
   const nowMs = Date.parse(now);
   if (!Number.isFinite(nowMs)) reasons.push('clock_invalid');
-  if (request.schema !== CLAUDE_PROVIDER_REQUEST_SCHEMA || request.provider !== 'claude')
-    reasons.push('request_schema_invalid');
   if (!isNonEmpty(request.request_id)) reasons.push('request_id_invalid');
   if (!isNonEmpty(request.run_ref)) reasons.push('run_ref_invalid');
+  if (!isNonEmpty(request.attempt_id)) reasons.push('attempt_id_invalid');
   if (!isNonEmpty(request.workspace) || !path.isAbsolute(request.workspace))
     reasons.push('workspace_invalid');
   if (!isNonEmpty(request.objective)) reasons.push('objective_invalid');
   if (!isNonEmpty(request.model) || request.model === 'auto') reasons.push('model_invalid');
-  if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(request.effort))
-    reasons.push('effort_invalid');
-  if (
-    request.permission.mode !== 'dontAsk' ||
-    request.permission.account_mutation !== 'forbidden' ||
-    request.permission.credential_write !== 'forbidden' ||
-    request.permission.remote_mutation !== 'forbidden'
-  )
-    reasons.push('permission_policy_invalid');
+  if (!isNonEmpty(request.runtime_sha256)) reasons.push('runtime_sha256_invalid');
+  if (!isNonEmpty(request.launch_idempotency_key)) reasons.push('launch_idempotency_key_invalid');
+  if (!isNonEmpty(request.launch_nonce)) reasons.push('launch_nonce_invalid');
   if (
     !validTimeout(request.timeouts_ms.startup) ||
     !validTimeout(request.timeouts_ms.idle) ||
@@ -230,27 +572,66 @@ function validationReasons(request: ClaudeProviderRequest, now: string): string[
     reasons.push('startup_exceeds_hard_timeout');
 
   const facts = request.admission;
-  if (facts.policy.decision !== 'allow') reasons.push(`policy_${facts.policy.decision}`);
-  if (facts.auth.state !== 'authenticated') reasons.push(`auth_${facts.auth.state}`);
-  if (facts.quota.state !== 'ample') reasons.push(`quota_${facts.quota.state}`);
-  if (facts.quota.preflight.decision !== 'allow')
-    reasons.push(`quota_preflight_${facts.quota.preflight.decision}`);
+  if (facts.policy.decision !== 'allow') reasons.push('policy_not_allowed');
+  if (facts.auth.state !== 'authenticated') reasons.push('auth_not_authenticated');
+  if (facts.quota.state !== 'ample') reasons.push('quota_not_ample');
+  if (facts.quota.preflight.decision !== 'allow') reasons.push('quota_preflight_not_allowed');
   if (facts.quota.preflight.freshness !== 'fresh') reasons.push('quota_preflight_stale');
   if (facts.quota.preflight.spawn_count !== 0) reasons.push('quota_preflight_effect_invalid');
-  if (facts.model.state !== 'available') reasons.push(`model_${facts.model.state}`);
+  if (facts.model.state !== 'available') reasons.push('model_not_available');
   if (facts.model.requested !== request.model || facts.model.resolved !== request.model)
     reasons.push('model_mismatch');
   if (facts.quota.pool.kind !== 'subscription') reasons.push('quota_pool_kind_mismatch');
-  if (!isNonEmpty(facts.quota.pool.pool_id)) reasons.push('quota_pool_id_invalid');
+  const authority = facts.quota;
+  const reservation = authority.reservation;
+  const pool = authority.pool;
   const ticket = facts.quota.ticket;
   if (
-    ticket.schema !== 'ccm/quota-admission-ticket/v1' ||
+    ![
+      request.attempt_id,
+      request.runtime_sha256,
+      request.launch_idempotency_key,
+      request.launch_nonce,
+      pool.pool_id,
+      pool.account_id,
+      pool.identity_fingerprint,
+      reservation.reservation_id,
+      reservation.request_hash,
+      reservation.expires_at,
+      reservation.aggregation_key,
+      reservation.source_revision,
+      authority.ticket_digest,
+      ticket.ticket_id,
+    ].every(isNonEmpty)
+  )
+    reasons.push('quota_authority_invalid');
+  if (authority.ticket_digest !== digest(ticket)) reasons.push('quota_ticket_digest_mismatch');
+  const issuedAt = Date.parse(ticket.issued_at);
+  const committedAt = Date.parse(ticket.committed_at);
+  const launchBy = Date.parse(ticket.launch_by);
+  const reservationExpiresAt = Date.parse(ticket.reservation_expires_at);
+  if (
+    ![issuedAt, committedAt, launchBy, reservationExpiresAt].every(Number.isFinite) ||
+    committedAt < issuedAt ||
+    launchBy < committedAt ||
+    launchBy > reservationExpiresAt
+  )
+    reasons.push('quota_ticket_time_invalid');
+  if (launchBy <= nowMs || reservationExpiresAt <= nowMs) reasons.push('quota_ticket_expired');
+  if (
+    ticket.reservation_id !== reservation.reservation_id ||
+    ticket.reservation_request_hash !== reservation.request_hash ||
+    ticket.reservation_expires_at !== reservation.expires_at ||
+    ticket.attempt_id !== request.attempt_id ||
     ticket.run_ref !== request.run_ref ||
-    ticket.pool_id !== facts.quota.pool.pool_id ||
-    !isNonEmpty(ticket.account_id) ||
-    !isNonEmpty(ticket.identity_fingerprint) ||
-    !Number.isFinite(Date.parse(ticket.launch_by)) ||
-    Date.parse(ticket.launch_by) <= nowMs
+    ticket.account_id !== pool.account_id ||
+    ticket.pool_id !== pool.pool_id ||
+    ticket.identity_fingerprint !== pool.identity_fingerprint ||
+    ticket.aggregation_key !== reservation.aggregation_key ||
+    ticket.live_source_revision !== reservation.source_revision ||
+    ticket.runtime_sha256 !== request.runtime_sha256 ||
+    ticket.launch_idempotency_key !== request.launch_idempotency_key ||
+    ticket.launch_nonce !== request.launch_nonce
   )
     reasons.push('quota_ticket_mismatch');
   for (const [name, fact] of Object.entries(facts)) {
@@ -260,8 +641,28 @@ function validationReasons(request: ClaudeProviderRequest, now: string): string[
 }
 
 export function preflightClaudeProvider(
-  request: ClaudeProviderRequest,
+  input: unknown,
   now = new Date().toISOString(),
+): ClaudeProviderPreflight {
+  const parsed = parseClaudeProviderRequest(input);
+  if (!parsed.ok) {
+    return {
+      schema: CLAUDE_PROVIDER_PREFLIGHT_SCHEMA,
+      request_id: parsed.request_id,
+      run_ref: parsed.run_ref,
+      selection: null,
+      decision: 'reject',
+      reason_codes: [parsed.reason],
+      claim_count: 0,
+      process_effects: 0,
+    };
+  }
+  return preflightParsedClaudeProvider(parsed.request, now);
+}
+
+function preflightParsedClaudeProvider(
+  request: ClaudeProviderRequest,
+  now: string,
 ): ClaudeProviderPreflight {
   const reasonCodes = validationReasons(request, now);
   return {
@@ -271,6 +672,7 @@ export function preflightClaudeProvider(
     selection: selectionFor(request.origin_harness),
     decision: reasonCodes.length === 0 ? 'allow' : 'reject',
     reason_codes: reasonCodes,
+    claim_count: 0,
     process_effects: 0,
   };
 }
@@ -289,10 +691,15 @@ function compiledEnvelope(request: ClaudeProviderRequest): Record<string, unknow
 }
 
 export function compileClaudeProviderInvocation(
-  request: ClaudeProviderRequest,
+  input: unknown,
   now = new Date().toISOString(),
 ): CompiledClaudeProviderInvocation {
-  const preflight = preflightClaudeProvider(request, now);
+  const parsed = parseClaudeProviderRequest(input);
+  if (!parsed.ok) {
+    throw new TypeError(`Claude provider request rejected: ${parsed.reason}`);
+  }
+  const request = parsed.request;
+  const preflight = preflightParsedClaudeProvider(request, now);
   if (preflight.decision !== 'allow') {
     throw new TypeError(`Claude provider request rejected: ${preflight.reason_codes.join(',')}`);
   }
@@ -319,7 +726,9 @@ export function compileClaudeProviderInvocation(
   };
 }
 
-export function reconcileClaudeProviderTerminal(runRef: string): ClaudeProviderReconciliation {
+export function reconcileClaudeProviderTerminal(
+  runRef: string | null,
+): ClaudeProviderReconciliation {
   return {
     schema: CLAUDE_PROVIDER_RECONCILIATION_SCHEMA,
     run_ref: runRef,
@@ -337,7 +746,11 @@ const ZERO_SIDE_EFFECTS = Object.freeze({
 });
 
 function resultBase(
-  request: ClaudeProviderRequest,
+  context: {
+    request_id: string | null;
+    run_ref: string | null;
+    requested_model: string | null;
+  },
   preflight: ClaudeProviderPreflight,
 ): Pick<
   ClaudeProviderResult,
@@ -352,22 +765,42 @@ function resultBase(
 > {
   return {
     schema: CLAUDE_PROVIDER_RESULT_SCHEMA,
-    request_id: request.request_id,
-    run_ref: request.run_ref,
+    request_id: context.request_id,
+    run_ref: context.run_ref,
     selection: preflight.selection,
-    preflight: { decision: preflight.decision, reason_codes: [...preflight.reason_codes] },
-    requested_model: request.model,
-    reconciliation: reconcileClaudeProviderTerminal(request.run_ref),
+    preflight: {
+      decision: preflight.decision,
+      reason_codes: [...preflight.reason_codes],
+      claim_count: 0,
+    },
+    requested_model: context.requested_model,
+    reconciliation: reconcileClaudeProviderTerminal(context.run_ref),
     side_effects: { ...ZERO_SIDE_EFFECTS },
   };
 }
 
+function requestContext(request: ClaudeProviderRequest): {
+  request_id: string;
+  run_ref: string;
+  requested_model: string;
+} {
+  return {
+    request_id: request.request_id,
+    run_ref: request.run_ref,
+    requested_model: request.model,
+  };
+}
+
 function rejectedResult(
-  request: ClaudeProviderRequest,
+  context: {
+    request_id: string | null;
+    run_ref: string | null;
+    requested_model: string | null;
+  },
   preflight: ClaudeProviderPreflight,
 ): ClaudeProviderResult {
   return {
-    ...resultBase(request, preflight),
+    ...resultBase(context, preflight),
     status: 'rejected',
     process: {
       spawn_count: 0,
@@ -382,10 +815,6 @@ function rejectedResult(
     output: null,
     error: { code: preflight.reason_codes[0] ?? 'preflight_rejected', messages: [] },
   };
-}
-
-function plain(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function stringArray(value: unknown): string[] {
@@ -406,7 +835,7 @@ function parseProviderTerminal(
     terminal = parsed;
   } catch (error) {
     return {
-      ...resultBase(request, preflight),
+      ...resultBase(requestContext(request), preflight),
       status: 'failed',
       process: {
         spawn_count: 1,
@@ -479,7 +908,7 @@ function parseProviderTerminal(
         }
       : null;
   return {
-    ...resultBase(request, preflight),
+    ...resultBase(requestContext(request), preflight),
     status,
     process: {
       spawn_count: 1,
@@ -512,13 +941,43 @@ function supervisorFailureResult(
           ? 'rejected'
           : 'failed';
   return {
-    ...resultBase(request, preflight),
+    ...resultBase(requestContext(request), preflight),
     status,
     process: {
       spawn_count: 1,
       exit_code: supervised?.termination?.exitCode ?? null,
       signal: supervised?.termination?.signal ?? null,
       reaped: supervised?.termination?.reaped ?? false,
+      duration_ms: null,
+    },
+    terminal: { kind: 'supervisor_terminal', subtype: code, session_id: null },
+    actual_models: [],
+    actual_identity: null,
+    output: null,
+    error: { code, messages: [error instanceof Error ? error.message : String(error)] },
+  };
+}
+
+function synchronousEffectFailureResult(
+  request: ClaudeProviderRequest,
+  preflight: ClaudeProviderPreflight,
+  phase: 'resolve' | 'spawn',
+  error: unknown,
+): ClaudeProviderResult {
+  const code =
+    phase === 'resolve'
+      ? 'resolve_error'
+      : error instanceof ProviderProcessTreeOwnershipError
+        ? error.code
+        : 'spawn_error';
+  return {
+    ...resultBase(requestContext(request), preflight),
+    status: 'rejected',
+    process: {
+      spawn_count: phase === 'spawn' ? 1 : 0,
+      exit_code: null,
+      signal: null,
+      reaped: false,
       duration_ms: null,
     },
     terminal: { kind: 'supervisor_terminal', subtype: code, session_id: null },
@@ -541,17 +1000,28 @@ function childLimits(request: ClaudeProviderRequest): ProviderChildLimits {
 }
 
 export async function invokeOfflineClaudeProvider(
-  request: ClaudeProviderRequest,
+  input: unknown,
   runtime: ProviderRuntime,
   options: InvokeOfflineClaudeProviderOptions = {},
 ): Promise<ClaudeProviderResult> {
   const now = options.now ?? new Date().toISOString();
-  const preflight = preflightClaudeProvider(request, now);
-  if (preflight.decision !== 'allow') return rejectedResult(request, preflight);
-  const executable = runtime.process.resolveExecutable('claude');
+  const parsed = parseClaudeProviderRequest(input);
+  if (!parsed.ok) {
+    const preflight = preflightClaudeProvider(input, now);
+    return rejectedResult(parsed, preflight);
+  }
+  const request = parsed.request;
+  const preflight = preflightParsedClaudeProvider(request, now);
+  if (preflight.decision !== 'allow') return rejectedResult(requestContext(request), preflight);
+  let executable: string | null;
+  try {
+    executable = runtime.process.resolveExecutable('claude');
+  } catch (error) {
+    return synchronousEffectFailureResult(request, preflight, 'resolve', error);
+  }
   if (!executable) {
     return {
-      ...rejectedResult(request, {
+      ...rejectedResult(requestContext(request), {
         ...preflight,
         decision: 'reject',
         reason_codes: ['cli_missing'],
@@ -560,13 +1030,18 @@ export async function invokeOfflineClaudeProvider(
     };
   }
   const compiled = compileClaudeProviderInvocation(request, now);
-  const ownedChild = runtime.process.spawnProvider({
-    executable,
-    argv: compiled.argv,
-    cwd: compiled.cwd,
-    env: compiled.env,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
+  let ownedChild: ProviderOwnedChild;
+  try {
+    ownedChild = runtime.process.spawnProvider({
+      executable,
+      argv: compiled.argv,
+      cwd: compiled.cwd,
+      env: compiled.env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  } catch (error) {
+    return synchronousEffectFailureResult(request, preflight, 'spawn', error);
+  }
   ownedChild.child.stdin?.on('error', () => {
     // The supervised terminal/cleanup result remains authoritative when a child closes stdin first.
   });
