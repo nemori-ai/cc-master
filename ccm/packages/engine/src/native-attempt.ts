@@ -1,4 +1,5 @@
 import { taskTrulyDone } from './board-model.js';
+import { reconcileGating } from './board-reconcile.js';
 import { canonicalJson } from './canonical-json.js';
 import { sha256Hex } from './sha256.js';
 
@@ -615,6 +616,7 @@ function requireObservedLineage(
 }
 
 function requireAdmission(attempt: JsonObject, admission: JsonObject): void {
+  requireCurrentAuthority(attempt, admission);
   required(admission?.account, 'NATIVE-ACCOUNT-FINGERPRINT-UNKNOWN');
   requireKnownAccount(admission.account.status);
   if (
@@ -641,6 +643,13 @@ function requireAdmission(attempt: JsonObject, admission: JsonObject): void {
   ) {
     reject('NATIVE-PERMISSION-DENY-INCOMPATIBLE');
   }
+}
+
+function requireCurrentAuthority(attempt: JsonObject, authority: unknown): JsonObject {
+  if (!isJsonObject(authority)) reject('NATIVE-LINEAGE-MISMATCH');
+  const currentLineage = authority.current_lineage;
+  requireLineage(currentLineage, attempt.lineage);
+  return currentLineage as JsonObject;
 }
 
 function requireSelection(task: JsonObject, selection: JsonObject, attempt: JsonObject): void {
@@ -867,11 +876,11 @@ function bind(board: JsonObject, command: JsonObject): NativeAttemptApplyResult 
     reject('NATIVE-HANDOFF-UNSUPPORTED');
   }
 
-  if (attempt.state === 'running') {
+  if (attempt.handle_binding) {
     if (
       attempt.handle_binding?.evidence_record_ref !== evidence.record_ref ||
       attempt.handle_binding?.evidence_hash !== evidence.record_hash ||
-      task.handle !== evidence.observed?.handle
+      attempt.handle_binding?.handle !== evidence.observed?.handle
     ) {
       reject('NATIVE-ATTEMPT-REPLAY-CONFLICT');
     }
@@ -906,6 +915,10 @@ function cancel(board: JsonObject, command: JsonObject): NativeAttemptApplyResul
   const attempt = findAttempt(task, command.attempt_id);
   required(command.request, 'NATIVE-CANCEL-REQUEST-MISSING');
   requireCancelRequest(command.request);
+  const currentLineage = requireCurrentAuthority(attempt, command.authority_snapshot);
+  if (command.request.requested_by_session_ref !== currentLineage.origin_session_ref) {
+    reject('NATIVE-LINEAGE-MISMATCH');
+  }
   if (attempt.cancel) {
     if (!same(attempt.cancel, command.request)) reject('NATIVE-ATTEMPT-REPLAY-CONFLICT');
     return { ok: true, board, result: { host_control_effects: 0, attempt_id: attempt.id } };
@@ -1035,6 +1048,7 @@ function reconcile(board: JsonObject, command: JsonObject): NativeAttemptApplyRe
       delete attempt.handle;
       task.status = 'ready';
       delete task.handle;
+      task.status = expectedOrphanedTaskStatus(board, task);
       break;
     }
     default:
@@ -1102,6 +1116,19 @@ function projectionIssue(task: JsonObject, message: string, path: string): Nativ
     message,
     task_id: typeof task.id === 'string' ? task.id : undefined,
   };
+}
+
+function expectedOrphanedTaskStatus(board: JsonObject, task: JsonObject): unknown {
+  const candidate = clone(board);
+  const candidateTask = Array.isArray(candidate.tasks)
+    ? candidate.tasks.find((entry: JsonObject) => entry?.id === task.id)
+    : undefined;
+  if (!candidateTask) return 'ready';
+  candidateTask.status = 'ready';
+  const reconciled = reconcileGating(candidate);
+  return Array.isArray(reconciled.tasks)
+    ? reconciled.tasks.find((entry: JsonObject) => entry?.id === task.id)?.status
+    : 'ready';
 }
 
 export function validateNativeAttemptProjection(inputBoard: JsonObject): NativeAttemptIssue[] {
@@ -1232,7 +1259,7 @@ export function validateNativeAttemptProjection(inputBoard: JsonObject): NativeA
         break;
       case 'orphaned':
         if (
-          task.status !== 'ready' ||
+          task.status !== expectedOrphanedTaskStatus(inputBoard, task) ||
           taskHasHandle ||
           attemptHasHandle ||
           latest.orphan_audit?.origin_session_status !== 'unavailable' ||
@@ -1242,7 +1269,13 @@ export function validateNativeAttemptProjection(inputBoard: JsonObject): NativeA
           !isNonEmptyString(latest.orphan_audit?.audit_ref) ||
           !SHA256_RE.test(latest.orphan_audit?.audit_hash)
         ) {
-          issues.push(projectionIssue(task, 'orphaned requires ready with no handle', 'status'));
+          issues.push(
+            projectionIssue(
+              task,
+              'orphaned requires dependency-gated ready/blocked with no handle',
+              'status',
+            ),
+          );
         }
         break;
       default:

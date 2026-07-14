@@ -842,6 +842,19 @@ test('bind/cancel/terminal and exact replay mutate observable board state', () =
   assertBindCancelTerminal(engineApi(engine));
 });
 
+test('exact bind replay remains a no-op after terminal lifecycle progression', () => {
+  const api = engineApi(engine);
+  const terminal = checkpoint(api, 'terminal');
+  const before = clone(terminal);
+  const replay = api.nativeAttemptApply(terminal, verifiedCommand(terminal, fixture.commands.bind));
+
+  assert.equal(replay.ok, true, JSON.stringify(replay.issues ?? []));
+  assert.equal(replay.result?.bound, false);
+  assert.equal(replay.result?.attempt_id, fixture.commands.bind.attempt_id);
+  assert.deepEqual(replay.board, before, 'post-terminal bind replay must not rewrite history');
+  assert.deepEqual(terminal, before, 'post-terminal bind replay must not mutate its input');
+});
+
 test('create validates every frozen record boundary before append or launch permission', () => {
   const api = engineApi(engine);
   for (const row of CREATE_SCHEMA_MUTATIONS) {
@@ -1168,6 +1181,41 @@ test('dedicated reconcile covers uncertain/running/terminal/orphaned projections
   assertReconcile(engineApi(engine));
 });
 
+test('fenced orphan projection composes with dependency gating without weakening projection lint', () => {
+  const api = engineApi(engine);
+  const uncertain = checkpoint(api, 'uncertain');
+  uncertain.tasks.unshift({
+    id: 'T-native-upstream',
+    status: 'ready',
+    deps: [],
+    executor: 'user',
+  });
+  task(uncertain).deps = ['T-native-upstream'];
+
+  const orphaned = applyOk(api, uncertain, fixture.commands.reconcile_orphaned);
+  const reconcileGating = engineExports.reconcileGating as (board: FixtureJson) => FixtureJson;
+  const gated = reconcileGating(orphaned.board);
+  assert.equal(task(gated).status, 'blocked', 'unsatisfied deps must remain authoritative');
+  assert.deepEqual(
+    api.validateNativeAttemptProjection(gated),
+    [],
+    'dependency-derived blocked must be a valid fenced-orphan projection',
+  );
+
+  const falselyBlocked = clone(gated);
+  const upstream = falselyBlocked.tasks.find(
+    (entry: FixtureJson) => entry.id === 'T-native-upstream',
+  );
+  upstream.status = 'done';
+  upstream.verified = true;
+  upstream.artifact = 'artifact://trusted-upstream';
+  assertHardProjection(
+    api,
+    falselyBlocked,
+    'orphaned must not accept blocked when ordinary dependency gating resolves ready',
+  );
+});
+
 test('every mutation returns its issue code with failure atomicity', () => {
   assertNegativeCases(engineApi(engine));
 });
@@ -1235,6 +1283,7 @@ test('create hash is canonical UTF-8 SHA-256 and hard lint recomputes it in the 
   const unicodeCreate = clone(fixture.commands.create);
   unicodeCreate.attempt.lineage.origin_session_ref = 'session-ref:原点-🚀';
   unicodeCreate.attempt.dispatch.claim_owner_session_ref = 'session-ref:原点-🚀';
+  unicodeCreate.admission_snapshot.current_lineage.origin_session_ref = 'session-ref:原点-🚀';
   const created = applyOk(api, clone(fixture.initial_board), unicodeCreate).board;
   const current = attempt(created);
   assert.equal(
@@ -1361,6 +1410,68 @@ test('descriptor and permission admission are closed, ordered, and deny-set base
   const inherited = api.nativeAttemptApply(coherentForeign, foreignCommand);
   assert.equal(inherited.ok, false);
   assert.ok(inherited.issues?.some((issue) => issue.code === 'NATIVE-DESCRIPTOR-UNSUPPORTED'));
+});
+
+test('create and cancel authority are bound to the immutable current lineage', () => {
+  const api = engineApi(engine);
+  const lineageDrifts: Array<[string, (lineage: FixtureJson) => void]> = [
+    ['origin session', (lineage) => (lineage.origin_session_ref = 'session-ref:foreign')],
+    ['workspace', (lineage) => (lineage.workspace_ref = 'workspace-ref:foreign')],
+    ['worktree', (lineage) => (lineage.worktree_ref = 'worktree-ref:foreign')],
+    [
+      'baseline',
+      (lineage) => (lineage.baseline_commit = '9999999999999999999999999999999999999999'),
+    ],
+  ];
+
+  for (const [name, mutate] of lineageDrifts) {
+    const board = clone(fixture.initial_board);
+    const before = clone(board);
+    const command = clone(fixture.commands.create);
+    mutate(command.admission_snapshot.current_lineage);
+    const outcome = api.nativeAttemptApply(board, command);
+    assert.equal(outcome.ok, false, `create/${name}`);
+    assert.equal(outcome.result?.launch_allowed, undefined, `create/${name}`);
+    assert.ok(
+      outcome.issues?.some((issue) => issue.code === 'NATIVE-LINEAGE-MISMATCH'),
+      `create/${name}: ${JSON.stringify(outcome.issues ?? [])}`,
+    );
+    assert.deepEqual(outcome.board, before, `create/${name}: partial write`);
+    assert.deepEqual(board, before, `create/${name}: input mutation`);
+  }
+
+  const missingCurrent = clone(fixture.commands.create);
+  delete missingCurrent.admission_snapshot.current_lineage;
+  const missing = api.nativeAttemptApply(clone(fixture.initial_board), missingCurrent);
+  assert.equal(missing.ok, false, 'create/missing current lineage');
+  assert.ok(missing.issues?.some((issue) => issue.code === 'NATIVE-LINEAGE-MISMATCH'));
+
+  for (const [name, mutate] of lineageDrifts) {
+    const board = checkpoint(api, 'running');
+    const before = clone(board);
+    const command = clone(fixture.commands.cancel);
+    mutate(command.authority_snapshot.current_lineage);
+    const outcome = api.nativeAttemptApply(board, command);
+    assert.equal(outcome.ok, false, `cancel/${name}`);
+    assert.equal(outcome.result?.host_control_effects, undefined, `cancel/${name}`);
+    assert.ok(
+      outcome.issues?.some((issue) => issue.code === 'NATIVE-LINEAGE-MISMATCH'),
+      `cancel/${name}: ${JSON.stringify(outcome.issues ?? [])}`,
+    );
+    assert.deepEqual(outcome.board, before, `cancel/${name}: partial write`);
+    assert.deepEqual(board, before, `cancel/${name}: input mutation`);
+  }
+
+  const unrelatedRequesterBoard = checkpoint(api, 'running');
+  const unrelatedRequester = clone(fixture.commands.cancel);
+  unrelatedRequester.request.requested_by_session_ref = 'session-ref:unrelated-requester';
+  const requesterOutcome = api.nativeAttemptApply(unrelatedRequesterBoard, unrelatedRequester);
+  assert.equal(requesterOutcome.ok, false, 'cancel/unrelated requester');
+  assert.equal(requesterOutcome.result?.host_control_effects, undefined);
+  assert.ok(
+    requesterOutcome.issues?.some((issue) => issue.code === 'NATIVE-LINEAGE-MISMATCH'),
+    JSON.stringify(requesterOutcome.issues ?? []),
+  );
 });
 
 test('verified evidence envelope rejects raw/forged scope and requires authoritative live target', () => {

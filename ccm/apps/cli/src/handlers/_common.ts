@@ -121,6 +121,7 @@ export interface NativeAttemptPrivateEvidenceBoundary {
 
 export interface NativeAttemptAdmissionBoundary {
   resolveCreate: () => Record<string, any>;
+  resolveControl: () => Record<string, any>;
 }
 
 // ctx 契约形态（契约 §三 ctx 形态·router.buildCtx 产出）。handler / runner 共用。

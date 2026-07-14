@@ -337,6 +337,20 @@
       },
       "replay_intent": "accept-no-launch",
       "admission_snapshot": {
+        "current_lineage": {
+          "origin_session_ref": "session-ref:fixture-origin",
+          "parent_target": "/root/fixture-parent",
+          "expected_child_target": "/root/fixture-parent/fixture-worker",
+          "account_fingerprint_ref": "account-ref:fixture-current-codex",
+          "workspace_ref": "workspace-ref:fixture-repository",
+          "worktree_ref": "worktree-ref:fixture-isolated",
+          "baseline_commit": "1111111111111111111111111111111111111111",
+          "permission": {
+            "snapshot_ref": "permission-ref:fixture-workspace-write",
+            "profile": "workspace-write",
+            "denies": ["account-mutation", "push-remote"]
+          }
+        },
         "account": {
           "requested_fingerprint_ref": "account-ref:fixture-current-codex",
           "current_fingerprint_ref": "account-ref:fixture-current-codex",
@@ -466,6 +480,20 @@
       },
       "replay_intent": "accept-no-launch",
       "admission_snapshot": {
+        "current_lineage": {
+          "origin_session_ref": "session-ref:fixture-origin",
+          "parent_target": "/root/fixture-parent",
+          "expected_child_target": "/root/fixture-parent/fixture-worker-2",
+          "account_fingerprint_ref": "account-ref:fixture-current-codex",
+          "workspace_ref": "workspace-ref:fixture-repository",
+          "worktree_ref": "worktree-ref:fixture-isolated-2",
+          "baseline_commit": "1111111111111111111111111111111111111111",
+          "permission": {
+            "snapshot_ref": "permission-ref:fixture-workspace-write",
+            "profile": "workspace-write",
+            "denies": ["account-mutation", "push-remote"]
+          }
+        },
         "account": {
           "requested_fingerprint_ref": "account-ref:fixture-current-codex",
           "current_fingerprint_ref": "account-ref:fixture-current-codex",
@@ -558,6 +586,22 @@
         "requested_by_session_ref": "session-ref:fixture-origin",
         "control": "interrupt-agent",
         "reason_code": "operator-request"
+      },
+      "authority_snapshot": {
+        "current_lineage": {
+          "origin_session_ref": "session-ref:fixture-origin",
+          "parent_target": "/root/fixture-parent",
+          "expected_child_target": "/root/fixture-parent/fixture-worker",
+          "account_fingerprint_ref": "account-ref:fixture-current-codex",
+          "workspace_ref": "workspace-ref:fixture-repository",
+          "worktree_ref": "worktree-ref:fixture-isolated",
+          "baseline_commit": "1111111111111111111111111111111111111111",
+          "permission": {
+            "snapshot_ref": "permission-ref:fixture-workspace-write",
+            "profile": "workspace-write",
+            "denies": ["account-mutation", "push-remote"]
+          }
+        }
       }
     },
     "terminal": {

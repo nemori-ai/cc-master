@@ -146,7 +146,7 @@
 | `running`（认证 spawn + 同 handle live roster 证据） | `in_flight`，投影该真实 opaque handle | `native-attempt-bind` 或同一 handle 的 `native-attempt-reconcile` |
 | `uncertain` | `uncertain`，清 active `handle`；阻止新 launch | `native-attempt-reconcile` |
 | `terminal`（认证 terminal evidence） | `uncertain`，无 `handle`，绝不直接 `done`/`verified` | `native-attempt-terminal` 或 `native-attempt-reconcile` |
-| `orphaned`（完成 fenced orphan audit） | `ready`，无 `handle`；只允许后来显式 create | `native-attempt-reconcile` |
+| `orphaned`（完成 fenced orphan audit） | 清 `handle` 后由普通 deps gating 归一为 `ready` 或 `blocked`；只允许后来显式 create | `native-attempt-reconcile` |
 
 latest attempt 为 `starting|running|uncertain` 时，mutation boundary 统一拒绝 generic `task start/done/block/unblock/set-status`、`task update --handle` / 通用 setter、legacy `route-bind` 及其 `--force` 绕路；`BIZ-NATIVE-ATTEMPT-PROJECTION` hard lint 同时捕获 board 上被手改出的 projection mismatch。terminal 只是 worker 事实，不是父 task 验收：父层验证 result/artifact 后，仍从 `uncertain` 走普通 `task done --verified --artifact` true-done 不变式。
 

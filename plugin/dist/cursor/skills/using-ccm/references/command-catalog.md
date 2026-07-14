@@ -781,7 +781,7 @@ ccm task native-attempt-reconcile <id> --attempt-id <str> --evidence-record-ref 
 | `--json` | bool | | 输出 operation result JSON |
 
 - 例：`ccm task native-attempt-reconcile T7 --attempt-id attempt-1 --evidence-record-ref evidence:reconcile-1`
-- 只接受认证 evidence 驱动 `uncertain`、same-handle `running`、`terminal` 或完成 fenced orphan audit 后的 `orphaned` projection；调用方不能自选 status/handle。
+- 只接受认证 evidence 驱动 `uncertain`、same-handle `running`、`terminal` 或完成 fenced orphan audit 后的 `orphaned` projection；调用方不能自选 status/handle。`orphaned` 清 handle 后仍走普通 deps gating，依赖未满足时落 `blocked`，不会绕过依赖门控。
 - exact replay 是 no-op；conflicting evidence 拒绝。stage/verify 后仅在 durable board commit 成功时消费，所有失败 rollback/no-consumption。
 
 > **五个 verb 的共同硬边界：**它们是 ledger writer，不是 runtime spawn wrapper。native-active projection 也不能被 generic status/handle writer、legacy `route-bind` 或 `--force` 构造/修复；硬 lint `BIZ-NATIVE-ATTEMPT-PROJECTION` 捕获 projection mismatch。

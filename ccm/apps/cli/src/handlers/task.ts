@@ -515,13 +515,18 @@ export function nativeAttemptBind(ctx: Ctx): number {
 }
 
 export function nativeAttemptCancel(ctx: Ctx): number {
-  return nativeAttemptWrite(ctx, 'native-cancel', () => ({
-    type: 'cancel',
-    task_id: ctx.positionals[0],
-    attempt_id: ctx.values['attempt-id'],
-    request: readJsonInput(ctx, ctx.values.request, '--request'),
-    acknowledgement_terminal_class: ctx.values['acknowledgement-terminal-class'],
-  }));
+  return nativeAttemptWrite(ctx, 'native-cancel', () => {
+    const authority = ctx.nativeAttemptAdmission;
+    if (!authority) nativeAttemptError('NATIVE-CONTROL-AUTHORITY-UNAVAILABLE');
+    return {
+      type: 'cancel',
+      task_id: ctx.positionals[0],
+      attempt_id: ctx.values['attempt-id'],
+      request: readJsonInput(ctx, ctx.values.request, '--request'),
+      authority_snapshot: authority.resolveControl(),
+      acknowledgement_terminal_class: ctx.values['acknowledgement-terminal-class'],
+    };
+  });
 }
 
 export function nativeAttemptTerminal(ctx: Ctx): number {

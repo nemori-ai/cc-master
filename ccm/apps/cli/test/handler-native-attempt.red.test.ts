@@ -126,6 +126,7 @@ class PrivateEvidenceHarness {
   failAfterReservationCode: string | null = null;
   private nextTransaction = 1;
   createAdmission: any;
+  controlAuthority: any;
 
   constructor() {
     for (const [ref, entry] of Object.entries(fixture.private_evidence.owner_store.records)) {
@@ -166,6 +167,7 @@ class PrivateEvidenceHarness {
       if (recordHash) this.claims.set(claim, String(recordHash));
     }
     this.createAdmission = clone(fixture.commands.create.admission_snapshot);
+    this.controlAuthority = clone(fixture.commands.cancel.authority_snapshot);
   }
 
   installVector(vector: any): void {
@@ -682,6 +684,12 @@ class PrivateEvidenceHarness {
     this.trace.push('create-admission');
     return clone(this.createAdmission);
   };
+
+  resolveControlAuthority = (): any => {
+    this.trace.length = 0;
+    this.trace.push('control-authority');
+    return clone(this.controlAuthority);
+  };
 }
 
 function boardFile(): { root: string; path: string } {
@@ -729,6 +737,7 @@ function runCli(path: string, argv: string[]): CliResult {
     },
     nativeAttemptAdmission: {
       resolveCreate: auth.resolveCreateAdmission,
+      resolveControl: auth.resolveControlAuthority,
     },
     writeFileAtomicSync: (boardPath: string, content: string) => {
       auth.trace.push('write');
@@ -832,6 +841,7 @@ function runOperation(path: string, command: any): CliResult {
   const auth = AUTH_BY_BOARD.get(path);
   assert.ok(auth);
   if (command.type === 'create') auth.createAdmission = clone(command.admission_snapshot);
+  if (command.type === 'cancel') auth.controlAuthority = clone(command.authority_snapshot);
   if (command.type === 'terminal' || command.type === 'reconcile') {
     const attempt = task(path)?.routing?.attempts?.find(
       (entry: any) => entry.id === command.attempt_id,
@@ -878,6 +888,10 @@ function applyCheckpoint(path: string, name: string): void {
   if (name === 'initial') return;
   assertOk(runOperation(path, fixture.commands.create), `${name}: create setup`);
   if (name === 'created') return;
+  if (name === 'starting-uncertain') {
+    assertOk(runOperation(path, fixture.commands.reconcile_uncertain), `${name}: uncertain setup`);
+    return;
+  }
   assertOk(runOperation(path, fixture.commands.bind), `${name}: bind setup`);
   if (name === 'running') return;
   if (name === 'cancelled-requested') {
@@ -1055,6 +1069,75 @@ test('create/bind/cancel/terminal CLI handlers execute and exact replay is a no-
   const beforeTerminalReplay = readFileSync(path, 'utf8');
   assertOk(runOperation(path, fixture.commands.terminal), 'terminal exact replay');
   assert.equal(readFileSync(path, 'utf8'), beforeTerminalReplay);
+});
+
+test('real bind exact replay remains a committed no-op after terminal progression', () => {
+  const { path } = boardFile();
+  applyCheckpoint(path, 'terminal');
+  const auth = AUTH_BY_BOARD.get(path);
+  assert.ok(auth);
+  const beforeBytes = readFileSync(path, 'utf8');
+  const beforeConsumption = consumedSnapshot(auth);
+  const commitsBefore = auth.commits.length;
+  const rollbacksBefore = auth.rollbacks.length;
+
+  const replay = runOperation(path, fixture.commands.bind);
+
+  assertOk(replay, 'post-terminal bind exact replay');
+  assert.match(replay.stdout, /"bound"\s*:\s*false/);
+  assert.equal(readFileSync(path, 'utf8'), beforeBytes, 'bind replay rewrote terminal history');
+  assert.equal(consumedSnapshot(auth), beforeConsumption, 'bind replay changed claim identity');
+  assert.equal(auth.commits.length, commitsBefore + 1, 'authenticated replay was not committed');
+  assert.equal(auth.rollbacks.length, rollbacksBefore, 'authenticated replay rolled back');
+  assertTransactionOrder(auth, 'post-terminal bind exact replay');
+});
+
+test('real create and cancel authority reject foreign current lineage before launch or control', () => {
+  const lineageDrifts: Array<[string, (lineage: any) => void]> = [
+    ['origin session', (lineage) => (lineage.origin_session_ref = 'session-ref:foreign')],
+    ['workspace', (lineage) => (lineage.workspace_ref = 'workspace-ref:foreign')],
+    ['worktree', (lineage) => (lineage.worktree_ref = 'worktree-ref:foreign')],
+    [
+      'baseline',
+      (lineage) => (lineage.baseline_commit = '9999999999999999999999999999999999999999'),
+    ],
+  ];
+
+  for (const [name, mutate] of lineageDrifts) {
+    const { path } = boardFile();
+    const command = clone(fixture.commands.create);
+    mutate(command.admission_snapshot.current_lineage);
+    const before = readFileSync(path, 'utf8');
+    const result = runOperation(path, command);
+    assert.equal(result.code, EXIT.VALIDATION, `create/${name}: ${result.stderr}`);
+    assert.match(result.stderr, /NATIVE-LINEAGE-MISMATCH/, `create/${name}`);
+    assert.doesNotMatch(result.stdout, /"launch_allowed"\s*:\s*true/, `create/${name}`);
+    assert.equal(readFileSync(path, 'utf8'), before, `create/${name}: board bytes changed`);
+  }
+
+  for (const [name, mutate] of lineageDrifts) {
+    const { path } = boardFile();
+    applyCheckpoint(path, 'running');
+    const command = clone(fixture.commands.cancel);
+    mutate(command.authority_snapshot.current_lineage);
+    const before = readFileSync(path, 'utf8');
+    const result = runOperation(path, command);
+    assert.equal(result.code, EXIT.VALIDATION, `cancel/${name}: ${result.stderr}`);
+    assert.match(result.stderr, /NATIVE-LINEAGE-MISMATCH/, `cancel/${name}`);
+    assert.doesNotMatch(result.stdout, /"host_control_effects"/, `cancel/${name}`);
+    assert.equal(readFileSync(path, 'utf8'), before, `cancel/${name}: board bytes changed`);
+  }
+
+  const unrelated = boardFile();
+  applyCheckpoint(unrelated.path, 'running');
+  const request = clone(fixture.commands.cancel);
+  request.request.requested_by_session_ref = 'session-ref:unrelated-requester';
+  const before = readFileSync(unrelated.path, 'utf8');
+  const result = runOperation(unrelated.path, request);
+  assert.equal(result.code, EXIT.VALIDATION, `cancel/unrelated requester: ${result.stderr}`);
+  assert.match(result.stderr, /NATIVE-LINEAGE-MISMATCH/);
+  assert.doesNotMatch(result.stdout, /"host_control_effects"/);
+  assert.equal(readFileSync(unrelated.path, 'utf8'), before);
 });
 
 test('real create router rejects every frozen record boundary with force and no board write', () => {
@@ -1533,7 +1616,7 @@ test('evidence stage failure rolls back its reservation for bind/terminal/reconc
 
 test('engine conflict after successful evidence stage consumes nothing for every evidence class', () => {
   for (const row of [
-    { label: 'bind', checkpoint: 'uncertain', command: fixture.commands.bind },
+    { label: 'bind', checkpoint: 'starting-uncertain', command: fixture.commands.bind },
     { label: 'terminal', checkpoint: 'created', command: fixture.commands.terminal },
     { label: 'reconcile', checkpoint: 'created', command: fixture.commands.reconcile_running },
   ]) {
@@ -1682,6 +1765,40 @@ test('reconcile CLI handler owns uncertain/running/terminal/orphaned task projec
     'explicit create after fenced orphan audit',
   );
   assert.equal(task(orphaned.path).routing.attempts.length, 2);
+});
+
+test('trusted orphan audit commits while ordinary dependency gating projects blocked', () => {
+  const { path } = boardFile();
+  applyCheckpoint(path, 'uncertain');
+  const board = readBoard(path);
+  board.tasks.unshift({
+    id: 'T-native-upstream',
+    status: 'ready',
+    deps: [],
+    executor: 'user',
+  });
+  board.tasks.find((entry: any) => entry.id === 'T-native-v1').deps = ['T-native-upstream'];
+  writeFileSync(path, `${JSON.stringify(board, null, 2)}\n`);
+
+  const auth = AUTH_BY_BOARD.get(path);
+  assert.ok(auth);
+  const consumedBefore = consumedSnapshot(auth);
+  const commitsBefore = auth.commits.length;
+  const rollbacksBefore = auth.rollbacks.length;
+  const result = runOperation(path, fixture.commands.reconcile_orphaned);
+
+  assertOk(result, 'orphan audit with unsatisfied dependency');
+  assert.equal(task(path).routing.attempts[0].state, 'orphaned');
+  assert.equal(task(path).status, 'blocked');
+  assert.equal(task(path).handle ?? null, null);
+  assert.notEqual(consumedSnapshot(auth), consumedBefore, 'orphan evidence was not consumed');
+  assert.equal(auth.commits.length, commitsBefore + 1, 'orphan evidence was not committed');
+  assert.equal(auth.rollbacks.length, rollbacksBefore, 'orphan evidence was rolled back');
+  assertTransactionOrder(auth, 'orphan audit with unsatisfied dependency');
+
+  const beforeReplay = readFileSync(path, 'utf8');
+  assertOk(runOperation(path, fixture.commands.reconcile_orphaned), 'blocked orphan exact replay');
+  assert.equal(readFileSync(path, 'utf8'), beforeReplay, 'blocked orphan replay changed bytes');
 });
 
 test('trusted reconcile-uncertain permits structurally complete lineage drift only', () => {
