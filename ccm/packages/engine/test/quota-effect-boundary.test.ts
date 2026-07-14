@@ -118,6 +118,14 @@ test('allowed-but-unbound, undeclared, unknown, and forbidden capabilities fail 
     errorCode(() => boundary.execute('process.spawn', {})),
     'QUOTA_EFFECT_FORBIDDEN',
   );
+  assert.equal(
+    errorCode(() => boundary.assertCapabilities(['auth.observe', 'quota.observe'])),
+    'QUOTA_CAPABILITY_UNAVAILABLE',
+  );
+  assert.equal(
+    errorCode(() => boundary.assertCapabilities(['auth.observe', 'filesystem.quota.stat'])),
+    'QUOTA_CAPABILITY_UNDECLARED',
+  );
   assert.equal(handlerCalls, 0);
 });
 

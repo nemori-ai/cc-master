@@ -22,6 +22,7 @@ const EXPECTED: Record<string, string[]> = {
   provider: ['inspect'],
   orchestrator: ['context'],
   route: ['advise'],
+  quota: ['status', 'preflight', 'reserve', 'audit'],
   board: [
     'show',
     'lint',

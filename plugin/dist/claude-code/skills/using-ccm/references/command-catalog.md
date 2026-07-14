@@ -16,6 +16,11 @@
   - [orchestrator context](#orchestrator-context)
 - [namespace route（shadow advisory）](#namespace-routeshadow-advisory)
   - [route advise](#route-advise)
+- [namespace quota（live admission authority）](#namespace-quotalive-admission-authority)
+  - [quota status](#quota-status)
+  - [quota preflight](#quota-preflight)
+  - [quota reserve](#quota-reserve)
+  - [quota audit](#quota-audit)
 - [namespace board](#namespace-board)
   - [board show](#board-show)
   - [board lint](#board-lint)
@@ -145,6 +150,7 @@ ccm <alias> [args] [flags]
 |---|---|
 | `orchestrator` | 从显式本地 cache 构造 frozen orchestrator context；cached-only、零 live probe |
 | `route` | 对 frozen task + context 给纯 shadow route advice；永远 `spawned:false`、不写 board |
+| `quota` | provider-neutral live quota admission：owner-only observation/reservation store、payer+pool capacity reservation 与 audit；Codex 只认 7d hard window |
 | `board` | 板级：查看 / 校验 / DAG 分析 / 建板 / 改配置 |
 | `task` | 任务：增删改查 + 状态机（DAG 节点） |
 | `log` | append-only 审计轨迹 |
@@ -274,6 +280,78 @@ context origin 必须等于 `--origin`；`available:false`、unknown/stale/revis
 为 no-route。advice 会按自己的 `--as-of` 重算 freshness，旧的 fresh context 过期后不能 replay。
 同 harness CLI 保持 `cli-headless`，不会折叠为 native；品牌/crossness 不参与排序。该命令不
 reserve、不 spawn、不建 attempt、不写 board。
+
+---
+
+## namespace quota（live admission authority）
+
+这组命令是 cross-harness dispatch 的 provider-neutral 本地 quota authority seam。它不登录、登出、切号、
+复制或写入 Codex/Cursor credential，也不直接调用 provider/model 或启动 worker。每个 provider rule 明示
+承重 window；Codex 的 5h window 已退役，只有 Codex rule 会过滤 5h 并以同 payer+pool 的 fresh 7d
+observation 作 hard gate。rolling 24h 只给风险 advisory，不把 ample 硬改成 deny。
+
+### quota status
+
+```bash
+ccm quota status [--home <dir>] [--json]
+```
+
+读取 owner-only quota store。空 store 也 exit 0，并诚实返回
+`{schema:"ccm/quota-status/v1",available:false}`；missing 绝不折算成 ample。
+
+### quota preflight
+
+```bash
+ccm quota preflight --input <json|@file|-> [--json]
+```
+
+admission 输入只接受 `source_key`、`reservation_id`、`checked_at` 这类 authority reference；命令从
+owner-only observation/reservation store 读取 policy、effect、provider-rule hard-window buckets、source revision、committed
+ticket digest 与 run lineage 后重验，caller 自给的 `live` / `policy` / `effect` 结论不产生授权。
+unknown / empty / tight / hard-stale / observation conflict / identity conflict / invalid commit 均返回
+`automatic_spawn_limit:0`。带 `requested_effect` 的 lifecycle deny 仍是零副作用纯机械判定；
+Codex/Cursor 的 account/session/credential/auth mutation request 固定 deny，effect count 为 0。
+
+### quota reserve
+
+```bash
+ccm quota reserve --input <json|@file|-> [--home <dir>] [--json]
+```
+
+请求必须是闭合 `ccm/quota-reservation-request/v1`，带明确 `checked_at`，amount 为 positive finite，且只能创建 `held`；
+caller 不能自铸 `committed`，也不能自铸 capacity/headroom/request hash。命令从 owner-only observation
+authority 重验 source/account/pool/identity 与 hard-window buckets，并按 source profile 的 fresh/hard TTL、
+`observed_at`、`valid_until`、reset 与 clock skew 在每次读取时重算 freshness；持久化的 `freshness:"fresh"`
+不能授权过期 evidence。caller 给出的 capacity 必须与锁内推导
+完全一致，否则 typed deny。Codex policy/provider-rule revision 必须是受支持的 7d pairing，所有承重百分比
+严格落在 finite `0..100`；未知 revision、越界 ceiling/usage/margin/amount 都在 hold 前 fail closed。request
+hash 由 store 对完整承重 binding canonical 计算；idempotency key 由 machine-scope lock + durable index 统一
+寻址，同 canonical hash 即使换 provisional ID 也复用原 receipt，变更 aggregation/attempt/candidate/source/
+account/pool/identity 即冲突；reservation ID 在本机 authority scope 全局唯一。multi-bucket 先发布 recoverable
+transaction coordinator，只有 committed
+journal 才让所有 legs 同时成为 authority；lookup、audit、expiry、release 也以该 journal 为唯一 authority，
+projection 只可重建，crash/retry 不暴露 split state，任一不 fit 时全部写入 0。`held -> committed` 是
+supervisor/runtime composition 的内部 transition：写入
+ticket digest 与 attempt/run/account/pool/identity/aggregation/source/expiry lineage，不由 public reserve
+输入控制。该命令只保留本地容量，不声称 provider 已预留或退款。
+
+### quota audit
+
+```bash
+ccm quota audit --input <json|@file|-> [--home <dir>] [--json]
+```
+
+用 launch/process evidence 审计 reservation。只有 store locked/readable、claim absent、process identity
+proven-absent 且 TTL 已到才能把 held 判为 expired；`committed` 即使 claim absent 或墙钟已过也只能
+orphan-audit 并继续计入容量。terminal/finalization proof 必须用闭合 schema 绑定 reservation ID/request hash、
+attempt、run、ticket digest、连续 terminal journal revision、proven-dead process identity 与 cleanup/evidence
+retention；任意非空对象、partial/mismatch/conflict proof 都不能释放容量。manager/session 消失、mtime 或
+PID-not-found 单独都不能释放。managed
+lock owner 记录 boot ID、process-start identity 与 nonce；只有平台证据可证明 stale 时才 journaled
+recovery，不可证明就保持 `QUOTA_LOCK_BUSY`。multi-key transition 由 coordinator 一次发布全部 legs；
+`expired|released` 是单调 terminal，重试不得新增 event、复活 reservation 或重新占用容量；single-key
+transition 在 event durable、snapshot publish 前 crash 时，terminal retry 会先从 event authority 修复 stale
+projection 再返回。
 
 ---
 
@@ -2091,6 +2169,19 @@ ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
 ## --json 输出形状
 
 通用信封：成功 `{"ok": true, "data": <below>}`，失败 `{"ok": false, "exit": N, "error": "…", "violations": []}`。以下只列 `data` 形状。
+
+### quota status / preflight / reserve / audit
+
+- `quota status` 的 `data` 至少含 `{schema:"ccm/quota-status/v1",available:boolean}`。
+- `quota preflight` 的 `data` 是从 authority store 重验后得到的 mechanical decision；caller 结论不进入
+  authority。承重 gate 不成立时显式含 `automatic_spawn_limit:0` 与 `blocking_reasons[]`。
+- `quota reserve` 的成功 `data` 含 `action:"created"`、`reservation_id`、store-derived `request_hash`、`event_ref`、
+  `snapshot_ref`、event/snapshot 各自的 directory-sync receipt；同 key 幂等返回
+  `action:"idempotent-existing"` 与原 receipt。
+- `quota audit` 的 `data` 是 reservation transition。只有已到 TTL 的 `held` +
+  confirmed-unlaunched evidence 才为 `state:"expired"`；`committed` 或 unknown evidence 返回
+  `state:"orphaned"`，容量仍 counted。multi-key 的 capacity-changing transition 由 coordinator 一次发布
+  全部 legs；`expired|released` 是单调 terminal，重试只返回既有 receipt，不新增 event、不复活或重占容量。
 
 ### board next（`ccm board next --json` / `ccm next --json`）
 

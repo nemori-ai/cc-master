@@ -1,6 +1,6 @@
-// Opt-in RED contract for design_docs/2026-07-13-cross-harness-quota-admission-contract.md.
-// This file intentionally does not end in .test.ts, so default tests stay green until the S4
-// implementation slice promotes it. Keep these tracked commands in sync with the spec:
+// Explicit promotion contract for design_docs/2026-07-13-cross-harness-quota-admission-contract.md.
+// The historical .red.ts filename intentionally stays outside the default test glob; both tracked
+// commands below are release gates for the bounded local runtime:
 //   CCM_QUOTA_ADMISSION_FIXTURES_ONLY=1 node --import tsx test/quota-admission-contract.red.ts
 //   node --import tsx test/quota-admission-contract.red.ts
 
@@ -64,6 +64,8 @@ interface QuotaAdmissionStore {
   publishObservation: (request: Readonly<Record<string, unknown>>) => unknown | Promise<unknown>;
   readObservation: (sourceKey: string) => unknown | Promise<unknown>;
   reserve: (request: Readonly<Record<string, unknown>>) => unknown | Promise<unknown>;
+  commitReservation: (request: Readonly<Record<string, unknown>>) => unknown | Promise<unknown>;
+  preflight: (request: Readonly<Record<string, unknown>>) => unknown | Promise<unknown>;
   inspectAggregation: (aggregationKey: string) => unknown | Promise<unknown>;
 }
 
@@ -71,6 +73,7 @@ interface QuotaAdmissionStoreModule {
   createQuotaAdmissionStore: (options: {
     home: string;
     filesystem?: Record<PropertyKey, unknown>;
+    now?: () => Date;
   }) => QuotaAdmissionStore;
 }
 
@@ -251,6 +254,90 @@ function tempHome(prefix: string): { root: string; home: string } {
   mkdirSync(home, { recursive: true });
   TMP.push(root);
   return { root, home };
+}
+
+function storeReservationRequest(request: Record<string, unknown>): Record<string, unknown> {
+  const id = String(request.id ?? 'fixture-reservation');
+  const requestedExpiry = Date.parse(String(request.expires_at ?? ''));
+  return {
+    ...request,
+    schema: 'ccm/quota-reservation-request/v1',
+    key: request.key ?? `key:${id}`,
+    hash: request.hash ?? `hash:${id}`,
+    state: request.state ?? 'held',
+    checked_at: request.checked_at ?? new Date().toISOString(),
+    expires_at:
+      Number.isFinite(requestedExpiry) && requestedExpiry > Date.now()
+        ? request.expires_at
+        : new Date(Date.now() + 60_000).toISOString(),
+    source_revision: request.source_revision ?? 'sha256:fixture-live-r1',
+    attempt_id: request.attempt_id ?? `attempt:${id}`,
+    candidate_id: request.candidate_id ?? 'fixture-candidate',
+    account_id: request.account_id ?? 'fixture-account',
+    pool_id: request.pool_id ?? 'fixture-pool',
+    identity_fingerprint: request.identity_fingerprint ?? 'sha256:fixture-identity',
+  };
+}
+
+async function seedReservationAuthority(
+  home: string,
+  request: Record<string, unknown>,
+): Promise<void> {
+  const module = await storeModule();
+  const aggregationKeys = Array.isArray(request.aggregation_keys)
+    ? request.aggregation_keys.map(String).sort()
+    : [String(request.aggregation_key)];
+  const capacities =
+    typeof request.capacity_pct === 'number'
+      ? {}
+      : record(request.capacity_pct, 'reservation authority capacity');
+  const capacityFor = (key: string): number =>
+    typeof request.capacity_pct === 'number' ? request.capacity_pct : Number(capacities[key]);
+  const accountId = String(request.account_id ?? 'fixture-account');
+  const poolId = String(request.pool_id ?? 'fixture-pool');
+  const identityFingerprint = String(request.identity_fingerprint ?? 'sha256:fixture-identity');
+  const sourceRevision = String(request.source_revision ?? 'sha256:fixture-live-r1');
+  const sourceKey = `fixture:${createHash('sha256')
+    .update(`${sourceRevision}\0${accountId}\0${poolId}\0${aggregationKeys.join('\0')}`)
+    .digest('hex')}`;
+  await module.createQuotaAdmissionStore({ home }).publishObservation({
+    source_key: sourceKey,
+    observation: {
+      schema: 'ccm/quota-authority-observation/v1',
+      provider: 'codex',
+      provider_rule_revision: 'ccm/codex-7d-pacing/v1',
+      source_revision: sourceRevision,
+      observed_at: new Date(Date.now() - 1_000).toISOString(),
+      valid_until: new Date(Date.now() + 300_000).toISOString(),
+      source_profile: {
+        schema: 'ccm/quota-source-profile/v1',
+        revision: 'ccm/test-quota-source/v1',
+        fresh_ttl_sec: 60,
+        hard_ttl_sec: 300,
+        max_clock_skew_sec: 5,
+      },
+      account_id: accountId,
+      pool_id: poolId,
+      identity_fingerprint: identityFingerprint,
+      hard_window: { name: 'seven_day', duration_sec: 604_800 },
+      policy: {
+        decision: 'allow',
+        revision: 'ccm/codex-7d-pacing/v1',
+        hard_ceiling_used_pct: 85,
+      },
+      effects: { decision: 'allow', effect: 'read-only' },
+      buckets: aggregationKeys.map((aggregationKey) => ({
+        id: `seven-day:${aggregationKey}`,
+        window: 'seven_day',
+        duration_sec: 604_800,
+        freshness: 'fresh',
+        used_pct: 85 - capacityFor(aggregationKey),
+        safety_margin_pct: 0,
+        projected_p80_pct: 0,
+        aggregation_key: aggregationKey,
+      })),
+    },
+  });
 }
 
 function storeCase(
@@ -723,13 +810,20 @@ async function cli(
   env: Record<string, string | undefined> = {},
   quotaEffects?: QuotaEffectBoundary,
 ): Promise<{ code: number; stdout: string; stderr: string; json: Record<string, unknown> }> {
+  const effects =
+    quotaEffects ??
+    (
+      (await import('../src/quota-production-effects.js')) as {
+        createProductionQuotaEffectBoundary(options: { home: string }): QuotaEffectBoundary;
+      }
+    ).createProductionQuotaEffectBoundary({ home });
   const stdout: string[] = [];
   const stderr: string[] = [];
   const code = await run(['--home', home, ...args], {
     out: (line: string) => stdout.push(line),
     err: (line: string) => stderr.push(line),
     env: { HOME: dirname(home), CC_MASTER_HOME: home, CC_MASTER_NO_AUTOINSTALL: '1', ...env },
-    quotaEffects,
+    quotaEffects: effects,
   });
   const output = stdout.join('');
   let json: Record<string, unknown> = {};
@@ -1297,7 +1391,18 @@ storeCase(
       Array.from({ length: Number(input.concurrent_callers) }, (_, workerId) => ({
         operation: 'refresh',
         sourceKey: String(input.source_key),
-        observation: input.observation as Record<string, unknown>,
+        observation: {
+          ...(input.observation as Record<string, unknown>),
+          observed_at: new Date(Date.now() - 1_000).toISOString(),
+          valid_until: new Date(Date.now() + 300_000).toISOString(),
+          source_profile: {
+            schema: 'ccm/quota-source-profile/v1',
+            revision: 'ccm/test-quota-source/v1',
+            fresh_ttl_sec: 60,
+            hard_ttl_sec: 300,
+            max_clock_skew_sec: 5,
+          },
+        },
         collectorDir,
         workerId,
       })),
@@ -1496,11 +1601,12 @@ storeCase(
     const { home } = tempHome('ccm-quota-recovery-');
     const scenario = fixtureCase('store.json', 'event-durable-snapshot-missing-recovers');
     const aggregationKey = String(scenario.input.aggregation_key);
-    const request: Record<string, unknown> = {
+    const request: Record<string, unknown> = storeReservationRequest({
       ...(scenario.input.request as Record<string, unknown>),
       aggregation_key: aggregationKey,
       capacity_pct: scenario.input.capacity_pct,
-    };
+    });
+    await seedReservationAuthority(home, request);
     const first = record(
       await module.createQuotaAdmissionStore({ home }).reserve(request),
       'first reservation',
@@ -1531,6 +1637,7 @@ storeCase(
         key: `${String(request.key)}-${suffix}`,
         hash: `${String(request.hash)}-${suffix}`,
       };
+      await seedReservationAuthority(seededHome, seededRequest);
       const seeded = record(
         await module.createQuotaAdmissionStore({ home: seededHome }).reserve(seededRequest),
         `${suffix} seeded reservation`,
@@ -1641,14 +1748,15 @@ storeCase(
     const module = await storeModule();
     const scenario = fixtureCase('store.json', 'atomic-owner-only-reservation-snapshot-publish');
     const aggregationKey = String(scenario.input.aggregation_key);
-    const request = {
+    const request = storeReservationRequest({
       ...(scenario.input.request as Record<string, unknown>),
       aggregation_key: aggregationKey,
       capacity_pct: scenario.input.capacity_pct,
-    };
+    });
     const expected = record(scenario.expected, 'atomic reservation snapshot expected');
 
     const { home } = tempHome('ccm-quota-atomic-reservation-');
+    await seedReservationAuthority(home, request);
     const durableIo = observedFilesystem();
     const reserved = record(
       await module
@@ -1681,6 +1789,7 @@ storeCase(
     const hardCodes = expected.directory_sync_hard_failure_codes as DirectorySyncFaultCode[];
     assert.ok(softCodes.length > 0 && hardCodes.length > 0, 'reservation durability codes');
     const supportedHome = tempHome('ccm-quota-reservation-dirfsync-supported-').home;
+    await seedReservationAuthority(supportedHome, request);
     const supportedIo = observedFilesystem({ directorySyncSupported: true });
     const supportedResult = record(
       await module
@@ -1711,6 +1820,7 @@ storeCase(
           directorySyncErrorCode: softCode,
           directorySyncErrorPath: softBoundaryPath,
         });
+        await seedReservationAuthority(softHome, request);
         const softResult = record(
           await module
             .createQuotaAdmissionStore({ home: softHome, filesystem: softIo.filesystem })
@@ -1739,6 +1849,7 @@ storeCase(
           directorySyncErrorCode: hardCode,
           directorySyncErrorPath: hardBoundaryPath,
         });
+        await seedReservationAuthority(hardHome, request);
         let rejectedCode: string | undefined;
         await assert.rejects(
           async () =>
@@ -1774,6 +1885,7 @@ storeCase(
     }
 
     const failedHome = tempHome('ccm-quota-atomic-reservation-fault-').home;
+    await seedReservationAuthority(failedHome, request);
     const failedSnapshotRef = join(reservationPath(failedHome, aggregationKey), 'snapshot.json');
     const failedIo = observedFilesystem({ failRenameTo: failedSnapshotRef });
     await assert.rejects(
@@ -1807,14 +1919,15 @@ storeCase(
     const { home } = tempHome('ccm-quota-same-key-');
     const scenario = fixtureCase('concurrency.json', 'ten-same-key-single-reservation');
     const input = scenario.input;
-    const request = {
+    const request = storeReservationRequest({
       ...(input.request as Record<string, unknown>),
       aggregation_key: (input.aggregation_keys as string[])[0],
       capacity_pct: record(input.capacity_pct, 'same-key capacity')[
         (input.aggregation_keys as string[])[0] as string
       ],
-    };
+    });
     const provisionalIds = input.provisional_reservation_ids as string[];
+    await seedReservationAuthority(home, request);
     const results = await runWorkers(
       home,
       provisionalIds.map((id) => ({ ...request, id })),
@@ -1853,8 +1966,13 @@ storeCase(
       aggregation_key: aggregationKey,
       capacity_pct: capacity,
       state: 'held',
-      expires_at: '2026-07-13T08:01:00Z',
+      checked_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
     }));
+    await seedReservationAuthority(
+      home,
+      storeReservationRequest(requests[0] as Record<string, unknown>),
+    );
     const values = (await runWorkers(home, requests)).map((entry) =>
       record(entry, 'capacity worker result'),
     );
@@ -1886,30 +2004,44 @@ storeCase(
     const capacity = record(scenario.input.capacity_pct, 'multi-bucket capacity');
     const existing = record(scenario.input.existing_pct, 'multi-bucket existing');
     const store = module.createQuotaAdmissionStore({ home });
-    const seed = record(
-      await store.reserve({
-        aggregation_key: bucketB,
-        capacity_pct: capacity[bucketB],
-        id: 'multi-seed-b',
-        key: 'multi-seed-b-key',
-        hash: 'multi-seed-b-hash',
-        amount_pct: existing[bucketB],
+    await seedReservationAuthority(
+      home,
+      storeReservationRequest({
+        ...(scenario.input.request as Record<string, unknown>),
+        aggregation_keys: [bucketA, bucketB],
+        capacity_pct: capacity,
         state: 'held',
-        expires_at: '2026-07-13T08:01:00Z',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
       }),
+    );
+    const seed = record(
+      await store.reserve(
+        storeReservationRequest({
+          aggregation_key: bucketB,
+          capacity_pct: capacity[bucketB],
+          id: 'multi-seed-b',
+          key: 'multi-seed-b-key',
+          hash: 'multi-seed-b-hash',
+          amount_pct: existing[bucketB],
+          state: 'held',
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        }),
+      ),
       'multi-bucket seed',
     );
     assert.equal(seed.action, 'created');
     const beforeA = reservationAuthoritySnapshot(home, bucketA);
     const beforeB = reservationAuthoritySnapshot(home, bucketB);
     const result = record(
-      await store.reserve({
-        ...(scenario.input.request as Record<string, unknown>),
-        aggregation_keys: [bucketA, bucketB],
-        capacity_pct: capacity,
-        state: 'held',
-        expires_at: '2026-07-13T08:01:00Z',
-      }),
+      await store.reserve(
+        storeReservationRequest({
+          ...(scenario.input.request as Record<string, unknown>),
+          aggregation_keys: [bucketA, bucketB],
+          capacity_pct: capacity,
+          state: 'held',
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        }),
+      ),
       'multi-bucket rejection',
     );
     assert.equal(result.error, 'RESERVATION_CAPACITY_CONFLICT');
@@ -1943,15 +2075,17 @@ storeCase(
     const before = snapshotTree(reservationRoot);
     const request = scenario.input.request as Record<string, unknown>;
     const result = record(
-      await module.createQuotaAdmissionStore({ home }).reserve({
-        ...request,
-        key: 'unknown-lock-key',
-        hash: 'unknown-lock-hash',
-        aggregation_key: aggregationKey,
-        capacity_pct: 10,
-        state: 'held',
-        expires_at: '2026-07-13T08:01:00Z',
-      }),
+      await module.createQuotaAdmissionStore({ home }).reserve(
+        storeReservationRequest({
+          ...request,
+          key: 'unknown-lock-key',
+          hash: 'unknown-lock-hash',
+          aggregation_key: aggregationKey,
+          capacity_pct: 10,
+          state: 'held',
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        }),
+      ),
       'unknown lock result',
     );
     assert.equal(result.error, 'QUOTA_LOCK_BUSY');
@@ -1972,21 +2106,151 @@ if (!FIXTURES_ONLY) {
     );
     assert.equal(record(status.json.data, 'quota status data').schema, 'ccm/quota-status/v1');
 
-    for (const name of [
-      'authenticated-without-quota-spawn-zero',
-      'observation-conflict-spawn-zero',
-      'provider-neutral-ample',
-    ]) {
-      const scenario = fixtureCase('admission.json', name);
-      const result = await cli(
-        ['quota', 'preflight', '--input', JSON.stringify(scenario.input), '--json'],
-        home,
-      );
-      assert.equal(result.code, 0, `HONEST RED [cli preflight:${name}]: ${result.stderr}`);
-      assert.deepEqual(record(result.json.data, `${name} data`), scenario.expected);
-    }
+    const missingAuthority = await cli(
+      [
+        'quota',
+        'preflight',
+        '--input',
+        JSON.stringify({
+          source_key: 'missing',
+          reservation_id: 'missing',
+          checked_at: '2026-07-13T08:00:25Z',
+        }),
+        '--json',
+      ],
+      home,
+    );
+    assert.equal(
+      missingAuthority.code,
+      0,
+      `HONEST RED [cli preflight]: ${missingAuthority.stderr}`,
+    );
+    assert.equal(record(missingAuthority.json.data, 'preflight data').decision, 'reject');
+    assert.equal(record(missingAuthority.json.data, 'preflight data').automatic_spawn_limit, 0);
 
-    const reserveInput = {
+    const authorityStore = (await storeModule()).createQuotaAdmissionStore({ home });
+    const authorityAggregation = 'codex|cli-account|cli-pool|seven_day';
+    await authorityStore.publishObservation({
+      source_key: 'cli-codex-current',
+      observation: {
+        schema: 'ccm/quota-authority-observation/v1',
+        provider: 'codex',
+        provider_rule_revision: 'ccm/codex-7d-pacing/v1',
+        source_revision: 'sha256:cli-live-r1',
+        observed_at: new Date(Date.now() - 1_000).toISOString(),
+        valid_until: new Date(Date.now() + 300_000).toISOString(),
+        source_profile: {
+          schema: 'ccm/quota-source-profile/v1',
+          revision: 'ccm/test-quota-source/v1',
+          fresh_ttl_sec: 60,
+          hard_ttl_sec: 300,
+          max_clock_skew_sec: 5,
+        },
+        account_id: 'cli-account',
+        pool_id: 'cli-pool',
+        identity_fingerprint: 'sha256:cli-identity',
+        hard_window: { name: 'seven_day', duration_sec: 604_800 },
+        policy: {
+          decision: 'allow',
+          revision: 'ccm/codex-7d-pacing/v1',
+          hard_ceiling_used_pct: 85,
+        },
+        effects: { decision: 'allow', effect: 'read-only' },
+        buckets: [
+          {
+            id: 'retired-five-hour',
+            window: 'five_hour',
+            duration_sec: 18_000,
+            freshness: 'fresh',
+            used_pct: 100,
+            aggregation_key: 'codex|cli-account|cli-pool|five_hour',
+          },
+          {
+            id: 'seven-day',
+            window: 'seven_day',
+            duration_sec: 604_800,
+            freshness: 'fresh',
+            used_pct: 20,
+            safety_margin_pct: 5,
+            projected_p80_pct: 4,
+            aggregation_key: authorityAggregation,
+          },
+        ],
+        rolling24h: { advisory: 'throttle-risk', hard_gate_effect: 'none' },
+      },
+    });
+    const authorityReservation = record(
+      await authorityStore.reserve(
+        storeReservationRequest({
+          aggregation_key: authorityAggregation,
+          capacity_pct: 60,
+          id: 'qres-cli-authority',
+          key: 'cli-authority-idempotency',
+          hash: 'sha256:cli-authority-request',
+          amount_pct: 4,
+          expires_at: '2099-07-14T01:00:00Z',
+          source_revision: 'sha256:cli-live-r1',
+          attempt_id: 'attempt-cli-authority',
+          candidate_id: 'codex-cli-worker',
+          account_id: 'cli-account',
+          pool_id: 'cli-pool',
+          identity_fingerprint: 'sha256:cli-identity',
+        }),
+      ),
+      'CLI authority reservation',
+    );
+    const committed = record(
+      await authorityStore.commitReservation({
+        reservation_id: 'qres-cli-authority',
+        checked_at: new Date().toISOString(),
+        ticket: {
+          schema: 'ccm/quota-admission-ticket/v1',
+          ticket_id: 'ticket-cli-authority',
+          reservation_id: 'qres-cli-authority',
+          reservation_request_hash: authorityReservation.request_hash,
+          reservation_expires_at: '2099-07-14T01:00:00Z',
+          attempt_id: 'attempt-cli-authority',
+          run_ref: 'run-cli-authority',
+          account_id: 'cli-account',
+          pool_id: 'cli-pool',
+          identity_fingerprint: 'sha256:cli-identity',
+          aggregation_key: authorityAggregation,
+          live_source_revision: 'sha256:cli-live-r1',
+          runtime_sha256: 'sha256:cli-runtime',
+          launch_idempotency_key: 'launch-cli-authority',
+          launch_nonce: 'nonce-cli-authority',
+          issued_at: new Date().toISOString(),
+          launch_by: '2099-07-14T01:00:00Z',
+        },
+      }),
+      'CLI authority commit',
+    );
+    assert.equal(committed.action, 'committed');
+    const authorityPreflight = await cli(
+      [
+        'quota',
+        'preflight',
+        '--input',
+        JSON.stringify({
+          source_key: 'cli-codex-current',
+          reservation_id: 'qres-cli-authority',
+          checked_at: new Date().toISOString(),
+          policy: { decision: 'deny' },
+          live: { state: 'exhausted', freshness: 'hard-stale' },
+        }),
+        '--json',
+      ],
+      home,
+    );
+    const authorityData = record(authorityPreflight.json.data, 'CLI authority preflight');
+    assert.equal(authorityData.decision, 'launch-claim-allowed');
+    assert.equal(authorityData.automatic_spawn_limit, 1);
+    assert.equal(authorityData.hard_window, 'seven_day');
+    assert.deepEqual(authorityData.ignored_windows, ['five_hour']);
+    assert.deepEqual(authorityData.advisories, ['throttle-risk']);
+
+    const reserveExpiresAt = new Date(Date.now() + 60_000).toISOString();
+    const reserveInput = storeReservationRequest({
       aggregation_key: 'cli-reservation-key',
       capacity_pct: 10,
       id: 'qres-cli',
@@ -1994,8 +2258,9 @@ if (!FIXTURES_ONLY) {
       hash: 'cli-request-hash',
       amount_pct: 4,
       state: 'held',
-      expires_at: '2026-07-13T08:01:00Z',
-    };
+      expires_at: reserveExpiresAt,
+    });
+    await seedReservationAuthority(home, reserveInput);
     const reserved = await cli(
       ['quota', 'reserve', '--input', JSON.stringify(reserveInput), '--json'],
       home,
@@ -2004,7 +2269,7 @@ if (!FIXTURES_ONLY) {
     assert.equal(record(reserved.json.data, 'reserve data').action, 'created');
     const auditInput = {
       reservation_id: 'qres-cli',
-      now: '2026-07-13T08:02:00Z',
+      now: new Date(Date.now() + 120_000).toISOString(),
       launch_evidence: { store_locked: true, claim: 'absent', process_identity: 'proven-absent' },
     };
     const audited = await cli(
@@ -2013,6 +2278,216 @@ if (!FIXTURES_ONLY) {
     );
     assert.equal(audited.code, 0, `HONEST RED [cli audit]: ${audited.stderr}`);
     assert.equal(record(audited.json.data, 'audit data').state, 'expired');
+  });
+
+  test('[cli] load-bearing admission fixtures execute through the production registry and store', async (t) => {
+    await t.test('authenticated-without-quota-spawn-zero', async () => {
+      const scenario = fixtureCase('admission.json', 'authenticated-without-quota-spawn-zero');
+      const { home } = tempHome('ccm-quota-cli-auth-without-quota-');
+      const result = await cli(
+        [
+          'quota',
+          'preflight',
+          '--input',
+          JSON.stringify({
+            source_key: 'missing-authenticated-quota',
+            reservation_id: 'missing-authenticated-quota',
+            checked_at: new Date().toISOString(),
+            auth_state: scenario.input.auth_state,
+          }),
+          '--json',
+        ],
+        home,
+      );
+      assert.equal(result.code, 0, result.stderr);
+      const data = record(result.json.data, scenario.name);
+      assert.equal(data.decision, 'reject');
+      assert.equal(data.automatic_spawn_limit, 0);
+      assert.deepEqual(
+        data.blocking_reasons,
+        record(scenario.expected, scenario.name).blocking_reasons,
+      );
+      assert.equal(data.spawn_count, 0);
+    });
+
+    await t.test('observation-conflict-spawn-zero', async () => {
+      const scenario = fixtureCase('admission.json', 'observation-conflict-spawn-zero');
+      const { home } = tempHome('ccm-quota-cli-observation-conflict-');
+      const nowMs = Date.now();
+      const store = (await storeModule()).createQuotaAdmissionStore({ home });
+      await store.publishObservation({
+        source_key: 'conflicted-source',
+        observation: {
+          schema: 'ccm/quota-authority-observation/v1',
+          observation_status: 'conflict',
+          provider: 'codex',
+          provider_rule_revision: 'ccm/codex-7d-pacing/v1',
+          source_revision: 'sha256:conflicted-source',
+          observed_at: new Date(nowMs - 1_000).toISOString(),
+          valid_until: new Date(nowMs + 300_000).toISOString(),
+          source_profile: {
+            schema: 'ccm/quota-source-profile/v1',
+            revision: 'ccm/test-quota-source/v1',
+            fresh_ttl_sec: 60,
+            hard_ttl_sec: 300,
+            max_clock_skew_sec: 5,
+          },
+          account_id: 'identity-A',
+          pool_id: 'pool-A',
+          identity_fingerprint: 'sha256:identity-A',
+          hard_window: { name: 'seven_day', duration_sec: 604_800 },
+          policy: {
+            decision: 'allow',
+            revision: 'ccm/codex-7d-pacing/v1',
+            hard_ceiling_used_pct: 85,
+          },
+          effects: { decision: 'allow', effect: 'read-only' },
+          buckets: [],
+        },
+      });
+      const result = await cli(
+        [
+          'quota',
+          'preflight',
+          '--input',
+          JSON.stringify({
+            source_key: 'conflicted-source',
+            reservation_id: 'missing-conflicted-reservation',
+            checked_at: new Date(nowMs).toISOString(),
+          }),
+          '--json',
+        ],
+        home,
+      );
+      assert.equal(result.code, 0, result.stderr);
+      const data = record(result.json.data, scenario.name);
+      assert.equal(data.decision, 'reject');
+      assert.equal(data.automatic_spawn_limit, 0);
+      assert.deepEqual(
+        data.blocking_reasons,
+        record(scenario.expected, scenario.name).blocking_reasons,
+      );
+      assert.equal(data.spawn_count, 0);
+    });
+
+    await t.test('provider-neutral-ample', async () => {
+      const scenario = fixtureCase('admission.json', 'provider-neutral-ample');
+      const { home } = tempHome('ccm-quota-cli-provider-neutral-');
+      const nowMs = Date.now();
+      const checkedAt = new Date(nowMs).toISOString();
+      const expiresAt = new Date(nowMs + 120_000).toISOString();
+      const aggregationKey = 'future-provider|identity-F|pool-F|thirty_day';
+      const store = (await storeModule()).createQuotaAdmissionStore({ home });
+      await store.publishObservation({
+        source_key: 'future-provider-current',
+        observation: {
+          schema: 'ccm/quota-authority-observation/v1',
+          provider: scenario.input.provider,
+          provider_rule_revision: 'future-provider/thirty-day/v1',
+          source_revision: 'live-future-r2',
+          observed_at: new Date(nowMs - 1_000).toISOString(),
+          valid_until: new Date(nowMs + 300_000).toISOString(),
+          source_profile: {
+            schema: 'ccm/quota-source-profile/v1',
+            revision: 'ccm/test-quota-source/v1',
+            fresh_ttl_sec: 60,
+            hard_ttl_sec: 300,
+            max_clock_skew_sec: 5,
+          },
+          account_id: 'identity-F',
+          pool_id: 'pool-F',
+          identity_fingerprint: 'sha256:identity-F',
+          hard_window: scenario.input.provider_window_rule,
+          policy: {
+            decision: 'allow',
+            revision: 'future-provider/thirty-day/v1',
+            hard_ceiling_used_pct: 85,
+          },
+          effects: { decision: 'allow', effect: 'read-only' },
+          buckets: [
+            {
+              id: 'future-thirty-day',
+              window: 'thirty_day',
+              duration_sec: 2_592_000,
+              freshness: 'fresh',
+              used_pct: 65,
+              safety_margin_pct: 0,
+              projected_p80_pct: 0,
+              aggregation_key: aggregationKey,
+            },
+          ],
+        },
+      });
+      const held = record(
+        await store.reserve(
+          storeReservationRequest({
+            source_key: 'future-provider-current',
+            aggregation_key: aggregationKey,
+            capacity_pct: 20,
+            amount_pct: 4,
+            id: 'qres-future',
+            key: 'key-future',
+            checked_at: checkedAt,
+            expires_at: expiresAt,
+            source_revision: 'live-future-r2',
+            attempt_id: 'attempt-future',
+            account_id: 'identity-F',
+            pool_id: 'pool-F',
+            identity_fingerprint: 'sha256:identity-F',
+          }),
+        ),
+        'provider-neutral hold',
+      );
+      assert.equal(held.action, 'created');
+      const committed = record(
+        await store.commitReservation({
+          reservation_id: 'qres-future',
+          checked_at: checkedAt,
+          ticket: {
+            schema: 'ccm/quota-admission-ticket/v1',
+            ticket_id: 'ticket-future',
+            reservation_id: 'qres-future',
+            reservation_request_hash: held.request_hash,
+            reservation_expires_at: expiresAt,
+            attempt_id: 'attempt-future',
+            run_ref: 'run-future',
+            account_id: 'identity-F',
+            pool_id: 'pool-F',
+            identity_fingerprint: 'sha256:identity-F',
+            aggregation_key: aggregationKey,
+            live_source_revision: 'live-future-r2',
+            runtime_sha256: 'sha256:future-runtime',
+            launch_idempotency_key: 'launch-future',
+            launch_nonce: 'nonce-future',
+            issued_at: checkedAt,
+            launch_by: new Date(nowMs + 60_000).toISOString(),
+          },
+        }),
+        'provider-neutral commit',
+      );
+      assert.equal(committed.action, 'committed');
+      const result = await cli(
+        [
+          'quota',
+          'preflight',
+          '--input',
+          JSON.stringify({
+            source_key: 'future-provider-current',
+            reservation_id: 'qres-future',
+            checked_at: checkedAt,
+          }),
+          '--json',
+        ],
+        home,
+      );
+      assert.equal(result.code, 0, result.stderr);
+      const data = record(result.json.data, scenario.name);
+      assert.equal(data.decision, 'launch-claim-allowed');
+      assert.equal(data.automatic_spawn_limit, 1);
+      assert.deepEqual(data.blocking_reasons, []);
+      assert.equal(data.spawn_count, 0);
+      assert.equal(data.hard_window, 'thirty_day');
+    });
   });
 
   test('[cli] complete Codex/Cursor mutation matrix leaves entire watched config scopes unchanged', async () => {
@@ -2104,7 +2579,10 @@ if (!FIXTURES_ONLY) {
 async function runWorkers(home: string, requests: Record<string, unknown>[]): Promise<unknown[]> {
   return runConcurrentWorkers(
     home,
-    requests.map((request) => ({ operation: 'reserve', request })),
+    requests.map((request) => ({
+      operation: 'reserve',
+      request: storeReservationRequest(request),
+    })),
   );
 }
 

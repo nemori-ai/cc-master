@@ -272,6 +272,17 @@ export {
   resolveProjectsDir,
   resolveRateCachePath,
 } from './paths.js';
+// ── quota admission（provider-neutral pure admission / reservation / audit rules）──
+export {
+  classifyQuotaError,
+  deriveQuotaHeadroom,
+  deriveRolling24h,
+  evaluateLiveQuotaAdmission,
+  evaluateQuotaLifecycleEffect,
+  evaluateQuotaObservation,
+  evaluateQuotaOrphanAudit,
+  evaluateQuotaReservationTransition,
+} from './quota-admission.js';
 // ── quota effect boundary（C2 hard-deny capability port；纯 policy + 注入 handler）──
 export type {
   CreateQuotaEffectBoundaryOptions,

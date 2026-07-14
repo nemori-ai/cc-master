@@ -169,13 +169,32 @@
     },
     {
       "name": "terminal-release-pending-still-counted",
-      "spec_ids": ["QA-RES-006", "QA-COMMIT-004", "QA-ORP-004"],
+      "spec_ids": ["QA-RES-006", "QA-COMMIT-004", "QA-ORP-004", "QA-ORP-005"],
       "input": {
-        "reservation": { "id": "qres-1", "state": "committed", "amount_pct": 4 },
+        "reservation": {
+          "id": "qres-1",
+          "hash": "hash-1",
+          "attempt_id": "attempt-1",
+          "state": "committed",
+          "amount_pct": 4,
+          "ticket_digest": "sha256:ticket-1",
+          "run_lineage": { "run_ref": "run-1" }
+        },
         "terminal_evidence": {
-          "journal_terminal": true,
-          "process_dead_proven": false,
-          "cleanup_complete": false
+          "schema": "ccm/quota-terminal-evidence/v1",
+          "proof_revision": "terminal-r1",
+          "reservation_id": "qres-1",
+          "reservation_request_hash": "hash-1",
+          "attempt_id": "attempt-1",
+          "run_ref": "run-1",
+          "ticket_digest": "sha256:ticket-1",
+          "journal_ref": "journal://run-1",
+          "journal_revision": "sha256:journal-1",
+          "journal_terminal": "succeeded",
+          "journal_continuous": true,
+          "process_identity": "dead-proven",
+          "cleanup_complete": false,
+          "evidence_retained": true
         }
       },
       "expected": {
@@ -187,14 +206,32 @@
     },
     {
       "name": "audited-release",
-      "spec_ids": ["QA-ORP-003", "QA-ORP-004"],
+      "spec_ids": ["QA-ORP-003", "QA-ORP-004", "QA-ORP-005"],
       "input": {
-        "reservation": { "id": "qres-1", "state": "release_pending", "amount_pct": 4 },
+        "reservation": {
+          "id": "qres-1",
+          "hash": "hash-1",
+          "attempt_id": "attempt-1",
+          "state": "release_pending",
+          "amount_pct": 4,
+          "ticket_digest": "sha256:ticket-1",
+          "run_lineage": { "run_ref": "run-1" }
+        },
         "audit": {
-          "receipt_revision": "audit-r1",
-          "terminal_valid": true,
-          "process_dead_proven": true,
-          "cleanup_complete": true
+          "schema": "ccm/quota-terminal-audit/v1",
+          "proof_revision": "audit-r1",
+          "reservation_id": "qres-1",
+          "reservation_request_hash": "hash-1",
+          "attempt_id": "attempt-1",
+          "run_ref": "run-1",
+          "ticket_digest": "sha256:ticket-1",
+          "journal_ref": "journal://run-1",
+          "journal_revision": "sha256:journal-1",
+          "journal_terminal": "succeeded",
+          "journal_continuous": true,
+          "process_identity": "dead-proven",
+          "cleanup_complete": true,
+          "evidence_retained": true
         }
       },
       "expected": {

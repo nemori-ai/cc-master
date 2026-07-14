@@ -2,7 +2,7 @@
 //
 // 定位：与 bin/ccm.cjs 等价的**可执行**入口，但形态适配 SEA——
 //   bin/ccm.cjs 是「薄壳 + require('../dist/index.cjs')」，相对 require 在 SEA blob 内无法解析；
-//   本文件改成「import { run } from './router.js'」让 tsdown 把 router + handlers + registry + io + @ccm/engine
+//   本文件从 production-run 导入入口，让 tsdown 把 router + handlers + registry + io + @ccm/engine
 //   全内联进单 CJS bundle（dist/ccm-sea.cjs），顶层直接执行 CLI、设退出码、装进程安全网——单文件自包含。
 //
 // 与 bin/ccm.cjs 的行为契约逐字对齐（epipeBomb / uncaught nets / 退出码纪律 / 注入流 / stdin fd:0）：
@@ -20,7 +20,7 @@
 //   故构建期由 tsdown `define` 把 __CCM_SEA_VERSION__ 注入到 process.env.CCM_VERSION（help._readVersion 优先读它）。
 //   非 SEA 路径（bin/ccm.cjs）不经本文件、不设该 env，行为不变。
 
-import { run } from './router.js';
+import { runProduction } from './production-run.js';
 
 // 构建期注入的版本号（tsdown define：__CCM_SEA_VERSION__ → JSON 字面量字符串）。
 // 若构建未注入（直跑本文件）则为 undefined，help._readVersion 退回原 fs 逻辑。
@@ -89,7 +89,7 @@ const err = (s: string) => process.stderr.write(`${s}\n`);
 
 // 全文件唯一一处设 process.exitCode（run 返回码）。stdin: { fd: 0 }（io.readStdinSync 直读 fd 0）。
 //   sync verb 同步落码（字节级不变）；`account switch` 唯一 async（Promise<number>）→ await 后落码（同 bin/ccm.cjs）。
-const _result = run(process.argv.slice(2), {
+const _result = runProduction(process.argv.slice(2), {
   out,
   err,
   env: process.env,

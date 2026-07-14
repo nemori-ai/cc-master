@@ -1,6 +1,6 @@
 # Cross-harness quota observation, reservation, and live-admission contract v1
 
-> 状态：**C2/S4 spec-first contract；implementation absent；fixtures intentionally RED**
+> 状态：**C2/S4 bounded local runtime current；collector/supervisor dispatch integration target**
 >
 > 日期：2026-07-13 UTC
 >
@@ -27,8 +27,10 @@
   orphan 与 active-run lifecycle；本分支只以 commit pin 消费，不复制其状态机；
 - 用户批准的 `design_docs/plans/codex-7d-pacing-spec.md`：Codex 已退役 5h ceiling；7d 是唯一
   quota hard ceiling；rolling 24h 只作 advisory；
-- `design_docs/plans/cross-harness-implementation-dag.md` 的 `xh_c2_quota_reservation_spec` 切片：只冻结
-  spec/RED，不实现 runtime、不发 provider/model probe。plan 是执行输入，不是 runtime/current evidence。
+- `design_docs/plans/cross-harness-implementation-dag.md` 的 `xh_c2_quota_reservation` 切片：plan 是历史执行
+  输入，不是 runtime/current evidence；本合同、production engine/store/CLI 与 executable oracle 共同构成
+  bounded local runtime 的 current evidence。真实 collector、supervisor claim/spawn 与 provider/model probe 仍不在
+  本切片内。
 
 规范性不变式：
 
@@ -224,17 +226,18 @@ velocity_ratio = observed_daily_velocity_pct / daily_budget_pct
 
 ### 5.0 Owner-only store 与 crash boundary
 
-future runtime 的 production store seam 固定为
+production store seam 固定为
 `ccm/apps/cli/src/quota-admission-store.ts`；纯判定从 `@ccm/engine` 的
 `quota-admission` 公共 export 进入，CLI composition 从现有 router/registry 的 `quota` noun 进入。删除旧的
 单文件 `ccm/apps/cli/src/quota-admission-contract.ts` evaluator seam：它既不拥有 engine contract，也没有
-CLI/store/lock 边界，不能作为 future GREEN 的落点。
+CLI/store/lock 边界，不能作为 production GREEN 的落点。
 
 最小 owner-only layout：
 
 ```text
 <CC_MASTER_HOME>/quota/v1/
   observations/<source-key-sha256>/current.json
+  reservation-keys/<idempotency-key-sha256>/current.json
   reservations/<aggregation-key-sha256>/
     events/<zero-padded-seq>-<event-id>.json
     snapshot.json
@@ -305,7 +308,10 @@ receipt 对 event/snapshot 分别使用同义字段 `event_directory_sync` / `sn
 `refreshObservation(request, collector)`、`publishObservation(request)`、`readObservation(sourceKey)`、
 `reserve(request)`、`inspectAggregation(aggregationKey)`；method 可返回值或 Promise，语义相同。这个 surface
 不是 public npm stability 承诺；`createQuotaAdmissionStore({home, filesystem?})` 的 filesystem port 是同一个
-production factory 的 infrastructure dependency，不是第二 repository。future implementation 若另起一套
+production factory 的 infrastructure dependency，不是第二 repository。CLI handler 必须把同一 injected
+`QuotaEffectBoundary` 适配成这个 filesystem port；缺 boundary/capability 时须在任何 store I/O 前失败，不能
+使用 factory 的 ambient Node filesystem 缺省值。direct store tests 可显式使用缺省 Node implementation，以
+验证真实 filesystem 约束。若另起一套
 fixture-only adapter，或注入后仍绕开 port 直写，不能通过本合同。
 
 ### 5.1 Record 与 capacity accounting
@@ -347,20 +353,40 @@ released/expired are terminal; retry returns the same receipt
   aggregation-key exclusive lock 内完成；multi-key 锁按 canonical key 排序，all-or-nothing，避免死锁。
 - **QA-RES-002**：lock owner identity 至少含 boot ID、process start identity、owner nonce；mtime/PID
   单独不能回收 lock。拿不到/无法证明 stale owner 时 `QUOTA_LOCK_BUSY`，write/claim/spawn=0。
-- **QA-RES-003**：同 idempotency key + 同 request hash 返回原 reservation/receipt，新增 reservation=0；
-  同 key + 不同 hash/attempt/candidate/source group 是 `RESERVATION_IDEMPOTENCY_CONFLICT`。
+- **QA-RES-003**：request hash 由 owner store 对 authority revision + 完整承重 binding canonical 计算，
+  caller 的 hash 不拥有 authority；同 idempotency key + 同 canonical hash 返回原 reservation/receipt，
+  新增 reservation=0；同 key + 不同 hash/attempt/candidate/source group 是
+  `RESERVATION_IDEMPOTENCY_CONFLICT`。`expired|released` 是单调 terminal，audit retry 返回既有 receipt，
+  不新增 event、不复活或重新占容量。idempotency key 在 machine authority scope 有独立 lock 与 durable
+  key→reservation index；不同 provisional ID 或不相交 aggregation 也必须先解析同一 key authority，不能各建
+  一份 hold。reservation event/journal durable 后、key index publish 前 crash 时，retry 从全局 authority replay
+  修复 index，不新增 reservation/event。
 - **QA-RES-004**：并发 contenders 在锁内重算 active total；linearized committed/held 总量绝不超过
   每个 bucket 的 reservable headroom。cache 中的 pre-lock fit 不能授权 hold。验收不得把
   `linearization_order` 当输入；至少 10 个真正同时开始的 contenders 竞争同一 home/store。
 - **QA-RES-005**：`held` TTL 只限制未 claim 的 admission ticket。TTL 到达后必须在 launch store lock
   下证明 claim absent、writer/process absent 才可 `expired`；claim store 不读/冲突即 `orphaned`，继续占容量。
 - **QA-RES-006**：`committed` 不按墙钟自动过期。只有 terminal/pre-spawn-abort + audit proof 才进入
-  release；manager/session death、heartbeat silence、PID missing、upgrade 都不释放。
+  release；manager/session death、heartbeat silence、PID missing、upgrade 都不释放。terminal/audit proof 必须是
+  闭合 schema，并绑定 reservation ID/request hash、attempt、run 与 committed ticket digest；任一 binding
+  missing/mismatch/conflict 均保留容量，不能把任意非空对象当 proof。
 - **QA-RES-007**：reservation events append-only，snapshot 可原子投影；crash 后从 durable events 恢复，
-  不能删除/覆盖目录来“解锁容量”。
+  不能删除/覆盖目录来“解锁容量”。single-key capacity transition 在 event durable、snapshot replace 前 crash
+  时，terminal audit retry 必须从 event authority 主动修复 snapshot 后再返回既有 terminal receipt。
 - **QA-RES-008**：同一 idempotency key + 同一 request hash 的至少 10-way 并发只有一个 `created`、一个
   reservation/event/ref，其余全部 `idempotent-existing`；所有 caller 返回同一 reservation ID，新增
   reservation/launch/spawn 分别最多 `1/0/0`。不同 provisional caller ID 不产生第二份 authority。
+- **QA-RES-009**：public reserve request 是闭合 schema；amount 与 caller capacity assertion 必须 positive
+  finite，identity/key/source/attempt/candidate/account/pool 不可为空，request hash 由 store 生成，且创建
+  操作只能写 `held`。multi-key success 以
+  recoverable coordinator/journal 作为单一可见性点；preparing 不计容量，committed 才同时投影全部 legs，
+  crash/retry 不得暴露 split hold 或把残腿误报为完整幂等成功。
+- **QA-RES-010**：capacity/headroom 只从 owner-only observation/config 的 hard-window buckets 锁内推导；
+  caller capacity 只能作为一致性断言，不一致为 `RESERVATION_AUTHORITY_MISMATCH`，绝不覆盖 store authority。
+  reservation ID 在本机 authority scope 全局唯一：同 ID 不同 key/aggregation/binding 必须 typed conflict。
+- **QA-RES-011**：multi-key committed journal 同时是 reservation-ID lookup 与所有 capacity-changing
+  transition（audit/expiry/orphan/release）的唯一 authority；transition canonical-lock 全部 legs 后一次发布，
+  snapshot 只是可重建 projection。任一 crash/retry 只能看到完整旧状态或完整新状态。
 
 ### 5.2 Commit 与 supervisor launch bind
 
@@ -369,19 +395,29 @@ released/expired are terminal; retry returns the same receipt
 ```json
 {
   "schema": "ccm/quota-admission-ticket/v1",
+  "ticket_id": "ticket-7",
   "reservation_id": "qres-7",
   "reservation_request_hash": "sha256:<request>",
+  "reservation_expires_at": "2026-07-13T08:01:10Z",
   "attempt_id": "attempt-7",
+  "run_ref": "run-7",
+  "account_id": "account-7",
+  "pool_id": "pool-7",
   "launch_idempotency_key": "sha256:<supervisor-dispatch-key>",
   "launch_nonce": "nonce-7",
   "runtime_sha256": "sha256:<exact-image>",
   "identity_fingerprint": "sha256:<same-current-identity>",
   "aggregation_key": "sha256:<same-quota-group>",
   "live_source_revision": "sha256:<rechecked-revision>",
+  "issued_at": "2026-07-13T08:00:19Z",
   "committed_at": "2026-07-13T08:00:20Z",
   "launch_by": "2026-07-13T08:00:35Z"
 }
 ```
+
+`committed_at` 由 reservation writer 在 `held -> committed` transition 内生成；caller 不可预填。
+immutable digest 同时绑定 ticket 与 attempt/run/account/pool/identity/aggregation/source/reservation-expiry/
+launch-expiry lineage，后续幂等重放只接受同一 ticket request digest。
 
 - **QA-COMMIT-001**：supervisor `claimed` event 必须引用并重验 committed ticket digest；missing/held/
   released/expired/orphaned、binding mismatch 或 `launch_by` 已过均 `ADMISSION_COMMIT_MISSING_OR_INVALID`，
@@ -431,8 +467,8 @@ validate accepted planning/routing/authority and candidate requirement
   品牌分支。非 Codex case 仍走相同 freshness→derivation→reservation→admission 语义；只有 Codex-specific
   registry rule 才过滤 5h。
 
-future CLI composition 必须接入现有 `router.ts` / `registry.ts`，不另建测试入口。opt-in oracle 冻结以下
-target command surface（在 implementation 落地前不得写入 current help/用户手册）：
+CLI composition 已接入现有 `router.ts` / `registry.ts`，不另建测试入口。executable oracle 冻结以下 current
+command surface：
 
 ```text
 ccm quota status --json
@@ -441,8 +477,14 @@ ccm quota reserve --input <JSON|@file> --json
 ccm quota audit --input <JSON|@file> --json
 ```
 
-`--input` 复用既有 `io.readInputSpec`；`preflight` 是纯机械判定且 provider/model/account effect=0，`reserve`/
-`audit` 必须经同一个 `createQuotaAdmissionStore`。空 store 的 `status` 以
+`--input` 复用既有 `io.readInputSpec`。`reserve` request 必带明确 `checked_at`，owner store 在锁内以
+source profile 的 `fresh_ttl_sec` / `hard_ttl_sec` / `max_clock_skew_sec` 对 `observed_at`、`valid_until` 与
+required bucket reset 重算 freshness；caller 持久化的 `freshness:"fresh"` 不拥有 authority。过期 observation
+不能创建 hold，过期 reservation 不能 commit，过期 reservation/ticket 不能取得 launch authority。
+`preflight` 是从 owner-only observation/reservation authority
+store 读取 reference 并重验后形成的纯机械判定，caller 自给的 derived live/policy/effect 结论不产生
+授权，且 provider/model/account effect=0；带 `requested_effect` 的 lifecycle deny 仍是 pure engine
+路径。`reserve`/`audit` 必须经同一个 `createQuotaAdmissionStore`。空 store 的 `status` 以
 `{ok:true,data:{schema:"ccm/quota-status/v1",available:false,...}}` 诚实返回，不把 missing 当 ample。
 
 ## 7. Orphan audit、expiry 与 release
@@ -465,6 +507,10 @@ lease 或 handoff prose 都不是单独证据。
   没有时间一到自动清空的路径。
 - **QA-ORP-003**：同 audit input revision 重放幂等；conflicting audit receipt fail closed 并保留较保守 state。
 - **QA-ORP-004**：释放只改变本地 capacity accounting，不声称/推断 provider 已退款、返还或停止计费。
+- **QA-ORP-005**：public `terminal_evidence` / `audit` 是闭合、版本化 proof envelope；必须绑定当前
+  reservation ID/request hash、attempt ID、run ref 与 ticket digest，并携带连续 terminal journal ref/revision、
+  proven-dead process identity、cleanup/evidence-retention 证明。缺字段、额外字段、binding mismatch、partial 或
+  conflicting proof 均 release=0，且 committed/release_pending/orphaned capacity 继续计入。
 
 ## 8. Error taxonomy 与 fallback legality
 
@@ -604,17 +650,15 @@ handler 调用前同步 fail closed：分别为 `QUOTA_EFFECT_FORBIDDEN`（accou
   或任一 reachable relative module 含 process/network/provider/model/keychain/board/repo/account escape，
   均默认 RED。扫描必须基于 AST 的 static/export/dynamic-import/require 传递闭包，不得只扫 entry 文本或
   静默跳过缺失 root。
-- **QA-EFX-012**：production quota handler/store/admission seam 仍缺席时，router contract 只可用明确
-  `test` controlled-handler root 验证同一 dispatch 路径：missing boundary 在任何 router side effect/handler
-  work 前失败，unknown/forbidden/undeclared/unbound capability 在 controlled work 前失败，独立 effect spies
-  全为 0；allowed fixture 必须调用 injected boundary 并消费其返回值。该证明不得注册假的 current quota
-  command；production roots 保持 `honest-absent`，full opt-in runner 继续以 production handler missing
-  `HONEST RED` 报告，直到后续 runtime slice 真正落地。controlled handler 及其 test closure 还必须在默认
-  focused source audit 下拒绝 registry 中每个 ambient effect class；尤其直接 `node:fs.writeFileSync` 即使只写
-  test-owned temp file，也必须先因 `ambient-filesystem-io` source violation 令 focused RED，不能靠未连接的
-  callback 零值宣称 effect=0。
+- **QA-EFX-012**：controlled-handler root 只验证 boundary primitive，不能替代 current production
+  `quota.status|preflight|reserve|audit` registry/handler/store 路径。focused oracle 必须直接穿 production registry：
+  missing boundary 在任何 handler/store work 前失败；unknown/forbidden/undeclared/unbound filesystem capability
+  在任何 quota file mutation 前失败；allowed path 的每个 filesystem primitive 必须消费 injected boundary 的
+  返回值。把 production handler 改回 `createQuotaAdmissionStore({home})` ambient fallback，或把 router gate 收窄
+  到 fixture-only handler，必须令默认 focused suite RED。controlled test closure 仍拒绝 registry 中每个 ambient
+  effect class，不能靠未连接 callback 的零值宣称 effect=0。
 
-## 11. Opt-in RED fixture contract
+## 11. Executable promotion contract
 
 版本化 fixtures 位于：
 
@@ -622,15 +666,16 @@ handler 调用前同步 fail closed：分别为 `QUOTA_EFFECT_FORBIDDEN`（accou
 ccm/apps/cli/test/fixtures/quota-admission-contract-v1/
 ```
 
-`ccm/apps/cli/test/quota-admission-contract.red.ts` 故意不匹配默认 `**/*.test.ts` glob。结构校准使用
-tracked runner 直接执行 TypeScript entry；不要额外加 `--test`，以免外层只报告一个泛化 file-level failure：
+`ccm/apps/cli/test/quota-admission-contract.red.ts` 保留历史文件名且故意不匹配默认 `**/*.test.ts` glob；它现在
+是 bounded runtime 的显式 promotion gate。结构校准使用 tracked runner 直接执行 TypeScript entry；不要额外加
+`--test`，以免外层只报告一个泛化 file-level failure：
 
 ```bash
 cd ccm/apps/cli
 CCM_QUOTA_ADMISSION_FIXTURES_ONLY=1 node --import tsx test/quota-admission-contract.red.ts
 ```
 
-完整 opt-in 命令当前必须 RED：
+完整命令当前必须 GREEN：
 
 ```bash
 cd ccm/apps/cli
@@ -645,12 +690,12 @@ node --import tsx test/quota-admission-contract.red.ts
   quota exports；② existing CLI router/registry 的 `quota status|preflight|reserve|audit`；③
   `createQuotaAdmissionStore({home})` 的 owner-only filesystem/lock/event replay。任一缺失都以带 seam 名的
   `HONEST RED` 失败；manifest/spec/fixture 自洽问题必须先在 fixture-only mode 暴露。
-- **QA-FIX-004**：future GREEN 不得按 fixture filename/name/input serialization hard-code。runner 会扫描
+- **QA-FIX-004**：production GREEN 不得按 fixture filename/name/input serialization hard-code。runner 会扫描
   production seam 禁止引用 fixture root/case names，并生成不在 JSON fixtures 内的 arithmetic/permutation
   probes；store/CLI oracle 主动制造 temp residue、snapshot loss、10-way simultaneous start。真实 provider
   canary 仍是另一个需要用户 opt-in/budget 的节点。
-- **QA-FIX-005**：fixture-only 只检查 schema/spec-ID/coverage/oracle isolation；不 import future runtime。
-  full mode 至少分别报告 engine、CLI、store/concurrency 缺口，不能用一个 generic evaluator import 把全部
+- **QA-FIX-005**：fixture-only 只检查 schema/spec-ID/coverage/oracle isolation；不 import production runtime。
+  full mode 至少分别执行 engine、CLI、store/concurrency 三条 production seam，不能用一个 generic evaluator import 把全部
   case 折成同形失败或被 input→expected lookup 一次骗绿。
 - **QA-FIX-006**：manifest 明列 engine whole-file 与 store exact-row execution domains。engine domain 的新增
   row 自动进入 evaluator loop；`store.json`/`concurrency.json` 的每一 row 必须经 `storeCase()` 注册并穿真实
@@ -679,15 +724,17 @@ fixtures 覆盖：
 
 ## 12. Acceptance、kill、rollback 与 current/target 声明
 
-本 spec/RED slice 的完成条件：
+bounded local runtime 的 current 完成条件：
 
 1. 本文与 manifest/fixtures 的 spec IDs、schemas、case coverage 自洽；
-2. fixture-only 命令 GREEN；full opt-in 命令以明确 `HONEST RED` + missing implementation seam 失败；
+2. fixture-only 与 full promotion 命令均 GREEN；full mode 真实穿 engine、production CLI/registry/handler 与
+   owner-only store/concurrency/effect boundary；
 3. 默认 build/typecheck/lint/test 不收集 `.red.ts`，不因 fixtures 变 RED；
 4. 实际 provider/model request/spawn、board/account/auth/credential/runtime write 全为 0；
-5. capability model 只新增 spec/RED evidence link，Reservation/S4 仍为 target，不冒充 current/runtime。
+5. capability model 把 engine/store/CLI reservation/preflight 标为 bounded current，把 collector、supervisor
+   claim/spawn integration 与完整 S4/SG3 promotion保留为 partial/target。
 
-future GREEN/SG3 acceptance：
+current bounded runtime 与 future full SG3 共同 acceptance：
 
 - unknown/tight/exhausted/soft-stale-unrefreshed/hard-stale/conflict automatic spawn=0；
 - Codex 5h poison 永久 ignored，7d hard gate authority/threshold 不变，rolling 24h 只 advisory；
