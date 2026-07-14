@@ -1,0 +1,174 @@
+{
+  "schema": "ccm/quota-derivation-fixtures/v1",
+  "cases": [
+    {
+      "name": "fresh-ample",
+      "spec_ids": ["QA-BND-003", "QA-DER-001", "QA-DER-002"],
+      "input": {
+        "policy": { "revision": "ccm/codex-7d-pacing/v1", "hard_ceiling_used_pct": 85 },
+        "buckets": [
+          {
+            "id": "seven-day-global",
+            "freshness": "fresh",
+            "used_pct": 60,
+            "active_reserved_pct": 5,
+            "projected_p80_pct": 6,
+            "safety_margin_pct": 3
+          }
+        ]
+      },
+      "expected": {
+        "state": "ample",
+        "per_bucket": [
+          {
+            "id": "seven-day-global",
+            "reservable_headroom_pct": 17,
+            "remaining_after_p80_pct": 11,
+            "state": "ample"
+          }
+        ],
+        "automatic_spawn_limit": 1,
+        "blocking_reasons": []
+      }
+    },
+    {
+      "name": "fresh-tight-p80-does-not-fit",
+      "spec_ids": ["QA-BND-004", "QA-DER-001"],
+      "input": {
+        "policy": { "revision": "ccm/codex-7d-pacing/v1", "hard_ceiling_used_pct": 85 },
+        "buckets": [
+          {
+            "id": "seven-day-global",
+            "freshness": "fresh",
+            "used_pct": 74,
+            "active_reserved_pct": 4,
+            "projected_p80_pct": 5,
+            "safety_margin_pct": 3
+          }
+        ]
+      },
+      "expected": {
+        "state": "tight",
+        "per_bucket": [
+          {
+            "id": "seven-day-global",
+            "reservable_headroom_pct": 4,
+            "remaining_after_p80_pct": -1,
+            "state": "tight"
+          }
+        ],
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["QUOTA_TIGHT"]
+      }
+    },
+    {
+      "name": "fresh-exhausted",
+      "spec_ids": ["QA-BND-004", "QA-DER-001"],
+      "input": {
+        "policy": { "revision": "ccm/codex-7d-pacing/v1", "hard_ceiling_used_pct": 85 },
+        "buckets": [
+          {
+            "id": "seven-day-global",
+            "freshness": "fresh",
+            "used_pct": 84,
+            "active_reserved_pct": 1,
+            "projected_p80_pct": 1,
+            "safety_margin_pct": 0
+          }
+        ]
+      },
+      "expected": {
+        "state": "exhausted",
+        "per_bucket": [
+          {
+            "id": "seven-day-global",
+            "reservable_headroom_pct": 0,
+            "remaining_after_p80_pct": -1,
+            "state": "exhausted"
+          }
+        ],
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["QUOTA_EXHAUSTED"]
+      }
+    },
+    {
+      "name": "multi-bucket-worst-state",
+      "spec_ids": ["QA-AGG-002", "QA-DER-001"],
+      "input": {
+        "policy": { "revision": "ccm/codex-7d-pacing/v1", "hard_ceiling_used_pct": 85 },
+        "buckets": [
+          {
+            "id": "seven-day-global",
+            "freshness": "fresh",
+            "used_pct": 30,
+            "active_reserved_pct": 0,
+            "projected_p80_pct": 4,
+            "safety_margin_pct": 2
+          },
+          {
+            "id": "seven-day-review",
+            "freshness": "fresh",
+            "used_pct": 78,
+            "active_reserved_pct": 1,
+            "projected_p80_pct": 5,
+            "safety_margin_pct": 2
+          }
+        ]
+      },
+      "expected": {
+        "state": "tight",
+        "per_bucket": [
+          {
+            "id": "seven-day-global",
+            "reservable_headroom_pct": 53,
+            "remaining_after_p80_pct": 49,
+            "state": "ample"
+          },
+          {
+            "id": "seven-day-review",
+            "reservable_headroom_pct": 4,
+            "remaining_after_p80_pct": -1,
+            "state": "tight"
+          }
+        ],
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["QUOTA_TIGHT"]
+      }
+    },
+    {
+      "name": "different-pools-never-join",
+      "spec_ids": ["QA-BND-001", "QA-AGG-002"],
+      "input": {
+        "policy": { "revision": "ccm/codex-7d-pacing/v1", "hard_ceiling_used_pct": 85 },
+        "buckets": [
+          {
+            "id": "pool-A-global",
+            "aggregation_key": "pool-A",
+            "freshness": "fresh",
+            "used_pct": 82,
+            "active_reserved_pct": 0,
+            "projected_p80_pct": 4,
+            "safety_margin_pct": 0
+          },
+          {
+            "id": "pool-B-global",
+            "aggregation_key": "pool-B",
+            "freshness": "fresh",
+            "used_pct": 1,
+            "active_reserved_pct": 0,
+            "projected_p80_pct": 0,
+            "safety_margin_pct": 0
+          }
+        ],
+        "required_aggregation_key": "pool-A"
+      },
+      "expected": {
+        "state": "tight",
+        "used_aggregation_keys": ["pool-A"],
+        "ignored_aggregation_keys": ["pool-B"],
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["QUOTA_TIGHT"]
+      }
+    }
+  ]
+}

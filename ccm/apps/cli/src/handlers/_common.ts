@@ -18,6 +18,7 @@
 //   逻辑/数值/正则/报错文案/.errKind 逐字保持。`fs` 由文件顶层 import（原在 runWrite 内 require）。
 
 import * as fs from 'node:fs';
+import type { QuotaEffectBoundary } from '@ccm/engine';
 import { formatReport, lintBoard, reconcileGating, reconcileInbox } from '@ccm/engine';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
@@ -59,6 +60,7 @@ export interface Ctx {
   // Optional host capability injection used exclusively by provider handlers.  Production creates
   // it at the router seam; tests replace it with a controlled transport.
   providerRuntime?: ProviderRuntime;
+  quotaEffects?: QuotaEffectBoundary;
 }
 
 // buildFields 收集的 --set / --set-json 操作项。

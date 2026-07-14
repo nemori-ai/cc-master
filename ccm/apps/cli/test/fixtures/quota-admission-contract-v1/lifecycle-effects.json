@@ -1,0 +1,293 @@
+{
+  "schema": "ccm/quota-lifecycle-effects-fixtures/v1",
+  "cases": [
+    {
+      "name": "durable-handoff-same-reservation",
+      "spec_ids": ["QA-LIFE-001"],
+      "input": {
+        "run_ref": "durable_run_ref",
+        "run_id": "run-1",
+        "reservation": { "id": "qres-1", "state": "committed" },
+        "handoff": { "manager_epoch": 2, "attach_same_run": true }
+      },
+      "expected": {
+        "action": "attach-existing-run",
+        "reservation_id": "qres-1",
+        "reservation_action": "retain-committed",
+        "new_reservation_count": 0,
+        "automatic_spawn_limit": 0
+      }
+    },
+    {
+      "name": "journal-only-handoff-retains",
+      "spec_ids": ["QA-LIFE-001"],
+      "input": {
+        "run_ref": "journal_only",
+        "run_id": "run-1",
+        "reservation": { "id": "qres-1", "state": "committed" },
+        "handoff": { "journal_valid": true, "live_handle_available": false }
+      },
+      "expected": {
+        "action": "observe-journal-only",
+        "reservation_id": "qres-1",
+        "reservation_action": "retain-committed",
+        "control_capability": "degraded",
+        "new_reservation_count": 0,
+        "automatic_spawn_limit": 0
+      }
+    },
+    {
+      "name": "legacy-session-bound-retains",
+      "spec_ids": ["QA-LIFE-002"],
+      "input": {
+        "run_ref": "legacy_session_bound",
+        "reservation": { "id": "qres-1", "state": "committed" },
+        "handoff": { "session_live": false, "writer_audited": false }
+      },
+      "expected": {
+        "action": "audit-required",
+        "reservation_action": "retain-committed",
+        "release_count": 0,
+        "automatic_spawn_limit": 0
+      }
+    },
+    {
+      "name": "orphan-handoff-retains",
+      "spec_ids": ["QA-LIFE-002", "QA-ORP-001"],
+      "input": {
+        "run_ref": "orphaned",
+        "reservation": { "id": "qres-1", "state": "orphaned" },
+        "handoff": { "identity_evidence": "unknown" }
+      },
+      "expected": {
+        "action": "orphan-audit",
+        "reservation_action": "retain-orphaned",
+        "release_count": 0,
+        "automatic_spawn_limit": 0
+      }
+    },
+    {
+      "name": "active-old-runtime-upgrade-retains",
+      "spec_ids": ["QA-LIFE-003", "QA-LIFE-004"],
+      "input": {
+        "active_run": { "id": "run-1", "runtime_sha256": "sha256:old", "reservation_id": "qres-1" },
+        "activation": { "current_runtime_sha256": "sha256:new", "linearized": true }
+      },
+      "expected": {
+        "action": "active-run-keeps-pinned-runtime",
+        "runtime_sha256": "sha256:old",
+        "reservation_id": "qres-1",
+        "reservation_action": "retain-committed",
+        "interrupt_count": 0,
+        "rereservation_count": 0,
+        "automatic_spawn_limit": 0
+      }
+    },
+    {
+      "name": "rollback-does-not-release",
+      "spec_ids": ["QA-LIFE-003", "QA-LIFE-005"],
+      "input": {
+        "active_run": { "id": "run-1", "runtime_sha256": "sha256:new", "reservation_id": "qres-1" },
+        "rollback": { "current_runtime_sha256": "sha256:old", "linearized": true }
+      },
+      "expected": {
+        "action": "active-run-keeps-pinned-runtime",
+        "runtime_sha256": "sha256:new",
+        "reservation_action": "retain-committed",
+        "release_count": 0,
+        "interrupt_count": 0,
+        "automatic_spawn_limit": 0
+      }
+    },
+    {
+      "name": "active-runtime-gc-denied",
+      "spec_ids": ["QA-LIFE-004"],
+      "input": {
+        "runtime_image": { "sha256": "sha256:old", "referenced_by": ["run-1", "qres-1"] },
+        "gc_request": { "operation": "delete" }
+      },
+      "expected": {
+        "action": "deny",
+        "error": "RUNTIME_IMAGE_IN_USE",
+        "runtime_delete_count": 0,
+        "reservation_action": "retain-committed"
+      }
+    },
+    {
+      "name": "codex-account-login-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "codex", "requested_effect": "account_login" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "account_login_count": 0
+      }
+    },
+    {
+      "name": "codex-account-logout-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "codex", "requested_effect": "account_logout" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "account_logout_count": 0
+      }
+    },
+    {
+      "name": "codex-account-switch-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "codex", "requested_effect": "account_switch" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "account_switch_count": 0
+      }
+    },
+    {
+      "name": "codex-session-switch-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "codex", "requested_effect": "session_switch" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "session_switch_count": 0
+      }
+    },
+    {
+      "name": "codex-credential-import-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "codex", "requested_effect": "credential_import" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "credential_import_count": 0
+      }
+    },
+    {
+      "name": "codex-credential-copy-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "codex", "requested_effect": "credential_copy" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "credential_copy_count": 0
+      }
+    },
+    {
+      "name": "codex-credential-write-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "codex", "requested_effect": "credential_write" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "credential_write_count": 0
+      }
+    },
+    {
+      "name": "codex-auth-write-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "codex", "requested_effect": "auth_write" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "auth_write_count": 0
+      }
+    },
+    {
+      "name": "cursor-account-login-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "cursor", "requested_effect": "account_login" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "account_login_count": 0
+      }
+    },
+    {
+      "name": "cursor-account-logout-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "cursor", "requested_effect": "account_logout" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "account_logout_count": 0
+      }
+    },
+    {
+      "name": "cursor-account-switch-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "cursor", "requested_effect": "account_switch" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "account_switch_count": 0
+      }
+    },
+    {
+      "name": "cursor-session-switch-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "cursor", "requested_effect": "session_switch" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "session_switch_count": 0
+      }
+    },
+    {
+      "name": "cursor-credential-import-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "cursor", "requested_effect": "credential_import" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "credential_import_count": 0
+      }
+    },
+    {
+      "name": "cursor-credential-copy-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "cursor", "requested_effect": "credential_copy" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "credential_copy_count": 0
+      }
+    },
+    {
+      "name": "cursor-credential-write-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "cursor", "requested_effect": "credential_write" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "credential_write_count": 0
+      }
+    },
+    {
+      "name": "cursor-auth-write-denied",
+      "spec_ids": ["QA-BND-008", "QA-EFX-002"],
+      "input": { "provider": "cursor", "requested_effect": "auth_write" },
+      "expected": {
+        "action": "deny",
+        "error": "ACCOUNT_MUTATION_FORBIDDEN",
+        "effect_count": 0,
+        "auth_write_count": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,208 @@
+{
+  "schema": "ccm/quota-reservation-fixtures/v1",
+  "cases": [
+    {
+      "name": "fresh-hold",
+      "spec_ids": ["QA-RES-001", "QA-RES-004"],
+      "input": {
+        "now": "2026-07-13T08:00:00Z",
+        "capacity_pct": 12,
+        "existing": [],
+        "request": {
+          "id": "qres-1",
+          "key": "key-1",
+          "hash": "hash-1",
+          "amount_pct": 4,
+          "state": "held",
+          "expires_at": "2026-07-13T08:01:00Z"
+        }
+      },
+      "expected": {
+        "action": "created",
+        "reservation_id": "qres-1",
+        "state": "held",
+        "active_reserved_pct": 4,
+        "new_reservation_count": 1
+      }
+    },
+    {
+      "name": "duplicate-same-request",
+      "spec_ids": ["QA-RES-003", "QA-RES-007"],
+      "input": {
+        "now": "2026-07-13T08:00:10Z",
+        "capacity_pct": 12,
+        "existing": [
+          {
+            "id": "qres-1",
+            "key": "key-1",
+            "hash": "hash-1",
+            "amount_pct": 4,
+            "state": "held",
+            "expires_at": "2026-07-13T08:01:00Z"
+          }
+        ],
+        "request": {
+          "id": "qres-new-must-not-persist",
+          "key": "key-1",
+          "hash": "hash-1",
+          "amount_pct": 4,
+          "state": "held",
+          "expires_at": "2026-07-13T08:01:10Z"
+        }
+      },
+      "expected": {
+        "action": "idempotent-existing",
+        "reservation_id": "qres-1",
+        "state": "held",
+        "active_reserved_pct": 4,
+        "new_reservation_count": 0
+      }
+    },
+    {
+      "name": "duplicate-conflicting-request",
+      "spec_ids": ["QA-RES-003"],
+      "input": {
+        "now": "2026-07-13T08:00:10Z",
+        "capacity_pct": 12,
+        "existing": [
+          {
+            "id": "qres-1",
+            "key": "key-1",
+            "hash": "hash-1",
+            "amount_pct": 4,
+            "state": "held",
+            "expires_at": "2026-07-13T08:01:00Z"
+          }
+        ],
+        "request": {
+          "id": "qres-2",
+          "key": "key-1",
+          "hash": "hash-conflict",
+          "amount_pct": 3,
+          "state": "held",
+          "expires_at": "2026-07-13T08:01:10Z"
+        }
+      },
+      "expected": {
+        "action": "rejected",
+        "error": "RESERVATION_IDEMPOTENCY_CONFLICT",
+        "active_reserved_pct": 4,
+        "new_reservation_count": 0
+      }
+    },
+    {
+      "name": "commit-before-claim",
+      "spec_ids": ["QA-BND-007", "QA-COMMIT-001", "QA-COMMIT-002"],
+      "input": {
+        "now": "2026-07-13T08:00:20Z",
+        "reservation": {
+          "id": "qres-1",
+          "key": "key-1",
+          "hash": "hash-1",
+          "state": "held",
+          "source_revision": "live-r2"
+        },
+        "ticket": {
+          "launch_key": "launch-key-1",
+          "launch_nonce": "nonce-1",
+          "runtime_sha256": "sha256:runtime-a",
+          "identity": "identity-A",
+          "source_revision": "live-r2",
+          "launch_by": "2026-07-13T08:00:35Z"
+        }
+      },
+      "expected": {
+        "action": "committed",
+        "reservation_id": "qres-1",
+        "state": "committed",
+        "claim_authorized": true,
+        "new_reservation_count": 0
+      }
+    },
+    {
+      "name": "expired-held-no-claim",
+      "spec_ids": ["QA-RES-005", "QA-ORP-002"],
+      "input": {
+        "now": "2026-07-13T08:02:00Z",
+        "reservation": {
+          "id": "qres-1",
+          "state": "held",
+          "amount_pct": 4,
+          "expires_at": "2026-07-13T08:01:00Z"
+        },
+        "launch_evidence": {
+          "store_locked": true,
+          "claim": "absent",
+          "process_identity": "proven-absent"
+        }
+      },
+      "expected": {
+        "action": "expired",
+        "state": "expired",
+        "capacity_counted_pct": 0,
+        "automatic_spawn_limit": 0
+      }
+    },
+    {
+      "name": "expired-held-claim-unknown-orphan",
+      "spec_ids": ["QA-RES-005", "QA-ORP-001", "QA-ORP-002"],
+      "input": {
+        "now": "2026-07-13T08:02:00Z",
+        "reservation": {
+          "id": "qres-1",
+          "state": "held",
+          "amount_pct": 4,
+          "expires_at": "2026-07-13T08:01:00Z"
+        },
+        "launch_evidence": {
+          "store_locked": false,
+          "claim": "unknown",
+          "process_identity": "unknown"
+        }
+      },
+      "expected": {
+        "action": "orphan-audit",
+        "state": "orphaned",
+        "capacity_counted_pct": 4,
+        "automatic_spawn_limit": 0
+      }
+    },
+    {
+      "name": "terminal-release-pending-still-counted",
+      "spec_ids": ["QA-RES-006", "QA-COMMIT-004", "QA-ORP-004"],
+      "input": {
+        "reservation": { "id": "qres-1", "state": "committed", "amount_pct": 4 },
+        "terminal_evidence": {
+          "journal_terminal": true,
+          "process_dead_proven": false,
+          "cleanup_complete": false
+        }
+      },
+      "expected": {
+        "action": "release-pending",
+        "state": "release_pending",
+        "capacity_counted_pct": 4,
+        "provider_refund_claimed": false
+      }
+    },
+    {
+      "name": "audited-release",
+      "spec_ids": ["QA-ORP-003", "QA-ORP-004"],
+      "input": {
+        "reservation": { "id": "qres-1", "state": "release_pending", "amount_pct": 4 },
+        "audit": {
+          "receipt_revision": "audit-r1",
+          "terminal_valid": true,
+          "process_dead_proven": true,
+          "cleanup_complete": true
+        }
+      },
+      "expected": {
+        "action": "released",
+        "state": "released",
+        "capacity_counted_pct": 0,
+        "provider_refund_claimed": false
+      }
+    }
+  ]
+}

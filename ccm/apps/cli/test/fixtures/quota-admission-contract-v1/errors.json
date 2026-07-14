@@ -1,0 +1,96 @@
+{
+  "schema": "ccm/quota-error-taxonomy-fixtures/v1",
+  "cases": [
+    {
+      "name": "tight-can-map-after-release",
+      "spec_ids": ["QA-ERR-001", "QA-ERR-003"],
+      "input": {
+        "error": { "code": "QUOTA_TIGHT", "class": "capacity", "source_revision": "live-r2" },
+        "launch_claim": "absent",
+        "reservation": { "id": "qres-1", "state": "released" }
+      },
+      "expected": {
+        "generic_reason": "quota-tight",
+        "automatic_fallback_allowed": true,
+        "fallback_requires_new_attempt_key": true,
+        "automatic_spawn_limit": 0
+      }
+    },
+    {
+      "name": "rate-limit-can-map-before-claim",
+      "spec_ids": ["QA-ERR-001", "QA-ERR-003"],
+      "input": {
+        "error": {
+          "code": "QUOTA_RATE_LIMITED",
+          "class": "provider-mechanical",
+          "source_revision": "live-r2"
+        },
+        "launch_claim": "absent",
+        "reservation": null
+      },
+      "expected": {
+        "generic_reason": "rate-limited",
+        "automatic_fallback_allowed": true,
+        "fallback_requires_new_attempt_key": true,
+        "automatic_spawn_limit": 0
+      }
+    },
+    {
+      "name": "unknown-never-fallback",
+      "spec_ids": ["QA-ERR-002", "QA-ERR-003"],
+      "input": {
+        "error": {
+          "code": "QUOTA_REQUIRED_WINDOW_UNKNOWN",
+          "class": "missing-evidence",
+          "source_revision": null
+        },
+        "launch_claim": "absent",
+        "reservation": null
+      },
+      "expected": {
+        "generic_reason": "quota-unknown",
+        "automatic_fallback_allowed": false,
+        "fallback_requires_new_attempt_key": false,
+        "automatic_spawn_limit": 0
+      }
+    },
+    {
+      "name": "orphan-never-fallback",
+      "spec_ids": ["QA-ERR-002", "QA-ORP-001"],
+      "input": {
+        "error": {
+          "code": "RESERVATION_ORPHANED",
+          "class": "orphan-security",
+          "source_revision": "live-r2"
+        },
+        "launch_claim": "unknown",
+        "reservation": { "id": "qres-1", "state": "orphaned" }
+      },
+      "expected": {
+        "generic_reason": "reservation-orphaned",
+        "automatic_fallback_allowed": false,
+        "release_count": 0,
+        "automatic_spawn_limit": 0
+      }
+    },
+    {
+      "name": "identity-conflict-never-fallback",
+      "spec_ids": ["QA-ERR-002", "QA-LIFE-006"],
+      "input": {
+        "error": {
+          "code": "LIVE_QUOTA_IDENTITY_CONFLICT",
+          "class": "orphan-security",
+          "source_revision": "live-r2"
+        },
+        "launch_claim": "absent",
+        "reservation": { "id": "qres-1", "state": "held" }
+      },
+      "expected": {
+        "generic_reason": "quota-identity-conflict",
+        "automatic_fallback_allowed": false,
+        "account_mutation_count": 0,
+        "automatic_spawn_limit": 0
+      }
+    }
+  ]
+}

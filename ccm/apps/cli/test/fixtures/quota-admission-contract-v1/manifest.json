@@ -1,0 +1,166 @@
+{
+  "schema": "ccm/quota-admission-contract-fixtures/v1",
+  "contract": "design_docs/2026-07-13-cross-harness-quota-admission-contract.md",
+  "implementation_seams": {
+    "engine": "ccm/packages/engine/src/quota-admission.ts via @ccm/engine barrel",
+    "cli": "ccm/apps/cli/src/router.ts -> registry quota noun -> handlers/quota.ts",
+    "store": "ccm/apps/cli/src/quota-admission-store.ts#createQuotaAdmissionStore({home,filesystem?})",
+    "effects": "@ccm/engine#createQuotaEffectBoundary -> router RunOpts.quotaEffects -> Ctx.quotaEffects"
+  },
+  "execution_domains": {
+    "engine_whole_files": [
+      "observation.json",
+      "derivation.json",
+      "rolling24h.json",
+      "reservation.json",
+      "admission.json",
+      "orphan.json",
+      "lifecycle-effects.json",
+      "errors.json"
+    ],
+    "store_exact_rows": {
+      "store.json": [
+        "ten-refresh-callers-single-flight",
+        "atomic-owner-only-observation-publish",
+        "event-durable-snapshot-missing-recovers",
+        "atomic-owner-only-reservation-snapshot-publish"
+      ],
+      "concurrency.json": [
+        "ten-contenders-no-oversubscription",
+        "ten-same-key-single-reservation",
+        "multi-bucket-all-or-nothing",
+        "lock-owner-unknown-no-write"
+      ]
+    }
+  },
+  "files": {
+    "observation.json": [
+      "fresh-codex-seven-day",
+      "five-hour-poison-ignored",
+      "only-five-hour-is-unknown",
+      "hard-stale-seven-day",
+      "soft-stale-requires-refresh",
+      "partial-required-bucket",
+      "aggregation-key-mismatch",
+      "same-id-different-revision-conflict",
+      "provider-neutral-thirty-day-fresh"
+    ],
+    "derivation.json": [
+      "fresh-ample",
+      "fresh-tight-p80-does-not-fit",
+      "fresh-exhausted",
+      "multi-bucket-worst-state",
+      "different-pools-never-join"
+    ],
+    "rolling24h.json": [
+      "full-day-above-budget-advisory",
+      "partial-eighteen-hour-coverage",
+      "insufficient-two-hour-history",
+      "reset-crossing-unavailable",
+      "same-timestamp-conflict"
+    ],
+    "reservation.json": [
+      "fresh-hold",
+      "duplicate-same-request",
+      "duplicate-conflicting-request",
+      "commit-before-claim",
+      "expired-held-no-claim",
+      "expired-held-claim-unknown-orphan",
+      "terminal-release-pending-still-counted",
+      "audited-release"
+    ],
+    "concurrency.json": [
+      "ten-contenders-no-oversubscription",
+      "ten-same-key-single-reservation",
+      "multi-bucket-all-or-nothing",
+      "lock-owner-unknown-no-write"
+    ],
+    "store.json": [
+      "ten-refresh-callers-single-flight",
+      "atomic-owner-only-observation-publish",
+      "event-durable-snapshot-missing-recovers",
+      "atomic-owner-only-reservation-snapshot-publish"
+    ],
+    "admission.json": [
+      "fresh-ample-committed-ticket",
+      "unknown-spawn-zero",
+      "tight-spawn-zero",
+      "hard-stale-spawn-zero",
+      "live-recheck-becomes-tight",
+      "live-identity-change",
+      "ticket-expired-before-claim",
+      "spawn-before-commit-rejected",
+      "rate-limited-circuit",
+      "rolling24h-risk-does-not-block-ample",
+      "authenticated-without-quota-spawn-zero",
+      "observation-conflict-spawn-zero",
+      "provider-neutral-ample"
+    ],
+    "orphan.json": [
+      "claimed-without-hello-retained",
+      "parent-dead-run-live-retained",
+      "pid-not-found-alone-retained",
+      "pid-reuse-retained",
+      "journal-conflict-retained",
+      "terminal-cleanup-pending-retained",
+      "terminal-audit-released"
+    ],
+    "lifecycle-effects.json": [
+      "durable-handoff-same-reservation",
+      "journal-only-handoff-retains",
+      "legacy-session-bound-retains",
+      "orphan-handoff-retains",
+      "active-old-runtime-upgrade-retains",
+      "rollback-does-not-release",
+      "active-runtime-gc-denied",
+      "codex-account-login-denied",
+      "codex-account-logout-denied",
+      "codex-account-switch-denied",
+      "codex-session-switch-denied",
+      "codex-credential-import-denied",
+      "codex-credential-copy-denied",
+      "codex-credential-write-denied",
+      "codex-auth-write-denied",
+      "cursor-account-login-denied",
+      "cursor-account-logout-denied",
+      "cursor-account-switch-denied",
+      "cursor-session-switch-denied",
+      "cursor-credential-import-denied",
+      "cursor-credential-copy-denied",
+      "cursor-credential-write-denied",
+      "cursor-auth-write-denied"
+    ],
+    "errors.json": [
+      "tight-can-map-after-release",
+      "rate-limit-can-map-before-claim",
+      "unknown-never-fallback",
+      "orphan-never-fallback",
+      "identity-conflict-never-fallback"
+    ]
+  },
+  "required_coverage": {
+    "fresh": "observation.json:fresh-codex-seven-day",
+    "unknown": "admission.json:unknown-spawn-zero",
+    "tight": "admission.json:tight-spawn-zero",
+    "hard-stale": "admission.json:hard-stale-spawn-zero",
+    "duplicate": "reservation.json:duplicate-same-request",
+    "concurrent": "concurrency.json:ten-contenders-no-oversubscription",
+    "same-key-10-way": "concurrency.json:ten-same-key-single-reservation",
+    "single-flight": "store.json:ten-refresh-callers-single-flight",
+    "atomic-store": "store.json:atomic-owner-only-observation-publish",
+    "atomic-fault-visibility": "store.json:atomic-owner-only-observation-publish",
+    "directory-fsync-matrix": "store.json:atomic-owner-only-observation-publish",
+    "atomic-reservation-snapshot": "store.json:atomic-owner-only-reservation-snapshot-publish",
+    "crash-recovery": "store.json:event-durable-snapshot-missing-recovers",
+    "multi-bucket-atomic": "concurrency.json:multi-bucket-all-or-nothing",
+    "lock-owner-unknown": "concurrency.json:lock-owner-unknown-no-write",
+    "expired": "reservation.json:expired-held-no-claim",
+    "orphan": "orphan.json:claimed-without-hello-retained",
+    "5h-poison": "observation.json:five-hour-poison-ignored",
+    "auth-not-quota": "admission.json:authenticated-without-quota-spawn-zero",
+    "observation-conflict": "admission.json:observation-conflict-spawn-zero",
+    "provider-neutral": "admission.json:provider-neutral-ample",
+    "account-mutation-matrix": "lifecycle-effects.json:cursor-auth-write-denied",
+    "credential-scope": "lifecycle-effects.json:codex-credential-write-denied"
+  }
+}

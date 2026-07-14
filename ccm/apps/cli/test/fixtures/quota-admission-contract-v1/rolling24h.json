@@ -1,0 +1,112 @@
+{
+  "schema": "ccm/quota-rolling24h-fixtures/v1",
+  "cases": [
+    {
+      "name": "full-day-above-budget-advisory",
+      "spec_ids": ["QA-BND-005", "QA-R24-001", "QA-R24-002", "QA-R24-004"],
+      "input": {
+        "aggregation_key": "codex-pool-A-seven-day",
+        "as_of": "2026-07-13T08:00:00Z",
+        "samples": [
+          { "at": "2026-07-12T08:00:00Z", "used_pct": 30, "fresh_endpoint": true },
+          { "at": "2026-07-13T08:00:00Z", "used_pct": 48, "fresh_endpoint": true }
+        ]
+      },
+      "expected": {
+        "state": "available",
+        "coverage_kind": "full",
+        "coverage_hours": 24,
+        "delta_used_pct": 18,
+        "daily_budget_pct": 14.285714,
+        "observed_daily_velocity_pct": 18,
+        "velocity_ratio": 1.26,
+        "confidence": "high",
+        "advisory": "throttle-risk",
+        "hard_gate_effect": "none"
+      }
+    },
+    {
+      "name": "partial-eighteen-hour-coverage",
+      "spec_ids": ["QA-R24-001", "QA-R24-002"],
+      "input": {
+        "aggregation_key": "codex-pool-A-seven-day",
+        "as_of": "2026-07-13T08:00:00Z",
+        "samples": [
+          { "at": "2026-07-12T14:00:00Z", "used_pct": 40, "fresh_endpoint": true },
+          { "at": "2026-07-13T08:00:00Z", "used_pct": 46, "fresh_endpoint": true }
+        ]
+      },
+      "expected": {
+        "state": "available",
+        "coverage_kind": "partial",
+        "coverage_hours": 18,
+        "delta_used_pct": 6,
+        "daily_budget_pct": 14.285714,
+        "observed_daily_velocity_pct": 8,
+        "velocity_ratio": 0.56,
+        "confidence": "medium",
+        "advisory": "none",
+        "hard_gate_effect": "none"
+      }
+    },
+    {
+      "name": "insufficient-two-hour-history",
+      "spec_ids": ["QA-R24-002", "QA-R24-003"],
+      "input": {
+        "aggregation_key": "codex-pool-A-seven-day",
+        "as_of": "2026-07-13T08:00:00Z",
+        "samples": [
+          { "at": "2026-07-13T06:00:00Z", "used_pct": 40, "fresh_endpoint": true },
+          { "at": "2026-07-13T08:00:00Z", "used_pct": 43, "fresh_endpoint": true }
+        ]
+      },
+      "expected": {
+        "state": "unavailable",
+        "coverage_hours": 2,
+        "confidence": "none",
+        "advisory": "none",
+        "reason": "ROLLING24H_INSUFFICIENT_COVERAGE",
+        "hard_gate_effect": "none"
+      }
+    },
+    {
+      "name": "reset-crossing-unavailable",
+      "spec_ids": ["QA-FRESH-004", "QA-R24-003"],
+      "input": {
+        "aggregation_key": "codex-pool-A-seven-day",
+        "as_of": "2026-07-13T08:00:00Z",
+        "samples": [
+          { "at": "2026-07-12T08:00:00Z", "used_pct": 70, "fresh_endpoint": true },
+          { "at": "2026-07-13T08:00:00Z", "used_pct": 10, "fresh_endpoint": true }
+        ]
+      },
+      "expected": {
+        "state": "unavailable",
+        "confidence": "none",
+        "advisory": "none",
+        "reason": "ROLLING24H_RESET_CROSSING",
+        "hard_gate_effect": "none"
+      }
+    },
+    {
+      "name": "same-timestamp-conflict",
+      "spec_ids": ["QA-OBS-003", "QA-R24-003"],
+      "input": {
+        "aggregation_key": "codex-pool-A-seven-day",
+        "as_of": "2026-07-13T08:00:00Z",
+        "samples": [
+          { "at": "2026-07-12T08:00:00Z", "used_pct": 30, "fresh_endpoint": true },
+          { "at": "2026-07-13T08:00:00Z", "used_pct": 45, "fresh_endpoint": true },
+          { "at": "2026-07-13T08:00:00Z", "used_pct": 46, "fresh_endpoint": true }
+        ]
+      },
+      "expected": {
+        "state": "unavailable",
+        "confidence": "none",
+        "advisory": "none",
+        "reason": "ROLLING24H_SAMPLE_CONFLICT",
+        "hard_gate_effect": "none"
+      }
+    }
+  ]
+}

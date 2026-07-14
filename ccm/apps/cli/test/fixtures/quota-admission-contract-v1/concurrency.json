@@ -1,0 +1,113 @@
+{
+  "schema": "ccm/quota-reservation-concurrency-fixtures/v1",
+  "cases": [
+    {
+      "name": "ten-contenders-no-oversubscription",
+      "spec_ids": ["QA-RES-001", "QA-RES-004"],
+      "input": {
+        "aggregation_keys": ["codex-pool-A-seven-day"],
+        "capacity_pct": { "codex-pool-A-seven-day": 10 },
+        "contenders": [
+          { "id": "r01", "key": "key-01", "hash": "hash-01", "amount_pct": 3 },
+          { "id": "r02", "key": "key-02", "hash": "hash-02", "amount_pct": 3 },
+          { "id": "r03", "key": "key-03", "hash": "hash-03", "amount_pct": 3 },
+          { "id": "r04", "key": "key-04", "hash": "hash-04", "amount_pct": 3 },
+          { "id": "r05", "key": "key-05", "hash": "hash-05", "amount_pct": 3 },
+          { "id": "r06", "key": "key-06", "hash": "hash-06", "amount_pct": 3 },
+          { "id": "r07", "key": "key-07", "hash": "hash-07", "amount_pct": 3 },
+          { "id": "r08", "key": "key-08", "hash": "hash-08", "amount_pct": 3 },
+          { "id": "r09", "key": "key-09", "hash": "hash-09", "amount_pct": 3 },
+          { "id": "r10", "key": "key-10", "hash": "hash-10", "amount_pct": 3 }
+        ]
+      },
+      "expected": {
+        "contender_count": 10,
+        "accepted_count": 3,
+        "rejected_count": 7,
+        "unique_reservation_count": 3,
+        "active_reserved_pct": { "codex-pool-A-seven-day": 9 },
+        "oversubscribed": false,
+        "spawn_count": 0
+      }
+    },
+    {
+      "name": "ten-same-key-single-reservation",
+      "spec_ids": ["QA-RES-003", "QA-RES-004", "QA-RES-008"],
+      "input": {
+        "aggregation_keys": ["codex-pool-A-seven-day"],
+        "capacity_pct": { "codex-pool-A-seven-day": 10 },
+        "concurrent_callers": 10,
+        "provisional_reservation_ids": [
+          "same-key-r01",
+          "same-key-r02",
+          "same-key-r03",
+          "same-key-r04",
+          "same-key-r05",
+          "same-key-r06",
+          "same-key-r07",
+          "same-key-r08",
+          "same-key-r09",
+          "same-key-r10"
+        ],
+        "request": {
+          "key": "same-key-10-way",
+          "hash": "same-request-hash",
+          "amount_pct": 3,
+          "state": "held",
+          "expires_at": "2026-07-13T08:01:00Z"
+        }
+      },
+      "expected": {
+        "caller_count": 10,
+        "created_count": 1,
+        "idempotent_existing_count": 9,
+        "discarded_provisional_id_count": 9,
+        "unique_reservation_count": 1,
+        "durable_event_count": 1,
+        "active_reserved_pct": { "codex-pool-A-seven-day": 3 },
+        "oversubscribed": false,
+        "claim_count": 0,
+        "spawn_count": 0
+      }
+    },
+    {
+      "name": "multi-bucket-all-or-nothing",
+      "spec_ids": ["QA-AGG-003", "QA-RES-001", "QA-RES-004"],
+      "input": {
+        "aggregation_keys": ["bucket-A", "bucket-B"],
+        "capacity_pct": { "bucket-A": 8, "bucket-B": 2 },
+        "existing_pct": { "bucket-A": 0, "bucket-B": 1 },
+        "request": { "id": "multi-1", "amount_pct": { "bucket-A": 4, "bucket-B": 2 } }
+      },
+      "expected": {
+        "accepted": [],
+        "rejected": ["multi-1"],
+        "writes": { "bucket-A": 0, "bucket-B": 0 },
+        "error": "RESERVATION_CAPACITY_CONFLICT",
+        "spawn_count": 0
+      }
+    },
+    {
+      "name": "lock-owner-unknown-no-write",
+      "spec_ids": ["QA-RES-002"],
+      "input": {
+        "aggregation_keys": ["codex-pool-A-seven-day"],
+        "lock": {
+          "pid": 7,
+          "boot_id": "unknown",
+          "process_start_identity": "unknown",
+          "owner_nonce": "nonce-old",
+          "mtime_old": true
+        },
+        "request": { "id": "r01", "amount_pct": 3 }
+      },
+      "expected": {
+        "accepted": [],
+        "rejected": ["r01"],
+        "writes": 0,
+        "error": "QUOTA_LOCK_BUSY",
+        "spawn_count": 0
+      }
+    }
+  ]
+}
