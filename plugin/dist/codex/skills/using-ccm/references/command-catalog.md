@@ -160,7 +160,7 @@ ccm <alias> [args] [flags]
 | `web-viewer` | 本地只读 board web viewer lifecycle：open/start/status/stop/restart；home-scoped service，127.0.0.1 + token |
 | `monitor` | 可选本地 monitor daemon：连续扫 harness usage / active boards，复用 pool arbiter 边沿写 `coordination.inbox` |
 | `services` | home 常驻服务 reconcile：ccm 二进制替换后按 wanted 语义重启 monitor / web-viewer |
-| `runtime` | cross-harness worker runtime 的 immutable image supply chain：stage / activate / exact resolve+invoke / doctor / rollback（非 board 操作） |
+| `runtime` | cross-harness worker runtime 的 immutable image supply chain：stage / activate / assurance-tiered resolve+invoke / doctor / rollback（非 board 操作） |
 | `estimate` | 工作侧**只读 advisory**：双通道 MC 工期预测 / EVM / velocity / 风险（消费 OR/ML 引擎） |
 | `account` | 账号池 namespace 不对 Codex 可用：`ccm account add` / `refresh` / `list` / `switch` 统一走 `NotImplemented`；仅保留 `usage` 对当前账户 5h/7d 的只读 advisory。 |
 | `statusline` | statusline namespace 仅作兼容告知：Codex 无外部命令式 status-line hook；`statusline install/uninstall` 为 `NotImplemented`（当前用量来自 `codex` 侧速率源）。 |
@@ -1752,21 +1752,30 @@ ccm runtime activate <transaction-id> [--json]
 ccm runtime resolve [--json]
 ```
 
-返回当前 `sequence`、`transaction_id`、`sha256`、exact `image_path` / `image_ref` 和
-`activation_path`。每次读取都重验最新 commit 与 image；最新 commit 损坏时 fail closed，不静默
-退旧版本。无 current → `exit 5`。
+返回当前 `sequence`、`transaction_id`、`sha256`、`image_path` / `image_ref`、
+`activation_path` 和 `invoke_assurance`。其中 Linux 报
+`exact-fd-v1/local-sha256-provenance/resistant`，Darwin 报
+`path-attested-v1/local-sha256-provenance/residual`；不要把 Darwin pathname 当 exact-object。
+每次读取都重验最新 commit 与 image；最新 commit 损坏时 fail closed，不静默退旧版本。无
+current → `exit 5`。
 
 ### runtime invoke
 
-**启动 current exact image；不写 board**
+**按平台声明的 assurance 启动 current image；不写 board**
 
 ```text
-ccm runtime invoke -- <runtime-argv...>
+ccm runtime invoke [--require-assurance exact-object] -- <runtime-argv...>
 ```
 
-selector 重验并固定 image fd，再由 platform backend 直接启动该 fd 对应 image；后续 activation /
-rollback 不 hot-reload 这个 invocation。handler 透传 child exit code；该 verb 不提供 JSON envelope。
-`--dry-run` 显式 `exit 2`，不会启动 child。
+selector 重验并固定 image fd。Linux 由 build-attested `linux-exact-fd-v1` launcher 对该 fd
+直接执行；Darwin 由 build-attested `darwin-path-attested-v1` launcher 在最后一个 native handoff
+内重验 pathname fd 与 pinned fd 的 vnode identity/revision、SHA-256 和权限后立即 pathname
+`execve`。Darwin 内核仍会在检查后重解析 pathname，因此同 UID replacement race 是公开 residual，
+不是 resistant。需要 exact-object 的调用方必须传 `--require-assurance exact-object`；Darwin 会在
+创建 child 前以 `RUNTIME_INVOKE_ASSURANCE`、`exit 3` fail closed，不静默降级。两端都不把
+`/dev/fd` / `/proc/self/fd` 当 executable path；后续 activation / rollback 不 hot-reload 该
+invocation。launcher/backend 在 payload 执行前失败返回结构化 `RUNTIME_INVOKE_*`；成功后 handler
+只透传 child exit code。该 verb 不提供 JSON envelope；`--dry-run` 显式 `exit 2`，不会启动 child。
 
 ### runtime doctor
 

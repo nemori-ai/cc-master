@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'tsdown';
@@ -14,6 +15,10 @@ import { defineConfig } from 'tsdown';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const pkg = JSON.parse(readFileSync(`${__dirname}/package.json`, 'utf8')) as { version?: string };
 const version = typeof pkg.version === 'string' ? pkg.version : '0.0.0';
+const helperBytes = readFileSync(`${__dirname}/.native-build/runtime-invoke-helper`);
+const helperSha256 = createHash('sha256').update(helperBytes).digest('hex');
+const helperContract =
+  process.platform === 'linux' ? 'linux-exact-fd-v1' : 'darwin-path-attested-v1';
 
 export default defineConfig({
   entry: 'src/sea.ts',
@@ -32,5 +37,10 @@ export default defineConfig({
   // 构建期注入版本号（literal 文本替换；JSON.stringify 包成字符串字面量）。
   define: {
     __CCM_SEA_VERSION__: JSON.stringify(version),
+    __CCM_RUNTIME_INVOKE_HELPER_BASE64__: JSON.stringify(helperBytes.toString('base64')),
+    __CCM_RUNTIME_INVOKE_HELPER_SHA256__: JSON.stringify(helperSha256),
+    __CCM_RUNTIME_INVOKE_HELPER_PLATFORM__: JSON.stringify(process.platform),
+    __CCM_RUNTIME_INVOKE_HELPER_ARCH__: JSON.stringify(process.arch),
+    __CCM_RUNTIME_INVOKE_HELPER_CONTRACT__: JSON.stringify(helperContract),
   },
 });

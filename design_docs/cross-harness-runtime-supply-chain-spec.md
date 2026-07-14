@@ -16,7 +16,7 @@
    校验的 artifact 永远不能进入 activation commit；
 3. `current` 与 `previous` 是**一个 activation commit 内的原子状态对**，不是两个可分别 torn-write
    的 mutable pointer；
-4. selector 返回 exact image path + expected hash；invoke 在启动前重新验证二者；
+4. selector 返回 exact image path + expected hash + platform invoke assurance；invoke 在启动前重新验证；
 5. activation/rollback 只影响后续 selector。已解析或已启动的旧 image 不 hot-reload、不被普通
    activation/rollback 杀死；
 6. transaction journal 和 activation commits append-only。crash 后以已发布 commit 为事实，
@@ -43,6 +43,8 @@ activations/
   00000000000000000001-<transaction-id>.json
 launcher/
   README.json                 # stable-selector contract marker；不是 mutable current pointer
+  linux-exact-fd-v1-<sha256>  # Linux build-attested exact-fd launcher
+  darwin-path-attested-v1-<sha256> # Darwin build-attested final-attestation launcher
 quarantine/
 locks/
   activation.lock
@@ -90,8 +92,17 @@ rollback 不是回写旧 commit，而是追加新 commit，把旧 commit 的 `pr
 - artifact 和 provenance input 都必须是 non-symlink regular file。
 - input 以 `O_NOFOLLOW` 打开并固定 fd；copy/hash 从该 fd 读取，前后 `fstat` identity/size/time 必须
   稳定。pathname swap 或读取中变更 fail closed。managed image 的每个 path component 都必须留在
-  owner-only runtime root 且非 symlink；invoke 使用重验后的 inherited fd path，不在 verify→spawn 间
-  重新信任 pathname。
+  owner-only runtime root 且非 symlink。
+- Linux invoke 把重验后的 image fd 交给随 SEA 构建并由 digest 固定的 `linux-exact-fd-v1`
+  launcher，由 launcher 直接 `fexecve` 该 fd。实现不得把 `/dev/fd`、`/proc/self/fd` 或重验后的
+  pathname 当 executable path，也不得在 verify→exec 间重新信任 image pathname。
+- Darwin 没有公开 `fexecve` / `execveat`。Darwin invoke 使用独立的
+  `darwin-path-attested-v1` launcher：在最后一个同步 native handoff 内以 `O_NOFOLLOW` 重新打开
+  content-addressed image pathname，把 pathname fd 与先前 pinned fd 的 vnode identity/revision 对齐，
+  从 pathname fd 重新计算并比对 SHA-256，再次复核 pathname/fd revision，随后立即以 pathname
+  `execve`，不经 shell 或 PATH lookup。所有在最后复核完成前被观察到的替换/改写均 fail closed。
+  kernel 在最终用户态检查后仍会重新解析 pathname，因此该合同**不能**声称抵抗一个持续竞争的
+  same-UID process；owner-only mode 与 content-addressed name 都不消除这项 residual。
 - resolve 每次同时重验 executable hash、READY、manifest、normalized provenance digest 与
   repository/tag/asset/hash identity；相同 bytes 被不同 tag/asset 重新声明也拒绝复用。
 - POSIX backend 要求文件 owner 等于 effective uid、owner-executable、group/other 不可写。
@@ -135,16 +146,22 @@ artifact + provenance
 ccm runtime stage <artifact> --provenance <file> [--json]
 ccm runtime activate <transaction-id> [--json]
 ccm runtime resolve [--json]
-ccm runtime invoke -- <runtime-argv...>
+ccm runtime invoke [--require-assurance exact-object] -- <runtime-argv...>
 ccm runtime doctor [--installed-path <legacy-in-place-binary>] [--repair] [--json]
 ccm runtime rollback [--json]
 ```
 
 - `stage` 不 activation；返回 transaction、exact image、hash 和 normalized provenance。
 - `activate` 在锁内全量重验，成功后返回 current/previous 和 commit ref。
-- `resolve` 是只读 stable selector；无 current 或最新 commit/image 不合法时 fail closed。
-- `invoke` 先 resolve/reverify并保持 image fd 打开，再由 platform backend 通过 inherited fd path 直接
-  spawn exact image，不经 shell；返回 child exit code。
+- `resolve` 是只读 stable selector；无 current 或最新 commit/image 不合法时 fail closed。返回值显式
+  带 `invoke_assurance`：Linux=`exact-fd-v1/resistant`；Darwin=`path-attested-v1/residual`；
+  publisher identity 仍只承诺 `local-sha256-provenance`，不把 ad-hoc code signing 冒充 Developer ID。
+- `invoke` 先 resolve/reverify并保持 image fd 打开，再由 platform backend 启动经过自身
+  SHA-256/owner/mode/no-symlink 重验的 launcher。默认接受该平台诚实声明的 guarantee；调用者可用
+  `--require-assurance exact-object` 要求 exact-object。Linux `exact-fd-v1` 满足；Darwin
+  `path-attested-v1` 必须在创建 child 前以 typed `RUNTIME_INVOKE_ASSURANCE` fail closed，绝不静默降级。
+  launcher/backend 在 payload 执行前失败时经 close-on-exec control fd 返回结构化
+  `RUNTIME_INVOKE_*`；成功后 handler 只透传真实 payload 的 exit code。
 - `doctor` 可重复、默认只读。`--installed-path` 解释现有 in-place layout 的迁移计划，不移动原文件；
   `--repair` 只追加 recovery/aborted event和回收已证 dead 的 stale installer lock。
 - `rollback` 要求 previous 存在并重验，追加 operation=`rollback` 的 activation commit。
@@ -157,20 +174,22 @@ backend 合同：
 
 ```text
 id/platform/arch
+invokeAssurance # object_binding / publisher_identity / active_same_uid_replacement / platform
 ensurePrivateDirectory(path)
 verifyOpenFile(path, fd, fstat, purpose)
 verifyManagedDirectory(path, lstat)
 sealFile（platform-native executable/metadata security）
 publishUniqueFile(tempPath, finalPath) # hard-link no-replace；不能 exists+rename
 publishImage(stagingDir, finalDir)     # exclusive claim + READY-last
-spawnVerifiedImage(path, fd, argv, env)
+spawnVerifiedImage(path, fd, argv, env, {root, resolution})
 flushDirectory(path)
 inspectLockOwner(record)
 ```
 
 | Backend | C1 状态 | 证据门 |
 | --- | --- | --- |
-| Linux/macOS POSIX | supported-by-scope | uid/mode/no-symlink、O_NOFOLLOW/fstat、hard-link no-replace、fd invoke、fsync、并发/crash fixtures |
+| Linux POSIX | supported | uid/mode/no-symlink、O_NOFOLLOW/fstat、hard-link no-replace、build-attested `linux-exact-fd-v1` launcher + `fexecve`、无 `/dev/fd` 假设、active pathname-swap fixture 仍执行 pinned trusted image |
+| Darwin POSIX | supported-by-scope；资格仍由真机 gate 决定 | uid/mode/no-symlink、O_NOFOLLOW/fstat、hard-link no-replace、build-attested `darwin-path-attested-v1` launcher、final vnode identity/revision + SHA-256 recheck、无 `fexecve`/`execveat`/fd pseudo-path；darwin-arm64/x64 各跑 downloaded SEA 的 stage→activate→resolve→invoke、pre-final-check mutation denial、strict exact-object typed denial，并把 same-UID final-check→exec race记录为 residual 而非伪造 resistant green |
 | Windows | public seam + independent contract fixture；default fail-closed | 公共状态模型无 symlink/admin 假设；真实 ACL/Authenticode、locked SEA/fd-equivalent 与 durable publish e2e 未过前 activation 返回 `RUNTIME_BACKEND` |
 
 Windows 是待实现 backend，不是公共模型中的永久 unsupported。后续 platform hardening 只替换 backend，

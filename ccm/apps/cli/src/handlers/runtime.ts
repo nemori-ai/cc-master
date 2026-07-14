@@ -57,7 +57,10 @@ export function resolve(ctx: Ctx): number {
 
 export function invoke(ctx: Ctx): number {
   rejectMutationDryRun(ctx, 'invoke');
-  return runtimeFor(ctx).invoke(ctx.positionals).exit_code;
+  return runtimeFor(ctx).invoke(ctx.positionals, {
+    requireAssurance:
+      ctx.values['require-assurance'] === 'exact-object' ? 'exact-object' : undefined,
+  }).exit_code;
 }
 
 export function doctor(ctx: Ctx): number {

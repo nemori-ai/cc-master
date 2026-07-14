@@ -2,7 +2,14 @@ import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { captureRuntimeEnvironment, ccMasterHome } from '@ccm/engine';
+
+declare const __CCM_RUNTIME_INVOKE_HELPER_BASE64__: string | undefined;
+declare const __CCM_RUNTIME_INVOKE_HELPER_SHA256__: string | undefined;
+declare const __CCM_RUNTIME_INVOKE_HELPER_PLATFORM__: string | undefined;
+declare const __CCM_RUNTIME_INVOKE_HELPER_ARCH__: string | undefined;
+declare const __CCM_RUNTIME_INVOKE_HELPER_CONTRACT__: string | undefined;
 
 const PROVENANCE_SCHEMA = 'ccm/runtime-provenance/v1';
 const IMAGE_SCHEMA = 'ccm/runtime-image/v1';
@@ -36,6 +43,30 @@ export interface RuntimeResolution {
   image_path: string;
   image_ref: string;
   activation_path: string;
+  invoke_assurance: RuntimeInvokeAssurance;
+}
+
+export type RuntimeObjectBinding = 'exact-fd-v1' | 'path-attested-v1' | 'launch-cdhash-v1';
+export type RuntimeInvokeRequirement = 'exact-object';
+
+export interface RuntimeInvokeAssurance {
+  object_binding: RuntimeObjectBinding;
+  publisher_identity: 'local-sha256-provenance';
+  active_same_uid_replacement: 'resistant' | 'residual';
+  platform: string;
+}
+
+export interface RuntimeInvokeHelperArtifact {
+  contract: 'linux-exact-fd-v1' | 'darwin-path-attested-v1';
+  platform: string;
+  arch: string;
+  sha256: string;
+  bytes: Uint8Array;
+}
+
+export interface RuntimeInvokeContext {
+  root: string;
+  resolution: RuntimeResolution;
 }
 
 export interface StageResult {
@@ -66,6 +97,7 @@ export interface RuntimePlatformBackend {
   activationSupported: boolean;
   unsupportedReason?: string;
   expectedAsset: string | null;
+  invokeAssurance: RuntimeInvokeAssurance | null;
   ensurePrivateDirectory(dirPath: string): void;
   verifyOpenFile(
     filePath: string,
@@ -82,6 +114,7 @@ export interface RuntimePlatformBackend {
     imageFd: number,
     args: string[],
     env: NodeJS.ProcessEnv,
+    context: RuntimeInvokeContext,
   ): ReturnType<typeof spawnSync>;
   flushDirectory(dirPath: string): void;
   isProcessAlive(pid: number): boolean;
@@ -102,7 +135,10 @@ export interface RuntimeSupplyChain {
   activate(transactionId: string): ActivationResult;
   resolve(): RuntimeResolution;
   rollback(): ActivationResult;
-  invoke(args: string[]): { exit_code: number; resolution: RuntimeResolution };
+  invoke(
+    args: string[],
+    options?: { requireAssurance?: RuntimeInvokeRequirement },
+  ): { exit_code: number; resolution: RuntimeResolution };
   doctor(input?: { installedPath?: string; repair?: boolean }): RuntimeDoctorReport;
 }
 
@@ -115,6 +151,7 @@ export interface RuntimeDoctorReport {
     arch: string;
     activation_supported: boolean;
     reason: string | null;
+    invoke_assurance: RuntimeInvokeAssurance | null;
   };
   current: RuntimeResolution | null;
   transaction_count: number;
@@ -200,6 +237,87 @@ function expectedAsset(platform: string, arch: string): string | null {
   return `ccm-${osName}-${arch}`;
 }
 
+function verifyNativeHelperImage(bytes: Buffer, platform: string, arch: string): void {
+  let matches = false;
+  if (platform === 'linux' && bytes.length >= 20) {
+    const elf64LittleEndian =
+      bytes[0] === 0x7f &&
+      bytes[1] === 0x45 &&
+      bytes[2] === 0x4c &&
+      bytes[3] === 0x46 &&
+      bytes[4] === 2 &&
+      bytes[5] === 1;
+    const machine = bytes.readUInt16LE(18);
+    matches = elf64LittleEndian && machine === (arch === 'x64' ? 62 : 183);
+  } else if (platform === 'darwin' && bytes.length >= 8) {
+    const macho64LittleEndian =
+      bytes[0] === 0xcf && bytes[1] === 0xfa && bytes[2] === 0xed && bytes[3] === 0xfe;
+    const cpuType = bytes.readUInt32LE(4);
+    matches = macho64LittleEndian && cpuType === (arch === 'x64' ? 0x01000007 : 0x0100000c);
+  }
+  if (!matches) {
+    validation(
+      `native invoke helper is not a ${platform}/${arch} 64-bit executable image`,
+      'RUNTIME_INVOKE_BACKEND',
+    );
+  }
+}
+
+function runtimeInvokeHelperContract(
+  platform: string,
+): RuntimeInvokeHelperArtifact['contract'] | null {
+  if (platform === 'linux') return 'linux-exact-fd-v1';
+  if (platform === 'darwin') return 'darwin-path-attested-v1';
+  return null;
+}
+
+function loadRuntimeInvokeHelperArtifact(): RuntimeInvokeHelperArtifact {
+  if (
+    typeof __CCM_RUNTIME_INVOKE_HELPER_BASE64__ === 'string' &&
+    typeof __CCM_RUNTIME_INVOKE_HELPER_SHA256__ === 'string' &&
+    typeof __CCM_RUNTIME_INVOKE_HELPER_PLATFORM__ === 'string' &&
+    typeof __CCM_RUNTIME_INVOKE_HELPER_ARCH__ === 'string' &&
+    (__CCM_RUNTIME_INVOKE_HELPER_CONTRACT__ === 'linux-exact-fd-v1' ||
+      __CCM_RUNTIME_INVOKE_HELPER_CONTRACT__ === 'darwin-path-attested-v1')
+  ) {
+    return {
+      contract: __CCM_RUNTIME_INVOKE_HELPER_CONTRACT__,
+      platform: __CCM_RUNTIME_INVOKE_HELPER_PLATFORM__,
+      arch: __CCM_RUNTIME_INVOKE_HELPER_ARCH__,
+      sha256: __CCM_RUNTIME_INVOKE_HELPER_SHA256__,
+      bytes: Buffer.from(__CCM_RUNTIME_INVOKE_HELPER_BASE64__, 'base64'),
+    };
+  }
+
+  // Source-level tests run after the package build but without tsdown's embedded defines.
+  const developmentPath = fileURLToPath(
+    new URL('../.native-build/runtime-invoke-helper', import.meta.url),
+  );
+  let bytes: Buffer;
+  try {
+    bytes = fs.readFileSync(developmentPath);
+  } catch (error) {
+    validation(
+      `build-attested native invoke helper is unavailable: ${(error as Error).message}`,
+      'RUNTIME_INVOKE_BACKEND',
+    );
+  }
+  const contract = runtimeInvokeHelperContract(process.platform);
+  if (contract === null) {
+    validation(
+      `native invoke helper has no contract for ${process.platform}`,
+      'RUNTIME_INVOKE_BACKEND',
+    );
+  }
+  return {
+    contract,
+    platform: process.platform,
+    arch: process.arch,
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+    bytes,
+  };
+}
+
 function checkRegularNoSymlink(filePath: string, purpose: string): fs.Stats {
   let stat: fs.Stats;
   try {
@@ -243,9 +361,27 @@ export function createDefaultRuntimeBackend(
   platform: NodeJS.Platform | string = process.platform,
   arch = process.arch,
   expectedUid = typeof process.geteuid === 'function' ? process.geteuid() : null,
+  invokeHelperArtifact?: RuntimeInvokeHelperArtifact,
 ): RuntimePlatformBackend {
   const asset = expectedAsset(platform, arch);
   const supported = (platform === 'linux' || platform === 'darwin') && asset !== null;
+  const helperContract = runtimeInvokeHelperContract(String(platform));
+  const invokeAssurance: RuntimeInvokeAssurance | null =
+    platform === 'linux'
+      ? {
+          object_binding: 'exact-fd-v1',
+          publisher_identity: 'local-sha256-provenance',
+          active_same_uid_replacement: 'resistant',
+          platform: `linux-${arch}`,
+        }
+      : platform === 'darwin'
+        ? {
+            object_binding: 'path-attested-v1',
+            publisher_identity: 'local-sha256-provenance',
+            active_same_uid_replacement: 'residual',
+            platform: `darwin-${arch}`,
+          }
+        : null;
   const requireSupported = (): void => {
     if (!supported) {
       validation(
@@ -287,8 +423,121 @@ export function createDefaultRuntimeBackend(
       throw error;
     }
   };
+  let verifiedHelperArtifact: { bytes: Buffer; sha256: string } | null = null;
+  const requireHelperArtifact = (): { bytes: Buffer; sha256: string } => {
+    requireSupported();
+    if (verifiedHelperArtifact) return verifiedHelperArtifact;
+    const artifact = invokeHelperArtifact || loadRuntimeInvokeHelperArtifact();
+    if (
+      helperContract === null ||
+      artifact.contract !== helperContract ||
+      artifact.platform !== platform ||
+      artifact.arch !== arch ||
+      !SHA256_RE.test(artifact.sha256)
+    ) {
+      validation(
+        `native invoke helper contract does not match ${platform}/${arch}`,
+        'RUNTIME_INVOKE_BACKEND',
+      );
+    }
+    const bytes = Buffer.from(artifact.bytes);
+    const actual = createHash('sha256').update(bytes).digest('hex');
+    if (actual !== artifact.sha256) {
+      validation(
+        `native invoke helper digest ${actual} != build digest ${artifact.sha256}`,
+        'RUNTIME_INVOKE_BACKEND',
+      );
+    }
+    if (bytes.length === 0) {
+      validation('native invoke helper is empty', 'RUNTIME_INVOKE_BACKEND');
+    }
+    verifyNativeHelperImage(bytes, platform, arch);
+    verifiedHelperArtifact = { bytes, sha256: actual };
+    return verifiedHelperArtifact;
+  };
+  const verifyHelperPath = (helperPath: string, expectedHash: string): number => {
+    const pathStat = checkRegularNoSymlink(helperPath, 'native invoke helper');
+    let fd: number;
+    try {
+      fd = fs.openSync(helperPath, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ELOOP') {
+        validation('native invoke helper must not be a symlink', 'RUNTIME_INVOKE_BACKEND');
+      }
+      throw error;
+    }
+    try {
+      const before = fs.fstatSync(fd);
+      if (!before.isFile() || before.dev !== pathStat.dev || before.ino !== pathStat.ino) {
+        validation('native invoke helper changed while opening', 'RUNTIME_INVOKE_BACKEND');
+      }
+      verifyPosixStat(before, 'native invoke helper', true);
+      const actual = createHash('sha256').update(fs.readFileSync(fd)).digest('hex');
+      const after = fs.fstatSync(fd);
+      if (
+        before.dev !== after.dev ||
+        before.ino !== after.ino ||
+        before.size !== after.size ||
+        before.mtimeMs !== after.mtimeMs ||
+        before.ctimeMs !== after.ctimeMs
+      ) {
+        validation('native invoke helper changed while hashing', 'RUNTIME_INVOKE_BACKEND');
+      }
+      if (actual !== expectedHash) {
+        validation(
+          `native invoke helper digest ${actual} != build digest ${expectedHash}`,
+          'RUNTIME_INVOKE_BACKEND',
+        );
+      }
+      return fd;
+    } catch (error) {
+      fs.closeSync(fd);
+      throw error;
+    }
+  };
+  const materializeHelper = (context: RuntimeInvokeContext): { path: string; fd: number } => {
+    const artifact = requireHelperArtifact();
+    const launcherDir = path.join(context.root, 'launcher');
+    const launcherStat = fs.lstatSync(launcherDir);
+    if (launcherStat.isSymbolicLink() || !launcherStat.isDirectory()) {
+      validation('native invoke launcher directory is not trusted', 'RUNTIME_INVOKE_BACKEND');
+    }
+    verifyPosixStat(launcherStat, 'native invoke launcher directory', false);
+    const helperPath = path.join(launcherDir, `${helperContract}-${artifact.sha256}`);
+    const temporary = path.join(
+      launcherDir,
+      `.${helperContract}-${process.pid}-${randomUUID()}.tmp`,
+    );
+    fs.chmodSync(launcherDir, 0o700);
+    try {
+      if (!fs.existsSync(helperPath)) {
+        fs.writeFileSync(temporary, artifact.bytes, { flag: 'wx', mode: 0o600 });
+        flushFile(temporary);
+        fs.chmodSync(temporary, 0o500);
+        try {
+          fs.linkSync(temporary, helperPath);
+          flushDirectoryBestEffort(launcherDir);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+        } finally {
+          fs.rmSync(temporary, { force: true });
+        }
+      }
+      const helperFd = verifyHelperPath(helperPath, artifact.sha256);
+      fs.chmodSync(launcherDir, 0o500);
+      return { path: helperPath, fd: helperFd };
+    } catch (error) {
+      fs.rmSync(temporary, { force: true });
+      try {
+        fs.chmodSync(launcherDir, 0o500);
+      } catch {
+        // Preserve the primary materialization/verification failure.
+      }
+      throw error;
+    }
+  };
   return {
-    id: supported ? 'posix-v1' : 'windows-contract-v1',
+    id: supported && helperContract !== null ? helperContract : 'windows-contract-v1',
     platform,
     arch,
     activationSupported: supported,
@@ -296,6 +545,7 @@ export function createDefaultRuntimeBackend(
       ? undefined
       : 'platform security backend requires ACL/Authenticode and locked-SEA endpoint evidence',
     expectedAsset: asset,
+    invokeAssurance,
     ensurePrivateDirectory(dirPath) {
       try {
         fs.mkdirSync(dirPath, { mode: 0o700 });
@@ -386,21 +636,55 @@ export function createDefaultRuntimeBackend(
         throw error;
       }
     },
-    spawnVerifiedImage(imagePath, imageFd, args, childEnv) {
+    spawnVerifiedImage(imagePath, imageFd, args, childEnv, context) {
       requireSupported();
-      const inheritedFd = 3;
-      const pinnedPath =
-        platform === 'linux' ? `/proc/self/fd/${inheritedFd}` : `/dev/fd/${inheritedFd}`;
-      if (!fs.existsSync(path.dirname(pinnedPath))) {
+      if (
+        context.resolution.image_path !== imagePath ||
+        !SHA256_RE.test(context.resolution.sha256) ||
+        !Number.isSafeInteger(context.resolution.sequence) ||
+        context.resolution.sequence <= 0 ||
+        !TX_RE.test(context.resolution.transaction_id)
+      ) {
         validation(
-          `fd-backed executable path is unavailable for ${imagePath}`,
+          'verified image descriptor is not bound to a valid activation resolution',
           'RUNTIME_INVOKE_BACKEND',
         );
       }
-      return spawnSync(pinnedPath, args, {
-        stdio: ['inherit', 'inherit', 'inherit', imageFd],
-        env: childEnv,
-      });
+      const helper = materializeHelper(context);
+      try {
+        const helperArgs =
+          platform === 'darwin'
+            ? [imagePath, context.resolution.sha256, ...args]
+            : [imagePath, ...args];
+        const child = spawnSync(helper.path, helperArgs, {
+          stdio: ['inherit', 'inherit', 'inherit', imageFd, 'pipe'],
+          env: childEnv,
+        });
+        if (child.error) {
+          validation(
+            `native invoke helper failed to start: ${child.error.message}`,
+            'RUNTIME_INVOKE_BACKEND',
+          );
+        }
+        const rawControl = child.output?.[4];
+        const control = rawControl ? String(rawControl).trim() : '';
+        if (control) {
+          const parsed = /^CCM_RUNTIME_INVOKE_ERROR\tv1\t([a-z-]+)\t(\d+)$/.exec(control);
+          if (!parsed) {
+            validation(
+              'native invoke helper returned malformed control data',
+              'RUNTIME_INVOKE_BACKEND',
+            );
+          }
+          validation(
+            `native invoke helper failed at ${parsed[1]} (errno ${parsed[2]})`,
+            'RUNTIME_INVOKE_EXEC',
+          );
+        }
+        return child;
+      } finally {
+        fs.closeSync(helper.fd);
+      }
     },
     flushDirectory: flushDirectoryBestEffort,
     isProcessAlive(pid) {
@@ -1094,6 +1378,9 @@ export function createRuntimeSupplyChain(
 
   function resolve(): RuntimeResolution {
     ensureSupported();
+    if (backend.invokeAssurance === null) {
+      validation('runtime backend has no invoke assurance', 'RUNTIME_INVOKE_BACKEND');
+    }
     if (!inspectExistingLayout()) {
       notFound('no active runtime image', 'RUNTIME_CURRENT_MISSING');
     }
@@ -1107,6 +1394,7 @@ export function createRuntimeSupplyChain(
       image_path: imagePath,
       image_ref: latest.activation.current.image,
       activation_path: latest.path,
+      invoke_assurance: backend.invokeAssurance,
     };
   }
 
@@ -1143,14 +1431,35 @@ export function createRuntimeSupplyChain(
     }
   }
 
-  function invoke(args: string[]): { exit_code: number; resolution: RuntimeResolution } {
+  function invoke(
+    args: string[],
+    invokeOptions: { requireAssurance?: RuntimeInvokeRequirement } = {},
+  ): { exit_code: number; resolution: RuntimeResolution } {
+    if (
+      invokeOptions.requireAssurance === 'exact-object' &&
+      (backend.invokeAssurance === null ||
+        backend.invokeAssurance.active_same_uid_replacement !== 'resistant' ||
+        (backend.invokeAssurance.object_binding !== 'exact-fd-v1' &&
+          backend.invokeAssurance.object_binding !== 'launch-cdhash-v1'))
+    ) {
+      validation(
+        `runtime backend ${backend.id} cannot satisfy exact-object invocation`,
+        'RUNTIME_INVOKE_ASSURANCE',
+      );
+    }
     const resolution = resolve();
     const imageFd = openVerifiedManagedImage(resolution.image_path, resolution.sha256);
     try {
-      const child = backend.spawnVerifiedImage(resolution.image_path, imageFd, args, {
-        ...process.env,
-        ...env,
-      });
+      const child = backend.spawnVerifiedImage(
+        resolution.image_path,
+        imageFd,
+        args,
+        {
+          ...process.env,
+          ...env,
+        },
+        { root, resolution },
+      );
       if (child.error) throw child.error;
       return { exit_code: child.status ?? 1, resolution };
     } finally {
@@ -1277,6 +1586,7 @@ export function createRuntimeSupplyChain(
         arch: backend.arch,
         activation_supported: backend.activationSupported,
         reason: backend.unsupportedReason || null,
+        invoke_assurance: backend.invokeAssurance,
       },
       current,
       transaction_count:

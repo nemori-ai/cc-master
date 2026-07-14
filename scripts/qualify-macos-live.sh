@@ -136,6 +136,45 @@ validate_runtime_matrix_log() {
   grep -q 'process crash after commit leaves a stale lock' "${log}" || return 23
   grep -q 'concurrent activation has one linearization winner' "${log}" || return 24
   grep -q 'no-replace publish has one winner under a real two-process race' "${log}" || return 25
+  grep -q 'native invoke enforces the platform assurance tier' "${log}" || return 28
+  grep -q 'exact-object callers fail closed before spawn' "${log}" || return 29
+}
+
+validate_darwin_runtime_assurance() {
+  node - "${EVIDENCE_DIR}/runtime_resolve.log" "${EVIDENCE_DIR}/runtime_doctor.log" \
+    "${CONTRACT}" <<'NODE'
+const fs = require('node:fs');
+const [resolveFile, doctorFile, expectedPlatform] = process.argv.slice(2);
+function data(file) {
+  const text = fs.readFileSync(file, 'utf8');
+  const start = text.indexOf('{');
+  if (start < 0) process.exit(2);
+  return JSON.parse(text.slice(start)).data;
+}
+const resolved = data(resolveFile);
+const doctor = data(doctorFile);
+const expected = {
+  object_binding: 'path-attested-v1',
+  publisher_identity: 'local-sha256-provenance',
+  active_same_uid_replacement: 'residual',
+  platform: expectedPlatform,
+};
+for (const [key, value] of Object.entries(expected)) {
+  if (resolved.invoke_assurance?.[key] !== value) process.exit(3);
+  if (doctor.backend.invoke_assurance?.[key] !== value) process.exit(4);
+}
+process.stdout.write(`${JSON.stringify(expected, null, 2)}\n`);
+NODE
+}
+
+assert_exact_object_denied() {
+  local output rc
+  output="$(env HOME="${QUAL_HOME}" CC_MASTER_HOME="${CCM_HOME}" \
+    "${SEA}" runtime invoke --require-assurance exact-object -- --version 2>&1)"
+  rc=$?
+  printf '%s\n' "${output}"
+  [ "${rc}" -eq 3 ] || return 30
+  printf '%s\n' "${output}" | grep -q 'RUNTIME_INVOKE_ASSURANCE' || return 31
 }
 
 validate_installer_matrix_log() {
@@ -290,6 +329,8 @@ if [ -n "${TX}" ]; then
     "${SEA}" runtime invoke -- --version
   run_required runtime_doctor env HOME="${QUAL_HOME}" CC_MASTER_HOME="${CCM_HOME}" \
     "${SEA}" runtime doctor --json
+  run_required runtime_assurance validate_darwin_runtime_assurance
+  run_required runtime_exact_object_denial assert_exact_object_denied
 else
   printf '%s\n' 'runtime stage did not return a transaction_id' >"${EVIDENCE_DIR}/runtime_transaction.log"
   record runtime_transaction FAIL 65
@@ -297,7 +338,8 @@ else
 fi
 
 run_required runtime_apfs_exdev_crash_matrix \
-  pnpm -C ccm/apps/cli exec node --import tsx --test test/handler-runtime.test.ts
+  pnpm -C ccm/apps/cli exec node --import tsx --test \
+  test/handler-runtime.test.ts test/runtime-verified-exec-contract.test.ts
 run_required runtime_matrix_coverage validate_runtime_matrix_log
 run_required installer_apfs_fault_matrix bash tests/scripts/test_install_integrity.sh
 run_required installer_matrix_coverage validate_installer_matrix_log

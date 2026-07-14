@@ -10,9 +10,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "node scripts/gen-web-viewer-assets.mjs && tsdown",
+    "build": "node scripts/build-runtime-invoke-helper.mjs && node scripts/gen-web-viewer-assets.mjs && tsdown",
     "build:sea": "node scripts/gen-web-viewer-assets.mjs && bash scripts/build-sea.sh",
-    "test": "node --import tsx --test \"test/**/*.test.ts\"",
+    "test": "node scripts/build-runtime-invoke-helper.mjs && node --import tsx --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "lint": "biome check ."
   },

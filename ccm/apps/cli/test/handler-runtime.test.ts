@@ -3,6 +3,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
   linkSync,
   lstatSync,
@@ -24,6 +25,7 @@ import { run } from '../src/router.js';
 import {
   createDefaultRuntimeBackend,
   createRuntimeSupplyChain,
+  type RuntimeInvokeAssurance,
   type RuntimePlatformBackend,
   type RuntimeSupplyChain,
 } from '../src/runtime-supply-chain.js';
@@ -92,17 +94,52 @@ function fixture(
   return { root, home, artifact, provenance, hash };
 }
 
+function compileNative(source: string, output: string, defines: string[] = []): void {
+  const result = spawnSync(
+    process.env.CC || 'cc',
+    ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', ...defines, source, '-o', output],
+    { encoding: 'utf8' },
+  );
+  assert.equal(
+    result.status,
+    0,
+    `native fixture compilation failed: ${result.error?.message || result.stderr || result.stdout}`,
+  );
+  chmodSync(output, 0o755);
+}
+
+function nativeFixture(version: string, payloadText: string): ReturnType<typeof fixture> {
+  const base = fixture(version);
+  compileNative(join(HERE, 'fixtures', 'runtime-test-payload.c'), base.artifact, [
+    `-DPAYLOAD_TEXT="${payloadText}"`,
+  ]);
+  const hash = createHash('sha256').update(readFileSync(base.artifact)).digest('hex');
+  const provenance = JSON.parse(readFileSync(base.provenance, 'utf8')) as Record<string, unknown>;
+  provenance.sha256 = hash;
+  writeFileSync(base.provenance, `${JSON.stringify(provenance, null, 2)}\n`);
+  return { ...base, hash };
+}
+
 function manager(home: string): RuntimeSupplyChain {
   return createRuntimeSupplyChain({ env: { HOME: join(home, '..'), CC_MASTER_HOME: home } });
 }
 
-function createPlatformNeutralContractBackend(expectedAsset: string): RuntimePlatformBackend {
+function createPlatformNeutralContractBackend(
+  expectedAsset: string,
+  invokeAssurance: RuntimeInvokeAssurance = {
+    object_binding: 'exact-fd-v1',
+    publisher_identity: 'local-sha256-provenance',
+    active_same_uid_replacement: 'resistant',
+    platform: `test-${process.arch}`,
+  },
+): RuntimePlatformBackend {
   return {
     id: 'test-platform-neutral-no-symlink-v1',
     platform: 'win32-simulated',
     arch: process.arch,
     activationSupported: true,
     expectedAsset,
+    invokeAssurance,
     ensurePrivateDirectory(dirPath) {
       mkdirSync(dirPath, { recursive: true });
     },
@@ -211,7 +248,63 @@ test('stage -> activate publishes one atomic current/previous pair and preserves
   const resolved = runtime.resolve();
   assert.equal(resolved.sha256, f.hash);
   assert.equal(resolved.image_path, staged.image_path);
+  assert.equal(
+    resolved.invoke_assurance.object_binding,
+    process.platform === 'linux' ? 'exact-fd-v1' : 'path-attested-v1',
+  );
+  assert.equal(
+    resolved.invoke_assurance.active_same_uid_replacement,
+    process.platform === 'linux' ? 'resistant' : 'residual',
+  );
+  assert.deepEqual(runtime.doctor().backend.invoke_assurance, resolved.invoke_assurance);
   assert.equal(existsSync(join(f.home, 'boards', 'keep.board.json')), true);
+});
+
+test('exact-object callers fail closed before spawn on a path-attested backend', () => {
+  const first = fixture('1.2.4');
+  const provenance = JSON.parse(readFileSync(first.provenance, 'utf8')) as { asset: string };
+  const base = createPlatformNeutralContractBackend(provenance.asset, {
+    object_binding: 'path-attested-v1',
+    publisher_identity: 'local-sha256-provenance',
+    active_same_uid_replacement: 'residual',
+    platform: `test-${process.arch}`,
+  });
+  let spawnCalls = 0;
+  const backend: RuntimePlatformBackend = {
+    ...base,
+    spawnVerifiedImage() {
+      spawnCalls += 1;
+      return spawnSync(process.execPath, ['--version']);
+    },
+  };
+  const runtime = createRuntimeSupplyChain({ env: { CC_MASTER_HOME: first.home }, backend });
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+
+  expectRuntimeError(
+    () => runtime.invoke([], { requireAssurance: 'exact-object' }),
+    'RUNTIME_INVOKE_ASSURANCE',
+  );
+  assert.equal(spawnCalls, 0, 'strict assurance rejection happens before child creation');
+
+  const invoked = runtime.invoke([]);
+  assert.equal(invoked.exit_code, 0);
+  assert.equal(spawnCalls, 1, 'non-strict caller may explicitly consume the advertised residual');
+
+  const exactRuntime = createRuntimeSupplyChain({
+    env: { CC_MASTER_HOME: first.home },
+    backend: {
+      ...backend,
+      invokeAssurance: {
+        object_binding: 'exact-fd-v1',
+        publisher_identity: 'local-sha256-provenance',
+        active_same_uid_replacement: 'resistant',
+        platform: `test-${process.arch}`,
+      },
+    },
+  });
+  assert.equal(exactRuntime.invoke([], { requireAssurance: 'exact-object' }).exit_code, 0);
+  assert.equal(spawnCalls, 2);
 });
 
 test('stage rejects bad hash, untrusted provenance, unsafe permissions, owner mismatch, and input symlinks', () => {
@@ -454,31 +547,90 @@ test('rollback affects only new invocations; a resolved old image keeps running'
   assert.equal(runtime.resolve().sha256, firstStage.sha256);
 });
 
-test('invoke executes the already-verified fd even if the managed pathname is swapped before spawn', () => {
-  const first = fixture('4.1.0', '#!/bin/sh\nprintf trusted > "$1"\n');
+test('native invoke enforces the platform assurance tier under a managed-path TOCTOU mutant', () => {
+  const first = nativeFixture('4.1.0', 'trusted');
+  const malicious = nativeFixture('4.1.9', 'malicious');
   const base = createDefaultRuntimeBackend();
   let swapped = false;
+  const mutant = join(first.root, 'runtime-path-swap-mutant');
+  compileNative(join(HERE, 'fixtures', 'runtime-path-swap-mutant.c'), mutant);
   const backend: RuntimePlatformBackend = {
     ...base,
-    spawnVerifiedImage(imagePath, imageFd, args, childEnv) {
+    spawnVerifiedImage(imagePath, imageFd, args, childEnv, context) {
       const imageDir = join(imagePath, '..');
+      const maliciousPath = join(imageDir, '.native-mutant');
       chmodSync(imageDir, 0o700);
-      renameSync(imagePath, `${imagePath}.verified`);
-      writeFileSync(imagePath, '#!/bin/sh\nprintf malicious > "$1"\n', { mode: 0o500 });
-      chmodSync(imagePath, 0o500);
+      copyFileSync(malicious.artifact, maliciousPath);
+      chmodSync(maliciousPath, 0o500);
+      const mutation = spawnSync(mutant, [imagePath, maliciousPath, `${imagePath}.verified`], {
+        encoding: 'utf8',
+      });
+      assert.equal(
+        mutation.status,
+        0,
+        `native TOCTOU mutant failed: ${mutation.error?.message || mutation.stderr}`,
+      );
       chmodSync(imageDir, 0o500);
       swapped = true;
-      return base.spawnVerifiedImage(imagePath, imageFd, args, childEnv);
+      return base.spawnVerifiedImage(imagePath, imageFd, args, childEnv, context);
     },
   };
   const runtime = createRuntimeSupplyChain({ env: { CC_MASTER_HOME: first.home }, backend });
   const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
   runtime.activate(staged.transaction_id);
   const output = join(first.root, 'invoke-output');
-  const invoked = runtime.invoke([output]);
-  assert.equal(invoked.exit_code, 0);
+  if (process.platform === 'linux') {
+    const invoked = runtime.invoke([output]);
+    assert.equal(invoked.exit_code, 0);
+    assert.equal(readFileSync(output, 'utf8'), 'trusted');
+  } else {
+    expectRuntimeError(() => runtime.invoke([output]), 'RUNTIME_INVOKE_EXEC');
+    assert.equal(
+      existsSync(output),
+      false,
+      'Darwin final attestation rejects the swapped pathname',
+    );
+  }
   assert.equal(swapped, true);
-  assert.equal(readFileSync(output, 'utf8'), 'trusted');
+});
+
+test('native verified-exec helper failure is structured and never half-executes the payload', () => {
+  const first = nativeFixture('4.1.1', 'half-executed');
+  const invalidHelper = Buffer.from('not a native executable');
+  const backend = createDefaultRuntimeBackend(
+    process.platform,
+    process.arch,
+    typeof process.geteuid === 'function' ? process.geteuid() : null,
+    {
+      contract: process.platform === 'linux' ? 'linux-exact-fd-v1' : 'darwin-path-attested-v1',
+      platform: process.platform,
+      arch: process.arch,
+      sha256: createHash('sha256').update(invalidHelper).digest('hex'),
+      bytes: invalidHelper,
+    },
+  );
+  const runtime = createRuntimeSupplyChain({ env: { CC_MASTER_HOME: first.home }, backend });
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+  const output = join(first.root, 'must-not-exist');
+
+  expectRuntimeError(() => runtime.invoke([output]), 'RUNTIME_INVOKE_BACKEND');
+  assert.equal(existsSync(output), false, 'payload must not run when the launcher cannot exec');
+});
+
+test('native image exec-format failure is structured without a shell fallback', () => {
+  const first = fixture('4.1.2', 'printf half-executed > "$1"\n');
+  const runtime = manager(first.home);
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+  const output = join(first.root, 'must-not-exist');
+
+  expectRuntimeError(() => runtime.invoke([output]), 'RUNTIME_INVOKE_EXEC');
+  assert.equal(
+    existsSync(output),
+    false,
+    'invalid image bytes must never be interpreted by a shell',
+  );
 });
 
 test('publish EXDEV and activation kill-switch fail closed without changing current', () => {
@@ -790,6 +942,10 @@ test('runtime CLI exposes stage/activate/resolve/doctor/rollback as stable JSON 
   assert.equal(report.schema, 'ccm/runtime-doctor/v1');
   assert.equal(report.migration.kind, 'in-place-file');
   assert.equal(report.migration.mutates_source, false);
+
+  const invokeHelp = invokeCli(['runtime', 'invoke', '--help'], first.home);
+  assert.equal(invokeHelp.code, 0, invokeHelp.stderr);
+  assert.match(invokeHelp.stdout, /--require-assurance <exact-object>/);
 });
 
 test('runtime CLI dry-run is read-only and never silently executes mutation verbs', () => {

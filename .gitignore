@@ -13,6 +13,7 @@ design_docs/plans/
 ccm/node_modules
 ccm/**/node_modules
 ccm/**/dist
+ccm/**/.native-build
 ccm/.turbo
 ccm/**/.turbo
 ccm/**/*.tsbuildinfo

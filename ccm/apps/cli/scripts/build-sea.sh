@@ -2,7 +2,7 @@
 # build-sea.sh — 把 apps/cli 打成本平台的 Node SEA（Single Executable Application）单可执行 `ccm` 二进制（T3·ADR-014）。
 #
 # 整条构建链（Node 官方 SEA 流程 + macOS 重签名）：
-#   ① tsdown --config tsdown.sea.config.mts → dist/ccm-sea.cjs（自包含可执行 bundle，引擎全内联、顶层执行 CLI）
+#   ① 编译本平台 tiered invoke helper 并嵌入 tsdown bundle → dist/ccm-sea.cjs
 #   ② node --experimental-sea-config sea-config.json → dist/ccm-sea.blob（useCodeCache:true 的 SEA blob）
 #   ③ 拷贝当前 node 可执行 → 目标二进制（dist/ccm[-<os>-<arch>]）
 #   ④ macOS：codesign --remove-signature（postject 注入会使原签名失效，须先去签）
@@ -50,7 +50,8 @@ log "platform: ${OS} ($(uname -m)) → 产物 ${OUT}"
 
 # ── ① tsdown：产自包含可执行 bundle dist/ccm-sea.cjs ───────────────────────────────────────────────
 if [ "${CCM_SEA_SKIP_BUNDLE:-0}" != "1" ]; then
-  log "① gen web-viewer assets + tsdown → ${BUNDLE}"
+  log "① build native verified-exec helper + gen web-viewer assets + tsdown → ${BUNDLE}"
+  node scripts/build-runtime-invoke-helper.mjs
   node scripts/gen-web-viewer-assets.mjs
   npx tsdown --config tsdown.sea.config.mts
 else
