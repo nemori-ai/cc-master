@@ -6,6 +6,7 @@
 // PARITY: rule-orchestrator-context-dedup
 // PARITY: rule-orchestrator-context-fail-open
 // PARITY: rule-orchestrator-context-shadow-only
+// PARITY: rule-orchestrator-context-cursor-surfaces
 const fs = require('fs');
 const path = require('path');
 const candidates = [

@@ -39,6 +39,85 @@ interface SecretInjectableEnvelope extends Record<string, unknown> {
   }>;
 }
 
+interface CursorContextFixture {
+  id: string;
+  installed: [boolean, boolean];
+  auth: [
+    'authenticated' | 'unauthenticated' | 'unknown',
+    'authenticated' | 'unauthenticated' | 'unknown',
+  ];
+  eligible: [boolean, boolean];
+  blockers: [string[], string[]];
+}
+
+const CURSOR_CONTEXT_FIXTURES = JSON.parse(
+  readFileSync(
+    new URL('../../../../tests/fixtures/cursor-cached-context-v1.json', import.meta.url),
+    'utf8',
+  ),
+) as {
+  states: CursorContextFixture[];
+  invalid: Array<{ id: string; mutation: string; value: unknown }>;
+};
+
+function cursorSurfaces(fixture: CursorContextFixture): Record<string, unknown> {
+  const [ideInstalled, agentInstalled] = fixture.installed;
+  const [ideAuth, agentAuth] = fixture.auth;
+  const [ideEligible, agentEligible] = fixture.eligible;
+  return {
+    schema: 'ccm/cursor-surface-context/v1',
+    state: fixture.id,
+    surfaces: [
+      {
+        surface_id: 'cursor-ide-plugin',
+        harness: 'cursor',
+        surface: 'host-native',
+        role: 'master-origin',
+        installed: ideInstalled,
+        auth_state: ideAuth,
+        role_eligible: ideEligible,
+        blocker_codes: fixture.blockers[0],
+        provenance: {
+          installed: 'cursor-ide/plugin-install-probe/v1',
+          authentication: null,
+          role_eligibility: ideEligible
+            ? [
+                'cursor-ide/plugin-host-qualification/v1',
+                'cursor-ide/origin-session-attestation/v1',
+              ]
+            : [],
+        },
+      },
+      {
+        surface_id: 'cursor-agent-cli',
+        harness: 'cursor',
+        surface: 'cli-headless',
+        role: 'worker-target',
+        installed: agentInstalled,
+        auth_state: agentAuth,
+        role_eligible: agentEligible,
+        blocker_codes: fixture.blockers[1],
+        provenance: {
+          installed: 'cursor-agent/version-help-probe/v1',
+          authentication: agentAuth === 'unknown' ? null : 'cursor-agent/status-json/v1',
+          role_eligibility: agentEligible
+            ? [
+                'cursor-agent/status-json/v1',
+                'cursor-agent/model-entitlement-collector/v1',
+                'cursor-agent/quota-collector/v1',
+                'cursor-agent/sandbox-runtime-qualification/v1',
+                'cursor-agent/transport-qualification/v1',
+                'ccm/supervisor-process-tree-qualification/v1',
+              ]
+            : agentInstalled
+              ? ['cursor-agent/quota-collector/v1']
+              : [],
+        },
+      },
+    ],
+  };
+}
+
 function candidate(
   id: string,
   surface: 'host-native' | 'cli-headless',
@@ -175,7 +254,10 @@ function threeOriginTask(
   return value;
 }
 
-function cache(facts: Record<string, unknown>[]): Record<string, unknown> {
+function cache(
+  facts: Record<string, unknown>[],
+  cursorSurfaceContext?: Record<string, unknown>,
+): Record<string, unknown> {
   return {
     schema: 'ccm/machine-context-cache/v1',
     revision: 'machine-r17',
@@ -183,6 +265,7 @@ function cache(facts: Record<string, unknown>[]): Record<string, unknown> {
     observed_at: '2026-07-13T03:00:00Z',
     valid_until: '2026-07-13T03:10:00Z',
     candidates: facts,
+    ...(cursorSurfaceContext ? { cursor_surfaces: cursorSurfaceContext } : {}),
     warnings: [],
   };
 }
@@ -248,6 +331,83 @@ test('origin content is bounded, redacted, and common-CLI equivalent across thre
   });
   assert.deepEqual(normalize(deliveries[0].payload), normalize(deliveries[1].payload));
   assert.deepEqual(normalize(deliveries[1].payload), normalize(deliveries[2].payload));
+});
+
+test('Cursor cached inventory exposes exactly four independent states across three origins', () => {
+  const board = activatedBoard([]);
+  for (const fixture of CURSOR_CONTEXT_FIXTURES.states) {
+    const deliveries = ['claude-code', 'codex', 'cursor'].map((originHarness) => {
+      const projectedContext = buildCachedOrchestratorContext({
+        originHarness,
+        boardRevision: 'board-r8',
+        snapshot: cache([], cursorSurfaces(fixture)),
+        asOf: AS_OF,
+      });
+      return buildOriginContextContent({
+        board,
+        context: projectedContext,
+        originHarness,
+        boardRevision: 'board-r8',
+        asOf: AS_OF,
+      });
+    });
+    for (const delivery of deliveries) {
+      assert.equal(delivery.payload.cursor_surfaces?.state, fixture.id);
+      assert.deepEqual(
+        delivery.payload.cursor_surfaces?.surfaces.map((surface) => ({
+          surface_id: surface.surface_id,
+          surface: surface.surface,
+          installed: surface.installed,
+          auth_state: surface.auth_state,
+          role_eligible: surface.role_eligible,
+          installed_source: surface.provenance.installed,
+        })),
+        [
+          {
+            surface_id: 'cursor-ide-plugin',
+            surface: 'host-native',
+            installed: fixture.installed[0],
+            auth_state: fixture.auth[0],
+            role_eligible: fixture.eligible[0],
+            installed_source: 'cursor-ide/plugin-install-probe/v1',
+          },
+          {
+            surface_id: 'cursor-agent-cli',
+            surface: 'cli-headless',
+            installed: fixture.installed[1],
+            auth_state: fixture.auth[1],
+            role_eligible: fixture.eligible[1],
+            installed_source: 'cursor-agent/version-help-probe/v1',
+          },
+        ],
+      );
+      assert.equal(delivery.payload.dispatch_enabled, false);
+    }
+    const normalize = (delivery: (typeof deliveries)[number]) => ({
+      ...delivery.payload,
+      origin_harness: '<origin>',
+    });
+    assert.deepEqual(normalize(deliveries[0]), normalize(deliveries[1]));
+    assert.deepEqual(normalize(deliveries[1]), normalize(deliveries[2]));
+  }
+});
+
+test('Cursor cached inventory rejects cross-surface inference and counterfeit provenance', () => {
+  const neither = CURSOR_CONTEXT_FIXTURES.states.find((entry) => entry.id === 'neither');
+  assert.ok(neither);
+  for (const invalid of CURSOR_CONTEXT_FIXTURES.invalid) {
+    const value = cursorSurfaces(neither);
+    const surfaces = value.surfaces as Array<Record<string, unknown>>;
+    if (invalid.mutation === 'state') value.state = invalid.value;
+    if (invalid.mutation === 'agent-installed-source') {
+      (surfaces[1].provenance as Record<string, unknown>).installed = invalid.value;
+    }
+    if (invalid.mutation === 'agent-auth') surfaces[1].auth_state = invalid.value;
+    if (invalid.mutation === 'agent-eligible') surfaces[1].role_eligible = invalid.value;
+    if (invalid.mutation === 'agent-surface-id') surfaces[1].surface_id = invalid.value;
+    const issues = validateMachineContextCache(cache([], value));
+    assert.ok(issues.length > 0, invalid.id);
+  }
 });
 
 test('origin equivalence preserves shared policy truth while selecting each origin-local native', () => {

@@ -32,6 +32,13 @@ to refresh facts, choose a route, or authorize dispatch.
   fallback exists.
 - `rule-orchestrator-context-shadow-only`: delivered authority always says shadow-only and
   `dispatch_enabled:false`; host injection cannot authorize a worker.
+- `rule-orchestrator-context-cursor-surfaces`: when ccm publishes the optional
+  `ccm/cursor-surface-context/v1` cache block, every host accepts only the canonical ordered
+  `cursor-ide-plugin` / `cursor-agent-cli` pair, verifies the four-state derivation, preserves
+  surface-local installed/authentication/role-eligibility provenance, and emits the same block unchanged. Missing
+  inventory remains absent; adapters never probe or infer it. The two descriptors remain
+  `host-native` versus `cli-headless`, so this context cannot collapse later native and CLI
+  attempts or authorize run-control.
 
 ## 注入 taxonomy
 
@@ -59,6 +66,8 @@ launcher-provided, containment-checked board and revalidate it.
 - rule: rule-orchestrator-context-fail-open
   required_hosts: [claude-code, codex, cursor]
 - rule: rule-orchestrator-context-shadow-only
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-orchestrator-context-cursor-surfaces
   required_hosts: [claude-code, codex, cursor]
 ```
 

@@ -127,6 +127,48 @@ interface SecretInjectableEnvelope extends Record<string, unknown> {
   }>;
 }
 
+function cachedCursorSurfaces() {
+  return {
+    schema: 'ccm/cursor-surface-context/v1',
+    state: 'both',
+    surfaces: [
+      {
+        surface_id: 'cursor-ide-plugin',
+        harness: 'cursor',
+        surface: 'host-native',
+        role: 'master-origin',
+        installed: true,
+        auth_state: 'unknown',
+        role_eligible: true,
+        blocker_codes: [],
+        provenance: {
+          installed: 'cursor-ide/plugin-install-probe/v1',
+          authentication: null,
+          role_eligibility: [
+            'cursor-ide/plugin-host-qualification/v1',
+            'cursor-ide/origin-session-attestation/v1',
+          ],
+        },
+      },
+      {
+        surface_id: 'cursor-agent-cli',
+        harness: 'cursor',
+        surface: 'cli-headless',
+        role: 'worker-target',
+        installed: true,
+        auth_state: 'authenticated',
+        role_eligible: false,
+        blocker_codes: ['quota-unknown'],
+        provenance: {
+          installed: 'cursor-agent/version-help-probe/v1',
+          authentication: 'cursor-agent/status-json/v1',
+          role_eligibility: ['cursor-agent/quota-collector/v1'],
+        },
+      },
+    ],
+  };
+}
+
 function runtimeQualification(runtime: CandidateState['runtime']): 'pass' | 'fail' | 'unknown' {
   return runtime === 'healthy' ? 'pass' : runtime === 'unhealthy' ? 'fail' : 'unknown';
 }
@@ -324,6 +366,7 @@ test('agent-visible context emits bounded shadow-only delivery without route ref
   const snapshot = JSON.parse(readFileSync(f.snapshot, 'utf8'));
   snapshot.board_revision = revision;
   snapshot.warnings = ['safe-code', '/home/private/credential.json'];
+  snapshot.cursor_surfaces = cachedCursorSurfaces();
   writeFileSync(f.snapshot, JSON.stringify(snapshot));
   const before = treeState(f.root);
   const result = call([
@@ -357,6 +400,34 @@ test('agent-visible context emits bounded shadow-only delivery without route ref
   );
   assert.equal(payload.routes[0].selected.candidate_id, 'codex-cli');
   assert.equal(payload.routes[0].outcome, 'other-harness-cli');
+  assert.equal(payload.cursor_surfaces.state, 'both');
+  assert.deepEqual(
+    payload.cursor_surfaces.surfaces.map(
+      ({ surface_id, surface, installed, auth_state, role_eligible }: Record<string, unknown>) => ({
+        surface_id,
+        surface,
+        installed,
+        auth_state,
+        role_eligible,
+      }),
+    ),
+    [
+      {
+        surface_id: 'cursor-ide-plugin',
+        surface: 'host-native',
+        installed: true,
+        auth_state: 'unknown',
+        role_eligible: true,
+      },
+      {
+        surface_id: 'cursor-agent-cli',
+        surface: 'cli-headless',
+        installed: true,
+        auth_state: 'authenticated',
+        role_eligible: false,
+      },
+    ],
+  );
   assert.deepEqual(treeState(f.root), before);
 });
 

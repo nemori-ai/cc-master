@@ -7,6 +7,7 @@
 // PARITY: rule-orchestrator-context-dedup
 // PARITY: rule-orchestrator-context-fail-open
 // PARITY: rule-orchestrator-context-shadow-only
+// PARITY: rule-orchestrator-context-cursor-surfaces
 
 const crypto = require('crypto');
 const fs = require('fs');
@@ -32,6 +33,40 @@ const ENUMS = {
   activation: new Set(['legacy', 'enabled', 'invalid']),
   outcome: new Set(['same-native', 'same-harness-cli', 'other-harness-cli', 'origin-stay', 'no-route']),
 };
+
+const CURSOR_STATES = new Set(['only-ide', 'only-agent', 'both', 'neither']);
+const CURSOR_SURFACE_SPECS = [
+  {
+    surface_id: 'cursor-ide-plugin', surface: 'host-native', role: 'master-origin',
+    installed_source: 'cursor-ide/plugin-install-probe/v1',
+    authentication_source: null,
+    eligibility_sources: [
+      'cursor-ide/plugin-host-qualification/v1',
+      'cursor-ide/origin-session-attestation/v1',
+    ],
+  },
+  {
+    surface_id: 'cursor-agent-cli', surface: 'cli-headless', role: 'worker-target',
+    installed_source: 'cursor-agent/version-help-probe/v1',
+    authentication_source: 'cursor-agent/status-json/v1',
+    eligibility_sources: [
+      'cursor-agent/status-json/v1',
+      'cursor-agent/model-entitlement-collector/v1',
+      'cursor-agent/quota-collector/v1',
+      'cursor-agent/sandbox-runtime-qualification/v1',
+      'cursor-agent/transport-qualification/v1',
+      'ccm/supervisor-process-tree-qualification/v1',
+    ],
+  },
+];
+const PUBLIC_PATH_VALUES = new Set([
+  'ccm/origin-context/v1',
+  'ccm/cursor-surface-context/v1',
+  ...CURSOR_SURFACE_SPECS.flatMap((spec) => [
+    spec.installed_source,
+    ...spec.eligibility_sources,
+  ]),
+]);
 
 function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
@@ -104,10 +139,65 @@ function strictIso(value) {
 }
 
 function privateShapedString(value) {
-  if (value === 'ccm/origin-context/v1') return false;
+  if (PUBLIC_PATH_VALUES.has(value)) return false;
   if (secretShapedValue(value)) return true;
   if (/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(value)) return true;
   return value.includes('/') || value.includes('\\');
+}
+
+function cursorState(ideInstalled, agentInstalled) {
+  if (ideInstalled && agentInstalled) return 'both';
+  if (ideInstalled) return 'only-ide';
+  if (agentInstalled) return 'only-agent';
+  return 'neither';
+}
+
+function rebuildCursorSurface(value, spec) {
+  if (!exactKeys(value, ['surface_id', 'harness', 'surface', 'role', 'installed', 'auth_state', 'role_eligible', 'blocker_codes', 'provenance'])) return null;
+  if (value.surface_id !== spec.surface_id || value.harness !== 'cursor' || value.surface !== spec.surface || value.role !== spec.role) return null;
+  if (typeof value.installed !== 'boolean' || !['authenticated', 'unauthenticated', 'unknown'].includes(value.auth_state) || typeof value.role_eligible !== 'boolean') return null;
+  if (value.auth_state !== 'unknown' && !value.installed) return null;
+  if (spec.surface_id === 'cursor-ide-plugin' && value.auth_state !== 'unknown') return null;
+  if (spec.surface_id === 'cursor-agent-cli' && value.role_eligible && value.auth_state !== 'authenticated') return null;
+  if (value.role_eligible && !value.installed) return null;
+  if (!Array.isArray(value.blocker_codes) || !value.blocker_codes.every(safeCode)) return null;
+  if (new Set(value.blocker_codes).size !== value.blocker_codes.length) return null;
+  if (value.role_eligible !== (value.blocker_codes.length === 0)) return null;
+  if (!exactKeys(value.provenance, ['installed', 'authentication', 'role_eligibility'])) return null;
+  if (value.provenance.installed !== spec.installed_source) return null;
+  if (value.provenance.authentication !== null && value.provenance.authentication !== spec.authentication_source) return null;
+  if (value.auth_state !== 'unknown' && value.provenance.authentication !== spec.authentication_source) return null;
+  if (!Array.isArray(value.provenance.role_eligibility)) return null;
+  if (new Set(value.provenance.role_eligibility).size !== value.provenance.role_eligibility.length) return null;
+  if (!value.provenance.role_eligibility.every((source) => spec.eligibility_sources.includes(source))) return null;
+  if (value.role_eligible && value.provenance.role_eligibility.length !== spec.eligibility_sources.length) return null;
+  return {
+    surface_id: value.surface_id,
+    harness: 'cursor',
+    surface: value.surface,
+    role: value.role,
+    installed: value.installed,
+    auth_state: value.auth_state,
+    role_eligible: value.role_eligible,
+    blocker_codes: [...value.blocker_codes],
+    provenance: {
+      installed: value.provenance.installed,
+      authentication: value.provenance.authentication,
+      role_eligibility: [...value.provenance.role_eligibility],
+    },
+  };
+}
+
+function rebuildCursorSurfaces(value) {
+  if (!exactKeys(value, ['schema', 'state', 'surfaces'])) return null;
+  if (value.schema !== 'ccm/cursor-surface-context/v1' || !CURSOR_STATES.has(value.state)) return null;
+  if (!Array.isArray(value.surfaces) || value.surfaces.length !== 2) return null;
+  const surfaces = value.surfaces.map((surface, index) =>
+    rebuildCursorSurface(surface, CURSOR_SURFACE_SPECS[index]),
+  );
+  if (surfaces.some((surface) => surface === null)) return null;
+  if (value.state !== cursorState(surfaces[0].installed, surfaces[1].installed)) return null;
+  return { schema: value.schema, state: value.state, surfaces };
 }
 
 function containsPrivateValue(value) {
@@ -186,6 +276,7 @@ function rebuildRoute(value, harness) {
 
 function rebuildPayload(value, harness, outerRevisions) {
   const keys = ['schema', 'cached_only', 'shadow_only', 'dispatch_enabled', 'origin_harness', 'available', 'revisions', 'freshness', 'contract_activation', 'candidates', 'routes', 'warnings', 'truncation'];
+  if (value && value.cursor_surfaces !== undefined) keys.push('cursor_surfaces');
   if (!exactKeys(value, keys)) return null;
   if (value.schema !== 'ccm/origin-context/v1' || value.cached_only !== true || value.shadow_only !== true || value.dispatch_enabled !== false || value.origin_harness !== harness || typeof value.available !== 'boolean') return null;
   if (!exactKeys(value.revisions, ['board', 'machine']) || !safeId(value.revisions.board) || !safeId(value.revisions.machine)) return null;
@@ -196,6 +287,10 @@ function rebuildPayload(value, harness, outerRevisions) {
   const candidates = value.candidates.map(rebuildCandidate);
   const routes = value.routes.map((entry) => rebuildRoute(entry, harness));
   if (candidates.some((entry) => entry === null) || routes.some((entry) => entry === null) || !value.warnings.every(safeCode)) return null;
+  const cursorSurfaces = value.cursor_surfaces === undefined
+    ? undefined
+    : rebuildCursorSurfaces(value.cursor_surfaces);
+  if (value.cursor_surfaces !== undefined && cursorSurfaces === null) return null;
   const candidateIds = candidates.map((entry) => entry.candidate_id);
   const taskIds = routes.map((entry) => entry.task_id);
   if (new Set(candidateIds).size !== candidateIds.length || new Set(taskIds).size !== taskIds.length) return null;
@@ -235,6 +330,7 @@ function rebuildPayload(value, harness, outerRevisions) {
     freshness: { state: value.freshness.state, valid_until: value.freshness.valid_until },
     contract_activation: value.contract_activation,
     candidates,
+    ...(cursorSurfaces === undefined ? {} : { cursor_surfaces: cursorSurfaces }),
     routes,
     warnings: [...value.warnings],
     truncation: {

@@ -32,6 +32,54 @@ if (fs.existsSync(`${__dirname}/corrupt`)) {
   process.exit(0);
 }
 const harness = args[args.indexOf('--harness') + 1];
+const requestedCursorState = ['only-ide', 'only-agent', 'both', 'neither'].find((state) =>
+  fs.existsSync(`${__dirname}/cursor-state-${state}`),
+) || 'both';
+function cursorSurfaces(state) {
+  const ideInstalled = state === 'only-ide' || state === 'both';
+  const agentInstalled = state === 'only-agent' || state === 'both';
+  const ideEligible = ideInstalled;
+  const agentEligible = state === 'only-agent';
+  return {
+    schema: 'ccm/cursor-surface-context/v1',
+    state,
+    surfaces: [
+      {
+        surface_id: 'cursor-ide-plugin', harness: 'cursor', surface: 'host-native',
+        role: 'master-origin', installed: ideInstalled, auth_state: 'unknown',
+        role_eligible: ideEligible,
+        blocker_codes: ideEligible ? [] : ['surface-not-installed'],
+        provenance: {
+          installed: 'cursor-ide/plugin-install-probe/v1',
+          authentication: null,
+          role_eligibility: ideEligible
+            ? ['cursor-ide/plugin-host-qualification/v1', 'cursor-ide/origin-session-attestation/v1']
+            : [],
+        },
+      },
+      {
+        surface_id: 'cursor-agent-cli', harness: 'cursor', surface: 'cli-headless',
+        role: 'worker-target', installed: agentInstalled,
+        auth_state: agentInstalled ? 'authenticated' : 'unknown', role_eligible: agentEligible,
+        blocker_codes: agentEligible ? [] : [agentInstalled ? 'quota-unknown' : 'surface-not-installed'],
+        provenance: {
+          installed: 'cursor-agent/version-help-probe/v1',
+          authentication: agentInstalled ? 'cursor-agent/status-json/v1' : null,
+          role_eligibility: agentEligible
+            ? [
+                'cursor-agent/status-json/v1',
+                'cursor-agent/model-entitlement-collector/v1',
+                'cursor-agent/quota-collector/v1',
+                'cursor-agent/sandbox-runtime-qualification/v1',
+                'cursor-agent/transport-qualification/v1',
+                'ccm/supervisor-process-tree-qualification/v1',
+              ]
+            : agentInstalled ? ['cursor-agent/quota-collector/v1'] : [],
+        },
+      },
+    ],
+  };
+}
 const payload = {
   schema: 'ccm/origin-context/v1', cached_only: true, shadow_only: true,
   dispatch_enabled: false, origin_harness: harness, available: true,
@@ -39,6 +87,7 @@ const payload = {
   freshness: { state: 'fresh', valid_until: '2026-07-13T09:00:00Z' },
   contract_activation: 'enabled',
   candidates: [{ candidate_id: 'codex-cli', harness: 'codex', surface: 'cli-headless', availability: 'available', quota: 'ample', auth: 'authenticated', model: 'available', runtime: 'healthy', qualifications: [{ predicate: 'runtime-healthy', status: 'pass' }] }],
+  cursor_surfaces: cursorSurfaces(requestedCursorState),
   routes: [{ task_id: 'T1', status: 'ready', eligible: true, outcome: harness === 'codex' ? 'same-harness-cli' : 'other-harness-cli', selected: { candidate_id: 'codex-cli', harness: 'codex', surface: 'cli-headless' }, reason_codes: ['shadow-first-eligible'] }],
   warnings: [], truncation: { applied: false, omitted_candidates: 0, omitted_routes: 0, omitted_warnings: 0, max_bytes: 4096 },
 };
@@ -95,6 +144,20 @@ if (fs.existsSync(`${__dirname}/malicious-permission-fail`)) {
 }
 if (fs.existsSync(`${__dirname}/malicious-selected-missing-candidate`)) {
   payload.routes[0].selected.candidate_id = 'missing-candidate';
+}
+if (fs.existsSync(`${__dirname}/malicious-cursor-state`)) payload.cursor_surfaces.state = 'neither';
+if (fs.existsSync(`${__dirname}/malicious-cursor-cross-provenance`)) {
+  payload.cursor_surfaces.surfaces[1].provenance.installed =
+    'cursor-ide/plugin-install-probe/v1';
+}
+if (fs.existsSync(`${__dirname}/malicious-cursor-eligible-uninstalled`)) {
+  payload.cursor_surfaces.surfaces[1].installed = false;
+  payload.cursor_surfaces.surfaces[1].role_eligible = true;
+  payload.cursor_surfaces.surfaces[1].blocker_codes = [];
+}
+if (fs.existsSync(`${__dirname}/malicious-cursor-auth-uninstalled`)) {
+  payload.cursor_surfaces.surfaces[1].installed = false;
+  payload.cursor_surfaces.surfaces[1].auth_state = 'authenticated';
 }
 if (fs.existsSync(`${__dirname}/positive-native-tight`)) {
   const nativeId = `${harness}-native`;
@@ -162,7 +225,48 @@ const normalized = values.map((value) => ({
 assert.deepStrictEqual(normalized[0], normalized[1]);
 assert.deepStrictEqual(normalized[1], normalized[2]);
 assert.strictEqual(values[1].routes[0].selected.surface, 'cli-headless');
+assert.strictEqual(values[2].cursor_surfaces.state, 'both');
+assert.deepStrictEqual(
+  values[2].cursor_surfaces.surfaces.map(({ surface_id, surface, installed, auth_state, role_eligible }) => ({
+    surface_id, surface, installed, auth_state, role_eligible,
+  })),
+  [
+    { surface_id: 'cursor-ide-plugin', surface: 'host-native', installed: true, auth_state: 'unknown', role_eligible: true },
+    { surface_id: 'cursor-agent-cli', surface: 'cli-headless', installed: true, auth_state: 'authenticated', role_eligible: false },
+  ],
+);
 NODE
+
+# Cursor's verified postToolUse host surface preserves each cached installation state without
+# inferring the other descriptor or enabling dispatch.
+for STATE in only-ide only-agent both neither; do
+  rm -f "$HOME_DIR/hooks/orchestrator-context"/*.json 2>/dev/null || true
+  touch "$TMP/cursor-state-$STATE"
+  (
+    cd "$ROOT/plugin/src"
+    printf '%s\n' '{"hook_event_name":"postToolUse","conversation_id":"sid-context","tool_name":"Shell"}' |
+      node "$CURSOR_LAUNCHER" --event postToolUse \
+        --core './hooks/orchestrator-context/implementations/cursor/orchestrator-context-core.js' >"$TMP/cursor-state-$STATE.json"
+  )
+  node - "$STATE" "$TMP/cursor-state-$STATE.json" <<'NODE'
+const fs = require('fs');
+const assert = require('assert');
+const state = process.argv[2];
+const envelope = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+const payload = JSON.parse(
+  envelope.additional_context
+    .replace(/^<ambient source="orchestrator-context">/, '')
+    .replace(/<\/ambient>$/, ''),
+);
+assert.strictEqual(payload.cursor_surfaces.state, state);
+assert.strictEqual(payload.dispatch_enabled, false);
+assert.strictEqual(payload.cursor_surfaces.surfaces[0].surface_id, 'cursor-ide-plugin');
+assert.strictEqual(payload.cursor_surfaces.surfaces[1].surface_id, 'cursor-agent-cli');
+assert.strictEqual(payload.cursor_surfaces.surfaces[0].surface, 'host-native');
+assert.strictEqual(payload.cursor_surfaces.surfaces[1].surface, 'cli-headless');
+NODE
+  rm -f "$TMP/cursor-state-$STATE"
+done
 
 # Generated adapters must resolve the projected shared core, not only source-tree relative paths.
 rm -f "$HOME_DIR/hooks/orchestrator-context"/*.json 2>/dev/null || true
@@ -201,6 +305,8 @@ NEGATIVE_MODES=( \
   malicious-quota-exhausted malicious-quota-unknown malicious-cli-quota-tight malicious-auth-unauthenticated \
   malicious-model-unavailable malicious-runtime-unhealthy malicious-qualification-fail \
   malicious-effect-fail malicious-permission-fail malicious-selected-missing-candidate \
+  malicious-cursor-state malicious-cursor-cross-provenance malicious-cursor-eligible-uninstalled \
+  malicious-cursor-auth-uninstalled \
 )
 for MODE in "${NEGATIVE_MODES[@]}" "${PRIVATE_VALUE_MODES[@]}"; do
   rm -f "$HOME_DIR/hooks/orchestrator-context"/*.json 2>/dev/null || true

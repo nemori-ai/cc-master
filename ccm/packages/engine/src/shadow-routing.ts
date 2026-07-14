@@ -15,6 +15,7 @@ export const MACHINE_CONTEXT_CACHE_SCHEMA = 'ccm/machine-context-cache/v1';
 export const ORCHESTRATOR_CONTEXT_SCHEMA = 'ccm/orchestrator-context/v1';
 export const SHADOW_ROUTE_ADVICE_SCHEMA = 'ccm/shadow-route-advice/v1';
 export const ORIGIN_CONTEXT_SCHEMA = 'ccm/origin-context/v1';
+export const CURSOR_SURFACE_CONTEXT_SCHEMA = 'ccm/cursor-surface-context/v1';
 
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const AVAILABILITY = ['available', 'unavailable', 'unknown'] as const;
@@ -73,6 +74,36 @@ const CONTRACT_PREDICATES = new Set([
   'account-mutation-forbidden',
 ]);
 
+const CURSOR_SURFACE_STATES = ['only-ide', 'only-agent', 'both', 'neither'] as const;
+const CURSOR_SURFACE_SPECS = [
+  {
+    surface_id: 'cursor-ide-plugin',
+    surface: 'host-native',
+    role: 'master-origin',
+    installed_source: 'cursor-ide/plugin-install-probe/v1',
+    authentication_source: null,
+    eligibility_sources: [
+      'cursor-ide/plugin-host-qualification/v1',
+      'cursor-ide/origin-session-attestation/v1',
+    ],
+  },
+  {
+    surface_id: 'cursor-agent-cli',
+    surface: 'cli-headless',
+    role: 'worker-target',
+    installed_source: 'cursor-agent/version-help-probe/v1',
+    authentication_source: 'cursor-agent/status-json/v1',
+    eligibility_sources: [
+      'cursor-agent/status-json/v1',
+      'cursor-agent/model-entitlement-collector/v1',
+      'cursor-agent/quota-collector/v1',
+      'cursor-agent/sandbox-runtime-qualification/v1',
+      'cursor-agent/transport-qualification/v1',
+      'ccm/supervisor-process-tree-qualification/v1',
+    ],
+  },
+] as const;
+
 type Availability = (typeof AVAILABILITY)[number];
 type Quota = (typeof QUOTA)[number];
 type QualificationStatus = (typeof QUALIFICATION)[number];
@@ -100,6 +131,30 @@ export interface CachedCandidateFact {
   qualifications: CachedQualification[];
 }
 
+export type CursorSurfaceState = (typeof CURSOR_SURFACE_STATES)[number];
+
+export interface CursorSurfaceContextFact {
+  surface_id: 'cursor-ide-plugin' | 'cursor-agent-cli';
+  harness: 'cursor';
+  surface: 'host-native' | 'cli-headless';
+  role: 'master-origin' | 'worker-target';
+  installed: boolean;
+  auth_state: 'authenticated' | 'unauthenticated' | 'unknown';
+  role_eligible: boolean;
+  blocker_codes: string[];
+  provenance: {
+    installed: string;
+    authentication: string | null;
+    role_eligibility: string[];
+  };
+}
+
+export interface CursorSurfaceContext {
+  schema: typeof CURSOR_SURFACE_CONTEXT_SCHEMA;
+  state: CursorSurfaceState;
+  surfaces: [CursorSurfaceContextFact, CursorSurfaceContextFact];
+}
+
 export interface MachineContextCache {
   schema: typeof MACHINE_CONTEXT_CACHE_SCHEMA;
   revision: string;
@@ -107,6 +162,7 @@ export interface MachineContextCache {
   observed_at: string;
   valid_until: string;
   candidates: CachedCandidateFact[];
+  cursor_surfaces?: CursorSurfaceContext;
   warnings: string[];
 }
 
@@ -123,6 +179,7 @@ export interface OrchestratorContext {
     as_of: string;
   };
   candidates: CachedCandidateFact[];
+  cursor_surfaces?: CursorSurfaceContext;
   warnings: string[];
   truncation: {
     applied: boolean;
@@ -203,6 +260,7 @@ export interface OriginContextPayload {
   freshness: { state: 'fresh' | 'stale' | 'unknown'; valid_until: string };
   contract_activation: 'legacy' | 'enabled' | 'invalid';
   candidates: OriginContextCandidate[];
+  cursor_surfaces?: CursorSurfaceContext;
   routes: OriginContextRouteSummary[];
   warnings: string[];
   truncation: {
@@ -329,6 +387,280 @@ function freshnessAt(
   return Date.parse(asOf) <= Date.parse(validUntil) ? 'fresh' : 'stale';
 }
 
+function hasExactKeys(value: RecordLike, keys: readonly string[]): boolean {
+  return Object.keys(value).sort().join('\0') === [...keys].sort().join('\0');
+}
+
+function cursorState(ideInstalled: boolean, agentInstalled: boolean): CursorSurfaceState {
+  if (ideInstalled && agentInstalled) return 'both';
+  if (ideInstalled) return 'only-ide';
+  if (agentInstalled) return 'only-agent';
+  return 'neither';
+}
+
+function validateCursorSurfaceContext(value: unknown): ContractIssue[] {
+  const out: ContractIssue[] = [];
+  const rootPath = 'snapshot.cursor_surfaces';
+  if (!record(value)) return [issue('CURSOR-SURFACE-SHAPE', rootPath, 'must be an object')];
+  if (!hasExactKeys(value, ['schema', 'state', 'surfaces'])) {
+    out.push(
+      issue('CURSOR-SURFACE-SHAPE', rootPath, 'must contain exactly schema, state, and surfaces'),
+    );
+  }
+  if (value.schema !== CURSOR_SURFACE_CONTEXT_SCHEMA) {
+    out.push(
+      issue(
+        'CURSOR-SURFACE-SCHEMA',
+        `${rootPath}.schema`,
+        `must equal ${CURSOR_SURFACE_CONTEXT_SCHEMA}`,
+      ),
+    );
+  }
+  if (!(CURSOR_SURFACE_STATES as readonly unknown[]).includes(value.state)) {
+    out.push(
+      issue(
+        'CURSOR-SURFACE-STATE',
+        `${rootPath}.state`,
+        `must be one of ${CURSOR_SURFACE_STATES.join(', ')}`,
+      ),
+    );
+  }
+  if (!Array.isArray(value.surfaces) || value.surfaces.length !== CURSOR_SURFACE_SPECS.length) {
+    out.push(
+      issue(
+        'CURSOR-SURFACE-PAIR',
+        `${rootPath}.surfaces`,
+        'must contain the canonical ordered IDE and Agent descriptors',
+      ),
+    );
+    return out;
+  }
+
+  value.surfaces.forEach((surface: unknown, index: number) => {
+    const path = `${rootPath}.surfaces[${index}]`;
+    const spec = CURSOR_SURFACE_SPECS[index]!;
+    if (!record(surface)) {
+      out.push(issue('CURSOR-SURFACE-DESCRIPTOR', path, 'must be an object'));
+      return;
+    }
+    if (
+      !hasExactKeys(surface, [
+        'surface_id',
+        'harness',
+        'surface',
+        'role',
+        'installed',
+        'auth_state',
+        'role_eligible',
+        'blocker_codes',
+        'provenance',
+      ])
+    ) {
+      out.push(
+        issue('CURSOR-SURFACE-DESCRIPTOR', path, 'contains unknown or missing descriptor fields'),
+      );
+    }
+    if (
+      surface.surface_id !== spec.surface_id ||
+      surface.harness !== 'cursor' ||
+      surface.surface !== spec.surface ||
+      surface.role !== spec.role
+    ) {
+      out.push(
+        issue(
+          'CURSOR-SURFACE-IDENTITY',
+          path,
+          'descriptor identity, role, and transport must match its canonical surface',
+        ),
+      );
+    }
+    if (
+      typeof surface.installed !== 'boolean' ||
+      !['authenticated', 'unauthenticated', 'unknown'].includes(surface.auth_state) ||
+      typeof surface.role_eligible !== 'boolean'
+    ) {
+      out.push(
+        issue(
+          'CURSOR-SURFACE-FACT',
+          path,
+          'installed/role_eligible must be booleans and auth_state must be valid',
+        ),
+      );
+    }
+    if (surface.auth_state !== 'unknown' && surface.installed !== true) {
+      out.push(
+        issue(
+          'CURSOR-SURFACE-INFERENCE',
+          `${path}.auth_state`,
+          'an uninstalled surface cannot claim an authentication state',
+        ),
+      );
+    }
+    if (spec.surface_id === 'cursor-ide-plugin' && surface.auth_state !== 'unknown') {
+      out.push(
+        issue(
+          'CURSOR-SURFACE-INFERENCE',
+          `${path}.auth_state`,
+          'Cursor IDE authentication is not part of this cached plugin-origin slice',
+        ),
+      );
+    }
+    if (
+      spec.surface_id === 'cursor-agent-cli' &&
+      surface.role_eligible === true &&
+      surface.auth_state !== 'authenticated'
+    ) {
+      out.push(
+        issue(
+          'CURSOR-SURFACE-INFERENCE',
+          `${path}.auth_state`,
+          'an eligible Agent worker requires independently cached authentication',
+        ),
+      );
+    }
+    if (surface.role_eligible === true && surface.installed !== true) {
+      out.push(
+        issue(
+          'CURSOR-SURFACE-INFERENCE',
+          `${path}.role_eligible`,
+          'an uninstalled surface cannot be role eligible',
+        ),
+      );
+    }
+    if (
+      !Array.isArray(surface.blocker_codes) ||
+      !surface.blocker_codes.every(
+        (code: unknown) => typeof code === 'string' && SAFE_PUBLIC_CODE.test(code),
+      )
+    ) {
+      out.push(
+        issue(
+          'CURSOR-SURFACE-BLOCKERS',
+          `${path}.blocker_codes`,
+          'must be an array of safe machine-readable codes',
+        ),
+      );
+    } else {
+      if (duplicateValues(surface.blocker_codes).length > 0) {
+        out.push(
+          issue(
+            'CURSOR-SURFACE-BLOCKERS',
+            `${path}.blocker_codes`,
+            'must not contain duplicate blocker codes',
+          ),
+        );
+      }
+      if (surface.role_eligible === true && surface.blocker_codes.length !== 0) {
+        out.push(
+          issue(
+            'CURSOR-SURFACE-INFERENCE',
+            `${path}.blocker_codes`,
+            'an eligible surface cannot carry blockers',
+          ),
+        );
+      }
+      if (surface.role_eligible === false && surface.blocker_codes.length === 0) {
+        out.push(
+          issue(
+            'CURSOR-SURFACE-INFERENCE',
+            `${path}.blocker_codes`,
+            'an ineligible surface must retain at least one blocker',
+          ),
+        );
+      }
+    }
+    if (
+      !record(surface.provenance) ||
+      !hasExactKeys(surface.provenance, ['installed', 'authentication', 'role_eligibility'])
+    ) {
+      out.push(
+        issue(
+          'CURSOR-SURFACE-PROVENANCE',
+          `${path}.provenance`,
+          'must contain exactly installed, authentication, and role_eligibility provenance',
+        ),
+      );
+      return;
+    }
+    if (surface.provenance.installed !== spec.installed_source) {
+      out.push(
+        issue(
+          'CURSOR-SURFACE-PROVENANCE',
+          `${path}.provenance.installed`,
+          'installation provenance belongs to the wrong surface',
+        ),
+      );
+    }
+    if (
+      (surface.provenance.authentication !== null &&
+        surface.provenance.authentication !== spec.authentication_source) ||
+      (surface.auth_state !== 'unknown' &&
+        surface.provenance.authentication !== spec.authentication_source)
+    ) {
+      out.push(
+        issue(
+          'CURSOR-SURFACE-PROVENANCE',
+          `${path}.provenance.authentication`,
+          'authentication provenance belongs to the wrong surface or is missing',
+        ),
+      );
+    }
+    if (
+      !Array.isArray(surface.provenance.role_eligibility) ||
+      !surface.provenance.role_eligibility.every(
+        (source: unknown) =>
+          typeof source === 'string' &&
+          (spec.eligibility_sources as readonly string[]).includes(source),
+      ) ||
+      duplicateValues(
+        Array.isArray(surface.provenance.role_eligibility)
+          ? surface.provenance.role_eligibility.filter(
+              (source: unknown): source is string => typeof source === 'string',
+            )
+          : [],
+      ).length > 0
+    ) {
+      out.push(
+        issue(
+          'CURSOR-SURFACE-PROVENANCE',
+          `${path}.provenance.role_eligibility`,
+          'eligibility provenance must be a unique surface-local source subset',
+        ),
+      );
+    } else if (
+      surface.role_eligible === true &&
+      surface.provenance.role_eligibility.length !== spec.eligibility_sources.length
+    ) {
+      out.push(
+        issue(
+          'CURSOR-SURFACE-PROVENANCE',
+          `${path}.provenance.role_eligibility`,
+          'eligible surfaces require every approved role qualification source',
+        ),
+      );
+    }
+  });
+
+  const ide = value.surfaces[0];
+  const agent = value.surfaces[1];
+  if (
+    record(ide) &&
+    typeof ide.installed === 'boolean' &&
+    record(agent) &&
+    typeof agent.installed === 'boolean' &&
+    value.state !== cursorState(ide.installed, agent.installed)
+  ) {
+    out.push(
+      issue(
+        'CURSOR-SURFACE-STATE',
+        `${rootPath}.state`,
+        'must equal the deterministic state derived from the two installed facts',
+      ),
+    );
+  }
+  return out;
+}
+
 export function validateMachineContextCache(value: unknown): ContractIssue[] {
   if (!record(value)) return [issue('MACHINE-CONTEXT-SHAPE', 'snapshot', 'must be an object')];
   const out: ContractIssue[] = [];
@@ -375,6 +707,9 @@ export function validateMachineContextCache(value: unknown): ContractIssue[] {
   }
   if (!strings(value.warnings)) {
     out.push(issue('MACHINE-CONTEXT-WARNINGS', 'snapshot.warnings', 'must be a string array'));
+  }
+  if (value.cursor_surfaces !== undefined) {
+    out.push(...validateCursorSurfaceContext(value.cursor_surfaces));
   }
   if (!Array.isArray(value.candidates)) {
     out.push(issue('MACHINE-CONTEXT-CANDIDATES', 'snapshot.candidates', 'must be an array'));
@@ -656,6 +991,9 @@ export function buildCachedOrchestratorContext(input: {
       as_of: input.asOf,
     },
     candidates: snapshot.candidates,
+    ...(snapshot.cursor_surfaces
+      ? { cursor_surfaces: structuredClone(snapshot.cursor_surfaces) }
+      : {}),
     warnings: [...new Set(warnings)],
   });
 }
@@ -792,6 +1130,7 @@ function validateContext(value: unknown): ContractIssue[] {
         observed_at: value.freshness.observed_at,
         valid_until: value.freshness.valid_until,
         candidates: value.candidates,
+        ...(value.cursor_surfaces === undefined ? {} : { cursor_surfaces: value.cursor_surfaces }),
         warnings: value.warnings,
       }).map((entry) => ({
         ...entry,
@@ -1158,6 +1497,9 @@ export function buildOriginContextContent(input: {
     },
     contract_activation: activation,
     candidates: projectedCandidates,
+    ...(context.cursor_surfaces
+      ? { cursor_surfaces: structuredClone(context.cursor_surfaces) }
+      : {}),
     routes,
     warnings: safeWarningCodes(warnings),
     truncation: {
