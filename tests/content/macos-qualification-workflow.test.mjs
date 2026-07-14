@@ -5,6 +5,10 @@ import { test } from 'node:test';
 
 const workflow = readFileSync('.github/workflows/macos-live-qualification.yml', 'utf8');
 const operator = readFileSync('scripts/qualify-macos-live.sh', 'utf8');
+const runtimeSupplyChainSpec = readFileSync(
+  'design_docs/cross-harness-runtime-supply-chain-spec.md',
+  'utf8',
+);
 
 function jobBlock(id) {
   const marker = `  ${id}:\n`;
@@ -66,6 +70,19 @@ test('runtime-affecting pull requests require both real macOS architecture quali
   assert.match(workflow, /^permissions:\n  contents: read$/m);
   assert.match(workflow, /runner: macos-14\n            contract: darwin-arm64/);
   assert.match(workflow, /runner: macos-15-intel\n            contract: darwin-x64/);
+});
+
+test('Darwin support claim is bound to replayable arm64/x64 evidence and preserves exclusions', () => {
+  assert.match(runtimeSupplyChainSpec, /Darwin POSIX \| supported；已通过真机资格门/);
+  assert.match(
+    runtimeSupplyChainSpec,
+    /tree `1e8f49e29b3c87eea37ac5dc5588f58e3f1a3b24`/,
+  );
+  assert.match(runtimeSupplyChainSpec, /Actions run `29309116222`/);
+  assert.match(runtimeSupplyChainSpec, /darwin-arm64.*darwin-x64/s);
+  assert.match(runtimeSupplyChainSpec, /same-UID final-check→exec race.*residual/);
+  assert.match(runtimeSupplyChainSpec, /Gatekeeper\/notarization.*conditional/);
+  assert.match(runtimeSupplyChainSpec, /真实 Cursor Agent\s+endpoint.*conditional/s);
 });
 
 test('build and qualification jobs retain the exact arm64/x64 contracts', () => {
