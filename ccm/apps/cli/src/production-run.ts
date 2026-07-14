@@ -1,4 +1,5 @@
 import * as discover from './discover.js';
+import { createProductionNativeAttemptBoundaries } from './native-attempt-production.js';
 import { createProductionQuotaEffectBoundary } from './quota-production-effects.js';
 import { run } from './router.js';
 
@@ -23,9 +24,14 @@ function homeFlag(argv: readonly string[]): string | undefined {
 export function runProduction(argv: string[], opts: RunOptions = {}): number | Promise<number> {
   const env = opts.env ?? process.env;
   const home = discover.resolveHome({ homeFlag: homeFlag(argv), env });
+  const nativeAttempt = createProductionNativeAttemptBoundaries({ home });
   return run(argv, {
     ...opts,
     env,
     quotaEffects: opts.quotaEffects ?? createProductionQuotaEffectBoundary({ home }),
+    // Production trust roots are always composed from the resolved owner home. Injectable router
+    // boundaries remain a test seam and cannot masquerade as installed production evidence.
+    nativeAttemptAdmission: nativeAttempt.admission,
+    nativeAttemptPrivateEvidence: nativeAttempt.evidence,
   });
 }

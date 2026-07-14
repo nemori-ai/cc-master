@@ -51,14 +51,10 @@ function authority(command: Json): Json {
     run_ref: 'run-ref:native-fixture-001',
     account_id: 'account-native-fixture',
     pool_id: 'pool-native-fixture',
-    identity_fingerprint:
-      'sha256:4444444444444444444444444444444444444444444444444444444444444444',
-    aggregation_key:
-      'sha256:5555555555555555555555555555555555555555555555555555555555555555',
-    live_source_revision:
-      'sha256:6666666666666666666666666666666666666666666666666666666666666666',
-    runtime_sha256:
-      'sha256:7777777777777777777777777777777777777777777777777777777777777777',
+    identity_fingerprint: 'sha256:4444444444444444444444444444444444444444444444444444444444444444',
+    aggregation_key: 'sha256:5555555555555555555555555555555555555555555555555555555555555555',
+    live_source_revision: 'sha256:6666666666666666666666666666666666666666666666666666666666666666',
+    runtime_sha256: 'sha256:7777777777777777777777777777777777777777777777777777777777777777',
     launch_idempotency_key:
       'sha256:8888888888888888888888888888888888888888888888888888888888888888',
     launch_nonce: 'launch-nonce-native-fixture-001',
@@ -165,12 +161,31 @@ test('R1 canonical identity rejects provider/model/effort/runtime/workspace/work
     ],
     [
       'workspace',
-      (_board, command) =>
-        (command.attempt.lineage.workspace_ref = 'workspace-ref:forged'),
+      (_board, command) => (command.attempt.lineage.workspace_ref = 'workspace-ref:forged'),
     ],
     [
       'worktree',
       (_board, command) => (command.attempt.lineage.worktree_ref = 'worktree-ref:forged'),
+    ],
+    [
+      'account',
+      (_board, command) => (command.attempt.lineage.account_fingerprint_ref = 'account-ref:forged'),
+    ],
+    [
+      'permission',
+      (_board, command) => command.attempt.lineage.permission.denies.push('forged-deny'),
+    ],
+    [
+      'input digest',
+      (_board, command) =>
+        (command.attempt.dispatch.input_hash =
+          'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'),
+    ],
+    [
+      'request digest',
+      (_board, command) =>
+        (command.attempt.dispatch.request_hash =
+          'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'),
     ],
   ];
   for (const [label, mutate] of cases) {
@@ -181,4 +196,21 @@ test('R1 canonical identity rejects provider/model/effort/runtime/workspace/work
     assert.equal(result.ok, false, `${label} substitution must fail closed`);
     assert.deepEqual(result.board, before, `${label} substitution mutated board`);
   }
+});
+
+test('R1 hard projection binds current launch authority to the immutable create snapshot', () => {
+  const value = validCreate();
+  const accepted = engine.nativeAttemptApply(value.board, value.command);
+  assert.equal(accepted.ok, true, JSON.stringify(accepted.issues));
+  const attempt = accepted.board.tasks[0].routing.attempts[0];
+  attempt.launch_authority.ticket.ticket_id = 'ticket-native-fixture-forged';
+  attempt.launch_authority.ticket_digest = digest(attempt.launch_authority.ticket);
+  attempt.launch_authority.reservation.ticket_digest = attempt.launch_authority.ticket_digest;
+
+  const issues = engine.validateNativeAttemptProjection(accepted.board);
+  assert.equal(
+    issues.some((issue: Json) => issue.code === 'NATIVE-ATTEMPT-PROJECTION-MISMATCH'),
+    true,
+    JSON.stringify(issues),
+  );
 });

@@ -384,8 +384,12 @@ function nativeAttemptExpected(
     candidate_id: row.candidate_id,
     transport: immutableDescriptor.transport,
     dispatch_key: row.dispatch?.key,
+    input_hash: row.dispatch?.input_hash,
     request_hash: row.dispatch?.request_hash,
     launch_claim_id: row.dispatch?.launch_claim_id,
+    reservation_id: row.launch_authority?.reservation?.reservation_id,
+    ticket_digest: row.launch_authority?.ticket_digest,
+    launch_identity_digest: row.launch_authority?.canonical_identity_digest,
     lineage: structuredClone(row.lineage),
   };
 }
@@ -399,14 +403,25 @@ function nativeAttemptWrite(
       evidenceClass: NativeAttemptEvidenceClass;
       recordRef: string;
       expected: Record<string, any>;
+      existingEvidence?: { record_ref: string; record_hash: string };
     }) => NativeAttemptVerifiedEvidence,
+    stageLaunch: (input: {
+      task_id: string;
+      selection_snapshot: Record<string, any>;
+      attempt: Record<string, any>;
+      replay_intent?: string;
+      existing_attempt?: Record<string, any>;
+    }) => { admissionSnapshot: Record<string, any>; launchAuthority: Record<string, any> },
   ) => Record<string, any>,
 ): number {
   const id = ctx.positionals[0] as string;
   let operationResult: Record<string, any> | undefined;
   let evidenceTransaction:
     | {
-        boundary: NonNullable<Ctx['nativeAttemptPrivateEvidence']>;
+        boundary: {
+          commit: NonNullable<Ctx['nativeAttemptPrivateEvidence']>['commit'];
+          rollback: NonNullable<Ctx['nativeAttemptPrivateEvidence']>['rollback'];
+        };
         transactionId: string;
       }
     | undefined;
@@ -415,10 +430,12 @@ function nativeAttemptWrite(
     evidenceClass,
     recordRef,
     expected,
+    existingEvidence,
   }: {
     evidenceClass: NativeAttemptEvidenceClass;
     recordRef: string;
     expected: Record<string, any>;
+    existingEvidence?: { record_ref: string; record_hash: string };
   }): NativeAttemptVerifiedEvidence => {
     if (evidenceTransaction) nativeAttemptError('NATIVE-EVIDENCE-TRANSACTION-CONFLICT');
     const boundary = ctx.nativeAttemptPrivateEvidence;
@@ -427,6 +444,7 @@ function nativeAttemptWrite(
       evidence_class: evidenceClass,
       record_ref: recordRef,
       expected,
+      existing_evidence: existingEvidence,
     });
     if (staged.transaction_id) {
       evidenceTransaction = { boundary, transactionId: staged.transaction_id };
@@ -442,11 +460,41 @@ function nativeAttemptWrite(
     return staged.verified_evidence;
   };
 
+  const stageLaunch = (input: {
+    task_id: string;
+    selection_snapshot: Record<string, any>;
+    attempt: Record<string, any>;
+    replay_intent?: string;
+    existing_attempt?: Record<string, any>;
+  }): { admissionSnapshot: Record<string, any>; launchAuthority: Record<string, any> } => {
+    if (evidenceTransaction) nativeAttemptError('NATIVE-EVIDENCE-TRANSACTION-CONFLICT');
+    const boundary = ctx.nativeAttemptAdmission;
+    if (!boundary) nativeAttemptError('NATIVE-CREATE-ADMISSION-UNAVAILABLE');
+    const staged = boundary.stageCreate(input);
+    if (staged.transaction_id) {
+      evidenceTransaction = { boundary, transactionId: staged.transaction_id };
+    }
+    if (!staged.ok) {
+      const codes = Array.isArray(staged.issues)
+        ? staged.issues.map((issue) => issue.code).join(', ')
+        : 'NATIVE-LAUNCH-AUTHORITY-INVALID';
+      nativeAttemptError(codes);
+    }
+    if (!evidenceTransaction) nativeAttemptError('NATIVE-LAUNCH-TRANSACTION-MISSING');
+    if (!staged.admission_snapshot || !staged.launch_authority) {
+      nativeAttemptError('NATIVE-LAUNCH-AUTHORITY-MISSING');
+    }
+    return {
+      admissionSnapshot: staged.admission_snapshot,
+      launchAuthority: staged.launch_authority,
+    };
+  };
+
   return runWrite(ctx, {
     mutate: (board) => {
       const applied = mutations.applyNativeAttemptCommand(
         board as BoardArg,
-        makeCommand(board as BoardArg, stageEvidence),
+        makeCommand(board as BoardArg, stageEvidence, stageLaunch),
       );
       operationResult = applied.result;
       return applied.board;
@@ -480,16 +528,38 @@ function nativeAttemptWrite(
 }
 
 export function nativeAttemptCreate(ctx: Ctx): number {
-  return nativeAttemptWrite(ctx, 'native-create', () => {
-    const admission = ctx.nativeAttemptAdmission;
-    if (!admission) nativeAttemptError('NATIVE-CREATE-ADMISSION-UNAVAILABLE');
+  return nativeAttemptWrite(ctx, 'native-create', (board, _stageEvidence, stageLaunch) => {
+    const selectionSnapshot = nativeAttemptRecord(
+      readJsonInput(ctx, ctx.values.selection, '--selection'),
+      'NATIVE-SELECTION-MISMATCH',
+    );
+    const attempt = nativeAttemptRecord(
+      readJsonInput(ctx, ctx.values.attempt, '--attempt'),
+      'NATIVE-ATTEMPT-MISSING',
+    );
+    const taskId = ctx.positionals[0] as string;
+    const replayIntent = ctx.values['replay-intent'] as string | undefined;
+    const task = nativeAttemptTask(board, taskId);
+    const existingAttempt = Array.isArray(task.routing?.attempts)
+      ? task.routing.attempts.find(
+          (entry: Record<string, any>) => entry?.dispatch?.key === attempt.dispatch?.key,
+        )
+      : undefined;
+    const staged = stageLaunch({
+      task_id: taskId,
+      selection_snapshot: selectionSnapshot,
+      attempt,
+      replay_intent: replayIntent,
+      existing_attempt: existingAttempt ? structuredClone(existingAttempt) : undefined,
+    });
     return {
       type: 'create',
-      task_id: ctx.positionals[0],
-      selection_snapshot: readJsonInput(ctx, ctx.values.selection, '--selection'),
-      attempt: readJsonInput(ctx, ctx.values.attempt, '--attempt'),
-      replay_intent: ctx.values['replay-intent'],
-      admission_snapshot: admission.resolveCreate(),
+      task_id: taskId,
+      selection_snapshot: selectionSnapshot,
+      attempt,
+      replay_intent: replayIntent,
+      admission_snapshot: staged.admissionSnapshot,
+      launch_authority: staged.launchAuthority,
     };
   });
 }
@@ -499,10 +569,22 @@ export function nativeAttemptBind(ctx: Ctx): number {
     const taskId = ctx.positionals[0] as string;
     const attemptId = ctx.values['attempt-id'] as string;
     const evidenceRef = ctx.values['evidence-record-ref'] as string;
+    const task = nativeAttemptTask(board, taskId);
+    const existingAttempt = Array.isArray(task.routing?.attempts)
+      ? task.routing.attempts.find((entry: Record<string, any>) => entry?.id === attemptId)
+      : undefined;
+    const existingBinding = existingAttempt?.handle_binding;
     const verifiedEvidence = stageEvidence({
       evidenceClass: 'bind',
       recordRef: evidenceRef,
       expected: nativeAttemptExpected(board, taskId, attemptId),
+      existingEvidence:
+        existingBinding?.evidence_record_ref && existingBinding?.evidence_hash
+          ? {
+              record_ref: existingBinding.evidence_record_ref,
+              record_hash: existingBinding.evidence_hash,
+            }
+          : undefined,
     });
     return {
       type: 'bind',
@@ -523,7 +605,10 @@ export function nativeAttemptCancel(ctx: Ctx): number {
       task_id: ctx.positionals[0],
       attempt_id: ctx.values['attempt-id'],
       request: readJsonInput(ctx, ctx.values.request, '--request'),
-      authority_snapshot: authority.resolveControl(),
+      authority_snapshot: authority.resolveControl({
+        task_id: ctx.positionals[0] as string,
+        attempt_id: ctx.values['attempt-id'] as string,
+      }),
       acknowledgement_terminal_class: ctx.values['acknowledgement-terminal-class'],
     };
   });
@@ -534,6 +619,11 @@ export function nativeAttemptTerminal(ctx: Ctx): number {
     const taskId = ctx.positionals[0] as string;
     const attemptId = ctx.values['attempt-id'] as string;
     const evidenceRef = ctx.values['evidence-record-ref'] as string;
+    const task = nativeAttemptTask(board, taskId);
+    const existingAttempt = Array.isArray(task.routing?.attempts)
+      ? task.routing.attempts.find((entry: Record<string, any>) => entry?.id === attemptId)
+      : undefined;
+    const existingTerminal = existingAttempt?.terminal;
     return {
       type: 'terminal',
       task_id: taskId,
@@ -543,6 +633,13 @@ export function nativeAttemptTerminal(ctx: Ctx): number {
         evidenceClass: 'terminal',
         recordRef: evidenceRef,
         expected: nativeAttemptExpected(board, taskId, attemptId),
+        existingEvidence:
+          existingTerminal?.evidence_record_ref && existingTerminal?.evidence_hash
+            ? {
+                record_ref: existingTerminal.evidence_record_ref,
+                record_hash: existingTerminal.evidence_hash,
+              }
+            : undefined,
       }),
       requested_task_status: ctx.values['requested-task-status'],
     };
@@ -554,6 +651,15 @@ export function nativeAttemptReconcile(ctx: Ctx): number {
     const taskId = ctx.positionals[0] as string;
     const attemptId = ctx.values['attempt-id'] as string;
     const evidenceRef = ctx.values['evidence-record-ref'] as string;
+    const task = nativeAttemptTask(board, taskId);
+    const existingAttempt = Array.isArray(task.routing?.attempts)
+      ? task.routing.attempts.find((entry: Record<string, any>) => entry?.id === attemptId)
+      : undefined;
+    const existingReconciliation = Array.isArray(existingAttempt?.reconciliation)
+      ? existingAttempt.reconciliation.find(
+          (entry: Record<string, any>) => entry?.evidence_record_ref === evidenceRef,
+        )
+      : undefined;
     return {
       type: 'reconcile',
       task_id: taskId,
@@ -563,6 +669,13 @@ export function nativeAttemptReconcile(ctx: Ctx): number {
         evidenceClass: 'reconcile',
         recordRef: evidenceRef,
         expected: nativeAttemptExpected(board, taskId, attemptId),
+        existingEvidence:
+          existingReconciliation?.evidence_record_ref && existingReconciliation?.evidence_hash
+            ? {
+                record_ref: existingReconciliation.evidence_record_ref,
+                record_hash: existingReconciliation.evidence_hash,
+              }
+            : undefined,
       }),
     };
   });

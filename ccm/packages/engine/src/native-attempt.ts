@@ -1,5 +1,10 @@
 import { taskTrulyDone } from './board-model.js';
 import { reconcileGating } from './board-reconcile.js';
+import {
+  CANONICAL_LAUNCH_IDENTITY_SCHEMA,
+  canonicalLaunchIdentityDigest,
+  normalizeCanonicalLaunchIdentity,
+} from './canonical-launch-identity.js';
 import { canonicalJson } from './canonical-json.js';
 import { sha256Hex } from './sha256.js';
 
@@ -60,7 +65,9 @@ class NativeAttemptError extends Error {
 }
 
 function clone<T>(value: T): T {
-  return structuredClone(value);
+  return typeof globalThis.structuredClone === 'function'
+    ? globalThis.structuredClone(value)
+    : (JSON.parse(JSON.stringify(value)) as T);
 }
 
 function same(left: unknown, right: unknown): boolean {
@@ -247,6 +254,7 @@ function requireAttemptBaseStructure(
     !isUtcSecond(attempt.created_at) ||
     !isJsonObject(attempt.dispatch) ||
     !isNonEmptyString(attempt.dispatch.key) ||
+    !SHA256_RE.test(attempt.dispatch.input_hash) ||
     !SHA256_RE.test(attempt.dispatch.request_hash) ||
     !isNonEmptyString(attempt.dispatch.launch_claim_id) ||
     !isNonEmptyString(attempt.dispatch.claim_owner_session_ref) ||
@@ -259,6 +267,187 @@ function requireAttemptBaseStructure(
     reject('NATIVE-ATTEMPT-INVALID', 'attempt.dispatch.claim_owner_session_ref');
   }
   requireSelectionSnapshotStructure(attempt.selection_snapshot);
+}
+
+const TICKET_FIELDS = [
+  'schema',
+  'ticket_id',
+  'reservation_id',
+  'reservation_request_hash',
+  'reservation_expires_at',
+  'attempt_id',
+  'run_ref',
+  'account_id',
+  'pool_id',
+  'identity_fingerprint',
+  'aggregation_key',
+  'live_source_revision',
+  'runtime_sha256',
+  'launch_idempotency_key',
+  'launch_nonce',
+  'issued_at',
+  'committed_at',
+  'launch_by',
+] as const;
+
+const RESERVATION_FIELDS = [
+  'schema',
+  'reservation_id',
+  'request_hash',
+  'state',
+  'expires_at',
+  'attempt_id',
+  'candidate_id',
+  'account_id',
+  'pool_id',
+  'identity_fingerprint',
+  'ticket_digest',
+] as const;
+
+const LAUNCH_AUTHORITY_FIELDS = [
+  'schema',
+  'claim_id',
+  'canonical_identity',
+  'canonical_identity_digest',
+  'reservation',
+  'ticket',
+  'ticket_digest',
+] as const;
+
+function timestamp(value: unknown): number {
+  return isUtcSecond(value) ? new Date(value).valueOf() : Number.NaN;
+}
+
+function canonicalDigest(value: unknown): string {
+  return `sha256:${sha256Hex(canonicalJson(value))}`;
+}
+
+function selectedCandidate(task: JsonObject, attempt: JsonObject): JsonObject {
+  const candidate = task.routing?.policy?.candidates?.find(
+    (entry: JsonObject) => entry?.id === attempt.candidate_id,
+  );
+  if (!candidate) reject('NATIVE-LAUNCH-IDENTITY-MISMATCH', 'launch_authority');
+  return candidate;
+}
+
+function expectedLaunchIdentity(
+  task: JsonObject,
+  attempt: JsonObject,
+  ticket: JsonObject,
+): JsonObject {
+  const candidate = selectedCandidate(task, attempt);
+  const descriptor = descriptorForAttempt(attempt);
+  try {
+    return normalizeCanonicalLaunchIdentity({
+      schema: CANONICAL_LAUNCH_IDENTITY_SCHEMA,
+      origin: {
+        harness: descriptor.origin,
+        session_ref: attempt.lineage?.origin_session_ref,
+      },
+      target: {
+        harness: descriptor.harness,
+        adapter: descriptor.adapter,
+        surface: descriptor.surface,
+        transport: descriptor.transport,
+        candidate_id: attempt.candidate_id,
+      },
+      provider: {
+        id: candidate.provider,
+        model: candidate.model,
+        effort: candidate.effort,
+      },
+      account: {
+        fingerprint_ref: attempt.lineage?.account_fingerprint_ref,
+        account_id: ticket.account_id,
+        pool_id: ticket.pool_id,
+        identity_fingerprint: ticket.identity_fingerprint,
+      },
+      workspace: {
+        workspace_ref: attempt.lineage?.workspace_ref,
+        worktree_ref: attempt.lineage?.worktree_ref,
+        baseline_commit: attempt.lineage?.baseline_commit,
+      },
+      permission: clone(attempt.lineage?.permission),
+      input: { digest: attempt.dispatch?.input_hash },
+      request: { digest: attempt.dispatch?.request_hash },
+      runtime: {
+        image_sha256: ticket.runtime_sha256,
+        selector: { kind: 'exact', model_id: candidate.model, effort: candidate.effort },
+      },
+    });
+  } catch {
+    reject('NATIVE-LAUNCH-IDENTITY-MISMATCH', 'launch_authority.canonical_identity');
+  }
+}
+
+function requireLaunchAuthority(task: JsonObject, attempt: JsonObject, value: unknown): JsonObject {
+  if (!isJsonObject(value) || !hasExactKeys(value, LAUNCH_AUTHORITY_FIELDS)) {
+    reject('NATIVE-LAUNCH-AUTHORITY-MISSING', 'launch_authority');
+  }
+  const authority = value as JsonObject;
+  const reservation = authority.reservation;
+  const ticket = authority.ticket;
+  if (
+    authority.schema !== 'ccm/native-launch-authority/v1' ||
+    authority.claim_id !== attempt.dispatch?.launch_claim_id ||
+    !SHA256_RE.test(authority.canonical_identity_digest) ||
+    !SHA256_RE.test(authority.ticket_digest) ||
+    !isJsonObject(reservation) ||
+    !hasExactKeys(reservation, RESERVATION_FIELDS) ||
+    reservation.schema !== 'ccm/quota-reservation/v1' ||
+    reservation.state !== 'committed' ||
+    !isJsonObject(ticket) ||
+    !hasExactKeys(ticket, TICKET_FIELDS) ||
+    ticket.schema !== 'ccm/quota-admission-ticket/v1'
+  ) {
+    reject('NATIVE-LAUNCH-AUTHORITY-INVALID', 'launch_authority');
+  }
+  if (
+    TICKET_FIELDS.slice(1).some((field) => !isNonEmptyString(ticket[field])) ||
+    !isUtcSecond(ticket.issued_at) ||
+    !isUtcSecond(ticket.committed_at) ||
+    !isUtcSecond(ticket.launch_by) ||
+    !isUtcSecond(ticket.reservation_expires_at) ||
+    timestamp(ticket.issued_at) > timestamp(ticket.committed_at) ||
+    timestamp(ticket.committed_at) > timestamp(ticket.launch_by) ||
+    timestamp(attempt.created_at) >= timestamp(ticket.launch_by) ||
+    timestamp(attempt.created_at) >= timestamp(ticket.reservation_expires_at) ||
+    ticket.reservation_id !== reservation.reservation_id ||
+    ticket.reservation_request_hash !== reservation.request_hash ||
+    ticket.reservation_expires_at !== reservation.expires_at ||
+    ticket.attempt_id !== attempt.id ||
+    ticket.attempt_id !== reservation.attempt_id ||
+    reservation.candidate_id !== attempt.candidate_id ||
+    ticket.account_id !== reservation.account_id ||
+    ticket.pool_id !== reservation.pool_id ||
+    ticket.identity_fingerprint !== reservation.identity_fingerprint ||
+    authority.ticket_digest !== canonicalDigest(ticket) ||
+    reservation.ticket_digest !== authority.ticket_digest
+  ) {
+    reject('NATIVE-LAUNCH-AUTHORITY-INVALID', 'launch_authority');
+  }
+  const expectedIdentity = expectedLaunchIdentity(task, attempt, ticket);
+  let normalizedIdentity: JsonObject;
+  try {
+    normalizedIdentity = normalizeCanonicalLaunchIdentity(authority.canonical_identity);
+  } catch {
+    reject('NATIVE-LAUNCH-IDENTITY-MISMATCH', 'launch_authority.canonical_identity');
+  }
+  if (
+    !same(normalizedIdentity, expectedIdentity) ||
+    authority.canonical_identity_digest !== canonicalLaunchIdentityDigest(expectedIdentity)
+  ) {
+    reject('NATIVE-LAUNCH-IDENTITY-MISMATCH', 'launch_authority.canonical_identity');
+  }
+  return clone({
+    schema: authority.schema,
+    claim_id: authority.claim_id,
+    canonical_identity: expectedIdentity,
+    canonical_identity_digest: authority.canonical_identity_digest,
+    reservation: clone(reservation),
+    ticket: clone(ticket),
+    ticket_digest: authority.ticket_digest,
+  });
 }
 
 function requireInitialCreateAttempt(value: unknown, expectedOrdinal: number): void {
@@ -453,6 +642,14 @@ function requireStoredAttemptLifecycle(attempt: JsonObject): void {
   ) {
     reject('NATIVE-ATTEMPT-INVALID', 'attempt.state');
   }
+  if (
+    (hasStartedAt && timestamp(attempt.started_at) < timestamp(attempt.created_at)) ||
+    (hasBinding && timestamp(attempt.handle_binding.bound_at) < timestamp(attempt.started_at)) ||
+    (hasCancel &&
+      timestamp(attempt.cancel.requested_at) < timestamp(attempt.handle_binding?.bound_at))
+  ) {
+    reject('NATIVE-EVIDENCE-CAUSAL-ORDER', 'attempt');
+  }
 
   let reachableState = hasBinding ? 'running' : 'starting';
   const initialObservationTimes = [
@@ -558,6 +755,9 @@ function requireStoredAttemptLifecycle(attempt: JsonObject): void {
     }
     reachableState = 'terminal';
   }
+  if (hasTerminal && timestamp(attempt.terminal.observed_at) < timestamp(previousObservedAt)) {
+    reject('NATIVE-EVIDENCE-CAUSAL-ORDER', 'terminal.observed_at');
+  }
   if (reachableState !== attempt.state) {
     reject('NATIVE-ATTEMPT-INVALID', 'attempt.state');
   }
@@ -576,6 +776,9 @@ function requireStoredAttemptStructure(value: unknown, expectedOrdinal: number):
   }
   if (attempt.finished_at !== undefined && !isUtcSecond(attempt.finished_at)) {
     reject('NATIVE-ATTEMPT-INVALID', 'finished_at');
+  }
+  if (!isJsonObject(attempt.launch_authority)) {
+    reject('NATIVE-LAUNCH-AUTHORITY-MISSING', 'launch_authority');
   }
   requireStoredAttemptLifecycle(attempt);
 }
@@ -696,8 +899,12 @@ function expectedEvidenceScope(task: JsonObject, attempt: JsonObject): JsonObjec
     attempt_id: attempt.id,
     candidate_id: attempt.candidate_id,
     dispatch_key: attempt.dispatch?.key,
+    input_hash: attempt.dispatch?.input_hash,
     request_hash: attempt.dispatch?.request_hash,
     launch_claim_id: attempt.dispatch?.launch_claim_id,
+    reservation_id: attempt.launch_authority?.reservation?.reservation_id,
+    ticket_digest: attempt.launch_authority?.ticket_digest,
+    launch_identity_digest: attempt.launch_authority?.canonical_identity_digest,
     create_hash: attempt.create_hash,
   };
 }
@@ -779,6 +986,12 @@ function requireAuthoritativeLiveTarget(evidence: JsonObject, attempt: JsonObjec
   ) {
     reject('NATIVE-HANDLE-UNATTESTED');
   }
+  if (
+    timestamp(observed.spawn.observed_at) < timestamp(attempt.created_at) ||
+    timestamp(observed.roster.observed_at) < timestamp(observed.spawn.observed_at)
+  ) {
+    reject('NATIVE-EVIDENCE-CAUSAL-ORDER');
+  }
 }
 
 function requireTerminalPayload(payload: JsonObject): void {
@@ -814,13 +1027,28 @@ function create(board: JsonObject, command: JsonObject): NativeAttemptApplyResul
   if (incoming.create_snapshot !== undefined || incoming.create_hash !== undefined) {
     reject('NATIVE-ATTEMPT-INVALID', 'attempt');
   }
-  const createSnapshot = canonicalCreateSnapshot(command);
   const attempts = task.routing?.attempts;
   if (!Array.isArray(attempts)) reject('NATIVE-ROUTING-MISSING', 'routing.attempts');
   const replay = attempts.find(
     (entry: JsonObject) => entry?.dispatch?.key === incoming.dispatch?.key,
   );
-  requireInitialCreateAttempt(incoming, replay?.ordinal ?? nativeAttempts(task).length + 1);
+  if (replay) {
+    const frozenIncoming = clone(replay.create_snapshot?.attempt ?? {});
+    delete frozenIncoming.descriptor;
+    delete frozenIncoming.launch_authority;
+    if (
+      !same(frozenIncoming, incoming) ||
+      !same(command.selection_snapshot, incoming.selection_snapshot)
+    ) {
+      reject('NATIVE-ATTEMPT-REPLAY-CONFLICT');
+    }
+  }
+  requireSelection(task, command.selection_snapshot, incoming);
+  requireAdmission(incoming, command.admission_snapshot);
+  const launchAuthority = requireLaunchAuthority(task, incoming, command.launch_authority);
+  const preparedIncoming = { ...clone(incoming), launch_authority: launchAuthority };
+  const createSnapshot = canonicalCreateSnapshot({ ...command, attempt: preparedIncoming });
+  requireInitialCreateAttempt(preparedIncoming, replay?.ordinal ?? nativeAttempts(task).length + 1);
   requireSelectionSnapshotStructure(command.selection_snapshot);
   const createHash = createHashFor(createSnapshot);
 
@@ -848,12 +1076,9 @@ function create(board: JsonObject, command: JsonObject): NativeAttemptApplyResul
     reject('NATIVE-ATTEMPT-ACTIVE');
   }
   if (task.status !== 'ready' || task.executor !== 'subagent') reject('NATIVE-TASK-NOT-READY');
-  requireSelection(task, command.selection_snapshot, incoming);
-  requireAdmission(incoming, command.admission_snapshot);
-
   task.routing.selected = clone(command.selection_snapshot);
   task.routing.attempts.push({
-    ...clone(incoming),
+    ...preparedIncoming,
     descriptor: clone(createSnapshot.attempt.descriptor),
     create_snapshot: createSnapshot,
     create_hash: createHash,
@@ -924,6 +1149,9 @@ function cancel(board: JsonObject, command: JsonObject): NativeAttemptApplyResul
     return { ok: true, board, result: { host_control_effects: 0, attempt_id: attempt.id } };
   }
   if (attempt.state !== 'running') reject('NATIVE-ATTEMPT-STATE-CONFLICT');
+  if (timestamp(command.request.requested_at) < timestamp(attempt.handle_binding?.bound_at)) {
+    reject('NATIVE-EVIDENCE-CAUSAL-ORDER');
+  }
   attempt.cancel = clone(command.request);
   return { ok: true, board, result: { host_control_effects: 1, attempt_id: attempt.id } };
 }
@@ -944,6 +1172,13 @@ function terminal(board: JsonObject, command: JsonObject): NativeAttemptApplyRes
   }
   if (!['running', 'uncertain'].includes(attempt.state)) {
     reject('NATIVE-ATTEMPT-STATE-CONFLICT');
+  }
+  const previousObservedAt =
+    attempt.reconciliation.at(-1)?.observed_at ??
+    attempt.handle_binding?.bound_at ??
+    attempt.created_at;
+  if (timestamp(normalized.observed_at) < timestamp(previousObservedAt)) {
+    reject('NATIVE-EVIDENCE-CAUSAL-ORDER');
   }
   attempt.state = 'terminal';
   attempt.terminal = normalized;
@@ -1099,6 +1334,7 @@ function createIdentityValid(task: JsonObject, attempt: JsonObject): boolean {
       !same(frozen.lineage, attempt.lineage) ||
       !same(frozen.selection_snapshot, attempt.selection_snapshot) ||
       !same(frozen.descriptor, attempt.descriptor) ||
+      !same(frozen.launch_authority, attempt.launch_authority) ||
       !same(snapshot.selection_snapshot, frozen.selection_snapshot)
     ) {
       return false;
@@ -1159,6 +1395,10 @@ export function validateNativeAttemptProjection(inputBoard: JsonObject): NativeA
       try {
         requireStoredAttemptStructure(current, index + 1);
         requireInitialCreateAttempt(current.create_snapshot?.attempt, index + 1);
+        const storedAuthority = requireLaunchAuthority(task, current, current.launch_authority);
+        if (!same(storedAuthority, current.launch_authority)) {
+          reject('NATIVE-LAUNCH-AUTHORITY-INVALID', 'launch_authority');
+        }
       } catch (error) {
         if (!(error instanceof NativeAttemptError)) throw error;
         issues.push(

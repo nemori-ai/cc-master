@@ -308,8 +308,13 @@ class PrivateEvidenceHarness {
       expected.attempt_id === fixture.commands.create.attempt.id &&
       expected.candidate_id === fixture.commands.create.attempt.candidate_id &&
       expected.dispatch_key === fixture.commands.create.attempt.dispatch.key &&
+      expected.input_hash === fixture.commands.create.attempt.dispatch.input_hash &&
       expected.request_hash === fixture.commands.create.attempt.dispatch.request_hash &&
       expected.launch_claim_id === fixture.commands.create.attempt.dispatch.launch_claim_id &&
+      expected.reservation_id === fixture.commands.create.launch_authority.reservation.reservation_id &&
+      expected.ticket_digest === fixture.commands.create.launch_authority.ticket_digest &&
+      expected.launch_identity_digest ===
+        fixture.commands.create.launch_authority.canonical_identity_digest &&
       /^sha256:[a-f0-9]{64}$/.test(expected.create_hash) &&
       stableJson(expected.lineage) === stableJson(fixture.commands.create.attempt.lineage)
     );
@@ -541,7 +546,7 @@ class PrivateEvidenceHarness {
       const bindClaim = String(record.create_link.launch_claim_id);
       claim = bindClaim;
       const claimedBy = this.claims.get(bindClaim);
-      if (claimedBy && claimedBy !== record.record_hash) {
+      if (!claimedBy || claimedBy !== expected.launch_identity_digest) {
         return authFailure('NATIVE-EVIDENCE-CLAIM-REUSED');
       }
     }
@@ -611,8 +616,12 @@ class PrivateEvidenceHarness {
         attempt_id: expected.attempt_id,
         candidate_id: expected.candidate_id,
         dispatch_key: expected.dispatch_key,
+        input_hash: expected.input_hash,
         request_hash: expected.request_hash,
         launch_claim_id: expected.launch_claim_id,
+        reservation_id: expected.reservation_id,
+        ticket_digest: expected.ticket_digest,
+        launch_identity_digest: expected.launch_identity_digest,
         create_hash: expected.create_hash,
       },
       observed,
@@ -624,8 +633,7 @@ class PrivateEvidenceHarness {
       record_hash: recordHash,
       scope: verifiedEvidence.scope,
     });
-    const consumeKey =
-      evidenceClass === 'bind' ? `claim:${claim}` : `${evidenceClass}:${recordRef}`;
+    const consumeKey = `${evidenceClass}:${recordRef}`;
     const consumedIdentity = this.consumed.get(consumeKey);
     if (consumedIdentity && consumedIdentity !== identity) {
       return authFailure(
@@ -640,7 +648,7 @@ class PrivateEvidenceHarness {
     this.reservations.set(transactionId, {
       consumeKey,
       identity,
-      claim,
+      claim: undefined,
       recordHash,
       verifiedEvidence,
     });
@@ -666,8 +674,11 @@ class PrivateEvidenceHarness {
       'evidence commit must name the durable board bytes',
     );
     this.trace.push('commit');
-    this.consumed.set(reservation.consumeKey, reservation.identity);
-    if (reservation.claim) this.claims.set(reservation.claim, reservation.recordHash);
+    if (reservation.kind === 'launch') {
+      this.claims.set(reservation.claim, reservation.identity);
+    } else {
+      this.consumed.set(reservation.consumeKey, reservation.identity);
+    }
     this.reservations.delete(input.transaction_id);
     this.commits.push(clone(input));
   };
@@ -683,6 +694,40 @@ class PrivateEvidenceHarness {
     this.trace.length = 0;
     this.trace.push('create-admission');
     return clone(this.createAdmission);
+  };
+
+  stageCreate = (input: any): any => {
+    this.trace.length = 0;
+    this.trace.push('create-admission');
+    const template =
+      input.attempt?.id === fixture.commands.create_second_after_orphan_audit.attempt.id
+        ? fixture.commands.create_second_after_orphan_audit
+        : fixture.commands.create;
+    const authority = clone(template.launch_authority);
+    const claim = String(authority.claim_id);
+    const identity = String(authority.canonical_identity_digest);
+    const existing = this.claims.get(claim);
+    if (existing && existing !== identity) {
+      return authFailure('NATIVE-LAUNCH-CLAIM-REUSED');
+    }
+    const transactionId = `launch-tx-${this.nextTransaction++}`;
+    this.reservations.set(transactionId, {
+      kind: 'launch',
+      claim,
+      identity,
+      admissionSnapshot: clone(
+        template === fixture.commands.create ? this.createAdmission : template.admission_snapshot,
+      ),
+      launchAuthority: authority,
+    });
+    return {
+      ok: true,
+      transaction_id: transactionId,
+      admission_snapshot: clone(
+        template === fixture.commands.create ? this.createAdmission : template.admission_snapshot,
+      ),
+      launch_authority: authority,
+    };
   };
 
   resolveControlAuthority = (): any => {
@@ -736,7 +781,9 @@ function runCli(path: string, argv: string[]): CliResult {
       rollback: auth.rollback,
     },
     nativeAttemptAdmission: {
-      resolveCreate: auth.resolveCreateAdmission,
+      stageCreate: auth.stageCreate,
+      commit: auth.commit,
+      rollback: auth.rollback,
       resolveControl: auth.resolveControlAuthority,
     },
     writeFileAtomicSync: (boardPath: string, content: string) => {
@@ -1041,7 +1088,7 @@ test('create/bind/cancel/terminal CLI handlers execute and exact replay is a no-
   }
   assert.equal(
     auth.claims.get(fixture.commands.create.attempt.dispatch.launch_claim_id),
-    fixture.commands.bind.verified_evidence.record_hash,
+    fixture.commands.create.launch_authority.canonical_identity_digest,
   );
   assert.equal(task(path).status, 'in_flight');
   assert.equal(task(path).handle, 'agent-fixture-001');

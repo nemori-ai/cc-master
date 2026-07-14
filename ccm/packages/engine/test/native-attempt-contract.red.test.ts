@@ -104,8 +104,12 @@ function evidenceScope(board: FixtureJson, command: FixtureJson): FixtureJson {
     attempt_id: current.id,
     candidate_id: current.candidate_id,
     dispatch_key: current.dispatch.key,
+    input_hash: current.dispatch.input_hash,
     request_hash: current.dispatch.request_hash,
     launch_claim_id: current.dispatch.launch_claim_id,
+    reservation_id: current.launch_authority.reservation.reservation_id,
+    ticket_digest: current.launch_authority.ticket_digest,
+    launch_identity_digest: current.launch_authority.canonical_identity_digest,
     create_hash: current.create_hash,
   };
 }
@@ -1284,6 +1288,10 @@ test('create hash is canonical UTF-8 SHA-256 and hard lint recomputes it in the 
   unicodeCreate.attempt.lineage.origin_session_ref = 'session-ref:原点-🚀';
   unicodeCreate.attempt.dispatch.claim_owner_session_ref = 'session-ref:原点-🚀';
   unicodeCreate.admission_snapshot.current_lineage.origin_session_ref = 'session-ref:原点-🚀';
+  unicodeCreate.launch_authority.canonical_identity.origin.session_ref = 'session-ref:原点-🚀';
+  unicodeCreate.launch_authority.canonical_identity_digest = `sha256:${createHash('sha256')
+    .update(stableJson(unicodeCreate.launch_authority.canonical_identity))
+    .digest('hex')}`;
   const created = applyOk(api, clone(fixture.initial_board), unicodeCreate).board;
   const current = attempt(created);
   assert.equal(
@@ -1793,4 +1801,36 @@ test('shared projection/mutation guard is hard, force-independent input for ever
     task(parentChoice).status = status;
     assert.deepEqual(api.validateNativeAttemptProjection(parentChoice), [], status);
   }
+});
+
+test('R1 causal order rejects terminal/reconcile observations before the bound lifecycle floor', () => {
+  const api = engineApi(engine);
+  const running = checkpoint(api, 'running');
+  for (const [label, command] of [
+    [
+      'terminal',
+      (() => {
+        const value = clone(fixture.commands.terminal);
+        value.evidence.observed_at = '2026-07-13T08:00:01Z';
+        return value;
+      })(),
+    ],
+    [
+      'reconcile',
+      (() => {
+        const value = clone(fixture.commands.reconcile_uncertain);
+        value.evidence.observed_at = '2026-07-13T08:00:01Z';
+        return value;
+      })(),
+    ],
+  ] as const) {
+    const before = clone(running);
+    const result = api.nativeAttemptApply(running, verifiedCommand(running, command));
+    assert.equal(result.ok, false, label);
+    assert.deepEqual(result.board, before, `${label}: board mutated`);
+  }
+
+  const impossible = clone(running);
+  attempt(impossible).started_at = '2026-07-13T07:59:59Z';
+  assertHardProjection(api, impossible, 'started_at before created_at must fail hard projection');
 });

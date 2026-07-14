@@ -274,6 +274,7 @@
         "created_at": "2026-07-13T08:00:00Z",
         "dispatch": {
           "key": "dispatch-fixture-001",
+          "input_hash": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
           "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
           "launch_claim_id": "launch-claim-fixture-001",
           "claim_owner_session_ref": "session-ref:fixture-origin"
@@ -336,6 +337,94 @@
         "reconciliation": []
       },
       "replay_intent": "accept-no-launch",
+      "launch_authority": {
+        "schema": "ccm/native-launch-authority/v1",
+        "claim_id": "launch-claim-fixture-001",
+        "canonical_identity": {
+          "schema": "ccm/canonical-launch-identity/v1",
+          "origin": {
+            "harness": "codex",
+            "session_ref": "session-ref:fixture-origin"
+          },
+          "target": {
+            "harness": "codex",
+            "adapter": "codex/api-tool-multi-agent-v1",
+            "surface": "host-native",
+            "transport": "codex-api-tool-multi-agent",
+            "candidate_id": "codex-native"
+          },
+          "provider": {
+            "id": "openai",
+            "model": "host-default",
+            "effort": "medium"
+          },
+          "account": {
+            "fingerprint_ref": "account-ref:fixture-current-codex",
+            "account_id": "account-native-fixture",
+            "pool_id": "pool-native-fixture",
+            "identity_fingerprint": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+          },
+          "workspace": {
+            "workspace_ref": "workspace-ref:fixture-repository",
+            "worktree_ref": "worktree-ref:fixture-isolated",
+            "baseline_commit": "1111111111111111111111111111111111111111"
+          },
+          "permission": {
+            "snapshot_ref": "permission-ref:fixture-workspace-write",
+            "profile": "workspace-write",
+            "denies": ["account-mutation", "push-remote"]
+          },
+          "input": {
+            "digest": "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+          },
+          "request": {
+            "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          "runtime": {
+            "image_sha256": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "selector": {
+              "kind": "exact",
+              "model_id": "host-default",
+              "effort": "medium"
+            }
+          }
+        },
+        "canonical_identity_digest": "sha256:d5dd5ab7296eb76930995946e7bf4d5cf48ea671b530edd04cfb7cb67a9662d8",
+        "reservation": {
+          "schema": "ccm/quota-reservation/v1",
+          "reservation_id": "qres-native-fixture-001",
+          "request_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+          "state": "committed",
+          "expires_at": "2099-07-13T08:15:00Z",
+          "attempt_id": "attempt-native-fixture-001",
+          "candidate_id": "codex-native",
+          "account_id": "account-native-fixture",
+          "pool_id": "pool-native-fixture",
+          "identity_fingerprint": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+          "ticket_digest": "sha256:5d3129d773114de50566e38836000365565a552d63736e85aa2975e5a6ea6095"
+        },
+        "ticket": {
+          "schema": "ccm/quota-admission-ticket/v1",
+          "ticket_id": "ticket-native-fixture-001",
+          "reservation_id": "qres-native-fixture-001",
+          "reservation_request_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+          "reservation_expires_at": "2099-07-13T08:15:00Z",
+          "attempt_id": "attempt-native-fixture-001",
+          "run_ref": "run-ref:native-fixture-001",
+          "account_id": "account-native-fixture",
+          "pool_id": "pool-native-fixture",
+          "identity_fingerprint": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+          "aggregation_key": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "live_source_revision": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "runtime_sha256": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "launch_idempotency_key": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "launch_nonce": "launch-nonce-native-fixture-001",
+          "issued_at": "2026-07-13T07:59:58Z",
+          "committed_at": "2026-07-13T07:59:59Z",
+          "launch_by": "2099-07-13T08:14:00Z"
+        },
+        "ticket_digest": "sha256:5d3129d773114de50566e38836000365565a552d63736e85aa2975e5a6ea6095"
+      },
       "admission_snapshot": {
         "current_lineage": {
           "origin_session_ref": "session-ref:fixture-origin",
@@ -418,6 +507,7 @@
         "created_at": "2026-07-13T08:10:00Z",
         "dispatch": {
           "key": "dispatch-fixture-002",
+          "input_hash": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
           "request_hash": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
           "launch_claim_id": "launch-claim-fixture-002",
           "claim_owner_session_ref": "session-ref:fixture-origin"
@@ -479,6 +569,94 @@
         "reconciliation": []
       },
       "replay_intent": "accept-no-launch",
+      "launch_authority": {
+        "schema": "ccm/native-launch-authority/v1",
+        "claim_id": "launch-claim-fixture-002",
+        "canonical_identity": {
+          "schema": "ccm/canonical-launch-identity/v1",
+          "origin": {
+            "harness": "codex",
+            "session_ref": "session-ref:fixture-origin"
+          },
+          "target": {
+            "harness": "codex",
+            "adapter": "codex/api-tool-multi-agent-v1",
+            "surface": "host-native",
+            "transport": "codex-api-tool-multi-agent",
+            "candidate_id": "codex-native"
+          },
+          "provider": {
+            "id": "openai",
+            "model": "host-default",
+            "effort": "medium"
+          },
+          "account": {
+            "fingerprint_ref": "account-ref:fixture-current-codex",
+            "account_id": "account-native-fixture",
+            "pool_id": "pool-native-fixture",
+            "identity_fingerprint": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+          },
+          "workspace": {
+            "workspace_ref": "workspace-ref:fixture-repository",
+            "worktree_ref": "worktree-ref:fixture-isolated-2",
+            "baseline_commit": "1111111111111111111111111111111111111111"
+          },
+          "permission": {
+            "snapshot_ref": "permission-ref:fixture-workspace-write",
+            "profile": "workspace-write",
+            "denies": ["account-mutation", "push-remote"]
+          },
+          "input": {
+            "digest": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+          },
+          "request": {
+            "digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          "runtime": {
+            "image_sha256": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "selector": {
+              "kind": "exact",
+              "model_id": "host-default",
+              "effort": "medium"
+            }
+          }
+        },
+        "canonical_identity_digest": "sha256:83a31c0c541448fc45555a89fa66ea8162ecb0a6bdd6c0568987b3c2ec0740b4",
+        "reservation": {
+          "schema": "ccm/quota-reservation/v1",
+          "reservation_id": "qres-native-fixture-002",
+          "request_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333334",
+          "state": "committed",
+          "expires_at": "2099-07-13T08:15:00Z",
+          "attempt_id": "attempt-native-fixture-002",
+          "candidate_id": "codex-native",
+          "account_id": "account-native-fixture",
+          "pool_id": "pool-native-fixture",
+          "identity_fingerprint": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+          "ticket_digest": "sha256:17b9e39a6048804bdc04c42e4023402a9a03d1737b1aa8d8df6f93dd2179e194"
+        },
+        "ticket": {
+          "schema": "ccm/quota-admission-ticket/v1",
+          "ticket_id": "ticket-native-fixture-002",
+          "reservation_id": "qres-native-fixture-002",
+          "reservation_request_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333334",
+          "reservation_expires_at": "2099-07-13T08:15:00Z",
+          "attempt_id": "attempt-native-fixture-002",
+          "run_ref": "run-ref:native-fixture-002",
+          "account_id": "account-native-fixture",
+          "pool_id": "pool-native-fixture",
+          "identity_fingerprint": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+          "aggregation_key": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+          "live_source_revision": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "runtime_sha256": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "launch_idempotency_key": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+          "launch_nonce": "launch-nonce-native-fixture-002",
+          "issued_at": "2026-07-13T08:09:58Z",
+          "committed_at": "2026-07-13T08:09:59Z",
+          "launch_by": "2099-07-13T08:14:00Z"
+        },
+        "ticket_digest": "sha256:17b9e39a6048804bdc04c42e4023402a9a03d1737b1aa8d8df6f93dd2179e194"
+      },
       "admission_snapshot": {
         "current_lineage": {
           "origin_session_ref": "session-ref:fixture-origin",

@@ -38,8 +38,12 @@ test('R1 bind rejects spawn-before-create and roster-before-spawn without mutati
         attempt_id: attempt.id,
         candidate_id: attempt.candidate_id,
         dispatch_key: attempt.dispatch.key,
+        input_hash: attempt.dispatch.input_hash,
         request_hash: attempt.dispatch.request_hash,
         launch_claim_id: attempt.dispatch.launch_claim_id,
+        reservation_id: attempt.launch_authority.reservation.reservation_id,
+        ticket_digest: attempt.launch_authority.ticket_digest,
+        launch_identity_digest: attempt.launch_authority.canonical_identity_digest,
         create_hash: attempt.create_hash,
       },
       producer: {

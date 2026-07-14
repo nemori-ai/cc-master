@@ -73,8 +73,12 @@ export interface NativeAttemptVerifiedEvidence {
     attempt_id: string;
     candidate_id: string;
     dispatch_key: string;
+    input_hash: string;
     request_hash: string;
     launch_claim_id: string;
+    reservation_id: string;
+    ticket_digest: string;
+    launch_identity_digest: string;
     create_hash: string;
   };
   observed: {
@@ -110,6 +114,10 @@ export interface NativeAttemptPrivateEvidenceBoundary {
     evidence_class: NativeAttemptEvidenceClass;
     record_ref: string;
     expected: Record<string, any>;
+    existing_evidence?: {
+      record_ref: string;
+      record_hash: string;
+    };
   }) => NativeAttemptEvidenceStageResult;
   commit: (input: {
     transaction_id: string;
@@ -120,8 +128,26 @@ export interface NativeAttemptPrivateEvidenceBoundary {
 }
 
 export interface NativeAttemptAdmissionBoundary {
-  resolveCreate: () => Record<string, any>;
-  resolveControl: () => Record<string, any>;
+  stageCreate: (input: {
+    task_id: string;
+    selection_snapshot: Record<string, any>;
+    attempt: Record<string, any>;
+    replay_intent?: string;
+    existing_attempt?: Record<string, any>;
+  }) => {
+    ok: boolean;
+    transaction_id?: string;
+    admission_snapshot?: Record<string, any>;
+    launch_authority?: Record<string, any>;
+    issues?: Array<{ code: string; path?: string; message?: string }>;
+  };
+  commit: (input: {
+    transaction_id: string;
+    board_path: string;
+    board_content_hash: string;
+  }) => void;
+  rollback: (input: { transaction_id: string; reason: string }) => void;
+  resolveControl: (input: { task_id: string; attempt_id: string }) => Record<string, any>;
 }
 
 // ctx 契约形态（契约 §三 ctx 形态·router.buildCtx 产出）。handler / runner 共用。

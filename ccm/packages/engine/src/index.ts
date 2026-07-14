@@ -279,6 +279,12 @@ export {
   validateNativeAttemptMutation,
   validateNativeAttemptProjection,
 } from './native-attempt.js';
+export {
+  CANONICAL_LAUNCH_IDENTITY_FIELD_REGISTRY,
+  CANONICAL_LAUNCH_IDENTITY_SCHEMA,
+  canonicalLaunchIdentityDigest,
+  normalizeCanonicalLaunchIdentity,
+} from './canonical-launch-identity.js';
 // ── paths（CLAUDE_CONFIG_DIR 跟随 + 派生路径 SSOT·home/rate-cache/credentials/.claude.json/projects）──
 export type { PathEnv } from './paths.js';
 export {
