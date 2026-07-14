@@ -1,0 +1,192 @@
+{
+  "schema": "ccm/codex-model-admission-a-now-fixture-manifest/v1",
+  "contract": "ccm/codex-model-admission-a-now/v1",
+  "files": {
+    "w1.json": [
+      "live-exact-operator-attempt-admits",
+      "controlled-fixture-admits-without-real-request",
+      "persistent-only-evidence-cannot-admit",
+      "serialized-cut-replay-cannot-admit",
+      "unknown-auth-rejects",
+      "stale-auth-rejects",
+      "fresh-labelled-expired-auth-rejects",
+      "stale-catalog-rejects",
+      "fresh-labelled-expired-catalog-rejects",
+      "unknown-seven-day-quota-rejects",
+      "tight-seven-day-quota-rejects",
+      "exhausted-seven-day-quota-rejects",
+      "stale-seven-day-quota-rejects",
+      "fresh-labelled-expired-seven-day-quota-rejects",
+      "policy-deny-rejects",
+      "catalog-discovery-is-not-real-request-authority",
+      "authorization-schema-mismatch-rejects",
+      "authorization-issuer-mismatch-rejects",
+      "authorization-authority-ref-mismatch-rejects",
+      "authorization-attempt-id-mismatch-rejects",
+      "authorization-run-ref-mismatch-rejects",
+      "authorization-idempotency-key-mismatch-rejects",
+      "authorization-provider-mismatch-rejects",
+      "authorization-operation-mismatch-rejects",
+      "authorization-model-id-mismatch-rejects",
+      "authorization-effort-mismatch-rejects",
+      "authorization-workspace-realpath-mismatch-rejects",
+      "authorization-baseline-sha256-mismatch-rejects",
+      "authorization-effect-mismatch-rejects",
+      "authorization-issued-at-in-future-rejects",
+      "authorization-expires-at-before-now-rejects",
+      "authorization-nonce-mismatch-rejects",
+      "resolved-model-mismatch-rejects",
+      "resolved-effort-mismatch-rejects",
+      "strict-automatic-live-spawn-rejects",
+      "non-isolated-workspace-rejects",
+      "missing-reservation-rejects",
+      "expired-reservation-rejects",
+      "account-quota-identity-conflict-rejects"
+    ],
+    "authority.json": [
+      "same-process-live-decision-spawns-once",
+      "serialized-w1-decision-is-not-authority",
+      "persistent-audit-admit-is-not-authority",
+      "other-supervisor-live-decision-is-not-transferable",
+      "same-process-second-invocation-does-not-spawn",
+      "same-process-concurrent-invocations-spawn-at-most-once",
+      "duplicate-same-key-requires-private-verified-attach",
+      "invoke-intent-without-handle-is-uncertain-no-retry",
+      "same-key-conflict-never-spawns"
+    ],
+    "reconciliation.json": [
+      "exact-actual-terminal-still-awaits-parent",
+      "actual-model-mismatch-fails",
+      "actual-effort-mismatch-fails",
+      "missing-actual-does-not-copy-requested",
+      "parent-acceptance-is-separate"
+    ],
+    "effects.json": [
+      "contract-evaluation-is-hermetic",
+      "controlled-fixture-spawn-is-observed-not-self-reported",
+      "real-provider-request-is-rejected",
+      "paid-canary-is-rejected",
+      "login-is-rejected",
+      "logout-is-rejected",
+      "switch-account-is-rejected",
+      "import-credential-is-rejected",
+      "copy-credential-is-rejected",
+      "device-auth-is-rejected",
+      "refresh-auth-is-rejected",
+      "write-credential-is-rejected",
+      "write-config-is-rejected",
+      "write-board-is-rejected",
+      "remote-mutation-is-rejected"
+    ]
+  },
+  "mutants": {
+    "persistent-positive-authority": {
+      "domain": "w1.json",
+      "killed_by": ["persistent-only-evidence-cannot-admit"]
+    },
+    "fresh-label-overrides-expiry": {
+      "domain": "w1.json",
+      "killed_by": [
+        "fresh-labelled-expired-auth-rejects",
+        "fresh-labelled-expired-catalog-rejects",
+        "fresh-labelled-expired-seven-day-quota-rejects"
+      ]
+    },
+    "replay-is-live": {
+      "domain": "w1.json",
+      "killed_by": ["serialized-cut-replay-cannot-admit"]
+    },
+    "unknown-tight-or-exhausted-quota-is-ample": {
+      "domain": "w1.json",
+      "killed_by": [
+        "unknown-seven-day-quota-rejects",
+        "tight-seven-day-quota-rejects",
+        "exhausted-seven-day-quota-rejects",
+        "stale-seven-day-quota-rejects"
+      ]
+    },
+    "policy-default-allow": {
+      "domain": "w1.json",
+      "killed_by": [
+        "policy-deny-rejects",
+        "catalog-discovery-is-not-real-request-authority",
+        "strict-automatic-live-spawn-rejects"
+      ]
+    },
+    "grant-binding-or-expiry-ignored": {
+      "domain": "w1.json",
+      "killed_by": [
+        "authorization-schema-mismatch-rejects",
+        "authorization-issuer-mismatch-rejects",
+        "authorization-authority-ref-mismatch-rejects",
+        "authorization-attempt-id-mismatch-rejects",
+        "authorization-run-ref-mismatch-rejects",
+        "authorization-idempotency-key-mismatch-rejects",
+        "authorization-provider-mismatch-rejects",
+        "authorization-operation-mismatch-rejects",
+        "authorization-model-id-mismatch-rejects",
+        "authorization-effort-mismatch-rejects",
+        "authorization-workspace-realpath-mismatch-rejects",
+        "authorization-baseline-sha256-mismatch-rejects",
+        "authorization-effect-mismatch-rejects",
+        "authorization-issued-at-in-future-rejects",
+        "authorization-expires-at-before-now-rejects",
+        "authorization-nonce-mismatch-rejects"
+      ]
+    },
+    "workspace-or-reservation-ignored": {
+      "domain": "w1.json",
+      "killed_by": [
+        "non-isolated-workspace-rejects",
+        "missing-reservation-rejects",
+        "expired-reservation-rejects"
+      ]
+    },
+    "serialized-decision-is-capability": {
+      "domain": "authority.json",
+      "killed_by": [
+        "serialized-w1-decision-is-not-authority",
+        "persistent-audit-admit-is-not-authority",
+        "other-supervisor-live-decision-is-not-transferable"
+      ]
+    },
+    "duplicate-spawns-again": {
+      "domain": "authority.json",
+      "killed_by": [
+        "same-process-second-invocation-does-not-spawn",
+        "same-process-concurrent-invocations-spawn-at-most-once",
+        "duplicate-same-key-requires-private-verified-attach",
+        "invoke-intent-without-handle-is-uncertain-no-retry",
+        "same-key-conflict-never-spawns"
+      ]
+    },
+    "requested-identity-copied-as-actual": {
+      "domain": "reconciliation.json",
+      "killed_by": [
+        "actual-model-mismatch-fails",
+        "actual-effort-mismatch-fails",
+        "missing-actual-does-not-copy-requested"
+      ]
+    },
+    "implementation-self-reports-zero-effects": {
+      "domain": "effects.json",
+      "killed_by": [
+        "contract-evaluation-is-hermetic",
+        "controlled-fixture-spawn-is-observed-not-self-reported",
+        "real-provider-request-is-rejected",
+        "paid-canary-is-rejected",
+        "login-is-rejected",
+        "logout-is-rejected",
+        "switch-account-is-rejected",
+        "import-credential-is-rejected",
+        "copy-credential-is-rejected",
+        "device-auth-is-rejected",
+        "refresh-auth-is-rejected",
+        "write-credential-is-rejected",
+        "write-config-is-rejected",
+        "write-board-is-rejected",
+        "remote-mutation-is-rejected"
+      ]
+    }
+  }
+}

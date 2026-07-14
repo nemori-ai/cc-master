@@ -1,0 +1,288 @@
+{
+  "schema": "ccm/codex-model-admission-a-now-fixtures/v1",
+  "contract": "ccm/codex-model-admission-a-now/v1",
+  "domain": {
+    "evaluator": "evaluateEffectCase",
+    "observation_owner": "test-process-sandbox",
+    "forbidden_actions": [
+      "real-provider-request",
+      "paid-canary",
+      "login",
+      "logout",
+      "switch-account",
+      "import-credential",
+      "copy-credential",
+      "device-auth",
+      "refresh-auth",
+      "write-credential",
+      "write-config",
+      "write-board",
+      "remote-mutation"
+    ]
+  },
+  "base": {
+    "operation": "evaluate-contract",
+    "provider_target": "none",
+    "requested_action": "none"
+  },
+  "cases": [
+    {
+      "name": "contract-evaluation-is-hermetic",
+      "patch": {},
+      "expected": {
+        "result": { "status": "ok" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "controlled-fixture-spawn-is-observed-not-self-reported",
+      "patch": {
+        "operation": "fixture-attempt",
+        "provider_target": "controlled-fixture"
+      },
+      "expected": {
+        "result": { "status": "ok" },
+        "observation": {
+          "controlled_fixture_spawns": 1,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "real-provider-request-is-rejected",
+      "patch": { "requested_action": "real-provider-request" },
+      "expected": {
+        "result": { "status": "rejected" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "paid-canary-is-rejected",
+      "patch": { "requested_action": "paid-canary" },
+      "expected": {
+        "result": { "status": "rejected" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "login-is-rejected",
+      "patch": { "requested_action": "login" },
+      "expected": {
+        "result": { "status": "rejected" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "logout-is-rejected",
+      "patch": { "requested_action": "logout" },
+      "expected": {
+        "result": { "status": "rejected" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "switch-account-is-rejected",
+      "patch": { "requested_action": "switch-account" },
+      "expected": {
+        "result": { "status": "rejected" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "import-credential-is-rejected",
+      "patch": { "requested_action": "import-credential" },
+      "expected": {
+        "result": { "status": "rejected" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "copy-credential-is-rejected",
+      "patch": { "requested_action": "copy-credential" },
+      "expected": {
+        "result": { "status": "rejected" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "device-auth-is-rejected",
+      "patch": { "requested_action": "device-auth" },
+      "expected": {
+        "result": { "status": "rejected" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "refresh-auth-is-rejected",
+      "patch": { "requested_action": "refresh-auth" },
+      "expected": {
+        "result": { "status": "rejected" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "write-credential-is-rejected",
+      "patch": { "requested_action": "write-credential" },
+      "expected": {
+        "result": { "status": "rejected" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "write-config-is-rejected",
+      "patch": { "requested_action": "write-config" },
+      "expected": {
+        "result": { "status": "rejected" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "write-board-is-rejected",
+      "patch": { "requested_action": "write-board" },
+      "expected": {
+        "result": { "status": "rejected" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "remote-mutation-is-rejected",
+      "patch": { "requested_action": "remote-mutation" },
+      "expected": {
+        "result": { "status": "rejected" },
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    }
+  ]
+}
