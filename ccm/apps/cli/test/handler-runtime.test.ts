@@ -218,6 +218,20 @@ function waitForExit(child: ReturnType<typeof spawn>): Promise<{
   return new Promise((resolve) => child.once('exit', (code) => resolve({ code, stdout, stderr })));
 }
 
+async function waitForFile(
+  filePath: string,
+  child: ReturnType<typeof spawn>,
+  label: string,
+  timeoutMs = 10_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!existsSync(filePath)) {
+    assert.equal(child.exitCode, null, `${label} exited before publishing its ready handshake`);
+    assert.ok(Date.now() < deadline, `${label} did not publish its ready handshake`);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 function invokeCli(args: string[], home: string): { code: number; stdout: string; stderr: string } {
   const stdout: string[] = [];
   const stderr: string[] = [];
@@ -829,25 +843,46 @@ test('concurrent activation has one linearization winner and a locked loser, the
   const tx2 = runtime.stage({ artifactPath: second.artifact, provenancePath: second.provenance });
   const worker = join(HERE, 'fixtures', 'runtime-activate-worker.ts');
   const common = ['--import', 'tsx', worker, first.home];
+  const winnerReady = join(first.root, 'winner-ready');
+  const releaseWinner = join(first.root, 'release-winner');
 
-  const winner = spawn(process.execPath, [...common, tx1.transaction_id, '1500'], {
-    cwd: join(HERE, '..'),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const winner = spawn(
+    process.execPath,
+    [
+      ...common,
+      tx1.transaction_id,
+      JSON.stringify({
+        readyFile: winnerReady,
+        releaseFile: releaseWinner,
+        barrierTimeoutMs: 10_000,
+      }),
+    ],
+    {
+      cwd: join(HERE, '..'),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  const winnerResultPromise = waitForExit(winner);
   const lockPath = join(runtimeRoot(first.home), 'locks', 'activation.lock');
-  for (let i = 0; i < 400 && !existsSync(lockPath); i++) {
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
+  await waitForFile(winnerReady, winner, 'activation winner');
   assert.equal(existsSync(lockPath), true, 'first worker acquired activation lock');
-  const loser = spawn(process.execPath, [...common, tx2.transaction_id, '0'], {
-    cwd: join(HERE, '..'),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const loser = spawn(
+    process.execPath,
+    [...common, tx2.transaction_id, JSON.stringify({ startupDelayMs: 2_000 })],
+    {
+      cwd: join(HERE, '..'),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
 
-  const [winnerResult, loserResult] = await Promise.all([waitForExit(winner), waitForExit(loser)]);
-  assert.equal(winnerResult.code, 0, winnerResult.stderr);
+  const loserResult = await waitForExit(loser);
   assert.equal(loserResult.code, 4, loserResult.stderr);
   assert.match(loserResult.stderr, /RUNTIME_LOCKED/);
+  assert.equal(winner.exitCode, null, 'winner remains blocked on the release handshake');
+  assert.equal(existsSync(lockPath), true, 'winner still holds the lock after loser attempts');
+  writeFileSync(releaseWinner, 'release\n');
+  const winnerResult = await winnerResultPromise;
+  assert.equal(winnerResult.code, 0, winnerResult.stderr);
   assert.equal(activationCount(first.home), 1);
   assert.equal(runtime.resolve().sha256, tx1.sha256);
 
@@ -856,6 +891,62 @@ test('concurrent activation has one linearization winner and a locked loser, the
   assert.equal(retried.current.sha256, tx2.sha256);
   assert.equal(retried.previous?.sha256, tx1.sha256);
   assert.equal(runtime.resolve().sha256, tx2.sha256);
+});
+
+test('activation worker failures and barrier timeouts release the lock without publishing a commit', async () => {
+  const cases = [
+    {
+      version: '8.1.0',
+      code: 'RUNTIME_TEST_BARRIER_FAILURE',
+      control: { failAfterReady: true },
+    },
+    {
+      version: '8.1.1',
+      code: 'RUNTIME_TEST_BARRIER_TIMEOUT',
+      control: { releaseFile: 'missing', barrierTimeoutMs: 50 },
+    },
+  ];
+
+  for (const [index, probe] of cases.entries()) {
+    const first = fixture(probe.version);
+    const runtime = manager(first.home);
+    const staged = runtime.stage({
+      artifactPath: first.artifact,
+      provenancePath: first.provenance,
+    });
+    const readyFile = join(first.root, `failure-ready-${index}`);
+    const control = {
+      ...probe.control,
+      readyFile,
+      ...(probe.control.releaseFile
+        ? { releaseFile: join(first.root, probe.control.releaseFile) }
+        : {}),
+    };
+    const worker = join(HERE, 'fixtures', 'runtime-activate-worker.ts');
+    const child = spawn(
+      process.execPath,
+      ['--import', 'tsx', worker, first.home, staged.transaction_id, JSON.stringify(control)],
+      { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    const resultPromise = waitForExit(child);
+    await waitForFile(readyFile, child, probe.code);
+    const result = await resultPromise;
+    assert.equal(result.code, 1, result.stderr);
+    assert.match(result.stderr, new RegExp(probe.code));
+    assert.equal(
+      existsSync(join(runtimeRoot(first.home), 'locks', 'activation.lock')),
+      false,
+      `${probe.code} leaked the activation lock`,
+    );
+    assert.equal(activationCount(first.home), 0, `${probe.code} published an activation commit`);
+
+    const followUp = fixture(`8.2.${index}`);
+    const followUpStaged = runtime.stage({
+      artifactPath: followUp.artifact,
+      provenancePath: followUp.provenance,
+    });
+    assert.equal(runtime.activate(followUpStaged.transaction_id).current.sha256, followUp.hash);
+  }
 });
 
 test('no-replace publish has one winner under a real two-process race and never overwrites final', async () => {

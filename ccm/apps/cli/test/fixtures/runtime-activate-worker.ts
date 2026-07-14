@@ -1,17 +1,51 @@
+import { existsSync, writeFileSync } from 'node:fs';
 import { createRuntimeSupplyChain } from '../../src/runtime-supply-chain.js';
 
-const [home, transactionId, delayText = '0'] = process.argv.slice(2);
+interface WorkerControl {
+  startupDelayMs?: number;
+  readyFile?: string;
+  releaseFile?: string;
+  barrierTimeoutMs?: number;
+  failAfterReady?: boolean;
+}
+
+function wait(ms: number): void {
+  if (ms > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function controlledFailure(code: string, message: string): Error & { code: string } {
+  return Object.assign(new Error(message), { code });
+}
+
+const [home, transactionId, controlText = '{}'] = process.argv.slice(2);
 if (!home || !transactionId) {
-  process.stderr.write('usage: runtime-activate-worker <home> <transaction> [delay-ms]\n');
+  process.stderr.write('usage: runtime-activate-worker <home> <transaction> [control-json]\n');
   process.exitCode = 2;
 } else {
-  const delayMs = Number(delayText) || 0;
   try {
+    const control = JSON.parse(controlText) as WorkerControl;
+    wait(control.startupDelayMs || 0);
     const runtime = createRuntimeSupplyChain({
       env: { CC_MASTER_HOME: home },
       fault(point) {
-        if (point === 'after_prepare' && delayMs > 0) {
-          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs);
+        if (point !== 'after_prepare') return;
+        if (control.readyFile) writeFileSync(control.readyFile, 'ready\n');
+        if (control.failAfterReady) {
+          throw controlledFailure(
+            'RUNTIME_TEST_BARRIER_FAILURE',
+            'synthetic activation worker failure after ready',
+          );
+        }
+        if (!control.releaseFile) return;
+        const deadline = Date.now() + (control.barrierTimeoutMs || 10_000);
+        while (!existsSync(control.releaseFile)) {
+          if (Date.now() >= deadline) {
+            throw controlledFailure(
+              'RUNTIME_TEST_BARRIER_TIMEOUT',
+              `timed out waiting for release file: ${control.releaseFile}`,
+            );
+          }
+          wait(5);
         }
       },
     });
