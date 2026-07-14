@@ -11,6 +11,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   symlinkSync,
@@ -52,6 +53,10 @@ function makeTreeWritable(target: string): void {
   } else {
     chmodSync(target, 0o600);
   }
+}
+
+function physicalDirectoryIdentity(target: string): string {
+  return realpathSync.native(target);
 }
 
 function fixture(
@@ -764,6 +769,20 @@ test('native image exec-format failure is structured without a shell fallback', 
   );
 });
 
+test('physical cwd identity accepts path aliases but rejects real directory drift', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-runtime-cwd-identity-'));
+  TMP.push(root);
+  const expected = join(root, 'caller-cwd');
+  const different = join(root, 'different-cwd');
+  const alias = join(root, 'caller-cwd-alias');
+  mkdirSync(expected, { mode: 0o700 });
+  mkdirSync(different, { mode: 0o700 });
+  symlinkSync(expected, alias, 'dir');
+
+  assert.equal(physicalDirectoryIdentity(alias), physicalDirectoryIdentity(expected));
+  assert.notEqual(physicalDirectoryIdentity(different), physicalDirectoryIdentity(expected));
+});
+
 test('materialization never changes same-process Worker relative path resolution', () => {
   const first = nativeFixture('4.1.3', 'cwd-worker-trusted');
   const runtime = manager(first.home);
@@ -791,7 +810,7 @@ test('materialization never changes same-process Worker relative path resolution
     workerResult: string;
   };
   assert.equal(result.exit_code, 0);
-  assert.equal(result.cwd, probeDirectory);
+  assert.equal(physicalDirectoryIdentity(result.cwd), physicalDirectoryIdentity(probeDirectory));
   assert.equal(result.workerResult, 'caller-cwd');
   assert.equal(readFileSync(output, 'utf8'), 'cwd-worker-trusted');
 });
