@@ -231,12 +231,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: macos-live-evidence-${{ matrix.contract }}
+          name: macos-live-raw-evidence-${{ matrix.contract }}
           path: ${{ runner.temp }}/macos-qualification-${{ matrix.contract }}
           # The isolated RUNNER_TEMP tree intentionally contains runtime state and plugin manifests
           # below dot-directories; it is not the runner's ambient HOME or credential store.
           include-hidden-files: true
           if-no-files-found: error
+          overwrite: true
           retention-days: 14
       - name: Enforce qualification verdict
         if: steps.live.outcome != 'success'
@@ -254,7 +255,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          pattern: macos-live-evidence-*
+          # Keep raw inputs in a namespace that cannot match this job's index from an earlier attempt.
+          pattern: macos-live-raw-evidence-*
           path: evidence
           merge-multiple: false
       - name: Verify inner manifests and build the outer index
@@ -264,8 +266,8 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const expected = [
-            'macos-live-evidence-darwin-arm64',
-            'macos-live-evidence-darwin-x64',
+            'macos-live-raw-evidence-darwin-arm64',
+            'macos-live-raw-evidence-darwin-x64',
           ];
           const entries = fs.readdirSync('evidence', { withFileTypes: true });
           if (entries.some((entry) => !entry.isDirectory())) {
@@ -278,8 +280,8 @@ jobs:
           NODE
 
           for artifact in \
-            macos-live-evidence-darwin-arm64 \
-            macos-live-evidence-darwin-x64; do
+            macos-live-raw-evidence-darwin-arm64 \
+            macos-live-raw-evidence-darwin-x64; do
             root="evidence/${artifact}"
             node scripts/macos-evidence-manifest.mjs verify "${root}" "${root}/SHA256SUMS"
           done
@@ -291,4 +293,5 @@ jobs:
           name: macos-live-evidence-index
           path: EVIDENCE_SHA256SUMS
           if-no-files-found: error
+          overwrite: true
           retention-days: 14
