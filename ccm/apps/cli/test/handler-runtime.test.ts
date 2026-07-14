@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawn, spawnSync } from 'node:child_process';
+import { type ChildProcess, type SpawnOptions, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   chmodSync,
@@ -34,8 +34,207 @@ import {
 
 const TMP: string[] = [];
 const HERE = dirname(fileURLToPath(import.meta.url));
+const OWNS_POSIX_PROCESS_GROUP = process.platform !== 'win32';
 
-afterEach(() => {
+interface OwnedChildRecord {
+  child: ChildProcess;
+  closed: Promise<void>;
+  closedNow: boolean;
+  groupId: number | null;
+  label: string;
+}
+
+function processGroupIsAlive(groupId: number | null): boolean {
+  if (groupId === null) return false;
+  try {
+    process.kill(-groupId, 0);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false;
+    throw error;
+  }
+}
+
+function waitForOwnedTreeClose(record: OwnedChildRecord, timeoutMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(
+      () => finish(new Error(`${record.label} did not close its owned tree within ${timeoutMs}ms`)),
+      timeoutMs,
+    );
+    let poll: NodeJS.Timeout | undefined;
+    let settled = false;
+    const finish = (error?: unknown) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (poll) clearTimeout(poll);
+      if (error) reject(error);
+      else resolve();
+    };
+    const check = () => {
+      if (settled) return;
+      try {
+        if (record.closedNow && !processGroupIsAlive(record.groupId)) finish();
+        else if (record.closedNow) poll = setTimeout(check, 10);
+      } catch (error) {
+        finish(error);
+      }
+    };
+    record.closed.then(check, finish);
+    check();
+  });
+}
+
+class TestChildOwner {
+  readonly #records = new Map<ChildProcess, OwnedChildRecord>();
+
+  track<T extends ChildProcess>(child: T, label: string, ownsProcessGroup = false): T {
+    const record: OwnedChildRecord = {
+      child,
+      closed: Promise.resolve(),
+      closedNow: false,
+      groupId:
+        ownsProcessGroup && Number.isSafeInteger(child.pid) && Number(child.pid) > 0
+          ? Number(child.pid)
+          : null,
+      label,
+    };
+    const closed = new Promise<void>((resolve) => {
+      child.once('close', () => {
+        record.closedNow = true;
+        resolve();
+      });
+    });
+    record.closed = closed;
+    this.#records.set(child, record);
+    return child;
+  }
+
+  async waitForNaturalClose(child: ChildProcess, timeoutMs: number): Promise<void> {
+    const record = this.#records.get(child);
+    if (!record) throw new Error('cannot wait for an unowned test child');
+    await waitForOwnedTreeClose(record, timeoutMs);
+    this.#records.delete(child);
+  }
+
+  async terminateAll(): Promise<void> {
+    await this.terminate([...this.#records.keys()]);
+  }
+
+  async terminate(children: ChildProcess[]): Promise<void> {
+    const records = children
+      .map((child) => this.#records.get(child))
+      .filter((record): record is OwnedChildRecord => record !== undefined);
+    const results = await Promise.allSettled(records.map((record) => this.#terminate(record)));
+    const errors = results
+      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+      .map((result) => result.reason);
+    if (errors.length > 0) {
+      throw new AggregateError(
+        errors,
+        `${errors.length} owned test child process(es) could not close`,
+      );
+    }
+  }
+
+  async #terminate(record: OwnedChildRecord): Promise<void> {
+    const { child, groupId, label } = record;
+    const rootExited = record.closedNow || child.exitCode !== null || child.signalCode !== null;
+    if (rootExited && !processGroupIsAlive(groupId)) {
+      await waitForOwnedTreeClose(record, 500);
+      this.#records.delete(child);
+      return;
+    }
+    const signal = (value: NodeJS.Signals) => {
+      if (groupId === null) {
+        if (child.exitCode === null && child.signalCode === null) child.kill(value);
+        return;
+      }
+      try {
+        process.kill(-groupId, value);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+      }
+    };
+    signal('SIGTERM');
+    try {
+      await waitForOwnedTreeClose(record, 500);
+    } catch (termError) {
+      signal('SIGKILL');
+      try {
+        await waitForOwnedTreeClose(record, 1_000);
+      } catch (killError) {
+        throw new AggregateError([termError, killError], `${label} could not be terminated`);
+      }
+    }
+    this.#records.delete(child);
+  }
+}
+
+const TEST_CHILDREN = new TestChildOwner();
+
+function spawnOwned(
+  executable: string,
+  args: readonly string[],
+  options: SpawnOptions,
+  label: string,
+): ChildProcess {
+  return TEST_CHILDREN.track(
+    spawn(executable, args, { ...options, detached: OWNS_POSIX_PROCESS_GROUP }),
+    label,
+    OWNS_POSIX_PROCESS_GROUP,
+  );
+}
+
+async function withCleanup<T>(
+  run: () => Promise<T>,
+  cleanup: () => Promise<void>,
+  label: string,
+): Promise<T> {
+  let result: T | undefined;
+  let primaryFailure: { error: unknown } | undefined;
+  let cleanupFailure: { error: unknown } | undefined;
+  try {
+    try {
+      result = await run();
+    } catch (error) {
+      primaryFailure = { error };
+    }
+  } finally {
+    try {
+      await cleanup();
+    } catch (error) {
+      cleanupFailure = { error };
+    }
+  }
+  if (primaryFailure && cleanupFailure) {
+    throw new AggregateError(
+      [primaryFailure.error, cleanupFailure.error],
+      `${label} failed and cleanup also failed`,
+    );
+  }
+  if (primaryFailure) throw primaryFailure.error;
+  if (cleanupFailure) throw cleanupFailure.error;
+  return result as T;
+}
+
+function processIsAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false;
+    throw error;
+  }
+}
+
+function assertNoLivePids(pids: number[], label: string): void {
+  const alive = pids.filter(processIsAlive);
+  assert.deepEqual(alive, [], `${label} leaked owned child PIDs: ${alive.join(', ')}`);
+}
+
+afterEach(async () => {
+  await TEST_CHILDREN.terminateAll();
   for (const root of TMP) {
     makeTreeWritable(root);
     rmSync(root, { recursive: true, force: true });
@@ -321,7 +520,7 @@ function expectRuntimeError(fn: () => unknown, code: string): void {
   });
 }
 
-function waitForExit(child: ReturnType<typeof spawn>): Promise<{
+function waitForExit(child: ChildProcess): Promise<{
   code: number | null;
   signal: NodeJS.Signals | null;
   stdout: string;
@@ -342,7 +541,7 @@ function waitForExit(child: ReturnType<typeof spawn>): Promise<{
 
 async function waitForFile(
   filePath: string,
-  child: ReturnType<typeof spawn>,
+  child: ChildProcess,
   label: string,
   timeoutMs = 10_000,
 ): Promise<void> {
@@ -352,6 +551,110 @@ async function waitForFile(
     assert.ok(Date.now() < deadline, `${label} did not publish its ready handshake`);
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
+}
+
+interface PublishRaceOptions {
+  afterReady?: () => void;
+  onDescendants?: (pids: number[]) => void;
+  onSpawn?: (children: ChildProcess[]) => void;
+  readyTimeoutMs?: number;
+  suppressReady?: 'a' | 'b';
+  withDescendants?: boolean;
+}
+
+async function runNoReplacePublishRace(options: PublishRaceOptions = {}): Promise<{
+  finalPath: string;
+  results: Awaited<ReturnType<typeof waitForExit>>[];
+  tempA: string;
+  tempB: string;
+}> {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-publish-race-'));
+  TMP.push(root);
+  const tempA = join(root, 'a.tmp');
+  const tempB = join(root, 'b.tmp');
+  const finalPath = join(root, 'final.json');
+  const barrier = join(root, 'go');
+  const descendantA = join(root, 'descendant-a.pid');
+  const descendantB = join(root, 'descendant-b.pid');
+  const readyA = join(root, 'ready-a');
+  const readyB = join(root, 'ready-b');
+  writeFileSync(tempA, 'A');
+  writeFileSync(tempB, 'B');
+  const worker = join(HERE, 'fixtures', 'runtime-publish-worker.ts');
+  const common = ['--import', 'tsx', worker];
+  const children: ChildProcess[] = [];
+  return withCleanup(
+    async () => {
+      const a = spawnOwned(
+        process.execPath,
+        [
+          ...common,
+          tempA,
+          finalPath,
+          barrier,
+          readyA,
+          JSON.stringify({
+            descendantPidPath: options.withDescendants ? descendantA : undefined,
+            suppressReady: options.suppressReady === 'a',
+          }),
+        ],
+        { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+        'runtime publish worker A',
+      );
+      children.push(a);
+      const b = spawnOwned(
+        process.execPath,
+        [
+          ...common,
+          tempB,
+          finalPath,
+          barrier,
+          readyB,
+          JSON.stringify({
+            descendantPidPath: options.withDescendants ? descendantB : undefined,
+            suppressReady: options.suppressReady === 'b',
+          }),
+        ],
+        { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+        'runtime publish worker B',
+      );
+      children.push(b);
+      options.onSpawn?.(children);
+      if (options.withDescendants) {
+        await waitForFile(descendantA, a, 'publisher A descendant');
+        await waitForFile(descendantB, b, 'publisher B descendant');
+        const pids = [descendantA, descendantB].map((path) => Number(readFileSync(path, 'utf8')));
+        assert.equal(
+          pids.every((pid) => Number.isSafeInteger(pid) && pid > 0),
+          true,
+          'publish workers reported invalid descendant PIDs',
+        );
+        options.onDescendants?.(pids);
+      }
+      await waitForFile(
+        readyA,
+        a,
+        'publisher A',
+        options.suppressReady === 'a' ? options.readyTimeoutMs : undefined,
+      );
+      await waitForFile(
+        readyB,
+        b,
+        'publisher B',
+        options.suppressReady === 'b' ? options.readyTimeoutMs : undefined,
+      );
+      options.afterReady?.();
+      writeFileSync(barrier, 'go');
+      return {
+        finalPath,
+        results: await Promise.all([waitForExit(a), waitForExit(b)]),
+        tempA,
+        tempB,
+      };
+    },
+    () => TEST_CHILDREN.terminate(children),
+    'publish race',
+  );
 }
 
 function invokeCli(args: string[], home: string): { code: number; stdout: string; stderr: string } {
@@ -654,7 +957,12 @@ test('rollback affects only new invocations; a resolved old image keeps running'
   const started = join(first.root, 'started');
   const release = join(first.root, 'release');
   const result = join(first.root, 'result');
-  const child = spawn(pinnedOld.image_path, [started, release, result], { stdio: 'ignore' });
+  const child = spawnOwned(
+    pinnedOld.image_path,
+    [started, release, result],
+    { stdio: 'ignore' },
+    'resolved old runtime image',
+  );
   for (let i = 0; i < 100 && !existsSync(started); i++) {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
@@ -861,21 +1169,23 @@ test('two concurrent cold invokes both succeed through one digest-pinned launche
   const outputA = join(first.root, 'output-a');
   const outputB = join(first.root, 'output-b');
   const args = ['--import', 'tsx', worker, first.home];
-  const a = spawn(
+  const a = spawnOwned(
     process.execPath,
     [...args, outputA, readyA, barrier, 'before_helper_publish_native'],
     {
       cwd: join(HERE, '..'),
       stdio: ['ignore', 'pipe', 'pipe'],
     },
+    'cold launcher publisher A',
   );
-  const b = spawn(
+  const b = spawnOwned(
     process.execPath,
     [...args, outputB, readyB, barrier, 'before_helper_publish_native'],
     {
       cwd: join(HERE, '..'),
       stdio: ['ignore', 'pipe', 'pipe'],
     },
+    'cold launcher publisher B',
   );
   for (let i = 0; i < 400 && !(existsSync(readyA) && existsSync(readyB)); i++) {
     await new Promise((resolve) => setTimeout(resolve, 5));
@@ -915,13 +1225,14 @@ test('shared materializer root churn between lstat and open preserves directory 
   const blockedOutput = join(first.root, 'blocked-output');
   const concurrentOutput = join(first.root, 'concurrent-output');
   const args = ['--import', 'tsx', worker, first.home];
-  const blocked = spawn(
+  const blocked = spawnOwned(
     process.execPath,
     [...args, blockedOutput, ready, barrier, 'after_materializer_root_lstat'],
     {
       cwd: join(HERE, '..'),
       stdio: ['ignore', 'pipe', 'pipe'],
     },
+    'materializer root-churn blocked publisher',
   );
   const blockedExit = waitForExit(blocked);
   await waitForCondition(
@@ -929,10 +1240,12 @@ test('shared materializer root churn between lstat and open preserves directory 
     'blocked publisher did not reach the materializer root lstat/open seam',
   );
 
-  const concurrent = spawn(process.execPath, [...args, concurrentOutput], {
-    cwd: join(HERE, '..'),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const concurrent = spawnOwned(
+    process.execPath,
+    [...args, concurrentOutput],
+    { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    'materializer root-churn concurrent publisher',
+  );
   const concurrentResult = await waitForExit(concurrent);
   writeFileSync(barrier, 'go');
   const blockedResult = await blockedExit;
@@ -1076,14 +1389,18 @@ test('dead-temp cleanup is idempotent across two cold publishers', async () => {
   const outputA = join(first.root, 'cleanup-output-a');
   const outputB = join(first.root, 'cleanup-output-b');
   const args = ['--import', 'tsx', worker, first.home];
-  const a = spawn(process.execPath, [...args, outputA, readyA, barrier, 'before_temp_cleanup'], {
-    cwd: join(HERE, '..'),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  const b = spawn(process.execPath, [...args, outputB, readyB, barrier, 'before_temp_cleanup'], {
-    cwd: join(HERE, '..'),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const a = spawnOwned(
+    process.execPath,
+    [...args, outputA, readyA, barrier, 'before_temp_cleanup'],
+    { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    'dead-temp cleanup publisher A',
+  );
+  const b = spawnOwned(
+    process.execPath,
+    [...args, outputB, readyB, barrier, 'before_temp_cleanup'],
+    { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    'dead-temp cleanup publisher B',
+  );
   for (let index = 0; index < 600 && !(existsSync(readyA) && existsSync(readyB)); index++) {
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
@@ -1118,10 +1435,11 @@ test('final verification detects a valid publisher hard-link converging from two
   const verifierOutput = join(first.root, 'verifier-output');
   const args = ['--import', 'tsx', worker, first.home];
 
-  const winner = spawn(
+  const winner = spawnOwned(
     process.execPath,
     [...args, winnerOutput, winnerReady, winnerBarrier, 'after_helper_publish_native'],
     { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    'final-convergence winner',
   );
   const winnerExit = waitForExit(winner);
   await waitForCondition(
@@ -1131,10 +1449,11 @@ test('final verification detects a valid publisher hard-link converging from two
   const finalPath = join(launcherDirectory(first.home), builtLauncherHelperName());
   assert.equal(lstatSync(finalPath).nlink, 2, 'winner must retain its temporary hard link');
 
-  const verifier = spawn(
+  const verifier = spawnOwned(
     process.execPath,
     [...args, verifierOutput, verifierReady, verifierBarrier, 'after_final_open_native'],
     { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    'final-convergence verifier',
   );
   const verifierExit = waitForExit(verifier);
   await waitForCondition(
@@ -1167,7 +1486,7 @@ test('final verification still rejects in-place invalid bytes at the same open b
   const ready = join(first.root, 'final-invalid-open-ready');
   const barrier = join(first.root, 'final-invalid-read-go');
   const rejectedOutput = join(first.root, 'final-invalid-rejected-output');
-  const verifier = spawn(
+  const verifier = spawnOwned(
     process.execPath,
     [
       '--import',
@@ -1180,6 +1499,7 @@ test('final verification still rejects in-place invalid bytes at the same open b
       'after_final_open_native',
     ],
     { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    'in-place invalid-final verifier',
   );
   const verifierExit = waitForExit(verifier);
   await waitForCondition(() => existsSync(ready), 'invalid verifier did not pin the final');
@@ -1236,7 +1556,7 @@ test('a real publisher-parent SIGKILL cannot strand an executable materializer b
   const ready = join(first.root, 'real-parent-sigkill-ready');
   const barrier = join(first.root, 'real-parent-sigkill-go');
   const before = new Set(observedMaterializerBootstraps(first.home));
-  const publisher = spawn(
+  const publisher = spawnOwned(
     process.execPath,
     [
       '--import',
@@ -1249,6 +1569,7 @@ test('a real publisher-parent SIGKILL cannot strand an executable materializer b
       'before_bootstrap_self_cleanup_native',
     ],
     { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    'parent-SIGKILL launcher publisher',
   );
   let during: string[] = [];
   try {
@@ -1293,7 +1614,7 @@ test('a publisher crash after bootstrap creation is reclaimed by the next activa
   const interruptedOutput = join(first.root, 'pre-spawn-interrupted');
   const ready = join(first.root, 'pre-spawn-ready');
   const barrier = join(first.root, 'pre-spawn-go');
-  const publisher = spawn(
+  const publisher = spawnOwned(
     process.execPath,
     [
       '--import',
@@ -1306,6 +1627,7 @@ test('a publisher crash after bootstrap creation is reclaimed by the next activa
       'after_materializer_bootstrap_create',
     ],
     { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    'bootstrap-create crash publisher',
   );
   try {
     await waitForCondition(
@@ -1352,10 +1674,11 @@ test('native bootstrap self-clean survives parent SIGKILL before and after helpe
     const ready = join(first.root, `${point}-parent-ready`);
     const barrier = join(first.root, `${point}-parent-go`);
     const interruptedOutput = join(first.root, `${point}-interrupted`);
-    const publisher = spawn(
+    const publisher = spawnOwned(
       process.execPath,
       ['--import', 'tsx', worker, first.home, interruptedOutput, ready, barrier, point],
       { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+      `${point} self-clean publisher`,
     );
     try {
       await waitForCondition(() => existsSync(ready), `${point}: native seam was not reached`);
@@ -1372,12 +1695,13 @@ test('native bootstrap self-clean survives parent SIGKILL before and after helpe
       writeFileSync(barrier, 'go');
       await waitForCondition(
         () => launcherHelpers(first.home).length === 1,
-        `${point}: orphaned native child did not finish`,
+        `${point}: orphaned native child did not publish its helper`,
       );
       await waitForCondition(
         () => materializerInstances(first.home).length === 0,
-        `${point}: executable bootstrap survived orphan completion`,
+        `${point}: executable bootstrap survived native self-clean`,
       );
+      await TEST_CHILDREN.waitForNaturalClose(publisher, 3_000);
 
       const recoveredOutput = join(first.root, `${point}-recovered`);
       assert.equal(runtime.invoke([recoveredOutput]).exit_code, 0);
@@ -1437,15 +1761,17 @@ test('dead materializer bootstrap recovery is idempotent across concurrent activ
   const outputA = join(first.root, 'bootstrap-recovery-output-a');
   const outputB = join(first.root, 'bootstrap-recovery-output-b');
   const args = ['--import', 'tsx', worker, first.home];
-  const a = spawn(
+  const a = spawnOwned(
     process.execPath,
     [...args, outputA, readyA, barrier, 'before_bootstrap_recovery_native'],
     { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    'bootstrap recovery publisher A',
   );
-  const b = spawn(
+  const b = spawnOwned(
     process.execPath,
     [...args, outputB, readyB, barrier, 'before_bootstrap_recovery_native'],
     { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    'bootstrap recovery publisher B',
   );
   try {
     await waitForCondition(
@@ -1476,7 +1802,7 @@ test('native materializer self-cleans its own bootstrap before stale recovery', 
   const ready = join(first.root, 'bootstrap-self-clean-order-ready');
   const barrier = join(first.root, 'bootstrap-self-clean-order-go');
   const output = join(first.root, 'bootstrap-self-clean-order-output');
-  const publisher = spawn(
+  const publisher = spawnOwned(
     process.execPath,
     [
       '--import',
@@ -1489,6 +1815,7 @@ test('native materializer self-cleans its own bootstrap before stale recovery', 
       'before_bootstrap_recovery_native',
     ],
     { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    'bootstrap self-clean order publisher',
   );
   try {
     await waitForCondition(() => existsSync(ready), 'native child did not reach recovery seam');
@@ -1849,7 +2176,7 @@ test('concurrent activation has one linearization winner and a locked loser, the
   const winnerReady = join(first.root, 'winner-ready');
   const releaseWinner = join(first.root, 'release-winner');
 
-  const winner = spawn(
+  const winner = spawnOwned(
     process.execPath,
     [
       ...common,
@@ -1860,22 +2187,18 @@ test('concurrent activation has one linearization winner and a locked loser, the
         barrierTimeoutMs: 10_000,
       }),
     ],
-    {
-      cwd: join(HERE, '..'),
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
+    { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    'activation winner',
   );
   const winnerResultPromise = waitForExit(winner);
   const lockPath = join(runtimeRoot(first.home), 'locks', 'activation.lock');
   await waitForFile(winnerReady, winner, 'activation winner');
   assert.equal(existsSync(lockPath), true, 'first worker acquired activation lock');
-  const loser = spawn(
+  const loser = spawnOwned(
     process.execPath,
     [...common, tx2.transaction_id, JSON.stringify({ startupDelayMs: 2_000 })],
-    {
-      cwd: join(HERE, '..'),
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
+    { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    'activation loser',
   );
 
   const loserResult = await waitForExit(loser);
@@ -1926,10 +2249,11 @@ test('activation worker failures and barrier timeouts release the lock without p
         : {}),
     };
     const worker = join(HERE, 'fixtures', 'runtime-activate-worker.ts');
-    const child = spawn(
+    const child = spawnOwned(
       process.execPath,
       ['--import', 'tsx', worker, first.home, staged.transaction_id, JSON.stringify(control)],
       { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+      `${probe.code} activation worker`,
     );
     const resultPromise = waitForExit(child);
     await waitForFile(readyFile, child, probe.code);
@@ -1953,32 +2277,7 @@ test('activation worker failures and barrier timeouts release the lock without p
 });
 
 test('no-replace publish has one winner under a real two-process race and never overwrites final', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'ccm-publish-race-'));
-  TMP.push(root);
-  const tempA = join(root, 'a.tmp');
-  const tempB = join(root, 'b.tmp');
-  const finalPath = join(root, 'final.json');
-  const barrier = join(root, 'go');
-  const readyA = join(root, 'ready-a');
-  const readyB = join(root, 'ready-b');
-  writeFileSync(tempA, 'A');
-  writeFileSync(tempB, 'B');
-  const worker = join(HERE, 'fixtures', 'runtime-publish-worker.ts');
-  const common = ['--import', 'tsx', worker];
-  const a = spawn(process.execPath, [...common, tempA, finalPath, barrier, readyA], {
-    cwd: join(HERE, '..'),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  const b = spawn(process.execPath, [...common, tempB, finalPath, barrier, readyB], {
-    cwd: join(HERE, '..'),
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  for (let i = 0; i < 400 && !(existsSync(readyA) && existsSync(readyB)); i++) {
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
-  assert.equal(existsSync(readyA) && existsSync(readyB), true, 'both publishers reached barrier');
-  writeFileSync(barrier, 'go');
-  const results = await Promise.all([waitForExit(a), waitForExit(b)]);
+  const { finalPath, results, tempA, tempB } = await runNoReplacePublishRace();
   assert.deepEqual(
     results.map((result) => result.code).sort(),
     [0, 3],
@@ -1992,6 +2291,99 @@ test('no-replace publish has one winner under a real two-process race and never 
     readFileSync(finalPath, 'utf8'),
     winner,
     'loser temp mutation cannot overwrite final hard-link',
+  );
+});
+
+test('owned cleanup reports both the primary failure and a cleanup failure', async () => {
+  const primaryFailure = new Error('synthetic primary failure');
+  const cleanupFailure = new Error('synthetic cleanup failure');
+  await assert.rejects(
+    withCleanup(
+      async () => {
+        throw primaryFailure;
+      },
+      async () => {
+        throw cleanupFailure;
+      },
+      'dual-failure probe',
+    ),
+    (error: unknown) => {
+      assert.ok(error instanceof AggregateError);
+      assert.deepEqual(error.errors, [primaryFailure, cleanupFailure]);
+      assert.match(error.message, /dual-failure probe failed and cleanup also failed/);
+      return true;
+    },
+  );
+});
+
+test('publish race tears down owned worker subtrees after an injected assertion failure', async () => {
+  const emergencyOwner = new TestChildOwner();
+  const pids: number[] = [];
+  await withCleanup(
+    async () => {
+      await assert.rejects(
+        runNoReplacePublishRace({
+          afterReady() {
+            assert.fail('synthetic assertion failure after both publishers reached the barrier');
+          },
+          onDescendants(descendantPids) {
+            pids.push(...descendantPids);
+          },
+          onSpawn(children) {
+            for (const [index, child] of children.entries()) {
+              emergencyOwner.track(
+                child,
+                `assertion-failure publisher ${index}`,
+                OWNS_POSIX_PROCESS_GROUP,
+              );
+              assert.ok(child.pid);
+              pids.push(child.pid);
+            }
+          },
+          withDescendants: OWNS_POSIX_PROCESS_GROUP,
+        }),
+        /synthetic assertion failure/,
+      );
+      assert.equal(pids.length, OWNS_POSIX_PROCESS_GROUP ? 4 : 2);
+      assertNoLivePids(pids, 'assertion-failure path');
+    },
+    () => emergencyOwner.terminateAll(),
+    'assertion-failure regression',
+  );
+});
+
+test('publish race tears down owned worker subtrees after a readiness barrier timeout', async () => {
+  const emergencyOwner = new TestChildOwner();
+  const pids: number[] = [];
+  await withCleanup(
+    async () => {
+      await assert.rejects(
+        runNoReplacePublishRace({
+          onDescendants(descendantPids) {
+            pids.push(...descendantPids);
+          },
+          onSpawn(children) {
+            for (const [index, child] of children.entries()) {
+              emergencyOwner.track(
+                child,
+                `barrier-timeout publisher ${index}`,
+                OWNS_POSIX_PROCESS_GROUP,
+              );
+              assert.ok(child.pid);
+              pids.push(child.pid);
+            }
+          },
+          readyTimeoutMs: 100,
+          suppressReady: 'b',
+          withDescendants: OWNS_POSIX_PROCESS_GROUP,
+        }),
+        /publisher B did not publish its ready handshake/,
+      );
+      assert.equal(pids.length, OWNS_POSIX_PROCESS_GROUP ? 4 : 2);
+      assertNoLivePids(pids, 'barrier-timeout path');
+    },
+    () => emergencyOwner.terminateAll(),
+    'barrier-timeout regression',
   );
 });
 
