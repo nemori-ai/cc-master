@@ -72,8 +72,8 @@ node scripts/macos-evidence-manifest.mjs verify \
 
 outer_tree="$tmp/outer"
 mkdir -p "$outer_tree"
-cp -R "$download_tree" "$outer_tree/macos-live-evidence-darwin-arm64"
-cp -R "$download_tree" "$outer_tree/macos-live-evidence-darwin-x64"
+cp -R "$download_tree" "$outer_tree/macos-live-raw-evidence-darwin-arm64"
+cp -R "$download_tree" "$outer_tree/macos-live-raw-evidence-darwin-x64"
 node scripts/macos-evidence-manifest.mjs write \
   "$outer_tree" "$tmp/EVIDENCE_SHA256SUMS"
 node scripts/macos-evidence-manifest.mjs verify \
@@ -81,37 +81,37 @@ node scripts/macos-evidence-manifest.mjs verify \
 
 outer_missing_tree="$tmp/outer-missing-hidden"
 cp -R "$outer_tree" "$outer_missing_tree"
-rm "$outer_missing_tree/macos-live-evidence-darwin-arm64/Fresh Home with spaces 用户/.cc_master/runtime/transactions/tx.json"
+rm "$outer_missing_tree/macos-live-raw-evidence-darwin-arm64/Fresh Home with spaces 用户/.cc_master/runtime/transactions/tx.json"
 if node scripts/macos-evidence-manifest.mjs verify \
   "$outer_missing_tree" "$tmp/EVIDENCE_SHA256SUMS" >"$tmp/outer-missing.out" 2>"$tmp/outer-missing.err"; then
   printf '%s\n' 'not ok - the outer index must reject a missing hidden member' >&2
   exit 1
 fi
-grep -q 'missing=.*macos-live-evidence-darwin-arm64/Fresh Home with spaces 用户/.cc_master/runtime/transactions/tx.json' \
+grep -q 'missing=.*macos-live-raw-evidence-darwin-arm64/Fresh Home with spaces 用户/.cc_master/runtime/transactions/tx.json' \
   "$tmp/outer-missing.err"
 
 outer_corrupt_tree="$tmp/outer-corrupt-hidden"
 cp -R "$outer_tree" "$outer_corrupt_tree"
 printf '%s\n' 'outer mutation' \
-  >>"$outer_corrupt_tree/macos-live-evidence-darwin-x64/plugin-extract-claude-code/cc-master/.claude-plugin/plugin.json"
+  >>"$outer_corrupt_tree/macos-live-raw-evidence-darwin-x64/plugin-extract-claude-code/cc-master/.claude-plugin/plugin.json"
 if node scripts/macos-evidence-manifest.mjs verify \
   "$outer_corrupt_tree" "$tmp/EVIDENCE_SHA256SUMS" >"$tmp/outer-corrupt.out" 2>"$tmp/outer-corrupt.err"; then
   printf '%s\n' 'not ok - the outer index must reject a corrupt hidden member' >&2
   exit 1
 fi
-grep -q 'corrupt=.*macos-live-evidence-darwin-x64/plugin-extract-claude-code/cc-master/.claude-plugin/plugin.json' \
+grep -q 'corrupt=.*macos-live-raw-evidence-darwin-x64/plugin-extract-claude-code/cc-master/.claude-plugin/plugin.json' \
   "$tmp/outer-corrupt.err"
 
 outer_extra_tree="$tmp/outer-extra-member"
 cp -R "$outer_tree" "$outer_extra_tree"
 printf '%s\n' 'undeclared outer evidence' \
-  >"$outer_extra_tree/macos-live-evidence-darwin-arm64/unexpected-outer.log"
+  >"$outer_extra_tree/macos-live-raw-evidence-darwin-arm64/unexpected-outer.log"
 if node scripts/macos-evidence-manifest.mjs verify \
   "$outer_extra_tree" "$tmp/EVIDENCE_SHA256SUMS" >"$tmp/outer-extra.out" 2>"$tmp/outer-extra.err"; then
   printf '%s\n' 'not ok - the outer index must reject an undeclared member' >&2
   exit 1
 fi
-grep -q 'extra=.*macos-live-evidence-darwin-arm64/unexpected-outer.log' \
+grep -q 'extra=.*macos-live-raw-evidence-darwin-arm64/unexpected-outer.log' \
   "$tmp/outer-extra.err"
 
 missing_tree="$tmp/missing-hidden"

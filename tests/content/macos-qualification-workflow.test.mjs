@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import {
+  cpSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join, resolve } from 'node:path';
 import { test } from 'node:test';
 
 const workflow = readFileSync('.github/workflows/macos-live-qualification.yml', 'utf8');
@@ -9,6 +19,7 @@ const runtimeSupplyChainSpec = readFileSync(
   'design_docs/cross-harness-runtime-supply-chain-spec.md',
   'utf8',
 );
+const manifestScript = resolve('scripts/macos-evidence-manifest.mjs');
 
 function jobBlock(id) {
   const marker = `  ${id}:\n`;
@@ -45,6 +56,69 @@ function runScript(step) {
     .split('\n')
     .map((line) => (line.startsWith('          ') ? line.slice(10) : line))
     .join('\n');
+}
+
+function downloadPattern(block) {
+  const match = block.match(/^ {10}pattern: (.+)$/m);
+  assert.ok(match, 'evidence index must declare an artifact download pattern');
+  return match[1];
+}
+
+function matchesTrailingStarPattern(name, pattern) {
+  assert.match(pattern, /^[a-z0-9-]+\*$/, 'the hermetic matcher covers the workflow trailing-star contract');
+  return name.startsWith(pattern.slice(0, -1));
+}
+
+function writeRawArtifact(root, name) {
+  const artifact = join(root, name);
+  mkdirSync(artifact, { recursive: true });
+  writeFileSync(join(artifact, 'evidence.log'), `${name}\n`);
+  const manifest = spawnSync(
+    process.execPath,
+    [manifestScript, 'write', artifact, join(artifact, 'SHA256SUMS')],
+    { encoding: 'utf8' },
+  );
+  assert.equal(manifest.status, 0, manifest.stderr);
+}
+
+function prepareIndexAttempt(artifactNames, pattern) {
+  const root = mkdtempSync(join(tmpdir(), 'cc-master-macos-evidence-index-'));
+  const catalog = join(root, 'catalog');
+  const workspace = join(root, 'workspace');
+  const evidence = join(workspace, 'evidence');
+  mkdirSync(catalog, { recursive: true });
+  mkdirSync(join(workspace, 'scripts'), { recursive: true });
+  cpSync(manifestScript, join(workspace, 'scripts', basename(manifestScript)));
+
+  for (const name of artifactNames) {
+    if (name === 'macos-live-evidence-index') {
+      const artifact = join(catalog, name);
+      mkdirSync(artifact, { recursive: true });
+      writeFileSync(join(artifact, 'EVIDENCE_SHA256SUMS'), 'previous attempt index\n');
+    } else {
+      writeRawArtifact(catalog, name);
+    }
+  }
+
+  mkdirSync(evidence, { recursive: true });
+  for (const entry of readdirSync(catalog, { withFileTypes: true })) {
+    if (entry.isDirectory() && matchesTrailingStarPattern(entry.name, pattern)) {
+      cpSync(join(catalog, entry.name), join(evidence, entry.name), { recursive: true });
+    }
+  }
+
+  return {
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+    evidence,
+    workspace,
+  };
+}
+
+function runIndexAttempt(attempt, script) {
+  return spawnSync('bash', ['-c', script], {
+    cwd: attempt.workspace,
+    encoding: 'utf8',
+  });
 }
 
 const expectedStrategy = `    strategy:
@@ -198,8 +272,14 @@ test('raw evidence upload intentionally includes hidden members only within the 
     upload,
     /path: \$\{\{ runner\.temp \}\}\/macos-qualification-\$\{\{ matrix\.contract \}\}/,
   );
+  assert.match(
+    upload,
+    /^ {10}name: macos-live-raw-evidence-\$\{\{ matrix\.contract \}\}$/m,
+  );
   assert.match(upload, /^ {10}include-hidden-files: true$/m);
   assert.match(upload, /^ {10}if-no-files-found: error$/m);
+  assert.match(upload, /^ {10}overwrite: true$/m);
+  assert.match(upload, /^ {10}retention-days: 14$/m);
   assert.equal(
     (workflow.match(/^[ \t]+include-hidden-files: true$/gm) ?? []).length,
     1,
@@ -212,10 +292,10 @@ test('downloaded inner artifacts and the outer index are verified before index u
   const index = jobBlock('evidence-index');
   assert.match(index, /uses: actions\/checkout@v4/);
   assert.match(index, /uses: actions\/download-artifact@v4/);
-  assert.match(index, /^ {10}pattern: macos-live-evidence-\*$/m);
+  assert.match(index, /^ {10}pattern: macos-live-raw-evidence-\*$/m);
   assert.match(index, /^ {10}merge-multiple: false$/m);
   for (const contract of ['darwin-arm64', 'darwin-x64']) {
-    assert.match(index, new RegExp(`macos-live-evidence-${contract}`));
+    assert.match(index, new RegExp(`macos-live-raw-evidence-${contract}`));
   }
   const innerVerify = index.indexOf(
     'macos-evidence-manifest.mjs verify "${root}" "${root}/SHA256SUMS"',
@@ -232,6 +312,52 @@ test('downloaded inner artifacts and the outer index are verified before index u
   assert.ok(outerVerify > outerWrite, 'outer index must verify after it is written');
   assert.ok(indexUpload > outerVerify, 'index artifact must upload only after outer verification');
   assert.match(index.slice(outerVerify), /uses: actions\/upload-artifact@v4/);
+  assert.match(index.slice(indexUpload), /^ {10}overwrite: true$/m);
+  assert.match(index.slice(indexUpload), /^ {10}retention-days: 14$/m);
+});
+
+test('rerun selection excludes a previous index while duplicate, extra, missing, and corrupt raw evidence fail closed', () => {
+  const index = jobBlock('evidence-index');
+  const pattern = downloadPattern(index);
+  const script = runScript(namedStep(index, 'Verify inner manifests and build the outer index'));
+  const arm = 'macos-live-raw-evidence-darwin-arm64';
+  const x64 = 'macos-live-raw-evidence-darwin-x64';
+  const previousIndex = 'macos-live-evidence-index';
+
+  assert.equal(matchesTrailingStarPattern(previousIndex, pattern), false);
+  const rerun = prepareIndexAttempt([arm, x64, previousIndex], pattern);
+  try {
+    assert.deepEqual(readdirSync(rerun.evidence).sort(), [arm, x64]);
+    const result = runIndexAttempt(rerun, script);
+    assert.equal(result.status, 0, result.stderr);
+  } finally {
+    rerun.cleanup();
+  }
+
+  for (const [label, names] of [
+    ['duplicate architecture', [arm, `${arm}-rerun`, x64]],
+    ['unknown architecture', [arm, x64, 'macos-live-raw-evidence-darwin-riscv64']],
+    ['missing architecture', [arm]],
+  ]) {
+    const attempt = prepareIndexAttempt(names, pattern);
+    try {
+      const result = runIndexAttempt(attempt, script);
+      assert.notEqual(result.status, 0, `${label} must fail closed`);
+      assert.match(result.stderr, /expected artifact directories/);
+    } finally {
+      attempt.cleanup();
+    }
+  }
+
+  const corrupt = prepareIndexAttempt([arm, x64], pattern);
+  try {
+    writeFileSync(join(corrupt.evidence, x64, 'evidence.log'), 'corrupt after manifest\n');
+    const result = runIndexAttempt(corrupt, script);
+    assert.notEqual(result.status, 0, 'manifest corruption must fail closed');
+    assert.match(result.stderr, /manifest closure mismatch:.*corrupt=evidence\.log/);
+  } finally {
+    corrupt.cleanup();
+  }
 });
 
 test('the operator finalizes all evidence before writing and self-verifying the inner manifest', () => {
