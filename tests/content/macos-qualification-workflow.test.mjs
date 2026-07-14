@@ -20,6 +20,69 @@ const runtimeSupplyChainSpec = readFileSync(
   'utf8',
 );
 const manifestScript = resolve('scripts/macos-evidence-manifest.mjs');
+const deactivationValidator = 'scripts/validate-macos-launchd-deactivation.mjs';
+
+const legacyLaunchdMutations = {
+  'missing-result': (doc) => {
+    delete doc.deactivation.steps[0].result;
+  },
+  'shell-command': (doc) => {
+    doc.deactivation.steps[0].command = 'sh';
+  },
+  'wrong-args': (doc) => {
+    doc.deactivation.steps[0].args.push('extra');
+  },
+  'wrong-target': (doc) => {
+    doc.deactivation.steps[0].args[1] = `system/${doc.deactivation.steps[0].args[1].split('/').at(-1)}`;
+  },
+  'wrong-result': (doc) => {
+    doc.deactivation.steps[0].result = 'failed';
+  },
+  'wrong-arch': (doc) => {
+    doc.arch = doc.arch === 'arm64' ? 'x64' : 'arm64';
+  },
+  'extra-step': (doc) => {
+    const target = doc.deactivation.steps[0].args[1];
+    doc.deactivation.steps.push({
+      id: 'status',
+      command: 'launchctl',
+      args: ['print', target],
+      code: 0,
+      ok: true,
+      error: null,
+      result: 'succeeded',
+    });
+  },
+};
+
+const launchdRejectionReasons = {
+  'missing-result': 'bootout result must be one of succeeded/already-absent/failed',
+  'shell-command':
+    'bootout must use exact structured launchctl argv for the independently trusted target',
+  'wrong-args':
+    'bootout must use exact structured launchctl argv for the independently trusted target',
+  'wrong-target':
+    'bootout must use exact structured launchctl argv for the independently trusted target',
+  'wrong-result':
+    'live install→uninstall evidence requires result=succeeded, ok=true, code=0, error=null',
+  'wrong-arch': 'evidence platform/arch must be darwin/',
+  'extra-step': 'deactivation must contain exactly one bootout step',
+  'wrong-numeric-uid':
+    'bootout must use exact structured launchctl argv for the independently trusted target',
+  'relative-path': 'uninstall path must exactly match the independently trusted plist path',
+  'wrong-parent': 'uninstall path must exactly match the independently trusted plist path',
+  'self-consistent-wrong-triple':
+    'uninstall path must exactly match the independently trusted plist path',
+};
+
+function triggerBlock(id) {
+  const marker = `  ${id}:\n`;
+  const start = workflow.indexOf(marker);
+  assert.notEqual(start, -1, `workflow trigger ${id} must exist`);
+  const tail = workflow.slice(start + marker.length);
+  const nextTrigger = tail.search(/^  [a-z_][a-z0-9_-]*:\n/m);
+  return nextTrigger === -1 ? tail : tail.slice(0, nextTrigger);
+}
 
 function jobBlock(id) {
   const marker = `  ${id}:\n`;
@@ -137,10 +200,17 @@ const expectedStrategy = `    strategy:
             asset: ccm-darwin-x64
 `;
 
-test('runtime-affecting pull requests require both real macOS architecture qualification jobs', () => {
+test('validator-only changes require both real macOS architecture qualification jobs', () => {
   assert.match(workflow, /^  pull_request:\n    paths:\n/m);
   assert.match(workflow, /^      - "ccm\/\*\*"$/m);
   assert.match(workflow, /^      - "scripts\/qualify-macos-live\.sh"$/m);
+  for (const trigger of ['push', 'pull_request']) {
+    assert.match(
+      triggerBlock(trigger),
+      /^      - "scripts\/validate-macos-launchd-deactivation\.mjs"$/m,
+      `${trigger} must qualify a validator-only diff`,
+    );
+  }
   assert.match(workflow, /^permissions:\n  contents: read$/m);
   assert.match(workflow, /runner: macos-14\n            contract: darwin-arm64/);
   assert.match(workflow, /runner: macos-15-intel\n            contract: darwin-x64/);
@@ -162,6 +232,143 @@ test('Darwin support claim is bound to replayable arm64/x64 evidence and preserv
 test('build and qualification jobs retain the exact arm64/x64 contracts', () => {
   assert.equal(strategyBlock(jobBlock('build-sea')), expectedStrategy);
   assert.equal(strategyBlock(jobBlock('qualify')), expectedStrategy);
+});
+
+test('both macOS architecture contracts replay and reject historical active deactivation evidence', () => {
+  const validatorStart = operator.indexOf('validate_launchd_uninstall_log() {');
+  const validatorEnd = operator.indexOf('\n}', validatorStart);
+  const validatorFunction = operator.slice(validatorStart, validatorEnd + 2);
+  assert.match(
+    validatorFunction,
+    /node scripts\/validate-macos-launchd-deactivation\.mjs/,
+    'the live operator must use the same replayable deactivation validator as fixtures',
+  );
+  assert.match(validatorFunction, /"\$\{EVIDENCE_DIR\}\/launchd_uninstall\.log"/);
+  assert.match(validatorFunction, /"\$\{CONTRACT\}" "\$\{LAUNCHD_IDENTITY\}"/);
+  for (const contract of ['darwin-arm64', 'darwin-x64']) {
+    const fixture = `tests/fixtures/macos-launchd-deactivation/${contract}/launchd_uninstall.log`;
+    const identity = `tests/fixtures/macos-launchd-deactivation/${contract}/trusted-identity.json`;
+    const replay = spawnSync(
+      process.execPath,
+      [deactivationValidator, fixture, contract, identity],
+      { encoding: 'utf8' },
+    );
+    assert.equal(replay.status, 1, `${contract} historical state=active evidence must fail closed`);
+    assert.match(replay.stderr, /deactivation\.state="inactive"/);
+  }
+});
+
+test('both macOS architecture contracts accept only exact structured launchctl bootout evidence', () => {
+  for (const contract of ['darwin-arm64', 'darwin-x64']) {
+    const fixtureDir = `tests/fixtures/macos-launchd-deactivation/${contract}`;
+    const identity = `${fixtureDir}/trusted-identity.json`;
+    const validDoc = JSON.parse(readFileSync(`${fixtureDir}/valid-launchd-uninstall.log`, 'utf8'));
+    const accepted = spawnSync(
+      process.execPath,
+      [deactivationValidator, `${fixtureDir}/valid-launchd-uninstall.log`, contract, identity],
+      { encoding: 'utf8' },
+    );
+    assert.equal(accepted.status, 0, `${contract} valid evidence rejected: ${accepted.stderr}`);
+
+    const otherContract = contract === 'darwin-arm64' ? 'darwin-x64' : 'darwin-arm64';
+    const wrongArch = spawnSync(
+      process.execPath,
+      [deactivationValidator, `${fixtureDir}/valid-launchd-uninstall.log`, otherContract, identity],
+      { encoding: 'utf8' },
+    );
+    assert.equal(wrongArch.status, 1, `${contract} evidence must not certify ${otherContract}`);
+
+    const invalidCases = JSON.parse(readFileSync(`${fixtureDir}/invalid-cases.json`, 'utf8'));
+    assert.ok(Array.isArray(invalidCases) && invalidCases.length >= 11);
+    const scratch = mkdtempSync(join(tmpdir(), `ccm-launchd-evidence-${contract}-`));
+    try {
+      for (const scenario of invalidCases) {
+        const expectedReason = launchdRejectionReasons[scenario.name];
+        assert.ok(expectedReason, `${contract}/${scenario.name} must name its rejection branch`);
+        const mutateLegacyCase = legacyLaunchdMutations[scenario.name];
+        if (mutateLegacyCase) {
+          const expectedDoc = structuredClone(validDoc);
+          mutateLegacyCase(expectedDoc);
+          assert.deepEqual(
+            scenario.doc,
+            expectedDoc,
+            `${contract}/${scenario.name} must be only its named mutation of the accepted fixture`,
+          );
+        }
+        const evidence = join(scratch, `${scenario.name}.json`);
+        writeFileSync(evidence, `${JSON.stringify(scenario.doc)}\n`);
+        const rejected = spawnSync(
+          process.execPath,
+          [deactivationValidator, evidence, contract, identity],
+          { encoding: 'utf8' },
+        );
+        assert.equal(
+          rejected.status,
+          1,
+          `${contract}/${scenario.name} counterfeit evidence was accepted`,
+        );
+        assert.ok(
+          rejected.stderr.includes(`launchd deactivation evidence invalid: ${expectedReason}`),
+          `${contract}/${scenario.name} hit the wrong rejection branch: ${rejected.stderr}`,
+        );
+      }
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  }
+});
+
+test('live operator supplies an independent trusted launchd identity before uninstall', () => {
+  assert.match(operator, /write_launchd_trusted_identity/);
+  assert.match(operator, /id -u/);
+  assert.match(operator, /launchd_trusted_identity\.json/);
+  assert.match(operator, /validate-macos-launchd-deactivation\.mjs/);
+  assert.match(operator, /"\$\{CONTRACT\}" "\$\{LAUNCHD_IDENTITY\}"/);
+  const identityWrite = operator.indexOf('run_required launchd_trusted_identity');
+  const uninstall = operator.indexOf('run_required launchd_uninstall');
+  assert.ok(identityWrite !== -1 && identityWrite < uninstall, 'trusted identity must predate uninstall');
+});
+
+test('ccm launchd fix and using-ccm projections carry separate release-line truth', () => {
+  const changeset = readFileSync('ccm/.changeset/honest-launchd-uninstall.md', 'utf8');
+  assert.match(changeset, /'ccm': patch/);
+  assert.match(changeset, /unit removal/i);
+  assert.match(changeset, /nonzero/i);
+
+  const canonical = readFileSync(
+    'plugin/src/skills/using-ccm/canonical/references/command-catalog.md',
+    'utf8',
+  );
+  assert.match(canonical, /bootout/);
+  assert.match(canonical, /unit_removal/);
+  assert.match(canonical, /uninstalled:false/);
+  assert.match(canonical, /already-absent/);
+  const uninstallSection = (text) => {
+    const start = text.indexOf('### monitor uninstall-service');
+    assert.notEqual(start, -1);
+    const end = text.indexOf('\n---', start);
+    assert.notEqual(end, -1);
+    return text.slice(start, end);
+  };
+  for (const host of ['claude-code', 'codex', 'cursor']) {
+    const projected = readFileSync(
+      `plugin/dist/${host}/skills/using-ccm/references/command-catalog.md`,
+      'utf8',
+    );
+    assert.equal(
+      uninstallSection(projected),
+      uninstallSection(canonical),
+      `${host} using-ccm uninstall guidance drifted`,
+    );
+  }
+
+  const rootChangelog = readFileSync('CHANGELOG.md', 'utf8');
+  assert.match(rootChangelog, /macOS monitor uninstall guidance/);
+  assert.doesNotMatch(rootChangelog, /macOS launchd deactivation truth/);
+  assert.ok(
+    readdirSync('ccm/.changeset').includes('honest-launchd-uninstall.md'),
+    'ccm behavior must carry ccm-line release intent',
+  );
 });
 
 test('Darwin build and live operator attest the path-attested invoke contract without fd-exec claims', () => {

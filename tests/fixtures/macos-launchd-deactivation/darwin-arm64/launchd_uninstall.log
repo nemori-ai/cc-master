@@ -1,0 +1,1 @@
+{"ok":true,"uninstalled":true,"stopped":true,"kind":"launchd","path":"/qualification/darwin-arm64/Library/LaunchAgents/ai.nemori.ccm.monitor.fixture.plist","deactivation":{"ok":true,"kind":"launchd","state":"active","steps":[{"id":"bootout","command":"launchctl","args":["bootout","gui/501/ai.nemori.ccm.monitor.fixture"],"code":0,"ok":true,"error":null}]}}
