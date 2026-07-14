@@ -1,6 +1,6 @@
+import { createHash, createPublicKey, randomUUID, verify } from 'node:crypto';
 import {
   closeSync,
-  existsSync,
   fsyncSync,
   mkdirSync,
   openSync,
@@ -9,7 +9,6 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { createHash, createPublicKey, randomUUID, verify } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { canonicalJson } from '@ccm/engine';
 import type {

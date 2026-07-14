@@ -15,7 +15,10 @@ const fixture = JSON.parse(
 const clone = <T>(value: T): T => structuredClone(value);
 
 test('R1 bind rejects spawn-before-create and roster-before-spawn without mutating board', () => {
-  const created = engine.nativeAttemptApply(clone(fixture.initial_board), clone(fixture.commands.create));
+  const created = engine.nativeAttemptApply(
+    clone(fixture.initial_board),
+    clone(fixture.commands.create),
+  );
   assert.equal(created.ok, true, JSON.stringify(created.issues));
   const attempt = created.board.tasks[0].routing.attempts[0];
   const raw = clone(fixture.commands.bind.verified_evidence);

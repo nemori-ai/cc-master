@@ -119,6 +119,12 @@ export {
 // ── board-reconcile（reconcileGating·deps 驱动 ready↔blocked 门控归一·ADR-023）──
 export { reconcileGating } from './board-reconcile.js';
 export { canonicalJson } from './canonical-json.js';
+export {
+  CANONICAL_LAUNCH_IDENTITY_FIELD_REGISTRY,
+  CANONICAL_LAUNCH_IDENTITY_SCHEMA,
+  canonicalLaunchIdentityDigest,
+  normalizeCanonicalLaunchIdentity,
+} from './canonical-launch-identity.js';
 // ── coordination/（COORD 多 orchestrator 感知通道 + notification inbox）──
 export type {
   AllocatePoolOptions,
@@ -279,12 +285,6 @@ export {
   validateNativeAttemptMutation,
   validateNativeAttemptProjection,
 } from './native-attempt.js';
-export {
-  CANONICAL_LAUNCH_IDENTITY_FIELD_REGISTRY,
-  CANONICAL_LAUNCH_IDENTITY_SCHEMA,
-  canonicalLaunchIdentityDigest,
-  normalizeCanonicalLaunchIdentity,
-} from './canonical-launch-identity.js';
 // ── paths（CLAUDE_CONFIG_DIR 跟随 + 派生路径 SSOT·home/rate-cache/credentials/.claude.json/projects）──
 export type { PathEnv } from './paths.js';
 export {

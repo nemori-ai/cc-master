@@ -15,7 +15,11 @@ import { after, test } from 'node:test';
 import { runProduction } from '../src/production-run.js';
 
 const roots: string[] = [];
-after(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
+after(() =>
+  roots.splice(0).forEach((root) => {
+    rmSync(root, { recursive: true, force: true });
+  }),
+);
 const clone = <T>(value: T): T => structuredClone(value);
 
 function canonical(value: unknown): string {

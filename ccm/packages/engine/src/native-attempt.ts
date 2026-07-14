@@ -1,11 +1,11 @@
 import { taskTrulyDone } from './board-model.js';
 import { reconcileGating } from './board-reconcile.js';
+import { canonicalJson } from './canonical-json.js';
 import {
   CANONICAL_LAUNCH_IDENTITY_SCHEMA,
   canonicalLaunchIdentityDigest,
   normalizeCanonicalLaunchIdentity,
 } from './canonical-launch-identity.js';
-import { canonicalJson } from './canonical-json.js';
 import { sha256Hex } from './sha256.js';
 
 export const NATIVE_ATTEMPT_CONTRACT = 'ccm/native-attempt/v1';

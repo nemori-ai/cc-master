@@ -19,12 +19,7 @@ export const CANONICAL_LAUNCH_IDENTITY_FIELD_REGISTRY = Object.freeze({
   origin: Object.freeze(['harness', 'session_ref']),
   target: Object.freeze(['harness', 'adapter', 'surface', 'transport', 'candidate_id']),
   provider: Object.freeze(['id', 'model', 'effort']),
-  account: Object.freeze([
-    'fingerprint_ref',
-    'account_id',
-    'pool_id',
-    'identity_fingerprint',
-  ]),
+  account: Object.freeze(['fingerprint_ref', 'account_id', 'pool_id', 'identity_fingerprint']),
   workspace: Object.freeze(['workspace_ref', 'worktree_ref', 'baseline_commit']),
   permission: Object.freeze(['snapshot_ref', 'profile', 'denies']),
   digest: Object.freeze(['digest']),

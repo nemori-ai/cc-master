@@ -311,7 +311,8 @@ class PrivateEvidenceHarness {
       expected.input_hash === fixture.commands.create.attempt.dispatch.input_hash &&
       expected.request_hash === fixture.commands.create.attempt.dispatch.request_hash &&
       expected.launch_claim_id === fixture.commands.create.attempt.dispatch.launch_claim_id &&
-      expected.reservation_id === fixture.commands.create.launch_authority.reservation.reservation_id &&
+      expected.reservation_id ===
+        fixture.commands.create.launch_authority.reservation.reservation_id &&
       expected.ticket_digest === fixture.commands.create.launch_authority.ticket_digest &&
       expected.launch_identity_digest ===
         fixture.commands.create.launch_authority.canonical_identity_digest &&
@@ -565,7 +566,7 @@ class PrivateEvidenceHarness {
     const expected = input?.expected;
     const authenticated = this.authenticateRecord(input);
     if (!authenticated.ok) return authenticated;
-    const { record, entry, claim } = authenticated;
+    const { record, entry } = authenticated;
     const recordHash = record.record_hash;
     let observed: any;
     let payload: any;
