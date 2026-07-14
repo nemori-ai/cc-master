@@ -89,6 +89,34 @@ test('Darwin build and live operator attest the path-attested invoke contract wi
   assert.match(operator, /runtime-verified-exec-contract\.test\.ts/);
 });
 
+test('Darwin execve symbol assertion accepts only the exact unresolved-symbol line shapes', () => {
+  const build = namedStep(jobBlock('build-sea'), 'Build and attest SEA');
+  const predicate = '^[[:space:]]*_execve$';
+  assert.ok(
+    build.includes(
+      `grep -Eq '${predicate}' "\${EVIDENCE}/runtime-helper-symbols.log"`,
+    ),
+    'the workflow must accept both column-one and whitespace-prefixed macOS nm -u output',
+  );
+
+  const matches = (input) =>
+    spawnSync('grep', ['-Eq', predicate], { input, encoding: 'utf8' }).status === 0;
+
+  for (const accepted of ['_execve\n', '  _execve\n', '\t_execve\n']) {
+    assert.equal(matches(accepted), true, `expected exact unresolved symbol: ${JSON.stringify(accepted)}`);
+  }
+  for (const rejected of [
+    '_execveat\n',
+    '_execve_suffix\n',
+    '_my_execve\n',
+    '0000000000000000 T _execve\n',
+    'T _execve\n',
+    '_execve U\n',
+  ]) {
+    assert.equal(matches(rejected), false, `must reject non-exact symbol: ${JSON.stringify(rejected)}`);
+  }
+});
+
 test('Darwin build failure uploads complete evidence before preserving the original verdict', () => {
   const buildJob = jobBlock('build-sea');
   const build = namedStep(buildJob, 'Build and attest SEA');

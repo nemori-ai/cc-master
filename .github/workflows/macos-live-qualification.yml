@@ -119,7 +119,7 @@ jobs:
               printf '%s\n' 'Darwin helper imports a forbidden descriptor-exec symbol' >&2
               exit 1
             fi
-            grep -Eq '[[:space:]]_execve$' "${EVIDENCE}/runtime-helper-symbols.log"
+            grep -Eq '^[[:space:]]*_execve$' "${EVIDENCE}/runtime-helper-symbols.log"
             chmod 755 "${OUT}"
             "${OUT}" --version >"${EVIDENCE}/sea-version.log" 2>&1
             codesign --verify --strict --verbose=4 "${OUT}" >"${EVIDENCE}/codesign-verify.log" 2>&1
