@@ -6,6 +6,59 @@
 > Contract IDs: `ccm/native-attempt/v1`, `ccm/native-handle-evidence-record/codex-api-tool/v1`, `ccm/native-private-evidence-authentication/v1`, `ccm/native-attempt-feature-probe/codex-api-tool/v1`
 > Depends on: [`2026-07-10-cross-harness-contract-spine.md`](2026-07-10-cross-harness-contract-spine.md), [`cross-harness-orchestration-capability-model.md`](cross-harness-orchestration-capability-model.md) §§4–6, 10, 15
 
+## R1 authority correction (post-PR115)
+
+This contract consumes, and never competes with, the unique launch authority frozen by
+`2026-07-13-cross-harness-quota-admission-contract.md`. A native-attempt create is launch-capable
+only when a ccm-owned production composition has atomically staged one claim against an already
+`committed`, still-current reservation/ticket. The claim is committed only after the new board bytes
+are durable. Missing, held, expired, mismatched, or already-consumed authority rejects the write;
+board and claim bytes remain unchanged.
+
+The shared, provider-neutral identity vocabulary is `ccm/canonical-launch-identity/v1`, implemented
+once in `@ccm/engine` and reusable by the future Cursor provider driver. Its closed shape binds:
+
+- origin harness, target harness, adapter, surface, transport and candidate;
+- exact provider, model and effort from the selected routing candidate;
+- account fingerprint, workspace ref, worktree ref and baseline commit;
+- the complete permission snapshot/profile/deny set;
+- separate immutable input and request SHA-256 digests;
+- exact runtime image SHA-256 and the exact model/effort selector.
+
+Native code, quota code, and future Cursor code call the shared canonical builder/digest. They do
+not maintain a second field list, JSON canonicalizer, or hash implementation.
+
+The owner-store launch record is `ccm/native-launch-authority/v1`. It contains the canonical launch
+identity and digest, the authoritative committed reservation projection, the complete
+`ccm/quota-admission-ticket/v1`, its canonical digest, and the native claim id. The ticket repeats
+the attempt, account, pool, identity, runtime, launch idempotency, nonce and expiry bindings from the
+quota contract. The reservation repeats the ticket and digest committed by the quota writer. The
+native ledger stores only this immutable, non-secret authority projection; later bind, terminal and
+reconciliation evidence scopes repeat its reservation id, ticket digest and launch-identity digest.
+
+`attempt.dispatch` therefore has the closed, immutable launch-input fields `key`, `input_hash`,
+`request_hash`, `launch_claim_id`, and `claim_owner_session_ref`. `input_hash` and `request_hash` are
+distinct facts even when an upstream caller happens to derive equal bytes.
+
+The installed composition root is `runProduction`, not the injectable router test seam. It always
+constructs the ccm-owned admission/claim boundary and private-evidence authenticator from the
+resolved `CC_MASTER_HOME`; caller-supplied test boundaries are not accepted as production evidence.
+Owner records, producer registrations, staged claim locks, committed claims and evidence-consumption
+records live under that home with owner-only permissions. An offline fixture may materialize those
+same production records and exercise `runProduction`, but receives no fixture-only verifier or
+resolver shortcut.
+
+Lifecycle time is causal evidence, not display metadata. Both mutation apply and hard board
+projection enforce the applicable partial order:
+
+```text
+created_at <= spawn.observed_at <= roster.observed_at == bound_at
+             <= terminal/reconcile observed_at
+```
+
+Every later reconciliation observation is strictly after the preceding lifecycle observation.
+Impossible time order rejects before durable board or claim/evidence consumption.
+
 ## 1. Scope and evidence verdict
 
 This slice freezes the first host-native attempt contract. The ledger, dedicated writer, and private evidence authentication surface are implemented: `@ccm/engine` validates and applies the lifecycle,
