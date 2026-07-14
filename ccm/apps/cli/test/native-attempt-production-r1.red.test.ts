@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -124,7 +125,12 @@ function bind(boardPath: string, home: string, command: any) {
   return { code, out, err };
 }
 
-function installBindEvidence(home: string, boardPath: string, value: any): void {
+function installBindEvidence(
+  home: string,
+  boardPath: string,
+  value: any,
+  mutate?: (state: { record: any; registration: any; entry: any }) => void,
+): { recordPath: string; registrationPath: string; recordRef: string } {
   const board = JSON.parse(readFileSync(boardPath, 'utf8'));
   const attempt = board.tasks[0].routing.attempts[0];
   const recordRef = value.commands.bind.evidence_record_ref;
@@ -179,6 +185,21 @@ function installBindEvidence(home: string, boardPath: string, value: any): void 
     },
     observed: clone(value.commands.bind.verified_evidence.observed),
   };
+  const entry = {
+    provenance: {
+      store: 'ccm-owner-evidence/v1',
+      visibility: 'owner-only',
+      owner_home_ref: home,
+      record_ref: recordRef,
+    },
+    fact_resolution: {
+      account: 'current',
+      permission_profile: 'compatible',
+      permission_denies: 'compatible',
+    },
+    record,
+  };
+  mutate?.({ record, registration, entry });
   const signed = {
     schema: record.schema,
     record_id: record.record_id,
@@ -219,26 +240,10 @@ function installBindEvidence(home: string, boardPath: string, value: any): void 
   writeFileSync(registrationPath, `${JSON.stringify(registration, null, 2)}\n`, { mode: 0o600 });
   writeFileSync(
     recordPath,
-    `${JSON.stringify(
-      {
-        provenance: {
-          store: 'ccm-owner-evidence/v1',
-          visibility: 'owner-only',
-          owner_home_ref: home,
-          record_ref: recordRef,
-        },
-        fact_resolution: {
-          account: 'current',
-          permission_profile: 'compatible',
-          permission_denies: 'compatible',
-        },
-        record,
-      },
-      null,
-      2,
-    )}\n`,
+    `${JSON.stringify(entry, null, 2)}\n`,
     { mode: 0o600 },
   );
+  return { recordPath, registrationPath, recordRef };
 }
 
 function installAdmission(home: string, command: any): string {
@@ -537,4 +542,172 @@ test('R1 never reclaims a matching stage while its owner process is still alive'
   assert.equal(readFileSync(boardPath, 'utf8'), beforeBoard);
   assert.equal(readFileSync(lockPath, 'utf8'), beforeStage);
   assert.equal(existsSync(claimPath), false);
+});
+
+test('R2 committed launch claim replay requires the exact durable board path and projection', () => {
+  for (const variant of ['rolled-back-board', 'copied-path', 'current-hash-drift'] as const) {
+    const value = fixture();
+    const root = mkdtempSync(join(tmpdir(), `ccm-native-production-r2-${variant}-`));
+    roots.push(root);
+    const home = join(root, 'home');
+    const boardPath = join(root, 'native.board.json');
+    mkdirSync(home, { recursive: true, mode: 0o700 });
+    const initialBytes = `${JSON.stringify(value.initial_board, null, 2)}\n`;
+    writeFileSync(boardPath, initialBytes);
+    const command = clone(value.commands.create);
+    installAdmission(home, command);
+    const created = invoke(boardPath, home, command);
+    assert.equal(created.code, 0, created.err.join('\n'));
+
+    const claimPath = join(
+      home,
+      'native-attempt',
+      'v1',
+      'claims',
+      createHash('sha256').update(command.attempt.dispatch.launch_claim_id).digest('hex'),
+      'current.json',
+    );
+    let replayPath = boardPath;
+    if (variant === 'rolled-back-board') {
+      writeFileSync(boardPath, initialBytes);
+    } else if (variant === 'copied-path') {
+      replayPath = join(root, 'copied.board.json');
+      copyFileSync(boardPath, replayPath);
+    } else {
+      const current = JSON.parse(readFileSync(claimPath, 'utf8'));
+      current.board_content_hash =
+        'sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+      writeFileSync(claimPath, `${JSON.stringify(current, null, 2)}\n`, { mode: 0o600 });
+    }
+    const beforeBoard = readFileSync(replayPath, 'utf8');
+    const beforeClaim = readFileSync(claimPath, 'utf8');
+    const replay = invoke(replayPath, home, command);
+    assert.notEqual(replay.code, 0, `${variant}: replay must fail closed`);
+    assert.equal(readFileSync(replayPath, 'utf8'), beforeBoard, `${variant}: board changed`);
+    assert.equal(readFileSync(claimPath, 'utf8'), beforeClaim, `${variant}: claim changed`);
+  }
+});
+
+test('R2 committed evidence replay requires the exact durable board path and projection', () => {
+  for (const variant of ['rolled-back-board', 'copied-path', 'current-hash-drift'] as const) {
+    const value = fixture();
+    const root = mkdtempSync(join(tmpdir(), `ccm-native-evidence-r2-${variant}-`));
+    roots.push(root);
+    const home = join(root, 'home');
+    const boardPath = join(root, 'native.board.json');
+    mkdirSync(home, { recursive: true, mode: 0o700 });
+    writeFileSync(boardPath, `${JSON.stringify(value.initial_board, null, 2)}\n`);
+    const command = clone(value.commands.create);
+    installAdmission(home, command);
+    const created = invoke(boardPath, home, command);
+    assert.equal(created.code, 0, created.err.join('\n'));
+    installBindEvidence(home, boardPath, value);
+    const preBindBytes = readFileSync(boardPath, 'utf8');
+    const bound = bind(boardPath, home, value.commands.bind);
+    assert.equal(bound.code, 0, bound.err.join('\n'));
+
+    const consumptionPath = join(
+      home,
+      'native-attempt',
+      'v1',
+      'evidence',
+      'consumptions',
+      createHash('sha256').update(`bind\0${value.commands.bind.evidence_record_ref}`).digest('hex'),
+      'current.json',
+    );
+    let replayPath = boardPath;
+    if (variant === 'rolled-back-board') {
+      writeFileSync(boardPath, preBindBytes);
+    } else if (variant === 'copied-path') {
+      replayPath = join(root, 'copied.board.json');
+      copyFileSync(boardPath, replayPath);
+    } else {
+      const current = JSON.parse(readFileSync(consumptionPath, 'utf8'));
+      current.board_content_hash =
+        'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+      writeFileSync(consumptionPath, `${JSON.stringify(current, null, 2)}\n`, { mode: 0o600 });
+    }
+    const beforeBoard = readFileSync(replayPath, 'utf8');
+    const beforeConsumption = readFileSync(consumptionPath, 'utf8');
+    const replay = bind(replayPath, home, value.commands.bind);
+    assert.notEqual(replay.code, 0, `${variant}: replay must fail closed`);
+    assert.equal(readFileSync(replayPath, 'utf8'), beforeBoard, `${variant}: board changed`);
+    assert.equal(
+      readFileSync(consumptionPath, 'utf8'),
+      beforeConsumption,
+      `${variant}: consumption changed`,
+    );
+  }
+});
+
+test('R2 default runProduction executes the complete production evidence verifier', () => {
+  const cases: Array<{
+    id: string;
+    issue: string;
+    mutate: (state: { record: any; registration: any; entry: any }) => void;
+  }> = [
+    {
+      id: 'caller-verification',
+      issue: 'NATIVE-EVIDENCE-CALLER-VERIFICATION-FORBIDDEN',
+      mutate: ({ record }) => (record.verified_by_ccm = true),
+    },
+    {
+      id: 'unsigned-extra-field',
+      issue: 'NATIVE-EVIDENCE-CANONICAL-HASH-MISMATCH',
+      mutate: ({ record }) => (record.unsigned_extra = 'not-covered-by-the-frozen-schema'),
+    },
+    {
+      id: 'registration-schema',
+      issue: 'NATIVE-EVIDENCE-REGISTRATION-UNKNOWN',
+      mutate: ({ registration }) => (registration.schema = 'ccm/forged-registration/v1'),
+    },
+    {
+      id: 'registration-key-id',
+      issue: 'NATIVE-EVIDENCE-REGISTRATION-UNKNOWN',
+      mutate: ({ registration }) => (registration.public_key_id = 'ed25519:other-key'),
+    },
+    {
+      id: 'expected-child',
+      issue: 'NATIVE-EXPECTED-CHILD-MISMATCH',
+      mutate: ({ record }) => (record.expected.child_target = '/root/fixture-parent/other-child'),
+    },
+    {
+      id: 'expected-transport',
+      issue: 'NATIVE-EVIDENCE-TRUST-SCOPE-MISMATCH',
+      mutate: ({ record }) => (record.expected.transport = 'forged-transport'),
+    },
+    {
+      id: 'raw-spawn-provenance',
+      issue: 'NATIVE-HANDLE-UNATTESTED',
+      mutate: ({ record }) => delete record.observed.spawn.owner_record_ref,
+    },
+    {
+      id: 'owner-store-provenance',
+      issue: 'NATIVE-EVIDENCE-OWNER-STORE-PROVENANCE',
+      mutate: ({ entry }) => (entry.provenance.store = 'workspace-staged-evidence/v1'),
+    },
+  ];
+
+  for (const row of cases) {
+    const value = fixture();
+    const root = mkdtempSync(join(tmpdir(), `ccm-native-verifier-r2-${row.id}-`));
+    roots.push(root);
+    const home = join(root, 'home');
+    const boardPath = join(root, 'native.board.json');
+    mkdirSync(home, { recursive: true, mode: 0o700 });
+    writeFileSync(boardPath, `${JSON.stringify(value.initial_board, null, 2)}\n`);
+    const command = clone(value.commands.create);
+    installAdmission(home, command);
+    const created = invoke(boardPath, home, command);
+    assert.equal(created.code, 0, created.err.join('\n'));
+    installBindEvidence(home, boardPath, value, row.mutate);
+
+    const beforeBoard = readFileSync(boardPath, 'utf8');
+    const consumptionRoot = join(home, 'native-attempt', 'v1', 'evidence', 'consumptions');
+    const result = bind(boardPath, home, value.commands.bind);
+    assert.notEqual(result.code, 0, `${row.id}: verifier accepted the mutation`);
+    assert.match(result.err.join('\n'), new RegExp(row.issue), `${row.id}: wrong issue`);
+    assert.equal(readFileSync(boardPath, 'utf8'), beforeBoard, `${row.id}: board changed`);
+    assert.equal(existsSync(consumptionRoot), false, `${row.id}: consumption was staged`);
+  }
 });

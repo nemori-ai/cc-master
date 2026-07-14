@@ -23,6 +23,7 @@ once in `@ccm/engine` and reusable by the future Cursor provider driver. Its clo
 - account fingerprint, workspace ref, worktree ref and baseline commit;
 - the complete permission snapshot/profile/deny set;
 - separate immutable input and request SHA-256 digests;
+- the supervisor `run_ref`, launch idempotency key, launch nonce, and native one-shot claim ID;
 - exact runtime image SHA-256 and the exact model/effort selector.
 
 Native-attempt code and every future provider driver call the shared canonical builder/digest. The
@@ -38,9 +39,14 @@ quota contract. The reservation repeats the ticket and digest committed by the q
 native ledger stores only this immutable, non-secret authority projection; later bind, terminal and
 reconciliation evidence scopes repeat its reservation id, ticket digest and launch-identity digest.
 
-`attempt.dispatch` therefore has the closed, immutable launch-input fields `key`, `input_hash`,
-`request_hash`, `launch_claim_id`, and `claim_owner_session_ref`. `input_hash` and `request_hash` are
-distinct facts even when an upstream caller happens to derive equal bytes.
+`attempt.dispatch` therefore has the closed, immutable launch-input fields `key`, `run_ref`,
+`input_hash`, `request_hash`, `launch_claim_id`, and `claim_owner_session_ref`. `key` is the exact
+supervisor launch idempotency key carried by the quota ticket; `run_ref` is the exact
+`ccm-run:v1:<run-id>` ticket run; and the ticket `launch_nonce` is the native one-shot
+`launch_claim_id`. These are equality bindings, not three merely non-empty ticket annotations.
+`input_hash` and `request_hash` are distinct facts even when an upstream caller happens to derive
+equal bytes. Replacing any one ticket/attempt/claim member and recomputing only the ticket digest is
+invalid.
 
 The installed composition root is `runProduction`, not the injectable router test seam. It always
 constructs the ccm-owned admission/claim boundary and private-evidence authenticator from the
@@ -50,7 +56,15 @@ records live under that home with owner-only permissions. An offline fixture may
 same production records and exercise `runProduction`, but receives no fixture-only verifier or
 resolver shortcut.
 
-The stage file is itself a durable owner-only intent record with the staging process identity. If
+The stage file is itself a durable owner-only intent record with the staging process identity. A
+committed claim/evidence current record uses `ccm/native-owner-current/v2` and binds its exact
+payload schema/version and identity to the canonical board path, the post-operation board-content
+hash, the immutable attempt `create_hash`, and the exact canonical create/bind/terminal/reconcile
+projection. The record carries a canonical self-hash. Exact replay is permitted only when that
+current record is intact and the board at the same canonical path still contains the exact committed
+projection; replay never returns another launch permission. A copied path, pre-operation/rolled-back
+board, immutable projection mutation, stale current-record hash, or schema mismatch fails closed and
+does not rewrite the board, stage, claim, or consumption. If
 that process dies after the board rename but before the owner claim/consumption commit, an exact
 retry may reclaim that stage only
 when the locked board already contains the same immutable attempt or evidence ref/hash. A missing
@@ -223,7 +237,8 @@ Every native attempt appended to `task.routing.attempts[]` has this minimum shap
   "state": "starting",
   "created_at": "2026-07-13T08:00:00Z",
   "dispatch": {
-    "key": "stable-dispatch-key",
+    "key": "sha256:supervisor-launch-idempotency-key",
+    "run_ref": "ccm-run:v1:run-opaque",
     "input_hash": "sha256:...",
     "request_hash": "sha256:...",
     "launch_claim_id": "opaque-one-shot-claim",
@@ -256,8 +271,12 @@ the create request and in the appended attempt, byte-for-value equal in parsed J
 `candidate_id` must equal both the attempt candidate and a candidate in the selected policy chain.
 The contract fixture is self-contained and is not allowed to outsource this check to a `selection_ref`.
 `expected_child_target` is frozen before spawn and cannot be supplied for the first time at bind.
-`ordinal` is monotonic per task. `dispatch.key`, `input_hash`, and `request_hash` are immutable and
-value-bound to the committed canonical launch identity. All timestamps use exact
+`ordinal` is monotonic per task. `dispatch.key`, `run_ref`, `input_hash`, `request_hash`,
+`launch_claim_id`, and `claim_owner_session_ref` are immutable and value-bound to the committed
+canonical launch identity. The quota ticket MUST satisfy
+`ticket.launch_idempotency_key == dispatch.key`, `ticket.run_ref == dispatch.run_ref`, and
+`ticket.launch_nonce == dispatch.launch_claim_id`; the native authority `claim_id` equals that same
+`dispatch.launch_claim_id`. All timestamps use exact
 canonical UTC second precision and must round-trip to the same calendar instant; impossible dates
 and invalid leap days fail closed.
 
@@ -442,6 +461,14 @@ task to `in_flight`. An exact retry returns the same attempt with
 If the first response is lost, retry withholds launch. An exact retry may accept that result; a
 retry explicitly demanding another launch permission is `NATIVE-LAUNCH-REPLAY-DENIED`. Safety wins
 over convenience; the caller must reconcile the starting attempt and must not spawn again.
+
+The committed owner current record is not sufficient by its presence alone. Before classifying a
+create as replay, the production boundary authenticates the `ccm/native-owner-current/v2` self-hash,
+requires its stored canonical board path to equal the invocation path, and compares the board's
+immutable create projection and `create_hash` to the committed projection. Only then may the engine
+return the ordinary exact no-op `{created:false,launch_allowed:false}`. The same proof applies to
+evidence-consumption replay. A dead stage owner is only one recovery prerequisite; it never replaces
+durable board-identity proof. A live stage owner is never reclaimed or unlinked.
 
 ### 5.2 Bind: `starting → running`
 
