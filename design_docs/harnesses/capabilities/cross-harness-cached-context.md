@@ -19,6 +19,15 @@ Codex, or Cursor without allowing the origin adapter to probe providers or recom
 3. Missing/corrupt/stale/unknown cache is explicit or silent, RC0, and never causes a live probe.
 4. Delta events emit only when the ccm delivery hash changes; routine telemetry does not create a
    new Cursor round.
+5. An optional cached Cursor surface block preserves exactly two ordered descriptors:
+   `cursor-ide-plugin` / `host-native` / `master-origin` and
+   `cursor-agent-cli` / `cli-headless` / `worker-target`. Its derived state is exactly one of
+   `only-ide|only-agent|both|neither`; installed, authentication, and role-eligibility facts remain independent and
+   retain surface-local provenance. Plugin installation never proves Agent installation, auth,
+   quota, or eligibility, and Agent installation never proves the IDE plugin is installed.
+6. The Cursor surface block is inventory/context only. It never creates, binds, reconciles, or
+   completes an origin-native or CLI attempt; those future attempt paths must retain the published
+   `surface_id` and `surface` rather than collapsing same-brand surfaces.
 
 ## Host mechanisms
 

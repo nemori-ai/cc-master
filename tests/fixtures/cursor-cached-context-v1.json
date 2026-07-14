@@ -1,0 +1,40 @@
+{
+  "schema": "ccm/cursor-cached-context-fixtures/v1",
+  "states": [
+    {
+      "id": "only-ide",
+      "installed": [true, false],
+      "auth": ["unknown", "unknown"],
+      "eligible": [true, false],
+      "blockers": [[], ["surface-not-installed"]]
+    },
+    {
+      "id": "only-agent",
+      "installed": [false, true],
+      "auth": ["unknown", "authenticated"],
+      "eligible": [false, true],
+      "blockers": [["surface-not-installed"], []]
+    },
+    {
+      "id": "both",
+      "installed": [true, true],
+      "auth": ["unknown", "authenticated"],
+      "eligible": [true, false],
+      "blockers": [[], ["quota-unknown"]]
+    },
+    {
+      "id": "neither",
+      "installed": [false, false],
+      "auth": ["unknown", "unknown"],
+      "eligible": [false, false],
+      "blockers": [["surface-not-installed"], ["surface-not-installed"]]
+    }
+  ],
+  "invalid": [
+    { "id": "state-mismatch", "mutation": "state", "value": "both" },
+    { "id": "cross-surface-provenance", "mutation": "agent-installed-source", "value": "cursor-ide/plugin-install-probe/v1" },
+    { "id": "auth-without-install", "mutation": "agent-auth", "value": "authenticated" },
+    { "id": "eligible-without-install", "mutation": "agent-eligible", "value": true },
+    { "id": "surface-id-rebound", "mutation": "agent-surface-id", "value": "cursor-ide-plugin" }
+  ]
+}

@@ -41,6 +41,45 @@ The input schema is `ccm/machine-context-cache/v1`:
       ]
     }
   ],
+  "cursor_surfaces": {
+    "schema": "ccm/cursor-surface-context/v1",
+    "state": "only-ide",
+    "surfaces": [
+      {
+        "surface_id": "cursor-ide-plugin",
+        "harness": "cursor",
+        "surface": "host-native",
+        "role": "master-origin",
+        "installed": true,
+        "auth_state": "unknown",
+        "role_eligible": true,
+        "blocker_codes": [],
+        "provenance": {
+          "installed": "cursor-ide/plugin-install-probe/v1",
+          "authentication": null,
+          "role_eligibility": [
+            "cursor-ide/plugin-host-qualification/v1",
+            "cursor-ide/origin-session-attestation/v1"
+          ]
+        }
+      },
+      {
+        "surface_id": "cursor-agent-cli",
+        "harness": "cursor",
+        "surface": "cli-headless",
+        "role": "worker-target",
+        "installed": false,
+        "auth_state": "unknown",
+        "role_eligible": false,
+        "blocker_codes": ["surface-not-installed"],
+        "provenance": {
+          "installed": "cursor-agent/version-help-probe/v1",
+          "authentication": null,
+          "role_eligibility": []
+        }
+      }
+    ]
+  },
   "warnings": []
 }
 ```
@@ -53,6 +92,13 @@ The input schema is `ccm/machine-context-cache/v1`:
 none is inferred from aggregate availability. Unknown is data and is never inferred to pass.
 Candidate harness/surface must match the routing-policy candidate with the same ID; a mismatch is
 ineligible, not silently normalized.
+
+`cursor_surfaces` is optional cached inventory, not route authority. When present it contains the
+canonical ordered `cursor-ide-plugin` / `cursor-agent-cli` pair and one mechanically derived state:
+`only-ide|only-agent|both|neither`. Each descriptor has its own installed fact, role eligibility,
+authentication fact, blockers, surface id/transport, and closed-world provenance. Cross-surface provenance, eligible
+without installed, state mismatch, unknown fields, or descriptor rebinding rejects the cache.
+Nothing in this block creates an attempt or enables dispatch.
 
 The cache carries no credential, identity, token, argv, environment, transcript, balance, or
 provider raw response. Producers remain responsible for redaction before atomic cache publication,

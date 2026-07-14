@@ -378,6 +378,9 @@ export {
 export type {
   CachedCandidateFact,
   CachedQualification,
+  CursorSurfaceContext,
+  CursorSurfaceContextFact,
+  CursorSurfaceState,
   MachineContextCache,
   OrchestratorContext,
   OriginContextCandidate,
@@ -391,6 +394,7 @@ export {
   adviseShadowRoute,
   buildCachedOrchestratorContext,
   buildOriginContextContent,
+  CURSOR_SURFACE_CONTEXT_SCHEMA,
   MACHINE_CONTEXT_CACHE_SCHEMA,
   ORCHESTRATOR_CONTEXT_MAX_BYTES,
   ORCHESTRATOR_CONTEXT_SCHEMA,

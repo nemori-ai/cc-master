@@ -47,6 +47,10 @@ The embedded payload uses `ccm/origin-context/v1` and contains only:
   predicate/status;
 - at most 12 board-order `ready` route summaries: task id/status, eligibility, descriptive outcome,
   selected candidate id/harness/surface, and stable reason codes;
+- an optional `ccm/cursor-surface-context/v1` block containing the canonical ordered IDE-origin and
+  headless-Agent descriptors, their independent `installed` / `auth_state` / `role_eligible` facts, blocker codes,
+  and field-local cached provenance. Its `state` is mechanically derived as
+  `only-ide|only-agent|both|neither` from the two installation booleans;
 - safe machine-readable warning codes and explicit truncation counters.
 
 Qualification refs, absolute or relative paths, identity, balance, argv/env, provider raw response,
@@ -68,6 +72,14 @@ harness, and surface. The candidate must be available, authenticated, model-avai
 runtime-healthy, non-unknown/non-exhausted on quota, and all published qualifications must pass;
 `cli-headless` additionally requires `quota:ample`. These are delivery-consistency checks, not an
 origin-side policy rerank: the adapter never changes order, reasons, or selection.
+
+Cursor provenance is closed-world and surface-local. IDE installation may only cite
+`cursor-ide/plugin-install-probe/v1`; Agent installation may only cite
+`cursor-agent/version-help-probe/v1`. Role-eligibility provenance is restricted to the approved
+sources for that same descriptor. `role_eligible:true` requires `installed:true` and an empty
+blocker set; a blocked descriptor requires at least one safe blocker code. The block is cached
+inventory only: it carries no identity, pool ref, path, credential, live state, run handle, attempt,
+or dispatch authority.
 
 The delivery hash covers the exact ambient content. The agent payload omits `as_of`; therefore
 routine calls remain stable inside one freshness state, while a board revision, machine revision,
