@@ -8,7 +8,7 @@
 
 - [A. task 字段速查](#a-task-字段速查)
   - [🔒 load-bearing 字段（走专属命令，不用 --set）](#-load-bearing-字段)
-  - [✎ flexible 字段（--set 改，task verb 裸 path 即本 task）](#-flexible-字段)
+  - [✎ flexible 字段（默认 --set，合约字段走专属写口）](#-flexible-字段)
   - [👁 observed 字段（hook 若有则用，走具名 flag）](#-observed-字段)
 - [B. status 八态语义 + 生命周期](#b-status-八态语义--生命周期)
   - [各态语义速查](#各态语义速查)
@@ -54,7 +54,7 @@
 
 ### ✎ flexible 字段
 
-**这些字段用 `--set`（`task add`/`task update <id>` 里裸 `--set field=value` 即作用于该 task；跨 task 用 `tasks[<id>].field` 前缀；板级顶层用 `board update --set`），或各自的具名 flag。写入后非 `--json` 输出回显实际落点（`set tasks[T1].field`）。**
+**默认用 `--set`（`task add`/`task update <id>` 里裸 `--set field=value` 即作用于该 task；跨 task 用 `tasks[<id>].field` 前缀；板级顶层用 `board update --set`），或各自的具名 flag。例外是 `delivery` / `dependency_requirements`：虽属 flexible tier，仍保留给下表中的专属命令，generic setter 会拒绝 root 与 nested path。写入后非 `--json` 输出回显实际落点（`set tasks[T1].field`）。**
 
 | 字段 | 何时设 | 操作侧要点 |
 |---|---|---|
@@ -69,6 +69,8 @@
 | `verified` | 端点验收通过后 | `task done --verified` 一步到位，或 `task update --verified`；`task retry` 原子复位为布尔 `false` |
 | `dependency_gate` | review task 必须明确批准后才允许下游开始时 | `task add|update --review-gate APPROVE`；缺省保持旧板的 status-only 依赖语义 |
 | `review_verdict` | 当前 review attempt 产出明确结论时 | `task done --review-verdict APPROVE|REQUEST-CHANGES`；只有当前 attempt 的 APPROVE 满足显式 review gate；`task retry` 先归档旧值、再从当前 attempt 清除 |
+| `delivery` | 当前 true-done attempt 要证明 candidate / target delivery 时 | 只用 `task attest-delivery` 写；candidate fingerprint 由命令按当前 `finished_at` + `artifact` 重算，observations 绑定 immutable target snapshot；reviewed proof 每次重读绝对 attestation path 并验 digest/binding；stale 可留旧证据审计但不 qualify，retry 整块归档并清 current |
+| `dependency_requirements` | downstream 需把某条 deps edge 从 legacy 升为 candidate/delivered 合约时 | 只用 `dependency require/default/waive`；exact key 优先 `*`；waiver 必须显式 user authorization；资格是 `qualified|unqualified|unknown` 派生值，绝不持久化布尔 |
 | `blocked_on` | `task block --on` 时自动设 | `"user"` 或某 task id；见 [G. blocked_on 怎么选](#g-blocked_on-怎么选) |
 | `justification` | 需记录决策理由时 | 解释「为什么建这个 task / 用这个方法」 |
 | `observability` | 后台任务完成 / recon 时，从 Codex subagent result、后台 terminal session、cloud task 或外部 run 的可得 telemetry 抄取 | 可选遥测；缺失优雅降级，不影响派发逻辑 |
@@ -108,6 +110,7 @@
 
 - `baseline`——EVM 计划基线（plan 基线 SSOT），用 `ccm baseline snapshot / show / reset` 维护；缺→无 EVM baseline，形状坏→`FMT-BASELINE` warn。命令详见 command-catalog 的 baseline namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-BASELINE`。
 - `policy`——可读取历史 `autonomous_account_switch`，但 Codex account switch 永久不可用；stored `allow` 不产生能力。不要把它用作 dispatch 或 credential mutation 输入；形状坏仍触发 `FMT-POLICY` warn。
+- `delivery_contract`——declared-mode v1 的 target 声明与冻结 snapshot。用 `ccm target set/show/refresh` 维护；缺失的历史 board 逐字保持现有 dependency/ready/reconcile 行为。当前唯一可持久化 mode 是 `declared`；`strict` 只存在于只读 `--strict-dry-run` preview，不能写板。Git target 只用本地 objects，artifact target 绑定 immutable manifest digest；branch/worktree 只定位 repository，不是交付证据。
 - `coordination`——多 orchestrator 协调**感知**块，让 M 个并行 orchestrator 互相看见、各自独立配速（**hook 不读**·跨板只读读侧是 `ccm peers`）。可扩展对象，字段全 optional：
   - `priority` ∈ `{'urgent','high','normal','low','trivial'}`（**板级**优先级·非板内任务排序·缺/坏 → 解析为 `normal`）——这是跨板协调的裁决主轴 + 机械 fair-share 权重源（用户声明的协调 hint·不喂引擎的板内任务调度）。**专属 flag：`ccm board update --priority <urgent|high|normal|low|trivial>`**（枚举校验在 update 端·非法值 → `exit 2`；init 时用户给的板级优先级经它落盘）。
   - `state.current`（此刻在烧什么·喂即时 fair-share）：`active_tasks`（int·数字）/ `workload`（string·人类可读）/ `burn_contribution`（number·对聚合配额% burn 的估计贡献）。
@@ -184,13 +187,13 @@ stale      → ready
 | 上游 artifact 变了 | `stale` | `task set-status <id> stale` |
 | stale / failed / escalated 节点确认重跑 | 请求 `ready`（新 attempt）；只有 deps 全满足时才保持 `ready`，否则最终归一为 `blocked` | `task retry <id>` |
 
-**retry 是 attempt 边界，不是 status setter：** `task retry` 先把来源 status 与旧 `started_at` / `finished_at` / `artifact` / `verified` / `review_verdict` 归档为 `ccm/task-retry/v1` log detail，再清空当前 attempt 的 `started_at` / `finished_at` / `artifact` / `review_verdict`、把 `verified` 设为布尔 `false`，并请求落 `ready`。这些步骤在同一持锁写入里原子发生；随后既有 deps 门控仍按 `dependencySatisfied` 归一最终态（只有 deps 全满足才→`ready`，否则→`blocked`），human/JSON 输出逐 task 报这个最终态。普通依赖以 `status=done` 满足；显式 review gate 还要求当前 attempt 的精确 `review_verdict=APPROVE`，所以旧 verdict 即使已归档也绝不参与新 attempt 门控。批量任一 id 不可 retry 时整批不落盘。合法的通用 `set-status <id> ready` 也走同一 reset，避免旧入口泄漏旧证据。
+**retry 是 attempt 边界，不是 status setter：** `task retry` 先把来源 status 与旧 `started_at` / `finished_at` / `artifact` / `verified` / `review_verdict` / `delivery` 归档为 `ccm/task-retry/v1` log detail，再清空当前 attempt 的 `started_at` / `finished_at` / `artifact` / `review_verdict` / `delivery`、把 `verified` 设为布尔 `false`，并请求落 `ready`。这些步骤在同一持锁写入里原子发生；随后 deps 门控用同一个 dependency qualification evaluator 归一最终态（只有 deps 全满足，即 declared edge `qualified` / legacy edge satisfied，才→`ready`；否则→`blocked`），human/JSON 输出逐 task 报这个最终态。旧 verdict / candidate / observation 即使已归档也绝不参与新 attempt 门控。批量任一 id 不可 retry 时整批不落盘。合法的通用 `set-status <id> ready` 也走同一 reset，避免旧入口泄漏旧证据。
 
 **`--force` 越闸是逃生口，不是捷径：** 正常流程用 verb；重跑 stale/failed/escalated 用 `task retry`。用 `--force` 跳 `in_flight` 直接 `done` 会造成无 `started_at` 的 done 节点——伪造审计轨迹，影响 timeline 与 p95 估算。
 
 ### ready ↔ blocked 由系统按 deps 自动门控
 
-**每次 ccm 写命令落盘前，引擎自动跑一趟 `reconcileGating` 归一化**——把每个「**无 `blocked_on`**（非语义阻塞）且 status ∈ {ready, blocked}」的 task 按 deps 满足度重定：**deps 全满足 → `ready`，否则 → `blocked`**。普通/旧 task 的满足条件仍是 `status=done`；显式 review gate 还要求精确 `review_verdict=APPROVE`。这意味着：
+**每次 ccm 写命令落盘前，引擎自动跑一趟 `reconcileGating` 归一化**——把每个「**无 `blocked_on`**（非语义阻塞）且 status ∈ {ready, blocked}」的 task 按 deps 资格重定：**deps 全满足（declared edge `qualified` / legacy edge satisfied）→ `ready`，否则 → `blocked`**。缺 `delivery_contract` 的历史板、以及 declared 板中未声明 requirement 的边，逐字保持 legacy `dependencySatisfied` 行为。显式 requirement 的 edge 先要求 `taskTrulyDone`；review gate 的 `REQUEST-CHANGES` / 缺 APPROVE 优先 fail closed；再按 candidate 或指定 target delivered 求值。这意味着：
 
 - **你几乎不用手动在 ready/blocked 之间搬**——普通上游 done，或 review 上游 APPROVE 后，下游会自动翻成 `ready`；反之未满足的依赖会让新节点自动落成 `blocked`。
 - **手动 `task set-status <id> ready` 会被 deps 否决**——若该 task deps 未全满足且无 `blocked_on`，下一趟归一化会把它打回 `blocked`。想让一个 deps 未满足的节点强行可派发，是设计味道问题（该先切依赖），不是状态问题。
@@ -372,6 +375,29 @@ ccm task done R1 --artifact /abs/review-v2.md --verified --review-verdict APPROV
 ```
 
 `review_verdict` 只属于当前 attempt。`stale|failed|escalated → ready` 是统一 retry 边界，会清除 current verdict；旧值即使进入 retry 审计也不参与门控。retry 后 `task done` 不带 verdict 时仍保持缺失，绝不会复用上轮 `APPROVE`。缺失、空、null、非法值或 `REQUEST-CHANGES` 都不会开门（非法形状还会被 lint hard gate 拒绝）。没有 `dependency_gate` 的旧板/普通 task 继续按 status-only 语义运行，不需要迁移。
+
+**declared delivery edge 的三层真相：**
+
+1. `candidate-complete`：上游满足 `taskTrulyDone`；它证明本 attempt 已完成并验收，不证明已到接收端。
+2. `target-delivered`：当前 candidate 对冻结 target snapshot 有可重验 proof。Git 支持本地 exact containment，或
+   “integration commit contained + fresh APPROVE attestation 精确绑定”的 reviewed reconciliation；非 Git 支持
+   immutable artifact/ref/digest manifest containment。target ref 漂移或本地 object 缺失后旧 observation 变
+   `unknown`，不是 false positive。
+3. `dependency-qualified`：downstream exact edge（或 `*` fallback）的 requirement 求值得到
+   `qualified|unqualified|unknown`。这是派生值，不落一个可陈旧的 bool。waiver 只会让 exact
+   user-authorized、edge-scoped、未过期 requirement `qualified_by=waiver`；它始终
+   `target_delivered=false`。
+
+```bash
+ccm target set main --kind git-ref --ref refs/remotes/origin/main
+ccm dependency require DOWN UP --level delivered --target main
+ccm task attest-delivery UP --target main --method git-commit-contained --candidate-commit <oid>
+ccm dependency explain DOWN UP
+```
+
+`candidate` requirement 只需第一层；`delivered` requirement 必须第二层（或有效 waiver）。所有显式 edge
+都先过 true-done + review gate。`ccm delivery audit --strict-dry-run` 只把未声明 edge 在本次读取里显示为
+unknown，绝不改 persisted mode；strict-default 尚未启用。
 
 **真实数据依赖 vs 虚假保险边：**
 
@@ -911,6 +937,9 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `FMT-ACCEPTANCE` | warn | `acceptance` 既非字符串也非对象，或对象 `criteria` 空、`criterion.status` 不在 {pending,met,failed} | `--accept "一句话"` 或 `--set-json acceptance={criteria:[...]}`——见 [D 节](#d-acceptance-怎么写好) |
 | `FMT-DEPENDENCY-GATE` | hard | `dependency_gate` 存在但不是 `{kind:"review",required_verdict:"APPROVE"}` | 用 `task add|update --review-gate APPROVE` 声明；非法 gate fail closed |
 | `FMT-REVIEW-VERDICT` | hard | 非空 `review_verdict` 不在 `{APPROVE,REQUEST-CHANGES}` | 用 `task done --review-verdict APPROVE|REQUEST-CHANGES`；缺失/null 表示尚无结论 |
+| `FMT-DELIVERY-CONTRACT` | hard | `delivery_contract` 不是 declared v1、target/snapshot 形状坏，或试图持久化 strict | 用 `target set/refresh`；只持久化 `mode:declared`，strict 仅 dry-run preview |
+| `FMT-TASK-DELIVERY` | hard | candidate/observation/proof 形状或 immutable binding 坏，或持久化 derived qualification | 只用 `task attest-delivery`；proof 必须精确绑定当前 candidate 与冻结 target snapshot |
+| `FMT-DEPENDENCY-REQUIREMENTS` | hard | requirement 不是 candidate/delivered、delivered target 未声明、waiver authority/scope/expiry 坏，或写了 `qualified` bool | 用 `dependency require/default/waive`；qualification 永远读取时派生 |
 | `FMT-TIME` | warn | 时间锚（`created_at`/`started_at`/`finished_at`/`owner.heartbeat`）存在却非严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`） | 用 ccm verb 自动盖戳（盖标准格式）；手填时严格 UTC 定宽、无时区偏移、无毫秒 |
 
 ### GRAPH 家族（图完整性）
@@ -950,6 +979,11 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `BIZ-TIME-ORDER` | warn | 时间序乱：`started_at` 早于 `created_at` / `finished_at` 早于 `started_at` / 有 finished 无 started / `in_flight` 无 started / `done` 无 finished | 用 ccm verb（`start`/`done`）按序盖戳，别手填出乱序时间 |
 | `BIZ-DONE-VERIFIED` | hard | done 真语义（`status=done` ∧ `verified=true` ∧ `artifact` 非空）缺失 | `task done --verified --artifact /abs/...`;若尚未端点验收或没有产物,不要标 `done`——见 [L 节](#l-referencesartifactverified-语义) |
 | `BIZ-REVIEW-VERDICT-GATE` | hard | task 有非空 `review_verdict`，却没有合法显式 review gate | 先用 `task add|update --review-gate APPROVE` 声明下游门控语义，再记录 verdict |
+| `BIZ-DELIVERY-CANDIDATE-BINDING` | hard | current delivery candidate fingerprint/fields 不再精确绑定当前 true-done `finished_at` / `artifact` / subject，或不是合法保留在 `stale` 上的旧 attempt evidence | `done→stale` 可留证据审计但不会 qualify；`retry` 会原子归档并清空，开新 attempt 后重新 attest；不得伪造 fingerprint 或复用旧 candidate |
+| `DELIVERY_SIZE_CAP` | hard | targets >64、单 task observations >128、单 downstream requirements >256 | 拆 board / 归档旧 attempt；不要用超大 metadata 把 board 变成 evidence store |
+| `BIZ-DEPENDENCY-REQUIREMENT` | warn | requirement exact key 已不是当前 `deps[]` edge | 删除/改正陈旧 requirement；metadata 不会创建隐藏 DAG edge |
+| `BIZ-DELIVERY-PROOF` | warn | 显式 edge 当前为 unqualified/unknown | 跑 `dependency explain` 看 containment、drift、missing-object、review 或 waiver diagnostic |
+| `BIZ-DELIVERY-IMPACT` | warn | 显式 edge 未 qualified，但 downstream 已越过 planned/blocked | 跑任意 ccm 写命令触发 reconcile，使状态回到 declared truth 后补 proof |
 
 > **schema 版本说明：** 当前引擎期望 `schema === "cc-master/v2"`。如果你看到的 board 或别处文档写 `cc-master/v1`（旧板 / 旧叙事），以 `ccm board --help` / 引擎 board-model 为准——schema 锚点是机器读的窄腰字段，别手改。
 

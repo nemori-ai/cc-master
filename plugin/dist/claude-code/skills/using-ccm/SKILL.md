@@ -14,7 +14,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 
 ## 何时翻开本 skill
 
-你要对 board 做**任何**读或写——建板、建立 / 确认 / 修订 Goal Contract、加 / 改任务、起跑 / 完成 / 阻塞、查 ready 集 / DAG / 临界路径、记 judgment_call 或 log、开 / 收 cadence iteration、arm watchdog——就用 ccm,用法看这里。本文给的是**心智 + 纪律 + 热路径**,让你不必逐条 `--help` 也敲得对;深度按两面分进两个 reference,按问题选读:
+你要对 board 做**任何**读或写——建板、建立 / 确认 / 修订 Goal Contract、加 / 改任务、起跑 / 完成 / 阻塞、声明 delivery target 与依赖资格、查 ready 集 / DAG / 临界路径、记 judgment_call 或 log、开 / 收 cadence iteration、arm watchdog——就用 ccm,用法看这里。本文给的是**心智 + 纪律 + 热路径**,让你不必逐条 `--help` 也敲得对;深度按两面分进两个 reference,按问题选读:
 
 - **[references/command-catalog.md](references/command-catalog.md)**（面1·命令面）—— 全量命令 / flag / `--json` 输出形状。**「这条命令怎么敲、有哪些 flag」翻它。**
 - **[references/board-model-guide.md](references/board-model-guide.md)**（面2·模型与取值）—— board 领域概念（task 字段 / status 八态 / executor 五种 / judgment_call / cadence / parent / watchdog）解释 + 字段**什么时候设什么值**的取值判断（acceptance 怎么写好 / estimate 怎么估 / deps 怎么连 / executor 怎么选）+ 决策树 + footgun 深化。**「这个字段填什么、这个概念是什么、这个场景选哪个」翻它。**
@@ -28,7 +28,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 1. **持锁**(`.lock`·O_EXCL 原子抢占)——串行化写入,防两个写者撕裂文件。
 2. **校验不变式**——FMT/GRAPH/BIZ 规则在落盘前跑;有 hard error 直接 exit 3 拒绝,坏 board 写不进去。
 3. **守状态机**——非法状态转移(见锚 2)当场挡下。
-4. **守 attempt 边界**——`task start` 自动盖 `started_at`、`task done` 盖 `finished_at`;`task retry` 把旧 attempt 证据归档到 log 后清空当前态的 `started_at` / `finished_at` / `artifact` / `review_verdict`,并把 `verified` 复位为布尔 `false`。手改 status 会漏掉这些联动,board 就此说谎。
+4. **守 attempt 边界**——`task start` 自动盖 `started_at`、`task done` 盖 `finished_at`;`task retry` 把旧 attempt 证据（含 current `delivery` candidate/observations）归档到 log 后清空当前态的 `started_at` / `finished_at` / `artifact` / `review_verdict` / `delivery`,并把 `verified` 复位为布尔 `false`。手改 status 会漏掉这些联动,board 就此说谎。
 
 手改 JSON 把这四道全绕过。**别因为"就改一个字段、Write 更快"在 ccm 可用时绕开它**——那一下省的几秒,换来的是绕锁、跳校验、derived 字段失真。
 
@@ -42,7 +42,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 - **没有** `task set`;`task update` **不接** `--status`;`--set tasks[T].status=…` 被 🔒 守门拒(exit 3);裸 `--set status=done` 同样被拒(exit 3)——task verb 的裸 path scope 到本 task,`status` 命中 🔒 守门,不会静默落 board 顶层。
 - **`ready → done` 非法**:必须先 `task start`(ready → in_flight)再 `task done`。直接 done 撞 `illegal transition: ready → done`(exit 3)。
 - **native-active projection 是更窄的专属状态机**：板启用 `ccm/native-attempt/v1` 且 latest attempt 为 `starting|running|uncertain` 时，generic `start/done/block/unblock/set-status`、`task update --handle` / 通用 setter、legacy `route-bind` 和 `--force` 都不能构造或修复 status/handle；只走 `native-attempt-create/bind/cancel/terminal/reconcile`。可信 terminal 证据只把 task 投影到 `uncertain`，父层完成端点验收后仍须满足普通 `task done --verified --artifact` 不变式。
-- **`ready ↔ blocked` 由系统按 deps 自动归一**:每次 ccm 写命令落盘前引擎跑一趟 `reconcileGating`——**无 `blocked_on`** 且 status∈{ready,blocked} 的 task 按 deps 满足度重定(deps 全满足→ready,否则→blocked)。普通/旧 task 仍以 `status=done` 满足依赖；用 `task add|update --review-gate APPROVE` 显式声明的 review gate 则必须同时有 `review_verdict=APPROVE`，`REQUEST-CHANGES`、缺失、空或 null 都保持下游 blocked。review 的 `status=done` 只表示审查工作执行完，不等于批准。**手动 `set-status <id> ready` 会被 deps 否决**(deps 未满足下一趟归回 blocked)。**有 `blocked_on`(等 user / 等某 task)= 语义阻塞,豁免自动门控**;解除用 **`task unblock <id>`**,别用 `set-status`。手改 board 造出的不一致态由 `BIZ-STATUS-DEPS` warn 兜。
+- **`ready ↔ blocked` 由系统按 deps 自动归一**:每次 ccm 写命令落盘前引擎跑一趟 `reconcileGating`——**无 `blocked_on`** 且 status∈{ready,blocked} 的 task 按 deps 满足度重定(deps 全满足→ready,否则→blocked)。普通历史板和 declared 板里没有显式 requirement 的边保持 legacy；用 `task add|update --review-gate APPROVE` 声明的 review gate 必须有当前 attempt 的精确 `APPROVE`，`REQUEST-CHANGES`、缺失、空或 null 都 fail closed。显式 delivery requirement 还先要求上游 `taskTrulyDone`，再按 `candidate` 或指定 target 的 `delivered` 资格判定。review 的 `status=done` 只表示审查工作执行完，不等于批准。**手动 `set-status <id> ready` 会被 deps 否决**(deps 未满足下一趟归回 blocked)。**有 `blocked_on`(等 user / 等某 task)= 语义阻塞,豁免自动门控**;解除用 **`task unblock <id>`**,别用 `set-status`。手改 board 造出的不一致态由 `BIZ-STATUS-DEPS` warn 兜。
 
 完整转移表:
 
@@ -60,7 +60,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 > `verified` 是与 status **正交的布尔**(`--verified`),不是一个 status 值。`done` 且 `verified:true` 且 `artifact` 非空,才是真完成(端点验收过);缺任一项会被 `BIZ-DONE-VERIFIED` hard gate 拒绝落盘(exit 3)。
 > 对显式 review gate，`verified:true` 只验收「review 工作与报告已完成」，是否批准由**当前 attempt** 的 `review_verdict` 单独表达；只有 `APPROVE` 满足下游 deps。`stale|failed|escalated → ready` 开新 attempt 时旧 verdict 自动失效，重跑后必须产出新 verdict。
 
-> `stale` / `failed` / `escalated` 要重跑时优先用 `task retry <id>`。它把旧 attempt 的 `started_at`、`finished_at`、`artifact`、`verified`、`review_verdict` 以 `ccm/task-retry/v1` 结构归档进 append-only log,再原子复位当前 attempt;合法的通用 `set-status <id> ready` 也共享同一 reset,不会把旧验收证据带进新一轮。retry 的 lifecycle 目标是 `ready`,但写入关卡随后仍按 `dependencySatisfied` 归一:只有 deps 全满足的 task 才落 `ready`,否则最终落 `blocked`;human/JSON 输出按每个 task 的最终态回显。
+> `stale` / `failed` / `escalated` 要重跑时优先用 `task retry <id>`。它把旧 attempt 的 `started_at`、`finished_at`、`artifact`、`verified`、`review_verdict`、`delivery` 以 `ccm/task-retry/v1` 结构归档进 append-only log,再原子复位当前 attempt;合法的通用 `set-status <id> ready` 也共享同一 reset,不会把旧验收 / delivery 证据带进新一轮。retry 的 lifecycle 目标是 `ready`,但写入关卡随后仍按同一依赖资格求值归一:只有 deps 全满足（declared edge 已 `qualified`，legacy edge 按既有 satisfied 规则）的 task 才落 `ready`,否则最终落 `blocked`;human/JSON 输出按每个 task 的最终态回显。
 
 ### Rationalization Table —— status 这条最常见的自我说服
 
@@ -72,15 +72,15 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 
 ---
 
-## 心智锚 3:三档字段 —— 🔒 走专属命令,只有 ✎ 能 `--set`
+## 心智锚 3:三档字段 —— 🔒 走专属命令,✎ 默认 `--set` 但可有专属写口
 
 board 字段分三档(权威定义在 `ccm` 引擎:enums / 字段元数据 / 不变式 / 状态机——实时真相用 `ccm <ns> --help`。每字段属哪档 + 怎么取值的操作视图见 [references/board-model-guide.md](references/board-model-guide.md) §A;这里只给**操作规则**):
 
 - **🔒 load-bearing**:`id` / `status` / `deps` / `parent`,以及 board 级 `goal` / `owner` / `git` / `tasks`。**`--set` 一律拒(exit 3)**,只能走专属命令(`task add`/`start`/`done`/`retry`/`block`/`set-status`、`task update --add-dep/--rm-dep/--parent`、`ccm goal set|confirm|amend`、`board update --branch/...`)。新板的 goal 只走 `ccm goal`;`board update --goal` 仅兼容没有 `goal_contract` 的 legacy board。
-- **✎ flexible**:`title` / `description` / `estimate` / `acceptance` / `justification` / `artifact` 等。**这些才用 `--set`**,且 scoping 跟着命令语境走:`task add`/`task update <id>` 里**裸 path 作用于该 task**(`ccm task update T1 --set title="新标题"` 就落在 T1 上);板级顶层 ✎ 字段走 `board update --set`;要跨 task 写才用显式前缀 `--set tasks[T2].title=…`。长尾对象/数组用 `--set-json`。写入后非 `--json` 输出会回显实际落点(如 `set tasks[T1].title`),落点不对一眼可见。
+- **✎ flexible**:`title` / `description` / `estimate` / `acceptance` / `justification` / `artifact` 等。**这些才用 `--set`**,且 scoping 跟着命令语境走:`task add`/`task update <id>` 里**裸 path 作用于该 task**(`ccm task update T1 --set title="新标题"` 就落在 T1 上);板级顶层 ✎ 字段走 `board update --set`;要跨 task 写才用显式前缀 `--set tasks[T2].title=…`。长尾对象/数组用 `--set-json`。写入后非 `--json` 输出会回显实际落点(如 `set tasks[T1].title`),落点不对一眼可见。**少数带 authority/proof 的 ✎ 字段保留专属写口**:`delivery_contract`、task `delivery` / `dependency_requirements` 会拒绝 generic setter,分别走 `target`、`task attest-delivery`、`dependency` 命令。
 - **👁 observed**:`scheduling.wip_limit`、`watchdog`、`wip_limit` 等——hook 有则用、缺则降级,走各自具名 flag。
 
-一句话:**改 🔒 找专属命令;改 task 的 ✎ 用 `task update <id> --set field=…`(裸 path 即本 task),改板级 ✎ 用 `board update --set`;拿不准先 `ccm task update <id> --help` 看有没有具名 flag。**
+一句话:**改 🔒 找专属命令;改普通 task ✎ 用 `task update <id> --set field=…`(裸 path 即本 task),改普通板级 ✎ 用 `board update --set`;delivery 合约字段例外走具名 domain verb;拿不准先看对应 `--help`。**
 
 ---
 
@@ -119,6 +119,13 @@ ccm task add R1 --type review --review-gate APPROVE
 ccm task start R1
 ccm task done R1 --artifact /abs/review.md --verified --review-verdict REQUEST-CHANGES
 
+# declared delivery：先声明目标与 edge 要求，再为当前 true-done attempt 做本地 proof
+ccm target set main --kind git-ref --ref refs/remotes/origin/main
+ccm dependency require DOWN UP --level delivered --target main
+ccm task attest-delivery UP --target main --method git-commit-contained --candidate-commit <oid>
+ccm dependency explain DOWN UP             # qualified|unqualified|unknown + 稳定 diagnostics
+ccm delivery audit --strict-dry-run         # 只预览缺声明边；绝不打开 strict-default、绝不写板
+
 # 阻塞等用户(必带 decision_package,否则 BIZ-AWAITING 硬闸 exit 3)
 ccm task block T9 --on user --decision @/abs/decision.json
 ccm task block T5 --on T2                 # 阻塞在另一个 task 上
@@ -154,6 +161,9 @@ ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism cron --job-id cron-a
 | `goal check` 返回 pending | 目标还没 settled；澄清后 `goal set` / `goal amend`，不要切 DAG 或派发。复杂背景用 `--brief-file` 落成受管 Goal Brief。 |
 | review task 已 `done`，下游仍 blocked | 若它声明了 `--review-gate APPROVE`，这是正确行为：检查 `review_verdict`；只有 `task done ... --review-verdict APPROVE` 开门，REQUEST-CHANGES/缺 verdict 都不开门。 |
 | review 上轮已 `APPROVE`，retry 后下游又 blocked | verdict 只属于当前 attempt；`stale|failed|escalated → ready` 会清旧 verdict。新一轮 `task done` 必须显式给新的 `--review-verdict APPROVE` 才重新开门。 |
+| 上游 true-done，但 declared 下游仍 blocked | true-done 只证明 candidate-complete，不证明已到指定 target。用 `delivery check` / `dependency explain` 看本地 containment、target drift 或 missing-object diagnostic；branch/worktree 存在不是 delivery proof。 |
+| waiver 让 edge ready，却看到 `target_delivered:false` | 这是设计语义：waiver 只把这一条 user-authorized、edge-scoped、未过期 requirement 资格化，输出 `qualified_by=waiver`；它从不伪装 target 已交付。 |
+| 想把 declared 一键变 strict-default | 本版本没有这个写口。只有 `delivery audit --strict-dry-run` / explain 的 ephemeral preview；不得持久化 `mode:strict`。 |
 | ISO 时间字段被 lint warn | 一律严格 `YYYY-MM-DDTHH:MM:SSZ`(UTC 定宽),别用本地时区 / 带毫秒。 |
 | 多个 active 板时命令报 Ambiguous | 用 `--goal <子串>` 或 `--board <path>` 消歧。 |
 | open cadence iteration 出 overbooked / critical-path / oversized warn | 这不是 hard gate,但说明本轮节奏不健康。先拆小、移出 scope、删假依赖或重估;不要靠 `cadence ship` 把超载藏起来。 |
@@ -162,7 +172,7 @@ ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism cron --job-id cron-a
 
 ## Exit code 速记
 
-`0` 成功 · `2` 用法错 · `3` 校验拒绝 · `4` 锁超时 · `5` 无 active board · `7` policy-deny（`account switch` 被 `autonomous_account_switch:deny` 拦下）。exit 2/3 时先读 stderr。
+`0` 成功 · `2` 用法错 · `3` 校验拒绝 · `4` 锁超时 · `5` 无 active board · `7` 授权拒绝（`account switch` 被 `autonomous_account_switch:deny` 拦下，或 `dependency waive` 缺显式 `--user-authorized`）。exit 2/3 时先读 stderr。
 
 ---
 

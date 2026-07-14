@@ -21,7 +21,7 @@
 // 红线2：只碰 task.status（✎ 域·非窄腰 hook-read 语义），deps/blocked_on 只读不写——不动窄腰协议。
 
 import { analyzeGraph } from './board-graph-core.js';
-import { dependencySatisfied } from './board-model.js';
+import { type DeliveryFacts, dependencyQualified } from './delivery-contract.js';
 
 // 受门控归一的状态集（ready/blocked 两态才自动翻；其余态豁免）。
 const GATED = new Set(['ready', 'blocked']);
@@ -31,28 +31,24 @@ function hasSemanticBlock(t: { blocked_on?: unknown }): boolean {
   return typeof t.blocked_on === 'string' && t.blocked_on !== '';
 }
 
-export function reconcileGating<T>(board: T): T {
+export function reconcileGating<T>(board: T, deliveryFacts: DeliveryFacts = {}): T {
   if (!board || typeof board !== 'object' || Array.isArray(board)) return board;
   const src = board as { tasks?: unknown };
   if (!Array.isArray(src.tasks)) return board; // 无 tasks（如 init 空板）→ 原样返回。
 
   const b = structuredClone(board) as unknown as { tasks: Array<Record<string, unknown>> };
-  const g = analyzeGraph(b); // 建图（clone 上）：g.taskById / predecessors 指向 clone 的 task 对象。
-
-  // 依赖满足快照（按入参态）：reconcile 不改上游完成/verdict → 快照稳定 → 遍历顺序无关、单趟即幂等。
-  const satisfiedIds = new Set<string>();
-  for (const t of b.tasks) {
-    if (t && typeof t === 'object' && typeof t.id === 'string' && dependencySatisfied(t)) {
-      satisfiedIds.add(t.id);
-    }
-  }
+  const g = analyzeGraph(b, { deliveryFacts }); // 建图（clone 上）：g.taskById / predecessors 指向 clone 的 task 对象。
 
   for (const t of b.tasks) {
     if (!t || typeof t !== 'object' || typeof t.id !== 'string') continue;
     if (!GATED.has(t.status as string)) continue; // 只归一 ready/blocked，其余态豁免。
     if (hasSemanticBlock(t)) continue; // 语义阻塞（blocked_on 非空）豁免，deps 满足也不翻。
     const deps = g.predecessors(t.id); // 规范上游（排除 dangling/self-loop·同 readySet 口径）。
-    t.status = deps.every((d) => satisfiedIds.has(d)) ? 'ready' : 'blocked';
+    t.status = deps.every(
+      (d) => dependencyQualified(b, t.id as string, d, deliveryFacts).state === 'qualified',
+    )
+      ? 'ready'
+      : 'blocked';
   }
   return b as T;
 }

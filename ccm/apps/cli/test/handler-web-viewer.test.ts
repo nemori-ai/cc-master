@@ -849,6 +849,14 @@ test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no b
     assert.deepEqual(viewModel.body.graph.ready_set, ['C']);
     assert.deepEqual(viewModel.body.ready_set, ['C']);
     assert.deepEqual(viewModel.body.summary.readySet, ['C']);
+    assert.equal(viewModel.body.delivery.mode, 'legacy');
+    assert.equal(viewModel.body.delivery.edges.length, 4);
+    assert.ok(
+      viewModel.body.delivery.edges.every(
+        (edge: { qualification?: { basis?: string } }) => edge.qualification?.basis === 'legacy',
+      ),
+      'viewer dep edges carry the engine-derived qualification read model',
+    );
     assert.deepEqual(
       viewModel.body.graph.edges
         .filter((e: { type: string }) => e.type === 'dep')

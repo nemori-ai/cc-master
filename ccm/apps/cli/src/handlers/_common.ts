@@ -27,6 +27,7 @@ import {
   reconcileInbox,
   validateNativeAttemptMutation,
 } from '@ccm/engine';
+import { resolveDeliveryFacts } from '../delivery-proof.js';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
 import type { ProviderRuntime } from '../provider-runtime.js';
@@ -436,7 +437,9 @@ export function runWrite(
       }
 
       const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-      const next = reconcileInbox(reconcileGating(mutate(raw, ctx, { boardPath })), now);
+      const mutated = mutate(raw, ctx, { boardPath });
+      const deliveryFacts = resolveDeliveryFacts(mutated as BoardArg, { now });
+      const next = reconcileInbox(reconcileGating(mutated, deliveryFacts), now);
 
       // Native attempt 的 writer ownership 是 mutation-boundary hard gate，先于可被 --force 越过的普通 lint。
       // generic 是所有既有 writer 的默认值；只有 dedicated native verb 显式传对应 writerKind。

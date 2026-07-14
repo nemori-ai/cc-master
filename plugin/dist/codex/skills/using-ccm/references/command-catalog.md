@@ -43,6 +43,18 @@
   - [goal check](#goal-check)
 - [namespace capability](#namespace-capability)
   - [capability check](#capability-check)
+- [namespace target](#namespace-target)
+  - [target set](#target-set)
+  - [target show](#target-show)
+  - [target refresh](#target-refresh)
+- [namespace delivery](#namespace-delivery)
+  - [delivery check](#delivery-check)
+  - [delivery audit](#delivery-audit)
+- [namespace dependency](#namespace-dependency)
+  - [dependency require](#dependency-require)
+  - [dependency default](#dependency-default)
+  - [dependency explain](#dependency-explain)
+  - [dependency waive](#dependency-waive)
 - [namespace task](#namespace-task)
   - [task add](#task-add)
   - [task show](#task-show)
@@ -56,6 +68,7 @@
   - [task start](#task-start)
   - [task done](#task-done)
   - [task retry](#task-retry)
+  - [task attest-delivery](#task-attest-delivery)
   - [task block](#task-block)
   - [task unblock](#task-unblock)
   - [task set-status](#task-set-status)
@@ -172,6 +185,9 @@ ccm <alias> [args] [flags]
 | `board` | 板级：查看 / 校验 / DAG 分析 / 建板 / 改配置 |
 | `goal` | Goal Contract 生命周期：首次转写、用户确认、修订、读取、完整性校验 |
 | `capability` | 独立发版消费者的稳定能力握手（只读） |
+| `target` | declared delivery target：本地解析 / 显示 / 刷新冻结 snapshot；不 fetch |
+| `delivery` | candidate 对 target 的 delivered 三态检查 + ephemeral strict dry-run audit |
+| `dependency` | downstream/dependency edge 的 requirement / explain / user-authorized waiver |
 | `task` | 任务：增删改查 + 状态机（DAG 节点） |
 | `log` | append-only 审计轨迹 |
 | `jc` | judgment_calls 自驱决策记录 |
@@ -231,6 +247,8 @@ ccm <alias> [args] [flags]
 
 接受 `--set` / `--set-json` 的写命令实测为：`task add`、`task update`、`board update`、`jc add`、`cadence update`、`cadence open`。
 
+**专属写口例外**：board `delivery_contract` 与 task `delivery` / `dependency_requirements` 虽属 ✎ flexible tier，仍被 generic setter 保留区拦截（含 root replacement 与任意 nested path，exit 3）。它们只能分别经 `target set|refresh`、`task attest-delivery`、`dependency require|default|waive` 写入，避免绕过 proof、binding、edge scope 与 waiver authorization。
+
 **`--set`/`--set-json` 的 scoping 语义（裸 path 落哪里由命令语境决定）**：
 
 - **`task add <id>` / `task update <id>`**：裸 path（如 `--set 'decision_package=…'`）作用于**该 task**——与 `--title` 等具名 flag 一致的直觉。显式 `tasks[<其它id>].field` 前缀仍作用于指定 task（跨 task 逃生口）。task 🔒 字段（`id`/`status`/`deps`/`parent`）裸写同样被拒（exit 3），不会静默落 board 顶层。
@@ -249,7 +267,7 @@ ccm <alias> [args] [flags]
 | `3` | 校验拒绝（lint hard error / 非法状态转移 / `--set` 命中 🔒 字段） |
 | `4` | 锁超时 |
 | `5` | 无 active board |
-| `7` | 跨 host policy-deny 兼容码；Codex 不存在可执行的 account-switch 路线 |
+| `7` | 授权拒绝——`dependency waive` 缺显式 `--user-authorized`；亦保留跨 host policy-deny 兼容码，Codex 没有可执行的 account-switch 路线 |
 
 ### JSON 信封
 
@@ -705,6 +723,71 @@ ccm capability check <capability-id> [--json]
 - 当前稳定 id：`board-init/structured-board-path-v1`、`goal-contract/v1`。
 - 支持时 exit 0 + `supported:true`；未知/不支持时 exit 3。plugin bootstrap 用它/等价 init capability envelope 做写前握手。
 
+## namespace target
+
+declared-mode v1 的接收端目标。所有 Git 解析只读本地 object database，固定
+`GIT_NO_LAZY_FETCH=1` / 禁交互；不 fetch、不起 daemon。CLI registry 只有两级 noun+verb，故设计里的
+`delivery target <verb>` 落成等义的 `target <verb>`。
+
+### target set
+
+**写**：`ccm target set <target-id> --kind git-ref --ref <ref> [--repository <local-worktree>]`
+或 `ccm target set <target-id> --kind artifact-set --namespace file:/abs/manifest.json`。
+本地解析后写 `delivery_contract.mode=declared` 与冻结 snapshot；缺 `--repository` 时用
+`board.git.worktree`。支持全局 `--dry-run`。
+
+### target show
+
+**读**：`ccm target show <target-id> [--json]`。同时返回声明、冻结 snapshot 与当前本地
+`current|drift|unknown` fact；missing object 是 unknown，不隐式联网补齐。
+
+### target refresh
+
+**写**：`ccm target refresh <target-id> [--dry-run] [--json]`。本地重解 snapshot；ref drift 后旧
+observation 不再授权。exact/artifact proof 可按新 snapshot 重验；即使某次刷新记录 negative/unknown，后续刷新仍从
+保留的原始 proof method 重试并可恢复为 delivered。reviewed reconciliation 必须重新提供 fresh review binding。
+
+## namespace delivery
+
+### delivery check
+
+**读**：`ccm delivery check <task-id> <target-id> [--json]`。返回 `qualified|unqualified|unknown`、
+`candidate_complete`、`target_delivered`、`qualified_by` 与稳定 diagnostic codes。blocked/unknown 是可读事实，
+exit 0；命令本身坏输入/坏契约才非零。
+
+### delivery audit
+
+**读**：`ccm delivery audit --strict-dry-run [--json]`。把本次未声明 edge 临时视为 unknown，列全 edge
+qualification。它不写板，也不把 `delivery_contract.mode` 改成 strict；declared-mode v1 没有 strict-default 写口。
+
+## namespace dependency
+
+### dependency require
+
+**写**：`ccm dependency require <downstream-id> <dependency-id> --level candidate|delivered
+[--target <target-id>] [--dry-run] [--json]`。只写 exact 既有 `deps[]` edge；`delivered` 必须给已声明 target，
+`candidate` 不得带 target。
+
+### dependency default
+
+**写**：`ccm dependency default <downstream-id> --level candidate|delivered [--target <target-id>]`。
+写该 downstream 的 `*` fallback；exact key 优先。它不创建或改写 `deps[]`。
+
+### dependency explain
+
+**读**：`ccm dependency explain <downstream-id> <dependency-id> [--strict-dry-run] [--json]`。解释派生
+qualification 与 diagnostic codes；不持久化布尔。显式 edge 一律先要求上游 true-done，review
+`REQUEST-CHANGES` / 缺 APPROVE 优先 fail closed。
+
+### dependency waive
+
+**写**：`ccm dependency waive <downstream-id> <dependency-id> --target <target-id> --reason <text>
+--expires-at <UTC> --user-authorized [--dry-run] [--json]`。只接受已存在的 exact delivered requirement；waiver
+精确绑定 downstream/dependency/target、过期即失效。缺 `--user-authorized` → exit 7。成功资格输出
+`qualified_by:"waiver"` 且 `target_delivered:false`，绝不伪造交付事实。`--set-json` 不能替代本命令写 waiver。
+
+---
+
 ## namespace task
 
 任务：增删改查 + 状态机（DAG 节点）。
@@ -1004,7 +1087,7 @@ ccm task retry <id> [<id2> <id3> ...] [flags]
 |---|---|---|
 | `<id>` | 是 | task id（**可给多个**，空格分隔——批量开启新 attempt） |
 
-- 行为：仅允许 `stale` / `failed` / `escalated` → `ready`。每个 task 的旧 `started_at` / `finished_at` / `artifact` / `verified` / `review_verdict` 连同来源 status 先以 `ccm/task-retry/v1` 结构归档到 append-only log，再清空当前 attempt 的 `started_at` / `finished_at` / `artifact` / `review_verdict` 并把 `verified` 设为布尔 `false`。归档与复位同一次持锁写入，不能只成功一半。随后写入关卡照常按 `dependencySatisfied` 归一：只有 deps 全满足的 task 最终落 `ready`，否则落 `blocked`；普通依赖以 `status=done` 满足，显式 review gate 还要求当前 attempt 的精确 `review_verdict=APPROVE`。human 与 JSON 输出都逐项回显这个 reconcile 后的最终态（批量可同时出现 `blocked` / `ready`）。
+- 行为：仅允许 `stale` / `failed` / `escalated` → `ready`。每个 task 的旧 `started_at` / `finished_at` / `artifact` / `verified` / `review_verdict` / `delivery` 连同来源 status 先以 `ccm/task-retry/v1` 结构归档到 append-only log，再清空当前 attempt 的 `started_at` / `finished_at` / `artifact` / `review_verdict` / `delivery` 并把 `verified` 设为布尔 `false`。归档与复位同一次持锁写入，不能只成功一半。随后写入关卡按同一依赖资格 evaluator 归一：只有 deps 全满足（declared edge `qualified` / legacy edge satisfied）的 task 最终落 `ready`，否则落 `blocked`。human 与 JSON 输出都逐项回显这个 reconcile 后的最终态（批量可同时出现 `blocked` / `ready`）。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
@@ -1014,6 +1097,32 @@ ccm task retry <id> [<id2> <id3> ...] [flags]
 - 例：`ccm task retry T7` · `ccm task retry T7 T8 T9 --log "上游契约已更新"`
 - 非上述三态会报非法转移（exit 3），`--force` 也不会扩大 retry 的来源集合；若 `done` 需要重做，先合法转为 `stale`，再 `retry`。
 - 合法的通用 `ccm task set-status <id> ready` 也共享同一归档 + reset，避免旧路径遗留旧证据；面向重跑意图仍优先使用具名 `retry`。
+
+### task attest-delivery
+
+**写**：为当前 true-done attempt 建 candidate binding，并用本地 proof 写一条 target observation。proof 不成立时
+exit 3，且在进入写关卡前就拒绝，`--force` 不能把失败 proof 变成交付。
+
+```bash
+ccm task attest-delivery <id> --target <target-id> \
+  --method git-commit-contained --candidate-commit <commit-or-ref>
+
+ccm task attest-delivery <id> --target <target-id> \
+  --method reviewed-reconciliation-contained --candidate-commit <oid> \
+  --integration-commit <oid> --attestation /abs/review.json
+
+ccm task attest-delivery <id> --target <target-id> \
+  --method artifact-digest-contained --logical-name <name> --artifact-version <immutable-version> \
+  --artifact-ref <immutable-ref> --artifact-digest sha256:<64hex>
+```
+
+- exact Git：candidate commit 必须本地存在且被冻结 target OID exact containment。
+- reviewed reconciliation：integration commit 必须 contained；本地 attestation（≤1 MiB）须 APPROVE，并精确绑定
+  candidate fingerprint、target/target OID、integration commit 与 reviewed base。proof 持久化 attestation 的绝对路径与
+  exact-byte digest；每次资格求值都会重新读取并复核，文件缺失、内容改变或 binding 漂移均为 unknown/fail-closed。
+- artifact：冻结 manifest（≤1 MiB / ≤4096 entries）须含 exact logical-name/version/ref/digest 条目。
+- branch/worktree 只定位 repository，不是 proof。命令不 fetch、不调用 provider/harness。
+- generic `--set` / `--set-json` 不能写 `delivery`；candidate fingerprint 必须由本命令按当前 attempt 证据重算。
 
 **批量语义（`task start` / `task done` / `task retry` 共用）**：`runWrite` 的写入
 关卡是"mutate → 对整块 next 板跑一次 `lintBoard` → 有 hard error 就整体拒绝、不落盘"。逐条独立调用
@@ -1688,7 +1797,7 @@ ccm usage runway [flags]
 
 ## namespace status-report
 
-生成式 board 状态报告。`render` 纯 stdout 计算；`write` / `show` / `watch` 只写 derived report artifact 到 `<home>/reports/status-report/boards/<board-file-stem>.status-report.json`，**不写 board JSON**。JSON schema 是 `ccm/status-report/v1`；freshness 由 board hash / topology hash / advisory hash / input hash / TTL 判定。web viewer 的 Status module 也读同一报告路径，不另造 status 模型。
+生成式 board 状态报告。`render` 纯 stdout 计算；`write` / `show` / `watch` 只写 derived report artifact 到 `<home>/reports/status-report/boards/<board-file-stem>.status-report.json`，**不写 board JSON**。JSON schema 是 `ccm/status-report/v1`；freshness 由 board hash / topology hash / advisory hash / input hash / TTL 判定。报告 `delivery` 块列 mode 与每条 dep edge 的同源 qualification；readySet 使用注入本地 target drift/missing-object facts 的同一 evaluator。web viewer 的 Status module 读同一报告路径，DAG view-model 的 dep edge 也携带 qualification，不另造第二套交付模型。
 
 ### status-report render
 
@@ -2406,6 +2515,32 @@ HOME/XDG 与 provider 可能写入；`account_credential_zero_write_attested:fal
   confirmed-unlaunched evidence 才为 `state:"expired"`；`committed` 或 unknown evidence 返回
   `state:"orphaned"`，容量仍 counted。multi-key 的 capacity-changing transition 由 coordinator 一次发布
   全部 legs；`expired|released` 是单调 terminal，重试只返回既有 receipt，不新增 event、不复活或重占容量。
+
+### target / delivery / dependency
+
+- `target set`：`{target_id,target,dry_run}`；`target show`：`{target_id,target,fact}`；`target refresh`：
+  `{target_id,target,revalidations,dry_run}`。
+- `delivery check` 与 `dependency explain` 的 `data` 是同一 qualification 形状：
+
+```json
+{
+  "state": "qualified",
+  "basis": "delivery",
+  "candidate_complete": true,
+  "target_delivered": true,
+  "target_id": "main",
+  "observation_id": "D-...",
+  "qualified_by": "delivery",
+  "reasons": []
+}
+```
+
+`state` 固定为 `qualified|unqualified|unknown`；`qualified_by` 只在 qualified 时出现。waiver 的
+`qualified_by` 是 `waiver`，但 `target_delivered` 固定 false。
+- `delivery audit`：`{strict_preview:true,persisted_mode:"legacy|declared",edges:[{downstream,dependency,qualification}]}`。
+- `dependency require/default`：`{downstream,dependency,requirement,dry_run}`；`dependency waive`：
+  `{waiver,qualification,dry_run}`。
+- `task attest-delivery`：`{task_id,target_id,qualification,dry_run}`。
 
 ### board next（`ccm board next --json` / `ccm next --json`）
 

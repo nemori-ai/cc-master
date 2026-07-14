@@ -6,7 +6,9 @@ import * as path from 'node:path';
 import {
   analyzeGraph,
   buildPeerRoster,
+  type DeliveryFacts,
   type DurableWriteCheckpoint,
+  dependencyQualified,
   durableWriteFileSync,
   isAwaitingUser,
   loadHomeBoards,
@@ -14,6 +16,7 @@ import {
   taskTrulyDone,
   withLock,
 } from '@ccm/engine';
+import { resolveDeliveryFacts } from '../delivery-proof.js';
 import * as discover from '../discover.js';
 import { readVersion } from '../help.js';
 import * as io from '../io.js';
@@ -1214,6 +1217,7 @@ interface ViewerEdge {
   to: string;
   type: 'dep' | 'parent';
   critical?: boolean;
+  qualification?: ReturnType<typeof dependencyQualified>;
 }
 
 interface RankInfo {
@@ -1221,7 +1225,12 @@ interface RankInfo {
   ranks: Array<{ id: string; label: string; node_ids: string[] }>;
 }
 
-function graphEdges(tasks: JsonRecord[], criticalPath: string[] = []): ViewerEdge[] {
+function graphEdges(
+  board: JsonRecord,
+  tasks: JsonRecord[],
+  criticalPath: string[] = [],
+  deliveryFacts: DeliveryFacts = {},
+): ViewerEdge[] {
   const criticalEdges = new Set<string>();
   for (let i = 1; i < criticalPath.length; i++) {
     criticalEdges.add(`${criticalPath[i - 1]}->${criticalPath[i]}`);
@@ -1242,6 +1251,7 @@ function graphEdges(tasks: JsonRecord[], criticalPath: string[] = []): ViewerEdg
             to: id,
             type: 'dep',
             critical: criticalEdges.has(edgeId),
+            qualification: dependencyQualified(board, id, dep, deliveryFacts),
           });
         }
       }
@@ -1742,7 +1752,8 @@ function buildViewModel(home: string, boardPath: string): JsonRecord {
   const snapshot = readBoardSnapshot(boardPath);
   const board = snapshot.board;
   const tasks = tasksOf(board);
-  const graph = analyzeGraph(board as Parameters<typeof analyzeGraph>[0]);
+  const deliveryFacts = resolveDeliveryFacts(board, { now: nowIso() });
+  const graph = analyzeGraph(board as Parameters<typeof analyzeGraph>[0], { deliveryFacts });
   const topo = graph.topoSort();
   const cp = graph.criticalPath({ now: Date.now() });
   const criticalPath = Array.isArray(cp.chain) ? cp.chain : [];
@@ -1752,7 +1763,7 @@ function buildViewModel(home: string, boardPath: string): JsonRecord {
   const compactTasks = tasks.map(compactTask).filter((t): t is JsonRecord => !!t);
   const ranks = rankTasks(tasks, topo.order, graph.upstream as Map<string, unknown>);
   const readySet = graph.readySet();
-  const edges = graphEdges(tasks, criticalPath);
+  const edges = graphEdges(board, tasks, criticalPath, deliveryFacts);
   const statusCounts = countStatuses(tasks);
   const selectedTaskId =
     criticalPath[criticalPath.length - 1] || readySet[0] || compactTasks[0]?.id || null;
@@ -1819,6 +1830,19 @@ function buildViewModel(home: string, boardPath: string): JsonRecord {
       },
       awaitingUserCount: tasks.filter((task) => isAwaitingUser(task as never)).length,
       verifiedDone: tasks.filter((task) => taskTrulyDone(task as never)).length,
+    },
+    delivery: {
+      mode:
+        board.delivery_contract && typeof board.delivery_contract === 'object'
+          ? (board.delivery_contract as JsonRecord).mode
+          : 'legacy',
+      edges: edges
+        .filter((edge) => edge.type === 'dep')
+        .map((edge) => ({
+          downstream: edge.target,
+          dependency: edge.source,
+          qualification: edge.qualification,
+        })),
     },
     insights,
     ...(boardExtras ? { board_extras: boardExtras } : {}),
@@ -1949,7 +1973,8 @@ function buildTaskDetail(boardPath: string, taskIdValue: string): JsonRecord | n
   const snapshot = readBoardSnapshot(boardPath);
   const board = snapshot.board;
   const tasks = tasksOf(board);
-  const graph = analyzeGraph(board as Parameters<typeof analyzeGraph>[0]);
+  const deliveryFacts = resolveDeliveryFacts(board, { now: nowIso() });
+  const graph = analyzeGraph(board as Parameters<typeof analyzeGraph>[0], { deliveryFacts });
   const byId = new Map(tasks.map((task) => [taskId(task), task]));
   const task = byId.get(taskIdValue);
   if (!task) return null;

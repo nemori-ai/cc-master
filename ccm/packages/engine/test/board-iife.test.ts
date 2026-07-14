@@ -11,11 +11,13 @@
 //   明确指引而非静默假绿。
 
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { analyzeGraph, canonicalJson, dependencyQualified, lintBoard } from '../dist/index.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const IIFE = join(HERE, '..', 'dist', 'index.iife.js');
@@ -24,9 +26,112 @@ const IIFE = join(HERE, '..', 'dist', 'index.iife.js');
 //   classic <script> 语义：顶层 `var __ccmEngine = …` 成为 global 属性。banner 里的 require fallback
 //   在无 require 时把 node:fs/node:crypto 退化成 {}（board-lock 在浏览器路径不被调用，占位足够）。
 function browserRealmWithIIFE(src: string) {
-  const ctx = vm.createContext({});
+  const ctx = vm.createContext({ TextEncoder });
   vm.runInContext(src, ctx, { filename: 'index.iife.js' });
   return ctx;
+}
+
+function deliveryParityFixture(counterfeit = false) {
+  const finishedAt = '2026-07-15T01:00:00Z';
+  const artifact = '/artifacts/U.json';
+  const subject = { kind: 'git-commit', commit_oid: 'c'.repeat(40) };
+  const fingerprint = `sha256:${createHash('sha256')
+    .update(
+      canonicalJson({
+        task_id: 'U',
+        bound_finished_at: finishedAt,
+        bound_artifact: artifact,
+        subject,
+      }),
+    )
+    .digest('hex')}`;
+  const candidateFingerprint = counterfeit ? `sha256:${'f'.repeat(64)}` : fingerprint;
+  const targetOid = 'a'.repeat(40);
+  return {
+    schema: 'cc-master/v2',
+    goal: 'browser delivery parity',
+    owner: { active: true, session_id: 's' },
+    git: { worktree: '/repo', branch: 'topic' },
+    delivery_contract: {
+      schema: 'ccm/delivery-contract/v1',
+      mode: 'declared',
+      targets: {
+        main: {
+          kind: 'git-ref',
+          repository: { source: 'board.git.worktree' },
+          ref: 'refs/remotes/origin/main',
+          snapshot: { oid: targetOid, observed_at: '2026-07-15T01:01:00Z' },
+        },
+      },
+    },
+    tasks: [
+      {
+        id: 'U',
+        status: 'done',
+        deps: [],
+        verified: true,
+        artifact,
+        finished_at: finishedAt,
+        delivery: {
+          schema: 'ccm/task-delivery/v1',
+          candidate: {
+            fingerprint: candidateFingerprint,
+            bound_finished_at: finishedAt,
+            bound_artifact: artifact,
+            subject,
+          },
+          observations: [
+            {
+              id: 'U-main',
+              target: 'main',
+              candidate_fingerprint: candidateFingerprint,
+              target_snapshot: { oid: targetOid },
+              outcome: 'delivered',
+              proof: {
+                method: 'git-commit-contained',
+                candidate_commit: subject.commit_oid,
+                target_oid: targetOid,
+              },
+              checked_at: '2026-07-15T01:02:00Z',
+            },
+          ],
+        },
+      },
+      {
+        id: 'D',
+        status: 'ready',
+        deps: ['U'],
+        dependency_requirements: { U: { level: 'delivered', target: 'main' } },
+      },
+    ],
+  };
+}
+
+function deliverySummary(engine: Record<string, (...args: unknown[]) => unknown>, board: unknown) {
+  const lint = engine.lintBoard(JSON.stringify(board)) as {
+    errors: Array<{ rule: string }>;
+    warnings: Array<{ rule: string }>;
+  };
+  const qualification = engine.dependencyQualified(board, 'D', 'U') as {
+    state: string;
+    basis: string;
+    qualified_by?: string;
+    reasons: Array<{ code: string }>;
+  };
+  const graph = engine.analyzeGraph(board) as { readySet(): string[] };
+  return {
+    lint: {
+      errors: lint.errors.map((entry) => entry.rule),
+      warnings: lint.warnings.map((entry) => entry.rule),
+    },
+    dependencyQualified: {
+      state: qualification.state,
+      basis: qualification.basis,
+      qualified_by: qualification.qualified_by ?? null,
+      reasons: qualification.reasons.map((entry) => entry.code),
+    },
+    readySet: graph.readySet(),
+  };
 }
 
 test('dist/index.iife.js exists (built by `pnpm build` before this gate)', () => {
@@ -138,4 +243,39 @@ test('IIFE realm: lintBoard runs and flags a hard schema error', () => {
     out.rules.includes('FMT-SCHEMA'),
     'lintBoard flags FMT-SCHEMA hard error in the IIFE realm',
   );
+});
+
+test('IIFE realm: delivery fingerprint truth matches ESM for valid and counterfeit fixtures', () => {
+  const src = readFileSync(IIFE, 'utf8');
+  const ctx = browserRealmWithIIFE(src);
+  const nodeEngine = { analyzeGraph, dependencyQualified, lintBoard };
+
+  for (const counterfeit of [false, true]) {
+    const board = deliveryParityFixture(counterfeit);
+    const expected = deliverySummary(nodeEngine, board);
+    (ctx as Record<string, unknown>).__deliveryFixture = JSON.parse(JSON.stringify(board));
+    const actual = JSON.parse(
+      vm.runInContext(
+        `JSON.stringify((${deliverySummary.toString()})(globalThis.__ccmEngine, __deliveryFixture))`,
+        ctx,
+      ),
+    );
+    assert.deepEqual(
+      actual,
+      expected,
+      `${counterfeit ? 'counterfeit' : 'valid'} delivery truth must match across ESM and IIFE`,
+    );
+
+    if (counterfeit) {
+      assert.ok(expected.lint.errors.includes('BIZ-DELIVERY-CANDIDATE-BINDING'));
+      assert.equal(expected.dependencyQualified.state, 'unknown');
+      assert.deepEqual(expected.dependencyQualified.reasons, ['DELIVERY_CANDIDATE_BINDING_STALE']);
+      assert.deepEqual(expected.readySet, []);
+    } else {
+      assert.deepEqual(expected.lint.errors, []);
+      assert.equal(expected.dependencyQualified.state, 'qualified');
+      assert.equal(expected.dependencyQualified.qualified_by, 'delivery');
+      assert.deepEqual(expected.readySet, ['D']);
+    }
+  }
 });

@@ -31,6 +31,7 @@ export const EXIT = {
   VALIDATION: 3,
   LOCKED: 4,
   NOT_FOUND: 5,
+  AUTHORIZATION: 7,
 } as const;
 
 // ── isTTY：单流 TTY 判定（契约 §一.6·每流独立）。stream 缺 / 非 TTY → false。

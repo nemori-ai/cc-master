@@ -132,11 +132,14 @@ export function contractWritePolicy(
   if (scope === 'board' && segments[0] === 'meta') {
     if (segments.length === 1 || segments[1] === 'contracts') return 'dedicated';
   }
+  if (scope === 'board' && segments[0] === 'delivery_contract') return 'dedicated';
   if (scope === 'task') {
     if (segments[0] === 'planning') return 'dedicated';
     if (segments[0] === 'routing') {
       return segments[1] === 'attempts' ? 'append-only' : 'dedicated';
     }
+    if (segments[0] === 'delivery') return 'dedicated';
+    if (segments[0] === 'dependency_requirements') return 'dedicated';
     if (segments[0] === 'handle' && opts.contractEnabled) return 'dedicated';
     if (segments[0] === 'executor' && opts.contractEnabled) return 'dedicated';
   }

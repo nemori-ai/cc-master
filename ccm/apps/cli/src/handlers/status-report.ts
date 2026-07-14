@@ -5,10 +5,12 @@ import {
   analyzeGraph,
   type CriticalPathResult,
   canonicalJson,
+  dependencyQualified,
   lintBoard,
   taskTrulyDone,
   withLock,
 } from '@ccm/engine';
+import { resolveDeliveryFacts } from '../delivery-proof.js';
 import * as discover from '../discover.js';
 import { readVersion } from '../help.js';
 import * as io from '../io.js';
@@ -30,6 +32,7 @@ interface BoardRecord {
   scheduling?: unknown;
   tasks?: unknown;
   judgment_calls?: unknown;
+  delivery_contract?: unknown;
 }
 
 interface TaskRecord {
@@ -261,7 +264,10 @@ function computeReport(input: ResolvedInput, opts: ComputeOpts = {}): ReportEnve
 
   const tasks = tasksOf(input.board);
   const byId = new Map(tasks.map((t) => [taskId(t), t]));
-  const graph = analyzeGraph(input.board as Parameters<typeof analyzeGraph>[0]);
+  const deliveryFacts = resolveDeliveryFacts(input.board as Record<string, any>, {
+    now: createdAt,
+  });
+  const graph = analyzeGraph(input.board as Parameters<typeof analyzeGraph>[0], { deliveryFacts });
   const readyIds = graph.readySet();
   const readySet = new Set(readyIds);
   const lint = lintBoard(input.raw);
@@ -321,6 +327,24 @@ function computeReport(input: ResolvedInput, opts: ComputeOpts = {}): ReportEnve
       git: input.board.git && typeof input.board.git === 'object' ? input.board.git : {},
     },
     summary,
+    delivery: {
+      mode:
+        input.board.delivery_contract && typeof input.board.delivery_contract === 'object'
+          ? (input.board.delivery_contract as { mode?: unknown }).mode
+          : 'legacy',
+      edges: tasks.flatMap((downstream) =>
+        (Array.isArray(downstream.deps) ? downstream.deps : []).map((upstream) => ({
+          downstream: taskId(downstream),
+          dependency: upstream,
+          qualification: dependencyQualified(
+            input.board as Parameters<typeof dependencyQualified>[0],
+            taskId(downstream),
+            String(upstream),
+            deliveryFacts,
+          ),
+        })),
+      ),
+    },
     groups: Object.fromEntries(
       Object.entries(groups).map(([k, v]) => [k, v.map((t) => taskView(t))]),
     ),

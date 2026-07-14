@@ -25,7 +25,6 @@
 //   逻辑、规则码、报错文案、级别分流逐字保持（零行为变化）。浏览器形态由 tsdown 的 IIFE 产物承接。
 
 import {
-  dependencySatisfied,
   durationHours,
   ENUMS,
   isAbsolutePathOrUrl,
@@ -39,6 +38,11 @@ import {
   type TaskLike,
   taskTrulyDone,
 } from './board-model.js';
+import {
+  type DeliveryBoardLike,
+  dependencyQualified,
+  validateDeliveryContracts,
+} from './delivery-contract.js';
 import {
   NATIVE_ATTEMPT_CONTRACT,
   NATIVE_ATTEMPT_PROJECTION_RULE,
@@ -246,6 +250,14 @@ export function lintBoard(text: string): LintResult {
   lintCoordination(b, emit);
   lintInbox(b, emit);
   lintRuntime(b, emit);
+  for (const diagnostic of validateDeliveryContracts(b as DeliveryBoardLike)) {
+    const task = diagnostic.path?.match(/^tasks\.([^.]+)/)?.[1];
+    emit(
+      diagnostic.code,
+      `${diagnostic.path ? `${diagnostic.path}: ` : ''}${diagnostic.message}`,
+      task,
+    );
+  }
 
   // FMT-TASKS（数组）——非数组无从遍历，板级检查已做，提前返回。
   const tasks = b.tasks;
@@ -537,7 +549,46 @@ export function lintBoard(text: string): LintResult {
   //   CLI 写路径经 reconcileGating 自动归一 ready↔blocked，永不产生这类不一致；此规则兜「手改 board」造出的。
   //   用 lint 已建的图 g.upstream（排除 dangling/self·同 readySet / reconcile 口径）+ taskById 判 deps 满足度。
   for (const [id, t] of taskById) {
-    lintStatusDeps(id, t, g.upstream, taskById, emit);
+    lintStatusDeps(b, id, t, g.upstream, emit);
+  }
+
+  // ── BIZ-DELIVERY-*（declared edge proof/readiness impact；资格只派生、不写回）──────────────────────
+  // lint 没有外部 target/time facts，因此 drift/waiver expiry 无法静态确证时保持 unknown + warn；
+  // CLI delivery check / dependency explain 会补本地 facts 给出稳定细因。
+  if (
+    b.delivery_contract &&
+    typeof b.delivery_contract === 'object' &&
+    !Array.isArray(b.delivery_contract) &&
+    (b.delivery_contract as Record<string, unknown>).mode === 'declared'
+  ) {
+    for (const [id, task] of taskById) {
+      const requirements =
+        task.dependency_requirements &&
+        typeof task.dependency_requirements === 'object' &&
+        !Array.isArray(task.dependency_requirements)
+          ? (task.dependency_requirements as Record<string, unknown>)
+          : null;
+      if (!requirements) continue;
+      for (const dependency of g.upstream.get(id) ?? []) {
+        if (!Object.hasOwn(requirements, dependency) && !Object.hasOwn(requirements, '*')) continue;
+        const qualification = dependencyQualified(b as DeliveryBoardLike, id, dependency);
+        if (qualification.state === 'qualified') continue;
+        const codes = qualification.reasons.map((entry) => entry.code).join(', ') || 'unknown';
+        emit(
+          'BIZ-DELIVERY-PROOF',
+          `${id} <- ${dependency} 的显式 delivery requirement 当前为 ${qualification.state}` +
+            `（${codes}）；运行 ccm dependency explain ${id} ${dependency} 获取本地 proof/drift 事实。`,
+          id,
+        );
+        if (task.status !== 'blocked' && task.status !== 'planned') {
+          emit(
+            'BIZ-DELIVERY-IMPACT',
+            `${id} 已处于 ${String(task.status)}，但显式依赖 ${dependency} 未 qualified；运行 reconcile 使门控状态回到 declared truth。`,
+            id,
+          );
+        }
+      }
+    }
   }
 
   // ── BIZ-CADENCE-SHIPPED（iteration 收口完整性：shipped ⇒ members 全 done+verified·hard）───────────────
@@ -1511,10 +1562,10 @@ function lintTaskRoutingContract(board: BoardLike, id: string, t: TaskLike, emit
 //   有 blocked_on（等 user / 等某 task）的整体豁免——语义阻塞与拓扑就绪正交，reconcile 不碰，此规则也不报。
 //   deps 满足度用 lint 已建图的 upstream（排除 dangling/self）+ dependencySatisfied（同 readySet/reconcile 口径）。
 function lintStatusDeps(
+  board: BoardLike,
   id: string,
   t: TaskLike,
   upstream: Map<string, string[]>,
-  taskById: Map<string, TaskLike>,
   emit: Emit,
 ): void {
   const status = t.status;
@@ -1522,7 +1573,9 @@ function lintStatusDeps(
   const bo = t.blocked_on;
   if (typeof bo === 'string' && bo !== '') return; // 语义阻塞（blocked_on 非空）豁免。
   const deps = upstream.get(id) || [];
-  const undone = deps.filter((d) => !dependencySatisfied(taskById.get(d)));
+  const undone = deps.filter(
+    (d) => dependencyQualified(board as DeliveryBoardLike, id, d).state !== 'qualified',
+  );
   const target = undone.length === 0 ? 'ready' : 'blocked';
   if (target === status) return; // 一致——无须报。
   if (status === 'ready') {

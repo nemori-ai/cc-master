@@ -530,6 +530,148 @@ export const REGISTRY: Registry = {
     },
   },
 
+  // ════════════════════ declared delivery/dependency truth（ADR-036）════════════════════════════
+  target: {
+    set: {
+      summary: '声明并本地解析一个 delivery target（只用本地 Git objects / immutable manifest）',
+      read: false,
+      positionals: [{ name: 'target-id', required: true }],
+      options: {
+        kind: {
+          type: 'string',
+          required: true,
+          enum: ['git-ref', 'artifact-set'],
+          desc: '目标类型',
+        },
+        ref: { type: 'string', desc: 'git-ref 的 symbolic ref' },
+        repository: { type: 'string', desc: '显式本地 Git worktree；缺省用 board.git.worktree' },
+        namespace: { type: 'string', desc: 'artifact-set 的 file:/absolute/manifest.json' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm target set main --kind git-ref --ref refs/remotes/origin/main',
+        'ccm target set archive --kind artifact-set --namespace file:/abs/manifest.json',
+      ],
+      handler: 'target.set',
+    },
+    show: {
+      summary: '显示 target 声明、冻结 snapshot 与当前本地 drift fact',
+      read: true,
+      positionals: [{ name: 'target-id', required: true }],
+      options: { json: { type: 'boolean', desc: '结构化输出' } },
+      examples: ['ccm target show main --json'],
+      handler: 'target.show',
+    },
+    refresh: {
+      summary: '本地重解 target snapshot，并使旧 observation fail-closed 后重验可重验 proof',
+      read: false,
+      positionals: [{ name: 'target-id', required: true }],
+      options: { json: { type: 'boolean', desc: '结构化输出' } },
+      examples: ['ccm target refresh main --dry-run', 'ccm target refresh main --json'],
+      handler: 'target.refresh',
+    },
+  },
+  delivery: {
+    check: {
+      summary: '检查一个 task candidate 对一个 target 的 delivered 三态事实',
+      read: true,
+      positionals: [
+        { name: 'task-id', required: true },
+        { name: 'target-id', required: true },
+      ],
+      options: { json: { type: 'boolean', desc: '结构化输出' } },
+      examples: ['ccm delivery check UPSTREAM main --json'],
+      handler: 'delivery.check',
+    },
+    audit: {
+      summary: '只读 strict preview：未声明 requirement 的 edge 报 unknown；绝不持久化 strict',
+      read: true,
+      positionals: [],
+      options: {
+        'strict-dry-run': {
+          type: 'boolean',
+          required: true,
+          desc: '启用本次 ephemeral strict preview',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm delivery audit --strict-dry-run --json'],
+      handler: 'delivery.audit',
+    },
+  },
+  dependency: {
+    require: {
+      summary: '给 exact downstream/dependency edge 声明 candidate 或 delivered 要求',
+      read: false,
+      positionals: [
+        { name: 'downstream-id', required: true },
+        { name: 'dependency-id', required: true },
+      ],
+      options: {
+        level: {
+          type: 'string',
+          required: true,
+          enum: ['candidate', 'delivered'],
+          desc: '资格层级',
+        },
+        target: { type: 'string', desc: 'level=delivered 时必给的 target id' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm dependency require DOWN UP --level delivered --target main'],
+      handler: 'dependency.require',
+    },
+    default: {
+      summary: '给 downstream 的未精确覆盖 deps[] edge 声明 * 默认要求',
+      read: false,
+      positionals: [{ name: 'downstream-id', required: true }],
+      options: {
+        level: {
+          type: 'string',
+          required: true,
+          enum: ['candidate', 'delivered'],
+          desc: '资格层级',
+        },
+        target: { type: 'string', desc: 'level=delivered 时必给的 target id' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm dependency default DOWN --level candidate'],
+      handler: 'dependency.defaultRequirement',
+    },
+    explain: {
+      summary: '解释 exact edge 的 qualified|unqualified|unknown 派生资格与 diagnostic codes',
+      read: true,
+      positionals: [
+        { name: 'downstream-id', required: true },
+        { name: 'dependency-id', required: true },
+      ],
+      options: {
+        'strict-dry-run': { type: 'boolean', desc: '本次把未声明 edge 当 unknown；不写板' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm dependency explain DOWN UP --json'],
+      handler: 'dependency.explain',
+    },
+    waive: {
+      summary: '写入 user-authorized、edge-scoped、expiring waiver（不伪造 target_delivered）',
+      read: false,
+      positionals: [
+        { name: 'downstream-id', required: true },
+        { name: 'dependency-id', required: true },
+      ],
+      options: {
+        target: { type: 'string', required: true, desc: 'exact requirement 的 target id' },
+        reason: { type: 'string', required: true, desc: '用户批准的具体理由' },
+        'expires-at': { type: 'string', required: true, desc: '严格 ISO UTC expiry' },
+        'user-authorized': { type: 'boolean', desc: '显式用户授权闸；缺失 exit 7' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm dependency waive DOWN UP --target main --reason "user approved" --expires-at 2026-07-21T00:00:00Z --user-authorized',
+      ],
+      handler: 'dependency.waive',
+    },
+  },
+
   // ════════════════════ task ═════════════════════════════════════════════════════════════════════
   task: {
     add: {
@@ -771,6 +913,43 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm task retry T7', 'ccm task retry T7 T8 T9'],
       handler: 'task.retry',
+    },
+    'attest-delivery': {
+      summary:
+        '以本地 exact/reviewed/artifact proof 为当前 true-done candidate 写 delivery observation',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        target: { type: 'string', required: true, desc: '已声明 target id' },
+        method: {
+          type: 'string',
+          required: true,
+          enum: [
+            'git-commit-contained',
+            'reviewed-reconciliation-contained',
+            'artifact-digest-contained',
+          ],
+          desc: 'proof method',
+        },
+        'candidate-commit': {
+          type: 'string',
+          desc: 'git proof 的 candidate commit/ref（本地解析为 OID）',
+        },
+        'integration-commit': {
+          type: 'string',
+          desc: 'reviewed reconciliation 的 integration commit/ref',
+        },
+        attestation: { type: 'string', desc: 'review attestation 的本地绝对路径（≤1 MiB）' },
+        'logical-name': { type: 'string', desc: 'artifact subject logical_name' },
+        'artifact-version': { type: 'string', desc: 'artifact subject immutable version' },
+        'artifact-ref': { type: 'string', desc: 'artifact subject immutable ref' },
+        'artifact-digest': { type: 'string', desc: 'artifact subject sha256 digest' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm task attest-delivery UP --target main --method git-commit-contained --candidate-commit HEAD',
+      ],
+      handler: 'task.attestDelivery',
     },
     'set-planning': {
       summary: '经 dedicated writer 写 task-planning/v1 多维任务画像',
