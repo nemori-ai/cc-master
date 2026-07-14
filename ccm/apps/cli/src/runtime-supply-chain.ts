@@ -64,6 +64,30 @@ export interface RuntimeInvokeHelperArtifact {
   bytes: Uint8Array;
 }
 
+export type RuntimeLauncherMaterializationPoint =
+  | 'before_directory_recovery'
+  | 'after_directory_recovery'
+  | 'after_materializer_root_lstat'
+  | 'after_materializer_bootstrap_create'
+  | 'before_helper_publish'
+  | 'after_helper_publish';
+
+export interface RuntimeLauncherMaterializationOptions {
+  fault?: (point: RuntimeLauncherMaterializationPoint) => void;
+  nativeTest?: {
+    point:
+      | 'before_bootstrap_self_cleanup'
+      | 'before_bootstrap_recovery'
+      | 'before_temp_cleanup'
+      | 'before_helper_publish'
+      | 'after_helper_publish'
+      | 'after_final_open';
+    readyPath: string;
+    barrierPath?: string;
+    action: 'pause' | 'kill';
+  };
+}
+
 export interface RuntimeInvokeContext {
   root: string;
   resolution: RuntimeResolution;
@@ -362,6 +386,7 @@ export function createDefaultRuntimeBackend(
   arch = process.arch,
   expectedUid = typeof process.geteuid === 'function' ? process.geteuid() : null,
   invokeHelperArtifact?: RuntimeInvokeHelperArtifact,
+  materializationOptions: RuntimeLauncherMaterializationOptions = {},
 ): RuntimePlatformBackend {
   const asset = expectedAsset(platform, arch);
   const supported = (platform === 'linux' || platform === 'darwin') && asset !== null;
@@ -495,45 +520,337 @@ export function createDefaultRuntimeBackend(
       throw error;
     }
   };
+  const flushMaterializedLauncherDirectory = (fd: number): void => {
+    try {
+      fs.fsyncSync(fd);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (platform === 'darwin' && (code === 'EINVAL' || code === 'ENOTSUP')) return;
+      throw error;
+    }
+  };
+  const recoverLauncherDirectory = (launcherDir: string): number => {
+    const pathStat = fs.lstatSync(launcherDir);
+    if (pathStat.isSymbolicLink() || !pathStat.isDirectory()) {
+      validation('native invoke launcher directory is not trusted', 'RUNTIME_INVOKE_BACKEND');
+    }
+    verifyPosixStat(pathStat, 'native invoke launcher directory', false);
+    const fd = fs.openSync(
+      launcherDir,
+      fs.constants.O_RDONLY | (fs.constants.O_DIRECTORY || 0) | (fs.constants.O_NOFOLLOW || 0),
+    );
+    try {
+      const opened = fs.fstatSync(fd);
+      if (!opened.isDirectory() || opened.dev !== pathStat.dev || opened.ino !== pathStat.ino) {
+        validation(
+          'native invoke launcher directory changed while opening',
+          'RUNTIME_INVOKE_BACKEND',
+        );
+      }
+      verifyPosixStat(opened, 'native invoke launcher directory', false);
+      materializationOptions.fault?.('before_directory_recovery');
+      fs.fchmodSync(fd, 0o700);
+      flushMaterializedLauncherDirectory(fd);
+      materializationOptions.fault?.('after_directory_recovery');
+      const recovered = fs.fstatSync(fd);
+      verifyPosixStat(recovered, 'native invoke launcher directory', false);
+      if ((recovered.mode & 0o777) !== 0o700) {
+        validation(
+          `native invoke launcher directory mode ${(recovered.mode & 0o777).toString(8)} != 700`,
+          'RUNTIME_INVOKE_BACKEND',
+        );
+      }
+      return fd;
+    } catch (error) {
+      fs.closeSync(fd);
+      throw error;
+    }
+  };
+  const sameMaterializerObjectIdentity = (pathStat: fs.Stats, opened: fs.Stats): boolean =>
+    pathStat.dev === opened.dev &&
+    pathStat.ino === opened.ino &&
+    pathStat.uid === opened.uid &&
+    pathStat.mode === opened.mode;
+  const sameMaterializerFileRevision = (pathStat: fs.Stats, opened: fs.Stats): boolean =>
+    sameMaterializerObjectIdentity(pathStat, opened) &&
+    pathStat.size === opened.size &&
+    pathStat.mtimeMs === opened.mtimeMs &&
+    pathStat.ctimeMs === opened.ctimeMs;
+  const openMaterializerDirectory = (directoryPath: string, purpose: string): number => {
+    const pathStat = fs.lstatSync(directoryPath);
+    if (pathStat.isSymbolicLink() || !pathStat.isDirectory()) {
+      validation(`${purpose} is not a trusted directory`, 'RUNTIME_INVOKE_BACKEND');
+    }
+    verifyPosixStat(pathStat, purpose, false);
+    if ((pathStat.mode & 0o777) !== 0o700) {
+      validation(`${purpose} mode is not 0700`, 'RUNTIME_INVOKE_BACKEND');
+    }
+    if (purpose === 'native materializer lifecycle root') {
+      materializationOptions.fault?.('after_materializer_root_lstat');
+    }
+    const fd = fs.openSync(
+      directoryPath,
+      fs.constants.O_RDONLY | (fs.constants.O_DIRECTORY || 0) | (fs.constants.O_NOFOLLOW || 0),
+    );
+    try {
+      const opened = fs.fstatSync(fd);
+      if (!opened.isDirectory() || !sameMaterializerObjectIdentity(pathStat, opened)) {
+        validation(`${purpose} changed while opening`, 'RUNTIME_INVOKE_BACKEND');
+      }
+      verifyPosixStat(opened, purpose, false);
+      if ((opened.mode & 0o777) !== 0o700) {
+        validation(`${purpose} opened mode is not 0700`, 'RUNTIME_INVOKE_BACKEND');
+      }
+      return fd;
+    } catch (error) {
+      fs.closeSync(fd);
+      throw error;
+    }
+  };
+  const createMaterializerBootstrap = (
+    runtimeRoot: string,
+    artifact: { bytes: Buffer; sha256: string },
+  ): {
+    path: string;
+    instanceName: string;
+    rootFd: number;
+    instanceFd: number;
+    fileFd: number;
+    cleanup: () => void;
+  } => {
+    const root = path.join(runtimeRoot, 'materializers');
+    try {
+      fs.mkdirSync(root, { mode: 0o700 });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+    let rootFd: number | null = null;
+    let instanceFd: number | null = null;
+    let bootstrapFd: number | null = null;
+    const instanceName = `.materializer-${helperContract}-${process.pid}-${randomUUID()}.tmp`;
+    const instancePath = path.join(root, instanceName);
+    const bootstrapPath = path.join(instancePath, 'materializer');
+    let cleaned = false;
+    const cleanup = (): void => {
+      if (cleaned) return;
+      cleaned = true;
+      let cleanupError: unknown = null;
+      try {
+        if (bootstrapFd !== null) {
+          const pinned = fs.fstatSync(bootstrapFd);
+          try {
+            const observed = fs.lstatSync(bootstrapPath);
+            if (
+              observed.isSymbolicLink() ||
+              !observed.isFile() ||
+              !sameMaterializerFileRevision(observed, pinned)
+            ) {
+              validation(
+                'native materializer bootstrap changed before cleanup',
+                'RUNTIME_INVOKE_BACKEND',
+              );
+            }
+            fs.unlinkSync(bootstrapPath);
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          }
+        }
+        if (instanceFd !== null) {
+          const pinned = fs.fstatSync(instanceFd);
+          try {
+            const observed = fs.lstatSync(instancePath);
+            if (
+              observed.isSymbolicLink() ||
+              !observed.isDirectory() ||
+              !sameMaterializerObjectIdentity(observed, pinned)
+            ) {
+              validation(
+                'native materializer bootstrap instance changed before cleanup',
+                'RUNTIME_INVOKE_BACKEND',
+              );
+            }
+            fs.rmdirSync(instancePath);
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          }
+        }
+      } catch (error) {
+        cleanupError = error;
+      } finally {
+        if (bootstrapFd !== null) fs.closeSync(bootstrapFd);
+        if (instanceFd !== null) fs.closeSync(instanceFd);
+        if (rootFd !== null) fs.closeSync(rootFd);
+      }
+      if (cleanupError) throw cleanupError;
+    };
+    try {
+      rootFd = openMaterializerDirectory(root, 'native materializer lifecycle root');
+      fs.mkdirSync(instancePath, { mode: 0o700 });
+      instanceFd = openMaterializerDirectory(
+        instancePath,
+        'native materializer bootstrap instance',
+      );
+      const writableFd = fs.openSync(bootstrapPath, 'wx+', 0o600);
+      try {
+        fs.writeFileSync(writableFd, artifact.bytes);
+        fs.fsyncSync(writableFd);
+        fs.fchmodSync(writableFd, 0o500);
+        fs.fsyncSync(writableFd);
+      } finally {
+        fs.closeSync(writableFd);
+      }
+      const bootstrapStat = fs.lstatSync(bootstrapPath);
+      if ((bootstrapStat.mode & 0o777) !== 0o500) {
+        validation('native materializer bootstrap mode is not 0500', 'RUNTIME_INVOKE_BACKEND');
+      }
+      bootstrapFd = verifyHelperPath(bootstrapPath, artifact.sha256);
+      return {
+        path: bootstrapPath,
+        instanceName,
+        rootFd,
+        instanceFd,
+        fileFd: bootstrapFd,
+        cleanup,
+      };
+    } catch (error) {
+      cleanup();
+      throw error;
+    }
+  };
+  const runPinnedDirectoryMaterializer = (
+    runtimeRoot: string,
+    launcherFd: number,
+    artifact: { bytes: Buffer; sha256: string },
+  ): void => {
+    if (helperContract === null) {
+      validation('native materializer contract is unavailable', 'RUNTIME_INVOKE_BACKEND');
+    }
+    const bootstrap = createMaterializerBootstrap(runtimeRoot, artifact);
+    let cleaned = false;
+    const cleanup = (): void => {
+      if (cleaned) return;
+      cleaned = true;
+      bootstrap.cleanup();
+    };
+    const nativeTest = materializationOptions.nativeTest;
+    try {
+      materializationOptions.fault?.('after_materializer_bootstrap_create');
+      const child = spawnSync(
+        bootstrap.path,
+        [
+          '--ccm-launcher-materialize-v1',
+          helperContract,
+          artifact.sha256,
+          randomUUID(),
+          String(artifact.bytes.length),
+          bootstrap.instanceName,
+          nativeTest?.point || '-',
+          nativeTest?.readyPath || '-',
+          nativeTest?.barrierPath || '-',
+          nativeTest?.action || 'none',
+        ],
+        {
+          input: artifact.bytes,
+          stdio: [
+            'pipe',
+            'ignore',
+            'ignore',
+            launcherFd,
+            'pipe',
+            bootstrap.rootFd,
+            bootstrap.instanceFd,
+            bootstrap.fileFd,
+          ],
+        },
+      );
+      if (child.error) {
+        validation(
+          `native materializer failed to start: ${child.error.message}`,
+          'RUNTIME_INVOKE_BACKEND',
+        );
+      }
+      if (child.signal) {
+        if (child.signal === 'SIGKILL' && nativeTest?.action === 'kill') {
+          cleanup();
+          process.kill(process.pid, 'SIGKILL');
+        }
+        validation(`native materializer terminated by ${child.signal}`, 'RUNTIME_INVOKE_BACKEND');
+      }
+      const rawControl = child.output?.[4];
+      const control = rawControl ? String(rawControl).trim() : '';
+      if (child.status !== 0 || control) {
+        const parsed = /^CCM_RUNTIME_MATERIALIZE_ERROR\tv1\t([a-z-]+)\t(\d+)$/.exec(control);
+        if (!parsed) {
+          validation(
+            'native materializer returned malformed control data',
+            'RUNTIME_INVOKE_BACKEND',
+          );
+        }
+        if (parsed[1] === 'publish-cross-volume') {
+          validation(
+            'native invoke helper publication crossed filesystem boundary',
+            'RUNTIME_CROSS_VOLUME',
+          );
+        }
+        validation(
+          `native materializer failed at ${parsed[1]} (errno ${parsed[2]})`,
+          'RUNTIME_INVOKE_BACKEND',
+        );
+      }
+    } finally {
+      cleanup();
+    }
+  };
+  const verifyLauncherDirectoryPathIdentity = (launcherDir: string, launcherFd: number): void => {
+    let pathStat: fs.Stats;
+    try {
+      pathStat = fs.lstatSync(launcherDir);
+    } catch (error) {
+      validation(
+        `native invoke launcher directory pathname disappeared after pinning: ${(error as Error).message}`,
+        'RUNTIME_INVOKE_BACKEND',
+      );
+    }
+    const pinned = fs.fstatSync(launcherFd);
+    if (
+      pathStat.isSymbolicLink() ||
+      !pathStat.isDirectory() ||
+      pathStat.dev !== pinned.dev ||
+      pathStat.ino !== pinned.ino
+    ) {
+      validation(
+        'native invoke launcher directory pathname changed after pinning',
+        'RUNTIME_INVOKE_BACKEND',
+      );
+    }
+    verifyPosixStat(pathStat, 'native invoke launcher directory', false);
+    verifyPosixStat(pinned, 'native invoke launcher directory', false);
+    if ((pinned.mode & 0o777) !== 0o700) {
+      validation(
+        `native invoke launcher directory mode ${(pinned.mode & 0o777).toString(8)} != 700`,
+        'RUNTIME_INVOKE_BACKEND',
+      );
+    }
+  };
   const materializeHelper = (context: RuntimeInvokeContext): { path: string; fd: number } => {
     const artifact = requireHelperArtifact();
     const launcherDir = path.join(context.root, 'launcher');
-    const launcherStat = fs.lstatSync(launcherDir);
-    if (launcherStat.isSymbolicLink() || !launcherStat.isDirectory()) {
-      validation('native invoke launcher directory is not trusted', 'RUNTIME_INVOKE_BACKEND');
-    }
-    verifyPosixStat(launcherStat, 'native invoke launcher directory', false);
-    const helperPath = path.join(launcherDir, `${helperContract}-${artifact.sha256}`);
-    const temporary = path.join(
-      launcherDir,
-      `.${helperContract}-${process.pid}-${randomUUID()}.tmp`,
-    );
-    fs.chmodSync(launcherDir, 0o700);
+    const helperName = `${helperContract}-${artifact.sha256}`;
+    const helperPath = path.join(launcherDir, helperName);
+    const launcherFd = recoverLauncherDirectory(launcherDir);
+    let helperFd: number | null = null;
     try {
-      if (!fs.existsSync(helperPath)) {
-        fs.writeFileSync(temporary, artifact.bytes, { flag: 'wx', mode: 0o600 });
-        flushFile(temporary);
-        fs.chmodSync(temporary, 0o500);
-        try {
-          fs.linkSync(temporary, helperPath);
-          flushDirectoryBestEffort(launcherDir);
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-        } finally {
-          fs.rmSync(temporary, { force: true });
-        }
-      }
-      const helperFd = verifyHelperPath(helperPath, artifact.sha256);
-      fs.chmodSync(launcherDir, 0o500);
+      runPinnedDirectoryMaterializer(context.root, launcherFd, artifact);
+      verifyLauncherDirectoryPathIdentity(launcherDir, launcherFd);
+      // Publication was already verified through launcherFd by the native materializer. This
+      // pathname re-open is the separately disclosed launcher-check -> spawn residual boundary.
+      helperFd = verifyHelperPath(helperPath, artifact.sha256);
       return { path: helperPath, fd: helperFd };
     } catch (error) {
-      fs.rmSync(temporary, { force: true });
-      try {
-        fs.chmodSync(launcherDir, 0o500);
-      } catch {
-        // Preserve the primary materialization/verification failure.
-      }
+      if (helperFd !== null) fs.closeSync(helperFd);
       throw error;
+    } finally {
+      fs.closeSync(launcherFd);
     }
   };
   return {
@@ -715,6 +1032,7 @@ export function createRuntimeSupplyChain(
     transactions: path.join(root, 'transactions'),
     activations: path.join(root, 'activations'),
     launcher: path.join(root, 'launcher'),
+    materializers: path.join(root, 'materializers'),
     quarantine: path.join(root, 'quarantine'),
     locks: path.join(root, 'locks'),
   };

@@ -21,6 +21,8 @@ const runtimeSupplyChainSpec = readFileSync(
 );
 const manifestScript = resolve('scripts/macos-evidence-manifest.mjs');
 const deactivationValidator = 'scripts/validate-macos-launchd-deactivation.mjs';
+const fixtureEvidenceCommit = '1'.repeat(40);
+const fixtureEvidenceTree = '2'.repeat(40);
 
 const legacyLaunchdMutations = {
   'missing-result': (doc) => {
@@ -136,6 +138,20 @@ function writeRawArtifact(root, name) {
   const artifact = join(root, name);
   mkdirSync(artifact, { recursive: true });
   writeFileSync(join(artifact, 'evidence.log'), `${name}\n`);
+  writeFileSync(
+    join(artifact, 'summary.txt'),
+    `required_failures=0\nexact_commit=${fixtureEvidenceCommit}\nexact_tree=${fixtureEvidenceTree}\n`,
+  );
+  const buildEvidence = join(artifact, 'sea-build-evidence');
+  mkdirSync(buildEvidence, { recursive: true });
+  writeFileSync(
+    join(buildEvidence, 'runner.txt'),
+    `exact_commit=${fixtureEvidenceCommit}\nexact_tree=${fixtureEvidenceTree}\n`,
+  );
+  writeRawManifest(artifact);
+}
+
+function writeRawManifest(artifact) {
   const manifest = spawnSync(
     process.execPath,
     [manifestScript, 'write', artifact, join(artifact, 'SHA256SUMS')],
@@ -177,9 +193,10 @@ function prepareIndexAttempt(artifactNames, pattern) {
   };
 }
 
-function runIndexAttempt(attempt, script) {
+function runIndexAttempt(attempt, script, expectedCommit = fixtureEvidenceCommit) {
   return spawnSync('bash', ['-c', script], {
     cwd: attempt.workspace,
+    env: { ...process.env, EXPECTED_COMMIT: expectedCommit },
     encoding: 'utf8',
   });
 }
@@ -216,13 +233,31 @@ test('validator-only changes require both real macOS architecture qualification 
   assert.match(workflow, /runner: macos-15-intel\n            contract: darwin-x64/);
 });
 
-test('Darwin support claim is bound to replayable arm64/x64 evidence and preserves exclusions', () => {
-  assert.match(runtimeSupplyChainSpec, /Darwin POSIX \| supported；已通过真机资格门/);
+test('every Darwin job checks out and attests the exact pull-request head tree', () => {
+  const exactRef = 'ref: ${{ github.event.pull_request.head.sha || github.sha }}';
+  assert.equal(
+    (workflow.match(new RegExp(exactRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? [])
+      .length,
+    3,
+    'build, qualification, and evidence-index jobs must all use the exact PR head',
+  );
+  assert.match(workflow, /printf 'exact_commit=%s\\n'.*git rev-parse HEAD/s);
+  assert.match(workflow, /printf 'exact_tree=%s\\n'.*git rev-parse 'HEAD\^\{tree\}'/s);
+  assert.match(workflow, /downloaded-sea\/build-evidence\/runner\.txt/);
+  assert.match(workflow, /sea-build-evidence/);
+  assert.match(workflow, /summary\.txt.*exact_commit.*exact_tree/s);
+  assert.match(workflow, /expected_commit=.*git rev-parse HEAD/s);
+  assert.match(workflow, /expected_tree=.*git rev-parse 'HEAD\^\{tree\}'/s);
+});
+
+test('current Darwin claim stays unqualified until replayable exact-tree arm64/x64 evidence exists', () => {
   assert.match(
     runtimeSupplyChainSpec,
-    /tree `1e8f49e29b3c87eea37ac5dc5588f58e3f1a3b24`/,
+    /Darwin POSIX \| historical baseline qualified；当前 runtime-affecting tree 未资格化/,
   );
+  assert.match(runtimeSupplyChainSpec, /历史资格快照.*tree `1e8f49e29b3c87eea37ac5dc5588f58e3f1a3b24`/s);
   assert.match(runtimeSupplyChainSpec, /Actions run `29309116222`/);
+  assert.match(runtimeSupplyChainSpec, /旧 run 不得作为新 tree 的通过证据/);
   assert.match(runtimeSupplyChainSpec, /darwin-arm64.*darwin-x64/s);
   assert.match(runtimeSupplyChainSpec, /same-UID final-check→exec race.*residual/);
   assert.match(runtimeSupplyChainSpec, /Gatekeeper\/notarization.*conditional/);
@@ -387,6 +422,25 @@ test('Darwin build and live operator attest the path-attested invoke contract wi
   assert.match(operator, /runtime-verified-exec-contract\.test\.ts/);
 });
 
+test('macOS live evidence requires launcher cold-race and SIGKILL recovery coverage', () => {
+  assert.match(operator, /two concurrent cold invokes both succeed/);
+  assert.match(operator, /a concurrently appearing invalid launcher final is preserved and rejected/);
+  assert.match(operator, /launcher pathname replacement after pinning cannot redirect publication/);
+  assert.match(operator, /an independently verified valid launcher final is idempotent/);
+  assert.match(operator, /SIGKILL around launcher directory recovery and helper publication/);
+  assert.match(operator, /a real publisher-parent SIGKILL cannot strand an executable materializer bootstrap/);
+  assert.match(operator, /a publisher crash after bootstrap creation is reclaimed by the next activation/);
+  assert.match(operator, /native bootstrap self-clean survives parent SIGKILL before and after helper publication/);
+  assert.match(operator, /dead publisher materializer bootstrap instances are recovered without touching live owners/);
+  assert.match(operator, /dead materializer bootstrap recovery is idempotent across concurrent activations/);
+  assert.match(operator, /native materializer self-cleans its own bootstrap before stale recovery/);
+  assert.match(
+    operator,
+    /materializer bootstrap recovery fails closed on symlink, type, and permission anomalies/,
+  );
+  assert.match(operator, /runtime_apfs_exdev_crash_matrix/);
+});
+
 test('Darwin execve symbol assertion accepts only the exact unresolved-symbol line shapes', () => {
   const build = namedStep(jobBlock('build-sea'), 'Build and attest SEA');
   const predicate = '^[[:space:]]*_execve$';
@@ -497,6 +551,8 @@ test('raw evidence upload intentionally includes hidden members only within the 
 
 test('downloaded inner artifacts and the outer index are verified before index upload', () => {
   const index = jobBlock('evidence-index');
+  const verification = namedStep(index, 'Verify inner manifests and build the outer index');
+  const verificationScript = runScript(verification);
   assert.match(index, /uses: actions\/checkout@v4/);
   assert.match(index, /uses: actions\/download-artifact@v4/);
   assert.match(index, /^ {10}pattern: macos-live-raw-evidence-\*$/m);
@@ -521,6 +577,12 @@ test('downloaded inner artifacts and the outer index are verified before index u
   assert.match(index.slice(outerVerify), /uses: actions\/upload-artifact@v4/);
   assert.match(index.slice(indexUpload), /^ {10}overwrite: true$/m);
   assert.match(index.slice(indexUpload), /^ {10}retention-days: 14$/m);
+  assert.match(
+    verification,
+    /^ {8}env:\n {10}EXPECTED_COMMIT: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}$/m,
+  );
+  assert.match(verificationScript, /process\.env\.EXPECTED_COMMIT/);
+  assert.doesNotMatch(verificationScript, /git rev-parse/);
 });
 
 test('rerun selection excludes a previous index while duplicate, extra, missing, and corrupt raw evidence fail closed', () => {
@@ -539,6 +601,30 @@ test('rerun selection excludes a previous index while duplicate, extra, missing,
     assert.equal(result.status, 0, result.stderr);
   } finally {
     rerun.cleanup();
+  }
+
+  const wrongExpectedCommit = prepareIndexAttempt([arm, x64], pattern);
+  try {
+    const result = runIndexAttempt(wrongExpectedCommit, script, '3'.repeat(40));
+    assert.notEqual(result.status, 0, 'event commit mismatch must fail closed');
+    assert.match(result.stderr, /expected commit/i);
+  } finally {
+    wrongExpectedCommit.cleanup();
+  }
+
+  const inconsistentTree = prepareIndexAttempt([arm, x64], pattern);
+  try {
+    const summary = join(inconsistentTree.evidence, x64, 'summary.txt');
+    writeFileSync(
+      summary,
+      readFileSync(summary, 'utf8').replace(fixtureEvidenceTree, '4'.repeat(40)),
+    );
+    writeRawManifest(join(inconsistentTree.evidence, x64));
+    const result = runIndexAttempt(inconsistentTree, script);
+    assert.notEqual(result.status, 0, 'cross-record tree mismatch must fail closed');
+    assert.match(result.stderr, /tree/i);
+  } finally {
+    inconsistentTree.cleanup();
   }
 
   for (const [label, names] of [

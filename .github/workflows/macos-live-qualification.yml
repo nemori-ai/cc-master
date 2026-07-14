@@ -51,6 +51,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10.22.0
@@ -86,7 +88,8 @@ jobs:
           (
             set -euxo pipefail
             {
-              printf 'commit=%s\n' "$(git rev-parse HEAD)"
+              printf 'exact_commit=%s\n' "$(git rev-parse HEAD)"
+              printf 'exact_tree=%s\n' "$(git rev-parse 'HEAD^{tree}')"
               printf 'runner_label=%s\n' '${{ matrix.runner }}'
               printf 'expected_contract=%s\n' '${{ matrix.contract }}'
               printf 'uname_s=%s\n' "$(uname -s)"
@@ -196,6 +199,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10.22.0
@@ -209,6 +214,19 @@ jobs:
         with:
           name: macos-sea-${{ matrix.contract }}
           path: ${{ runner.temp }}/downloaded-sea
+      - name: Bind downloaded SEA to exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_commit="$(git rev-parse HEAD)"
+          expected_tree="$(git rev-parse 'HEAD^{tree}')"
+          build_identity="${RUNNER_TEMP}/downloaded-sea/build-evidence/runner.txt"
+          grep -Fx "exact_commit=${expected_commit}" "${build_identity}"
+          grep -Fx "exact_tree=${expected_tree}" "${build_identity}"
+          qualification_root="${RUNNER_TEMP}/macos-qualification-${{ matrix.contract }}"
+          mkdir -p "${qualification_root}"
+          cp -R "${RUNNER_TEMP}/downloaded-sea/build-evidence" \
+            "${qualification_root}/sea-build-evidence"
       - name: Install qualification dependencies
         shell: bash
         run: |
@@ -255,6 +273,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/download-artifact@v4
         with:
           # Keep raw inputs in a namespace that cannot match this job's index from an earlier attempt.
@@ -263,6 +283,8 @@ jobs:
           merge-multiple: false
       - name: Verify inner manifests and build the outer index
         shell: bash
+        env:
+          EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           node <<'NODE'
@@ -287,6 +309,54 @@ jobs:
             root="evidence/${artifact}"
             node scripts/macos-evidence-manifest.mjs verify "${root}" "${root}/SHA256SUMS"
           done
+          node <<'NODE'
+          const fs = require('node:fs');
+          const artifacts = [
+            'macos-live-raw-evidence-darwin-arm64',
+            'macos-live-raw-evidence-darwin-x64',
+          ];
+          const expectedCommit = process.env.EXPECTED_COMMIT;
+          if (!/^[0-9a-f]{40}$/.test(expectedCommit || '')) {
+            throw new Error('expected commit must be one immutable 40-hex workflow identity');
+          }
+          function readIdentity(file) {
+            const lines = fs.readFileSync(file, 'utf8').split('\n');
+            const value = (key) => {
+              const prefix = `${key}=`;
+              const matches = lines.filter((line) => line.startsWith(prefix));
+              if (matches.length !== 1) {
+                throw new Error(`${file}: expected exactly one ${key} record`);
+              }
+              const observed = matches[0].slice(prefix.length);
+              if (!/^[0-9a-f]{40}$/.test(observed)) {
+                throw new Error(`${file}: ${key} must be 40-hex`);
+              }
+              return observed;
+            };
+            return {
+              exact_commit: value('exact_commit'),
+              exact_tree: value('exact_tree'),
+            };
+          }
+          let commonTree = null;
+          for (const artifact of artifacts) {
+            const root = `evidence/${artifact}`;
+            const summary = readIdentity(`${root}/summary.txt`);
+            const build = readIdentity(`${root}/sea-build-evidence/runner.txt`);
+            for (const [record, identity] of [['summary', summary], ['build', build]]) {
+              if (identity.exact_commit !== expectedCommit) {
+                throw new Error(`${artifact}/${record}: expected commit ${expectedCommit}; observed ${identity.exact_commit}`);
+              }
+            }
+            if (summary.exact_tree !== build.exact_tree) {
+              throw new Error(`${artifact}: qualification/build tree identity mismatch`);
+            }
+            if (commonTree !== null && summary.exact_tree !== commonTree) {
+              throw new Error(`${artifact}: cross-architecture tree identity mismatch`);
+            }
+            commonTree = summary.exact_tree;
+          }
+          NODE
           node scripts/macos-evidence-manifest.mjs write evidence EVIDENCE_SHA256SUMS
           node scripts/macos-evidence-manifest.mjs verify evidence EVIDENCE_SHA256SUMS
           cat EVIDENCE_SHA256SUMS

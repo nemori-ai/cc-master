@@ -7,6 +7,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#define CCM_RUNTIME_HELPER_CONTRACT "linux-exact-fd-v1"
+#include "runtime-launcher-materializer.h"
+
 extern char **environ;
 
 enum {
@@ -41,6 +44,10 @@ static int report_failure(const char *stage, int error_number) {
 }
 
 int main(int argc, char **argv) {
+  int materializer_result = ccm_runtime_launcher_materializer_main(argc, argv);
+  if (materializer_result >= 0) {
+    return materializer_result;
+  }
   if (argc < 2) {
     return report_failure("argv", EINVAL);
   }

@@ -45,6 +45,7 @@ launcher/
   README.json                 # stable-selector contract marker；不是 mutable current pointer
   linux-exact-fd-v1-<sha256>  # Linux build-attested exact-fd launcher
   darwin-path-attested-v1-<sha256> # Darwin build-attested final-attestation launcher
+materializers/                # owner-only native bootstrap lifecycle root；正常稳态为空
 quarantine/
 locks/
   activation.lock
@@ -55,6 +56,69 @@ no-replace 把 inode 发布到唯一最终名，再删除临时目录项；`EEXI
 先用 exclusive `mkdir` claim 内容寻址目录，逐个 hard-link 已 sealed 文件，最后发布 `READY`；没有
 `READY` 的 partial/crash image 永远不可解析。selector 取序号最大的 activation commit；
 若最新 commit 损坏则 fail closed，不静默回落旧 commit。
+
+`launcher/` 的稳定 POSIX 不变式是 **effective-UID owner + mode `0700`**；它不是在“可写
+`0700`”和“只读 `0500`”之间切换的临界区。每次 native invoke 都通过 pinned directory fd
+重验 owner/type/no-symlink，并把合法但只读的旧 `0500` 状态恢复为 `0700` 后再物化 helper。
+因此并发 first invoke 不会互相撤掉写权限，SIGKILL 也不会留下一个需要依赖前任进程 finally
+才能恢复的目录状态。
+
+helper 的 `<contract>-<sha256>` 最终 pathname 是唯一 publication authority。publisher 先固定并验证
+`launcher/` 目录对象；之后的 abandoned-temp 枚举/回收、final observation、owner-only unique temp
+创建、final publish、post-publish verify 与 durability barrier 必须全部通过该 pinned directory object
+上的相对 leaf name 完成。实现必须使用 dirfd-relative syscall（`openat` / `fstatat` / `linkat` /
+`unlinkat` 或等强平台原语）；不得调用 process-global `chdir` / `fchdir`，不得依赖 `/dev/fd`、
+`/proc/self/fd` 或其他 fd pseudo-path，也不得在已 pin 后退回 `launcher/` pathname 执行其中任何一步。
+若 Node 标准库不能表达这些原语，必须把整条 publication authority chain 放进隔离的 native subprocess，
+只向它继承已经 pin 的 directory fd；subprocess bootstrap pathname 不参与 publication 证明，主进程 cwd
+始终不变。任何实现都不得把新 pathname 中的 publication 与旧 directory fd 的 `fsync` 混成一份证明。
+
+native materializer bootstrap 的 crash ownership 是独立于 JavaScript `finally` 的承重合同：
+
+- bootstrap 只能落在 runtime root 内的 `materializers/`，不得再落 system temp。该 root 必须是
+  effective-UID owner、non-symlink directory、精确 `0700`，并在创建 instance 前以 no-follow open 固定；
+- 每次 cold invoke/materialization 只创建一个 `.materializer-<contract>-<publisher-pid>-<uuid>.tmp/` owner instance。
+  instance 必须是 effective-UID owner、non-symlink directory、精确 `0700`；唯一合法 payload leaf 为
+  `materializer`，写入态精确 `0600`、seal 后精确 `0500`。root/instance directory 的 pathname observation
+  必须与各自 inherited fd 的稳定 object identity/policy（device/inode/owner/type/精确 mode；平台提供时含
+  object generation）对齐；它们的目录内容会被合法的并发 create/unlink 改变，因此 directory size/mtime/ctime
+  不属于 object identity、不得作为 pathname replacement 的判据。bootstrap regular file 的 pathname
+  observation 则必须与 inherited fd 的 immutable file revision（object identity/policy + size/mtime/ctime）对齐；
+- native child 一进入 materializer mode、在 launcher temp cleanup/publication 之前，就须只经 inherited
+  root/instance fd 对自己的 `materializer` leaf 执行 no-follow identity check、`unlinkat`、instance
+  `AT_REMOVEDIR` 与 root durability barrier。真实 Node parent 即使此刻被 `SIGKILL`，child 仍能完成
+  self-clean；parent graceful cleanup 只能是 best-effort，不得作为 crash-safety 证明；
+- 若 parent 在 native spawn/self-clean 前死亡，后续 invoke/materialization 必须在同一 pinned `materializers/` root
+  枚举 exact contract/PID/UUID instance，先证明 publisher PID 为 dead（`ESRCH`；`EPERM` 仍视为
+  live/unknown），再 object-relative 回收。只允许空 instance，或只含一个 owner-matching regular
+  `materializer`（mode `0600`/`0500`）；symlink、非 directory/regular、wrong owner/mode、未知 leaf、
+  permission/I/O anomaly 一律保留并 fail closed；
+- 两个 recovery worker 可同时 snapshot 同一个已证 dead candidate。只有该 exact candidate 在证明后的
+  `fstatat` / `openat` / `unlinkat` / `AT_REMOVEDIR` 并发消失所产生的 `ENOENT` 可视为幂等成功；
+  该豁免不得扩到未匹配名称、live/unknown publisher 或其他 errno。live publisher 的 instance 不得回收；
+- 正常返回、并发 cold activation、parent 在 bootstrap create / native self-clean / helper publish 前后任意点
+  被 `SIGKILL`，最终都只能留下空的 managed root，不能留下可执行 bootstrap 或 owner instance。
+  bootstrap GC 不得删除 launcher final、launcher temp、unknown sibling 或 runtime root 之外的任何对象。
+
+因此 crash recovery 有两层：native self-clean 收口“child 已启动、parent 消失”的窗口；下一次 invoke/materialization
+的 dead-owner GC 收口“parent 在 spawn/self-clean 前消失”的窗口。两层都必须存在，删除任一层都应由
+regression/mutation instrument 检出；测试自己的 attributable cleanup 只能发生在 leak 断言之后。
+
+publisher 写完 temp 后 file-fsync、seal 为 `0500`，再以同目录 hard-link no-replace 发布；`link(2)`
+成功是 publication linearization point，`EEXIST` 只转入对既有 final 的独立验证，绝不 rename/copy
+覆盖。无论 final 是本次发布还是前任在 crash-before-directory-fsync 后留下的合法 publication，返回前
+都必须从同一 pinned directory object 对 final 重新执行 no-symlink/owner/mode/size/digest 验证，并对
+该目录对象执行 durability barrier。Darwin 明确只容忍 directory fd 对 `fsync` 返回
+`EINVAL`/`ENOTSUP` 的平台不支持结果，其他 I/O 错误继续向调用方传播。若外部 `launcher/`
+pathname 在 pin 后改指另一目录，materialization 仍不得逃离 pinned object，且在把 pathname 交给既有
+launcher spawn 边界前必须因 identity drift fail closed。
+
+并发 publisher 即使都观察到 final 缺失，也只能把**同一已验证 digest bytes**原子发布到同一 digest
+name，reader 不会观察 partial final。SIGKILL 留下的 unique temp 不具备 authority；后续 invoke 只回收
+pid 已证 dead、名称/owner/type 都符合本合同的 abandoned temp，再继续发布。错误不吞掉；final 已存在
+但校验失败时保留原 entry 并 fail closed，不以“修复”为名覆盖未知内容。cleanup 可把已经通过候选名称
+语法与 dead-pid 证明、随后在 `fstatat` 或 `unlinkat` 并发消失产生的 `ENOENT` 视为幂等成功；该豁免不
+扩展到其他名称、错误码或 surviving entry，symlink/type/owner/permission/I/O 异常仍须 fail closed。
 
 每个 activation commit 同时持有：
 
@@ -96,6 +160,13 @@ rollback 不是回写旧 commit，而是追加新 commit，把旧 commit 的 `pr
 - Linux invoke 把重验后的 image fd 交给随 SEA 构建并由 digest 固定的 `linux-exact-fd-v1`
   launcher，由 launcher 直接 `fexecve` 该 fd。实现不得把 `/dev/fd`、`/proc/self/fd` 或重验后的
   pathname 当 executable path，也不得在 verify→exec 间重新信任 image pathname。
+- 两个平台当前都由 Node `spawn` 通过 digest-pinned **launcher pathname** 进入 native helper；隔离的
+  materializer subprocess bootstrap 也只能经 runtime-root 内、已重验并与 inherited fd identity 对齐的
+  owner-only sealed pathname 启动。helper
+  自身虽在 spawn 前重验 owner/mode/digest，kernel 仍会在用户态校验后重新解析 pathname。因此一个
+  持续竞争的 same-UID process 仍能制造 launcher-check→launcher-exec residual。Linux
+  `exact-fd-v1/resistant` 描述的是 helper 内对 **payload image fd** 的绑定，不把 launcher-by-path
+  边界伪装成抵抗 same-UID 替换；`--require-assurance exact-object` 也不升级该 launcher 边界。
 - Darwin 没有公开 `fexecve` / `execveat`。Darwin invoke 使用独立的
   `darwin-path-attested-v1` launcher：在最后一个同步 native handoff 内以 `O_NOFOLLOW` 重新打开
   content-addressed image pathname，把 pathname fd 与先前 pinned fd 的 vnode identity/revision 对齐，
@@ -189,15 +260,22 @@ inspectLockOwner(record)
 | Backend | C1 状态 | 证据门 |
 | --- | --- | --- |
 | Linux POSIX | supported | uid/mode/no-symlink、O_NOFOLLOW/fstat、hard-link no-replace、build-attested `linux-exact-fd-v1` launcher + `fexecve`、无 `/dev/fd` 假设、active pathname-swap fixture 仍执行 pinned trusted image |
-| Darwin POSIX | supported；已通过真机资格门 | uid/mode/no-symlink、O_NOFOLLOW/fstat、hard-link no-replace、build-attested `darwin-path-attested-v1` launcher、final vnode identity/revision + SHA-256 recheck、无 `fexecve`/`execveat`/fd pseudo-path；darwin-arm64/x64 各跑 downloaded SEA 的 stage→activate→resolve→invoke、pre-final-check mutation denial、strict exact-object typed denial，并把 same-UID final-check→exec race记录为 residual 而非伪造 resistant green |
+| Darwin POSIX | historical baseline qualified；当前 runtime-affecting tree 未资格化 | uid/mode/no-symlink、O_NOFOLLOW/fstat、hard-link no-replace、build-attested `darwin-path-attested-v1` launcher、final vnode identity/revision + SHA-256 recheck、无 `fexecve`/`execveat`/fd pseudo-path；每个 runtime-affecting PR 的 exact head 须由 darwin-arm64/x64 各跑 downloaded SEA 的 stage→activate→resolve→invoke、launcher materialization race/recovery、pre-final-check mutation denial、strict exact-object typed denial，并把 same-UID final-check→exec race记录为 residual 而非伪造 resistant green |
 | Windows | public seam + independent contract fixture；default fail-closed | 公共状态模型无 symlink/admin 假设；真实 ACL/Authenticode、locked SEA/fd-equivalent 与 durable publish e2e 未过前 activation 返回 `RUNTIME_BACKEND` |
 
-Darwin 资格快照（2026-07-14 UTC）：tree `1e8f49e29b3c87eea37ac5dc5588f58e3f1a3b24`
+Darwin 历史资格快照（2026-07-14 UTC）：tree `1e8f49e29b3c87eea37ac5dc5588f58e3f1a3b24`
 在 [Actions run `29309116222`](https://github.com/nemori-ai/cc-master/actions/runs/29309116222)
 中由真实 `darwin-arm64` / `darwin-x64` runner 完成，两个 inner manifest 与 outer
 `EVIDENCE_SHA256SUMS` 均可完整复验，所有 required gates 为 PASS。该支持声明不扩大 invoke assurance：
 same-UID final-check→exec race 仍明确为 residual；Gatekeeper/notarization 仍为 conditional，真实 Cursor Agent
-endpoint 仍为 conditional，不能借 runtime/plugin/installer/service 资格结果推导为已验收。
+endpoint 仍为 conditional，不能借 runtime/plugin/installer/service 资格结果推导为已验收。该快照只证明
+其记录的 exact tree；任何后续 runtime-affecting tree 在新的 arm64/x64 inner manifests 与 outer index
+同时记录并校验相同 exact commit + tree 前均保持未资格化，旧 run 不得作为新 tree 的通过证据。
+outer index verifier 必须从 workflow event 注入的 immutable expected commit 与已经 inner-manifest
+封闭的 `summary.txt` / `sea-build-evidence/runner.txt` identity records 完成该校验：两份 record 各自只允许
+一个 40-hex commit/tree，commit 必须等于 event expected commit，tree 必须在同一 artifact 内及 arm64/x64
+之间完全一致。build / qualify producer 仍须从各自 exact checkout 生成并互验 identity；outer index
+不得重新依赖 ambient Git repository 推导 expected identity，否则无 Git 的 hermetic replay 无法验证这条合同。
 
 Windows 是待实现 backend，不是公共模型中的永久 unsupported。后续 platform hardening 只替换 backend，
 不得改变 image/provenance/transaction/activation commit/selector 合同。
