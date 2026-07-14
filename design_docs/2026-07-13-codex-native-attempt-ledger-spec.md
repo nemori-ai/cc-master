@@ -1,6 +1,6 @@
 # Codex API/tool native-attempt ledger v1
 
-> Status: **Frozen C2 implementation contract; runtime remains unsupported**
+> Status: **Frozen C2 implementation contract; ledger implemented; host-native live dispatch unsupported**
 > Date: 2026-07-13 UTC
 > Board task: `xh_c2_native_attempt_spec`
 > Contract IDs: `ccm/native-attempt/v1`, `ccm/native-handle-evidence-record/codex-api-tool/v1`, `ccm/native-private-evidence-authentication/v1`, `ccm/native-attempt-feature-probe/codex-api-tool/v1`
@@ -8,9 +8,12 @@
 
 ## 1. Scope and evidence verdict
 
-This slice freezes the first host-native attempt contract. It does **not** implement an engine
-validator, ccm writer, Codex adapter, provider invocation, or model request. The checked-in opt-in
-tests are deliberately RED until a later implementation slice lands all of those pieces.
+This slice freezes the first host-native attempt contract. The ledger, dedicated writer, and private evidence authentication surface are implemented: `@ccm/engine` validates and applies the lifecycle,
+ccm owns the locked board/evidence transaction, and the five dedicated CLI verbs in §5 are executable
+and contract-tested. **Host-native live dispatch/spawn remains unsupported**: no host strategy projects
+an invoke artifact, no Codex origin adapter invokes spawn/list/wait/interrupt, and no provider/model
+request is made by this surface. The checked-in tests exercise the implemented ledger contract without
+claiming or calling a live host runtime.
 
 The selected origin is narrowly:
 
@@ -81,8 +84,9 @@ Given a contract-enabled routed `executor=subagent` task whose selected candidat
   native launch remains unavailable until the lineage is proven.
 - The handle is `legacy_session_bound`. No cross-session attach/resume/cancel claim is allowed.
 - Ambiguous observations project the task to `uncertain` and clear the active handle projection.
-  A complete orphan audit may project it back to `ready` only after write authority is fenced; this
-  permits a later explicit create, never an automatic respawn.
+  A complete fenced orphan audit clears the handle, seeds `ready`, and then runs ordinary dependency
+  gating through `reconcileGating`; the resulting task projection is `ready|blocked`. Unmet deps always
+  project to `blocked`. The result may permit a later explicit create, never an automatic respawn.
 
 ### 2.2 Non-goals
 
@@ -183,7 +187,7 @@ Every native attempt appended to `task.routing.attempts[]` has this minimum shap
 `selection_snapshot` is the entire immutable C1 selection, not a mutable ref. It must be present in
 the create request and in the appended attempt, byte-for-value equal in parsed JSON, and its
 `candidate_id` must equal both the attempt candidate and a candidate in the selected policy chain.
-The RED fixture is self-contained and is not allowed to outsource this check to a `selection_ref`.
+The contract fixture is self-contained and is not allowed to outsource this check to a `selection_ref`.
 `expected_child_target` is frozen before spawn and cannot be supplied for the first time at bind.
 `ordinal` is monotonic per task. `dispatch.key` and `request_hash` are unique together. All timestamps use exact
 canonical UTC second precision and must round-trip to the same calendar instant; impossible dates
@@ -314,25 +318,29 @@ from the evidence record. Missing or unequal expected context is a create-link f
 
 ## 5. Dedicated operation semantics
 
-Planned ccm verbs are:
+The current executable ccm command surface is:
 
 ```text
-ccm task native-attempt-create   <task-id> --selection @selection.json --attempt @attempt.json
-ccm task native-attempt-bind     <task-id> --attempt-id <id> --evidence-record-ref <owner-ref>
-ccm task native-attempt-cancel   <task-id> --attempt-id <id> --request @cancel.json
-ccm task native-attempt-terminal <task-id> --attempt-id <id> --evidence-record-ref <owner-ref>
-ccm task native-attempt-reconcile <task-id> --attempt-id <id> --evidence-record-ref <owner-ref>
+ccm task native-attempt-create <task-id> --selection @selection.json --attempt @attempt.json --replay-intent <accept-no-launch|require-new-launch> [--json]
+ccm task native-attempt-bind <task-id> --attempt-id <id> --evidence-record-ref <owner-ref> [--json]
+ccm task native-attempt-cancel <task-id> --attempt-id <id> --request @cancel.json [--acknowledgement-terminal-class <class>] [--json]
+ccm task native-attempt-terminal <task-id> --attempt-id <id> --evidence-record-ref <owner-ref> [--requested-task-status <status>] [--json]
+ccm task native-attempt-reconcile <task-id> --attempt-id <id> --evidence-record-ref <owner-ref> [--json]
 ```
 
-They are planned names, not current CLI claims.
+These five verbs are dedicated ledger writers, not host-tool wrappers. The two optional negative-
+contract flags reject attempts to treat a cancellation acknowledgement as terminal or to make native
+terminal evidence write task `done`; they do not add alternate state transitions. `--json` selects the
+operation-result output shape. While live dispatch is unsupported, create's ledger result—including
+`launch_allowed:true` on a first create—is not permission for a default runtime path to spawn.
 
 The pure engine endpoint is frozen as
 `nativeAttemptApply(board, command) -> {ok, board, result?, issues?}`. It never mutates its input.
 On any rejected command, `ok:false`, the returned board and input board are value-identical to the
 pre-call board, and `issues[]` contains stable codes. The ccm handlers resolve/authenticate private
 evidence before calling it, then commit the returned board through the existing locked write gate.
-The executable RED oracle calls this endpoint and the real CLI router; symbol/registry existence is
-not acceptance.
+The executable contract oracle calls this endpoint and the real CLI router; symbol/registry existence
+alone is not acceptance.
 
 ### 5.1 Create: `absent → starting`
 
@@ -412,10 +420,12 @@ supports exactly these projections:
 | `starting|running → uncertain` | append ambiguity/control-loss evidence; preserve any prior binding in history | `uncertain`, clear active `task.handle` |
 | `uncertain → running` | only the same bound handle, create link, expected child, and current lineage may be re-proven | `in_flight`, re-project that exact handle |
 | `uncertain → terminal` | append trusted terminal evidence; terminal becomes immutable | `uncertain`, handle absent, never `done` |
-| `uncertain → orphaned` | require origin unavailable, handle unaddressable, and write authority fenced in an owner-only orphan audit | `ready`, handle absent; a later explicit create is permitted, automatic respawn remains false |
+| `uncertain → orphaned` | require origin unavailable, handle unaddressable, and write authority fenced in an owner-only orphan audit | `ready|blocked`, handle absent; `reconcileGating` applies ordinary deps gating, a later explicit create is permitted only when ready, and automatic respawn remains false |
 
 `orphaned` means the audit is complete enough to fence the old writer, not merely “the parent went
-away.” Missing fencing is `NATIVE-ORPHAN-AUDIT-INCOMPLETE` and continues to block launch. Exact
+away.” The writer seeds `ready` only as input to ordinary `reconcileGating`; unmet deps produce
+`blocked`, so orphan recovery never bypasses dependency gates. Missing fencing is
+`NATIVE-ORPHAN-AUDIT-INCOMPLETE` and continues to block launch. Exact
 reconcile replay is a no-op. A different record/classification for an already-applied reconciliation
 is `NATIVE-RECONCILE-CONFLICT`; terminal and orphaned history cannot be rewritten. Generic setters,
 `route-bind`, `--force`, and task status verbs cannot perform any of these projections.
@@ -462,7 +472,8 @@ The v1 durability class is exactly `legacy_session_bound`:
 - if the old session disappears before terminal proof, classify `uncertain`/`orphaned`, preserve the
   worktree and evidence, and do not respawn or release related authority automatically. Only a
   trusted orphan audit that fences the old write authority may close the attempt as `orphaned` and
-  return the task to `ready`; it still performs no spawn.
+  project the task to dependency-gated `ready|blocked`; unmet deps remain `blocked`, and the operation
+  still performs no spawn.
 
 `attach` and `durable_run_ref` are explicitly outside this contract. They require a supervisor or a
 future host probe proving a cross-session native lease/control surface.
@@ -476,7 +487,7 @@ closed with zero board mutation. A trusted reconcile record may only classify th
 
 ## 8. Error taxonomy
 
-The following issue codes are frozen for fixtures and future engine validators:
+The following issue codes are frozen for fixtures and the implemented engine validator:
 
 | Code | Meaning |
 | --- | --- |
@@ -512,7 +523,7 @@ The following issue codes are frozen for fixtures and future engine validators:
 Errors identify code/path/reason but never echo raw handle response, account identity, credentials,
 argv/env, transcript, or secret-shaped values.
 
-## 9. RED fixtures and implementation gate
+## 9. Executable fixtures and verification gate
 
 The executable oracle is:
 
@@ -521,28 +532,27 @@ The executable oracle is:
 - `ccm/packages/engine/test/native-attempt-contract.red.test.ts`;
 - `ccm/apps/cli/test/handler-native-attempt.red.test.ts`.
 
-Default suites prove the fixture is coherent and the runtime remains honestly unsupported. The
-planned surface is opt-in RED:
+The focused suites prove that the fixtures are coherent, the engine validator and five real CLI
+handlers enforce the frozen state/security contract, and host-native live dispatch remains honestly
+unsupported. Run:
 
 ```bash
 cd ccm
 pnpm --filter @ccm/engine build
 
-CCM_NATIVE_ATTEMPT_CONTRACT_RED=1 \
-  pnpm --filter @ccm/engine exec node --test test/native-attempt-contract.red.test.ts
+pnpm --filter @ccm/engine exec node --test test/native-attempt-contract.red.test.ts
 
-CCM_NATIVE_ATTEMPT_CONTRACT_RED=1 \
-  pnpm --filter ccm exec node --import tsx --test test/handler-native-attempt.red.test.ts
+pnpm --filter ccm exec node --import tsx --test test/handler-native-attempt.red.test.ts test/registry.test.ts
 ```
 
-Both commands MUST fail today because the engine apply/detector endpoints, ccm private evidence
-channel, and five dedicated CLI verbs do not exist. The engine RED calls the operation endpoint for
+Both focused commands MUST pass today. The engine suite calls the implemented operation endpoint for
 every positive/replay/conflict/mutation case and asserts returned board state plus failure atomicity.
-The CLI RED calls the real router/handlers against a temporary board and owner evidence store,
-including a live `route-bind` bypass attempt. Default tests also run deliberate counterfeits: a
+The CLI suite calls the real router/handlers against a temporary board and owner evidence store,
+including a `route-bind` bypass attempt; `registry.test.ts` pins the five command/flag registrations.
+The suites also run deliberate counterfeits: a
 no-op/fixture-lookup engine and registry-only verbs without handlers must be rejected by the same
-observable-state requirements. Do not make RED green with stubs, registry-only verbs, arbitrary
-handle acceptance, caller-controlled `verified` fields, or fixture-specific special cases.
+observable-state requirements. Stubs, registry-only verbs, arbitrary handle acceptance,
+caller-controlled `verified` fields, and fixture-specific special cases do not satisfy the gate.
 
 The bind authentication fixture contains independent, fully materialized, precomputed records; it
 does not mutate one signed positive record at test time. The default coherence oracle proves the
@@ -572,9 +582,10 @@ issue before board mutation. `reconcile_running` and
 real CLI endpoint matrices; the second invocation must be an exact no-op with byte/value-identical
 board state.
 
-A future implementation may promote only after:
+A future host-native live dispatch/spawn implementation may promote only after:
 
-1. spec → validator/transition tests → dedicated writers → Codex origin adapter, in that order;
+1. the existing spec → validator/transition tests → dedicated writers/private evidence chain remains
+   green while a Codex origin adapter is added after those boundaries;
 2. every negative issue above fails through engine and CLI endpoints with the board byte/value
    unchanged, while create/bind/cancel/terminal/reconcile exact replay and conflicting replay are
    exercised through those endpoints;
