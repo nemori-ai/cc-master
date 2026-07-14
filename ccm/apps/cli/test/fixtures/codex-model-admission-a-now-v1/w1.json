@@ -1,0 +1,622 @@
+{
+  "schema": "ccm/codex-model-admission-a-now-fixtures/v1",
+  "contract": "ccm/codex-model-admission-a-now/v1",
+  "domain": {
+    "evaluator": "evaluateW1Case",
+    "now": "2026-07-14T08:01:00Z",
+    "reason_priority": [
+      "persistent_only_evidence",
+      "cut_replayed",
+      "policy_denied",
+      "automatic_live_spawn_disabled_strict",
+      "provider_request_authorization_missing",
+      "provider_request_authorization_mismatch",
+      "auth_unknown",
+      "auth_stale",
+      "catalog_stale",
+      "quota_7d_unknown",
+      "quota_7d_tight",
+      "quota_7d_exhausted",
+      "quota_7d_stale",
+      "model_exact_mismatch",
+      "effort_exact_mismatch",
+      "workspace_mismatch",
+      "reservation_invalid",
+      "account_identity_conflict"
+    ],
+    "authorization_binding_fields": [
+      "schema",
+      "issuer",
+      "authority_ref",
+      "attempt_id",
+      "run_ref",
+      "idempotency_key",
+      "provider",
+      "operation",
+      "model_id",
+      "effort",
+      "workspace_realpath",
+      "baseline_sha256",
+      "effect",
+      "issued_at",
+      "expires_at",
+      "nonce"
+    ]
+  },
+  "base": {
+    "schema": "ccm/codex-model-admission-cut/v1",
+    "identity": {
+      "attempt_id": "attempt-1",
+      "run_ref": "ccm-run:v1:run-1",
+      "idempotency_key": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "supervisor_instance_id": "supervisor-1",
+      "collected_by": "supervisor-1",
+      "collection_epoch": "epoch-1",
+      "materialization": "live-in-memory"
+    },
+    "request": {
+      "provider": "codex",
+      "operation": "inspect",
+      "model_id": "gpt-contract-fixture",
+      "effort": "high",
+      "launch_mode": "operator-explicit",
+      "provider_target": "real-codex"
+    },
+    "binary": {
+      "source": "live-readonly",
+      "path": "/opt/fixture/codex",
+      "version": "codex-cli fixture-v1",
+      "behavior_revision": "fixture-behavior-v1",
+      "freshness": "fresh",
+      "completeness": "complete"
+    },
+    "auth": {
+      "source": "live-readonly",
+      "state": "authenticated",
+      "account_id": "account-opaque-1",
+      "credential_id": "credential-opaque-1",
+      "observed_at": "2026-07-14T08:00:00Z",
+      "valid_until": "2026-07-14T08:05:00Z",
+      "freshness": "fresh",
+      "completeness": "complete"
+    },
+    "discovery": {
+      "source": "live-readonly",
+      "authority": "discovery-only",
+      "model_identity_kind": "provider-cli-model-id",
+      "source_method": "model/list",
+      "model_id": "gpt-contract-fixture",
+      "efforts": ["medium", "high"],
+      "observed_at": "2026-07-14T08:00:00Z",
+      "valid_until": "2026-07-14T08:05:00Z",
+      "freshness": "fresh",
+      "completeness": "complete"
+    },
+    "resolution": {
+      "requested_model_id": "gpt-contract-fixture",
+      "requested_effort": "high",
+      "resolved_model_id": "gpt-contract-fixture",
+      "resolved_effort": "high"
+    },
+    "quota_7d": {
+      "source": "live-readonly",
+      "status": "ample",
+      "account_id": "account-opaque-1",
+      "pool_id": "pool-opaque-1",
+      "observed_at": "2026-07-14T08:00:00Z",
+      "valid_until": "2026-07-14T08:05:00Z",
+      "freshness": "fresh",
+      "completeness": "complete"
+    },
+    "policy": {
+      "source": "current-authority",
+      "cross_harness": "allow",
+      "effect": "read-only",
+      "approval": "never",
+      "account_mutation": "forbidden",
+      "credential_write": "forbidden",
+      "threat_policy": "strict",
+      "launch_authorization": {
+        "schema": "ccm/provider-request-authorization/v1",
+        "issuer": "user",
+        "authority_ref": "decision://fixture/operator-1",
+        "attempt_id": "attempt-1",
+        "run_ref": "ccm-run:v1:run-1",
+        "idempotency_key": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "provider": "codex",
+        "operation": "inspect",
+        "model_id": "gpt-contract-fixture",
+        "effort": "high",
+        "workspace_realpath": "/worktrees/fixture",
+        "baseline_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "effect": "read-only",
+        "issued_at": "2026-07-14T08:00:30Z",
+        "expires_at": "2026-07-14T08:02:00Z",
+        "nonce": "grant-nonce-1"
+      }
+    },
+    "workspace": {
+      "root_realpath": "/worktrees/fixture",
+      "baseline_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "isolated": true,
+      "write_set": []
+    },
+    "reservation": {
+      "held": true,
+      "attempt_id": "attempt-1",
+      "account_id": "account-opaque-1",
+      "pool_id": "pool-opaque-1",
+      "workspace_realpath": "/worktrees/fixture",
+      "valid_until": "2026-07-14T08:03:00Z"
+    },
+    "provenance": {
+      "persistent_evidence_used": false,
+      "audit_refs": []
+    }
+  },
+  "cases": [
+    {
+      "name": "live-exact-operator-attempt-admits",
+      "patch": {},
+      "expected": {
+        "verdict": "admit",
+        "reason_codes": [],
+        "provider_target": "real-codex",
+        "provider_spawn_permitted": true,
+        "real_provider_request_permitted": true
+      }
+    },
+    {
+      "name": "controlled-fixture-admits-without-real-request",
+      "patch": {
+        "request": { "launch_mode": "fixture", "provider_target": "controlled-fixture" },
+        "policy": { "launch_authorization": null }
+      },
+      "expected": {
+        "verdict": "admit",
+        "reason_codes": [],
+        "provider_target": "controlled-fixture",
+        "provider_spawn_permitted": true,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "persistent-only-evidence-cannot-admit",
+      "patch": {
+        "auth": { "source": "cache" },
+        "discovery": { "source": "ledger" },
+        "quota_7d": { "source": "receipt" },
+        "provenance": {
+          "persistent_evidence_used": true,
+          "audit_refs": ["audit://apparently-valid"]
+        }
+      },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["persistent_only_evidence"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "serialized-cut-replay-cannot-admit",
+      "patch": { "identity": { "materialization": "serialized-replay" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["cut_replayed"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "unknown-auth-rejects",
+      "patch": { "auth": { "state": "unknown", "freshness": "unknown" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["auth_unknown"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "stale-auth-rejects",
+      "patch": { "auth": { "freshness": "hard-stale", "valid_until": "2026-07-14T08:00:59Z" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["auth_stale"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "fresh-labelled-expired-auth-rejects",
+      "patch": { "auth": { "valid_until": "2026-07-14T08:00:59Z" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["auth_stale"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "stale-catalog-rejects",
+      "patch": {
+        "discovery": { "freshness": "hard-stale", "valid_until": "2026-07-14T08:00:59Z" }
+      },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["catalog_stale"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "fresh-labelled-expired-catalog-rejects",
+      "patch": { "discovery": { "valid_until": "2026-07-14T08:00:59Z" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["catalog_stale"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "unknown-seven-day-quota-rejects",
+      "patch": { "quota_7d": { "status": "unknown", "freshness": "unknown" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["quota_7d_unknown"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "tight-seven-day-quota-rejects",
+      "patch": { "quota_7d": { "status": "tight" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["quota_7d_tight"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "exhausted-seven-day-quota-rejects",
+      "patch": { "quota_7d": { "status": "exhausted" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["quota_7d_exhausted"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "stale-seven-day-quota-rejects",
+      "patch": {
+        "quota_7d": { "freshness": "hard-stale", "valid_until": "2026-07-14T08:00:59Z" }
+      },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["quota_7d_stale"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "fresh-labelled-expired-seven-day-quota-rejects",
+      "patch": { "quota_7d": { "valid_until": "2026-07-14T08:00:59Z" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["quota_7d_stale"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "policy-deny-rejects",
+      "patch": { "policy": { "cross_harness": "deny" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["policy_denied"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "catalog-discovery-is-not-real-request-authority",
+      "patch": { "policy": { "launch_authorization": null } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_missing"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-schema-mismatch-rejects",
+      "patch": {
+        "policy": { "launch_authorization": { "schema": "ccm/provider-request-authorization/v0" } }
+      },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-issuer-mismatch-rejects",
+      "patch": { "policy": { "launch_authorization": { "issuer": "agent" } } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-authority-ref-mismatch-rejects",
+      "patch": { "policy": { "launch_authorization": { "authority_ref": "" } } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-attempt-id-mismatch-rejects",
+      "patch": { "policy": { "launch_authorization": { "attempt_id": "attempt-other" } } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-run-ref-mismatch-rejects",
+      "patch": { "policy": { "launch_authorization": { "run_ref": "ccm-run:v1:run-other" } } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-idempotency-key-mismatch-rejects",
+      "patch": {
+        "policy": {
+          "launch_authorization": {
+            "idempotency_key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-provider-mismatch-rejects",
+      "patch": { "policy": { "launch_authorization": { "provider": "claude-code" } } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-operation-mismatch-rejects",
+      "patch": { "policy": { "launch_authorization": { "operation": "execute" } } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-model-id-mismatch-rejects",
+      "patch": { "policy": { "launch_authorization": { "model_id": "other-model" } } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-effort-mismatch-rejects",
+      "patch": { "policy": { "launch_authorization": { "effort": "medium" } } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-workspace-realpath-mismatch-rejects",
+      "patch": {
+        "policy": { "launch_authorization": { "workspace_realpath": "/worktrees/other" } }
+      },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-baseline-sha256-mismatch-rejects",
+      "patch": {
+        "policy": {
+          "launch_authorization": {
+            "baseline_sha256": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-effect-mismatch-rejects",
+      "patch": { "policy": { "launch_authorization": { "effect": "write" } } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-issued-at-in-future-rejects",
+      "patch": { "policy": { "launch_authorization": { "issued_at": "2026-07-14T08:01:01Z" } } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-expires-at-before-now-rejects",
+      "patch": { "policy": { "launch_authorization": { "expires_at": "2026-07-14T08:00:59Z" } } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "authorization-nonce-mismatch-rejects",
+      "patch": { "policy": { "launch_authorization": { "nonce": "" } } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["provider_request_authorization_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "resolved-model-mismatch-rejects",
+      "patch": { "resolution": { "resolved_model_id": "other-model" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["model_exact_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "resolved-effort-mismatch-rejects",
+      "patch": { "resolution": { "resolved_effort": "medium" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["effort_exact_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "strict-automatic-live-spawn-rejects",
+      "patch": {
+        "request": { "launch_mode": "automatic", "provider_target": "real-codex" },
+        "policy": { "launch_authorization": null }
+      },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["automatic_live_spawn_disabled_strict"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "non-isolated-workspace-rejects",
+      "patch": { "workspace": { "isolated": false } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["workspace_mismatch"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "missing-reservation-rejects",
+      "patch": { "reservation": { "held": false } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["reservation_invalid"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "expired-reservation-rejects",
+      "patch": { "reservation": { "valid_until": "2026-07-14T08:00:59Z" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["reservation_invalid"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    },
+    {
+      "name": "account-quota-identity-conflict-rejects",
+      "patch": { "quota_7d": { "account_id": "other-account" } },
+      "expected": {
+        "verdict": "reject",
+        "reason_codes": ["account_identity_conflict"],
+        "provider_target": null,
+        "provider_spawn_permitted": false,
+        "real_provider_request_permitted": false
+      }
+    }
+  ]
+}

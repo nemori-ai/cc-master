@@ -1,0 +1,304 @@
+{
+  "schema": "ccm/codex-model-admission-a-now-fixtures/v1",
+  "contract": "ccm/codex-model-admission-a-now/v1",
+  "domain": {
+    "evaluator": "createAuthorityHarness",
+    "at_most_once_scope": ["attempt_id", "idempotency_key"],
+    "persistent_positive_authority": false,
+    "serialized_launch_capability": false,
+    "spawn_observer_owner": "test-runtime-port"
+  },
+  "base": {
+    "attempt_id": "attempt-1",
+    "run_ref": "ccm-run:v1:run-1",
+    "idempotency_key": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "supervisor_instance_id": "supervisor-1",
+    "provider_target": "controlled-fixture",
+    "decision": {
+      "verdict": "admit",
+      "origin": "same-call-stack",
+      "supervisor_instance_id": "supervisor-1",
+      "collection_epoch": "epoch-1"
+    },
+    "durable_control": {
+      "home_claim": "absent",
+      "invoke_intent": "absent",
+      "started_handle": "absent"
+    },
+    "compiled_invocation": {
+      "schema": "ccm/codex-provider-compiled-invocation/v1",
+      "provider_target": "controlled-fixture",
+      "executable": "/opt/fixture/codex",
+      "argv": ["exec", "--model", "gpt-contract-fixture", "-"],
+      "cwd": "/worktrees/fixture",
+      "env": {},
+      "permission": {
+        "effect": "read-only",
+        "approval": "never",
+        "write_set": []
+      },
+      "binding": {
+        "attempt_id": "attempt-1",
+        "idempotency_key": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    }
+  },
+  "cases": [
+    {
+      "name": "same-process-live-decision-spawns-once",
+      "patch": {},
+      "invocation": { "mode": "single", "count": 1 },
+      "expected": {
+        "results": [
+          {
+            "action": "spawn",
+            "spawn_count_delta": 1,
+            "state": "invoking",
+            "reason": "same_process_live_admit"
+          }
+        ],
+        "observation": {
+          "controlled_fixture_spawns": 1,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "serialized-w1-decision-is-not-authority",
+      "patch": { "decision": { "origin": "serialized-replay" } },
+      "invocation": { "mode": "single", "count": 1 },
+      "expected": {
+        "results": [
+          {
+            "action": "reject",
+            "spawn_count_delta": 0,
+            "state": "rejected",
+            "reason": "serialized_decision_not_authority"
+          }
+        ],
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "persistent-audit-admit-is-not-authority",
+      "patch": { "decision": { "origin": "audit-ledger" } },
+      "invocation": { "mode": "single", "count": 1 },
+      "expected": {
+        "results": [
+          {
+            "action": "reject",
+            "spawn_count_delta": 0,
+            "state": "rejected",
+            "reason": "persistent_record_not_authority"
+          }
+        ],
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "other-supervisor-live-decision-is-not-transferable",
+      "patch": { "decision": { "supervisor_instance_id": "supervisor-other" } },
+      "invocation": { "mode": "single", "count": 1 },
+      "expected": {
+        "results": [
+          {
+            "action": "reject",
+            "spawn_count_delta": 0,
+            "state": "rejected",
+            "reason": "supervisor_identity_mismatch"
+          }
+        ],
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "same-process-second-invocation-does-not-spawn",
+      "patch": {},
+      "invocation": { "mode": "sequential", "count": 2 },
+      "expected": {
+        "results": [
+          {
+            "action": "spawn",
+            "spawn_count_delta": 1,
+            "state": "invoking",
+            "reason": "same_process_live_admit"
+          },
+          {
+            "action": "reuse",
+            "spawn_count_delta": 0,
+            "state": "started",
+            "reason": "launch_capability_already_used"
+          }
+        ],
+        "observation": {
+          "controlled_fixture_spawns": 1,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "same-process-concurrent-invocations-spawn-at-most-once",
+      "patch": {},
+      "invocation": { "mode": "concurrent", "count": 2 },
+      "expected": {
+        "results": [
+          {
+            "action": "spawn",
+            "spawn_count_delta": 1,
+            "state": "invoking",
+            "reason": "same_process_live_admit"
+          },
+          {
+            "action": "reuse",
+            "spawn_count_delta": 0,
+            "state": "started",
+            "reason": "launch_capability_already_used"
+          }
+        ],
+        "observation": {
+          "controlled_fixture_spawns": 1,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "duplicate-same-key-requires-private-verified-attach",
+      "patch": {
+        "durable_control": {
+          "home_claim": "same-key-same-request",
+          "invoke_intent": "durable",
+          "started_handle": "present"
+        }
+      },
+      "invocation": { "mode": "single", "count": 1 },
+      "expected": {
+        "results": [
+          {
+            "action": "uncertain",
+            "spawn_count_delta": 0,
+            "state": "uncertain",
+            "reason": "original_run_attach_required"
+          }
+        ],
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "invoke-intent-without-handle-is-uncertain-no-retry",
+      "patch": {
+        "decision": { "origin": "none-after-crash", "verdict": "unknown" },
+        "durable_control": {
+          "home_claim": "same-key-same-request",
+          "invoke_intent": "durable",
+          "started_handle": "unknown"
+        }
+      },
+      "invocation": { "mode": "sequential", "count": 2 },
+      "expected": {
+        "results": [
+          {
+            "action": "uncertain",
+            "spawn_count_delta": 0,
+            "state": "uncertain",
+            "reason": "invoke_outcome_ambiguous_no_auto_retry"
+          },
+          {
+            "action": "uncertain",
+            "spawn_count_delta": 0,
+            "state": "uncertain",
+            "reason": "invoke_outcome_ambiguous_no_auto_retry"
+          }
+        ],
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    },
+    {
+      "name": "same-key-conflict-never-spawns",
+      "patch": { "durable_control": { "home_claim": "same-key-different-request" } },
+      "invocation": { "mode": "single", "count": 1 },
+      "expected": {
+        "results": [
+          {
+            "action": "reject",
+            "spawn_count_delta": 0,
+            "state": "rejected",
+            "reason": "idempotency_conflict"
+          }
+        ],
+        "observation": {
+          "controlled_fixture_spawns": 0,
+          "real_provider_requests": 0,
+          "paid_canaries": 0,
+          "account_mutations": 0,
+          "credential_writes": 0,
+          "config_writes": 0,
+          "board_writes": 0,
+          "remote_mutations": 0
+        }
+      }
+    }
+  ]
+}

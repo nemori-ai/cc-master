@@ -6,5 +6,25 @@
 // T2b：替换 T0 占位（原占位返回 SCHEMA_VERSION?0:1）。真 wiring = 直接 re-export router.run（tsdown 把
 //   router + handlers + registry + io + @ccm/engine 全内联进单 CJS bundle·dist/index.cjs）。
 
+export type {
+  AuthorityDiagnosticEvidence,
+  AuthorityResult,
+  CodexModelAdmissionReconciliationInput,
+  CodexModelAdmissionSupervisor,
+  CodexModelAdmissionSupervisorInput,
+  CodexModelAdmissionSupervisorPorts,
+  CodexModelAdmissionSupervisorResult,
+  CodexPreinvokeChallenge,
+  CodexRunAttachChallenge,
+  CompiledCodexInvocation,
+  W1DecisionV1,
+} from './codex-model-admission-a-now.js';
+export {
+  CODEX_ADMISSION_REASON_PRIORITY_V1,
+  CODEX_PREINVOKE_CHANGED_REASON_V1,
+  createCodexModelAdmissionSupervisor,
+  evaluateCodexAdmissionV1,
+  evaluateReconciliationCase,
+} from './codex-model-admission-a-now.js';
 export { runProduction } from './production-run.js';
 export { run } from './router.js';

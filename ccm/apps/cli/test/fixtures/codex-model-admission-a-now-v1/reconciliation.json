@@ -1,0 +1,68 @@
+{
+  "schema": "ccm/codex-model-admission-a-now-fixtures/v1",
+  "contract": "ccm/codex-model-admission-a-now/v1",
+  "domain": { "evaluator": "evaluateReconciliationCase" },
+  "base": {
+    "requested": { "model_id": "gpt-contract-fixture", "effort": "high" },
+    "resolved": { "model_id": "gpt-contract-fixture", "effort": "high" },
+    "actual": {
+      "source": "provider-event-channel",
+      "model_id": "gpt-contract-fixture",
+      "effort": "high"
+    },
+    "provider_terminal": "succeeded",
+    "parent_verified": false
+  },
+  "cases": [
+    {
+      "name": "exact-actual-terminal-still-awaits-parent",
+      "patch": {},
+      "expected": {
+        "attempt_outcome": "terminal",
+        "reason": "actual_identity_exact",
+        "task_done": false,
+        "parent_verification_required": true
+      }
+    },
+    {
+      "name": "actual-model-mismatch-fails",
+      "patch": { "actual": { "model_id": "other-model" } },
+      "expected": {
+        "attempt_outcome": "failed",
+        "reason": "actual_model_mismatch",
+        "task_done": false,
+        "parent_verification_required": true
+      }
+    },
+    {
+      "name": "actual-effort-mismatch-fails",
+      "patch": { "actual": { "effort": "medium" } },
+      "expected": {
+        "attempt_outcome": "failed",
+        "reason": "actual_effort_mismatch",
+        "task_done": false,
+        "parent_verification_required": true
+      }
+    },
+    {
+      "name": "missing-actual-does-not-copy-requested",
+      "patch": { "actual": null },
+      "expected": {
+        "attempt_outcome": "uncertain",
+        "reason": "actual_identity_unknown",
+        "task_done": false,
+        "parent_verification_required": true
+      }
+    },
+    {
+      "name": "parent-acceptance-is-separate",
+      "patch": { "parent_verified": true },
+      "expected": {
+        "attempt_outcome": "terminal",
+        "reason": "actual_identity_exact",
+        "task_done": true,
+        "parent_verification_required": false
+      }
+    }
+  ]
+}
