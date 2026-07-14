@@ -25,8 +25,10 @@ once in `@ccm/engine` and reusable by the future Cursor provider driver. Its clo
 - separate immutable input and request SHA-256 digests;
 - exact runtime image SHA-256 and the exact model/effort selector.
 
-Native code, quota code, and future Cursor code call the shared canonical builder/digest. They do
-not maintain a second field list, JSON canonicalizer, or hash implementation.
+Native-attempt code and every future provider driver call the shared canonical builder/digest. The
+quota admission module remains the authority for reservation/ticket facts and does not define a
+parallel launch-identity vocabulary. No provider maintains a second field list, JSON canonicalizer,
+or hash implementation.
 
 The owner-store launch record is `ccm/native-launch-authority/v1`. It contains the canonical launch
 identity and digest, the authoritative committed reservation projection, the complete
