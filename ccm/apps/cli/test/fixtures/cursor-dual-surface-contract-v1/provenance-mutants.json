@@ -1,0 +1,110 @@
+{
+  "schema": "ccm/cursor-dual-surface-provenance-mutants/v1",
+  "contract": "ccm/cursor-dual-surface-contract/v1",
+  "base_case_id": "CSD-003",
+  "mutants": [
+    {
+      "id": "CSDP-001",
+      "title": "expired authentication evidence fails closed",
+      "target": { "surface_id": "cursor-agent-cli", "role": "worker-target" },
+      "patch": {
+        "cursor-agent-cli": {
+          "evidence": {
+            "auth_state": { "valid_until": "2026-07-14T12:05:00.000Z" }
+          }
+        }
+      },
+      "expected_eligible": false,
+      "expected_blockers": ["auth-evidence-stale"]
+    },
+    {
+      "id": "CSDP-002",
+      "title": "missing quota source fails closed",
+      "target": { "surface_id": "cursor-agent-cli", "role": "worker-target" },
+      "patch": {
+        "cursor-agent-cli": {
+          "evidence": {
+            "quota_state": { "source": null }
+          }
+        }
+      },
+      "expected_eligible": false,
+      "expected_blockers": ["quota-evidence-source-unknown"]
+    },
+    {
+      "id": "CSDP-003",
+      "title": "IDE quota provenance cannot authorize the Agent surface",
+      "target": { "surface_id": "cursor-agent-cli", "role": "worker-target" },
+      "patch": {
+        "cursor-agent-cli": {
+          "evidence": {
+            "quota_state": { "source": "cursor-ide/quota-collector/v1" }
+          }
+        }
+      },
+      "expected_eligible": false,
+      "expected_blockers": ["quota-evidence-source-untrusted"]
+    },
+    {
+      "id": "CSDP-004",
+      "title": "future model evidence fails closed",
+      "target": { "surface_id": "cursor-agent-cli", "role": "worker-target" },
+      "patch": {
+        "cursor-agent-cli": {
+          "evidence": {
+            "model_entitlement": { "observed_at": "2026-07-14T12:06:00.000Z" }
+          }
+        }
+      },
+      "expected_eligible": false,
+      "expected_blockers": ["model-entitlement-evidence-future"]
+    },
+    {
+      "id": "CSDP-005",
+      "title": "an inverted pool evidence window fails closed",
+      "target": { "surface_id": "cursor-agent-cli", "role": "worker-target" },
+      "patch": {
+        "cursor-agent-cli": {
+          "evidence": {
+            "pool_ref": {
+              "observed_at": "2026-07-14T12:04:00.000Z",
+              "valid_until": "2026-07-14T12:03:00.000Z"
+            }
+          }
+        }
+      },
+      "expected_eligible": false,
+      "expected_blockers": ["pool-evidence-window-invalid"]
+    },
+    {
+      "id": "CSDP-006",
+      "title": "Agent plugin-host provenance cannot qualify the IDE surface",
+      "base_case_id": "CSD-004",
+      "target": { "surface_id": "cursor-ide-plugin", "role": "master-origin" },
+      "patch": {
+        "cursor-ide-plugin": {
+          "evidence": {
+            "plugin_host_qualified": { "source": "cursor-agent/version-help-probe/v1" }
+          }
+        }
+      },
+      "expected_eligible": false,
+      "expected_blockers": ["plugin-host-qualified-evidence-source-untrusted"]
+    },
+    {
+      "id": "CSDP-007",
+      "title": "expired IDE origin-session evidence fails closed",
+      "base_case_id": "CSD-004",
+      "target": { "surface_id": "cursor-ide-plugin", "role": "master-origin" },
+      "patch": {
+        "cursor-ide-plugin": {
+          "evidence": {
+            "origin_session_attested": { "valid_until": "2026-07-14T12:05:00.000Z" }
+          }
+        }
+      },
+      "expected_eligible": false,
+      "expected_blockers": ["origin-session-attested-evidence-stale"]
+    }
+  ]
+}

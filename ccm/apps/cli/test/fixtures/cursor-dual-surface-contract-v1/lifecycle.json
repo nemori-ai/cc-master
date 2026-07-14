@@ -1,0 +1,124 @@
+{
+  "schema": "ccm/cursor-dual-surface-lifecycle-fixtures/v1",
+  "contract": "ccm/cursor-dual-surface-contract/v1",
+  "migration": {
+    "id": "CSDL-001",
+    "input": {
+      "incoming_surface_id": "cursor-agent",
+      "pool_ref": "cursor-agent:subscription:first-party",
+      "runtime_sha256": "sha256:runtime-new",
+      "evidence_revision": "evidence:r2",
+      "active_runs": [
+        {
+          "run_ref": "run-active-before-cutover",
+          "surface_id": "cursor-agent-cli",
+          "pool_ref": "cursor-agent:api-key:on-demand",
+          "runtime_sha256": "sha256:runtime-old",
+          "evidence_revision": "evidence:r1",
+          "state": "running"
+        }
+      ]
+    },
+    "expected": {
+      "normalized_surface_id": "cursor-agent-cli",
+      "journal": { "surface_id": "cursor-agent-cli" },
+      "reservation": {
+        "surface_id": "cursor-agent-cli",
+        "pool_ref": "cursor-agent:subscription:first-party"
+      },
+      "new_run": {
+        "surface_id": "cursor-agent-cli",
+        "pool_ref": "cursor-agent:subscription:first-party",
+        "runtime_sha256": "sha256:runtime-new",
+        "evidence_revision": "evidence:r2"
+      },
+      "active_runs": [
+        {
+          "run_ref": "run-active-before-cutover",
+          "surface_id": "cursor-agent-cli",
+          "pool_ref": "cursor-agent:api-key:on-demand",
+          "runtime_sha256": "sha256:runtime-old",
+          "evidence_revision": "evidence:r1",
+          "state": "running"
+        }
+      ]
+    }
+  },
+  "rollback": {
+    "id": "CSDL-002",
+    "input": {
+      "producer": "strict-dual-surface-profile-v1",
+      "consumers": ["shadow-route", "quota-reservation", "supervisor"],
+      "legacy_surface": {
+        "surface_id": "cursor-agent",
+        "installed": true,
+        "authenticated": true
+      },
+      "strict_facts_after_rollback": {
+        "plugin_host_qualified": "unknown",
+        "sandbox_qualified": "unknown",
+        "effective_cancel_qualified": "unknown"
+      },
+      "active_runs": [
+        {
+          "run_ref": "run-pinned-during-rollback",
+          "surface_id": "cursor-agent-cli",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "runtime_sha256": "sha256:runtime-new",
+          "evidence_revision": "evidence:r2",
+          "state": "running"
+        }
+      ]
+    },
+    "expected": {
+      "ordered_steps": ["disable-profile-consumers", "restore-legacy-producer"],
+      "automatic_eligible_surface_ids": [],
+      "active_runs": [
+        {
+          "run_ref": "run-pinned-during-rollback",
+          "surface_id": "cursor-agent-cli",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "runtime_sha256": "sha256:runtime-new",
+          "evidence_revision": "evidence:r2",
+          "state": "running"
+        }
+      ],
+      "effects": {
+        "login": false,
+        "logout": false,
+        "account_switch": false,
+        "credential_migration": false,
+        "pool_merge": false,
+        "active_run_reparent": false,
+        "destructive_cancel": false
+      }
+    }
+  },
+  "rollback_mutants": [
+    {
+      "id": "CSDL-RM-001",
+      "title": "an empty strict-fact set never becomes automatically eligible",
+      "strict_facts_after_rollback": {},
+      "expected_automatic_eligible_surface_ids": []
+    },
+    {
+      "id": "CSDL-RM-002",
+      "title": "a partial all-qualified strict-fact set never becomes automatically eligible",
+      "strict_facts_after_rollback": {
+        "plugin_host_qualified": "qualified",
+        "sandbox_qualified": "qualified"
+      },
+      "expected_automatic_eligible_surface_ids": []
+    },
+    {
+      "id": "CSDL-RM-003",
+      "title": "the complete qualified strict-fact set remains reachable",
+      "strict_facts_after_rollback": {
+        "plugin_host_qualified": "qualified",
+        "sandbox_qualified": "qualified",
+        "effective_cancel_qualified": "qualified"
+      },
+      "expected_automatic_eligible_surface_ids": ["cursor-agent-cli"]
+    }
+  ]
+}

@@ -1,0 +1,819 @@
+{
+  "schema": "ccm/cursor-dual-surface-scenarios/v1",
+  "contract": "ccm/cursor-dual-surface-contract/v1",
+  "defaults": {
+    "cursor-ide-plugin": {
+      "as_of": "2026-07-14T12:05:00.000Z",
+      "installed": false,
+      "plugin_host_qualified": false,
+      "origin_session_attested": false,
+      "identity_fingerprint": null,
+      "quota_state": "unknown",
+      "pool_ref": null,
+      "evidence": {
+        "installed": {
+          "source": "cursor-ide/plugin-install-probe/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-15T12:00:00.000Z"
+        },
+        "plugin_host_qualified": {
+          "source": "cursor-ide/plugin-host-qualification/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-15T12:00:00.000Z"
+        },
+        "origin_session_attested": {
+          "source": "cursor-ide/origin-session-attestation/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-14T12:10:00.000Z"
+        },
+        "identity_fingerprint": {
+          "source": "cursor-ide/identity-fingerprint/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-14T12:10:00.000Z"
+        },
+        "quota_state": {
+          "source": "cursor-ide/quota-collector/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-14T12:10:00.000Z"
+        },
+        "pool_ref": {
+          "source": "cursor-ide/quota-collector/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-14T12:10:00.000Z"
+        }
+      }
+    },
+    "cursor-agent-cli": {
+      "as_of": "2026-07-14T12:05:00.000Z",
+      "installed": false,
+      "binary_state": "missing",
+      "compatibility": "unknown",
+      "auth_state": "unknown",
+      "identity_fingerprint": null,
+      "model_entitlement": "unknown",
+      "quota_state": "unknown",
+      "pool_ref": null,
+      "route_kind": "one-shot",
+      "sandbox_required": true,
+      "sandbox_qualified": false,
+      "invoke_qualified": false,
+      "result_qualified": false,
+      "effective_cancel_qualified": false,
+      "resume_qualified": false,
+      "evidence": {
+        "installed": {
+          "source": "cursor-agent/version-help-probe/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-15T12:00:00.000Z"
+        },
+        "binary_state": {
+          "source": "cursor-agent/version-help-probe/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-15T12:00:00.000Z"
+        },
+        "compatibility": {
+          "source": "cursor-agent/version-help-probe/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-15T12:00:00.000Z"
+        },
+        "auth_state": {
+          "source": "cursor-agent/status-json/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-14T12:10:00.000Z"
+        },
+        "identity_fingerprint": {
+          "source": "cursor-agent/status-json/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-14T12:10:00.000Z"
+        },
+        "model_entitlement": {
+          "source": "cursor-agent/model-entitlement-collector/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-15T12:00:00.000Z"
+        },
+        "quota_state": {
+          "source": "cursor-agent/quota-collector/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-14T12:10:00.000Z"
+        },
+        "pool_ref": {
+          "source": "cursor-agent/quota-collector/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-14T12:10:00.000Z"
+        },
+        "sandbox_qualified": {
+          "source": "cursor-agent/sandbox-runtime-qualification/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-15T12:00:00.000Z"
+        },
+        "invoke_qualified": {
+          "source": "cursor-agent/transport-qualification/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-15T12:00:00.000Z"
+        },
+        "result_qualified": {
+          "source": "cursor-agent/transport-qualification/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-15T12:00:00.000Z"
+        },
+        "effective_cancel_qualified": {
+          "source": "ccm/supervisor-process-tree-qualification/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-15T12:00:00.000Z"
+        },
+        "resume_qualified": {
+          "source": "cursor-agent/resume-qualification/v1",
+          "observed_at": "2026-07-14T12:00:00.000Z",
+          "valid_until": "2026-07-15T12:00:00.000Z"
+        }
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "CSD-013",
+      "title": "ample quota and a bound pool never substitute for unknown authentication",
+      "coverage": ["quota-not-auth"],
+      "overrides": {
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "unknown",
+          "model_entitlement": "entitled",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "sandbox_qualified": true,
+          "invoke_qualified": true,
+          "result_qualified": true,
+          "effective_cancel_qualified": true
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": [],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [
+            "surface-not-installed",
+            "plugin-host-unqualified",
+            "origin-session-unattested"
+          ],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": ["auth-unknown"]
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-014",
+      "title": "an optional sandbox profile does not require sandbox qualification",
+      "coverage": ["sandbox-optional"],
+      "overrides": {
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "authenticated",
+          "model_entitlement": "entitled",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "sandbox_required": false,
+          "sandbox_qualified": false,
+          "invoke_qualified": true,
+          "result_qualified": true,
+          "effective_cancel_qualified": true
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": ["cursor-agent-cli"],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [
+            "surface-not-installed",
+            "plugin-host-unqualified",
+            "origin-session-unattested"
+          ],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": []
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-015",
+      "title": "a qualified result parser never substitutes for an unqualified invoke path",
+      "coverage": ["result-not-invoke"],
+      "overrides": {
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "authenticated",
+          "model_entitlement": "entitled",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "sandbox_qualified": true,
+          "invoke_qualified": false,
+          "result_qualified": true,
+          "effective_cancel_qualified": true
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": [],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [
+            "surface-not-installed",
+            "plugin-host-unqualified",
+            "origin-session-unattested"
+          ],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": ["invoke-unqualified"]
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-016",
+      "title": "a continuation route fails closed without resume qualification",
+      "coverage": ["resume-required"],
+      "overrides": {
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "authenticated",
+          "model_entitlement": "entitled",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "route_kind": "continuation",
+          "sandbox_qualified": true,
+          "invoke_qualified": true,
+          "result_qualified": true,
+          "effective_cancel_qualified": true,
+          "resume_qualified": false
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": [],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [
+            "surface-not-installed",
+            "plugin-host-unqualified",
+            "origin-session-unattested"
+          ],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": ["resume-unqualified"]
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-017",
+      "title": "a continuation route becomes eligible only with resume qualification",
+      "coverage": ["resume-required-positive"],
+      "overrides": {
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "authenticated",
+          "model_entitlement": "entitled",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "route_kind": "continuation",
+          "sandbox_qualified": true,
+          "invoke_qualified": true,
+          "result_qualified": true,
+          "effective_cancel_qualified": true,
+          "resume_qualified": true
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": ["cursor-agent-cli"],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [
+            "surface-not-installed",
+            "plugin-host-unqualified",
+            "origin-session-unattested"
+          ],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": []
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-018",
+      "title": "ample IDE quota never authenticates an otherwise qualified Agent worker",
+      "coverage": ["ide-quota-not-agent-auth"],
+      "overrides": {
+        "cursor-ide-plugin": {
+          "installed": true,
+          "plugin_host_qualified": true,
+          "origin_session_attested": true,
+          "identity_fingerprint": "opaque:ide-origin",
+          "quota_state": "ample",
+          "pool_ref": "cursor-ide:billing-period:first-party"
+        },
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "unknown",
+          "identity_fingerprint": "opaque:agent-worker",
+          "model_entitlement": "entitled",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "sandbox_qualified": true,
+          "invoke_qualified": true,
+          "result_qualified": true,
+          "effective_cancel_qualified": true
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-ide-plugin", "cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": ["cursor-ide-plugin"],
+        "worker_eligible_surface_ids": [],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": ["auth-unknown"]
+        },
+        "pool_relations": [
+          {
+            "left": "cursor-ide:billing-period:first-party",
+            "right": "cursor-agent:subscription:first-party",
+            "join_allowed": false,
+            "reason": "cross-surface-pool-inference-forbidden"
+          }
+        ]
+      }
+    },
+    {
+      "id": "CSD-001",
+      "title": "neither surface is installed",
+      "coverage": ["neither", "agent-master-origin-forbidden"],
+      "overrides": {},
+      "expected": {
+        "installed_surface_ids": [],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": [],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [
+            "surface-not-installed",
+            "plugin-host-unqualified",
+            "origin-session-unattested"
+          ],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": [
+            "surface-not-installed",
+            "binary-missing",
+            "compatibility-unknown",
+            "auth-unknown",
+            "model-entitlement-unknown",
+            "quota-unknown",
+            "pool-unbound",
+            "sandbox-unqualified",
+            "invoke-unqualified",
+            "result-unqualified",
+            "cancel-unqualified"
+          ]
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-002",
+      "title": "IDE-only can be an attested master origin and never a headless worker",
+      "coverage": ["only-ide", "plugin-host-positive"],
+      "overrides": {
+        "cursor-ide-plugin": {
+          "installed": true,
+          "plugin_host_qualified": true,
+          "origin_session_attested": true,
+          "identity_fingerprint": "opaque:cursor-identity-a"
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-ide-plugin"],
+        "master_origin_eligible_surface_ids": ["cursor-ide-plugin"],
+        "worker_eligible_surface_ids": [],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": [
+            "surface-not-installed",
+            "binary-missing",
+            "compatibility-unknown",
+            "auth-unknown",
+            "model-entitlement-unknown",
+            "quota-unknown",
+            "pool-unbound",
+            "sandbox-unqualified",
+            "invoke-unqualified",
+            "result-unqualified",
+            "cancel-unqualified"
+          ]
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-003",
+      "title": "Agent-only can be a qualified worker but never a master origin",
+      "coverage": ["only-agent", "sandbox-positive", "agent-master-origin-forbidden"],
+      "overrides": {
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "authenticated",
+          "identity_fingerprint": "opaque:cursor-identity-a",
+          "model_entitlement": "entitled",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "sandbox_qualified": true,
+          "invoke_qualified": true,
+          "result_qualified": true,
+          "effective_cancel_qualified": true
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": ["cursor-agent-cli"],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [
+            "surface-not-installed",
+            "plugin-host-unqualified",
+            "origin-session-unattested"
+          ],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": []
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-004",
+      "title": "both surfaces remain independently eligible for their own roles",
+      "coverage": ["both"],
+      "overrides": {
+        "cursor-ide-plugin": {
+          "installed": true,
+          "plugin_host_qualified": true,
+          "origin_session_attested": true,
+          "identity_fingerprint": "opaque:cursor-identity-a",
+          "quota_state": "ample",
+          "pool_ref": "cursor-ide:billing-period:first-party"
+        },
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "authenticated",
+          "identity_fingerprint": "opaque:cursor-identity-a",
+          "model_entitlement": "entitled",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "sandbox_qualified": true,
+          "invoke_qualified": true,
+          "result_qualified": true,
+          "effective_cancel_qualified": true
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-ide-plugin", "cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": ["cursor-ide-plugin"],
+        "worker_eligible_surface_ids": ["cursor-agent-cli"],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": []
+        },
+        "pool_relations": [
+          {
+            "left": "cursor-ide:billing-period:first-party",
+            "right": "cursor-agent:subscription:first-party",
+            "join_allowed": false,
+            "reason": "cross-surface-pool-inference-forbidden"
+          }
+        ]
+      }
+    },
+    {
+      "id": "CSD-005",
+      "title": "authenticated Agent with unknown quota remains blocked",
+      "coverage": ["auth-not-quota"],
+      "overrides": {
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "authenticated",
+          "identity_fingerprint": "opaque:cursor-identity-a",
+          "model_entitlement": "entitled",
+          "sandbox_qualified": true,
+          "invoke_qualified": true,
+          "result_qualified": true,
+          "effective_cancel_qualified": true
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": [],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [
+            "surface-not-installed",
+            "plugin-host-unqualified",
+            "origin-session-unattested"
+          ],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": ["quota-unknown", "pool-unbound"]
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-006",
+      "title": "same opaque identity does not join IDE and Agent pools",
+      "coverage": ["pool-not-mixed"],
+      "overrides": {
+        "cursor-ide-plugin": {
+          "installed": true,
+          "plugin_host_qualified": true,
+          "origin_session_attested": true,
+          "identity_fingerprint": "opaque:same-identity",
+          "quota_state": "ample",
+          "pool_ref": "cursor-ide:billing-period:first-party"
+        },
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "authenticated",
+          "identity_fingerprint": "opaque:same-identity",
+          "model_entitlement": "entitled",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:api-key:on-demand",
+          "sandbox_qualified": true,
+          "invoke_qualified": true,
+          "result_qualified": true,
+          "effective_cancel_qualified": true
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-ide-plugin", "cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": ["cursor-ide-plugin"],
+        "worker_eligible_surface_ids": ["cursor-agent-cli"],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": []
+        },
+        "pool_relations": [
+          {
+            "left": "cursor-ide:billing-period:first-party",
+            "right": "cursor-agent:api-key:on-demand",
+            "join_allowed": false,
+            "reason": "cross-surface-pool-inference-forbidden"
+          }
+        ]
+      }
+    },
+    {
+      "id": "CSD-007",
+      "title": "required sandbox without runtime qualification blocks Agent",
+      "coverage": ["sandbox-negative"],
+      "overrides": {
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "authenticated",
+          "model_entitlement": "entitled",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "invoke_qualified": true,
+          "result_qualified": true,
+          "effective_cancel_qualified": true
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": [],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [
+            "surface-not-installed",
+            "plugin-host-unqualified",
+            "origin-session-unattested"
+          ],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": ["sandbox-unqualified"]
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-008",
+      "title": "installed IDE without qualified plugin host is not a master origin",
+      "coverage": ["plugin-host-negative"],
+      "overrides": {
+        "cursor-ide-plugin": {
+          "installed": true,
+          "origin_session_attested": true,
+          "identity_fingerprint": "opaque:cursor-identity-a"
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-ide-plugin"],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": [],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": ["plugin-host-unqualified"],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": [
+            "surface-not-installed",
+            "binary-missing",
+            "compatibility-unknown",
+            "auth-unknown",
+            "model-entitlement-unknown",
+            "quota-unknown",
+            "pool-unbound",
+            "sandbox-unqualified",
+            "invoke-unqualified",
+            "result-unqualified",
+            "cancel-unqualified"
+          ]
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-009",
+      "title": "model entitlement remains independent from auth and quota",
+      "coverage": ["model-unknown"],
+      "overrides": {
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "authenticated",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "sandbox_qualified": true,
+          "invoke_qualified": true,
+          "result_qualified": true,
+          "effective_cancel_qualified": true
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": [],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [
+            "surface-not-installed",
+            "plugin-host-unqualified",
+            "origin-session-unattested"
+          ],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": ["model-entitlement-unknown"]
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-010",
+      "title": "invoke and terminal result proof remain separate",
+      "coverage": ["invoke-result-negative"],
+      "overrides": {
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "authenticated",
+          "model_entitlement": "entitled",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "sandbox_qualified": true,
+          "invoke_qualified": true,
+          "effective_cancel_qualified": true
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": [],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [
+            "surface-not-installed",
+            "plugin-host-unqualified",
+            "origin-session-unattested"
+          ],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": ["result-unqualified"]
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-011",
+      "title": "one-shot worker requires effective cancel but not provider-native cancel",
+      "coverage": ["cancel-negative"],
+      "overrides": {
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "authenticated",
+          "model_entitlement": "entitled",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "sandbox_qualified": true,
+          "invoke_qualified": true,
+          "result_qualified": true
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": [],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [
+            "surface-not-installed",
+            "plugin-host-unqualified",
+            "origin-session-unattested"
+          ],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": ["cancel-unqualified"]
+        },
+        "pool_relations": []
+      }
+    },
+    {
+      "id": "CSD-012",
+      "title": "unknown resume does not block an otherwise qualified one-shot worker",
+      "coverage": ["resume-optional"],
+      "overrides": {
+        "cursor-agent-cli": {
+          "installed": true,
+          "binary_state": "available",
+          "compatibility": "supported",
+          "auth_state": "authenticated",
+          "model_entitlement": "entitled",
+          "quota_state": "ample",
+          "pool_ref": "cursor-agent:subscription:first-party",
+          "sandbox_qualified": true,
+          "invoke_qualified": true,
+          "result_qualified": true,
+          "effective_cancel_qualified": true,
+          "resume_qualified": false
+        }
+      },
+      "expected": {
+        "installed_surface_ids": ["cursor-agent-cli"],
+        "master_origin_eligible_surface_ids": [],
+        "worker_eligible_surface_ids": ["cursor-agent-cli"],
+        "blockers": {
+          "cursor-ide-plugin:master-origin": [
+            "surface-not-installed",
+            "plugin-host-unqualified",
+            "origin-session-unattested"
+          ],
+          "cursor-ide-plugin:worker-target": ["role-unsupported"],
+          "cursor-agent-cli:master-origin": ["role-unsupported"],
+          "cursor-agent-cli:worker-target": []
+        },
+        "pool_relations": []
+      }
+    }
+  ]
+}

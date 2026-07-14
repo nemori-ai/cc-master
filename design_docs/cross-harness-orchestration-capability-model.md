@@ -215,7 +215,7 @@ Track 纪律：
 
 - Track A：host 有原生等价 surface。按 Capability/hook CONTRACT → host implementation → equivalence-class fixture → projection → real probe 推进。
 - Track B：host 无 1:1 机制。必须有 declared divergence、compensating mechanism 和 target acceptance；不得用相似 event 名制造 parity。
-- Cursor IDE plugin 与 Cursor Agent CLI 是两个 descriptor / contract；任一侧 installed/authenticated 不推出另一侧可用。
+- Cursor IDE plugin 与 Cursor Agent CLI 是两个 descriptor / contract；任一侧 installed/authenticated 不推出另一侧可用。正式 bounded-context、角色、负能力、pool 禁止推导与迁移/rollback 合同见 [`harnesses/cursor-dual-surface-contract.md`](harnesses/cursor-dual-surface-contract.md)。
 - Codex/Cursor 无 PostToolBatch 是负能力，不应由逐工具事件伪装。
 - origin delivery fail-open 只表示 context/notification 降级；dispatch mechanical gate 仍独立 fail-closed。
 
@@ -267,7 +267,7 @@ Cursor 的首个发现切片先收口在 `ccm harness list` 的本机只读 inve
 - 本切片只证明 local binary presence；`authentication` / `quota` 固定报 `unknown` + `not-probed`，不读 credential、不调 provider。`accountMutation` 报 `forbidden`，`accountAutoswitch` 与 `pluginDistribution` 报 `unsupported`；这些负能力不因用户已手工 auth 而改变。
 - 这是 machine-fact discovery 切片，不晋升 headless invocation / structured result / cancel / resume / model / quota admission 的 target 状态。
 
-Cursor Agent admission 合同已有一个 **partial** 落点：[`harnesses/cursor-agent-admission-contract.md`](harnesses/cursor-agent-admission-contract.md) 定义 `ccm/cursor-agent-admission/v1`，把 `binary.available`、`authentication.state`、`quota.state`、sandbox、result schema、task acceptance 和 transport termination 独立建模。inventory 只挂 unprobed、fail-closed snapshot，不执行 provider process；fixture-only evaluator 已证明 RC0-empty/invalid 不 accepted、AppArmor pre-exec 不污染 auth、mode/profile evidence 不跨用。真实 auth/quota collectors、production driver、reservation 与 dispatcher 接线仍为 `target`，不能据此宣称 Cursor headless dispatch current。
+Cursor 双 surface 的正式 contract 已冻结在 [`harnesses/cursor-dual-surface-contract.md`](harnesses/cursor-dual-surface-contract.md)：IDE plugin 是 `master-origin` bounded context，Agent CLI 是 `worker-target` bounded context；`--plugin-dir` 不把后者晋升成 origin。其 mode-specific admission **partial** 落点仍由 [`harnesses/cursor-agent-admission-contract.md`](harnesses/cursor-agent-admission-contract.md) 定义 `ccm/cursor-agent-admission/v1`，把 `binary.available`、`authentication.state`、`quota.state`、sandbox、result schema、task acceptance 和 transport termination 独立建模。inventory 只挂 unprobed、fail-closed snapshot，不执行 provider process；fixture-only evaluator 已证明 RC0-empty/invalid 不 accepted、AppArmor pre-exec 不污染 auth、mode/profile evidence 不跨用。双 surface 聚合 evaluator 的 opt-in fixtures 仍 intentionally RED；真实 auth/quota collectors、production driver、effective cancel、reservation 与 dispatcher 接线仍为 `target`，不能据此宣称 Cursor headless dispatch current。
 
 ### 7.2 Auth、account 与 pool 固定边界
 

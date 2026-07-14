@@ -1,0 +1,236 @@
+{
+  "schema": "ccm/cursor-dual-surface-fixture-manifest/v1",
+  "contract": "ccm/cursor-dual-surface-contract/v1",
+  "surface_ids": ["cursor-ide-plugin", "cursor-agent-cli"],
+  "legacy_aliases": { "cursor-agent": "cursor-agent-cli" },
+  "fixture_files": ["scenarios.json", "provenance-mutants.json", "lifecycle.json"],
+  "required_coverage": [
+    "only-ide",
+    "only-agent",
+    "both",
+    "neither",
+    "auth-not-quota",
+    "quota-not-auth",
+    "ide-quota-not-agent-auth",
+    "pool-not-mixed",
+    "sandbox-positive",
+    "sandbox-negative",
+    "sandbox-optional",
+    "plugin-host-positive",
+    "plugin-host-negative",
+    "model-unknown",
+    "invoke-result-negative",
+    "result-not-invoke",
+    "cancel-negative",
+    "resume-optional",
+    "resume-required",
+    "resume-required-positive",
+    "agent-master-origin-forbidden"
+  ],
+  "provenance_policy": {
+    "cursor-ide-plugin": {
+      "installed": ["cursor-ide/plugin-install-probe/v1"],
+      "plugin_host_qualified": ["cursor-ide/plugin-host-qualification/v1"],
+      "origin_session_attested": ["cursor-ide/origin-session-attestation/v1"],
+      "identity_fingerprint": ["cursor-ide/identity-fingerprint/v1"],
+      "quota_state": ["cursor-ide/quota-collector/v1"],
+      "pool_ref": ["cursor-ide/quota-collector/v1"]
+    },
+    "cursor-agent-cli": {
+      "installed": ["cursor-agent/version-help-probe/v1"],
+      "binary_state": ["cursor-agent/version-help-probe/v1"],
+      "compatibility": ["cursor-agent/version-help-probe/v1"],
+      "auth_state": ["cursor-agent/status-json/v1"],
+      "identity_fingerprint": ["cursor-agent/status-json/v1"],
+      "model_entitlement": ["cursor-agent/model-entitlement-collector/v1"],
+      "quota_state": ["cursor-agent/quota-collector/v1"],
+      "pool_ref": ["cursor-agent/quota-collector/v1"],
+      "sandbox_qualified": ["cursor-agent/sandbox-runtime-qualification/v1"],
+      "invoke_qualified": ["cursor-agent/transport-qualification/v1"],
+      "result_qualified": ["cursor-agent/transport-qualification/v1"],
+      "effective_cancel_qualified": ["ccm/supervisor-process-tree-qualification/v1"],
+      "resume_qualified": ["cursor-agent/resume-qualification/v1"]
+    }
+  },
+  "profiles": {
+    "cursor-ide-plugin": {
+      "bounded_context": "ide-origin-plugin",
+      "roles": {
+        "master_origin": {
+          "state": "supported",
+          "track": "A+B",
+          "requires": ["surface-installed", "plugin-host-qualified", "origin-session-attested"],
+          "claim_refs": ["cursor-ide-track-a-native-plugin", "cursor-ide-track-b-lifecycle"]
+        },
+        "worker_target": { "state": "unsupported" }
+      },
+      "capabilities": {
+        "plugin_host": "qualified",
+        "headless_invoke": "unsupported",
+        "structured_result": "unsupported",
+        "model_selection": "supported-origin-native",
+        "sandbox_control": "unknown-origin-native",
+        "native_cancel": "unsupported-as-worker-transport",
+        "resume": "origin-native-not-worker-transport"
+      }
+    },
+    "cursor-agent-cli": {
+      "bounded_context": "headless-worker-transport",
+      "roles": {
+        "master_origin": {
+          "state": "unsupported",
+          "track": "B",
+          "substitute": "dispatch-as-headless-worker-from-a-supported-origin",
+          "claim_refs": ["cursor-agent-track-b-headless-worker"]
+        },
+        "worker_target": { "state": "supported" }
+      },
+      "capabilities": {
+        "plugin_host": "loader-flag-present-lifecycle-unqualified",
+        "headless_invoke": "declared-needs-runtime-qualification",
+        "structured_result": "official-schema-needs-terminal-proof",
+        "model_selection": "flag-present-entitlement-independent",
+        "sandbox_control": "flag-present-needs-runtime-qualification",
+        "native_cancel": "unsupported-effective-supervisor-cancel-target",
+        "resume": "flag-present-not-required-for-one-shot"
+      }
+    }
+  },
+  "track_claims": {
+    "cursor-ide-track-a-native-plugin": {
+      "surface_id": "cursor-ide-plugin",
+      "track": "A",
+      "status": "implemented",
+      "anchors": [
+        {
+          "kind": "capability-intent",
+          "path": "design_docs/harnesses/capabilities/path-token-resolution.md",
+          "contains": ["| cursor | implemented", "launcher.js"]
+        },
+        {
+          "kind": "hook-contract",
+          "path": "plugin/src/hooks/bootstrap-board/CONTRACT.md",
+          "contains": ["rule-bootstrap-fresh-arm", "required_hosts: [claude-code, cursor]"]
+        },
+        {
+          "kind": "machine-surface-descriptor",
+          "surface_id": "cursor-ide-plugin",
+          "path": "ccm/apps/cli/src/harnesses/cursor-surfaces.ts",
+          "contains": ["surface_id: 'cursor-ide-plugin'", "surface_kind: 'origin-plugin'"]
+        },
+        {
+          "kind": "adapter-strategy",
+          "path": "plugin/src/commands/as-master-orchestrator/adapters/cursor/strategy.yaml",
+          "contains": ["mode: host_native", "target: commands/as-master-orchestrator.md"]
+        },
+        {
+          "kind": "host-native-dist",
+          "path": "plugin/dist/cursor/commands/as-master-orchestrator.md",
+          "contains": ["cc-master:bootstrap:v1", "conversation_id"]
+        },
+        {
+          "kind": "probe-evidence",
+          "path": "plugin/src/hooks/_hosts/cursor/probes/fixtures/samples/preToolUse.sample.json",
+          "contains": ["\"cursor_version\": \"3.10.20\"", "\"hook_event_name\": \"preToolUse\""]
+        }
+      ]
+    },
+    "cursor-ide-track-b-lifecycle": {
+      "surface_id": "cursor-ide-plugin",
+      "track": "B",
+      "status": "implemented-with-declared-divergence",
+      "anchors": [
+        {
+          "kind": "capability-intent",
+          "path": "design_docs/harnesses/capabilities/role-substrate-reinject.md",
+          "contains": ["Layered substitute", "affected_hosts: [cursor]"]
+        },
+        {
+          "kind": "hook-contract",
+          "path": "plugin/src/hooks/verify-board/CONTRACT.md",
+          "contains": ["verify-board-cursor-stop-envelope", "{ followup_message }"]
+        },
+        {
+          "kind": "machine-surface-descriptor",
+          "surface_id": "cursor-ide-plugin",
+          "path": "ccm/apps/cli/src/harnesses/cursor-surfaces.ts",
+          "contains": ["surface_id: 'cursor-ide-plugin'", "automatic_login: 'forbidden'"]
+        },
+        {
+          "kind": "adapter-strategy",
+          "path": "plugin/src/hooks/_hosts/cursor/strategy.yaml",
+          "contains": ["status: implemented-track-b", "status: implemented-followup"]
+        },
+        {
+          "kind": "host-native-dist",
+          "path": "plugin/dist/cursor/hooks/hooks.json",
+          "contains": ["\"postToolUse\"", "\"loop_limit\": 5"]
+        },
+        {
+          "kind": "probe-evidence",
+          "path": "plugin/src/hooks/_hosts/cursor/probes/fixtures/samples/postToolUse.sample.json",
+          "contains": ["\"cursor_version\": \"3.10.20\"", "\"hook_event_name\": \"postToolUse\""]
+        }
+      ]
+    },
+    "cursor-agent-track-b-headless-worker": {
+      "surface_id": "cursor-agent-cli",
+      "track": "B",
+      "status": "contract-only-production-evaluator-absent",
+      "anchors": [
+        {
+          "kind": "capability-intent",
+          "path": "design_docs/cross-harness-orchestration-capability-model.md",
+          "contains": [
+            "Cursor IDE plugin 与 Cursor Agent CLI 是两个 descriptor / contract",
+            "provider success ≠ done"
+          ]
+        },
+        {
+          "kind": "transport-contract",
+          "path": "design_docs/harnesses/cursor-agent-admission-contract.md",
+          "contains": [
+            "ccm/cursor-agent-admission/v1",
+            "真实 auth/quota collector、production process driver"
+          ]
+        },
+        {
+          "kind": "machine-surface-descriptor",
+          "surface_id": "cursor-agent-cli",
+          "path": "ccm/apps/cli/src/harnesses/cursor-surfaces.ts",
+          "contains": [
+            "surface_id: 'cursor-agent-cli'",
+            "surface_kind: 'cli-headless'",
+            "quota_pool_inference: 'forbidden'"
+          ]
+        },
+        {
+          "kind": "adapter-strategy",
+          "path": "plugin/src/skills/using-ccm/adapters/cursor/strategy.yaml",
+          "contains": ["host: cursor", "mode: copy"]
+        },
+        {
+          "kind": "host-native-dist",
+          "path": "plugin/dist/cursor/skills/using-ccm/references/command-catalog.md",
+          "contains": ["cursor-agent.admission", "surfaceInventory"]
+        },
+        {
+          "kind": "probe-evidence",
+          "path": "ccm/apps/cli/test/fixtures/cursor-agent-admission/dogfood.json",
+          "contains": ["apparmor-pre-exec-sandbox-unavailable", "valid-ask-json"]
+        }
+      ]
+    }
+  },
+  "negative_capabilities": {
+    "automatic_login": "forbidden",
+    "automatic_logout": "forbidden",
+    "account_switch": "forbidden",
+    "session_switch": "forbidden",
+    "credential_import": "forbidden",
+    "credential_copy": "forbidden",
+    "credential_write": "forbidden",
+    "auth_store_write": "forbidden",
+    "cross_surface_pool_inference": "forbidden"
+  }
+}
