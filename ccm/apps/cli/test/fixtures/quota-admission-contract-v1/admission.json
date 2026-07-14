@@ -1,0 +1,346 @@
+{
+  "schema": "ccm/quota-live-admission-fixtures/v1",
+  "cases": [
+    {
+      "name": "fresh-ample-committed-ticket",
+      "spec_ids": ["QA-ADM-001", "QA-ADM-002", "QA-ADM-005"],
+      "input": {
+        "checked_at": "2026-07-13T08:00:25Z",
+        "preflight": {
+          "state": "ample",
+          "identity": "identity-A",
+          "aggregation_key": "pool-A",
+          "source_revision": "live-r1"
+        },
+        "live": {
+          "state": "ample",
+          "freshness": "fresh",
+          "identity": "identity-A",
+          "aggregation_key": "pool-A",
+          "source_revision": "live-r2"
+        },
+        "reservation": { "id": "qres-1", "state": "committed", "source_revision": "live-r2" },
+        "ticket": {
+          "reservation_id": "qres-1",
+          "launch_key": "launch-1",
+          "launch_by": "2026-07-13T08:00:35Z",
+          "source_revision": "live-r2"
+        }
+      },
+      "expected": {
+        "decision": "launch-claim-allowed",
+        "automatic_spawn_limit": 1,
+        "blocking_reasons": [],
+        "reservation_action": "retain-committed"
+      }
+    },
+    {
+      "name": "unknown-spawn-zero",
+      "spec_ids": ["QA-BND-004", "QA-ADM-001", "QA-ADM-005"],
+      "input": {
+        "checked_at": "2026-07-13T08:00:25Z",
+        "live": {
+          "state": "unknown",
+          "freshness": "unknown",
+          "identity": "identity-A",
+          "aggregation_key": "pool-A"
+        },
+        "reservation": { "id": "qres-1", "state": "held" }
+      },
+      "expected": {
+        "decision": "reject",
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["QUOTA_REQUIRED_WINDOW_UNKNOWN"],
+        "reservation_action": "audit-release"
+      }
+    },
+    {
+      "name": "tight-spawn-zero",
+      "spec_ids": ["QA-BND-004", "QA-DER-001", "QA-ADM-001"],
+      "input": {
+        "checked_at": "2026-07-13T08:00:25Z",
+        "live": {
+          "state": "tight",
+          "freshness": "fresh",
+          "identity": "identity-A",
+          "aggregation_key": "pool-A",
+          "source_revision": "live-r2"
+        },
+        "reservation": { "id": "qres-1", "state": "held" }
+      },
+      "expected": {
+        "decision": "reject",
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["QUOTA_TIGHT"],
+        "reservation_action": "audit-release"
+      }
+    },
+    {
+      "name": "hard-stale-spawn-zero",
+      "spec_ids": ["QA-BND-004", "QA-FRESH-003", "QA-ADM-001"],
+      "input": {
+        "checked_at": "2026-07-13T08:05:01Z",
+        "live": {
+          "state": "ample",
+          "freshness": "hard-stale",
+          "identity": "identity-A",
+          "aggregation_key": "pool-A",
+          "source_revision": "live-old"
+        },
+        "reservation": { "id": "qres-1", "state": "held" }
+      },
+      "expected": {
+        "decision": "reject",
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["QUOTA_HARD_STALE"],
+        "reservation_action": "audit-release"
+      }
+    },
+    {
+      "name": "live-recheck-becomes-tight",
+      "spec_ids": ["QA-ADM-001", "QA-ADM-002"],
+      "input": {
+        "checked_at": "2026-07-13T08:00:25Z",
+        "preflight": {
+          "state": "ample",
+          "identity": "identity-A",
+          "aggregation_key": "pool-A",
+          "source_revision": "live-r1"
+        },
+        "live": {
+          "state": "tight",
+          "freshness": "fresh",
+          "identity": "identity-A",
+          "aggregation_key": "pool-A",
+          "source_revision": "live-r2"
+        },
+        "reservation": { "id": "qres-1", "state": "held", "source_revision": "live-r1" }
+      },
+      "expected": {
+        "decision": "reject",
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["QUOTA_TIGHT"],
+        "reservation_action": "audit-release",
+        "claim_count": 0
+      }
+    },
+    {
+      "name": "live-identity-change",
+      "spec_ids": ["QA-ADM-002", "QA-LIFE-006"],
+      "input": {
+        "checked_at": "2026-07-13T08:00:25Z",
+        "preflight": {
+          "state": "ample",
+          "identity": "identity-A",
+          "aggregation_key": "pool-A",
+          "source_revision": "live-r1"
+        },
+        "live": {
+          "state": "ample",
+          "freshness": "fresh",
+          "identity": "identity-B",
+          "aggregation_key": "pool-B",
+          "source_revision": "live-r2"
+        },
+        "reservation": { "id": "qres-1", "state": "held", "source_revision": "live-r1" }
+      },
+      "expected": {
+        "decision": "orphan-audit",
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["LIVE_QUOTA_IDENTITY_CONFLICT"],
+        "reservation_action": "retain-orphaned",
+        "account_mutation_count": 0
+      }
+    },
+    {
+      "name": "ticket-expired-before-claim",
+      "spec_ids": ["QA-COMMIT-001", "QA-ADM-004"],
+      "input": {
+        "checked_at": "2026-07-13T08:00:36Z",
+        "live": {
+          "state": "ample",
+          "freshness": "fresh",
+          "identity": "identity-A",
+          "aggregation_key": "pool-A",
+          "source_revision": "live-r2"
+        },
+        "reservation": { "id": "qres-1", "state": "committed", "source_revision": "live-r2" },
+        "ticket": {
+          "reservation_id": "qres-1",
+          "launch_key": "launch-1",
+          "launch_by": "2026-07-13T08:00:35Z",
+          "source_revision": "live-r2"
+        }
+      },
+      "expected": {
+        "decision": "reject",
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["ADMISSION_TICKET_EXPIRED"],
+        "reservation_action": "audit-release",
+        "claim_count": 0
+      }
+    },
+    {
+      "name": "spawn-before-commit-rejected",
+      "spec_ids": ["QA-BND-007", "QA-COMMIT-001", "QA-COMMIT-002"],
+      "input": {
+        "checked_at": "2026-07-13T08:00:25Z",
+        "live": {
+          "state": "ample",
+          "freshness": "fresh",
+          "identity": "identity-A",
+          "aggregation_key": "pool-A",
+          "source_revision": "live-r2"
+        },
+        "reservation": { "id": "qres-1", "state": "held", "source_revision": "live-r2" },
+        "claim_attempt": { "launch_key": "launch-1", "ticket_digest": null }
+      },
+      "expected": {
+        "decision": "orphan-audit",
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["ADMISSION_COMMIT_MISSING_OR_INVALID"],
+        "reservation_action": "retain-orphaned",
+        "claim_count": 0
+      }
+    },
+    {
+      "name": "rate-limited-circuit",
+      "spec_ids": ["QA-ADM-003", "QA-ERR-001"],
+      "input": {
+        "checked_at": "2026-07-13T08:00:25Z",
+        "live_refresh": { "status": 429, "provider": "codex", "facet": "quota" },
+        "reservation": { "id": "qres-1", "state": "held" },
+        "claim_state": "absent"
+      },
+      "expected": {
+        "decision": "reject",
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["QUOTA_RATE_LIMITED"],
+        "circuit": "open",
+        "reservation_action": "audit-release",
+        "claim_count": 0
+      }
+    },
+    {
+      "name": "rolling24h-risk-does-not-block-ample",
+      "spec_ids": ["QA-BND-005", "QA-R24-004", "QA-ADM-005"],
+      "input": {
+        "checked_at": "2026-07-13T08:00:25Z",
+        "live": {
+          "state": "ample",
+          "freshness": "fresh",
+          "identity": "identity-A",
+          "aggregation_key": "pool-A",
+          "source_revision": "live-r2"
+        },
+        "rolling24h": {
+          "state": "available",
+          "velocity_ratio": 1.26,
+          "advisory": "throttle-risk",
+          "hard_gate_effect": "none"
+        },
+        "reservation": { "id": "qres-1", "state": "committed", "source_revision": "live-r2" },
+        "ticket": {
+          "reservation_id": "qres-1",
+          "launch_key": "launch-1",
+          "launch_by": "2026-07-13T08:00:35Z",
+          "source_revision": "live-r2"
+        }
+      },
+      "expected": {
+        "decision": "launch-claim-allowed",
+        "automatic_spawn_limit": 1,
+        "blocking_reasons": [],
+        "advisories": ["throttle-risk"],
+        "reservation_action": "retain-committed"
+      }
+    },
+    {
+      "name": "authenticated-without-quota-spawn-zero",
+      "spec_ids": ["QA-BND-009", "QA-ADM-005", "QA-ADM-007"],
+      "input": {
+        "checked_at": "2026-07-13T08:00:25Z",
+        "provider": "codex",
+        "auth_state": "authenticated",
+        "live": {
+          "state": "unknown",
+          "freshness": "unknown",
+          "observation_status": "missing",
+          "identity": "identity-A",
+          "aggregation_key": "pool-A"
+        },
+        "reservation": null
+      },
+      "expected": {
+        "decision": "reject",
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["QUOTA_REQUIRED_WINDOW_UNKNOWN"],
+        "hold_count": 0,
+        "commit_count": 0,
+        "claim_count": 0,
+        "spawn_count": 0
+      }
+    },
+    {
+      "name": "observation-conflict-spawn-zero",
+      "spec_ids": ["QA-OBS-003", "QA-ADM-005", "QA-ADM-007"],
+      "input": {
+        "checked_at": "2026-07-13T08:00:25Z",
+        "provider": "codex",
+        "auth_state": "authenticated",
+        "live": {
+          "state": "unknown",
+          "freshness": "unknown",
+          "observation_status": "conflict",
+          "identity": "identity-A",
+          "aggregation_key": "pool-A"
+        },
+        "reservation": null
+      },
+      "expected": {
+        "decision": "reject",
+        "automatic_spawn_limit": 0,
+        "blocking_reasons": ["QUOTA_OBSERVATION_CONFLICT"],
+        "circuit": "open",
+        "hold_count": 0,
+        "commit_count": 0,
+        "claim_count": 0,
+        "spawn_count": 0
+      }
+    },
+    {
+      "name": "provider-neutral-ample",
+      "spec_ids": ["QA-DER-001", "QA-ADM-005", "QA-ADM-008"],
+      "input": {
+        "checked_at": "2026-07-13T08:00:25Z",
+        "provider": "future-provider",
+        "auth_state": "authenticated",
+        "provider_window_rule": { "name": "thirty_day", "duration_sec": 2592000 },
+        "live": {
+          "state": "ample",
+          "freshness": "fresh",
+          "identity": "identity-F",
+          "aggregation_key": "pool-F",
+          "source_revision": "live-future-r2"
+        },
+        "reservation": {
+          "id": "qres-future",
+          "state": "committed",
+          "source_revision": "live-future-r2"
+        },
+        "ticket": {
+          "reservation_id": "qres-future",
+          "launch_key": "launch-future",
+          "launch_by": "2026-07-13T08:00:35Z",
+          "source_revision": "live-future-r2"
+        }
+      },
+      "expected": {
+        "decision": "launch-claim-allowed",
+        "automatic_spawn_limit": 1,
+        "blocking_reasons": [],
+        "reservation_action": "retain-committed"
+      }
+    }
+  ]
+}

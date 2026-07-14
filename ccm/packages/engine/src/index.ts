@@ -272,6 +272,27 @@ export {
   resolveProjectsDir,
   resolveRateCachePath,
 } from './paths.js';
+// ── quota effect boundary（C2 hard-deny capability port；纯 policy + 注入 handler）──
+export type {
+  CreateQuotaEffectBoundaryOptions,
+  ForbiddenQuotaEffectCapability,
+  QuotaEffectBoundary,
+  QuotaEffectCapability,
+  QuotaEffectErrorCode,
+  QuotaEffectHandler,
+  QuotaEffectInput,
+  QuotaEffectProfile,
+  QuotaProductionEffectCapability,
+  QuotaTestEffectCapability,
+} from './quota-effect-boundary.js';
+export {
+  ACCOUNT_MUTATION_CAPABILITIES,
+  createQuotaEffectBoundary,
+  FORBIDDEN_QUOTA_EFFECT_CAPABILITIES,
+  QUOTA_PRODUCTION_EFFECT_ALLOWLIST,
+  QUOTA_TEST_EFFECT_ALLOWLIST,
+  QuotaEffectError,
+} from './quota-effect-boundary.js';
 // ── routing-contract（cross-harness C1/S0 additive contracts·provider-neutral pure rules）──
 export type {
   ContractActivation,

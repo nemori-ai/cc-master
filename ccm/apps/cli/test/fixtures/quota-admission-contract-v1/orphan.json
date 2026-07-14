@@ -1,0 +1,130 @@
+{
+  "schema": "ccm/quota-orphan-audit-fixtures/v1",
+  "cases": [
+    {
+      "name": "claimed-without-hello-retained",
+      "spec_ids": ["QA-COMMIT-003", "QA-ORP-001"],
+      "input": {
+        "reservation": { "state": "committed", "amount_pct": 4 },
+        "launch": { "claim": "present", "hello": "absent" },
+        "journal": "empty",
+        "process_identity": "unknown"
+      },
+      "expected": {
+        "audit_class": "orphan-audit",
+        "state": "orphaned",
+        "capacity_counted_pct": 4,
+        "release_count": 0,
+        "spawn_count": 0
+      }
+    },
+    {
+      "name": "parent-dead-run-live-retained",
+      "spec_ids": ["QA-RES-006", "QA-LIFE-001"],
+      "input": {
+        "reservation": { "state": "committed", "amount_pct": 4 },
+        "launch": { "claim": "present", "hello": "valid" },
+        "lease": "fresh",
+        "process_identity": "match",
+        "parent_manager": "dead"
+      },
+      "expected": {
+        "audit_class": "active",
+        "state": "committed",
+        "capacity_counted_pct": 4,
+        "release_count": 0,
+        "spawn_count": 0,
+        "handoff_action": "attach-same-run"
+      }
+    },
+    {
+      "name": "pid-not-found-alone-retained",
+      "spec_ids": ["QA-RES-002", "QA-RES-006", "QA-ORP-001"],
+      "input": {
+        "reservation": { "state": "committed", "amount_pct": 4 },
+        "launch": { "claim": "present", "hello": "valid" },
+        "lease": "stale",
+        "pid_probe": "not-found",
+        "boot_id": "unknown",
+        "process_start_identity": "unknown"
+      },
+      "expected": {
+        "audit_class": "orphan-audit",
+        "state": "orphaned",
+        "capacity_counted_pct": 4,
+        "release_count": 0,
+        "spawn_count": 0
+      }
+    },
+    {
+      "name": "pid-reuse-retained",
+      "spec_ids": ["QA-ORP-001", "QA-LIFE-002"],
+      "input": {
+        "reservation": { "state": "committed", "amount_pct": 4 },
+        "launch": { "claim": "present", "hello": "valid" },
+        "lease": { "pid": 77, "boot_id": "boot-A", "process_start_identity": "start-A" },
+        "process": { "pid": 77, "boot_id": "boot-B", "process_start_identity": "start-B" }
+      },
+      "expected": {
+        "audit_class": "orphan-audit",
+        "state": "orphaned",
+        "capacity_counted_pct": 4,
+        "release_count": 0,
+        "signal_count": 0,
+        "spawn_count": 0
+      }
+    },
+    {
+      "name": "journal-conflict-retained",
+      "spec_ids": ["QA-ORP-001", "QA-ORP-003"],
+      "input": {
+        "reservation": { "state": "committed", "amount_pct": 4 },
+        "launch": { "claim": "present", "hello": "valid" },
+        "journal": { "sequence": "conflict", "writer_identity": "mismatch" }
+      },
+      "expected": {
+        "audit_class": "orphan-audit",
+        "state": "orphaned",
+        "capacity_counted_pct": 4,
+        "release_count": 0,
+        "spawn_count": 0
+      }
+    },
+    {
+      "name": "terminal-cleanup-pending-retained",
+      "spec_ids": ["QA-COMMIT-004", "QA-ORP-004"],
+      "input": {
+        "reservation": { "state": "committed", "amount_pct": 4 },
+        "journal": { "terminal": "succeeded", "continuous": true },
+        "process_identity": "dead-proven",
+        "cleanup_complete": false
+      },
+      "expected": {
+        "audit_class": "terminal-pending-cleanup",
+        "state": "release_pending",
+        "capacity_counted_pct": 4,
+        "release_count": 0,
+        "spawn_count": 0
+      }
+    },
+    {
+      "name": "terminal-audit-released",
+      "spec_ids": ["QA-ORP-003", "QA-ORP-004"],
+      "input": {
+        "reservation": { "state": "release_pending", "amount_pct": 4 },
+        "journal": { "terminal": "succeeded", "continuous": true },
+        "process_identity": "dead-proven",
+        "cleanup_complete": true,
+        "evidence_retained": true
+      },
+      "expected": {
+        "audit_class": "releasable",
+        "state": "released",
+        "capacity_counted_pct": 0,
+        "release_count": 1,
+        "provider_refund_claimed": false,
+        "spawn_count": 0
+      }
+    }
+  ]
+}

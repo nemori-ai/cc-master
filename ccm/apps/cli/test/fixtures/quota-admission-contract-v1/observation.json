@@ -1,0 +1,309 @@
+{
+  "schema": "ccm/quota-observation-fixtures/v1",
+  "cases": [
+    {
+      "name": "fresh-codex-seven-day",
+      "spec_ids": ["QA-BND-002", "QA-OBS-002", "QA-FRESH-001", "QA-AGG-001"],
+      "input": {
+        "provider": "codex",
+        "checked_at": "2026-07-13T08:00:30Z",
+        "profile": { "fresh_ttl_sec": 60, "hard_ttl_sec": 300 },
+        "required_bucket_ids": ["seven-day-global"],
+        "observations": [
+          {
+            "id": "obs-7d",
+            "revision": "rev-7d",
+            "aggregation_key": "codex|cli|identity-A|subscription|pool-A|percent|seven_day",
+            "bucket_id": "seven-day-global",
+            "window": "seven_day",
+            "duration_sec": 604800,
+            "used_pct": 41,
+            "observed_at": "2026-07-13T08:00:00Z",
+            "valid_until": "2026-07-13T08:05:00Z"
+          }
+        ]
+      },
+      "expected": {
+        "hard_window": "seven_day",
+        "freshness": "fresh",
+        "accepted_observation_ids": ["obs-7d"],
+        "ignored_observation_ids": [],
+        "blocking_error": null
+      }
+    },
+    {
+      "name": "five-hour-poison-ignored",
+      "spec_ids": ["QA-BND-002", "QA-AGG-001", "QA-AGG-004"],
+      "input": {
+        "provider": "codex",
+        "checked_at": "2026-07-13T08:00:30Z",
+        "profile": { "fresh_ttl_sec": 60, "hard_ttl_sec": 300 },
+        "required_bucket_ids": ["seven-day-global"],
+        "observations": [
+          {
+            "id": "poison-5h",
+            "revision": "rev-poison",
+            "aggregation_key": "codex|cli|identity-A|subscription|pool-A|percent|five_hour",
+            "bucket_id": "legacy-five-hour",
+            "window": "five_hour",
+            "duration_sec": 18000,
+            "used_pct": 100,
+            "observed_at": "2026-07-13T08:00:29Z",
+            "valid_until": "2099-01-01T00:00:00Z"
+          },
+          {
+            "id": "obs-7d",
+            "revision": "rev-7d",
+            "aggregation_key": "codex|cli|identity-A|subscription|pool-A|percent|seven_day",
+            "bucket_id": "seven-day-global",
+            "window": "seven_day",
+            "duration_sec": 604800,
+            "used_pct": 41,
+            "observed_at": "2026-07-13T08:00:00Z",
+            "valid_until": "2026-07-13T08:05:00Z"
+          }
+        ]
+      },
+      "expected": {
+        "hard_window": "seven_day",
+        "freshness": "fresh",
+        "accepted_observation_ids": ["obs-7d"],
+        "ignored_observation_ids": ["poison-5h"],
+        "blocking_error": null,
+        "five_hour_actions": []
+      }
+    },
+    {
+      "name": "only-five-hour-is-unknown",
+      "spec_ids": ["QA-BND-002", "QA-BND-004", "QA-FRESH-002"],
+      "input": {
+        "provider": "codex",
+        "checked_at": "2026-07-13T08:00:30Z",
+        "profile": { "fresh_ttl_sec": 60, "hard_ttl_sec": 300 },
+        "required_bucket_ids": ["seven-day-global"],
+        "observations": [
+          {
+            "id": "poison-5h",
+            "window": "five_hour",
+            "duration_sec": 18000,
+            "used_pct": 1,
+            "observed_at": "2026-07-13T08:00:29Z",
+            "valid_until": "2026-07-13T08:05:00Z"
+          }
+        ]
+      },
+      "expected": {
+        "hard_window": "seven_day",
+        "freshness": "unknown",
+        "accepted_observation_ids": [],
+        "ignored_observation_ids": ["poison-5h"],
+        "blocking_error": "QUOTA_REQUIRED_WINDOW_UNKNOWN"
+      }
+    },
+    {
+      "name": "hard-stale-seven-day",
+      "spec_ids": ["QA-BND-004", "QA-FRESH-001", "QA-FRESH-003"],
+      "input": {
+        "provider": "codex",
+        "checked_at": "2026-07-13T08:05:01Z",
+        "profile": { "fresh_ttl_sec": 60, "hard_ttl_sec": 300 },
+        "required_bucket_ids": ["seven-day-global"],
+        "observations": [
+          {
+            "id": "obs-old",
+            "revision": "rev-old",
+            "aggregation_key": "codex|cli|identity-A|subscription|pool-A|percent|seven_day",
+            "bucket_id": "seven-day-global",
+            "window": "seven_day",
+            "duration_sec": 604800,
+            "used_pct": 20,
+            "observed_at": "2026-07-13T08:00:00Z",
+            "valid_until": "2026-07-13T09:00:00Z"
+          }
+        ]
+      },
+      "expected": {
+        "hard_window": "seven_day",
+        "freshness": "hard-stale",
+        "accepted_observation_ids": [],
+        "ignored_observation_ids": [],
+        "blocking_error": "QUOTA_HARD_STALE"
+      }
+    },
+    {
+      "name": "soft-stale-requires-refresh",
+      "spec_ids": ["QA-BND-004", "QA-FRESH-001", "QA-FRESH-003"],
+      "input": {
+        "provider": "codex",
+        "checked_at": "2026-07-13T08:01:30Z",
+        "profile": { "fresh_ttl_sec": 60, "hard_ttl_sec": 300 },
+        "required_bucket_ids": ["seven-day-global"],
+        "observations": [
+          {
+            "id": "obs-soft-stale",
+            "revision": "rev-soft-stale",
+            "aggregation_key": "codex|cli|identity-A|subscription|pool-A|percent|seven_day",
+            "bucket_id": "seven-day-global",
+            "window": "seven_day",
+            "duration_sec": 604800,
+            "used_pct": 20,
+            "observed_at": "2026-07-13T08:00:00Z",
+            "valid_until": "2026-07-13T09:00:00Z"
+          }
+        ]
+      },
+      "expected": {
+        "hard_window": "seven_day",
+        "freshness": "soft-stale",
+        "accepted_observation_ids": [],
+        "report_observation_ids": ["obs-soft-stale"],
+        "refresh_required": true,
+        "automatic_spawn_limit": 0,
+        "blocking_error": "QUOTA_SOFT_STALE"
+      }
+    },
+    {
+      "name": "partial-required-bucket",
+      "spec_ids": ["QA-FRESH-002", "QA-AGG-002"],
+      "input": {
+        "provider": "codex",
+        "checked_at": "2026-07-13T08:00:30Z",
+        "profile": { "fresh_ttl_sec": 60, "hard_ttl_sec": 300 },
+        "required_bucket_ids": ["seven-day-global", "seven-day-review"],
+        "observations": [
+          {
+            "id": "obs-global",
+            "revision": "rev-global",
+            "aggregation_key": "codex|cli|identity-A|subscription|pool-A|percent|seven_day",
+            "bucket_id": "seven-day-global",
+            "window": "seven_day",
+            "duration_sec": 604800,
+            "used_pct": 20,
+            "observed_at": "2026-07-13T08:00:00Z",
+            "valid_until": "2026-07-13T08:05:00Z"
+          }
+        ]
+      },
+      "expected": {
+        "hard_window": "seven_day",
+        "freshness": "unknown",
+        "accepted_observation_ids": ["obs-global"],
+        "missing_bucket_ids": ["seven-day-review"],
+        "blocking_error": "QUOTA_REQUIRED_BUCKET_UNKNOWN"
+      }
+    },
+    {
+      "name": "aggregation-key-mismatch",
+      "spec_ids": ["QA-BND-001", "QA-OBS-002", "QA-AGG-002"],
+      "input": {
+        "provider": "codex",
+        "checked_at": "2026-07-13T08:00:30Z",
+        "profile": { "fresh_ttl_sec": 60, "hard_ttl_sec": 300 },
+        "required_bucket_ids": ["seven-day-global", "seven-day-review"],
+        "observations": [
+          {
+            "id": "obs-pool-a",
+            "aggregation_key": "codex|cli|identity-A|subscription|pool-A|percent|seven_day",
+            "bucket_id": "seven-day-global",
+            "window": "seven_day",
+            "duration_sec": 604800,
+            "used_pct": 20,
+            "observed_at": "2026-07-13T08:00:00Z",
+            "valid_until": "2026-07-13T08:05:00Z"
+          },
+          {
+            "id": "obs-pool-b",
+            "aggregation_key": "codex|cli|identity-A|api|pool-B|percent|seven_day",
+            "bucket_id": "seven-day-review",
+            "window": "seven_day",
+            "duration_sec": 604800,
+            "used_pct": 10,
+            "observed_at": "2026-07-13T08:00:00Z",
+            "valid_until": "2026-07-13T08:05:00Z"
+          }
+        ]
+      },
+      "expected": {
+        "hard_window": "seven_day",
+        "freshness": "unknown",
+        "accepted_observation_ids": [],
+        "blocking_error": "QUOTA_AGGREGATION_MISMATCH"
+      }
+    },
+    {
+      "name": "same-id-different-revision-conflict",
+      "spec_ids": ["QA-OBS-003", "QA-ADM-007"],
+      "input": {
+        "provider": "codex",
+        "checked_at": "2026-07-13T08:00:30Z",
+        "profile": { "fresh_ttl_sec": 60, "hard_ttl_sec": 300 },
+        "required_bucket_ids": ["seven-day-global"],
+        "observations": [
+          {
+            "id": "obs-conflict",
+            "revision": "rev-A",
+            "source_sequence": 42,
+            "aggregation_key": "codex|cli|identity-A|subscription|pool-A|percent|seven_day",
+            "bucket_id": "seven-day-global",
+            "window": "seven_day",
+            "duration_sec": 604800,
+            "used_pct": 41,
+            "observed_at": "2026-07-13T08:00:00Z",
+            "valid_until": "2026-07-13T08:05:00Z"
+          },
+          {
+            "id": "obs-conflict",
+            "revision": "rev-B",
+            "source_sequence": 42,
+            "aggregation_key": "codex|cli|identity-A|subscription|pool-A|percent|seven_day",
+            "bucket_id": "seven-day-global",
+            "window": "seven_day",
+            "duration_sec": 604800,
+            "used_pct": 43,
+            "observed_at": "2026-07-13T08:00:00Z",
+            "valid_until": "2026-07-13T08:05:00Z"
+          }
+        ]
+      },
+      "expected": {
+        "hard_window": "seven_day",
+        "freshness": "unknown",
+        "accepted_observation_ids": [],
+        "circuit": "open",
+        "automatic_spawn_limit": 0,
+        "blocking_error": "QUOTA_OBSERVATION_CONFLICT"
+      }
+    },
+    {
+      "name": "provider-neutral-thirty-day-fresh",
+      "spec_ids": ["QA-OBS-002", "QA-FRESH-001", "QA-ADM-008"],
+      "input": {
+        "provider": "future-provider",
+        "checked_at": "2026-07-13T08:00:30Z",
+        "profile": { "fresh_ttl_sec": 60, "hard_ttl_sec": 300 },
+        "provider_window_rule": { "name": "thirty_day", "duration_sec": 2592000 },
+        "required_bucket_ids": ["monthly-work"],
+        "observations": [
+          {
+            "id": "obs-future-monthly",
+            "revision": "rev-future-monthly",
+            "aggregation_key": "future|cli|identity-F|subscription|pool-F|percent|thirty_day",
+            "bucket_id": "monthly-work",
+            "window": "thirty_day",
+            "duration_sec": 2592000,
+            "used_pct": 12,
+            "observed_at": "2026-07-13T08:00:00Z",
+            "valid_until": "2026-07-13T08:05:00Z"
+          }
+        ]
+      },
+      "expected": {
+        "hard_window": "thirty_day",
+        "freshness": "fresh",
+        "accepted_observation_ids": ["obs-future-monthly"],
+        "ignored_observation_ids": [],
+        "blocking_error": null
+      }
+    }
+  ]
+}

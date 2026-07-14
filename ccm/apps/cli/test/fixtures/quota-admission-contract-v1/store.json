@@ -1,0 +1,162 @@
+{
+  "schema": "ccm/quota-store-fixtures/v1",
+  "cases": [
+    {
+      "name": "ten-refresh-callers-single-flight",
+      "spec_ids": ["QA-OBS-005", "QA-STORE-001", "QA-STORE-002"],
+      "input": {
+        "concurrent_callers": 10,
+        "source_key": "future|cli|identity-F|subscription|pool-F|percent|thirty_day",
+        "observation": {
+          "schema": "ccm/quota-observation/v1",
+          "observation_id": "obs-single-flight",
+          "revision": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "aggregation_key": "future|cli|identity-F|subscription|pool-F|percent|thirty_day",
+          "bucket_id": "monthly-work",
+          "window": "thirty_day",
+          "duration_sec": 2592000,
+          "used_pct": 12,
+          "observed_at": "2026-07-13T08:00:00Z",
+          "valid_until": "2026-07-13T08:05:00Z"
+        }
+      },
+      "expected": {
+        "caller_count": 10,
+        "collector_call_count": 1,
+        "unique_revision_count": 1,
+        "snapshot_mode": "0600"
+      }
+    },
+    {
+      "name": "atomic-owner-only-observation-publish",
+      "spec_ids": ["QA-OBS-005", "QA-STORE-002", "QA-STORE-005", "QA-STORE-006", "QA-STORE-007"],
+      "input": {
+        "source_key": "codex|cli|identity-A|subscription|pool-A|percent|seven_day",
+        "revisions": [
+          {
+            "schema": "ccm/quota-observation/v1",
+            "observation_id": "obs-atomic",
+            "revision": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+            "aggregation_key": "codex|cli|identity-A|subscription|pool-A|percent|seven_day",
+            "bucket_id": "seven-day-global",
+            "window": "seven_day",
+            "duration_sec": 604800,
+            "used_pct": 41,
+            "observed_at": "2026-07-13T08:00:00Z",
+            "valid_until": "2026-07-13T08:05:00Z"
+          },
+          {
+            "schema": "ccm/quota-observation/v1",
+            "observation_id": "obs-atomic",
+            "revision": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+            "aggregation_key": "codex|cli|identity-A|subscription|pool-A|percent|seven_day",
+            "bucket_id": "seven-day-global",
+            "window": "seven_day",
+            "duration_sec": 604800,
+            "used_pct": 42,
+            "observed_at": "2026-07-13T08:00:30Z",
+            "valid_until": "2026-07-13T08:05:30Z"
+          }
+        ]
+      },
+      "expected": {
+        "required_protocol": [
+          "same-directory-temp-open-wx-0600",
+          "temp-write-complete",
+          "temp-file-fsync-complete",
+          "atomic-rename-complete",
+          "directory-fsync-attempt"
+        ],
+        "rename_fault_publish_rejected": true,
+        "rename_fault_visible_revision": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "rename_boundary_visible_revision": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "visible_revision": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+        "snapshot_mode": "0600",
+        "parseable_json": true,
+        "temp_residue_authoritative": false,
+        "directory_sync": ["durable", "unsupported"],
+        "directory_sync_supported_result": "durable",
+        "directory_sync_soft_unsupported_result": "unsupported",
+        "directory_sync_soft_unsupported_codes": ["EINVAL", "ENOTSUP"],
+        "directory_sync_hard_failure_codes": ["EACCES", "EPERM"],
+        "directory_sync_hard_failure_publish_rejected": true
+      }
+    },
+    {
+      "name": "event-durable-snapshot-missing-recovers",
+      "spec_ids": ["QA-RES-007", "QA-STORE-003", "QA-STORE-004", "QA-STORE-005"],
+      "input": {
+        "aggregation_key": "codex-pool-A-seven-day",
+        "capacity_pct": 10,
+        "request": {
+          "id": "qres-recover",
+          "key": "recover-key",
+          "hash": "recover-request-hash",
+          "amount_pct": 4,
+          "state": "held",
+          "expires_at": "2026-07-13T08:01:00Z"
+        },
+        "crash_point": "after-event-fsync-before-snapshot-replace",
+        "authoritative_event_corruption_probes": [
+          { "kind": "truncated", "contents": "{\"schema\":" },
+          { "kind": "invalid-json", "contents": "not-json" }
+        ]
+      },
+      "expected": {
+        "reservation_id": "qres-recover",
+        "state": "held",
+        "active_reserved_pct": 4,
+        "durable_event_count": 1,
+        "replayed_event_count": 1,
+        "snapshot_rebuilt": true,
+        "authoritative_event_corruption_error": "RESERVATION_STORE_CONFLICT",
+        "corruption_new_reservation_count": 0,
+        "new_reservation_count": 0,
+        "release_count": 0,
+        "spawn_count": 0
+      }
+    },
+    {
+      "name": "atomic-owner-only-reservation-snapshot-publish",
+      "spec_ids": ["QA-RES-007", "QA-STORE-002", "QA-STORE-003", "QA-STORE-006", "QA-STORE-007"],
+      "input": {
+        "aggregation_key": "codex-pool-atomic-snapshot-seven-day",
+        "capacity_pct": 10,
+        "request": {
+          "id": "qres-atomic-snapshot",
+          "key": "atomic-snapshot-key",
+          "hash": "atomic-snapshot-request-hash",
+          "amount_pct": 4,
+          "state": "held",
+          "expires_at": "2026-07-13T08:01:00Z"
+        }
+      },
+      "expected": {
+        "active_reserved_pct": 4,
+        "durable_event_count": 1,
+        "directory_sync": ["durable", "unsupported"],
+        "directory_sync_supported_result": "durable",
+        "directory_sync_soft_unsupported_result": "unsupported",
+        "directory_sync_soft_unsupported_codes": ["EINVAL", "ENOTSUP"],
+        "directory_sync_hard_failure_codes": ["EACCES", "EPERM"],
+        "directory_sync_hard_failure_publish_rejected": true,
+        "directory_sync_boundaries": [
+          {
+            "name": "event",
+            "result_field": "event_directory_sync",
+            "relative_directory": "events"
+          },
+          {
+            "name": "snapshot",
+            "result_field": "snapshot_directory_sync",
+            "relative_directory": "."
+          }
+        ],
+        "rename_fault_replayed_event_count": 1,
+        "rename_fault_snapshot_rebuilt": true,
+        "release_count": 0,
+        "spawn_count": 0
+      }
+    }
+  ]
+}

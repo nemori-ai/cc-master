@@ -1,0 +1,204 @@
+{
+  "schema": "ccm/quota-effect-hard-deny-registry/v1",
+  "effect_classes": [
+    "process-spawn",
+    "network-socket",
+    "network-dns",
+    "network-http",
+    "provider-invocation",
+    "model-invocation",
+    "os-keychain",
+    "board-write",
+    "repo-write",
+    "credential-mutation",
+    "ambient-filesystem-io"
+  ],
+  "api_rows": [
+    {
+      "id": "process-spawn.module.child-process",
+      "effect_class": "process-spawn",
+      "kind": "module",
+      "targets": ["child_process", "node:child_process"]
+    },
+    {
+      "id": "process-spawn.call.bun-spawn",
+      "effect_class": "process-spawn",
+      "kind": "call",
+      "targets": ["Bun.spawn"]
+    },
+    {
+      "id": "process-spawn.construct.deno-command",
+      "effect_class": "process-spawn",
+      "kind": "construct",
+      "targets": ["Deno.Command"]
+    },
+    {
+      "id": "network-socket.module.socket",
+      "effect_class": "network-socket",
+      "kind": "module",
+      "targets": ["net", "node:net", "tls", "node:tls", "dgram", "node:dgram"]
+    },
+    {
+      "id": "network-socket.construct.websocket",
+      "effect_class": "network-socket",
+      "kind": "construct",
+      "targets": ["WebSocket", "globalThis.WebSocket"]
+    },
+    {
+      "id": "network-dns.module.dns",
+      "effect_class": "network-dns",
+      "kind": "module",
+      "targets": ["dns", "node:dns", "dns/promises", "node:dns/promises"]
+    },
+    {
+      "id": "network-http.module.http",
+      "effect_class": "network-http",
+      "kind": "module",
+      "targets": ["http", "node:http", "https", "node:https", "http2", "node:http2"]
+    },
+    {
+      "id": "network-http.call.fetch",
+      "effect_class": "network-http",
+      "kind": "call",
+      "targets": ["fetch", "globalThis.fetch"]
+    },
+    {
+      "id": "provider-invocation.module.sdk",
+      "effect_class": "provider-invocation",
+      "kind": "module",
+      "targets": ["openai", "@anthropic-ai/sdk", "@google/generative-ai"]
+    },
+    {
+      "id": "provider-invocation.call.provider",
+      "effect_class": "provider-invocation",
+      "kind": "call",
+      "targets": ["provider.invoke", "provider.spawn", "provider.complete"]
+    },
+    {
+      "id": "model-invocation.call.model",
+      "effect_class": "model-invocation",
+      "kind": "call",
+      "targets": ["model.invoke", "model.generate", "model.complete"]
+    },
+    {
+      "id": "model-invocation.call.client",
+      "effect_class": "model-invocation",
+      "kind": "call",
+      "targets": ["responses.create", "messages.create"]
+    },
+    {
+      "id": "os-keychain.module.keychain",
+      "effect_class": "os-keychain",
+      "kind": "module",
+      "targets": ["keytar", "keychain"]
+    },
+    {
+      "id": "os-keychain.call.keychain",
+      "effect_class": "os-keychain",
+      "kind": "call",
+      "targets": [
+        "keychain.read",
+        "keychain.write",
+        "keychain.delete",
+        "keychain.getPassword",
+        "keychain.setPassword",
+        "keychain.deletePassword"
+      ]
+    },
+    {
+      "id": "board-write.call.writer",
+      "effect_class": "board-write",
+      "kind": "call",
+      "targets": ["runWrite", "writeBoard", "mutateBoard", "board.write", "task.done"]
+    },
+    {
+      "id": "repo-write.call.writer",
+      "effect_class": "repo-write",
+      "kind": "call",
+      "targets": [
+        "repo.write",
+        "repo.commit",
+        "repo.checkout",
+        "repo.reset",
+        "simpleGit",
+        "isomorphicGit"
+      ]
+    },
+    {
+      "id": "credential-mutation.call.account-session",
+      "effect_class": "credential-mutation",
+      "kind": "call",
+      "targets": ["account.login", "account.logout", "account.switch", "session.switch"]
+    },
+    {
+      "id": "credential-mutation.call.credential-auth",
+      "effect_class": "credential-mutation",
+      "kind": "call",
+      "targets": ["credential.import", "credential.copy", "credential.write", "auth.write"]
+    },
+    {
+      "id": "ambient-filesystem-io.module.node-fs",
+      "effect_class": "ambient-filesystem-io",
+      "kind": "module",
+      "targets": ["fs", "node:fs", "fs/promises", "node:fs/promises"],
+      "source_kinds": ["test"]
+    }
+  ],
+  "source_roots": [
+    {
+      "id": "engine-effect-boundary",
+      "kind": "production",
+      "path": "ccm/packages/engine/src/quota-effect-boundary.ts",
+      "state": "required"
+    },
+    {
+      "id": "engine-quota-admission",
+      "kind": "production",
+      "path": "ccm/packages/engine/src/quota-admission.ts",
+      "state": "honest-absent",
+      "reason": "future quota derivation seam is intentionally absent in this slice"
+    },
+    {
+      "id": "cli-quota-admission-store",
+      "kind": "production",
+      "path": "ccm/apps/cli/src/quota-admission-store.ts",
+      "state": "honest-absent",
+      "reason": "future durable quota store seam is intentionally absent in this slice"
+    },
+    {
+      "id": "cli-quota-handler",
+      "kind": "production",
+      "path": "ccm/apps/cli/src/handlers/quota.ts",
+      "state": "honest-absent",
+      "reason": "production quota command handler remains an explicit HONEST RED"
+    },
+    {
+      "id": "controlled-quota-handler",
+      "kind": "test",
+      "path": "ccm/apps/cli/test/fixtures/quota-effect-hard-deny-v1/roots/controlled-quota-handler.ts",
+      "state": "required"
+    }
+  ],
+  "source_domains": [
+    {
+      "kind": "production",
+      "directory": "ccm/packages/engine/src",
+      "file_pattern": "^quota-.*\\.ts$"
+    },
+    {
+      "kind": "production",
+      "directory": "ccm/apps/cli/src",
+      "file_pattern": "^quota-.*\\.ts$"
+    },
+    {
+      "kind": "production",
+      "directory": "ccm/apps/cli/src/handlers",
+      "file_pattern": "^quota(?:-.*)?\\.ts$"
+    },
+    {
+      "kind": "test",
+      "directory": "ccm/apps/cli/test/fixtures/quota-effect-hard-deny-v1/roots",
+      "file_pattern": ".*\\.ts$"
+    }
+  ]
+}

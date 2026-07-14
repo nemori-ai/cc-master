@@ -26,6 +26,7 @@
 //   正则/报错文案/.errKind/退出码逐字保持。
 
 import { parseArgs } from 'node:util';
+import type { QuotaEffectBoundary } from '@ccm/engine';
 import type { Ctx } from './handlers/_common.js';
 import * as accountHandler from './handlers/account.js';
 import * as attemptHandler from './handlers/attempt.js';
@@ -62,6 +63,7 @@ import {
   type NounSpec,
   type OptionSpec,
   REGISTRY,
+  type Registry,
   type VerbSpec,
 } from './registry.js';
 import * as suggest from './suggest.js';
@@ -84,10 +86,20 @@ interface RunOpts {
   stdin?: { fd?: number };
   shadowRoutingBoundary?: ShadowRoutingBoundary;
   providerRuntime?: ProviderRuntime;
+  quotaEffects?: QuotaEffectBoundary;
 }
 
 // 一个 handler 模块 = 名字 → handler(ctx) 函数（动态派发·hkey 在运行期定）。
 type HandlerModule = Record<string, (ctx: Ctx) => number | Promise<number>>;
+
+export interface RouterComposition {
+  registry: Registry;
+  aliases: Record<string, [string, string]>;
+  nounAliases: Record<string, string>;
+  defaultVerbs: Record<string, string>;
+  handlers: Record<string, HandlerModule>;
+  autoInstallStatusline: (env: Record<string, string | undefined>, harness?: string) => void;
+}
 
 // ── 静态 HANDLERS 表：noun → handler 模块（取代原 require('./handlers/'+hnoun)·见文件头偏离注记）。──────
 //   key 与 spec.handler 字符串的首段（hnoun）对齐：'task.setStatus' → HANDLERS.task.setStatus。
@@ -126,6 +138,15 @@ const HANDLERS: Record<string, HandlerModule> = {
 const DEFAULT_VERBS: Record<string, string> = {
   statusline: 'render',
   upgrade: 'all',
+};
+
+const DEFAULT_COMPOSITION: RouterComposition = {
+  registry: REGISTRY,
+  aliases: ALIASES,
+  nounAliases: NOUN_ALIASES,
+  defaultVerbs: DEFAULT_VERBS,
+  handlers: HANDLERS,
+  autoInstallStatusline: statuslineHandler.autoInstall,
 };
 
 // node util.parseArgs 的 options 形态（带 short / multiple）——router 自有，独立于 registry 的 OptionSpec。
@@ -256,11 +277,21 @@ function isReadOnlyCapabilityNegotiation(args: string[], scan: ScanResult): bool
 //   返回 number（绝大多数 sync verb·同步落码）；`account switch`（唯一 async verb·await refresh）返回
 //   Promise<number>，由 bin await。sync verb 路径全程不变（仍同步 return number）。
 export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promise<number> {
+  return runWithComposition(argv, opts, DEFAULT_COMPOSITION);
+}
+
+export function runWithComposition(
+  argv: string[],
+  opts: Partial<RunOpts>,
+  composition: RouterComposition,
+): number | Promise<number> {
   const out = opts.out as RunOpts['out'];
   const err = opts.err as RunOpts['err'];
   const env = opts.env || {};
   const stdin = opts.stdin;
   const args = Array.isArray(argv) ? argv.slice() : [];
+  const { registry, aliases, nounAliases, defaultVerbs, handlers, autoInstallStatusline } =
+    composition;
 
   // ── ① 先 flag-aware 扫一遍认出 noun/verb 与顶层 --help/--version（防 `--session-id X` 的 X 被误当 noun）。──
   const scan0 = scanPositions(args);
@@ -272,8 +303,8 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
   //   ALIASES / REGISTRY 查找全部按改写后的真实 noun 走，无需另开一条分支。
   if (scan0.positionals.length > 0) {
     const first0 = scan0.positionals[0] as { token: string; index: number };
-    if (Object.hasOwn(NOUN_ALIASES, first0.token)) {
-      args[first0.index] = NOUN_ALIASES[first0.token] as string;
+    if (Object.hasOwn(nounAliases, first0.token)) {
+      args[first0.index] = nounAliases[first0.token] as string;
     }
   }
 
@@ -284,11 +315,18 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
   //   `ccm --help` / `ccm --version` 等也算「首次被调用」。env 注入 → 测试用临时 CLAUDE_CONFIG_DIR 隔离。
   //   capability discovery 必须在任何 init 路径解析/持久化前安全运行；它的零写契约不能要求每个 caller
   //   记住一个无关 statusline kill switch，所以 router 自身显式免除 auto-install。
+  const firstToken = scan0.positionals[0]?.token;
+  const preRouteNoun =
+    firstToken && Object.hasOwn(aliases, firstToken)
+      ? (aliases[firstToken] as [string, string])[0]
+      : firstToken;
+  const registeredQuotaComposition = preRouteNoun === 'quota' && Object.hasOwn(registry, 'quota');
   if (
-    (scan0.positionals[0] && scan0.positionals[0].token) !== 'statusline' &&
+    preRouteNoun !== 'statusline' &&
+    !registeredQuotaComposition &&
     !isReadOnlyCapabilityNegotiation(args, scan0)
   ) {
-    statuslineHandler.autoInstall(env, harnessFlag0 || undefined);
+    autoInstallStatusline(env, harnessFlag0 || undefined);
   }
 
   if (scan0.positionals.length === 0) {
@@ -297,7 +335,11 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
       help.printVersion(out);
       return EXIT.OK;
     }
-    help.printHelp(out, { REGISTRY, ALIASES, NOUN_ALIASES });
+    help.printHelp(out, {
+      REGISTRY: registry,
+      ALIASES: aliases,
+      NOUN_ALIASES: nounAliases,
+    });
     return EXIT.OK;
   }
 
@@ -306,9 +348,9 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
   {
     // length>0 已由上方早退保证·positionals[0] 必有值（窄断言·不改逻辑）。
     const first = scan0.positionals[0] as { token: string; index: number };
-    if (Object.hasOwn(ALIASES, first.token)) {
+    if (Object.hasOwn(aliases, first.token)) {
       // hasOwnProperty 已保证命中·ALIASES[first.token] 必为 [noun, verb]（! 窄断言）。
-      const expansion = ALIASES[first.token] as [string, string]; // [noun, verb]
+      const expansion = aliases[first.token] as [string, string]; // [noun, verb]
       working = args.slice(0, first.index).concat(expansion, args.slice(first.index + 1));
     }
   }
@@ -323,8 +365,8 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
   const wantsHelp = scan.hasHelp;
 
   // ── ③ noun 校验。────────────────────────────────────────────────────────────────────────────────
-  if (!Object.hasOwn(REGISTRY, noun as string)) {
-    const cands = suggest.suggestSimilar(noun, Object.keys(REGISTRY));
+  if (!Object.hasOwn(registry, noun as string)) {
+    const cands = suggest.suggestSimilar(noun, Object.keys(registry));
     err(`unknown command: ${noun}`);
     if (cands.length) err(`Did you mean: ${cands.join(', ')}?`);
     err('Run `ccm --help` for the list of commands.');
@@ -334,16 +376,20 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
   // hasOwnProperty 已保证 noun 在 REGISTRY·此处 noun 必为 string、nounSpec 必有值（窄断言·不改逻辑）。
   //   后续以 nounSpec 复用 REGISTRY[noun]（避免反复 noUncheckedIndexedAccess 窄化）。
   const nounStr = noun as string;
-  const nounSpec = REGISTRY[nounStr] as NounSpec;
+  const nounSpec = registry[nounStr] as NounSpec;
 
   // `ccm <noun> --help`（无 verb 或 wantsHelp 且 verb 未知）。
   if (!verb) {
     if (wantsHelp) {
-      help.printHelp(out, { REGISTRY, ALIASES, NOUN_ALIASES }, nounStr);
+      help.printHelp(
+        out,
+        { REGISTRY: registry, ALIASES: aliases, NOUN_ALIASES: nounAliases },
+        nounStr,
+      );
       return EXIT.OK;
     }
     // 缺 verb 但该 noun 有约定默认 verb（如 statusline→render）→ 不报错，落默认 verb 继续（见 resolvedVerb 初值）。
-    if (!Object.hasOwn(DEFAULT_VERBS, nounStr)) {
+    if (!Object.hasOwn(defaultVerbs, nounStr)) {
       // 缺 verb：列该 noun 的 verbs 当候选（无输入可纠错，直接列全集）。
       err(`missing command for: ${noun}`);
       err(`Available: ${Object.keys(nounSpec).join(', ')}`);
@@ -356,22 +402,26 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
   //   ALIASES 里形如 `ls:['task','list']` 的条目同时是「verb 级别名」——当 verb 不是 noun 的真 verb，但等于某个
   //   ALIASES key 且该 alias 的 noun 段 === 当前 noun，则把 verb 解析成 alias 的 verb 段（registry §3.2 ls 注释）。
   //   verb 缺省时落 DEFAULT_VERBS（statusline→render）：bare `ccm statusline` 等价 `ccm statusline render`。
-  let resolvedVerb = (verb ?? DEFAULT_VERBS[nounStr]) as string;
+  let resolvedVerb = (verb ?? defaultVerbs[nounStr]) as string;
   if (
     verb !== undefined &&
     !Object.hasOwn(nounSpec, resolvedVerb) &&
-    Object.hasOwn(ALIASES, verb) &&
-    Array.isArray(ALIASES[verb]) &&
-    (ALIASES[verb] as [string, string])[0] === noun
+    Object.hasOwn(aliases, verb) &&
+    Array.isArray(aliases[verb]) &&
+    (aliases[verb] as [string, string])[0] === noun
   ) {
-    resolvedVerb = (ALIASES[verb] as [string, string])[1];
+    resolvedVerb = (aliases[verb] as [string, string])[1];
   }
 
   // ── verb 校验。──────────────────────────────────────────────────────────────────────────────────
   if (!Object.hasOwn(nounSpec, resolvedVerb)) {
     // `ccm <noun> <unknown> --help` → 降级到 noun 级 help（help.js 容忍未知 verb）。
     if (wantsHelp) {
-      help.printHelp(out, { REGISTRY, ALIASES, NOUN_ALIASES }, nounStr);
+      help.printHelp(
+        out,
+        { REGISTRY: registry, ALIASES: aliases, NOUN_ALIASES: nounAliases },
+        nounStr,
+      );
       return EXIT.OK;
     }
     const cands = suggest.suggestSimilar(verb, Object.keys(nounSpec));
@@ -386,8 +436,18 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
 
   // `ccm <noun> <verb> --help` → verb 级 help（用解析后的 canonical verb）。
   if (wantsHelp) {
-    help.printHelp(out, { REGISTRY, ALIASES, NOUN_ALIASES }, nounStr, resolvedVerb);
+    help.printHelp(
+      out,
+      { REGISTRY: registry, ALIASES: aliases, NOUN_ALIASES: nounAliases },
+      nounStr,
+      resolvedVerb,
+    );
     return EXIT.OK;
+  }
+
+  if (nounStr === 'quota' && !opts.quotaEffects) {
+    err('error: QUOTA_CAPABILITY_UNAVAILABLE: quota effect boundary is required');
+    return EXIT.ERROR;
   }
 
   // ── ④ parseArgs：合并全局 + 命令 spec.options，喂 rest（去掉 noun/verb 两个位置 token）。───────────────
@@ -466,6 +526,7 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
     stdin,
     argv: working,
     providerRuntime: opts.providerRuntime || createDefaultProviderRuntime(env),
+    quotaEffects: opts.quotaEffects,
   });
 
   const [hnoun, hkey] = String(spec.handler).split('.');
@@ -476,7 +537,7 @@ export function run(argv: string[], opts: Partial<RunOpts> = {}): number | Promi
       ? (shadowRoutingHandler.createShadowRoutingHandlers(
           opts.shadowRoutingBoundary,
         ) as unknown as HandlerModule)
-      : HANDLERS[hnoun as string];
+      : handlers[hnoun as string];
   if (!handlerMod) {
     err(`internal error: cannot load handler module for ${noun} (${hnoun})`);
     return EXIT.ERROR;
@@ -517,6 +578,7 @@ function buildCtx({
   stdin,
   argv,
   providerRuntime,
+  quotaEffects,
 }: {
   values: Record<string, unknown>;
   positionals: string[];
@@ -526,6 +588,7 @@ function buildCtx({
   stdin?: { fd?: number };
   argv: string[];
   providerRuntime?: ProviderRuntime;
+  quotaEffects?: QuotaEffectBoundary;
 }): Ctx {
   const harnessFlag = typeof values.harness === 'string' ? values.harness : undefined;
   const sid =
@@ -554,6 +617,7 @@ function buildCtx({
     stdin,
     isTTY: io.isTTY(process.stdin),
     providerRuntime,
+    quotaEffects,
   };
 }
 
