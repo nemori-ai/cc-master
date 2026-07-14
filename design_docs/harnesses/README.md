@@ -8,6 +8,8 @@
 - `claude-code.md`：Claude Code adapter 事实和本仓落点。
 - `codex.md`：Codex adapter 事实、实测结论和当前风险。
 - `cursor.md`：Cursor IDE Agent harness 事实、Track A/B 双轨、hook 映射、Capability Cards 索引（2026-07-09）。
+- `cursor-dual-surface-contract.md`：Cursor IDE plugin origin 与 `agent|cursor-agent` headless worker 的正式双 bounded-context contract、负能力、RED fixtures、迁移与 rollback。
+- `cursor-agent-admission-contract.md`：headless worker 的 mode/sandbox/result 子合同；由双 surface contract 引用，不代表完整 provider transport 已交付。
 - `capabilities/`：跨 surface Capability INTENT cards + ADR-031 对齐机制。
 - `skill-host-coupling-audit.md`：`plugin/src/skills/*/canonical` 里 Claude Code 专有指导的盘点，以及应抽成 host capability / path token / overlay 的落点。
 - `skill-adaptation-task-list.md`：skills 多 host adapter 化的跟踪清单。

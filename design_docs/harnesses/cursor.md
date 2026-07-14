@@ -30,7 +30,7 @@ Cursor 事实按以下优先级维护：
 - **Cursor Cloud Agents**（cursor.com/agents）：官方明确多个 hook 无等价触发点（`sessionStart`/`sessionEnd`、`beforeSubmitPrompt`、`stop`、Tab hooks、部分 MCP hooks 等）。
 - Cursor Tab 补全专用 hooks（`beforeTabFileRead`/`afterTabFileEdit`）。
 - Cursor SDK / Cloud Agents API（`@cursor/sdk`、`CURSOR_API_KEY`）——编排 dispatch 的 CI/外部面，不是 IDE Agent runtime。
-- Cursor Agent CLI / headless one-shot 的完整 **调用 / quota / cancel / supervisor 契约**——它是 cross-harness 调用面，不等于本页的 IDE plugin / hook adapter；本页记录 presence-only `harnesses[].surfaces` 与严格 C1 `surfaceInventory` 两层只读发现合同，已落地的 mode-specific admission/result 子合同见 [`cursor-agent-admission-contract.md`](cursor-agent-admission-contract.md)，但尚未定义完整 spawn / poll / cancel / resume transport。
+- Cursor Agent CLI / headless one-shot 的完整 **调用 / quota / cancel / supervisor 契约**——它是 cross-harness 调用面，不等于本页的 IDE plugin / hook adapter；两个 bounded context 的角色、独立事实轴、负能力、pool 禁止推导、RED fixtures 与迁移/rollback 以 [`cursor-dual-surface-contract.md`](cursor-dual-surface-contract.md) 为正式合同，mode-specific admission/result 子合同见 [`cursor-agent-admission-contract.md`](cursor-agent-admission-contract.md)，但完整 spawn / poll / cancel / resume transport 仍未交付。
 
 ## Cursor execution surfaces【官方 + 本仓实测】
 
