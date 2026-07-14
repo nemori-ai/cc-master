@@ -189,8 +189,15 @@ inspectLockOwner(record)
 | Backend | C1 状态 | 证据门 |
 | --- | --- | --- |
 | Linux POSIX | supported | uid/mode/no-symlink、O_NOFOLLOW/fstat、hard-link no-replace、build-attested `linux-exact-fd-v1` launcher + `fexecve`、无 `/dev/fd` 假设、active pathname-swap fixture 仍执行 pinned trusted image |
-| Darwin POSIX | supported-by-scope；资格仍由真机 gate 决定 | uid/mode/no-symlink、O_NOFOLLOW/fstat、hard-link no-replace、build-attested `darwin-path-attested-v1` launcher、final vnode identity/revision + SHA-256 recheck、无 `fexecve`/`execveat`/fd pseudo-path；darwin-arm64/x64 各跑 downloaded SEA 的 stage→activate→resolve→invoke、pre-final-check mutation denial、strict exact-object typed denial，并把 same-UID final-check→exec race记录为 residual 而非伪造 resistant green |
+| Darwin POSIX | supported；已通过真机资格门 | uid/mode/no-symlink、O_NOFOLLOW/fstat、hard-link no-replace、build-attested `darwin-path-attested-v1` launcher、final vnode identity/revision + SHA-256 recheck、无 `fexecve`/`execveat`/fd pseudo-path；darwin-arm64/x64 各跑 downloaded SEA 的 stage→activate→resolve→invoke、pre-final-check mutation denial、strict exact-object typed denial，并把 same-UID final-check→exec race记录为 residual 而非伪造 resistant green |
 | Windows | public seam + independent contract fixture；default fail-closed | 公共状态模型无 symlink/admin 假设；真实 ACL/Authenticode、locked SEA/fd-equivalent 与 durable publish e2e 未过前 activation 返回 `RUNTIME_BACKEND` |
+
+Darwin 资格快照（2026-07-14 UTC）：tree `1e8f49e29b3c87eea37ac5dc5588f58e3f1a3b24`
+在 [Actions run `29309116222`](https://github.com/nemori-ai/cc-master/actions/runs/29309116222)
+中由真实 `darwin-arm64` / `darwin-x64` runner 完成，两个 inner manifest 与 outer
+`EVIDENCE_SHA256SUMS` 均可完整复验，所有 required gates 为 PASS。该支持声明不扩大 invoke assurance：
+same-UID final-check→exec race 仍明确为 residual；Gatekeeper/notarization 仍为 conditional，真实 Cursor Agent
+endpoint 仍为 conditional，不能借 runtime/plugin/installer/service 资格结果推导为已验收。
 
 Windows 是待实现 backend，不是公共模型中的永久 unsupported。后续 platform hardening 只替换 backend，
 不得改变 image/provenance/transaction/activation commit/selector 合同。
