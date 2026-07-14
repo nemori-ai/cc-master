@@ -699,7 +699,7 @@ ccm task update <id> [flags]
 ccm task native-attempt-create <id> --selection <json> --attempt <json> --replay-intent <enum> [flags]
 ```
 
-当前 native invoke runtime 为 `unsupported`：三 host strategy 都不投影 invoke artifact。此命令只在 opt-in board 上原子冻结 immutable create snapshot / canonical request hash、append `starting` attempt 并返回 ledger operation result；public `launch_allowed` 不能被解释成默认 spawn 授权。
+当前 native invoke runtime 为 `unsupported`：三 host strategy 都不投影 invoke artifact。此命令只在 opt-in board 上，从 `$CC_MASTER_HOME/native-attempt/v1/` 的 owner-only production store 读取已提交且未过期的 reservation/ticket，核对 canonical launch identity，原子 stage 唯一 claim、冻结 immutable create snapshot、持久提交 board 后再 commit claim。`launch_allowed:true` 只属于该精确 identity/claim；命令本身不 spawn，当前也没有 host adapter 消费它。
 
 | flag | 类型 | 必填 | enum 取值 | 含义 |
 |---|---|---|---|---|
@@ -710,6 +710,7 @@ ccm task native-attempt-create <id> --selection <json> --attempt <json> --replay
 
 - 例：`ccm task native-attempt-create T7 --selection @/abs/selection.json --attempt @/abs/attempt.json --replay-intent accept-no-launch`
 - 精确重放返回既有 attempt、`launch_allowed:false`；同 dispatch key 的冲突 request 一律拒绝。latest attempt 为 `starting|running|uncertain` 时禁止再 create。
+- production 路径不接受测试注入的 admission/evidence resolver 冒充 owner 事实。若进程在 board 落盘后、claim commit 前崩溃，只在 stage owner 已消失且 board 已含完全相同 attempt/authority 时回收同一 durable stage；owner 仍存活、缺投影或 identity 漂移时保留现场并 fail-closed。
 
 ### task native-attempt-bind
 
@@ -727,6 +728,7 @@ ccm task native-attempt-bind <id> --attempt-id <str> --evidence-record-ref <str>
 
 - 例：`ccm task native-attempt-bind T7 --attempt-id attempt-1 --evidence-record-ref evidence:bind-1`
 - writer 在锁内 stage + verify evidence，应用 engine projection 并持久提交 board 后才 commit consume；engine/lint/conflict/write 失败会 rollback，record/claim 不消费。
+- 若进程恰在 board 落盘后、evidence consumption commit 前崩溃，精确重放只凭 board 上相同 evidence ref/hash 恢复同一 stage；不同 record/hash 不能借 stale lock 继续。
 - 只有认证 spawn handle 与同 handle 的 authoritative live roster observation 才能投影 `running`；create 时的 `expected_child_target` 从来不是 observation。
 
 ### task native-attempt-cancel

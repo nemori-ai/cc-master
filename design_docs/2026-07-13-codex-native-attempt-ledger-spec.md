@@ -48,6 +48,14 @@ records live under that home with owner-only permissions. An offline fixture may
 same production records and exercise `runProduction`, but receives no fixture-only verifier or
 resolver shortcut.
 
+The stage file is itself a durable owner-only intent record with the staging process identity. If
+that process dies after the board
+rename but before the owner claim/consumption commit, an exact retry may reclaim that stage only
+when the locked board already contains the same immutable attempt or evidence ref/hash. A missing
+projection, changed identity/payload, unrelated stage, or still-live stage owner is never reclaimed. This closes the
+post-board/pre-owner-commit crash window without granting a second launch or consuming conflicting
+evidence.
+
 Lifecycle time is causal evidence, not display metadata. Both mutation apply and hard board
 projection enforce the applicable partial order:
 
@@ -145,7 +153,8 @@ Given a contract-enabled routed `executor=subagent` task whose selected candidat
 
 - no cross-harness CLI worker or durable supervisor;
 - no generic Codex CLI/App/background-terminal contract;
-- no model/effort selection, entitlement, pricing, or quota implementation;
+- no model/effort scoring, entitlement, pricing, or quota-policy evaluator; this slice only consumes
+  and revalidates an already committed quota reservation/ticket;
 - no account login/logout/switch, credential read/copy/import/write, or automatic account fallback;
 - no route scoring, fallback policy, task acceptance, or board `done` ownership in a host adapter;
 - no claim that a one-shot ledger permit alone mechanically prevents a caller from bypassing ccm
@@ -212,6 +221,7 @@ Every native attempt appended to `task.routing.attempts[]` has this minimum shap
   "created_at": "2026-07-13T08:00:00Z",
   "dispatch": {
     "key": "stable-dispatch-key",
+    "input_hash": "sha256:...",
     "request_hash": "sha256:...",
     "launch_claim_id": "opaque-one-shot-claim",
     "claim_owner_session_ref": "opaque-origin-session-ref"
@@ -231,6 +241,7 @@ Every native attempt appended to `task.routing.attempts[]` has this minimum shap
     }
   },
   "selection_snapshot": { "candidate_id": "codex-native", "chain": "ample", "selected_at": "...", "evidence": {}, "reason_codes": [] },
+  "launch_authority": { "schema": "ccm/native-launch-authority/v1", "canonical_identity_digest": "sha256:...", "ticket_digest": "sha256:...", "reservation": {}, "ticket": {} },
   "handle_binding": null,
   "cancel": null,
   "terminal": null
@@ -242,7 +253,8 @@ the create request and in the appended attempt, byte-for-value equal in parsed J
 `candidate_id` must equal both the attempt candidate and a candidate in the selected policy chain.
 The contract fixture is self-contained and is not allowed to outsource this check to a `selection_ref`.
 `expected_child_target` is frozen before spawn and cannot be supplied for the first time at bind.
-`ordinal` is monotonic per task. `dispatch.key` and `request_hash` are unique together. All timestamps use exact
+`ordinal` is monotonic per task. `dispatch.key`, `input_hash`, and `request_hash` are immutable and
+value-bound to the committed canonical launch identity. All timestamps use exact
 canonical UTC second precision and must round-trip to the same calendar instant; impossible dates
 and invalid leap days fail closed.
 
@@ -276,8 +288,12 @@ complete replayable shape):
     "attempt_id": "attempt-1",
     "candidate_id": "codex-native",
     "dispatch_key": "dispatch-1",
+    "input_hash": "sha256:...",
     "request_hash": "sha256:...",
-    "launch_claim_id": "claim-1"
+    "launch_claim_id": "claim-1",
+    "reservation_id": "reservation-1",
+    "ticket_digest": "sha256:...",
+    "launch_identity_digest": "sha256:..."
   },
   "expected": {
     "transport": "codex-api-tool-multi-agent",
@@ -310,12 +326,13 @@ complete replayable shape):
 
 The canonical `record_hash` covers the schema, record ID, producer ID/private channel/registration,
 create link, expected targets, and all observations; the producer signature covers that hash. The
-producer is registered before launch for one origin/transport/session trust scope. The launch
-claim is delivered to that adapter only over the private channel and is never printed in the public
-create result. The adapter writes raw spawn/roster observations to the owner-only evidence store,
+producer is registered before launch for one origin/transport/session trust scope. The launch claim
+is consumed by the create transaction before any adapter may spawn and is never printed in the
+public create result. The adapter writes raw spawn/roster observations to the owner-only evidence store,
 signs the canonical record hash with its registered key, and returns only `record_id` to the public
 workflow. The ccm writer resolves the ref, verifies owner-store provenance, hash, signature,
-producer scope, and one-shot claim consumption, then passes a verified projection to the engine.
+producer scope, exact create/authority linkage, and one-shot evidence consumption, then passes a
+verified projection to the engine.
 The board stores only the normalized handle, `record_id`, `record_hash`, producer ID, and durability
 class. It never stores raw responses, the producer private key, or the private channel credential.
 
@@ -355,18 +372,19 @@ before calling `nativeAttemptApply` or changing board bytes:
    `origin_session_ref` (no prefix, parent-session, or same-brand inference);
 7. recheck the create link, handle corroboration, account/workspace/worktree/baseline/permission
    lineage, and expected child against the immutable attempt;
-8. compare-and-claim `launch_claim_id -> {attempt_id, record_hash}` under the same transaction as
-   the board projection. An unclaimed claim may bind once; the same attempt+record exact replay is
-   a no-op; a different record/attempt on an already claimed ID is rejected. Failed authentication
-   or failed board commit consumes nothing.
+8. require the committed launch claim to match the attempt's reservation, ticket, and canonical
+   identity digests, then stage one evidence-consumption identity under the same transaction as the
+   board projection. The same attempt+record exact replay is a no-op; a different record/projection
+   is rejected. Failed authentication or failed board commit consumes nothing.
 
 The handler receives only the authentication result/projection, never a resolver object whose
 contents are implicitly trusted. The engine still rechecks content linkage, but it cannot replace
 steps 1–8. The executable CLI oracle injects this authentication boundary, records its check trace,
 and makes the old resolver-only seam throw; endpoint acceptance therefore requires the real router
 and handler to cross the complete path. Its bind request is
-`{record_ref, expected:{origin,task_id,attempt_id,candidate_id,transport,dispatch_key,request_hash,
-launch_claim_id,lineage}}`; `expected` must be derived from the locked board attempt, not copied
+`{record_ref, expected:{origin,task_id,attempt_id,candidate_id,transport,dispatch_key,input_hash,
+request_hash,launch_claim_id,reservation_id,ticket_digest,launch_identity_digest,lineage}}`;
+`expected` must be derived from the locked board attempt, not copied
 from the evidence record. Missing or unequal expected context is a create-link failure.
 
 ## 5. Dedicated operation semantics
@@ -381,11 +399,14 @@ ccm task native-attempt-terminal <task-id> --attempt-id <id> --evidence-record-r
 ccm task native-attempt-reconcile <task-id> --attempt-id <id> --evidence-record-ref <owner-ref> [--json]
 ```
 
-These five verbs are dedicated ledger writers, not host-tool wrappers. The two optional negative-
-contract flags reject attempts to treat a cancellation acknowledgement as terminal or to make native
-terminal evidence write task `done`; they do not add alternate state transitions. `--json` selects the
-operation-result output shape. While live dispatch is unsupported, create's ledger result—including
-`launch_allowed:true` on a first create—is not permission for a default runtime path to spawn.
+These five verbs are dedicated ledger writers, not host-tool wrappers. `runProduction` always
+resolves create authority and later evidence through the owner home; test-only injected boundaries
+are overwritten at this composition root. The two optional negative-contract flags reject attempts
+to treat a cancellation acknowledgement as terminal or to make native terminal evidence write task
+`done`; they do not add alternate state transitions. `--json` selects the
+operation-result output shape. While live dispatch is unsupported, create's
+`launch_allowed:true` is the one-shot result for the exact committed identity/claim; the command
+does not itself spawn, and no current host adapter consumes that result.
 
 The pure engine endpoint is frozen as
 `nativeAttemptApply(board, command) -> {ok, board, result?, issues?}`. It never mutates its input.
@@ -397,16 +418,18 @@ alone is not acceptance.
 
 ### 5.1 Create: `absent → starting`
 
-Preconditions: enabled contracts; task `ready`; valid selected `host-native` Codex candidate; no
-other `starting|running|uncertain` native attempt and no unfenced orphan; immutable full selection,
-request hash, lineage, expected child, and parent authority;
+Preconditions: enabled contracts; task `ready`; valid selected `host-native` Codex candidate; a
+ccm-owner launch record carrying a committed, unexpired reservation/ticket and exact canonical
+identity; no other `starting|running|uncertain` native attempt and no unfenced orphan; immutable full
+selection, request hash, lineage, expected child, and parent authority;
 account/worktree/session facts are known and mutually consistent.
 
 The current account fingerprint must resolve as known+current, and the ccm-resolved permission
 snapshot must prove a compatible profile plus every required deny. A known-but-different account,
 an unknown account ref, an incompatible/unknown profile, or an omitted deny fails before append.
 
-The writer atomically freezes the self-contained selection, appends `state:"starting"`, and returns
+The writer stages the unique launch claim, atomically freezes the self-contained selection and
+authority, appends `state:"starting"`, durably writes the board, commits the claim, and returns
 `created:true, launch_allowed:true` exactly once to the private adapter workflow. It does not expose
 the launch claim secret in public JSON, set `task.handle`, or move the
 task to `in_flight`. An exact retry returns the same attempt with
@@ -427,8 +450,9 @@ containing the record ref/hash and producer ID, changes the attempt to `running`
 handle to `task.handle`, and changes `task.status: ready → in_flight`.
 
 Exact replay is a no-op. A second/different record or handle, lineage drift, wrong child, another
-active attempt, raw/free-form JSON, an unregistered producer, a bad signature/hash, or reused claim
-is a hard conflict with zero partial writes. Bind timeout or ambiguous spawn outcome changes the
+active attempt, raw/free-form JSON, an unregistered producer, a bad signature/hash, or conflicting
+evidence consumption is a hard conflict with zero partial writes. Bind timeout or ambiguous spawn
+outcome changes the
 attempt to `uncertain` through reconciliation; it never fabricates a handle and never auto-spawns a
 replacement.
 
@@ -555,7 +579,7 @@ The following issue codes are frozen for fixtures and the implemented engine val
 | `NATIVE-EVIDENCE-SIGNATURE-INVALID` | Ed25519 signature does not verify over the declared record hash |
 | `NATIVE-EVIDENCE-REGISTRATION-UNKNOWN` | producer registration is absent/revoked or does not identify the signed producer/key |
 | `NATIVE-EVIDENCE-TRUST-SCOPE-MISMATCH` | registered origin/transport/session scope does not equal the attempt |
-| `NATIVE-EVIDENCE-CLAIM-REUSED` | one-shot launch claim is already bound to another attempt or record hash |
+| `NATIVE-EVIDENCE-CLAIM-REUSED` | evidence consumption identity or its committed launch linkage conflicts with an existing owner record |
 | `NATIVE-EVIDENCE-CALLER-VERIFICATION-FORBIDDEN` | caller/record supplied `verified_by_ccm` or equivalent certification |
 | `NATIVE-EVIDENCE-UNTRUSTED-PRODUCER` | other private-channel/producer authentication failure not covered by the specific codes above |
 | `NATIVE-EVIDENCE-CREATE-LINK-MISMATCH` | evidence task/attempt/candidate/dispatch/request/claim differs from create |
@@ -563,6 +587,9 @@ The following issue codes are frozen for fixtures and the implemented engine val
 | `NATIVE-ACCOUNT-FINGERPRINT-MISMATCH` | a known current/bind account fingerprint differs from the create snapshot |
 | `NATIVE-PERMISSION-PROFILE-INCOMPATIBLE` | permission snapshot is unknown or profile is not equal/mechanically stricter than selected profile |
 | `NATIVE-PERMISSION-DENY-INCOMPATIBLE` | effective deny set omits a candidate/task-required denial |
+| `NATIVE-LAUNCH-AUTHORITY-MISSING` | create lacks the owner-store launch authority needed to stage a claim |
+| `NATIVE-LAUNCH-AUTHORITY-INVALID` | reservation/ticket/identity is incomplete, expired, uncommitted, or mismatched |
+| `NATIVE-LAUNCH-CLAIM-REUSED` | launch claim is already committed/staged for a different identity, or a stranded stage lacks matching durable board proof |
 | `NATIVE-ATTEMPT-REPLAY-CONFLICT` | same idempotency key carries different immutable input |
 | `NATIVE-ATTEMPT-ACTIVE` | another starting/running/unaudited uncertain attempt blocks create |
 | `NATIVE-LAUNCH-REPLAY-DENIED` | replay attempted to obtain a second launch permission |
@@ -583,7 +610,10 @@ The executable oracle is:
 - `ccm/packages/engine/test/fixtures/native-attempt/codex-api-tool-v1.json`;
 - `ccm/packages/engine/test/fixtures/native-attempt/codex-api-tool-feature-probe-v1.json`;
 - `ccm/packages/engine/test/native-attempt-contract.red.test.ts`;
-- `ccm/apps/cli/test/handler-native-attempt.red.test.ts`.
+- `ccm/packages/engine/test/native-attempt-r1-authority.red.test.ts`;
+- `ccm/packages/engine/test/native-attempt-r1-causal.red.test.ts`;
+- `ccm/apps/cli/test/handler-native-attempt.red.test.ts`;
+- `ccm/apps/cli/test/native-attempt-production-r1.red.test.ts`.
 
 The focused suites prove that the fixtures are coherent, the engine validator and five real CLI
 handlers enforce the frozen state/security contract, and host-native live dispatch remains honestly
@@ -593,9 +623,9 @@ unsupported. Run:
 cd ccm
 pnpm --filter @ccm/engine build
 
-pnpm --filter @ccm/engine exec node --test test/native-attempt-contract.red.test.ts
+pnpm --filter @ccm/engine exec node --test test/native-attempt-contract.red.test.ts test/native-attempt-r1-authority.red.test.ts test/native-attempt-r1-causal.red.test.ts
 
-pnpm --filter ccm exec node --import tsx --test test/handler-native-attempt.red.test.ts test/registry.test.ts
+pnpm --filter ccm exec node --import tsx --test test/handler-native-attempt.red.test.ts test/native-attempt-production-r1.red.test.ts test/registry.test.ts
 ```
 
 Both focused commands MUST pass today. The engine suite calls the implemented operation endpoint for
