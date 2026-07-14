@@ -80,7 +80,8 @@ export interface RuntimeLauncherMaterializationOptions {
       | 'before_bootstrap_recovery'
       | 'before_temp_cleanup'
       | 'before_helper_publish'
-      | 'after_helper_publish';
+      | 'after_helper_publish'
+      | 'after_final_open';
     readyPath: string;
     barrierPath?: string;
     action: 'pause' | 'kill';

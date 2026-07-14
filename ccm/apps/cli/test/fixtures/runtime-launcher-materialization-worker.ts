@@ -23,7 +23,9 @@ if (!home || !outputPath) {
             ? 'before_helper_publish'
             : faultPoint === 'after_helper_publish_native'
               ? 'after_helper_publish'
-              : null;
+              : faultPoint === 'after_final_open_native'
+                ? 'after_final_open'
+                : null;
   const backend = createDefaultRuntimeBackend(
     process.platform,
     process.arch,

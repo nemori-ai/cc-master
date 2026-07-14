@@ -1103,6 +1103,99 @@ test('dead-temp cleanup is idempotent across two cold publishers', async () => {
   assertRecoveredLauncherDirectory(first.home);
 });
 
+test('final verification detects a valid publisher hard-link converging from two names to one', async () => {
+  const first = nativeFixture('4.1.9-final-convergence', 'final-convergence-trusted');
+  const runtime = manager(first.home);
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+
+  const worker = join(HERE, 'fixtures', 'runtime-launcher-materialization-worker.ts');
+  const winnerReady = join(first.root, 'winner-published-ready');
+  const winnerBarrier = join(first.root, 'winner-cleanup-go');
+  const verifierReady = join(first.root, 'verifier-open-ready');
+  const verifierBarrier = join(first.root, 'verifier-read-go');
+  const winnerOutput = join(first.root, 'winner-output');
+  const verifierOutput = join(first.root, 'verifier-output');
+  const args = ['--import', 'tsx', worker, first.home];
+
+  const winner = spawn(
+    process.execPath,
+    [...args, winnerOutput, winnerReady, winnerBarrier, 'after_helper_publish_native'],
+    { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  const winnerExit = waitForExit(winner);
+  await waitForCondition(
+    () => existsSync(winnerReady),
+    'winner did not publish the final before temporary-link cleanup',
+  );
+  const finalPath = join(launcherDirectory(first.home), builtLauncherHelperName());
+  assert.equal(lstatSync(finalPath).nlink, 2, 'winner must retain its temporary hard link');
+
+  const verifier = spawn(
+    process.execPath,
+    [...args, verifierOutput, verifierReady, verifierBarrier, 'after_final_open_native'],
+    { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  const verifierExit = waitForExit(verifier);
+  await waitForCondition(
+    () => existsSync(verifierReady),
+    'verifier did not pin the valid two-link final revision',
+  );
+
+  writeFileSync(winnerBarrier, 'go');
+  const winnerResult = await winnerExit;
+  assert.equal(winnerResult.code, 0, winnerResult.stderr);
+  assert.equal(lstatSync(finalPath).nlink, 1, 'winner did not converge the final to one name');
+  writeFileSync(verifierBarrier, 'go');
+  const verifierResult = await verifierExit;
+  assert.equal(verifierResult.code, 0, verifierResult.stderr);
+  assert.equal(readFileSync(winnerOutput, 'utf8'), 'final-convergence-trusted');
+  assert.equal(readFileSync(verifierOutput, 'utf8'), 'final-convergence-trusted');
+  assert.equal(launcherHelpers(first.home).length, 1);
+  assertRecoveredLauncherDirectory(first.home);
+});
+
+test('final verification still rejects in-place invalid bytes at the same open boundary', async () => {
+  const first = nativeFixture('4.1.9-final-invalid', 'final-invalid-must-not-run');
+  const runtime = manager(first.home);
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+  const seedOutput = join(first.root, 'final-invalid-seed');
+  assert.equal(runtime.invoke([seedOutput]).exit_code, 0);
+
+  const worker = join(HERE, 'fixtures', 'runtime-launcher-materialization-worker.ts');
+  const ready = join(first.root, 'final-invalid-open-ready');
+  const barrier = join(first.root, 'final-invalid-read-go');
+  const rejectedOutput = join(first.root, 'final-invalid-rejected-output');
+  const verifier = spawn(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      worker,
+      first.home,
+      rejectedOutput,
+      ready,
+      barrier,
+      'after_final_open_native',
+    ],
+    { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  const verifierExit = waitForExit(verifier);
+  await waitForCondition(() => existsSync(ready), 'invalid verifier did not pin the final');
+  const finalPath = join(launcherDirectory(first.home), builtLauncherHelperName());
+  chmodSync(finalPath, 0o700);
+  writeFileSync(finalPath, 'in-place-invalid-final');
+  chmodSync(finalPath, 0o500);
+  writeFileSync(barrier, 'go');
+
+  const result = await verifierExit;
+  assert.equal(result.code, 1, result.stderr);
+  assert.match(result.stderr, /native materializer failed at existing-final/);
+  assert.equal(existsSync(rejectedOutput), false, 'invalid final unexpectedly executed payload');
+  assert.equal(readFileSync(finalPath, 'utf8'), 'in-place-invalid-final');
+});
+
 test('dead-temp cleanup fails closed on surviving symlink, type, and permission anomalies', () => {
   const cases = ['symlink', 'directory', 'permission'] as const;
   for (const [index, kind] of cases.entries()) {

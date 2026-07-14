@@ -378,6 +378,28 @@ static int ccm_materializer_same_file_revision(const struct stat *left,
 #endif
 }
 
+/* A no-replace publisher creates final_name by hard-linking its sealed temp,
+ * then removes that temp. A concurrent verifier can therefore observe one
+ * exact immutable inode converging from two names to one. unlink(2) updates
+ * ctime even though bytes and executable metadata are unchanged. This is the
+ * only revision transition eligible for one bounded full re-verification. */
+static int ccm_materializer_publish_link_converged(
+    const struct stat *left, const struct stat *right) {
+  if (!ccm_materializer_same_object_identity(left, right) ||
+      left->st_size != right->st_size || left->st_nlink != 2 ||
+      right->st_nlink != 1) {
+    return 0;
+  }
+#if defined(__APPLE__)
+  return left->st_flags == right->st_flags &&
+         left->st_mtimespec.tv_sec == right->st_mtimespec.tv_sec &&
+         left->st_mtimespec.tv_nsec == right->st_mtimespec.tv_nsec;
+#else
+  return left->st_mtim.tv_sec == right->st_mtim.tv_sec &&
+         left->st_mtim.tv_nsec == right->st_mtim.tv_nsec;
+#endif
+}
+
 static int ccm_materializer_read_exact(int fd, unsigned char *bytes, size_t length) {
   size_t offset = 0;
   while (offset < length) {
@@ -455,9 +477,11 @@ static int ccm_materializer_verify_fd_bytes(int fd, const unsigned char *expecte
   return 0;
 }
 
-static int ccm_materializer_verify_final(int directory_fd, const char *name,
-                                         const unsigned char *expected,
-                                         size_t length) {
+/* Returns 1 only for the exact valid-publisher 2 -> 1 hard-link convergence. */
+static int ccm_materializer_verify_final_once(
+    int directory_fd, const char *name, const unsigned char *expected,
+    size_t length, const char *test_point, const char *ready_path,
+    const char *barrier_path, const char *test_action) {
   struct stat path_before;
   if (fstatat(directory_fd, name, &path_before, AT_SYMLINK_NOFOLLOW) < 0) {
     return -1;
@@ -480,8 +504,20 @@ static int ccm_materializer_verify_final(int directory_fd, const char *name,
     return -1;
   }
   if (!ccm_materializer_same_file_revision(&path_before, &opened_before)) {
+    int converged = ccm_materializer_publish_link_converged(
+        &path_before, &opened_before);
     close(fd);
+    if (converged) {
+      return 1;
+    }
     errno = EAGAIN;
+    return -1;
+  }
+  if (ccm_materializer_test_seam("after_final_open", test_point, ready_path,
+                                 barrier_path, test_action) < 0) {
+    int saved = errno;
+    close(fd);
+    errno = saved;
     return -1;
   }
   if (ccm_materializer_verify_fd_bytes(fd, expected, length) < 0) {
@@ -499,9 +535,21 @@ static int ccm_materializer_verify_final(int directory_fd, const char *name,
     errno = saved;
     return -1;
   }
-  if (!ccm_materializer_same_file_revision(&opened_before, &opened_after) ||
-      !ccm_materializer_same_file_revision(&opened_after, &path_after)) {
+  int opened_stable =
+      ccm_materializer_same_file_revision(&opened_before, &opened_after);
+  int path_stable =
+      ccm_materializer_same_file_revision(&opened_after, &path_after);
+  if (!opened_stable || !path_stable) {
+    int converged =
+        (ccm_materializer_publish_link_converged(&opened_before,
+                                                 &opened_after) &&
+         path_stable) ||
+        (opened_stable &&
+         ccm_materializer_publish_link_converged(&opened_after, &path_after));
     close(fd);
+    if (converged) {
+      return 1;
+    }
     errno = EAGAIN;
     return -1;
   }
@@ -509,6 +557,31 @@ static int ccm_materializer_verify_final(int directory_fd, const char *name,
     return -1;
   }
   return 0;
+}
+
+static int ccm_materializer_verify_final(
+    int directory_fd, const char *name, const unsigned char *expected,
+    size_t length, const char *test_point, const char *ready_path,
+    const char *barrier_path, const char *test_action) {
+  int first = ccm_materializer_verify_final_once(
+      directory_fd, name, expected, length, test_point, ready_path,
+      barrier_path, test_action);
+  if (first <= 0) {
+    return first;
+  }
+
+  /* No sleep and no errno-based retry: one exact state transition earns one
+   * fresh path/open/hash/revision proof, with the test seam disabled. */
+  int second = ccm_materializer_verify_final_once(
+      directory_fd, name, expected, length, "-", "-", "-", "none");
+  if (second == 0) {
+    return 0;
+  }
+  if (second < 0) {
+    return -1;
+  }
+  errno = EAGAIN;
+  return -1;
 }
 
 static int ccm_materializer_flush_directory(int directory_fd) {
@@ -963,7 +1036,8 @@ static int ccm_runtime_launcher_materializer_main(int argc, char **argv) {
   if (fstatat(CCM_MATERIALIZER_DIRECTORY_FD, final_name, &existing,
               AT_SYMLINK_NOFOLLOW) == 0) {
     if (ccm_materializer_verify_final(CCM_MATERIALIZER_DIRECTORY_FD, final_name,
-                                      bytes, length) < 0 ||
+                                      bytes, length, test_point, ready_path,
+                                      barrier_path, test_action) < 0 ||
         ccm_materializer_flush_directory(CCM_MATERIALIZER_DIRECTORY_FD) < 0) {
       int saved = errno;
       free(bytes);
@@ -1053,7 +1127,8 @@ static int ccm_runtime_launcher_materializer_main(int argc, char **argv) {
     return ccm_materializer_report("temp-unlink", saved);
   }
   if (ccm_materializer_verify_final(CCM_MATERIALIZER_DIRECTORY_FD, final_name,
-                                    bytes, length) < 0 ||
+                                    bytes, length, test_point, ready_path,
+                                    barrier_path, test_action) < 0 ||
       ccm_materializer_flush_directory(CCM_MATERIALIZER_DIRECTORY_FD) < 0) {
     int saved = errno;
     free(bytes);

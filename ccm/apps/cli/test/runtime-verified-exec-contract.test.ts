@@ -89,3 +89,35 @@ test('materializer bootstrap lifecycle has native self-clean and dead-owner reco
   assert.match(materializerSource, /st_uid\s*!=\s*geteuid\s*\(\)/);
   assert.match(materializerSource, /unlinkat\s*\([^;]+AT_REMOVEDIR/);
 });
+
+test('final verification rechecks only the exact valid-publisher hard-link convergence once', () => {
+  const convergenceStart = materializerSource.indexOf(
+    'static int ccm_materializer_publish_link_converged(',
+  );
+  const convergenceEnd = materializerSource.indexOf(
+    '\nstatic int ccm_materializer_read_exact',
+    convergenceStart,
+  );
+  assert.notEqual(convergenceStart, -1);
+  assert.notEqual(convergenceEnd, -1);
+  const convergence = materializerSource.slice(convergenceStart, convergenceEnd);
+  assert.match(convergence, /ccm_materializer_same_object_identity/);
+  assert.match(convergence, /left->st_size\s*!=\s*right->st_size/);
+  assert.match(convergence, /left->st_nlink\s*!=\s*2/);
+  assert.match(convergence, /right->st_nlink\s*!=\s*1/);
+  assert.match(convergence, /st_mtimespec|st_mtim/);
+
+  const verificationStart = materializerSource.indexOf('static int ccm_materializer_verify_final(');
+  const verificationEnd = materializerSource.indexOf(
+    '\nstatic int ccm_materializer_flush_directory',
+    verificationStart,
+  );
+  assert.notEqual(verificationStart, -1);
+  assert.notEqual(verificationEnd, -1);
+  const verification = materializerSource.slice(verificationStart, verificationEnd);
+  assert.match(verification, /int first = ccm_materializer_verify_final_once/);
+  assert.match(verification, /if \(first <= 0\)/);
+  assert.match(verification, /int second = ccm_materializer_verify_final_once/);
+  assert.match(verification, /if \(second < 0\)/);
+  assert.doesNotMatch(verification, /\bfor\s*\(|\bwhile\s*\(|nanosleep|errno\s*==\s*EAGAIN/);
+});
