@@ -1,5 +1,14 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
@@ -294,7 +303,133 @@ test('monitor install-service → uninstall-service deactivates via structured c
   const r = invoke(['monitor', 'uninstall-service', '--json'], home);
   assert.equal(r.code, EXIT.OK, r.stderr);
   const j = json(r.stdout);
+  assert.equal(j.ok, true);
   assert.equal(j.uninstalled, true);
   assert.equal(j.deactivation.kind, 'systemd');
+  assert.equal(j.deactivation.state, 'active', 'the established Linux projection stays unchanged');
   assert.ok(ids.includes('disable'));
+});
+
+test('monitor launchd uninstall: successful bootout projects inactive and removes the unit', () => {
+  const home = mkHome();
+  monitor.__setMonitorTestHooks({
+    runtimePlatform: 'darwin',
+    runServiceCommand: () => ({ status: 0, stdout: '', stderr: '' }),
+  });
+  const installed = invoke(['monitor', 'install-service', '--json'], home);
+  assert.equal(installed.code, EXIT.OK, installed.stderr);
+  const unitPath = json(installed.stdout).path;
+  assert.equal(existsSync(unitPath), true);
+
+  const r = invoke(['monitor', 'uninstall-service', '--json'], home);
+  assert.equal(r.code, EXIT.OK, r.stderr);
+  const j = json(r.stdout);
+  assert.equal(j.ok, true);
+  assert.equal(j.uninstalled, true);
+  assert.equal(j.deactivation.ok, true);
+  assert.equal(j.deactivation.state, 'inactive');
+  assert.equal(j.deactivation.steps[0].result, 'succeeded');
+  assert.equal(j.platform, 'darwin');
+  assert.equal(j.arch, process.arch);
+  assert.deepEqual(j.unit_removal, {
+    ok: true,
+    result: 'removed',
+    path: unitPath,
+    error: null,
+  });
+  assert.equal(existsSync(unitPath), false);
+});
+
+test('monitor launchd uninstall: successful bootout plus unit removal failure stays explicit', () => {
+  const home = mkHome();
+  monitor.__setMonitorTestHooks({
+    runtimePlatform: 'darwin',
+    runServiceCommand: () => ({ status: 0, stdout: '', stderr: '' }),
+  });
+  const installed = invoke(['monitor', 'install-service', '--json'], home);
+  assert.equal(installed.code, EXIT.OK, installed.stderr);
+  const unitPath = json(installed.stdout).path;
+  const displacedUnit = `${unitPath}.displaced`;
+  renameSync(unitPath, displacedUnit);
+  mkdirSync(unitPath);
+  writeFileSync(join(unitPath, 'sentinel'), 'must survive failed non-recursive removal');
+
+  const r = invoke(['monitor', 'uninstall-service', '--json'], home);
+  assert.notEqual(r.code, EXIT.OK, 'unit removal failure must not return success');
+  const j = json(r.stdout);
+  assert.equal(j.ok, false);
+  assert.equal(j.uninstalled, false);
+  assert.equal(j.stopped, false);
+  assert.equal(j.deactivation.ok, true, 'successful bootout remains truthful');
+  assert.equal(j.deactivation.state, 'inactive');
+  assert.equal(j.deactivation.steps[0].result, 'succeeded');
+  assert.equal(j.unit_removal.ok, false);
+  assert.equal(j.unit_removal.result, 'failed');
+  assert.equal(j.unit_removal.path, unitPath);
+  assert.match(j.unit_removal.error, /director|EISDIR|operation not permitted/i);
+  assert.equal(existsSync(unitPath), true, 'failed removal must not claim the path is absent');
+  const state = JSON.parse(readFileSync(join(home, 'services', 'monitor', 'state.json'), 'utf8'));
+  assert.equal(
+    state.wanted,
+    true,
+    'failed aggregate uninstall must not stop or clear wanted state',
+  );
+});
+
+test('monitor launchd uninstall: bootout failure stays explicit active and preserves the unit', () => {
+  const home = mkHome();
+  monitor.__setMonitorTestHooks({
+    runtimePlatform: 'darwin',
+    runServiceCommand: () => ({ status: 0, stdout: '', stderr: '' }),
+  });
+  const installed = invoke(['monitor', 'install-service', '--json'], home);
+  assert.equal(installed.code, EXIT.OK, installed.stderr);
+  const unitPath = json(installed.stdout).path;
+
+  monitor.__setMonitorTestHooks({
+    runtimePlatform: 'darwin',
+    runServiceCommand: () => ({
+      status: 5,
+      stdout: '',
+      stderr: 'Boot-out failed: 5: Input/output error',
+    }),
+  });
+  const r = invoke(['monitor', 'uninstall-service', '--json'], home);
+  assert.notEqual(r.code, EXIT.OK, 'failed bootout must not return success');
+  const j = json(r.stdout);
+  assert.equal(j.ok, false);
+  assert.equal(j.uninstalled, false);
+  assert.equal(j.stopped, false);
+  assert.equal(j.deactivation.ok, false);
+  assert.equal(j.deactivation.state, 'active');
+  assert.equal(j.deactivation.steps[0].result, 'failed');
+  assert.match(j.deactivation.steps[0].error, /Input\/output error/);
+  assert.equal(j.unit_removal.ok, false);
+  assert.equal(j.unit_removal.result, 'not-attempted');
+  assert.match(j.unit_removal.error, /deactivation failed/i);
+  assert.equal(existsSync(unitPath), true, 'failed bootout must preserve the unit for replay');
+});
+
+test('monitor launchd uninstall: already-absent service is idempotent inactive', () => {
+  const home = mkHome();
+  monitor.__setMonitorTestHooks({
+    runtimePlatform: 'darwin',
+    runServiceCommand: () => ({
+      status: 3,
+      stdout: '',
+      stderr: `Could not find service in domain for user gui: ${process.getuid?.() ?? ''}`,
+    }),
+  });
+
+  const r = invoke(['monitor', 'uninstall-service', '--json'], home);
+  assert.equal(r.code, EXIT.OK, r.stderr);
+  const j = json(r.stdout);
+  assert.equal(j.ok, true);
+  assert.equal(j.uninstalled, true);
+  assert.equal(j.deactivation.ok, true);
+  assert.equal(j.deactivation.state, 'inactive');
+  assert.equal(j.deactivation.steps[0].code, 3, 'raw launchctl code remains replayable');
+  assert.equal(j.deactivation.steps[0].result, 'already-absent');
+  assert.equal(j.unit_removal.ok, true);
+  assert.equal(j.unit_removal.result, 'already-absent');
 });

@@ -1,0 +1,10 @@
+{
+  "schema": "ccm/macos-launchd-qualification-identity/v1",
+  "contract": "darwin-arm64",
+  "platform": "darwin",
+  "arch": "arm64",
+  "plist_path": "/qualification/darwin-arm64/Library/LaunchAgents/ai.nemori.ccm.monitor.0123456789.plist",
+  "label": "ai.nemori.ccm.monitor.0123456789",
+  "gui_uid": "501",
+  "launchctl_target": "gui/501/ai.nemori.ccm.monitor.0123456789"
+}

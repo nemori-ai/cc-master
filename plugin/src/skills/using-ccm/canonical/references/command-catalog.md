@@ -1672,7 +1672,7 @@ ccm monitor install-service [flags]
 ccm monitor uninstall-service [flags]
 ```
 
-- 行为：删除用户级 OS service 文件并停止 monitor。
+- 行为：Linux 保持既有 `systemd --user` 卸载流程。macOS 先用结构化 `launchctl bootout` 停用 LaunchAgent，再删除 plist；只有停用与删除都成功后才停止 monitor 并返回 `ok:true` / `uninstalled:true`。识别到 service `already-absent` 是幂等停用成功，但仍须把残留 plist 删除（或确认本就不存在）。真实 `bootout` 失败时返回非零、`deactivation.state:"active"`，保留 plist；`bootout` 成功但 plist 删除失败时，`deactivation.state:"inactive"` 仍保持真实，同时聚合结果返回非零、`ok:false` / `uninstalled:false` / `stopped:false`。`--json` 的 macOS 结果带三态 `deactivation.steps[].result`（`succeeded` / `already-absent` / `failed`）与 `unit_removal` 证据；不得把任一失败当成已卸载。
 - flags：`--json`
 - 例：`ccm monitor uninstall-service --json`
 

@@ -25,6 +25,7 @@ SEA="$(cd "$(dirname "${SEA}")" && pwd)/$(basename "${SEA}")"
 mkdir -p "${EVIDENCE_DIR}"
 EVIDENCE_DIR="$(cd "${EVIDENCE_DIR}" && pwd)"
 VERDICTS="${EVIDENCE_DIR}/verdicts.tsv"
+LAUNCHD_IDENTITY="${EVIDENCE_DIR}/launchd_trusted_identity.json"
 FAILURES=0
 printf 'gate\tclassification\texit_code\n' >"${VERDICTS}"
 
@@ -197,17 +198,38 @@ process.stdout.write(`${JSON.stringify(doc, null, 2)}\n`);
 NODE
 }
 
-validate_launchd_uninstall_log() {
-  node - "${EVIDENCE_DIR}/launchd_uninstall.log" <<'NODE'
-const fs = require('node:fs');
-const doc = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-if (doc.ok !== true || doc.uninstalled !== true || doc.stopped !== true) process.exit(2);
-if (doc.kind !== 'launchd' || doc.deactivation?.kind !== 'launchd') process.exit(3);
-const steps = doc.deactivation?.steps ?? [];
-if (steps.map((step) => step.id).join(',') !== 'bootout') process.exit(4);
-if (steps.some((step) => step.ok !== true || step.code !== 0 || !Array.isArray(step.args))) process.exit(5);
-process.stdout.write(`${JSON.stringify(doc, null, 2)}\n`);
+write_launchd_trusted_identity() {
+  local uid label arch target
+  [ -n "${PLIST:-}" ] || return 1
+  uid="$(id -u)" || return 1
+  label="$(basename "${PLIST}" .plist)" || return 1
+  case "${CONTRACT}" in
+    darwin-arm64) arch=arm64 ;;
+    darwin-x64) arch=x64 ;;
+    *) return 2 ;;
+  esac
+  target="gui/${uid}/${label}"
+  TRUSTED_CONTRACT="${CONTRACT}" TRUSTED_ARCH="${arch}" TRUSTED_PLIST="${PLIST}" \
+    TRUSTED_LABEL="${label}" TRUSTED_UID="${uid}" TRUSTED_TARGET="${target}" \
+    node >"${LAUNCHD_IDENTITY}" <<'NODE'
+const identity = {
+  schema: 'ccm/macos-launchd-qualification-identity/v1',
+  contract: process.env.TRUSTED_CONTRACT,
+  platform: 'darwin',
+  arch: process.env.TRUSTED_ARCH,
+  plist_path: process.env.TRUSTED_PLIST,
+  label: process.env.TRUSTED_LABEL,
+  gui_uid: process.env.TRUSTED_UID,
+  launchctl_target: process.env.TRUSTED_TARGET,
+};
+process.stdout.write(`${JSON.stringify(identity, null, 2)}\n`);
 NODE
+  cat "${LAUNCHD_IDENTITY}"
+}
+
+validate_launchd_uninstall_log() {
+  node scripts/validate-macos-launchd-deactivation.mjs "${EVIDENCE_DIR}/launchd_uninstall.log" \
+    "${CONTRACT}" "${LAUNCHD_IDENTITY}"
 }
 
 write_provenance() {
@@ -357,6 +379,7 @@ PLIST="$(find "${PLIST_DIR}" -maxdepth 1 -name '*.plist' -print 2>/dev/null | he
 if [ -n "${PLIST}" ]; then
   run_required launchd_plutil plutil -lint "${PLIST}"
   run_required launchd_plist_dump plutil -p "${PLIST}"
+  run_required launchd_trusted_identity write_launchd_trusted_identity
 else
   printf '%s\n' 'monitor install-service produced no plist' >"${EVIDENCE_DIR}/launchd_plist.log"
   record launchd_plist FAIL 66

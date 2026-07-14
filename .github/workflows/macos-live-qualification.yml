@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/macos-live-qualification.yml"
       - "scripts/qualify-macos-live.sh"
+      - "scripts/validate-macos-launchd-deactivation.mjs"
       - "scripts/macos-evidence-manifest.mjs"
       - "ccm/**"
       - "install.sh"
@@ -20,6 +21,7 @@ on:
     paths:
       - ".github/workflows/macos-live-qualification.yml"
       - "scripts/qualify-macos-live.sh"
+      - "scripts/validate-macos-launchd-deactivation.mjs"
       - "scripts/macos-evidence-manifest.mjs"
       - "ccm/**"
       - "tests/content/macos-qualification-workflow.test.mjs"

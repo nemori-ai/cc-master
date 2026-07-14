@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **macOS monitor uninstall guidance** — the distributed `using-ccm` manual now distinguishes successful, already-absent, deactivation-failed, and LaunchAgent-removal-failed outcomes without teaching agents to treat partial teardown as an uninstall success.
 - **Executor handle lint state scope** — `BIZ-EXECUTOR-HANDLE` now warns only when an `in_flight` subagent/workflow task lacks its real dispatch handle; future `ready` / `blocked` tasks no longer produce false positives or invite placeholder handles. `using-ccm` now teaches dispatch → record the returned handle → enter `in_flight` across all three host adapters.
 - **Board-guard target classification** — Codex now classifies `apply_patch` targets only from Add/Delete/Update/Move headers while validating the installed parser's section grammar, exact Rust whitespace/CRLF behavior, context-sensitive controls, and raw-rootedness-before-TAB/CR filesystem effects. Leading TAB/CR plus an absolute-looking path stays a legal patch-cwd-relative shadow, a second space after the header colon stays a literal leading-space path, leading-space header-looking hunk data stays harmless, FEFF remains a literal filename byte, true board targets cannot hide behind parser normalization, and malformed patches fail closed. Structured Codex writes inspect every `file_path`/`path`/`filename` alias, and all three hosts deny `ccm ... >|>> board` shell writes while continuing to allow ordinary `ccm ... --board` calls.
 

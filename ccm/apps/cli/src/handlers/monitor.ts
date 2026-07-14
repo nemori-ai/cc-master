@@ -96,6 +96,7 @@ interface TestHooks {
   kill?: (pid: number) => boolean;
   tick?: (ctx: Ctx, state: MonitorState) => TickResult;
   runServiceCommand?: (cmd: ServiceCommand) => ServiceCommandResult;
+  runtimePlatform?: 'darwin' | 'linux';
 }
 
 let testHooks: TestHooks = {};
@@ -577,6 +578,8 @@ function serviceFilePath(): string {
 //   and unit file name are derived from the cc-master home hash (identical default naming as before).
 interface MonitorUnitTarget {
   kind: 'launchd' | 'systemd';
+  platform: string;
+  arch: string;
   label: string;
   unitName: string;
   unitPath: string;
@@ -587,13 +590,15 @@ function monitorUnitTarget(
   env: Record<string, string | undefined>,
   home: string,
 ): MonitorUnitTarget {
-  const rt = captureRuntimeEnvironment({ env });
+  const rt = captureRuntimeEnvironment({ env, platform: testHooks.runtimePlatform });
   const suffix = Buffer.from(home).toString('hex').slice(0, 10);
   const label = `ai.nemori.ccm.monitor.${suffix}`;
   if (rt.platform === 'darwin') {
     const unitName = `${label}.plist`;
     return {
       kind: 'launchd',
+      platform: rt.platform,
+      arch: rt.arch,
       label,
       unitName,
       unitPath: path.join(launchAgentsDir(rt), unitName),
@@ -603,6 +608,8 @@ function monitorUnitTarget(
   const unitName = `ccm-monitor-${suffix}.service`;
   return {
     kind: 'systemd',
+    platform: rt.platform,
+    arch: rt.arch,
     label,
     unitName,
     unitPath: path.join(systemdUserDir(rt), unitName),
@@ -650,6 +657,24 @@ interface ActivationOutcome {
   kind: 'launchd' | 'systemd';
   state: 'active' | 'written-not-activated';
   steps: ActivationStep[];
+}
+
+interface DeactivationStep extends ActivationStep {
+  result: 'succeeded' | 'already-absent' | 'failed';
+}
+
+interface LaunchdDeactivationOutcome {
+  ok: boolean;
+  kind: 'launchd';
+  state: 'inactive' | 'active';
+  steps: DeactivationStep[];
+}
+
+interface LaunchdUnitRemovalOutcome {
+  ok: boolean;
+  result: 'removed' | 'already-absent' | 'failed' | 'not-attempted';
+  path: string;
+  error: string | null;
 }
 
 function runServiceCommand(cmd: ServiceCommand): ServiceCommandResult {
@@ -702,12 +727,62 @@ function activateOsService(target: MonitorUnitTarget): ActivationOutcome {
   return runActivation(target.kind, cmds);
 }
 
-function deactivateOsService(target: MonitorUnitTarget): ActivationOutcome {
-  const cmds =
-    target.kind === 'launchd'
-      ? launchdUninstallCommands({ domainTarget: target.domainTarget, label: target.label })
-      : systemdUninstallCommands({ unitName: target.unitName });
-  return runActivation(target.kind, cmds);
+function launchdServiceAlreadyAbsent(result: ServiceCommandResult): boolean {
+  return /could not find service|no such process|service (?:is )?not loaded/i.test(
+    `${result.stderr}\n${result.stdout}`,
+  );
+}
+
+function deactivateLaunchdService(target: MonitorUnitTarget): LaunchdDeactivationOutcome {
+  const steps = launchdUninstallCommands({
+    domainTarget: target.domainTarget,
+    label: target.label,
+  }).map((cmd): DeactivationStep => {
+    const executed = runServiceCommand(cmd);
+    const result =
+      executed.status === 0
+        ? 'succeeded'
+        : launchdServiceAlreadyAbsent(executed)
+          ? 'already-absent'
+          : 'failed';
+    const ok = result !== 'failed';
+    return {
+      id: cmd.id,
+      command: cmd.command,
+      args: cmd.args,
+      code: executed.status,
+      ok,
+      error: ok ? null : (executed.stderr || executed.stdout || `exit ${executed.status}`).trim(),
+      result,
+    };
+  });
+  const ok = steps.every((step) => step.ok);
+  return { ok, kind: 'launchd', state: ok ? 'inactive' : 'active', steps };
+}
+
+function deactivateOsService(
+  target: MonitorUnitTarget,
+): ActivationOutcome | LaunchdDeactivationOutcome {
+  if (target.kind === 'launchd') return deactivateLaunchdService(target);
+  return runActivation('systemd', systemdUninstallCommands({ unitName: target.unitName }));
+}
+
+function removeLaunchdUnit(unitPath: string): LaunchdUnitRemovalOutcome {
+  try {
+    fs.rmSync(unitPath);
+    return { ok: true, result: 'removed', path: unitPath, error: null };
+  } catch (error) {
+    const failure = error as NodeJS.ErrnoException;
+    if (failure.code === 'ENOENT') {
+      return { ok: true, result: 'already-absent', path: unitPath, error: null };
+    }
+    return {
+      ok: false,
+      result: 'failed',
+      path: unitPath,
+      error: failure.message || String(error),
+    };
+  }
 }
 
 export function installService(ctx: Ctx): number {
@@ -748,29 +823,56 @@ export function uninstallService(ctx: Ctx): number {
   const paths = servicePaths(home);
   const target = monitorUnitTarget(ctx.env, home);
   const deactivation = deactivateOsService(target);
-  try {
-    fs.rmSync(target.unitPath, { force: true });
-  } catch {
-    /* best-effort */
-  }
-  ensureServiceDirs(paths);
+  // Preserve the established systemd projection. On launchd, both OS deactivation and persistent
+  // LaunchAgent removal are required before the aggregate uninstall may claim success or stop state.
+  let unitRemoval: LaunchdUnitRemovalOutcome | null = null;
+  let completed = target.kind !== 'launchd';
   let stopped = false;
-  withLock(paths.lockTarget, () => {
-    stopped = stopOne(readState(paths.state)).stopped;
-  });
+  if (target.kind === 'launchd') {
+    unitRemoval = deactivation.ok
+      ? removeLaunchdUnit(target.unitPath)
+      : {
+          ok: false,
+          result: 'not-attempted',
+          path: target.unitPath,
+          error: 'unit removal not attempted because launchd deactivation failed',
+        };
+    completed = deactivation.ok && unitRemoval.ok;
+  } else {
+    try {
+      fs.rmSync(target.unitPath, { force: true });
+    } catch {
+      /* best-effort */
+    }
+  }
+  if (completed) {
+    ensureServiceDirs(paths);
+    withLock(paths.lockTarget, () => {
+      stopped = stopOne(readState(paths.state)).stopped;
+    });
+  }
+  const failed = deactivation.steps.find((step) => !step.ok);
+  const failurePoint =
+    failed?.id ?? (unitRemoval?.result === 'failed' ? 'unit-removal' : 'deactivation');
+  const failureError = failed?.error ?? unitRemoval?.error ?? 'unknown';
   output(
     ctx,
     {
-      ok: true,
-      uninstalled: true,
+      ok: completed,
+      uninstalled: completed,
       stopped,
       kind: target.kind,
       path: target.unitPath,
       deactivation,
+      ...(target.kind === 'launchd'
+        ? { platform: target.platform, arch: target.arch, unit_removal: unitRemoval }
+        : {}),
     },
-    `uninstalled monitor ${target.kind} unit: ${target.unitPath}`,
+    completed
+      ? `uninstalled monitor ${target.kind} unit: ${target.unitPath}`
+      : `failed to uninstall monitor ${target.kind} unit at ${failurePoint}: ${failureError}`,
   );
-  return EXIT.OK;
+  return completed ? EXIT.OK : EXIT.ERROR;
 }
 
 export function restartOsServiceIfInstalled(ctx: Ctx): boolean {
