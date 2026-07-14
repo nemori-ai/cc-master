@@ -412,10 +412,12 @@ function nativeAttemptWrite(
       replay_intent?: string;
       existing_attempt?: Record<string, any>;
     }) => { admissionSnapshot: Record<string, any>; launchAuthority: Record<string, any> },
+    boardPath: string,
   ) => Record<string, any>,
 ): number {
   const id = ctx.positionals[0] as string;
   let operationResult: Record<string, any> | undefined;
+  let boardPath = '';
   let evidenceTransaction:
     | {
         boundary: {
@@ -441,6 +443,7 @@ function nativeAttemptWrite(
     const boundary = ctx.nativeAttemptPrivateEvidence;
     if (!boundary) nativeAttemptError('NATIVE-EVIDENCE-AUTHENTICATOR-UNAVAILABLE');
     const staged = boundary.stageAndVerify({
+      board_path: boardPath,
       evidence_class: evidenceClass,
       record_ref: recordRef,
       expected,
@@ -470,7 +473,7 @@ function nativeAttemptWrite(
     if (evidenceTransaction) nativeAttemptError('NATIVE-EVIDENCE-TRANSACTION-CONFLICT');
     const boundary = ctx.nativeAttemptAdmission;
     if (!boundary) nativeAttemptError('NATIVE-CREATE-ADMISSION-UNAVAILABLE');
-    const staged = boundary.stageCreate(input);
+    const staged = boundary.stageCreate({ ...input, board_path: boardPath });
     if (staged.transaction_id) {
       evidenceTransaction = { boundary, transactionId: staged.transaction_id };
     }
@@ -491,10 +494,11 @@ function nativeAttemptWrite(
   };
 
   return runWrite(ctx, {
-    mutate: (board) => {
+    mutate: (board, _ctx, opts) => {
+      boardPath = opts.boardPath;
       const applied = mutations.applyNativeAttemptCommand(
         board as BoardArg,
-        makeCommand(board as BoardArg, stageEvidence, stageLaunch),
+        makeCommand(board as BoardArg, stageEvidence, stageLaunch, boardPath),
       );
       operationResult = applied.result;
       return applied.board;

@@ -13,6 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, test } from 'node:test';
+import { canonicalSha256Digest } from '@ccm/engine';
 import { runProduction } from '../src/production-run.js';
 
 const roots: string[] = [];
@@ -23,20 +24,8 @@ after(() =>
 );
 const clone = <T>(value: T): T => structuredClone(value);
 
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const row = value as Record<string, unknown>;
-    return `{${Object.keys(row)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonical(row[key])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
 function sha(value: unknown): string {
-  return `sha256:${createHash('sha256').update(canonical(value)).digest('hex')}`;
+  return canonicalSha256Digest(value);
 }
 
 function fixture(): any {
@@ -238,11 +227,7 @@ function installBindEvidence(
   mkdirSync(dirname(registrationPath), { recursive: true, mode: 0o700 });
   mkdirSync(dirname(recordPath), { recursive: true, mode: 0o700 });
   writeFileSync(registrationPath, `${JSON.stringify(registration, null, 2)}\n`, { mode: 0o600 });
-  writeFileSync(
-    recordPath,
-    `${JSON.stringify(entry, null, 2)}\n`,
-    { mode: 0o600 },
-  );
+  writeFileSync(recordPath, `${JSON.stringify(entry, null, 2)}\n`, { mode: 0o600 });
   return { recordPath, registrationPath, recordRef };
 }
 
@@ -282,31 +267,35 @@ function strandOwnerCommit(
   ownerPid = 2_147_483_647,
 ): string {
   const current = JSON.parse(readFileSync(currentPath, 'utf8'));
-  const payload =
+  const projection = current.projection;
+  const locator =
     kind === 'launch'
       ? {
-          schema: current.schema,
-          claim_id: current.claim_id,
-          canonical_identity_digest: current.canonical_identity_digest,
-          ticket_digest: current.ticket_digest,
-          reservation_id: current.reservation_id,
+          kind,
+          task_id: projection.task_id,
+          attempt_id: projection.attempt_id,
+          dispatch_key: projection.value.attempt.dispatch.key,
         }
       : {
-          schema: current.schema,
-          evidence_class: current.evidence_class,
-          record_ref: current.record_ref,
-          record_hash: current.record_hash,
+          kind,
+          evidence_class: projection.evidence_class,
+          task_id: projection.task_id,
+          attempt_id: projection.attempt_id,
+          record_ref: projection.record_ref,
+          record_hash: projection.record_hash,
         };
   const lockPath = join(dirname(currentPath), 'stage.lock');
   writeFileSync(
     lockPath,
     `${JSON.stringify(
       {
-        schema: 'ccm/native-owner-stage/v1',
+        schema: 'ccm/native-owner-stage/v2',
         kind,
         owner_pid: ownerPid,
         identity: current.identity,
-        payload,
+        payload: current.payload,
+        board_path: current.board_path,
+        locator,
       },
       null,
       2,
@@ -645,6 +634,12 @@ test('R2 default runProduction executes the complete production evidence verifie
     id: string;
     issue: string;
     mutate: (state: { record: any; registration: any; entry: any }) => void;
+    afterInstall?: (state: {
+      recordPath: string;
+      registrationPath: string;
+      home: string;
+      command: any;
+    }) => void;
   }> = [
     {
       id: 'caller-verification',
@@ -667,6 +662,38 @@ test('R2 default runProduction executes the complete production evidence verifie
       mutate: ({ registration }) => (registration.public_key_id = 'ed25519:other-key'),
     },
     {
+      id: 'registration-revoked',
+      issue: 'NATIVE-EVIDENCE-REGISTRATION-UNKNOWN',
+      mutate: ({ registration }) => (registration.revoked = true),
+    },
+    {
+      id: 'registration-extra-field',
+      issue: 'NATIVE-EVIDENCE-REGISTRATION-UNKNOWN',
+      mutate: ({ registration }) => (registration.caller_extension = true),
+    },
+    {
+      id: 'registration-unknown',
+      issue: 'NATIVE-EVIDENCE-REGISTRATION-UNKNOWN',
+      mutate: ({ record }) =>
+        (record.producer.registration_ref = 'private-producer-registration:missing'),
+    },
+    {
+      id: 'signature',
+      issue: 'NATIVE-EVIDENCE-SIGNATURE-INVALID',
+      mutate: () => undefined,
+      afterInstall: ({ recordPath }) => {
+        const entry = JSON.parse(readFileSync(recordPath, 'utf8'));
+        entry.record.producer.signature = `ed25519:${Buffer.alloc(64, 7).toString('base64')}`;
+        writeFileSync(recordPath, `${JSON.stringify(entry, null, 2)}\n`, { mode: 0o600 });
+      },
+    },
+    {
+      id: 'trust-scope',
+      issue: 'NATIVE-EVIDENCE-TRUST-SCOPE-MISMATCH',
+      mutate: ({ registration }) =>
+        (registration.trust_scope.origin_session_ref = 'session-ref:other-origin'),
+    },
+    {
       id: 'expected-child',
       issue: 'NATIVE-EXPECTED-CHILD-MISMATCH',
       mutate: ({ record }) => (record.expected.child_target = '/root/fixture-parent/other-child'),
@@ -679,7 +706,79 @@ test('R2 default runProduction executes the complete production evidence verifie
     {
       id: 'raw-spawn-provenance',
       issue: 'NATIVE-HANDLE-UNATTESTED',
-      mutate: ({ record }) => delete record.observed.spawn.owner_record_ref,
+      mutate: ({ record }) => (record.observed.spawn.owner_record_ref = ''),
+    },
+    {
+      id: 'raw-roster-hash',
+      issue: 'NATIVE-HANDLE-UNATTESTED',
+      mutate: ({ record }) => (record.observed.roster.raw_evidence_hash = 'not-a-digest'),
+    },
+    {
+      id: 'handle-missing',
+      issue: 'NATIVE-HANDLE-MISSING',
+      mutate: ({ record }) => (record.observed.handle = ''),
+    },
+    {
+      id: 'create-link-input',
+      issue: 'NATIVE-EVIDENCE-CREATE-LINK-MISMATCH',
+      mutate: ({ record }) => (record.create_link.input_hash = `sha256:${'a'.repeat(64)}`),
+    },
+    {
+      id: 'create-link-reservation',
+      issue: 'NATIVE-EVIDENCE-CREATE-LINK-MISMATCH',
+      mutate: ({ record }) => (record.create_link.reservation_id = 'qres-forged'),
+    },
+    {
+      id: 'create-link-ticket',
+      issue: 'NATIVE-EVIDENCE-CREATE-LINK-MISMATCH',
+      mutate: ({ record }) => (record.create_link.ticket_digest = `sha256:${'b'.repeat(64)}`),
+    },
+    {
+      id: 'create-link-identity',
+      issue: 'NATIVE-EVIDENCE-CREATE-LINK-MISMATCH',
+      mutate: ({ record }) =>
+        (record.create_link.launch_identity_digest = `sha256:${'c'.repeat(64)}`),
+    },
+    {
+      id: 'lineage',
+      issue: 'NATIVE-LINEAGE-MISMATCH',
+      mutate: ({ record }) => (record.observed.current_lineage.worktree_ref = 'worktree-ref:other'),
+    },
+    {
+      id: 'account-unknown',
+      issue: 'NATIVE-ACCOUNT-FINGERPRINT-UNKNOWN',
+      mutate: ({ entry }) => (entry.fact_resolution.account = 'unknown'),
+    },
+    {
+      id: 'account-drift',
+      issue: 'NATIVE-ACCOUNT-FINGERPRINT-MISMATCH',
+      mutate: ({ entry }) => (entry.fact_resolution.account = 'drifted'),
+    },
+    {
+      id: 'permission-profile',
+      issue: 'NATIVE-PERMISSION-PROFILE-INCOMPATIBLE',
+      mutate: ({ entry }) => (entry.fact_resolution.permission_profile = 'incompatible'),
+    },
+    {
+      id: 'permission-denies',
+      issue: 'NATIVE-PERMISSION-DENY-INCOMPATIBLE',
+      mutate: ({ entry }) => (entry.fact_resolution.permission_denies = 'incompatible'),
+    },
+    {
+      id: 'launch-claim',
+      issue: 'NATIVE-EVIDENCE-CLAIM-REUSED',
+      mutate: () => undefined,
+      afterInstall: ({ home, command }) =>
+        unlinkSync(
+          join(
+            home,
+            'native-attempt',
+            'v1',
+            'claims',
+            createHash('sha256').update(command.attempt.dispatch.launch_claim_id).digest('hex'),
+            'current.json',
+          ),
+        ),
     },
     {
       id: 'owner-store-provenance',
@@ -700,7 +799,8 @@ test('R2 default runProduction executes the complete production evidence verifie
     installAdmission(home, command);
     const created = invoke(boardPath, home, command);
     assert.equal(created.code, 0, created.err.join('\n'));
-    installBindEvidence(home, boardPath, value, row.mutate);
+    const installed = installBindEvidence(home, boardPath, value, row.mutate);
+    row.afterInstall?.({ ...installed, home, command });
 
     const beforeBoard = readFileSync(boardPath, 'utf8');
     const consumptionRoot = join(home, 'native-attempt', 'v1', 'evidence', 'consumptions');

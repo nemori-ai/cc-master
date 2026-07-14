@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { createHash, createPrivateKey, createPublicKey, sign, verify } from 'node:crypto';
+import { createHash, createPrivateKey, sign } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { canonicalJson, canonicalSha256Digest } from '@ccm/engine';
 import * as io from '../src/io.js';
+import { verifyProductionNativeEvidence } from '../src/native-attempt-evidence-verifier.js';
 import { REGISTRY } from '../src/registry.js';
 import { run } from '../src/router.js';
 
@@ -51,18 +53,6 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const row = value as Record<string, unknown>;
-    return `{${Object.keys(row)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stableJson(row[key])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
 function canonicalSignedRecord(record: any): any {
   if (record.schema !== 'ccm/native-evidence-record/v1') {
     // The frozen bind vectors predate the generic record envelope. Keep their exact
@@ -98,9 +88,7 @@ function canonicalSignedRecord(record: any): any {
 }
 
 function canonicalRecordHash(record: any): string {
-  return `sha256:${createHash('sha256')
-    .update(stableJson(canonicalSignedRecord(record)))
-    .digest('hex')}`;
+  return canonicalSha256Digest(canonicalSignedRecord(record));
 }
 
 function authFailure(code: string): any {
@@ -129,9 +117,6 @@ class PrivateEvidenceHarness {
   controlAuthority: any;
 
   constructor() {
-    for (const [ref, entry] of Object.entries(fixture.private_evidence.owner_store.records)) {
-      this.records.set(ref, clone(entry));
-    }
     for (const [ref, registration] of Object.entries(
       fixture.private_evidence.producer_registrations,
     )) {
@@ -163,6 +148,9 @@ class PrivateEvidenceHarness {
         origin_session_ref: fixture.lineage.origin_session_ref,
       },
     });
+    for (const [ref, entry] of Object.entries(fixture.private_evidence.owner_store.records)) {
+      this.installOwnerEntry(ref, clone(entry));
+    }
     for (const [claim, recordHash] of Object.entries(fixture.private_evidence.launch_claims)) {
       if (recordHash) this.claims.set(claim, String(recordHash));
     }
@@ -171,12 +159,84 @@ class PrivateEvidenceHarness {
   }
 
   installVector(vector: any): void {
-    this.records.set(vector.record_ref, clone(vector.owner_store_entry));
+    this.installOwnerEntry(vector.record_ref, clone(vector.owner_store_entry), vector.issue);
     if (vector.claim_prebound_record_hash) {
       this.claims.set(
         vector.owner_store_entry.record.create_link.launch_claim_id,
         vector.claim_prebound_record_hash,
       );
+    }
+  }
+
+  private installOwnerEntry(recordRef: string, sourceEntry: any, issue?: string): void {
+    const base = clone(
+      fixture.private_evidence.owner_store.records['evidence:fixture-bind-001'].record,
+    );
+    const incoming = clone(sourceEntry.record ?? {});
+    const incomingObserved = incoming.observed ?? {};
+    const entry = {
+      provenance: clone(sourceEntry.provenance),
+      fact_resolution: clone(sourceEntry.fact_resolution),
+      record: {
+        schema: 'ccm/native-handle-evidence-record/codex-api-tool/v1',
+        record_id: recordRef,
+        record_hash: '',
+        producer: { ...TEST_PRODUCER, signature: '' },
+        create_link: {
+          task_id: incoming.create_link?.task_id ?? base.create_link.task_id,
+          attempt_id: incoming.create_link?.attempt_id ?? base.create_link.attempt_id,
+          candidate_id: incoming.create_link?.candidate_id ?? base.create_link.candidate_id,
+          dispatch_key:
+            issue === 'NATIVE-EVIDENCE-CREATE-LINK-MISMATCH'
+              ? incoming.create_link?.dispatch_key
+              : fixture.commands.create.attempt.dispatch.key,
+          input_hash: fixture.commands.create.attempt.dispatch.input_hash,
+          request_hash: incoming.create_link?.request_hash ?? base.create_link.request_hash,
+          launch_claim_id:
+            incoming.create_link?.launch_claim_id ?? base.create_link.launch_claim_id,
+          reservation_id: fixture.commands.create.launch_authority.reservation.reservation_id,
+          ticket_digest: fixture.commands.create.launch_authority.ticket_digest,
+          launch_identity_digest:
+            fixture.commands.create.launch_authority.canonical_identity_digest,
+        },
+        expected: {
+          transport: incoming.expected?.transport ?? base.expected.transport,
+          parent_target: incoming.expected?.parent_target ?? base.expected.parent_target,
+          child_target: incoming.expected?.child_target ?? base.expected.child_target,
+        },
+        observed: {
+          handle_kind: incomingObserved.handle_kind ?? base.observed.handle_kind,
+          handle: incomingObserved.handle ?? base.observed.handle,
+          canonical_target: incomingObserved.canonical_target ?? base.observed.canonical_target,
+          spawn: clone(incomingObserved.spawn ?? base.observed.spawn),
+          roster: clone(incomingObserved.roster ?? base.observed.roster),
+          current_lineage: clone(incomingObserved.current_lineage ?? base.observed.current_lineage),
+        },
+      },
+    };
+    const record = entry.record as any;
+    if (Object.hasOwn(incoming, 'verified_by_ccm')) {
+      record.verified_by_ccm = incoming.verified_by_ccm;
+    }
+    if (issue === 'NATIVE-HANDLE-MISSING') record.observed.handle = '';
+    if (issue === 'NATIVE-HANDLE-UNATTESTED') {
+      record.observed.roster.owner_record_ref = '';
+    }
+    if (issue === 'NATIVE-EVIDENCE-REGISTRATION-UNKNOWN') {
+      record.producer.registration_ref = 'private-producer-registration:unknown';
+    }
+    if (issue === 'NATIVE-EVIDENCE-TRUST-SCOPE-MISMATCH') {
+      this.registrations.get(TEST_PRODUCER.registration_ref).trust_scope.origin_session_ref =
+        'session-ref:other-origin';
+    }
+    this.records.set(recordRef, entry);
+    this.resignRecord(recordRef);
+    if (issue === 'NATIVE-EVIDENCE-SIGNATURE-INVALID') {
+      record.producer.signature = `ed25519:${Buffer.alloc(64, 7).toString('base64')}`;
+    }
+    if (issue === 'NATIVE-EVIDENCE-CANONICAL-HASH-MISMATCH') {
+      record.record_hash =
+        'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
     }
   }
 
@@ -242,8 +302,12 @@ class PrivateEvidenceHarness {
         attempt_id: fixture.commands.create.attempt.id,
         candidate_id: fixture.commands.create.attempt.candidate_id,
         dispatch_key: fixture.commands.create.attempt.dispatch.key,
+        input_hash: fixture.commands.create.attempt.dispatch.input_hash,
         request_hash: fixture.commands.create.attempt.dispatch.request_hash,
         launch_claim_id: fixture.commands.create.attempt.dispatch.launch_claim_id,
+        reservation_id: fixture.commands.create.launch_authority.reservation.reservation_id,
+        ticket_digest: fixture.commands.create.launch_authority.ticket_digest,
+        launch_identity_digest: fixture.commands.create.launch_authority.canonical_identity_digest,
         create_hash: createHash,
       },
       expected: {
@@ -277,11 +341,6 @@ class PrivateEvidenceHarness {
   resignRecord(recordRef: string): void {
     const record = this.records.get(recordRef)?.record;
     assert.ok(record, `cannot sign missing owner record ${recordRef}`);
-    assert.equal(
-      record.producer.registration_ref,
-      TEST_PRODUCER.registration_ref,
-      'only deterministic synthetic owner records may be re-signed',
-    );
     record.record_hash = canonicalRecordHash(record);
     const privateKey = createPrivateKey({
       key: Buffer.from(TEST_PRIVATE_KEY_PKCS8_BASE64, 'base64'),
@@ -295,340 +354,37 @@ class PrivateEvidenceHarness {
     ).toString('base64')}`;
   }
 
-  private expectedContextMatches(expected: any): boolean {
-    return !!(
-      expected &&
-      expected.contract === fixture.contract &&
-      expected.origin === 'codex' &&
-      expected.harness === 'codex' &&
-      expected.adapter === 'codex/api-tool-multi-agent-v1' &&
-      expected.surface === fixture.commands.create.attempt.surface &&
-      expected.transport === fixture.commands.create.attempt.transport &&
-      expected.task_id === fixture.commands.create.task_id &&
-      expected.attempt_id === fixture.commands.create.attempt.id &&
-      expected.candidate_id === fixture.commands.create.attempt.candidate_id &&
-      expected.dispatch_key === fixture.commands.create.attempt.dispatch.key &&
-      expected.input_hash === fixture.commands.create.attempt.dispatch.input_hash &&
-      expected.request_hash === fixture.commands.create.attempt.dispatch.request_hash &&
-      expected.launch_claim_id === fixture.commands.create.attempt.dispatch.launch_claim_id &&
-      expected.reservation_id ===
-        fixture.commands.create.launch_authority.reservation.reservation_id &&
-      expected.ticket_digest === fixture.commands.create.launch_authority.ticket_digest &&
-      expected.launch_identity_digest ===
-        fixture.commands.create.launch_authority.canonical_identity_digest &&
-      /^sha256:[a-f0-9]{64}$/.test(expected.create_hash) &&
-      stableJson(expected.lineage) === stableJson(fixture.commands.create.attempt.lineage)
-    );
-  }
-
-  authenticateRecord(input: any): any {
-    this.trace.length = 0;
+  stageAndVerify = (input: any): any => {
+    this.stageCalls += 1;
     const evidenceClass = input?.evidence_class;
     if (evidenceClass === 'bind') this.authenticateBindCalls += 1;
     const recordRef = input?.record_ref;
     const expected = input?.expected;
-    this.trace.push('expected-attempt-context');
-    if (!this.expectedContextMatches(expected)) {
-      return authFailure('NATIVE-EVIDENCE-CREATE-LINK-MISMATCH');
-    }
-    const entry = this.records.get(recordRef);
-    this.trace.push('owner-store-resolve');
-    if (!entry) return authFailure('NATIVE-EVIDENCE-RECORD-MISSING');
-    const record = entry.record;
-
-    this.trace.push('evidence-class');
-    const recordClass =
-      record.schema === 'ccm/native-handle-evidence-record/codex-api-tool/v1'
-        ? 'bind'
-        : record.evidence_class;
-    if (recordClass !== evidenceClass) {
-      return authFailure('NATIVE-EVIDENCE-CLASS-UNSUPPORTED');
-    }
-
-    this.trace.push('caller-verification-field');
-    if (Object.hasOwn(record, 'verified_by_ccm')) {
-      return authFailure('NATIVE-EVIDENCE-CALLER-VERIFICATION-FORBIDDEN');
-    }
-
-    this.trace.push('owner-store-provenance');
-    const provenance = entry.provenance;
-    if (
-      provenance.store !== 'ccm-owner-evidence/v1' ||
-      provenance.owner_home_ref !== fixture.private_evidence.configured_owner_home_ref ||
-      provenance.visibility !== 'owner-only' ||
-      provenance.record_ref !== recordRef ||
-      record.record_id !== recordRef
-    ) {
-      return authFailure('NATIVE-EVIDENCE-OWNER-STORE-PROVENANCE');
-    }
-
-    this.trace.push('canonical-hash');
-    if (canonicalRecordHash(record) !== record.record_hash) {
-      return authFailure('NATIVE-EVIDENCE-CANONICAL-HASH-MISMATCH');
-    }
-
-    this.trace.push('producer-registration');
-    const registration = this.registrations.get(record.producer.registration_ref);
-    if (
-      !registration ||
-      registration.revoked === true ||
-      registration.producer_id !== record.producer.producer_id ||
-      registration.channel !== record.producer.channel
-    ) {
-      return authFailure('NATIVE-EVIDENCE-REGISTRATION-UNKNOWN');
-    }
-
-    this.trace.push('producer-key-integrity');
-    const publicKeyBytes = Buffer.from(registration.public_key_spki_base64, 'base64');
-    const keyFingerprint = `sha256:${createHash('sha256').update(publicKeyBytes).digest('hex')}`;
-    if (
-      registration.public_key_id !==
-        `ed25519:${registration.producer_id.replace(/^producer:/, '')}` ||
-      registration.public_key_fingerprint !== keyFingerprint
-    ) {
-      return authFailure('NATIVE-EVIDENCE-REGISTRATION-UNKNOWN');
-    }
-
-    this.trace.push('signature');
-    const publicKey = createPublicKey({
-      key: publicKeyBytes,
-      format: 'der',
-      type: 'spki',
-    });
-    if (
-      !verify(
-        null,
-        Buffer.from(record.record_hash),
-        publicKey,
-        Buffer.from(record.producer.signature.replace(/^ed25519:/, ''), 'base64'),
-      )
-    ) {
-      return authFailure('NATIVE-EVIDENCE-SIGNATURE-INVALID');
-    }
-
-    this.trace.push('producer-trust-scope');
-    const scope = registration.trust_scope;
-    if (
-      scope.contract !== expected.contract ||
-      scope.origin !== expected.origin ||
-      scope.harness !== expected.harness ||
-      scope.adapter !== expected.adapter ||
-      scope.surface !== expected.surface ||
-      scope.transport !== expected.transport ||
-      scope.origin_session_ref !== expected.lineage.origin_session_ref
-    ) {
-      return authFailure('NATIVE-EVIDENCE-TRUST-SCOPE-MISMATCH');
-    }
-
-    this.trace.push('content-linkage');
-    const link = record.create_link;
-    if (
-      link.task_id !== expected.task_id ||
-      link.attempt_id !== expected.attempt_id ||
-      link.candidate_id !== expected.candidate_id ||
-      link.dispatch_key !== expected.dispatch_key ||
-      link.request_hash !== expected.request_hash ||
-      link.launch_claim_id !== expected.launch_claim_id ||
-      (record.schema === 'ccm/native-evidence-record/v1' &&
-        link.create_hash !== expected.create_hash)
-    ) {
-      return authFailure('NATIVE-EVIDENCE-CREATE-LINK-MISMATCH');
-    }
-    if (record.expected.child_target !== expected.lineage.expected_child_target) {
-      return authFailure('NATIVE-EXPECTED-CHILD-MISMATCH');
-    }
-    if (record.schema === 'ccm/native-evidence-record/v1') {
-      if (
-        record.expected.contract !== expected.contract ||
-        stableJson(record.expected.descriptor) !==
-          stableJson({
-            origin: expected.origin,
-            harness: expected.harness,
-            adapter: expected.adapter,
-            surface: expected.surface,
-            transport: expected.transport,
-          }) ||
-        stableJson(record.observed.descriptor) !== stableJson(record.expected.descriptor)
-      ) {
-        return authFailure('NATIVE-EVIDENCE-TRUST-SCOPE-MISMATCH');
-      }
-    }
-    const current = record.observed.current_lineage;
-    const lineageKeys = [
-      'origin_session_ref',
-      'parent_target',
-      'expected_child_target',
-      'workspace_ref',
-      'worktree_ref',
-      'baseline_commit',
-    ];
-    const permitsDrift =
-      evidenceClass === 'reconcile' && record.payload.classification === 'uncertain';
-    for (const key of lineageKeys) {
-      if (
-        typeof current?.[key] !== 'string' ||
-        current[key].length === 0 ||
-        (!permitsDrift && current[key] !== expected.lineage[key])
-      ) {
-        return authFailure('NATIVE-LINEAGE-MISMATCH');
-      }
-    }
-    if (
-      !current.permission ||
-      typeof current.account_fingerprint_ref !== 'string' ||
-      current.account_fingerprint_ref.length === 0 ||
-      typeof current.permission.snapshot_ref !== 'string' ||
-      typeof current.permission.profile !== 'string' ||
-      !Array.isArray(current.permission.denies)
-    ) {
-      return authFailure('NATIVE-LINEAGE-MISMATCH');
-    }
-
-    if (evidenceClass === 'bind') {
-      this.trace.push('handle-content');
-      if (!record.observed.handle) return authFailure('NATIVE-HANDLE-MISSING');
-      if (
-        record.observed.handle === expected.lineage.origin_session_ref ||
-        record.observed.handle === expected.lineage.parent_target ||
-        record.observed.handle === expected.task_id
-      ) {
-        return authFailure('NATIVE-HANDLE-PARENT-SESSION');
-      }
-      if (!record.observed.roster || record.observed.roster.handle !== record.observed.handle) {
-        return authFailure('NATIVE-HANDLE-UNATTESTED');
-      }
-      if (record.observed.canonical_target !== expected.lineage.expected_child_target) {
-        return authFailure('NATIVE-EXPECTED-CHILD-MISMATCH');
-      }
-    } else {
-      const targetRequired =
-        evidenceClass === 'terminal' ||
-        record.payload.classification === 'running' ||
-        record.payload.classification === 'terminal';
-      if (
-        (targetRequired && record.observed.target !== expected.lineage.expected_child_target) ||
-        (!targetRequired && record.observed.target !== null)
-      ) {
-        return authFailure('NATIVE-EXPECTED-CHILD-MISMATCH');
-      }
-      if (
-        evidenceClass === 'reconcile' &&
-        record.payload.classification === 'running' &&
-        (!record.observed.handle ||
-          record.observed.spawn?.target !== record.observed.target ||
-          record.observed.roster?.target !== record.observed.target ||
-          record.observed.roster?.handle !== record.observed.handle)
-      ) {
-        return authFailure('NATIVE-HANDLE-UNATTESTED');
-      }
-    }
-
-    this.trace.push('account-lineage');
-    if (entry.fact_resolution.account === 'unknown') {
-      return authFailure('NATIVE-ACCOUNT-FINGERPRINT-UNKNOWN');
-    }
-    if (entry.fact_resolution.account === 'drifted') {
-      return authFailure('NATIVE-ACCOUNT-FINGERPRINT-MISMATCH');
-    }
-
-    this.trace.push('permission-profile');
-    if (entry.fact_resolution.permission_profile !== 'compatible') {
-      return authFailure('NATIVE-PERMISSION-PROFILE-INCOMPATIBLE');
-    }
-
-    this.trace.push('permission-denies');
-    if (entry.fact_resolution.permission_denies !== 'compatible') {
-      return authFailure('NATIVE-PERMISSION-DENY-INCOMPATIBLE');
-    }
-
-    let claim: string | undefined;
-    if (evidenceClass === 'bind') {
-      this.trace.push('one-shot-claim');
-      const bindClaim = String(record.create_link.launch_claim_id);
-      claim = bindClaim;
-      const claimedBy = this.claims.get(bindClaim);
-      if (!claimedBy || claimedBy !== expected.launch_identity_digest) {
-        return authFailure('NATIVE-EVIDENCE-CLAIM-REUSED');
-      }
-    }
-    return {
-      ok: true,
-      record,
-      entry,
-      claim,
-    };
-  }
-
-  stageAndVerify = (input: any): any => {
-    this.stageCalls += 1;
-    const evidenceClass = input?.evidence_class;
-    const recordRef = input?.record_ref;
-    const expected = input?.expected;
-    const authenticated = this.authenticateRecord(input);
-    if (!authenticated.ok) return authenticated;
-    const { record, entry } = authenticated;
-    const recordHash = record.record_hash;
-    let observed: any;
-    let payload: any;
-    if (evidenceClass === 'bind') {
-      observed = {
-        descriptor: {
-          origin: expected.origin,
-          harness: expected.harness,
-          adapter: expected.adapter,
-          surface: expected.surface,
-          transport: expected.transport,
-        },
-        target: record.observed.canonical_target,
-        source: 'authoritative-spawn-and-roster',
-        current_lineage: clone(record.observed.current_lineage),
-        handle: record.observed.handle,
-        handle_kind: record.observed.handle_kind,
-        spawn: { ...clone(record.observed.spawn), target: record.observed.canonical_target },
-        roster: { ...clone(record.observed.roster), target: record.observed.canonical_target },
-      };
-      payload = {
-        durability_class: 'legacy_session_bound',
-      };
-    } else {
-      observed = clone(record.observed);
-      payload = clone(record.payload);
-    }
-
-    const verifiedEvidence = {
-      schema: 'ccm/native-verified-evidence/v1',
+    const authenticated = verifyProductionNativeEvidence({
       evidence_class: evidenceClass,
       record_ref: recordRef,
-      record_hash: recordHash,
-      producer: {
-        producer_id: record.producer.producer_id,
-        channel: record.producer.channel,
-        registration_ref: record.producer.registration_ref,
+      expected,
+      store: {
+        ownerHomeRef: fixture.private_evidence.configured_owner_home_ref,
+        resolveRecord: (ref) => this.records.get(ref),
+        resolveRegistration: (ref) => this.registrations.get(ref),
+        resolveLaunchClaim: (claimId) =>
+          this.claims.get(claimId) === expected.launch_identity_digest
+            ? {
+                schema: 'ccm/native-launch-claim/v1',
+                claim_id: claimId,
+                canonical_identity_digest: expected.launch_identity_digest,
+                ticket_digest: expected.ticket_digest,
+                reservation_id: expected.reservation_id,
+              }
+            : undefined,
       },
-      resolved_context: clone(entry.fact_resolution),
-      scope: {
-        contract: expected.contract,
-        origin: expected.origin,
-        harness: expected.harness,
-        adapter: expected.adapter,
-        surface: expected.surface,
-        transport: expected.transport,
-        task_id: expected.task_id,
-        attempt_id: expected.attempt_id,
-        candidate_id: expected.candidate_id,
-        dispatch_key: expected.dispatch_key,
-        input_hash: expected.input_hash,
-        request_hash: expected.request_hash,
-        launch_claim_id: expected.launch_claim_id,
-        reservation_id: expected.reservation_id,
-        ticket_digest: expected.ticket_digest,
-        launch_identity_digest: expected.launch_identity_digest,
-        create_hash: expected.create_hash,
-      },
-      observed,
-      payload,
-    };
-    const identity = stableJson({
+    });
+    this.trace.splice(0, this.trace.length, ...authenticated.trace);
+    if (!authenticated.ok) return authenticated;
+    const verifiedEvidence = authenticated.verified_evidence;
+    const recordHash = verifiedEvidence.record_hash;
+    const identity = canonicalJson({
       evidence_class: evidenceClass,
       record_ref: recordRef,
       record_hash: recordHash,
@@ -916,7 +672,7 @@ function assertOk(result: CliResult, label: string): void {
 }
 
 function consumedSnapshot(auth: PrivateEvidenceHarness): string {
-  return stableJson({
+  return canonicalJson({
     claims: [...auth.claims.entries()].sort(),
     consumed: [...auth.consumed.entries()].sort(),
   });

@@ -111,6 +111,7 @@ export interface NativeAttemptPrivateEvidenceBoundary {
   schema: string;
   channel: string;
   stageAndVerify: (input: {
+    board_path: string;
     evidence_class: NativeAttemptEvidenceClass;
     record_ref: string;
     expected: Record<string, any>;
@@ -129,6 +130,7 @@ export interface NativeAttemptPrivateEvidenceBoundary {
 
 export interface NativeAttemptAdmissionBoundary {
   stageCreate: (input: {
+    board_path: string;
     task_id: string;
     selection_snapshot: Record<string, any>;
     attempt: Record<string, any>;
@@ -327,7 +329,7 @@ export function resolveBoardIgnoringGoal(ctx: Ctx): { boardPath: string; board: 
 
 // runWrite / runRead 回调签名。render 的第三参（{dryRun}）只在 runWrite 传。
 type ResolveFn = (ctx: Ctx) => { boardPath: string; board: unknown };
-type MutateFn = (board: unknown, ctx: Ctx) => unknown;
+type MutateFn = (board: unknown, ctx: Ctx, opts: { boardPath: string }) => unknown;
 type WriteRenderFn = (
   next: unknown,
   ctx: Ctx,
@@ -431,7 +433,7 @@ export function runWrite(
       }
 
       const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-      const next = reconcileInbox(reconcileGating(mutate(raw, ctx)), now);
+      const next = reconcileInbox(reconcileGating(mutate(raw, ctx, { boardPath })), now);
 
       // Native attempt 的 writer ownership 是 mutation-boundary hard gate，先于可被 --force 越过的普通 lint。
       // generic 是所有既有 writer 的默认值；只有 dedicated native verb 显式传对应 writerKind。
