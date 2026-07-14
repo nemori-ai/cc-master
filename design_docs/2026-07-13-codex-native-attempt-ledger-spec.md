@@ -49,10 +49,11 @@ same production records and exercise `runProduction`, but receives no fixture-on
 resolver shortcut.
 
 The stage file is itself a durable owner-only intent record with the staging process identity. If
-that process dies after the board
-rename but before the owner claim/consumption commit, an exact retry may reclaim that stage only
+that process dies after the board rename but before the owner claim/consumption commit, an exact
+retry may reclaim that stage only
 when the locked board already contains the same immutable attempt or evidence ref/hash. A missing
-projection, changed identity/payload, unrelated stage, or still-live stage owner is never reclaimed. This closes the
+projection, changed identity/payload, unrelated stage, or still-live stage owner is never reclaimed.
+This closes the
 post-board/pre-owner-commit crash window without granting a second launch or consuming conflicting
 evidence.
 

@@ -31,11 +31,11 @@ test('frozen native-attempt SSOT exposes the current five writer commands and ex
 
   assert.match(
     spec,
-    /pnpm --filter @ccm\/engine exec node --test test\/native-attempt-contract\.red\.test\.ts/,
+    /pnpm --filter @ccm\/engine exec node --test test\/native-attempt-contract\.red\.test\.ts test\/native-attempt-r1-authority\.red\.test\.ts test\/native-attempt-r1-causal\.red\.test\.ts/,
   );
   assert.match(
     spec,
-    /pnpm --filter ccm exec node --import tsx --test test\/handler-native-attempt\.red\.test\.ts test\/registry\.test\.ts/,
+    /pnpm --filter ccm exec node --import tsx --test test\/handler-native-attempt\.red\.test\.ts test\/native-attempt-production-r1\.red\.test\.ts test\/registry\.test\.ts/,
   );
   assert.match(spec, /Both focused commands MUST pass today/);
 
