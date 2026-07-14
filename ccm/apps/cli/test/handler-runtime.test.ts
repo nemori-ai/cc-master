@@ -110,6 +110,13 @@ class TestChildOwner {
     return child;
   }
 
+  async waitForNaturalClose(child: ChildProcess, timeoutMs: number): Promise<void> {
+    const record = this.#records.get(child);
+    if (!record) throw new Error('cannot wait for an unowned test child');
+    await waitForOwnedTreeClose(record, timeoutMs);
+    this.#records.delete(child);
+  }
+
   async terminateAll(): Promise<void> {
     await this.terminate([...this.#records.keys()]);
   }
@@ -1688,12 +1695,13 @@ test('native bootstrap self-clean survives parent SIGKILL before and after helpe
       writeFileSync(barrier, 'go');
       await waitForCondition(
         () => launcherHelpers(first.home).length === 1,
-        `${point}: orphaned native child did not finish`,
+        `${point}: orphaned native child did not publish its helper`,
       );
       await waitForCondition(
         () => materializerInstances(first.home).length === 0,
-        `${point}: executable bootstrap survived orphan completion`,
+        `${point}: executable bootstrap survived native self-clean`,
       );
+      await TEST_CHILDREN.waitForNaturalClose(publisher, 3_000);
 
       const recoveredOutput = join(first.root, `${point}-recovered`);
       assert.equal(runtime.invoke([recoveredOutput]).exit_code, 0);
