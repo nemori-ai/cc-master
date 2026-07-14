@@ -270,6 +270,36 @@ if (surface === 'all') {
   }
 }
 
+// Origin capability adapters: host-native tool invocation mappings only. Each capability must
+// declare an explicit per-host strategy; unsupported hosts project no payload.
+if (surface === 'all') {
+  const adaptersSrc = path.join(src, 'adapters');
+  if (fs.existsSync(adaptersSrc)) {
+    for (const capability of fs.readdirSync(adaptersSrc).sort()) {
+      if (capability === 'AGENTS.md' || capability.startsWith('_')) continue;
+      const capabilityDir = path.join(adaptersSrc, capability);
+      if (!fs.statSync(capabilityDir).isDirectory()) continue;
+      const hostDir = path.join(capabilityDir, 'adapters', host);
+      const strategy = path.join(hostDir, 'strategy.yaml');
+      if (!fs.existsSync(strategy)) throw new Error(`missing ${strategy}`);
+      const mode = readStrategyMode(strategy);
+      if (mode === 'unsupported') continue;
+      if (mode !== 'host_native') {
+        throw new Error(`unsupported origin adapter projection mode "${mode}" in ${strategy}`);
+      }
+      const sourceRel = readYamlString(strategy, 'source');
+      const targetRel = readYamlString(strategy, 'target');
+      if (!sourceRel || !targetRel) {
+        throw new Error(`missing projection.source or projection.target in ${strategy}`);
+      }
+      const sourcePath = path.join(hostDir, sourceRel);
+      const targetPath = path.join(dst, targetRel);
+      if (!fs.existsSync(sourcePath)) throw new Error(`missing ${sourcePath}`);
+      copyFileWithMode(sourcePath, targetPath);
+    }
+  }
+}
+
 // SAP: project every skill canonical tree to dist/<host>/skills/<skill>.
 const skillsSrc = path.join(src, 'skills');
 const skillsDst = path.join(dst, 'skills');

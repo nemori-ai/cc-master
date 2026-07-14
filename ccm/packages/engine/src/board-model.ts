@@ -443,7 +443,7 @@ export const FIELDS = {
       writers: 'agent 经 CLI；routing contract 下走 executor mutation gate',
       when: '派发前；contract prepared 后一次性定为 subagent，in-flight 冻结',
       degrade:
-        '非法值→hard(FMT-EXECUTOR);in_flight subagent/workflow 缺 handle→warn(BIZ-EXECUTOR-HANDLE);contract 绕闸→mutation fail-closed',
+        '非法值→hard(FMT-EXECUTOR);in_flight subagent/workflow 缺 handle→warn(BIZ-EXECUTOR-HANDLE)，但 valid native no-handle projection 由 native hard rule 接管；contract 绕闸→mutation fail-closed',
     },
     type: {
       tier: '✎',
@@ -469,8 +469,9 @@ export const FIELDS = {
       default: '缺省',
       readers: 'resume 接驳后台句柄 / viewer',
       writers: 'agent 经 CLI',
-      when: '真实派发 subagent/workflow 后、进入 in_flight 前；ready/blocked future task 不预填；external 可记录 issue URL/number 或外部 run id',
-      degrade: 'in_flight 且 executor∈{subagent,workflow} 缺→warn(BIZ-EXECUTOR-HANDLE)',
+      when: '真实派发 subagent/workflow 后、进入 in_flight 前；ready/blocked future task 不预填；external 可记录 issue URL/number 或外部 run id；valid native no-handle 走 native projection',
+      degrade:
+        'in_flight 且 executor∈{subagent,workflow} 缺→warn(BIZ-EXECUTOR-HANDLE)，valid native no-handle projection 除外',
     },
     justification: {
       tier: '✎',
@@ -899,7 +900,8 @@ export const INVARIANTS: Invariant[] = [
     level: 'warn',
     family: 'BIZ',
     scope: 'task',
-    summary: 'status=in_flight 且 executor ∈ {subagent, workflow} ⇒ handle 存在',
+    summary:
+      'status=in_flight 且 executor ∈ {subagent, workflow} ⇒ handle 存在；valid native no-handle projection 除外',
   },
   {
     id: 'BIZ-ROUTED-PLANNING-REQUIRED',
@@ -1024,6 +1026,14 @@ export const INVARIANTS: Invariant[] = [
     family: 'BIZ',
     scope: 'task',
     summary: '非空 review_verdict 必须有合法 dependency_gate 声明其下游门控语义',
+  },
+  {
+    id: 'BIZ-NATIVE-ATTEMPT-PROJECTION',
+    level: 'hard',
+    family: 'BIZ',
+    scope: 'task',
+    summary:
+      'native attempt 与 task status/handle 投影一致；parent done 同时满足 terminal evidence + true-done',
   },
   {
     id: 'FMT-BASELINE',

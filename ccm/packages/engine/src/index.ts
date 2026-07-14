@@ -260,6 +260,25 @@ export {
   MACHINE_SURFACE_CONTRACT,
   MACHINE_SURFACE_INVENTORY_CONTRACT,
 } from './machine-surface.js';
+// ── native-attempt（host-native attempt/acceptance 共享纯状态机）──
+export type {
+  NativeAttemptApplyResult,
+  NativeAttemptIssue,
+  NativeAttemptWriterKind,
+} from './native-attempt.js';
+export {
+  NATIVE_ATTEMPT_CONTRACT,
+  NATIVE_ATTEMPT_DESCRIPTOR_REGISTRY,
+  NATIVE_ATTEMPT_FEATURE_PROBE_CODEX_API_TOOL,
+  NATIVE_ATTEMPT_PROJECTION_RULE,
+  NATIVE_CANCEL_CONTROL_INTERRUPT_AGENT,
+  NATIVE_HANDLE_EVIDENCE_RECORD_CODEX_API_TOOL,
+  NATIVE_VERIFIED_EVIDENCE_CONTRACT,
+  nativeAttemptApply,
+  nativeAttemptFeatureDecision,
+  validateNativeAttemptMutation,
+  validateNativeAttemptProjection,
+} from './native-attempt.js';
 // ── paths（CLAUDE_CONFIG_DIR 跟随 + 派生路径 SSOT·home/rate-cache/credentials/.claude.json/projects）──
 export type { PathEnv } from './paths.js';
 export {

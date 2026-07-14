@@ -37,6 +37,11 @@
   - [task show](#task-show)
   - [task list](#task-list)
   - [task update](#task-update)
+  - [task native-attempt-create](#task-native-attempt-create)
+  - [task native-attempt-bind](#task-native-attempt-bind)
+  - [task native-attempt-cancel](#task-native-attempt-cancel)
+  - [task native-attempt-terminal](#task-native-attempt-terminal)
+  - [task native-attempt-reconcile](#task-native-attempt-reconcile)
   - [task start](#task-start)
   - [task done](#task-done)
   - [task retry](#task-retry)
@@ -685,6 +690,101 @@ ccm task update <id> [flags]
   直达的 `Usage` 错误（**exit 2**，不是 exit 3），指路"同时加 `--verified` 或改用 `task done --verified
   --artifact`"。这是体验性提前诊断（lint 仍是唯一校验权威），不是新增校验规则——同时给 `--verified` 或目标
   不是"已 done 且未 verified"时不触发，正常交给 lint 判。
+
+### task native-attempt-create
+
+**写（精确 Codex native-attempt ledger contract；不调用 host tool）**
+
+```
+ccm task native-attempt-create <id> --selection <json> --attempt <json> --replay-intent <enum> [flags]
+```
+
+当前 native invoke runtime 为 `unsupported`：三 host strategy 都不投影 invoke artifact。此命令只在 opt-in board 上原子冻结 immutable create snapshot / canonical request hash、append `starting` attempt 并返回 ledger operation result；public `launch_allowed` 不能被解释成默认 spawn 授权。
+
+| flag | 类型 | 必填 | enum 取值 | 含义 |
+|---|---|---|---|---|
+| `--selection <json>` | JSON input | 是 | | 完整 qualified selection snapshot（`@/abs/file.json`、`-` 或 JSON 字面量） |
+| `--attempt <json>` | JSON input | 是 | | `starting` native attempt + immutable dispatch/lineage/request snapshot |
+| `--replay-intent <enum>` | enum | 是 | `accept-no-launch`, `require-new-launch` | 精确重放如何处理已存在 create；重放永不再次授权 launch |
+| `--json` | bool | | | 输出 operation result JSON |
+
+- 例：`ccm task native-attempt-create T7 --selection @/abs/selection.json --attempt @/abs/attempt.json --replay-intent accept-no-launch`
+- 精确重放返回既有 attempt、`launch_allowed:false`；同 dispatch key 的冲突 request 一律拒绝。latest attempt 为 `starting|running|uncertain` 时禁止再 create。
+
+### task native-attempt-bind
+
+**写（owner-only evidence transaction）**
+
+```
+ccm task native-attempt-bind <id> --attempt-id <str> --evidence-record-ref <str> [flags]
+```
+
+| flag | 类型 | 必填 | 含义 |
+|---|---|---|---|
+| `--attempt-id <str>` | string | 是 | 要从 `starting` 绑定到 `running` 的 native attempt id |
+| `--evidence-record-ref <str>` | string | 是 | ccm owner-only evidence record ref；不接受 raw response / 调用方自证 JSON |
+| `--json` | bool | | 输出 operation result JSON |
+
+- 例：`ccm task native-attempt-bind T7 --attempt-id attempt-1 --evidence-record-ref evidence:bind-1`
+- writer 在锁内 stage + verify evidence，应用 engine projection 并持久提交 board 后才 commit consume；engine/lint/conflict/write 失败会 rollback，record/claim 不消费。
+- 只有认证 spawn handle 与同 handle 的 authoritative live roster observation 才能投影 `running`；create 时的 `expected_child_target` 从来不是 observation。
+
+### task native-attempt-cancel
+
+**写（记录控制请求；ack 不是 terminal）**
+
+```
+ccm task native-attempt-cancel <id> --attempt-id <str> --request <json> [flags]
+```
+
+| flag | 类型 | 必填 | 含义 |
+|---|---|---|---|
+| `--attempt-id <str>` | string | 是 | 当前 `running` native attempt id |
+| `--request <json>` | JSON input | 是 | immutable cancel request（`@/abs/file.json`、`-` 或 JSON 字面量） |
+| `--acknowledgement-terminal-class <str>` | string | | 负向契约入口；任何用 control acknowledgement 伪造 terminal 的请求都会被拒 |
+| `--json` | bool | | 输出 operation result JSON |
+
+- 例：`ccm task native-attempt-cancel T7 --attempt-id attempt-1 --request @/abs/cancel.json`
+- request 必须是完整的 `{id,request_hash,requested_at,requested_by_session_ref,control,reason_code}`；`request_hash` 是 `sha256:<64hex>`，时间是 UTC 秒精度，且本 surface 唯一合法的 `control` 是 `"interrupt-agent"`。
+- 首次 exact request 记录一个 host-control effect，精确重放为零 effect；acknowledgement 不改变 `running`，后续 terminal 必须另有认证 evidence。
+
+### task native-attempt-terminal
+
+**写（owner-only terminal evidence transaction；不直接 done）**
+
+```
+ccm task native-attempt-terminal <id> --attempt-id <str> --evidence-record-ref <str> [flags]
+```
+
+| flag | 类型 | 必填 | 含义 |
+|---|---|---|---|
+| `--attempt-id <str>` | string | 是 | `running|uncertain` native attempt id |
+| `--evidence-record-ref <str>` | string | 是 | ccm owner-only terminal evidence record ref |
+| `--requested-task-status <str>` | string | | 负向契约入口；请求 terminal 直接写 `done` 会被拒 |
+| `--json` | bool | | 输出 operation result JSON |
+
+- 例：`ccm task native-attempt-terminal T7 --attempt-id attempt-1 --evidence-record-ref evidence:terminal-1`
+- stage/verify → engine apply → durable board commit → evidence consume；任一失败 rollback 且不消费。成功只记录 immutable terminal、清 handle 并把 task 投影到 `uncertain`；父层独立验收后仍须普通 `task done --verified --artifact`。
+
+### task native-attempt-reconcile
+
+**写（owner-only repair/classification evidence transaction）**
+
+```
+ccm task native-attempt-reconcile <id> --attempt-id <str> --evidence-record-ref <str> [flags]
+```
+
+| flag | 类型 | 必填 | 含义 |
+|---|---|---|---|
+| `--attempt-id <str>` | string | 是 | 要 reconcile 的 native attempt id |
+| `--evidence-record-ref <str>` | string | 是 | ccm owner-only reconcile evidence record ref |
+| `--json` | bool | | 输出 operation result JSON |
+
+- 例：`ccm task native-attempt-reconcile T7 --attempt-id attempt-1 --evidence-record-ref evidence:reconcile-1`
+- 只接受认证 evidence 驱动 `uncertain`、same-handle `running`、`terminal` 或完成 fenced orphan audit 后的 `orphaned` projection；调用方不能自选 status/handle。
+- exact replay 是 no-op；conflicting evidence 拒绝。stage/verify 后仅在 durable board commit 成功时消费，所有失败 rollback/no-consumption。
+
+> **五个 verb 的共同硬边界：**它们是 ledger writer，不是 runtime spawn wrapper。native-active projection 也不能被 generic status/handle writer、legacy `route-bind` 或 `--force` 构造/修复；硬 lint `BIZ-NATIVE-ATTEMPT-PROJECTION` 捕获 projection mismatch。
 
 ### task start
 

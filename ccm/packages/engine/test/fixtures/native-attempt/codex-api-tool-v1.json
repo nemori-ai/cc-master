@@ -1,0 +1,2638 @@
+{
+  "schema": "ccm/native-attempt-fixture/v1",
+  "contract": "ccm/native-attempt/v1",
+  "feature_probe_ref": "fixture://native-attempt/codex-api-tool-feature-probe-v1",
+  "capability_intent": {
+    "id": "native-attempt-ledger",
+    "origin": "codex",
+    "surface": "codex-api-tool-multi-agent",
+    "selection_status": "selected-for-contract-only",
+    "runtime_status": "unsupported",
+    "evidence_refs": [
+      "design_docs/harnesses/codex.md#background-and-parallel-execution",
+      "design_docs/cross-harness-orchestration-capability-model.md §6"
+    ],
+    "required_operations": ["create", "bind", "cancel", "terminal", "reconcile"],
+    "negative_claims": [
+      "not-generic-codex-cli-or-app",
+      "not-cross-session-durable",
+      "not-provider-idempotent",
+      "not-task-done",
+      "not-account-switch-authority",
+      "not-public-json-attestation"
+    ]
+  },
+  "trusted_producer": {
+    "schema": "ccm/native-evidence-producer/codex-api-tool/v1",
+    "producer_id": "producer:fixture-codex-origin-adapter",
+    "channel": "ccm-private-adapter/v1",
+    "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+    "public_key_id": "ed25519:fixture-codex-origin-adapter",
+    "public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+    "public_key_fingerprint": "sha256:a2b3d46f1a3ef275c9e599498a7058d25634f61c079565628fd00baf68c2917c",
+    "revoked": false,
+    "trust_scope": {
+      "origin": "codex",
+      "transport": "codex-api-tool-multi-agent",
+      "origin_session_ref": "session-ref:fixture-origin"
+    },
+    "storage": {
+      "record_visibility": "owner-only",
+      "raw_evidence_visibility": "owner-only",
+      "board_projection": "hash-and-ref-only"
+    }
+  },
+  "initial_board": {
+    "schema": "cc-master/v2",
+    "meta": {
+      "template_version": 3,
+      "contracts": {
+        "task_planning": "ccm/task-planning/v1",
+        "agent_routing": "ccm/agent-routing/v1",
+        "agent_routing_activated_at": "2026-07-13T07:59:58Z",
+        "agent_routing_grandfathered_terminal": [],
+        "native_attempt": "ccm/native-attempt/v1"
+      }
+    },
+    "goal": "native attempt contract fixture",
+    "owner": {
+      "active": true,
+      "session_id": "session-ref:fixture-origin",
+      "heartbeat": "2026-07-13T07:59:59Z"
+    },
+    "git": {
+      "worktree": "/fixture/worktree",
+      "branch": "fixture/native-attempt"
+    },
+    "tasks": [
+      {
+        "id": "T-native-v1",
+        "status": "ready",
+        "deps": [],
+        "executor": "subagent",
+        "estimate": {
+          "value": 1,
+          "unit": "h"
+        },
+        "planning": {
+          "schema": "ccm/task-planning/v1",
+          "assessed_at": "2026-07-13T07:59:00Z",
+          "assessor": "master-orchestrator",
+          "dimensions": {
+            "reasoning": "multi-step",
+            "uncertainty": "low",
+            "risk": "high",
+            "scope": "multi-file",
+            "context": "medium",
+            "coordination": "single-boundary",
+            "reversibility": "costly"
+          },
+          "estimate_confidence": "high",
+          "quality": {
+            "effect_floor": "meets-required-capabilities"
+          },
+          "budget": {
+            "posture": "ample",
+            "max_attempts": 2
+          },
+          "capabilities": {
+            "required": [
+              {
+                "id": "structured-output"
+              }
+            ],
+            "preferred": [],
+            "forbidden": [
+              {
+                "id": "push-remote"
+              }
+            ]
+          }
+        },
+        "routing": {
+          "schema": "ccm/agent-routing/v1",
+          "mode": "cross-harness",
+          "policy": {
+            "objective": "balanced",
+            "constraints": {
+              "effect_floor": "meets-required-capabilities",
+              "quota_unknown": "ineligible",
+              "cross_harness_quota_admission": "ample-only"
+            },
+            "candidates": [
+              {
+                "id": "codex-native",
+                "surface": "host-native",
+                "adapter": "codex/api-tool-multi-agent-v1",
+                "harness": "codex",
+                "provider": "openai",
+                "model": "host-default",
+                "effort": "medium",
+                "capabilities": ["structured-output"],
+                "effect_floors_met": ["meets-required-capabilities"],
+                "permission": {
+                  "profile": "workspace-write",
+                  "denies": ["push-remote", "account-mutation"]
+                },
+                "account_mutation": "forbidden",
+                "requires": [
+                  "runtime-healthy",
+                  "capability-match",
+                  "effect-floor",
+                  "permission-compatible",
+                  "account-mutation-forbidden"
+                ]
+              }
+            ],
+            "chains": {
+              "ample": ["codex-native"],
+              "tight": ["codex-native"]
+            },
+            "fallback": {
+              "on": ["transport-error"],
+              "never_on": [
+                "policy-blocked",
+                "permission-blocked",
+                "security-blocked",
+                "workspace-mismatch",
+                "task-blocked",
+                "acceptance-failed"
+              ],
+              "exhaustion": "fail-closed",
+              "same_harness": "explicit-candidate-only"
+            }
+          },
+          "selected": null,
+          "attempts": []
+        }
+      }
+    ],
+    "log": []
+  },
+  "selection_snapshot": {
+    "candidate_id": "codex-native",
+    "chain": "ample",
+    "selected_at": "2026-07-13T08:00:00Z",
+    "evidence": {
+      "observed_at": "2026-07-13T07:59:30Z",
+      "valid_until": "2026-07-13T08:04:30Z",
+      "qualification_results": [
+        {
+          "predicate": "runtime-healthy",
+          "status": "pass",
+          "ref": "probe://codex/api-tool/contract-only"
+        },
+        {
+          "predicate": "capability-match",
+          "status": "pass",
+          "ref": "contract://native-attempt/capabilities"
+        },
+        {
+          "predicate": "effect-floor",
+          "status": "pass",
+          "ref": "contract://native-attempt/effect-floor"
+        },
+        {
+          "predicate": "permission-compatible",
+          "status": "pass",
+          "ref": "contract://native-attempt/permissions"
+        },
+        {
+          "predicate": "account-mutation-forbidden",
+          "status": "pass",
+          "ref": "contract://native-attempt/account-mutation"
+        }
+      ]
+    },
+    "reason_codes": ["capability-best-fit", "contract-only-not-runtime-enabled"],
+    "rationale": "Synthetic contract fixture; it is not promotion evidence."
+  },
+  "lineage": {
+    "origin_session_ref": "session-ref:fixture-origin",
+    "parent_target": "/root/fixture-parent",
+    "expected_child_target": "/root/fixture-parent/fixture-worker",
+    "account_fingerprint_ref": "account-ref:fixture-current-codex",
+    "workspace_ref": "workspace-ref:fixture-repository",
+    "worktree_ref": "worktree-ref:fixture-isolated",
+    "baseline_commit": "1111111111111111111111111111111111111111",
+    "permission": {
+      "snapshot_ref": "permission-ref:fixture-workspace-write",
+      "profile": "workspace-write",
+      "denies": ["account-mutation", "push-remote"]
+    }
+  },
+  "commands": {
+    "create": {
+      "type": "create",
+      "task_id": "T-native-v1",
+      "selection_snapshot": {
+        "candidate_id": "codex-native",
+        "chain": "ample",
+        "selected_at": "2026-07-13T08:00:00Z",
+        "evidence": {
+          "observed_at": "2026-07-13T07:59:30Z",
+          "valid_until": "2026-07-13T08:04:30Z",
+          "qualification_results": [
+            {
+              "predicate": "runtime-healthy",
+              "status": "pass",
+              "ref": "probe://codex/api-tool/contract-only"
+            },
+            {
+              "predicate": "capability-match",
+              "status": "pass",
+              "ref": "contract://native-attempt/capabilities"
+            },
+            {
+              "predicate": "effect-floor",
+              "status": "pass",
+              "ref": "contract://native-attempt/effect-floor"
+            },
+            {
+              "predicate": "permission-compatible",
+              "status": "pass",
+              "ref": "contract://native-attempt/permissions"
+            },
+            {
+              "predicate": "account-mutation-forbidden",
+              "status": "pass",
+              "ref": "contract://native-attempt/account-mutation"
+            }
+          ]
+        },
+        "reason_codes": ["capability-best-fit", "contract-only-not-runtime-enabled"],
+        "rationale": "Synthetic contract fixture; it is not promotion evidence."
+      },
+      "attempt": {
+        "schema": "ccm/native-attempt/v1",
+        "id": "attempt-native-fixture-001",
+        "ordinal": 1,
+        "candidate_id": "codex-native",
+        "surface": "host-native",
+        "transport": "codex-api-tool-multi-agent",
+        "state": "starting",
+        "created_at": "2026-07-13T08:00:00Z",
+        "dispatch": {
+          "key": "dispatch-fixture-001",
+          "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "launch_claim_id": "launch-claim-fixture-001",
+          "claim_owner_session_ref": "session-ref:fixture-origin"
+        },
+        "lineage": {
+          "origin_session_ref": "session-ref:fixture-origin",
+          "parent_target": "/root/fixture-parent",
+          "expected_child_target": "/root/fixture-parent/fixture-worker",
+          "account_fingerprint_ref": "account-ref:fixture-current-codex",
+          "workspace_ref": "workspace-ref:fixture-repository",
+          "worktree_ref": "worktree-ref:fixture-isolated",
+          "baseline_commit": "1111111111111111111111111111111111111111",
+          "permission": {
+            "snapshot_ref": "permission-ref:fixture-workspace-write",
+            "profile": "workspace-write",
+            "denies": ["account-mutation", "push-remote"]
+          }
+        },
+        "selection_snapshot": {
+          "candidate_id": "codex-native",
+          "chain": "ample",
+          "selected_at": "2026-07-13T08:00:00Z",
+          "evidence": {
+            "observed_at": "2026-07-13T07:59:30Z",
+            "valid_until": "2026-07-13T08:04:30Z",
+            "qualification_results": [
+              {
+                "predicate": "runtime-healthy",
+                "status": "pass",
+                "ref": "probe://codex/api-tool/contract-only"
+              },
+              {
+                "predicate": "capability-match",
+                "status": "pass",
+                "ref": "contract://native-attempt/capabilities"
+              },
+              {
+                "predicate": "effect-floor",
+                "status": "pass",
+                "ref": "contract://native-attempt/effect-floor"
+              },
+              {
+                "predicate": "permission-compatible",
+                "status": "pass",
+                "ref": "contract://native-attempt/permissions"
+              },
+              {
+                "predicate": "account-mutation-forbidden",
+                "status": "pass",
+                "ref": "contract://native-attempt/account-mutation"
+              }
+            ]
+          },
+          "reason_codes": ["capability-best-fit", "contract-only-not-runtime-enabled"],
+          "rationale": "Synthetic contract fixture; it is not promotion evidence."
+        },
+        "handle_binding": null,
+        "cancel": null,
+        "terminal": null,
+        "reconciliation": []
+      },
+      "replay_intent": "accept-no-launch",
+      "admission_snapshot": {
+        "account": {
+          "requested_fingerprint_ref": "account-ref:fixture-current-codex",
+          "current_fingerprint_ref": "account-ref:fixture-current-codex",
+          "status": "known-current"
+        },
+        "permission": {
+          "snapshot_ref": "permission-ref:fixture-workspace-write",
+          "requested_profile": "workspace-write",
+          "effective_profile": "workspace-write",
+          "profile_status": "compatible",
+          "required_denies": ["account-mutation", "push-remote"],
+          "effective_denies": ["account-mutation", "push-remote"],
+          "deny_status": "compatible"
+        }
+      }
+    },
+    "create_second_after_orphan_audit": {
+      "type": "create",
+      "task_id": "T-native-v1",
+      "selection_snapshot": {
+        "candidate_id": "codex-native",
+        "chain": "ample",
+        "selected_at": "2026-07-13T08:10:00Z",
+        "evidence": {
+          "observed_at": "2026-07-13T08:09:30Z",
+          "valid_until": "2026-07-13T08:14:30Z",
+          "qualification_results": [
+            {
+              "predicate": "runtime-healthy",
+              "status": "pass",
+              "ref": "probe://codex/api-tool/contract-only-2"
+            },
+            {
+              "predicate": "capability-match",
+              "status": "pass",
+              "ref": "contract://native-attempt/capabilities"
+            },
+            {
+              "predicate": "effect-floor",
+              "status": "pass",
+              "ref": "contract://native-attempt/effect-floor"
+            },
+            {
+              "predicate": "permission-compatible",
+              "status": "pass",
+              "ref": "contract://native-attempt/permissions"
+            },
+            {
+              "predicate": "account-mutation-forbidden",
+              "status": "pass",
+              "ref": "contract://native-attempt/account-mutation"
+            }
+          ]
+        },
+        "reason_codes": ["manual-retry-after-fenced-orphan-audit"]
+      },
+      "attempt": {
+        "schema": "ccm/native-attempt/v1",
+        "id": "attempt-native-fixture-002",
+        "ordinal": 2,
+        "candidate_id": "codex-native",
+        "surface": "host-native",
+        "transport": "codex-api-tool-multi-agent",
+        "state": "starting",
+        "created_at": "2026-07-13T08:10:00Z",
+        "dispatch": {
+          "key": "dispatch-fixture-002",
+          "request_hash": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+          "launch_claim_id": "launch-claim-fixture-002",
+          "claim_owner_session_ref": "session-ref:fixture-origin"
+        },
+        "lineage": {
+          "origin_session_ref": "session-ref:fixture-origin",
+          "parent_target": "/root/fixture-parent",
+          "expected_child_target": "/root/fixture-parent/fixture-worker-2",
+          "account_fingerprint_ref": "account-ref:fixture-current-codex",
+          "workspace_ref": "workspace-ref:fixture-repository",
+          "worktree_ref": "worktree-ref:fixture-isolated-2",
+          "baseline_commit": "1111111111111111111111111111111111111111",
+          "permission": {
+            "snapshot_ref": "permission-ref:fixture-workspace-write",
+            "profile": "workspace-write",
+            "denies": ["account-mutation", "push-remote"]
+          }
+        },
+        "selection_snapshot": {
+          "candidate_id": "codex-native",
+          "chain": "ample",
+          "selected_at": "2026-07-13T08:10:00Z",
+          "evidence": {
+            "observed_at": "2026-07-13T08:09:30Z",
+            "valid_until": "2026-07-13T08:14:30Z",
+            "qualification_results": [
+              {
+                "predicate": "runtime-healthy",
+                "status": "pass",
+                "ref": "probe://codex/api-tool/contract-only-2"
+              },
+              {
+                "predicate": "capability-match",
+                "status": "pass",
+                "ref": "contract://native-attempt/capabilities"
+              },
+              {
+                "predicate": "effect-floor",
+                "status": "pass",
+                "ref": "contract://native-attempt/effect-floor"
+              },
+              {
+                "predicate": "permission-compatible",
+                "status": "pass",
+                "ref": "contract://native-attempt/permissions"
+              },
+              {
+                "predicate": "account-mutation-forbidden",
+                "status": "pass",
+                "ref": "contract://native-attempt/account-mutation"
+              }
+            ]
+          },
+          "reason_codes": ["manual-retry-after-fenced-orphan-audit"]
+        },
+        "handle_binding": null,
+        "cancel": null,
+        "terminal": null,
+        "reconciliation": []
+      },
+      "replay_intent": "accept-no-launch",
+      "admission_snapshot": {
+        "account": {
+          "requested_fingerprint_ref": "account-ref:fixture-current-codex",
+          "current_fingerprint_ref": "account-ref:fixture-current-codex",
+          "status": "known-current"
+        },
+        "permission": {
+          "snapshot_ref": "permission-ref:fixture-workspace-write",
+          "requested_profile": "workspace-write",
+          "effective_profile": "workspace-write",
+          "profile_status": "compatible",
+          "required_denies": ["account-mutation", "push-remote"],
+          "effective_denies": ["account-mutation", "push-remote"],
+          "deny_status": "compatible"
+        }
+      }
+    },
+    "bind": {
+      "type": "bind",
+      "task_id": "T-native-v1",
+      "attempt_id": "attempt-native-fixture-001",
+      "evidence_record_ref": "evidence:fixture-bind-001",
+      "verified_evidence": {
+        "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+        "record_id": "evidence:fixture-bind-001",
+        "producer": {
+          "producer_id": "producer:fixture-codex-origin-adapter",
+          "channel": "ccm-private-adapter/v1",
+          "registration_ref": "private-producer-registration:fixture-codex-origin-adapter"
+        },
+        "create_link": {
+          "task_id": "T-native-v1",
+          "attempt_id": "attempt-native-fixture-001",
+          "candidate_id": "codex-native",
+          "dispatch_key": "dispatch-fixture-001",
+          "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+          "launch_claim_id": "launch-claim-fixture-001"
+        },
+        "expected": {
+          "transport": "codex-api-tool-multi-agent",
+          "parent_target": "/root/fixture-parent",
+          "child_target": "/root/fixture-parent/fixture-worker"
+        },
+        "observed": {
+          "handle_kind": "codex-agent-id",
+          "handle": "agent-fixture-001",
+          "canonical_target": "/root/fixture-parent/fixture-worker",
+          "spawn": {
+            "observed_at": "2026-07-13T08:00:01Z",
+            "owner_record_ref": "owner-evidence://fixture/spawn-001",
+            "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+          },
+          "roster": {
+            "observed_at": "2026-07-13T08:00:02Z",
+            "owner_record_ref": "owner-evidence://fixture/roster-001",
+            "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "state": "running",
+            "handle": "agent-fixture-001"
+          },
+          "current_lineage": {
+            "origin_session_ref": "session-ref:fixture-origin",
+            "parent_target": "/root/fixture-parent",
+            "expected_child_target": "/root/fixture-parent/fixture-worker",
+            "account_fingerprint_ref": "account-ref:fixture-current-codex",
+            "workspace_ref": "workspace-ref:fixture-repository",
+            "worktree_ref": "worktree-ref:fixture-isolated",
+            "baseline_commit": "1111111111111111111111111111111111111111",
+            "permission": {
+              "snapshot_ref": "permission-ref:fixture-workspace-write",
+              "profile": "workspace-write",
+              "denies": ["account-mutation", "push-remote"]
+            }
+          }
+        },
+        "record_hash": "sha256:95b8ae0ab81d8a3ca9959db61388888c9cfd0768f67b7729b3c633cdcfbb06b4",
+        "resolved_context": {
+          "account": "current",
+          "permission_profile": "compatible",
+          "permission_denies": "compatible"
+        }
+      }
+    },
+    "cancel": {
+      "type": "cancel",
+      "task_id": "T-native-v1",
+      "attempt_id": "attempt-native-fixture-001",
+      "request": {
+        "id": "cancel-fixture-001",
+        "request_hash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "requested_at": "2026-07-13T08:01:00Z",
+        "requested_by_session_ref": "session-ref:fixture-origin",
+        "control": "interrupt-agent",
+        "reason_code": "operator-request"
+      }
+    },
+    "terminal": {
+      "type": "terminal",
+      "task_id": "T-native-v1",
+      "attempt_id": "attempt-native-fixture-001",
+      "evidence": {
+        "class": "succeeded",
+        "observed_at": "2026-07-13T08:02:00Z",
+        "source": "final-status-notification",
+        "result_ref": "artifact-ref:fixture-worker-final",
+        "artifact_refs": ["artifact-ref:fixture-patch"],
+        "evidence_record_ref": "owner-evidence://fixture/terminal-001",
+        "evidence_hash": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+      }
+    },
+    "reconcile_uncertain": {
+      "type": "reconcile",
+      "task_id": "T-native-v1",
+      "attempt_id": "attempt-native-fixture-001",
+      "evidence": {
+        "record_id": "evidence:fixture-reconcile-uncertain-001",
+        "record_hash": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+        "producer_channel": "ccm-private-adapter/v1",
+        "observed_at": "2026-07-13T08:00:30Z",
+        "classification": "uncertain",
+        "reason_code": "spawn-response-ambiguous",
+        "current_lineage": {
+          "origin_session_ref": "session-ref:fixture-origin",
+          "parent_target": "/root/fixture-parent",
+          "expected_child_target": "/root/fixture-parent/fixture-worker",
+          "account_fingerprint_ref": "account-ref:fixture-current-codex",
+          "workspace_ref": "workspace-ref:fixture-repository",
+          "worktree_ref": "worktree-ref:fixture-isolated",
+          "baseline_commit": "1111111111111111111111111111111111111111",
+          "permission": {
+            "snapshot_ref": "permission-ref:fixture-workspace-write",
+            "profile": "workspace-write",
+            "denies": ["account-mutation", "push-remote"]
+          }
+        }
+      }
+    },
+    "reconcile_running": {
+      "type": "reconcile",
+      "task_id": "T-native-v1",
+      "attempt_id": "attempt-native-fixture-001",
+      "evidence": {
+        "record_id": "evidence:fixture-reconcile-running-001",
+        "record_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "producer_channel": "ccm-private-adapter/v1",
+        "observed_at": "2026-07-13T08:00:40Z",
+        "classification": "running",
+        "same_handle_evidence_record_ref": "evidence:fixture-bind-001",
+        "handle": "agent-fixture-001",
+        "current_lineage": {
+          "origin_session_ref": "session-ref:fixture-origin",
+          "parent_target": "/root/fixture-parent",
+          "expected_child_target": "/root/fixture-parent/fixture-worker",
+          "account_fingerprint_ref": "account-ref:fixture-current-codex",
+          "workspace_ref": "workspace-ref:fixture-repository",
+          "worktree_ref": "worktree-ref:fixture-isolated",
+          "baseline_commit": "1111111111111111111111111111111111111111",
+          "permission": {
+            "snapshot_ref": "permission-ref:fixture-workspace-write",
+            "profile": "workspace-write",
+            "denies": ["account-mutation", "push-remote"]
+          }
+        }
+      }
+    },
+    "reconcile_terminal": {
+      "type": "reconcile",
+      "task_id": "T-native-v1",
+      "attempt_id": "attempt-native-fixture-001",
+      "evidence": {
+        "record_id": "evidence:fixture-reconcile-terminal-001",
+        "record_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "producer_channel": "ccm-private-adapter/v1",
+        "observed_at": "2026-07-13T08:02:00Z",
+        "classification": "terminal",
+        "terminal": {
+          "class": "succeeded",
+          "result_ref": "artifact-ref:fixture-worker-final",
+          "artifact_refs": ["artifact-ref:fixture-patch"],
+          "evidence_hash": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+        },
+        "current_lineage": {
+          "origin_session_ref": "session-ref:fixture-origin",
+          "parent_target": "/root/fixture-parent",
+          "expected_child_target": "/root/fixture-parent/fixture-worker",
+          "account_fingerprint_ref": "account-ref:fixture-current-codex",
+          "workspace_ref": "workspace-ref:fixture-repository",
+          "worktree_ref": "worktree-ref:fixture-isolated",
+          "baseline_commit": "1111111111111111111111111111111111111111",
+          "permission": {
+            "snapshot_ref": "permission-ref:fixture-workspace-write",
+            "profile": "workspace-write",
+            "denies": ["account-mutation", "push-remote"]
+          }
+        }
+      }
+    },
+    "reconcile_orphaned": {
+      "type": "reconcile",
+      "task_id": "T-native-v1",
+      "attempt_id": "attempt-native-fixture-001",
+      "evidence": {
+        "record_id": "evidence:fixture-reconcile-orphaned-001",
+        "record_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "producer_channel": "ccm-private-adapter/v1",
+        "observed_at": "2026-07-13T08:05:00Z",
+        "classification": "orphaned",
+        "orphan_audit": {
+          "origin_session_status": "unavailable",
+          "handle_status": "unaddressable",
+          "worktree_authority": "fenced",
+          "account_authority": "unchanged",
+          "audit_ref": "owner-evidence://fixture/orphan-audit-001",
+          "audit_hash": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        "current_lineage": {
+          "origin_session_ref": "session-ref:fixture-origin",
+          "parent_target": "/root/fixture-parent",
+          "expected_child_target": "/root/fixture-parent/fixture-worker",
+          "account_fingerprint_ref": "account-ref:fixture-current-codex",
+          "workspace_ref": "workspace-ref:fixture-repository",
+          "worktree_ref": "worktree-ref:fixture-isolated",
+          "baseline_commit": "1111111111111111111111111111111111111111",
+          "permission": {
+            "snapshot_ref": "permission-ref:fixture-workspace-write",
+            "profile": "workspace-write",
+            "denies": ["account-mutation", "push-remote"]
+          }
+        }
+      }
+    },
+    "route_bind_bypass": {
+      "type": "route-bind",
+      "task_id": "T-native-v1",
+      "selection": {
+        "candidate_id": "codex-native",
+        "chain": "ample",
+        "selected_at": "2026-07-13T08:00:00Z"
+      },
+      "attempt": {
+        "id": "attempt-bypass",
+        "candidate_id": "codex-native",
+        "state": "running",
+        "handle": "agent-forged"
+      }
+    }
+  },
+  "expected": {
+    "create": {
+      "created": true,
+      "launch_allowed": true,
+      "task_status": "ready",
+      "task_handle": null,
+      "attempt_state": "starting"
+    },
+    "create_exact_replay": {
+      "created": false,
+      "launch_allowed": false,
+      "same_attempt_id": "attempt-native-fixture-001"
+    },
+    "bind": {
+      "task_status": "in_flight",
+      "task_handle": "agent-fixture-001",
+      "attempt_state": "running",
+      "durability_class": "legacy_session_bound",
+      "evidence_record_ref": "evidence:fixture-bind-001"
+    },
+    "cancel": {
+      "attempt_state": "running",
+      "cancel_status": "requested",
+      "host_control_effects": 1,
+      "task_status": "in_flight"
+    },
+    "cancel_exact_replay": {
+      "cancel_status": "requested",
+      "host_control_effects": 0
+    },
+    "terminal": {
+      "attempt_state": "terminal",
+      "task_status": "uncertain",
+      "task_handle": null,
+      "task_done": false,
+      "requires_parent_verification": true
+    },
+    "reconcile_uncertain": {
+      "attempt_state": "uncertain",
+      "task_status": "uncertain",
+      "task_handle": null
+    },
+    "reconcile_running": {
+      "attempt_state": "running",
+      "task_status": "in_flight",
+      "task_handle": "agent-fixture-001"
+    },
+    "reconcile_terminal": {
+      "attempt_state": "terminal",
+      "task_status": "uncertain",
+      "task_handle": null,
+      "task_done": false
+    },
+    "reconcile_orphaned": {
+      "attempt_state": "orphaned",
+      "task_status": "ready",
+      "task_handle": null,
+      "worktree_authority": "fenced",
+      "automatic_respawn": false
+    }
+  },
+  "state_transitions": [
+    {
+      "from": "absent",
+      "event": "create",
+      "to": "starting",
+      "task_status": "ready"
+    },
+    {
+      "from": "starting",
+      "event": "bind",
+      "to": "running",
+      "task_status": "in_flight"
+    },
+    {
+      "from": "starting",
+      "event": "reconcile-uncertain",
+      "to": "uncertain",
+      "task_status": "uncertain"
+    },
+    {
+      "from": "running",
+      "event": "cancel-request",
+      "to": "running",
+      "task_status": "in_flight"
+    },
+    {
+      "from": "running",
+      "event": "terminal",
+      "to": "terminal",
+      "task_status": "uncertain"
+    },
+    {
+      "from": "running",
+      "event": "reconcile-uncertain",
+      "to": "uncertain",
+      "task_status": "uncertain"
+    },
+    {
+      "from": "uncertain",
+      "event": "reconcile-running",
+      "to": "running",
+      "task_status": "in_flight"
+    },
+    {
+      "from": "uncertain",
+      "event": "reconcile-terminal",
+      "to": "terminal",
+      "task_status": "uncertain"
+    },
+    {
+      "from": "uncertain",
+      "event": "reconcile-orphaned",
+      "to": "orphaned",
+      "task_status": "ready"
+    }
+  ],
+  "negative_cases": [
+    {
+      "id": "bind-without-evidence-record",
+      "checkpoint": "created",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "remove",
+        "path": "/verified_evidence"
+      },
+      "issue": "NATIVE-EVIDENCE-RECORD-MISSING"
+    },
+    {
+      "id": "bind-without-handle",
+      "checkpoint": "created",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "remove",
+        "path": "/verified_evidence/observed/handle"
+      },
+      "issue": "NATIVE-HANDLE-MISSING"
+    },
+    {
+      "id": "bind-without-roster-corroboration",
+      "checkpoint": "created",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "remove",
+        "path": "/verified_evidence/observed/roster"
+      },
+      "issue": "NATIVE-HANDLE-UNATTESTED"
+    },
+    {
+      "id": "bind-public-json-attestation",
+      "checkpoint": "created",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/verified_evidence/producer/channel",
+        "value": "public-json"
+      },
+      "issue": "NATIVE-EVIDENCE-UNTRUSTED-PRODUCER"
+    },
+    {
+      "id": "bind-parent-session-id-as-handle",
+      "checkpoint": "created",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/verified_evidence/observed/handle",
+        "value": "session-ref:fixture-origin"
+      },
+      "issue": "NATIVE-HANDLE-PARENT-SESSION"
+    },
+    {
+      "id": "bind-lineage-drift",
+      "checkpoint": "created",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/verified_evidence/observed/current_lineage/worktree_ref",
+        "value": "worktree-ref:drifted"
+      },
+      "issue": "NATIVE-LINEAGE-MISMATCH"
+    },
+    {
+      "id": "bind-wrong-expected-child",
+      "checkpoint": "created",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/verified_evidence/observed/canonical_target",
+        "value": "/root/fixture-parent/unexpected-worker"
+      },
+      "issue": "NATIVE-EXPECTED-CHILD-MISMATCH"
+    },
+    {
+      "id": "bind-wrong-create-link",
+      "checkpoint": "created",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/verified_evidence/create_link/launch_claim_id",
+        "value": "launch-claim-forged"
+      },
+      "issue": "NATIVE-EVIDENCE-CREATE-LINK-MISMATCH"
+    },
+    {
+      "id": "conflicting-create-replay",
+      "checkpoint": "created",
+      "command": "create",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/attempt/dispatch/request_hash",
+        "value": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "issue": "NATIVE-ATTEMPT-REPLAY-CONFLICT"
+    },
+    {
+      "id": "second-active-attempt",
+      "checkpoint": "created",
+      "command": "create_second_after_orphan_audit",
+      "mutation": {
+        "target": "command",
+        "op": "none",
+        "path": ""
+      },
+      "issue": "NATIVE-ATTEMPT-ACTIVE"
+    },
+    {
+      "id": "launch-replay",
+      "checkpoint": "created",
+      "command": "create",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/replay_intent",
+        "value": "require-new-launch"
+      },
+      "issue": "NATIVE-LAUNCH-REPLAY-DENIED"
+    },
+    {
+      "id": "bind-conflicting-replay",
+      "checkpoint": "running",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/verified_evidence/observed/handle",
+        "value": "agent-fixture-conflict"
+      },
+      "issue": "NATIVE-ATTEMPT-REPLAY-CONFLICT"
+    },
+    {
+      "id": "cancel-conflicting-replay",
+      "checkpoint": "cancelled-requested",
+      "command": "cancel",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/request/id",
+        "value": "cancel-fixture-conflict"
+      },
+      "issue": "NATIVE-ATTEMPT-REPLAY-CONFLICT"
+    },
+    {
+      "id": "terminal-conflicting-replay",
+      "checkpoint": "terminal",
+      "command": "terminal",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/evidence/class",
+        "value": "failed"
+      },
+      "issue": "NATIVE-ATTEMPT-REPLAY-CONFLICT"
+    },
+    {
+      "id": "terminal-direct-to-done",
+      "checkpoint": "running",
+      "command": "terminal",
+      "mutation": {
+        "target": "command",
+        "op": "add",
+        "path": "/requested_task_status",
+        "value": "done"
+      },
+      "issue": "NATIVE-TERMINAL-DIRECT-DONE"
+    },
+    {
+      "id": "cancel-ack-treated-as-terminal",
+      "checkpoint": "running",
+      "command": "cancel",
+      "mutation": {
+        "target": "command",
+        "op": "add",
+        "path": "/acknowledgement_terminal_class",
+        "value": "cancelled"
+      },
+      "issue": "NATIVE-CANCEL-UNCONFIRMED"
+    },
+    {
+      "id": "cross-session-attach-claim",
+      "checkpoint": "created",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "add",
+        "path": "/claimed_durability_class",
+        "value": "durable_run_ref"
+      },
+      "issue": "NATIVE-HANDOFF-UNSUPPORTED"
+    },
+    {
+      "id": "route-bind-bypass",
+      "checkpoint": "initial",
+      "command": "route_bind_bypass",
+      "mutation": {
+        "target": "command",
+        "op": "none",
+        "path": ""
+      },
+      "issue": "NATIVE-ROUTE-BIND-BYPASS"
+    },
+    {
+      "id": "incomplete-orphan-audit",
+      "checkpoint": "uncertain",
+      "command": "reconcile_orphaned",
+      "mutation": {
+        "target": "command",
+        "op": "remove",
+        "path": "/evidence/orphan_audit/worktree_authority"
+      },
+      "issue": "NATIVE-ORPHAN-AUDIT-INCOMPLETE"
+    },
+    {
+      "id": "reconcile-conflicting-replay",
+      "checkpoint": "orphaned",
+      "command": "reconcile_orphaned",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/evidence/record_hash",
+        "value": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      "issue": "NATIVE-RECONCILE-CONFLICT"
+    }
+  ],
+  "private_evidence": {
+    "schema": "ccm/native-private-evidence-authentication/v1",
+    "configured_owner_home_ref": "owner-home-ref:fixture",
+    "producer_registrations": {
+      "private-producer-registration:fixture-codex-origin-adapter": {
+        "schema": "ccm/native-evidence-producer/codex-api-tool/v1",
+        "producer_id": "producer:fixture-codex-origin-adapter",
+        "channel": "ccm-private-adapter/v1",
+        "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+        "public_key_id": "ed25519:fixture-codex-origin-adapter",
+        "public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "public_key_fingerprint": "sha256:a2b3d46f1a3ef275c9e599498a7058d25634f61c079565628fd00baf68c2917c",
+        "revoked": false,
+        "trust_scope": {
+          "origin": "codex",
+          "transport": "codex-api-tool-multi-agent",
+          "origin_session_ref": "session-ref:fixture-origin"
+        },
+        "storage": {
+          "record_visibility": "owner-only",
+          "raw_evidence_visibility": "owner-only",
+          "board_projection": "hash-and-ref-only"
+        }
+      },
+      "private-producer-registration:fixture-codex-wrong-scope-adapter": {
+        "schema": "ccm/native-evidence-producer/codex-api-tool/v1",
+        "producer_id": "producer:fixture-codex-wrong-scope-adapter",
+        "channel": "ccm-private-adapter/v1",
+        "registration_ref": "private-producer-registration:fixture-codex-wrong-scope-adapter",
+        "public_key_id": "ed25519:fixture-codex-wrong-scope-adapter",
+        "public_key_spki_base64": "MCowBQYDK2VwAyEAM4tdY8dElgWRzxzjg704dKxuejgS5j8cxjECrysepjs=",
+        "public_key_fingerprint": "sha256:d1a42e3d19166c25056795a43f2cb8d51c2c3bd24caa07fe0853a5dff3e53ab9",
+        "revoked": false,
+        "trust_scope": {
+          "origin": "codex",
+          "transport": "codex-api-tool-multi-agent",
+          "origin_session_ref": "session-ref:other-origin"
+        },
+        "storage": {
+          "record_visibility": "owner-only",
+          "raw_evidence_visibility": "owner-only",
+          "board_projection": "hash-and-ref-only"
+        }
+      }
+    },
+    "owner_store": {
+      "schema": "ccm-owner-evidence/v1",
+      "records": {
+        "evidence:fixture-bind-001": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-001"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-001",
+            "record_hash": "sha256:95b8ae0ab81d8a3ca9959db61388888c9cfd0768f67b7729b3c633cdcfbb06b4",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:DOBRR1nZy/IQszhNwhSIf3xOC+Boe94JKBvGlY7bLHuZGkVA5FU3/jOcbiVw2y64y0en9Dm7McLiLD6NX198Bg=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "launch_claims": {
+      "launch-claim-fixture-001": null
+    },
+    "authentication_negative_vectors": [
+      {
+        "id": "bind-owner-store-provenance",
+        "issue": "NATIVE-EVIDENCE-OWNER-STORE-PROVENANCE",
+        "record_ref": "evidence:fixture-bind-owner-provenance",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "workspace-staged-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-owner-provenance"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-owner-provenance",
+            "record_hash": "sha256:b9602bedf8445b978e5f6f30ccdeec8541f6e97b5231bcd483ad907fdd95df05",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:xnc8mgFhTFnJ4C00oquZO6qM6W5JUEFnHrUbdZGGqOptjO+HrxMe5bkKckmCHI/XHAR/x8tYFXBLzEN0ubUgBw=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "owner-store-provenance"
+        }
+      },
+      {
+        "id": "bind-bad-signature",
+        "issue": "NATIVE-EVIDENCE-SIGNATURE-INVALID",
+        "record_ref": "evidence:fixture-bind-bad-signature",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-bad-signature"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-bad-signature",
+            "record_hash": "sha256:1e45b0d7094a6b1bbdecc85fc3c6bd135dd74d014fbadfe4e8ad38174c8b7c15",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:FuHUuSYn4CO5H5Ikt25YVv16BTr82VLiRy6dJzZU6enJuyhLWMQ6eEF1uzxV/3Gd+m6uMzdiqTQE3XgtarnADw=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": false,
+          "authentication_check": "signature"
+        }
+      },
+      {
+        "id": "bind-bad-canonical-hash",
+        "issue": "NATIVE-EVIDENCE-CANONICAL-HASH-MISMATCH",
+        "record_ref": "evidence:fixture-bind-bad-canonical-hash",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-bad-canonical-hash"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-bad-canonical-hash",
+            "record_hash": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:rE2OywSpAx5kkrwPo0VKU0w3HAciVW2sTyQu3hW6sWN1PqlChQIj0Z9Gnd/qNIFLEPwy2QVTRDhkFSgif2XSBg=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": false,
+          "signature_valid": true,
+          "authentication_check": "canonical-hash"
+        }
+      },
+      {
+        "id": "bind-unknown-registration",
+        "issue": "NATIVE-EVIDENCE-REGISTRATION-UNKNOWN",
+        "record_ref": "evidence:fixture-bind-unknown-registration",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAlKQmiZICCnf8EF35kSgMyrPfvTaFrHnTAdfLaTftu08=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-unknown-registration"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-unknown-registration",
+            "record_hash": "sha256:382507f433e62a0a1f206cd7ed3ca85587ddb7ea9ecc1e3dd8ce35b2caa638d5",
+            "producer": {
+              "producer_id": "producer:fixture-codex-unregistered-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-unregistered-adapter",
+              "signature": "ed25519:KitmBu0zyjtfm+vBrVoED8QV2gEag6zpVQb5vAFDH+IteawRFhJttp2KZjqLpnRhqmdturYZ4juILclX1ySTBQ=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "producer-registration"
+        }
+      },
+      {
+        "id": "bind-wrong-trust-scope",
+        "issue": "NATIVE-EVIDENCE-TRUST-SCOPE-MISMATCH",
+        "record_ref": "evidence:fixture-bind-wrong-trust-scope",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAM4tdY8dElgWRzxzjg704dKxuejgS5j8cxjECrysepjs=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-wrong-trust-scope"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-wrong-trust-scope",
+            "record_hash": "sha256:663021c210e44bd97a842cc8cb6e14f223bfba428b2b77622391ae66cbfeda2f",
+            "producer": {
+              "producer_id": "producer:fixture-codex-wrong-scope-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-wrong-scope-adapter",
+              "signature": "ed25519:rU0+UxrSD7vfg1O4x1GExRcNSWjfcpDHW52otOC2kiiO/8K+sgHpKDFoNCytmoFa5hn0+3zDDpwEjKGLWSglAw=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "producer-trust-scope"
+        }
+      },
+      {
+        "id": "bind-reused-claim",
+        "issue": "NATIVE-EVIDENCE-CLAIM-REUSED",
+        "record_ref": "evidence:fixture-bind-reused-claim",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-reused-claim"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-reused-claim",
+            "record_hash": "sha256:d11b31301bd0836ea837e8c51570d97545e9dd3f2ac3dd407eb5d45af6a8490f",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:ezGPll+eYLnvHcTSEU6zCFq9mfe0FvLA1Ii6TLFNZ7GYTjdDdlCUjvlwUqjp7Kse3aCo94NLTDTO9L3uRb2EDQ=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "claim_prebound_record_hash": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "one-shot-claim"
+        }
+      },
+      {
+        "id": "bind-caller-verified-by-ccm",
+        "issue": "NATIVE-EVIDENCE-CALLER-VERIFICATION-FORBIDDEN",
+        "record_ref": "evidence:fixture-bind-caller-verified-by-ccm",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-caller-verified-by-ccm"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-caller-verified-by-ccm",
+            "record_hash": "sha256:54c596721cdf7c6cca3e8ff97868577f4fccc618384191fc2a4ebea1ed5af6fe",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:HoCNoSn1IEI8tB/6TNnLIsw1jmdePIbi1XCgvPuDN/QQHuLzHsMowAPz+3Gjl1XOCKG7kKFgWa2xmYZUKONUAg=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            },
+            "verified_by_ccm": true
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "caller-verification-field"
+        }
+      }
+    ],
+    "bind_lineage_negative_vectors": [
+      {
+        "id": "bind-account-fingerprint-drift",
+        "issue": "NATIVE-ACCOUNT-FINGERPRINT-MISMATCH",
+        "record_ref": "evidence:fixture-bind-account-drift",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-account-drift"
+          },
+          "fact_resolution": {
+            "account": "drifted",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-account-drift",
+            "record_hash": "sha256:10811d0b95a776926cd77ec2b29612cc76c977b36fe7a8b0ed38e4077d0ca222",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:7Rk5buWcTzoyOk2WJT0+doYr87O88dw7HmOf39mNVRECcgARhxTjS+0XbibziMMenVajncI3bAYYh64LobT8CA=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-other-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "account-lineage"
+        }
+      },
+      {
+        "id": "bind-account-fingerprint-unknown",
+        "issue": "NATIVE-ACCOUNT-FINGERPRINT-UNKNOWN",
+        "record_ref": "evidence:fixture-bind-account-unknown",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-account-unknown"
+          },
+          "fact_resolution": {
+            "account": "unknown",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-account-unknown",
+            "record_hash": "sha256:a53aeeaafcf8e9bb092db8284f960cc96d5f12db72899c628811120bc9fbf187",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:upSIPbkLXLxkzdeUbvc2oI2wdUMa9oi1LUXOd9PjwZfNaoDMeuXi5zoxzUPIuFouzwEqYqO4oPr52DXOd5OhCg=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-unknown",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "account-lineage"
+        }
+      },
+      {
+        "id": "bind-permission-profile-incompatible",
+        "issue": "NATIVE-PERMISSION-PROFILE-INCOMPATIBLE",
+        "record_ref": "evidence:fixture-bind-permission-profile",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-permission-profile"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "incompatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-permission-profile",
+            "record_hash": "sha256:a6888b519f12c4ee98db2cf59b65bbb6e54eca0a019bf057b54d6b9633629402",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:EyclaUZdI5DMUWUOy4whnSoFOArNdCWs0Ub6sWcCoRkxRiBTeRJ97+azBQhJS3tVktheluxJXCerDyPyfQo5Bg=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "danger-full-access",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "permission-profile"
+        }
+      },
+      {
+        "id": "bind-permission-deny-incompatible",
+        "issue": "NATIVE-PERMISSION-DENY-INCOMPATIBLE",
+        "record_ref": "evidence:fixture-bind-permission-deny",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-permission-deny"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "incompatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-permission-deny",
+            "record_hash": "sha256:16228cb0e07d2bea409ba2c36092c779745b2d804fb5fdf7e2a3faa6d441cf26",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:bj/zs17zFrsxRHw9CqxxDg7s1F5DAaBhmVvO8/Kv8H+mhkiqNtw1JqufC/tg9Vqpr466YMM3iKV9bQurxu44CA=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "permission-denies"
+        }
+      }
+    ],
+    "bind_content_negative_vectors": [
+      {
+        "id": "bind-without-handle",
+        "issue": "NATIVE-HANDLE-MISSING",
+        "record_ref": "evidence:fixture-bind-without-handle",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-without-handle"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-without-handle",
+            "record_hash": "sha256:a4c9ac0fdc6f581303d5b4c38b0551b6358555bb11cf4588095493566d48e577",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:GmsBs04VtZmPfWZt57CXWV3+LTrkanfphvmUzSKtva1G4Sk4ei50FWMCzlPsePUg5cTtfNvIt7+8aor6fnWIBg=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "handle-content"
+        }
+      },
+      {
+        "id": "bind-without-roster-corroboration",
+        "issue": "NATIVE-HANDLE-UNATTESTED",
+        "record_ref": "evidence:fixture-bind-without-roster",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-without-roster"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-without-roster",
+            "record_hash": "sha256:53917f1bb4126804db7cc1ed225ec690d30c8ca39a1a7c20260aaed4a447c56f",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:y9N7t3dhHBA3l2kqiyZCpy4AgOq+WUYdIPPgpxkE/7Vx+9xjUCQgn1mguMRLht5Uc9gzOYj5ULcL8dbH2CzeCg=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "handle-content"
+        }
+      },
+      {
+        "id": "bind-parent-session-id-as-handle",
+        "issue": "NATIVE-HANDLE-PARENT-SESSION",
+        "record_ref": "evidence:fixture-bind-parent-as-handle",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-parent-as-handle"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-parent-as-handle",
+            "record_hash": "sha256:188baf75c1cc4dd3a5b75d7d6434ff9b211d9f3c0bf5ba297d36fd31ed7ffd42",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:7NjXlx3w5s3RfdeTmO9JlrU6a9kCpor5brDFjB1Of+sH9Ba08e9yQw9I+QSKIbYp4Dz+ZasoJA3MTyag1v6dDQ=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "session-ref:fixture-origin",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "handle-content"
+        }
+      },
+      {
+        "id": "bind-lineage-drift",
+        "issue": "NATIVE-LINEAGE-MISMATCH",
+        "record_ref": "evidence:fixture-bind-worktree-drift",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-worktree-drift"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-worktree-drift",
+            "record_hash": "sha256:12d85bf0abb64532ff0b9d9d381fc8f7674a78e1cbaae2a08bdfd2b56be72209",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:wCLpdJcRY8qSRVOyaC7qLrpXieL/Hf99wuNp2JMcx7lJCHXmdPX/cTinfhHpNvXdh9mTeMWcqaqqvIryTU5aAw=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:drifted",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "content-linkage"
+        }
+      },
+      {
+        "id": "bind-wrong-expected-child",
+        "issue": "NATIVE-EXPECTED-CHILD-MISMATCH",
+        "record_ref": "evidence:fixture-bind-wrong-child",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-wrong-child"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-wrong-child",
+            "record_hash": "sha256:559fdde50115e1cb99b2e8c94d71b664c1dbf4bd61394813163b6f1d4631eeda",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:1lVbJia16HIItUtvgo167N9l2Kp/MoAZUrWPn4JKUXMbw34uZn1hdkn3y5zKtATOZZkRQ8KR63GegqZ28/oVBA=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-fixture-001"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/unexpected-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "content-linkage"
+        }
+      },
+      {
+        "id": "bind-wrong-create-link",
+        "issue": "NATIVE-EVIDENCE-CREATE-LINK-MISMATCH",
+        "record_ref": "evidence:fixture-bind-wrong-create-link",
+        "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAnJPZNVWT89zCkEUaWpj7NpPM8/9IWYR0M2Bdp34FMbQ=",
+        "owner_store_entry": {
+          "provenance": {
+            "store": "ccm-owner-evidence/v1",
+            "owner_home_ref": "owner-home-ref:fixture",
+            "visibility": "owner-only",
+            "record_ref": "evidence:fixture-bind-wrong-create-link"
+          },
+          "fact_resolution": {
+            "account": "current",
+            "permission_profile": "compatible",
+            "permission_denies": "compatible"
+          },
+          "record": {
+            "schema": "ccm/native-handle-evidence-record/codex-api-tool/v1",
+            "record_id": "evidence:fixture-bind-wrong-create-link",
+            "record_hash": "sha256:53871a2132d0e6f56702322da1d40a90cf411ec4bec6015b3beb5c58016b8f80",
+            "producer": {
+              "producer_id": "producer:fixture-codex-origin-adapter",
+              "channel": "ccm-private-adapter/v1",
+              "registration_ref": "private-producer-registration:fixture-codex-origin-adapter",
+              "signature": "ed25519:OD47vGWEzdvvi5hGkjg35EG5qJJWsJkqCslE89TBGJvWTXCAq9zqMxO/WMArpCXSvVfA03AR9Dhk1OEM0RlyDQ=="
+            },
+            "create_link": {
+              "task_id": "T-native-v1",
+              "attempt_id": "attempt-native-fixture-001",
+              "candidate_id": "codex-native",
+              "dispatch_key": "dispatch-fixture-001",
+              "request_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "launch_claim_id": "launch-claim-forged"
+            },
+            "expected": {
+              "transport": "codex-api-tool-multi-agent",
+              "parent_target": "/root/fixture-parent",
+              "child_target": "/root/fixture-parent/fixture-worker"
+            },
+            "observed": {
+              "handle_kind": "codex-agent-id",
+              "handle": "agent-fixture-001",
+              "canonical_target": "/root/fixture-parent/fixture-worker",
+              "spawn": {
+                "observed_at": "2026-07-13T08:00:01Z",
+                "owner_record_ref": "owner-evidence://fixture/spawn-001",
+                "raw_evidence_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+              },
+              "roster": {
+                "observed_at": "2026-07-13T08:00:02Z",
+                "owner_record_ref": "owner-evidence://fixture/roster-001",
+                "raw_evidence_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+                "state": "running",
+                "handle": "agent-fixture-001"
+              },
+              "current_lineage": {
+                "origin_session_ref": "session-ref:fixture-origin",
+                "parent_target": "/root/fixture-parent",
+                "expected_child_target": "/root/fixture-parent/fixture-worker",
+                "account_fingerprint_ref": "account-ref:fixture-current-codex",
+                "workspace_ref": "workspace-ref:fixture-repository",
+                "worktree_ref": "worktree-ref:fixture-isolated",
+                "baseline_commit": "1111111111111111111111111111111111111111",
+                "permission": {
+                  "snapshot_ref": "permission-ref:fixture-workspace-write",
+                  "profile": "workspace-write",
+                  "denies": ["account-mutation", "push-remote"]
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "canonical_hash_valid": true,
+          "signature_valid": true,
+          "authentication_check": "content-linkage"
+        }
+      }
+    ]
+  },
+  "endpoint_negative_cases": [
+    {
+      "id": "create-account-fingerprint-drift",
+      "endpoint": "create",
+      "checkpoint": "initial",
+      "command": "create",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/admission_snapshot/account/current_fingerprint_ref",
+        "value": "account-ref:fixture-other-codex"
+      },
+      "issue": "NATIVE-ACCOUNT-FINGERPRINT-MISMATCH"
+    },
+    {
+      "id": "create-account-fingerprint-unknown",
+      "endpoint": "create",
+      "checkpoint": "initial",
+      "command": "create",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/admission_snapshot/account/status",
+        "value": "unknown"
+      },
+      "issue": "NATIVE-ACCOUNT-FINGERPRINT-UNKNOWN"
+    },
+    {
+      "id": "create-permission-profile-incompatible",
+      "endpoint": "create",
+      "checkpoint": "initial",
+      "command": "create",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/admission_snapshot/permission/profile_status",
+        "value": "incompatible"
+      },
+      "issue": "NATIVE-PERMISSION-PROFILE-INCOMPATIBLE"
+    },
+    {
+      "id": "create-permission-deny-incompatible",
+      "endpoint": "create",
+      "checkpoint": "initial",
+      "command": "create",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/admission_snapshot/permission/deny_status",
+        "value": "incompatible"
+      },
+      "issue": "NATIVE-PERMISSION-DENY-INCOMPATIBLE"
+    },
+    {
+      "id": "bind-account-fingerprint-drift",
+      "endpoint": "bind",
+      "checkpoint": "created",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/verified_evidence/resolved_context/account",
+        "value": "drifted"
+      },
+      "issue": "NATIVE-ACCOUNT-FINGERPRINT-MISMATCH"
+    },
+    {
+      "id": "bind-account-fingerprint-unknown",
+      "endpoint": "bind",
+      "checkpoint": "created",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/verified_evidence/resolved_context/account",
+        "value": "unknown"
+      },
+      "issue": "NATIVE-ACCOUNT-FINGERPRINT-UNKNOWN"
+    },
+    {
+      "id": "bind-permission-profile-incompatible",
+      "endpoint": "bind",
+      "checkpoint": "created",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/verified_evidence/resolved_context/permission_profile",
+        "value": "incompatible"
+      },
+      "issue": "NATIVE-PERMISSION-PROFILE-INCOMPATIBLE"
+    },
+    {
+      "id": "bind-permission-deny-incompatible",
+      "endpoint": "bind",
+      "checkpoint": "created",
+      "command": "bind",
+      "mutation": {
+        "target": "command",
+        "op": "replace",
+        "path": "/verified_evidence/resolved_context/permission_denies",
+        "value": "incompatible"
+      },
+      "issue": "NATIVE-PERMISSION-DENY-INCOMPATIBLE"
+    }
+  ]
+}

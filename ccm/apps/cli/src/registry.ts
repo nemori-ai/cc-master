@@ -693,6 +693,94 @@ export const REGISTRY: Registry = {
       ],
       handler: 'task.routeBind',
     },
+    'native-attempt-create': {
+      summary: '创建 host-native starting attempt；只返回 launch permission，不伪造 running',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        selection: { type: 'string', required: true, desc: 'qualified selection JSON' },
+        attempt: { type: 'string', required: true, desc: 'starting native attempt JSON' },
+        'replay-intent': {
+          type: 'string',
+          required: true,
+          enum: ['accept-no-launch', 'require-new-launch'],
+          desc: '精确重放意图；重放绝不再次授权 launch',
+        },
+        json: { type: 'boolean', desc: '输出 operation result JSON' },
+      },
+      examples: [
+        'ccm task native-attempt-create T7 --selection @/abs/selection.json --attempt @/abs/attempt.json --replay-intent accept-no-launch',
+      ],
+      handler: 'task.nativeAttemptCreate',
+    },
+    'native-attempt-bind': {
+      summary: '经私有 owner evidence 鉴权绑定真实 native handle（starting → running）',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        'attempt-id': { type: 'string', required: true, desc: 'native attempt id' },
+        'evidence-record-ref': {
+          type: 'string',
+          required: true,
+          desc: 'owner-only evidence record ref（不接受调用方自证 JSON）',
+        },
+        json: { type: 'boolean', desc: '输出 operation result JSON' },
+      },
+      examples: [
+        'ccm task native-attempt-bind T7 --attempt-id attempt-1 --evidence-record-ref evidence:bind-1',
+      ],
+      handler: 'task.nativeAttemptBind',
+    },
+    'native-attempt-cancel': {
+      summary: '记录幂等 cancel request 并返回 host control effect；ack 不作 terminal',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        'attempt-id': { type: 'string', required: true, desc: 'native attempt id' },
+        request: { type: 'string', required: true, desc: 'cancel request JSON' },
+        'acknowledgement-terminal-class': {
+          type: 'string',
+          desc: '拒绝用 cancel acknowledgement 伪造 terminal（负向契约入口）',
+        },
+        json: { type: 'boolean', desc: '输出 operation result JSON' },
+      },
+      examples: [
+        'ccm task native-attempt-cancel T7 --attempt-id attempt-1 --request @/abs/cancel.json',
+      ],
+      handler: 'task.nativeAttemptCancel',
+    },
+    'native-attempt-terminal': {
+      summary: '以 owner evidence 记录 native terminal；task 只到 uncertain，不直接 done',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        'attempt-id': { type: 'string', required: true, desc: 'native attempt id' },
+        'evidence-record-ref': { type: 'string', required: true, desc: 'terminal evidence ref' },
+        'requested-task-status': {
+          type: 'string',
+          desc: '拒绝 terminal 直接请求 done（负向契约入口）',
+        },
+        json: { type: 'boolean', desc: '输出 operation result JSON' },
+      },
+      examples: [
+        'ccm task native-attempt-terminal T7 --attempt-id attempt-1 --evidence-record-ref evidence:terminal-1',
+      ],
+      handler: 'task.nativeAttemptTerminal',
+    },
+    'native-attempt-reconcile': {
+      summary: '以 owner evidence 幂等 reconcile uncertain/running/terminal/orphaned',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        'attempt-id': { type: 'string', required: true, desc: 'native attempt id' },
+        'evidence-record-ref': { type: 'string', required: true, desc: 'reconcile evidence ref' },
+        json: { type: 'boolean', desc: '输出 operation result JSON' },
+      },
+      examples: [
+        'ccm task native-attempt-reconcile T7 --attempt-id attempt-1 --evidence-record-ref evidence:reconcile-1',
+      ],
+      handler: 'task.nativeAttemptReconcile',
+    },
     block: {
       summary: '阻塞（→ blocked·设 blocked_on）',
       read: false,

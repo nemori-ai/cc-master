@@ -27,7 +27,11 @@
 
 import { parseArgs } from 'node:util';
 import type { QuotaEffectBoundary } from '@ccm/engine';
-import type { Ctx } from './handlers/_common.js';
+import type {
+  Ctx,
+  NativeAttemptAdmissionBoundary,
+  NativeAttemptPrivateEvidenceBoundary,
+} from './handlers/_common.js';
 import * as accountHandler from './handlers/account.js';
 import * as attemptHandler from './handlers/attempt.js';
 import * as baselineHandler from './handlers/baseline.js';
@@ -88,6 +92,9 @@ interface RunOpts {
   shadowRoutingBoundary?: ShadowRoutingBoundary;
   providerRuntime?: ProviderRuntime;
   quotaEffects?: QuotaEffectBoundary;
+  nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
+  nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
+  writeFileAtomicSync?: typeof io.writeFileAtomicSync;
 }
 
 // 一个 handler 模块 = 名字 → handler(ctx) 函数（动态派发·hkey 在运行期定）。
@@ -529,6 +536,9 @@ export function runWithComposition(
     argv: working,
     providerRuntime: opts.providerRuntime || createDefaultProviderRuntime(env),
     quotaEffects: opts.quotaEffects,
+    nativeAttemptPrivateEvidence: opts.nativeAttemptPrivateEvidence,
+    nativeAttemptAdmission: opts.nativeAttemptAdmission,
+    writeFileAtomicSync: opts.writeFileAtomicSync,
   });
 
   const [hnoun, hkey] = String(spec.handler).split('.');
@@ -581,6 +591,9 @@ function buildCtx({
   argv,
   providerRuntime,
   quotaEffects,
+  nativeAttemptPrivateEvidence,
+  nativeAttemptAdmission,
+  writeFileAtomicSync,
 }: {
   values: Record<string, unknown>;
   positionals: string[];
@@ -591,6 +604,9 @@ function buildCtx({
   argv: string[];
   providerRuntime?: ProviderRuntime;
   quotaEffects?: QuotaEffectBoundary;
+  nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
+  nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
+  writeFileAtomicSync?: typeof io.writeFileAtomicSync;
 }): Ctx {
   const harnessFlag = typeof values.harness === 'string' ? values.harness : undefined;
   const sid =
@@ -620,6 +636,9 @@ function buildCtx({
     isTTY: io.isTTY(process.stdin),
     providerRuntime,
     quotaEffects,
+    nativeAttemptPrivateEvidence,
+    nativeAttemptAdmission,
+    writeFileAtomicSync,
   };
 }
 

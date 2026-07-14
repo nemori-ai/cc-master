@@ -15,6 +15,7 @@ content-summary: |
 | 路径 | 职责 |
 | --- | --- |
 | `commands/` | command adapter source：`_manifest/` + `_hosts/<host>/` + `<command>/adapters/<host>/`；Claude Code 当前投影为 slash-command markdown |
+| `adapters/` | 跨 surface capability 的 origin host-native invocation 映射；只调 host tool/归一观察，不拥有 ccm 状态机或 board writer |
 | `skills/` | SAP：每个 skill 的 `canonical/` runtime body + `adapters/<host>/strategy.yaml` |
 | `hooks/` | PHIP：hook contract、host base、每个 hook 的 `implementations/<host>/` |
 | `.claude-plugin/` | Claude Code adapter manifest source；第二阶段可下沉为 host adapter manifest |

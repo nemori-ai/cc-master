@@ -17,9 +17,16 @@
 //   引擎 rewire：原 require('../board-lint-core.js') 改成从 `@ccm/engine` import { lintBoard, formatReport }。
 //   逻辑/数值/正则/报错文案/.errKind 逐字保持。`fs` 由文件顶层 import（原在 runWrite 内 require）。
 
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import type { QuotaEffectBoundary } from '@ccm/engine';
-import { formatReport, lintBoard, reconcileGating, reconcileInbox } from '@ccm/engine';
+import {
+  formatReport,
+  lintBoard,
+  reconcileGating,
+  reconcileInbox,
+  validateNativeAttemptMutation,
+} from '@ccm/engine';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
 import type { ProviderRuntime } from '../provider-runtime.js';
@@ -37,6 +44,84 @@ interface KindedError extends Error {
 //   handler 把动态 unknown 形参窄断言成它喂 mutation。忠实偏离记一笔：原 CJS 无类型，故无此别名；
 //   TS 下用它把「mutation 的 board 入参类型」收口一处。
 export type BoardArg = Record<string, any>;
+
+export type NativeAttemptEvidenceClass = 'bind' | 'terminal' | 'reconcile';
+
+export interface NativeAttemptVerifiedEvidence {
+  schema: 'ccm/native-verified-evidence/v1';
+  evidence_class: NativeAttemptEvidenceClass;
+  record_ref: string;
+  record_hash: string;
+  producer: {
+    producer_id: string;
+    channel: string;
+    registration_ref: string;
+  };
+  resolved_context: {
+    account: string;
+    permission_profile: string;
+    permission_denies: string;
+  };
+  scope: {
+    contract: string;
+    origin: string;
+    harness: string;
+    adapter: string;
+    surface: string;
+    transport: string;
+    task_id: string;
+    attempt_id: string;
+    candidate_id: string;
+    dispatch_key: string;
+    request_hash: string;
+    launch_claim_id: string;
+    create_hash: string;
+  };
+  observed: {
+    descriptor: {
+      origin: string;
+      harness: string;
+      adapter: string;
+      surface: string;
+      transport: string;
+    };
+    target: string | null;
+    source: string;
+    current_lineage: Record<string, any>;
+    handle?: string;
+    handle_kind?: string;
+    spawn?: Record<string, any>;
+    roster?: Record<string, any>;
+  };
+  payload: Record<string, any>;
+}
+
+export interface NativeAttemptEvidenceStageResult {
+  ok: boolean;
+  transaction_id?: string;
+  verified_evidence?: NativeAttemptVerifiedEvidence;
+  issues?: Array<{ code: string; path?: string; message?: string }>;
+}
+
+export interface NativeAttemptPrivateEvidenceBoundary {
+  schema: string;
+  channel: string;
+  stageAndVerify: (input: {
+    evidence_class: NativeAttemptEvidenceClass;
+    record_ref: string;
+    expected: Record<string, any>;
+  }) => NativeAttemptEvidenceStageResult;
+  commit: (input: {
+    transaction_id: string;
+    board_path: string;
+    board_content_hash: string;
+  }) => void;
+  rollback: (input: { transaction_id: string; reason: string }) => void;
+}
+
+export interface NativeAttemptAdmissionBoundary {
+  resolveCreate: () => Record<string, any>;
+}
 
 // ctx 契约形态（契约 §三 ctx 形态·router.buildCtx 产出）。handler / runner 共用。
 export interface Ctx {
@@ -61,6 +146,9 @@ export interface Ctx {
   // it at the router seam; tests replace it with a controlled transport.
   providerRuntime?: ProviderRuntime;
   quotaEffects?: QuotaEffectBoundary;
+  nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
+  nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
+  writeFileAtomicSync?: typeof io.writeFileAtomicSync;
 }
 
 // buildFields 收集的 --set / --set-json 操作项。
@@ -221,6 +309,21 @@ type WriteRenderFn = (
 type ComputeFn = (board: unknown, ctx: Ctx) => unknown;
 type ReadRenderFn = (result: unknown, ctx: Ctx) => string;
 
+export type NativeAttemptWriterKind =
+  | 'generic'
+  | 'generic-state'
+  | 'native-create'
+  | 'native-bind'
+  | 'native-cancel'
+  | 'native-terminal'
+  | 'native-reconcile';
+
+export interface WriteTransactionLifecycle {
+  rollback: (input: { reason: string }) => void;
+  commit: (input: { boardPath: string; boardContentHash: string }) => void;
+  active?: () => boolean;
+}
+
 // ── runWrite(ctx, { resolve, mutate, render }) → exitCode ─────────────────────────────────────────
 //   设计稿 §5 写入关卡：resolveBoard（discover）→ withBoardLock( read → mutate → lint → 拒/写 )。
 //     resolve(ctx) → { boardPath, board }（默认用 discover.resolveBoard；handler 可覆盖，如 board.init 不发现而新建）。
@@ -242,7 +345,21 @@ type ReadRenderFn = (result: unknown, ctx: Ctx) => string;
 //     mutate 忽略 raw 直接产板；此时仍走 lock + lint + 原子写同一管线。
 export function runWrite(
   ctx: Ctx,
-  { resolve, mutate, render }: { resolve?: ResolveFn; mutate: MutateFn; render: WriteRenderFn },
+  {
+    resolve,
+    mutate,
+    render,
+    writerKind = 'generic',
+    targetTaskIds,
+    transaction,
+  }: {
+    resolve?: ResolveFn;
+    mutate: MutateFn;
+    render: WriteRenderFn;
+    writerKind?: NativeAttemptWriterKind;
+    targetTaskIds?: readonly string[];
+    transaction?: WriteTransactionLifecycle;
+  },
 ): number {
   const flags = ctx.flags || ({} as Ctx['flags']);
 
@@ -259,38 +376,88 @@ export function runWrite(
   const boardPath = resolved.boardPath;
 
   const execute = (raw: unknown): number => {
-    // mutate 后跑写关卡 reconcile（mutate → reconcile → lint）：
-    //   ① reconcileGating：deps 驱动 ready↔blocked 归一（ADR-023）。
-    //   ② reconcileInbox：通知收件箱过期 / supersede / GC（ADR-032）。
-    // lint 校验的是归一后的板（含 BIZ-STATUS-DEPS / FMT-INBOX）。
-    const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
-    const next = reconcileInbox(reconcileGating(mutate(raw, ctx)), now);
-    const res = lintBoard(JSON.stringify(next));
+    let boardPersisted = false;
+    const rollback = (reason: string): void => {
+      if (!transaction || (transaction.active && !transaction.active())) return;
+      transaction.rollback({ reason });
+    };
 
-    if (res.errors.length > 0 && !flags.force) {
-      ctx.err(formatReport(res));
-      return EXIT.VALIDATION;
-    }
-    // QA #6：成功写不再每次重打整板 warning（多任务时刷屏、淹没确认）——默认只一行摘要 + 指路，
-    //   --verbose 才全量展开。hard error 仍走上方 EXIT.VALIDATION 分支全量打（那是写入闸要解释为何拒绝）。
-    if (res.warnings.length > 0 && !flags.quiet) {
-      if (flags.verbose) {
-        ctx.err(formatReport({ errors: [], warnings: res.warnings }));
-      } else {
-        ctx.err(
-          `lint: 0 hard error，${res.warnings.length} warning（\`ccm board lint\` 看详情；--verbose 展开）`,
+    try {
+      // mutate 后跑写关卡 reconcile（mutate → reconcile → lint）：
+      //   ① reconcileGating：deps 驱动 ready↔blocked 归一（ADR-023）。
+      //   ② reconcileInbox：通知收件箱过期 / supersede / GC（ADR-032）。
+      // lint 校验的是归一后的板（含 BIZ-STATUS-DEPS / FMT-INBOX）。
+      // generic-state 表达的是 writer intent；即使底层 mutation 会先以旧错误拒绝或最终不产生 byte delta，
+      // active native attempt 也必须由同一 ownership guard 统一拒绝。
+      if (writerKind === 'generic-state') {
+        const intentIssues = validateNativeAttemptMutation(
+          raw as Record<string, any>,
+          raw as Record<string, any>,
+          writerKind,
+          targetTaskIds,
         );
+        if (intentIssues.length > 0) {
+          rollback('native-attempt-mutation-guard');
+          ctx.err(intentIssues.map((issue) => issue.code).join(', '));
+          return EXIT.VALIDATION;
+        }
       }
-    }
 
-    if (flags.dryRun) {
-      ctx.out(render(next, ctx, { dryRun: true, boardPath }));
+      const now = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+      const next = reconcileInbox(reconcileGating(mutate(raw, ctx)), now);
+
+      // Native attempt 的 writer ownership 是 mutation-boundary hard gate，先于可被 --force 越过的普通 lint。
+      // generic 是所有既有 writer 的默认值；只有 dedicated native verb 显式传对应 writerKind。
+      const nativeIssues = validateNativeAttemptMutation(
+        raw as Record<string, any>,
+        next as Record<string, any>,
+        writerKind,
+        targetTaskIds,
+      );
+      if (nativeIssues.length > 0) {
+        rollback('native-attempt-mutation-guard');
+        ctx.err(nativeIssues.map((issue) => issue.code).join(', '));
+        return EXIT.VALIDATION;
+      }
+
+      const res = lintBoard(JSON.stringify(next));
+
+      if (res.errors.length > 0 && (!flags.force || transaction?.active?.())) {
+        rollback('lint');
+        ctx.err(formatReport(res));
+        return EXIT.VALIDATION;
+      }
+      // QA #6：成功写不再每次重打整板 warning（多任务时刷屏、淹没确认）——默认只一行摘要 + 指路，
+      //   --verbose 才全量展开。hard error 仍走上方 EXIT.VALIDATION 分支全量打（那是写入闸要解释为何拒绝）。
+      if (res.warnings.length > 0 && !flags.quiet) {
+        if (flags.verbose) {
+          ctx.err(formatReport({ errors: [], warnings: res.warnings }));
+        } else {
+          ctx.err(
+            `lint: 0 hard error，${res.warnings.length} warning（\`ccm board lint\` 看详情；--verbose 展开）`,
+          );
+        }
+      }
+
+      if (flags.dryRun) {
+        rollback('dry-run');
+        ctx.out(render(next, ctx, { dryRun: true, boardPath }));
+        return EXIT.OK;
+      }
+
+      const boardContent = `${JSON.stringify(next, null, 2)}\n`;
+      const boardContentHash = `sha256:${createHash('sha256').update(boardContent).digest('hex')}`;
+      (ctx.writeFileAtomicSync || io.writeFileAtomicSync)(boardPath, boardContent);
+      boardPersisted = true;
+      transaction?.commit({ boardPath, boardContentHash });
+      ctx.out(render(next, ctx, { dryRun: false, boardPath }));
       return EXIT.OK;
+    } catch (error) {
+      // Board 写成功以后 commit/render 的异常不能释放 reservation：此时 board 已经 durable，精确重试须
+      // 由 evidence boundary 依据 board hash 幂等 finalize。写成功以前的任何失败都必须 rollback。
+      if (!boardPersisted) rollback('write-pipeline-error');
+      throw error;
     }
-
-    io.writeFileAtomicSync(boardPath, `${JSON.stringify(next, null, 2)}\n`);
-    ctx.out(render(next, ctx, { dryRun: false, boardPath }));
-    return EXIT.OK;
   };
 
   // dry-run 是真正的零写操作：不创建锁、临时文件或父目录。resolve 已给出只读快照，

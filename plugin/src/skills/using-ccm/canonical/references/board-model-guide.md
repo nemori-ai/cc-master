@@ -12,6 +12,7 @@
   - [👁 observed 字段（hook 若有则用，走具名 flag）](#-observed-字段)
 - [B. status 八态语义 + 生命周期](#b-status-八态语义--生命周期)
   - [各态语义速查](#各态语义速查)
+  - [native-attempt 专属 projection](#native-attempt-专属-projection)
   - [status 何时转向哪态（决策指导）](#status-何时转向哪态)
   - [uncertain vs blocked_on（辨析）](#uncertain-vs-blocked_on-辨析)
 - [C. executor 五种语义 + 选择决策树](#c-executor-五种语义--选择决策树)
@@ -63,7 +64,7 @@
 | `references` | 开发类 task 必须，其余推荐 | ref 只能绝对路径或 URL，禁相对（FMT-REF·exit 3） |
 | `estimate` | 估点时 | 见 [E. estimate 怎么估](#e-estimate-怎么估) |
 | `executor` | 派发前必须设 | 见 [C. executor 五种语义](#c-executor-五种语义--选择决策树) |
-| `handle` | 真实派发后、任务进入 `in_flight` 前必须 | 记录派发工具返回的真实句柄，resume 靠它 recon；`ready` / `blocked` future task 不预填 |
+| `handle` | legacy 真实派发后、任务进入 `in_flight` 前必须；native bind/reconcile 时由专属 writer 投影 | 记录真实 opaque 句柄，resume 靠它 recon；`ready` / `blocked` future task 不预填，native-active 时禁止 `task update --handle` / 通用 setter 自填 |
 | `artifact` | 产出落盘后（`task done` 时带 `--artifact`） | 绝对路径或 URL；done 真语义（verified+artifact）靠它；`task retry` 会归档旧值并从当前 attempt 清除 |
 | `verified` | 端点验收通过后 | `task done --verified` 一步到位，或 `task update --verified`；`task retry` 原子复位为布尔 `false` |
 | `dependency_gate` | review task 必须明确批准后才允许下游开始时 | `task add|update --review-gate APPROVE`；缺省保持旧板的 status-only 依赖语义 |
@@ -134,6 +135,24 @@
 | `failed` | 节点失败 | 不在 readySet | `task retry` 开新 attempt，或升级处置 → `escalated` |
 | `stale` | 上游产物变了、需重跑 | 不在 readySet | 重确认输入后 `task retry`（先归档旧 evidence，再开干净新 attempt；旧 review verdict 不参与当前 gate） |
 | `uncertain` | 做了但未验（验证节点尚未派出） | 不在 readySet | 验收通过 → `done`，失败 → `failed`，重做 → `in_flight` |
+
+### native-attempt 专属 projection
+
+板通过 `meta.contracts.native_attempt: "ccm/native-attempt/v1"` 显式 opt in 后，latest native attempt 的 append-only 状态与 task 的 status/handle 是一个由 ccm dedicated writer 独占的 projection；它不是 generic status/handle 字段的另一种写法。
+
+| Attempt state / observation | Task projection | 唯一入口 |
+|---|---|---|
+| `starting` | `ready`，无 `handle` | `native-attempt-create` |
+| `running`（认证 spawn + 同 handle live roster 证据） | `in_flight`，投影该真实 opaque handle | `native-attempt-bind` 或同一 handle 的 `native-attempt-reconcile` |
+| `uncertain` | `uncertain`，清 active `handle`；阻止新 launch | `native-attempt-reconcile` |
+| `terminal`（认证 terminal evidence） | `uncertain`，无 `handle`，绝不直接 `done`/`verified` | `native-attempt-terminal` 或 `native-attempt-reconcile` |
+| `orphaned`（完成 fenced orphan audit） | `ready`，无 `handle`；只允许后来显式 create | `native-attempt-reconcile` |
+
+latest attempt 为 `starting|running|uncertain` 时，mutation boundary 统一拒绝 generic `task start/done/block/unblock/set-status`、`task update --handle` / 通用 setter、legacy `route-bind` 及其 `--force` 绕路；`BIZ-NATIVE-ATTEMPT-PROJECTION` hard lint 同时捕获 board 上被手改出的 projection mismatch。terminal 只是 worker 事实，不是父 task 验收：父层验证 result/artifact 后，仍从 `uncertain` 走普通 `task done --verified --artifact` true-done 不变式。
+
+attempt 内的 lifecycle record 也受同一 hard projection 约束：`starting` 只能保留 create 初态，不能预载 `handle_binding`、cancel、terminal、时间戳、orphan audit 或 reconciliation；cancel 必须建立在已认证 binding 之后，terminal/orphan record 只能出现在对应可达状态。reconciliation 必须是按 observation time 严格递增的完整可信链：每条都保留私有 evidence ref/hash、source、descriptor、target 与 current lineage，running/terminal/orphaned 的专属 payload 还须分别与原 binding、顶层 terminal、顶层 fenced orphan audit 值相等；classification-only、缺字段、重排或只补一个看似合理顶层 audit 的历史一律 hard-fail。即使加 `--force`，不可能由 dedicated writer 产生的 state×record 组合也会被拒；不要靠手改 board 预填“未来证据”。
+
+**runtime 边界：**当前三 host 的 native-attempt strategy 都是 `unsupported`，Codex 不投影 invoke artifact，也不会默认 spawn。五个 `native-attempt-*` 命令只维护 ledger，其中 bind/terminal/reconcile 消费 ccm 私有认证 evidence；它们不是 host tool wrapper。`expected_child_target` 是 create 时冻结的期望，不是 spawn/roster 观察，更不能单独证明 handle。
 
 ### status 何时转向哪态
 
@@ -218,7 +237,7 @@ stale      → ready
 {{USING_CCM_EXECUTOR_DECISION_TAIL}}
 ```
 
-**executor 与 handle 的关系：** `executor` 是谁来执行的计划，因此 `ready` / `blocked` future task 可先选 `subagent` 或 `workflow`，**不要预填 placeholder / phantom handle**。真实调用派发工具后，立即把其返回的真实句柄写入 task（`task update --handle <句柄>`），再转 `in_flight`；只有 `status=in_flight` 且 `executor∈{subagent,workflow}` 时，缺 handle 才触发 `BIZ-EXECUTOR-HANDLE`，因为 resume 要靠它 recon 任务是否还活着。`external` 节点靠 `reference kind=issue` 的 URL 去外部系统查；`handle` 可选地记录 issue URL / issue number / 外部 run id，方便 recon。`user` 和 `master-orchestrator` 没有后台句柄。
+**executor 与 handle 的关系：** `executor` 是谁来执行的计划，因此 `ready` / `blocked` future task 可先选 `subagent` 或 `workflow`，**不要预填 placeholder / phantom handle**。legacy 调用真实派发工具后，立即把其返回的句柄写入 task（`task update --handle <句柄>`），再转 `in_flight`；只有 `status=in_flight` 且 `executor∈{subagent,workflow}` 时，缺 handle 才触发 `BIZ-EXECUTOR-HANDLE`。opt-in native attempt 的 handle 只能由认证 evidence 经 `native-attempt-bind/reconcile` 投影，generic update 会被拒。`external` 节点靠 `reference kind=issue` 的 URL 去外部系统查；`handle` 可选地记录 issue URL / issue number / 外部 run id，方便 recon。`user` 和 `master-orchestrator` 没有后台句柄。
 
 ### external + issue tracking 语义
 
@@ -235,7 +254,7 @@ stale      → ready
 
 **反模式：**
 - 把 `user` 任务标成 `subagent`——看起来在跑、其实没人做。
-- 真实派发后把 `executor: subagent` 任务标成 `in_flight`，却不带派发工具返回的真实 `handle`——会触发 `BIZ-EXECUTOR-HANDLE` warn，resume 时也找不到后台任务。反之，future `ready` / `blocked` 任务不应为了消 warning 预填 phantom handle。
+- 真实派发后把 `executor: subagent` 任务标成 `in_flight`，却不带派发工具返回的真实 `handle`——会触发 `BIZ-EXECUTOR-HANDLE` warn，resume 时也找不到后台任务；唯一例外是通过 hard native projection 校验、尚不应有 active handle 的 native attempt 状态。反之，future `ready` / `blocked` 任务不应为了消 warning 预填 phantom handle。
 - 把 orchestrator 自己的整合工作标 `subagent`——指挥不演奏（orchestrator 协调、不亲手做单元工作），orchestrator 的工作应标 `master-orchestrator`。
 
 ---
@@ -712,6 +731,21 @@ ccm task start T3          # ready → in_flight，盖 started_at
 ccm task done T3 --verified --artifact /abs/output.md   # in_flight → done，盖 finished_at，带 true-done 证据
 ```
 
+**footgun 2b：用 generic verb / `--force` 修 native-active projection**
+
+```bash
+# ❌ 都会被 mutation boundary 拒绝；--force 不是 native 专属状态机的逃生口
+ccm task start T3 --force
+ccm task update T3 --handle guessed-child
+ccm task route-bind T3 --selection @selection.json --attempt @attempt.json --force
+
+# ✅ 只让 dedicated writer 消费 ccm 私有认证 evidence
+ccm task native-attempt-bind T3 --attempt-id attempt-1 --evidence-record-ref evidence:bind-1
+
+# terminal 只到 uncertain；父层独立验收后才走普通 true-done
+ccm task done T3 --verified --artifact /abs/output.md
+```
+
 **footgun 3：重跑只改 status，沿用旧完成证据**
 
 ```bash
@@ -889,10 +923,11 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `BIZ-AGILE-ACCEPTANCE-MISSING` | warn | cadence member 缺清晰 `acceptance` | 给该 member 补一句 DoD 或 criteria；没有验收标准的节点不该作为可 ship 切片收口 |
 | `BIZ-ESTIMATE-STALE` | warn | 实测 duration 与 estimate 明显漂移，提示下游重估 | 用新的实测反馈重估未开始下游，必要时重开 baseline / replan |
 | `BIZ-STATUS-DEPS` | warn | deps 门控不一致：`ready` 但 deps 未全满足 / `blocked` 无 `blocked_on` 但 deps 全满足 | **CLI 写路径经 `reconcileGating` 永不产生此态**——看到它多半是手改 board；跑任意 ccm 写命令触发归一，或 `task unblock`/`set-status` 手动对齐——见 [B 节](#ready--blocked-由系统按-deps-自动门控) |
+| `BIZ-NATIVE-ATTEMPT-PROJECTION` | **hard** | opt-in task 的 attempt/create/cancel/binding schema、ordinal/dispatch identity、reconciliation 完整性/顺序/值绑定、state×record 时序可达性或 status/handle 专属 projection 不一致，或 active history/handle 被 generic 写路径伪造 | 不手改、不用 generic verb 或 `--force` 修；只走 `native-attempt-create/bind/cancel/terminal/reconcile`，让认证 evidence 驱动 projection——见 [B 节](#native-attempt-专属-projection) |
 | `BIZ-DECISION-PACKAGE` | warn | `decision_package` 在但字段不全：`context_md`/`what_i_need`/`enter_cmd` 空、`ask_type` 不在枚举、decision 型 `options` 空、`inputs_hash` 非 `sha256:<64hex>` | 备齐采访包字段；decision 型必须有非空 options——见 [G 节](#g-blocked_on-怎么选) |
 | `BIZ-DEV-REFS` | **hard** | `type=development` 的 task 缺 `kind=spec`≥1 或 `kind=plan`≥1 引用 | development task 加 `--ref spec:/abs/spec.md --ref plan:/abs/plan.md`（`task add`）或 `--add-ref`（`task update`）；`--force` 可越——见 [L 节](#l-referencesartifactverified-语义) |
 | `BIZ-ACCEPTANCE-REQUIRED` | warn | type ∈ {development, development-demo, acceptance, e2e-integration} 但 `acceptance` 为空 | 这些 type 必须带 `--accept`——见 [D 节](#d-acceptance-怎么写好) |
-| `BIZ-EXECUTOR-HANDLE` | warn | `status=in_flight` 且 `executor` ∈ {subagent, workflow}，但缺真实 `handle` | 派发工具返回句柄后 `task update --handle <后台句柄>`，再转 `in_flight`；`ready` / `blocked` future task 不预填——见 [C 节](#c-executor-五种语义--选择决策树) |
+| `BIZ-EXECUTOR-HANDLE` | warn | `status=in_flight` 且 `executor` ∈ {subagent, workflow}，但缺真实 `handle`；valid native no-handle projection 除外 | legacy 派发工具返回句柄后 `task update --handle <后台句柄>`，再转 `in_flight`；`ready` / `blocked` future task 不预填；native attempt 只走 dedicated writer，由 hard rule 接管——见 [C 节](#c-executor-五种语义--选择决策树) |
 | `BIZ-EXTERNAL-ISSUE` | warn | `executor=external` 但缺 `kind=issue` 引用 | external task 加 `--ref issue:https://github.com/o/r/issues/N` 做外部追踪锚点 |
 | `BIZ-EXTERNAL-ARTIFACT` | warn | `executor=external` 且 `status=done`，但 `artifact` 等于同一个 `kind=issue` tracking URL | 把 artifact 改成外部实际产出（PR / commit / release / report / CI run）；若 issue closed 但尚未验收，别标 done，先用 `uncertain` / `in_flight` / `stale` |
 | `BIZ-TIME-ORDER` | warn | 时间序乱：`started_at` 早于 `created_at` / `finished_at` 早于 `started_at` / 有 finished 无 started / `in_flight` 无 started / `done` 无 finished | 用 ccm verb（`start`/`done`）按序盖戳，别手填出乱序时间 |

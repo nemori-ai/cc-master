@@ -23,7 +23,17 @@ import * as io from '../io.js';
 import * as mutations from '../mutations.js';
 import { REGISTRY } from '../registry.js';
 import * as render from '../render.js';
-import { type BoardArg, buildFields, type Ctx, runRead, runWrite, type SetOp } from './_common.js';
+import {
+  type BoardArg,
+  buildFields,
+  type Ctx,
+  type NativeAttemptEvidenceClass,
+  type NativeAttemptVerifiedEvidence,
+  type NativeAttemptWriterKind,
+  runRead,
+  runWrite,
+  type SetOp,
+} from './_common.js';
 
 const EXIT = io.EXIT;
 
@@ -149,12 +159,24 @@ function diagnoseArtifactOnlyOnAlreadyDoneTask(
 // ── task update ──────────────────────────────────────────────────────────────────────────────────
 //   id 必填 positional。普通字段覆写 + addDep/rmDep/addRef/rmRef（buildFields 的 field 名直接对齐 updateTask 特殊键）。
 //   目标 id 不存在 → mutations.updateTask throw NotFound（冒泡 router 映射 exit 5）。
+function asStringArray(value: unknown): string[] {
+  if (value === undefined) return [];
+  return (Array.isArray(value) ? value : [value]).map(String);
+}
+
 export function update(ctx: Ctx): number {
   const spec = REGISTRY.task?.update;
+  const id = ctx.positionals[0] as string;
   let echoOps: SetOp[] = []; // mutate 收集 → render 回显逻辑落点（Finding #83）
+  const rawSetOps = [...asStringArray(ctx.values.set), ...asStringArray(ctx.values['set-json'])];
+  const targetsHandle =
+    ctx.values.handle !== undefined ||
+    rawSetOps.some((entry) => {
+      const path = entry.slice(0, entry.indexOf('=') === -1 ? entry.length : entry.indexOf('='));
+      return path === 'handle' || /(?:^|\.)handle$/.test(path);
+    });
   return runWrite(ctx, {
     mutate: (board) => {
-      const id = ctx.positionals[0] as string;
       const { fields, sets, setJsons } = buildFields(ctx.values, spec, { stdin: ctx.stdin });
       echoOps = [...sets, ...setJsons];
       diagnoseArtifactOnlyOnAlreadyDoneTask(board as BoardArg, id, fields);
@@ -164,7 +186,6 @@ export function update(ctx: Ctx): number {
       return next;
     },
     render: (next, c, { dryRun }) => {
-      const id = ctx.positionals[0] as string;
       if (c.flags.json) {
         const t = findTask(next, id);
         return render.renderTaskDetail(t, { json: true });
@@ -172,6 +193,8 @@ export function update(ctx: Ctx): number {
       const prefix = dryRun ? `[dry-run] 将更新 task: ${id}` : `task 已更新: ${id}`;
       return prefix + echoSetPaths(echoOps, id);
     },
+    writerKind: targetsHandle ? 'generic-state' : 'generic',
+    targetTaskIds: [id],
   });
 }
 
@@ -224,6 +247,8 @@ function _transitionVerb(ctx: Ctx, toStatus: string, label: string): number {
         ? `[dry-run] 将 ${label} task: ${idList} (→ ${toStatus})`
         : `task ${idList} → ${toStatus}`;
     },
+    writerKind: 'generic-state',
+    targetTaskIds: ids,
   });
 }
 export function start(ctx: Ctx): number {
@@ -310,6 +335,231 @@ export function routeBind(ctx: Ctx): number {
         ? `[dry-run] 将 bind task ${id} opaque handle claim`
         : `task ${id} route 已 bind（opaque handle claim；非 real/live attestation）`;
     },
+    writerKind: 'generic-state',
+    targetTaskIds: [id],
+  });
+}
+
+function nativeAttemptError(code: string): never {
+  const error = new Error(code) as KindedError;
+  error.errKind = 'Validation';
+  throw error;
+}
+
+function nativeAttemptRecord(value: unknown, code: string): Record<string, any> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) nativeAttemptError(code);
+  return value as Record<string, any>;
+}
+
+function nativeAttemptTask(board: BoardArg, id: string): Record<string, any> {
+  const task = Array.isArray(board.tasks)
+    ? board.tasks.find((entry: Record<string, any>) => entry?.id === id)
+    : undefined;
+  return nativeAttemptRecord(task, 'NATIVE-TASK-NOT-FOUND');
+}
+
+function nativeAttemptExpected(
+  board: BoardArg,
+  taskId: string,
+  attemptId: string,
+): Record<string, any> {
+  const task = nativeAttemptTask(board, taskId);
+  const attempt = Array.isArray(task.routing?.attempts)
+    ? task.routing.attempts.find((entry: Record<string, any>) => entry?.id === attemptId)
+    : undefined;
+  const row = nativeAttemptRecord(attempt, 'NATIVE-ATTEMPT-NOT-FOUND');
+  const immutableDescriptor = nativeAttemptRecord(
+    row.descriptor,
+    'NATIVE-ATTEMPT-DESCRIPTOR-MISSING',
+  );
+  return {
+    contract: row.schema,
+    origin: immutableDescriptor.origin,
+    harness: immutableDescriptor.harness,
+    adapter: immutableDescriptor.adapter,
+    surface: immutableDescriptor.surface,
+    create_hash: row.create_hash,
+    task_id: taskId,
+    attempt_id: row.id,
+    candidate_id: row.candidate_id,
+    transport: immutableDescriptor.transport,
+    dispatch_key: row.dispatch?.key,
+    request_hash: row.dispatch?.request_hash,
+    launch_claim_id: row.dispatch?.launch_claim_id,
+    lineage: structuredClone(row.lineage),
+  };
+}
+
+function nativeAttemptWrite(
+  ctx: Ctx,
+  writerKind: NativeAttemptWriterKind,
+  makeCommand: (
+    board: BoardArg,
+    stageEvidence: (input: {
+      evidenceClass: NativeAttemptEvidenceClass;
+      recordRef: string;
+      expected: Record<string, any>;
+    }) => NativeAttemptVerifiedEvidence,
+  ) => Record<string, any>,
+): number {
+  const id = ctx.positionals[0] as string;
+  let operationResult: Record<string, any> | undefined;
+  let evidenceTransaction:
+    | {
+        boundary: NonNullable<Ctx['nativeAttemptPrivateEvidence']>;
+        transactionId: string;
+      }
+    | undefined;
+
+  const stageEvidence = ({
+    evidenceClass,
+    recordRef,
+    expected,
+  }: {
+    evidenceClass: NativeAttemptEvidenceClass;
+    recordRef: string;
+    expected: Record<string, any>;
+  }): NativeAttemptVerifiedEvidence => {
+    if (evidenceTransaction) nativeAttemptError('NATIVE-EVIDENCE-TRANSACTION-CONFLICT');
+    const boundary = ctx.nativeAttemptPrivateEvidence;
+    if (!boundary) nativeAttemptError('NATIVE-EVIDENCE-AUTHENTICATOR-UNAVAILABLE');
+    const staged = boundary.stageAndVerify({
+      evidence_class: evidenceClass,
+      record_ref: recordRef,
+      expected,
+    });
+    if (staged.transaction_id) {
+      evidenceTransaction = { boundary, transactionId: staged.transaction_id };
+    }
+    if (!staged.ok) {
+      const codes = Array.isArray(staged.issues)
+        ? staged.issues.map((issue) => issue.code).join(', ')
+        : 'NATIVE-EVIDENCE-AUTHENTICATION-FAILED';
+      nativeAttemptError(codes);
+    }
+    if (!evidenceTransaction) nativeAttemptError('NATIVE-EVIDENCE-TRANSACTION-MISSING');
+    if (!staged.verified_evidence) nativeAttemptError('NATIVE-EVIDENCE-PROJECTION-MISSING');
+    return staged.verified_evidence;
+  };
+
+  return runWrite(ctx, {
+    mutate: (board) => {
+      const applied = mutations.applyNativeAttemptCommand(
+        board as BoardArg,
+        makeCommand(board as BoardArg, stageEvidence),
+      );
+      operationResult = applied.result;
+      return applied.board;
+    },
+    render: (_next, c, { dryRun }) => {
+      if (c.flags.json) return render.jsonString(operationResult ?? null);
+      const suffix = dryRun ? '（dry-run）' : '';
+      return `task ${id} native attempt 已更新${suffix}`;
+    },
+    writerKind,
+    transaction: {
+      active: () => !!evidenceTransaction,
+      rollback: ({ reason }) => {
+        if (!evidenceTransaction) return;
+        const { boundary, transactionId } = evidenceTransaction;
+        boundary.rollback({ transaction_id: transactionId, reason });
+        evidenceTransaction = undefined;
+      },
+      commit: ({ boardPath, boardContentHash }) => {
+        if (!evidenceTransaction) return;
+        const { boundary, transactionId } = evidenceTransaction;
+        boundary.commit({
+          transaction_id: transactionId,
+          board_path: boardPath,
+          board_content_hash: boardContentHash,
+        });
+        evidenceTransaction = undefined;
+      },
+    },
+  });
+}
+
+export function nativeAttemptCreate(ctx: Ctx): number {
+  return nativeAttemptWrite(ctx, 'native-create', () => {
+    const admission = ctx.nativeAttemptAdmission;
+    if (!admission) nativeAttemptError('NATIVE-CREATE-ADMISSION-UNAVAILABLE');
+    return {
+      type: 'create',
+      task_id: ctx.positionals[0],
+      selection_snapshot: readJsonInput(ctx, ctx.values.selection, '--selection'),
+      attempt: readJsonInput(ctx, ctx.values.attempt, '--attempt'),
+      replay_intent: ctx.values['replay-intent'],
+      admission_snapshot: admission.resolveCreate(),
+    };
+  });
+}
+
+export function nativeAttemptBind(ctx: Ctx): number {
+  return nativeAttemptWrite(ctx, 'native-bind', (board, stageEvidence) => {
+    const taskId = ctx.positionals[0] as string;
+    const attemptId = ctx.values['attempt-id'] as string;
+    const evidenceRef = ctx.values['evidence-record-ref'] as string;
+    const verifiedEvidence = stageEvidence({
+      evidenceClass: 'bind',
+      recordRef: evidenceRef,
+      expected: nativeAttemptExpected(board, taskId, attemptId),
+    });
+    return {
+      type: 'bind',
+      task_id: taskId,
+      attempt_id: attemptId,
+      evidence_record_ref: evidenceRef,
+      verified_evidence: verifiedEvidence,
+    };
+  });
+}
+
+export function nativeAttemptCancel(ctx: Ctx): number {
+  return nativeAttemptWrite(ctx, 'native-cancel', () => ({
+    type: 'cancel',
+    task_id: ctx.positionals[0],
+    attempt_id: ctx.values['attempt-id'],
+    request: readJsonInput(ctx, ctx.values.request, '--request'),
+    acknowledgement_terminal_class: ctx.values['acknowledgement-terminal-class'],
+  }));
+}
+
+export function nativeAttemptTerminal(ctx: Ctx): number {
+  return nativeAttemptWrite(ctx, 'native-terminal', (board, stageEvidence) => {
+    const taskId = ctx.positionals[0] as string;
+    const attemptId = ctx.values['attempt-id'] as string;
+    const evidenceRef = ctx.values['evidence-record-ref'] as string;
+    return {
+      type: 'terminal',
+      task_id: taskId,
+      attempt_id: attemptId,
+      evidence_record_ref: evidenceRef,
+      verified_evidence: stageEvidence({
+        evidenceClass: 'terminal',
+        recordRef: evidenceRef,
+        expected: nativeAttemptExpected(board, taskId, attemptId),
+      }),
+      requested_task_status: ctx.values['requested-task-status'],
+    };
+  });
+}
+
+export function nativeAttemptReconcile(ctx: Ctx): number {
+  return nativeAttemptWrite(ctx, 'native-reconcile', (board, stageEvidence) => {
+    const taskId = ctx.positionals[0] as string;
+    const attemptId = ctx.values['attempt-id'] as string;
+    const evidenceRef = ctx.values['evidence-record-ref'] as string;
+    return {
+      type: 'reconcile',
+      task_id: taskId,
+      attempt_id: attemptId,
+      evidence_record_ref: evidenceRef,
+      verified_evidence: stageEvidence({
+        evidenceClass: 'reconcile',
+        recordRef: evidenceRef,
+        expected: nativeAttemptExpected(board, taskId, attemptId),
+      }),
+    };
   });
 }
 
@@ -345,6 +595,8 @@ export function block(ctx: Ctx): number {
       const on = ctx.values && ctx.values.on;
       return dryRun ? `[dry-run] 将阻塞 task: ${id} (on ${on})` : `task ${id} → blocked (on ${on})`;
     },
+    writerKind: 'generic-state',
+    targetTaskIds: [id],
   });
 }
 
@@ -368,6 +620,8 @@ export function unblock(ctx: Ctx): number {
       const st = t && t.status ? ` (→ ${t.status})` : '';
       return dryRun ? `[dry-run] 将解除阻塞 task: ${id}` : `task ${id} 已解除 blocked_on${st}`;
     },
+    writerKind: 'generic-state',
+    targetTaskIds: [id],
   });
 }
 
@@ -388,6 +642,8 @@ export function setStatus(ctx: Ctx): number {
       }
       return dryRun ? `[dry-run] 将转移 task: ${id} → ${toStatus}` : `task ${id} → ${toStatus}`;
     },
+    writerKind: 'generic-state',
+    targetTaskIds: [id],
   });
 }
 
