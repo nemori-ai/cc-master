@@ -42,6 +42,7 @@ import * as monitorHandler from './handlers/monitor.js';
 import * as peersHandler from './handlers/peers.js';
 import * as policyHandler from './handlers/policy.js';
 import * as providerHandler from './handlers/provider.js';
+import * as quotaHandler from './handlers/quota.js';
 import * as runtimeHandler from './handlers/runtime.js';
 import * as servicesHandler from './handlers/services.js';
 import type { ShadowRoutingBoundary } from './handlers/shadow-routing.js';
@@ -129,6 +130,7 @@ const HANDLERS: Record<string, HandlerModule> = {
   statusline: statuslineHandler as unknown as HandlerModule,
   upgrade: upgradeHandler as unknown as HandlerModule,
   provider: providerHandler as unknown as HandlerModule,
+  quota: quotaHandler as unknown as HandlerModule,
 };
 
 // ── DEFAULT_VERBS：某些 noun 无 verb 时落到约定默认 verb（让 `ccm statusline` ≡ `ccm statusline render`）。──

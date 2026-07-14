@@ -155,22 +155,19 @@
       "id": "engine-quota-admission",
       "kind": "production",
       "path": "ccm/packages/engine/src/quota-admission.ts",
-      "state": "honest-absent",
-      "reason": "future quota derivation seam is intentionally absent in this slice"
+      "state": "required"
     },
     {
       "id": "cli-quota-admission-store",
       "kind": "production",
       "path": "ccm/apps/cli/src/quota-admission-store.ts",
-      "state": "honest-absent",
-      "reason": "future durable quota store seam is intentionally absent in this slice"
+      "state": "required"
     },
     {
       "id": "cli-quota-handler",
       "kind": "production",
       "path": "ccm/apps/cli/src/handlers/quota.ts",
-      "state": "honest-absent",
-      "reason": "production quota command handler remains an explicit HONEST RED"
+      "state": "required"
     },
     {
       "id": "controlled-quota-handler",

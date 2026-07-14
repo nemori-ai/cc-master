@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createQuotaEffectBoundary } from '@ccm/engine';
+import { runProduction } from '../src/production-run.js';
+import { createQuotaAdmissionStore } from '../src/quota-admission-store.js';
 import { REGISTRY, type Registry } from '../src/registry.js';
 import { type RouterComposition, run, runWithComposition } from '../src/router.js';
 import { COUNTERFEIT_API_ROWS } from './fixtures/quota-effect-hard-deny-v1/counterfeits.js';
@@ -237,12 +240,8 @@ test('declared production/test roots are exact and every reachable module is tra
     audit.reachableByKind.test.some((path) => path.endsWith('quota-effect-boundary.ts')),
     false,
   );
-  assert.deepEqual(audit.honestAbsent.map((root) => root.id).sort(), [
-    'cli-quota-admission-store',
-    'cli-quota-handler',
-    'engine-quota-admission',
-  ]);
-  assert.equal(Object.hasOwn(REGISTRY, 'quota'), false, 'honest-absent handler cannot be current');
+  assert.deepEqual(audit.honestAbsent, []);
+  assert.equal(Object.hasOwn(REGISTRY, 'quota'), true, 'required quota handler must be current');
 
   const transitiveRoot = join(
     HERE,
@@ -270,10 +269,10 @@ test('declared production/test roots are exact and every reachable module is tra
   const requiredMissing = structuredClone(EFFECT_REGISTRY);
   const absentRoot = requiredMissing.source_roots.find((root) => root.id === 'cli-quota-handler');
   assert.ok(absentRoot);
-  absentRoot.state = 'required';
+  absentRoot.path = absentRoot.path.replace('quota.ts', 'quota-missing.ts');
   assert.throws(
     () => auditDeclaredQuotaSources(REPO_ROOT, requiredMissing, GUARD_IMPLEMENTATION_ROWS),
-    /required quota source root is missing:.*handlers\/quota\.ts/,
+    /required quota source root is missing:.*handlers\/quota-missing\.ts/,
   );
 });
 
@@ -373,12 +372,13 @@ test('production/test source kinds cannot be swapped or satisfied through the op
   );
 });
 
-test('default run keeps base statusline auto-install when production registry has no quota noun', (t) => {
+test('production quota status requires and consumes its injected filesystem boundary', async (t) => {
   const configDir = mkdtempSync(join(tmpdir(), 'ccm-quota-default-'));
   t.after(() => rmSync(configDir, { recursive: true, force: true }));
+  const quotaHome = join(configDir, 'home');
   const out: string[] = [];
   const err: string[] = [];
-  const result = run(['quota'], {
+  const missing = await run(['--home', quotaHome, 'quota', 'status', '--json'], {
     out: (line) => out.push(line),
     err: (line) => err.push(line),
     env: {
@@ -386,16 +386,177 @@ test('default run keeps base statusline auto-install when production registry ha
       CCM_BIN: join(dirname(tmpdir()), 'ccm-quota-installed', 'ccm'),
     },
   });
-  assert.equal(typeof result, 'number');
-  assert.equal(result, 2);
-  assert.match(err.join('\n'), /unknown command: quota/);
+  assert.equal(missing, 1);
+  assert.match(err.join('\n'), /QUOTA_CAPABILITY_UNAVAILABLE/);
   assert.equal(out.length, 0);
-  assert.equal(Object.hasOwn(REGISTRY, 'quota'), false);
+
+  let statCalls = 0;
+  const allowedOut: string[] = [];
+  const allowedErr: string[] = [];
+  const result = await run(['--home', quotaHome, 'quota', 'status', '--json'], {
+    out: (line) => allowedOut.push(line),
+    err: (line) => allowedErr.push(line),
+    env: {
+      CLAUDE_CONFIG_DIR: configDir,
+      CCM_BIN: join(dirname(tmpdir()), 'ccm-quota-installed', 'ccm'),
+    },
+    quotaEffects: createQuotaEffectBoundary({
+      allow: ['filesystem.quota.stat'],
+      quotaRoot: join(quotaHome, 'quota', 'v1'),
+      handlers: {
+        'filesystem.quota.stat': () => {
+          statCalls += 1;
+          const error = new Error('absent') as NodeJS.ErrnoException;
+          error.code = 'ENOENT';
+          throw error;
+        },
+      },
+    }),
+  });
+  assert.equal(result, 0);
+  assert.equal(allowedErr.length, 0);
+  assert.equal(statCalls > 0, true, 'status must consume filesystem.quota.stat result');
+  assert.deepEqual(JSON.parse(allowedOut.join('')), {
+    ok: true,
+    data: { schema: 'ccm/quota-status/v1', available: false },
+  });
+  const productionOut: string[] = [];
+  const productionErr: string[] = [];
+  const productionResult = await runProduction(['--home', quotaHome, 'quota', 'status', '--json'], {
+    out: (line) => productionOut.push(line),
+    err: (line) => productionErr.push(line),
+    env: { HOME: configDir, CC_MASTER_NO_AUTOINSTALL: '1' },
+  });
+  assert.equal(productionResult, 0);
+  assert.deepEqual(productionErr, []);
+  assert.deepEqual(JSON.parse(productionOut.join('')), {
+    ok: true,
+    data: { schema: 'ccm/quota-status/v1', available: false },
+  });
+  assert.equal(Object.hasOwn(REGISTRY, 'quota'), true);
   assert.equal(
     existsSync(join(configDir, 'settings.json')),
-    true,
-    'default absent quota noun must preserve base statusline auto-install behavior',
+    false,
+    'quota composition must not borrow unrelated statusline filesystem authority',
   );
+});
+
+test('production quota reserve cannot mutate files through an undeclared boundary', async (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-quota-production-mutation-kill-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const quotaHome = join(root, 'home');
+  const nowMs = Date.now();
+  const aggregationKey = 'codex|identity-A|pool-A|seven_day';
+  await createQuotaAdmissionStore({ home: quotaHome }).publishObservation({
+    source_key: 'codex-current',
+    observation: {
+      schema: 'ccm/quota-authority-observation/v1',
+      provider: 'codex',
+      provider_rule_revision: 'ccm/codex-7d-pacing/v1',
+      source_revision: 'sha256:live-r2',
+      observed_at: new Date(nowMs - 1_000).toISOString(),
+      valid_until: new Date(nowMs + 300_000).toISOString(),
+      source_profile: {
+        schema: 'ccm/quota-source-profile/v1',
+        revision: 'ccm/test-quota-source/v1',
+        fresh_ttl_sec: 60,
+        hard_ttl_sec: 300,
+        max_clock_skew_sec: 5,
+      },
+      account_id: 'identity-A',
+      pool_id: 'pool-A',
+      identity_fingerprint: 'sha256:identity-A',
+      hard_window: { name: 'seven_day', duration_sec: 604_800 },
+      policy: {
+        decision: 'allow',
+        revision: 'ccm/codex-7d-pacing/v1',
+        hard_ceiling_used_pct: 85,
+      },
+      effects: { decision: 'allow', effect: 'read-only' },
+      buckets: [
+        {
+          id: 'seven-day',
+          window: 'seven_day',
+          duration_sec: 604_800,
+          freshness: 'fresh',
+          used_pct: 65,
+          safety_margin_pct: 0,
+          projected_p80_pct: 0,
+          aggregation_key: aggregationKey,
+        },
+      ],
+    },
+  });
+  const reservationRoot = join(quotaHome, 'quota', 'v1', 'reservations');
+  const reservationKeyRoot = join(quotaHome, 'quota', 'v1', 'reservation-keys');
+  assert.equal(existsSync(reservationRoot), false);
+  assert.equal(existsSync(reservationKeyRoot), false);
+  const reserveArgs = [
+    '--home',
+    quotaHome,
+    'quota',
+    'reserve',
+    '--input',
+    JSON.stringify({
+      schema: 'ccm/quota-reservation-request/v1',
+      source_key: 'codex-current',
+      aggregation_key: aggregationKey,
+      capacity_pct: 20,
+      id: 'qres-effect-kill',
+      key: 'attempt-effect-kill',
+      hash: 'caller-hash-ignored',
+      amount_pct: 4,
+      state: 'held',
+      checked_at: new Date(nowMs).toISOString(),
+      expires_at: new Date(nowMs + 60_000).toISOString(),
+      source_revision: 'sha256:live-r2',
+      attempt_id: 'attempt-effect-kill',
+      candidate_id: 'codex-cli-worker',
+      account_id: 'identity-A',
+      pool_id: 'pool-A',
+      identity_fingerprint: 'sha256:identity-A',
+    }),
+    '--json',
+  ];
+  const partialOut: string[] = [];
+  const partialErr: string[] = [];
+  const partial = await run(reserveArgs, {
+    out: (line) => partialOut.push(line),
+    err: (line) => partialErr.push(line),
+    env: {},
+    quotaEffects: createQuotaEffectBoundary({
+      allow: ['filesystem.quota.make_directory'],
+      quotaRoot: join(quotaHome, 'quota', 'v1'),
+      handlers: {
+        'filesystem.quota.make_directory': (input) =>
+          fsPromises.mkdir(
+            String(input.path),
+            input.options as Parameters<typeof fsPromises.mkdir>[1],
+          ),
+      },
+    }),
+  });
+  assert.equal(partial, 1);
+  assert.match(partialErr.join('\n'), /QUOTA_CAPABILITY_UNDECLARED/);
+  assert.equal(partialOut.length, 0);
+  assert.equal(existsSync(reservationKeyRoot), false);
+  assert.equal(existsSync(reservationRoot), false);
+  const out: string[] = [];
+  const err: string[] = [];
+  const result = await run(reserveArgs, {
+    out: (line) => out.push(line),
+    err: (line) => err.push(line),
+    env: {},
+    quotaEffects: createQuotaEffectBoundary({
+      allow: [],
+      quotaRoot: join(quotaHome, 'quota', 'v1'),
+      handlers: {},
+    }),
+  });
+  assert.equal(result, 1);
+  assert.match(err.join('\n'), /QUOTA_CAPABILITY_UNDECLARED/);
+  assert.equal(out.length, 0);
+  assert.equal(existsSync(reservationRoot), false);
 });
 
 test('router-to-controlled-handler fails closed and the allowed path consumes the boundary', () => {

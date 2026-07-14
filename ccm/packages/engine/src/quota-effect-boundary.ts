@@ -88,6 +88,7 @@ export type QuotaEffectHandler = (input: QuotaEffectInput) => unknown | Promise<
 export interface QuotaEffectBoundary {
   readonly profile: QuotaEffectProfile;
   readonly declaredCapabilities: readonly QuotaEffectCapability[];
+  assertCapabilities(capabilities: readonly string[]): void;
   execute(capability: string, input: QuotaEffectInput): unknown | Promise<unknown>;
 }
 
@@ -196,28 +197,36 @@ export function createQuotaEffectBoundary(
     declared as QuotaEffectCapability[],
   ) as readonly QuotaEffectCapability[];
 
+  const assertCapability = (capability: string): QuotaEffectHandler => {
+    if (!profileCapabilities.has(capability) || FORBIDDEN_CAPABILITY_SET.has(capability)) {
+      rejectCapability(capability, `capability is not permitted in the ${profile} profile`);
+    }
+    if (!declaredSet.has(capability)) {
+      throw new QuotaEffectError(
+        'QUOTA_CAPABILITY_UNDECLARED',
+        capability,
+        'capability was not declared by this boundary',
+      );
+    }
+    const handler = handlers[capability];
+    if (!handler) {
+      throw new QuotaEffectError(
+        'QUOTA_CAPABILITY_UNAVAILABLE',
+        capability,
+        'declared capability has no executable handler',
+      );
+    }
+    return handler;
+  };
+
   return Object.freeze({
     profile,
     declaredCapabilities,
+    assertCapabilities(capabilities: readonly string[]): void {
+      for (const capability of capabilities) assertCapability(capability);
+    },
     execute(capability: string, input: QuotaEffectInput): unknown | Promise<unknown> {
-      if (!profileCapabilities.has(capability) || FORBIDDEN_CAPABILITY_SET.has(capability)) {
-        rejectCapability(capability, `capability is not permitted in the ${profile} profile`);
-      }
-      if (!declaredSet.has(capability)) {
-        throw new QuotaEffectError(
-          'QUOTA_CAPABILITY_UNDECLARED',
-          capability,
-          'capability was not declared by this boundary',
-        );
-      }
-      const handler = handlers[capability];
-      if (!handler) {
-        throw new QuotaEffectError(
-          'QUOTA_CAPABILITY_UNAVAILABLE',
-          capability,
-          'declared capability has no executable handler',
-        );
-      }
+      const handler = assertCapability(capability);
       enforceFilesystemScope(capability, input, quotaRoot);
       return handler(Object.freeze({ ...input }));
     },

@@ -55,6 +55,62 @@ export type Registry = Record<string, NounSpec>;
 
 // ── REGISTRY：noun → verb → spec。read:true 的 verb 用 runRead，read:false 用 runWrite（_common.js）。──
 export const REGISTRY: Registry = {
+  // ════════════════════ quota（provider-neutral；Codex rule 为 7d-only）═══════════════════════════
+  quota: {
+    status: {
+      summary: '读取本机 quota observation/reservation store 的可用状态',
+      read: true,
+      positionals: [],
+      options: { json: { type: 'boolean', desc: '结构化输出' } },
+      examples: ['ccm quota status --json'],
+      handler: 'quota.status',
+    },
+    preflight: {
+      summary: '从 owner-only authority store 重验 quota admission，或纯机械求值 lifecycle deny',
+      read: true,
+      positionals: [],
+      options: {
+        input: {
+          type: 'string',
+          required: true,
+          desc: 'authority refs 或 lifecycle effect JSON（@file / - / 字面量）',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm quota preflight --input @/abs/admission.json --json'],
+      handler: 'quota.preflight',
+    },
+    reserve: {
+      summary: '在 payer+pool aggregation locks 内原子创建 owner-only quota hold',
+      read: false,
+      positionals: [],
+      options: {
+        input: {
+          type: 'string',
+          required: true,
+          desc: 'quota reservation request JSON（@file / - / 字面量）',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm quota reserve --input @/abs/reservation.json --json'],
+      handler: 'quota.reserve',
+    },
+    audit: {
+      summary: '以 launch/process evidence 审计 reservation；未知证据绝不释放容量',
+      read: false,
+      positionals: [],
+      options: {
+        input: {
+          type: 'string',
+          required: true,
+          desc: 'quota audit evidence JSON（@file / - / 字面量）',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm quota audit --input @/abs/audit.json --json'],
+      handler: 'quota.audit',
+    },
+  },
   // ════════════════════ provider ══════════════════════════════════════════════════════════════════
   provider: {
     inspect: {
