@@ -81,7 +81,8 @@ assert_runner_identity() {
 }
 
 capture_environment() {
-  printf 'commit=%s\n' "$(git rev-parse HEAD)"
+  printf 'exact_commit=%s\n' "$(git rev-parse HEAD)"
+  printf 'exact_tree=%s\n' "$(git rev-parse 'HEAD^{tree}')"
   printf 'contract=%s\n' "${CONTRACT}"
   printf 'uname_s=%s\n' "$(uname -s)"
   printf 'uname_m=%s\n' "$(uname -m)"
@@ -137,8 +138,20 @@ validate_runtime_matrix_log() {
   grep -q 'process crash after commit leaves a stale lock' "${log}" || return 23
   grep -q 'concurrent activation has one linearization winner' "${log}" || return 24
   grep -q 'no-replace publish has one winner under a real two-process race' "${log}" || return 25
+  grep -q 'a concurrently appearing invalid launcher final is preserved and rejected' "${log}" || return 26
+  grep -q 'launcher pathname replacement after pinning cannot redirect publication' "${log}" || return 27
   grep -q 'native invoke enforces the platform assurance tier' "${log}" || return 28
   grep -q 'exact-object callers fail closed before spawn' "${log}" || return 29
+  grep -q 'an independently verified valid launcher final is idempotent' "${log}" || return 30
+  grep -q 'two concurrent cold invokes both succeed' "${log}" || return 32
+  grep -q 'SIGKILL around launcher directory recovery and helper publication' "${log}" || return 33
+  grep -q 'a real publisher-parent SIGKILL cannot strand an executable materializer bootstrap' "${log}" || return 45
+  grep -q 'a publisher crash after bootstrap creation is reclaimed by the next activation' "${log}" || return 46
+  grep -q 'native bootstrap self-clean survives parent SIGKILL before and after helper publication' "${log}" || return 47
+  grep -q 'dead publisher materializer bootstrap instances are recovered without touching live owners' "${log}" || return 48
+  grep -q 'dead materializer bootstrap recovery is idempotent across concurrent activations' "${log}" || return 49
+  grep -q 'native materializer self-cleans its own bootstrap before stale recovery' "${log}" || return 50
+  grep -q 'materializer bootstrap recovery fails closed on symlink, type, and permission anomalies' "${log}" || return 51
 }
 
 validate_darwin_runtime_assurance() {
@@ -415,6 +428,7 @@ fi
 
 printf 'required_failures=%s\n' "${FAILURES}" >"${EVIDENCE_DIR}/summary.txt"
 printf 'exact_commit=%s\n' "$(git rev-parse HEAD)" >>"${EVIDENCE_DIR}/summary.txt"
+printf 'exact_tree=%s\n' "$(git rev-parse 'HEAD^{tree}')" >>"${EVIDENCE_DIR}/summary.txt"
 printf 'contract=%s\n' "${CONTRACT}" >>"${EVIDENCE_DIR}/summary.txt"
 cat "${VERDICTS}"
 cat "${EVIDENCE_DIR}/summary.txt"

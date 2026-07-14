@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { Worker } from 'node:worker_threads';
 import { run } from '../src/router.js';
 import {
   createDefaultRuntimeBackend,
@@ -195,6 +196,119 @@ function activationCount(home: string): number {
   return existsSync(dir) ? readdirSync(dir).filter((name) => name.endsWith('.json')).length : 0;
 }
 
+function launcherDirectory(home: string): string {
+  return join(runtimeRoot(home), 'launcher');
+}
+
+function launcherHelperEntries(directory: string): string[] {
+  return readdirSync(directory)
+    .filter((name) => /^(?:linux-exact-fd-v1|darwin-path-attested-v1)-[a-f0-9]{64}$/.test(name))
+    .sort();
+}
+
+function launcherHelpers(home: string): string[] {
+  return launcherHelperEntries(launcherDirectory(home));
+}
+
+function builtLauncherHelperName(): string {
+  const contract = process.platform === 'linux' ? 'linux-exact-fd-v1' : 'darwin-path-attested-v1';
+  const bytes = readFileSync(join(HERE, '..', '.native-build', 'runtime-invoke-helper'));
+  return `${contract}-${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+function launcherContract(): 'linux-exact-fd-v1' | 'darwin-path-attested-v1' {
+  return process.platform === 'linux' ? 'linux-exact-fd-v1' : 'darwin-path-attested-v1';
+}
+
+function materializerRoot(home: string): string {
+  return join(runtimeRoot(home), 'materializers');
+}
+
+function materializerInstanceName(
+  publisherPid = 99_999_999,
+  uuid = '00000000-0000-0000-0000-000000000001',
+): string {
+  return `.materializer-${launcherContract()}-${publisherPid}-${uuid}.tmp`;
+}
+
+function ensureMaterializerRoot(home: string): string {
+  const root = materializerRoot(home);
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  chmodSync(root, 0o700);
+  return root;
+}
+
+function seedMaterializerInstance(
+  home: string,
+  options: {
+    publisherPid?: number;
+    uuid?: string;
+    mode?: 0o600 | 0o500;
+    empty?: boolean;
+  } = {},
+): string {
+  const root = ensureMaterializerRoot(home);
+  const instance = join(root, materializerInstanceName(options.publisherPid, options.uuid));
+  mkdirSync(instance, { mode: 0o700 });
+  chmodSync(instance, 0o700);
+  if (!options.empty) {
+    const executable = join(instance, 'materializer');
+    writeFileSync(executable, 'attributed-materializer-bootstrap', {
+      mode: options.mode ?? 0o500,
+    });
+    chmodSync(executable, options.mode ?? 0o500);
+  }
+  return instance;
+}
+
+function materializerInstances(home: string): string[] {
+  const root = materializerRoot(home);
+  if (!existsSync(root)) return [];
+  return readdirSync(root)
+    .map((name) => join(root, name))
+    .sort();
+}
+
+function observedMaterializerBootstraps(home: string): string[] {
+  const observed: string[] = [];
+  for (const name of readdirSync(tmpdir())) {
+    if (!name.startsWith('ccm-runtime-materializer-')) continue;
+    const executable = join(tmpdir(), name, 'materializer');
+    if (existsSync(executable)) observed.push(executable);
+  }
+  const managedRoot = materializerRoot(home);
+  if (existsSync(managedRoot)) {
+    for (const name of readdirSync(managedRoot)) {
+      const executable = join(managedRoot, name, 'materializer');
+      if (existsSync(executable)) observed.push(executable);
+    }
+  }
+  return observed.sort();
+}
+
+async function waitForCondition(predicate: () => boolean, message: string): Promise<void> {
+  for (let attempt = 0; attempt < 600; attempt++) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.fail(message);
+}
+
+function assertRecoveredLauncherDirectory(home: string): void {
+  const directory = lstatSync(launcherDirectory(home));
+  assert.equal(directory.isDirectory(), true);
+  assert.equal(directory.isSymbolicLink(), false);
+  assert.equal(directory.mode & 0o777, 0o700, 'launcher directory must recover stable 0700');
+  if (typeof process.geteuid === 'function') {
+    assert.equal(directory.uid, process.geteuid(), 'launcher directory owner drifted');
+  }
+  assert.equal(
+    readdirSync(launcherDirectory(home)).some((name) => name.endsWith('.tmp')),
+    false,
+    'dead publisher temp survived a successful invoke',
+  );
+}
+
 function expectRuntimeError(fn: () => unknown, code: string): void {
   assert.throws(fn, (error: any) => {
     assert.equal(error.code, code, error?.stack || String(error));
@@ -204,6 +318,7 @@ function expectRuntimeError(fn: () => unknown, code: string): void {
 
 function waitForExit(child: ReturnType<typeof spawn>): Promise<{
   code: number | null;
+  signal: NodeJS.Signals | null;
   stdout: string;
   stderr: string;
 }> {
@@ -215,7 +330,9 @@ function waitForExit(child: ReturnType<typeof spawn>): Promise<{
   child.stderr?.on('data', (chunk) => {
     stderr += String(chunk);
   });
-  return new Promise((resolve) => child.once('exit', (code) => resolve({ code, stdout, stderr })));
+  return new Promise((resolve) =>
+    child.once('exit', (code, signal) => resolve({ code, signal, stdout, stderr })),
+  );
 }
 
 async function waitForFile(
@@ -645,6 +762,780 @@ test('native image exec-format failure is structured without a shell fallback', 
     false,
     'invalid image bytes must never be interpreted by a shell',
   );
+});
+
+test('materialization never changes same-process Worker relative path resolution', () => {
+  const first = nativeFixture('4.1.3', 'cwd-worker-trusted');
+  const runtime = manager(first.home);
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+  const output = join(first.root, 'cwd-worker-output');
+  const probeDirectory = join(first.root, 'caller-cwd');
+  mkdirSync(probeDirectory, { mode: 0o700 });
+  const probe = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      join(HERE, 'fixtures', 'runtime-launcher-cwd-worker-probe.ts'),
+      first.home,
+      output,
+      probeDirectory,
+    ],
+    { cwd: join(HERE, '..'), encoding: 'utf8' },
+  );
+  assert.equal(probe.status, 0, probe.stderr);
+  const result = JSON.parse(probe.stdout) as {
+    exit_code: number;
+    cwd: string;
+    workerResult: string;
+  };
+  assert.equal(result.exit_code, 0);
+  assert.equal(result.cwd, probeDirectory);
+  assert.equal(result.workerResult, 'caller-cwd');
+  assert.equal(readFileSync(output, 'utf8'), 'cwd-worker-trusted');
+});
+
+test('nested launcher materialization is reentrant and preserves the caller cwd', () => {
+  const first = nativeFixture('4.1.4', 'nested-materialization');
+  let nested = false;
+  const nestedOutput = join(first.root, 'nested-output');
+  const backend = createDefaultRuntimeBackend(
+    process.platform,
+    process.arch,
+    typeof process.geteuid === 'function' ? process.geteuid() : null,
+    undefined,
+    {
+      fault(point) {
+        if (point !== 'after_directory_recovery' || nested) return;
+        nested = true;
+        assert.equal(manager(first.home).invoke([nestedOutput]).exit_code, 0);
+      },
+    },
+  );
+  const runtime = createRuntimeSupplyChain({ env: { CC_MASTER_HOME: first.home }, backend });
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+  const before = process.cwd();
+  const outerOutput = join(first.root, 'outer-output');
+  assert.equal(runtime.invoke([outerOutput]).exit_code, 0);
+  assert.equal(process.cwd(), before);
+  assert.equal(readFileSync(nestedOutput, 'utf8'), 'nested-materialization');
+  assert.equal(readFileSync(outerOutput, 'utf8'), 'nested-materialization');
+});
+
+test('two concurrent cold invokes both succeed through one digest-pinned launcher publication', async () => {
+  const first = nativeFixture('4.1.5', 'concurrent-trusted');
+  const runtime = manager(first.home);
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+  assert.deepEqual(
+    launcherHelpers(first.home),
+    [],
+    'fixture must begin with a cold launcher cache',
+  );
+
+  const worker = join(HERE, 'fixtures', 'runtime-launcher-materialization-worker.ts');
+  const barrier = join(first.root, 'publish-go');
+  const readyA = join(first.root, 'ready-a');
+  const readyB = join(first.root, 'ready-b');
+  const outputA = join(first.root, 'output-a');
+  const outputB = join(first.root, 'output-b');
+  const args = ['--import', 'tsx', worker, first.home];
+  const a = spawn(
+    process.execPath,
+    [...args, outputA, readyA, barrier, 'before_helper_publish_native'],
+    {
+      cwd: join(HERE, '..'),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  const b = spawn(
+    process.execPath,
+    [...args, outputB, readyB, barrier, 'before_helper_publish_native'],
+    {
+      cwd: join(HERE, '..'),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  for (let i = 0; i < 400 && !(existsSync(readyA) && existsSync(readyB)); i++) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.equal(existsSync(readyA) && existsSync(readyB), true, 'both publishers reached rename');
+  writeFileSync(barrier, 'go');
+  const [resultA, resultB] = await Promise.all([waitForExit(a), waitForExit(b)]);
+  assert.equal(resultA.code, 0, resultA.stderr);
+  assert.equal(resultB.code, 0, resultB.stderr);
+  assert.equal(readFileSync(outputA, 'utf8'), 'concurrent-trusted');
+  assert.equal(readFileSync(outputB, 'utf8'), 'concurrent-trusted');
+
+  const helpers = launcherHelpers(first.home);
+  assert.equal(helpers.length, 1, 'cold race must expose one digest-pinned final helper');
+  const helper = join(launcherDirectory(first.home), helpers[0] as string);
+  const helperStat = lstatSync(helper);
+  assert.equal(helperStat.mode & 0o777, 0o500);
+  if (typeof process.geteuid === 'function') assert.equal(helperStat.uid, process.geteuid());
+  assert.equal(
+    createHash('sha256').update(readFileSync(helper)).digest('hex'),
+    helpers[0]?.slice(-64),
+    'published helper bytes must match its digest-pinned name',
+  );
+  assertRecoveredLauncherDirectory(first.home);
+});
+
+test('shared materializer root churn between lstat and open preserves directory identity', async () => {
+  const first = nativeFixture('4.1.5-root-churn', 'root-churn-trusted');
+  const runtime = manager(first.home);
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+  ensureMaterializerRoot(first.home);
+
+  const worker = join(HERE, 'fixtures', 'runtime-launcher-materialization-worker.ts');
+  const barrier = join(first.root, 'root-open-go');
+  const ready = join(first.root, 'root-lstat-ready');
+  const blockedOutput = join(first.root, 'blocked-output');
+  const concurrentOutput = join(first.root, 'concurrent-output');
+  const args = ['--import', 'tsx', worker, first.home];
+  const blocked = spawn(
+    process.execPath,
+    [...args, blockedOutput, ready, barrier, 'after_materializer_root_lstat'],
+    {
+      cwd: join(HERE, '..'),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  const blockedExit = waitForExit(blocked);
+  await waitForCondition(
+    () => existsSync(ready),
+    'blocked publisher did not reach the materializer root lstat/open seam',
+  );
+
+  const concurrent = spawn(process.execPath, [...args, concurrentOutput], {
+    cwd: join(HERE, '..'),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const concurrentResult = await waitForExit(concurrent);
+  writeFileSync(barrier, 'go');
+  const blockedResult = await blockedExit;
+  assert.equal(concurrentResult.code, 0, concurrentResult.stderr);
+  assert.equal(readFileSync(concurrentOutput, 'utf8'), 'root-churn-trusted');
+  assert.equal(blockedResult.code, 0, blockedResult.stderr);
+  assert.equal(readFileSync(blockedOutput, 'utf8'), 'root-churn-trusted');
+  assert.deepEqual(materializerInstances(first.home), []);
+  assert.equal(launcherHelpers(first.home).length, 1);
+  assertRecoveredLauncherDirectory(first.home);
+});
+
+test('a concurrently appearing invalid launcher final is preserved and rejected', async () => {
+  const first = nativeFixture('4.1.6', 'must-not-run-invalid-final');
+  const finalPath = join(launcherDirectory(first.home), builtLauncherHelperName());
+  const invalidBytes = Buffer.from('concurrent-invalid-launcher-final');
+  const readyPath = join(first.root, 'invalid-final-ready');
+  const barrierPath = join(first.root, 'invalid-final-go');
+  const backend = createDefaultRuntimeBackend(
+    process.platform,
+    process.arch,
+    typeof process.geteuid === 'function' ? process.geteuid() : null,
+    undefined,
+    {
+      nativeTest: {
+        point: 'before_helper_publish',
+        readyPath,
+        barrierPath,
+        action: 'pause',
+      },
+    } as any,
+  );
+  const runtime = createRuntimeSupplyChain({ env: { CC_MASTER_HOME: first.home }, backend });
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+
+  const output = join(first.root, 'invalid-final-output');
+  const publisher = new Worker(
+    `
+      const { chmodSync, existsSync, writeFileSync } = require('node:fs');
+      const { workerData } = require('node:worker_threads');
+      const deadline = Date.now() + 3000;
+      while (!existsSync(workerData.readyPath) && Date.now() < deadline) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+      }
+      if (!existsSync(workerData.readyPath)) throw new Error('materializer seam timeout');
+      writeFileSync(workerData.finalPath, Buffer.from(workerData.bytes, 'base64'), { mode: 0o500 });
+      chmodSync(workerData.finalPath, 0o500);
+      writeFileSync(workerData.barrierPath, 'go');
+    `,
+    {
+      eval: true,
+      workerData: {
+        readyPath,
+        barrierPath,
+        finalPath,
+        bytes: invalidBytes.toString('base64'),
+      },
+    },
+  );
+  try {
+    expectRuntimeError(() => runtime.invoke([output]), 'RUNTIME_INVOKE_BACKEND');
+  } finally {
+    await publisher.terminate();
+  }
+  assert.equal(existsSync(output), false, 'payload ran after invalid final publication');
+  assert.deepEqual(readFileSync(finalPath), invalidBytes, 'invalid final was overwritten');
+});
+
+test('launcher pathname replacement after pinning cannot redirect publication', () => {
+  const first = nativeFixture('4.1.7', 'must-not-run-path-replacement');
+  const launcherDir = launcherDirectory(first.home);
+  const pinnedDirectory = `${launcherDir}.pinned`;
+  const backend = createDefaultRuntimeBackend(
+    process.platform,
+    process.arch,
+    typeof process.geteuid === 'function' ? process.geteuid() : null,
+    undefined,
+    {
+      fault(point) {
+        if (point !== 'after_directory_recovery') return;
+        renameSync(launcherDir, pinnedDirectory);
+        mkdirSync(launcherDir, { mode: 0o700 });
+        chmodSync(launcherDir, 0o700);
+      },
+    },
+  );
+  const runtime = createRuntimeSupplyChain({ env: { CC_MASTER_HOME: first.home }, backend });
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+
+  const output = join(first.root, 'path-replacement-output');
+  expectRuntimeError(() => runtime.invoke([output]), 'RUNTIME_INVOKE_BACKEND');
+  assert.equal(existsSync(output), false, 'payload ran through a replacement launcher directory');
+  assert.deepEqual(
+    launcherHelperEntries(launcherDir),
+    [],
+    'publication escaped from the pinned directory into the replacement pathname',
+  );
+  assert.equal(
+    launcherHelperEntries(pinnedDirectory).length,
+    1,
+    'publication did not remain bound to the pinned directory object',
+  );
+});
+
+test('an independently verified valid launcher final is idempotent', () => {
+  const first = nativeFixture('4.1.8', 'valid-final-idempotent');
+  const runtime = manager(first.home);
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+
+  const firstOutput = join(first.root, 'valid-final-first');
+  assert.equal(runtime.invoke([firstOutput]).exit_code, 0);
+  const finalPath = join(launcherDirectory(first.home), builtLauncherHelperName());
+  const before = lstatSync(finalPath);
+
+  const secondOutput = join(first.root, 'valid-final-second');
+  assert.equal(runtime.invoke([secondOutput]).exit_code, 0);
+  const after = lstatSync(finalPath);
+  assert.equal(after.dev, before.dev);
+  assert.equal(after.ino, before.ino, 'valid final was republished instead of reused');
+  assert.equal(readFileSync(secondOutput, 'utf8'), 'valid-final-idempotent');
+  assertRecoveredLauncherDirectory(first.home);
+});
+
+test('dead-temp cleanup is idempotent across two cold publishers', async () => {
+  const first = nativeFixture('4.1.9', 'stale-temp-concurrent');
+  const runtime = manager(first.home);
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+  const staleName = `.${launcherContract()}-99999999-00000000-0000-0000-0000-000000000001.tmp`;
+  const stalePath = join(launcherDirectory(first.home), staleName);
+  writeFileSync(stalePath, 'abandoned-publisher', { mode: 0o600 });
+  chmodSync(stalePath, 0o600);
+
+  const worker = join(HERE, 'fixtures', 'runtime-launcher-materialization-worker.ts');
+  const barrier = join(first.root, 'cleanup-go');
+  const readyA = join(first.root, 'cleanup-ready-a');
+  const readyB = join(first.root, 'cleanup-ready-b');
+  const outputA = join(first.root, 'cleanup-output-a');
+  const outputB = join(first.root, 'cleanup-output-b');
+  const args = ['--import', 'tsx', worker, first.home];
+  const a = spawn(process.execPath, [...args, outputA, readyA, barrier, 'before_temp_cleanup'], {
+    cwd: join(HERE, '..'),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const b = spawn(process.execPath, [...args, outputB, readyB, barrier, 'before_temp_cleanup'], {
+    cwd: join(HERE, '..'),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  for (let index = 0; index < 600 && !(existsSync(readyA) && existsSync(readyB)); index++) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.equal(
+    existsSync(readyA) && existsSync(readyB),
+    true,
+    'both cleanup processes must snapshot the proven stale candidate before release',
+  );
+  writeFileSync(barrier, 'go');
+  const [resultA, resultB] = await Promise.all([waitForExit(a), waitForExit(b)]);
+  assert.equal(resultA.code, 0, resultA.stderr);
+  assert.equal(resultB.code, 0, resultB.stderr);
+  assert.equal(readFileSync(outputA, 'utf8'), 'stale-temp-concurrent');
+  assert.equal(readFileSync(outputB, 'utf8'), 'stale-temp-concurrent');
+  assert.equal(existsSync(stalePath), false, 'stale temp survived concurrent cleanup');
+  assert.equal(launcherHelpers(first.home).length, 1, 'cleanup race published multiple finals');
+  assertRecoveredLauncherDirectory(first.home);
+});
+
+test('dead-temp cleanup fails closed on surviving symlink, type, and permission anomalies', () => {
+  const cases = ['symlink', 'directory', 'permission'] as const;
+  for (const [index, kind] of cases.entries()) {
+    const first = nativeFixture(`4.1.${10 + index}`, `cleanup-reject-${kind}`);
+    const runtime = manager(first.home);
+    const staged = runtime.stage({
+      artifactPath: first.artifact,
+      provenancePath: first.provenance,
+    });
+    runtime.activate(staged.transaction_id);
+    const staleName = `.${launcherContract()}-99999999-00000000-0000-0000-0000-00000000000${index + 2}.tmp`;
+    const stalePath = join(launcherDirectory(first.home), staleName);
+    if (kind === 'symlink') {
+      const target = join(first.root, 'untrusted-temp-target');
+      writeFileSync(target, 'untrusted');
+      symlinkSync(target, stalePath);
+    } else if (kind === 'directory') {
+      mkdirSync(stalePath, { mode: 0o700 });
+    } else {
+      writeFileSync(stalePath, 'untrusted-permissions', { mode: 0o644 });
+      chmodSync(stalePath, 0o644);
+    }
+    const output = join(first.root, `cleanup-reject-${kind}-output`);
+    expectRuntimeError(() => runtime.invoke([output]), 'RUNTIME_INVOKE_BACKEND');
+    assert.equal(existsSync(output), false, `${kind}: payload unexpectedly ran`);
+    assert.equal(existsSync(stalePath), true, `${kind}: invalid stale entry was removed`);
+  }
+});
+
+test('a real publisher-parent SIGKILL cannot strand an executable materializer bootstrap', async () => {
+  const first = nativeFixture('4.1.13', 'parent-sigkill-bootstrap-recovery');
+  const runtime = manager(first.home);
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+
+  const worker = join(HERE, 'fixtures', 'runtime-launcher-materialization-worker.ts');
+  const interruptedOutput = join(first.root, 'real-parent-sigkill-interrupted');
+  const ready = join(first.root, 'real-parent-sigkill-ready');
+  const barrier = join(first.root, 'real-parent-sigkill-go');
+  const before = new Set(observedMaterializerBootstraps(first.home));
+  const publisher = spawn(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      worker,
+      first.home,
+      interruptedOutput,
+      ready,
+      barrier,
+      'before_bootstrap_self_cleanup_native',
+    ],
+    { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  let during: string[] = [];
+  try {
+    await waitForCondition(
+      () => existsSync(ready),
+      'native child did not reach the pre-self-clean pause seam',
+    );
+    during = observedMaterializerBootstraps(first.home).filter((entry) => !before.has(entry));
+    assert.equal(during.length, 1, 'crash probe did not observe one live bootstrap executable');
+    publisher.kill('SIGKILL');
+    const crashed = await waitForExit(publisher);
+    assert.equal(crashed.code, null, crashed.stderr);
+    assert.equal(crashed.signal, 'SIGKILL', crashed.stderr);
+
+    writeFileSync(barrier, 'go');
+    await waitForCondition(
+      () => launcherHelpers(first.home).length === 1,
+      'orphaned native child did not finish helper publication',
+    );
+    const leaked = during.filter((entry) => existsSync(entry));
+    assert.deepEqual(
+      leaked,
+      [],
+      `real parent SIGKILL leaked bootstrap evidence ${JSON.stringify({ during, leaked })}`,
+    );
+  } finally {
+    if (publisher.exitCode === null && publisher.signalCode === null) publisher.kill('SIGKILL');
+    if (!existsSync(barrier)) writeFileSync(barrier, 'go');
+    for (const executable of during) {
+      const attributedRoot = dirname(executable);
+      if (existsSync(attributedRoot)) rmSync(attributedRoot, { recursive: true, force: true });
+    }
+  }
+});
+
+test('a publisher crash after bootstrap creation is reclaimed by the next activation', async () => {
+  const first = nativeFixture('4.1.14', 'pre-spawn-bootstrap-recovery');
+  const runtime = manager(first.home);
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+  const worker = join(HERE, 'fixtures', 'runtime-launcher-materialization-worker.ts');
+  const interruptedOutput = join(first.root, 'pre-spawn-interrupted');
+  const ready = join(first.root, 'pre-spawn-ready');
+  const barrier = join(first.root, 'pre-spawn-go');
+  const publisher = spawn(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      worker,
+      first.home,
+      interruptedOutput,
+      ready,
+      barrier,
+      'after_materializer_bootstrap_create',
+    ],
+    { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  try {
+    await waitForCondition(
+      () => existsSync(ready),
+      'publisher did not pause after bootstrap create',
+    );
+    const attributed = materializerInstances(first.home);
+    assert.equal(
+      attributed.length,
+      1,
+      'pre-spawn seam did not expose one owned bootstrap instance',
+    );
+    publisher.kill('SIGKILL');
+    const crashed = await waitForExit(publisher);
+    assert.equal(crashed.code, null, crashed.stderr);
+    assert.equal(crashed.signal, 'SIGKILL', crashed.stderr);
+    assert.equal(existsSync(attributed[0] as string), true, 'fixture did not capture stale owner');
+
+    const recoveredOutput = join(first.root, 'pre-spawn-recovered');
+    assert.equal(runtime.invoke([recoveredOutput]).exit_code, 0);
+    assert.equal(readFileSync(recoveredOutput, 'utf8'), 'pre-spawn-bootstrap-recovery');
+    assert.deepEqual(
+      materializerInstances(first.home),
+      [],
+      'dead pre-spawn owner survived recovery',
+    );
+  } finally {
+    if (publisher.exitCode === null && publisher.signalCode === null) publisher.kill('SIGKILL');
+    if (!existsSync(barrier)) writeFileSync(barrier, 'go');
+  }
+});
+
+test('native bootstrap self-clean survives parent SIGKILL before and after helper publication', async () => {
+  const points = ['before_bootstrap_self_cleanup_native', 'after_helper_publish_native'] as const;
+  const worker = join(HERE, 'fixtures', 'runtime-launcher-materialization-worker.ts');
+  for (const [index, point] of points.entries()) {
+    const first = nativeFixture(`4.1.${15 + index}`, `bootstrap-self-clean-${point}`);
+    const runtime = manager(first.home);
+    const staged = runtime.stage({
+      artifactPath: first.artifact,
+      provenancePath: first.provenance,
+    });
+    runtime.activate(staged.transaction_id);
+    const ready = join(first.root, `${point}-parent-ready`);
+    const barrier = join(first.root, `${point}-parent-go`);
+    const interruptedOutput = join(first.root, `${point}-interrupted`);
+    const publisher = spawn(
+      process.execPath,
+      ['--import', 'tsx', worker, first.home, interruptedOutput, ready, barrier, point],
+      { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    try {
+      await waitForCondition(() => existsSync(ready), `${point}: native seam was not reached`);
+      const during = materializerInstances(first.home)
+        .map((instance) => join(instance, 'materializer'))
+        .filter((entry) => existsSync(entry));
+      if (point === 'before_bootstrap_self_cleanup_native') {
+        assert.equal(during.length, 1, `${point}: expected live bootstrap was not observable`);
+      }
+      publisher.kill('SIGKILL');
+      const crashed = await waitForExit(publisher);
+      assert.equal(crashed.code, null, crashed.stderr);
+      assert.equal(crashed.signal, 'SIGKILL', crashed.stderr);
+      writeFileSync(barrier, 'go');
+      await waitForCondition(
+        () => launcherHelpers(first.home).length === 1,
+        `${point}: orphaned native child did not finish`,
+      );
+      await waitForCondition(
+        () => materializerInstances(first.home).length === 0,
+        `${point}: executable bootstrap survived orphan completion`,
+      );
+
+      const recoveredOutput = join(first.root, `${point}-recovered`);
+      assert.equal(runtime.invoke([recoveredOutput]).exit_code, 0);
+      assert.equal(readFileSync(recoveredOutput, 'utf8'), `bootstrap-self-clean-${point}`);
+      assert.deepEqual(materializerInstances(first.home), []);
+    } finally {
+      if (publisher.exitCode === null && publisher.signalCode === null) publisher.kill('SIGKILL');
+      if (!existsSync(barrier)) writeFileSync(barrier, 'go');
+    }
+  }
+});
+
+test('dead publisher materializer bootstrap instances are recovered without touching live owners', () => {
+  const staleCases = [
+    { label: 'partial-write', mode: 0o600 as const },
+    { label: 'sealed', mode: 0o500 as const },
+    { label: 'empty', empty: true },
+  ];
+  for (const [index, staleCase] of staleCases.entries()) {
+    const first = nativeFixture(`4.1.${14 + index}`, `bootstrap-recovery-${staleCase.label}`);
+    const runtime = manager(first.home);
+    const staged = runtime.stage({
+      artifactPath: first.artifact,
+      provenancePath: first.provenance,
+    });
+    runtime.activate(staged.transaction_id);
+    const stale = seedMaterializerInstance(first.home, {
+      uuid: `00000000-0000-0000-0000-00000000001${index}`,
+      mode: staleCase.mode,
+      empty: staleCase.empty,
+    });
+    const live = seedMaterializerInstance(first.home, {
+      publisherPid: process.pid,
+      uuid: `00000000-0000-0000-0000-00000000002${index}`,
+    });
+
+    const output = join(first.root, `bootstrap-recovery-${staleCase.label}-output`);
+    assert.equal(runtime.invoke([output]).exit_code, 0);
+    assert.equal(readFileSync(output, 'utf8'), `bootstrap-recovery-${staleCase.label}`);
+    assert.equal(existsSync(stale), false, `${staleCase.label}: dead owner instance survived`);
+    assert.equal(existsSync(live), true, `${staleCase.label}: live owner instance was reclaimed`);
+  }
+});
+
+test('dead materializer bootstrap recovery is idempotent across concurrent activations', async () => {
+  const first = nativeFixture('4.1.22', 'concurrent-bootstrap-recovery');
+  const runtime = manager(first.home);
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+  const stale = seedMaterializerInstance(first.home, {
+    uuid: '00000000-0000-0000-0000-000000000099',
+  });
+  const worker = join(HERE, 'fixtures', 'runtime-launcher-materialization-worker.ts');
+  const barrier = join(first.root, 'bootstrap-recovery-go');
+  const readyA = join(first.root, 'bootstrap-recovery-ready-a');
+  const readyB = join(first.root, 'bootstrap-recovery-ready-b');
+  const outputA = join(first.root, 'bootstrap-recovery-output-a');
+  const outputB = join(first.root, 'bootstrap-recovery-output-b');
+  const args = ['--import', 'tsx', worker, first.home];
+  const a = spawn(
+    process.execPath,
+    [...args, outputA, readyA, barrier, 'before_bootstrap_recovery_native'],
+    { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  const b = spawn(
+    process.execPath,
+    [...args, outputB, readyB, barrier, 'before_bootstrap_recovery_native'],
+    { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  try {
+    await waitForCondition(
+      () => existsSync(readyA) && existsSync(readyB),
+      'both recovery workers must snapshot the dead bootstrap before release',
+    );
+    writeFileSync(barrier, 'go');
+    const [resultA, resultB] = await Promise.all([waitForExit(a), waitForExit(b)]);
+    assert.equal(resultA.code, 0, resultA.stderr);
+    assert.equal(resultB.code, 0, resultB.stderr);
+    assert.equal(readFileSync(outputA, 'utf8'), 'concurrent-bootstrap-recovery');
+    assert.equal(readFileSync(outputB, 'utf8'), 'concurrent-bootstrap-recovery');
+    assert.equal(existsSync(stale), false, 'dead bootstrap survived concurrent recovery');
+    assert.deepEqual(materializerInstances(first.home), []);
+  } finally {
+    if (a.exitCode === null && a.signalCode === null) a.kill('SIGKILL');
+    if (b.exitCode === null && b.signalCode === null) b.kill('SIGKILL');
+    if (!existsSync(barrier)) writeFileSync(barrier, 'go');
+  }
+});
+
+test('native materializer self-cleans its own bootstrap before stale recovery', async () => {
+  const first = nativeFixture('4.1.23', 'bootstrap-self-clean-order');
+  const runtime = manager(first.home);
+  const staged = runtime.stage({ artifactPath: first.artifact, provenancePath: first.provenance });
+  runtime.activate(staged.transaction_id);
+  const worker = join(HERE, 'fixtures', 'runtime-launcher-materialization-worker.ts');
+  const ready = join(first.root, 'bootstrap-self-clean-order-ready');
+  const barrier = join(first.root, 'bootstrap-self-clean-order-go');
+  const output = join(first.root, 'bootstrap-self-clean-order-output');
+  const publisher = spawn(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      worker,
+      first.home,
+      output,
+      ready,
+      barrier,
+      'before_bootstrap_recovery_native',
+    ],
+    { cwd: join(HERE, '..'), stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  try {
+    await waitForCondition(() => existsSync(ready), 'native child did not reach recovery seam');
+    assert.deepEqual(
+      materializerInstances(first.home),
+      [],
+      'own bootstrap remained published until parent graceful cleanup',
+    );
+    writeFileSync(barrier, 'go');
+    const result = await waitForExit(publisher);
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(readFileSync(output, 'utf8'), 'bootstrap-self-clean-order');
+  } finally {
+    if (publisher.exitCode === null && publisher.signalCode === null) publisher.kill('SIGKILL');
+    if (!existsSync(barrier)) writeFileSync(barrier, 'go');
+  }
+});
+
+test('materializer bootstrap recovery fails closed on symlink, type, and permission anomalies', () => {
+  const cases = [
+    'root-symlink',
+    'root-mode',
+    'instance-symlink',
+    'instance-file',
+    'instance-mode',
+    'bootstrap-symlink',
+    'bootstrap-mode',
+    'unknown-leaf',
+  ] as const;
+  for (const [index, kind] of cases.entries()) {
+    const first = nativeFixture(`4.1.${17 + index}`, `must-not-run-bootstrap-${kind}`);
+    const runtime = manager(first.home);
+    const staged = runtime.stage({
+      artifactPath: first.artifact,
+      provenancePath: first.provenance,
+    });
+    runtime.activate(staged.transaction_id);
+    const root = materializerRoot(first.home);
+    let anomaly: string;
+    if (kind === 'root-symlink') {
+      rmSync(root, { recursive: true, force: true });
+      const target = join(first.root, 'untrusted-materializer-root');
+      mkdirSync(target, { mode: 0o700 });
+      symlinkSync(target, root);
+      anomaly = root;
+    } else if (kind === 'root-mode') {
+      ensureMaterializerRoot(first.home);
+      chmodSync(root, 0o755);
+      anomaly = root;
+    } else if (kind === 'instance-symlink' || kind === 'instance-file') {
+      ensureMaterializerRoot(first.home);
+      anomaly = join(
+        root,
+        materializerInstanceName(99_999_999, `00000000-0000-0000-0000-00000000003${index}`),
+      );
+      if (kind === 'instance-symlink') {
+        const target = join(first.root, 'untrusted-materializer-instance');
+        mkdirSync(target, { mode: 0o700 });
+        symlinkSync(target, anomaly);
+      } else {
+        writeFileSync(anomaly, 'untrusted-instance-file', { mode: 0o600 });
+      }
+    } else {
+      anomaly = seedMaterializerInstance(first.home, {
+        uuid: `00000000-0000-0000-0000-00000000003${index}`,
+      });
+      if (kind === 'instance-mode') chmodSync(anomaly, 0o755);
+      if (kind === 'bootstrap-symlink') {
+        const bootstrap = join(anomaly, 'materializer');
+        const target = join(first.root, 'untrusted-materializer-bootstrap');
+        writeFileSync(target, 'untrusted');
+        unlinkSync(bootstrap);
+        symlinkSync(target, bootstrap);
+      }
+      if (kind === 'bootstrap-mode') chmodSync(join(anomaly, 'materializer'), 0o644);
+      if (kind === 'unknown-leaf') writeFileSync(join(anomaly, 'unknown'), 'untrusted');
+    }
+
+    const output = join(first.root, `must-not-run-bootstrap-${kind}-output`);
+    expectRuntimeError(() => runtime.invoke([output]), 'RUNTIME_INVOKE_BACKEND');
+    assert.equal(existsSync(output), false, `${kind}: payload unexpectedly ran`);
+    assert.equal(existsSync(anomaly), true, `${kind}: anomalous path was removed`);
+  }
+});
+
+test('SIGKILL around launcher directory recovery and helper publication is recoverable', () => {
+  const worker = join(HERE, 'fixtures', 'runtime-launcher-materialization-worker.ts');
+  const points = [
+    'before_directory_recovery',
+    'after_directory_recovery',
+    'before_helper_publish',
+    'after_helper_publish',
+  ] as const;
+
+  for (const [index, point] of points.entries()) {
+    const first = nativeFixture(`4.2.${index}`, `recovered-${point}`);
+    const runtime = manager(first.home);
+    const staged = runtime.stage({
+      artifactPath: first.artifact,
+      provenancePath: first.provenance,
+    });
+    runtime.activate(staged.transaction_id);
+    const launcherDir = launcherDirectory(first.home);
+    if (point === 'before_directory_recovery') chmodSync(launcherDir, 0o500);
+    const ready = join(first.root, `${point}-ready`);
+    const interruptedOutput = join(first.root, `${point}-interrupted`);
+    const crashed = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        'tsx',
+        worker,
+        first.home,
+        interruptedOutput,
+        ready,
+        '',
+        point === 'before_helper_publish'
+          ? 'before_helper_publish_native'
+          : point === 'after_helper_publish'
+            ? 'after_helper_publish_native'
+            : point,
+      ],
+      { cwd: join(HERE, '..'), encoding: 'utf8' },
+    );
+    assert.equal(crashed.status, null, `${point}: worker unexpectedly exited: ${crashed.stderr}`);
+    assert.equal(crashed.signal, 'SIGKILL', `${point}: expected injected SIGKILL`);
+    assert.equal(existsSync(ready), true, `${point}: fault seam was not reached`);
+
+    if (point === 'before_helper_publish') {
+      assert.deepEqual(
+        launcherHelpers(first.home),
+        [],
+        'pre-publication crash published a final helper',
+      );
+      assert.equal(
+        readdirSync(launcherDir).some((name) => name.endsWith('.tmp')),
+        true,
+        'pre-publication crash did not preserve the expected abandoned temp probe',
+      );
+    }
+    if (point === 'after_helper_publish') {
+      assert.equal(
+        launcherHelpers(first.home).length,
+        1,
+        'post-publication crash lost final helper',
+      );
+    }
+
+    const recoveredOutput = join(first.root, `${point}-recovered`);
+    const recovered = runtime.invoke([recoveredOutput]);
+    assert.equal(recovered.exit_code, 0, `${point}: subsequent invoke failed`);
+    assert.equal(readFileSync(recoveredOutput, 'utf8'), `recovered-${point}`);
+    assert.equal(
+      launcherHelpers(first.home).length,
+      1,
+      `${point}: final helper multiplicity drifted`,
+    );
+    assertRecoveredLauncherDirectory(first.home);
+  }
 });
 
 test('publish EXDEV and activation kill-switch fail closed without changing current', () => {

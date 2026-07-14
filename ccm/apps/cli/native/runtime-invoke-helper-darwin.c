@@ -9,6 +9,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#define CCM_RUNTIME_HELPER_CONTRACT "darwin-path-attested-v1"
+#include "runtime-launcher-materializer.h"
+
 extern char **environ;
 
 enum {
@@ -101,6 +104,10 @@ static int hash_fd(int fd, char output[CC_SHA256_DIGEST_LENGTH * 2 + 1]) {
 }
 
 int main(int argc, char **argv) {
+  int materializer_result = ccm_runtime_launcher_materializer_main(argc, argv);
+  if (materializer_result >= 0) {
+    return materializer_result;
+  }
   if (argc < 3 || !valid_sha256(argv[2])) {
     return report_failure("argv", EINVAL);
   }
