@@ -20,5 +20,5 @@ Codex adapter 当前不支持账号池切换。读到 `switch` / `switch_candida
 
 ## 停 lever
 
-- **`stop_5h`**：当前 5h 配额本窗口已烧穿。停止派发新工作，把当前在飞任务收敛到安全点，然后用 `ccm watchdog arm --mechanism external` 记录 reset 后要查的事项。Codex adapter 可用后台 terminal、thread automation（若当前环境提供）、外部 scheduler 或 cloud status loop 做真实唤醒；没有真实 wakeup handle 时，把它作为 `blocked_on:"quota-reset"` 或 `blocked_on:"user"` 的可续状态记录下来，不要伪造自动唤醒。
+- **`stop_5h`**：当前 5h 配额本窗口已烧穿。停止派发新工作，把当前在飞任务收敛到安全点；先创建后台 terminal、thread automation（若当前环境提供）、外部 scheduler 或 cloud status loop 并拿真实 handle，再用 `ccm watchdog arm --fire-at <reset-ISO-UTC> --mechanism <cron|loop|monitor|shell> --job-id <handle>` 记录 reset 后要查的事项。没有真实 handle 时，把它作为 `blocked_on:"quota-reset"` 或 `blocked_on:"user"` 的可续状态记录下来，不要 arm 或伪造自动唤醒。
 - **`stop_7d`**：7d 是不可逆的跨窗口消耗边界，停派新节点并 surface 用户拍板；动作与抗合理化归 `master-orchestrator-guide`。

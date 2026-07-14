@@ -129,7 +129,7 @@ ccm board critical-path                   # 临界链 + 工期
 # 自驱决策记录 / 节奏 / watchdog
 ccm jc add "选 X 不选 Y" --category architecture --severity high
 ccm cadence open I1 --goal "ship 切片" --deadline 2026-06-05T14:00:00Z --members T0,T1
-ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism shell --checklist "poll Codex 后台 session / subagent handle 并 recon"
+ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism shell --job-id codex-session-abc --checklist "poll Codex 后台 session / subagent handle 并 recon"
 ```
 
 全量命令、每个 flag、`--json` 输出形状 → [references/command-catalog.md](references/command-catalog.md)。

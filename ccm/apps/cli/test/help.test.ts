@@ -125,10 +125,12 @@ test('printHelp verb level marks required flags in usage line', () => {
   const c = cap();
   help.printHelp(c.out, registry, 'watchdog', 'arm');
   const t = c.text();
-  // --fire-at / --mechanism 是 required → 进 USAGE 行。
+  // --fire-at / --mechanism / --job-id 都是 required → 进 USAGE 行。
   assert.ok(t.includes('--fire-at'), 'usage/flags show --fire-at');
   assert.ok(t.includes('--mechanism'), 'usage/flags show --mechanism');
+  assert.ok(t.includes('--job-id'), 'usage/flags show --job-id');
   assert.ok(/USAGE[\s\S]*--fire-at/.test(t), 'required --fire-at appears in usage line');
+  assert.ok(/USAGE[\s\S]*--job-id/.test(t), 'required --job-id appears in usage line');
   assert.ok(t.includes('必填'), 'required flag tagged 必填');
 });
 

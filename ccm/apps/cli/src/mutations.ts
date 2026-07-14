@@ -867,26 +867,36 @@ export function cadenceShip(board: Board, iterId: string, _args?: { force?: bool
 }
 
 // ── watchdog（ADR-011 自我唤醒）─────────────────────────────────────────────────────────────────
-// watchdogArm(board, {fireAt, mechanism, jobId?, checklist?}) → 整对象写入（armed_at 盖戳）。
+// watchdogArm(board, {fireAt, mechanism, jobId, checklist?}) → 整对象写入（armed_at 盖戳）。
+//   jobId 必须是 nonblank string：没有真实、可追踪/可退役的外部句柄就不允许声称 ARMED；
+//   该 mutation 闸独立于 registry，direct handler 与 --force 都绕不过。
 export function watchdogArm(
   board: Board,
   args?: { fireAt?: string; mechanism?: string; jobId?: string; checklist?: unknown },
 ): Board {
-  const b = clone(board);
   args = args || {};
+  const jobId = typeof args.jobId === 'string' ? args.jobId.trim() : '';
+  if (!jobId) {
+    throw err(
+      'watchdog arm requires a non-blank --job-id for the real wakeup handle',
+      'Validation',
+    );
+  }
+  const b = clone(board);
   const wd: Record<string, any> = { armed_at: stampNow() };
   if (args.fireAt !== undefined) wd.fire_at = args.fireAt;
   if (args.mechanism !== undefined) wd.mechanism = args.mechanism;
-  if (args.jobId !== undefined) wd.job_id = args.jobId;
+  wd.job_id = jobId;
   if (args.checklist !== undefined) wd.checklist = args.checklist;
   b.watchdog = wd;
   return touch(b);
 }
 
-// watchdogDisarm(board) → 删整 watchdog 对象（置 null·不留残骸·FIELDS.board.watchdog degrade）。
+// watchdogDisarm(board) → 删除 canonical watchdog + legacy wakeup 整字段（ABSENT·不留 null/空对象残骸）。
 export function watchdogDisarm(board: Board): Board {
   const b = clone(board);
-  b.watchdog = null;
+  delete b.watchdog;
+  delete (b as Record<string, any>).wakeup;
   return touch(b);
 }
 

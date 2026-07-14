@@ -4,9 +4,9 @@
 # ── watchdog self-wakeup reminder (ADR-011) ───────────────────────────────────────────────────────
 # verify-board.js's completion-state handshake gains a soft-observed clause: when a matched (armed)
 # board is in a completion state (no ready/uncertain) but still carries an `in_flight` background task
-# AND has no armed top-level `wakeup` OBJECT, the handshake reason additionally nudges the orchestrator
+# AND has no healthy top-level `watchdog` / legacy `wakeup` OBJECT, the handshake reason additionally nudges the orchestrator
 # to "arm a watchdog wakeup" (canonical phrase) so a silently-failing background task has someone come
-# back to recon it. An already-armed `wakeup` object silences it (graceful-degrade, like wip_limit).
+# back to recon it. Only a nonblank job_id + non-expired fire_at silences it.
 # Mirrors the verify-board.js test harness exactly (mkactive + run_stop_sid degraded/sid runners).
 
 mkactive() { mkdir -p "$1/boards"; printf '%s' "$3" > "$1/boards/$2.board.json"; }
@@ -188,9 +188,8 @@ assert_eq "0 $NEW_FP" "$(cat "$H/.$SID.stopcheck")" "WD-j: dedup allow KEEPS the
 rm -rf "$H"
 
 # ── EXPIRY-AWARE SELF-HEAL (簇#2: a STALE wakeup must not silence the reminder) ────────────────────
-# wakeup_armed treats "object + legal fire_at + already past now" as NOT armed (the watchdog should have
-# fired but the task is still in_flight → itself the silent-failure signal). The ONLY downgrade case is
-# that fully-determined stale trio; missing/malformed fire_at graceful-degrades to "armed" (red line 2).
+# wakeup_armed first requires a nonblank accountable handle, then treats "legal fire_at + already past
+# now" as NOT armed. Missing/malformed fire_at graceful-degrades to future only when the handle is real.
 
 # Case WD-k (STALE watchdog → re-remind): completion state + an in_flight task + a `watchdog` OBJECT (v2
 #            field) whose `fire_at` is in the PAST (legal ISO-8601-UTC, < now). The stale safety net must
@@ -212,9 +211,25 @@ assert_contains "$HOOK_OUT" "self-check" "WD-l: future watchdog + in_flight → 
 assert_not_contains "$HOOK_OUT" "$CANON" "WD-l: future (non-expired) watchdog → reminder stays silent (genuinely armed)"
 rm -rf "$H"
 
+# Case WD-o (future record but NO accountable handle → re-remind): object presence and a future
+#            fire_at are not proof that a real scheduler/loop/monitor/shell exists.
+H="$(make_project)"; SID="sess-wd-o"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"watchdog\":{\"armed_at\":\"2099-01-01T00:00:00Z\",\"fire_at\":\"2099-01-01T00:30:00Z\",\"mechanism\":\"shell\"},\"tasks\":[{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "$CANON" "WD-o: future watchdog without job_id is unarmed → reminder fires"
+rm -rf "$H"
+
+# Case WD-p (legacy wakeup with BLANK accountable handle → re-remind): legacy compatibility keeps the
+#            object readable, but whitespace cannot identify or retire an external job.
+H="$(make_project)"; SID="sess-wd-p"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"wakeup\":{\"armed_at\":\"2099-01-01T00:00:00Z\",\"fire_at\":\"2099-01-01T00:30:00Z\",\"mechanism\":\"loop\",\"job_id\":\"   \"},\"tasks\":[{\"id\":\"T2\",\"status\":\"in_flight\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "$CANON" "WD-p: legacy wakeup with blank job_id is unarmed → reminder fires"
+rm -rf "$H"
+
 # ── v1 BACKWARD-COMPAT (old board still carrying root `wakeup`, no v2 `watchdog`) ──────────────────
 # v2 verify-board.js reads board.watchdog first, falling back to the v1 root `wakeup` object when
-# watchdog is absent (so an old board armed under the v1 field name keeps silencing the reminder).
+# watchdog is absent/null (so a healthy old v1 record remains readable, while missing-handle legacy data does not silence).
 
 # Case WD-m (v1 wakeup fallback → still silences): an OLD board with NO `watchdog` field but a root
 #            `wakeup` OBJECT whose `fire_at` is in the FUTURE → the fallback read honors it → the watchdog

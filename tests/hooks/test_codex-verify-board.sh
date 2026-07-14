@@ -66,6 +66,27 @@ assert_contains "$HOOK_OUT" "user decisions are still open: approve deploy" "use
 assert_contains "$HOOK_OUT" "in-flight tasks have no armed watchdog: T4" "watchdog advisory"
 rm -rf "$H"
 
+# Future canonical record without an accountable handle is still unarmed.
+H="$(make_project)"
+mkactive "$H" "missing-handle" '{"schema":"cc-master/v2","goal":"MISSING HANDLE","owner":{"active":true,"session_id":"sess-missing-handle"},"watchdog":{"fire_at":"2099-01-01T00:30:00Z","mechanism":"shell"},"tasks":[{"id":"T6","status":"in_flight","deps":[]}]}'
+run_stop "$H" "sess-missing-handle"
+assert_contains "$HOOK_OUT" "in-flight tasks have no armed watchdog: T6" "future watchdog without job_id remains unarmed"
+rm -rf "$H"
+
+# Legacy record with a blank handle is readable but cannot silence the gate.
+H="$(make_project)"
+mkactive "$H" "blank-handle" '{"schema":"cc-master/v2","goal":"BLANK HANDLE","owner":{"active":true,"session_id":"sess-blank-handle"},"wakeup":{"fire_at":"2099-01-01T00:30:00Z","mechanism":"loop","job_id":"   "},"tasks":[{"id":"T7","status":"in_flight","deps":[]}]}'
+run_stop "$H" "sess-blank-handle"
+assert_contains "$HOOK_OUT" "in-flight tasks have no armed watchdog: T7" "legacy wakeup with blank job_id remains unarmed"
+rm -rf "$H"
+
+# A traceable but expired handle is no longer armed.
+H="$(make_project)"
+mkactive "$H" "expired" '{"schema":"cc-master/v2","goal":"EXPIRED","owner":{"active":true,"session_id":"sess-expired"},"watchdog":{"fire_at":"2000-01-01T00:30:00Z","mechanism":"cron","job_id":"cron-old"},"tasks":[{"id":"T8","status":"in_flight","deps":[]}]}'
+run_stop "$H" "sess-expired"
+assert_contains "$HOOK_OUT" "in-flight tasks have no armed watchdog: T8" "expired watchdog remains unarmed"
+rm -rf "$H"
+
 # Done-only completion state: final self-check advisory.
 H="$(make_project)"
 mkactive "$H" "done" '{"schema":"cc-master/v2","goal":"DONE CODEX BOARD","owner":{"active":true,"session_id":"sess-done"},"tasks":[{"id":"T5","status":"done","deps":[]}]}'

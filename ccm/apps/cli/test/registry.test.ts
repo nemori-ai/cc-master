@@ -152,6 +152,7 @@ test('option enums are sourced from board-model.ENUMS (no hand-typed drift)', ()
   assert.deepEqual(REGISTRY.jc!.add!.options.severity!.enum, model.ENUMS.jcSeverity);
   assert.deepEqual(REGISTRY.jc!.list!.options.status!.enum, model.ENUMS.jcStatus);
   assert.deepEqual(REGISTRY.watchdog!.arm!.options.mechanism!.enum, model.ENUMS.watchdogMechanism);
+  assert.equal(REGISTRY.watchdog!.arm!.options['job-id']!.required, true);
 });
 
 // ── usage / estimate 只读不变式（ADR-015 §2 不变式 1·硬约束：纯只读 = 全 verb read:true）──────────────

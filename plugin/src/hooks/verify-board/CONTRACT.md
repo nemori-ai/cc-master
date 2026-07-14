@@ -24,10 +24,15 @@ whether stopping now would abandon unfinished/unverified/un-surfaced work.
 - `rule-verify-board-pending-user`: any task with `status:"blocked"` and `blocked_on:"user"` is named
   explicitly in the block reason — the agent must not silently exit on an open, unanswered user
   decision.
-- `rule-verify-board-watchdog-reminder`: a `in_flight` task with no armed watchdog
-  (`board.watchdog`/`board.wakeup`, missing or `fire_at` already in the past) triggers a reminder to
-  arm a watchdog wakeup before stopping, framed as "come back and recon ground truth," not a verdict
-  that the task is dead.
+- `rule-verify-board-watchdog-reminder`: a `in_flight` task with no healthy armed watchdog triggers a
+  reminder to arm one before stopping, framed as "come back and recon ground truth," not a verdict
+  that the task is dead. A `board.watchdog`/legacy `board.wakeup` record is healthy only when it has
+  a non-blank string `job_id` that identifies the real external scheduler/loop/monitor/shell handle
+  and a `fire_at` that has not passed. Missing/blank handles and expired records are unarmed; a
+  missing or malformed `fire_at` remains a graceful-degrade future record only when the accountable
+  handle is present. The hook never repairs or deletes legacy records: `ccm watchdog status`
+  diagnoses them, then the agent retires the record with `ccm watchdog disarm`, creates a real
+  wakeup, and re-arms with its `--job-id`.
 - `rule-verify-board-rollup-check`: if any owner task is `status:"done"` while some task whose
   `parent` points at it is not `done`, the block reason names the inconsistent owner/child pair
   (soft reminder, layered onto whichever other rule already triggered the block — this rule never

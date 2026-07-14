@@ -14,7 +14,10 @@ unarmed watchdogs, check rollup consistency, and **bound infinite stop loops** (
 3. Settled completion state → handshake required once per completion fingerprint (mechanism may
    differ per host).
 4. `blocked` + `blocked_on:user` → explicit naming in block/continuation reason.
-5. `in_flight` without valid watchdog → reminder (advisory layer).
+5. `in_flight` without a valid watchdog → reminder (advisory layer). Valid means the canonical
+   `watchdog` or legacy `wakeup` record carries a non-blank string `job_id` for a real
+   scheduler/loop/monitor/shell handle and its `fire_at` is not in the past. Missing/blank handles
+   and expired records are unarmed on every host; the hook observes but never mutates legacy data.
 6. Rollup inconsistency → soft reminder when another rule already blocked.
 7. **FUSE**: after N consecutive blocks on same session, force release + strong advisory (finite
    upper bound on stop loop duration).

@@ -122,8 +122,11 @@ function listMatchingBoards(home, sessionId) {
 }
 
 function watchdogArmed(board) {
-  const wd = board && typeof board === 'object' ? board.watchdog || board.wakeup : null;
+  const wd = board && typeof board === 'object'
+    ? (board.watchdog === undefined || board.watchdog === null ? board.wakeup : board.watchdog)
+    : null;
   if (!wd || typeof wd !== 'object' || Array.isArray(wd)) return false;
+  if (typeof wd.job_id !== 'string' || wd.job_id.trim() === '') return false;
   const fireAt = typeof wd.fire_at === 'string' ? wd.fire_at : '';
   if (!fireAt) return true;
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(fireAt)) return true;

@@ -2,7 +2,7 @@
 
 > Status: **Accepted**（部分收窄 ADR-002 的 ScheduleWakeup/cron 排除；补充 ADR-004 的 background-shell 消解，非取代）
 > Date: 2026-06-16
-> Scope: 编排方法论（`skills/master-orchestrator-guide/SKILL.md` 决策程序 `wait` 边 + 镜头4/6 + `references/async-hitl.md`·`dispatch.md`·`board.md`·`external-coordinates.md`）+ `hooks/scripts/verify-board.sh`（完成态握手新增 watchdog 提醒 clause）+ board 柔性边 `wakeup` 字段 + 红线 5（AGENTS.md §3）+ `design_docs/spec.md` §12
+> Scope: 编排方法论（`skills/master-orchestrator-guide/SKILL.md` 决策程序 `wait` 边 + 镜头4/6 + `references/async-hitl.md`·`dispatch.md`·`board.md`·`external-coordinates.md`）+ `verify-board`（完成态握手 watchdog 提醒 clause）+ board 柔性边 canonical `watchdog` / legacy `wakeup` + 红线 5（AGENTS.md §3）+ `design_docs/spec.md` §12
 > Source: dogfood Finding #17 / Finding #46（幽灵任务——派发未真正发出 / 静默失败，无完成事件，orchestrator 永远等不到唤醒）+ 实现契约 `design_docs/plans/idle-self-wakeup-impl-contract.md`
 
 ---
@@ -28,7 +28,7 @@ ADR-002 当时把 ScheduleWakeup/cron 整体排除，理由是 ship-anywhere（S
 
 按优先级，缺则降级：
 
-1. **CronCreate `recurring:false`（首选 / 通用 watchdog）** —— 本地 session 内存调度器，`durable:false`，**不需 claude.ai OAuth**，**只在 REPL idle 时 fire**（正好在 orchestrator 空转时叫回、不打断正在干的活）。间隔 ≈ 最长 in_flight 任务的 p95 + 余量（cache 心智：<270s 保温 / ≥1200s 长等，贴 ScheduleWakeup 的 cache-warmth 心智）。退役时**两件一起做**：**CronDelete 清掉待发 job** 免重复 fire，**且从 board 移除 `wakeup` 对象**（详见 §3.2 陈旧 `wakeup` 盲区）。
+1. **CronCreate `recurring:false`（首选 / 通用 watchdog）** —— 本地 session 内存调度器，`durable:false`，**不需 claude.ai OAuth**，**只在 REPL idle 时 fire**（正好在 orchestrator 空转时叫回、不打断正在干的活）。间隔 ≈ 最长 in_flight 任务的 p95 + 余量（cache 心智：<270s 保温 / ≥1200s 长等，贴 ScheduleWakeup 的 cache-warmth 心智）。先拿真实 job id 再 arm；退役时**两件一起做**：按 id **CronDelete 清掉待发 job**，且运行 `ccm watchdog disarm` 删除 canonical / legacy board 记录。
 2. **ScheduleWakeup** —— `/loop` dynamic 时原生的自定步长 + cache-warmth 信号；可作 CronCreate 的同档替代。
 3. **Monitor** —— 某后台任务有可观测 liveness 信号（log 文件 / 进程）时用：`tail -f | grep -E --line-buffered '<进度>|<失败签名>'`，事件驱动、精准。**"silence ≠ success"**：filter 必须覆盖失败终态，不能只 grep happy path。
 4. **background-shell `until <ready>; do sleep N; done` 丢进 `run_in_background`（universal ship-anywhere floor）** —— ADR-004 的既有消解，**永远兜底**：上面三者在某宿主不可用时，这条恒可用（harness 完成重入）。
@@ -37,15 +37,15 @@ ADR-002 当时把 ScheduleWakeup/cron 整体排除，理由是 ship-anywhere（S
 
 ### 2.3 "被唤醒后看什么"的记录 = 双层
 
-- **实质 = board**（持久、扛 compaction）：arm 时在 board 写一条 `wakeup` 柔性边记录（见 §2.4 schema）。
+- **实质 = board**（持久、扛 compaction）：先创建真实唤醒并拿 handle，再用 `ccm watchdog arm ... --job-id <handle>` 写 canonical `watchdog` 柔性边记录（legacy `wakeup` 只读兼容）。
 - **指针 = wakeup prompt**（轻、易朽）：只说"watchdog fired：重读 board <路径>，跑决策程序 recon——逐个 in_flight 对地面真相、处置静默失败、re-arm 或继续"。prompt 触发、board 供料；compaction 后 prompt 没了也无妨，board 还在。
 
-### 2.4 board `wakeup` 柔性边（soft-observed，不动硬 narrow-waist）
+### 2.4 board `watchdog` 柔性边（legacy `wakeup` 兼容；soft-observed，不动硬 narrow-waist）
 
-新增 top-level 可选对象 `wakeup`（类比 `wip_limit` 的 soft-observed：hook 若有则用、缺则 graceful-degrade 不报错）：
+canonical top-level 可选对象 `watchdog`（旧板同形 `wakeup` 继续兼容读取）：
 
 ```json
-"wakeup": {
+"watchdog": {
   "armed_at": "<iso>",
   "fire_at": "<iso>",
   "mechanism": "cron" | "loop" | "monitor" | "shell",
@@ -54,13 +54,13 @@ ADR-002 当时把 ScheduleWakeup/cron 整体排除，理由是 ship-anywhere（S
 }
 ```
 
-- 语义：存在 = 已 arm 一个 watchdog；`checklist` = 被唤醒后要 recon / 确认的事项清单。
+- 语义：**对象存在不等于 armed**；只有 `job_id` 为 nonblank 真实句柄且 `fire_at` 未过期才健康。`checklist` = 被唤醒后要 recon / 确认的事项清单。
 - 这是**柔性边**（agent-shaped）+ 被 hook 以 soft-observed 方式读。**绝不进硬 waist**——`schema`/`goal`/`owner`/`git`/`tasks[{id,status,deps}]`+status enum 才是硬 waist（ADR-003 一字不动，红线 2 不破）。
 
 ### 2.5 触发条件 + hook 软提醒
 
 - **何时 arm**：走决策程序 `wait` 边之前，**若剩余 path 中存在 blocked 在 in_flight 后台任务上的（不只是 awaiting user）** → arm 一个 watchdog。纯 awaiting-user 的等待不需 watchdog（用户那条线由既有 HITL / PushNotification 覆盖）。
-- **hook 软提醒**：`verify-board.sh` 完成态握手新增一条 clause——soft-observed 读 top-level `wakeup`：有 in_flight 且无 `wakeup`（或 `wakeup` 非对象）→ 注入"为可能静默失败的 in_flight 任务 arm a watchdog wakeup"提醒；已有 `wakeup` → 静默不提醒（graceful-degrade，类比 `wip_limit`）。canonical 短语锚点 **"arm a watchdog wakeup" / "watchdog 自我唤醒"**。hook 只 bash + node/JS（红线 1·ADR-006 不破，不引 jq/python）；武装闸不变（红线 6·ADR-007：未武装一律静默）。
+- **hook 软提醒**：`verify-board` 完成态握手 soft-observed 读 canonical `watchdog` / legacy `wakeup`：有 in_flight 且无健康记录（缺/非对象、`job_id` 缺失或空白、`fire_at` 已过期）→ 注入"为可能静默失败的 in_flight 任务 arm a watchdog wakeup"提醒。canonical 短语锚点 **"arm a watchdog wakeup" / "watchdog 自我唤醒"**。hook 只 bash + node/JS（红线 1·ADR-006 不破，不引 jq/python）；武装闸不变（红线 6·ADR-007：未武装一律静默）。
 
 ## 3. Consequences
 
@@ -73,14 +73,14 @@ ADR-002 当时把 ScheduleWakeup/cron 整体排除，理由是 ship-anywhere（S
 
 ### 3.2 Negative
 
-- **新增一个易朽外部资源要管 + 一条 board 卫生不变式**：退役一个 watchdog 是**两件一起做**——① CronDelete 清掉待发 job（否则重复 fire），② **从 board 移除 `wakeup` 对象**。第 2 件同样不可省：verify-board hook 对 `wakeup` 是 soft-observed（present = armed），见任何 root `wakeup` 对象就当 armed 而**静默不提醒**——所以只 CronDelete 了 job、却把陈旧 `wakeup` 对象留在 board 上，会让 hook（与 compaction 后的 orchestrator）误判仍有 watchdog armed，下一次「有可能静默失败的 in_flight」等待时本该发出的提醒被静默掉，**重开本 ADR 要堵的静默失败盲区**。**不变式：当前无 watchdog armed 时，`board.wakeup` 必须 ABSENT**（不留陈旧残骸）。漏清任一件都是新的踩坑面（来源 Finding #56：活体复现过 CronDelete 了 job 却没清 `wakeup` 对象的陈旧残留）。
+- **新增一个易朽外部资源要管 + 一条 board 卫生不变式**：退役一个 watchdog 是**两件一起做**——① 按 `job_id` 清掉真实外部 job（否则重复 fire），② `ccm watchdog disarm` 删除 canonical `watchdog` 与 legacy `wakeup` 整字段。第 2 件同样不可省：只删外部 job、却把 nonblank handle + future `fire_at` 留在 board，读侧仍无法知道机制已消失；只删 board 则外部 job 仍会空响。**不变式：当前无 watchdog armed 时，两字段都必须 ABSENT**。存量缺/空 handle 只产生 `FMT-WATCHDOG` warn 与 status/hook unarmed 诊断，不让其它写入死锁。
 - **降级链 + 可用性提示增加教法面**：比 ADR-002"三机制干净排除"的简洁面更复杂——多了一条降级链要教、要让 agent 判断当前宿主哪一档可用。以 background-shell 永为 floor 兜底来控制这个复杂度。
 - **watchdog 间隔是估计、非精确**：间隔取 p95 + 余量是启发式；间隔过短 → 空转 recon 噪声，过长 → 静默失败发现慢。无法精确闭环（任务时长不可预测）。
 
 ### 3.3 Neutral
 
 - ADR-002 / ADR-004 的 background-shell 消解**不废**——它从"唯一兜底"变为"降级链的 floor"，语义增强而非取代。
-- `wakeup` 是向后兼容的柔性边扩展：旧 board 无此字段时 hook 不报错（soft-observed，缺失合法）。但**它与 `wip_limit` 的 graceful-degrade 方向相反，别混淆**：`wip_limit` 缺失 = 关掉 C5 过调度警告（功能 off）；而 `wakeup` 缺失 = 「未 arm watchdog」的信号——**board 有 in_flight 任务时缺 `wakeup` 恰恰会触发** watchdog 提醒（功能 on），只有无 in_flight 时才不涉及（见 §2.5 的条件行为）。soft-observed 指「有则用、缺不报错」，不指「缺则一律静默」。
+- `watchdog` 是柔性边，legacy `wakeup` 是兼容读入口：两者缺失都合法；board 有 in_flight 任务时，无健康记录恰会触发提醒。soft-observed 指「有则校验使用、坏值不把 board 变成 hard-invalid」，不指「对象存在就 armed」。
 
 ## 4. Alternatives Considered
 
@@ -110,7 +110,7 @@ ADR-002 当时把 ScheduleWakeup/cron 整体排除，理由是 ship-anywhere（S
 
 - [`ADR-002-ship-anywhere-scope.md`](ADR-002-ship-anywhere-scope.md) —— 本 ADR **部分收窄**其 ScheduleWakeup/cron 排除（"Superseded in part by ADR-011"）；agent-teams / 云 routines 排除不收窄。
 - [`ADR-004-loop-dissolution-and-goal-hook.md`](ADR-004-loop-dissolution-and-goal-hook.md) —— background-shell 消解仍是 floor，本 ADR 在其上补 timer primitives（补充非取代）。
-- [`ADR-003-board-narrow-waist.md`](ADR-003-board-narrow-waist.md) —— `wakeup` 是柔性边，硬 waist 一字不动（红线 2）。
+- [`ADR-003-board-narrow-waist.md`](ADR-003-board-narrow-waist.md) —— canonical `watchdog` / legacy `wakeup` 是柔性边，硬 waist 一字不动（红线 2）。
 - [`ADR-006-hooks-may-use-node-js.md`](ADR-006-hooks-may-use-node-js.md) —— `verify-board.sh` watchdog 提醒走 bash（+node 若必要），不引 jq/python（红线 1）。
 - [`ADR-007-hook-arming-gate.md`](ADR-007-hook-arming-gate.md) —— hook 武装闸不变，watchdog 提醒只在武装态注入（红线 6）。
 - [`../design_docs/dogfood-findings.md`](../design_docs/dogfood-findings.md) —— Finding #17 / Finding #46（幽灵任务——本决策的触发源）。
