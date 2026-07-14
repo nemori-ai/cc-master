@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
@@ -27,6 +28,19 @@ function strategyBlock(block) {
   const match = block.match(/^    strategy:\n[\s\S]*?(?=^    runs-on:)/m);
   assert.ok(match, 'job must contain a strategy immediately before runs-on');
   return match[0];
+}
+
+function runScript(step) {
+  const marker = '        run: |\n';
+  const start = step.indexOf(marker);
+  assert.notEqual(start, -1, 'workflow step must contain a run block');
+  const tail = step.slice(start + marker.length);
+  const nextYaml = tail.search(/^ {0,8}\S/m);
+  const body = nextYaml === -1 ? tail : tail.slice(0, nextYaml);
+  return body
+    .split('\n')
+    .map((line) => (line.startsWith('          ') ? line.slice(10) : line))
+    .join('\n');
 }
 
 const expectedStrategy = `    strategy:
@@ -73,6 +87,62 @@ test('Darwin build and live operator attest the path-attested invoke contract wi
   assert.match(operator, /runtime_exact_object_denial/);
   assert.match(operator, /RUNTIME_INVOKE_ASSURANCE/);
   assert.match(operator, /runtime-verified-exec-contract\.test\.ts/);
+});
+
+test('Darwin build failure uploads complete evidence before preserving the original verdict', () => {
+  const buildJob = jobBlock('build-sea');
+  const build = namedStep(buildJob, 'Build and attest SEA');
+  const upload = namedStep(buildJob, 'Upload non-release SEA evidence');
+  const enforce = namedStep(buildJob, 'Enforce build verdict');
+
+  assert.match(build, /^ {8}id: build$/m);
+  assert.match(build, /^ {10}set \+e$/m);
+  assert.match(build, /\) 2>&1 \| tee "\$\{EVIDENCE\}\/build-attestation\.log"/);
+  assert.match(build, /pipeline_status=\("\$\{PIPESTATUS\[@\]\}"\)/);
+  assert.match(build, /build_exit_code="\$\{pipeline_status\[0\]\}"/);
+  assert.match(build, /tee_exit_code="\$\{pipeline_status\[1\]\}"/);
+  assert.match(build, /^ {10}NODE$/m, 'heredoc terminator must stay at the YAML run-block baseline');
+  assert.doesNotMatch(build, /^ {12}NODE$/m, 'shell nesting must not indent the heredoc terminator');
+  assert.match(build, /build-attestation\.log/);
+  assert.match(build, /build-result\.json/);
+  assert.match(build, /exit_code=%s\\n.*GITHUB_OUTPUT/);
+  assert.match(build, /^ {10}exit 0$/m);
+
+  assert.match(upload, /^ {8}if: always\(\)$/m);
+  assert.match(upload, /uses: actions\/upload-artifact@v4/);
+  assert.match(upload, /\$\{\{ runner\.temp \}\}\/macos-sea\/build-evidence/);
+  assert.match(upload, /^ {10}if-no-files-found: error$/m);
+
+  assert.match(enforce, /^ {8}if: always\(\)$/m);
+  assert.match(enforce, /steps\.build\.outputs\.exit_code/);
+  assert.match(enforce, /\^\[0-9\]\+\$/);
+  assert.match(enforce, /exit "\$\{BUILD_EXIT_CODE\}"/);
+
+  const buildSyntax = spawnSync('bash', ['-n'], { input: runScript(build), encoding: 'utf8' });
+  assert.equal(buildSyntax.status, 0, buildSyntax.stderr);
+  const enforceScript = runScript(enforce);
+  const success = spawnSync('bash', ['-c', enforceScript], {
+    env: { ...process.env, BUILD_EXIT_CODE: '0' },
+    encoding: 'utf8',
+  });
+  assert.equal(success.status, 0, success.stderr);
+  const failure = spawnSync('bash', ['-c', enforceScript], {
+    env: { ...process.env, BUILD_EXIT_CODE: '37' },
+    encoding: 'utf8',
+  });
+  assert.equal(failure.status, 37, 'the final gate must preserve the original nonzero verdict');
+  assert.match(failure.stderr, /build attestation exited 37/);
+  const missing = spawnSync('bash', ['-c', enforceScript], {
+    env: { ...process.env, BUILD_EXIT_CODE: '' },
+    encoding: 'utf8',
+  });
+  assert.equal(missing.status, 1, 'missing build evidence must fail closed');
+
+  const buildOffset = buildJob.indexOf('- name: Build and attest SEA');
+  const uploadOffset = buildJob.indexOf('- name: Upload non-release SEA evidence');
+  const enforceOffset = buildJob.indexOf('- name: Enforce build verdict');
+  assert.ok(buildOffset < uploadOffset, 'evidence upload must follow the captured build attempt');
+  assert.ok(uploadOffset < enforceOffset, 'the original failure must be re-raised only after upload');
 });
 
 test('raw evidence upload intentionally includes hidden members only within the evidence root', () => {

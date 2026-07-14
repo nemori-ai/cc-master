@@ -71,6 +71,7 @@ jobs:
           pnpm -C ccm install --frozen-lockfile
           pnpm -C ccm build
       - name: Build and attest SEA
+        id: build
         shell: bash
         env:
           ASSET: ${{ matrix.asset }}
@@ -79,29 +80,32 @@ jobs:
           OUT="${RUNNER_TEMP}/macos-sea/${ASSET}"
           EVIDENCE="${RUNNER_TEMP}/macos-sea/build-evidence"
           mkdir -p "$(dirname "${OUT}")" "${EVIDENCE}"
-          {
-            printf 'commit=%s\n' "$(git rev-parse HEAD)"
-            printf 'runner_label=%s\n' '${{ matrix.runner }}'
-            printf 'expected_contract=%s\n' '${{ matrix.contract }}'
-            printf 'uname_s=%s\n' "$(uname -s)"
-            printf 'uname_m=%s\n' "$(uname -m)"
-            printf 'node_arch=%s\n' "$(node -p 'process.arch')"
-            uname -a
-            sw_vers
-            node --version
-            pnpm --version
-            diskutil info / || true
-            mount
-          } >"${EVIDENCE}/runner.txt" 2>&1
-          CCM_SEA_NODE="$(command -v node)" CCM_SEA_OUT="${OUT}" \
-            bash ccm/apps/cli/scripts/build-sea.sh >"${EVIDENCE}/build-sea.log" 2>&1
-          if grep -Eq 'fexecve|execveat|/dev/fd|/proc/self/fd' \
-            ccm/apps/cli/native/runtime-invoke-helper-darwin.c; then
-            printf '%s\n' 'Darwin helper source contains a forbidden fd-exec claim' >&2
-            exit 1
-          fi
-          node - ccm/apps/cli/.native-build/runtime-invoke-helper.json '${{ matrix.node_arch }}' \
-            >"${EVIDENCE}/runtime-helper-contract.log" <<'NODE'
+          set +e
+          (
+            set -euxo pipefail
+            {
+              printf 'commit=%s\n' "$(git rev-parse HEAD)"
+              printf 'runner_label=%s\n' '${{ matrix.runner }}'
+              printf 'expected_contract=%s\n' '${{ matrix.contract }}'
+              printf 'uname_s=%s\n' "$(uname -s)"
+              printf 'uname_m=%s\n' "$(uname -m)"
+              printf 'node_arch=%s\n' "$(node -p 'process.arch')"
+              uname -a
+              sw_vers
+              node --version
+              pnpm --version
+              diskutil info / || true
+              mount
+            } >"${EVIDENCE}/runner.txt" 2>&1
+            CCM_SEA_NODE="$(command -v node)" CCM_SEA_OUT="${OUT}" \
+              bash ccm/apps/cli/scripts/build-sea.sh >"${EVIDENCE}/build-sea.log" 2>&1
+            if grep -Eq 'fexecve|execveat|/dev/fd|/proc/self/fd' \
+              ccm/apps/cli/native/runtime-invoke-helper-darwin.c; then
+              printf '%s\n' 'Darwin helper source contains a forbidden fd-exec claim' >&2
+              exit 1
+            fi
+            node - ccm/apps/cli/.native-build/runtime-invoke-helper.json '${{ matrix.node_arch }}' \
+              >"${EVIDENCE}/runtime-helper-contract.log" <<'NODE'
           const fs = require('node:fs');
           const [file, expectedArch] = process.argv.slice(2);
           const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -109,28 +113,41 @@ jobs:
           if (doc.platform !== 'darwin' || doc.arch !== expectedArch) process.exit(3);
           process.stdout.write(`${JSON.stringify(doc, null, 2)}\n`);
           NODE
-          nm -u ccm/apps/cli/.native-build/runtime-invoke-helper \
-            >"${EVIDENCE}/runtime-helper-symbols.log"
-          if grep -Eq '_fexecve|_execveat' "${EVIDENCE}/runtime-helper-symbols.log"; then
-            printf '%s\n' 'Darwin helper imports a forbidden descriptor-exec symbol' >&2
-            exit 1
+            nm -u ccm/apps/cli/.native-build/runtime-invoke-helper \
+              >"${EVIDENCE}/runtime-helper-symbols.log"
+            if grep -Eq '_fexecve|_execveat' "${EVIDENCE}/runtime-helper-symbols.log"; then
+              printf '%s\n' 'Darwin helper imports a forbidden descriptor-exec symbol' >&2
+              exit 1
+            fi
+            grep -Eq '[[:space:]]_execve$' "${EVIDENCE}/runtime-helper-symbols.log"
+            chmod 755 "${OUT}"
+            "${OUT}" --version >"${EVIDENCE}/sea-version.log" 2>&1
+            codesign --verify --strict --verbose=4 "${OUT}" >"${EVIDENCE}/codesign-verify.log" 2>&1
+            codesign -dvvv "${OUT}" >"${EVIDENCE}/codesign-display.log" 2>&1
+            otool -L "${OUT}" >"${EVIDENCE}/otool.log" 2>&1
+            if grep -Eq '/opt/homebrew|/usr/local/(opt|Cellar)|libnode' "${EVIDENCE}/otool.log"; then
+              printf '%s\n' 'non-system dynamic dependency found' >&2
+              exit 1
+            fi
+            (
+              cd "$(dirname "${OUT}")"
+              shasum -a 256 "${ASSET}" >"${ASSET}.sha256"
+              shasum -a 256 -c "${ASSET}.sha256"
+            ) >"${EVIDENCE}/checksum.log" 2>&1
+          ) 2>&1 | tee "${EVIDENCE}/build-attestation.log"
+          pipeline_status=("${PIPESTATUS[@]}")
+          build_exit_code="${pipeline_status[0]}"
+          tee_exit_code="${pipeline_status[1]}"
+          if [ "${build_exit_code}" -eq 0 ] && [ "${tee_exit_code}" -ne 0 ]; then
+            build_exit_code="${tee_exit_code}"
           fi
-          grep -Eq '[[:space:]]_execve$' "${EVIDENCE}/runtime-helper-symbols.log"
-          chmod 755 "${OUT}"
-          "${OUT}" --version >"${EVIDENCE}/sea-version.log" 2>&1
-          codesign --verify --strict --verbose=4 "${OUT}" >"${EVIDENCE}/codesign-verify.log" 2>&1
-          codesign -dvvv "${OUT}" >"${EVIDENCE}/codesign-display.log" 2>&1
-          otool -L "${OUT}" >"${EVIDENCE}/otool.log" 2>&1
-          if grep -Eq '/opt/homebrew|/usr/local/(opt|Cellar)|libnode' "${EVIDENCE}/otool.log"; then
-            printf '%s\n' 'non-system dynamic dependency found' >&2
-            exit 1
-          fi
-          (
-            cd "$(dirname "${OUT}")"
-            shasum -a 256 "${ASSET}" >"${ASSET}.sha256"
-            shasum -a 256 -c "${ASSET}.sha256"
-          ) >"${EVIDENCE}/checksum.log" 2>&1
+          set -e
+          printf '{"schema":"ccm/macos-build-result/v1","exit_code":%s,"tee_exit_code":%s}\n' \
+            "${build_exit_code}" "${tee_exit_code}" >"${EVIDENCE}/build-result.json"
+          printf 'exit_code=%s\n' "${build_exit_code}" >>"${GITHUB_OUTPUT}"
+          exit 0
       - name: Upload non-release SEA evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: macos-sea-${{ matrix.contract }}
@@ -140,6 +157,21 @@ jobs:
             ${{ runner.temp }}/macos-sea/build-evidence
           if-no-files-found: error
           retention-days: 14
+      - name: Enforce build verdict
+        if: always()
+        shell: bash
+        env:
+          BUILD_EXIT_CODE: ${{ steps.build.outputs.exit_code }}
+        run: |
+          set -euo pipefail
+          if ! [[ "${BUILD_EXIT_CODE}" =~ ^[0-9]+$ ]] || [ "${BUILD_EXIT_CODE}" -gt 255 ]; then
+            printf '%s\n' 'build attestation did not report a valid exit code; inspect the uploaded evidence' >&2
+            exit 1
+          fi
+          if [ "${BUILD_EXIT_CODE}" -ne 0 ]; then
+            printf 'build attestation exited %s; inspect the uploaded evidence\n' "${BUILD_EXIT_CODE}" >&2
+            exit "${BUILD_EXIT_CODE}"
+          fi
 
   qualify:
     name: qualify / ${{ matrix.contract }}
