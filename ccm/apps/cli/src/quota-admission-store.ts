@@ -1939,11 +1939,31 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
       return rejectPreflight('ADMISSION_COMMIT_MISSING_OR_INVALID');
     }
     const aggregationKey = found.aggregationKeys[0] as string;
+    const current = found.reservation;
+    const authoritySourceKey = hash(sourceKey);
+    if (current.authority_source_key !== authoritySourceKey) {
+      return rejectPreflight('ADMISSION_COMMIT_MISSING_OR_INVALID');
+    }
     const requiredBuckets = hardWindowBuckets.filter(
       (bucket) => bucket.aggregation_key === aggregationKey,
     );
     if (requiredBuckets.length !== 1) {
       return rejectPreflight('QUOTA_AGGREGATION_MISMATCH');
+    }
+    const requiredBucket = requiredBuckets[0] as Data;
+    const remaining =
+      numeric(policy.hard_ceiling_used_pct) -
+      numeric(requiredBucket.used_pct) -
+      numeric(requiredBucket.safety_margin_pct);
+    const currentAuthorityDigest = quotaAuthorityDigest({
+      sourceKey: authoritySourceKey,
+      observation,
+      validated,
+      aggregationKeys: [aggregationKey],
+      capacityByAggregation: { [aggregationKey]: remaining > 0 ? remaining : 0 },
+    });
+    if (current.authority_digest !== currentAuthorityDigest) {
+      return rejectPreflight('ADMISSION_COMMIT_MISSING_OR_INVALID');
     }
     const buckets: Data[] = [];
     for (const bucket of requiredBuckets) {
@@ -1956,7 +1976,6 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
       });
     }
     const headroom = deriveQuotaHeadroom({ policy, buckets }) as Data;
-    const current = found.reservation;
     const ticket = object(current.ticket);
     const ticketDigest = digest(ticket);
     if (

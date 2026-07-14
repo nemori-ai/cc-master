@@ -190,6 +190,102 @@ async function publishAuthority(
   });
 }
 
+const r3AuthorityNowMs = Date.parse('2026-07-14T00:00:00.000Z');
+const r3AuthorityRevision = `sha256:${'a'.repeat(64)}`;
+const r3IdentityFingerprint = `sha256:${'b'.repeat(64)}`;
+const r3AggregationKey = 'shared|identity-A|pool-A|quota';
+
+function r3AuthorityObservation(
+  provider: string,
+  providerRule: string,
+  windowName: string,
+  windowDuration: number,
+  usedPct: number,
+  hardCeilingUsedPct: number,
+): Data {
+  return {
+    schema: 'ccm/quota-authority-observation/v1',
+    provider,
+    provider_rule_revision: providerRule,
+    source_revision: r3AuthorityRevision,
+    observed_at: '2026-07-13T23:59:59.000Z',
+    valid_until: '2026-07-14T00:05:00.000Z',
+    source_profile: {
+      schema: 'ccm/quota-source-profile/v1',
+      revision: 'ccm/reviewer-r3/v1',
+      fresh_ttl_sec: 60,
+      hard_ttl_sec: 300,
+      max_clock_skew_sec: 5,
+    },
+    identity: 'identity-A',
+    identity_fingerprint: r3IdentityFingerprint,
+    account_id: 'identity-A',
+    pool_id: 'pool-A',
+    hard_window: { name: windowName, duration_sec: windowDuration },
+    policy: {
+      decision: 'allow',
+      revision: providerRule,
+      hard_ceiling_used_pct: hardCeilingUsedPct,
+    },
+    effects: { decision: 'allow', effect: 'read-only' },
+    buckets: [
+      {
+        id: `${windowName}:${r3AggregationKey}`,
+        window: windowName,
+        duration_sec: windowDuration,
+        freshness: 'fresh',
+        used_pct: usedPct,
+        safety_margin_pct: 5,
+        projected_p80_pct: 4,
+        aggregation_key: r3AggregationKey,
+      },
+    ],
+  };
+}
+
+async function r3CommittedAuthority(prefix: string): Promise<AuthorityStore> {
+  const store = authorityStore(home(prefix), undefined, () => new Date(r3AuthorityNowMs));
+  await store.publishObservation({
+    source_key: 'source-A',
+    observation: r3AuthorityObservation(
+      'codex',
+      'ccm/codex-7d-pacing/v1',
+      'seven_day',
+      604_800,
+      20,
+      85,
+    ),
+  });
+  const expiresAt = '2026-07-14T00:02:00.000Z';
+  const held = await store.reserve(
+    reservation({
+      source_key: 'source-A',
+      aggregation_key: r3AggregationKey,
+      capacity_pct: 60,
+      checked_at: '2026-07-14T00:00:00.000Z',
+      expires_at: expiresAt,
+      source_revision: r3AuthorityRevision,
+      identity_fingerprint: r3IdentityFingerprint,
+    }),
+  );
+  assert.equal(held.action, 'created');
+  const committed = await store.commitReservation({
+    reservation_id: 'qres-1',
+    checked_at: '2026-07-14T00:00:00.000Z',
+    ticket: ticket({
+      reservation_request_hash: held.request_hash,
+      reservation_expires_at: expiresAt,
+      aggregation_key: r3AggregationKey,
+      live_source_revision: r3AuthorityRevision,
+      identity_fingerprint: r3IdentityFingerprint,
+      issued_at: '2026-07-13T23:59:59.000Z',
+      launch_by: '2026-07-14T00:01:00.000Z',
+    }),
+  });
+  assert.equal(committed.action, 'committed');
+  return store;
+}
+
 async function seededSingleAuthority(prefix: string): Promise<{
   quotaHome: string;
   store: AuthorityStore;
@@ -1108,6 +1204,56 @@ test('final review P1-3: provider-neutral hard window reaches production reserve
   assert.equal(result.hard_window, 'thirty_day');
   assert.equal(result.provider_rule_revision, 'acme/thirty-day/v1');
   assert.deepEqual(result.ignored_windows, []);
+});
+
+test('reviewer R3 P1: preflight rejects a cross-source authority rebind', async () => {
+  const store = await r3CommittedAuthority('ccm-quota-r3-cross-source-');
+  await store.publishObservation({
+    source_key: 'source-B',
+    observation: r3AuthorityObservation(
+      'future-provider',
+      'future-provider/thirty-day/v1',
+      'thirty_day',
+      2_592_000,
+      0,
+      95,
+    ),
+  });
+
+  const preflight = await store.preflight({
+    source_key: 'source-B',
+    reservation_id: 'qres-1',
+    checked_at: '2026-07-14T00:00:00.000Z',
+  });
+  assert.equal(preflight.decision, 'reject');
+  assert.equal(preflight.automatic_spawn_limit, 0);
+  assert.deepEqual(preflight.blocking_reasons, ['ADMISSION_COMMIT_MISSING_OR_INVALID']);
+  assert.equal((await store.inspectAggregation(r3AggregationKey)).active_reserved_pct, 4);
+});
+
+test('reviewer R3 P1: preflight rejects same-source same-revision authority rewrite', async () => {
+  const store = await r3CommittedAuthority('ccm-quota-r3-same-source-rewrite-');
+  await store.publishObservation({
+    source_key: 'source-A',
+    observation: r3AuthorityObservation(
+      'codex',
+      'ccm/codex-7d-pacing/v1',
+      'seven_day',
+      604_800,
+      0,
+      85,
+    ),
+  });
+
+  const preflight = await store.preflight({
+    source_key: 'source-A',
+    reservation_id: 'qres-1',
+    checked_at: '2026-07-14T00:00:00.000Z',
+  });
+  assert.equal(preflight.decision, 'reject');
+  assert.equal(preflight.automatic_spawn_limit, 0);
+  assert.deepEqual(preflight.blocking_reasons, ['ADMISSION_COMMIT_MISSING_OR_INVALID']);
+  assert.equal((await store.inspectAggregation(r3AggregationKey)).active_reserved_pct, 4);
 });
 
 test('reviewer P2-1: managed lock owner includes boot and process-start identity', async () => {
