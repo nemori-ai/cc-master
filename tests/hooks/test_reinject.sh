@@ -7,9 +7,10 @@ run_ss() {
   HOOK_OUT="$(CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
              node "$PLUGIN_ROOT/hooks/scripts/reinject.js" </dev/null 2>/dev/null)"; HOOK_RC=$?
 }
-# run_ss_with_ccm HOME CCM — pin the Goal Contract transport for semantic-vs-transport cases.
+# run_ss_with_ccm HOME CCM [VERDICT [EXIT]] — pin the Goal Contract transport for classifier cases.
 run_ss_with_ccm() {
   HOOK_OUT="$(CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" CCM_BIN="$2" \
+             CCM_GOAL_TEST_VERDICT="${3:-}" CCM_GOAL_TEST_EXIT="${4:-0}" \
              node "$PLUGIN_ROOT/hooks/scripts/reinject.js" </dev/null 2>/dev/null)"; HOOK_RC=$?
 }
 # run_ss_sid HOME SID — run reinject with stdin JSON carrying session_id=SID (SessionStart-shaped).
@@ -80,6 +81,26 @@ mkactive "$H" "contract-missing" '{"schema":"cc-master/v2","goal":"BROKEN CONFIR
 run_ss_with_ccm "$H" "${CCM_BIN:-$REPO_ROOT/ccm/apps/cli/dev-bin/ccm}"
 assert_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "determined missing Brief remains a hard block"
 assert_contains "$HOOK_OUT" "verdict=missing_brief" "semantic failure preserves the ccm verdict despite non-zero exit"
+rm -rf "$H"
+
+# A parseable JSON envelope with a future/corrupt verdict is schema-invalid transport, not a
+# determined integrity verdict. Pin the allowlist boundary and keep all frozen failure verdicts hard.
+H="$(make_project)"
+GOAL_STUB="$H/goal-check-stub"
+printf '%s\n' '#!/usr/bin/env node' \
+  'process.stdout.write(JSON.stringify({ok:true,data:{schema:"ccm/goal-check/v1",verdict:process.env.CCM_GOAL_TEST_VERDICT}}));' \
+  'process.exit(Number(process.env.CCM_GOAL_TEST_EXIT || 0));' >"$GOAL_STUB"
+chmod +x "$GOAL_STUB"
+mkactive "$H" "contract-near-miss" '{"schema":"cc-master/v2","goal":"VALID CONFIRMED GOAL","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"confirmed","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true},"tasks":[{"id":"T1","status":"stale","deps":[]}]}'
+run_ss_with_ccm "$H" "$GOAL_STUB" "future_or_corrupt_value" 0
+assert_contains "$HOOK_OUT" "STRONG ADVISORY" "unknown parseable verdict degrades to strong advisory"
+assert_not_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "unknown parseable verdict is not semantic evidence"
+assert_contains "$HOOK_OUT" "unresolved node(s)" "unknown parseable verdict preserves local gates"
+for VERDICT in missing_brief hash_mismatch malformed; do
+  run_ss_with_ccm "$H" "$GOAL_STUB" "$VERDICT" 3
+  assert_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "known $VERDICT verdict remains a hard block"
+  assert_contains "$HOOK_OUT" "verdict=$VERDICT" "known $VERDICT verdict survives non-zero exit"
+done
 rm -rf "$H"
 
 # Case B2: an active board with zero tasks → hard stop before ordinary progress.

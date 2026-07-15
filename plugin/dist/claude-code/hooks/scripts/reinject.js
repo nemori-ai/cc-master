@@ -37,7 +37,7 @@ function goalCheck(boardPath, homeDir) {
     });
     if (!result || result.error || result.signal) return { verdict: 'check_unavailable' };
     const parsed = JSON.parse(result.stdout || '{}');
-    return parsed && parsed.data && typeof parsed.data.verdict === 'string'
+    return parsed && parsed.data && ['legacy', 'pending', 'ok', 'malformed', 'missing_brief', 'hash_mismatch'].includes(parsed.data.verdict)
       ? parsed.data
       : { verdict: 'check_unavailable' };
   } catch (_) {

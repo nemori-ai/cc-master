@@ -18,7 +18,8 @@ run_session_start() {
 run_session_start_from() {
   HOOK_OUT="$(
     printf '{"session_id":"%s","hook_event_name":"SessionStart","source":"startup"}' "$2" |
-      CC_MASTER_HOME="$1" CCM_BIN="$3" node "$4" --event SessionStart --core "$5" 2>/dev/null
+      CC_MASTER_HOME="$1" CCM_BIN="$3" CCM_GOAL_TEST_VERDICT="${6:-}" CCM_GOAL_TEST_EXIT="${7:-0}" \
+        node "$4" --event SessionStart --core "$5" 2>/dev/null
   )"
   HOOK_RC=$?
 }
@@ -79,6 +80,34 @@ mkactive "$H" "contract-missing" '{"schema":"cc-master/v2","goal":"BROKEN CONFIR
 run_session_start_from "$H" "sess-missing" "${CCM_BIN:-$REPO_ROOT/ccm/apps/cli/dev-bin/ccm}" "$LAUNCHER" "$CORE"
 assert_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "determined missing Brief remains a hard block"
 assert_contains "$HOOK_OUT" "verdict=missing_brief" "semantic failure preserves the ccm verdict despite non-zero exit"
+rm -rf "$H"
+
+# A parseable but schema-invalid future verdict must degrade on both source and installed Codex;
+# the frozen determined integrity verdicts stay hard even when the CLI exits non-zero.
+H="$(make_project)"
+GOAL_STUB="$H/goal-check-stub"
+printf '%s\n' '#!/usr/bin/env node' \
+  'process.stdout.write(JSON.stringify({ok:true,data:{schema:"ccm/goal-check/v1",verdict:process.env.CCM_GOAL_TEST_VERDICT}}));' \
+  'process.exit(Number(process.env.CCM_GOAL_TEST_EXIT || 0));' >"$GOAL_STUB"
+chmod +x "$GOAL_STUB"
+for SURFACE in source dist; do
+  mkactive "$H" "contract-near-miss-$SURFACE" "{\"schema\":\"cc-master/v2\",\"goal\":\"VALID CONFIRMED GOAL\",\"goal_contract\":{\"schema\":\"ccm/goal-contract/v1\",\"revision\":1,\"assurance\":\"confirmed\",\"updated_at\":\"2026-07-15T00:00:00Z\"},\"owner\":{\"active\":true,\"session_id\":\"sess-near-$SURFACE\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"stale\",\"deps\":[]}]}"
+  if [ "$SURFACE" = source ]; then
+    SURFACE_LAUNCHER="$LAUNCHER"; SURFACE_CORE="$CORE"
+  else
+    SURFACE_LAUNCHER="$DIST_LAUNCHER"; SURFACE_CORE="$DIST_CORE"
+  fi
+  run_session_start_from "$H" "sess-near-$SURFACE" "$GOAL_STUB" "$SURFACE_LAUNCHER" "$SURFACE_CORE" "future_or_corrupt_value" 0
+  assert_contains "$HOOK_OUT" "STRONG ADVISORY" "$SURFACE Codex unknown verdict degrades to strong advisory"
+  assert_not_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "$SURFACE Codex unknown verdict is not semantic evidence"
+  assert_contains "$HOOK_OUT" "unresolved node(s)" "$SURFACE Codex unknown verdict preserves local gates"
+  for VERDICT in missing_brief hash_mismatch malformed; do
+    run_session_start_from "$H" "sess-near-$SURFACE" "$GOAL_STUB" "$SURFACE_LAUNCHER" "$SURFACE_CORE" "$VERDICT" 3
+    assert_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "$SURFACE Codex known $VERDICT remains hard"
+    assert_contains "$HOOK_OUT" "verdict=$VERDICT" "$SURFACE Codex known $VERDICT survives non-zero exit"
+  done
+  rm -f "$H/boards/contract-near-miss-$SURFACE.board.json"
+done
 rm -rf "$H"
 
 # Matching empty board: SessionStart must force DAG creation before work.
