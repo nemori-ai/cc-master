@@ -79,3 +79,20 @@ P2 的实际动作：
 
 GREEN 复测必须同时满足：选择仍 4/4 正确；P1/P2 使用真实专属命令；不再把 revision/Brief 权威散落到 jc/task notes；能说明 legacy/pending/confirmed 与 amendment 后任务重审。
 
+## 5. GREEN 独立端点复测
+
+评委：Codex CLI 0.144.4，`gpt-5.6-sol`，read-only；只以当前 canonical entry skill、Goal Contract reference、using-ccm command catalog 与三个 lifecycle hook CONTRACT 为证据。
+
+首轮 GREEN 回归没有静默放行：S1（raw request → framing → DAG）、S2（拒绝“顺手重构支付”）、S3（范围/权限变化 → amend + 新 revision + 旧 Brief 保留 + tasks 重审）均通过；S4 被判失败，因为当时 `in-scope` 行只说“更新 task / acceptance，revision 不变”，没有写死“不改变成功状态的域内新事实必须进 finding log”。评委给出的唯一 gap 是：
+
+> “缺少规范性条款：不改变outcome/goal acceptance/non-goals/authority的域内新事实必须使用ccm log add --kind finding记录，且不得借机改写Goal Contract或成功状态。”
+
+按此只补一个窄 delta：canonical Goal Delta Classifier 的 `in-scope` 动作改为使用真实命令 `ccm log add "<fact>" --board <board> --kind finding --detail "<evidence>"`，必要时只更新 task 执行细节，revision 不变，不改写 Goal Contract 或成功状态；content contract 同步锁定。
+
+同一独立端点重跑后判决 `PASS`，S1–S4 全绿、`gaps: []`。代表性证据：
+
+> “raw request/issue 限定为 source evidence，要求先完成 Goal Framing Test、goal set/check，且只有 check 通过后才可拆 DAG。”
+
+> “现已明确要求域内且不改变成功状态的新事实用 ccm log add ... --kind finding --detail ... 记录，同时 revision 不变且不得改写 Goal Contract 或成功状态。”
+
+裁决：GREEN 满足预注册语义判断与持久化路径；评委未发现命令虚构、权威散落、revision/Brief 覆盖、resume 跳过 integrity check 或不可逆权限自授权。
