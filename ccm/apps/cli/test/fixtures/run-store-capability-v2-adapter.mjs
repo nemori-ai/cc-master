@@ -11,14 +11,33 @@ function mutation(operation) {
   return operation.kind !== 'read-file' && operation.kind !== 'list-directory';
 }
 
-function snapshot(observeDurability) {
+function snapshot(observeDurability, operation) {
   if (typeof observeDurability !== 'function') return null;
-  const value = observeDurability();
+  const value = observeDurability(operation);
   return {
     writes: value?.writes ?? 0,
     fileSyncs: value?.fileSyncs ?? 0,
     directorySyncs: value?.directorySyncs ?? 0,
+    targetIdentity: value?.targetIdentity ?? null,
+    parentDirectoryIdentity: value?.parentDirectoryIdentity ?? null,
+    targetWrites: value?.targetWrites ?? 0,
+    targetFileSyncs: value?.targetFileSyncs ?? 0,
+    parentDirectorySyncs: value?.parentDirectorySyncs ?? 0,
   };
+}
+
+function targetEvidenceAdvanced(before, after, countKey, identityKey) {
+  if (before === null || after === null || after[identityKey] === null) return false;
+  const baseline = before[identityKey] === after[identityKey] ? before[countKey] : 0;
+  return after[countKey] > baseline;
+}
+
+function writeObserved(before, after) {
+  if (before === null || after === null) return false;
+  return (
+    after.writes > before.writes ||
+    targetEvidenceAdvanced(before, after, 'targetWrites', 'targetIdentity')
+  );
 }
 
 function validateCommittedEvidence(operation, execution, before, after) {
@@ -26,9 +45,9 @@ function validateCommittedEvidence(operation, execution, before, after) {
   if (
     before === null ||
     after === null ||
-    after.writes <= before.writes ||
-    after.fileSyncs <= before.fileSyncs ||
-    after.directorySyncs <= before.directorySyncs
+    !targetEvidenceAdvanced(before, after, 'targetWrites', 'targetIdentity') ||
+    !targetEvidenceAdvanced(before, after, 'targetFileSyncs', 'targetIdentity') ||
+    !targetEvidenceAdvanced(before, after, 'parentDirectorySyncs', 'parentDirectoryIdentity')
   ) {
     throw bindRunStoreErrorV2(
       new Error('committed mutation lacks observed write, file sync, or directory sync'),
@@ -77,23 +96,32 @@ export async function executeViaRunStoreCapabilityV2({
   const executions = [];
   for (const operation of operations) {
     capabilityInvocations += 1;
-    const before = snapshot(observeDurability);
+    const before = snapshot(observeDurability, operation);
     try {
       const execution = validateExecutionV2(
         await capability.execute(operation),
         authority.authority_id,
         operation,
       );
-      validateCommittedEvidence(operation, execution, before, snapshot(observeDurability));
+      validateCommittedEvidence(
+        operation,
+        execution,
+        before,
+        snapshot(observeDurability, operation),
+      );
       if (mutation(operation) && typeof observeMutation === 'function') {
         await observeMutation(operation, execution);
       }
       executions.push(execution);
     } catch (error) {
+      const publicationObserved = mutation(operation)
+        ? writeObserved(before, snapshot(observeDurability, operation))
+        : false;
       throw bindRunStoreErrorV2(error, authority.authority_id, operation, {
         effect: mutation(operation) ? 'unknown' : 'none',
         retry:
           error?.effect === 'none' ? 'never' : mutation(operation) ? 'reconcile-first' : 'never',
+        overrideClassification: publicationObserved,
       });
     }
   }

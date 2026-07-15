@@ -46,8 +46,10 @@ type ScenarioMode =
   | 'forged-before-revision'
   | 'forged-append-receipt'
   | 'no-write-synced-receipt'
+  | 'wrong-target-sync'
   | 'post-publication-failure'
   | 'partial-append'
+  | 'wrong-append-prefix'
   | 'missing-durability'
   | 'unsafe-durability'
   | 'adapter-bypass';
@@ -487,6 +489,31 @@ test('forged append revision and byte length are rejected', { skip: !posix }, as
   } finally {
     outcome.cleanup();
   }
+
+  const expectedPrefix = createCcmjFrame(Buffer.from('{"seq":0}', 'utf8'));
+  const actualPrefix = createCcmjFrame(Buffer.from('{"seq":9}', 'utf8'));
+  assert.equal(actualPrefix.length, expectedPrefix.length);
+  const frame = createCcmjFrame(Buffer.from('{"seq":1}', 'utf8'));
+  const wrongPrefix = await runScenario(
+    'wrong-append-prefix',
+    [
+      {
+        ...appendOperation('wrong-append-prefix', frame),
+        expected_revision: sha256V2(expectedPrefix),
+        expected_byte_length: expectedPrefix.length,
+      },
+    ],
+    (store) => {
+      mkdirSync(join(store, 'by-run', 'run-a'), { recursive: true, mode: 0o700 });
+      writeFileSync(join(store, 'by-run', 'run-a', 'journal.ccmj'), actualPrefix, { mode: 0o600 });
+    },
+  );
+  try {
+    assertScenarioError(wrongPrefix, 'RUN_STORE_COMMITTED_OBSERVATION');
+    assertBoundError(wrongPrefix, 'wrong-append-prefix', 'unknown', 'reconcile-first');
+  } finally {
+    wrongPrefix.cleanup();
+  }
 });
 
 test('a synced receipt without observed write and sync calls is rejected', {
@@ -505,6 +532,20 @@ test('a synced receipt without observed write and sync calls is rejected', {
   } finally {
     outcome.cleanup();
   }
+
+  const wrongTarget = await runScenario('wrong-target-sync', [
+    createOperation(
+      'wrong-target-sync',
+      ['by-run', 'run-a', 'lease', 'hello.json'],
+      Buffer.from('target-was-not-synced'),
+    ),
+  ]);
+  try {
+    assertScenarioError(wrongTarget, 'RUN_STORE_RECEIPT_DURABILITY');
+    assertBoundError(wrongTarget, 'wrong-target-sync', 'unknown', 'reconcile-first');
+  } finally {
+    wrongTarget.cleanup();
+  }
 });
 
 test('post-publication failure is bound and conservatively requires reconciliation', {
@@ -517,7 +558,7 @@ test('post-publication failure is bound and conservatively requires reconciliati
   );
   const outcome = await runScenario('post-publication-failure', [operation]);
   try {
-    assertScenarioError(outcome, 'RUN_STORE_ORACLE_UNTYPED');
+    assertScenarioError(outcome, 'RUN_STORE_FALSE_SAFE');
     assertBoundError(outcome, 'post-publication', 'unknown', 'reconcile-first');
     assert.equal(
       readFileSync(join(outcome.pinnedStore, 'by-run', 'run-a', 'lease', 'hello.json'), 'utf8'),

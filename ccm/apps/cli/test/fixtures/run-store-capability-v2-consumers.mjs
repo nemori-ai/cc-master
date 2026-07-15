@@ -358,6 +358,24 @@ export function consumeNoWriteSyncedReceiptCounterfeitV2({ env, cwdStat }) {
   });
 }
 
+export function consumeWrongTargetSyncCounterfeitV2({ env, cwdStat }) {
+  const authority = decodeAndValidateAuthorityV2({ env, cwdStat });
+  return capability(authority, (rawOperation) => {
+    const operation = validateOperationV2(rawOperation, authority.grant);
+    const desired = Buffer.from(operation.bytes_base64, 'base64');
+    const parent = ensureParent(operation.segments);
+    writeFileSync(join(...operation.segments), desired, { flag: 'wx', mode: 0o600 });
+    writeFileSync(join(parent, 'unrelated-sync-target'), 'x', { flag: 'w', mode: 0o600 });
+    syncPath(join(parent, 'unrelated-sync-target'));
+    syncPath(parent);
+    return createMutationReceiptV2(authority.authority_id, operation, {
+      beforeRevision: 'absent',
+      afterRevision: sha256V2(desired),
+      byteLength: desired.length,
+    });
+  });
+}
+
 export function consumePostPublicationFailureCounterfeitV2({ env, cwdStat }) {
   const authority = decodeAndValidateAuthorityV2({ env, cwdStat });
   return capability(authority, (rawOperation) => {
@@ -367,7 +385,27 @@ export function consumePostPublicationFailureCounterfeitV2({ env, cwdStat }) {
       flag: 'w',
       mode: 0o600,
     });
-    throw new Error('counterfeit failure after target publication started');
+    throw oracleErrorV2(
+      'RUN_STORE_FALSE_SAFE',
+      'counterfeit failure after target publication started',
+      { effect: 'none', retry: 'never' },
+    );
+  });
+}
+
+export function consumeWrongAppendPrefixCounterfeitV2({ env, cwdStat }) {
+  const authority = decodeAndValidateAuthorityV2({ env, cwdStat });
+  return capability(authority, (rawOperation) => {
+    const operation = validateOperationV2(rawOperation, authority.grant);
+    const current = readRegular(operation.segments, operation.max_file_bytes) ?? Buffer.alloc(0);
+    const frame = Buffer.from(operation.frame_base64, 'base64');
+    const desired = Buffer.concat([current, frame]);
+    writeAtomic(join(...operation.segments), desired);
+    return createMutationReceiptV2(authority.authority_id, operation, {
+      beforeRevision: operation.expected_revision,
+      afterRevision: sha256V2(desired),
+      byteLength: desired.length,
+    });
   });
 }
 

@@ -98,6 +98,7 @@ export function bindRunStoreErrorV2(
     effect?: 'none' | 'unknown';
     retry?: 'safe-same-operation' | 'reconcile-first' | 'never';
     code?: string;
+    overrideClassification?: boolean;
   },
 ): Error & {
   code: string;

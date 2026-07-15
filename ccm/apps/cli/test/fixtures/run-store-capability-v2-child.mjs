@@ -12,28 +12,97 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const productionModule = join(here, '..', '..', 'src', 'run-store-capability-v2.ts');
 
-const durabilityEvidence = { writes: 0, fileSyncs: 0, directorySyncs: 0 };
+const durabilityEvidence = {
+  writes: 0,
+  fileSyncs: 0,
+  directorySyncs: 0,
+  writesByIdentity: new Map(),
+  fileSyncsByIdentity: new Map(),
+  directorySyncsByIdentity: new Map(),
+};
 const originalWriteFileSync = fs.writeFileSync;
 const originalWriteSync = fs.writeSync;
 const originalFsyncSync = fs.fsyncSync;
+const originalFstatSync = fs.fstatSync;
+const originalLstatSync = fs.lstatSync;
+
+function objectIdentity(stat) {
+  return `${String(stat.dev)}:${String(stat.ino)}`;
+}
+
+function bump(map, identity) {
+  map.set(identity, (map.get(identity) ?? 0) + 1);
+}
+
+function identityForWriteTarget(target) {
+  try {
+    return objectIdentity(
+      typeof target === 'number' ? originalFstatSync(target) : originalLstatSync(target),
+    );
+  } catch {
+    return null;
+  }
+}
+
+function count(map, identity) {
+  return identity === null ? 0 : (map.get(identity) ?? 0);
+}
 
 fs.writeFileSync = (...args) => {
   const result = originalWriteFileSync(...args);
   durabilityEvidence.writes += 1;
+  const identity = identityForWriteTarget(args[0]);
+  if (identity !== null) bump(durabilityEvidence.writesByIdentity, identity);
   return result;
 };
 fs.writeSync = (...args) => {
   const result = originalWriteSync(...args);
   durabilityEvidence.writes += 1;
+  const identity = identityForWriteTarget(args[0]);
+  if (identity !== null) bump(durabilityEvidence.writesByIdentity, identity);
   return result;
 };
 fs.fsyncSync = (fd) => {
+  const stat = originalFstatSync(fd);
   const result = originalFsyncSync(fd);
-  if (fs.fstatSync(fd).isDirectory()) durabilityEvidence.directorySyncs += 1;
-  else durabilityEvidence.fileSyncs += 1;
+  const identity = objectIdentity(stat);
+  if (stat.isDirectory()) {
+    durabilityEvidence.directorySyncs += 1;
+    bump(durabilityEvidence.directorySyncsByIdentity, identity);
+  } else {
+    durabilityEvidence.fileSyncs += 1;
+    bump(durabilityEvidence.fileSyncsByIdentity, identity);
+  }
   return result;
 };
 syncBuiltinESMExports();
+
+function identityAt(path) {
+  try {
+    return objectIdentity(originalLstatSync(path));
+  } catch {
+    return null;
+  }
+}
+
+function observeDurability(operation) {
+  const target = join(...operation.segments);
+  const targetIdentity = identityAt(target);
+  const parentDirectoryIdentity = identityAt(dirname(target));
+  return {
+    writes: durabilityEvidence.writes,
+    fileSyncs: durabilityEvidence.fileSyncs,
+    directorySyncs: durabilityEvidence.directorySyncs,
+    targetIdentity,
+    parentDirectoryIdentity,
+    targetWrites: count(durabilityEvidence.writesByIdentity, targetIdentity),
+    targetFileSyncs: count(durabilityEvidence.fileSyncsByIdentity, targetIdentity),
+    parentDirectorySyncs: count(
+      durabilityEvidence.directorySyncsByIdentity,
+      parentDirectoryIdentity,
+    ),
+  };
+}
 
 let fixtureConsumers;
 
@@ -77,10 +146,16 @@ async function consumerFor(mode) {
   if (mode === 'no-write-synced-receipt') {
     return fixtures.consumeNoWriteSyncedReceiptCounterfeitV2;
   }
+  if (mode === 'wrong-target-sync') {
+    return fixtures.consumeWrongTargetSyncCounterfeitV2;
+  }
   if (mode === 'post-publication-failure') {
     return fixtures.consumePostPublicationFailureCounterfeitV2;
   }
   if (mode === 'partial-append') return fixtures.consumePartialAppendCounterfeitV2;
+  if (mode === 'wrong-append-prefix') {
+    return fixtures.consumeWrongAppendPrefixCounterfeitV2;
+  }
   if (mode === 'missing-durability') return fixtures.consumeMissingDurabilityCounterfeitV2;
   if (mode === 'unsafe-durability') return fixtures.consumeUnsafeDurabilityCounterfeitV2;
   if (mode === 'production') return productionConsumer();
@@ -108,13 +183,16 @@ function observeMutation(operation, execution) {
   }
   if (operation.kind === 'append-ccmj-frame-cas') {
     const frame = Buffer.from(operation.frame_base64, 'base64');
+    const prefix = bytes.subarray(0, operation.expected_byte_length);
+    const prefixRevision = prefix.length === 0 ? 'absent' : sha256V2(prefix);
     if (
       bytes.length !== operation.expected_byte_length + frame.length ||
-      !bytes.subarray(-frame.length).equals(frame)
+      !bytes.subarray(-frame.length).equals(frame) ||
+      prefixRevision !== operation.expected_revision
     ) {
       throw oracleErrorV2(
         'RUN_STORE_COMMITTED_OBSERVATION',
-        'committed append does not contain the complete frame at the expected length',
+        'committed append does not bind the actual prefix revision and complete frame',
         { effect: 'unknown', retry: 'reconcile-first' },
       );
     }
@@ -158,7 +236,7 @@ process.on('message', async (message) => {
             env: process.env,
             cwdStat,
             rawOperations: message.operations,
-            observeDurability: () => ({ ...durabilityEvidence }),
+            observeDurability,
             observeMutation,
           });
     sendAndDisconnect({ type: 'run-store-v2-result', ...outcome });

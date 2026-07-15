@@ -107,15 +107,24 @@ export function bindRunStoreErrorV2(
   error,
   authorityId,
   operation,
-  { effect: defaultEffect = 'none', retry: defaultRetry = 'never', code: defaultCode } = {},
+  {
+    effect: defaultEffect = 'none',
+    retry: defaultRetry = 'never',
+    code: defaultCode,
+    overrideClassification = false,
+  } = {},
 ) {
   const effect =
-    error?.effect === 'none' || error?.effect === 'unknown' ? error.effect : defaultEffect;
-  const retry = ['safe-same-operation', 'reconcile-first', 'never'].includes(error?.retry)
-    ? error.retry
-    : effect === 'unknown'
-      ? 'reconcile-first'
-      : defaultRetry;
+    !overrideClassification && (error?.effect === 'none' || error?.effect === 'unknown')
+      ? error.effect
+      : defaultEffect;
+  const retry =
+    !overrideClassification &&
+    ['safe-same-operation', 'reconcile-first', 'never'].includes(error?.retry)
+      ? error.retry
+      : effect === 'unknown'
+        ? 'reconcile-first'
+        : defaultRetry;
   return oracleErrorV2(
     error?.code ?? defaultCode ?? 'RUN_STORE_ORACLE_UNTYPED',
     error instanceof Error ? error.message : String(error),

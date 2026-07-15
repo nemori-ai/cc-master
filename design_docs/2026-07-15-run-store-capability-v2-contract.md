@@ -154,8 +154,10 @@ final byte length, and exact durability proof:
 
 A committed receipt is returned only after final bytes match the after revision and both file and containing directory are
 synced. Newly created ancestor directories are mode 0700 and their publication is synced before success. Files are mode 0600.
-The executable oracle independently observes at least one successful write, regular-file sync and directory sync for every
-`committed` mutation, then rereads the pinned cwd target and checks mode, complete bytes, revision and length. An
+The executable oracle independently binds at least one successful write and regular-file sync to the inode currently named by
+the operation target, and a directory sync to the inode of that target's containing directory, for every `committed` mutation.
+It then rereads the pinned cwd target and checks mode, complete bytes, revision and length. For append, the independently read
+prefix bytes through `expected_byte_length` must hash to `expected_revision` before the requested frame suffix. An
 `already-committed` replay need not issue another write or sync. These observations are oracle instrumentation, not extra
 public filesystem operations or receipt fields.
 
@@ -169,7 +171,8 @@ Cross-process errors use an exact `ccm/run-store-error/v2` envelope with code, a
 target publication or append starts is `unknown/reconcile-first`; it is never silently relabeled safe.
 Once authority and an operation id are available, the adapter binds both into every error. An unclassified read/list error is
 non-mutating; an unclassified mutation error is conservatively `unknown/reconcile-first`. Explicit pre-effect conflicts may
-remain `none/never`.
+remain `none/never`. Once the observer sees any write during a failed mutation, the adapter's
+`unknown/reconcile-first` classification is authoritative over a consumer's self-declared `none/never`.
 
 ## 8. Counterexample-first promotion contract
 
@@ -180,7 +183,8 @@ The executable oracle must establish all of these before production work starts:
    that same arm executes all five operations plus cross-run/phase rejection, stale CAS, symlink rejection, receipt,
    write/sync evidence and pinned-target observations;
 3. V1, absolute/parent paths, symlink escape, unknown rename/remove, phase-forbidden operations, forged results, stale CAS,
-   partial append, missing/unsafe durability and adapter bypass are rejected;
+   wrong-prefix/partial append, wrong-target/missing/unsafe durability, post-publication false-safe errors and adapter bypass
+   are rejected;
 4. a correct future `consumeRunStoreCapabilityV2` export can satisfy the same oracle without changing it;
 5. Linux is exercised on a real filesystem; macOS is contract-qualified for the same Node primitives but requires its own
    later live run before runtime promotion;
