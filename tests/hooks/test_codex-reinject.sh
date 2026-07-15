@@ -3,6 +3,8 @@
 
 LAUNCHER="$REPO_ROOT/plugin/src/hooks/_hosts/codex/launcher.js"
 CORE="$REPO_ROOT/plugin/src/hooks/reinject/implementations/codex/reinject-core.js"
+DIST_LAUNCHER="$REPO_ROOT/plugin/dist/codex/hooks/_hosts/codex/launcher.js"
+DIST_CORE="$REPO_ROOT/plugin/dist/codex/hooks/reinject/implementations/codex/reinject-core.js"
 
 mkactive() {
   mkdir -p "$1/boards"
@@ -10,9 +12,13 @@ mkactive() {
 }
 
 run_session_start() {
+  run_session_start_from "$1" "$2" "${CCM_BIN:-ccm}" "$LAUNCHER" "$CORE"
+}
+
+run_session_start_from() {
   HOOK_OUT="$(
     printf '{"session_id":"%s","hook_event_name":"SessionStart","source":"startup"}' "$2" |
-      CC_MASTER_HOME="$1" node "$LAUNCHER" --event SessionStart --core "$CORE" 2>/dev/null
+      CC_MASTER_HOME="$1" CCM_BIN="$3" node "$4" --event SessionStart --core "$5" 2>/dev/null
   )"
   HOOK_RC=$?
 }
@@ -48,6 +54,31 @@ mkactive "$H" "contract" '{"schema":"cc-master/v2","goal":"REFINED GOAL","goal_c
 run_session_start "$H" "sess-contract"
 assert_contains "$HOOK_OUT" "r2 confirmed" "reinject names current goal revision and assurance"
 assert_contains "$HOOK_OUT" "ccm goal check" "reinject requires integrity check"
+rm -rf "$H"
+
+# Source and projected Codex adapters both treat Goal Contract transport failure as advisory, not
+# semantic evidence. The stale-task note proves other local gates continue to run.
+for SURFACE in source dist; do
+  H="$(make_project)"
+  mkactive "$H" "contract-unavailable-$SURFACE" "{\"schema\":\"cc-master/v2\",\"goal\":\"VALID CONFIRMED GOAL\",\"goal_contract\":{\"schema\":\"ccm/goal-contract/v1\",\"revision\":1,\"assurance\":\"confirmed\",\"updated_at\":\"2026-07-15T00:00:00Z\"},\"owner\":{\"active\":true,\"session_id\":\"sess-$SURFACE\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"stale\",\"deps\":[]}]}"
+  if [ "$SURFACE" = source ]; then
+    run_session_start_from "$H" "sess-$SURFACE" "$H/no-such-ccm" "$LAUNCHER" "$CORE"
+  else
+    run_session_start_from "$H" "sess-$SURFACE" "$H/no-such-ccm" "$DIST_LAUNCHER" "$DIST_CORE"
+  fi
+  assert_contains "$HOOK_OUT" "STRONG ADVISORY" "$SURFACE Codex transport failure is a strong advisory"
+  assert_contains "$HOOK_OUT" "Goal Contract integrity probe unavailable" "$SURFACE Codex advisory names the unavailable probe"
+  assert_not_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "$SURFACE Codex transport failure does not prohibit dispatch"
+  assert_contains "$HOOK_OUT" "unresolved node(s)" "$SURFACE Codex transport failure preserves local gates"
+  rm -rf "$H"
+done
+
+# A determined semantic failure remains a hard block even though ccm reports it with a non-zero exit.
+H="$(make_project)"
+mkactive "$H" "contract-missing" '{"schema":"cc-master/v2","goal":"BROKEN CONFIRMED GOAL","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"confirmed","brief":{"ref":"goals/contract-missing/r0001.goal.md","sha256":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true,"session_id":"sess-missing"},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_session_start_from "$H" "sess-missing" "${CCM_BIN:-$REPO_ROOT/ccm/apps/cli/dev-bin/ccm}" "$LAUNCHER" "$CORE"
+assert_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "determined missing Brief remains a hard block"
+assert_contains "$HOOK_OUT" "verdict=missing_brief" "semantic failure preserves the ccm verdict despite non-zero exit"
 rm -rf "$H"
 
 # Matching empty board: SessionStart must force DAG creation before work.

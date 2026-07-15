@@ -7,6 +7,11 @@ run_ss() {
   HOOK_OUT="$(CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
              node "$PLUGIN_ROOT/hooks/scripts/reinject.js" </dev/null 2>/dev/null)"; HOOK_RC=$?
 }
+# run_ss_with_ccm HOME CCM — pin the Goal Contract transport for semantic-vs-transport cases.
+run_ss_with_ccm() {
+  HOOK_OUT="$(CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" CCM_BIN="$2" \
+             node "$PLUGIN_ROOT/hooks/scripts/reinject.js" </dev/null 2>/dev/null)"; HOOK_RC=$?
+}
 # run_ss_sid HOME SID — run reinject with stdin JSON carrying session_id=SID (SessionStart-shaped).
 # Session-scoped armed gate: only THIS session's active board(s) re-anchor the role.
 run_ss_sid() {
@@ -56,6 +61,25 @@ mkactive "$H" "contract" '{"schema":"cc-master/v2","goal":"REFINED GOAL","goal_c
 run_ss "$H"
 assert_contains "$HOOK_OUT" "r2 confirmed" "reinject names current goal revision and assurance"
 assert_contains "$HOOK_OUT" "ccm goal check" "reinject requires integrity check"
+rm -rf "$H"
+
+# Goal Contract transport unavailable is not evidence of semantic corruption: warn strongly, keep
+# the local dangling-node gate, and do not turn the transport failure into a dispatch prohibition.
+H="$(make_project)"
+mkactive "$H" "contract-unavailable" '{"schema":"cc-master/v2","goal":"VALID CONFIRMED GOAL","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"confirmed","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true},"tasks":[{"id":"T1","status":"stale","deps":[]}]}'
+run_ss_with_ccm "$H" "$H/no-such-ccm"
+assert_contains "$HOOK_OUT" "STRONG ADVISORY" "transport failure is injected as a strong advisory"
+assert_contains "$HOOK_OUT" "Goal Contract integrity probe unavailable" "transport advisory names the unavailable integrity probe"
+assert_not_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "transport failure does not prohibit dispatch"
+assert_contains "$HOOK_OUT" "unresolved node(s)" "transport failure does not skip other local reinject gates"
+rm -rf "$H"
+
+# A determined semantic failure remains a hard block even though `ccm goal check` exits non-zero.
+H="$(make_project)"
+mkactive "$H" "contract-missing" '{"schema":"cc-master/v2","goal":"BROKEN CONFIRMED GOAL","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"confirmed","brief":{"ref":"goals/contract-missing/r0001.goal.md","sha256":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_ss_with_ccm "$H" "${CCM_BIN:-$REPO_ROOT/ccm/apps/cli/dev-bin/ccm}"
+assert_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "determined missing Brief remains a hard block"
+assert_contains "$HOOK_OUT" "verdict=missing_brief" "semantic failure preserves the ccm verdict despite non-zero exit"
 rm -rf "$H"
 
 # Case B2: an active board with zero tasks → hard stop before ordinary progress.

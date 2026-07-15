@@ -18,7 +18,9 @@ before new work is scheduled.
   recognizes its own board by goal.
 - `rule-reinject-goal-integrity`: for every Goal Contract board, run the bounded read-only
   `ccm goal check --board <path> --json --no-input`. Missing/tampered Briefs or malformed contracts
-  are named as a HARD STOP before dispatch. A `pending` empty board is a goal-framing stop: refine
+  are named as a HARD STOP before dispatch. A spawn/timeout/signal/malformed-transport failure is
+  not semantic evidence: inject a strong advisory, keep evaluating local gates, and do not prohibit
+  dispatch on that transport failure alone. A `pending` empty board is a goal-framing stop: refine
   and persist the Goal Contract before decomposition; it is not a task-decomposition stop.
 - `rule-reinject-empty-board-hard-stop`: any listed board with zero tasks triggers a HARD STOP note
   — an armed-but-undecomposed board must never be read as permission to start implementation/tests/

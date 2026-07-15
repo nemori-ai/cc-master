@@ -35,9 +35,11 @@ function goalCheck(boardPath, homeDir) {
     const result = spawnSync(ccm, ['goal', 'check', '--board', boardPath, '--json', '--no-input'], {
       encoding: 'utf8', timeout: 10000, env: { ...process.env, CC_MASTER_HOME: homeDir },
     });
-    if (!result || result.error || result.signal || result.status !== 0) return { verdict: 'check_unavailable' };
+    if (!result || result.error || result.signal) return { verdict: 'check_unavailable' };
     const parsed = JSON.parse(result.stdout || '{}');
-    return parsed && parsed.ok === true && parsed.data ? parsed.data : { verdict: 'check_unavailable' };
+    return parsed && parsed.data && typeof parsed.data.verdict === 'string'
+      ? parsed.data
+      : { verdict: 'check_unavailable' };
   } catch (_) {
     return { verdict: 'check_unavailable' };
   }
@@ -54,6 +56,7 @@ runHook({
     const danglingEntries = [];
     const emptyBoards = [];
     const goalStops = [];
+    const goalCheckUnavailable = [];
     for (const { name, path: boardPath, board } of boards) {
       const label = goalLabel(board);
       listing += ` • ${name} [${label}]`;
@@ -61,7 +64,8 @@ runHook({
       const hasContract = !!(board.goal_contract && board.goal_contract.schema === 'ccm/goal-contract/v1');
       if (hasContract) {
         const check = goalCheck(boardPath, ctx.homeDir);
-        if (check.verdict !== 'ok') goalStops.push(`${name} [${label}] verdict=${check.verdict || 'malformed'}`);
+        if (check.verdict === 'check_unavailable') goalCheckUnavailable.push(`${name} [${label}]`);
+        else if (check.verdict !== 'ok') goalStops.push(`${name} [${label}] verdict=${check.verdict || 'malformed'}`);
       }
       if (tasks.length === 0) emptyBoards.push({ text: `${name} [${label}]`, pending: hasContract && board.goal_contract.assurance === 'pending' });
       for (const t of tasks) {
@@ -82,6 +86,10 @@ runHook({
     if (goalStops.length) {
       ctxText += ` HARD STOP: Goal Contract integrity/assurance requires reconciliation before dispatch: ${goalStops.join(', ')}. ` +
         `Use ccm goal show/check; refine with ccm goal set, or amend through ccm goal amend. Never bypass a bad Brief hash.`;
+    }
+    if (goalCheckUnavailable.length) {
+      ctxText += ` STRONG ADVISORY: Goal Contract integrity probe unavailable for ${goalCheckUnavailable.join(', ')}. ` +
+        `This transport failure is not proof of contract corruption and does not by itself prohibit dispatch; retry ccm goal check while continuing the other local reconciliation gates.`;
     }
 
     // PARITY: rule-reinject-empty-board-hard-stop
