@@ -11,6 +11,44 @@ Every other hook is dormant until a board with `owner.active:true` and a matchin
 under `<home>/boards/`. This hook is what creates that condition — either by writing a fresh board
 (fresh start) or by re-arming an existing archived board onto the current session (`--resume`).
 
+## XH C3 subscription registration authority（Track B target）
+
+This hook CONTRACT is the only authority for bootstrap-local subscription registration. The
+cross-surface Capability Card owns intent/status; derived design documents may link these rules but
+must not restate their command or failure schema.
+
+<!-- XH-C3-BOOTSTRAP-AUTHORITY:BEGIN -->
+```json
+{
+  "schema": "cc-master/xh-c3-bootstrap-authority/v1",
+  "capability_id": "cross-harness-notification-subscription",
+  "owns": [
+    "bootstrap-subscription-registration",
+    "registration-response-validation",
+    "registration-failure-arm-semantics"
+  ],
+  "rule_ids": [
+    "rule-bootstrap-subscription-register",
+    "rule-bootstrap-subscription-registration-response",
+    "rule-bootstrap-subscription-registration-failure"
+  ],
+  "registration": {
+    "command": ["coordination", "subscription", "register"],
+    "required_selectors": ["--board", "--origin", "--session-id", "--capability"],
+    "fixed_values": {"--capability": "coordination-inbox"},
+    "terminal_flags": ["--json", "--no-input"],
+    "required_non_empty_response_fields": ["subscription_id", "session_epoch"],
+    "exact_echo_response_fields": ["session_id", "origin", "capability"],
+    "required_state": "current"
+  },
+  "failure": {
+    "observations": ["command-failure", "malformed-json", "missing-field", "empty-field", "identity-echo-mismatch"],
+    "effects": ["arm-remains-valid", "owner-unchanged", "no-adapter-fallback", "no-weaker-retry"]
+  }
+}
+```
+<!-- XH-C3-BOOTSTRAP-AUTHORITY:END -->
+
 ## 业务规则
 
 - `rule-bootstrap-trigger-prefix`: the hook only acts when the user prompt begins (first non-empty
@@ -56,6 +94,17 @@ under `<home>/boards/`. This hook is what creates that condition — either by w
 - `rule-bootstrap-ccm-hard-precheck`: before creating/arming a board, the hook hard-checks that the
   `ccm` binary is present (`command -v ccm`, or `$CCM_BIN` if set). If absent, the hook **refuses to
   arm** (no board is created/re-armed) and relays a user-facing reminder to install `ccm` (ADR-021).
+- `rule-bootstrap-subscription-register`: after fresh/resume ARM has committed the exact board and
+  host session owner, all three hosts make one best-effort registration using the canonical JSON
+  block above. `--board` is the absolute lexical board path already selected by ARM (symlinked homes
+  remain opaque), `--origin` is the normalized host, and `--session-id` is the exact native session
+  identity normalized by that host launcher. The adapter never synthesizes an epoch.
+- `rule-bootstrap-subscription-registration-response`: registration is accepted only when the
+  response is valid JSON, carries non-empty ccm-issued `subscription_id` and `session_epoch`, echoes
+  the requested identity fields exactly, and reports `state:"current"`.
+- `rule-bootstrap-subscription-registration-failure`: command failure, malformed/missing/empty data,
+  or identity echo mismatch does not roll back ARM, deactivate/steal the board, or change owner. It
+  creates no adapter-owned epoch/fallback and never retries with fewer selectors.
 
 ## 注入 taxonomy
 
@@ -83,6 +132,10 @@ from AGENTS.md §12's `runHook`/`isArmed` grep door). Its own "gate" is the trig
 - rule: rule-bootstrap-raw-request-is-evidence
   required_hosts: [claude-code, codex, cursor]
 ```
+
+The XH C3 rules above are a Track B `target`, not current implementation anchors. Their required
+three-host set and stage live only in the Capability Card until executable host evidence promotes
+them; adding them to this implemented-anchor block early would falsely claim runtime coverage.
 
 ## 降级行为
 

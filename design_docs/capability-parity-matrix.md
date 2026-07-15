@@ -11,6 +11,7 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 | --- | --- | --- | --- | --- |
 | ccm-quota-account | implemented | partial; read-only provider candidate implemented, usage migration pending | partial | [ccm-quota-account.md](harnesses/capabilities/ccm-quota-account.md) |
 | cross-harness-cached-context | implemented | implemented | implemented-track-b | [cross-harness-cached-context.md](harnesses/capabilities/cross-harness-cached-context.md) |
+| cross-harness-notification-subscription | target | target | target | [cross-harness-notification-subscription.md](harnesses/capabilities/cross-harness-notification-subscription.md) |
 | cross-harness-session-bound-worker | current-partial | current-partial | current-partial | [cross-harness-session-bound-worker.md](harnesses/capabilities/cross-harness-session-bound-worker.md) |
 | goal-contract-lifecycle | implemented | implemented | implemented-track-b | [goal-contract-lifecycle.md](harnesses/capabilities/goal-contract-lifecycle.md) |
 | path-token-resolution | implemented | implemented | implemented | [path-token-resolution.md](harnesses/capabilities/path-token-resolution.md) |

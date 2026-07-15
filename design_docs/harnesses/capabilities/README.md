@@ -44,6 +44,7 @@ skills 和/或 ccm，且各 host 机制不能 1:1 平移时，用 Capability Car
 | path-token-resolution | [path-token-resolution.md](path-token-resolution.md) | A/B | `protocol-capability-gap` |
 | ccm-quota-account | [ccm-quota-account.md](ccm-quota-account.md) | B | `protocol-capability-gap` — unsupported |
 | cross-harness-cached-context | [cross-harness-cached-context.md](cross-harness-cached-context.md) | A/B | `protocol-capability-gap` — postToolUse dynamic substitute |
+| cross-harness-notification-subscription | [cross-harness-notification-subscription.md](cross-harness-notification-subscription.md) | B | `target` — exact session/epoch contract |
 | cross-harness-session-bound-worker | [cross-harness-session-bound-worker.md](cross-harness-session-bound-worker.md) | B | `current-partial` — global ccm process boundary |
 | goal-contract-lifecycle | [goal-contract-lifecycle.md](goal-contract-lifecycle.md) | B | `protocol-capability-gap` — alwaysApply + PreCompact + completion gate |
 

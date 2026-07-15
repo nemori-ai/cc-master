@@ -1,0 +1,179 @@
+{
+  "schema": "cc-master/xh-c3-subscription-phip-ssot-fixture/v1",
+  "role": "non-normative-test-oracle",
+  "canonical": {
+    "capability": {
+      "path": "design_docs/harnesses/capabilities/cross-harness-notification-subscription.md",
+      "marker": "XH-C3-CAPABILITY-AUTHORITY",
+      "authority": {
+        "schema": "cc-master/xh-c3-capability-authority/v1",
+        "capability_id": "cross-harness-notification-subscription",
+        "track": "B",
+        "owns": ["cross-surface-intent", "cross-surface-acceptance", "per-host-capability-status"],
+        "required_hosts": ["claude-code", "codex", "cursor"],
+        "affected_hooks": [
+          "plugin/src/hooks/bootstrap-board/CONTRACT.md",
+          "plugin/src/hooks/coordination-inbox/CONTRACT.md"
+        ],
+        "derived_documents": [
+          "design_docs/2026-07-15-cross-harness-notification-subscription-transport-contract-v1.md"
+        ]
+      },
+      "exclusive_semantic_anchors": ["cc-master/xh-c3-capability-authority/v1"]
+    },
+    "bootstrap": {
+      "path": "plugin/src/hooks/bootstrap-board/CONTRACT.md",
+      "marker": "XH-C3-BOOTSTRAP-AUTHORITY",
+      "authority": {
+        "schema": "cc-master/xh-c3-bootstrap-authority/v1",
+        "capability_id": "cross-harness-notification-subscription",
+        "owns": [
+          "bootstrap-subscription-registration",
+          "registration-response-validation",
+          "registration-failure-arm-semantics"
+        ],
+        "rule_ids": [
+          "rule-bootstrap-subscription-register",
+          "rule-bootstrap-subscription-registration-response",
+          "rule-bootstrap-subscription-registration-failure"
+        ],
+        "registration": {
+          "command": ["coordination", "subscription", "register"],
+          "required_selectors": ["--board", "--origin", "--session-id", "--capability"],
+          "fixed_values": { "--capability": "coordination-inbox" },
+          "terminal_flags": ["--json", "--no-input"],
+          "required_non_empty_response_fields": ["subscription_id", "session_epoch"],
+          "exact_echo_response_fields": ["session_id", "origin", "capability"],
+          "required_state": "current"
+        },
+        "failure": {
+          "observations": [
+            "command-failure",
+            "malformed-json",
+            "missing-field",
+            "empty-field",
+            "identity-echo-mismatch"
+          ],
+          "effects": [
+            "arm-remains-valid",
+            "owner-unchanged",
+            "no-adapter-fallback",
+            "no-weaker-retry"
+          ]
+        }
+      },
+      "exclusive_semantic_anchors": [
+        "cc-master/xh-c3-bootstrap-authority/v1",
+        "\"command\": [\"coordination\", \"subscription\", \"register\"]"
+      ]
+    },
+    "inbox": {
+      "path": "plugin/src/hooks/coordination-inbox/CONTRACT.md",
+      "marker": "XH-C3-INBOX-AUTHORITY",
+      "authority": {
+        "schema": "cc-master/xh-c3-inbox-authority/v1",
+        "capability_id": "cross-harness-notification-subscription",
+        "owns": [
+          "current-subscription-resolution",
+          "bounded-inbox-list",
+          "delivery-fail-closed",
+          "notification-delivery-provenance",
+          "inbox-read-only-effects"
+        ],
+        "rule_ids": [
+          "rule-coordination-inbox-current-subscription",
+          "rule-coordination-inbox-bounded-list",
+          "rule-coordination-inbox-subscription-fail-closed",
+          "rule-coordination-inbox-delivery-provenance",
+          "rule-coordination-inbox-read-only"
+        ],
+        "current": {
+          "command": ["coordination", "subscription", "current"],
+          "required_selectors": ["--board", "--origin", "--session-id", "--capability"],
+          "fixed_values": { "--capability": "coordination-inbox" },
+          "terminal_flags": ["--json", "--no-input"],
+          "required_non_empty_response_fields": ["subscription_id", "session_epoch"],
+          "exact_echo_response_fields": ["session_id", "origin", "capability"],
+          "required_state": "current"
+        },
+        "list": {
+          "command": ["coordination", "inbox", "list"],
+          "required_selectors": [
+            "--current-subscription",
+            "--board",
+            "--origin",
+            "--session-id",
+            "--session-epoch",
+            "--capability",
+            "--unconsumed"
+          ],
+          "fixed_values": { "--capability": "coordination-inbox" },
+          "terminal_flags": ["--json", "--no-input"],
+          "exact_echo_response_fields": [
+            "subscription_id",
+            "session_id",
+            "session_epoch",
+            "origin",
+            "capability"
+          ]
+        },
+        "fail_closed": {
+          "observations": [
+            "registration-failure",
+            "no-current",
+            "stale-epoch",
+            "expired-epoch",
+            "identity-mismatch",
+            "epoch-mismatch"
+          ],
+          "effects": [
+            "silent-rc0",
+            "no-list-before-exact-current",
+            "no-weaker-retry",
+            "no-unbound-fallback"
+          ]
+        },
+        "provenance": {
+          "required_non_empty_fields": [
+            "subscription_id",
+            "session_id",
+            "session_epoch",
+            "origin",
+            "capability",
+            "source_policy_revision",
+            "consent_provenance_ref"
+          ],
+          "exact_match_fields": [
+            "subscription_id",
+            "session_id",
+            "session_epoch",
+            "origin",
+            "capability"
+          ],
+          "surface_audit_fields": ["source_policy_revision", "consent_provenance_ref"],
+          "invalid_effect": "suppress-item"
+        },
+        "read_only": {
+          "allowed_commands": ["coordination subscription current", "coordination inbox list"],
+          "forbidden_effect_classes": [
+            "ack",
+            "coordination-write",
+            "board-write",
+            "provider-network",
+            "credential",
+            "account",
+            "monitor-service"
+          ]
+        }
+      },
+      "exclusive_semantic_anchors": [
+        "cc-master/xh-c3-inbox-authority/v1",
+        "\"command\": [\"coordination\", \"subscription\", \"current\"]",
+        "\"command\": [\"coordination\", \"inbox\", \"list\"]",
+        "\"source_policy_revision\"",
+        "\"consent_provenance_ref\""
+      ]
+    }
+  },
+  "required_status": "target"
+}
