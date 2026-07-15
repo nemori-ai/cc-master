@@ -1,0 +1,168 @@
+{
+  "schema": "cc-master/xh-c3-executable-subscription-epoch-fixture/v2",
+  "hosts": ["claude-code", "codex", "cursor"],
+  "entry_paths": {
+    "claude-code": {
+      "production_bootstrap": "plugin/dist/claude-code/hooks/scripts/bootstrap-board.sh",
+      "production_hook": "plugin/dist/claude-code/hooks/scripts/coordination-inbox.js",
+      "known_good_bootstrap": "known-good-entry.mjs",
+      "known_good_hook": "known-good-entry.mjs"
+    },
+    "codex": {
+      "launcher": "plugin/dist/codex/hooks/_hosts/codex/launcher.js",
+      "production_bootstrap": "plugin/dist/codex/hooks/bootstrap-board/implementations/codex/bootstrap-board-core.js",
+      "production_hook": "plugin/dist/codex/hooks/coordination-inbox/implementations/codex/coordination-inbox-core.js",
+      "known_good_bootstrap": "known-good-entry.mjs",
+      "known_good_hook": "known-good-entry.mjs"
+    },
+    "cursor": {
+      "launcher": "plugin/dist/cursor/hooks/_hosts/cursor/launcher.js",
+      "production_bootstrap": "plugin/dist/cursor/hooks/bootstrap-board/implementations/cursor/bootstrap-board-core.js",
+      "production_hook": "plugin/dist/cursor/hooks/coordination-inbox/implementations/cursor/coordination-inbox-core.js",
+      "known_good_bootstrap": "known-good-entry.mjs",
+      "known_good_hook": "known-good-entry.mjs"
+    }
+  },
+  "contract": {
+    "capability": "coordination-inbox",
+    "subscription_id": "sub-exact",
+    "session_epoch": "epoch-exact",
+    "identity_fields": ["subscription_id", "session_id", "session_epoch", "origin", "capability"],
+    "provenance_fields": [
+      "subscription_id",
+      "session_id",
+      "session_epoch",
+      "origin",
+      "capability",
+      "source_policy_revision",
+      "consent_provenance_ref"
+    ],
+    "source_policy_revision": "sha256:fixture-policy-revision",
+    "consent_provenance_ref": "policy://fixture/explicit-cached"
+  },
+  "case_families": {
+    "bootstrap": {
+      "standalone": ["success", "registration-failure", "register-malformed-json"],
+      "register_response": {
+        "subscription_id": ["missing", "empty", "wrong-type"],
+        "session_id": ["missing", "empty", "wrong-type", "mismatch"],
+        "session_epoch": ["missing", "empty", "wrong-type"],
+        "origin": ["missing", "empty", "wrong-type", "mismatch"],
+        "capability": ["missing", "empty", "wrong-type", "mismatch"],
+        "state": ["missing", "empty", "wrong-type", "mismatch"]
+      }
+    },
+    "hook": {
+      "standalone": [
+        "success",
+        "current-command-failure",
+        "current-malformed-json",
+        "stale-epoch",
+        "list-command-failure",
+        "list-malformed-json"
+      ],
+      "current_response": {
+        "subscription_id": ["missing", "empty", "wrong-type"],
+        "session_id": ["missing", "empty", "wrong-type", "mismatch"],
+        "session_epoch": ["missing", "empty", "wrong-type"],
+        "origin": ["missing", "empty", "wrong-type", "mismatch"],
+        "capability": ["missing", "empty", "wrong-type", "mismatch"],
+        "state": ["missing", "empty", "wrong-type", "mismatch"]
+      },
+      "list_response": {
+        "subscription_id": ["missing", "empty", "wrong-type", "mismatch"],
+        "session_id": ["missing", "empty", "wrong-type", "mismatch"],
+        "session_epoch": ["missing", "empty", "wrong-type", "mismatch"],
+        "origin": ["missing", "empty", "wrong-type", "mismatch"],
+        "capability": ["missing", "empty", "wrong-type", "mismatch"]
+      },
+      "delivery_provenance": {
+        "subscription_id": ["missing", "empty", "wrong-type", "mismatch"],
+        "session_id": ["missing", "empty", "wrong-type", "mismatch"],
+        "session_epoch": ["missing", "empty", "wrong-type", "mismatch"],
+        "origin": ["missing", "empty", "wrong-type", "mismatch"],
+        "capability": ["missing", "empty", "wrong-type", "mismatch"],
+        "source_policy_revision": ["missing", "empty", "wrong-type"],
+        "consent_provenance_ref": ["missing", "empty", "wrong-type"]
+      }
+    }
+  },
+  "shell_effect_traps": [
+    "curl",
+    "wget",
+    "nc",
+    "netcat",
+    "ssh",
+    "scp",
+    "rsync",
+    "claude",
+    "codex",
+    "cursor-agent",
+    "aws",
+    "gcloud",
+    "az",
+    "security",
+    "secret-tool",
+    "pass",
+    "systemctl",
+    "launchctl",
+    "service"
+  ],
+  "counterfeit_calibration": [
+    {
+      "id": "identity",
+      "case": "hook:list_response:origin:mismatch",
+      "expected_failure": "silent"
+    },
+    {
+      "id": "path",
+      "case": "hook:success",
+      "expected_failure": "bounded-list-command"
+    },
+    {
+      "id": "ccm-effect",
+      "case": "hook:success",
+      "expected_failure": "closed-ccm-allowlist"
+    },
+    {
+      "id": "provider-effect",
+      "case": "hook:success",
+      "expected_failure": "zero-effects"
+    },
+    {
+      "id": "network-effect",
+      "case": "hook:success",
+      "expected_failure": "zero-effects"
+    },
+    {
+      "id": "register-delete-validation",
+      "case": "bootstrap:register_response:origin:mismatch",
+      "expected_failure": "registration-result-consumed"
+    },
+    {
+      "id": "register-origin-bypass",
+      "case": "bootstrap:register_response:origin:mismatch",
+      "expected_failure": "registration-result-consumed"
+    },
+    {
+      "id": "register-subscription-id-bypass",
+      "case": "bootstrap:register_response:subscription_id:missing",
+      "expected_failure": "registration-result-consumed"
+    },
+    {
+      "id": "register-state-bypass",
+      "case": "bootstrap:register_response:state:mismatch",
+      "expected_failure": "registration-result-consumed"
+    },
+    {
+      "id": "node-fork-effect",
+      "case": "hook:success",
+      "expected_failure": "zero-effects"
+    },
+    {
+      "id": "node-options-effect",
+      "case": "hook:success",
+      "expected_failure": "zero-effects"
+    }
+  ]
+}
