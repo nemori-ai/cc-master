@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   allocatePool,
   buildPeerRoster,
+  durableWriteFileSync,
   ENUMS,
   effectiveN,
   isISOUTC,
@@ -19,6 +21,7 @@ import {
   type QuotaModel,
   shouldAppendAllocationNotification,
   type UsageSignal,
+  withLock,
 } from '@ccm/engine';
 import * as discover from '../discover.js';
 import { resolveHarnessAdapter } from '../harnesses/registry.js';
@@ -41,6 +44,205 @@ function stampNow(): string {
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
+const SUBSCRIPTION_SCHEMA = 'ccm/coordination-subscriptions/v1';
+const SUBSCRIPTION_CAPABILITY = 'coordination-inbox';
+const CACHED_POLICY_REVISION = 'ccm/cached-board-inbox/v1';
+const CACHED_CONSENT_REF = 'ccm://coordination/subscriptions/cached-only';
+const ORIGINS = new Set(['claude-code', 'codex', 'cursor']);
+
+interface CoordinationSubscription {
+  subscription_id: string;
+  session_id: string;
+  session_epoch: string;
+  origin: string;
+  capability: string;
+  state: 'current';
+  board_path: string;
+  registered_at: string;
+  source_policy_revision: string;
+  consent_provenance_ref: string;
+}
+
+interface SubscriptionStore {
+  schema: typeof SUBSCRIPTION_SCHEMA;
+  subscriptions: CoordinationSubscription[];
+}
+
+function nonempty(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() !== '';
+}
+
+function subscriptionInput(ctx: Ctx): {
+  boardPath: string;
+  home: string;
+  origin: string;
+  sessionId: string;
+  capability: string;
+} {
+  const resolved = discover.resolveBoard({
+    boardFlag: ctx.values.board as string,
+    sid: ctx.sid,
+    homeFlag: ctx.values.home as string,
+    goalSubstr: ctx.values.goal as string,
+    env: ctx.env,
+  });
+  const origin = ctx.values.origin;
+  const sessionId = ctx.values['session-id'];
+  const capability = ctx.values.capability;
+  if (!nonempty(origin) || !ORIGINS.has(origin)) {
+    usage('--origin 必须是 claude-code、codex 或 cursor');
+  }
+  if (!nonempty(sessionId)) usage('--session-id 须是非空字符串');
+  if (capability !== SUBSCRIPTION_CAPABILITY) {
+    usage(`--capability 必须是 ${SUBSCRIPTION_CAPABILITY}`);
+  }
+  return {
+    boardPath: path.resolve(resolved.boardPath),
+    home: discover.resolveHome({ homeFlag: ctx.values.home as string, env: ctx.env }),
+    origin,
+    sessionId,
+    capability,
+  };
+}
+
+function subscriptionStorePath(home: string): string {
+  return path.join(home, 'coordination', 'subscriptions.json');
+}
+
+function isSubscription(value: unknown): value is CoordinationSubscription {
+  if (!isObject(value)) return false;
+  return (
+    nonempty(value.subscription_id) &&
+    nonempty(value.session_id) &&
+    nonempty(value.session_epoch) &&
+    nonempty(value.origin) &&
+    ORIGINS.has(value.origin) &&
+    value.capability === SUBSCRIPTION_CAPABILITY &&
+    value.state === 'current' &&
+    nonempty(value.board_path) &&
+    path.isAbsolute(value.board_path) &&
+    nonempty(value.registered_at) &&
+    value.source_policy_revision === CACHED_POLICY_REVISION &&
+    value.consent_provenance_ref === CACHED_CONSENT_REF
+  );
+}
+
+function readSubscriptionStore(filePath: string): SubscriptionStore | null {
+  try {
+    const value: unknown = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (!isObject(value) || value.schema !== SUBSCRIPTION_SCHEMA) return null;
+    if (!Array.isArray(value.subscriptions) || !value.subscriptions.every(isSubscription))
+      return null;
+    const scopes = new Set<string>();
+    for (const item of value.subscriptions) {
+      const scope = `${item.board_path}\0${item.origin}\0${item.capability}`;
+      if (scopes.has(scope)) return null;
+      scopes.add(scope);
+    }
+    return {
+      schema: SUBSCRIPTION_SCHEMA,
+      subscriptions: structuredClone(value.subscriptions),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function subscriptionStoreForWrite(filePath: string): SubscriptionStore {
+  if (!fs.existsSync(filePath)) return { schema: SUBSCRIPTION_SCHEMA, subscriptions: [] };
+  const store = readSubscriptionStore(filePath);
+  if (!store) throw new Error('coordination subscription store is invalid; refusing to overwrite');
+  return store;
+}
+
+function sameSubscriptionScope(
+  subscription: CoordinationSubscription,
+  input: { boardPath: string; origin: string; capability: string },
+): boolean {
+  return (
+    subscription.board_path === input.boardPath &&
+    subscription.origin === input.origin &&
+    subscription.capability === input.capability
+  );
+}
+
+function currentSubscription(
+  input: { boardPath: string; home: string; origin: string; sessionId: string; capability: string },
+  epoch?: unknown,
+): CoordinationSubscription | null {
+  const store = readSubscriptionStore(subscriptionStorePath(input.home));
+  if (!store) return null;
+  const found = store.subscriptions.find(
+    (item) => sameSubscriptionScope(item, input) && item.session_id === input.sessionId,
+  );
+  if (!found) return null;
+  if (epoch !== undefined && (!nonempty(epoch) || found.session_epoch !== epoch)) return null;
+  return found;
+}
+
+function publicSubscription(subscription: CoordinationSubscription): Record<string, string> {
+  return {
+    subscription_id: subscription.subscription_id,
+    session_id: subscription.session_id,
+    session_epoch: subscription.session_epoch,
+    origin: subscription.origin,
+    capability: subscription.capability,
+  };
+}
+
+function renderSubscription(subscription: CoordinationSubscription | null, ctx: Ctx): string {
+  const data: Record<string, string> | null = subscription
+    ? { ...publicSubscription(subscription), state: 'current' }
+    : null;
+  if (ctx.flags.json) return JSON.stringify({ ok: true, data: { subscription: data } });
+  return data
+    ? `coordination subscription current: ${data.subscription_id} ${data.session_epoch}\n`
+    : 'coordination subscription current: none\n';
+}
+
+export function subscription(ctx: Ctx): number {
+  const action = ctx.positionals[0];
+  const input = subscriptionInput(ctx);
+  if (action === 'current') {
+    ctx.out(renderSubscription(currentSubscription(input), ctx));
+    return 0;
+  }
+  if (action !== 'register') usage('coordination subscription 需要子命令：register 或 current');
+
+  const filePath = subscriptionStorePath(input.home);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });
+  const registered = withLock(filePath, () => {
+    const existing = subscriptionStoreForWrite(filePath);
+    const replay = existing.subscriptions.find(
+      (item) => sameSubscriptionScope(item, input) && item.session_id === input.sessionId,
+    );
+    if (replay) return replay;
+    const next: CoordinationSubscription = {
+      subscription_id: `sub-${randomUUID()}`,
+      session_id: input.sessionId,
+      session_epoch: `epoch-${randomUUID()}`,
+      origin: input.origin,
+      capability: input.capability,
+      state: 'current',
+      board_path: input.boardPath,
+      registered_at: stampNow(),
+      source_policy_revision: CACHED_POLICY_REVISION,
+      consent_provenance_ref: CACHED_CONSENT_REF,
+    };
+    const store: SubscriptionStore = {
+      schema: SUBSCRIPTION_SCHEMA,
+      subscriptions: [
+        ...existing.subscriptions.filter((item) => !sameSubscriptionScope(item, input)),
+        next,
+      ],
+    };
+    durableWriteFileSync(filePath, `${JSON.stringify(store, null, 2)}\n`);
+    return next;
+  });
+  ctx.out(renderSubscription(registered, ctx));
+  return 0;
 }
 
 function readRegistry(
@@ -152,9 +354,16 @@ function asStrength(v: unknown): NotificationStrength {
   usage('--strength 必须是 weak 或 strong');
 }
 
-function renderList(items: Notification[], ctx: Ctx): string {
-  if (ctx.flags.json)
-    return JSON.stringify({ ok: true, data: { inbox: items, count: items.length } });
+function renderList(
+  items: Array<Notification & { delivery_provenance?: Record<string, string> }>,
+  ctx: Ctx,
+  subscription?: Record<string, string> | null,
+): string {
+  if (ctx.flags.json) {
+    const data = { inbox: items, count: items.length } as Record<string, unknown>;
+    if (subscription !== undefined) data.subscription = subscription;
+    return JSON.stringify({ ok: true, data });
+  }
   const lines = [`coordination inbox（${items.length}）`];
   for (const n of items) {
     lines.push(`  ${n.id} [${n.status}] ${n.kind} ${n.strength}: ${n.summary}`);
@@ -171,10 +380,41 @@ export function inbox(ctx: Ctx): number {
 }
 
 function inboxList(ctx: Ctx): number {
+  let boardPath = '';
   return runRead(ctx, {
+    resolve: (c) => {
+      const resolved = discover.resolveBoard({
+        boardFlag: c.values.board as string,
+        sid: c.sid,
+        homeFlag: c.values.home as string,
+        goalSubstr: c.values.goal as string,
+        env: c.env,
+      });
+      boardPath = path.resolve(resolved.boardPath);
+      return resolved;
+    },
     render: (board, c) => {
       let items = NotificationInbox.fromBoard(board).toArray();
       if (c.values.unconsumed) items = items.filter((item) => item.status === 'unconsumed');
+      if (c.values['current-subscription']) {
+        const input = subscriptionInput(c);
+        if (input.boardPath !== boardPath) return renderList([], c, null);
+        const current = currentSubscription(input, c.values['session-epoch']);
+        if (!current) return renderList([], c, null);
+        const binding = publicSubscription(current);
+        return renderList(
+          items.map((item) => ({
+            ...item,
+            delivery_provenance: {
+              ...binding,
+              source_policy_revision: current.source_policy_revision,
+              consent_provenance_ref: current.consent_provenance_ref,
+            },
+          })),
+          c,
+          binding,
+        );
+      }
       return renderList(items, c);
     },
   });

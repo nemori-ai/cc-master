@@ -76,3 +76,40 @@ test('all structured markers reject an alternate owner of a canonical subject', 
   assertRejected(result, /unapproved authority marker XH-C3-ALTERNATE-AUTHORITY/);
   assert.match(`${result.stdout}\n${result.stderr}`, /duplicate authority for bounded-inbox-list/);
 });
+
+test('implemented runtime cannot regress to target-only card or generated matrix truth', (t) => {
+  const root = mutationTarget(t, 'target-only-truth');
+  const card = join(
+    root,
+    'design_docs/harnesses/capabilities/cross-harness-notification-subscription.md',
+  );
+  const cardBefore = readFileSync(card, 'utf8');
+  const cardAfter = cardBefore.replace('| claude-code | implemented-track-b |', '| claude-code | target |');
+  assert.notEqual(cardAfter, cardBefore, 'card status mutation did not reach current truth');
+  writeFileSync(card, cardAfter);
+
+  const matrix = join(root, 'design_docs/capability-parity-matrix.md');
+  const matrixBefore = readFileSync(matrix, 'utf8');
+  const matrixAfter = matrixBefore.replace(
+    '| cross-harness-notification-subscription | implemented-track-b |',
+    '| cross-harness-notification-subscription | target |',
+  );
+  assert.notEqual(matrixAfter, matrixBefore, 'matrix status mutation did not reach generated truth');
+  writeFileSync(matrix, matrixAfter);
+
+  assertRejected(runChecker(root), /capability\.host-status|capability\.matrix-status/);
+});
+
+test('implemented runtime cannot omit a canonical XH C3 PARITY anchor', (t) => {
+  const root = mutationTarget(t, 'parity-anchor-omission');
+  const contract = join(root, 'plugin/src/hooks/bootstrap-board/CONTRACT.md');
+  const before = readFileSync(contract, 'utf8');
+  const after = before.replace(
+    '- rule: rule-bootstrap-subscription-register\n  required_hosts: [claude-code, codex, cursor]\n',
+    '',
+  );
+  assert.notEqual(after, before, 'PARITY anchor mutation did not reach bootstrap contract');
+  writeFileSync(contract, after);
+
+  assertRejected(runChecker(root), /bootstrap\.parity\.rule-bootstrap-subscription-register/);
+});

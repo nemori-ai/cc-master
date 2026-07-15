@@ -9,6 +9,13 @@ Object.defineProperty(globalThis, 'fetch', {
 });
 
 const require = createRequire(import.meta.url);
+const fs = require('node:fs');
+fs.fchmodSync = (_fd, mode) => {
+  if (mode !== 0o600) {
+    throw new Error(`CLOSED_EFFECT_SANDBOX: unexpected durable-write mode ${mode}`);
+  }
+};
+fs.fsyncSync = () => undefined;
 const sqlite = require('node:sqlite');
 sqlite.DatabaseSync = class ForbiddenDatabaseSync {
   constructor() {

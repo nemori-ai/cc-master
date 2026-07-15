@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -104,6 +104,11 @@ assert.deepEqual(
   'CLOSED_EFFECT_SANDBOX: undeclared service state mutation denied',
 );
 const after = JSON.parse(readFileSync(statePath, 'utf8'));
+assert.equal(
+  statSync(statePath).mode & 0o777,
+  0o600,
+  'durable monitor state must remain owner-only when the permission-model probe replaces fchmod',
+);
 assert.equal(
   after.tick_count,
   before.tick_count + 1,

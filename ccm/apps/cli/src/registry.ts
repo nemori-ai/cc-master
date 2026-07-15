@@ -1508,6 +1508,17 @@ export const REGISTRY: Registry = {
       ],
       options: {
         unconsumed: { type: 'boolean', desc: 'list 时只列 status=unconsumed 的通知' },
+        'current-subscription': {
+          type: 'boolean',
+          desc: '只按当前 session-bound subscription 精确读取；不匹配时返回空',
+        },
+        origin: {
+          type: 'string',
+          enum: ['claude-code', 'codex', 'cursor'],
+          desc: '订阅来源 harness（与 session/epoch 一起精确绑定）',
+        },
+        'session-epoch': { type: 'string', desc: '当前订阅 epoch；旧 epoch fail closed' },
+        capability: { type: 'string', desc: '当前固定为 coordination-inbox' },
         note: { type: 'string', desc: 'ack 时记录 consumed_note' },
         json: { type: 'boolean', desc: '结构化输出' },
       },
@@ -1516,6 +1527,30 @@ export const REGISTRY: Registry = {
         'ccm coordination inbox ack ntf-20260709T120000Z-a1b2 --note "降档并暂停 fill-work"',
       ],
       handler: 'coordination.inbox',
+    },
+    subscription: {
+      summary: '注册或读取 credential-free、session-bound coordination inbox 订阅',
+      read: false,
+      positionals: [{ name: 'register|current', required: true }],
+      options: {
+        origin: {
+          type: 'string',
+          enum: ['claude-code', 'codex', 'cursor'],
+          required: true,
+          desc: '订阅来源 harness',
+        },
+        capability: {
+          type: 'string',
+          required: true,
+          desc: '当前固定为 coordination-inbox',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm coordination subscription register --origin codex --session-id SID --capability coordination-inbox --json --no-input',
+        'ccm coordination subscription current --origin codex --session-id SID --capability coordination-inbox --json --no-input',
+      ],
+      handler: 'coordination.subscription',
     },
     notify: {
       summary: '低层 append 一条 coordination.inbox 通知（producer / Tier2 用）',

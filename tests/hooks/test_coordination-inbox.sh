@@ -15,14 +15,44 @@ seed_board() {
 }
 
 mk_ccm_stub() {
-  local dir stub payload marker
+  local dir stub payload current marker origin sid
   dir="$(make_project)"
   stub="$dir/ccm"
   payload="$dir/inbox.json"
+  current="$dir/current.json"
   marker="$dir/ack-called"
+  origin="$2"
+  sid="$3"
   printf '%s' "$1" >"$payload"
+  ORIGIN="$origin" SID="$sid" node - "$payload" <<'NODE'
+const fs = require('node:fs');
+const file = process.argv[2];
+const value = JSON.parse(fs.readFileSync(file, 'utf8'));
+const subscription = {
+  subscription_id: 'sub-fixture',
+  session_id: process.env.SID,
+  session_epoch: 'epoch-fixture',
+  origin: process.env.ORIGIN,
+  capability: 'coordination-inbox',
+};
+value.data.subscription = subscription;
+for (const item of value.data.inbox) {
+  item.delivery_provenance = {
+    ...subscription,
+    source_policy_revision: 'ccm/cached-board-inbox/v1',
+    consent_provenance_ref: 'ccm://coordination/subscriptions/cached-only',
+  };
+}
+fs.writeFileSync(file, JSON.stringify(value));
+NODE
+  printf '{"ok":true,"data":{"subscription":{"subscription_id":"sub-fixture","session_id":"%s","session_epoch":"epoch-fixture","origin":"%s","capability":"coordination-inbox","state":"current"}}}' \
+    "$sid" "$origin" >"$current"
   cat >"$stub" <<STUB
 #!/usr/bin/env bash
+if [ "\$1" = "coordination" ] && [ "\$2" = "subscription" ] && [ "\$3" = "current" ]; then
+  cat "$current"
+  exit 0
+fi
 if [ "\$1" = "coordination" ] && [ "\$2" = "inbox" ] && [ "\$3" = "list" ]; then
   cat "$payload"
   exit 0
@@ -44,7 +74,7 @@ chmod +x "$CODEX_CORE" "$CURSOR_CORE"
 # Claude Code: additionalContext, advisory+directive tags, no ack, repeat suppression by sidecar.
 H="$(make_project)"
 seed_board "$H" "sess-i"
-STUB="$(mk_ccm_stub "$INBOX_JSON")"
+STUB="$(mk_ccm_stub "$INBOX_JSON" "claude-code" "sess-i")"
 STATE="$H/inbox-state.json"
 HOOK_OUT="$(printf '{"session_id":"sess-i","hook_event_name":"Stop"}' |
   CC_MASTER_HOME="$H" CC_MASTER_NOW="$NOW" CC_MASTER_INBOX_SURFACE_STATE="$STATE" CCM_BIN="$STUB" node "$CLAUDE_HOOK" 2>/dev/null)"
@@ -53,8 +83,7 @@ assert_eq 0 "$HOOK_RC" "claude coordination-inbox -> rc 0"
 assert_contains "$HOOK_OUT" '"additionalContext"' "claude coordination-inbox -> additionalContext"
 assert_contains "$HOOK_OUT" '<advisory source=\"coordination-inbox\" strength=\"strong\">' "pacing_throttle -> advisory strong"
 assert_contains "$HOOK_OUT" '<directive source=\"coordination-inbox\">' "pacing_stop -> directive"
-assert_contains "$HOOK_OUT" "ccm coordination inbox ack ntf-1" "ack instruction present"
-assert_contains "$HOOK_OUT" "ccm coordination inbox ack ntf-2" "directive ack instruction present"
+assert_contains "$HOOK_OUT" "acknowledge it explicitly with ccm coordination inbox ack using the id above" "explicit ack guidance present"
 assert_no_file "$(dirname "$STUB")/ack-called" "coordination-inbox must not call ack"
 HOOK_OUT="$(printf '{"session_id":"sess-i","hook_event_name":"Stop"}' |
   CC_MASTER_HOME="$H" CC_MASTER_NOW="$NOW" CC_MASTER_INBOX_SURFACE_STATE="$STATE" CCM_BIN="$STUB" node "$CLAUDE_HOOK" 2>/dev/null)"
@@ -64,7 +93,7 @@ rm -rf "$H" "$(dirname "$STUB")"
 # Codex: launcher maps core kind:system to systemMessage.
 H="$(make_project)"
 seed_board "$H" "sess-cx"
-STUB="$(mk_ccm_stub "$INBOX_JSON")"
+STUB="$(mk_ccm_stub "$INBOX_JSON" "codex" "sess-cx")"
 HOOK_OUT="$(printf '{"session_id":"sess-cx","hook_event_name":"Stop"}' |
   CC_MASTER_HOME="$H" CC_MASTER_NOW="$NOW" CC_MASTER_INBOX_SURFACE_STATE="$H/state.json" CCM_BIN="$STUB" \
     node "$CODEX_LAUNCHER" --event Stop --core "$CODEX_CORE" 2>/dev/null)"
@@ -75,7 +104,7 @@ rm -rf "$H" "$(dirname "$STUB")"
 # Cursor: launcher maps core kind:system to followup_message.
 H="$(make_project)"
 seed_board "$H" "sess-cur"
-STUB="$(mk_ccm_stub "$INBOX_JSON")"
+STUB="$(mk_ccm_stub "$INBOX_JSON" "cursor" "sess-cur")"
 HOOK_OUT="$(printf '{"conversation_id":"sess-cur","session_id":"sess-cur","hook_event_name":"stop"}' |
   CC_MASTER_HOME="$H" CC_MASTER_NOW="$NOW" CC_MASTER_INBOX_SURFACE_STATE="$H/state.json" CCM_BIN="$STUB" \
     node "$CURSOR_LAUNCHER" --event stop --core "$CURSOR_CORE" 2>/dev/null)"

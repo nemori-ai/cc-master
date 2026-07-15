@@ -8,7 +8,7 @@ Surface durable, unconsumed `coordination.inbox` notifications to the orchestrat
 The hook is a read-only delivery surface: producers write notifications through `ccm coordination
 notify` / `arbitrate`, and the agent consumes them explicitly with `ccm coordination inbox ack`.
 
-## XH C3 exact-subscription authority（Track B target）
+## XH C3 exact-subscription authority（implemented Track B）
 
 This hook CONTRACT is the only authority for current-subscription resolution, epoch-bounded list,
 delivery fail-closed semantics, the seven-field delivery provenance set, and inbox read-only effects.
@@ -115,6 +115,14 @@ own repeat-suppression sidecar under the cc-master home.
 ## PARITY anchors
 
 ```yaml
+- rule: rule-coordination-inbox-current-subscription
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-coordination-inbox-bounded-list
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-coordination-inbox-subscription-fail-closed
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-coordination-inbox-delivery-provenance
+  required_hosts: [claude-code, codex, cursor]
 - rule: rule-coordination-inbox-read-only
   required_hosts: [claude-code, codex, cursor]
 - rule: rule-coordination-inbox-tag-protocol
@@ -123,9 +131,9 @@ own repeat-suppression sidecar under the cc-master home.
   required_hosts: [claude-code, codex, cursor]
 ```
 
-The XH C3 rules above are a Track B `target`, not current implementation anchors. Their required
-three-host set and stage live only in the Capability Card until executable host evidence promotes
-them; adding them to this implemented-anchor block early would falsely claim runtime coverage.
+The XH C3 rules above are current three-host implementation anchors. The Capability Card owns the
+cross-surface status; this CONTRACT owns exact current/list/provenance/read-only semantics, and the
+executable matrix verifies the host-native envelopes without admitting unbound or live-provider reads.
 
 ## 降级行为
 
