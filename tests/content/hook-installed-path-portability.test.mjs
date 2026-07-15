@@ -302,7 +302,10 @@ test('installed fresh bootstrap works for all hosts with spaces, Unicode, and sy
       const board = JSON.parse(readFileSync(boardPath, 'utf8'));
       assert.equal(board.owner.active, true, host);
       assert.equal(board.owner.session_id, sessionId, host);
-      if (host !== 'claude-code') assert.equal(board.goal, 'Portable fresh goal', host);
+      assert.equal(board.goal, '', `${host}: raw request remains evidence, not canonical goal`);
+      assert.equal(board.goal_contract?.schema, 'ccm/goal-contract/v1', host);
+      assert.equal(board.goal_contract?.revision, 1, host);
+      assert.equal(board.goal_contract?.assurance, 'pending', host);
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
     }

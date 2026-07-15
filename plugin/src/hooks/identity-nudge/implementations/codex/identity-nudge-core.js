@@ -7,12 +7,21 @@ const path = require('path');
 const CCM_BIN = process.env.CCM_BIN || 'ccm';
 const DEFAULT_IDENTITY_INTERVAL_SEC = 6 * 60 * 60;
 const DEFAULT_CRITPATH_INTERVAL_SEC = 2 * 60 * 60;
+const DEFAULT_GOAL_INTERVAL_SEC = 2 * 60 * 60;
 
 const IDENTITY_TEXT =
   '[身份周期提示] 你是一个 cc-master master orchestrator，正在把某个长程目标编排到完成。' +
   '若你已偏离编排者姿态（开始亲手实现 / 亲自 review / 空转等待 / 把 green gate 当 passed），' +
   '现在是重温 master-orchestrator-guide（SKILL A）七镜头 + 决策程序、回到指挥位的时机。' +
   '若你确在编排轨道上，无需特定动作——继续推进。';
+
+function goalText(board) {
+  const contract = board && board.goal_contract;
+  if (!contract || contract.schema !== 'ccm/goal-contract/v1') return '';
+  const compact = String(board.goal || '(goal pending)').replace(/\s+/g, ' ').trim().slice(0, 160);
+  return `[目标对齐周期提示] 当前 Goal Contract r${contract.revision || '?'} ${contract.assurance || 'unknown'}：${compact}。` +
+    '有用不等于相关：继续前先做 Goal Trace Test，工作必须能追溯到当前 goal / acceptance；新发现只能分类为 in-scope、amendment、follow-up 或 unrelated，绝不静默扩 scope。';
+}
 
 function readJson() {
   const raw = fs.readFileSync(0, 'utf8');
@@ -174,6 +183,14 @@ function main() {
   if (due(board, 'last_identity_remind', nowMs, intervalSec(process.env.CC_MASTER_IDNUDGE_INTERVAL_SEC, DEFAULT_IDENTITY_INTERVAL_SEC))) {
     if (setParam(home, boardPath, 'last_identity_remind', nowIso)) {
       messages.push(advisory('identity-nudge', 'weak', IDENTITY_TEXT));
+    }
+  }
+  // PARITY: rule-identity-nudge-goal-cadence
+  if (board.goal_contract && board.goal_contract.schema === 'ccm/goal-contract/v1' &&
+      due(board, 'last_goal_remind', nowMs, intervalSec(process.env.CC_MASTER_GOAL_REMIND_INTERVAL_SEC, DEFAULT_GOAL_INTERVAL_SEC))) {
+    if (setParam(home, boardPath, 'last_goal_remind', nowIso)) {
+      const text = goalText(board);
+      if (text) messages.push(advisory('goal-alignment-nudge', 'weak', text));
     }
   }
   if (due(board, 'last_critpath_remind', nowMs, intervalSec(process.env.CC_MASTER_CRITPATH_INTERVAL_SEC, DEFAULT_CRITPATH_INTERVAL_SEC))) {

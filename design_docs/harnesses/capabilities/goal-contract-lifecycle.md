@@ -10,7 +10,7 @@ compaction、派发、amendment 和完成时始终对齐当前 revision。
 
 1. Fresh bootstrap 不把命令参数、prompt 或 issue URL 逐字写入 `board.goal`。
 2. Entry surface 在切 DAG 前完成 framing，并以 `ccm goal set|confirm` 持久化。
-3. 实质歧义停在 pending decision package；清晰低风险请求可 asserted。
+3. 实质歧义停在 pending `decision_package`；清晰低风险请求可 asserted。
 4. Resume/compaction 先 check 当前 contract 并按需读取当前 Brief。
 5. Goal amendment 生成新 revision，旧 Brief 不被覆盖，现有任务被语义重审。
 6. 最终完成同时满足 task acceptance 与当前 Goal Contract。
@@ -20,9 +20,9 @@ compaction、派发、amendment 和完成时始终对齐当前 revision。
 
 | host | status | mechanism | notes |
 | --- | --- | --- | --- |
-| claude-code | planned | command + `SessionStart`/`PreCompact`/`Stop` hooks + canonical skills + `ccm goal` | `$ARGUMENTS` 只作 raw request；bootstrap 建 pending skeleton |
-| codex | planned | entry skill + session_start/pre_compact/turn_complete hooks + `ccm goal` | bootstrap shim 不再把解析参数传入 `--goal` |
-| cursor | planned-track-b | command + alwaysApply rule + PreCompact snapshot + afterAgentResponse gate + `ccm goal` | 分层替代 Claude Code 的动态完整重注 |
+| claude-code | implemented | command + `SessionStart`/`PreCompact`/`Stop` hooks + canonical skills + `ccm goal` | `$ARGUMENTS` 只作 raw request；bootstrap 建 pending skeleton |
+| codex | implemented | entry skill + session_start/pre_compact/turn_complete hooks + `ccm goal` | bootstrap shim 不再把解析参数传入 `--goal` |
+| cursor | implemented-track-b | command + alwaysApply rule + PreCompact snapshot + afterAgentResponse gate + `ccm goal` | 分层替代 Claude Code 的动态完整重注 |
 
 ## Declared divergence
 

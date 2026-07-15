@@ -100,6 +100,20 @@ test('FMT-RUNTIME warns when last_critpath_remind is a non-ISO string', () => {
   );
 });
 
+test('valid runtime {last_goal_remind: ISO} → 0 errors 0 FMT-RUNTIME warnings', () => {
+  const result = M.lintBoard(
+    JSON.stringify(makeBoard({ last_goal_remind: '2026-07-15T08:00:00Z' })),
+  );
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.warnings.filter((w: { rule: string }) => w.rule === 'FMT-RUNTIME').length, 0);
+});
+
+test('FMT-RUNTIME warns when last_goal_remind is a non-ISO string', () => {
+  const result = M.lintBoard(JSON.stringify(makeBoard({ last_goal_remind: 'not-iso' })));
+  assert.equal(result.errors.length, 0);
+  assert.ok(result.warnings.find((w: { rule: string }) => w.rule === 'FMT-RUNTIME'));
+});
+
 // stop_allow_until 是 Codex Stop decision:block 的显式释放阀：合法 ISO 0 warn，
 //   非 ISO → FMT-RUNTIME warn（同属 runtime 参数区）。
 test('valid runtime {stop_allow_until: ISO} → 0 errors 0 FMT-RUNTIME warnings', () => {

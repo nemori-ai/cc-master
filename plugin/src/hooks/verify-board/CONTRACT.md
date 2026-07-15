@@ -19,11 +19,21 @@ whether stopping now would abandon unfinished/unverified/un-surfaced work.
   either work that can proceed now, or output awaiting verification.
 - `rule-verify-board-self-check-handshake`: once the board is in a "settled" completion state (every
   task is `in_flight`/`blocked`/`done`/`failed`/`escalated`/`stale`, none `ready`/`uncertain`), the
-  agent must self-check against the board's `goal` at least once before being allowed to stop on
-  that exact completion state.
-- `rule-verify-board-pending-user`: any task with `status:"blocked"` and `blocked_on:"user"` is named
-  explicitly in the block reason — the agent must not silently exit on an open, unanswered user
-  decision.
+  agent must self-check against the current Goal Contract revision and both local task acceptance
+  and global goal acceptance at least once before being allowed to stop on that exact completion
+  state. The completion fingerprint includes revision, assurance, goal summary, and Brief hash so an
+  amendment necessarily invalidates an earlier handshake.
+- `rule-verify-board-goal-integrity`: run `ccm goal check --board <path> --json --no-input` before a
+  completion allow. A malformed contract, missing Brief, or hash mismatch blocks. A pending Goal
+  Contract blocks normal completion; the only legal stop is a handoff made exclusively of complete,
+  explicit `blocked_on:"user"` `decision_package` records (required non-empty context/need/type/hash/entry
+  fields, plus options for a decision), so the user can supply the information needed to
+  refine/confirm the goal. A status label without that package does not qualify. Legacy boards retain
+  their pre-contract behavior.
+- `rule-verify-board-pending-user`: on a settled/legacy goal, any task with `status:"blocked"` and
+  `blocked_on:"user"` is named explicitly in the completion-handshake block reason — the agent must
+  not silently claim completion over an open decision. The pending-goal handoff above is the narrow
+  exception: stopping is how the complete `decision_package` reaches the user.
 - `rule-verify-board-watchdog-reminder`: a `in_flight` task with no healthy armed watchdog triggers a
   reminder to arm one before stopping, framed as "come back and recon ground truth," not a verdict
   that the task is dead. A `board.watchdog`/legacy `board.wakeup` record is healthy only when it has
@@ -77,6 +87,8 @@ only proves "both hosts' source at least declares awareness of this rule."
 - rule: rule-verify-board-rollup-check
   required_hosts: [claude-code, codex]
 - rule: rule-verify-board-tag-protocol
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-verify-board-goal-integrity
   required_hosts: [claude-code, codex, cursor]
 ```
 

@@ -32,6 +32,7 @@ assert_file "$BOARD" "codex bootstrap board created"
 assert_contains "$HOOK_OUT" "--board $BOARD" "codex bootstrap gives exact ccm board path"
 
 GOAL="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.goal||""));' "$BOARD")"
+GOAL_CONTRACT="$(node -e 'const b=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const c=b.goal_contract||{};process.stdout.write(`${c.schema||""}|${c.revision||""}|${c.assurance||""}`);' "$BOARD")"
 SID="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String((b.owner&&b.owner.session_id)||""));' "$BOARD")"
 ACTIVE="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.owner&&b.owner.active));' "$BOARD")"
 WIP="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.scheduling&&b.scheduling.wip_limit));' "$BOARD")"
@@ -39,7 +40,11 @@ PRIORITY="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(p
 POLICY="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.policy&&b.policy.autonomous_account_switch));' "$BOARD")"
 SESSION_STATE="$HOME_DIR/sessions/codex-sess-1.json"
 
-assert_eq "Ship the slice" "$GOAL" "codex bootstrap records goal"
+assert_eq "" "$GOAL" "codex bootstrap does not copy raw request into goal"
+assert_eq "ccm/goal-contract/v1|1|pending" "$GOAL_CONTRACT" "codex bootstrap creates pending goal contract"
+assert_contains "$HOOK_OUT" "ccm goal set" "codex bootstrap requires refined goal persistence"
+assert_contains "$HOOK_OUT" "ccm goal check" "codex bootstrap requires goal integrity check"
+assert_contains "$HOOK_OUT" "raw request" "codex bootstrap distinguishes evidence from canonical goal"
 assert_eq "codex-sess-1" "$SID" "codex bootstrap stamps owner.session_id"
 assert_eq "true" "$ACTIVE" "codex bootstrap arms owner.active"
 assert_eq "2" "$WIP" "codex bootstrap maps --wip"
@@ -147,6 +152,7 @@ RESUME_RC=$?
 assert_eq 0 "$RESUME_RC" "codex bootstrap resume rc 0"
 assert_valid_json "$RESUME_OUT" "codex bootstrap resume context envelope valid JSON"
 assert_contains "$RESUME_OUT" "cc-master resume: armed Codex orchestration board" "codex bootstrap resume reports armed board"
+assert_contains "$RESUME_OUT" "ccm goal check" "codex resume checks current goal contract before dispatch"
 RESUME_SID="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String((b.owner&&b.owner.session_id)||""));' "$RESUME_BOARD")"
 RESUME_ACTIVE="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.owner&&b.owner.active));' "$RESUME_BOARD")"
 RESUME_TASKS="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String((b.tasks||[]).length));' "$RESUME_BOARD")"
@@ -216,6 +222,24 @@ assert_valid_json "$RESUME_IGNORE_OUT" "codex bootstrap resume with --github-iss
 assert_eq 1 "$(board_task_count "$RESUME_IGNORE_BOARD")" "codex resume ignores --github-issue (tasks preserved)"
 assert_eq "" "$(board_github_issue_source "$RESUME_IGNORE_BOARD")" "codex resume does not record github issue source"
 assert_contains "$RESUME_IGNORE_OUT" "cc-master resume: armed Codex orchestration board" "codex resume still arms board"
+
+# Present but incompatible ccm: capability handshake fails closed before boards/ is created.
+OLD_CCM="$H/old-ccm"
+cat >"$OLD_CCM" <<'SH'
+#!/usr/bin/env bash
+if [[ "$*" == *"--capabilities"* ]]; then
+  printf '%s\n' '{"ok":true,"data":{"capabilities":["board-init/structured-board-path-v1"]}}'
+  exit 0
+fi
+exit 99
+SH
+chmod +x "$OLD_CCM"
+INCOMPAT_HOME="$H/incompatible-home"
+INCOMPAT_OUT="$(printf '%s' '{"session_id":"codex-sess-incompatible","hook_event_name":"UserPromptSubmit","prompt":"cc-master:as-master-orchestrator incompatible ccm","cwd":"/tmp/work"}' \
+  | CC_MASTER_HOME="$INCOMPAT_HOME" CCM_BIN="$OLD_CCM" node "$LAUNCHER" --core "$CORE" 2>/dev/null)"
+assert_contains "$INCOMPAT_OUT" 'source=\"bootstrap-board\"' "codex incompatible ccm emits hard directive"
+assert_contains "$INCOMPAT_OUT" "goal-contract/v1" "codex incompatible ccm names missing capability"
+assert_no_file "$INCOMPAT_HOME/boards" "codex incompatible ccm creates no board dir"
 
 rm -rf "$H"
 finish

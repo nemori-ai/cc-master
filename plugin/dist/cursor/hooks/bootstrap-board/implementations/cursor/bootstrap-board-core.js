@@ -27,7 +27,7 @@ function ccmCommand() {
 }
 
 function ccmPresent() {
-  // PARITY: rule-bootstrap-ccm-hard-precheck (see CONTRACT.md — codex has no equivalent, declared divergence)
+  // PARITY: rule-bootstrap-ccm-hard-precheck (see CONTRACT.md — implemented for every host)
   const override = process.env.CCM_BIN || '';
   if (override) {
     try {
@@ -50,6 +50,19 @@ function ccmMissingDirective() {
     'After install, re-run /as-master-orchestrator <goal>. Do not continue orchestration until ccm is available.',
     '</directive>',
   ].join(' ');
+}
+
+// PARITY: rule-bootstrap-structured-path-capability
+function requireBootstrapCapabilities(home) {
+  const res = run('ccm', ['board', 'init', '--capabilities', '--json', '--no-input'], {
+    env: { ...process.env, CC_MASTER_HOME: home, CC_MASTER_NO_AUTOINSTALL: '1' },
+  });
+  const envelope = JSON.parse(res.stdout || '{}');
+  const capabilities = envelope && envelope.ok === true && envelope.data && envelope.data.capabilities;
+  const required = ['board-init/structured-board-path-v1', 'goal-contract/v1'];
+  if (!Array.isArray(capabilities) || required.some((item) => !capabilities.includes(item))) {
+    throw new Error(`ccm lacks required bootstrap capabilities: ${required.join(', ')}`);
+  }
 }
 
 function resetStopAllowUntil(home) {
@@ -355,7 +368,7 @@ function resumeBoard(home, boardsDir, flags, sessionId, invocation) {
       `cc-master resume: armed Cursor orchestration board at ${boardPath}`,
       `session_id=${sessionId || '(empty)'}`,
       `goal=${compactGoal(resumed.goal)}`,
-      `Recon the board before dispatching new work: inspect current tasks, blocked items, decision_package entries, and latest log entries.${harnessNote}`,
+      `Before dispatching: run ccm goal check --board ${boardPath} --json, read the current Goal Brief when present, then reconcile tasks, blocked items, decision_package entries, and latest log entries.${harnessNote}`,
     ].join('\n')
   );
 }
@@ -376,18 +389,33 @@ function main() {
 
   resetStopAllowUntil(home);
 
-  const { flags, goal } = parseArgs(invocation.args);
+  const { flags, goal: rawRequest } = parseArgs(invocation.args);
   const boardsDir = path.join(home, 'boards');
   if (flags.resume) {
     resumeBoard(home, boardsDir, flags, sessionId, invocation);
     return;
   }
 
+
+  try {
+    requireBootstrapCapabilities(home);
+  } catch (error) {
+    say(
+      'block',
+      `<directive source="bootstrap-board">cc-master refused to arm: ${error.message}. Upgrade ccm to a build that advertises goal-contract/v1, then retry.</directive>`
+    );
+    return;
+  }
+
+  // PARITY: rule-bootstrap-fresh-arm
   const stamp = stampNow().replace(/[:-]/g, '');
   const boardPath = path.join(boardsDir, `${stamp}-${process.pid}.board.json`);
   fs.mkdirSync(boardsDir, { recursive: true });
 
-  const initArgs = ['--board', boardPath, 'board', 'init', '--goal', goal, '--json', '--no-input'];
+  // PARITY: rule-bootstrap-raw-request-is-evidence
+  // rawRequest is source evidence for the agent to refine; board init deliberately creates goal=""
+  // plus a pending ccm/goal-contract/v1 skeleton. Never forward raw text through --goal.
+  const initArgs = ['--board', boardPath, 'board', 'init', '--json', '--no-input'];
   if (flags.githubIssue && isGithubIssueUrl(flags.githubIssue)) {
     initArgs.push('--github-issue', String(flags.githubIssue).trim());
   }
@@ -468,11 +496,11 @@ function main() {
 
   const bits = [
     `cc-master fresh: created and armed Cursor orchestration board at ${boardPath}`,
-    'MANDATORY NEXT STEP: before implementation, tests, git, push, or PR work, decompose the goal into a dependency DAG and write tasks with acceptance criteria via ccm task add. An armed fresh board with zero tasks is not a runnable orchestration.',
+    'MANDATORY NEXT STEP: the raw request is source evidence, not the canonical goal. Invoke master-orchestrator-guide, clarify/refine an unambiguous Goal Contract, persist it with ccm goal set --board <board> --summary <refined-goal> [--brief-file <file>] --assurance asserted, then run ccm goal check --board <board> --json. Only after that may you decompose the settled goal into a DAG. An armed fresh board with a pending Goal Contract and zero tasks is not a runnable orchestration.',
     `Use this exact board path for ccm writes: --board ${boardPath}`,
     `session_id=${sessionId || '(empty)'}`,
   ];
-  if (goal) bits.push(`goal=${goal}`);
+  if (rawRequest) bits.push('raw_request_present=true (kept as evidence; not copied into board.goal)');
   if (applied.length > 0) bits.push(`bootstrap_applied=${applied.join(' ')}`);
   if (notes.length > 0) bits.push(`bootstrap_advisory=${notes.join('; ')}`);
   say('context', bits.join('\n'));

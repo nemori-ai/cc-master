@@ -42,13 +42,21 @@ assert_contains "$HOOK_OUT" "tool_search" "prompts Codex deferred tool discovery
 assert_contains "$HOOK_OUT" "multi_agent_v1.spawn_agent" "prompts Codex multi-agent spawn handle discipline"
 rm -rf "$H"
 
+# Goal Contract boards name revision/assurance and require integrity reconciliation before dispatch.
+H="$(make_project)"
+mkactive "$H" "contract" '{"schema":"cc-master/v2","goal":"REFINED GOAL","goal_contract":{"schema":"ccm/goal-contract/v1","revision":2,"assurance":"confirmed","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true,"session_id":"sess-contract"},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_session_start "$H" "sess-contract"
+assert_contains "$HOOK_OUT" "r2 confirmed" "reinject names current goal revision and assurance"
+assert_contains "$HOOK_OUT" "ccm goal check" "reinject requires integrity check"
+rm -rf "$H"
+
 # Matching empty board: SessionStart must force DAG creation before work.
 H="$(make_project)"
-mkactive "$H" "empty" '{"schema":"cc-master/v2","goal":"EMPTY CODEX GOAL","owner":{"active":true,"session_id":"sess-empty"},"tasks":[]}'
+mkactive "$H" "empty" '{"schema":"cc-master/v2","goal":"","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"pending","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true,"session_id":"sess-empty"},"tasks":[]}'
 run_session_start "$H" "sess-empty"
 assert_contains "$HOOK_OUT" "HARD STOP" "empty active board gets hard stop"
 assert_contains "$HOOK_OUT" "zero tasks are not runnable orchestration DAGs" "empty active board blocks ordinary progress"
-assert_contains "$HOOK_OUT" "ccm task add" "empty active board instructs ccm task add"
+assert_contains "$HOOK_OUT" "ccm goal set" "pending empty board instructs goal framing before decomposition"
 rm -rf "$H"
 
 # Other session: do not leak another active board.

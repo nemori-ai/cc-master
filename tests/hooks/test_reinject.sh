@@ -50,13 +50,21 @@ HN="$(printf '%s' "$H/boards" | sed 's#//*#/#g')"
 assert_contains "$HOOK_OUT" "$HN" "points at the boards dir under the home"
 rm -rf "$H"
 
+# Goal Contract boards name revision/assurance and require integrity reconciliation before dispatch.
+H="$(make_project)"
+mkactive "$H" "contract" '{"schema":"cc-master/v2","goal":"REFINED GOAL","goal_contract":{"schema":"ccm/goal-contract/v1","revision":2,"assurance":"confirmed","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_ss "$H"
+assert_contains "$HOOK_OUT" "r2 confirmed" "reinject names current goal revision and assurance"
+assert_contains "$HOOK_OUT" "ccm goal check" "reinject requires integrity check"
+rm -rf "$H"
+
 # Case B2: an active board with zero tasks → hard stop before ordinary progress.
 H="$(make_project)"
-mkactive "$H" "empty" '{"schema":"cc-master/v2","goal":"EMPTY CLAUDE GOAL","owner":{"active":true},"tasks":[]}'
+mkactive "$H" "empty" '{"schema":"cc-master/v2","goal":"","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"pending","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true},"tasks":[]}'
 run_ss "$H"
 assert_contains "$HOOK_OUT" "HARD STOP" "empty active board gets hard stop"
 assert_contains "$HOOK_OUT" "zero tasks are not runnable orchestration DAGs" "empty active board blocks ordinary progress"
-assert_contains "$HOOK_OUT" "ccm task add" "empty active board instructs ccm task add"
+assert_contains "$HOOK_OUT" "ccm goal set" "pending empty board instructs goal framing before decomposition"
 rm -rf "$H"
 
 # Case C: only an archived board (active:false) → no-op

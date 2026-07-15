@@ -80,6 +80,33 @@ function rollupOwnersViaCcm(boardPath) {
   return owners;
 }
 
+// PARITY: rule-verify-board-goal-integrity
+function goalCheckViaCcm(boardPath, home, board) {
+  const contract = board && board.goal_contract;
+  if (!contract) return { verdict: 'legacy' };
+  if (typeof contract !== 'object' || contract.schema !== 'ccm/goal-contract/v1') return { verdict: 'malformed' };
+  try {
+    const result = spawnSync(CCM_BIN, ['goal', 'check', '--board', boardPath, '--json', '--no-input'], {
+      encoding: 'utf8', timeout: 15000, env: { ...process.env, CC_MASTER_HOME: home },
+    });
+    if (!result || result.error || result.signal || result.status !== 0) return { verdict: 'check_unavailable' };
+    const parsed = JSON.parse(result.stdout || '{}');
+    return parsed && parsed.ok === true && parsed.data ? parsed.data : { verdict: 'malformed' };
+  } catch {
+    return { verdict: 'check_unavailable' };
+  }
+}
+
+function completePendingDecision(task) {
+  if (!task || task.status !== 'blocked' || task.blocked_on !== 'user') return false;
+  const dp = task.decision_package;
+  if (!dp || typeof dp !== 'object' || Array.isArray(dp)) return false;
+  const required = ['context_md', 'what_i_need', 'ask_type', 'inputs_hash', 'enter_cmd'];
+  if (!required.every((key) => typeof dp[key] === 'string' && dp[key].trim() !== '')) return false;
+  if (!/^sha256:[0-9a-f]{64}$/.test(dp.inputs_hash)) return false;
+  return dp.ask_type !== 'decision' || (Array.isArray(dp.options) && dp.options.length > 0);
+}
+
 function readJson() {
   const raw = fs.readFileSync(0, 'utf8');
   return raw ? JSON.parse(raw) : {};
@@ -168,12 +195,24 @@ function main() {
 
   const notes = [];
   for (const { name, path: boardPath, board } of boards) {
-    if (stopAllowed(board)) continue;
     const goal = typeof board.goal === 'string' && board.goal ? board.goal : '(goal not recorded yet)';
     const hint = releaseHint(boardPath);
     const tasks = Array.isArray(board.tasks)
       ? board.tasks.filter((task) => task && typeof task === 'object' && !Array.isArray(task) && typeof task.id === 'string' && task.id)
       : [];
+    const goalState = goalCheckViaCcm(boardPath, home, board);
+    if (!['ok', 'legacy', 'pending'].includes(goalState.verdict)) {
+      notes.push(`${name} [${goal}]: Goal Contract integrity check failed (${goalState.verdict || 'malformed'}); run ccm goal check/show and restore or explicitly amend the contract. ${hint}.`);
+      continue;
+    }
+    const pendingDecisionOnly = goalState.verdict === 'pending' && tasks.length > 0 &&
+      tasks.every(completePendingDecision);
+    if (pendingDecisionOnly) continue;
+    if (goalState.verdict === 'pending') {
+      notes.push(`${name} [${goal}]: Goal Contract is pending; refine it with ccm goal set or surface a complete blocked_on:"user" decision_package, then pass ccm goal check. ${hint}.`);
+      continue;
+    }
+    if (stopAllowed(board)) continue;
     if (tasks.length === 0) {
       notes.push(`${name} [${goal}]: active board has no tasks; decompose the goal into tasks before treating it as complete. ${hint}.`);
       continue;
@@ -192,7 +231,9 @@ function main() {
       notes.push(`${name} [${goal}]: in-flight tasks have no armed watchdog: ${inFlight.join(', ')}. ${hint}.`);
     }
     if (ready.length === 0 && uncertain.length === 0 && userBlocked.length === 0 && inFlight.length === 0) {
-      notes.push(`${name} [${goal}]: before stopping, self-check against the original goal and confirm no missing task remains outside the board. ${hint}.`);
+      const c = board.goal_contract;
+      const revision = c && c.schema === 'ccm/goal-contract/v1' ? `r${c.revision || '?'} ${c.assurance || 'unknown'}` : 'legacy goal';
+      notes.push(`${name} [${goal}]: before stopping, self-check local task acceptance and global acceptance against the current Goal Contract ${revision}; confirm no missing task remains outside the board. ${hint}.`);
     }
 
     // PARITY: rule-verify-board-rollup-check — owner done 而 child 未 done 的 rollup 不一致（SOFT 提醒，

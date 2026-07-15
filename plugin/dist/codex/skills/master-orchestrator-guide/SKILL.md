@@ -17,7 +17,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 你不赤手空拳——你活在一块 board 上、握着一把 CLI：
 
-- **board**——你为这场长任务存的持久任务看板：一张带状态的依赖图，既是扛 compaction 的记忆，也是 hook 唯一能读的窗口。**它是单一真相源；变更只走 `ccm`**（直接 file-edit 会被 board-guard 拦）。协议要点见 `references/board.md`。
+- **board**——你为这场长任务存的持久任务看板：一张带状态的依赖图，既是扛 compaction 的记忆，也是 hook 唯一能读的窗口。**它是单一真相源；变更只走 `ccm`**（直接 file-edit 会被 board-guard 拦）。开工前先把原始需求证据改写成当前 revision 的 Goal Contract；澄清、Brief、追溯与修订纪律见 `references/goal-contract.md`。协议要点见 `references/board.md`。
 - **`ccm`——你随身的 CLI 工具**：board 的读写 / 状态机 / DAG 分析、配速与估算（`usage` / `estimate`）、号池换号（`account`）、自我唤醒（`watchdog`）、自主权限（`policy`）、交付节奏（`cadence`）、自驱决策记录（`jc`）、跨编排协调（`peers` / `coordination inbox` / `coordination arbitrate`）——都经它操作。它能做什么、怎么敲，见 `using-ccm`。
 
 ### 思维底色（你怎么想）
@@ -71,7 +71,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 ### 七镜头（The seven lenses）——操作哲学
 
 1. **指挥不演奏 (Conduct, don't play)** — 拆图 / 派发 / 验收 / 整合。绝不亲手实现或 review。
-2. **目标即依赖图 (Goal = dependency graph)** — 拆成 DAG，找临界路径，把资源压到临界链上（非临界的 float 是免费的并行预算；「资源」也含**模型档位**——临界链上用强模型、float 上用廉价模型——档位事实与按难度选档见 `pacing-and-estimation` skill）。**每条依赖边都是债务，默认错——除非你能指名一个被下游直接消费的具体上游产物（artifact / hash），否则删掉它。**「先做 X 当安全网」「按这个顺序更稳妥」是顺序习惯，不是数据依赖。默认全并行，逐边举证；拆图细节见 `references/decomposition.md` §1–§2（临界路径 / float 可心算估计，也可用 `ccm board graph` 机器算·详见 `references/decomposition.md` §3）。一个大节点*内部*本身是复杂规划问题时，让它用被编排项目自己的 planning 层 + 维护计划文档——见 `references/multi-layer-planning.md`。
+2. **目标即依赖图 (Goal = dependency graph)** — **先有通过 Goal Framing Test / `ccm goal check` 的 Goal Contract，才有资格拆图**（原始请求是证据，不是可复制的目标；见 `references/goal-contract.md`）。再拆成 DAG，找临界路径，把资源压到临界链上（非临界的 float 是免费的并行预算；「资源」也含**模型档位**——临界链上用强模型、float 上用廉价模型——档位事实与按难度选档见 `pacing-and-estimation` skill）。**每条依赖边都是债务，默认错——除非你能指名一个被下游直接消费的具体上游产物（artifact / hash），否则删掉它。**「先做 X 当安全网」「按这个顺序更稳妥」是顺序习惯，不是数据依赖。默认全并行，逐边举证；拆图细节见 `references/decomposition.md` §1–§2（临界路径 / float 可心算估计，也可用 `ccm board graph` 机器算·详见 `references/decomposition.md` §3）。一个大节点*内部*本身是复杂规划问题时，让它用被编排项目自己的 planning 层 + 维护计划文档——见 `references/multi-layer-planning.md`。
 3. **就绪即发，绝不在 barrier 干等 (Dispatch on ready, never wait at a barrier)** — dataflow：一个节点的依赖刚满足就立刻派发它；并行度 = 用 T₁/T∞ 算该开几条 lane（T₁/T∞ 可心算，也可 `ccm board graph` 机器读·见 `references/decomposition.md` §3）。按当前 Codex surface 已感知能力选择 subagent / 后台 terminal / cloud / external / automation；API 会话里 subagent 工具可能是 deferred，先 `tool_search` 再派发；不要调用 Claude Code 的 workflow / background-runner 原语；需要机制细节时见 `references/dispatch.md`。**dispatch 动作 = 一次真实工具调用并记下它返回的 handle；没有真实 handle 的 task 不得标 `in_flight`。派发先于 board 标注——先调工具拿 handle、再 `Write` board**（标注 ≠ 派发；为什么、地面真相验证法见 `references/dispatch.md` §「派发卫生」）。
 4. **主观能动，不被动空等 (Be proactive, never idle-wait)** — 歇下来之前，先把可做工作池榨干、主动排程。合法的等待 = 剩下的每条 path 要么 blocked 在某个 `in-flight` 后台任务上、要么已抛给用户待答。罪在**本可行动却被动**，不在闲置本身。**等待前若有 blocked 在「可能静默失败的 in-flight 后台任务」上的 path，先 arm 一个 watchdog 自我唤醒**——harness 的自动重唤起只在任务*完成*时触发，对 hang / 静默死 / 幽灵任务（永不触发完成事件）结构性失明；watchdog 是补这个盲区的安全网（纯 awaiting-user 不需，那条线既有通知覆盖）。探活分两轨（机械 watchdog 兜底 ∥ 心智搭车探活防迟钝）、ceiling 是 recon 触发器**不是死亡判据**（recon 后健康则延长重 arm、不误杀）——机制 / 触发条件 / 节制判据 / board `wakeup` 双层记录见 `references/async-hitl.md` §等待前 arm watchdog。
 5. **量力而行，不顶满 (Work within capacity — don't max it out)** — 限制 WIP，瞄一条**目标走廊上界**而非冲到 100%（Little's Law + 利用率悬崖；加 agent 不总是更快）。capacity 在 Codex 只指当前账号的 **7d hard ceiling**；rolling-24h 只是过快消耗 advisory。历史或额外 `five_hour` / 5h 输入只保留为 ignored provenance，不得触发 `throttle`、`switch`、`stop_5h`、reset 或 wakeup；Codex 自动换号永久禁止。只有 7d 压力可以让你单侧收紧：降档、降 WIP、推迟 float，必要时停派或 surface 用户；rolling-24h 只提示复核节奏，不单独授权动作。同池多块 active board 时，先读 `coordination inbox` 或跑 `ccm coordination arbitrate --json`，把 fresh own row 纳入 WIP / 模型档 / dispatch 判断。**`stop_7d`（7d≥85% 跨窗口硬总闸）：停派新节点——不 dispatch 新活，把「是否继续消耗 7d 配额」作为 `blocked_on:"user"` surface 给用户拍板。** 用 `ccm usage advise` / `coordination arbitrate` 感知、按 `pacing-and-estimation` 读取 provider-authoritative 部分；ccm 出事实与 advisory，你决策。Codex 下不要 drill `references/cost-decisions.md` 当换号手册。
@@ -175,6 +175,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 | reference | 何时 drill |
 |---|---|
+| `goal-contract.md` | fresh 澄清/改写目标、长需求落 Goal Brief、工作追溯、防 scope 漂移、amend revision、完成前全局验收 |
 | `decomposition.md` | 一张**已切好**的 DAG 怎么**排期**（CPM / float / 临界路径；心算 或 `ccm board graph` 机器算 §3） |
 | `model-allocation.md` | 读取 host 模型事实后，怎样按复杂性 / 风险 / duration 分档，以及配额收紧时怎样联动 WIP / float / background / watchdog / 用户决策 |
 | `dispatch.md` | 选 Codex 当前 surface 可追踪后台机制（subagent / 后台 terminal / cloud task / external scheduler / automation）+ **派发卫生**；API 会话先发现 deferred subagent 工具；Workflow 语义当前 unsupported |
@@ -243,7 +244,7 @@ digraph decision_program {
 }
 ```
 
-这张 graph *就是*控制流。有六件事塞不进任何一条边：**(a)** dispatch 在 HITL 进行中照样触发——不依赖那个待答问题的就绪工作并行派发，于是一段密集的前台 Q&A 绝不会把独立目标串行化；**(b)**「verify」指*独立地、在你自己的端点上*验，绝不是对 agent 自报的一次重读；**(c)** 走 `wait` 那条边之前，先写 **step-6 ledger**（每条 path 的自检 + 验收证据，对话与 board 双写——确切形态与它为什么重要见 `references/async-hitl.md` §"The step-6 ledger — the fixed shape (single source)"），再 flush；**(d)** recon（reconcile）时**逐个对账每个 `in_flight` 是否都有真实 handle**——无 handle 的 `in_flight` 是幽灵任务（phantom），board / 自报都会显示「在跑」，唯有 git / 工具结果的地面真相能戳穿（验证法见 `references/dispatch.md` §「派发卫生」）；**(e)** 走 `wait` 边前，若有 path blocked 在「可能静默失败的 in-flight 后台任务」上，**arm 一个 watchdog 自我唤醒**（间隔回来 recon 对地面真相，补 harness 完成事件对 hang / 静默死 / phantom 的盲区；纯 awaiting-user 不需）——机制 + board `wakeup` 双层记录见 `references/async-hitl.md` §等待前 arm watchdog；**(f)** dispatch 前过 Codex 7d 硬闸——越过当前 policy 边界就不派新节点，把「是否继续消耗」作为 `blocked_on:"user"` 决策；在飞任务可跑到安全点并验收。hook 的非阻断只说明它不物理拦工具调用，执行暂停仍由你负责。
+这张 graph *就是*控制流。有七件事塞不进任何一条边：**(a)** recon / dispatch / fill / verify 前都以当前 Goal Contract revision 跑 Goal Trace Test；新发现先过 Delta Classifier，绝不让 task 反向偷偷扩 goal（见 `references/goal-contract.md`）；**(b)** dispatch 在 HITL 进行中照样触发——不依赖那个待答问题的就绪工作并行派发，于是一段密集的前台 Q&A 绝不会把独立目标串行化；**(c)**「verify」指*独立地、在你自己的端点上*验，且同时验 task local acceptance 与当前 revision 的 global acceptance，绝不是对 agent 自报的一次重读；**(d)** 走 `wait` 那条边之前，先写 **step-6 ledger**（每条 path 的自检 + 验收证据，对话与 board 双写——确切形态与它为什么重要见 `references/async-hitl.md` §"The step-6 ledger — the fixed shape (single source)"），再 flush；**(e)** recon（reconcile）时**逐个对账每个 `in_flight` 是否都有真实 handle**——无 handle 的 `in_flight` 是幽灵任务（phantom），board / 自报都会显示「在跑」，唯有 git / 工具结果的地面真相能戳穿（验证法见 `references/dispatch.md` §「派发卫生」）；**(f)** 走 `wait` 边前，若有 path blocked 在「可能静默失败的 in-flight 后台任务」上，**arm 一个 watchdog 自我唤醒**（间隔回来 recon 对地面真相，补 harness 完成事件对 hang / 静默死 / phantom 的盲区；纯 awaiting-user 不需）——机制 + board `wakeup` 双层记录见 `references/async-hitl.md` §等待前 arm watchdog；**(g)** dispatch 前过 Codex 7d 硬闸——越过当前 policy 边界就不派新节点，把「是否继续消耗」作为 `blocked_on:"user"` 决策；在飞任务可跑到安全点并验收。hook 的非阻断只说明它不物理拦工具调用，执行暂停仍由你负责。
 
 **决策程序是一个手动跑的 dataflow scheduler——一个 TFU。** dispatch-when-ready、让等待相互重叠、唯 ready 集合为空才停：这与 `pipeline()` 在 workflow 里作为代码跑的是同一套 dataflow 思想，只是这里内化成了纪律——因为主线 DAG 是动态的，而且里面有一个人。这个两尺度、自相似的画面——以及何时*不该* pipeline——在 `references/dispatch.md`（"Dataflow at two scales"）。
 
@@ -270,7 +271,7 @@ digraph decision_program {
 
 拿不准就回到默认：能派出去的实现工作一律 `subagent`，`master-orchestrator` 只收你亲手不可外包的那几件。
 
-dev 任务的派发 prompt 至少带六件事：**objective**（acceptance / non-goals）、**measurement**（测试 / repro / endpoint / 人验口径）、**artifact**（路径 / diff / 报告 / hash）、**constraints**（依赖 / 架构 / blast radius）、**stop-or-restart**（验收即停；plateau / false gradient / 同形失败时重启或升级）、**skill pointers**（`dev-as-ml-loop` 管循环形状，设计 / 测试手艺再带 `engineering-with-craft`）。这六项是 handoff 质量，不是实现细节。**非原子 / 非一次性可验的节点，默认还须含第七件事**：先产出或引用一份已认可 spec，或先派一轮 scoping——是否命中「值得 SDD」的场景、动手前的硬闸判定见 `engineering-with-craft` 的 sdd.md；acceptance 写得再清楚也不能替代这一步（它锁不住存储选型 / 并发语义 / 失败模式这类内部决策）。
+dev 任务的派发 prompt 至少带六件事：**objective**（含当前 goal revision、acceptance / non-goals）、**measurement**（测试 / repro / endpoint / 人验口径）、**artifact**（路径 / diff / 报告 / hash）、**constraints**（依赖 / 架构 / blast radius）、**stop-or-restart**（验收即停；plateau / false gradient / 同形失败时重启或升级）、**skill pointers**（`dev-as-ml-loop` 管循环形状，设计 / 测试手艺再带 `engineering-with-craft`）。这六项是 handoff 质量，不是实现细节。**非原子 / 非一次性可验的节点，默认还须含第七件事**：先产出或引用一份已认可 spec，或先派一轮 scoping——是否命中「值得 SDD」的场景、动手前的硬闸判定见 `engineering-with-craft` 的 sdd.md；acceptance 写得再清楚也不能替代这一步（它锁不住存储选型 / 并发语义 / 失败模式这类内部决策）。
 
 - 详细机制选择（三种后台机制、parallel vs pipeline、escalation、派发卫生）见 `references/dispatch.md`。
 - executor 字段怎么写进 board（各值必填字段、选择决策树）见 `using-ccm` skill 的 `references/board-model-guide.md`。

@@ -56,20 +56,24 @@ chmod +x "$CORE"
 
 # Both due: emits followup_message, writes both runtime timestamps, includes critpath.
 H="$(make_project)"
-seed_board "$H" '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-i"},"tasks":[{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":["T1"]}],"runtime":{"last_identity_remind":"2026-07-03T00:00:00Z","last_critpath_remind":"2026-07-03T09:00:00Z"}}'
+seed_board "$H" '{"schema":"cc-master/v2","goal":"g","goal_contract":{"schema":"ccm/goal-contract/v1","revision":2,"assurance":"confirmed","updated_at":"2026-07-03T00:00:00Z"},"owner":{"active":true,"session_id":"sess-i"},"tasks":[{"id":"T1","status":"done","deps":[]},{"id":"T2","status":"in_flight","deps":["T1"]}],"runtime":{"last_identity_remind":"2026-07-03T00:00:00Z","last_critpath_remind":"2026-07-03T09:00:00Z"}}'
 run_stop "$H" "sess-i"
 assert_contains "$HOOK_OUT" '"followup_message"' "due -> followup_message"
 assert_not_contains "$HOOK_OUT" '"additional_context"' "due -> not additional_context"
 assert_contains "$HOOK_OUT" "身份周期提示" "identity nudge present"
 assert_contains "$HOOK_OUT" "1/2 个任务" "critpath count present"
 assert_contains "$HOOK_OUT" "behind schedule" "estimate verdict present"
+assert_contains "$HOOK_OUT" "目标对齐周期提示" "goal alignment nudge present"
+assert_contains "$HOOK_OUT" "r2 confirmed" "goal alignment names revision and assurance"
+assert_contains "$HOOK_OUT" "有用不等于相关" "goal alignment rejects drift"
 assert_eq "$NOW" "$(runtime_value "$H" last_identity_remind)" "identity timestamp written"
 assert_eq "$NOW" "$(runtime_value "$H" last_critpath_remind)" "critpath timestamp written"
+assert_eq "$NOW" "$(runtime_value "$H" last_goal_remind)" "goal timestamp written"
 rm -rf "$H"
 
 # Not due: silent.
 H="$(make_project)"
-seed_board "$H" '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-i"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}],"runtime":{"last_identity_remind":"2026-07-03T11:59:00Z","last_critpath_remind":"2026-07-03T11:59:00Z"}}'
+seed_board "$H" '{"schema":"cc-master/v2","goal":"g","goal_contract":{"schema":"ccm/goal-contract/v1","revision":2,"assurance":"confirmed","updated_at":"2026-07-03T00:00:00Z"},"owner":{"active":true,"session_id":"sess-i"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}],"runtime":{"last_identity_remind":"2026-07-03T11:59:00Z","last_critpath_remind":"2026-07-03T11:59:00Z","last_goal_remind":"2026-07-03T11:59:00Z"}}'
 run_stop "$H" "sess-i"
 assert_eq "" "$HOOK_OUT" "not due -> silent"
 rm -rf "$H"

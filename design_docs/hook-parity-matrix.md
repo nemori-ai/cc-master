@@ -43,7 +43,6 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | rule | kind | affected hosts | tracked by |
 | --- | --- | --- | --- |
 | bootstrap-slash-command-expansion | protocol-capability-gap | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md |
-| bootstrap-ccm-hard-precheck-missing-on-codex | host-convention-divergence | codex | backlog — not in HOOKPAR-DEC's four-item fix scope (FUSE / rollup / board-guard fallback / ADR-018 tags); needs its own follow-up to port ADR-021's fail-loud precheck to Codex bootstrap |
 | bootstrap-beforeSubmitPrompt-envelope | protocol-capability-gap | cursor | plugin v0.17.2 envelope fix |
 
 ### coordination-inbox

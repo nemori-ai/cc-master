@@ -20,14 +20,20 @@ under `<home>/boards/`. This hook is what creates that condition — either by w
   silent (dormant, since arming hasn't happened yet).
 - `rule-bootstrap-fresh-arm`: on fresh trigger (no `--resume`), create a new `<home>/boards/*.board.json`
   and stamp `owner.session_id` = the current session id, `owner.active = true`. This is the ARM act.
+- `rule-bootstrap-raw-request-is-evidence`: the free-form text in the trigger is source evidence, not
+  the canonical goal. Fresh bootstrap must never pass it as `ccm board init --goal` or otherwise
+  copy it into `board.goal`; the new board starts with `goal:""` and a
+  `ccm/goal-contract/v1` skeleton at revision 1 with `assurance:"pending"`. The injected next step
+  tells the agent to load `master-orchestrator-guide`, refine an unambiguous goal, persist it through
+  `ccm goal set`, and run `ccm goal check` before DAG decomposition.
 - `rule-bootstrap-structured-created-path`: fresh bootstrap obtains the created artifact path only
   from `ccm board init --json`'s schema-owned `data.board_path` field. The path must be absolute and
   identify a board artifact; hook implementations must not scrape human-readable CLI output.
   Spaces, Unicode, and symlinked homes are opaque path data and do not change ARM semantics.
-- `rule-bootstrap-structured-path-capability`: before the Claude Code implementation performs the
+- `rule-bootstrap-structured-path-capability`: before any host implementation performs the
   mutating init, legacy migration, or directory creation, it runs the read-only
   `CC_MASTER_NO_AUTOINSTALL=1 ccm board init --capabilities --json --no-input` endpoint and requires capability
-  `board-init/structured-board-path-v1`. Capability is authoritative because independently released
+  both `board-init/structured-board-path-v1` and `goal-contract/v1`. Capability is authoritative because independently released
   plugin/ccm builds may share version `0.20.0`. Missing or malformed capability output fails loudly
   before any persistent effect. The first planned compatible release is ccm `0.21.0`; an older ccm
   rejects the unknown flag during argument parsing, before its legacy init resolver can create a
@@ -41,7 +47,8 @@ under `<home>/boards/`. This hook is what creates that condition — either by w
   unique-match rule when no selector given), refuse to steal a board that is currently
   `owner.active:true` for a *different* session, otherwise re-stamp `owner.session_id` to the current
   session and set `owner.active = true` (including reviving an archived board). `tasks[]` / `log[]` /
-  `goal` / `git` are preserved untouched.
+  `goal` / `goal_contract` / `git` are preserved untouched. Resume context requires `ccm goal check`
+  and reading the current Goal Brief (when present) before reconciling or dispatching work.
 - `rule-bootstrap-init-flags`: `--priority` / `--wip` / `--owner-wip` / `--policy-switch` passed on the
   triggering prompt are applied to the newly-armed board's coordination/scheduling/policy fields at
   init time (best-effort — a flag-apply failure must not block arming).
@@ -66,10 +73,14 @@ from AGENTS.md §12's `runHook`/`isArmed` grep door). Its own "gate" is the trig
 ## PARITY anchors
 
 ```yaml
-- rule: rule-bootstrap-ccm-hard-precheck
+- rule: rule-bootstrap-fresh-arm
   required_hosts: [claude-code, cursor]
+- rule: rule-bootstrap-ccm-hard-precheck
+  required_hosts: [claude-code, codex, cursor]
 - rule: rule-bootstrap-structured-path-capability
-  required_hosts: [claude-code]
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-bootstrap-raw-request-is-evidence
+  required_hosts: [claude-code, codex, cursor]
 ```
 
 ## 降级行为
@@ -88,20 +99,6 @@ from AGENTS.md §12's `runHook`/`isArmed` grep door). Its own "gate" is the trig
     rule-bootstrap-trigger-prefix (including the bare `cc-master-as-master-orchestrator` form a user
     would actually type without slash-command sugar).
   tracked_by: "adrs/ADR-028-hook-parity-contract-and-normalization.md"
-
-- rule: bootstrap-ccm-hard-precheck-missing-on-codex
-  kind: host-convention-divergence
-  affected_hosts: [codex]
-  reason: >
-    Discovered during HOOKPAR-DEC drafting (out of the four originally-scoped divergences, so fixed
-    in a follow-up rather than this PR): claude-code bootstrap-board.sh hard-checks `command -v ccm`
-    (or `$CCM_BIN`) before creating/arming a board and refuses to arm with a user-facing directive if
-    `ccm` is missing (ADR-021). codex bootstrap-board-core.js has no equivalent precheck — it spawns
-    `ccm` directly (board init / update / policy set) and only degrades per-call (via try/catch
-    `notes.push(...)`), so a missing `ccm` on Codex can still arm an empty, half-initialized board
-    rather than refusing to arm at all.
-  compensating_mechanism: "none yet — per-call spawn failures are caught and reported as notes, but arming still proceeds."
-  tracked_by: "backlog — not in HOOKPAR-DEC's four-item fix scope (FUSE / rollup / board-guard fallback / ADR-018 tags); needs its own follow-up to port ADR-021's fail-loud precheck to Codex bootstrap"
 
 - rule: bootstrap-beforeSubmitPrompt-envelope
   kind: protocol-capability-gap

@@ -78,6 +78,33 @@ function rollupOwnersViaCcm(boardPath) {
   return owners;
 }
 
+// PARITY: rule-verify-board-goal-integrity
+function goalCheckViaCcm(boardPath, homeDir, board) {
+  const contract = board && board.goal_contract;
+  if (!contract) return { verdict: 'legacy' };
+  if (typeof contract !== 'object' || contract.schema !== 'ccm/goal-contract/v1') return { verdict: 'malformed' };
+  try {
+    const r = spawnSync(CCM_BIN, ['goal', 'check', '--board', boardPath, '--json', '--no-input'], {
+      encoding: 'utf8', timeout: 15000, env: { ...process.env, CC_MASTER_HOME: homeDir },
+    });
+    if (!r || r.error || r.signal || r.status !== 0) return { verdict: 'check_unavailable' };
+    const parsed = JSON.parse(r.stdout || '{}');
+    return parsed && parsed.ok === true && parsed.data ? parsed.data : { verdict: 'malformed' };
+  } catch (_) {
+    return { verdict: 'check_unavailable' };
+  }
+}
+
+function completePendingDecision(task) {
+  if (!task || task.status !== 'blocked' || task.blocked_on !== 'user') return false;
+  const dp = task.decision_package;
+  if (!dp || typeof dp !== 'object' || Array.isArray(dp)) return false;
+  const required = ['context_md', 'what_i_need', 'ask_type', 'inputs_hash', 'enter_cmd'];
+  if (!required.every((key) => typeof dp[key] === 'string' && dp[key].trim() !== '')) return false;
+  if (!/^sha256:[0-9a-f]{64}$/.test(dp.inputs_hash)) return false;
+  return dp.ask_type !== 'decision' || (Array.isArray(dp.options) && dp.options.length > 0);
+}
+
 // PARITY: rule-verify-board-fuse
 const FUSE = 5;
 // ISO-8601-UTC 严格定宽（与 board-model.js 同口径）。定宽 + Z 后缀的串按字典序即时间序。
@@ -204,12 +231,26 @@ function body(ctx) {
   let emptyActive = false;       // 任一匹配板 0 task
   let actionable = false;        // 任一匹配板有 ready / uncertain task
   let watchdogNeeded = false;    // 任一匹配板有 in_flight task 但无 armed watchdog
+  let goalIntegrityProblem = '';
+  let pendingGoal = false;
+  let pendingDecisionPackageOnly = matched.length > 0;
 
-  for (const { board } of matched) {
+  for (const { name, path: boardPath, board } of matched) {
     // top-level task 数组（JSON.parse 让嵌套 log[] 里的 status 天然不冒充顶层 task）。
     const tasks = Array.isArray(board.tasks) ? board.tasks : [];
     const realTasks = tasks.filter((t) => t && typeof t === 'object' && !Array.isArray(t) &&
                                           typeof t.id === 'string' && t.id !== '');
+    const goalState = goalCheckViaCcm(boardPath, HOME_DIR, board);
+    if (!['ok', 'legacy', 'pending'].includes(goalState.verdict)) {
+      goalIntegrityProblem += `${name}: ${goalState.verdict || 'malformed'}; `;
+    }
+    if (goalState.verdict === 'pending') {
+      pendingGoal = true;
+      const decisionOnly = realTasks.length > 0 && realTasks.every(completePendingDecision);
+      if (!decisionOnly) pendingDecisionPackageOnly = false;
+    } else {
+      pendingDecisionPackageOnly = false;
+    }
     if (realTasks.length === 0) emptyActive = true;   // 0 个真 task（有 id 的顶层对象）→ 空板
     let hasInFlight = false;
     for (const t of realTasks) {
@@ -231,6 +272,12 @@ function body(ctx) {
     const lines = [];
     lines.push(`watchdog_needed:${watchdogNeeded ? 1 : 0}`);
     for (const { board } of matched) {
+      const contract = board && board.goal_contract;
+      if (contract && contract.schema === 'ccm/goal-contract/v1') {
+        const briefHash = contract.brief && typeof contract.brief.sha256 === 'string' ? contract.brief.sha256 : '';
+        const goal = typeof board.goal === 'string' ? board.goal : '';
+        lines.push(`goal_contract:${contract.revision || ''}:${contract.assurance || ''}:${goal}:${briefHash}`);
+      }
       const fa = watchdogFireAt(board);
       if (fa) lines.push(`fire_at:${fa}`);
       const tasks = Array.isArray(board.tasks) ? board.tasks : [];
@@ -285,9 +332,24 @@ function body(ctx) {
   // 无匹配 active 板 → dormant → allow。
   if (matched.length === 0) { allow(); return; }
 
+  if (goalIntegrityProblem) {
+    emitBlock(`cc-master: Goal Contract integrity check failed (${goalIntegrityProblem.trim()}). Run ccm goal check/show, restore the immutable Goal Brief or amend explicitly; do not complete against a missing/tampered contract.`);
+    return;
+  }
+
+  if (pendingGoal && pendingDecisionPackageOnly) {
+    allow();
+    return;
+  }
+
+  if (pendingGoal) {
+    emitBlock('cc-master: the Goal Contract is still pending. Clarify/refine the request, persist it with ccm goal set (or surface a complete blocked_on:"user" decision_package), then pass ccm goal check before decomposing or completing work.');
+    return;
+  }
+
   // 空 active 板 → bootstrap 从未填充 → block。
   if (emptyActive) {
-    emitBlock('cc-master: an active board in your home has no tasks. Decompose the goal into a dependency DAG and write tasks[] into it (or archive it with /cc-master:stop) before ending.');
+    emitBlock('cc-master: an active board in your home has no tasks. For a settled/legacy goal, decompose it into a dependency DAG and write tasks[] into it (or archive it with /cc-master:stop) before ending.');
     return;
   }
 
@@ -308,9 +370,9 @@ function body(ctx) {
   }
   // 新（或变了的）完成态 → 记下要握手的指纹，再 block。
   lastFp = fpNow;
-  let handshakeReason = "cc-master: before you stop, self-check against this board's `goal`. " +
+  let handshakeReason = "cc-master: before you stop, self-check against the current Goal Contract revision. " +
     '(1) Is every point that needs the user surfaced / marked `blocked_on:"user"`? ' +
-    '(2) Against the **original goal**, is every to-do actually done — including any NOT yet listed on the board? ' +
+    '(2) Does each task satisfy its local acceptance? (3) Against the current goal and its global acceptance, is every to-do actually done — including any NOT yet listed on the board? ' +
     'If something is missing, add it to `tasks[]` and keep going; only stop once the goal is truly met.';
 
   // H3：若任一匹配板有 task 停在 user 上（status blocked 且 blocked_on:"user"），把这些开放决策点名进握手，

@@ -1106,6 +1106,12 @@ function lintRuntime(board: BoardLike, emit: Emit): void {
       `runtime.last_critpath_remind 是 ${JSON.stringify(r.last_critpath_remind)}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：critpath-nudge 读它判周期阈值——格式不对则退化为「从未提示」(首次必提示)。`,
     );
   }
+  if (badTimestamp(r.last_goal_remind)) {
+    emit(
+      'FMT-RUNTIME',
+      `runtime.last_goal_remind 是 ${JSON.stringify(r.last_goal_remind)}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：goal-alignment nudge 读它判周期阈值——格式不对则退化为「从未提示」(首次必提示)。`,
+    );
+  }
   if (badTimestamp(r.last_account_switch)) {
     emit(
       'FMT-RUNTIME',

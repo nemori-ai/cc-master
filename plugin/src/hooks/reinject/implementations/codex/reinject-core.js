@@ -2,6 +2,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 function readJson() {
   const raw = fs.readFileSync(0, 'utf8');
@@ -54,6 +55,26 @@ function emitContext(context) {
   process.stdout.write(`${JSON.stringify({ kind: 'context', context })}\n`);
 }
 
+function goalLabel(board) {
+  const goal = typeof board.goal === 'string' && board.goal ? board.goal : '(goal not recorded yet)';
+  const contract = board.goal_contract;
+  if (!contract || typeof contract !== 'object' || contract.schema !== 'ccm/goal-contract/v1') return `legacy: ${goal}`;
+  return `r${contract.revision || '?'} ${contract.assurance || 'unknown'}: ${goal}`;
+}
+
+function goalCheck(boardPath, home) {
+  try {
+    const result = spawnSync(process.env.CCM_BIN || 'ccm', ['goal', 'check', '--board', boardPath, '--json', '--no-input'], {
+      encoding: 'utf8', timeout: 10000, env: { ...process.env, CC_MASTER_HOME: home },
+    });
+    if (!result || result.error || result.signal || result.status !== 0) return { verdict: 'check_unavailable' };
+    const parsed = JSON.parse(result.stdout || '{}');
+    return parsed && parsed.ok === true && parsed.data ? parsed.data : { verdict: 'check_unavailable' };
+  } catch (_) {
+    return { verdict: 'check_unavailable' };
+  }
+}
+
 function main() {
   const payload = readJson();
   const event = String(payload.event || payload.hook_event_name || '').toLowerCase();
@@ -66,11 +87,17 @@ function main() {
   let listing = '';
   const dangling = [];
   const emptyBoards = [];
-  for (const { name, board } of boards) {
-    const goal = typeof board.goal === 'string' && board.goal ? board.goal : '(goal not recorded yet)';
-    listing += ` • ${name} [${goal}]`;
+  const goalStops = [];
+  for (const { name, path: boardPath, board } of boards) {
+    const label = goalLabel(board);
+    listing += ` • ${name} [${label}]`;
     const tasks = Array.isArray(board.tasks) ? board.tasks : [];
-    if (tasks.length === 0) emptyBoards.push(`${name} [${goal}]`);
+    const hasContract = !!(board.goal_contract && board.goal_contract.schema === 'ccm/goal-contract/v1');
+    if (hasContract) {
+      const check = goalCheck(boardPath, home);
+      if (check.verdict !== 'ok') goalStops.push(`${name} [${label}] verdict=${check.verdict || 'malformed'}`);
+    }
+    if (tasks.length === 0) emptyBoards.push({ text: `${name} [${label}]`, pending: hasContract && board.goal_contract.assurance === 'pending' });
     for (const task of tasks) {
       if (!task || typeof task !== 'object' || Array.isArray(task)) continue;
       if (task.status !== 'stale' && task.status !== 'escalated') continue;
@@ -81,16 +108,25 @@ function main() {
   }
 
   let context = `You are a cc-master master orchestrator. Your orchestration board(s) live in ${boardsDir(home)}. Active:${listing}. ` +
-    'Re-read the board for the task you are working on (recognise it by its goal), then invoke the master-orchestrator-guide skill ' +
+    'Run ccm goal check for the board you are working on, read its current Goal Brief when present, then invoke the master-orchestrator-guide skill ' +
     'and continue the decision program. In Codex API/tool sessions, if you need subagent dispatch and the multi-agent tools are not visible, ' +
     'use tool_search to surface them before treating subagent dispatch as unavailable; once discovered, use multi_agent_v1.spawn_agent and record the returned handle. ' +
     'Do not restart work already done/verified; integrate any completed background results first.';
 
+  // PARITY: rule-reinject-goal-integrity
+  if (goalStops.length > 0) {
+    context += ` HARD STOP: Goal Contract integrity/assurance requires reconciliation before dispatch: ${goalStops.join(', ')}. ` +
+      'Use ccm goal show/check; refine with ccm goal set, or amend through ccm goal amend. Never bypass a bad Brief hash.';
+  }
+
   // PARITY: rule-reinject-empty-board-hard-stop
   if (emptyBoards.length > 0) {
-    context += ` HARD STOP: active board(s) with zero tasks are not runnable orchestration DAGs: ${emptyBoards.join(', ')}. ` +
-      'Before any implementation, tests, git, push, or PR work, decompose the goal and write tasks with acceptance criteria via ccm task add. ' +
-      'Do not treat an armed empty board as permission to proceed.';
+    const pending = emptyBoards.filter((entry) => entry.pending).map((entry) => entry.text);
+    const settled = emptyBoards.filter((entry) => !entry.pending).map((entry) => entry.text);
+    context += ` HARD STOP: active board(s) with zero tasks are not runnable orchestration DAGs: ${emptyBoards.map((entry) => entry.text).join(', ')}. `;
+    if (pending.length) context += `Pending Goal Contract board(s) ${pending.join(', ')} must be clarified and persisted via ccm goal set, then pass ccm goal check before decomposition. `;
+    if (settled.length) context += `For settled/legacy board(s) ${settled.join(', ')}, write tasks with acceptance criteria via ccm task add. `;
+    context += 'Do not treat an armed empty board as permission to proceed.';
   }
 
   // PARITY: rule-reinject-dangling-nodes

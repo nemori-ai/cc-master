@@ -32,6 +32,14 @@
   - [board archive](#board-archive)
   - [board set-param](#board-set-param)
   - [board stamp-harness](#board-stamp-harness)
+- [namespace goal](#namespace-goal)
+  - [goal set](#goal-set)
+  - [goal confirm](#goal-confirm)
+  - [goal amend](#goal-amend)
+  - [goal show](#goal-show)
+  - [goal check](#goal-check)
+- [namespace capability](#namespace-capability)
+  - [capability check](#capability-check)
 - [namespace task](#namespace-task)
   - [task add](#task-add)
   - [task show](#task-show)
@@ -158,6 +166,8 @@ ccm <alias> [args] [flags]
 | `route` | 对 frozen task + context 给纯 shadow route advice；永远 `spawned:false`、不写 board |
 | `quota` | provider-neutral live quota admission：owner-only observation/reservation store、payer+pool capacity reservation 与 audit；Codex 只认 7d hard window |
 | `board` | 板级：查看 / 校验 / DAG 分析 / 建板 / 改配置 |
+| `goal` | Goal Contract 生命周期：首次转写、用户确认、修订、读取、完整性校验 |
+| `capability` | 独立发版消费者的稳定能力握手（只读） |
 | `task` | 任务：增删改查 + 状态机（DAG 节点） |
 | `log` | append-only 审计轨迹 |
 | `jc` | judgment_calls 自驱决策记录 |
@@ -485,19 +495,19 @@ ccm board init [flags]
 
 | flag | 短名 | 类型 | default | 含义 |
 |---|---|---|---|---|
-| `--goal <str>` | | string | 空串 | 初始 goal |
-| `--github-issue <url>` | | URL | | 以 GitHub issue URL 作为 board 需求来源，写 `board.source.kind=github_issue` / `board.source.url`；若未给 `--goal`，goal 派生为 `GitHub issue: <url>` |
+| `--goal <str>` | | string | 空串 | 显式给值时同时建立 `assurance:asserted` 的 r1 Goal Contract；省略时建立空 goal + `assurance:pending` skeleton |
+| `--github-issue <url>` | | URL | | 仅写 `board.source.kind=github_issue` / `board.source.url` 作为需求证据；绝不把 URL 复制成 goal |
 | `--json` | | bool | | 返回 board 摘要；真实写入含 `data.board_path`，并声明 `data.capabilities` |
 | `--dry-run` | `-n` | bool | false | 跑完整建板校验但不落盘；仍声明 capability，但输出不含 `data.board_path` |
 | `--capabilities` | | bool | false | 只读返回 init 能力列表；不解析路径、不加锁、不建目录，供独立发版的 plugin 写前握手 |
 
-- 例：`ccm board init --goal "试验性编排"` · `ccm board init --github-issue https://github.com/o/r/issues/9`
+- 例：`ccm board init`（master-orchestrator fresh 形态）· `ccm board init --goal "已转写的明确目标"`（显式 asserted）· `ccm board init --github-issue https://github.com/o/r/issues/9`
 - 产物：`<home>/<YYYYMMDDThhmmssZ>-<pid>.board.json`
 - 结构化路径合同：真实 `--json` 输出含绝对 `data.board_path` 和
-  `data.capabilities:["board-init/structured-board-path-v1"]`。用 `--capabilities --json` 做写前握手；
+  `data.capabilities:["board-init/structured-board-path-v1","goal-contract/v1"]`。用 `--capabilities --json` 做写前握手；
   旧 ccm 会在参数解析阶段拒绝该 flag，不会触发 init resolver。`--dry-run --json` 仍声明
   同一 capability，但**省略 `data.board_path`**，因为没有产物被写出；它自身也是零写。
-- 注意：`--github-issue` 是 board source，不会创建 synthetic task；orchestrator 读取 issue 后再拆真实 DAG。
+- 注意：`--github-issue` 是 board source，不会创建 synthetic task 或 authoritative goal；orchestrator 读取 issue、按 Goal Framing Test 转写并 `ccm goal set`，check 通过后再拆真实 DAG。
 
 ### board update
 
@@ -512,7 +522,7 @@ ccm board update [flags]
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--goal <str>` | | string | 重定 goal |
+| `--goal <str>` | | string | 仅 legacy board 可重定 goal；已有 `goal_contract` 时拒绝，须改用 `ccm goal amend` |
 | `--wip-limit <str>` | | int | `scheduling.wip_limit`（并发软上限） |
 | `--owner-wip <str>` | | int | `scheduling.owner_wip_limit` |
 | `--branch <str>` | | string | `git.branch` |
@@ -521,9 +531,9 @@ ccm board update [flags]
 | `--set <path=val>` | | string（可重复） | 设**板级顶层** ✎ 标量（裸 path 落 board 顶层；🔒 `schema`/`goal`/`owner`/`git`/`tasks` 被拒 exit 3；`tasks[<id>].path` 作用于该 task） |
 | `--set-json <path=json>` | | string（可重复） | 设**板级顶层** ✎ 对象/数组（scoping 同上） |
 
-- 例：`ccm board update --goal "收尾冲刺"` · `ccm board update --wip-limit 4 --branch feature-x` · `ccm board update --priority high` · `ccm board update --set notes="收尾备注"`
+- 例：`ccm board update --wip-limit 4 --branch feature-x` · `ccm board update --priority high` · `ccm board update --set notes="收尾备注"` · legacy-only：`ccm board update --goal "收尾冲刺"`
 - `--priority` 写 ✎ `coordination.priority`（板级优先级·`ccm peers` 跨板花名册的裁决主轴 + 机械 fair-share 权重源；缺/坏 → 解析为 `normal`）。枚举校验在 update 端（坏值 exit 2·不静默写非法值）；它是 agent-shaped ✎ 字段（hook 不读·非窄腰）。init 时用户给的板级优先级经此落盘（命令体 bootstrap 段指导 orchestrator 捕获并记入）。
-- 发现：`--goal` 在此是 payload（重定 goal），**不**当发现过滤器——所有 flag 走同一条两层匹配（精确 sid → 未认领 `session_id:""` 兜底），与 `task add` 等一致；隐式发现（无 `--board`）在 `ccm board init` 建的未认领板上对 `--goal` 与 `--wip-limit` **行为一致**。多 active 板时用 `--board <path>` 消歧。
+- 发现：`--goal` 在此是 legacy payload，**不**当发现过滤器；已有 Goal Contract 时 writer 在持锁校验内拒绝静默改写。所有 flag 走同一条两层匹配（精确 sid → 未认领 `session_id:""` 兜底），多 active 板时用 `--board <path>` 消歧。
 
 ### board archive
 
@@ -574,6 +584,75 @@ ccm board stamp-harness [flags]
 - 例：`ccm board stamp-harness --board <path> --json`
 
 ---
+
+## namespace goal
+
+Goal Contract 是 `board.goal` 的 revisioned 写入面。raw request / issue 只作证据；agent 先澄清转写，再通过本 namespace 持久化。`--brief-file` 的输入必须是 ≤1 MiB、有效 UTF-8、非 symlink 的普通文件；ccm 把它复制到 `<home>/goals/<board-stem>/rNNNN.goal.md`，以 `0600` 权限保存，并在 `board.goal_contract.brief` 记录 home-relative ref + SHA-256。revision 文件 immutable，不覆盖旧版。
+
+### goal set
+
+**写**：首次把 pending skeleton / legacy board 转成 r1 Goal Contract。
+
+```bash
+ccm goal set --summary "<normalized goal>" --assurance <pending|asserted> [--brief-file /abs/goal.md]
+```
+
+- `--summary`、`--assurance` 必填；已有非 skeleton contract 时拒绝，改用 `goal amend`。
+- `asserted` 表示 agent 按安全默认补齐且 Goal Framing Test 通过；不是伪造用户确认。
+- 例：`ccm goal set --board /abs/x.board.json --summary "交付一份通过验收的 draft PR，不合并" --assurance asserted --brief-file /tmp/goal.md`
+
+### goal confirm
+
+**写**：把当前 revision 的 assurance 升到 `confirmed`，revision 不变。
+
+```bash
+ccm goal confirm --user-authorized
+```
+
+- `--user-authorized` 必填且只代表当前对话已有真实用户确认；agent 绝不自授权。
+
+### goal amend
+
+**写**：需求语义变化时创建下一 revision，并 append 审计 log；旧 Brief 保留不覆盖。
+
+```bash
+ccm goal amend --summary "<new normalized goal>" --reason "<semantic delta>" \
+  --assurance <pending|asserted> [--brief-file /abs/new-goal.md]
+```
+
+- `--summary`、`--reason`、`--assurance` 必填。新 revision 不继承旧 Brief 指针；仍需完整长背景时显式给新版 `--brief-file`。
+
+### goal show
+
+**只读**：显示 summary、contract 与受管 Brief 绝对路径；legacy board 的 contract 显示为 legacy/null。
+
+```bash
+ccm goal show [--json]
+```
+
+### goal check
+
+**只读**：校验 contract 形状、Brief containment / 普通文件 / 存在性 / SHA-256。
+
+```bash
+ccm goal check [--json]
+```
+
+- verdict：`ok`（settled + integrity valid）、`pending`（还须澄清/确认）、`legacy`（旧板，无 contract）、`malformed`、`missing_brief`、`hash_mismatch`。
+- `malformed|missing_brief|hash_mismatch` exit 3；`ok|pending|legacy` exit 0。exit 0 不代表 pending 可以执行，调用方必须读取 verdict。
+
+## namespace capability
+
+### capability check
+
+**只读、零写**：检查当前独立发版的 ccm 是否兑现指定稳定 capability。
+
+```bash
+ccm capability check <capability-id> [--json]
+```
+
+- 当前稳定 id：`board-init/structured-board-path-v1`、`goal-contract/v1`。
+- 支持时 exit 0 + `supported:true`；未知/不支持时 exit 3。plugin bootstrap 用它/等价 init capability envelope 做写前握手。
 
 ## namespace task
 
@@ -2352,7 +2431,7 @@ id 不存在时 `data` = `null`，exit 0。
 
 ```json
 {
-  "capabilities": ["board-init/structured-board-path-v1"],
+  "capabilities": ["board-init/structured-board-path-v1", "goal-contract/v1"],
   "board_path": "/abs/home/boards/<generated-board-name>",
   "goal": "catalog probe demo",
   "owner": { "active": true, "session_id": "", "heartbeat": "2026-07-13T12:00:00Z" },
@@ -2365,7 +2444,7 @@ id 不存在时 `data` = `null`，exit 0。
 示例里的 `board_path` 代表实际绝对 board artifact 路径。`ccm board init --dry-run --json`
 的 `data.capabilities` 相同，但输出**不含 `data.board_path`**：dry-run 没有写出可命名的
 artifact。消费者应先用 `ccm board init --capabilities --json` 做兼容性握手；该只读端点返回
-`{"ok":true,"data":{"capabilities":["board-init/structured-board-path-v1"]}}`，不解析或创建任何路径。
+`{"ok":true,"data":{"capabilities":["board-init/structured-board-path-v1","goal-contract/v1"]}}`，不解析或创建任何路径。
 不得从人读 stdout 抓路径，也不得把 dry-run 当成已创建。
 
 ### board lint（`ccm board lint --json` / `ccm lint --json`）

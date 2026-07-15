@@ -19,6 +19,12 @@ critical-path status) that re-grounds the agent without gating anything.
 - `rule-identity-nudge-critpath-cadence`: the critical-path reminder fires on the same due/write-back
   pattern (default 2h interval) using `ccm board critical-path` + `ccm estimate evm` to report
   done/total critical-chain progress and an on-track/behind-schedule clause when a baseline exists.
+- `rule-identity-nudge-goal-cadence`: independently of identity/critical-path cadence, a Goal Contract
+  reminder fires when `board.runtime.last_goal_remind` is missing or older than the interval
+  (default 2h, overridable) and its ccm write-back succeeds. It names the current revision,
+  assurance, and compact goal, and reminds the orchestrator that “有用不等于相关”: continue only
+  work traceable to the current goal/acceptance criteria; classify discoveries as in-scope,
+  amendment, follow-up, or unrelated rather than silently expanding scope.
 - `rule-identity-nudge-tag-protocol`: both reminders are wrapped as
   `<advisory strength="weak" source="identity-nudge"|"critpath-nudge">` — periodic, low-stakes,
   reasonably ignorable nudges, never a gate.
@@ -31,13 +37,15 @@ critical-path status) that re-grounds the agent without gating anything.
 
 Single-active-board gate (stricter than the general `arm:'boards'` multi-board pattern — see
 `rule-identity-nudge-single-board-gate`). Writes only `runtime.last_identity_remind` /
-`runtime.last_critpath_remind` through the `ccm board set-param` whitelisted-key path (ADR-020) —
+`runtime.last_critpath_remind` / `runtime.last_goal_remind` through the `ccm board set-param` whitelisted-key path (ADR-020) —
 never touches the narrow waist.
 
 ## PARITY anchors
 
 ```yaml
 - rule: rule-identity-nudge-tag-protocol
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-identity-nudge-goal-cadence
   required_hosts: [claude-code, codex, cursor]
 ```
 

@@ -35,6 +35,7 @@ assert_file "$BOARD" "cursor bootstrap board created"
 assert_contains "$HOOK_OUT" "--board $BOARD" "cursor bootstrap gives exact ccm board path"
 
 GOAL="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.goal||""));' "$BOARD")"
+GOAL_CONTRACT="$(node -e 'const b=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const c=b.goal_contract||{};process.stdout.write(`${c.schema||""}|${c.revision||""}|${c.assurance||""}`);' "$BOARD")"
 SID="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String((b.owner&&b.owner.session_id)||""));' "$BOARD")"
 ACTIVE="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.owner&&b.owner.active));' "$BOARD")"
 WIP="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.scheduling&&b.scheduling.wip_limit));' "$BOARD")"
@@ -42,7 +43,11 @@ PRIORITY="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(p
 POLICY="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.policy&&b.policy.autonomous_account_switch));' "$BOARD")"
 SESSION_STATE="$HOME_DIR/sessions/cursor-sess-1.json"
 
-assert_eq "Ship the slice" "$GOAL" "cursor bootstrap records goal"
+assert_eq "" "$GOAL" "cursor bootstrap does not copy raw request into goal"
+assert_eq "ccm/goal-contract/v1|1|pending" "$GOAL_CONTRACT" "cursor bootstrap creates pending goal contract"
+assert_contains "$HOOK_OUT" "ccm goal set" "cursor bootstrap requires refined goal persistence"
+assert_contains "$HOOK_OUT" "ccm goal check" "cursor bootstrap requires goal integrity check"
+assert_contains "$HOOK_OUT" "raw request" "cursor bootstrap distinguishes evidence from canonical goal"
 assert_eq "cursor-sess-1" "$SID" "cursor bootstrap stamps owner.session_id"
 assert_eq "true" "$ACTIVE" "cursor bootstrap arms owner.active"
 assert_eq "2" "$WIP" "cursor bootstrap maps --wip"
@@ -85,7 +90,7 @@ assert_contains "$SLASH_OUT" '"user_message"' "cursor bootstrap slash command us
 SLASH_BOARD="$(find "$SLASH_HOME/boards" -type f -name '*.board.json' | sort | head -n1)"
 SLASH_GOAL="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.goal||""));' "$SLASH_BOARD")"
 SLASH_PRIORITY="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.coordination&&b.coordination.priority));' "$SLASH_BOARD")"
-assert_eq "Slash goal from Cursor" "$SLASH_GOAL" "cursor bootstrap slash command records goal"
+assert_eq "" "$SLASH_GOAL" "cursor bootstrap slash command keeps raw request out of goal"
 assert_eq "normal" "$SLASH_PRIORITY" "cursor bootstrap slash command maps --priority"
 
 GITHUB_SLASH_HOME="$H/github-slash-home"
@@ -104,7 +109,7 @@ assert_contains "$MARKER_OUT" "cc-master fresh: created and armed Cursor orchest
 MARKER_BOARD="$(find "$H/marker-home/boards" -type f -name '*.board.json' | sort | head -n1)"
 MARKER_GOAL="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.goal||""));' "$MARKER_BOARD")"
 MARKER_WIP="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.scheduling&&b.scheduling.wip_limit));' "$MARKER_BOARD")"
-assert_eq "Marker goal" "$MARKER_GOAL" "cursor bootstrap marker recovers goal"
+assert_eq "" "$MARKER_GOAL" "cursor bootstrap marker keeps raw request out of goal"
 assert_eq "3" "$MARKER_WIP" "cursor bootstrap marker recovers --wip"
 
 RESUME_HOME="$H/resume-home"
@@ -141,6 +146,7 @@ RESUME_RC=$?
 assert_eq 0 "$RESUME_RC" "cursor bootstrap resume rc 0"
 assert_contains "$RESUME_OUT" '"user_message"' "cursor bootstrap resume uses user_message envelope"
 assert_contains "$RESUME_OUT" "cc-master resume: armed Cursor orchestration board" "cursor bootstrap resume reports armed board"
+assert_contains "$RESUME_OUT" "ccm goal check" "cursor resume checks current goal contract before dispatch"
 RESUME_SID="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String((b.owner&&b.owner.session_id)||""));' "$RESUME_BOARD")"
 RESUME_ACTIVE="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String(b.owner&&b.owner.active));' "$RESUME_BOARD")"
 RESUME_TASKS="$(node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(String((b.tasks||[]).length));' "$RESUME_BOARD")"
@@ -161,6 +167,24 @@ assert_contains "$MISSING_OUT" '"continue":false' "cursor bootstrap ccm missing 
 assert_contains "$MISSING_OUT" '"user_message"' "cursor bootstrap ccm missing -> user_message directive"
 assert_contains "$MISSING_OUT" 'source=\"bootstrap\"' "cursor bootstrap ccm missing -> bootstrap directive"
 assert_no_file "$MISSING_HOME/boards" "cursor bootstrap ccm missing creates no board dir"
+
+# Present but incompatible ccm: capability handshake fails closed before boards/ is created.
+OLD_CCM="$H/old-ccm"
+cat >"$OLD_CCM" <<'SH'
+#!/usr/bin/env bash
+if [[ "$*" == *"--capabilities"* ]]; then
+  printf '%s\n' '{"ok":true,"data":{"capabilities":["board-init/structured-board-path-v1"]}}'
+  exit 0
+fi
+exit 99
+SH
+chmod +x "$OLD_CCM"
+INCOMPAT_HOME="$H/incompatible-home"
+INCOMPAT_OUT="$(printf '%s' '{"conversation_id":"cursor-sess-incompatible","session_id":"cursor-sess-incompatible","hook_event_name":"beforeSubmitPrompt","prompt":"cc-master:as-master-orchestrator incompatible ccm","cwd":"/tmp/work"}' \
+  | CC_MASTER_HOME="$INCOMPAT_HOME" CCM_BIN="$OLD_CCM" node "$LAUNCHER" --core "$CORE" 2>/dev/null)"
+assert_contains "$INCOMPAT_OUT" '"continue":false' "cursor incompatible ccm -> continue false"
+assert_contains "$INCOMPAT_OUT" "goal-contract/v1" "cursor incompatible ccm names missing capability"
+assert_no_file "$INCOMPAT_HOME/boards" "cursor incompatible ccm creates no board dir"
 
 rm -rf "$H"
 finish

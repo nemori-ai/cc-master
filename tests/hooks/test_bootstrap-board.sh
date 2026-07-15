@@ -161,9 +161,14 @@ run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"  /cc-master:as-master-o
 assert_eq 0 "$HOOK_RC" "raw command exits 0"
 assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "board created for a raw command prompt (leading whitespace allowed)"
 assert_contains "$HOOK_OUT" "MANDATORY NEXT STEP" "fresh bootstrap requires DAG before work"
-assert_contains "$HOOK_OUT" "zero tasks is not a runnable orchestration" "fresh bootstrap rejects empty-board progress"
+assert_contains "$HOOK_OUT" "pending Goal Contract + zero tasks" "fresh bootstrap rejects empty-board progress"
 BOARD_F="$(ls "$P/.claude/cc-master/boards"/*.board.json | head -n1)"
 assert_contains "$HOOK_OUT" "ccm task add --board $BOARD_F" "fresh bootstrap gives exact ccm board path"
+assert_eq "" "$(board_goal "$BOARD_F")" "fresh bootstrap does not copy raw request into goal"
+assert_contains "$(cat "$BOARD_F")" '"assurance": "pending"' "fresh bootstrap creates pending goal contract"
+assert_contains "$HOOK_OUT" "ccm goal set" "fresh bootstrap requires refined goal persistence before DAG"
+assert_contains "$HOOK_OUT" "ccm goal check" "fresh bootstrap requires goal integrity check before DAG"
+assert_contains "$HOOK_OUT" "原始请求" "fresh bootstrap distinguishes source evidence from canonical goal"
 rm -rf "$P"
 
 # Case G (Finding #15): expanded-body — prompt opens with the bootstrap marker comment on its first

@@ -11,7 +11,7 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 | --- | --- | --- | --- | --- |
 | ccm-quota-account | implemented | partial; read-only provider candidate implemented, usage migration pending | partial | [ccm-quota-account.md](harnesses/capabilities/ccm-quota-account.md) |
 | cross-harness-cached-context | implemented | implemented | implemented-track-b | [cross-harness-cached-context.md](harnesses/capabilities/cross-harness-cached-context.md) |
-| goal-contract-lifecycle | planned | planned | planned-track-b | [goal-contract-lifecycle.md](harnesses/capabilities/goal-contract-lifecycle.md) |
+| goal-contract-lifecycle | implemented | implemented | implemented-track-b | [goal-contract-lifecycle.md](harnesses/capabilities/goal-contract-lifecycle.md) |
 | path-token-resolution | implemented | implemented | implemented | [path-token-resolution.md](harnesses/capabilities/path-token-resolution.md) |
 | post-tool-batch-gate | implemented | unsupported | unsupported | [post-tool-batch-gate.md](harnesses/capabilities/post-tool-batch-gate.md) |
 | role-substrate-reinject | implemented | implemented | implemented | [role-substrate-reinject.md](harnesses/capabilities/role-substrate-reinject.md) |

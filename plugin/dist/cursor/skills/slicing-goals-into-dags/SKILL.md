@@ -9,6 +9,8 @@ description: 'Use when you (orchestrator) carve a goal/epic into a board DAG —
 >
 > **职责边界:** **切**(carve)归本 skill;**排**(schedule:CPM / 临界路径 / 并行度计算)归 master-orchestrator-guide 的 board 协议 reference;**派**(dispatch)归 master-orchestrator-guide;**执行**单个 task 到验收归 dev-as-ml-loop;**写进** board 归 using-ccm。本 skill 只管"怎么把目标切成图"这一刀。
 
+> **前置条件：只切 settled Goal Contract。** raw request / issue / goal 参数只是证据；先按 `${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/references/goal-contract.md` 澄清转写，并让 `ccm goal check` 返回 `ok`（legacy 板保持兼容），再用本 skill 切当前 revision。若 assurance 仍是 `pending`，只准备 `blocked_on:user` `decision_package`，不用一张精致 DAG 掩盖目标歧义。
+
 ---
 
 ## 为什么这一刀最值钱
