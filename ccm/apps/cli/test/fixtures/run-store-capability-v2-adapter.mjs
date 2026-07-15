@@ -15,6 +15,7 @@ function snapshot(observeDurability, operation) {
   if (typeof observeDurability !== 'function') return null;
   const value = observeDurability(operation);
   return {
+    eventSequence: value?.eventSequence ?? 0,
     writes: value?.writes ?? 0,
     fileSyncs: value?.fileSyncs ?? 0,
     directorySyncs: value?.directorySyncs ?? 0,
@@ -23,6 +24,9 @@ function snapshot(observeDurability, operation) {
     targetWrites: value?.targetWrites ?? 0,
     targetFileSyncs: value?.targetFileSyncs ?? 0,
     parentDirectorySyncs: value?.parentDirectorySyncs ?? 0,
+    targetLastWriteEvent: value?.targetLastWriteEvent ?? 0,
+    targetLastFileSyncEvent: value?.targetLastFileSyncEvent ?? 0,
+    parentLastDirectorySyncEvent: value?.parentLastDirectorySyncEvent ?? 0,
   };
 }
 
@@ -42,15 +46,31 @@ function writeObserved(before, after) {
 
 function validateCommittedEvidence(operation, execution, before, after) {
   if (!mutation(operation) || execution.outcome !== 'committed') return;
+  const orderedDurability =
+    before !== null &&
+    after !== null &&
+    Number.isSafeInteger(before.eventSequence) &&
+    Number.isSafeInteger(after.eventSequence) &&
+    Number.isSafeInteger(after.targetLastWriteEvent) &&
+    Number.isSafeInteger(after.targetLastFileSyncEvent) &&
+    Number.isSafeInteger(after.parentLastDirectorySyncEvent) &&
+    after.targetLastWriteEvent > before.eventSequence &&
+    after.targetLastFileSyncEvent > after.targetLastWriteEvent &&
+    after.parentLastDirectorySyncEvent > after.targetLastWriteEvent &&
+    after.targetLastFileSyncEvent <= after.eventSequence &&
+    after.parentLastDirectorySyncEvent <= after.eventSequence;
   if (
     before === null ||
     after === null ||
     !targetEvidenceAdvanced(before, after, 'targetWrites', 'targetIdentity') ||
     !targetEvidenceAdvanced(before, after, 'targetFileSyncs', 'targetIdentity') ||
-    !targetEvidenceAdvanced(before, after, 'parentDirectorySyncs', 'parentDirectoryIdentity')
+    !targetEvidenceAdvanced(before, after, 'parentDirectorySyncs', 'parentDirectoryIdentity') ||
+    !orderedDurability
   ) {
     throw bindRunStoreErrorV2(
-      new Error('committed mutation lacks observed write, file sync, or directory sync'),
+      new Error(
+        'committed mutation lacks an observed final write followed by target file and parent directory syncs',
+      ),
       execution.authority_id,
       operation,
       { effect: 'unknown', retry: 'reconcile-first', code: 'RUN_STORE_RECEIPT_DURABILITY' },

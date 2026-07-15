@@ -13,12 +13,16 @@ const here = dirname(fileURLToPath(import.meta.url));
 const productionModule = join(here, '..', '..', 'src', 'run-store-capability-v2.ts');
 
 const durabilityEvidence = {
+  eventSequence: 0,
   writes: 0,
   fileSyncs: 0,
   directorySyncs: 0,
   writesByIdentity: new Map(),
   fileSyncsByIdentity: new Map(),
   directorySyncsByIdentity: new Map(),
+  lastWriteEventByIdentity: new Map(),
+  lastFileSyncEventByIdentity: new Map(),
+  lastDirectorySyncEventByIdentity: new Map(),
 };
 const originalWriteFileSync = fs.writeFileSync;
 const originalWriteSync = fs.writeSync;
@@ -32,6 +36,11 @@ function objectIdentity(stat) {
 
 function bump(map, identity) {
   map.set(identity, (map.get(identity) ?? 0) + 1);
+}
+
+function recordEvent(map, identity) {
+  durabilityEvidence.eventSequence += 1;
+  if (identity !== null) map.set(identity, durabilityEvidence.eventSequence);
 }
 
 function identityForWriteTarget(target) {
@@ -48,11 +57,16 @@ function count(map, identity) {
   return identity === null ? 0 : (map.get(identity) ?? 0);
 }
 
+function lastEvent(map, identity) {
+  return identity === null ? 0 : (map.get(identity) ?? 0);
+}
+
 fs.writeFileSync = (...args) => {
   const result = originalWriteFileSync(...args);
   durabilityEvidence.writes += 1;
   const identity = identityForWriteTarget(args[0]);
   if (identity !== null) bump(durabilityEvidence.writesByIdentity, identity);
+  recordEvent(durabilityEvidence.lastWriteEventByIdentity, identity);
   return result;
 };
 fs.writeSync = (...args) => {
@@ -60,6 +74,7 @@ fs.writeSync = (...args) => {
   durabilityEvidence.writes += 1;
   const identity = identityForWriteTarget(args[0]);
   if (identity !== null) bump(durabilityEvidence.writesByIdentity, identity);
+  recordEvent(durabilityEvidence.lastWriteEventByIdentity, identity);
   return result;
 };
 fs.fsyncSync = (fd) => {
@@ -69,9 +84,11 @@ fs.fsyncSync = (fd) => {
   if (stat.isDirectory()) {
     durabilityEvidence.directorySyncs += 1;
     bump(durabilityEvidence.directorySyncsByIdentity, identity);
+    recordEvent(durabilityEvidence.lastDirectorySyncEventByIdentity, identity);
   } else {
     durabilityEvidence.fileSyncs += 1;
     bump(durabilityEvidence.fileSyncsByIdentity, identity);
+    recordEvent(durabilityEvidence.lastFileSyncEventByIdentity, identity);
   }
   return result;
 };
@@ -90,6 +107,7 @@ function observeDurability(operation) {
   const targetIdentity = identityAt(target);
   const parentDirectoryIdentity = identityAt(dirname(target));
   return {
+    eventSequence: durabilityEvidence.eventSequence,
     writes: durabilityEvidence.writes,
     fileSyncs: durabilityEvidence.fileSyncs,
     directorySyncs: durabilityEvidence.directorySyncs,
@@ -97,8 +115,17 @@ function observeDurability(operation) {
     parentDirectoryIdentity,
     targetWrites: count(durabilityEvidence.writesByIdentity, targetIdentity),
     targetFileSyncs: count(durabilityEvidence.fileSyncsByIdentity, targetIdentity),
+    targetLastWriteEvent: lastEvent(durabilityEvidence.lastWriteEventByIdentity, targetIdentity),
+    targetLastFileSyncEvent: lastEvent(
+      durabilityEvidence.lastFileSyncEventByIdentity,
+      targetIdentity,
+    ),
     parentDirectorySyncs: count(
       durabilityEvidence.directorySyncsByIdentity,
+      parentDirectoryIdentity,
+    ),
+    parentLastDirectorySyncEvent: lastEvent(
+      durabilityEvidence.lastDirectorySyncEventByIdentity,
       parentDirectoryIdentity,
     ),
   };
@@ -148,6 +175,9 @@ async function consumerFor(mode) {
   }
   if (mode === 'wrong-target-sync') {
     return fixtures.consumeWrongTargetSyncCounterfeitV2;
+  }
+  if (mode === 'pre-sync-final-unsynced-write') {
+    return fixtures.consumePreSyncThenFinalWriteCounterfeitV2;
   }
   if (mode === 'post-publication-failure') {
     return fixtures.consumePostPublicationFailureCounterfeitV2;

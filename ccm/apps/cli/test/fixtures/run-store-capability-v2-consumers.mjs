@@ -376,6 +376,34 @@ export function consumeWrongTargetSyncCounterfeitV2({ env, cwdStat }) {
   });
 }
 
+export function consumePreSyncThenFinalWriteCounterfeitV2({ env, cwdStat }) {
+  const authority = decodeAndValidateAuthorityV2({ env, cwdStat });
+  return capability(authority, (rawOperation) => {
+    const operation = validateOperationV2(rawOperation, authority.grant);
+    const path = join(...operation.segments);
+    const parent = dirname(path);
+    const current = readRegular(operation.segments, 16_777_216);
+    const beforeRevision = current === null ? 'absent' : sha256V2(current);
+    if (beforeRevision !== operation.expected_revision) {
+      throw oracleErrorV2('RUN_STORE_REVISION_CONFLICT', 'counterfeit pre-sync revision conflict', {
+        effect: 'none',
+      });
+    }
+
+    // Sync the exact current target and exact parent while the target still contains old bytes.
+    // The final write deliberately has no later target-file or parent-directory sync.
+    syncPath(path);
+    syncPath(parent);
+    const desired = Buffer.from(operation.bytes_base64, 'base64');
+    writeFileSync(path, desired, { flag: 'w', mode: 0o600 });
+    return createMutationReceiptV2(authority.authority_id, operation, {
+      beforeRevision,
+      afterRevision: sha256V2(desired),
+      byteLength: desired.length,
+    });
+  });
+}
+
 export function consumePostPublicationFailureCounterfeitV2({ env, cwdStat }) {
   const authority = decodeAndValidateAuthorityV2({ env, cwdStat });
   return capability(authority, (rawOperation) => {

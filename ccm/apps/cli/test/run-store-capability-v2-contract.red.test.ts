@@ -47,6 +47,7 @@ type ScenarioMode =
   | 'forged-append-receipt'
   | 'no-write-synced-receipt'
   | 'wrong-target-sync'
+  | 'pre-sync-final-unsynced-write'
   | 'post-publication-failure'
   | 'partial-append'
   | 'wrong-append-prefix'
@@ -545,6 +546,35 @@ test('a synced receipt without observed write and sync calls is rejected', {
     assertBoundError(wrongTarget, 'wrong-target-sync', 'unknown', 'reconcile-first');
   } finally {
     wrongTarget.cleanup();
+  }
+
+  const oldBytes = Buffer.from('old-bytes-synced-before-final-write');
+  const finalBytes = Buffer.from('final-bytes-written-without-later-sync');
+  const preSync = await runScenario(
+    'pre-sync-final-unsynced-write',
+    [
+      replaceOperation(
+        'pre-sync-final-unsynced-write',
+        ['by-run', 'run-a', 'lease', 'supervisor.json'],
+        sha256V2(oldBytes),
+        finalBytes,
+      ),
+    ],
+    (store) => {
+      const parent = join(store, 'by-run', 'run-a', 'lease');
+      mkdirSync(parent, { recursive: true, mode: 0o700 });
+      writeFileSync(join(parent, 'supervisor.json'), oldBytes, { mode: 0o600 });
+    },
+  );
+  try {
+    assertScenarioError(preSync, 'RUN_STORE_RECEIPT_DURABILITY');
+    assertBoundError(preSync, 'pre-sync-final-unsynced-write', 'unknown', 'reconcile-first');
+    assert.deepEqual(
+      readFileSync(join(preSync.pinnedStore, 'by-run', 'run-a', 'lease', 'supervisor.json')),
+      finalBytes,
+    );
+  } finally {
+    preSync.cleanup();
   }
 });
 
