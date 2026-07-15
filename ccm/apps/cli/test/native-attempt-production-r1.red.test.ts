@@ -81,7 +81,7 @@ function invoke(
   return { code, out, err };
 }
 
-function bind(boardPath: string, home: string, command: any) {
+function bind(boardPath: string, home: string, command: any, extra: Record<string, unknown> = {}) {
   const out: string[] = [];
   const err: string[] = [];
   const code = runProduction(
@@ -108,10 +108,56 @@ function bind(boardPath: string, home: string, command: any) {
         CODEX_SESSION_ID: 'session-ref:fixture-origin',
         CC_MASTER_STATUSLINE_AUTO_INSTALL: '0',
       },
+      ...extra,
     } as any,
   );
   assert.equal(typeof code, 'number');
   return { code, out, err };
+}
+
+function rejectionEffectProbe(): {
+  effects: {
+    boardWrites: number;
+    providerResolves: number;
+    providerSpawns: number;
+    providerNetworkRequests: number;
+  };
+  options: Record<string, unknown>;
+} {
+  const effects = {
+    boardWrites: 0,
+    providerResolves: 0,
+    providerSpawns: 0,
+    providerNetworkRequests: 0,
+  };
+  return {
+    effects,
+    options: {
+      writeFileAtomicSync: () => {
+        effects.boardWrites += 1;
+        throw new Error('rejected replay reached the board writer');
+      },
+      providerRuntime: {
+        schema: 'ccm/provider-runtime-capabilities/v1',
+        process: {
+          resolveExecutable: () => {
+            effects.providerResolves += 1;
+            return null;
+          },
+          spawnProvider: () => {
+            effects.providerSpawns += 1;
+            throw new Error('rejected replay reached provider spawn');
+          },
+        },
+        network: {
+          request: () => {
+            effects.providerNetworkRequests += 1;
+            throw new Error('rejected replay reached provider network');
+          },
+        },
+      },
+    },
+  };
 }
 
 function installBindEvidence(
@@ -577,6 +623,78 @@ test('R2 committed launch claim replay requires the exact durable board path and
   }
 });
 
+test('R3 launch replay rejects a coherent create-projection substitution before effects', () => {
+  const value = fixture();
+  const root = mkdtempSync(join(tmpdir(), 'ccm-native-production-r3-launch-projection-'));
+  roots.push(root);
+  const home = join(root, 'home');
+  const boardPath = join(root, 'native.board.json');
+  mkdirSync(home, { recursive: true, mode: 0o700 });
+  writeFileSync(boardPath, `${JSON.stringify(value.initial_board, null, 2)}\n`);
+  const command = clone(value.commands.create);
+  installAdmission(home, command);
+  const created = invoke(boardPath, home, command);
+  assert.equal(created.code, 0, created.err.join('\n'));
+
+  const claimPath = join(
+    home,
+    'native-attempt',
+    'v1',
+    'claims',
+    createHash('sha256').update(command.attempt.dispatch.launch_claim_id).digest('hex'),
+    'current.json',
+  );
+  const board = JSON.parse(readFileSync(boardPath, 'utf8'));
+  const task = board.tasks[0];
+  const attempt = task.routing.attempts[0];
+  for (const selection of [
+    task.routing.selected,
+    attempt.selection_snapshot,
+    attempt.create_snapshot.selection_snapshot,
+    attempt.create_snapshot.attempt.selection_snapshot,
+    command.selection_snapshot,
+    command.attempt.selection_snapshot,
+  ]) {
+    selection.reason_codes = [...selection.reason_codes, 'coherent-projection-substitution'];
+  }
+  attempt.create_hash = sha(attempt.create_snapshot);
+  writeFileSync(boardPath, `${JSON.stringify(board, null, 2)}\n`);
+
+  const beforeBoard = readFileSync(boardPath, 'utf8');
+  const beforeClaim = readFileSync(claimPath, 'utf8');
+  const beforeState = {
+    taskStatus: task.status,
+    attemptState: attempt.state,
+    attempts: task.routing.attempts.length,
+    createHash: attempt.create_hash,
+  };
+  const stagePath = join(dirname(claimPath), 'stage.lock');
+  const probe = rejectionEffectProbe();
+  const replay = invoke(boardPath, home, command, probe.options);
+
+  assert.notEqual(replay.code, 0);
+  assert.match(replay.err.join('\n'), /NATIVE-LAUNCH-CLAIM-REUSED/);
+  assert.equal(readFileSync(boardPath, 'utf8'), beforeBoard);
+  assert.equal(readFileSync(claimPath, 'utf8'), beforeClaim);
+  assert.equal(existsSync(stagePath), false);
+  const after = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.deepEqual(
+    {
+      taskStatus: after.tasks[0].status,
+      attemptState: after.tasks[0].routing.attempts[0].state,
+      attempts: after.tasks[0].routing.attempts.length,
+      createHash: after.tasks[0].routing.attempts[0].create_hash,
+    },
+    beforeState,
+  );
+  assert.deepEqual(probe.effects, {
+    boardWrites: 0,
+    providerResolves: 0,
+    providerSpawns: 0,
+    providerNetworkRequests: 0,
+  });
+});
+
 test('R2 committed evidence replay requires the exact durable board path and projection', () => {
   for (const variant of ['rolled-back-board', 'copied-path', 'current-hash-drift'] as const) {
     const value = fixture();
@@ -627,6 +745,74 @@ test('R2 committed evidence replay requires the exact durable board path and pro
       `${variant}: consumption changed`,
     );
   }
+});
+
+test('R3 evidence replay rejects a coherent binding-projection substitution before effects', () => {
+  const value = fixture();
+  const root = mkdtempSync(join(tmpdir(), 'ccm-native-production-r3-evidence-projection-'));
+  roots.push(root);
+  const home = join(root, 'home');
+  const boardPath = join(root, 'native.board.json');
+  mkdirSync(home, { recursive: true, mode: 0o700 });
+  writeFileSync(boardPath, `${JSON.stringify(value.initial_board, null, 2)}\n`);
+  const command = clone(value.commands.create);
+  installAdmission(home, command);
+  const created = invoke(boardPath, home, command);
+  assert.equal(created.code, 0, created.err.join('\n'));
+  installBindEvidence(home, boardPath, value);
+  const bound = bind(boardPath, home, value.commands.bind);
+  assert.equal(bound.code, 0, bound.err.join('\n'));
+
+  const consumptionPath = join(
+    home,
+    'native-attempt',
+    'v1',
+    'evidence',
+    'consumptions',
+    createHash('sha256').update(`bind\0${value.commands.bind.evidence_record_ref}`).digest('hex'),
+    'current.json',
+  );
+  const board = JSON.parse(readFileSync(boardPath, 'utf8'));
+  const task = board.tasks[0];
+  const attempt = task.routing.attempts[0];
+  attempt.handle_binding.producer_id = 'producer:coherent-projection-substitution';
+  writeFileSync(boardPath, `${JSON.stringify(board, null, 2)}\n`);
+
+  const beforeBoard = readFileSync(boardPath, 'utf8');
+  const beforeConsumption = readFileSync(consumptionPath, 'utf8');
+  const beforeState = {
+    taskStatus: task.status,
+    taskHandle: task.handle,
+    attemptState: attempt.state,
+    attemptHandle: attempt.handle,
+    binding: clone(attempt.handle_binding),
+  };
+  const stagePath = join(dirname(consumptionPath), 'stage.lock');
+  const probe = rejectionEffectProbe();
+  const replay = bind(boardPath, home, value.commands.bind, probe.options);
+
+  assert.notEqual(replay.code, 0);
+  assert.match(replay.err.join('\n'), /NATIVE-EVIDENCE-CLAIM-REUSED/);
+  assert.equal(readFileSync(boardPath, 'utf8'), beforeBoard);
+  assert.equal(readFileSync(consumptionPath, 'utf8'), beforeConsumption);
+  assert.equal(existsSync(stagePath), false);
+  const after = JSON.parse(readFileSync(boardPath, 'utf8'));
+  assert.deepEqual(
+    {
+      taskStatus: after.tasks[0].status,
+      taskHandle: after.tasks[0].handle,
+      attemptState: after.tasks[0].routing.attempts[0].state,
+      attemptHandle: after.tasks[0].routing.attempts[0].handle,
+      binding: after.tasks[0].routing.attempts[0].handle_binding,
+    },
+    beforeState,
+  );
+  assert.deepEqual(probe.effects, {
+    boardWrites: 0,
+    providerResolves: 0,
+    providerSpawns: 0,
+    providerNetworkRequests: 0,
+  });
 });
 
 test('R2 default runProduction executes the complete production evidence verifier', () => {
