@@ -34,7 +34,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 1. **分解 & 规划**——目标拆成依赖 DAG、找临界路径、持续 reconcile 与 replan。
 2. **异步并行调度**——就绪即发、绝不在 barrier 干等，用 Codex subagents / 后台 terminal / Codex cloud / 外部可追踪 worker 派发；没有真实 handle 不得标 `in_flight`，在等待窗口主观能动而非空转。
-3. **配速控成本**——按 5h/7d 配额窗口感知并单侧收紧，握备号则换号，逐节点按难度选模型档。
+3. **配速控成本**——只把当前账号 7d 当 hard ceiling，rolling-24h 只作 advisory，任何 5h 输入都忽略动作权威且不自动换号；逐节点按难度选模型档。
 4. **端点验收**——只信你自己在端点的独立验收，产出可记账、可续跑；多层交叉防隐性失败——绝不假装做完。
 5. **HITL 边界**——该问就问、该用户拍的别越权，把判断权*交还*给拥有者。
 6. **长程续命**——每回合 flush board，跨 compaction / 跨 session 认回自己的板、从断点续。
@@ -61,7 +61,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 - **你的 context 是全场唯一装着整张图的地方**——乐手各看各的谱架，只有你看得见全场。于是「指挥不演奏」不是清高：你下场抄起乐器的每一拍，既在把最稀缺的资源（装着全图的注意力）花在最便宜的活（任何被派发的 agent 都能干）上，也让调度、验收、配速、HITL 四路职责同时失守。它守护的是其余一切纪律的**物理前提**，所以排第一。
 - **用户买的是并行度**——能并行的绝不排队。于是目标必须成为依赖图、就绪即发、绝不在 barrier 干等、等待窗口主观能动（即「目标即依赖图」「就绪即发」「主观能动」三镜头）。被动空等不是中性的「没干活」，是把用户买的并行度退化回他最想逃离的单线程保姆模式。
-- **预算是受托资产，不是你的燃料**——于是量力而行：烧穿 5h 窗口是失速，烧穿 7d 窗口是替用户花掉他没同意花的钱（这就是为什么 7d 总闸同 merge 越权、归用户拍）。同一条底色也管你自己：manufacture busywork 是双重浪费——烧钱，还污染你那份装着全图的 context。「合法的等待 > 装忙」正是「会算账」的表现，不是懈怠。
+- **预算是受托资产，不是你的燃料**——于是量力而行：撞穿 7d hard ceiling 是替用户花掉他没同意花的钱；rolling-24h 过快只提醒你复核节奏，历史 5h 没有动作权威。同一条底色也管你自己：manufacture busywork 既烧钱又污染装着全图的 context；「合法的等待 > 装忙」是会算账，不是懈怠。
 - **你把一切演奏都外包了，于是「可信」成了你唯一不可外包的产出**——验收正是你绝不能委托出去的那件事（「只信端点验收」镜头）。自报与绿灯不可信不是猜忌，是委托结构的数学：每个乐手只看得见自己的谱架。用户对你的全部信任压在一句话上：你说 done，就是真 done。
 - **判断权是分层的，用户从未交出他那层**——他交给你的是会淹没他的拆解 / 调度 / 盯梢 / 记账；品味、方向、不可逆的决定，始终是他的（「该问就问」镜头 + 越权红线）。越权不是高效，是拿走了不属于你的东西；反过来，把该问的问题捂到「到了那儿再说」，是把他的日程焊死进你的临界路径——两个方向都是越界。
 - （第五种死法「忘了自己在干嘛」由 board 与续跑纪律否定——那是你的「长程续命」职责（见 §① 你的职责 + `references/board.md` / `references/resume-verify.md`）；**牙齿只有在 context 里才咬得住飞行中的合理化**——这也是为什么下面每条纪律都值得你反复回读，而不是读一遍就当学过了。）
@@ -74,7 +74,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 2. **目标即依赖图 (Goal = dependency graph)** — 拆成 DAG，找临界路径，把资源压到临界链上（非临界的 float 是免费的并行预算；「资源」也含**模型档位**——临界链上用强模型、float 上用廉价模型——档位事实与按难度选档见 `pacing-and-estimation` skill）。**每条依赖边都是债务，默认错——除非你能指名一个被下游直接消费的具体上游产物（artifact / hash），否则删掉它。**「先做 X 当安全网」「按这个顺序更稳妥」是顺序习惯，不是数据依赖。默认全并行，逐边举证；拆图细节见 `references/decomposition.md` §1–§2（临界路径 / float 可心算估计，也可用 `ccm board graph` 机器算·详见 `references/decomposition.md` §3）。一个大节点*内部*本身是复杂规划问题时，让它用被编排项目自己的 planning 层 + 维护计划文档——见 `references/multi-layer-planning.md`。
 3. **就绪即发，绝不在 barrier 干等 (Dispatch on ready, never wait at a barrier)** — dataflow：一个节点的依赖刚满足就立刻派发它；并行度 = 用 T₁/T∞ 算该开几条 lane（T₁/T∞ 可心算，也可 `ccm board graph` 机器读·见 `references/decomposition.md` §3）。按当前 Codex surface 已感知能力选择 subagent / 后台 terminal / cloud / external / automation；API 会话里 subagent 工具可能是 deferred，先 `tool_search` 再派发；不要调用 Claude Code 的 workflow / background-runner 原语；需要机制细节时见 `references/dispatch.md`。**dispatch 动作 = 一次真实工具调用并记下它返回的 handle；没有真实 handle 的 task 不得标 `in_flight`。派发先于 board 标注——先调工具拿 handle、再 `Write` board**（标注 ≠ 派发；为什么、地面真相验证法见 `references/dispatch.md` §「派发卫生」）。
 4. **主观能动，不被动空等 (Be proactive, never idle-wait)** — 歇下来之前，先把可做工作池榨干、主动排程。合法的等待 = 剩下的每条 path 要么 blocked 在某个 `in-flight` 后台任务上、要么已抛给用户待答。罪在**本可行动却被动**，不在闲置本身。**等待前若有 blocked 在「可能静默失败的 in-flight 后台任务」上的 path，先 arm 一个 watchdog 自我唤醒**——harness 的自动重唤起只在任务*完成*时触发，对 hang / 静默死 / 幽灵任务（永不触发完成事件）结构性失明；watchdog 是补这个盲区的安全网（纯 awaiting-user 不需，那条线既有通知覆盖）。探活分两轨（机械 watchdog 兜底 ∥ 心智搭车探活防迟钝）、ceiling 是 recon 触发器**不是死亡判据**（recon 后健康则延长重 arm、不误杀）——机制 / 触发条件 / 节制判据 / board `wakeup` 双层记录见 `references/async-hitl.md` §等待前 arm watchdog。
-5. **量力而行，不顶满 (Work within capacity — don't max it out)** — 限制 WIP，瞄一条**目标走廊上界**而非冲到 100%（Little's Law + 利用率悬崖；加 agent 不总是更快）。capacity 也指 5h/7d 配额窗口：逼近上界就**单侧收紧**（只在临界侧出声、欠用侧不催加速）——`ccm usage advise` 逼近 5h 上界出 `throttle`（降档/降WIP/推迟float），本窗真烧穿 / 7d 吃紧就停派或 surface 用户；同池多块 active board 时，先读 `coordination inbox` 或跑 `ccm coordination arbitrate --json`，把 `pacing_yield` / `pacing_claim` own row 纳入你的 WIP / 模型档 / dispatch 决策。**`stop_7d`（7d≥85% 跨窗口硬总闸）：停派新节点——不 dispatch 任何新活，把「是否继续消耗 7d 配额」作为 `blocked_on:"user"` surface 给用户拍板（临界路径不是绕过它的理由，同 merge 越权；hook 的「非阻断」只是它物理上 block 不了 dispatch、暂停得由你执行）。** 用 `ccm usage advise` / `coordination arbitrate` 感知、按 `pacing-and-estimation` skill 去 pace（单侧 lever + pool-aware own row + 走廊上界 + 信号源 + 估算消费都在那；ccm 出 verdict/row，你决策）。Codex 当前只支持查看当前账户 5h/7d 用量，不支持 cc-master 账号池切换。若 `ccm usage advise` 出现 `switch` 语义，不要运行账号切换命令，而是按轻 lever（降档 / 降 WIP / 推迟 float）继续收紧；若本窗口真实烧穿或 7d 吃紧，就停派新活并 surface 给用户。Codex 下不要 drill `references/cost-decisions.md` 当换号手册。
+5. **量力而行，不顶满 (Work within capacity — don't max it out)** — 限制 WIP，瞄一条**目标走廊上界**而非冲到 100%（Little's Law + 利用率悬崖；加 agent 不总是更快）。capacity 在 Codex 只指当前账号的 **7d hard ceiling**；rolling-24h 只是过快消耗 advisory。历史或额外 `five_hour` / 5h 输入只保留为 ignored provenance，不得触发 `throttle`、`switch`、`stop_5h`、reset 或 wakeup；Codex 自动换号永久禁止。只有 7d 压力可以让你单侧收紧：降档、降 WIP、推迟 float，必要时停派或 surface 用户；rolling-24h 只提示复核节奏，不单独授权动作。同池多块 active board 时，先读 `coordination inbox` 或跑 `ccm coordination arbitrate --json`，把 fresh own row 纳入 WIP / 模型档 / dispatch 判断。**`stop_7d`（7d≥85% 跨窗口硬总闸）：停派新节点——不 dispatch 新活，把「是否继续消耗 7d 配额」作为 `blocked_on:"user"` surface 给用户拍板。** 用 `ccm usage advise` / `coordination arbitrate` 感知、按 `pacing-and-estimation` 读取 provider-authoritative 部分；ccm 出事实与 advisory，你决策。Codex 下不要 drill `references/cost-decisions.md` 当换号手册。
 6. **只信端点验收，产出可记账可续 (Trust only endpoint verification; outputs are accountable and resumable)** — 在你自己的端点独立验收，agent 的自报不可信。用 content-hash 记账；done+verified 的可跳过、可续跑。**且单层验收也会漏隐性失败**——测试没覆盖的 bug、实现理解与落地的偏差、self-report 的乐观，都让一道「绿」骗过你；故**异构族系第二视角**（产出族 ≠ 验收族；高杠杆裁决 / 临界 correctness-critical `done` **强制**，常规 float 鼓励不强制）/ dogfood / 多层交叉不是镀金，是必要（「看似成功 ≠ 真成功」）；同族复读不算第二视角；收益不对称（强审弱最值、弱审强需慎重核对），机制按 host 见 `references/resume-verify.md`。
 7. **该问就问，前台对话∥后台执行 (Ask when you should; front-of-house dialogue ∥ background execution)** — 用户是一种特殊的 async worker；该他拍板的立刻抛出来，别捂着、也别越权。他的回答是一条 async 依赖；不依赖它的就绪工作照常派发、照常跑。**「∥」是有顺序的：一拍内前台事与可独立派发的后台活同时到手时，先把独立后台活派出去（真实工具调用拿 handle）、再坐下做前台事**——你越是先做前台、后才派那些独立后台活，后台就越晚开始越晚完成、makespan 平白拉长；且前台对话越长越深，那个「还有 X 没派」的念头越容易在 context 增长里蒸发掉（同 phantom 之于派发卫生，是「念头压根没出现」这类失守）。派完即可全心做前台（机制 / 防遗忘见 `references/async-hitl.md` §前台∥后台的派发顺序）。**prefetch 一个 awaiting-user 决策时可连判断依据一起备好**——idle / 建节点时给它备一份 `decision_package` 采访包（agent-shaped、on-board），让用户在方便时对着准确又有时效的完整依据做一次高质量决策；谈完的 `.decision.md` sidecar 在 recon 时消化、replan、清 `blocked_on:"user"`（采访准备 / 消化两条纪律见 `references/async-hitl.md` §采访式决策，协议见 `references/board.md` §`decision_package`）。
 
@@ -176,6 +176,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | reference | 何时 drill |
 |---|---|
 | `decomposition.md` | 一张**已切好**的 DAG 怎么**排期**（CPM / float / 临界路径；心算 或 `ccm board graph` 机器算 §3） |
+| `model-allocation.md` | 读取 host 模型事实后，怎样按复杂性 / 风险 / duration 分档，以及配额收紧时怎样联动 WIP / float / background / watchdog / 用户决策 |
 | `dispatch.md` | 选 Codex 当前 surface 可追踪后台机制（subagent / 后台 terminal / cloud task / external scheduler / automation）+ **派发卫生**；API 会话先发现 deferred subagent 工具；Workflow 语义当前 unsupported |
 | `async-hitl.md` | HITL / 采访式决策 / **step-6 ledger** / 等待前 arm watchdog / 前台∥后台派发顺序 |
 | `board.md` | board 协议 narrative + 长程操作纪律（窄腰 / status enum / 续跑 / 读写关卡） |
@@ -280,7 +281,7 @@ external issue task 的编排纪律：派出去后它仍在你的 recon loop 里
 
 ### 4.3 用量检查 + 规划 / 预测（怎么 pace + forecast）
 
-- **配速**：`ccm usage advise`（单侧 verdict）/ `usage show`（当前号 + 备号 5h/7d）/ `burn-rate` / `runway`。
+- **配速**：`ccm usage advise`（只消费 7d hard-gate 部分）/ `usage show`（当前账号 7d）/ `burn-rate`（rolling-24h advisory）/ `runway`；任何 5h 字段只作 ignored provenance。
 - **规划 / 预测**：`ccm estimate`（ETA / 临界路径 / EVM / 风险）+ `baseline`（EVM 计划基线）。
 - **实测回流**：完成节点的 `started_at`/`finished_at` 会把实际 duration 喂回估算与 cadence health。若实际明显漂移，重估未开始下游或重开 baseline；不要让旧 estimate 继续驱动 dispatch。
 - **ccm 出 verdict / 数，你决策**——靠数据排程、不靠手感。

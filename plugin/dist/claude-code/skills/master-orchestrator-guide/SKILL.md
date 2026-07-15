@@ -34,7 +34,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 1. **分解 & 规划**——目标拆成依赖 DAG、找临界路径、持续 reconcile 与 replan。
 2. **异步并行调度**——就绪即发、绝不在 barrier 干等，用 shell / sub-agent / workflow 三机制派发，在等待窗口主观能动而非空转。
-3. **配速控成本**——按 5h/7d 配额窗口感知并单侧收紧，握备号则换号，逐节点按难度选模型档。
+3. **配速控成本**——按 5h/7d 配额窗口感知并单侧收紧，握备号则按授权换号，逐节点按难度选模型档。
 4. **端点验收**——只信你自己在端点的独立验收，产出可记账、可续跑；多层交叉防隐性失败——绝不假装做完。
 5. **HITL 边界**——该问就问、该用户拍的别越权，把判断权*交还*给拥有者。
 6. **长程续命**——每回合 flush board，跨 compaction / 跨 session 认回自己的板、从断点续。
@@ -176,6 +176,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | reference | 何时 drill |
 |---|---|
 | `decomposition.md` | 一张**已切好**的 DAG 怎么**排期**（CPM / float / 临界路径；心算 或 `ccm board graph` 机器算 §3） |
+| `model-allocation.md` | 读取 host 模型事实后，怎样按复杂性 / 风险 / duration 分档，以及配额收紧时怎样联动 WIP / float / background / watchdog / 用户决策 |
 | `dispatch.md` | 选后台机制（shell / subagent / workflow）+ parallel/pipeline 形状 + **派发卫生** |
 | `async-hitl.md` | HITL / 采访式决策 / **step-6 ledger** / 等待前 arm watchdog / 前台∥后台派发顺序 |
 | `board.md` | board 协议 narrative + 长程操作纪律（窄腰 / status enum / 续跑 / 读写关卡） |

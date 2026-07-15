@@ -5,9 +5,17 @@ mode: copy
 projection:
   source: canonical/
   target: skills/pacing-and-estimation/
+runtime_contracts:
+  read_only_capability:
+    registry: read-only-capability.json
+    slot: "{{PACING_READ_ONLY_CAPABILITY}}"
+    host: cursor
+  model_admission:
+    source: adapters/cursor/overlays/model-tiers-reference.md
+    target: references/model-tiers.md
 unsupported:
   - capability: account_switch_pacing
-    reason: "Cursor account switching is not implemented in ccm; no switch verdict."
+    reason: "Cursor automatic account switching is permanently forbidden; no switch verdict."
   - capability: statusline_sidecar
     reason: "Claude Code statusline sidecar does not exist in Cursor adapter; usage from cursor-dashboard."
 supported:
@@ -16,30 +24,11 @@ supported:
   - capability: estimation_method
     reason: "Cost-to-complete estimation method is host-neutral when it consumes normalized board data."
   - capability: model_tier_provider
-    reason: "Cursor model tier mapping encodes two-pool routing plus GPT-5.6 Sol/Terra/Luna × effort for quota-ample and quota-tight operation; no Fable."
+    reason: "Cursor model guidance is plan/payer-qualified; real model tests admit only freshly cataloged Auto/Composer 2.5/Grok 4.5 first-party selectors and never auto-fallback to API."
 slot_replacements:
   "{{PACING_DESCRIPTION}}": adapters/cursor/overlays/description.md
-  "{{PACING_BOUNDARY}}": adapters/cursor/overlays/boundary.md
-  "{{PACING_REFERENCE_POINTERS_HEAD}}": adapters/cursor/overlays/reference-pointers-head.md
-  "{{PACING_MODEL_TIER_ANCHOR}}": adapters/cursor/overlays/model-tier-anchor.md
   "{{PACING_MODEL_TIERS_REFERENCE}}": adapters/cursor/overlays/model-tiers-reference.md
-  "{{PACING_COMMAND_CATALOG_POINTER}}": adapters/cursor/overlays/command-catalog-pointer.md
-  "{{PACING_USAGE_FOOTGUN_ROWS}}": adapters/cursor/overlays/usage-footgun-rows.md
-  "{{PACING_POINTERS_HOST}}": adapters/cursor/overlays/pointers-host.md
-  "{{PACING_SIBLING_POINTERS}}": adapters/cursor/overlays/sibling-pointers.md
-  "{{PACING_STOP_5H_WAKEUP_LEVER}}": adapters/cursor/overlays/stop-5h-wakeup-lever.md
-  "{{PACING_STOP_5H_WAKEUP_GUIDANCE}}": adapters/cursor/overlays/stop-5h-wakeup-guidance.md
-  "{{PACING_SWITCH_VERDICT_ROW}}": adapters/cursor/overlays/switch-verdict-row.md
   "{{PACING_USAGE_SIGNALS_REFERENCE}}": adapters/cursor/overlays/usage-signals-reference.md
   "{{PACING_LEVERS_REFERENCE}}": adapters/cursor/overlays/levers-reference.md
-host_slots:
-  "{{PACING_STOP_5H_WAKEUP_LEVER}}":
-    capability: watchdog_wakeup
-    source: plugin/src/skills/_hosts/cursor/capabilities.yaml
-    status: partial_source_uses_cursor_specific_guidance
-  "{{PACING_STOP_5H_WAKEUP_GUIDANCE}}":
-    capability: watchdog_wakeup
-    source: plugin/src/skills/_hosts/cursor/capabilities.yaml
-    status: partial_source_uses_cursor_specific_guidance
 notes:
-  - Cursor projects the canonical pacing guide plus billing_period usage and Cursor model-tier slots (Composer/Grok/Claude/GPT-5.6; no Fable).
+  - Cursor projects the closed read-only capability block plus billing_period and plan-qualified model facts; real model tests are first-party-only.

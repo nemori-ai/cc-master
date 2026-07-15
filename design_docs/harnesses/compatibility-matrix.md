@@ -21,3 +21,13 @@ Cursor 列事实来源：[`cursor.md`](cursor.md)（2026-07-09 官方文档 + pr
 | Project memory / rules | `AGENTS.md` / `CLAUDE.md` 可作为项目级入口；本仓 `CLAUDE.md = @AGENTS.md`。 | Codex 读取 `AGENTS.md`；项目 skills 从 `.agents/skills` 发现。 | `.cursor/rules/*.mdc` + 根 `AGENTS.md`【官方】。**不是** SessionStart/compaction reinject 等价物【推导 — 硬缺口】。 | 顶层 `AGENTS.md` 是跨 host 项目导航 SSOT；reinject 需 Cursor-native redesign。 |
 | Dist artifact | `plugin/dist/claude-code` 可被 `claude plugin validate` 验证。 | `plugin/dist/codex` 由 sync 生成；Codex 无等价 validate；靠 projection + hook tests + probe。 | `plugin/dist/cursor` 由 sync 生成；`cc-master-plugin-cursor-*.zip` release asset；无 documented validate 等价物。 | 不手改 dist；三 host 经 `sync-plugin-dist.sh` + package + probe/hook tests。 |
 | 主要风险 | Claude Code hooks 演进很快，需用本仓 hooks research 和 validator 对齐。 | Codex plugin/hook 机制仍在变化；path token 与 paragoge 旧文档不一致。 | **已接受硬差异**：无 PostToolBatch；reinject 无 1:1；Stop 为 `followup_message` 续跑非 block；D5 `postToolUse` 注入 PASS 但 D4 `sessionStart` 仍是已知 bug；无 Workflow；配额只有 billing-period，无 account pool / external statusline。Cloud Agents 另档。 | Cursor adapter 已发布；新能力继续按 Track A SAP/PHIP + CONTRACT 或 Track B Capability Card（ADR-031）锁步。真实剩余验收缺口见 `cursor.md` Phase 5。 |
+
+## Headless worker surfaces
+
+本表不把 worker CLI 塞进上面的 origin plugin 列。`cursor-agent-cli` 与 `cursor-ide-plugin` 是独立 descriptor；前者只能是 `worker-target`，后者只能是 Cursor 的 `master-origin`。
+
+| Surface | Current | Honest gap / admission | Plugin-host boundary |
+| --- | --- | --- | --- |
+| `cursor-agent-cli` (`agent` / `cursor-agent` executable aliases) | read-only binary/version/help/auth discovery；plan/payer topology 与 first-party catalog 是独立 fail-closed facts；fixture-only admission/result contract | production model/quota/topology collector、per-OS sandbox、invoke/cancel/resume evidence 未齐即 fail closed；真实模型测试只允许 fresh-proven first-party selector，零 API fallback；只允许用户手动 auth，自动换号永久禁止 | `--plugin-dir` 只是 CLI loader flag，不证明 IDE plugin/hook/session/ARM parity |
+
+完整 probes、TTL、维护 runbook 与 OOP composition 只在 [`cursor-agent-cli.md`](cursor-agent-cli.md) 维护；上表不复制易变 CLI facts。

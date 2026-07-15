@@ -79,6 +79,15 @@ fi
 SYNC_HOST="${HOST}" SYNC_SURFACE="${SURFACE}" node <<'NODE'
 const fs = require('fs');
 const path = require('path');
+const {
+  assertPacingCanonicalTemplate,
+  loadPacingReadOnlyRegistry,
+  renderPacingReadOnlyCapability,
+} = require('./scripts/pacing-read-only-capability.cjs');
+const {
+  assertPacingRenderedArtifact,
+  assertPacingRuntimeTree,
+} = require('./scripts/pacing-read-only-attestation.cjs');
 
 const src = 'plugin/src';
 const host = process.env.SYNC_HOST || 'claude-code';
@@ -185,6 +194,45 @@ function readYamlList(file, key) {
     values.push(item[1].trim());
   }
   return values;
+}
+
+function readIndentedYamlBlock(text, key, indent = 0) {
+  const lines = text.split(/\r?\n/);
+  const prefix = ' '.repeat(indent);
+  const start = lines.findIndex((line) => line === `${prefix}${key}:`);
+  if (start < 0) return null;
+  const block = [];
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^\s*$/u.test(line) || /^\s*#/u.test(line)) {
+      block.push(line);
+      continue;
+    }
+    const lineIndent = line.match(/^(\s*)/u)[1].length;
+    if (lineIndent <= indent) break;
+    block.push(line);
+  }
+  return block.join('\n');
+}
+
+function readReadOnlyCapabilityContract(file) {
+  const text = fs.readFileSync(file, 'utf8');
+  const runtimeContracts = readIndentedYamlBlock(text, 'runtime_contracts');
+  if (runtimeContracts === null) return null;
+  const contract = readIndentedYamlBlock(runtimeContracts, 'read_only_capability', 2);
+  if (contract === null) return null;
+  const value = (key) => {
+    const match = contract.match(
+      new RegExp(`^ {4}${key}:\\s*["']?([^"'\\n]+)["']?\\s*$`, 'm'),
+    );
+    if (!match) throw new Error(`missing runtime_contracts.read_only_capability.${key} in ${file}`);
+    return match[1].trim();
+  };
+  return {
+    registry: value('registry'),
+    slot: value('slot'),
+    host: value('host'),
+  };
 }
 
 function projectText(text, replacements, sourcePath) {
@@ -315,34 +363,87 @@ for (const skill of fs.readdirSync(skillsSrc).sort()) {
   if (!fs.existsSync(strategy)) throw new Error(`missing ${strategy}`);
   const mode = readStrategyMode(strategy);
   const slotReplacements = readSlotReplacements(strategy, skillDir);
+  const readOnlyContract = readReadOnlyCapabilityContract(strategy);
+  let readOnlyRegistry = null;
+  if (readOnlyContract) {
+    if (readOnlyContract.host !== host) {
+      throw new Error(
+        `runtime read-only capability host ${readOnlyContract.host} does not match ${host} in ${strategy}`,
+      );
+    }
+    if (slotReplacements.has(readOnlyContract.slot)) {
+      throw new Error(`duplicate replacement for ${readOnlyContract.slot} in ${strategy}`);
+    }
+    const registryPath = path.join(skillDir, readOnlyContract.registry);
+    if (!fs.existsSync(registryPath)) throw new Error(`missing ${registryPath}`);
+    const registry = loadPacingReadOnlyRegistry(registryPath);
+    readOnlyRegistry = registry;
+    if (readOnlyContract.slot !== registry.slot) {
+      throw new Error(
+        `runtime read-only capability slot ${readOnlyContract.slot} does not match registry ${registry.slot}`,
+      );
+    }
+    assertPacingCanonicalTemplate(
+      fs.readFileSync(path.join(canonical, 'SKILL.md'), 'utf8'),
+      registry.slot,
+    );
+    const rendered = renderPacingReadOnlyCapability(registry, readOnlyContract.host);
+    assertPacingRenderedArtifact(registry, readOnlyContract.host, rendered);
+    slotReplacements.set(registry.slot, rendered.replace(/\s+$/u, ''));
+  }
   const target = path.join(skillsDst, skill);
   if (mode === 'planned') {
     // Phase B: cursor (and future hosts) may declare planned until overlays exist.
     continue;
   }
-  if (mode === 'copy') {
-    copyDir(canonical, target, {
-      exclude: SKILL_DIST_EXCLUDES,
-      replacements: slotReplacements,
-    });
-    removeProjectedPaths(target, readYamlList(strategy, 'exclude_canonical'));
-    copyCanonicalIncludes(skillDir, target, readYamlList(strategy, 'include_adapter'), slotReplacements);
-  } else if (mode === 'unsupported_stub') {
-    const stub = path.join(skillDir, 'adapters', host, 'stub');
-    requireDir(stub);
-    copyDir(stub, target, {
-      exclude: SKILL_DIST_EXCLUDES,
-    });
-  } else if (mode === 'partial_overlay') {
-    const sourceRel = readYamlString(strategy, 'source') || path.join('adapters', host, 'partial');
-    const partial = path.join(skillDir, sourceRel);
-    requireDir(partial);
-    copyDir(partial, target, {
-      exclude: SKILL_DIST_EXCLUDES,
-    });
-    copyCanonicalIncludes(canonical, target, readYamlList(strategy, 'include_canonical'), slotReplacements);
-  } else {
-    throw new Error(`unsupported projection mode "${mode}" in ${strategy}`);
+  const staging = readOnlyContract
+    ? fs.mkdtempSync(path.join(skillsDst, `.${skill}-stage-`))
+    : null;
+  const projectionTarget = staging || target;
+  try {
+    if (mode === 'copy') {
+      copyDir(canonical, projectionTarget, {
+        exclude: SKILL_DIST_EXCLUDES,
+        replacements: slotReplacements,
+      });
+      removeProjectedPaths(projectionTarget, readYamlList(strategy, 'exclude_canonical'));
+      copyCanonicalIncludes(
+        skillDir,
+        projectionTarget,
+        readYamlList(strategy, 'include_adapter'),
+        slotReplacements,
+      );
+    } else if (mode === 'unsupported_stub') {
+      const stub = path.join(skillDir, 'adapters', host, 'stub');
+      requireDir(stub);
+      copyDir(stub, projectionTarget, {
+        exclude: SKILL_DIST_EXCLUDES,
+      });
+    } else if (mode === 'partial_overlay') {
+      const sourceRel = readYamlString(strategy, 'source') || path.join('adapters', host, 'partial');
+      const partial = path.join(skillDir, sourceRel);
+      requireDir(partial);
+      copyDir(partial, projectionTarget, {
+        exclude: SKILL_DIST_EXCLUDES,
+      });
+      copyCanonicalIncludes(
+        canonical,
+        projectionTarget,
+        readYamlList(strategy, 'include_canonical'),
+        slotReplacements,
+      );
+    } else {
+      throw new Error(`unsupported projection mode "${mode}" in ${strategy}`);
+    }
+    if (readOnlyContract) {
+      assertPacingRuntimeTree(readOnlyRegistry, readOnlyContract.host, projectionTarget);
+      if (fs.existsSync(target)) throw new Error(`refusing to replace existing attested target ${target}`);
+      fs.renameSync(projectionTarget, target);
+    }
+  } finally {
+    if (staging && fs.existsSync(staging)) {
+      fs.rmSync(staging, { recursive: true, force: true });
+    }
   }
 }
 

@@ -15,7 +15,7 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 | post-tool-batch-gate | implemented | unsupported | unsupported | [post-tool-batch-gate.md](harnesses/capabilities/post-tool-batch-gate.md) |
 | role-substrate-reinject | implemented | implemented | implemented | [role-substrate-reinject.md](harnesses/capabilities/role-substrate-reinject.md) |
 | stop-continuation-gate | implemented | implemented-blocking | implemented | [stop-continuation-gate.md](harnesses/capabilities/stop-continuation-gate.md) |
-| usage-pacing-midflight | implemented | implemented-stop-advisory; 7d-only migration pending | implemented-stop-advisory | [usage-pacing-midflight.md](harnesses/capabilities/usage-pacing-midflight.md) |
+| usage-pacing-midflight | implemented | implemented-stop-advisory; runtime migration pending | implemented-stop-advisory | [usage-pacing-midflight.md](harnesses/capabilities/usage-pacing-midflight.md) |
 | workflow-authoring | implemented | unsupported_stub | unsupported_stub | [workflow-authoring.md](harnesses/capabilities/workflow-authoring.md) |
 
 ## Declared divergences by kind

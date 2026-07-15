@@ -1,17 +1,17 @@
-# 配额信号 —— 感知 5h/7d 窗口 + 信号源链 + 诚实天花板
+# 配额信号 —— 当前窗口 + 信号源链 + 诚实天花板
 
-> **何时读：** 要把一场长跑对照 5h/7d 配额窗口配速、想知道配额信号从哪来、`ccm usage advise` 出 `available:false` 时怎么办、或要理解为什么 pacing 只能做方向性走廊（不能精确收尾）时。**ccm 出 verdict、你（作为 orchestrator）决策**（advisory 不替编排判断）。
+> **何时读：** 要把一场长跑对照当前 host 的配额窗口配速、想知道信号从哪来、`ccm usage advise` 出 `available:false` 时怎么办、或要理解为什么 pacing 只能做方向性走廊（不能精确收尾）时。**ccm 出 verdict、你（作为 orchestrator）决策**（advisory 不替编排判断）。
 
-## 感知订阅账期（billing_period）配额
+## 感知当前订阅账期
 
-Cursor 当前只消费**当前账号**的订阅账期用量（约 30 天 `billing_period`）。对一个 >24h 的目标，真正构成容量约束的是这个账期窗口、而非 context%（「量力而行」镜头）。**没有 5h / 7d 滚动窗**——`window_5h_pct` / `window_7d_pct` 在 Cursor 上为 null，不要当配速输入。
+Cursor 的单一 `billing_period` 是当前账户的 aggregate 近邻信号，不能证明任一池的 headroom。`ccm usage show --json` 给出 `used_percent`、`remaining_percent`、`resets_at` 与 `window_billing_period_pct`；`ccm usage advise --json` 把它映射为 `hold`、`throttle` 或 `stop_billing_period`。先看 `available`：`false` 表示当前不可判，必须保持 fail closed。
 
-读取方式，按口径可信度排：
+这个绑定 `cursor-ide-plugin` 的 aggregate 信号不授权任何模型候选、跨池推断或 fallback。`cursor-agent-cli` 的 model/quota 事实必须独立绑定到 CLI surface；两条路线的诚实边界查 [model-tiers.md](model-tiers.md)。
 
-1. **走廊 verdict（首选）—— `ccm usage advise --json`。** 引擎 `pacing.ts` 是**走廊数学的 SSOT**：吃 Cursor 当前账号 `billing_period` `used_percentage`（+ 账期结束 `resets_at`），吐 `verdict`（`hold` / `throttle` / `stop_billing_period`）+ `strength` + `nearest_reset` + 推荐 lever 类。账户信号不可得 → `available:false`。**不会**出 `switch` / `stop_5h` / `stop_7d` 作为 Cursor 目标语义。
-2. **账户权威信号源 —— Cursor dashboard。** ccm 通过本机 Cursor 登录态调用 dashboard `GetCurrentPeriodUsage`（`source: cursor-dashboard`），映射为单窗 `billing_period`。Cursor 不依赖外部状态行 sidecar，也不安装 Claude 式 statusline 命令。
-3. **本地 JSONL / transcript 反推不用作 verdict。** 它看不见服务端真实 reset；信号不可用时宁可 `available:false` 诚实降级。
+读取顺序：
 
-**诚实天花板：** 账户口径给 `used_percentage` + 账期结束时间，不给窗口绝对 token 分母；所以 pacing 只能做方向性/区间判断（该节流 / 该停 / 是否 surface 用户），不能承诺把 used% 精确收敛到某点。
+1. 用 `ccm usage advise --json` 读 verdict、`strength` 与 `nearest_reset`，不要自己重算阈值。
+2. 信号来自当前本机 Cursor 登录态的 dashboard usage read（`source: cursor-dashboard`）。它只证明 aggregate 账期，不证明容量拓扑、headroom 或 spillover。
+3. 本地 transcript 或账户级 delta 不能补齐缺失事实，也不能归因到并发节点。
 
-**per-node observability 正交：** 账户级 pacing 管整场长跑别撞墙；单个节点的 token / duration / tool uses 来自 Task subagent result、后台 Shell session 或外部 run 的可得 telemetry，写进 task `observability`。不要用账户级 delta 反推单节点成本，并发时它结构性无法归因。
+**诚实边界：** IDE 账期百分比不能替代 [model-tiers.md](model-tiers.md) 中 `cursor-agent-cli` 的独立模型合同。单节点 token、duration、tool uses 只从对应 Task / Shell / external run 的可得 telemetry 记录，不能从账户 aggregate 反推。

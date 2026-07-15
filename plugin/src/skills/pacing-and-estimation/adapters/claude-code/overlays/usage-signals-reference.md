@@ -10,6 +10,6 @@
 
 **接法：** 不用手动改 settings；ccm 自动安装 status line。要恢复原状态行用 `ccm statusline uninstall`；要手动重装用 `ccm statusline install`；要禁用自动安装设 `CC_MASTER_NO_AUTOINSTALL=1`。
 
-**诚实天花板：** 账户口径给 `used_percentage` + `resets_at`，不给窗口绝对 token 分母；所以 pacing 只能做方向性/区间判断（该节流 / 该换号 / 该停），不能承诺把 used% 精确收敛到某点。
+**诚实天花板：** 账户口径给 `used_percentage` + `resets_at`，不给窗口绝对 token 分母；所以 pacing 只能表达压力方向、强度与 reset 区间，不能承诺把 used% 精确收敛到某点。
 
 **per-node observability 正交：** 账户级 pacing 管整场长跑别撞墙；单个节点的 token / duration / tool uses 来自后台任务完成事件的 observability，写进 task `observability`，不要用账户级 delta 反推单节点成本。

@@ -19,7 +19,10 @@ slot_replacements:
   "{{BACKGROUND_EXTERNAL_WAIT_GUIDANCE}}": adapters/claude-code/overlays/background-external-wait-guidance.md
   "{{WATCHDOG_WAKEUP_TOOL_CHAIN}}": adapters/claude-code/overlays/watchdog-wakeup-tool-chain.md
   "{{WATCHDOG_WAKEUP_TOOL_CHAIN_INLINE}}": adapters/claude-code/overlays/watchdog-wakeup-tool-chain-inline.md
+  "{{PACING_COST_RESPONSIBILITY}}": adapters/claude-code/overlays/pacing-cost-responsibility.md
+  "{{PACING_BUDGET_STEWARDSHIP}}": adapters/claude-code/overlays/pacing-budget-stewardship.md
   "{{CAPACITY_ACCOUNT_GUIDANCE}}": adapters/claude-code/overlays/capacity-account-guidance.md
+  "{{PACING_COMMAND_SUMMARY}}": adapters/claude-code/overlays/pacing-command-summary.md
   "{{AUTHORING_WORKFLOWS_ROW}}": adapters/claude-code/overlays/authoring-workflows-row.md
   "{{COST_DECISIONS_REFERENCE_ROW}}": adapters/claude-code/overlays/cost-decisions-reference-row.md
   "{{COMMAND_SURFACE_GUIDANCE}}": adapters/claude-code/overlays/command-surface-guidance.md
@@ -34,6 +37,7 @@ slot_replacements:
   "{{PLATFORM_RESUME_GUIDANCE}}": adapters/claude-code/overlays/platform-resume-guidance.md
   "{{HETEROGENEOUS_REVIEW_MECHANISM}}": adapters/claude-code/overlays/heterogeneous-review-mechanism.md
   "{{HANDOFF_REFERENCE_ROW}}": adapters/claude-code/overlays/handoff-reference-row.md
+  "{{MASTER_HOST_MODEL_ALLOCATION}}": adapters/claude-code/overlays/model-allocation.md
 mechanisms:
   declarative-patch:
     enabled: false

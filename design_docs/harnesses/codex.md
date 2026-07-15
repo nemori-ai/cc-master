@@ -131,10 +131,12 @@ Codex `usage-pacing` 也是 Stop replacement advisory：
 - `switch` 只提示，不自动执行 `ccm account switch`；Codex account pool switching 当前不属于已支持面。
 - 不实现 Claude Code `PostToolBatch` mid-turn sampling；Codex 还没有已验证同构事件。
 
-> **2026-07-13 target addendum（不是 current 实现声明）：** 产品决策已退役 Codex 5h pacing。
-> 上述 `stop_5h` 是本基线仍待后续迁移的 current implementation fact，不能再作为新合同语义。
-> 冻结目标为 7d-only hard ceiling + rolling-24h advisory；历史/意外 5h 字段只保留 ignored
-> provenance。Codex/Cursor 仍不支持 ccm 自动切号。详见
+> **2026-07-13 target addendum（2026-07-15 consumer guidance 已对齐，hook/engine 迁移仍另行跟踪）：**
+> 产品决策已退役 Codex 5h pacing。上述 `stop_5h` 是本基线仍待后续迁移的 current hook fact，
+> 不能再作为新合同语义；pacing-and-estimation 与 master-orchestrator-guide 的 Codex 投影只把
+> 7d 当 hard ceiling、rolling-24h 当 advisory，并在交给决策层前拒绝任何 5h 动作权威。
+> 历史/意外 5h 字段只保留 ignored provenance，不能触发 throttle/switch/stop_5h/reset/wakeup。
+> Codex/Cursor 仍不支持 ccm 自动切号。详见
 > [`../2026-07-13-codex-candidate-provider-driver-contract-v1.md`](../2026-07-13-codex-candidate-provider-driver-contract-v1.md)
 > §4.5。本文 addendum 不把 spec-only endpoint 冒充 current。
 

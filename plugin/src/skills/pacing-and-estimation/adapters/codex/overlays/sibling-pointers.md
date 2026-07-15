@@ -1,2 +1,0 @@
-- **using-ccm** —— ccm 命令怎么敲、board 字段怎么写。
-- **master-orchestrator-guide** —— 决策层；Codex adapter 只消费这里的 advisory 与本 host 的 GPT-5.6 mapping，不把其他 harness 的 account/statusline 机制投影过来。

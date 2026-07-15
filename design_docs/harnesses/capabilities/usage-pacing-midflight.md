@@ -2,10 +2,11 @@
 
 ## Intent（host-neutral）
 
-During long orchestration runs, surface **quota / pacing advisories** so the orchestrator can
-throttle or accelerate against 5h/7d windows (ADR-010 corridor). Mid-flight sampling at tool-batch
-boundaries reduces noise; stop-side pacing catches end-of-turn decisions; optional autonomous
-account switch is policy-gated (ADR-016).
+During long orchestration runs, surface **provider-scoped quota / pacing advisories** so the
+orchestrator can pace against the window contract that actually belongs to that provider: Claude
+5h/7d, Codex 7d hard ceiling plus rolling-24h advisory, or Cursor billing period. Mid-flight sampling
+at tool-batch boundaries reduces noise; stop-side pacing catches end-of-turn decisions; autonomous
+account switch exists only on an explicitly supported and policy-gated host (ADR-016).
 
 ## Acceptance（可测等价类）
 
@@ -19,7 +20,7 @@ account switch is policy-gated (ADR-016).
 | host | status | mechanism | notes |
 | --- | --- | --- | --- |
 | claude-code | implemented | PostToolBatch sample + Stop; statusline sidecar; LBHOOK autoswitch | Full |
-| codex | implemented-stop-advisory; 7d-only migration pending | current base: Stop-only app-server signal; accepted target: 7d-only hard ceiling + rolling-24h advisory, never 5h pacing; account switch NI | usage-pacing CONTRACT + Codex provider contract v1 |
+| codex | implemented-stop-advisory; runtime migration pending | consumer guidance: 7d-only hard ceiling + rolling-24h advisory, never 5h pacing; current hook/engine normalization remains separately tracked; account switch NI | usage-pacing CONTRACT + Codex provider contract v1 |
 | cursor | implemented-stop-advisory | **Stop-only**; `ccm usage advise` via `billing_period` (never 5h/7d/switch); signal = Cursor dashboard API | Track B + `cursor-usage.ts` |
 
 ## Declared divergence
@@ -63,7 +64,9 @@ account switch is policy-gated (ADR-016).
 Closed by current implementation: `cursor-usage.ts` reads dashboard `GetCurrentPeriodUsage` and maps
 it to a billing-period-only signal. API/token failure remains an intentional fail-open path.
 
-Codex target clarification (2026-07-13): the host-neutral intent remains multi-host, but Codex no
-longer consumes a 5h pacing dimension. Its historical/extra 5h fields are ignored provenance; only
-the existing 7d hard ceiling gates, while rolling-24h velocity is advisory. The contract-only source
-is [`../../2026-07-13-codex-candidate-provider-driver-contract-v1.md`](../../2026-07-13-codex-candidate-provider-driver-contract-v1.md).
+Codex target clarification (2026-07-13, consumer guidance aligned 2026-07-15): the host-neutral
+intent remains multi-host, but Codex no longer consumes a 5h pacing dimension. Its historical/extra
+5h fields are ignored provenance and cannot cause throttle/switch/stop_5h/reset/wakeup; only the 7d
+hard ceiling gates, while rolling-24h velocity is advisory. This guidance alignment does not claim
+the current hook/engine normalization migration is already complete. The provider contract source is
+[`../../2026-07-13-codex-candidate-provider-driver-contract-v1.md`](../../2026-07-13-codex-candidate-provider-driver-contract-v1.md).

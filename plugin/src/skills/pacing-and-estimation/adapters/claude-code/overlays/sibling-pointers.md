@@ -1,2 +1,0 @@
-- **master-orchestrator-guide**（决策层）—— 该不该减速/换号/停派/surface 是它的活；换号 lever 阶梯 / policy 授权 / 绝不自授权红线在它的 `${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/references/cost-decisions.md`。本 skill 是它的「decision 之前怎么读 advisory」。
-- **using-ccm**（命令面）—— ccm 命令怎么敲、account 录号换号操作、board 字段填什么。

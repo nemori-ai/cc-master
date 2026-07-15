@@ -1,11 +1,11 @@
 # OBJECTIVE — pacing-and-estimation
 
-J_top: agent 在一场 long-horizon 跑里要消费 ccm 只读 advisory 做配速/估算判断的输入时，**把 verdict 与字段读对、并主动召回估算轴**——读 `ccm usage advise` 的 verdict 据它拍 lever 类（不自己拿 `used_percentage` 重算走廊）、在 dispatch/recon/replan 拍**主动 consult `ccm estimate`**（forecast/evm/risk·不让估算整轴 out-of-mind）、读诚实字段（coverage_pct/confidence/conformal 区间）对低覆盖预测**降低信任权重**（不拿点估当承诺）、按 host provider mapping 在配额充足/紧张两种模式下综合能力与价格选 family×effort、识别 usage⊗estimate 张力——且读完之后的**动作**（该不该减速/加速/换号/surface）回 master-orchestrator-guide，不自己拍。
+J_top: agent 在一场 long-horizon 跑里要消费 ccm 只读 advisory 做配速/估算判断的输入时，**把 verdict 与字段读对、并主动召回估算轴**——读 `ccm usage advise` 的 verdict 与 lever 类事实（不自己拿 `used_percentage` 重算走廊）、在 dispatch/recon/replan 拍**主动 consult `ccm estimate`**（forecast/evm/risk·不让估算整轴 out-of-mind）、读诚实字段（coverage_pct/confidence/conformal 区间）对低覆盖预测**降低信任权重**（不拿点估当承诺）、引用当前 host 的模型 registry 获取可用性/provenance/能力/成本事实、识别 usage⊗estimate 张力——且只把这些决策输入交给 master-orchestrator-guide，不自己选择动作或模型。
 
 baseline_reference:
   user_task: 给 agent 一个具体的 pacing/估算决策处境（如"长跑跑了一半、想知道还要多久能完 + 当前配额节奏对不对"、"配额逼顶了、该怎么 pace"、"这个 forecast 给了个 ETA、我该信吗"），看它会不会消费 ccm advisory、读对 verdict/字段。
-  without_skill_floor: 默认 agent **想不到去查估算轴**——估工期靠拍脑袋、不跑 `ccm estimate forecast`/`evm`/`risk`（B.2 out-of-mind：能力就绪、消费层从不被召回）；pacing 凭感觉不读 `ccm usage advise` 的 verdict、或自己拿百分比瞎算走廊（不知引擎已算好）；拿到一个 forecast 点估当承诺、不读 coverage_pct/confidence 就汇报一个假精确 ETA；模型档位乱选或一律用主线模型。
-  expected_uplift: 决策点主动 consult ccm advisory——pacing 读 `usage advise` verdict→对应 lever 类、估工期跑 `estimate forecast` 读 p80 区间、查偏差跑 `estimate evm` 读 spi_t/cpi、低 coverage/confidence 时带区间报且降信任；模型按 host mapping 同时报出 family、effort、配额模式与理由；usage⊗estimate 张力识别出来后把三选一决策 surface 回 A，而非自己拍。
+  without_skill_floor: 默认 agent **想不到去查估算轴**——估工期靠拍脑袋、不跑 `ccm estimate forecast`/`evm`/`risk`（B.2 out-of-mind：能力就绪、消费层从不被召回）；pacing 凭感觉不读 `ccm usage advise` 的 verdict、或自己拿百分比瞎算走廊（不知引擎已算好）；拿到一个 forecast 点估当承诺、不读 coverage_pct/confidence 就汇报一个假精确 ETA；模型分配拿陈旧先验当当前事实。
+  expected_uplift: 决策点主动 consult ccm advisory——pacing 读 `usage advise` verdict→对应 lever 类事实、估工期跑 `estimate forecast` 读 p80 区间、查偏差跑 `estimate evm` 读 spi_t/cpi、低 coverage/confidence 时带区间报且降信任；模型分配前从 host registry 同时报出可用性、provenance、family/effort 能力与相对成本事实；usage⊗estimate 张力识别出来后把输入交给 A，而非自己拍。
 
 strict_dims: [advisory 消费正确性（pacing 读 verdict 而非自算走廊 + 估算轴被主动召回而非 out-of-mind + 诚实字段触发降信任）]
 

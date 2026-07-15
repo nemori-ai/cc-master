@@ -1,20 +1,23 @@
 **pacing 是单侧的（只在逼近上界时出声）。** 没有「欠用侧加速」；走廊内一律 `hold`（静默）。
 
-## 走廊上界
+## 7d 硬边界与 rolling-24h advisory
 
-5h 窗口 `used%` 逼近约 90% 即临界（`throttle`），7d 窗口逼近约 85% 即硬总闸（`stop_7d`）。`ccm usage advise` 的 `verdict` 就是引擎把当前 `used%` 对照上界算出来的——你读 verdict，不必自己算。
+7d 是 Codex 唯一的百分比硬边界：`used%` 逼近当前 policy 的上界时产生 7d hard-gate 事实。rolling-24h 只把 7d 快照的近期 burn 与 `100 / 7` 日预算比较，产生 `throttle-risk` advisory；它不能改变 hard eligibility、fallback、reset 或 wakeup。
+
+任何历史或意外 `five_hour` / 5h 输入只保留为 **ignored provenance**，不得触发 throttle、switch、stop_5h、reset 或 wakeup，也不得污染一份 fresh、complete、ample 的 7d 事实。若旧输出仍把 5h 当 pacing 维度，视为 stale schema，不把它交给决策层。
 
 ## Codex 下没有换号 lever
 
-Codex adapter 当前不支持账号池切换。读到 `switch` / `switch_candidate` 时，不要执行账号切换；把它当成强节流信号：先降 WIP / 推迟高 float / 改派更便宜的可用模型或 reasoning effort，仍不足时停派并 surface 用户。7d 逼顶永远是总闸，不能靠账号池绕过。
+Codex 自动换号永久禁止，`switch` / `switch_candidate` 不是 Codex pacing 合同的有效 lever。模型 / reasoning effort、WIP 与 high-float 是独立的 burn 影响向量；7d hard gate 不能靠账号池绕过。具体取舍与编排动作由 `master-orchestrator-guide` 决定。
 
-## 减速 lever
+## burn 影响向量
 
-1. **降级模型 / effort** —— 切到 model-tiers.md 的「配额紧张」列：先降有强机械验收的叶子（Sol→Terra→Luna，xhigh/max→high→medium/low），再降 WIP；高错误代价裁决保留 Sol high/max。Fast mode会更快消耗 credits，**不是**省配额档；`ultra` 在 throttle 下停用。
-2. **降 WIP** —— 让更少的并发叶子在飞。
-3. **推迟高 float 工作** —— 把非临界、token 重的叶子推到下一个窗口。
+1. **模型 / effort** —— 从 model-tiers.md 读取相对 token 成本与能力边界；降档可能降低 burn，也可能提高返工风险。Fast mode 更快消耗 credits，**不是**省配额档。
+2. **WIP** —— 并发叶子越多，同一 7d 容量内的 burn 通常越高。
+3. **high-float** —— 非临界、token 重的工作可延后，不把 rolling-24h advisory 伪装成硬停指令。
 
-## 停 lever
+## 决策输入边界
 
-- **`stop_5h`**：当前 5h 配额本窗口已烧穿。停止派发新工作，把当前在飞任务收敛到安全点；先创建后台 terminal、thread automation（若当前环境提供）、外部 scheduler 或 cloud status loop 并拿真实 handle，再用 `ccm watchdog arm --fire-at <reset-ISO-UTC> --mechanism <cron|loop|monitor|shell> --job-id <handle>` 记录 reset 后要查的事项。没有真实 handle 时，把它作为 `blocked_on:"quota-reset"` 或 `blocked_on:"user"` 的可续状态记录下来，不要 arm 或伪造自动唤醒。
-- **`stop_7d`**：7d 是不可逆的跨窗口消耗边界，停派新节点并 surface 用户拍板；动作与抗合理化归 `master-orchestrator-guide`。
+- **7d hard gate**：继续消耗已进入用户拥有的决定边界；具体取舍、编排动作与抗合理化归 `master-orchestrator-guide`。
+- **rolling-24h advisory**：只报告 velocity、coverage、confidence 与来源，不单独产生硬停、reset 或 wakeup。
+- 若决策层选择建立 watchdog，必须先创建真实 wakeup 并取得 handle，再用 `ccm watchdog arm ... --job-id <handle> --checklist <事项>` 写 canonical `watchdog.checklist`；没有真实 handle 就不能 arm。该事实不赋予 5h 或 rolling-24h 任何调度 authority。
