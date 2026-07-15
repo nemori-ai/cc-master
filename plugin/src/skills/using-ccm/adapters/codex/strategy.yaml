@@ -5,6 +5,11 @@ mode: copy
 projection:
   source: canonical/
   target: skills/using-ccm/
+runtime_contracts:
+  provider_guidance:
+    registry: ../provider-guidance-runtime.json
+    host: codex
+    skill: using-ccm
 exclude_canonical:
   - references/account-pool.md
 unsupported:
@@ -16,7 +21,7 @@ supported:
   - capability: board_operations
     reason: "ccm board/task/log/jc/cadence/watchdog commands are harness-neutral."
   - capability: current_quota_signal
-    reason: "ccm usage show/advise reads Codex current-account 5h/7d usage via `codex app-server --stdio` account/rateLimits/read."
+    reason: "ccm usage show/advise reads Codex current-account 7d usage via `codex app-server --stdio` account/rateLimits/read; rolling-24h is advisory and automatic switching is forbidden."
   - capability: plugin_upgrade
     reason: "ccm upgrade plugin supports Codex by registering a local Codex marketplace/plugin entry for the installed package."
   - capability: plugin_skills_distribution
@@ -52,6 +57,25 @@ slot_replacements:
   "{{USING_CCM_JC_HOOK_GUIDANCE}}": adapters/codex/overlays/jc-hook-guidance.md
   "{{USING_CCM_WATCHDOG_JOB_ID_GUIDANCE}}": adapters/codex/overlays/watchdog-job-id-guidance.md
   "{{USING_CCM_WAKEUP_SELF_HEAL_GUIDANCE}}": adapters/codex/overlays/wakeup-self-heal-guidance.md
+  "{{USING_CCM_USAGE_NAMESPACE_ROW}}": adapters/codex/overlays/usage-namespace-row.md
+  "{{USING_CCM_USAGE_OVERVIEW}}": adapters/codex/overlays/usage-overview.md
+  "{{USING_CCM_USAGE_SHOW_BEHAVIOR}}": adapters/codex/overlays/usage-show-behavior.md
+  "{{USING_CCM_USAGE_SHOW_SCOPE_FLAGS}}": adapters/codex/overlays/usage-show-scope-flags.md
+  "{{USING_CCM_USAGE_ADVISE_BEHAVIOR}}": adapters/codex/overlays/usage-advise-behavior.md
+  "{{USING_CCM_USAGE_ADVISE_SCOPE_FLAG}}": adapters/codex/overlays/usage-advise-scope-flag.md
+  "{{USING_CCM_USAGE_RUNWAY_BEHAVIOR}}": adapters/codex/overlays/usage-runway-behavior.md
+  "{{USING_CCM_USAGE_ADVISE_EXAMPLE}}": adapters/codex/overlays/usage-advise-example.md
+  "{{USING_CCM_EXIT_CODES}}": adapters/codex/overlays/exit-codes.md
+  "{{USING_CCM_POLICY_NAMESPACE_ROW}}": adapters/codex/overlays/policy-namespace-row.md
+  "{{USING_CCM_POLICY_DENY_EXIT_ROW}}": adapters/codex/overlays/policy-deny-exit-row.md
+  "{{USING_CCM_POLICY_NAMESPACE}}": adapters/codex/overlays/policy-namespace.md
+  "{{USING_CCM_POLICY_JSON_EXAMPLE}}": adapters/codex/overlays/policy-json-example.md
+  "{{USING_CCM_BOARD_POLICY_GUIDANCE}}": adapters/codex/overlays/board-policy-guidance.md
+  "{{USING_CCM_FMT_POLICY_ROW}}": adapters/codex/overlays/fmt-policy-row.md
+  "{{USING_CCM_COORDINATION_QUOTA_MODEL_EXAMPLE}}": adapters/codex/overlays/coordination-quota-model-example.md
+  "{{USING_CCM_USAGE_SHOW_JSON_EXAMPLE}}": adapters/codex/overlays/usage-show-json-example.md
+  "{{USING_CCM_USAGE_BURN_RATE_JSON_EXAMPLE}}": adapters/codex/overlays/usage-burn-rate-json-example.md
+  "{{USING_CCM_USAGE_RUNWAY_JSON_EXAMPLE}}": adapters/codex/overlays/usage-runway-json-example.md
 host_slots:
   "{{USING_CCM_EXECUTOR_TABLE_ROWS}}":
     capability: background_dispatch

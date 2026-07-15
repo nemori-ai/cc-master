@@ -8,6 +8,11 @@ projection:
   exclude:
     - AGENTS.md
     - CLAUDE.md
+runtime_contracts:
+  provider_guidance:
+    registry: ../provider-guidance-runtime.json
+    host: codex
+    skill: master-orchestrator-guide
 mode: copy
 exclude_canonical:
   - references/cost-decisions.md
@@ -42,6 +47,11 @@ slot_replacements:
   "{{HETEROGENEOUS_REVIEW_MECHANISM}}": adapters/codex/overlays/heterogeneous-review-mechanism.md
   "{{HANDOFF_REFERENCE_ROW}}": adapters/codex/overlays/handoff-reference-row.md
   "{{MASTER_HOST_MODEL_ALLOCATION}}": adapters/codex/overlays/model-allocation.md
+  "{{HOST_QUOTA_DESERTION_EXAMPLE}}": adapters/codex/overlays/quota-desertion-example.md
+  "{{HOST_QUOTA_RATIONALIZATION_ROW}}": adapters/codex/overlays/quota-rationalization-row.md
+  "{{HOST_QUOTA_RED_FLAG}}": adapters/codex/overlays/quota-red-flag.md
+  "{{HOST_QUOTA_DECISION_GATE}}": adapters/codex/overlays/quota-decision-gate.md
+  "{{HOST_QUOTA_JUDGMENT_ROW}}": adapters/codex/overlays/quota-judgment-row.md
 notes:
   - Codex projection uses the host-neutral canonical body plus Codex-verified dispatch and watchdog slots.
   - Verified in Codex CLI 0.142.5 and current Codex manual: subagents are explicit, codex exec resume is scriptable, codex cloud tasks are addressable, and app thread automations are app-side rather than a CLI CronCreate equivalent.

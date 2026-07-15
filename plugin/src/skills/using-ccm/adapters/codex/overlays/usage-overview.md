@@ -1,0 +1,1 @@
+配额侧只读 advisory：Codex 只消费当前账号 7d hard ceiling，并以 rolling-24h 报告近期 burn 风险。全部 verb 纯 query/compute，零 board 写入；信号不可得时 exit 0 + `available:false`。Codex 不使用账号池、`effective_n` 扩容或自动换号；ccm 出数据，编排动作归 `master-orchestrator-guide`。

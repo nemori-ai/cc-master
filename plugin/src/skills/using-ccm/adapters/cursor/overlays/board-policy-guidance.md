@@ -1,0 +1,1 @@
+- `policy`——可读取历史 `autonomous_account_switch`，但 Cursor account switch 永久不可用；stored `allow` 不产生能力。不要把它用作 dispatch、login/logout 或 credential mutation 输入；形状坏仍触发 `FMT-POLICY` warn。

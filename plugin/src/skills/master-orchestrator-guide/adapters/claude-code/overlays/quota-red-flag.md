@@ -1,0 +1,1 @@
+- 你正要在 Claude Code 7d 已越过当前 policy 硬边界时 dispatch 新节点，却没有先把「是否继续消耗」surface 给用户——你在替用户跨不可逆消耗边界。

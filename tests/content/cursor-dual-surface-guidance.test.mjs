@@ -29,11 +29,17 @@ const makeProjectionFixture = () => {
   const root = mkdtempSync(join(tmpdir(), 'ccm-cursor-guidance-mutant-'));
   mkdirSync(join(root, 'plugin/src'), { recursive: true });
   mkdirSync(join(root, 'scripts'), { recursive: true });
+  mkdirSync(join(root, 'ccm/apps/cli/src'), { recursive: true });
   cpSync(join(ROOT, 'plugin/src/skills'), join(root, 'plugin/src/skills'), { recursive: true });
+  cpSync(
+    join(ROOT, 'ccm/apps/cli/src/provider-model-facts.json'),
+    join(root, 'ccm/apps/cli/src/provider-model-facts.json'),
+  );
   for (const script of [
     'sync-plugin-dist.sh',
     'pacing-read-only-capability.cjs',
     'pacing-read-only-attestation.cjs',
+    'provider-guidance-attestation.cjs',
   ]) {
     cpSync(join(ROOT, 'scripts', script), join(root, 'scripts', script));
   }
@@ -55,8 +61,8 @@ const assertRejected = (root, host, label) => {
   );
   assert.match(
     `${result.stdout}\n${result.stderr}`,
-    /pacing read-only attestation/iu,
-    `${host}: ${label} must fail through the independent production attestor`,
+    /(?:pacing read-only|provider guidance) attestation/iu,
+    `${host}: ${label} must fail through an independent production attestor`,
   );
   assert.equal(
     existsSync(join(root, `plugin/dist/${host}/skills/pacing-and-estimation`)),

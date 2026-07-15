@@ -7,6 +7,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as io from '../io.js';
 import {
   assessCodexCapability,
   type CodexCapabilityAssessment,
@@ -34,6 +35,7 @@ import {
   compileProviderOutputSchema,
   ProviderJsonSchemaError,
 } from '../provider-json-schema.js';
+import { providerModelFacts } from '../provider-model-facts.js';
 import {
   assertCodexQualificationDispatcher,
   CODEX_QUALIFICATION_PHASE_REGISTRY,
@@ -87,6 +89,14 @@ type Predicate = {
 };
 type PredicateEvidenceBindings = Partial<Record<PredicateId, string[]>>;
 type TimeoutPhase = 'startup' | 'idle' | 'hard';
+
+export function facts(ctx: Ctx): number {
+  const provider = ctx.positionals[0] ?? '';
+  const asOf =
+    typeof ctx.values['as-of'] === 'string' ? ctx.values['as-of'] : new Date().toISOString();
+  ctx.out(`${io.jsonOk(providerModelFacts(provider, asOf))}\n`);
+  return io.EXIT.OK;
+}
 
 function plain(value: unknown): value is Json {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

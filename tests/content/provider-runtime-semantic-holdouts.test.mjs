@@ -33,9 +33,14 @@ test('Cursor native Task review guidance does not prescribe unadmitted API-famil
   const review = read(
     'plugin/dist/cursor/skills/master-orchestrator-guide/references/resume-verify.md',
   );
+  const portfolio = readMarkdownTree('plugin/dist/cursor/skills');
   assert.doesNotMatch(
     review,
     /本 host 机制（Cursor）[\s\S]{0,1200}(?:gpt-5\.6|Claude（Opus|Claude 档|GPT-5\.6)/iu,
+  );
+  assert.doesNotMatch(
+    portfolio,
+    /\b(?:gpt-[0-9][a-z0-9.-]*|claude-(?:opus|sonnet|haiku|fable)-[0-9][a-z0-9.-]*)\b/iu,
   );
 });
 
@@ -51,7 +56,12 @@ test('Claude runtime model facts include the current Sonnet 5 tier', () => {
   const models = read(
     'plugin/dist/claude-code/skills/pacing-and-estimation/references/model-tiers.md',
   );
+  const reviewTransport = read(
+    'plugin/dist/claude-code/skills/master-orchestrator-guide/scripts/codex-review.sh',
+  );
   assert.match(models, /Sonnet 5|claude-sonnet-5/u);
+  assert.match(reviewTransport, /CODEX_REVIEW_MODEL_REQUIRED/u);
+  assert.doesNotMatch(reviewTransport, /CODEX_REVIEW_MODEL:-gpt-/u);
 });
 
 test('Claude runtime model facts do not claim Fable is unconditionally unavailable', () => {

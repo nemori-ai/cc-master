@@ -1,0 +1,119 @@
+{
+  "schema": "cc-master.provider-guidance-runtime.v1",
+  "facts_registry": "ccm/apps/cli/src/provider-model-facts.json",
+  "projection_as_of": "2026-07-15T00:00:00Z",
+  "hosts": {
+    "claude-code": {
+      "skills": {
+        "master-orchestrator-guide": {
+          "schema": "cc-master.provider-guidance-runtime-manifest.v1",
+          "files": {
+            "SKILL.md": "40cb38b9a5b640d99fb910bac06a6d897eb5a8ff16e0fe036da72f8f1304228a",
+            "references/async-hitl.md": "9870b752f3555d1495ef3ee6938dd0fbaf11d4c3b86684477868e2c232c43dbb",
+            "references/board.md": "3014c12249c5a28d2d8494c61b99506ef5dfacdc52692cbe8aab5aa4edfdfacf",
+            "references/cost-decisions.md": "f9cb9122199c13c8a14ba35ed5b25b0b8bc464749d76ce1d7a0ce2dc80bf4237",
+            "references/decomposition.md": "9c2917509e1bc3afb87221fa0fba138a7de5ad3cf69875aaf36964eca012b5b7",
+            "references/dispatch.md": "d5bd16ee657d9ed5f896d017ef6f0f992aee4ca94088f7eebda790df699bdf1c",
+            "references/handoff.md": "25b88ef2efc945f139d18484ee179483a2e767b9414710e9b0c1308994a25c2f",
+            "references/model-allocation.md": "d5045e325564deaab0e35a21312f23b412d5a31f327b68f52e3ba73c62b4de33",
+            "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
+            "references/resume-verify.md": "6088c82ef91dc274f7c584cd8c78a6632184e0fff3b390c1b33bdbf29ba38c70",
+            "scripts/codex-review.sh": "282c59a181bab3c53a97886c77bd6efe5e54ea00daf63e019c8a4962bcaf1948"
+          }
+        },
+        "pacing-and-estimation": {
+          "schema": "cc-master.provider-guidance-runtime-manifest.v1",
+          "files": {
+            "SKILL.md": "431bd7ad134d7fc19445a5c5d023b1b3e464e15d52ad6d2cb1b3fd2b0b82646e",
+            "references/estimation.md": "6aeae595718ab64c9b02e991c10d4cefb161e15ddc6f8bcdb1a62fa6968653f7",
+            "references/model-tiers.md": "a87a73263d978f308e080baf76adf415a60da6819e4c72000e93e19ec7c41b55",
+            "references/pacing-levers.md": "7ce1627f9e0995fd4bd3d7bb5df08502a0c71898f3adf0a6b54e2721e6311213",
+            "references/pool-aware-advice.md": "d5e76a941cae6045f942143c3cd8b6f8d3efb11ba3304fb2a6302acb4c66bdf4",
+            "references/usage-signals.md": "3b6f415b4c37e30f3aa4ac2a43951d5ffea29cad6a4973e1c4843d988a668843"
+          }
+        },
+        "using-ccm": {
+          "schema": "cc-master.provider-guidance-runtime-manifest.v1",
+          "files": {
+            "SKILL.md": "26c272817222ed14f5f58a64c7b297dec9b650e8b8d49406ad3470eaf3d280ea",
+            "references/account-pool.md": "da7a5826ba8ceb1eefc26722b4e305df6042ea30264abade27f896ef1fb2a8d6",
+            "references/board-model-guide.md": "4b8992e2cb9e3a05c3bc9c296d83d504f15deb914fba6d9c6744ee5207d1ee6b",
+            "references/command-catalog.md": "046b334ab4c0ae6eb769b9371c398b8c0bc5ede578c8416a1b08bf0020a1013d"
+          }
+        }
+      }
+    },
+    "codex": {
+      "skills": {
+        "master-orchestrator-guide": {
+          "schema": "cc-master.provider-guidance-runtime-manifest.v1",
+          "files": {
+            "SKILL.md": "1da99ee02d2ad911474833c534ee8260d6d84c817a27e132b403954115d1a72d",
+            "references/async-hitl.md": "9877ad38d12e71ddeddbd8a12747e61e792720b3d6504f17c74fb001da4142ab",
+            "references/board.md": "39dfec8792054c707407083b5c9b1e786f36071a56be5b29719ee8b183a4d991",
+            "references/decomposition.md": "9d3fc377a4d8e4cd4c9c4d312ce47ab58a74f7faa9d071dda6e8a6c22609ced7",
+            "references/dispatch.md": "bff2ff41727519a78b5ecc440d6d4f45673813d16284c91b8d44ef906f43fd51",
+            "references/model-allocation.md": "1ce7e299811af74df987c4d845812fa068626934347a423c4f5407e4357ff942",
+            "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
+            "references/resume-verify.md": "859c734bc947ce38d1bb0c7b74ebad0c3bb45ace5c88ee26e471d82efe02f1da"
+          }
+        },
+        "pacing-and-estimation": {
+          "schema": "cc-master.provider-guidance-runtime-manifest.v1",
+          "files": {
+            "SKILL.md": "fd622d4a3204d0322a3af036cf26190772e0bc09a36a8bf9641adb96d21776ba",
+            "references/estimation.md": "6aeae595718ab64c9b02e991c10d4cefb161e15ddc6f8bcdb1a62fa6968653f7",
+            "references/model-tiers.md": "9f936362d78466d034c99fb189553a4a54816c190e9c2bce0b58a45b3f0d89dc",
+            "references/pacing-levers.md": "13ddf4b0767e5f16983ceb2d88a13be049f13a6825ee253997f68c53252c60c0",
+            "references/pool-aware-advice.md": "d5e76a941cae6045f942143c3cd8b6f8d3efb11ba3304fb2a6302acb4c66bdf4",
+            "references/usage-signals.md": "701a0c6a4c993fc4188b07ee1c88ca13290c96b0a705b403bda2efa6e18779f8"
+          }
+        },
+        "using-ccm": {
+          "schema": "cc-master.provider-guidance-runtime-manifest.v1",
+          "files": {
+            "SKILL.md": "3529640db885a276bb0009c349ee02885d97e9976f87afdf750e8cffd958b61f",
+            "references/board-model-guide.md": "8a2e614fdd3426b4b218012cafec087fbf00a2b1a75f88ce48f7a7d92d0b649f",
+            "references/command-catalog.md": "5779cc053e64c62c783884781030b53315a93654436d094a5aafbc6425069f70"
+          }
+        }
+      }
+    },
+    "cursor": {
+      "skills": {
+        "master-orchestrator-guide": {
+          "schema": "cc-master.provider-guidance-runtime-manifest.v1",
+          "files": {
+            "SKILL.md": "831636ed56cf3d698447a2a488fedce2e6dc1aca1eb53f779a9b6c6a916fcceb",
+            "references/async-hitl.md": "90f061a14d431bc1abc9000931cb9575c237b272e430f3899c176225f1f11281",
+            "references/board.md": "f3669b71cdab613e4c559ee6839109575bc3edd7d4288759b8ff19088d281c29",
+            "references/decomposition.md": "9d3fc377a4d8e4cd4c9c4d312ce47ab58a74f7faa9d071dda6e8a6c22609ced7",
+            "references/dispatch.md": "99b735df221d5ad7fadeb6cbd70a30378957c11956a32a4ee7dd204b91cc92cb",
+            "references/model-allocation.md": "adf91ecc673e8b10f6ae3b1852fb886258716c56a211bc230e4b9119c54640f9",
+            "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
+            "references/resume-verify.md": "95d5757e908effe027ab3e9d043dc5a147ab903f20a360fb5d9da6d1f61e8550"
+          }
+        },
+        "pacing-and-estimation": {
+          "schema": "cc-master.provider-guidance-runtime-manifest.v1",
+          "files": {
+            "SKILL.md": "a311d77d090f93653c484512677ab9a21a6c106de946c205a5a7fccecb16528d",
+            "references/estimation.md": "6aeae595718ab64c9b02e991c10d4cefb161e15ddc6f8bcdb1a62fa6968653f7",
+            "references/model-tiers.md": "391ec216175a5d6ac2fd58dbfed98017e07cdaf1ef364c548881cfbf2cb4a023",
+            "references/pacing-levers.md": "798782f575812588ae5697c4eb37a7201c956e15cb10c9c96067dc18e45df2bc",
+            "references/pool-aware-advice.md": "d5e76a941cae6045f942143c3cd8b6f8d3efb11ba3304fb2a6302acb4c66bdf4",
+            "references/usage-signals.md": "d64b9ea4f4e2347a816f6ac6bf2b9ab2f5277f02e785e8dee01c76042b4fe04b"
+          }
+        },
+        "using-ccm": {
+          "schema": "cc-master.provider-guidance-runtime-manifest.v1",
+          "files": {
+            "SKILL.md": "f0e9d335be53b383febb056ee48d11b2bee04d96cb90ce7500d2a76a4061c637",
+            "references/board-model-guide.md": "c6abdad7a2d07407755d9b7592937caee4795a60a353cc3feb51a29437fcd061",
+            "references/command-catalog.md": "acd7832b47a75afbbe84fe59a9dbb21986d63566af3e2c9b62bf31c244661392"
+          }
+        }
+      }
+    }
+  }
+}

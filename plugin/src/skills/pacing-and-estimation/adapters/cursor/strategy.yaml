@@ -10,6 +10,10 @@ runtime_contracts:
     registry: read-only-capability.json
     slot: "{{PACING_READ_ONLY_CAPABILITY}}"
     host: cursor
+  provider_guidance:
+    registry: ../provider-guidance-runtime.json
+    host: cursor
+    skill: pacing-and-estimation
   model_admission:
     source: adapters/cursor/overlays/model-tiers-reference.md
     target: references/model-tiers.md

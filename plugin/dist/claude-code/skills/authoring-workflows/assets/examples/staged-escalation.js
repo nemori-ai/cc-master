@@ -4,7 +4,9 @@ export const meta = {
   phases: [{ title: 'Cheap pass' }, { title: 'Escalate' }],
 }
 const CHEAP = { type: 'object', properties: { answer: { type: 'string' }, confidence: { type: 'number' } }, required: ['answer', 'confidence'] }
-const STRONG_MODEL = 'claude-opus-4-8' // model is part of the cache key — keep it a literal so resume is stable.
+// Resolve this selector from fresh `ccm provider facts <provider> --json`, prove live admission,
+// then freeze that admitted identity for the run: model is part of the cache key.
+const STRONG_MODEL = '<freshly-admitted-strong-model-id>'
 const THRESHOLD = 0.8
 
 const items = args ?? ['ITEM_A', 'ITEM_B', 'ITEM_C']

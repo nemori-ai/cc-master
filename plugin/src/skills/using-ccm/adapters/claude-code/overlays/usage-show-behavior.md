@@ -1,0 +1,1 @@
+- 行为：列当前号的权威 5h/7d `used%` / `resets_at`，以及备号 registry snapshot（带 `as_of` / `snapshot_stale`）；缺信号时 `available:false`、exit 0。

@@ -88,6 +88,10 @@ const {
   assertPacingRenderedArtifact,
   assertPacingRuntimeTree,
 } = require('./scripts/pacing-read-only-attestation.cjs');
+const {
+  assertProviderGuidanceRuntimeTree,
+  loadProviderGuidanceRegistry,
+} = require('./scripts/provider-guidance-attestation.cjs');
 
 const src = 'plugin/src';
 const host = process.env.SYNC_HOST || 'claude-code';
@@ -235,6 +239,26 @@ function readReadOnlyCapabilityContract(file) {
   };
 }
 
+function readProviderGuidanceContract(file) {
+  const text = fs.readFileSync(file, 'utf8');
+  const runtimeContracts = readIndentedYamlBlock(text, 'runtime_contracts');
+  if (runtimeContracts === null) return null;
+  const contract = readIndentedYamlBlock(runtimeContracts, 'provider_guidance', 2);
+  if (contract === null) return null;
+  const value = (key) => {
+    const match = contract.match(
+      new RegExp(`^ {4}${key}:\\s*["']?([^"'\\n]+)["']?\\s*$`, 'm'),
+    );
+    if (!match) throw new Error(`missing runtime_contracts.provider_guidance.${key} in ${file}`);
+    return match[1].trim();
+  };
+  return {
+    registry: value('registry'),
+    host: value('host'),
+    skill: value('skill'),
+  };
+}
+
 function projectText(text, replacements, sourcePath) {
   let projected = text;
   for (const [token, replacement] of replacements.entries()) {
@@ -364,7 +388,9 @@ for (const skill of fs.readdirSync(skillsSrc).sort()) {
   const mode = readStrategyMode(strategy);
   const slotReplacements = readSlotReplacements(strategy, skillDir);
   const readOnlyContract = readReadOnlyCapabilityContract(strategy);
+  const providerGuidanceContract = readProviderGuidanceContract(strategy);
   let readOnlyRegistry = null;
+  let providerGuidanceRegistry = null;
   if (readOnlyContract) {
     if (readOnlyContract.host !== host) {
       throw new Error(
@@ -391,12 +417,28 @@ for (const skill of fs.readdirSync(skillsSrc).sort()) {
     assertPacingRenderedArtifact(registry, readOnlyContract.host, rendered);
     slotReplacements.set(registry.slot, rendered.replace(/\s+$/u, ''));
   }
+  if (providerGuidanceContract) {
+    if (providerGuidanceContract.host !== host) {
+      throw new Error(
+        `runtime provider guidance host ${providerGuidanceContract.host} does not match ${host} in ${strategy}`,
+      );
+    }
+    if (providerGuidanceContract.skill !== skill) {
+      throw new Error(
+        `runtime provider guidance skill ${providerGuidanceContract.skill} does not match ${skill} in ${strategy}`,
+      );
+    }
+    const registryPath = path.join(skillDir, providerGuidanceContract.registry);
+    if (!fs.existsSync(registryPath)) throw new Error(`missing ${registryPath}`);
+    providerGuidanceRegistry = loadProviderGuidanceRegistry(registryPath, process.cwd());
+  }
   const target = path.join(skillsDst, skill);
   if (mode === 'planned') {
     // Phase B: cursor (and future hosts) may declare planned until overlays exist.
     continue;
   }
-  const staging = readOnlyContract
+  const attested = readOnlyContract || providerGuidanceContract;
+  const staging = attested
     ? fs.mkdtempSync(path.join(skillsDst, `.${skill}-stage-`))
     : null;
   const projectionTarget = staging || target;
@@ -435,8 +477,18 @@ for (const skill of fs.readdirSync(skillsSrc).sort()) {
     } else {
       throw new Error(`unsupported projection mode "${mode}" in ${strategy}`);
     }
+    if (providerGuidanceContract) {
+      assertProviderGuidanceRuntimeTree(
+        providerGuidanceRegistry,
+        providerGuidanceContract.host,
+        providerGuidanceContract.skill,
+        projectionTarget,
+      );
+    }
     if (readOnlyContract) {
       assertPacingRuntimeTree(readOnlyRegistry, readOnlyContract.host, projectionTarget);
+    }
+    if (attested) {
       if (fs.existsSync(target)) throw new Error(`refusing to replace existing attested target ${target}`);
       fs.renameSync(projectionTarget, target);
     }

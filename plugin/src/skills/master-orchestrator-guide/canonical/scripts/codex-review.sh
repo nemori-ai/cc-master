@@ -7,7 +7,8 @@
 # review-output.schema.json. This is the dogfood reviewer for skill/plugin quality.
 #
 # Requires: codex CLI, logged in (OAuth). Usage: codex-review.sh [--base <branch>]
-# Env: CODEX_REVIEW_MODEL overrides the review model (default gpt-5.6-sol).
+# Env: CODEX_REVIEW_MODEL is required. Resolve it from fresh `ccm provider facts codex --json`,
+# then prove live account admission before invoking this transport.
 #
 # Silent-pass-through guard (see skills/master-orchestrator-guide/references/
 # resume-verify.md §3): an empty review or a failed call is treated as NOT passed.
@@ -22,7 +23,11 @@ if [ "${1:-}" = "--base" ]; then
 elif [ -n "${1:-}" ]; then
   BASE="$1"
 fi
-MODEL="${CODEX_REVIEW_MODEL:-gpt-5.6-sol}"
+if [ -z "${CODEX_REVIEW_MODEL:-}" ]; then
+  echo "CODEX_REVIEW_MODEL_REQUIRED: select from fresh ccm provider facts and prove live admission" >&2
+  exit 2
+fi
+MODEL="${CODEX_REVIEW_MODEL}"
 
 # mktemp 双 OS 安全形（不依赖 `-t` 的 BSD/GNU 分歧语义：BSD `-t PREFIX` 给前缀、GNU `-t` 把参数当模板·
 #   行为不一致）。显式给完整模板路径，BSD + GNU 同义：在 $TMPDIR（缺则 /tmp）下造唯一文件。

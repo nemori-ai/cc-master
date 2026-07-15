@@ -79,7 +79,7 @@
 
 各 host 上「怎么换族」的机制（脚本 / Task / 带外 CLI）见下——原则在此，管道在 adapter：
 
-**本 host 机制（Claude Code）**：主线 / 产出多为 Claude 族时，异构第二视角默认走 **GPT/Codex 族**——用 `${CLAUDE_SKILL_DIR}/scripts/codex-review.sh` 跑 `codex exec review --base <branch> --json`（review-only、只读 sandbox），按 openai-codex 插件的 `review-output.schema.json` 吐 `verdict`（`approve | needs-attention`，finding 带 severity/file/line/confidence）。这是管道，不是原则：原则仍是「换族」；若产出已是 GPT/Codex 族，就改派 Claude 族独立 subagent 做第二读，不要再派同族 Codex。
+**本 host 机制（Claude Code）**：主线 / 产出多为 Claude 族时，异构第二视角可以走 **GPT/Codex 族**。先读 fresh `ccm provider facts codex --json`，再用 Codex transport 证明当前账号对精确 selector 的 live admission；将该 selector 写入 `CODEX_REVIEW_MODEL` 后，才用 `${CLAUDE_SKILL_DIR}/scripts/codex-review.sh` 跑 `codex exec review --base <branch> --json`（review-only、只读 sandbox），按 openai-codex 插件的 `review-output.schema.json` 吐 `verdict`（`approve | needs-attention`，finding 带 severity/file/line/confidence）。事实过期、admission 未证或 payer/quota 不明都 fail closed。这是管道，不是原则：原则仍是「换族」；若产出已是 GPT/Codex 族，就改派 Claude 族独立 subagent 做第二读，不要再派同族 Codex。
 
 **跨族二审的收益不对称**——用更强模型审弱模型的产出收益最大；反过来让明显更弱的模型审明显更强模型的产出，收益薄，且弱 reviewer 的「纠错」可能改坏正确产物。所以：
 
