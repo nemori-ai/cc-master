@@ -357,6 +357,7 @@ function makeTickState(label: string) {
       2,
     )}\n`,
   );
+  chmodSync(state, 0o600);
   const deniedRoot = makeTemp(`denied-${label}`);
   const credential = join(deniedRoot, 'credentials.sqlite');
   const serviceWanted = join(service, 'undeclared-service-state.json');
@@ -557,6 +558,27 @@ test('ccm effects are default-deny with complete per-event argv schemas', () => 
       'arm',
       'codex',
       ['board', 'init', '--capabilities', '--json', '--no-input', '--monitor'],
+    ],
+    [
+      'subscription-option-suffix',
+      'arm',
+      'codex',
+      [
+        'coordination',
+        'subscription',
+        'register',
+        '--board',
+        board,
+        '--origin',
+        'codex',
+        '--session-id',
+        'counterfeit-session',
+        '--capability',
+        'coordination-inbox',
+        '--json',
+        '--no-input',
+        '--network',
+      ],
     ],
     [
       'goal-check-option-suffix',

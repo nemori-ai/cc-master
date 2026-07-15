@@ -478,6 +478,7 @@ EOF
   if ! CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board stamp-harness --board "$TARGET" --json >/dev/null 2>&1; then
     harness_note=" <advisory source=\"bootstrap\" strength=\"weak\">ccm board stamp-harness 未能写入 owner.harness；ccm peers 会把该 board 退到 unknown 单例池，可稍后重跑 ccm board stamp-harness --board ${TARGET} 修复。</advisory>"
   fi
+  register_coordination_subscription "$TARGET"
 
   inject_ctx "cc-master resume: you have TAKEN OVER the existing orchestration board at ${TARGET}. This is a RESUME, not a fresh start — do NOT re-decompose the goal and do NOT reset tasks[]. Invoke the master-orchestrator-guide skill, run ccm goal check --board ${TARGET} --json and read the current Goal Brief when present, then RECONCILE the existing tasks[]: rebuild your mental model from their statuses. Treat every in_flight task as an ORPHAN (its handle died with the prior session) — do not wait on it; run it through endpoint verification (resume-verify content-hash + endpoint check): if its artifact exists and passes, mark it done/verified; otherwise demote it to ready/stale and re-dispatch for a fresh handle. This board is your single source of truth; from now on update owner.heartbeat each time you flush it.${harness_note}"
   return 0
@@ -615,6 +616,28 @@ CCM_CMD="${CCM_BIN:-ccm}"
 CCM_BOARD_PATH_CAPABILITY='board-init/structured-board-path-v1'
 CCM_GOAL_CONTRACT_CAPABILITY='goal-contract/v1'
 CCM_BOARD_PATH_MIN_VERSION='0.21.0'
+register_coordination_subscription() {
+  board_path="$1"
+  subscription_out="$(CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" coordination subscription register \
+    --board "$board_path" --origin claude-code --session-id "$sid" \
+    --capability coordination-inbox --json --no-input 2>/dev/null)" || return 0
+  printf '%s' "$subscription_out" | CCM_EXPECTED_SESSION="$sid" node -e '
+    let input = "";
+    process.stdin.on("data", (chunk) => { input += chunk; });
+    process.stdin.on("end", () => {
+      try {
+        const envelope = JSON.parse(input);
+        const value = envelope && envelope.ok === true && envelope.data && envelope.data.subscription;
+        if (value && typeof value.subscription_id === "string" && value.subscription_id &&
+            typeof value.session_epoch === "string" && value.session_epoch &&
+            value.session_id === process.env.CCM_EXPECTED_SESSION && value.origin === "claude-code" &&
+            value.capability === "coordination-inbox" && value.state === "current") process.exitCode = 0;
+        else process.exitCode = 1;
+      } catch (_) { process.exitCode = 1; }
+    });
+  ' >/dev/null 2>&1 || true
+  return 0
+}
 # This negotiation endpoint is intentionally distinct from --dry-run: an older ccm rejects the
 # unknown flag during argument parsing, before its legacy init resolver can create a parent directory
 # or resume can re-stamp an existing owner.
@@ -791,6 +814,7 @@ init_pri=""; init_wip=""; init_ownerwip=""; init_pol=""; init_issue=""
 if ! CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board stamp-harness --board "$BOARD" --json >/dev/null 2>&1; then
   flag_notes="${flag_notes} ccm board stamp-harness 未能写入 owner.harness（peers 将退 unknown 单例池·可手动重跑）；"
 fi
+register_coordination_subscription "$BOARD"
 # 纯 bash token 循环抽 flag 值（enum/int 轻解析）。set -f 关 glob（goal 文本可能含 `*`·别让它扩成文件名）；
 #   `set -- $fresh_args` 按 IFS 词分割成 token（goal 词被下面 *) 分支跳过·只挑 flag）。扫完恢复 +f。
 set -f

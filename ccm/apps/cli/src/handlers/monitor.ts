@@ -10,7 +10,6 @@ import {
   launchdUninstallCommands,
   lintBoard,
   loadHomeBoards,
-  type QuotaModel,
   type ServiceCommand,
   type ServiceDefinition,
   serializeLaunchdPlist,
@@ -18,16 +17,21 @@ import {
   systemdInstallCommands,
   systemdUninstallCommands,
   systemdUserDir,
-  type UsageSignal,
   withLock,
 } from '@ccm/engine';
 import * as discover from '../discover.js';
-import { MachineHarnessRegistry, resolveHarnessAdapter } from '../harnesses/registry.js';
-import type { HarnessDescriptor } from '../harnesses/types.js';
+import { MachineHarnessRegistry } from '../harnesses/registry.js';
 import { readVersion } from '../help.js';
 import * as io from '../io.js';
 import type { Ctx } from './_common.js';
 import { type ArbiterUsageOverride, arbitrateBoardForService } from './coordination.js';
+import {
+  type MonitorLifecycleObserver,
+  monitorLifecycleNoopObserver,
+  runMonitorSourceCycle,
+} from './monitor-source-composition.js';
+
+export { isMonitorSourcePolicyInvocation } from './monitor-source-composition.js';
 
 const EXIT = io.EXIT;
 const SERVICE_SCHEMA = 'ccm/monitor-service/v1';
@@ -100,6 +104,11 @@ interface TestHooks {
 }
 
 let testHooks: TestHooks = {};
+let lifecycleObserver = monitorLifecycleNoopObserver();
+
+export function __setMonitorLifecycleObserver(observer: MonitorLifecycleObserver): void {
+  lifecycleObserver = observer;
+}
 
 export function __setMonitorTestHooks(hooks: TestHooks): void {
   testHooks = hooks;
@@ -107,6 +116,7 @@ export function __setMonitorTestHooks(hooks: TestHooks): void {
 
 export function __resetMonitorTestHooks(): void {
   testHooks = {};
+  lifecycleObserver = monitorLifecycleNoopObserver();
 }
 
 function kinded(message: string, kind: string): KindedError {
@@ -431,6 +441,7 @@ interface TickResult {
   checked_boards: number;
   writes: number;
   errors: string[];
+  mode?: 'cached-only';
 }
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -450,74 +461,71 @@ function readAccountsMap(home: string): Record<string, unknown> | null {
   }
 }
 
-function usageForHarness(
-  descriptor: HarnessDescriptor,
-  env: Record<string, string | undefined>,
-): ArbiterUsageOverride {
-  const adapter = resolveHarnessAdapter({ env, harnessFlag: descriptor.id });
-  const reading = adapter.readCurrentUsage(env);
-  const source = descriptor.usageSource;
-  return {
-    signal: reading.signal as UsageSignal | null,
-    quotaModel: source.quotaModel as QuotaModel,
-    pollable: source.pollable,
-  };
-}
-
-function tickOnce(ctx: Ctx, state: MonitorState): TickResult {
+async function tickOnce(ctx: Ctx, state: MonitorState): Promise<TickResult> {
   if (testHooks.tick) return testHooks.tick(ctx, state);
-  const registry = MachineHarnessRegistry.sweep(ctx.env);
-  const registryJson = registry.toJSON();
-  const usageByHarness = new Map<string, ArbiterUsageOverride>();
-  for (const descriptor of registry.installed()) {
-    usageByHarness.set(descriptor.id, usageForHarness(descriptor, ctx.env));
-  }
-  const accountsMap = readAccountsMap(state.home);
-  const boardsDir = discover.boardsDir(state.home);
-  const boards = loadHomeBoards(boardsDir, {
-    maxBoards: Number.POSITIVE_INFINITY,
-    maxDaysAgo: Number.POSITIVE_INFINITY,
-  });
-  let checkedBoards = 0;
-  let writes = 0;
-  const errors: string[] = [];
-  for (const entry of boards) {
-    const owner = boardOwner(entry.board);
-    if (owner.active !== true) continue;
-    checkedBoards += 1;
-    const boardPath = path.join(boardsDir, entry.file);
-    const harness = typeof owner.harness === 'string' ? owner.harness : undefined;
-    const usage = harness ? usageByHarness.get(harness) : undefined;
-    try {
-      withLock(boardPath, () => {
-        const raw = JSON.parse(fs.readFileSync(boardPath, 'utf8'));
-        const out = arbitrateBoardForService(
-          raw,
-          {
-            ...ctx,
-            values: {
-              ...ctx.values,
-              home: state.home,
-              board: boardPath,
-              ...(harness ? { harness } : {}),
-            },
-          },
-          boardPath,
-          { usage, accountsMap },
-        );
-        const res = lintBoard(JSON.stringify(out.board));
-        if (res.errors.length > 0) {
-          errors.push(`${entry.file}: ${formatReport(res)}`);
-          return;
-        }
-        io.writeFileAtomicSync(boardPath, `${JSON.stringify(out.board, null, 2)}\n`);
-        writes += out.result.appended;
+  return runMonitorSourceCycle({
+    observer: lifecycleObserver,
+    readCached: () => {
+      const registry = MachineHarnessRegistry.sweep(ctx.env);
+      const registryJson = registry.toJSON();
+      const usageByHarness = new Map<string, ArbiterUsageOverride>();
+      for (const descriptor of registryJson.harnesses) {
+        usageByHarness.set(descriptor.id, {
+          signal: null,
+          quotaModel: descriptor.usageSource.quotaModel,
+          pollable: false,
+        });
+      }
+      const accountsMap = readAccountsMap(state.home);
+      const boardsDir = discover.boardsDir(state.home);
+      const boards = loadHomeBoards(boardsDir, {
+        maxBoards: Number.POSITIVE_INFINITY,
+        maxDaysAgo: Number.POSITIVE_INFINITY,
       });
-    } catch (e) {
-      errors.push(`${entry.file}: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }
-  return { registry: registryJson, checked_boards: checkedBoards, writes, errors };
+      let checkedBoards = 0;
+      let writes = 0;
+      const errors: string[] = [];
+      for (const entry of boards) {
+        const owner = boardOwner(entry.board);
+        if (owner.active !== true) continue;
+        checkedBoards += 1;
+        const boardPath = path.join(boardsDir, entry.file);
+        const harness = typeof owner.harness === 'string' ? owner.harness : undefined;
+        const usage =
+          (harness ? usageByHarness.get(harness) : undefined) ??
+          ({ signal: null, quotaModel: 'primary-secondary', pollable: false } as const);
+        try {
+          withLock(boardPath, () => {
+            const raw = JSON.parse(fs.readFileSync(boardPath, 'utf8'));
+            const out = arbitrateBoardForService(
+              raw,
+              {
+                ...ctx,
+                values: {
+                  ...ctx.values,
+                  home: state.home,
+                  board: boardPath,
+                  ...(harness ? { harness } : {}),
+                },
+              },
+              boardPath,
+              { usage, accountsMap },
+            );
+            const res = lintBoard(JSON.stringify(out.board));
+            if (res.errors.length > 0) {
+              errors.push(`${entry.file}: ${formatReport(res)}`);
+              return;
+            }
+            io.writeFileAtomicSync(boardPath, `${JSON.stringify(out.board, null, 2)}\n`);
+            writes += out.result.appended;
+          });
+        } catch (e) {
+          errors.push(`${entry.file}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+      return { registry: registryJson, checked_boards: checkedBoards, writes, errors };
+    },
+  });
 }
 
 function sleep(ms: number): Promise<void> {
@@ -542,7 +550,7 @@ export async function serve(ctx: Ctx): Promise<number> {
     if (!latest.wanted) break;
     let next = latest;
     try {
-      const tick = tickOnce(ctx, latest);
+      const tick = await tickOnce(ctx, latest);
       next = {
         ...latest,
         pid: process.pid,

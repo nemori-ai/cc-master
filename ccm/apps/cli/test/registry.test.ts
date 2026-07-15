@@ -71,7 +71,7 @@ const EXPECTED: Record<string, string[]> = {
   watchdog: ['arm', 'disarm', 'status'],
   policy: ['show', 'set'],
   peers: ['list'],
-  coordination: ['inbox', 'notify', 'arbitrate'],
+  coordination: ['inbox', 'notify', 'arbitrate', 'subscription'],
   usage: ['show', 'advise', 'task-cost', 'burn-rate', 'runway'],
   estimate: ['show', 'forecast', 'evm', 'velocity', 'risk', 'cost-to-complete'],
   account: ['add', 'refresh', 'delete', 'list', 'switch'],

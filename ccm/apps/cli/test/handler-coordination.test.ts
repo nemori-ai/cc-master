@@ -1,13 +1,14 @@
 // handler-coordination.test.ts — ADR-032 coordination inbox CLI handlers.
 
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import type { Ctx } from '../src/handlers/_common.js';
 import * as coordinationHandler from '../src/handlers/coordination.js';
 import * as io from '../src/io.js';
+import { run } from '../src/router.js';
 
 const EXIT = io.EXIT;
 
@@ -215,6 +216,187 @@ test('coordination inbox ack unknown id throws Usage', () => {
       return true;
     },
   );
+});
+
+test('coordination subscription is credential-free, idempotent for one session, and rotates epoch on handoff', () => {
+  const boardPath = mkBoard();
+  const home = mkTmp('ccm-hcoord-subscription-');
+  const register = (sessionId: string): Record<string, unknown> => {
+    const ctx = mkCtx(boardPath, {
+      positionals: ['register'],
+      values: {
+        home,
+        origin: 'codex',
+        'session-id': sessionId,
+        capability: 'coordination-inbox',
+      },
+      flags: { json: true },
+    });
+    assert.equal(coordinationHandler.subscription(ctx), EXIT.OK);
+    return JSON.parse(ctx.outBuf.join('')).data.subscription as Record<string, unknown>;
+  };
+
+  const first = register('sid-one');
+  const replay = register('sid-one');
+  assert.deepEqual(replay, first, 'the same ARM replay must not rotate subscription identity');
+  assert.equal(first.state, 'current');
+  assert.equal(first.origin, 'codex');
+  assert.equal(first.capability, 'coordination-inbox');
+
+  const next = register('sid-two');
+  assert.notEqual(next.subscription_id, first.subscription_id);
+  assert.notEqual(next.session_epoch, first.session_epoch);
+
+  const stale = mkCtx(boardPath, {
+    positionals: ['current'],
+    values: {
+      home,
+      origin: 'codex',
+      'session-id': 'sid-one',
+      capability: 'coordination-inbox',
+    },
+    flags: { json: true },
+  });
+  assert.equal(coordinationHandler.subscription(stale), EXIT.OK);
+  assert.equal(JSON.parse(stale.outBuf.join('')).data.subscription, null);
+
+  const store = join(home, 'coordination', 'subscriptions.json');
+  assert.equal(statSync(store).mode & 0o777, 0o600, 'subscription state must be owner-only');
+});
+
+test('coordination subscription refuses to replace a corrupt durable store', () => {
+  const boardPath = mkBoard();
+  const home = mkTmp('ccm-hcoord-subscription-corrupt-');
+  const store = join(home, 'coordination', 'subscriptions.json');
+  mkdirSync(join(home, 'coordination'), { recursive: true });
+  writeFileSync(store, '{not-json\n');
+  const register = mkCtx(boardPath, {
+    positionals: ['register'],
+    values: {
+      home,
+      origin: 'codex',
+      'session-id': 'sid-corrupt',
+      capability: 'coordination-inbox',
+    },
+    flags: { json: true },
+  });
+  assert.throws(
+    () => coordinationHandler.subscription(register),
+    /subscription store is invalid; refusing to overwrite/,
+  );
+  assert.equal(readFileSync(store, 'utf8'), '{not-json\n');
+});
+
+test('real CLI router registers and queries the exact current subscription', async () => {
+  const boardPath = mkBoard();
+  const home = mkTmp('ccm-hcoord-router-');
+  const env = {
+    HOME: home,
+    CLAUDE_CONFIG_DIR: join(home, 'claude'),
+    CC_MASTER_NO_AUTOINSTALL: '1',
+    PATH: process.env.PATH,
+  };
+  const invoke = async (argv: string[]): Promise<Record<string, any>> => {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await run(argv, {
+      env,
+      out: (line) => out.push(line),
+      err: (line) => err.push(line),
+    });
+    assert.equal(code, EXIT.OK, err.join('\n'));
+    assert.deepEqual(err, []);
+    return JSON.parse(out.join('')) as Record<string, any>;
+  };
+  const common = [
+    '--board',
+    boardPath,
+    '--home',
+    home,
+    '--origin',
+    'claude-code',
+    '--session-id',
+    'sid-router',
+    '--capability',
+    'coordination-inbox',
+    '--json',
+    '--no-input',
+  ];
+  const registered = await invoke(['coordination', 'subscription', 'register', ...common]);
+  const current = await invoke(['coordination', 'subscription', 'current', ...common]);
+  assert.deepEqual(current.data.subscription, registered.data.subscription);
+});
+
+test('bounded inbox list requires exact current session epoch, adds cached provenance, and never auto-acks', () => {
+  const boardPath = mkBoard();
+  const home = mkTmp('ccm-hcoord-bounded-');
+  const notify = mkCtx(boardPath, {
+    values: {
+      kind: 'pacing_throttle',
+      summary: 'Use cached pacing fact',
+      expires: '2099-01-01T00:00:00Z',
+    },
+    flags: { json: true },
+  });
+  assert.equal(coordinationHandler.notify(notify), EXIT.OK);
+
+  const register = mkCtx(boardPath, {
+    positionals: ['register'],
+    values: {
+      home,
+      origin: 'cursor',
+      'session-id': 'sid-current',
+      capability: 'coordination-inbox',
+    },
+    flags: { json: true },
+  });
+  assert.equal(coordinationHandler.subscription(register), EXIT.OK);
+  const subscription = JSON.parse(register.outBuf.join('')).data.subscription;
+
+  const list = (epoch: string): TestCtx =>
+    mkCtx(boardPath, {
+      positionals: ['list'],
+      values: {
+        home,
+        unconsumed: true,
+        'current-subscription': true,
+        origin: 'cursor',
+        'session-id': 'sid-current',
+        'session-epoch': epoch,
+        capability: 'coordination-inbox',
+      },
+      flags: { json: true },
+    });
+
+  const current = list(subscription.session_epoch);
+  assert.equal(coordinationHandler.inbox(current), EXIT.OK);
+  const data = JSON.parse(current.outBuf.join('')).data;
+  assert.equal(data.count, 1);
+  assert.deepEqual(data.subscription, {
+    subscription_id: subscription.subscription_id,
+    session_id: 'sid-current',
+    session_epoch: subscription.session_epoch,
+    origin: 'cursor',
+    capability: 'coordination-inbox',
+  });
+  assert.deepEqual(data.inbox[0].delivery_provenance, {
+    ...data.subscription,
+    source_policy_revision: 'ccm/cached-board-inbox/v1',
+    consent_provenance_ref: 'ccm://coordination/subscriptions/cached-only',
+  });
+  assert.equal(
+    (readBoard(boardPath).coordination as { inbox: Array<{ status: string }> }).inbox[0]?.status,
+    'unconsumed',
+    'listing is observation only; only an explicit ack may consume',
+  );
+
+  const stale = list('epoch-stale');
+  assert.equal(coordinationHandler.inbox(stale), EXIT.OK);
+  assert.deepEqual(JSON.parse(stale.outBuf.join('')).data, {
+    subscription: null,
+    inbox: [],
+    count: 0,
+  });
 });
 
 test('coordination notify supersedes older unconsumed notification of same kind through write gate', () => {

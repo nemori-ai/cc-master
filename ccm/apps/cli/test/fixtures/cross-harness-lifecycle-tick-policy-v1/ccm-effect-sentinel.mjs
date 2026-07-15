@@ -19,6 +19,24 @@ function isoInstant(value) {
 
 function armShape(args) {
   if (
+    args.length === 13 &&
+    args[0] === 'coordination' &&
+    args[1] === 'subscription' &&
+    args[2] === 'register' &&
+    args[3] === '--board' &&
+    boardPath(args[4]) &&
+    args[5] === '--origin' &&
+    args[6] === harness &&
+    args[7] === '--session-id' &&
+    typeof args[8] === 'string' &&
+    args[8].length > 0 &&
+    args[9] === '--capability' &&
+    args[10] === 'coordination-inbox' &&
+    args[11] === '--json' &&
+    args[12] === '--no-input'
+  )
+    return true;
+  if (
     args.length === 5 &&
     args[0] === 'board' &&
     args[1] === 'init' &&

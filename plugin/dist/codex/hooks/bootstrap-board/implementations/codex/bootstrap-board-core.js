@@ -175,6 +175,39 @@ function run(cmd, args, options = {}) {
   return res;
 }
 
+function registerCoordinationSubscription(home, boardPath, sessionId) {
+  try {
+    const res = run('ccm', [
+      'coordination',
+      'subscription',
+      'register',
+      '--board',
+      boardPath,
+      '--origin',
+      'codex',
+      '--session-id',
+      sessionId,
+      '--capability',
+      'coordination-inbox',
+      '--json',
+      '--no-input',
+    ], { env: { ...process.env, CC_MASTER_HOME: home } });
+    const envelope = JSON.parse(res.stdout || '{}');
+    const value = envelope && envelope.ok === true && envelope.data && envelope.data.subscription;
+    return !!(
+      value &&
+      typeof value.subscription_id === 'string' && value.subscription_id &&
+      typeof value.session_epoch === 'string' && value.session_epoch &&
+      value.session_id === sessionId &&
+      value.origin === 'codex' &&
+      value.capability === 'coordination-inbox' &&
+      value.state === 'current'
+    );
+  } catch {
+    return false;
+  }
+}
+
 // PARITY: rule-bootstrap-structured-path-capability
 function requireBootstrapCapabilities(home) {
   const res = run('ccm', ['board', 'init', '--capabilities', '--json', '--no-input'], {
@@ -351,6 +384,7 @@ function resumeBoard(home, boardsDir, flags, sessionId, invocation) {
     harnessNote = `\nharness_stamp_advisory=ccm board stamp-harness failed: ${error.message}`;
   }
   writeSessionState(home, sessionId, boardPath, invocation, 'resume');
+  registerCoordinationSubscription(home, boardPath, sessionId);
   say(
     'context',
     [
@@ -413,6 +447,7 @@ function main() {
     // Keep ARM usable; ccm peers will treat missing harness as an unknown singleton pool.
   }
   writeSessionState(home, sessionId, boardPath, invocation, 'fresh');
+  registerCoordinationSubscription(home, boardPath, sessionId);
 
   const updateArgs = ['--board', boardPath, 'board', 'update', '--json', '--no-input'];
   const applied = [];
