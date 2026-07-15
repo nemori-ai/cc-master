@@ -48,6 +48,7 @@ cc-master/
 │   ├── src/                  ← **单一语义源**：SAP skills + PHIP hooks + host manifest/commands source
 │   │   ├── .claude-plugin/   ← Claude Code adapter manifest source（第二 host 出现后可下沉到 host adapter）
 │   │   ├── commands/         ← command body source（第一阶段按 Claude Code 投影）
+│   │   ├── adapters/         ← cross-surface origin host-native invocation 映射；per-host strategy 投影，状态机/writer 仍归 ccm
 │   │   ├── skills/           ← **SAP**：`<skill>/canonical/` runtime 源 + `<skill>/adapters/<host>/strategy.yaml`
 │   │   │   └── _hosts/       ← host-wide skill adapter base（当前 `claude-code`）
 │   │   └── hooks/            ← **PHIP**：`_manifest/` contract + `_hosts/<host>/` + `<hook>/implementations/<host>/`

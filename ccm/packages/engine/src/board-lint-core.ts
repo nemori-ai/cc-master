@@ -40,6 +40,11 @@ import {
   taskTrulyDone,
 } from './board-model.js';
 import {
+  NATIVE_ATTEMPT_CONTRACT,
+  NATIVE_ATTEMPT_PROJECTION_RULE,
+  validateNativeAttemptProjection,
+} from './native-attempt.js';
+import {
   contractActivation,
   routingContractAppliesToTask,
   validateRoutedTaskForInFlight,
@@ -429,6 +434,29 @@ export function lintBoard(text: string): LintResult {
     }
   }
 
+  const nativeProjectionIssues = validateNativeAttemptProjection(b);
+  const invalidNativeTaskIds = new Set(
+    nativeProjectionIssues.map((issue) => issue.task_id).filter((id): id is string => Boolean(id)),
+  );
+  const validNativeNoHandleTaskIds = new Set(
+    [...taskById]
+      .filter(([id, task]) => {
+        const attempts = (task as { routing?: { attempts?: unknown } }).routing?.attempts;
+        return (
+          !invalidNativeTaskIds.has(id) &&
+          Array.isArray(attempts) &&
+          attempts.some(
+            (entry: Record<string, unknown>) =>
+              entry?.schema === NATIVE_ATTEMPT_CONTRACT ||
+              (entry?.create_snapshot as { attempt?: { schema?: unknown } } | undefined)?.attempt
+                ?.schema === NATIVE_ATTEMPT_CONTRACT ||
+              (entry?.create_snapshot !== undefined && entry?.create_hash !== undefined),
+          )
+        );
+      })
+      .map(([id]) => id),
+  );
+
   // ── 每个 task 的 v2 字段 FMT（executor/role/type/references/estimate/acceptance/blocked_on/wip_limit/时间）──
   for (const [id, t] of taskById) {
     lintTaskFields(id, t, validIds, emit);
@@ -436,8 +464,16 @@ export function lintBoard(text: string): LintResult {
 
   // ── BIZ 条件业务规则（per-task）+ awaiting-user 完整性 ───────────────────────────────────────────────
   for (const [id, t] of taskById) {
-    lintTaskBiz(id, t, emit);
+    lintTaskBiz(id, t, emit, validNativeNoHandleTaskIds.has(id));
     lintTaskRoutingContract(b, id, t, emit);
+  }
+
+  for (const issue of nativeProjectionIssues) {
+    emit(
+      NATIVE_ATTEMPT_PROJECTION_RULE,
+      `${issue.code}${issue.path ? ` at ${issue.path}` : ''}: ${issue.message ?? issue.code}`,
+      issue.task_id,
+    );
   }
 
   // ── BIZ-STATUS-DEPS（deps 门控不一致·warn·ADR-023）──────────────────────────────────────────────────
@@ -1193,7 +1229,12 @@ function lintTaskFields(id: string, t: TaskLike, validIds: Set<string>, emit: Em
 }
 
 // ── 每个 task 的 BIZ 条件业务规则 ───────────────────────────────────────────────────────────────────
-function lintTaskBiz(id: string, t: TaskLike, emit: Emit): void {
+function lintTaskBiz(
+  id: string,
+  t: TaskLike,
+  emit: Emit,
+  nativeProjectionOwnsHandleAbsence: boolean,
+): void {
   const refs = Array.isArray(t.references)
     ? t.references.filter((r) => r && typeof r === 'object')
     : [];
@@ -1230,7 +1271,8 @@ function lintTaskBiz(id: string, t: TaskLike, emit: Emit): void {
   if (
     t.status === 'in_flight' &&
     (t.executor === 'subagent' || t.executor === 'workflow') &&
-    (typeof t.handle !== 'string' || t.handle === '')
+    (typeof t.handle !== 'string' || t.handle === '') &&
+    !(t.executor === 'subagent' && nativeProjectionOwnsHandleAbsence)
   ) {
     emit(
       'BIZ-EXECUTOR-HANDLE',

@@ -1,0 +1,113 @@
+{
+  "schema": "ccm/native-attempt-feature-probe/codex-api-tool/v1",
+  "fixture_kind": "sanitized-contract-template",
+  "capture_status": "not-live-probe-evidence",
+  "origin": "codex",
+  "surface": "codex-api-tool-multi-agent",
+  "transport": "codex-api-tool-multi-agent",
+  "observed_version": "0.144.2",
+  "version_is_capability_evidence": false,
+  "raw_evidence_stored": false,
+  "sanitization": {
+    "removed": ["account-identity", "credential", "environment", "prompt", "transcript"],
+    "allowed": ["logical-tool-name", "input-shape-hash", "output-shape-hash", "lifecycle-class"]
+  },
+  "required_operations": ["spawn", "list", "wait", "interrupt"],
+  "cases": [
+    {
+      "id": "synthetic-all-declared",
+      "input": {
+        "capture_kind": "synthetic-contract-template",
+        "producer_trust": "unverified",
+        "observations": [
+          {
+            "operation": "spawn",
+            "presence": "declared",
+            "input_shape_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "output_shape_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          {
+            "operation": "list",
+            "presence": "declared",
+            "input_shape_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+            "output_shape_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+          },
+          {
+            "operation": "wait",
+            "presence": "declared",
+            "input_shape_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "output_shape_hash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          },
+          {
+            "operation": "interrupt",
+            "presence": "declared",
+            "input_shape_hash": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "output_shape_hash": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+          }
+        ]
+      },
+      "expected": {
+        "selection_status": "selected-for-contract-only",
+        "runtime_status": "unsupported",
+        "promotion_eligible": false,
+        "reason_codes": ["PROBE-SYNTHETIC-ONLY", "PROBE-PRODUCER-UNVERIFIED"]
+      }
+    },
+    {
+      "id": "version-only",
+      "input": {
+        "capture_kind": "version-only",
+        "producer_trust": "unverified",
+        "observations": []
+      },
+      "expected": {
+        "selection_status": "unsupported",
+        "runtime_status": "unsupported",
+        "promotion_eligible": false,
+        "reason_codes": ["PROBE-VERSION-NOT-CAPABILITY-EVIDENCE", "PROBE-OPERATIONS-MISSING"]
+      }
+    },
+    {
+      "id": "missing-interrupt",
+      "input": {
+        "capture_kind": "sanitized-live-probe",
+        "producer_trust": "verified-private-adapter",
+        "observations": [
+          {
+            "operation": "spawn",
+            "presence": "observed",
+            "input_shape_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "output_shape_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+          },
+          {
+            "operation": "list",
+            "presence": "observed",
+            "input_shape_hash": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+            "output_shape_hash": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+          },
+          {
+            "operation": "wait",
+            "presence": "observed",
+            "input_shape_hash": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+            "output_shape_hash": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+          }
+        ]
+      },
+      "expected": {
+        "selection_status": "unsupported",
+        "runtime_status": "unsupported",
+        "promotion_eligible": false,
+        "reason_codes": ["PROBE-OPERATIONS-MISSING"]
+      }
+    }
+  ],
+  "promotion_requires": [
+    "verified-private-adapter-producer",
+    "spawn-return-handle-observed",
+    "same-session-list-corroboration-observed",
+    "wait-terminal-race-observed",
+    "interrupt-is-not-terminal-observed",
+    "parent-child-lineage-observed",
+    "account-and-credential-mutation-zero"
+  ]
+}

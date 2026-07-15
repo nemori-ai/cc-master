@@ -1,8 +1,8 @@
 # Cross-harness orchestration capability model
 
 > 状态：**tracked capability SSOT；current / partial / target 分层描述**
-> 日期：2026-07-10 UTC
-> 方向批准：用户已于 2026-07-10 批准 cross-harness A–F 推荐包；architecture / authority / privacy / lifecycle 方向生效，具体 implementation、API、schema、runtime 与 rollout 仍为 `target`
+> 日期：2026-07-13 UTC
+> 方向批准：用户已于 2026-07-10 批准 cross-harness A–F 推荐包；C1 planning/routing contract 与 C2 精确 Codex native-attempt ledger / dedicated CLI writer 已落成 `partial`，但 native invoke runtime 仍为 `unsupported`，其余 implementation、API、schema、runtime 与 rollout 仍按各切片证据分层
 > 适用范围：cc-master master orchestrator 在 Claude Code、Codex、Cursor 任一 origin harness 中，对本机 host-native 与 cross-harness agent workers 的规划、选择、派发、管理、恢复和验收
 > 非范围：本文不是 implementation spec，不定义最终 CLI 名、JSON wire schema、阈值、模型价格或 provider flags；所有标为 `target` 的能力在对应 spec / ADR / contract / test 晋升前都不得宣称 shipped
 
@@ -44,6 +44,7 @@ Unix process survived  = industrial runtime lifecycle
 - board narrow waist、CLI process boundary、advisory 边界等已接受结构决策，以 [`adrs/`](../adrs/) 中对应 ADR 为准；本文不修改它们。
 - 当前 host 事实和易变 probe 以 [`design_docs/harnesses/`](harnesses/) 为准，尤其是 [Claude Code](harnesses/claude-code.md)、[Codex](harnesses/codex.md)、[Cursor IDE Agent](harnesses/cursor.md) 与 [compatibility matrix](harnesses/compatibility-matrix.md)。
 - 跨 surface 能力差异以 [`design_docs/harnesses/capabilities/`](harnesses/capabilities/) 的 Capability Cards、hook `CONTRACT.md` 和 per-host strategy 为准。
+- C2 Codex native-attempt 的冻结 wire/state/security 合同以 [`design_docs/2026-07-13-codex-native-attempt-ledger-spec.md`](2026-07-13-codex-native-attempt-ledger-spec.md) 为准；它只晋升 ledger 与 dedicated writer，不授权或宣称 live spawn runtime。
 - 运行时方法论以 `plugin/src/skills/master-orchestrator-guide/canonical/` 为准；本文不复述其纪律正文。
 - 本文是**能力完整性模型**，不是 wire-level implementation spec。后续正式 spec 负责精确 schema、commands、state machine、migration 和 rollout；ADR 负责把已批准方向固化为不可轻易逆转的 architecture / authority / lifecycle 决策。若冲突，已批准 ADR 与已实现 contract 高于本文的 target capability；本文须在同一 PR 回写状态和链接。
 
@@ -227,11 +228,11 @@ Track 纪律：
 | --- | --- | --- | --- |
 | task planning | 多维 profile、acceptance、input pins、required/preferred/forbidden capabilities | context movement 可更低，仍不免 profile | explicit minimal envelope/worktree/ref |
 | routing | candidate、effect floor、quota/policy/permission gate、rationale | `surface=host-native`；origin overhead 计入 | `surface=cli-headless`；driver/runtime identity 固定 |
-| attempt | append-only ordinal、requested/resolved、真实 handle、artifact、terminal taxonomy | plugin create native lease，再 invoke + bind host handle | ccm launch intent → supervisor hello → run_ref |
+| attempt | append-only ordinal、requested/resolved、真实 handle、artifact、terminal taxonomy | 精确 Codex C2 ledger/dedicated writer 已 `partial`；invoke adapter 未投影、runtime `unsupported` | ccm launch intent → supervisor hello → run_ref |
 | lifecycle | starting/running/terminal/uncertain/orphaned；无 handle 不 running | durability 依 host probe，不默认跨 session | target 为 independent supervisor + journal/lease |
 | completion | terminal 不是 done；父层独立验收 | native success 只是 attempt terminal | structured success 也只是 attempt terminal |
 
-Task profile 必须先于模型品牌，至少覆盖 reasoning、uncertainty、risk、scope、context、coordination、reversibility、duration/confidence、capability needs、data/permission/side effect、acceptance、inputs、budget/timeout 和 restart/escalation 条件。字段与 writer 的精确形式属于后续 engine contract；在该 contract 落地前，这一段仍为 `target`。
+Task profile 必须先于模型品牌，至少覆盖 reasoning、uncertainty、risk、scope、context、coordination、reversibility、duration/confidence、capability needs、data/permission/side effect、acceptance、inputs、budget/timeout 和 restart/escalation 条件。C1 planning/routing 与冻结 C2 Codex native-attempt 的精确字段和 writer 以已落地 engine contract / frozen spec 为准；其它 host、transport、supervisor 与 live runtime 仍为 `target` 或 `unsupported`，不得从这两个局部 contract 外推。
 
 ### 6.2 Handoff 四类分流
 
@@ -311,6 +312,8 @@ partial/target，不能把本地 decision seam 冒充 end-to-end dispatch。
 2. Advisory utility：比较 `P_accept`、total cost-to-accepted-result、quota opportunity、wall latency、context movement、orchestration/integration overhead、critical-path impact。
 
 engine 接收调用方 objective/weights，输出 eligible/rejected、分项与 sensitivity；master 决定 quality-first/balanced/cost-first、接受/override advisory、最终 route 与 rationale。engine 不硬编码 provider/model 优先级。
+
+冻结 C2 目前只实现从 create 到 reconcile 的 board ledger / evidence transaction 合同。Codex origin strategy 明示 `unsupported` 且不投影 invoke artifact；下图中的 native invoke 仍是未来 runtime gate，public `launch_allowed` 不能被解释成默认 spawn 授权。
 
 ```text
 validate planning/routing/authority
@@ -428,25 +431,25 @@ direction ─┬─> S0 ─┬─> S1 ─┬─> S4 ─┬─> S6 ─> S7 ─> S
 
 | Domain | Current | Partial / honest gap | Target | Slice |
 | --- | --- | --- | --- | --- |
-| Board/lock/DAG | board v2、状态机、lock、ready/graph/estimate | planning/routing/attempt 不存在 | additive contracts、conditional gates、dedicated writers | S0 |
-| Task CLI | add/update/start/done 等 | routed task 可无 route 直接 start | planning/routing dedicated writers、dispatch/run control | S0/S6 |
+| Board/lock/DAG | board v2、状态机、lock、ready/graph/estimate | C1 planning/routing + 精确 Codex C2 native-attempt append-only ledger / projection hard invariant 已 `partial`；未泛化到其它 descriptor/runtime | conditional gates 与多 descriptor lifecycle | S0 |
+| Task CLI | add/update/start/done + planning/routing 与五个 native-attempt dedicated writer | production composition 已认证 owner-store committed reservation/ticket、canonical launch identity、唯一 claim 与 Ed25519 evidence，并覆盖 post-board crash recovery；verbs 仍只写 ledger/authority transaction，不调用 host tool，generic/`--force` 不能修 active native projection | host invoke adapter、dispatch/run control 与 live canary | S0/S6 |
 | Machine registry | 已知 host 安装/session/usage descriptors；Cursor IDE plugin 与 `agent|cursor-agent` CLI 已有独立 `ccm/machine-surface/v1` read-only descriptors、auth/model/quota unknown 保真与 negative capabilities | 仅 Cursor C1 slice；其余 host 尚无统一 surface 快照，Cursor model/quota/permission 仍无 live proof | 全 host surface-level capability snapshots | S1 |
 | Account boundary | Claude token-blind vault/policy；Codex account mutation unsupported | Cursor 需要全路径 spy；无统一 opaque auth snapshot | provider-neutral identity + Codex/Cursor hard negative | S1/S8 |
 | Usage/pacing | 三路 reader、engine pacing/forecast、monitor sweep | 单 origin 窄 signal；monitor非持久store；multi-bucket/pool语义不足 | home machine quota read model + honest derivation | S1/S4 |
 | Reservation | provider-neutral pure engine；owner-only observation/reservation authority；crash-durable locks/events/replay；`quota status/preflight/reserve/audit` bounded local runtime | collector/provider refresh、supervisor claim/spawn 与 paid endpoint 未接；完整 SG3 仍 partial；pacing 不是 reservation | collector→two-read live recheck→same-run claim/spawn 与 endpoint promotion | S4/S6 |
 | Model guidance | skills 中已有 per-host 模型档/选型 prose | 无 live entitlement × versioned evidence registry | registry/provenance/generator/outcome calibration | S5/S10 |
-| Cross route policy | additive task planning/routing contract、ample/tight 明示 chain、cached-only pure shadow advice（同 harness CLI 不折叠 native）；bounded quota admission decision seam | 无 route→collector→reservation→supervisor claim/spawn transaction；当前 advice/preflight 不自行 dispatch | deny-by-default end-to-end admission、master rationale、可恢复 attempt | S0/S4/S5/S6 |
-| Worktree/permission | board记录worktree；已有安全范式 | 无 lease/env/profile/provider enforcement | isolated writer + permission compiler + redaction | S7 |
+| Cross route policy | additive task planning/routing contract、ample/tight 明示 chain、cached-only pure shadow advice（同 harness CLI 不折叠 native）；bounded quota admission decision seam；精确 Codex native attempt ledger 已 `partial` | 无 route→collector→reservation→supervisor claim/spawn transaction；无 live spawn，当前 advice/preflight 与 ledger launch bit 都不授权 runtime dispatch | deny-by-default end-to-end mechanical admission、master rationale、可恢复 runtime attempt | S0/S4/S5/S6 |
+| Worktree/permission | board记录worktree；已有安全范式；冻结 C2 对已选 profile 使用显式偏序、effective deny-set superset 与 lineage snapshot 机械校验 | 精确约束只覆盖 Codex ledger admission/evidence；无通用 lease/env/provider permission compiler 或 enforcement | isolated writer + permission compiler + redaction | S7 |
 | Provider execution | 无 cross driver | CLI research 是设计事实，不是 runtime | driver facets + structured result/error fixtures | S3/S6/S8 |
 | Supervisor/run store | monitor有 detached service 技术片段 | detached/unref 不等于 attempt supervisor | per-run journal/lease/process tree/control/artifacts | S3 |
 | Attach/handoff | board可re-arm；legacy handoff/drain | 无run manager/control；叙事偏session-bound | 四类handle分流 + same-run attach/reconcile | S3/S9 |
 | Runtime lifecycle | Unix SEA原路径替换；singleton reconcile | 无immutable/lease/protocol/Windows工业合同 | stable launcher + side-by-side + drain/GC/provenance | S2/S3 |
-| Plugin substrate | 三host packages、SAP/PHIP/commands/hooks；三 origin 已消费同一 `ccm/origin-context-delivery/v1`（≤4KiB、脱敏、shadow-only），Claude/Codex SessionStart、Cursor verified postToolUse Track B | 无 native ledger/真实 dispatch；Codex 无 mid-turn batch event，Cursor dynamic SessionStart 仍是已确认 gap | canonical policy + host landing + worker role + equivalence | S9 |
-| Native subagent | 三host已有各自指导/工具面 | handle/result/cancel durability未统一 | native attempt create/bind/heartbeat/result/cancel | S0/S9 |
+| Plugin substrate | 三host packages、SAP/PHIP/commands/hooks；三 origin 已消费同一 `ccm/origin-context-delivery/v1`（≤4KiB、脱敏、shadow-only），Claude/Codex SessionStart、Cursor verified postToolUse Track B | C2 ledger contract 存在，但三 host 的 native-attempt strategy 均 `unsupported`，无 Codex invoke projection/真实 dispatch；Codex 无 mid-turn batch event，Cursor dynamic SessionStart 仍是已确认 gap | canonical policy + host landing + worker role + equivalence | S9 |
+| Native subagent | 三host已有各自指导/工具面；精确 Codex create/bind/cancel/terminal/reconcile ledger 为 `partial` | 无受信 one-shot runtime enablement、live spawn/roster producer、跨 session durability；默认 spawn 为零 | 经 live probe 晋升的 native invoke + durable handle/result/cancel | S0/S9 |
 | Coordination/HITL | inbox、discuss、Stop continuation、judgment logs | route-loss/run attention taxonomy未接入 | decision-grade notification + fresh package | S9 |
 | Viewer/report | board status/report/web viewer | 无planning/route/quota-at-selection/attempt/operator attention | one read model；frontend render-only | S9 |
-| Verification | true-done/endpoint discipline | provider result/outcome linkage无 | terminal→independent verify→done/outcome | S6/S10 |
-| Tests/rollout | board/account/usage/monitor/services/release tests | 无provider/supervisor/crash/canary/parity/lifecycle eval | hermetic fixtures + opt-in canary + kill/metrics | all/S10 |
+| Verification | true-done/endpoint discipline；C2 terminal evidence 只投影 `uncertain`、不直接 done | 精确 ledger linkage 有 hermetic contract，仍无 live provider result/outcome | terminal→independent verify→done/outcome | S6/S10 |
+| Tests/rollout | board/account/usage/monitor/services/release tests + C2 hermetic engine/CLI/security/mutation assertions | 无 provider/supervisor/crash/live canary/parity/lifecycle eval；synthetic fixture 不作 live 证据 | hermetic fixtures + genuinely paid/live opt-in canary + kill/metrics | all/S10 |
 
 不得用邻近 current 能力代称 target：monitor ≠ quota store；detached child ≠ supervisor；plugin installed ≠ headless eligible；provider success ≠ done；Unix inode存活 ≠ runtime lifecycle。
 

@@ -41,6 +41,7 @@ description: '{{USING_CCM_DESCRIPTION}}'
 - 改 status **只有**这几条命令:`task start`(→ in_flight)、`task done`(→ done)、`task retry`(stale/failed/escalated → ready,开启新 attempt)、`task block --on`(→ blocked)、`task unblock`(清 `blocked_on`·交回 deps 门控)、`task set-status <id> <status>`(通用转移)。
 - **没有** `task set`;`task update` **不接** `--status`;`--set tasks[T].status=…` 被 🔒 守门拒(exit 3);裸 `--set status=done` 同样被拒(exit 3)——task verb 的裸 path scope 到本 task,`status` 命中 🔒 守门,不会静默落 board 顶层。
 - **`ready → done` 非法**:必须先 `task start`(ready → in_flight)再 `task done`。直接 done 撞 `illegal transition: ready → done`(exit 3)。
+- **native-active projection 是更窄的专属状态机**：板启用 `ccm/native-attempt/v1` 且 latest attempt 为 `starting|running|uncertain` 时，generic `start/done/block/unblock/set-status`、`task update --handle` / 通用 setter、legacy `route-bind` 和 `--force` 都不能构造或修复 status/handle；只走 `native-attempt-create/bind/cancel/terminal/reconcile`。可信 terminal 证据只把 task 投影到 `uncertain`，父层完成端点验收后仍须满足普通 `task done --verified --artifact` 不变式。
 - **`ready ↔ blocked` 由系统按 deps 自动归一**:每次 ccm 写命令落盘前引擎跑一趟 `reconcileGating`——**无 `blocked_on`** 且 status∈{ready,blocked} 的 task 按 deps 满足度重定(deps 全满足→ready,否则→blocked)。普通/旧 task 仍以 `status=done` 满足依赖；用 `task add|update --review-gate APPROVE` 显式声明的 review gate 则必须同时有 `review_verdict=APPROVE`，`REQUEST-CHANGES`、缺失、空或 null 都保持下游 blocked。review 的 `status=done` 只表示审查工作执行完，不等于批准。**手动 `set-status <id> ready` 会被 deps 否决**(deps 未满足下一趟归回 blocked)。**有 `blocked_on`(等 user / 等某 task)= 语义阻塞,豁免自动门控**;解除用 **`task unblock <id>`**,别用 `set-status`。手改 board 造出的不一致态由 `BIZ-STATUS-DEPS` warn 兜。
 
 完整转移表:
@@ -67,7 +68,7 @@ description: '{{USING_CCM_DESCRIPTION}}'
 |---|---|
 | "status 不过是个字段,改字段的通用 idiom 就是 `set --status <值>`,赋值就行,不用懂状态机。" | ccm **故意**不给 status 一个通用 field-setter。赋值绕过转移闸、不盖 `started_at`/`finished_at`——所以 `--set status=…` 无论带不带 `tasks[]` 前缀都被 🔒 守门拒(exit 3)。verb 才是对的路:它校验转移合法 + 盖 derived 字段。 |
 | "我赶时间,`task update --status done` 一条搞定,省得 start 再 done 两步。" | `task update` 没有 `--status` flag(exit 2),`ready→done` 也非法(exit 3)——这条"省一步"两次都会失败,反而更慢。`start` 再 `done` 才是真正的两步到位。 |
-| "ccm 报 illegal transition,我加 `--force` 推过去得了。" | `--force` 是越闸逃生口、会记 log,留给真异常态。重跑 stale/failed/escalated 有 `task retry`;正常完成一个任务用 `--force` 跳过 `in_flight`,等于亲手制造一个没 `started_at` 的"done"——你在伪造审计轨迹。 |
+| "ccm 报 illegal transition,我加 `--force` 推过去得了。" | `--force` 只给非 native-active 的真异常态留逃生口、会记 log；重跑 stale/failed/escalated 有 `task retry`，native-active projection 则在 mutation boundary 明确拒绝 `--force`。正常完成用它跳过 `in_flight`，等于亲手制造一个没 `started_at` 的 "done"——你在伪造审计轨迹。 |
 
 ---
 
@@ -139,6 +140,7 @@ ccm cadence open I1 --goal "ship 切片" --deadline 2026-06-05T14:00:00Z --membe
 | `task update --set status=done` 被拒 exit 3 | task 语境的裸 path scope 到本 task,`status` 是 🔒。status 永远走 verb(锚 2)。 |
 | `task done` 报 `illegal transition: ready → done` | 先 `task start`。`ready` 不能直接 `done`。 |
 | 重跑后 task 还显示旧 artifact / verified | 用 `task retry <id>` 开新 attempt,不要用字段 setter 拼 reset。合法的 `set-status <id> ready` 也会走同一原子 reset。 |
+| native attempt 活跃时 `task start/done/set-status/update --handle` 或 `route-bind --force` 被拒 | 这是 `BIZ-NATIVE-ATTEMPT-PROJECTION` 对专属 writer 的硬闸，`--force` 也不能绕。只用五个 `native-attempt-*` verb；terminal 后先独立验收，再从 `uncertain` 走普通 true-done。 |
 | `--set` 的值不知道落哪了 | 看非 `--json` 输出的 `set <path>` 回显行:task verb 裸 path=本 task,`board update` 裸 path=board 顶层,`jc add`/`cadence *` 裸 path=board 顶层。 |
 | `task show <id>` 返回 `data:null` 还 exit 0 | 读不存在的 id **不报错**——调用方自己判 null。 |
 | `board lint` exit 3 但 stdout 是 `{"ok":true,...}` | 外层信封 `ok` 恒 true;**lint 是否净看 `data.ok` 与 exit code**(3=有 hard error)。 |

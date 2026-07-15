@@ -1,0 +1,4 @@
+host: claude-code
+capability: native-attempt
+mode: unsupported
+reason: no approved Claude Code native handle-return probe for ccm/native-attempt/v1

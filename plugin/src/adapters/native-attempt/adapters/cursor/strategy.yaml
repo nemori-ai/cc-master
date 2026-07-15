@@ -1,0 +1,4 @@
+host: cursor
+capability: native-attempt
+mode: unsupported
+reason: Cursor IDE Task probes do not prove the native handle/reconcile contract

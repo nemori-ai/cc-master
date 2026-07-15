@@ -1,0 +1,4 @@
+host: codex
+capability: native-attempt
+mode: unsupported
+reason: ccm/native-attempt/v1 只有 ledger contract；尚无认证的一次性 exact-descriptor enablement 与可信 live spawn/roster evidence，禁止默认 invoke

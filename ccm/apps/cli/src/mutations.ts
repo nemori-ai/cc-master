@@ -20,6 +20,7 @@
 //   报错文案/.errKind 逐字保持。board 用宽松结构类型（mutations 只机械写形状·不强 schema）。
 
 import {
+  canonicalJson,
   contractActivation,
   contractWritePolicy,
   createRoutingEnvelope,
@@ -29,6 +30,8 @@ import {
   isLegalTransition,
   isRetryTransition,
   isReviewDependencyGate,
+  NATIVE_ATTEMPT_CONTRACT,
+  nativeAttemptApply,
   routingContractPreflight,
   SCHEMA_VERSION,
   STATUS_MACHINE,
@@ -463,6 +466,16 @@ export function transition(
   const t = requireTask(b, id);
   const from = t.status;
   if (
+    b.meta?.contracts?.native_attempt === NATIVE_ATTEMPT_CONTRACT &&
+    t.executor === 'subagent' &&
+    (toStatus === 'in_flight' || (from === 'uncertain' && toStatus === 'ready'))
+  ) {
+    throw err(
+      'NATIVE-DEDICATED-WRITER-REQUIRED: native in-flight/recovery projection requires a native-attempt verb',
+      'Validation',
+    );
+  }
+  if (
     toStatus === 'in_flight' &&
     contractActivation(b) === 'enabled' &&
     t.executor === 'subagent'
@@ -581,6 +594,12 @@ export function bindTaskRoute(
   id: string,
   args: { selection?: unknown; attempt?: unknown },
 ): Board {
+  if (board.meta?.contracts?.native_attempt === NATIVE_ATTEMPT_CONTRACT) {
+    throw err(
+      'NATIVE-ROUTE-BIND-BYPASS: opted-in native attempts require task native-attempt-bind',
+      'Validation',
+    );
+  }
   const b = clone(board);
   const t = requireTask(b, id);
   if (t.executor !== 'subagent') {
@@ -642,6 +661,29 @@ export function bindTaskRoute(
   if (wasReady) t.started_at = stampNow();
   assertNoContractIssues('routed in-flight task', validateRoutedTaskForInFlight(t));
   return touch(b);
+}
+
+export interface NativeAttemptMutationResult {
+  board: Board;
+  result?: Record<string, any>;
+}
+
+// Native attempt 的唯一 CLI mutation adapter：状态转移归 @ccm/engine；这里仅把 engine issue
+// 映射成 CLI Validation，并在真实变化时刷新 owner heartbeat。精确重放保持字节级 no-op。
+export function applyNativeAttemptCommand(
+  board: Board,
+  command: Record<string, any>,
+): NativeAttemptMutationResult {
+  const outcome = nativeAttemptApply(board, command);
+  if (!outcome.ok) {
+    const codes = (outcome.issues || []).map((issue) => issue.code).join(', ');
+    throw err(codes || 'NATIVE-ATTEMPT-REJECTED', 'Validation');
+  }
+  const changed = canonicalJson(outcome.board) !== canonicalJson(board);
+  return {
+    board: changed ? touch(outcome.board) : outcome.board,
+    result: outcome.result,
+  };
 }
 
 export function enableRoutingContracts(board: Board): Board {
