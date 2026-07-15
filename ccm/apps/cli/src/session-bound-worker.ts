@@ -2,7 +2,11 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { parseCursorStream } from './cursor-provider-driver.js';
+import {
+  evaluateCursorProviderCompletion,
+  evaluateCursorProviderDiscoveryAdmission,
+  supportedCursorProviderBinaryVersion,
+} from './cursor-provider-driver.js';
 import type { ProviderChildResult } from './provider-child-supervisor.js';
 import {
   createProviderRequestDeadline,
@@ -49,8 +53,26 @@ export interface SessionBoundWorkerResult {
   policy: {
     mode: 'ask';
     sandbox: 'enabled';
-    account_mutation: 'forbidden';
-    credential_write: 'forbidden';
+    ccm_effects: {
+      account_switch_requested: false;
+      account_switch_executed: false;
+      credential_write_requested: false;
+      credential_write_executed: false;
+      credential_import_or_copy: false;
+      api_key_byok_forwarded: false;
+    };
+    provider_residual_effects: {
+      authentication_token_maintenance: 'possible';
+      config_cache_data_state_writes: 'possible';
+      inherited_locations: [
+        'HOME',
+        'XDG_CONFIG_HOME',
+        'XDG_CACHE_HOME',
+        'XDG_DATA_HOME',
+        'XDG_STATE_HOME',
+      ];
+      account_credential_zero_write_attested: false;
+    };
     automatic_route: false;
     automatic_fallback: false;
   };
@@ -102,8 +124,26 @@ function baseResult(request: SessionBoundWorkerRequest): SessionBoundWorkerResul
     policy: {
       mode: 'ask',
       sandbox: 'enabled',
-      account_mutation: 'forbidden',
-      credential_write: 'forbidden',
+      ccm_effects: {
+        account_switch_requested: false,
+        account_switch_executed: false,
+        credential_write_requested: false,
+        credential_write_executed: false,
+        credential_import_or_copy: false,
+        api_key_byok_forwarded: false,
+      },
+      provider_residual_effects: {
+        authentication_token_maintenance: 'possible',
+        config_cache_data_state_writes: 'possible',
+        inherited_locations: [
+          'HOME',
+          'XDG_CONFIG_HOME',
+          'XDG_CACHE_HOME',
+          'XDG_DATA_HOME',
+          'XDG_STATE_HOME',
+        ],
+        account_credential_zero_write_attested: false,
+      },
       automatic_route: false,
       automatic_fallback: false,
     },
@@ -228,6 +268,20 @@ function transportFromSuccess(
   };
 }
 
+function childLimits(
+  request: SessionBoundWorkerRequest,
+  stdoutLimitBytes: number,
+): Parameters<typeof superviseProviderChild>[1]['limits'] {
+  return {
+    startupTimeoutMs: Math.min(5_000, request.timeoutMs),
+    idleTimeoutMs: Math.min(30_000, request.timeoutMs),
+    stdoutLimitBytes,
+    stderrLimitBytes: STDERR_LIMIT_BYTES,
+    terminationGraceMs: 100,
+    reapTimeoutMs: 1_000,
+  };
+}
+
 function supervisorFailureResult(
   request: SessionBoundWorkerRequest,
   error: ProviderChildSupervisorError,
@@ -267,6 +321,94 @@ export async function runSessionBoundCursorWorker(
   let result = baseResult(request);
   try {
     stagingDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'ccm-worker-'));
+    const deadline = createProviderRequestDeadline(request.timeoutMs);
+    const runDiscoveryProbe = async (
+      argv: string[],
+      operation: string,
+      stdoutLimitBytes: number,
+    ): Promise<ProviderChildResult> => {
+      const owned = request.runtime.process.spawnProvider({
+        executable,
+        argv,
+        cwd: stagingDirectory as string,
+        env: childEnvironment(request.env, stagingDirectory as string),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      return superviseProviderChild(owned, {
+        operation,
+        deadline,
+        limits: childLimits(request, stdoutLimitBytes),
+        signal: request.signal,
+      });
+    };
+
+    let versionProbe: ProviderChildResult;
+    try {
+      versionProbe = await runDiscoveryProbe(
+        ['--version'],
+        'session-bound cursor-agent version admission',
+        4_096,
+      );
+    } catch (error) {
+      result =
+        error instanceof ProviderChildSupervisorError
+          ? supervisorFailureResult(request, error)
+          : reject(
+              request,
+              'provider_discovery_rejected',
+              String((error as Error)?.message || error),
+            );
+      return result;
+    }
+    result.transport = transportFromSuccess(versionProbe);
+    if (versionProbe.exitCode !== 0 || !supportedCursorProviderBinaryVersion(versionProbe.stdout)) {
+      result.error = {
+        code: 'provider_discovery_rejected',
+        message: 'headless.binary-unsupported',
+      };
+      return result;
+    }
+
+    let catalogProbe: ProviderChildResult;
+    try {
+      catalogProbe = await runDiscoveryProbe(
+        ['--list-models'],
+        'session-bound cursor-agent catalog admission',
+        262_144,
+      );
+    } catch (error) {
+      result =
+        error instanceof ProviderChildSupervisorError
+          ? supervisorFailureResult(request, error)
+          : reject(
+              request,
+              'provider_discovery_rejected',
+              String((error as Error)?.message || error),
+            );
+      return result;
+    }
+    result.transport = transportFromSuccess(catalogProbe);
+    if (catalogProbe.exitCode !== 0) {
+      result.error = {
+        code: 'provider_discovery_rejected',
+        message: 'catalog.stale-or-invalid',
+      };
+      return result;
+    }
+    const discovery = evaluateCursorProviderDiscoveryAdmission({
+      binaryVersionOutput: versionProbe.stdout,
+      catalogOutput: catalogProbe.stdout,
+      selector: request.model,
+      asOf: new Date().toISOString(),
+    });
+    if (!discovery.eligible) {
+      result.error = {
+        code: 'provider_discovery_rejected',
+        message: redactProviderDiagnostic(discovery.blockers.join(', ')),
+      };
+      return result;
+    }
+
     const owned = request.runtime.process.spawnProvider({
       executable,
       argv: cursorArgv(workspace, request.model, request.prompt),
@@ -284,15 +426,8 @@ export async function runSessionBoundCursorWorker(
     try {
       const child = await superviseProviderChild(owned, {
         operation: 'session-bound cursor-agent worker',
-        deadline: createProviderRequestDeadline(request.timeoutMs),
-        limits: {
-          startupTimeoutMs: Math.min(5_000, request.timeoutMs),
-          idleTimeoutMs: Math.min(30_000, request.timeoutMs),
-          stdoutLimitBytes: request.maxOutputBytes,
-          stderrLimitBytes: STDERR_LIMIT_BYTES,
-          terminationGraceMs: 100,
-          reapTimeoutMs: 1_000,
-        },
+        deadline,
+        limits: childLimits(request, request.maxOutputBytes),
         signal: request.signal,
       });
       result.transport = transportFromSuccess(child);
@@ -305,32 +440,29 @@ export async function runSessionBoundCursorWorker(
           ),
         };
       } else {
-        const parsed = parseCursorStream(child.stdout, {
-          permissionMode: 'ask',
-          sandboxMode: 'enabled',
+        const completion = evaluateCursorProviderCompletion({
+          stdout: child.stdout,
+          exitCode: child.exitCode,
+          signal: child.signal,
+          executable,
+          requestedSelector: request.model,
+          requestedWorkspace: workspace,
         });
-        if (!parsed.valid || !parsed.terminal) {
+        const terminal = completion.parsed.terminal;
+        if (completion.blockers.length > 0 || !terminal) {
           result.state = 'failed';
           result.error = {
-            code: 'provider_stream_invalid',
+            code: 'provider_completion_rejected',
             message: redactProviderDiagnostic(
-              parsed.blockers.join(', ') || 'invalid provider stream',
+              completion.blockers.join(', ') || 'invalid provider completion',
             ),
           };
         } else {
           result.terminal = {
-            ...parsed.terminal,
-            result: redactProviderDiagnostic(parsed.terminal.result),
+            ...terminal,
+            result: redactProviderDiagnostic(terminal.result),
           };
-          if (parsed.terminal.is_error) {
-            result.state = 'failed';
-            result.error = {
-              code: 'provider_reported_error',
-              message: redactProviderDiagnostic(parsed.terminal.result),
-            };
-          } else {
-            result.state = 'succeeded';
-          }
+          result.state = 'succeeded';
         }
       }
     } catch (error) {

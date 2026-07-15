@@ -270,7 +270,9 @@ ccm worker run --harness cursor-agent --model composer-2.5 --effort standard \
 ```
 
 - 当前显式取值固定为 `cursor-agent` / `composer-2.5` / `standard`；不自动 route、fallback 或切换账号。
-- 子进程 argv 固定为 Cursor Agent headless `--mode ask --sandbox enabled`，使用当前已登录账号；子进程环境不转发 API key。
+- 启动 worker 前先核对冻结的 Cursor Agent 支持版本、fresh official first-party model snapshot 与 live `--list-models` 精确 selector；任一未知、不新鲜或不一致都 fail closed。真实 stream 只在 terminal subtype 为 `success`、`is_error:false`，且 resolved model / workspace 与请求精确一致时接纳。
+- 子进程 argv 固定为 Cursor Agent headless `--mode ask --sandbox enabled`，使用当前已登录账号。ccm 不请求或执行 login/logout/account switch/credential write，不导入或复制 credential，也不通过 argv / env 转发 API key / BYOK。
+- worker 仍继承当前 `HOME` 与 `XDG_CONFIG_HOME` / `XDG_CACHE_HOME` / `XDG_DATA_HOME` / `XDG_STATE_HOME`；Cursor CLI 自身可能维护 auth token、config、cache、data 或 state。因此本命令**不证明** provider-wide account / credential zero-write，也不会为追求该强声明而复制或隔离真实 credential。
 - 命令同步等待 terminal result；超时、取消与 stdout/stderr 都有界，结束前回收其 POSIX process group 并清理临时 staging 目录。
 - `data` schema 为 `ccm/session-bound-worker-result/v1`，并明示 `session_bound:true`；它不跨 parent exit、handoff 或 ccm update 存活。
 
@@ -2364,7 +2366,9 @@ ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
 
 `data` 是 `ccm/session-bound-worker-result/v1`。成功时 `state:"succeeded"` 且 exit 0；provider
 非零退出、timeout、cancel、输出越界或 stream 验证失败仍返回同一结构化 `data`，但 exit 1（真实
-SIGINT/SIGTERM 取消分别为 130/143）。字段含显式 `target`、只读 `policy`、session-bound
+SIGINT/SIGTERM 取消分别为 130/143）。字段含显式 `target`、`policy.ccm_effects`（ccm 未请求或执行
+account / credential mutation，且未转发 API key / BYOK）、`policy.provider_residual_effects`（继承的
+HOME/XDG 与 provider 可能写入；`account_credential_zero_write_attested:false`）、session-bound
 `lifecycle`、进程组 `handle`、Cursor `terminal`、有界 `transport`、`cleanup` 与脱敏 `error`。
 
 ### quota status / preflight / reserve / audit
