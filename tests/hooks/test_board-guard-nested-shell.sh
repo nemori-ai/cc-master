@@ -100,6 +100,25 @@ for HOST in claude-code codex cursor; do
   assert_allowed "$HOST" "$H" "printf '%s\n' 'literal;still-data > $BOARD'" "quoted separator data argv"
   assert_allowed "$HOST" "$H" "ccm task update T0 --set 'note=please cp this later' --board '$BOARD'" "quoted cp data in ccm argv"
 
+  # Exact dogfood false positives: the protected path is ccm's --board argv, while the shell
+  # redirect target is /dev/null. Earlier assignment segments and quoted log punctuation remain
+  # data/segment boundaries; neither means that the shell itself writes the board.
+  FIRE_REPRO="FIRE=\$(date -u -d '+15 minutes' +%Y-%m-%dT%H:%M:%SZ)
+ccm watchdog arm --fire-at \"\$FIRE\" --mechanism shell --job-id shell-terminal:53392 --checklist 'Poll lifecycle-R2, PHIP checker, RunStore review; record verdicts and dispatch next ready task.' --board '$BOARD' >/dev/null
+ccm watchdog status --board '$BOARD'"
+  assert_allowed "$HOST" "$H" "$FIRE_REPRO" "FIRE prefix plus ccm watchdog output redirected away from board"
+
+  REVIEW_REPRO="ccm task update xh_c2_run_store_capability_v2_contract_r2 --handle codex-subagent:/root/c3_subscription_oracle --log 'Independent review assigned after PR #124 delivery; reviewer is disjoint from R2 producer.' --board '$BOARD' >/dev/null
+ccm board lint --board '$BOARD' | sed -n '1,2p'"
+  assert_allowed "$HOST" "$H" "$REVIEW_REPRO" "quoted PR hash/log plus ccm output redirected away from board"
+
+  # The target-aware ccm exception is narrow. Real board redirects, true writer commands, Node/fs
+  # writes, and nested-shell counterfeits stay fail-closed.
+  assert_blocked "$HOST" "$H" "ccm watchdog status --board '$BOARD' > '$BOARD'" "ccm redirect target is the board"
+  assert_blocked "$HOST" "$H" "printf x | tee '$BOARD' >/dev/null" "tee board write with unrelated stdout redirect"
+  assert_blocked "$HOST" "$H" "node -e 'require(\"fs\").writeFileSync(process.argv[1], \"{}\")' '$BOARD' >/dev/null" "Node fs board write with unrelated stdout redirect"
+  assert_blocked "$HOST" "$H" "bash -c 'ccm board show --board \"$BOARD\" > \"$BOARD\"'" "nested ccm redirect counterfeit"
+
   # Independent shell execution proves that each rejected space-path shape is real RC0 write syntax,
   # not inert text. It runs only against this disposable fixture after all armed-hook assertions.
   /bin/sh -c "$SPACE_DIRECT"

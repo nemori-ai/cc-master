@@ -95,23 +95,33 @@ const MAX_NESTED_SHELL_DEPTH = 4;
 function lexShellCommands(command) {
   const commands = [];
   let words = [];
+  let redirectionTargets = [];
   let word = '';
   let wordStarted = false;
   let hasRedirection = false;
+  let expectsRedirectionTarget = false;
   let quote = null;
   let escaped = false;
 
   const pushWord = () => {
     if (!wordStarted) return;
     words.push(word);
+    if (expectsRedirectionTarget) {
+      redirectionTargets.push(word);
+      expectsRedirectionTarget = false;
+    }
     word = '';
     wordStarted = false;
   };
   const pushCommand = () => {
     pushWord();
-    if (words.length > 0 || hasRedirection) commands.push({ words, hasRedirection });
+    if (words.length > 0 || hasRedirection) {
+      commands.push({ words, hasRedirection, redirectionTargets });
+    }
     words = [];
+    redirectionTargets = [];
     hasRedirection = false;
+    expectsRedirectionTarget = false;
   };
 
   for (let i = 0; i < command.length; i += 1) {
@@ -160,6 +170,7 @@ function lexShellCommands(command) {
     if (ch === '>') {
       pushWord();
       hasRedirection = true;
+      expectsRedirectionTarget = true;
       if (command[i + 1] === '>') i += 1;
       continue;
     }
@@ -193,11 +204,13 @@ function commandWritesBoard(command) {
   const executable = command.words[index];
   if (!executable) return false;
   const name = path.basename(executable);
-  const writes = command.hasRedirection
-    || (name !== 'ccm' && (
-      SHELL_WRITE_COMMANDS.has(name)
-      || (name === 'sed' && command.words.slice(index + 1).some((arg) => /^-i(?:$|.)/u.test(arg)))
-    ));
+  // ccm legitimately receives the protected board as argv. For that command only, a redirect is a
+  // board write iff its own parsed target is the board; `--board board >/dev/null` is not one.
+  const writes = name === 'ccm'
+    ? command.redirectionTargets.some((target) => segmentTouchesRealBoard([target]))
+    : command.hasRedirection
+      || SHELL_WRITE_COMMANDS.has(name)
+      || (name === 'sed' && command.words.slice(index + 1).some((arg) => /^-i(?:$|.)/u.test(arg)));
   return writes && segmentTouchesRealBoard(command.words);
 }
 
