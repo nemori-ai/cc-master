@@ -142,6 +142,41 @@ export function lintBoard(text: string): LintResult {
         `坏什么：resume selector 按 goal 子串匹配认板、viewer 顶栏渲染它；缺 = resume 认领退化、顶栏空。`,
     );
   }
+  // FMT-GOAL-CONTRACT（👁 observed；legacy 缺省合法，存在即 hard 校验完整形状）。
+  const goalContract = b.goal_contract;
+  let goalContractWellShaped = true;
+  if (goalContract !== undefined) {
+    if (!goalContract || typeof goalContract !== 'object' || Array.isArray(goalContract)) {
+      goalContractWellShaped = false;
+    } else {
+      const contract = goalContract as Record<string, unknown>;
+      const brief = contract.brief;
+      const briefWellShaped =
+        brief === undefined ||
+        (!!brief &&
+          typeof brief === 'object' &&
+          !Array.isArray(brief) &&
+          typeof (brief as Record<string, unknown>).ref === 'string' &&
+          /^goals\/[A-Za-z0-9._-]+\/r\d{4}\.goal\.md$/.test(
+            (brief as Record<string, unknown>).ref as string,
+          ) &&
+          typeof (brief as Record<string, unknown>).sha256 === 'string' &&
+          /^sha256:[0-9a-f]{64}$/.test((brief as Record<string, unknown>).sha256 as string));
+      goalContractWellShaped =
+        contract.schema === 'ccm/goal-contract/v1' &&
+        Number.isInteger(contract.revision) &&
+        (contract.revision as number) >= 1 &&
+        isEnumMember('goalAssurance', contract.assurance) &&
+        isISOUTC(contract.updated_at) &&
+        briefWellShaped;
+    }
+    if (!goalContractWellShaped) {
+      emit(
+        'FMT-GOAL-CONTRACT',
+        'goal_contract 必须符合 ccm/goal-contract/v1：revision>=1、assurance 合法、updated_at 为 UTC；brief（若有）须是受管 ref + sha256。',
+      );
+    }
+  }
   // FMT-OWNER（owner 对象 + active:bool + session_id:string；heartbeat 非 ISO → FMT-TIME warn）
   const owner = b.owner;
   if (!owner || typeof owner !== 'object' || Array.isArray(owner)) {
@@ -221,6 +256,28 @@ export function lintBoard(text: string): LintResult {
         `坏什么：goal-hook 数状态、viewer 整个 DAG、resume 重建模型全靠它；非数组 = viewer 空图（静默）、hook 扫描错位。`,
     );
     return { errors, warnings };
+  }
+
+  if (
+    goalContractWellShaped &&
+    goalContract &&
+    typeof goalContract === 'object' &&
+    !Array.isArray(goalContract) &&
+    (goalContract as Record<string, unknown>).assurance === 'pending' &&
+    Array.isArray(tasks) &&
+    tasks.some(
+      (task) =>
+        !!task &&
+        typeof task === 'object' &&
+        ['ready', 'in_flight', 'uncertain'].includes(
+          String((task as Record<string, unknown>).status || ''),
+        ),
+    )
+  ) {
+    emit(
+      'BIZ-GOAL-PENDING',
+      'Goal Contract 仍为 pending，但 board 已含可执行任务；先收敛/确认目标，或只保留明确的需求侦察/用户等待节点。',
+    );
   }
 
   // ── 每个 task 的钉死契约 FMT（🔒：id / status / deps）+ id 唯一 ─────────────────────────────────────
@@ -1047,6 +1104,12 @@ function lintRuntime(board: BoardLike, emit: Emit): void {
     emit(
       'FMT-RUNTIME',
       `runtime.last_critpath_remind 是 ${JSON.stringify(r.last_critpath_remind)}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：critpath-nudge 读它判周期阈值——格式不对则退化为「从未提示」(首次必提示)。`,
+    );
+  }
+  if (badTimestamp(r.last_goal_remind)) {
+    emit(
+      'FMT-RUNTIME',
+      `runtime.last_goal_remind 是 ${JSON.stringify(r.last_goal_remind)}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：goal-alignment nudge 读它判周期阈值——格式不对则退化为「从未提示」(首次必提示)。`,
     );
   }
   if (badTimestamp(r.last_account_switch)) {

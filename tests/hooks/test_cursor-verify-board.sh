@@ -16,6 +16,13 @@ run_stop() {
   )"
   HOOK_RC=$?
 }
+run_stop_with_ccm() {
+  HOOK_OUT="$(
+    printf '{"conversation_id":"%s","session_id":"%s","hook_event_name":"stop","loop_count":0}' "$2" "$2" |
+      CC_MASTER_HOME="$1" CCM_BIN="$3" node "$LAUNCHER" --event stop --core "$CORE" 2>/dev/null
+  )"
+  HOOK_RC=$?
+}
 
 chmod +x "$CORE"
 
@@ -92,7 +99,54 @@ H="$(make_project)"
 mkactive "$H" "done" '{"schema":"cc-master/v2","goal":"DONE CURSOR BOARD","owner":{"active":true,"session_id":"sess-done"},"tasks":[{"id":"T5","status":"done","deps":[]}]}'
 run_stop "$H" "sess-done"
 assert_contains "$HOOK_OUT" '"followup_message"' "done-only board followup for final self-check"
-assert_contains "$HOOK_OUT" "self-check against the original goal" "completion self-check advisory"
+assert_contains "$HOOK_OUT" "self-check local task acceptance and global acceptance" "completion self-check advisory"
+rm -rf "$H"
+
+# Pending Goal Contract blocks ordinary completion/decomposition.
+H="$(make_project)"
+mkactive "$H" "pending" '{"schema":"cc-master/v2","goal":"","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"pending","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true,"session_id":"sess-pending"},"tasks":[]}'
+run_stop "$H" "sess-pending"
+assert_contains "$HOOK_OUT" "Goal Contract is pending" "pending contract continues for refinement"
+assert_contains "$HOOK_OUT" "ccm goal set" "pending contract gives refinement verb"
+rm -rf "$H"
+
+# A complete pending decision package may stop so the user can answer it.
+H="$(make_project)"
+mkactive "$H" "question" '{"schema":"cc-master/v2","goal":"","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"pending","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true,"session_id":"sess-question"},"tasks":[{"id":"D1","title":"Choose deployment authority","status":"blocked","blocked_on":"user","deps":[],"decision_package":{"inputs_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","ask_type":"decision","context_md":"Deployment authority changes the allowed delivery action.","what_i_need":"Choose whether the PR may be merged.","options":[{"id":"draft","label":"Draft PR only"},{"id":"merge","label":"Allow merge"}],"enter_cmd":"ccm discuss D1"}}]}'
+run_stop "$H" "sess-question"
+assert_eq "" "$HOOK_OUT" "pending decision package allows user handoff"
+rm -rf "$H"
+
+# A blocked_on:user label without a complete decision_package is not a legal pending handoff.
+H="$(make_project)"
+mkactive "$H" "incomplete-question" '{"schema":"cc-master/v2","goal":"","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"pending","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true,"session_id":"sess-incomplete-question"},"tasks":[{"id":"D1","title":"Choose deployment authority","status":"blocked","blocked_on":"user","deps":[]}]}'
+run_stop "$H" "sess-incomplete-question"
+assert_contains "$HOOK_OUT" '"followup_message"' "incomplete pending decision package continues"
+assert_contains "$HOOK_OUT" "complete blocked_on" "incomplete pending decision package gives repair guidance"
+rm -rf "$H"
+
+# A ccm-confirmed missing Brief cannot be bypassed by stop_allow_until.
+H="$(make_project)"
+mkactive "$H" "missing-brief" '{"schema":"cc-master/v2","goal":"g","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"confirmed","brief":{"ref":"goals/missing-brief/r0001.goal.md","sha256":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true,"session_id":"sess-missing-brief"},"runtime":{"stop_allow_until":"2999-01-01T00:00:00Z"},"tasks":[{"id":"T1","status":"done","deps":[]}]}'
+run_stop "$H" "sess-missing-brief"
+assert_contains "$HOOK_OUT" "integrity check failed" "confirmed missing Brief continues Cursor completion"
+assert_contains "$HOOK_OUT" "missing_brief" "Cursor names the confirmed integrity verdict"
+rm -rf "$H"
+
+# Malformed Goal Contract cannot be bypassed by stop_allow_until.
+H="$(make_project)"
+mkactive "$H" "bad" '{"schema":"cc-master/v2","goal":"g","goal_contract":{"schema":"wrong","revision":1,"assurance":"confirmed"},"owner":{"active":true,"session_id":"sess-bad"},"runtime":{"stop_allow_until":"2999-01-01T00:00:00Z"},"tasks":[{"id":"T1","status":"done","deps":[]}]}'
+run_stop "$H" "sess-bad"
+assert_contains "$HOOK_OUT" "integrity check failed" "malformed goal contract continues despite release timestamp"
+rm -rf "$H"
+
+# A transiently unavailable ccm is advisory, not proof that the contract is malformed/tampered.
+H="$(make_project)"
+mkactive "$H" "unavailable" '{"schema":"cc-master/v2","goal":"g","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"confirmed","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true,"session_id":"sess-unavailable"},"runtime":{"stop_allow_until":"2999-01-01T00:00:00Z"},"tasks":[{"id":"T1","status":"done","deps":[]}]}'
+run_stop_with_ccm "$H" "sess-unavailable" "$H/missing-ccm"
+assert_not_contains "$HOOK_OUT" "integrity check failed" "unavailable ccm is not reported as Cursor integrity failure"
+assert_contains "$HOOK_OUT" "advisory" "unavailable ccm emits Cursor advisory"
+assert_contains "$HOOK_OUT" "unavailable" "Cursor advisory names unavailable integrity probe"
 rm -rf "$H"
 
 # FUSE: 5 consecutive blocks → release with followup_message (kind:system).

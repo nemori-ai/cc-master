@@ -36,8 +36,8 @@ noun="$1"; verb="$2"
 if [ "$noun" = "board" ] && [ "$verb" = "set-param" ]; then
   shift 2; key="$1"; val="$2"; shift 2; board=""
   while [ $# -gt 0 ]; do case "$1" in --board) board="$2"; shift 2;; --home) shift 2;; *) shift;; esac; done
-  # whitelist mirrors the real verb (identity + critpath); others exit 2.
-  if [ "$key" != "last_identity_remind" ] && [ "$key" != "last_critpath_remind" ]; then
+  # whitelist mirrors the real verb (identity + critpath + goal); others exit 2.
+  if [ "$key" != "last_identity_remind" ] && [ "$key" != "last_critpath_remind" ] && [ "$key" != "last_goal_remind" ]; then
     echo "error: not whitelisted" >&2; exit 2; fi
   node -e 'const fs=require("fs");const [b,k,v]=process.argv.slice(1);const o=JSON.parse(fs.readFileSync(b,"utf8"));o.runtime=o.runtime||{};o.runtime[k]=v;fs.writeFileSync(b,JSON.stringify(o,null,2)+"\n");' "$board" "$key" "$val"
   exit 0
@@ -67,10 +67,10 @@ seed_home() {
   local lastid="${2:-}" lastcp="${3:-2026-06-29T11:55:00Z}"   # default critpath: 5min ago < 2h → not due
   local rt=""
   rt="$rt\"last_identity_remind\":\"$lastid\""
-  rt="$rt,\"last_critpath_remind\":\"$lastcp\""
+  rt="$rt,\"last_critpath_remind\":\"$lastcp\",\"last_goal_remind\":\"2026-06-29T11:55:00Z\""
   # if lastid empty, drop the identity key entirely (first-time case wants it ABSENT).
-  if [ -z "$lastid" ]; then rt="\"last_critpath_remind\":\"$lastcp\""; fi
-  printf '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"%s","heartbeat":"2026-06-01T00:00:00Z"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T1","status":"in_flight","deps":[]}],"runtime":{%s}}' "$1" "$rt" > "$h/boards/mine.board.json"
+  if [ -z "$lastid" ]; then rt="\"last_critpath_remind\":\"$lastcp\",\"last_goal_remind\":\"2026-06-29T11:55:00Z\""; fi
+  printf '{"schema":"cc-master/v2","goal":"g","goal_contract":{"schema":"ccm/goal-contract/v1","revision":3,"assurance":"confirmed","updated_at":"2026-06-29T00:00:00Z"},"owner":{"active":true,"session_id":"%s","heartbeat":"2026-06-01T00:00:00Z"},"git":{"worktree":"","branch":""},"tasks":[{"id":"T1","status":"in_flight","deps":[]}],"runtime":{%s}}' "$1" "$rt" > "$h/boards/mine.board.json"
   echo "$h"
 }
 
@@ -91,6 +91,9 @@ board_runtime_remind() {
 board_runtime_critpath() {
   node -e 'const fs=require("fs");const b=process.argv[1];try{const o=JSON.parse(fs.readFileSync(b,"utf8"));process.stdout.write(String((o.runtime&&o.runtime.last_critpath_remind)||""));}catch(e){}' "$1/boards/mine.board.json"
 }
+board_runtime_goal() {
+  node -e 'const o=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(String((o.runtime&&o.runtime.last_goal_remind)||""));' "$1/boards/mine.board.json"
+}
 
 NOW="2026-06-29T12:00:00Z"
 
@@ -105,6 +108,16 @@ assert_contains "$HOOK_OUT" '<advisory source=\"identity-nudge\" strength=\"weak
 assert_not_contains "$HOOK_OUT" '"decision":"block"' "(a) NEVER blocks — non-blocking only"
 assert_valid_json "$HOOK_OUT" "(a) emits a single well-formed JSON object"
 assert_eq "$NOW" "$(board_runtime_remind "$H")" "(a) writes last_identity_remind BACK to now (via ccm set-param)"
+rm -rf "$H"
+
+# Goal alignment has an independent cadence and names the immutable revision.
+H="$(seed_home "sess-goal" "2026-06-29T11:55:00Z")"
+node -e 'const fs=require("fs"),p=process.argv[1],o=JSON.parse(fs.readFileSync(p,"utf8"));delete o.runtime.last_goal_remind;fs.writeFileSync(p,JSON.stringify(o));' "$H/boards/mine.board.json"
+run_idnudge "$H" "sess-goal" "$NOW"
+assert_contains "$HOOK_OUT" "目标对齐周期提示" "goal cadence emits alignment reminder"
+assert_contains "$HOOK_OUT" "r3 confirmed" "goal reminder names revision and assurance"
+assert_contains "$HOOK_OUT" "有用不等于相关" "goal reminder rejects useful-but-unrelated drift"
+assert_eq "$NOW" "$(board_runtime_goal "$H")" "goal cadence writes last_goal_remind"
 rm -rf "$H"
 
 # ── (b) NOT DUE (last remind 1h ago < 6h interval) → silent, rc 0, no write ─────────────────────────

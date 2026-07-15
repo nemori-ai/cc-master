@@ -11,6 +11,7 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 | --- | --- | --- | --- | --- |
 | ccm-quota-account | implemented | partial; read-only provider candidate implemented, usage migration pending | partial | [ccm-quota-account.md](harnesses/capabilities/ccm-quota-account.md) |
 | cross-harness-cached-context | implemented | implemented | implemented-track-b | [cross-harness-cached-context.md](harnesses/capabilities/cross-harness-cached-context.md) |
+| goal-contract-lifecycle | implemented | implemented | implemented-track-b | [goal-contract-lifecycle.md](harnesses/capabilities/goal-contract-lifecycle.md) |
 | path-token-resolution | implemented | implemented | implemented | [path-token-resolution.md](harnesses/capabilities/path-token-resolution.md) |
 | post-tool-batch-gate | implemented | unsupported | unsupported | [post-tool-batch-gate.md](harnesses/capabilities/post-tool-batch-gate.md) |
 | role-substrate-reinject | implemented | implemented | implemented | [role-substrate-reinject.md](harnesses/capabilities/role-substrate-reinject.md) |
@@ -36,6 +37,12 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 | --- | --- | --- | --- |
 | cross-harness-context-midturn-delta | event-unavailable | codex | plugin/src/hooks/orchestrator-context/CONTRACT.md |
 | cross-harness-context-cursor-start | protocol-capability-gap | cursor | design_docs/harnesses/cursor.md D3/D4/D5 |
+
+### goal-contract-lifecycle
+
+| rule | kind | affected hosts | tracked by |
+| --- | --- | --- | --- |
+| goal-contract-dynamic-reinject-on-compaction | protocol-capability-gap | cursor | design_docs/harnesses/cursor.md |
 
 ### path-token-resolution
 

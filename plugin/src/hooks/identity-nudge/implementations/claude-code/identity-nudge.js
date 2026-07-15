@@ -42,6 +42,7 @@ const IDENTITY_INTERVAL_RAW = process.env.CC_MASTER_IDNUDGE_INTERVAL_SEC || '';
 // CC_MASTER_CRITPATH_INTERVAL_SEC：临界路径提示周期阈值（秒）。缺/非正/非数 → 默认 2h（7200s）。临界路径进度是
 //   编排健康度的高价值周期信号，值得比身份提示（6h）更勤。
 const CRITPATH_INTERVAL_RAW = process.env.CC_MASTER_CRITPATH_INTERVAL_SEC || '';
+const GOAL_INTERVAL_RAW = process.env.CC_MASTER_GOAL_REMIND_INTERVAL_SEC || '';
 // ccm 子进程超时（ms）。默认 10s。CC_MASTER_IDNUDGE_TIMEOUT_MS 覆写（测试注入·两条 nudge 共用）。
 const CCM_TIMEOUT_MS = (() => {
   const n = Number(process.env.CC_MASTER_IDNUDGE_TIMEOUT_MS);
@@ -50,6 +51,7 @@ const CCM_TIMEOUT_MS = (() => {
 
 const DEFAULT_IDENTITY_INTERVAL_SEC = 6 * 60 * 60; // 6h
 const DEFAULT_CRITPATH_INTERVAL_SEC = 2 * 60 * 60; // 2h
+const DEFAULT_GOAL_INTERVAL_SEC = 2 * 60 * 60; // 2h
 
 // intervalSecOf(raw, dflt) → 周期阈值（秒）。空/非正/非数 → 默认（先判空串：Number('')===0 的 JS footgun）。
 function intervalSecOf(raw, dflt) {
@@ -64,6 +66,14 @@ const IDENTITY_TEXT =
   '若你已偏离编排者姿态（开始亲手实现 / 亲自 review / 空转等待 / 把 green gate 当 passed），' +
   '现在是重温 master-orchestrator-guide（SKILL A）七镜头 + 决策程序、回到指挥位的时机。' +
   '若你确在编排轨道上，无需特定动作——继续推进。';
+
+function buildGoalText(board) {
+  const contract = board && board.goal_contract;
+  if (!contract || contract.schema !== 'ccm/goal-contract/v1') return null;
+  const compact = String(board.goal || '(goal pending)').replace(/\s+/g, ' ').trim().slice(0, 160);
+  return `[目标对齐周期提示] 当前 Goal Contract r${contract.revision || '?'} ${contract.assurance || 'unknown'}：${compact}。` +
+    '有用不等于相关：继续前先做 Goal Trace Test，工作必须能追溯到当前 goal / acceptance；新发现只能分类为 in-scope、amendment、follow-up 或 unrelated，绝不静默扩 scope。';
+}
 
 // ── critpath：spawn ccm 读图 + estimate verdict（红线3：ccm 出数/verdict·hook 不算图）──────────────────
 // spawnCcmJson(args) → 解析后的 `{ ok, data }` 的 data 对象 | null。spawnSync `ccm <args> --json`（透传
@@ -165,6 +175,23 @@ function body(ctx) {
     build: () => IDENTITY_TEXT,
   });
   if (identityText) blocks.push(advisory('identity-nudge', 'weak', identityText));
+
+  // PARITY: rule-identity-nudge-goal-cadence
+  const goalContract = board && board.goal_contract;
+  if (goalContract && goalContract.schema === 'ccm/goal-contract/v1') {
+    const goalText = periodicNudge({
+      board,
+      boardPath,
+      homeDir: ctx.homeDir,
+      ccmBin: CCM_BIN,
+      key: 'last_goal_remind',
+      intervalSec: intervalSecOf(GOAL_INTERVAL_RAW, DEFAULT_GOAL_INTERVAL_SEC),
+      nowMs,
+      setparamTimeoutMs: CCM_TIMEOUT_MS,
+      build: () => buildGoalText(board),
+    });
+    if (goalText) blocks.push(advisory('goal-alignment-nudge', 'weak', goalText));
+  }
 
   // ② CRITPATH 周期提示（advisory weak·source critpath-nudge）。build 在 due 且写回成功后才 spawn ccm 读图
   //   （被 interval 门控·罕见·spawn 节制）；chain 空 → build 弃权 → 不注入（但时间戳已前移·下个 interval 再 due）。

@@ -7,6 +7,12 @@ run_ss() {
   HOOK_OUT="$(CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
              node "$PLUGIN_ROOT/hooks/scripts/reinject.js" </dev/null 2>/dev/null)"; HOOK_RC=$?
 }
+# run_ss_with_ccm HOME CCM [VERDICT [EXIT]] — pin the Goal Contract transport for classifier cases.
+run_ss_with_ccm() {
+  HOOK_OUT="$(CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" CCM_BIN="$2" \
+             CCM_GOAL_TEST_VERDICT="${3:-}" CCM_GOAL_TEST_EXIT="${4:-0}" \
+             node "$PLUGIN_ROOT/hooks/scripts/reinject.js" </dev/null 2>/dev/null)"; HOOK_RC=$?
+}
 # run_ss_sid HOME SID — run reinject with stdin JSON carrying session_id=SID (SessionStart-shaped).
 # Session-scoped armed gate: only THIS session's active board(s) re-anchor the role.
 run_ss_sid() {
@@ -50,13 +56,60 @@ HN="$(printf '%s' "$H/boards" | sed 's#//*#/#g')"
 assert_contains "$HOOK_OUT" "$HN" "points at the boards dir under the home"
 rm -rf "$H"
 
+# Goal Contract boards name revision/assurance and require integrity reconciliation before dispatch.
+H="$(make_project)"
+mkactive "$H" "contract" '{"schema":"cc-master/v2","goal":"REFINED GOAL","goal_contract":{"schema":"ccm/goal-contract/v1","revision":2,"assurance":"confirmed","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_ss "$H"
+assert_contains "$HOOK_OUT" "r2 confirmed" "reinject names current goal revision and assurance"
+assert_contains "$HOOK_OUT" "ccm goal check" "reinject requires integrity check"
+rm -rf "$H"
+
+# Goal Contract transport unavailable is not evidence of semantic corruption: warn strongly, keep
+# the local dangling-node gate, and do not turn the transport failure into a dispatch prohibition.
+H="$(make_project)"
+mkactive "$H" "contract-unavailable" '{"schema":"cc-master/v2","goal":"VALID CONFIRMED GOAL","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"confirmed","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true},"tasks":[{"id":"T1","status":"stale","deps":[]}]}'
+run_ss_with_ccm "$H" "$H/no-such-ccm"
+assert_contains "$HOOK_OUT" "STRONG ADVISORY" "transport failure is injected as a strong advisory"
+assert_contains "$HOOK_OUT" "Goal Contract integrity probe unavailable" "transport advisory names the unavailable integrity probe"
+assert_not_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "transport failure does not prohibit dispatch"
+assert_contains "$HOOK_OUT" "unresolved node(s)" "transport failure does not skip other local reinject gates"
+rm -rf "$H"
+
+# A determined semantic failure remains a hard block even though `ccm goal check` exits non-zero.
+H="$(make_project)"
+mkactive "$H" "contract-missing" '{"schema":"cc-master/v2","goal":"BROKEN CONFIRMED GOAL","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"confirmed","brief":{"ref":"goals/contract-missing/r0001.goal.md","sha256":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_ss_with_ccm "$H" "${CCM_BIN:-$REPO_ROOT/ccm/apps/cli/dev-bin/ccm}"
+assert_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "determined missing Brief remains a hard block"
+assert_contains "$HOOK_OUT" "verdict=missing_brief" "semantic failure preserves the ccm verdict despite non-zero exit"
+rm -rf "$H"
+
+# A parseable JSON envelope with a future/corrupt verdict is schema-invalid transport, not a
+# determined integrity verdict. Pin the allowlist boundary and keep all frozen failure verdicts hard.
+H="$(make_project)"
+GOAL_STUB="$H/goal-check-stub"
+printf '%s\n' '#!/usr/bin/env node' \
+  'process.stdout.write(JSON.stringify({ok:true,data:{schema:"ccm/goal-check/v1",verdict:process.env.CCM_GOAL_TEST_VERDICT}}));' \
+  'process.exit(Number(process.env.CCM_GOAL_TEST_EXIT || 0));' >"$GOAL_STUB"
+chmod +x "$GOAL_STUB"
+mkactive "$H" "contract-near-miss" '{"schema":"cc-master/v2","goal":"VALID CONFIRMED GOAL","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"confirmed","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true},"tasks":[{"id":"T1","status":"stale","deps":[]}]}'
+run_ss_with_ccm "$H" "$GOAL_STUB" "future_or_corrupt_value" 0
+assert_contains "$HOOK_OUT" "STRONG ADVISORY" "unknown parseable verdict degrades to strong advisory"
+assert_not_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "unknown parseable verdict is not semantic evidence"
+assert_contains "$HOOK_OUT" "unresolved node(s)" "unknown parseable verdict preserves local gates"
+for VERDICT in missing_brief hash_mismatch malformed; do
+  run_ss_with_ccm "$H" "$GOAL_STUB" "$VERDICT" 3
+  assert_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "known $VERDICT verdict remains a hard block"
+  assert_contains "$HOOK_OUT" "verdict=$VERDICT" "known $VERDICT verdict survives non-zero exit"
+done
+rm -rf "$H"
+
 # Case B2: an active board with zero tasks → hard stop before ordinary progress.
 H="$(make_project)"
-mkactive "$H" "empty" '{"schema":"cc-master/v2","goal":"EMPTY CLAUDE GOAL","owner":{"active":true},"tasks":[]}'
+mkactive "$H" "empty" '{"schema":"cc-master/v2","goal":"","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"pending","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true},"tasks":[]}'
 run_ss "$H"
 assert_contains "$HOOK_OUT" "HARD STOP" "empty active board gets hard stop"
 assert_contains "$HOOK_OUT" "zero tasks are not runnable orchestration DAGs" "empty active board blocks ordinary progress"
-assert_contains "$HOOK_OUT" "ccm task add" "empty active board instructs ccm task add"
+assert_contains "$HOOK_OUT" "ccm goal set" "pending empty board instructs goal framing before decomposition"
 rm -rf "$H"
 
 # Case C: only an archived board (active:false) → no-op

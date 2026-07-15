@@ -161,9 +161,14 @@ run_hook "hooks/scripts/bootstrap-board.sh" '{"prompt":"  /cc-master:as-master-o
 assert_eq 0 "$HOOK_RC" "raw command exits 0"
 assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "board created for a raw command prompt (leading whitespace allowed)"
 assert_contains "$HOOK_OUT" "MANDATORY NEXT STEP" "fresh bootstrap requires DAG before work"
-assert_contains "$HOOK_OUT" "zero tasks is not a runnable orchestration" "fresh bootstrap rejects empty-board progress"
+assert_contains "$HOOK_OUT" "pending Goal Contract + zero tasks" "fresh bootstrap rejects empty-board progress"
 BOARD_F="$(ls "$P/.claude/cc-master/boards"/*.board.json | head -n1)"
 assert_contains "$HOOK_OUT" "ccm task add --board $BOARD_F" "fresh bootstrap gives exact ccm board path"
+assert_eq "" "$(board_goal "$BOARD_F")" "fresh bootstrap does not copy raw request into goal"
+assert_contains "$(cat "$BOARD_F")" '"assurance": "pending"' "fresh bootstrap creates pending goal contract"
+assert_contains "$HOOK_OUT" "ccm goal set" "fresh bootstrap requires refined goal persistence before DAG"
+assert_contains "$HOOK_OUT" "ccm goal check" "fresh bootstrap requires goal integrity check before DAG"
+assert_contains "$HOOK_OUT" "原始请求" "fresh bootstrap distinguishes source evidence from canonical goal"
 rm -rf "$P"
 
 # Case G (Finding #15): expanded-body — prompt opens with the bootstrap marker comment on its first
@@ -922,5 +927,26 @@ if [ -n "${CCM_BIN:-}" ] && [ -x "${CCM_BIN:-}" ]; then
 else
   echo "(INIT-FLAGS series skipped — no executable CCM_BIN/ccm to apply board update/policy set)"
 fi
+
+# Resume capability parity: an installed but old ccm must fail before any owner re-stamp.
+P="$(make_project)"; H="$(make_project)"
+B="$(seed_board "$H" "old-sess" "false" "capability guarded resume")"
+OLD_CCM="$P/old-ccm"
+cat >"$OLD_CCM" <<'SH'
+#!/usr/bin/env bash
+if [[ "$*" == *"--capabilities"* ]]; then
+  printf '%s\n' '{"ok":true,"data":{"capabilities":["board-init/structured-board-path-v1"]}}'
+  exit 0
+fi
+exit 99
+SH
+chmod +x "$OLD_CCM"
+HOOK_OUT="$(printf '%s' '{"session_id":"new-sess","prompt":"/cc-master:as-master-orchestrator --resume capability"}' \
+  | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$H" CCM_BIN="$OLD_CCM" \
+    bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+assert_contains "$HOOK_OUT" "goal-contract/v1" "Claude incompatible ccm refuses resume with missing capability"
+assert_eq "old-sess" "$(board_sid "$B")" "Claude incompatible resume does not restamp owner.session_id"
+assert_eq "false" "$(board_active "$B")" "Claude incompatible resume does not reactivate board"
+rm -rf "$P" "$H"
 
 finish

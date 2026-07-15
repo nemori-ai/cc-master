@@ -162,6 +162,7 @@ test('board init --capabilities：安装路径也保持协商只读，不触发 
   assert.equal(r.code, 0, r.err.join('\n'));
   assert.deepEqual(JSON.parse(r.out.join('\n')).data.capabilities, [
     'board-init/structured-board-path-v1',
+    'goal-contract/v1',
   ]);
   assert.equal(existsSync(configDir), false, 'capability negotiation leaves config home absent');
   assert.equal(existsSync(masterHome), false, 'capability negotiation leaves ccm home absent');

@@ -26,6 +26,8 @@ But make no mistake — this is **not** "make a wish and the AI does it all." Ta
 
 One line, and it's off — then you're free to step away. It works on its own and only comes back when a call is genuinely yours to make.
 
+That first line is treated as **source evidence, not pasted in as the execution goal**. Before it builds the task graph, the orchestrator rewrites the request into a short, testable Goal Contract and asks only about ambiguities that would materially change the outcome, scope, acceptance, constraints, or authority. For a complex or long-lived goal, it stores the full context as a versioned Goal Brief linked from the board and checks its hash on resume. If the goal changes, it creates a new revision and re-checks the plan instead of quietly drifting.
+
 ---
 
 ## Is this you?
@@ -50,7 +52,7 @@ cc-master takes all of that off your hands, like a project lead who can actually
 - **⚡ It barely ever "stops."** Other AIs hit a usage limit and tell you to *"come back in a few hours."* On Claude Code it can switch to another account in the pool and keep going; on Cursor it paces against your subscription **billing period** instead (no account autoswitch). **Either way, the wall is managed — not ignored.**
 - **🧠 It doesn't forget.** Other AIs lose the thread after a long chat; this one remembers who it is, where it got to, and what's left — even across dozens of context resets and several sessions — and **picks up right where it left off.**
 - **🙋 It only asks you about the things that matter.** Small calls it makes itself; only when something genuinely needs you does it stop, lay out the context, and wait for your word.
-- **🏁 It won't fake being done.** Before it wraps, it checks itself against your original goal, point by point: is every piece actually done? did it ask you everything it should have? did anything quietly die in the background? **If it's not done, it won't pretend it is.**
+- **🏁 It won't fake being done.** Before it wraps, it checks itself against the current Goal Contract revision, point by point: is every piece actually done? did it ask you everything it should have? did anything quietly die in the background? **If it's not done, it won't pretend it is.**
 
 All you do is the one idea at the start, and the few calls along the way.
 
@@ -134,7 +136,7 @@ Checksum failures are treated as release integrity failures, not as prompts to b
 
 > **Rather do it by hand, or run from source?** Clone the repo, generate the adapter you want with `bash scripts/sync-plugin-dist.sh --host <harness>`, then install that adapter through the harness-native route. Claude Code can point at `plugin/dist/claude-code`; Codex should be registered through a local marketplace that points at `plugin/dist/codex` (with only skill/hooks packaged there); Cursor can copy `plugin/dist/cursor` to `~/.cursor/plugins/local/cc-master`. You'll still need `ccm` on your PATH — download `ccm-<os>-<arch>` from the latest `ccm-v*` release's **Assets**, rename it to `ccm`, `chmod +x`, and drop it in `~/.local/bin`.
 
-**Moved your harness config?** `CLAUDE_CONFIG_DIR` still controls Claude Code's own settings, credentials, and transcript project files; `CODEX_HOME` controls Codex's home. cc-master's runtime state is harness-neutral: boards, account registry, file vault, and quota sidecar live under `${CC_MASTER_HOME:-$HOME/.cc_master}` unless you pass `--home`.
+**Moved your harness config?** `CLAUDE_CONFIG_DIR` still controls Claude Code's own settings, credentials, and transcript project files; `CODEX_HOME` controls Codex's home. cc-master's runtime state is harness-neutral: boards, versioned Goal Briefs, account registry, file vault, and quota sidecar live under `${CC_MASTER_HOME:-$HOME/.cc_master}` unless you pass `--home`.
 
 ### Cursor install
 
@@ -171,7 +173,7 @@ $cc-master-as-master-orchestrator <your goal>
 
 The handful of commands you'll actually type. The in-session entrypoint is harness-specific; `ccm …` always runs in your **terminal**.
 
-- **Start / resume** — Claude Code: `/cc-master:as-master-orchestrator <goal>` or `/cc-master:as-master-orchestrator --resume`; Codex: `$cc-master-as-master-orchestrator <goal>` or `$cc-master-as-master-orchestrator --resume`; Cursor: `/as-master-orchestrator <goal>` or `/as-master-orchestrator --resume` (reopen the Agent session after install so hooks/rules load).
+- **Start / resume** — Claude Code: `/cc-master:as-master-orchestrator <goal>` or `/cc-master:as-master-orchestrator --resume`; Codex: `$cc-master-as-master-orchestrator <goal>` or `$cc-master-as-master-orchestrator --resume`; Cursor: `/as-master-orchestrator <goal>` or `/as-master-orchestrator --resume` (reopen the Agent session after install so hooks/rules load). Fresh runs frame and check a Goal Contract before creating tasks; resume checks the current revision and Goal Brief before dispatch.
 - **Status** — `ccm status-report show`. Generates the shared JSON-backed board status report for CLI and the web viewer.
 - **View** — `ccm web-viewer open`. Opens the live plan as a read-only graph in your browser; lifecycle commands are `ccm web-viewer start/open/status/stop/restart` (OS-assigned port by default; survives `ccm upgrade` when the service was already wanted).
 - **Discuss** — Claude Code: `/cc-master:discuss <decision>`; Cursor: `/discuss <decision>`; Codex: `$cc-master-discuss <decision>`. Use it when a decision is waiting on you.

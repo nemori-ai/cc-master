@@ -19,8 +19,12 @@ alwaysApply: true
 
 ## 空板硬停
 
-若本 session 已武装（home `boards/` 下有匹配的 active board）但板内 **tasks 为空**：这是 **HARD STOP**——先把目标切成 DAG / 写入任务，再谈实现、测试、git、PR。空板 ≠ 许可开工。
+若本 session 已武装（home `boards/` 下有匹配的 active board），先运行 `ccm goal check --board <board> --json`。Goal Contract 为 pending、malformed、Brief missing/hash mismatch 时都是 **HARD STOP**；原始请求不是 canonical goal。先按 Goal Framing Test 澄清并以 `ccm goal set` / `goal amend` 写当前 revision，复杂背景读取/更新 Goal Brief。只有 check 为 `ok` 后，才能把当前 revision 切成 DAG / 写入任务；空板 ≠ 许可开工。
+
+## 防漂移
+
+派发、新增工作、需求变化与完成前都做 Goal Trace Test：它兑现当前 revision 的哪条 outcome/acceptance/constraint，证据是什么，删掉后 acceptance 是否仍全满足？将 delta 分类为 aligned / amendment-required / unrelated；只有 aligned 继续，amendment-required 先 `ccm goal amend`，unrelated 不做。**有用不等于相关**；完成必须同时满足 task acceptance 与当前 Goal Contract 的全局 acceptance。
 
 ## Compaction 后
 
-Cursor 无法在 compaction 后全文重注 `master-orchestrator-guide`。本 alwaysApply rule 是常驻角色锚；细节仍回 skill。用 `ccm` 读板确认 goal / ready / 悬空节点后再调度。
+Cursor 无法在 compaction 后全文重注 `master-orchestrator-guide`。本 alwaysApply rule 是常驻角色锚；细节仍回 skill。用 `ccm goal check` + `ccm` 读板确认当前 revision / Brief / ready / 悬空节点后再调度。

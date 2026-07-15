@@ -15,6 +15,11 @@ run_stop_sid() {
              | CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
                node "$PLUGIN_ROOT/hooks/scripts/verify-board.js" 2>/dev/null)"; HOOK_RC=$?
 }
+run_stop_sid_with_ccm() {
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$2" \
+             | CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" CCM_BIN="$3" \
+               node "$PLUGIN_ROOT/hooks/scripts/verify-board.js" 2>/dev/null)"; HOOK_RC=$?
+}
 # run_stop_json HOME JSON — run the Stop hook with arbitrary stdin JSON (e.g. one WITHOUT session_id).
 run_stop_json() {
   HOOK_OUT="$(printf '%s' "$2" \
@@ -73,6 +78,43 @@ assert_contains "$HOOK_OUT" "block" "uncertain task → block"
 rm -rf "$H"
 
 # ─── SELF-CHECK HANDSHAKE (completion state: all in_flight/blocked/done) ───────────────────────────
+
+# Pending Goal Contract blocks ordinary completion, but a complete decision_package may hand off.
+H="$(make_project)"; SID="sess-goal-pending"
+mkactive "$H" "pending" "{\"schema\":\"cc-master/v2\",\"goal\":\"\",\"goal_contract\":{\"schema\":\"ccm/goal-contract/v1\",\"revision\":1,\"assurance\":\"pending\",\"updated_at\":\"2026-07-15T00:00:00Z\"},\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "Goal Contract is still pending" "pending Goal Contract → block"
+rm -rf "$H"
+
+H="$(make_project)"; SID="sess-goal-question"
+mkactive "$H" "question" "{\"schema\":\"cc-master/v2\",\"goal\":\"\",\"goal_contract\":{\"schema\":\"ccm/goal-contract/v1\",\"revision\":1,\"assurance\":\"pending\",\"updated_at\":\"2026-07-15T00:00:00Z\"},\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"D1\",\"title\":\"Choose deployment authority\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"deps\":[],\"decision_package\":{\"inputs_hash\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"ask_type\":\"decision\",\"context_md\":\"Deployment authority changes the allowed delivery action.\",\"what_i_need\":\"Choose whether the PR may be merged.\",\"options\":[{\"id\":\"draft\",\"label\":\"Draft PR only\"},{\"id\":\"merge\",\"label\":\"Allow merge\"}],\"enter_cmd\":\"ccm discuss D1\"}}]}"
+run_stop_sid "$H" "$SID"
+assert_not_contains "$HOOK_OUT" "block" "complete pending decision_package → allow user handoff"
+rm -rf "$H"
+
+H="$(make_project)"; SID="sess-goal-incomplete-question"
+mkactive "$H" "incomplete-question" "{\"schema\":\"cc-master/v2\",\"goal\":\"\",\"goal_contract\":{\"schema\":\"ccm/goal-contract/v1\",\"revision\":1,\"assurance\":\"pending\",\"updated_at\":\"2026-07-15T00:00:00Z\"},\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"D1\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "incomplete pending decision_package → block"
+assert_contains "$HOOK_OUT" "complete blocked_on" "incomplete pending decision_package → repair guidance"
+rm -rf "$H"
+
+# A ccm-confirmed missing Brief is a hard integrity failure.
+H="$(make_project)"; SID="sess-goal-missing-brief"
+mkactive "$H" "missing-brief" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"goal_contract\":{\"schema\":\"ccm/goal-contract/v1\",\"revision\":1,\"assurance\":\"confirmed\",\"brief\":{\"ref\":\"goals/missing-brief/r0001.goal.md\",\"sha256\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"updated_at\":\"2026-07-15T00:00:00Z\"},\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "integrity check failed" "confirmed missing Brief blocks Claude Stop"
+assert_contains "$HOOK_OUT" "missing_brief" "Claude names the confirmed integrity verdict"
+rm -rf "$H"
+
+# A transiently unavailable ccm cannot prove tampering and therefore must not become a hard integrity block.
+H="$(make_project)"; SID="sess-goal-unavailable"
+mkactive "$H" "unavailable" "{\"schema\":\"cc-master/v2\",\"goal\":\"\",\"goal_contract\":{\"schema\":\"ccm/goal-contract/v1\",\"revision\":1,\"assurance\":\"pending\",\"updated_at\":\"2026-07-15T00:00:00Z\"},\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"D1\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"deps\":[],\"decision_package\":{\"inputs_hash\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"ask_type\":\"decision\",\"context_md\":\"Need authority.\",\"what_i_need\":\"Choose an option.\",\"options\":[{\"id\":\"a\",\"label\":\"A\"}],\"enter_cmd\":\"ccm discuss D1\"}}]}"
+run_stop_sid_with_ccm "$H" "$SID" "$H/missing-ccm"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "unavailable ccm does not hard-block Claude Stop as integrity failure"
+assert_contains "$HOOK_OUT" "advisory" "unavailable ccm emits Claude advisory"
+assert_contains "$HOOK_OUT" "unavailable" "Claude advisory names unavailable integrity probe"
+rm -rf "$H"
 
 # tasks_region_t BOARD — retain the historical source-order extractor only for the explicit pre-D3
 # fingerprint fixture below. Current fp_of() uses parsed JSON so it can mirror production semantics.
@@ -139,6 +181,13 @@ const hasInFlight = realTasks.some((task) => task.status === 'in_flight');
 const nowIso = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
 console.log(`watchdog_needed:${hasInFlight && !watchdogArmed(board, nowIso) ? 1 : 0}`);
 
+const contract = board && board.goal_contract;
+if (contract && contract.schema === 'ccm/goal-contract/v1') {
+  const briefHash = contract.brief && typeof contract.brief.sha256 === 'string' ? contract.brief.sha256 : '';
+  const goal = typeof board.goal === 'string' ? board.goal : '';
+  console.log(`goal_contract:${contract.revision || ''}:${contract.assurance || ''}:${goal}:${briefHash}`);
+}
+
 const record = watchdogRecord(board);
 const fireAt = record && typeof record.fire_at === 'string' ? record.fire_at : '';
 if (fireAt) console.log(`fire_at:${fireAt}`);
@@ -192,7 +241,7 @@ mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"owner\":{\"act
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "first completion → block"
 assert_contains "$HOOK_OUT" "self-check" "first completion → reason has self-check keyword"
-assert_contains "$HOOK_OUT" "original goal" "first completion → reason cites original goal"
+assert_contains "$HOOK_OUT" "current Goal Contract revision" "first completion → reason cites current goal revision"
 # ADR-018：self-check 握手 block reason 是系统硬闸 → directive（含 why·P5）。
 assert_contains "$HOOK_OUT" '<directive source=\"verify-board\">' "first completion handshake → tag-wrapped directive (ADR-018)"
 assert_file "$H/.$SID.stopcheck" "first completion → sidecar created"
@@ -217,6 +266,17 @@ KEPT_FP="$(awk '{print $2}' "$H/.$SID.stopcheck")"
 assert_eq "$EXP_FP" "$KEPT_FP" "second completion → handshook fingerprint retained"
 KEPT_STREAK="$(awk '{print $1}' "$H/.$SID.stopcheck")"
 assert_eq 0 "$KEPT_STREAK" "second completion → streak reset to 0 on allow"
+rm -rf "$H"
+
+# A Goal Contract amendment changes the completion fingerprint and forces a new global self-check.
+H="$(make_project)"; SID="sess-goal-amend-handshake"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"ship draft PR\",\"goal_contract\":{\"schema\":\"ccm/goal-contract/v1\",\"revision\":1,\"assurance\":\"asserted\",\"updated_at\":\"2026-07-15T00:00:00Z\"},\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
+R1_FP="$(fp_of "$H/boards/b1.board.json")"
+printf '0 %s\n' "$R1_FP" > "$H/.$SID.stopcheck"
+mkactive "$H" "b1" "{\"schema\":\"cc-master/v2\",\"goal\":\"ship draft PR without merge\",\"goal_contract\":{\"schema\":\"ccm/goal-contract/v1\",\"revision\":2,\"assurance\":\"asserted\",\"updated_at\":\"2026-07-15T01:00:00Z\"},\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "block" "goal amendment invalidates old completion handshake"
+assert_contains "$HOOK_OUT" "current Goal Contract revision" "goal amendment requests fresh global acceptance self-check"
 rm -rf "$H"
 
 # Case J (NEW): handshake reset — sidecar carried a handshook fingerprint, but board now has a ready

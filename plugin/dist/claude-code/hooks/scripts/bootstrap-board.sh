@@ -479,7 +479,7 @@ EOF
     harness_note=" <advisory source=\"bootstrap\" strength=\"weak\">ccm board stamp-harness 未能写入 owner.harness；ccm peers 会把该 board 退到 unknown 单例池，可稍后重跑 ccm board stamp-harness --board ${TARGET} 修复。</advisory>"
   fi
 
-  inject_ctx "cc-master resume: you have TAKEN OVER the existing orchestration board at ${TARGET}. This is a RESUME, not a fresh start — do NOT re-decompose the goal and do NOT reset tasks[]. Invoke the master-orchestrator-guide skill, then RECONCILE the existing tasks[]: rebuild your mental model from their statuses. Treat every in_flight task as an ORPHAN (its handle died with the prior session) — do not wait on it; run it through endpoint verification (resume-verify content-hash + endpoint check): if its artifact exists and passes, mark it done/verified; otherwise demote it to ready/stale and re-dispatch for a fresh handle. This board is your single source of truth; from now on update owner.heartbeat each time you flush it.${harness_note}"
+  inject_ctx "cc-master resume: you have TAKEN OVER the existing orchestration board at ${TARGET}. This is a RESUME, not a fresh start — do NOT re-decompose the goal and do NOT reset tasks[]. Invoke the master-orchestrator-guide skill, run ccm goal check --board ${TARGET} --json and read the current Goal Brief when present, then RECONCILE the existing tasks[]: rebuild your mental model from their statuses. Treat every in_flight task as an ORPHAN (its handle died with the prior session) — do not wait on it; run it through endpoint verification (resume-verify content-hash + endpoint check): if its artifact exists and passes, mark it done/verified; otherwise demote it to ready/stale and re-dispatch for a fresh handle. This board is your single source of truth; from now on update owner.heartbeat each time you flush it.${harness_note}"
   return 0
 }
 
@@ -553,7 +553,7 @@ esac
 # (ADR-021 §3.5 boundary). Pure bash `command -v` (red line 1 floor·no jq/python/node·no ccm spawn).
 #   CCM_BIN override (absolute executable path·dev/test/custom install·same口径 as node hooks): when set,
 #   check `[ -x "$CCM_BIN" ]`; else check `command -v ccm` on PATH.
-# PARITY: rule-bootstrap-ccm-hard-precheck (see CONTRACT.md — codex has no equivalent, declared divergence)
+# PARITY: rule-bootstrap-ccm-hard-precheck (see CONTRACT.md — implemented for every host)
 ccm_present=0
 if [ -n "${CCM_BIN:-}" ]; then
   [ -x "$CCM_BIN" ] && ccm_present=1
@@ -583,8 +583,8 @@ fi
 HOME_DIR="$(cc_master_home)"
 BOARDS_DIR="$(cc_master_boards_dir)"
 
-# Parse fresh versus resume before any legacy migration or directory creation. Resume keeps its
-# established migration behavior; fresh must negotiate its process-boundary capability first.
+# Parse fresh versus resume before any legacy migration or directory creation. Both modes must
+# negotiate the process-boundary capability before they can create or re-arm persistent state.
 mode=fresh
 selector=""
 rest="${trimmed#/cc-master:as-master-orchestrator}"
@@ -613,30 +613,30 @@ fi
 CCM_CMD="${CCM_BIN:-ccm}"
 # PARITY: rule-bootstrap-structured-path-capability
 CCM_BOARD_PATH_CAPABILITY='board-init/structured-board-path-v1'
+CCM_GOAL_CONTRACT_CAPABILITY='goal-contract/v1'
 CCM_BOARD_PATH_MIN_VERSION='0.21.0'
-if [ "$mode" = "fresh" ]; then
-  # This negotiation endpoint is intentionally distinct from --dry-run: an older ccm rejects the
-  # unknown flag during argument parsing, before its legacy init resolver can create a parent directory.
-  capability_out="$(CC_MASTER_NO_AUTOINSTALL=1 CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init --capabilities --json --no-input 2>/dev/null)"
-  capability_ok="$(printf '%s' "$capability_out" | CCM_REQUIRED_CAPABILITY="$CCM_BOARD_PATH_CAPABILITY" node -e '
-    let input = "";
-    process.stdin.on("data", (chunk) => { input += chunk; });
-    process.stdin.on("end", () => {
-      try {
-        const envelope = JSON.parse(input);
-        const capabilities = envelope && envelope.ok === true && envelope.data && envelope.data.capabilities;
-        if (Array.isArray(capabilities) && capabilities.includes(process.env.CCM_REQUIRED_CAPABILITY)) {
-          process.stdout.write("yes");
-        }
-      } catch (_) {}
-    });
-  ')"
-  if [ "$capability_ok" != 'yes' ]; then
-    ccm_version="$(CC_MASTER_NO_AUTOINSTALL=1 "$CCM_CMD" --version 2>/dev/null | head -1)"
-    [ -n "$ccm_version" ] || ccm_version='unknown'
-    inject_ctx "<directive source=\"bootstrap\">cc-master: 当前 ccm 不支持 fresh ARM 所需的结构化建板路径能力（installed: $ccm_version；required capability: $CCM_BOARD_PATH_CAPABILITY；minimum release: ccm $CCM_BOARD_PATH_MIN_VERSION）。本次已在任何 legacy migration、目录创建或真实 init 前拒绝，cc-master home 与 Claude config home 均保持不变。请升级 ccm 后重试 /cc-master:as-master-orchestrator &lt;goal&gt;。</directive>"
-    exit 0
-  fi
+# This negotiation endpoint is intentionally distinct from --dry-run: an older ccm rejects the
+# unknown flag during argument parsing, before its legacy init resolver can create a parent directory
+# or resume can re-stamp an existing owner.
+capability_out="$(CC_MASTER_NO_AUTOINSTALL=1 CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init --capabilities --json --no-input 2>/dev/null)"
+capability_ok="$(printf '%s' "$capability_out" | CCM_REQUIRED_CAPABILITY="$CCM_BOARD_PATH_CAPABILITY" CCM_REQUIRED_GOAL_CAPABILITY="$CCM_GOAL_CONTRACT_CAPABILITY" node -e '
+  let input = "";
+  process.stdin.on("data", (chunk) => { input += chunk; });
+  process.stdin.on("end", () => {
+    try {
+      const envelope = JSON.parse(input);
+      const capabilities = envelope && envelope.ok === true && envelope.data && envelope.data.capabilities;
+      if (Array.isArray(capabilities) && capabilities.includes(process.env.CCM_REQUIRED_CAPABILITY) && capabilities.includes(process.env.CCM_REQUIRED_GOAL_CAPABILITY)) {
+        process.stdout.write("yes");
+      }
+    } catch (_) {}
+  });
+')"
+if [ "$capability_ok" != 'yes' ]; then
+  ccm_version="$(CC_MASTER_NO_AUTOINSTALL=1 "$CCM_CMD" --version 2>/dev/null | head -1)"
+  [ -n "$ccm_version" ] || ccm_version='unknown'
+  inject_ctx "<directive source=\"bootstrap\">cc-master: 当前 ccm 不支持 ARM 所需能力（installed: $ccm_version；required: $CCM_BOARD_PATH_CAPABILITY + $CCM_GOAL_CONTRACT_CAPABILITY；minimum release: ccm $CCM_BOARD_PATH_MIN_VERSION）。本次已在任何 legacy migration、目录创建、真实 init 或 resume owner mutation 前拒绝，cc-master home 与 Claude config home 均保持不变。请升级 ccm 后重试 /cc-master:as-master-orchestrator &lt;goal&gt; 或 --resume。</directive>"
+  exit 0
 fi
 # 一次性、非破坏的旧布局迁移：把旧 per-repo $CLAUDE_PROJECT_DIR/.claude/cc-master/*.board.json 复制进
 # 全局 boards/（保留原件·同名跳过·全程吞错）。只迁 CLAUDE_PROJECT_DIR 这个有据可查的旧 per-repo home，
@@ -714,6 +714,8 @@ done
 
 mkdir -p "$BOARDS_DIR"
 
+# PARITY: rule-bootstrap-raw-request-is-evidence
+# 原始请求只是需求证据；fresh init 必须保持 goal="" + pending Goal Contract，绝不复制原始参数为 goal。
 # ── FRESH board 骨架经 `ccm board init` 建（ADR-014 进程边界·红线：hooks ⊥ skill assets）───────────────
 # board 的**空骨架**现由 ccm（board-model SSOT·@ccm/engine）建，不再 `cp` 一个 skill asset——hook 绝不
 # 反向伸手够某个 skill 的 assets/ 或 scripts/ 目录（本任务消除的唯一违规）。ccm 上方已硬前置在场，故可依赖它。把 CC_MASTER_HOME
@@ -724,6 +726,7 @@ mkdir -p "$BOARDS_DIR"
 # 有、无 ccm setter，且 board-guard（ADR-025）只 gate agent 的工具调用、不管 hook 进程内的写。
 # Portability contract: “恢复所建路径”具体只指解析 `--json` 的 schema-owned
 # `data.board_path`；不得扫描或匹配人读 stdout。路径整体作为 opaque data 传递。
+# PARITY: rule-bootstrap-fresh-arm
 if [ -n "$init_issue_for_board" ] && is_github_issue_url "$init_issue_for_board"; then
   init_out="$(CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init --github-issue "$init_issue_for_board" --json)"
 else
@@ -856,7 +859,7 @@ if [ -n "$init_issue" ]; then
   fi
 fi
 
-ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. MANDATORY NEXT STEP: before implementation, tests, git, push, or PR work, decompose the goal into a dependency DAG and write tasks with acceptance criteria via ccm task add --board ${BOARD}. An armed fresh board with zero tasks is not a runnable orchestration. Then invoke the master-orchestrator-guide skill and run the decision program."
+ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. MANDATORY NEXT STEP: 原始请求只是需求证据，不是 canonical goal。先调用 master-orchestrator-guide，澄清并改写成无歧义 Goal Contract，用 ccm goal set --board ${BOARD} --summary <refined-goal> [--brief-file <file>] --assurance asserted 持久化，再运行 ccm goal check --board ${BOARD} --json。只有 goal check 通过后才能拆 DAG，并用 ccm task add --board ${BOARD} 写任务与验收标准。pending Goal Contract + zero tasks 不是可运行编排。"
 # applied / flag_notes 都是**单行**（无内嵌换行）——下方 per-line sed 量化（s/^/"/; s/$/"/）才不破 JSON。
 if [ -n "$applied" ]; then
   ctx="${ctx} bootstrap 已据你启动命令里的显式 flag 预设了这些 board 旋钮：${applied}（已写入 board）。设 board.goal 时把这些 flag token 从 goal 里剔除；这些已落板的旋钮原样保留、别覆写。"

@@ -1084,6 +1084,12 @@ test('boardSetParam: last_critpath_remind 非法 ISO 值 → throw .errKind=Usag
   );
 });
 
+test('boardSetParam: last_goal_remind 白名单 key + 合法 ISO → 写 runtime.last_goal_remind', () => {
+  const b = baseBoard();
+  const out = m.boardSetParam(b, { key: 'last_goal_remind', value: '2026-07-15T08:00:00Z' });
+  assert.equal(out.runtime.last_goal_remind, '2026-07-15T08:00:00Z');
+});
+
 test('boardSetParam: stop_allow_until 白名单 key + 合法 ISO → 写 runtime.stop_allow_until', () => {
   const b = baseBoard();
   const out = m.boardSetParam(b, { key: 'stop_allow_until', value: '2026-07-03T15:30:00Z' });

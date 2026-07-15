@@ -15,11 +15,35 @@
 //   reinject 输出是 agent 的操作 substrate（魂重注·**不进 ADR-018 标签体系**·§13），但 plumbing 与其余三个
 //   listMatchingBoards hook 同构、可共用 harness——harness 不碰文案，标签由各 body 自决（reinject 不套）。
 //
-// 红线1/ADR-006：node/JS only，纯 stdlib，零 spawn/网络/依赖。红线6：dormant-until-armed——harness 武装闸
+// 红线1/ADR-006：node/JS only，纯 stdlib + 有界 ccm goal check（进程边界），零网络/第三方依赖。红线6：dormant-until-armed——harness 武装闸
 //   （arm:'boards' 空列表静默 exit 0）。红线2：只读 narrow-waist（owner.active/session_id 判武装 + goal/
 //   tasks[].status/parent 列信息，不写 board）。
 
+const { spawnSync } = require('child_process');
 const { boardsDir, jsonEscape, runHook } = require('./hook-common.js');
+
+function goalLabel(board) {
+  const goal = (typeof board.goal === 'string' && board.goal) ? board.goal : '(goal not recorded yet)';
+  const contract = board.goal_contract;
+  if (!contract || typeof contract !== 'object' || contract.schema !== 'ccm/goal-contract/v1') return `legacy: ${goal}`;
+  return `r${contract.revision || '?'} ${contract.assurance || 'unknown'}: ${goal}`;
+}
+
+function goalCheck(boardPath, homeDir) {
+  const ccm = process.env.CCM_BIN || 'ccm';
+  try {
+    const result = spawnSync(ccm, ['goal', 'check', '--board', boardPath, '--json', '--no-input'], {
+      encoding: 'utf8', timeout: 10000, env: { ...process.env, CC_MASTER_HOME: homeDir },
+    });
+    if (!result || result.error || result.signal) return { verdict: 'check_unavailable' };
+    const parsed = JSON.parse(result.stdout || '{}');
+    return parsed && parsed.data && ['legacy', 'pending', 'ok', 'malformed', 'missing_brief', 'hash_mismatch'].includes(parsed.data.verdict)
+      ? parsed.data
+      : { verdict: 'check_unavailable' };
+  } catch (_) {
+    return { verdict: 'check_unavailable' };
+  }
+}
 
 runHook({
   event: 'SessionStart',
@@ -31,11 +55,19 @@ runHook({
     let listing = '';
     const danglingEntries = [];
     const emptyBoards = [];
-    for (const { name, board } of boards) {
-      const goal = (typeof board.goal === 'string' && board.goal) ? board.goal : '(goal not recorded yet)';
-      listing += ` • ${name} [${goal}]`;
+    const goalStops = [];
+    const goalCheckUnavailable = [];
+    for (const { name, path: boardPath, board } of boards) {
+      const label = goalLabel(board);
+      listing += ` • ${name} [${label}]`;
       const tasks = Array.isArray(board.tasks) ? board.tasks : [];
-      if (tasks.length === 0) emptyBoards.push(`${name} [${goal}]`);
+      const hasContract = !!(board.goal_contract && board.goal_contract.schema === 'ccm/goal-contract/v1');
+      if (hasContract) {
+        const check = goalCheck(boardPath, ctx.homeDir);
+        if (check.verdict === 'check_unavailable') goalCheckUnavailable.push(`${name} [${label}]`);
+        else if (check.verdict !== 'ok') goalStops.push(`${name} [${label}] verdict=${check.verdict || 'malformed'}`);
+      }
+      if (tasks.length === 0) emptyBoards.push({ text: `${name} [${label}]`, pending: hasContract && board.goal_contract.assurance === 'pending' });
       for (const t of tasks) {
         if (!t || typeof t !== 'object' || Array.isArray(t)) continue;
         if (t.status !== 'stale' && t.status !== 'escalated') continue; // 只看 top-level task 的 status
@@ -47,14 +79,27 @@ runHook({
     }
 
     let ctxText = `You are a cc-master master orchestrator. Your orchestration board(s) live in ${BOARDS_DIR}. Active:${listing}. ` +
-      `Re-read the board for the task you are working on (recognise it by its goal), then invoke the master-orchestrator-guide skill ` +
+      `Run ccm goal check for the board you are working on, read its current Goal Brief when present, then invoke the master-orchestrator-guide skill ` +
       `and continue the decision program. Do not restart work already done/verified; integrate any completed background results first.`;
+
+    // PARITY: rule-reinject-goal-integrity
+    if (goalStops.length) {
+      ctxText += ` HARD STOP: Goal Contract integrity/assurance requires reconciliation before dispatch: ${goalStops.join(', ')}. ` +
+        `Use ccm goal show/check; refine with ccm goal set, or amend through ccm goal amend. Never bypass a bad Brief hash.`;
+    }
+    if (goalCheckUnavailable.length) {
+      ctxText += ` STRONG ADVISORY: Goal Contract integrity probe unavailable for ${goalCheckUnavailable.join(', ')}. ` +
+        `This transport failure is not proof of contract corruption and does not by itself prohibit dispatch; retry ccm goal check while continuing the other local reconciliation gates.`;
+    }
 
     // PARITY: rule-reinject-empty-board-hard-stop
     if (emptyBoards.length) {
-      ctxText += ` HARD STOP: active board(s) with zero tasks are not runnable orchestration DAGs: ${emptyBoards.join(', ')}. ` +
-        `Before any implementation, tests, git, push, or PR work, decompose the goal and write tasks with acceptance criteria via ccm task add. ` +
-        `Do not treat an armed empty board as permission to proceed.`;
+      const pending = emptyBoards.filter((entry) => entry.pending).map((entry) => entry.text);
+      const settled = emptyBoards.filter((entry) => !entry.pending).map((entry) => entry.text);
+      ctxText += ` HARD STOP: active board(s) with zero tasks are not runnable orchestration DAGs: ${emptyBoards.map((entry) => entry.text).join(', ')}. `;
+      if (pending.length) ctxText += `Pending Goal Contract board(s) ${pending.join(', ')} must be clarified and persisted via ccm goal set, then pass ccm goal check before decomposition. `;
+      if (settled.length) ctxText += `For settled/legacy board(s) ${settled.join(', ')}, write tasks with acceptance criteria via ccm task add. `;
+      ctxText += `Do not treat an armed empty board as permission to proceed.`;
     }
 
     // H4：点名未对账节点（stale/escalated）。空 → ctx 与无 note 时字节一致。

@@ -20,6 +20,29 @@ function resolveHome(env) {
   return env.CC_MASTER_HOME || path.join(env.HOME || '', '.cc_master');
 }
 
+function ccmCommand() {
+  return process.env.CCM_BIN || 'ccm';
+}
+
+// PARITY: rule-bootstrap-ccm-hard-precheck
+function ccmPresent() {
+  const override = process.env.CCM_BIN || '';
+  if (override) {
+    try {
+      fs.accessSync(override, fs.constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const res = spawnSync('command', ['-v', 'ccm'], { encoding: 'utf8', shell: true });
+  return !!res && !res.error && res.status === 0;
+}
+
+function ccmMissingDirective() {
+  return '<directive source="bootstrap-board">cc-master requires the external `ccm` CLI. No board was created or re-armed. Install `ccm`, verify `ccm --version`, then retry as-master-orchestrator.</directive>';
+}
+
 function resetStopAllowUntil(home) {
   const boardPath = process.env.CC_MASTER_BOARD || '';
   if (!boardPath || !path.isAbsolute(boardPath) || !boardPath.endsWith('.board.json')) return false;
@@ -138,7 +161,8 @@ function parseArgs(args) {
 }
 
 function run(cmd, args, options = {}) {
-  const res = spawnSync(cmd, args, {
+  const resolvedCmd = cmd === 'ccm' ? ccmCommand() : cmd;
+  const res = spawnSync(resolvedCmd, args, {
     encoding: 'utf8',
     env: process.env,
     ...options,
@@ -149,6 +173,19 @@ function run(cmd, args, options = {}) {
     throw new Error(`${cmd} ${args.join(' ')} failed with ${res.status}${stderr ? `: ${stderr}` : ''}`);
   }
   return res;
+}
+
+// PARITY: rule-bootstrap-structured-path-capability
+function requireBootstrapCapabilities(home) {
+  const res = run('ccm', ['board', 'init', '--capabilities', '--json', '--no-input'], {
+    env: { ...process.env, CC_MASTER_HOME: home, CC_MASTER_NO_AUTOINSTALL: '1' },
+  });
+  const envelope = JSON.parse(res.stdout || '{}');
+  const capabilities = envelope && envelope.ok === true && envelope.data && envelope.data.capabilities;
+  const required = ['board-init/structured-board-path-v1', 'goal-contract/v1'];
+  if (!Array.isArray(capabilities) || required.some((item) => !capabilities.includes(item))) {
+    throw new Error(`ccm lacks required bootstrap capabilities: ${required.join(', ')}`);
+  }
 }
 
 function isPositiveInteger(value) {
@@ -320,7 +357,7 @@ function resumeBoard(home, boardsDir, flags, sessionId, invocation) {
       `cc-master resume: armed Codex orchestration board at ${boardPath}`,
       `session_id=${sessionId || '(empty)'}`,
       `goal=${compactGoal(resumed.goal)}`,
-      `Recon the board before dispatching new work: inspect current tasks, blocked items, decision_package entries, and latest log entries.${harnessNote}`,
+      `Before dispatching: run ccm goal check --board ${boardPath} --json, read the current Goal Brief when present, then reconcile tasks, blocked items, decision_package entries, and latest log entries.${harnessNote}`,
     ].join('\n')
   );
 }
@@ -335,8 +372,23 @@ function main() {
   const invocation = parseInvocation(prompt);
   if (!invocation.matched) return;
 
-  const { flags, goal } = parseArgs(invocation.args);
+  if (!ccmPresent()) {
+    say('block', ccmMissingDirective());
+    return;
+  }
+
+  const { flags, goal: rawRequest } = parseArgs(invocation.args);
   const boardsDir = path.join(home, 'boards');
+  try {
+    requireBootstrapCapabilities(home);
+  } catch (error) {
+    say(
+      'block',
+      `<directive source="bootstrap-board">cc-master refused to arm: ${error.message}. Upgrade ccm to a build that advertises goal-contract/v1, then retry.</directive>`
+    );
+    return;
+  }
+
   if (flags.resume) {
     resumeBoard(home, boardsDir, flags, sessionId, invocation);
     return;
@@ -346,7 +398,10 @@ function main() {
   const boardPath = path.join(boardsDir, `${stamp}-${process.pid}.board.json`);
   fs.mkdirSync(boardsDir, { recursive: true });
 
-  const initArgs = ['--board', boardPath, 'board', 'init', '--goal', goal, '--json', '--no-input'];
+  // PARITY: rule-bootstrap-raw-request-is-evidence
+  // rawRequest is source evidence for the agent to refine; board init deliberately creates goal=""
+  // plus a pending ccm/goal-contract/v1 skeleton. Never forward raw text through --goal.
+  const initArgs = ['--board', boardPath, 'board', 'init', '--json', '--no-input'];
   if (flags.githubIssue && isGithubIssueUrl(flags.githubIssue)) {
     initArgs.push('--github-issue', String(flags.githubIssue).trim());
   }
@@ -427,11 +482,11 @@ function main() {
 
   const bits = [
     `cc-master fresh: created and armed Codex orchestration board at ${boardPath}`,
-    'MANDATORY NEXT STEP: before implementation, tests, git, push, or PR work, decompose the goal into a dependency DAG and write tasks with acceptance criteria via ccm task add. An armed fresh board with zero tasks is not a runnable orchestration.',
+    'MANDATORY NEXT STEP: the raw request is source evidence, not the canonical goal. Invoke master-orchestrator-guide, clarify/refine an unambiguous Goal Contract, persist it with ccm goal set --board <board> --summary <refined-goal> [--brief-file <file>] --assurance asserted, then run ccm goal check --board <board> --json. Only after that may you decompose the settled goal into a DAG. An armed fresh board with a pending Goal Contract and zero tasks is not a runnable orchestration.',
     `Use this exact board path for ccm writes: --board ${boardPath}`,
     `session_id=${sessionId || '(empty)'}`,
   ];
-  if (goal) bits.push(`goal=${goal}`);
+  if (rawRequest) bits.push('raw_request_present=true (kept as evidence; not copied into board.goal)');
   if (applied.length > 0) bits.push(`bootstrap_applied=${applied.join(' ')}`);
   if (notes.length > 0) bits.push(`bootstrap_advisory=${notes.join('; ')}`);
   say('context', bits.join('\n'));
