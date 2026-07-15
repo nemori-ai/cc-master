@@ -60,6 +60,7 @@ import * as upgradeHandler from './handlers/upgrade.js';
 import * as usageHandler from './handlers/usage.js';
 import * as watchdogHandler from './handlers/watchdog.js';
 import * as webViewerHandler from './handlers/web-viewer.js';
+import * as workerHandler from './handlers/worker.js';
 import { harnessSessionId } from './harnesses/registry.js';
 import * as help from './help.js';
 import * as io from './io.js';
@@ -93,6 +94,7 @@ interface RunOpts {
   stdin?: { fd?: number };
   shadowRoutingBoundary?: ShadowRoutingBoundary;
   providerRuntime?: ProviderRuntime;
+  workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
@@ -142,6 +144,7 @@ const HANDLERS: Record<string, HandlerModule> = {
   upgrade: upgradeHandler as unknown as HandlerModule,
   provider: providerHandler as unknown as HandlerModule,
   quota: quotaHandler as unknown as HandlerModule,
+  worker: workerHandler as unknown as HandlerModule,
 };
 
 // ── DEFAULT_VERBS：某些 noun 无 verb 时落到约定默认 verb（让 `ccm statusline` ≡ `ccm statusline render`）。──
@@ -539,6 +542,7 @@ export function runWithComposition(
     stdin,
     argv: working,
     providerRuntime: opts.providerRuntime || createDefaultProviderRuntime(env),
+    workerSignal: opts.workerSignal,
     quotaEffects: opts.quotaEffects,
     nativeAttemptPrivateEvidence: opts.nativeAttemptPrivateEvidence,
     nativeAttemptAdmission: opts.nativeAttemptAdmission,
@@ -594,6 +598,7 @@ function buildCtx({
   stdin,
   argv,
   providerRuntime,
+  workerSignal,
   quotaEffects,
   nativeAttemptPrivateEvidence,
   nativeAttemptAdmission,
@@ -607,6 +612,7 @@ function buildCtx({
   stdin?: { fd?: number };
   argv: string[];
   providerRuntime?: ProviderRuntime;
+  workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
@@ -639,6 +645,7 @@ function buildCtx({
     stdin,
     isTTY: io.isTTY(process.stdin),
     providerRuntime,
+    workerSignal,
     quotaEffects,
     nativeAttemptPrivateEvidence,
     nativeAttemptAdmission,

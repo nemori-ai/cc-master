@@ -1,0 +1,370 @@
+import assert from 'node:assert/strict';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { after, test } from 'node:test';
+import {
+  createDefaultProviderRuntime,
+  type ProviderRuntime,
+  type ProviderSpawnSpec,
+} from '../src/provider-runtime.js';
+import { run } from '../src/router.js';
+
+const root = mkdtempSync(join(tmpdir(), 'ccm-session-bound-worker-test-'));
+const workspace = resolve(join(root, 'workspace'));
+const home = resolve(join(root, 'home'));
+const fakeCursors = {
+  supported: resolve(join(root, 'cursor-agent')),
+  unsupportedVersion: resolve(join(root, 'cursor-agent-unsupported-version')),
+  missingVersion: resolve(join(root, 'cursor-agent-missing-version')),
+  missingCatalog: resolve(join(root, 'cursor-agent-missing-catalog')),
+} as const;
+mkdirSync(workspace, { recursive: true });
+mkdirSync(home, { recursive: true });
+const fakeCursorSource = `#!/usr/bin/env node
+const { basename } = require('node:path');
+const argv = process.argv.slice(2);
+const fixture = basename(process.argv[1]);
+if (argv.length === 1 && argv[0] === '--version') {
+  if (fixture.includes('missing-version')) process.exit(0);
+  process.stdout.write(fixture.includes('unsupported-version')
+    ? '2026.07.08-unsupported\\n'
+    : '2026.07.09-a3815c0\\n');
+  process.exit(0);
+}
+if (argv.length === 1 && argv[0] === '--list-models') {
+  process.stdout.write(fixture.includes('missing-catalog')
+    ? 'Available models\\nauto - Auto (default)\\n'
+    : 'Available models\\nauto - Auto (default)\\ncomposer-2.5 - Composer 2.5 (current)\\n');
+  process.exit(0);
+}
+const prompt = argv.at(-1);
+const valueAfter = (flag) => argv[argv.indexOf(flag) + 1];
+const emit = (value) => process.stdout.write(JSON.stringify(value) + '\\n');
+const init = () => emit({
+  type: 'system',
+  subtype: 'init',
+  model: prompt === 'fixture:wrong-model' ? 'gpt-5.6-sol-high' : valueAfter('--model'),
+  cwd: prompt === 'fixture:wrong-workspace'
+    ? '/definitely/not/the/requested/workspace'
+    : valueAfter('--workspace'),
+  session_id: 'fixture-session-1',
+  permissionMode: valueAfter('--mode'),
+  sandboxMode: valueAfter('--sandbox'),
+});
+const terminal = (result, isError = false) => emit({
+  type: 'result',
+  subtype: prompt === 'fixture:not-success' ? 'not-success' : isError ? 'error' : 'success',
+  is_error: isError,
+  result,
+  session_id: 'fixture-session-1',
+});
+if (prompt === 'fixture:nonzero') {
+  process.stderr.write('api_key=topsecret user@example.com\\n');
+  process.exit(42);
+}
+if (prompt === 'fixture:hang') setInterval(() => {}, 1_000);
+else if (prompt === 'fixture:cancel') {
+  init();
+  setInterval(() => {}, 1_000);
+} else if (prompt === 'fixture:large') {
+  init();
+  terminal('x'.repeat(4_096));
+} else {
+  init();
+  terminal(prompt === 'fixture:secret'
+    ? 'api_key=topsecret user@example.com'
+    : JSON.stringify({
+        staging_cwd: process.cwd(),
+        argv,
+        has_forbidden_env: Boolean(
+          process.env.CURSOR_API_KEY ||
+          process.env.OPENAI_API_KEY ||
+          process.env.ANTHROPIC_API_KEY
+        ),
+      }));
+}
+`;
+for (const fakeCursor of Object.values(fakeCursors)) {
+  writeFileSync(fakeCursor, fakeCursorSource, 'utf8');
+  chmodSync(fakeCursor, 0o755);
+}
+
+after(() => rmSync(root, { recursive: true, force: true }));
+
+interface WorkerResult {
+  schema: string;
+  contract: string;
+  state: string;
+  target: { harness: string; model: string; effort: string };
+  policy: {
+    mode: string;
+    sandbox: string;
+    ccm_effects: {
+      account_switch_requested: boolean;
+      account_switch_executed: boolean;
+      credential_write_requested: boolean;
+      credential_write_executed: boolean;
+      credential_import_or_copy: boolean;
+      api_key_byok_forwarded: boolean;
+    };
+    provider_residual_effects: {
+      authentication_token_maintenance: string;
+      config_cache_data_state_writes: string;
+      inherited_locations: string[];
+      account_credential_zero_write_attested: boolean;
+    };
+    automatic_route: boolean;
+    automatic_fallback: boolean;
+  };
+  lifecycle: {
+    session_bound: boolean;
+    survives_parent_exit: boolean;
+    survives_handoff: boolean;
+    survives_ccm_update: boolean;
+  };
+  handle: { kind: string; group_id: number; id: string } | null;
+  terminal: { result: string; is_error: boolean; session_id: string } | null;
+  transport: {
+    exit_code: number | null;
+    reaped: boolean;
+    stdout_bytes: number;
+    stderr_bytes: number;
+  } | null;
+  cleanup: { staging_removed: boolean };
+  error: { code: string; message: string } | null;
+}
+
+function recordingRuntime(
+  env: Record<string, string | undefined>,
+  spawns: ProviderSpawnSpec[],
+): ProviderRuntime {
+  const actual = createDefaultProviderRuntime(env);
+  return {
+    ...actual,
+    process: {
+      resolveExecutable: actual.process.resolveExecutable,
+      spawnProvider(spec) {
+        spawns.push(structuredClone(spec));
+        return actual.process.spawnProvider(spec);
+      },
+    },
+  };
+}
+
+async function invoke(
+  prompt: string,
+  options: {
+    timeoutMs?: number;
+    maxOutputBytes?: number;
+    signal?: AbortSignal;
+    fakeCursor?: keyof typeof fakeCursors;
+  } = {},
+): Promise<{
+  code: number;
+  result: WorkerResult;
+  spawns: ProviderSpawnSpec[];
+  stderr: string;
+}> {
+  const env = {
+    PATH: process.env.PATH || '/usr/bin:/bin',
+    HOME: home,
+    CCM_CURSOR_AGENT_BIN: fakeCursors[options.fakeCursor ?? 'supported'],
+    CURSOR_API_KEY: 'must-not-be-forwarded',
+    OPENAI_API_KEY: 'must-not-be-forwarded',
+    ANTHROPIC_API_KEY: 'must-not-be-forwarded',
+  };
+  const spawns: ProviderSpawnSpec[] = [];
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const code = await run(
+    [
+      'worker',
+      'run',
+      '--harness',
+      'cursor-agent',
+      '--model',
+      'composer-2.5',
+      '--effort',
+      'standard',
+      '--workspace',
+      workspace,
+      '--prompt',
+      prompt,
+      '--timeout-ms',
+      String(options.timeoutMs ?? 2_000),
+      '--max-output-bytes',
+      String(options.maxOutputBytes ?? 65_536),
+      '--json',
+    ],
+    {
+      env,
+      out: (value) => stdout.push(value),
+      err: (value) => stderr.push(value),
+      providerRuntime: recordingRuntime(env, spawns),
+      workerSignal: options.signal,
+    },
+  );
+  const envelope = JSON.parse(stdout.join('')) as { ok: true; data: WorkerResult };
+  assert.equal(envelope.ok, true);
+  return { code, result: envelope.data, spawns, stderr: stderr.join('') };
+}
+
+test('worker run launches one explicit first-party Cursor Agent in read-only session-bound mode', async () => {
+  const { code, result, spawns, stderr } = await invoke('fixture:success');
+
+  assert.equal(code, 0);
+  assert.equal(stderr, '');
+  assert.equal(result.schema, 'ccm/session-bound-worker-result/v1');
+  assert.equal(result.contract, 'ccm/session-bound-read-only-worker/v1');
+  assert.equal(result.state, 'succeeded');
+  assert.deepEqual(result.target, {
+    harness: 'cursor-agent',
+    model: 'composer-2.5',
+    effort: 'standard',
+  });
+  assert.deepEqual(result.lifecycle, {
+    session_bound: true,
+    survives_parent_exit: false,
+    survives_handoff: false,
+    survives_ccm_update: false,
+  });
+  assert.deepEqual(result.policy, {
+    mode: 'ask',
+    sandbox: 'enabled',
+    ccm_effects: {
+      account_switch_requested: false,
+      account_switch_executed: false,
+      credential_write_requested: false,
+      credential_write_executed: false,
+      credential_import_or_copy: false,
+      api_key_byok_forwarded: false,
+    },
+    provider_residual_effects: {
+      authentication_token_maintenance: 'possible',
+      config_cache_data_state_writes: 'possible',
+      inherited_locations: [
+        'HOME',
+        'XDG_CONFIG_HOME',
+        'XDG_CACHE_HOME',
+        'XDG_DATA_HOME',
+        'XDG_STATE_HOME',
+      ],
+      account_credential_zero_write_attested: false,
+    },
+    automatic_route: false,
+    automatic_fallback: false,
+  });
+  assert.equal(spawns.length, 3);
+  assert.deepEqual(spawns[0]?.argv, ['--version']);
+  assert.deepEqual(spawns[1]?.argv, ['--list-models']);
+  const spawn = spawns[2];
+  assert.ok(spawn);
+  assert.deepEqual(spawn.argv, [
+    '--workspace',
+    workspace,
+    '--print',
+    '--output-format',
+    'stream-json',
+    '--stream-partial-output',
+    '--trust',
+    '--sandbox',
+    'enabled',
+    '--mode',
+    'ask',
+    '--model',
+    'composer-2.5',
+    'fixture:success',
+  ]);
+  assert.equal(spawn.env.CURSOR_API_KEY, undefined);
+  assert.equal(spawn.env.OPENAI_API_KEY, undefined);
+  assert.equal(spawn.env.ANTHROPIC_API_KEY, undefined);
+  assert.equal(result.handle?.kind, 'posix-process-group');
+  assert.match(result.handle?.id || '', /^pgid:\d+$/u);
+  assert.equal(result.transport?.reaped, true);
+  assert.equal(result.cleanup.staging_removed, true);
+  assert.ok(result.terminal);
+  const terminal = JSON.parse(result.terminal.result) as {
+    staging_cwd: string;
+    argv: string[];
+    has_forbidden_env: boolean;
+  };
+  assert.equal(terminal.has_forbidden_env, false);
+  assert.equal(existsSync(terminal.staging_cwd), false);
+});
+
+test('worker run requires the frozen Cursor version and live first-party selector catalog before launch', async () => {
+  for (const fixture of [
+    { fakeCursor: 'unsupportedVersion' as const, expectedSpawns: 1 },
+    { fakeCursor: 'missingVersion' as const, expectedSpawns: 1 },
+    { fakeCursor: 'missingCatalog' as const, expectedSpawns: 2 },
+  ]) {
+    const { code, result, spawns } = await invoke('fixture:success', {
+      fakeCursor: fixture.fakeCursor,
+    });
+    assert.equal(code, 1, fixture.fakeCursor);
+    assert.equal(result.state, 'rejected', fixture.fakeCursor);
+    assert.equal(result.error?.code, 'provider_discovery_rejected', fixture.fakeCursor);
+    assert.equal(spawns.length, fixture.expectedSpawns, fixture.fakeCursor);
+    assert.equal(result.terminal, null, fixture.fakeCursor);
+  }
+});
+
+test('worker run rejects resolved selector, workspace, and terminal-success counterfeits', async () => {
+  for (const fixture of [
+    { prompt: 'fixture:wrong-model', blocker: 'selector.resolved-mismatch' },
+    { prompt: 'fixture:wrong-workspace', blocker: 'workspace.resolved-mismatch' },
+    { prompt: 'fixture:not-success', blocker: 'task_acceptance.rejected' },
+  ]) {
+    const { code, result, spawns } = await invoke(fixture.prompt);
+    assert.equal(code, 1, fixture.prompt);
+    assert.equal(result.state, 'failed', fixture.prompt);
+    assert.equal(result.error?.code, 'provider_completion_rejected', fixture.prompt);
+    assert.match(result.error?.message || '', new RegExp(fixture.blocker, 'u'), fixture.prompt);
+    assert.equal(spawns.length, 3, fixture.prompt);
+  }
+});
+
+test('worker run returns a redacted structured failure for a nonzero provider exit', async () => {
+  const { code, result, stderr } = await invoke('fixture:nonzero');
+  assert.equal(code, 1);
+  assert.equal(stderr, '');
+  assert.equal(result.state, 'failed');
+  assert.equal(result.transport?.exit_code, 42);
+  assert.equal(result.transport?.reaped, true);
+  assert.doesNotMatch(JSON.stringify(result), /topsecret|user@example\.com/u);
+  assert.match(result.error?.message || '', /\[REDACTED\]/u);
+  assert.equal(result.cleanup.staging_removed, true);
+});
+
+test('worker run bounds timeout, cancellation, and provider output while reaping the process group', async () => {
+  const timedOut = await invoke('fixture:hang', { timeoutMs: 100 });
+  assert.equal(timedOut.code, 1);
+  assert.equal(timedOut.result.state, 'timed_out');
+  assert.equal(timedOut.result.transport?.reaped, true);
+  assert.equal(timedOut.result.cleanup.staging_removed, true);
+
+  const abort = new AbortController();
+  const cancellation = invoke('fixture:cancel', { timeoutMs: 2_000, signal: abort.signal });
+  setTimeout(() => abort.abort(), 100);
+  const cancelled = await cancellation;
+  assert.equal(cancelled.code, 1);
+  assert.equal(cancelled.result.state, 'cancelled');
+  assert.equal(cancelled.result.transport?.reaped, true);
+  assert.equal(cancelled.result.cleanup.staging_removed, true);
+
+  const bounded = await invoke('fixture:large', { maxOutputBytes: 512 });
+  assert.equal(bounded.code, 1);
+  assert.equal(bounded.result.state, 'failed');
+  assert.equal(bounded.result.error?.code, 'output_limit');
+  assert.equal(bounded.result.transport?.reaped, true);
+  assert.equal(bounded.result.cleanup.staging_removed, true);
+});
+
+test('worker run redacts secrets from a successful provider result', async () => {
+  const { code, result } = await invoke('fixture:secret');
+  assert.equal(code, 0);
+  assert.equal(result.state, 'succeeded');
+  assert.doesNotMatch(JSON.stringify(result), /topsecret|user@example\.com/u);
+  assert.match(result.terminal?.result || '', /\[REDACTED\]/u);
+});

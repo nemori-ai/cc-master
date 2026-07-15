@@ -30,6 +30,7 @@ import {
   superviseProviderChild,
   terminateAndReapProviderChild,
 } from './provider-child-supervisor.js';
+import { providerModelFacts } from './provider-model-facts.js';
 import type { ProviderOwnedChild, ProviderRuntime, ProviderSpawnSpec } from './provider-runtime.js';
 import {
   digestQuotaAdmissionTicket,
@@ -224,6 +225,9 @@ const CONTRACT_ENUMS = Object.freeze({
 });
 const SUPPORTED_CURSOR_AGENT_NAMES = new Set(CONTRACT_ENUMS.binary_name);
 const SUPPORTED_CURSOR_AGENT_VERSIONS = new Set(CONTRACT_ENUMS.binary_version);
+const SESSION_BOUND_CURSOR_MODEL_ID = 'cursor-composer-2-5';
+const SESSION_BOUND_CURSOR_ACCOUNT_SCOPE =
+  'cursor-agent-cli first-party subscription; live entitlement separate';
 const EVIDENCE_SOURCES = {
   installed: 'cursor-agent-cli/install/path-resolution/v1',
   binary: 'cursor-agent-cli/binary/capability-qualified/v1',
@@ -866,47 +870,22 @@ export async function invokeCursorProvider(
 
   try {
     const supervised = await supervisedPromise;
-    const parsed = parseCursorStream(supervised.stdout, {
-      permissionMode: 'ask',
-      sandboxMode: 'enabled',
+    const completion = evaluateCursorProviderCompletion({
+      stdout: supervised.stdout,
+      exitCode: supervised.exitCode,
+      signal: supervised.signal,
+      executable: invocation.executable,
+      requestedSelector: selector ?? '',
+      requestedWorkspace: string(request.workspace),
     });
-    const shapeValid = parsed.valid && parsed.terminal !== null;
-    const accepted =
-      shapeValid &&
-      supervised.exitCode === 0 &&
-      parsed.terminal?.subtype === 'success' &&
-      parsed.terminal.is_error === false;
-    const exactResolution = parsed.init?.model === selector;
-    const workspaceExact = parsed.init?.cwd === string(request.workspace);
-    const admission = evaluateCursorAgentAdmission({
-      request: { mode: 'ask', sandbox: 'required' },
-      binary: {
-        name: 'cursor-agent',
-        path: invocation.executable,
-        available: true,
-      },
-      authentication: { state: 'available', source: 'cursor-provider-preflight' },
-      quota: { state: 'available', source: 'cursor-provider-preflight' },
-      sandbox: 'supported',
-      result_schema: shapeValid ? 'valid' : 'invalid-shape',
-      task_acceptance: accepted ? 'accepted' : 'rejected',
-      transport: {
-        terminated: true,
-        exit_code: supervised.exitCode,
-        signal: supervised.signal,
-      },
-    });
-    const blockers = [...admission.blockers, ...parsed.blockers];
-    if (!exactResolution) blockers.push('selector.resolved-mismatch');
-    if (!workspaceExact) blockers.push('workspace.resolved-mismatch');
     return runResult(
       preflight,
-      blockers.length === 0 ? 'succeeded' : 'failed',
+      completion.blockers.length === 0 ? 'succeeded' : 'failed',
       selector,
-      parsed.init?.model ?? null,
-      parsed.terminal?.session_id ?? parsed.init?.session_id ?? null,
-      accepted ? 'accepted' : 'rejected',
-      unique(blockers),
+      completion.parsed.init?.model ?? null,
+      completion.parsed.terminal?.session_id ?? completion.parsed.init?.session_id ?? null,
+      completion.accepted ? 'accepted' : 'rejected',
+      completion.blockers,
       {
         exit_code: supervised.exitCode,
         signal: supervised.signal,
@@ -1000,7 +979,7 @@ function runResult(
   };
 }
 
-function parseCursorStream(
+export function parseCursorStream(
   stdout: string,
   expected: { permissionMode: 'ask'; sandboxMode: 'enabled' },
 ): {
@@ -1013,7 +992,7 @@ function parseCursorStream(
     permissionMode: string;
     sandboxMode: string | null;
   } | null;
-  terminal: { subtype: string; is_error: boolean; session_id: string } | null;
+  terminal: { subtype: string; is_error: boolean; result: string; session_id: string } | null;
 } {
   let valid = true;
   const blockers: string[] = [];
@@ -1024,7 +1003,8 @@ function parseCursorStream(
     permissionMode: string;
     sandboxMode: string | null;
   } | null = null;
-  let terminal: { subtype: string; is_error: boolean; session_id: string } | null = null;
+  let terminal: { subtype: string; is_error: boolean; result: string; session_id: string } | null =
+    null;
   let initCount = 0;
   let terminalCount = 0;
   let phase: 'before-init' | 'active' | 'terminal' = 'before-init';
@@ -1079,6 +1059,7 @@ function parseCursorStream(
         terminal = {
           subtype: string(event.subtype),
           is_error: event.is_error,
+          result: string(event.result),
           session_id: string(event.session_id),
         };
       }
@@ -1112,6 +1093,124 @@ function parseCursorStream(
   }
   valid = valid && blockers.length === 0;
   return { valid, blockers: unique(blockers), init, terminal };
+}
+
+export interface CursorProviderDiscoveryAdmission {
+  eligible: boolean;
+  blockers: string[];
+  binary_version: string | null;
+  selector: string;
+}
+
+export function supportedCursorProviderBinaryVersion(binaryVersionOutput: string): string | null {
+  const versionLines = binaryVersionOutput
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const binaryVersion = versionLines.length === 1 ? (versionLines[0] ?? null) : null;
+  return binaryVersion && SUPPORTED_CURSOR_AGENT_VERSIONS.has(binaryVersion) ? binaryVersion : null;
+}
+
+export function evaluateCursorProviderDiscoveryAdmission(input: {
+  binaryVersionOutput: string;
+  catalogOutput: string;
+  selector: string;
+  asOf: string;
+}): CursorProviderDiscoveryAdmission {
+  const blockers: string[] = [];
+  const binaryVersion = supportedCursorProviderBinaryVersion(input.binaryVersionOutput);
+  if (!binaryVersion) blockers.push('headless.binary-unsupported');
+
+  let snapshot: JsonRecord | null = null;
+  try {
+    snapshot = providerModelFacts('cursor', input.asOf);
+  } catch {
+    blockers.push('catalog.stale-or-invalid');
+  }
+  if (snapshot?.freshness !== 'fresh') blockers.push('catalog.stale-or-invalid');
+  const models = Array.isArray(snapshot?.models) ? snapshot.models : [];
+  const publishedFirstParty = models.some((entry) => {
+    const model = object(entry);
+    const availability = object(model.availability);
+    return (
+      model.model_id === SESSION_BOUND_CURSOR_MODEL_ID &&
+      Array.isArray(model.selectors) &&
+      model.selectors.includes(input.selector) &&
+      availability.state === 'published' &&
+      availability.account_scope === SESSION_BOUND_CURSOR_ACCOUNT_SCOPE
+    );
+  });
+  if (!publishedFirstParty) blockers.push('selector.exact-match-required');
+
+  const catalogLines = input.catalogOutput
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const headerValid = catalogLines[0] === 'Available models';
+  const liveSelectorRows = catalogLines.slice(1).filter((line) => {
+    const separator = line.indexOf(' - ');
+    return separator > 0 && line.slice(0, separator).trim() === input.selector;
+  });
+  if (!headerValid || liveSelectorRows.length !== 1) {
+    blockers.push('selector.exact-match-required');
+  }
+
+  return {
+    eligible: blockers.length === 0,
+    blockers: unique(blockers),
+    binary_version: binaryVersion,
+    selector: input.selector,
+  };
+}
+
+export function evaluateCursorProviderCompletion(input: {
+  stdout: string;
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  executable: string;
+  requestedSelector: string;
+  requestedWorkspace: string;
+}): {
+  parsed: ReturnType<typeof parseCursorStream>;
+  accepted: boolean;
+  blockers: string[];
+} {
+  const parsed = parseCursorStream(input.stdout, {
+    permissionMode: 'ask',
+    sandboxMode: 'enabled',
+  });
+  const shapeValid = parsed.valid && parsed.terminal !== null;
+  const accepted =
+    shapeValid &&
+    input.exitCode === 0 &&
+    parsed.terminal?.subtype === 'success' &&
+    parsed.terminal.is_error === false;
+  const admission = evaluateCursorAgentAdmission({
+    request: { mode: 'ask', sandbox: 'required' },
+    binary: {
+      name: 'cursor-agent',
+      path: input.executable,
+      available: true,
+    },
+    authentication: { state: 'available', source: 'cursor-provider-preflight' },
+    quota: { state: 'available', source: 'cursor-provider-preflight' },
+    sandbox: 'supported',
+    result_schema: shapeValid ? 'valid' : 'invalid-shape',
+    task_acceptance: accepted ? 'accepted' : 'rejected',
+    transport: {
+      terminated: true,
+      exit_code: input.exitCode,
+      signal: input.signal,
+    },
+  });
+  const blockers = [...admission.blockers, ...parsed.blockers];
+  if (parsed.init?.model !== input.requestedSelector) {
+    blockers.push('selector.resolved-mismatch');
+  }
+  if (parsed.init?.cwd !== input.requestedWorkspace) {
+    blockers.push('workspace.resolved-mismatch');
+  }
+  return { parsed, accepted, blockers: unique(blockers) };
 }
 
 function validCursorProviderRequest(input: unknown): boolean {

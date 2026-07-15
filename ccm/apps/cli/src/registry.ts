@@ -65,6 +65,41 @@ export const REGISTRY: Registry = {
       handler: 'capability.check',
     },
   },
+  // ════════════════════ worker（MVP：显式、session-bound、只读）════════════════════════════════════
+  worker: {
+    run: {
+      summary: '显式启动一次 session-bound、只读的 Cursor Agent worker 并等待结构化结果',
+      read: true,
+      positionals: [],
+      options: {
+        model: {
+          type: 'string',
+          required: true,
+          enum: ['composer-2.5'],
+          desc: 'Cursor first-party 模型',
+        },
+        effort: { type: 'string', required: true, enum: ['standard'], desc: 'MVP 固定档位' },
+        workspace: { type: 'string', required: true, desc: '只读检查的绝对工作区路径' },
+        prompt: {
+          type: 'string',
+          required: true,
+          transform: 'input',
+          desc: 'worker prompt（@file / - / 字面量）',
+        },
+        'timeout-ms': { type: 'string', required: true, desc: '总超时，50..600000 毫秒' },
+        'max-output-bytes': {
+          type: 'string',
+          required: true,
+          desc: 'stdout 上限，256..1048576 字节',
+        },
+        json: { type: 'boolean', required: true, desc: '输出结构化 terminal result' },
+      },
+      examples: [
+        'ccm worker run --harness cursor-agent --model composer-2.5 --effort standard --workspace /abs/repo --prompt @/abs/task.txt --timeout-ms 120000 --max-output-bytes 262144 --json',
+      ],
+      handler: 'worker.run',
+    },
+  },
   // ════════════════════ quota（provider-neutral；Codex rule 为 7d-only）═══════════════════════════
   quota: {
     status: {
