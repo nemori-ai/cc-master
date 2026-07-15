@@ -17,7 +17,10 @@ try {
 function record(kind, detail) {
   if (!capture) return;
   fs.mkdirSync(path.dirname(capture), { recursive: true });
-  fs.appendFileSync(capture, `${JSON.stringify({ type: 'effect', kind, detail: String(detail || '') })}\n`);
+  fs.appendFileSync(
+    capture,
+    `${JSON.stringify({ type: 'effect', kind, detail: String(detail || '') })}\n`,
+  );
 }
 
 function block(kind, detail) {
@@ -43,11 +46,26 @@ function childAllowed(command, args) {
   return allowedChildren.includes(script);
 }
 
+function childOptions(rest) {
+  return Array.isArray(rest[0]) ? rest[1] : rest[0];
+}
+
+function preservesSentinel(options) {
+  if (!options || typeof options !== 'object' || !Object.hasOwn(options, 'env')) return true;
+  const childEnv = options.env;
+  return (
+    !!childEnv && typeof childEnv === 'object' && childEnv.NODE_OPTIONS === process.env.NODE_OPTIONS
+  );
+}
+
 for (const method of ['spawn', 'spawnSync', 'execFile', 'execFileSync']) {
   const original = childProcess[method];
   childProcess[method] = function guardedCommand(command, ...rest) {
     const args = Array.isArray(rest[0]) ? rest[0] : [];
-    if (!childAllowed(command, args)) return block('process', normalized(command) || String(command || ''));
+    if (!childAllowed(command, args))
+      return block('process', normalized(command) || String(command || ''));
+    if (!preservesSentinel(childOptions(rest)))
+      return block('process:node-options', normalized(command) || String(command || ''));
     return original.call(this, command, ...rest);
   };
 }
@@ -57,6 +75,10 @@ for (const method of ['exec', 'execSync']) {
     return block('process:shell', String(command || ''));
   };
 }
+
+childProcess.fork = function guardedFork(modulePath) {
+  return block('process:fork', String(modulePath || ''));
+};
 
 function blockMethods(moduleName, methods) {
   const target = require(moduleName);

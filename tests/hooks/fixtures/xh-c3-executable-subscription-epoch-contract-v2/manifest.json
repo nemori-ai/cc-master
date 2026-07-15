@@ -27,13 +27,7 @@
     "capability": "coordination-inbox",
     "subscription_id": "sub-exact",
     "session_epoch": "epoch-exact",
-    "identity_fields": [
-      "subscription_id",
-      "session_id",
-      "session_epoch",
-      "origin",
-      "capability"
-    ],
+    "identity_fields": ["subscription_id", "session_id", "session_epoch", "origin", "capability"],
     "provenance_fields": [
       "subscription_id",
       "session_id",
@@ -137,6 +131,36 @@
     },
     {
       "id": "network-effect",
+      "case": "hook:success",
+      "expected_failure": "zero-effects"
+    },
+    {
+      "id": "register-delete-validation",
+      "case": "bootstrap:register_response:origin:mismatch",
+      "expected_failure": "registration-result-consumed"
+    },
+    {
+      "id": "register-origin-bypass",
+      "case": "bootstrap:register_response:origin:mismatch",
+      "expected_failure": "registration-result-consumed"
+    },
+    {
+      "id": "register-subscription-id-bypass",
+      "case": "bootstrap:register_response:subscription_id:missing",
+      "expected_failure": "registration-result-consumed"
+    },
+    {
+      "id": "register-state-bypass",
+      "case": "bootstrap:register_response:state:mismatch",
+      "expected_failure": "registration-result-consumed"
+    },
+    {
+      "id": "node-fork-effect",
+      "case": "hook:success",
+      "expected_failure": "zero-effects"
+    },
+    {
+      "id": "node-options-effect",
       "case": "hook:success",
       "expected_failure": "zero-effects"
     }

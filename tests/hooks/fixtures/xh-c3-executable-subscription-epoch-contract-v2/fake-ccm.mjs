@@ -11,7 +11,9 @@ const capture = process.env.CCM_XH_C3_CAPTURE || '';
 const phase = process.env.CCM_XH_C3_PHASE || 'hook';
 const host = process.env.CCM_XH_C3_HOST || 'unknown';
 const sessionId = process.env.CCM_XH_C3_SESSION_ID || 'sess-exact';
-const testCase = JSON.parse(process.env.CCM_XH_C3_CASE || '{"phase":"hook","family":"standalone","name":"success"}');
+const testCase = JSON.parse(
+  process.env.CCM_XH_C3_CASE || '{"phase":"hook","family":"standalone","name":"success"}',
+);
 const home = resolve(process.env.CC_MASTER_HOME || join(process.env.HOME || '.', '.cc_master'));
 const contract = manifest.contract;
 
@@ -21,11 +23,17 @@ function value(flag) {
 }
 
 function same(actual, expected) {
-  return actual.length === expected.length && actual.every((item, index) => item === expected[index]);
+  return (
+    actual.length === expected.length && actual.every((item, index) => item === expected[index])
+  );
 }
 
 function absoluteBoard(valueToCheck) {
-  return typeof valueToCheck === 'string' && valueToCheck.startsWith('/') && valueToCheck.endsWith('.board.json');
+  return (
+    typeof valueToCheck === 'string' &&
+    valueToCheck.startsWith('/') &&
+    valueToCheck.endsWith('.board.json')
+  );
 }
 
 function expectedRegister(board) {
@@ -88,7 +96,8 @@ function expectedList(board, epoch) {
 
 function classifyBootstrap() {
   if (same(argv, ['--version'])) return 'version';
-  if (same(argv, ['board', 'init', '--capabilities', '--json', '--no-input'])) return 'board-init-capabilities';
+  if (same(argv, ['board', 'init', '--capabilities', '--json', '--no-input']))
+    return 'board-init-capabilities';
   if (same(argv, ['board', 'init', '--json'])) return 'board-init';
   if (
     argv.length === 6 &&
@@ -231,13 +240,17 @@ if (commandKind === 'subscription-register') {
     process.exit(0);
   }
   const subscription = baseSubscription();
-  if (testCase.family === 'register_response') mutate(subscription, testCase.field, testCase.mutation);
+  if (testCase.family === 'register_response')
+    mutate(subscription, testCase.field, testCase.mutation);
   reply({ subscription });
   process.exit(0);
 }
 
 if (commandKind === 'subscription-current') {
-  if (testCase.phase === 'bootstrap' && !(testCase.family === 'standalone' && testCase.name === 'success')) {
+  if (
+    testCase.phase === 'bootstrap' &&
+    !(testCase.family === 'standalone' && testCase.name === 'success')
+  ) {
     reply({ subscription: baseSubscription('missing') });
     process.exit(0);
   }
@@ -251,7 +264,8 @@ if (commandKind === 'subscription-current') {
   const subscription = baseSubscription(
     testCase.family === 'standalone' && testCase.name === 'stale-epoch' ? 'stale' : 'current',
   );
-  if (testCase.family === 'current_response') mutate(subscription, testCase.field, testCase.mutation);
+  if (testCase.family === 'current_response')
+    mutate(subscription, testCase.field, testCase.mutation);
   reply({ subscription });
   process.exit(0);
 }
@@ -276,7 +290,8 @@ if (commandKind === 'bounded-inbox-list') {
     source_policy_revision: contract.source_policy_revision,
     consent_provenance_ref: contract.consent_provenance_ref,
   };
-  if (testCase.family === 'delivery_provenance') mutate(provenance, testCase.field, testCase.mutation);
+  if (testCase.family === 'delivery_provenance')
+    mutate(provenance, testCase.field, testCase.mutation);
   reply({
     subscription,
     count: 1,

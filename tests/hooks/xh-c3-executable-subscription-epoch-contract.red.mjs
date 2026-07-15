@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 
+import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const runnerPath = fileURLToPath(import.meta.url);
@@ -188,7 +188,13 @@ function expandCases() {
       if (family === 'standalone') continue;
       for (const [field, mutations] of Object.entries(schema)) {
         for (const mutation of mutations) {
-          cases.push({ id: `${phase}:${family}:${field}:${mutation}`, phase, family, field, mutation });
+          cases.push({
+            id: `${phase}:${family}:${field}:${mutation}`,
+            phase,
+            family,
+            field,
+            mutation,
+          });
         }
       }
     }
@@ -217,6 +223,7 @@ function expectedProbeNames(testCase) {
         'post-failure-silent',
       );
     }
+    if (fixtureOnly) names.push('registration-result-consumed');
     return names;
   }
   const names = ['hook-spawn', 'current-command', 'closed-ccm-allowlist', 'zero-effects'];
@@ -256,7 +263,11 @@ function validateManifest() {
       ]),
     JSON.stringify(contract.provenance_fields),
   );
-  assert('manifest/case-ids-unique', new Set(cases.map((item) => item.id)).size === cases.length, 'duplicate case id');
+  assert(
+    'manifest/case-ids-unique',
+    new Set(cases.map((item) => item.id)).size === cases.length,
+    'duplicate case id',
+  );
   assert(
     'manifest/case-filter-reachable',
     !caseFilter || selectedCases.length === 1,
@@ -264,10 +275,23 @@ function validateManifest() {
   );
   for (const host of manifest.hosts) {
     const entries = manifest.entry_paths[host];
-    assert(`manifest/entry-paths/${host}`, !!entries && typeof entries === 'object', JSON.stringify(entries));
+    assert(
+      `manifest/entry-paths/${host}`,
+      !!entries && typeof entries === 'object',
+      JSON.stringify(entries),
+    );
     if (!entries) continue;
-    for (const key of ['production_bootstrap', 'production_hook', 'known_good_bootstrap', 'known_good_hook']) {
-      assert(`manifest/entry-paths/${host}/${key}`, typeof entries[key] === 'string' && !!entries[key], String(entries[key]));
+    for (const key of [
+      'production_bootstrap',
+      'production_hook',
+      'known_good_bootstrap',
+      'known_good_hook',
+    ]) {
+      assert(
+        `manifest/entry-paths/${host}/${key}`,
+        typeof entries[key] === 'string' && !!entries[key],
+        String(entries[key]),
+      );
     }
   }
 }
@@ -279,6 +303,7 @@ function makeSandbox(host, testCase) {
   const bin = join(base, 'bin');
   const capture = join(base, 'ccm-capture.jsonl');
   const effectCapture = join(base, 'effect-capture.jsonl');
+  const decisionCapture = join(base, 'registration-decision.jsonl');
   const tmp = join(base, 'tmp');
   mkdirSync(home, { recursive: true });
   mkdirSync(bin, { recursive: true });
@@ -326,7 +351,7 @@ function makeSandbox(host, testCase) {
     );
     chmodSync(sentinel, 0o755);
   }
-  return { base, home, bin, capture, effectCapture, tmp, wrapper };
+  return { base, home, bin, capture, effectCapture, decisionCapture, tmp, wrapper };
 }
 
 function envFor(sandbox, host, testCase, sessionId, phase, board = '') {
@@ -335,7 +360,8 @@ function envFor(sandbox, host, testCase, sessionId, phase, board = '') {
   const childPaths = new Set([sandbox.wrapper, knownGoodEntry]);
   for (const command of [config.bootstrap, config.hook]) {
     for (const token of command) {
-      if (typeof token === 'string' && token.startsWith('/') && existsSync(token)) childPaths.add(token);
+      if (typeof token === 'string' && token.startsWith('/') && existsSync(token))
+        childPaths.add(token);
     }
   }
   return {
@@ -358,6 +384,7 @@ function envFor(sandbox, host, testCase, sessionId, phase, board = '') {
     CLAUDE_CONFIG_DIR: join(sandbox.home, '.claude'),
     CCM_XH_C3_CAPTURE: sandbox.capture,
     CCM_XH_C3_EFFECT_CAPTURE: sandbox.effectCapture,
+    CCM_XH_C3_REGISTRATION_DECISION_CAPTURE: sandbox.decisionCapture,
     CCM_XH_C3_ALLOWED_CHILDREN_JSON: JSON.stringify([...childPaths]),
     CCM_XH_C3_PHASE: phase,
     CCM_XH_C3_HOST: host,
@@ -404,6 +431,10 @@ function effectRows(sandbox) {
   return jsonLines(sandbox.effectCapture).filter((row) => row.type === 'effect');
 }
 
+function registrationDecisionRows(sandbox) {
+  return jsonLines(sandbox.decisionCapture).filter((row) => row.type === 'registration-decision');
+}
+
 function rowsSince(rows, start) {
   return rows.slice(start);
 }
@@ -413,7 +444,9 @@ function commandRows(rows, kind) {
 }
 
 function sameArgv(actual, expected) {
-  return actual.length === expected.length && actual.every((value, index) => value === expected[index]);
+  return (
+    actual.length === expected.length && actual.every((value, index) => value === expected[index])
+  );
 }
 
 function expectedRegister(board, host, sessionId) {
@@ -522,7 +555,11 @@ function walkFiles(dir) {
 }
 
 function fallbackArtifacts(home) {
-  const needles = [contract.subscription_id, contract.session_epoch, `wrong-${contract.session_epoch}`];
+  const needles = [
+    contract.subscription_id,
+    contract.session_epoch,
+    `wrong-${contract.session_epoch}`,
+  ];
   const hits = [];
   for (const file of walkFiles(home)) {
     let body = '';
@@ -536,13 +573,34 @@ function fallbackArtifacts(home) {
   return hits;
 }
 
+function expectedRegistrationAcceptance(testCase) {
+  return testCase.family === 'standalone' && testCase.name === 'success';
+}
+
+function recomputeRegistrationAcceptance(subscription, expected) {
+  if (!subscription || typeof subscription !== 'object' || Array.isArray(subscription))
+    return false;
+  for (const field of ['subscription_id', 'session_id', 'session_epoch', 'origin', 'capability']) {
+    if (typeof subscription[field] !== 'string' || subscription[field].length === 0) return false;
+  }
+  return (
+    subscription.session_id === expected.session_id &&
+    subscription.origin === expected.origin &&
+    subscription.capability === expected.capability &&
+    subscription.state === 'current'
+  );
+}
+
 function closedBootstrapRows(rows) {
   if (rows.some((row) => row.allowed !== true)) return false;
   const counts = Object.fromEntries(
-    ['version', 'board-init-capabilities', 'board-init', 'board-stamp-harness', 'subscription-register'].map((kind) => [
-      kind,
-      commandRows(rows, kind).length,
-    ]),
+    [
+      'version',
+      'board-init-capabilities',
+      'board-init',
+      'board-stamp-harness',
+      'subscription-register',
+    ].map((kind) => [kind, commandRows(rows, kind).length]),
   );
   return (
     counts.version <= 1 &&
@@ -631,8 +689,13 @@ function verifyBootstrap(hostName, testCase) {
       hostName,
       testCase,
       'owner-preserved',
-      !!boardBody && boardBody.owner && boardBody.owner.active === true && boardBody.owner.session_id === sessionId,
-      board ? JSON.stringify(boardBody && boardBody.owner) : 'bootstrap did not create exactly one board',
+      !!boardBody &&
+        boardBody.owner &&
+        boardBody.owner.active === true &&
+        boardBody.owner.session_id === sessionId,
+      board
+        ? JSON.stringify(boardBody && boardBody.owner)
+        : 'bootstrap did not create exactly one board',
     );
     const rows = ccmRows(sandbox);
     const registrations = commandRows(rows, 'subscription-register');
@@ -640,11 +703,48 @@ function verifyBootstrap(hostName, testCase) {
       hostName,
       testCase,
       'register-command',
-      !!board && registrations.length === 1 && sameArgv(registrations[0].argv, expectedRegister(board, host.origin, sessionId)),
+      !!board &&
+        registrations.length === 1 &&
+        sameArgv(registrations[0].argv, expectedRegister(board, host.origin, sessionId)),
       JSON.stringify(registrations.map((row) => row.argv)),
     );
-    probe(hostName, testCase, 'closed-ccm-allowlist', closedBootstrapRows(rows), JSON.stringify(rows));
-    probe(hostName, testCase, 'zero-effects', effectRows(sandbox).length === 0, JSON.stringify(effectRows(sandbox)));
+    probe(
+      hostName,
+      testCase,
+      'closed-ccm-allowlist',
+      closedBootstrapRows(rows),
+      JSON.stringify(rows),
+    );
+    probe(
+      hostName,
+      testCase,
+      'zero-effects',
+      effectRows(sandbox).length === 0,
+      JSON.stringify(effectRows(sandbox)),
+    );
+    if (fixtureOnly) {
+      const decisions = registrationDecisionRows(sandbox);
+      const decision = decisions.length === 1 ? decisions[0] : null;
+      const expected = {
+        session_id: sessionId,
+        origin: host.origin,
+        capability: contract.capability,
+      };
+      const recomputed = decision
+        ? recomputeRegistrationAcceptance(decision.subscription, expected)
+        : false;
+      probe(
+        hostName,
+        testCase,
+        'registration-result-consumed',
+        !!decision &&
+          decisions.length === 1 &&
+          decision.accepted === expectedRegistrationAcceptance(testCase) &&
+          decision.accepted === recomputed &&
+          JSON.stringify(decision.expected) === JSON.stringify(expected),
+        JSON.stringify(decisions),
+      );
+    }
 
     const negative = !(testCase.family === 'standalone' && testCase.name === 'success');
     if (negative) {
@@ -674,7 +774,8 @@ function verifyBootstrap(hostName, testCase) {
         hostName,
         testCase,
         'post-failure-current',
-        currents.length === 1 && sameArgv(currents[0].argv, expectedCurrent(board, host.origin, sessionId)),
+        currents.length === 1 &&
+          sameArgv(currents[0].argv, expectedCurrent(board, host.origin, sessionId)),
         JSON.stringify(postRows),
       );
       probe(
@@ -688,7 +789,8 @@ function verifyBootstrap(hostName, testCase) {
         hostName,
         testCase,
         'post-failure-silent',
-        String(hookResult.stdout || '').trim() === '' && fallbackArtifacts(sandbox.home).length === 0,
+        String(hookResult.stdout || '').trim() === '' &&
+          fallbackArtifacts(sandbox.home).length === 0,
         String(hookResult.stdout || '') || JSON.stringify(fallbackArtifacts(sandbox.home)),
       );
     }
@@ -722,7 +824,8 @@ function verifyHook(hostName, testCase) {
       hostName,
       testCase,
       'current-command',
-      currents.length === 1 && sameArgv(currents[0].argv, expectedCurrent(board, host.origin, sessionId)),
+      currents.length === 1 &&
+        sameArgv(currents[0].argv, expectedCurrent(board, host.origin, sessionId)),
       `${JSON.stringify(rows)} stderr=${result.stderr || ''}`,
     );
     const listCount = hookExpectsList(testCase) ? 1 : 0;
@@ -730,10 +833,29 @@ function verifyHook(hostName, testCase) {
     const listOk =
       listCount === 0
         ? lists.length === 0
-        : lists.length === 1 && sameArgv(lists[0].argv, expectedList(board, host.origin, sessionId));
-    probe(hostName, testCase, listCount ? 'bounded-list-command' : 'no-list', listOk, JSON.stringify(rows));
-    probe(hostName, testCase, 'closed-ccm-allowlist', closedHookRows(rows, listCount), JSON.stringify(rows));
-    probe(hostName, testCase, 'zero-effects', effectRows(sandbox).length === 0, JSON.stringify(effectRows(sandbox)));
+        : lists.length === 1 &&
+          sameArgv(lists[0].argv, expectedList(board, host.origin, sessionId));
+    probe(
+      hostName,
+      testCase,
+      listCount ? 'bounded-list-command' : 'no-list',
+      listOk,
+      JSON.stringify(rows),
+    );
+    probe(
+      hostName,
+      testCase,
+      'closed-ccm-allowlist',
+      closedHookRows(rows, listCount),
+      JSON.stringify(rows),
+    );
+    probe(
+      hostName,
+      testCase,
+      'zero-effects',
+      effectRows(sandbox).length === 0,
+      JSON.stringify(effectRows(sandbox)),
+    );
     if (hookExpectsSurface(testCase)) {
       const native = nativeContext(hostName, result.stdout);
       probe(hostName, testCase, 'host-native-surface-once', native.ok, native.detail);
@@ -758,7 +880,8 @@ function verifyDeclaredExecution() {
   for (const host of manifest.hosts) {
     for (const testCase of selectedCases) {
       expectedCases.push(caseKey(host, testCase));
-      for (const name of expectedProbeNames(testCase)) expectedProbes.push(`${caseKey(host, testCase)}:${name}`);
+      for (const name of expectedProbeNames(testCase))
+        expectedProbes.push(`${caseKey(host, testCase)}:${name}`);
     }
   }
   const actualCases = [...executedCases].sort();
@@ -776,13 +899,21 @@ function verifyDeclaredExecution() {
 }
 
 function verifyBoundaryCalibration() {
-  const testCase = { id: 'fixture:boundary-calibration', phase: 'hook', family: 'standalone', name: 'success' };
+  const testCase = {
+    id: 'fixture:boundary-calibration',
+    phase: 'hook',
+    family: 'standalone',
+    name: 'success',
+  };
   const sandbox = makeSandbox('codex', testCase);
   const sessionId = 'sess-boundary-calibration';
   const board = seedBoard(sandbox.home, sessionId);
   const env = envFor(sandbox, 'codex', testCase, sessionId, 'hook', board);
   try {
-    const unknown = spawnSync(sandbox.wrapper, ['coordination', 'remote', 'send'], { encoding: 'utf8', env });
+    const unknown = spawnSync(sandbox.wrapper, ['coordination', 'remote', 'send'], {
+      encoding: 'utf8',
+      env,
+    });
     assert('fixture-boundary/unknown-ccm-rejected', unknown.status === 23, `rc=${unknown.status}`);
     const write = spawnSync(sandbox.wrapper, ['board', 'update', '--board', board, '--json'], {
       encoding: 'utf8',
@@ -799,7 +930,8 @@ function verifyBoundaryCalibration() {
     const effects = effectRows(sandbox);
     assert(
       'fixture-boundary/sentinels-recorded',
-      effects.some((row) => row.kind === 'process') && effects.some((row) => row.kind === 'network:fetch'),
+      effects.some((row) => row.kind === 'process') &&
+        effects.some((row) => row.kind === 'network:fetch'),
       JSON.stringify(effects),
     );
   } finally {
@@ -852,9 +984,16 @@ for (const host of manifest.hosts) {
   assert(`entry/${host}`, !!config, 'manifest host has no entry mapping');
   if (!config) continue;
   for (const file of [...config.bootstrap, ...config.hook].filter(
-    (item) => typeof item === 'string' && item !== process.execPath && (item.startsWith(root) || item.startsWith(fixtureDir)),
+    (item) =>
+      typeof item === 'string' &&
+      item !== process.execPath &&
+      (item.startsWith(root) || item.startsWith(fixtureDir)),
   )) {
-    assert(`entry/${host}/${basename(file)}`, existsSync(file), 'manifest-selected executable entry missing');
+    assert(
+      `entry/${host}/${basename(file)}`,
+      existsSync(file),
+      'manifest-selected executable entry missing',
+    );
   }
   for (const testCase of selectedCases) {
     if (testCase.phase === 'bootstrap') verifyBootstrap(host, testCase);
@@ -866,7 +1005,9 @@ verifyDeclaredExecution();
 if (fixtureOnly) verifyBoundaryCalibration();
 
 if (failures.length > 0) {
-  process.stderr.write(`XH C3 executable subscription/epoch contract: ${failures.length} failure(s)\n`);
+  process.stderr.write(
+    `XH C3 executable subscription/epoch contract: ${failures.length} failure(s)\n`,
+  );
   for (const item of failures) process.stderr.write(`- ${item}\n`);
   process.exit(1);
 }
