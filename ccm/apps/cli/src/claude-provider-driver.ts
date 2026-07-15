@@ -4,8 +4,15 @@
 // and reconciliation. It accepts a supervisor-issued run_ref and an injected runtime; it does not
 // create durable runs, probe accounts/quota, mutate credentials, or request provider/network APIs.
 
-import { createHash } from 'node:crypto';
 import * as path from 'node:path';
+import {
+  CANONICAL_LAUNCH_IDENTITY_SCHEMA,
+  type CanonicalLaunchIdentity,
+  canonicalJson,
+  isSha256Digest,
+  normalizeCanonicalLaunchIdentity,
+  sha256Digest,
+} from '@ccm/engine';
 import {
   createProviderRequestDeadline,
   type ProviderChildLimits,
@@ -18,6 +25,14 @@ import {
   ProviderProcessTreeOwnershipError,
   type ProviderRuntime,
 } from './provider-runtime.js';
+import {
+  digestQuotaAdmissionTicket,
+  parseQuotaAdmissionTicket,
+  QUOTA_ADMISSION_TICKET_REGISTRY,
+  type QuotaAdmissionTicket,
+  type QuotaAdmissionTicketProviderLaunchBindingContext,
+  validateQuotaAdmissionTicketProviderLaunchBinding,
+} from './quota-admission-ticket.js';
 
 export const CLAUDE_PROVIDER_REQUEST_SCHEMA = 'ccm/claude-provider-request/v1' as const;
 export const CLAUDE_PROVIDER_PREFLIGHT_SCHEMA = 'ccm/claude-provider-preflight/v1' as const;
@@ -26,6 +41,10 @@ export const CLAUDE_PROVIDER_INVOCATION_SCHEMA =
 export const CLAUDE_PROVIDER_RESULT_SCHEMA = 'ccm/claude-provider-result/v1' as const;
 export const CLAUDE_PROVIDER_RECONCILIATION_SCHEMA =
   'ccm/claude-provider-reconciliation/v1' as const;
+export const CLAUDE_PROVIDER_CONTRACT_REGISTRY_SCHEMA =
+  'ccm/claude-provider-contract-registry/v1' as const;
+export const CLAUDE_PROVIDER_LAUNCH_EXTENSION_SCHEMA =
+  'ccm/claude-provider-launch-extension/v1' as const;
 
 type ClaudeOriginHarness = 'claude-code' | 'codex' | 'cursor';
 type AdmissionDecision = 'allow' | 'deny' | 'unknown';
@@ -42,6 +61,7 @@ export const CLAUDE_PROVIDER_PARSE_REASON_CODES = Object.freeze([
   'provider_invalid',
   'origin_harness_invalid',
   'effort_invalid',
+  'lineage_invalid',
   'permission_invalid',
   'admission_fields_invalid',
   'policy_fact_invalid',
@@ -79,7 +99,6 @@ export const CLAUDE_PROVIDER_VALIDATION_REASON_CODES = Object.freeze([
   'quota_pool_kind_mismatch',
   'quota_authority_invalid',
   'quota_ticket_digest_mismatch',
-  'quota_ticket_time_invalid',
   'quota_ticket_expired',
   'quota_ticket_mismatch',
   'policy_stale_or_invalid',
@@ -101,6 +120,22 @@ export const CLAUDE_PROVIDER_TERMINAL_FAILURE_CODES = Object.freeze([
   'structured_output_malformed',
 ] as const);
 
+export const CLAUDE_PROVIDER_EFFECT_FAILURE_CODES = Object.freeze([
+  'resolve_error',
+  'spawn_error',
+  'provider_process_tree_ownership_unavailable',
+] as const);
+
+export const CLAUDE_PROVIDER_CONTRACT_REGISTRY = Object.freeze({
+  schema: CLAUDE_PROVIDER_CONTRACT_REGISTRY_SCHEMA,
+  parse_reasons: CLAUDE_PROVIDER_PARSE_REASON_CODES,
+  validation_reasons: CLAUDE_PROVIDER_VALIDATION_REASON_CODES,
+  terminal_failure_reasons: CLAUDE_PROVIDER_TERMINAL_FAILURE_CODES,
+  ticket_fields: QUOTA_ADMISSION_TICKET_REGISTRY.fields,
+  ticket_binding_ids: QUOTA_ADMISSION_TICKET_REGISTRY.provider_launch_binding_ids,
+  effect_failure_reasons: CLAUDE_PROVIDER_EFFECT_FAILURE_CODES,
+});
+
 interface TimedFact {
   observed_at: string;
   valid_until: string;
@@ -118,6 +153,15 @@ export interface ClaudeProviderRequest {
   objective: string;
   model: string;
   effort: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  lineage: {
+    origin_session_ref: string;
+    candidate_id: string;
+    account_fingerprint_ref: string;
+    workspace_ref: string;
+    worktree_ref: string;
+    baseline_commit: string;
+    permission_snapshot_ref: string;
+  };
   runtime_sha256: string;
   launch_idempotency_key: string;
   launch_nonce: string;
@@ -151,26 +195,7 @@ export interface ClaudeProviderRequest {
         freshness: 'fresh' | 'soft-stale' | 'hard-stale' | 'unknown' | 'conflict';
         spawn_count: 0;
       };
-      ticket: {
-        schema: 'ccm/quota-admission-ticket/v1';
-        ticket_id: string;
-        reservation_id: string;
-        reservation_request_hash: string;
-        reservation_expires_at: string;
-        attempt_id: string;
-        run_ref: string;
-        account_id: string;
-        pool_id: string;
-        identity_fingerprint: string;
-        aggregation_key: string;
-        live_source_revision: string;
-        runtime_sha256: string;
-        launch_idempotency_key: string;
-        launch_nonce: string;
-        issued_at: string;
-        committed_at: string;
-        launch_by: string;
-      };
+      ticket: Readonly<QuotaAdmissionTicket>;
       ticket_digest: string;
     };
     model: TimedFact & {
@@ -294,21 +319,6 @@ function member(value: unknown, values: readonly string[]): boolean {
   return typeof value === 'string' && values.includes(value);
 }
 
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entry]) => `${JSON.stringify(key)}:${canonical(entry)}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
-function digest(value: unknown): string {
-  return `sha256:${createHash('sha256').update(canonical(value)).digest('hex')}`;
-}
-
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
     for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
@@ -352,6 +362,7 @@ export function parseClaudeProviderRequest(input: unknown): ParsedRequest {
     'objective',
     'model',
     'effort',
+    'lineage',
     'runtime_sha256',
     'launch_idempotency_key',
     'launch_nonce',
@@ -385,6 +396,25 @@ export function parseClaudeProviderRequest(input: unknown): ParsedRequest {
     return parseFailure(input, 'origin_harness_invalid');
   if (!member(input.effort, ['low', 'medium', 'high', 'xhigh', 'max']))
     return parseFailure(input, 'effort_invalid');
+
+  const lineage = input.lineage;
+  const lineageFields = [
+    'origin_session_ref',
+    'candidate_id',
+    'account_fingerprint_ref',
+    'workspace_ref',
+    'worktree_ref',
+    'baseline_commit',
+    'permission_snapshot_ref',
+  ] as const;
+  if (
+    !plain(lineage) ||
+    !exactKeys(lineage, lineageFields) ||
+    !stringFields(lineage, lineageFields) ||
+    !lineageFields.every((field) => isNonEmpty(lineage[field])) ||
+    !/^[0-9a-f]{40}$/.test(String(lineage.baseline_commit))
+  )
+    return parseFailure(input, 'lineage_invalid');
 
   const permission = input.permission;
   if (
@@ -476,33 +506,7 @@ export function parseClaudeProviderRequest(input: unknown): ParsedRequest {
   )
     return parseFailure(input, 'quota_preflight_invalid');
   const ticket = quota.ticket;
-  const ticketFields = [
-    'schema',
-    'ticket_id',
-    'reservation_id',
-    'reservation_request_hash',
-    'reservation_expires_at',
-    'attempt_id',
-    'run_ref',
-    'account_id',
-    'pool_id',
-    'identity_fingerprint',
-    'aggregation_key',
-    'live_source_revision',
-    'runtime_sha256',
-    'launch_idempotency_key',
-    'launch_nonce',
-    'issued_at',
-    'committed_at',
-    'launch_by',
-  ] as const;
-  if (
-    !plain(ticket) ||
-    !exactKeys(ticket, ticketFields) ||
-    !stringFields(ticket, ticketFields) ||
-    ticket.schema !== 'ccm/quota-admission-ticket/v1'
-  )
-    return parseFailure(input, 'quota_ticket_invalid');
+  if (!parseQuotaAdmissionTicket(ticket)) return parseFailure(input, 'quota_ticket_invalid');
   const model = admission.model;
   if (
     !plain(model) ||
@@ -548,6 +552,101 @@ function selectionFor(origin: ClaudeOriginHarness): ClaudeProviderSelection {
   };
 }
 
+function actualProviderExtension(
+  request: ClaudeProviderRequest,
+): Readonly<Record<string, unknown>> {
+  return Object.freeze({
+    schema: CLAUDE_PROVIDER_LAUNCH_EXTENSION_SCHEMA,
+    model: request.model,
+    effort: request.effort,
+    workspace_path: request.workspace,
+  });
+}
+
+function actualCanonicalLaunchIdentity(
+  request: ClaudeProviderRequest,
+): Readonly<CanonicalLaunchIdentity> {
+  const pool = request.admission.quota.pool;
+  const extension = actualProviderExtension(request);
+  const dispatch = {
+    attempt_id: request.attempt_id,
+    run_ref: request.run_ref,
+    launch_idempotency_key: request.launch_idempotency_key,
+    launch_nonce: request.launch_nonce,
+  };
+  return normalizeCanonicalLaunchIdentity({
+    schema: CANONICAL_LAUNCH_IDENTITY_SCHEMA,
+    origin: {
+      harness: request.origin_harness,
+      session_ref: request.lineage.origin_session_ref,
+    },
+    target: {
+      harness: 'claude-code',
+      adapter: 'claude-code/cli-v1',
+      surface: 'cli-headless',
+      transport: 'claude-cli-json-v1',
+      candidate_id: request.lineage.candidate_id,
+    },
+    provider: { id: request.provider, model: request.model, effort: request.effort },
+    account: {
+      fingerprint_ref: request.lineage.account_fingerprint_ref,
+      account_id: pool.account_id,
+      pool_id: pool.pool_id,
+      identity_fingerprint: pool.identity_fingerprint,
+    },
+    workspace: {
+      workspace_ref: request.lineage.workspace_ref,
+      worktree_ref: request.lineage.worktree_ref,
+      baseline_commit: request.lineage.baseline_commit,
+    },
+    permission: {
+      snapshot_ref: request.lineage.permission_snapshot_ref,
+      profile: 'workspace-write',
+      denies: ['account-mutation', 'credential-write', 'push-remote'],
+    },
+    input: { digest: sha256Digest(request.objective) },
+    request: {
+      digest: sha256Digest(canonicalJson({ provider_extension: extension, dispatch })),
+    },
+    dispatch: {
+      run_ref: request.run_ref,
+      idempotency_key: request.launch_idempotency_key,
+      launch_nonce: request.launch_nonce,
+      claim_id: request.launch_nonce,
+    },
+    runtime: {
+      image_sha256: request.runtime_sha256,
+      selector: { kind: 'exact', model_id: request.model, effort: request.effort },
+    },
+  });
+}
+
+function providerLaunchBindingContext(
+  request: ClaudeProviderRequest,
+  checkedAt: string,
+): QuotaAdmissionTicketProviderLaunchBindingContext {
+  const quota = request.admission.quota;
+  return {
+    ticket_digest: quota.ticket_digest,
+    reservation_id: quota.reservation.reservation_id,
+    reservation_request_hash: quota.reservation.request_hash,
+    reservation_expires_at: quota.reservation.expires_at,
+    attempt_id: request.attempt_id,
+    run_ref: request.run_ref,
+    account_id: quota.pool.account_id,
+    pool_id: quota.pool.pool_id,
+    identity_fingerprint: quota.pool.identity_fingerprint,
+    aggregation_key: quota.reservation.aggregation_key,
+    live_source_revision: quota.reservation.source_revision,
+    runtime_sha256: request.runtime_sha256,
+    launch_idempotency_key: request.launch_idempotency_key,
+    launch_nonce: request.launch_nonce,
+    checked_at: checkedAt,
+    canonical_identity: actualCanonicalLaunchIdentity(request),
+    provider_extension: actualProviderExtension(request),
+  };
+}
+
 function validationReasons(request: ClaudeProviderRequest, now: string): string[] {
   const reasons: string[] = [];
   const nowMs = Date.parse(now);
@@ -559,8 +658,9 @@ function validationReasons(request: ClaudeProviderRequest, now: string): string[
     reasons.push('workspace_invalid');
   if (!isNonEmpty(request.objective)) reasons.push('objective_invalid');
   if (!isNonEmpty(request.model) || request.model === 'auto') reasons.push('model_invalid');
-  if (!isNonEmpty(request.runtime_sha256)) reasons.push('runtime_sha256_invalid');
-  if (!isNonEmpty(request.launch_idempotency_key)) reasons.push('launch_idempotency_key_invalid');
+  if (!isSha256Digest(request.runtime_sha256)) reasons.push('runtime_sha256_invalid');
+  if (!isSha256Digest(request.launch_idempotency_key))
+    reasons.push('launch_idempotency_key_invalid');
   if (!isNonEmpty(request.launch_nonce)) reasons.push('launch_nonce_invalid');
   if (
     !validTimeout(request.timeouts_ms.startup) ||
@@ -585,7 +685,7 @@ function validationReasons(request: ClaudeProviderRequest, now: string): string[
   const authority = facts.quota;
   const reservation = authority.reservation;
   const pool = authority.pool;
-  const ticket = facts.quota.ticket;
+  const ticket = parseQuotaAdmissionTicket(facts.quota.ticket);
   if (
     ![
       request.attempt_id,
@@ -601,39 +701,31 @@ function validationReasons(request: ClaudeProviderRequest, now: string): string[
       reservation.aggregation_key,
       reservation.source_revision,
       authority.ticket_digest,
-      ticket.ticket_id,
+      ticket?.ticket_id,
     ].every(isNonEmpty)
   )
     reasons.push('quota_authority_invalid');
-  if (authority.ticket_digest !== digest(ticket)) reasons.push('quota_ticket_digest_mismatch');
-  const issuedAt = Date.parse(ticket.issued_at);
-  const committedAt = Date.parse(ticket.committed_at);
-  const launchBy = Date.parse(ticket.launch_by);
-  const reservationExpiresAt = Date.parse(ticket.reservation_expires_at);
-  if (
-    ![issuedAt, committedAt, launchBy, reservationExpiresAt].every(Number.isFinite) ||
-    committedAt < issuedAt ||
-    launchBy < committedAt ||
-    launchBy > reservationExpiresAt
-  )
-    reasons.push('quota_ticket_time_invalid');
-  if (launchBy <= nowMs || reservationExpiresAt <= nowMs) reasons.push('quota_ticket_expired');
-  if (
-    ticket.reservation_id !== reservation.reservation_id ||
-    ticket.reservation_request_hash !== reservation.request_hash ||
-    ticket.reservation_expires_at !== reservation.expires_at ||
-    ticket.attempt_id !== request.attempt_id ||
-    ticket.run_ref !== request.run_ref ||
-    ticket.account_id !== pool.account_id ||
-    ticket.pool_id !== pool.pool_id ||
-    ticket.identity_fingerprint !== pool.identity_fingerprint ||
-    ticket.aggregation_key !== reservation.aggregation_key ||
-    ticket.live_source_revision !== reservation.source_revision ||
-    ticket.runtime_sha256 !== request.runtime_sha256 ||
-    ticket.launch_idempotency_key !== request.launch_idempotency_key ||
-    ticket.launch_nonce !== request.launch_nonce
-  )
-    reasons.push('quota_ticket_mismatch');
+  if (ticket) {
+    if (authority.ticket_digest !== digestQuotaAdmissionTicket(ticket))
+      reasons.push('quota_ticket_digest_mismatch');
+    const launchBy = Date.parse(ticket.launch_by);
+    const reservationExpiresAt = Date.parse(ticket.reservation_expires_at);
+    if (launchBy <= nowMs || reservationExpiresAt <= nowMs) reasons.push('quota_ticket_expired');
+    try {
+      if (
+        !validateQuotaAdmissionTicketProviderLaunchBinding(
+          ticket,
+          providerLaunchBindingContext(request, now),
+        )
+      ) {
+        reasons.push('quota_ticket_mismatch');
+      }
+    } catch {
+      reasons.push('quota_ticket_mismatch');
+    }
+  } else {
+    reasons.push('quota_authority_invalid');
+  }
   for (const [name, fact] of Object.entries(facts)) {
     if (!Number.isFinite(nowMs) || !isFresh(fact, nowMs)) reasons.push(`${name}_stale_or_invalid`);
   }
@@ -964,7 +1056,7 @@ function synchronousEffectFailureResult(
   phase: 'resolve' | 'spawn',
   error: unknown,
 ): ClaudeProviderResult {
-  const code =
+  const code: (typeof CLAUDE_PROVIDER_EFFECT_FAILURE_CODES)[number] =
     phase === 'resolve'
       ? 'resolve_error'
       : error instanceof ProviderProcessTreeOwnershipError
