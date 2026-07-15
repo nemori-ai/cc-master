@@ -670,7 +670,14 @@ function reactivateTaskInPlace(board: Board, task: Task, fromStatus: string): vo
   const priorEvidence: Record<string, unknown> = {};
   // Snapshot every attempt-scoped completion/review fact before clearing current state. The
   // archived verdict is audit evidence only; dependency gates read only task.review_verdict.
-  for (const key of ['started_at', 'finished_at', 'artifact', 'verified', 'review_verdict']) {
+  for (const key of [
+    'started_at',
+    'finished_at',
+    'artifact',
+    'verified',
+    'review_verdict',
+    'delivery',
+  ]) {
     if (Object.hasOwn(task, key)) priorEvidence[key] = structuredClone(task[key]);
   }
 
@@ -691,8 +698,127 @@ function reactivateTaskInPlace(board: Board, task: Task, fromStatus: string): vo
   delete task.started_at;
   delete task.finished_at;
   delete task.artifact;
+  delete task.delivery;
   task.verified = false;
   clearAttemptScopedReviewVerdictInPlace(task);
+}
+
+const DELIVERY_TARGET_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+function declaredContractInPlace(board: Board): Record<string, any> {
+  if (board.delivery_contract === undefined) {
+    board.delivery_contract = {
+      schema: 'ccm/delivery-contract/v1',
+      mode: 'declared',
+      targets: {},
+    };
+  }
+  const contract = board.delivery_contract;
+  if (
+    !contract ||
+    typeof contract !== 'object' ||
+    Array.isArray(contract) ||
+    contract.schema !== 'ccm/delivery-contract/v1' ||
+    contract.mode !== 'declared' ||
+    !contract.targets ||
+    typeof contract.targets !== 'object' ||
+    Array.isArray(contract.targets)
+  ) {
+    throw err(
+      'refused: delivery contract must be ccm/delivery-contract/v1 mode=declared; persisted strict mode is unsupported',
+      'Validation',
+    );
+  }
+  return contract;
+}
+
+export function setDeliveryTarget(board: Board, id: string, target: unknown): Board {
+  if (!DELIVERY_TARGET_ID_RE.test(id)) {
+    throw err(`invalid delivery target id: ${JSON.stringify(id)}`, 'Validation');
+  }
+  const b = clone(board);
+  const contract = declaredContractInPlace(b);
+  contract.targets[id] = structuredClone(target);
+  return touch(b);
+}
+
+export function setTaskDelivery(board: Board, id: string, delivery: unknown): Board {
+  const b = clone(board);
+  const task = requireTask(b, id);
+  task.delivery = structuredClone(delivery);
+  return touch(b);
+}
+
+function requireDependencyEdge(board: Board, downstreamId: string, upstreamId: string): Task {
+  const downstream = requireTask(board, downstreamId);
+  requireTask(board, upstreamId);
+  if (!Array.isArray(downstream.deps) || !downstream.deps.includes(upstreamId)) {
+    throw err(`refused: ${downstreamId} does not have dependency edge ${upstreamId}`, 'Validation');
+  }
+  return downstream;
+}
+
+function setRequirementInPlace(task: Task, key: string, requirement: unknown): void {
+  if (
+    task.dependency_requirements === undefined ||
+    !task.dependency_requirements ||
+    typeof task.dependency_requirements !== 'object' ||
+    Array.isArray(task.dependency_requirements)
+  ) {
+    task.dependency_requirements = {};
+  }
+  task.dependency_requirements[key] = structuredClone(requirement);
+}
+
+export function setDependencyRequirement(
+  board: Board,
+  downstreamId: string,
+  upstreamId: string,
+  requirement: unknown,
+): Board {
+  const b = clone(board);
+  declaredContractInPlace(b);
+  const downstream = requireDependencyEdge(b, downstreamId, upstreamId);
+  setRequirementInPlace(downstream, upstreamId, requirement);
+  return touch(b);
+}
+
+export function setDependencyDefault(
+  board: Board,
+  downstreamId: string,
+  requirement: unknown,
+): Board {
+  const b = clone(board);
+  declaredContractInPlace(b);
+  const downstream = requireTask(b, downstreamId);
+  setRequirementInPlace(downstream, '*', requirement);
+  return touch(b);
+}
+
+export function setDependencyWaiver(
+  board: Board,
+  downstreamId: string,
+  upstreamId: string,
+  waiver: unknown,
+  opts: { userAuthorized?: boolean } = {},
+): Board {
+  if (opts.userAuthorized !== true) {
+    throw err(
+      'refused: dependency waiver dedicated writer requires explicit --user-authorized authority',
+      'Authorization',
+    );
+  }
+  const b = clone(board);
+  const downstream = requireDependencyEdge(b, downstreamId, upstreamId);
+  const requirement = downstream.dependency_requirements?.[upstreamId];
+  if (!requirement || requirement.level !== 'delivered' || typeof requirement.target !== 'string') {
+    throw err(
+      'refused: waiver requires an existing exact delivered requirement for this edge',
+      'Validation',
+    );
+  }
+  requirement.waiver_record = structuredClone(waiver);
+  return touch(b);
 }
 
 function assertNoContractIssues(
@@ -1143,8 +1269,17 @@ function assertFlexible(board: Board, parsed: ParsedPath): void {
     contractEnabled: contractActivation(board) === 'enabled',
   });
   if (policy !== 'generic') {
+    const root = parsed.segs[0];
+    const dedicatedCommand =
+      parsed.scope === 'board' && root === 'delivery_contract'
+        ? 'target set|refresh'
+        : parsed.scope === 'task' && root === 'delivery'
+          ? 'task attest-delivery'
+          : parsed.scope === 'task' && root === 'dependency_requirements'
+            ? 'dependency require|default|waive'
+            : 'board enable-contract / task set-planning / task set-routing / task route-bind';
     throw err(
-      `refused: "${parsed.segs.join('.')}" has ${policy} writer policy; use board enable-contract / task set-planning / task set-routing / task route-bind instead of --set`,
+      `refused: "${parsed.segs.join('.')}" has ${policy} writer policy; use ${dedicatedCommand} instead of --set`,
       'Validation',
     );
   }

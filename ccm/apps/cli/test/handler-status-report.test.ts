@@ -112,6 +112,47 @@ test('render emits ccm/status-report/v1 and writes no artifact or board bytes', 
   assert.equal(env.report.summary.verified_done, 1);
   assert.equal(env.report.next_actions.ready_to_dispatch[0].id, 'T4');
   assert.equal(env.report.decisions.awaiting_user[0].id, 'T3');
+  assert.equal(env.report.delivery.mode, 'legacy');
+  assert.ok(env.report.delivery.edges.every((edge: any) => edge.qualification.basis === 'legacy'));
+});
+
+test('rendered readiness and delivery edge read model share declared qualification truth', () => {
+  const home = mkHome();
+  const boardPath = seedBoard(home);
+  const board = JSON.parse(readFileSync(boardPath, 'utf8'));
+  board.delivery_contract = {
+    schema: 'ccm/delivery-contract/v1',
+    mode: 'declared',
+    targets: {
+      main: {
+        kind: 'git-ref',
+        repository: { source: 'board.git.worktree' },
+        ref: 'refs/remotes/origin/main',
+        snapshot: { oid: 'a'.repeat(40), observed_at: '2026-07-08T12:00:00Z' },
+      },
+    },
+  };
+  board.tasks.find((task: any) => task.id === 'T4').dependency_requirements = {
+    T1: { level: 'delivered', target: 'main' },
+  };
+  writeFileSync(boardPath, `${JSON.stringify(board, null, 2)}\n`, 'utf8');
+
+  const result = invoke(
+    ['status-report', 'render', '--json', '--as-of', '2026-07-08T12:01:02Z'],
+    home,
+  );
+  assert.equal(result.code, EXIT.OK, result.stderr);
+  const report = json(result.stdout).report;
+  const edge = report.delivery.edges.find(
+    (entry: any) => entry.downstream === 'T4' && entry.dependency === 'T1',
+  );
+  assert.equal(report.delivery.mode, 'declared');
+  assert.equal(edge.qualification.state, 'unknown');
+  assert.equal(edge.qualification.reasons[0].code, 'DELIVERY_CANDIDATE_BINDING_STALE');
+  assert.equal(
+    report.next_actions.ready_to_dispatch.some((task: any) => task.id === 'T4'),
+    false,
+  );
 });
 
 test('write/show/watch write report artifacts without mutating board JSON', () => {

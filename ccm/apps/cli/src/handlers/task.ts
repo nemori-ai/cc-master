@@ -19,6 +19,7 @@
 // T2b port 注：require → ESM import；module.exports → 命名导出。逻辑/正则/报错文案/.errKind/退出码逐字保持。
 //   动态派发的 board 形参类型为 unknown（runWrite/runRead 回调签名）——按需窄断言为 BoardArg / 任务数组。
 
+import { type AttestationInput, attestDelivery as proveDelivery } from '../delivery-proof.js';
 import * as io from '../io.js';
 import * as mutations from '../mutations.js';
 import { REGISTRY } from '../registry.js';
@@ -278,6 +279,62 @@ export function retry(ctx: Ctx): number {
       return dryRun
         ? `[dry-run] 将 retry task: ${outcomes} (归档并清理旧 attempt evidence)`
         : `task retry: ${outcomes} (旧 attempt evidence 已归档)`;
+    },
+  });
+}
+
+export function attestDelivery(ctx: Ctx): number {
+  const id = ctx.positionals[0] as string;
+  const target = String(ctx.values.target ?? '');
+  const method = String(ctx.values.method ?? '') as AttestationInput['method'];
+  let qualification: any;
+  return runWrite(ctx, {
+    mutate: (board) => {
+      let input: AttestationInput;
+      if (method === 'git-commit-contained') {
+        input = {
+          method,
+          candidate_commit: String(ctx.values['candidate-commit'] ?? ''),
+        };
+      } else if (method === 'reviewed-reconciliation-contained') {
+        input = {
+          method,
+          candidate_commit: String(ctx.values['candidate-commit'] ?? ''),
+          integration_commit: String(ctx.values['integration-commit'] ?? ''),
+          attestation: String(ctx.values.attestation ?? ''),
+        };
+      } else if (method === 'artifact-digest-contained') {
+        input = {
+          method,
+          artifact: {
+            logical_name: String(ctx.values['logical-name'] ?? ''),
+            version: String(ctx.values['artifact-version'] ?? ''),
+            ref: String(ctx.values['artifact-ref'] ?? ''),
+            digest: String(ctx.values['artifact-digest'] ?? ''),
+          },
+        };
+      } else {
+        const e = new Error(`unsupported delivery proof method: ${method}`) as KindedError;
+        e.errKind = 'Usage';
+        throw e;
+      }
+      const result = proveDelivery(board as BoardArg, id, target, input);
+      qualification = result.qualification;
+      if (!result.delivery || result.qualification.state !== 'qualified') {
+        const codes = result.qualification.reasons.map((reason) => reason.code).join(',');
+        const e = new Error(`delivery proof rejected: ${codes}`) as KindedError & {
+          violations?: unknown[];
+        };
+        e.errKind = 'Validation';
+        e.violations = result.qualification.reasons;
+        throw e;
+      }
+      return mutations.setTaskDelivery(board as BoardArg, id, result.delivery);
+    },
+    render: (_next, c, { dryRun }) => {
+      if (c.flags.json)
+        return io.jsonOk({ task_id: id, target_id: target, qualification, dry_run: dryRun });
+      return `${dryRun ? '[dry-run] ' : ''}delivery attested ${id} -> ${target}: state=${qualification.state} target_delivered=${qualification.target_delivered} observation=${qualification.observation_id}`;
     },
   });
 }

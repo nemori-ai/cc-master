@@ -22,12 +22,8 @@
 //   CPM forward/backward pass、float 公式逐字保持（零行为变化）。浏览器形态由 tsdown 的 IIFE 产物承接。
 
 import { buildGraph, findCycle } from './board-lint-core.js';
-import {
-  dependencySatisfied,
-  durationHours,
-  type EstimateLike,
-  type TaskLike,
-} from './board-model.js';
+import { durationHours, type EstimateLike, type TaskLike } from './board-model.js';
+import { type DeliveryFacts, dependencyQualified } from './delivery-contract.js';
 
 // 终态状态（done 家族）。rollup「子全 done」判定用——只有 'done' 算真完成（与 verify-board / lint 口径一致）。
 const DONE = 'done';
@@ -98,6 +94,10 @@ export interface BoardLike {
   [key: string]: unknown;
 }
 
+export interface GraphOptions {
+  deliveryFacts?: DeliveryFacts;
+}
+
 // analyzeGraph 返回的句柄形状（cheap + rich 方法全集）。
 export interface GraphHandle {
   ids: Set<string>;
@@ -131,7 +131,10 @@ export interface GraphHandle {
 
 // ── analyzeGraph(board) → Graph 句柄 ────────────────────────────────────────────────────────────
 //   一次建图 + 缓存邻接 + parent 倒排，返回带方法的句柄。坏 board（非对象 / tasks 非数组）→ 退化空图。
-export function analyzeGraph(board: BoardLike | null | undefined): GraphHandle {
+export function analyzeGraph(
+  board: BoardLike | null | undefined,
+  opts: GraphOptions = {},
+): GraphHandle {
   const tasks = board && typeof board === 'object' && Array.isArray(board.tasks) ? board.tasks : [];
   const g = buildGraph(tasks); // { ids, taskById, upstream, downstream, dangling, selfLoops, edgeIssues, children, parentOf }
   const ids = g.ids;
@@ -144,7 +147,9 @@ export function analyzeGraph(board: BoardLike | null | undefined): GraphHandle {
     return t ? t.status : undefined;
   };
   const isDone = (id: string): boolean => statusOf(id) === DONE;
-  const satisfiesDependency = (id: string): boolean => dependencySatisfied(taskById.get(id));
+  const satisfiesDependency = (downstreamId: string, upstreamId: string): boolean =>
+    dependencyQualified(board ?? {}, downstreamId, upstreamId, opts.deliveryFacts).state ===
+    'qualified';
 
   // ── cheap 子集（O(V+E)，hook 可 require）─────────────────────────────────────────────────────
 
@@ -188,7 +193,7 @@ export function analyzeGraph(board: BoardLike | null | undefined): GraphHandle {
     for (const id of ids) {
       if (statusOf(id) !== 'ready') continue;
       const deps = upstream.get(id) as string[];
-      if (deps.every((d) => satisfiesDependency(d))) out.push(id);
+      if (deps.every((d) => satisfiesDependency(id, d))) out.push(id);
     }
     return out;
   }

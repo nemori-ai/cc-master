@@ -258,6 +258,16 @@ export const FIELDS = {
       when: '用户锁/放开自主权限时',
       degrade: '缺→解析为 allow；形状坏→warn(FMT-POLICY)',
     },
+    delivery_contract: {
+      tier: '✎',
+      type: 'object{schema:"ccm/delivery-contract/v1",mode:"declared",targets:object}?',
+      default: '缺省(逐字保持 legacy dependencySatisfied/ready/reconcile 语义)',
+      readers: 'delivery evaluator / graph readySet / reconcile / lint / CLI delivery read models',
+      writers: 'ccm target set|refresh',
+      when: '用户显式声明交付目标并选择逐 edge delivery contract 时',
+      degrade:
+        '缺→legacy；形状坏/持久化 strict→hard(FMT-DELIVERY-CONTRACT)；ref 漂移/对象缺失→资格 unknown(fail closed)',
+    },
     coordination: {
       tier: '✎',
       type: 'object{priority?:enum coordPriority, state?:{current?:{active_tasks?:int, workload?:string, burn_contribution?:number}, planned?:{remaining_work?:string, cost_to_complete_pct?:number}}, inbox?:notification[]}?',
@@ -343,6 +353,26 @@ export const FIELDS = {
       writers: 'agent 经 CLI',
       when: '建 dev 类 task',
       degrade: '特定 type 缺→warn(BIZ-ACCEPTANCE-REQUIRED);obj 则 criteria 非空(FMT-ACCEPTANCE)',
+    },
+    delivery: {
+      tier: '✎',
+      type: 'object{schema:"ccm/task-delivery/v1",candidate:object,observations:array}?',
+      default: '缺省(无当前 candidate/delivery observation)',
+      readers: 'delivery evaluator / delivery check / dependency explain',
+      writers: 'ccm task attest-delivery；retry/reactivation 原子归档后清空 current',
+      when: 'true-done task 对 declared target 产出本地可复核 delivery proof 时',
+      degrade:
+        '缺→delivered requirement 为 unknown；done→stale 可保留精确旧 binding 供审计但不 qualify；其它 binding/fingerprint 过期→hard(BIZ-DELIVERY-CANDIDATE-BINDING)；坏形状→hard(FMT-TASK-DELIVERY)',
+    },
+    dependency_requirements: {
+      tier: '✎',
+      type: 'object{<dep-id|*>:{level:"candidate"|"delivered",target?:string,waiver_record?:object}}?',
+      default: '缺省(该 edge 逐字保持 legacy dependencySatisfied)',
+      readers: 'delivery evaluator / graph readySet / reconcile / lint / dependency explain',
+      writers: 'ccm dependency require|default|waive',
+      when: 'downstream 显式声明某 deps[] edge 的 candidate/delivered 资格要求时',
+      degrade:
+        '缺→legacy；坏形状/authority/scope→hard(FMT-DEPENDENCY-REQUIREMENTS)；stale key→warn(BIZ-DEPENDENCY-REQUIREMENT)',
     },
     dependency_gate: {
       tier: '✎',
@@ -818,6 +848,35 @@ export const INVARIANTS: Invariant[] = [
     summary: 'review_verdict 若非空须 ∈ {APPROVE,REQUEST-CHANGES}',
   },
   {
+    id: 'FMT-DELIVERY-CONTRACT',
+    level: 'hard',
+    family: 'FMT',
+    scope: 'board',
+    summary: 'delivery_contract 若存在须为 declared-mode v1；strict 不可持久化',
+  },
+  {
+    id: 'FMT-TASK-DELIVERY',
+    level: 'hard',
+    family: 'FMT',
+    scope: 'task',
+    summary: 'task.delivery 若存在须含当前 candidate binding 与有界 observations',
+  },
+  {
+    id: 'FMT-DEPENDENCY-REQUIREMENTS',
+    level: 'hard',
+    family: 'FMT',
+    scope: 'task',
+    summary:
+      'dependency_requirements 若存在须为 candidate/delivered edge contract；waiver 精确绑定',
+  },
+  {
+    id: 'DELIVERY_SIZE_CAP',
+    level: 'hard',
+    family: 'BIZ',
+    scope: 'board/task',
+    summary: 'declared targets/observations/requirements 不得超过 v1 有界上限',
+  },
+  {
     id: 'FMT-CONTRACTS',
     level: 'hard',
     family: 'FMT',
@@ -1063,6 +1122,35 @@ export const INVARIANTS: Invariant[] = [
       'native attempt 与 task status/handle 投影一致；parent done 同时满足 terminal evidence + true-done',
   },
   {
+    id: 'BIZ-DELIVERY-CANDIDATE-BINDING',
+    level: 'hard',
+    family: 'BIZ',
+    scope: 'task',
+    summary:
+      'current delivery candidate 必须重算 fingerprint 并绑定当前 true-done evidence，或精确保留于 stale 供审计',
+  },
+  {
+    id: 'BIZ-DEPENDENCY-REQUIREMENT',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'task',
+    summary: 'dependency requirement key 应对应当前 deps[] edge；陈旧 key 不参与求值',
+  },
+  {
+    id: 'BIZ-DELIVERY-PROOF',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'task',
+    summary: '显式 delivery requirement 当前没有 qualified proof；资格派生且 fail closed',
+  },
+  {
+    id: 'BIZ-DELIVERY-IMPACT',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'task',
+    summary: '非 qualified 显式依赖边的下游已越过 blocked 状态，需 reconcile',
+  },
+  {
     id: 'FMT-BASELINE',
     level: 'warn',
     family: 'FMT',
@@ -1134,8 +1222,11 @@ export interface TaskLike {
   blocked_on?: unknown;
   verified?: unknown;
   artifact?: unknown;
+  finished_at?: unknown;
   dependency_gate?: unknown;
   review_verdict?: unknown;
+  delivery?: unknown;
+  dependency_requirements?: unknown;
   [key: string]: unknown;
 }
 

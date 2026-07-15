@@ -39,6 +39,8 @@ import * as boardHandler from './handlers/board.js';
 import * as cadenceHandler from './handlers/cadence.js';
 import * as capabilityHandler from './handlers/capability.js';
 import * as coordinationHandler from './handlers/coordination.js';
+import * as deliveryHandler from './handlers/delivery.js';
+import * as dependencyHandler from './handlers/dependency.js';
 import * as estimateHandler from './handlers/estimate.js';
 import * as goalHandler from './handlers/goal.js';
 import * as harnessHandler from './handlers/harness.js';
@@ -55,6 +57,7 @@ import type { ShadowRoutingBoundary } from './handlers/shadow-routing.js';
 import * as shadowRoutingHandler from './handlers/shadow-routing.js';
 import * as statusReportHandler from './handlers/status-report.js';
 import * as statuslineHandler from './handlers/statusline.js';
+import * as targetHandler from './handlers/target.js';
 import * as taskHandler from './handlers/task.js';
 import * as upgradeHandler from './handlers/upgrade.js';
 import * as usageHandler from './handlers/usage.js';
@@ -121,6 +124,9 @@ const HANDLERS: Record<string, HandlerModule> = {
   board: boardHandler as unknown as HandlerModule,
   goal: goalHandler as unknown as HandlerModule,
   task: taskHandler as unknown as HandlerModule,
+  target: targetHandler as unknown as HandlerModule,
+  delivery: deliveryHandler as unknown as HandlerModule,
+  dependency: dependencyHandler as unknown as HandlerModule,
   log: logHandler as unknown as HandlerModule,
   jc: jcHandler as unknown as HandlerModule,
   cadence: cadenceHandler as unknown as HandlerModule,
@@ -711,6 +717,8 @@ function reportHandlerError(e: KindedError, err: RunOpts['err'], ctx: Ctx): numb
     code = EXIT.LOCKED;
   } else if (kind === 'Usage') {
     code = EXIT.USAGE;
+  } else if (kind === 'Authorization') {
+    code = EXIT.AUTHORIZATION;
   } else {
     code = EXIT.ERROR;
   }

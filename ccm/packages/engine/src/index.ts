@@ -44,6 +44,7 @@ export type {
   CriticalPathResult,
   Estimate,
   GraphHandle,
+  GraphOptions,
   NodeDuration,
   ScheduleEntry,
   WeightSource,
@@ -164,6 +165,25 @@ export type {
   RosterOptions,
 } from './coordination/peers.js';
 export { buildPeerRoster, PEER_FRESHNESS_SEC } from './coordination/peers.js';
+// ── delivery-contract（candidate / target / edge qualification·ADR-036）──
+export type {
+  DeliveryBoardLike,
+  DeliveryDiagnostic,
+  DeliveryFacts,
+  DeliveryObservationFact,
+  DeliveryTargetFact,
+  Qualification,
+} from './delivery-contract.js';
+export {
+  DELIVERY_CONTRACT_SCHEMA,
+  DELIVERY_OBSERVATION_LIMIT,
+  DELIVERY_TARGET_LIMIT,
+  DEPENDENCY_REQUIREMENT_LIMIT,
+  dependencyQualified,
+  TASK_DELIVERY_SCHEMA,
+  targetDelivered,
+  validateDeliveryContracts,
+} from './delivery-contract.js';
 // ── durable-write（owner-only state 的单一 crash-durable publish primitive）──
 export type {
   DurableDirectorySyncDisposition,

@@ -32,6 +32,7 @@ import {
   lintBoard,
   routingContractPreflight,
 } from '@ccm/engine';
+import { resolveDeliveryFacts } from '../delivery-proof.js';
 import * as discover from '../discover.js';
 import { detectTrustedHarnessId } from '../harnesses/registry.js';
 import * as io from '../io.js';
@@ -126,7 +127,10 @@ function readRawBoard(ctx: Ctx): string {
 // DAG 全量分析：把 analyzeGraph(board) 句柄直接喂 render.renderGraph（render 内部探测句柄方法·_coerceAnalysis）。
 export function graph(ctx: Ctx): number {
   return runRead(ctx, {
-    compute: (board) => analyzeGraph((board || {}) as Parameters<typeof analyzeGraph>[0]),
+    compute: (board) =>
+      analyzeGraph((board || {}) as Parameters<typeof analyzeGraph>[0], {
+        deliveryFacts: resolveDeliveryFacts((board || {}) as BoardArg),
+      }),
     render: (analysis, c) =>
       render.renderGraph(analysis, { json: !!c.flags.json, color: c.flags.color }),
   });
@@ -135,7 +139,10 @@ export function graph(ctx: Ctx): number {
 // ── 读 verb：critical-path ──────────────────────────────────────────────────────────────────────
 export function criticalPath(ctx: Ctx): number {
   return runRead(ctx, {
-    compute: (board) => analyzeGraph((board || {}) as Parameters<typeof analyzeGraph>[0]),
+    compute: (board) =>
+      analyzeGraph((board || {}) as Parameters<typeof analyzeGraph>[0], {
+        deliveryFacts: resolveDeliveryFacts((board || {}) as BoardArg),
+      }),
     render: (analysis, c) =>
       render.renderCriticalPath(analysis, { json: !!c.flags.json, color: c.flags.color }),
   });
@@ -146,7 +153,9 @@ export function criticalPath(ctx: Ctx): number {
 export function next(ctx: Ctx): number {
   return runRead(ctx, {
     compute: (board) =>
-      analyzeGraph((board || {}) as Parameters<typeof analyzeGraph>[0]).readySet(),
+      analyzeGraph((board || {}) as Parameters<typeof analyzeGraph>[0], {
+        deliveryFacts: resolveDeliveryFacts((board || {}) as BoardArg),
+      }).readySet(),
     render: (ready, c) => render.renderNext(ready, { json: !!c.flags.json, color: c.flags.color }),
   });
 }

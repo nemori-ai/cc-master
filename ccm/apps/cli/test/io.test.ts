@@ -26,6 +26,7 @@ test('EXIT enum carries the agreed distinct codes', () => {
       VALIDATION: 3,
       LOCKED: 4,
       NOT_FOUND: 5,
+      AUTHORIZATION: 7,
     },
   );
 });

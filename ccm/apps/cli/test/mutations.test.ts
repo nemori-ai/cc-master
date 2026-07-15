@@ -466,6 +466,11 @@ test('retryTask stale→ready archives prior evidence and resets the current att
   t0.started_at = '2019-12-31T23:00:00Z';
   t0.artifact = '/abs/old.md';
   t0.verified = true;
+  t0.delivery = {
+    schema: 'ccm/task-delivery/v1',
+    candidate: { fingerprint: `sha256:${'a'.repeat(64)}` },
+    observations: [{ id: 'old-observation' }],
+  };
   const stale = m.transition(orig, 'T0', 'stale', {});
   const retried = m.retryTask(stale, 'T0');
   const task = retried.tasks.find((x: AnyBoard) => x.id === 'T0');
@@ -475,6 +480,7 @@ test('retryTask stale→ready archives prior evidence and resets the current att
   assert.equal(task.finished_at, undefined);
   assert.equal(task.artifact, undefined);
   assert.equal(task.verified, false);
+  assert.equal(task.delivery, undefined);
   assert.equal(typeof task.verified, 'boolean', 'verified reset is typed, never string "false"');
 
   const entry = retried.log.at(-1);
@@ -488,6 +494,11 @@ test('retryTask stale→ready archives prior evidence and resets the current att
     finished_at: '2020-01-01T00:00:00Z',
     artifact: '/abs/old.md',
     verified: true,
+    delivery: {
+      schema: 'ccm/task-delivery/v1',
+      candidate: { fingerprint: `sha256:${'a'.repeat(64)}` },
+      observations: [{ id: 'old-observation' }],
+    },
   });
   assert.equal(snapshot(stale).includes('/abs/old.md'), true, 'input board remains untouched');
 });
@@ -522,6 +533,81 @@ test('retryTask rejects non-retryable statuses and leaves ordinary first start/d
   assert.match(task.started_at, ISO);
   assert.match(task.finished_at, ISO);
   assert.equal(board.log.length, 0, 'ordinary first attempt emits no retry audit');
+});
+
+test('declared delivery dedicated writers preserve narrow waist and exact edge scope', () => {
+  const original = baseBoard();
+  const target = {
+    kind: 'git-ref',
+    repository: { source: 'board.git.worktree' },
+    ref: 'HEAD',
+    snapshot: { oid: 'a'.repeat(40), observed_at: '2026-07-14T00:00:00Z' },
+  };
+  let next = m.setDeliveryTarget(original, 'main', target);
+  next = m.setDependencyRequirement(next, 'T1', 'T0', {
+    level: 'delivered',
+    target: 'main',
+  });
+  next = m.setDependencyDefault(next, 'T1', { level: 'candidate' });
+  next = m.setTaskDelivery(next, 'T0', {
+    schema: 'ccm/task-delivery/v1',
+    candidate: { fingerprint: `sha256:${'b'.repeat(64)}` },
+    observations: [],
+  });
+  assert.equal(next.delivery_contract.mode, 'declared');
+  assert.equal(
+    next.tasks.find((t: AnyBoard) => t.id === 'T1').dependency_requirements.T0.target,
+    'main',
+  );
+  assert.equal(
+    next.tasks.find((t: AnyBoard) => t.id === 'T1').dependency_requirements['*'].level,
+    'candidate',
+  );
+  assert.equal(
+    next.tasks.find((t: AnyBoard) => t.id === 'T0').delivery.schema,
+    'ccm/task-delivery/v1',
+  );
+  assert.equal(original.delivery_contract, undefined, 'dedicated writers remain pure');
+  assert.deepEqual(
+    next.tasks.map((t: AnyBoard) => ({ id: t.id, status: t.status, deps: t.deps })),
+    original.tasks.map((t: AnyBoard) => ({ id: t.id, status: t.status, deps: t.deps })),
+    'delivery writers do not alter the narrow waist',
+  );
+});
+
+test('dependency waiver writer requires exact existing delivered edge contract', () => {
+  let b = m.setDeliveryTarget(baseBoard(), 'main', {
+    kind: 'git-ref',
+    repository: { source: 'board.git.worktree' },
+    ref: 'HEAD',
+    snapshot: { oid: 'a'.repeat(40), observed_at: '2026-07-14T00:00:00Z' },
+  });
+  b = m.setDependencyRequirement(b, 'T1', 'T0', { level: 'delivered', target: 'main' });
+  const waiver = {
+    id: 'W-1',
+    authorized_by: 'user',
+    authorized_at: '2026-07-14T01:00:00Z',
+    expires_at: '2026-07-15T01:00:00Z',
+    reason: 'approved exception',
+    downstream: 'T1',
+    dependency: 'T0',
+    target: 'main',
+  };
+  assert.throws(
+    () => m.setDependencyWaiver(b, 'T1', 'T0', waiver),
+    (error: any) =>
+      error.errKind === 'Authorization' && /user-authorized/.test(String(error.message)),
+    'the dedicated writer itself must require an explicit authorization capability',
+  );
+  const next = m.setDependencyWaiver(b, 'T1', 'T0', waiver, { userAuthorized: true });
+  assert.deepEqual(
+    next.tasks.find((t: AnyBoard) => t.id === 'T1').dependency_requirements.T0.waiver_record,
+    waiver,
+  );
+  assert.throws(
+    () => m.setDependencyWaiver(b, 'T1', 'NOPE', waiver, { userAuthorized: true }),
+    (error: any) => error.errKind === 'NotFound',
+  );
 });
 
 test('routing contract dedicated writers bind selection + immutable attempt snapshot + handle claim atomically', () => {
