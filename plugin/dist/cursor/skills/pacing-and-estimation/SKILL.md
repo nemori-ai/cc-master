@@ -53,3 +53,4 @@ description: 'Use when 你（orchestrator/agent）在 Cursor origin 下要消费
 - **[references/pacing-levers.md](references/pacing-levers.md)** — verdict 与候选 lever 类的事实映射。
 - **[references/estimation.md](references/estimation.md)** — estimate 字段、baseline-derived 事实与不确定性读法。
 - **[references/pool-aware-advice.md](references/pool-aware-advice.md)** — 已经产出的 own row 与 pool-aware 通知读法。
+- **[references/cross-harness-target-facts.md](references/cross-harness-target-facts.md)** — 从任意 origin 解释 selected target 的 inventory、model 与 quota envelope。

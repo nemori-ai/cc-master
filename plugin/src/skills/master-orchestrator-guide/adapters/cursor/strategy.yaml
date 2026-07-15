@@ -52,6 +52,8 @@ slot_replacements:
   "{{HOST_QUOTA_RED_FLAG}}": adapters/cursor/overlays/quota-red-flag.md
   "{{HOST_QUOTA_DECISION_GATE}}": adapters/cursor/overlays/quota-decision-gate.md
   "{{HOST_QUOTA_JUDGMENT_ROW}}": adapters/cursor/overlays/quota-judgment-row.md
+  "{{CROSS_HARNESS_ACTIVE_QUERY_POINTER}}": adapters/cursor/overlays/cross-harness-active-query-pointer.md
+  "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/cursor/overlays/cross-harness-target-facts-pointer.md
 notes:
   - Cursor projection uses the host-neutral canonical body plus Cursor Task/Shell dispatch and shell-floor watchdog slots.
   - Quota overlays teach billing_period only (no 5h/7d/account switch). Workflow remains unsupported.

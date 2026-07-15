@@ -12,6 +12,7 @@
   - [Global flags](#global-flags)
   - [Exit codes](#exit-codes)
   - [JSON 信封](#json-信封)
+- [跨 harness 主动查询目标事实](#跨-harness-主动查询目标事实)
 - [namespace worker（session-bound read-only MVP）](#namespace-workersession-bound-read-only-mvp)
   - [worker run](#worker-run)
 - [namespace orchestrator（cached context）](#namespace-orchestratorcached-context)
@@ -256,6 +257,34 @@ ccm <alias> [args] [flags]
 - 失败：`{"ok": false, "exit": <code>, "error": "<msg>", "violations": [...]}`
 
 `data` 形状随命令而变，见 [--json 输出形状](#--json-输出形状)。
+
+---
+
+## 跨 harness 主动查询目标事实
+
+当前上下文没有 selected target 的事实时，用下面的只读命令面主动取得 envelope；不要从 origin-local
+事实、同品牌登录态或模型 prior 补造目标事实。
+
+```bash
+ccm harness list --machine-wide --json
+ccm provider facts <target-provider> --json
+ccm quota status --json
+ccm quota preflight --input <json|@file|-> --json
+```
+
+- `harness list --machine-wide` 用于选择精确 execution surface；`cursor-ide-plugin` 与
+  `cursor-agent-cli` 是两个 descriptor，安装、认证与资格不可互推。
+- `provider facts` 的 `<target-provider>` 当前取 `claude-code | codex | cursor`。它返回静态、带来源与
+  freshness 的模型事实，不执行 live provider probe，也不证明当前账号 entitlement 或 exact-model admission。
+- `quota status` 只回答 owner-only quota store 是否存在；`available:true` **不等于** ample headroom，
+  `available:false` 也必须保留为 unknown。
+- 只有已经持有 authority flow 给出的 `source_key`、committed `reservation_id` 与 `checked_at` 时，才把
+  它们作为 `quota preflight` 输入。必须读取其 `decision`、`automatic_spawn_limit`、
+  `blocking_reasons` 与 owner receipt；缺 authority reference、`automatic_spawn_limit:0` 或任一 blocker 都
+  不能授权 spawn。不要由 caller 自铸 live / policy / effect 结论。
+- 这些命令只取得和重验事实，不代替 orchestrator 的选择、用户对一次付费调用的授权或 parent 验收。
+  字段如何解释查 [pacing-and-estimation 目标事实口径](../../pacing-and-estimation/references/cross-harness-target-facts.md)；是否派发归
+  `master-orchestrator-guide`。
 
 ---
 

@@ -1,0 +1,16 @@
+{
+  "schema": "cc-master/track-b-judge-run/v1",
+  "judge": "claude-sonnet-single-judge",
+  "model": "sonnet",
+  "effort": "medium",
+  "second_judge": {
+    "status": "pending/unpassed",
+    "agreement_claim": false
+  },
+  "prompt_sha256": "f4cc25b3366d24e4c2c53adbbfad1912f4c7448a26c246ac4effc336a9c5a66d",
+  "schema_sha256": "239e5f5de477e623995d7de54255bc524446cc769cc1d0b045f60fc18002862f",
+  "exit_code": 0,
+  "signal": null,
+  "raw_sha256": "65c3468aeec147c77d8865f908a217488c6bbde2421ae00da7474c9cd72515ce",
+  "verdict_count": 30
+}

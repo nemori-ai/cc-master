@@ -13,7 +13,7 @@
             "references/board.md": "3014c12249c5a28d2d8494c61b99506ef5dfacdc52692cbe8aab5aa4edfdfacf",
             "references/cost-decisions.md": "f9cb9122199c13c8a14ba35ed5b25b0b8bc464749d76ce1d7a0ce2dc80bf4237",
             "references/decomposition.md": "9c2917509e1bc3afb87221fa0fba138a7de5ad3cf69875aaf36964eca012b5b7",
-            "references/dispatch.md": "d5bd16ee657d9ed5f896d017ef6f0f992aee4ca94088f7eebda790df699bdf1c",
+            "references/dispatch.md": "0100307c0f49e7f817fae5422cc260d082701e16dc5cc5f21b9715b1ea7b6f9c",
             "references/goal-contract.md": "95f8e8344e03e1271403191f09163784420108780bc18149d6ad4f78f86d5d19",
             "references/handoff.md": "25b88ef2efc945f139d18484ee179483a2e767b9414710e9b0c1308994a25c2f",
             "references/model-allocation.md": "d5045e325564deaab0e35a21312f23b412d5a31f327b68f52e3ba73c62b4de33",
@@ -25,7 +25,8 @@
         "pacing-and-estimation": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "431bd7ad134d7fc19445a5c5d023b1b3e464e15d52ad6d2cb1b3fd2b0b82646e",
+            "SKILL.md": "8641215987cdb9b730028bba5a582cbe22c284e5489847909a2e99a8eb7c1cd5",
+            "references/cross-harness-target-facts.md": "ec3c6b8a11c20e655e1b39a4af5b32eb2629f243c452eb0908c77ff5ef1d465e",
             "references/estimation.md": "6aeae595718ab64c9b02e991c10d4cefb161e15ddc6f8bcdb1a62fa6968653f7",
             "references/model-tiers.md": "a87a73263d978f308e080baf76adf415a60da6819e4c72000e93e19ec7c41b55",
             "references/pacing-levers.md": "7ce1627f9e0995fd4bd3d7bb5df08502a0c71898f3adf0a6b54e2721e6311213",
@@ -39,7 +40,7 @@
             "SKILL.md": "5c69fc3643fca540839b5e21b423f4c1d72e85ce4927868f75857fcca0dd3641",
             "references/account-pool.md": "da7a5826ba8ceb1eefc26722b4e305df6042ea30264abade27f896ef1fb2a8d6",
             "references/board-model-guide.md": "c08342b951e2d180cd07cf93554ddb1f4c726acbc30cb1c4cfa28bc35346143a",
-            "references/command-catalog.md": "69a17ea65233d0250bcb2474093a00e6ab458578187d2e0d7a90ad8679824c4d"
+            "references/command-catalog.md": "233ec7c1884122400b3e521d653c46602e291fc6193c5a423924886b56a1b9d3"
           }
         }
       }
@@ -53,7 +54,7 @@
             "references/async-hitl.md": "9877ad38d12e71ddeddbd8a12747e61e792720b3d6504f17c74fb001da4142ab",
             "references/board.md": "39dfec8792054c707407083b5c9b1e786f36071a56be5b29719ee8b183a4d991",
             "references/decomposition.md": "9d3fc377a4d8e4cd4c9c4d312ce47ab58a74f7faa9d071dda6e8a6c22609ced7",
-            "references/dispatch.md": "bff2ff41727519a78b5ecc440d6d4f45673813d16284c91b8d44ef906f43fd51",
+            "references/dispatch.md": "2a4d61f49f79a90d378a08d659651ff1bdc7cc3ecb7ee5fc7a08ee23ef2fced4",
             "references/goal-contract.md": "95f8e8344e03e1271403191f09163784420108780bc18149d6ad4f78f86d5d19",
             "references/model-allocation.md": "1ce7e299811af74df987c4d845812fa068626934347a423c4f5407e4357ff942",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
@@ -63,7 +64,8 @@
         "pacing-and-estimation": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "fd622d4a3204d0322a3af036cf26190772e0bc09a36a8bf9641adb96d21776ba",
+            "SKILL.md": "f8c92e88ae7d0f415dc2b3de162a29942a387dacfabeff5a74a23450c06ba9a2",
+            "references/cross-harness-target-facts.md": "ad1abc08bf1427f8189c1eb5dd9d7bba03c9c2b6f415c1448d97ee3985b5dd23",
             "references/estimation.md": "6aeae595718ab64c9b02e991c10d4cefb161e15ddc6f8bcdb1a62fa6968653f7",
             "references/model-tiers.md": "9f936362d78466d034c99fb189553a4a54816c190e9c2bce0b58a45b3f0d89dc",
             "references/pacing-levers.md": "13ddf4b0767e5f16983ceb2d88a13be049f13a6825ee253997f68c53252c60c0",
@@ -76,7 +78,7 @@
           "files": {
             "SKILL.md": "b066375d95396b15b64f483ce89740e82603051d4159f5b78d5efdadb98d5427",
             "references/board-model-guide.md": "e06429e61b2a864952b62231fdefc1db4dc1fa044f6a073ed2f05e579e583376",
-            "references/command-catalog.md": "eee861bde8acaa02853c7a856f65bd4236eac1e7b0432c5e3f5d3d922e8c3a52"
+            "references/command-catalog.md": "8776ea2d0dce01765834245a62ec38ef6ed57ea055e1d039a3edef94b735f161"
           }
         }
       }
@@ -90,7 +92,7 @@
             "references/async-hitl.md": "90f061a14d431bc1abc9000931cb9575c237b272e430f3899c176225f1f11281",
             "references/board.md": "f3669b71cdab613e4c559ee6839109575bc3edd7d4288759b8ff19088d281c29",
             "references/decomposition.md": "9d3fc377a4d8e4cd4c9c4d312ce47ab58a74f7faa9d071dda6e8a6c22609ced7",
-            "references/dispatch.md": "99b735df221d5ad7fadeb6cbd70a30378957c11956a32a4ee7dd204b91cc92cb",
+            "references/dispatch.md": "f9ed7e981706aca49ff8cc044e4d7f966ea857c78f5ecf17c8f4d9302abebeaf",
             "references/goal-contract.md": "95f8e8344e03e1271403191f09163784420108780bc18149d6ad4f78f86d5d19",
             "references/model-allocation.md": "adf91ecc673e8b10f6ae3b1852fb886258716c56a211bc230e4b9119c54640f9",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
@@ -100,7 +102,8 @@
         "pacing-and-estimation": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "a311d77d090f93653c484512677ab9a21a6c106de946c205a5a7fccecb16528d",
+            "SKILL.md": "236f076b095a9e91c2d722e10e8c1fe4e58d1c9dcc0ba82d602fbcf7ff1a3c96",
+            "references/cross-harness-target-facts.md": "ad1abc08bf1427f8189c1eb5dd9d7bba03c9c2b6f415c1448d97ee3985b5dd23",
             "references/estimation.md": "6aeae595718ab64c9b02e991c10d4cefb161e15ddc6f8bcdb1a62fa6968653f7",
             "references/model-tiers.md": "391ec216175a5d6ac2fd58dbfed98017e07cdaf1ef364c548881cfbf2cb4a023",
             "references/pacing-levers.md": "798782f575812588ae5697c4eb37a7201c956e15cb10c9c96067dc18e45df2bc",
@@ -113,7 +116,7 @@
           "files": {
             "SKILL.md": "345628f70945e949ee46c6d852d4781c9053796cdbc3edccf9e73f7094f520ac",
             "references/board-model-guide.md": "25467456b3ad108897cbf2cc752365cfd8928da62b03ce7050503205c91b2519",
-            "references/command-catalog.md": "66f507090c8d80a7d8642e89c241974cfa3abe687d7a1b2e7a56f03c53d3000c"
+            "references/command-catalog.md": "2ba070e361dce2f873ed5dbb859db434ad12b92a1d30e2b64829ee91532c4a41"
           }
         }
       }

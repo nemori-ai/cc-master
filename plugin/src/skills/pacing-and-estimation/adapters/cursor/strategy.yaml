@@ -34,5 +34,6 @@ slot_replacements:
   "{{PACING_MODEL_TIERS_REFERENCE}}": adapters/cursor/overlays/model-tiers-reference.md
   "{{PACING_USAGE_SIGNALS_REFERENCE}}": adapters/cursor/overlays/usage-signals-reference.md
   "{{PACING_LEVERS_REFERENCE}}": adapters/cursor/overlays/levers-reference.md
+  "{{CROSS_HARNESS_ACTIVE_QUERY_POINTER}}": adapters/cursor/overlays/cross-harness-active-query-pointer.md
 notes:
   - Cursor projects the closed read-only capability block plus billing_period and plan-qualified model facts; real model tests are first-party-only.

@@ -1,0 +1,8 @@
+["--help"]
+["harness","list"]
+["provider","facts","cursor"]
+["quota","status"]
+["quota","preflight"]
+[]
+["help"]
+["worker","run"]

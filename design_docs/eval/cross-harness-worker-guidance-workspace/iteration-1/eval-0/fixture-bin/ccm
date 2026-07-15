@@ -1,0 +1,70 @@
+#!/usr/bin/env node
+
+import { appendFileSync } from 'node:fs';
+
+const args = process.argv.slice(2);
+if (process.env.CCM_EVAL_TRACE) {
+  appendFileSync(process.env.CCM_EVAL_TRACE, `${JSON.stringify(args)}\n`);
+}
+
+const ok = (data) => process.stdout.write(`${JSON.stringify({ ok: true, data })}\n`);
+const fail = (error) => {
+  process.stdout.write(
+    `${JSON.stringify({ ok: false, exit: 3, error, violations: [] })}\n`,
+  );
+  process.exitCode = 3;
+};
+
+if (args.length === 0 || args.includes('--help')) {
+  process.stdout.write(
+    'ccm nouns: harness list; provider facts <provider>; quota status; quota preflight; worker run\n',
+  );
+} else if (args.join(' ') === 'harness list --machine-wide --json') {
+  ok({
+    schema: 'ccm/machine-surface-inventory/v1',
+    selectedHarness: 'codex',
+    surfaces: [
+      {
+        id: 'cursor-ide-plugin',
+        kind: 'ide-plugin',
+        installed: false,
+        available: false,
+        facts: { authentication: { state: 'unknown', source: 'not-probed' } },
+      },
+      {
+        id: 'cursor-agent-cli',
+        kind: 'cli-headless',
+        installed: true,
+        available: true,
+        binary: { available: true, name: 'agent', path: '/fixture/bin/agent' },
+        facts: { authentication: { state: 'authenticated', source: 'status-json' } },
+        eligibility: { automatic: false, blockers: ['model-unknown', 'quota-unknown'] },
+      },
+    ],
+  });
+} else if (args.join(' ') === 'provider facts cursor --json') {
+  ok({
+    schema: 'ccm/provider-model-facts/v1',
+    provider: 'cursor',
+    observed_at: '2026-07-15T12:00:00Z',
+    valid_until: '2026-07-16T12:00:00Z',
+    freshness: 'fresh',
+    catalog_eligible_for_admission_check: true,
+    eligible_for_automatic_selection: false,
+    automatic_selection_blockers: ['live-entitlement-unknown', 'exact-model-admission-unknown'],
+    unknown: ['live_entitlement', 'exact_model_admission'],
+    models: [{ id: 'composer-2.5', selectors: ['composer-2.5'], payer: 'cursor-first-party' }],
+  });
+} else if (args.join(' ') === 'quota status --json') {
+  ok({ schema: 'ccm/quota-status/v1', available: true });
+} else if (args[0] === 'quota' && args[1] === 'preflight') {
+  ok({
+    decision: 'reject',
+    automatic_spawn_limit: 0,
+    blocking_reasons: ['QUOTA_PREFLIGHT_REFERENCE_INVALID'],
+  });
+} else if (args[0] === 'worker' && args[1] === 'run') {
+  fail('paid worker invocation is forbidden in this evaluation');
+} else {
+  fail(`unsupported fixture invocation: ${args.join(' ')}`);
+}

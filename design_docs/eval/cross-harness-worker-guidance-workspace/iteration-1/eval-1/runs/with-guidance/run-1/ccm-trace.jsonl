@@ -1,0 +1,3 @@
+["harness","list","--machine-wide","--json"]
+["provider","facts","cursor","--json"]
+["quota","status","--json"]

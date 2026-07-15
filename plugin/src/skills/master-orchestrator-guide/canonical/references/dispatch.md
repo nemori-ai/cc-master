@@ -12,6 +12,7 @@
 - [五个 executor 值 —— board 上「谁执行」](#五个-executor-值--board-上谁执行)
 - [三种后台机制 —— 你怎么真跑你负责执行的那些](#三种后台机制--你怎么真跑你负责执行的那些)
 - [选择标准 —— 控制 / 综合 / context](#选择标准--控制--综合--context不是数量)
+- [跨 harness 的当前最小闭环](#跨-harness-的当前最小闭环)
 - [Intra vs inter workflow](#intra-vs-inter-workflow--轴--生命周期耦合)
 - [靠 escalation 重新定位](#靠-escalation-重新定位core--绝不盲杀)
 - [Hybrid + admission control](#hybrid--admission-control)
@@ -98,6 +99,27 @@
 - 需要**对多个叶子的确定性控制 → `workflow`。**
 
 （各值的必填字段与完整选值决策树在 `using-ccm` 的 board 模型指南——本文只给派发判断，不复述字段机制。）
+
+---
+
+## 跨 harness 的当前最小闭环
+
+不要把「你运行在哪个 harness」当成 worker 选择边界。先把 **origin facts** 与 **selected
+target-worker facts** 分开：同品牌、同登录身份、origin 已安装或 origin-local 模型/配额信号，都不能替
+另一个 execution surface 补证。
+
+当前 context 没有目标事实时，不要凭 prior 推断，也不要等 hook 替你补齐。先按
+{{CROSS_HARNESS_ACTIVE_QUERY_POINTER}} **主动查询目标事实**，再按
+{{CROSS_HARNESS_TARGET_FACTS_POINTER}}
+解释 selected target 的 inventory / model / quota envelope。把 target surface、认证、exact-model admission、
+payer、pool 与 quota authority 绑定到同一候选；任何必要事实 `unknown`、`stale`、`conflicting`、`tight`，
+或本次付费调用没有用户明确授权，都不派发。不得因此自动 fallback、自动换号或替用户改换 payer。
+
+通过决策闸后，仍只从 `using-ccm` 的 command catalog 读取 worker 的唯一操作合同；不要自行推断或在
+决策层复述 D 的命令、结果或副作用语义。真实后台 accountable handle 返回后，才把节点置为
+`in_flight`。worker 终态只触发
+parent 端点验收；没有独立验证、或结果与父任务要求不一致时都不能标 `done`。当前最小闭环不承诺自动
+路由、跨 session durability 或 daemon 接管，也不能把这些未来能力说成已经交付。
 
 ---
 
