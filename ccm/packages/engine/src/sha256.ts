@@ -1,9 +1,8 @@
-// A small synchronous SHA-256 implementation for deterministic JSON identity checks.
-//
-// This module deliberately has no Node imports: native-attempt projection validation is called by
-// lintBoard in the browser IIFE as well as by the Node CLI. Web Crypto is asynchronous, so using it
-// here would split the validation contract by host. Keep this pure function covered against
-// node:crypto, including non-ASCII input.
+// A small synchronous SHA-256 implementation for deterministic identities shared by Node and the
+// browser IIFE. This module deliberately has no Node imports: native-attempt projection validation
+// is called by lintBoard in the browser IIFE as well as by the Node CLI. Web Crypto is asynchronous,
+// so using it here would split the validation contract by host. Keep this pure function covered
+// against node:crypto, including non-ASCII input.
 
 const ROUND_CONSTANTS = new Uint32Array([
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -20,12 +19,17 @@ function utf8Bytes(input: string): number[] {
   const bytes: number[] = [];
   for (let index = 0; index < input.length; index += 1) {
     let point = input.charCodeAt(index);
-    if (point >= 0xd800 && point <= 0xdbff && index + 1 < input.length) {
-      const low = input.charCodeAt(index + 1);
+    if (point >= 0xd800 && point <= 0xdbff) {
+      const low = index + 1 < input.length ? input.charCodeAt(index + 1) : -1;
       if (low >= 0xdc00 && low <= 0xdfff) {
         point = 0x10000 + ((point - 0xd800) << 10) + (low - 0xdc00);
         index += 1;
+      } else {
+        // WHATWG/Node UTF-8 encoding replaces an unpaired UTF-16 surrogate with U+FFFD.
+        point = 0xfffd;
       }
+    } else if (point >= 0xdc00 && point <= 0xdfff) {
+      point = 0xfffd;
     }
     if (point <= 0x7f) {
       bytes.push(point);
@@ -125,4 +129,12 @@ export function sha256Hex(input: string): string {
   }
 
   return Array.from(hash, (word) => word.toString(16).padStart(8, '0')).join('');
+}
+
+export function sha256Digest(input: string): string {
+  return `sha256:${sha256Hex(input)}`;
+}
+
+export function isSha256Digest(value: unknown): value is string {
+  return typeof value === 'string' && /^sha256:[0-9a-f]{64}$/.test(value);
 }

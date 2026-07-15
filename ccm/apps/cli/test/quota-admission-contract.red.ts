@@ -30,7 +30,14 @@ import { basename, dirname, join, relative } from 'node:path';
 import { afterEach, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
-import type { QuotaEffectBoundary } from '@ccm/engine';
+import {
+  CANONICAL_LAUNCH_IDENTITY_SCHEMA,
+  canonicalJson,
+  canonicalLaunchIdentityDigest,
+  normalizeCanonicalLaunchIdentity,
+  type QuotaEffectBoundary,
+  sha256Digest,
+} from '@ccm/engine';
 import { run } from '../src/router.js';
 
 interface ContractCase extends Record<string, unknown> {
@@ -96,6 +103,71 @@ type DirectorySyncFaultCode = 'EINVAL' | 'ENOTSUP' | 'EACCES' | 'EPERM';
 interface DirectorySyncOutcome {
   result?: unknown;
   rejectedCode?: string;
+}
+
+function withCanonicalLaunchAuthority(ticket: Record<string, unknown>): Record<string, unknown> {
+  const providerExtension = {
+    schema: 'ccm/fixture-provider-launch-extension/v1',
+    selector: 'fixture-model[effort=standard]',
+    workspace_path: '/fixture/worktree',
+    executable_path: ticket.executable_path,
+  };
+  const dispatch = {
+    attempt_id: ticket.attempt_id,
+    run_ref: ticket.run_ref,
+    launch_idempotency_key: ticket.launch_idempotency_key,
+    launch_nonce: ticket.launch_nonce,
+  };
+  const canonicalIdentity = normalizeCanonicalLaunchIdentity({
+    schema: CANONICAL_LAUNCH_IDENTITY_SCHEMA,
+    origin: { harness: 'codex', session_ref: 'session-ref:quota-contract-fixture' },
+    target: {
+      harness: 'fixture-provider',
+      adapter: 'fixture-provider/cli-v1',
+      surface: 'cli-headless',
+      transport: 'fixture-jsonl-v1',
+      candidate_id: 'fixture-cli-worker',
+    },
+    provider: { id: 'fixture-provider', model: 'fixture-model', effort: 'standard' },
+    account: {
+      fingerprint_ref: ticket.identity_fingerprint,
+      account_id: ticket.account_id,
+      pool_id: ticket.pool_id,
+      identity_fingerprint: ticket.identity_fingerprint,
+    },
+    workspace: {
+      workspace_ref: 'workspace:fixture',
+      worktree_ref: 'worktree:fixture',
+      baseline_commit: '1'.repeat(40),
+    },
+    permission: {
+      snapshot_ref: 'permission:fixture',
+      profile: 'workspace-write',
+      denies: ['account-mutation', 'credential-write', 'push-remote'],
+    },
+    input: { digest: sha256Digest('fixture-input') },
+    request: {
+      digest: sha256Digest(canonicalJson({ provider_extension: providerExtension, dispatch })),
+    },
+    dispatch: {
+      run_ref: ticket.run_ref,
+      idempotency_key: ticket.launch_idempotency_key,
+      launch_nonce: ticket.launch_nonce,
+      claim_id: ticket.launch_nonce,
+    },
+    runtime: {
+      image_sha256: ticket.runtime_sha256,
+      selector: { kind: 'exact', model_id: 'fixture-model', effort: 'standard' },
+    },
+  });
+  const result: Record<string, unknown> = {
+    ...ticket,
+    canonical_identity: canonicalIdentity,
+    canonical_identity_digest: canonicalLaunchIdentityDigest(canonicalIdentity),
+    provider_extension: providerExtension,
+  };
+  delete result.executable_path;
+  return result;
 }
 
 interface DirectorySyncBoundary {
@@ -2148,7 +2220,7 @@ if (!FIXTURES_ONLY) {
         },
         account_id: 'cli-account',
         pool_id: 'cli-pool',
-        identity_fingerprint: 'sha256:cli-identity',
+        identity_fingerprint: `sha256:${'c'.repeat(64)}`,
         hard_window: { name: 'seven_day', duration_sec: 604_800 },
         policy: {
           decision: 'allow',
@@ -2194,7 +2266,7 @@ if (!FIXTURES_ONLY) {
           candidate_id: 'codex-cli-worker',
           account_id: 'cli-account',
           pool_id: 'cli-pool',
-          identity_fingerprint: 'sha256:cli-identity',
+          identity_fingerprint: `sha256:${'c'.repeat(64)}`,
         }),
       ),
       'CLI authority reservation',
@@ -2203,25 +2275,26 @@ if (!FIXTURES_ONLY) {
       await authorityStore.commitReservation({
         reservation_id: 'qres-cli-authority',
         checked_at: new Date().toISOString(),
-        ticket: {
+        ticket: withCanonicalLaunchAuthority({
           schema: 'ccm/quota-admission-ticket/v1',
           ticket_id: 'ticket-cli-authority',
           reservation_id: 'qres-cli-authority',
           reservation_request_hash: authorityReservation.request_hash,
           reservation_expires_at: '2099-07-14T01:00:00Z',
           attempt_id: 'attempt-cli-authority',
-          run_ref: 'run-cli-authority',
+          run_ref: 'ccm-run:v1:cli-authority',
           account_id: 'cli-account',
           pool_id: 'cli-pool',
-          identity_fingerprint: 'sha256:cli-identity',
+          identity_fingerprint: `sha256:${'c'.repeat(64)}`,
           aggregation_key: authorityAggregation,
           live_source_revision: 'sha256:cli-live-r1',
-          runtime_sha256: 'sha256:cli-runtime',
-          launch_idempotency_key: 'launch-cli-authority',
+          runtime_sha256: `sha256:${'d'.repeat(64)}`,
+          executable_path: '/fixture/runtime/cli-authority',
+          launch_idempotency_key: sha256Digest('launch-cli-authority'),
           launch_nonce: 'nonce-cli-authority',
           issued_at: new Date().toISOString(),
           launch_by: '2099-07-14T01:00:00Z',
-        },
+        }),
       }),
       'CLI authority commit',
     );
@@ -2384,7 +2457,7 @@ if (!FIXTURES_ONLY) {
           schema: 'ccm/quota-authority-observation/v1',
           provider: scenario.input.provider,
           provider_rule_revision: 'future-provider/thirty-day/v1',
-          source_revision: 'live-future-r2',
+          source_revision: 'sha256:live-future-r2',
           observed_at: new Date(nowMs - 1_000).toISOString(),
           valid_until: new Date(nowMs + 300_000).toISOString(),
           source_profile: {
@@ -2396,7 +2469,7 @@ if (!FIXTURES_ONLY) {
           },
           account_id: 'identity-F',
           pool_id: 'pool-F',
-          identity_fingerprint: 'sha256:identity-F',
+          identity_fingerprint: `sha256:${'e'.repeat(64)}`,
           hard_window: scenario.input.provider_window_rule,
           policy: {
             decision: 'allow',
@@ -2429,11 +2502,11 @@ if (!FIXTURES_ONLY) {
             key: 'key-future',
             checked_at: checkedAt,
             expires_at: expiresAt,
-            source_revision: 'live-future-r2',
+            source_revision: 'sha256:live-future-r2',
             attempt_id: 'attempt-future',
             account_id: 'identity-F',
             pool_id: 'pool-F',
-            identity_fingerprint: 'sha256:identity-F',
+            identity_fingerprint: `sha256:${'e'.repeat(64)}`,
           }),
         ),
         'provider-neutral hold',
@@ -2443,25 +2516,26 @@ if (!FIXTURES_ONLY) {
         await store.commitReservation({
           reservation_id: 'qres-future',
           checked_at: checkedAt,
-          ticket: {
+          ticket: withCanonicalLaunchAuthority({
             schema: 'ccm/quota-admission-ticket/v1',
             ticket_id: 'ticket-future',
             reservation_id: 'qres-future',
             reservation_request_hash: held.request_hash,
             reservation_expires_at: expiresAt,
             attempt_id: 'attempt-future',
-            run_ref: 'run-future',
+            run_ref: 'ccm-run:v1:future-provider',
             account_id: 'identity-F',
             pool_id: 'pool-F',
-            identity_fingerprint: 'sha256:identity-F',
+            identity_fingerprint: `sha256:${'e'.repeat(64)}`,
             aggregation_key: aggregationKey,
-            live_source_revision: 'live-future-r2',
-            runtime_sha256: 'sha256:future-runtime',
-            launch_idempotency_key: 'launch-future',
+            live_source_revision: 'sha256:live-future-r2',
+            runtime_sha256: `sha256:${'f'.repeat(64)}`,
+            executable_path: '/fixture/runtime/future-provider',
+            launch_idempotency_key: sha256Digest('launch-future'),
             launch_nonce: 'nonce-future',
             issued_at: checkedAt,
             launch_by: new Date(nowMs + 60_000).toISOString(),
-          },
+          }),
         }),
         'provider-neutral commit',
       );

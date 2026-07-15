@@ -120,6 +120,7 @@ export {
 export { reconcileGating } from './board-reconcile.js';
 export { canonicalSha256Digest } from './canonical-digest.js';
 export { canonicalJson } from './canonical-json.js';
+export type { CanonicalLaunchIdentity } from './canonical-launch-identity.js';
 export {
   CANONICAL_LAUNCH_IDENTITY_FIELD_REGISTRY,
   CANONICAL_LAUNCH_IDENTITY_SCHEMA,
@@ -400,7 +401,7 @@ export {
   systemdInstallCommands,
   systemdUninstallCommands,
 } from './service-serializers.js';
-export { sha256Hex } from './sha256.js';
+export { isSha256Digest, sha256Digest, sha256Hex } from './sha256.js';
 // ── shadow-routing（C1 cached machine context + pure advisory route；零 IO/spawn/mutation）──
 export type {
   CachedCandidateFact,

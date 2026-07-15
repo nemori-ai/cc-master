@@ -16,13 +16,25 @@ import { platform, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import {
+  CANONICAL_LAUNCH_IDENTITY_SCHEMA,
+  canonicalJson,
+  canonicalLaunchIdentityDigest,
   deriveQuotaHeadroom,
   evaluateLiveQuotaAdmission,
   evaluateQuotaObservation,
   evaluateQuotaOrphanAudit,
   evaluateQuotaReservationTransition,
+  normalizeCanonicalLaunchIdentity,
+  sha256Digest,
 } from '@ccm/engine';
 import { createQuotaAdmissionStore } from '../src/quota-admission-store.js';
+import {
+  digestQuotaAdmissionTicket,
+  parseQuotaAdmissionTicket,
+  QUOTA_ADMISSION_TICKET_PREDICATE_IDS,
+  QUOTA_ADMISSION_TICKET_RESERVATION_BINDING_IDS,
+} from '../src/quota-admission-ticket.js';
+import { parseQuotaOwnerPreflightReceipt } from '../src/quota-owner-receipt.js';
 
 type Data = Record<string, unknown>;
 
@@ -37,6 +49,10 @@ interface AuthorityStore {
 }
 
 const roots: string[] = [];
+const IDENTITY_A = `sha256:${'a'.repeat(64)}`;
+const IDENTITY_B = `sha256:${'b'.repeat(64)}`;
+const IDENTITY_OTHER = `sha256:${'c'.repeat(64)}`;
+const RUNTIME_1 = `sha256:${'d'.repeat(64)}`;
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -65,32 +81,99 @@ function reservation(overrides: Data = {}): Data {
     candidate_id: 'codex-cli-worker',
     account_id: 'identity-A',
     pool_id: 'pool-A',
-    identity_fingerprint: 'sha256:identity-A',
+    identity_fingerprint: IDENTITY_A,
     ...overrides,
   };
 }
 
 function ticket(overrides: Data = {}): Data {
-  return {
+  const value = {
     schema: 'ccm/quota-admission-ticket/v1',
     ticket_id: 'ticket-1',
     reservation_id: 'qres-1',
     reservation_request_hash: 'sha256:request-1',
     reservation_expires_at: '2099-07-14T01:00:00Z',
     attempt_id: 'attempt-1',
-    run_ref: 'run-1',
+    run_ref: 'ccm-run:v1:quota-fixture-1',
     account_id: 'identity-A',
     pool_id: 'pool-A',
-    identity_fingerprint: 'sha256:identity-A',
+    identity_fingerprint: IDENTITY_A,
     aggregation_key: 'codex|identity-A|pool-A|seven_day',
     live_source_revision: 'sha256:live-r2',
-    runtime_sha256: 'sha256:runtime-1',
-    launch_idempotency_key: 'launch-1',
+    runtime_sha256: RUNTIME_1,
+    executable_path: '/fixture/runtime/codex',
+    launch_idempotency_key: sha256Digest('launch-1'),
     launch_nonce: 'nonce-1',
     issued_at: new Date().toISOString(),
     launch_by: '2099-07-14T01:00:00Z',
     ...overrides,
   };
+  const providerExtension =
+    overrides.provider_extension ??
+    ({
+      schema: 'ccm/fixture-provider-launch-extension/v1',
+      selector: 'fixture-model[effort=standard]',
+      workspace_path: '/fixture/worktree',
+      executable_path: value.executable_path,
+    } as const);
+  const dispatch = {
+    attempt_id: value.attempt_id,
+    run_ref: value.run_ref,
+    launch_idempotency_key: value.launch_idempotency_key,
+    launch_nonce: value.launch_nonce,
+  };
+  const canonicalIdentity =
+    overrides.canonical_identity ??
+    normalizeCanonicalLaunchIdentity({
+      schema: CANONICAL_LAUNCH_IDENTITY_SCHEMA,
+      origin: { harness: 'codex', session_ref: 'session-ref:quota-fixture' },
+      target: {
+        harness: 'codex',
+        adapter: 'codex/cli-v1',
+        surface: 'cli-headless',
+        transport: 'codex-cli-jsonl-v1',
+        candidate_id: 'codex-cli-worker',
+      },
+      provider: { id: 'openai', model: 'fixture-model', effort: 'standard' },
+      account: {
+        fingerprint_ref: value.identity_fingerprint,
+        account_id: value.account_id,
+        pool_id: value.pool_id,
+        identity_fingerprint: value.identity_fingerprint,
+      },
+      workspace: {
+        workspace_ref: 'workspace:fixture',
+        worktree_ref: 'worktree:fixture',
+        baseline_commit: '1'.repeat(40),
+      },
+      permission: {
+        snapshot_ref: 'permission:fixture',
+        profile: 'workspace-write',
+        denies: ['account-mutation', 'credential-write', 'push-remote'],
+      },
+      input: { digest: sha256Digest('fixture-input') },
+      request: {
+        digest: sha256Digest(canonicalJson({ provider_extension: providerExtension, dispatch })),
+      },
+      dispatch: {
+        run_ref: value.run_ref,
+        idempotency_key: value.launch_idempotency_key,
+        launch_nonce: value.launch_nonce,
+        claim_id: value.launch_nonce,
+      },
+      runtime: {
+        image_sha256: value.runtime_sha256,
+        selector: { kind: 'exact', model_id: 'fixture-model', effort: 'standard' },
+      },
+    });
+  const result: Data = {
+    ...value,
+    canonical_identity: canonicalIdentity,
+    canonical_identity_digest: canonicalLaunchIdentityDigest(canonicalIdentity),
+    provider_extension: providerExtension,
+  };
+  delete result.executable_path;
+  return result;
 }
 
 function terminalProof(
@@ -121,6 +204,134 @@ function terminalProof(
     evidence_retained: true,
   };
 }
+
+test('shared canonical ticket surface kills every grammar, time, binding, and digest mutation class', async () => {
+  const contract = (await import('../src/quota-admission-ticket.js').catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+  const parse = contract.parseQuotaAdmissionTicket as
+    | ((value: unknown) => Readonly<Data> | null)
+    | undefined;
+  const validateBinding = contract.validateQuotaAdmissionTicketBinding as
+    | ((value: Readonly<Data>, context: Readonly<Data>) => boolean)
+    | undefined;
+  const digestTicket = contract.digestQuotaAdmissionTicket as
+    | ((value: Readonly<Data>) => string)
+    | undefined;
+  assert.equal(typeof parse, 'function');
+  assert.equal(typeof validateBinding, 'function');
+  assert.equal(typeof digestTicket, 'function');
+
+  const canonicalTicket = {
+    ...ticket({
+      reservation_request_hash: 'sha256:request-1',
+      reservation_expires_at: '2026-07-14T12:10:00.000Z',
+      issued_at: '2026-07-14T12:00:00.000Z',
+      committed_at: '2026-07-14T12:00:01.000Z',
+      launch_by: '2026-07-14T12:05:00.000Z',
+    }),
+  };
+  const context = {
+    aggregation_key: 'codex|identity-A|pool-A|seven_day',
+    reservation: {
+      id: 'qres-1',
+      hash: 'sha256:request-1',
+      expires_at: '2026-07-14T12:10:00.000Z',
+      attempt_id: 'attempt-1',
+      account_id: 'identity-A',
+      pool_id: 'pool-A',
+      identity_fingerprint: IDENTITY_A,
+      source_revision: 'sha256:live-r2',
+    },
+  };
+  const parsed = parse?.(canonicalTicket);
+  assert.ok(parsed);
+  assert.equal(validateBinding?.(parsed, context), true);
+  assert.equal(
+    digestTicket?.(parsed),
+    'sha256:e75139e6aed21ba4e33970a137135bccac214b73a9dc68aa9670599d9bdbf98a',
+  );
+
+  const grammarAndTimeMutants: Record<string, Data> = {
+    'closed-fields': { ...canonicalTicket, unexpected: true },
+    schema: { ...canonicalTicket, schema: 'ccm/quota-admission-ticket/v0' },
+    'canonical-identifiers': { ...canonicalTicket, ticket_id: 'ticket-1 ' },
+    'sha256-digests': { ...canonicalTicket, runtime_sha256: 'sha256:not-a-digest' },
+    'live-source-revision': {
+      ...canonicalTicket,
+      live_source_revision: 'revision-without-sha256-prefix',
+    },
+    'parseable-instants': { ...canonicalTicket, issued_at: 'not-an-instant' },
+    'committed-not-before-issued': {
+      ...canonicalTicket,
+      issued_at: '2026-07-14T12:00:02.000Z',
+    },
+    'launch-after-issued': {
+      ...canonicalTicket,
+      launch_by: '2026-07-14T12:00:00.000Z',
+    },
+    'launch-not-before-committed': {
+      ...canonicalTicket,
+      launch_by: '2026-07-14T12:00:00.500Z',
+    },
+    'launch-not-after-reservation-expiry': {
+      ...canonicalTicket,
+      launch_by: '2026-07-14T12:10:01.000Z',
+    },
+    'canonical-identity': {
+      ...canonicalTicket,
+      canonical_identity: {
+        ...(canonicalTicket.canonical_identity as Data),
+        request: {
+          digest: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+      },
+    },
+    'canonical-identity-top-level-binding': {
+      ...canonicalTicket,
+      runtime_sha256: `sha256:${'e'.repeat(64)}`,
+    },
+    'provider-extension': { ...canonicalTicket, provider_extension: null },
+  };
+  assert.deepEqual(Object.keys(grammarAndTimeMutants), QUOTA_ADMISSION_TICKET_PREDICATE_IDS);
+  for (const [predicateId, mutant] of Object.entries(grammarAndTimeMutants)) {
+    assert.equal(parse?.(mutant), null, predicateId);
+  }
+
+  const rebound = (overrides: Data): Data => {
+    const value = { ...canonicalTicket, ...overrides };
+    delete value.canonical_identity;
+    delete value.canonical_identity_digest;
+    delete value.provider_extension;
+    return ticket(value);
+  };
+  const bindingMutants: Record<string, Data> = {
+    'reservation-id': rebound({ reservation_id: 'qres-other' }),
+    'reservation-request-hash': rebound({
+      reservation_request_hash: 'sha256:request-other',
+    }),
+    'reservation-expiry': rebound({
+      reservation_expires_at: '2026-07-14T12:09:59.000Z',
+    }),
+    'attempt-id': rebound({ attempt_id: 'attempt-other' }),
+    'account-id': rebound({ account_id: 'identity-other' }),
+    'pool-id': rebound({ pool_id: 'pool-other' }),
+    'identity-fingerprint': rebound({
+      identity_fingerprint: IDENTITY_OTHER,
+    }),
+    'aggregation-key': rebound({ aggregation_key: 'aggregation-other' }),
+    'live-source-revision': rebound({
+      live_source_revision: 'sha256:live-other',
+    }),
+  };
+  assert.deepEqual(Object.keys(bindingMutants), QUOTA_ADMISSION_TICKET_RESERVATION_BINDING_IDS);
+  for (const [bindingId, mutant] of Object.entries(bindingMutants)) {
+    const parsedMutant = parse?.(mutant);
+    assert.ok(parsedMutant, bindingId);
+    assert.equal(validateBinding?.(parsedMutant, context), false, bindingId);
+  }
+});
 
 function authorityStore(
   quotaHome: string,
@@ -166,7 +377,7 @@ async function publishAuthority(
       source_revision: 'sha256:live-r2',
       ...freshnessEnvelope(),
       identity: 'identity-A',
-      identity_fingerprint: 'sha256:identity-A',
+      identity_fingerprint: IDENTITY_A,
       account_id: 'identity-A',
       pool_id: 'pool-A',
       hard_window: { name: 'seven_day', duration_sec: 604_800 },
@@ -513,7 +724,7 @@ test('final audit P1: commit rejects a reservation after its current authority b
     source_revision: 'sha256:live-r1',
     ...freshnessEnvelope(nowMs),
     identity: 'identity-A',
-    identity_fingerprint: 'sha256:identity-A',
+    identity_fingerprint: IDENTITY_A,
     account_id: 'identity-A',
     pool_id: 'pool-A',
     hard_window: { name: 'seven_day', duration_sec: 604_800 },
@@ -552,7 +763,7 @@ test('final audit P1: commit rejects a reservation after its current authority b
       ...authority,
       source_revision: 'sha256:live-r2',
       identity: 'identity-B',
-      identity_fingerprint: 'sha256:identity-B',
+      identity_fingerprint: IDENTITY_B,
       account_id: 'identity-B',
       pool_id: 'pool-B',
     },
@@ -590,7 +801,7 @@ test('final review P1-1: source TTL/reset and reservation expiry are recomputed 
     valid_until: new Date(nowMs + 3_600_000).toISOString(),
     account_id: 'identity-A',
     pool_id: 'pool-A',
-    identity_fingerprint: 'sha256:identity-A',
+    identity_fingerprint: IDENTITY_A,
     hard_window: { name: 'seven_day', duration_sec: 604_800 },
     policy: {
       decision: 'allow',
@@ -868,10 +1079,10 @@ test('reviewer P1-2: strict hold, immutable commit lineage, and committed audit 
     {
       attempt_id: 'attempt-1',
       ticket_id: 'ticket-1',
-      run_ref: 'run-1',
+      run_ref: 'ccm-run:v1:quota-fixture-1',
       account_id: 'identity-A',
       pool_id: 'pool-A',
-      identity_fingerprint: 'sha256:identity-A',
+      identity_fingerprint: IDENTITY_A,
       aggregation_key: 'codex|identity-A|pool-A|seven_day',
       source_revision: 'sha256:live-r2',
       reservation_expires_at: '2099-07-14T01:00:00Z',
@@ -911,8 +1122,8 @@ test('reviewer P1-2: strict hold, immutable commit lineage, and committed audit 
       reservation_id: 'qres-valid-proof',
       reservation_request_hash: proofHeld.request_hash,
       attempt_id: 'attempt-valid-proof',
-      run_ref: 'run-valid-proof',
-      launch_idempotency_key: 'launch-valid-proof',
+      run_ref: 'ccm-run:v1:valid-proof',
+      launch_idempotency_key: sha256Digest('launch-valid-proof'),
       launch_nonce: 'nonce-valid-proof',
     }),
   });
@@ -921,7 +1132,7 @@ test('reviewer P1-2: strict hold, immutable commit lineage, and committed audit 
     reservationId: 'qres-valid-proof',
     requestHash: proofHeld.request_hash,
     attemptId: 'attempt-valid-proof',
-    runRef: 'run-valid-proof',
+    runRef: 'ccm-run:v1:valid-proof',
     ticketDigest: proofCommit.ticket_digest,
   };
   const releasePending = await store.auditReservation({
@@ -1043,7 +1254,7 @@ test('reviewer P1-4: preflight derives Codex 7d authority from store and keeps r
       source_revision: 'sha256:live-r2',
       ...freshnessEnvelope(),
       identity: 'identity-A',
-      identity_fingerprint: 'sha256:identity-A',
+      identity_fingerprint: IDENTITY_A,
       account_id: 'identity-A',
       pool_id: 'pool-A',
       hard_window: { name: 'seven_day', duration_sec: 604800 },
@@ -1102,6 +1313,22 @@ test('reviewer P1-4: preflight derives Codex 7d authority from store and keeps r
   assert.equal(result.hard_window, 'seven_day');
   assert.equal(result.provider_rule_revision, 'ccm/codex-7d-pacing/v1');
   assert.deepEqual(result.ignored_windows, ['five_hour']);
+  const ownerReceipt = parseQuotaOwnerPreflightReceipt(result.owner_receipt);
+  assert.ok(ownerReceipt);
+  assert.equal(ownerReceipt.reservation_id, 'qres-1');
+  assert.equal(ownerReceipt.attempt_id, 'attempt-1');
+  assert.equal(ownerReceipt.run_ref, 'ccm-run:v1:quota-fixture-1');
+  assert.equal(ownerReceipt.account_id, 'identity-A');
+  assert.equal(ownerReceipt.pool_id, 'pool-A');
+  assert.equal(ownerReceipt.source_revision, 'sha256:live-r2');
+  assert.match(ownerReceipt.checked_at, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
+  assert.match(ownerReceipt.reservation_request_hash, /^sha256:[a-f0-9]{64}$/);
+  assert.match(ownerReceipt.ticket_digest, /^sha256:[a-f0-9]{64}$/);
+  assert.match(ownerReceipt.authority_digest, /^sha256:[a-f0-9]{64}$/);
+  const committedTicket = parseQuotaAdmissionTicket(result.committed_ticket);
+  assert.ok(committedTicket);
+  assert.equal(digestQuotaAdmissionTicket(committedTicket), ownerReceipt.ticket_digest);
+  assert.equal(parseQuotaOwnerPreflightReceipt({ ...ownerReceipt, unexpected: true }), null);
 
   await store.publishObservation({
     source_key: 'codex-empty',
@@ -1112,7 +1339,7 @@ test('reviewer P1-4: preflight derives Codex 7d authority from store and keeps r
       source_revision: 'sha256:live-r2',
       ...freshnessEnvelope(),
       identity: 'identity-A',
-      identity_fingerprint: 'sha256:identity-A',
+      identity_fingerprint: IDENTITY_A,
       account_id: 'identity-A',
       pool_id: 'pool-A',
       hard_window: { name: 'seven_day', duration_sec: 604800 },
@@ -1149,7 +1376,7 @@ test('final review P1-3: provider-neutral hard window reaches production reserve
       source_revision: 'sha256:live-r2',
       ...freshnessEnvelope(nowMs),
       identity: 'identity-A',
-      identity_fingerprint: 'sha256:identity-A',
+      identity_fingerprint: IDENTITY_A,
       account_id: 'identity-A',
       pool_id: 'pool-A',
       hard_window: { name: 'thirty_day', duration_sec: 2_592_000 },
@@ -1729,7 +1956,7 @@ test('reviewer R3 P1-2: Codex policy revision and percentage domain fail closed 
         ...freshnessEnvelope(),
         account_id: 'identity-A',
         pool_id: 'pool-A',
-        identity_fingerprint: 'sha256:identity-A',
+        identity_fingerprint: IDENTITY_A,
         hard_window: { name: 'seven_day', duration_sec: 604_800 },
         policy,
         effects: { decision: 'allow', effect: 'read-only' },

@@ -41,7 +41,11 @@ export type ProviderChildSupervisorErrorCode =
 export interface ProviderChildTermination {
   exitCode: number | null;
   signal: NodeJS.Signals | null;
-  /** True only after launcher `close` and proof that the complete owned process tree is gone. */
+  /**
+   * True only after proof that the launcher terminated and the complete owned process tree is
+   * gone. Normal children must emit `close`; malformed event surfaces fall back to a terminal
+   * process snapshot because they cannot install a `close` listener.
+   */
   reaped: boolean;
 }
 
@@ -126,6 +130,74 @@ export function createProviderRequestDeadline(hardTimeoutMs: number): ProviderRe
     schema: PROVIDER_REQUEST_DEADLINE_SCHEMA,
     expiresAtMs,
   });
+}
+
+/**
+ * Bounded cleanup for the narrow gap after spawn ownership transfers but before supervision is
+ * installed. Callers must retain the returned owned handle and use this path on any synchronous
+ * handoff failure; a generic catch is not allowed to forget a child it already owns.
+ */
+export async function terminateAndReapProviderChild(
+  ownedChild: ProviderOwnedChild,
+  limits: Pick<ProviderChildLimits, 'terminationGraceMs' | 'reapTimeoutMs'>,
+): Promise<ProviderChildTermination> {
+  assertPositiveFinite(limits.terminationGraceMs, 'terminationGraceMs');
+  assertPositiveFinite(limits.reapTimeoutMs, 'reapTimeoutMs');
+  const child = ownedChild?.child;
+  const tree = ownedChild?.tree;
+  if (!child || !tree || typeof tree.signal !== 'function' || typeof tree.isAlive !== 'function') {
+    return { exitCode: child?.exitCode ?? null, signal: child?.signalCode ?? null, reaped: false };
+  }
+
+  let closed = false;
+  let treeGone = false;
+  const canObserveClose =
+    typeof child.once === 'function' && typeof child.removeListener === 'function';
+  const onClose = (): void => {
+    closed = true;
+  };
+  if (canObserveClose) child.once('close', onClose);
+  const observeTreeGone = (): boolean => {
+    if (treeGone) return true;
+    try {
+      treeGone = !tree.isAlive();
+    } catch {
+      treeGone = false;
+    }
+    return treeGone;
+  };
+  const launcherTerminated = (): boolean =>
+    canObserveClose ? closed : child.exitCode !== null || child.signalCode !== null;
+  const reaped = (): boolean => launcherTerminated() && observeTreeGone();
+  const waitUntil = async (deadlineMs: number): Promise<boolean> => {
+    while (!reaped() && Date.now() < deadlineMs) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 5));
+    }
+    return reaped();
+  };
+
+  try {
+    try {
+      if (!tree.signal('SIGTERM')) treeGone = true;
+    } catch {
+      // KILL remains the bounded fallback when TERM authority is temporarily unavailable.
+    }
+    if (!(await waitUntil(Date.now() + limits.terminationGraceMs))) {
+      try {
+        if (!tree.signal('SIGKILL')) treeGone = true;
+      } catch {
+        // The result below reports missing reap proof rather than pretending cleanup succeeded.
+      }
+      await waitUntil(Date.now() + limits.reapTimeoutMs);
+    }
+    return {
+      exitCode: child.exitCode,
+      signal: child.signalCode,
+      reaped: reaped(),
+    };
+  } finally {
+    if (canObserveClose) child.removeListener('close', onClose);
+  }
 }
 
 /**
