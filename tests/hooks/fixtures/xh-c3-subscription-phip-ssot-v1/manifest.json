@@ -1,0 +1,56 @@
+{
+  "schema": "cc-master/xh-c3-subscription-phip-ssot-fixture/v1",
+  "capability_id": "cross-harness-notification-subscription",
+  "canonical": {
+    "capability": {
+      "path": "design_docs/harnesses/capabilities/cross-harness-notification-subscription.md",
+      "marker": "XH-C3-CAPABILITY-AUTHORITY",
+      "owns": ["cross-surface-intent", "cross-surface-acceptance", "per-host-capability-status"],
+      "exclusive_semantic_anchors": ["cc-master/xh-c3-capability-authority/v1"]
+    },
+    "bootstrap": {
+      "path": "plugin/src/hooks/bootstrap-board/CONTRACT.md",
+      "marker": "XH-C3-BOOTSTRAP-AUTHORITY",
+      "owns": ["bootstrap-subscription-registration", "registration-response-validation", "registration-failure-arm-semantics"],
+      "exclusive_semantic_anchors": [
+        "cc-master/xh-c3-bootstrap-authority/v1",
+        "\"command\": [\"coordination\", \"subscription\", \"register\"]"
+      ]
+    },
+    "inbox": {
+      "path": "plugin/src/hooks/coordination-inbox/CONTRACT.md",
+      "marker": "XH-C3-INBOX-AUTHORITY",
+      "owns": ["current-subscription-resolution", "bounded-inbox-list", "delivery-fail-closed", "notification-delivery-provenance", "inbox-read-only-effects"],
+      "exclusive_semantic_anchors": [
+        "cc-master/xh-c3-inbox-authority/v1",
+        "\"command\": [\"coordination\", \"subscription\", \"current\"]",
+        "\"command\": [\"coordination\", \"inbox\", \"list\"]",
+        "\"source_policy_revision\"",
+        "\"consent_provenance_ref\""
+      ]
+    }
+  },
+  "derived_documents": [
+    "design_docs/2026-07-15-cross-harness-notification-subscription-transport-contract-v1.md"
+  ],
+  "required_hosts": ["claude-code", "codex", "cursor"],
+  "required_status": "target",
+  "bootstrap_contract": {
+    "command": ["coordination", "subscription", "register"],
+    "required_selectors": ["--board", "--origin", "--session-id", "--capability"],
+    "required_non_empty_response_fields": ["subscription_id", "session_epoch"],
+    "exact_echo_response_fields": ["session_id", "origin", "capability"],
+    "failure_observations": ["command-failure", "malformed-json", "missing-field", "empty-field", "identity-echo-mismatch"],
+    "failure_effects": ["arm-remains-valid", "owner-unchanged", "no-adapter-fallback", "no-weaker-retry"]
+  },
+  "inbox_contract": {
+    "current_command": ["coordination", "subscription", "current"],
+    "list_command": ["coordination", "inbox", "list"],
+    "current_required_selectors": ["--board", "--origin", "--session-id", "--capability"],
+    "list_required_selectors": ["--current-subscription", "--board", "--origin", "--session-id", "--session-epoch", "--capability", "--unconsumed"],
+    "fail_closed_observations": ["registration-failure", "no-current", "stale-epoch", "expired-epoch", "identity-mismatch", "epoch-mismatch"],
+    "fail_closed_effects": ["silent-rc0", "no-list-before-exact-current", "no-weaker-retry", "no-unbound-fallback"],
+    "provenance_required_non_empty_fields": ["subscription_id", "session_id", "session_epoch", "origin", "capability", "source_policy_revision", "consent_provenance_ref"],
+    "provenance_exact_match_fields": ["subscription_id", "session_id", "session_epoch", "origin", "capability"]
+  }
+}
