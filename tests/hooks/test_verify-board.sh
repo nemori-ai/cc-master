@@ -74,10 +74,8 @@ rm -rf "$H"
 
 # ─── SELF-CHECK HANDSHAKE (completion state: all in_flight/blocked/done) ───────────────────────────
 
-# fp_of BOARD — compute the completion-state fingerprint of a board exactly as the hook does
-# (id+status+blocked_on triples inside the bracket-matched tasks array, file order, no sort), so
-# tests can seed the sidecar's last_handshook_fp field deterministically. MUST mirror
-# status_fingerprint() + tasks_region() in verify-board.sh.
+# tasks_region_t BOARD — retain the historical source-order extractor only for the explicit pre-D3
+# fingerprint fixture below. Current fp_of() uses parsed JSON so it can mirror production semantics.
 tasks_region_t() {
   awk '
     { s = s $0 "\n" }
@@ -107,56 +105,57 @@ tasks_region_t() {
       printf "%s", out
     }' "$1" 2>/dev/null
 }
-# wakeup_is_object_t BOARD — mirror of verify-board.sh's wakeup_is_object(): exit 0 iff the board has a
-# ROOT-depth `"wakeup"` key whose value is an OBJECT. Needed so fp_of can replicate watchdog_needed.
-wakeup_is_object_t() {
-  awk '
-    { s = s $0 "\n" }
-    END {
-      n = length(s)
-      cd = 0; bd = 0; instr = 0; esc = 0
-      capkey = 0; key = ""; pendKey = ""
-      afterColon = 0
-      for (k = 1; k <= n; k++) {
-        ch = substr(s, k, 1)
-        if (instr) {
-          if (esc) { esc = 0; if (capkey) key = key ch; continue }
-          if (ch == "\\") { esc = 1; if (capkey) key = key ch; continue }
-          if (ch == "\"") { instr = 0; if (capkey) { capkey = 0; pendKey = key } continue }
-          if (capkey) key = key ch
-          continue
-        }
-        if (afterColon) {
-          if (ch == " " || ch == "\t" || ch == "\n" || ch == "\r" || ch == ":") continue
-          if (ch == "{") { print "yes"; exit }
-          exit
-        }
-        if (ch == "\"") { instr = 1; if (cd == 1 && bd == 0) { capkey = 1; key = "" } else capkey = 0; continue }
-        if (ch == "[") { bd++; pendKey = ""; continue }
-        if (ch == "]") { if (bd > 0) bd--; continue }
-        if (ch == "{") { cd++; pendKey = ""; continue }
-        if (ch == "}") { if (cd > 0) cd--; pendKey = ""; continue }
-        if (ch == ":") { if (cd == 1 && bd == 0 && pendKey == "wakeup") afterColon = 1; continue }
-        if (ch == ",") pendKey = ""
-      }
-    }' "$1" 2>/dev/null | grep -q "yes"
+# fingerprint_input_t BOARD — mirror verify-board.js statusFingerprint() for one matched board:
+# canonical watchdog wins unless absent/null, legacy wakeup is fallback, a trimmed nonblank job_id is
+# required, strict expired fire_at is unarmed, missing/malformed fire_at graceful-degrades only after
+# handle truth, and the selected fire_at plus task keys are emitted in production order.
+fingerprint_input_t() { # $1 = board path
+  node - "$1" <<'NODE'
+const fs = require('fs');
+const board = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+
+function watchdogRecord(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  let record = value.watchdog;
+  if (record === undefined || record === null) record = value.wakeup;
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+  return record;
 }
-# fp_of BOARD — MUST mirror status_fingerprint() in verify-board.sh. Since codex round-2's P2 fix, the
-# fingerprint folds in the watchdog_needed bit (0/1) as a leading "watchdog_needed:<v>" line BEFORE the
-# task id+status+blocked_on+parent quads (D3 added `parent` to the fold: a child's status flip changes the
-# owner sub-graph fingerprint; an old board with no `parent` token hashes exactly as the pre-D3 formula).
-# (so a state needing a watchdog hashes differently, AND a stale
-# pre-upgrade .stopcheck can never collide). watchdog_needed = (board has an in_flight task in the tasks
-# region) AND (no root-depth wakeup OBJECT) — replicated here exactly. Single-board mirror (the seed/assert
-# tests below each use ONE matched board), matching the loop the hook runs over $matched_boards.
+
+function watchdogArmed(value, nowIso) {
+  const record = watchdogRecord(value);
+  if (!record) return false;
+  if (typeof record.job_id !== 'string' || record.job_id.trim() === '') return false;
+  const fireAt = typeof record.fire_at === 'string' ? record.fire_at : '';
+  if (!fireAt || !ISO_RE.test(fireAt)) return true;
+  return fireAt >= nowIso;
+}
+
+const tasks = Array.isArray(board.tasks) ? board.tasks : [];
+const realTasks = tasks.filter((task) => task && typeof task === 'object' && !Array.isArray(task) &&
+  typeof task.id === 'string' && task.id !== '');
+const hasInFlight = realTasks.some((task) => task.status === 'in_flight');
+const nowIso = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+console.log(`watchdog_needed:${hasInFlight && !watchdogArmed(board, nowIso) ? 1 : 0}`);
+
+const record = watchdogRecord(board);
+const fireAt = record && typeof record.fire_at === 'string' ? record.fire_at : '';
+if (fireAt) console.log(`fire_at:${fireAt}`);
+for (const task of tasks) {
+  if (!task || typeof task !== 'object' || Array.isArray(task)) continue;
+  if (typeof task.id !== 'string' || task.id === '') continue;
+  for (const key of Object.keys(task)) {
+    if (!['id', 'status', 'blocked_on', 'parent'].includes(key)) continue;
+    if (typeof task[key] !== 'string') continue;
+    console.log(`"${key}":"${task[key]}"`);
+  }
+}
+NODE
+}
+
 fp_of() { # $1 = board path
-  local wn=0
-  if tasks_region_t "$1" | grep -qE '"status"[[:space:]]*:[[:space:]]*"in_flight"'; then
-    wakeup_is_object_t "$1" || wn=1
-  fi
-  { printf 'watchdog_needed:%s\n' "$wn"
-    tasks_region_t "$1" | grep -oE '"(id|status|blocked_on|parent)"[[:space:]]*:[[:space:]]*"[^"]*"'
-  } | cksum | awk '{print $1}'
+  fingerprint_input_t "$1" | cksum | awk '{print $1}'
 }
 
 # assert_fp_mirrors_hook NAME BOARD_JSON — seed the Stop sidecar with fp_of() and prove production takes
@@ -180,6 +179,7 @@ assert_fp_mirrors_hook "canonical-healthy" "{\"schema\":\"cc-master/v2\",\"owner
 assert_fp_mirrors_hook "canonical-missing-handle" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-canonical-missing-handle\"},\"watchdog\":{\"fire_at\":\"2099-01-01T00:00:00Z\"},$FP_TASKS}"
 assert_fp_mirrors_hook "legacy-healthy" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-legacy-healthy\"},\"wakeup\":{\"job_id\":\"job-legacy\",\"fire_at\":\"2099-01-01T00:00:00Z\"},$FP_TASKS}"
 assert_fp_mirrors_hook "legacy-blank-handle" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-legacy-blank-handle\"},\"wakeup\":{\"job_id\":\"   \",\"fire_at\":\"2099-01-01T00:00:00Z\"},$FP_TASKS}"
+assert_fp_mirrors_hook "canonical-null-fallback" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-canonical-null-fallback\"},\"watchdog\":null,\"wakeup\":{\"job_id\":\"job-legacy\",\"fire_at\":\"2099-01-01T00:00:00Z\"},$FP_TASKS}"
 assert_fp_mirrors_hook "canonical-expired" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-canonical-expired\"},\"watchdog\":{\"job_id\":\"job-expired\",\"fire_at\":\"2000-01-01T00:00:00Z\"},$FP_TASKS}"
 assert_fp_mirrors_hook "canonical-malformed-fire-at" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-canonical-malformed-fire-at\"},\"watchdog\":{\"job_id\":\"job-malformed\",\"fire_at\":\"later\"},$FP_TASKS}"
 assert_fp_mirrors_hook "canonical-precedence" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-canonical-precedence\"},\"watchdog\":{\"job_id\":\"   \",\"fire_at\":\"2099-01-01T00:00:00Z\"},\"wakeup\":{\"job_id\":\"job-legacy\",\"fire_at\":\"2099-01-01T00:00:00Z\"},$FP_TASKS}"

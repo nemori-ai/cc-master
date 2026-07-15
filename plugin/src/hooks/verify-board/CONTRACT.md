@@ -32,7 +32,9 @@ whether stopping now would abandon unfinished/unverified/un-surfaced work.
   missing or malformed `fire_at` remains a graceful-degrade future record only when the accountable
   handle is present. The hook never repairs or deletes legacy records: `ccm watchdog status`
   diagnoses them, then the agent retires the record with `ccm watchdog disarm`, creates a real
-  wakeup, and re-arms with its `--job-id`.
+  wakeup, and re-arms with its `--job-id`. User-facing recovery text names missing/blank handles,
+  uses the canonical `watchdog.checklist` write field, and never instructs writes to legacy
+  `wakeup.checklist`.
 - `rule-verify-board-rollup-check`: if any owner task is `status:"done"` while some task whose
   `parent` points at it is not `done`, the block reason names the inconsistent owner/child pair
   (soft reminder, layered onto whichever other rule already triggered the block — this rule never
