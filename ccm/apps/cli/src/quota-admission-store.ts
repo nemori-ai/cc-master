@@ -3,10 +3,22 @@ import * as fsPromises from 'node:fs/promises';
 import { platform, uptime } from 'node:os';
 import { join } from 'node:path';
 import {
+  canonicalJson,
   deriveQuotaHeadroom,
   evaluateLiveQuotaAdmission,
   evaluateQuotaReservationTransition,
+  sha256Hex,
 } from '@ccm/engine';
+import {
+  digestQuotaAdmissionTicket,
+  parseQuotaAdmissionTicket,
+  QUOTA_ADMISSION_TICKET_REQUEST_FIELDS,
+  validateQuotaAdmissionTicketBinding,
+} from './quota-admission-ticket.js';
+import {
+  parseQuotaOwnerPreflightReceipt,
+  QUOTA_OWNER_PREFLIGHT_RECEIPT_SCHEMA,
+} from './quota-owner-receipt.js';
 
 type Data = Record<string, unknown>;
 type FilePort = Pick<
@@ -259,20 +271,8 @@ function validAuthorityBucket(
   );
 }
 
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    return `{${Object.entries(value as Data)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entry]) => `${JSON.stringify(key)}:${canonical(entry)}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
-function digest(value: unknown): string {
-  return `sha256:${hash(canonical(value))}`;
-}
+const canonical = canonicalJson;
+const digest = (value: unknown): string => `sha256:${sha256Hex(canonicalJson(value))}`;
 
 function quotaAuthorityDigest(input: {
   sourceKey: string;
@@ -1632,47 +1632,13 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
   };
 
   const validateTicket = (ticket: Data, aggregationKey: string, reservation: Data): boolean => {
-    const required = [
-      'ticket_id',
-      'reservation_id',
-      'reservation_request_hash',
-      'reservation_expires_at',
-      'attempt_id',
-      'run_ref',
-      'account_id',
-      'pool_id',
-      'identity_fingerprint',
-      'aggregation_key',
-      'live_source_revision',
-      'runtime_sha256',
-      'launch_idempotency_key',
-      'launch_nonce',
-      'issued_at',
-      'committed_at',
-      'launch_by',
-    ];
-    const allowed = new Set(['schema', ...required]);
-    return (
-      ticket.schema === 'ccm/quota-admission-ticket/v1' &&
-      Object.keys(ticket).every((field) => allowed.has(field)) &&
-      required.every((field) => nonempty(ticket[field])) &&
-      Number.isFinite(Date.parse(String(ticket.issued_at))) &&
-      Number.isFinite(Date.parse(String(ticket.committed_at))) &&
-      Number.isFinite(Date.parse(String(ticket.launch_by))) &&
-      Number.isFinite(Date.parse(String(ticket.reservation_expires_at))) &&
-      Date.parse(String(ticket.committed_at)) >= Date.parse(String(ticket.issued_at)) &&
-      Date.parse(String(ticket.launch_by)) > Date.parse(String(ticket.issued_at)) &&
-      Date.parse(String(ticket.launch_by)) >= Date.parse(String(ticket.committed_at)) &&
-      Date.parse(String(ticket.launch_by)) <= Date.parse(String(reservation.expires_at)) &&
-      ticket.reservation_id === reservation.id &&
-      ticket.reservation_request_hash === reservation.hash &&
-      ticket.reservation_expires_at === reservation.expires_at &&
-      ticket.attempt_id === reservation.attempt_id &&
-      ticket.account_id === reservation.account_id &&
-      ticket.pool_id === reservation.pool_id &&
-      ticket.identity_fingerprint === reservation.identity_fingerprint &&
-      ticket.aggregation_key === aggregationKey &&
-      ticket.live_source_revision === reservation.source_revision
+    const parsed = parseQuotaAdmissionTicket(ticket);
+    return Boolean(
+      parsed &&
+        validateQuotaAdmissionTicketBinding(parsed, {
+          aggregation_key: aggregationKey,
+          reservation,
+        }),
     );
   };
 
@@ -1777,25 +1743,7 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
         };
       }
       const requestedTicket = object(request.ticket);
-      const allowedTicketRequestFields = new Set([
-        'schema',
-        'ticket_id',
-        'reservation_id',
-        'reservation_request_hash',
-        'reservation_expires_at',
-        'attempt_id',
-        'run_ref',
-        'account_id',
-        'pool_id',
-        'identity_fingerprint',
-        'aggregation_key',
-        'live_source_revision',
-        'runtime_sha256',
-        'launch_idempotency_key',
-        'launch_nonce',
-        'issued_at',
-        'launch_by',
-      ]);
+      const allowedTicketRequestFields = new Set<string>(QUOTA_ADMISSION_TICKET_REQUEST_FIELDS);
       if (Object.keys(requestedTicket).some((field) => !allowedTicketRequestFields.has(field))) {
         return { action: 'rejected', error: 'ADMISSION_TICKET_INVALID', spawn_count: 0 };
       }
@@ -1804,7 +1752,11 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
       if (!validateTicket(ticket, aggregationKey, current)) {
         return { action: 'rejected', error: 'ADMISSION_TICKET_INVALID', spawn_count: 0 };
       }
-      const ticketDigest = digest(ticket);
+      const parsedTicket = parseQuotaAdmissionTicket(ticket);
+      if (!parsedTicket) {
+        return { action: 'rejected', error: 'ADMISSION_TICKET_INVALID', spawn_count: 0 };
+      }
+      const ticketDigest = digestQuotaAdmissionTicket(parsedTicket);
       const ticketRequestDigest = digest(requestedTicket);
       if (current.state === 'committed') {
         return current.ticket_request_digest === ticketRequestDigest
@@ -1977,7 +1929,8 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
     }
     const headroom = deriveQuotaHeadroom({ policy, buckets }) as Data;
     const ticket = object(current.ticket);
-    const ticketDigest = digest(ticket);
+    const parsedTicket = parseQuotaAdmissionTicket(ticket);
+    const ticketDigest = parsedTicket ? digestQuotaAdmissionTicket(parsedTicket) : '';
     if (
       Date.parse(String(current.expires_at)) <= operationNow.getTime() ||
       Date.parse(String(ticket.launch_by)) <= operationNow.getTime()
@@ -1990,6 +1943,7 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
       current.account_id !== observation.account_id ||
       current.pool_id !== observation.pool_id ||
       current.identity_fingerprint !== observation.identity_fingerprint ||
+      !parsedTicket ||
       !validateTicket(ticket, aggregationKey, current) ||
       current.ticket_digest !== ticketDigest
     ) {
@@ -2012,6 +1966,20 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
       reservation: current,
       ticket,
     });
+    const ownerReceipt = parseQuotaOwnerPreflightReceipt({
+      schema: QUOTA_OWNER_PREFLIGHT_RECEIPT_SCHEMA,
+      reservation_id: current.id,
+      reservation_request_hash: current.hash,
+      ticket_digest: current.ticket_digest,
+      attempt_id: ticket.attempt_id,
+      run_ref: ticket.run_ref,
+      account_id: current.account_id,
+      pool_id: current.pool_id,
+      source_revision: observation.source_revision,
+      authority_digest: current.authority_digest,
+      checked_at: operationNow.toISOString(),
+    });
+    if (!ownerReceipt) return rejectPreflight('ADMISSION_COMMIT_MISSING_OR_INVALID');
     return {
       ...decision,
       claim_count: decision.claim_count ?? 0,
@@ -2019,6 +1987,9 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
       hard_window: hardWindowName,
       provider_rule_revision: observation.provider_rule_revision,
       source_revision: observation.source_revision,
+      ...(decision.decision === 'launch-claim-allowed' && decision.automatic_spawn_limit === 1
+        ? { owner_receipt: ownerReceipt, committed_ticket: parsedTicket }
+        : {}),
       ignored_windows:
         provider === 'codex' && allBuckets.some((bucket) => bucket.window === 'five_hour')
           ? ['five_hour']

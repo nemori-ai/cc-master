@@ -1,0 +1,1402 @@
+{
+  "schema": "ccm/cursor-provider-driver-fixtures/v2",
+  "contract": "ccm/cursor-provider-driver/v2",
+  "registries": {
+    "request_fields": {
+      "$": [
+        "schema",
+        "as_of",
+        "origin_harness",
+        "origin_session_ref",
+        "run_ref",
+        "attempt_id",
+        "workspace",
+        "prompt",
+        "selector",
+        "candidate",
+        "lineage",
+        "owner",
+        "surfaces",
+        "payer",
+        "catalog",
+        "quota",
+        "reservation",
+        "launch",
+        "sandbox",
+        "policy"
+      ],
+      "candidate": ["candidate_id", "provider", "model", "effort", "selector"],
+      "lineage": [
+        "account_fingerprint_ref",
+        "workspace_ref",
+        "worktree_ref",
+        "baseline_commit",
+        "permission"
+      ],
+      "lineage.permission": ["snapshot_ref", "profile", "denies"],
+      "owner": ["schema", "source_key", "reservation_id"],
+      "surfaces": ["cursor-ide-plugin", "cursor-agent-cli"],
+      "surfaces.cursor-ide-plugin": ["installed", "auth"],
+      "surfaces.cursor-ide-plugin.auth": ["state"],
+      "surfaces.cursor-agent-cli": [
+        "surface_id",
+        "installed",
+        "installed_evidence",
+        "binary",
+        "auth"
+      ],
+      "surfaces.cursor-agent-cli.installed_evidence": [
+        "surface_id",
+        "axis",
+        "source",
+        "observed_at",
+        "valid_until"
+      ],
+      "surfaces.cursor-agent-cli.binary": [
+        "available",
+        "name",
+        "path",
+        "version",
+        "runtime_sha256",
+        "surface_id",
+        "axis",
+        "source",
+        "observed_at",
+        "valid_until"
+      ],
+      "surfaces.cursor-agent-cli.auth": [
+        "state",
+        "surface_id",
+        "axis",
+        "source",
+        "observed_at",
+        "valid_until"
+      ],
+      "payer": [
+        "payer_id",
+        "identity_fingerprint",
+        "authority_id",
+        "surface_id",
+        "axis",
+        "source",
+        "observed_at",
+        "valid_until"
+      ],
+      "catalog": [
+        "authority_id",
+        "payer_id",
+        "pool",
+        "pool_ref",
+        "surface_id",
+        "axis",
+        "source",
+        "observed_at",
+        "valid_until",
+        "selectors"
+      ],
+      "catalog.selectors[]": [
+        "candidate_id",
+        "provider",
+        "model",
+        "effort",
+        "selector",
+        "authority_id",
+        "payer_id",
+        "pool",
+        "pool_ref"
+      ],
+      "quota": [
+        "state",
+        "authority_id",
+        "surface_id",
+        "axis",
+        "source",
+        "source_revision",
+        "aggregation_key",
+        "payer_id",
+        "pool",
+        "provenance",
+        "pool_ref",
+        "observed_at",
+        "valid_until"
+      ],
+      "reservation": [
+        "id",
+        "request_hash",
+        "ticket_digest",
+        "authority_digest",
+        "authority_id",
+        "state",
+        "run_ref",
+        "attempt_id",
+        "payer_id",
+        "pool",
+        "pool_ref",
+        "source_revision",
+        "launch_by",
+        "expires_at"
+      ],
+      "launch": ["idempotency_key", "nonce"],
+      "sandbox": ["required", "qualified"],
+      "policy": [
+        "decision",
+        "mode",
+        "automatic_api_fallback",
+        "account_mutation",
+        "credential_write"
+      ]
+    },
+    "enums": {
+      "origin_harness": ["claude-code", "codex", "cursor"],
+      "auth_state": ["authenticated", "unauthenticated", "unknown"],
+      "binary_name": ["agent", "cursor-agent"],
+      "binary_version": ["2026.07.09-a3815c0"],
+      "quota_state": ["ample", "tight", "exhausted", "unknown"],
+      "reservation_state": [
+        "held",
+        "committed",
+        "release_pending",
+        "orphaned",
+        "released",
+        "expired"
+      ],
+      "policy_decision": ["allow", "deny"],
+      "policy_mode": ["ask"],
+      "forbidden_effect": ["forbidden"]
+    },
+    "effects": ["owner.preflight", "executable.resolve", "process.spawn", "network.request"],
+    "reason_sets": {
+      "preflight": [
+        "request.invalid",
+        "request.input-invalid",
+        "request.schema-invalid",
+        "headless.surface-not-installed",
+        "headless.binary-unavailable",
+        "headless.evidence-invalid",
+        "headless.binary-unsupported",
+        "headless.authentication-unavailable",
+        "payer.provenance-invalid",
+        "catalog.stale-or-invalid",
+        "catalog.provenance-invalid",
+        "selector.auto-forbidden",
+        "selector.exact-match-required",
+        "candidate.binding-mismatch",
+        "lineage.binding-mismatch",
+        "permission.binding-mismatch",
+        "quota.provenance-invalid",
+        "quota.first-party-pool-required",
+        "payer.binding-mismatch",
+        "payer.authority-mismatch",
+        "catalog.binding-mismatch",
+        "quota.revision-invalid",
+        "reservation.identity-invalid",
+        "run.identity-invalid",
+        "sandbox.unqualified",
+        "reservation.binding-mismatch",
+        "policy.denied",
+        "quota.tight",
+        "quota.exhausted",
+        "quota.unknown",
+        "quota.stale-or-invalid"
+      ],
+      "invoke": [
+        "runtime.unsupported",
+        "invoke.options-invalid",
+        "owner.receipt-invalid",
+        "owner.binding-mismatch",
+        "owner.ticket-invalid",
+        "owner.ticket-binding-mismatch",
+        "headless.binary-resolution-mismatch",
+        "transport.spawn-failed",
+        "transport.supervisor-handoff-failed",
+        "selector.resolved-mismatch",
+        "workspace.resolved-mismatch",
+        "result_schema.invalid-shape",
+        "task_acceptance.rejected"
+      ],
+      "stream": [
+        "stream.invalid-json",
+        "stream.post-terminal-evidence",
+        "stream.init-duplicate",
+        "session.identity-invalid",
+        "stream.terminal-duplicate",
+        "stream.terminal-before-init",
+        "stream.init-missing",
+        "stream.terminal-missing",
+        "permission.resolved-mismatch",
+        "sandbox.resolved-missing",
+        "sandbox.resolved-mismatch",
+        "session.identity-mismatch"
+      ],
+      "supervisor": [
+        "transport.startup_timeout",
+        "transport.idle_timeout",
+        "transport.hard_timeout",
+        "transport.cancelled",
+        "transport.spawn_error",
+        "transport.stdio_unavailable",
+        "transport.byte_stream_required",
+        "transport.invalid_utf8",
+        "transport.output_limit",
+        "transport.consumer_error",
+        "transport.owned_tree_survived"
+      ],
+      "dynamic_patterns": ["transport.exit-*", "transport.signal-*"]
+    },
+    "owner_receipt": {
+      "fields": [
+        "schema",
+        "reservation_id",
+        "reservation_request_hash",
+        "ticket_digest",
+        "attempt_id",
+        "run_ref",
+        "account_id",
+        "pool_id",
+        "source_revision",
+        "authority_digest",
+        "checked_at"
+      ],
+      "predicate_ids": [
+        "closed-fields",
+        "schema",
+        "canonical-identifiers",
+        "source-revision",
+        "sha256-digests",
+        "parseable-checked-at"
+      ],
+      "binding_ids": [
+        "reservation-id",
+        "reservation-request-hash",
+        "ticket-digest",
+        "attempt-id",
+        "run-ref",
+        "account-id",
+        "pool-id",
+        "source-revision",
+        "authority-digest"
+      ]
+    },
+    "ticket": {
+      "fields": [
+        "schema",
+        "ticket_id",
+        "reservation_id",
+        "reservation_request_hash",
+        "reservation_expires_at",
+        "attempt_id",
+        "run_ref",
+        "account_id",
+        "pool_id",
+        "identity_fingerprint",
+        "aggregation_key",
+        "live_source_revision",
+        "runtime_sha256",
+        "launch_idempotency_key",
+        "launch_nonce",
+        "issued_at",
+        "committed_at",
+        "launch_by",
+        "canonical_identity",
+        "canonical_identity_digest",
+        "provider_extension"
+      ],
+      "request_fields": [
+        "schema",
+        "ticket_id",
+        "reservation_id",
+        "reservation_request_hash",
+        "reservation_expires_at",
+        "attempt_id",
+        "run_ref",
+        "account_id",
+        "pool_id",
+        "identity_fingerprint",
+        "aggregation_key",
+        "live_source_revision",
+        "runtime_sha256",
+        "launch_idempotency_key",
+        "launch_nonce",
+        "issued_at",
+        "launch_by",
+        "canonical_identity",
+        "canonical_identity_digest",
+        "provider_extension"
+      ],
+      "predicate_ids": [
+        "closed-fields",
+        "schema",
+        "canonical-identifiers",
+        "sha256-digests",
+        "live-source-revision",
+        "parseable-instants",
+        "committed-not-before-issued",
+        "launch-after-issued",
+        "launch-not-before-committed",
+        "launch-not-after-reservation-expiry",
+        "canonical-identity",
+        "canonical-identity-top-level-binding",
+        "provider-extension"
+      ],
+      "reservation_binding_ids": [
+        "reservation-id",
+        "reservation-request-hash",
+        "reservation-expiry",
+        "attempt-id",
+        "account-id",
+        "pool-id",
+        "identity-fingerprint",
+        "aggregation-key",
+        "live-source-revision"
+      ],
+      "provider_launch_binding_ids": [
+        "ticket-digest",
+        "reservation-id",
+        "reservation-request-hash",
+        "reservation-expiry",
+        "attempt-id",
+        "run-ref",
+        "account-id",
+        "pool-id",
+        "identity-fingerprint",
+        "aggregation-key",
+        "live-source-revision",
+        "runtime-sha256",
+        "launch-idempotency-key",
+        "launch-nonce",
+        "checked-at-window",
+        "canonical-identity",
+        "provider-extension"
+      ],
+      "canonical_identity": {
+        "root": [
+          "schema",
+          "origin",
+          "target",
+          "provider",
+          "account",
+          "workspace",
+          "permission",
+          "input",
+          "request",
+          "dispatch",
+          "runtime"
+        ],
+        "origin": ["harness", "session_ref"],
+        "target": ["harness", "adapter", "surface", "transport", "candidate_id"],
+        "provider": ["id", "model", "effort"],
+        "account": ["fingerprint_ref", "account_id", "pool_id", "identity_fingerprint"],
+        "workspace": ["workspace_ref", "worktree_ref", "baseline_commit"],
+        "permission": ["snapshot_ref", "profile", "denies"],
+        "digest": ["digest"],
+        "dispatch": ["run_ref", "idempotency_key", "launch_nonce", "claim_id"],
+        "runtime": ["image_sha256", "selector"],
+        "selector": ["kind", "model_id", "effort"]
+      }
+    },
+    "launch_extension": {
+      "fields": ["schema", "selector", "workspace_path", "executable_path"],
+      "dispatch_fields": ["attempt_id", "run_ref", "launch_idempotency_key", "launch_nonce"],
+      "predicate_ids": ["closed-fields", "schema", "canonical-selector", "absolute-paths"]
+    }
+  },
+  "owner_receipt": {
+    "schema": "ccm/quota-owner-preflight-receipt/v1",
+    "reservation_id": "qres-cursor-fixture-001",
+    "reservation_request_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "ticket_digest": "sha256:e92e9a9cee4a3b46f739c431d751dfdeacca93ae8bac36c54c83d30659034674",
+    "attempt_id": "attempt_cursor_fixture_001",
+    "run_ref": "ccm-run:v1:cursor-fixture-001",
+    "account_id": "payer-first-party-fixture",
+    "pool_id": "cursor:first-party:fixture",
+    "source_revision": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "authority_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+    "checked_at": "2026-07-14T12:00:00.000Z"
+  },
+  "committed_ticket": {
+    "schema": "ccm/quota-admission-ticket/v1",
+    "ticket_id": "ticket-cursor-fixture-001",
+    "reservation_id": "qres-cursor-fixture-001",
+    "reservation_request_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "reservation_expires_at": "2026-07-14T12:04:00.000Z",
+    "attempt_id": "attempt_cursor_fixture_001",
+    "run_ref": "ccm-run:v1:cursor-fixture-001",
+    "account_id": "payer-first-party-fixture",
+    "pool_id": "cursor:first-party:fixture",
+    "identity_fingerprint": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+    "aggregation_key": "cursor|payer-first-party-fixture|cursor:first-party:fixture|billing_period",
+    "live_source_revision": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "runtime_sha256": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+    "launch_idempotency_key": "sha256:166e85d1a856b7ab38fecce63100f8d68ecc76790dce8259f560c862dee36f42",
+    "launch_nonce": "nonce-cursor-fixture-001",
+    "issued_at": "2026-07-14T11:59:50.000Z",
+    "committed_at": "2026-07-14T11:59:55.000Z",
+    "launch_by": "2026-07-14T12:03:00.000Z",
+    "canonical_identity": {
+      "schema": "ccm/canonical-launch-identity/v1",
+      "origin": {
+        "harness": "cursor",
+        "session_ref": "cursor-session-origin-fixture"
+      },
+      "target": {
+        "harness": "cursor",
+        "adapter": "cursor/agent-cli-v1",
+        "surface": "cli-headless",
+        "transport": "cursor-agent-json-stream-v1",
+        "candidate_id": "cursor-cli-composer-standard"
+      },
+      "provider": {
+        "id": "cursor",
+        "model": "composer-2.5",
+        "effort": "standard"
+      },
+      "account": {
+        "fingerprint_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "account_id": "payer-first-party-fixture",
+        "pool_id": "cursor:first-party:fixture",
+        "identity_fingerprint": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+      },
+      "workspace": {
+        "workspace_ref": "workspace:cursor-fixture",
+        "worktree_ref": "worktree:cursor-fixture",
+        "baseline_commit": "1111111111111111111111111111111111111111"
+      },
+      "permission": {
+        "snapshot_ref": "permission:cursor-fixture",
+        "profile": "workspace-write",
+        "denies": ["account-mutation", "credential-write", "push-remote"]
+      },
+      "input": {
+        "digest": "sha256:30b3fd9dbe0049f49a7db3c9a2e726fbfcc7e326004791afded8a6f8eed02c85"
+      },
+      "request": {
+        "digest": "sha256:07467328abe544e2511e836eb908e4a14317511ec5b09a7e272486f362e36e30"
+      },
+      "dispatch": {
+        "run_ref": "ccm-run:v1:cursor-fixture-001",
+        "idempotency_key": "sha256:166e85d1a856b7ab38fecce63100f8d68ecc76790dce8259f560c862dee36f42",
+        "launch_nonce": "nonce-cursor-fixture-001",
+        "claim_id": "nonce-cursor-fixture-001"
+      },
+      "runtime": {
+        "image_sha256": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "selector": {
+          "kind": "exact",
+          "model_id": "composer-2.5",
+          "effort": "standard"
+        }
+      }
+    },
+    "canonical_identity_digest": "sha256:7b127e4bfb8534f0a20c95aaa456b45c8070efb05cc57c02dcf7314ee903630b",
+    "provider_extension": {
+      "schema": "ccm/cursor-provider-launch-extension/v1",
+      "selector": "composer-2.5[fast=false]",
+      "workspace_path": "/fixture/worktree",
+      "executable_path": "/fixture/bin/cursor-agent"
+    }
+  },
+  "defaults": {
+    "schema": "ccm/cursor-provider-request/v2",
+    "as_of": "2026-07-14T12:00:00.000Z",
+    "origin_harness": "cursor",
+    "origin_session_ref": "cursor-session-origin-fixture",
+    "run_ref": "ccm-run:v1:cursor-fixture-001",
+    "attempt_id": "attempt_cursor_fixture_001",
+    "workspace": "/fixture/worktree",
+    "prompt": "fixture:success",
+    "selector": "composer-2.5[fast=false]",
+    "candidate": {
+      "candidate_id": "cursor-cli-composer-standard",
+      "provider": "cursor",
+      "model": "composer-2.5",
+      "effort": "standard",
+      "selector": "composer-2.5[fast=false]"
+    },
+    "lineage": {
+      "account_fingerprint_ref": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "workspace_ref": "workspace:cursor-fixture",
+      "worktree_ref": "worktree:cursor-fixture",
+      "baseline_commit": "1111111111111111111111111111111111111111",
+      "permission": {
+        "snapshot_ref": "permission:cursor-fixture",
+        "profile": "workspace-write",
+        "denies": ["account-mutation", "credential-write", "push-remote"]
+      }
+    },
+    "owner": {
+      "schema": "ccm/quota-owner-preflight-request/v1",
+      "source_key": "cursor-first-party-fixture",
+      "reservation_id": "qres-cursor-fixture-001"
+    },
+    "surfaces": {
+      "cursor-ide-plugin": { "installed": false, "auth": { "state": "unknown" } },
+      "cursor-agent-cli": {
+        "surface_id": "cursor-agent-cli",
+        "installed": true,
+        "installed_evidence": {
+          "surface_id": "cursor-agent-cli",
+          "axis": "installed",
+          "source": "cursor-agent-cli/install/path-resolution/v1",
+          "observed_at": "2026-07-14T11:59:00.000Z",
+          "valid_until": "2026-07-14T12:05:00.000Z"
+        },
+        "binary": {
+          "available": true,
+          "name": "cursor-agent",
+          "path": "/fixture/bin/cursor-agent",
+          "version": "2026.07.09-a3815c0",
+          "runtime_sha256": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+          "surface_id": "cursor-agent-cli",
+          "axis": "binary",
+          "source": "cursor-agent-cli/binary/capability-qualified/v1",
+          "observed_at": "2026-07-14T11:59:00.000Z",
+          "valid_until": "2026-07-14T12:05:00.000Z"
+        },
+        "auth": {
+          "state": "authenticated",
+          "surface_id": "cursor-agent-cli",
+          "axis": "auth",
+          "source": "cursor-agent-cli/auth/status-json/v1",
+          "observed_at": "2026-07-14T11:59:00.000Z",
+          "valid_until": "2026-07-14T12:05:00.000Z"
+        }
+      }
+    },
+    "payer": {
+      "payer_id": "payer-first-party-fixture",
+      "identity_fingerprint": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "authority_id": "cursor-first-party-owner-fixture",
+      "surface_id": "cursor-agent-cli",
+      "axis": "payer",
+      "source": "cursor-agent-cli/payer/first-party-owner-store/v1",
+      "observed_at": "2026-07-14T11:59:00.000Z",
+      "valid_until": "2026-07-14T12:05:00.000Z"
+    },
+    "catalog": {
+      "authority_id": "cursor-first-party-owner-fixture",
+      "payer_id": "payer-first-party-fixture",
+      "pool": "first_party",
+      "pool_ref": "cursor:first-party:fixture",
+      "surface_id": "cursor-agent-cli",
+      "axis": "catalog",
+      "source": "cursor-agent-cli/model-catalog/first-party-owner-store/v1",
+      "observed_at": "2026-07-14T11:59:00.000Z",
+      "valid_until": "2026-07-14T12:05:00.000Z",
+      "selectors": [
+        {
+          "candidate_id": "cursor-cli-composer-standard",
+          "provider": "cursor",
+          "model": "composer-2.5",
+          "effort": "standard",
+          "selector": "composer-2.5[fast=false]",
+          "authority_id": "cursor-first-party-owner-fixture",
+          "payer_id": "payer-first-party-fixture",
+          "pool": "first_party",
+          "pool_ref": "cursor:first-party:fixture"
+        }
+      ]
+    },
+    "quota": {
+      "state": "ample",
+      "authority_id": "cursor-first-party-owner-fixture",
+      "surface_id": "cursor-agent-cli",
+      "axis": "quota",
+      "source": "cursor-agent-cli/quota/first-party-owner-store/v1",
+      "source_revision": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "aggregation_key": "cursor|payer-first-party-fixture|cursor:first-party:fixture|billing_period",
+      "payer_id": "payer-first-party-fixture",
+      "pool": "first_party",
+      "provenance": "first_party",
+      "pool_ref": "cursor:first-party:fixture",
+      "observed_at": "2026-07-14T11:59:00.000Z",
+      "valid_until": "2026-07-14T12:05:00.000Z"
+    },
+    "reservation": {
+      "id": "qres-cursor-fixture-001",
+      "request_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "ticket_digest": "sha256:e92e9a9cee4a3b46f739c431d751dfdeacca93ae8bac36c54c83d30659034674",
+      "authority_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "authority_id": "cursor-first-party-owner-fixture",
+      "state": "committed",
+      "run_ref": "ccm-run:v1:cursor-fixture-001",
+      "attempt_id": "attempt_cursor_fixture_001",
+      "payer_id": "payer-first-party-fixture",
+      "pool": "first_party",
+      "pool_ref": "cursor:first-party:fixture",
+      "source_revision": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "launch_by": "2026-07-14T12:03:00.000Z",
+      "expires_at": "2026-07-14T12:04:00.000Z"
+    },
+    "launch": {
+      "idempotency_key": "sha256:166e85d1a856b7ab38fecce63100f8d68ecc76790dce8259f560c862dee36f42",
+      "nonce": "nonce-cursor-fixture-001"
+    },
+    "sandbox": { "required": true, "qualified": true },
+    "policy": {
+      "decision": "allow",
+      "mode": "ask",
+      "automatic_api_fallback": "forbidden",
+      "account_mutation": "forbidden",
+      "credential_write": "forbidden"
+    }
+  },
+  "cases": [
+    {
+      "id": "CPD-001",
+      "title": "only IDE never implies a headless worker",
+      "overrides": {
+        "surfaces": {
+          "cursor-ide-plugin": { "installed": true, "auth": { "state": "authenticated" } },
+          "cursor-agent-cli": {
+            "installed": false,
+            "binary": { "available": false, "path": null },
+            "auth": { "state": "unauthenticated" }
+          }
+        }
+      },
+      "expected": {
+        "eligible": false,
+        "axis": "headless.surface",
+        "blocker": "headless.surface-not-installed"
+      }
+    },
+    {
+      "id": "CPD-002",
+      "title": "only Agent is eligible from the same origin",
+      "overrides": {},
+      "expected": { "eligible": true, "route_relation": "same-origin" }
+    },
+    {
+      "id": "CPD-003",
+      "title": "both surfaces remain independently eligible from another origin",
+      "overrides": {
+        "origin_harness": "claude-code",
+        "surfaces": {
+          "cursor-ide-plugin": { "installed": true, "auth": { "state": "authenticated" } }
+        }
+      },
+      "expected": { "eligible": true, "route_relation": "other-origin" }
+    },
+    {
+      "id": "CPD-004",
+      "title": "neither surface is ineligible",
+      "overrides": {
+        "surfaces": {
+          "cursor-agent-cli": {
+            "installed": false,
+            "binary": { "available": false, "path": null },
+            "auth": { "state": "unauthenticated" }
+          }
+        }
+      },
+      "expected": {
+        "eligible": false,
+        "axis": "headless.surface",
+        "blocker": "headless.surface-not-installed"
+      }
+    },
+    {
+      "id": "CPD-005",
+      "title": "IDE authentication never implies Agent authentication",
+      "overrides": {
+        "surfaces": {
+          "cursor-ide-plugin": { "installed": true, "auth": { "state": "authenticated" } },
+          "cursor-agent-cli": { "auth": { "state": "unauthenticated" } }
+        }
+      },
+      "expected": {
+        "eligible": false,
+        "axis": "headless.authentication",
+        "blocker": "headless.authentication-unavailable"
+      }
+    },
+    {
+      "id": "CPD-006",
+      "title": "payer provenance is independently required",
+      "overrides": { "payer": { "source": "" } },
+      "expected": {
+        "eligible": false,
+        "axis": "payer.provenance",
+        "blocker": "payer.provenance-invalid"
+      }
+    },
+    {
+      "id": "CPD-007",
+      "title": "API pool cannot satisfy first-party selection",
+      "overrides": { "quota": { "pool": "api", "pool_ref": "cursor:api:fixture" } },
+      "expected": {
+        "eligible": false,
+        "axis": "quota.pool",
+        "blocker": "quota.first-party-pool-required"
+      }
+    },
+    {
+      "id": "CPD-008",
+      "title": "stale catalog blocks before process effects",
+      "overrides": { "catalog": { "valid_until": "2026-07-14T12:00:00.000Z" } },
+      "expected": {
+        "eligible": false,
+        "axis": "catalog.freshness",
+        "blocker": "catalog.stale-or-invalid"
+      }
+    },
+    {
+      "id": "CPD-009",
+      "title": "selector must be an exact fresh catalog member",
+      "overrides": { "selector": "composer-2.5[fast=true]" },
+      "expected": {
+        "eligible": false,
+        "axis": "selector.exact",
+        "blocker": "selector.exact-match-required"
+      }
+    },
+    {
+      "id": "CPD-010",
+      "title": "Auto cannot prove exact model selection",
+      "overrides": { "selector": "Auto" },
+      "expected": {
+        "eligible": false,
+        "axis": "selector.auto",
+        "blocker": "selector.auto-forbidden"
+      }
+    },
+    {
+      "id": "CPD-011",
+      "title": "sandbox qualification is independent",
+      "overrides": { "sandbox": { "qualified": false } },
+      "expected": {
+        "eligible": false,
+        "axis": "sandbox.qualification",
+        "blocker": "sandbox.unqualified"
+      }
+    },
+    {
+      "id": "CPD-012",
+      "title": "quota availability is independent",
+      "overrides": { "quota": { "state": "unknown" } },
+      "expected": { "eligible": false, "axis": "quota.state", "blocker": "quota.unknown" }
+    },
+    {
+      "id": "CPD-013",
+      "title": "policy deny cannot fall back to API",
+      "overrides": { "policy": { "decision": "deny" } },
+      "expected": { "eligible": false, "axis": "policy", "blocker": "policy.denied" }
+    },
+    {
+      "id": "CPD-014",
+      "title": "reservation must bind the exact quota pool",
+      "overrides": { "reservation": { "pool_ref": "cursor:first-party:other" } },
+      "expected": {
+        "eligible": false,
+        "axis": "reservation.binding",
+        "blocker": "reservation.binding-mismatch"
+      }
+    },
+    {
+      "id": "CPD-015",
+      "title": "quota freshness is independent",
+      "overrides": { "quota": { "valid_until": "2026-07-14T12:00:00.000Z" } },
+      "expected": {
+        "eligible": false,
+        "axis": "quota.freshness",
+        "blocker": "quota.stale-or-invalid"
+      }
+    },
+    {
+      "id": "CPD-016",
+      "title": "first-party pool provenance is independently required",
+      "overrides": { "quota": { "provenance": "unknown" } },
+      "expected": {
+        "eligible": false,
+        "axis": "quota.provenance",
+        "blocker": "quota.first-party-pool-required"
+      }
+    },
+    {
+      "id": "CPD-017",
+      "title": "missing request schema is rejected before effects",
+      "overrides": { "schema": null },
+      "expected": {
+        "eligible": false,
+        "axis": "request.schema",
+        "blocker": "request.schema-invalid"
+      }
+    },
+    {
+      "id": "CPD-018",
+      "title": "unknown request schema is rejected before effects",
+      "overrides": { "schema": "ccm/cursor-provider-request/v1" },
+      "expected": {
+        "eligible": false,
+        "axis": "request.schema",
+        "blocker": "request.schema-invalid"
+      }
+    },
+    {
+      "id": "CPD-019",
+      "title": "IDE catalog provenance cannot authorize Agent CLI selection",
+      "overrides": {
+        "catalog": { "source": "cursor-ide-plugin/model-catalog/first-party-owner-store/v1" }
+      },
+      "expected": {
+        "eligible": false,
+        "axis": "catalog.provenance",
+        "blocker": "catalog.provenance-invalid",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-020",
+      "title": "arbitrary payer provenance is not owner authority",
+      "overrides": { "payer": { "source": "fixture/arbitrary-payer-source/v1" } },
+      "expected": {
+        "eligible": false,
+        "axis": "payer.provenance",
+        "blocker": "payer.provenance-invalid",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-021",
+      "title": "IDE quota provenance cannot authorize Agent CLI launch",
+      "overrides": { "quota": { "source": "cursor-ide-plugin/quota/first-party-owner-store/v1" } },
+      "expected": {
+        "eligible": false,
+        "axis": "quota.provenance",
+        "blocker": "quota.provenance-invalid",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-022",
+      "title": "missing quota and reservation revisions never bind by equality",
+      "overrides": {
+        "quota": { "source_revision": null },
+        "reservation": { "source_revision": null }
+      },
+      "expected": {
+        "eligible": false,
+        "axis": "quota.revision",
+        "blocker": "quota.revision-invalid",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-023",
+      "title": "reservation identity must be non-empty",
+      "overrides": { "reservation": { "id": null } },
+      "expected": {
+        "eligible": false,
+        "axis": "reservation.identity",
+        "blocker": "reservation.identity-invalid",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-024",
+      "title": "empty matching run and attempt identities are invalid",
+      "overrides": {
+        "run_ref": "",
+        "attempt_id": "",
+        "reservation": { "run_ref": "", "attempt_id": "" }
+      },
+      "expected": {
+        "eligible": false,
+        "axis": "run.identity",
+        "blocker": "request.invalid",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-025",
+      "title": "relative Cursor Agent executable identity is unsupported",
+      "overrides": { "surfaces": { "cursor-agent-cli": { "binary": { "path": "cursor-agent" } } } },
+      "expected": {
+        "eligible": false,
+        "axis": "headless.binary",
+        "blocker": "headless.binary-unsupported",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-026",
+      "title": "installed evidence cannot cross from the IDE surface",
+      "overrides": {
+        "surfaces": {
+          "cursor-agent-cli": {
+            "installed_evidence": { "surface_id": "cursor-ide-plugin" }
+          }
+        }
+      },
+      "expected": {
+        "eligible": false,
+        "axis": "headless.surface",
+        "blocker": "headless.evidence-invalid"
+      }
+    },
+    {
+      "id": "CPD-027",
+      "title": "binary evidence must remain bound to the binary axis",
+      "overrides": { "surfaces": { "cursor-agent-cli": { "binary": { "axis": "auth" } } } },
+      "expected": {
+        "eligible": false,
+        "axis": "headless.binary",
+        "blocker": "headless.evidence-invalid"
+      }
+    },
+    {
+      "id": "CPD-028",
+      "title": "auth evidence requires canonical UTC freshness",
+      "overrides": {
+        "surfaces": {
+          "cursor-agent-cli": { "auth": { "observed_at": "2026-07-14T11:59:00Z" } }
+        }
+      },
+      "expected": {
+        "eligible": false,
+        "axis": "headless.authentication",
+        "blocker": "headless.evidence-invalid"
+      }
+    },
+    {
+      "id": "CPD-029",
+      "title": "unsupported Cursor Agent binary version is rejected",
+      "overrides": {
+        "surfaces": { "cursor-agent-cli": { "binary": { "version": "2026.07.10-unknown" } } }
+      },
+      "expected": {
+        "eligible": false,
+        "axis": "headless.binary",
+        "blocker": "headless.binary-unsupported"
+      }
+    },
+    {
+      "id": "CPD-030",
+      "title": "reservation authority must match the owner lineage",
+      "overrides": { "reservation": { "authority_id": "cursor-first-party-owner-other" } },
+      "expected": {
+        "eligible": false,
+        "axis": "payer.authority",
+        "blocker": "payer.authority-mismatch"
+      }
+    },
+    {
+      "id": "CPD-031",
+      "title": "catalog pool binding must match the owner quota lineage",
+      "overrides": { "catalog": { "pool_ref": "cursor:first-party:other" } },
+      "expected": {
+        "eligible": false,
+        "axis": "catalog.binding",
+        "blocker": "catalog.binding-mismatch"
+      }
+    },
+    {
+      "id": "CPD-032",
+      "title": "top-level request keys are closed",
+      "overrides": { "unexpected_authority": "forged" },
+      "expected": {
+        "eligible": false,
+        "axis": "request.closed-shape",
+        "blocker": "request.invalid",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-033",
+      "title": "nested request keys are recursively closed",
+      "overrides": { "catalog": { "unexpected_authority": "forged" } },
+      "expected": {
+        "eligible": false,
+        "axis": "request.closed-shape",
+        "blocker": "request.invalid"
+      }
+    },
+    {
+      "id": "CPD-034",
+      "title": "origin harness is an exact closed enum",
+      "overrides": { "origin_harness": "malicious-origin" },
+      "expected": {
+        "eligible": false,
+        "axis": "request.origin",
+        "blocker": "request.invalid",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-035",
+      "title": "matching whitespace lineage never becomes authority",
+      "overrides": {
+        "run_ref": " ",
+        "attempt_id": " ",
+        "owner": { "source_key": " ", "reservation_id": " " },
+        "payer": { "payer_id": " ", "authority_id": " " },
+        "catalog": {
+          "authority_id": " ",
+          "payer_id": " ",
+          "pool_ref": " ",
+          "selectors": [
+            {
+              "selector": "composer-2.5[fast=false]",
+              "authority_id": " ",
+              "payer_id": " ",
+              "pool": "first_party",
+              "pool_ref": " "
+            }
+          ]
+        },
+        "quota": { "authority_id": " ", "payer_id": " ", "pool_ref": " ", "source_revision": " " },
+        "reservation": {
+          "id": " ",
+          "request_hash": " ",
+          "ticket_digest": " ",
+          "authority_digest": " ",
+          "authority_id": " ",
+          "run_ref": " ",
+          "attempt_id": " ",
+          "payer_id": " ",
+          "pool_ref": " ",
+          "source_revision": " "
+        }
+      },
+      "owner_receipt_overrides": {
+        "reservation_id": " ",
+        "reservation_request_hash": " ",
+        "ticket_digest": " ",
+        "attempt_id": " ",
+        "run_ref": " ",
+        "account_id": " ",
+        "pool_id": " ",
+        "source_revision": " ",
+        "authority_digest": " "
+      },
+      "expected": {
+        "eligible": false,
+        "axis": "request.identity",
+        "blocker": "request.invalid",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-036",
+      "title": "workspace must be a canonical absolute path string",
+      "overrides": { "workspace": null },
+      "expected": {
+        "eligible": false,
+        "axis": "request.workspace",
+        "blocker": "request.invalid",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-037",
+      "title": "prompt must be a nonblank string",
+      "overrides": { "prompt": null },
+      "expected": {
+        "eligible": false,
+        "axis": "request.prompt",
+        "blocker": "request.invalid",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-038",
+      "title": "workspace cannot be relative",
+      "overrides": { "workspace": "relative/worktree" },
+      "expected": {
+        "eligible": false,
+        "axis": "request.workspace",
+        "blocker": "request.invalid"
+      }
+    },
+    {
+      "id": "CPD-039",
+      "title": "load-bearing booleans retain exact types",
+      "overrides": { "surfaces": { "cursor-agent-cli": { "installed": "true" } } },
+      "expected": {
+        "eligible": false,
+        "axis": "request.types",
+        "blocker": "request.invalid"
+      }
+    },
+    {
+      "id": "CPD-040",
+      "title": "authentication state retains an exact enum",
+      "overrides": { "surfaces": { "cursor-agent-cli": { "auth": { "state": "maybe" } } } },
+      "expected": {
+        "eligible": false,
+        "axis": "request.enums",
+        "blocker": "request.invalid"
+      }
+    },
+    {
+      "id": "CPD-041",
+      "title": "owner preflight reference is closed",
+      "overrides": { "owner": { "unexpected": "forged" } },
+      "expected": {
+        "eligible": false,
+        "axis": "owner.request",
+        "blocker": "request.invalid"
+      }
+    },
+    {
+      "id": "CPD-042",
+      "title": "owner receipt is closed at the canonical boundary",
+      "overrides": {},
+      "owner_receipt_overrides": { "unexpected": "forged" },
+      "expected": {
+        "eligible": false,
+        "preflight_eligible": true,
+        "axis": "owner.receipt",
+        "blocker": "owner.receipt-invalid"
+      }
+    },
+    {
+      "id": "CPD-043",
+      "title": "owner receipt binds the reservation request hash",
+      "overrides": {},
+      "owner_receipt_overrides": {
+        "reservation_request_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "expected": {
+        "eligible": false,
+        "preflight_eligible": true,
+        "axis": "owner.binding",
+        "blocker": "owner.binding-mismatch"
+      }
+    },
+    {
+      "id": "CPD-044",
+      "title": "owner receipt binds the committed ticket digest",
+      "overrides": {},
+      "owner_receipt_overrides": {
+        "ticket_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "expected": {
+        "eligible": false,
+        "preflight_eligible": true,
+        "axis": "owner.binding",
+        "blocker": "owner.binding-mismatch"
+      }
+    },
+    {
+      "id": "CPD-045",
+      "title": "owner receipt binds attempt run payer and pool lineage",
+      "overrides": {},
+      "owner_receipt_overrides": {
+        "attempt_id": "attempt-other",
+        "run_ref": "run-other",
+        "account_id": "payer-other",
+        "pool_id": "pool-other"
+      },
+      "expected": {
+        "eligible": false,
+        "preflight_eligible": true,
+        "axis": "owner.binding",
+        "blocker": "owner.binding-mismatch"
+      }
+    },
+    {
+      "id": "CPD-046",
+      "title": "owner receipt binds live source and owner authority revisions",
+      "overrides": {},
+      "owner_receipt_overrides": {
+        "source_revision": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "authority_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "expected": {
+        "eligible": false,
+        "preflight_eligible": true,
+        "axis": "owner.binding",
+        "blocker": "owner.binding-mismatch"
+      }
+    },
+    {
+      "id": "CPD-047",
+      "title": "requested selector must be a canonical nonblank identifier",
+      "overrides": { "selector": " " },
+      "expected": {
+        "eligible": false,
+        "axis": "request.identity",
+        "blocker": "request.invalid",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-048",
+      "title": "catalog selector must be a canonical nonblank identifier",
+      "overrides": {
+        "catalog": {
+          "selectors": [
+            {
+              "selector": " ",
+              "authority_id": "cursor-first-party-owner-fixture",
+              "payer_id": "payer-first-party-fixture",
+              "pool": "first_party",
+              "pool_ref": "cursor:first-party:fixture"
+            }
+          ]
+        }
+      },
+      "expected": {
+        "eligible": false,
+        "axis": "catalog.identity",
+        "blocker": "request.invalid",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-049",
+      "title": "binary identity must be a canonical absolute path",
+      "overrides": {
+        "surfaces": {
+          "cursor-agent-cli": { "binary": { "path": "/fixture/bin/cursor-agent " } }
+        }
+      },
+      "expected": {
+        "eligible": false,
+        "axis": "headless.binary-identity",
+        "blocker": "headless.binary-unsupported",
+        "review_counterexample": true
+      }
+    },
+    {
+      "id": "CPD-050",
+      "title": "owner receipt source revision requires the canonical sha256 grammar",
+      "overrides": {},
+      "owner_receipt_overrides": { "source_revision": "revision-without-sha256-prefix" },
+      "expected": {
+        "eligible": false,
+        "preflight_eligible": true,
+        "axis": "owner.receipt-grammar",
+        "blocker": "owner.receipt-invalid",
+        "review_counterexample": true
+      }
+    }
+  ],
+  "invoke_cases": [
+    {
+      "id": "CPO-001",
+      "title": "zero hard timeout rejects before effects",
+      "axis": "invoke.timeout",
+      "hard_timeout_ms": 0,
+      "expected": { "state": "rejected", "blocker": "invoke.options-invalid" }
+    },
+    {
+      "id": "CPO-002",
+      "title": "negative hard timeout rejects before effects",
+      "axis": "invoke.timeout",
+      "hard_timeout_ms": -1,
+      "expected": { "state": "rejected", "blocker": "invoke.options-invalid" }
+    },
+    {
+      "id": "CPO-003",
+      "title": "non-finite hard timeout rejects before effects",
+      "axis": "invoke.timeout",
+      "hard_timeout_ms": "NaN",
+      "expected": { "state": "rejected", "blocker": "invoke.options-invalid" }
+    },
+    {
+      "id": "CPO-004",
+      "title": "unsupported runtime rejects before effects",
+      "axis": "invoke.runtime",
+      "options_overrides": { "runtime_schema": "ccm/provider-runtime-capabilities/v0" },
+      "expected": { "state": "rejected", "blocker": "runtime.unsupported" }
+    },
+    {
+      "id": "CPO-005",
+      "title": "signal must be an AbortSignal",
+      "axis": "invoke.signal",
+      "options_overrides": { "invalid_signal": true },
+      "expected": { "state": "rejected", "blocker": "invoke.options-invalid" }
+    },
+    {
+      "id": "CPO-006",
+      "title": "invoke options are closed",
+      "axis": "invoke.closed-shape",
+      "options_overrides": { "unexpected": true },
+      "expected": { "state": "rejected", "blocker": "invoke.options-invalid" }
+    },
+    {
+      "id": "CPO-007",
+      "title": "malformed child event surface retains tree ownership through failed supervision installation",
+      "axis": "invoke.supervision-handoff",
+      "options_overrides": { "malformed_child_event_surface": true },
+      "expected": { "state": "failed", "blocker": "transport.supervisor-handoff-failed" }
+    }
+  ],
+  "stream_cases": [
+    {
+      "id": "CPS-001",
+      "title": "resolved permission mode must remain ask",
+      "axis": "stream.permission",
+      "stream": { "init_overrides": { "permissionMode": "agent" } },
+      "expected": { "state": "failed", "blocker": "permission.resolved-mismatch" }
+    },
+    {
+      "id": "CPS-002",
+      "title": "init and terminal session identity must match",
+      "axis": "stream.session",
+      "stream": { "terminal_overrides": { "session_id": "cursor-session-other" } },
+      "expected": { "state": "failed", "blocker": "session.identity-mismatch" }
+    },
+    {
+      "id": "CPS-003",
+      "title": "duplicate init evidence is ambiguous",
+      "axis": "stream.init-cardinality",
+      "stream": { "duplicate_init": true },
+      "expected": { "state": "failed", "blocker": "stream.init-duplicate" }
+    },
+    {
+      "id": "CPS-004",
+      "title": "duplicate terminal evidence is ambiguous",
+      "axis": "stream.terminal-cardinality",
+      "stream": { "duplicate_terminal": true },
+      "expected": { "state": "failed", "blocker": "stream.terminal-duplicate" }
+    },
+    {
+      "id": "CPS-005",
+      "title": "available sandbox resolution must match enabled",
+      "axis": "stream.sandbox",
+      "stream": { "init_overrides": { "sandboxMode": "disabled" } },
+      "expected": { "state": "failed", "blocker": "sandbox.resolved-mismatch" }
+    },
+    {
+      "id": "CPS-006",
+      "title": "sandbox attestation is required",
+      "axis": "stream.sandbox-attestation",
+      "stream": { "omit_init_fields": ["sandboxMode"] },
+      "expected": { "state": "failed", "blocker": "sandbox.resolved-missing" }
+    },
+    {
+      "id": "CPS-007",
+      "title": "terminal cannot precede init",
+      "axis": "stream.order",
+      "stream": { "terminal_before_init": true },
+      "expected": { "state": "failed", "blocker": "stream.terminal-before-init" }
+    },
+    {
+      "id": "CPS-008",
+      "title": "matching whitespace session identity is invalid",
+      "axis": "stream.session",
+      "stream": {
+        "init_overrides": { "session_id": " " },
+        "terminal_overrides": { "session_id": " " }
+      },
+      "expected": { "state": "failed", "blocker": "session.identity-invalid" }
+    },
+    {
+      "id": "CPS-009",
+      "title": "terminal unrelated event then init is malformed",
+      "axis": "stream.order",
+      "stream": { "terminal_before_init": true, "between_terminal_and_init": true },
+      "expected": { "state": "failed", "blocker": "stream.post-terminal-evidence" }
+    },
+    {
+      "id": "CPS-010",
+      "title": "lifecycle evidence after terminal is rejected",
+      "axis": "stream.order",
+      "stream": { "post_terminal_event": true },
+      "expected": { "state": "failed", "blocker": "stream.post-terminal-evidence" }
+    }
+  ]
+}

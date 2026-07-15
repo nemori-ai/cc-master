@@ -299,6 +299,19 @@ partial/target，不能把本地 decision seam 冒充 end-to-end dispatch。
   append-only replay；真实 collector/circuit producer 仍 target，monitor 仅可选 prewarm，不是 correctness 前提。
 - hook 只能 cached-read；current preflight 重验 owner authority 与同 identity+pool reservation。把 live collector
   refresh #2 和 supervisor launch claim 串成完整 pre-dispatch transaction 仍 target。
+- bounded offline provider seam 必须消费 owner 返回的完整 committed ticket preimage，而不是只消费 caller
+  投影的 digest；共享 ticket/receipt/provider-launch binding registries 负责在 executable resolution 前绑定
+  run/attempt、identity/pool/aggregation/source、pinned runtime+absolute executable、idempotency/nonce 与 launch
+  window。ticket 内必须直接携带 native-attempt 已拥有的唯一 engine-owned
+  `ccm/canonical-launch-identity/v1` immutable envelope + digest；Cursor raw selector/workspace path/executable path
+  只进入不复制 identity atoms 的显式 provider extension，其 digest 与 dispatch 一起成为共享 identity 的
+  `request.digest`。共享 canonical JSON + SHA-256 绑定实际 selector/model/effort、account、workspace/worktree、
+  permission、完整 input/request bytes 与 runtime image/path；provider 只能从即将组装 argv/cwd 的
+  request/runtime seam 生成 context，不能从 ticket 回填。该 seam 的 fixture/driver
+  证据只能晋升对应 offline slice，真实 collector/claim/spawn 仍为 target。
+- 共享 canonical launch identity 不晋升 attempt state machine：Cursor CLI descriptor/candidate 继续被冻结的
+  Codex-only `ccm/native-attempt/v1` registry 与所有 create/bind/reconcile writer 拒绝；Cursor provider 只产
+  provider-local result/reconciliation，未来 promotion 必须另有 versioned evidence contract 与 review。
 - overall tight 可改投另一个**自身 ample**的 pool；不能用便宜小模型偷烧目标 tight pool 尾部。
 - promotion runner 已穿 `@ccm/engine` 公共 contract、existing CLI router/registry 与 owner-only filesystem store
   三条 production seam；fixture lookup evaluator 不构成证据。可执行 oracle 覆盖 10-way refresh single-flight、

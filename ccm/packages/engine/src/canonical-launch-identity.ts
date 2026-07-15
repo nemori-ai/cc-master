@@ -1,4 +1,5 @@
 import { canonicalSha256Digest } from './canonical-digest.js';
+import { isSha256Digest } from './sha256.js';
 
 export const CANONICAL_LAUNCH_IDENTITY_SCHEMA = 'ccm/canonical-launch-identity/v1';
 
@@ -28,9 +29,41 @@ export const CANONICAL_LAUNCH_IDENTITY_FIELD_REGISTRY = Object.freeze({
   selector: Object.freeze(['kind', 'model_id', 'effort']),
 });
 
+export interface CanonicalLaunchIdentity {
+  schema: typeof CANONICAL_LAUNCH_IDENTITY_SCHEMA;
+  origin: { harness: string; session_ref: string };
+  target: {
+    harness: string;
+    adapter: string;
+    surface: string;
+    transport: string;
+    candidate_id: string;
+  };
+  provider: { id: string; model: string; effort: string };
+  account: {
+    fingerprint_ref: string;
+    account_id: string;
+    pool_id: string;
+    identity_fingerprint: string;
+  };
+  workspace: { workspace_ref: string; worktree_ref: string; baseline_commit: string };
+  permission: { snapshot_ref: string; profile: string; denies: string[] };
+  input: { digest: string };
+  request: { digest: string };
+  dispatch: {
+    run_ref: string;
+    idempotency_key: string;
+    launch_nonce: string;
+    claim_id: string;
+  };
+  runtime: {
+    image_sha256: string;
+    selector: { kind: 'exact'; model_id: string; effort: string };
+  };
+}
+
 type Json = Record<string, unknown>;
 
-const SHA256_RE = /^sha256:[0-9a-f]{64}$/;
 const GIT_COMMIT_RE = /^[0-9a-f]{40}$/;
 
 function object(value: unknown): Json | undefined {
@@ -54,7 +87,9 @@ function strings(value: Json, keys: readonly string[]): boolean {
   return keys.every((key) => nonempty(value[key]));
 }
 
-export function normalizeCanonicalLaunchIdentity(value: unknown): Json {
+export function normalizeCanonicalLaunchIdentity(
+  value: unknown,
+): Readonly<CanonicalLaunchIdentity> {
   const row = object(value);
   const origin = object(row?.origin);
   const target = object(row?.target);
@@ -79,6 +114,7 @@ export function normalizeCanonicalLaunchIdentity(value: unknown): Json {
     !strings(provider, fields.provider) ||
     !exact(account, fields.account) ||
     !strings(account, fields.account) ||
+    !isSha256Digest(account.identity_fingerprint) ||
     !exact(workspace, fields.workspace) ||
     !strings(workspace, fields.workspace) ||
     !GIT_COMMIT_RE.test(String(workspace.baseline_commit)) ||
@@ -88,16 +124,16 @@ export function normalizeCanonicalLaunchIdentity(value: unknown): Json {
     !Array.isArray(permission.denies) ||
     permission.denies.some((entry) => !nonempty(entry)) ||
     !exact(input, fields.digest) ||
-    !SHA256_RE.test(String(input.digest)) ||
+    !isSha256Digest(input.digest) ||
     !exact(request, fields.digest) ||
-    !SHA256_RE.test(String(request.digest)) ||
+    !isSha256Digest(request.digest) ||
     !exact(dispatch, fields.dispatch) ||
     !strings(dispatch, fields.dispatch) ||
-    !SHA256_RE.test(String(dispatch.idempotency_key)) ||
+    !isSha256Digest(dispatch.idempotency_key) ||
     !String(dispatch.run_ref).startsWith('ccm-run:v1:') ||
     dispatch.launch_nonce !== dispatch.claim_id ||
     !exact(runtime, fields.runtime) ||
-    !SHA256_RE.test(String(runtime.image_sha256)) ||
+    !isSha256Digest(runtime.image_sha256) ||
     !exact(selector, fields.selector) ||
     selector.kind !== 'exact' ||
     !nonempty(selector.model_id) ||
@@ -107,7 +143,7 @@ export function normalizeCanonicalLaunchIdentity(value: unknown): Json {
   ) {
     throw new Error('CANONICAL-LAUNCH-IDENTITY-INVALID');
   }
-  return {
+  return deepFreeze({
     schema: CANONICAL_LAUNCH_IDENTITY_SCHEMA,
     origin: { harness: origin.harness, session_ref: origin.session_ref },
     target: {
@@ -146,9 +182,17 @@ export function normalizeCanonicalLaunchIdentity(value: unknown): Json {
       image_sha256: runtime.image_sha256,
       selector: { kind: 'exact', model_id: selector.model_id, effort: selector.effort },
     },
-  };
+  } as CanonicalLaunchIdentity);
 }
 
 export function canonicalLaunchIdentityDigest(value: unknown): string {
   return canonicalSha256Digest(normalizeCanonicalLaunchIdentity(value));
+}
+
+function deepFreeze<T>(value: T): Readonly<T> {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value)) deepFreeze(child);
+  }
+  return value;
 }
