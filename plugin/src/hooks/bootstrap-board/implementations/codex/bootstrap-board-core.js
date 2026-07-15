@@ -177,6 +177,7 @@ function run(cmd, args, options = {}) {
 
 function registerCoordinationSubscription(home, boardPath, sessionId) {
   try {
+    // PARITY: rule-bootstrap-subscription-register
     const res = run('ccm', [
       'coordination',
       'subscription',
@@ -192,6 +193,7 @@ function registerCoordinationSubscription(home, boardPath, sessionId) {
       '--json',
       '--no-input',
     ], { env: { ...process.env, CC_MASTER_HOME: home } });
+    // PARITY: rule-bootstrap-subscription-registration-response
     const envelope = JSON.parse(res.stdout || '{}');
     const value = envelope && envelope.ok === true && envelope.data && envelope.data.subscription;
     return !!(
@@ -204,6 +206,7 @@ function registerCoordinationSubscription(home, boardPath, sessionId) {
       value.state === 'current'
     );
   } catch {
+    // PARITY: rule-bootstrap-subscription-registration-failure
     return false;
   }
 }

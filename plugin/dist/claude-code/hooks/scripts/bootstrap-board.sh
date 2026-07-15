@@ -618,9 +618,12 @@ CCM_GOAL_CONTRACT_CAPABILITY='goal-contract/v1'
 CCM_BOARD_PATH_MIN_VERSION='0.21.0'
 register_coordination_subscription() {
   board_path="$1"
+  # PARITY: rule-bootstrap-subscription-register
+  # PARITY: rule-bootstrap-subscription-registration-failure
   subscription_out="$(CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" coordination subscription register \
     --board "$board_path" --origin claude-code --session-id "$sid" \
     --capability coordination-inbox --json --no-input 2>/dev/null)" || return 0
+  # PARITY: rule-bootstrap-subscription-registration-response
   printf '%s' "$subscription_out" | CCM_EXPECTED_SESSION="$sid" node -e '
     let input = "";
     process.stdin.on("data", (chunk) => { input += chunk; });

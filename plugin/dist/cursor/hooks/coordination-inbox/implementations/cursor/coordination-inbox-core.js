@@ -123,6 +123,8 @@ function validProvenance(value, current) {
 }
 
 function listUnconsumed(home, boardPath, origin, sessionId) {
+  // PARITY: rule-coordination-inbox-subscription-fail-closed
+  // PARITY: rule-coordination-inbox-current-subscription
   const currentData = callCcm(home, [
     'coordination',
     'subscription',
@@ -140,6 +142,7 @@ function listUnconsumed(home, boardPath, origin, sessionId) {
   ]);
   const current = currentData && currentData.subscription;
   if (!validSubscription(current, { session_id: sessionId, origin }, true)) return [];
+  // PARITY: rule-coordination-inbox-bounded-list
   const listData = callCcm(home, [
     'coordination',
     'inbox',
@@ -162,6 +165,7 @@ function listUnconsumed(home, boardPath, origin, sessionId) {
   const selected = listData && listData.subscription;
   if (!validSubscription(selected, current, false)) return [];
   const inbox = Array.isArray(listData.inbox) ? listData.inbox : [];
+  // PARITY: rule-coordination-inbox-delivery-provenance
   return inbox.filter(
     (item) =>
       item &&

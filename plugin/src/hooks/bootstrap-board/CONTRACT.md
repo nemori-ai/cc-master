@@ -11,7 +11,7 @@ Every other hook is dormant until a board with `owner.active:true` and a matchin
 under `<home>/boards/`. This hook is what creates that condition — either by writing a fresh board
 (fresh start) or by re-arming an existing archived board onto the current session (`--resume`).
 
-## XH C3 subscription registration authority（Track B target）
+## XH C3 subscription registration authority（implemented Track B）
 
 This hook CONTRACT is the only authority for bootstrap-local subscription registration. The
 cross-surface Capability Card owns intent/status; derived design documents may link these rules but
@@ -131,11 +131,17 @@ from AGENTS.md §12's `runHook`/`isArmed` grep door). Its own "gate" is the trig
   required_hosts: [claude-code, codex, cursor]
 - rule: rule-bootstrap-raw-request-is-evidence
   required_hosts: [claude-code, codex, cursor]
+- rule: rule-bootstrap-subscription-register
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-bootstrap-subscription-registration-response
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-bootstrap-subscription-registration-failure
+  required_hosts: [claude-code, codex, cursor]
 ```
 
-The XH C3 rules above are a Track B `target`, not current implementation anchors. Their required
-three-host set and stage live only in the Capability Card until executable host evidence promotes
-them; adding them to this implemented-anchor block early would falsely claim runtime coverage.
+The XH C3 rules above are current three-host implementation anchors. The Capability Card owns the
+cross-surface status; this CONTRACT owns these bootstrap-local rules, and the executable matrix
+proves their host-native projections without broadening registration beyond the cached-only slice.
 
 ## 降级行为
 

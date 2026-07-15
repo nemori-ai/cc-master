@@ -1,6 +1,6 @@
 # cross-harness-notification-subscription
 
-> Track B specification target. This card owns only the cross-surface capability intent,
+> Implemented Track B capability. This card owns only the cross-surface capability intent,
 > acceptance, and per-host status. Hook-local command and failure rules live in the affected PHIP
 > CONTRACT files named below.
 
@@ -52,9 +52,9 @@ identity/epoch 和不完整 provenance 全部 fail closed，不回退到别的 a
 
 | host | status | mechanism | notes |
 | --- | --- | --- | --- |
-| claude-code | target | UserPromptSubmit bootstrap registration + Stop exact subscription resolution/read | contract-first; runtime pending |
-| codex | target | launcher-normalized bootstrap registration + Stop system-message exact resolution/read | contract-first; runtime pending |
-| cursor | target | beforeSubmitPrompt bootstrap registration + stop followup-message exact resolution/read | contract-first; runtime pending |
+| claude-code | implemented-track-b | UserPromptSubmit bootstrap registration + Stop exact subscription resolution/read | executable fresh/resume and delivery matrix verified |
+| codex | implemented-track-b | launcher-normalized bootstrap registration + Stop system-message exact resolution/read | executable fresh/resume and delivery matrix verified |
+| cursor | implemented-track-b | beforeSubmitPrompt bootstrap registration + stop followup-message exact resolution/read | executable fresh/resume and delivery matrix verified |
 
 ## Declared divergence
 
@@ -78,5 +78,7 @@ identity/epoch 和不完整 provenance 全部 fail closed，不回退到别的 a
 
 ## Current truth
 
-当前 production hooks 还没有兑现本 Track B target；在 executable implementation 与独立端点证据落地前，
-三个 host 均保持 `target`，不得从 hook 整体已安装/已运行推导为本能力 `implemented*`。
+当前 production hooks 已在三个 host 兑现本 Track B capability：fresh/resume ARM 后 best-effort 注册、
+Stop 时精确解析 current subscription/epoch、按 seven-field provenance 筛选并保持 explicit ack。
+`implemented-track-b` 只证明本卡 acceptance 与两个 PHIP CONTRACT 的规则已由 executable matrix 覆盖；
+它不扩张为 live provider polling、自动 ack、account switching 或未声明的 host surface。

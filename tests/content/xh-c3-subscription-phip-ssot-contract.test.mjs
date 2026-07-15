@@ -86,6 +86,62 @@ function hookCoverage(text, hookId, requiredHosts) {
   return coverage;
 }
 
+function parityAnchors(text) {
+  const heading = text.indexOf('## PARITY anchors');
+  if (heading < 0) return new Map();
+  const rest = text.slice(heading);
+  const fenceStart = rest.indexOf('```yaml');
+  if (fenceStart < 0) return new Map();
+  const afterFence = rest.slice(fenceStart + '```yaml'.length);
+  const fenceEnd = afterFence.indexOf('```');
+  const block = fenceEnd < 0 ? afterFence : afterFence.slice(0, fenceEnd);
+  const anchors = new Map();
+  let current = null;
+  for (const line of block.split(/\r?\n/)) {
+    const rule = line.match(/^\s*-\s+rule:\s*(.+?)\s*$/);
+    if (rule) {
+      current = rule[1].replace(/^["']|["']$/g, '');
+      anchors.set(current, []);
+      continue;
+    }
+    const hosts = line.match(/^\s+required_hosts:\s*\[(.*)\]\s*$/);
+    if (current && hosts) {
+      anchors.set(
+        current,
+        hosts[1]
+          .split(',')
+          .map((host) => host.trim())
+          .filter(Boolean),
+      );
+    }
+  }
+  return anchors;
+}
+
+function implementationText(hook, host, failures) {
+  const root = join(TARGET_ROOT, 'plugin/src/hooks', hook, 'implementations', host);
+  if (!existsSync(root)) {
+    failures.push(`${hook}/${host}: implementation directory missing`);
+    return '';
+  }
+  return readdirSync(root)
+    .filter((name) => name.endsWith('.js') || name.endsWith('.sh'))
+    .map((name) => readFileSync(join(root, name), 'utf8'))
+    .join('\n');
+}
+
+function matrixStatuses(text, capabilityId, requiredHosts) {
+  const line = text
+    .split(/\r?\n/)
+    .find((candidate) => candidate.startsWith(`| ${capabilityId} |`));
+  if (!line) return {};
+  const cells = line
+    .split('|')
+    .slice(1, -1)
+    .map((cell) => cell.trim());
+  return Object.fromEntries(requiredHosts.map((host, index) => [host, cells[index + 1] || '']));
+}
+
 test('XH C3 Track-B capability has one mapped authority per subject and executable contract anchors', () => {
   const failures = [];
   if (MANIFEST.role !== 'non-normative-test-oracle') {
@@ -166,6 +222,56 @@ test('XH C3 Track-B capability has one mapped authority per subject and executab
       rows,
       Object.fromEntries(requiredHosts.map((host) => [host, MANIFEST.required_status])),
     );
+    const matrixText = readTarget(
+      'design_docs/capability-parity-matrix.md',
+      failures,
+      'capability-matrix',
+    );
+    expectExact(
+      failures,
+      'capability.matrix-status',
+      matrixStatuses(matrixText, capability.capability_id, requiredHosts),
+      Object.fromEntries(requiredHosts.map((host) => [host, MANIFEST.required_status])),
+    );
+
+    const targetOnlyClaims = [
+      /Track B specification target/i,
+      /Track B `target`/i,
+      /runtime pending/i,
+      /not current implementation anchors/i,
+      /还没有兑现本 Track B target/,
+      /均保持 `target`/,
+    ];
+    for (const path of [
+      MANIFEST.canonical.capability.path,
+      MANIFEST.canonical.bootstrap.path,
+      MANIFEST.canonical.inbox.path,
+    ]) {
+      const text = readTarget(path, failures, 'current-truth');
+      for (const pattern of targetOnlyClaims) {
+        if (pattern.test(text)) failures.push(`${path}: stale target-only claim ${pattern}`);
+      }
+    }
+  }
+
+  for (const [name, hook] of [
+    ['bootstrap', 'bootstrap-board'],
+    ['inbox', 'coordination-inbox'],
+  ]) {
+    const authority = parsed[name];
+    if (!authority) continue;
+    const contractPath = MANIFEST.canonical[name].path;
+    const contractText = readTarget(contractPath, failures, `${name}-contract`);
+    const anchors = parityAnchors(contractText);
+    for (const rule of authority.rule_ids) {
+      expectExact(failures, `${name}.parity.${rule}`, anchors.get(rule) || [], requiredHosts);
+      for (const host of requiredHosts) {
+        const implementation = implementationText(hook, host, failures);
+        if (!implementation.includes(`PARITY: ${rule}`)) {
+          failures.push(`${hook}/${host}: executable runtime missing PARITY: ${rule}`);
+        }
+      }
+    }
   }
 
   const hooksManifest = readTarget(
