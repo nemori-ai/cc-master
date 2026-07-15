@@ -216,7 +216,7 @@ Track 纪律：
 
 - Track A：host 有原生等价 surface。按 Capability/hook CONTRACT → host implementation → equivalence-class fixture → projection → real probe 推进。
 - Track B：host 无 1:1 机制。必须有 declared divergence、compensating mechanism 和 target acceptance；不得用相似 event 名制造 parity。
-- Cursor IDE plugin `cursor-ide-plugin` 与 Cursor Agent CLI `cursor-agent-cli` 是两个 descriptor / contract；同品牌不能合并，任一侧 installed/authenticated 不推出另一侧可用。正式 bounded-context、角色、负能力、pool 禁止推导与迁移/rollback 合同见 [`harnesses/cursor-dual-surface-contract.md`](harnesses/cursor-dual-surface-contract.md)。
+- Cursor IDE plugin 与 Cursor Agent CLI 是两个 descriptor / contract；对应 canonical surface IDs 分别为 `cursor-ide-plugin` 与 `cursor-agent-cli`。同品牌不能合并，任一侧 installed/authenticated 不推出另一侧可用。正式 bounded-context、角色、负能力、pool 禁止推导与迁移/rollback 合同见 [`harnesses/cursor-dual-surface-contract.md`](harnesses/cursor-dual-surface-contract.md)。
 - Codex/Cursor 无 PostToolBatch 是负能力，不应由逐工具事件伪装。
 - origin delivery fail-open 只表示 context/notification 降级；dispatch mechanical gate 仍独立 fail-closed。
 
