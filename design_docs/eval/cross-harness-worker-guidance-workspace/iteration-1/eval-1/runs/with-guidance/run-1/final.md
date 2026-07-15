@@ -1,0 +1,5 @@
+**DO_NOT_DISPATCH** —— cursor-agent-cli 虽已安装且已认证，但 provider facts 显示 `live_entitlement`、`exact_model_admission` 均为 unknown（`eligible_for_automatic_selection:false`），machine inventory 的 eligibility 也标出 `model-unknown`、`quota-unknown` 两个 blocker；quota status 的 `available:true` 只证明本地权威 store 可读，不等于 ample headroom，且当前没有已提交的 `quota preflight` 引用（source_key / reservation_id / decision / spawn limit）。承重事实缺失即须 fail closed，不得凭 prior 或"更省事"补齐。
+
+补充说明：
+- **Cursor IDE 与 Cursor Agent CLI 不是同一可互换 surface**——inventory 里明确是两个独立 descriptor（`cursor-ide-plugin` 未安装/未探测，`cursor-agent-cli` 已安装已认证），二者的安装、认证、资格互不可推。
+- **选择 origin 内的 worker并不能降低所需证据标准**——无论目标是本 harness 内还是跨 harness 的 Cursor worker，只要涉及一次显式付费调用，都必须先有绑定同一候选（surface + provider + payer + pool + model）的完整 quota preflight 授权，缺任一维度都不能派发；停留在当前 harness 不是绕过该门槛的理由。

@@ -1,0 +1,17 @@
+{
+  "schema": "cc-master/track-b-run/v1",
+  "arm": "with-guidance",
+  "split": "train",
+  "run": 1,
+  "candidate_base": "aae6788cc5830465e7dc067cf0156e7cba481f47",
+  "model": "sonnet",
+  "effort": "medium",
+  "prompt_sha256": "60502be4c2975852f24207aebcafa7d0a766ad5181370fc9c6989d7257f92bb6",
+  "appended_guidance_sha256": "b08ce56aa2e4d539279b686f029bcec58bde80cbcfb4e1b65c2f0c693c1ccd78",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "raw_sha256": "b3b05db11c5ecec517e47074a88c46e89511c586632b8b0bf0ee4d9c5a2f355f",
+  "final_sha256": "29a32933a0027ac802510d42a0986ac7bb25767dea81c172ab0db83f4a8df905",
+  "trace_sha256": "dd565d481d13ef6e55cd6441c36e048df7d3b775626ab5f89bdd08ad0372a7f1"
+}

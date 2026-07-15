@@ -34,7 +34,7 @@
 
 - **消费 ccm 已产生的 advisory / 事实** 的读法 + 字段解读 + 喂回 orchestrator 判断：`usage`（show/advise/task-cost/burn-rate/runway）· `estimate`（show/forecast/evm/velocity/risk/cost-to-complete）· baseline 派生的 `has_baseline` / EVM 字段；不教 baseline 与 coordination 写入机制。
 - 顶层 capability 只声明 `read_and_interpret_ccm_advisory` / `reference_model_registry` / `handoff_decision_input` 三种操作；host strategy 只选择同一 registry 的 profile，canonical `SKILL.md` 只保留生成 slot；三宿主最终发布的 `SKILL.md`、canonical references 与 host overlay/include 结果必须逐文件等于 registry 的 host-local manifest。
-- **host-localized 模型档位事实 registry**（Claude 四档；Codex GPT-5.6 Sol/Terra/Luna×effort；Cursor 已准入 first-party selectors）：只提供可用性 / provenance / 相对成本 / 能力边界，具体模型分配、路由与主线固定归 A。
+- **host-localized 模型档位事实 registry**（Claude 四档；Codex GPT-5.6 Sol/Terra/Luna×effort；Cursor 已准入 first-party selectors），以及 provider-neutral 的 selected-target inventory/model/quota envelope 解释：只提供可用性 / provenance / freshness / 相对成本 / 能力边界，具体模型分配、路由与主线固定归 A；精确命令形状归 D。
 - **host-localized 配额信号源链**（Claude 5h/7d；Codex 7d-only hard ceiling + rolling-24h advisory，`five_hour` / 5h 只作 ignored provenance；Cursor billing_period；`ccm usage advise` 的 provider-authoritative 部分优先 / 信号不可得时诚实降级）+ effective-N 可用时的缩放节奏消费。
 - **估算诚实字段怎么用**（coverage_pct / source / confidence / conformal 区间 → 何时降低对预测的信任权重）。
 

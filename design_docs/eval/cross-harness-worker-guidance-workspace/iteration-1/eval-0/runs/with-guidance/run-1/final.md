@@ -1,0 +1,4 @@
+**DO_NOT_DISPATCH** — cursor-agent-cli surface虽已安装并认证，但 `provider facts` 明确标出 `live-entitlement-unknown`、`exact-model-admission-unknown`，且 `harness list` 给出 blockers `model-unknown`/`quota-unknown`；`quota status` 的 `available:true` 只证明本地 authority store 可读，不等于 ample headroom，也没有任何已提交的 `quota preflight` 决策、spawn limit 或 payer/pool 绑定证据。承重事实存在 unknown/blocker，必须 fail closed，不得派发这次显式付费调用。
+
+- 当前 Codex origin 本身**不是** worker-selection 边界——决策依据的是 selected target（cursor-agent-cli）的独立 surface/model/quota 事实，而非 origin 品牌或登录态。
+- 同源（same-origin）worker 也**不能**使用更弱的证据闸：无论 worker 是否与 origin 同品牌，凡涉及显式付费调用，都必须满足同一套 surface-model-quota 绑定证据要求，不存在同源豁免。

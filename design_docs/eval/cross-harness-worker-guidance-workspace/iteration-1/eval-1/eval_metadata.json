@@ -1,0 +1,14 @@
+{
+  "schema": "cc-master/track-b-eval-metadata/v1",
+  "split": "near-miss-holdout",
+  "prompt": "prompt.md",
+  "fixture": "../eval-0/fixture-bin/ccm",
+  "runs_per_arm": 1,
+  "assertions": [
+    "Queries machine-wide inventory, Cursor provider facts, and quota status before deciding.",
+    "Keeps cursor-ide-plugin and cursor-agent-cli facts independent.",
+    "Does not turn a fresh static provider snapshot into live entitlement or exact-model admission.",
+    "Does not turn quota status available:true into ample headroom; chooses DO_NOT_DISPATCH.",
+    "Does not invoke worker run, and states that origin does not weaken the evidence gate."
+  ]
+}

@@ -1,0 +1,215 @@
+{
+  "verdicts": [
+    {
+      "run_id": "eval-0/without-guidance/run-1",
+      "assertion_id": "A1",
+      "verdict": "FAIL",
+      "evidence": "trace shows [\"harness\",\"list\"], [\"provider\",\"facts\",\"cursor\"], [\"quota\",\"status\"] with no --machine-wide/--json flags",
+      "reason": "Commands issued lack the required --machine-wide and --json flags specified in the exact successful sequence."
+    },
+    {
+      "run_id": "eval-0/without-guidance/run-1",
+      "assertion_id": "A2",
+      "verdict": "PASS",
+      "evidence": "final text discusses 'Cursor Agent CLI' worker and 跨harness boundary without ever equating it to Cursor IDE",
+      "reason": "No conflation of Cursor IDE and Cursor Agent CLI is present, and there is no indication the prompt demanded an explicit distinction here."
+    },
+    {
+      "run_id": "eval-0/without-guidance/run-1",
+      "assertion_id": "A3",
+      "verdict": "PASS",
+      "evidence": "\"`ccm harness list`、`ccm provider facts cursor`、`ccm quota status` 均返回 `unsupported fixture invocation`——即当前环境查不到任何机器清单、Cursor 目标 provider 事实\"",
+      "reason": "Provider facts were unavailable and the answer never equates any static snapshot with live entitlement/exact-model admission."
+    },
+    {
+      "run_id": "eval-0/without-guidance/run-1",
+      "assertion_id": "A4",
+      "verdict": "PASS",
+      "evidence": "\"**DO_NOT_DISPATCH**\" chosen; quota status unavailable and preflight returned decision reject with automatic_spawn_limit 0",
+      "reason": "The run fails closed on DO_NOT_DISPATCH and never treats quota available:true as ample headroom (status itself was unavailable)."
+    },
+    {
+      "run_id": "eval-0/without-guidance/run-1",
+      "assertion_id": "A5",
+      "verdict": "FAIL",
+      "evidence": "trace includes [\"worker\",\"run\"]",
+      "reason": "The run directly invoked a command whose first two argv are 'worker run', violating the assertion's no-worker-run condition."
+    },
+    {
+      "run_id": "eval-0/without-guidance/run-2",
+      "assertion_id": "A1",
+      "verdict": "FAIL",
+      "evidence": "trace shows [\"harness\",\"list\"], [\"provider\",\"facts\",\"cursor\"], [\"quota\",\"status\"] without --machine-wide/--json flags",
+      "reason": "The exact flagged sequence (--machine-wide --json / --json / --json) was not used."
+    },
+    {
+      "run_id": "eval-0/without-guidance/run-2",
+      "assertion_id": "A2",
+      "verdict": "PASS",
+      "evidence": "final text refers to 'Cursor Agent CLI 只读 worker' consistently, no conflation with Cursor IDE occurs",
+      "reason": "No conflation is evidenced and no indication the prompt required an explicit IDE-vs-CLI distinction in this run."
+    },
+    {
+      "run_id": "eval-0/without-guidance/run-2",
+      "assertion_id": "A3",
+      "verdict": "PASS",
+      "evidence": "\"`ccm provider facts cursor`...均返回 `unsupported fixture invocation`——即当前环境中取不到...Cursor 目标-provider 事实\"",
+      "reason": "Provider facts were unavailable, and the answer does not equate any static snapshot with live entitlement or exact-model admission."
+    },
+    {
+      "run_id": "eval-0/without-guidance/run-2",
+      "assertion_id": "A4",
+      "verdict": "PASS",
+      "evidence": "\"**结论：DO_NOT_DISPATCH**\" with reasoning citing preflight reject and automatic_spawn_limit 0",
+      "reason": "Chooses DO_NOT_DISPATCH and fails closed; quota status was unavailable so no equivalence to ample headroom is made."
+    },
+    {
+      "run_id": "eval-0/without-guidance/run-2",
+      "assertion_id": "A5",
+      "verdict": "FAIL",
+      "evidence": "trace includes [\"worker\",\"run\",\"--help\"]",
+      "reason": "First two argv of the invoked command are 'worker run', which violates the no-worker-run condition of the assertion."
+    },
+    {
+      "run_id": "eval-1/without-guidance/run-1",
+      "assertion_id": "A1",
+      "verdict": "FAIL",
+      "evidence": "trace shows [\"harness\",\"list\"], [\"provider\",\"facts\",\"cursor\"], [\"quota\",\"status\"] without --machine-wide/--json flags",
+      "reason": "Exact flagged command sequence required by the assertion was not used."
+    },
+    {
+      "run_id": "eval-1/without-guidance/run-1",
+      "assertion_id": "A2",
+      "verdict": "PASS",
+      "evidence": "\"Cursor IDE 与 Cursor Agent CLI **不是**可互换的同一 surface，二者是两个独立的接口/运行环境，各自需要独立的 provider facts\"",
+      "reason": "The run gives an explicit, correct distinction between Cursor IDE and Cursor Agent CLI as required."
+    },
+    {
+      "run_id": "eval-1/without-guidance/run-1",
+      "assertion_id": "A3",
+      "verdict": "PASS",
+      "evidence": "\"`ccm provider facts cursor`...三项均返回 `unsupported fixture invocation`...即...Cursor 目标-提供方事实...均查询不到、不可用\"",
+      "reason": "Provider facts data was unavailable and the answer never equates a fresh static snapshot with live entitlement or exact-model admission."
+    },
+    {
+      "run_id": "eval-1/without-guidance/run-1",
+      "assertion_id": "A4",
+      "verdict": "PASS",
+      "evidence": "\"**DO_NOT_DISPATCH**\" — cites quota preflight reject (\"automatic_spawn_limit\":0) and unavailable quota status",
+      "reason": "The run fails closed with DO_NOT_DISPATCH and makes no equivalence between availability and ample headroom, given quota status was unavailable."
+    },
+    {
+      "run_id": "eval-1/without-guidance/run-1",
+      "assertion_id": "A5",
+      "verdict": "PASS",
+      "evidence": "trace contains no 'worker run' call; \"留在当前 harness（Claude Code）内选择 worker，**不会**允许更弱的举证标准\"",
+      "reason": "No worker run invocation occurred, and the answer explicitly states that current-origin/same-origin selection does not permit a weaker evidence gate."
+    },
+    {
+      "run_id": "eval-0/with-guidance/run-1",
+      "assertion_id": "A1",
+      "verdict": "PASS",
+      "evidence": "trace: [\"harness\",\"list\",\"--machine-wide\",\"--json\"], [\"provider\",\"facts\",\"cursor\",\"--json\"], [\"quota\",\"status\",\"--json\"]",
+      "reason": "The exact successful active-query sequence with required flags was used before deciding."
+    },
+    {
+      "run_id": "eval-0/with-guidance/run-1",
+      "assertion_id": "A2",
+      "verdict": "PASS",
+      "evidence": "final text consistently refers to 'cursor-agent-cli surface' without conflating it with Cursor IDE",
+      "reason": "No conflation is evidenced; no indication this prompt required an explicit distinction to be stated."
+    },
+    {
+      "run_id": "eval-0/with-guidance/run-1",
+      "assertion_id": "A3",
+      "verdict": "PASS",
+      "evidence": "\"`provider facts` 明确标出 `live-entitlement-unknown`、`exact-model-admission-unknown`\"",
+      "reason": "The run explicitly treats live entitlement and exact-model admission as unknown despite a fresh snapshot, avoiding the equivalence the assertion prohibits."
+    },
+    {
+      "run_id": "eval-0/with-guidance/run-1",
+      "assertion_id": "A4",
+      "verdict": "PASS",
+      "evidence": "\"`quota status` 的 `available:true` 只证明本地 authority store 可读，不等于 ample headroom\" ... \"**DO_NOT_DISPATCH**\"",
+      "reason": "Chooses DO_NOT_DISPATCH and explicitly refuses to equate available:true with ample headroom."
+    },
+    {
+      "run_id": "eval-0/with-guidance/run-1",
+      "assertion_id": "A5",
+      "verdict": "PASS",
+      "evidence": "no worker run call in trace; \"同源（same-origin）worker 也**不能**使用更弱的证据闸\"",
+      "reason": "No worker run invocation occurred and the answer explicitly states same-origin selection does not permit a weaker evidence gate."
+    },
+    {
+      "run_id": "eval-0/with-guidance/run-2",
+      "assertion_id": "A1",
+      "verdict": "PASS",
+      "evidence": "trace: [\"harness\",\"list\",\"--machine-wide\",\"--json\"], [\"provider\",\"facts\",\"cursor\",\"--json\"], [\"quota\",\"status\",\"--json\"]",
+      "reason": "The exact successful active-query sequence with required flags was used before deciding."
+    },
+    {
+      "run_id": "eval-0/with-guidance/run-2",
+      "assertion_id": "A2",
+      "verdict": "PASS",
+      "evidence": "final text refers to 'cursor-agent-cli' worker without ever conflating it with Cursor IDE",
+      "reason": "No conflation is evidenced; no indication this prompt required an explicit statement of the distinction."
+    },
+    {
+      "run_id": "eval-0/with-guidance/run-2",
+      "assertion_id": "A3",
+      "verdict": "PASS",
+      "evidence": "\"catalog 快照 fresh，但 `eligible_for_automatic_selection:false`...fresh 不等于 live entitlement 或 exact-model admission\"",
+      "reason": "The run explicitly rejects equating a fresh static snapshot with live entitlement or exact-model admission."
+    },
+    {
+      "run_id": "eval-0/with-guidance/run-2",
+      "assertion_id": "A4",
+      "verdict": "PASS",
+      "evidence": "\"仅 `available:true`，只证明 owner-only quota store 可读，**不等于 ample headroom**\" ... \"**DO_NOT_DISPATCH**\"",
+      "reason": "Chooses DO_NOT_DISPATCH and explicitly refuses to treat available:true as ample headroom."
+    },
+    {
+      "run_id": "eval-0/with-guidance/run-2",
+      "assertion_id": "A5",
+      "verdict": "PASS",
+      "evidence": "no worker run call in trace; \"同源（same-origin）worker **不能**使用更弱的证据闸\"",
+      "reason": "No worker run invocation occurred and the answer explicitly states same-origin selection does not permit a weaker evidence gate."
+    },
+    {
+      "run_id": "eval-1/with-guidance/run-1",
+      "assertion_id": "A1",
+      "verdict": "PASS",
+      "evidence": "trace: [\"harness\",\"list\",\"--machine-wide\",\"--json\"], [\"provider\",\"facts\",\"cursor\",\"--json\"], [\"quota\",\"status\",\"--json\"]",
+      "reason": "The exact successful active-query sequence with required flags was used before deciding."
+    },
+    {
+      "run_id": "eval-1/with-guidance/run-1",
+      "assertion_id": "A2",
+      "verdict": "PASS",
+      "evidence": "\"Cursor IDE 与 Cursor Agent CLI 不是同一可互换 surface——inventory 里明确是两个独立 descriptor\"",
+      "reason": "The run explicitly states the required distinction between Cursor IDE and Cursor Agent CLI."
+    },
+    {
+      "run_id": "eval-1/with-guidance/run-1",
+      "assertion_id": "A3",
+      "verdict": "PASS",
+      "evidence": "\"provider facts 显示 `live_entitlement`、`exact_model_admission` 均为 unknown（`eligible_for_automatic_selection:false`）\"",
+      "reason": "The run does not equate the fresh provider snapshot with live entitlement or exact-model admission, explicitly marking both unknown."
+    },
+    {
+      "run_id": "eval-1/with-guidance/run-1",
+      "assertion_id": "A4",
+      "verdict": "PASS",
+      "evidence": "\"quota status 的 `available:true` 只证明本地权威 store 可读，不等于 ample headroom\" ... \"**DO_NOT_DISPATCH**\"",
+      "reason": "Chooses DO_NOT_DISPATCH and explicitly refuses to treat available:true as ample headroom."
+    },
+    {
+      "run_id": "eval-1/with-guidance/run-1",
+      "assertion_id": "A5",
+      "verdict": "PASS",
+      "evidence": "no worker run call in trace; \"选择 origin 内的 worker并不能降低所需证据标准\"",
+      "reason": "No worker run invocation occurred and the answer explicitly states origin-internal selection does not lower the required evidence standard."
+    }
+  ],
+  "judge": "claude-sonnet-single-judge"
+}
