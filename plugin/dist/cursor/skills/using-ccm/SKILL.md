@@ -158,7 +158,7 @@ ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism shell --job-id curso
 
 ## Exit code 速记
 
-`0` 成功 · `2` 用法错(缺 arg / 未知 flag) · `3` 校验拒绝(lint hard error / 非法转移 / `--set` 命中 🔒) · `4` 锁超时 · `5` 无 active board · `7` policy-deny(`account switch` 自主换号被 `policy.autonomous_account_switch:deny` 拦下)。**exit 2/3 是工具在拦你,读它的 stderr——几乎总是上面某条 footgun。**
+`0` 成功 · `2` 用法错 · `3` 校验拒绝 · `4` 锁超时 · `5` 无 active board。`7` 是 ccm 的跨 host policy-deny 码；Cursor 没有可执行的 account-switch 路线，看到它只作诊断，不尝试换号。exit 2/3 时先读 stderr。
 
 ---
 

@@ -1,0 +1,1 @@
+- `policy`——`autonomous_account_switch ∈ {allow,deny}`；用 `ccm policy show / set` 维护，写入视为用户所有，agent 绝不自行添加 `--user-authorized`。形状坏触发 `FMT-POLICY` warn。

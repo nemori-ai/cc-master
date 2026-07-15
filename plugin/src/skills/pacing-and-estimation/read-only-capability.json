@@ -1,0 +1,78 @@
+{
+  "schema": "cc-master.pacing-read-only-capability.v2",
+  "slot": "{{PACING_READ_ONLY_CAPABILITY}}",
+  "operations": [
+    "read_and_interpret_ccm_advisory",
+    "reference_model_registry",
+    "handoff_decision_input"
+  ],
+  "advisories": [
+    "usage_advise",
+    "usage_show",
+    "usage_task_cost",
+    "coordination_inbox_list",
+    "estimate_forecast",
+    "estimate_evm",
+    "estimate_velocity",
+    "estimate_risk",
+    "estimate_cost_to_complete"
+  ],
+  "model_registry": "references/model-tiers.md",
+  "references": [
+    "references/usage-signals.md",
+    "references/pacing-levers.md",
+    "references/estimation.md",
+    "references/pool-aware-advice.md"
+  ],
+  "owners": {
+    "command_and_mutation": "using-ccm",
+    "decision": "master-orchestrator-guide"
+  },
+  "hosts": {
+    "claude-code": {
+      "profile": "claude-5h-7d",
+      "rendered_body_sha256": "79ffd7d198d3b222a337a396ec464c80c56918e5bd0aa7befa330ea808b8f53a",
+      "rendered_runtime_manifest": {
+        "schema": "cc-master.pacing-runtime-manifest.v1",
+        "files": {
+          "SKILL.md": "431bd7ad134d7fc19445a5c5d023b1b3e464e15d52ad6d2cb1b3fd2b0b82646e",
+          "references/estimation.md": "6aeae595718ab64c9b02e991c10d4cefb161e15ddc6f8bcdb1a62fa6968653f7",
+          "references/model-tiers.md": "a87a73263d978f308e080baf76adf415a60da6819e4c72000e93e19ec7c41b55",
+          "references/pacing-levers.md": "7ce1627f9e0995fd4bd3d7bb5df08502a0c71898f3adf0a6b54e2721e6311213",
+          "references/pool-aware-advice.md": "d5e76a941cae6045f942143c3cd8b6f8d3efb11ba3304fb2a6302acb4c66bdf4",
+          "references/usage-signals.md": "3b6f415b4c37e30f3aa4ac2a43951d5ffea29cad6a4973e1c4843d988a668843"
+        }
+      }
+    },
+    "codex": {
+      "profile": "codex-7d-rolling24h",
+      "rendered_body_sha256": "31acac56d4d75fe47f3ed217ccef1d3a6e3932efb4458699b8bec8ff5b06148f",
+      "rendered_runtime_manifest": {
+        "schema": "cc-master.pacing-runtime-manifest.v1",
+        "files": {
+          "SKILL.md": "fd622d4a3204d0322a3af036cf26190772e0bc09a36a8bf9641adb96d21776ba",
+          "references/estimation.md": "6aeae595718ab64c9b02e991c10d4cefb161e15ddc6f8bcdb1a62fa6968653f7",
+          "references/model-tiers.md": "9f936362d78466d034c99fb189553a4a54816c190e9c2bce0b58a45b3f0d89dc",
+          "references/pacing-levers.md": "13ddf4b0767e5f16983ceb2d88a13be049f13a6825ee253997f68c53252c60c0",
+          "references/pool-aware-advice.md": "d5e76a941cae6045f942143c3cd8b6f8d3efb11ba3304fb2a6302acb4c66bdf4",
+          "references/usage-signals.md": "701a0c6a4c993fc4188b07ee1c88ca13290c96b0a705b403bda2efa6e18779f8"
+        }
+      }
+    },
+    "cursor": {
+      "profile": "cursor-billing-period",
+      "rendered_body_sha256": "6a68d5335c8cb4222347ab7bde00fbdeb2b1fa2c4bb2c06b8c7a6d98e96c991a",
+      "rendered_runtime_manifest": {
+        "schema": "cc-master.pacing-runtime-manifest.v1",
+        "files": {
+          "SKILL.md": "a311d77d090f93653c484512677ab9a21a6c106de946c205a5a7fccecb16528d",
+          "references/estimation.md": "6aeae595718ab64c9b02e991c10d4cefb161e15ddc6f8bcdb1a62fa6968653f7",
+          "references/model-tiers.md": "391ec216175a5d6ac2fd58dbfed98017e07cdaf1ef364c548881cfbf2cb4a023",
+          "references/pacing-levers.md": "798782f575812588ae5697c4eb37a7201c956e15cb10c9c96067dc18e45df2bc",
+          "references/pool-aware-advice.md": "d5e76a941cae6045f942143c3cd8b6f8d3efb11ba3304fb2a6302acb4c66bdf4",
+          "references/usage-signals.md": "d64b9ea4f4e2347a816f6ac6bf2b9ab2f5277f02e785e8dee01c76042b4fe04b"
+        }
+      }
+    }
+  }
+}

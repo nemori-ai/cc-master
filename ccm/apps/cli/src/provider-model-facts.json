@@ -1,0 +1,249 @@
+{
+  "schema": "ccm/provider-model-facts-registry/v1",
+  "revision": "2026-07-15.1",
+  "providers": {
+    "claude-code": {
+      "schema": "ccm/provider-model-facts/v1",
+      "provider": "claude-code",
+      "revision": "2026-07-15.1",
+      "supported_surfaces": ["claude-code-cli"],
+      "supported_client_versions": ["current"],
+      "source": [
+        {
+          "id": "anthropic-sonnet-5",
+          "url": "https://www.anthropic.com/news/claude-sonnet-5",
+          "retrieved_at": "2026-07-15T00:00:00Z"
+        },
+        {
+          "id": "anthropic-fable-5",
+          "url": "https://www.anthropic.com/news/redeploying-fable-5",
+          "retrieved_at": "2026-07-15T00:00:00Z"
+        },
+        {
+          "id": "anthropic-opus",
+          "url": "https://www.anthropic.com/claude/opus",
+          "retrieved_at": "2026-07-15T00:00:00Z"
+        }
+      ],
+      "observed_at": "2026-07-15T00:00:00Z",
+      "valid_until": "2026-07-22T00:00:00Z",
+      "account_scope": "public catalog; live account entitlement separate",
+      "confidence": "official-published-snapshot",
+      "unknown": [
+        "live_account_model_entitlement",
+        "live_account_quota",
+        "current_haiku_generation"
+      ],
+      "models": [
+        {
+          "model_id": "claude-sonnet-5",
+          "display_name": "Sonnet 5",
+          "tier": "balanced",
+          "relative_output_cost": null,
+          "availability": {
+            "state": "published",
+            "account_scope": "public catalog; live account entitlement separate"
+          },
+          "pricing": {
+            "currency": "USD",
+            "input_per_million_tokens": 2,
+            "output_per_million_tokens": 10,
+            "note": "promotional through 2026-08-31; then 3/15"
+          },
+          "benchmarks": null,
+          "selectors": [],
+          "source_refs": ["anthropic-sonnet-5"],
+          "supersedes": ["claude-sonnet-4-6"]
+        },
+        {
+          "model_id": "claude-fable-5",
+          "display_name": "Fable 5",
+          "tier": "economy",
+          "relative_output_cost": null,
+          "availability": {
+            "state": "conditional",
+            "account_scope": "eligible plans and credits; live account entitlement separate"
+          },
+          "pricing": null,
+          "benchmarks": null,
+          "selectors": [],
+          "source_refs": ["anthropic-fable-5"],
+          "supersedes": []
+        },
+        {
+          "model_id": "claude-opus-4-8",
+          "display_name": "Opus 4.8",
+          "tier": "frontier",
+          "relative_output_cost": null,
+          "availability": {
+            "state": "published",
+            "account_scope": "public catalog; live account entitlement separate"
+          },
+          "pricing": {
+            "currency": "USD",
+            "input_per_million_tokens": 5,
+            "output_per_million_tokens": 25,
+            "note": null
+          },
+          "benchmarks": null,
+          "selectors": [],
+          "source_refs": ["anthropic-opus"],
+          "supersedes": []
+        }
+      ]
+    },
+    "codex": {
+      "schema": "ccm/provider-model-facts/v1",
+      "provider": "codex",
+      "revision": "2026-07-15.1",
+      "supported_surfaces": ["codex-cli"],
+      "supported_client_versions": ["current"],
+      "source": [
+        {
+          "id": "openai-gpt-5-6",
+          "url": "https://openai.com/index/gpt-5-6/",
+          "retrieved_at": "2026-07-15T00:00:00Z"
+        }
+      ],
+      "observed_at": "2026-07-15T00:00:00Z",
+      "valid_until": "2026-07-22T00:00:00Z",
+      "account_scope": "public catalog; live Codex account entitlement separate",
+      "confidence": "official-published-snapshot",
+      "unknown": ["live_account_model_entitlement", "live_account_quota"],
+      "models": [
+        {
+          "model_id": "gpt-5.6-luna",
+          "display_name": "GPT-5.6 Luna",
+          "tier": "economy",
+          "relative_output_cost": 1,
+          "availability": {
+            "state": "published",
+            "account_scope": "public catalog; live Codex account entitlement separate"
+          },
+          "pricing": null,
+          "benchmarks": {
+            "swe_bench_pro_pct": 62.7,
+            "terminal_bench_2_1_pct": 84.7
+          },
+          "selectors": ["gpt-5.6-luna"],
+          "source_refs": ["openai-gpt-5-6"],
+          "supersedes": []
+        },
+        {
+          "model_id": "gpt-5.6-terra",
+          "display_name": "GPT-5.6 Terra",
+          "tier": "balanced",
+          "relative_output_cost": 2.5,
+          "availability": {
+            "state": "published",
+            "account_scope": "public catalog; live Codex account entitlement separate"
+          },
+          "pricing": null,
+          "benchmarks": {
+            "swe_bench_pro_pct": 63.4,
+            "terminal_bench_2_1_pct": 87.4
+          },
+          "selectors": ["gpt-5.6-terra"],
+          "source_refs": ["openai-gpt-5-6"],
+          "supersedes": []
+        },
+        {
+          "model_id": "gpt-5.6-sol",
+          "display_name": "GPT-5.6 Sol",
+          "tier": "frontier",
+          "relative_output_cost": 5,
+          "availability": {
+            "state": "published",
+            "account_scope": "public catalog; live Codex account entitlement separate"
+          },
+          "pricing": null,
+          "benchmarks": {
+            "swe_bench_pro_pct": 64.6,
+            "terminal_bench_2_1_pct": 88.8
+          },
+          "selectors": ["gpt-5.6-sol"],
+          "source_refs": ["openai-gpt-5-6"],
+          "supersedes": []
+        }
+      ]
+    },
+    "cursor": {
+      "schema": "ccm/provider-model-facts/v1",
+      "provider": "cursor",
+      "revision": "2026-07-15.1",
+      "supported_surfaces": ["cursor-agent-cli", "cursor-ide"],
+      "supported_client_versions": ["current"],
+      "source": [
+        {
+          "id": "cursor-models-pricing",
+          "url": "https://cursor.com/docs/models-and-pricing",
+          "retrieved_at": "2026-07-15T00:00:00Z"
+        }
+      ],
+      "observed_at": "2026-07-15T00:00:00Z",
+      "valid_until": "2026-07-22T00:00:00Z",
+      "account_scope": "cursor-subscription-first-party; live entitlement separate",
+      "confidence": "official-published-snapshot-with-surface-unknowns",
+      "unknown": [
+        "cursor_ide_task_model_catalog",
+        "cursor_ide_task_selector_acceptance",
+        "live_account_model_entitlement",
+        "live_account_quota"
+      ],
+      "models": [
+        {
+          "model_id": "cursor-auto",
+          "display_name": "Cursor Auto",
+          "tier": "adaptive",
+          "relative_output_cost": null,
+          "availability": {
+            "state": "published",
+            "account_scope": "cursor-agent-cli first-party subscription; live entitlement separate"
+          },
+          "pricing": null,
+          "benchmarks": null,
+          "selectors": ["auto"],
+          "source_refs": ["cursor-models-pricing"],
+          "supersedes": []
+        },
+        {
+          "model_id": "cursor-composer-2-5",
+          "display_name": "Cursor Composer 2.5",
+          "tier": "balanced",
+          "relative_output_cost": null,
+          "availability": {
+            "state": "published",
+            "account_scope": "cursor-agent-cli first-party subscription; live entitlement separate"
+          },
+          "pricing": null,
+          "benchmarks": null,
+          "selectors": ["composer-2.5", "composer-2.5-fast"],
+          "source_refs": ["cursor-models-pricing"],
+          "supersedes": []
+        },
+        {
+          "model_id": "cursor-grok-4-5",
+          "display_name": "Cursor Grok 4.5",
+          "tier": "frontier",
+          "relative_output_cost": null,
+          "availability": {
+            "state": "published",
+            "account_scope": "cursor-agent-cli first-party subscription; live entitlement separate"
+          },
+          "pricing": null,
+          "benchmarks": null,
+          "selectors": [
+            "cursor-grok-4.5-low",
+            "cursor-grok-4.5-medium",
+            "cursor-grok-4.5-high",
+            "cursor-grok-4.5-low-fast",
+            "cursor-grok-4.5-medium-fast",
+            "cursor-grok-4.5-high-fast"
+          ],
+          "source_refs": ["cursor-models-pricing"],
+          "supersedes": []
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,1 @@
+- 行为：Codex 单侧 verdict 只用当前账号 7d：`hold | throttle | stop_7d`；rolling-24h 只产生 burn-risk advisory。`switch`、`switch_candidate` 与短窗口 stop 不属于 Codex 合同，自动换号永久禁止。信号缺失时 `hold` + `available:false`。

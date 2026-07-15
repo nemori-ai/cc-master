@@ -79,13 +79,13 @@
 
 各 host 上「怎么换族」的机制（脚本 / Task / 带外 CLI）见下——原则在此，管道在 adapter：
 
-**本 host 机制（Cursor）**：在 Cursor **已支持的模型**里换族做第二视角——不绑死某一 vendor CLI。选验收模型时对照产出方所属族：
+**本 host 机制（Cursor）**：先区分两个 surface，再选择第二视角；同属 Cursor 不代表共享模型目录或 selector。
 
-- 产出是 **Grok / Composer（Cursor first-party）或 Claude** → 第二视角优先 **GPT-5.6 族**：效果优先用 `gpt-5.6-sol` max，配额紧张用 Sol high 或 `gpt-5.6-terra` max；或另一 Claude 档仅当无法换到 GPT 时（同族升档仍弱于真换族）。
-- 产出是 **GPT-5.6 / 其它 GPT·Codex 族** → 第二视角优先 **Claude（Opus/Sonnet）或 Grok 4.5 high**。
-- 产出是 **Claude** → 第二视角优先 **GPT-5.6 Sol/Terra 或 Grok**。
+- **IDE 原生 Task**：IDE 的模型目录、selector 接受面与精确身份当前保持 `unknown`。不要给 Task 强塞 GPT、Claude 或 CLI selector，也不要把“另开一个 Task”自动算成异构复核；只有 IDE-local 证据能证明产出族与验收族不同时才记为异构。
+- **`cursor-agent-cli`**：先读 `ccm provider facts cursor --json`，再要求 fresh first-party catalog、subscription payer/quota provenance、live entitlement 与 exact admission 全部绑定到 CLI surface。只有 ccm 返回 fresh 且候选已准入时才选 review-only worker，记录 external `run_ref`；prose 中的 family 名或 selector 不能替代本次 admission。
+- **其它 harness**：如果 ccm 给出一个独立、fresh、已准入的 Codex 或 Claude Code candidate，可把它作为 cross-harness reviewer；记录 harness、surface、payer、quota pool、模型事实 revision 与 accountable handle。它不是 Cursor IDE Task，也不能冒充 Cursor 配额。
 
-落地：派一个独立 Task（review-only、显式指定异构模型），只给 diff + 验收契约，记录 subagent id / 输出文件。环境若有 `codex` CLI 可带外 `codex exec review`，那只是 GPT 族管道之一，不是唯一做法；**不要假设** Claude Code 的 `codex-review.sh` 路径。同族再派一个 Task（例如主线 Grok、二审还是 Grok）不算异构。
+只给 reviewer diff + 验收契约。同族再跑一遍不算异构；事实过期、身份不明或需要 API/BYOK/on-demand 容量时 fail closed。真实付费 canary 仍须用户对该次调用明确批准。
 
 **跨族二审的收益不对称**——用更强模型审弱模型的产出收益最大；反过来让明显更弱的模型审明显更强模型的产出，收益薄，且弱 reviewer 的「纠错」可能改坏正确产物。所以：
 

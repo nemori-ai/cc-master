@@ -5,6 +5,11 @@ mode: copy
 projection:
   source: canonical/
   target: skills/using-ccm/
+runtime_contracts:
+  provider_guidance:
+    registry: ../provider-guidance-runtime.json
+    host: cursor
+    skill: using-ccm
 exclude_canonical:
   - references/account-pool.md
 unsupported:
@@ -52,6 +57,25 @@ slot_replacements:
   "{{USING_CCM_JC_HOOK_GUIDANCE}}": adapters/cursor/overlays/jc-hook-guidance.md
   "{{USING_CCM_WATCHDOG_JOB_ID_GUIDANCE}}": adapters/cursor/overlays/watchdog-job-id-guidance.md
   "{{USING_CCM_WAKEUP_SELF_HEAL_GUIDANCE}}": adapters/cursor/overlays/wakeup-self-heal-guidance.md
+  "{{USING_CCM_USAGE_NAMESPACE_ROW}}": adapters/cursor/overlays/usage-namespace-row.md
+  "{{USING_CCM_USAGE_OVERVIEW}}": adapters/cursor/overlays/usage-overview.md
+  "{{USING_CCM_USAGE_SHOW_BEHAVIOR}}": adapters/cursor/overlays/usage-show-behavior.md
+  "{{USING_CCM_USAGE_SHOW_SCOPE_FLAGS}}": adapters/cursor/overlays/usage-show-scope-flags.md
+  "{{USING_CCM_USAGE_ADVISE_BEHAVIOR}}": adapters/cursor/overlays/usage-advise-behavior.md
+  "{{USING_CCM_USAGE_ADVISE_SCOPE_FLAG}}": adapters/cursor/overlays/usage-advise-scope-flag.md
+  "{{USING_CCM_USAGE_RUNWAY_BEHAVIOR}}": adapters/cursor/overlays/usage-runway-behavior.md
+  "{{USING_CCM_USAGE_ADVISE_EXAMPLE}}": adapters/cursor/overlays/usage-advise-example.md
+  "{{USING_CCM_EXIT_CODES}}": adapters/cursor/overlays/exit-codes.md
+  "{{USING_CCM_POLICY_NAMESPACE_ROW}}": adapters/cursor/overlays/policy-namespace-row.md
+  "{{USING_CCM_POLICY_DENY_EXIT_ROW}}": adapters/cursor/overlays/policy-deny-exit-row.md
+  "{{USING_CCM_POLICY_NAMESPACE}}": adapters/cursor/overlays/policy-namespace.md
+  "{{USING_CCM_POLICY_JSON_EXAMPLE}}": adapters/cursor/overlays/policy-json-example.md
+  "{{USING_CCM_BOARD_POLICY_GUIDANCE}}": adapters/cursor/overlays/board-policy-guidance.md
+  "{{USING_CCM_FMT_POLICY_ROW}}": adapters/cursor/overlays/fmt-policy-row.md
+  "{{USING_CCM_COORDINATION_QUOTA_MODEL_EXAMPLE}}": adapters/cursor/overlays/coordination-quota-model-example.md
+  "{{USING_CCM_USAGE_SHOW_JSON_EXAMPLE}}": adapters/cursor/overlays/usage-show-json-example.md
+  "{{USING_CCM_USAGE_BURN_RATE_JSON_EXAMPLE}}": adapters/cursor/overlays/usage-burn-rate-json-example.md
+  "{{USING_CCM_USAGE_RUNWAY_JSON_EXAMPLE}}": adapters/cursor/overlays/usage-runway-json-example.md
 host_slots:
   "{{USING_CCM_EXECUTOR_TABLE_ROWS}}":
     capability: background_dispatch

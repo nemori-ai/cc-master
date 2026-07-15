@@ -1,1 +1,0 @@
-停止派发新工作，把当前在飞任务收敛到安全点。Cursor adapter 没有 CronCreate / ScheduleWakeup；先创建 background Shell floor（`block_until_ms: 0` + AwaitShell）或外部 scheduler 并拿真实 handle，再用 `ccm watchdog arm --fire-at <reset-ISO-UTC> --mechanism <shell|cron> --job-id <handle> --checklist "账期 reset 后 recon"` 记录。没有真实 handle 时，记为 `blocked_on:"quota-reset"` 或 `blocked_on:"user"`，不要 arm 或伪造自动唤醒。

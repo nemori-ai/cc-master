@@ -1,0 +1,1 @@
+- 行为：只对当前 Codex 账号 7d policy 上界计算“触顶先于 reset”还是“reset 先于触顶”；rolling-24h 只补充 burn 风险。返回 `ample | will-exhaust-before-reset | unknown`；信号缺失时 `available:false`、exit 0。

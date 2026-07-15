@@ -79,7 +79,7 @@
 | `type` | 建 task 时 | 见下方 taskType 枚举说明 |
 | `output_schema` | 需约束结构化产出时（低频） | workflow 节点的产出契约 |
 | `dep_pins` | 钉依赖快照时（低频） | freshness / inputs_hash 用 |
-| `model` | 派发 / 完成时记录该 task 用的模型档 | `ccm task update <id> --set model=<模型id>`（如 `claude-sonnet-4-5`，无具名 flag·裸 path 即本 task）；estimate 层按档分层校准读它，缺→无 tier 校准 |
+| `model` | 派发 / 完成时记录该 task 实际使用的模型 selector | 先用 `ccm provider facts <provider> --json` 取得 fresh catalog、再用对应 transport 证明 live admission，最后 `ccm task update <id> --set model=<admitted-provider-model-id>`（无具名 flag·裸 path 即本 task）；estimate 层按档分层校准读它，缺→无 tier 校准 |
 
 **taskType 枚举参考**（开放枚举，未知值 warn 不 fail）：
 
@@ -106,7 +106,7 @@
 **board 级 ✎ 字段（走专属 noun、不经 `--set`）：**
 
 - `baseline`——EVM 计划基线（plan 基线 SSOT），用 `ccm baseline snapshot / show / reset` 维护；缺→无 EVM baseline，形状坏→`FMT-BASELINE` warn。命令详见 command-catalog 的 baseline namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-BASELINE`。
-- `policy`——框定本块板 master-orchestrator 自主权限的**可扩展对象**，首条键 `autonomous_account_switch` ∈ `{'allow','deny'}`（门控是否允许 orchestrator 自主换号）；**缺省 = allow**（向后兼容旧板·读不到一律解析为 allow），形状坏→`FMT-POLICY` warn。用 `ccm policy show / set` 维护（`set` 写为用户所有、非 TTY 须 `--user-authorized`）；命令详见 command-catalog 的 policy namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-POLICY`。
+- `policy`——可读取历史 `autonomous_account_switch`，但 Codex account switch 永久不可用；stored `allow` 不产生能力。不要把它用作 dispatch 或 credential mutation 输入；形状坏仍触发 `FMT-POLICY` warn。
 - `coordination`——多 orchestrator 协调**感知**块，让 M 个并行 orchestrator 互相看见、各自独立配速（**hook 不读**·跨板只读读侧是 `ccm peers`）。可扩展对象，字段全 optional：
   - `priority` ∈ `{'urgent','high','normal','low','trivial'}`（**板级**优先级·非板内任务排序·缺/坏 → 解析为 `normal`）——这是跨板协调的裁决主轴 + 机械 fair-share 权重源（用户声明的协调 hint·不喂引擎的板内任务调度）。**专属 flag：`ccm board update --priority <urgent|high|normal|low|trivial>`**（枚举校验在 update 端·非法值 → `exit 2`；init 时用户给的板级优先级经它落盘）。
   - `state.current`（此刻在烧什么·喂即时 fair-share）：`active_tasks`（int·数字）/ `workload`（string·人类可读）/ `burn_contribution`（number·对聚合配额% burn 的估计贡献）。
@@ -890,7 +890,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `FMT-REF-KIND` | warn | `references[].kind` 不在 refKind 枚举内（开放枚举） | kind ∈ {spec, plan, doc, web, code, issue, other}，未知值不致命 |
 | `FMT-BLOCKED-ON` | warn | `blocked_on` 既非 `"user"` 也非存在的 task id | `task block --on user` 或 `--on <存在的 taskid>`——见 [G 节](#g-blocked_on-怎么选) |
 | `FMT-WIP` | warn | task 级 `wip_limit` 非数字 | `--wip-limit N`（整数）；非数字会让 per-owner WIP 覆写静默失效 |
-| `FMT-MODEL` | warn | task `model` 存在却非字符串 | `ccm task update <id> --set model=<模型id>`（如 `claude-sonnet-4-5`·裸 path 即本 task）；非 string → estimate 层 tier 分层校准降级忽略 |
+| `FMT-MODEL` | warn | task `model` 存在却非字符串 | 从 fresh `ccm provider facts` 与 live admission 取得实际 selector 后，`ccm task update <id> --set model=<admitted-provider-model-id>`（裸 path 即本 task）；非 string → estimate 层 tier 分层校准降级忽略 |
 | `FMT-SCHEDULING` | warn | `scheduling.wip_limit` / `owner_wip_limit`（或旧板顶层 `wip_limit`）非数字 | `ccm board update --wip-limit N --owner-wip N`（整数）；非数字 → WIP 软警告静默关闭 |
 | `FMT-WATCHDOG` | warn | canonical `watchdog` / legacy `wakeup` 的 `job_id` 缺失或空白、`mechanism` 不在枚举内，或 `armed_at`/`fire_at` 非严格 ISO-8601 UTC | 先创建真实机制拿 handle，再 `ccm watchdog arm --mechanism <cron/loop/monitor/shell> --fire-at YYYY-MM-DDTHH:MM:SSZ --job-id <handle>`；存量缺 handle 先 `status` 诊断、`disarm` 后重建——见 [K 节](#k-watchdog何时-armwatchdog--legacy-wakeup-字段含义) |
 | `FMT-META` | warn | `meta.template_version` 非整数，或 `meta.created_at` 非 ISO-8601 UTC | meta 由 bootstrap 写，别手改；template_version 是整数 |
@@ -898,7 +898,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `FMT-JUDGMENT-CALLS` | warn | `judgment_calls` 非数组，或条目 `summary` 空、`category`/`severity`/`status` 不在各枚举内、时间戳非 ISO | 用 `ccm jc add/resolve` 而非手拼——见 [H 节](#h-judgment_calljc何时建severity-怎么定) |
 | `FMT-CADENCE` | warn | `cadence` 非对象，或 iteration 的 `id` 空、`status` 不在 {open,shipped}、时间非 ISO、`members` 非字符串数组 | 用 `ccm cadence update/open/ship`；deadline 严格 UTC——见 [I 节](#i-cadence-与-iteration节奏怎么定) |
 | `FMT-BASELINE` | warn | `baseline` 非对象，或 `captured_at`/`t0`/`history[].reset_at` 非严格 ISO-8601 UTC、`task_estimates`/`dag_snapshot` 非对象、`bac_h` 非数字、`history` 非数组 | 用 `ccm baseline snapshot/reset` 维护、别手拼；时间严格 UTC（estimate evm 读它，格式不对则 EVM 时间轴错位） |
-| `FMT-POLICY` | warn | `policy` 非对象，或 `autonomous_account_switch` 不在 `{allow, deny}` 枚举内 | 用 `ccm policy set --autonomous-account-switch=allow\|deny`（缺省解析为 allow）；值仅这两个——非法值会让 switch-account.sh 机制硬闸的开关判定失效（退化为 allow） |
+| `FMT-POLICY` | warn | 历史 `policy` 非对象，或值不在 `{allow, deny}` | 只作兼容诊断；Codex no-switch 不因 stored `allow` 改变 |
 | `FMT-COORD` | warn | `coordination` 非对象，或 `priority` 不在 `{urgent,high,normal,low,trivial}` 枚举，或 `state`/`state.current`/`state.planned` 非对象、数字字段（`active_tasks`/`burn_contribution`/`cost_to_complete_pct`）非数字、人类可读字段（`workload`/`remaining_work`）非字符串 | 全 optional·缺即降级（`ccm peers` 把该维度退 null）；priority 仅五挡——非法值退化为 normal。永不 hard（advisory ✎·fail-safe）——见 [A 节](#a-task-字段速查) coordination 块 |
 | `FMT-INBOX` | warn | `coordination.inbox` 存在但非数组，或通知条目 id 非空唯一 / kind / status / strength / ISO 时间 / consumed_at 状态对应关系不合法 | 缺失 = 空 inbox；append 用 `ccm coordination notify`，消费用 `ccm coordination inbox ack <id...>`，不要手拼。`kind` 闭集、`status` 单调；坏形态只 warn，读取侧跳过坏条目 |
 | `FMT-RUNTIME` | warn | `runtime` 非对象，或已知键（`last_identity_remind` / `last_critpath_remind` / `last_account_switch` / `stop_allow_until` 等）类型不合法（时间锚须严格 ISO-8601 UTC） | hook-owned ✎ 参数区：用 `ccm board set-param <白名单 key> <ISO>` 写（白名单 + 值校验在 verb 层）；缺/坏一律 graceful-degrade（周期 hook 退化为「从未提示」·首次必提示；Stop 释放闸退化为继续阻止停止）。未知键 silent-on-unknown。永不 hard |

@@ -5,36 +5,37 @@
 
 ## 1. One-liner
 
-在跑 long-horizon 目标、要把一场长跑对照配额窗口配速、或要估算工期/风险/选模型档时调用——给 agent **消费 ccm 只读 advisory（usage/estimate/baseline）的机制知识**：怎么读单侧走廊 verdict（ADR-024·hold/throttle/switch/stop_5h/stop_7d）、各 host 的模型 family×effort / 相对成本与配额充足/紧张两套路由、配额信号源链、估算诚实字段；覆写「estimate 整轴 out-of-mind 从不被召回」的默认失败。**ccm 出 verdict、A 决策**——本 skill 只教消费层，决策回 master-orchestrator-guide。
+在跑 long-horizon 目标、要把一场长跑对照配额窗口配速、估算工期/风险、或在模型分配前读取 host-localized 事实时调用——给 agent **消费 ccm 已产生的 usage/estimate advisory 与 baseline-derived 事实的机制知识**：怎么按 provider 合同读 verdict（Claude 5h/7d、Codex 7d hard ceiling + rolling-24h advisory、Cursor billing period）、各 host 的模型 family×effort / 相对成本 registry、配额信号源链、估算诚实字段；baseline 与 coordination 的写入机制仍归 `using-ccm`，模型与调度选择归 A。它覆写「estimate 整轴 out-of-mind 从不被召回」的默认失败。**ccm 出事实与 advisory、A 决策**——本 skill 只教消费层，决策回 master-orchestrator-guide。
 
 ## 2. Craft 自分类
 
 - **Craft**：**B 心智模型为主 + A 机械配方**（命令 schema / 字段速查 / 档位表下沉 reference）。
 - **process-control 轴**：**弱**——它不是序敏感的纪律 loop，而是按需 consult（在 dispatch / recon / replan 拍查 advisory），不强制每回合跑。
 - **cognitive-override 轴**：**强（stale-prior 覆写，不是 B.1 行为纪律）**——价值在 **B.2 触发召回**（estimate 整轴 out-of-mind，顶层 description 才召回）+ provider 事实覆盖（agent 无法从 prior 推出当前 family×effort 的 benchmark / score/$）；「强」指必须用当前事实替换旧模型先验，不意味着 pacing 是 agent 会合理化掉的重型纪律。
-- **形状蕴含**：**命名锚为主**（哪个 verb 何时查 / 读哪个字段 / 触发什么判断），命令面机械细节 + 模型档位表下沉 reference；**不配重型 Rationalization Table**——pacing / tiering 的 subagent pressure baseline（历史 model-tiering ×6、usage-pacing ×2；2026-07-10 Codex/Cursor 两模式 ×2）实证**零失败**，skillsmith 铁律禁止为一条 agent 根本不会违背的规则编造重型纪律 prose。多数内容靠「使用验证」（trigger eval + dogfood），不跑重型 behavior benchmark。
+- **形状蕴含**：顶层正文是由唯一 `read-only-capability.json` 结构声明机械生成的**封闭 capability block**，语法只容纳三类动作：读/解释 ccm advisory、引用 host-localized 模型 registry、把决策输入交给 A；每个 host 在 registry 独立声明预期 body SHA-256 与最终 runtime tree 的路径→SHA-256 manifest。projection 先把 canonical、slot/overlay、include 投影到 staging tree，再由不调用 renderer 的 attestor 验证完整 manifest，成功后才发布该 skill，避免生产 generator 或未受约束 reference 自证。命令/状态 mutation 仍路由 D。哪个 verb 读哪些字段与模型档位事实下沉 reference，不在顶层自由追加 procedure prose；**不配重型 Rationalization Table**——pacing / tiering 的 subagent pressure baseline（历史 model-tiering ×6、usage-pacing ×2；2026-07-10 Codex/Cursor 两模式 ×2）实证**零失败**，skillsmith 铁律禁止为一条 agent 根本不会违背的规则编造重型纪律 prose。多数内容靠「使用验证」（trigger eval + dogfood），不跑重型 behavior benchmark。
 
 ## 3. Value triad（三视角价值）
 
 ### 3.1 Plugin 视角 —— 对 cc-master 这个产品 / portfolio 而言
 
-补 charter ②（控 token 消耗速度）④（分解/规划）⑤（资源下最大化效率）⑥（按难度选档）的**消费层**——ccm 工具（`usage`/`estimate`/`baseline` 只读 advisory namespace·ADR-015）已就绪、消费指导此前埋在 SKILL A 的 `cost-and-pacing.md` reference 里**跳层、不被召回**（前序报告 §3 根因 2「estimate 整轴缺席」）。本 skill 是把消费知识升成**顶层可发现 skill** 的正解。**不能被 A 覆盖**：A own「该不该减速/加速/换号/replan」这个**决策**，H own「决策前怎么读这些 advisory」的**消费机制**——红线 3 正交（这正是 ADR-015「ccm advises 不 decides、orchestrator 决策」在 skill 层的镜像）。
+补 charter ②（控 token 消耗速度）④（分解/规划）⑤（资源下最大化效率）⑥（按难度选档）的**消费层**——ccm 的 `usage` / `estimate` 只读 advisory 与 baseline-derived 事实已就绪，消费指导此前埋在 SKILL A 的 `cost-and-pacing.md` reference 里**跳层、不被召回**（前序报告 §3 根因 2「estimate 整轴缺席」）。baseline 和 coordination 的写入 namespace 与命令机制归 `using-ccm`。本 skill 是把消费知识升成**顶层可发现 skill** 的正解。**不能被 A 覆盖**：A own「该不该减速/加速/换号/replan」这个**决策**，H own「决策前怎么读这些 advisory」的**消费机制**——红线 3 正交（这正是 ADR-015「ccm advises 不 decides、orchestrator 决策」在 skill 层的镜像）。
 
 ### 3.2 Agent 视角 —— 对调用这个 skill 的 AI 而言
 
-在 pacing / 估算决策瞬间提供两样东西：① **A.1 新领域知识**——`ccm usage advise` / `ccm estimate forecast` 等全自研命令的输出 schema 与 verdict 语义（ADR-024 单侧 enum：hold/throttle/switch/stop_5h/stop_7d、p50/p80/p95、CPI/SPI、风险指数）、各 host 的 family×effort / score/$ / 配额模式、配额信号源链、估算诚实字段——这些 agent 先验不携带、推不出来、必须教；② **B.2 触发召回**——顶层 description 让 agent 在「该 forecast 工期 / 查 EVM 偏差 / 读 risk flag / 按配额选模型」时被 router 主动召回，克服「estimate 整轴 out-of-mind」。不用它会怎样退化：estimate 整轴零消费（forecast/EVM/risk 工具空转）、pacing 凭感觉不读 verdict、模型档位乱选。
+在 pacing / 估算决策瞬间提供两样东西：① **A.1 新领域知识**——`ccm usage advise` / `ccm estimate forecast` 等全自研命令的输出 schema 与 provider-scoped verdict 语义（Claude 保留 5h/7d；Codex 只认 7d hard ceiling、rolling-24h 只 advisory、任何 5h 只作 ignored provenance；Cursor 只认 billing period；另含 p50/p80/p95、CPI/SPI、风险指数）、各 host 的 family×effort / score/$ / 配额模式、配额信号源链、估算诚实字段——这些 agent 先验不携带、推不出来、必须教；② **B.2 触发召回**——顶层 description 让 agent 在「该 forecast 工期 / 查 EVM 偏差 / 读 risk flag / 模型分配前查 registry」时被 router 主动召回，克服「estimate 整轴 out-of-mind」。不用它会怎样退化：estimate 整轴零消费（forecast/EVM/risk 工具空转）、pacing 凭感觉不读 verdict、模型分配拿不到当前事实。
 
 ### 3.3 Human 视角 —— 对最终落地的用户 / 维护者而言
 
-用户的长跑被**配额感知地**驱动（不半截撞墙、不白白蒸发额度）、工期/风险有**诚实区间**预测可看（非假精确点估）、模型档位在效果优先 / 性价比优先之间按任务切换。用了/没用可观察区分：用了的会在决策点留下「查了 `advise=throttle` 故切性价比路由 / 查了 `forecast` p80 超期故 surface 用户」的痕迹，没用的撞墙才发现、或工期估歪。
+用户的长跑被**配额感知地**驱动（不半截撞墙、不白白蒸发额度）、工期/风险有**诚实区间**预测可看（非假精确点估）、模型分配拿到当前可用性 / provenance / 能力 / 成本事实。用了/没用可观察区分：用了的会留下「读到 `advise=throttle` + 当前模型 registry 事实后把输入交给 A」「读到 `forecast` p80 超期后把张力交给 A」的痕迹；没用的撞墙才发现、工期估歪、或拿陈旧模型先验决策。
 
 ## 4. 责任边界
 
 ### 4.1 IN scope
 
-- **消费 ccm 只读 advisory** 的读法 + 字段解读 + 喂回 orchestrator 判断：`usage`（show/advise/task-cost/burn-rate/runway）· `estimate`（show/forecast/evm/velocity/risk/cost-to-complete）· `baseline` 生命周期。
-- **host-localized 模型档位事实**（Claude 四档；Codex GPT-5.6 Sol/Terra/Luna×effort；Cursor 两池 + GPT-5.6/Grok/Composer 的 score/$）+ 配额充足/紧张两套路由 + 为何主线固定一个模型（prompt-cache）。
-- **host-localized 配额信号源链**（Claude/Codex 5h/7d；Cursor billing_period；`ccm usage advise` verdict 首选 / 信号不可得时诚实降级）+ effective-N 可用时的缩放节奏消费。
+- **消费 ccm 已产生的 advisory / 事实** 的读法 + 字段解读 + 喂回 orchestrator 判断：`usage`（show/advise/task-cost/burn-rate/runway）· `estimate`（show/forecast/evm/velocity/risk/cost-to-complete）· baseline 派生的 `has_baseline` / EVM 字段；不教 baseline 与 coordination 写入机制。
+- 顶层 capability 只声明 `read_and_interpret_ccm_advisory` / `reference_model_registry` / `handoff_decision_input` 三种操作；host strategy 只选择同一 registry 的 profile，canonical `SKILL.md` 只保留生成 slot；三宿主最终发布的 `SKILL.md`、canonical references 与 host overlay/include 结果必须逐文件等于 registry 的 host-local manifest。
+- **host-localized 模型档位事实 registry**（Claude 四档；Codex GPT-5.6 Sol/Terra/Luna×effort；Cursor 已准入 first-party selectors）：只提供可用性 / provenance / 相对成本 / 能力边界，具体模型分配、路由与主线固定归 A。
+- **host-localized 配额信号源链**（Claude 5h/7d；Codex 7d-only hard ceiling + rolling-24h advisory，`five_hour` / 5h 只作 ignored provenance；Cursor billing_period；`ccm usage advise` 的 provider-authoritative 部分优先 / 信号不可得时诚实降级）+ effective-N 可用时的缩放节奏消费。
 - **估算诚实字段怎么用**（coverage_pct / source / confidence / conformal 区间 → 何时降低对预测的信任权重）。
 
 ### 4.2 OUT of scope（明确移交给谁）
@@ -55,7 +56,7 @@
 ### 5.1 Recognition cues（应当被触发的信号）
 
 - 要把长跑对照配额窗口配速；纠结升档还是降档。
-- 要在配额充足 / 紧张两种模式下，结合 benchmark、实际 task cost、family 与 effort 选模型。
+- 要在模型分配前读取当前 host 的 benchmark、可用性、provenance、相对成本与 family×effort 事实，再把输入交给 A。
 - 要估目标 ETA / 查进度偏差（EVM）/ 看综合风险 / 算 cost-to-complete。
 - 要读 `ccm usage advise` / `ccm estimate forecast` 的输出、不知道哪个字段是什么意思。
 - 配额逼顶要判该不该换号的**读 usage 那一半**（决策那一半归 A）。
@@ -80,4 +81,5 @@
   - ① H 不复述 pacing 数学 / 估算算法（SSOT 在引擎）→ grep H 正文无走廊公式 / MC 算法实现，只有「调 `ccm usage advise` 读 verdict」→ 人审 + dogfood。
   - ② H 与 A 不重叠 → 两者 description 的 Use-when / 反例互指闭合 → Track A trigger eval（`evals/trigger.json`）。
   - ③ ccm 命令 schema 变 → H 随 ccm 锁步（同 §6 using-ccm 锁步精神：H 的命令面引用须与 ccm 真实 verb 对得上）→ 改 ccm `usage`/`estimate` 命令面的 PR 须同步 H。
+  - ④ H runtime 不靠 writer target / verb 词表猜责任语义 → `read-only-capability.json` 的 exact schema + canonical closed-template grammar + 三宿主完整 runtime-tree manifest attestation；任何未同步 manifest 的 canonical / renderer / overlay / include 变化都会在该 skill 发布前因 provenance 违规失败。
 - **Cross-major review owner**：`curating-skill-portfolios`。

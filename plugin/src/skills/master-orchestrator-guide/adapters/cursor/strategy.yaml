@@ -8,6 +8,11 @@ projection:
   exclude:
     - AGENTS.md
     - CLAUDE.md
+runtime_contracts:
+  provider_guidance:
+    registry: ../provider-guidance-runtime.json
+    host: cursor
+    skill: master-orchestrator-guide
 mode: copy
 exclude_canonical:
   - references/cost-decisions.md
@@ -23,7 +28,10 @@ slot_replacements:
   "{{BACKGROUND_EXTERNAL_WAIT_GUIDANCE}}": adapters/cursor/overlays/background-external-wait-guidance.md
   "{{WATCHDOG_WAKEUP_TOOL_CHAIN}}": adapters/cursor/overlays/watchdog-wakeup-tool-chain.md
   "{{WATCHDOG_WAKEUP_TOOL_CHAIN_INLINE}}": adapters/cursor/overlays/watchdog-wakeup-tool-chain-inline.md
+  "{{PACING_COST_RESPONSIBILITY}}": adapters/cursor/overlays/pacing-cost-responsibility.md
+  "{{PACING_BUDGET_STEWARDSHIP}}": adapters/cursor/overlays/pacing-budget-stewardship.md
   "{{CAPACITY_ACCOUNT_GUIDANCE}}": adapters/cursor/overlays/capacity-account-guidance.md
+  "{{PACING_COMMAND_SUMMARY}}": adapters/cursor/overlays/pacing-command-summary.md
   "{{AUTHORING_WORKFLOWS_ROW}}": adapters/cursor/overlays/authoring-workflows-row.md
   "{{COST_DECISIONS_REFERENCE_ROW}}": adapters/cursor/overlays/cost-decisions-reference-row.md
   "{{COMMAND_SURFACE_GUIDANCE}}": adapters/cursor/overlays/command-surface-guidance.md
@@ -38,6 +46,12 @@ slot_replacements:
   "{{PLATFORM_RESUME_GUIDANCE}}": adapters/cursor/overlays/platform-resume-guidance.md
   "{{HETEROGENEOUS_REVIEW_MECHANISM}}": adapters/cursor/overlays/heterogeneous-review-mechanism.md
   "{{HANDOFF_REFERENCE_ROW}}": adapters/cursor/overlays/handoff-reference-row.md
+  "{{MASTER_HOST_MODEL_ALLOCATION}}": adapters/cursor/overlays/model-allocation.md
+  "{{HOST_QUOTA_DESERTION_EXAMPLE}}": adapters/cursor/overlays/quota-desertion-example.md
+  "{{HOST_QUOTA_RATIONALIZATION_ROW}}": adapters/cursor/overlays/quota-rationalization-row.md
+  "{{HOST_QUOTA_RED_FLAG}}": adapters/cursor/overlays/quota-red-flag.md
+  "{{HOST_QUOTA_DECISION_GATE}}": adapters/cursor/overlays/quota-decision-gate.md
+  "{{HOST_QUOTA_JUDGMENT_ROW}}": adapters/cursor/overlays/quota-judgment-row.md
 notes:
   - Cursor projection uses the host-neutral canonical body plus Cursor Task/Shell dispatch and shell-floor watchdog slots.
   - Quota overlays teach billing_period only (no 5h/7d/account switch). Workflow remains unsupported.

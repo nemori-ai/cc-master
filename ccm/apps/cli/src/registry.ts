@@ -113,6 +113,23 @@ export const REGISTRY: Registry = {
   },
   // ════════════════════ provider ══════════════════════════════════════════════════════════════════
   provider: {
+    facts: {
+      summary: '读取带官方来源、有效期与未知项的 provider 模型事实快照（零 live probe）',
+      read: true,
+      positionals: [{ name: 'provider', required: true }],
+      options: {
+        'as-of': {
+          type: 'string',
+          desc: '冻结求值时间（严格 UTC；缺省为当前时间）',
+        },
+        json: { type: 'boolean', desc: '输出 ccm/provider-model-facts/v1 JSON' },
+      },
+      examples: [
+        'ccm provider facts codex --json',
+        'ccm provider facts cursor --as-of 2026-07-15T12:00:00Z --json',
+      ],
+      handler: 'provider.facts',
+    },
     inspect: {
       summary: '以冻结 env、只读 Codex 探测与一次受资格门控的执行检查 candidate',
       read: true,

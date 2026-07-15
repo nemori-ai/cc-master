@@ -1,4 +1,0 @@
-- **[references/model-tiers.md](references/model-tiers.md)** —— 四档模型相对成本 + 按难度选档的事实映射 + 为何主线固定一个模型（prompt-cache）。**「该用哪档、为什么不切主线模型」翻它。**
-- **[references/usage-signals.md](references/usage-signals.md)** —— 5h/7d 配额窗口、`ccm usage advise/show` 信号源链、sidecar 由 ccm 自带的 `ccm statusline`（自动安装·无需手接）落、诚实天花板。**「配额信号从哪来、`available:false` 怎么办」翻它。**
-- **[references/pacing-levers.md](references/pacing-levers.md)** —— 单侧 levers（减速 / 换号 / 停）怎么做、目标走廊上界、effective-N（多账号）缩放节奏的消费。**「verdict 出来了、具体怎么 pace」翻它。**
-- **[references/estimation.md](references/estimation.md)** —— 5 个 estimate verb 的消费决策（何时查 → 读哪个字段 → 据此判断什么）+ baseline 生命周期 + 诚实字段 + usage⊗estimate 张力。**「估工期/风险/EVM 怎么读、forecast 信不信」翻它。**

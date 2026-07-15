@@ -6,7 +6,7 @@
 
 ## 1. Scope 与 ownership
 
-本合同只覆盖 `cursor-agent` / `cli-headless` execution surface 的 mode-specific transport admission。Cursor IDE plugin 仍由 [`cursor.md`](cursor.md) 描述，顶层 `cursor.installed` 仍只代表 IDE/plugin distribution target；headless binary 不得把它翻真。
+本合同只覆盖 `cursor-agent-cli` / `cli-headless` execution surface 的 mode-specific transport admission；`agent` 与 `cursor-agent` 只是 executable aliases。Cursor IDE plugin 仍由 [`cursor.md`](cursor.md) 描述，CLI 易变事实由 [`cursor-agent-cli.md`](cursor-agent-cli.md) 描述；顶层 `cursor.installed` 仍只代表 IDE/plugin distribution target，headless binary 不得把它翻真。
 
 schema 与 evaluator 的实现 SSOT 是 [`cursor-agent-admission.ts`](../../ccm/apps/cli/src/harnesses/cursor-agent-admission.ts) 及 [`types.ts`](../../ccm/apps/cli/src/harnesses/types.ts)。本页冻结字段语义与 failure boundary；更广的 route、quota reservation、supervisor 和 true-done 仍以 [`cross-harness-orchestration-capability-model.md`](../cross-harness-orchestration-capability-model.md) 为能力完整性 SSOT。
 
@@ -69,7 +69,7 @@ RC0 只证明 process transport terminated。以下情况都不得 accepted：
 ## 6. Remaining target work
 
 - production provider driver 与 immutable runtime/supervisor 接线；
-- read-only auth fact、quota pool/freshness/reservation 的独立 collectors；
+- read-only auth、plan/payer topology、fresh first-party selector catalog、quota pool/freshness/reservation 的独立 collectors；
 - macOS binary/auth/quota/sandbox/result live qualification；
 - requested-vs-resolved model、permission profile、cancel/resume 与 terminal artifact coverage；
 - dispatcher 在 spawn 前消费同一 admission 结果，且 acceptance failure 不触发越权 fallback。

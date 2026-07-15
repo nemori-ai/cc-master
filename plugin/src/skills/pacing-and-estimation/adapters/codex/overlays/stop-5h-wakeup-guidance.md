@@ -1,1 +1,0 @@
-停止派发新工作，把当前在飞任务收敛到安全点。先创建真实 thread automation、cron、CI scheduler、后台 terminal 或其它外部唤醒并拿 handle，再用 `ccm watchdog arm --fire-at <reset-ISO-UTC> --mechanism <cron|loop|monitor|shell> --job-id <handle> --checklist "reset 后 recon 配额与 board"` 记录。没有真实 handle 时，把它作为 `blocked_on:"quota-reset"` 或 `blocked_on:"user"` 的可续状态记录下来，不要 arm 或伪造自动唤醒。

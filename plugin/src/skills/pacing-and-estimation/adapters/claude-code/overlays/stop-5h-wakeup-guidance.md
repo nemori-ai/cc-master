@@ -1,1 +1,0 @@
-响应是 **arm 一个 watchdog 自我唤醒**（background-shell `until` 轮询为 floor·降级链见 `master-orchestrator-guide` 的 `${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/references/dispatch.md` + `authoring-workflows`）守到 `ccm usage advise` 出的 `nearest_reset` 后配额回血再续派；在飞任务可跑完 / 端点验收，别再派需要大量 5h 配额的新活。

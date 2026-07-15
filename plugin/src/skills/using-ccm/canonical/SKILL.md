@@ -155,7 +155,7 @@ ccm cadence open I1 --goal "ship 切片" --deadline 2026-06-05T14:00:00Z --membe
 
 ## Exit code 速记
 
-`0` 成功 · `2` 用法错(缺 arg / 未知 flag) · `3` 校验拒绝(lint hard error / 非法转移 / `--set` 命中 🔒) · `4` 锁超时 · `5` 无 active board · `7` policy-deny(`account switch` 自主换号被 `policy.autonomous_account_switch:deny` 拦下)。**exit 2/3 是工具在拦你,读它的 stderr——几乎总是上面某条 footgun。**
+{{USING_CCM_EXIT_CODES}}
 
 ---
 

@@ -1,0 +1,1 @@
+- 行为：按 5h 走廊上界 90% 与 7d 上界 85% 计算“触顶先于 reset”还是“reset 先于触顶”；返回 `ample | will-exhaust-before-reset | unknown`。信号缺失时 `available:false`、exit 0。

@@ -42,7 +42,7 @@ Unix process survived  = industrial runtime lifecycle
 
 - 产品六项 charter 以 [`design_docs/spec.md`](spec.md) §1.0 为准。
 - board narrow waist、CLI process boundary、advisory 边界等已接受结构决策，以 [`adrs/`](../adrs/) 中对应 ADR 为准；本文不修改它们。
-- 当前 host 事实和易变 probe 以 [`design_docs/harnesses/`](harnesses/) 为准，尤其是 [Claude Code](harnesses/claude-code.md)、[Codex](harnesses/codex.md)、[Cursor IDE Agent](harnesses/cursor.md) 与 [compatibility matrix](harnesses/compatibility-matrix.md)。
+- 当前 host 事实和易变 probe 以 [`design_docs/harnesses/`](harnesses/) 为准，尤其是 [Claude Code](harnesses/claude-code.md)、[Codex](harnesses/codex.md)、[Cursor IDE Agent](harnesses/cursor.md)、[Cursor Agent CLI](harnesses/cursor-agent-cli.md) 与 [compatibility matrix](harnesses/compatibility-matrix.md)。Cursor 两个 surface 同品牌也不得合并事实或 role。
 - 跨 surface 能力差异以 [`design_docs/harnesses/capabilities/`](harnesses/capabilities/) 的 Capability Cards、hook `CONTRACT.md` 和 per-host strategy 为准。
 - C2 Codex native-attempt 的冻结 wire/state/security 合同以 [`design_docs/2026-07-13-codex-native-attempt-ledger-spec.md`](2026-07-13-codex-native-attempt-ledger-spec.md) 为准；它只晋升 ledger 与 dedicated writer，不授权或宣称 live spawn runtime。
 - 运行时方法论以 `plugin/src/skills/master-orchestrator-guide/canonical/` 为准；本文不复述其纪律正文。
@@ -216,7 +216,7 @@ Track 纪律：
 
 - Track A：host 有原生等价 surface。按 Capability/hook CONTRACT → host implementation → equivalence-class fixture → projection → real probe 推进。
 - Track B：host 无 1:1 机制。必须有 declared divergence、compensating mechanism 和 target acceptance；不得用相似 event 名制造 parity。
-- Cursor IDE plugin 与 Cursor Agent CLI 是两个 descriptor / contract；任一侧 installed/authenticated 不推出另一侧可用。正式 bounded-context、角色、负能力、pool 禁止推导与迁移/rollback 合同见 [`harnesses/cursor-dual-surface-contract.md`](harnesses/cursor-dual-surface-contract.md)。
+- Cursor IDE plugin 与 Cursor Agent CLI 是两个 descriptor / contract；对应 canonical surface IDs 分别为 `cursor-ide-plugin` 与 `cursor-agent-cli`。同品牌不能合并，任一侧 installed/authenticated 不推出另一侧可用。正式 bounded-context、角色、负能力、pool 禁止推导与迁移/rollback 合同见 [`harnesses/cursor-dual-surface-contract.md`](harnesses/cursor-dual-surface-contract.md)。
 - Codex/Cursor 无 PostToolBatch 是负能力，不应由逐工具事件伪装。
 - origin delivery fail-open 只表示 context/notification 降级；dispatch mechanical gate 仍独立 fail-closed。
 
@@ -258,17 +258,17 @@ Task profile 必须先于模型品牌，至少覆盖 reasoning、uncertainty、r
 - quota source/pool/bucket ref、freshness/error/circuit；
 - account mutation、external write、nested orchestration、network/MCP 等 negative capabilities，值域需区分 `forbidden/unsupported/unknown/supported`。
 
-必须分别发现 Claude native/CLI、Codex native/CLI、Cursor IDE plugin、`agent|cursor-agent` headless。PATH 只有其中任一种的正反 fixture 都要正确。
+必须分别发现 Claude native/CLI、Codex native/CLI、Cursor IDE plugin `cursor-ide-plugin`、Cursor headless `cursor-agent-cli`（`agent|cursor-agent` executable aliases）。PATH 只有其中任一种的正反 fixture 都要正确。
 
 Cursor 的首个发现切片先收口在 `ccm harness list` 的本机只读 inventory：
 
-- `cursor-ide-plugin` / `ide-plugin` 与 `cursor-agent` / `cli-headless` 是两个独立 surface descriptor；顶层 Cursor harness 的 `installed` 仍只回答 IDE/plugin 分发目标是否存在，不因 `cursor-agent` 单独存在而翻真。
+- `cursor-ide-plugin` / `ide-plugin` 与 `cursor-agent-cli` / `cli-headless` 是两个独立 surface descriptor；顶层 Cursor harness 的 `installed` 仍只回答 IDE/plugin 分发目标是否存在，不因 CLI executable 单独存在而翻真。
 - 结构化 inventory 用加法字段 `surfaces[]` 载两个 descriptor，用 `installedSurfaces[]` 给出已安装 surface id；不改现有 `installed[]` 的 plugin-target 语义，避免 headless-only 机器触发 IDE plugin install/upgrade。
-- `cursor-agent` 只在可执行的 `cursor-agent` binary（或显式 `CCM_CURSOR_AGENT_BIN` / `CURSOR_AGENT_BIN`）存在时才是 `installed:true` + `available:true`；descriptor 保留 binary name 和 PATH 命中的绝对路径，symlink 按可执行入口路径报告，非可执行文件不算发现。
+- `cursor-agent-cli` 只在 precedence 选中的可执行 binary（显式 override → `agent` → `cursor-agent`）存在时才是 `installed:true` + `available:true`；descriptor 保留 binary name 和 PATH 命中的绝对路径，symlink 按可执行入口路径报告，非可执行文件不算发现。完整事实与维护 runbook 只在 [`harnesses/cursor-agent-cli.md`](harnesses/cursor-agent-cli.md) 维护。
 - 本切片只证明 local binary presence；`authentication` / `quota` 固定报 `unknown` + `not-probed`，不读 credential、不调 provider。`accountMutation` 报 `forbidden`，`accountAutoswitch` 与 `pluginDistribution` 报 `unsupported`；这些负能力不因用户已手工 auth 而改变。
 - 这是 machine-fact discovery 切片，不晋升 headless invocation / structured result / cancel / resume / model / quota admission 的 target 状态。
 
-Cursor 双 surface 的正式 contract 已冻结在 [`harnesses/cursor-dual-surface-contract.md`](harnesses/cursor-dual-surface-contract.md)：IDE plugin 是 `master-origin` bounded context，Agent CLI 是 `worker-target` bounded context；`--plugin-dir` 不把后者晋升成 origin。其 mode-specific admission **partial** 落点仍由 [`harnesses/cursor-agent-admission-contract.md`](harnesses/cursor-agent-admission-contract.md) 定义 `ccm/cursor-agent-admission/v1`，把 `binary.available`、`authentication.state`、`quota.state`、sandbox、result schema、task acceptance 和 transport termination 独立建模。inventory 只挂 unprobed、fail-closed snapshot，不执行 provider process；fixture-only evaluator 已证明 RC0-empty/invalid 不 accepted、AppArmor pre-exec 不污染 auth、mode/profile evidence 不跨用。双 surface 聚合 evaluator 的 opt-in fixtures 仍 intentionally RED；真实 auth/quota collectors、production driver、effective cancel、reservation 与 dispatcher 接线仍为 `target`，不能据此宣称 Cursor headless dispatch current。
+Cursor 双 surface 的正式 contract 已冻结在 [`harnesses/cursor-dual-surface-contract.md`](harnesses/cursor-dual-surface-contract.md)：IDE plugin 是 `master-origin` bounded context，Agent CLI 是 `worker-target` bounded context；`--plugin-dir` 不把后者晋升成 origin。其 mode-specific admission **partial** 落点仍由 [`harnesses/cursor-agent-admission-contract.md`](harnesses/cursor-agent-admission-contract.md) 定义 `ccm/cursor-agent-admission/v1`，把 `binary.available`、`authentication.state`、`quota.state`、sandbox、result schema、task acceptance 和 transport termination 独立建模；易变 CLI facts 由 [`harnesses/cursor-agent-cli.md`](harnesses/cursor-agent-cli.md) 单独维护。inventory 只挂 unprobed、fail-closed snapshot，不执行 provider process；fixture-only evaluator 已证明 RC0-empty/invalid 不 accepted、AppArmor pre-exec 不污染 auth、mode/profile evidence 不跨用。双 surface 聚合 evaluator 的 opt-in fixtures 仍 intentionally RED；真实 auth/quota collectors、production driver、effective cancel、reservation 与 dispatcher 接线仍为 `target`，不能据此宣称 Cursor headless dispatch current。
 
 ### 7.2 Auth、account 与 pool 固定边界
 
