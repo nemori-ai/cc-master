@@ -176,9 +176,9 @@ HITL 只是诸多轴之一；失败隔离、优先级、整合时机同样重要
 
 **工具降级链（按优先级，缺则降级）**——ship-anywhere 诚实性：不同 harness 的唤醒能力不同，故教法是降级链 + 显式可用性提示，不假设某个工具名到处都在：
 
-1. **CronCreate `recurring:false`（首选 / 通用 watchdog）** —— 本地 session 调度器，**只在 REPL idle 时 fire**（正好在你空转时叫回、不打断干活）。间隔 ≈ 最长 `in_flight` 任务的 p95 + 余量。cache 心智：<270s 保温 / ≥1200s 长等（贴 ScheduleWakeup 的 cache-warmth 心智）。重唤起处置完后 **CronDelete** 清掉待发 job 免重复 fire。注意 `durable:false` 是**本地 session 内存调度**、不需 claude.ai OAuth，故 ship-anywhere OK——区别于云 routines / RemoteTrigger（破 ship-anywhere，不教）。
-2. **ScheduleWakeup** —— 原生自定步长 + cache-warmth；已在 /loop dynamic 时用过。
-3. **Monitor** —— 某后台任务有可观测 liveness 信号（log 文件 / 进程）时用：`tail -f | grep -E --line-buffered '<进度>|<失败签名>'`，事件驱动、精准。**"silence ≠ success"**：filter 必须覆盖**失败终态**，不能只 grep happy path——否则一个吐了错误就死的任务，你的 filter 等不到它的 happy 行、反而以为还在跑。
-4. **background-shell `until <ready>; do sleep N; done` 丢进 `run_in_background`（universal ship-anywhere floor）** —— 既有的后台-shell 消解法（见 §等待外部状态），**永远兜底**：上面三者在某宿主不可用时，这条恒可用（harness 完成重入）。timer primitives 只是在它之上**补充**，不取代它。
+1. **CronCreate `recurring:false`（首选 / 通用 watchdog）** —— 本地 session 调度器，**只在 REPL idle 时 fire**（正好在你空转时叫回、不打断干活）。间隔 ≈ 最长 `in_flight` 任务的 p95 + 余量。cache 心智：<270s 保温 / ≥1200s 长等（贴 ScheduleWakeup 的 cache-warmth 心智）。先拿 CronCreate 返回的真实 id，再用 `--mechanism cron --job-id <id>` arm；重唤起处置完后 **CronDelete** 清掉待发 job 免重复 fire。注意 `durable:false` 是**本地 session 内存调度**、不需 claude.ai OAuth，故 ship-anywhere OK——区别于云 routines / RemoteTrigger（破 ship-anywhere，不教）。
+2. **ScheduleWakeup** —— 原生自定步长 + cache-warmth；创建成功并拿到真实句柄后，用 `--mechanism loop --job-id <handle>` arm。
+3. **Monitor** —— 某后台任务有可观测 liveness 信号（log 文件 / 进程）时用：`tail -f | grep -E --line-buffered '<进度>|<失败签名>'`，事件驱动、精准。拿到 monitor 句柄后用 `--mechanism monitor --job-id <handle>` arm。**"silence ≠ success"**：filter 必须覆盖**失败终态**，不能只 grep happy path——否则一个吐了错误就死的任务，你的 filter 等不到它的 happy 行、反而以为还在跑。
+4. **background-shell `until <ready>; do sleep N; done` 丢进 `run_in_background`（universal ship-anywhere floor）** —— 既有的后台-shell 消解法（见 §等待外部状态），**永远兜底**：上面三者在某宿主不可用时，这条恒可用（harness 完成重入）。拿到 background job / session id 后用 `--mechanism shell --job-id <id>` arm；没有真实 id 就不声称 armed。timer primitives 只是在它之上**补充**，不取代它。
 
 被唤醒后 recon 用的就是上面派发卫生那套地面真相验证法（handle / `git status` / 工具结果），处置完静默失败的、该 re-arm 的 re-arm——细节在 `async-hitl.md` §等待前 arm watchdog。

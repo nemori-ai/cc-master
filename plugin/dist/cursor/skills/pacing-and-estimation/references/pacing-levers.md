@@ -20,5 +20,5 @@ Cursor adapter **不支持**账号池切换；`verdict` 也不应出现 `switch`
 
 ## 停 lever
 
-- **`stop_billing_period`**：当前订阅账期配额已烧穿。停止派发新工作，把当前在飞任务收敛到安全点，然后用 `ccm watchdog arm --mechanism external`（或 background Shell floor）记录 reset 后要查的事项。没有真实 wakeup handle 时，记为 `blocked_on:"quota-reset"` 或 `blocked_on:"user"`，不要伪造自动唤醒。
+- **`stop_billing_period`**：当前订阅账期配额已烧穿。停止派发新工作，把当前在飞任务收敛到安全点；先创建 background Shell 或外部 scheduler 并拿真实 handle，再用 `ccm watchdog arm --fire-at <reset-ISO-UTC> --mechanism <shell|cron> --job-id <handle>` 记录 reset 后要查的事项。没有真实 handle 时，记为 `blocked_on:"quota-reset"` 或 `blocked_on:"user"`，不要 arm 或伪造自动唤醒。
 - **不要教 `stop_5h` / `stop_7d`**：那是 Claude Code / Codex 双窗语义，不适用于 Cursor。

@@ -863,10 +863,32 @@ test('watchdogArm writes full object {armed_at, fire_at, mechanism, job_id, chec
   assert.deepEqual(b.watchdog.checklist, ['drain']);
 });
 
-test('watchdogDisarm nulls the whole object (no残骸)', () => {
-  let b = m.watchdogArm(baseBoard(), { fireAt: '2026-06-24T13:00:00Z', mechanism: 'cron' });
+test('watchdogArm requires a non-blank accountable handle for every mechanism', () => {
+  for (const mechanism of ['cron', 'loop', 'monitor', 'shell']) {
+    for (const jobId of [undefined, '   ']) {
+      const input = baseBoard();
+      const before = snapshot(input);
+      assert.throws(
+        () => m.watchdogArm(input, { fireAt: '2099-06-24T13:00:00Z', mechanism, jobId }),
+        (error: any) =>
+          error.errKind === 'Validation' && /job-id|job_id/i.test(error.message || ''),
+        `${mechanism}/${jobId === undefined ? 'missing' : 'blank'}`,
+      );
+      assert.equal(snapshot(input), before, 'input board remains unchanged after rejection');
+    }
+  }
+});
+
+test('watchdogDisarm deletes canonical and legacy whole objects (no残骸)', () => {
+  let b: any = m.watchdogArm(baseBoard(), {
+    fireAt: '2026-06-24T13:00:00Z',
+    mechanism: 'cron',
+    jobId: 'cron-1',
+  });
+  b.wakeup = { fire_at: '2099-06-24T13:00:00Z', mechanism: 'cron', job_id: 'legacy-1' };
   b = m.watchdogDisarm(b);
-  assert.equal(b.watchdog, null);
+  assert.equal(Object.hasOwn(b, 'watchdog'), false);
+  assert.equal(Object.hasOwn(b, 'wakeup'), false);
 });
 
 // ── applySet / applySetJson — 🔒 守门 + ✎ 放行 ─────────────────────────────────────────────────────
@@ -1111,7 +1133,12 @@ test('all mutators stamp heartbeat and leave input board structurally untouched'
     (b) => m.addJc(b, { id: 'J', summary: 's', category: 'other', severity: 'low' }),
     (b) => m.cadenceUpdate(b, { shipEvery: '1h' }),
     (b) => m.cadenceOpen(b, 'I', {}),
-    (b) => m.watchdogArm(b, { fireAt: '2026-06-24T13:00:00Z', mechanism: 'shell' }),
+    (b) =>
+      m.watchdogArm(b, {
+        fireAt: '2026-06-24T13:00:00Z',
+        mechanism: 'shell',
+        jobId: 'shell-probe-1',
+      }),
     (b) => m.watchdogDisarm(b),
     (b) => m.applySet(b, 'meta.x', 1),
   ];

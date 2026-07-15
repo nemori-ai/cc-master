@@ -1051,11 +1051,16 @@ export const REGISTRY: Registry = {
           required: true,
           desc: 'cron|loop|monitor|shell（降级链）',
         },
-        'job-id': { type: 'string', field: 'jobId', desc: '外部调度句柄（便于 disarm 清理）' },
+        'job-id': {
+          type: 'string',
+          field: 'jobId',
+          required: true,
+          desc: '真实外部调度句柄（必填；用于追踪与 disarm 清理）',
+        },
         checklist: { type: 'string', field: 'checklist', desc: '唤醒后该检查什么' },
       },
       examples: [
-        'ccm watchdog arm --fire-at 2026-06-24T12:00:00Z --mechanism cron --checklist "查后台 3 个 subagent"',
+        'ccm watchdog arm --fire-at 2026-06-24T12:00:00Z --mechanism cron --job-id cron-abc --checklist "查后台 3 个 subagent"',
       ],
       handler: 'watchdog.arm',
     },

@@ -756,3 +756,81 @@ test('task block --on user 经 stdin 喂 decision_package（-）', () => {
     assert.ok(t1.decision_package, 'decision_package should be set from stdin');
   }
 });
+
+test('watchdog arm requires a non-blank accountable handle atomically and --force cannot bypass it', () => {
+  const { home } = mkHome();
+  const boardPath = seedBoard(home);
+  const before = readFileSync(boardPath, 'utf8');
+
+  const missing = runCcm(
+    ['watchdog', 'arm', '--fire-at', '2099-06-24T12:00:00Z', '--mechanism', 'shell'],
+    { home },
+  );
+  assert.equal(missing.status, 2, `missing flag is usage error; stderr=${missing.stderr}`);
+  assert.match(missing.stderr, /missing required flag --job-id/);
+  assert.equal(
+    readFileSync(boardPath, 'utf8'),
+    before,
+    'missing handle leaves board byte-identical',
+  );
+
+  for (const extra of [[], ['--force']]) {
+    const blank = runCcm(
+      [
+        'watchdog',
+        'arm',
+        '--fire-at',
+        '2099-06-24T12:00:00Z',
+        '--mechanism',
+        'shell',
+        '--job-id',
+        '   ',
+        ...extra,
+      ],
+      { home },
+    );
+    assert.equal(blank.status, 3, `blank handle is validation error; stderr=${blank.stderr}`);
+    assert.match(blank.stderr, /job-id|job_id/i);
+    assert.equal(
+      readFileSync(boardPath, 'utf8'),
+      before,
+      'blank handle leaves board byte-identical',
+    );
+  }
+});
+
+test('legacy missing-handle watchdog warns but does not brick unrelated writes', () => {
+  const { home } = mkHome();
+  const boardPath = seedBoard(home);
+  const board = readBoard(boardPath);
+  board.watchdog = { fire_at: '2099-06-24T12:00:00Z', mechanism: 'shell' };
+  writeFileSync(boardPath, `${JSON.stringify(board, null, 2)}\n`, 'utf8');
+
+  const write = runCcm(['log', 'add', 'legacy watchdog remains writable'], { home });
+  assert.equal(write.status, 0, `warn-only compatibility; stderr=${write.stderr}`);
+  assert.match(write.stderr, /FMT-WATCHDOG|warn/i);
+  assert.equal(readBoard(boardPath).log.at(-1).summary, 'legacy watchdog remains writable');
+});
+
+test('watchdog status diagnoses legacy wakeup and disarm leaves both fields absent', () => {
+  const { home } = mkHome();
+  const boardPath = seedBoard(home);
+  const board = readBoard(boardPath);
+  board.watchdog = null;
+  board.wakeup = { fire_at: '2099-06-24T12:00:00Z', mechanism: 'loop', job_id: '   ' };
+  writeFileSync(boardPath, `${JSON.stringify(board, null, 2)}\n`, 'utf8');
+
+  const status = runCcm(['watchdog', 'status', '--json'], { home });
+  assert.equal(status.status, 0, status.stderr);
+  const data = JSON.parse(status.stdout).data;
+  assert.equal(data.mechanism, 'loop', 'legacy fields preserved');
+  assert.equal(data.health.armed, false);
+  assert.equal(data.health.code, 'missing-accountable-handle');
+  assert.match(data.health.action, /watchdog disarm/);
+
+  const disarm = runCcm(['watchdog', 'disarm'], { home });
+  assert.equal(disarm.status, 0, disarm.stderr);
+  const after = readBoard(boardPath);
+  assert.equal(Object.hasOwn(after, 'watchdog'), false);
+  assert.equal(Object.hasOwn(after, 'wakeup'), false);
+});

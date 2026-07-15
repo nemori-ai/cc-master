@@ -471,6 +471,29 @@ test('watchdog null / absent is legal (no warn)', () => {
   assert.equal(lintBoard(J({ ...GOOD, watchdog: null })).warnings.length, 0);
 });
 
+test('FMT-WATCHDOG warns on missing/blank accountable handles without becoming hard', () => {
+  for (const watchdog of [
+    { fire_at: '2099-06-24T12:00:00Z', mechanism: 'shell' },
+    { fire_at: '2099-06-24T12:00:00Z', mechanism: 'cron', job_id: '   ' },
+  ]) {
+    const result = lintBoard(J({ ...GOOD, watchdog }));
+    assert.equal(result.errors.length, 0, 'legacy watchdog remains writable');
+    assert.ok(ruleSet(result.warnings).has('FMT-WATCHDOG'));
+    assert.match(
+      result.warnings.find((warning) => warning.rule === 'FMT-WATCHDOG')?.message || '',
+      /job_id/,
+    );
+  }
+});
+
+test('FMT-WATCHDOG diagnoses legacy wakeup without a handle as warn-only', () => {
+  const result = lintBoard(
+    J({ ...GOOD, wakeup: { fire_at: '2099-06-24T12:00:00Z', mechanism: 'loop' } }),
+  );
+  assert.equal(result.errors.length, 0);
+  assert.ok(ruleSet(result.warnings).has('FMT-WATCHDOG'));
+});
+
 // ── BIZ awaiting-user 完整性 ────────────────────────────────────────────────────────────────────────
 const HASH = `sha256:${'a'.repeat(64)}`;
 const FULL_DP = {

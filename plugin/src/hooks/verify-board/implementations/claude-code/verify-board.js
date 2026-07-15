@@ -119,7 +119,7 @@ function posixCksum(str) {
 function watchdogRecord(board) {
   if (!board || typeof board !== 'object') return null;
   let wd = board.watchdog;
-  if (wd === undefined) wd = board.wakeup;     // v1 旧板兼容：watchdog 缺 → 降级读 wakeup
+  if (wd === undefined || wd === null) wd = board.wakeup; // v1/旧 disarm(null) 兼容：降级读 wakeup
   if (!wd || typeof wd !== 'object' || Array.isArray(wd)) return null;
   return wd;
 }
@@ -129,13 +129,13 @@ function watchdogFireAt(board) {
   if (!wd) return '';
   return (typeof wd.fire_at === 'string') ? wd.fire_at : '';
 }
-// watchdogArmed(board, nowIso) → 该 board 是否带一个仍应被当作 ARMED 的 watchdog（即 NOT stale·簇#2 self-heal）。
-//   ARMED = watchdog 对象 ∧ fire_at（缺/非严格 ISO-8601-UTC → graceful-degrade 当 armed；或合法且仍在未来 >= now）。
-//   唯一判「not armed」的：对象 + 合法 fire_at + 已过 now 这一三元组——该响而未响、任务仍 in_flight 即静默失败信号，
-//   提醒须再响（self-heal）。graceful-degrade 是红线2（watchdog 是软读 / agent-shaped、非 pinned waist）。
+// watchdogArmed(board, nowIso) → 该 board 是否带一个仍应被当作 ARMED 的 watchdog。
+//   ARMED 首先要求 nonblank job_id（真实、可追踪/可退役句柄）；再按 fire_at 判断过期。
+//   fire_at 缺/非严格 ISO 仍 graceful-degrade 当 future，但绝不放松 handle truth。
 function watchdogArmed(board, nowIso) {
   const wd = watchdogRecord(board);
   if (!wd) return false;                        // 无 watchdog 对象 → not armed
+  if (typeof wd.job_id !== 'string' || wd.job_id.trim() === '') return false;
   const fa = (typeof wd.fire_at === 'string') ? wd.fire_at : '';
   if (!fa) return true;                         // 对象但无 fire_at → graceful-degrade → armed
   if (!ISO_RE.test(fa)) return true;            // fire_at 非严格 ISO → graceful-degrade → armed
@@ -341,12 +341,13 @@ function body(ctx) {
   // CEILING = RECON 触发器，非死刑判决（Finding #60）：过期 fire_at 而仍 in_flight 是回来 recon 地面真相的
   //   信号，不是杀掉健康长跑者；措辞须含 "recon, not verdict" + "宽限时间天花板，绝不拿 output-size 停滞当存活信号"。
   if (watchdogNeeded) {
-    handshakeReason += ' This board has an in_flight background task but no armed watchdog (the `wakeup` field is missing, or its `fire_at` is already in the past). ' +
+    handshakeReason += ' This board has an in_flight background task but no healthy armed watchdog (the canonical/legacy record is absent, has a missing or blank accountable handle, or its `fire_at` is already in the past). ' +
       'An expired `fire_at` while a task is still in_flight is a trigger to come back and RECON ground truth — NOT a death verdict: ' +
       'if recon shows it healthy (git moving / output mtime still changing / legitimately blocked on a long silent command like run-tests), ' +
       'extend / re-arm the watchdog and let it run; only a task frozen with no ground-truth change well past a generous ceiling is judged hung. ' +
       'Before you stop, arm a watchdog wakeup (CronCreate one-shot / ScheduleWakeup / Monitor / background-shell `until`) for the in_flight tasks that could fail silently — ' +
-      "use a generous time ceiling, never an output-size stall as the liveness signal — and record what to recon when it fires in the board's `wakeup.checklist` — " +
+      'run `ccm watchdog status`; if the record is unhealthy, run `ccm watchdog disarm`, create the real wakeup and capture its handle, then re-arm with `ccm watchdog arm ... --job-id <handle>`. ' +
+      "Use a generous time ceiling, never an output-size stall as the liveness signal, and record what to recon when it fires in the board's `watchdog.checklist` — " +
       'otherwise a silently-failing background task leaves no one to come back and look.';
   }
 

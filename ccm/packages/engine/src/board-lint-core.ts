@@ -528,26 +528,36 @@ function lintScheduling(board: BoardLike, emit: Emit): void {
   }
 }
 
-// FMT-WATCHDOG：watchdog.mechanism ∈ enum + fire_at/armed_at ISO（观察档·graceful；v2 补 fire_at 格式·v1 漏）。
+// FMT-WATCHDOG：watchdog.mechanism ∈ enum + fire_at/armed_at ISO + nonblank job_id
+// （观察档·graceful；legacy missing-handle 只告警，不让无关写入死锁）。canonical 缺/null 时诊断 v1 wakeup。
 function lintWatchdog(board: BoardLike, emit: Emit): void {
-  const w = board.watchdog;
-  if (w === undefined || w === null) return; // 缺/null 合法（无 watchdog）
+  const canonical = board.watchdog;
+  const useLegacy = canonical === undefined || canonical === null;
+  const w = useLegacy ? board.wakeup : canonical;
+  const field = useLegacy ? 'wakeup' : 'watchdog';
+  if (w === undefined || w === null) return; // 两种字段都缺/null 合法（无 watchdog）
   if (typeof w !== 'object' || Array.isArray(w)) {
-    emit('FMT-WATCHDOG', `watchdog 若存在必须是对象或 null（当前：${JSON.stringify(w)}）。`);
+    emit('FMT-WATCHDOG', `${field} 若存在必须是对象或 null（当前：${JSON.stringify(w)}）。`);
     return;
   }
   const wd = w as Record<string, unknown>;
+  if (typeof wd.job_id !== 'string' || wd.job_id.trim() === '') {
+    emit(
+      'FMT-WATCHDOG',
+      `${field}.job_id 必须是 nonblank string，指向真实且可追踪/可退役的 scheduler/loop/monitor/shell 句柄。影响：该记录不算 armed；先运行 ccm watchdog disarm，再创建真实唤醒并带 --job-id 重新 arm。`,
+    );
+  }
   if (wd.mechanism !== undefined && !isEnumMember('watchdogMechanism', wd.mechanism)) {
     emit(
       'FMT-WATCHDOG',
-      `watchdog.mechanism 是 ${JSON.stringify(wd.mechanism)}，应 ∈ {cron, loop, monitor, shell}。影响：verify-board 到点/缺失提醒按机制分支——错值则提醒退化。`,
+      `${field}.mechanism 是 ${JSON.stringify(wd.mechanism)}，应 ∈ {cron, loop, monitor, shell}。影响：verify-board 到点/缺失提醒按机制分支——错值则提醒退化。`,
     );
   }
   for (const k of ['armed_at', 'fire_at']) {
     if (badTimestamp(wd[k])) {
       emit(
         'FMT-WATCHDOG',
-        `watchdog.${k} 是 ${JSON.stringify(wd[k])}，非严格 ISO-8601 UTC。影响：verify-board 到点判定/过期 self-heal 读它——格式不对则自我唤醒提醒失准。`,
+        `${field}.${k} 是 ${JSON.stringify(wd[k])}，非严格 ISO-8601 UTC。影响：verify-board 到点判定/过期 self-heal 读它——格式不对则自我唤醒提醒失准。`,
       );
     }
   }

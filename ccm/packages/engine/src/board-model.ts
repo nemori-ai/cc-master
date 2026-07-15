@@ -183,12 +183,13 @@ export const FIELDS = {
     },
     watchdog: {
       tier: '👁',
-      type: 'object{armed_at, fire_at, mechanism, job_id, checklist} | null',
+      type: 'object{armed_at, fire_at, mechanism, job_id:nonblank-string, checklist} | null(legacy)',
       default: '缺省(无 watchdog)',
       readers: 'verify-board 到点/缺失提醒 + 过期 self-heal',
       writers: 'agent 经 CLI(arm / 退役)',
       when: 'arm 自我唤醒 / 退役',
-      degrade: '缺→提醒按需注入;退役须删整对象(不留残骸);fire_at 非 ISO→warn',
+      degrade:
+        '缺→提醒按需注入;退役须删 canonical watchdog + legacy wakeup 整字段;job_id 缺/空→unarmed+warn;fire_at 非 ISO→warn',
     },
     tasks: {
       tier: '🔒',
@@ -659,7 +660,7 @@ export const INVARIANTS: Invariant[] = [
     level: 'warn',
     family: 'FMT',
     scope: 'board',
-    summary: 'watchdog.mechanism ∈ enum + fire_at ISO(观察档·graceful)',
+    summary: 'watchdog/wakeup.job_id nonblank + mechanism ∈ enum + fire_at ISO(观察档·graceful)',
   },
   {
     id: 'FMT-META',

@@ -1,1 +1,1 @@
-后台 Shell → 外部 scheduler + 手动 recon → manual recon；没有 CronCreate/ScheduleWakeup 时不要伪造
+后台 Shell → 外部 scheduler + 手动 recon → manual recon；每档先拿真实 handle 再 arm，没有 handle 就记 blocked / recon 状态、不要伪造 CronCreate/ScheduleWakeup
