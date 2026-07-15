@@ -24,7 +24,11 @@ whether stopping now would abandon unfinished/unverified/un-surfaced work.
   state. The completion fingerprint includes revision, assurance, goal summary, and Brief hash so an
   amendment necessarily invalidates an earlier handshake.
 - `rule-verify-board-goal-integrity`: run `ccm goal check --board <path> --json --no-input` before a
-  completion allow. A malformed contract, missing Brief, or hash mismatch blocks. A pending Goal
+  completion allow. A confirmed malformed contract, missing Brief, or hash mismatch blocks. Failure
+  to spawn the checker, timeout, signal termination, malformed transport envelope, or another
+  transiently unavailable check is not evidence of tampering: preserve locally known pending-goal
+  semantics, continue the other local Stop gates, and emit a non-blocking strong advisory asking the
+  agent to retry `ccm goal check`. A pending Goal
   Contract blocks normal completion; the only legal stop is a handoff made exclusively of complete,
   explicit `blocked_on:"user"` `decision_package` records (required non-empty context/need/type/hash/entry
   fields, plus options for a decision), so the user can supply the information needed to
@@ -62,8 +66,9 @@ whether stopping now would abandon unfinished/unverified/un-surfaced work.
 ## 注入 taxonomy
 
 - Real `block` reasons → `directive` (hard gate, must comply to proceed).
-- Fuse-tripped release warning → `advisory strength="strong"` (not a gate — the agent is now free to
-  stop; the advisory just flags that something may be stuck).
+- Fuse-tripped release warning and a transiently unavailable Goal Contract probe →
+  `advisory strength="strong"` (not a gate — the agent is now free to stop when no independent local
+  gate blocks; the advisory flags that state needs reconfirmation).
 
 ## 武装语义
 

@@ -1,5 +1,17 @@
 import { createHash } from 'node:crypto';
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
+import {
+  closeSync,
+  constants,
+  existsSync,
+  fstatSync,
+  fsyncSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  unlinkSync,
+} from 'node:fs';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { lintBoard } from '@ccm/engine';
@@ -7,6 +19,7 @@ import * as discover from '../discover.js';
 import * as io from '../io.js';
 import * as mutations from '../mutations.js';
 import * as render from '../render.js';
+import { createDefaultRuntimeBackend } from '../runtime-supply-chain.js';
 import { type BoardArg, type Ctx, runWrite } from './_common.js';
 
 const GOAL_CHECK_SCHEMA = 'ccm/goal-check/v1';
@@ -51,6 +64,121 @@ function digest(bytes: Buffer): string {
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 }
 
+interface PinnedManagedDirectory {
+  fd: number;
+  lexicalPath: string;
+  openedDev: number;
+  openedIno: number;
+}
+
+function pinManagedDirectory(directory: string): PinnedManagedDirectory {
+  const backend = createDefaultRuntimeBackend();
+  backend.ensurePrivateDirectory(directory);
+  const pathStat = lstatSync(directory);
+  const fd = openSync(
+    directory,
+    constants.O_RDONLY | (constants.O_DIRECTORY || 0) | (constants.O_NOFOLLOW || 0),
+  );
+  try {
+    const opened = fstatSync(fd);
+    if (
+      !opened.isDirectory() ||
+      pathStat.isSymbolicLink() ||
+      opened.dev !== pathStat.dev ||
+      opened.ino !== pathStat.ino
+    ) {
+      fail('Goal Brief managed directory changed while being pinned');
+    }
+    return { fd, lexicalPath: directory, openedDev: opened.dev, openedIno: opened.ino };
+  } catch (error) {
+    closeSync(fd);
+    throw error;
+  }
+}
+
+function attestPinnedDirectory(pinned: PinnedManagedDirectory, realHome: string): void {
+  const opened = fstatSync(pinned.fd);
+  const pathStat = lstatSync(pinned.lexicalPath);
+  if (
+    !opened.isDirectory() ||
+    pathStat.isSymbolicLink() ||
+    opened.dev !== pinned.openedDev ||
+    opened.ino !== pinned.openedIno ||
+    pathStat.dev !== opened.dev ||
+    pathStat.ino !== opened.ino
+  ) {
+    fail('Goal Brief managed directory authority changed during publish');
+  }
+  const realDirectory = realpathSync(pinned.lexicalPath);
+  if (!contained(realHome, realDirectory)) {
+    fail('Goal Brief managed directory resolves outside CC_MASTER_HOME');
+  }
+}
+
+function pinnedChildPath(pinned: PinnedManagedDirectory, basename: string): string {
+  if (process.platform === 'linux' && existsSync(`/proc/self/fd/${pinned.fd}`)) {
+    return `/proc/self/fd/${pinned.fd}/${basename}`;
+  }
+  return path.join(pinned.lexicalPath, basename);
+}
+
+function readRegularNoFollow(filePath: string): Buffer {
+  const fd = openSync(filePath, constants.O_RDONLY | (constants.O_NOFOLLOW || 0));
+  try {
+    const stat = fstatSync(fd);
+    if (!stat.isFile()) fail('Goal Brief immutable target is not a regular file');
+    return readFileSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function publishManagedBrief(
+  pinned: PinnedManagedDirectory,
+  realHome: string,
+  targetName: string,
+  bytes: Buffer,
+  writeFileAtomicSync: (filePath: string, data: string) => void,
+): void {
+  const backend = createDefaultRuntimeBackend();
+  const target = pinnedChildPath(pinned, targetName);
+  attestPinnedDirectory(pinned, realHome);
+  if (existsSync(target)) {
+    const stat = lstatSync(target);
+    if (stat.isSymbolicLink() || !stat.isFile()) {
+      fail('Goal Brief immutable target already exists but is not a regular file');
+    }
+    if (!readRegularNoFollow(target).equals(bytes)) {
+      fail('Goal Brief revision is immutable: target already exists with different bytes');
+    }
+    return;
+  }
+
+  const temp = pinnedChildPath(
+    pinned,
+    `.${targetName}.publish-${process.pid}-${Date.now().toString(36)}`,
+  );
+  try {
+    writeFileAtomicSync(temp, bytes.toString('utf8'));
+    attestPinnedDirectory(pinned, realHome);
+    backend.publishUniqueFile(temp, target);
+    try {
+      fsyncSync(pinned.fd);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (process.platform !== 'darwin' || (code !== 'EINVAL' && code !== 'ENOTSUP')) throw error;
+    }
+    attestPinnedDirectory(pinned, realHome);
+  } finally {
+    try {
+      unlinkSync(temp);
+    } catch {
+      // Publication normally removes the temp link; cleanup is best-effort and must not mask
+      // the publish/attestation result.
+    }
+  }
+}
+
 function readBriefSource(sourcePath: string): Buffer {
   const absolute = path.resolve(sourcePath);
   const stat = lstatSync(absolute);
@@ -74,33 +202,36 @@ export function prepareManagedBrief(input: ManagedBriefInput): ManagedBriefResul
   const bytes = readBriefSource(input.sourcePath);
   const home = path.resolve(input.home);
   const stem = boardStem(input.boardPath);
-  if (!/^[A-Za-z0-9._-]+$/.test(stem)) fail('board filename cannot form a safe Goal Brief path');
+  if (!/^[A-Za-z0-9._-]+$/.test(stem) || stem === '.' || stem === '..') {
+    fail('board filename cannot form a safe Goal Brief path');
+  }
   const ref = `goals/${stem}/r${String(input.revision).padStart(4, '0')}.goal.md`;
   const target = path.resolve(home, ref);
   if (!contained(home, target)) fail('Goal Brief target escapes CC_MASTER_HOME');
 
   if (!input.dryRun) {
-    const directory = path.dirname(target);
-    mkdirSync(directory, { recursive: true, mode: 0o700 });
-    chmodSync(directory, 0o700);
-    if (existsSync(target)) {
-      const targetStat = lstatSync(target);
-      if (targetStat.isSymbolicLink() || !targetStat.isFile()) {
-        fail('Goal Brief immutable target already exists but is not a regular file');
-      }
-      const existing = readFileSync(target);
-      if (!existing.equals(bytes)) {
-        fail('Goal Brief revision is immutable: target already exists with different bytes');
-      }
-    } else {
-      (input.writeFileAtomicSync || io.writeFileAtomicSync)(target, bytes.toString('utf8'));
-    }
-    chmodSync(target, 0o600);
-
-    // 防 parent symlink 把受管文件导出 home；文件存在后用真实路径再校验一次。
+    if (!existsSync(home)) mkdirSync(home, { mode: 0o700 });
     const realHome = realpathSync(home);
-    const realTarget = realpathSync(target);
-    if (!contained(realHome, realTarget)) fail('Goal Brief target resolves outside CC_MASTER_HOME');
+    const homeAuthority = pinManagedDirectory(realHome);
+    let goalsAuthority: PinnedManagedDirectory | null = null;
+    let revisionAuthority: PinnedManagedDirectory | null = null;
+    try {
+      const goalsDir = pinnedChildPath(homeAuthority, 'goals');
+      goalsAuthority = pinManagedDirectory(goalsDir);
+      const revisionDir = pinnedChildPath(goalsAuthority, stem);
+      revisionAuthority = pinManagedDirectory(revisionDir);
+      publishManagedBrief(
+        revisionAuthority,
+        realHome,
+        path.basename(target),
+        bytes,
+        input.writeFileAtomicSync || io.writeFileAtomicSync,
+      );
+    } finally {
+      if (revisionAuthority) closeSync(revisionAuthority.fd);
+      if (goalsAuthority) closeSync(goalsAuthority.fd);
+      closeSync(homeAuthority.fd);
+    }
   }
 
   return { ref, sha256: digest(bytes), path: target };

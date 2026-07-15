@@ -15,6 +15,11 @@ run_stop_sid() {
              | CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" \
                node "$PLUGIN_ROOT/hooks/scripts/verify-board.js" 2>/dev/null)"; HOOK_RC=$?
 }
+run_stop_sid_with_ccm() {
+  HOOK_OUT="$(printf '{"session_id":"%s","hook_event_name":"Stop"}' "$2" \
+             | CLAUDE_PROJECT_DIR="/nonexistent-proj" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$1" CCM_BIN="$3" \
+               node "$PLUGIN_ROOT/hooks/scripts/verify-board.js" 2>/dev/null)"; HOOK_RC=$?
+}
 # run_stop_json HOME JSON — run the Stop hook with arbitrary stdin JSON (e.g. one WITHOUT session_id).
 run_stop_json() {
   HOOK_OUT="$(printf '%s' "$2" \
@@ -92,6 +97,23 @@ mkactive "$H" "incomplete-question" "{\"schema\":\"cc-master/v2\",\"goal\":\"\",
 run_stop_sid "$H" "$SID"
 assert_contains "$HOOK_OUT" "block" "incomplete pending decision_package → block"
 assert_contains "$HOOK_OUT" "complete blocked_on" "incomplete pending decision_package → repair guidance"
+rm -rf "$H"
+
+# A ccm-confirmed missing Brief is a hard integrity failure.
+H="$(make_project)"; SID="sess-goal-missing-brief"
+mkactive "$H" "missing-brief" "{\"schema\":\"cc-master/v2\",\"goal\":\"g\",\"goal_contract\":{\"schema\":\"ccm/goal-contract/v1\",\"revision\":1,\"assurance\":\"confirmed\",\"brief\":{\"ref\":\"goals/missing-brief/r0001.goal.md\",\"sha256\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"updated_at\":\"2026-07-15T00:00:00Z\"},\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"deps\":[]}]}"
+run_stop_sid "$H" "$SID"
+assert_contains "$HOOK_OUT" "integrity check failed" "confirmed missing Brief blocks Claude Stop"
+assert_contains "$HOOK_OUT" "missing_brief" "Claude names the confirmed integrity verdict"
+rm -rf "$H"
+
+# A transiently unavailable ccm cannot prove tampering and therefore must not become a hard integrity block.
+H="$(make_project)"; SID="sess-goal-unavailable"
+mkactive "$H" "unavailable" "{\"schema\":\"cc-master/v2\",\"goal\":\"\",\"goal_contract\":{\"schema\":\"ccm/goal-contract/v1\",\"revision\":1,\"assurance\":\"pending\",\"updated_at\":\"2026-07-15T00:00:00Z\"},\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"D1\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"deps\":[],\"decision_package\":{\"inputs_hash\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"ask_type\":\"decision\",\"context_md\":\"Need authority.\",\"what_i_need\":\"Choose an option.\",\"options\":[{\"id\":\"a\",\"label\":\"A\"}],\"enter_cmd\":\"ccm discuss D1\"}}]}"
+run_stop_sid_with_ccm "$H" "$SID" "$H/missing-ccm"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "unavailable ccm does not hard-block Claude Stop as integrity failure"
+assert_contains "$HOOK_OUT" "advisory" "unavailable ccm emits Claude advisory"
+assert_contains "$HOOK_OUT" "unavailable" "Claude advisory names unavailable integrity probe"
 rm -rf "$H"
 
 # tasks_region_t BOARD — retain the historical source-order extractor only for the explicit pre-D3

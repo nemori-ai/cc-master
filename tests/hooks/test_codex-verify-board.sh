@@ -16,6 +16,13 @@ run_stop() {
   )"
   HOOK_RC=$?
 }
+run_stop_with_ccm() {
+  HOOK_OUT="$(
+    printf '{"session_id":"%s","hook_event_name":"Stop","stop_hook_active":false}' "$2" |
+      CC_MASTER_HOME="$1" CCM_BIN="$3" node "$LAUNCHER" --event Stop --core "$CORE" 2>/dev/null
+  )"
+  HOOK_RC=$?
+}
 
 chmod +x "$CORE"
 
@@ -118,11 +125,28 @@ assert_contains "$HOOK_OUT" '"decision":"block"' "incomplete pending decision pa
 assert_contains "$HOOK_OUT" "complete blocked_on" "incomplete pending decision package gives repair guidance"
 rm -rf "$H"
 
+# A ccm-confirmed missing Brief cannot be bypassed by stop_allow_until.
+H="$(make_project)"
+mkactive "$H" "missing-brief" '{"schema":"cc-master/v2","goal":"g","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"confirmed","brief":{"ref":"goals/missing-brief/r0001.goal.md","sha256":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true,"session_id":"sess-missing-brief"},"runtime":{"stop_allow_until":"2999-01-01T00:00:00Z"},"tasks":[{"id":"T1","status":"done","deps":[]}]}'
+run_stop "$H" "sess-missing-brief"
+assert_contains "$HOOK_OUT" "integrity check failed" "confirmed missing Brief blocks Codex Stop"
+assert_contains "$HOOK_OUT" "missing_brief" "Codex names the confirmed integrity verdict"
+rm -rf "$H"
+
 # Malformed Goal Contract cannot be bypassed by stop_allow_until.
 H="$(make_project)"
 mkactive "$H" "bad" '{"schema":"cc-master/v2","goal":"g","goal_contract":{"schema":"wrong","revision":1,"assurance":"confirmed"},"owner":{"active":true,"session_id":"sess-bad"},"runtime":{"stop_allow_until":"2999-01-01T00:00:00Z"},"tasks":[{"id":"T1","status":"done","deps":[]}]}'
 run_stop "$H" "sess-bad"
 assert_contains "$HOOK_OUT" "integrity check failed" "malformed goal contract blocks despite release timestamp"
+rm -rf "$H"
+
+# A transiently unavailable ccm is advisory, not proof that the contract is malformed/tampered.
+H="$(make_project)"
+mkactive "$H" "unavailable" '{"schema":"cc-master/v2","goal":"g","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"confirmed","updated_at":"2026-07-15T00:00:00Z"},"owner":{"active":true,"session_id":"sess-unavailable"},"runtime":{"stop_allow_until":"2999-01-01T00:00:00Z"},"tasks":[{"id":"T1","status":"done","deps":[]}]}'
+run_stop_with_ccm "$H" "sess-unavailable" "$H/missing-ccm"
+assert_not_contains "$HOOK_OUT" '"decision":"block"' "unavailable ccm does not hard-block Codex Stop as integrity failure"
+assert_contains "$HOOK_OUT" "advisory" "unavailable ccm emits Codex advisory"
+assert_contains "$HOOK_OUT" "unavailable" "Codex advisory names unavailable integrity probe"
 rm -rf "$H"
 
 finish

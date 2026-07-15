@@ -241,5 +241,18 @@ assert_contains "$INCOMPAT_OUT" 'source=\"bootstrap-board\"' "codex incompatible
 assert_contains "$INCOMPAT_OUT" "goal-contract/v1" "codex incompatible ccm names missing capability"
 assert_no_file "$INCOMPAT_HOME/boards" "codex incompatible ccm creates no board dir"
 
+# Present but incompatible ccm must also refuse resume before mutating owner/session state.
+INCOMPAT_RESUME_HOME="$H/incompatible-resume-home"
+INCOMPAT_RESUME_BOARD="$INCOMPAT_RESUME_HOME/boards/resume-old.board.json"
+mkdir -p "$INCOMPAT_RESUME_HOME/boards"
+cat >"$INCOMPAT_RESUME_BOARD" <<'JSON'
+{"schema":"cc-master/v2","goal":"preserve","owner":{"active":false,"session_id":"old-session"},"tasks":[{"id":"T1","status":"done","deps":[]}]}
+JSON
+INCOMPAT_RESUME_OUT="$(printf '%s' '{"session_id":"codex-sess-incompatible-resume","hook_event_name":"UserPromptSubmit","prompt":"cc-master:as-master-orchestrator --resume resume-old","cwd":"/tmp/work"}' \
+  | CC_MASTER_HOME="$INCOMPAT_RESUME_HOME" CCM_BIN="$OLD_CCM" node "$LAUNCHER" --core "$CORE" 2>/dev/null)"
+INCOMPAT_RESUME_OWNER="$(node -e 'const b=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(`${b.owner.active}|${b.owner.session_id}`);' "$INCOMPAT_RESUME_BOARD")"
+assert_contains "$INCOMPAT_RESUME_OUT" "goal-contract/v1" "codex incompatible ccm refuses resume with missing capability"
+assert_eq "false|old-session" "$INCOMPAT_RESUME_OWNER" "codex incompatible resume leaves owner byte-semantics unchanged"
+
 rm -rf "$H"
 finish

@@ -85,15 +85,20 @@ function goalCheckViaCcm(boardPath, home, board) {
   const contract = board && board.goal_contract;
   if (!contract) return { verdict: 'legacy' };
   if (typeof contract !== 'object' || contract.schema !== 'ccm/goal-contract/v1') return { verdict: 'malformed' };
+  const localAssurance = contract.assurance === 'pending' ? 'pending' : 'settled';
   try {
     const result = spawnSync(CCM_BIN, ['goal', 'check', '--board', boardPath, '--json', '--no-input'], {
       encoding: 'utf8', timeout: 15000, env: { ...process.env, CC_MASTER_HOME: home },
     });
-    if (!result || result.error || result.signal || result.status !== 0) return { verdict: 'check_unavailable' };
+    if (!result || result.error || result.signal) {
+      return { verdict: 'check_unavailable', local_assurance: localAssurance };
+    }
     const parsed = JSON.parse(result.stdout || '{}');
-    return parsed && parsed.ok === true && parsed.data ? parsed.data : { verdict: 'malformed' };
+    return parsed && parsed.data && typeof parsed.data.verdict === 'string'
+      ? parsed.data
+      : { verdict: 'check_unavailable', local_assurance: localAssurance };
   } catch {
-    return { verdict: 'check_unavailable' };
+    return { verdict: 'check_unavailable', local_assurance: localAssurance };
   }
 }
 
@@ -194,13 +199,18 @@ function main() {
   if (boards.length === 0) return;
 
   const notes = [];
+  const goalCheckUnavailable = [];
   for (const { name, path: boardPath, board } of boards) {
     const goal = typeof board.goal === 'string' && board.goal ? board.goal : '(goal not recorded yet)';
     const hint = releaseHint(boardPath);
     const tasks = Array.isArray(board.tasks)
       ? board.tasks.filter((task) => task && typeof task === 'object' && !Array.isArray(task) && typeof task.id === 'string' && task.id)
       : [];
-    const goalState = goalCheckViaCcm(boardPath, home, board);
+    let goalState = goalCheckViaCcm(boardPath, home, board);
+    if (goalState.verdict === 'check_unavailable') {
+      goalCheckUnavailable.push(name);
+      goalState = { verdict: goalState.local_assurance === 'pending' ? 'pending' : 'ok' };
+    }
     if (!['ok', 'legacy', 'pending'].includes(goalState.verdict)) {
       notes.push(`${name} [${goal}]: Goal Contract integrity check failed (${goalState.verdict || 'malformed'}); run ccm goal check/show and restore or explicitly amend the contract. ${hint}.`);
       continue;
@@ -256,6 +266,11 @@ function main() {
 
   if (notes.length === 0) {
     clearFuseStreak(fuseSidecarPath(home, sessionId));
+    if (goalCheckUnavailable.length > 0) {
+      system(advisory('verify-board', 'strong',
+        `cc-master: Goal Contract integrity probe unavailable for ${goalCheckUnavailable.join(', ')}. ` +
+        'This transient transport failure is not proof of missing/tampered state, so completion was not continued as an integrity failure; rerun ccm goal check before relying on the contract.'));
+    }
     return;
   }
 

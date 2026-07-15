@@ -379,11 +379,6 @@ function main() {
 
   const { flags, goal: rawRequest } = parseArgs(invocation.args);
   const boardsDir = path.join(home, 'boards');
-  if (flags.resume) {
-    resumeBoard(home, boardsDir, flags, sessionId, invocation);
-    return;
-  }
-
   try {
     requireBootstrapCapabilities(home);
   } catch (error) {
@@ -391,6 +386,11 @@ function main() {
       'block',
       `<directive source="bootstrap-board">cc-master refused to arm: ${error.message}. Upgrade ccm to a build that advertises goal-contract/v1, then retry.</directive>`
     );
+    return;
+  }
+
+  if (flags.resume) {
+    resumeBoard(home, boardsDir, flags, sessionId, invocation);
     return;
   }
 

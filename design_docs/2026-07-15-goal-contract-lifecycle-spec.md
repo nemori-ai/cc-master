@@ -102,6 +102,11 @@ fresh bootstrap 创建 revision 1 的 pending skeleton：`goal=""`、无 `brief`
 - 每个 revision append-only；amend 写新文件，禁止覆盖旧 revision。
 - 输入必须是普通 UTF-8 文件，最大 1 MiB；拒绝设备、目录和越界/symlink 逃逸。
 - managed ref 永远相对 `$CC_MASTER_HOME`；复制后以 owner-only 权限保存。
+- 写入沿用 ccm runtime backend 的 owner-only/no-follow 目录 authority 与 durable
+  temp→hard-link(no-replace) publish：静态 parent symlink/越界必须在 final 文件出现前拒绝，已存在
+  revision 永不覆盖。Linux 可经 pinned directory fd 发布，抵抗 publish 窗口内的 parent rename；Darwin
+  因 Node 当前没有跨平台 `openat(2)` 面，只能在 publish 前后校验 pathname/vnode identity，故同 UID
+  对手恰好在极窄窗口并发 rename parent 仍是明确披露的 residual，不宣称 resistant。
 - 生成或复制失败不得更新 board。若 Brief 已落盘而 board 原子写失败，允许留下可安全清理的孤儿文件，不允许半个 contract。
 - Brief 至少含：原始来源、真实 job、normalized goal、可观察验收、in/out scope、约束/权限、假设/开放问题、相对上一 revision 的 delta。
 - ccm 不解析 Markdown 语义；模板完整性由 command/skill 内容契约与评审保证。

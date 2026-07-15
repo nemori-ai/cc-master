@@ -83,15 +83,20 @@ function goalCheckViaCcm(boardPath, homeDir, board) {
   const contract = board && board.goal_contract;
   if (!contract) return { verdict: 'legacy' };
   if (typeof contract !== 'object' || contract.schema !== 'ccm/goal-contract/v1') return { verdict: 'malformed' };
+  const localAssurance = contract.assurance === 'pending' ? 'pending' : 'settled';
   try {
     const r = spawnSync(CCM_BIN, ['goal', 'check', '--board', boardPath, '--json', '--no-input'], {
       encoding: 'utf8', timeout: 15000, env: { ...process.env, CC_MASTER_HOME: homeDir },
     });
-    if (!r || r.error || r.signal || r.status !== 0) return { verdict: 'check_unavailable' };
+    if (!r || r.error || r.signal) {
+      return { verdict: 'check_unavailable', local_assurance: localAssurance };
+    }
     const parsed = JSON.parse(r.stdout || '{}');
-    return parsed && parsed.ok === true && parsed.data ? parsed.data : { verdict: 'malformed' };
+    return parsed && parsed.data && typeof parsed.data.verdict === 'string'
+      ? parsed.data
+      : { verdict: 'check_unavailable', local_assurance: localAssurance };
   } catch (_) {
-    return { verdict: 'check_unavailable' };
+    return { verdict: 'check_unavailable', local_assurance: localAssurance };
   }
 }
 
@@ -232,6 +237,7 @@ function body(ctx) {
   let actionable = false;        // 任一匹配板有 ready / uncertain task
   let watchdogNeeded = false;    // 任一匹配板有 in_flight task 但无 armed watchdog
   let goalIntegrityProblem = '';
+  const goalCheckUnavailable = [];
   let pendingGoal = false;
   let pendingDecisionPackageOnly = matched.length > 0;
 
@@ -240,7 +246,11 @@ function body(ctx) {
     const tasks = Array.isArray(board.tasks) ? board.tasks : [];
     const realTasks = tasks.filter((t) => t && typeof t === 'object' && !Array.isArray(t) &&
                                           typeof t.id === 'string' && t.id !== '');
-    const goalState = goalCheckViaCcm(boardPath, HOME_DIR, board);
+    let goalState = goalCheckViaCcm(boardPath, HOME_DIR, board);
+    if (goalState.verdict === 'check_unavailable') {
+      goalCheckUnavailable.push(name);
+      goalState = { verdict: goalState.local_assurance === 'pending' ? 'pending' : 'ok' };
+    }
     if (!['ok', 'legacy', 'pending'].includes(goalState.verdict)) {
       goalIntegrityProblem += `${name}: ${goalState.verdict || 'malformed'}; `;
     }
@@ -325,6 +335,13 @@ function body(ctx) {
   }
   // allow → 清 sidecar（streak → 0）。
   function allow() { clearSidecar(SIDECAR); }
+  function allowWithGoalAdvisory(preserveFingerprint = false) {
+    if (preserveFingerprint) allowHandshookFp();
+    else clearSidecar(SIDECAR);
+    const warn = `cc-master: Goal Contract integrity probe unavailable for ${goalCheckUnavailable.join(', ')}. ` +
+      'This transient transport failure is not proof of missing/tampered state, so Stop was not hard-blocked; rerun ccm goal check before relying on the contract.';
+    process.stdout.write(`{"reason":${jsonStr(advisory('verify-board', 'strong', warn))}}\n`);
+  }
   // allowHandshookFp — allow，但 KEEP 握手指纹，让同一完成态在后续每次 Stop 都放行（已 self-check 过）。
   //   streak 归 0；只有变了的指纹（或写 "-" 的 actionable）才重强 self-check。
   function allowHandshookFp() { writeSidecar(SIDECAR, `0 ${lastFp}\n`); }
@@ -338,7 +355,8 @@ function body(ctx) {
   }
 
   if (pendingGoal && pendingDecisionPackageOnly) {
-    allow();
+    if (goalCheckUnavailable.length > 0) allowWithGoalAdvisory();
+    else allow();
     return;
   }
 
@@ -365,7 +383,8 @@ function body(ctx) {
   //   若这个完成态已握手过（fp 不变）→ allow（别再问）；只有变了的完成态才重强 self-check。
   const fpNow = statusFingerprint();
   if (lastFp === fpNow) {
-    allowHandshookFp();   // 此完成态指纹已握手 → allow + KEEP fp
+    if (goalCheckUnavailable.length > 0) allowWithGoalAdvisory(true);
+    else allowHandshookFp();   // 此完成态指纹已握手 → allow + KEEP fp
     return;
   }
   // 新（或变了的）完成态 → 记下要握手的指纹，再 block。

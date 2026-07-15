@@ -48,6 +48,33 @@ test('GC-02/05: entry and resume surfaces name the Goal Contract lifecycle', () 
   assert.match(guide, /references\/goal-contract\.md/);
 });
 
+test('GC-02: projected Goal Contract guidance uses host-valid installed references', () => {
+  const codexEntry = read(
+    'plugin/dist/codex/skills/cc-master-as-master-orchestrator/SKILL.md',
+  );
+  assert.doesNotMatch(codexEntry, /\$\{CLAUDE_PLUGIN_ROOT\}/);
+  assert.match(codexEntry, /master-orchestrator-guide/);
+  assert.match(codexEntry, /references\/goal-contract\.md/);
+
+  for (const host of ['claude-code', 'codex', 'cursor']) {
+    const slicing = read(`plugin/dist/${host}/skills/slicing-goals-into-dags/SKILL.md`);
+    assert.doesNotMatch(
+      slicing,
+      /\$\{CLAUDE_PLUGIN_ROOT\}/,
+      `${host} Goal Contract guidance must not inherit a foreign path token`,
+    );
+    assert.ok(
+      fs.existsSync(
+        path.join(
+          repo,
+          `plugin/dist/${host}/skills/master-orchestrator-guide/references/goal-contract.md`,
+        ),
+      ),
+      `${host} projected Goal Contract reference exists`,
+    );
+  }
+});
+
 test('GC-13: detailed semantic procedure has one canonical reference', () => {
   const reference = read(
     'plugin/src/skills/master-orchestrator-guide/canonical/references/goal-contract.md',
@@ -58,4 +85,15 @@ test('GC-13: detailed semantic procedure has one canonical reference', () => {
   assert.match(reference, /有用.*相关/);
   assert.match(reference, /ccm log add.*--kind finding/);
   assert.match(reference, /不借机改写 Goal Contract 或成功状态/);
+});
+
+test('GC-08: Cursor capability evidence names PreCompact as a silent no-op', () => {
+  const card = read('design_docs/harnesses/capabilities/goal-contract-lifecycle.md');
+  const precompact = read(
+    'plugin/src/hooks/reinject/implementations/cursor/precompact-observe-core.js',
+  );
+  assert.match(precompact, /silent observe|no-op/i);
+  assert.match(card, /PreCompact[^\n]*(?:silent|no-op)/i);
+  assert.match(card, /alwaysApply/i);
+  assert.doesNotMatch(card, /PreCompact 保存有界 revision 摘要/);
 });

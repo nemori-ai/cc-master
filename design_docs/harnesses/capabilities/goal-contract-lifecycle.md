@@ -22,7 +22,7 @@ compaction、派发、amendment 和完成时始终对齐当前 revision。
 | --- | --- | --- | --- |
 | claude-code | implemented | command + `SessionStart`/`PreCompact`/`Stop` hooks + canonical skills + `ccm goal` | `$ARGUMENTS` 只作 raw request；bootstrap 建 pending skeleton |
 | codex | implemented | entry skill + session_start/pre_compact/turn_complete hooks + `ccm goal` | bootstrap shim 不再把解析参数传入 `--goal` |
-| cursor | implemented-track-b | command + alwaysApply rule + PreCompact snapshot + afterAgentResponse gate + `ccm goal` | 分层替代 Claude Code 的动态完整重注 |
+| cursor | implemented-track-b | command + alwaysApply rule + PreCompact silent no-op + afterAgentResponse gate + `ccm goal` | 分层替代 Claude Code 的动态完整重注 |
 
 ## Declared divergence
 
@@ -34,7 +34,7 @@ compaction、派发、amendment 和完成时始终对齐当前 revision。
     Cursor 无 Claude Code SessionStart(compact) 等价的动态完整重注事件。
   compensating_mechanism: >
     Fresh/resume command 先 framing/check；alwaysApply orchestrator rule 常驻 Goal Contract
-    决策协议；PreCompact 保存有界 revision 摘要；afterAgentResponse verify-board 在完成前检查
+    决策协议；PreCompact 当前为 silent no-op，靠 AlwaysApply 常驻规则补偿；afterAgentResponse verify-board 在完成前检查
     完整性与 pending 状态。
   tracked_by: design_docs/harnesses/cursor.md
 ```

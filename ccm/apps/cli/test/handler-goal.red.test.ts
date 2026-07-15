@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -130,6 +131,32 @@ test('GC-10: managed Brief rejects symlink, directory, invalid UTF-8 and files o
         revision: 1,
       }),
     /1 MiB/,
+  );
+});
+
+test('GC-10: managed Brief rejects a symlinked managed parent before writing outside home', () => {
+  const f = fixture();
+  const stem = '20260715-100000-42';
+  const outside = join(f.root, 'outside');
+  const goals = join(f.home, 'goals');
+  mkdirSync(goals, { recursive: true });
+  mkdirSync(outside, { recursive: true });
+  symlinkSync(outside, join(goals, stem));
+
+  assert.throws(
+    () =>
+      goalHandler.prepareManagedBrief({
+        sourcePath: f.briefPath,
+        home: f.home,
+        boardPath: f.boardPath,
+        revision: 1,
+      }),
+    /symlink|outside|trusted|managed/i,
+  );
+  assert.equal(
+    existsSync(join(outside, 'r0001.goal.md')),
+    false,
+    'a rejected parent symlink must never receive Goal Brief bytes',
   );
 });
 

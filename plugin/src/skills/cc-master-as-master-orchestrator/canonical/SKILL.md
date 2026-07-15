@@ -24,7 +24,7 @@ $ARGUMENTS
 ## fresh 形态
 
 1. 调用 `master-orchestrator-guide` skill，内化身份、红线、决策程序与 board 协议。
-2. 从参数里分离需求证据与启动 flag。原始 goal 文本、GitHub issue 与上下文都是 source evidence，不是 canonical goal；不得 copy-paste 到 `board.goal`。按 `${CLAUDE_PLUGIN_ROOT}/skills/master-orchestrator-guide/references/goal-contract.md` 的 Goal Framing Test 澄清 outcome、范围/非目标、验收、约束与授权边界。
+2. 从参数里分离需求证据与启动 flag。原始 goal 文本、GitHub issue 与上下文都是 source evidence，不是 canonical goal；不得 copy-paste 到 `board.goal`。按 `master-orchestrator-guide` 的 `references/goal-contract.md` 中 Goal Framing Test 澄清 outcome、范围/非目标、验收、约束与授权边界。
 3. 用 `ccm goal set --board <board> --summary "<无歧义目标>" --assurance asserted [--brief-file <file>]` 写入 revision；复杂、易失真或需长期复盘的需求必须有独立 Goal Brief，并由 `board.goal_contract.brief` 锚定。运行 `ccm goal check --board <board> --json`；路线级歧义未解时保持 `pending`，只产出完整的 `blocked_on:user` `decision_package`。
 4. **硬闸：在任何实现 / 测试 / git / PR / 发布动作之前，只有 goal check 通过后，才能把当前 revision 拆成依赖 DAG 并用 `ccm task add` 写进 board。** issue source 只保留为来源证据，不是 task，也不代表 `executor=external`。
 5. 每个 task 至少有 `id`、`title`、`status`、`deps`、`acceptance`。填上 `git`；保留已写好的 Goal Contract、`owner.session_id`、`owner.active` 和所有 policy / WIP / priority 字段。所有 board 写入都走 `ccm`，不要手改 JSON。

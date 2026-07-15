@@ -583,8 +583,8 @@ fi
 HOME_DIR="$(cc_master_home)"
 BOARDS_DIR="$(cc_master_boards_dir)"
 
-# Parse fresh versus resume before any legacy migration or directory creation. Resume keeps its
-# established migration behavior; fresh must negotiate its process-boundary capability first.
+# Parse fresh versus resume before any legacy migration or directory creation. Both modes must
+# negotiate the process-boundary capability before they can create or re-arm persistent state.
 mode=fresh
 selector=""
 rest="${trimmed#/cc-master:as-master-orchestrator}"
@@ -615,29 +615,28 @@ CCM_CMD="${CCM_BIN:-ccm}"
 CCM_BOARD_PATH_CAPABILITY='board-init/structured-board-path-v1'
 CCM_GOAL_CONTRACT_CAPABILITY='goal-contract/v1'
 CCM_BOARD_PATH_MIN_VERSION='0.21.0'
-if [ "$mode" = "fresh" ]; then
-  # This negotiation endpoint is intentionally distinct from --dry-run: an older ccm rejects the
-  # unknown flag during argument parsing, before its legacy init resolver can create a parent directory.
-  capability_out="$(CC_MASTER_NO_AUTOINSTALL=1 CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init --capabilities --json --no-input 2>/dev/null)"
-  capability_ok="$(printf '%s' "$capability_out" | CCM_REQUIRED_CAPABILITY="$CCM_BOARD_PATH_CAPABILITY" CCM_REQUIRED_GOAL_CAPABILITY="$CCM_GOAL_CONTRACT_CAPABILITY" node -e '
-    let input = "";
-    process.stdin.on("data", (chunk) => { input += chunk; });
-    process.stdin.on("end", () => {
-      try {
-        const envelope = JSON.parse(input);
-        const capabilities = envelope && envelope.ok === true && envelope.data && envelope.data.capabilities;
-        if (Array.isArray(capabilities) && capabilities.includes(process.env.CCM_REQUIRED_CAPABILITY) && capabilities.includes(process.env.CCM_REQUIRED_GOAL_CAPABILITY)) {
-          process.stdout.write("yes");
-        }
-      } catch (_) {}
-    });
-  ')"
-  if [ "$capability_ok" != 'yes' ]; then
-    ccm_version="$(CC_MASTER_NO_AUTOINSTALL=1 "$CCM_CMD" --version 2>/dev/null | head -1)"
-    [ -n "$ccm_version" ] || ccm_version='unknown'
-    inject_ctx "<directive source=\"bootstrap\">cc-master: 当前 ccm 不支持 fresh ARM 所需能力（installed: $ccm_version；required: $CCM_BOARD_PATH_CAPABILITY + $CCM_GOAL_CONTRACT_CAPABILITY；minimum release: ccm $CCM_BOARD_PATH_MIN_VERSION）。本次已在任何 legacy migration、目录创建或真实 init 前拒绝，cc-master home 与 Claude config home 均保持不变。请升级 ccm 后重试 /cc-master:as-master-orchestrator &lt;goal&gt;。</directive>"
-    exit 0
-  fi
+# This negotiation endpoint is intentionally distinct from --dry-run: an older ccm rejects the
+# unknown flag during argument parsing, before its legacy init resolver can create a parent directory
+# or resume can re-stamp an existing owner.
+capability_out="$(CC_MASTER_NO_AUTOINSTALL=1 CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board init --capabilities --json --no-input 2>/dev/null)"
+capability_ok="$(printf '%s' "$capability_out" | CCM_REQUIRED_CAPABILITY="$CCM_BOARD_PATH_CAPABILITY" CCM_REQUIRED_GOAL_CAPABILITY="$CCM_GOAL_CONTRACT_CAPABILITY" node -e '
+  let input = "";
+  process.stdin.on("data", (chunk) => { input += chunk; });
+  process.stdin.on("end", () => {
+    try {
+      const envelope = JSON.parse(input);
+      const capabilities = envelope && envelope.ok === true && envelope.data && envelope.data.capabilities;
+      if (Array.isArray(capabilities) && capabilities.includes(process.env.CCM_REQUIRED_CAPABILITY) && capabilities.includes(process.env.CCM_REQUIRED_GOAL_CAPABILITY)) {
+        process.stdout.write("yes");
+      }
+    } catch (_) {}
+  });
+')"
+if [ "$capability_ok" != 'yes' ]; then
+  ccm_version="$(CC_MASTER_NO_AUTOINSTALL=1 "$CCM_CMD" --version 2>/dev/null | head -1)"
+  [ -n "$ccm_version" ] || ccm_version='unknown'
+  inject_ctx "<directive source=\"bootstrap\">cc-master: 当前 ccm 不支持 ARM 所需能力（installed: $ccm_version；required: $CCM_BOARD_PATH_CAPABILITY + $CCM_GOAL_CONTRACT_CAPABILITY；minimum release: ccm $CCM_BOARD_PATH_MIN_VERSION）。本次已在任何 legacy migration、目录创建、真实 init 或 resume owner mutation 前拒绝，cc-master home 与 Claude config home 均保持不变。请升级 ccm 后重试 /cc-master:as-master-orchestrator &lt;goal&gt; 或 --resume。</directive>"
+  exit 0
 fi
 # 一次性、非破坏的旧布局迁移：把旧 per-repo $CLAUDE_PROJECT_DIR/.claude/cc-master/*.board.json 复制进
 # 全局 boards/（保留原件·同名跳过·全程吞错）。只迁 CLAUDE_PROJECT_DIR 这个有据可查的旧 per-repo home，
