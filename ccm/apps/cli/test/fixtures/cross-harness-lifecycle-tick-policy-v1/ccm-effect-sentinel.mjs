@@ -25,7 +25,8 @@ function armShape(args) {
     args[2] === '--capabilities' &&
     args[3] === '--json' &&
     args[4] === '--no-input'
-  ) return true;
+  )
+    return true;
   if (harness === 'claude-code') {
     if (args.length === 3 && args[0] === 'board' && args[1] === 'init' && args[2] === '--json') {
       return true;
@@ -92,10 +93,7 @@ const allowed =
   ((schema === 'arm' && armShape(argv)) ||
     (schema === 'reinject' && reinjectShape(argv)) ||
     (schema === 'orchestrator-context' && contextShape(argv)));
-appendFileSync(
-  logPath,
-  `${JSON.stringify({ invoked_as: invokedAs, argv, schema, allowed })}\n`,
-);
+appendFileSync(logPath, `${JSON.stringify({ invoked_as: invokedAs, argv, schema, allowed })}\n`);
 if (!allowed) {
   process.stderr.write(`CLOSED_EFFECT_SANDBOX: ccm argv denied for ${schema || 'unknown-event'}\n`);
   process.exit(invokedAs === 'ccm' ? 95 : 93);

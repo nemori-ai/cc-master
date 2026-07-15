@@ -196,7 +196,9 @@ function effectEvents(log: string): EffectEvent[] {
 }
 
 function assertLifecycleEffectsClosed(label: string, log: string): void {
-  const forbidden = effectEvents(log).filter((event) => event.invoked_as !== 'ccm' || !event.allowed);
+  const forbidden = effectEvents(log).filter(
+    (event) => event.invoked_as !== 'ccm' || !event.allowed,
+  );
   assert.deepEqual(forbidden, [], `${label}: manifest entry crossed a forbidden effect boundary`);
 }
 
@@ -369,7 +371,10 @@ function tsdownExecutable(): string {
     join(CONTRACT_ROOT, 'ccm', 'node_modules', '.bin', 'tsdown'),
   ].filter((value): value is string => Boolean(value));
   const found = candidates.find((candidate) => existsSync(candidate));
-  assert.ok(found, 'exact production materialization requires the target checkout tsdown executable');
+  assert.ok(
+    found,
+    'exact production materialization requires the target checkout tsdown executable',
+  );
   return found;
 }
 
@@ -432,7 +437,10 @@ function materializeProductionModules(
     0,
     `${label}: could not materialize exact target @ccm/engine source: ${engine.stderr}`,
   );
-  assert.ok(existsSync(join(engineOut, 'index.mjs')), `${label}: exact target engine bundle missing`);
+  assert.ok(
+    existsSync(join(engineOut, 'index.mjs')),
+    `${label}: exact target engine bundle missing`,
+  );
   writeFileSync(
     join(engineRoot, 'package.json'),
     `${JSON.stringify({ name: '@ccm/engine', type: 'module', exports: { '.': './dist/index.mjs' } })}\n`,
@@ -538,7 +546,12 @@ test('three-host ARM and lifecycle cases are discovered and executed from host m
 test('ccm effects are default-deny with complete per-event argv schemas', () => {
   const board = join(makeTemp('ccm-counterfeit-board'), 'counterfeit.board.json');
   const cases: Array<[string, string, Harness, string[]]> = [
-    ['board-init-monitor', 'arm', 'claude-code', ['board', 'init', '--monitor', '--json', '--no-input']],
+    [
+      'board-init-monitor',
+      'arm',
+      'claude-code',
+      ['board', 'init', '--monitor', '--json', '--no-input'],
+    ],
     [
       'capability-option-suffix',
       'arm',
@@ -575,7 +588,10 @@ test('ccm effects are default-deny with complete per-event argv schemas', () => 
   const denied = cases.map(([label, schema, harness, argv]) =>
     assertCcmCounterfeitRejected(label, schema, harness, argv),
   );
-  assert.equal(denied.every((event) => event.allowed === false), true);
+  assert.equal(
+    denied.every((event) => event.allowed === false),
+    true,
+  );
 });
 
 test('known-good public monitor tick consumes source policy in the same tick', () => {

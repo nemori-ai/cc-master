@@ -1,11 +1,7 @@
 const authenticInvocations = new WeakSet();
 
 export function isMonitorSourcePolicyInvocation(token) {
-  return (
-    typeof token === 'object' &&
-    token !== null &&
-    authenticInvocations.has(token)
-  );
+  return typeof token === 'object' && token !== null && authenticInvocations.has(token);
 }
 
 export async function runMonitorSourceCycle({ observer }) {
