@@ -283,8 +283,7 @@ ccm quota preflight --input <json|@file|-> --json
   `blocking_reasons` 与 owner receipt；缺 authority reference、`automatic_spawn_limit:0` 或任一 blocker 都
   不能授权 spawn。不要由 caller 自铸 live / policy / effect 结论。
 - 这些命令只取得和重验事实，不代替 orchestrator 的选择、用户对一次付费调用的授权或 parent 验收。
-  字段如何解释查 `pacing-and-estimation` 的
-  `${CLAUDE_PLUGIN_ROOT}/skills/pacing-and-estimation/references/cross-harness-target-facts.md`；是否派发归
+  字段如何解释查 {{CROSS_HARNESS_TARGET_FACTS_POINTER}}；是否派发归
   `master-orchestrator-guide`。
 
 ---

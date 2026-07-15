@@ -2,7 +2,7 @@
 
 > **何时读：** 你已为一个候选 worker 取得 machine inventory、target-provider model facts 与 quota
 > authority 输出，需要从任意 origin 按同一口径解释它们时。命令形状查
-> `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/command-catalog.md#跨-harness-主动查询目标事实`；
+> [using-ccm 主动查询合同](../../using-ccm/references/command-catalog.md#跨-harness-主动查询目标事实)；
 > 是否派发交回 `master-orchestrator-guide`。
 
 把每份 envelope 绑定到 **selected target**，不要绑定到当前 origin：

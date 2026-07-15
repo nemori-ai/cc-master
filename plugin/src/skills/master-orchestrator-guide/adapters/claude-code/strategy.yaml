@@ -48,6 +48,8 @@ slot_replacements:
   "{{HOST_QUOTA_RED_FLAG}}": adapters/claude-code/overlays/quota-red-flag.md
   "{{HOST_QUOTA_DECISION_GATE}}": adapters/claude-code/overlays/quota-decision-gate.md
   "{{HOST_QUOTA_JUDGMENT_ROW}}": adapters/claude-code/overlays/quota-judgment-row.md
+  "{{CROSS_HARNESS_ACTIVE_QUERY_POINTER}}": adapters/claude-code/overlays/cross-harness-active-query-pointer.md
+  "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/claude-code/overlays/cross-harness-target-facts-pointer.md
 mechanisms:
   declarative-patch:
     enabled: false
