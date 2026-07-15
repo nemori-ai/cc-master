@@ -56,8 +56,14 @@ attempt to hand-edit a `*.board.json` file directly, redirecting the agent to th
   simultaneously (a) contains a `.board.json`-looking token and (b) contains a write-operator
   (`>`, `>>`, `sed -i`, `tee`, `cp`, `mv`, `dd`, `truncate`). The command word does not exempt a
   shell write: `ccm ... > board` and `ccm ... >> board` are denied because the shell opens/truncates
-  the board outside ccm's write gate. An ordinary `ccm ... --board <board>` has no shell write
-  operator and remains allowed. This is a best-effort heuristic, deliberately biased toward false
+  the board outside ccm's write gate. For an actual `ccm` command segment, redirections are
+  target-aware: a board used only as the `--board` argv value is not a shell write target, so
+  redirecting ordinary CLI output to a non-board target such as `/dev/null` remains allowed; any
+  `>` / `>>` whose own target is a real board is still denied. Shell syntax in earlier segments
+  (including a `FIRE=$(date ...)` assignment used by a later `ccm watchdog arm`) cannot bleed into
+  the ccm segment. Quoted argv data remains data even when it contains `#`, `;`, `|`, or `>`.
+  An ordinary `ccm ... --board <board>` with no redirection also remains allowed. This is a
+  best-effort heuristic, deliberately biased toward false
   negatives (missed hand-edits) over false positives (denying an unrelated command) — see
   `rule-board-guard-segment-touches-real-board`.
 - `rule-board-guard-nested-shell-command`: when the actual command word (after env assignments) is
