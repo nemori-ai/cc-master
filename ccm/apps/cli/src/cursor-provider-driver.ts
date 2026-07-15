@@ -1000,7 +1000,7 @@ function runResult(
   };
 }
 
-function parseCursorStream(
+export function parseCursorStream(
   stdout: string,
   expected: { permissionMode: 'ask'; sandboxMode: 'enabled' },
 ): {
@@ -1013,7 +1013,7 @@ function parseCursorStream(
     permissionMode: string;
     sandboxMode: string | null;
   } | null;
-  terminal: { subtype: string; is_error: boolean; session_id: string } | null;
+  terminal: { subtype: string; is_error: boolean; result: string; session_id: string } | null;
 } {
   let valid = true;
   const blockers: string[] = [];
@@ -1024,7 +1024,8 @@ function parseCursorStream(
     permissionMode: string;
     sandboxMode: string | null;
   } | null = null;
-  let terminal: { subtype: string; is_error: boolean; session_id: string } | null = null;
+  let terminal: { subtype: string; is_error: boolean; result: string; session_id: string } | null =
+    null;
   let initCount = 0;
   let terminalCount = 0;
   let phase: 'before-init' | 'active' | 'terminal' = 'before-init';
@@ -1079,6 +1080,7 @@ function parseCursorStream(
         terminal = {
           subtype: string(event.subtype),
           is_error: event.is_error,
+          result: string(event.result),
           session_id: string(event.session_id),
         };
       }

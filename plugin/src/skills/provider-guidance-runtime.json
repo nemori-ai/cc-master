@@ -39,7 +39,7 @@
             "SKILL.md": "5c69fc3643fca540839b5e21b423f4c1d72e85ce4927868f75857fcca0dd3641",
             "references/account-pool.md": "da7a5826ba8ceb1eefc26722b4e305df6042ea30264abade27f896ef1fb2a8d6",
             "references/board-model-guide.md": "c08342b951e2d180cd07cf93554ddb1f4c726acbc30cb1c4cfa28bc35346143a",
-            "references/command-catalog.md": "d921517aa3ebe7008c114be1bbcf2058e402e63943a2c2eca433b7c8a5323d09"
+            "references/command-catalog.md": "ab27c2671d3128d1abc21755d247383108f01db53203459b1754001bd52311a8"
           }
         }
       }
@@ -76,7 +76,7 @@
           "files": {
             "SKILL.md": "b066375d95396b15b64f483ce89740e82603051d4159f5b78d5efdadb98d5427",
             "references/board-model-guide.md": "e06429e61b2a864952b62231fdefc1db4dc1fa044f6a073ed2f05e579e583376",
-            "references/command-catalog.md": "c9db978b1913c9f4d747bb662a7763af05677f3d8f597e0b26d797acaa5c1f3d"
+            "references/command-catalog.md": "1bae5c7db856a39f36a553975fa4d9bf2694c284fe8080c7c5e133426c994da5"
           }
         }
       }
@@ -113,7 +113,7 @@
           "files": {
             "SKILL.md": "345628f70945e949ee46c6d852d4781c9053796cdbc3edccf9e73f7094f520ac",
             "references/board-model-guide.md": "25467456b3ad108897cbf2cc752365cfd8928da62b03ce7050503205c91b2519",
-            "references/command-catalog.md": "6862ec8ab50405879d20fd4f20f9934b0fc52f44c855717d3ed490a0a435b937"
+            "references/command-catalog.md": "34ef857b28a6278a53fc45457815a1e24977a9b289ba2b8c41a2c0051e2be934"
           }
         }
       }

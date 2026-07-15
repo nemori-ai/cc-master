@@ -70,32 +70,34 @@ test('unsupported platforms fail closed before invoking the spawn primitive', ()
   assert.equal(spawnCalls, 0);
 });
 
-test('supported runtime isolates every provider launcher as a detached process-group leader', () => {
-  let observedOptions: SpawnOptions | undefined;
-  const runtime = createDefaultProviderRuntime(
-    {},
-    {
-      platform: 'linux',
-      spawn: ((_executable: string, _argv: readonly string[], options: SpawnOptions) => {
-        observedOptions = options;
-        return childWithPid(5_151);
-      }) as typeof spawn,
-      signal: () => true,
-    },
-  );
+for (const platform of ['linux', 'darwin'] as const) {
+  test(`${platform} runtime isolates every provider launcher as a detached process-group leader`, () => {
+    let observedOptions: SpawnOptions | undefined;
+    const runtime = createDefaultProviderRuntime(
+      {},
+      {
+        platform,
+        spawn: ((_executable: string, _argv: readonly string[], options: SpawnOptions) => {
+          observedOptions = options;
+          return childWithPid(5_151);
+        }) as typeof spawn,
+        signal: () => true,
+      },
+    );
 
-  const owned = runtime.process.spawnProvider({
-    executable: process.execPath,
-    argv: ['--version'],
-    cwd: process.cwd(),
-    env: {},
+    const owned = runtime.process.spawnProvider({
+      executable: process.execPath,
+      argv: ['--version'],
+      cwd: process.cwd(),
+      env: {},
+    });
+
+    assert.equal(observedOptions?.detached, true);
+    assert.equal(owned.child.pid, 5_151);
+    assert.ok(owned.tree);
+    assert.equal(owned.tree.groupId, 5_151);
   });
-
-  assert.equal(observedOptions?.detached, true);
-  assert.equal(owned.child.pid, 5_151);
-  assert.ok(owned.tree);
-  assert.equal(owned.tree.groupId, 5_151);
-});
+}
 
 interface SpawnErrorProbeSummary {
   endpointCode: number;

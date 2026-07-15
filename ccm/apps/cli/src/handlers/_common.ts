@@ -174,6 +174,9 @@ export interface Ctx {
   // Optional host capability injection used exclusively by provider handlers.  Production creates
   // it at the router seam; tests replace it with a controlled transport.
   providerRuntime?: ProviderRuntime;
+  // Session-bound worker cancellation injection. Production SIGINT/SIGTERM is bridged by its
+  // handler; tests use this seam without signaling the test runner process.
+  workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;

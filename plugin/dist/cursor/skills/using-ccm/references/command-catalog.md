@@ -12,6 +12,8 @@
   - [Global flags](#global-flags)
   - [Exit codes](#exit-codes)
   - [JSON 信封](#json-信封)
+- [namespace worker（session-bound read-only MVP）](#namespace-workersession-bound-read-only-mvp)
+  - [worker run](#worker-run)
 - [namespace orchestrator（cached context）](#namespace-orchestratorcached-context)
   - [orchestrator context](#orchestrator-context)
 - [namespace route（shadow advisory）](#namespace-routeshadow-advisory)
@@ -161,6 +163,7 @@ ccm <alias> [args] [flags]
 
 | ns | 职责 |
 |---|---|
+| `worker` | 显式启动一次 session-bound、只读的 Cursor Agent worker，等待并返回结构化 terminal result |
 | `provider` | 模型事实 snapshot 查询与 provider candidate 检查；facts 零 live probe，inspect 另走准入门 |
 | `orchestrator` | 从显式本地 cache 构造 frozen orchestrator context；cached-only、零 live probe |
 | `route` | 对 frozen task + context 给纯 shadow route advice；永远 `spawned:false`、不写 board |
@@ -253,6 +256,23 @@ ccm <alias> [args] [flags]
 - 失败：`{"ok": false, "exit": <code>, "error": "<msg>", "violations": [...]}`
 
 `data` 形状随命令而变，见 [--json 输出形状](#--json-输出形状)。
+
+---
+
+## namespace worker（session-bound read-only MVP）
+
+### worker run
+
+```bash
+ccm worker run --harness cursor-agent --model composer-2.5 --effort standard \
+  --workspace /abs/repo --prompt <text|@file|-> \
+  --timeout-ms <50..600000> --max-output-bytes <256..1048576> --json
+```
+
+- 当前显式取值固定为 `cursor-agent` / `composer-2.5` / `standard`；不自动 route、fallback 或切换账号。
+- 子进程 argv 固定为 Cursor Agent headless `--mode ask --sandbox enabled`，使用当前已登录账号；子进程环境不转发 API key。
+- 命令同步等待 terminal result；超时、取消与 stdout/stderr 都有界，结束前回收其 POSIX process group 并清理临时 staging 目录。
+- `data` schema 为 `ccm/session-bound-worker-result/v1`，并明示 `session_bound:true`；它不跨 parent exit、handoff 或 ccm update 存活。
 
 ---
 
@@ -2333,6 +2353,13 @@ ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
 ## --json 输出形状
 
 通用信封：成功 `{"ok": true, "data": <below>}`，失败 `{"ok": false, "exit": N, "error": "…", "violations": []}`。以下只列 `data` 形状。
+
+### worker run
+
+`data` 是 `ccm/session-bound-worker-result/v1`。成功时 `state:"succeeded"` 且 exit 0；provider
+非零退出、timeout、cancel、输出越界或 stream 验证失败仍返回同一结构化 `data`，但 exit 1（真实
+SIGINT/SIGTERM 取消分别为 130/143）。字段含显式 `target`、只读 `policy`、session-bound
+`lifecycle`、进程组 `handle`、Cursor `terminal`、有界 `transport`、`cleanup` 与脱敏 `error`。
 
 ### quota status / preflight / reserve / audit
 
