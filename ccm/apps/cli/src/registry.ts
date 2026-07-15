@@ -55,6 +55,16 @@ export type Registry = Record<string, NounSpec>;
 
 // ── REGISTRY：noun → verb → spec。read:true 的 verb 用 runRead，read:false 用 runWrite（_common.js）。──
 export const REGISTRY: Registry = {
+  capability: {
+    check: {
+      summary: '检查当前 ccm 是否兑现指定稳定 capability',
+      read: true,
+      positionals: [{ name: 'capability-id', required: true }],
+      options: { json: { type: 'boolean', desc: '结构化输出' } },
+      examples: ['ccm capability check goal-contract/v1 --json'],
+      handler: 'capability.check',
+    },
+  },
   // ════════════════════ quota（provider-neutral；Codex rule 为 7d-only）═══════════════════════════
   quota: {
     status: {
@@ -410,6 +420,78 @@ export const REGISTRY: Registry = {
       },
       examples: ['ccm board enable-contract --preflight --json', 'ccm board enable-contract'],
       handler: 'board.enableContract',
+    },
+  },
+  goal: {
+    set: {
+      summary: '首次写入 normalized goal 与可选 Goal Brief',
+      read: false,
+      positionals: [],
+      options: {
+        summary: { type: 'string', required: true, desc: '短、无歧义、可验收的 normalized goal' },
+        assurance: {
+          type: 'string',
+          required: true,
+          enum: ['pending', 'asserted'],
+          desc: '分级确认状态',
+        },
+        'brief-file': { type: 'string', desc: '待复制进 ccm home 的 UTF-8 Goal Brief' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm goal set --summary "交付 draft PR" --assurance asserted --json'],
+      handler: 'goal.set',
+    },
+    confirm: {
+      summary: '在用户明确授权后确认当前 Goal Contract revision',
+      read: false,
+      positionals: [],
+      options: {
+        'user-authorized': {
+          type: 'boolean',
+          required: true,
+          desc: '声明当前对话已有用户明确确认；agent 不得自授权',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm goal confirm --user-authorized --json'],
+      handler: 'goal.confirm',
+    },
+    amend: {
+      summary: '以新 revision 修改 goal 语义并保留旧 Brief',
+      read: false,
+      positionals: [],
+      options: {
+        summary: { type: 'string', required: true, desc: '新版 normalized goal' },
+        reason: { type: 'string', required: true, desc: '相对上一 revision 的语义变更原因' },
+        assurance: {
+          type: 'string',
+          required: true,
+          enum: ['pending', 'asserted'],
+          desc: '新版分级确认状态',
+        },
+        'brief-file': { type: 'string', desc: '新版完整 Goal Brief' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm goal amend --summary "交付 PR，不发布" --reason "用户收窄范围" --assurance asserted --json',
+      ],
+      handler: 'goal.amend',
+    },
+    show: {
+      summary: '显示当前 Goal Contract 与受管 Brief 路径',
+      read: true,
+      positionals: [],
+      options: { json: { type: 'boolean', desc: '结构化输出' } },
+      examples: ['ccm goal show --json'],
+      handler: 'goal.show',
+    },
+    check: {
+      summary: '校验 Goal Contract 形状、Brief containment/存在性/hash',
+      read: true,
+      positionals: [],
+      options: { json: { type: 'boolean', desc: '结构化输出' } },
+      examples: ['ccm goal check --json'],
+      handler: 'goal.check',
     },
   },
 

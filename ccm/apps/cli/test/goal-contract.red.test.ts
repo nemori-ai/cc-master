@@ -39,9 +39,5 @@ test('GC-03: explicit non-empty board init goal becomes asserted contract', () =
 
 test('GC-09: generic board update cannot bypass an active goal contract', () => {
   const fresh = boardInit({ goal: 'v1' });
-  assert.throws(
-    () => boardUpdate(fresh, { goal: 'v2' }),
-    /ccm goal amend/,
-  );
+  assert.throws(() => boardUpdate(fresh, { goal: 'v2' }), /ccm goal amend/);
 });
-

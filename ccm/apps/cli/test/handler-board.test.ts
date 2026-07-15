@@ -490,7 +490,10 @@ test('board init --json exposes the schema-owned absolute board_path without scr
 
   const payload = JSON.parse(ctx.outBuf.join(''));
   assert.equal(payload.ok, true);
-  assert.deepEqual(payload.data.capabilities, ['board-init/structured-board-path-v1']);
+  assert.deepEqual(payload.data.capabilities, [
+    'board-init/structured-board-path-v1',
+    'goal-contract/v1',
+  ]);
   assert.equal(typeof payload.data.board_path, 'string');
   assert.equal(payload.data.board_path.startsWith(home), true);
   assert.equal(payload.data.board_path.endsWith('.board.json'), true);
@@ -516,7 +519,7 @@ test('board init --dry-run --json does not claim that a board_path was written',
   assert.equal(payload.ok, true);
   assert.deepEqual(
     payload.data.capabilities,
-    ['board-init/structured-board-path-v1'],
+    ['board-init/structured-board-path-v1', 'goal-contract/v1'],
     'dry-run advertises the output capability without claiming an artifact exists',
   );
   assert.equal(Object.hasOwn(payload.data, 'board_path'), false);
@@ -536,11 +539,12 @@ test('board init --capabilities --json negotiates without resolving or writing a
   assert.equal(code, EXIT.OK);
   assert.deepEqual(JSON.parse(ctx.outBuf.join('')).data.capabilities, [
     'board-init/structured-board-path-v1',
+    'goal-contract/v1',
   ]);
   assert.equal(existsSync(join(root, 'never-created')), false);
 });
 
-test('board init --github-issue records issue source and derives default goal', () => {
+test('board init --github-issue records source evidence without copying it into goal', () => {
   const root = mkTmp('ccm-hinit-gh-');
   const home = join(root, '.claude', 'cc-master');
   mkdirSync(home, { recursive: true });
@@ -552,7 +556,8 @@ test('board init --github-issue records issue source and derives default goal', 
   const files = readdirSync(boardsDir).filter((n) => n.endsWith('.board.json'));
   assert.equal(files.length, 1, 'one board file created');
   const onDisk = JSON.parse(readFileSync(join(boardsDir, files[0] as string), 'utf8'));
-  assert.equal(onDisk.goal, `GitHub issue: ${issueUrl}`);
+  assert.equal(onDisk.goal, '');
+  assert.equal(onDisk.goal_contract.assurance, 'pending');
   assert.deepEqual(onDisk.source, { kind: 'github_issue', url: issueUrl });
   assert.deepEqual(onDisk.tasks, [], 'board init records source, not a synthetic task');
 });

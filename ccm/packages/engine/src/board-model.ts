@@ -78,6 +78,8 @@ export const ENUMS = {
   acceptanceStatus: ['pending', 'met', 'failed'],
   // review dependency gate 的闭合 outcome。保持与 reviewer 产物词汇逐字一致，不做大小写猜测。
   reviewVerdict: ['APPROVE', 'REQUEST-CHANGES'],
+  // Goal Contract 的确认级别（ADR-035）。pending/ asserted 可由 agent 写；confirmed 由 CLI 授权闸控制。
+  goalAssurance: ['pending', 'asserted', 'confirmed'],
 } satisfies Record<string, string[]>;
 
 // 枚举名（ENUMS 的 key）——isEnumMember 的 name 形参类型。
@@ -151,6 +153,16 @@ export const FIELDS = {
       writers: 'agent 经 CLI',
       when: '建板 / 重定目标',
       degrade: 'hard error(FMT-GOAL)',
+    },
+    goal_contract: {
+      tier: '👁',
+      type: 'object{schema:"ccm/goal-contract/v1",revision:int>=1,assurance:pending|asserted|confirmed,brief?:{ref,sha256},updated_at:ISO}?',
+      default: 'legacy board 可缺；fresh board 建 revision=1,pending skeleton',
+      readers: 'orchestrator resume/re-ground + reinject/verify-board lifecycle guard + viewer',
+      writers: 'ccm goal set|confirm|amend（专属生命周期）',
+      when: 'fresh framing / 用户确认 / 目标语义 amendment',
+      degrade:
+        '缺→legacy；形状坏→hard(FMT-GOAL-CONTRACT)；pending+可执行任务→warn(BIZ-GOAL-PENDING)',
     },
     owner: {
       tier: '🔒',
@@ -627,11 +639,25 @@ export const INVARIANTS: Invariant[] = [
   },
   { id: 'FMT-GOAL', level: 'hard', family: 'FMT', scope: 'board', summary: 'goal 是字符串' },
   {
+    id: 'FMT-GOAL-CONTRACT',
+    level: 'hard',
+    family: 'FMT',
+    scope: 'board',
+    summary: 'goal_contract 若存在，schema/revision/assurance/brief/time 形状合法',
+  },
+  {
     id: 'FMT-OWNER',
     level: 'hard',
     family: 'FMT',
     scope: 'board',
     summary: 'owner 对象 + active:bool + session_id:string',
+  },
+  {
+    id: 'BIZ-GOAL-PENDING',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'board',
+    summary: 'pending Goal Contract 不应已有 ready/in_flight/uncertain 执行任务',
   },
   {
     id: 'FMT-GIT',

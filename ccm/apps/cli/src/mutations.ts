@@ -104,16 +104,18 @@ const TEMPLATE_VERSION = 3;
 const DEFAULT_WIP_LIMIT = 4;
 export function boardInit(args?: { goal?: string; githubIssue?: string }): Board {
   const githubIssue = args && typeof args.githubIssue === 'string' ? args.githubIssue : '';
-  const goal =
-    args && typeof args.goal === 'string' && args.goal
-      ? args.goal
-      : githubIssue
-        ? `GitHub issue: ${githubIssue}`
-        : '';
+  const goal = args && typeof args.goal === 'string' ? args.goal.trim() : '';
+  const updatedAt = stampNow();
   const board: Board = {
     schema: SCHEMA_VERSION,
     meta: { template_version: TEMPLATE_VERSION },
     goal,
+    goal_contract: {
+      schema: 'ccm/goal-contract/v1',
+      revision: 1,
+      assurance: goal ? 'asserted' : 'pending',
+      updated_at: updatedAt,
+    },
     owner: { active: true, session_id: '', heartbeat: '' },
     git: { worktree: '', branch: '' },
     scheduling: { wip_limit: DEFAULT_WIP_LIMIT },
@@ -145,7 +147,15 @@ export function boardUpdate(
 ): Board {
   const b = clone(board);
   args = args || {};
-  if (args.goal !== undefined) b.goal = args.goal;
+  if (args.goal !== undefined) {
+    if (b.goal_contract !== undefined) {
+      throw err(
+        'refused: active Goal Contract cannot be bypassed by board update --goal; use `ccm goal amend`.',
+        'Validation',
+      );
+    }
+    b.goal = args.goal;
+  }
   if (args.priority !== undefined) {
     if (!b.coordination || typeof b.coordination !== 'object') b.coordination = {};
     b.coordination.priority = args.priority;
@@ -160,6 +170,139 @@ export function boardUpdate(
     if (args.branch !== undefined) b.git.branch = args.branch;
     if (args.worktree !== undefined) b.git.worktree = args.worktree;
   }
+  return touch(b);
+}
+
+type GoalAssurance = 'pending' | 'asserted' | 'confirmed';
+interface GoalBriefPointer {
+  ref: string;
+  sha256: string;
+}
+
+function appendGoalLog(
+  board: Board,
+  summary: string,
+  detail: Record<string, unknown>,
+  ts: string,
+): void {
+  if (!Array.isArray(board.log)) board.log = [];
+  board.log.push({ ts, kind: 'decision', summary, detail });
+}
+
+function isFreshGoalSkeleton(board: Board): boolean {
+  const c = board.goal_contract;
+  return (
+    c &&
+    typeof c === 'object' &&
+    c.schema === 'ccm/goal-contract/v1' &&
+    c.revision === 1 &&
+    c.assurance === 'pending' &&
+    !c.brief &&
+    String(board.goal || '').trim() === ''
+  );
+}
+
+export function goalSet(
+  board: Board,
+  args: {
+    summary?: string;
+    assurance?: Exclude<GoalAssurance, 'confirmed'>;
+    brief?: GoalBriefPointer;
+  } = {},
+): Board {
+  const summary = String(args.summary || '').trim();
+  if (!summary) throw err('refused: goal summary must be non-empty', 'Usage');
+  const assurance = args.assurance || 'asserted';
+  if (!['pending', 'asserted'].includes(assurance)) {
+    throw err('refused: goal set assurance must be pending or asserted', 'Usage');
+  }
+  if (board.goal_contract !== undefined && !isFreshGoalSkeleton(board)) {
+    throw err('refused: Goal Contract already active; use `ccm goal amend`', 'Validation');
+  }
+  const b = clone(board);
+  const now = stampNow();
+  b.goal = summary;
+  b.goal_contract = {
+    schema: 'ccm/goal-contract/v1',
+    revision: 1,
+    assurance,
+    ...(args.brief ? { brief: structuredClone(args.brief) } : {}),
+    updated_at: now,
+  };
+  appendGoalLog(
+    b,
+    `Goal Contract r1 set (${assurance})`,
+    { revision: 1, assurance, brief: args.brief?.ref },
+    now,
+  );
+  return touch(b);
+}
+
+export function goalConfirm(board: Board, args: { userAuthorized?: boolean } = {}): Board {
+  if (args.userAuthorized !== true) {
+    throw err('refused: goal confirm requires explicit --user-authorized', 'Validation');
+  }
+  const c = board.goal_contract;
+  if (!c || typeof c !== 'object' || c.schema !== 'ccm/goal-contract/v1') {
+    throw err('refused: no active Goal Contract to confirm', 'Validation');
+  }
+  if (!String(board.goal || '').trim()) {
+    throw err('refused: cannot confirm an empty goal summary', 'Validation');
+  }
+  const b = clone(board);
+  const now = stampNow();
+  b.goal_contract.assurance = 'confirmed';
+  b.goal_contract.updated_at = now;
+  appendGoalLog(
+    b,
+    `Goal Contract r${b.goal_contract.revision} confirmed by user`,
+    { revision: b.goal_contract.revision, assurance: 'confirmed', user_authorized: true },
+    now,
+  );
+  return touch(b);
+}
+
+export function goalAmend(
+  board: Board,
+  args: {
+    summary?: string;
+    reason?: string;
+    assurance?: Exclude<GoalAssurance, 'confirmed'>;
+    brief?: GoalBriefPointer;
+  } = {},
+): Board {
+  const c = board.goal_contract;
+  if (!c || typeof c !== 'object' || c.schema !== 'ccm/goal-contract/v1') {
+    throw err('refused: no active Goal Contract to amend; use `ccm goal set`', 'Validation');
+  }
+  const summary = String(args.summary || '').trim();
+  const reason = String(args.reason || '').trim();
+  if (!summary || !reason)
+    throw err('refused: goal amend requires non-empty summary and reason', 'Usage');
+  const assurance = args.assurance || 'pending';
+  if (!['pending', 'asserted'].includes(assurance)) {
+    throw err('refused: goal amend assurance must be pending or asserted', 'Usage');
+  }
+  const revision = Number(c.revision) + 1;
+  if (!Number.isInteger(revision) || revision < 2) {
+    throw err('refused: current Goal Contract revision is malformed', 'Validation');
+  }
+  const b = clone(board);
+  const now = stampNow();
+  b.goal = summary;
+  b.goal_contract = {
+    schema: 'ccm/goal-contract/v1',
+    revision,
+    assurance,
+    ...(args.brief ? { brief: structuredClone(args.brief) } : {}),
+    updated_at: now,
+  };
+  appendGoalLog(
+    b,
+    `Goal Contract amended r${revision - 1} → r${revision} (${assurance})`,
+    { from_revision: revision - 1, revision, assurance, reason, brief: args.brief?.ref },
+    now,
+  );
   return touch(b);
 }
 

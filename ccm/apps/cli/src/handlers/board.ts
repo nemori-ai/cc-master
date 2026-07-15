@@ -188,6 +188,7 @@ export function enableContract(ctx: Ctx): number {
 //     resolve 返回 { boardPath, board:null }——mutate 忽略 raw 直接 boardInit 产板（owner.active:true / session_id:""）。
 //   仍走 runWrite 的 lock + lint + 原子写同一管线（模板含 hard error → EXIT.VALIDATION）。
 export const BOARD_INIT_STRUCTURED_PATH_CAPABILITY = 'board-init/structured-board-path-v1';
+export const GOAL_CONTRACT_CAPABILITY = 'goal-contract/v1';
 
 function initResolve(ctx: Ctx): { boardPath: string; board: null } {
   const explicit =
@@ -229,7 +230,9 @@ function parseGithubIssueUrl(value: unknown): string {
 
 export function init(ctx: Ctx): number {
   if (ctx.values && ctx.values.capabilities) {
-    const data = { capabilities: [BOARD_INIT_STRUCTURED_PATH_CAPABILITY] };
+    const data = {
+      capabilities: [BOARD_INIT_STRUCTURED_PATH_CAPABILITY, GOAL_CONTRACT_CAPABILITY],
+    };
     ctx.out(ctx.flags.json ? render.jsonString(data) : data.capabilities.join('\n'));
     return EXIT.OK;
   }
@@ -246,7 +249,7 @@ export function init(ctx: Ctx): number {
         return render.renderBoardSummary(b, {
           json: true,
           boardPath: dryRun ? undefined : boardPath,
-          capabilities: [BOARD_INIT_STRUCTURED_PATH_CAPABILITY],
+          capabilities: [BOARD_INIT_STRUCTURED_PATH_CAPABILITY, GOAL_CONTRACT_CAPABILITY],
         });
       const goalStr = b.goal ? `goal="${b.goal}"` : '(无 goal)';
       const sourceStr =
