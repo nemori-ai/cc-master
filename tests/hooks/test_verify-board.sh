@@ -159,6 +159,31 @@ fp_of() { # $1 = board path
   } | cksum | awk '{print $1}'
 }
 
+# assert_fp_mirrors_hook NAME BOARD_JSON — seed the Stop sidecar with fp_of() and prove production takes
+# the same-fingerprint allow path. These cases calibrate the test oracle against canonical/legacy
+# precedence, accountable-handle truth, and fire_at expiry/malformed semantics.
+assert_fp_mirrors_hook() { # $1 label, $2 board JSON
+  local label="$1" board_json="$2" h sid expected
+  h="$(make_project)"; sid="fp-${label}"
+  mkactive "$h" "b1" "$board_json"
+  expected="$(fp_of "$h/boards/b1.board.json")"
+  printf '0 %s\n' "$expected" > "$h/.$sid.stopcheck"
+  run_stop_sid "$h" "$sid"
+  assert_eq 0 "$HOOK_RC" "fp oracle $label → rc 0"
+  assert_not_contains "$HOOK_OUT" "block" "fp oracle $label → production accepts seeded fingerprint"
+  assert_eq "0 $expected" "$(cat "$h/.$sid.stopcheck")" "fp oracle $label → production preserves the same fingerprint"
+  rm -rf "$h"
+}
+
+FP_TASKS='"tasks":[{"id":"T1","status":"in_flight","deps":[]}]'
+assert_fp_mirrors_hook "canonical-healthy" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-canonical-healthy\"},\"watchdog\":{\"job_id\":\"job-canonical\",\"fire_at\":\"2099-01-01T00:00:00Z\"},$FP_TASKS}"
+assert_fp_mirrors_hook "canonical-missing-handle" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-canonical-missing-handle\"},\"watchdog\":{\"fire_at\":\"2099-01-01T00:00:00Z\"},$FP_TASKS}"
+assert_fp_mirrors_hook "legacy-healthy" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-legacy-healthy\"},\"wakeup\":{\"job_id\":\"job-legacy\",\"fire_at\":\"2099-01-01T00:00:00Z\"},$FP_TASKS}"
+assert_fp_mirrors_hook "legacy-blank-handle" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-legacy-blank-handle\"},\"wakeup\":{\"job_id\":\"   \",\"fire_at\":\"2099-01-01T00:00:00Z\"},$FP_TASKS}"
+assert_fp_mirrors_hook "canonical-expired" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-canonical-expired\"},\"watchdog\":{\"job_id\":\"job-expired\",\"fire_at\":\"2000-01-01T00:00:00Z\"},$FP_TASKS}"
+assert_fp_mirrors_hook "canonical-malformed-fire-at" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-canonical-malformed-fire-at\"},\"watchdog\":{\"job_id\":\"job-malformed\",\"fire_at\":\"later\"},$FP_TASKS}"
+assert_fp_mirrors_hook "canonical-precedence" "{\"schema\":\"cc-master/v2\",\"owner\":{\"active\":true,\"session_id\":\"fp-canonical-precedence\"},\"watchdog\":{\"job_id\":\"   \",\"fire_at\":\"2099-01-01T00:00:00Z\"},\"wakeup\":{\"job_id\":\"job-legacy\",\"fire_at\":\"2099-01-01T00:00:00Z\"},$FP_TASKS}"
+
 # Case H (NEW): completion state (in_flight/blocked/done), no sidecar mark → BLOCK with self-check
 #                checklist, AND sidecar's last_handshook_fp set to the current fingerprint.
 H="$(make_project)"

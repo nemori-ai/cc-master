@@ -35,6 +35,12 @@ assert_contains "$HOOK_OUT" "self-check" "WD-a: in_flight + no wakeup → still 
 assert_contains "$HOOK_OUT" "$CANON" "WD-a: in_flight + no wakeup → reason carries canonical 'arm a watchdog wakeup' nudge"
 assert_contains "$HOOK_OUT" "$RECON_NOT_VERDICT" "WD-a: reminder frames an expired ceiling as a recon trigger, NOT a death verdict (Finding #60)"
 assert_contains "$HOOK_OUT" "$NO_OUTPUT_STALL" "WD-a: reminder warns against output-size stall as the liveness signal (Finding #60)"
+assert_contains "$HOOK_OUT" "missing or blank accountable handle" "WD-a: reminder names a missing/blank accountable handle as an unarmed cause"
+assert_contains "$HOOK_OUT" "ccm watchdog status" "WD-a: reminder starts recovery from the status endpoint"
+assert_contains "$HOOK_OUT" "ccm watchdog disarm" "WD-a: reminder retires a stale record before replacement"
+assert_contains "$HOOK_OUT" "--job-id" "WD-a: reminder requires re-arm with the real external handle"
+assert_contains "$HOOK_OUT" "watchdog.checklist" "WD-a: reminder records recon intent in the canonical checklist"
+assert_not_contains "$HOOK_OUT" "wakeup.checklist" "WD-a: reminder never directs writes to the retired legacy checklist"
 assert_valid_json "$HOOK_OUT" "WD-a: hook stdout is well-formed JSON with watchdog clause appended"
 rm -rf "$H"
 
