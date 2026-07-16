@@ -78,6 +78,22 @@
           "references/usage-signals.md": "06f9c3c69c40c33a10877cd6d010a7cd38fe8da99a58c930a2fb3cdd015c6829"
         }
       }
+    },
+    "kimi-code": {
+      "profile": "kimi-no-quota-signal",
+      "rendered_body_sha256": "4bb8c6a47320c3a77fd4becac815658a9cc6389d3fc90c80516e16a9e8201316",
+      "rendered_runtime_manifest": {
+        "schema": "cc-master.pacing-runtime-manifest.v1",
+        "files": {
+          "SKILL.md": "2cb69119fa515c88a52e2052168adcbf8f5eda590d708f54ac8a6927c55dd485",
+          "references/cross-harness-target-facts.md": "8ed21b268074edcff2bf7fb1ee28f6dff87b769f60dadb8f6e3f3e1b8e3b6e0d",
+          "references/estimation.md": "f51f7ddecf44779cbb5cc106b028166478f01f6569c6b4404a48aa87c7ea6e18",
+          "references/model-tiers.md": "62ae8337a3b33c8b0958169de6f9de70121edc1fe7f1f041ce49697feb2a098f",
+          "references/pacing-levers.md": "b82c03f5fdb7922d2d36c5681a1a49d72ff1488e164768d736fb11cee108f850",
+          "references/pool-aware-advice.md": "907e1946f8703ed5590fca146062c3e14f90dec25e2d1b584f8cacc9e5434503",
+          "references/usage-signals.md": "06f9c3c69c40c33a10877cd6d010a7cd38fe8da99a58c930a2fb3cdd015c6829"
+        }
+      }
     }
   }
 }

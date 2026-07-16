@@ -75,7 +75,7 @@ export const REGISTRY: Registry = {
         harness: {
           type: 'string',
           required: true,
-          enum: ['codex', 'claude-code', 'cursor-agent'],
+          enum: ['codex', 'claude-code', 'cursor-agent', 'kimi-code'],
           desc: '目标 harness CLI',
         },
         scope: {
@@ -110,6 +110,7 @@ export const REGISTRY: Registry = {
         'ccm worker run --harness codex --cwd /abs/repo -- --ask-for-approval never exec "review this repo"',
         'ccm worker run --harness claude-code --cwd /abs/repo -- --print "review this repo"',
         'ccm worker run --harness cursor-agent --cwd /abs/repo -- --print "review this repo"',
+        'ccm worker run --harness kimi-code --cwd /abs/repo -- -p "review this repo" --output-format stream-json',
       ],
       handler: 'worker.run',
     },
@@ -1570,7 +1571,7 @@ export const REGISTRY: Registry = {
           type: 'string',
           enum: E.agentHarness,
           required: true,
-          desc: 'agent 所在 harness（codex|claude-code|cursor-agent|origin）',
+          desc: 'agent 所在 harness（codex|claude-code|cursor-agent|kimi-code|origin）',
         },
         intent: { type: 'string', required: true, desc: '一句话：派它去干什么' },
         model: { type: 'string', desc: '已知才填的模型（unknown 保真·缺则不填）' },
@@ -1721,7 +1722,7 @@ export const REGISTRY: Registry = {
         },
         origin: {
           type: 'string',
-          enum: ['claude-code', 'codex', 'cursor'],
+          enum: ['claude-code', 'codex', 'cursor', 'kimi-code'],
           desc: '订阅来源 harness（与 session/epoch 一起精确绑定）',
         },
         'session-epoch': { type: 'string', desc: '当前订阅 epoch；旧 epoch fail closed' },
@@ -1742,7 +1743,7 @@ export const REGISTRY: Registry = {
       options: {
         origin: {
           type: 'string',
-          enum: ['claude-code', 'codex', 'cursor'],
+          enum: ['claude-code', 'codex', 'cursor', 'kimi-code'],
           required: true,
           desc: '订阅来源 harness',
         },

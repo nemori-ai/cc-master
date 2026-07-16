@@ -21,6 +21,7 @@ dispatch mechanism for complex fan-out.
 | claude-code | implemented | `authoring-workflows` skill + Workflow tool | Full SAP |
 | codex | unsupported_stub | `adapters/codex/strategy.yaml` mode unsupported_stub | No Workflow equivalent |
 | cursor | unsupported_stub | `adapters/cursor/strategy.yaml` mode `unsupported_stub` | Task tool + background shell + `/loop` substitutes |
+| kimi-code | unsupported | No Workflow equivalent | `authoring-workflows` unsupported_stub; alt: Bash background tasks / built-in coder/explore/plan subagents + Agent Swarm |
 
 ## Declared divergence
 
@@ -33,6 +34,13 @@ dispatch mechanism for complex fan-out.
     unsupported_stub skill body; current master-orchestrator-guide Cursor dispatch slots point to
     Task subagent, background shell (block_until_ms:0), /loop where available, and external schedulers.
   tracked_by: plugin/src/skills/authoring-workflows/adapters/codex/strategy.yaml + plugin/src/skills/authoring-workflows/adapters/cursor/strategy.yaml
+
+- rule: workflow-authoring-kimi-event-unavailable
+  kind: event-unavailable
+  affected_hosts: [kimi-code]
+  reason: kimi has no Workflow authoring/execution equivalent.
+  compensating_mechanism: authoring-workflows unsupported_stub; alt Bash background tasks / built-in subagents + Agent Swarm.
+  tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §7
 ```
 
 ## Linked surfaces

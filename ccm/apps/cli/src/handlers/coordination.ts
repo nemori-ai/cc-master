@@ -53,7 +53,7 @@ const SUBSCRIPTION_SCHEMA = 'ccm/coordination-subscriptions/v1';
 const SUBSCRIPTION_CAPABILITY = 'coordination-inbox';
 const CACHED_POLICY_REVISION = 'ccm/cached-board-inbox/v1';
 const CACHED_CONSENT_REF = 'ccm://coordination/subscriptions/cached-only';
-const ORIGINS = new Set(['claude-code', 'codex', 'cursor']);
+const ORIGINS = new Set(['claude-code', 'codex', 'cursor', 'kimi-code']);
 
 interface CoordinationSubscription {
   subscription_id: string;
@@ -95,7 +95,7 @@ function subscriptionInput(ctx: Ctx): {
   const sessionId = ctx.values['session-id'];
   const capability = ctx.values.capability;
   if (!nonempty(origin) || !ORIGINS.has(origin)) {
-    usage('--origin 必须是 claude-code、codex 或 cursor');
+    usage('--origin 必须是 claude-code、codex、cursor 或 kimi-code');
   }
   if (!nonempty(sessionId)) usage('--session-id 须是非空字符串');
   if (capability !== SUBSCRIPTION_CAPABILITY) {

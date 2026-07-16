@@ -1,6 +1,6 @@
 {
   "schema": "ccm/model-role-candidate-registry/v1",
-  "revision": "2026-07-16.2",
+  "revision": "2026-07-16.3",
   "role_grades": {
     "O": "orchestrator-grade system, architecture, specification and high-risk adversarial judgment",
     "T1": "implementation from a complete specification and routine heterogeneous review",
@@ -108,6 +108,42 @@
       "model_id": "cursor-composer-2-5",
       "candidate_role_grades": ["T1", "T2", "T3"],
       "state": "candidate",
+      "blockers": ["project-role-certification-required", "live-target-admission-required"]
+    },
+    {
+      "candidate_id": "kimi-code-cli:kimi-k3",
+      "provider": "kimi-code",
+      "surface": "kimi-code-cli",
+      "model_id": "kimi-k3",
+      "candidate_role_grades": ["T1", "T2"],
+      "state": "candidate",
+      "provenance": [
+        {
+          "kind": "research-report",
+          "ref": "design_docs/2026-07-16-kimi-model-tier-research.md",
+          "recorded_at": "2026-07-16T00:00:00Z"
+        }
+      ],
+      "blockers": [
+        "project-role-certification-required",
+        "live-target-admission-required",
+        "official-benchmarks-unpublished"
+      ]
+    },
+    {
+      "candidate_id": "kimi-code-cli:kimi-k2.7-code",
+      "provider": "kimi-code",
+      "surface": "kimi-code-cli",
+      "model_id": "kimi-k2.7-code",
+      "candidate_role_grades": ["T1", "T2", "T3"],
+      "state": "candidate",
+      "provenance": [
+        {
+          "kind": "research-report",
+          "ref": "design_docs/2026-07-16-kimi-model-tier-research.md",
+          "recorded_at": "2026-07-16T00:00:00Z"
+        }
+      ],
       "blockers": ["project-role-certification-required", "live-target-admission-required"]
     }
   ],

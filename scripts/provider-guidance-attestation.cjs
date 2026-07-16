@@ -7,10 +7,17 @@ const path = require('node:path');
 const REGISTRY_SCHEMA = 'cc-master.provider-guidance-runtime.v1';
 const MANIFEST_SCHEMA = 'cc-master.provider-guidance-runtime-manifest.v1';
 const FACTS_SCHEMA = 'ccm/provider-model-facts-registry/v1';
-const HOSTS = ['claude-code', 'codex', 'cursor'];
+const HOSTS = ['claude-code', 'codex', 'cursor', 'kimi-code'];
 const SKILLS = ['master-orchestrator-guide', 'pacing-and-estimation', 'using-ccm'];
 const SHA256 = /^[0-9a-f]{64}$/u;
-const OFFICIAL_HOSTS = new Set(['anthropic.com', 'www.anthropic.com', 'openai.com', 'cursor.com']);
+const OFFICIAL_HOSTS = new Set([
+  'anthropic.com',
+  'www.anthropic.com',
+  'openai.com',
+  'cursor.com',
+  'platform.kimi.ai',
+  'www.kimi.com',
+]);
 const compareText = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 
 function fail(message) {

@@ -1,6 +1,6 @@
 import rawRegistry from './provider-model-facts.json' with { type: 'json' };
 
-export type ProviderModelFactsProvider = 'claude-code' | 'codex' | 'cursor';
+export type ProviderModelFactsProvider = 'claude-code' | 'codex' | 'cursor' | 'kimi-code';
 export type ProviderModelFactsFreshness = 'fresh' | 'future-invalid' | 'hard-stale';
 
 type JsonObject = Record<string, unknown>;
@@ -13,8 +13,16 @@ export interface ProviderModelFactsRegistry {
 
 export const PROVIDER_MODEL_FACTS_REGISTRY = rawRegistry as unknown as ProviderModelFactsRegistry;
 
-const PROVIDERS = ['claude-code', 'codex', 'cursor'] as const;
-const OFFICIAL_HOSTS = new Set(['anthropic.com', 'www.anthropic.com', 'openai.com', 'cursor.com']);
+const PROVIDERS = ['claude-code', 'codex', 'cursor', 'kimi-code'] as const;
+const OFFICIAL_HOSTS = new Set([
+  'anthropic.com',
+  'www.anthropic.com',
+  'openai.com',
+  'cursor.com',
+  'platform.kimi.ai',
+  'kimi.com',
+  'www.kimi.com',
+]);
 
 function object(value: unknown, path: string): JsonObject {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {

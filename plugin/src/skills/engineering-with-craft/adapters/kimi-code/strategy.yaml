@@ -1,0 +1,9 @@
+host: kimi-code
+skill: engineering-with-craft
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/engineering-with-craft/
+notes:
+  - Host-neutral method; safe to project to kimi-code unchanged.

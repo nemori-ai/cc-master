@@ -31,11 +31,14 @@
 
 CODEX_LAUNCHER="$REPO_ROOT/plugin/src/hooks/_hosts/codex/launcher.js"
 CURSOR_LAUNCHER="$REPO_ROOT/plugin/src/hooks/_hosts/cursor/launcher.js"
+KIMI_LAUNCHER="$REPO_ROOT/plugin/src/hooks/_hosts/kimi-code/launcher.js"
 BOARD_GUARD_CLAUDE="$PLUGIN_ROOT/hooks/scripts/board-guard.js"
 BOARD_GUARD_CODEX_CORE="$REPO_ROOT/plugin/src/hooks/board-guard/implementations/codex/board-guard-core.js"
 BOARD_GUARD_CURSOR_CORE="$REPO_ROOT/plugin/src/hooks/board-guard/implementations/cursor/board-guard-core.js"
+BOARD_GUARD_KIMI_CORE="$REPO_ROOT/plugin/src/hooks/board-guard/implementations/kimi-code/board-guard-core.js"
 VERIFY_BOARD_CLAUDE="$PLUGIN_ROOT/hooks/scripts/verify-board.js"
 VERIFY_BOARD_CODEX_CORE="$REPO_ROOT/plugin/src/hooks/verify-board/implementations/codex/verify-board-core.js"
+VERIFY_BOARD_KIMI_CORE="$REPO_ROOT/plugin/src/hooks/verify-board/implementations/kimi-code/verify-board-core.js"
 
 seed_board() { mkdir -p "$1/boards"; printf '%s' "$3" >"$1/boards/$2.board.json"; }
 
@@ -72,6 +75,14 @@ run_verify_board_claude() {
 }
 run_verify_board_codex() {
   HOOK_OUT="$(printf '%s' "$1" | CC_MASTER_HOME="$2" node "$CODEX_LAUNCHER" --event Stop --core "$VERIFY_BOARD_CODEX_CORE" 2>/dev/null)"; HOOK_RC=$?
+}
+# kimi uses the same Bash tool name + snake_case stdin as the codex/claude-code native shape, so the
+# host-neutral fixture feeds unmodified through the kimi launcher (unlike cursor's Shell rewrite).
+run_board_guard_kimi() {
+  HOOK_OUT="$(printf '%s' "$1" | CC_MASTER_HOME="$2" node "$KIMI_LAUNCHER" --event PreToolUse --core "$BOARD_GUARD_KIMI_CORE" 2>/dev/null)"; HOOK_RC=$?
+}
+run_verify_board_kimi() {
+  HOOK_OUT="$(printf '%s' "$1" | CC_MASTER_HOME="$2" node "$KIMI_LAUNCHER" --event Stop --core "$VERIFY_BOARD_KIMI_CORE" 2>/dev/null)"; HOOK_RC=$?
 }
 
 # board-guard PreToolUse deny envelope differs by host (a declared, legitimate envelope-format
@@ -198,5 +209,45 @@ fs.writeFileSync(p, JSON.stringify(b));
 run_verify_board_codex "$FIXTURE3" "$H"
 assert_eq "" "$HOOK_OUT" "fixture3 codex third Stop WITH future stop_allow_until -> allow (explicit release valve, the declared compensating mechanism)"
 rm -rf "$H"
+
+# =====================================================================================================
+# Fixture K — kimi-code (FULLY SELF-CONTAINED). Deliberately NOT interleaved into the fixtures above:
+# its own make_project home(s) AND its own session_id ("sess-kimi", distinct from "sess-x") so the
+# FUSE / self-check sidecars (home-scoped: verify-board sidecarPath(homeDir,sid)) can never share
+# mutable state with the claude-code/codex/cursor rounds. kimi feeds the same host-neutral Bash /
+# Stop stdin (kimi uses the same Bash tool name + snake_case shape as codex/claude-code native).
+# =====================================================================================================
+KSID="sess-kimi"
+
+# board-guard equivalence class: DENY on a real board write, ALLOW otherwise (stateless).
+HK="$(make_project)"
+seed_board "$HK" "mine" '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-kimi"},"tasks":[{"id":"T0","status":"ready","deps":[]}]}'
+run_board_guard_kimi "$(bash_payload "$KSID" "echo hi > $HK/scratch.txt; cat $HK/notes.board.json")" "$HK"
+assert_eq "" "$HOOK_OUT" "fixtureK (scratch write, board-looking token outside boards/) kimi-code -> allow (silent)"
+run_board_guard_kimi "$(bash_payload "$KSID" "echo '{}' > $HK/boards/mine.board.json")" "$HK"
+assert_contains "$HOOK_OUT" '"permissionDecision":"deny"' "fixtureK (real board write) kimi-code -> deny"
+run_board_guard_kimi "$(bash_payload "$KSID" "ccm task ls --board $HK/boards/mine.board.json")" "$HK"
+assert_eq "" "$HOOK_OUT" "fixtureK (plain ccm --board) kimi-code -> allow"
+for REDIRECT in '>' '>>'; do
+  run_board_guard_kimi "$(bash_payload "$KSID" "ccm board show --board $HK/boards/mine.board.json $REDIRECT $HK/boards/mine.board.json")" "$HK"
+  assert_contains "$HOOK_OUT" '"permissionDecision":"deny"' "fixtureK (ccm $REDIRECT real board) kimi-code -> deny"
+done
+rm -rf "$HK"
+
+# verify-board FUSE: same streak (5). Rounds 1-4 block via permissionDecision:"deny" (kimi Stop-deny →
+# continue once + reason injected). Round 5 trips the fuse and RELEASES; the fuse-tripped advisory is a
+# kind:system message which kimi cannot surface on Stop (no non-blocking Stop advisory channel — the
+# declared verify-board-kimi-stop-envelope divergence), so the release is a silent allow. Equivalence
+# class: rounds 1-4 = DENY, round 5 = ALLOW (same fuse streak as claude-code/codex).
+HK="$(make_project)"
+seed_board "$HK" "mine" '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-kimi"},"tasks":[{"id":"T0","status":"ready","deps":[]}]}'
+FIXTUREK_STOP="$(stop_payload "$KSID")"
+for i in 1 2 3 4; do
+  run_verify_board_kimi "$FIXTUREK_STOP" "$HK"
+  assert_contains "$HOOK_OUT" '"permissionDecision":"deny"' "fixtureK verify-board round $i -> deny (continue + reason)"
+done
+run_verify_board_kimi "$FIXTUREK_STOP" "$HK"
+assert_eq "" "$HOOK_OUT" "fixtureK verify-board round 5 -> fuse trips, release is silent (no non-blocking Stop advisory channel — declared divergence)"
+rm -rf "$HK"
 
 finish

@@ -1,0 +1,9 @@
+host: kimi-code
+skill: dev-as-ml-loop
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/dev-as-ml-loop/
+notes:
+  - Host-neutral method; safe to project to kimi-code unchanged.

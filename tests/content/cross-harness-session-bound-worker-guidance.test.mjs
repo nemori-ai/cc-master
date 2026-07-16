@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 const ROOT = join(import.meta.dirname, '..', '..');
-const HOSTS = ['claude-code', 'codex', 'cursor'];
+const HOSTS = ['claude-code', 'codex', 'cursor', 'kimi-code'];
 const read = (path) => readFileSync(join(ROOT, path), 'utf8');
 
 const A_SOURCE =
@@ -24,9 +24,9 @@ const workerSection = (body) => {
 };
 
 const RAW_HELP =
-  /ccm worker help --harness <codex\|claude-code\|cursor-agent> \[--scope <agent\|root>\]/u;
+  /ccm worker help --harness <codex\|claude-code\|cursor-agent\|kimi-code> \[--scope <agent\|root>\]/u;
 const RAW_RUN =
-  /ccm worker run --harness <codex\|claude-code\|cursor-agent> \[--cwd <path>\] \[--timeout-ms <n>\] \[--max-output-bytes <n>\] -- <provider argv\.\.\.>/u;
+  /ccm worker run --harness <codex\|claude-code\|cursor-agent\|kimi-code> \[--cwd <path>\] \[--timeout-ms <n>\] \[--max-output-bytes <n>\] -- <provider argv\.\.\.>/u;
 const NORMALIZED_PROVIDER_ADAPTER = [
   /--model\s+composer-2\.5/u,
   /--effort\s+standard/u,

@@ -1,0 +1,1 @@
+kimi-code host 当前没有 Claude Code 那种外部命令式 status-line hook。`ccm statusline install/uninstall` 在 kimi-code 下必须显式 `NotImplemented`，且不得写 Claude Code settings。kimi-code 也没有任何 CLI 侧配额 / 用量信号可供 statusline sidecar 采集——`ccm usage` 在 kimi-code 恒 `available:false`，不要伪造用量百分比。

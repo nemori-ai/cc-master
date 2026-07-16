@@ -1,0 +1,11 @@
+host: kimi-code
+skill: slicing-goals-into-dags
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/slicing-goals-into-dags/
+slot_replacements:
+  "{{SLICING_DISPATCH_POINTER}}": adapters/kimi-code/overlays/dispatch-pointer.md
+notes:
+  - Host-neutral DAG slicing method; kimi dispatch wording uses built-in subagent roles / background Bash (no Workflow).

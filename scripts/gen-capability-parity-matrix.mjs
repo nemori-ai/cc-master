@@ -106,8 +106,8 @@ out.push('');
 out.push('See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and');
 out.push('[capabilities/README.md](harnesses/capabilities/README.md).');
 out.push('');
-out.push('| capability | claude-code | codex | cursor | card |');
-out.push('| --- | --- | --- | --- | --- |');
+out.push('| capability | claude-code | codex | cursor | kimi-code | card |');
+out.push('| --- | --- | --- | --- | --- | --- |');
 
 for (const id of cards) {
   const text = readFileSync(join(CAP_DIR, `${id}.md`), 'utf8');
@@ -115,7 +115,7 @@ for (const id of cards) {
   const byHost = Object.fromEntries(mechs.map((r) => [r.host, r.status]));
   out.push(
     '| ' +
-      [id, byHost['claude-code'] || '?', byHost['codex'] || '?', byHost['cursor'] || '?', `[${id}.md](harnesses/capabilities/${id}.md)`].join(
+      [id, byHost['claude-code'] || '?', byHost['codex'] || '?', byHost['cursor'] || '?', byHost['kimi-code'] || '?', `[${id}.md](harnesses/capabilities/${id}.md)`].join(
         ' | ',
       ) +
       ' |',

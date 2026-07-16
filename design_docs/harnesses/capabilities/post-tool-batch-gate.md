@@ -20,6 +20,7 @@ mid-flight usage pacing samples that should not fire on every single `PostToolUs
 | claude-code | implemented | `PostToolBatch` → posttool-batch.js + usage-pacing.js sampling | Distinct from PostToolUse |
 | codex | unsupported | No PostToolBatch event — hooks.yaml `unsupported` | WIP via board-guard + stop pacing |
 | cursor | unsupported | **No PostToolBatch**【官方】— hooks.yaml `unsupported` | Track B event-unavailable |
+| kimi-code | unsupported | No PostToolBatch event (kimi-code.md §6) | WIP/pacing via board-guard PreToolUse deny + verify-board Stop deny-continue gate |
 
 ## Declared divergence
 
@@ -40,6 +41,13 @@ mid-flight usage pacing samples that should not fire on every single `PostToolUs
   reason: usage-pacing PostToolBatch sampling segment has no trigger on these hosts.
   compensating_mechanism: Stop-only pacing advisory (see usage-pacing-midflight capability).
   tracked_by: plugin/src/hooks/usage-pacing/CONTRACT.md
+
+- rule: post-tool-batch-kimi-event-unavailable
+  kind: event-unavailable
+  affected_hosts: [kimi-code]
+  reason: kimi has no PostToolBatch event (kimi-code.md §6).
+  compensating_mechanism: WIP/pacing via board-guard PreToolUse deny + verify-board Stop deny-continue gate.
+  tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §3,§7
 ```
 
 ## Linked surfaces

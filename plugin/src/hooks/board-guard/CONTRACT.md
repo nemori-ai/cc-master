@@ -165,4 +165,18 @@ equivalent inline `isArmed` check at the top of `main()` on Codex. Reads only `o
     so the wrapper is a small local duplicate matching claude-code's hook-common.js directive()
     byte-for-byte in output shape).
   tracked_by: "adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR)"
+
+- rule: board-guard-kimi-envelope
+  kind: host-convention-divergence
+  affected_hosts: [kimi-code]
+  reason: >
+    kimi has no Claude `decision:block` / Codex `apply_patch`. Direct board writes arrive as
+    Write/Edit/MultiEdit (path check) or Bash (write heuristic). The deny envelope is
+    hookSpecificOutput.permissionDecision="deny" + permissionDecisionReason, not decision:block.
+  compensating_mechanism: >
+    kimi-code board-guard-core.js ports the claude-code/cursor lexer (lexShellCommands /
+    segmentTouchesRealBoard byte-aligned) with a Bash|Write|Edit|MultiEdit dispatch; the launcher
+    maps kind:block -> { hookSpecificOutput: { permissionDecision: "deny", permissionDecisionReason } }.
+    PreToolUse deny is authoritative on kimi (probe-confirmed). SSOT: _hosts/kimi-code/ENVELOPE.md.
+  tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §3
 ```

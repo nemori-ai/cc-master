@@ -21,13 +21,13 @@ function makeBoard(harness?: unknown): Record<string, unknown> {
 }
 
 test('ENUMS exposes closed harness ids including unknown fallback', () => {
-  assert.deepEqual(M.ENUMS.harness, ['claude-code', 'codex', 'cursor', 'unknown']);
+  assert.deepEqual(M.ENUMS.harness, ['claude-code', 'codex', 'cursor', 'kimi-code', 'unknown']);
 });
 
 test('FIELDS documents owner.harness as optional non-gating subfield', () => {
   const owner = M.FIELDS.board.owner;
   assert.equal(owner.tier, '🔒');
-  assert.match(owner.type, /harness\?:claude-code\|codex\|cursor\|unknown/);
+  assert.match(owner.type, /harness\?:claude-code\|codex\|cursor\|kimi-code\|unknown/);
   assert.match(owner.degrade, /harness 缺→unknown/);
 });
 

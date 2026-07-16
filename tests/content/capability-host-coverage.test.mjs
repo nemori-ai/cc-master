@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const ROOT = join(import.meta.dirname, '..', '..');
-const KNOWN_HOSTS = ['claude-code', 'codex', 'cursor'];
+const KNOWN_HOSTS = ['claude-code', 'codex', 'cursor', 'kimi-code'];
 
 function parseYamlList(filePath, listKey) {
   const yaml = readFileSync(filePath, 'utf8');

@@ -50,7 +50,7 @@ DST="plugin/dist/${HOST}"
 
 [ -d "${SRC}" ] || { echo "sync-plugin-dist: missing ${SRC}" >&2; exit 1; }
 
-if [ "${SURFACE}" = "all" ] && [ "${HOST}" != "claude-code" ] && [ "${HOST}" != "codex" ] && [ "${HOST}" != "cursor" ]; then
+if [ "${SURFACE}" = "all" ] && [ "${HOST}" != "claude-code" ] && [ "${HOST}" != "codex" ] && [ "${HOST}" != "cursor" ] && [ "${HOST}" != "kimi-code" ]; then
   echo "sync-plugin-dist: full adapter generation for ${HOST} is not implemented. Use --skills-only for ${HOST}." >&2
   exit 2
 fi
@@ -67,6 +67,10 @@ if [ "${SURFACE}" = "all" ]; then
     manifest_dirs=".codex-plugin"
   elif [ "${HOST}" = "cursor" ]; then
     manifest_dirs=".cursor-plugin"
+  elif [ "${HOST}" = "kimi-code" ]; then
+    # kimi manifest is a root file (kimi.plugin.json) synthesized in the node block below
+    # from .kimi-plugin/plugin.json plus an inlined hooks[] array; no directory copy.
+    manifest_dirs=""
   else
     manifest_dirs=".claude-plugin"
   fi
@@ -308,6 +312,30 @@ function removeProjectedPaths(target, rels) {
   }
 }
 
+// kimi-code manifest: synthesize root kimi.plugin.json from .kimi-plugin/plugin.json plus an
+// inlined hooks[] array read from _hosts/kimi-code/hooks.fragment.json (K4-owned). kimi does not
+// use a hooks.json file; hook registration lives inline in the manifest. Tolerate the fragment
+// being absent (K4 not yet landed) by omitting the hooks[] key with a warning.
+if (surface === 'all' && host === 'kimi-code') {
+  const manifestSrc = path.join(src, '.kimi-plugin', 'plugin.json');
+  if (!fs.existsSync(manifestSrc)) throw new Error(`missing ${manifestSrc}`);
+  const manifest = JSON.parse(fs.readFileSync(manifestSrc, 'utf8'));
+  const fragmentPath = path.join(src, 'hooks', '_hosts', 'kimi-code', 'hooks.fragment.json');
+  if (fs.existsSync(fragmentPath)) {
+    const fragment = JSON.parse(fs.readFileSync(fragmentPath, 'utf8'));
+    const hooks = Array.isArray(fragment) ? fragment : fragment.hooks;
+    if (!Array.isArray(hooks)) {
+      throw new Error(`kimi hooks fragment ${fragmentPath} must be a hooks[] array or {hooks:[...]}`);
+    }
+    manifest.hooks = hooks;
+  } else {
+    console.warn(`sync-plugin-dist: kimi-code hooks fragment ${fragmentPath} missing (K4 not landed); manifest hooks[] omitted`);
+    delete manifest.hooks;
+  }
+  fs.mkdirSync(dst, { recursive: true });
+  fs.writeFileSync(path.join(dst, 'kimi.plugin.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
 // Commands: project host-native command bodies through adapter strategies.
 if (surface === 'all') {
   const commandsSrc = path.join(src, 'commands');
@@ -510,25 +538,14 @@ if (host === 'cursor') {
   }
 }
 
-// PHIP: project Claude Code host registration and per-hook native scripts.
-const hooksDst = path.join(dst, 'hooks');
-const hooksHost = path.join(src, 'hooks', '_hosts', host);
-const hookRegistration = path.join(hooksHost, 'hooks.json');
-if (!fs.existsSync(hookRegistration)) throw new Error(`missing ${hookRegistration}`);
-if (host === 'claude-code') fs.mkdirSync(path.join(hooksDst, 'scripts'), { recursive: true });
-else fs.mkdirSync(hooksDst, { recursive: true });
-fs.copyFileSync(hookRegistration, path.join(hooksDst, 'hooks.json'));
-
+// PHIP: project host registration and per-hook native scripts.
 const hooksSrc = path.join(src, 'hooks');
-if (host === 'codex' || host === 'cursor') {
-  const launcher = path.join(hooksHost, 'launcher.js');
-  if (!fs.existsSync(launcher)) throw new Error(`missing ${launcher}`);
-  copyFileWithMode(launcher, path.join(hooksDst, '_hosts', host, 'launcher.js'));
-}
-// PHIP runtime helpers are host-neutral implementation code. Maintainer prose in _shared stays
-// source-only; only JS helpers cross the projection boundary.
-const hookShared = path.join(hooksSrc, '_shared');
-if (fs.existsSync(hookShared)) {
+const hooksDst = path.join(dst, 'hooks');
+const hooksHost = path.join(hooksSrc, '_hosts', host);
+
+function copyHookShared() {
+  const hookShared = path.join(hooksSrc, '_shared');
+  if (!fs.existsSync(hookShared)) return;
   for (const entry of fs.readdirSync(hookShared, { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
     copyFileWithMode(
@@ -537,18 +554,64 @@ if (fs.existsSync(hookShared)) {
     );
   }
 }
-for (const hook of fs.readdirSync(hooksSrc).sort()) {
-  if (hook.startsWith('_') || hook === 'AGENTS.md' || hook === 'CLAUDE.md') continue;
-  const implDir = path.join(hooksSrc, hook, 'implementations', host);
-  if (!fs.existsSync(implDir)) continue;
-  for (const entry of fs.readdirSync(implDir, { withFileTypes: true })) {
-    if (!entry.isFile()) continue;
-    if (entry.name === 'meta.yaml') continue;
-    const sourcePath = path.join(implDir, entry.name);
-    const targetPath = (host === 'codex' || host === 'cursor')
-      ? path.join(hooksDst, hook, 'implementations', host, entry.name)
-      : path.join(hooksDst, 'scripts', entry.name);
-    copyFileWithMode(sourcePath, targetPath);
+
+if (host === 'kimi-code') {
+  // kimi registers hooks inline in the manifest (synthesized above from hooks.fragment.json),
+  // not via a hooks.json file. Tolerate the kimi hooks host dir being absent (K4 not yet landed):
+  // skip hook projection with a warning so the skills/commands/manifest surfaces still generate.
+  if (!fs.existsSync(hooksHost)) {
+    console.warn(`sync-plugin-dist: kimi-code hooks host ${hooksHost} missing (K4 not landed); skipping hook projection`);
+  } else {
+    fs.mkdirSync(hooksDst, { recursive: true });
+    const launcher = path.join(hooksHost, 'launcher.js');
+    if (fs.existsSync(launcher)) {
+      copyFileWithMode(launcher, path.join(hooksDst, '_hosts', host, 'launcher.js'));
+    } else {
+      console.warn(`sync-plugin-dist: kimi-code launcher ${launcher} missing (K4 not landed); skipping launcher`);
+    }
+    copyHookShared();
+    for (const hook of fs.readdirSync(hooksSrc).sort()) {
+      if (hook.startsWith('_') || hook === 'AGENTS.md' || hook === 'CLAUDE.md') continue;
+      const implDir = path.join(hooksSrc, hook, 'implementations', host);
+      if (!fs.existsSync(implDir)) continue;
+      for (const entry of fs.readdirSync(implDir, { withFileTypes: true })) {
+        if (!entry.isFile() || entry.name === 'meta.yaml') continue;
+        copyFileWithMode(
+          path.join(implDir, entry.name),
+          path.join(hooksDst, hook, 'implementations', host, entry.name),
+        );
+      }
+    }
+  }
+} else {
+  // Claude Code / Codex / Cursor register hooks via a hooks.json file.
+  const hookRegistration = path.join(hooksHost, 'hooks.json');
+  if (!fs.existsSync(hookRegistration)) throw new Error(`missing ${hookRegistration}`);
+  if (host === 'claude-code') fs.mkdirSync(path.join(hooksDst, 'scripts'), { recursive: true });
+  else fs.mkdirSync(hooksDst, { recursive: true });
+  fs.copyFileSync(hookRegistration, path.join(hooksDst, 'hooks.json'));
+
+  if (host === 'codex' || host === 'cursor') {
+    const launcher = path.join(hooksHost, 'launcher.js');
+    if (!fs.existsSync(launcher)) throw new Error(`missing ${launcher}`);
+    copyFileWithMode(launcher, path.join(hooksDst, '_hosts', host, 'launcher.js'));
+  }
+  // PHIP runtime helpers are host-neutral implementation code. Maintainer prose in _shared stays
+  // source-only; only JS helpers cross the projection boundary.
+  copyHookShared();
+  for (const hook of fs.readdirSync(hooksSrc).sort()) {
+    if (hook.startsWith('_') || hook === 'AGENTS.md' || hook === 'CLAUDE.md') continue;
+    const implDir = path.join(hooksSrc, hook, 'implementations', host);
+    if (!fs.existsSync(implDir)) continue;
+    for (const entry of fs.readdirSync(implDir, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      if (entry.name === 'meta.yaml') continue;
+      const sourcePath = path.join(implDir, entry.name);
+      const targetPath = (host === 'codex' || host === 'cursor')
+        ? path.join(hooksDst, hook, 'implementations', host, entry.name)
+        : path.join(hooksDst, 'scripts', entry.name);
+      copyFileWithMode(sourcePath, targetPath);
+    }
   }
 }
 NODE

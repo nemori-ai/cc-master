@@ -1,0 +1,33 @@
+host: kimi-code
+skill: pacing-and-estimation
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/pacing-and-estimation/
+runtime_contracts:
+  read_only_capability:
+    registry: read-only-capability.json
+    slot: "{{PACING_READ_ONLY_CAPABILITY}}"
+    host: kimi-code
+  provider_guidance:
+    registry: ../provider-guidance-runtime.json
+    host: kimi-code
+    skill: pacing-and-estimation
+unsupported:
+  - capability: current_quota_signal
+    reason: "kimi exposes no CLI quota/usage signal; ccm usage show/advise returns available:false; no window pacing verdicts."
+  - capability: account_switch_pacing
+    reason: "kimi automatic account switching is unsupported (ccm account binds Claude OAuth); no switch verdict."
+  - capability: statusline_sidecar
+    reason: "Claude Code statusline sidecar does not exist in the kimi adapter; there is no kimi usage source."
+supported:
+  - capability: estimation_method
+    reason: "Cost-to-complete estimation method is host-neutral when it consumes normalized board data."
+  - capability: model_tier_provider
+    reason: "kimi model guidance is catalog-qualified; real model tests admit only freshly cataloged kimi-code first-party selectors (k3 / kimi-for-coding[-highspeed]) and never auto-fallback."
+slot_replacements:
+  "{{PACING_DESCRIPTION}}": adapters/kimi-code/overlays/description.md
+  "{{CROSS_HARNESS_ACTIVE_QUERY_POINTER}}": adapters/kimi-code/overlays/cross-harness-active-query-pointer.md
+notes:
+  - kimi projects the closed read-only capability block plus first-party-only model facts; kimi has no CLI quota window (usage available:false), so no window pacing verdicts.

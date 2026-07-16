@@ -1,0 +1,49 @@
+{
+  "name": "cc-master",
+  "version": "0.20.1",
+  "description": "Turn a kimi-code session into a long-horizon master orchestrator through the cc-master adapter.",
+  "skills": "./skills/",
+  "commands": "./commands/",
+  "sessionStart": {
+    "skill": "master-orchestrator-guide"
+  },
+  "author": {
+    "name": "cc-master contributors"
+  },
+  "license": "UNLICENSED",
+  "interface": {
+    "displayName": "cc-master",
+    "shortDescription": "Long-horizon master orchestrator adapter",
+    "longDescription": "cc-master provides skills, commands, and harness hooks for long-horizon orchestration.",
+    "developerName": "cc-master contributors"
+  },
+  "hooks": [
+    {
+      "event": "UserPromptSubmit",
+      "command": "node \"$KIMI_PLUGIN_ROOT/hooks/_hosts/kimi-code/launcher.js\" --event UserPromptSubmit --core \"$KIMI_PLUGIN_ROOT/hooks/bootstrap-board/implementations/kimi-code/bootstrap-board-core.js\"",
+      "timeout": 45
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "Bash|Write|Edit|MultiEdit",
+      "command": "node \"$KIMI_PLUGIN_ROOT/hooks/_hosts/kimi-code/launcher.js\" --event PreToolUse --core \"$KIMI_PLUGIN_ROOT/hooks/board-guard/implementations/kimi-code/board-guard-core.js\"",
+      "timeout": 15
+    },
+    {
+      "event": "PostToolUse",
+      "matcher": "Write|Edit|MultiEdit",
+      "command": "node \"$KIMI_PLUGIN_ROOT/hooks/_hosts/kimi-code/launcher.js\" --event PostToolUse --core \"$KIMI_PLUGIN_ROOT/hooks/board-lint/implementations/kimi-code/board-lint-core.js\"",
+      "timeout": 20
+    },
+    {
+      "event": "Stop",
+      "command": "node \"$KIMI_PLUGIN_ROOT/hooks/_hosts/kimi-code/launcher.js\" --event Stop --core \"$KIMI_PLUGIN_ROOT/hooks/verify-board/implementations/kimi-code/verify-board-core.js\"",
+      "timeout": 30
+    },
+    {
+      "event": "PostCompact",
+      "command": "node \"$KIMI_PLUGIN_ROOT/hooks/_hosts/kimi-code/launcher.js\" --event PostCompact --core \"$KIMI_PLUGIN_ROOT/hooks/reinject/implementations/kimi-code/reinject-core.js\"",
+      "timeout": 10
+    }
+  ]
+}

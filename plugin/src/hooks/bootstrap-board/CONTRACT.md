@@ -172,4 +172,20 @@ proves their host-native projections without broadening registration beyond the 
     `{ continue: true, user_message }`; kind:block|deny to `{ continue: false, user_message }`.
     SSOT: `_hosts/cursor/ENVELOPE.md`.
   tracked_by: "plugin v0.17.2 envelope fix"
+
+- rule: bootstrap-kimi-trigger-and-envelope
+  kind: host-convention-divergence
+  affected_hosts: [kimi-code]
+  reason: >
+    kimi native plugin commands are namespaced `cc-master:<command>` (no slash-command body expansion
+    like Claude Code). The UserPromptSubmit hook reads prompt[0].text (a content-block array) and
+    matches the literal `cc-master:as-master-orchestrator` prefix (or the injected sentinel). Injection
+    uses `message` (fresh/resume context) / permissionDecision="deny" (ccm-missing refusal), not
+    additionalContext (CC) / systemMessage (codex) / user_message (cursor).
+  compensating_mechanism: >
+    bootstrap-board-core.js matches the cc-master: prefix spellings + the `<!-- cc-master:bootstrap:v1 -->`
+    sentinel; UserPromptSubmit message injection is probe-confirmed live. The launcher maps
+    kind:context -> { message }, kind:block -> { hookSpecificOutput: { permissionDecision: "deny" } }.
+    SSOT: _hosts/kimi-code/ENVELOPE.md.
+  tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §3,§4
 ```

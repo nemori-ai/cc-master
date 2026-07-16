@@ -108,4 +108,17 @@ launcher-provided, containment-checked board and revalidate it.
   reason: Cursor sessionStart.additional_context is a confirmed drop bug and sessionStart does not re-fire after compact.
   compensating_mechanism: Keep static alwaysApply role substrate and deliver dynamic cached context on verified postToolUse.additional_context with hash dedupe.
   tracked_by: design_docs/harnesses/capabilities/cross-harness-cached-context.md
+
+- rule: orchestrator-context-kimi-no-session-start-injection
+  kind: protocol-capability-gap
+  affected_hosts: [kimi-code]
+  reason: >
+    orchestrator-context delivers cached ccm/origin context at session start / on context delta. On
+    kimi, SessionStart hook output is discarded and PostToolUse output is discarded
+    (fireAndForgetTrigger) — neither injects (K4 probe). Not registered on kimi.
+  compensating_mechanism: >
+    The manifest sessionStart.skill static substrate carries role priming (re-injected after
+    compaction); the bootstrap-board UserPromptSubmit message carries the initial board context.
+    Dynamic cached-context delta delivery has no kimi channel.
+  tracked_by: design_docs/harnesses/capabilities/cross-harness-cached-context.md
 ```

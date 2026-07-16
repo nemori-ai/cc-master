@@ -1,0 +1,1 @@
+kimi-code agent runtime 可用后台 Bash 等外部状态，但没有 Claude Code 那种“后台 Bash 完成后自动唤醒主线”的同名语义。等外部状态时，优先用可追踪后台 Bash 任务（ + 轮询任务输出）；需要跨 session / 定时唤醒时，再用外部 scheduler，并在 board 记录 scheduler 名称、命令、run id、取消方式和 checklist。不要只写“稍后回来”。

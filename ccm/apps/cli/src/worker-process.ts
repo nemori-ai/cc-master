@@ -148,6 +148,7 @@ function childEnvironment(source: Record<string, string | undefined>): Record<st
     'TERM',
     'CLAUDE_CONFIG_DIR',
     'CODEX_HOME',
+    'KIMI_CODE_HOME',
   ] as const;
   const env: Record<string, string> = {
     HOME: source.HOME || os.homedir(),

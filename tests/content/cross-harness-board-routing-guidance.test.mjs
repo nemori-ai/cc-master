@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const HOSTS = ['claude-code', 'codex', 'cursor'];
+const HOSTS = ['claude-code', 'codex', 'cursor', 'kimi-code'];
 const read = (path) => readFileSync(join(ROOT, path), 'utf8');
 
 function section(text, start, end) {
@@ -118,14 +118,14 @@ test('command catalog gives an honest discovery-to-raw-dispatch hot path', () =>
 
   for (const command of [
     'ccm harness list --machine-wide --json',
-    'ccm worker help --harness <codex|claude-code|cursor-agent> --scope agent',
+    'ccm worker help --harness <codex|claude-code|cursor-agent|kimi-code> --scope agent',
     'ccm provider facts <target-provider> --json',
     'ccm quota status --machine-wide --json',
     'ccm --harness <claude-code|codex|cursor-agent> usage show --accounts current --json',
     'ccm --harness <claude-code|codex|cursor-agent> usage advise --json',
     'ccm quota preflight --input <json|@file|-> --json',
     'ccm route advise <task-id>',
-    'ccm worker run --harness <codex|claude-code|cursor-agent>',
+    'ccm worker run --harness <codex|claude-code|cursor-agent|kimi-code>',
   ]) {
     assert.ok(hotPath.includes(command), command);
   }

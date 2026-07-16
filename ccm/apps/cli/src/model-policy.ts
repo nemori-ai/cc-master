@@ -374,7 +374,7 @@ export function modelPolicyReadModel(taskTaxonomy: string, asOf: string): JsonOb
   const asOfMs = utc(asOf, 'as_of');
   const requiredRole = MODEL_ROLE_CANDIDATE_REGISTRY.task_policy[taskTaxonomy];
   if (!requiredRole) throw new Error(`unsupported model-policy task taxonomy: ${taskTaxonomy}`);
-  const providers = (['claude-code', 'codex', 'cursor'] as const).map((provider) =>
+  const providers = (['claude-code', 'codex', 'cursor', 'kimi-code'] as const).map((provider) =>
     providerModelFacts(provider, asOf),
   );
   const candidates = MODEL_ROLE_CANDIDATE_REGISTRY.candidates.map((candidate) => ({

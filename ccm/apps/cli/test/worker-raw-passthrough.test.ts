@@ -79,6 +79,7 @@ const executables = {
   codex: makeFake('codex'),
   claude: makeFake('claude'),
   cursor: makeFake('agent'),
+  kimi: makeFake('kimi'),
   helpExit23: makeFake('help-exit-23'),
 };
 
@@ -181,6 +182,7 @@ function testEnv(): Record<string, string | undefined> {
     CCM_CODEX_BIN: executables.codex,
     CCM_CLAUDE_BIN: executables.claude,
     CCM_CURSOR_AGENT_BIN: executables.cursor,
+    CCM_KIMI_BIN: executables.kimi,
     OPENAI_API_KEY: 'must-not-forward-openai',
     ANTHROPIC_API_KEY: 'must-not-forward-anthropic',
     CURSOR_API_KEY: 'must-not-forward-cursor',
@@ -286,6 +288,7 @@ test('registry freezes one raw worker namespace with help and run', () => {
     'codex',
     'claude-code',
     'cursor-agent',
+    'kimi-code',
   ]);
   assert.deepEqual(REGISTRY.worker?.help?.options.scope?.enum, ['agent', 'root']);
   assert.equal(REGISTRY.worker?.run?.options.harness?.enum, undefined);
@@ -300,6 +303,7 @@ test('worker help defaults to agent scope and root scope launches executable hel
     codex: ['exec', '--help'],
     'claude-code': ['--help'],
     'cursor-agent': ['--help'],
+    'kimi-code': ['--help'],
   } as const;
   for (const [harness, argv] of Object.entries(expected)) {
     const invoked = await invokeHelp(harness);
@@ -408,7 +412,7 @@ test('worker run preserves raw argv order/metacharacters, inherited stdin bytes,
 });
 
 test('worker run passes the complete provider argv unchanged and defaults cwd to process.cwd()', async () => {
-  for (const harness of ['codex', 'claude-code', 'cursor-agent'] as const) {
+  for (const harness of ['codex', 'claude-code', 'cursor-agent', 'kimi-code'] as const) {
     const providerArgv =
       harness === 'codex'
         ? ['--ask-for-approval', 'never', 'exec', '--flag', 'value']

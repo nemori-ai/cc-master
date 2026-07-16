@@ -22,6 +22,7 @@ account switch exists only on an explicitly supported and policy-gated host (ADR
 | claude-code | implemented | PostToolBatch sample + Stop; statusline sidecar; LBHOOK autoswitch | Full |
 | codex | implemented-stop-advisory; runtime migration pending | consumer guidance: 7d-only hard ceiling + rolling-24h advisory, never 5h pacing; current hook/engine normalization remains separately tracked; account switch NI | usage-pacing CONTRACT + Codex provider contract v1 |
 | cursor | implemented-stop-advisory | **Stop-only**; `ccm usage advise` via `billing_period` (never 5h/7d/switch); signal = Cursor dashboard API | Track B + `cursor-usage.ts` |
+| kimi-code | unsupported | No quota signal + no non-blocking Stop advisory channel (K4 probe) | Stop-only pacing has no kimi delivery; UserPromptSubmit-time advisory is candidate follow-up |
 
 ## Declared divergence
 
@@ -51,6 +52,13 @@ account switch exists only on an explicitly supported and policy-gated host (ADR
     ccm maps planUsage.totalPercentUsed → UsageSignal.billing_period; pacingAdvice emits
     hold/throttle/stop_billing_period only (never switch). Fail-open when token/API unavailable.
   tracked_by: ccm/apps/cli/src/cursor-usage.ts + design_docs/harnesses/capabilities/ccm-quota-account.md
+
+- rule: usage-pacing-kimi-no-signal-no-channel
+  kind: event-unavailable
+  affected_hosts: [kimi-code]
+  reason: No quota signal + no non-blocking Stop advisory channel on kimi (K4 probe).
+  compensating_mechanism: none on the data side; UserPromptSubmit-time advisory is the candidate follow-up channel.
+  tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §3,§7
 ```
 
 ## Linked surfaces

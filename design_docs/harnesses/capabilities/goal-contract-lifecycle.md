@@ -23,6 +23,7 @@ compaction、派发、amendment 和完成时始终对齐当前 revision。
 | claude-code | implemented | command + `SessionStart`/`PreCompact`/`Stop` hooks + canonical skills + `ccm goal` | `$ARGUMENTS` 只作 raw request；bootstrap 建 pending skeleton |
 | codex | implemented | entry skill + session_start/pre_compact/turn_complete hooks + `ccm goal` | bootstrap shim 不再把解析参数传入 `--goal` |
 | cursor | implemented-track-b | command + alwaysApply rule + PreCompact silent no-op + afterAgentResponse gate + `ccm goal` | 分层替代 Claude Code 的动态完整重注 |
+| kimi-code | implemented | via `ccm goal` (harness-neutral); bootstrap creates pending goal_contract; verify-board runs `ccm goal check` | Same as other hosts (ccm-owned) |
 
 ## Declared divergence
 

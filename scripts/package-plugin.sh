@@ -14,7 +14,8 @@
 #   bash scripts/package-plugin.sh --host claude-code          # tag 从 git/plugin.json 推导
 #   bash scripts/package-plugin.sh --host codex v0.10.0        # 显式指定 tag（CI 传 GITHUB_REF_NAME）
 #   bash scripts/package-plugin.sh --host cursor v0.10.0       # Cursor adapter zip
-#   bash scripts/package-plugin.sh --all-hosts v0.10.0         # 输出所有 supported host 制品（claude-code + codex + cursor）
+#   bash scripts/package-plugin.sh --host kimi-code v0.10.0    # kimi-code adapter zip（根 manifest kimi.plugin.json）
+#   bash scripts/package-plugin.sh --all-hosts v0.10.0         # 输出所有 supported host 制品（claude-code + codex + cursor + kimi-code）
 #   CCM_PLUGIN_OUT_DIR=dist bash ...          # 自定义产物目录（默认 dist/）
 #
 # 产物路径打到 stdout；同时在输出目录生成 SHA256SUMS，供 install.sh fail-closed 校验 release asset。
@@ -87,12 +88,12 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --host)
       HOST="${2:-}"
-      [ -n "${HOST}" ] || die "--host 需要一个值（claude-code / codex / cursor）"
+      [ -n "${HOST}" ] || die "--host 需要一个值（claude-code / codex / cursor / kimi-code）"
       shift 2
       ;;
     --host=*)
       HOST="${1#*=}"
-      [ -n "${HOST}" ] || die "--host 需要一个值（claude-code / codex / cursor）"
+      [ -n "${HOST}" ] || die "--host 需要一个值（claude-code / codex / cursor / kimi-code）"
       shift
       ;;
     --all-hosts)
@@ -126,8 +127,8 @@ PACKAGE_SEQ=0
 package_one() {
   local host="$1" stage pkg plugin_root zip out_dir manifest hash
   case "$host" in
-    claude-code|codex|cursor) ;;
-    *) die "未知 host：${host}（支持：claude-code / codex / cursor）" ;;
+    claude-code|codex|cursor|kimi-code) ;;
+    *) die "未知 host：${host}（支持：claude-code / codex / cursor / kimi-code）" ;;
   esac
 
   bash scripts/sync-plugin-dist.sh --host "$host" >/dev/null
@@ -139,11 +140,17 @@ package_one() {
   mkdir -p "$pkg"
 
   local include_dirs=( skills hooks docs agents bin )
+  local root_manifest_file=""
   if [ "$host" = "claude-code" ]; then
     include_dirs=( .claude-plugin commands "${include_dirs[@]}" )
   elif [ "$host" = "cursor" ]; then
     # Track B reinject ships as alwaysApply rules/; commands are Cursor adapter stubs/bodies.
     include_dirs=( .cursor-plugin commands rules "${include_dirs[@]}" )
+  elif [ "$host" = "kimi-code" ]; then
+    # kimi manifest is a root file (kimi.plugin.json), not a .{host}-plugin/ directory; commands
+    # project host-native under commands/.
+    include_dirs=( commands "${include_dirs[@]}" )
+    root_manifest_file="kimi.plugin.json"
   else
     include_dirs=( .codex-plugin "${include_dirs[@]}" )
   fi
@@ -159,6 +166,11 @@ package_one() {
       log "+ dir  ${d}/"
     fi
   done
+  if [ -n "${root_manifest_file}" ]; then
+    [ -f "${plugin_root}/${root_manifest_file}" ] || die "缺 ${plugin_root}/${root_manifest_file}"
+    cp "${plugin_root}/${root_manifest_file}" "${pkg}/${root_manifest_file}"
+    log "+ file ${root_manifest_file}"
+  fi
   [ -d "${pkg}/skills" ] || die "缺 skills/"
   if [ "$host" = "claude-code" ]; then
     [ -d "${pkg}/.claude-plugin" ] || die "缺 .claude-plugin/——Claude Code 制品不会是合法 plugin"
@@ -166,6 +178,9 @@ package_one() {
   elif [ "$host" = "cursor" ]; then
     [ -d "${pkg}/.cursor-plugin" ] || die "缺 .cursor-plugin/"
     [ -f "${pkg}/.cursor-plugin/plugin.json" ] || die "缺 .cursor-plugin/plugin.json"
+  elif [ "$host" = "kimi-code" ]; then
+    [ -f "${pkg}/kimi.plugin.json" ] || die "缺 kimi.plugin.json——kimi-code 制品不会是合法 plugin"
+    [ -d "${pkg}/commands" ] || die "缺 commands/"
   else
     [ -d "${pkg}/.codex-plugin" ] || die "缺 .codex-plugin/"
   fi
@@ -207,6 +222,7 @@ if [ "$ALL_HOSTS" = "1" ]; then
   package_one claude-code
   package_one codex
   package_one cursor
+  package_one kimi-code
 else
   package_one "$HOST"
 fi

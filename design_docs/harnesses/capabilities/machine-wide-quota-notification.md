@@ -43,6 +43,7 @@ fan-out。origin hook 零 provider/network/credential probe。
 | claude-code | implemented-track-b | SessionStart cached summary + Stop coordination inbox | 既有 PostToolBatch pacing 是 provider-local 早期采样，不冒充 machine-wide delta producer |
 | codex | implemented-track-b | SessionStart cached summary + Stop coordination inbox | 无 fake batch event；所有 agent-visible landing 都执行 7d-only 校验 |
 | cursor | implemented-track-b | verified postToolUse cached summary + Stop coordination inbox | SessionStart dynamic context gap 由 postToolUse + durable inbox 补偿；Cursor IDE/Agent target row 不互相推断 |
+| kimi-code | unsupported | No kimi quota target (kimi-code.md §10) | No machine-wide-quota TARGETS entry |
 
 ## Declared divergence
 
@@ -60,6 +61,13 @@ fan-out。origin hook 零 provider/network/credential probe。
   reason: Cursor sessionStart.additional_context 是已确认 drop bug。
   compensating_mechanism: 使用 verified postToolUse.additional_context 投递 cached summary；decision edge 使用 durable inbox。
   tracked_by: plugin/src/hooks/orchestrator-context/CONTRACT.md
+
+- rule: machine-wide-quota-kimi-no-target
+  kind: protocol-capability-gap
+  affected_hosts: [kimi-code]
+  reason: kimi has no quota face → no machine-wide-quota TARGETS entry (kimi-code.md §10).
+  compensating_mechanism: none; ccm does not fabricate a kimi quota window.
+  tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §7
 ```
 
 ## Linked canonical surfaces

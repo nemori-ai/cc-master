@@ -1,5 +1,5 @@
-export type WorkerHarness = 'codex' | 'claude-code' | 'cursor-agent';
-export type WorkerExecutableKey = 'codex' | 'claude' | 'cursor-agent';
+export type WorkerHarness = 'codex' | 'claude-code' | 'cursor-agent' | 'kimi-code';
+export type WorkerExecutableKey = 'codex' | 'claude' | 'cursor-agent' | 'kimi';
 
 export interface WorkerDescriptor {
   harness: WorkerHarness;
@@ -7,7 +7,7 @@ export interface WorkerDescriptor {
   defaultAgentHelpPrefix: readonly string[];
 }
 
-export const WORKER_HARNESSES = ['codex', 'claude-code', 'cursor-agent'] as const;
+export const WORKER_HARNESSES = ['codex', 'claude-code', 'cursor-agent', 'kimi-code'] as const;
 
 const DESCRIPTORS: Readonly<Record<WorkerHarness, WorkerDescriptor>> = Object.freeze({
   codex: Object.freeze({
@@ -23,6 +23,12 @@ const DESCRIPTORS: Readonly<Record<WorkerHarness, WorkerDescriptor>> = Object.fr
   'cursor-agent': Object.freeze({
     harness: 'cursor-agent',
     executableKey: 'cursor-agent',
+    defaultAgentHelpPrefix: [],
+  }),
+  // kimi -p is the top-level headless entry (no exec subcommand); help/run pass argv straight through.
+  'kimi-code': Object.freeze({
+    harness: 'kimi-code',
+    executableKey: 'kimi',
     defaultAgentHelpPrefix: [],
   }),
 });

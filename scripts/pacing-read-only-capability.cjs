@@ -17,6 +17,7 @@ const HOST_PROFILES = {
   'claude-code': 'claude-5h-7d',
   codex: 'codex-7d-rolling24h',
   cursor: 'cursor-billing-period',
+  'kimi-code': 'kimi-no-quota-signal',
 };
 const PROFILE_GUIDANCE = {
   'claude-5h-7d':
@@ -25,6 +26,8 @@ const PROFILE_GUIDANCE = {
     '只把当前账号 7d 当 hard ceiling，rolling-24h 只作过快消耗 advisory；历史或额外 `five_hour` / 5h 字段仅是 ignored provenance，不得触发 `throttle`、`switch`、`stop_5h`、reset 或 wakeup。Codex 自动换号永久禁止。',
   'cursor-billing-period':
     '读取 aggregate `billing_period` 的 `hold`、`throttle`、`stop_billing_period` 与 reset 事实；它不证明容量池拓扑，自动换号永久禁止。',
+  'kimi-no-quota-signal':
+    'kimi 无 CLI 配额信号：`ccm usage` 恒 `available:false` / `signal:null`，不读任何窗口百分比、不出 `throttle`、`switch`、`stop_5h`、`stop_7d` 或 reset verdict；缺信号即保持不可判，自动换号永久禁止。',
 };
 const ADVISORIES = {
   usage_advise: {

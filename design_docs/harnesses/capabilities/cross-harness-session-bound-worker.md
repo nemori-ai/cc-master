@@ -26,6 +26,7 @@ worker-selection boundary.
 | claude-code | current | projected A/D/H guidance + global `ccm` raw wrapper | same R0 contract |
 | codex | current | projected A/D/H guidance + global `ccm` raw wrapper | same R0 contract |
 | cursor | current | projected A/D/H guidance + global `ccm` raw wrapper | IDE origin and Agent CLI target stay separate |
+| kimi-code | partial | `kimi -p --output-format stream-json` + `session_index.jsonl` recon usable (kimi-code.md §10/§13) | ccm worker driver impl = K5; raw passthrough MVP |
 
 ## Current evidence
 

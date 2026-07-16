@@ -1,0 +1,14 @@
+hook: bootstrap-board
+host: kimi-code
+version: 1
+event: UserPromptSubmit
+matcher: ""
+projection:
+  target: hooks/
+status: implemented-fresh-resume
+notes:
+  - Sentinel/prefix detect on prompt[0].text (content-block array) + ccm board init/arm (fresh + resume),
+    session-state write (harness=kimi-code).
+  - Envelope: kind:context → { message } (injected, probe-confirmed); ccm missing → kind:block →
+    { hookSpecificOutput: { permissionDecision: deny } }.
+  - The ARM action itself (AGENTS.md §12 唯一豁免); no armed-gate of its own.

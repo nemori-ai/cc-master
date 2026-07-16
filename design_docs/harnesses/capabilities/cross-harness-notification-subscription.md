@@ -55,11 +55,19 @@ identity/epoch 和不完整 provenance 全部 fail closed，不回退到别的 a
 | claude-code | implemented-track-b | UserPromptSubmit bootstrap registration + Stop exact subscription resolution/read | executable fresh/resume and delivery matrix verified |
 | codex | implemented-track-b | launcher-normalized bootstrap registration + Stop system-message exact resolution/read | executable fresh/resume and delivery matrix verified |
 | cursor | implemented-track-b | beforeSubmitPrompt bootstrap registration + stop followup-message exact resolution/read | executable fresh/resume and delivery matrix verified |
+| kimi-code | partial | bootstrap-board registers subscription via `ccm coordination subscription register` (works); delivery via coordination-inbox unsupported (no Stop advisory) | Subscription registration implemented; inbox delivery has no kimi channel |
 
 ## Declared divergence
 
 ```yaml
 []
+
+- rule: notification-subscription-kimi-delivery-gap
+  kind: protocol-capability-gap
+  affected_hosts: [kimi-code]
+  reason: bootstrap subscription registration works; coordination-inbox delivery is a Stop advisory with no kimi channel.
+  compensating_mechanism: subscription registered via ccm; inbox delivery deferred (UserPromptSubmit-time candidate).
+  tracked_by: plugin/src/hooks/coordination-inbox/CONTRACT.md
 ```
 
 ## Linked canonical surfaces

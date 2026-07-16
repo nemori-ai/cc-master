@@ -1,0 +1,68 @@
+host: kimi-code
+skill: using-ccm
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/using-ccm/
+runtime_contracts:
+  provider_guidance:
+    registry: ../provider-guidance-runtime.json
+    host: kimi-code
+    skill: using-ccm
+exclude_canonical:
+  - references/account-pool.md
+unsupported:
+  - capability: account_switch
+    reason: "ccm account backend currently targets Claude Code OAuth credential stores; kimi returns NotImplemented."
+  - capability: statusline_install
+    reason: "kimi has no Claude-style external statusline hook; statusline install/uninstall is NotImplemented."
+  - capability: current_quota_signal
+    reason: "kimi exposes no CLI quota/usage output; ccm usage show/advise returns available:false / signal:null."
+supported:
+  - capability: board_operations
+    reason: "ccm board/task/log/jc/cadence/watchdog commands are harness-neutral."
+  - capability: plugin_upgrade
+    reason: "ccm upgrade plugin may refresh local kimi plugin registration from plugin/dist/kimi-code (managed-dir reinstall) when the kimi upgrade adapter is available; otherwise manual reinstall."
+  - capability: plugin_skills_distribution
+    reason: "kimi command-like入口与 hooks 通过 plugin skills + host-native manifest commands 实现。"
+slot_replacements:
+  "{{USING_CCM_DESCRIPTION}}": adapters/kimi-code/overlays/description.md
+  "{{USING_CCM_BOUNDARY}}": adapters/kimi-code/overlays/boundary.md
+  "{{USING_CCM_POINTERS_HOST}}": adapters/kimi-code/overlays/pointers-host.md
+  "{{USING_CCM_EXECUTOR_TABLE_ROWS}}": adapters/kimi-code/overlays/executor-table-rows.md
+  "{{USING_CCM_EXECUTOR_DECISION_TAIL}}": adapters/kimi-code/overlays/executor-decision-tail.md
+  "{{USING_CCM_WATCHDOG_PROBLEM}}": adapters/kimi-code/overlays/watchdog-problem.md
+  "{{USING_CCM_WATCHDOG_HOOK_REMINDER}}": adapters/kimi-code/overlays/watchdog-hook-reminder.md
+  "{{USING_CCM_WATCHDOG_MECHANISM_ROWS}}": adapters/kimi-code/overlays/watchdog-mechanism-rows.md
+  "{{USING_CCM_WATCHDOG_SHELL_GUIDANCE}}": adapters/kimi-code/overlays/watchdog-shell-guidance.md
+  "{{USING_CCM_WATCHDOG_CANCEL_GUIDANCE}}": adapters/kimi-code/overlays/watchdog-cancel-guidance.md
+  "{{USING_CCM_WATCHDOG_DISARM_WARNING}}": adapters/kimi-code/overlays/watchdog-disarm-warning.md
+  "{{USING_CCM_BOARD_GUARD_GUIDANCE}}": adapters/kimi-code/overlays/board-guard-guidance.md
+  "{{USING_CCM_TASK_ADD_EXAMPLE}}": adapters/kimi-code/overlays/task-add-example.md
+  "{{USING_CCM_WATCHDOG_ARM_EXAMPLE}}": adapters/kimi-code/overlays/watchdog-arm-example.md
+  "{{USING_CCM_SESSION_ID_FLAG}}": adapters/kimi-code/overlays/session-id-flag.md
+  "{{USING_CCM_BOARD_ARCHIVE_BEHAVIOR}}": adapters/kimi-code/overlays/board-archive-behavior.md
+  "{{USING_CCM_ACCOUNT_NAMESPACE}}": adapters/kimi-code/overlays/account-namespace.md
+  "{{USING_CCM_STATUSLINE_NAMESPACE}}": adapters/kimi-code/overlays/statusline-namespace.md
+  "{{USING_CCM_STATUSLINE_NAMESPACE_ROW}}": adapters/kimi-code/overlays/statusline-namespace-row.md
+  "{{USING_CCM_UPGRADE_NAMESPACE}}": adapters/kimi-code/overlays/upgrade-namespace.md
+  "{{USING_CCM_UPGRADE_PLUGIN_BEHAVIOR}}": adapters/kimi-code/overlays/upgrade-plugin-behavior.md
+  "{{USING_CCM_ACCOUNT_NAMESPACE_ROW}}": adapters/kimi-code/overlays/account-namespace-row.md
+  "{{USING_CCM_OBSERVABILITY_SOURCE}}": adapters/kimi-code/overlays/observability-source.md
+  "{{USING_CCM_DECISION_PACKAGE_ENTRYPOINT}}": adapters/kimi-code/overlays/decision_package-entrypoint.md
+  "{{USING_CCM_ENTER_CMD_EXAMPLE}}": adapters/kimi-code/overlays/enter-cmd-example.md
+  "{{USING_CCM_JC_HOOK_GUIDANCE}}": adapters/kimi-code/overlays/jc-hook-guidance.md
+  "{{USING_CCM_WATCHDOG_JOB_ID_GUIDANCE}}": adapters/kimi-code/overlays/watchdog-job-id-guidance.md
+  "{{USING_CCM_WAKEUP_SELF_HEAL_GUIDANCE}}": adapters/kimi-code/overlays/wakeup-self-heal-guidance.md
+  "{{USING_CCM_EXIT_CODES}}": adapters/kimi-code/overlays/exit-codes.md
+  "{{USING_CCM_POLICY_NAMESPACE_ROW}}": adapters/kimi-code/overlays/policy-namespace-row.md
+  "{{USING_CCM_POLICY_DENY_EXIT_ROW}}": adapters/kimi-code/overlays/policy-deny-exit-row.md
+  "{{USING_CCM_POLICY_NAMESPACE}}": adapters/kimi-code/overlays/policy-namespace.md
+  "{{USING_CCM_POLICY_JSON_EXAMPLE}}": adapters/kimi-code/overlays/policy-json-example.md
+  "{{USING_CCM_BOARD_POLICY_GUIDANCE}}": adapters/kimi-code/overlays/board-policy-guidance.md
+  "{{USING_CCM_FMT_POLICY_ROW}}": adapters/kimi-code/overlays/fmt-policy-row.md
+  "{{USING_CCM_COORDINATION_QUOTA_MODEL_EXAMPLE}}": adapters/kimi-code/overlays/coordination-quota-model-example.md
+  "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/kimi-code/overlays/cross-harness-target-facts-pointer.md
+notes:
+  - kimi projects the canonical ccm guide plus host-specific account/statusline/upgrade and executor/watchdog slots (no quota signal; built-in subagent roles + background Bash; no account switch).

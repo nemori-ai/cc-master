@@ -1,0 +1,54 @@
+host: kimi-code
+skill: master-orchestrator-guide
+version: 1
+projection:
+  source: canonical/
+  target: skills/master-orchestrator-guide/
+  copy: true
+  exclude:
+    - AGENTS.md
+    - CLAUDE.md
+runtime_contracts:
+  provider_guidance:
+    registry: ../provider-guidance-runtime.json
+    host: kimi-code
+    skill: master-orchestrator-guide
+mode: copy
+exclude_canonical:
+  - references/cost-decisions.md
+  - scripts/codex-review.sh
+slot_replacements:
+  "{{BACKGROUND_DISPATCH_SUMMARY}}": adapters/kimi-code/overlays/background-dispatch-summary.md
+  "{{BACKGROUND_DISPATCH_LENS}}": adapters/kimi-code/overlays/background-dispatch-lens.md
+  "{{DISPATCH_REFERENCE_SUMMARY}}": adapters/kimi-code/overlays/dispatch-reference-summary.md
+  "{{BACKGROUND_DISPATCH_MECHANISM_LIST}}": adapters/kimi-code/overlays/background-dispatch-mechanism-list.md
+  "{{BACKGROUND_DISPATCH_EXECUTOR_MAPPING}}": adapters/kimi-code/overlays/background-dispatch-executor-mapping.md
+  "{{BACKGROUND_DISPATCH_MECHANISMS}}": adapters/kimi-code/overlays/background-dispatch-mechanisms.md
+  "{{BACKGROUND_EXTERNAL_WAIT_GUIDANCE}}": adapters/kimi-code/overlays/background-external-wait-guidance.md
+  "{{WATCHDOG_WAKEUP_TOOL_CHAIN}}": adapters/kimi-code/overlays/watchdog-wakeup-tool-chain.md
+  "{{WATCHDOG_WAKEUP_TOOL_CHAIN_INLINE}}": adapters/kimi-code/overlays/watchdog-wakeup-tool-chain-inline.md
+  "{{AUTHORING_WORKFLOWS_ROW}}": adapters/kimi-code/overlays/authoring-workflows-row.md
+  "{{COST_DECISIONS_REFERENCE_ROW}}": adapters/kimi-code/overlays/cost-decisions-reference-row.md
+  "{{COMMAND_SURFACE_GUIDANCE}}": adapters/kimi-code/overlays/command-surface-guidance.md
+  "{{CCM_COMMAND_CATALOG_POINTER}}": adapters/kimi-code/overlays/ccm-command-catalog-pointer.md
+  "{{USING_CCM_BOARD_MODEL_POINTER}}": adapters/kimi-code/overlays/using-ccm-board-model-pointer.md
+  "{{DECISION_PACKAGE_CONSUMPTION}}": adapters/kimi-code/overlays/decision_package-consumption.md
+  "{{DATAFLOW_MICRO_SCALE_GUIDANCE}}": adapters/kimi-code/overlays/dataflow-micro-scale-guidance.md
+  "{{EXECUTOR_VALUE_GUIDANCE}}": adapters/kimi-code/overlays/executor-value-guidance.md
+  "{{ASYNC_COMPLETION_INTEGRATION}}": adapters/kimi-code/overlays/async-completion-integration.md
+  "{{DISCUSS_SESSION_GUIDANCE}}": adapters/kimi-code/overlays/discuss-session-guidance.md
+  "{{WATCHDOG_RETIRE_SCHEDULER_GUIDANCE}}": adapters/kimi-code/overlays/watchdog-retire-scheduler-guidance.md
+  "{{PLATFORM_RESUME_GUIDANCE}}": adapters/kimi-code/overlays/platform-resume-guidance.md
+  "{{HETEROGENEOUS_REVIEW_MECHANISM}}": adapters/kimi-code/overlays/heterogeneous-review-mechanism.md
+  "{{HANDOFF_REFERENCE_ROW}}": adapters/kimi-code/overlays/handoff-reference-row.md
+  "{{CROSS_HARNESS_WORKER_HELP_POINTER}}": adapters/kimi-code/overlays/cross-harness-worker-help-pointer.md
+  "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/kimi-code/overlays/cross-harness-target-facts-pointer.md
+notes:
+  - kimi-code projection uses the host-neutral canonical body, including machine-wide selected-target quota guidance, plus kimi built-in subagent / Bash dispatch and background-Bash-floor watchdog slots.
+  - kimi has no CLI quota signal; Workflow remains unsupported.
+  - Exclude cost-decisions.md (Claude Code account-pool switching is unsupported on kimi-code); keep
+    codex-review.sh excluded (optional external). Unlike Codex/Cursor, DO project handoff.md — its
+    content is host-neutral (no Claude-specific tokens) and the `cc-master:handoff-to-new-session`
+    command body and SKILL.md's own command-entry bullet both point at it; excluding it would leave a
+    dangling reference (codex second-opinion review, PR #159).
+  - Heterogeneous second-perspective review is a host slot: kimi picks a cross-harness worker (Codex/Claude via ccm), not its own same-model subagent.

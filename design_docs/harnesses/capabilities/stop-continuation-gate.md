@@ -30,6 +30,7 @@ unarmed watchdogs, check rollup consistency, and **bound infinite stop loops** (
 | claude-code | implemented | `Stop` → `decision:block` + fingerprint dedup sidecar + FUSE | ADR-018 directive/advisory |
 | codex | implemented-blocking | `Stop` → `decision:block` + `runtime.stop_allow_until` release valve + streak FUSE | See verify-board CONTRACT |
 | cursor | implemented | `stop` → **`followup_message`** auto-continue (not hard block) + `loop_limit` (default 5, docs) + `loop_count` in stdin + session FUSE sidecar aligned with Codex streak model | Track B; D6 closed by official docs 2026-07-09 |
+| kimi-code | implemented | Stop `permissionDecision="deny"` → agent continues once (built-in guard) + reason injected (K4 probe) | verify-board gate; session-level FUSE (5) bounds loops; no non-blocking Stop advisory |
 
 ## Declared divergence
 
@@ -51,6 +52,15 @@ unarmed watchdogs, check rollup consistency, and **bound infinite stop loops** (
   affected_hosts: [codex, cursor]
   reason: Claude fingerprint dedup on unchanged completion state; Codex uses stop_allow_until; Cursor uses followup loop.
   compensating_mechanism: stop_allow_until + FUSE on Codex/Cursor; fingerprint on Claude.
+  tracked_by: plugin/src/hooks/verify-board/CONTRACT.md
+
+- rule: stop-continuation-kimi-envelope
+  kind: host-convention-divergence
+  affected_hosts: [kimi-code]
+  reason: >
+    kimi Stop surfaces only via permissionDecision="deny" (continue once + reason injected); a non-deny
+    Stop message is discarded (triggerBlock consumes only the block decision — K4 probe).
+  compensating_mechanism: verify-board emits kind:block → permissionDecision deny; per-cycle guard + FUSE(5) bound loops.
   tracked_by: plugin/src/hooks/verify-board/CONTRACT.md
 ```
 

@@ -1,0 +1,164 @@
+host: kimi-code
+updated: 2026-07-16
+status: runtime_adapter_with_verified_dispatch_primitives
+capabilities:
+  project_skills:
+    location: "plugin skills via kimi.plugin.json skills field (kimi-code plugin skills surface)"
+    symlink_supported: false
+  path_tokens:
+    plugin_root:
+      token: "KIMI_PLUGIN_ROOT"
+      scope: "hook/MCP subprocess env only; not substituted in skill or command bodies"
+      status: hook_subprocess_env_only
+    skill_dir:
+      token: "${KIMI_SKILL_DIR}"
+      status: skill_body_text_substitution
+    plugin_data: null
+    notes:
+      - "kimi does documented text substitution (content.replaceAll) on ${KIMI_SKILL_DIR} and ${KIMI_SESSION_ID} inside skill/command bodies — stronger than Cursor which has no skill-body path token."
+      - "${KIMI_PLUGIN_ROOT} is NOT substituted in bodies (grep count 0); it is only a hook/MCP subprocess env. Do not write ${KIMI_PLUGIN_ROOT} in skill prose."
+      - "Skill prose that references its own bundled resource uses ${KIMI_SKILL_DIR}/...; cross-skill references stay bare skill names. Never project ${CLAUDE_PLUGIN_ROOT} / ${PLUGIN_ROOT} into kimi skill bodies."
+      - "Hook commands read the install root from $KIMI_PLUGIN_ROOT (shell-expanded in the command string) or launcher __dirname / launcher-injected CC_MASTER_PLUGIN_ROOT."
+  background_dispatch:
+    scope: "cc-master dispatch primitives usable by a kimi-code agent at runtime"
+    subagent:
+      available: true
+      candidate_official_surface: "Task tool (built-in roles only)"
+      mapping_status: "docs_and_runtime_tool_model"
+      notes:
+        - "kimi Task tool launches built-in subagent roles via subagent_type: coder (default), explore (read-only), plan, general — plus Agent Swarm for parallel built-in roles."
+        - "No custom subagent roles: the manifest has no agents field. Do not invent role names; use the built-in roles."
+        - "Record the host-returned agent id as the recon handle; do not invent a handle."
+        - "Not Claude Code run_in_background Agent; not Codex spawn_agent; not Cursor generalPurpose Task."
+    workflow:
+      available: false
+      mapping_status: "unsupported"
+      notes:
+        - "No verified kimi equivalent of Claude Code Workflow / dynamic-workflow. authoring-workflows stays unsupported_stub."
+        - "Substitute: built-in Task subagent roles, Agent Swarm, or background Bash task."
+    shell:
+      available: true
+      candidate_official_surface: "Bash tool (background task)"
+      mapping_status: "docs_and_runtime_tool_model"
+      notes:
+        - "Background execution: the Bash tool supports background tasks (bashAutoBackgroundOnTimeout / keepAliveOnExit); poll the task output until the predicate is met or timeout."
+        - "Record task id, command, cwd, predicate, and cancellation method as the handle."
+        - "Tool name in hooks and prose is Bash (not Cursor's Shell)."
+  command_surface:
+    status: host_native_commands_md
+    plugin_distributed_slash_commands: host_native_markdown
+    init_prompt_prefixes:
+      - "cc-master:as-master-orchestrator <goal> [flags]"
+    slash_commands:
+      - "cc-master:as-master-orchestrator"
+      - "cc-master:discuss"
+      - "cc-master:distill"
+      - "cc-master:handoff-to-new-session"
+      - "cc-master:retro"
+      - "cc-master:stop"
+    supported:
+      - "fresh board creation via UserPromptSubmit bootstrap"
+      - "host-native command markdown projection for all required commands (namespaced cc-master:<command>)"
+    unsupported:
+      - "user/project command directories (kimi commands come only from plugin manifest commands[] + skill /skill:<name>)"
+    notes:
+      - "kimi projects commands as host-native markdown through the plugin manifest commands[] field; the surface is namespaced <plugin>:<command> = cc-master:<command>."
+      - "cc-master:stop is namespaced and does NOT collide with any built-in command — no rename needed (source dir stays stop, frontmatter name stop)."
+      - "cc-master-* skills are unsupported_stub; the namespaced commands are the entry."
+  completion_notification:
+    status: subagent_stop_and_bash_poll
+    notes:
+      - "Subagent completion observable via SubagentStop; background Bash task completion via polling the task output."
+      - "No Claude Code <task-notification> equivalent assumed."
+  watchdog_wakeup:
+    chain:
+      - "background_bash_until_floor"
+      - "manual_recon"
+    scope: "cc-master in-thread self-wakeup/watchdog primitive"
+    status: degrade_to_shell_floor
+    native_primitives:
+      CronCreate:
+        available: false
+        notes:
+          - "kimi has KIMI_CRON_* env but no agent-facing CronCreate-equivalent tool for cc-master watchdog."
+      ScheduleWakeup:
+        available: false
+        notes:
+          - "No kimi agent-facing ScheduleWakeup-equivalent tool documented for cc-master watchdog."
+      Monitor:
+        available: false
+        notes:
+          - "Do not project Claude Monitor semantics into kimi."
+    official_alternatives:
+      background_shell_until:
+        status: runtime_tool_model
+        fit: "Universal floor for same-session watchdog/check loops."
+        notes:
+          - "Arm a background Bash task that polls a predicate until true or timeout; record task id as handle."
+          - "Poll the task output rather than assuming Claude task-notification."
+      loop_skill:
+        status: optional_host_skill
+        fit: "Recurring prompt on an interval only where the environment provides such a skill."
+        notes:
+          - "Not a drop-in CronCreate; use only when the user/environment already supports it."
+    notes:
+      - "Watchdog degrades to the background-Bash floor. Do not teach CronCreate / ScheduleWakeup / Monitor on kimi."
+  hooks:
+    key: hooks
+    plugin_root_token:
+      token: "KIMI_PLUGIN_ROOT"
+      status: hook_subprocess_env
+    default_plugin_hook_path: "manifest inline hooks[] array (not a hooks.json file)"
+    implemented:
+      bootstrap-board:
+        event: UserPromptSubmit
+        mode: fresh_arm
+      reinject:
+        event: PostCompact
+        mode: post_compact_message_or_session_start_substrate
+      verify-board:
+        event: Stop
+        mode: followup_message
+      usage-pacing:
+        event: Stop
+        mode: message_when_signal_present
+      identity-nudge:
+        event: Stop
+        mode: message
+      board-guard:
+        event: PreToolUse
+        mode: permission_deny
+        matcher: "Bash|Write|Edit|MultiEdit"
+      board-lint:
+        event: PostToolUse
+        mode: message
+        matcher: "Write|Edit|MultiEdit"
+    unsupported:
+      posttool-batch:
+        reason: "No PostToolBatch-equivalent batch boundary event on kimi."
+    output_envelopes:
+      message:
+        documented_events: [UserPromptSubmit, SessionStart, PostToolUse, Stop, PostCompact]
+        note: "Context injection is top-level message or hookSpecificOutput.message (NOT additionalContext / systemMessage)."
+      permission_deny:
+        verified_events: [PreToolUse]
+        note: "hookSpecificOutput.permissionDecision=deny + permissionDecisionReason."
+  quota_signal:
+    source: "none — kimi exposes no CLI quota/usage output"
+    status: unsupported
+    window: null
+    supported: []
+    unsupported:
+      - "5h rolling window (window_5h_pct is null on kimi)"
+      - "7d rolling window (window_7d_pct is null on kimi)"
+      - "billing_period window (kimi has no CLI usage command)"
+      - "stop_5h / stop_7d / stop_billing_period / switch verdicts as kimi pacing targets"
+    notes:
+      - "kimi has no `kimi usage` command and no CLI-side quota structure; ccm usage show/advise returns available:false / signal:null."
+      - "Do not pace kimi against any window. Do not invent percentages; hooks stay silent when there is no signal."
+  account_switch:
+    backend: null
+    status: unsupported
+    notes:
+      - "ccm account pool capture/switch binds Claude OAuth stores; kimi returns NotImplemented."
+      - "Never suggest ccm account switch as a kimi pacing lever."
