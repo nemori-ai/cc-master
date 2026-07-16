@@ -1,4 +1,5 @@
 import type {
+  AgentStreamPayload,
   BoardExtrasPayload,
   BoardsPayload,
   CompactAgent,
@@ -934,5 +935,85 @@ export const fixtureStatusReport: StatusReportPayload = {
     { id: 'lint', label: 'Board lint', state: 'warning', detail: '2 warnings' },
     { id: 'usage', label: 'Usage verdict', state: 'ok', detail: 'within pacing corridor' },
     { id: 'freshness', label: 'Report freshness', state: 'fresh', detail: '18s ago' },
+  ],
+};
+
+// Offline sample for the agent live-stream drawer — one turn's worth of normalized events across
+// every kind (user / assistant / thinking / tool / tool_result / system / raw), shaped exactly
+// like a `/agent-stream.json` tail page so the drawer and its tests can render without a server.
+export const fixtureAgentStream: AgentStreamPayload = {
+  schema: 'ccm/web-viewer-agent-stream/v1',
+  agent_id: 'agt-001',
+  mode: 'tail',
+  source: {
+    kind: 'transcript',
+    harness: 'claude-code',
+    path: '/home/dev/.claude/projects/-repo/9f2c-…-session.jsonl',
+    size: 48213,
+    mtime: '2026-07-08T12:24:10Z',
+  },
+  live: { active: true, as_of: '2026-07-08T12:24:18Z' },
+  cursor: { next: 48213, prev: 41022, at_start: false },
+  reset: false,
+  events: [
+    {
+      id: '41022.0',
+      kind: 'user',
+      title: 'user',
+      text: 'Add a retry with backoff to the upload client and cover it with a test.',
+      ts: '2026-07-08T12:23:41Z',
+    },
+    {
+      id: '41780.0',
+      kind: 'thinking',
+      title: 'thinking',
+      text: 'The client has no retry today. I will wrap the request in an exponential backoff loop and add a fake-timer test.',
+      ts: '2026-07-08T12:23:48Z',
+    },
+    {
+      id: '42310.0',
+      kind: 'assistant',
+      title: 'assistant',
+      text: "I'll add a bounded exponential backoff to `upload()` and a test that asserts three attempts before success.",
+      ts: '2026-07-08T12:23:52Z',
+    },
+    {
+      id: '42980.0',
+      kind: 'tool',
+      title: 'Edit',
+      text: 'Edit',
+      detail:
+        '{"file_path":"src/upload.ts","old_string":"await post(url, body)","new_string":"await withBackoff(() => post(url, body), { retries: 3 })"}',
+      ts: '2026-07-08T12:23:59Z',
+    },
+    {
+      id: '43610.0',
+      kind: 'tool_result',
+      title: 'tool result',
+      text: 'Applied edit to src/upload.ts (1 hunk).',
+      ts: '2026-07-08T12:24:01Z',
+    },
+    {
+      id: '44120.0',
+      kind: 'tool',
+      title: 'Bash',
+      text: 'Bash',
+      detail: '{"command":"npm test -- upload","description":"Run the upload test suite"}',
+      ts: '2026-07-08T12:24:06Z',
+    },
+    {
+      id: '44820.0',
+      kind: 'tool_result',
+      title: 'tool result',
+      text: 'PASS  src/upload.test.ts\n  ✓ retries three times then succeeds (14 ms)',
+      ts: '2026-07-08T12:24:10Z',
+    },
+    {
+      id: '45510.0',
+      kind: 'system',
+      title: 'system',
+      text: 'context compacted (turn boundary)',
+      ts: '2026-07-08T12:24:11Z',
+    },
   ],
 };

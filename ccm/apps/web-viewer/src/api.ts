@@ -1,6 +1,7 @@
 import { fixtureBoards, fixtureStatusReport, fixtureTask, fixtureViewModel } from './fixtures';
 import type {
   AgentDetailPayload,
+  AgentStreamPayload,
   BoardsPayload,
   DecisionEntry,
   PeersPayload,
@@ -70,6 +71,29 @@ export async function loadAgentDetail(
     throw new Error(String(payload.error));
   }
   return payload;
+}
+
+/**
+ * Agent live-stream page from `/agent-stream.json`. Three read modes tile perfectly by
+ * byte-offset cursor: omit both params for the tail (latest screen), pass `cursor` (a prior
+ * `cursor.next`) to pull newer events forward, or pass `before` (a prior `cursor.prev`) to page
+ * older history backward. Fail-loud on transport so the drawer can surface a retry state — but
+ * a `source.kind==='none'` body is a normal 200 (the agent exposes no transcript), not an error.
+ */
+export async function loadAgentStream(
+  agentId: string,
+  opts: { boardFilename?: string; cursor?: string; before?: string } = {},
+  signal?: AbortSignal,
+): Promise<AgentStreamPayload> {
+  return getJson<AgentStreamPayload>(
+    withParams('/agent-stream.json', {
+      agent: agentId,
+      board: opts.boardFilename,
+      cursor: opts.cursor,
+      before: opts.before,
+    }),
+    signal,
+  );
 }
 
 /**

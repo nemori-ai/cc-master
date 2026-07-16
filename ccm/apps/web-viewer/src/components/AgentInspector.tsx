@@ -16,6 +16,7 @@ interface AgentInspectorProps {
   agentLoading?: boolean;
   onClose?: () => void;
   onSelectTask: (taskId: string) => void;
+  onOpenStream?: () => void;
 }
 
 function str(value: unknown): string | null {
@@ -40,6 +41,7 @@ export function AgentInspector({
   agentLoading = false,
   onClose,
   onSelectTask,
+  onOpenStream,
 }: AgentInspectorProps) {
   const record = detail.agent ?? {};
   const compact = detail.compact ?? null;
@@ -47,6 +49,13 @@ export function AgentInspector({
   const handle = obj(record, 'handle');
   const launch = obj(record, 'launch');
   const probe = detail.probe ?? null;
+
+  // Whether a live transcript stream can plausibly resolve — a session-id handle or a recorded
+  // transcript ref. The drawer itself confirms and shows the real reason on `source.kind==='none'`.
+  const streamAvailable =
+    compact?.has_transcript === true ||
+    str(handle.transcript_ref) !== null ||
+    str(handle.kind) === 'session-id';
 
   const id = str(record.id) ?? compact?.id ?? 'agent';
   const state = str(lifecycle.state) ?? compact?.state ?? 'unknown';
@@ -137,6 +146,21 @@ export function AgentInspector({
         >
           ✕
         </button>
+      </div>
+
+      <div className="dsect stream-cta">
+        {streamAvailable ? (
+          <button
+            className="stream-open-btn"
+            onClick={onOpenStream}
+            title="Watch this agent's live work stream"
+            type="button"
+          >
+            ▶ VIEW STREAM
+          </button>
+        ) : (
+          <div className="dim-note">no live stream — this agent exposes no transcript source</div>
+        )}
       </div>
 
       {attachCmd ? (

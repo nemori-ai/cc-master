@@ -313,6 +313,49 @@ export interface AgentDetailPayload {
   error?: string;
 }
 
+// ---- Agent live stream (server-normalized transcript tail; frontend renders, never parses) --
+
+export type StreamEventKind =
+  | 'user'
+  | 'assistant'
+  | 'thinking'
+  | 'tool'
+  | 'tool_result'
+  | 'system'
+  | 'raw';
+
+/** One normalized stream event from `/agent-stream.json` (server `buildAgentStream`). */
+export interface StreamEvent {
+  id: string; // stable key (`${lineByteOffset}.${blockIndex}`) — dedup + React key across pages
+  kind: StreamEventKind;
+  title: string;
+  text: string;
+  detail?: string;
+  ts?: string;
+  truncated?: boolean;
+}
+
+/** `/agent-stream.json` incremental-tail payload. Source info is nested so the cursor protocol
+ *  can outlive the "file" concept (a future run-store journal is the same shape). */
+export interface AgentStreamPayload {
+  schema?: string;
+  agent_id: string;
+  mode: 'tail' | 'forward' | 'backward' | 'none';
+  source: {
+    kind: 'transcript' | 'none';
+    harness: string;
+    path?: string;
+    size?: number;
+    mtime?: string;
+    reason?: string;
+  };
+  live: { active: boolean; as_of: string };
+  cursor: { next: number; prev: number; at_start: boolean };
+  events: StreamEvent[];
+  reset: boolean;
+  error?: string;
+}
+
 /** One same-home peer board row from `/peers.json` (read-only roster). */
 export interface PeerSummary {
   board_file: string;

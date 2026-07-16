@@ -23,6 +23,7 @@ import { readVersion } from '../help.js';
 import * as io from '../io.js';
 import { ensureWebViewerAppDist, resolveAppDistDir } from '../web-viewer-app-dist.js';
 import type { Ctx } from './_common.js';
+import { AGENT_STREAM_SCHEMA, buildAgentStream } from './agent-stream.js';
 import { writeReportForBoard } from './status-report.js';
 
 const EXIT = io.EXIT;
@@ -2101,6 +2102,32 @@ function buildAgentDetail(boardPath: string, agentIdValue: string): JsonRecord |
   };
 }
 
+// Resolve an agent's transcript-source handle for /agent-stream.json. Read-only board lookup:
+// returns the harness + handle fields buildAgentStream needs to locate the transcript file, or
+// null when the agent id is unknown on this board.
+interface AgentStreamHandle {
+  harness: string;
+  handleKind: string;
+  handleValue: string;
+  transcriptRef: string | null;
+}
+
+function resolveAgentStreamHandle(
+  boardPath: string,
+  agentIdValue: string,
+): AgentStreamHandle | null {
+  const snapshot = readBoardSnapshot(boardPath);
+  const agent = agentsOf(snapshot.board).find((candidate) => agentId(candidate) === agentIdValue);
+  if (!agent) return null;
+  const handle = objectField(agent, 'handle');
+  return {
+    harness: typeof agent.harness === 'string' ? agent.harness : 'unknown',
+    handleKind: typeof handle.kind === 'string' ? handle.kind : 'none',
+    handleValue: typeof handle.value === 'string' ? handle.value : '',
+    transcriptRef: typeof handle.transcript_ref === 'string' ? handle.transcript_ref : null,
+  };
+}
+
 // ---- /peers.json — same-home peer roster (engine buildPeerRoster, `ccm peers` source) ---
 // Read-only cross-board awareness: every OTHER active + heartbeat-fresh board in the same
 // home, plus the current board's coordination.inbox as a notification summary. Fail-safe
@@ -2994,6 +3021,63 @@ export function serve(ctx: Ctx): Promise<number> {
         } catch (e) {
           sendJson(res, 200, {
             schema: AGENT_DETAIL_SCHEMA,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+        return;
+      }
+      if (url.pathname === '/agent-stream.json') {
+        const runtimeState = latestRuntimeState(state);
+        const boardPath = resolveHttpBoard(
+          runtimeState.home,
+          runtimeState.current_selection?.board_path || null,
+          url,
+        );
+        if (!boardPath) {
+          sendJson(res, 404, { schema: AGENT_STREAM_SCHEMA, error: 'board not found' });
+          return;
+        }
+        const requestedAgent = url.searchParams.get('agent') || url.searchParams.get('id');
+        if (!requestedAgent) {
+          sendJson(res, 400, { schema: AGENT_STREAM_SCHEMA, error: 'missing agent parameter' });
+          return;
+        }
+        // cursor: 'tail' | non-negative int | absent; before: non-negative int | absent. Reject
+        // malformed offsets up front so buildAgentStream only ever sees validated params.
+        const cursorParam = url.searchParams.get('cursor');
+        const beforeParam = url.searchParams.get('before');
+        const isOffset = (v: string) => /^\d+$/.test(v);
+        if (cursorParam != null && cursorParam !== 'tail' && !isOffset(cursorParam)) {
+          sendJson(res, 400, { schema: AGENT_STREAM_SCHEMA, error: 'invalid cursor parameter' });
+          return;
+        }
+        if (beforeParam != null && !isOffset(beforeParam)) {
+          sendJson(res, 400, { schema: AGENT_STREAM_SCHEMA, error: 'invalid before parameter' });
+          return;
+        }
+        try {
+          const handle = resolveAgentStreamHandle(boardPath, requestedAgent);
+          if (!handle) {
+            sendJson(res, 404, { schema: AGENT_STREAM_SCHEMA, error: 'agent not found' });
+            return;
+          }
+          sendJson(
+            res,
+            200,
+            buildAgentStream({
+              agentId: requestedAgent,
+              harness: handle.harness,
+              handleKind: handle.handleKind,
+              handleValue: handle.handleValue,
+              transcriptRef: handle.transcriptRef,
+              cursorParam,
+              beforeParam,
+              env: ctx.env,
+            }),
+          );
+        } catch (e) {
+          sendJson(res, 200, {
+            schema: AGENT_STREAM_SCHEMA,
             error: e instanceof Error ? e.message : String(e),
           });
         }

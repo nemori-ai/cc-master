@@ -80,6 +80,7 @@ interface SessionScan {
 interface WalkFile {
   base: string; // 文件名去掉 .json/.jsonl 后缀
   mtimeMs: number; // 遍历时一次 stat（索引经 dirCache memo·匹配阶段零 fs 调用）
+  full: string; // 绝对路径（transcript 定位复用同一索引取文件路径）
 }
 
 interface WalkIndex {
@@ -131,7 +132,7 @@ function walkSessionRoot(root: string, cache?: Map<string, unknown>): WalkIndex 
           const base = stripSessionExt(ent.name);
           if (base !== null) {
             try {
-              files.push({ base, mtimeMs: statSync(full).mtimeMs });
+              files.push({ base, mtimeMs: statSync(full).mtimeMs, full });
             } catch {
               complete = false; // stat 失败：该文件「没拿到」——不可作消失证据
             }
@@ -304,6 +305,97 @@ export function probeAgent(input: ProbeInput, opts: ProbeOpts = {}): ProbeResult
 
   // 无可探测句柄（none / 缺失）→ 保真 unknown。
   return { method: 'none', observed: 'unknown' };
+}
+
+// ── transcript 文件定位（复用 probe 的会话根解析 + 文件匹配·供实时流增量 tail 用）─────────────
+//   与 probeAgent 共享同一套 roots / 匹配规则，避免第二份 ~/.codex ~/.claude 平行实现。
+//   保真：拿不到就返回 null（调用方如实降级 source.kind='none'），绝不猜路径。
+
+export interface TranscriptLocation {
+  path: string;
+  mtimeMs: number;
+}
+
+// claude-code：projects/<slug>/<sid>.jsonl 目标寻址（同 scanClaudeRoots 的 slug 策略）。
+function locateClaudeTranscript(
+  roots: string[],
+  sid: string,
+  cache?: Map<string, unknown>,
+): TranscriptLocation | null {
+  let best: TranscriptLocation | null = null;
+  for (const root of roots) {
+    const key = `slugs:${root}`;
+    let idx = cache?.get(key) as { slugs: string[]; complete: boolean } | undefined;
+    if (!idx) {
+      let slugs: string[] = [];
+      let ok = true;
+      if (existsSync(root)) {
+        try {
+          slugs = readdirSync(root, { withFileTypes: true })
+            .filter((d) => d.isDirectory())
+            .map((d) => d.name);
+        } catch {
+          ok = false;
+        }
+      }
+      idx = { slugs, complete: ok };
+      cache?.set(key, idx);
+    }
+    for (const slug of idx.slugs) {
+      const candidate = join(root, slug, `${sid}.jsonl`);
+      if (!existsSync(candidate)) continue;
+      try {
+        const m = statSync(candidate).mtimeMs;
+        if (best === null || m > best.mtimeMs) best = { path: candidate, mtimeMs: m };
+      } catch {
+        /* stat 失败：该候选拿不到路径·跳过 */
+      }
+    }
+  }
+  return best;
+}
+
+// 通用策略：递归 walk 索引 + 文件名边界匹配，多命中取最新 mtime（复用 scanWalkRoots 的索引）。
+function locateWalkTranscript(
+  roots: string[],
+  sid: string,
+  cache?: Map<string, unknown>,
+): TranscriptLocation | null {
+  let best: TranscriptLocation | null = null;
+  for (const root of roots) {
+    const idx = walkSessionRoot(root, cache);
+    for (const f of idx.files) {
+      if (!baseMatchesSid(f.base, sid)) continue;
+      if (best === null || f.mtimeMs > best.mtimeMs) best = { path: f.full, mtimeMs: f.mtimeMs };
+    }
+  }
+  return best;
+}
+
+// locateTranscriptFile — 按 agent handle 解析其 transcript 文件路径（实时流的源定位单点）。
+//   优先级：transcript_ref 存在即用 → session-id 经 harness adapter roots + 匹配 → 否则 null。
+export function locateTranscriptFile(
+  input: ProbeInput,
+  opts: ProbeOpts = {},
+): TranscriptLocation | null {
+  const ref = (input.transcriptRef || '').trim();
+  if (ref && existsSync(ref)) {
+    try {
+      return { path: ref, mtimeMs: statSync(ref).mtimeMs };
+    } catch {
+      return null;
+    }
+  }
+  if (input.handleKind === 'session-id' && input.harness) {
+    const value = (input.handleValue || '').trim();
+    if (!value) return null;
+    const roots = sessionRootsFor(input.harness, opts);
+    if (roots.length === 0) return null;
+    return input.harness === 'claude-code'
+      ? locateClaudeTranscript(roots, value, opts.dirCache)
+      : locateWalkTranscript(roots, value, opts.dirCache);
+  }
+  return null;
 }
 
 // mtime 类方法（sid/路径内容寻址·身份强）——orphaned 复活的证据强度门槛。

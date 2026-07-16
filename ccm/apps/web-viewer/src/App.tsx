@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadAgentDetail, loadDecisions, loadPeers, loadTaskDetail, loadWorkspace } from './api';
 import { AgentInspector } from './components/AgentInspector';
 import { AgentRoster } from './components/AgentRoster';
+import { AgentStreamDrawer } from './components/AgentStreamDrawer';
 import { BoardBrief } from './components/BoardBrief';
 import { BoardView } from './components/BoardView';
 import { DagWorkspace } from './components/DagWorkspace';
@@ -49,12 +50,18 @@ function setWorkspaceStateInUrl(
   taskId: string | null,
   agentId: string | null,
   filters: Set<string>,
+  stream: boolean,
 ): void {
   if (typeof window === 'undefined') return;
   window.history.replaceState(
     null,
     '',
-    writeWorkspaceUrlState(window.location.href, { task: taskId, agent: agentId, filters }),
+    writeWorkspaceUrlState(window.location.href, {
+      task: taskId,
+      agent: agentId,
+      filters,
+      stream,
+    }),
   );
 }
 
@@ -91,6 +98,13 @@ function agentFromUrl(): string | null {
     return null;
   }
   return readWorkspaceUrlState(window.location.href).agent;
+}
+
+function streamFromUrl(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  return readWorkspaceUrlState(window.location.href).stream;
 }
 
 function initialTheme(): 'dark' | 'light' {
@@ -163,6 +177,7 @@ export function App() {
   );
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => taskFromUrl());
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(() => agentFromUrl());
+  const [streamOpen, setStreamOpen] = useState<boolean>(() => streamFromUrl());
   const [selectedAgent, setSelectedAgent] = useState<AgentDetailPayload | null>(null);
   const [agentLoading, setAgentLoading] = useState(false);
   const [locateRequest, setLocateRequest] = useState<LocateRequest | null>(null);
@@ -213,11 +228,23 @@ export function App() {
     selectedTaskIdRef.current = selectedTaskId;
   }, [selectedTaskId]);
 
-  // Single URL-sync point: task, agent (mutually exclusive selection), and filters are
-  // mirrored into the querystring from state — handlers only mutate state, never the URL.
+  // Single URL-sync point: task, agent (mutually exclusive selection), filters, and the agent
+  // stream drawer flag are mirrored into the querystring from state — handlers only mutate
+  // state, never the URL. The stream flag is agent-scoped: it only persists with an agent.
   useEffect(() => {
-    setWorkspaceStateInUrl(selectedTaskId, selectedAgentId, activeFilters);
-  }, [selectedTaskId, selectedAgentId, activeFilters]);
+    setWorkspaceStateInUrl(
+      selectedTaskId,
+      selectedAgentId,
+      activeFilters,
+      streamOpen && !!selectedAgentId,
+    );
+  }, [selectedTaskId, selectedAgentId, activeFilters, streamOpen]);
+
+  // The stream drawer is an agent-scoped overlay — clear it whenever no agent is selected so it
+  // never lingers over the mission brief or a task inspector.
+  useEffect(() => {
+    if (!selectedAgentId && streamOpen) setStreamOpen(false);
+  }, [selectedAgentId, streamOpen]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -467,10 +494,15 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [topNotice, shareFallbackUrl]);
 
-  // Keyboard reach: Esc closes the detail rail, `/` focuses search.
+  // Keyboard reach: Esc closes the stream drawer first (it is the top overlay), then the detail
+  // rail; `/` focuses search.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (streamOpen) {
+          setStreamOpen(false);
+          return;
+        }
         setSelectedTaskId(null);
         setSelectedAgentId(null);
         return;
@@ -485,7 +517,7 @@ export function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [streamOpen]);
 
   // Board switch keeps the previous frame mounted (last-known-good) and lets the load
   // effect swap in the new board's data when it arrives — no workspace teardown, no
@@ -785,6 +817,7 @@ export function App() {
               agentLoading={agentLoading}
               detail={railAgent}
               onClose={() => setSelectedAgentId(null)}
+              onOpenStream={() => setStreamOpen(true)}
               onSelectTask={selectTaskFromClick}
             />
           ) : displayedTask ? (
@@ -807,6 +840,19 @@ export function App() {
           )}
         </aside>
       </div>
+
+      {streamOpen && selectedAgentId && !degradedFrame ? (
+        <AgentStreamDrawer
+          agentId={selectedAgentId}
+          boardFilename={workspace.viewModel.board.filename}
+          intent={
+            (typeof railAgent?.agent?.intent === 'string' ? railAgent.agent.intent : null) ??
+            railAgent?.compact?.intent ??
+            undefined
+          }
+          onClose={() => setStreamOpen(false)}
+        />
+      ) : null}
 
       {topNotice ? (
         <div className="top-feedback" role="status">
