@@ -115,6 +115,19 @@ test('create auto-increments ids agt-001 → agt-002', () => {
   );
 });
 
+test('create records launch.cwd: defaults to invocation cwd; explicit --cwd wins', () => {
+  // launch.cwd 是 attach/resume 的关键接入证据（claude-code resume 须回原目录·viewer cwd-aware
+  //   attach 依赖它）——漏传 --cwd 不该让它永远空：默认记录登记时刻的 process.cwd()。
+  const bp = mkBoardHome();
+  agent.create(mkCtx(bp, { values: { type: 'cli-worker', harness: 'codex', intent: 'a' } }));
+  agent.create(
+    mkCtx(bp, { values: { type: 'cli-worker', harness: 'codex', intent: 'b', cwd: '/work/repo' } }),
+  );
+  const board = readBoard(bp);
+  assert.equal(board.agents[0].launch.cwd, process.cwd(), 'default: registration-time cwd');
+  assert.equal(board.agents[1].launch.cwd, '/work/repo', 'explicit --cwd wins');
+});
+
 // ── bind ──────────────────────────────────────────────────────────────────────────────────────────
 test('bind with real handle evidence: starting → running', () => {
   const bp = mkBoardHome();

@@ -83,7 +83,9 @@ export function create(ctx: Ctx): number {
         quota_pool_ref: null,
       };
       if (ctx.values.model !== undefined) rec.model = ctx.values.model;
-      if (ctx.values.cwd !== undefined) rec.launch.cwd = ctx.values.cwd;
+      // launch.cwd 是 attach/resume 的关键接入证据（claude-code resume 必须回原目录·viewer 的
+      //   cwd-aware attach 命令也依赖它）——不靠登记者自觉：--cwd 未传时默认记录登记时刻的工作目录。
+      rec.launch.cwd = ctx.values.cwd !== undefined ? ctx.values.cwd : process.cwd();
       (b.agents as AgentRecord[]).push(rec);
       createdId = id;
       createdRecord = rec;
