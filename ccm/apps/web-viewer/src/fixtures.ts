@@ -664,6 +664,9 @@ const fixtureAgents: CompactAgent[] = [
     has_transcript: true,
     registered_at: '2026-07-08T08:10:00Z',
     ended_at: '2026-07-08T08:52:00Z',
+    // Terminal attribution demo: `fetch-inputs` is a done node, so this chip renders in the
+    // de-emphasized terminal form on its tile (grey lamp, faded, outcome in the hover title).
+    outcome: 'release inputs fetched and checksummed (42 files)',
     probe: { observed: 'gone', as_of: '2026-07-08T08:52:00Z', method: 'session-file-mtime' },
     links: ['fetch-inputs'],
   },

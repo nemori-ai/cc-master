@@ -278,6 +278,9 @@ export interface CompactAgent {
   has_transcript?: boolean;
   registered_at?: string; // elapsed anchor
   ended_at?: string | null;
+  /** Terminal outcome summary when the projection carries one — enriches the chip hover title;
+   *  absent stays absent (the inspector reads the full record via /agent.json). */
+  outcome?: string;
   probe?: AgentProbe | null;
   links?: string[]; // linked task ids
 }

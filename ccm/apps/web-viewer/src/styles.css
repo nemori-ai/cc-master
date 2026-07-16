@@ -1823,6 +1823,17 @@ header.missionline {
 .cc-node .agentchip.orphaned:hover {
   border-color: var(--failed);
 }
+/* terminal agents are attribution, not activity — keep "who did this" on the finished tile,
+   but recede: grey lamp (inline), no clock, faded until hover */
+.cc-node .agentchip.terminal {
+  opacity: 0.55;
+}
+.cc-node .agentchip.terminal .alamp {
+  box-shadow: none;
+}
+.cc-node .agentchip.terminal:hover {
+  opacity: 0.9;
+}
 .cc-node .agentmore {
   font-family: 'Martian Mono', ui-monospace, monospace;
   font-size: 8px;
