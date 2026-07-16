@@ -14,7 +14,7 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 | cross-harness-notification-subscription | implemented-track-b | implemented-track-b | implemented-track-b | [cross-harness-notification-subscription.md](harnesses/capabilities/cross-harness-notification-subscription.md) |
 | cross-harness-session-bound-worker | current | current | current | [cross-harness-session-bound-worker.md](harnesses/capabilities/cross-harness-session-bound-worker.md) |
 | goal-contract-lifecycle | implemented | implemented | implemented-track-b | [goal-contract-lifecycle.md](harnesses/capabilities/goal-contract-lifecycle.md) |
-| machine-wide-quota-notification | contract-red | contract-red | contract-red | [machine-wide-quota-notification.md](harnesses/capabilities/machine-wide-quota-notification.md) |
+| machine-wide-quota-notification | implemented-track-b | implemented-track-b | implemented-track-b | [machine-wide-quota-notification.md](harnesses/capabilities/machine-wide-quota-notification.md) |
 | path-token-resolution | implemented | implemented | implemented | [path-token-resolution.md](harnesses/capabilities/path-token-resolution.md) |
 | post-tool-batch-gate | implemented | unsupported | unsupported | [post-tool-batch-gate.md](harnesses/capabilities/post-tool-batch-gate.md) |
 | role-substrate-reinject | implemented | implemented | implemented | [role-substrate-reinject.md](harnesses/capabilities/role-substrate-reinject.md) |

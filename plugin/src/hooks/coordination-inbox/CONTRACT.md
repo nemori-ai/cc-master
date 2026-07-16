@@ -69,7 +69,7 @@ The cross-surface Capability Card owns intent/status; derived design docs only m
 
 ## 业务规则
 
-### Machine-wide quota signal target rules（R2 contract frozen；production RED）
+### Machine-wide quota signal target rules（implemented Track B；PR #145 / #148）
 
 - `rule-coordination-inbox-machine-quota-delta`: accept `kind:"quota_state_change"` only when payload
   is exact `ccm/machine-quota-decision-delta/v1`, retains the agent-safe
@@ -92,9 +92,12 @@ The cross-surface Capability Card owns intent/status; derived design docs only m
   null means the relation is unknown and also does not authorize additive capacity. Identity/payer/pool diagnostics
   are not posture gates.
 
-These target rules are executable RED and intentionally are not PARITY anchors until all three
-production implementations consume the new kind/schema. Cross-surface intent and maturity live in
-`machine-wide-quota-notification` Capability Card.
+前三个 origin implementation 已消费同一 kind/schema，并由
+`tests/hooks/test_machine-wide-quota-landing.sh` 的三 origin fixture 验证 delta schema/target 保留、
+scope+delta 去重、exact current/list 只读边界、secret/provenance 拒绝、严格 reset marker 与 Codex
+5h/switch 静默；因此前四条是 PARITY anchors。`shared-pool` 仍是 producer/capacity-view 语义：本 hook
+只保留 `quota_scope_digest` 而不计算或相加容量，所以在出现专门的 hook-side capacity 计算前不把它伪装成
+implementation anchor。Cross-surface intent/status 仍归 `machine-wide-quota-notification` Capability Card。
 
 - `rule-coordination-inbox-current-subscription`: for every armed host event, resolve exactly one
   current binding using the canonical `current` command above. The absolute lexical board path,
@@ -144,6 +147,14 @@ own repeat-suppression sidecar under the cc-master home.
 ## PARITY anchors
 
 ```yaml
+- rule: rule-coordination-inbox-machine-quota-delta
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-coordination-inbox-machine-quota-scope-dedup
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-coordination-inbox-machine-quota-read-boundary
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-coordination-inbox-machine-quota-no-account-mutation
+  required_hosts: [claude-code, codex, cursor]
 - rule: rule-coordination-inbox-current-subscription
   required_hosts: [claude-code, codex, cursor]
 - rule: rule-coordination-inbox-bounded-list

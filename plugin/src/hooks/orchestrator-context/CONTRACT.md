@@ -9,7 +9,7 @@ to refresh facts, choose a route, or authorize dispatch.
 
 ## 业务规则
 
-### Machine-wide quota signal target rule（R2 contract frozen；production RED）
+### Machine-wide quota signal target rule（implemented Track B；PR #145 / #148）
 
 - `rule-orchestrator-context-machine-quota-summary`: an optional cached machine quota summary is
   ccm-owned and contains only ordered agent-safe
@@ -22,9 +22,10 @@ to refresh facts, choose a route, or authorize dispatch.
   Identity/payer/pool diagnostics are not posture gates. `healthy` is ambient pacing posture, never task admission
   or spawn authority. Missing/uninstalled/unauthenticated/unsupported/stale is absent or unknown, never healthy.
 
-This target rule is executable RED and intentionally is not a PARITY anchor until the shared payload
-and all three adapters land. Mid-turn decision edges belong to the durable coordination inbox rather
-than repeated full summaries.
+Shared payload 与三个 origin adapter 已落地；`tests/hooks/test_machine-wide-quota-landing.sh` 证明同一
+Cursor IDE/Agent 双 row summary 经 Claude Code SessionStart、Codex SessionStart 与 Cursor postToolUse envelope
+保持不变，且 secret、Codex 5h/action provenance 与非法 truncation fail closed。因此本规则是三 host
+PARITY anchor。Mid-turn decision edge 仍归 durable coordination inbox，而非重复注入 full summary。
 
 - `rule-orchestrator-context-ccm-owned`: every host consumes
   `ccm/origin-context-delivery/v1`; adapters do not recompute candidate eligibility, order, reason,
@@ -73,6 +74,8 @@ launcher-provided, containment-checked board and revalidate it.
 ## PARITY anchors
 
 ```yaml
+- rule: rule-orchestrator-context-machine-quota-summary
+  required_hosts: [claude-code, codex, cursor]
 - rule: rule-orchestrator-context-ccm-owned
   required_hosts: [claude-code, codex, cursor]
 - rule: rule-orchestrator-context-cached-only
