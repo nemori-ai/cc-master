@@ -8,6 +8,7 @@ import {
   resetToTail,
   STREAM_WINDOW_CAP,
   type StreamWindow,
+  sourceRotated,
 } from '../src/streamWindow';
 import type { AgentStreamPayload, StreamEvent } from '../src/types';
 import { readWorkspaceUrlState, writeWorkspaceUrlState } from '../src/workspaceUrlState';
@@ -182,6 +183,49 @@ test('window eviction never tears a multi-event line group', () => {
   );
   assert.equal(wb.events.length, STREAM_WINDOW_CAP - 1, 'cut moved down to the group boundary');
   assert.equal(wb.events[0]?.id, '500.0', 'prepended event retained at the top');
+});
+
+test('sourceRotated flags an inode change across adjacent pages and triggers a clean re-tail', () => {
+  // FS-independent rotation coverage (the server test only asserts ino STABILITY — inode
+  // recycling on ext4 means "recreated path => new ino" is not a testable OS property): the
+  // client decision is pure — same ino / missing ino never rotate, a differing ino does, and
+  // the reaction is a fresh resetToTail that discards every held offset.
+  const withIno = (ino: number | undefined) =>
+    page(
+      [ev(100)],
+      { next: 200, prev: 100, at_start: true },
+      {
+        source: { kind: 'transcript', harness: 'claude-code', size: 10_000, ino },
+      },
+    );
+
+  assert.equal(sourceRotated(null, withIno(42)), false, 'no prior identity — adopt, not rotate');
+  assert.equal(sourceRotated(42, withIno(42)), false, 'same identity');
+  assert.equal(sourceRotated(42, withIno(undefined)), false, 'missing ino never rotates');
+  assert.equal(sourceRotated(42, withIno(43)), true, 'changed identity is a rotation');
+
+  // Reaction: the drawer answers a rotation with a fresh tail — resetToTail replaces the whole
+  // window, so no stale byte-offset id can collide with the new file's offsets.
+  const stale = resetToTail(
+    page([ev(9000), ev(9500)], { next: 10_000, prev: 9000, at_start: false }),
+  );
+  assert.equal(stale.events.length, 2);
+  const fresh = resetToTail(
+    page(
+      [ev(120)],
+      { next: 240, prev: 120, at_start: true },
+      {
+        source: { kind: 'transcript', harness: 'claude-code', size: 240, ino: 43 },
+      },
+    ),
+  );
+  assert.deepEqual(
+    fresh.events.map((e) => e.id),
+    ['120.0'],
+    'window rebuilt purely from the new file',
+  );
+  assert.equal(fresh.cursorNext, 240);
+  assert.equal(fresh.atStart, true);
 });
 
 test('stream URL flag round-trips only alongside an agent selection', () => {

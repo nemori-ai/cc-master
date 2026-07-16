@@ -497,7 +497,13 @@ test('forward page over an all-noise window advances the cursor with zero events
   assert.ok(p.cursor.next > 0, 'cursor progresses through the noise window');
 });
 
-test('source carries a stable file identity (ino) that changes when the path is re-created', () => {
+test('source carries a stable file identity (ino) across repeated reads', () => {
+  // Only assert the property our code actually relies on: the SAME file exposes the SAME
+  // identity on every page, so the client can compare adjacent pages. Do NOT assert that a
+  // deleted-and-recreated path gets a different ino — Linux ext4 recycles freed inodes
+  // immediately (only macOS APFS happens to allocate monotonically), so "recreate => new ino"
+  // is not a property any filesystem promises. The rotation REACTION is covered by the
+  // client-side pure-function test (synthesized adjacent pages with differing ino).
   const ref = tmpFile('ident.jsonl', fileFrom(CLAUDE_LINES.slice(0, 2)));
   const args = {
     agentId: 'a',
@@ -508,16 +514,10 @@ test('source carries a stable file identity (ino) that changes when the path is 
   };
   const a = buildAgentStream(args);
   const b = buildAgentStream(args);
+  const c = buildAgentStream({ ...args, cursorParam: '0' });
   assert.equal(typeof a.source.ino, 'number');
-  assert.equal(a.source.ino, b.source.ino, 'identity stable across reads of the same file');
-
-  // Rotation the size check cannot see: replace the file (new inode) and grow it PAST the old
-  // cursor — the client detects the ino change and re-tails.
-  rmSync(ref);
-  writeFileSync(ref, fileFrom([...CLAUDE_LINES.slice(0, 2), ...CLAUDE_LINES.slice(0, 2)]), 'utf8');
-  const c = buildAgentStream(args);
-  assert.equal(typeof c.source.ino, 'number');
-  assert.notEqual(c.source.ino, a.source.ino, 'replaced file exposes a new identity');
+  assert.equal(a.source.ino, b.source.ino, 'identity stable across tail reads');
+  assert.equal(a.source.ino, c.source.ino, 'identity stable across read modes');
 });
 
 test('event text truncation never tears a surrogate pair', () => {

@@ -571,6 +571,10 @@ export function buildAgentStream(req: AgentStreamRequest): AgentStreamPayload {
     const live = { active: nowMs - mtimeMs <= freshnessSec * 1000, as_of: nowIso };
     // ino = 文件身份锚：truncate 后再涨回旧 cursor 之上的轮转 server 侧检测不到（size 比较失效），
     //   client 对比相邻页的 ino 变化即识别「同路径换了文件」→ 清窗重 tail。server 保持无状态。
+    //   诚实残余风险：Linux（ext4）会立即复用刚释放的 inode——「删除后马上重建」的新文件可能拿到
+    //   同号 ino，此时 ino 比对失明；漏检还需同时满足新文件 size ≥ 旧 cursor（否则既有的
+    //   cursor>size reset 检测兜住），两条件叠加属罕见窗口，接受不加码（mtime/ctime 加签会引入
+    //   自己的精度假阳）。
     const sourceBase = {
       kind: 'transcript' as const,
       harness: req.harness,

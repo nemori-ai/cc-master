@@ -7,6 +7,7 @@ import {
   mergeForward,
   resetToTail,
   type StreamWindow,
+  sourceRotated,
 } from '../streamWindow';
 import type { AgentStreamPayload, StreamEvent } from '../types';
 
@@ -103,13 +104,11 @@ export function AgentStreamDrawer({
 
   // Returns true (and schedules a full reload) when the page reveals a different file identity.
   const detectRotation = useCallback((page: AgentStreamPayload): boolean => {
-    const ino = page.source.ino;
-    if (typeof ino !== 'number') return false;
-    if (sourceInoRef.current !== null && sourceInoRef.current !== ino) {
+    if (sourceRotated(sourceInoRef.current, page)) {
       setReloadNonce((n) => n + 1);
       return true;
     }
-    sourceInoRef.current = ino;
+    if (typeof page.source.ino === 'number') sourceInoRef.current = page.source.ino;
     return false;
   }, []);
 

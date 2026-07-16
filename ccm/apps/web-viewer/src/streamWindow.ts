@@ -33,6 +33,18 @@ export function offsetOfEvent(event: StreamEvent): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/**
+ * File-identity rotation check: a page whose `source.ino` differs from the last accepted one
+ * means the same path now names a different file — every held byte offset (and every event id
+ * derived from one) is garbage, so the caller must drop the window and re-tail from scratch.
+ * Absent inode info (either side) is never treated as rotation.
+ */
+export function sourceRotated(lastIno: number | null, page: AgentStreamPayload): boolean {
+  const ino = page.source.ino;
+  if (typeof ino !== 'number' || lastIno === null) return false;
+  return ino !== lastIno;
+}
+
 /** Fresh window from a tail (or reset) page — replaces whatever was held. */
 export function resetToTail(page: AgentStreamPayload): StreamWindow {
   return {
