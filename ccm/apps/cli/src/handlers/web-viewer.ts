@@ -12,6 +12,7 @@ import {
   durableWriteFileSync,
   isAwaitingUser,
   loadHomeBoards,
+  readDeadline,
   routeOutcomeClass,
   STATUS_ENUM,
   taskTrulyDone,
@@ -1324,6 +1325,10 @@ function missionProjection(board: JsonRecord): JsonRecord {
   }
   const brief = recordOf(contract.brief);
   const assurance = typeof contract.assurance === 'string' ? contract.assurance : 'pending';
+  // 交付 DDL 只读投影（issue #149·D6）：只传 board-derived 事实（截止时刻 / 状态 / 精度 / 硬软）；
+  //   剩余时间 / overdue 由客户端用自己的挂钟渲染（同 board-watchdog 的活倒计时）。DDL 未 engage（键缺失）→ 不传。
+  //   相对 forecast 的 margin / risk band 归 `ccm estimate deadline-risk`（verdict SSOT·viewer 不跑 MC）。
+  const dl = readDeadline(board);
   return {
     kind: 'goal-contract',
     summary: goal,
@@ -1334,6 +1339,16 @@ function missionProjection(board: JsonRecord): JsonRecord {
       present: typeof brief?.ref === 'string',
       ...(typeof brief?.ref === 'string' ? { ref: brief.ref } : {}),
     },
+    ...(dl.present
+      ? {
+          deadline: {
+            state: dl.state,
+            ...(dl.at != null ? { at: dl.at } : {}),
+            precision: dl.precision,
+            kind: dl.kind,
+          },
+        }
+      : {}),
     pending: assurance === 'pending',
   };
 }
