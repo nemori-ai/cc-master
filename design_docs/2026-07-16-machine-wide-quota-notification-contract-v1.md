@@ -192,17 +192,16 @@ Checkpoint 是 observation store 旁的 ccm-owned derived projection，不是第
 
 ### 4.1 可测 composition seam（不是新 authority）
 
-CLI router 允许测试/组装层注入一个 `machineWideQuotaNotifications` boundary；production default 仍接现有
-quota/subscription/inbox store。boundary 只暴露下列既有 authority 的 effect ports：
+CLI router 只允许测试/组装层替换既有的**原始 effect ports**：provider collector、owner-only quota
+authority/reservation store、subscription list 与 inbox delivery。collector 返回 usage evidence 与来自已认证本地
+provider 事实的 authority refs；identity 不可可靠取得时必须返回 unknown，不得用 `current` 或 provider 常量伪造。
 
-- `readPostures({refresh:false|true})`：false 只读 current cached zero-candidate posture，true 才可调用既有
-  collector/authority refresh；
-- `listSubscriptions()`：返回 subscription registry rows，由 composition 精确过滤 current/valid epoch；
-- `readCheckpoint(scope_digest)` / `publishCheckpoint(scope_digest, decision)`；
-- `putInbox(notification)`：按确定性 id 幂等写现有 coordination inbox。
-
-它只为端到端测试替换 effect port，不允许调用者注入现成 notifications、伪造 edge 或绕过 projector；也不新建
-inbox/checkpoint store。status、refresh、partial failure 与 retry 必须经真实 registry→handler→composition 调用。
+composition 必须把 collector evidence 规范化后写入既有 quota authority store，再从该 store 读取 observation、
+active reservation、policy 与 requirement authority，构造 `ccm/machine-quota-posture-input/v1` 并调用 canonical
+`machine-wide-quota-posture` pure projector。测试不得注入现成 decision/posture/notification，也不得用
+`readPostures()` 一类 final-decision boundary 绕过 projector。checkpoint 仍是同一 machine projection 的派生部分，
+inbox 仍是现有 coordination inbox；不新增 authority、inbox 或 reservation store。status、refresh、partial failure
+与 retry 必须经真实 registry→handler→composition 调用。
 
 ## 5. 两条且仅两条 machine-wide notification refresh/fan-out 入口
 
