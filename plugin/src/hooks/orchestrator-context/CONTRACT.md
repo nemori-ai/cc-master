@@ -13,10 +13,11 @@ to refresh facts, choose a route, or authorize dispatch.
 
 - `rule-orchestrator-context-machine-quota-summary`: an optional cached machine quota summary is
   ccm-owned and contains only ordered agent-safe
-  `target/state/freshness/reason_codes/decision_revision/observation_revision` rows from
+  `target/policy_digest/requirement_digest/state/freshness/reason_codes/decision_revision/observation_revision` rows from
   `ccm/machine-quota-decision/v1`. The hook validates the same canonical hash/redaction/4096-byte
   boundary, performs zero live refresh/provider/network/credential effects, and never infers quota
-  between Cursor IDE and Cursor Agent CLI. Missing/uninstalled/unauthenticated/unsupported is absent
+  between Cursor IDE and Cursor Agent CLI or across an identity change within one pool. `healthy` is the
+  zero-candidate posture (`projected_p80=0`), never task admission or spawn authority. Missing/uninstalled/unauthenticated/unsupported is absent
   or unknown, never healthy.
 
 This target rule is executable RED and intentionally is not a PARITY anchor until the shared payload

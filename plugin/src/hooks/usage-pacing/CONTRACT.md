@@ -21,8 +21,11 @@ remains Stop-time (plus Claude Code PostToolBatch) cached delivery, not a provid
   second coordination notification are both silent. If not covered, the floor may surface only the
   explicit local target/revision, never an inferred remote provider.
 - `rule-usage-pacing-codex-7d-only`: Codex ignores every 5h field for
-  throttle/switch/stop/reset/wakeup and never performs account switch. Only 7d is a hard ceiling;
+  decision/revision/throttle/switch/stop/reset/wakeup/notification and never performs account switch. Only 7d is a hard ceiling;
   rolling-24h velocity is advisory. This does not remove provider-owned Claude 5h/7d semantics.
+- `rule-usage-pacing-no-automatic-switch`: Codex and Cursor automatically switch zero accounts. A
+  machine-wide quota posture or delta never invokes `ccm account switch` and never turns account mutation
+  into a fallback for exhausted quota.
 
 These rules are executable RED and are not added to PARITY anchors before runtime migration.
 
@@ -91,9 +94,9 @@ goes through `ccm account switch`, a process-boundary call, not a board write).
     switching is not implemented in this adapter. Cursor has no account-pool switch surface and its
     billing_period pacing path never emits `switch`.
   compensating_mechanism: >
-    Codex treats `switch` as advisory-only: it reports the recommended switch candidate and tells
-    the agent to treat it as a signal to throttle or ask the user, since it cannot execute the
-    switch itself. Cursor stays silent on `switch`/`stop_5h`/`stop_7d` (defensive) and only
+    Codex and Cursor discard legacy `switch` without direct output or coordination notification;
+    it is not translated into an account candidate or user prompt. Cursor also stays silent on
+    `stop_5h`/`stop_7d` (defensive) and only
     surfaces hold/throttle/stop_billing_period.
   tracked_by: "n/a — declared in _hosts/codex/strategy.yaml usage_pacing.behavior; Cursor billing_period path intentional"
 

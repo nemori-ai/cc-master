@@ -72,7 +72,8 @@ The cross-surface Capability Card owns intent/status; derived design docs only m
 ### Machine-wide quota target rules（contract frozen；production RED）
 
 - `rule-coordination-inbox-machine-quota-delta`: accept `kind:"quota_state_change"` only when payload
-  is exact `ccm/machine-quota-decision-delta/v1`, retains an agent-safe target scope plus
+  is exact `ccm/machine-quota-decision-delta/v1`, retains the complete agent-safe
+  harness/surface/provider/identity/payer/pool/bucket/unit/window target plus policy/requirement digests and
   `decision_revision`/`delta_revision`, and carries the existing exact subscription/session/epoch
   delivery provenance. Tight/exhausted/stale/unknown are strong advisories; recovery/reset are weak
   advisories. They are target-scoped route inputs, never global stop/account-switch directives.
@@ -83,6 +84,9 @@ The cross-surface Capability Card owns intent/status; derived design docs only m
 - `rule-coordination-inbox-machine-quota-read-boundary`: delivery remains the canonical exact
   current/list read-only path. The hook never invokes `quota refresh`, a collector, provider/network,
   credential/account, monitor/service, or a weaker unbound inbox lookup.
+- `rule-coordination-inbox-machine-quota-no-account-mutation`: quota deltas are route-view advisories only.
+  Codex five-hour/switch evidence never enters a delta, and Codex/Cursor delivery never invokes, recommends as
+  automatic, or authorizes account switching.
 
 These target rules are executable RED and intentionally are not PARITY anchors until all three
 production implementations consume the new kind/schema. Cross-surface intent and maturity live in

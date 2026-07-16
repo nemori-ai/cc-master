@@ -6,7 +6,8 @@
 ## Intent（host-neutral）
 
 让任一已武装的 Claude Code、Codex 或 Cursor master-orchestrator 根据本机完整 worker pool 感知每个
-target surface/provider/payer/pool/bucket 的 quota decision。SessionStart/resume 提供 bounded cached summary；
+target provider scope 的 zero-candidate current reservability posture（既有 observation + reservation + policy +
+requirement，`projected_p80=0`）。它不是 task admission，真实 task preflight 可以更紧。SessionStart/resume 提供 bounded cached summary；
 运行中只有 tight/exhausted/stale/unknown/recovery/reset decision edge 经既有 durable coordination inbox
 fan-out。origin hook 零 provider/network/credential probe。
 
@@ -17,12 +18,14 @@ fan-out。origin hook 零 provider/network/credential probe。
 2. `healthy|tight|exhausted|stale|unknown` 与
    `entered_tight|entered_exhausted|became_stale|became_unknown|recovered|reset` 是闭集；same decision revision
    不重复，多个 provider 不因 notification kind 相同而互相 supersede。
-3. Hook 只读 ccm cached projection/current inbox；live producer 仅是显式
+3. Hook 只读 ccm cached projection/current inbox；machine-wide notification refresh/fan-out 入口仅是显式
    `quota refresh --machine-wide` 或显式 `monitor --quota-source machine-wide`。monitor default 保持
-   cached-only/no-autostart，mode 在现有 service state 中持久恢复。
-4. Codex 5h 不改变 decision、edge、throttle/stop/reset/wakeup；只有 7d hard ceiling 与 rolling-24h
-   advisory。Cursor IDE 与 Cursor Agent CLI 不互相推导 quota。
-5. Agent-visible summary/delta 不含 raw account、identity fingerprint、credential/path/token、精确余额或
+   cached-only/no-autostart，mode 在现有 service state 中持久恢复；既有 admission/supervisor collectors 不受此入口闭集影响。
+4. Codex 5h 不进入 decision、edge、notification/reset/wakeup/account-switch；只有 7d hard ceiling 与 rolling-24h
+   advisory。Codex/Cursor 自动切号禁止。
+5. Agent-safe scope 保留 harness/surface/provider/identity/payer/pool/bucket/unit/window 与 policy/requirement
+   identity；Cursor IDE 与 Cursor Agent CLI 不互相推导 quota，同 pool 换 identity 不串线。
+6. Agent-visible summary/delta 不含 raw account、identity fingerprint、credential/path/token、精确余额或
    provider raw response；未安装/未认证/unsupported 只能 unknown。
 
 ## Host mechanisms
