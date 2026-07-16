@@ -39,8 +39,8 @@
           "files": {
             "SKILL.md": "e3d56f6ad3fa93367cdc18018a33b49a29d2ab5175c009f01a9781b830a6b6a3",
             "references/account-pool.md": "da7a5826ba8ceb1eefc26722b4e305df6042ea30264abade27f896ef1fb2a8d6",
-            "references/board-model-guide.md": "70d9355f03e78fa5eef3550b802630104d8801fb0993f72069d08f0eb5ef8b10",
-            "references/command-catalog.md": "d37240f3cbda587276b5c0c62329cbdac9c7898cc587a8349c479195ea0aeb8f"
+            "references/board-model-guide.md": "c644288aa5d251d44b12cb593dc01986792c1a2c3c2a74f574bda005c758100c",
+            "references/command-catalog.md": "c09f155c40950bd7111c6c721fdd645c7912ad56684716fba6c2b0836fe68db3"
           }
         }
       }
@@ -77,8 +77,8 @@
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
             "SKILL.md": "fc8bfbe8450dffc652c84f4480ddcfbbf433afbba74c6b1741aa5bfeee75bcdf",
-            "references/board-model-guide.md": "4115316329894ef0611edd20264576baacc157a6e0d6652d52f3cf3fa38e818a",
-            "references/command-catalog.md": "be06671d61346b9409e7b1ce03f6fd7282131196f4da2c604d55f66f725aa514"
+            "references/board-model-guide.md": "c78399d148a177fd4a2c73aec81a4d6e33036b58a4bcb5146a13207e0906eae8",
+            "references/command-catalog.md": "f3af421243b222a622631075794a1fa3ea3518b81f0e4050cb57c1d1c986c98a"
           }
         }
       }
@@ -115,8 +115,8 @@
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
             "SKILL.md": "57addaf10a516714ecdae1f191935abca74d201bc63e3de831786166bb6c6b47",
-            "references/board-model-guide.md": "2f5bb3d1024ee82a0e88e5732943181a8e1c6230a9d1c762998cfbe8dccef03e",
-            "references/command-catalog.md": "42dee9fc052343d359f026f22506be2de3a56006799d583c0d1f59a56af8a1bd"
+            "references/board-model-guide.md": "377e3231d2de07be46f3b9bf4997776237953c06607a8cfc8b6790d24d64f5db",
+            "references/command-catalog.md": "bd9f90a50424f2c2028204aa9f367b24d6756a43fbee10d754566b48609d6ad7"
           }
         }
       }
