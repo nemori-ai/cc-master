@@ -60,8 +60,34 @@ test('stale known-prefix filter values are dropped against current board options
   const restored = readWorkspaceUrlState(
     '/?filter=harness%3Aretired&filter=surface%3Acursor-ide&filter=route-outcome%3Aother-harness-cli',
   );
-  assert.deepEqual(
-    [...normalizeTaskFilters(nodes, restored.filters)].sort(),
-    ['route-outcome:other-harness-cli', 'surface:cursor-ide'],
-  );
+  assert.deepEqual([...normalizeTaskFilters(nodes, restored.filters)].sort(), [
+    'route-outcome:other-harness-cli',
+    'surface:cursor-ide',
+  ]);
+});
+
+test('looksLikeShellCommand: conservative split between runnable commands and internal handles', async () => {
+  const { looksLikeShellCommand } = await import('../src/agentFormat');
+  // Runnable shell commands — lowercase binary/path head.
+  for (const cmd of [
+    'claude --resume 9f2c-abc',
+    'codex resume 019f2c74',
+    'cursor-agent attach x',
+    'tmux attach -t worker',
+    './scripts/attach.sh',
+    '~/bin/attach worker-1',
+    '/usr/local/bin/ccm attach',
+  ]) {
+    assert.equal(looksLikeShellCommand(cmd), true, `command form: ${cmd}`);
+  }
+  // Internal semantic handles / non-commands — must render as info line, never COPY+cd.
+  for (const handle of [
+    'SendMessage to a94c182d71804bad4',
+    'SendMessage with the agent id',
+    'Use the Task tool to continue',
+    '',
+    '   ',
+  ]) {
+    assert.equal(looksLikeShellCommand(handle), false, `info line: ${JSON.stringify(handle)}`);
+  }
 });

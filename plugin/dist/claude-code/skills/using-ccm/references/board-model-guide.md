@@ -124,7 +124,7 @@
 
   数字字段喂机械 floor、人类可读字段喂 agentic 价值推理；**缺即降级**（`ccm peers` 把该 peer 的对应维度退 null·配速退单板·fail-safe）。形状坏→`FMT-COORD` warn（永不 hard·advisory ✎）。读侧详见 command-catalog 的 peers namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-COORD`。**token-blind**：本块只含 goal/priority/workload/%——绝无任何 secret。
 - `owner.harness`——当前 board 所属 harness 的观察字段，取值 `claude-code | codex | cursor | unknown`。它**不是武装闸**：hook arming 仍只看 `owner.active` + `owner.session_id`；`owner.harness` 只给 `ccm peers` / 后续池中介做配额池分区。ARM 时 bootstrap 通过 `ccm board stamp-harness` 从当前进程 env 的可信 harness detect 盖写；无可信 env 时不写、不覆盖已有值。缺失或坏值都按 `unknown` 降级；`ccm peers` 会把 unknown board 放进单例池，避免跨 harness 或不明来源 board 混排。坏值→`FMT-HARNESS` warn。
-- `agents`——**运行时 agent 登记簿**（✎ 非窄腰·hook 不读），跨所有派发类型的统一花名册：凡派发（sub-agent / 后台 shell / workflow / 跨 harness worker）皆登记。只用 `ccm agent create / bind / link / terminal / probe` 写、`ccm agent list / show` 读——别用 `--set-json` 手拼（会绕过状态机校验、handle 证据闸与幂等 link）。缺 → 无登记（花名册空）；形状坏 → `FMT-AGENTS` warn；`in_flight` task 无登记指向 → `BIZ-INFLIGHT-AGENT` warn 软提示。概念与字段取值见 [C.6 节](#c6-agents运行时-agent-登记簿)。
+- `agents`——**运行时 agent 登记簿**（✎ 非窄腰·hook 不读），跨所有派发类型的统一花名册：凡派发（sub-agent / 后台 shell / workflow / 跨 harness worker）皆登记。只用 `ccm agent create / bind / link / terminal / probe` 写、`ccm agent list / show` 读、`ccm agent amend / rm` 事后修正（`amend` 补正 handle 域·`rm` 删登记·均不经状态机）——别用 `--set-json` 手拼（会绕过状态机校验、handle 证据闸与幂等 link）。缺 → 无登记（花名册空）；形状坏 → `FMT-AGENTS` warn；`in_flight` task 无登记指向 → `BIZ-INFLIGHT-AGENT` warn 软提示。概念与字段取值见 [C.6 节](#c6-agents运行时-agent-登记簿)。
 - `runtime`——**hook-owned 运行时参数区**（✎ 非窄腰），装「周期 hook/script 跑起来后维护的瞬态簿记」。白名单键（均 ISO-8601 UTC）：`last_identity_remind`（周期身份提示 hook 读它判阈值）、`last_critpath_remind`（周期临界路径提示 hook 读它判阈值）、`last_goal_remind`（Goal Contract 对齐提示判阈值）、`last_account_switch`（账号切换机制写换号时刻·usage-pacing hook 读它做「检测到换号」ambient）、`stop_allow_until`（Codex Stop hook 释放闸：agent 独立确认本板可停后写一个短期未来时刻）——周期 hook / 换号写侧注入 / Stop 释放确认后经 `ccm board set-param` 写回（带锁·进程边界）。**写法收窄**：唯一写口是 `ccm board set-param <白名单 key> <value>`（least-privilege·非白名单 key / 非法值 → `exit 2`）——agent 走 `ccm` 命令改 board 天然保留它（`ccm` 字段级合并、不整盘覆写；agent 自己**永不手写 `runtime.*`**·见 `master-orchestrator-guide` 的 board-写纪律）。缺/坏 → graceful-degrade（周期提示退化为「从未提示」；Stop 释放闸退化为继续阻止停止）；形状坏→`FMT-RUNTIME` warn（永不 hard）。**token-blind**：参数区只有时间戳等簿记·绝无 secret。
 
 > **不要把 observed 字段写进硬 waist。** 这三档的边界由 `ccm` 引擎权威定义（每字段的 tier 元数据）。
@@ -412,11 +412,13 @@ ccm task update T8 --executor subagent
 | worker 收工或起跑失败（成功 / 失败 / 根本没起来都要收口） | `terminal` | `agent terminal <id> --outcome "..."`——`starting` 也能直接收口（启动失败别留永久僵尸）。**terminal ≠ task done**，task 仍走父层独立验收；terminal 是唯一终态，probe 永不复活 |
 | `uncertain` / `orphaned` 后观测到还活着 | `running` | `agent probe` 双向 reconcile 自动归回，但复活按证据强度分级：`uncertain` 任何方法的 `alive` 都归回；**`orphaned` 只被 session / transcript 文件类的 `alive` 复活**（按 sid / 路径寻址、身份强），`pid` 的 `alive` 不够格（kill-0 不验进程身份·pid 复用会产生假 alive）。也可重新 `bind` 交新 handle |
 
+**登记后要修正 handle：用 `amend`，别重复 `create`。** 发现 handle 拼错、attach 命令漏了 `cd`、transcript 路径写错——`ccm agent amend <id> --handle/--attach-cmd/--transcript` 就地补正 handle 域三件套（任何状态可用，含 `terminal`；不做状态转移、不碰 `lifecycle.state` / `probe` / `links` / `intent`）。**绝不重复 `create` 一条新登记**——同一个真实 worker 两行 roster 是撕裂，花名册 / viewer / resume 后的自己会数错在跑的 agent。真多登记 / 误登记出来的多余行用 `ccm agent rm <id>`（破坏性·非 TTY 须 `--yes`）清除；`amend` 补正保留的那条、`rm` 删多出来的那条。两者都不经状态机。
+
 **handle.kind 怎么选：**
 
 | kind | 什么派发用 | attach 方式 |
 |---|---|---|
-| `session-id` | 跨 harness CLI worker（codex / claude-code headless） | `--attach-cmd` 记一键接入命令，**必须自包含**——执行位置敏感的连 `cd` 一起登记（如 `cd /abs/worktree && claude --resume <sid>`：claude-code 的 resume 必须在原 cwd 执行，session 按项目目录归档） |
+| `session-id` | 跨 harness CLI worker（codex / claude-code headless） | `--attach-cmd` 记一键接入命令，**必须自包含**——执行位置敏感的连 `cd` 一起登记（如 `cd /abs/worktree && claude --resume <sid>`：claude-code 的 resume 必须在原 cwd 执行，session 按项目目录归档）。codex 的 sid 运行时才生成：先 `pid` + `--transcript` 兜底 bind，再从 `codex exec --json` 日志首行 `thread.started` 事件取 `thread_id`（即 sid）升级 bind（完整配方见 command-catalog 的 agent bind 节；`codex exec resume --last` 接错 session 风险，不可作 attach 命令） |
 | `pid` | 后台 shell 进程 | 无 attach；probe 用进程存活判定 |
 | `task-id` | 以 task 粒度跟踪、只有 transcript 可查的派发 | `--transcript` 记 transcript 路径引用（绝不内嵌内容） |
 | `none` | 尚无证据（create 后的缺省态） | 不可手选——bind 不接受 `none` |

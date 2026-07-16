@@ -1603,6 +1603,26 @@ export const REGISTRY: Registry = {
       ],
       handler: 'agent.bind',
     },
+    amend: {
+      summary:
+        '事后补正 handle 域三件套（任何状态可用含 terminal·绝不碰 lifecycle/probe/links/intent）',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        handle: {
+          type: 'string',
+          desc: '修正后的 handle <kind:value>（kind ∈ session-id|pid|task-id·校验同 bind）',
+        },
+        'attach-cmd': { type: 'string', desc: '修正后的一键接入命令' },
+        transcript: { type: 'string', desc: '修正后的 transcript 路径引用' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm agent amend agt-001 --handle session-id:0197-abc --attach-cmd "codex resume 0197-abc"',
+        'ccm agent amend agt-002 --transcript /abs/path/rollout.jsonl --json',
+      ],
+      handler: 'agent.amend',
+    },
     link: {
       summary: '建 agent↔task 关联（存 agent 侧 links[]·幂等·维持 single-writer）',
       read: false,
@@ -1651,6 +1671,14 @@ export const REGISTRY: Registry = {
       options: { json: { type: 'boolean', desc: '结构化输出' } },
       examples: ['ccm agent show agt-001 --json'],
       handler: 'agent.show',
+    },
+    rm: {
+      summary: '删除一条 agent 记录含其 links（破坏性·非 TTY 须 --yes·重复登记/误登记的修正出口）',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: { json: { type: 'boolean', desc: '结构化输出' } },
+      examples: ['ccm agent rm agt-002 --yes'],
+      handler: 'agent.rm',
     },
   },
 

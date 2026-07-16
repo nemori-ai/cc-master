@@ -39,7 +39,8 @@ export interface CcNodeData extends Record<string, unknown> {
   routeOutcome: string | null;
   routeLabel: string | null;
   modelLabel: string | null;
-  /** Active (non-terminal) registry agents on this node — server-joined, table-lookup only. */
+  /** Registry agents on this node (all lifecycle states; active first, terminal de-emphasized
+   *  last) — server-joined, table-lookup only. */
   agents: CompactAgent[];
   onToggleCollapse: (id: string) => void;
   onSelectAgent: (agentId: string) => void;
@@ -159,22 +160,26 @@ export function CcNode({ data }: NodeProps<CcFlowNode>) {
       </div>
       {chips.length ? <div className="meta">{chips}</div> : null}
       {nodeAgents.length ? (
-        // Realtime "who is ON this node" row: one chip per active registry agent (state lamp
-        // + harness badge + live elapsed while running). Single fixed-height line — overflow
-        // folds into "+N" so the tile height stays bounded (rank-band contract).
+        // "Who is / was on this node" row: one chip per registry agent. Active agents get the
+        // live treatment (state lamp + running clock); terminal agents stay as de-emphasized
+        // attribution (grey lamp, no clock, faded — the work is done but the credit remains).
+        // Single fixed-height line — overflow folds into "+N" (actives sort first, so they
+        // claim the visible slots) and the task inspector lists them all.
         <div className="agentrow">
           {nodeAgents.slice(0, AGENT_CHIP_MAX).map((agent) => {
-            const chipLamp = agentStateLamp(agent.state);
+            const terminal = agent.state === 'terminal';
+            const chipLamp = terminal ? 'var(--ink-faint)' : agentStateLamp(agent.state);
             const elapsed = agentElapsed(agent);
+            const outcome = typeof agent.outcome === 'string' ? agent.outcome.trim() : '';
             return (
               <button
-                className={`agentchip${agent.state === 'orphaned' ? ' orphaned' : ''}`}
+                className={`agentchip${agent.state === 'orphaned' ? ' orphaned' : ''}${terminal ? ' terminal' : ''}`}
                 key={agent.id}
                 onClick={(event) => {
                   event.stopPropagation();
                   data.onSelectAgent(agent.id);
                 }}
-                title={`${agent.id}${agent.intent ? ` — ${agent.intent}` : ''} · ${agentStateText(agent.state)}${elapsed ? ` · ${elapsed}` : ''}`}
+                title={`${agent.id}${agent.intent ? ` — ${agent.intent}` : ''} · ${agentStateText(agent.state)}${elapsed ? ` · ${elapsed}` : ''}${outcome ? `\n${outcome}` : ''}`}
                 type="button"
               >
                 <span className="alamp" style={{ background: chipLamp, color: chipLamp }} />
@@ -188,7 +193,7 @@ export function CcNode({ data }: NodeProps<CcFlowNode>) {
           {nodeAgents.length > AGENT_CHIP_MAX ? (
             <span
               className="agentmore"
-              title={`${nodeAgents.length - AGENT_CHIP_MAX} more active agents — open the task to see all`}
+              title={`${nodeAgents.length - AGENT_CHIP_MAX} more agents — open the task to see all`}
             >
               +{nodeAgents.length - AGENT_CHIP_MAX}
             </span>

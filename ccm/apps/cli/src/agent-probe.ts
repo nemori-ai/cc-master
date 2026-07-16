@@ -22,7 +22,7 @@
 //   测试注入口保留：opts.home 桥接为 env.HOME（adapter 的 homeBase 契约读 env.HOME 优先）。
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { resolveHarnessAdapter } from './harnesses/registry.js';
 
 export interface ProbeInput {
@@ -80,6 +80,7 @@ interface SessionScan {
 interface WalkFile {
   base: string; // 文件名去掉 .json/.jsonl 后缀
   mtimeMs: number; // 遍历时一次 stat（索引经 dirCache memo·匹配阶段零 fs 调用）
+  full: string; // 绝对路径（transcript 定位复用同一索引取文件路径）
 }
 
 interface WalkIndex {
@@ -131,7 +132,7 @@ function walkSessionRoot(root: string, cache?: Map<string, unknown>): WalkIndex 
           const base = stripSessionExt(ent.name);
           if (base !== null) {
             try {
-              files.push({ base, mtimeMs: statSync(full).mtimeMs });
+              files.push({ base, mtimeMs: statSync(full).mtimeMs, full });
             } catch {
               complete = false; // stat 失败：该文件「没拿到」——不可作消失证据
             }
@@ -304,6 +305,141 @@ export function probeAgent(input: ProbeInput, opts: ProbeOpts = {}): ProbeResult
 
   // 无可探测句柄（none / 缺失）→ 保真 unknown。
   return { method: 'none', observed: 'unknown' };
+}
+
+// ── transcript 文件定位（复用 probe 的会话根解析 + 文件匹配·供实时流增量 tail 用）─────────────
+//   与 probeAgent 共享同一套 roots / 匹配规则，避免第二份 ~/.codex ~/.claude 平行实现。
+//   保真：拿不到就返回 null（调用方如实降级 source.kind='none'），绝不猜路径。
+
+export interface TranscriptLocation {
+  path: string;
+  mtimeMs: number;
+}
+
+// claude-code：projects/<slug>/<sid>.jsonl 目标寻址（同 scanClaudeRoots 的 slug 策略）。
+function locateClaudeTranscript(
+  roots: string[],
+  sid: string,
+  cache?: Map<string, unknown>,
+): TranscriptLocation | null {
+  let best: TranscriptLocation | null = null;
+  for (const root of roots) {
+    const key = `slugs:${root}`;
+    let idx = cache?.get(key) as { slugs: string[]; complete: boolean } | undefined;
+    if (!idx) {
+      let slugs: string[] = [];
+      let ok = true;
+      if (existsSync(root)) {
+        try {
+          slugs = readdirSync(root, { withFileTypes: true })
+            .filter((d) => d.isDirectory())
+            .map((d) => d.name);
+        } catch {
+          ok = false;
+        }
+      }
+      idx = { slugs, complete: ok };
+      cache?.set(key, idx);
+    }
+    for (const slug of idx.slugs) {
+      const candidate = join(root, slug, `${sid}.jsonl`);
+      if (!existsSync(candidate)) continue;
+      try {
+        const m = statSync(candidate).mtimeMs;
+        if (best === null || m > best.mtimeMs) best = { path: candidate, mtimeMs: m };
+      } catch {
+        /* stat 失败：该候选拿不到路径·跳过 */
+      }
+    }
+  }
+  return best;
+}
+
+// 通用策略：递归 walk 索引 + 文件名边界匹配，多命中取最新 mtime（复用 scanWalkRoots 的索引）。
+function locateWalkTranscript(
+  roots: string[],
+  sid: string,
+  cache?: Map<string, unknown>,
+): TranscriptLocation | null {
+  let best: TranscriptLocation | null = null;
+  for (const root of roots) {
+    const idx = walkSessionRoot(root, cache);
+    for (const f of idx.files) {
+      if (!baseMatchesSid(f.base, sid)) continue;
+      if (best === null || f.mtimeMs > best.mtimeMs) best = { path: f.full, mtimeMs: f.mtimeMs };
+    }
+  }
+  return best;
+}
+
+// locateTranscriptFile — 按 agent handle 解析其 transcript 文件路径（实时流的源定位单点）。
+//   优先级：transcript_ref 存在即用 → session-id 经 harness adapter roots + 匹配 → 否则 null。
+//
+//   信任边界（有意不做路径 allowlist）：transcript_ref 是 board 内容 ⇒ 指向任意本地文件的只读
+//   tail。这是正当功能——bg-shell / workflow worker 的日志文件就登记在这里，圈死到 session 目录
+//   会杀掉这类用法。防线由外层承担：web-viewer 只绑 127.0.0.1 + bearer token 门 + board 本身是
+//   operator 自有文件（能写 board 的人本就能读这台机器上的文件）。此处不再重复鉴权。
+export function locateTranscriptFile(
+  input: ProbeInput,
+  opts: ProbeOpts = {},
+): TranscriptLocation | null {
+  const ref = (input.transcriptRef || '').trim();
+  const value = (input.handleValue || '').trim();
+
+  // claude-code in-session subagent（Task tool 派生）：实证（真实 orchestration 转录）——子代理
+  //   消息**不内嵌**父转录（父转录全行 isSidechain:false，仅 Task tool_result 提及 agentId），
+  //   而是独立落盘：`<父转录去 .jsonl>/subagents/agent-<agentId>.jsonl`（行结构同主 claude 格式，
+  //   信封多 isSidechain:true / agentId / sessionId=父 sid；旁有 agent-<id>.meta.json：
+  //   {agentType, description, toolUseId, spawnDepth}）。
+  //   登记配方：`ccm agent bind <id> --handle task-id:<agentId> --transcript <父session.jsonl>`
+  //   → 此处派生子文件路径，存在即优先；尚未落盘（启动竞态）→ 回退父文件（子文件出现后
+  //   path/ino 变化触发 client 轮转检测清窗重 tail，自愈到子代理流）。
+  // harness 含 origin：in-session subagent 的登记惯例是 type=subagent/harness=origin，
+  // 其转录布局跟随宿主 Claude Code——派生同样适用（existsSync 已兜住不存在的情形）。
+  if (
+    (input.harness === 'claude-code' || input.harness === 'origin') &&
+    input.handleKind === 'task-id' &&
+    value &&
+    ref
+  ) {
+    const base = basename(ref);
+    if (base.endsWith('.jsonl')) {
+      const derived = join(
+        dirname(ref),
+        base.slice(0, -'.jsonl'.length),
+        'subagents',
+        `agent-${value}.jsonl`,
+      );
+      if (existsSync(derived)) {
+        try {
+          return { path: derived, mtimeMs: statSync(derived).mtimeMs };
+        } catch {
+          /* stat 失败：走通用回退 */
+        }
+      }
+    }
+  }
+  // TODO(codex subagent/collab)：codex rollout 里也见到 multi_agent_v1 spawn_agent 工具面——
+  //   若其子代理消息在 rollout 内有等价可寻址结构（独立文件或行级身份），可在此加对应派生；
+  //   目前未实证，不猜。
+
+  if (ref && existsSync(ref)) {
+    try {
+      return { path: ref, mtimeMs: statSync(ref).mtimeMs };
+    } catch {
+      return null;
+    }
+  }
+  if (input.handleKind === 'session-id' && input.harness) {
+    const value = (input.handleValue || '').trim();
+    if (!value) return null;
+    const roots = sessionRootsFor(input.harness, opts);
+    if (roots.length === 0) return null;
+    return input.harness === 'claude-code'
+      ? locateClaudeTranscript(roots, value, opts.dirCache)
+      : locateWalkTranscript(roots, value, opts.dirCache);
+  }
+  return null;
 }
 
 // mtime 类方法（sid/路径内容寻址·身份强）——orphaned 复活的证据强度门槛。

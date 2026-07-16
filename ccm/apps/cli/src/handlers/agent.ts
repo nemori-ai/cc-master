@@ -1,4 +1,4 @@
-// handlers/agent.ts — Agent Registry noun handler（create / bind / link / terminal / probe / list / show）。
+// handlers/agent.ts — Agent Registry noun handler（create / bind / amend / link / terminal / probe / list / show / rm）。
 //
 // agent = 实际跑起来的运行时实例（runtime 层）·board-scoped 顶层实体（board.agents[] ✎ 段）·与 node 多对多。
 //   凡派发皆登记：sub-agent / 后台 shell / workflow / 跨 harness CLI worker 全进同一花名册（各类型探测能力分级）。
@@ -21,6 +21,7 @@
 
 import { AGENT_STATE_MACHINE, isLegalAgentTransition } from '@ccm/engine';
 import { probeAgent, reconcileAgentState } from '../agent-probe.js';
+import * as io from '../io.js';
 import * as mutations from '../mutations.js';
 import { type BoardArg, type Ctx, runRead, runWrite } from './_common.js';
 
@@ -100,21 +101,27 @@ export function create(ctx: Ctx): number {
   });
 }
 
+// handle 证据解析 + 校验（bind / amend 共用·同一套规则不漂移）：kind ∈ session-id|pid|task-id、value 非空。
+//   不合规 → 拒绝（VALIDATION）。
+function parseHandleSpec(raw: unknown, verb: string, why: string): { kind: string; value: string } {
+  const handleSpec = (raw as string) || '';
+  const idx = handleSpec.indexOf(':');
+  const kind = idx === -1 ? '' : handleSpec.slice(0, idx);
+  const value = idx === -1 ? '' : handleSpec.slice(idx + 1);
+  if (!['session-id', 'pid', 'task-id'].includes(kind) || value.trim() === '') {
+    throw fail(
+      `${verb} 需真实 handle 证据 --handle <kind:value>（kind ∈ session-id|pid|task-id，value 非空）——${why}（收到 ${JSON.stringify(handleSpec)}）`,
+      'Validation',
+    );
+  }
+  return { kind, value: value.trim() };
+}
+
 // ── agent bind <id> --handle <kind:value> ─────────────────────────────────────
 //   交证据 starting→running（无真实 handle 拒绝·「无真实 handle 不算 running」铁律）。handle.kind ∈ session-id|pid|task-id。
 export function bind(ctx: Ctx): number {
   const id = ctx.positionals[0] as string;
-  const handleSpec = (ctx.values.handle as string) || '';
-  const idx = handleSpec.indexOf(':');
-  const kind = idx === -1 ? '' : handleSpec.slice(0, idx);
-  const value = idx === -1 ? '' : handleSpec.slice(idx + 1);
-  // 无真实 handle 证据 → 拒绝（VALIDATION）。kind 须 ∈ session-id|pid|task-id、value 非空。
-  if (!['session-id', 'pid', 'task-id'].includes(kind) || value.trim() === '') {
-    throw fail(
-      `bind 需真实 handle 证据 --handle <kind:value>（kind ∈ session-id|pid|task-id，value 非空）——无证据不算 running（收到 ${JSON.stringify(handleSpec)}）`,
-      'Validation',
-    );
-  }
+  const { kind, value } = parseHandleSpec(ctx.values.handle, 'bind', '无证据不算 running');
   let bound: AgentRecord = {};
   return runWrite(ctx, {
     mutate: (board) => {
@@ -144,6 +151,52 @@ export function bind(ctx: Ctx): number {
     render: (_next, c) => {
       if (c.flags.json) return JSON.stringify({ ok: true, data: { agent: bound } });
       return `agent ${id} bound（handle=${kind}:${value.trim()}·state=running）\n`;
+    },
+  });
+}
+
+// ── agent amend <id> [--handle <kind:value>] [--attach-cmd "..."] [--transcript <path>] ─
+//   登记簿事后补正（真实缺口：坏 handle 在 agent 已 terminal 后才发现——bind 被状态机拒〔terminal 冻结〕，
+//   唯一出路曾是重复登记新 record，一个真实 worker 在 roster 撕成两行）。
+//   语义边界：**只**允许改 handle 域三件套（handle / attach_cmd / transcript_ref），至少给一项；
+//   **任何 lifecycle 状态可用（含 terminal）**——amend 不是状态转移、不交证据、不复活：
+//   **绝不**触碰 lifecycle.state / probe / links / intent（要改状态走 bind/terminal 等既有 verb）。
+//   handle 校验复用 bind 的同一套规则（parseHandleSpec）。仍是登记簿语义——无 spawn/route/dispatch。
+export function amend(ctx: Ctx): number {
+  const id = ctx.positionals[0] as string;
+  const hasHandle = ctx.values.handle !== undefined;
+  const hasAttach = ctx.values['attach-cmd'] !== undefined;
+  const hasTranscript = ctx.values.transcript !== undefined;
+  if (!hasHandle && !hasAttach && !hasTranscript) {
+    throw fail(
+      'amend 至少给一项 --handle / --attach-cmd / --transcript（只允许补正 handle 域三件套）',
+      'Usage',
+    );
+  }
+  const parsed = hasHandle
+    ? parseHandleSpec(ctx.values.handle, 'amend', '坏 handle 不入登记簿')
+    : null;
+  let amended: AgentRecord = {};
+  return runWrite(ctx, {
+    mutate: (board) => {
+      const b = board as BoardArg;
+      const agent = findAgent(b, id);
+      if (!agent) throw fail(`agent ${id} 不存在`, 'NotFound');
+      if (!agent.handle || typeof agent.handle !== 'object') {
+        agent.handle = { kind: 'none', value: '' };
+      }
+      if (parsed) {
+        agent.handle.kind = parsed.kind;
+        agent.handle.value = parsed.value;
+      }
+      if (hasAttach) agent.handle.attach_cmd = ctx.values['attach-cmd'];
+      if (hasTranscript) agent.handle.transcript_ref = ctx.values.transcript;
+      amended = agent;
+      return mutations.touch(b);
+    },
+    render: (_next, c) => {
+      if (c.flags.json) return JSON.stringify({ ok: true, data: { agent: amended } });
+      return `agent ${id} handle 域已补正（handle=${amended.handle?.kind}:${amended.handle?.value}·state=${amended.lifecycle?.state} 不变——amend 不做状态转移）\n`;
     },
   });
 }
@@ -378,6 +431,35 @@ export function show(ctx: Ctx): number {
         `  probe: observed=${agent.probe?.observed ?? '(未探测)'}·as_of=${agent.probe?.as_of ?? '-'}\n` +
         `  links: ${links}\n`
       );
+    },
+  });
+}
+
+// ── agent rm <id> ─────────────────────────────────────────────────────────────
+//   删除一条 agent 记录（links[] 存在 agent 侧、随记录一并消失）——重复登记 / 误登记的撕裂行修正出口。
+//   破坏性：非 TTY 须 --yes（对齐 task rm 语义·agent 永不撞交互提示·clig/12-factor）。
+//   登记簿删除 ≠ 状态转移——不经状态机；仍走 runWrite（带锁 + lint after mutate）。
+export function rm(ctx: Ctx): number {
+  const id = ctx.positionals[0] as string;
+  // TTY 检测：ctx 显式注入 isTTY 时用之（测试便利），否则嗅 process.stdin.isTTY（非 TTY → 须 --yes）。
+  const tty = ctx.isTTY !== undefined ? ctx.isTTY : io.isTTY(process.stdin);
+  if (!tty && !ctx.flags.yes) {
+    ctx.err(`refused: "agent rm ${id}" 是破坏性操作；非交互环境须加 --yes 确认`);
+    return io.EXIT.USAGE;
+  }
+  return runWrite(ctx, {
+    mutate: (board) => {
+      const b = board as BoardArg;
+      const exists = agentsOf(b).some((a) => a.id === id);
+      if (!exists) throw fail(`agent ${id} 不存在`, 'NotFound');
+      b.agents = (b.agents as unknown[]).filter(
+        (a) => !(!!a && typeof a === 'object' && !Array.isArray(a) && (a as AgentRecord).id === id),
+      );
+      return mutations.touch(b);
+    },
+    render: (_next, c, { dryRun }) => {
+      if (c.flags.json) return JSON.stringify({ ok: true, data: { removed: id } });
+      return dryRun ? `[dry-run] 将删除 agent: ${id}\n` : `agent 已删除: ${id}\n`;
     },
   });
 }

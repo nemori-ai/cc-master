@@ -5,6 +5,7 @@ import {
   agentStateLamp,
   agentStateText,
   harnessBadge,
+  looksLikeShellCommand,
   probeLamp,
 } from '../agentFormat';
 import { useSecondTick } from '../analytics';
@@ -16,6 +17,7 @@ interface AgentInspectorProps {
   agentLoading?: boolean;
   onClose?: () => void;
   onSelectTask: (taskId: string) => void;
+  onOpenStream?: () => void;
 }
 
 function str(value: unknown): string | null {
@@ -40,6 +42,7 @@ export function AgentInspector({
   agentLoading = false,
   onClose,
   onSelectTask,
+  onOpenStream,
 }: AgentInspectorProps) {
   const record = detail.agent ?? {};
   const compact = detail.compact ?? null;
@@ -48,6 +51,13 @@ export function AgentInspector({
   const launch = obj(record, 'launch');
   const probe = detail.probe ?? null;
 
+  // Whether a live transcript stream can plausibly resolve — a session-id handle or a recorded
+  // transcript ref. The drawer itself confirms and shows the real reason on `source.kind==='none'`.
+  const streamAvailable =
+    compact?.has_transcript === true ||
+    str(handle.transcript_ref) !== null ||
+    str(handle.kind) === 'session-id';
+
   const id = str(record.id) ?? compact?.id ?? 'agent';
   const state = str(lifecycle.state) ?? compact?.state ?? 'unknown';
   const lamp = agentStateLamp(state);
@@ -55,11 +65,17 @@ export function AgentInspector({
   const attachCmd = str(handle.attach_cmd);
   const transcript = str(handle.transcript_ref);
   const outcome = str(lifecycle.outcome);
+  // Some attach handles are not shell commands (an in-session subagent records "SendMessage to
+  // <id>" — an internal semantic instruction). Rendering those in a command box with COPY and a
+  // `cd` prefix ships a broken instruction, so only plausible shell commands get that form; the
+  // rest render as a plain info line, verbatim.
+  const attachIsCommand = attachCmd !== null && looksLikeShellCommand(attachCmd);
   // Sessions are archived per working directory (e.g. `claude --resume <sid>` only finds the
   // session when run from the original cwd), so the copied command carries the launch cwd.
   // Display-level composition of two verbatim record fields — no derivation.
   const launchCwd = str(launch.cwd);
-  const attachCopyText = attachCmd && launchCwd ? `cd ${launchCwd} && ${attachCmd}` : attachCmd;
+  const attachCopyText =
+    attachIsCommand && attachCmd && launchCwd ? `cd ${launchCwd} && ${attachCmd}` : attachCmd;
 
   // Live elapsed while the agent is active.
   const active = agentIsActive(state);
@@ -139,7 +155,24 @@ export function AgentInspector({
         </button>
       </div>
 
-      {attachCmd ? (
+      <div className="dsect stream-cta">
+        {streamAvailable ? (
+          <button
+            className="stream-open-btn"
+            onClick={onOpenStream}
+            title="Watch this agent's live work stream"
+            type="button"
+          >
+            ▶ VIEW STREAM
+          </button>
+        ) : (
+          <div className="dim-note">
+            no live stream — no readable stream source for this agent type yet
+          </div>
+        )}
+      </div>
+
+      {attachCmd && attachIsCommand ? (
         <div className="dsect attach">
           <div className="sl">⎘ attach</div>
           {launchCwd ? (
@@ -155,6 +188,18 @@ export function AgentInspector({
             <button className="attach-copy" onClick={copyAttach} type="button">
               {copied ? 'copied' : 'copy'}
             </button>
+          </div>
+        </div>
+      ) : attachCmd ? (
+        // Not a shell command (internal semantic handle, e.g. "SendMessage to <id>") — honest
+        // info line, verbatim, no COPY, no cd prefix: nothing here pretends to be runnable.
+        <div className="dsect attach">
+          <div className="sl">⎘ attach</div>
+          <div className="kv">
+            <div className="row">
+              <span className="k">internal handle</span>
+              <span className="v mono">{attachCmd}</span>
+            </div>
           </div>
         </div>
       ) : (

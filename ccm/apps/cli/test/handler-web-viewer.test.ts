@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  appendFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -2446,6 +2447,134 @@ test('serve view-model agents[] is empty and node agent_refs absent-safe when bo
     assert.deepEqual(vm.body.graph.nodes[0].agent_refs, []);
   } finally {
     await httpJson({ port, path: '/_ccm/shutdown', token: 'na-token', method: 'POST' }).catch(
+      () => {},
+    );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});
+
+test('serve implements agent-stream.json: tail, forward increment, backward paging, none, 400/404', async () => {
+  const home = mkHome();
+  // A transcript file the agent handle points at directly (transcript_ref) so the source
+  // resolves deterministically without harness session roots.
+  const transcript = join(home, 'boards', 'agent-1.transcript.jsonl');
+  const line = (i: number) =>
+    `{"type":"user","timestamp":"2026-07-08T12:00:0${i % 10}Z","message":{"role":"user","content":"message ${i}"}}`;
+  const initial = Array.from({ length: 250 }, (_v, i) => line(i)).join('\n');
+  writeFileSync(transcript, `${initial}\n`, 'utf8');
+
+  const boardPath = writeBoard(home, '20260708T120000Z-1.board.json', {
+    schema: 'cc-master/v2',
+    goal: 'Ship viewer lifecycle',
+    owner: { active: true, session_id: SID, heartbeat: '2026-07-08T12:00:00Z' },
+    git: { worktree: '', branch: '' },
+    tasks: [{ id: 'A', title: 'Task', status: 'in_flight', deps: [] }],
+    agents: [
+      {
+        id: 'agt-1',
+        harness: 'claude-code',
+        intent: 'add retries',
+        handle: { kind: 'task-id', transcript_ref: transcript },
+        lifecycle: { state: 'running' },
+      },
+      {
+        id: 'agt-none',
+        harness: 'origin',
+        handle: { kind: 'none' },
+        lifecycle: { state: 'running' },
+      },
+    ],
+    log: [],
+  });
+
+  const { statePath } = writeServeState(home, 'wv_stream', 'stream-token', boardPath);
+  const { port, servePromise } = await startServe(statePath, home);
+
+  try {
+    // token gate
+    const forbidden = await httpJson({ port, path: '/agent-stream.json?agent=agt-1' });
+    assert.equal(forbidden.status, 403);
+
+    // missing agent -> 400
+    const noAgent = await httpJson({ port, path: '/agent-stream.json', token: 'stream-token' });
+    assert.equal(noAgent.status, 400);
+
+    // unknown agent -> 404
+    const unknown = await httpJson({
+      port,
+      path: '/agent-stream.json?agent=nope',
+      token: 'stream-token',
+    });
+    assert.equal(unknown.status, 404);
+
+    // malformed cursor -> 400
+    const badCursor = await httpJson({
+      port,
+      path: '/agent-stream.json?agent=agt-1&cursor=-4',
+      token: 'stream-token',
+    });
+    assert.equal(badCursor.status, 400);
+
+    // tail (default): latest screen, capped at 200 events, prev>0 (older history exists)
+    const tail = await httpJson({
+      port,
+      path: '/agent-stream.json?agent=agt-1',
+      token: 'stream-token',
+    });
+    assert.equal(tail.status, 200);
+    assert.equal(tail.body.schema, 'ccm/web-viewer-agent-stream/v1');
+    assert.equal(tail.body.source.kind, 'transcript');
+    assert.equal(tail.body.mode, 'tail');
+    assert.ok(tail.body.events.length <= 200 && tail.body.events.length > 0);
+    assert.equal(tail.body.cursor.at_start, false);
+    assert.ok(tail.body.cursor.prev > 0);
+
+    // backward: page older history; prev retreats toward the head
+    const back = await httpJson({
+      port,
+      path: `/agent-stream.json?agent=agt-1&before=${tail.body.cursor.prev}`,
+      token: 'stream-token',
+    });
+    assert.equal(back.status, 200);
+    assert.equal(back.body.mode, 'backward');
+    assert.ok(back.body.events.length > 0);
+    assert.ok(back.body.cursor.prev < tail.body.cursor.prev);
+    // backward page's last event sits immediately before the tail window's first (contiguous)
+    assert.equal(back.body.cursor.next, tail.body.cursor.prev);
+
+    // forward: no new data yet at the tail frontier
+    const caughtUp = await httpJson({
+      port,
+      path: `/agent-stream.json?agent=agt-1&cursor=${tail.body.cursor.next}`,
+      token: 'stream-token',
+    });
+    assert.equal(caughtUp.status, 200);
+    assert.equal(caughtUp.body.mode, 'forward');
+    assert.equal(caughtUp.body.events.length, 0);
+
+    // append new lines -> forward picks them up incrementally
+    appendFileSync(transcript, `${line(250)}\n${line(251)}\n`, 'utf8');
+    const forward = await httpJson({
+      port,
+      path: `/agent-stream.json?agent=agt-1&cursor=${tail.body.cursor.next}`,
+      token: 'stream-token',
+    });
+    assert.equal(forward.status, 200);
+    assert.equal(forward.body.events.length, 2);
+    assert.equal(forward.body.events[1].text, 'message 251');
+
+    // agent with a no-transcript handle -> source.kind none, 200 (not an error)
+    const none = await httpJson({
+      port,
+      path: '/agent-stream.json?agent=agt-none',
+      token: 'stream-token',
+    });
+    assert.equal(none.status, 200);
+    assert.equal(none.body.source.kind, 'none');
+    assert.equal(none.body.mode, 'none');
+    assert.ok(none.body.source.reason);
+  } finally {
+    await httpJson({ port, path: '/_ccm/shutdown', token: 'stream-token', method: 'POST' }).catch(
       () => {},
     );
   }

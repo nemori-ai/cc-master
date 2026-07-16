@@ -1823,6 +1823,17 @@ header.missionline {
 .cc-node .agentchip.orphaned:hover {
   border-color: var(--failed);
 }
+/* terminal agents are attribution, not activity — keep "who did this" on the finished tile,
+   but recede: grey lamp (inline), no clock, faded until hover */
+.cc-node .agentchip.terminal {
+  opacity: 0.55;
+}
+.cc-node .agentchip.terminal .alamp {
+  box-shadow: none;
+}
+.cc-node .agentchip.terminal:hover {
+  opacity: 0.9;
+}
 .cc-node .agentmore {
   font-family: 'Martian Mono', ui-monospace, monospace;
   font-size: 8px;
@@ -4883,4 +4894,337 @@ button.attempt-row-agent:hover {
 }
 .policy .policy-deny {
   color: var(--failed);
+}
+
+/* ── Agent live-stream drawer ─────────────────────────────────────────────────────────────
+   Independent right-side overlay above the inspector rail (z above the workspace scrim). Event
+   rows use content-visibility:auto so off-screen rows stay out of layout/paint. */
+.stream-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  border: none;
+  padding: 0;
+  background: var(--mm-mask);
+  cursor: pointer;
+  animation: stream-fade 140ms ease;
+}
+@keyframes stream-fade {
+  from {
+    opacity: 0;
+  }
+}
+.stream-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 91;
+  width: min(72%, 980px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-left: 1px solid var(--hair);
+  box-shadow: -18px 0 48px -12px var(--shadow);
+  animation: stream-slide 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes stream-slide {
+  from {
+    transform: translateX(24px);
+    opacity: 0.4;
+  }
+}
+.stream-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hair);
+  background: var(--panel-hi);
+}
+.stream-lamp {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--ink-faint);
+  box-shadow: 0 0 0 1px var(--lamp-ring);
+}
+.stream-lamp.live {
+  background: var(--done);
+  box-shadow:
+    0 0 0 1px var(--lamp-ring),
+    0 0 8px var(--done);
+  animation: stream-breathe 2.4s ease-in-out infinite;
+}
+@keyframes stream-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+.stream-htext {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.stream-htitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stream-hmeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--ink-dim);
+}
+.stream-hid {
+  color: var(--ink-faint);
+}
+.stream-harness {
+  color: var(--edge);
+}
+.stream-close {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--hair);
+  background: transparent;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+.stream-close:hover {
+  background: var(--panel-hi);
+  color: var(--ink);
+}
+.stream-source {
+  flex: 0 0 auto;
+  padding: 6px 16px;
+  font-size: 10px;
+  color: var(--ink-faint);
+  border-bottom: 1px solid var(--hair-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stream-errbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  font-size: 10.5px;
+  color: var(--failed);
+  background: oklch(0.63 0.19 26 / 0.08);
+  border-bottom: 1px solid var(--hair-soft);
+}
+.stream-errbar span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stream-retry {
+  flex: 0 0 auto;
+  padding: 2px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--failed);
+  background: transparent;
+  color: var(--failed);
+  font-size: 10px;
+  cursor: pointer;
+}
+.stream-retry:hover {
+  background: oklch(0.63 0.19 26 / 0.14);
+}
+.stream-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 12px 24px;
+  scroll-behavior: auto;
+}
+.stream-empty {
+  padding: 32px 12px;
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+.stream-edge {
+  padding: 8px;
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.stream-more {
+  display: block;
+  width: 100%;
+  margin: 4px 0;
+  padding: 6px;
+  border: 1px dashed var(--hair);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.stream-more:hover:not(:disabled) {
+  background: var(--panel-hi);
+  color: var(--ink);
+}
+.stream-more:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.stream-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 60px;
+  padding: 5px 8px;
+  margin: 3px 0;
+  border-left: 2px solid var(--edge);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--band-alt);
+}
+.stream-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 10px;
+}
+.stream-kind {
+  flex: 0 0 auto;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 8.5px;
+  color: var(--edge);
+}
+.stream-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stream-ts {
+  flex: 0 0 auto;
+  color: var(--ink-faint);
+  font-size: 9px;
+}
+.stream-trunc {
+  flex: 0 0 auto;
+  color: var(--stale);
+  font-size: 8.5px;
+}
+.stream-text {
+  margin: 3px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 11.5px;
+  line-height: 1.42;
+  color: var(--ink);
+  font-family: 'Martian Mono', ui-monospace, monospace;
+}
+.stream-detail {
+  margin-top: 3px;
+}
+.stream-detail > summary {
+  cursor: pointer;
+  font-size: 9.5px;
+  color: var(--ink-faint);
+}
+.stream-detail .stream-text {
+  color: var(--ink-dim);
+  font-size: 10.5px;
+}
+/* Kind accents */
+.stream-row[data-kind='user'] {
+  border-left-color: var(--ink-dim);
+}
+.stream-row[data-kind='assistant'] {
+  border-left-color: var(--ready);
+}
+.stream-row[data-kind='thinking'] {
+  border-left-color: var(--uncertain);
+  background: transparent;
+}
+.stream-row[data-kind='thinking'] .stream-text {
+  color: var(--ink-dim);
+  font-style: italic;
+}
+.stream-row[data-kind='tool'] {
+  border-left-color: var(--inflight);
+}
+.stream-row[data-kind='tool_result'] {
+  border-left-color: var(--done);
+}
+.stream-row[data-kind='tool_result'] .stream-text {
+  color: var(--ink-dim);
+}
+.stream-row[data-kind='system'] {
+  border-left-color: var(--ink-faint);
+  background: transparent;
+}
+.stream-row[data-kind='system'] .stream-text {
+  color: var(--ink-faint);
+  font-size: 10.5px;
+}
+.stream-row[data-kind='raw'] {
+  border-left-color: var(--edge);
+  background: transparent;
+}
+.stream-jump {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  background: var(--done);
+  color: var(--ground);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px -4px var(--shadow);
+}
+.stream-jump:hover {
+  filter: brightness(1.08);
+}
+/* VIEW STREAM call-to-action in the agent inspector */
+.dsect.stream-cta {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.stream-open-btn {
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--ready);
+  background: oklch(0.7 0.115 244 / 0.1);
+  color: var(--ready);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.stream-open-btn:hover {
+  background: oklch(0.7 0.115 244 / 0.2);
+}
+@media (max-width: 720px) {
+  .stream-drawer {
+    width: 100%;
+  }
 }

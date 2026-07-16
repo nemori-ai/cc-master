@@ -14,10 +14,19 @@ export function agentStateRank(state: string | undefined): number {
   return index === -1 ? AGENT_STATE_ORDER.length : index;
 }
 
-// Lifecycle states that surface as chips on the task face (DAG node / list row): the
-// realtime "who is working this node" readout. Terminal agents stay off the tile — the
-// task inspector's agents section still lists them.
-export const AGENT_CHIP_STATES = new Set(['running', 'starting', 'uncertain', 'orphaned']);
+// Lifecycle states that surface as chips on the task face (DAG node / list row): the full
+// lifecycle, so attribution survives completion — "who worked this node" must not evaporate
+// when the task lands and the worker goes terminal. Visual weight is graded per state at the
+// render site: active states keep the live treatment, terminal renders de-emphasized (grey
+// lamp, no clock, faded) and sorts last (agentStateRank), so actives claim the visible slots
+// before the "+N" fold.
+export const AGENT_CHIP_STATES = new Set([
+  'running',
+  'starting',
+  'uncertain',
+  'orphaned',
+  'terminal',
+]);
 
 // Lifecycle state -> a status-lamp CSS var, reusing the board status palette semantics so
 // running reads like in-flight, orphaned like failed, terminal like done, etc.
@@ -73,4 +82,19 @@ export function agentIsActive(state: string | undefined): boolean {
 
 export function harnessBadge(harness: string | undefined): string {
   return (harness ?? 'unknown').replace(/-agent$/, '');
+}
+
+/**
+ * Whether an attach_cmd is plausibly a runnable shell command (vs an internal semantic handle
+ * like "SendMessage to a94c…" that must never be rendered as a copyable command with a `cd`
+ * prefix). Deliberately conservative — only an all-lowercase leading token shaped like a
+ * binary or path (`claude`, `codex`, `tmux`, `./run.sh`, `~/bin/x`, `/usr/bin/x`) qualifies;
+ * anything with uppercase in the head token (tool names are CamelCase by convention) or an
+ * empty/odd head renders as an info line instead. Misclassifying a real command as info-only
+ * costs a copy button; misclassifying a handle as a command ships a broken instruction.
+ */
+export function looksLikeShellCommand(cmd: string): boolean {
+  const head = cmd.trim().split(/\s+/)[0] ?? '';
+  if (!head) return false;
+  return /^(?:\.{0,2}\/|~\/)?[a-z0-9][a-z0-9_./-]*$/.test(head);
 }

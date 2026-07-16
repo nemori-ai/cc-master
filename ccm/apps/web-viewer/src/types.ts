@@ -278,6 +278,9 @@ export interface CompactAgent {
   has_transcript?: boolean;
   registered_at?: string; // elapsed anchor
   ended_at?: string | null;
+  /** Terminal outcome summary when the projection carries one — enriches the chip hover title;
+   *  absent stays absent (the inspector reads the full record via /agent.json). */
+  outcome?: string;
   probe?: AgentProbe | null;
   links?: string[]; // linked task ids
 }
@@ -310,6 +313,51 @@ export interface AgentDetailPayload {
   compact?: CompactAgent;
   linked_tasks?: AgentLinkedTask[];
   probe?: AgentProbe | null;
+  error?: string;
+}
+
+// ---- Agent live stream (server-normalized transcript tail; frontend renders, never parses) --
+
+export type StreamEventKind =
+  | 'user'
+  | 'assistant'
+  | 'thinking'
+  | 'tool'
+  | 'tool_result'
+  | 'system'
+  | 'raw';
+
+/** One normalized stream event from `/agent-stream.json` (server `buildAgentStream`). */
+export interface StreamEvent {
+  id: string; // stable key (`${lineByteOffset}.${blockIndex}`) — dedup + React key across pages
+  kind: StreamEventKind;
+  title: string;
+  text: string;
+  detail?: string;
+  ts?: string;
+  truncated?: boolean;
+}
+
+/** `/agent-stream.json` incremental-tail payload. Source info is nested so the cursor protocol
+ *  can outlive the "file" concept (a future run-store journal is the same shape). */
+export interface AgentStreamPayload {
+  schema?: string;
+  agent_id: string;
+  mode: 'tail' | 'forward' | 'backward' | 'none';
+  source: {
+    kind: 'transcript' | 'none';
+    harness: string;
+    path?: string;
+    size?: number;
+    mtime?: string;
+    /** File identity (inode) — the client compares across pages to detect rotation. */
+    ino?: number;
+    reason?: string;
+  };
+  live: { active: boolean; as_of: string };
+  cursor: { next: number; prev: number; at_start: boolean };
+  events: StreamEvent[];
+  reset: boolean;
   error?: string;
 }
 

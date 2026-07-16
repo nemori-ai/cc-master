@@ -1774,7 +1774,7 @@ ccm baseline reset [flags]
 
 ## namespace agent（Agent Registry·登记/探测/读取）
 
-运行时 agent 登记簿：凡派发皆登记——sub-agent / 后台 shell / workflow / 跨 harness CLI worker 全进本板 ✎ `agents[]` 花名册。**它是登记 / 探测 / 读取 noun**：七个 verb 不含任何 spawn / route / dispatch 语义（不起进程、不选路、不派活；dispatch 命令面归 `worker`）。agent = 实际跑起来的运行时实例（runtime 层），与 task 的 `executor`（planning 层的计划执行者类型）分层不合并——概念与字段取值见 [board-model-guide.md §C.6](board-model-guide.md#c6-agents运行时-agent-登记簿)。
+运行时 agent 登记簿：凡派发皆登记——sub-agent / 后台 shell / workflow / 跨 harness CLI worker 全进本板 ✎ `agents[]` 花名册。**它是登记 / 探测 / 读取 noun**：九个 verb（create / bind / amend / link / terminal / probe / list / show / rm）不含任何 spawn / route / dispatch 语义（不起进程、不选路、不派活；dispatch 命令面归 `worker`）。其中 create / bind / terminal / probe 走生命周期状态机，`amend`（补正 handle 域）与 `rm`（删登记）是**登记簿事后修正**——不经状态机、不做状态转移。agent = 实际跑起来的运行时实例（runtime 层），与 task 的 `executor`（planning 层的计划执行者类型）分层不合并——概念与字段取值见 [board-model-guide.md §C.6](board-model-guide.md#c6-agents运行时-agent-登记簿)。
 
 agent 生命周期状态机（写 verb 强制·同态重入幂等）：
 
@@ -1831,6 +1831,36 @@ ccm agent bind <id> --handle <kind:value> [flags]
 | `--json` | | bool | | 结构化输出 |
 
 - 例：`ccm agent bind agt-001 --handle session-id:0197-abc --attach-cmd "cd /abs/worktree && codex resume 0197-abc"` · `ccm agent bind agt-002 --handle pid:48213`
+
+**codex worker 登记配方（sid 运行时才生成·两步 bind 升级到位）**：codex 没有 claude-code 那样的 `--session-id` 预设——sid 在 worker 启动后才存在。别用凑合 handle 顶替，照这个顺序登记：
+
+1. **派发**：`codex exec --json "<prompt>" > /abs/worker.log 2>&1 &`——`--json` 让 codex 把事件以 JSONL 打到 stdout，重定向落成日志文件。
+2. **立即 bind 兜底证据**：`ccm agent bind <id> --handle pid:<pid> --transcript /abs/worker.log`——pid 立刻可探测、日志立刻可看（纯文本 fallback）。
+3. **起跑后升级 bind**：日志**首行 `thread.started` 事件的 `thread_id` 就是 sid**（`head -1 /abs/worker.log` 即可提取；它与 rollout 文件名里的 sid 一致。旧版 codex 若输出的是 `session_meta` 形状，则取其 `payload.session_id`）。拿到就升级：`ccm agent bind <id> --handle session-id:<sid> --attach-cmd "cd /abs/cwd && codex resume <sid>"`——探测随之升级为会话文件 mtime（rollout 落盘于 `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<sid>.jsonl`），attach / 流定位升级为精确 rollout 源。
+4. **反模式**：`codex exec resume --last` 不可作 attach 命令——它接「最近一个 session」，并行多 worker 时会接错人；shell 后台任务 id 也不是可探测的 handle（登记成 `task-id:<shell任务id>` 会让 probe 无从探测、流定位不到 rollout 文件）。精确 resume 永远是 `codex resume <sid>`。
+
+### agent amend
+
+**写**（只改 handle 域·非状态转移）
+
+```
+ccm agent amend <id> [--handle <kind:value>] [--attach-cmd "..."] [--transcript <path>] [flags]
+```
+
+- positional：`<id>`（必填）
+- 行为：事后补正已登记 agent 的 **handle 域三件套**——`handle`（kind:value）/ `attach_cmd` / `transcript_ref`，至少给一项，否则 usage 报错。**任何生命周期状态都能 amend，含 `terminal`**——因为它不是状态转移、不交证据、不复活：**绝不**触碰 `lifecycle.state` / `probe` / `links` / `intent`（要改状态仍走 `bind` / `terminal` 等既有 verb）。`--handle` 复用 `bind` 的同一套校验（`kind ∈ session-id\|pid\|task-id` 且 value 非空，坏 handle 不入登记簿）。agent id 不存在 → exit 5
+- flags：
+
+| flag | 短名 | 类型 | 必填 | 含义 |
+|---|---|---|---|---|
+| `--handle <kind:value>` | | string | | 补正 handle 证据（校验同 `bind`） |
+| `--attach-cmd <str>` | | string | | 补正一键接入命令（同 `bind`：执行位置敏感的连 `cd` 一起写自包含） |
+| `--transcript <str>` | | string | | 补正 transcript 路径引用 |
+| `--json` | | bool | | 结构化输出（`{agent}`） |
+
+- 为什么存在：坏 handle 常在 agent 已 `terminal` 后才被发现，此时 `bind` 被状态机拒（终态冻结），唯一出路曾是重复 `create` 一条新登记——**同一个真实 worker 在 roster 撕成两行**。`amend` 就是补正而不撕裂的出口。
+- **心智锚**：登记后发现 handle 不完美（sid 拼错、attach 命令漏了 `cd`、transcript 路径写错），**用 `amend` 补正，绝不重复 `create` 登记**——一个真实 worker 两行 roster 是撕裂，会让花名册、viewer 与 resume 后的自己都数错在跑的 agent。
+- 例：`ccm agent amend agt-001 --attach-cmd "cd /abs/worktree && codex resume 0197-abc"` · `ccm agent amend agt-002 --handle session-id:0197-fixed --transcript /abs/worker.log`
 
 ### agent link
 
@@ -1909,6 +1939,25 @@ ccm agent show <id> [flags]
 - 行为：单 agent 钻取：record + attach 命令 + transcript 路径 + probe 观测与新鲜度 + links
 - flags：`--json`（`{agent}`）
 - 例：`ccm agent show agt-001 --json`
+
+### agent rm
+
+**写**（破坏性·删登记·非状态转移）
+
+```
+ccm agent rm <id> [--yes] [flags]
+```
+
+- positional：`<id>`（必填）
+- 行为：从本板 `agents[]` 删除整条 agent 记录（该 agent 侧的 `links[]` 随记录一并消失）——重复登记 / 误登记的撕裂行的**清除**出口（与 `amend` 互补：`amend` 补正保留的那条，`rm` 删多出来的那条）。**不经状态机**（删除 ≠ 状态转移），仍走带锁 + lint 写入关卡。破坏性，语义对齐 `task rm`：**非 TTY 须 `--yes`**，否则 refuse（exit 2）；agent id 不存在 → exit 5
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--yes` | `-y` | bool | 非交互环境确认（破坏性操作·不加则 exit 2 拒绝） |
+| `--json` | | bool | 结构化输出（`{removed}`；支持 `--dry-run` 预演） |
+
+- 例：`ccm agent rm agt-003 --yes` · `ccm agent rm agt-003 --dry-run`
 
 ---
 
