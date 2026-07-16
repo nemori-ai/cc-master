@@ -689,7 +689,8 @@ advancing across context compaction and across sessions.
 - **Docs** — `README.md` (EN) and `README_zh.md` (中文); design specification,
   design notes, and four research reports under `design_docs/`.
 
-[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/nemori-ai/cc-master/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/nemori-ai/cc-master/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/nemori-ai/cc-master/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/nemori-ai/cc-master/compare/v0.17.3...v0.18.0

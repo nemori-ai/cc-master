@@ -2,7 +2,7 @@
 
 Status: release candidate; do not tag or publish from this document.
 
-History window: `e80c57f6..b2d5691a` (62 commits, after plugin v0.19.0 and ccm-v0.20.0). Package versions produced by the repository changeset flow are `ccm@0.21.0`, `@ccm/engine@0.21.0`, and `@ccm/web-viewer@0.19.0`; the plugin manifests are `0.20.0`.
+History window: `e80c57f6..db7efc26` (63 commits, after plugin v0.19.0 and ccm-v0.20.0). Package versions produced by the repository changeset flow are `ccm@0.21.0`, `@ccm/engine@0.21.0`, and `@ccm/web-viewer@0.19.0`; the plugin manifests are `0.20.0`.
 
 ## Features
 
@@ -57,7 +57,7 @@ History window: `e80c57f6..b2d5691a` (62 commits, after plugin v0.19.0 and ccm-v
 
 - Cross-harness capability blueprints, information needs, orchestration model, provider contracts, quota notification contract, post-MVP roadmap, model role policy, and capability parity were formalized.
 - The feature manual now reflects the shipped eight-skill, three-origin, 82-rule, worker/agent/model-policy/quota/viewer/Goal Contract product, with current vs partial boundaries.
-- README changes are prepared in a separate review lane and are intentionally not part of this draft’s edit scope.
+- README / README_zh were refreshed and merged in #154: they now present the cross-harness worker pool, machine-wide facts, unified model/quota guidance, Agent Registry, current viewer, and the honest post-MVP boundary as the release’s user-facing theme.
 
 ## Compatibility
 
@@ -145,3 +145,4 @@ Every commit in the release window is represented below; this ledger is the audi
 - `d87458d6` — cross-harness skill-view convergence plan
 - `3991e64b` — cross-harness model-role policy
 - `b2d5691a` — machine-wide quota capability parity alignment (#153)
+- `db7efc26` — cross-harness release README / README_zh refresh (#154)

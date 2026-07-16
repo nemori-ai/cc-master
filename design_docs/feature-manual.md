@@ -90,7 +90,7 @@ board 是单一可写编排事实源；所有写入经 `ccm` 带锁关卡。`@cc
 
 ### 5.2 Cursor 双 surface ✅
 
-`ccm harness inventory` 分别报告 Cursor IDE plugin 与 Cursor Agent CLI 的 executable/auth/quota/role eligibility。IDE 安装不证明 Agent CLI 可用，反之亦然；只有 Cursor Agent 进入 headless worker dispatch。
+这组事实来自三个互不替代的只读面：`ccm harness list --machine-wide --json` 报告 Cursor IDE plugin 与 Cursor Agent CLI 的本机 surface inventory；`ccm quota status --machine-wide --json` 报告已有 cached quota posture；`ccm model-policy ...` 消费 role candidate、qualification 与 admission。任一面都不能从另一个面推断：IDE 安装不证明 Agent CLI 已安装、认证、额度可用或具备 role eligibility，反之亦然；只有已独立通过相应事实门的 Cursor Agent 才能进入 headless worker dispatch。
 
 ### 5.3 Runtime supply chain 🟡
 
