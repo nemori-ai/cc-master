@@ -47,4 +47,17 @@ test('only executable machine-wide quota hook rules are promoted to PARITY ancho
     pacing,
     /- rule: rule-usage-pacing-dual-delivery\n  required_hosts: \[claude-code\]/u,
   );
+  assert.match(
+    pacing,
+    /Stop fallback surfaces only `uncoveredChanges`:[\s\S]*`fanout_covered:false`[\s\S]*target harness matches the origin/u,
+  );
+  assert.match(
+    pacing,
+    /emits `kind:system` only when `uncoveredChanges` returns one or more validated[\s\S]*empty selection[\s\S]*silent/u,
+  );
+  assert.match(pacing, /`advisory\('usage-pacing', 'strong', body\)`[\s\S]*does not reuse Claude Code's verdict strength table/u);
+  assert.doesNotMatch(
+    pacing,
+    /surfaces hold\/throttle\/stop_billing_period|emits kind:system on throttle\/stop_billing_period|same\s+rule-usage-pacing-strength-mapping table/iu,
+  );
 });

@@ -121,10 +121,10 @@ goes through `ccm account switch`, a process-boundary call, not a board write).
     switching is not implemented in this adapter. Cursor has no account-pool switch surface and its
     billing_period pacing path never emits `switch`.
   compensating_mechanism: >
-    Codex and Cursor discard legacy `switch` without direct output or coordination notification;
-    it is not translated into an account candidate or user prompt. Cursor also stays silent on
-    `stop_5h`/`stop_7d` (defensive) and only
-    surfaces hold/throttle/stop_billing_period.
+    Codex and Cursor reject legacy switch-shaped evidence rather than translating it into an account
+    candidate or prompt. Their Stop fallback surfaces only `uncoveredChanges`: non-healthy,
+    `fanout_covered:false`, revision-new cached decisions whose target harness matches the origin;
+    an empty selection is silent and no legacy verdict enum is interpreted.
   tracked_by: "n/a — declared in _hosts/codex/strategy.yaml usage_pacing.behavior; Cursor billing_period path intentional"
 
 - rule: usage-pacing-post-tool-batch-sampling
@@ -167,8 +167,9 @@ goes through `ccm account switch`, a process-boundary call, not a board write).
     Cursor `stop` only documents `followup_message`. Pacing advisories must reach the agent (product
     requirement); launcher maps kind:system to `{ followup_message }`.
   compensating_mechanism: >
-    usage-pacing-core.js emits kind:system on throttle/stop_billing_period; launcher maps stop
-    notifications per ENVELOPE.md. hold verdict stays silent; stop_hook_active guard unchanged.
+    usage-pacing-core.js emits `kind:system` only when `uncoveredChanges` returns one or more validated
+    local cached decisions; the launcher maps that Stop output per ENVELOPE.md. An empty selection and
+    `stop_hook_active` re-entry are silent.
   tracked_by: "_hosts/cursor/ENVELOPE.md; plugin v0.17.2"
 
 - rule: usage-pacing-tag-protocol-missing-on-codex
@@ -176,12 +177,11 @@ goes through `ccm account switch`, a process-boundary call, not a board write).
   affected_hosts: [codex]
   reason: >
     Prior to HOOKPAR-DEC, Codex usage-pacing-core.js emitted a bare `{kind:'system', message}` with
-    no ADR-018 tag wrapper — the agent had no machine-readable strength signal for a pacing message
-    whose stakes vary a lot by verdict (switch is low-stakes/reversible, stop_5h/stop_7d/throttle are
-    high-stakes).
+    no ADR-018 tag wrapper — the agent had no machine-readable strength for the uncovered cached
+    machine decision fallback.
   compensating_mechanism: >
-    Fixed in this round — codex usage-pacing-core.js now wraps the message in a local
-    `advisory('usage-pacing', strength, body)` helper using the same
-    rule-usage-pacing-strength-mapping table as claude-code usage-pacing.js.
+    Codex now wraps every non-empty uncovered cached decision fallback with
+    `advisory('usage-pacing', 'strong', body)`. It does not reuse Claude Code's verdict strength table;
+    recovery/reset edge strength remains owned by the durable coordination-inbox path.
   tracked_by: "adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR)"
 ```
