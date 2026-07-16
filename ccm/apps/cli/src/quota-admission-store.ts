@@ -618,6 +618,7 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
   const transactionRoot = join(quotaRoot, 'transactions');
   const reservationIdentityLockRoot = join(quotaRoot, 'reservation-identities');
   const reservationKeyRoot = join(quotaRoot, 'reservation-keys');
+  const machineProjectionPath = join(quotaRoot, 'machine-wide', 'projection.json');
 
   const observationPath = (sourceKey: string): string =>
     join(observationRoot, hash(sourceKey), 'current.json');
@@ -949,7 +950,7 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
     if (!lock) throw new Error('QUOTA_LOCK_BUSY');
     try {
       const current = await readObservation(sourceKey);
-      if (current) {
+      if (current && request.force !== true) {
         const sourceProfile = validatedSourceProfile(current);
         const freshness: ObservationFreshness = sourceProfile
           ? observationFreshness(current, sourceProfile, currentTime().getTime())
@@ -969,6 +970,18 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
     } finally {
       await lock.release();
     }
+  };
+
+  const readMachineProjection = async (): Promise<Data | undefined> =>
+    readJson(fs, machineProjectionPath);
+
+  const publishMachineProjection = async (projection: Readonly<Data>): Promise<Data> => {
+    const directorySync = await atomicPublish(fs, machineProjectionPath, projection);
+    return {
+      ...projection,
+      snapshot_ref: machineProjectionPath,
+      directory_sync: directorySync,
+    };
   };
 
   const loadAggregation = async (
@@ -2172,6 +2185,8 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
     refreshObservation,
     publishObservation,
     readObservation,
+    readMachineProjection,
+    publishMachineProjection,
     reserve,
     commitReservation,
     preflight,

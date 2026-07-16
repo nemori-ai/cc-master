@@ -23,10 +23,14 @@ import * as discover from '../discover.js';
 import { MachineHarnessRegistry } from '../harnesses/registry.js';
 import { readVersion } from '../help.js';
 import * as io from '../io.js';
+import { refreshMachineWideQuota } from '../machine-wide-quota.js';
+import { createQuotaAdmissionStore } from '../quota-admission-store.js';
+import { quotaFilesystemFromBoundary } from '../quota-production-effects.js';
 import type { Ctx } from './_common.js';
 import { type ArbiterUsageOverride, arbitrateBoardForService } from './coordination.js';
 import {
   type MonitorLifecycleObserver,
+  type MonitorQuotaSourceMode,
   monitorLifecycleNoopObserver,
   runMonitorSourceCycle,
 } from './monitor-source-composition.js';
@@ -52,6 +56,7 @@ interface MonitorState {
   pid_path: string;
   log_path: string;
   interval_sec: number;
+  quota_source_mode: MonitorQuotaSourceMode;
   server: {
     started_at: string;
     ccm_version: string;
@@ -175,6 +180,15 @@ function parseInterval(raw: unknown): number {
   return n;
 }
 
+function parseQuotaSource(
+  raw: unknown,
+  fallback: MonitorQuotaSourceMode = 'cached-only',
+): MonitorQuotaSourceMode {
+  if (raw === undefined) return fallback;
+  if (raw === 'cached-only' || raw === 'machine-wide') return raw;
+  throw kinded('monitor --quota-source must be cached-only or machine-wide', 'Usage');
+}
+
 function writeJson(filePath: string, value: unknown): void {
   // state.json carries wanted/liveness continuity across service restarts, so it is durable authority.
   // pid/log remain ephemeral operational files and intentionally do not pay this fsync protocol.
@@ -203,6 +217,7 @@ function readState(statePath: string): MonitorState | null {
         typeof s.interval_sec === 'number' && Number.isFinite(s.interval_sec)
           ? s.interval_sec
           : DEFAULT_INTERVAL_SEC,
+      quota_source_mode: parseQuotaSource(s.quota_source_mode),
       server:
         s.server && typeof s.server === 'object'
           ? (s.server as MonitorState['server'])
@@ -245,7 +260,11 @@ function classifyService(service: MonitorState | null): MonitorState | null {
   };
 }
 
-function buildState(home: string, intervalSec: number): MonitorState {
+function buildState(
+  home: string,
+  intervalSec: number,
+  quotaSourceMode: MonitorQuotaSourceMode = 'cached-only',
+): MonitorState {
   const paths = servicePaths(home);
   return {
     schema: SERVICE_SCHEMA,
@@ -257,6 +276,7 @@ function buildState(home: string, intervalSec: number): MonitorState {
     pid_path: paths.pid,
     log_path: paths.log,
     interval_sec: intervalSec,
+    quota_source_mode: quotaSourceMode,
     server: { started_at: nowIso(), ccm_version: ccmVersion() },
     last_tick_at: null,
     last_error: null,
@@ -314,11 +334,24 @@ function startService(ctx: Ctx): { service: MonitorState; reused: boolean } {
   ensureServiceDirs(paths);
   return withLock(paths.lockTarget, () => {
     const existing = classifyService(readState(paths.state));
-    if (existing && existing.health === 'ok' && existing.binary_match !== false) {
+    const quotaSourceMode = parseQuotaSource(
+      ctx.values['quota-source'],
+      existing?.quota_source_mode ?? 'cached-only',
+    );
+    if (
+      existing &&
+      existing.health === 'ok' &&
+      existing.binary_match !== false &&
+      existing.quota_source_mode === quotaSourceMode
+    ) {
       return { service: existing, reused: true };
     }
     if (existing && existing.pid > 0) stopOne(existing);
-    const state = buildState(home, parseInterval(ctx.values.interval));
+    const state = buildState(
+      home,
+      parseInterval(ctx.values.interval ?? existing?.interval_sec),
+      quotaSourceMode,
+    );
     writeJson(paths.state, state);
     fs.writeFileSync(paths.pid, '', 'utf8');
     const child = spawnService({ statePath: state.state_path, logPath: state.log_path });
@@ -441,7 +474,8 @@ interface TickResult {
   checked_boards: number;
   writes: number;
   errors: string[];
-  mode?: 'cached-only';
+  mode?: MonitorQuotaSourceMode;
+  machine_wide?: unknown;
 }
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -465,6 +499,24 @@ async function tickOnce(ctx: Ctx, state: MonitorState): Promise<TickResult> {
   if (testHooks.tick) return testHooks.tick(ctx, state);
   return runMonitorSourceCycle({
     observer: lifecycleObserver,
+    mode: state.quota_source_mode,
+    ...(state.quota_source_mode === 'machine-wide'
+      ? {
+          refreshMachineWide: async () => {
+            if (!ctx.quotaEffects) throw new Error('quota effect boundary is required');
+            const store = createQuotaAdmissionStore({
+              home: state.home,
+              filesystem: quotaFilesystemFromBoundary(ctx.quotaEffects),
+            });
+            return refreshMachineWideQuota({
+              home: state.home,
+              env: ctx.env,
+              store,
+              collectors: ctx.machineQuotaCollectors,
+            });
+          },
+        }
+      : {}),
     readCached: () => {
       const registry = MachineHarnessRegistry.sweep(ctx.env);
       const registryJson = registry.toJSON();
@@ -797,8 +849,19 @@ export function installService(ctx: Ctx): number {
   const home = canonicalHome(ctx);
   const paths = servicePaths(home);
   ensureServiceDirs(paths);
-  const state = readState(paths.state) || buildState(home, parseInterval(ctx.values.interval));
-  writeJson(paths.state, { ...state, wanted: true });
+  const existing = readState(paths.state);
+  const state =
+    existing ||
+    buildState(
+      home,
+      parseInterval(ctx.values.interval),
+      parseQuotaSource(ctx.values['quota-source']),
+    );
+  writeJson(paths.state, {
+    ...state,
+    wanted: true,
+    quota_source_mode: parseQuotaSource(ctx.values['quota-source'], state.quota_source_mode),
+  });
   const target = monitorUnitTarget(ctx.env, home);
   fs.mkdirSync(path.dirname(target.unitPath), { recursive: true });
   const def = buildServiceDefinition(target, paths);

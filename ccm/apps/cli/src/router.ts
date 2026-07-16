@@ -67,6 +67,7 @@ import * as workerHandler from './handlers/worker.js';
 import { harnessSessionId } from './harnesses/registry.js';
 import * as help from './help.js';
 import * as io from './io.js';
+import type { MachineQuotaCollectorBoundary } from './machine-wide-quota.js';
 import { createDefaultProviderRuntime, type ProviderRuntime } from './provider-runtime.js';
 import {
   ALIASES,
@@ -99,6 +100,7 @@ interface RunOpts {
   providerRuntime?: ProviderRuntime;
   workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
+  machineQuotaCollectors?: MachineQuotaCollectorBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
   writeFileAtomicSync?: typeof io.writeFileAtomicSync;
@@ -550,6 +552,7 @@ export function runWithComposition(
     providerRuntime: opts.providerRuntime || createDefaultProviderRuntime(env),
     workerSignal: opts.workerSignal,
     quotaEffects: opts.quotaEffects,
+    machineQuotaCollectors: opts.machineQuotaCollectors,
     nativeAttemptPrivateEvidence: opts.nativeAttemptPrivateEvidence,
     nativeAttemptAdmission: opts.nativeAttemptAdmission,
     writeFileAtomicSync: opts.writeFileAtomicSync,
@@ -606,6 +609,7 @@ function buildCtx({
   providerRuntime,
   workerSignal,
   quotaEffects,
+  machineQuotaCollectors,
   nativeAttemptPrivateEvidence,
   nativeAttemptAdmission,
   writeFileAtomicSync,
@@ -620,6 +624,7 @@ function buildCtx({
   providerRuntime?: ProviderRuntime;
   workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
+  machineQuotaCollectors?: MachineQuotaCollectorBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
   writeFileAtomicSync?: typeof io.writeFileAtomicSync;
@@ -653,6 +658,7 @@ function buildCtx({
     providerRuntime,
     workerSignal,
     quotaEffects,
+    machineQuotaCollectors,
     nativeAttemptPrivateEvidence,
     nativeAttemptAdmission,
     writeFileAtomicSync,

@@ -1067,7 +1067,7 @@ function lintInbox(board: BoardLike, emit: Emit): void {
     if (!isEnumMember('notificationKind', n.kind)) {
       emit(
         'FMT-INBOX',
-        `${label}.kind 是 ${JSON.stringify(n.kind)}，应 ∈ {pacing_throttle, pacing_yield, pacing_claim, pacing_switch, pacing_stop, hitl_turn, artifact_serialize}。`,
+        `${label}.kind 是 ${JSON.stringify(n.kind)}，应 ∈ {pacing_throttle, pacing_yield, pacing_claim, pacing_switch, pacing_stop, hitl_turn, artifact_serialize, quota_state_change}。`,
       );
     }
     if (!['unconsumed', 'consumed', 'expired'].includes(n.status as string)) {

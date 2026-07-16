@@ -7,7 +7,8 @@ export type NotificationKind =
   | 'pacing_switch'
   | 'pacing_stop'
   | 'hitl_turn'
-  | 'artifact_serialize';
+  | 'artifact_serialize'
+  | 'quota_state_change';
 
 export type NotificationStatus = 'unconsumed' | 'consumed' | 'expired';
 export type NotificationStrength = 'weak' | 'strong';
@@ -211,15 +212,16 @@ export class NotificationInbox {
       }
     }
 
-    const newestByKind = new Map<NotificationKind, Notification>();
+    const newestByKind = new Map<string, Notification>();
     for (const item of items) {
       if (item.status !== 'unconsumed') continue;
-      const prev = newestByKind.get(item.kind);
-      if (!prev || compareNewest(item, prev) >= 0) newestByKind.set(item.kind, item);
+      const key = supersessionKey(item);
+      const prev = newestByKind.get(key);
+      if (!prev || compareNewest(item, prev) >= 0) newestByKind.set(key, item);
     }
     for (const item of items) {
       if (item.status !== 'unconsumed') continue;
-      const newest = newestByKind.get(item.kind);
+      const newest = newestByKind.get(supersessionKey(item));
       if (newest && newest.id !== item.id) {
         item.status = 'expired';
         item.superseded_by = newest.id;
@@ -254,6 +256,12 @@ export class NotificationInbox {
   has(id: string): boolean {
     return this.items.some((item) => item.id === id);
   }
+}
+
+function supersessionKey(item: Notification): string {
+  if (item.kind !== 'quota_state_change') return item.kind;
+  const scope = item.payload.scope_digest;
+  return `${item.kind}\0${typeof scope === 'string' ? scope : ''}`;
 }
 
 function compareNewest(a: Notification, b: Notification): number {

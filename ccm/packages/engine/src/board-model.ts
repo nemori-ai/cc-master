@@ -72,6 +72,7 @@ export const ENUMS = {
     'pacing_stop',
     'hitl_turn',
     'artifact_serialize',
+    'quota_state_change',
   ],
   // acceptance 目标函数 criterion 的 kind / status（spec §4.1）。
   acceptanceKind: ['test', 'metric', 'manual', 'review'],

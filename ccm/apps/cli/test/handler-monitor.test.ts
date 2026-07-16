@@ -85,6 +85,34 @@ test('monitor start/status exposes binary_match and reuses healthy current-binar
   assert.equal(json(status.stdout).running_ccm_version, readVersion());
 });
 
+test('monitor quota source is cached-only by default and an explicit machine-wide mode survives restart', () => {
+  const home = mkHome();
+  let pid = 5000;
+  monitor.__setMonitorTestHooks({
+    now: () => new Date('2026-07-09T10:00:00Z'),
+    spawnService: ({ statePath }) => {
+      pid += 1;
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      writeFileSync(statePath, `${JSON.stringify({ ...state, pid }, null, 2)}\n`, 'utf8');
+      return { pid };
+    },
+    isPidAlive: (candidate) => candidate === pid,
+    kill: () => true,
+  });
+
+  const first = invoke(['monitor', 'start', '--json'], home);
+  assert.equal(json(first.stdout).service.quota_source_mode, 'cached-only');
+
+  const optedIn = invoke(['monitor', 'start', '--quota-source', 'machine-wide', '--json'], home);
+  assert.equal(json(optedIn.stdout).reused, false, 'changing source mode restarts the service');
+  assert.equal(json(optedIn.stdout).service.quota_source_mode, 'machine-wide');
+
+  const restarted = invoke(['monitor', 'restart', '--json'], home);
+  assert.equal(json(restarted.stdout).service.quota_source_mode, 'machine-wide');
+  const status = invoke(['monitor', 'status', '--json'], home);
+  assert.equal(json(status.stdout).service.quota_source_mode, 'machine-wide');
+});
+
 test('monitor start forces restart when running service has stale ccm binary', () => {
   const home = mkHome();
   let pid = 2001;

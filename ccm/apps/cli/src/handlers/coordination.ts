@@ -7,7 +7,9 @@ import {
   durableWriteFileSync,
   ENUMS,
   effectiveN,
+  formatReport,
   isISOUTC,
+  lintBoard,
   loadHomeBoards,
   type NewNotification,
   type Notification,
@@ -25,6 +27,7 @@ import {
 } from '@ccm/engine';
 import * as discover from '../discover.js';
 import { resolveHarnessAdapter } from '../harnesses/registry.js';
+import * as io from '../io.js';
 import * as mutations from '../mutations.js';
 import { type BoardArg, type Ctx, runRead, runWrite } from './_common.js';
 
@@ -147,6 +150,86 @@ function readSubscriptionStore(filePath: string): SubscriptionStore | null {
     };
   } catch {
     return null;
+  }
+}
+
+export interface CoordinationNotificationDestination extends CoordinationSubscription {}
+
+export interface CoordinationDeliveryResult {
+  status: 'delivered' | 'deduped' | 'invalid' | 'error';
+  subscription_id: string;
+  error?: string;
+}
+
+export function listCurrentCoordinationSubscriptions(
+  home: string,
+): CoordinationNotificationDestination[] {
+  const store = readSubscriptionStore(subscriptionStorePath(home));
+  return store ? structuredClone(store.subscriptions) : [];
+}
+
+function sameExactSubscription(
+  left: CoordinationSubscription,
+  right: CoordinationSubscription,
+): boolean {
+  return (
+    left.subscription_id === right.subscription_id &&
+    left.session_id === right.session_id &&
+    left.session_epoch === right.session_epoch &&
+    left.origin === right.origin &&
+    left.capability === right.capability &&
+    left.state === right.state &&
+    left.board_path === right.board_path
+  );
+}
+
+export function deliverCoordinationNotification(
+  home: string,
+  destination: CoordinationNotificationDestination,
+  notification: Omit<NewNotification, 'expires_at'> & { id: string },
+  now = stampNow(),
+): CoordinationDeliveryResult {
+  const result = (status: CoordinationDeliveryResult['status'], error?: string) => ({
+    status,
+    subscription_id: destination.subscription_id,
+    ...(error ? { error } : {}),
+  });
+  try {
+    return withLock(destination.board_path, () => {
+      // Re-read the registry under the destination board lock. A replaced epoch/session cannot
+      // receive a notification selected from an earlier scan.
+      const current = readSubscriptionStore(subscriptionStorePath(home))?.subscriptions.find(
+        (candidate) => candidate.subscription_id === destination.subscription_id,
+      );
+      if (!current || !sameExactSubscription(current, destination)) return result('invalid');
+      let board: BoardArg;
+      try {
+        board = JSON.parse(fs.readFileSync(destination.board_path, 'utf8')) as BoardArg;
+      } catch (error) {
+        return result('error', error instanceof Error ? error.message : String(error));
+      }
+      const owner = boardOwner(board);
+      if (owner.active !== true || owner.session_id !== destination.session_id) {
+        return result('invalid');
+      }
+      let inbox = NotificationInbox.fromBoard(board);
+      if (inbox.has(notification.id)) return result('deduped');
+      inbox = inbox.append(
+        {
+          ...notification,
+          expires_at: addSeconds(now, 24 * 60 * 60),
+        },
+        now,
+      );
+      const next = mutations.touch(structuredClone(board));
+      setInbox(next, inbox.reconcile(now).toArray());
+      const lint = lintBoard(JSON.stringify(next));
+      if (lint.errors.length > 0) return result('error', formatReport(lint));
+      io.writeFileAtomicSync(destination.board_path, `${JSON.stringify(next, null, 2)}\n`);
+      return result('delivered');
+    });
+  } catch (error) {
+    return result('error', error instanceof Error ? error.message : String(error));
   }
 }
 

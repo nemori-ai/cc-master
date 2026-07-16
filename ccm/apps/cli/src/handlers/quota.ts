@@ -1,6 +1,11 @@
 import { evaluateQuotaLifecycleEffect } from '@ccm/engine';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
+import {
+  type MachineQuotaStore,
+  readMachineWideQuotaStatus,
+  refreshMachineWideQuota,
+} from '../machine-wide-quota.js';
 import { createQuotaAdmissionStore } from '../quota-admission-store.js';
 import {
   QUOTA_FILESYSTEM_CAPABILITIES,
@@ -15,6 +20,15 @@ interface QuotaStoreExtension {
   preflight(request: Readonly<Record<string, unknown>>): Promise<Record<string, unknown>>;
   reserve(request: Readonly<Record<string, unknown>>): Promise<Record<string, unknown>>;
   auditReservation(request: Readonly<Record<string, unknown>>): Promise<Record<string, unknown>>;
+  readObservation(sourceKey: string): Promise<Record<string, unknown> | undefined>;
+  refreshObservation(
+    request: Readonly<Record<string, unknown>>,
+    collect: () => Promise<Record<string, unknown>>,
+  ): Promise<Record<string, unknown>>;
+  readMachineProjection(): Promise<Record<string, unknown> | undefined>;
+  publishMachineProjection(
+    projection: Readonly<Record<string, unknown>>,
+  ): Promise<Record<string, unknown>>;
 }
 
 function store(
@@ -58,7 +72,33 @@ function emit(ctx: Ctx, data: unknown): number {
 }
 
 export async function status(ctx: Ctx): Promise<number> {
+  if (ctx.values['machine-wide'] === true) {
+    return emit(ctx, await readMachineWideQuotaStatus(store(ctx) as MachineQuotaStore));
+  }
   return emit(ctx, await store(ctx, ['filesystem.quota.stat']).status());
+}
+
+export async function refresh(ctx: Ctx): Promise<number> {
+  if (ctx.values['machine-wide'] !== true) {
+    const error = new Error('quota refresh requires --machine-wide') as Error & {
+      errKind?: string;
+    };
+    error.errKind = 'Usage';
+    throw error;
+  }
+  const home = discover.resolveHome({
+    homeFlag: ctx.values.home as string | undefined,
+    env: ctx.env,
+  });
+  return emit(
+    ctx,
+    await refreshMachineWideQuota({
+      home,
+      env: ctx.env,
+      store: store(ctx) as MachineQuotaStore,
+      collectors: ctx.machineQuotaCollectors,
+    }),
+  );
 }
 
 export async function preflight(ctx: Ctx): Promise<number> {

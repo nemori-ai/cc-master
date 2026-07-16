@@ -30,6 +30,7 @@ test('FIELDS/ENUMS/INVARIANTS expose coordination inbox model facts', () => {
     'pacing_stop',
     'hitl_turn',
     'artifact_serialize',
+    'quota_state_change',
   ]);
   const inv = M.INVARIANTS.find((item: { id: string }) => item.id === 'FMT-INBOX');
   assert.ok(inv, 'FMT-INBOX must be registered');
@@ -97,6 +98,51 @@ test('NotificationInbox reconcile supersedes older unconsumed notification per k
   assert.equal(old.status, 'expired');
   assert.equal(old.superseded_by, unconsumed[0].id);
   assert.equal(unconsumed.length, 1);
+});
+
+test('quota notifications supersede only within the same target scope', () => {
+  let inbox = M.NotificationInbox.empty().append(
+    {
+      id: 'codex-old',
+      kind: 'quota_state_change',
+      summary: 'Codex old',
+      payload: { scope_digest: 'scope-codex' },
+      expires_at: EXPIRES,
+    },
+    NOW,
+  );
+  inbox = inbox.append(
+    {
+      id: 'claude',
+      kind: 'quota_state_change',
+      summary: 'Claude',
+      payload: { scope_digest: 'scope-claude' },
+      expires_at: EXPIRES,
+    },
+    LATER,
+  );
+  inbox = inbox.append(
+    {
+      id: 'codex-new',
+      kind: 'quota_state_change',
+      summary: 'Codex new',
+      payload: { scope_digest: 'scope-codex' },
+      expires_at: EXPIRES,
+    },
+    LATER,
+  );
+  const items = inbox.reconcile(LATER).toArray();
+  assert.deepEqual(
+    items
+      .filter((item: { status: string }) => item.status === 'unconsumed')
+      .map((item: { id: string }) => item.id)
+      .sort(),
+    ['claude', 'codex-new'],
+  );
+  assert.equal(
+    items.find((item: { id: string }) => item.id === 'codex-old').superseded_by,
+    'codex-new',
+  );
 });
 
 test('NotificationInbox reconcile GC removes old terminal items by TTL and capacity', () => {

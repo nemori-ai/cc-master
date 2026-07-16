@@ -57,10 +57,10 @@ function exercise(project: Projector) {
     assertSafe(out);
   }
 
-  const codex = targets[0];
+  const codex = targets[0]!;
   const states = [
     ['exhausted','entered_exhausted'], ['stale','became_stale'], ['unknown','became_unknown']
-  ];
+  ] as const;
   for (const [state, edge] of states) {
     const out = project({previous:[decision(codex,'healthy','base')], decisions:[decision(codex,state,`now-${state}`)], subscriptions});
     assert.equal(out.notifications.length, 3);
@@ -78,8 +78,8 @@ function exercise(project: Projector) {
   assert.equal(project({previous:[unchanged], decisions:[unchanged], subscriptions, legacy_five_hour_pct:100}).notifications.length, 0, 'Codex 5h cannot create an edge');
 
   const two = project({
-    previous:[decision(targets[0],'healthy','c0'), decision(targets[1],'healthy','a0')],
-    decisions:[decision(targets[0],'tight','c1'), decision(targets[1],'tight','a1')],
+    previous:[decision(targets[0]!,'healthy','c0'), decision(targets[1]!,'healthy','a0')],
+    decisions:[decision(targets[0]!,'tight','c1'), decision(targets[1]!,'tight','a1')],
     subscriptions
   });
   assert.equal(two.notifications.length, 6, 'same kind retains both provider scopes');
@@ -92,7 +92,7 @@ test('fixture oracle accepts known-good machine-wide fan-out', () => exercise(kn
 
 test('fixture oracle kills reviewed counterfeit classes', () => {
   for (const id of manifest.counterfeits as string[]) {
-    assert.throws(() => exercise(counterfeits[id]), undefined, id);
+    assert.throws(() => exercise(counterfeits[id]!), id);
   }
 });
 
@@ -105,7 +105,7 @@ test('production projector satisfies machine-wide contract (RED until implementa
 test('production CLI exposes explicit machine-wide floor and opt-in monitor mode (RED until implementation)', {skip: !runProduction}, () => {
   const registry = readFileSync(join(here, '..', 'src', 'registry.ts'), 'utf8');
   const quota = registry.slice(registry.indexOf('  quota: {'), registry.indexOf('  // ════════════════════ provider'));
-  const monitorRegistry = registry.slice(registry.indexOf('  monitor: {'), registry.indexOf('  // ════════════════════ status-report'));
+  const monitorRegistry = registry.slice(registry.indexOf('  monitor: {'), registry.indexOf('  // ════════════════════ services'));
   assert.match(quota, /refresh:\s*{/);
   assert.match(quota, /status:\s*{[\s\S]*?options:\s*{[\s\S]*?'machine-wide'/);
   assert.match(monitorRegistry, /start:\s*{[\s\S]*?options:\s*{[\s\S]*?'quota-source'/);

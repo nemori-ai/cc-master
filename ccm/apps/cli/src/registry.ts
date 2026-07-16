@@ -120,9 +120,27 @@ export const REGISTRY: Registry = {
       summary: '读取本机 quota observation/reservation store 的可用状态',
       read: true,
       positionals: [],
-      options: { json: { type: 'boolean', desc: '结构化输出' } },
-      examples: ['ccm quota status --json'],
+      options: {
+        'machine-wide': { type: 'boolean', desc: '读取所有受支持 target scope 的本机缓存投影' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm quota status --json', 'ccm quota status --machine-wide --json'],
       handler: 'quota.status',
+    },
+    refresh: {
+      summary: '显式刷新本机所有受支持 target scope，投影 decision edge 并 fan-out',
+      read: false,
+      positionals: [],
+      options: {
+        'machine-wide': {
+          type: 'boolean',
+          required: true,
+          desc: '显式启用 machine-wide live producer',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm quota refresh --machine-wide --json'],
+      handler: 'quota.refresh',
     },
     preflight: {
       summary: '从 owner-only authority store 重验 quota admission，或纯机械求值 lifecycle deny',
@@ -1834,6 +1852,11 @@ export const REGISTRY: Registry = {
       positionals: [],
       options: {
         interval: { type: 'string', desc: 'tick 间隔秒（默认 45，范围 5..3600）' },
+        'quota-source': {
+          type: 'string',
+          enum: ['cached-only', 'machine-wide'],
+          desc: 'quota producer 模式（默认 cached-only；machine-wide 必须显式 opt-in）',
+        },
         json: { type: 'boolean', desc: '结构化输出' },
       },
       examples: ['ccm monitor start', 'ccm monitor start --interval 30 --json'],
@@ -1865,6 +1888,11 @@ export const REGISTRY: Registry = {
       positionals: [],
       options: {
         interval: { type: 'string', desc: 'tick 间隔秒（默认 45，范围 5..3600）' },
+        'quota-source': {
+          type: 'string',
+          enum: ['cached-only', 'machine-wide'],
+          desc: '显式覆盖 quota producer 模式；缺省保留现有 mode',
+        },
         json: { type: 'boolean', desc: '结构化输出' },
       },
       examples: ['ccm monitor restart', 'ccm monitor restart --json'],
@@ -1887,6 +1915,11 @@ export const REGISTRY: Registry = {
       positionals: [],
       options: {
         interval: { type: 'string', desc: 'tick 间隔秒（默认 45，范围 5..3600）' },
+        'quota-source': {
+          type: 'string',
+          enum: ['cached-only', 'machine-wide'],
+          desc: '持久化 quota producer 模式（默认 cached-only）',
+        },
         json: { type: 'boolean', desc: '结构化输出' },
       },
       examples: ['ccm monitor install-service', 'ccm monitor install-service --json'],
