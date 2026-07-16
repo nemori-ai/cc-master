@@ -153,6 +153,18 @@ bwrap: not found on PATH
 
 这不是 Cursor Agent “技术上不可用”，而是当前 OS/kernel/helper 组合不满足 safety canary 的资格。安装一个名字叫 `bwrap` 的用户文件、看到 `--sandbox` flag、或让无 sandbox 请求成功，都不能把该结论翻绿。
 
+同日的 R0 first-party live probe 进一步把 transport 与 provider compatibility 分开：Cursor 的 resolver、
+binary、真实 help 与 launch 都 technically callable；但 provider launcher exit 0 后，本次新建、同 PGID 的
+workspace helper / LSP 仍存活。ccm 因此把本次 run 判为 wrapper exit 1、`state:failed`、
+`error.code:owned_tree_survived`，随后对 owned group 做 TERM/KILL cleanup；最终 `reaped:true`，整个 owned
+process group 已消失。此次没有 OK output，也没有证明 exact model、payer 或 live task success。故三 harness
+raw wrapper 的 hermetic contract 仍为 `current`，Codex 与 Claude Code 的 first-party live probe 为 pass；
+Cursor 在**当前 host/version** 的 live canary 仅为 `partial`，阻塞项是 external provider compatibility，不能
+写成 fully qualified success。这里的证据不外推到其他 OS、kernel 或 Cursor version。
+
+`no-daemon` / await-helper 语义或一个短的 natural-drain grace 是否能兼容该 provider 生命周期，留作
+post-MVP 独立调研；无论采用哪条路径，terminal 前 **whole owned group gone** 的不变量都不放宽。
+
 ### 4.2 Prerequisite matrix
 
 | Gate | Linux host prerequisite | macOS host prerequisite | 必须保存的证据 | 不可替代的负例 |

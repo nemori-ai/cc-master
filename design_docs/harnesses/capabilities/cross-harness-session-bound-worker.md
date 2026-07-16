@@ -27,6 +27,17 @@ worker-selection boundary.
 | codex | current | projected A/D/H guidance + global `ccm` raw wrapper | same R0 contract |
 | cursor | current | projected A/D/H guidance + global `ccm` raw wrapper | IDE origin and Agent CLI target stay separate |
 
+## Current evidence
+
+The hermetic raw-wrapper contract is current for all three harness ids. On the 2026-07-16 development host,
+first-party live probes passed for Codex and Claude Code. Cursor's resolver, binary, real help and launch were
+technically callable, but its launcher exited 0 while newly created same-PGID workspace helper / LSP processes
+remained alive. ccm classified the run as wrapper exit 1, `state:failed`,
+`error.code:owned_tree_survived`, then completed TERM/KILL cleanup with `reaped:true` and the whole owned process
+group gone. There was no OK output; exact model, payer and live task success remain unproven. Cursor's live canary
+on this exact host/version is therefore `partial` with an external provider-compatibility block, not a fully
+qualified success. This host evidence does not transfer to another OS, kernel or Cursor version.
+
 ## Declared divergence
 
 None in the guidance path. Each origin uses the same process-boundary capability; host-native subagents are
@@ -52,4 +63,5 @@ cross-session durability, daemon takeover and hook-owned dispatch remain outside
 Registry/help tests prove that help and run resolve the same fake executable. Provider invocation tests prove
 raw argv/stdin, cwd/default cwd, timeout/cancel/output bounds and generic process-terminal fields for all three
 harness ids. They do not prove provider-specific flag correctness, paid endpoint success, safety or automatic
-eligibility.
+eligibility. Post-MVP work may investigate no-daemon / await-helper behavior or a short natural-drain grace for
+Cursor, but must not relax the terminal invariant that the whole owned process group is gone.

@@ -153,6 +153,17 @@ test('capability and gap surfaces make raw wrapper current only with its runtime
   assert.match(card, /D.*only.*exact command grammar/isu);
   assert.match(card, /process terminal.*parent acceptance/isu);
   assert.match(card, /current.*same runtime PR/isu);
+  assert.match(card, /hermetic raw-wrapper contract.*current.*all three harness/isu);
+  assert.match(card, /first-party live probes passed.*Codex.*Claude Code/isu);
+  assert.match(card, /Cursor.*resolver.*binary.*real help.*launch.*technically callable/isu);
+  assert.match(card, /launcher exited 0.*same-PGID.*helper.*LSP.*remained alive/isu);
+  assert.match(card, /wrapper exit 1.*state:failed.*owned_tree_survived/isu);
+  assert.match(card, /reaped:true.*whole owned process.*group gone/isu);
+  assert.match(card, /no OK output.*exact model.*payer.*live task success.*unproven/isu);
+  assert.match(card, /Cursor.*live canary.*exact host\/version.*partial.*external provider-compatibility/isu);
+  assert.match(card, /does not transfer.*another OS.*kernel.*Cursor version/isu);
+  assert.match(card, /post-MVP.*no-daemon.*await-helper.*natural-drain grace/isu);
+  assert.match(card, /must not relax.*whole owned process group.*gone/isu);
   for (const pattern of [RAW_HELP, RAW_RUN, ...NORMALIZED_PROVIDER_ADAPTER]) {
     assert.doesNotMatch(card, pattern);
   }
@@ -162,6 +173,9 @@ test('capability and gap surfaces make raw wrapper current only with its runtime
 
   const gap = read('design_docs/cross-harness-orchestration-capability-model.md');
   assert.match(gap, /Provider execution \|[^\n]*raw wrapper[^\n]*current/iu);
+  assert.match(gap, /Provider execution \|[^\n]*Codex[^\n]*Claude Code[^\n]*live probe[^\n]*pass/iu);
+  assert.match(gap, /Provider execution \|[^\n]*Cursor[^\n]*owned_tree_survived[^\n]*partial/iu);
+  assert.match(gap, /Provider execution \|[^\n]*whole group gone[^\n]*(?:no|无) OK output/iu);
   assert.match(gap, /normalized.*provider adapter[^\n]*target/iu);
 });
 
@@ -188,4 +202,14 @@ test('roadmap keeps real help in R0 and normalized routing adapters post-MVP', (
   assert.match(roadmap, /ccm.*不主动注入.*API\/BYOK env/isu);
   assert.match(roadmap, /R0.*不声明.*provider.*credential\/account.*side-effect safety/isu);
   assert.doesNotMatch(roadmap, /API\/BYOK env 不转发；账号 mutation=0/u);
+  assert.match(roadmap, /Cursor.*resolver.*binary.*真实 help.*launch.*technically callable/isu);
+  assert.match(roadmap, /launcher exit 0.*同 PGID.*helper.*LSP.*仍存活/isu);
+  assert.match(roadmap, /wrapper exit 1.*state:failed.*owned_tree_survived/isu);
+  assert.match(roadmap, /TERM\/KILL.*reaped:true.*process group.*消失/isu);
+  assert.match(roadmap, /没有 OK output.*exact model.*payer.*live task success/isu);
+  assert.match(roadmap, /hermetic contract.*current.*Codex.*Claude Code.*live probe.*pass/isu);
+  assert.match(roadmap, /Cursor.*当前 host\/version.*live canary.*partial.*external provider compatibility/isu);
+  assert.match(roadmap, /证据不外推.*其他 OS.*kernel.*Cursor version/isu);
+  assert.match(roadmap, /post-MVP.*no-daemon.*await-helper.*natural-drain grace/isu);
+  assert.match(roadmap, /whole owned group gone.*不变量.*不放宽/isu);
 });
