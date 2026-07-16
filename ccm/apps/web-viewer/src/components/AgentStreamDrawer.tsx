@@ -13,6 +13,10 @@ import type { AgentStreamPayload, StreamEvent } from '../types';
 const POLL_MS = 1500;
 const BOTTOM_THRESHOLD = 48; // px from bottom counted as "pinned to live"
 const TOP_THRESHOLD = 200; // px from top triggers an older-history fetch
+// Backward pages may legally carry zero events while the cursor still progresses (windows full
+// of server-dropped line types, oversized-line skips). Auto-follow up to this many consecutive
+// empty pages per fetch, then pause auto-triggering and hand control back to the button.
+const MAX_EMPTY_BACK_HOPS = 10;
 
 interface AgentStreamDrawerProps {
   agentId: string;
@@ -52,7 +56,10 @@ const StreamRow = memo(function StreamRow({ event }: { event: StreamEvent }) {
  * caps memory to a sliding window, evicts off the side away from travel, batches each poll into
  * one state write, memoizes rows, and windows the DOM via content-visibility. Two modes:
  * `following` (pinned to bottom, forward-polls, auto-scrolls) and history browsing (scroll up to
- * page older; a peek poll counts new events without disturbing the viewport).
+ * page older; a peek poll counts new events without disturbing the viewport). Backward paging
+ * triggers three ways — the explicit button, scrolling near the top, and an auto-fill pass when
+ * the window is shorter than the viewport — and auto-follows empty-but-progressing pages up to a
+ * hop cap before yielding control back to the button.
  */
 export function AgentStreamDrawer({
   agentId,
@@ -161,6 +168,7 @@ export function AgentStreamDrawer({
 
   // Restore the viewport anchor after an older-history prepend so the content the user was
   // reading stays put (record scrollHeight before, correct scrollTop by the delta after).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `win` is the trigger, not an input — the anchor must be re-applied after every window commit (prepends change scrollHeight).
   useLayoutEffect(() => {
     const anchor = prependAnchor.current;
     const el = scrollRef.current;
@@ -170,27 +178,62 @@ export function AgentStreamDrawer({
     }
   }, [win]);
 
-  const fetchOlder = useCallback(async () => {
-    if (loadingOlderRef.current) return;
-    const w = winRef.current;
-    if (w.atStart) return;
-    setLoadingOlder(true);
-    const el = scrollRef.current;
-    try {
-      const page = await loadAgentStream(agentId, {
-        boardFilename,
-        before: String(w.cursorPrev),
-      });
-      if (page.events.length && el) {
-        prependAnchor.current = { prevHeight: el.scrollHeight, prevTop: el.scrollTop };
+  // After a run of MAX_EMPTY_BACK_HOPS consecutive empty (but progressing) pages, stop
+  // auto-triggering (scroll / viewport fill) and wait for an explicit button click — so a long
+  // dropped-only stretch can't turn into an unbounded request storm behind the user's back.
+  const autoBackPausedRef = useRef(false);
+
+  // Page older history. Backward pages may be empty while the cursor still progresses (windows
+  // full of dropped line types / oversized-line skips) — keep following the cursor until events
+  // arrive, the head is reached, or the hop cap trips. `manual` (button click) clears the pause.
+  const fetchOlder = useCallback(
+    async (manual = false) => {
+      if (loadingOlderRef.current) return;
+      if (manual) autoBackPausedRef.current = false;
+      else if (autoBackPausedRef.current) return;
+      let w = winRef.current;
+      if (w.atStart) return;
+      loadingOlderRef.current = true;
+      setLoadingOlder(true);
+      const el = scrollRef.current;
+      try {
+        for (let hop = 0; hop < MAX_EMPTY_BACK_HOPS; hop++) {
+          const page = await loadAgentStream(agentId, {
+            boardFilename,
+            before: String(w.cursorPrev),
+          });
+          const merged = mergeBackward(w, page);
+          // Server contract: prev strictly decreases. Guard anyway — a stalled cursor must
+          // never spin this loop.
+          const progressed = merged.atStart || merged.cursorPrev < w.cursorPrev;
+          if (page.events.length && el) {
+            prependAnchor.current = { prevHeight: el.scrollHeight, prevTop: el.scrollTop };
+          }
+          winRef.current = merged;
+          w = merged;
+          setWin(merged);
+          if (page.events.length > 0 || merged.atStart || !progressed) return;
+        }
+        autoBackPausedRef.current = true;
+      } catch {
+        /* transient — the top sentinel stays, next scroll retries */
+      } finally {
+        loadingOlderRef.current = false;
+        setLoadingOlder(false);
       }
-      setWin((cur) => mergeBackward(cur, page));
-    } catch {
-      /* transient — the top sentinel stays, next scroll retries */
-    } finally {
-      setLoadingOlder(false);
-    }
-  }, [agentId, boardFilename]);
+    },
+    [agentId, boardFilename],
+  );
+
+  // Auto-fill: when the held window is shorter than the viewport (no scrollbar -> scroll events
+  // can never fire) and history remains, keep paging back until the pane fills, the head is
+  // reached, or the auto-pause trips. This also covers a tail that landed on a sparse region.
+  useEffect(() => {
+    if (!ready || initialError || loadingOlder) return;
+    if (win.atStart || autoBackPausedRef.current) return;
+    const el = scrollRef.current;
+    if (el && el.scrollHeight <= el.clientHeight + 1) void fetchOlder();
+  }, [ready, initialError, loadingOlder, win, fetchOlder]);
 
   const jumpToLatest = useCallback(() => {
     setFollowing(true);
@@ -268,7 +311,20 @@ export function AgentStreamDrawer({
           ) : !ready ? (
             <div className="stream-empty">loading stream…</div>
           ) : win.events.length === 0 ? (
-            <div className="stream-empty">no events yet — waiting for the agent to write</div>
+            <div className="stream-empty">
+              {win.atStart ? (
+                'no events yet — waiting for the agent to write'
+              ) : (
+                <button
+                  className="stream-more"
+                  disabled={loadingOlder}
+                  onClick={() => void fetchOlder(true)}
+                  type="button"
+                >
+                  {loadingOlder ? 'loading earlier…' : 'nothing here yet — ↑ load earlier'}
+                </button>
+              )}
+            </div>
           ) : (
             <>
               {win.atStart ? (
@@ -277,7 +333,7 @@ export function AgentStreamDrawer({
                 <button
                   className="stream-more"
                   disabled={loadingOlder}
-                  onClick={() => void fetchOlder()}
+                  onClick={() => void fetchOlder(true)}
                   type="button"
                 >
                   {loadingOlder ? 'loading earlier…' : '↑ load earlier'}

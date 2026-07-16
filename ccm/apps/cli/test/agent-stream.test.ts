@@ -75,7 +75,10 @@ function collectForward(ref: string, harness: string): AgentStreamPayload['event
   return events;
 }
 
-// Walk backward from the tail to the file head, prepending each page.
+// Walk backward from the tail to the file head, prepending each page. Asserts the paging
+// protocol invariants the frontend relies on: prev strictly decreases on EVERY page (empty
+// intermediate pages included — a stalled prev means "load earlier" spins forever), and the
+// walk terminates at at_start. Returns the full prepended sequence.
 function collectBackward(ref: string, harness: string): AgentStreamPayload['events'] {
   const tail = buildAgentStream({
     agentId: 'a',
@@ -87,7 +90,9 @@ function collectBackward(ref: string, harness: string): AgentStreamPayload['even
   const events = tail.events.slice();
   let before = tail.cursor.prev;
   let atStart = tail.cursor.at_start;
-  for (let guard = 0; guard < 10000 && !atStart; guard++) {
+  let guard = 0;
+  while (!atStart) {
+    assert.ok(guard++ < 10000, 'backward walk page guard');
     const page = buildAgentStream({
       agentId: 'a',
       harness,
@@ -96,8 +101,11 @@ function collectBackward(ref: string, harness: string): AgentStreamPayload['even
       transcriptRef: ref,
       beforeParam: String(before),
     });
+    assert.ok(
+      page.cursor.prev < before,
+      `backward page must progress: before=${before} prev=${page.cursor.prev} events=${page.events.length}`,
+    );
     events.unshift(...page.events);
-    if (page.cursor.prev === before) break;
     before = page.cursor.prev;
     atStart = page.cursor.at_start;
   }
@@ -305,4 +313,116 @@ test('truncation marks long values and unknown harness falls back to raw lines',
   assert.ok(truncated && truncated.text.length <= 4100);
   // parserFor dispatch is public and stable.
   assert.equal(parserFor('claude-code')('  ').length, 0);
+});
+
+test('real-shape tiling: multi-window fixture with an all-dropped middle stretch pages back losslessly', () => {
+  // >2 windows (~190KiB) with a dropped-only band in the middle — the shape of a real claude
+  // transcript where file-history-snapshot / queue-operation lines dominate whole 64KiB windows.
+  const normal = (i: number) =>
+    `{"type":"assistant","timestamp":"2026-07-08T12:00:00Z","message":{"role":"assistant","content":[{"type":"text","text":"normal ${i} ${'x'.repeat(120)}"}]}}`;
+  const dropped = (i: number) =>
+    `{"type":"file-history-snapshot","snapshot":{"seq":${i},"pad":"${'d'.repeat(120)}"}}`;
+  const lines = [
+    ...Array.from({ length: 200 }, (_v, i) => normal(i)),
+    ...Array.from({ length: 800 }, (_v, i) => dropped(i)),
+    ...Array.from({ length: 200 }, (_v, i) => normal(1000 + i)),
+  ];
+  const ref = tmpFile('band.jsonl', fileFrom(lines));
+  const forward = collectForward(ref, 'claude-code');
+  assert.equal(forward.length, 400, 'dropped band contributes zero events');
+  // collectBackward asserts per-page strict progress (empty pages included) + at_start arrival.
+  const backward = collectBackward(ref, 'claude-code');
+  assert.deepEqual(
+    backward.map((e) => e.id),
+    forward.map((e) => e.id),
+    'backward pages tile to the same sequence as a full forward parse',
+  );
+});
+
+test('giant single line (>64KiB, the real 23MB-transcript bug shape) pages back with progress', () => {
+  // The exact production failure: a ~1MiB tool_result line whose middle fills the whole 64KiB
+  // backward window — before the fix the page came back empty with prev unchanged (dead
+  // "load earlier"). The line-boundary scan must find its start and emit the (truncated) event.
+  const giantPayload = 'G'.repeat(1_100_000);
+  const lines = [
+    ...Array.from(
+      { length: 10 },
+      (_v, i) =>
+        `{"type":"user","timestamp":"2026-07-08T12:00:00Z","message":{"role":"user","content":"pre ${i}"}}`,
+    ),
+    `{"type":"user","timestamp":"2026-07-08T12:00:01Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"${giantPayload}"}]}}`,
+    ...Array.from(
+      { length: 10 },
+      (_v, i) =>
+        `{"type":"user","timestamp":"2026-07-08T12:00:02Z","message":{"role":"user","content":"post ${i}"}}`,
+    ),
+  ];
+  const ref = tmpFile('giant.jsonl', fileFrom(lines));
+
+  // Direct reproduction of the reported HTTP sequence: tail, then before=tail.prev.
+  const tail = buildAgentStream({
+    agentId: 'a',
+    harness: 'claude-code',
+    handleKind: 'task-id',
+    handleValue: '',
+    transcriptRef: ref,
+  });
+  assert.equal(
+    tail.cursor.at_start,
+    false,
+    'tail window cannot reach the head past the giant line',
+  );
+  const back = buildAgentStream({
+    agentId: 'a',
+    harness: 'claude-code',
+    handleKind: 'task-id',
+    handleValue: '',
+    transcriptRef: ref,
+    beforeParam: String(tail.cursor.prev),
+  });
+  assert.ok(back.cursor.prev < tail.cursor.prev, 'prev advances past the giant line');
+  assert.equal(back.events.length, 1, 'the giant tool_result line itself is emitted');
+  assert.equal(back.events[0]?.kind, 'tool_result');
+  assert.equal(back.events[0]?.truncated, true);
+  assert.ok((back.events[0]?.text ?? '').length <= 4100, 'event text stays capped');
+
+  // And the giant line does not break lossless tiling (it parses in both directions).
+  const forward = collectForward(ref, 'claude-code');
+  const backward = collectBackward(ref, 'claude-code');
+  assert.equal(forward.length, 21);
+  assert.deepEqual(
+    backward.map((e) => e.id),
+    forward.map((e) => e.id),
+  );
+});
+
+test('pathological line beyond the boundary-scan budget still progresses in both directions', () => {
+  // >4MiB single line: backward degrades to empty progressing pages; forward emits a raw
+  // truncated head fragment and keeps moving. Neither direction may stall, and the normal
+  // lines on both sides must all surface in both directions.
+  const monster = 'M'.repeat(5 * 1024 * 1024);
+  const mk = (tag: string, i: number) =>
+    `{"type":"user","timestamp":"2026-07-08T12:00:00Z","message":{"role":"user","content":"${tag} ${i}"}}`;
+  const lines = [
+    ...Array.from({ length: 5 }, (_v, i) => mk('pre', i)),
+    `{"type":"user","message":{"role":"user","content":"${monster}"}}`,
+    ...Array.from({ length: 5 }, (_v, i) => mk('post', i)),
+  ];
+  const ref = tmpFile('monster.jsonl', fileFrom(lines));
+
+  const forward = collectForward(ref, 'claude-code');
+  const backward = collectBackward(ref, 'claude-code'); // asserts strict progress internally
+  const textsOf = (events: AgentStreamPayload['events']) =>
+    events.map((e) => e.text).filter((t) => /^(pre|post) \d+$/.test(t));
+  const expected = [
+    ...Array.from({ length: 5 }, (_v, i) => `pre ${i}`),
+    ...Array.from({ length: 5 }, (_v, i) => `post ${i}`),
+  ];
+  assert.deepEqual(textsOf(forward), expected, 'forward surfaces every normal line');
+  assert.deepEqual(textsOf(backward), expected, 'backward surfaces every normal line');
+  // Forward honesty: the unparseable-within-budget monster shows up as a truncated raw fragment.
+  assert.ok(
+    forward.some((e) => e.kind === 'raw' && e.truncated),
+    'forward emits a truncated raw fragment for the monster line',
+  );
 });

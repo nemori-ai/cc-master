@@ -109,6 +109,25 @@ test('mergeBackward evicts the newest past the cap and flags omittedBottom', () 
   assert.equal(w1.events[0]?.id, '10.0', 'older events kept at the top');
 });
 
+test('mergeBackward on an empty progressing page advances the cursor without touching events', () => {
+  // Backward pages may legally carry zero events while prev still retreats (dropped-only
+  // windows / oversized-line skips) — the window must track the new anchor so the next hop
+  // continues from it instead of spinning on the same offset.
+  const w0 = resetToTail(page([ev(5000)], { next: 6000, prev: 5000, at_start: false }));
+  const w1 = mergeBackward(w0, page([], { next: 5000, prev: 3000, at_start: false }));
+  assert.deepEqual(
+    w1.events.map((e) => e.id),
+    ['5000.0'],
+    'held events untouched',
+  );
+  assert.equal(w1.cursorPrev, 3000, 'backward anchor advances past the empty stretch');
+  assert.equal(w1.atStart, false);
+
+  const w2 = mergeBackward(w1, page([], { next: 3000, prev: 0, at_start: true }));
+  assert.equal(w2.cursorPrev, 0);
+  assert.equal(w2.atStart, true, 'empty final page still lands at_start');
+});
+
 test('stream URL flag round-trips only alongside an agent selection', () => {
   const withAgent = readWorkspaceUrlState('http://x/?agent=agt-1&stream=1');
   assert.equal(withAgent.agent, 'agt-1');

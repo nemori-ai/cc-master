@@ -3,11 +3,16 @@
 // 数据源 = transcript 文件的增量 tail（非 pty）：各 harness 的 session 文件本地实时追加，server
 //   按字节偏移增量读取 + 解析成规范化事件，前端只渲染。事后回放与实时是同一条代码路径。
 //
-// 三种读取模式（server 无状态·cursor/before 都是行首对齐的字节偏移，页与页完美平铺不重叠不撕裂）：
+// 三种读取模式（server 无状态·cursor/before 都是字节偏移，页与页平铺不重叠不撕裂）：
 //   · tail    —— cursor 省略/为 'tail'：只读文件末尾最后 ~64KiB（大文件绝不整读），出最新一屏。
 //   · forward —— cursor=<n>：从 n（上一页 cursor.next）向后增量，追新。
-//   · backward—— before=<n>：读 [max(0,n-64KiB) 对齐, n) 区间，往前翻历史。
-//   每种单次响应封顶 ≤200 事件 / ≤256KiB 扫描，其余留给下一轮 cursor。
+//   · backward—— before=<n>：读 [行首对齐, n) 区间，往前翻历史。
+//   常规页单次响应封顶 ≤200 事件 / ≤256KiB 扫描，其余留给下一轮 cursor。
+//
+// 超长单行（真实 claude transcript 有 >1MiB 的 tool_result 行、实测最长 2.5MiB）：常规窗内找不到
+//   任何行首时，用独立的行边界扫描预算（GIANT_LINE_SCAN=4MiB）定位该行的起止并整行读入解析
+//   （事件正文仍截 4KiB）；超过 4MiB 的病态行降级为 raw 头部片段（truncated）。**任何一页的
+//   cursor 都严格前进**（空事件中间页也前进）——消费方以 prev/next 推进、不得假设页页有事件。
 //
 // 保真红线：解析不了的行 → kind:'raw' 截断透传（unknown 不猜）；文件截断/轮转（cursor>size）→ reset。
 //   源信息全收在 source 对象里，cursor 语义留给将来换源（run-store journal）不绑死「文件」。
@@ -18,7 +23,8 @@ import { locateTranscriptFile } from '../agent-probe.js';
 export const AGENT_STREAM_SCHEMA = 'ccm/web-viewer-agent-stream/v1';
 
 const TAIL_BYTES = 64 * 1024; // tail / backward 单窗字节上限（绝不整读大文件）
-const MAX_SCAN = 256 * 1024; // 单次响应扫描字节上限
+const MAX_SCAN = 256 * 1024; // 常规页单次响应扫描字节上限
+const GIANT_LINE_SCAN = 4 * 1024 * 1024; // 超长单行的边界搜索/整行解析预算（真实见过 2.5MiB 单行）
 const MAX_EVENTS = 200; // 单次响应事件上限
 const TEXT_MAX = 4096; // 单事件正文截断（含 base64/二进制样式超长值）
 const DETAIL_MAX = 4096; // 事件 detail 截断
@@ -464,6 +470,36 @@ function alignForward(buf: Buffer): number {
   return nl === -1 ? buf.length : nl + 1;
 }
 
+// 向低地址方向找 pos 之前最近的 '\n'（在 [max(0,pos-budget), pos) 内·逐 64KiB 块扫描）。
+//   超长单行的行首定位：budget 内没有 → null（调用方降级为片段跳页保进度）。
+function scanPrevNewline(fd: number, pos: number, budget: number): number | null {
+  const floor = Math.max(0, pos - budget);
+  let end = pos;
+  while (end > floor) {
+    const start = Math.max(floor, end - TAIL_BYTES);
+    const buf = readRange(fd, start, end);
+    for (let i = buf.length - 1; i >= 0; i--) {
+      if (buf[i] === 0x0a) return start + i;
+    }
+    end = start;
+  }
+  return null;
+}
+
+// 向高地址方向找 pos 起第一个 '\n'（在 [pos, min(size,pos+budget)) 内·逐 64KiB 块扫描）。
+function scanNextNewline(fd: number, pos: number, size: number, budget: number): number | null {
+  const ceil = Math.min(size, pos + budget);
+  let start = pos;
+  while (start < ceil) {
+    const end = Math.min(ceil, start + TAIL_BYTES);
+    const buf = readRange(fd, start, end);
+    const idx = buf.indexOf(0x0a);
+    if (idx !== -1) return start + idx;
+    start = end;
+  }
+  return null;
+}
+
 function noSourcePayload(
   req: AgentStreamRequest,
   reason: string,
@@ -531,14 +567,43 @@ export function buildAgentStream(req: AgentStreamRequest): AgentStreamPayload {
       mtime: mtimeIso,
     };
 
-    // ── backward：before=<n>，读 [max(0,n-64KiB) 对齐, n) ────────────────────────────────────
+    // ── backward：before=<n>，读 [行首对齐, n) ────────────────────────────────────────────────
     if (req.beforeParam != null) {
       const before = clampOffset(req.beforeParam, size);
       const rawStart = Math.max(0, before - TAIL_BYTES);
       const buf = readRange(fd, rawStart, before);
       const alignOffset = rawStart > 0 ? alignForward(buf) : 0;
-      const alignedStart = rawStart + alignOffset;
-      const { lines } = splitLines(buf.subarray(alignOffset), alignedStart);
+      let alignedStart = rawStart + alignOffset;
+      let { lines } = splitLines(buf.subarray(alignOffset), alignedStart);
+
+      // 常规 64KiB 窗内没有任何完整行 且 还没到文件头：结束于 before 附近的这一行比窗口还长
+      //   （真实 transcript 有 >1MiB 的 tool_result 单行——不处理会让 prev 卡死、「load earlier」
+      //   永远无进展）。用行边界扫描预算向前找它的行首，把这一整行读入解析。
+      if (lines.length === 0 && rawStart > 0) {
+        const nl = scanPrevNewline(fd, before - 1, GIANT_LINE_SCAN);
+        if (nl !== null) {
+          const lineStart = nl + 1;
+          const lineBuf = readRange(fd, lineStart, before);
+          alignedStart = lineStart;
+          ({ lines } = splitLines(lineBuf, lineStart));
+          // lines 可能仍为空（before 落在行中段·无终止 \n）——此时 prev=alignedStart 仍严格前进，
+          //   下一页回到行首锚自愈。
+        } else {
+          // 边界在 4MiB 预算内都找不到（病态怪物行）：空事件页 + prev 硬退一个预算保进度。
+          const prev = Math.max(0, before - GIANT_LINE_SCAN);
+          return {
+            schema: AGENT_STREAM_SCHEMA,
+            agent_id: req.agentId,
+            mode: 'backward',
+            source: sourceBase,
+            live,
+            cursor: { next: before, prev, at_start: prev === 0 },
+            events: [],
+            reset: false,
+          };
+        }
+      }
+
       const { events, firstKeptStart } = collectEvents(lines, parser, true);
       const prev = firstKeptStart ?? alignedStart;
       return {
@@ -563,7 +628,40 @@ export function buildAgentStream(req: AgentStreamRequest): AgentStreamPayload {
         mode = 'forward';
         const end = Math.min(size, n + MAX_SCAN);
         const buf = readRange(fd, n, end);
-        const { lines } = splitLines(buf, n);
+        let { lines } = splitLines(buf, n);
+
+        // 满窗仍无一条完整行：从 n 起的这一行比 256KiB 扫描窗还长（对称于 backward 的超长行处理；
+        //   不满窗则是尾部残行还在写——保持 next=n 等待，两种情况必须区分）。
+        if (lines.length === 0 && end - n >= MAX_SCAN) {
+          const nl = scanNextNewline(fd, n, size, GIANT_LINE_SCAN);
+          if (nl !== null) {
+            const lineBuf = readRange(fd, n, nl + 1);
+            ({ lines } = splitLines(lineBuf, n));
+          } else if (size - n >= GIANT_LINE_SCAN) {
+            // 4MiB 预算内无终止符（病态怪物行）：raw 头部片段事件（truncated·保真上限）+ 前进。
+            const headBuf = readRange(fd, n, n + TEXT_MAX);
+            return {
+              schema: AGENT_STREAM_SCHEMA,
+              agent_id: req.agentId,
+              mode,
+              source: sourceBase,
+              live,
+              cursor: { next: n + GIANT_LINE_SCAN, prev: n, at_start: n === 0 },
+              events: [
+                {
+                  id: `${n}.0`,
+                  kind: 'raw',
+                  title: 'oversized line',
+                  text: headBuf.toString('utf8'),
+                  truncated: true,
+                },
+              ],
+              reset: false,
+            };
+          }
+          // else：未满 4MiB 且没 \n = 巨行仍在写入中 → lines 留空、next=n 等下一轮。
+        }
+
         const { events, lastKeptEnd } = collectEvents(lines, parser, false);
         const next = lastKeptEnd ?? n;
         return {
