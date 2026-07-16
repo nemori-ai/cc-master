@@ -4709,6 +4709,13 @@ button.attempt-row-agent:hover {
   margin-right: 5px;
   box-shadow: 0 0 5px currentColor;
 }
+.attach-cwd {
+  margin-bottom: 5px;
+  font-size: 10px;
+  color: var(--ink-dim);
+  overflow-x: auto;
+  white-space: nowrap;
+}
 .attach-row {
   display: flex;
   align-items: stretch;

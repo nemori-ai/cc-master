@@ -55,6 +55,11 @@ export function AgentInspector({
   const attachCmd = str(handle.attach_cmd);
   const transcript = str(handle.transcript_ref);
   const outcome = str(lifecycle.outcome);
+  // Sessions are archived per working directory (e.g. `claude --resume <sid>` only finds the
+  // session when run from the original cwd), so the copied command carries the launch cwd.
+  // Display-level composition of two verbatim record fields — no derivation.
+  const launchCwd = str(launch.cwd);
+  const attachCopyText = attachCmd && launchCwd ? `cd ${launchCwd} && ${attachCmd}` : attachCmd;
 
   // Live elapsed while the agent is active.
   const active = agentIsActive(state);
@@ -69,10 +74,10 @@ export function AgentInspector({
   }, [copied]);
 
   const copyAttach = async () => {
-    if (!attachCmd) return;
+    if (!attachCopyText) return;
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(attachCmd);
+        await navigator.clipboard.writeText(attachCopyText);
         setCopied(true);
       }
     } catch {
@@ -137,6 +142,14 @@ export function AgentInspector({
       {attachCmd ? (
         <div className="dsect attach">
           <div className="sl">⎘ attach</div>
+          {launchCwd ? (
+            <div
+              className="attach-cwd mono"
+              title={`Run the attach command from this directory — sessions are archived per cwd, so copy prepends "cd ${launchCwd} && "`}
+            >
+              CWD {launchCwd}
+            </div>
+          ) : null}
           <div className="attach-row">
             <code className="attach-cmd mono">{attachCmd}</code>
             <button className="attach-copy" onClick={copyAttach} type="button">
