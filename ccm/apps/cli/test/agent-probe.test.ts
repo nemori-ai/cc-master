@@ -122,10 +122,23 @@ test('claude-code session-id: ~/.claude/projects/<slug>/<sid>.jsonl mtime', () =
 });
 
 test('session-id on harness without session roots → method none, observed unknown (no path guessing)', () => {
-  // cursor-agent / origin 经 adapter 注册表解析：无 session 根（generic adapter）→ 如实 method=none。
-  for (const harness of ['cursor-agent', 'origin']) {
+  // origin 经 adapter 注册表解析到 generic adapter：无 session 根 → 如实 method=none（不猜路径）。
+  for (const harness of ['origin']) {
     const r = probeAgent({ harness, handleKind: 'session-id', handleValue: 'x' }, { nowMs: NOW });
     assert.deepEqual(r, { method: 'none', observed: 'unknown' }, `harness=${harness}`);
+  }
+});
+
+test('session-id on cursor-agent (adapter alias with session roots) → method session-file-mtime, observed unknown', () => {
+  // cursor-agent / cursor-agent-cli 现经 cursor adapter alias 解析：cursor adapter 暴露 session 根
+  // （globalStorage），故 probe 取 method=session-file-mtime；无对应 session 文件 → observed=unknown（mtime 类不判死）。
+  for (const harness of ['cursor-agent', 'cursor-agent-cli']) {
+    const r = probeAgent({ harness, handleKind: 'session-id', handleValue: 'x' }, { nowMs: NOW });
+    assert.deepEqual(
+      r,
+      { method: 'session-file-mtime', observed: 'unknown' },
+      `harness=${harness}`,
+    );
   }
 });
 
