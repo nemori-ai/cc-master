@@ -59,7 +59,7 @@ export const ENUMS = {
   // accountSwitchPolicy：board.policy.autonomous_account_switch 合法值（闭合枚举）。
   accountSwitchPolicy: ['allow', 'deny'],
   // harness：owner.harness 观察字段（配额池分区键）。unknown 只作降级池，不参与武装闸。
-  harness: ['claude-code', 'codex', 'cursor', 'unknown'],
+  harness: ['claude-code', 'codex', 'cursor', 'kimi-code', 'unknown'],
   // coordPriority：board.coordination.priority 板级优先级五挡（COORD·跨板协调 hint·非板内任务排序·见 §5.1）。
   //   有序高→低：urgent > high > normal（默认）> low > trivial。
   coordPriority: ['urgent', 'high', 'normal', 'low', 'trivial'],
@@ -86,7 +86,7 @@ export const ENUMS = {
   // agentType：被登记的运行时实例种类（凡派发皆登记·闭合）。
   agentType: ['cli-worker', 'subagent', 'background-shell', 'workflow'],
   // agentHarness：实例所在 harness（配额/attach 语义分区键·闭合）。origin = 本 orchestrator 进程内 sub-agent。
-  agentHarness: ['codex', 'claude-code', 'cursor-agent', 'origin'],
+  agentHarness: ['codex', 'claude-code', 'cursor-agent', 'kimi-code', 'origin'],
   // agentState：agent lifecycle 状态机（逐字复用 native-attempt 铁律语义·闭合）。
   //   starting→running 须交真实 handle 证据；terminal ≠ task done；probe 观测冲突以观测为准降级。
   agentState: ['starting', 'running', 'uncertain', 'terminal', 'orphaned'],
@@ -210,7 +210,7 @@ export const FIELDS = {
     },
     owner: {
       tier: '🔒',
-      type: 'object{active:bool, session_id:string, heartbeat:ISO, harness?:claude-code|codex|cursor|unknown}',
+      type: 'object{active:bool, session_id:string, heartbeat:ISO, harness?:claude-code|codex|cursor|kimi-code|unknown}',
       default: '必填',
       readers:
         '全 hook 武装闸(active/session_id) + bootstrap resume 探测(heartbeat) + ccm peers 按 harness 分区(owner.harness)',
@@ -757,7 +757,7 @@ export const INVARIANTS: Invariant[] = [
     level: 'warn',
     family: 'FMT',
     scope: 'board',
-    summary: 'owner.harness 若存在须 ∈ {claude-code,codex,cursor,unknown}',
+    summary: 'owner.harness 若存在须 ∈ {claude-code,codex,cursor,kimi-code,unknown}',
   },
   { id: 'FMT-TASKS', level: 'hard', family: 'FMT', scope: 'board', summary: 'tasks 是数组' },
   {

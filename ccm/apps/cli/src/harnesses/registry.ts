@@ -2,6 +2,7 @@ import { claudeCodeAdapter } from './claude-code.js';
 import { codexAdapter } from './codex.js';
 import { cursorAdapter } from './cursor.js';
 import { genericAdapter } from './generic.js';
+import { kimiCodeAdapter } from './kimi-code.js';
 import type {
   Env,
   HarnessAdapter,
@@ -13,7 +14,13 @@ import type {
 } from './types.js';
 
 // Cursor after Codex, before Claude Code: CURSOR_AGENT must win over Claude-compatible fallback env.
-const KNOWN_ADAPTERS: readonly HarnessAdapter[] = [codexAdapter, cursorAdapter, claudeCodeAdapter];
+// kimi-code after Cursor, before the Claude-compatible fallback: KIMI_CODE_HOME must win over it too.
+const KNOWN_ADAPTERS: readonly HarnessAdapter[] = [
+  codexAdapter,
+  cursorAdapter,
+  kimiCodeAdapter,
+  claudeCodeAdapter,
+];
 
 export function resolveHarnessAdapter(selection: HarnessSelection = {}): HarnessAdapter {
   const env = selection.env || process.env;

@@ -18,8 +18,8 @@
 两条公共形状是：
 
 ```text
-ccm worker help --harness <codex|claude-code|cursor-agent> [--scope <agent|root>]
-ccm worker run --harness <codex|claude-code|cursor-agent> [--cwd <path>] [--timeout-ms <n>] [--max-output-bytes <n>] -- <provider argv...>
+ccm worker help --harness <codex|claude-code|cursor-agent|kimi-code> [--scope <agent|root>]
+ccm worker run --harness <codex|claude-code|cursor-agent|kimi-code> [--cwd <path>] [--timeout-ms <n>] [--max-output-bytes <n>] -- <provider argv...>
 ```
 
 本轮只有在以下条件全部成立时闭环：

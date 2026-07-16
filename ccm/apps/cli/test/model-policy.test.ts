@@ -18,7 +18,13 @@ function invoke(args: string[]) {
 function candidate(id: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
   const [surface, model] = id.split(':');
   const provider =
-    surface === 'claude-code-cli' ? 'claude-code' : surface === 'codex-cli' ? 'codex' : 'cursor';
+    surface === 'claude-code-cli'
+      ? 'claude-code'
+      : surface === 'codex-cli'
+        ? 'codex'
+        : surface === 'kimi-code-cli'
+          ? 'kimi-code'
+          : 'cursor';
   return {
     id,
     provider,
@@ -69,7 +75,7 @@ function candidate(id: string, overrides: Record<string, unknown> = {}): Record<
       integration_score: 0.8,
     },
     community_affinity: {
-      registry_revision: '2026-07-16.1',
+      registry_revision: '2026-07-16.2',
       evidence_refs: [],
     },
     ...overrides,
@@ -125,6 +131,48 @@ test('model-policy show exposes one cross-provider role/facts/taste read model',
   );
 });
 
+test('model-policy show surfaces kimi-code as a fourth worker-target provider with T1/T2/T3 candidates', () => {
+  const result = invoke([
+    'model-policy',
+    'show',
+    '--task',
+    'implementation-from-spec',
+    '--as-of',
+    AS_OF,
+    '--json',
+  ]);
+  assert.equal(result.code, 0, result.err.join('\n'));
+  const data = result.value.data;
+  assert.equal(data.task.required_role_grade, 'T1');
+  const providerIds = data.layers.hard_facts.providers.map((p: { provider: string }) => p.provider);
+  assert.ok(providerIds.includes('kimi-code'), 'hard_facts must include kimi-code provider');
+  const kimiCandidates = new Map<string, string[]>(
+    data.layers.project_role_evidence.candidates
+      .filter((item: { provider: string }) => item.provider === 'kimi-code')
+      .map((item: { candidate_id: string; candidate_role_grades: string[] }) => [
+        item.candidate_id,
+        item.candidate_role_grades,
+      ]),
+  );
+  assert.deepEqual(kimiCandidates.get('kimi-code-cli:kimi-k3'), ['T1', 'T2']);
+  assert.deepEqual(kimiCandidates.get('kimi-code-cli:kimi-k2.7-code'), ['T1', 'T2', 'T3']);
+  // kimi candidates are never O — no automatic selection, effect-floor conservative
+  for (const candidate of data.layers.project_role_evidence.candidates) {
+    if (candidate.provider === 'kimi-code') {
+      assert.equal(candidate.eligible_for_automatic_selection, false);
+      assert.ok(!candidate.candidate_role_grades.includes('O'));
+    }
+  }
+  // community advisory for this task carries the kimi K2.7 implementation signal with provenance
+  const kimiAdvisory = data.layers.community_advisory.entries.find(
+    (entry: { evidence_id: string }) =>
+      entry.evidence_id === 'zhihu-2026-07-k27code-implementation',
+  );
+  assert.ok(kimiAdvisory, 'kimi implementation advisory must surface for implementation-from-spec');
+  assert.equal(kimiAdvisory.model_id, 'kimi-k2.7-code');
+  assert.equal(kimiAdvisory.signal, 'positive');
+});
+
 test('model-policy advise hard-gates role/admission and only lets fresh taste break a base equivalence band', () => {
   const request = {
     schema: 'ccm/model-policy-advice-request/v1',
@@ -150,7 +198,7 @@ test('model-policy advise hard-gates role/admission and only lets fresh taste br
           integration_score: 0.8,
         },
         community_affinity: {
-          registry_revision: '2026-07-16.1',
+          registry_revision: '2026-07-16.2',
           evidence_refs: ['coderabbit-2026-07-fable-architecture'],
         },
       }),
@@ -269,7 +317,7 @@ test('stale, contradictory and very weak community taste is neutral', async () =
           valid_until: '2026-09-09T00:00:00Z',
         },
         community_affinity: {
-          registry_revision: '2026-07-16.1',
+          registry_revision: '2026-07-16.2',
           evidence_refs: ['coderabbit-2026-07-fable-architecture'],
         },
       }),
@@ -308,7 +356,7 @@ test('stale, contradictory and very weak community taste is neutral', async () =
         candidates: [
           candidate('claude-code-cli:claude-fable-5', {
             community_affinity: {
-              registry_revision: '2026-07-16.1',
+              registry_revision: '2026-07-16.2',
               evidence_refs: ['coderabbit-2026-07-fable-architecture'],
             },
           }),
@@ -336,7 +384,7 @@ test('stale, contradictory and very weak community taste is neutral', async () =
         candidates: [
           candidate('claude-code-cli:claude-fable-5', {
             community_affinity: {
-              registry_revision: '2026-07-16.1',
+              registry_revision: '2026-07-16.2',
               evidence_refs: ['coderabbit-2026-07-fable-architecture'],
             },
           }),
@@ -504,13 +552,13 @@ test('advice derives taste only from exact current tracked evidence and rejects 
   for (const [label, communityAffinity, pattern] of [
     [
       'invented evidence',
-      { registry_revision: '2026-07-16.1', evidence_refs: ['community:invented'] },
+      { registry_revision: '2026-07-16.2', evidence_refs: ['community:invented'] },
       /unknown community affinity evidence/u,
     ],
     [
       'wrong task evidence',
       {
-        registry_revision: '2026-07-16.1',
+        registry_revision: '2026-07-16.2',
         evidence_refs: ['coderabbit-2026-07-sol-implementation'],
       },
       /does not bind request task and candidate/u,

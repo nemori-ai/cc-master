@@ -1,0 +1,4 @@
+host: kimi-code
+capability: native-attempt
+mode: unsupported
+reason: kimi 只有内置 subagent 角色（coder/explore/plan/general + Agent Swarm），无认证的一次性 exact-descriptor enablement 与可信 native handle/reconcile evidence；禁止默认 native invoke，走 ccm ledger + 记录 host 返回的 agent id 作 recon handle。

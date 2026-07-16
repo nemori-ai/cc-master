@@ -1,6 +1,6 @@
 {
   "schema": "ccm/provider-model-facts-registry/v1",
-  "revision": "2026-07-16.1",
+  "revision": "2026-07-16.2",
   "providers": {
     "claude-code": {
       "schema": "ccm/provider-model-facts/v1",
@@ -246,6 +246,83 @@
             "cursor-grok-4.5-high-fast"
           ],
           "source_refs": ["cursor-models-pricing"],
+          "supersedes": []
+        }
+      ]
+    },
+    "kimi-code": {
+      "schema": "ccm/provider-model-facts/v1",
+      "provider": "kimi-code",
+      "revision": "2026-07-16.1",
+      "supported_surfaces": ["kimi-code-cli"],
+      "supported_client_versions": ["current"],
+      "source": [
+        {
+          "id": "moonshot-kimi-k3-pricing",
+          "url": "https://platform.kimi.ai/docs/pricing/chat-k3",
+          "retrieved_at": "2026-07-16T00:00:00Z"
+        },
+        {
+          "id": "moonshot-kimi-k27-code-pricing",
+          "url": "https://platform.kimi.ai/docs/pricing/chat-k27-code",
+          "retrieved_at": "2026-07-16T00:00:00Z"
+        },
+        {
+          "id": "moonshot-kimi-k27-code-card",
+          "url": "https://www.kimi.com/resources/kimi-k2-7-code",
+          "retrieved_at": "2026-07-16T00:00:00Z"
+        }
+      ],
+      "observed_at": "2026-07-16T00:00:00Z",
+      "valid_until": "2026-07-23T00:00:00Z",
+      "account_scope": "managed:kimi-code OAuth subscription; live account entitlement separate",
+      "confidence": "official-published-snapshot-with-k3-benchmark-unknowns",
+      "unknown": [
+        "live_account_model_entitlement",
+        "live_account_quota",
+        "kimi_k3_official_benchmarks",
+        "kimi_k3_open_weights",
+        "kimi_code_cli_headless_quota_signal"
+      ],
+      "models": [
+        {
+          "model_id": "kimi-k3",
+          "display_name": "Kimi K3",
+          "tier": "frontier",
+          "relative_output_cost": null,
+          "availability": {
+            "state": "published",
+            "account_scope": "managed:kimi-code OAuth subscription; live entitlement separate"
+          },
+          "pricing": {
+            "currency": "USD",
+            "input_per_million_tokens": 3.0,
+            "output_per_million_tokens": 15.0,
+            "note": "cache-hit input $0.30/M; launched 2026-07-16; official benchmarks/model card not yet published; 1M context"
+          },
+          "benchmarks": null,
+          "selectors": ["kimi-code/k3"],
+          "source_refs": ["moonshot-kimi-k3-pricing"],
+          "supersedes": []
+        },
+        {
+          "model_id": "kimi-k2.7-code",
+          "display_name": "Kimi K2.7 Code",
+          "tier": "balanced",
+          "relative_output_cost": null,
+          "availability": {
+            "state": "published",
+            "account_scope": "managed:kimi-code OAuth subscription; live entitlement separate"
+          },
+          "pricing": {
+            "currency": "USD",
+            "input_per_million_tokens": 0.95,
+            "output_per_million_tokens": 4.0,
+            "note": "cache-hit input $0.19/M; open-weight Modified MIT; forced-thinking (no non-thinking mode); 256K context; vendor self-benchmarks only, not comparable to cross-vendor standard sets"
+          },
+          "benchmarks": null,
+          "selectors": ["kimi-code/kimi-for-coding", "kimi-code/kimi-for-coding-highspeed"],
+          "source_refs": ["moonshot-kimi-k27-code-pricing", "moonshot-kimi-k27-code-card"],
           "supersedes": []
         }
       ]

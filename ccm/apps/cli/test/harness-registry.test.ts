@@ -277,6 +277,54 @@ test('harness adapters expose machine-wide registry coordinates', () => {
     quotaModel: 'billing-period',
   });
   assert.equal(cursor.accountPoolLocation({ HOME: root }), null);
+
+  const kimiHome = join(root, 'kimi-home');
+  const kimi = resolveHarnessAdapter({ harnessFlag: 'kimi-code', env: {} });
+  assert.deepEqual(kimi.sessionStoreRoots({ HOME: root, KIMI_CODE_HOME: kimiHome }), [
+    join(kimiHome, 'sessions'),
+  ]);
+  assert.deepEqual(kimi.usageSource({}), {
+    kind: 'dashboard-api',
+    pollable: false,
+    quotaModel: 'rolling-5h-7d',
+  });
+  assert.equal(kimi.accountPoolLocation({ HOME: root }), null);
+});
+
+test('kimi-code adapter: detection, aliases, unsupported usage/account, plugin distribution', () => {
+  assert.equal(resolveHarnessId({ env: { KIMI_CODE_HOME: '/tmp/kimi-home' } }), 'kimi-code');
+  assert.equal(detectTrustedHarnessId({ KIMI_CODE_HOME: '/tmp/kimi-home' }), 'kimi-code');
+
+  const kimi = resolveHarnessAdapter({ harnessFlag: 'kimi', env: {} });
+  assert.equal(kimi.id, 'kimi-code');
+
+  const usage = kimi.readCurrentUsage({});
+  assert.equal(usage.signal, null);
+  assert.equal(usage.source, 'unavailable');
+
+  assert.equal(kimi.accountPool.supported, false);
+  assert.equal(kimi.externalStatusline.supported, false);
+  assert.equal(kimi.pluginDistribution.supported, true);
+  assert.deepEqual(kimi.accountSwitchPreflight({}), {
+    action: 'noop',
+    reason: kimi.accountPool.reason,
+  });
+});
+
+test('kimi-code inventory reports install from bin or home without claiming other harnesses', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-kimi-inventory-'));
+  const bin = join(root, 'bin');
+  mkdirSync(bin, { recursive: true });
+  writeExecutable(join(bin, 'kimi'));
+
+  const kimi = inspectKnownHarnesses({ PATH: bin, HOME: join(root, 'home') }).find(
+    (h) => h.id === 'kimi-code',
+  );
+  assert.ok(kimi);
+  assert.equal(kimi?.installed, true);
+  assert.equal(kimi?.cli.path, join(bin, 'kimi'));
+  assert.equal(kimi?.capabilities.pluginDistribution.supported, true);
+  assert.equal(kimi?.capabilities.accountPool.supported, false);
 });
 
 test('MachineHarnessRegistry.sweep walks all known adapters into an immutable snapshot', () => {
@@ -297,7 +345,7 @@ test('MachineHarnessRegistry.sweep walks all known adapters into an immutable sn
   assert.equal(snapshot.schema, 'ccm/machine-harness-registry/v1');
   assert.deepEqual(
     snapshot.harnesses.map((h) => h.id),
-    ['codex', 'cursor', 'claude-code'],
+    ['codex', 'cursor', 'kimi-code', 'claude-code'],
   );
   assert.ok(snapshot.installed.includes('codex'));
   assert.ok(snapshot.installed.includes('claude-code'));

@@ -216,7 +216,7 @@ export function lintBoard(text: string): LintResult {
     if (ow.harness !== undefined && !isEnumMember('harness', ow.harness)) {
       emit(
         'FMT-HARNESS',
-        `owner.harness 是 ${JSON.stringify(ow.harness)}，应 ∈ {claude-code, codex, cursor, unknown}。` +
+        `owner.harness 是 ${JSON.stringify(ow.harness)}，应 ∈ {claude-code, codex, cursor, kimi-code, unknown}。` +
           `影响：ccm peers 按 harness 分配额池；未知值会退化为 unknown 单例池，避免跨 harness 混排。`,
       );
     }
@@ -1233,7 +1233,7 @@ function lintAgents(board: BoardLike, emit: Emit): void {
     if (!isEnumMember('agentHarness', a.harness)) {
       emit(
         'FMT-AGENTS',
-        `${label}.harness 是 ${JSON.stringify(a.harness)}，应 ∈ {codex, claude-code, cursor-agent, origin}。`,
+        `${label}.harness 是 ${JSON.stringify(a.harness)}，应 ∈ {codex, claude-code, cursor-agent, kimi-code, origin}。`,
       );
     }
     if (a.intent !== undefined && typeof a.intent !== 'string') {

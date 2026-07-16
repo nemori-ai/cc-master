@@ -122,7 +122,12 @@ export function createDefaultProviderRuntime(
     schema: PROVIDER_RUNTIME_SCHEMA,
     process: {
       resolveExecutable(provider: string): string | null {
-        if (provider !== 'codex' && provider !== 'claude' && provider !== 'cursor-agent') {
+        if (
+          provider !== 'codex' &&
+          provider !== 'claude' &&
+          provider !== 'cursor-agent' &&
+          provider !== 'kimi'
+        ) {
           return null;
         }
         const explicit =
@@ -130,7 +135,9 @@ export function createDefaultProviderRuntime(
             ? env.CCM_CODEX_BIN || env.CODEX_BIN
             : provider === 'claude'
               ? env.CCM_CLAUDE_BIN || env.CLAUDE_BIN
-              : env.CCM_CURSOR_AGENT_BIN || env.CURSOR_AGENT_BIN;
+              : provider === 'kimi'
+                ? env.CCM_KIMI_BIN || env.KIMI_BIN
+                : env.CCM_CURSOR_AGENT_BIN || env.CURSOR_AGENT_BIN;
         if (explicit) {
           try {
             fs.accessSync(explicit, fs.constants.X_OK);
@@ -141,6 +148,7 @@ export function createDefaultProviderRuntime(
         }
         if (provider === 'codex') return executableOnPath('codex', env.PATH);
         if (provider === 'claude') return executableOnPath('claude', env.PATH);
+        if (provider === 'kimi') return executableOnPath('kimi', env.PATH);
         return executableOnPath('cursor-agent', env.PATH) ?? executableOnPath('agent', env.PATH);
       },
       spawnProvider(spec: ProviderSpawnSpec): ProviderOwnedChild {

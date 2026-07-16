@@ -1,6 +1,6 @@
 {
   "schema": "ccm/task-affinity-registry/v1",
-  "revision": "2026-07-16.1",
+  "revision": "2026-07-16.2",
   "entries": [
     {
       "evidence_id": "coderabbit-2026-07-fable-architecture",
@@ -101,6 +101,31 @@
       "valid_until": "2026-07-22T00:00:00Z",
       "contradictions": ["verifier-required-follow-up-corrections"],
       "limitations": ["n=1", "different-orchestrator-model", "user-report-not-independent-eval"]
+    },
+    {
+      "evidence_id": "zhihu-2026-07-k27code-implementation",
+      "provider": "kimi-code",
+      "surface": "kimi-code-cli",
+      "model_id": "kimi-k2.7-code",
+      "task_taxonomy": "implementation-from-spec",
+      "signal": "positive",
+      "direction": 0.4,
+      "confidence": 0.3,
+      "source": {
+        "url": "https://zhuanlan.zhihu.com/p/2049227544931706021",
+        "author": "Zhihu community (实测Kimi K2.7 Code：不争全能，专注coding)",
+        "published_at": "2026-06-25T00:00:00Z",
+        "retrieved_at": "2026-07-16T00:00:00Z"
+      },
+      "observed_at": "2026-06-25T00:00:00Z",
+      "valid_until": "2026-09-16T00:00:00Z",
+      "contradictions": [],
+      "limitations": [
+        "vendor-self-benchmark-context",
+        "single-community-review",
+        "coding-below-frontier-on-standard-comparators",
+        "chinese-language-workload"
+      ]
     }
   ]
 }

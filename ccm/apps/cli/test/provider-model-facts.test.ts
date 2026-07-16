@@ -75,6 +75,28 @@ test('Cursor facts separate Agent CLI first-party selectors from unknown IDE fac
   assert.equal(facts.account_scope, 'cursor-subscription-first-party; live entitlement separate');
 });
 
+test('Kimi facts expose K3/K2.7-code with honest benchmark and quota unknowns', () => {
+  const result = query('kimi-code', '2026-07-16T12:00:00Z');
+  assert.equal(result.code, 0, result.err.join('\n'));
+  const facts = result.value.data;
+  assert.equal(facts.schema, 'ccm/provider-model-facts/v1');
+  assert.equal(facts.provider, 'kimi-code');
+  assert.equal(facts.freshness, 'fresh');
+  assert.equal(facts.eligible_for_automatic_selection, false);
+  const byId = new Map<string, any>(
+    facts.models.map((model: { model_id: string }) => [model.model_id, model]),
+  );
+  assert.equal(byId.get('kimi-k3').tier, 'frontier');
+  assert.equal(byId.get('kimi-k3').benchmarks, null);
+  assert.deepEqual(byId.get('kimi-k3').selectors, ['kimi-code/k3']);
+  assert.equal(byId.get('kimi-k2.7-code').tier, 'balanced');
+  assert.equal(byId.get('kimi-k2.7-code').benchmarks, null);
+  assert.ok(byId.get('kimi-k2.7-code').selectors.includes('kimi-code/kimi-for-coding'));
+  assert.ok(facts.unknown.includes('kimi_k3_official_benchmarks'));
+  assert.ok(facts.unknown.includes('kimi_code_cli_headless_quota_signal'));
+  assert.equal(facts.revision, '2026-07-16.1');
+});
+
 test('expired snapshots remain observable but fail closed for automatic selection', () => {
   const facts = query('claude-code', '2026-07-23T00:00:00Z').value.data;
   assert.equal(facts.freshness, 'hard-stale');
@@ -85,7 +107,7 @@ test('expired snapshots remain observable but fail closed for automatic selectio
 
 test('registry validation rejects freshness and provenance hostile mutants', async () => {
   const module = await import('../src/provider-model-facts.js');
-  assert.equal(module.PROVIDER_MODEL_FACTS_REGISTRY.revision, '2026-07-16.1');
+  assert.equal(module.PROVIDER_MODEL_FACTS_REGISTRY.revision, '2026-07-16.2');
   assert.equal(
     module.PROVIDER_MODEL_FACTS_REGISTRY.providers['claude-code'].revision,
     '2026-07-16.1',
