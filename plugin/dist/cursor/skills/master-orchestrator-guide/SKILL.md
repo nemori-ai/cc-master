@@ -131,6 +131,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | 「**selected target 已越过当前 hard quota boundary，但这个节点在临界路径上；我先派了再说。**」 | 临界路径不是绕过不可逆消耗边界的理由。停止向该 target 派新节点，把继续消耗 / 等 reset / 缩 scope / 改选其他已充分证明可用的 target 做成 `blocked_on:"user"` 决策；旧 ship 意图不是续耗 standing 授权，hook 的非阻断也不是可忽略的 FYI。在飞任务只跑到安全点并验收。 |
 | 「我 **`Write` board 标了 `in_flight` 就等于派了**。」 | **board 标注 ≠ 真实派发。** 标 `in_flight` 必须由一次真实派发产生一个**真实 agent 或 background process/session handle**，否则就是虚构进度。尤其 `ccm` worker 是同步 wrapper：跨 harness 长任务必须把它运行在当前 origin 可追踪的后台 shell / terminal / session 中；handle 来自这个后台机制，不是同步 wrapper 的返回结果。先拿到可 recon 的 handle、再标板。 |
 | 「我 `--resume` 接手了，**当前 cwd 就是干活的地方，直接 reconcile / 跑闸**。」 | **resume 的 cwd 未必 == `board.git.worktree`。** 不先 `cd` 进 worktree 并核对一致，后续相对路径 / git / 端点闸全在错目录静默跑——轻则挂、重则在另一棵树上跑绿、把非目标产物标 `done`，端点验收（「只信端点验收」镜头）的可信度连必要条件都不成立。resume 第 0 步永远是落 worktree、确认 cwd==它——见 `references/resume-verify.md` §resume 第 0 步。 |
+| 「**三个 subagent 独立调研还都对上了——这基本就是事实了**，那行『未与真实用户确认』不过是句免责声明；窗口今晚关，先按这个切完 DAG 全派，验收时再兜。」 | **内部共识不是外部验证。** 三份报告一致，往往是同一个未验证前提被复制了三次（相关失败），不是三条独立证据收敛——「同族复读不算第二视角」在假设层同构成立。一个**承重**判断（删掉它 DAG 形状就变）若只由内部推断支撑，端点验收兜的是*成品对不对*、兜不回一个大规模投入*建错了方向*。先问「哪一项外部事实最能廉价地推翻它」、用与风险相称的最低成本手段接触现实，再决定投入——这不是拖慢，是不往错误方向加速。越是「方案很顺 + 沉没成本高 + 窗口紧」，那份「*这次*直接走」的冲动本身就是症状（低风险 ∧ 可逆 ∧ 事实充分的小改除外，记一笔照常推进即可，别过度求证）。分级 / 校准阶梯见 `references/outside-in.md`。 |
 
 ### Red Flags（红旗）—— 停下，重跑决策程序
 
@@ -145,6 +146,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 - 你正要画一条依赖边 / 把两个任务串起来跑，却**说不出一个被下游直接消费的具体上游产物**——你在凭顺序习惯串行化，不是在跟数据依赖走。
 - 你正要把一个 task 标 `in_flight`，却**没有真实 agent 或 background process/session handle 对应它**；或者你同步调用了 `ccm` worker，却没把它放进当前 origin 可追踪的后台机制、就把同步 wrapper 的结果冒充 handle——你在虚构进度。
 - 你正要向已越过其当前 hard quota boundary 的 selected target dispatch 新节点，或把 `unknown` / stale / missing 当 ample，却没有先停派并 surface 容量取舍——你在替用户跨不可逆消耗边界。
+- 你正基于一个**只由内部推断支撑**的承重假设做完整规划 / 扩大投入（不可逆或门控很大），却没问过「哪项外部事实最能廉价地推翻它」、也没把它记成一条待验证假设——「三份内部报告一致」「应该兼容吧」「subagent 都同意了」都是把内部共识当外部验证的信号（反侧同样是脱轨：对一个低风险 ∧ 可逆 ∧ 事实充分的小改堆问用户 / 造 review / 起 dogfood，是把靶向校准过度泛化成仪式）。
 - 你正在为「**这场 orchestration 是某条红线的例外**」构建论证。
 - 你正要 Stop，却**没有 step-6 ledger**（没有把每条 path 的证据写进 board + 对话）。
 
@@ -180,6 +182,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | reference | 何时 drill |
 |---|---|
 | `goal-contract.md` | fresh 澄清/改写目标、长需求落 Goal Brief、工作追溯、防 scope 漂移、amend revision、完成前全局验收 |
+| `outside-in.md` | 规划 / 设计 / replan 中某**承重判断只由内部推断支撑**、缺外部证据时：证据五分级、校准成本阶梯、无外部通道时诚实记未知 + 可逆实验、外部证据改 goal 语义走 amendment、低风险可逆豁免 |
 | `decomposition.md` | 一张**已切好**的 DAG 怎么**排期**（CPM / float / 临界路径；心算 或 `ccm board graph` 机器算 §3） |
 | `model-allocation.md` | 读取三路统一模型事实后，怎样按工作角色定 `O / T1 / T2 / T3` floor、跨 provider 排序，以及配额收紧时怎样保持 floor 并联动 WIP / float / background / watchdog / 用户决策 |
 | `dispatch.md` | 从本机全池选跨 harness worker + 选 Cursor 当前 surface 可追踪后台机制（Task subagent / 后台 Shell / external scheduler）+ **派发卫生**；Workflow 语义当前 unsupported |
@@ -267,7 +270,7 @@ digraph decision_program {
 }
 ```
 
-这张 graph *就是*控制流。有七件事塞不进任何一条边：**(a)** recon / dispatch / fill / verify 前都以当前 Goal Contract revision 跑 Goal Trace Test；新发现先过 Delta Classifier，绝不让 task 反向偷偷扩 goal（见 `references/goal-contract.md`）；**(b)** dispatch 在 HITL 进行中照样触发——不依赖那个待答问题的就绪工作并行派发，于是一段密集的前台 Q&A 绝不会把独立目标串行化；**(c)**「verify」指*独立地、在你自己的端点上*验，且同时验 task local acceptance 与当前 revision 的 global acceptance，绝不是对 agent 自报的一次重读；**(d)** 走 `wait` 那条边之前，先写 **step-6 ledger**（每条 path 的自检 + 验收证据，对话与 board 双写——确切形态与它为什么重要见 `references/async-hitl.md` §"The step-6 ledger — the fixed shape (single source)"），再 flush；**(e)** recon（reconcile）时**逐个对账每个 `in_flight` 是否都有真实 handle**——无 handle 的 `in_flight` 是幽灵任务（phantom），board / 自报都会显示「在跑」，唯有 git / 工具结果的地面真相能戳穿（验证法见 `references/dispatch.md` §「派发卫生」）；**(f)** 走 `wait` 边前，若有 path blocked 在「可能静默失败的 in-flight 后台任务」上，**arm 一个 watchdog 自我唤醒**（间隔回来 recon 对地面真相，补 harness 完成事件对 hang / 静默死 / phantom 的盲区；纯 awaiting-user 不需）——机制 + board `wakeup` 双层记录见 `references/async-hitl.md` §等待前 arm watchdog；**(g)** 每次 dispatch 前先读全机 quota posture、把候选绑定到精确 selected target，并应用**该 target 自己**的窗口合同；hard boundary 已触发，或承重事实 unknown / stale / missing，就不向它派新节点，把继续消耗 / 等 reset / 缩 scope / 改选其他已充分证明可用的 target surface 给用户；在飞任务可跑到安全点并验收。hook 的非阻断只说明它不物理拦工具调用，执行暂停仍由你负责。
+这张 graph *就是*控制流。有八件事塞不进任何一条边：**(a)** recon / dispatch / fill / verify 前都以当前 Goal Contract revision 跑 Goal Trace Test；新发现先过 Delta Classifier，绝不让 task 反向偷偷扩 goal（见 `references/goal-contract.md`）；**(b)** dispatch 在 HITL 进行中照样触发——不依赖那个待答问题的就绪工作并行派发，于是一段密集的前台 Q&A 绝不会把独立目标串行化；**(c)**「verify」指*独立地、在你自己的端点上*验，且同时验 task local acceptance 与当前 revision 的 global acceptance，绝不是对 agent 自报的一次重读；**(d)** 走 `wait` 那条边之前，先写 **step-6 ledger**（每条 path 的自检 + 验收证据，对话与 board 双写——确切形态与它为什么重要见 `references/async-hitl.md` §"The step-6 ledger — the fixed shape (single source)"），再 flush；**(e)** recon（reconcile）时**逐个对账每个 `in_flight` 是否都有真实 handle**——无 handle 的 `in_flight` 是幽灵任务（phantom），board / 自报都会显示「在跑」，唯有 git / 工具结果的地面真相能戳穿（验证法见 `references/dispatch.md` §「派发卫生」）；**(f)** 走 `wait` 边前，若有 path blocked 在「可能静默失败的 in-flight 后台任务」上，**arm 一个 watchdog 自我唤醒**（间隔回来 recon 对地面真相，补 harness 完成事件对 hang / 静默死 / phantom 的盲区；纯 awaiting-user 不需）——机制 + board `wakeup` 双层记录见 `references/async-hitl.md` §等待前 arm watchdog；**(g)** 每次 dispatch 前先读全机 quota posture、把候选绑定到精确 selected target，并应用**该 target 自己**的窗口合同；hard boundary 已触发，或承重事实 unknown / stale / missing，就不向它派新节点，把继续消耗 / 等 reset / 缩 scope / 改选其他已充分证明可用的 target surface 给用户；在飞任务可跑到安全点并验收。hook 的非阻断只说明它不物理拦工具调用，执行暂停仍由你负责；**(h)** recon / dispatch / fill / 扩大投入前，与 (a) 同拍再验一轴：某**承重判断**若**只由内部推断支撑**（既非已知事实、非用户决策、也非外部证据），先问「哪一项外部事实最能廉价地推翻它」——(a) 验它追不追溯得到 goal（内部一致性）、(h) 验它接没接触外部现实（外部有效性），同一时刻、正交两轴；承重 ∧ 内部唯一支撑 ∧ 门控大 / 不可逆，三者全中 → 先用与风险相称的最低成本手段接触现实再投入，低风险 ∧ 可逆 ∧ 事实充分 → 记为假设照常推进（别退化成凡事外求证）；证据分级 / 校准手段阶梯 / 无外部通道时的可逆推进 / 外部证据改 goal 走 amendment 见 `references/outside-in.md`。
 
 **决策程序是一个手动跑的 dataflow scheduler——一个 TFU。** dispatch-when-ready、让等待相互重叠、唯 ready 集合为空才停：这与 `pipeline()` 在 workflow 里作为代码跑的是同一套 dataflow 思想，只是这里内化成了纪律——因为主线 DAG 是动态的，而且里面有一个人。这个两尺度、自相似的画面——以及何时*不该* pipeline——在 `references/dispatch.md`（"Dataflow at two scales"）。
 

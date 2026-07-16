@@ -8,7 +8,7 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "6e549468bb3680122d7b778d04a40137a877db63f923810f9cc4a348d82616f1",
+            "SKILL.md": "c2286483609f2af2369ecabf4189df23bda7092238c4d3fce0b029bd26417b16",
             "references/async-hitl.md": "57d269b2b91bcfcf4c656cb3e4b7e6e605c20b504ecc92beef99dac7f9e2d1c8",
             "references/board.md": "3014c12249c5a28d2d8494c61b99506ef5dfacdc52692cbe8aab5aa4edfdfacf",
             "references/cost-decisions.md": "f9cb9122199c13c8a14ba35ed5b25b0b8bc464749d76ce1d7a0ce2dc80bf4237",
@@ -18,6 +18,7 @@
             "references/handoff.md": "253b1227fec8ae9306c236db594052785bf374fab7a0401d972ecaace1dc5c39",
             "references/model-allocation.md": "57c59f86b137bcca50aa8f9dc10e56f097052d86afe467e2bfe33a681fefddbc",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
+            "references/outside-in.md": "f85eba56f0cec48645e4a1d0ee98589d929e8602c322dd891a0c011e948c9277",
             "references/resume-verify.md": "1221622b78b8edac6f339d11787152a3a19fe5cc1852d2aeff0bc3b168287e0c",
             "scripts/codex-review.sh": "282c59a181bab3c53a97886c77bd6efe5e54ea00daf63e019c8a4962bcaf1948"
           }
@@ -50,7 +51,7 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "42fb6be12de5897b78d0ef0ada0acc68542be71ff67ac3931e6b4fb307eae33a",
+            "SKILL.md": "836a646061f41cd1fca1a474b377d51facc83f92685a2984d6edc9d5ed736a5b",
             "references/async-hitl.md": "4a56ab3e551879e654747c54c9b22f9b221e92e526f5bd0f4de8a3acceef8a62",
             "references/board.md": "39dfec8792054c707407083b5c9b1e786f36071a56be5b29719ee8b183a4d991",
             "references/decomposition.md": "9d3fc377a4d8e4cd4c9c4d312ce47ab58a74f7faa9d071dda6e8a6c22609ced7",
@@ -58,6 +59,7 @@
             "references/goal-contract.md": "95f8e8344e03e1271403191f09163784420108780bc18149d6ad4f78f86d5d19",
             "references/model-allocation.md": "57c59f86b137bcca50aa8f9dc10e56f097052d86afe467e2bfe33a681fefddbc",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
+            "references/outside-in.md": "f85eba56f0cec48645e4a1d0ee98589d929e8602c322dd891a0c011e948c9277",
             "references/resume-verify.md": "bf5e83a5989381ef0b09311919ee990c57f60c5caf0641c3ec9a2c6523e49ad6"
           }
         },
@@ -88,7 +90,7 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "d5fc997e8f7803f77ebbd137642e8e18caa54c60c400bc3493e2e51533843ff6",
+            "SKILL.md": "8ee23fdc56eeddf5bca51a15837154fa36acea60b83f445c2507299854b4d544",
             "references/async-hitl.md": "622768b1f2ed0ccab493b78b057b91594b15242c2c3f7426866dfd8234c5f41b",
             "references/board.md": "f3669b71cdab613e4c559ee6839109575bc3edd7d4288759b8ff19088d281c29",
             "references/decomposition.md": "9d3fc377a4d8e4cd4c9c4d312ce47ab58a74f7faa9d071dda6e8a6c22609ced7",
@@ -96,6 +98,7 @@
             "references/goal-contract.md": "95f8e8344e03e1271403191f09163784420108780bc18149d6ad4f78f86d5d19",
             "references/model-allocation.md": "57c59f86b137bcca50aa8f9dc10e56f097052d86afe467e2bfe33a681fefddbc",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
+            "references/outside-in.md": "f85eba56f0cec48645e4a1d0ee98589d929e8602c322dd891a0c011e948c9277",
             "references/resume-verify.md": "ce973d2d0bc1c6906a03ba454636a16fe3399459929f79d3435a2a358aa66d4a"
           }
         },
