@@ -33,6 +33,7 @@ import type {
   NativeAttemptPrivateEvidenceBoundary,
 } from './handlers/_common.js';
 import * as accountHandler from './handlers/account.js';
+import * as agentHandler from './handlers/agent.js';
 import * as attemptHandler from './handlers/attempt.js';
 import * as baselineHandler from './handlers/baseline.js';
 import * as boardHandler from './handlers/board.js';
@@ -176,6 +177,7 @@ export interface RouterComposition {
 //   key 与 spec.handler 字符串的首段（hnoun）对齐：'task.setStatus' → HANDLERS.task.setStatus。
 const HANDLERS: Record<string, HandlerModule> = {
   capability: capabilityHandler as unknown as HandlerModule,
+  agent: agentHandler as unknown as HandlerModule,
   attempt: attemptHandler as unknown as HandlerModule,
   board: boardHandler as unknown as HandlerModule,
   goal: goalHandler as unknown as HandlerModule,

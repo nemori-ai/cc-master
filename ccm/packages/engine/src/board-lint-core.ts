@@ -28,6 +28,7 @@ import {
   durationHours,
   ENUMS,
   isAbsolutePathOrUrl,
+  isAgentId,
   isAwaitingUser,
   isEnumMember,
   isISOUTC,
@@ -250,6 +251,7 @@ export function lintBoard(text: string): LintResult {
   lintCoordination(b, emit);
   lintInbox(b, emit);
   lintRuntime(b, emit);
+  lintAgents(b, emit);
   for (const diagnostic of validateDeliveryContracts(b as DeliveryBoardLike)) {
     const task = diagnostic.path?.match(/^tasks\.([^.]+)/)?.[1];
     emit(
@@ -551,6 +553,9 @@ export function lintBoard(text: string): LintResult {
   for (const [id, t] of taskById) {
     lintStatusDeps(b, id, t, g.upstream, emit);
   }
+
+  // ── BIZ-INFLIGHT-AGENT（in_flight task 未登记 agent·warn·软提示补登记）───────────────────────────────
+  lintInflightAgent(b, taskById, emit);
 
   // ── BIZ-DELIVERY-*（declared edge proof/readiness impact；资格只派生、不写回）──────────────────────
   // lint 没有外部 target/time facts，因此 drift/waiver expiry 无法静态确证时保持 unknown + warn；
@@ -1173,6 +1178,207 @@ function lintRuntime(board: BoardLike, emit: Emit): void {
     emit(
       'FMT-RUNTIME',
       `runtime.stop_allow_until 是 ${JSON.stringify(r.stop_allow_until)}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：Codex Stop hook 读它判本次是否允许停止——格式不对则退化为继续阻止停止（fail-safe）。`,
+    );
+  }
+}
+
+// FMT-AGENTS：agents[] 段形状（Agent Registry·present 才校验·全 warn·graceful）。
+//   agents 是 ✎ board-scoped 运行时登记簿（hook 不读·非窄腰）——形状坏不阻断写盘，只让 ccm agent list/show
+//   与 viewer 花名册对坏条目降级。校验：① 整段是数组；② 每条是对象；③ id 语法合法 + 全段唯一；
+//   ④ type/harness ∈ 闭合枚举；⑤ handle.kind / lifecycle.state / probe.observed / probe.method ∈ 闭合枚举
+//   （present 才校验）；⑥ intent 为字符串；⑦ 时间锚（launch.created_at / lifecycle.registered_at·ended_at /
+//   probe.last_probe_at·as_of）若存在须严格 ISO；⑧ links[] 若存在须是数组、每条 {task_id:非空字符串}；
+//   ⑨ account_ref / quota_pool_ref 若存在须为 null 或字符串（只存 ref 不存数值·预留位）。
+function lintAgents(board: BoardLike, emit: Emit): void {
+  const ag = board.agents;
+  if (ag === undefined || ag === null) return;
+  if (!Array.isArray(ag)) {
+    emit(
+      'FMT-AGENTS',
+      `agents 若存在必须是数组（当前：${JSON.stringify(ag)}）。影响：ccm agent list/show 与 viewer 花名册读它——非数组则读不出、退化为空登记簿。`,
+    );
+    return;
+  }
+  const ids = new Set<string>();
+  for (let i = 0; i < ag.length; i++) {
+    const item = ag[i];
+    const label =
+      item &&
+      typeof item === 'object' &&
+      !Array.isArray(item) &&
+      typeof (item as Record<string, unknown>).id === 'string'
+        ? String((item as Record<string, unknown>).id)
+        : `agents[${i}]`;
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      emit('FMT-AGENTS', `${label} 应为对象（当前：${JSON.stringify(item)}）。`);
+      continue;
+    }
+    const a = item as Record<string, unknown>;
+    if (!isAgentId(a.id)) {
+      emit(
+        'FMT-AGENTS',
+        `${label}.id 须匹配 ${'[A-Za-z0-9][A-Za-z0-9._-]{0,127}'}（当前：${JSON.stringify(a.id)}）。`,
+      );
+    } else if (ids.has(a.id as string)) {
+      emit('FMT-AGENTS', `agents[].id 重复：${JSON.stringify(a.id)}（board-scoped 内须唯一）。`);
+    } else {
+      ids.add(a.id as string);
+    }
+    if (!isEnumMember('agentType', a.type)) {
+      emit(
+        'FMT-AGENTS',
+        `${label}.type 是 ${JSON.stringify(a.type)}，应 ∈ {cli-worker, subagent, background-shell, workflow}。`,
+      );
+    }
+    if (!isEnumMember('agentHarness', a.harness)) {
+      emit(
+        'FMT-AGENTS',
+        `${label}.harness 是 ${JSON.stringify(a.harness)}，应 ∈ {codex, claude-code, cursor-agent, origin}。`,
+      );
+    }
+    if (a.intent !== undefined && typeof a.intent !== 'string') {
+      emit('FMT-AGENTS', `${label}.intent 若存在须为字符串（当前：${JSON.stringify(a.intent)}）。`);
+    }
+    if (a.model !== undefined && typeof a.model !== 'string') {
+      emit('FMT-AGENTS', `${label}.model 若存在须为字符串（unknown 保真·缺则不填；当前：${JSON.stringify(a.model)}）。`);
+    }
+    // launch
+    if (a.launch !== undefined) {
+      if (typeof a.launch !== 'object' || a.launch === null || Array.isArray(a.launch)) {
+        emit('FMT-AGENTS', `${label}.launch 若存在须为对象（当前：${JSON.stringify(a.launch)}）。`);
+      } else {
+        const l = a.launch as Record<string, unknown>;
+        if (l.created_at !== undefined && badTimestamp(l.created_at)) {
+          emit('FMT-AGENTS', `${label}.launch.created_at 是 ${JSON.stringify(l.created_at)}，非严格 ISO-8601 UTC。`);
+        }
+      }
+    }
+    // handle
+    if (a.handle !== undefined) {
+      if (typeof a.handle !== 'object' || a.handle === null || Array.isArray(a.handle)) {
+        emit('FMT-AGENTS', `${label}.handle 若存在须为对象（当前：${JSON.stringify(a.handle)}）。`);
+      } else {
+        const h = a.handle as Record<string, unknown>;
+        if (h.kind !== undefined && !isEnumMember('agentHandleKind', h.kind)) {
+          emit(
+            'FMT-AGENTS',
+            `${label}.handle.kind 是 ${JSON.stringify(h.kind)}，应 ∈ {session-id, pid, task-id, none}。`,
+          );
+        }
+        if (h.value !== undefined && typeof h.value !== 'string') {
+          emit('FMT-AGENTS', `${label}.handle.value 若存在须为字符串（当前：${JSON.stringify(h.value)}）。`);
+        }
+      }
+    }
+    // lifecycle（state 必校验·其余 present 才校验）
+    if (a.lifecycle !== undefined) {
+      if (typeof a.lifecycle !== 'object' || a.lifecycle === null || Array.isArray(a.lifecycle)) {
+        emit('FMT-AGENTS', `${label}.lifecycle 若存在须为对象（当前：${JSON.stringify(a.lifecycle)}）。`);
+      } else {
+        const lc = a.lifecycle as Record<string, unknown>;
+        if (!isEnumMember('agentState', lc.state)) {
+          emit(
+            'FMT-AGENTS',
+            `${label}.lifecycle.state 是 ${JSON.stringify(lc.state)}，应 ∈ {starting, running, uncertain, terminal, orphaned}。`,
+          );
+        }
+        for (const k of ['registered_at', 'ended_at']) {
+          if (lc[k] !== undefined && lc[k] !== null && badTimestamp(lc[k])) {
+            emit('FMT-AGENTS', `${label}.lifecycle.${k} 是 ${JSON.stringify(lc[k])}，非严格 ISO-8601 UTC。`);
+          }
+        }
+      }
+    }
+    // probe
+    if (a.probe !== undefined && a.probe !== null) {
+      if (typeof a.probe !== 'object' || Array.isArray(a.probe)) {
+        emit('FMT-AGENTS', `${label}.probe 若存在须为对象（当前：${JSON.stringify(a.probe)}）。`);
+      } else {
+        const p = a.probe as Record<string, unknown>;
+        if (p.observed !== undefined && !isEnumMember('agentObserved', p.observed)) {
+          emit(
+            'FMT-AGENTS',
+            `${label}.probe.observed 是 ${JSON.stringify(p.observed)}，应 ∈ {alive, silent, gone, unknown}。`,
+          );
+        }
+        if (p.method !== undefined && !isEnumMember('agentProbeMethod', p.method)) {
+          emit(
+            'FMT-AGENTS',
+            `${label}.probe.method 是 ${JSON.stringify(p.method)}，应 ∈ {pid, session-file-mtime, transcript-mtime, none}。`,
+          );
+        }
+        for (const k of ['last_probe_at', 'as_of']) {
+          if (p[k] !== undefined && p[k] !== null && badTimestamp(p[k])) {
+            emit('FMT-AGENTS', `${label}.probe.${k} 是 ${JSON.stringify(p[k])}，非严格 ISO-8601 UTC。`);
+          }
+        }
+      }
+    }
+    // links[]（agent→task 关联·join 存 agent 侧）
+    if (a.links !== undefined) {
+      if (!Array.isArray(a.links)) {
+        emit('FMT-AGENTS', `${label}.links 若存在须为数组（当前：${JSON.stringify(a.links)}）。`);
+      } else {
+        for (let j = 0; j < a.links.length; j++) {
+          const ln = a.links[j];
+          if (!ln || typeof ln !== 'object' || Array.isArray(ln)) {
+            emit('FMT-AGENTS', `${label}.links[${j}] 应为对象 {task_id, linked_at?}（当前：${JSON.stringify(ln)}）。`);
+            continue;
+          }
+          const link = ln as Record<string, unknown>;
+          if (typeof link.task_id !== 'string' || link.task_id === '') {
+            emit('FMT-AGENTS', `${label}.links[${j}].task_id 必须是非空字符串。`);
+          }
+          if (link.linked_at !== undefined && badTimestamp(link.linked_at)) {
+            emit('FMT-AGENTS', `${label}.links[${j}].linked_at 是 ${JSON.stringify(link.linked_at)}，非严格 ISO-8601 UTC。`);
+          }
+        }
+      }
+    }
+    // account_ref / quota_pool_ref（只存 ref 不存数值·预留位·null 或字符串）
+    for (const k of ['account_ref', 'quota_pool_ref']) {
+      if (a[k] !== undefined && a[k] !== null && typeof a[k] !== 'string') {
+        emit('FMT-AGENTS', `${label}.${k} 若存在须为 null 或字符串（只存 ref 不存数值；当前：${JSON.stringify(a[k])}）。`);
+      }
+    }
+  }
+}
+
+// BIZ-INFLIGHT-AGENT（warn）：in_flight task 无任何 agent 登记指向它——软提示补登记（凡派发皆登记）。
+//   「指向它」= 任一 agents[].links[].task_id === 本 task.id，或任一 task.routing.attempts[].agent_ref 存在。
+//   两种登记形态都算（join 主存 agent 侧的 links[]，attempt 侧 agent_ref 是未来 dedicated writer 的旁路引用）。
+function lintInflightAgent(board: BoardLike, taskById: Map<string, TaskLike>, emit: Emit): void {
+  // 建「已被 agent 登记的 task id」集合（一次·O(agents×links)）。
+  const linkedTaskIds = new Set<string>();
+  const agents = Array.isArray(board.agents) ? board.agents : [];
+  for (const a of agents) {
+    if (!a || typeof a !== 'object') continue;
+    const links = (a as Record<string, unknown>).links;
+    if (!Array.isArray(links)) continue;
+    for (const ln of links) {
+      const tid = ln && typeof ln === 'object' ? (ln as Record<string, unknown>).task_id : undefined;
+      if (typeof tid === 'string' && tid !== '') linkedTaskIds.add(tid);
+    }
+  }
+  for (const [id, t] of taskById) {
+    if (t.status !== 'in_flight') continue;
+    if (linkedTaskIds.has(id)) continue;
+    // attempt 侧 agent_ref 旁路（未来 dedicated writer 写）——任一 attempt 带非空 agent_ref 即算已登记。
+    const attempts = (t as { routing?: { attempts?: unknown } }).routing?.attempts;
+    const hasAttemptRef =
+      Array.isArray(attempts) &&
+      attempts.some(
+        (e) =>
+          e &&
+          typeof e === 'object' &&
+          typeof (e as Record<string, unknown>).agent_ref === 'string' &&
+          (e as Record<string, unknown>).agent_ref !== '',
+      );
+    if (hasAttemptRef) continue;
+    emit(
+      'BIZ-INFLIGHT-AGENT',
+      `${id} 已 in_flight 但无任何 agent 登记指向它——凡派发皆登记，建议 \`ccm agent create\`+\`ccm agent link ${id}\` 补登记，让花名册/viewer 能观测这次派发。`,
+      id,
     );
   }
 }

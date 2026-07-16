@@ -93,9 +93,13 @@ export type {
 // ── board-model（数据模型 SSOT：enums / FIELDS / INVARIANTS / STATUS_MACHINE / predicates）──
 export {
   acceptanceConverged,
+  AGENT_ID_RE,
+  AGENT_STATE_MACHINE,
   dependencySatisfied,
   durationHours,
   ENUMS,
+  isAgentId,
+  isLegalAgentTransition,
   FIELDS,
   INVARIANTS,
   ISO_UTC_RE,

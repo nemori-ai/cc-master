@@ -70,6 +70,7 @@ const EXPECTED: Record<string, string[]> = {
   cadence: ['update', 'open', 'ship', 'status'],
   watchdog: ['arm', 'disarm', 'status'],
   policy: ['show', 'set'],
+  agent: ['create', 'bind', 'link', 'terminal', 'probe', 'list', 'show'],
   peers: ['list'],
   coordination: ['inbox', 'notify', 'arbitrate', 'subscription'],
   usage: ['show', 'advise', 'task-cost', 'burn-rate', 'runway'],
