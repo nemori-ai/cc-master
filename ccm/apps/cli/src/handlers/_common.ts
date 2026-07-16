@@ -34,7 +34,6 @@ import type {
   MachineQuotaCollectorBoundary,
   MachineQuotaCoordinationBoundary,
 } from '../machine-wide-quota.js';
-import type { MachineWideQuotaNotificationBoundary } from '../machine-wide-quota-notification.js';
 import type { ProviderRuntime } from '../provider-runtime.js';
 import type { OptionSpec, VerbSpec } from '../registry.js';
 
@@ -186,7 +185,6 @@ export interface Ctx {
   quotaEffects?: QuotaEffectBoundary;
   machineQuotaCollectors?: MachineQuotaCollectorBoundary;
   machineQuotaCoordination?: MachineQuotaCoordinationBoundary;
-  machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
   writeFileAtomicSync?: typeof io.writeFileAtomicSync;

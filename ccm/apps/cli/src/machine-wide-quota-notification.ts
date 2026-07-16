@@ -45,14 +45,6 @@ export interface MachineQuotaProjectionInput {
   subscriptions?: Data[];
 }
 
-export interface MachineWideQuotaNotificationBoundary {
-  readPostures(input: { refresh: boolean }): Promise<Data[]>;
-  listSubscriptions(): Promise<Data[]>;
-  readCheckpoint(scopeDigest: string): Promise<Data | null>;
-  publishCheckpoint(scopeDigest: string, decision: Data): Promise<void>;
-  putInbox(notification: Data): Promise<void>;
-}
-
 function digest(value: unknown): string {
   return `sha256:${sha256Hex(typeof value === 'string' ? value : canonicalJson(value))}`;
 }
@@ -251,21 +243,4 @@ export async function runMachineWideQuotaNotificationCycle(input: {
     await input.checkpoint.publish(String(decision.scope_digest), structuredClone(decision));
   }
   return { schema: 'ccm/machine-quota-fanout/v1', notifications: delivered };
-}
-
-export async function runMachineWideQuotaBoundaryCycle(
-  boundary: MachineWideQuotaNotificationBoundary,
-  refresh: boolean,
-): Promise<Data> {
-  const decisions = await boundary.readPostures({ refresh });
-  const subscriptions = await boundary.listSubscriptions();
-  return runMachineWideQuotaNotificationCycle({
-    decisions,
-    subscriptions,
-    checkpoint: {
-      read: (scopeDigest) => boundary.readCheckpoint(scopeDigest),
-      publish: (scopeDigest, decision) => boundary.publishCheckpoint(scopeDigest, decision),
-    },
-    inbox: { put: (notification) => boundary.putInbox(notification) },
-  });
 }

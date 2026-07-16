@@ -1,9 +1,19 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import {
+  deliverCoordinationNotification,
+  listCurrentCoordinationSubscriptions,
+} from '../src/handlers/coordination.js';
+import type {
+  MachineQuotaAuthorityRefs,
+  MachineQuotaCollection,
+  MachineQuotaCollectorBoundary,
+} from '../src/machine-wide-quota.js';
+import { createProductionQuotaEffectBoundary } from '../src/quota-production-effects.js';
 // @ts-expect-error Executable fixture modules intentionally remain plain ESM next to their JSON manifest.
 import { counterfeits } from './fixtures/machine-wide-quota-notification-v1/counterfeits.mjs';
 // @ts-expect-error Executable fixture modules intentionally remain plain ESM next to their JSON manifest.
@@ -361,6 +371,7 @@ function rawProjectorInput(
       payer_scope: authority.payer_scope,
       pool_id: authority.pool_id,
       bucket_id: authority.bucket_id,
+      aggregation_key: `${authority.provider_id}|${identityFingerprint}|${authority.pool_id}|${authority.window.name}`,
       unit: authority.unit,
       window: structuredClone(authority.window),
     },
@@ -493,84 +504,211 @@ test('production pure projector derives posture from raw authority rather than i
   assert.notEqual(changedSevenDay.decision_revision, codex.decision_revision);
 });
 
-function productionBoundary() {
-  const decision = knownGood.projectPosture(manifest.authorities[0], { state: 'tight' });
-  const effects = memoryEffects('sub-codex');
-  const counters = { cached_reads: 0, live_reads: 0, account_switches: 0 };
+function productionAuthority(target: Record<string, any>): MachineQuotaAuthorityRefs {
+  const template = (manifest.authorities as Record<string, any>[]).find(
+    (authority) => authority.surface_id === target.surface_id,
+  );
+  const identity = template?.identity_fingerprint ?? `${target.provider_id}-fixture-identity`;
+  const pool = template?.pool_id ?? `${target.provider_id}-fixture-pool`;
   return {
-    decision,
-    effects,
-    counters,
-    boundary: {
-      readPostures: async ({ refresh }: { refresh: boolean }) => {
-        if (refresh) counters.live_reads += 1;
-        else counters.cached_reads += 1;
-        return [decision];
+    schema: 'ccm/machine-quota-collector-authority/v1',
+    account_key: `${target.provider_id}-fixture-account`,
+    identity_fingerprint: identity,
+    payer_scope: template?.payer_scope ?? 'subscription',
+    pool_id: pool,
+    aggregation_key: `${target.provider_id}|${identity}|${pool}|${target.window_name}`,
+    policy: {
+      revision:
+        target.provider_id === 'codex'
+          ? 'ccm/codex-7d-pacing/v1'
+          : `fixture:${target.surface_id}:${target.window_name}:policy-v1`,
+      hard_ceiling_used_pct: 85,
+    },
+    requirement: {
+      revision: `fixture:${target.surface_id}:${target.window_name}:requirement-v1`,
+      required_bucket_ids: [target.bucket_id],
+      safety_margin: { [target.bucket_id]: 2 },
+    },
+  };
+}
+
+const PRODUCTION_CAPTURED_AT = Math.floor(Date.now() / 1000);
+
+function productionCollection(target: Record<string, any>): MachineQuotaCollection {
+  const capturedAt = PRODUCTION_CAPTURED_AT;
+  const reset = capturedAt + 604_800;
+  const used = target.surface_id === 'codex-cli' ? 84 : 20;
+  return {
+    status: 'refreshed',
+    source: `${target.provider_id}-fixture`,
+    authority: productionAuthority(target),
+    signal: {
+      captured_at: capturedAt,
+      five_hour: {
+        used_percentage: target.window_name === 'five_hour' ? used : 100,
+        resets_at: reset,
       },
-      listSubscriptions: async () => [...subscriptions, ...rejectedSubscriptions],
-      readCheckpoint: effects.checkpoint.read,
-      publishCheckpoint: effects.checkpoint.publish,
-      putInbox: effects.inbox.put,
-      switchAccount: async () => {
-        counters.account_switches += 1;
-        throw new Error('ACCOUNT_SWITCH_FORBIDDEN');
+      seven_day: {
+        used_percentage: target.window_name === 'seven_day' ? used : 20,
+        resets_at: reset,
+      },
+      billing_period: {
+        used_percentage: target.window_name === 'billing_period' ? used : 20,
+        resets_at: reset,
       },
     },
   };
 }
 
-async function runCli(argv: string[], boundary: any, env: Record<string, string | undefined> = {}) {
+function writeBoard(path: string, sessionId: string) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(
+    path,
+    `${JSON.stringify({
+      schema: 'cc-master/v2',
+      goal: 'machine quota production composition',
+      owner: { active: true, session_id: sessionId },
+      git: { worktree: dirname(path), branch: 'test' },
+      tasks: [],
+    })}\n`,
+  );
+}
+
+function productionComposition(input: { brokenDestination?: boolean } = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-machine-quota-production-'));
+  const home = join(root, '.cc_master');
+  const goodBoard = join(home, 'boards', 'good.json');
+  const brokenBoard = join(home, 'boards', 'broken.json');
+  writeBoard(goodBoard, 'session-good');
+  if (!input.brokenDestination) writeBoard(brokenBoard, 'session-broken');
+  mkdirSync(join(home, 'coordination'), { recursive: true });
+  writeFileSync(
+    join(home, 'coordination', 'subscriptions.json'),
+    `${JSON.stringify({
+      schema: 'ccm/coordination-subscriptions/v1',
+      subscriptions: [
+        {
+          subscription_id: 'sub-good',
+          session_id: 'session-good',
+          session_epoch: 'epoch-good',
+          origin: 'codex',
+          capability: 'coordination-inbox',
+          state: 'current',
+          board_path: goodBoard,
+          registered_at: new Date().toISOString(),
+          source_policy_revision: 'ccm/cached-board-inbox/v1',
+          consent_provenance_ref: 'ccm://coordination/subscriptions/cached-only',
+        },
+        {
+          subscription_id: 'sub-broken',
+          session_id: 'session-broken',
+          session_epoch: 'epoch-broken',
+          origin: 'claude-code',
+          capability: 'coordination-inbox',
+          state: 'current',
+          board_path: brokenBoard,
+          registered_at: new Date().toISOString(),
+          source_policy_revision: 'ccm/cached-board-inbox/v1',
+          consent_provenance_ref: 'ccm://coordination/subscriptions/cached-only',
+        },
+      ],
+    })}\n`,
+  );
+  const counters = { collections: 0 };
+  const collectors: MachineQuotaCollectorBoundary = {
+    collect(target) {
+      counters.collections += 1;
+      return productionCollection(target);
+    },
+  };
+  return {
+    root,
+    home,
+    goodBoard,
+    brokenBoard,
+    counters,
+    collectors,
+    quotaEffects: createProductionQuotaEffectBoundary({ home }),
+    coordination: {
+      listSubscriptions: listCurrentCoordinationSubscriptions,
+      deliverNotification: deliverCoordinationNotification,
+    },
+    repairBroken: () => writeBoard(brokenBoard, 'session-broken'),
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
+}
+
+async function runCli(
+  argv: string[],
+  composition: ReturnType<typeof productionComposition>,
+  env: Record<string, string | undefined> = {},
+) {
   const { run } = await import('../src/router.js');
   const stdout: string[] = [];
   const stderr: string[] = [];
   const code = await run(argv, {
     out: (line: string) => stdout.push(line),
     err: (line: string) => stderr.push(line),
-    env,
-    quotaEffects: {} as any,
-    machineWideQuotaNotifications: boundary,
-  } as any);
+    env: { ...env, HOME: composition.root, CC_MASTER_HOME: composition.home },
+    quotaEffects: composition.quotaEffects,
+    machineQuotaCollectors: composition.collectors,
+    machineQuotaCoordination: composition.coordination,
+  });
   return { code, stdout, stderr };
 }
 
 test('production quota status is zero-effect through the real registry/handler seam', {
   skip: !runProduction,
 }, async () => {
-  const production = productionBoundary();
-  const result = await runCli(['quota', 'status', '--machine-wide', '--json'], production.boundary);
-  assert.equal(result.code, 0, result.stderr.join('\n'));
-  assert.equal(production.counters.cached_reads, 1);
-  assert.equal(production.counters.live_reads, 0);
-  assert.equal(production.effects.items.size, 0);
-  assert.equal(production.effects.checkpoints.size, 0);
-  assert.equal(JSON.parse(result.stdout.at(-1) || '{}').schema, 'ccm/machine-quota-status/v1');
+  const production = productionComposition();
+  try {
+    const result = await runCli(['quota', 'status', '--machine-wide', '--json'], production);
+    assert.equal(result.code, 0, result.stderr.join('\n'));
+    assert.equal(production.counters.collections, 0);
+    assert.equal(JSON.parse(result.stdout.at(-1) || '{}').schema, 'ccm/machine-quota-status/v1');
+  } finally {
+    production.cleanup();
+  }
 });
 
 test('production explicit refresh retries partial fan-out without checkpoint loss', {
   skip: !runProduction,
 }, async () => {
-  const production = productionBoundary();
-  const implicit = await runCli(['quota', 'refresh', '--json'], production.boundary);
-  assert.equal(implicit.code, 2, 'refresh without --machine-wide is a usage error');
-  assert.equal(production.counters.live_reads, 0);
+  const production = productionComposition({ brokenDestination: true });
+  try {
+    const implicit = await runCli(['quota', 'refresh', '--json'], production);
+    assert.equal(implicit.code, 2, 'refresh without --machine-wide is a usage error');
+    assert.equal(production.counters.collections, 0);
 
-  const first = await runCli(['quota', 'refresh', '--machine-wide', '--json'], production.boundary);
-  assert.notEqual(first.code, 0, 'injected partial inbox failure must be observable');
-  assert.equal(production.effects.checkpoints.size, 0, 'checkpoint cannot run ahead of fan-out');
-  const second = await runCli(
-    ['quota', 'refresh', '--machine-wide', '--json'],
-    production.boundary,
-  );
-  assert.equal(second.code, 0, second.stderr.join('\n'));
-  assert.equal(production.counters.live_reads, 2);
-  assert.equal(production.effects.items.size, expectedCurrentSubscriptions);
-  assert.equal(production.effects.checkpoints.size, 1);
-  assert.equal(production.counters.account_switches, 0);
-  const retried = production.effects.attempts.filter(
-    (item) => item.subscription_id === 'sub-claude-code',
-  );
-  assert.equal(retried.length, 2);
-  assert.equal(retried[0]!.id, retried[1]!.id);
+    const first = await runCli(['quota', 'refresh', '--machine-wide', '--json'], production);
+    assert.equal(first.code, 0, first.stderr.join('\n'));
+    const firstPayload = JSON.parse(first.stdout.at(-1) || '{}');
+    assert.equal(firstPayload.fanout_complete, false);
+    assert.equal(firstPayload.checkpoint_advanced, false);
+    assert.equal(
+      JSON.parse(readFileSync(production.goodBoard, 'utf8')).coordination.inbox.length,
+      1,
+    );
+
+    production.repairBroken();
+    const second = await runCli(['quota', 'refresh', '--machine-wide', '--json'], production);
+    assert.equal(second.code, 0, second.stderr.join('\n'));
+    const secondPayload = JSON.parse(second.stdout.at(-1) || '{}');
+    assert.equal(secondPayload.fanout_complete, true);
+    assert.equal(secondPayload.checkpoint_advanced, true);
+    assert.equal(production.counters.collections, 10);
+    assert.equal(
+      JSON.parse(readFileSync(production.goodBoard, 'utf8')).coordination.inbox.length,
+      1,
+      'retry remains duplicate-free at an already delivered destination',
+    );
+    assert.equal(
+      JSON.parse(readFileSync(production.brokenBoard, 'utf8')).coordination.inbox.length,
+      1,
+    );
+  } finally {
+    production.cleanup();
+  }
 });
 
 test('production monitor keeps cached-only default and persists explicit source mode', {
@@ -581,7 +719,7 @@ test('production monitor keeps cached-only default and persists explicit source 
   );
   const root = mkdtempSync(join(tmpdir(), 'ccm-machine-quota-monitor-'));
   const env = { HOME: join(root, 'user'), XDG_CONFIG_HOME: join(root, 'xdg') };
-  const production = productionBoundary();
+  const production = productionComposition();
   __setMonitorTestHooks({
     runtimePlatform: 'linux',
     runServiceCommand: () => ({ status: 0, stdout: '', stderr: '' }),
@@ -591,13 +729,13 @@ test('production monitor keeps cached-only default and persists explicit source 
     const cachedHome = join(root, 'cached-home');
     const cached = await runCli(
       ['monitor', 'install-service', '--home', cachedHome, '--json'],
-      production.boundary,
+      production,
       env,
     );
     assert.equal(cached.code, 0, cached.stderr.join('\n'));
     const cachedStatus = await runCli(
       ['monitor', 'status', '--home', cachedHome, '--json'],
-      production.boundary,
+      production,
       env,
     );
     assert.equal(
@@ -605,7 +743,7 @@ test('production monitor keeps cached-only default and persists explicit source 
       'cached-only',
     );
     assert.equal(
-      production.counters.live_reads,
+      production.counters.collections,
       0,
       'install/default cannot autostart live quota refresh',
     );
@@ -621,13 +759,13 @@ test('production monitor keeps cached-only default and persists explicit source 
         liveHome,
         '--json',
       ],
-      production.boundary,
+      production,
       env,
     );
     assert.equal(live.code, 0, live.stderr.join('\n'));
     const liveStatus = await runCli(
       ['monitor', 'status', '--home', liveHome, '--json'],
-      production.boundary,
+      production,
       env,
     );
     assert.equal(
@@ -635,12 +773,13 @@ test('production monitor keeps cached-only default and persists explicit source 
       'machine-wide',
     );
     assert.equal(
-      production.counters.live_reads,
+      production.counters.collections,
       0,
       'install persists mode but does not itself collect',
     );
   } finally {
     __resetMonitorTestHooks();
+    production.cleanup();
     rmSync(root, { recursive: true, force: true });
   }
 });

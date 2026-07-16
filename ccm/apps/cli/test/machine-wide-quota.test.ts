@@ -8,12 +8,14 @@ import {
   listCurrentCoordinationSubscriptions,
 } from '../src/handlers/coordination.js';
 import {
+  type MachineQuotaAuthorityRefs,
   type MachineQuotaCollection,
   type MachineQuotaCollectorBoundary,
   type MachineQuotaStore,
   readMachineWideQuotaStatus,
   refreshMachineWideQuota,
 } from '../src/machine-wide-quota.js';
+import { createQuotaAdmissionStore } from '../src/quota-admission-store.js';
 import { createProductionQuotaEffectBoundary } from '../src/quota-production-effects.js';
 import { run } from '../src/router.js';
 
@@ -117,7 +119,7 @@ function authorityFor(
     ceiling?: number;
     margin?: number;
   } = {},
-): Data {
+): MachineQuotaAuthorityRefs {
   const identity = overrides.identity ?? `${target.provider_id}-identity-a`;
   const ceiling = overrides.ceiling ?? (target.provider_id === 'anthropic' ? 90 : 85);
   const margin = overrides.margin ?? (target.provider_id === 'anthropic' ? 10 : 5);
@@ -129,7 +131,10 @@ function authorityFor(
     pool_id: `${target.provider_id}-pool-shared`,
     aggregation_key: `${target.provider_id}|${identity}|pool-shared|${target.window_name}`,
     policy: {
-      revision: `policy:${target.surface_id}:${target.window_name}:v1`,
+      revision:
+        target.provider_id === 'codex'
+          ? 'ccm/codex-7d-pacing/v1'
+          : `policy:${target.surface_id}:${target.window_name}:v1`,
       hard_ceiling_used_pct: ceiling,
     },
     requirement: {
@@ -318,6 +323,79 @@ test('production composition consumes store reservation plus policy/requirement 
   );
   assert.equal(after.state, 'tight', 'active reservation must reduce ambient headroom');
   assert.notEqual(after.decision_revision, before.decision_revision);
+});
+
+test('production posture reads an active reservation from the owner-only admission store', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-machine-quota-real-reservation-'));
+  roots.push(root);
+  const home = join(root, '.cc_master');
+  const store = createQuotaAdmissionStore({ home, now: () => NOW });
+  let used = 70;
+  let codexAuthority: MachineQuotaAuthorityRefs | undefined;
+  const reservationCollector: MachineQuotaCollectorBoundary = {
+    collect(target) {
+      const result = collectionFor(target);
+      if (target.surface_id !== 'codex-cli') return result;
+      codexAuthority = authorityFor(target, { ceiling: 90, margin: 2 });
+      return {
+        ...result,
+        authority: codexAuthority,
+        signal: {
+          captured_at: NOW.getTime() / 1000,
+          five_hour: { used_percentage: 100, resets_at: RESET - 10_000 },
+          seven_day: { used_percentage: used, resets_at: RESET },
+        },
+      };
+    },
+  };
+  await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors: reservationCollector,
+    coordination,
+    now: NOW,
+  });
+  assert.ok(codexAuthority);
+  const sourceKey = 'machine-wide/codex/codex-cli/seven_day';
+  const observation = await store.readObservation(sourceKey);
+  assert.ok(observation);
+  const held = await store.reserve({
+    schema: 'ccm/quota-reservation-request/v1',
+    source_key: sourceKey,
+    aggregation_key: codexAuthority.aggregation_key,
+    capacity_pct: 18,
+    id: 'qres-machine-posture-1',
+    key: 'attempt-machine-posture-1',
+    hash: 'sha256:caller-hash-is-not-authority',
+    amount_pct: 10,
+    state: 'held',
+    expires_at: '2026-07-16T09:00:00Z',
+    checked_at: NOW.toISOString(),
+    source_revision: observation.source_revision,
+    attempt_id: 'attempt-machine-posture-1',
+    candidate_id: 'codex-cli-worker',
+    account_id: codexAuthority.account_key,
+    pool_id: codexAuthority.pool_id,
+    identity_fingerprint: codexAuthority.identity_fingerprint,
+  });
+  assert.equal(held.action, 'created', JSON.stringify(held));
+  assert.equal(held.active_reserved_pct, 10);
+
+  used = 79;
+  await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors: reservationCollector,
+    coordination,
+    now: NOW,
+  });
+  const decision = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.find(
+    (candidate: Data) => candidate.target.surface_id === 'codex-cli',
+  );
+  assert.equal(decision.state, 'tight');
+  assert.deepEqual(decision.reason_codes, ['QUOTA_TIGHT']);
 });
 
 test('same surface identity swap creates a new production scope', async () => {

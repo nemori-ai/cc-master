@@ -23,6 +23,26 @@ export interface CurrentUsageReading {
   signal: UsageSignal | null;
   source: UsageSignalSource;
   unavailableReason: string;
+  authority?: CurrentQuotaAuthorityRefs;
+}
+
+/** Owner-only authenticated scope refs; never expose these directly to an agent-facing payload. */
+export interface CurrentQuotaAuthorityRefs {
+  schema: 'ccm/machine-quota-collector-authority/v1';
+  account_key: string;
+  identity_fingerprint: string;
+  payer_scope: string;
+  pool_id: string;
+  aggregation_key: string;
+  policy: {
+    revision: string;
+    hard_ceiling_used_pct: number;
+  };
+  requirement: {
+    revision: string;
+    required_bucket_ids: string[];
+    safety_margin: Record<string, number>;
+  };
 }
 
 export interface PluginUpgradeRequest {

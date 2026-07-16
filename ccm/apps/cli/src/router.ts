@@ -73,7 +73,6 @@ import type {
   MachineQuotaCollectorBoundary,
   MachineQuotaCoordinationBoundary,
 } from './machine-wide-quota.js';
-import type { MachineWideQuotaNotificationBoundary } from './machine-wide-quota-notification.js';
 import { createDefaultProviderRuntime, type ProviderRuntime } from './provider-runtime.js';
 import {
   ALIASES,
@@ -100,13 +99,20 @@ const DEFAULT_MACHINE_QUOTA_COLLECTORS: MachineQuotaCollectorBoundary = {
     }
     try {
       const reading: CurrentUsageReading = adapter.readCurrentUsage(env);
-      return reading.signal
-        ? { status: 'refreshed', signal: reading.signal, source: reading.source }
+      return reading.signal && reading.authority
+        ? {
+            status: 'refreshed',
+            signal: reading.signal,
+            source: reading.source,
+            authority: reading.authority,
+          }
         : {
             status: 'unknown',
-            signal: null,
+            signal: reading.signal,
             source: reading.source,
-            reason: reading.unavailableReason,
+            reason: reading.signal
+              ? 'authenticated quota identity authority is unavailable'
+              : reading.unavailableReason,
           };
     } catch (error) {
       return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
@@ -134,7 +140,6 @@ interface RunOpts {
   quotaEffects?: QuotaEffectBoundary;
   machineQuotaCollectors?: MachineQuotaCollectorBoundary;
   machineQuotaCoordination?: MachineQuotaCoordinationBoundary;
-  machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
   writeFileAtomicSync?: typeof io.writeFileAtomicSync;
@@ -597,7 +602,6 @@ export function runWithComposition(
           now,
         ),
     },
-    machineWideQuotaNotifications: opts.machineWideQuotaNotifications,
     nativeAttemptPrivateEvidence: opts.nativeAttemptPrivateEvidence,
     nativeAttemptAdmission: opts.nativeAttemptAdmission,
     writeFileAtomicSync: opts.writeFileAtomicSync,
@@ -656,7 +660,6 @@ function buildCtx({
   quotaEffects,
   machineQuotaCollectors,
   machineQuotaCoordination,
-  machineWideQuotaNotifications,
   nativeAttemptPrivateEvidence,
   nativeAttemptAdmission,
   writeFileAtomicSync,
@@ -673,7 +676,6 @@ function buildCtx({
   quotaEffects?: QuotaEffectBoundary;
   machineQuotaCollectors?: MachineQuotaCollectorBoundary;
   machineQuotaCoordination?: MachineQuotaCoordinationBoundary;
-  machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
   writeFileAtomicSync?: typeof io.writeFileAtomicSync;
@@ -709,7 +711,6 @@ function buildCtx({
     quotaEffects,
     machineQuotaCollectors,
     machineQuotaCoordination,
-    machineWideQuotaNotifications,
     nativeAttemptPrivateEvidence,
     nativeAttemptAdmission,
     writeFileAtomicSync,

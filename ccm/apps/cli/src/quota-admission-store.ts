@@ -1088,6 +1088,12 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
     };
   };
 
+  // Cached/read-only posture input: replay authoritative events without repairing snapshots.
+  const readAggregation = async (aggregationKey: string): Promise<Data> => {
+    const loaded = await loadAggregation(aggregationKey, false);
+    return { ...loaded.state };
+  };
+
   const validateReserveRequest = (
     request: Readonly<Data>,
     aggregationKeys: string[],
@@ -2190,6 +2196,7 @@ export function createQuotaAdmissionStore(options: StoreOptions) {
     reserve,
     commitReservation,
     preflight,
+    readAggregation,
     inspectAggregation,
     auditReservation,
     status,

@@ -2,18 +2,13 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { UsageSignal, WindowSignal } from '@ccm/engine';
+import { canonicalJson, sha256Hex } from '@ccm/engine';
+import type { CurrentQuotaAuthorityRefs, Env } from './harnesses/types.js';
+import { projectMachineWideQuotaNotifications } from './machine-wide-quota-notification.js';
 import {
-  canonicalJson,
-  deriveQuotaHeadroom,
-  evaluateQuotaObservation,
-  sha256Hex,
-} from '@ccm/engine';
-import type { Env } from './harnesses/types.js';
-import {
-  type MachineQuotaState,
   projectMachineQuotaPosture,
-  projectMachineWideQuotaNotifications,
-} from './machine-wide-quota-notification.js';
+  type RawMachineQuotaPostureInput,
+} from './machine-wide-quota-posture.js';
 
 type Data = Record<string, any>;
 
@@ -21,23 +16,21 @@ interface MachineQuotaTarget {
   harnessId: string;
   surfaceId: string;
   providerId: string;
-  payerScope: string;
-  poolId: string;
   bucketId: string;
   windowName: 'five_hour' | 'seven_day' | 'billing_period';
   durationSec: number;
-  policyRevision: string;
-  hardCeiling: number;
-  warningLine: number;
   collectorId: string;
   defaultCollectorHarness: string | null;
 }
+
+export type MachineQuotaAuthorityRefs = CurrentQuotaAuthorityRefs;
 
 export interface MachineQuotaCollection {
   status: 'refreshed' | 'unknown' | 'unsupported' | 'error';
   signal?: UsageSignal | null;
   source?: string;
   reason?: string;
+  authority?: MachineQuotaAuthorityRefs;
 }
 
 export interface MachineQuotaCollectorBoundary {
@@ -55,6 +48,7 @@ export interface MachineQuotaCoordinationBoundary {
 export interface MachineQuotaStore {
   readObservation(sourceKey: string): Promise<Data | undefined>;
   refreshObservation(request: Readonly<Data>, collect: () => Promise<Data>): Promise<Data>;
+  readAggregation(aggregationKey: string): Promise<Data>;
   readMachineProjection(): Promise<Data | undefined>;
   publishMachineProjection(projection: Readonly<Data>): Promise<Data>;
 }
@@ -64,14 +58,9 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     harnessId: 'codex',
     surfaceId: 'codex-cli',
     providerId: 'codex',
-    payerScope: 'subscription',
-    poolId: 'pool:opaque-codex-current',
     bucketId: 'seven-day-global',
     windowName: 'seven_day',
     durationSec: 604_800,
-    policyRevision: 'ccm/codex-7d-pacing/v1',
-    hardCeiling: 85,
-    warningLine: 80,
     collectorId: 'codex-app-server',
     defaultCollectorHarness: 'codex',
   },
@@ -79,14 +68,9 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     harnessId: 'claude-code',
     surfaceId: 'claude-cli',
     providerId: 'anthropic',
-    payerScope: 'subscription',
-    poolId: 'pool:opaque-claude-current',
     bucketId: 'five-hour-global',
     windowName: 'five_hour',
     durationSec: 18_000,
-    policyRevision: 'ccm/claude-5h-pacing/v1',
-    hardCeiling: 90,
-    warningLine: 80,
     collectorId: 'claude-statusline-sidecar',
     defaultCollectorHarness: 'claude-code',
   },
@@ -94,14 +78,9 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     harnessId: 'claude-code',
     surfaceId: 'claude-cli',
     providerId: 'anthropic',
-    payerScope: 'subscription',
-    poolId: 'pool:opaque-claude-current',
     bucketId: 'seven-day-global',
     windowName: 'seven_day',
     durationSec: 604_800,
-    policyRevision: 'ccm/claude-7d-pacing/v1',
-    hardCeiling: 85,
-    warningLine: 80,
     collectorId: 'claude-statusline-sidecar',
     defaultCollectorHarness: 'claude-code',
   },
@@ -109,14 +88,9 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     harnessId: 'cursor',
     surfaceId: 'cursor-ide-plugin',
     providerId: 'cursor',
-    payerScope: 'subscription',
-    poolId: 'pool:opaque-cursor-current',
     bucketId: 'billing-period-ide',
     windowName: 'billing_period',
     durationSec: 2_592_000,
-    policyRevision: 'ccm/cursor-billing-period/v1',
-    hardCeiling: 85,
-    warningLine: 80,
     collectorId: 'cursor-dashboard',
     defaultCollectorHarness: 'cursor',
   },
@@ -124,14 +98,9 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     harnessId: 'cursor',
     surfaceId: 'cursor-agent-cli',
     providerId: 'cursor',
-    payerScope: 'subscription',
-    poolId: 'pool:opaque-cursor-current',
     bucketId: 'billing-period-agent',
     windowName: 'billing_period',
     durationSec: 2_592_000,
-    policyRevision: 'ccm/cursor-agent-billing-period/v1',
-    hardCeiling: 85,
-    warningLine: 80,
     collectorId: 'cursor-agent-quota',
     // Cursor Agent auth/quota is an independent surface. The IDE dashboard must never be inherited.
     defaultCollectorHarness: null,
@@ -151,7 +120,6 @@ function collectionTarget(target: MachineQuotaTarget): Data {
     harness_id: target.harnessId,
     surface_id: target.surfaceId,
     provider_id: target.providerId,
-    payer_scope: target.payerScope,
     bucket_id: target.bucketId,
     unit: 'percent',
     window: {
@@ -173,7 +141,48 @@ function signalWindow(
   return signal?.[name] ?? null;
 }
 
-function buildObservation(
+function object(value: unknown): Data {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Data)
+    : {};
+}
+
+function nonempty(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function percentage(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
+}
+
+function validatedAuthorityRefs(
+  target: MachineQuotaTarget,
+  collection: MachineQuotaCollection,
+): MachineQuotaAuthorityRefs | null {
+  const authority = collection.authority;
+  if (
+    authority?.schema !== 'ccm/machine-quota-collector-authority/v1' ||
+    !nonempty(authority.account_key) ||
+    !nonempty(authority.identity_fingerprint) ||
+    !nonempty(authority.payer_scope) ||
+    !nonempty(authority.pool_id) ||
+    !nonempty(authority.aggregation_key) ||
+    !nonempty(authority.policy?.revision) ||
+    !percentage(authority.policy?.hard_ceiling_used_pct) ||
+    authority.policy.hard_ceiling_used_pct === 0 ||
+    !nonempty(authority.requirement?.revision) ||
+    !Array.isArray(authority.requirement.required_bucket_ids) ||
+    authority.requirement.required_bucket_ids.length !== 1 ||
+    authority.requirement.required_bucket_ids[0] !== target.bucketId ||
+    !percentage(authority.requirement.safety_margin?.[target.bucketId])
+  ) {
+    return null;
+  }
+  return structuredClone(authority);
+}
+
+/** Provider adapter normalization only; all posture math lives in machine-wide-quota-posture. */
+function normalizeCollectedAuthorityObservation(
   target: MachineQuotaTarget,
   collection: MachineQuotaCollection,
   now: Date,
@@ -190,8 +199,10 @@ function buildObservation(
     typeof window?.resets_at === 'number' && Number.isFinite(window.resets_at)
       ? strictIso(Math.floor(window.resets_at))
       : undefined;
+  const authority = validatedAuthorityRefs(target, collection);
   const usable =
     collection.status === 'refreshed' &&
+    authority !== null &&
     typeof used === 'number' &&
     Number.isFinite(used) &&
     used >= 0 &&
@@ -202,28 +213,55 @@ function buildObservation(
     used_pct: usable ? used : null,
     reset_marker: resetAt ?? null,
     source: collection.source ?? target.collectorId,
+    authority: authority
+      ? {
+          account_key: authority.account_key,
+          identity_fingerprint: authority.identity_fingerprint,
+          payer_scope: authority.payer_scope,
+          pool_id: authority.pool_id,
+          aggregation_key: authority.aggregation_key,
+          policy: authority.policy,
+          requirement: authority.requirement,
+        }
+      : null,
   };
-  const aggregationKey = `${target.providerId}/${target.surfaceId}/${target.bucketId}`;
+  const requirement = authority?.requirement ?? {
+    revision: `unknown:${target.harnessId}:${target.surfaceId}:${target.windowName}`,
+    required_bucket_ids: [target.bucketId],
+    safety_margin: {},
+  };
   return {
     schema: 'ccm/quota-authority-observation/v1',
     source_key: sourceKey(target),
     source_revision: digest(semantic),
     observation_status: usable ? 'ok' : collection.status,
     provider: target.providerId,
-    provider_rule_revision: target.policyRevision,
-    account_id: `opaque:${target.providerId}:current`,
-    pool_id: target.poolId,
-    // Cursor IDE and Agent may share one authenticated identity while remaining distinct surfaces.
-    identity_fingerprint: digest(`${target.providerId}\0current`),
+    provider_rule_revision: authority?.policy.revision ?? 'unknown',
+    ...(authority
+      ? {
+          account_id: authority.account_key,
+          pool_id: authority.pool_id,
+          identity_fingerprint: authority.identity_fingerprint,
+        }
+      : {}),
+    machine_scope: {
+      harness_id: target.harnessId,
+      surface_id: target.surfaceId,
+      provider_id: target.providerId,
+      payer_scope: authority?.payer_scope ?? null,
+      authority_available: authority !== null,
+    },
     observed_at: observedAt,
     valid_until: validUntil,
     hard_window: { name: target.windowName, duration_sec: target.durationSec },
-    policy: {
-      revision: target.policyRevision,
-      decision: 'allow',
-      hard_ceiling_used_pct: target.hardCeiling,
+    policy: authority
+      ? { ...authority.policy, decision: 'allow' }
+      : { revision: 'unknown', decision: 'deny' },
+    requirement,
+    effects: {
+      decision: authority ? 'allow' : 'deny',
+      effect: 'read-only',
     },
-    effects: { decision: 'allow', effect: 'read-only' },
     source_profile: {
       schema: 'ccm/quota-source-profile/v1',
       revision: 'ccm/machine-wide-source-profile/v1',
@@ -231,112 +269,180 @@ function buildObservation(
       hard_ttl_sec: 900,
       max_clock_skew_sec: 30,
     },
-    buckets: [
-      {
-        id: target.bucketId,
-        bucket_id: target.bucketId,
-        aggregation_key: aggregationKey,
-        window: target.windowName,
-        duration_sec: target.durationSec,
-        freshness: usable ? 'fresh' : 'unknown',
-        used_pct: usable ? used : 0,
-        safety_margin_pct: target.hardCeiling - target.warningLine,
-        projected_p80_pct: 0,
-        observed_at: observedAt,
-        valid_until: validUntil,
-        ...(resetAt ? { resets_at: resetAt } : {}),
-      },
-    ],
+    buckets: usable
+      ? [
+          {
+            id: target.bucketId,
+            bucket_id: target.bucketId,
+            aggregation_key: authority.aggregation_key,
+            window: target.windowName,
+            duration_sec: target.durationSec,
+            freshness: 'fresh',
+            used_pct: used,
+            safety_margin_pct: authority.requirement.safety_margin[target.bucketId],
+            projected_p80_pct: 0,
+            observed_at: observedAt,
+            valid_until: validUntil,
+            ...(resetAt ? { resets_at: resetAt } : {}),
+          },
+        ]
+      : [],
   };
 }
 
-function projectDecision(
+function unavailablePostureInput(
   target: MachineQuotaTarget,
-  observation: Data | undefined,
   now: Date,
   homeSalt: string,
-): Data {
-  const authority = {
-    harness_id: target.harnessId,
-    surface_id: target.surfaceId,
-    provider_id: target.providerId,
-    identity_fingerprint: String(
-      observation?.identity_fingerprint ?? digest(`missing-identity:${target.providerId}`),
-    ),
-    payer_scope: target.payerScope,
-    pool_id: String(observation?.pool_id ?? target.poolId),
-    bucket_id: target.bucketId,
-    unit: 'percent',
-    window: collectionTarget(target).window,
-    policy_revision: target.policyRevision,
-    required_bucket_ids: [target.bucketId],
-    safety_margin: { [target.bucketId]: target.hardCeiling - target.warningLine },
-  };
-  if (!observation) {
-    return projectMachineQuotaPosture(authority, {
-      home_salt: homeSalt,
-      state: 'unknown',
-      freshness: 'unknown',
-      reason_codes: ['QUOTA_REQUIRED_WINDOW_UNKNOWN'],
-      observation_revision: digest(`missing:${sourceKey(target)}`),
-      source: {
-        collector_id: target.collectorId,
-        source_schema: 'ccm/quota-authority-observation/v1',
-      },
-    });
-  }
-  const bucket = Array.isArray(observation.buckets) ? observation.buckets[0] : undefined;
-  const observationEvaluation = evaluateQuotaObservation({
-    provider: target.providerId,
-    provider_window_rule: { name: target.windowName, duration_sec: target.durationSec },
-    required_bucket_ids: [target.bucketId],
+  reasonCode = 'QUOTA_IDENTITY_AUTHORITY_UNKNOWN',
+): RawMachineQuotaPostureInput {
+  return {
+    schema: 'ccm/machine-quota-posture-input/v1',
+    home_scope_salt: homeSalt,
     checked_at: now.toISOString(),
-    profile: observation.source_profile,
+    authority: {
+      available: false,
+      reason_code: reasonCode,
+      harness_id: target.harnessId,
+      surface_id: target.surfaceId,
+      provider_id: target.providerId,
+      identity_fingerprint: null,
+      payer_scope: null,
+      pool_id: null,
+      unit: 'percent',
+      bucket_id: target.bucketId,
+      window: collectionTarget(target).window,
+    },
+    observations: [],
+    source_profiles: [],
+    active_reservations: [],
+    policy: {
+      revision: `unknown:${target.harnessId}:${target.surfaceId}:${target.windowName}`,
+      hard_ceiling_used_pct: {},
+    },
+    requirement: {
+      revision: `unknown:${target.harnessId}:${target.surfaceId}:${target.windowName}`,
+      required_bucket_ids: [target.bucketId],
+      safety_margin: {},
+    },
+  };
+}
+
+function postureInputFromAuthority(
+  target: MachineQuotaTarget,
+  observation: Data | undefined,
+  aggregation: Data | undefined,
+  now: Date,
+  homeSalt: string,
+): RawMachineQuotaPostureInput {
+  const scope = object(observation?.machine_scope);
+  const policy = object(observation?.policy);
+  const requirement = object(observation?.requirement);
+  const buckets = Array.isArray(observation?.buckets) ? observation.buckets.map(object) : [];
+  const bucket = buckets.find(
+    (candidate) =>
+      candidate.bucket_id === target.bucketId &&
+      candidate.window === target.windowName &&
+      candidate.duration_sec === target.durationSec,
+  );
+  const authorityAvailable =
+    observation?.schema === 'ccm/quota-authority-observation/v1' &&
+    observation.observation_status === 'ok' &&
+    scope.authority_available === true &&
+    scope.harness_id === target.harnessId &&
+    scope.surface_id === target.surfaceId &&
+    scope.provider_id === target.providerId &&
+    nonempty(scope.payer_scope) &&
+    observation.provider === target.providerId &&
+    nonempty(observation.account_id) &&
+    nonempty(observation.identity_fingerprint) &&
+    nonempty(observation.pool_id) &&
+    nonempty(policy.revision) &&
+    percentage(policy.hard_ceiling_used_pct) &&
+    policy.hard_ceiling_used_pct > 0 &&
+    nonempty(requirement.revision) &&
+    Array.isArray(requirement.required_bucket_ids) &&
+    requirement.required_bucket_ids.length === 1 &&
+    requirement.required_bucket_ids[0] === target.bucketId &&
+    percentage(object(requirement.safety_margin)[target.bucketId]) &&
+    bucket !== undefined &&
+    nonempty(bucket.aggregation_key) &&
+    aggregation?.aggregation_key === bucket.aggregation_key &&
+    percentage(aggregation.active_reserved_pct);
+  if (!authorityAvailable) {
+    return unavailablePostureInput(target, now, homeSalt);
+  }
+  const sourceSchema = String(observation.schema);
+  return {
+    schema: 'ccm/machine-quota-posture-input/v1',
+    home_scope_salt: homeSalt,
+    checked_at: now.toISOString(),
+    authority: {
+      available: true,
+      harness_id: target.harnessId,
+      surface_id: target.surfaceId,
+      provider_id: target.providerId,
+      account_key: String(observation.account_id),
+      identity_fingerprint: String(observation.identity_fingerprint),
+      payer_scope: String(scope.payer_scope),
+      pool_id: String(observation.pool_id),
+      unit: 'percent',
+      bucket_id: target.bucketId,
+      window: collectionTarget(target).window,
+    },
     observations: [
       {
-        ...(bucket ?? {}),
-        revision: observation.source_revision,
-        observation_id: observation.source_revision,
+        schema: 'ccm/quota-observation/v1',
+        observation_id: String(observation.source_revision),
+        revision: String(observation.source_revision),
+        source_key: {
+          harness: target.harnessId,
+          surface_id: target.surfaceId,
+          provider: target.providerId,
+          identity_fingerprint: String(observation.identity_fingerprint),
+          payer_scope: String(scope.payer_scope),
+          pool_id: String(observation.pool_id),
+          bucket_id: target.bucketId,
+          aggregation_key: String(bucket.aggregation_key),
+          unit: 'percent',
+          window: collectionTarget(target).window,
+        },
+        value: {
+          used: bucket.used_pct,
+          limit: 100,
+          ...(bucket.resets_at ? { resets_at: bucket.resets_at } : {}),
+        },
+        source: {
+          collector: target.collectorId,
+          schema: sourceSchema,
+          raw_revision: String(observation.source_revision),
+        },
+        observed_at: observation.observed_at,
+        valid_until: observation.valid_until,
       },
     ],
-  });
-  const freshness = String(observationEvaluation.freshness ?? 'unknown');
-  const aggregationKey = String(bucket?.aggregation_key ?? '');
-  const headroom = deriveQuotaHeadroom({
-    policy: observation.policy,
-    buckets: observation.buckets,
-    required_aggregation_key: aggregationKey,
-  });
-  const rawState = String(headroom.state ?? 'unknown');
-  const state: MachineQuotaState =
-    freshness === 'soft-stale' || freshness === 'hard-stale'
-      ? 'stale'
-      : freshness !== 'fresh' || rawState === 'unknown'
-        ? 'unknown'
-        : rawState === 'ample'
-          ? 'healthy'
-          : (rawState as MachineQuotaState);
-  const reasonCodes =
-    state === 'healthy'
-      ? []
-      : state === 'stale'
-        ? [String(observationEvaluation.blocking_error ?? 'QUOTA_STALE')]
-        : state === 'unknown'
-          ? [String(observationEvaluation.blocking_error ?? 'QUOTA_REQUIRED_WINDOW_UNKNOWN')]
-          : Array.isArray(headroom.blocking_reasons)
-            ? headroom.blocking_reasons.map(String)
-            : [`QUOTA_${state.toUpperCase()}`];
-  return projectMachineQuotaPosture(authority, {
-    home_salt: homeSalt,
-    state,
-    freshness,
-    reason_codes: reasonCodes,
-    observation_revision: digest(observation.source_revision ?? observation),
-    reset_marker: bucket?.resets_at ?? null,
-    source: { collector_id: target.collectorId, source_schema: String(observation.schema) },
-    observed_at: observation.observed_at,
-    valid_until: observation.valid_until,
-  });
+    source_profiles: [
+      {
+        schema: 'ccm/quota-source-profile/v1',
+        source_schema: sourceSchema,
+        fresh_ttl_sec: Number(object(observation.source_profile).fresh_ttl_sec),
+        hard_ttl_sec: Number(object(observation.source_profile).hard_ttl_sec),
+        max_clock_skew_sec: Number(object(observation.source_profile).max_clock_skew_sec),
+      },
+    ],
+    active_reservations: [structuredClone(aggregation)],
+    policy: {
+      revision: String(policy.revision),
+      hard_ceiling_used_pct: { [target.bucketId]: Number(policy.hard_ceiling_used_pct) },
+    },
+    requirement: {
+      revision: String(requirement.revision),
+      required_bucket_ids: [target.bucketId],
+      safety_margin: {
+        [target.bucketId]: Number(object(requirement.safety_margin)[target.bucketId]),
+      },
+    },
+  };
 }
 
 async function decisionsFromStore(
@@ -349,7 +455,34 @@ async function decisionsFromStore(
       // Before the owner-only home salt exists, never correlate a real cached identity with a
       // process-global fallback. The sentinel posture remains unknown until explicit refresh.
       const observation = homeSalt ? await store.readObservation(sourceKey(target)) : undefined;
-      return projectDecision(target, observation, now, homeSalt ?? 'uninitialized-machine-quota');
+      if (!homeSalt) {
+        return projectMachineQuotaPosture(
+          unavailablePostureInput(target, now, 'uninitialized-machine-quota'),
+        );
+      }
+      const bucket = Array.isArray(observation?.buckets)
+        ? observation.buckets
+            .map(object)
+            .find(
+              (candidate) =>
+                candidate.bucket_id === target.bucketId &&
+                candidate.window === target.windowName &&
+                candidate.duration_sec === target.durationSec,
+            )
+        : undefined;
+      let aggregation: Data | undefined;
+      if (nonempty(bucket?.aggregation_key)) {
+        try {
+          aggregation = await store.readAggregation(bucket.aggregation_key);
+        } catch {
+          return projectMachineQuotaPosture(
+            unavailablePostureInput(target, now, homeSalt, 'QUOTA_RESERVATION_AUTHORITY_UNKNOWN'),
+          );
+        }
+      }
+      return projectMachineQuotaPosture(
+        postureInputFromAuthority(target, observation, aggregation, now, homeSalt),
+      );
     }),
   );
 }
@@ -418,6 +551,7 @@ export function readMachineWideQuotaStatusCached(home: string, now = new Date())
       : null;
   const decisions = TARGETS.map((target) => {
     let observation: Data | undefined;
+    let aggregation: Data | undefined;
     if (homeSalt) {
       const sourceDigest = createHash('sha256').update(sourceKey(target)).digest('hex');
       const candidate = readCachedJson(
@@ -428,13 +562,42 @@ export function readMachineWideQuotaStatusCached(home: string, now = new Date())
       if (
         candidate?.schema === 'ccm/quota-authority-observation/v1' &&
         candidate.source_key === sourceKey(target) &&
-        candidate.provider === target.providerId &&
-        candidate.provider_rule_revision === target.policyRevision
+        candidate.provider === target.providerId
       ) {
         observation = candidate;
+        const bucket = Array.isArray(candidate.buckets)
+          ? candidate.buckets
+              .map(object)
+              .find(
+                (row: Data) =>
+                  row.bucket_id === target.bucketId &&
+                  row.window === target.windowName &&
+                  row.duration_sec === target.durationSec,
+              )
+          : undefined;
+        if (nonempty(bucket?.aggregation_key)) {
+          const aggregationDigest = createHash('sha256')
+            .update(bucket.aggregation_key)
+            .digest('hex');
+          aggregation = readCachedJson(
+            join(quotaRoot, 'reservations', aggregationDigest, 'snapshot.json'),
+          );
+          if (!aggregation) {
+            aggregation = {
+              schema: 'ccm/quota-reservation-snapshot/v1',
+              aggregation_key: bucket.aggregation_key,
+              active_reserved_pct: 0,
+              reservations: [],
+            };
+          }
+        }
       }
     }
-    return projectDecision(target, observation, now, homeSalt ?? 'uninitialized-machine-quota');
+    return projectMachineQuotaPosture(
+      homeSalt
+        ? postureInputFromAuthority(target, observation, aggregation, now, homeSalt)
+        : unavailablePostureInput(target, now, 'uninitialized-machine-quota'),
+    );
   });
   return machineQuotaStatus(decisions, projection);
 }
@@ -503,7 +666,7 @@ export async function refreshMachineWideQuota(input: {
       decisions: [],
     };
   }
-  const scopes: Data[] = [];
+  const scopeResults: Data[] = [];
   for (const target of TARGETS) {
     let collection: MachineQuotaCollection;
     try {
@@ -522,23 +685,20 @@ export async function refreshMachineWideQuota(input: {
         reason: error instanceof Error ? error.message : String(error),
       };
     }
-    const observation = buildObservation(target, collection, now);
-    const projected = projectDecision(target, observation, now, homeSalt);
+    const observation = normalizeCollectedAuthorityObservation(target, collection, now);
     try {
       await input.store.refreshObservation(
         { source_key: sourceKey(target), force: true },
         async () => observation,
       );
-      scopes.push({
-        scope_digest: projected.scope_digest,
-        target: projected.target,
+      scopeResults.push({
+        source_key: sourceKey(target),
         status: collection.status,
         ...(collection.reason ? { reason: collection.reason } : {}),
       });
     } catch (error) {
-      scopes.push({
-        scope_digest: projected.scope_digest,
-        target: projected.target,
+      scopeResults.push({
+        source_key: sourceKey(target),
         status: 'error',
         reason: error instanceof Error ? error.message : String(error),
       });
@@ -546,6 +706,18 @@ export async function refreshMachineWideQuota(input: {
   }
 
   const decisions = await decisionsFromStore(input.store, now, homeSalt);
+  const decisionsBySource = new Map(
+    TARGETS.map((target, index) => [sourceKey(target), decisions[index] as Data]),
+  );
+  const scopes = scopeResults.map((result) => {
+    const decision = decisionsBySource.get(String(result.source_key));
+    return {
+      scope_digest: decision?.scope_digest,
+      target: decision?.target,
+      status: result.status,
+      ...(result.reason ? { reason: result.reason } : {}),
+    };
+  });
   const destinations = input.coordination.listSubscriptions(input.home);
   const projected = projectMachineWideQuotaNotifications({
     previous: checkpointDecisions(previousProjection),
