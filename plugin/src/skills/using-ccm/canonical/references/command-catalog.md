@@ -1723,7 +1723,7 @@ ccm baseline reset [flags]
 agent 生命周期状态机（写 verb 强制·同态重入幂等）：
 
 ```
-starting  → running, uncertain, orphaned
+starting  → running, uncertain, orphaned, terminal
 running   → terminal, uncertain, orphaned
 uncertain → running, terminal, orphaned
 orphaned  → running, terminal
@@ -1798,7 +1798,7 @@ ccm agent terminal <id> --outcome <str> [flags]
 ```
 
 - positional：`<id>`（必填）
-- 行为：`running/uncertain/orphaned → terminal`，盖 `ended_at` + 登记 `outcome`（`terminal→terminal` 幂等；`starting→terminal` 非法·exit 3）。**terminal ≠ task done**——本命令绝不碰 task status，父层仍须独立验收后走 `task done --verified --artifact`
+- 行为：`starting/running/uncertain/orphaned → terminal`，盖 `ended_at` + 登记 `outcome`（`starting→terminal` = **启动失败收口**——spawn 失败、无 handle 可 bind 的 agent 也要能收口，别留永久僵尸；`terminal→terminal` 幂等）。**terminal ≠ task done**——本命令绝不碰 task status，父层仍须独立验收后走 `task done --verified --artifact`
 - flags：`--outcome <str>`（必填·收口结论一句话）· `--json`
 - 例：`ccm agent terminal agt-001 --outcome "review approved, 3 findings filed"`
 
@@ -1812,17 +1812,19 @@ ccm agent probe [<id>] [flags]
 
 - positional：`<id>`（可选；缺省探测本板全体 agent）
 - 行为：活性探测 + reconcile。**只写 agent 自己的 `probe` / `lifecycle` 字段，绝不碰 `task.handle` / attempt 投影**。探测手段按 handle 分级：
-  - `pid` → 进程存活判定（存在 / 无权限 → `alive`；kill-0 确定进程不存在 → `gone`）——**`gone` 只出自这条确定性判死路径**；
-  - `session-id` × `codex` → `~/.codex/sessions/**` 会话文件 mtime；`session-id` × `claude-code` → `~/.claude/projects/*/<sid>.jsonl` mtime（mtime 在 freshness 窗内 → `alive`，在但陈旧 → `silent`，**文件不存在 → `unknown`**——「从未见过文件」≠「曾在而消失」，启动竞态下 session 文件可能尚未落盘，mtime 类方法不判死）；
-  - `task-id` 或 `type=subagent` → `handle.transcript_ref` 路径 mtime（有 ref 但文件不存在 → `unknown`·同上不判死；无 ref → `unknown`）；
+  - `pid` → 进程存活判定（进程在 / 存在但无权限 → `alive`；kill-0 确定进程不存在 → `gone`）；
+  - `session-id` → 按 harness 的会话落盘根扫描会话文件 mtime（codex 默认 `~/.codex/sessions/**`·递归扫描 + 文件名精确匹配；claude-code 默认 `~/.claude/projects/*/<sid>.jsonl`·定向寻址；`origin` 等无会话落盘的 harness → `method=none`、`observed=unknown`）；
+  - `task-id` 或 `type=subagent` → `handle.transcript_ref` 路径 mtime；无 ref → `unknown`；
   - 其余 / 无句柄 → `method=none`、`observed=unknown`（**保真**：拿不到就 unknown，绝不用相邻字段推导补齐）。
-  - reconcile 双向、以观测为准：active 态（`starting/running/uncertain`）按 `gone→orphaned`、`silent→uncertain`、`alive→running`、`unknown→不变`；**`orphaned` 观测 `alive` → 恢复 `running`**（观测即证据——误判死 / 文件后到可自愈），其余观测保持 orphaned；`terminal` 是唯一终态，probe 记录观测但永不复活
+  - mtime 类观测（session-file / transcript）：mtime 在 freshness 窗内 → `alive`，在但陈旧 → `silent`；**文件不存在分两种**——上一次**同方法**观测到过 `alive`/`silent` 且本次**完整**扫描确认缺失 → `gone`（「曾在而消失」= 真死亡证据·seen-before 判死），**从未见过 → `unknown`** 不判死（启动竞态下 session 文件可能尚未落盘）；扫描不完整（目录预算耗尽 / 读取失败）不作判死证据、一律 `unknown`。
+  - reconcile 双向、以观测为准、按证据强度分级：active 态（`starting/running/uncertain`）按 `gone→orphaned`、`silent→uncertain`、`alive→running`、`unknown→不变`；**`orphaned` 只被 mtime 类方法的 `alive` 复活为 `running`**（session/transcript 按 sid / 路径寻址、身份强）——`pid` 的 `alive` **不**复活 orphaned（kill-0 不验进程身份：pid 复用、存在但无权限都会产生假 alive；`uncertain` + pid `alive` 仍可回 `running`）；`terminal` 是唯一终态，probe 记录观测但永不复活。
+  - reconcile 提议的转移在写盘前再过一道引擎状态机闸：不合法则该 agent 保持原态，并记入 `--json` 输出的 `reconcile_rejected`（人类输出以 `!` 行标注）
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-| `--freshness-sec <n>` | | string | mtime 判活窗口秒（默认 300） |
-| `--json` | | bool | 结构化输出（`{probed}`） |
+| `--freshness-sec <n>` | | string | mtime 判活窗口秒（默认 300·须正数——非法值 exit 2 拒绝进入写路径，不带病判活） |
+| `--json` | | bool | 结构化输出（`{probed, reconcile_rejected}`） |
 
 - 例：`ccm agent probe agt-001` · `ccm agent probe --board /abs/x.board.json --json`
 
