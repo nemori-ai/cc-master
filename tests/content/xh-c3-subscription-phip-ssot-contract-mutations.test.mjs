@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
@@ -89,6 +89,7 @@ test('all structured markers reject an alternate owner of a canonical subject', 
 
 test('ignored local plan cannot become an authority surface', (t) => {
   const root = mutationTarget(t, 'ignored-plan');
+  mkdirSync(join(root, 'design_docs/plans'), { recursive: true });
   const ignoredPlan = join(root, 'design_docs/plans/hostile-local-review.md');
   writeFileSync(
     ignoredPlan,
