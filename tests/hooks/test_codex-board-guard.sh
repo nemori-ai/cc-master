@@ -406,8 +406,8 @@ exercise_effect_obfuscated_target_case() {
         assert_no_file "$source" "$label -> real source removed"
         ;;
     esac
+    assert_no_file "$wire" "$label -> no literal control-byte path"
   fi
-  assert_no_file "$wire" "$label -> no literal control-byte path"
   rm -rf "$h"
 }
 
@@ -918,8 +918,10 @@ fi
 CONTROL_INNER_BLANK="$H/control-inner-blank.txt"
 printf -v PATCH '*** Begin Patch\n \t\n*** Add File: %s\n+inner-blank\n*** End Patch' "$CONTROL_INNER_BLANK"
 assert_patch_blocked "$PATCH" "$H" "apply_patch whitespace-only line inside envelope"
-assert_real_patch_rejected "$PATCH" "$H" "apply_patch whitespace-only line inside envelope"
-assert_no_file "$CONTROL_INNER_BLANK" "apply_patch inner whitespace line -> no filesystem effect"
+if require_apply_patch "apply_patch whitespace-only line inside envelope"; then
+  assert_real_patch_rejected "$PATCH" "$H" "apply_patch whitespace-only line inside envelope"
+  assert_no_file "$CONTROL_INNER_BLANK" "apply_patch inner whitespace line -> no filesystem effect"
+fi
 
 CONTROL_CRLF_ALL="$H/control-crlf-all.txt"
 printf -v PATCH '*** Begin Patch\r\n*** Add File: %s\r\n+all-crlf\r\n*** End Patch\r\n' "$CONTROL_CRLF_ALL"
@@ -976,16 +978,20 @@ printf 'before\n\n' > "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT"
 printf -v PATCH '*** Begin Patch\r\n*** Update File: %s\r\n@@\r\n-before\r\n+after\r\n\r\r\r\n*** End Patch\r\n' \
   "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT"
 assert_patch_blocked "$PATCH" "$H" "apply_patch triple-CR empty context is malformed"
-assert_real_patch_rejected "$PATCH" "$H" "apply_patch triple-CR empty context is malformed"
-assert_eq before "$(< "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT")" "apply_patch triple-CR rejection -> source unchanged"
+if require_apply_patch "apply_patch triple-CR empty context is malformed"; then
+  assert_real_patch_rejected "$PATCH" "$H" "apply_patch triple-CR empty context is malformed"
+  assert_eq before "$(< "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT")" "apply_patch triple-CR rejection -> source unchanged"
+fi
 
 CONTROL_TRIPLE_CR_EMPTY_CONTEXT_BOARD="$H/boards/control-triple-cr-empty-context.board.json"
 printf 'before\n\n' > "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT_BOARD"
 printf -v PATCH '*** Begin Patch\r\n*** Update File: %s\r\n@@\r\n-before\r\n+after\r\n\r\r\r\n*** End Patch\r\n' \
   "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT_BOARD"
 assert_patch_blocked "$PATCH" "$H" "apply_patch triple-CR empty context board is malformed"
-assert_real_patch_rejected "$PATCH" "$H" "apply_patch triple-CR empty context board is malformed"
-assert_eq before "$(< "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT_BOARD")" "apply_patch triple-CR board rejection -> source unchanged"
+if require_apply_patch "apply_patch triple-CR empty context board is malformed"; then
+  assert_real_patch_rejected "$PATCH" "$H" "apply_patch triple-CR empty context board is malformed"
+  assert_eq before "$(< "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT_BOARD")" "apply_patch triple-CR board rejection -> source unchanged"
+fi
 
 CONTROL_CR_BEGIN="$H/control-cr-begin.txt"
 printf -v PATCH '*** Begin Patch\r\n*** Add File: %s\n+begin-cr\n*** End Patch' "$CONTROL_CR_BEGIN"
@@ -1079,15 +1085,19 @@ CONTROL_FEFF_BEGIN="$H/control-feff-begin.txt"
 printf -v PATCH '%s*** Begin Patch\n*** Add File: %s\n+feff-begin\n*** End Patch' \
   "$FEFF" "$CONTROL_FEFF_BEGIN"
 assert_patch_blocked "$PATCH" "$H" "apply_patch FEFF before Begin Patch is malformed"
-assert_real_patch_rejected "$PATCH" "$H" "apply_patch FEFF before Begin Patch is malformed"
-assert_no_file "$CONTROL_FEFF_BEGIN" "apply_patch FEFF Begin rejection -> no effect"
+if require_apply_patch "apply_patch FEFF before Begin Patch is malformed"; then
+  assert_real_patch_rejected "$PATCH" "$H" "apply_patch FEFF before Begin Patch is malformed"
+  assert_no_file "$CONTROL_FEFF_BEGIN" "apply_patch FEFF Begin rejection -> no effect"
+fi
 
 CONTROL_FEFF_HEADER="$H/control-feff-header.txt"
 printf -v PATCH '*** Begin Patch\n%s*** Add File: %s\n+feff-header\n*** End Patch' \
   "$FEFF" "$CONTROL_FEFF_HEADER"
 assert_patch_blocked "$PATCH" "$H" "apply_patch FEFF before file header is malformed"
-assert_real_patch_rejected "$PATCH" "$H" "apply_patch FEFF before file header is malformed"
-assert_no_file "$CONTROL_FEFF_HEADER" "apply_patch FEFF header rejection -> no effect"
+if require_apply_patch "apply_patch FEFF before file header is malformed"; then
+  assert_real_patch_rejected "$PATCH" "$H" "apply_patch FEFF before file header is malformed"
+  assert_no_file "$CONTROL_FEFF_HEADER" "apply_patch FEFF header rejection -> no effect"
+fi
 
 CONTROL_FEFF_SUFFIX="$H/boards/distinct.board.json${FEFF}"
 printf -v PATCH '*** Begin Patch\n*** Add File: %s\n+feff-suffix\n*** End Patch' "$CONTROL_FEFF_SUFFIX"
@@ -1095,8 +1105,8 @@ assert_patch_allowed "$PATCH" "$H" "apply_patch FEFF-suffixed board-looking path
 if require_apply_patch "apply_patch FEFF-suffixed board-looking path is distinct non-board"; then
   assert_real_patch_applied "$PATCH" "$H" "apply_patch FEFF-suffixed board-looking path is distinct non-board"
   assert_file "$CONTROL_FEFF_SUFFIX" "apply_patch FEFF suffix -> exact distinct file effect"
+  assert_no_file "$H/boards/distinct.board.json" "apply_patch FEFF suffix -> no normalized board effect"
 fi
-assert_no_file "$H/boards/distinct.board.json" "apply_patch FEFF suffix -> no normalized board effect"
 
 CONTROL_CR_BOARD="$H/boards/control-crlf.board.json"
 printf -v PATCH '*** Begin Patch\r\n*** Add File: %s\r\n+{}\r\n*** End Patch\r\n' "$CONTROL_CR_BOARD"
@@ -1119,8 +1129,10 @@ printf 'before\n' > "$CONTROL_POST_EOF_NONBLANK"
 printf -v PATCH '*** Begin Patch\n*** Update File: %s\n@@\n-before\n+after\n*** End of File\n context without a new hunk marker\n*** End Patch' \
   "$CONTROL_POST_EOF_NONBLANK"
 assert_patch_blocked "$PATCH" "$H" "apply_patch nonblank body after End of File stays malformed"
-assert_real_patch_rejected "$PATCH" "$H" "apply_patch nonblank body after End of File stays malformed"
-assert_eq before "$(< "$CONTROL_POST_EOF_NONBLANK")" "apply_patch post-EOF nonblank rejection -> source unchanged"
+if require_apply_patch "apply_patch nonblank body after End of File stays malformed"; then
+  assert_real_patch_rejected "$PATCH" "$H" "apply_patch nonblank body after End of File stays malformed"
+  assert_eq before "$(< "$CONTROL_POST_EOF_NONBLANK")" "apply_patch post-EOF nonblank rejection -> source unchanged"
+fi
 
 # Trailing U+0085 is legal Rust whitespace on every target-bearing control. Board rows are the
 # security assertions used by the normalization-removal mutation: all four must flip to ALLOW if
