@@ -8,7 +8,8 @@ projection:
 status: implemented-stop-advisory
 notes:
   - Cursor-specific billing_period pacing (NOT a Codex 5h/7d fork).
-  - Uses ccm usage advise as the only pacing verdict source.
+  - Uses cached ccm quota status --machine-wide --json only; no provider refresh, network, or credential input.
+  - Keeps cursor-ide-plugin and cursor-agent-cli as distinct target surfaces.
   - Emits Stop kind:system advisory → launcher followup_message; Cursor has no PostToolBatch.
   - Handles hold / throttle / stop_billing_period only; switch/stop_5h/stop_7d stay silent.
   - Never mentions 5h/7d/switch in agent-facing copy.

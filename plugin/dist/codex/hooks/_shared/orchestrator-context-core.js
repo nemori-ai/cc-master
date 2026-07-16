@@ -254,7 +254,7 @@ function rebuildMachineQuotaDecision(value) {
   if (!target || !source || !MACHINE_QUOTA_STATES.has(value.state) || !MACHINE_QUOTA_FRESHNESS.has(value.freshness)) return null;
   if (!Array.isArray(value.reason_codes) || !value.reason_codes.every((code) => typeof code === 'string' && MACHINE_QUOTA_REASON.test(code))) return null;
   if (new Set(value.reason_codes).size !== value.reason_codes.length || typeof value.fanout_covered !== 'boolean') return null;
-  if (!codexSevenDayOnly(target, value.reason_codes)) return null;
+  if (!codexSevenDayOnly(target, value.reason_codes, Object.values(source))) return null;
   return {
     scope_digest: value.scope_digest,
     target,
