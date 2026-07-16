@@ -3,6 +3,16 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const {
+  rebuildDeliveryProvenance,
+  sanitizeInboxItems,
+  selectItemsToSurface,
+  surfaceStateKey,
+} = require('../../../_shared/coordination-inbox-delivery.js');
+// PARITY: rule-coordination-inbox-machine-quota-delta
+// PARITY: rule-coordination-inbox-machine-quota-scope-dedup
+// PARITY: rule-coordination-inbox-machine-quota-read-boundary
+// PARITY: rule-coordination-inbox-machine-quota-no-account-mutation
 
 const CCM_BIN = process.env.CCM_BIN || 'ccm';
 const STATE_FILE =
@@ -51,24 +61,12 @@ function writeState(state) {
   }
 }
 
-function boardKey(boardPath) {
-  return Buffer.from(String(boardPath || ''), 'utf8').toString('base64url');
-}
-
-function shouldSurface(boardPath, ids, atMs) {
-  if (!ids.length) return false;
-  const key = boardKey(boardPath);
+function itemsToSurface(boardPath, sessionEpoch, items, atMs) {
+  const key = surfaceStateKey(boardPath, sessionEpoch);
   const state = readState();
-  const prev = state[key] && typeof state[key] === 'object' ? state[key] : {};
-  const prevIds = Array.isArray(prev.ids) ? prev.ids.filter((x) => typeof x === 'string') : [];
-  const prevSet = new Set(prevIds);
-  const hasNew = ids.some((id) => !prevSet.has(id));
-  const last = typeof prev.last_surface_at_ms === 'number' ? prev.last_surface_at_ms : 0;
-  const cooled = atMs - last >= cooldownSec() * 1000;
-  if (!hasNew && !cooled) return false;
-  state[key] = { ids, last_surface_at_ms: atMs };
+  const selected = selectItemsToSurface(state, key, items, atMs, cooldownSec());
   writeState(state);
-  return true;
+  return selected;
 }
 
 function callCcm(home, args) {
@@ -106,22 +104,6 @@ function validSubscription(value, expected, requireState) {
   return !requireState || value.state === 'current';
 }
 
-function validProvenance(value, current) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  for (const field of [
-    'subscription_id',
-    'session_id',
-    'session_epoch',
-    'origin',
-    'capability',
-    'source_policy_revision',
-    'consent_provenance_ref',
-  ]) {
-    if (typeof value[field] !== 'string' || !value[field]) return false;
-  }
-  return validSubscription(value, current, false);
-}
-
 function listUnconsumed(home, boardPath, origin, sessionId) {
   // PARITY: rule-coordination-inbox-subscription-fail-closed
   // PARITY: rule-coordination-inbox-current-subscription
@@ -141,7 +123,7 @@ function listUnconsumed(home, boardPath, origin, sessionId) {
     '--no-input',
   ]);
   const current = currentData && currentData.subscription;
-  if (!validSubscription(current, { session_id: sessionId, origin }, true)) return [];
+  if (!validSubscription(current, { session_id: sessionId, origin }, true)) return null;
   // PARITY: rule-coordination-inbox-bounded-list
   const listData = callCcm(home, [
     'coordination',
@@ -163,16 +145,15 @@ function listUnconsumed(home, boardPath, origin, sessionId) {
     '--no-input',
   ]);
   const selected = listData && listData.subscription;
-  if (!validSubscription(selected, current, false)) return [];
+  if (!validSubscription(selected, current, false)) return null;
   const inbox = Array.isArray(listData.inbox) ? listData.inbox : [];
   // PARITY: rule-coordination-inbox-delivery-provenance
-  return inbox.filter(
-    (item) =>
-      item &&
-      typeof item === 'object' &&
-      typeof item.id === 'string' &&
-      validProvenance(item.delivery_provenance, current),
-  );
+  const items = inbox.map((item) => {
+    if (!item || typeof item !== 'object' || typeof item.id !== 'string') return null;
+    const deliveryProvenance = rebuildDeliveryProvenance(item.delivery_provenance, current);
+    return deliveryProvenance ? { ...item, delivery_provenance: deliveryProvenance } : null;
+  }).filter(Boolean);
+  return { current, items: sanitizeInboxItems(items) };
 }
 
 function advisory(source, strength, body) {
@@ -236,11 +217,17 @@ function main() {
   if (!boardPath) return;
 
   // PARITY: rule-coordination-inbox-read-only
-  const items = listUnconsumed(home, boardPath, 'codex', sessionId);
-  const ids = items.map((item) => item.id).sort();
+  const listed = listUnconsumed(home, boardPath, 'codex', sessionId);
+  if (!listed) return;
   // PARITY: rule-coordination-inbox-repeat-suppression
-  if (!shouldSurface(boardPath, ids, nowMs())) return;
-  system(items.map(tagged).join('\n'));
+  const selected = itemsToSurface(
+    boardPath,
+    listed.current.session_epoch,
+    listed.items,
+    nowMs(),
+  );
+  if (!selected.length) return;
+  system(selected.map(tagged).join('\n'));
 }
 
 try {

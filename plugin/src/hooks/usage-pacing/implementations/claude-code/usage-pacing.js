@@ -56,6 +56,7 @@ const { resolveHome, ambient, advisory, runHook } = require('./hook-common.js');
 //   throttle 5h 临界减速：临界侧、风险中高 → strong
 //   switch   n>1 切到下一份配额：机会信号·可逆·低 stakes → weak
 // PARITY: rule-usage-pacing-tag-protocol
+// PARITY: rule-usage-pacing-origin-local-floor
 const PACING_STRENGTH = { stop_7d: 'strong', stop_5h: 'strong', throttle: 'strong', switch: 'weak' };
 function pacingStrengthOf(kind) {
   return PACING_STRENGTH[kind] || 'weak'; // 未知 kind → 最低够用（weak·P2）

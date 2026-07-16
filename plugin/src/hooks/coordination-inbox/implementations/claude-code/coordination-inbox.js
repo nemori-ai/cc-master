@@ -10,6 +10,20 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { advisory, directive, runHook } = require('./hook-common.js');
+const deliveryHelperPath = [
+  path.resolve(__dirname, '../../../_shared/coordination-inbox-delivery.js'),
+  path.resolve(__dirname, '../_shared/coordination-inbox-delivery.js'),
+].find((candidate) => fs.existsSync(candidate));
+const {
+  rebuildDeliveryProvenance,
+  sanitizeInboxItems,
+  selectItemsToSurface,
+  surfaceStateKey,
+} = require(deliveryHelperPath);
+// PARITY: rule-coordination-inbox-machine-quota-delta
+// PARITY: rule-coordination-inbox-machine-quota-scope-dedup
+// PARITY: rule-coordination-inbox-machine-quota-read-boundary
+// PARITY: rule-coordination-inbox-machine-quota-no-account-mutation
 
 const CCM_BIN = process.env.CCM_BIN || 'ccm';
 const STATE_FILE =
@@ -53,24 +67,12 @@ function writeState(state) {
   }
 }
 
-function boardKey(boardPath) {
-  return Buffer.from(String(boardPath || ''), 'utf8').toString('base64url');
-}
-
-function shouldSurface(boardPath, ids, atMs) {
-  if (!ids.length) return false;
-  const key = boardKey(boardPath);
+function itemsToSurface(boardPath, sessionEpoch, items, atMs) {
+  const key = surfaceStateKey(boardPath, sessionEpoch);
   const state = readState();
-  const prev = state[key] && typeof state[key] === 'object' ? state[key] : {};
-  const prevIds = Array.isArray(prev.ids) ? prev.ids.filter((x) => typeof x === 'string') : [];
-  const prevSet = new Set(prevIds);
-  const hasNew = ids.some((id) => !prevSet.has(id));
-  const last = typeof prev.last_surface_at_ms === 'number' ? prev.last_surface_at_ms : 0;
-  const cooled = atMs - last >= cooldownSec() * 1000;
-  if (!hasNew && !cooled) return false;
-  state[key] = { ids, last_surface_at_ms: atMs };
+  const selected = selectItemsToSurface(state, key, items, atMs, cooldownSec());
   writeState(state);
-  return true;
+  return selected;
 }
 
 function callCcm(homeDir, args) {
@@ -108,22 +110,6 @@ function validSubscription(value, expected, requireState) {
   return !requireState || value.state === 'current';
 }
 
-function validProvenance(value, current) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  for (const field of [
-    'subscription_id',
-    'session_id',
-    'session_epoch',
-    'origin',
-    'capability',
-    'source_policy_revision',
-    'consent_provenance_ref',
-  ]) {
-    if (typeof value[field] !== 'string' || !value[field]) return false;
-  }
-  return validSubscription(value, current, false);
-}
-
 function listUnconsumed(homeDir, boardPath, origin, sessionId) {
   // PARITY: rule-coordination-inbox-subscription-fail-closed
   // PARITY: rule-coordination-inbox-current-subscription
@@ -143,7 +129,7 @@ function listUnconsumed(homeDir, boardPath, origin, sessionId) {
     '--no-input',
   ]);
   const current = currentData && currentData.subscription;
-  if (!validSubscription(current, { session_id: sessionId, origin }, true)) return [];
+  if (!validSubscription(current, { session_id: sessionId, origin }, true)) return null;
   // PARITY: rule-coordination-inbox-bounded-list
   const listData = callCcm(homeDir, [
     'coordination',
@@ -165,16 +151,15 @@ function listUnconsumed(homeDir, boardPath, origin, sessionId) {
     '--no-input',
   ]);
   const selected = listData && listData.subscription;
-  if (!validSubscription(selected, current, false)) return [];
+  if (!validSubscription(selected, current, false)) return null;
   const inbox = Array.isArray(listData.inbox) ? listData.inbox : [];
   // PARITY: rule-coordination-inbox-delivery-provenance
-  return inbox.filter(
-    (item) =>
-      item &&
-      typeof item === 'object' &&
-      typeof item.id === 'string' &&
-      validProvenance(item.delivery_provenance, current),
-  );
+  const items = inbox.map((item) => {
+    if (!item || typeof item !== 'object' || typeof item.id !== 'string') return null;
+    const deliveryProvenance = rebuildDeliveryProvenance(item.delivery_provenance, current);
+    return deliveryProvenance ? { ...item, delivery_provenance: deliveryProvenance } : null;
+  }).filter(Boolean);
+  return { current, items: sanitizeInboxItems(items) };
 }
 
 function strengthOf(item) {
@@ -222,11 +207,16 @@ function body(ctx) {
 
   for (const entry of ctx.boards) {
     // PARITY: rule-coordination-inbox-read-only
-    const items = listUnconsumed(ctx.homeDir, entry.path, 'claude-code', ctx.sid);
-    const ids = items.map((item) => item.id).sort();
+    const listed = listUnconsumed(ctx.homeDir, entry.path, 'claude-code', ctx.sid);
+    if (!listed) continue;
     // PARITY: rule-coordination-inbox-repeat-suppression
-    if (!shouldSurface(entry.path, ids, atMs)) continue;
-    for (const item of items) blocks.push(tagged(item));
+    const selected = itemsToSurface(
+      entry.path,
+      listed.current.session_epoch,
+      listed.items,
+      atMs,
+    );
+    for (const item of selected) blocks.push(tagged(item));
   }
 
   if (!blocks.length) return;

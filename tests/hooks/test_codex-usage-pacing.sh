@@ -9,108 +9,125 @@ seed_board() {
   printf '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"%s"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' "$2" >"$1/boards/armed.board.json"
 }
 
-mk_ccm_stub() {
-  local dir stub payload
-  dir="$(make_project)"
-  stub="$dir/ccm"
-  payload="$dir/payload.json"
-  printf '%s' "$1" >"$payload"
-  cat >"$stub" <<STUB
-#!/usr/bin/env bash
-if [ "\$1" = "usage" ] && [ "\$2" = "advise" ]; then
-  printf '{"ok":true,"data":%s}\\n' "\$(cat "$payload")"
-  exit 0
-fi
-exit 1
-STUB
-  chmod +x "$stub"
-  echo "$stub"
+status_json() {
+  local state="$1" revision="$2" covered="$3"
+  node -e '
+const [state, revision, covered] = process.argv.slice(1);
+const decisions = state === "none" ? [] : [{
+  scope_digest: `sha256:${"a".repeat(64)}`,
+  target: {
+    harness_id: "codex", surface_id: "codex-cli", provider_id: "codex",
+    window: { kind: "rolling", name: "seven_day", duration_sec: 604800 },
+  },
+  quota_scope_digest: `sha256:${"e".repeat(64)}`,
+  state,
+  freshness: state === "unknown" ? "unknown" : "fresh",
+  reason_codes: state === "healthy" ? [] : [`QUOTA_${state.toUpperCase()}`],
+  source: { collector_id: "codex-app-server", source_schema: "codex/account-rate-limits/v1", auth_source: "codex-cli-current-login" },
+  decision_revision: `sha256:${revision.repeat(64)}`,
+  observation_revision: `sha256:${"0".repeat(64)}`,
+  fanout_covered: covered === "true",
+}];
+process.stdout.write(JSON.stringify({
+  schema: "ccm/machine-quota-status/v1",
+  summary: { schema: "ccm/machine-quota-summary/v1", decisions },
+  readings: [],
+  capacity_views: { schema: "ccm/machine-quota-capacity-views/v1", known_capacities: [], unresolved_scope_digests: [], unresolved_capacity_units: null },
+}));
+' "$state" "$revision" "$covered"
 }
-mk_ccm_notify_stub() {
-  local dir stub payload
-  dir="$(make_project)"
-  stub="$dir/ccm"
-  payload="$dir/payload.json"
-  printf '%s' "$1" >"$payload"
-  cat >"$stub" <<STUB
+
+mutate_status() {
+  local kind="$1"
+  KIND="$kind" node -e '
+let raw = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => raw += chunk);
+process.stdin.on("end", () => {
+  const value = JSON.parse(raw);
+  const decision = value.summary.decisions[0];
+  if (process.env.KIND === "five-hour") {
+    decision.target.window = { kind: "rolling", name: "five_hour", duration_sec: 18000 };
+  }
+  if (process.env.KIND === "legacy-switch") decision.reason_codes = ["QUOTA_SWITCH"];
+  process.stdout.write(JSON.stringify(value));
+});
+'
+}
+
+write_stub() {
+  local home="$1" response="$2"
+  printf '%s' "$response" >"$home/status.json"
+  cat >"$home/ccm" <<STUB
 #!/usr/bin/env bash
-if [ "\$1" = "usage" ] && [ "\$2" = "advise" ]; then
-  printf '{"ok":true,"data":%s}\\n' "\$(cat "$payload")"
-  exit 0
-fi
-if [ "\$1" = "coordination" ] && [ "\$2" = "notify" ]; then
-  printf '%s\\n' "\$*" > "$dir/notify.args"
-  printf '{"ok":true,"data":{"notification":{"id":"ntf-test"}}}\\n'
-  exit 0
-fi
-exit 1
+printf '%s\n' "\$*" >>"$home/calls"
+if [ "\$1 \$2" = "quota status" ]; then cat "$home/status.json"; exit 0; fi
+exit 29
 STUB
-  chmod +x "$stub"
-  echo "$stub"
+  chmod +x "$home/ccm"
 }
 
 run_stop() {
-  local home="$1" sid="$2" payload="$3" active="${4:-false}" stub
-  stub="$(mk_ccm_stub "$payload")"
+  local home="$1" sid="$2" active="${3:-false}"
   HOOK_OUT="$(
     printf '{"session_id":"%s","hook_event_name":"Stop","stop_hook_active":%s}' "$sid" "$active" |
-      CC_MASTER_HOME="$home" CCM_BIN="$stub" node "$LAUNCHER" --event Stop --core "$CORE" 2>/dev/null
+      CC_MASTER_HOME="$home" CCM_BIN="$home/ccm" node "$LAUNCHER" --event Stop --core "$CORE" 2>/dev/null
   )"
   HOOK_RC=$?
-  rm -rf "$(dirname "$stub")"
 }
-
-chmod +x "$CORE"
-
-ADV_HOLD='{"verdict":"hold","strength":"weak","reason":"r","levers":[],"window_5h_pct":50,"window_7d_pct":20,"effective_n":1,"available":true}'
-ADV_THROTTLE='{"verdict":"throttle","strength":"strong","reason":"r","levers":[],"window_5h_pct":92,"window_7d_pct":40,"effective_n":1,"available":true}'
-ADV_SWITCH='{"verdict":"switch","strength":"weak","reason":"r","levers":[],"window_5h_pct":92,"window_7d_pct":20,"effective_n":2,"switch_candidate":"b@example.com","available":true}'
-ADV_STOP5='{"verdict":"stop_5h","strength":"strong","reason":"r","levers":[],"window_5h_pct":99,"window_7d_pct":70,"nearest_reset":"2026-07-03T12:00:00Z","available":true}'
-ADV_STOP7='{"verdict":"stop_7d","strength":"strong","reason":"r","levers":[],"window_5h_pct":40,"window_7d_pct":88,"available":true}'
-ADV_UNAVAILABLE='{"verdict":"hold","strength":"weak","reason":"r","levers":[],"available":false}'
 
 H="$(make_project)"
 seed_board "$H" "sess-u"
 
-run_stop "$H" "sess-u" "$ADV_HOLD"
-assert_eq "" "$HOOK_OUT" "hold -> silent"
+write_stub "$H" "$(status_json healthy 1 true)"
+run_stop "$H" "sess-u"
+assert_eq "" "$HOOK_OUT" "healthy covered status -> silent"
 
-run_stop "$H" "sess-u" "$ADV_THROTTLE"
-assert_contains "$HOOK_OUT" '"systemMessage"' "throttle -> systemMessage"
-assert_contains "$HOOK_OUT" "Slow down" "throttle -> slowdown wording"
-assert_contains "$HOOK_OUT" "5h 92%" "throttle -> includes 5h pct"
+write_stub "$H" "$(status_json tight 2 false)"
+run_stop "$H" "sess-u"
+assert_contains "$HOOK_OUT" '"systemMessage"' "uncovered tight -> Codex systemMessage"
+assert_contains "$HOOK_OUT" "codex/codex-cli/codex" "target scope retained"
+assert_contains "$HOOK_OUT" "state=tight" "state retained"
+assert_contains "$HOOK_OUT" "7d hard ceiling" "Codex 7d-only policy is explicit"
+assert_not_contains "$HOOK_OUT" "5h quota" "no 5h pacing branch"
+assert_contains "$HOOK_OUT" "automatic account switching are ignored" "no automatic account switch is explicit"
 
-run_stop "$H" "sess-u" "$ADV_SWITCH"
-assert_contains "$HOOK_OUT" "not implemented" "switch -> no autoswitch in Codex"
-assert_contains "$HOOK_OUT" "b@example.com" "switch -> candidate included"
+run_stop "$H" "sess-u"
+assert_eq "" "$HOOK_OUT" "same scope+revision -> sidecar dedupe"
 
-run_stop "$H" "sess-u" "$ADV_STOP5"
-assert_contains "$HOOK_OUT" "Pause new dispatch until reset at 2026-07-03T12:00:00Z" "stop_5h -> reset advice"
+write_stub "$H" "$(status_json exhausted 3 false)"
+run_stop "$H" "sess-u"
+assert_contains "$HOOK_OUT" "state=exhausted" "changed revision surfaces"
 
-run_stop "$H" "sess-u" "$ADV_STOP7"
-assert_contains "$HOOK_OUT" "surface the decision to the user" "stop_7d -> surface user"
+write_stub "$H" "$(status_json exhausted 4 true)"
+run_stop "$H" "sess-u"
+assert_eq "" "$HOOK_OUT" "machine fan-out covered revision -> direct floor silent"
 
-run_stop "$H" "sess-u" "$ADV_UNAVAILABLE"
-assert_eq "" "$HOOK_OUT" "available false -> silent"
+run_stop "$H" "sess-u" "true"
+assert_eq "" "$HOOK_OUT" "stop_hook_active -> silent"
 
-run_stop "$H" "sess-u" "$ADV_THROTTLE" "true"
-assert_eq "" "$HOOK_OUT" "stop_hook_active true -> silent"
-
-NSTUB="$(mk_ccm_notify_stub "$ADV_THROTTLE")"
-HOOK_OUT="$(
-  printf '{"session_id":"sess-u","hook_event_name":"Stop","stop_hook_active":false}' |
-    CC_MASTER_HOME="$H" CCM_BIN="$NSTUB" node "$LAUNCHER" --event Stop --core "$CORE" 2>/dev/null
-)"
-assert_eq "" "$HOOK_OUT" "durable throttle notify succeeds -> no duplicate Codex systemMessage"
-assert_file "$(dirname "$NSTUB")/notify.args" "durable throttle -> ccm coordination notify called"
-assert_contains "$(cat "$(dirname "$NSTUB")/notify.args")" "pacing_throttle" "durable throttle -> pacing_throttle"
-rm -rf "$(dirname "$NSTUB")"
-
+CALLS="$(cat "$H/calls")"
+assert_contains "$CALLS" "quota status --machine-wide --json" "cached machine-wide status is the only read"
+assert_not_contains "$CALLS" "usage advise" "legacy usage adapter is never invoked"
+assert_not_contains "$CALLS" "coordination notify" "hook does not duplicate ccm fan-out"
+assert_not_contains "$CALLS" "account switch" "Codex never switches accounts"
 rm -rf "$H"
 
+for BAD_KIND in five-hour legacy-switch; do
+  H="$(make_project)"
+  seed_board "$H" "sess-codex-negative-$BAD_KIND"
+  write_stub "$H" "$(status_json tight 6 false | mutate_status "$BAD_KIND")"
+  run_stop "$H" "sess-codex-negative-$BAD_KIND"
+  assert_eq "" "$HOOK_OUT" "Codex rejects $BAD_KIND machine decisions"
+  assert_no_file "$H/hooks/usage-pacing-machine-quota" "Codex $BAD_KIND creates no agent line or sidecar"
+  rm -rf "$H"
+done
+
 H="$(make_project)"
-run_stop "$H" "sess-unarmed" "$ADV_THROTTLE"
+write_stub "$H" "$(status_json tight 5 false)"
+run_stop "$H" "sess-unarmed"
 assert_eq "" "$HOOK_OUT" "unarmed -> silent"
+assert_no_file "$H/calls" "unarmed -> no ccm read"
 rm -rf "$H"
 
 finish

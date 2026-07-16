@@ -8,11 +8,13 @@
 // PARITY: rule-orchestrator-context-fail-open
 // PARITY: rule-orchestrator-context-shadow-only
 // PARITY: rule-orchestrator-context-cursor-surfaces
+// PARITY: rule-orchestrator-context-machine-quota-summary
 
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { codexSevenDayOnly } = require('./machine-quota-semantics.js');
 const { secretShapedValue } = require('./orchestrator-context-private-value.js');
 
 const MAX_BYTES = 4096;
@@ -62,6 +64,7 @@ const CURSOR_SURFACE_SPECS = [
 const PUBLIC_PATH_VALUES = new Set([
   'ccm/origin-context/v1',
   'ccm/cursor-surface-context/v1',
+  'ccm/machine-quota-summary/v1',
   ...CURSOR_SURFACE_SPECS.flatMap((spec) => [
     spec.installed_source,
     ...spec.eligibility_sources,
@@ -200,11 +203,95 @@ function rebuildCursorSurfaces(value) {
   return { schema: value.schema, state: value.state, surfaces };
 }
 
-function containsPrivateValue(value) {
-  if (typeof value === 'string') return privateShapedString(value);
-  if (Array.isArray(value)) return value.some(containsPrivateValue);
+const MACHINE_QUOTA_STATES = new Set(['healthy', 'tight', 'exhausted', 'unknown']);
+const MACHINE_QUOTA_FRESHNESS = new Set(['fresh', 'soft-stale', 'hard-stale', 'unknown']);
+const MACHINE_QUOTA_REASON = /^[A-Z0-9][A-Z0-9_:-]{0,127}$/;
+const MACHINE_QUOTA_DIGEST = /^sha256:[0-9a-f]{64}$/;
+const MACHINE_QUOTA_PROVENANCE = /^[A-Za-z0-9][A-Za-z0-9_./:-]{0,127}$/;
+
+function rebuildMachineQuotaTarget(value) {
+  if (!exactKeys(value, ['harness_id', 'surface_id', 'provider_id', 'window'])) return null;
+  if (!safeHarness(value.harness_id) || !safeId(value.surface_id) || !safeId(value.provider_id)) return null;
+  if (!exactKeys(value.window, ['kind', 'name', 'duration_sec'])) return null;
+  if (!safeId(value.window.kind) || !safeId(value.window.name) || !Number.isSafeInteger(value.window.duration_sec) || value.window.duration_sec <= 0) return null;
+  return {
+    harness_id: value.harness_id,
+    surface_id: value.surface_id,
+    provider_id: value.provider_id,
+    window: { kind: value.window.kind, name: value.window.name, duration_sec: value.window.duration_sec },
+  };
+}
+
+function rebuildMachineQuotaSource(value) {
+  if (!exactKeys(value, ['collector_id', 'source_schema', 'auth_source'])) return null;
+  if (![value.collector_id, value.source_schema, value.auth_source].every((entry) =>
+    typeof entry === 'string' && MACHINE_QUOTA_PROVENANCE.test(entry)
+  )) return null;
+  return {
+    collector_id: value.collector_id,
+    source_schema: value.source_schema,
+    auth_source: value.auth_source,
+  };
+}
+
+function rebuildMachineQuotaDecision(value) {
+  if (!exactKeys(value, [
+    'scope_digest',
+    'target',
+    'quota_scope_digest',
+    'state',
+    'freshness',
+    'reason_codes',
+    'source',
+    'decision_revision',
+    'observation_revision',
+    'fanout_covered',
+  ])) return null;
+  if (![value.scope_digest, value.decision_revision, value.observation_revision].every((digest) => MACHINE_QUOTA_DIGEST.test(digest))) return null;
+  if (value.quota_scope_digest !== null && !MACHINE_QUOTA_DIGEST.test(value.quota_scope_digest)) return null;
+  const target = rebuildMachineQuotaTarget(value.target);
+  const source = rebuildMachineQuotaSource(value.source);
+  if (!target || !source || !MACHINE_QUOTA_STATES.has(value.state) || !MACHINE_QUOTA_FRESHNESS.has(value.freshness)) return null;
+  if (!Array.isArray(value.reason_codes) || !value.reason_codes.every((code) => typeof code === 'string' && MACHINE_QUOTA_REASON.test(code))) return null;
+  if (new Set(value.reason_codes).size !== value.reason_codes.length || typeof value.fanout_covered !== 'boolean') return null;
+  if (!codexSevenDayOnly(target, value.reason_codes)) return null;
+  return {
+    scope_digest: value.scope_digest,
+    target,
+    quota_scope_digest: value.quota_scope_digest,
+    state: value.state,
+    freshness: value.freshness,
+    reason_codes: [...value.reason_codes],
+    source,
+    decision_revision: value.decision_revision,
+    observation_revision: value.observation_revision,
+    fanout_covered: value.fanout_covered,
+  };
+}
+
+function rebuildMachineQuotaSummary(value) {
+  if (!exactKeys(value, ['schema', 'decisions'])) return null;
+  if (value.schema !== 'ccm/machine-quota-summary/v1' || !Array.isArray(value.decisions)) return null;
+  const decisions = value.decisions.map(rebuildMachineQuotaDecision);
+  if (decisions.some((decision) => decision === null)) return null;
+  const scopes = decisions.map((decision) => decision.scope_digest);
+  if (new Set(scopes).size !== scopes.length) return null;
+  for (let index = 1; index < scopes.length; index += 1) {
+    if (scopes[index - 1].localeCompare(scopes[index]) >= 0) return null;
+  }
+  return { schema: value.schema, decisions };
+}
+
+function containsPrivateValue(value, key = '') {
+  if (typeof value === 'string') {
+    if (key === 'source_schema' && MACHINE_QUOTA_PROVENANCE.test(value)) {
+      return secretShapedValue(value) || /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(value);
+    }
+    return privateShapedString(value);
+  }
+  if (Array.isArray(value)) return value.some((entry) => containsPrivateValue(entry, key));
   if (!record(value)) return false;
-  return Object.values(value).some(containsPrivateValue);
+  return Object.entries(value).some(([childKey, child]) => containsPrivateValue(child, childKey));
 }
 
 function rebuildQualification(value) {
@@ -277,6 +364,7 @@ function rebuildRoute(value, harness) {
 function rebuildPayload(value, harness, outerRevisions) {
   const keys = ['schema', 'cached_only', 'shadow_only', 'dispatch_enabled', 'origin_harness', 'available', 'revisions', 'freshness', 'contract_activation', 'candidates', 'routes', 'warnings', 'truncation'];
   if (value && value.cursor_surfaces !== undefined) keys.push('cursor_surfaces');
+  if (value && value.machine_quota !== undefined) keys.push('machine_quota');
   if (!exactKeys(value, keys)) return null;
   if (value.schema !== 'ccm/origin-context/v1' || value.cached_only !== true || value.shadow_only !== true || value.dispatch_enabled !== false || value.origin_harness !== harness || typeof value.available !== 'boolean') return null;
   if (!exactKeys(value.revisions, ['board', 'machine']) || !safeId(value.revisions.board) || !safeId(value.revisions.machine)) return null;
@@ -291,6 +379,10 @@ function rebuildPayload(value, harness, outerRevisions) {
     ? undefined
     : rebuildCursorSurfaces(value.cursor_surfaces);
   if (value.cursor_surfaces !== undefined && cursorSurfaces === null) return null;
+  const machineQuota = value.machine_quota === undefined
+    ? undefined
+    : rebuildMachineQuotaSummary(value.machine_quota);
+  if (value.machine_quota !== undefined && machineQuota === null) return null;
   const candidateIds = candidates.map((entry) => entry.candidate_id);
   const taskIds = routes.map((entry) => entry.task_id);
   if (new Set(candidateIds).size !== candidateIds.length || new Set(taskIds).size !== taskIds.length) return null;
@@ -314,11 +406,13 @@ function rebuildPayload(value, harness, outerRevisions) {
       candidate.qualifications.some((entry) => entry.status !== 'pass')
     ) return null;
   }
-  if (!exactKeys(value.truncation, ['applied', 'omitted_candidates', 'omitted_routes', 'omitted_warnings', 'max_bytes'])) return null;
+  if (!exactKeys(value.truncation, ['applied', 'omitted_candidates', 'omitted_routes', 'omitted_warnings', 'omitted_quota_scopes', 'max_bytes'])) return null;
   if (typeof value.truncation.applied !== 'boolean' || value.truncation.max_bytes !== MAX_BYTES) return null;
-  for (const key of ['omitted_candidates', 'omitted_routes', 'omitted_warnings']) {
+  const truncationCounts = ['omitted_candidates', 'omitted_routes', 'omitted_warnings', 'omitted_quota_scopes'];
+  for (const key of truncationCounts) {
     if (!Number.isSafeInteger(value.truncation[key]) || value.truncation[key] < 0) return null;
   }
+  if (value.truncation.applied !== truncationCounts.some((key) => value.truncation[key] > 0)) return null;
   const rebuilt = {
     schema: value.schema,
     cached_only: true,
@@ -331,6 +425,7 @@ function rebuildPayload(value, harness, outerRevisions) {
     contract_activation: value.contract_activation,
     candidates,
     ...(cursorSurfaces === undefined ? {} : { cursor_surfaces: cursorSurfaces }),
+    ...(machineQuota === undefined ? {} : { machine_quota: machineQuota }),
     routes,
     warnings: [...value.warnings],
     truncation: {
@@ -338,6 +433,7 @@ function rebuildPayload(value, harness, outerRevisions) {
       omitted_candidates: value.truncation.omitted_candidates,
       omitted_routes: value.truncation.omitted_routes,
       omitted_warnings: value.truncation.omitted_warnings,
+      omitted_quota_scopes: value.truncation.omitted_quota_scopes,
       max_bytes: MAX_BYTES,
     },
   };
