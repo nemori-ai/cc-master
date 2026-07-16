@@ -1,21 +1,21 @@
 ---
 name: pacing-and-estimation
-description: 'Use when 你（orchestrator/agent）在 Codex 下要读取 ccm 的只读 advisory 与估算——解释当前账号 7d hard ceiling、rolling-24h 过快消耗风险、GPT-5.6 Sol/Terra/Luna 与 reasoning effort 的能力和成本事实、目标 ETA、EVM、综合风险、cost-to-complete，或 `ccm usage advise` / `ccm estimate forecast` 的 verdict 与字段。覆盖 Codex 7d-only 配速合同、rolling-24h advisory、当前账号 rate-limit 信号源、family×effort 观测，以及 coverage_pct/confidence/conformal 区间等诚实字段；历史或额外 `five_hour` / 5h 输入只是 ignored provenance，不具备动作权威。Triggers: 在 Codex 下读 ccm usage/estimate 输出或 EVM 的 `has_baseline` 字段、"Sol/Terra/Luna 的能力和相对成本是什么 / high、xhigh、max 表示什么 / 这个 forecast 信不信 / EVM 偏差怎么看 / 当前账号 7d 和过去 24h 消耗速度怎么看"、配额逼顶时判读 usage、pacing/估算 hook 注入提示。Do NOT use when 要决定减速、停派、replan、用户升级、模型分配、WIP、拆分、推迟、后台放置或 watchdog（归 master-orchestrator-guide）；不要在这里执行 ccm 命令、baseline / coordination 写操作或填写 board 字段（归 using-ccm），也不要借用其他 harness 的 account、statusline 或 workflow 机制。任何 5h 输入都不得触发 throttle、switch、stop_5h、reset 或 wakeup；Codex 自动换号永久禁止。ccm 提供事实与 advisory，这里只整理决策输入；具体决策查 master-orchestrator-guide。'
+description: 'Use when 你（orchestrator/agent）在 Codex origin 中要读取 ccm 的只读 advisory 与估算——包括三路统一 `model-policy` 的 O/T1/T2/T3 候选、角色证据、成本与 task affinity，以及 Codex 当前账号 7d hard ceiling、rolling-24h 风险、目标 ETA、EVM、综合风险和 cost-to-complete。Triggers: 读 `ccm model-policy show|advise`、ccm usage/estimate 输出或 EVM 的 `has_baseline` 字段、"跨 provider 哪些候选有证据 / 这个 affinity 或 forecast 信不信 / 当前账号 7d 和过去 24h 消耗速度怎么看"、配额逼顶时判读 usage、pacing/估算 hook 注入提示。Do NOT use when 要决定减速、停派、replan、用户升级、最终模型分配、WIP、拆分、推迟、后台放置或 watchdog（归 master-orchestrator-guide）；不要在这里执行 ccm 命令、baseline / coordination 写操作或填写 board 字段（归 using-ccm），也不要借用其他 harness 的 account、statusline 或 workflow 机制。模型事实视图跨 provider 共享；usage 信号与 dispatch 机制仍按目标 surface / origin 各自证明。任何 5h 输入都不得触发 throttle、switch、stop_5h、reset 或 wakeup；Codex 自动换号永久禁止。'
 ---
 
 # pacing-and-estimation — 消费 ccm 只读 advisory 配速 + 估算
 
-> 这里只执行三类能力：读取并解释 ccm 已产生的 advisory；引用当前 host 的模型事实 registry；把整理后的决策输入交给 `master-orchestrator-guide`。
+> 这里只执行三类能力：读取并解释 ccm 已产生的 advisory；引用三个 provider 共用的模型事实 / role / affinity registry；把整理后的决策输入交给 `master-orchestrator-guide`。
 
 ## 封闭能力边界
 
 1. **读取并解释 advisory**：只消费 ccm 已返回的字段，不在这里产生或更新 board、baseline、coordination 或账号状态。
-2. **引用模型 registry**：只从 [references/model-tiers.md](references/model-tiers.md) 读取当前 host 已证明的可用性、provenance、能力与成本事实。
+2. **引用模型 registry**：只从 [references/model-tiers.md](references/model-tiers.md) 读取全机 selected targets 的可用性、provenance、role evidence、affinity 与成本事实。
 3. **交接决策输入**：只把 verdict、reset、不确定性、模型事实与来源整理给 `master-orchestrator-guide`；具体编排动作由它决定。
 
 命令形状、flag 与任何状态 mutation 都查 `using-ccm`。前置事实不存在时保持 `unknown` / `available:false`，不要在这里补造。
 
-## 当前 host 事实入口
+## 当前 origin 的 usage + 全机模型事实入口
 
 - **host**：`codex`
 - **usage profile**：只把当前账号 7d 当 hard ceiling，rolling-24h 只作过快消耗 advisory；历史或额外 `five_hour` / 5h 字段仅是 ignored provenance，不得触发 `throttle`、`switch`、`stop_5h`、reset 或 wakeup。Codex 自动换号永久禁止。
@@ -28,6 +28,7 @@ description: 'Use when 你（orchestrator/agent）在 Codex 下要读取 ccm 的
 | `ccm usage advise --json` | 读 `available`、`verdict`、`strength` 与 `nearest_reset`；不自行重算走廊。 |
 | `ccm usage show --json` | 读当前 host 已证明的窗口百分比与 reset 状态；缺失字段保持 unknown。 |
 | `ccm usage task-cost <id> --json` | 读单任务可归因的 token / duration 事实；不要用账户 aggregate delta 反推节点成本。 |
+| `ccm model-policy show --task <task-taxonomy> --json` | 读三个 provider 共用的 hard facts、项目 role evidence 与有时效的 community advisory；三层不可互相补证。 |
 | `ccm coordination inbox list --unconsumed --json` | 只读已经产出的 pool-aware own row 与通知；不存在或陈旧时保持不可判。 |
 | `ccm estimate forecast --json` | 读 p50 / p80 / p95、`coverage_pct`、`confidence` 与区间宽度。 |
 | `ccm estimate evm --json` | 读 `has_baseline`、`spi_t` 与 `cpi`；`has_baseline:false` 时不制造计划事实。 |
@@ -42,13 +43,13 @@ description: 'Use when 你（orchestrator/agent）在 Codex 下要读取 ccm 的
 - usage：`verdict`、`strength`、`nearest_reset`、窗口事实与信号来源。
 - estimate：p50 / p80 / p95、`coverage_pct`、`confidence`、conformal 区间、EVM 与风险字段。
 - pool-aware：只读已经产出的 own row、通知 freshness 与 pool identity 证据。
-- model：registry 中当前 host 已证明的可用性、provenance、能力与相对成本。
+- model：registry 中三个 provider 的可用性、provenance、role evidence、task affinity 与相对成本；origin 不裁剪候选池。
 
 把以上输入交给 `master-orchestrator-guide`；超出三类能力的具体编排动作一律归它决定。
 
 ## Pointers
 
-- **[references/model-tiers.md](references/model-tiers.md)** — 当前 host 的模型事实 registry：可用性、provenance、相对成本与能力边界。
+- **[references/model-tiers.md](references/model-tiers.md)** — 三个 provider 共用的模型事实 / role evidence / task-affinity read model：可用性、provenance、相对成本与能力边界。
 - **[references/usage-signals.md](references/usage-signals.md)** — usage 信号源、窗口与诚实天花板。
 - **[references/pacing-levers.md](references/pacing-levers.md)** — verdict 与候选 lever 类的事实映射。
 - **[references/estimation.md](references/estimation.md)** — estimate 字段、baseline-derived 事实与不确定性读法。

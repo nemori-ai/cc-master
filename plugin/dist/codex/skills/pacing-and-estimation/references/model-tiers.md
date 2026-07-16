@@ -1,20 +1,20 @@
 # 模型档位事实 —— 可用性、相对成本与能力边界
 
-> **何时读：** 需要确认当前 host 可用哪些档位、相对成本、能力边界、provenance 或不确定性时读取；把事实交给 `master-orchestrator-guide` 的 `references/model-allocation.md` 作具体分档、主线固定与容量动作。
+> **何时读：** 需要从任意 origin 确认全机三个 provider 有哪些模型候选、角色证据、相对成本、任务亲和度、provenance 或不确定性时读取；把事实交给 `master-orchestrator-guide` 的 `references/model-allocation.md` 作具体分档、主线固定与容量动作。
 
-## Codex 模型事实入口（family × effort）
+不要读“当前 host 的内嵌型号表”。统一查询当前安装的 ccm registry：
 
-运行 `ccm provider facts codex --json`。该命令返回 ccm 内置、带 OpenAI 官方来源和有效期的 GPT-5.6 snapshot；本页只教你消费字段，不维护第二份 model ID 清单。
+```bash
+ccm model-policy show --task <task-taxonomy> --json
+ccm provider facts <claude-code|codex|cursor> --json
+```
 
-进入 live admission 前要求 `freshness:"fresh"`、`catalog_eligible_for_admission_check:true`、完整的 `source/observed_at/valid_until/account_scope/confidence/unknown`。静态 snapshot 的 `eligible_for_automatic_selection` 必须保持 `false`；当前账号 entitlement 与 exact-model admission 另行证明后，orchestrator 才能组合这些事实做选择。当前 snapshot 保存的官方观测是 Luna/Terra/Sol 相对 output cost `1 / 2.5 / 5`，以及 SWE-Pro / Terminal-Bench 2.1 headline；例如 Sol 为 `64.6 / 88.8`。这些数值只用于校验 ccm facts 没有漂移，不能替代当次命令输出，也不是每类任务或每种 effort 的承诺。
+三个 origin 得到相同的 selected-target 事实视图；origin-specific slot 只保留 usage 信号与发车机制，不再改变目标模型表。读输出时始终分三层：
 
-### Effort 语义
+1. `hard_facts`：厂商官方 model / surface / availability / price / benchmark snapshot。它能产生 candidate，不能证明当前账号 entitlement、exact selector 或 role grade。
+2. `project_role_evidence`：本项目对 `O / T1 / T2 / T3` 的候选、认证状态和 blockers。`candidate` 不等于 `certified`；认证过期或 target version 漂移后按 unknown 处理。
+3. `community_advisory`：带来源、TTL、confidence、contradictions 和衰减的任务 taste。它只在硬门已过且基础分相近时作有界 tie-break；`stale / mixed / unknown` 归零，不能生成 availability、eligibility 或 effect floor。
 
-| effort | 稳定语义 |
-|---|---|
-| **low**（UI 的 Light） | 边际推理深度与消耗最低 |
-| **medium** | 默认的中等推理深度 |
-| **high / xhigh** | 更高的推理深度、自检与消耗 |
-| **max** | 单任务可用的最高常规推理深度与消耗 |
+成本比较也要 target-bound：官方 API price、订阅内 credits、on-demand、BYOK 和未知 payer 不是同一个成本池。缺真实 payer / quota / authorization 时标 unknown，不因为另一个 surface、同品牌账号或宣传价格看起来便宜就补值。
 
-`ultra` 是用 subagents 展开 workstreams 的多-agent 拓扑，不是 `max` 之后的普通 effort，也不应记录成 leaf 的 model tier。Fast mode 会更快消耗 credits，不是低成本档。Family 与 effort 是独立输入；具体任务分档查 `master-orchestrator-guide` 的 `references/model-allocation.md`。
+本页只解释事实与不确定性，不决定 executor、route、WIP 或是否发车。排序决策与 ample / tight fallback 回 `master-orchestrator-guide`；命令输入形状查 `using-ccm`。

@@ -52,14 +52,20 @@ test('complete installed Codex skill portfolio contains no actionable five-hour 
   );
 });
 
-test('Claude runtime model facts include the current Sonnet 5 tier', () => {
+test('Claude runtime guidance resolves current Sonnet 5 facts through the tracked ccm registry', () => {
   const models = read(
     'plugin/dist/claude-code/skills/pacing-and-estimation/references/model-tiers.md',
   );
+  const registry = JSON.parse(read('ccm/apps/cli/src/provider-model-facts.json'));
   const reviewTransport = read(
     'plugin/dist/claude-code/skills/master-orchestrator-guide/scripts/codex-review.sh',
   );
-  assert.match(models, /Sonnet 5|claude-sonnet-5/u);
+  assert.match(models, /ccm provider facts/u);
+  assert.ok(
+    registry.providers['claude-code'].models.some(
+      (model) => model.model_id === 'claude-sonnet-5',
+    ),
+  );
   assert.match(reviewTransport, /CODEX_REVIEW_MODEL_REQUIRED/u);
   assert.doesNotMatch(reviewTransport, /CODEX_REVIEW_MODEL:-gpt-/u);
 });
@@ -68,5 +74,12 @@ test('Claude runtime model facts do not claim Fable is unconditionally unavailab
   const models = read(
     'plugin/dist/claude-code/skills/pacing-and-estimation/references/model-tiers.md',
   );
+  const registry = JSON.parse(read('ccm/apps/cli/src/provider-model-facts.json'));
   assert.doesNotMatch(models, /Fable 5 当前不可用/u);
+  assert.equal(
+    registry.providers['claude-code'].models.find(
+      (model) => model.model_id === 'claude-fable-5',
+    ).availability.state,
+    'conditional',
+  );
 });

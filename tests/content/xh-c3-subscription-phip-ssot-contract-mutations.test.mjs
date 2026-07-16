@@ -91,6 +91,7 @@ test('ignored local plan cannot become an authority surface', (t) => {
   const root = mutationTarget(t, 'ignored-plan');
   mkdirSync(join(root, 'design_docs/plans'), { recursive: true });
   const ignoredPlan = join(root, 'design_docs/plans/hostile-local-review.md');
+  mkdirSync(join(root, 'design_docs/plans'), { recursive: true });
   writeFileSync(
     ignoredPlan,
     [

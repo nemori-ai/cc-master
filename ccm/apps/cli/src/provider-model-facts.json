@@ -1,11 +1,11 @@
 {
   "schema": "ccm/provider-model-facts-registry/v1",
-  "revision": "2026-07-15.1",
+  "revision": "2026-07-16.1",
   "providers": {
     "claude-code": {
       "schema": "ccm/provider-model-facts/v1",
       "provider": "claude-code",
-      "revision": "2026-07-15.1",
+      "revision": "2026-07-16.1",
       "supported_surfaces": ["claude-code-cli"],
       "supported_client_versions": ["current"],
       "source": [
@@ -17,6 +17,11 @@
         {
           "id": "anthropic-fable-5",
           "url": "https://www.anthropic.com/news/redeploying-fable-5",
+          "retrieved_at": "2026-07-15T00:00:00Z"
+        },
+        {
+          "id": "anthropic-fable-5-capabilities",
+          "url": "https://www.anthropic.com/claude/fable",
           "retrieved_at": "2026-07-15T00:00:00Z"
         },
         {
@@ -67,7 +72,7 @@
           "pricing": null,
           "benchmarks": null,
           "selectors": [],
-          "source_refs": ["anthropic-fable-5"],
+          "source_refs": ["anthropic-fable-5", "anthropic-fable-5-capabilities"],
           "supersedes": []
         },
         {

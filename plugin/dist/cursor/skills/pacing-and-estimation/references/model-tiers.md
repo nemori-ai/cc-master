@@ -1,22 +1,20 @@
 # 模型档位事实 —— 可用性、相对成本与能力边界
 
-> **何时读：** 需要确认当前 host 可用哪些档位、相对成本、能力边界、provenance 或不确定性时读取；把事实交给 `master-orchestrator-guide` 的 `references/model-allocation.md` 作具体分档、主线固定与容量动作。
+> **何时读：** 需要从任意 origin 确认全机三个 provider 有哪些模型候选、角色证据、相对成本、任务亲和度、provenance 或不确定性时读取；把事实交给 `master-orchestrator-guide` 的 `references/model-allocation.md` 作具体分档、主线固定与容量动作。
 
-## Cursor 双 surface 模型事实入口
+不要读“当前 host 的内嵌型号表”。统一查询当前安装的 ccm registry：
 
-先运行 `ccm provider facts cursor --json`。该命令返回 ccm 内置、带 Cursor 官方来源和有效期的 snapshot；本页只教你消费字段，不维护第二份 selector allowlist。
+```bash
+ccm model-policy show --task <task-taxonomy> --json
+ccm provider facts <claude-code|codex|cursor> --json
+```
 
-### `cursor-ide-plugin`：IDE 原生 Task
+三个 origin 得到相同的 selected-target 事实视图；origin-specific slot 只保留 usage 信号与发车机制，不再改变目标模型表。读输出时始终分三层：
 
-若 `unknown[]` 仍含 `cursor_ide_task_model_catalog` 或 `cursor_ide_task_selector_acceptance`，IDE 的精确模型与 selector 就必须保持 `unknown` 并 fail closed。不得用 `cursor-agent-cli` 的 catalog、quota、entitlement 或 selector 补齐 IDE 事实，也不得因两者登录同一 Cursor identity 而声称 IDE Task 接受某个模型。
+1. `hard_facts`：厂商官方 model / surface / availability / price / benchmark snapshot。它能产生 candidate，不能证明当前账号 entitlement、exact selector 或 role grade。
+2. `project_role_evidence`：本项目对 `O / T1 / T2 / T3` 的候选、认证状态和 blockers。`candidate` 不等于 `certified`；认证过期或 target version 漂移后按 unknown 处理。
+3. `community_advisory`：带来源、TTL、confidence、contradictions 和衰减的任务 taste。它只在硬门已过且基础分相近时作有界 tie-break；`stale / mixed / unknown` 归零，不能生成 availability、eligibility 或 effect floor。
 
-### `cursor-agent-cli`：headless worker
+成本比较也要 target-bound：官方 API price、订阅内 credits、on-demand、BYOK 和未知 payer 不是同一个成本池。缺真实 payer / quota / authorization 时标 unknown，不因为另一个 surface、同品牌账号或宣传价格看起来便宜就补值。
 
-ccm facts 当前记录 Cursor first-party 的 Auto、Composer 2.5 与 Grok 4.5 selector；精确 selector 只读命令当次返回的 `models[].selectors`。自动候选还必须同时通过：
-
-1. snapshot `freshness:"fresh"` 且 `catalog_eligible_for_admission_check:true`；静态 snapshot 的 `eligible_for_automatic_selection` 必须保持 `false`，不得跳过后续 live gates；
-2. fresh `cursor-agent --list-models` catalog 与本次 selector 交集；
-3. payer 为 Cursor subscription，quota provenance 绑定 `cursor-first-party` pool；
-4. live entitlement、exact-model admission 与 accountable `run_ref` 全部绑定 `cursor-agent-cli` surface。
-
-Auto 只能做 identity smoke，不证明 exact-model acceptance；`fast` 不是省配额档。任何 BYOK、on-demand、API、external-key、shared、unknown 或 ambiguous payer/quota provenance 都 fail closed。API fallback 永久禁止；真实 paid canary 只有在用户对该次调用给出新的明确批准后才可执行。
+本页只解释事实与不确定性，不决定 executor、route、WIP 或是否发车。排序决策与 ample / tight fallback 回 `master-orchestrator-guide`；命令输入形状查 `using-ccm`。

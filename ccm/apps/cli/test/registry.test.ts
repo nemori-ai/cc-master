@@ -22,6 +22,7 @@ const EXPECTED: Record<string, string[]> = {
   capability: ['check'],
   worker: ['help', 'run'],
   provider: ['facts', 'inspect'],
+  'model-policy': ['show', 'advise'],
   orchestrator: ['context'],
   route: ['advise'],
   quota: ['status', 'refresh', 'preflight', 'reserve', 'audit'],

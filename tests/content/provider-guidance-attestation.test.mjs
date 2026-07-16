@@ -77,7 +77,7 @@ test('each R17 P1 hostile guidance mutant is rejected before its tree is publish
     {
       host: 'claude-code',
       skill: 'pacing-and-estimation',
-      path: 'plugin/src/skills/pacing-and-estimation/adapters/claude-code/overlays/model-tiers-reference.md',
+      path: 'plugin/src/skills/pacing-and-estimation/canonical/references/model-tiers.md',
       payload: '\nFable 5 当前不可用；Sonnet 4.6 是当前平衡档。\n',
       label: 'Claude stale model facts mutant',
     },

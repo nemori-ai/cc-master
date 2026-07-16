@@ -298,7 +298,7 @@ Codex 下，`executor` 仍是 board 的领域字段，不是 Codex API 名。`re
 | `coordination` | `none | single-boundary | multi-boundary` |
 | `reversibility` | `reversible | costly | irreversible` |
 
-同一 profile 还必须带：严格 UTC `assessed_at`、非空 `assessor`、`estimate_confidence: low|medium|high`、`quality.effect_floor`、`budget.posture: ample|tight`、正整数 `budget.max_attempts`，以及 `capabilities.required/preferred/forbidden` 三组 capability object。`required` 至少一个；三组 id 各自唯一且不可跨组重叠。task 本身还要有正数 `estimate`。
+同一 profile 还必须带：严格 UTC `assessed_at`、非空 `assessor`、`estimate_confidence: low|medium|high`、`quality.effect_floor`、`budget.posture: ample|tight`、正整数 `budget.max_attempts`，以及 `capabilities.required/preferred/forbidden` 三组 capability object。新写入的模型角色 policy 中，`quality.effect_floor` 只取 `O | T1 | T2 | T3`：设计 / 规格和高风险异族 review 用 `O`，完整规格实现与常规异族 review 用 `T1`，只读研究 / grounded summarize 用 `T2`，机械确定性工作用 `T3`。`required` 至少一个；三组 id 各自唯一且不可跨组重叠。task 本身还要有正数 `estimate`。
 
 ```json
 {
@@ -315,7 +315,7 @@ Codex 下，`executor` 仍是 board 的领域字段，不是 Codex API 名。`re
     "reversibility": "reversible"
   },
   "estimate_confidence": "medium",
-  "quality": { "effect_floor": "acceptance-capable" },
+  "quality": { "effect_floor": "T1" },
   "budget": { "posture": "ample", "max_attempts": 2 },
   "capabilities": {
     "required": [{ "id": "repository-reasoning" }],
@@ -333,11 +333,22 @@ Codex 下，`executor` 仍是 board 的领域字段，不是 Codex API 名。`re
 - `constraints`：非空 `effect_floor`；`quota_unknown` 必须是 `ineligible`；`cross_harness_quota_admission` 必须是 `ample-only`。
 - `candidates[]`：每项显式给 `id`、`surface: host-native|cli-headless`、`adapter`、`harness`、`provider`、**精确** `model`（禁止 `auto`）、`effort`、`capabilities[]`、`effect_floors_met[]`、`permission{profile,denies[]}`、`account_mutation:"forbidden"`、`requires[]`。候选能力必须覆盖 planning.required、满足 effect floor，permission.denies 必须覆盖 planning.forbidden 和 `account-mutation`。
 - `requires[]` 至少含 `capability-match`、`effect-floor`、`permission-compatible`、`account-mutation-forbidden`；其它机械资格（例如 runtime health）可显式追加。
-- `chains.ample` / `chains.tight`：candidate id 的有序、无重复链；同 harness 也只有显式列成 candidate 才能 fallback 回去。
+- `chains.ample` / `chains.tight`：candidate id 的有序、无重复链；同 harness 也只有显式列成 candidate 才能 fallback 回去。两条链都必须保持 planning 的同一 effect floor；tight 只能在同档候选中改为价格 / quota 优先，不得用降档冒充 fallback。
 - `fallback.on` 只允许机械失败：`binary-unavailable | auth-expired | model-unavailable | model-mismatch | quota-tight | rate-limited | startup-timeout | transport-error`。
 - `fallback.never_on` 必须覆盖：`policy-blocked | permission-blocked | security-blocked | workspace-mismatch | task-blocked | acceptance-failed`；`exhaustion:"fail-closed"`、`same_harness:"explicit-candidate-only"` 固定 fail-closed。
 
 `set-routing` 只生成 `mode:"cross-harness"`、`selected:null`、`attempts:[]` 的 envelope；**它不读取 provider、不选择 candidate、不 reserve、不 spawn、不 fallback**。candidate 的 `harness/provider/model/effort/surface` 是 ledger 中的计划事实，不是 ccm 对各家 CLI flags 的复制。
+
+先用 `ccm model-policy show --task <task-taxonomy> --json` 取得三路共用的角色 / 事实 / affinity 视图，再对每个候选独立取得 live admission。只把已过硬门的精确 target 写进 routing policy：
+
+- 系统 / 架构 / spec 节点：`effect_floor: "O"`；master 独有全图判断用 `executor=master-orchestrator`，可独立交付设计 artifact 才用 O subagent。
+- 实现节点：完整 spec 下用 `T1`；常规 review 也用与 producer 不同 family 的异族 `T1`。
+- 安全 / 架构 / adversarial review：用异族 `O`；无 O 容量就保持 gate blocked。
+- repository / web research：`T2`；纯机械提取可另切 `T3` leaf，不能原地降低研究节点的 floor。
+
+示意链：`chains.ample=["t1-quality", "t1-cheap"]`，`chains.tight=["t1-cheap", "t1-quality"]`。两条都只引用 `effect_floors_met` 含 `T1` 且已准入的候选；quota tight 可重排，不得塞入 T2。Cursor third-party Fable / Sol 还必须有明确 payer、paid-use 与 retention 授权，否则不要写进任何 chain。
+
+community taste 只影响合格候选的近似同分排序。最终 routing rationale 应通过现有 selection / log 记下 model-policy registry revision、task taxonomy、采用或忽略的 evidence refs 与理由；不要把 community ledger 全量复制进 board，也不要把它写进 `effect_floors_met`。
 
 ### activation 与写入顺序
 

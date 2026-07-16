@@ -76,7 +76,7 @@ test('Cursor IDE and headless CLI guidance keep independent role and evidence bo
   const ideFacts = read('design_docs/harnesses/cursor.md');
   const cliFacts = read('design_docs/harnesses/cursor-agent-cli.md');
   const cursorModelFacts = read(
-    'plugin/src/skills/pacing-and-estimation/adapters/cursor/overlays/model-tiers-reference.md',
+    'plugin/src/skills/pacing-and-estimation/canonical/references/model-tiers.md',
   );
   assert.match(contract, /`cursor-ide-plugin`/u);
   assert.match(contract, /`cursor-agent-cli`/u);
@@ -128,9 +128,9 @@ test('three-host pacing projection rejects canonical references, overlays, descr
   }
 
   for (const [host, overlay, holdout] of [
-    ['claude-code', 'model-tiers-reference.md', HOLDOUTS[0]],
+    ['claude-code', 'usage-signals-reference.md', HOLDOUTS[0]],
     ['codex', 'levers-reference.md', HOLDOUTS[1]],
-    ['cursor', 'model-tiers-reference.md', HOLDOUTS[2]],
+    ['cursor', 'usage-signals-reference.md', HOLDOUTS[2]],
   ]) {
     const root = makeProjectionFixture();
     try {

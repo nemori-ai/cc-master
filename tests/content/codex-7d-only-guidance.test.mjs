@@ -25,7 +25,7 @@ const CODEX_GUIDANCE_PATHS = [
   'plugin/src/skills/pacing-and-estimation/adapters/codex/overlays/description.md',
   'plugin/src/skills/pacing-and-estimation/adapters/codex/overlays/usage-signals-reference.md',
   'plugin/src/skills/pacing-and-estimation/adapters/codex/overlays/levers-reference.md',
-  'plugin/src/skills/pacing-and-estimation/adapters/codex/overlays/model-tiers-reference.md',
+  'plugin/src/skills/pacing-and-estimation/canonical/references/model-tiers.md',
   'plugin/src/skills/master-orchestrator-guide/adapters/codex/overlays/capacity-account-guidance.md',
   'plugin/dist/codex/skills/pacing-and-estimation/SKILL.md',
   'plugin/dist/codex/skills/pacing-and-estimation/references/usage-signals.md',

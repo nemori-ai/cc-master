@@ -14,9 +14,6 @@ runtime_contracts:
     registry: ../provider-guidance-runtime.json
     host: cursor
     skill: pacing-and-estimation
-  model_admission:
-    source: adapters/cursor/overlays/model-tiers-reference.md
-    target: references/model-tiers.md
 unsupported:
   - capability: account_switch_pacing
     reason: "Cursor automatic account switching is permanently forbidden; no switch verdict."
@@ -31,7 +28,6 @@ supported:
     reason: "Cursor model guidance is plan/payer-qualified; real model tests admit only freshly cataloged Auto/Composer 2.5/Grok 4.5 first-party selectors and never auto-fallback to API."
 slot_replacements:
   "{{PACING_DESCRIPTION}}": adapters/cursor/overlays/description.md
-  "{{PACING_MODEL_TIERS_REFERENCE}}": adapters/cursor/overlays/model-tiers-reference.md
   "{{PACING_USAGE_SIGNALS_REFERENCE}}": adapters/cursor/overlays/usage-signals-reference.md
   "{{PACING_LEVERS_REFERENCE}}": adapters/cursor/overlays/levers-reference.md
   "{{CROSS_HARNESS_ACTIVE_QUERY_POINTER}}": adapters/cursor/overlays/cross-harness-active-query-pointer.md

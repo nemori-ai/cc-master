@@ -1,6 +1,6 @@
 ---
 name: master-orchestrator-guide
-description: 'Use when running a long-horizon (>24h) goal as a master orchestrator, or coordinating several background agents / workflows toward one large goal — 当你在做总指挥协调多个后台任务时 — even if the user never said "orchestrate". 每次 compaction 之后都要用。一旦你抓到自己在以下任一情形——后台还有可派发的活却 idle-wait 空等、为显得忙而 manufacture busywork、亲手抄起乐器（亲自实现或 review）、把 green gate 或空 review 当 passed、或擅自决定一个本该用户拍板的 merge / 不可逆步骤——立刻调用。'
+description: 'Use when running a long-horizon (>24h) goal as a master orchestrator, coordinating several background agents / workflows toward one large goal，或要跨 Claude Code、Codex、Cursor 的统一 worker pool 按任务角色选择 O/T1/T2/T3 候选与 fail-closed fallback — 当你在做总指挥协调多个后台任务时 — even if the user never said "orchestrate". 每次 compaction 之后都要用。一旦你抓到自己在以下任一情形——后台还有可派发的活却 idle-wait 空等、只看当前 origin 的模型、为显得忙而 manufacture busywork、亲手抄起乐器（亲自实现或 review）、把 green gate 或空 review 当 passed、或擅自决定一个本该用户拍板的 merge / 不可逆步骤——立刻调用。Do NOT use when 你只需要查询 ccm 命令语法或解释事实字段；操作面归 using-ccm，事实消费归 pacing-and-estimation。'
 ---
 
 # Orchestrating to Completion（编排至完成）
@@ -73,7 +73,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 ### 七镜头（The seven lenses）——操作哲学
 
 1. **指挥不演奏 (Conduct, don't play)** — 拆图 / 派发 / 验收 / 整合。绝不亲手实现或 review。
-2. **目标即依赖图 (Goal = dependency graph)** — **先有通过 Goal Framing Test / `ccm goal check` 的 Goal Contract，才有资格拆图**（原始请求是证据，不是可复制的目标；见 `references/goal-contract.md`）。再拆成 DAG，找临界路径，把资源压到临界链上（非临界的 float 是免费的并行预算；「资源」也含**模型档位**——临界链上用强模型、float 上用廉价模型——档位事实与按难度选档见 `pacing-and-estimation` skill）。**每条依赖边都是债务，默认错——除非你能指名一个被下游直接消费的具体上游产物（artifact / hash），否则删掉它。**「先做 X 当安全网」「按这个顺序更稳妥」是顺序习惯，不是数据依赖。默认全并行，逐边举证；拆图细节见 `references/decomposition.md` §1–§2（临界路径 / float 可心算估计，也可用 `ccm board graph` 机器算·详见 `references/decomposition.md` §3）。一个大节点*内部*本身是复杂规划问题时，让它用被编排项目自己的 planning 层 + 维护计划文档——见 `references/multi-layer-planning.md`。
+2. **目标即依赖图 (Goal = dependency graph)** — **先有通过 Goal Framing Test / `ccm goal check` 的 Goal Contract，才有资格拆图**（原始请求是证据，不是可复制的目标；见 `references/goal-contract.md`）。再拆成 DAG，找临界路径，把资源压到临界链上（非临界的 float 是免费的并行预算；task 的工作形态 / 风险先决定 `O / T1 / T2 / T3` effect floor，临界性只决定同档候选中如何分配额度和 headroom，绝不把“临界=强档、float=弱档”当捷径——统一事实与选档见 `pacing-and-estimation` 和 `references/model-allocation.md`）。**每条依赖边都是债务，默认错——除非你能指名一个被下游直接消费的具体上游产物（artifact / hash），否则删掉它。**「先做 X 当安全网」「按这个顺序更稳妥」是顺序习惯，不是数据依赖。默认全并行，逐边举证；拆图细节见 `references/decomposition.md` §1–§2（临界路径 / float 可心算估计，也可用 `ccm board graph` 机器算·详见 `references/decomposition.md` §3）。一个大节点*内部*本身是复杂规划问题时，让它用被编排项目自己的 planning 层 + 维护计划文档——见 `references/multi-layer-planning.md`。
 3. **就绪即发，绝不在 barrier 干等 (Dispatch on ready, never wait at a barrier)** — dataflow：一个节点的依赖刚满足就立刻派发它；并行度 = 用 T₁/T∞ 算该开几条 lane（T₁/T∞ 可心算，也可 `ccm board graph` 机器读·见 `references/decomposition.md` §3）。派发前先从整个本机 worker pool 选择 target harness、agent 与模型：origin harness 不是 worker 候选边界，按目标 harness 的模型能力、成本、配额与任务适配度择优；再按 先选 target harness（origin harness 只是候选之一），再按当前 Cursor surface 已感知能力选择本 host 的 Task subagent / 后台 Shell / external，或用 `ccm` 管理其他 harness worker；不要调用 Claude Code 的 workflow / background-runner 原语；需要机制细节，细节见 `references/dispatch.md`。**dispatch 动作 = 一次真实工具调用并记下它返回的 handle；没有真实 handle 的 task 不得标 `in_flight`。派发先于 board 标注——先调工具拿 handle、再 `Write` board**（标注 ≠ 派发；为什么、地面真相验证法见 `references/dispatch.md` §「派发卫生」）。
 4. **主观能动，不被动空等 (Be proactive, never idle-wait)** — 歇下来之前，先把可做工作池榨干、主动排程。合法的等待 = 剩下的每条 path 要么 blocked 在某个 `in-flight` 后台任务上、要么已抛给用户待答。罪在**本可行动却被动**，不在闲置本身。**等待前若有 blocked 在「可能静默失败的 in-flight 后台任务」上的 path，先 arm 一个 watchdog 自我唤醒**——harness 的自动重唤起只在任务*完成*时触发，对 hang / 静默死 / 幽灵任务（永不触发完成事件）结构性失明；watchdog 是补这个盲区的安全网（纯 awaiting-user 不需，那条线既有通知覆盖）。探活分两轨（机械 watchdog 兜底 ∥ 心智搭车探活防迟钝）、ceiling 是 recon 触发器**不是死亡判据**（recon 后健康则延长重 arm、不误杀）——机制 / 触发条件 / 节制判据 / board `wakeup` 双层记录见 `references/async-hitl.md` §等待前 arm watchdog。
 5. **量力而行，不顶满 (Work within capacity — don't max it out)** — 限制 WIP，瞄一条**目标走廊上界**而非冲到 100%（Little's Law + 利用率悬崖；加 agent 不总是更快）。capacity 在 Cursor 只指当前账户 **billing_period（~30d）** 用量（`source: cursor-dashboard`），没有 5h/7d 滚动窗，也不支持 cc-master 账号池切换。若 `ccm usage advise` 出现 `switch` / `stop_5h` / `stop_7d` 残留语义，不运行账号切换命令，也不按双窗走廊行动；只有 billing-period 压力可以驱动降档、降 WIP、推迟 float，若账期真实烧穿（`stop_billing_period`）才停派并 surface 用户或等 `nearest_reset`。同池多块 active board 时，只消费来源与账期身份都 fresh 的 own row。用 `ccm usage advise` / `coordination arbitrate` 感知、按 `pacing-and-estimation` 读取 Cursor provider facts；ccm 出事实与 advisory，你决策。Cursor 下不要 drill `references/cost-decisions.md` 当换号手册。
@@ -167,7 +167,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | **slicing-goals-into-dags** | 怎么把目标**切**成 DAG（纵切薄增量 / walking skeleton / 粒度 / 价值风险排序） | 「这目标怎么拆 / 先做什么」——「切」先于你「目标即依赖图」镜头的「排」 |
 | **dev-as-ml-loop** | 把 dev 工作当优化系统：你设计外层 loop 与 handoff，执行 agent 跑单任务内层 loop | 派发 dev 任务前用它塑形 objective / measurement / artifact / restart；执行者用它把任务优化到验收 |
 | **engineering-with-craft** | 领域 / 类 / 合约 / 测试**本身**怎么建得好（DDD/OOP/SDD/TDD 五根 + 工程红线） | 派发的任务涉及设计/建模/写测试的手艺**内容**时（同 F，多由执行者用） |
-| **pacing-and-estimation** | 读 ccm `usage`/`estimate` 只读 advisory 配速 + 估算（verdict / host 模型档位 / EVM / 诚实字段） | 读 usage/estimate 输出、判降档/换号、拿不准 forecast 信不信时（**ccm 出 verdict、你决策**） |
+| **pacing-and-estimation** | 读 ccm `usage`/`estimate` 与跨 provider model-policy 只读 advisory（verdict / 角色证据 / 成本 / taste / EVM / 诚实字段） | 读 usage/estimate/model-policy 输出、判同档重排或拿不准 forecast / affinity 信不信时（**ccm 出事实与 advisory、你决策**） |
 
 > **分工红线**：**你 = 决策 + 排期 + 换号决策锚**；切分归 `slicing-goals-into-dags`、执行循环形状归 `dev-as-ml-loop`、手艺内容归 `engineering-with-craft`、读 advisory 消费归 `pacing-and-estimation`、ccm 操作机制归 `using-ccm`、workflow 写法归 `authoring-workflows`。越界复述会破坏 skill 间互不重叠的边界。
 
@@ -179,7 +179,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 |---|---|
 | `goal-contract.md` | fresh 澄清/改写目标、长需求落 Goal Brief、工作追溯、防 scope 漂移、amend revision、完成前全局验收 |
 | `decomposition.md` | 一张**已切好**的 DAG 怎么**排期**（CPM / float / 临界路径；心算 或 `ccm board graph` 机器算 §3） |
-| `model-allocation.md` | 读取 host 模型事实后，怎样按复杂性 / 风险 / duration 分档，以及配额收紧时怎样联动 WIP / float / background / watchdog / 用户决策 |
+| `model-allocation.md` | 读取三路统一模型事实后，怎样按工作角色定 `O / T1 / T2 / T3` floor、跨 provider 排序，以及配额收紧时怎样保持 floor 并联动 WIP / float / background / watchdog / 用户决策 |
 | `dispatch.md` | 从本机全池选跨 harness worker + 选 Cursor 当前 surface 可追踪后台机制（Task subagent / 后台 Shell / external scheduler）+ **派发卫生**；Workflow 语义当前 unsupported |
 | `async-hitl.md` | HITL / 采访式决策 / **step-6 ledger** / 等待前 arm watchdog / 前台∥后台派发顺序 |
 | `board.md` | board 协议 narrative + 长程操作纪律（窄腰 / status enum / 续跑 / 读写关卡） |
@@ -212,9 +212,10 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 1. `ccm harness list` —— 确认 machine-wide inventory 与真实 execution surface。
 2. `ccm worker help` —— 读取目标 CLI 的真实 help。
-3. `ccm provider facts`、`ccm usage show`、`ccm quota status` / `ccm quota preflight` —— 收集带 freshness / authority 边界的模型、用量与额度证据。
-4. `ccm route advise` —— 取得 shadow advice；它始终 `spawned=false`，不替你启动 worker。
-5. `ccm worker run` —— 选定后显式 dispatch。
+3. `ccm model-policy show`、`ccm provider facts` —— 先按 task role 读取三路统一的 hard facts / project role evidence / community advisory；candidate 不是 certified。
+4. `ccm usage show`、`ccm quota status` / `ccm quota preflight` —— 收集 selected target 的用量与 authority 证据；missing / stale / unknown 不补成 ample。
+5. `ccm model-policy advise` / `ccm route advise` —— 前者只在已 qualification 候选间执行有界排序，后者给 board shadow advice 且稳定返回 `spawned=false`；两者都不启动 worker。
+6. `ccm worker run` —— 选定后显式 dispatch。
 
 usage / quota 只提供各自当前能证明的证据：**当前没有按 target harness 统一查询剩余额度的通用命令**，任何 missing / stale / unavailable / unknown 都保持 unknown，不推断为 ample；持有 authority reference 时才做 quota preflight。
 

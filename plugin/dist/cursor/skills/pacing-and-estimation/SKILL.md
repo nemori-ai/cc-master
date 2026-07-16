@@ -1,21 +1,21 @@
 ---
 name: pacing-and-estimation
-description: 'Use when 你（orchestrator/agent）在 Cursor origin 下要消费 ccm 已产生的 advisory 与估算事实，并严格区分 `cursor-ide-plugin` 与 `cursor-agent-cli`：前者没有 IDE-local 证据时，模型资格、目录与能力保持 `unknown` 并 fail closed；后者只按 `references/model-tiers.md` 的 headless worker 合同读取 first-party 候选。Triggers: 在 Cursor 下读 `ccm usage advise` / `ccm estimate`，解释 hold/throttle/stop_billing_period、`window_billing_period_pct`、`nearest_reset`、`has_baseline` 或 `cursor-agent-cli` 已准入候选。Do NOT use when 你要决定是否停派/replan/请求用户拍板（归 master-orchestrator-guide），要建立 baseline、运行 coordination arbitration 或查 ccm 命令写法（归 using-ccm），要执行真实 Cursor/provider 请求，或要配置非 Cursor first-party 容量。Cursor 自动换号永久禁止；不得用 `cursor-agent-cli` 证据补齐 `cursor-ide-plugin` 事实。'
+description: 'Use when 你（orchestrator/agent）在 Cursor origin 中要读取 ccm 的只读 advisory 与估算——包括三路统一 `model-policy` 的 O/T1/T2/T3 候选、角色证据、成本与 task affinity，以及 Cursor billing-period usage；当 target 是 Cursor 时仍严格区分 `cursor-ide-plugin` 与 `cursor-agent-cli`，各自缺 target-local 证据即保持 `unknown`。Triggers: 读 `ccm model-policy show|advise`、`ccm usage advise` / `ccm estimate`，解释跨 provider 候选、affinity、hold/throttle/stop_billing_period、`window_billing_period_pct`、`nearest_reset` 或 `has_baseline`。Do NOT use when 你要决定最终模型分配、停派/replan/请求用户拍板（归 master-orchestrator-guide），要建立 baseline、运行 coordination arbitration 或查 ccm 命令写法（归 using-ccm），或要执行真实 provider 请求。模型事实视图跨 provider 共享；usage 信号与 dispatch 机制仍按目标 surface / origin 各自证明。Cursor 自动换号永久禁止；不得用 `cursor-agent-cli` 证据补齐 `cursor-ide-plugin` 事实。'
 ---
 
 # pacing-and-estimation — 消费 ccm 只读 advisory 配速 + 估算
 
-> 这里只执行三类能力：读取并解释 ccm 已产生的 advisory；引用当前 host 的模型事实 registry；把整理后的决策输入交给 `master-orchestrator-guide`。
+> 这里只执行三类能力：读取并解释 ccm 已产生的 advisory；引用三个 provider 共用的模型事实 / role / affinity registry；把整理后的决策输入交给 `master-orchestrator-guide`。
 
 ## 封闭能力边界
 
 1. **读取并解释 advisory**：只消费 ccm 已返回的字段，不在这里产生或更新 board、baseline、coordination 或账号状态。
-2. **引用模型 registry**：只从 [references/model-tiers.md](references/model-tiers.md) 读取当前 host 已证明的可用性、provenance、能力与成本事实。
+2. **引用模型 registry**：只从 [references/model-tiers.md](references/model-tiers.md) 读取全机 selected targets 的可用性、provenance、role evidence、affinity 与成本事实。
 3. **交接决策输入**：只把 verdict、reset、不确定性、模型事实与来源整理给 `master-orchestrator-guide`；具体编排动作由它决定。
 
 命令形状、flag 与任何状态 mutation 都查 `using-ccm`。前置事实不存在时保持 `unknown` / `available:false`，不要在这里补造。
 
-## 当前 host 事实入口
+## 当前 origin 的 usage + 全机模型事实入口
 
 - **host**：`cursor`
 - **usage profile**：读取 aggregate `billing_period` 的 `hold`、`throttle`、`stop_billing_period` 与 reset 事实；它不证明容量池拓扑，自动换号永久禁止。
@@ -28,6 +28,7 @@ description: 'Use when 你（orchestrator/agent）在 Cursor origin 下要消费
 | `ccm usage advise --json` | 读 `available`、`verdict`、`strength` 与 `nearest_reset`；不自行重算走廊。 |
 | `ccm usage show --json` | 读当前 host 已证明的窗口百分比与 reset 状态；缺失字段保持 unknown。 |
 | `ccm usage task-cost <id> --json` | 读单任务可归因的 token / duration 事实；不要用账户 aggregate delta 反推节点成本。 |
+| `ccm model-policy show --task <task-taxonomy> --json` | 读三个 provider 共用的 hard facts、项目 role evidence 与有时效的 community advisory；三层不可互相补证。 |
 | `ccm coordination inbox list --unconsumed --json` | 只读已经产出的 pool-aware own row 与通知；不存在或陈旧时保持不可判。 |
 | `ccm estimate forecast --json` | 读 p50 / p80 / p95、`coverage_pct`、`confidence` 与区间宽度。 |
 | `ccm estimate evm --json` | 读 `has_baseline`、`spi_t` 与 `cpi`；`has_baseline:false` 时不制造计划事实。 |
@@ -42,13 +43,13 @@ description: 'Use when 你（orchestrator/agent）在 Cursor origin 下要消费
 - usage：`verdict`、`strength`、`nearest_reset`、窗口事实与信号来源。
 - estimate：p50 / p80 / p95、`coverage_pct`、`confidence`、conformal 区间、EVM 与风险字段。
 - pool-aware：只读已经产出的 own row、通知 freshness 与 pool identity 证据。
-- model：registry 中当前 host 已证明的可用性、provenance、能力与相对成本。
+- model：registry 中三个 provider 的可用性、provenance、role evidence、task affinity 与相对成本；origin 不裁剪候选池。
 
 把以上输入交给 `master-orchestrator-guide`；超出三类能力的具体编排动作一律归它决定。
 
 ## Pointers
 
-- **[references/model-tiers.md](references/model-tiers.md)** — 当前 host 的模型事实 registry：可用性、provenance、相对成本与能力边界。
+- **[references/model-tiers.md](references/model-tiers.md)** — 三个 provider 共用的模型事实 / role evidence / task-affinity read model：可用性、provenance、相对成本与能力边界。
 - **[references/usage-signals.md](references/usage-signals.md)** — usage 信号源、窗口与诚实天花板。
 - **[references/pacing-levers.md](references/pacing-levers.md)** — verdict 与候选 lever 类的事实映射。
 - **[references/estimation.md](references/estimation.md)** — estimate 字段、baseline-derived 事实与不确定性读法。

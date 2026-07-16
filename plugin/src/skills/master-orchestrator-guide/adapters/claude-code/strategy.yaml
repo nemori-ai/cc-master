@@ -42,7 +42,6 @@ slot_replacements:
   "{{PLATFORM_RESUME_GUIDANCE}}": adapters/claude-code/overlays/platform-resume-guidance.md
   "{{HETEROGENEOUS_REVIEW_MECHANISM}}": adapters/claude-code/overlays/heterogeneous-review-mechanism.md
   "{{HANDOFF_REFERENCE_ROW}}": adapters/claude-code/overlays/handoff-reference-row.md
-  "{{MASTER_HOST_MODEL_ALLOCATION}}": adapters/claude-code/overlays/model-allocation.md
   "{{HOST_QUOTA_DESERTION_EXAMPLE}}": adapters/claude-code/overlays/quota-desertion-example.md
   "{{HOST_QUOTA_RATIONALIZATION_ROW}}": adapters/claude-code/overlays/quota-rationalization-row.md
   "{{HOST_QUOTA_RED_FLAG}}": adapters/claude-code/overlays/quota-red-flag.md

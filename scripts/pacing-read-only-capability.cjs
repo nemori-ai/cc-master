@@ -39,6 +39,11 @@ const ADVISORIES = {
     command: 'ccm usage task-cost <id> --json',
     interpretation: '读单任务可归因的 token / duration 事实；不要用账户 aggregate delta 反推节点成本。',
   },
+  model_policy_show: {
+    command: 'ccm model-policy show --task <task-taxonomy> --json',
+    interpretation:
+      '读三个 provider 共用的 hard facts、项目 role evidence 与有时效的 community advisory；三层不可互相补证。',
+  },
   coordination_inbox_list: {
     command: 'ccm coordination inbox list --unconsumed --json',
     interpretation: '只读已经产出的 pool-aware own row 与通知；不存在或陈旧时保持不可判。',
@@ -65,7 +70,8 @@ const ADVISORIES = {
   },
 };
 const REFERENCE_LABELS = {
-  'references/model-tiers.md': '当前 host 的模型事实 registry：可用性、provenance、相对成本与能力边界。',
+  'references/model-tiers.md':
+    '三个 provider 共用的模型事实 / role evidence / task-affinity read model：可用性、provenance、相对成本与能力边界。',
   'references/usage-signals.md': 'usage 信号源、窗口与诚实天花板。',
   'references/pacing-levers.md': 'verdict 与候选 lever 类的事实映射。',
   'references/estimation.md': 'estimate 字段、baseline-derived 事实与不确定性读法。',
@@ -191,17 +197,17 @@ function renderPacingReadOnlyCapability(registry, host) {
   return [
     '# pacing-and-estimation — 消费 ccm 只读 advisory 配速 + 估算',
     '',
-    '> 这里只执行三类能力：读取并解释 ccm 已产生的 advisory；引用当前 host 的模型事实 registry；把整理后的决策输入交给 `master-orchestrator-guide`。',
+    '> 这里只执行三类能力：读取并解释 ccm 已产生的 advisory；引用三个 provider 共用的模型事实 / role / affinity registry；把整理后的决策输入交给 `master-orchestrator-guide`。',
     '',
     '## 封闭能力边界',
     '',
     '1. **读取并解释 advisory**：只消费 ccm 已返回的字段，不在这里产生或更新 board、baseline、coordination 或账号状态。',
-    `2. **引用模型 registry**：只从 [${registry.model_registry}](${registry.model_registry}) 读取当前 host 已证明的可用性、provenance、能力与成本事实。`,
+    `2. **引用模型 registry**：只从 [${registry.model_registry}](${registry.model_registry}) 读取全机 selected targets 的可用性、provenance、role evidence、affinity 与成本事实。`,
     `3. **交接决策输入**：只把 verdict、reset、不确定性、模型事实与来源整理给 \`${registry.owners.decision}\`；具体编排动作由它决定。`,
     '',
     `命令形状、flag 与任何状态 mutation 都查 \`${registry.owners.command_and_mutation}\`。前置事实不存在时保持 \`unknown\` / \`available:false\`，不要在这里补造。`,
     '',
-    '## 当前 host 事实入口',
+    '## 当前 origin 的 usage + 全机模型事实入口',
     '',
     `- **host**：\`${host}\``,
     `- **usage profile**：${PROFILE_GUIDANCE[profile]}`,
@@ -220,7 +226,7 @@ function renderPacingReadOnlyCapability(registry, host) {
     '- usage：`verdict`、`strength`、`nearest_reset`、窗口事实与信号来源。',
     '- estimate：p50 / p80 / p95、`coverage_pct`、`confidence`、conformal 区间、EVM 与风险字段。',
     '- pool-aware：只读已经产出的 own row、通知 freshness 与 pool identity 证据。',
-    '- model：registry 中当前 host 已证明的可用性、provenance、能力与相对成本。',
+    '- model：registry 中三个 provider 的可用性、provenance、role evidence、task affinity 与相对成本；origin 不裁剪候选池。',
     '',
     `把以上输入交给 \`${registry.owners.decision}\`；超出三类能力的具体编排动作一律归它决定。`,
     '',

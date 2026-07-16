@@ -16,6 +16,9 @@
 - [namespace worker（session-bound raw wrapper MVP）](#namespace-workersession-bound-raw-wrapper-mvp)
   - [worker help](#worker-help)
   - [worker run](#worker-run)
+- [namespace model-policy（统一模型角色与排序 advisory）](#namespace-model-policy统一模型角色与排序-advisory)
+  - [model-policy show](#model-policy-show)
+  - [model-policy advise](#model-policy-advise)
 - [namespace orchestrator（cached context）](#namespace-orchestratorcached-context)
   - [orchestrator context](#orchestrator-context)
 - [namespace route（shadow advisory）](#namespace-routeshadow-advisory)
@@ -192,6 +195,7 @@ ccm <alias> [args] [flags]
 |---|---|
 | `worker` | 查看 resolver 选中的真实 agent-command help，或显式启动一次三 harness session-bound raw wrapper |
 | `provider` | 模型事实 snapshot 查询与 provider candidate 检查；facts 零 live probe，inspect 另走准入门 |
+| `model-policy` | 三路 origin 共用的模型角色 / provider 事实 / 社区 affinity 分层视图，以及对已 qualification 候选的纯排序 advisory |
 | `orchestrator` | 从显式本地 cache 构造 frozen orchestrator context；cached-only、零 live probe |
 | `route` | 对 frozen task + context 给纯 shadow route advice；永远 `spawned:false`、不写 board |
 | `quota` | provider-neutral live quota admission：owner-only observation/reservation store、payer+pool capacity reservation 与 audit；Codex 只认 7d hard window |
@@ -294,7 +298,7 @@ ccm <alias> [args] [flags]
 
 ## 跨 harness 主动查询目标事实
 
-这是 `master-orchestrator-guide` 高频派发热路径的命令面 SSOT。顺序是**发现 → 查真实 CLI → 查模型事实 → 查可证 usage/quota → 可选 shadow advice → 经 origin 后台机制显式 raw dispatch → 记真实后台 handle**；其中没有一步会自动替 orchestrator 选择或启动 worker。
+这是 `master-orchestrator-guide` 高频派发热路径的命令面 SSOT。顺序是**发现 → 查真实 CLI → 查统一模型角色 / 事实 / taste → 查可证 usage/quota → 可选纯排序或 shadow advice → 经 origin 后台机制显式 raw dispatch → 记真实后台 handle**；其中没有一步会自动替 orchestrator 启动 worker。
 
 ### 1. 发现与目标事实
 
@@ -305,6 +309,7 @@ ccm <alias> [args] [flags]
 ccm harness list --machine-wide --json
 ccm worker help --harness <codex|claude-code|cursor-agent> --scope agent
 ccm provider facts <target-provider> --json
+ccm model-policy show --task <task-taxonomy> --json
 ccm --harness <claude-code|codex|cursor> usage show --accounts current --json
 ccm quota status --json
 ccm quota preflight --input <json|@file|-> --json
@@ -315,6 +320,7 @@ ccm quota preflight --input <json|@file|-> --json
 - `worker help` 经与 `worker run` 相同的 resolver，读取这台机器上**实际被选中的 executable** 的 agent-command help；provider flags 以它为准。需要 executable 顶层 flags 时另跑 `--scope root`。这比把某版 CLI 参数表复制进 skill 更抗版本漂移。
 - `provider facts` 的 `<target-provider>` 当前取 `claude-code | codex | cursor`。它返回静态、带来源与
   freshness 的模型事实，不执行 live provider probe，也不证明当前账号 entitlement 或 exact-model admission。
+- `model-policy show` 为三个 origin 返回同一份 `hard_facts / project_role_evidence / community_advisory` 分层 read model。它给出 task 的 `O / T1 / T2 / T3` effect floor 与候选，但 `candidate` 不等于 certified / admitted；社区 affinity 也绝不产生准入。
 - `ccm --harness <target> usage show --accounts current` 只读取该 adapter 当前登录账号已经实现的 usage source；它是 advisory，不是 automatic admission。`available:false`、窗口缺失或字段 unknown 必须原样保留，不能从 binary/auth/model facts、进程 RC0 或同品牌另一 surface 推出 ample。
 - `quota status` 只回答 home-scoped owner-only quota observation/reservation store 是否存在；`available:true` **不等于**某个 harness 有 ample headroom，`available:false` 也必须保留为 unknown。当前不存在一个把 harness id 当查询 key、统一返回各 harness 剩余额度的通用 `ccm quota ... --harness <X>` 读面；全局 harness selection 即使出现在进程上下文里，也不改变 `quota status` 的 store-availability 语义。
 - 只有已经持有 authority flow 给出的 `source_key`、committed `reservation_id` 与 `checked_at` 时，才把
@@ -413,6 +419,31 @@ ccm provider facts <provider> [--as-of <UTC>] [--json]
 ### provider inspect
 
 `ccm provider inspect codex --request @request.json --json` 是独立的 candidate inspection / gated execution 面；不要拿 facts snapshot 冒充它的 live admission。
+
+---
+
+## namespace model-policy（统一模型角色与排序 advisory）
+
+### model-policy show
+
+```text
+ccm model-policy show --task <task-taxonomy> [--as-of <UTC>] [--json]
+```
+
+- `--task` 必填，取项目 registry 中的稳定 taxonomy，例如 `architecture-design`、`implementation-from-spec`、`routine-heterogeneous-review`、`repository-code-research`、`mechanical-deterministic-work`。
+- 输出 `ccm/model-policy-read-model/v1`。`hard_facts` 是官方 provider snapshot，`project_role_evidence` 是项目角色候选 / blockers，`community_advisory` 是带 provenance、TTL、confidence、contradictions 与 freshness 的 taste ledger；三层不可互相补证。
+- O 候选、T1/T2/T3 候选只是跨 provider 候选发现。`eligible_for_automatic_selection:false` 会一直保持，直到调用者另行取得精确 target 的 role certification 与 live admission；本命令零 provider probe、零 board 写入。
+- Cursor first-party 与 third-party-model route 分开。第三方 Fable / Sol 路线因 payer / paid-use 未明确而列入 `excluded_automatic_routes`，不得静默进入 first-party fallback。
+
+### model-policy advise
+
+```text
+ccm model-policy advise --input <json|@file|-> [--as-of <UTC>] [--json]
+```
+
+输入是 `ccm/model-policy-advice-request/v1`：调用者必须为每个 candidate 提供已认证 role grades、exact selector / live admission / quota / permission / workspace / paid-use / retention 硬门、归一化的 cost / quota-headroom / latency / context-fit / integration 分数，以及可选 community affinity envelope。
+
+输出 `ccm/model-policy-advice/v1`，机械顺序固定为：effect floor 与 target 硬门 → 按 posture 加权基础分 → 只在基础分等价带内应用有上限且会衰减的 community tie-break。stale、mixed、unknown 或无 evidence refs 的 affinity 归零；hard deny 进入 `rejected[].reason_codes`。命令只排序输入，不现场 qualification、不选择 CLI flags、不 reserve、不 spawn、不写 board。
 
 ---
 

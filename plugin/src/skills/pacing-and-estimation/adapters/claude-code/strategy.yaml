@@ -20,7 +20,6 @@ runtime_contracts:
     skill: pacing-and-estimation
 slot_replacements:
   "{{PACING_DESCRIPTION}}": adapters/claude-code/overlays/description.md
-  "{{PACING_MODEL_TIERS_REFERENCE}}": adapters/claude-code/overlays/model-tiers-reference.md
   "{{PACING_USAGE_SIGNALS_REFERENCE}}": adapters/claude-code/overlays/usage-signals-reference.md
   "{{PACING_LEVERS_REFERENCE}}": adapters/claude-code/overlays/levers-reference.md
   "{{CROSS_HARNESS_ACTIVE_QUERY_POINTER}}": adapters/claude-code/overlays/cross-harness-active-query-pointer.md

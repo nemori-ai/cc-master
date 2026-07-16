@@ -41,6 +41,9 @@ test('Claude facts are fresh, provenance-complete, and account-scope honest', ()
     (model: { model_id: string }) => model.model_id === 'claude-fable-5',
   );
   assert.equal(fable.availability.state, 'conditional');
+  assert.equal(fable.tier, 'economy');
+  assert.ok(fable.source_refs.includes('anthropic-fable-5-capabilities'));
+  assert.equal(facts.revision, '2026-07-16.1');
   assert.notEqual(fable.availability.account_scope, 'global');
 });
 
@@ -82,6 +85,11 @@ test('expired snapshots remain observable but fail closed for automatic selectio
 
 test('registry validation rejects freshness and provenance hostile mutants', async () => {
   const module = await import('../src/provider-model-facts.js');
+  assert.equal(module.PROVIDER_MODEL_FACTS_REGISTRY.revision, '2026-07-16.1');
+  assert.equal(
+    module.PROVIDER_MODEL_FACTS_REGISTRY.providers['claude-code'].revision,
+    '2026-07-16.1',
+  );
   const valid = structuredClone(module.PROVIDER_MODEL_FACTS_REGISTRY);
   const cases: Array<[string, (registry: any) => void, RegExp]> = [
     [

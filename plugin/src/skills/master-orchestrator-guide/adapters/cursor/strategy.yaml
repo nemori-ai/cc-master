@@ -46,7 +46,6 @@ slot_replacements:
   "{{PLATFORM_RESUME_GUIDANCE}}": adapters/cursor/overlays/platform-resume-guidance.md
   "{{HETEROGENEOUS_REVIEW_MECHANISM}}": adapters/cursor/overlays/heterogeneous-review-mechanism.md
   "{{HANDOFF_REFERENCE_ROW}}": adapters/cursor/overlays/handoff-reference-row.md
-  "{{MASTER_HOST_MODEL_ALLOCATION}}": adapters/cursor/overlays/model-allocation.md
   "{{HOST_QUOTA_DESERTION_EXAMPLE}}": adapters/cursor/overlays/quota-desertion-example.md
   "{{HOST_QUOTA_RATIONALIZATION_ROW}}": adapters/cursor/overlays/quota-rationalization-row.md
   "{{HOST_QUOTA_RED_FLAG}}": adapters/cursor/overlays/quota-red-flag.md
