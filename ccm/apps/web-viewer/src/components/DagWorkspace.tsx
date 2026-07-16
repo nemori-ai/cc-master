@@ -272,6 +272,11 @@ function DagCanvas({
           childOf: childOf && visible.visibleIds.has(childOf) ? childOf : null,
           dimmed,
           horizontal: orientation === 'horizontal',
+          routeOutcome: node.route_outcome ?? null,
+          routeLabel: node.surface_label ?? null,
+          modelLabel: node.model
+            ? `${node.model}${node.role_grades?.length ? ` · ${node.role_grades.join('/')}` : ''}`
+            : null,
           onToggleCollapse: toggleCollapse,
         },
       };

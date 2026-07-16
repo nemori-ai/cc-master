@@ -21,13 +21,16 @@ import {
   taskDuration
 } from '../format';
 import { type LocateRequest, useLocateTask } from '../locate';
-import type { CompactTask, ViewModelPayload } from '../types';
+import { nodeMatchesTaskFilters } from '../taskFilters';
+import type { CompactTask, GraphNode, ViewModelPayload } from '../types';
 
 interface ListViewProps {
   viewModel: ViewModelPayload;
   selectedTaskId: string | null;
   onSelectTask: (taskId: string) => void;
   locateRequest: LocateRequest | null;
+  activeFilters: Set<string>;
+  query: string;
 }
 
 interface ListRowProps {
@@ -174,6 +177,22 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
       </span>
     );
   }
+  const selectedRoute = task.execution?.route?.selected;
+  if (selectedRoute) {
+    chips.push(
+      <span className="lchip route" key="route" title={task.execution?.route?.outcome}>
+        {selectedRoute.surface_label}
+      </span>
+    );
+    if (selectedRoute.model) {
+      chips.push(
+        <span className="lchip model" key="model">
+          {selectedRoute.model}
+          {selectedRoute.role_grades.length ? ` · ${selectedRoute.role_grades.join('/')}` : ''}
+        </span>
+      );
+    }
+  }
 
   const title = (typeof task.title === 'string' ? task.title : '').trim();
   return (
@@ -202,10 +221,32 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
  * strip on top. Sections in fixed priority order (AWAITING YOU first), empty ones omitted,
  * unknown statuses land under NEEDS ATTENTION.
  */
-export function ListView({ viewModel, selectedTaskId, onSelectTask, locateRequest }: ListViewProps) {
+function queryMatches(node: GraphNode, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    node.id.toLowerCase().includes(q) ||
+    (node.title ?? '').toLowerCase().includes(q) ||
+    (node.tags ?? []).some((tag) => tag.toLowerCase().includes(q))
+  );
+}
+
+export function ListView({
+  viewModel,
+  selectedTaskId,
+  onSelectTask,
+  locateRequest,
+  activeFilters,
+  query
+}: ListViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   useLocateTask(containerRef, locateRequest);
-  const tasks = tasksOf(viewModel);
+  const allTasks = tasksOf(viewModel);
+  const nodesById = new Map(viewModel.graph.nodes.map((node) => [node.id, node]));
+  const tasks = allTasks.filter((task) => {
+    const node = nodesById.get(task.id);
+    return node ? nodeMatchesTaskFilters(node, activeFilters) && queryMatches(node, query) : false;
+  });
   const gateIds = awaitingIds(viewModel);
   const sections = partitionTasks(tasks, gateIds, viewModel.insights);
   const insights = viewModel.insights;
@@ -271,7 +312,13 @@ export function ListView({ viewModel, selectedTaskId, onSelectTask, locateReques
           <span className="sv">{String(userGates)}</span>
         </div>
       </div>
-      {sectionEls.length ? sectionEls : <div className="lvempty">no tasks on the board</div>}
+      {sectionEls.length ? (
+        sectionEls
+      ) : (
+        <div className="lvempty">
+          {allTasks.length ? 'no tasks match current filters' : 'no tasks on the board'}
+        </div>
+      )}
     </div>
   );
 }

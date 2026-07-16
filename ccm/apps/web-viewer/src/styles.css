@@ -2468,6 +2468,93 @@ header.missionline {
   gap: 7px;
   flex-wrap: wrap;
 }
+
+.mission-contract.pending,
+.execution-contract {
+  border-left: 2px solid color-mix(in oklch, var(--ready) 55%, transparent);
+}
+
+.mission-contract.pending {
+  border-left-color: color-mix(in oklch, var(--alert) 65%, transparent);
+}
+
+.contract-callout {
+  margin-top: 10px;
+  padding: 8px 10px;
+  color: var(--alert);
+  background: color-mix(in oklch, var(--alert) 8%, transparent);
+  border: 1px solid color-mix(in oklch, var(--alert) 28%, transparent);
+  border-radius: 5px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.contract-subblock {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hair-soft);
+}
+
+.contract-label {
+  margin-bottom: 7px;
+  color: var(--ink-dim);
+  font: 600 10px/1.2 var(--mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.contract-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.contract-pill,
+.cc-node .chip.route,
+.cc-node .chip.model,
+.lvrow .lchip.route,
+.lvrow .lchip.model {
+  color: var(--ink-dim);
+  background: color-mix(in oklch, var(--ready) 7%, var(--panel));
+  border-color: color-mix(in oklch, var(--ready) 25%, var(--hair));
+}
+
+.contract-pill {
+  padding: 3px 6px;
+  border: 1px solid color-mix(in oklch, var(--ready) 25%, var(--hair));
+  border-radius: 999px;
+  font: 500 9px/1.2 var(--mono);
+}
+
+.contract-note {
+  margin-top: 8px;
+  color: var(--ink-dim);
+  font-size: 10px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.attempt-row,
+.candidate-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 6px 0;
+  color: var(--ink-dim);
+  border-bottom: 1px solid var(--hair-soft);
+  font-size: 10px;
+}
+
+.attempt-row span,
+.candidate-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidate-row[data-selected='true'] {
+  color: var(--ready);
+}
 .badge {
   display: inline-flex;
   align-items: center;
