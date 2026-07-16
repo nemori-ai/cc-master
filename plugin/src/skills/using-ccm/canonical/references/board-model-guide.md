@@ -34,6 +34,7 @@
   - [FMT 家族（格式 / 类型）](#fmt-家族格式--类型)
   - [GRAPH 家族（图完整性）](#graph-家族图完整性)
   - [BIZ 家族（条件业务规则）](#biz-家族条件业务规则)
+- [O. 交付 DDL 字段取值 + 四态状态机](#o-交付-ddl-字段取值--四态状态机)
 
 ---
 
@@ -106,7 +107,7 @@
 | `scheduling.wip_limit` | board 顶层 | `ccm board update --wip-limit N` | 全局过调度软警告静默关闭 |
 | `scheduling.owner_wip_limit` | board 顶层 | `ccm board update --owner-wip N` | 每 owner 过调度软警告静默关闭 |
 | `owner.harness` | board owner 子字段 | `ccm board stamp-harness`（ARM 时 bootstrap 调用） | 缺失解析为 `unknown`；`ccm peers` 按它分配额池，hook 武装闸不读它 |
-| `goal_contract` | board 顶层 | `ccm goal set / confirm / amend` | 缺失表示 legacy board；hook 保持兼容但不提供 revision / Brief 完整性守卫 |
+| `goal_contract` | board 顶层 | `ccm goal set / confirm / amend`；其 `deadline` 子对象走 `ccm goal deadline set / confirm / confirm-none / amend` | 缺失表示 legacy board；hook 保持兼容但不提供 revision / Brief 完整性守卫。交付 DDL 嵌在 `goal_contract.deadline`（单一 SSOT，随 goal revision 走）——字段取值见 [O 小节](#o-交付-ddl-字段取值--四态状态机) |
 | `watchdog` | board 顶层 | `ccm watchdog arm / disarm` | {{USING_CCM_WATCHDOG_HOOK_REMINDER}} |
 | `task.wip_limit` | task 级 | `ccm task add/update --wip-limit N` | 覆写 owner_wip_limit（per-owner cap） |
 
@@ -120,12 +121,12 @@
   - `priority` ∈ `{'urgent','high','normal','low','trivial'}`（**板级**优先级·非板内任务排序·缺/坏 → 解析为 `normal`）——这是跨板协调的裁决主轴 + 机械 fair-share 权重源（用户声明的协调 hint·不喂引擎的板内任务调度）。**专属 flag：`ccm board update --priority <urgent|high|normal|low|trivial>`**（枚举校验在 update 端·非法值 → `exit 2`；init 时用户给的板级优先级经它落盘）。
   - `state.current`（此刻在烧什么·喂即时 fair-share）：`active_tasks`（int·数字）/ `workload`（string·人类可读）/ `burn_contribution`（number·对聚合配额% burn 的估计贡献）。
   - `state.planned`（还剩多少活·喂价值/紧迫推理）：`remaining_work`（string·人类可读）/ `cost_to_complete_pct`（number·偿付力）。
-  - `inbox`（入站中介建议收件箱）：通知数组，缺失 = 空。每条通知有 `id` / `kind` / `status` / `created_at` / `expires_at` / `strength` / `summary` / `payload` / `consumed_at` / `consumed_note`；`kind` 闭集为 `pacing_throttle`、`pacing_yield`、`pacing_claim`、`pacing_switch`、`pacing_stop`、`hitl_turn`、`artifact_serialize`；`status` 是 `unconsumed → consumed|expired`。你用 `ccm coordination inbox list --unconsumed` 读取，消费后用 `ccm coordination inbox ack <id...> --note ...` 标记 consumed；低层 producer 用 `ccm coordination notify` append。每次 ccm 写盘前自动跑 `reconcileInbox`：过期未消费转 expired、同 kind 只保留最新 unconsumed、终态按 TTL/capacity GC。形状坏→`FMT-INBOX` warn（永不 hard）。
+  - `inbox`（入站中介建议收件箱）：通知数组，缺失 = 空。每条通知有 `id` / `kind` / `status` / `created_at` / `expires_at` / `strength` / `summary` / `payload` / `consumed_at` / `consumed_note`；`kind` 闭集为 `pacing_throttle`、`pacing_yield`、`pacing_claim`、`pacing_switch`、`pacing_stop`、`hitl_turn`、`artifact_serialize`、`quota_state_change`、`deadline_risk`（交付 DDL 风险 durable 审计条目·deadline-risk hook 直接注入 advisory 后立即 self-ack 一条）；`status` 是 `unconsumed → consumed|expired`。你用 `ccm coordination inbox list --unconsumed` 读取，消费后用 `ccm coordination inbox ack <id...> --note ...` 标记 consumed；低层 producer 用 `ccm coordination notify` append。每次 ccm 写盘前自动跑 `reconcileInbox`：过期未消费转 expired、同 kind 只保留最新 unconsumed、终态按 TTL/capacity GC。形状坏→`FMT-INBOX` warn（永不 hard）。
 
   数字字段喂机械 floor、人类可读字段喂 agentic 价值推理；**缺即降级**（`ccm peers` 把该 peer 的对应维度退 null·配速退单板·fail-safe）。形状坏→`FMT-COORD` warn（永不 hard·advisory ✎）。读侧详见 command-catalog 的 peers namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-COORD`。**token-blind**：本块只含 goal/priority/workload/%——绝无任何 secret。
 - `owner.harness`——当前 board 所属 harness 的观察字段，取值 `claude-code | codex | cursor | kimi-code | unknown`。它**不是武装闸**：hook arming 仍只看 `owner.active` + `owner.session_id`；`owner.harness` 只给 `ccm peers` / 后续池中介做配额池分区。ARM 时 bootstrap 通过 `ccm board stamp-harness` 从当前进程 env 的可信 harness detect 盖写；无可信 env 时不写、不覆盖已有值。缺失或坏值都按 `unknown` 降级；`ccm peers` 会把 unknown board 放进单例池，避免跨 harness 或不明来源 board 混排。坏值→`FMT-HARNESS` warn。
 - `agents`——**运行时 agent 登记簿**（✎ 非窄腰·hook 不读），跨所有派发类型的统一花名册：凡派发（sub-agent / 后台 shell / workflow / 跨 harness worker）皆登记。只用 `ccm agent create / bind / link / terminal / probe` 写、`ccm agent list / show` 读、`ccm agent amend / rm` 事后修正（`amend` 补正 handle 域·`rm` 删登记·均不经状态机）——别用 `--set-json` 手拼（会绕过状态机校验、handle 证据闸与幂等 link）。缺 → 无登记（花名册空）；形状坏 → `FMT-AGENTS` warn；`in_flight` task 无登记指向 → `BIZ-INFLIGHT-AGENT` warn 软提示。概念与字段取值见 [C.6 节](#c6-agents运行时-agent-登记簿)。
-- `runtime`——**hook-owned 运行时参数区**（✎ 非窄腰），装「周期 hook/script 跑起来后维护的瞬态簿记」。白名单键（均 ISO-8601 UTC）：`last_identity_remind`（周期身份提示 hook 读它判阈值）、`last_critpath_remind`（周期临界路径提示 hook 读它判阈值）、`last_goal_remind`（Goal Contract 对齐提示判阈值）、`last_account_switch`（账号切换机制写换号时刻·usage-pacing hook 读它做「检测到换号」ambient）、`stop_allow_until`（Codex Stop hook 释放闸：agent 独立确认本板可停后写一个短期未来时刻）——周期 hook / 换号写侧注入 / Stop 释放确认后经 `ccm board set-param` 写回（带锁·进程边界）。**写法收窄**：唯一写口是 `ccm board set-param <白名单 key> <value>`（least-privilege·非白名单 key / 非法值 → `exit 2`）——agent 走 `ccm` 命令改 board 天然保留它（`ccm` 字段级合并、不整盘覆写；agent 自己**永不手写 `runtime.*`**·见 `master-orchestrator-guide` 的 board-写纪律）。缺/坏 → graceful-degrade（周期提示退化为「从未提示」；Stop 释放闸退化为继续阻止停止）；形状坏→`FMT-RUNTIME` warn（永不 hard）。**token-blind**：参数区只有时间戳等簿记·绝无 secret。
+- `runtime`——**hook-owned 运行时参数区**（✎ 非窄腰），装「周期 hook/script 跑起来后维护的瞬态簿记」。白名单键（多数是 ISO-8601 UTC 时间戳·一个是任意非空字符串指纹）：`last_identity_remind`（周期身份提示 hook 读它判阈值·ISO）、`last_critpath_remind`（周期临界路径提示 hook 读它判阈值·ISO）、`last_goal_remind`（Goal Contract 对齐提示判阈值·ISO）、`last_account_switch`（账号切换机制写换号时刻·usage-pacing hook 读它做「检测到换号」ambient·ISO）、`stop_allow_until`（Codex Stop hook 释放闸：agent 独立确认本板可停后写一个短期未来时刻·ISO）、`last_deadline_risk_check`（交付 DDL 风险 hook 上次重估时刻·判周期重估阈值·ISO）、`last_deadline_risk_fingerprint`（交付 DDL 风险 hook 上次 risk-input 指纹·非空字符串·判 verdict/driver/bucket 是否变化以去重节流·**不是时间戳**）——周期 hook / 换号写侧注入 / Stop 释放确认后经 `ccm board set-param` 写回（带锁·进程边界）。**写法收窄**：唯一写口是 `ccm board set-param <白名单 key> <value>`（least-privilege·非白名单 key / 非法值 / 字符串键传空值 → `exit 2`）——agent 走 `ccm` 命令改 board 天然保留它（`ccm` 字段级合并、不整盘覆写；agent 自己**永不手写 `runtime.*`**·见 `master-orchestrator-guide` 的 board-写纪律）。缺/坏 → graceful-degrade（周期提示退化为「从未提示」；Stop 释放闸退化为继续阻止停止）；形状坏→`FMT-RUNTIME` warn（永不 hard）。**token-blind**：参数区只有时间戳等簿记·绝无 secret。
 
 > **不要把 observed 字段写进硬 waist。** 这三档的边界由 `ccm` 引擎权威定义（每字段的 tier 元数据）。
 
@@ -1056,6 +1057,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `FMT-SCHEMA` | hard | `schema` 不是字符串字面量 `"cc-master/v2"` | 永远让 bootstrap / ccm 建板，别手写 schema；当前期望值 `cc-master/v2` |
 | `FMT-GOAL` | hard | `goal` 不是字符串 | `ccm board init --goal "..."` / `ccm board update --goal "..."`，goal 永远是字符串（空串也合法） |
 | `FMT-GOAL-CONTRACT` | hard | 存在的 `goal_contract` schema/revision/assurance/updated_at/brief ref+sha256 形状非法 | 只用 `ccm goal set / confirm / amend` 写；Brief 路径与 hash 另由 `ccm goal check` 校验 |
+| `FMT-DEADLINE` | hard | 存在的 `goal_contract.deadline` 形状非法：`state` 不在 `{pending,asserted,confirmed,none}`；`asserted`/`confirmed` 缺 `at` 或 `at` 非严格 ISO-8601 UTC；`none` 带 `at`；`precision` 非 `{minute,day}`；`kind` 非 `hard`（v1）；`rev` 非整数≥1；`provenance.source` 非枚举 | 只用 `ccm goal deadline set/confirm/confirm-none/amend` 写（见 [I 小节](#o-交付-ddl-字段取值--四态状态机)）；`deadline.updated_at` 形状坏只 warn（`FMT-TIME`·不拦写盘） |
 | `FMT-OWNER` | hard | `owner` 不是对象，或 `active` 非 bool，或 `session_id` 非字符串 | 别手改 owner——它是武装闸读的；session_id 空串 `""` 合法（待显式 re-arm 认领） |
 | `FMT-HARNESS` | warn | `owner.harness` 存在但不在 `{claude-code,codex,cursor,kimi-code,unknown}` | 不手填；ARM 时由 `ccm board stamp-harness` 从可信 harness env 写入。缺失向后兼容为 `unknown`；坏值只 warn，`ccm peers` 按 unknown 单例池降级 |
 | `FMT-GIT` | hard | `git` 不是对象，或 `worktree`/`branch` 存在却非字符串 | `ccm board update --branch / --worktree`，值都是字符串 |
@@ -1083,7 +1085,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 {{USING_CCM_FMT_POLICY_ROW}}
 | `FMT-COORD` | warn | `coordination` 非对象，或 `priority` 不在 `{urgent,high,normal,low,trivial}` 枚举，或 `state`/`state.current`/`state.planned` 非对象、数字字段（`active_tasks`/`burn_contribution`/`cost_to_complete_pct`）非数字、人类可读字段（`workload`/`remaining_work`）非字符串 | 全 optional·缺即降级（`ccm peers` 把该维度退 null）；priority 仅五挡——非法值退化为 normal。永不 hard（advisory ✎·fail-safe）——见 [A 节](#a-task-字段速查) coordination 块 |
 | `FMT-INBOX` | warn | `coordination.inbox` 存在但非数组，或通知条目 id 非空唯一 / kind / status / strength / ISO 时间 / consumed_at 状态对应关系不合法 | 缺失 = 空 inbox；append 用 `ccm coordination notify`，消费用 `ccm coordination inbox ack <id...>`，不要手拼。`kind` 闭集、`status` 单调；坏形态只 warn，读取侧跳过坏条目 |
-| `FMT-RUNTIME` | warn | `runtime` 非对象，或已知键（`last_identity_remind` / `last_critpath_remind` / `last_goal_remind` / `last_account_switch` / `stop_allow_until` 等）类型不合法（时间锚须严格 ISO-8601 UTC） | hook-owned ✎ 参数区：用 `ccm board set-param <白名单 key> <ISO>` 写（白名单 + 值校验在 verb 层）；缺/坏一律 graceful-degrade（周期 hook 退化为「从未提示」·首次必提示；Stop 释放闸退化为继续阻止停止）。未知键 silent-on-unknown。永不 hard |
+| `FMT-RUNTIME` | warn | `runtime` 非对象，或已知键类型不合法（时间锚 `last_identity_remind` / `last_critpath_remind` / `last_goal_remind` / `last_account_switch` / `stop_allow_until` / `last_deadline_risk_check` 须严格 ISO-8601 UTC；`last_deadline_risk_fingerprint` 须非空字符串） | hook-owned ✎ 参数区：用 `ccm board set-param <白名单 key> <value>` 写（白名单 + 按 key 声明类型校验在 verb 层·时间锚要 ISO / 指纹要非空字符串）；缺/坏一律 graceful-degrade（周期 hook 退化为「从未提示」·首次必提示；Stop 释放闸退化为继续阻止停止）。未知键 silent-on-unknown。永不 hard |
 | `FMT-AGENTS` | warn | `agents` 存在但非数组；或条目非对象、`id` 不合 ID 文法 / 重复、`type`/`harness`/`handle.kind`/`lifecycle.state`/`probe.observed`/`probe.method` 不在各枚举、`intent`/`model`/`handle.value` 非字符串、`launch`/`handle`/`lifecycle`/`probe` 非对象、时间锚非严格 ISO-8601 UTC、`links` 非数组或条目缺非空 `task_id`、`account_ref`/`quota_pool_ref` 既非 null 也非字符串 | 只用 `ccm agent create/bind/link/terminal/probe` 写（自动生成合法 id、盖标准时间戳、校验枚举与转移），别 `--set-json` 手拼。graceful：坏形状不拦写盘，但 `ccm agent list/show` 与 viewer 花名册读不出坏条目——见 [C.6 节](#c6-agents运行时-agent-登记簿) |
 | `FMT-ESTIMATE` | warn | `estimate` 不是 `{value:number, unit:string}` 对象 | `--estimate 3h`（ccm 自动解析成对象），别手拼——见 [E 节](#e-estimate-怎么估) |
 | `FMT-ACCEPTANCE` | warn | `acceptance` 既非字符串也非对象，或对象 `criteria` 空、`criterion.status` 不在 {pending,met,failed} | `--accept "一句话"` 或 `--set-json acceptance={criteria:[...]}`——见 [D 节](#d-acceptance-怎么写好) |
@@ -1116,6 +1118,8 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 |---|---|---|---|
 | `BIZ-AWAITING` | hard | awaiting-user 节点（`blocked_on:"user"` + status ∈ {blocked, in_flight}）缺 `decision_package` 对象 | `task block --on user --decision @file`，必须带采访包——见 [G 节](#g-blocked_on-怎么选) |
 | `BIZ-GOAL-PENDING` | warn | `assurance:pending` 的 Goal Contract 已有 ready / in_flight / uncertain 执行任务 | 先澄清并用 `ccm goal set` / `goal amend` settle，再切 DAG / 派发；等待用户时只保留完整 `blocked_on:user` `decision_package` |
+| `BIZ-DEADLINE-PENDING` | warn | 交付 DDL 未 settle（`deadline` 键缺失或 `state:pending`）却已有 ready / in_flight / uncertain 执行任务 | 拆 DAG 前先 `ccm goal deadline set/confirm`（确认交付截止期）或 `ccm goal deadline confirm-none`（确认无 DDL）——见 [I 小节](#o-交付-ddl-字段取值--四态状态机) |
+| `BIZ-DEADLINE-OVERDUE` | warn | `state:asserted|confirmed` 的交付 DDL 已过期（`now>=at`）而全局 acceptance 未完成（板未归档且存在未 trulyDone 任务） | 别静默降验收/伪造完成——先向用户报告状态/剩余交付物/方案，再由用户裁决延期（`ccm goal deadline amend --user-authorized`）/缩范围（`ccm goal amend`）/分阶段/终止 |
 | `BIZ-CADENCE-SHIPPED` | hard | iteration 标 `shipped` 但 members 未全部 done+verified（含不存在的 member） | 先把成员推到 done+verified 再 `ccm cadence ship`，或移出 members——见 [I 节](#i-cadence-与-iteration节奏怎么定) |
 | `BIZ-CADENCE-MISSING-ESTIMATE` | warn | open iteration 的 member 缺有效 `estimate` | 给 member 补 `--estimate 3h` 这类估时，或移出本轮；否则 overbook / critical-path 判断会失明——见 [E 节](#e-estimate-怎么估) 与 [I 节](#i-cadence-与-iteration节奏怎么定) |
 | `BIZ-CADENCE-OVERBOOKED` | warn | open iteration 的 member 估时总量超过 timebox（deadline-started_at 或 `target.ship_every`，含小幅 grace） | 拆小、移出非本轮 member、降低 WIP 后重排；不要用 shipped 掩盖超载 |
@@ -1144,6 +1148,46 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `BIZ-DEPENDENCY-REQUIREMENT` | warn | requirement exact key 已不是当前 `deps[]` edge | 删除/改正陈旧 requirement；metadata 不会创建隐藏 DAG edge |
 | `BIZ-DELIVERY-PROOF` | warn | 显式 edge 当前为 unqualified/unknown | 跑 `dependency explain` 看 containment、drift、missing-object、review 或 waiver diagnostic |
 | `BIZ-DELIVERY-IMPACT` | warn | 显式 edge 未 qualified，但 downstream 已越过 planned/blocked | 跑任意 ccm 写命令触发 reconcile，使状态回到 declared truth 后补 proof |
+
+---
+
+## O. 交付 DDL 字段取值 + 四态状态机
+
+交付 DDL（delivery deadline）落 `goal_contract.deadline`——「整块 board / 当前 Goal Contract revision 最终交付」的时间承诺，单一 SSOT，随 goal revision 走。它是 👁 观察字段（嵌在已是 👁 的 `goal_contract` 内），窄腰一字不动。只走专属 verb 写：`ccm goal deadline set / confirm / confirm-none / amend`（命令签名见 [command-catalog goal deadline](command-catalog.md#goal-deadline)）；泛型 `--set goal_contract.*` 被拒。
+
+**与三个近邻概念严格区分**（别混）：
+
+| 概念 | 是什么 | 落点 |
+|---|---|---|
+| **交付 DDL（本字段）** | 整块交付的时间承诺 / 约束 | `goal_contract.deadline` |
+| `cadence.iterations[].deadline` | 单个 iteration 的局部 timebox 末端 | `cadence.iterations[i].deadline`（并存·语义正交·DDL 不替代它） |
+| ETA | 基于当前 DAG / 吞吐算出的**预测** | `ccm estimate forecast` 的 `p50/p80/p95`（每次算·非承诺） |
+| task timeout / watchdog | worker 硬超时 / 自我唤醒 | `watchdog.*`（DDL 不替代任何超时机制） |
+
+**四态 settledness 状态机**（`deadline.state`·与 goal `assurance` 正交）：
+
+| `state` | 含义 | `at` | dispatch 门控 |
+|---|---|---|---|
+| **（`deadline` 键缺失）** | **未询问**（fresh skeleton 默认） | 无 | 门控（= pending 语义） |
+| `pending` | 已识别候选但未 settle（歧义 / 冲突 / 待用户答） | 可无 / 可有暂定候选 | **门控**（不 settle 不派发） |
+| `asserted` | 无歧义 evidence / 显式 `--ddl` 转写的候选（可逆推进） | 有 | 放行 |
+| `confirmed` | 用户明确确认的截止期（`--user-authorized`） | 有 | 放行 |
+| `none` | 用户明确确认**无 DDL** | 无 | 放行（不再追问） |
+
+- **`none` ≠ 键缺失 / `pending`**：`none` 是显式持久状态（用户确认无 DDL）——`goal check` 见它即 `ok`，不再 `deadline_pending`、不再追问。「未询问」（键缺失）与「仍歧义」（pending）才门控派发。
+- **`asserted` 语义收紧**：`asserted` 只可来自**显式 `--ddl`**，或**用户输入文本里的无歧义绝对时刻**（如「2026-08-01 09:00 UTC 前交付」）。推断 / 相对表达（「周五前」「尽快」「本月底」）/ 多源冲突一律用 `pending`——识别到候选但未 settle，先向用户确认再升 `asserted`/`confirmed`。别把模糊输入当 `asserted` 蒙混过门。
+
+**字段取值**：
+
+- **`at`**：严格 ISO-8601 UTC（`YYYY-MM-DDTHH:MM:SSZ`）。用户给本地时刻由 **agent 换算成 UTC** 后经 `--at` 传入；ccm 不做时区换算 / 自然语言解析（语义归 agent）。原始表达传 `--provenance-raw`、假定时区传 `--tz-input`（审计留痕）。
+- **`precision`**：`minute`（默认·精确到秒的挂钟时刻）或 `day`（只给日期）。`--precision day` 落当日 UTC **末刻 `23:59:59Z`**（「当日交付」而非「当日 00:00」），且**必须带 `--tz-input`**（date-only 无时区证据不可落板）。
+- **`kind`**：v1 恒 `hard`（字段预留 `soft`·行为差异作 follow-up；`FMT-DEADLINE` 拒绝非 `hard`）。
+- **`rev`**：单调递增修订号，每次 `set/confirm/confirm-none/amend` +1，与 `board.log` decision 条目（revision / reason / timestamp）配套构成审计。
+- **`provenance`**：`{raw?, source?, tz_input?}`——原始表达 / 来源（`goal-evidence|cli-flag|user-reply`）/ 假定时区，供审计，不参与任何计算。
+
+**授权与审计**：`confirm` / `confirm-none` / `amend` 强制 `--user-authorized`（agent 绝不自授权）；`amend` 额外强制 `--reason`。deadline 的任何写**绝不 bump `goal_contract.revision`**（延长/改期不是目标 scope 变更），只刷 `deadline.updated_at` + `goal_contract.updated_at` + `rev`+1 + append `board.log`。`ccm goal amend`（目标 scope 变更）**原样保留** deadline 子对象——scope 改了 ≠ deadline 改了，不静默丢弃。
+
+**会撞的规则**：形状坏 → `FMT-DEADLINE` hard（exit 3）；未 settle 却已有可执行任务 → `BIZ-DEADLINE-PENDING` warn；`asserted`/`confirmed` 已过期而全局 acceptance 未完成 → `BIZ-DEADLINE-OVERDUE` warn（都在 [N 节](#n-校验规则全集速查fmt--graph--biz)）。legacy board（无 `goal_contract` / 无 `deadline` 键）三规则皆早返回、板仍合法。
 
 > **schema 版本说明：** 当前引擎期望 `schema === "cc-master/v2"`。如果你看到的 board 或别处文档写 `cc-master/v1`（旧板 / 旧叙事），以 `ccm board --help` / 引擎 board-model 为准——schema 锚点是机器读的窄腰字段，别手改。
 
