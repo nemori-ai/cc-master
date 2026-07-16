@@ -31,11 +31,11 @@
 
 ## drain 纪律 + straggler 兜底
 
-**为什么在当前 session drain，而不是把一切甩给新 session：** 你现在还握着每个在飞任务的 **live handle**——能直接收割后台输出、就地端点验收。一旦切到新 session，那些 handle 活在已死的旧 session 里、attach 不回（孤儿 `in_flight`，读侧处理见 `resume-verify.md` §3）。所以凡能在当前 session 排空、验完的，就别留给新 session 当孤儿盲验——**当前 session drain 是更省的那条路**。
+**为什么仍优先在当前 session drain，而不是把一切甩给新 session：** 你现在握着 live context 与直接控制面，收割输出、就地端点验收通常最便宜。Agent Registry 让部分跨 session 恢复成为可能，却不保证每个 handle 都可接入或仍存活：交接前先用 `ccm agent list` 重建 roster，对在飞条目做 `ccm agent show` / `ccm agent probe`；`ccm agent show` 若返回已存的自包含 attach command，把它连同 worktree 一起留作恢复入口。能在当前 session 排空、验完的仍然当场收口，只有真 straggler 才走恢复兜底。
 
 - **drain 的 happy path**：在飞任务逐个收敛，每个落地即就地端点验收（亲跑闸 + 读 diff，见 `resume-verify.md` §3——不信任何 agent 自报），标 `done`/`verified`。收敛后多半只剩一份干净的 board 可交。
-- **straggler 兜底**：某个**真长跑**的在飞任务在一个合理收敛窗口内排不空时——别让收敛把「切 session」无限期焊死。把**这一个**降级成「孤儿 + 重验指引」（在 handoff 文档第 3 段写清产物落点 + 怎么端点验 + content-hash 提示，链到 `resume-verify.md` §3），并 **surface 给用户**：等它跑完再交、还是现在当孤儿交出去。这是一个 `blocked_on:"user"` 形态的抉择——抛给用户，别擅自焊死任一边。
-- **纪律边界**：straggler 兜底是**针对单个长跑任务的逃生口**，不是「整批在飞都不验、全甩成孤儿」的许可证。能在合理窗口内排空的就排空、就验——只有真排不空的那一个才降级。把可 drain 的整批甩成孤儿，是把端点验收的活推给一个 handle 已死、验起来更贵的新 session（反 drain 的全部意义）。
+- **straggler 兜底**：某个**真长跑**的在飞任务在合理收敛窗口内排不空时——别让收敛把「切 session」无限期焊死。把**这一个**作为 registry-tracked straggler 交接：写清 agent id、probe 结论、stored attach command（若有）、产物落点、端点验法与 content-hash 提示，并 **surface 给用户**：等它跑完再交，还是现在按这些证据交出去。这是一个 `blocked_on:"user"` 形态的抉择。
+- **纪律边界**：straggler 兜底是**针对单个长跑任务的逃生口**，不是「整批在飞都不验」的许可证。agent terminal ≠ task done；无论新 session 能否接入 runtime agent，父 task 都须独立验收。
 
 ---
 
@@ -78,7 +78,7 @@ board 里——`--resume` 会原样读到，本文件不复述它，只补 board
 ## 2. 在飞孤儿 + 重验指引
 （收敛后 happy path 多半为空；只剩 drain 兜底降级的 straggler。）
 逐个：产物落在哪、怎么端点验（亲跑哪道闸 + 读哪段 diff）、content-hash 提示。
-→ 怎么 reconcile 一个孤儿 `in_flight`（旧 handle 一律当失效、走端点验或重派）见
+→ 怎么 reconcile 一个 `in_flight`（先 list/show/probe，能接则接，不能接则端点验或重派）见
 `resume-verify.md` §3，本节不复述那套路由。
 
 ## 3. 关键判断 / 上下文（board 装不下的）
@@ -118,7 +118,7 @@ board 里——`--resume` 会原样读到，本文件不复述它，只补 board
 | 「我不在了没法答问，**为稳妥把整个 board 也 dump 进 handoff**，belt-and-suspenders。」 | 那是造**第二份会过期的真相**，不是稳妥。board 是活的、你 dump 的是冻结快照；新 session 一动手，board 对、你那段成了读起来像权威的谎。一份和 live board 打架的文档比没有还糟。指向 board，别复抄。 |
 | 「**再用英文把每个 task 的 status 走一遍**，新 session 看着省事、不用 parse JSON。」 | 「省得 parse JSON」省的是一笔不存在的成本——新 session 用 cc-master 机制读 board，不手 parse。一段 prose 形态的 per-task status 走查，**形态是叙事、本质是 board `tasks[]` 的英文转写**，是噪声。叙事 carries 的是 board 装不下的（why / 死路 / 综合判断）。 |
 | 「**那我只走临界路径那 5 个 task 的 status**，折中，不全 dump。」 | 折中是错答案穿了件小一号的衣服——它保留的正是错的那类内容（live state 的冻结副本），只是少一点。「该往哪推」的结论本就由第 5 段一行综合判断 carry，不靠复述那 5 个 status。砍到 5 个不解决漂移。 |
-| 「这个在飞任务还在跑，**整批先不验、全当孤儿甩给新 session**，我好早点收。」 | 那是把端点验收推给一个 **handle 已死、验起来更贵**的新 session（反 drain 的全部意义）。straggler 兜底只对**真排不空的那一个**降级；能在合理窗口内 drain+验的整批，必须当前 session 验完。 |
+| 「Registry 里有 handle / attach command，**整批不验也能交给新 session**。」 | Registry 提供恢复证据，不替父 task 验收，也不保证每个 agent 仍活或可接。straggler 兜底只对**真排不空的那一个**；能在合理窗口内 drain+验的整批，仍应当前 session 验完。 |
 
 ---
 

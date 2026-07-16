@@ -56,13 +56,13 @@
 
 ### 孤儿 `in_flight` 续接（新 session 接管旧板时）
 
-`--resume` 把一块**已存在**的 board 盖成本 session 后（跨 session re-arm），上一段 orchestration 派发的后台任务的 **handle 活在那个已不在的旧 session 里**——新 session **attach 不回这些 handle**，那些后台进程可能早随旧 session 死了，也可能还在跑但你无从收割。board 上它们是 `status:"in_flight"` + 一个**已失效的 handle**。这是 resume 最微妙的正确性点——但它**不引入新机制**，只是把这个触发场景接进上面已有的 §1 content-hash 续跑 + §3 端点验收 + status enum 的 `stale`/`ready` 路由：
+`--resume` 把一块**已存在**的 board 盖成本 session 后，不要把旧 `in_flight` 一律判死，也不要仅凭旧 status 继续等。先用 `ccm agent list` 重建 runtime roster；对关联条目运行 `ccm agent show` / `ccm agent probe`，把 registry 的 handle、task link、stored attach command 与 git / transcript / process 证据对上。`ccm agent show` 返回已存的 attach command 且 probe 有足够强的 live evidence 时，从它声明的正确 worktree 执行那条自包含命令；不要臆造新的 attach verb。
 
-- **旧 handle 一律当作【失效】**——绝不用它去查 / 收割后台输出（attach 不上）。
-- **走端点验收判它到底有没有真做完**：算该节点的 content-hash（§1：`spec + 上游产物 + key context`），查产物是否已落地（commit / PR / 文件已存在）。
-  - 产物**存在且通过端点验收**（§3：亲跑闸 + 读 diff，不信任何自报）→ 标 `done`/`verified`。这正是 §1 的 content-hash 续跑：产物在且验过 = 不重跑（O(changeset)）。
-  - 产物**不存在 / 验收不过** → 该 `in_flight` 是孤儿、未完成：降回 `ready`（或 `stale`，若它依赖的上游产物也可能变了，见 §2），**重新派发**拿到一个写回 board 的**新 handle**。
-- **绝不把旧 `in_flight` 当作「还在飞、继续等」**——旧 handle 已死，干等 = idle-wait 空等（「主观能动」镜头的反模式）。在端点【验或重派】，二选一，不留薛定谔的 `in_flight`。
+- **可恢复且仍活** → 接入后继续 recon；保持 task 与 agent / attempt 分层，不能拿「成功接入」冒充 task 完成。
+- **agent 已 terminal** → agent terminal ≠ task done。算该节点的 content-hash（§1：`spec + 上游产物 + key context`），查产物是否已落地，再亲跑闸 + 读 diff；通过才把父 task 标 `done`/`verified`。
+- **gone / orphaned，或 unknown 且没有可问责 handle / attach command** → 不再盲等：产物存在就走端点验收；不存在或验收不过，就把父 task 降回 `ready`（上游变化则 `stale`），重新派发并登记新的 runtime agent。
+
+这条恢复路径的核心不是「旧 handle 都死了」或「有 registry 就一定活着」，而是**先读登记、再 probe、能接则接，不能接则验或重派**；父 task 始终独立验收。
 
 ### 异构族系第二视角（高杠杆 / 临界强制）
 

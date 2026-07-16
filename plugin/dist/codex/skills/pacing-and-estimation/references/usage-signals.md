@@ -1,20 +1,42 @@
-# 配额信号 —— 当前窗口 + 信号源链 + 诚实天花板
+# 配额信号 —— 全机 target 视角 + 信号源链 + 诚实天花板
 
-> **何时读：** 要把一场长跑对照当前 host 的配额窗口配速、想知道信号从哪来、`ccm usage advise` 出 `available:false` 时怎么办、或要理解为什么 pacing 只能做方向性走廊（不能精确收尾）时。**ccm 出 verdict、你（作为 orchestrator）决策**（advisory 不替编排判断）。
+> **何时读：** 要从任意 origin 看本机所有受支持 harness / surface 的配额窗口、判断信号从哪来、
+> `available:false` / `state:"unknown"` 时怎么办，或理解为什么 pacing 只能做方向性走廊时。
+> **ccm 出事实与 verdict、你（作为 orchestrator）决策**；本页不执行编排动作。
 
-## 感知 7d hard ceiling 与 rolling-24h advisory
+## 先全局，再下钻
 
-Codex 当前只消费**当前账号**的 7d 用量作为 hard ceiling；rolling-24h burn-rate 只提示相对 7d 平均日预算是否消耗过快，不是第二个硬窗口。对一个 >24h 的目标，真正构成容量上限的是 7d，而非 context% 或历史 5h 字段（「量力而行」镜头）。
+1. 先读 `ccm quota status --machine-wide --json`。这是 cached-only 的全机视图，不调用 provider；把
+   `summary.decisions[]` 按 `target.harness_id + target.surface_id + target.window` 绑定到候选。只有同一 target
+   上的 `state`、`freshness`、`reason_codes[]` 与 source 才能组成一份 posture；不要跨 surface 拼接。
+2. 选中一个 target 后，再用 `ccm --harness <target> usage show --accounts current --json` 看原始 current
+   window，或用 `ccm --harness <target> usage advise --json` 读单侧 verdict。`usage` 是下钻 advisory，
+   不是 machine-wide inventory，也不授权 dispatch。
+3. `state:"unknown"`、非 fresh、`available:false`、窗口缺失或过期都保持 unknown；不得从 binary 存在、
+   已登录、进程 RC0、同品牌另一 surface 或历史 snapshot 推断为 healthy。
 
-读取方式，按口径可信度排：
+完整 flags 与 JSON schema 查 `using-ccm`；不要在这里复制 provider CLI 参数。
 
-1. **7d verdict（首选）—— `ccm usage advise --json`。** 只消费 Codex 当前账号 10080 分钟窗口的 `used_percentage` 与 `resets_at` 作为 hard-gate 输入。若输出还带 `five_hour`、`stop_5h` 或由 5h 推出的 `switch`，把它们标为 ignored provenance；它们不得进入 Codex 的动作判断。
-2. **账户权威信号源 —— Codex app-server。** ccm 通过 `codex app-server --stdio` 的 `account/rateLimits/read` 读取 rate limits；`secondary.windowDurationMins == 10080` 才能绑定为 7d。`primary` / `five_hour` 即使出现也只留作被忽略的来源证据，不能映射成 Codex pacing authority。Codex 不依赖外部状态行 sidecar，也不安装外部状态行命令。
-3. **rolling-24h burn-rate（advisory）——由可信 7d snapshot 的变化导出。** 它回答过去 24h 相对 7d 平均每日预算是否消耗过快，可提示 decision layer 检查节奏；它本身不能触发 hard stop、reset 或 wakeup。样本不足、跨 reset 或 provenance 不完整时保持 unknown。
-4. **本地 JSONL / transcript 反推不用作 hard verdict。** 它看不见服务端真实 7d reset，倒计时可能失真到数量级；权威信号不可用时宁可 `available:false` 诚实降级。
+## 三路窗口合同
 
-**5h 的非权威边界：** 历史或额外 `five_hour` / 5h 是 ignored provenance，不得触发 `throttle`、`switch`、`stop_5h`、reset 或 wakeup。这个过滤发生在把事实交给决策层之前；不能因为旧引擎仍吐出字段就恢复已退役的产品语义。
+| target | 承重窗口 | 信号语义 |
+|---|---|---|
+| Claude Code `claude-cli` | `five_hour` + `seven_day` | 两个窗口各自绑定 statusline sidecar 的当前登录态；账号 registry snapshot 只是历史弱信号 |
+| Codex `codex-cli` | **仅 `seven_day`** | app-server 的 7d 是唯一 hard pacing 窗口；任何 5h 字段只保留为 ignored provenance，不得触发 throttle / switch / stop / reset / wakeup |
+| Cursor `cursor-ide-plugin` | `billing_period` | IDE 当前登录态的账期信号，只适用于 IDE surface |
+| Cursor `cursor-agent-cli` | `billing_period` | Agent CLI 当前登录态的独立账期信号，只适用于 Agent surface |
 
-**诚实天花板：** 账户口径给 7d `used_percentage` + `resets_at`，不给窗口绝对 token 分母；所以 pacing 只能表达压力方向、强度与 reset 区间，rolling-24h 也只是 burn-rate advisory，不能承诺把 used% 精确收敛到某点。
+Cursor 两条 surface 即使可能落到同一订阅池，也必须分别保留 target / source / freshness；一条可用不证明另一条可用。
+Codex 的 rolling-24h（若另有足够样本导出）只能提示相对 7d 平均日预算的 burn risk，不能成为第二个 hard window。
 
-**per-node observability 正交：** 账户级 pacing 管整场长跑别撞墙；单个节点的 token / duration / tool uses 来自 Codex subagent result、后台 terminal session、cloud task 或外部 run 的可得 telemetry，写进 task `observability`。不要用账户级 delta 反推单节点成本，并发时它结构性无法归因。
+## 信号源与诚实天花板
+
+- machine-wide `readings[]` 暴露 target、`used_percentage`、reset / observation / validity 时间与 source；
+  `summary.decisions[]` 是它的 agent-safe posture。它们不证明模型 entitlement，也不替代 quota preflight 的
+  authority-bound spawn limit。
+- `usage show` 的统一窗口都位于 `data.current.{five_hour,seven_day,billing_period}`；不适用或不可得为
+  `null`。`accounts[]` 不把 current signal 的 `available` 点亮。
+- 这些信号给百分比与 reset，不给绝对 token 分母；因此只能表达压力方向、强度与重判时间，不能承诺把
+  used% 精确收敛到某点。
+- 账户级 pacing 与 per-node observability 正交。task token / duration / tool uses 来自对应后台任务的真实
+  telemetry；不要用并发期间的账户级 delta 反推单节点成本。

@@ -23,10 +23,10 @@ const read = (path) => {
 
 const CODEX_GUIDANCE_PATHS = [
   'plugin/src/skills/pacing-and-estimation/adapters/codex/overlays/description.md',
-  'plugin/src/skills/pacing-and-estimation/adapters/codex/overlays/usage-signals-reference.md',
-  'plugin/src/skills/pacing-and-estimation/adapters/codex/overlays/levers-reference.md',
-  'plugin/src/skills/pacing-and-estimation/adapters/codex/overlays/model-tiers-reference.md',
-  'plugin/src/skills/master-orchestrator-guide/adapters/codex/overlays/capacity-account-guidance.md',
+  'plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md',
+  'plugin/src/skills/pacing-and-estimation/canonical/references/pacing-levers.md',
+  'plugin/src/skills/pacing-and-estimation/canonical/references/model-tiers.md',
+  'plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md',
   'plugin/dist/codex/skills/pacing-and-estimation/SKILL.md',
   'plugin/dist/codex/skills/pacing-and-estimation/references/usage-signals.md',
   'plugin/dist/codex/skills/pacing-and-estimation/references/pacing-levers.md',
@@ -69,17 +69,21 @@ test('Codex pacing is 7d-only and treats every five-hour input as ignored proven
     codexGuidance,
     /(?:five_hour|5h)[^\n]*(?:不得|不能)[^\n]*throttle[^\n]*switch[^\n]*stop_5h[^\n]*reset[^\n]*wakeup/iu,
   );
-  for (const pattern of STALE_AUTHORITY_PATTERNS) assert.doesNotMatch(codexGuidance, pattern);
+  const codexTargetLines = codexGuidance
+    .split('\n')
+    .filter((line) => /Codex|codex-cli|five_hour|rolling-24h/iu.test(line))
+    .join('\n');
+  for (const pattern of STALE_AUTHORITY_PATTERNS) assert.doesNotMatch(codexTargetLines, pattern);
 
   const claudeGuidance = [
-    read('plugin/src/skills/pacing-and-estimation/adapters/claude-code/overlays/usage-signals-reference.md'),
+    read('plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md'),
     read('plugin/dist/claude-code/skills/pacing-and-estimation/references/pacing-levers.md'),
   ].join('\n');
   assert.match(claudeGuidance, /5h/u);
   assert.match(claudeGuidance, /stop_5h/u);
 
   const cursorGuidance = [
-    read('plugin/src/skills/pacing-and-estimation/adapters/cursor/overlays/usage-signals-reference.md'),
+    read('plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md'),
     read('plugin/dist/cursor/skills/pacing-and-estimation/SKILL.md'),
   ].join('\n');
   assert.match(cursorGuidance, /billing_period/u);

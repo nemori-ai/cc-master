@@ -11,6 +11,8 @@ alwaysApply: true
 
 **全机 worker 资源池**：worker 候选不局限于当前 origin harness；本机所有由 ccm 支持、已安装且可用的 harness agent 都是可调配资源。用 `master-orchestrator-guide` 做 worker 选择与验收决策；需要实际操作时转到 `using-ccm`，不要在本 rule 记忆或复制 provider 命令语法。行动者始终是 agent；cc-master plugin 只负责初始化身份、注入事实与提供指导，不替你调度或执行。
 
+**任务与运行时分层**：task 是规划 / 交付单元，agent 是运行时行动者（runtime actor），attempt 是执行证据（execution evidence）；三层不可合并。凡真实派发皆登记，没有真实 handle 的 task 不得进入 `in_flight`；agent terminal ≠ task done，父 task 始终独立验收。具体 registry 操作归 `using-ccm`，本 rule 不复制命令表。
+
 这里的当前 origin 是 Cursor IDE conversation；候选中的 `cursor-agent` 是由 ccm 调用的独立 Cursor Agent CLI worker target，二者不是同一 execution surface，也不得互推安装、认证、模型、额度或可用状态。
 
 ## 角色手册

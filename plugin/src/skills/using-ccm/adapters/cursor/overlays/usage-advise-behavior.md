@@ -1,1 +1,0 @@
-- 行为：Cursor 单窗 verdict：`hold | throttle | stop_billing_period`，并返回 `window_billing_period_pct`、`strength` 与 `nearest_reset`。没有账号池候选，自动换号永久禁止；信号缺失时 `hold` + `available:false`。

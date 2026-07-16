@@ -12,6 +12,8 @@ $cc-master:cc-master-as-master-orchestrator $ARGUMENTS
 
 **全机 worker 资源池**：worker 候选不局限于当前 origin harness；本机所有由 ccm 支持、已安装且可用的 harness agent 都是可调配资源。用 `master-orchestrator-guide` 做 worker 选择与验收决策；需要实际操作时转到 `using-ccm`，不要在这个初始化入口记忆或复制 provider 命令语法。行动者始终是 agent；cc-master plugin 只负责初始化身份、注入事实与提供指导，不替你调度或执行。
 
+**任务与运行时分层**：task 是规划 / 交付单元，agent 是运行时行动者（runtime actor），attempt 是执行证据（execution evidence）；三层不可合并。凡真实派发皆登记，没有真实 handle 的 task 不得进入 `in_flight`；agent terminal ≠ task done，父 task 始终独立验收。具体 registry 操作归 `using-ccm`，本入口不复制命令表。
+
 本回合会收到一段 `cc-master:` / `cc-master resume:` 的 context；
 它会告诉你 board 是否已创建或已接管，以及 board 的确切路径。
 
@@ -42,7 +44,7 @@ $ARGUMENTS
 
 1. 读注入 context 里的 board 路径。先进入 board 记录的 `git.worktree`，核对当前目录和分支；不在正确 worktree / branch 时先停下对账。
 2. 调用 `master-orchestrator-guide` skill。先运行 `ccm goal check --board <board> --json` 并读当前 Goal Brief；失败就停在修复/澄清。变化用 Goal Delta Classifier 处理：aligned 对账，amendment-required 走 `ccm goal amend` 新 revision，unrelated 不做；不要静默改写 goal 或重置 `tasks[]`。
-3. 通读现有 `tasks[]`，重建状态模型。旧 session 留下的 `in_flight` 都按孤儿处理：产物已落地且端点验收通过则标 `done` / `verified`；否则降回 `ready` / `stale` 重新派发，拿本 session 可追踪的新 handle。
+3. 通读现有 `tasks[]`，重建状态模型。旧 session 留下的 `in_flight` 不一律判死：按 `master-orchestrator-guide` 的 resume-verify 路径读取 registry、探测并使用其中已存的恢复入口；能接则接，不能接则端点验收已有产物或重派。runtime agent terminal 也不替父 task 完成验收。
 4. 保留已写好的 `owner.session_id`，后续所有写回都经 `ccm` 或 board 写入纪律完成，并刷新 heartbeat。
 5. 继续执行 master orchestrator 决策程序。
 

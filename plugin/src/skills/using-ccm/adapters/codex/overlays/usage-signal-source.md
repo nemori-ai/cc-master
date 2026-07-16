@@ -1,1 +1,0 @@
-> Codex 当前只消费**当前账号 7d**：ccm 通过 `codex app-server --stdio` 的 `account/rateLimits/read` 读取 `windowDurationMins==10080` 的权威窗口；rolling-24h 只从可信 7d 快照导出 advisory。其它窗口字段仅保留为 ignored provenance，不得触发 throttle、switch、短窗口 stop、reset 或 wakeup。缺信号时 `available:false`；自动换号永久禁止。

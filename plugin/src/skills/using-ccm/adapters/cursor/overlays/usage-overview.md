@@ -1,1 +1,0 @@
-配额侧只读 advisory：Cursor 只读取当前账号 aggregate `billing_period` 与任务成本。全部 verb 纯 query/compute，零 board 写入；信号不可得时 exit 0 + `available:false`。账期信号不证明 CLI first-party pool headroom，也不授权账号池或自动换号；ccm 出数据，编排动作归 `master-orchestrator-guide`。

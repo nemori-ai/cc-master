@@ -76,7 +76,7 @@ test('Cursor IDE and headless CLI guidance keep independent role and evidence bo
   const ideFacts = read('design_docs/harnesses/cursor.md');
   const cliFacts = read('design_docs/harnesses/cursor-agent-cli.md');
   const cursorModelFacts = read(
-    'plugin/src/skills/pacing-and-estimation/adapters/cursor/overlays/model-tiers-reference.md',
+    'plugin/src/skills/pacing-and-estimation/canonical/references/model-tiers.md',
   );
   assert.match(contract, /`cursor-ide-plugin`/u);
   assert.match(contract, /`cursor-agent-cli`/u);
@@ -127,16 +127,18 @@ test('three-host pacing projection rejects canonical references, overlays, descr
     }
   }
 
-  for (const [host, overlay, holdout] of [
-    ['claude-code', 'model-tiers-reference.md', HOLDOUTS[0]],
-    ['codex', 'levers-reference.md', HOLDOUTS[1]],
-    ['cursor', 'model-tiers-reference.md', HOLDOUTS[2]],
+  for (const [referenceName, holdout] of [
+    ['usage-signals.md', HOLDOUTS[0]],
+    ['pacing-levers.md', HOLDOUTS[1]],
   ]) {
     const root = makeProjectionFixture();
     try {
-      const path = join(root, `plugin/src/skills/pacing-and-estimation/adapters/${host}/overlays/${overlay}`);
+      const path = join(
+        root,
+        `plugin/src/skills/pacing-and-estimation/canonical/references/${referenceName}`,
+      );
       writeFileSync(path, `${readFileSync(path, 'utf8')}\n${holdout}\n`);
-      assertRejected(root, host, `${host} overlay mutant`);
+      for (const host of HOSTS) assertRejected(root, host, `${referenceName} canonical mutant`);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

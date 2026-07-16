@@ -47,6 +47,7 @@ import * as goalHandler from './handlers/goal.js';
 import * as harnessHandler from './handlers/harness.js';
 import * as jcHandler from './handlers/jc.js';
 import * as logHandler from './handlers/log.js';
+import * as modelPolicyHandler from './handlers/model-policy.js';
 import * as monitorHandler from './handlers/monitor.js';
 import * as peersHandler from './handlers/peers.js';
 import * as policyHandler from './handlers/policy.js';
@@ -207,6 +208,7 @@ const HANDLERS: Record<string, HandlerModule> = {
   statusline: statuslineHandler as unknown as HandlerModule,
   upgrade: upgradeHandler as unknown as HandlerModule,
   provider: providerHandler as unknown as HandlerModule,
+  modelpolicy: modelPolicyHandler as unknown as HandlerModule,
   quota: quotaHandler as unknown as HandlerModule,
   worker: workerHandler as unknown as HandlerModule,
 };

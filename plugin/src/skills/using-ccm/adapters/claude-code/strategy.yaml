@@ -31,8 +31,6 @@ slot_replacements:
   "{{USING_CCM_WATCHDOG_ARM_EXAMPLE}}": adapters/claude-code/overlays/watchdog-arm-example.md
   "{{USING_CCM_SESSION_ID_FLAG}}": adapters/claude-code/overlays/session-id-flag.md
   "{{USING_CCM_BOARD_ARCHIVE_BEHAVIOR}}": adapters/claude-code/overlays/board-archive-behavior.md
-  "{{USING_CCM_USAGE_SIGNAL_SOURCE}}": adapters/claude-code/overlays/usage-signal-source.md
-  "{{USING_CCM_USAGE_BURN_RATE_BEHAVIOR}}": adapters/claude-code/overlays/usage-burn-rate-behavior.md
   "{{USING_CCM_ACCOUNT_NAMESPACE}}": adapters/claude-code/overlays/account-namespace.md
   "{{USING_CCM_STATUSLINE_NAMESPACE}}": adapters/claude-code/overlays/statusline-namespace.md
   "{{USING_CCM_STATUSLINE_NAMESPACE_ROW}}": adapters/claude-code/overlays/statusline-namespace-row.md
@@ -45,14 +43,6 @@ slot_replacements:
   "{{USING_CCM_JC_HOOK_GUIDANCE}}": adapters/claude-code/overlays/jc-hook-guidance.md
   "{{USING_CCM_WATCHDOG_JOB_ID_GUIDANCE}}": adapters/claude-code/overlays/watchdog-job-id-guidance.md
   "{{USING_CCM_WAKEUP_SELF_HEAL_GUIDANCE}}": adapters/claude-code/overlays/wakeup-self-heal-guidance.md
-  "{{USING_CCM_USAGE_NAMESPACE_ROW}}": adapters/claude-code/overlays/usage-namespace-row.md
-  "{{USING_CCM_USAGE_OVERVIEW}}": adapters/claude-code/overlays/usage-overview.md
-  "{{USING_CCM_USAGE_SHOW_BEHAVIOR}}": adapters/claude-code/overlays/usage-show-behavior.md
-  "{{USING_CCM_USAGE_SHOW_SCOPE_FLAGS}}": adapters/claude-code/overlays/usage-show-scope-flags.md
-  "{{USING_CCM_USAGE_ADVISE_BEHAVIOR}}": adapters/claude-code/overlays/usage-advise-behavior.md
-  "{{USING_CCM_USAGE_ADVISE_SCOPE_FLAG}}": adapters/claude-code/overlays/usage-advise-scope-flag.md
-  "{{USING_CCM_USAGE_RUNWAY_BEHAVIOR}}": adapters/claude-code/overlays/usage-runway-behavior.md
-  "{{USING_CCM_USAGE_ADVISE_EXAMPLE}}": adapters/claude-code/overlays/usage-advise-example.md
   "{{USING_CCM_EXIT_CODES}}": adapters/claude-code/overlays/exit-codes.md
   "{{USING_CCM_POLICY_NAMESPACE_ROW}}": adapters/claude-code/overlays/policy-namespace-row.md
   "{{USING_CCM_POLICY_DENY_EXIT_ROW}}": adapters/claude-code/overlays/policy-deny-exit-row.md
@@ -61,9 +51,6 @@ slot_replacements:
   "{{USING_CCM_BOARD_POLICY_GUIDANCE}}": adapters/claude-code/overlays/board-policy-guidance.md
   "{{USING_CCM_FMT_POLICY_ROW}}": adapters/claude-code/overlays/fmt-policy-row.md
   "{{USING_CCM_COORDINATION_QUOTA_MODEL_EXAMPLE}}": adapters/claude-code/overlays/coordination-quota-model-example.md
-  "{{USING_CCM_USAGE_SHOW_JSON_EXAMPLE}}": adapters/claude-code/overlays/usage-show-json-example.md
-  "{{USING_CCM_USAGE_BURN_RATE_JSON_EXAMPLE}}": adapters/claude-code/overlays/usage-burn-rate-json-example.md
-  "{{USING_CCM_USAGE_RUNWAY_JSON_EXAMPLE}}": adapters/claude-code/overlays/usage-runway-json-example.md
   "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/claude-code/overlays/cross-harness-target-facts-pointer.md
 mechanisms:
   declarative-patch:

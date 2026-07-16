@@ -223,6 +223,50 @@ export const REGISTRY: Registry = {
       handler: 'provider.inspect',
     },
   },
+  // ════════════════════ model-policy（跨 provider 角色/事实/taste 只读视图）══════════════════════
+  'model-policy': {
+    show: {
+      summary: '读取三路 origin 共用的模型角色、provider 事实与社区 affinity 分层视图',
+      read: true,
+      positionals: [],
+      options: {
+        task: {
+          type: 'string',
+          required: true,
+          desc: '稳定 task taxonomy（如 architecture-design）',
+        },
+        'as-of': {
+          type: 'string',
+          desc: '冻结求值时间（严格 UTC；缺省为当前时间）',
+        },
+        json: { type: 'boolean', desc: '输出 ccm/model-policy-read-model/v1 JSON' },
+      },
+      examples: [
+        'ccm model-policy show --task architecture-design --json',
+        'ccm model-policy show --task implementation-from-spec --as-of 2026-07-16T12:00:00Z --json',
+      ],
+      handler: 'modelpolicy.show',
+    },
+    advise: {
+      summary: '对已带 live admission 的候选做硬门、基础成本排序与有界 affinity tie-break',
+      read: true,
+      positionals: [],
+      options: {
+        input: {
+          type: 'string',
+          required: true,
+          desc: 'ccm/model-policy-advice-request/v1 JSON（@file / - / 字面量）',
+        },
+        'as-of': {
+          type: 'string',
+          desc: '冻结求值时间（严格 UTC；缺省为当前时间）',
+        },
+        json: { type: 'boolean', desc: '输出 ccm/model-policy-advice/v1 JSON' },
+      },
+      examples: ['ccm model-policy advise --input @/abs/candidates.json --json'],
+      handler: 'modelpolicy.advise',
+    },
+  },
   // ════════════════════ orchestrator / route (C1 shadow-only) ════════════════════════════════════
   orchestrator: {
     context: {

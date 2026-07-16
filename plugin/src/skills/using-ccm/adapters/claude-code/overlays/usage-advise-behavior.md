@@ -1,1 +1,0 @@
-- 行为：池感知单侧 verdict：`hold | throttle | switch | stop_5h | stop_7d`，并返回 `strength`、levers、`nearest_reset` 与可得的 `switch_candidate`。信号缺失时 `hold` + `available:false`。

@@ -1,15 +1,29 @@
-# Pacing levers —— 单侧收紧 + 走廊上界
+# Pacing levers —— target-bound 单侧收紧
 
-> **何时读：** `ccm usage advise` 出了当前 host 的单侧 verdict 时，把 verdict、可用 lever 类与 reset 事实整理成决策输入；具体取舍与编排动作由 `master-orchestrator-guide` 决定。
+> **何时读：** machine-wide posture 或 selected-target `ccm usage advise` 给出压力时，把 verdict、窗口与
+> reset 事实整理成决策输入；具体取舍与编排动作由 `master-orchestrator-guide` 决定。本页不调 WIP、不换号、
+> 不派发 worker，也不创建 watchdog。
 
-Cursor pacing 只在账期逼近上界时给出收紧信号；走廊内保持 `hold`。下列项目是交给 `master-orchestrator-guide` 取舍的候选 lever，不是 pacing 自己执行的动作。
+## 只在上界收紧
 
-## 减速候选
+pacing 没有“额度空闲所以自动加速”的欠用侧。`healthy` / `hold` 只表示当前已证明的承重窗口未触发收紧；
+它不覆盖模型准入、任务质量、权限或安全条件。`tight` / `throttle` 表示需要决策层评估减速；
+`exhausted` / `stop_*` 表示该 target 的承重窗口已进入硬边界。unknown 永远不等于 healthy。
 
-1. **模型候选** —— model-tiers.md 只对 `cursor-agent-cli` headless worker 给出已准入 first-party 候选；`cursor-ide-plugin` 没有 IDE-local 证据时保持 unknown。
-2. **WIP** —— 同时消耗账期容量的叶子数。
-3. **high-float** —— 可推迟到 `nearest_reset` 之后的非临界、token 重叶子。
+按精确 target 解读：
 
-## 硬停决策输入
+- **Claude Code**：5h 与 7d 都承重；`switch_candidate` 只是一份账号池候选事实，不是换号授权。
+- **Codex**：只接受 7d hard gate；5h、`stop_5h`、`switch` 与 `switch_candidate` 不属于有效 Codex pacing
+  合同。Codex 自动换号永久禁止；rolling-24h 只作 burn-risk advisory。
+- **Cursor**：IDE 与 Agent 各自只接受自己的 billing-period posture；`stop_billing_period` 只约束对应
+  surface。Cursor 自动换号永久禁止，两条 surface 不互相兜底事实。
 
-`stop_billing_period` 表示当前账期容量已烧穿。`verdict`、`nearest_reset`、在飞状态、真实 background / wakeup handle 与“不可自动唤醒”标记都是中立输入。若决策层选择建立 watchdog，必须先创建 background Shell 或外部 scheduler 并取得真实 handle，再用 `ccm watchdog arm ... --job-id <handle> --checklist <事项>` 写 canonical `watchdog.checklist`；没有真实 handle 就不能 arm。是否停派、怎样收敛、是否建立 watchdog 或请求用户拍板，归 `master-orchestrator-guide` 决定。自动换号永久禁止。
+## 可交给决策层的影响向量
+
+1. **模型 / effort**：在不跌破任务 effect floor 的前提下，较低成本候选可能降低 burn，也可能增加返工。
+2. **WIP**：同时消耗同一 quota scope 的叶子越多，窗口内 burn 通常越高。
+3. **high-float**：非临界、token 重的工作可以跨 reset 推迟；临界链不能只因额度紧张就静默降质。
+
+这些只是决策输入，不是动作。是否减 WIP、换候选、延后任务、停派、请求用户拍板或建立 watchdog，全部交回
+`master-orchestrator-guide`。若决策层选择 wakeup，必须先取得真实 scheduler / background handle，再通过
+`using-ccm` 记录；`nearest_reset` 本身不是 handle，也不授权自动续跑。

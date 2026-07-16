@@ -1,1 +1,0 @@
-配额侧只读 advisory：读取当前号/备号 5h/7d 用量、单侧走廊 verdict 与任务成本。全部 verb 纯 query/compute，零 board 写入；信号不可得时 exit 0 + `available:false`。输出携带 `source`、`confidence`、`as_of`、`snapshot_stale` 与 `coverage_pct`；ccm 出数据，编排动作归 `master-orchestrator-guide`。

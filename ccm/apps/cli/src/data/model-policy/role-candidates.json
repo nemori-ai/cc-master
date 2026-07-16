@@ -1,0 +1,165 @@
+{
+  "schema": "ccm/model-role-candidate-registry/v1",
+  "revision": "2026-07-16.2",
+  "role_grades": {
+    "O": "orchestrator-grade system, architecture, specification and high-risk adversarial judgment",
+    "T1": "implementation from a complete specification and routine heterogeneous review",
+    "T2": "read-only repository or primary-source web research and grounded summarization",
+    "T3": "mechanical deterministic extraction, transformation and verification"
+  },
+  "task_policy": {
+    "architecture-design": "O",
+    "system-design": "O",
+    "spec-authoring": "O",
+    "high-risk-heterogeneous-review": "O",
+    "security-adversarial-review": "O",
+    "implementation-from-spec": "T1",
+    "frontend-ui-implementation": "T1",
+    "unit-test-authoring": "T1",
+    "large-refactor": "T1",
+    "routine-heterogeneous-review": "T1",
+    "code-review-recall": "T1",
+    "code-review-precision": "T1",
+    "repository-code-research": "T2",
+    "web-primary-source-research": "T2",
+    "source-grounded-summarization": "T2",
+    "mechanical-deterministic-work": "T3"
+  },
+  "candidates": [
+    {
+      "candidate_id": "claude-code-cli:claude-fable-5",
+      "provider": "claude-code",
+      "surface": "claude-code-cli",
+      "model_id": "claude-fable-5",
+      "candidate_role_grades": ["O"],
+      "state": "candidate",
+      "provenance": [
+        {
+          "kind": "user-approved-policy",
+          "ref": "cross-harness-model-role-and-allocation-policy#3.2",
+          "recorded_at": "2026-07-16T00:00:00Z"
+        }
+      ],
+      "blockers": ["project-role-certification-required", "live-target-admission-required"]
+    },
+    {
+      "candidate_id": "codex-cli:gpt-5.6-sol",
+      "provider": "codex",
+      "surface": "codex-cli",
+      "model_id": "gpt-5.6-sol",
+      "candidate_role_grades": ["O"],
+      "state": "candidate",
+      "provenance": [
+        {
+          "kind": "user-approved-policy",
+          "ref": "cross-harness-model-role-and-allocation-policy#3.2",
+          "recorded_at": "2026-07-16T00:00:00Z"
+        }
+      ],
+      "blockers": ["project-role-certification-required", "live-target-admission-required"]
+    },
+    {
+      "candidate_id": "cursor-agent-cli:cursor-grok-4-5",
+      "provider": "cursor",
+      "surface": "cursor-agent-cli",
+      "model_id": "cursor-grok-4-5",
+      "candidate_role_grades": ["O"],
+      "state": "candidate",
+      "provenance": [
+        {
+          "kind": "user-approved-policy",
+          "ref": "cross-harness-model-role-and-allocation-policy#3.2",
+          "recorded_at": "2026-07-16T00:00:00Z"
+        }
+      ],
+      "blockers": ["project-role-certification-required", "live-target-admission-required"]
+    },
+    {
+      "candidate_id": "claude-code-cli:claude-sonnet-5",
+      "provider": "claude-code",
+      "surface": "claude-code-cli",
+      "model_id": "claude-sonnet-5",
+      "candidate_role_grades": ["T1", "T2"],
+      "state": "candidate",
+      "blockers": ["project-role-certification-required", "live-target-admission-required"]
+    },
+    {
+      "candidate_id": "codex-cli:gpt-5.6-terra",
+      "provider": "codex",
+      "surface": "codex-cli",
+      "model_id": "gpt-5.6-terra",
+      "candidate_role_grades": ["T1", "T2"],
+      "state": "candidate",
+      "blockers": ["project-role-certification-required", "live-target-admission-required"]
+    },
+    {
+      "candidate_id": "codex-cli:gpt-5.6-luna",
+      "provider": "codex",
+      "surface": "codex-cli",
+      "model_id": "gpt-5.6-luna",
+      "candidate_role_grades": ["T2", "T3"],
+      "state": "candidate",
+      "blockers": ["project-role-certification-required", "live-target-admission-required"]
+    },
+    {
+      "candidate_id": "cursor-agent-cli:cursor-composer-2-5",
+      "provider": "cursor",
+      "surface": "cursor-agent-cli",
+      "model_id": "cursor-composer-2-5",
+      "candidate_role_grades": ["T1", "T2", "T3"],
+      "state": "candidate",
+      "blockers": ["project-role-certification-required", "live-target-admission-required"]
+    }
+  ],
+  "excluded_automatic_routes": [
+    {
+      "provider": "cursor",
+      "surface": "cursor-agent-cli-third-party-model-route",
+      "model_id": "claude-fable-5",
+      "reason_code": "cursor-third-party-paid-route-requires-explicit-authorization"
+    },
+    {
+      "provider": "cursor",
+      "surface": "cursor-agent-cli-third-party-model-route",
+      "model_id": "gpt-5.6-sol",
+      "reason_code": "cursor-third-party-paid-route-requires-explicit-authorization"
+    }
+  ],
+  "ordering": {
+    "effect_floor_gate": "hard",
+    "never_on": [
+      "policy-blocked",
+      "permission-blocked",
+      "security-blocked",
+      "workspace-mismatch",
+      "task-blocked",
+      "acceptance-failed"
+    ],
+    "equivalence_band": 0.05,
+    "max_affinity_delta": 0.03,
+    "postures": {
+      "ample": {
+        "cost_score": 0.2,
+        "quota_headroom": 0.2,
+        "latency_score": 0.15,
+        "context_fit": 0.25,
+        "integration_score": 0.2
+      },
+      "tight": {
+        "cost_score": 0.35,
+        "quota_headroom": 0.3,
+        "latency_score": 0.1,
+        "context_fit": 0.1,
+        "integration_score": 0.15
+      }
+    },
+    "community_affinity": {
+      "mode": "bounded-tie-break-only",
+      "stale": "neutral",
+      "mixed": "neutral",
+      "unknown": "neutral",
+      "contradictions": "neutral",
+      "very_weak_confidence_below": 0.3
+    }
+  }
+}

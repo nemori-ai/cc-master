@@ -1,0 +1,106 @@
+{
+  "schema": "ccm/task-affinity-registry/v1",
+  "revision": "2026-07-16.1",
+  "entries": [
+    {
+      "evidence_id": "coderabbit-2026-07-fable-architecture",
+      "provider": "claude-code",
+      "surface": "claude-code-cli",
+      "model_id": "claude-fable-5",
+      "task_taxonomy": "architecture-design",
+      "signal": "positive",
+      "direction": 0.6,
+      "confidence": 0.45,
+      "source": {
+        "url": "https://www.coderabbit.ai/blog/gpt-5-6-sol-and-terra-benchmark",
+        "author": "Juan Pablo Flores and Gowtham Kishore Vijay",
+        "published_at": "2026-07-09T00:00:00Z",
+        "retrieved_at": "2026-07-15T00:00:00Z"
+      },
+      "observed_at": "2026-07-09T00:00:00Z",
+      "valid_until": "2026-09-07T00:00:00Z",
+      "contradictions": [],
+      "limitations": ["external-workload", "cross-harness-denominators-not-comparable"]
+    },
+    {
+      "evidence_id": "coderabbit-2026-07-sol-implementation",
+      "provider": "codex",
+      "surface": "codex-cli",
+      "model_id": "gpt-5.6-sol",
+      "task_taxonomy": "implementation-from-spec",
+      "signal": "positive",
+      "direction": 0.65,
+      "confidence": 0.45,
+      "source": {
+        "url": "https://www.coderabbit.ai/blog/gpt-5-6-sol-and-terra-benchmark",
+        "author": "Juan Pablo Flores and Gowtham Kishore Vijay",
+        "published_at": "2026-07-09T00:00:00Z",
+        "retrieved_at": "2026-07-15T00:00:00Z"
+      },
+      "observed_at": "2026-07-09T00:00:00Z",
+      "valid_until": "2026-09-07T00:00:00Z",
+      "contradictions": [],
+      "limitations": ["external-workload", "test-repair-does-not-imply-unit-test-authoring"]
+    },
+    {
+      "evidence_id": "coderabbit-2026-07-sol-review-recall",
+      "provider": "codex",
+      "surface": "codex-cli",
+      "model_id": "gpt-5.6-sol",
+      "task_taxonomy": "code-review-recall",
+      "signal": "positive",
+      "direction": 0.7,
+      "confidence": 0.55,
+      "source": {
+        "url": "https://www.coderabbit.ai/blog/gpt-5-6-sol-and-terra-benchmark",
+        "author": "Juan Pablo Flores and Gowtham Kishore Vijay",
+        "published_at": "2026-07-09T00:00:00Z",
+        "retrieved_at": "2026-07-15T00:00:00Z"
+      },
+      "observed_at": "2026-07-09T00:00:00Z",
+      "valid_until": "2026-09-07T00:00:00Z",
+      "contradictions": ["coderabbit-2026-07-sol-review-precision"],
+      "limitations": ["99-sample-subset", "raw-comment-volume-indicates-noise"]
+    },
+    {
+      "evidence_id": "coderabbit-2026-07-sol-review-precision",
+      "provider": "codex",
+      "surface": "codex-cli",
+      "model_id": "gpt-5.6-sol",
+      "task_taxonomy": "code-review-precision",
+      "signal": "mixed",
+      "direction": -0.45,
+      "confidence": 0.5,
+      "source": {
+        "url": "https://www.coderabbit.ai/blog/gpt-5-6-sol-and-terra-benchmark",
+        "author": "Juan Pablo Flores and Gowtham Kishore Vijay",
+        "published_at": "2026-07-09T00:00:00Z",
+        "retrieved_at": "2026-07-15T00:00:00Z"
+      },
+      "observed_at": "2026-07-09T00:00:00Z",
+      "valid_until": "2026-09-07T00:00:00Z",
+      "contradictions": ["coderabbit-2026-07-sol-review-recall"],
+      "limitations": ["raw-comment-volume-is-not-accepted-finding-count"]
+    },
+    {
+      "evidence_id": "cursor-forum-2026-07-grok-large-refactor",
+      "provider": "cursor",
+      "surface": "cursor-agent-cli",
+      "model_id": "cursor-grok-4-5",
+      "task_taxonomy": "large-refactor",
+      "signal": "positive",
+      "direction": 0.5,
+      "confidence": 0.25,
+      "source": {
+        "url": "https://forum.cursor.com/t/share-your-thoughts-on-grok-4-5/165160/8",
+        "author": "Artemonim",
+        "published_at": "2026-07-08T00:00:00Z",
+        "retrieved_at": "2026-07-15T00:00:00Z"
+      },
+      "observed_at": "2026-07-08T00:00:00Z",
+      "valid_until": "2026-07-22T00:00:00Z",
+      "contradictions": ["verifier-required-follow-up-corrections"],
+      "limitations": ["n=1", "different-orchestrator-model", "user-report-not-independent-eval"]
+    }
+  ]
+}

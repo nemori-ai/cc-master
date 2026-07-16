@@ -1,1 +1,0 @@
-- 行为：只列当前 Codex 账号的 7d `used_percentage` / `resets_at` 与 rolling-24h 可得性；缺 app-server 信号时 `available:false`、exit 0。备号 snapshot 不形成可调度容量。
