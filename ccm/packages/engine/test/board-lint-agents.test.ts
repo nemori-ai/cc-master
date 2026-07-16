@@ -42,7 +42,12 @@ const GOOD_AGENT = {
   intent: 'review diff',
   launch: { created_at: '2026-07-16T08:00:00Z' },
   handle: { kind: 'session-id', value: '0197-abc' },
-  lifecycle: { state: 'running', registered_at: '2026-07-16T08:00:00Z', ended_at: null, outcome: null },
+  lifecycle: {
+    state: 'running',
+    registered_at: '2026-07-16T08:00:00Z',
+    ended_at: null,
+    outcome: null,
+  },
   probe: {
     last_probe_at: '2026-07-16T08:05:00Z',
     method: 'session-file-mtime',
@@ -178,7 +183,11 @@ test('agent_ref on a routed attempt is a legal bypass reference (no new routing 
   const before = lintBoard(base);
   const after = lintBoard(withRefBoard);
   // 冻结 routing 合同校验对未知字段 agent_ref 容忍——加它前后 routing 硬规则集合不变。
-  for (const rule of ['FMT-TASK-ROUTING', 'BIZ-ROUTE-ATTEMPT-REQUIRED', 'BIZ-ROUTE-SELECTION-REQUIRED']) {
+  for (const rule of [
+    'FMT-TASK-ROUTING',
+    'BIZ-ROUTE-ATTEMPT-REQUIRED',
+    'BIZ-ROUTE-SELECTION-REQUIRED',
+  ]) {
     assert.equal(errs(after).has(rule), errs(before).has(rule), `${rule} changed by agent_ref`);
   }
   // 且 attempt.agent_ref 抑制 BIZ-INFLIGHT-AGENT（in_flight 已登记）。

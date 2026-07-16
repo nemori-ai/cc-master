@@ -176,7 +176,9 @@ export function probeAgent(input: ProbeInput, opts: ProbeOpts = {}): ProbeResult
       }
     }
     // 有 ref 但文件缺 → gone；无 ref → unknown（保真·不推导）。
-    return ref ? { method: 'transcript-mtime', observed: 'gone' } : { method: 'none', observed: 'unknown' };
+    return ref
+      ? { method: 'transcript-mtime', observed: 'gone' }
+      : { method: 'none', observed: 'unknown' };
   }
 
   // 无可探测句柄（none / 缺失）→ 保真 unknown。

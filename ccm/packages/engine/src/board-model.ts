@@ -335,7 +335,8 @@ export const FIELDS = {
       default: '缺省(无 agent 登记)',
       readers:
         'ccm agent list|show / viewer 花名册与 agent 模式 / BIZ-INFLIGHT-AGENT 判 in_flight task 是否已登记 agent',
-      writers: 'ccm agent create|bind|link|terminal|probe（probe 只写 agents[] 自己的 probe/lifecycle 字段）',
+      writers:
+        'ccm agent create|bind|link|terminal|probe（probe 只写 agents[] 自己的 probe/lifecycle 字段）',
       when: '凡派发（sub-agent / 后台 shell / workflow / 跨 harness worker）即登记；bind 交证据 / link 建关联 / probe 探活',
       degrade:
         '缺→无 agent 登记(viewer 花名册空)；形状坏→warn(FMT-AGENTS)·不拦写盘(✎ hook 不读·窄腰零碰撞)',

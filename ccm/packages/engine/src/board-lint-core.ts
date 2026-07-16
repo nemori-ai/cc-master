@@ -1240,7 +1240,10 @@ function lintAgents(board: BoardLike, emit: Emit): void {
       emit('FMT-AGENTS', `${label}.intent 若存在须为字符串（当前：${JSON.stringify(a.intent)}）。`);
     }
     if (a.model !== undefined && typeof a.model !== 'string') {
-      emit('FMT-AGENTS', `${label}.model 若存在须为字符串（unknown 保真·缺则不填；当前：${JSON.stringify(a.model)}）。`);
+      emit(
+        'FMT-AGENTS',
+        `${label}.model 若存在须为字符串（unknown 保真·缺则不填；当前：${JSON.stringify(a.model)}）。`,
+      );
     }
     // launch
     if (a.launch !== undefined) {
@@ -1249,7 +1252,10 @@ function lintAgents(board: BoardLike, emit: Emit): void {
       } else {
         const l = a.launch as Record<string, unknown>;
         if (l.created_at !== undefined && badTimestamp(l.created_at)) {
-          emit('FMT-AGENTS', `${label}.launch.created_at 是 ${JSON.stringify(l.created_at)}，非严格 ISO-8601 UTC。`);
+          emit(
+            'FMT-AGENTS',
+            `${label}.launch.created_at 是 ${JSON.stringify(l.created_at)}，非严格 ISO-8601 UTC。`,
+          );
         }
       }
     }
@@ -1266,14 +1272,20 @@ function lintAgents(board: BoardLike, emit: Emit): void {
           );
         }
         if (h.value !== undefined && typeof h.value !== 'string') {
-          emit('FMT-AGENTS', `${label}.handle.value 若存在须为字符串（当前：${JSON.stringify(h.value)}）。`);
+          emit(
+            'FMT-AGENTS',
+            `${label}.handle.value 若存在须为字符串（当前：${JSON.stringify(h.value)}）。`,
+          );
         }
       }
     }
     // lifecycle（state 必校验·其余 present 才校验）
     if (a.lifecycle !== undefined) {
       if (typeof a.lifecycle !== 'object' || a.lifecycle === null || Array.isArray(a.lifecycle)) {
-        emit('FMT-AGENTS', `${label}.lifecycle 若存在须为对象（当前：${JSON.stringify(a.lifecycle)}）。`);
+        emit(
+          'FMT-AGENTS',
+          `${label}.lifecycle 若存在须为对象（当前：${JSON.stringify(a.lifecycle)}）。`,
+        );
       } else {
         const lc = a.lifecycle as Record<string, unknown>;
         if (!isEnumMember('agentState', lc.state)) {
@@ -1284,7 +1296,10 @@ function lintAgents(board: BoardLike, emit: Emit): void {
         }
         for (const k of ['registered_at', 'ended_at']) {
           if (lc[k] !== undefined && lc[k] !== null && badTimestamp(lc[k])) {
-            emit('FMT-AGENTS', `${label}.lifecycle.${k} 是 ${JSON.stringify(lc[k])}，非严格 ISO-8601 UTC。`);
+            emit(
+              'FMT-AGENTS',
+              `${label}.lifecycle.${k} 是 ${JSON.stringify(lc[k])}，非严格 ISO-8601 UTC。`,
+            );
           }
         }
       }
@@ -1309,7 +1324,10 @@ function lintAgents(board: BoardLike, emit: Emit): void {
         }
         for (const k of ['last_probe_at', 'as_of']) {
           if (p[k] !== undefined && p[k] !== null && badTimestamp(p[k])) {
-            emit('FMT-AGENTS', `${label}.probe.${k} 是 ${JSON.stringify(p[k])}，非严格 ISO-8601 UTC。`);
+            emit(
+              'FMT-AGENTS',
+              `${label}.probe.${k} 是 ${JSON.stringify(p[k])}，非严格 ISO-8601 UTC。`,
+            );
           }
         }
       }
@@ -1322,7 +1340,10 @@ function lintAgents(board: BoardLike, emit: Emit): void {
         for (let j = 0; j < a.links.length; j++) {
           const ln = a.links[j];
           if (!ln || typeof ln !== 'object' || Array.isArray(ln)) {
-            emit('FMT-AGENTS', `${label}.links[${j}] 应为对象 {task_id, linked_at?}（当前：${JSON.stringify(ln)}）。`);
+            emit(
+              'FMT-AGENTS',
+              `${label}.links[${j}] 应为对象 {task_id, linked_at?}（当前：${JSON.stringify(ln)}）。`,
+            );
             continue;
           }
           const link = ln as Record<string, unknown>;
@@ -1330,7 +1351,10 @@ function lintAgents(board: BoardLike, emit: Emit): void {
             emit('FMT-AGENTS', `${label}.links[${j}].task_id 必须是非空字符串。`);
           }
           if (link.linked_at !== undefined && badTimestamp(link.linked_at)) {
-            emit('FMT-AGENTS', `${label}.links[${j}].linked_at 是 ${JSON.stringify(link.linked_at)}，非严格 ISO-8601 UTC。`);
+            emit(
+              'FMT-AGENTS',
+              `${label}.links[${j}].linked_at 是 ${JSON.stringify(link.linked_at)}，非严格 ISO-8601 UTC。`,
+            );
           }
         }
       }
@@ -1338,7 +1362,10 @@ function lintAgents(board: BoardLike, emit: Emit): void {
     // account_ref / quota_pool_ref（只存 ref 不存数值·预留位·null 或字符串）
     for (const k of ['account_ref', 'quota_pool_ref']) {
       if (a[k] !== undefined && a[k] !== null && typeof a[k] !== 'string') {
-        emit('FMT-AGENTS', `${label}.${k} 若存在须为 null 或字符串（只存 ref 不存数值；当前：${JSON.stringify(a[k])}）。`);
+        emit(
+          'FMT-AGENTS',
+          `${label}.${k} 若存在须为 null 或字符串（只存 ref 不存数值；当前：${JSON.stringify(a[k])}）。`,
+        );
       }
     }
   }
@@ -1356,7 +1383,8 @@ function lintInflightAgent(board: BoardLike, taskById: Map<string, TaskLike>, em
     const links = (a as Record<string, unknown>).links;
     if (!Array.isArray(links)) continue;
     for (const ln of links) {
-      const tid = ln && typeof ln === 'object' ? (ln as Record<string, unknown>).task_id : undefined;
+      const tid =
+        ln && typeof ln === 'object' ? (ln as Record<string, unknown>).task_id : undefined;
       if (typeof tid === 'string' && tid !== '') linkedTaskIds.add(tid);
     }
   }

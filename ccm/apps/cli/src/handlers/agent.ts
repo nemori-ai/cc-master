@@ -151,8 +151,7 @@ export function link(ctx: Ctx): number {
       const b = board as BoardArg;
       const agent = findAgent(b, id);
       if (!agent) throw fail(`agent ${id} 不存在（先 \`ccm agent create\`）`, 'NotFound');
-      const taskExists =
-        Array.isArray(b.tasks) && b.tasks.some((t: any) => t && t.id === taskId);
+      const taskExists = Array.isArray(b.tasks) && b.tasks.some((t: any) => t && t.id === taskId);
       if (!taskExists) {
         throw fail(`link 目标 task ${taskId} 不存在于本 board（无法建关联）`, 'Validation');
       }
@@ -253,7 +252,8 @@ export function probe(ctx: Ctx): number {
     render: (_next, c) => {
       if (c.flags.json) return JSON.stringify({ ok: true, data: { probed } });
       const lines = probed.map(
-        (a) => `  ${a.id}: observed=${a.probe?.observed}·method=${a.probe?.method}·state=${a.lifecycle?.state}`,
+        (a) =>
+          `  ${a.id}: observed=${a.probe?.observed}·method=${a.probe?.method}·state=${a.lifecycle?.state}`,
       );
       return `probe ${probed.length} agent(s):\n${lines.join('\n')}\n`;
     },

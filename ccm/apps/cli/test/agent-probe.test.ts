@@ -138,7 +138,10 @@ test('task-id/subagent: transcript path present → mtime; absent → unknown', 
     { nowMs: NOW },
   );
   assert.deepEqual(r, { method: 'transcript-mtime', observed: 'alive' });
-  const noRef = probeAgent({ type: 'subagent', handleKind: 'task-id', handleValue: 'T1' }, { nowMs: NOW });
+  const noRef = probeAgent(
+    { type: 'subagent', handleKind: 'task-id', handleValue: 'T1' },
+    { nowMs: NOW },
+  );
   assert.deepEqual(noRef, { method: 'none', observed: 'unknown' });
   const missingRef = probeAgent(
     { type: 'subagent', handleKind: 'task-id', transcriptRef: join(home, 'gone.jsonl') },

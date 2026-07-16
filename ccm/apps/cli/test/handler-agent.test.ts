@@ -8,8 +8,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
-import * as agent from '../src/handlers/agent.js';
 import type { Ctx } from '../src/handlers/_common.js';
+import * as agent from '../src/handlers/agent.js';
 import * as io from '../src/io.js';
 
 const EXIT = io.EXIT;
@@ -107,7 +107,10 @@ test('create auto-increments ids agt-001 → agt-002', () => {
   agent.create(mkCtx(bp, { values: { type: 'subagent', harness: 'origin', intent: 'a' } }));
   agent.create(mkCtx(bp, { values: { type: 'workflow', harness: 'origin', intent: 'b' } }));
   const board = readBoard(bp);
-  assert.deepEqual(board.agents.map((a: any) => a.id), ['agt-001', 'agt-002']);
+  assert.deepEqual(
+    board.agents.map((a: any) => a.id),
+    ['agt-001', 'agt-002'],
+  );
 });
 
 // ── bind ──────────────────────────────────────────────────────────────────────────────────────────
@@ -144,7 +147,10 @@ test('bind with no handle evidence is rejected (Validation·exit 3): "no real ha
 test('bind on nonexistent agent → NotFound (exit 5)', () => {
   const bp = mkBoardHome();
   const ctx = mkCtx(bp, { positionals: ['agt-404'], values: { handle: 'pid:1' } });
-  assert.throws(() => agent.bind(ctx), (e: Error & { errKind?: string }) => e.errKind === 'NotFound');
+  assert.throws(
+    () => agent.bind(ctx),
+    (e: Error & { errKind?: string }) => e.errKind === 'NotFound',
+  );
 });
 
 test('bind on a terminal agent → IllegalTransition (exit 3)', () => {
@@ -161,10 +167,18 @@ test('bind on a terminal agent → IllegalTransition (exit 3)', () => {
 
 // ── link ──────────────────────────────────────────────────────────────────────────────────────────
 test('link appends an agent-side link; second link to same task is idempotent', () => {
-  const bp = mkBoardHome([{ id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' }]);
+  const bp = mkBoardHome([
+    { id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' },
+  ]);
   agent.create(mkCtx(bp, { values: { type: 'subagent', harness: 'origin', intent: 'x' } }));
-  assert.equal(agent.link(mkCtx(bp, { positionals: ['agt-001'], values: { task: 'T1' } })), EXIT.OK);
-  assert.equal(agent.link(mkCtx(bp, { positionals: ['agt-001'], values: { task: 'T1' } })), EXIT.OK);
+  assert.equal(
+    agent.link(mkCtx(bp, { positionals: ['agt-001'], values: { task: 'T1' } })),
+    EXIT.OK,
+  );
+  assert.equal(
+    agent.link(mkCtx(bp, { positionals: ['agt-001'], values: { task: 'T1' } })),
+    EXIT.OK,
+  );
   const a = readBoard(bp).agents[0];
   assert.equal(a.links.length, 1, 'idempotent: no duplicate link');
   assert.equal(a.links[0].task_id, 'T1');
@@ -174,11 +188,16 @@ test('link to a nonexistent task → Validation (exit 3)', () => {
   const bp = mkBoardHome([{ id: 'T1', status: 'ready', deps: [] }]);
   agent.create(mkCtx(bp, { values: { type: 'subagent', harness: 'origin', intent: 'x' } }));
   const ctx = mkCtx(bp, { positionals: ['agt-001'], values: { task: 'T-nope' } });
-  assert.throws(() => agent.link(ctx), (e: Error & { errKind?: string }) => e.errKind === 'Validation');
+  assert.throws(
+    () => agent.link(ctx),
+    (e: Error & { errKind?: string }) => e.errKind === 'Validation',
+  );
 });
 
 test('link never touches task.status / task.routing (terminal ≠ done boundary)', () => {
-  const bp = mkBoardHome([{ id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' }]);
+  const bp = mkBoardHome([
+    { id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' },
+  ]);
   agent.create(mkCtx(bp, { values: { type: 'subagent', harness: 'origin', intent: 'x' } }));
   agent.link(mkCtx(bp, { positionals: ['agt-001'], values: { task: 'T1' } }));
   const t = readBoard(bp).tasks[0];
@@ -188,7 +207,9 @@ test('link never touches task.status / task.routing (terminal ≠ done boundary)
 
 // ── terminal ──────────────────────────────────────────────────────────────────────────────────────
 test('terminal: running → terminal with outcome; task status untouched', () => {
-  const bp = mkBoardHome([{ id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' }]);
+  const bp = mkBoardHome([
+    { id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' },
+  ]);
   agent.create(mkCtx(bp, { values: { type: 'cli-worker', harness: 'codex', intent: 'x' } }));
   agent.bind(mkCtx(bp, { positionals: ['agt-001'], values: { handle: 'pid:1' } }));
   assert.equal(
@@ -199,7 +220,11 @@ test('terminal: running → terminal with outcome; task status untouched', () =>
   assert.equal(board.agents[0].lifecycle.state, 'terminal');
   assert.equal(board.agents[0].lifecycle.outcome, 'approved');
   assert.ok(board.agents[0].lifecycle.ended_at);
-  assert.equal(board.tasks[0].status, 'in_flight', 'terminal ≠ task done: task status never changed');
+  assert.equal(
+    board.tasks[0].status,
+    'in_flight',
+    'terminal ≠ task done: task status never changed',
+  );
 });
 
 test('terminal on a starting agent → IllegalTransition (exit 3)', () => {
@@ -215,7 +240,9 @@ test('terminal on a starting agent → IllegalTransition (exit 3)', () => {
 // ── probe（真进程降级）─────────────────────────────────────────────────────────────────────────────
 test('probe: live pid → running; after kill → orphaned (only agents[] segment written)', async () => {
   const { spawn } = await import('node:child_process');
-  const bp = mkBoardHome([{ id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' }]);
+  const bp = mkBoardHome([
+    { id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' },
+  ]);
   agent.create(mkCtx(bp, { values: { type: 'background-shell', harness: 'origin', intent: 'x' } }));
   const child = spawn('sleep', ['30'], { detached: true });
   const pid = child.pid as number;
@@ -272,12 +299,17 @@ test('show --json returns the full record; missing id → NotFound (exit 5)', ()
   assert.equal(agent.show(ctx), EXIT.OK);
   assert.equal(JSON.parse(ctx.outBuf.join('')).data.agent.id, 'agt-001');
   const miss = mkCtx(bp, { positionals: ['agt-404'], flags: { json: true } });
-  assert.throws(() => agent.show(miss), (e: Error & { errKind?: string }) => e.errKind === 'NotFound');
+  assert.throws(
+    () => agent.show(miss),
+    (e: Error & { errKind?: string }) => e.errKind === 'NotFound',
+  );
 });
 
 // ── 单条记录尺寸预算（~1KB·大证据只存路径引用）──────────────────────────────────────────────────────
 test('a single agent record stays under ~1KB', () => {
-  const bp = mkBoardHome([{ id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' }]);
+  const bp = mkBoardHome([
+    { id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' },
+  ]);
   agent.create(
     mkCtx(bp, {
       values: {
