@@ -16,7 +16,6 @@ runtime_contracts:
 mode: copy
 exclude_canonical:
   - references/cost-decisions.md
-  - references/handoff.md
   - scripts/codex-review.sh
 slot_replacements:
   "{{BACKGROUND_DISPATCH_SUMMARY}}": adapters/kimi-code/overlays/background-dispatch-summary.md
@@ -47,5 +46,9 @@ slot_replacements:
 notes:
   - kimi-code projection uses the host-neutral canonical body, including machine-wide selected-target quota guidance, plus kimi built-in subagent / Bash dispatch and background-Bash-floor watchdog slots.
   - kimi has no CLI quota signal; Workflow remains unsupported.
-  - Exclude cost-decisions.md and handoff.md like Codex/Cursor; keep codex-review.sh excluded (optional external).
+  - Exclude cost-decisions.md (Claude Code account-pool switching is unsupported on kimi-code); keep
+    codex-review.sh excluded (optional external). Unlike Codex/Cursor, DO project handoff.md — its
+    content is host-neutral (no Claude-specific tokens) and the `cc-master:handoff-to-new-session`
+    command body and SKILL.md's own command-entry bullet both point at it; excluding it would leave a
+    dangling reference (codex second-opinion review, PR #159).
   - Heterogeneous second-perspective review is a host slot: kimi picks a cross-harness worker (Codex/Claude via ccm), not its own same-model subagent.

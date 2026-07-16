@@ -191,7 +191,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | `resume-verify.md` | 廉价续跑 + 端点验收 + content-hash + **异构族系第二视角**（高杠杆/临界强制）+ **resume 第 0 步落 worktree** |
 | `cost-decisions.md` | Claude Code 账号池换号决策锚；kimi-code 当前账号池切换 unsupported，kimi-code 编排不要 drill |
 | `multi-layer-planning.md` | 派发的大节点**内部**本身是复杂规划问题时（board ⊥ 项目自身 planning 层） |
-| `handoff.md` | Claude Code slash-command handoff/resume 流程；kimi-code 当前不投影该 reference，续跑按 kimi-code resume + board recon 纪律处理 |
+| `handoff.md` | 优雅交接给新 session（quiesce / drain / 叙事层文档 + 归档）；kimi-code 走 `cc-master:handoff-to-new-session` + `cc-master:as-master-orchestrator --resume` |
 
 ### 你与用户之间的 commands（知道它们存在）
 

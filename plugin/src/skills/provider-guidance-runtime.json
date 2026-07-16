@@ -129,12 +129,13 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "24dd5fd37949eb9420d0a5331a878481422483b91e122f935df3ec7df38a4a47",
+            "SKILL.md": "8f4095fb3f46db56afca355946c85441acde1ec44586deb64113928372cf9007",
             "references/async-hitl.md": "f435d6abdcd7f524f847817b2308405b6fc9a4f6e6e7de7e758b676bfea27c35",
             "references/board.md": "913124607f420c52e1d884c1209b2d4454b04a9a38c8bc9f8889278bec0f0e55",
             "references/decomposition.md": "9d3fc377a4d8e4cd4c9c4d312ce47ab58a74f7faa9d071dda6e8a6c22609ced7",
             "references/dispatch.md": "89745681ba59f5c2b074b50a18004b9df1690abfdf2cf988ecad3126b74c6737",
             "references/goal-contract.md": "95f8e8344e03e1271403191f09163784420108780bc18149d6ad4f78f86d5d19",
+            "references/handoff.md": "253b1227fec8ae9306c236db594052785bf374fab7a0401d972ecaace1dc5c39",
             "references/model-allocation.md": "57c59f86b137bcca50aa8f9dc10e56f097052d86afe467e2bfe33a681fefddbc",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
             "references/outside-in.md": "02031c9ffe6b741659bcc2ceeb5e32404d43d0c75c906803b32275aea2e64e62",
