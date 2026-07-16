@@ -108,12 +108,14 @@ export function isAgentId(v: unknown): boolean {
 // ── Agent lifecycle 状态机（逐字复用 native-attempt 转移语义与错误词汇风格）。─────────────────────────
 //   starting→running（bind 交证据）· running/uncertain→terminal（登记 outcome·terminal ≠ done）·
 //   uncertain→running（probe alive / 再 bind 复活）· {starting,running,uncertain}→{uncertain,orphaned}（probe 降级）·
-//   orphaned→terminal（观测已消失后由 orchestrator 显式收口）。terminal 是终态。
+//   orphaned→running（probe alive 证据式恢复·双向 reconcile）· orphaned→terminal（由 orchestrator 显式收口）。
+//   terminal 是唯一终态（probe 永不复活）。
 export const AGENT_STATE_MACHINE: Record<string, string[]> = {
   starting: ['running', 'uncertain', 'orphaned'],
   running: ['terminal', 'uncertain', 'orphaned'],
   uncertain: ['running', 'terminal', 'orphaned'],
-  orphaned: ['terminal'],
+  // orphaned→running：证据式恢复（probe 观测 alive 即证据·orphaned 可能是启动竞态/误判死的产物）。
+  orphaned: ['terminal', 'running'],
   terminal: [],
 };
 export function isLegalAgentTransition(from: string, to: string): boolean {

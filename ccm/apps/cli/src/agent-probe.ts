@@ -11,7 +11,8 @@
 //   · 其余 / none             → method=none, observed=unknown。
 //
 // observed 语义：alive（进程活 / 文件 mtime 在 freshness 窗内）· silent（文件在但 mtime 陈旧）·
-//   gone（进程不存在 / 会话文件缺失）· unknown（无可探测句柄 / 无已知落盘路径）。
+//   gone（**仅确定性判死**：pid kill-0 ESRCH——进程不存在）· unknown（无可探测句柄 / 无已知落盘路径 /
+//   会话·transcript 文件不存在——「从未见过文件」≠「曾在而消失」，启动竞态下文件可能尚未写出，不判死）。
 //
 // 会话落盘根目录可经 env 覆写（测试注入临时 home）：CODEX_HOME / CLAUDE_CONFIG_DIR，否则回落 os.homedir()。
 
@@ -95,7 +96,9 @@ function findSessionFileMtime(root: string, sid: string): number | null {
 }
 
 function mtimeToObserved(mtimeMs: number | null, nowMs: number, freshnessSec: number): string {
-  if (mtimeMs === null) return 'gone'; // 文件不存在 = 会话已消失
+  // 文件不存在 → unknown（不是 gone）：无法区分「尚未写出」（启动竞态·worker 刚起、session 文件未落盘）
+  //   和「已清理」——gone 只保留给能确定性判死的方法（pid kill-0 ESRCH）。unknown 保真、不触发降级。
+  if (mtimeMs === null) return 'unknown';
   return nowMs - mtimeMs <= freshnessSec * 1000 ? 'alive' : 'silent';
 }
 
@@ -175,9 +178,9 @@ export function probeAgent(input: ProbeInput, opts: ProbeOpts = {}): ProbeResult
         return { method: 'transcript-mtime', observed: 'unknown' };
       }
     }
-    // 有 ref 但文件缺 → gone；无 ref → unknown（保真·不推导）。
+    // 有 ref 但文件缺 → unknown（可能尚未写出·mtime 类方法不判死）；无 ref → unknown（保真·不推导）。
     return ref
-      ? { method: 'transcript-mtime', observed: 'gone' }
+      ? { method: 'transcript-mtime', observed: 'unknown' }
       : { method: 'none', observed: 'unknown' };
   }
 
@@ -185,11 +188,14 @@ export function probeAgent(input: ProbeInput, opts: ProbeOpts = {}): ProbeResult
   return { method: 'none', observed: 'unknown' };
 }
 
-// reconcileAgentState — 观测与登记态冲突时以观测为准降级（只对 active 态生效·M4：只降 agent 自己）。
+// reconcileAgentState — 观测与登记态冲突时以观测为准（双向 reconcile·M4：只改 agent 自己）。
 //   active {starting,running,uncertain}：gone→orphaned · silent→uncertain · alive→running · unknown→不变。
-//   terminal / orphaned：终态/死态，probe 不自动复活（记录观测但不改 state）。
+//   orphaned：alive→running（**证据式恢复**——观测即证据；orphaned 可能来自误判死或 pid 复用，见 probe
+//     字段的 method/as_of 证据链），其余观测不动（gone/silent/unknown 都不能证明它复活）。
+//   terminal：唯一终态，probe 永不复活（收口是显式动作）。
 export function reconcileAgentState(state: string, observed: string): string {
-  if (state === 'terminal' || state === 'orphaned') return state;
+  if (state === 'terminal') return state;
+  if (state === 'orphaned') return observed === 'alive' ? 'running' : state;
   if (state !== 'starting' && state !== 'running' && state !== 'uncertain') return state;
   switch (observed) {
     case 'gone':

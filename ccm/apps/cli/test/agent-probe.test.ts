@@ -1,5 +1,6 @@
 // agent-probe.test.ts — Agent Registry S2 探测适配器（agent-probe.ts）契约门。
-//   证：按 handle 类型分级探测、mtime freshness → alive/silent/gone、拿不到 = unknown（保真·不推导）、
+//   证：按 handle 类型分级探测、mtime freshness → alive/silent（文件缺 → unknown·启动竞态不判死）、
+//   gone 只出自确定性方法（pid kill-0）、拿不到 = unknown（保真·不推导）、
 //   以及 reconcileAgentState 的观测降级语义。会话根目录经 env 覆写注入临时 home。
 
 import assert from 'node:assert/strict';
@@ -62,7 +63,7 @@ function mkCodexSession(home: string, sid: string, mtimeMs: number): void {
   utimesSync(f, mtimeMs / 1000, mtimeMs / 1000);
 }
 
-test('codex session-id: fresh mtime → alive, stale → silent, missing → gone', () => {
+test('codex session-id: fresh mtime → alive, stale → silent, missing → unknown (launch-race safe)', () => {
   const home = mkTmp('ccm-probe-cx-');
   mkCodexSession(home, 'sid-fresh', NOW - 60_000); // 1min old
   const fresh = probeAgent(
@@ -78,11 +79,12 @@ test('codex session-id: fresh mtime → alive, stale → silent, missing → gon
   );
   assert.equal(stale.observed, 'silent');
 
+  // 文件不存在 ≠ 判死：「从未见过文件」可能是启动竞态（尚未落盘）——unknown 保真，不触发降级。
   const missing = probeAgent(
     { harness: 'codex', handleKind: 'session-id', handleValue: 'sid-nope' },
     { home, nowMs: NOW },
   );
-  assert.equal(missing.observed, 'gone');
+  assert.equal(missing.observed, 'unknown');
 });
 
 test('codex session-id: CODEX_HOME env overrides home root', () => {
@@ -116,7 +118,7 @@ test('claude-code session-id: ~/.claude/projects/<slug>/<sid>.jsonl mtime', () =
     { harness: 'claude-code', handleKind: 'session-id', handleValue: 'nope' },
     { home, nowMs: NOW },
   );
-  assert.equal(missing.observed, 'gone');
+  assert.equal(missing.observed, 'unknown'); // 文件缺 → unknown（mtime 类方法不判死）
 });
 
 test('session-id on unknown harness → method none, observed unknown (no path guessing)', () => {
@@ -147,7 +149,7 @@ test('task-id/subagent: transcript path present → mtime; absent → unknown', 
     { type: 'subagent', handleKind: 'task-id', transcriptRef: join(home, 'gone.jsonl') },
     { nowMs: NOW },
   );
-  assert.equal(missingRef.observed, 'gone');
+  assert.equal(missingRef.observed, 'unknown'); // ref 在但文件缺 → unknown（可能尚未写出·不判死）
 });
 
 test('no handle → method none, observed unknown', () => {
@@ -168,7 +170,15 @@ test('reconcileAgentState: active states downgrade on observation', () => {
   assert.equal(reconcileAgentState('starting', 'alive'), 'running');
 });
 
-test('reconcileAgentState: terminal and orphaned are not auto-resurrected', () => {
+test('reconcileAgentState: orphaned recovers to running on alive evidence (bidirectional reconcile)', () => {
+  assert.equal(reconcileAgentState('orphaned', 'alive'), 'running'); // 观测即证据·证据式恢复
+  // 非 alive 观测不能证明复活——orphaned 保持。
+  assert.equal(reconcileAgentState('orphaned', 'gone'), 'orphaned');
+  assert.equal(reconcileAgentState('orphaned', 'silent'), 'orphaned');
+  assert.equal(reconcileAgentState('orphaned', 'unknown'), 'orphaned');
+});
+
+test('reconcileAgentState: terminal is the only true final state (never resurrected)', () => {
   assert.equal(reconcileAgentState('terminal', 'alive'), 'terminal');
-  assert.equal(reconcileAgentState('orphaned', 'alive'), 'orphaned');
+  assert.equal(reconcileAgentState('terminal', 'gone'), 'terminal');
 });

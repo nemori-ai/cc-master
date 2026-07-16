@@ -51,10 +51,12 @@ function mkCtx(
     values = {},
     flags = {},
     positionals = [],
+    env = {},
   }: {
     values?: Record<string, unknown>;
     flags?: Partial<Ctx['flags']>;
     positionals?: string[];
+    env?: Record<string, string | undefined>;
   } = {},
 ): TestCtx {
   const outBuf: string[] = [];
@@ -73,7 +75,7 @@ function mkCtx(
       ...flags,
     },
     sid: 'sid-ag',
-    env: {},
+    env,
     out: (s: string) => outBuf.push(s),
     err: (s: string) => errBuf.push(s),
     isTTY: true,
@@ -264,6 +266,68 @@ test('probe: live pid → running; after kill → orphaned (only agents[] segmen
   // M4：probe 只写 agents[] 段——task/attempt 投影零改动。
   assert.equal(board.tasks[0].status, 'in_flight');
   assert.equal(board.tasks[0].handle, undefined);
+});
+
+// ── probe 语义修复（启动竞态 + 证据式恢复 + pid 不回归）──────────────────────────────────────────────
+test('probe launch race: session file not yet on disk → observed=unknown, running is NOT downgraded', () => {
+  // 真实缺陷：claude worker 刚起、~/.claude/projects/<slug>/<sid>.jsonl 尚未落盘时立即 probe，
+  //   旧实现把「文件不存在」判成 gone → running 被误降 orphaned。「从未见过文件」≠「曾在而消失」。
+  const claudeHome = mkTmp('ccm-hag-cc-'); // 空 CLAUDE_CONFIG_DIR：session 文件不存在
+  const bp = mkBoardHome([
+    { id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' },
+  ]);
+  agent.create(mkCtx(bp, { values: { type: 'cli-worker', harness: 'claude-code', intent: 'x' } }));
+  agent.bind(mkCtx(bp, { positionals: ['agt-001'], values: { handle: 'session-id:sid-race-1' } }));
+  const env = { CLAUDE_CONFIG_DIR: claudeHome };
+  assert.equal(agent.probe(mkCtx(bp, { positionals: ['agt-001'], env })), EXIT.OK);
+  const a = readBoard(bp).agents[0];
+  assert.equal(a.probe.observed, 'unknown', 'missing session file must be unknown, not gone');
+  assert.equal(a.lifecycle.state, 'running', 'running must survive a launch-race probe');
+});
+
+test('probe evidence recovery: orphaned agent whose session file appears fresh → running', () => {
+  // 真实缺陷：单向降级卡死——文件后到、观测 alive，但 state 永久卡 orphaned（observed=alive+state=orphaned 矛盾）。
+  const claudeHome = mkTmp('ccm-hag-ccr-');
+  const bp = mkBoardHome([
+    { id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' },
+  ]);
+  agent.create(mkCtx(bp, { values: { type: 'cli-worker', harness: 'claude-code', intent: 'x' } }));
+  agent.bind(mkCtx(bp, { positionals: ['agt-001'], values: { handle: 'session-id:sid-rec-1' } }));
+  // 人为制造 orphaned（模拟历史误判死的板）。
+  {
+    const board = readBoard(bp);
+    board.agents[0].lifecycle.state = 'orphaned';
+    writeFileSync(bp, `${JSON.stringify(board, null, 2)}\n`, 'utf8');
+  }
+  // session 文件此刻出现且 mtime 新鲜 → probe 观测 alive → 证据式恢复 running。
+  const slugDir = join(claudeHome, 'projects', '-repo-slug');
+  mkdirSync(slugDir, { recursive: true });
+  writeFileSync(join(slugDir, 'sid-rec-1.jsonl'), '{}\n', 'utf8'); // 刚写出·mtime=now·必在 freshness 窗内
+  const env = { CLAUDE_CONFIG_DIR: claudeHome };
+  assert.equal(agent.probe(mkCtx(bp, { positionals: ['agt-001'], env })), EXIT.OK);
+  const a = readBoard(bp).agents[0];
+  assert.equal(a.probe.observed, 'alive');
+  assert.equal(
+    a.lifecycle.state,
+    'running',
+    'alive observation is evidence: orphaned must recover',
+  );
+  assert.equal(a.probe.method, 'session-file-mtime'); // 证据链照旧记录
+});
+
+test('probe pid semantics non-regression: kill -0 failure is still gone → orphaned', async () => {
+  const { spawn } = await import('node:child_process');
+  const bp = mkBoardHome();
+  agent.create(mkCtx(bp, { values: { type: 'background-shell', harness: 'origin', intent: 'x' } }));
+  const child = spawn('sleep', ['30'], { detached: true });
+  const pid = child.pid as number;
+  agent.bind(mkCtx(bp, { positionals: ['agt-001'], values: { handle: `pid:${pid}` } }));
+  process.kill(pid, 'SIGKILL');
+  await new Promise((r) => setTimeout(r, 150));
+  assert.equal(agent.probe(mkCtx(bp, { positionals: ['agt-001'] })), EXIT.OK);
+  const a = readBoard(bp).agents[0];
+  assert.equal(a.probe.observed, 'gone', 'pid is a deterministic death check: stays gone');
+  assert.equal(a.lifecycle.state, 'orphaned');
 });
 
 test('probe without id probes every agent on the board', () => {
