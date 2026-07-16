@@ -13,6 +13,10 @@ interface LeftRailProps {
 
 const filterGroups: Array<{ id: TaskFilterGroup; label: string }> = [
   { id: 'status', label: 'Status' },
+  { id: 'harness', label: 'Harness' },
+  { id: 'surface', label: 'Surface' },
+  { id: 'model-tier', label: 'Model tier' },
+  { id: 'route-outcome', label: 'Route outcome' },
   { id: 'executor', label: 'Executor' },
   { id: 'type', label: 'Type' }
 ];

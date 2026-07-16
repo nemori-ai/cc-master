@@ -45,6 +45,7 @@ function jcKey(entry: JudgmentCall, index: number): string {
  */
 export function BoardBrief({ viewModel, statusReport, peers = null, onSelectTask }: BoardBriefProps) {
   const extras = viewModel.board_extras ?? {};
+  const mission = viewModel.mission;
   const boardWatchdog = watchdogReadout(extras.watchdog);
   // Second ticker drives the board-watchdog countdown (re-renders each second).
   useSecondTick(boardWatchdog != null);
@@ -126,6 +127,38 @@ export function BoardBrief({ viewModel, statusReport, peers = null, onSelectTask
             <span>board-level intel — select a task to drill down</span>
           </div>
         </div>
+      </div>
+
+      <div className={`dsect mission-contract${mission?.pending ? ' pending' : ''}`}>
+        <div className="sl">goal contract</div>
+        <div className="why-text">{mission?.summary || viewModel.board.goal || 'No goal set'}</div>
+        <div className="kv">
+          <div className="row">
+            <span className="k">assurance</span>
+            <span className="v mono">{mission?.assurance ?? 'legacy'}</span>
+          </div>
+          {mission?.revision != null ? (
+            <div className="row">
+              <span className="k">revision</span>
+              <span className="v mono">{mission.revision}</span>
+            </div>
+          ) : null}
+          {mission?.brief?.ref ? (
+            <div className="row">
+              <span className="k">brief</span>
+              <span className="v mono">{mission.brief.ref}</span>
+            </div>
+          ) : null}
+          {mission?.updated_at ? (
+            <div className="row">
+              <span className="k">updated</span>
+              <span className="v mono">{mission.updated_at}</span>
+            </div>
+          ) : null}
+        </div>
+        {mission?.pending ? (
+          <div className="contract-callout">Goal assurance is pending; treat execution as provisional.</div>
+        ) : null}
       </div>
 
       <div className="dsect report">

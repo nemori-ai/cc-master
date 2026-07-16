@@ -13,7 +13,9 @@ import { StatusStrip } from './components/StatusStrip';
 import { TimelineView } from './components/TimelineView';
 import type { GraphOrientation } from './graphLayout';
 import type { LocateRequest } from './locate';
+import { normalizeTaskFilters } from './taskFilters';
 import type { DecisionEntry, PeersPayload, TaskDetailPayload, WorkspaceData } from './types';
+import { readWorkspaceUrlState, writeWorkspaceUrlState } from './workspaceUrlState';
 
 const VIEW_KEY = 'ccm-view';
 const THEME_KEY = 'ccm-theme';
@@ -22,7 +24,26 @@ function boardFromUrl(): string | undefined {
   if (typeof window === 'undefined') {
     return undefined;
   }
-  return new URL(window.location.href).searchParams.get('board') ?? undefined;
+  return readWorkspaceUrlState(window.location.href).board;
+}
+
+function taskFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  return readWorkspaceUrlState(window.location.href).task;
+}
+
+function filtersFromUrl(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  return readWorkspaceUrlState(window.location.href).filters;
+}
+
+function setWorkspaceStateInUrl(taskId: string | null, filters: Set<string>): void {
+  if (typeof window === 'undefined') return;
+  window.history.replaceState(
+    null,
+    '',
+    writeWorkspaceUrlState(window.location.href, { task: taskId, filters })
+  );
 }
 
 function setBoardInUrl(boardFilename: string | undefined): void {
@@ -103,11 +124,11 @@ export function App() {
   const [selectedBoardFilename, setSelectedBoardFilename] = useState<string | undefined>(() =>
     boardFromUrl()
   );
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => taskFromUrl());
   const [locateRequest, setLocateRequest] = useState<LocateRequest | null>(null);
   const [selectedTask, setSelectedTask] = useState<TaskDetailPayload | null>(null);
   const [taskLoading, setTaskLoading] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<Set<string>>(() => new Set());
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(() => filtersFromUrl());
   const [query, setQuery] = useState('');
   const [view, setView] = useState<ViewMode>(() => initialView());
   const [theme, setTheme] = useState<'dark' | 'light'>(() => initialTheme());
@@ -151,6 +172,10 @@ export function App() {
   useEffect(() => {
     selectedTaskIdRef.current = selectedTaskId;
   }, [selectedTaskId]);
+
+  useEffect(() => {
+    setWorkspaceStateInUrl(selectedTaskId, activeFilters);
+  }, [selectedTaskId, activeFilters]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -224,6 +249,7 @@ export function App() {
             ? preferredTaskId
             : null;
         setWorkspace(data);
+        setActiveFilters((current) => normalizeTaskFilters(data.viewModel.graph.nodes, current));
         setSelectedTask(data.selectedTask);
         setSelectedTaskId(nextSelectedTaskId);
         if (boardChanged) {
@@ -569,8 +595,10 @@ export function App() {
           ) : null}
           {view === 'list' ? (
             <ListView
+              activeFilters={activeFilters}
               locateRequest={locateRequest}
               onSelectTask={selectTaskFromClick}
+              query={query}
               selectedTaskId={selectedTaskId}
               viewModel={workspace.viewModel}
             />

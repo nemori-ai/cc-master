@@ -53,6 +53,76 @@ export interface GraphNode {
   selected?: boolean;
   awaiting_user?: boolean;
   stale?: boolean;
+  route_outcome?: string;
+  harness?: string;
+  surface?: string;
+  surface_label?: string;
+  model?: string;
+  role_grades?: string[];
+}
+
+export interface MissionReadModel {
+  kind: 'goal-contract' | 'legacy';
+  summary: string;
+  assurance?: string;
+  revision?: number;
+  updated_at?: string;
+  brief?: { present: boolean; ref?: string };
+  pending: boolean;
+}
+
+export interface PlanningReadModel {
+  assessed_at?: string;
+  assessor?: string;
+  dimensions: Record<string, string>;
+  estimate_confidence?: string;
+  quality: { effect_floor?: string };
+  budget: { posture?: string; max_attempts?: number };
+  capabilities: { required: string[]; preferred: string[]; forbidden: string[] };
+}
+
+export interface RouteCandidateReadModel {
+  id: string;
+  adapter?: string;
+  harness: string;
+  provider?: string;
+  surface: string;
+  surface_label: string;
+  model?: string;
+  effort?: string;
+  capabilities: string[];
+  role_grades: string[];
+  permission?: { profile?: string; denies: string[] };
+  candidate_id?: string;
+  chain?: string;
+  selected_at?: string;
+}
+
+export interface ExecutionReadModel {
+  state: 'legacy' | 'planned' | 'routed' | 'partial' | string;
+  planning?: PlanningReadModel;
+  route?: {
+    outcome: string;
+    objective?: string;
+    candidates: RouteCandidateReadModel[];
+    selected: RouteCandidateReadModel | null;
+    chains: { ample: string[]; tight: string[] };
+    fallback: {
+      on: string[];
+      never_on: string[];
+      exhaustion?: string;
+      same_harness?: string;
+    };
+    reason_codes: string[];
+  };
+  attempts: Array<{
+    id: string;
+    candidate_id?: string;
+    state?: string;
+    started_at?: string;
+    terminal_at?: string;
+    terminal_class?: string;
+  }>;
 }
 
 export interface GraphEdge {
@@ -104,6 +174,7 @@ export interface CompactTask {
   references?: unknown;
   watchdog?: WatchdogInfo;
   decision_package?: unknown;
+  execution?: ExecutionReadModel;
   [key: string]: unknown;
 }
 
@@ -264,6 +335,7 @@ export interface DecisionEntry {
 
 export interface ViewModelPayload {
   schema?: string;
+  mission?: MissionReadModel;
   rev?: {
     boardHash?: string;
     topologyHash?: string;
@@ -365,11 +437,11 @@ export interface TaskDetailPayload {
     role?: string;
     references?: unknown;
     watchdog?: WatchdogInfo;
+    execution?: ExecutionReadModel;
     summary?: string;
     next_actions?: string[];
     [key: string]: unknown;
   };
-  raw_task?: Record<string, unknown>;
   dependencies?: Array<{ id: string; title: string; status?: string }>;
   dependents?: Array<{ id: string; title: string; status?: string }>;
   activity?: Array<{ at: string; text: string }>;

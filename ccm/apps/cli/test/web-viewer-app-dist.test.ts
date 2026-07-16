@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
+import { WEB_VIEWER_APP_DIST_FILES } from '../src/generated/web-viewer-assets.js';
 import { readVersion } from '../src/help.js';
 import {
   __resetWebViewerAppDistTestHooks,
@@ -27,6 +28,17 @@ function mkHome(): string {
   TMPDIRS.push(root);
   return root;
 }
+
+test('bundled viewer includes goal and cross-harness execution surfaces', () => {
+  const script = Object.entries(WEB_VIEWER_APP_DIST_FILES)
+    .filter(([name]) => name.endsWith('.js'))
+    .map(([, encoded]) => Buffer.from(encoded, 'base64').toString('utf8'))
+    .join('\n');
+  assert.match(script, /goal contract/);
+  assert.match(script, /cross-harness execution/);
+  assert.match(script, /candidate routes/);
+  assert.match(script, /Route outcome/);
+});
 
 test('materializeWebViewerAppDist writes bundled map to versioned home dir without cwd dist', () => {
   const home = mkHome();

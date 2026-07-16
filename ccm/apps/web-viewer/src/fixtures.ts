@@ -219,6 +219,63 @@ const fixtureTasks: CompactTask[] = [
         { desc: 'p99 cutover latency below 400ms', kind: 'metric', target: '400ms', status: 'pending' },
         { desc: 'second reviewer signs off the runbook diff', kind: 'review', status: 'failed' }
       ]
+    },
+    execution: {
+      state: 'routed',
+      planning: {
+        assessed_at: '2026-07-08T09:55:00Z',
+        assessor: 'master',
+        dimensions: {
+          reasoning: 'multi-step',
+          uncertainty: 'medium',
+          risk: 'high',
+          scope: 'cross-module',
+          context: 'large',
+          coordination: 'multi-boundary',
+          reversibility: 'costly'
+        },
+        estimate_confidence: 'high',
+        quality: { effect_floor: 'T1' },
+        budget: { posture: 'ample', max_attempts: 3 },
+        capabilities: {
+          required: ['terraform-review'],
+          preferred: ['architecture'],
+          forbidden: ['account-mutation']
+        }
+      },
+      route: {
+        outcome: 'other-harness-cli',
+        objective: 'balanced',
+        candidates: [],
+        selected: {
+          id: 'codex-cli',
+          candidate_id: 'codex-cli',
+          harness: 'codex',
+          provider: 'openai',
+          surface: 'cli-headless',
+          surface_label: 'Codex CLI',
+          model: 'gpt-5.6-sol',
+          capabilities: ['terraform-review'],
+          role_grades: ['T1'],
+          chain: 'ample'
+        },
+        chains: { ample: ['codex-cli', 'cursor-agent'], tight: ['cursor-agent'] },
+        fallback: {
+          on: ['quota-tight'],
+          never_on: ['permission-blocked'],
+          exhaustion: 'fail-closed',
+          same_harness: 'explicit-candidate-only'
+        },
+        reason_codes: ['quality-floor-met', 'quota-healthy']
+      },
+      attempts: [
+        {
+          id: 'attempt-1',
+          candidate_id: 'codex-cli',
+          state: 'running',
+          started_at: '2026-07-08T10:05:00Z'
+        }
+      ]
     }
   },
   {
@@ -542,6 +599,15 @@ export const fixturePeers: PeersPayload = {
 
 export const fixtureViewModel: ViewModelPayload = {
   schema: 'ccm/web-viewer-view-model/v1',
+  mission: {
+    kind: 'goal-contract',
+    summary: 'Ship release train with verified infra handoff',
+    assurance: 'confirmed',
+    revision: 4,
+    updated_at: '2026-07-08T12:00:00Z',
+    brief: { present: true, ref: 'design_docs/release-plan.md' },
+    pending: false
+  },
   rev: {
     boardHash: 'sha256:fixture-board',
     topologyHash: 'sha256:fixture-topology',
@@ -597,21 +663,30 @@ export const fixtureViewModel: ViewModelPayload = {
     ranks: [...ranksGrouped.entries()]
       .sort(([a], [b]) => a - b)
       .map(([rank, nodeIds]) => ({ id: `R${rank}`, label: `R${rank}`, node_ids: nodeIds })),
-    nodes: fixtureTasks.map((task) => ({
-      id: task.id,
-      title: task.title ?? task.id,
-      status: task.status ?? 'ready',
-      type: task.type ?? 'task',
-      rank: `R${RANK_BY_ID[task.id] ?? 0}`,
-      rank_index: RANK_BY_ID[task.id] ?? 0,
-      executor: task.executor,
-      handle: task.handle,
-      tags: task.tags,
-      critical: CRITICAL_PATH.includes(task.id),
-      selected: task.id === 'deploy-infra',
-      awaiting_user: AWAITING.has(task.id),
-      stale: ['failed', 'uncertain', 'escalated'].includes(task.status ?? '')
-    })),
+    nodes: fixtureTasks.map((task) => {
+      const selectedRoute = task.execution?.route?.selected;
+      return {
+        id: task.id,
+        title: task.title ?? task.id,
+        status: task.status ?? 'ready',
+        type: task.type ?? 'task',
+        rank: `R${RANK_BY_ID[task.id] ?? 0}`,
+        rank_index: RANK_BY_ID[task.id] ?? 0,
+        executor: task.executor,
+        handle: task.handle,
+        tags: task.tags,
+        critical: CRITICAL_PATH.includes(task.id),
+        selected: task.id === 'deploy-infra',
+        awaiting_user: AWAITING.has(task.id),
+        stale: ['failed', 'uncertain', 'escalated'].includes(task.status ?? ''),
+        route_outcome: task.execution?.route?.outcome,
+        harness: selectedRoute?.harness,
+        surface: selectedRoute?.surface,
+        surface_label: selectedRoute?.surface_label,
+        model: selectedRoute?.model,
+        role_grades: selectedRoute?.role_grades
+      };
+    }),
     edges: derived.edges,
     upstream: derived.upstream,
     downstream: derived.downstream,
@@ -678,18 +753,9 @@ export const fixtureTask: TaskDetailPayload = {
         { desc: 'second reviewer signs off the runbook diff', kind: 'review', status: 'failed' }
       ]
     },
+    execution: fixtureTasks.find((task) => task.id === 'deploy-infra')?.execution,
     summary: 'Provisioning is active. The critical path remains clear while policy-check is stale.',
     next_actions: ['Monitor run progress', 'Review plan output', 'Proceed to run-jobs on success']
-  },
-  raw_task: {
-    id: 'deploy-infra',
-    title: 'Deploy infra cutover',
-    status: 'in_flight',
-    log: [
-      { ts: '2026-07-08T10:05:00Z', kind: 'dispatch', summary: 'Run started by ccm service' },
-      { ts: '2026-07-08T10:31:20Z', kind: 'progress', summary: 'Terraform plan uploaded' },
-      { ts: '2026-07-08T11:42:53Z', kind: 'progress', summary: 'Awaiting final apply result' }
-    ]
   },
   dependencies: [
     { id: 'plan-execution', title: 'Plan execution graph', status: 'done' },

@@ -12,6 +12,7 @@ import {
   durableWriteFileSync,
   isAwaitingUser,
   loadHomeBoards,
+  routeOutcomeClass,
   STATUS_ENUM,
   taskTrulyDone,
   withLock,
@@ -1132,7 +1133,210 @@ function statusOf(task: JsonRecord): string {
   return typeof task.status === 'string' ? task.status : '';
 }
 
-function compactTask(task: JsonRecord): JsonRecord | null {
+function recordOf(value: unknown): JsonRecord | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : null;
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string' && item.length > 0)
+    : [];
+}
+
+function surfaceLabel(harness: string, surface: string): string {
+  const labels: Record<string, string> = {
+    'cursor:host-native': 'Cursor IDE',
+    'cursor:cli-headless': 'Cursor Agent',
+    'codex:host-native': 'Codex native',
+    'codex:cli-headless': 'Codex CLI',
+    'claude-code:host-native': 'Claude Code native',
+    'claude-code:cli-headless': 'Claude Code CLI',
+  };
+  return labels[`${harness}:${surface}`] ?? 'Unknown surface';
+}
+
+function capabilityIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => (typeof item === 'string' ? item : recordOf(item)?.id))
+    .filter((item): item is string => typeof item === 'string' && item.length > 0);
+}
+
+function candidateProjection(value: unknown): JsonRecord | null {
+  const candidate = recordOf(value);
+  if (!candidate || typeof candidate.id !== 'string') return null;
+  const harness = typeof candidate.harness === 'string' ? candidate.harness : 'unknown';
+  const surface = typeof candidate.surface === 'string' ? candidate.surface : 'unknown';
+  const effectFloors = stringList(candidate.effect_floors_met);
+  const permission = recordOf(candidate.permission);
+  return {
+    id: candidate.id,
+    ...(typeof candidate.adapter === 'string' ? { adapter: candidate.adapter } : {}),
+    harness,
+    ...(typeof candidate.provider === 'string' ? { provider: candidate.provider } : {}),
+    surface,
+    surface_label: surfaceLabel(harness, surface),
+    ...(typeof candidate.model === 'string' ? { model: candidate.model } : {}),
+    ...(typeof candidate.effort === 'string' ? { effort: candidate.effort } : {}),
+    capabilities: capabilityIds(candidate.capabilities),
+    role_grades: effectFloors.filter((floor) => ['O', 'T1', 'T2', 'T3'].includes(floor)),
+    ...(permission
+      ? {
+          permission: {
+            ...(typeof permission.profile === 'string' ? { profile: permission.profile } : {}),
+            denies: stringList(permission.denies),
+          },
+        }
+      : {}),
+  };
+}
+
+function planningProjection(value: unknown): JsonRecord | null {
+  const planning = recordOf(value);
+  if (!planning) return null;
+  const dimensions = recordOf(planning.dimensions);
+  const quality = recordOf(planning.quality);
+  const budget = recordOf(planning.budget);
+  const capabilities = recordOf(planning.capabilities);
+  return {
+    ...(typeof planning.assessed_at === 'string' ? { assessed_at: planning.assessed_at } : {}),
+    ...(typeof planning.assessor === 'string' ? { assessor: planning.assessor } : {}),
+    dimensions: dimensions
+      ? Object.fromEntries(
+          Object.entries(dimensions).filter(([, item]) => typeof item === 'string'),
+        )
+      : {},
+    ...(typeof planning.estimate_confidence === 'string'
+      ? { estimate_confidence: planning.estimate_confidence }
+      : {}),
+    quality: {
+      ...(typeof quality?.effect_floor === 'string' ? { effect_floor: quality.effect_floor } : {}),
+    },
+    budget: {
+      ...(typeof budget?.posture === 'string' ? { posture: budget.posture } : {}),
+      ...(typeof budget?.max_attempts === 'number' ? { max_attempts: budget.max_attempts } : {}),
+    },
+    capabilities: {
+      required: capabilityIds(capabilities?.required),
+      preferred: capabilityIds(capabilities?.preferred),
+      forbidden: capabilityIds(capabilities?.forbidden),
+    },
+  };
+}
+
+function executionProjection(task: JsonRecord, originHarness: string): JsonRecord | null {
+  const planning = planningProjection(task.planning);
+  const routing = recordOf(task.routing);
+  if (!planning && !routing) return null;
+
+  const policy = recordOf(routing?.policy);
+  const candidates = (Array.isArray(policy?.candidates) ? policy.candidates : [])
+    .map(candidateProjection)
+    .filter((candidate): candidate is JsonRecord => !!candidate);
+  const byId = new Map(candidates.map((candidate) => [String(candidate.id), candidate]));
+  const selected = recordOf(routing?.selected);
+  const selectedId = typeof selected?.candidate_id === 'string' ? selected.candidate_id : '';
+  const selectedCandidate = selectedId ? byId.get(selectedId) : undefined;
+  const chains = recordOf(policy?.chains);
+  const fallback = recordOf(policy?.fallback);
+  const attempts = (Array.isArray(routing?.attempts) ? routing.attempts : [])
+    .map((value) => {
+      const attempt = recordOf(value);
+      if (!attempt || typeof attempt.id !== 'string') return null;
+      const terminal = recordOf(attempt.terminal);
+      const out: JsonRecord = { id: attempt.id };
+      for (const key of ['candidate_id', 'state']) {
+        if (typeof attempt[key] === 'string') out[key] = attempt[key];
+      }
+      const startedAt =
+        typeof attempt.created_at === 'string'
+          ? attempt.created_at
+          : typeof attempt.started_at === 'string'
+            ? attempt.started_at
+            : undefined;
+      const terminalAt =
+        typeof terminal?.observed_at === 'string'
+          ? terminal.observed_at
+          : typeof attempt.finished_at === 'string'
+            ? attempt.finished_at
+            : typeof attempt.failed_at === 'string'
+              ? attempt.failed_at
+              : undefined;
+      const terminalClass =
+        typeof terminal?.class === 'string'
+          ? terminal.class
+          : typeof attempt.failure_class === 'string'
+            ? attempt.failure_class
+            : undefined;
+      if (startedAt) out.started_at = startedAt;
+      if (terminalAt) out.terminal_at = terminalAt;
+      if (terminalClass) out.terminal_class = terminalClass;
+      return out;
+    })
+    .filter((attempt): attempt is JsonRecord => !!attempt);
+
+  const route = routing
+    ? {
+        outcome: routeOutcomeClass(originHarness, routing),
+        ...(typeof policy?.objective === 'string' ? { objective: policy.objective } : {}),
+        candidates,
+        selected: selectedCandidate
+          ? {
+              ...selectedCandidate,
+              candidate_id: selectedId,
+              ...(typeof selected?.chain === 'string' ? { chain: selected.chain } : {}),
+              ...(typeof selected?.selected_at === 'string'
+                ? { selected_at: selected.selected_at }
+                : {}),
+            }
+          : null,
+        chains: {
+          ample: stringList(chains?.ample),
+          tight: stringList(chains?.tight),
+        },
+        fallback: {
+          on: stringList(fallback?.on),
+          never_on: stringList(fallback?.never_on),
+          ...(typeof fallback?.exhaustion === 'string' ? { exhaustion: fallback.exhaustion } : {}),
+          ...(typeof fallback?.same_harness === 'string'
+            ? { same_harness: fallback.same_harness }
+            : {}),
+        },
+        reason_codes: stringList(selected?.reason_codes),
+      }
+    : null;
+
+  return {
+    state: routing ? (planning ? 'routed' : 'partial') : 'planned',
+    ...(planning ? { planning } : {}),
+    ...(route ? { route } : {}),
+    attempts,
+  };
+}
+
+function missionProjection(board: JsonRecord): JsonRecord {
+  const goal = typeof board.goal === 'string' ? board.goal : '';
+  const contract = recordOf(board.goal_contract);
+  if (!contract || contract.schema !== 'ccm/goal-contract/v1') {
+    return { kind: 'legacy', summary: goal, pending: false };
+  }
+  const brief = recordOf(contract.brief);
+  const assurance = typeof contract.assurance === 'string' ? contract.assurance : 'pending';
+  return {
+    kind: 'goal-contract',
+    summary: goal,
+    assurance,
+    ...(typeof contract.revision === 'number' ? { revision: contract.revision } : {}),
+    ...(typeof contract.updated_at === 'string' ? { updated_at: contract.updated_at } : {}),
+    brief: {
+      present: typeof brief?.ref === 'string',
+      ...(typeof brief?.ref === 'string' ? { ref: brief.ref } : {}),
+    },
+    pending: assurance === 'pending',
+  };
+}
+
+function compactTask(task: JsonRecord, originHarness = 'unknown'): JsonRecord | null {
   const id = taskId(task);
   if (!id) return null;
   const out: JsonRecord = {};
@@ -1170,6 +1374,8 @@ function compactTask(task: JsonRecord): JsonRecord | null {
         ? task.decision_package
         : true;
   }
+  const execution = executionProjection(task, originHarness);
+  if (execution) out.execution = execution;
   return out;
 }
 
@@ -1758,9 +1964,13 @@ function buildViewModel(home: string, boardPath: string): JsonRecord {
   const cp = graph.criticalPath({ now: Date.now() });
   const criticalPath = Array.isArray(cp.chain) ? cp.chain : [];
   const ids = tasks.map(taskId).filter(Boolean);
+  const owner = recordOf(board.owner);
+  const originHarness = typeof owner?.harness === 'string' ? owner.harness : 'unknown';
   const parents: Record<string, string | null> = {};
   for (const id of ids) parents[id] = graph.parentOf(id);
-  const compactTasks = tasks.map(compactTask).filter((t): t is JsonRecord => !!t);
+  const compactTasks = tasks
+    .map((task) => compactTask(task, originHarness))
+    .filter((t): t is JsonRecord => !!t);
   const ranks = rankTasks(tasks, topo.order, graph.upstream as Map<string, unknown>);
   const readySet = graph.readySet();
   const edges = graphEdges(board, tasks, criticalPath, deliveryFacts);
@@ -1775,6 +1985,9 @@ function buildViewModel(home: string, boardPath: string): JsonRecord {
   const nodeTasks = compactTasks.map((task) => {
     const id = taskId(task);
     const rankIndex = ranks.rankById.get(id) ?? 0;
+    const execution = recordOf(task.execution);
+    const route = recordOf(execution?.route);
+    const selected = recordOf(route?.selected);
     return {
       id,
       title: taskTitle(task),
@@ -1788,10 +2001,19 @@ function buildViewModel(home: string, boardPath: string): JsonRecord {
       selected: id === selectedTaskId,
       awaiting_user: isAwaitingUser(task as never),
       stale: ['failed', 'uncertain', 'escalated'].includes(statusOf(task)),
+      ...(typeof route?.outcome === 'string' ? { route_outcome: route.outcome } : {}),
+      ...(typeof selected?.harness === 'string' ? { harness: selected.harness } : {}),
+      ...(typeof selected?.surface === 'string' ? { surface: selected.surface } : {}),
+      ...(typeof selected?.surface_label === 'string'
+        ? { surface_label: selected.surface_label }
+        : {}),
+      ...(typeof selected?.model === 'string' ? { model: selected.model } : {}),
+      ...(Array.isArray(selected?.role_grades) ? { role_grades: selected.role_grades } : {}),
     };
   });
   return {
     schema: VIEW_MODEL_SCHEMA,
+    mission: missionProjection(board),
     rev: {
       boardHash: `sha256:${sha256Hex(snapshot.raw)}`,
       topologyHash: `sha256:${topologyHashFor(board)}`,
@@ -1980,7 +2202,9 @@ function buildTaskDetail(boardPath: string, taskIdValue: string): JsonRecord | n
   if (!task) return null;
   const parents = graph.predecessors(taskIdValue);
   const children = graph.successors(taskIdValue);
-  const compact = compactTask(task) || { id: taskIdValue };
+  const owner = recordOf(board.owner);
+  const originHarness = typeof owner?.harness === 'string' ? owner.harness : 'unknown';
+  const compact = compactTask(task, originHarness) || { id: taskIdValue };
   const filename = path.basename(boardPath);
   return {
     schema: TASK_DETAIL_SCHEMA,
@@ -2011,7 +2235,6 @@ function buildTaskDetail(boardPath: string, taskIdValue: string): JsonRecord | n
             ? ['Resolve user-blocked decision']
             : [],
     },
-    raw_task: task,
     dependencies: parents
       .map((id) => taskRef(byId.get(id)))
       .filter((ref): ref is JsonRecord => !!ref),

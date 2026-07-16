@@ -24,6 +24,9 @@ export interface CcNodeData extends Record<string, unknown> {
   childOf: string | null;
   dimmed: boolean;
   horizontal: boolean;
+  routeOutcome: string | null;
+  routeLabel: string | null;
+  modelLabel: string | null;
   onToggleCollapse: (id: string) => void;
 }
 
@@ -90,6 +93,20 @@ export function CcNode({ data }: NodeProps<CcFlowNode>) {
       <span className="chip dur" key="dur" title={`running ${clockStr} since dispatch`}>
         <span className="cglyph">◷</span>
         <span className="cn">{clockStr}</span>
+      </span>
+    );
+  }
+  if (data.routeLabel) {
+    chips.push(
+      <span className="chip route" key="route" title={data.routeOutcome ?? 'routed task'}>
+        {data.routeLabel}
+      </span>
+    );
+  }
+  if (data.modelLabel) {
+    chips.push(
+      <span className="chip model" key="model" title="selected model and role grade">
+        {data.modelLabel}
       </span>
     );
   }

@@ -52,7 +52,14 @@ function seedBoard(
     goal = 'Ship viewer lifecycle',
     sid = SID,
     tasks = [],
-  }: { file?: string; goal?: string; sid?: string; tasks?: Array<Record<string, unknown>> } = {},
+    extras = {},
+  }: {
+    file?: string;
+    goal?: string;
+    sid?: string;
+    tasks?: Array<Record<string, unknown>>;
+    extras?: Record<string, unknown>;
+  } = {},
 ): string {
   const boardPath = join(home, 'boards', file);
   const board = {
@@ -64,6 +71,7 @@ function seedBoard(
     scheduling: { wip_limit: 4 },
     tasks,
     log: [],
+    ...extras,
   };
   writeFileSync(boardPath, `${JSON.stringify(board, null, 2)}\n`, 'utf8');
   return boardPath;
@@ -631,6 +639,21 @@ test('start rejects non-localhost host and boards outside the selected home', ()
 test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no board JSON', async () => {
   const home = mkHome();
   const boardPath = seedBoard(home, {
+    extras: {
+      goal_contract: {
+        schema: 'ccm/goal-contract/v1',
+        revision: 3,
+        assurance: 'confirmed',
+        brief: { ref: 'design_docs/spec.md', sha256: 'sha256:brief' },
+        updated_at: '2026-07-08T11:58:00Z',
+      },
+      owner: {
+        active: true,
+        session_id: SID,
+        harness: 'claude-code',
+        heartbeat: '2026-07-08T12:00:00Z',
+      },
+    },
     tasks: [
       { id: 'A', title: 'Design viewer shell', status: 'done', deps: [], verified: true },
       { id: 'B', title: 'Wire DAG read model', status: 'in_flight', deps: ['A'] },
@@ -653,6 +676,203 @@ test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no b
         started_at: '2026-07-08T12:02:00Z',
         updated_at: '2026-07-08T12:03:00Z',
         decision_package: { question: 'approve launch' },
+        planning: {
+          schema: 'ccm/task-planning/v1',
+          assessed_at: '2026-07-08T12:01:00Z',
+          assessor: 'master',
+          dimensions: {
+            reasoning: 'multi-step',
+            uncertainty: 'medium',
+            risk: 'high',
+            scope: 'cross-module',
+            context: 'large',
+            coordination: 'multi-boundary',
+            reversibility: 'costly',
+          },
+          estimate_confidence: 'high',
+          quality: { effect_floor: 'T1' },
+          budget: { posture: 'ample', max_attempts: 3 },
+          capabilities: {
+            required: [{ id: 'code-review' }],
+            preferred: [{ id: 'architecture' }],
+            forbidden: [{ id: 'account-mutation' }],
+          },
+        },
+        routing: {
+          schema: 'ccm/agent-routing/v1',
+          mode: 'cross-harness',
+          policy: {
+            objective: 'balanced',
+            constraints: {
+              effect_floor: 'T1',
+              quota_unknown: 'ineligible',
+              cross_harness_quota_admission: 'ample-only',
+            },
+            candidates: [
+              {
+                id: 'claude-native',
+                adapter: 'claude-code',
+                harness: 'claude-code',
+                provider: 'anthropic',
+                surface: 'host-native',
+                model: 'fable-5',
+                effort: 'high',
+                requires: [
+                  'capability-match',
+                  'effect-floor',
+                  'permission-compatible',
+                  'account-mutation-forbidden',
+                ],
+                capabilities: ['architecture', 'code-review'],
+                effect_floors_met: ['O', 'T1'],
+                permission: { profile: 'read-only', denies: ['account-mutation'] },
+                account_mutation: 'forbidden',
+              },
+              {
+                id: 'codex-cli',
+                adapter: 'codex',
+                harness: 'codex',
+                provider: 'openai',
+                surface: 'cli-headless',
+                model: 'gpt-5.6-sol',
+                effort: 'high',
+                requires: [
+                  'capability-match',
+                  'effect-floor',
+                  'permission-compatible',
+                  'account-mutation-forbidden',
+                ],
+                capabilities: ['code-review'],
+                effect_floors_met: ['T1'],
+                permission: { profile: 'read-only', denies: ['account-mutation'] },
+                account_mutation: 'forbidden',
+              },
+              {
+                id: 'cursor-ide',
+                adapter: 'cursor-ide',
+                harness: 'cursor',
+                provider: 'cursor',
+                surface: 'host-native',
+                model: 'grok-4.5',
+                effort: 'high',
+                requires: [
+                  'capability-match',
+                  'effect-floor',
+                  'permission-compatible',
+                  'account-mutation-forbidden',
+                ],
+                capabilities: ['code-review'],
+                effect_floors_met: ['T1', 'T2'],
+                permission: { profile: 'read-only', denies: ['account-mutation'] },
+                account_mutation: 'forbidden',
+              },
+              {
+                id: 'cursor-agent',
+                adapter: 'cursor-agent',
+                harness: 'cursor',
+                provider: 'cursor',
+                surface: 'cli-headless',
+                model: 'grok-4.5',
+                effort: 'high',
+                requires: [
+                  'capability-match',
+                  'effect-floor',
+                  'permission-compatible',
+                  'account-mutation-forbidden',
+                ],
+                capabilities: ['code-review'],
+                effect_floors_met: ['T1', 'T2'],
+                permission: { profile: 'read-only', denies: ['account-mutation'] },
+                account_mutation: 'forbidden',
+              },
+              {
+                id: 'cursor-malformed',
+                adapter: 'cursor-agent',
+                harness: 'cursor',
+                provider: 'cursor',
+                surface: 'future-surface',
+                model: 'grok-4.5',
+                effort: 'high',
+                requires: [],
+                capabilities: [],
+                effect_floors_met: ['T2'],
+                permission: { profile: 'read-only', denies: ['account-mutation'] },
+                account_mutation: 'forbidden',
+              },
+            ],
+            chains: { ample: ['codex-cli', 'cursor-agent'], tight: ['cursor-agent'] },
+            fallback: {
+              on: ['quota-tight'],
+              never_on: [
+                'policy-blocked',
+                'permission-blocked',
+                'security-blocked',
+                'workspace-mismatch',
+                'task-blocked',
+                'acceptance-failed',
+              ],
+              exhaustion: 'fail-closed',
+              same_harness: 'explicit-candidate-only',
+            },
+          },
+          selected: {
+            candidate_id: 'codex-cli',
+            chain: 'ample',
+            selected_at: '2026-07-08T12:02:00Z',
+            evidence: {
+              observed_at: '2026-07-08T12:01:00Z',
+              valid_until: '2026-07-08T12:03:00Z',
+              qualification_results: [
+                { predicate: 'capability-match', status: 'pass' },
+                { predicate: 'effect-floor', status: 'pass' },
+                { predicate: 'permission-compatible', status: 'pass' },
+                { predicate: 'account-mutation-forbidden', status: 'pass' },
+              ],
+              identity_fingerprint: 'must-not-leak',
+              credential: 'must-not-leak',
+            },
+            reason_codes: ['quality-floor-met', 'quota-healthy'],
+          },
+          attempts: [
+            {
+              id: 'attempt-1',
+              candidate_id: 'codex-cli',
+              state: 'running',
+              created_at: '2026-07-08T12:01:30Z',
+              started_at: '2026-07-08T12:02:00Z',
+              handle: 'sensitive-runtime-handle',
+              selection_snapshot: { identity_fingerprint: 'must-not-leak' },
+            },
+            {
+              id: 'attempt-2',
+              candidate_id: 'codex-cli',
+              state: 'terminal',
+              created_at: '2026-07-08T12:03:00Z',
+              terminal: {
+                class: 'succeeded',
+                observed_at: '2026-07-08T12:04:00Z',
+              },
+              failure_class: 'legacy-must-not-override',
+              failed_at: '2026-07-08T12:05:00Z',
+            },
+            {
+              id: 'attempt-3',
+              candidate_id: 'codex-cli',
+              state: 'failed',
+              started_at: '2026-07-08T12:06:00Z',
+              failure_class: 'startup_failed',
+              failed_at: '2026-07-08T12:07:00Z',
+            },
+          ],
+        },
+        password: 'password-must-not-leak',
+        api_key: 'api-key-must-not-leak',
+        private_key: 'private-key-must-not-leak',
+        account_id: 'account-must-not-leak',
+        session_id: 'session-must-not-leak',
+        email: 'email-must-not-leak@example.test',
+        bearer: 'bearer-must-not-leak',
+        private_payload: { nested_unknown: 'nested-must-not-leak' },
       },
     ],
   });
@@ -827,6 +1047,15 @@ test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no b
     assert.equal(viewModel.body.board.id, '20260708T120000Z-1');
     assert.equal(viewModel.body.board.filename, '20260708T120000Z-1.board.json');
     assert.equal(viewModel.body.board.goal, 'Ship viewer lifecycle');
+    assert.deepEqual(viewModel.body.mission, {
+      kind: 'goal-contract',
+      summary: 'Ship viewer lifecycle',
+      assurance: 'confirmed',
+      revision: 3,
+      updated_at: '2026-07-08T11:58:00Z',
+      brief: { present: true, ref: 'design_docs/spec.md' },
+      pending: false,
+    });
     assert.equal(viewModel.body.freshness.state, 'live');
     assert.equal(viewModel.body.graph.family, 'task-dag');
     assert.deepEqual(
@@ -885,6 +1114,56 @@ test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no b
       ],
     );
     assert.equal(viewModel.body.defaults.selected_task_id, 'D');
+    const routedNode = viewModel.body.graph.nodes.find((node: { id: string }) => node.id === 'D');
+    assert.deepEqual(
+      {
+        route_outcome: routedNode.route_outcome,
+        harness: routedNode.harness,
+        surface: routedNode.surface,
+        surface_label: routedNode.surface_label,
+        model: routedNode.model,
+        role_grades: routedNode.role_grades,
+      },
+      {
+        route_outcome: 'other-harness-cli',
+        harness: 'codex',
+        surface: 'cli-headless',
+        surface_label: 'Codex CLI',
+        model: 'gpt-5.6-sol',
+        role_grades: ['T1'],
+      },
+    );
+    const compactD = viewModel.body.tasks.find((candidate: { id: string }) => candidate.id === 'D');
+    assert.equal(compactD.execution.planning.quality.effect_floor, 'T1');
+    assert.equal(compactD.execution.route.outcome, 'other-harness-cli');
+    assert.equal(compactD.execution.route.selected.model, 'gpt-5.6-sol');
+    assert.equal(compactD.execution.route.candidates[2].surface_label, 'Cursor IDE');
+    assert.equal(compactD.execution.route.candidates[3].surface_label, 'Cursor Agent');
+    assert.equal(compactD.execution.route.candidates[4].surface_label, 'Unknown surface');
+    assert.deepEqual(compactD.execution.attempts, [
+      {
+        id: 'attempt-1',
+        candidate_id: 'codex-cli',
+        state: 'running',
+        started_at: '2026-07-08T12:01:30Z',
+      },
+      {
+        id: 'attempt-2',
+        candidate_id: 'codex-cli',
+        state: 'terminal',
+        started_at: '2026-07-08T12:03:00Z',
+        terminal_at: '2026-07-08T12:04:00Z',
+        terminal_class: 'succeeded',
+      },
+      {
+        id: 'attempt-3',
+        candidate_id: 'codex-cli',
+        state: 'failed',
+        started_at: '2026-07-08T12:06:00Z',
+        terminal_at: '2026-07-08T12:07:00Z',
+        terminal_class: 'startup_failed',
+      },
+    ]);
     assert.equal(
       viewModel.body.status.buckets.find((b: { id: string }) => b.id === 'ready').count,
       1,
@@ -913,7 +1192,14 @@ test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no b
     assert.equal(task.body.task.started_at, '2026-07-08T12:02:00Z');
     assert.equal(task.body.task.updated_at, '2026-07-08T12:03:00Z');
     assert.deepEqual(task.body.task.decision_package, { question: 'approve launch' });
-    assert.equal(task.body.raw_task.id, 'D');
+    assert.equal(task.body.raw_task, undefined);
+    assert.equal(task.body.task.execution.route.outcome, 'other-harness-cli');
+    const safeDetail = JSON.stringify(task.body);
+    assert.doesNotMatch(safeDetail, /must-not-leak/);
+    assert.doesNotMatch(
+      safeDetail,
+      /identity_fingerprint|selection_snapshot|credential|password|api_key|private_key|account_id|session_id|email|bearer|nested_unknown/,
+    );
     assert.deepEqual(task.body.task.parents, ['B', 'C']);
     assert.deepEqual(
       task.body.dependencies.map((dep: { id: string }) => dep.id),
@@ -937,6 +1223,11 @@ test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no b
     });
     assert.equal(switched.status, 200);
     assert.equal(switched.body.board.goal, 'Second viewer board');
+    assert.deepEqual(switched.body.mission, {
+      kind: 'legacy',
+      summary: 'Second viewer board',
+      pending: false,
+    });
     assert.equal(switched.body.graph.nodes[0].id, 'X');
 
     const badBoard = await httpJson({
@@ -969,8 +1260,24 @@ test('serve exposes built Vite viewer app, app-shaped JSON APIs, and writes no b
     seedBoard(home, {
       file: '20260708T120000Z-3.board.json',
       goal: 'Third board seeded mid-flight',
+      extras: {
+        goal_contract: {
+          schema: 'ccm/goal-contract/v1',
+          revision: 1,
+          assurance: 'asserted',
+          updated_at: '2026-07-08T12:04:00Z',
+        },
+      },
       tasks: [{ id: 'Z', title: 'Late arrival', status: 'ready', deps: [] }],
     });
+    const asserted = await httpJson({
+      port,
+      path: '/view-model.json?board=20260708T120000Z-3.board.json',
+      token: 'route-token',
+    });
+    assert.equal(asserted.status, 200);
+    assert.equal(asserted.body.mission.assurance, 'asserted');
+    assert.equal(asserted.body.mission.pending, false);
     const rosterAfterSeed = await httpJson({ port, path: '/boards.json', token: 'route-token' });
     assert.equal(rosterAfterSeed.status, 200);
     assert.deepEqual(

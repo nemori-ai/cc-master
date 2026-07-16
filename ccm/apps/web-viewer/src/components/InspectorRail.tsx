@@ -136,7 +136,7 @@ export function InspectorRail({
   const isBneck = viewModel.insights?.bottleneck?.id === t.id;
   const structure = perNodeStructure(viewModel.insights, t.id);
 
-  const taskWatchdog = watchdogReadout(t.watchdog ?? task.raw_task?.watchdog);
+  const taskWatchdog = watchdogReadout(t.watchdog);
 
   const running = status === 'in_flight' && startTs(t as CompactTask) != null;
   // Second ticker also drives the watchdog countdown (re-renders each second).
@@ -150,7 +150,7 @@ export function InspectorRail({
   const elapsedMs =
     startTs(t as CompactTask) != null ? Date.now() - (startTs(t as CompactTask) as number) : null;
   const elStr = fmtElapsed(elapsedMs);
-  const dur = taskDuration(task.raw_task ? (task.raw_task as CompactTask) : (t as CompactTask));
+  const dur = taskDuration(t as CompactTask);
   const durStr = fmtDuration(dur);
 
   const decisionPackage =
@@ -194,11 +194,14 @@ export function InspectorRail({
   if (t.verified === true) addTele('verified', 'yes', false);
   else if (t.verified === false) addTele('verified', 'no', false);
 
-  const rawLog = Array.isArray(task.raw_task?.log) ? (task.raw_task?.log as unknown[]) : [];
   const activity = task.activity ?? [];
 
   const depPins = t.dep_pins && typeof t.dep_pins === 'object' ? Object.entries(t.dep_pins) : [];
   const acceptance = acceptanceView(t.acceptance);
+  const execution = t.execution;
+  const planning = execution?.planning;
+  const route = execution?.route;
+  const selectedRoute = route?.selected;
 
   return (
     <div className="dpanel" data-mode="task">
@@ -232,6 +235,140 @@ export function InspectorRail({
             {isBneck ? <span className="badge bneck">⚠ bottleneck</span> : null}
             {t.verified === true ? <span className="badge verified">✓ verified</span> : null}
           </div>
+        </div>
+      ) : null}
+
+      {execution ? (
+        <div className="dsect execution-contract">
+          <div className="sl">cross-harness execution</div>
+          <div className="kv">
+            <div className="row">
+              <span className="k">state</span>
+              <span className="v mono">{execution.state}</span>
+            </div>
+            {route ? (
+              <div className="row">
+                <span className="k">outcome</span>
+                <span className="v mono">{route.outcome}</span>
+              </div>
+            ) : null}
+            {selectedRoute ? (
+              <>
+                <div className="row">
+                  <span className="k">selected</span>
+                  <span className="v mono">
+                    {selectedRoute.harness} · {selectedRoute.surface_label}
+                  </span>
+                </div>
+                <div className="row">
+                  <span className="k">model</span>
+                  <span className="v mono">
+                    {selectedRoute.model ?? 'unknown'}
+                    {selectedRoute.role_grades.length
+                      ? ` · ${selectedRoute.role_grades.join('/')}`
+                      : ''}
+                  </span>
+                </div>
+              </>
+            ) : null}
+            {route?.reason_codes.length ? (
+              <div className="row">
+                <span className="k">reasons</span>
+                <span className="v mono">{route.reason_codes.join(', ')}</span>
+              </div>
+            ) : null}
+            {route ? (
+              <div className="row">
+                <span className="k">fallback</span>
+                <span className="v mono">
+                  ample {route.chains.ample.join(' → ') || '—'} · tight{' '}
+                  {route.chains.tight.join(' → ') || '—'}
+                </span>
+              </div>
+            ) : null}
+            {route?.fallback.on.length ? (
+              <div className="row">
+                <span className="k">fallback on</span>
+                <span className="v mono">
+                  {route.fallback.on.join(', ')}
+                  {route.fallback.exhaustion ? ` · ${route.fallback.exhaustion}` : ''}
+                </span>
+              </div>
+            ) : null}
+          </div>
+
+          {route?.candidates.length ? (
+            <div className="contract-subblock">
+              <div className="contract-label">candidate routes</div>
+              {route.candidates.map((candidate) => (
+                <div className="candidate-row" data-selected={candidate.id === selectedRoute?.id} key={candidate.id}>
+                  <span className="mono">{candidate.id}</span>
+                  <span>{candidate.surface_label}</span>
+                  <span className="mono">
+                    {candidate.model ?? 'unknown'}
+                    {candidate.role_grades.length ? ` · ${candidate.role_grades.join('/')}` : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {planning ? (
+            <div className="contract-subblock">
+              <div className="contract-label">planning</div>
+              <div className="contract-grid">
+                {Object.entries(planning.dimensions).map(([key, value]) => (
+                  <span className="contract-pill" key={key}>
+                    {key}: {value}
+                  </span>
+                ))}
+              </div>
+              <div className="contract-note mono">
+                floor {planning.quality.effect_floor ?? 'unknown'} · budget{' '}
+                {planning.budget.posture ?? 'unknown'} · max attempts{' '}
+                {planning.budget.max_attempts ?? '—'}
+              </div>
+              {planning.capabilities.required.length ? (
+                <div className="contract-note mono">
+                  required: {planning.capabilities.required.join(', ')}
+                </div>
+              ) : null}
+              {planning.capabilities.preferred.length ? (
+                <div className="contract-note mono">
+                  preferred: {planning.capabilities.preferred.join(', ')}
+                </div>
+              ) : null}
+              {planning.capabilities.forbidden.length ? (
+                <div className="contract-note mono">
+                  forbidden: {planning.capabilities.forbidden.join(', ')}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {execution.attempts.length ? (
+            <div className="contract-subblock">
+              <div className="contract-label">attempt lifecycle</div>
+              {execution.attempts.map((attempt) => (
+                <div className="attempt-row" key={attempt.id}>
+                  <span className="mono">{attempt.id}</span>
+                  <span>
+                    {attempt.state ?? 'unknown'}
+                    {attempt.terminal_class ? ` · ${attempt.terminal_class}` : ''}
+                  </span>
+                  <span
+                    className="mono"
+                    title={attempt.terminal_at ?? attempt.started_at ?? undefined}
+                  >
+                    {attempt.candidate_id ?? 'unassigned'}
+                    {attempt.terminal_at || attempt.started_at
+                      ? ` · ${attempt.terminal_at ?? attempt.started_at}`
+                      : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -396,7 +533,7 @@ export function InspectorRail({
         </div>
       ) : null}
 
-      {activity.length || rawLog.length ? (
+      {activity.length ? (
         <div className="dsect">
           <div className="sl">activity</div>
           <div className="activity">
@@ -420,7 +557,7 @@ export function InspectorRail({
             </div>
           ))}
         </div>
-        <pre className="raw-schema">{JSON.stringify(task.raw_task ?? t, null, 2)}</pre>
+        <pre className="raw-schema">{JSON.stringify(t, null, 2)}</pre>
       </details>
     </div>
   );
