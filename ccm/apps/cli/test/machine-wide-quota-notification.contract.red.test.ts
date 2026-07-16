@@ -306,6 +306,7 @@ function rawProjectorInput(
   const identityFingerprint = overrides.identity_fingerprint || authority.identity_fingerprint;
   const observation = {
     schema: 'ccm/quota-observation/v1',
+    observation_id: `obs-${authority.surface_id}-${authority.bucket_id}`,
     revision: `sha256:${'1'.repeat(64)}`,
     source_key: {
       harness: authority.harness_id,
@@ -318,8 +319,19 @@ function rawProjectorInput(
       unit: authority.unit,
       window: structuredClone(authority.window),
     },
-    value: { used_pct: overrides.seven_day_used_pct ?? 20 },
-    freshness: 'fresh',
+    value: {
+      used: overrides.seven_day_used_pct ?? 20,
+      limit: 100,
+      resets_at:
+        authority.window.name === 'billing_period'
+          ? '2026-08-01T00:00:00Z'
+          : '2026-07-20T08:00:00Z',
+    },
+    source: {
+      collector: `${authority.provider_id}-fixture`,
+      schema: `${authority.provider_id}/quota-fixture/v1`,
+      raw_revision: `sha256:${'a'.repeat(64)}`,
+    },
     observed_at: '2026-07-16T08:00:00Z',
     valid_until: '2026-07-16T08:05:00Z',
   };
@@ -327,6 +339,7 @@ function rawProjectorInput(
   if (authority.provider_id === 'codex' && overrides.five_hour_used_pct !== undefined) {
     observations.push({
       ...structuredClone(observation),
+      observation_id: `obs-${authority.surface_id}-five-hour`,
       revision: `sha256:${'2'.repeat(64)}`,
       source_key: {
         ...structuredClone(observation.source_key),
@@ -334,8 +347,16 @@ function rawProjectorInput(
         window: { kind: 'rolling', name: 'five_hour', duration_sec: 18000 },
       },
       value: {
-        used_pct: overrides.five_hour_used_pct,
-        reset_marker: overrides.five_hour_reset_marker || null,
+        used: overrides.five_hour_used_pct,
+        limit: 100,
+        resets_at: overrides.five_hour_reset_marker
+          ? '2026-07-16T09:00:00Z'
+          : '2026-07-16T12:00:00Z',
+      },
+      source: {
+        collector: `${authority.provider_id}-fixture`,
+        schema: `${authority.provider_id}/quota-fixture/v1`,
+        raw_revision: `sha256:${'b'.repeat(64)}`,
       },
     });
   }
@@ -353,6 +374,15 @@ function rawProjectorInput(
       unit: authority.unit,
     },
     observations,
+    source_profiles: [
+      {
+        schema: 'ccm/quota-source-profile/v1',
+        source_schema: `${authority.provider_id}/quota-fixture/v1`,
+        fresh_ttl_sec: 60,
+        hard_ttl_sec: 300,
+        max_clock_skew_sec: 5,
+      },
+    ],
     active_reservations: [],
     policy: {
       revision: authority.policy_revision,
