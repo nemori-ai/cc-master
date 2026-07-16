@@ -1722,7 +1722,7 @@ export const REGISTRY: Registry = {
         },
         origin: {
           type: 'string',
-          enum: ['claude-code', 'codex', 'cursor'],
+          enum: ['claude-code', 'codex', 'cursor', 'kimi-code'],
           desc: '订阅来源 harness（与 session/epoch 一起精确绑定）',
         },
         'session-epoch': { type: 'string', desc: '当前订阅 epoch；旧 epoch fail closed' },
@@ -1743,7 +1743,7 @@ export const REGISTRY: Registry = {
       options: {
         origin: {
           type: 'string',
-          enum: ['claude-code', 'codex', 'cursor'],
+          enum: ['claude-code', 'codex', 'cursor', 'kimi-code'],
           required: true,
           desc: '订阅来源 harness',
         },
