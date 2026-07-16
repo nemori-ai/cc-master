@@ -470,6 +470,181 @@ test('probe without id probes every agent on the board', () => {
   }
 });
 
+// ── amend（登记簿事后补正·handle 域三件套·任何状态可用含 terminal）────────────────────────────────────
+test('amend fixes handle domain on a terminal agent (the real-world gap: bad handle found after terminal)', () => {
+  // 真实缺口：坏 handle（task-id + resume --last）在 agent 已 terminal 后才发现——bind 被状态机拒，
+  //   此前唯一出路是重复登记新 record（roster 撕成两行）。amend 是事后补正出口。
+  const bp = mkBoardHome([
+    { id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' },
+  ]);
+  agent.create(mkCtx(bp, { values: { type: 'cli-worker', harness: 'codex', intent: 'review' } }));
+  agent.bind(
+    mkCtx(bp, {
+      positionals: ['agt-001'],
+      values: { handle: 'task-id:worker-7', 'attach-cmd': 'codex resume --last' }, // 坏 handle
+    }),
+  );
+  agent.link(mkCtx(bp, { positionals: ['agt-001'], values: { task: 'T1' } }));
+  agent.terminal(mkCtx(bp, { positionals: ['agt-001'], values: { outcome: 'done' } }));
+  const before = readBoard(bp).agents[0];
+
+  const ctx = mkCtx(bp, {
+    positionals: ['agt-001'],
+    values: {
+      handle: 'session-id:0197-real-sid',
+      'attach-cmd': 'codex resume 0197-real-sid',
+      transcript: '/abs/rollout.jsonl',
+    },
+    flags: { json: true },
+  });
+  assert.equal(agent.amend(ctx), EXIT.OK);
+  const out = JSON.parse(ctx.outBuf.join('')).data.agent;
+  assert.equal(out.handle.kind, 'session-id');
+  assert.equal(out.handle.value, '0197-real-sid');
+
+  const after = readBoard(bp).agents[0];
+  assert.equal(after.handle.kind, 'session-id');
+  assert.equal(after.handle.value, '0197-real-sid');
+  assert.equal(after.handle.attach_cmd, 'codex resume 0197-real-sid');
+  assert.equal(after.handle.transcript_ref, '/abs/rollout.jsonl');
+  // 只动 handle 域：lifecycle / probe / links / intent 一字不动。
+  assert.deepEqual(after.lifecycle, before.lifecycle, 'lifecycle untouched (state stays terminal)');
+  assert.equal(after.lifecycle.state, 'terminal');
+  assert.deepEqual(after.links, before.links, 'links untouched');
+  assert.equal(after.intent, before.intent, 'intent untouched');
+  assert.deepEqual(after.probe, before.probe, 'probe untouched');
+});
+
+test('amend works in every lifecycle state (starting/running/uncertain/orphaned/terminal)', () => {
+  const bp = mkBoardHome();
+  for (const state of ['starting', 'running', 'uncertain', 'orphaned', 'terminal']) {
+    agent.create(mkCtx(bp, { values: { type: 'subagent', harness: 'origin', intent: state } }));
+  }
+  {
+    const board = readBoard(bp);
+    const states = ['starting', 'running', 'uncertain', 'orphaned', 'terminal'];
+    board.agents.forEach((a: any, i: number) => {
+      a.lifecycle.state = states[i];
+    });
+    writeFileSync(bp, `${JSON.stringify(board, null, 2)}\n`, 'utf8');
+  }
+  for (let i = 1; i <= 5; i++) {
+    const id = `agt-00${i}`;
+    assert.equal(
+      agent.amend(mkCtx(bp, { positionals: [id], values: { handle: `pid:${i}` } })),
+      EXIT.OK,
+      `amend must work on ${id}`,
+    );
+  }
+  const board = readBoard(bp);
+  const states = ['starting', 'running', 'uncertain', 'orphaned', 'terminal'];
+  board.agents.forEach((a: any, i: number) => {
+    assert.equal(a.handle.kind, 'pid');
+    assert.equal(a.handle.value, String(i + 1));
+    assert.equal(a.lifecycle.state, states[i], 'amend never transitions state');
+  });
+});
+
+test('amend rejects illegal handle kind / empty value (same validation as bind)', () => {
+  const bp = mkBoardHome();
+  agent.create(mkCtx(bp, { values: { type: 'cli-worker', harness: 'codex', intent: 'x' } }));
+  for (const bad of ['', 'pid:', 'garbage-no-colon', 'bogus-kind:val']) {
+    const ctx = mkCtx(bp, { positionals: ['agt-001'], values: { handle: bad } });
+    assert.throws(
+      () => agent.amend(ctx),
+      (e: Error & { errKind?: string }) => e.errKind === 'Validation',
+      `handle=${JSON.stringify(bad)} must be rejected`,
+    );
+  }
+  // 记录未被改动。
+  assert.equal(readBoard(bp).agents[0].handle.kind, 'none');
+});
+
+test('amend requires at least one of --handle/--attach-cmd/--transcript (Usage); missing id → NotFound', () => {
+  const bp = mkBoardHome();
+  agent.create(mkCtx(bp, { values: { type: 'cli-worker', harness: 'codex', intent: 'x' } }));
+  assert.throws(
+    () => agent.amend(mkCtx(bp, { positionals: ['agt-001'], values: {} })),
+    (e: Error & { errKind?: string }) => e.errKind === 'Usage',
+  );
+  assert.throws(
+    () => agent.amend(mkCtx(bp, { positionals: ['agt-404'], values: { handle: 'pid:1' } })),
+    (e: Error & { errKind?: string }) => e.errKind === 'NotFound',
+  );
+  // 单项补正也合法（attach-cmd only）。
+  assert.equal(
+    agent.amend(mkCtx(bp, { positionals: ['agt-001'], values: { 'attach-cmd': 'claude -r sid' } })),
+    EXIT.OK,
+  );
+  const a = readBoard(bp).agents[0];
+  assert.equal(a.handle.attach_cmd, 'claude -r sid');
+  assert.equal(a.handle.kind, 'none', 'handle kind untouched when only attach-cmd amended');
+});
+
+test('probe after amend locates by the new handle: terminal agent gets fresh mtime observation, state stays terminal', () => {
+  // amend 补上真 sid 后 probe 能用新 handle 定位到会话文件（mtime 观测更新），
+  //   但 terminal 是唯一终态——reconcile 绝不复活，只有 probe 字段更新。
+  const claudeHome = mkTmp('ccm-hag-amend-');
+  const bp = mkBoardHome();
+  agent.create(mkCtx(bp, { values: { type: 'cli-worker', harness: 'claude-code', intent: 'x' } }));
+  agent.bind(mkCtx(bp, { positionals: ['agt-001'], values: { handle: 'task-id:worker-x' } })); // 坏 handle
+  agent.terminal(mkCtx(bp, { positionals: ['agt-001'], values: { outcome: 'done' } }));
+  const slugDir = join(claudeHome, 'projects', '-repo-slug');
+  mkdirSync(slugDir, { recursive: true });
+  writeFileSync(join(slugDir, 'sid-amended-1.jsonl'), '{}\n', 'utf8'); // 真会话文件·mtime=now
+  assert.equal(
+    agent.amend(
+      mkCtx(bp, { positionals: ['agt-001'], values: { handle: 'session-id:sid-amended-1' } }),
+    ),
+    EXIT.OK,
+  );
+  const env = { CLAUDE_CONFIG_DIR: claudeHome };
+  assert.equal(agent.probe(mkCtx(bp, { positionals: ['agt-001'], env })), EXIT.OK);
+  const a = readBoard(bp).agents[0];
+  assert.equal(a.probe.method, 'session-file-mtime', 'probe located via amended handle');
+  assert.equal(a.probe.observed, 'alive', 'fresh mtime observation through the new sid');
+  assert.equal(a.lifecycle.state, 'terminal', 'terminal never resurrected by probe');
+});
+
+// ── rm（登记簿删除·破坏性·非 TTY 须 --yes）───────────────────────────────────────────────────────────
+test('rm deletes an agent record including its links; --json returns removed id', () => {
+  const bp = mkBoardHome([
+    { id: 'T1', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' },
+  ]);
+  agent.create(mkCtx(bp, { values: { type: 'cli-worker', harness: 'codex', intent: 'dup' } }));
+  agent.create(mkCtx(bp, { values: { type: 'cli-worker', harness: 'codex', intent: 'keep' } }));
+  agent.link(mkCtx(bp, { positionals: ['agt-001'], values: { task: 'T1' } }));
+  const ctx = mkCtx(bp, { positionals: ['agt-001'], flags: { json: true } });
+  assert.equal(agent.rm(ctx), EXIT.OK);
+  assert.equal(JSON.parse(ctx.outBuf.join('')).data.removed, 'agt-001');
+  const board = readBoard(bp);
+  assert.equal(board.agents.length, 1, 'record removed (links live agent-side, gone with it)');
+  assert.equal(board.agents[0].id, 'agt-002');
+  assert.equal(board.tasks[0].status, 'in_flight', 'task untouched');
+});
+
+test('rm on nonexistent agent → NotFound (exit 5)', () => {
+  const bp = mkBoardHome();
+  assert.throws(
+    () => agent.rm(mkCtx(bp, { positionals: ['agt-404'] })),
+    (e: Error & { errKind?: string }) => e.errKind === 'NotFound',
+  );
+});
+
+test('rm is destructive: non-TTY without --yes refused as USAGE; --yes passes (task rm parity)', () => {
+  const bp = mkBoardHome();
+  agent.create(mkCtx(bp, { values: { type: 'subagent', harness: 'origin', intent: 'x' } }));
+  const refused = mkCtx(bp, { positionals: ['agt-001'] });
+  (refused as { isTTY: boolean }).isTTY = false;
+  assert.equal(agent.rm(refused), EXIT.USAGE);
+  assert.ok(refused.errBuf.join('').includes('--yes'), 'refusal explains --yes');
+  assert.equal(readBoard(bp).agents.length, 1, 'nothing deleted on refusal');
+  const confirmed = mkCtx(bp, { positionals: ['agt-001'], flags: { yes: true } });
+  (confirmed as { isTTY: boolean }).isTTY = false;
+  assert.equal(agent.rm(confirmed), EXIT.OK);
+  assert.equal(readBoard(bp).agents.length, 0);
+});
+
 // ── list / show ─────────────────────────────────────────────────────────────────────────────────────
 test('list --json returns count + state buckets + agents', () => {
   const bp = mkBoardHome();
