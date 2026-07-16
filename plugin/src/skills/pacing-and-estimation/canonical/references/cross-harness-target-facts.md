@@ -20,3 +20,6 @@
 把结果整理为 `eligible` 或 `insufficient` 的 advisory 输入，并附 provenance / freshness / unknown / blocker。
 任何承重事实 unknown、stale、conflicting 或 tight 都保持 `insufficient` 并交给决策层 fail closed；不要在这里
 启动、停止或验收 worker，也不要解释 worker 的执行终态与副作用。
+
+目标 agent command 的真实 help 与调用语法只查 `using-ccm`。本页不复制 provider CLI flags、model
+catalog 或 model/effort 参数，也不把易腐的 provider 命令面改写成 ccm 标准参数。
