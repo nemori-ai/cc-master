@@ -195,4 +195,17 @@ executable matrix verifies the host-native envelopes without admitting unbound o
     Codex `systemMessage`.
   compensating_mechanism: "Cursor coordination-inbox-core.js emits kind:'system'; launcher maps it to {followup_message}. Read/list/tag/suppression semantics are unchanged."
   tracked_by: "n/a — declared launcher-level envelope conversion; ADR-031 Track A"
+
+- rule: coordination-inbox-kimi-no-advisory-channel
+  kind: protocol-capability-gap
+  affected_hosts: [kimi-code]
+  reason: >
+    coordination-inbox is a Stop-time advisory, but kimi has no non-blocking Stop advisory channel
+    (Stop surfaces only via permissionDecision="deny", which forces one continuation and would clobber
+    verify-board's block reason via aggregateResults). Not registered on kimi.
+  compensating_mechanism: >
+    Peer-inbox delivery has no clean kimi channel today; a UserPromptSubmit-time delivery (start-of-turn
+    injection works) is the candidate follow-up. verify-board remains the sole Stop-deny gate to avoid
+    reason clobbering.
+  tracked_by: design_docs/harnesses/capabilities/cross-harness-notification-subscription.md
 ```

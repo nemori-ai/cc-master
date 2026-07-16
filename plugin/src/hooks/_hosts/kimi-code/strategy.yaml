@@ -1,0 +1,118 @@
+host: kimi-code
+version: 1
+surface: hooks
+status: phase-k4
+registration:
+  source: plugin-bundled
+  target: kimi.plugin.json#/hooks
+  fragment: hooks.fragment.json
+  manifest: .kimi-plugin/plugin.json
+  notes:
+    - kimi hook registration = inline manifest `hooks[]` array (NOT a separate hooks.json).
+      sync-plugin-dist.sh inlines hooks.fragment.json's array into kimi.plugin.json's `hooks`.
+    - command form A (kimi-code.md §5): `node "$KIMI_PLUGIN_ROOT/hooks/_hosts/kimi-code/launcher.js" ...`
+      — the shell running the hook command expands $KIMI_PLUGIN_ROOT (plugin-hook subprocess env);
+      launcher also falls back to __dirname. Hook cwd = plugin managed dir (probe-confirmed).
+  implemented_events:
+    - UserPromptSubmit
+    - PreToolUse
+    - PostToolUse
+    - Stop
+    - PostCompact
+  unsupported_events:
+    - PostToolBatch
+  notes_events:
+    - SessionStart fires but its hook output is discarded (no injection); role substrate re-primes
+      natively via manifest `sessionStart.skill` (PluginSessionStartInjector re-injects after each
+      compaction). reinject core is a silent PostCompact observe no-op.
+path_resolution:
+  status: verified-basic
+  verified_kimi: "0.26.0"
+  verified:
+    - Plugin hook subprocess env has KIMI_PLUGIN_ROOT + KIMI_CODE_HOME only (no CLAUDE_*/PLUGIN_ROOT).
+    - `$KIMI_PLUGIN_ROOT` expands inside the hook command string (shell-expanded; probe-confirmed).
+    - Hook child cwd = plugin managed dir; node on PATH.
+    - stdin is snake_case; session_id = session_<uuid>; prompt is a content-block array.
+  production_strategy:
+    - Register hooks with `node "$KIMI_PLUGIN_ROOT/hooks/_hosts/kimi-code/launcher.js"` commands.
+    - Launcher resolves plugin root via KIMI_PLUGIN_ROOT/CC_MASTER_PLUGIN_ROOT env then __dirname.
+    - Default home is $HOME/.cc_master (CC_MASTER_HOME overrides); independent of KIMI_CODE_HOME.
+    - Board discovery: session-state first, then unique active board-scan.
+    - Inject CC_MASTER_PLUGIN_ROOT / CC_MASTER_HARNESS=kimi-code for cores.
+payload_map:
+  status: verified-basic
+  verified_kimi: "0.26.0"
+  fixtures:
+    userPromptSubmit:
+      fields: [hook_event_name, session_id, cwd, prompt]
+      notes: "prompt is [{type:text,text}] content-block array"
+    sessionStart:
+      fields: [hook_event_name, session_id, cwd, source]
+    preToolUse:
+      fields: [hook_event_name, session_id, cwd, tool_name, tool_input]
+    postToolUse:
+      fields: [hook_event_name, session_id, cwd, tool_name, tool_input, tool_response, tool_use_id]
+    stop:
+      fields: [hook_event_name, session_id, cwd, stop_hook_active]
+  notes:
+    - Tool names mirror Claude shapes: Bash | Write | Edit | MultiEdit (no apply_patch).
+output_envelope:
+  status: implemented
+  ssot: ENVELOPE.md
+  by_event:
+    userPromptSubmit:
+      context_system: "{ message }"
+      block_deny: "{ hookSpecificOutput: { permissionDecision: deny, permissionDecisionReason } }"
+    preToolUse:
+      block_deny: "{ hookSpecificOutput: { permissionDecision: deny, permissionDecisionReason } }"
+    postToolUse:
+      context_system: "{ message } (best-effort; discarded by fireAndForgetTrigger today)"
+    stop:
+      block_deny: "{ hookSpecificOutput: { permissionDecision: deny, permissionDecisionReason } } (continue + surface reason)"
+      advisory: "(no output — no non-blocking Stop channel)"
+  verified:
+    - UserPromptSubmit message injection reaches the model (K4 probe PASS on 0.26.0).
+    - SessionStart hook output discarded (K4 probe: hook fired, message not injected).
+    - PostCompact output discarded (static: fireAndForgetTrigger); substrate via sessionStart.skill.
+  known_gaps:
+    - No non-blocking Stop/SessionStart/PostToolUse advisory channel → advisory Stop hooks
+      (usage-pacing/coordination-inbox/identity-nudge) and orchestrator-context are not registered.
+    - reinject dynamic board-list re-injection has no channel; sessionStart.skill carries static
+      role substrate (re-injected natively after compaction), losing dynamic board list / empty-board
+      hard-stop / stale nodes (Track B, role-substrate-reinject Capability Card).
+normalized_contract:
+  env: ../../_shared/contract.md
+  payload: ../../_shared/contract.md
+  result: ../../_shared/contract.md
+launcher:
+  source: launcher.js
+  status: implemented
+  responsibilities:
+    - parse kimi hook stdin JSON (snake_case)
+    - normalize to shared contract (harness: kimi-code); prompt array → prompt.text
+    - inject CC_MASTER_* env for cores
+    - map core result kinds to kimi envelopes per ENVELOPE.md (message / permissionDecision deny)
+hooks:
+  bootstrap-board:
+    event: UserPromptSubmit
+    status: implemented-fresh-resume
+  board-guard:
+    event: PreToolUse
+    matcher: Bash|Write|Edit|MultiEdit
+    status: implemented-deny
+  board-lint:
+    event: PostToolUse
+    matcher: Write|Edit|MultiEdit
+    status: implemented-lint-discarded
+    behavior: runs and lints edited boards, but PostToolUse output is discarded by kimi; board-guard PreToolUse deny is the authoritative gate
+  verify-board:
+    event: Stop
+    status: implemented-blocking
+    behavior: kind:block → permissionDecision deny → agent continues once + reason injected; FUSE releases after 5 consecutive blocks
+  reinject:
+    event: PostCompact
+    status: implemented-track-b-silent
+    behavior: silent no-op; role substrate carried by manifest sessionStart.skill (re-injected after compaction)
+notes:
+  - See design_docs/harnesses/kimi-code.md §6 + design_docs/2026-07-16-kimi-code-adapter-design.md §3.
+  - probes/README.md documents the K4 PostCompact/SessionStart/Stop injection probe + evidence.

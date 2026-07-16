@@ -5,17 +5,17 @@
 `bash scripts/gen-hook-parity-matrix.sh` after editing a CONTRACT.md (checked by
 `bash scripts/gen-hook-parity-matrix.sh --check`, wired into `run-tests.sh`).
 
-| hook | claude-code | codex | cursor | contract |
-| --- | --- | --- | --- | --- |
-| board-guard | implemented | implemented | implemented | [CONTRACT.md](../plugin/src/hooks/board-guard/CONTRACT.md) |
-| board-lint | implemented | implemented | implemented | [CONTRACT.md](../plugin/src/hooks/board-lint/CONTRACT.md) |
-| bootstrap-board | implemented | implemented-minimal-fresh | implemented-minimal-fresh | [CONTRACT.md](../plugin/src/hooks/bootstrap-board/CONTRACT.md) |
-| coordination-inbox | implemented | implemented-stop-system-message | implemented-stop-advisory | [CONTRACT.md](../plugin/src/hooks/coordination-inbox/CONTRACT.md) |
-| identity-nudge | implemented | implemented-stop-system-message | implemented-stop-advisory | [CONTRACT.md](../plugin/src/hooks/identity-nudge/CONTRACT.md) |
-| orchestrator-context | implemented-session-start-and-post-tool-batch | implemented-session-start | implemented-post-tool-use-track-b | [CONTRACT.md](../plugin/src/hooks/orchestrator-context/CONTRACT.md) |
-| reinject | implemented | implemented | implemented-track-b | [CONTRACT.md](../plugin/src/hooks/reinject/CONTRACT.md) |
-| usage-pacing | implemented | implemented-stop-advisory | implemented-stop-advisory | [CONTRACT.md](../plugin/src/hooks/usage-pacing/CONTRACT.md) |
-| verify-board | implemented | implemented-blocking | implemented-followup | [CONTRACT.md](../plugin/src/hooks/verify-board/CONTRACT.md) |
+| hook | claude-code | codex | cursor | kimi-code | contract |
+| --- | --- | --- | --- | --- | --- |
+| board-guard | implemented | implemented | implemented | implemented | [CONTRACT.md](../plugin/src/hooks/board-guard/CONTRACT.md) |
+| board-lint | implemented | implemented | implemented | implemented | [CONTRACT.md](../plugin/src/hooks/board-lint/CONTRACT.md) |
+| bootstrap-board | implemented | implemented-minimal-fresh | implemented-minimal-fresh | implemented-minimal-fresh | [CONTRACT.md](../plugin/src/hooks/bootstrap-board/CONTRACT.md) |
+| coordination-inbox | implemented | implemented-stop-system-message | implemented-stop-advisory | unsupported | [CONTRACT.md](../plugin/src/hooks/coordination-inbox/CONTRACT.md) |
+| identity-nudge | implemented | implemented-stop-system-message | implemented-stop-advisory | unsupported | [CONTRACT.md](../plugin/src/hooks/identity-nudge/CONTRACT.md) |
+| orchestrator-context | implemented-session-start-and-post-tool-batch | implemented-session-start | implemented-post-tool-use-track-b | unsupported | [CONTRACT.md](../plugin/src/hooks/orchestrator-context/CONTRACT.md) |
+| reinject | implemented | implemented | implemented-track-b | implemented-track-b | [CONTRACT.md](../plugin/src/hooks/reinject/CONTRACT.md) |
+| usage-pacing | implemented | implemented-stop-advisory | implemented-stop-advisory | unsupported | [CONTRACT.md](../plugin/src/hooks/usage-pacing/CONTRACT.md) |
+| verify-board | implemented | implemented-blocking | implemented-followup | implemented-blocking | [CONTRACT.md](../plugin/src/hooks/verify-board/CONTRACT.md) |
 
 ## Declared divergences by kind
 
@@ -31,12 +31,14 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | board-guard-apply-patch | host-convention-divergence | claude-code | n/a — legitimate host-tool-surface difference, not a bug |
 | board-guard-bash-fallback-false-positive | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
 | board-guard-directive-tag-protocol | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
+| board-guard-kimi-envelope | host-convention-divergence | kimi-code | design_docs/2026-07-16-kimi-code-adapter-design.md §3 |
 
 ### board-lint
 
 | rule | kind | affected hosts | tracked by |
 | --- | --- | --- | --- |
 | board-lint-apply-patch-surface | host-convention-divergence | claude-code | n/a |
+| board-lint-kimi-posttooluse-discarded | host-convention-divergence | kimi-code | design_docs/2026-07-16-kimi-code-adapter-design.md §3 |
 
 ### bootstrap-board
 
@@ -44,6 +46,7 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | --- | --- | --- | --- |
 | bootstrap-slash-command-expansion | protocol-capability-gap | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md |
 | bootstrap-beforeSubmitPrompt-envelope | protocol-capability-gap | cursor | plugin v0.17.2 envelope fix |
+| bootstrap-kimi-trigger-and-envelope | host-convention-divergence | kimi-code | design_docs/2026-07-16-kimi-code-adapter-design.md §3,§4 |
 
 ### coordination-inbox
 
@@ -51,6 +54,7 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | --- | --- | --- | --- |
 | coordination-inbox-envelope-codex | protocol-capability-gap | codex | n/a — declared launcher-level envelope conversion, not a business-logic gap |
 | coordination-inbox-envelope-cursor | host-convention-divergence | cursor | n/a — declared launcher-level envelope conversion; ADR-031 Track A |
+| coordination-inbox-kimi-no-advisory-channel | protocol-capability-gap | kimi-code | design_docs/harnesses/capabilities/cross-harness-notification-subscription.md |
 
 ### identity-nudge
 
@@ -59,6 +63,7 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | identity-nudge-envelope | protocol-capability-gap | codex | n/a — declared launcher-level envelope conversion, not a business-logic gap |
 | identity-nudge-cursor-envelope | host-convention-divergence | cursor | _hosts/cursor/ENVELOPE.md; plugin v0.17.2 |
 | identity-nudge-tag-protocol-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
+| identity-nudge-kimi-no-advisory-channel | protocol-capability-gap | kimi-code | design_docs/2026-07-16-kimi-code-adapter-design.md §3 |
 
 ### orchestrator-context
 
@@ -66,6 +71,7 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | --- | --- | --- | --- |
 | orchestrator-context-codex-midturn | event-unavailable | codex | design_docs/harnesses/capabilities/cross-harness-cached-context.md |
 | orchestrator-context-cursor-start | protocol-capability-gap | cursor | design_docs/harnesses/capabilities/cross-harness-cached-context.md |
+| orchestrator-context-kimi-no-session-start-injection | protocol-capability-gap | kimi-code | design_docs/harnesses/capabilities/cross-harness-cached-context.md |
 
 ### reinject
 
@@ -73,6 +79,7 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | --- | --- | --- | --- |
 | reinject-subagent-dispatch-discovery-hint | host-convention-divergence | claude-code | n/a — legitimate host-capability difference, not a bug |
 | reinject-full-substrate-on-compact | protocol-capability-gap | cursor | design_docs/harnesses/capabilities/role-substrate-reinject.md + cursor.md D3,D4 |
+| reinject-kimi-postcompact-discarded | protocol-capability-gap | kimi-code | design_docs/harnesses/capabilities/role-substrate-reinject.md + kimi-code.md §6 |
 
 ### usage-pacing
 
@@ -84,6 +91,7 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | usage-pacing-billing-period-cursor | host-convention-divergence | cursor | ccm packages/engine usage/pacing.ts billing_period path; ADR-031 Track A |
 | usage-pacing-cursor-stop-envelope | host-convention-divergence | cursor | _hosts/cursor/ENVELOPE.md; plugin v0.17.2 |
 | usage-pacing-tag-protocol-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
+| usage-pacing-kimi-no-signal-no-channel | protocol-capability-gap | kimi-code | design_docs/harnesses/capabilities/usage-pacing-midflight.md |
 
 ### verify-board
 
@@ -94,3 +102,4 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | verify-board-rollup-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
 | verify-board-tag-protocol-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
 | verify-board-cursor-stop-envelope | protocol-capability-gap | cursor | plugin v0.17.2 envelope fix |
+| verify-board-kimi-stop-envelope | host-convention-divergence | kimi-code | design_docs/2026-07-16-kimi-code-adapter-design.md §3.4 |

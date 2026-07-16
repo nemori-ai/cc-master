@@ -85,4 +85,16 @@ never touches the narrow waist.
     Fixed in this round — codex identity-nudge-core.js now wraps both reminders in a local
     `advisory(source, 'weak', body)` helper matching claude-code's wrapper output shape byte-for-byte.
   tracked_by: "adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR)"
+
+- rule: identity-nudge-kimi-no-advisory-channel
+  kind: protocol-capability-gap
+  affected_hosts: [kimi-code]
+  reason: >
+    identity-nudge is a Stop-time advisory (periodic identity / critical-path reminder), but kimi has
+    no non-blocking Stop advisory channel. Not registered on kimi.
+  compensating_mechanism: >
+    Role identity is re-primed via the manifest sessionStart.skill substrate (re-injected after
+    compaction natively). Periodic mid-flight identity nudges have no kimi channel; a UserPromptSubmit
+    delivery is the candidate follow-up.
+  tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §3
 ```

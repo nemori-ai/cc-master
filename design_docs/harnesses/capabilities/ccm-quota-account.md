@@ -21,6 +21,7 @@ account switch is policy-gated on board.
 | claude-code | implemented | statusline sidecar, account vault/keychain, plugin upgrade via claude CLI | ccm-host-coupling-audit |
 | codex | partial; read-only provider candidate implemented, usage migration pending | `ccm provider inspect codex` preserves multi-bucket provenance and uses 7d-only hard ceiling + rolling-24h advisory; current `readCodexUsageSignal` migration remains pending; account NotImplemented; statusline unsupported | codex.ts adapter + Codex provider contract v1 |
 | cursor | partial | `readCursorUsageSignal` → dashboard `GetCurrentPeriodUsage` → `UsageSignal.billing_period` (~30d); local-plugin upgrade implemented; account pool / statusline / autoswitch unsupported | `cursor-usage.ts` + `harnesses/cursor.ts` |
+| kimi-code | unsupported | No CLI quota face (kimi-code.md §10); account pool binds Claude OAuth | `ccm usage advise` → available:false; `ccm account *` NotImplemented |
 
 ## Declared divergence
 
@@ -38,6 +39,13 @@ account switch is policy-gated on board.
   reason: Account capture/switch binds Claude OAuth stores.
   compensating_mechanism: account handlers return NotImplemented under non-claude-code harness.
   tracked_by: ccm/apps/cli/src/harnesses/codex.ts, ccm/apps/cli/src/harnesses/cursor.ts
+
+- rule: ccm-quota-account-kimi-gap
+  kind: protocol-capability-gap
+  affected_hosts: [kimi-code]
+  reason: kimi exposes no CLI quota face (kimi-code.md §10); account pool binds Claude OAuth.
+  compensating_mechanism: ccm usage advise → available:false; ccm account * NotImplemented (honest, no fabricated window).
+  tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §7
 ```
 
 ## Linked surfaces

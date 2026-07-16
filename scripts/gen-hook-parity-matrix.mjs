@@ -75,7 +75,7 @@ function readHostCoverage() {
       continue;
     }
     if (!curId) continue;
-    const hostMatch = line.match(/^\s+(claude-code|codex|cursor):\s*(.+?)\s*$/);
+    const hostMatch = line.match(/^\s+(claude-code|codex|cursor|kimi-code):\s*(.+?)\s*$/);
     if (hostMatch) coverage[curId][hostMatch[1]] = hostMatch[2];
   }
   return coverage;
@@ -96,8 +96,8 @@ lines.push('`plugin/src/hooks/<hook>/CONTRACT.md` "降级行为" section. Regene
 lines.push('`bash scripts/gen-hook-parity-matrix.sh` after editing a CONTRACT.md (checked by');
 lines.push('`bash scripts/gen-hook-parity-matrix.sh --check`, wired into `run-tests.sh`).');
 lines.push('');
-lines.push('| hook | claude-code | codex | cursor | contract |');
-lines.push('| --- | --- | --- | --- | --- |');
+lines.push('| hook | claude-code | codex | cursor | kimi-code | contract |');
+lines.push('| --- | --- | --- | --- | --- | --- |');
 for (const hook of hookDirs) {
   const cov = hostCoverage[hook] || {};
   lines.push(
@@ -107,6 +107,7 @@ for (const hook of hookDirs) {
         cov['claude-code'] || '?',
         cov['codex'] || '?',
         cov['cursor'] || '?',
+        cov['kimi-code'] || '?',
         `[CONTRACT.md](../plugin/src/hooks/${hook}/CONTRACT.md)`,
       ].join(' | ') +
       ' |',

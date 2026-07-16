@@ -54,4 +54,17 @@ per AGENTS.md §12, stacks on top of the isArmed check) / equivalent inline gate
     Write/Edit/MultiEdit. Claude Code has no apply_patch tool, so it has no corresponding matcher.
   compensating_mechanism: "n/a — legitimate host-tool-surface difference, not a bug to reconcile."
   tracked_by: "n/a"
+
+- rule: board-lint-kimi-posttooluse-discarded
+  kind: host-convention-divergence
+  affected_hosts: [kimi-code]
+  reason: >
+    kimi delivers PostToolUse via fireAndForgetTrigger — the hook's output (message) is discarded,
+    so the lint advisory may not reach the model context (K4 probe: static agent-core analysis).
+  compensating_mechanism: >
+    board-guard PreToolUse deny is the authoritative gate on kimi (it denies Write/Edit/MultiEdit and
+    Bash writes to real boards before they execute), so the post-hoc lint backstop is redundant.
+    board-lint-core.js is still registered/projected (runs the same lint) for forward-compat; its
+    message is emitted best-effort. SSOT: _hosts/kimi-code/ENVELOPE.md.
+  tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §3
 ```

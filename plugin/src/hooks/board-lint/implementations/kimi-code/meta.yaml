@@ -1,0 +1,12 @@
+hook: board-lint
+host: kimi-code
+version: 1
+event: PostToolUse
+matcher: "Write|Edit|MultiEdit"
+projection:
+  target: hooks/
+status: implemented-lint-discarded
+notes:
+  - Lints edited board via `ccm board lint`; kind:context → { message }.
+  - DIVERGENCE: kimi delivers PostToolUse via fireAndForgetTrigger (output discarded), so the advisory
+    may not reach the model; board-guard PreToolUse deny is the authoritative gate. See CONTRACT.md 降级行为.

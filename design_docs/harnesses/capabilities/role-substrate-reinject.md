@@ -28,6 +28,7 @@ Fixture tests assert equivalence classes, not byte-identical reinject text.
 | claude-code | implemented | `SessionStart` hook (`matcher: startup\|resume\|compact`) reinject.js full SKILL A re-injection | Substrate exemption |
 | codex | implemented | `SessionStart` reinject-core.js — same rules + optional subagent tool_search hint | See reinject CONTRACT divergence |
 | cursor | implemented | **Layered substitute** (Track B): ① alwaysApply `plugin/dist/cursor/rules/cc-master-orchestrator.mdc` slim pointer to master-orchestrator-guide (not full SKILL A); ② `preCompact` → silent no-op core (cannot inject【官方】·D3); ③ **do not** rely on `sessionStart.additional_context` (staff-confirmed drop bug · D4 FAIL) | Not 1:1 full reinject; D3/D4 closed by docs+forum 2026-07-09; hooks.yaml `implemented-track-b` |
+| kimi-code | implemented | Track B: manifest `sessionStart.skill` re-injected after every compaction natively (PluginSessionStartInjector.onContextCompacted resets injectedAt); PostCompact `reinject-core.js` silent no-op (output discarded — K4 probe) | Stronger than Cursor (re-fires after compact); dynamic board list / empty-board hard-stop / stale nodes lost (no hook injection channel) |
 
 ## Declared divergence
 
@@ -53,6 +54,17 @@ Fixture tests assert equivalence classes, not byte-identical reinject text.
   reason: Codex-only tool_search hint for hidden subagent tools; Claude Agent tool always visible.
   compensating_mechanism: n/a
   tracked_by: plugin/src/hooks/reinject/CONTRACT.md
+
+- rule: reinject-kimi-postcompact-discarded
+  kind: protocol-capability-gap
+  affected_hosts: [kimi-code]
+  reason: >
+    kimi fires PostCompact + SessionStart hooks but discards their output (fireAndForgetTrigger /
+    dropped SessionStart results — K4 probe). No hook can re-inject role substrate after compaction.
+  compensating_mechanism: >
+    manifest sessionStart.skill re-injects the slim role substrate after every compaction natively;
+    PostCompact reinject-core is a silent no-op. Dynamic board data lost (Track B equivalence classes).
+  tracked_by: plugin/src/hooks/reinject/CONTRACT.md + design_docs/2026-07-16-kimi-code-adapter-design.md §3.5
 ```
 
 ## Linked surfaces

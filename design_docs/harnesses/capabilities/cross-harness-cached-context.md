@@ -36,6 +36,7 @@ Codex, or Cursor without allowing the origin adapter to probe providers or recom
 | claude-code | implemented | SessionStart + hash-deduped PostToolBatch additional context | Track A |
 | codex | implemented | verified SessionStart context/system-message substrate | Track A; no PostToolBatch substitute |
 | cursor | implemented-track-b | verified postToolUse.additional_context + hash dedupe | no dynamic SessionStart because D4 is a confirmed bug |
+| kimi-code | unsupported | SessionStart + PostToolUse hook output discarded (K4 probe) | sessionStart.skill static substrate carries role priming; bootstrap message carries initial board context |
 
 ## Declared divergence
 
@@ -53,6 +54,13 @@ Codex, or Cursor without allowing the origin adapter to probe providers or recom
   reason: Cursor 3.10.20 sessionStart.additional_context is a staff-confirmed drop bug and does not re-fire after compaction.
   compensating_mechanism: Static alwaysApply role substrate remains present; dynamic cached context is delivered through verified postToolUse.additional_context on first tool and later hash changes, with an on-demand ccm read as the pre-tool floor.
   tracked_by: design_docs/harnesses/cursor.md D3/D4/D5
+
+- rule: cached-context-kimi-no-channel
+  kind: protocol-capability-gap
+  affected_hosts: [kimi-code]
+  reason: SessionStart + PostToolUse hook output discarded on kimi (K4 probe); no session-start/delta injection channel.
+  compensating_mechanism: sessionStart.skill static substrate + bootstrap UserPromptSubmit message carry initial context.
+  tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §3
 ```
 
 ## Linked surfaces

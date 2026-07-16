@@ -1,0 +1,13 @@
+hook: board-guard
+host: kimi-code
+version: 1
+event: PreToolUse
+matcher: "Bash|Write|Edit|MultiEdit"
+projection:
+  target: hooks/
+status: implemented-deny
+notes:
+  - Write/Edit/MultiEdit → path check; Bash → write-heuristic (lexShellCommands, byte-aligned with
+    claude-code/cursor; no apply_patch on kimi).
+  - Envelope: kind:block → { hookSpecificOutput: { permissionDecision: deny, permissionDecisionReason } }.
+  - dormant-until-armed (isArmed on narrow waist owner.active/session_id); fail-open on crash.

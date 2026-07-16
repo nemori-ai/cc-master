@@ -184,4 +184,18 @@ goes through `ccm account switch`, a process-boundary call, not a board write).
     `advisory('usage-pacing', 'strong', body)`. It does not reuse Claude Code's verdict strength table;
     recovery/reset edge strength remains owned by the durable coordination-inbox path.
   tracked_by: "adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR)"
+
+- rule: usage-pacing-kimi-no-signal-no-channel
+  kind: protocol-capability-gap
+  affected_hosts: [kimi-code]
+  reason: >
+    kimi exposes no CLI quota/usage signal (kimi-code.md §10 — no `kimi usage`, /usage is TUI-only),
+    so there is nothing to pace on; and kimi has no non-blocking Stop advisory channel (Stop only
+    surfaces via permissionDecision="deny", which forces continuation — inappropriate for a pacing
+    nudge). The hook is not registered on kimi.
+  compensating_mechanism: >
+    None on the data side (no quota signal); `ccm usage advise` degrades to available:false. If kimi
+    ever exposes a quota face, a UserPromptSubmit-time advisory (start-of-turn injection works) is the
+    candidate channel.
+  tracked_by: design_docs/harnesses/capabilities/usage-pacing-midflight.md
 ```

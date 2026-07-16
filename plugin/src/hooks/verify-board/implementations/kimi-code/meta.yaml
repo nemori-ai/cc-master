@@ -1,0 +1,13 @@
+hook: verify-board
+host: kimi-code
+version: 1
+event: Stop
+matcher: ""
+projection:
+  target: hooks/
+status: implemented-blocking
+notes:
+  - Stop gate: kind:block → { hookSpecificOutput: { permissionDecision: deny, permissionDecisionReason } }.
+    Probe: kimi Stop-deny → agent continues once (built-in single-continuation guard) + reason injected.
+  - FUSE (5 consecutive blocks) releases to prevent session lock; goal-integrity + rollup + watchdog checks.
+  - dormant-until-armed (listMatchingBoards on narrow waist); fail-open on crash.

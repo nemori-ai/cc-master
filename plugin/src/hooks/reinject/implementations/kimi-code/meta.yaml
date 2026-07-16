@@ -1,0 +1,13 @@
+hook: reinject
+host: kimi-code
+version: 1
+event: PostCompact
+matcher: ""
+projection:
+  target: hooks/
+status: implemented-track-b-silent
+notes:
+  - Silent PostCompact observe no-op (output discarded by fireAndForgetTrigger).
+  - Role substrate re-primes natively via manifest sessionStart.skill (PluginSessionStartInjector
+    re-injects after compaction). Dynamic board list / empty-board hard-stop / stale nodes have no
+    channel on kimi (Track B; role-substrate-reinject Capability Card).

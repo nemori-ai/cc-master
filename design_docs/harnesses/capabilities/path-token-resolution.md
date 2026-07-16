@@ -31,6 +31,7 @@ skill prose.
 | claude-code | implemented | `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PLUGIN_DATA}` in hooks.json / skill rewrite; complete hook path is shell-quoted; fresh ARM preflights the ccm structured-path capability | Installed-root + previous-ccm refusal probes cover spaces/Unicode and zero board artifacts |
 | codex | implemented | `${PLUGIN_ROOT}` in hook **command string** expands; inject `CC_MASTER_PLUGIN_ROOT="${PLUGIN_ROOT}"`; launcher fallback climbs from `hooks/_hosts/codex` to installed root | codex.md probe + installed-root conformance |
 | cursor | implemented | launcher injects `CC_MASTER_PLUGIN_ROOT` via `__dirname`; Cursor IDE plugin root remains separate from the `cursor-agent` executable surface | Track A + installed-root conformance |
+| kimi-code | implemented | skill body `${KIMI_SKILL_DIR}` text replacement (kimi-code.md §3); hook command `$KIMI_PLUGIN_ROOT` subprocess env | Stronger than Cursor (documented text token); `${KIMI_PLUGIN_ROOT}` not expanded in skill/command body |
 
 ## Declared divergence
 

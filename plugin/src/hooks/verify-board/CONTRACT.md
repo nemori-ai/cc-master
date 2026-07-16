@@ -171,4 +171,20 @@ only proves "both hosts' source at least declares awareness of this rule."
     launcher maps all stop kinds to `{ followup_message }`. FUSE sidecar + `stop_allow_until` +
     hooks.json `loop_limit: 5` bound worst-case loops. SSOT: `_hosts/cursor/ENVELOPE.md`.
   tracked_by: "plugin v0.17.2 envelope fix"
+
+- rule: verify-board-kimi-stop-envelope
+  kind: host-convention-divergence
+  affected_hosts: [kimi-code]
+  reason: >
+    kimi Stop runs via triggerBlock: only permissionDecision="deny" surfaces. On deny, the agent
+    continues once (built-in single-continuation guard) and permissionDecisionReason is injected as a
+    user message (K4 probe: agent-core stop handler). A non-deny Stop message is discarded — kimi has
+    no non-blocking Stop advisory channel, so the FUSE-release / goal-check-unavailable strong
+    advisories are silent (silence = allow stop, which is the intended release effect anyway).
+  compensating_mechanism: >
+    verify-board-core.js emits kind:block for gate reasons; launcher maps it to
+    { hookSpecificOutput: { permissionDecision: "deny", permissionDecisionReason } }. kimi's per-cycle
+    single-continuation guard + the session-level FUSE (5 consecutive blocks -> release) bound
+    worst-case loops. SSOT: _hosts/kimi-code/ENVELOPE.md.
+  tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §3.4
 ```
