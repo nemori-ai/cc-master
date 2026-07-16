@@ -1772,11 +1772,11 @@ ccm agent bind <id> --handle <kind:value> [flags]
 | flag | 短名 | 类型 | 必填 | 含义 |
 |---|---|---|---|---|
 | `--handle <kind:value>` | | string | 是 | handle 证据，`kind ∈ session-id\|pid\|task-id`，value 非空 |
-| `--attach-cmd <str>` | | string | | 一键接入命令（如 `codex resume <sid>`） |
+| `--attach-cmd <str>` | | string | | 一键接入命令。**必须自包含**：登记的是「复制到任意 shell 都能跑」的完整命令——凡执行位置敏感的，把 `cd <工作目录> && ` 一并写进去（claude-code 是典型：`claude --resume <sid>` 必须在原 cwd 执行，session 按项目目录归档，写成 `cd /abs/worktree && claude --resume <sid>`） |
 | `--transcript <str>` | | string | | transcript 路径引用（绝不内嵌内容） |
 | `--json` | | bool | | 结构化输出 |
 
-- 例：`ccm agent bind agt-001 --handle session-id:0197-abc --attach-cmd "codex resume 0197-abc"` · `ccm agent bind agt-002 --handle pid:48213`
+- 例：`ccm agent bind agt-001 --handle session-id:0197-abc --attach-cmd "cd /abs/worktree && codex resume 0197-abc"` · `ccm agent bind agt-002 --handle pid:48213`
 
 ### agent link
 

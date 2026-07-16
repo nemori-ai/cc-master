@@ -405,7 +405,7 @@ ccm task update T8 --executor subagent
 
 | kind | 什么派发用 | attach 方式 |
 |---|---|---|
-| `session-id` | 跨 harness CLI worker（codex / claude-code headless） | `--attach-cmd` 记一键接入命令（如 `codex resume <sid>`） |
+| `session-id` | 跨 harness CLI worker（codex / claude-code headless） | `--attach-cmd` 记一键接入命令，**必须自包含**——执行位置敏感的连 `cd` 一起登记（如 `cd /abs/worktree && claude --resume <sid>`：claude-code 的 resume 必须在原 cwd 执行，session 按项目目录归档） |
 | `pid` | 后台 shell 进程 | 无 attach；probe 用进程存活判定 |
 | `task-id` | 以 task 粒度跟踪、只有 transcript 可查的派发 | `--transcript` 记 transcript 路径引用（绝不内嵌内容） |
 | `none` | 尚无证据（create 后的缺省态） | 不可手选——bind 不接受 `none` |
