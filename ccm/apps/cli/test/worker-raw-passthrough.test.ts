@@ -15,6 +15,7 @@ import { join, resolve } from 'node:path';
 import { after, test } from 'node:test';
 import {
   createDefaultProviderRuntime,
+  PROVIDER_PROCESS_TREE_SCHEMA,
   type ProviderRuntime,
   type ProviderSpawnSpec,
 } from '../src/provider-runtime.js';
@@ -118,6 +119,56 @@ function runtime(
         const child = actual.process.spawnProvider(spec);
         afterSpawn?.();
         return child;
+      },
+    },
+  };
+}
+
+function runtimeWithPostCloseTree(
+  env: Record<string, string | undefined>,
+  mode: 'settles' | 'survives',
+): { providerRuntime: ProviderRuntime; signals: NodeJS.Signals[] } {
+  const actual = createDefaultProviderRuntime(env);
+  const signals: NodeJS.Signals[] = [];
+  return {
+    signals,
+    providerRuntime: {
+      ...actual,
+      process: {
+        resolveExecutable: actual.process.resolveExecutable,
+        spawnProvider(spec) {
+          const owned = actual.process.spawnProvider(spec);
+          let launcherClosed = false;
+          let postCloseProbes = 0;
+          let survivorAlive = true;
+          owned.child.once('close', () => {
+            launcherClosed = true;
+          });
+          return {
+            child: owned.child,
+            tree: {
+              schema: PROVIDER_PROCESS_TREE_SCHEMA,
+              kind: 'posix-process-group',
+              groupId: owned.tree?.groupId ?? Number(owned.child.pid),
+              signal(signal) {
+                signals.push(signal);
+                survivorAlive = false;
+                return true;
+              },
+              isAlive() {
+                if (!launcherClosed) return true;
+                if (mode === 'settles') {
+                  postCloseProbes += 1;
+                  // Raw workers use a 100ms TERM grace and a 1s reap budget. Keep the fake tree
+                  // alive beyond the former so the regression proves close settlement is tied to
+                  // full-tree reap observation, not to signal escalation timing.
+                  return postCloseProbes <= 30;
+                }
+                return survivorAlive;
+              },
+            },
+          };
+        },
       },
     },
   };
@@ -413,6 +464,45 @@ test('worker mirrors provider nonzero exit inside the generic envelope', async (
   assert.equal(invoked.envelope?.exit_code, 17);
   assert.equal(invoked.envelope?.signal, null);
   assert.equal(invoked.envelope?.reaped, true);
+});
+
+test('worker preserves a completed provider transcript while its owned tree naturally settles', async () => {
+  const fixture = runtimeWithPostCloseTree(testEnv(), 'settles');
+  const invoked = await invokeRun({
+    harness: 'cursor-agent',
+    providerArgv: ['--model', 'cursor-first-party-test'],
+    stdin: 'offline cursor request',
+    providerRuntime: fixture.providerRuntime,
+  });
+
+  assert.equal(invoked.code, 0);
+  assert.equal(invoked.envelope?.state, 'exited');
+  assert.equal(invoked.envelope?.exit_code, 0);
+  assert.equal(invoked.envelope?.reaped, true);
+  assert.equal(invoked.envelope?.error, null);
+  const transcript = JSON.parse(invoked.envelope?.stdout ?? '{}') as {
+    argv: string[];
+    stdin: string;
+  };
+  assert.deepEqual(transcript.argv, ['--model', 'cursor-first-party-test']);
+  assert.equal(transcript.stdin, 'offline cursor request');
+  assert.deepEqual(fixture.signals, [], 'natural settlement must not terminate the provider tree');
+});
+
+test('worker still fails closed when an owned descendant survives the post-close settlement window', async () => {
+  const fixture = runtimeWithPostCloseTree(testEnv(), 'survives');
+  const invoked = await invokeRun({
+    harness: 'cursor-agent',
+    providerArgv: ['--model', 'cursor-first-party-test'],
+    stdin: 'offline cursor request',
+    providerRuntime: fixture.providerRuntime,
+  });
+
+  assert.equal(invoked.code, 1);
+  assert.equal(invoked.envelope?.state, 'failed');
+  assert.equal(invoked.envelope?.error?.code, 'owned_tree_survived');
+  assert.equal(invoked.envelope?.reaped, true);
+  assert.deepEqual(fixture.signals, ['SIGTERM']);
 });
 
 test('worker reports bounded timeout, cancellation, and output truncation after reaping', async () => {

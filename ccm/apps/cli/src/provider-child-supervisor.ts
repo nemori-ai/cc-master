@@ -21,7 +21,7 @@ export interface ProviderChildLimits {
   stderrLimitBytes: number;
   /** Time from SIGTERM to SIGKILL. */
   terminationGraceMs: number;
-  /** Maximum time after SIGKILL to observe close/reap proof. */
+  /** Maximum time to observe full tree disappearance after a clean close or SIGKILL. */
   reapTimeoutMs: number;
 }
 
@@ -247,6 +247,7 @@ export function superviseProviderChild(
     let terminationTimer: NodeJS.Timeout | null = null;
     let reapTimer: NodeJS.Timeout | null = null;
     let reapPollTimer: NodeJS.Timeout | null = null;
+    let closeSettlementTimer: NodeJS.Timeout | null = null;
     // Child events are normally immediate. Only a consumer callback opens an atomic boundary:
     // terminal effects queue until the outermost callback returns and fixes its own outcome. One
     // drain transaction owns that FIFO even when processing an effect invokes another callback.
@@ -283,6 +284,8 @@ export function superviseProviderChild(
       reapTimer = null;
       clearTimer(reapPollTimer);
       reapPollTimer = null;
+      clearTimer(closeSettlementTimer);
+      closeSettlementTimer = null;
     };
 
     const terminationSnapshot = (reaped: boolean): ProviderChildTermination => ({
@@ -374,6 +377,8 @@ export function superviseProviderChild(
       if (settled || primaryFailure) return;
       primaryFailure = error;
       clearOperationalTimers();
+      clearTimer(closeSettlementTimer);
+      closeSettlementTimer = null;
       beginTermination();
     };
 
@@ -619,6 +624,66 @@ export function superviseProviderChild(
       finalizeCollector(stream, collector);
     };
 
+    const resolveSuccessfulClose = (
+      exitCode: number | null,
+      signal: NodeJS.Signals | null,
+      closedAtMs: number,
+    ): void => {
+      if (settled || primaryFailure || !treeGone) return;
+      settled = true;
+      clearAllTimers();
+      options.signal?.removeEventListener('abort', onAbort);
+      resolve({
+        operation: options.operation,
+        stdout: stdout.fragments.join(''),
+        stderr: stderr.fragments.join(''),
+        stdoutBytes: stdout.bytes,
+        stderrBytes: stderr.bytes,
+        exitCode,
+        signal,
+        reaped: true,
+        startedAtMs,
+        closedAtMs,
+        durationMs: closedAtMs - supervisionStartedAtMs,
+      });
+    };
+
+    const waitForCleanCloseSettlement = (
+      exitCode: number | null,
+      signal: NodeJS.Signals | null,
+      closedAtMs: number,
+    ): void => {
+      const settlementDeadlineMs = closedAtMs + options.limits.reapTimeoutMs;
+      const probe = (): void => {
+        closeSettlementTimer = null;
+        if (settled) return;
+        if (primaryFailure) {
+          maybeRejectAfterCleanup();
+          return;
+        }
+        if (observeTreeGone()) {
+          resolveSuccessfulClose(exitCode, signal, closedAtMs);
+          return;
+        }
+        const remainingMs = settlementDeadlineMs - Date.now();
+        if (remainingMs <= 0) {
+          fail(
+            new ProviderChildSupervisorError({
+              code: 'owned_tree_survived',
+              operation: options.operation,
+              message: `${options.operation}: launcher closed while its owned process tree remained alive`,
+            }),
+          );
+          return;
+        }
+        closeSettlementTimer = setTimeout(probe, Math.min(5, remainingMs));
+      };
+      closeSettlementTimer = setTimeout(
+        probe,
+        Math.min(5, Math.max(0, settlementDeadlineMs - Date.now())),
+      );
+    };
+
     const processClose = (exitCode: number | null, signal: NodeJS.Signals | null): void => {
       if (closed) return;
       closed = true;
@@ -638,31 +703,14 @@ export function superviseProviderChild(
         return;
       }
       if (!gone) {
-        fail(
-          new ProviderChildSupervisorError({
-            code: 'owned_tree_survived',
-            operation: options.operation,
-            message: `${options.operation}: launcher closed while its owned process tree remained alive`,
-          }),
-        );
+        // `close` proves that Node reaped the launcher, but the OS can expose its process group (or
+        // a short-lived owned helper) for another scheduling turn. Observe a bounded natural drain
+        // before classifying a leak. A tree still alive at the deadline enters the existing
+        // fail-closed TERM -> KILL -> reap path unchanged.
+        waitForCleanCloseSettlement(exitCode, signal, closedAtMs);
         return;
       }
-      settled = true;
-      clearAllTimers();
-      options.signal?.removeEventListener('abort', onAbort);
-      resolve({
-        operation: options.operation,
-        stdout: stdout.fragments.join(''),
-        stderr: stderr.fragments.join(''),
-        stdoutBytes: stdout.bytes,
-        stderrBytes: stderr.bytes,
-        exitCode,
-        signal,
-        reaped: true,
-        startedAtMs,
-        closedAtMs,
-        durationMs: closedAtMs - supervisionStartedAtMs,
-      });
+      resolveSuccessfulClose(exitCode, signal, closedAtMs);
     };
 
     const processError = (cause: Error): void => {
