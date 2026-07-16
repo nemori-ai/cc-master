@@ -6,6 +6,8 @@
 
 Cursor 列事实来源：[`cursor.md`](cursor.md)（2026-07-09 官方文档 + probe 3.10.20；Phase C 已落地）。
 
+kimi-code（Moonshot AI CLI）事实来源：[`kimi-code.md`](kimi-code.md)（2026-07-16 本机 v0.26.0 probe + binary 取证）。它是 origin + headless worker 双角色，未纳入下方三-host 主表，另见文末 §kimi-code 专节。
+
 | Surface | Claude Code | Codex | Cursor (IDE Agent) | cc-master 决策 |
 | --- | --- | --- | --- | --- |
 | 当前支持状态 | 已发布 adapter。 | Codex adapter 已有 dist：skills + hooks + prompt-first bootstrap；install/upgrade 通过本地 marketplace 注册 Codex plugin；commands 不投影原生 slash-command artifact。 | **已发布 adapter**（`plugin/dist/cursor`、probe 完成、install `--harness cursor`）。 | 三 host 独立 release zip（ADR-022）；source 保持多 host adapter 边界。 |
@@ -31,3 +33,25 @@ Cursor 列事实来源：[`cursor.md`](cursor.md)（2026-07-09 官方文档 + pr
 | `cursor-agent-cli` (`agent` / `cursor-agent` executable aliases) | read-only binary/version/help/auth discovery；plan/payer topology 与 first-party catalog 是独立 fail-closed facts；fixture-only admission/result contract | production model/quota/topology collector、per-OS sandbox、invoke/cancel/resume evidence 未齐即 fail closed；真实模型测试只允许 fresh-proven first-party selector，零 API fallback；只允许用户手动 auth，自动换号永久禁止 | `--plugin-dir` 只是 CLI loader flag，不证明 IDE plugin/hook/session/ARM parity |
 
 完整 probes、TTL、维护 runbook 与 OOP composition 只在 [`cursor-agent-cli.md`](cursor-agent-cli.md) 维护；上表不复制易变 CLI facts。
+
+| `kimi-code` (`kimi -p` headless one-shot) | `kimi -p "<prompt>" --output-format stream-json`；exit 0；OpenAI-message JSONL；session `session_<uuid>` 落 `session_index.jsonl`；`kimi export <sid>` 拉 transcript zip；resume `kimi -S/-c` | **无 CLI quota/usage 信号**（`unsupported`，不得伪造窗口）；approval 需 `--auto` / config `[permission.rules]`，退出码全谱未穷举；ACP / server 更强 transport 未深 probe | kimi origin plugin 与 `kimi -p` worker 是独立 surface：installed/auth/model 不跨 surface 推导；详见 [`kimi-code.md`](kimi-code.md) §10/§13 |
+
+## kimi-code（origin + headless worker）
+
+kimi-code 是 origin plugin host 与 headless worker 双角色，事实全集见 [`kimi-code.md`](kimi-code.md)。下表按主表同维度给要点（terse；细节以 kimi-code.md 为准）。
+
+| Surface | kimi-code 事实 | 与三-host 的关键差异 |
+| --- | --- | --- |
+| 当前支持状态 | 未开工 adapter；facts + probe 已落 `kimi-code.md`（v0.26.0，本机已登录）。 | headless worker 面强于 Codex/Cursor 降级形态。 |
+| Plugin manifest | `kimi.plugin.json`（根）或 `.kimi-plugin/plugin.json`（fallback）；必填 `name`；无 `agents` 字段；忽略 `tools/apps/inject/config_file/bootstrap`。 | 独立 manifest 投影分支，不复用 CC/Codex。 |
+| 安装 | TUI-only `/plugins install`；**非交互** = 复制进 `$KIMI_CODE_HOME/plugins/managed/<id>/` + 写 `plugins/installed.json`（实测可用）。 | 无 `kimi plugins` CLI 命令；install.sh 直写 managed + installed.json。 |
+| Runtime skills | `$KIMI_CODE_HOME/skills/`、`~/.agents/skills/`、项目 `.kimi-code/skills/` + `.agents/skills/`、`extra_skill_dirs`、`--skills-dir`；SKILL.md 有 `type/whenToUse/disableModelInvocation/arguments`。 | 原生读 `.agents/skills` + `AGENTS.md`（趋同）。 |
+| Skill path token | `${KIMI_SKILL_DIR}` + `${KIMI_SESSION_ID}` = **文本替换**（非 env）；`${KIMI_PLUGIN_ROOT}` 正文不展开。 | 有 documented 文本 token（区别于 Cursor/Codex 缺位）。 |
+| Hook registration | 全局 `config.toml` `[[hooks]]`（**TOML**）+ plugin manifest `hooks[]`；**项目 `local.toml` `[[hooks]]` 不生效**；事件集大（含 PreCompact/PostCompact/SubagentStart/PostToolUseFailure），**无 PostToolBatch**。 | 合并 = UNION；hook 只从全局 config + plugin 加载。 |
+| Hook command path | plugin hook 子进程 env = `KIMI_CODE_HOME`+`KIMI_PLUGIN_ROOT`（无 `PLUGIN_ROOT`/`CLAUDE_*` 别名）；cwd = 插件 managed 目录；command 字符串不展开 `${KIMI_PLUGIN_ROOT}`（是 env）。 | 与 Codex `${PLUGIN_ROOT}` command-token 语义相反。 |
+| Hook 通信 | stdin snake_case（`hook_event_name/session_id/cwd` + 事件字段；`prompt` 是 content-block 数组）；注入走 **`message`**（非 `additionalContext`/`systemMessage`）；阻断 `hookSpecificOutput.permissionDecision="deny"`。 | 注入字段名是最大改写点。 |
+| Commands | 无独立 commands 目录；来自 plugin manifest `commands[]`（`<plugin>:<command>`）+ skill `/skill:<name>`；body 参数 `$ARGUMENTS/$n/$name`。 | 同 Codex/Cursor 无 `plugin:` 外的独立目录。 |
+| Subagents | 无自定义 subagent；内置 coder(默认)/explore/plan/general + Agent Swarm；`subagent_type` 入参。 | 与 Cursor `.cursor/agents/*.md` 不同——kimi 无自定义角色。 |
+| Project memory | 项目根 `AGENTS.md`（>32KB 告警）、`.kimi-code/AGENTS.md`、`~/.agents/AGENTS.md`。 | reinject 可能有 `PostCompact` 原生落点（待 probe，优于 Cursor）。 |
+| Dist artifact | 未有 dist；无 `validate` 等价（doctor 只校 config/tui）。 | 靠 projection + hook probe。 |
+| 主要风险/缺口 | 无自定义 subagent / 无 Workflow / 无 PostToolBatch / 无 CLI quota 信号——均须 Capability Card；日级发布节奏机制易变。 | 见 `kimi-code.md` §12/§13 落点。 |
