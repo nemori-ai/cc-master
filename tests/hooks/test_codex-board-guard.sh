@@ -70,6 +70,23 @@ assert_patch_blocked_in_cwd() {
 
 REAL_APPLY_PATCH_BIN="$(command -v apply_patch 2>/dev/null || true)"
 
+# require_apply_patch LABEL — single skip guard shared by every call site that runs the real
+# installed apply_patch binary and then asserts its on-disk effect. assert_real_patch_applied /
+# assert_real_patch_rejected below already print "SKIP: ..." and return without invoking the
+# binary when it is unavailable, but a *trailing* effect assertion (assert_eq/assert_file/
+# assert_no_file/symlink checks/...) that reads the resulting file must never run unconditionally
+# against a patch that was never applied — that turns an environmental SKIP into a false FAIL.
+# Callers wrap the assert_real_patch_* call and its trailing effect assertions together in
+# `if require_apply_patch "$label"; then ... fi` so the whole group is skipped as one unit, and
+# runs completely unmodified whenever the binary is present.
+require_apply_patch() {
+  if [ -z "$REAL_APPLY_PATCH_BIN" ]; then
+    printf 'SKIP: %s (installed apply_patch unavailable)\n' "$1"
+    return 1
+  fi
+  return 0
+}
+
 assert_real_patch_applied() {
   local patch="$1" cwd="$2" label="$3" out rc
   if [ -z "$REAL_APPLY_PATCH_BIN" ]; then
@@ -276,9 +293,11 @@ exercise_post_eof_gap_case() {
   else
     assert_patch_allowed "$patch" "$h" "$label"
   fi
-  assert_real_patch_applied "$patch" "$h" "$label"
-  assert_eq after "$(< "$target")" "$label -> real update effect"
-  assert_eq 6 "$(wc -c < "$target" | tr -d '[:space:]')" "$label -> exact real update size"
+  if require_apply_patch "$label"; then
+    assert_real_patch_applied "$patch" "$h" "$label"
+    assert_eq after "$(< "$target")" "$label -> real update effect"
+    assert_eq 6 "$(wc -c < "$target" | tr -d '[:space:]')" "$label -> exact real update size"
+  fi
   rm -rf "$h"
 }
 
@@ -321,13 +340,15 @@ exercise_nel_header_patch_case() {
   else
     assert_patch_allowed "$patch" "$h" "$label"
   fi
-  assert_real_patch_applied "$patch" "$h" "$label"
-  case "$kind" in
-    Add) assert_file "$target" "$label -> real add effect" ;;
-    Delete) assert_no_file "$target" "$label -> real delete effect" ;;
-    Update) assert_eq after "$(< "$target")" "$label -> real update effect" ;;
-    Move) assert_file "$target" "$label -> real move effect" ;;
-  esac
+  if require_apply_patch "$label"; then
+    assert_real_patch_applied "$patch" "$h" "$label"
+    case "$kind" in
+      Add) assert_file "$target" "$label -> real add effect" ;;
+      Delete) assert_no_file "$target" "$label -> real delete effect" ;;
+      Update) assert_eq after "$(< "$target")" "$label -> real update effect" ;;
+      Move) assert_file "$target" "$label -> real move effect" ;;
+    esac
+  fi
   rm -rf "$h"
 }
 
@@ -374,17 +395,19 @@ exercise_effect_obfuscated_target_case() {
   else
     assert_patch_allowed "$patch" "$h" "$label"
   fi
-  assert_real_patch_applied "$patch" "$h" "$label"
-  case "$kind" in
-    Add) assert_file "$target" "$label -> real add effect" ;;
-    Delete) assert_no_file "$target" "$label -> real delete effect" ;;
-    Update) assert_eq after "$(< "$target")" "$label -> real update effect" ;;
-    Move)
-      assert_file "$target" "$label -> real move effect"
-      assert_no_file "$source" "$label -> real source removed"
-      ;;
-  esac
-  assert_no_file "$wire" "$label -> no literal control-byte path"
+  if require_apply_patch "$label"; then
+    assert_real_patch_applied "$patch" "$h" "$label"
+    case "$kind" in
+      Add) assert_file "$target" "$label -> real add effect" ;;
+      Delete) assert_no_file "$target" "$label -> real delete effect" ;;
+      Update) assert_eq after "$(< "$target")" "$label -> real update effect" ;;
+      Move)
+        assert_file "$target" "$label -> real move effect"
+        assert_no_file "$source" "$label -> real source removed"
+        ;;
+    esac
+    assert_no_file "$wire" "$label -> no literal control-byte path"
+  fi
   rm -rf "$h"
 }
 
@@ -441,31 +464,33 @@ exercise_leading_separator_shadow_case() {
   esac
 
   assert_patch_allowed_in_cwd "$patch" "$home" "$patch_cwd" "$label"
-  assert_real_patch_applied "$patch" "$patch_cwd" "$label"
-  case "$kind:$role" in
-    Add:target)
-      assert_file "$shadow" "$label -> exact relative shadow add effect"
-      assert_no_file "$actual" "$label -> absolute-looking board target untouched"
-      ;;
-    Delete:source)
-      assert_no_file "$shadow" "$label -> exact relative shadow delete effect"
-      assert_eq "$actual_before" "$(< "$actual")" "$label -> actual board unchanged"
-      ;;
-    Update:source)
-      assert_eq after "$(< "$shadow")" "$label -> exact relative shadow update effect"
-      assert_eq "$actual_before" "$(< "$actual")" "$label -> actual board unchanged"
-      ;;
-    Move:destination)
-      assert_file "$shadow" "$label -> exact relative shadow move destination"
-      assert_no_file "$source" "$label -> move source removed"
-      assert_eq "$actual_before" "$(< "$actual")" "$label -> actual board unchanged"
-      ;;
-    Move:source)
-      assert_no_file "$shadow" "$label -> exact relative shadow move source removed"
-      assert_file "$destination" "$label -> move destination created"
-      assert_eq "$actual_before" "$(< "$actual")" "$label -> actual board unchanged"
-      ;;
-  esac
+  if require_apply_patch "$label"; then
+    assert_real_patch_applied "$patch" "$patch_cwd" "$label"
+    case "$kind:$role" in
+      Add:target)
+        assert_file "$shadow" "$label -> exact relative shadow add effect"
+        assert_no_file "$actual" "$label -> absolute-looking board target untouched"
+        ;;
+      Delete:source)
+        assert_no_file "$shadow" "$label -> exact relative shadow delete effect"
+        assert_eq "$actual_before" "$(< "$actual")" "$label -> actual board unchanged"
+        ;;
+      Update:source)
+        assert_eq after "$(< "$shadow")" "$label -> exact relative shadow update effect"
+        assert_eq "$actual_before" "$(< "$actual")" "$label -> actual board unchanged"
+        ;;
+      Move:destination)
+        assert_file "$shadow" "$label -> exact relative shadow move destination"
+        assert_no_file "$source" "$label -> move source removed"
+        assert_eq "$actual_before" "$(< "$actual")" "$label -> actual board unchanged"
+        ;;
+      Move:source)
+        assert_no_file "$shadow" "$label -> exact relative shadow move source removed"
+        assert_file "$destination" "$label -> move destination created"
+        assert_eq "$actual_before" "$(< "$actual")" "$label -> actual board unchanged"
+        ;;
+    esac
+  fi
   rm -rf "$h"
 }
 
@@ -482,9 +507,11 @@ exercise_literal_leading_space_target_case() {
   printf -v patch '*** Begin Patch\n*** Add File:  %s\n+space-shadow\n*** End Patch' "$actual"
 
   assert_patch_allowed_in_cwd "$patch" "$home" "$patch_cwd" "$label"
-  assert_real_patch_applied "$patch" "$patch_cwd" "$label"
-  assert_file "$shadow" "$label -> exact literal-space shadow effect"
-  assert_no_file "$actual" "$label -> absolute-looking board target untouched"
+  if require_apply_patch "$label"; then
+    assert_real_patch_applied "$patch" "$patch_cwd" "$label"
+    assert_file "$shadow" "$label -> exact literal-space shadow effect"
+    assert_no_file "$actual" "$label -> absolute-looking board target untouched"
+  fi
   rm -rf "$h"
 }
 
@@ -517,12 +544,14 @@ exercise_symlink_alias_case() {
 
   printf -v patch '*** Begin Patch\n*** Update File: %s\n@@\n-before\n+after\n*** End Patch' "$target"
   assert_patch_blocked_in_cwd "$patch" "$home" "$patch_cwd" "$label"
-  assert_real_patch_applied "$patch" "$patch_cwd" "$label"
-  assert_eq after "$(< "$board")" "$label -> real protected-board effect"
-  [ -L "$alias" ] && PASS=$((PASS+1)) || {
-    FAILED=$((FAILED+1))
-    _red "FAIL: $label -> parser replaced symlink alias"
-  }
+  if require_apply_patch "$label"; then
+    assert_real_patch_applied "$patch" "$patch_cwd" "$label"
+    assert_eq after "$(< "$board")" "$label -> real protected-board effect"
+    [ -L "$alias" ] && PASS=$((PASS+1)) || {
+      FAILED=$((FAILED+1))
+      _red "FAIL: $label -> parser replaced symlink alias"
+    }
+  fi
   rm -rf "$h"
 }
 
@@ -541,8 +570,10 @@ exercise_symlink_resolution_boundaries() {
   label='apply_patch absent Add leaf below directory symlink into protected boards root'
   printf -v patch '*** Begin Patch\n*** Add File: %s\n+new\n*** End Patch' "$target"
   assert_patch_blocked_in_cwd "$patch" "$home" "$patch_cwd" "$label"
-  assert_real_patch_applied "$patch" "$patch_cwd" "$label"
-  assert_file "$real_target" "$label -> real protected-board effect"
+  if require_apply_patch "$label"; then
+    assert_real_patch_applied "$patch" "$patch_cwd" "$label"
+    assert_file "$real_target" "$label -> real protected-board effect"
+  fi
 
   # Equivalent aliases outside the protected root remain ordinary legal parser targets.
   printf 'before\n' > "$patch_cwd/non-board-real/source.txt"
@@ -550,22 +581,28 @@ exercise_symlink_resolution_boundaries() {
   label='apply_patch existing file symlink alias outside protected boards root'
   printf -v patch '*** Begin Patch\n*** Update File: non-board-file-alias.txt\n@@\n-before\n+after\n*** End Patch'
   assert_patch_allowed_in_cwd "$patch" "$home" "$patch_cwd" "$label"
-  assert_real_patch_applied "$patch" "$patch_cwd" "$label"
-  assert_eq after "$(< "$patch_cwd/non-board-real/source.txt")" "$label -> real non-board effect"
+  if require_apply_patch "$label"; then
+    assert_real_patch_applied "$patch" "$patch_cwd" "$label"
+    assert_eq after "$(< "$patch_cwd/non-board-real/source.txt")" "$label -> real non-board effect"
+  fi
 
   ln -s "$patch_cwd/non-board-real" "$patch_cwd/non-board-directory-alias"
   label='apply_patch absent Add leaf below directory symlink outside protected boards root'
   printf -v patch '*** Begin Patch\n*** Add File: non-board-directory-alias/new.txt\n+new\n*** End Patch'
   assert_patch_allowed_in_cwd "$patch" "$home" "$patch_cwd" "$label"
-  assert_real_patch_applied "$patch" "$patch_cwd" "$label"
-  assert_file "$patch_cwd/non-board-real/new.txt" "$label -> real non-board effect"
+  if require_apply_patch "$label"; then
+    assert_real_patch_applied "$patch" "$patch_cwd" "$label"
+    assert_file "$patch_cwd/non-board-real/new.txt" "$label -> real non-board effect"
+  fi
 
   # A wholly absent non-board path is resolved from its deepest existing ancestor and stays legal.
   label='apply_patch wholly absent nested non-board target'
   printf -v patch '*** Begin Patch\n*** Add File: absent/nested/new.txt\n+new\n*** End Patch'
   assert_patch_allowed_in_cwd "$patch" "$home" "$patch_cwd" "$label"
-  assert_real_patch_applied "$patch" "$patch_cwd" "$label"
-  assert_file "$patch_cwd/absent/nested/new.txt" "$label -> exact absent-path effect"
+  if require_apply_patch "$label"; then
+    assert_real_patch_applied "$patch" "$patch_cwd" "$label"
+    assert_file "$patch_cwd/absent/nested/new.txt" "$label -> exact absent-path effect"
+  fi
 
   # Existing-but-unresolvable paths are opaque, not equivalent to an absent lexical suffix.
   ln -s "$patch_cwd/missing-target.txt" "$patch_cwd/broken-alias.txt"
@@ -602,8 +639,10 @@ exercise_environment_near_neighbor() {
     '+body' \
     '*** End Patch')"
   assert_patch_allowed "$patch" "$h" "$label"
-  assert_real_patch_applied "$patch" "$h" "$label"
-  assert_file "$target" "$label -> real add effect"
+  if require_apply_patch "$label"; then
+    assert_real_patch_applied "$patch" "$h" "$label"
+    assert_file "$target" "$label -> real add effect"
+  fi
   rm -rf "$h"
 }
 
@@ -781,8 +820,10 @@ PATCH="$(printf '%s\n' \
   '+begin' \
   '*** End Patch')"
 assert_patch_allowed "$PATCH" "$H" "apply_patch Begin Patch trailing whitespace"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch Begin Patch trailing whitespace"
-assert_file "$CONTROL_ADD_BEGIN" "apply_patch Begin Patch trailing whitespace -> real add effect"
+if require_apply_patch "apply_patch Begin Patch trailing whitespace"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch Begin Patch trailing whitespace"
+  assert_file "$CONTROL_ADD_BEGIN" "apply_patch Begin Patch trailing whitespace -> real add effect"
+fi
 
 CONTROL_ADD_END="$H/control-end.txt"
 PATCH="$(printf '%s\n' \
@@ -791,8 +832,10 @@ PATCH="$(printf '%s\n' \
   '+end' \
   '*** End Patch   ')"
 assert_patch_allowed "$PATCH" "$H" "apply_patch End Patch trailing whitespace"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch End Patch trailing whitespace"
-assert_file "$CONTROL_ADD_END" "apply_patch End Patch trailing whitespace -> real add effect"
+if require_apply_patch "apply_patch End Patch trailing whitespace"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch End Patch trailing whitespace"
+  assert_file "$CONTROL_ADD_END" "apply_patch End Patch trailing whitespace -> real add effect"
+fi
 
 CONTROL_UPDATE_EOF="$H/control-eof.txt"
 printf '%s\n' 'before' > "$CONTROL_UPDATE_EOF"
@@ -805,8 +848,10 @@ PATCH="$(printf '%s\n' \
   '*** End of File   ' \
   '*** End Patch')"
 assert_patch_allowed "$PATCH" "$H" "apply_patch End of File trailing whitespace"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch End of File trailing whitespace"
-assert_contains "$(tr -d '\n' < "$CONTROL_UPDATE_EOF")" 'after-eof' "apply_patch End of File trailing whitespace -> real update effect"
+if require_apply_patch "apply_patch End of File trailing whitespace"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch End of File trailing whitespace"
+  assert_contains "$(tr -d '\n' < "$CONTROL_UPDATE_EOF")" 'after-eof' "apply_patch End of File trailing whitespace -> real update effect"
+fi
 
 CONTROL_UPDATE_LEADING="$H/control-leading-update.txt"
 printf '%s\n' 'before' > "$CONTROL_UPDATE_LEADING"
@@ -818,8 +863,10 @@ PATCH="$(printf '%s\n' \
   '+after-leading-update' \
   '*** End Patch')"
 assert_patch_allowed "$PATCH" "$H" "apply_patch Update File leading whitespace"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch Update File leading whitespace"
-assert_contains "$(tr -d '\n' < "$CONTROL_UPDATE_LEADING")" 'after-leading-update' "apply_patch Update File leading whitespace -> real update effect"
+if require_apply_patch "apply_patch Update File leading whitespace"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch Update File leading whitespace"
+  assert_contains "$(tr -d '\n' < "$CONTROL_UPDATE_LEADING")" 'after-leading-update' "apply_patch Update File leading whitespace -> real update effect"
+fi
 
 CONTROL_ADD_LEADING_END="$H/control-leading-end.txt"
 PATCH="$(printf '%s\n' \
@@ -828,8 +875,10 @@ PATCH="$(printf '%s\n' \
   '+leading-end' \
   ' *** End Patch')"
 assert_patch_allowed "$PATCH" "$H" "apply_patch End Patch leading whitespace"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch End Patch leading whitespace"
-assert_file "$CONTROL_ADD_LEADING_END" "apply_patch End Patch leading whitespace -> real add effect"
+if require_apply_patch "apply_patch End Patch leading whitespace"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch End Patch leading whitespace"
+  assert_file "$CONTROL_ADD_LEADING_END" "apply_patch End Patch leading whitespace -> real add effect"
+fi
 
 # The installed parser also strips whitespace around the whole envelope and accepts CRLF line
 # endings. Keep these as filesystem-effect fixtures: the guard must not reject legal non-board input
@@ -837,113 +886,145 @@ assert_file "$CONTROL_ADD_LEADING_END" "apply_patch End Patch leading whitespace
 CONTROL_OUTER_LEADING="$H/control-outer-leading.txt"
 printf -v PATCH '\n*** Begin Patch\n*** Add File: %s\n+leading-blank\n*** End Patch' "$CONTROL_OUTER_LEADING"
 assert_patch_allowed "$PATCH" "$H" "apply_patch leading blank before envelope"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch leading blank before envelope"
-assert_file "$CONTROL_OUTER_LEADING" "apply_patch leading blank before envelope -> real add effect"
+if require_apply_patch "apply_patch leading blank before envelope"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch leading blank before envelope"
+  assert_file "$CONTROL_OUTER_LEADING" "apply_patch leading blank before envelope -> real add effect"
+fi
 
 CONTROL_OUTER_SPACES="$H/control-outer-spaces.txt"
 printf -v PATCH ' \t\n*** Begin Patch\n*** Add File: %s\n+outer-spaces\n*** End Patch' "$CONTROL_OUTER_SPACES"
 assert_patch_allowed "$PATCH" "$H" "apply_patch space-tab line before envelope"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch space-tab line before envelope"
-assert_file "$CONTROL_OUTER_SPACES" "apply_patch space-tab outer line -> real add effect"
+if require_apply_patch "apply_patch space-tab line before envelope"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch space-tab line before envelope"
+  assert_file "$CONTROL_OUTER_SPACES" "apply_patch space-tab outer line -> real add effect"
+fi
 
 CONTROL_OUTER_SPACES_BOARD="$H/boards/control-outer-spaces.board.json"
 printf -v PATCH ' \t\n*** Begin Patch\n*** Add File: %s\n+{}\n*** End Patch' "$CONTROL_OUTER_SPACES_BOARD"
 assert_patch_blocked "$PATCH" "$H" "apply_patch space-tab outer line board target"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch space-tab outer line board target"
-assert_file "$CONTROL_OUTER_SPACES_BOARD" "apply_patch space-tab outer board target -> real add effect"
+if require_apply_patch "apply_patch space-tab outer line board target"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch space-tab outer line board target"
+  assert_file "$CONTROL_OUTER_SPACES_BOARD" "apply_patch space-tab outer board target -> real add effect"
+fi
 
 CONTROL_OUTER_TRAILING="$H/control-outer-trailing.txt"
 printf -v PATCH '*** Begin Patch\n*** Add File: %s\n+trailing-blank\n*** End Patch\n\n' "$CONTROL_OUTER_TRAILING"
 assert_patch_allowed "$PATCH" "$H" "apply_patch two trailing newlines after envelope"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch two trailing newlines after envelope"
-assert_file "$CONTROL_OUTER_TRAILING" "apply_patch two trailing newlines after envelope -> real add effect"
+if require_apply_patch "apply_patch two trailing newlines after envelope"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch two trailing newlines after envelope"
+  assert_file "$CONTROL_OUTER_TRAILING" "apply_patch two trailing newlines after envelope -> real add effect"
+fi
 
 CONTROL_INNER_BLANK="$H/control-inner-blank.txt"
 printf -v PATCH '*** Begin Patch\n \t\n*** Add File: %s\n+inner-blank\n*** End Patch' "$CONTROL_INNER_BLANK"
 assert_patch_blocked "$PATCH" "$H" "apply_patch whitespace-only line inside envelope"
-assert_real_patch_rejected "$PATCH" "$H" "apply_patch whitespace-only line inside envelope"
-assert_no_file "$CONTROL_INNER_BLANK" "apply_patch inner whitespace line -> no filesystem effect"
+if require_apply_patch "apply_patch whitespace-only line inside envelope"; then
+  assert_real_patch_rejected "$PATCH" "$H" "apply_patch whitespace-only line inside envelope"
+  assert_no_file "$CONTROL_INNER_BLANK" "apply_patch inner whitespace line -> no filesystem effect"
+fi
 
 CONTROL_CRLF_ALL="$H/control-crlf-all.txt"
 printf -v PATCH '*** Begin Patch\r\n*** Add File: %s\r\n+all-crlf\r\n*** End Patch\r\n' "$CONTROL_CRLF_ALL"
 assert_patch_allowed "$PATCH" "$H" "apply_patch full CRLF envelope"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch full CRLF envelope"
-assert_file "$CONTROL_CRLF_ALL" "apply_patch full CRLF envelope -> real add effect"
+if require_apply_patch "apply_patch full CRLF envelope"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch full CRLF envelope"
+  assert_file "$CONTROL_CRLF_ALL" "apply_patch full CRLF envelope -> real add effect"
+fi
 
 CONTROL_CRLF_EMPTY_CONTEXT="$H/control-crlf-empty-context.txt"
 printf 'before\n\n' > "$CONTROL_CRLF_EMPTY_CONTEXT"
 printf -v PATCH '*** Begin Patch\r\n*** Update File: %s\r\n@@\r\n-before\r\n+after\r\n\r\n*** End Patch\r\n' "$CONTROL_CRLF_EMPTY_CONTEXT"
 assert_patch_allowed "$PATCH" "$H" "apply_patch CRLF empty physical context line"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch CRLF empty physical context line"
-assert_eq after "$(< "$CONTROL_CRLF_EMPTY_CONTEXT")" "apply_patch CRLF empty context -> real update content"
-assert_eq 6 "$(wc -c < "$CONTROL_CRLF_EMPTY_CONTEXT" | tr -d '[:space:]')" "apply_patch CRLF empty context -> exact real update size"
+if require_apply_patch "apply_patch CRLF empty physical context line"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch CRLF empty physical context line"
+  assert_eq after "$(< "$CONTROL_CRLF_EMPTY_CONTEXT")" "apply_patch CRLF empty context -> real update content"
+  assert_eq 6 "$(wc -c < "$CONTROL_CRLF_EMPTY_CONTEXT" | tr -d '[:space:]')" "apply_patch CRLF empty context -> exact real update size"
+fi
 
 CONTROL_CRLF_EMPTY_CONTEXT_BOARD="$H/boards/control-crlf-empty-context.board.json"
 printf 'before\n\n' > "$CONTROL_CRLF_EMPTY_CONTEXT_BOARD"
 printf -v PATCH '*** Begin Patch\r\n*** Update File: %s\r\n@@\r\n-before\r\n+after\r\n\r\n*** End Patch\r\n' "$CONTROL_CRLF_EMPTY_CONTEXT_BOARD"
 assert_patch_blocked "$PATCH" "$H" "apply_patch CRLF empty context board target"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch CRLF empty context board target"
-assert_eq after "$(< "$CONTROL_CRLF_EMPTY_CONTEXT_BOARD")" "apply_patch CRLF empty context board -> real update content"
-assert_eq 6 "$(wc -c < "$CONTROL_CRLF_EMPTY_CONTEXT_BOARD" | tr -d '[:space:]')" "apply_patch CRLF empty context board -> exact real update size"
+if require_apply_patch "apply_patch CRLF empty context board target"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch CRLF empty context board target"
+  assert_eq after "$(< "$CONTROL_CRLF_EMPTY_CONTEXT_BOARD")" "apply_patch CRLF empty context board -> real update content"
+  assert_eq 6 "$(wc -c < "$CONTROL_CRLF_EMPTY_CONTEXT_BOARD" | tr -d '[:space:]')" "apply_patch CRLF empty context board -> exact real update size"
+fi
 
 CONTROL_DOUBLE_CR_EMPTY_CONTEXT="$H/control-double-cr-empty-context.txt"
 printf 'before\n\n' > "$CONTROL_DOUBLE_CR_EMPTY_CONTEXT"
 printf -v PATCH '*** Begin Patch\r\n*** Update File: %s\r\n@@\r\n-before\r\n+after\r\n\r\r\n*** End Patch\r\n' \
   "$CONTROL_DOUBLE_CR_EMPTY_CONTEXT"
 assert_patch_allowed "$PATCH" "$H" "apply_patch double-CR empty physical context line"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch double-CR empty physical context line"
-assert_eq after "$(< "$CONTROL_DOUBLE_CR_EMPTY_CONTEXT")" "apply_patch double-CR empty context -> real update content"
-assert_eq 6 "$(wc -c < "$CONTROL_DOUBLE_CR_EMPTY_CONTEXT" | tr -d '[:space:]')" "apply_patch double-CR empty context -> exact real update size"
+if require_apply_patch "apply_patch double-CR empty physical context line"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch double-CR empty physical context line"
+  assert_eq after "$(< "$CONTROL_DOUBLE_CR_EMPTY_CONTEXT")" "apply_patch double-CR empty context -> real update content"
+  assert_eq 6 "$(wc -c < "$CONTROL_DOUBLE_CR_EMPTY_CONTEXT" | tr -d '[:space:]')" "apply_patch double-CR empty context -> exact real update size"
+fi
 
 CONTROL_DOUBLE_CR_EMPTY_CONTEXT_BOARD="$H/boards/control-double-cr-empty-context.board.json"
 printf 'before\n\n' > "$CONTROL_DOUBLE_CR_EMPTY_CONTEXT_BOARD"
 printf -v PATCH '*** Begin Patch\r\n*** Update File: %s\r\n@@\r\n-before\r\n+after\r\n\r\r\n*** End Patch\r\n' \
   "$CONTROL_DOUBLE_CR_EMPTY_CONTEXT_BOARD"
 assert_patch_blocked "$PATCH" "$H" "apply_patch double-CR empty context board target"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch double-CR empty context board target"
-assert_eq after "$(< "$CONTROL_DOUBLE_CR_EMPTY_CONTEXT_BOARD")" "apply_patch double-CR empty context board -> real update content"
-assert_eq 6 "$(wc -c < "$CONTROL_DOUBLE_CR_EMPTY_CONTEXT_BOARD" | tr -d '[:space:]')" "apply_patch double-CR empty context board -> exact real update size"
+if require_apply_patch "apply_patch double-CR empty context board target"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch double-CR empty context board target"
+  assert_eq after "$(< "$CONTROL_DOUBLE_CR_EMPTY_CONTEXT_BOARD")" "apply_patch double-CR empty context board -> real update content"
+  assert_eq 6 "$(wc -c < "$CONTROL_DOUBLE_CR_EMPTY_CONTEXT_BOARD" | tr -d '[:space:]')" "apply_patch double-CR empty context board -> exact real update size"
+fi
 
 CONTROL_TRIPLE_CR_EMPTY_CONTEXT="$H/control-triple-cr-empty-context.txt"
 printf 'before\n\n' > "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT"
 printf -v PATCH '*** Begin Patch\r\n*** Update File: %s\r\n@@\r\n-before\r\n+after\r\n\r\r\r\n*** End Patch\r\n' \
   "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT"
 assert_patch_blocked "$PATCH" "$H" "apply_patch triple-CR empty context is malformed"
-assert_real_patch_rejected "$PATCH" "$H" "apply_patch triple-CR empty context is malformed"
-assert_eq before "$(< "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT")" "apply_patch triple-CR rejection -> source unchanged"
+if require_apply_patch "apply_patch triple-CR empty context is malformed"; then
+  assert_real_patch_rejected "$PATCH" "$H" "apply_patch triple-CR empty context is malformed"
+  assert_eq before "$(< "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT")" "apply_patch triple-CR rejection -> source unchanged"
+fi
 
 CONTROL_TRIPLE_CR_EMPTY_CONTEXT_BOARD="$H/boards/control-triple-cr-empty-context.board.json"
 printf 'before\n\n' > "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT_BOARD"
 printf -v PATCH '*** Begin Patch\r\n*** Update File: %s\r\n@@\r\n-before\r\n+after\r\n\r\r\r\n*** End Patch\r\n' \
   "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT_BOARD"
 assert_patch_blocked "$PATCH" "$H" "apply_patch triple-CR empty context board is malformed"
-assert_real_patch_rejected "$PATCH" "$H" "apply_patch triple-CR empty context board is malformed"
-assert_eq before "$(< "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT_BOARD")" "apply_patch triple-CR board rejection -> source unchanged"
+if require_apply_patch "apply_patch triple-CR empty context board is malformed"; then
+  assert_real_patch_rejected "$PATCH" "$H" "apply_patch triple-CR empty context board is malformed"
+  assert_eq before "$(< "$CONTROL_TRIPLE_CR_EMPTY_CONTEXT_BOARD")" "apply_patch triple-CR board rejection -> source unchanged"
+fi
 
 CONTROL_CR_BEGIN="$H/control-cr-begin.txt"
 printf -v PATCH '*** Begin Patch\r\n*** Add File: %s\n+begin-cr\n*** End Patch' "$CONTROL_CR_BEGIN"
 assert_patch_allowed "$PATCH" "$H" "apply_patch Begin Patch CRLF only"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch Begin Patch CRLF only"
-assert_file "$CONTROL_CR_BEGIN" "apply_patch Begin Patch CRLF only -> real add effect"
+if require_apply_patch "apply_patch Begin Patch CRLF only"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch Begin Patch CRLF only"
+  assert_file "$CONTROL_CR_BEGIN" "apply_patch Begin Patch CRLF only -> real add effect"
+fi
 
 CONTROL_CR_FILE="$H/control-cr-file.txt"
 printf -v PATCH '*** Begin Patch\n*** Add File: %s\r\n+file-cr\n*** End Patch' "$CONTROL_CR_FILE"
 assert_patch_allowed "$PATCH" "$H" "apply_patch file header CRLF only"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch file header CRLF only"
-assert_file "$CONTROL_CR_FILE" "apply_patch file header CRLF only -> real add effect"
+if require_apply_patch "apply_patch file header CRLF only"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch file header CRLF only"
+  assert_file "$CONTROL_CR_FILE" "apply_patch file header CRLF only -> real add effect"
+fi
 
 CONTROL_CR_END="$H/control-cr-end.txt"
 printf -v PATCH '*** Begin Patch\n*** Add File: %s\n+end-cr\n*** End Patch\r\n' "$CONTROL_CR_END"
 assert_patch_allowed "$PATCH" "$H" "apply_patch End Patch CRLF only"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch End Patch CRLF only"
-assert_file "$CONTROL_CR_END" "apply_patch End Patch CRLF only -> real add effect"
+if require_apply_patch "apply_patch End Patch CRLF only"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch End Patch CRLF only"
+  assert_file "$CONTROL_CR_END" "apply_patch End Patch CRLF only -> real add effect"
+fi
 
 CONTROL_CR_EOF="$H/control-cr-eof.txt"
 printf '%s\n' 'before' > "$CONTROL_CR_EOF"
 printf -v PATCH '*** Begin Patch\n*** Update File: %s\n@@\n-before\n+after-eof-cr\n*** End of File\r\n*** End Patch' "$CONTROL_CR_EOF"
 assert_patch_allowed "$PATCH" "$H" "apply_patch End of File CRLF only"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch End of File CRLF only"
-assert_contains "$(tr -d '\n' < "$CONTROL_CR_EOF")" 'after-eof-cr' "apply_patch End of File CRLF only -> real update effect"
+if require_apply_patch "apply_patch End of File CRLF only"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch End of File CRLF only"
+  assert_contains "$(tr -d '\n' < "$CONTROL_CR_EOF")" 'after-eof-cr' "apply_patch End of File CRLF only -> real update effect"
+fi
 
 # Codex 0.144.2 is implemented in Rust: control and envelope normalization follows
 # `char::is_whitespace`, whose Unicode White_Space set includes U+0085 NEL while JavaScript trim
@@ -954,37 +1035,47 @@ CONTROL_NEL_TOPLEVEL="$H/control-nel-toplevel.txt"
 printf -v PATCH '%s*** Begin Patch%s\n%s*** Add File: %s%s\n+nel-toplevel\n%s*** End Patch%s' \
   "$NEL" "$NEL" "$NEL" "$CONTROL_NEL_TOPLEVEL" "$NEL" "$NEL" "$NEL"
 assert_patch_allowed "$PATCH" "$H" "apply_patch leading/trailing NEL on top-level controls"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch leading/trailing NEL on top-level controls"
-assert_file "$CONTROL_NEL_TOPLEVEL" "apply_patch top-level NEL -> real add effect"
+if require_apply_patch "apply_patch leading/trailing NEL on top-level controls"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch leading/trailing NEL on top-level controls"
+  assert_file "$CONTROL_NEL_TOPLEVEL" "apply_patch top-level NEL -> real add effect"
+fi
 
 CONTROL_NEL_TOPLEVEL_BOARD="$H/boards/control-nel-toplevel.board.json"
 printf -v PATCH '%s*** Begin Patch%s\n%s*** Add File: %s%s\n+{}\n%s*** End Patch%s' \
   "$NEL" "$NEL" "$NEL" "$CONTROL_NEL_TOPLEVEL_BOARD" "$NEL" "$NEL" "$NEL"
 assert_patch_blocked "$PATCH" "$H" "apply_patch leading/trailing NEL top-level board target"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch leading/trailing NEL top-level board target"
-assert_file "$CONTROL_NEL_TOPLEVEL_BOARD" "apply_patch top-level NEL board -> real add effect"
+if require_apply_patch "apply_patch leading/trailing NEL top-level board target"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch leading/trailing NEL top-level board target"
+  assert_file "$CONTROL_NEL_TOPLEVEL_BOARD" "apply_patch top-level NEL board -> real add effect"
+fi
 
 CONTROL_NEL_OUTER="$H/control-nel-outer.txt"
 printf -v PATCH '%s\n*** Begin Patch\n*** Add File: %s\n+nel-outer\n*** End Patch\n%s' \
   "$NEL" "$CONTROL_NEL_OUTER" "$NEL"
 assert_patch_allowed "$PATCH" "$H" "apply_patch NEL-only physical lines outside envelope"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch NEL-only physical lines outside envelope"
-assert_file "$CONTROL_NEL_OUTER" "apply_patch outer NEL -> real add effect"
+if require_apply_patch "apply_patch NEL-only physical lines outside envelope"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch NEL-only physical lines outside envelope"
+  assert_file "$CONTROL_NEL_OUTER" "apply_patch outer NEL -> real add effect"
+fi
 
 CONTROL_NEL_OUTER_BOARD="$H/boards/control-nel-outer.board.json"
 printf -v PATCH '%s\n*** Begin Patch\n*** Add File: %s\n+{}\n*** End Patch\n%s' \
   "$NEL" "$CONTROL_NEL_OUTER_BOARD" "$NEL"
 assert_patch_blocked "$PATCH" "$H" "apply_patch outer NEL board target"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch outer NEL board target"
-assert_file "$CONTROL_NEL_OUTER_BOARD" "apply_patch outer NEL board -> real add effect"
+if require_apply_patch "apply_patch outer NEL board target"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch outer NEL board target"
+  assert_file "$CONTROL_NEL_OUTER_BOARD" "apply_patch outer NEL board -> real add effect"
+fi
 
 CONTROL_NEL_EOF="$H/control-nel-eof.txt"
 printf 'before\n' > "$CONTROL_NEL_EOF"
 printf -v PATCH '*** Begin Patch\n*** Update File: %s\n@@\n-before\n+after-nel-eof\n*** End of File%s\n*** End Patch' \
   "$CONTROL_NEL_EOF" "$NEL"
 assert_patch_allowed "$PATCH" "$H" "apply_patch End of File trailing NEL"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch End of File trailing NEL"
-assert_eq after-nel-eof "$(< "$CONTROL_NEL_EOF")" "apply_patch End of File NEL -> real update effect"
+if require_apply_patch "apply_patch End of File trailing NEL"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch End of File trailing NEL"
+  assert_eq after-nel-eof "$(< "$CONTROL_NEL_EOF")" "apply_patch End of File NEL -> real update effect"
+fi
 
 # U+FEFF is intentionally not in Rust Unicode White_Space. It cannot prefix a control, and a
 # filename ending in FEFF is a distinct non-board path even when the preceding suffix is
@@ -994,28 +1085,36 @@ CONTROL_FEFF_BEGIN="$H/control-feff-begin.txt"
 printf -v PATCH '%s*** Begin Patch\n*** Add File: %s\n+feff-begin\n*** End Patch' \
   "$FEFF" "$CONTROL_FEFF_BEGIN"
 assert_patch_blocked "$PATCH" "$H" "apply_patch FEFF before Begin Patch is malformed"
-assert_real_patch_rejected "$PATCH" "$H" "apply_patch FEFF before Begin Patch is malformed"
-assert_no_file "$CONTROL_FEFF_BEGIN" "apply_patch FEFF Begin rejection -> no effect"
+if require_apply_patch "apply_patch FEFF before Begin Patch is malformed"; then
+  assert_real_patch_rejected "$PATCH" "$H" "apply_patch FEFF before Begin Patch is malformed"
+  assert_no_file "$CONTROL_FEFF_BEGIN" "apply_patch FEFF Begin rejection -> no effect"
+fi
 
 CONTROL_FEFF_HEADER="$H/control-feff-header.txt"
 printf -v PATCH '*** Begin Patch\n%s*** Add File: %s\n+feff-header\n*** End Patch' \
   "$FEFF" "$CONTROL_FEFF_HEADER"
 assert_patch_blocked "$PATCH" "$H" "apply_patch FEFF before file header is malformed"
-assert_real_patch_rejected "$PATCH" "$H" "apply_patch FEFF before file header is malformed"
-assert_no_file "$CONTROL_FEFF_HEADER" "apply_patch FEFF header rejection -> no effect"
+if require_apply_patch "apply_patch FEFF before file header is malformed"; then
+  assert_real_patch_rejected "$PATCH" "$H" "apply_patch FEFF before file header is malformed"
+  assert_no_file "$CONTROL_FEFF_HEADER" "apply_patch FEFF header rejection -> no effect"
+fi
 
 CONTROL_FEFF_SUFFIX="$H/boards/distinct.board.json${FEFF}"
 printf -v PATCH '*** Begin Patch\n*** Add File: %s\n+feff-suffix\n*** End Patch' "$CONTROL_FEFF_SUFFIX"
 assert_patch_allowed "$PATCH" "$H" "apply_patch FEFF-suffixed board-looking path is distinct non-board"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch FEFF-suffixed board-looking path is distinct non-board"
-assert_file "$CONTROL_FEFF_SUFFIX" "apply_patch FEFF suffix -> exact distinct file effect"
-assert_no_file "$H/boards/distinct.board.json" "apply_patch FEFF suffix -> no normalized board effect"
+if require_apply_patch "apply_patch FEFF-suffixed board-looking path is distinct non-board"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch FEFF-suffixed board-looking path is distinct non-board"
+  assert_file "$CONTROL_FEFF_SUFFIX" "apply_patch FEFF suffix -> exact distinct file effect"
+  assert_no_file "$H/boards/distinct.board.json" "apply_patch FEFF suffix -> no normalized board effect"
+fi
 
 CONTROL_CR_BOARD="$H/boards/control-crlf.board.json"
 printf -v PATCH '*** Begin Patch\r\n*** Add File: %s\r\n+{}\r\n*** End Patch\r\n' "$CONTROL_CR_BOARD"
 assert_patch_blocked "$PATCH" "$H" "apply_patch full CRLF board target"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch full CRLF board target"
-assert_file "$CONTROL_CR_BOARD" "apply_patch full CRLF board target -> real add effect"
+if require_apply_patch "apply_patch full CRLF board target"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch full CRLF board target"
+  assert_file "$CONTROL_CR_BOARD" "apply_patch full CRLF board target -> real add effect"
+fi
 
 # An End-of-File marker finishes a hunk, but the installed parser still accepts Rust-whitespace-only
 # physical separator lines before the outer End Patch. This is a state-specific allowance; the same
@@ -1030,8 +1129,10 @@ printf 'before\n' > "$CONTROL_POST_EOF_NONBLANK"
 printf -v PATCH '*** Begin Patch\n*** Update File: %s\n@@\n-before\n+after\n*** End of File\n context without a new hunk marker\n*** End Patch' \
   "$CONTROL_POST_EOF_NONBLANK"
 assert_patch_blocked "$PATCH" "$H" "apply_patch nonblank body after End of File stays malformed"
-assert_real_patch_rejected "$PATCH" "$H" "apply_patch nonblank body after End of File stays malformed"
-assert_eq before "$(< "$CONTROL_POST_EOF_NONBLANK")" "apply_patch post-EOF nonblank rejection -> source unchanged"
+if require_apply_patch "apply_patch nonblank body after End of File stays malformed"; then
+  assert_real_patch_rejected "$PATCH" "$H" "apply_patch nonblank body after End of File stays malformed"
+  assert_eq before "$(< "$CONTROL_POST_EOF_NONBLANK")" "apply_patch post-EOF nonblank rejection -> source unchanged"
+fi
 
 # Trailing U+0085 is legal Rust whitespace on every target-bearing control. Board rows are the
 # security assertions used by the normalization-removal mutation: all four must flip to ALLOW if
@@ -1097,9 +1198,11 @@ PATCH="$(printf '%s\n' \
   '+after' \
   '*** End Patch')"
 assert_patch_allowed "$PATCH" "$H" "apply_patch leading-space hunk controls stay data"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch leading-space hunk controls stay data"
-assert_contains "$(< "$HUNK_CONTEXT_TARGET")" 'after' "apply_patch leading-space hunk controls -> real update effect"
-assert_eq "$BOARD_BEFORE" "$(< "$H/boards/mine.board.json")" "apply_patch leading-space hunk controls -> board unchanged"
+if require_apply_patch "apply_patch leading-space hunk controls stay data"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch leading-space hunk controls stay data"
+  assert_contains "$(< "$HUNK_CONTEXT_TARGET")" 'after' "apply_patch leading-space hunk controls -> real update effect"
+  assert_eq "$BOARD_BEFORE" "$(< "$H/boards/mine.board.json")" "apply_patch leading-space hunk controls -> board unchanged"
+fi
 
 HUNK_CRLF_CONTEXT_TARGET="$H/control-looking-hunk-crlf.txt"
 printf '%s\n' \
@@ -1113,9 +1216,11 @@ printf -v PATCH '*** Begin Patch\r\n*** Update File: %s\r\n@@\r\n *** Update Fil
   "$H/boards/mine.board.json" \
   "$H/boards/mine.board.json"
 assert_patch_allowed "$PATCH" "$H" "apply_patch CRLF leading-space hunk controls stay data"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch CRLF leading-space hunk controls stay data"
-assert_contains "$(< "$HUNK_CRLF_CONTEXT_TARGET")" 'after-crlf' "apply_patch CRLF hunk controls -> real update effect"
-assert_eq "$BOARD_BEFORE" "$(< "$H/boards/mine.board.json")" "apply_patch CRLF hunk controls -> board unchanged"
+if require_apply_patch "apply_patch CRLF leading-space hunk controls stay data"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch CRLF leading-space hunk controls stay data"
+  assert_contains "$(< "$HUNK_CRLF_CONTEXT_TARGET")" 'after-crlf' "apply_patch CRLF hunk controls -> real update effect"
+  assert_eq "$BOARD_BEFORE" "$(< "$H/boards/mine.board.json")" "apply_patch CRLF hunk controls -> board unchanged"
+fi
 
 HUNK_NEL_MOVE_TARGET="$H/control-looking-hunk-nel.txt"
 printf '%s\n' \
@@ -1125,23 +1230,29 @@ BOARD_BEFORE="$(< "$H/boards/mine.board.json")"
 printf -v PATCH '*** Begin Patch\n*** Update File: %s\n@@\n %s*** Move to: %s\n-before\n+after-nel\n*** End Patch' \
   "$HUNK_NEL_MOVE_TARGET" "$NEL" "$H/boards/mine.board.json"
 assert_patch_allowed "$PATCH" "$H" "apply_patch NEL-leading Move text with hunk prefix stays data"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch NEL-leading Move text with hunk prefix stays data"
-assert_contains "$(< "$HUNK_NEL_MOVE_TARGET")" 'after-nel' "apply_patch NEL Move hunk data -> real update effect"
-assert_eq "$BOARD_BEFORE" "$(< "$H/boards/mine.board.json")" "apply_patch NEL Move hunk data -> board unchanged"
+if require_apply_patch "apply_patch NEL-leading Move text with hunk prefix stays data"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch NEL-leading Move text with hunk prefix stays data"
+  assert_contains "$(< "$HUNK_NEL_MOVE_TARGET")" 'after-nel' "apply_patch NEL Move hunk data -> real update effect"
+  assert_eq "$BOARD_BEFORE" "$(< "$H/boards/mine.board.json")" "apply_patch NEL Move hunk data -> board unchanged"
+fi
 
 HUNK_EMBEDDED_CR_TARGET="$H/hunk-embedded-cr.txt"
 printf '%s\n' 'before' > "$HUNK_EMBEDDED_CR_TARGET"
 printf -v PATCH '*** Begin Patch\n*** Update File: %s\n@@\n-before\n+al\rpha\n*** End Patch' "$HUNK_EMBEDDED_CR_TARGET"
 assert_patch_allowed "$PATCH" "$H" "apply_patch embedded hunk CR non-board target"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch embedded hunk CR non-board target"
-assert_contains "$(< "$HUNK_EMBEDDED_CR_TARGET")" $'al\rpha' "apply_patch embedded hunk CR -> real update effect"
+if require_apply_patch "apply_patch embedded hunk CR non-board target"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch embedded hunk CR non-board target"
+  assert_contains "$(< "$HUNK_EMBEDDED_CR_TARGET")" $'al\rpha' "apply_patch embedded hunk CR -> real update effect"
+fi
 
 HUNK_EMBEDDED_CR_BOARD="$H/boards/hunk-embedded-cr.board.json"
 printf '%s\n' 'before' > "$HUNK_EMBEDDED_CR_BOARD"
 printf -v PATCH '*** Begin Patch\n*** Update File: %s\n@@\n-before\n+al\rpha\n*** End Patch' "$HUNK_EMBEDDED_CR_BOARD"
 assert_patch_blocked "$PATCH" "$H" "apply_patch embedded hunk CR board target"
-assert_real_patch_applied "$PATCH" "$H" "apply_patch embedded hunk CR board target"
-assert_contains "$(< "$HUNK_EMBEDDED_CR_BOARD")" $'al\rpha' "apply_patch embedded hunk CR board -> real update effect"
+if require_apply_patch "apply_patch embedded hunk CR board target"; then
+  assert_real_patch_applied "$PATCH" "$H" "apply_patch embedded hunk CR board target"
+  assert_contains "$(< "$HUNK_EMBEDDED_CR_BOARD")" $'al\rpha' "apply_patch embedded hunk CR board -> real update effect"
+fi
 
 # Real-parser parity fixture for the current Codex control preamble. The installed parser accepts one
 # non-empty Environment ID only between Begin Patch and the first file header. Every accepted
