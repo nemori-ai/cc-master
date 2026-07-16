@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
@@ -429,6 +437,60 @@ test('agent-visible context emits bounded shadow-only delivery without route ref
     ],
   );
   assert.deepEqual(treeState(f.root), before);
+});
+
+test('agent-visible context includes the same cached machine quota projection without live effects', () => {
+  const f = fixture();
+  const home = join(f.root, '.cc_master');
+  const projectionPath = join(home, 'quota', 'v1', 'machine-wide', 'projection.json');
+  mkdirSync(join(home, 'quota', 'v1', 'machine-wide'), { recursive: true });
+  writeFileSync(
+    projectionPath,
+    `${JSON.stringify({
+      schema: 'ccm/machine-quota-projection/v1',
+      home_salt: 'owner-only-test-home-salt',
+      decisions: [],
+    })}\n`,
+  );
+  const before = treeState(f.root);
+  const result = call(
+    [
+      'orchestrator',
+      'context',
+      '--cached-only',
+      '--agent-visible',
+      '--snapshot',
+      `@${f.snapshot}`,
+      '--as-of',
+      AS_OF,
+      '--harness',
+      'codex',
+      '--board',
+      f.board,
+      '--json',
+    ],
+    { env: { CC_MASTER_NO_AUTOINSTALL: '1', CC_MASTER_HOME: home } },
+  );
+  assert.equal(result.code, 0, result.err.join('\n'));
+  const delivery = JSON.parse(result.out.join('')).data;
+  const payload = JSON.parse(
+    delivery.content
+      .replace(/^<ambient source="orchestrator-context">/, '')
+      .replace(/<\/ambient>$/, ''),
+  );
+  assert.equal(payload.machine_quota.schema, 'ccm/machine-quota-summary/v1');
+  assert.ok(payload.machine_quota.decisions.length > 0);
+  assert.ok(
+    payload.machine_quota.decisions.every(
+      (decision: Record<string, unknown>) => !('posture' in decision),
+    ),
+  );
+  assert.equal(payload.truncation.omitted_quota_scopes >= 0, true);
+  assert.deepEqual(
+    treeState(f.root),
+    before,
+    'cached quota context cannot mutate cache or board state',
+  );
 });
 
 test('cached-only context reports origin-stay only after an earlier CLI rejection', () => {

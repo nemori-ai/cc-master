@@ -30,6 +30,11 @@ import {
 import { resolveDeliveryFacts } from '../delivery-proof.js';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
+import type {
+  MachineQuotaCollectorBoundary,
+  MachineQuotaCoordinationBoundary,
+} from '../machine-wide-quota.js';
+import type { MachineWideQuotaNotificationBoundary } from '../machine-wide-quota-notification.js';
 import type { ProviderRuntime } from '../provider-runtime.js';
 import type { OptionSpec, VerbSpec } from '../registry.js';
 
@@ -179,6 +184,9 @@ export interface Ctx {
   // handler; tests use this seam without signaling the test runner process.
   workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
+  machineQuotaCollectors?: MachineQuotaCollectorBoundary;
+  machineQuotaCoordination?: MachineQuotaCoordinationBoundary;
+  machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
   writeFileAtomicSync?: typeof io.writeFileAtomicSync;

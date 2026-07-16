@@ -3,9 +3,11 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
   adviseShadowRoute,
+  attachMachineQuotaSummary,
   buildCachedOrchestratorContext,
   buildOriginContextContent,
   validateMachineContextCache,
+  validateMachineQuotaSummary,
 } from '../dist/index.mjs';
 
 const AS_OF = '2026-07-13T03:05:00Z';
@@ -1322,4 +1324,58 @@ test('public context is deterministically bounded to 4096 bytes with explicit tr
   assert.equal(first.revisions.machine, 'machine-r17');
   assert.equal(first.freshness.state, 'fresh');
   assert.equal(first.candidates[0]?.availability, 'available');
+});
+
+function machineQuotaSummary(count = 1): Record<string, unknown> {
+  const decisions = Array.from({ length: count }, (_, index) => {
+    const hex = index.toString(16).padStart(64, '0');
+    const digest = `sha256:${hex}`;
+    return {
+      scope_digest: digest,
+      target: {
+        harness_id: 'codex',
+        surface_id: `codex-cli-${index}`,
+        provider_id: 'codex',
+        window: { kind: 'rolling', name: 'seven_day', duration_sec: 604800 },
+      },
+      quota_scope_digest: digest,
+      state: 'healthy',
+      freshness: 'fresh',
+      reason_codes: [],
+      source: {
+        collector_id: 'codex-app-server',
+        source_schema: 'codex/account-rate-limits/v1',
+        auth_source: 'codex-cli-current-login',
+      },
+      decision_revision: digest,
+      observation_revision: digest,
+      fanout_covered: true,
+    };
+  });
+  return { schema: 'ccm/machine-quota-summary/v1', decisions };
+}
+
+test('machine quota summary is exact, agent-safe, optional, and bounded by ccm', () => {
+  const base = context([fact('codex-native', 'host-native')]);
+  const attached = attachMachineQuotaSummary(base, machineQuotaSummary());
+  assert.equal(attached.machine_quota?.decisions.length, 1);
+  assert.equal(attached.truncation.omitted_quota_scopes, 0);
+  assert.deepEqual(validateMachineQuotaSummary(attached.machine_quota), []);
+
+  const unsafe = machineQuotaSummary();
+  (unsafe.decisions as Array<Record<string, unknown>>)[0]!.identity_fingerprint = 'private';
+  assert.throws(() => attachMachineQuotaSummary(base, unsafe), /unknown|missing|machine quota/i);
+
+  const bounded = attachMachineQuotaSummary(base, machineQuotaSummary(20));
+  assert.ok(Buffer.byteLength(JSON.stringify(bounded), 'utf8') <= 4096);
+  assert.ok(bounded.truncation.omitted_quota_scopes > 0);
+  const origin = buildOriginContextContent({
+    board: activatedBoard([]),
+    context: bounded,
+    originHarness: 'codex',
+    boardRevision: 'board-r8',
+    asOf: AS_OF,
+  });
+  assert.ok(origin.content_bytes <= 4096);
+  assert.doesNotMatch(origin.content, /identity_fingerprint|posture/);
 });

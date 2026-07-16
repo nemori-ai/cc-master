@@ -6,6 +6,7 @@
 import { createHash } from 'node:crypto';
 import {
   adviseShadowRoute,
+  attachMachineQuotaSummary,
   buildCachedOrchestratorContext,
   buildOriginContextContent,
   canonicalJson,
@@ -15,6 +16,7 @@ import {
 } from '@ccm/engine';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
+import { readMachineWideQuotaContextSummaryCached } from '../machine-wide-quota.js';
 import type { BoardArg, Ctx } from './_common.js';
 
 const EXIT = io.EXIT;
@@ -47,6 +49,7 @@ export interface ShadowRoutingBoundary {
   writeAttempt: (...args: unknown[]) => never;
   writeBoard: (...args: unknown[]) => never;
   writeFile: (...args: unknown[]) => never;
+  readMachineQuotaSummary?: (ctx: Ctx) => unknown;
 }
 
 function forbiddenEffect(kind: string): (...args: unknown[]) => never {
@@ -72,6 +75,13 @@ const DEFAULT_BOUNDARY: ShadowRoutingBoundary = {
   writeAttempt: forbiddenEffect('attempt write'),
   writeBoard: forbiddenEffect('board write'),
   writeFile: forbiddenEffect('filesystem write'),
+  readMachineQuotaSummary: (ctx) => {
+    const home = discover.resolveHome({
+      homeFlag: ctx.values.home as string,
+      env: ctx.env,
+    });
+    return readMachineWideQuotaContextSummaryCached(home);
+  },
 };
 
 function error(kind: 'Usage' | 'Validation' | 'NotFound', message: string): KindedError {
@@ -132,6 +142,7 @@ function unavailableContext(
       omitted_candidates: 0,
       omitted_warnings: 0,
       shortened_fields: 0,
+      omitted_quota_scopes: 0,
       max_bytes: ORCHESTRATOR_CONTEXT_MAX_BYTES,
     },
   };
@@ -196,6 +207,14 @@ function contextWithBoundary(ctx: Ctx, boundary: ShadowRoutingBoundary): number 
             asOf,
             'machine-context-cache-corrupt',
           );
+        }
+      }
+      if (boundary.readMachineQuotaSummary) {
+        try {
+          const summary = boundary.readMachineQuotaSummary(ctx);
+          if (summary !== undefined) context = attachMachineQuotaSummary(context, summary);
+        } catch {
+          // Optional cached quota context is fail-open and never triggers a live fallback.
         }
       }
       if (ctx.values['agent-visible'] !== true) return context;

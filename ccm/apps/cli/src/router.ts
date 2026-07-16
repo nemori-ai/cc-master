@@ -64,9 +64,16 @@ import * as usageHandler from './handlers/usage.js';
 import * as watchdogHandler from './handlers/watchdog.js';
 import * as webViewerHandler from './handlers/web-viewer.js';
 import * as workerHandler from './handlers/worker.js';
-import { harnessSessionId } from './harnesses/registry.js';
+import { harnessSessionId, knownHarnessAdapters } from './harnesses/registry.js';
+import type { CurrentUsageReading } from './harnesses/types.js';
 import * as help from './help.js';
 import * as io from './io.js';
+import type {
+  MachineQuotaCollection,
+  MachineQuotaCollectorBoundary,
+  MachineQuotaCoordinationBoundary,
+} from './machine-wide-quota.js';
+import type { MachineWideQuotaNotificationBoundary } from './machine-wide-quota-notification.js';
 import { createDefaultProviderRuntime, type ProviderRuntime } from './provider-runtime.js';
 import {
   ALIASES,
@@ -80,6 +87,52 @@ import {
 import * as suggest from './suggest.js';
 
 const EXIT = io.EXIT;
+
+const DEFAULT_MACHINE_QUOTA_COLLECTORS: MachineQuotaCollectorBoundary = {
+  collect(target, env): MachineQuotaCollection {
+    const harness = target.default_collector_harness;
+    if (typeof harness !== 'string' || harness.length === 0) {
+      return { status: 'unsupported', reason: 'surface-owned quota collector is unavailable' };
+    }
+    const adapter = knownHarnessAdapters().find((candidate) => candidate.id === harness);
+    if (!adapter) {
+      return { status: 'unknown', reason: 'harness is not installed' };
+    }
+    const installation = adapter.inspectInstallation(env);
+    const requestedSurface = String(target.surface_id ?? '');
+    const surfaceInstalled = installation.surfaces.some(
+      (surface) =>
+        surface.installed &&
+        (surface.id === requestedSurface ||
+          (requestedSurface === 'cursor-agent-cli' && surface.id === 'cursor-agent')),
+    );
+    if (!installation.installed && !surfaceInstalled) {
+      return { status: 'unknown', reason: 'harness surface is not installed' };
+    }
+    try {
+      const reading: CurrentUsageReading = adapter.readCurrentUsageForSurface
+        ? adapter.readCurrentUsageForSurface(requestedSurface, env)
+        : adapter.readCurrentUsage(env);
+      return reading.signal
+        ? {
+            status: 'refreshed',
+            signal: reading.signal,
+            source: reading.source,
+            authority: reading.authority,
+            authSource: reading.authSource,
+            quotaScopeFingerprint: reading.quotaScopeFingerprint,
+          }
+        : {
+            status: 'unknown',
+            signal: reading.signal,
+            source: reading.source,
+            reason: reading.unavailableReason,
+          };
+    } catch (error) {
+      return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
+    }
+  },
+};
 
 // 带 .errKind / .kind 的 Error（router 据此映射退出码）。
 interface KindedError extends Error {
@@ -99,6 +152,9 @@ interface RunOpts {
   providerRuntime?: ProviderRuntime;
   workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
+  machineQuotaCollectors?: MachineQuotaCollectorBoundary;
+  machineQuotaCoordination?: MachineQuotaCoordinationBoundary;
+  machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
   writeFileAtomicSync?: typeof io.writeFileAtomicSync;
@@ -550,6 +606,18 @@ export function runWithComposition(
     providerRuntime: opts.providerRuntime || createDefaultProviderRuntime(env),
     workerSignal: opts.workerSignal,
     quotaEffects: opts.quotaEffects,
+    machineQuotaCollectors: opts.machineQuotaCollectors ?? DEFAULT_MACHINE_QUOTA_COLLECTORS,
+    machineQuotaCoordination: opts.machineQuotaCoordination ?? {
+      listSubscriptions: (home) => coordinationHandler.listCurrentCoordinationSubscriptions(home),
+      deliverNotification: (home, destination, notification, now) =>
+        coordinationHandler.deliverCoordinationNotification(
+          home,
+          destination as coordinationHandler.CoordinationNotificationDestination,
+          notification as Parameters<typeof coordinationHandler.deliverCoordinationNotification>[2],
+          now,
+        ),
+    },
+    machineWideQuotaNotifications: opts.machineWideQuotaNotifications,
     nativeAttemptPrivateEvidence: opts.nativeAttemptPrivateEvidence,
     nativeAttemptAdmission: opts.nativeAttemptAdmission,
     writeFileAtomicSync: opts.writeFileAtomicSync,
@@ -606,6 +674,9 @@ function buildCtx({
   providerRuntime,
   workerSignal,
   quotaEffects,
+  machineQuotaCollectors,
+  machineQuotaCoordination,
+  machineWideQuotaNotifications,
   nativeAttemptPrivateEvidence,
   nativeAttemptAdmission,
   writeFileAtomicSync,
@@ -620,6 +691,9 @@ function buildCtx({
   providerRuntime?: ProviderRuntime;
   workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
+  machineQuotaCollectors?: MachineQuotaCollectorBoundary;
+  machineQuotaCoordination?: MachineQuotaCoordinationBoundary;
+  machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
   writeFileAtomicSync?: typeof io.writeFileAtomicSync;
@@ -653,6 +727,9 @@ function buildCtx({
     providerRuntime,
     workerSignal,
     quotaEffects,
+    machineQuotaCollectors,
+    machineQuotaCoordination,
+    machineWideQuotaNotifications,
     nativeAttemptPrivateEvidence,
     nativeAttemptAdmission,
     writeFileAtomicSync,
