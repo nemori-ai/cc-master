@@ -93,11 +93,14 @@ export function AgentRoster({ viewModel, selectedAgentId, onSelectAgent }: Agent
                 />
                 <span className="ac-state-text">{agentStateText(agent.state)}</span>
               </span>
-              <span className="ac-id">
+              <span className="ac-id" title={`${agent.id} · ${agent.type ?? 'unknown'}`}>
                 <span className="ac-id-code mono">{agent.id}</span>
                 <span className="ac-type">{agent.type ?? 'unknown'}</span>
               </span>
-              <span className="ac-harness">
+              <span
+                className="ac-harness"
+                title={`${harnessBadge(agent.harness)}${agent.model ? ` · ${agent.model}` : ''}`}
+              >
                 <span className="harness-badge">{harnessBadge(agent.harness)}</span>
                 <span className="ac-model mono">{agent.model ?? '—'}</span>
               </span>
