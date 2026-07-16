@@ -18,7 +18,7 @@
             "references/handoff.md": "253b1227fec8ae9306c236db594052785bf374fab7a0401d972ecaace1dc5c39",
             "references/model-allocation.md": "57c59f86b137bcca50aa8f9dc10e56f097052d86afe467e2bfe33a681fefddbc",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
-            "references/outside-in.md": "f85eba56f0cec48645e4a1d0ee98589d929e8602c322dd891a0c011e948c9277",
+            "references/outside-in.md": "02031c9ffe6b741659bcc2ceeb5e32404d43d0c75c906803b32275aea2e64e62",
             "references/resume-verify.md": "1221622b78b8edac6f339d11787152a3a19fe5cc1852d2aeff0bc3b168287e0c",
             "scripts/codex-review.sh": "282c59a181bab3c53a97886c77bd6efe5e54ea00daf63e019c8a4962bcaf1948"
           }
@@ -59,7 +59,7 @@
             "references/goal-contract.md": "95f8e8344e03e1271403191f09163784420108780bc18149d6ad4f78f86d5d19",
             "references/model-allocation.md": "57c59f86b137bcca50aa8f9dc10e56f097052d86afe467e2bfe33a681fefddbc",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
-            "references/outside-in.md": "f85eba56f0cec48645e4a1d0ee98589d929e8602c322dd891a0c011e948c9277",
+            "references/outside-in.md": "02031c9ffe6b741659bcc2ceeb5e32404d43d0c75c906803b32275aea2e64e62",
             "references/resume-verify.md": "bf5e83a5989381ef0b09311919ee990c57f60c5caf0641c3ec9a2c6523e49ad6"
           }
         },
@@ -98,7 +98,7 @@
             "references/goal-contract.md": "95f8e8344e03e1271403191f09163784420108780bc18149d6ad4f78f86d5d19",
             "references/model-allocation.md": "57c59f86b137bcca50aa8f9dc10e56f097052d86afe467e2bfe33a681fefddbc",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
-            "references/outside-in.md": "f85eba56f0cec48645e4a1d0ee98589d929e8602c322dd891a0c011e948c9277",
+            "references/outside-in.md": "02031c9ffe6b741659bcc2ceeb5e32404d43d0c75c906803b32275aea2e64e62",
             "references/resume-verify.md": "ce973d2d0bc1c6906a03ba454636a16fe3399459929f79d3435a2a358aa66d4a"
           }
         },

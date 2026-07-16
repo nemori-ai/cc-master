@@ -25,12 +25,12 @@
 | 证据级 | 是什么 | 怎么落 board |
 |---|---|---|
 | **已知事实** | 仓库 / 运行时 / 权威源可复核 | `ccm log add "<事实>" --kind finding --detail "<来源>"`，需要时 `--ref code:/abs` |
-| **agent 推断** | 你或 subagent 推理得出、无外部接地——**危险级** | 承重的记一条 `ccm jc add … --category architecture/drift --severity <按风险>`（落 `pending_review`）；非承重的至多 `ccm log add … --kind note` |
-| **待验证假设** | 明知是猜、待测 | 一条 `pending_review` 的 jc **＋一个真实校准节点**（`ccm task add`「用 X 手段验假设 Y」，靠 deps 自动门控） |
-| **用户决策** | 只有用户能拍 | `ccm task block --on user --decision @file` 带一份采访包（见 `references/async-hitl.md`） |
-| **外部证据** | 已对现实校准 | `ccm log add … --kind finding --ref web:/issue:/doc:`；若它落定一条 jc → `ccm jc resolve <J> --status upheld`（证实）/ `overturned`（证伪） |
+| **agent 推断** | 你或 subagent 推理得出、无外部接地——**危险级** | 先 `ccm log add "<推断内容>·无外部接地" --kind note` 记下这个推断本身；只有当你**决定基于它推进**——这是一个你已做的判断，不是待验证队列——才追加 `ccm jc add "决定基于假设 X 推进 Y" --category <architecture\|drift\|spec-impl-misalignment\|other 按内容择一；单选枚举，不可斜杠组合> --severity <按风险>`（落 `pending_review`） |
+| **待验证假设** | 明知是猜、待测，**尚未决定要不要基于它行动** | `ccm log add "假设 X 未验证" --kind note` ＋ 一个真实校准节点（`ccm task add <id> --title "用 X 手段验假设 Y"`，靠 deps 自动门控）——**不占用 jc**：jc 只留给「已做判断」，见上一行 |
+| **用户决策** | 只有用户能拍 | `ccm task block <id> --on user --decision @file` 带一份采访包（见 `references/async-hitl.md`） |
+| **外部证据** | 已对现实校准 | `ccm log add … --kind finding --ref web:/issue:/doc:`；若它证实或证伪了一条**已做判断**的 jc → `ccm jc resolve <J> --status upheld`（证实）/ `overturned`（证伪） |
 
-jc 的 `pending_review → upheld / overturned` 生命周期*就是*「假设已验 / 被推翻」的天然载体：一个你据以行动的未验证假设 = 一条 `pending_review` 的 jc；外部证据证实它 → `upheld`，证伪它 → `overturned`（并按组件 E 判是否触发 amendment）。这些字段持久、扛 compaction——把关键证据、未决假设、下一验证点留在这里，compaction 后新一轮的你（或接手的 session）读 board 就能继续对齐。
+**jc 只记「已做判断」，不记「待验证假设」本身**——这是与「自驱决策记录不是待办队列」这条既有纪律保持一致的关键分界：一个假设本身待验证时，落点是 `log add`（note/finding）+ 一个真实校准 task；只有当你已经**决定**基于这个假设推进（哪怕假设还没验证），那个「决定推进」的判断才落一条 `pending_review` 的 jc——它的 `pending_review → upheld / overturned` 生命周期追踪的是**这个决定事后被证实还是被证伪**，不是假设本身的待办占位。外部证据证实决定所依赖的假设 → `upheld`，证伪它 → `overturned`（并按组件 E 判是否触发 amendment）。log / task / jc 三者都持久、扛 compaction——把关键证据、未决假设、下一验证点、以及已做判断留在这里，compaction 后新一轮的你（或接手的 session）读 board 就能继续对齐。
 
 **绝不为此新增 `board.assumptions` 之类顶层字段**——`log` + `jc` + `references` 已足够，新增字段是 scope creep、还会逼近 hook 依赖的窄腰。字段怎么填、会撞哪条校验规则，见 `using-ccm`。
 
@@ -59,9 +59,9 @@ jc 的 `pending_review → upheld / overturned` 生命周期*就是*「假设已
 
 无通道时有两个反面要一起堵：编造信心（「应该没问题吧」）和永久停摆（干等到用户上线）。协议五步：
 
-1. **诚实记未知**——`ccm jc add …`（`pending_review`）+ `ccm log add "假设 X 未验证·当前无外部通道" --kind finding`。
+1. **诚实记未知**——`ccm log add "假设 X 未验证·当前无外部通道" --kind finding` 记下这个假设本身；你**决定**在无通道时仍可逆推进（见下两步），这个决定才追加一条 `ccm jc add "决定在假设 X 未验证时可逆推进" --category drift --severity <按风险>`（`pending_review`）——jc 记的是这个决定，不是假设本身。
 2. **设计一个可逆、有限范围的实验**——小 blast radius、廉价接触现实：保留可回退层 + 加一个开关，或切一薄片对真实端点发一个探测请求看响应，而不是把整个东西不可逆地建在假设上。
-3. **可逆地推进**，把「上线 / 扩大前必须验 X」记成一个待验证节点。
+3. **可逆地推进**，把「上线 / 扩大前必须验 X」记成一个真实校准节点（`ccm task add <id> --title "验证假设 X"`，靠 deps 自动门控），不是一句空话。
 4. **绝不**编造证据 / 声称已验。
 5. **绝不**无限阻塞整块 board——只有真卡在这个未知上的那条 path 才等，其余独立就绪工作照常派。
 
@@ -69,7 +69,7 @@ jc 的 `pending_review → upheld / overturned` 生命周期*就是*「假设已
 
 ## 组件 E — 外部证据改了 goal 语义 → 走 amendment（不静默漂移）
 
-外部证据推翻的假设，若改变 outcome / scope / acceptance / 关键约束 / 权限边界，就是一次**目标语义变更**：过 `references/goal-contract.md` 的 Delta Classifier 判 `amendment`，走它的 amendment 流程（revision +1、逐个重跑受影响节点的 Trace Test、surface 用户确认），并把那条假设的 jc `resolve` 成 `overturned`。
+外部证据推翻的假设，若改变 outcome / scope / acceptance / 关键约束 / 权限边界，就是一次**目标语义变更**：过 `references/goal-contract.md` 的 Delta Classifier 判 `amendment`，走它的 amendment 流程（revision +1、逐个重跑受影响节点的 Trace Test、surface 用户确认）；若此前为「决定基于它推进」记过一条 jc，一并 `resolve` 成 `overturned`——若只是一条待验证假设（log note + 校准 task，未曾决定推进），直接收尾那条校准 task 并 `log add` 记下证伪结果即可，无需 jc。
 
 **绝不**静默把下游实现细节改成新方向、当作没事发生——那正是要防的 scope 漂移。若外部证据只是实现细节的细化、不改 acceptance，那是 `in-scope`，`ccm log add … --kind finding` 记事实即可。
 
