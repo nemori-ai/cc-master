@@ -27,10 +27,16 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-function fakeStore(): MachineQuotaStore & { observations: Map<string, Data>; projection?: Data } {
+function fakeStore(): MachineQuotaStore & {
+  observations: Map<string, Data>;
+  aggregations: Map<string, Data>;
+  projection?: Data;
+} {
   const observations = new Map<string, Data>();
+  const aggregations = new Map<string, Data>();
   return {
     observations,
+    aggregations,
     async readObservation(sourceKey) {
       return observations.get(sourceKey);
     },
@@ -45,6 +51,16 @@ function fakeStore(): MachineQuotaStore & { observations: Map<string, Data>; pro
     async publishMachineProjection(projection) {
       this.projection = structuredClone(projection);
       return this.projection;
+    },
+    async readAggregation(aggregationKey) {
+      return (
+        aggregations.get(aggregationKey) ?? {
+          schema: 'ccm/quota-reservation-snapshot/v1',
+          aggregation_key: aggregationKey,
+          active_reserved_pct: 0,
+          reservations: [],
+        }
+      );
     },
   };
 }
@@ -94,12 +110,43 @@ function setupSubscription(input: { brokenBoard?: boolean } = {}): {
   return { home, boardPath };
 }
 
+function authorityFor(
+  target: Readonly<Data>,
+  overrides: {
+    identity?: string;
+    ceiling?: number;
+    margin?: number;
+  } = {},
+): Data {
+  const identity = overrides.identity ?? `${target.provider_id}-identity-a`;
+  const ceiling = overrides.ceiling ?? (target.provider_id === 'anthropic' ? 90 : 85);
+  const margin = overrides.margin ?? (target.provider_id === 'anthropic' ? 10 : 5);
+  return {
+    schema: 'ccm/machine-quota-collector-authority/v1',
+    account_key: `${target.provider_id}-account-${identity}`,
+    identity_fingerprint: identity,
+    payer_scope: 'subscription',
+    pool_id: `${target.provider_id}-pool-shared`,
+    aggregation_key: `${target.provider_id}|${identity}|pool-shared|${target.window_name}`,
+    policy: {
+      revision: `policy:${target.surface_id}:${target.window_name}:v1`,
+      hard_ceiling_used_pct: ceiling,
+    },
+    requirement: {
+      revision: `requirement:${target.surface_id}:${target.window_name}:v1`,
+      required_bucket_ids: [target.bucket_id],
+      safety_margin: { [target.bucket_id]: margin },
+    },
+  };
+}
+
 function collectionFor(target: Readonly<Data>): MachineQuotaCollection {
   const common = { captured_at: NOW.getTime() / 1000 };
   if (target.surface_id === 'codex-cli') {
     return {
       status: 'refreshed',
       source: 'fake-codex',
+      authority: authorityFor(target),
       signal: {
         ...common,
         five_hour: { used_percentage: 100, resets_at: RESET },
@@ -111,6 +158,7 @@ function collectionFor(target: Readonly<Data>): MachineQuotaCollection {
     return {
       status: 'refreshed',
       source: 'fake-claude',
+      authority: authorityFor(target),
       signal: {
         ...common,
         five_hour: { used_percentage: 40, resets_at: RESET },
@@ -122,6 +170,7 @@ function collectionFor(target: Readonly<Data>): MachineQuotaCollection {
     return {
       status: 'refreshed',
       source: 'fake-cursor-ide',
+      authority: authorityFor(target),
       signal: {
         ...common,
         billing_period: { used_percentage: 86, resets_at: RESET },
@@ -221,6 +270,119 @@ test('Codex five-hour-only changes do not change the decision revision or emit a
   );
   assert.equal(after.decision_revision, before.decision_revision);
   assert.equal(refreshed.deltas.length, 0);
+});
+
+test('production composition consumes store reservation plus policy/requirement authority', async () => {
+  const { home } = setupSubscription();
+  const store = fakeStore();
+  let codexAggregation = '';
+  const authorityCollector: MachineQuotaCollectorBoundary = {
+    collect(target) {
+      const result = collectionFor(target);
+      if (target.surface_id !== 'codex-cli') return result;
+      const authority = authorityFor(target, { ceiling: 90, margin: 2 });
+      codexAggregation = authority.aggregation_key;
+      return {
+        ...result,
+        authority,
+        signal: {
+          captured_at: NOW.getTime() / 1000,
+          five_hour: { used_percentage: 100, resets_at: RESET - 10_000 },
+          seven_day: { used_percentage: 79, resets_at: RESET },
+        },
+      };
+    },
+  };
+
+  await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors: authorityCollector,
+    coordination,
+    now: NOW,
+  });
+  const before = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.find(
+    (decision: Data) => decision.target.surface_id === 'codex-cli',
+  );
+  assert.equal(before.state, 'healthy');
+
+  store.aggregations.set(codexAggregation, {
+    schema: 'ccm/quota-reservation-snapshot/v1',
+    aggregation_key: codexAggregation,
+    active_reserved_pct: 10,
+    reservations: [{ state: 'held', amount_pct: 10, aggregation_key: codexAggregation }],
+  });
+  const after = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.find(
+    (decision: Data) => decision.target.surface_id === 'codex-cli',
+  );
+  assert.equal(after.state, 'tight', 'active reservation must reduce ambient headroom');
+  assert.notEqual(after.decision_revision, before.decision_revision);
+});
+
+test('same surface identity swap creates a new production scope', async () => {
+  const { home } = setupSubscription();
+  const store = fakeStore();
+  let identity = 'codex-identity-a';
+  const identityCollector: MachineQuotaCollectorBoundary = {
+    collect(target) {
+      const result = collectionFor(target);
+      return target.surface_id === 'codex-cli'
+        ? { ...result, authority: authorityFor(target, { identity }) }
+        : result;
+    },
+  };
+  await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors: identityCollector,
+    coordination,
+    now: NOW,
+  });
+  const before = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.find(
+    (decision: Data) => decision.target.surface_id === 'codex-cli',
+  );
+
+  identity = 'codex-identity-b';
+  await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors: identityCollector,
+    coordination,
+    now: NOW,
+  });
+  const after = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.find(
+    (decision: Data) => decision.target.surface_id === 'codex-cli',
+  );
+  assert.notEqual(after.target.identity_scope_digest, before.target.identity_scope_digest);
+  assert.notEqual(after.scope_digest, before.scope_digest);
+});
+
+test('refreshed usage without authenticated identity authority fails closed', async () => {
+  const { home } = setupSubscription();
+  const store = fakeStore();
+  const identityBlind: MachineQuotaCollectorBoundary = {
+    collect(target) {
+      const result = collectionFor(target) as MachineQuotaCollection & { authority?: Data };
+      if (target.surface_id === 'codex-cli') delete result.authority;
+      return result;
+    },
+  };
+  await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors: identityBlind,
+    coordination,
+    now: NOW,
+  });
+  const decision = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.find(
+    (candidate: Data) => candidate.target.surface_id === 'codex-cli',
+  );
+  assert.equal(decision.state, 'unknown');
+  assert.match(decision.reason_codes.join(','), /IDENTITY|AUTHORITY|UNKNOWN/);
 });
 
 test('a current destination write failure prevents checkpoint advance for crash-safe replay', async () => {
