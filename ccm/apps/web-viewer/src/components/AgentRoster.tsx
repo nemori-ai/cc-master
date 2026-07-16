@@ -1,8 +1,8 @@
 import {
-  AGENT_STATE_ORDER,
   agentElapsed,
   agentIsActive,
   agentStateLamp,
+  agentStateRank,
   agentStateText,
   harnessBadge,
   probeLamp,
@@ -15,11 +15,6 @@ interface AgentRosterProps {
   viewModel: ViewModelPayload;
   selectedAgentId: string | null;
   onSelectAgent: (agentId: string) => void;
-}
-
-function stateRank(state: string | undefined): number {
-  const index = AGENT_STATE_ORDER.indexOf(state ?? '');
-  return index === -1 ? AGENT_STATE_ORDER.length : index;
 }
 
 /**
@@ -46,7 +41,7 @@ export function AgentRoster({ viewModel, selectedAgentId, onSelectAgent }: Agent
   }
 
   const sorted = [...agents].sort((a, b) => {
-    const byState = stateRank(a.state) - stateRank(b.state);
+    const byState = agentStateRank(a.state) - agentStateRank(b.state);
     return byState !== 0 ? byState : a.id.localeCompare(b.id);
   });
 

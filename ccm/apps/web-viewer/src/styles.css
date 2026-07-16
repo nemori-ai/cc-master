@@ -1771,6 +1771,76 @@ header.missionline {
   letter-spacing: 0.02em;
 }
 
+/* Agent chips on the node face — "who is ON this node" realtime row. Single fixed-height
+   line (overflow hidden; the render folds extras into "+N") so tile height stays bounded. */
+.cc-node .agentrow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  height: 18px;
+  overflow: hidden;
+}
+.cc-node .agentchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--chip-bg);
+  color: var(--ink-dim);
+  border: 1px solid var(--hair-soft);
+  cursor: pointer;
+}
+.cc-node .agentchip:hover {
+  color: var(--ink);
+  border-color: var(--ready);
+}
+.cc-node .agentchip .alamp,
+.lvrow .lchip.agents .alamp {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: 0 0 4px currentColor;
+}
+.cc-node .agentchip .ae {
+  color: var(--inflight);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+/* orphaned agents are an anomaly that must jump out of the graph */
+.cc-node .agentchip.orphaned {
+  background: oklch(0.62 0.19 25 / 0.14);
+  border-color: oklch(0.62 0.19 25 / 0.5);
+  color: var(--failed);
+}
+.cc-node .agentchip.orphaned:hover {
+  border-color: var(--failed);
+}
+.cc-node .agentmore {
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 8px;
+  color: var(--ink-dim);
+  flex: 0 0 auto;
+}
+.lvrow .lchip.agents {
+  gap: 3px;
+}
+.lvrow .lchip.agents.orphaned {
+  background: oklch(0.62 0.19 25 / 0.14);
+  border-color: oklch(0.62 0.19 25 / 0.5);
+  color: var(--failed);
+}
+.lvrow .lchip.agents.orphaned .cn {
+  color: var(--failed);
+}
+
 /* nesting: owner / child */
 .cc-node.owner {
   border-color: oklch(0.7 0.115 244 / 0.42);

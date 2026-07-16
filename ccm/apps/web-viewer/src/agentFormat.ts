@@ -8,6 +8,17 @@ import type { CompactAgent } from './types';
 // roster sort and the left rail's state buckets.
 export const AGENT_STATE_ORDER = ['running', 'starting', 'uncertain', 'orphaned', 'terminal'];
 
+// Sort key over AGENT_STATE_ORDER (unknown states last) — roster rows and node chips share it.
+export function agentStateRank(state: string | undefined): number {
+  const index = AGENT_STATE_ORDER.indexOf(state ?? '');
+  return index === -1 ? AGENT_STATE_ORDER.length : index;
+}
+
+// Lifecycle states that surface as chips on the task face (DAG node / list row): the
+// realtime "who is working this node" readout. Terminal agents stay off the tile — the
+// task inspector's agents section still lists them.
+export const AGENT_CHIP_STATES = new Set(['running', 'starting', 'uncertain', 'orphaned']);
+
 // Lifecycle state -> a status-lamp CSS var, reusing the board status palette semantics so
 // running reads like in-flight, orphaned like failed, terminal like done, etc.
 export function agentStateLamp(state: string | undefined): string {

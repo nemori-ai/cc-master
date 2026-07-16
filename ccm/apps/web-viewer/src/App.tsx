@@ -724,6 +724,7 @@ export function App() {
               highlightNodeIds={agentHighlightNodeIds}
               locateRequest={locateRequest}
               onResetLayout={resetLayout}
+              onSelectAgent={selectAgentFromClick}
               onSelectTask={selectTaskFromClick}
               onToggleFilter={toggleFilter}
               orientation={orientation}

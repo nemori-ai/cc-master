@@ -666,6 +666,21 @@ const fixtureAgents: CompactAgent[] = [
     probe: { observed: 'gone', as_of: '2026-07-08T08:52:00Z', method: 'session-file-mtime' },
     links: ['fetch-inputs'],
   },
+  {
+    id: 'agt-005',
+    type: 'cli-worker',
+    harness: 'claude-code',
+    model: 'opus-4.8',
+    intent: 'sync deploy secrets into vault',
+    state: 'orphaned',
+    handle_kind: 'session-id',
+    has_attach_cmd: true,
+    has_transcript: false,
+    registered_at: '2026-07-08T09:50:00Z',
+    ended_at: null,
+    probe: { observed: 'gone', as_of: '2026-07-08T11:20:00Z', method: 'session-file-mtime' },
+    links: ['secrets-sync'],
+  },
 ];
 
 const fixtureAgentRefs = new Map<string, string[]>();
@@ -737,10 +752,10 @@ export const fixtureViewModel: ViewModelPayload = {
   board_extras: fixtureBoardExtras,
   agents: fixtureAgents,
   agent_insights: {
-    total: 4,
+    total: 5,
     active: 3,
     running: 2,
-    by_state: { running: 2, uncertain: 1, terminal: 1 },
+    by_state: { running: 2, uncertain: 1, orphaned: 1, terminal: 1 },
     by_harness: { codex: 1, 'claude-code': 1, origin: 1 },
     oldest_in_flight: {
       id: 'agt-001',

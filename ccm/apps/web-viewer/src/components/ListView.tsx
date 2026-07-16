@@ -1,14 +1,15 @@
 import { type CSSProperties, useRef } from 'react';
+import { AGENT_CHIP_STATES, agentStateLamp, agentStateRank, agentStateText } from '../agentFormat';
 import {
+  awaitingIds,
   CONV_MIN,
   IMPACT_HOT,
-  LIST_SECTIONS,
   type LaneKind,
-  awaitingIds,
+  LIST_SECTIONS,
   partitionTasks,
   perNodeStructure,
   tasksOf,
-  useSecondTick
+  useSecondTick,
 } from '../analytics';
 import {
   DONE_STATUSES,
@@ -18,11 +19,11 @@ import {
   startTs,
   statusLampVar,
   statusText,
-  taskDuration
+  taskDuration,
 } from '../format';
 import { type LocateRequest, useLocateTask } from '../locate';
 import { nodeMatchesTaskFilters } from '../taskFilters';
-import type { CompactTask, GraphNode, ViewModelPayload } from '../types';
+import type { CompactAgent, CompactTask, GraphNode, ViewModelPayload } from '../types';
 
 interface ListViewProps {
   viewModel: ViewModelPayload;
@@ -39,6 +40,8 @@ interface ListRowProps {
   kind: LaneKind;
   gate: boolean;
   selected: boolean;
+  /** Active registry agents on this row's node (server join, precomputed by ListView). */
+  agents: CompactAgent[];
   onSelectTask: (taskId: string) => void;
 }
 
@@ -47,7 +50,7 @@ function msFromDispatch(task: CompactTask): number | null {
   return ts != null ? Date.now() - ts : null;
 }
 
-function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRowProps) {
+function ListRow({ task, viewModel, kind, gate, selected, agents, onSelectTask }: ListRowProps) {
   const status = normalizeStatus(typeof task.status === 'string' ? task.status : '');
   const running = status === 'in_flight' && startTs(task) != null;
   useSecondTick(running);
@@ -69,7 +72,7 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
       <span className="dpart gate" key="g">
         <span className="dk">gate</span>
         {`awaiting your decision${elStr != null ? ` · ${elStr}` : ''}`}
-      </span>
+      </span>,
     );
   }
   if (kind === 'inflight' || running) {
@@ -80,7 +83,7 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
           <span className="dpart clk" key="clk">
             <span className="cglyph">◷</span>
             {`running ${clk}`}
-          </span>
+          </span>,
         );
       }
     }
@@ -88,8 +91,9 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
       parts.push(
         <span className="dpart" key="mech">
           <span className="dk">via</span>
-          {task.mechanism + (typeof task.handle === 'string' && task.handle ? ` · ${task.handle}` : '')}
-        </span>
+          {task.mechanism +
+            (typeof task.handle === 'string' && task.handle ? ` · ${task.handle}` : '')}
+        </span>,
       );
     }
   } else if (kind === 'blocked' && !gate) {
@@ -105,14 +109,14 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
         <span className="dpart bon" key="bon">
           <span className="dk">blocked on</span>
           {String(task.blocked_on)}
-        </span>
+        </span>,
       );
     } else if (showDeps.length) {
       parts.push(
         <span className="dpart bon" key="bon">
           <span className="dk">blocked on</span>
           {showDeps.join(', ')}
-        </span>
+        </span>,
       );
     }
   } else if (kind === 'done') {
@@ -122,7 +126,7 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
         <span className="dpart" key="dur">
           <span className="dk">took</span>
           {durStr}
-        </span>
+        </span>,
       );
     }
     if (task.artifact) {
@@ -130,7 +134,7 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
         <span className="dpart art" key="art">
           <span className="dk">artifact</span>
           {typeof task.artifact === 'string' ? task.artifact : JSON.stringify(task.artifact)}
-        </span>
+        </span>,
       );
     }
   } else if (kind === 'attn') {
@@ -139,7 +143,7 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
       <span className="dpart bon" key="st">
         <span className="dk">status</span>
         {statusText(status) + (elStr != null ? ` · ${elStr}` : '')}
-      </span>
+      </span>,
     );
   }
 
@@ -148,14 +152,14 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
     chips.push(
       <span className="lchip crit" key="cr" title="on the critical path">
         ⟋ crit
-      </span>
+      </span>,
     );
   }
   if (isBneck) {
     chips.push(
       <span className="lchip bneck" key="bn" title="bottleneck — stalling the most work">
         ⚠ bottleneck
-      </span>
+      </span>,
     );
   }
   if (structure.impact > 0) {
@@ -167,14 +171,34 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
       >
         gates
         <span className="cn">{structure.impact}</span>
-      </span>
+      </span>,
     );
   }
   if (structure.inDeg >= CONV_MIN) {
     chips.push(
       <span className="lchip conv" key="cv" title={`convergence — ${structure.inDeg} direct deps`}>
         ⋈<span className="cn">{structure.inDeg}</span>
-      </span>
+      </span>,
+    );
+  }
+  // Mini agent lamp group (display-only — the whole row is one button, so no nested click
+  // target; selecting the row opens the task inspector where each agent is clickable).
+  if (agents.length) {
+    chips.push(
+      <span
+        className={`lchip agents${agents.some((agent) => agent.state === 'orphaned') ? ' orphaned' : ''}`}
+        key="agents"
+        title={agents.map((agent) => `${agent.id} · ${agentStateText(agent.state)}`).join('\n')}
+      >
+        {agents.slice(0, 3).map((agent) => (
+          <span
+            className="alamp"
+            key={agent.id}
+            style={{ background: agentStateLamp(agent.state) }}
+          />
+        ))}
+        <span className="cn">{agents.length}</span>
+      </span>,
     );
   }
   const selectedRoute = task.execution?.route?.selected;
@@ -182,14 +206,14 @@ function ListRow({ task, viewModel, kind, gate, selected, onSelectTask }: ListRo
     chips.push(
       <span className="lchip route" key="route" title={task.execution?.route?.outcome}>
         {selectedRoute.surface_label}
-      </span>
+      </span>,
     );
     if (selectedRoute.model) {
       chips.push(
         <span className="lchip model" key="model">
           {selectedRoute.model}
           {selectedRoute.role_grades.length ? ` · ${selectedRoute.role_grades.join('/')}` : ''}
-        </span>
+        </span>,
       );
     }
   }
@@ -237,12 +261,22 @@ export function ListView({
   onSelectTask,
   locateRequest,
   activeFilters,
-  query
+  query,
 }: ListViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   useLocateTask(containerRef, locateRequest);
   const allTasks = tasksOf(viewModel);
   const nodesById = new Map(viewModel.graph.nodes.map((node) => [node.id, node]));
+  // Agent lamp groups: table lookup over the server join (node.agent_refs -> agents[]),
+  // active states only, computed once per render for all rows.
+  const agentsById = new Map<string, CompactAgent>(
+    (viewModel.agents ?? []).map((agent) => [agent.id, agent]),
+  );
+  const rowAgentsFor = (taskId: string): CompactAgent[] =>
+    (nodesById.get(taskId)?.agent_refs ?? [])
+      .map((ref) => agentsById.get(ref))
+      .filter((agent): agent is CompactAgent => !!agent && AGENT_CHIP_STATES.has(agent.state))
+      .sort((a, b) => agentStateRank(a.state) - agentStateRank(b.state));
   const tasks = allTasks.filter((task) => {
     const node = nodesById.get(task.id);
     return node ? nodeMatchesTaskFilters(node, activeFilters) && queryMatches(node, query) : false;
@@ -252,7 +286,7 @@ export function ListView({
   const insights = viewModel.insights;
 
   const done = tasks.filter((task) =>
-    DONE_STATUSES.has(normalizeStatus(typeof task.status === 'string' ? task.status : ''))
+    DONE_STATUSES.has(normalizeStatus(typeof task.status === 'string' ? task.status : '')),
   ).length;
   const total = tasks.length;
   const pct = total ? Math.round((done / total) * 100) : 0;
@@ -271,6 +305,7 @@ export function ListView({
         </div>
         {sections[section.key].map((task) => (
           <ListRow
+            agents={rowAgentsFor(task.id)}
             gate={gateIds.has(task.id)}
             key={task.id}
             kind={section.kind}
@@ -281,7 +316,7 @@ export function ListView({
           />
         ))}
       </div>
-    )
+    ),
   );
 
   return (
