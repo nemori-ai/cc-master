@@ -363,6 +363,9 @@ function parseRawLine(raw: string): NormalizedEvent[] {
 
 export function parserFor(harness: string): (raw: string) => NormalizedEvent[] {
   if (harness === 'claude-code') return parseClaudeLine;
+  // origin = 宿主 Claude Code 会话内的派发（subagent / background-shell）——subagent 独立转录
+  // 的行结构就是主 claude 格式（多 isSidechain/agentId 信封字段，parser 天然容忍）。
+  if (harness === 'origin') return parseClaudeLine;
   if (harness === 'codex') return parseCodexLine;
   return parseRawLine;
 }
