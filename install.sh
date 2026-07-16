@@ -336,6 +336,18 @@ function treeDigest(root) {
   return hash.digest('hex');
 }
 
+function preserveCopiedModes(sourceRoot, targetRoot) {
+  const directories = [];
+  walk(sourceRoot, (_entry, rel, stat) => {
+    if (stat.isSymbolicLink()) return;
+    const targetEntry = rel ? path.join(targetRoot, rel) : targetRoot;
+    if (stat.isDirectory()) directories.push([targetEntry, stat.mode & 0o7777]);
+    else if (stat.isFile()) fs.chmodSync(targetEntry, stat.mode & 0o7777);
+  });
+  // Keep every directory traversable until all descendants have received their source mode.
+  for (const [entry, mode] of directories.reverse()) fs.chmodSync(entry, mode);
+}
+
 function fileDigest(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
@@ -590,6 +602,7 @@ try {
       preserveTimestamps: true,
       verbatimSymlinks: true,
     });
+    preserveCopiedModes(source, candidate);
   }
 
   phase = 'checksum';

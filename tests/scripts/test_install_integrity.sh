@@ -328,6 +328,22 @@ make_plugin_fixture() {
   ln -s "payload" "$root/assets/current"
 }
 
+# Release projection uses owner-only staging directories for attested skills, so a packaged plugin
+# may legitimately contain nested 0700 directories. Publication must preserve those modes instead
+# of letting the publisher umask widen them and then rejecting its own target-adjacent copy.
+restricted_source="$tmp/plugin restricted mode/source"
+restricted_target="$tmp/plugin restricted mode/target/cc-master"
+make_plugin_fixture "$restricted_source" claude-code "restricted-mode"
+mkdir -p "$restricted_source/skills/private-attested"
+printf '%s\n' 'owner-only skill payload' >"$restricted_source/skills/private-attested/SKILL.md"
+chmod 700 "$restricted_source/skills/private-attested"
+transactional_publish plugin:claude-code "$restricted_source" "$restricted_target" \
+  >"$tmp/plugin-restricted-mode-success.json"
+[ "$(stat -c '%a' "$restricted_target/skills/private-attested" 2>/dev/null \
+      || stat -f '%Lp' "$restricted_target/skills/private-attested")" = "700" ] \
+  || fail "plugin publication must preserve nested owner-only directory modes"
+pass "plugin publication preserves packaged owner-only directory modes"
+
 for host in claude-code codex cursor; do
   plugin_parent="$tmp/plugin targets/$host/含 空格"
   plugin_target="$plugin_parent/cc-master"

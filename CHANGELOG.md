@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.1] — 2026-07-16
+
+> **Transactional installer mode-preservation hotfix** — pairs with the unchanged **ccm-v0.21.0**.
+
+### Fixed
+
+- **Plugin publication no longer rejects owner-only directories** — the target-adjacent publisher now explicitly preserves regular-file and directory modes after Node.js copies a plugin tree, before comparing its mode-aware digest. This fixes `phase=checksum: target-adjacent copy checksum mismatch` for packaged attested skills whose legitimate `0700` projection directories were widened by the publisher umask. Symlinks remain unmodified and fail-closed validation, atomic activation, rollback, and durability barriers are unchanged. A Node.js 22 regression covers the released artifact shape on the shared Linux/macOS POSIX path.
+
 ## [0.20.0] — 2026-07-16
 
 > **Cross-harness orchestration MVP** — the orchestrator can discover, select, launch, register, observe, and pace workers across Claude Code, Codex, and Cursor. This plugin release is designed to pair with **ccm-v0.21.0**; when upgrading the two separately, upgrade `ccm` first.
@@ -689,7 +697,8 @@ advancing across context compaction and across sessions.
 - **Docs** — `README.md` (EN) and `README_zh.md` (中文); design specification,
   design notes, and four research reports under `design_docs/`.
 
-[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/nemori-ai/cc-master/compare/v0.20.1...HEAD
+[0.20.1]: https://github.com/nemori-ai/cc-master/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/nemori-ai/cc-master/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/nemori-ai/cc-master/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/nemori-ai/cc-master/compare/v0.18.0...v0.18.1
