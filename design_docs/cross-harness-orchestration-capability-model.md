@@ -245,6 +245,18 @@ Task profile 必须先于模型品牌，至少覆盖 reasoning、uncertainty、r
 
 目标程序：`quiesce new dispatch → classify in-flight handles → cheap terminal work可收敛则收敛 → durable refs写稳 → legacy有限drain → new session按class attach/poll/audit`。这不是 current handoff 已实现声明。
 
+### 6.3 Agent Registry：L1→L2 之间的 registry 切片（bounded local current）
+
+board 新增 ✎ 段 `agents[]` 与 `ccm agent` namespace，构成跨所有派发类型（sub-agent / background shell / workflow / cross-harness CLI worker）的统一运行时登记簿。它的成熟度定位是 **L1→L2 之间的 registry 切片**：登记制——master 经 ccm verb 显式登记 + ccm 自主 probe reconcile；它**不是 L2**——不含 provider driver、reservation、live gate 或 inspect canary，任何一项都不得由本切片外推。今天登记的 agent 在 §6.2 四分类下几乎都是 `legacy_session_bound`。
+
+**命令面裁定（不破命令面冻结）**：`ccm agent` 限定为**登记 / 探测 / 读取 noun**——verbs（create / bind / link / terminal / probe / list / show）不含任何 spawn / route / dispatch 语义：不起进程、不选路、不派活。dispatch 用户命令面仍唯一归 `ccm worker`；给 `agent` namespace 增加任何 spawn/route/dispatch verb 即视为破冻结，须重走 direction gate。
+
+**join 落点裁决**：agent↔task 多对多关联的实际落点是 **`agents[].links[]`（agent 侧 ✎ 写·带锁·幂等）**，不是 attempt 侧——冻结的 `ccm/agent-routing/v1` envelope 会对任何 `task.routing` 出现做整体硬校验（往 legacy task 追加轻量 attempt 条目会被 lint 拒），native attempt 又由 dedicated writer 独占（generic writer 不得改 attempt ledger）。`attempt.agent_ref` 保留为 routing envelope 容忍的 **forward 兼容字段**，供未来 dedicated writer 填充；`BIZ-INFLIGHT-AGENT` 对两种登记形态（`agents[].links[]` 与 `attempt.agent_ref`）都承认。`agents[].id` 语法遵守 run-store v2 ID 文法（`[A-Za-z0-9][A-Za-z0-9._-]{0,127}`），run store 落地后平滑升级映射为 `run_ref`（attempt 的 `dispatch.run_ref` 是现成锚点）。
+
+**probe 写权边界**：`ccm agent probe` 只写 `agents[]` 自己的 probe / lifecycle 字段；观测降级（gone→orphaned、silent→uncertain）也只降 agent 自身 state，**绝不写 `task.handle` / attempt 投影**——那是 native-attempt dedicated writer / 未来 active-version reconciler 的独占地盘（§9.2 `board_write_mode=none` 精神）。探测证据按 handle 分级（pid 存活 / session 文件 mtime / transcript mtime），拿不到即 `unknown`，不由相邻字段推导补齐。
+
+**逐字复用的既有铁律**：`starting→running` 必须交真实 handle 证据——无真实 handle 不算 running（§6.1）；agent `terminal` 只是 worker 事实，terminal ≠ task done，父层独立验收（§10），`agent terminal` 绝不碰 task status。段形状与登记完备性由 `FMT-AGENTS` / `BIZ-INFLIGHT-AGENT` 两条 warn 级 lint 兜底——「凡派发皆登记」当前是软提示纪律，不是机械闸。
+
 ## 7. Machine facts、model evidence、quota 与 admission
 
 ### 7.1 Surface inventory 只是候选域入口
@@ -456,11 +468,12 @@ direction ─┬─> S0 ─┬─> S1 ─┬─> S4 ─┬─> S6 ─> S7 ─> S
 | Provider execution | Codex、Claude Code、Cursor Agent 的 resolver-backed session-bound raw wrapper 由三 harness hermetic tests 证明为 `current`；Codex、Claude Code 在 2026-07-16 当前开发机的 first-party live probe 为 pass | ccm 只管理 process lifecycle；Cursor 当前 host/version 虽可 resolver/help/launch，但 live canary 因同 PGID helper/LSP 在 launcher exit 0 后存活而返回 `owned_tree_survived`，cleanup 后 whole group gone；无 OK output，exact model/payer/task success 未证明，故仅为 external-compatibility `partial`，且不外推其他 OS/version | normalized provider adapter、automatic route/admission 与 provider-specific result semantics 均为 `target`；Cursor no-daemon/await-helper 或短 natural-drain grace 另行调研，不放宽 whole-group-gone | S3/S6/S8 |
 | Supervisor/run store | monitor有 detached service 技术片段 | detached/unref 不等于 attempt supervisor | per-run journal/lease/process tree/control/artifacts | S3 |
 | Attach/handoff | board可re-arm；legacy handoff/drain | 无run manager/control；叙事偏session-bound | 四类handle分流 + same-run attach/reconcile | S3/S9 |
+| Agent registry | board ✎ `agents[]` 登记簿 + `ccm agent` 七 verb（登记/探测/读取 noun）+ 按 handle 分级 probe/reconcile + `FMT-AGENTS`/`BIZ-INFLIGHT-AGENT` warn（§6.3） | 登记完备性靠 orchestrator 纪律（warn 软提示，非机械闸）；probe 只有 pid/mtime 级证据，无 supervisor/journal/lease；几乎全部 handle 是 `legacy_session_bound` | run store 落地后 `agent_ref` 升级映射 `run_ref`；durable handle/attach 归 S3 | S1↔S3（registry 切片） |
 | Runtime lifecycle | Unix SEA原路径替换；singleton reconcile | 无immutable/lease/protocol/Windows工业合同 | stable launcher + side-by-side + drain/GC/provenance | S2/S3 |
 | Plugin substrate | 三host packages、SAP/PHIP/commands/hooks；三 origin 投影同一显式 raw-wrapper 决策/命令/验收指导，并消费同一 cached shadow context | C2 native-attempt strategy 仍 `unsupported`；hook 不授权 explicit wrapper 或 automatic dispatch；Codex 无 mid-turn batch event，Cursor dynamic SessionStart 仍是已确认 gap | canonical automatic policy + host landing + durable worker attention + equivalence | S9 |
 | Native subagent | 三host已有各自指导/工具面；精确 Codex create/bind/cancel/terminal/reconcile ledger 为 `partial` | 无受信 one-shot runtime enablement、live spawn/roster producer、跨 session durability；默认 spawn 为零 | 经 live probe 晋升的 native invoke + durable handle/result/cancel | S0/S9 |
 | Coordination/HITL | inbox、discuss、Stop continuation、judgment logs | route-loss/run attention taxonomy未接入 | decision-grade notification + fresh package | S9 |
-| Viewer/report | board status/report/web viewer | 无planning/route/quota-at-selection/attempt/operator attention | one read model；frontend render-only | S9 |
+| Viewer/report | board status/report/web viewer；agent 观测面：server 侧 join `agents[].links` 派生 view-model `agents[]` / node `agent_refs[]` + `/agent.json` 单 agent 钻取（frontend 零推理），probe 新鲜度如实上屏 | agent 观测面只覆盖登记簿投影（登记完备性靠纪律，见 Agent registry 行）；仍无 planning/route/quota-at-selection/operator attention | one read model；frontend render-only | S9 |
 | Verification | true-done/endpoint discipline；C2 terminal evidence 只投影 `uncertain`、不直接 done | 精确 ledger linkage 有 hermetic contract，仍无 live provider result/outcome | terminal→independent verify→done/outcome | S6/S10 |
 | Tests/rollout | board/account/usage/monitor/services/release tests + C2 hermetic engine/CLI/security/mutation assertions | 无 provider/supervisor/crash/live canary/parity/lifecycle eval；synthetic fixture 不作 live 证据 | hermetic fixtures + genuinely paid/live opt-in canary + kill/metrics | all/S10 |
 

@@ -19,6 +19,7 @@
   - [各 executor 语义](#各-executor-语义)
   - [executor 选择决策树](#executor-选择决策树)
 - [C.5 cross-harness planning / routing 合同](#c5-cross-harness-planning--routing-合同)
+- [C.6 agents[]：运行时 agent 登记簿](#c6-agents运行时-agent-登记簿)
 - [D. acceptance 怎么写好](#d-acceptance-怎么写好)
 - [E. estimate 怎么估](#e-estimate-怎么估)
 - [F. deps 怎么连](#f-deps-怎么连)
@@ -123,6 +124,7 @@
 
   数字字段喂机械 floor、人类可读字段喂 agentic 价值推理；**缺即降级**（`ccm peers` 把该 peer 的对应维度退 null·配速退单板·fail-safe）。形状坏→`FMT-COORD` warn（永不 hard·advisory ✎）。读侧详见 command-catalog 的 peers namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-COORD`。**token-blind**：本块只含 goal/priority/workload/%——绝无任何 secret。
 - `owner.harness`——当前 board 所属 harness 的观察字段，取值 `claude-code | codex | cursor | unknown`。它**不是武装闸**：hook arming 仍只看 `owner.active` + `owner.session_id`；`owner.harness` 只给 `ccm peers` / 后续池中介做配额池分区。ARM 时 bootstrap 通过 `ccm board stamp-harness` 从当前进程 env 的可信 harness detect 盖写；无可信 env 时不写、不覆盖已有值。缺失或坏值都按 `unknown` 降级；`ccm peers` 会把 unknown board 放进单例池，避免跨 harness 或不明来源 board 混排。坏值→`FMT-HARNESS` warn。
+- `agents`——**运行时 agent 登记簿**（✎ 非窄腰·hook 不读），跨所有派发类型的统一花名册：凡派发（sub-agent / 后台 shell / workflow / 跨 harness worker）皆登记。只用 `ccm agent create / bind / link / terminal / probe` 写、`ccm agent list / show` 读——别用 `--set-json` 手拼（会绕过状态机校验、handle 证据闸与幂等 link）。缺 → 无登记（花名册空）；形状坏 → `FMT-AGENTS` warn；`in_flight` task 无登记指向 → `BIZ-INFLIGHT-AGENT` warn 软提示。概念与字段取值见 [C.6 节](#c6-agents运行时-agent-登记簿)。
 - `runtime`——**hook-owned 运行时参数区**（✎ 非窄腰），装「周期 hook/script 跑起来后维护的瞬态簿记」。白名单键（均 ISO-8601 UTC）：`last_identity_remind`（周期身份提示 hook 读它判阈值）、`last_critpath_remind`（周期临界路径提示 hook 读它判阈值）、`last_goal_remind`（Goal Contract 对齐提示判阈值）、`last_account_switch`（账号切换机制写换号时刻·usage-pacing hook 读它做「检测到换号」ambient）、`stop_allow_until`（Codex Stop hook 释放闸：agent 独立确认本板可停后写一个短期未来时刻）——周期 hook / 换号写侧注入 / Stop 释放确认后经 `ccm board set-param` 写回（带锁·进程边界）。**写法收窄**：唯一写口是 `ccm board set-param <白名单 key> <value>`（least-privilege·非白名单 key / 非法值 → `exit 2`）——agent 走 `ccm` 命令改 board 天然保留它（`ccm` 字段级合并、不整盘覆写；agent 自己**永不手写 `runtime.*`**·见 `master-orchestrator-guide` 的 board-写纪律）。缺/坏 → graceful-degrade（周期提示退化为「从未提示」；Stop 释放闸退化为继续阻止停止）；形状坏→`FMT-RUNTIME` warn（永不 hard）。**token-blind**：参数区只有时间戳等簿记·绝无 secret。
 
 > **不要把 observed 字段写进硬 waist。** 这三档的边界由 `ccm` 引擎权威定义（每字段的 tier 元数据）。
@@ -367,6 +369,46 @@ ccm task update T8 --executor subagent
 `ccm worker help/run` 已是 current 的 session-bound raw wrapper，但它与 routing ledger **没有自动接线**：不会读 policy 自动选 route，不会把 process terminal 当 running handle，不会调用 `route-bind`，也不会自动 fallback。同步 `worker run` 只在 child terminal 后返回 process envelope；provider exit 0 也不等于 parent acceptance 通过。
 
 因此，只使用 raw wrapper 的 board 可以保持 legacy lifecycle；不要为了“看起来先进”启用一个当前派发面拿不到 opaque running handle 的 routing contract。等实际 dispatch surface 能返回 handle 时再按上面的 activation/bind 顺序 opt in。无 `meta.contracts`、无 `planning/routing` 的历史 board/task 继续逐字保持 legacy 行为。
+
+---
+
+## C.6 agents[]：运行时 agent 登记簿
+
+`agents[]` 是 board 级 ✎ 段（hook 不读·窄腰零碰撞）：**跨所有派发类型的统一运行时花名册**。纪律一句话：**凡派发皆登记**——你每派出去一个 sub-agent / 后台 shell / workflow / 跨 harness CLI worker，就 `ccm agent create` 登记一条，让花名册、viewer 和 resume 后的自己能看见「现在总共多少 agent 在跑、各自在干什么、还活着没」。
+
+**agent 和 executor 的分层（别合并、别互推）：**
+
+| | task 的 `executor` | `agents[]` 里的一条记录 |
+|---|---|---|
+| **层** | planning 层：**计划**由哪类执行者做 | runtime 层：**实际跑起来**的运行时实例 |
+| **基数** | 每 task 一个值 | 与 task 多对多（一个 agent 可服务多个 task，一个 task 可换多个 agent） |
+| **何时写** | 派发前规划时 | 真实派发那一刻（create）+ 拿到句柄时（bind） |
+
+一个 `executor: subagent` 的 task 被真实派发时，对应动作是两笔：task 侧照旧（`task start` / `--handle`），agent 侧 `agent create` + `agent bind` + `agent link <id> --task <task-id>`。join 存 agent 侧 `links[]`，不动 task 的 routing / attempt 结构。
+
+**生命周期状态机：何时转哪态（只走专属 verb，别用 `--set` / `--set-json` 手改）：**
+
+| 情况 | 转到 | 命令 |
+|---|---|---|
+| 刚发起派发、还没拿到句柄 | `starting` | `agent create --type ... --harness ... --intent "..."` |
+| 拿到真实句柄（session id / pid） | `running` | `agent bind <id> --handle <kind:value>`——**无真实证据会被拒（exit 3）**，别用占位值硬凑 |
+| probe 发现会话文件陈旧（在但不动了） | `uncertain` | `agent probe` 自动降级，不用手转 |
+| probe 发现进程 / 会话文件消失 | `orphaned` | `agent probe` 自动降级，不用手转 |
+| worker 收工（成功或失败都算收工） | `terminal` | `agent terminal <id> --outcome "..."`——**terminal ≠ task done**，task 仍走父层独立验收 |
+| `uncertain` 后确认还活着 | `running` | `agent probe`（观测 alive 自动归回）或重新 `bind` |
+
+**handle.kind 怎么选：**
+
+| kind | 什么派发用 | attach 方式 |
+|---|---|---|
+| `session-id` | 跨 harness CLI worker（codex / claude-code headless） | `--attach-cmd` 记一键接入命令（如 `codex resume <sid>`） |
+| `pid` | 后台 shell 进程 | 无 attach；probe 用进程存活判定 |
+| `task-id` | 以 task 粒度跟踪、只有 transcript 可查的派发 | `--transcript` 记 transcript 路径引用（绝不内嵌内容） |
+| `none` | 尚无证据（create 后的缺省态） | 不可手选——bind 不接受 `none` |
+
+**probe 字段是 ccm 写的，别手填。** `probe.{last_probe_at, method, observed, as_of}` 与 probe 引发的 lifecycle 降级全部由 `ccm agent probe` 落盘；`observed` 的语义是保真观测（`alive` / `silent` / `gone` / `unknown`）——拿不到就 `unknown`，ccm 不会用相邻字段推导补齐，你也不要手拼一个「看起来合理」的观测值伪造活性。同理 `account_ref` / `quota_pool_ref` 当前是预留位（保持 `null`），别自创取值。
+
+**会撞的规则**（详见 [N 节](#n-校验规则全集速查fmt--graph--biz)）：段形状坏 → `FMT-AGENTS` warn（graceful·不拦写盘，但 `ccm agent list/show` 与 viewer 花名册会读不出坏条目）；task 已 `in_flight` 却无任何 agent 登记指向它 → `BIZ-INFLIGHT-AGENT` warn（软提示补登记）。
 
 ---
 
@@ -1036,6 +1078,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `FMT-COORD` | warn | `coordination` 非对象，或 `priority` 不在 `{urgent,high,normal,low,trivial}` 枚举，或 `state`/`state.current`/`state.planned` 非对象、数字字段（`active_tasks`/`burn_contribution`/`cost_to_complete_pct`）非数字、人类可读字段（`workload`/`remaining_work`）非字符串 | 全 optional·缺即降级（`ccm peers` 把该维度退 null）；priority 仅五挡——非法值退化为 normal。永不 hard（advisory ✎·fail-safe）——见 [A 节](#a-task-字段速查) coordination 块 |
 | `FMT-INBOX` | warn | `coordination.inbox` 存在但非数组，或通知条目 id 非空唯一 / kind / status / strength / ISO 时间 / consumed_at 状态对应关系不合法 | 缺失 = 空 inbox；append 用 `ccm coordination notify`，消费用 `ccm coordination inbox ack <id...>`，不要手拼。`kind` 闭集、`status` 单调；坏形态只 warn，读取侧跳过坏条目 |
 | `FMT-RUNTIME` | warn | `runtime` 非对象，或已知键（`last_identity_remind` / `last_critpath_remind` / `last_goal_remind` / `last_account_switch` / `stop_allow_until` 等）类型不合法（时间锚须严格 ISO-8601 UTC） | hook-owned ✎ 参数区：用 `ccm board set-param <白名单 key> <ISO>` 写（白名单 + 值校验在 verb 层）；缺/坏一律 graceful-degrade（周期 hook 退化为「从未提示」·首次必提示；Stop 释放闸退化为继续阻止停止）。未知键 silent-on-unknown。永不 hard |
+| `FMT-AGENTS` | warn | `agents` 存在但非数组；或条目非对象、`id` 不合 ID 文法 / 重复、`type`/`harness`/`handle.kind`/`lifecycle.state`/`probe.observed`/`probe.method` 不在各枚举、`intent`/`model`/`handle.value` 非字符串、`launch`/`handle`/`lifecycle`/`probe` 非对象、时间锚非严格 ISO-8601 UTC、`links` 非数组或条目缺非空 `task_id`、`account_ref`/`quota_pool_ref` 既非 null 也非字符串 | 只用 `ccm agent create/bind/link/terminal/probe` 写（自动生成合法 id、盖标准时间戳、校验枚举与转移），别 `--set-json` 手拼。graceful：坏形状不拦写盘，但 `ccm agent list/show` 与 viewer 花名册读不出坏条目——见 [C.6 节](#c6-agents运行时-agent-登记簿) |
 | `FMT-ESTIMATE` | warn | `estimate` 不是 `{value:number, unit:string}` 对象 | `--estimate 3h`（ccm 自动解析成对象），别手拼——见 [E 节](#e-estimate-怎么估) |
 | `FMT-ACCEPTANCE` | warn | `acceptance` 既非字符串也非对象，或对象 `criteria` 空、`criterion.status` 不在 {pending,met,failed} | `--accept "一句话"` 或 `--set-json acceptance={criteria:[...]}`——见 [D 节](#d-acceptance-怎么写好) |
 | `FMT-DEPENDENCY-GATE` | hard | `dependency_gate` 存在但不是 `{kind:"review",required_verdict:"APPROVE"}` | 用 `task add|update --review-gate APPROVE` 声明；非法 gate fail closed |
@@ -1080,6 +1123,7 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `BIZ-DEV-REFS` | **hard** | `type=development` 的 task 缺 `kind=spec`≥1 或 `kind=plan`≥1 引用 | development task 加 `--ref spec:/abs/spec.md --ref plan:/abs/plan.md`（`task add`）或 `--add-ref`（`task update`）；`--force` 可越——见 [L 节](#l-referencesartifactverified-语义) |
 | `BIZ-ACCEPTANCE-REQUIRED` | warn | type ∈ {development, development-demo, acceptance, e2e-integration} 但 `acceptance` 为空 | 这些 type 必须带 `--accept`——见 [D 节](#d-acceptance-怎么写好) |
 | `BIZ-EXECUTOR-HANDLE` | warn | `status=in_flight` 且 `executor` ∈ {subagent, workflow}，但缺真实 `handle`；valid native no-handle projection 除外 | legacy 派发工具返回句柄后 `task update --handle <后台句柄>`，再转 `in_flight`；`ready` / `blocked` future task 不预填；native attempt 只走 dedicated writer，由 hard rule 接管——见 [C 节](#c-executor-五种语义--选择决策树) |
+| `BIZ-INFLIGHT-AGENT` | warn | task 已 `in_flight`，但无任何 agent 登记指向它——既没有任一 `agents[].links[].task_id` 等于本 task id，也没有任一 `routing.attempts[]` 条目带非空 `agent_ref` | 凡派发皆登记：`ccm agent create` + `ccm agent link <agent-id> --task <task-id>` 补登记，让花名册 / viewer 能观测这次派发——见 [C.6 节](#c6-agents运行时-agent-登记簿) |
 | `BIZ-ROUTED-PLANNING-REQUIRED` | hard | contract-enabled、非 grandfathered `subagent` 缺合法 planning 或正数 estimate | 先补 estimate，再用 `task set-planning` 写完整画像；enabled 新 task 最后才把 executor 定成 subagent——见 [C.5](#c5-cross-harness-planning--routing-合同) |
 | `BIZ-ROUTE-POLICY-REQUIRED` | hard | contract-enabled、非 grandfathered `subagent` 缺合法 provider-neutral routing policy / ample+tight chains | 用 `task set-routing`；candidate 必须满足 planning capability/effect/permission 交叉约束 |
 | `BIZ-ROUTE-SELECTION-REQUIRED` | hard | contract-enabled `in_flight` subagent 没有合格 current selection，或 selection 不在声明 chain / evidence 失效 | 不用 generic start/force；取得 fresh qualification evidence与真实 handle 后走 `route-bind` |
