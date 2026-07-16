@@ -1,4 +1,5 @@
 import {
+  Bot,
   ChartGantt,
   List,
   type LucideIcon,
@@ -8,13 +9,14 @@ import {
 } from 'lucide-react';
 import type React from 'react';
 
-export type ViewMode = 'graph' | 'board' | 'list' | 'timeline';
+export type ViewMode = 'graph' | 'board' | 'list' | 'timeline' | 'agents';
 
 const VIEWS: Array<{ id: ViewMode; Icon: LucideIcon; title: string }> = [
   { id: 'graph', Icon: Waypoints, title: 'graph view — the dependency DAG' },
   { id: 'board', Icon: SquareKanban, title: 'board view — the Kanban card board' },
   { id: 'list', Icon: List, title: 'list view — the status-board' },
-  { id: 'timeline', Icon: ChartGantt, title: 'timeline view — the time / gantt swimlanes' }
+  { id: 'timeline', Icon: ChartGantt, title: 'timeline view — the time / gantt swimlanes' },
+  { id: 'agents', Icon: Bot, title: 'agents view — the runtime agent roster' },
 ];
 
 interface StageToolbarProps {
@@ -42,7 +44,7 @@ export function StageToolbar({
   searchRef,
   activeFilterCount,
   onClearFilters,
-  onToggleDrawer
+  onToggleDrawer,
 }: StageToolbarProps) {
   return (
     <div className="stage-toolbar">

@@ -6,7 +6,7 @@ import type {
   JudgmentCall,
   PeersPayload,
   StatusReportPayload,
-  ViewModelPayload
+  ViewModelPayload,
 } from '../types';
 
 interface BoardBriefProps {
@@ -20,7 +20,7 @@ interface BoardBriefProps {
 // (display counting only — no scheduling semantics).
 function memberProgress(
   members: string[] | undefined,
-  viewModel: ViewModelPayload
+  viewModel: ViewModelPayload,
 ): { done: number; total: number } | null {
   if (!Array.isArray(members) || !members.length) return null;
   const byId = new Map(viewModel.graph.nodes.map((node) => [node.id, node]));
@@ -43,7 +43,12 @@ function jcKey(entry: JudgmentCall, index: number): string {
  * selecting a task swaps this whole panel for the task drill-down, and close/Esc lands
  * back here.
  */
-export function BoardBrief({ viewModel, statusReport, peers = null, onSelectTask }: BoardBriefProps) {
+export function BoardBrief({
+  viewModel,
+  statusReport,
+  peers = null,
+  onSelectTask,
+}: BoardBriefProps) {
   const extras = viewModel.board_extras ?? {};
   const mission = viewModel.mission;
   const boardWatchdog = watchdogReadout(extras.watchdog);
@@ -53,10 +58,10 @@ export function BoardBrief({ viewModel, statusReport, peers = null, onSelectTask
   const diagnostics = [
     ...(viewModel.freshness.errors ?? []).map((item) => ({
       severity: 'error',
-      message: item.message
+      message: item.message,
     })),
     ...(viewModel.diagnostics?.lint ?? []),
-    ...(viewModel.diagnostics?.over_scheduling ?? [])
+    ...(viewModel.diagnostics?.over_scheduling ?? []),
   ];
 
   // ---- status report: the real server nests the body under `report`; fixtures/older
@@ -71,7 +76,7 @@ export function BoardBrief({ viewModel, statusReport, peers = null, onSelectTask
         in_flight: summaryBody.in_flight,
         ready: summaryBody.ready,
         blocked: (summaryBody.blocked_on_user ?? 0) + (summaryBody.blocked_on_task ?? 0),
-        attention: summaryBody.attention
+        attention: summaryBody.attention,
       }
     : statusReport.progress
       ? {
@@ -81,16 +86,16 @@ export function BoardBrief({ viewModel, statusReport, peers = null, onSelectTask
           in_flight: statusReport.progress.in_flight,
           ready: statusReport.progress.ready,
           blocked: statusReport.progress.blocked,
-          attention: undefined as number | undefined
+          attention: undefined as number | undefined,
         }
       : null;
   const reportNextActions = reportBody?.next_actions ?? statusReport.next_actions ?? {};
   const operatorActions: string[] = reportBody?.next_actions?.recommended_operator_actions
     ? reportBody.next_actions.recommended_operator_actions.filter(
-        (action): action is string => typeof action === 'string'
+        (action): action is string => typeof action === 'string',
       )
     : (statusReport.next_actions?.operator_attention ?? []).map(
-        (item) => `${item.severity ?? 'attention'} · ${item.title || item.id}`
+        (item) => `${item.severity ?? 'attention'} · ${item.title || item.id}`,
       );
   const reportRisks = reportBody?.risks ?? statusReport.risks ?? [];
   const healthBody = reportBody?.health;
@@ -106,11 +111,16 @@ export function BoardBrief({ viewModel, statusReport, peers = null, onSelectTask
   const iterations: CadenceIteration[] = Array.isArray(cadence?.iterations)
     ? cadence.iterations.filter(
         (iteration): iteration is CadenceIteration =>
-          !!iteration && typeof iteration === 'object' && !Array.isArray(iteration)
+          !!iteration && typeof iteration === 'object' && !Array.isArray(iteration),
       )
     : [];
   const openIterations = iterations.filter((iteration) => iteration.status === 'open');
   const shippedIterations = iterations.filter((iteration) => iteration.status === 'shipped');
+  const policy = extras.policy ?? null;
+  const policyRows =
+    policy && typeof policy === 'object'
+      ? Object.entries(policy).filter(([, value]) => value != null && typeof value !== 'object')
+      : [];
   const inboxEntries: InboxNotification[] = Array.isArray(peers?.inbox)
     ? peers.inbox
     : Array.isArray(extras.coordination?.inbox)
@@ -420,6 +430,20 @@ export function BoardBrief({ viewModel, statusReport, peers = null, onSelectTask
           </div>
         ) : null}
       </div>
+
+      {policyRows.length ? (
+        <div className="dsect policy">
+          <div className="sl">⛨ policy</div>
+          <div className="kv">
+            {policyRows.map(([key, value]) => (
+              <div className="row" key={key}>
+                <span className="k">{key.replace(/_/g, ' ')}</span>
+                <span className={`v mono policy-${String(value)}`}>{String(value)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="dsect peers">
         <div className="sl">⇄ peers</div>

@@ -1,12 +1,13 @@
 import type {
   BoardExtrasPayload,
   BoardsPayload,
+  CompactAgent,
   CompactTask,
   GraphEdge,
   PeersPayload,
   StatusReportPayload,
   TaskDetailPayload,
-  ViewModelPayload
+  ViewModelPayload,
 } from './types';
 
 const now = '2026-07-08T12:24:18Z';
@@ -16,7 +17,7 @@ export const fixtureBoards: BoardsPayload = {
   service: {
     home: '~/.cc_master',
     health: 'ok',
-    id: 'wv_fixture'
+    id: 'wv_fixture',
   },
   current_board_id: 'release-2025-05-16',
   boards: [
@@ -35,7 +36,7 @@ export const fixtureBoards: BoardsPayload = {
       priority: 'high',
       heartbeat_age_sec: 42,
       branch: 'release/train-0516',
-      created_at: '2026-07-08T08:00:00Z'
+      created_at: '2026-07-08T08:00:00Z',
     },
     {
       id: 'infra-migration',
@@ -49,7 +50,7 @@ export const fixtureBoards: BoardsPayload = {
       awaiting_count: 1,
       priority: 'normal',
       heartbeat_age_sec: 60 * 42,
-      branch: 'feat/account-pool'
+      branch: 'feat/account-pool',
     },
     {
       id: 'data-pipeline-v2',
@@ -61,7 +62,7 @@ export const fixtureBoards: BoardsPayload = {
       done_count: 34,
       awaiting_count: 0,
       priority: 'low',
-      updated_at: '2026-07-06T18:04:00Z'
+      updated_at: '2026-07-06T18:04:00Z',
     },
     {
       id: 'incident-2407',
@@ -72,9 +73,9 @@ export const fixtureBoards: BoardsPayload = {
       status_counts: { done: 8, failed: 2, stale: 1 },
       done_count: 8,
       awaiting_count: 0,
-      updated_at: '2026-07-02T09:30:00Z'
-    }
-  ]
+      updated_at: '2026-07-02T09:30:00Z',
+    },
+  ],
 };
 
 // ---- fixture tasks: full 8-status coverage + awaiting-user (pure + combined) + nesting ---
@@ -90,7 +91,7 @@ const fixtureTasks: CompactTask[] = [
     created_at: '2026-07-08T08:00:00Z',
     started_at: '2026-07-08T08:05:00Z',
     finished_at: '2026-07-08T08:20:00Z',
-    artifact: 'design_docs/release-plan.md'
+    artifact: 'design_docs/release-plan.md',
   },
   {
     id: 'fetch-inputs',
@@ -101,14 +102,14 @@ const fixtureTasks: CompactTask[] = [
     created_at: '2026-07-08T08:00:00Z',
     started_at: '2026-07-08T08:20:00Z',
     finished_at: '2026-07-08T08:50:00Z',
-    artifact: 'inputs/manifest.json'
+    artifact: 'inputs/manifest.json',
   },
   {
     id: 'fetch-config',
     title: 'Fetch environment config',
     status: 'ready',
     deps: ['root'],
-    created_at: '2026-07-08T08:00:00Z'
+    created_at: '2026-07-08T08:00:00Z',
   },
   {
     id: 'load-credentials',
@@ -119,7 +120,7 @@ const fixtureTasks: CompactTask[] = [
     created_at: '2026-07-08T08:00:00Z',
     started_at: '2026-07-08T08:20:00Z',
     finished_at: '2026-07-08T08:40:00Z',
-    artifact: 'vault://release/creds'
+    artifact: 'vault://release/creds',
   },
   {
     id: 'validate-inputs',
@@ -130,7 +131,7 @@ const fixtureTasks: CompactTask[] = [
     created_at: '2026-07-08T08:00:00Z',
     started_at: '2026-07-08T08:50:00Z',
     finished_at: '2026-07-08T09:10:00Z',
-    artifact: 'reports/input-validation.md'
+    artifact: 'reports/input-validation.md',
   },
   {
     id: 'user-approval',
@@ -156,17 +157,17 @@ const fixtureTasks: CompactTask[] = [
           id: 'A',
           label: 'Tonight 02:00 UTC',
           rationale: 'Lowest traffic, fastest unblock.',
-          tradeoffs: 'No on-call coverage if rollback is needed.'
+          tradeoffs: 'No on-call coverage if rollback is needed.',
         },
         {
           id: 'B',
           label: 'Tomorrow 14:00 UTC',
           rationale: 'Full on-call coverage.',
-          tradeoffs: 'Delays the critical path by ~12h.'
-        }
+          tradeoffs: 'Delays the critical path by ~12h.',
+        },
       ],
-      enter_cmd: 'claude /cc-master:discuss user-approval'
-    }
+      enter_cmd: 'claude /cc-master:discuss user-approval',
+    },
   },
   {
     id: 'policy-check',
@@ -176,7 +177,7 @@ const fixtureTasks: CompactTask[] = [
     created_at: '2026-07-08T08:00:00Z',
     started_at: '2026-07-08T09:15:00Z',
     // fire_at in the past: demonstrates the expired/stale watchdog readout
-    watchdog: { mechanism: 'cron', fire_at: '2026-07-08T11:00:00Z', job_id: 'wd-policy' }
+    watchdog: { mechanism: 'cron', fire_at: '2026-07-08T11:00:00Z', job_id: 'wd-policy' },
   },
   {
     id: 'plan-execution',
@@ -187,7 +188,7 @@ const fixtureTasks: CompactTask[] = [
     created_at: '2026-07-08T08:00:00Z',
     started_at: '2026-07-08T09:10:00Z',
     finished_at: '2026-07-08T09:40:00Z',
-    artifact: 'plans/execution-graph.json'
+    artifact: 'plans/execution-graph.json',
   },
   {
     id: 'escalate-vendor',
@@ -195,7 +196,7 @@ const fixtureTasks: CompactTask[] = [
     status: 'escalated',
     deps: ['policy-check'],
     created_at: '2026-07-08T08:00:00Z',
-    started_at: '2026-07-08T09:30:00Z'
+    started_at: '2026-07-08T09:30:00Z',
   },
   {
     id: 'deploy-infra',
@@ -284,7 +285,7 @@ const fixtureTasks: CompactTask[] = [
     status: 'failed',
     deps: ['plan-execution'],
     created_at: '2026-07-08T08:00:00Z',
-    started_at: '2026-07-08T09:50:00Z'
+    started_at: '2026-07-08T09:50:00Z',
   },
   {
     id: 'retry-upload',
@@ -292,7 +293,7 @@ const fixtureTasks: CompactTask[] = [
     status: 'uncertain',
     deps: ['secrets-sync'],
     created_at: '2026-07-08T08:00:00Z',
-    started_at: '2026-07-08T10:10:00Z'
+    started_at: '2026-07-08T10:10:00Z',
   },
   {
     id: 'migration',
@@ -300,7 +301,7 @@ const fixtureTasks: CompactTask[] = [
     status: 'in_flight',
     deps: ['deploy-infra'],
     created_at: '2026-07-08T08:00:00Z',
-    started_at: '2026-07-08T10:40:00Z'
+    started_at: '2026-07-08T10:40:00Z',
   },
   {
     id: 'mig-a',
@@ -311,7 +312,7 @@ const fixtureTasks: CompactTask[] = [
     created_at: '2026-07-08T08:00:00Z',
     started_at: '2026-07-08T10:45:00Z',
     finished_at: '2026-07-08T11:05:00Z',
-    artifact: 'migrations/accounts.log'
+    artifact: 'migrations/accounts.log',
   },
   {
     id: 'mig-b',
@@ -320,14 +321,14 @@ const fixtureTasks: CompactTask[] = [
     parent: 'migration',
     deps: ['mig-a'],
     created_at: '2026-07-08T08:00:00Z',
-    started_at: '2026-07-08T11:10:00Z'
+    started_at: '2026-07-08T11:10:00Z',
   },
   {
     id: 'mig-c',
     title: 'Migrate archives shard',
     status: 'ready',
     parent: 'migration',
-    created_at: '2026-07-08T08:00:00Z'
+    created_at: '2026-07-08T08:00:00Z',
   },
   {
     id: 'run-jobs',
@@ -350,30 +351,30 @@ const fixtureTasks: CompactTask[] = [
       what_i_need: 'Advice on whether shard 7 blocks the release evidence.',
       why_it_matters: 'Skipping trims 40m off the critical path but weakens coverage.',
       options: [],
-      enter_cmd: 'claude /cc-master:discuss run-jobs'
-    }
+      enter_cmd: 'claude /cc-master:discuss run-jobs',
+    },
   },
   {
     id: 'verify-results',
     title: 'Verify launch evidence',
     status: 'blocked',
     deps: ['run-jobs', 'migration'],
-    created_at: '2026-07-08T08:00:00Z'
+    created_at: '2026-07-08T08:00:00Z',
   },
   {
     id: 'post-migration',
     title: 'Post-migration reconciliation',
     status: 'blocked',
     deps: ['mig-b'],
-    created_at: '2026-07-08T08:00:00Z'
+    created_at: '2026-07-08T08:00:00Z',
   },
   {
     id: 'publish-report',
     title: 'Publish release report',
     status: 'ready',
     deps: ['verify-results'],
-    created_at: '2026-07-08T08:00:00Z'
-  }
+    created_at: '2026-07-08T08:00:00Z',
+  },
 ];
 
 const CRITICAL_PATH = [
@@ -384,7 +385,7 @@ const CRITICAL_PATH = [
   'deploy-infra',
   'run-jobs',
   'verify-results',
-  'publish-report'
+  'publish-report',
 ];
 
 const RANK_BY_ID: Record<string, number> = {
@@ -407,7 +408,7 @@ const RANK_BY_ID: Record<string, number> = {
   'mig-a': 0,
   'mig-b': 1,
   'mig-c': 0,
-  'post-migration': 2
+  'post-migration': 2,
 };
 
 const PER_NODE: Record<string, { impact: number; in_deg: number }> = {
@@ -430,7 +431,7 @@ const PER_NODE: Record<string, { impact: number; in_deg: number }> = {
   'mig-a': { impact: 2, in_deg: 0 },
   'mig-b': { impact: 1, in_deg: 1 },
   'mig-c': { impact: 0, in_deg: 0 },
-  'post-migration': { impact: 0, in_deg: 1 }
+  'post-migration': { impact: 0, in_deg: 1 },
 };
 
 // Direct-adjacency derivation over the fixture tasks (edge lists + upstream/downstream maps
@@ -460,7 +461,7 @@ function deriveGraph(tasks: CompactTask[]) {
         source: dep,
         target: task.id,
         type: 'dep',
-        critical: criticalEdges.has(`${dep}->${task.id}`)
+        critical: criticalEdges.has(`${dep}->${task.id}`),
       });
     }
     if (parents[task.id]) {
@@ -468,7 +469,7 @@ function deriveGraph(tasks: CompactTask[]) {
         id: `${parents[task.id]}->${task.id}`,
         source: parents[task.id] as string,
         target: task.id,
-        type: 'parent'
+        type: 'parent',
       });
     }
   }
@@ -498,7 +499,7 @@ const fixtureBoardExtras: BoardExtrasPayload = {
       category: 'architecture',
       severity: 'high',
       status: 'pending_review',
-      summary: 'Split the cutover into three stages instead of a single apply.'
+      summary: 'Split the cutover into three stages instead of a single apply.',
     },
     {
       id: 'jc-2',
@@ -506,7 +507,7 @@ const fixtureBoardExtras: BoardExtrasPayload = {
       category: 'drift',
       severity: 'medium',
       status: 'upheld',
-      summary: 'Kept the legacy dispatched_at alias readable for archived boards.'
+      summary: 'Kept the legacy dispatched_at alias readable for archived boards.',
     },
     {
       id: 'jc-3',
@@ -514,8 +515,8 @@ const fixtureBoardExtras: BoardExtrasPayload = {
       category: 'other',
       severity: 'low',
       status: 'overturned',
-      summary: 'Dropped the speculative artifact cache after review.'
-    }
+      summary: 'Dropped the speculative artifact cache after review.',
+    },
   ],
   cadence: {
     target: { ship_every: '24h' },
@@ -526,40 +527,40 @@ const fixtureBoardExtras: BoardExtrasPayload = {
         started_at: '2026-07-08T08:00:00Z',
         deadline: '2026-07-09T08:00:00Z',
         goal: 'Ship the cutover wave end to end',
-        members: ['deploy-infra', 'migration', 'run-jobs']
+        members: ['deploy-infra', 'migration', 'run-jobs'],
       },
       {
         id: 'it-1',
         status: 'shipped',
         started_at: '2026-07-07T08:00:00Z',
         shipped_at: '2026-07-08T07:40:00Z',
-        members: ['root', 'fetch-inputs']
-      }
-    ]
+        members: ['root', 'fetch-inputs'],
+      },
+    ],
   },
   watchdog: {
     armed_at: '2026-07-08T11:00:00Z',
     fire_at: '2027-06-30T12:00:00Z',
     mechanism: 'cron',
-    job_id: 'wd-board'
+    job_id: 'wd-board',
   },
   policy: { autonomous_account_switch: 'allow' },
   coordination: {
     priority: 'high',
     state: {
       current: { active_tasks: 4, workload: 'release cutover wave', burn_contribution: 22 },
-      planned: { remaining_work: '6 tasks to verified done', cost_to_complete_pct: 35 }
+      planned: { remaining_work: '6 tasks to verified done', cost_to_complete_pct: 35 },
     },
     inbox: [
       {
         kind: 'pacing_throttle',
         ts: '2026-07-08T11:30:00Z',
         from: 'infra-migration',
-        note: 'peer claimed shared 5h headroom — throttle non-critical dispatch'
+        note: 'peer claimed shared 5h headroom — throttle non-critical dispatch',
       },
-      { kind: 'hitl_turn', ts: '2026-07-08T11:55:00Z', from: 'operator' }
-    ]
-  }
+      { kind: 'hitl_turn', ts: '2026-07-08T11:55:00Z', from: 'operator' },
+    ],
+  },
 };
 
 export const fixturePeers: PeersPayload = {
@@ -578,7 +579,7 @@ export const fixturePeers: PeersPayload = {
       heartbeat: '2026-07-08T12:23:48Z',
       heartbeat_age_sec: 30,
       current: { active_tasks: 2, workload: 'terraform account pool', burn_contribution: 18 },
-      planned: { remaining_work: '3 tasks', cost_to_complete_pct: 22 }
+      planned: { remaining_work: '3 tasks', cost_to_complete_pct: 22 },
     },
     {
       board_file: 'data-pipeline-v2.board.json',
@@ -590,12 +591,85 @@ export const fixturePeers: PeersPayload = {
       heartbeat: '2026-07-08T12:22:18Z',
       heartbeat_age_sec: 120,
       current: null,
-      planned: null
-    }
+      planned: null,
+    },
   ],
   inbox: fixtureBoardExtras.coordination?.inbox ?? [],
-  roster: { count: 3, freshness_sec: 600, as_of: now }
+  roster: { count: 3, freshness_sec: 600, as_of: now },
 };
+
+// ---- Agent Registry demo roster (compact projection + node join, offline fallback) -------
+const fixtureAgents: CompactAgent[] = [
+  {
+    id: 'agt-001',
+    type: 'cli-worker',
+    harness: 'codex',
+    model: 'gpt-5.6-luna',
+    intent: 'drive the infra cutover to green apply',
+    state: 'running',
+    handle_kind: 'session-id',
+    has_attach_cmd: true,
+    has_transcript: true,
+    registered_at: '2026-07-08T10:05:00Z',
+    ended_at: null,
+    probe: { observed: 'alive', as_of: '2026-07-08T12:23:40Z', method: 'session-file-mtime' },
+    links: ['deploy-infra'],
+  },
+  {
+    id: 'agt-002',
+    type: 'subagent',
+    harness: 'claude-code',
+    model: 'opus-4.8',
+    intent: 'migrate ledger shards and reconcile counts',
+    state: 'running',
+    handle_kind: 'task-id',
+    has_attach_cmd: false,
+    has_transcript: true,
+    registered_at: '2026-07-08T11:40:00Z',
+    ended_at: null,
+    probe: { observed: 'silent', as_of: '2026-07-08T12:10:00Z', method: 'transcript-mtime' },
+    links: ['migration', 'mig-b'],
+  },
+  {
+    id: 'agt-003',
+    type: 'background-shell',
+    harness: 'origin',
+    // model intentionally absent — unknown-faithful (renders —, never derived).
+    intent: 'watchdog poll on shard b',
+    state: 'uncertain',
+    handle_kind: 'pid',
+    has_attach_cmd: false,
+    has_transcript: false,
+    registered_at: '2026-07-08T12:05:00Z',
+    ended_at: null,
+    probe: { observed: 'unknown', as_of: '2026-07-08T12:15:00Z', method: 'none' },
+    links: ['mig-b'],
+  },
+  {
+    id: 'agt-004',
+    type: 'cli-worker',
+    harness: 'codex',
+    model: 'gpt-5.6-luna',
+    intent: 'fetch pipeline inputs',
+    state: 'terminal',
+    handle_kind: 'session-id',
+    has_attach_cmd: true,
+    has_transcript: true,
+    registered_at: '2026-07-08T08:10:00Z',
+    ended_at: '2026-07-08T08:52:00Z',
+    probe: { observed: 'gone', as_of: '2026-07-08T08:52:00Z', method: 'session-file-mtime' },
+    links: ['fetch-inputs'],
+  },
+];
+
+const fixtureAgentRefs = new Map<string, string[]>();
+for (const agent of fixtureAgents) {
+  for (const taskId of agent.links ?? []) {
+    const arr = fixtureAgentRefs.get(taskId) ?? [];
+    arr.push(agent.id);
+    fixtureAgentRefs.set(taskId, arr);
+  }
+}
 
 export const fixtureViewModel: ViewModelPayload = {
   schema: 'ccm/web-viewer-view-model/v1',
@@ -612,7 +686,7 @@ export const fixtureViewModel: ViewModelPayload = {
     boardHash: 'sha256:fixture-board',
     topologyHash: 'sha256:fixture-topology',
     mtimeMs: 1_783_512_062_000,
-    generatedAt: now
+    generatedAt: now,
   },
   board: {
     id: 'release-2025-05-16',
@@ -621,23 +695,23 @@ export const fixtureViewModel: ViewModelPayload = {
     mtime_ms: 1_783_512_062_000,
     hash: 'sha256:fixture',
     git: { branch: 'release/train-0516' },
-    meta: { template_version: 3 }
+    meta: { template_version: 3 },
   },
   freshness: {
     state: 'live',
     last_read_at: now,
     last_known_good_at: now,
-    errors: []
+    errors: [],
   },
   summary: {
     readySet: ['fetch-config', 'mig-c'],
     criticalPath: {
       chain: CRITICAL_PATH,
       makespan: 19_800_000,
-      weight_source: 'estimates'
+      weight_source: 'estimates',
     },
     awaitingUserCount: 2,
-    verifiedDone: 6
+    verifiedDone: 6,
   },
   insights: {
     impact: { id: 'root', count: 15 },
@@ -647,14 +721,31 @@ export const fixtureViewModel: ViewModelPayload = {
       impact: 4,
       status: 'in_flight',
       since: '2026-07-08T10:05:00Z',
-      elapsed_ms: 8_358_000
+      elapsed_ms: 8_358_000,
     },
     wip: { count: 4, limit: 3, over: true },
     awaiting: { count: 2, oldest_gate_elapsed_ms: 12_258_000 },
     age_ms: 15_558_000,
-    per_node: PER_NODE
+    per_node: PER_NODE,
   },
   board_extras: fixtureBoardExtras,
+  agents: fixtureAgents,
+  agent_insights: {
+    total: 4,
+    active: 3,
+    running: 2,
+    by_state: { running: 2, uncertain: 1, terminal: 1 },
+    by_harness: { codex: 1, 'claude-code': 1, origin: 1 },
+    oldest_in_flight: {
+      id: 'agt-001',
+      registered_at: '2026-07-08T10:05:00Z',
+      elapsed_ms: 8_358_000,
+    },
+    unclaimed_ready: [
+      { id: 'fetch-config', title: 'Fetch launch config' },
+      { id: 'mig-c', title: 'Migrate shard c' },
+    ],
+  },
   tasks: fixtureTasks,
   graph: {
     family: 'task-dag',
@@ -684,13 +775,14 @@ export const fixtureViewModel: ViewModelPayload = {
         surface: selectedRoute?.surface,
         surface_label: selectedRoute?.surface_label,
         model: selectedRoute?.model,
-        role_grades: selectedRoute?.role_grades
+        role_grades: selectedRoute?.role_grades,
+        agent_refs: fixtureAgentRefs.get(task.id) ?? []
       };
     }),
     edges: derived.edges,
     upstream: derived.upstream,
     downstream: derived.downstream,
-    parents: derived.parents
+    parents: derived.parents,
   },
   status: {
     buckets: [
@@ -699,28 +791,32 @@ export const fixtureViewModel: ViewModelPayload = {
       { id: 'awaiting-user', label: 'Awaiting User', tone: 'awaiting-user', count: 2 },
       { id: 'blocked', label: 'Blocked', tone: 'blocked', count: 2 },
       { id: 'stale', label: 'Stale / Error', tone: 'stale', count: 4 },
-      { id: 'done', label: 'Done / Verified', tone: 'done', count: 6 }
+      { id: 'done', label: 'Done / Verified', tone: 'done', count: 6 },
     ],
     awaiting_user: [
-      { id: 'user-approval', title: 'Approve credential plan', command: 'ccm task show user-approval' },
-      { id: 'run-jobs', title: 'Run verification jobs', command: 'ccm task show run-jobs' }
+      {
+        id: 'user-approval',
+        title: 'Approve credential plan',
+        command: 'ccm task show user-approval',
+      },
+      { id: 'run-jobs', title: 'Run verification jobs', command: 'ccm task show run-jobs' },
     ],
     in_flight: [
       { id: 'deploy-infra', title: 'Deploy infra cutover', handle: 'run_9a3d2b1e', age: '18m' },
       { id: 'migration', title: 'Data migration wave', age: '12m' },
-      { id: 'mig-b', title: 'Migrate ledgers shard', age: '8m' }
+      { id: 'mig-b', title: 'Migrate ledgers shard', age: '8m' },
     ],
-    blocked: [{ id: 'verify-results', title: 'Verify launch evidence', reason: 'run-jobs' }]
+    blocked: [{ id: 'verify-results', title: 'Verify launch evidence', reason: 'run-jobs' }],
   },
   diagnostics: {
     lint: [{ severity: 'warning', message: '2 warnings' }],
     over_scheduling: [{ severity: 'warning', message: 'wip 4 exceeds wip_limit 3' }],
-    report_freshness: 'fresh'
+    report_freshness: 'fresh',
   },
   defaults: {
     selected_task_id: 'deploy-infra',
-    focus: 'critical_path_or_ready'
-  }
+    focus: 'critical_path_or_ready',
+  },
 };
 
 export const fixtureTask: TaskDetailPayload = {
@@ -749,27 +845,32 @@ export const fixtureTask: TaskDetailPayload = {
     acceptance: {
       criteria: [
         { desc: 'terraform apply exits 0 on all three stages', kind: 'test', status: 'met' },
-        { desc: 'p99 cutover latency below 400ms', kind: 'metric', target: '400ms', status: 'pending' },
-        { desc: 'second reviewer signs off the runbook diff', kind: 'review', status: 'failed' }
-      ]
+        {
+          desc: 'p99 cutover latency below 400ms',
+          kind: 'metric',
+          target: '400ms',
+          status: 'pending',
+        },
+        { desc: 'second reviewer signs off the runbook diff', kind: 'review', status: 'failed' },
+      ],
     },
     execution: fixtureTasks.find((task) => task.id === 'deploy-infra')?.execution,
     summary: 'Provisioning is active. The critical path remains clear while policy-check is stale.',
-    next_actions: ['Monitor run progress', 'Review plan output', 'Proceed to run-jobs on success']
+    next_actions: ['Monitor run progress', 'Review plan output', 'Proceed to run-jobs on success'],
   },
   dependencies: [
     { id: 'plan-execution', title: 'Plan execution graph', status: 'done' },
-    { id: 'user-approval', title: 'Approve credential plan', status: 'blocked' }
+    { id: 'user-approval', title: 'Approve credential plan', status: 'blocked' },
   ],
   dependents: [
     { id: 'migration', title: 'Data migration wave', status: 'in_flight' },
-    { id: 'run-jobs', title: 'Run verification jobs', status: 'in_flight' }
+    { id: 'run-jobs', title: 'Run verification jobs', status: 'in_flight' },
   ],
   activity: [
     { at: '10:05:00', text: 'Run started by ccm service' },
     { at: '10:31:20', text: 'Terraform plan uploaded' },
-    { at: '11:42:53', text: 'Awaiting final apply result' }
-  ]
+    { at: '11:42:53', text: 'Awaiting final apply result' },
+  ],
 };
 
 export const fixtureStatusReport: StatusReportPayload = {
@@ -777,32 +878,38 @@ export const fixtureStatusReport: StatusReportPayload = {
   artifact: {
     freshness: 'fresh',
     generated_at: now,
-    expires_at: '2026-07-08T12:26:18Z'
+    expires_at: '2026-07-08T12:26:18Z',
   },
   progress: {
     total: 20,
     done: 6,
     in_flight: 4,
     ready: 3,
-    blocked: 4
+    blocked: 4,
   },
   next_actions: {
     ready_to_dispatch: [
       { id: 'fetch-config', title: 'Fetch environment config' },
-      { id: 'mig-c', title: 'Migrate archives shard' }
+      { id: 'mig-c', title: 'Migrate archives shard' },
     ],
     awaiting_user: [
-      { id: 'user-approval', title: 'Approve credential plan', command: 'ccm task show user-approval' }
+      {
+        id: 'user-approval',
+        title: 'Approve credential plan',
+        command: 'ccm task show user-approval',
+      },
     ],
-    operator_attention: [{ id: 'policy-check', title: 'Policy advisory stale', severity: 'warning' }]
+    operator_attention: [
+      { id: 'policy-check', title: 'Policy advisory stale', severity: 'warning' },
+    ],
   },
   risks: [
     { kind: 'over_scheduling', severity: 'medium', in_flight: 4, wip_limit: 3 },
-    { kind: 'attention_tasks', severity: 'medium', count: 4 }
+    { kind: 'attention_tasks', severity: 'medium', count: 4 },
   ],
   health: [
     { id: 'lint', label: 'Board lint', state: 'warning', detail: '2 warnings' },
     { id: 'usage', label: 'Usage verdict', state: 'ok', detail: 'within pacing corridor' },
-    { id: 'freshness', label: 'Report freshness', state: 'fresh', detail: '18s ago' }
-  ]
+    { id: 'freshness', label: 'Report freshness', state: 'fresh', detail: '18s ago' },
+  ],
 };

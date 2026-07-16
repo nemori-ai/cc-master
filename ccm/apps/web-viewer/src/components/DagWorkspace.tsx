@@ -44,6 +44,8 @@ interface DagWorkspaceProps {
   theme: 'dark' | 'light';
   locateRequest: LocateRequest | null;
   onResetLayout: () => void;
+  /** When set, dim every node NOT in this set (selected agent's linked nodes). */
+  highlightNodeIds?: Set<string> | null;
 }
 
 const nodeTypes = { cc: CcNode };
@@ -117,6 +119,7 @@ function DagCanvas({
   theme,
   locateRequest,
   onResetLayout,
+  highlightNodeIds = null,
 }: DagWorkspaceProps) {
   const rf = useReactFlow();
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
@@ -243,8 +246,9 @@ function DagCanvas({
       const childOf = parents[node.id] ?? null;
       const structure = perNodeStructure(insights, node.id);
       const dimmed =
-        filtersActive &&
-        !(nodeMatchesTaskFilters(node, activeFilters) && queryMatches(node, query));
+        (filtersActive &&
+          !(nodeMatchesTaskFilters(node, activeFilters) && queryMatches(node, query))) ||
+        (highlightNodeIds != null && !highlightNodeIds.has(node.id));
       return {
         id: node.id,
         type: 'cc' as const,
@@ -333,6 +337,7 @@ function DagCanvas({
     filtersActive,
     dragNonce,
     resetKey,
+    highlightNodeIds,
   ]);
 
   useEffect(() => {

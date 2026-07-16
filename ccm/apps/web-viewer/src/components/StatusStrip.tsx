@@ -1,4 +1,4 @@
-import { normalizeStatus, shortTime } from '../format';
+import { fmtElapsed, normalizeStatus, shortTime } from '../format';
 import type { ViewModelPayload, WorkspaceData } from '../types';
 
 interface StatusStripProps {
@@ -22,6 +22,11 @@ export function StatusStrip({ viewModel, source }: StatusStripProps) {
   const wip = viewModel.insights?.wip ?? { count: 0, limit: null, over: false };
   const freshness = viewModel.freshness.state;
   const branch = viewModel.board.git?.branch || null;
+  const agentInsights = viewModel.agent_insights ?? null;
+  const harnessEntries = agentInsights
+    ? Object.entries(agentInsights.by_harness).sort((a, b) => b[1] - a[1])
+    : [];
+  const oldest = agentInsights?.oldest_in_flight ?? null;
 
   return (
     <div className="statusstrip">
@@ -61,6 +66,28 @@ export function StatusStrip({ viewModel, source }: StatusStripProps) {
           <div className="readout branch">
             <span className="rl">branch</span>
             <span className="rv">{branch}</span>
+          </div>
+        </>
+      ) : null}
+
+      {agentInsights && agentInsights.total > 0 ? (
+        <>
+          <div className="vrule" />
+          <div className="readout agents" title="running agents · by harness · oldest in-flight">
+            <span className="rl">agents</span>
+            <span className="rv">
+              {agentInsights.running}
+              <span className="unit"> running</span>
+              {harnessEntries.length ? (
+                <span className="unit">
+                  {' '}
+                  · {harnessEntries.map(([harness, count]) => `${harness} ${count}`).join(' ')}
+                </span>
+              ) : null}
+              {oldest ? (
+                <span className="unit"> · oldest {fmtElapsed(oldest.elapsed_ms) ?? '<1m'}</span>
+              ) : null}
+            </span>
           </div>
         </>
       ) : null}

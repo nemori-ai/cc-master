@@ -1,18 +1,19 @@
 import { fixtureBoards, fixtureStatusReport, fixtureTask, fixtureViewModel } from './fixtures';
 import type {
+  AgentDetailPayload,
   BoardsPayload,
   DecisionEntry,
   PeersPayload,
   StatusReportPayload,
   TaskDetailPayload,
   ViewModelPayload,
-  WorkspaceData
+  WorkspaceData,
 } from './types';
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, {
     headers: { Accept: 'application/json' },
-    signal
+    signal,
   });
 
   if (!response.ok) {
@@ -32,7 +33,10 @@ function withParams(path: string, params: Record<string, string | undefined>): s
   return `${url.pathname}${url.search}`;
 }
 
-function selectedTaskIdFor(viewModel: ViewModelPayload, preferredTaskId?: string | null): string | null {
+function selectedTaskIdFor(
+  viewModel: ViewModelPayload,
+  preferredTaskId?: string | null,
+): string | null {
   if (preferredTaskId && viewModel.graph.nodes.some((node) => node.id === preferredTaskId)) {
     return preferredTaskId;
   }
@@ -42,11 +46,22 @@ function selectedTaskIdFor(viewModel: ViewModelPayload, preferredTaskId?: string
 export async function loadTaskDetail(
   taskId: string,
   boardFilename?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<TaskDetailPayload> {
   return getJson<TaskDetailPayload>(
     withParams('/task.json', { task: taskId, board: boardFilename }),
-    signal
+    signal,
+  );
+}
+
+export async function loadAgentDetail(
+  agentId: string,
+  boardFilename?: string,
+  signal?: AbortSignal,
+): Promise<AgentDetailPayload> {
+  return getJson<AgentDetailPayload>(
+    withParams('/agent.json', { agent: agentId, board: boardFilename }),
+    signal,
   );
 }
 
@@ -57,12 +72,12 @@ export async function loadTaskDetail(
  */
 export async function loadDecisions(
   boardFilename?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<DecisionEntry[]> {
   try {
     const data = await getJson<unknown>(
       withParams('/decisions.json', { board: boardFilename }),
-      signal
+      signal,
     );
     return Array.isArray(data) ? (data as DecisionEntry[]) : [];
   } catch {
@@ -77,17 +92,20 @@ export async function loadDecisions(
  */
 export async function loadPeers(
   boardFilename?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<PeersPayload | null> {
   try {
-    const data = await getJson<unknown>(withParams('/peers.json', { board: boardFilename }), signal);
+    const data = await getJson<unknown>(
+      withParams('/peers.json', { board: boardFilename }),
+      signal,
+    );
     if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
     const payload = data as PeersPayload;
     return {
       ...payload,
       available: payload.available === true,
       count: typeof payload.count === 'number' ? payload.count : 0,
-      peers: Array.isArray(payload.peers) ? payload.peers : []
+      peers: Array.isArray(payload.peers) ? payload.peers : [],
     };
   } catch {
     return null;
@@ -109,9 +127,9 @@ function lastKnownGoodFrame(previous: WorkspaceData, message: string): Workspace
       freshness: {
         ...previous.viewModel.freshness,
         state: 'stale',
-        errors: [{ message }]
-      }
-    }
+        errors: [{ message }],
+      },
+    },
   };
 }
 
@@ -119,12 +137,12 @@ export async function loadWorkspace(
   boardFilename?: string,
   signal?: AbortSignal,
   preferredTaskId?: string | null,
-  previous?: WorkspaceData | null
+  previous?: WorkspaceData | null,
 ): Promise<WorkspaceData> {
   try {
     const boards = await getJson<BoardsPayload>(
       withParams('/boards.json', { board: boardFilename }),
-      signal
+      signal,
     );
     const resolvedBoardFilename =
       boardFilename ??
@@ -133,12 +151,12 @@ export async function loadWorkspace(
     const [viewModel, statusReport] = await Promise.all([
       getJson<ViewModelPayload>(
         withParams('/view-model.json', { board: resolvedBoardFilename }),
-        signal
+        signal,
       ),
       getJson<StatusReportPayload>(
         withParams('/status-report.json', { board: resolvedBoardFilename }),
-        signal
-      )
+        signal,
+      ),
     ]);
 
     // Torn-write tolerance: a 200 + error payload (no graph) means the board bytes are
@@ -158,7 +176,7 @@ export async function loadWorkspace(
       boards,
       viewModel,
       selectedTask,
-      statusReport
+      statusReport,
     };
   } catch (error) {
     if (signal?.aborted) {
@@ -177,7 +195,7 @@ export async function loadWorkspace(
       viewModel: fixtureViewModel,
       selectedTask: fixtureTask,
       statusReport: fixtureStatusReport,
-      error: message
+      error: message,
     };
   }
 }

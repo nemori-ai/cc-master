@@ -1,4 +1,5 @@
 import { perNodeStructure, useSecondTick } from '../analytics';
+import { agentStateLamp, agentStateText, harnessBadge } from '../agentFormat';
 import {
   endStr,
   fmtDuration,
@@ -11,7 +12,7 @@ import {
   statusLampVar,
   statusText,
   taskDuration,
-  watchdogReadout
+  watchdogReadout,
 } from '../format';
 import type {
   AcceptanceCriterion,
@@ -19,7 +20,7 @@ import type {
   DecisionEntry,
   DecisionPackage,
   TaskDetailPayload,
-  ViewModelPayload
+  ViewModelPayload,
 } from '../types';
 import { DecisionCard } from './DecisionCard';
 import { DiscussHistory } from './DiscussHistory';
@@ -31,6 +32,7 @@ interface InspectorRailProps {
   taskLoading?: boolean;
   onClose?: () => void;
   onSelectTask: (taskId: string) => void;
+  onSelectAgent: (agentId: string) => void;
 }
 
 interface DepItemProps {
@@ -77,7 +79,7 @@ function acceptanceView(acceptance: unknown): AcceptanceView | null {
     const criteria = (acceptance as { criteria?: unknown }).criteria;
     if (Array.isArray(criteria)) {
       const rows = criteria.filter(
-        (c): c is AcceptanceCriterion => !!c && typeof c === 'object' && !Array.isArray(c)
+        (c): c is AcceptanceCriterion => !!c && typeof c === 'object' && !Array.isArray(c),
       );
       return rows.length ? { prose: [], criteria: rows } : null;
     }
@@ -109,7 +111,7 @@ const taskFieldKeys = [
   'started_at',
   'finished_at',
   'updated_at',
-  'decision_package'
+  'decision_package',
 ];
 
 /**
@@ -125,11 +127,17 @@ export function InspectorRail({
   decisions,
   taskLoading = false,
   onClose,
-  onSelectTask
+  onSelectTask,
+  onSelectAgent,
 }: InspectorRailProps) {
   const t = task.task;
   const status = normalizeStatus(String(t.status ?? ''));
   const node = viewModel.graph.nodes.find((candidate) => candidate.id === t.id);
+  // Server-joined agent ids working this node -> compact records by pure table lookup.
+  const agentRefs = node?.agent_refs ?? [];
+  const linkedAgents = agentRefs
+    .map((agentId) => (viewModel.agents ?? []).find((agent) => agent.id === agentId))
+    .filter((agent): agent is NonNullable<typeof agent> => !!agent);
   const userGate = node?.awaiting_user === true;
   const lamp = userGate ? 'var(--alert)' : statusLampVar(status);
   const isCrit = (viewModel.graph.critical_path ?? []).includes(t.id);
@@ -396,6 +404,36 @@ export function InspectorRail({
                 <span className={`v${mono ? ' mono' : ''}`}>{value}</span>
               </div>
             ))}
+          </div>
+        </div>
+      ) : null}
+
+      {linkedAgents.length ? (
+        <div className="dsect agents-sect">
+          <div className="sl">⚙ agents</div>
+          <div className="deplist">
+            {linkedAgents.map((agent) => {
+              const lampVar = agentStateLamp(agent.state);
+              return (
+                <button
+                  className="depitem"
+                  key={agent.id}
+                  onClick={() => onSelectAgent(agent.id)}
+                  type="button"
+                >
+                  <span className="lamp" style={{ background: lampVar, color: lampVar }} />
+                  <span className="dt">
+                    <span className="did">{agent.id}</span>
+                    {agent.intent || (
+                      <span className="untitled">{harnessBadge(agent.harness)}</span>
+                    )}
+                  </span>
+                  <span className="ds" style={{ color: lampVar }}>
+                    {agentStateText(agent.state)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : null}

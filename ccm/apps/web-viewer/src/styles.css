@@ -4448,3 +4448,311 @@ header.missionline {
   border-color: oklch(0.74 0.135 162 / 0.4);
   background: oklch(0.74 0.135 162 / 0.1);
 }
+
+/* ============================================================================
+   Agent Registry (S4) — roster stage view, agent inspector, macro / rail bits.
+   Reuses the shared .dpanel / .dsect / .depitem / .metric primitives; only the
+   agent-specific surfaces are styled here.
+   ============================================================================ */
+
+/* --- Agent roster (fifth stage view) --- */
+.agent-roster {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.agent-roster.empty {
+  align-items: center;
+  justify-content: center;
+}
+.agent-roster-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+.agent-roster-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--hair-soft);
+}
+.arh-count {
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.arh-summary {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.agent-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.agent-row {
+  display: grid;
+  grid-template-columns: 96px 1fr 130px 2fr 44px 72px 108px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  border: none;
+  border-bottom: 1px solid var(--hair-soft);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink);
+  width: 100%;
+  font: inherit;
+}
+.agent-row:hover {
+  background: var(--panel-hi);
+}
+.agent-row[data-selected='true'] {
+  background: var(--panel-hi);
+  box-shadow: inset 3px 0 0 var(--spine);
+}
+.agent-row-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  cursor: default;
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.agent-row-head:hover {
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+}
+.agent-row .lamp {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: 0 0 6px currentColor;
+}
+.ac-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ac-state-text {
+  font-size: 10.5px;
+  color: var(--ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-id {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.ac-id-code {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ac-type {
+  font-size: 9.5px;
+  color: var(--ink-faint);
+}
+.ac-harness {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.harness-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--hair);
+  background: var(--panel-hi);
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+  width: max-content;
+}
+.ac-model {
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-intent {
+  font-size: 11.5px;
+  color: var(--ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ac-intent .dim {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+.ac-links,
+.ac-elapsed {
+  font-size: 11px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+.ac-probe {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.ac-probe-text {
+  font-size: 10.5px;
+  color: var(--ink-dim);
+}
+.ac-probe-asof {
+  font-size: 9px;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 720px) {
+  .agent-row {
+    grid-template-columns: 84px 1fr 60px 88px;
+  }
+  .agent-row .ac-harness,
+  .agent-row .ac-intent,
+  .agent-row .ac-probe-asof {
+    display: none;
+  }
+  .agent-row-head .ac-harness,
+  .agent-row-head .ac-intent {
+    display: none;
+  }
+}
+
+/* --- Agent inspector (right rail, third mode) --- */
+.dpanel[data-mode='agent'] .v .lamp {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  box-shadow: 0 0 5px currentColor;
+}
+.attach-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.attach-cmd {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--hair);
+  border-radius: 7px;
+  background: var(--panel-hi);
+  font-size: 11px;
+  color: var(--ink);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.attach-copy {
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border: 1px solid var(--hair);
+  border-radius: 7px;
+  background: var(--panel-hi);
+  color: var(--ink-dim);
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.attach-copy:hover {
+  color: var(--spine);
+  border-color: var(--spine);
+}
+.depitem:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* --- Left-rail agents metric (bucket counts) --- */
+.metric-btn {
+  border: none;
+  border-bottom: 1px solid var(--hair-soft);
+  background: none;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  color: var(--ink);
+  font: inherit;
+}
+.metric-btn:hover {
+  background: var(--panel-hi);
+}
+.agent-buckets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.agent-bucket {
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--hair);
+  background: var(--panel);
+  color: var(--ink-dim);
+}
+.agent-bucket[data-state='running'] {
+  color: var(--inflight);
+  border-color: color-mix(in oklch, var(--inflight) 40%, transparent);
+}
+.agent-bucket[data-state='uncertain'] {
+  color: var(--uncertain);
+  border-color: color-mix(in oklch, var(--uncertain) 40%, transparent);
+}
+.agent-bucket[data-state='orphaned'] {
+  color: var(--failed);
+  border-color: color-mix(in oklch, var(--failed) 40%, transparent);
+}
+.agent-bucket[data-state='terminal'] {
+  color: var(--done);
+  border-color: color-mix(in oklch, var(--done) 40%, transparent);
+}
+.msub-inline {
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-left: 4px;
+}
+
+/* --- Board-brief policy readout --- */
+.policy .policy-allow {
+  color: var(--done);
+}
+.policy .policy-deny {
+  color: var(--failed);
+}

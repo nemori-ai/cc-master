@@ -31,6 +31,7 @@ const HEALTH_SCHEMA = 'ccm/web-viewer-health/v1';
 const BOARDS_SCHEMA = 'ccm/web-viewer-boards/v1';
 const VIEW_MODEL_SCHEMA = 'ccm/web-viewer-view-model/v1';
 const TASK_DETAIL_SCHEMA = 'ccm/web-viewer-task/v1';
+const AGENT_DETAIL_SCHEMA = 'ccm/web-viewer-agent/v1';
 const PEERS_SCHEMA = 'ccm/web-viewer-peers/v1';
 const DEFAULT_HOST = '127.0.0.1';
 /** 0 = OS-assigned ephemeral port (never hardcode a fixed listener port on install/start/restart). */
@@ -1886,6 +1887,200 @@ function buildBoardExtras(board: JsonRecord): JsonRecord | null {
   return Object.keys(out).length ? out : null;
 }
 
+// ---- Agent Registry read-model (S3) — compact projection + node join, all server-side ---
+// The board `agents[]` ✎ segment is a board-scoped runtime roster (ccm agent create/bind/
+// link/terminal/probe). The viewer join (which agent runs which node, which node is claimed)
+// is derived HERE so the frontend never infers: node.agent_refs and agent_insights are
+// server-computed; the frontend only renders and table-looks-up by id.
+function agentsOf(board: JsonRecord): JsonRecord[] {
+  return Array.isArray(board.agents)
+    ? board.agents.filter(
+        (agent): agent is JsonRecord =>
+          !!agent && typeof agent === 'object' && !Array.isArray(agent),
+      )
+    : [];
+}
+
+function agentId(agent: JsonRecord): string {
+  return typeof agent.id === 'string' ? agent.id : '';
+}
+
+// The board writer stores the agent↔task join on the AGENT side (`agents[].links[]`), not on
+// the attempt/task projection (frozen native-attempt contract). This reads the task ids off it.
+function agentLinkTaskIds(agent: JsonRecord): string[] {
+  return Array.isArray(agent.links)
+    ? agent.links
+        .map((link) =>
+          link && typeof link === 'object' && !Array.isArray(link)
+            ? (link as JsonRecord).task_id
+            : null,
+        )
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    : [];
+}
+
+function objectField(record: JsonRecord, key: string): JsonRecord {
+  const value = record[key];
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : {};
+}
+
+// Compact agent projection carried on the view-model top-level `agents[]`. Unknown-faithful:
+// `model` is omitted when the record never captured one (frontend shows unknown / —, never
+// derives it). Probe evidence passes through verbatim with its `as_of` freshness anchor.
+function compactAgent(agent: JsonRecord): JsonRecord | null {
+  const id = agentId(agent);
+  if (!id) return null;
+  const lifecycle = objectField(agent, 'lifecycle');
+  const handle = objectField(agent, 'handle');
+  const launch = objectField(agent, 'launch');
+  const probeRaw = objectField(agent, 'probe');
+  const hasProbe =
+    typeof agent.probe === 'object' && agent.probe !== null && !Array.isArray(agent.probe);
+  const attachCmd = typeof handle.attach_cmd === 'string' ? handle.attach_cmd : '';
+  const transcript = typeof handle.transcript_ref === 'string' ? handle.transcript_ref : '';
+  const out: JsonRecord = {
+    id,
+    type: typeof agent.type === 'string' ? agent.type : undefined,
+    harness: typeof agent.harness === 'string' ? agent.harness : undefined,
+    intent: typeof agent.intent === 'string' ? agent.intent : '',
+    state: typeof lifecycle.state === 'string' ? lifecycle.state : 'unknown',
+    handle_kind: typeof handle.kind === 'string' ? handle.kind : 'none',
+    has_attach_cmd: attachCmd.trim() !== '',
+    has_transcript: transcript.trim() !== '',
+    registered_at:
+      typeof lifecycle.registered_at === 'string'
+        ? lifecycle.registered_at
+        : typeof launch.created_at === 'string'
+          ? launch.created_at
+          : undefined,
+    ended_at: typeof lifecycle.ended_at === 'string' ? lifecycle.ended_at : null,
+    probe: hasProbe
+      ? {
+          observed: typeof probeRaw.observed === 'string' ? probeRaw.observed : 'unknown',
+          as_of: typeof probeRaw.as_of === 'string' ? probeRaw.as_of : null,
+          method: typeof probeRaw.method === 'string' ? probeRaw.method : 'none',
+        }
+      : null,
+    links: agentLinkTaskIds(agent),
+  };
+  if (typeof agent.model === 'string' && agent.model) out.model = agent.model;
+  return out;
+}
+
+// task_id -> agent ids (the reverse of agents[].links); powers node.agent_refs so the DAG /
+// task inspector can list who is working a node with a pure table lookup.
+function agentRefsByTask(agents: JsonRecord[]): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const agent of agents) {
+    const id = agentId(agent);
+    if (!id) continue;
+    for (const taskIdValue of agentLinkTaskIds(agent)) {
+      const arr = map.get(taskIdValue) ?? [];
+      if (!arr.includes(id)) arr.push(id);
+      map.set(taskIdValue, arr);
+    }
+  }
+  return map;
+}
+
+// Macro readouts + the "ready but no agent claimed it" derived list — all server-derived so
+// the strip / left rail render verbatim (no client aggregation).
+function buildAgentInsights(
+  compactAgents: JsonRecord[],
+  tasks: JsonRecord[],
+  refsByTask: Map<string, string[]>,
+): JsonRecord {
+  const byState: Record<string, number> = {};
+  const byHarness: Record<string, number> = {};
+  let active = 0;
+  let running = 0;
+  let oldest: { id: string; registered_at: string; ts: number } | null = null;
+  const nowMs = Date.now();
+  const ACTIVE = new Set(['starting', 'running', 'uncertain']);
+  for (const agent of compactAgents) {
+    const state = typeof agent.state === 'string' ? agent.state : 'unknown';
+    byState[state] = (byState[state] ?? 0) + 1;
+    if (ACTIVE.has(state)) {
+      active += 1;
+      const harness = typeof agent.harness === 'string' ? agent.harness : 'unknown';
+      byHarness[harness] = (byHarness[harness] ?? 0) + 1;
+    }
+    if (state === 'running') {
+      running += 1;
+      const registeredAt = typeof agent.registered_at === 'string' ? agent.registered_at : '';
+      const ts = parseTsLoose(registeredAt);
+      if (ts != null && (oldest == null || ts < oldest.ts)) {
+        oldest = { id: String(agent.id), registered_at: registeredAt, ts };
+      }
+    }
+  }
+  const unclaimedReady = tasks
+    .filter((task) => statusOf(task) === 'ready' && !refsByTask.get(taskId(task))?.length)
+    .map((task) => ({ id: taskId(task), title: taskTitle(task) }));
+  return {
+    total: compactAgents.length,
+    active,
+    running,
+    by_state: byState,
+    by_harness: byHarness,
+    oldest_in_flight: oldest
+      ? {
+          id: oldest.id,
+          registered_at: oldest.registered_at,
+          elapsed_ms: Math.max(0, nowMs - oldest.ts),
+        }
+      : null,
+    unclaimed_ready: unclaimedReady,
+  };
+}
+
+// buildAgentDetail — /agent.json single-agent drill-down: full record verbatim + linked-task
+// join (id/title/status) + probe freshness. Read-only: never probes on the HTTP path.
+function buildAgentDetail(boardPath: string, agentIdValue: string): JsonRecord | null {
+  const snapshot = readBoardSnapshot(boardPath);
+  const board = snapshot.board;
+  const agents = agentsOf(board);
+  const agent = agents.find((candidate) => agentId(candidate) === agentIdValue);
+  if (!agent) return null;
+  const tasks = tasksOf(board);
+  const byId = new Map(tasks.map((task) => [taskId(task), task]));
+  const linkRows = Array.isArray(agent.links)
+    ? agent.links.filter(
+        (link): link is JsonRecord => !!link && typeof link === 'object' && !Array.isArray(link),
+      )
+    : [];
+  const linkedTasks = linkRows.map((link) => {
+    const tid = typeof link.task_id === 'string' ? link.task_id : '';
+    const task = tid ? byId.get(tid) : undefined;
+    return {
+      task_id: tid,
+      linked_at: typeof link.linked_at === 'string' ? link.linked_at : undefined,
+      title: task ? taskTitle(task) : null,
+      status: task ? statusOf(task) : null,
+      exists: !!task,
+    };
+  });
+  const filename = path.basename(boardPath);
+  const probeRaw = objectField(agent, 'probe');
+  const hasProbe =
+    typeof agent.probe === 'object' && agent.probe !== null && !Array.isArray(agent.probe);
+  return {
+    schema: AGENT_DETAIL_SCHEMA,
+    board: { id: boardIdFromFilename(filename), filename },
+    agent,
+    compact: compactAgent(agent),
+    linked_tasks: linkedTasks,
+    probe: hasProbe
+      ? {
+          observed: typeof probeRaw.observed === 'string' ? probeRaw.observed : 'unknown',
+          as_of: typeof probeRaw.as_of === 'string' ? probeRaw.as_of : null,
+          method: typeof probeRaw.method === 'string' ? probeRaw.method : 'none',
+          last_probe_at: typeof probeRaw.last_probe_at === 'string' ? probeRaw.last_probe_at : null,
+        }
+      : null,
+  };
+}
+
 // ---- /peers.json — same-home peer roster (engine buildPeerRoster, `ccm peers` source) ---
 // Read-only cross-board awareness: every OTHER active + heartbeat-fresh board in the same
 // home, plus the current board's coordination.inbox as a notification summary. Fail-safe
@@ -1981,6 +2176,10 @@ function buildViewModel(home: string, boardPath: string): JsonRecord {
   const readAt = nowIso();
   const insights = buildInsights(board, tasks, graph);
   const boardExtras = buildBoardExtras(board);
+  const agents = agentsOf(board);
+  const compactAgents = agents.map(compactAgent).filter((a): a is JsonRecord => !!a);
+  const refsByTask = agentRefsByTask(agents);
+  const agentInsights = buildAgentInsights(compactAgents, tasks, refsByTask);
   const wipInsight = insights.wip as { count: number; limit: number | null; over: boolean };
   const nodeTasks = compactTasks.map((task) => {
     const id = taskId(task);
@@ -2009,6 +2208,7 @@ function buildViewModel(home: string, boardPath: string): JsonRecord {
         : {}),
       ...(typeof selected?.model === 'string' ? { model: selected.model } : {}),
       ...(Array.isArray(selected?.role_grades) ? { role_grades: selected.role_grades } : {}),
+      agent_refs: refsByTask.get(id) ?? [],
     };
   });
   return {
@@ -2068,6 +2268,8 @@ function buildViewModel(home: string, boardPath: string): JsonRecord {
     },
     insights,
     ...(boardExtras ? { board_extras: boardExtras } : {}),
+    agents: compactAgents,
+    agent_insights: agentInsights,
     tasks: compactTasks,
     graph: {
       family: 'task-dag',
@@ -2740,6 +2942,37 @@ export function serve(ctx: Ctx): Promise<number> {
         } catch (e) {
           sendJson(res, 200, {
             schema: TASK_DETAIL_SCHEMA,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+        return;
+      }
+      if (url.pathname === '/agent.json') {
+        const runtimeState = latestRuntimeState(state);
+        const boardPath = resolveHttpBoard(
+          runtimeState.home,
+          runtimeState.current_selection?.board_path || null,
+          url,
+        );
+        if (!boardPath) {
+          sendJson(res, 404, { schema: AGENT_DETAIL_SCHEMA, error: 'board not found' });
+          return;
+        }
+        const requestedAgent = url.searchParams.get('agent') || url.searchParams.get('id');
+        if (!requestedAgent) {
+          sendJson(res, 400, { schema: AGENT_DETAIL_SCHEMA, error: 'missing agent parameter' });
+          return;
+        }
+        try {
+          const detail = buildAgentDetail(boardPath, requestedAgent);
+          if (!detail) {
+            sendJson(res, 404, { schema: AGENT_DETAIL_SCHEMA, error: 'agent not found' });
+            return;
+          }
+          sendJson(res, 200, detail);
+        } catch (e) {
+          sendJson(res, 200, {
+            schema: AGENT_DETAIL_SCHEMA,
             error: e instanceof Error ? e.message : String(e),
           });
         }
