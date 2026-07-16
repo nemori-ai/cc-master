@@ -1834,7 +1834,7 @@ ccm agent bind <id> --handle <kind:value> [flags]
 
 1. **派发**：`codex exec --json "<prompt>" > /abs/worker.log 2>&1 &`——`--json` 让 codex 把事件以 JSONL 打到 stdout，重定向落成日志文件。
 2. **立即 bind 兜底证据**：`ccm agent bind <id> --handle pid:<pid> --transcript /abs/worker.log`——pid 立刻可探测、日志立刻可看（纯文本 fallback）。
-3. **起跑后升级 bind**：日志**第一个事件 `session_meta` 的 `payload.session_id` 就是 sid**（`head -1 /abs/worker.log` 即可提取）。拿到就升级：`ccm agent bind <id> --handle session-id:<sid> --attach-cmd "cd /abs/cwd && codex resume <sid>"`——探测随之升级为会话文件 mtime（rollout 落盘于 `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<sid>.jsonl`），attach / 流定位升级为精确 rollout 源。
+3. **起跑后升级 bind**：日志**首行 `thread.started` 事件的 `thread_id` 就是 sid**（`head -1 /abs/worker.log` 即可提取；它与 rollout 文件名里的 sid 一致。旧版 codex 若输出的是 `session_meta` 形状，则取其 `payload.session_id`）。拿到就升级：`ccm agent bind <id> --handle session-id:<sid> --attach-cmd "cd /abs/cwd && codex resume <sid>"`——探测随之升级为会话文件 mtime（rollout 落盘于 `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<sid>.jsonl`），attach / 流定位升级为精确 rollout 源。
 4. **反模式**：`codex exec resume --last` 不可作 attach 命令——它接「最近一个 session」，并行多 worker 时会接错人；shell 后台任务 id 也不是可探测的 handle（登记成 `task-id:<shell任务id>` 会让 probe 无从探测、流定位不到 rollout 文件）。精确 resume 永远是 `codex resume <sid>`。
 
 ### agent link

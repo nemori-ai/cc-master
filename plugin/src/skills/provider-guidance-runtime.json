@@ -39,8 +39,8 @@
           "files": {
             "SKILL.md": "f6b9ae935fbdec43a939640433a5952a2ec3968d388a80ec904b5170c754383a",
             "references/account-pool.md": "da7a5826ba8ceb1eefc26722b4e305df6042ea30264abade27f896ef1fb2a8d6",
-            "references/board-model-guide.md": "b0fbfe2d1a4ad281199bab9171f0f91ba767215b2053b8deca8a63dab12722d4",
-            "references/command-catalog.md": "341a735613b576db629995c8efb21df26769b8df5aaa630f82c9c335a8faa850"
+            "references/board-model-guide.md": "f8f4a50875fa816ae20f3c167e69a603757022e6e78f26f30a60f2f0d0a9a2b3",
+            "references/command-catalog.md": "db63b6c9d0efd0d094b86f70bbf6030ac0f64760c0600ebb6f29f811e106bd5c"
           }
         }
       }
@@ -77,8 +77,8 @@
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
             "SKILL.md": "ba1a8364c0700c74018b4f7797b32f0739962c711b44855c92d43768aad42078",
-            "references/board-model-guide.md": "1299b874e834949015c78eacca0fd31069be5127c557dc3f2d2ec436756f730d",
-            "references/command-catalog.md": "467df2f7c0f1003b04b309da6c81938f9413a3bcd76ba2f39d44673791c6c696"
+            "references/board-model-guide.md": "f1ec7c70842e6d39d8fe0055b1b40d0c0446d5de8e1ec8bebce4ad7745f84043",
+            "references/command-catalog.md": "0ee8e6233262009a707af482cb95cb13c461d31c07f6c6304e4ee1b9c1124388"
           }
         }
       }
@@ -115,8 +115,8 @@
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
             "SKILL.md": "41bc26768a60c536696c2b22d7a7a037edd3a966ac6e363a7545d7a6ce834e84",
-            "references/board-model-guide.md": "f48ac2c818a46ec740de4a98475509aa300319572923717a2d717b8368a73951",
-            "references/command-catalog.md": "57ba3c255c8caac6d6664c830e9f3c1ede9fc4ce2e96f826302eba256cc21248"
+            "references/board-model-guide.md": "4c8938280d84a20ab5f5d637a800c865feaf3089d4ce307a44ac2a530262c94e",
+            "references/command-catalog.md": "234460b834f22941cd00caff229015c9be3f46f6287f01ee40bddbf204dee515"
           }
         }
       }
