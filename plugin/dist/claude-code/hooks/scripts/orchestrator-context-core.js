@@ -7,6 +7,7 @@
 // PARITY: rule-orchestrator-context-fail-open
 // PARITY: rule-orchestrator-context-shadow-only
 // PARITY: rule-orchestrator-context-cursor-surfaces
+// PARITY: rule-orchestrator-context-machine-quota-summary
 const fs = require('fs');
 const path = require('path');
 const candidates = [

@@ -9,120 +9,131 @@ seed_board() {
   printf '{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"%s"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}]}' "$2" >"$1/boards/armed.board.json"
 }
 
-mk_ccm_stub() {
-  local dir stub payload
-  dir="$(make_project)"
-  stub="$dir/ccm"
-  payload="$dir/payload.json"
-  printf '%s' "$1" >"$payload"
-  cat >"$stub" <<STUB
-#!/usr/bin/env bash
-if [ "\$1" = "usage" ] && [ "\$2" = "advise" ]; then
-  printf '{"ok":true,"data":%s}\\n' "\$(cat "$payload")"
-  exit 0
-fi
-exit 1
-STUB
-  chmod +x "$stub"
-  echo "$stub"
+status_json() {
+  local state="$1" revision="$2" covered="$3" surface="$4"
+  node -e '
+const [state, revision, covered, surface] = process.argv.slice(1);
+const decisions = state === "none" ? [] : [{
+  scope_digest: `sha256:${"a".repeat(64)}`,
+  target: {
+    harness_id: "cursor", surface_id: surface, provider_id: "cursor",
+    window: { kind: "billing-cycle", name: "billing_period", duration_sec: 2592000 },
+  },
+  quota_scope_digest: `sha256:${"e".repeat(64)}`,
+  state,
+  freshness: state === "unknown" ? "unknown" : "fresh",
+  reason_codes: state === "healthy" ? [] : [`QUOTA_${state.toUpperCase()}`],
+  source: { collector_id: surface === "cursor-agent-cli" ? "cursor-agent-dashboard" : "cursor-dashboard", source_schema: "cursor/GetCurrentPeriodUsage/v1", auth_source: surface === "cursor-agent-cli" ? "cursor-agent-current-login" : "cursor-ide-current-login" },
+  decision_revision: `sha256:${revision.repeat(64)}`,
+  observation_revision: `sha256:${"0".repeat(64)}`,
+  fanout_covered: covered === "true",
+}];
+process.stdout.write(JSON.stringify({
+  schema: "ccm/machine-quota-status/v1",
+  summary: { schema: "ccm/machine-quota-summary/v1", decisions },
+  readings: [],
+  capacity_views: { schema: "ccm/machine-quota-capacity-views/v1", known_capacities: [], unresolved_scope_digests: [], unresolved_capacity_units: null },
+}));
+' "$state" "$revision" "$covered" "$surface"
 }
-mk_ccm_notify_stub() {
-  local dir stub payload
-  dir="$(make_project)"
-  stub="$dir/ccm"
-  payload="$dir/payload.json"
-  printf '%s' "$1" >"$payload"
-  cat >"$stub" <<STUB
+
+write_stub() {
+  local home="$1" response="$2"
+  printf '%s' "$response" >"$home/status.json"
+  cat >"$home/ccm" <<STUB
 #!/usr/bin/env bash
-if [ "\$1" = "usage" ] && [ "\$2" = "advise" ]; then
-  printf '{"ok":true,"data":%s}\\n' "\$(cat "$payload")"
-  exit 0
-fi
-if [ "\$1" = "coordination" ] && [ "\$2" = "notify" ]; then
-  printf '%s\\n' "\$*" > "$dir/notify.args"
-  printf '{"ok":true,"data":{"notification":{"id":"ntf-test"}}}\\n'
-  exit 0
-fi
-exit 1
+printf '%s\n' "\$*" >>"$home/calls"
+if [ "\$1 \$2" = "quota status" ]; then cat "$home/status.json"; exit 0; fi
+exit 29
 STUB
-  chmod +x "$stub"
-  echo "$stub"
+  chmod +x "$home/ccm"
 }
 
 run_stop() {
-  local home="$1" sid="$2" payload="$3" active="${4:-false}" stub
-  stub="$(mk_ccm_stub "$payload")"
+  local home="$1" sid="$2" active="${3:-false}"
   HOOK_OUT="$(
     printf '{"conversation_id":"%s","session_id":"%s","hook_event_name":"stop","stop_hook_active":%s}' "$sid" "$sid" "$active" |
-      CC_MASTER_HOME="$home" CCM_BIN="$stub" node "$LAUNCHER" --event stop --core "$CORE" 2>/dev/null
+      CC_MASTER_HOME="$home" CCM_BIN="$home/ccm" node "$LAUNCHER" --event stop --core "$CORE" 2>/dev/null
   )"
   HOOK_RC=$?
-  rm -rf "$(dirname "$stub")"
 }
-
-chmod +x "$CORE"
-
-ADV_HOLD='{"verdict":"hold","strength":"weak","reason":"r","levers":[],"window_billing_period_pct":40,"window_5h_pct":null,"window_7d_pct":null,"effective_n":1,"available":true}'
-ADV_THROTTLE='{"verdict":"throttle","strength":"strong","reason":"r","levers":[],"window_billing_period_pct":82,"window_5h_pct":null,"window_7d_pct":null,"effective_n":1,"available":true}'
-ADV_STOP_BP='{"verdict":"stop_billing_period","strength":"strong","reason":"r","levers":[],"window_billing_period_pct":90,"window_5h_pct":null,"window_7d_pct":null,"nearest_reset":"2026-08-01T00:00:00Z","available":true}'
-ADV_SWITCH='{"verdict":"switch","strength":"weak","reason":"r","levers":[],"window_5h_pct":92,"window_7d_pct":20,"effective_n":2,"switch_candidate":"b@example.com","available":true}'
-ADV_STOP5='{"verdict":"stop_5h","strength":"strong","reason":"r","levers":[],"window_5h_pct":99,"window_7d_pct":70,"nearest_reset":"2026-07-03T12:00:00Z","available":true}'
-ADV_STOP7='{"verdict":"stop_7d","strength":"strong","reason":"r","levers":[],"window_5h_pct":40,"window_7d_pct":88,"available":true}'
-ADV_UNAVAILABLE='{"verdict":"hold","strength":"weak","reason":"r","levers":[],"available":false}'
 
 H="$(make_project)"
 seed_board "$H" "sess-u"
 
-run_stop "$H" "sess-u" "$ADV_HOLD"
-assert_eq "" "$HOOK_OUT" "hold -> silent"
+write_stub "$H" "$(status_json healthy 1 true cursor-agent-cli)"
+run_stop "$H" "sess-u"
+assert_eq "" "$HOOK_OUT" "healthy covered status -> silent"
 
-run_stop "$H" "sess-u" "$ADV_THROTTLE"
-assert_contains "$HOOK_OUT" '"followup_message"' "throttle -> followup_message"
-assert_not_contains "$HOOK_OUT" '"additional_context"' "throttle -> not additional_context"
-assert_contains "$HOOK_OUT" "Slow down" "throttle -> slowdown wording"
-assert_contains "$HOOK_OUT" "billing_period" "throttle -> billing_period wording"
-assert_contains "$HOOK_OUT" "82%" "throttle -> includes billing_period pct"
-assert_not_contains "$HOOK_OUT" "5h" "throttle -> no 5h"
-assert_not_contains "$HOOK_OUT" "7d" "throttle -> no 7d"
-assert_not_contains "$HOOK_OUT" "switch" "throttle -> no switch"
+write_stub "$H" "$(status_json tight 2 false cursor-agent-cli)"
+run_stop "$H" "sess-u"
+assert_contains "$HOOK_OUT" '"followup_message"' "uncovered tight -> Cursor followup"
+assert_contains "$HOOK_OUT" "cursor/cursor-agent-cli/cursor" "Cursor Agent target retained"
+assert_contains "$HOOK_OUT" "state=tight" "state retained"
+assert_contains "$HOOK_OUT" "never inferred" "dual-surface boundary is explicit"
+assert_not_contains "$HOOK_OUT" "billing_period_pct" "no raw balance percentage"
+assert_contains "$HOOK_OUT" "no account switch is performed" "no account-switch action is explicit"
 
-run_stop "$H" "sess-u" "$ADV_STOP_BP"
-assert_contains "$HOOK_OUT" '"followup_message"' "stop_billing_period -> followup_message"
-assert_contains "$HOOK_OUT" "Pause new dispatch until billing reset at 2026-08-01T00:00:00Z" "stop_billing_period -> reset advice"
-assert_not_contains "$HOOK_OUT" "5h" "stop_billing_period -> no 5h"
-assert_not_contains "$HOOK_OUT" "7d" "stop_billing_period -> no 7d"
-assert_not_contains "$HOOK_OUT" "switch" "stop_billing_period -> no switch"
+run_stop "$H" "sess-u"
+assert_eq "" "$HOOK_OUT" "same scope+revision -> sidecar dedupe"
 
-run_stop "$H" "sess-u" "$ADV_SWITCH"
-assert_eq "" "$HOOK_OUT" "switch verdict -> silent (defensive)"
+write_stub "$H" "$(status_json unknown 3 false cursor-ide-plugin)"
+run_stop "$H" "sess-u"
+assert_contains "$HOOK_OUT" "cursor/cursor-ide-plugin/cursor" "Cursor IDE remains a distinct target"
+assert_contains "$HOOK_OUT" "state=unknown" "unknown is not healthy"
 
-run_stop "$H" "sess-u" "$ADV_STOP5"
-assert_eq "" "$HOOK_OUT" "stop_5h verdict -> silent (defensive)"
+write_stub "$H" "$(status_json exhausted 4 true cursor-agent-cli)"
+run_stop "$H" "sess-u"
+assert_eq "" "$HOOK_OUT" "machine fan-out covered revision -> direct floor silent"
 
-run_stop "$H" "sess-u" "$ADV_STOP7"
-assert_eq "" "$HOOK_OUT" "stop_7d verdict -> silent (defensive)"
+run_stop "$H" "sess-u" "true"
+assert_eq "" "$HOOK_OUT" "stop_hook_active -> silent"
 
-run_stop "$H" "sess-u" "$ADV_UNAVAILABLE"
-assert_eq "" "$HOOK_OUT" "available false -> silent"
-
-run_stop "$H" "sess-u" "$ADV_THROTTLE" "true"
-assert_eq "" "$HOOK_OUT" "stop_hook_active true -> silent"
-
-NSTUB="$(mk_ccm_notify_stub "$ADV_STOP_BP")"
-HOOK_OUT="$(
-  printf '{"conversation_id":"sess-u","session_id":"sess-u","hook_event_name":"stop","stop_hook_active":false}' |
-    CC_MASTER_HOME="$H" CCM_BIN="$NSTUB" node "$LAUNCHER" --event stop --core "$CORE" 2>/dev/null
-)"
-assert_eq "" "$HOOK_OUT" "durable stop_billing_period notify succeeds -> no duplicate Cursor additional_context"
-assert_file "$(dirname "$NSTUB")/notify.args" "durable stop_billing_period -> ccm coordination notify called"
-assert_contains "$(cat "$(dirname "$NSTUB")/notify.args")" "pacing_stop" "durable stop_billing_period -> pacing_stop"
-rm -rf "$(dirname "$NSTUB")"
-
+CALLS="$(cat "$H/calls")"
+assert_contains "$CALLS" "quota status --machine-wide --json" "cached machine-wide status is the only read"
+assert_not_contains "$CALLS" "usage advise" "dashboard-backed legacy usage adapter is never invoked"
+assert_not_contains "$CALLS" "coordination notify" "hook does not duplicate ccm fan-out"
+assert_not_contains "$CALLS" "account switch" "Cursor never switches accounts"
 rm -rf "$H"
 
 H="$(make_project)"
-run_stop "$H" "sess-unarmed" "$ADV_THROTTLE"
+seed_board "$H" "sess-shared-capacity"
+node -e '
+const make = (scope, surface, revision) => ({
+  scope_digest: `sha256:${scope.repeat(64)}`,
+  target: {
+    harness_id: "cursor", surface_id: surface, provider_id: "cursor",
+    window: { kind: "billing-cycle", name: "billing_period", duration_sec: 2592000 },
+  },
+  quota_scope_digest: `sha256:${"e".repeat(64)}`, state: "tight", freshness: "fresh",
+  reason_codes: ["QUOTA_TIGHT"], decision_revision: `sha256:${revision.repeat(64)}`,
+  source: { collector_id: surface === "cursor-agent-cli" ? "cursor-agent-dashboard" : "cursor-dashboard", source_schema: "cursor/GetCurrentPeriodUsage/v1", auth_source: surface === "cursor-agent-cli" ? "cursor-agent-current-login" : "cursor-ide-current-login" },
+  observation_revision: `sha256:${"0".repeat(64)}`, fanout_covered: false,
+});
+process.stdout.write(JSON.stringify({
+  schema: "ccm/machine-quota-status/v1",
+  summary: { schema: "ccm/machine-quota-summary/v1", decisions: [make("a", "cursor-agent-cli", "6"), make("b", "cursor-ide-plugin", "7")] },
+  readings: [],
+  capacity_views: { schema: "ccm/machine-quota-capacity-views/v1", known_capacities: [], unresolved_scope_digests: [], unresolved_capacity_units: null },
+}));
+' >"$H/shared-capacity.json"
+write_stub "$H" "$(cat "$H/shared-capacity.json")"
+run_stop "$H" "sess-shared-capacity"
+assert_contains "$HOOK_OUT" "scope=sha256:aaaaaaaa" "fallback line retains scope digest"
+assert_contains "$HOOK_OUT" "quota_scope=sha256:eeeeeeee" "collector-proven shared capacity digest is retained"
+assert_contains "$HOOK_OUT" "cursor/cursor-agent-cli/cursor" "Cursor Agent target remains visible"
+assert_contains "$HOOK_OUT" "cursor/cursor-ide-plugin/cursor" "Cursor IDE target remains visible"
+assert_contains "$HOOK_OUT" "window=billing-cycle/billing_period/2592000s" "fallback line retains canonical window"
+assert_not_contains "$HOOK_OUT" "account_id" "fallback line never emits raw account identity"
+TARGET_LINE_COUNT="$(printf '%s' "$HOOK_OUT" | grep -o 'cursor/cursor-[a-z-]*/cursor' | wc -l | tr -d ' ')"
+assert_eq "2" "$TARGET_LINE_COUNT" "shared capacity keeps both surface-scoped lines"
+rm -rf "$H"
+
+H="$(make_project)"
+write_stub "$H" "$(status_json tight 5 false cursor-agent-cli)"
+run_stop "$H" "sess-unarmed"
 assert_eq "" "$HOOK_OUT" "unarmed -> silent"
+assert_no_file "$H/calls" "unarmed -> no ccm read"
 rm -rf "$H"
 
 finish

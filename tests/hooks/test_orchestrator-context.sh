@@ -89,7 +89,7 @@ const payload = {
   candidates: [{ candidate_id: 'codex-cli', harness: 'codex', surface: 'cli-headless', availability: 'available', quota: 'ample', auth: 'authenticated', model: 'available', runtime: 'healthy', qualifications: [{ predicate: 'runtime-healthy', status: 'pass' }] }],
   cursor_surfaces: cursorSurfaces(requestedCursorState),
   routes: [{ task_id: 'T1', status: 'ready', eligible: true, outcome: harness === 'codex' ? 'same-harness-cli' : 'other-harness-cli', selected: { candidate_id: 'codex-cli', harness: 'codex', surface: 'cli-headless' }, reason_codes: ['shadow-first-eligible'] }],
-  warnings: [], truncation: { applied: false, omitted_candidates: 0, omitted_routes: 0, omitted_warnings: 0, max_bytes: 4096 },
+  warnings: [], truncation: { applied: false, omitted_candidates: 0, omitted_routes: 0, omitted_warnings: 0, omitted_quota_scopes: 0, max_bytes: 4096 },
 };
 if (fs.existsSync(`${__dirname}/malicious-unknown`)) {
   payload.extension = {
@@ -226,6 +226,7 @@ assert.deepStrictEqual(normalized[0], normalized[1]);
 assert.deepStrictEqual(normalized[1], normalized[2]);
 assert.strictEqual(values[1].routes[0].selected.surface, 'cli-headless');
 assert.strictEqual(values[2].cursor_surfaces.state, 'both');
+assert.strictEqual(values[2].truncation.omitted_quota_scopes, 0);
 assert.deepStrictEqual(
   values[2].cursor_surfaces.surfaces.map(({ surface_id, surface, installed, auth_state, role_eligible }) => ({
     surface_id, surface, installed, auth_state, role_eligible,
