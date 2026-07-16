@@ -1,275 +1,223 @@
-# Machine-wide quota observation notification contract v1
+# Machine-wide quota signal notification contract v1
 
-> 状态：**R1 contract frozen；production RED**
+> 状态：**R2 signal contract frozen；ccm runtime candidate GREEN**
 >
 > 日期：2026-07-16 UTC
 >
-> 覆盖：machine-wide cached read / explicit refresh、decision projection、状态边沿、subscription fan-out、
-> 去重、monitor 显式 quota-source mode、三 origin cached landing
+> 覆盖：本机各 execution surface 当前 authenticated login 的只读 quota signal 采集、machine-wide
+> cached read / explicit refresh、decision edge、subscription fan-out、去重、三 origin cached landing
 >
-> 不覆盖：provider collector 细节、task-level quota admission、自动 route/spawn、账号切换、credential
-> mutation、付费 canary、per-board permit/nonce
+> 不覆盖：task-level quota reservation/admission、自动 route/spawn、自动换号、credential mutation、付费
+> canary、per-board permit/nonce
 
-## 0. R1 review resolution（bounded）
+## 0. 收窄结论
 
-本轮只解决独立 review 的四个 blocker，不扩大实现面：
+本合同服务的是“让任一 origin 中的 orchestrator 看见本机所有受支持 worker surface 的真实配额信号”，
+不是另建一套 admission authority：
 
-| review concern | resolution | deliberately not added |
-| --- | --- | --- |
-| notification state 与 task admission 含混 | 定义为 provider-scoped、`projected_p80=0` 的 current reservability posture；task preflight 可更紧 | 新 admission 算法 |
-| scope 未绑定 identity/policy/requirement | agent-safe identity-specific 完整 scope + policy/requirement digest | 账号标识、raw fingerprint |
-| RED 只扫源码、crash path 未证 | 真实 registry/handler composition seam + 可注入 inbox/checkpoint 的 partial-failure retry | receipt/outbox/跨文件事务 |
-| Codex legacy 5h/switch 残留 | notification/reset/wakeup/switch 全路径零效果；Codex/Cursor 自动切号禁止 | 新 account policy |
+- **quota 属于 provider account / subscription / quota-pool，并跨 harness session 共享**；session 只是一条
+  authenticated login 的采集入口，以及通知的订阅 destination，绝不是 quota scope；
+- posture 的硬必需范围只有 `harness_id + surface_id + provider_id + window`。identity / payer / pool
+  证据可作为 owner-only diagnostics 或可选的 agent-safe correlation digest，但缺失不能把一条 fresh、可解析的
+  quota signal 降为 unknown；
+- 同一 pool 被多个 surface 观察到时是**同一份额度的两个 surface view**，不得相加、乘二或解释成两份可用容量。
+  只有 collector-proven `quota_scope_digest` 才允许相关联；digest 缺失时关系为 unknown，仍禁止按独立容量相加；
+- `missing`、collector error、未认证、unsupported 或 TTL 过期才是 `unknown`。stale 是 unknown 的 reason / freshness，
+  不再成为一套平行 posture state；
+- Cursor IDE 与 Cursor Agent 本版都必须产出真实 `billing_period` signal。二者可复用 Cursor
+  `DashboardService/GetCurrentPeriodUsage` backend，但 auth discovery 与 provenance 必须按 surface 区分。
 
-本修订不引入 circuit、hysteresis、receipt、独立 outbox、per-board ledger 或第二 quota store。
+## 1. Truth ownership 与 effect boundary
 
-## 1. Authority 与范围
+- 现有 provider usage / quota collector 拥有 raw signal；本合同不复制 provider response 或 credential。
+- `ccm` 拥有 signal normalization、machine decision、checkpoint 与 fan-out；plugin hook 只读 ccm cache/inbox，
+  不读 provider、不持 credential、不计算 quota。
+- 现有 provider-specific pacing policy 继续拥有 percentage → `healthy|tight|exhausted` 的阈值；本合同只要求
+  machine-wide projection 复用它，不引入 reservation、projected p80、task requirement 或新 safety margin。
+- notification posture 是 ambient route input，绝不直接授权 spawn；task preflight 可以更紧。
+- monitor 不是 correctness 前提，且不得因安装、upgrade、bootstrap 或 hook 调用自动从 cached-only 晋升 live。
 
-本合同只补齐 quota truth 到 origin notification 之间的投影边界，不复制既有 quota authority：
+## 2. Surface quota observation
 
-- [`2026-07-13-cross-harness-quota-admission-contract.md`](2026-07-13-cross-harness-quota-admission-contract.md)
-  唯一拥有 `ccm/quota-observation/v1`、source key、TTL/freshness、derived
-  `ample|tight|exhausted|unknown`、Codex 7d-only hard ceiling 与 rolling-24h advisory；
-- [`cross-harness-notification-subscription`](harnesses/capabilities/cross-harness-notification-subscription.md)
-  与 `coordination-inbox` CONTRACT 唯一拥有 session/epoch subscription、七字段 delivery provenance 和
-  inbox read-only landing；
-- [`cross-harness-cached-context`](harnesses/capabilities/cross-harness-cached-context.md) 与
-  `orchestrator-context` CONTRACT 唯一拥有 SessionStart/resume bounded cached context；
-- 本合同唯一拥有 **agent-safe machine quota posture projection、闭集 edge、跨 current subscription
-  fan-out、相同 revision 去重，以及 live producer 的显式启用边界**。
-
-`ccm` 是 observation、projection 与 fan-out producer。plugin hook 不读 provider、不持 credential、不计算
-quota、不写 machine projection。既有 admission、reservation、supervisor 与 opportunistic collector 入口继续按各自
-合同工作；本合同只限制 **machine-wide notification refresh/fan-out** 的入口。monitor 不是 correctness 前提，且不得因为安装、upgrade、bootstrap 或
-hook 调用而从 cached-only 自动晋升 live。
-
-## 2. Agent-safe zero-candidate posture projection
-
-notification producer 复用既有 observation + active reservation + policy + requirement authority，针对每个
-provider scope 求一次 **zero-candidate current reservability posture**：required bucket 与 safety margin 仍来自
-版本化 requirement/policy，但每个 bucket 的 `projected_p80` 固定为 `0`。它回答“此刻这个 provider scope 是否
-还具备接纳任意新工作的基础余量”，不是某个 task/model/effort 的 preflight 或 admission；真实 task admission
-会加入非零 p80、candidate identity 与 task-specific gate，因而可以比 ambient posture 更紧，绝不可由
-`state:"healthy"` 直接授权 spawn。
-
-authority 必须先投影成下面的 agent-safe decision；origin adapter 只消费投影，不消费 raw observation/provider
-response：
+collector 先规范化成既有 `ccm/quota-observation/v1` 语义。agent-visible decision 不暴露 raw value；但
+production input 必须可证明下面的最小事实：
 
 ```json
 {
-  "schema": "ccm/machine-quota-decision/v1",
-  "scope_digest": "sha256:<canonical-agent-safe-authority-scope>",
-  "target": {
-    "harness_id": "codex",
-    "surface_id": "codex-cli",
-    "provider_id": "codex",
-    "identity_scope_digest": "sha256:<home-salted-identity-specific-digest>",
-    "payer_scope": "subscription",
-    "pool_scope_digest": "sha256:<agent-safe-pool-digest>",
-    "bucket_id": "seven-day-global",
-    "unit": "percent",
-    "window": {"kind": "rolling", "name": "seven_day", "duration_sec": 604800}
-  },
-  "observation_revision": "sha256:<quota-observation-revision>",
-  "decision_revision": "sha256:<canonical-agent-safe-decision>",
-  "state": "healthy",
-  "freshness": "fresh",
-  "reason_codes": [],
-  "policy_digest": "sha256:<canonical-policy-identity>",
-  "requirement_digest": "sha256:<required-buckets+zero-p80+safety-margin>",
-  "posture": {"projected_p80": {"seven-day-global": 0}},
+  "harness_id": "cursor",
+  "surface_id": "cursor-agent-cli",
+  "provider_id": "cursor",
+  "window": {"kind":"billing","name":"billing_period","duration_sec":2592000},
+  "used_percentage": 42,
   "observed_at": "2026-07-16T08:00:00Z",
   "valid_until": "2026-07-16T08:05:00Z",
-  "reset_marker": null,
+  "reset_marker": "2026-08-01T00:00:00Z",
+  "quota_scope_digest": "sha256:<optional-collector-proven-shared-scope>",
   "source": {
-    "collector_id": "codex-app-server",
-    "source_schema": "codex/account-rate-limits/v1"
+    "collector_id": "cursor-agent-dashboard",
+    "source_schema": "cursor/GetCurrentPeriodUsage/v1",
+    "auth_source": "cursor-agent-current-login"
   }
 }
 ```
 
 规范：
 
-1. **MQN-DEC-001**：`target` 保留 harness/surface/provider/identity/payer/pool/bucket/unit/window 完整
-   agent-safe scope；decision key 还必须绑定 `policy_digest+requirement_digest`。任一维变化都形成不同
-   `scope_digest`，不可沿用 previous/checkpoint；
-   Cursor IDE plugin 与 Cursor Agent CLI 永远是不同 `surface_id`，不可互相继承 auth/quota。
-2. **MQN-DEC-002**：decision state 闭集为 `healthy|tight|exhausted|stale|unknown`。`healthy` 只可来自
-   fresh `ample`；`tight|exhausted` 来自同名 derivation；soft/hard stale 都投影为 `stale` 并保留
-   freshness；missing/error/conflict/unsupported 投影为 `unknown`。未安装或未认证不得投影成 healthy。
-3. **MQN-DEC-003**：`decision_revision` 覆盖完整 agent-safe decision，但不把 routine collection time 当作
-   decision change。相同 scope、state、freshness class、reason/policy/reset/source authority 的重采样保留
-  同一 decision revision；raw observation revision 仍可更新用于审计。
-4. **MQN-DEC-004**：`identity_scope_digest` 使用 ccm owner-only home salt + domain separation 从 authority
-   identity 派生；它同一 identity 稳定、换 identity 必变，但不能反推出或跨 home 关联账号。
-   `pool_scope_digest` 同样只暴露 agent-safe digest。email、account id、raw identity fingerprint、pool id、token、
-   credential path、精确余额、raw provider response、argv/env、绝对私有路径不得进入 decision/delta/hook output。
-5. **MQN-DEC-005**：Codex decision 只消费 `seven_day` hard gate与 rolling-24h velocity advisory。
-   `five_hour` 即使出现 100%、reset 或 schema error，也只能列入 ccm 私有 ignored evidence；不得改变
-   state/revision/edge、不得进入 notification/reset/wakeup/account-switch。Codex 与 Cursor 自动切号恒禁止；
-   quota notification 不调用 `ccm account switch`。Claude 的 provider-owned 5h/7d 合同不受影响。
-6. **MQN-DEC-006**：posture derivation 必须复用既有 quota authority 的 reservation/policy math；固定
-   `projected_p80=0` 只定义 ambient comparison，不创建 hold/ticket/claim，也不建立 task admission authority。
+1. **MQN-SIG-001**：collector 只观察本机该 surface 当前 authenticated login，不 login/logout/switch，不把
+   “binary installed”或另一 surface 的 auth 当成本 surface auth。
+2. **MQN-SIG-002**：Codex 只采 `seven_day` hard window；历史 `five_hour` 字段对 decision、edge、reset、
+   wakeup、notification 与 account switch 零效果。Claude provider-owned 5h/7d 不受影响。
+3. **MQN-SIG-003**：Cursor IDE 与 Cursor Agent 都采真实 `billing_period`。二者共享
+   `DashboardService/GetCurrentPeriodUsage` backend，但 collector provenance 分别是 `cursor-dashboard` 与
+   `cursor-agent-dashboard`，`auth_source` 分别是
+   `cursor-ide-current-login` 与 `cursor-agent-current-login`；不得因 IDE token/installation 存在直接宣称
+   Agent authenticated，反之亦然。
+4. **MQN-SIG-004**：identity/payer/pool 缺失不阻塞 signal posture。若 collector 能证明两个 surface 属于同一
+   provider quota scope，可发布 owner-home salted、不可逆的 `quota_scope_digest`；相同 digest 表示共享容量，
+   不同 digest 表示不同容量，null 只表示关系 unknown。null 绝不表示“独立、可叠加”。
+5. **MQN-SIG-005**：email、account id、raw identity fingerprint、pool id、token、credential path、raw provider
+   response、argv/env 与绝对私有路径不得进入 decision/delta/hook output。
 
-## 3. 闭集 decision delta
+### 2.1 统一查询面
 
-只在同一 `scope_digest` 的 agent-visible 决策发生变化时产生 delta：
+provider collector 的正式用户查询面不是 debug-only probe，而是既有只读 `usage` namespace：
+
+```text
+ccm usage show --harness cursor-agent --accounts current --json
+ccm usage advise --harness cursor-agent --json
+```
+
+1. **MQN-QUERY-001**：`usage show` 对 authenticated Cursor Agent current login 返回
+   `data.available:true`，并在 `data.current.billing_period` 原样投影
+   `{used_percentage,resets_at}`；`resets_at` 是 billing cycle end 的 epoch 秒，`data.as_of` 是该次
+   observation 的 RFC 3339 时间。`--accounts current` 不要求存在 account registry，也不能回退读取 Cursor IDE login。
+2. **MQN-QUERY-002**：`usage advise` 消费同一份 Agent signal，返回
+   `data.window_billing_period_pct`、`data.billing_period_resets_at` 与 `data.as_of`。reset 是 signal
+   provenance，不是 stop-only action hint：即使 verdict 为 healthy `hold` 或 non-stop `throttle`，
+   `billing_period_resets_at` 也必须保留；`nearest_reset` 可继续只表达需要 arm wakeup 的 action 语义。
+3. **MQN-QUERY-003**：两条命令均须通过 `cursor-agent-dashboard` +
+   `cursor-agent-current-login` collector/auth-source 读取 Agent 自己的 current login。Cursor IDE token 即使同时
+   存在也不得被复用或改标签；collector 不可用时以 `available:false` 诚实降级，不能用另一个 surface 的 signal 点亮。
+4. **MQN-QUERY-004**：`usage show` 与 `usage advise` 复用 machine observation store 的同一 TTL 结果。cache
+   miss 时由 observation store 在同一 source lock 内最多执行一次 live collect，并原子发布可复用 observation；后续
+   命令在 fresh TTL 内只读该 observation，不再次请求 provider。TTL 过期才允许下一次 live collect。
+
+## 3. Machine quota decision
 
 ```json
 {
-  "schema": "ccm/machine-quota-decision-delta/v1",
-  "producer": "machine-wide-quota-observer",
-  "delta_revision": "sha256:<scope+previous+current+edge>",
-  "scope_digest": "sha256:<same-as-decision>",
+  "schema": "ccm/machine-quota-decision/v1",
+  "scope_digest": "sha256:<harness+surface+provider+window>",
   "target": {
-    "harness_id": "codex", "surface_id": "codex-cli", "provider_id": "codex",
-    "identity_scope_digest": "sha256:<agent-safe>", "payer_scope": "subscription",
-    "pool_scope_digest": "sha256:<agent-safe>", "bucket_id": "seven-day-global", "unit": "percent",
-    "window": {"kind": "rolling", "name": "seven_day", "duration_sec": 604800}
+    "harness_id": "cursor",
+    "surface_id": "cursor-agent-cli",
+    "provider_id": "cursor",
+    "window": {"kind":"billing","name":"billing_period","duration_sec":2592000}
   },
-  "previous_state": "healthy",
-  "current_state": "tight",
-  "edge": "entered_tight",
-  "decision_revision": "sha256:<current-decision>",
-  "observation_revision": "sha256:<current-observation>",
+  "quota_scope_digest": "sha256:<optional-shared-scope>",
+  "observation_revision": "sha256:<normalized-signal>",
+  "decision_revision": "sha256:<agent-safe-decision>",
+  "state": "healthy",
   "freshness": "fresh",
-  "reason_codes": ["QUOTA_TIGHT"],
-  "policy_digest": "sha256:<policy-identity>",
-  "requirement_digest": "sha256:<zero-candidate-requirement>",
-  "observed_at": "2026-07-16T08:02:00Z",
-  "valid_until": "2026-07-16T08:07:00Z",
-  "reset_marker": null
+  "reason_codes": [],
+  "observed_at": "2026-07-16T08:00:00Z",
+  "valid_until": "2026-07-16T08:05:00Z",
+  "reset_marker": "2026-08-01T00:00:00Z",
+  "source": {
+    "collector_id": "cursor-agent-dashboard",
+    "source_schema": "cursor/GetCurrentPeriodUsage/v1",
+    "auth_source": "cursor-agent-current-login"
+  }
 }
 ```
 
-Edge 是闭集：
-
-| edge | 条件 | strength |
-| --- | --- | --- |
-| `entered_tight` | current=`tight` 且 previous!=`tight` | strong |
-| `entered_exhausted` | current=`exhausted` 且 previous!=`exhausted` | strong |
-| `became_stale` | current=`stale` 且 previous!=`stale` | strong |
-| `became_unknown` | current=`unknown` 且 previous!=`unknown` | strong |
-| `recovered` | current=`healthy`，previous 属于 tight/exhausted/stale/unknown，且没有 reset edge | weak |
-| `reset` | ccm authority 证明 reset marker 改变；used% 下降本身不构成 reset proof | weak |
-
 规范：
 
-- **MQN-EDGE-001**：初次看到 healthy 只建立 baseline，不制造 recovery；初次看到非 healthy 必须产生对应
-  decision-grade edge，使已运行 session 不会错过风险。
-- **MQN-EDGE-002**：已证 reset 优先形成一个 `reset` edge，携带 reset 后 current state；不同时再制造一份
-  `recovered`，避免一次事实两次打断。reset 后若仍 tight/exhausted，current state必须如实保留。
-- **MQN-EDGE-003**：same `decision_revision`、同 state routine refresh、rolling-24h 数值变化但 advisory class
-  不变，均无 edge。velocity advisory class 改变可更新 decision revision，但永远不变更 hard eligibility。
-- **MQN-EDGE-004**：一个 scope 的 edge 不得覆盖或抑制另一 scope；多 provider 同 kind 的 inbox item 按
-  `scope_digest` 分区 supersede，不能继续使用“每 kind 只留一条”的全局折叠规则。
+1. **MQN-DEC-001**：`scope_digest` 只绑定 harness/surface/provider/window。Cursor IDE 与 Cursor Agent 因
+   surface 不同而有不同 decision scope；policy 更新、login session 更换与可选 diagnostics 不能制造第三个 surface。
+2. **MQN-DEC-002**：state 闭集为 `healthy|tight|exhausted|unknown`。fresh、可解析 signal 按现有 provider pacing
+   policy 得到前三者；missing/error/unauthenticated/unsupported/soft-stale/hard-stale 得到 unknown，并用
+   freshness + reason 区分。
+3. **MQN-DEC-003**：routine collection time 不改变 `decision_revision`；相同 scope/state/freshness class/
+   reason/reset/source policy 保持 revision。raw observation revision仍可更新审计。
+4. **MQN-DEC-004**：`quota_scope_digest` 不参与 posture eligibility，也不改 `scope_digest`；它只为消费者合并
+   shared-pool capacity view。消费者按 digest 去重容量，null 保守为 non-additive unknown relation。
 
-## 4. Subscription fan-out 与 crash-safe 去重
+## 4. Decision delta 与 fan-out
 
-Machine-wide producer 只向现有 `coordination-inbox` current subscriptions fan-out，不另建 subscription
-registry。每个 destination 仍须通过既有 board/origin/session/epoch/capability 精确 binding；扫描 active board
-不是 subscription 的替代。
+只在同一 surface `scope_digest` 的 agent-visible decision 变化时产生
+`ccm/machine-quota-decision-delta/v1`：
 
-Fan-out notification：
+| edge | condition | strength |
+| --- | --- | --- |
+| `entered_tight` | current=tight, previous!=tight | strong |
+| `entered_exhausted` | current=exhausted, previous!=exhausted | strong |
+| `became_unknown` | current=unknown, previous!=unknown | strong |
+| `recovered` | current=healthy, previous 属于 tight/exhausted/unknown 且无 reset | weak |
+| `reset` | collector 证明 reset marker 改变 | weak |
 
-- `kind: "quota_state_change"`；这是 target-scoped advisory，不复用会暗示全局停止的 `pacing_stop`；
-- degraded edge 使用 strong advisory，recovery/reset 使用 weak advisory；任何 target edge 都不是自动
-  route/spawn/account-switch directive；
-- payload 是完整 `ccm/machine-quota-decision-delta/v1`；hook 继续附加既有七字段 delivery provenance；
-- 每个 destination 的 notification id 由 `subscription_id + delta_revision` 确定性派生。重试若已有相同
-  producer/scope/delta revision 必须 no-op，不得自动加 `-2` 形成重复。
+- 初次 healthy 只建 baseline；初次 non-healthy 产生对应 edge。
+- stale signal 形成 `became_unknown` + `QUOTA_SIGNAL_STALE`，不另造 `became_stale` state machine。
+- reset 优先于 recovered；used percentage 下降本身不是 reset proof。
+- same decision revision、routine re-observation 与 Codex 5h 变化无 edge。
+- 多 surface/provider edge 独立保留；`quota_state_change` supersession 按 surface `scope_digest` 分区。
+- payload 保留 `quota_scope_digest` 与完整 `source.collector_id/source_schema/auth_source`，使相同共享池的多
+  surface view 可相关联而不相加，并能证明每条 signal 来自目标 surface 自己的认证与 collector。
 
-Checkpoint 是 observation store 旁的 ccm-owned derived projection，不是第二 quota truth。最小协议：
+Machine-wide producer 只向既有 `coordination-inbox` current subscriptions fan-out：
 
-1. 读取 last completed decision checkpoint，计算 edge；
-2. 对 tick 开始时所有 current valid subscriptions 逐个带锁写 board inbox；
-3. 任一 current destination 写失败则不前移 scope checkpoint；重试完整 fan-out，已成功 destination 由确定性
-   id no-op；
-4. 全部成功后原子发布新 checkpoint；若当时没有 current subscriptions，可直接前移，后来的 session 由
-   SessionStart/resume full summary获得当前事实；
-5. crash 发生在最后一块 board 写后、checkpoint 前，只会导致幂等重试，不会重复通知；不需要 per-board
-   nonce、permit、签发系统或跨文件事务。
+1. notification `kind:"quota_state_change"`，target-scoped advisory，不是全局 stop/account-switch directive；
+2. destination 必须经 board/origin/session/epoch/capability exact binding；session 只属于 delivery，不属于 quota；
+3. notification id 由 `subscription_id + delta_revision` 确定性派生；相同 producer/scope/delta retry no-op；
+4. fan-out 任一 current destination 失败则不前移 scope checkpoint；重试稳定 id；全部成功后原子 publish；
+5. 无 current subscriptions 时可前移，后来的 session 由 bounded cached summary拿当前事实。
 
-### 4.1 可测 composition seam（不是新 authority）
+## 5. Live producer 入口
 
-CLI router 只允许测试/组装层替换既有的**原始 effect ports**：provider collector、owner-only quota
-authority/reservation store、subscription list 与 inbox delivery。collector 返回 usage evidence 与来自已认证本地
-provider 事实的 authority refs；identity 不可可靠取得时必须返回 unknown，不得用 `current` 或 provider 常量伪造。
-
-composition 必须把 collector evidence 规范化后写入既有 quota authority store，再从该 store 读取 observation、
-active reservation、policy 与 requirement authority，构造 `ccm/machine-quota-posture-input/v1` 并调用 canonical
-`machine-wide-quota-posture` pure projector。测试不得注入现成 decision/posture/notification，也不得用
-`readPostures()` 一类 final-decision boundary 绕过 projector。checkpoint 仍是同一 machine projection 的派生部分，
-inbox 仍是现有 coordination inbox；不新增 authority、inbox 或 reservation store。status、refresh、partial failure
-与 retry 必须经真实 registry→handler→composition 调用。
-
-## 5. 两条且仅两条 machine-wide notification refresh/fan-out 入口
-
-这里的“仅两条”只约束 ambient machine-wide notification 的 live refresh/fan-out composition root；它不关闭、
-替代或绕过既有 task admission/preflight、supervisor live recheck 与 provider-owned collectors。
-
-### 5.1 显式 CLI floor
+只有两条 ambient machine-wide refresh/fan-out 入口；既有 task admission/supervisor live recheck 不在此闭集：
 
 ```text
-ccm quota status --machine-wide --json
-ccm quota refresh --machine-wide --json
-```
-
-- `quota status --machine-wide` 只读 owner-only observation cache/projection，零 provider/network/credential effect，输出
-  `schema:"ccm/machine-quota-status/v1"` 与每 scope freshness/state/revision；missing 是 explicit unknown。
-- `quota refresh --machine-wide` 是用户或 orchestrator 显式调用的 live producer：枚举已安装且 ccm-supported
-  target surfaces，调用各自只读 collector、更新既有 quota authority store、计算 edge并 fan-out。未带
-  `--machine-wide` 必须 usage error，不偷偷退回 origin-local refresh。
-- refresh 可部分成功，但每 scope 独立报告 `refreshed|unknown|unsupported|error`；一个 provider error 不可把
-  另一个 provider 的 observation/revision 覆盖或伪造。
-
-### 5.2 显式 monitor quota-source mode
-
-```text
+ccm quota status --machine-wide --json   # cached-only, zero provider effect
+ccm quota refresh --machine-wide --json  # explicit live read-only collection + fan-out
 ccm monitor start --quota-source machine-wide
 ccm monitor install-service --quota-source machine-wide
 ```
 
-- monitor 缺省且升级后的默认恒为 `quota_source_mode:"cached-only"`，保持 PR #131 的
-  cached-only/no-autostart；cached-only tick 零 provider/network/credential effect。
-- `--quota-source machine-wide` 是显式 opt-in。mode 写入现有 monitor service state（owner-only + durable），
-  `status` 回显；普通 process restart、`monitor restart` 与 `services reconcile` 保持已选 mode。显式传
-  `--quota-source cached-only` 才降级关闭 live refresh。
-- install/upgrade/reinstall/bootstrap/hook 不得自行 start monitor 或把 cached-only 改成 machine-wide。
-- monitor 只周期调用与显式 refresh 相同的 ccm-owned composition；不另做 quota math，不成为调度脑。
+- `status` 返回每 surface scope 的 state/freshness/revision；missing explicit unknown。实现可在独立 safe
+  `readings` 投影返回 used%/reset/observed/valid/source，并以 `capacity_views` 对非 null shared digest 去重；
+  bounded hook `summary` 的 exact contract 不因此扩宽。
+- `refresh` 枚举 installed + ccm-supported surfaces；每 surface 独立报告
+  `refreshed|unknown|unsupported|error`，一处失败不污染另一处。
+- monitor 默认及升级默认恒为 `cached-only`；显式 opt-in mode 持久化，显式 cached-only 才关闭。
+- install/upgrade/reinstall/bootstrap/hook 不得自启动 monitor 或改 mode。
 
 ## 6. 三 origin landing
 
-1. `orchestrator-context`：SessionStart/resume（Cursor 使用既有 Track B 时点）可投递 bounded machine summary，
-   每 scope 仅含 agent-safe target/state/freshness/revision/reason；完整 payload 仍受 4096-byte 与 canonical
-   redaction contract。
-2. `coordination-inbox`：运行中只投递 `quota_state_change` delta。Claude/Codex/Cursor 的 envelope 可不同，
-   delta/provenance/revision 必须相同；hook 本身只 current/list，不 refresh、不 provider probe。
-3. `usage-pacing`：origin-local hook 只是 monitor/explicit refresh 缺席时的 universal floor；ccm 若回显相同
-   scope+decision revision 已由 machine-wide fan-out 覆盖，hook必须静默，不再 direct-inject 或另写一份。
-   未覆盖时只可发布带明确 target scope/revision 的同类 delta，不得声称它观察了其他 harness。
+1. `orchestrator-context`：SessionStart/resume（Cursor 既有 Track B 时点）投 bounded cached summary；每 row 仅含
+   agent-safe target/quota-scope-correlation/state/freshness/revision/reason/source provenance。
+2. `coordination-inbox`：运行中只投 `quota_state_change` delta；Claude/Codex/Cursor envelope 可不同，
+   delta/provenance/revision 相同。
+3. `usage-pacing`：origin-local cached hook 是 monitor/explicit refresh 缺席时的 floor。相同
+   scope+decision revision 已 fan-out 时静默；否则只发布 local surface delta，不冒充 remote observation。
 
-Landing fail-open 只影响 agent context；dispatch/admission live gate仍由 ccm fail-closed。
+Landing fail-open 只影响 agent context；dispatch/admission live gate仍由自己的合同负责。Codex/Cursor 自动切号恒禁止。
 
 ## 7. Executable acceptance
 
-Executable RED fixture 必须同时证明：
-
-1. Codex、Claude Code、Cursor Agent target 的 decision-grade edge 各自 fan-out 到 Claude Code、Codex、
-   Cursor 三个 current subscriptions，九个 destination 均保留相同 target delta revision。
-2. healthy→tight、exhausted、stale、unknown、recovery、reset 均命中闭集；unchanged revision 与 routine
-   re-observation 不新增 notification。
-3. 两个 provider 同时变化时各自保留，不能被 kind-only supersession 折叠。
-4. Codex 5h/switch evidence 产生零 decision revision/edge/notification/reset/wakeup/account-switch；7d tight 与
-   rolling-24h advisory class 按既有政策工作。Codex/Cursor 自动切号为零。
-5. 同 delta 重试、部分 fan-out 重试与 checkpoint crash 重放无重复；错 session/epoch/board subscription 不收件。
-6. output 不含 raw account、identity fingerprint、credential、token、provider response；uninstalled/
-   unauthenticated/unsupported 只能 unknown。
-7. Cursor IDE/Agent 即使 provider/pool 相同也保持不同 scope；同 pool 换 identity 形成新 scope，绝不沿用
-   previous/checkpoint 或 supersede 另一 identity。
-8. known-good fixture通过；origin-local-only、kind-collapse、duplicate-on-retry、Codex-5h-sensitive、
-   secret-leak、scope-collapse、checkpoint-early 等 counterfeit 至少各被一个 fixture杀死。
-9. production baseline 经真实 registry→handler/composition seam 执行：status 证明零 live/write effect；refresh
-   必须显式；一次 partial inbox write failure 后 checkpoint 不抢跑，retry 使用 stable id、无丢件/重复；stale/
-   wrong subscription 不收件；monitor 默认 cached-only 且不自动启用 live source，显式 mode 持久化。RED 不以
-   源码字符串、import/syntax/fixture setup 错误冒充行为失败。
+1. Codex、Claude Code、Cursor IDE、Cursor Agent 四个 target 都有可执行 fixture；两条 Cursor surface 都是
+   `billing_period` 真实 signal，同 dashboard backend、不同 collector/auth-source provenance；production RED
+   必须经独立 IDE credential 与 Agent auth-file discovery 各发起一次真实 `GetCurrentPeriodUsage`，不能只伪造字段。
+   同一 production RED 还必须实际调用 `usage show --harness cursor-agent --accounts current --json` 与
+   `usage advise --harness cursor-agent --json`，用 healthy Agent observation 验证 billing percentage、cycle reset 与
+   `as_of`；runtime 尚未实现时须在 `available`/字段行为断言处 RED，不得以 setup/import failure 冒充。
+2. 任一 target edge fan-out 到 Claude Code/Codex/Cursor current exact subscriptions；同 target delta revision一致。
+3. healthy/tight/exhausted/unknown 与 entered-tight/entered-exhausted/became-unknown/recovered/reset 闭集；
+   stale→unknown；unchanged revision不通知。
+4. Cursor IDE/Agent decision scope不同；collector-proven shared `quota_scope_digest` 相同，消费者不能把它们当
+   两份额度；digest 缺失不阻塞 posture，也不能被解释成可相加。
+5. Codex 5h/switch 产生零 revision/edge/notification/reset/wakeup/account-switch；7d 继续工作。
+6. 同 delta retry、partial fan-out retry、checkpoint crash replay 无重复；stale/wrong subscription 不收件。
+7. output 不含 raw account/identity/payer/pool/credential/token/provider response；未安装/未认证/unsupported/stale
+   只能 unknown。
+8. production test 经真实 registry→handler/composition seam：status 零 live/write effect；refresh 必须显式；
+   monitor cached-only default + opt-in persistence。RED 不以源码字符串、import/syntax/fixture setup 错误冒充行为失败。

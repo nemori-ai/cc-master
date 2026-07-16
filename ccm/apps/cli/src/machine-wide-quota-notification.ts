@@ -2,28 +2,21 @@ import { canonicalJson, sha256Hex } from '@ccm/engine';
 
 type Data = Record<string, any>;
 
-export type MachineQuotaState = 'healthy' | 'tight' | 'exhausted' | 'stale' | 'unknown';
+export type MachineQuotaState = 'healthy' | 'tight' | 'exhausted' | 'unknown';
 export type MachineQuotaEdge =
   | 'entered_tight'
   | 'entered_exhausted'
-  | 'became_stale'
   | 'became_unknown'
   | 'recovered'
   | 'reset';
 
-export interface MachineQuotaAuthority {
+export interface MachineQuotaSignalScope {
   harness_id: string;
   surface_id: string;
   provider_id: string;
-  identity_fingerprint: string;
-  payer_scope: string;
-  pool_id: string;
-  bucket_id: string;
-  unit: string;
   window: Data;
-  policy_revision: string;
-  required_bucket_ids: string[];
-  safety_margin: Data;
+  quota_scope_digest?: string | null;
+  source?: Data;
 }
 
 export interface MachineQuotaPostureInput {
@@ -45,64 +38,65 @@ export interface MachineQuotaProjectionInput {
   subscriptions?: Data[];
 }
 
+/** Injectable production seam used by alternate supervisors and contract tests. */
+export interface MachineWideQuotaNotificationBoundary {
+  readPostures(input: { refresh: boolean }): Promise<Data[]> | Data[];
+  listSubscriptions(): Promise<Data[]> | Data[];
+  readCheckpoint(scopeDigest: string): Promise<Data | null>;
+  publishCheckpoint(scopeDigest: string, decision: Data): Promise<void>;
+  putInbox(notification: Data): Promise<void>;
+}
+
 function digest(value: unknown): string {
   return `sha256:${sha256Hex(typeof value === 'string' ? value : canonicalJson(value))}`;
 }
 
 /**
- * Projects owner-only authority facts into an agent-safe, zero-candidate reservability posture.
- * Identity and pool values remain private; only home-salted correlation digests cross this seam.
+ * Projects trustworthy surface quota signals into an agent-safe machine-wide posture.
+ * Optional identity and pool diagnostics remain private; only a home-salted capacity-correlation
+ * digest crosses this seam when the collector can prove that two surfaces share one quota pool.
  */
 export function projectMachineQuotaPosture(
-  authority: MachineQuotaAuthority,
+  signal: MachineQuotaSignalScope,
   input: MachineQuotaPostureInput = {},
 ): Data {
-  const homeSalt = input.home_salt ?? 'ccm-machine-quota-missing-home-salt';
   const target = {
-    harness_id: authority.harness_id,
-    surface_id: authority.surface_id,
-    provider_id: authority.provider_id,
-    identity_scope_digest: digest(
-      `ccm/identity-scope/v1|${homeSalt}|${authority.identity_fingerprint}`,
-    ),
-    payer_scope: authority.payer_scope,
-    pool_scope_digest: digest(`ccm/pool-scope/v1|${homeSalt}|${authority.pool_id}`),
-    bucket_id: authority.bucket_id,
-    unit: authority.unit,
-    window: structuredClone(authority.window),
+    harness_id: signal.harness_id,
+    surface_id: signal.surface_id,
+    provider_id: signal.provider_id,
+    window: structuredClone(signal.window),
   };
-  const projectedP80 = Object.fromEntries(
-    authority.required_bucket_ids.map((bucketId) => [bucketId, 0]),
-  );
-  const policyDigest = digest({ policy_revision: authority.policy_revision });
-  const requirementDigest = digest({
-    required_bucket_ids: authority.required_bucket_ids,
-    projected_p80: projectedP80,
-    safety_margin: authority.safety_margin,
-  });
-  const scopeDigest = digest({
-    target,
-    policy_digest: policyDigest,
-    requirement_digest: requirementDigest,
-  });
-  const state = input.state ?? 'healthy';
+  const scopeDigest = digest(target);
+  const requestedState = String(input.state ?? 'healthy');
+  const state: MachineQuotaState = ['healthy', 'tight', 'exhausted', 'unknown'].includes(
+    requestedState,
+  )
+    ? (requestedState as MachineQuotaState)
+    : 'unknown';
   const freshness =
     input.freshness ??
-    (state === 'stale' ? 'hard-stale' : state === 'unknown' ? 'unknown' : 'fresh');
+    (requestedState === 'stale' ? 'hard-stale' : state === 'unknown' ? 'unknown' : 'fresh');
+  const defaultReasons =
+    state === 'healthy'
+      ? []
+      : state === 'unknown' && freshness === 'hard-stale'
+        ? ['QUOTA_HARD_STALE']
+        : state === 'unknown' && freshness === 'soft-stale'
+          ? ['QUOTA_SIGNAL_STALE']
+          : [`QUOTA_${state.toUpperCase()}`];
   const stableDecision = {
     target,
-    policy_digest: policyDigest,
-    requirement_digest: requirementDigest,
-    posture: { projected_p80: projectedP80 },
+    quota_scope_digest: signal.quota_scope_digest ?? null,
     state,
     freshness,
-    reason_codes:
-      input.reason_codes ?? (state === 'healthy' ? [] : [`QUOTA_${state.toUpperCase()}`]),
+    reason_codes: input.reason_codes ?? defaultReasons,
     reset_marker: input.reset_marker ?? null,
-    source: input.source ?? {
-      collector_id: `${authority.provider_id}-unknown`,
-      source_schema: 'ccm/quota-authority-observation/v1',
-    },
+    source: input.source ??
+      signal.source ?? {
+        collector_id: `${signal.provider_id}-unknown`,
+        source_schema: 'ccm/quota-observation/v1',
+        auth_source: 'unknown',
+      },
   };
   return {
     schema: 'ccm/machine-quota-decision/v1',
@@ -132,7 +126,6 @@ function edge(previous: Data | undefined, current: Data): MachineQuotaEdge | nul
   if (state === previous?.state) return null;
   if (state === 'tight') return 'entered_tight';
   if (state === 'exhausted') return 'entered_exhausted';
-  if (state === 'stale') return 'became_stale';
   if (state === 'unknown') return 'became_unknown';
   if (state === 'healthy' && previous) return 'recovered';
   return null;
@@ -175,8 +168,8 @@ export function projectMachineWideQuotaNotifications(input: MachineQuotaProjecti
       producer: 'machine-wide-quota-observer',
       scope_digest: scopeDigest,
       target: structuredClone(decision.target),
-      policy_digest: decision.policy_digest,
-      requirement_digest: decision.requirement_digest,
+      quota_scope_digest: decision.quota_scope_digest ?? null,
+      source: structuredClone(decision.source),
       previous_state: previous?.state ?? null,
       current_state: decision.state,
       edge: transition,
@@ -185,6 +178,8 @@ export function projectMachineWideQuotaNotifications(input: MachineQuotaProjecti
       freshness: decision.freshness,
       reason_codes: Array.isArray(decision.reason_codes) ? [...decision.reason_codes] : [],
       reset_marker: decision.reset_marker ?? null,
+      observed_at: decision.observed_at,
+      valid_until: decision.valid_until,
     };
     const deltaRevision = digest({
       scope_digest: scopeDigest,

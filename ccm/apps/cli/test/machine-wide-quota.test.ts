@@ -8,6 +8,7 @@ import {
   listCurrentCoordinationSubscriptions,
 } from '../src/handlers/coordination.js';
 import {
+  aggregateMachineQuotaCapacityViews,
   type MachineQuotaAuthorityRefs,
   type MachineQuotaCollection,
   type MachineQuotaCollectorBoundary,
@@ -182,7 +183,19 @@ function collectionFor(target: Readonly<Data>): MachineQuotaCollection {
       },
     };
   }
-  return { status: 'unsupported', reason: 'Cursor Agent has no surface-owned collector' };
+  if (target.surface_id === 'cursor-agent-cli') {
+    return {
+      status: 'refreshed',
+      source: 'fake-cursor-agent-dashboard',
+      authSource: 'cursor-agent-current-login',
+      quotaScopeFingerprint: 'sha256:shared-cursor-subscription',
+      signal: {
+        ...common,
+        billing_period: { used_percentage: 86, resets_at: RESET },
+      },
+    };
+  }
+  return { status: 'unsupported', reason: 'unknown fixture surface' };
 }
 
 const collectors: MachineQuotaCollectorBoundary = {
@@ -211,7 +224,7 @@ test('explicit refresh fans out scoped deltas, checkpoints, and retry is duplica
     first.deltas.map((delta: Data) => [delta.target.surface_id, delta.edge]).sort(),
     [
       ['codex-cli', 'entered_tight'],
-      ['cursor-agent-cli', 'became_unknown'],
+      ['cursor-agent-cli', 'entered_exhausted'],
       ['cursor-ide-plugin', 'entered_exhausted'],
     ],
   );
@@ -233,6 +246,18 @@ test('explicit refresh fans out scoped deltas, checkpoints, and retry is duplica
 
   const status = await readMachineWideQuotaStatus(store, NOW);
   assert.equal(status.schema, 'ccm/machine-quota-status/v1');
+  assert.equal(status.readings.length, 5);
+  const cursorAgentReading = status.readings.find(
+    (reading: Data) => reading.target.surface_id === 'cursor-agent-cli',
+  );
+  assert.equal(cursorAgentReading.used_percentage, 86);
+  assert.equal(cursorAgentReading.resets_at, '2026-07-20T08:00:00Z');
+  assert.deepEqual(cursorAgentReading.source, {
+    collector_id: 'cursor-agent-dashboard',
+    source_schema: 'cursor/GetCurrentPeriodUsage/v1',
+    auth_source: 'cursor-agent-current-login',
+  });
+  assert.doesNotMatch(JSON.stringify(status.readings), /access_token|refresh_token|credential/i);
   assert.ok(status.summary.decisions.every((decision: Data) => decision.fanout_covered === true));
   const cursor = status.summary.decisions.filter(
     (decision: Data) => decision.target.harness_id === 'cursor',
@@ -240,7 +265,7 @@ test('explicit refresh fans out scoped deltas, checkpoints, and retry is duplica
   assert.deepEqual(
     cursor.map((decision: Data) => [decision.target.surface_id, decision.state]).sort(),
     [
-      ['cursor-agent-cli', 'unknown'],
+      ['cursor-agent-cli', 'exhausted'],
       ['cursor-ide-plugin', 'exhausted'],
     ],
   );
@@ -277,7 +302,7 @@ test('Codex five-hour-only changes do not change the decision revision or emit a
   assert.equal(refreshed.deltas.length, 0);
 });
 
-test('production composition consumes store reservation plus policy/requirement authority', async () => {
+test('ambient production posture ignores admission reservation and collector ceiling/margin', async () => {
   const { home } = setupSubscription();
   const store = fakeStore();
   let codexAggregation = '';
@@ -321,11 +346,11 @@ test('production composition consumes store reservation plus policy/requirement 
   const after = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.find(
     (decision: Data) => decision.target.surface_id === 'codex-cli',
   );
-  assert.equal(after.state, 'tight', 'active reservation must reduce ambient headroom');
-  assert.notEqual(after.decision_revision, before.decision_revision);
+  assert.equal(after.state, 'healthy', 'ambient pacing must not consume task reservation headroom');
+  assert.equal(after.decision_revision, before.decision_revision);
 });
 
-test('production posture reads an active reservation from the owner-only admission store', async () => {
+test('owner-only admission reservation cannot redefine ambient machine pacing posture', async () => {
   const root = mkdtempSync(join(tmpdir(), 'ccm-machine-quota-real-reservation-'));
   roots.push(root);
   const home = join(root, '.cc_master');
@@ -394,11 +419,49 @@ test('production posture reads an active reservation from the owner-only admissi
   const decision = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.find(
     (candidate: Data) => candidate.target.surface_id === 'codex-cli',
   );
-  assert.equal(decision.state, 'tight');
-  assert.deepEqual(decision.reason_codes, ['QUOTA_TIGHT']);
+  assert.equal(decision.state, 'healthy');
+  assert.deepEqual(decision.reason_codes, []);
 });
 
-test('same surface identity swap creates a new production scope', async () => {
+test('machine posture reuses provider pacing boundaries for Cursor 80% and Claude 7d 87%', async () => {
+  const { home } = setupSubscription();
+  const store = fakeStore();
+  const boundaries: MachineQuotaCollectorBoundary = {
+    collect(target) {
+      const result = collectionFor(target);
+      if (!result.signal) return result;
+      if (target.surface_id === 'cursor-agent-cli') {
+        result.signal.billing_period = { used_percentage: 80, resets_at: RESET };
+      }
+      if (target.surface_id === 'claude-cli' && target.window_name === 'seven_day') {
+        result.signal.seven_day = { used_percentage: 87, resets_at: RESET };
+      }
+      return result;
+    },
+  };
+  await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors: boundaries,
+    coordination,
+    now: NOW,
+  });
+  const decisions = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions;
+  const cursor = decisions.find(
+    (decision: Data) => decision.target.surface_id === 'cursor-agent-cli',
+  );
+  const claude7d = decisions.find(
+    (decision: Data) =>
+      decision.target.surface_id === 'claude-cli' && decision.target.window.name === 'seven_day',
+  );
+  assert.equal(cursor.state, 'tight', 'Cursor billing period at 80% is pacing throttle, not stop');
+  assert.deepEqual(cursor.reason_codes, ['QUOTA_TIGHT']);
+  assert.equal(claude7d.state, 'exhausted', 'Claude 7d at 87% is pacing stop_7d');
+  assert.deepEqual(claude7d.reason_codes, ['QUOTA_EXHAUSTED']);
+});
+
+test('same surface identity diagnostics do not redefine the signal scope', async () => {
   const { home } = setupSubscription();
   const store = fakeStore();
   let identity = 'codex-identity-a';
@@ -434,11 +497,11 @@ test('same surface identity swap creates a new production scope', async () => {
   const after = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.find(
     (decision: Data) => decision.target.surface_id === 'codex-cli',
   );
-  assert.notEqual(after.target.identity_scope_digest, before.target.identity_scope_digest);
-  assert.notEqual(after.scope_digest, before.scope_digest);
+  assert.equal(after.scope_digest, before.scope_digest);
+  assert.equal(after.state, before.state);
 });
 
-test('refreshed usage without authenticated identity authority fails closed', async () => {
+test('refreshed usage without identity/payer authority still produces signal posture', async () => {
   const { home } = setupSubscription();
   const store = fakeStore();
   const identityBlind: MachineQuotaCollectorBoundary = {
@@ -459,8 +522,98 @@ test('refreshed usage without authenticated identity authority fails closed', as
   const decision = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.find(
     (candidate: Data) => candidate.target.surface_id === 'codex-cli',
   );
-  assert.equal(decision.state, 'unknown');
-  assert.match(decision.reason_codes.join(','), /IDENTITY|AUTHORITY|UNKNOWN/);
+  assert.equal(decision.state, 'tight');
+  assert.deepEqual(decision.reason_codes, ['QUOTA_TIGHT']);
+});
+
+test('Cursor IDE and Agent independently observe one shared billing pool with explicit provenance', async () => {
+  const { home } = setupSubscription();
+  const store = fakeStore();
+  const sharedCursorPool: MachineQuotaCollectorBoundary = {
+    collect(target) {
+      const result = collectionFor(target) as MachineQuotaCollection & { authority?: Data };
+      if (target.provider_id !== 'cursor') return result;
+      delete result.authority;
+      result.quotaScopeFingerprint = 'sha256:one-cursor-subscription';
+      result.authSource =
+        target.surface_id === 'cursor-agent-cli'
+          ? 'cursor-agent-current-login'
+          : 'cursor-ide-current-login';
+      return result;
+    },
+  };
+  await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors: sharedCursorPool,
+    coordination,
+    now: NOW,
+  });
+  const decisions = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.filter(
+    (candidate: Data) => candidate.target.provider_id === 'cursor',
+  );
+  assert.equal(decisions.length, 2);
+  assert.ok(decisions.every((decision: Data) => decision.state === 'exhausted'));
+  assert.equal(decisions[0].quota_scope_digest, decisions[1].quota_scope_digest);
+  assert.notEqual(decisions[0].scope_digest, decisions[1].scope_digest);
+  assert.deepEqual(decisions.map((decision: Data) => decision.source.auth_source).sort(), [
+    'cursor-agent-current-login',
+    'cursor-ide-current-login',
+  ]);
+  assert.ok(decisions.every((decision: Data) => decision.target.window.name === 'billing_period'));
+  const sharedCapacity = aggregateMachineQuotaCapacityViews(decisions);
+  assert.equal(sharedCapacity.known_capacities.length, 1);
+  assert.equal(sharedCapacity.known_capacities[0].capacity_units, 1);
+  assert.deepEqual(
+    sharedCapacity.known_capacities[0].scope_digests,
+    decisions.map((decision: Data) => decision.scope_digest).sort(),
+  );
+  const unresolvedCapacity = aggregateMachineQuotaCapacityViews(
+    decisions.map((decision: Data) => ({ ...decision, quota_scope_digest: null })),
+  );
+  assert.equal(unresolvedCapacity.known_capacities.length, 0);
+  assert.deepEqual(
+    unresolvedCapacity.unresolved_scope_digests,
+    decisions.map((decision: Data) => decision.scope_digest).sort(),
+  );
+  assert.equal(unresolvedCapacity.unresolved_capacity_units, null);
+});
+
+test('missing and hard-stale provider signals both degrade to unknown with explicit reason', async () => {
+  const { home } = setupSubscription();
+  const store = fakeStore();
+  const degraded: MachineQuotaCollectorBoundary = {
+    collect(target) {
+      if (target.surface_id === 'cursor-agent-cli') {
+        return { status: 'unknown', reason: 'agent auth unavailable' };
+      }
+      const result = collectionFor(target);
+      if (target.surface_id === 'cursor-ide-plugin' && result.signal) {
+        result.signal.captured_at = NOW.getTime() / 1000 - 1_000;
+      }
+      return result;
+    },
+  };
+  await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors: degraded,
+    coordination,
+    now: NOW,
+  });
+  const decisions = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions;
+  const missing = decisions.find(
+    (decision: Data) => decision.target.surface_id === 'cursor-agent-cli',
+  );
+  const hardStale = decisions.find(
+    (decision: Data) => decision.target.surface_id === 'cursor-ide-plugin',
+  );
+  assert.equal(missing.state, 'unknown');
+  assert.equal(hardStale.state, 'unknown');
+  assert.equal(hardStale.freshness, 'hard-stale');
+  assert.deepEqual(hardStale.reason_codes, ['QUOTA_HARD_STALE']);
 });
 
 test('a current destination write failure prevents checkpoint advance for crash-safe replay', async () => {

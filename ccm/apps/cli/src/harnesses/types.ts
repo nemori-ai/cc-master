@@ -24,6 +24,8 @@ export interface CurrentUsageReading {
   source: UsageSignalSource;
   unavailableReason: string;
   authority?: CurrentQuotaAuthorityRefs;
+  authSource?: string;
+  quotaScopeFingerprint?: string | null;
 }
 
 /** Owner-only authenticated scope refs; never expose these directly to an agent-facing payload. */
@@ -196,6 +198,7 @@ export interface HarnessAdapter {
   usageSource(env: Env): HarnessUsageSource;
   accountPoolLocation(env: Env): string | null;
   readCurrentUsage(env: Env): CurrentUsageReading;
+  readCurrentUsageForSurface?(surfaceId: string, env: Env): CurrentUsageReading;
   accountSwitchPreflight(env: Env): AccountSwitchPreflight;
   upgradePlugin(request: PluginUpgradeRequest): Promise<PluginUpgradeResult>;
   accountPool: Capability;

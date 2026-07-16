@@ -5,6 +5,7 @@
 // via node:sqlite DatabaseSync. HTTP is sync-bridged with Worker + Atomics (same pattern as
 // codex-rate-limits.ts). Fail-open: any error → null. Zero npm deps.
 
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
@@ -23,14 +24,22 @@ const ACCESS_TOKEN_KEY = 'cursorAuth/accessToken';
 
 export interface CursorUsageSignal {
   signal: UsageSignal;
-  source: 'cursor-dashboard';
+  source: 'cursor-dashboard' | 'cursor-agent-dashboard';
+  auth_source: 'cursor-ide-current-login' | 'cursor-agent-current-login';
+  quota_scope_fingerprint: string | null;
   cycle_start_ms: number | null;
   cycle_end_ms: number | null;
 }
 
+export type CursorUsageSurface = 'cursor-ide-plugin' | 'cursor-agent-cli';
+
 export function normalizeCursorPeriodUsage(
   raw: unknown,
-  opts?: { capturedAtSec?: number },
+  opts?: {
+    capturedAtSec?: number;
+    surface?: CursorUsageSurface;
+    quotaScopeFingerprint?: string | null;
+  },
 ): CursorUsageSignal | null {
   if (!isRecord(raw)) return null;
   const plan = isRecord(raw.planUsage) ? raw.planUsage : null;
@@ -50,7 +59,12 @@ export function normalizeCursorPeriodUsage(
       : Math.floor(Date.now() / 1000);
 
   return {
-    source: 'cursor-dashboard',
+    source: opts?.surface === 'cursor-agent-cli' ? 'cursor-agent-dashboard' : 'cursor-dashboard',
+    auth_source:
+      opts?.surface === 'cursor-agent-cli'
+        ? 'cursor-agent-current-login'
+        : 'cursor-ide-current-login',
+    quota_scope_fingerprint: opts?.quotaScopeFingerprint ?? null,
     cycle_start_ms: cycleStartMs,
     cycle_end_ms: cycleEndMs,
     signal: {
@@ -67,8 +81,9 @@ export function normalizeCursorPeriodUsage(
 
 export function readCursorUsageSignal(
   env: Record<string, string | undefined>,
+  surface: CursorUsageSurface = 'cursor-ide-plugin',
 ): CursorUsageSignal | null {
-  const token = resolveAccessToken(env);
+  const token = resolveCursorAccessToken(env, surface);
   if (!token) return null;
 
   const timeoutMs = parseTimeout(env.CCM_CURSOR_USAGE_TIMEOUT_MS) ?? DEFAULT_TIMEOUT_MS;
@@ -94,7 +109,10 @@ export function readCursorUsageSignal(
       | { ok?: boolean; result?: unknown }
       | undefined;
     if (!msg?.ok) return null;
-    return normalizeCursorPeriodUsage(msg.result);
+    return normalizeCursorPeriodUsage(msg.result, {
+      surface,
+      quotaScopeFingerprint: quotaScopeFingerprint(token),
+    });
   } catch {
     return null;
   } finally {
@@ -171,12 +189,77 @@ function resolveUsedPercent(plan: Record<string, unknown>): number | null {
   return null;
 }
 
-function resolveAccessToken(env: Record<string, string | undefined>): string | null {
-  const fromEnv = env.CCM_CURSOR_ACCESS_TOKEN?.trim();
+function resolveCursorAccessToken(
+  env: Record<string, string | undefined>,
+  surface: CursorUsageSurface,
+): string | null {
+  if (surface === 'cursor-agent-cli') {
+    const fromEnv = env.CCM_CURSOR_AGENT_ACCESS_TOKEN?.trim();
+    if (fromEnv) return fromEnv;
+    const authPath = resolveCursorAgentAuthPath(env);
+    return authPath ? readAccessTokenFromJson(authPath) : null;
+  }
+  const fromEnv = (env.CCM_CURSOR_IDE_ACCESS_TOKEN || env.CCM_CURSOR_ACCESS_TOKEN)?.trim();
   if (fromEnv) return fromEnv;
   const dbPath = resolveStateDbPath(env);
   if (!dbPath) return null;
   return readAccessTokenFromStateDb(dbPath);
+}
+
+/** Safe discovery probe: reports availability and surface provenance without returning a secret. */
+export function inspectCursorCredential(
+  env: Record<string, string | undefined>,
+  surface: CursorUsageSurface,
+): { available: boolean; auth_source: CursorUsageSignal['auth_source'] } {
+  return {
+    available: resolveCursorAccessToken(env, surface) !== null,
+    auth_source:
+      surface === 'cursor-agent-cli' ? 'cursor-agent-current-login' : 'cursor-ide-current-login',
+  };
+}
+
+function resolveCursorAgentAuthPath(env: Record<string, string | undefined>): string | null {
+  if (env.CCM_CURSOR_AGENT_AUTH_FILE) {
+    const explicit = path.resolve(env.CCM_CURSOR_AGENT_AUTH_FILE);
+    return fs.existsSync(explicit) ? explicit : null;
+  }
+  const home = env.HOME || env.USERPROFILE || os.homedir();
+  let candidate: string;
+  if (process.platform === 'darwin') {
+    candidate = path.join(home, '.cursor', 'auth.json');
+  } else if (process.platform === 'win32') {
+    const appData = env.APPDATA || path.join(home, 'AppData', 'Roaming');
+    candidate = path.join(appData, 'Cursor', 'auth.json');
+  } else {
+    const xdgConfig = env.XDG_CONFIG_HOME || path.join(home, '.config');
+    candidate = path.join(xdgConfig, 'cursor', 'auth.json');
+  }
+  return fs.existsSync(candidate) ? candidate : null;
+}
+
+function readAccessTokenFromJson(authPath: string): string | null {
+  try {
+    const stat = fs.statSync(authPath);
+    if (!stat.isFile() || stat.size > 1024 * 1024) return null;
+    const value: unknown = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+    if (!isRecord(value)) return null;
+    const token = value.accessToken;
+    return typeof token === 'string' && token.trim() ? token.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+function quotaScopeFingerprint(token: string): string | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3 || !parts[1]) return null;
+    const payload: unknown = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    if (!isRecord(payload) || typeof payload.sub !== 'string' || !payload.sub.trim()) return null;
+    return `sha256:${createHash('sha256').update(payload.sub).digest('hex')}`;
+  } catch {
+    return null;
+  }
 }
 
 function resolveStateDbPath(env: Record<string, string | undefined>): string | null {

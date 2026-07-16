@@ -5,8 +5,8 @@
 //   · advise     → runRead：单侧 verdict（hold|throttle|switch|stop_5h|stop_7d|stop_billing_period）+ lever + switch_candidate。
 //   · task-cost  → runRead：单/聚合任务 token（读 board observability·shell=N/A·coverage_pct·--group-by）。
 //
-// 硬不变式（plan §2 不变式 1·硬约束）：**usage 纯只读** = query/compute，零写、不抢 board-lock、不落状态。
-//   全部 verb 走 runRead（绝不 runWrite）；备号数据**只读** accounts.json（JSON.parse），绝不写 registry、
+// 硬不变式（plan §2 不变式 1·硬约束）：**usage 是 provider read-only query**，不改 board/account/provider。
+//   Cursor Agent show/advise 复用既有 machine observation store 的 TTL/原子 cache；备号数据**只读** accounts.json，
 //   绝不碰 token、绝不 import account-management 的 JS（进程/包边界·plan §5）。
 //
 // 诚实降级（plan §2 行 26/69）：账户信号不可得 = exit 0 + `data.available:false`（非 exit 1）；
@@ -39,6 +39,13 @@ import {
 import * as discover from '../discover.js';
 import { resolveHarnessAdapter } from '../harnesses/registry.js';
 import type { UsageSignalSource } from '../harnesses/types.js';
+import {
+  type MachineQuotaStore,
+  readMachineWideQuotaStatusCached,
+  readOrRefreshMachineQuotaSurfaceReading,
+} from '../machine-wide-quota.js';
+import { createQuotaAdmissionStore } from '../quota-admission-store.js';
+import { quotaFilesystemFromBoundary } from '../quota-production-effects.js';
 import { type BoardArg, type Ctx, runRead } from './_common.js';
 
 // 备号窗口快照（registry SwitchSnapshot 投影）。
@@ -182,23 +189,116 @@ function readBackups(
   return { accounts: out, raw: accounts };
 }
 
-function readCurrentUsageSignal(
-  env: Record<string, string | undefined>,
-  harnessFlag?: string,
-): {
+interface CurrentUsageSignalReading {
   signal: UsageSignal | null;
   source: UsageSignalSource;
   unavailableReason: string;
   harnessLabel: string;
-} {
+}
+
+function cursorAgentRequested(harnessFlag?: string): boolean {
+  const requested = String(harnessFlag ?? '')
+    .trim()
+    .toLowerCase()
+    .replaceAll('_', '-');
+  return requested === 'cursor-agent' || requested === 'cursor-agent-cli';
+}
+
+function projectMachineReading(
+  reading: Record<string, any> | undefined,
+): CurrentUsageSignalReading | undefined {
+  const used = reading?.used_percentage;
+  const resetMs =
+    typeof reading?.resets_at === 'string' ? Date.parse(reading.resets_at) : Number.NaN;
+  const observedMs =
+    typeof reading?.observed_at === 'string' ? Date.parse(reading.observed_at) : Number.NaN;
+  const validUntilMs =
+    typeof reading?.valid_until === 'string' ? Date.parse(reading.valid_until) : Number.NaN;
+  if (
+    typeof used !== 'number' ||
+    !Number.isFinite(used) ||
+    used < 0 ||
+    used > 100 ||
+    !Number.isFinite(resetMs) ||
+    !Number.isFinite(observedMs) ||
+    !Number.isFinite(validUntilMs) ||
+    validUntilMs < Date.now()
+  ) {
+    return undefined;
+  }
+  return {
+    signal: {
+      five_hour: null,
+      seven_day: null,
+      billing_period: {
+        used_percentage: used,
+        resets_at: Math.floor(resetMs / 1000),
+      },
+      captured_at: Math.floor(observedMs / 1000),
+    },
+    source: String(reading?.source?.collector_id ?? 'cursor-agent-dashboard'),
+    unavailableReason: 'Cursor Agent machine-wide quota cache 不可用或已过期',
+    harnessLabel: 'Cursor Agent',
+  };
+}
+
+function readCurrentUsageSignal(
+  env: Record<string, string | undefined>,
+  harnessFlag?: string,
+  homeFlag?: string,
+): CurrentUsageSignalReading {
+  const wantsCursorAgent = cursorAgentRequested(harnessFlag);
+  if (wantsCursorAgent) {
+    const home = resolveHomeDir(env, homeFlag);
+    const status = readMachineWideQuotaStatusCached(home);
+    const reading = Array.isArray(status.readings)
+      ? status.readings.find(
+          (candidate: Record<string, any>) => candidate?.target?.surface_id === 'cursor-agent-cli',
+        )
+      : undefined;
+    const projected = projectMachineReading(reading);
+    if (projected) return projected;
+  }
   const adapter = resolveHarnessAdapter({ env, harnessFlag });
-  const reading = adapter.readCurrentUsage(env);
+  const reading =
+    wantsCursorAgent && adapter.readCurrentUsageForSurface
+      ? adapter.readCurrentUsageForSurface('cursor-agent-cli', env)
+      : adapter.readCurrentUsage(env);
   return {
     signal: reading.signal,
     source: reading.source,
     unavailableReason: reading.unavailableReason,
     harnessLabel: adapter.displayName,
   };
+}
+
+async function readSharedCurrentUsageSignal(
+  ctx: Ctx,
+  harnessFlag?: string,
+  homeFlag?: string,
+): Promise<CurrentUsageSignalReading> {
+  if (!cursorAgentRequested(harnessFlag) || !ctx.machineQuotaCollectors) {
+    return readCurrentUsageSignal(ctx.env, harnessFlag, homeFlag);
+  }
+  const home = resolveHomeDir(ctx.env, homeFlag);
+  const store = createQuotaAdmissionStore({
+    home,
+    ...(ctx.quotaEffects ? { filesystem: quotaFilesystemFromBoundary(ctx.quotaEffects) } : {}),
+  }) as MachineQuotaStore;
+  const reading = await readOrRefreshMachineQuotaSurfaceReading({
+    surfaceId: 'cursor-agent-cli',
+    env: ctx.env,
+    store,
+    collectors: ctx.machineQuotaCollectors,
+  });
+  return (
+    projectMachineReading(reading) ?? {
+      signal: null,
+      source: 'unavailable',
+      unavailableReason: 'Cursor Agent machine-wide quota cache 不可用或已过期',
+      harnessLabel: 'Cursor Agent',
+    }
+  );
 }
 
 // effectiveNFromRegistry(env, nowMs, homeFlag) → 号池有效配额份数（复用引擎 effectiveN 纯函数）。无 registry → 1。
@@ -286,7 +386,18 @@ export function accountBurnRate(
 // ── usage show ──────────────────────────────────────────────────────────────
 //   当前号 + 全备号 5h/7d used%/resets_at（备号=registry 生命周期快照·标 as_of/snapshot_stale）。
 //   --accounts all|current（默认 all）；信号不可得 = exit 0 + available:false。
-export function show(ctx: Ctx): number {
+export function show(ctx: Ctx): number | Promise<number> {
+  const homeFlag = ctx.values.home as string | undefined;
+  const harnessFlag = ctx.values.harness as string | undefined;
+  if (cursorAgentRequested(harnessFlag)) {
+    return readSharedCurrentUsageSignal(ctx, harnessFlag, homeFlag).then((currentUsage) =>
+      renderShow(ctx, currentUsage),
+    );
+  }
+  return renderShow(ctx);
+}
+
+function renderShow(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading): number {
   return runRead(ctx, {
     // usage show 不需要 active board（号池是用户级·跨板）——自定义 resolve 兜空板，避免无板时 exit 5。
     resolve: () => ({ boardPath: '', board: {} }),
@@ -296,7 +407,8 @@ export function show(ctx: Ctx): number {
       const accountsScope = (c.values.accounts as string) || 'all';
       const homeFlag = c.values.home as string | undefined;
       const harnessFlag = c.values.harness as string | undefined;
-      const currentUsage = readCurrentUsageSignal(c.env, harnessFlag);
+      const currentUsage =
+        currentUsageOverride ?? readCurrentUsageSignal(c.env, harnessFlag, homeFlag);
       const sidecar = currentUsage.signal;
       const backups = readBackups(c.env, nowMs, homeFlag);
       // --effective-n 覆写优先；否则从 registry 算（与 advise 一致·#audit：show 此前广告了 --effective-n 但忽略）。
@@ -320,16 +432,20 @@ export function show(ctx: Ctx): number {
       };
       const cur5h = sidecar ? projectWindow(sidecar.five_hour) : null;
       const cur7d = sidecar ? projectWindow(sidecar.seven_day) : null;
+      const curBilling = sidecar ? projectWindow(sidecar.billing_period) : null;
       // 至少一个非过期窗口有有效 used% → 账户口径可用。
       const currentAvailable =
         sidecar != null &&
-        ((cur5h?.used_percentage ?? null) !== null || (cur7d?.used_percentage ?? null) !== null);
+        ((cur5h?.used_percentage ?? null) !== null ||
+          (cur7d?.used_percentage ?? null) !== null ||
+          (curBilling?.used_percentage ?? null) !== null);
       const current = sidecar
         ? {
             source: currentUsage.source,
             available: currentAvailable,
             five_hour: cur5h,
             seven_day: cur7d,
+            billing_period: curBilling,
             captured_at: sidecar.captured_at ?? null,
           }
         : {
@@ -337,6 +453,7 @@ export function show(ctx: Ctx): number {
             available: false,
             five_hour: null,
             seven_day: null,
+            billing_period: null,
             captured_at: null,
           };
 
@@ -373,9 +490,12 @@ export function show(ctx: Ctx): number {
       if (current.available) {
         const p5 = current.five_hour?.used_percentage;
         const p7 = current.seven_day?.used_percentage;
+        const billing = current.billing_period?.used_percentage;
         const label =
           currentUsage.source === 'codex-app-server' ? 'Codex app-server' : 'account 权威';
-        lines.push(`  current（${label}）: 5h=${fmtPct(p5)} 7d=${fmtPct(p7)}`);
+        lines.push(
+          `  current（${label}）: 5h=${fmtPct(p5)} 7d=${fmtPct(p7)}${billing != null ? ` billing_period=${fmtPct(billing)}` : ''}`,
+        );
       } else {
         lines.push(
           `  current: 账户权威信号不可用（${currentUsage.unavailableReason}·available:false·降级）`,
@@ -413,7 +533,18 @@ function fmtPct(p: number | null | undefined): string {
 
 // ── usage advise ──────────────────────────────────────────────────────────────
 //   单侧 verdict + 推荐 lever + switch_candidate（收口 usage-pacing 数学·引擎 pacingAdvice）。
-export function advise(ctx: Ctx): number {
+export function advise(ctx: Ctx): number | Promise<number> {
+  const homeFlag = ctx.values.home as string | undefined;
+  const harnessFlag = ctx.values.harness as string | undefined;
+  if (cursorAgentRequested(harnessFlag)) {
+    return readSharedCurrentUsageSignal(ctx, harnessFlag, homeFlag).then((currentUsage) =>
+      renderAdvice(ctx, currentUsage),
+    );
+  }
+  return renderAdvice(ctx);
+}
+
+function renderAdvice(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading): number {
   return runRead(ctx, {
     resolve: () => ({ boardPath: '', board: {} }),
     render: (_b, c) => {
@@ -421,7 +552,8 @@ export function advise(ctx: Ctx): number {
       const nowSec = Math.floor(nowMs / 1000);
       const homeFlag = c.values.home as string | undefined;
       const harnessFlag = c.values.harness as string | undefined;
-      const currentUsage = readCurrentUsageSignal(c.env, harnessFlag);
+      const currentUsage =
+        currentUsageOverride ?? readCurrentUsageSignal(c.env, harnessFlag, homeFlag);
       const sidecar = currentUsage.signal;
       // --effective-n 覆写优先；否则从 registry 算。
       const enFlag = c.values['effective-n'];
@@ -453,6 +585,7 @@ export function advise(ctx: Ctx): number {
         window_5h_pct: advice.window_5h_pct,
         window_7d_pct: advice.window_7d_pct,
         window_billing_period_pct: advice.window_billing_period_pct,
+        billing_period_resets_at: sidecar?.billing_period?.resets_at ?? null,
         effective_n: advice.effective_n,
         switch_candidate: advice.switch_candidate,
         confidence: advice.confidence,

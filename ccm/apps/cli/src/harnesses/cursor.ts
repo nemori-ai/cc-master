@@ -38,7 +38,7 @@ const HEADLESS_PLUGIN_REASON =
 export const cursorAdapter: HarnessAdapter = {
   id: 'cursor',
   displayName: 'Cursor',
-  aliases: ['cursor', 'cursor-ide'],
+  aliases: ['cursor', 'cursor-ide', 'cursor-agent', 'cursor-agent-cli'],
   detect(env) {
     return !!(
       env.CURSOR_AGENT ||
@@ -101,20 +101,13 @@ export const cursorAdapter: HarnessAdapter = {
   }),
   accountPoolLocation: () => null,
   readCurrentUsage(env) {
-    const reading = readCursorUsageSignal(env);
-    if (!reading?.signal) {
-      return {
-        signal: null,
-        source: 'unavailable',
-        unavailableReason:
-          'Cursor dashboard GetCurrentPeriodUsage 不可用（未登录 / token 失效 / API 变更）',
-      };
+    return readCursorSurfaceUsage('cursor-ide-plugin', env);
+  },
+  readCurrentUsageForSurface(surfaceId, env) {
+    if (surfaceId === 'cursor-agent-cli' || surfaceId === 'cursor-agent') {
+      return readCursorSurfaceUsage('cursor-agent-cli', env);
     }
-    return {
-      signal: reading.signal,
-      source: 'cursor-dashboard',
-      unavailableReason: 'Cursor dashboard GetCurrentPeriodUsage 不可用',
-    };
+    return readCursorSurfaceUsage('cursor-ide-plugin', env);
   },
   accountSwitchPreflight: () => ({
     action: 'noop',
@@ -127,6 +120,27 @@ export const cursorAdapter: HarnessAdapter = {
   externalStatusline: { supported: false, reason: STATUSLINE_REASON },
   pluginDistribution: { supported: true, reason: PLUGIN_DISTRIBUTION_REASON },
 };
+
+function readCursorSurfaceUsage(surfaceId: 'cursor-ide-plugin' | 'cursor-agent-cli', env: Env) {
+  const reading = readCursorUsageSignal(env, surfaceId);
+  if (!reading?.signal) {
+    return {
+      signal: null,
+      source: 'unavailable',
+      unavailableReason:
+        surfaceId === 'cursor-agent-cli'
+          ? 'Cursor Agent dashboard GetCurrentPeriodUsage 不可用（未登录 / token 失效 / API 变更）'
+          : 'Cursor IDE dashboard GetCurrentPeriodUsage 不可用（未登录 / token 失效 / API 变更）',
+    };
+  }
+  return {
+    signal: reading.signal,
+    source: reading.source,
+    unavailableReason: 'Cursor dashboard GetCurrentPeriodUsage 不可用',
+    authSource: reading.auth_source,
+    quotaScopeFingerprint: reading.quota_scope_fingerprint,
+  };
+}
 
 function cursorSurfaces(input: {
   ideCli: HarnessCliProbe;

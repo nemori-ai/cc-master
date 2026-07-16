@@ -58,6 +58,50 @@ export const counterfeits = {
       return decision;
     },
   },
+  'shared-pool-split': {
+    ...knownGood,
+    projectPosture(signal, input) {
+      const decision = knownGood.projectPosture(signal, input);
+      if (signal.provider_id === 'cursor') {
+        decision.quota_scope_digest = `sha256:${(
+          signal.surface_id === 'cursor-ide-plugin' ? 'e' : 'f'
+        ).repeat(64)}`;
+      }
+      return decision;
+    },
+  },
+  'shared-pool-additive': {
+    ...knownGood,
+    aggregateCapacityViews(decisions) {
+      const result = knownGood.aggregateCapacityViews(decisions);
+      result.known_capacities = decisions
+        .filter((decision) => decision.quota_scope_digest)
+        .map((decision) => ({
+          quota_scope_digest: decision.quota_scope_digest,
+          scope_digests: [decision.scope_digest],
+          capacity_units: 1,
+        }));
+      return result;
+    },
+  },
+  'null-scope-additive': {
+    ...knownGood,
+    aggregateCapacityViews(decisions) {
+      const result = knownGood.aggregateCapacityViews(decisions);
+      result.known_capacities.push(
+        ...decisions
+          .filter((decision) => !decision.quota_scope_digest)
+          .map((decision) => ({
+            quota_scope_digest: null,
+            scope_digests: [decision.scope_digest],
+            capacity_units: 1,
+          })),
+      );
+      result.unresolved_scope_digests = [];
+      result.unresolved_capacity_units = 0;
+      return result;
+    },
+  },
   'checkpoint-early': {
     ...knownGood,
     async runCycle(input) {

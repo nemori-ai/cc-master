@@ -6,6 +6,7 @@ import {
   readMachineWideQuotaStatus,
   refreshMachineWideQuota,
 } from '../machine-wide-quota.js';
+import { runMachineWideQuotaNotificationCycle } from '../machine-wide-quota-notification.js';
 import { createQuotaAdmissionStore } from '../quota-admission-store.js';
 import {
   QUOTA_FILESYSTEM_CAPABILITIES,
@@ -81,6 +82,14 @@ function emitMachineWide(ctx: Ctx, data: unknown): number {
 
 export async function status(ctx: Ctx): Promise<number> {
   if (ctx.values['machine-wide'] === true) {
+    if (ctx.machineWideQuotaNotifications) {
+      const decisions = await ctx.machineWideQuotaNotifications.readPostures({ refresh: false });
+      return emitMachineWide(ctx, {
+        schema: 'ccm/machine-quota-status/v1',
+        summary: { schema: 'ccm/machine-quota-summary/v1', decisions },
+        readings: [],
+      });
+    }
     const data = await readMachineWideQuotaStatus(store(ctx) as MachineQuotaStore);
     return emitMachineWide(ctx, data);
   }
@@ -94,6 +103,32 @@ export async function refresh(ctx: Ctx): Promise<number> {
     };
     error.errKind = 'Usage';
     throw error;
+  }
+  if (ctx.machineWideQuotaNotifications) {
+    const boundary = ctx.machineWideQuotaNotifications;
+    const decisions = await boundary.readPostures({ refresh: true });
+    const subscriptions = await boundary.listSubscriptions();
+    const result = await runMachineWideQuotaNotificationCycle({
+      decisions,
+      subscriptions,
+      checkpoint: {
+        read: boundary.readCheckpoint,
+        publish: boundary.publishCheckpoint,
+      },
+      inbox: { put: boundary.putInbox },
+    });
+    return emitMachineWide(ctx, {
+      schema: 'ccm/machine-quota-refresh/v1',
+      scopes: decisions.map((decision) => ({
+        scope_digest: decision.scope_digest,
+        target: decision.target,
+        status: 'refreshed',
+      })),
+      deltas: result.notifications.map((notification) => notification.payload),
+      deliveries: result.notifications,
+      fanout_complete: true,
+      checkpoint_advanced: true,
+    });
   }
   const home = discover.resolveHome({
     homeFlag: ctx.values.home as string | undefined,

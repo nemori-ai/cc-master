@@ -164,18 +164,13 @@ export interface MachineQuotaSummaryDecision {
     harness_id: string;
     surface_id: string;
     provider_id: string;
-    identity_scope_digest: string;
-    payer_scope: string;
-    pool_scope_digest: string;
-    bucket_id: string;
-    unit: string;
     window: { kind: string; name: string; duration_sec: number };
   };
-  policy_digest: string;
-  requirement_digest: string;
-  state: 'healthy' | 'tight' | 'exhausted' | 'stale' | 'unknown';
+  quota_scope_digest: string | null;
+  state: 'healthy' | 'tight' | 'exhausted' | 'unknown';
   freshness: 'fresh' | 'soft-stale' | 'hard-stale' | 'unknown';
   reason_codes: string[];
+  source: { collector_id: string; source_schema: string; auth_source: string };
   decision_revision: string;
   observation_revision: string;
   fanout_covered: boolean;
@@ -733,11 +728,11 @@ export function validateMachineQuotaSummary(
       !exactKeys(decision, [
         'scope_digest',
         'target',
-        'policy_digest',
-        'requirement_digest',
+        'quota_scope_digest',
         'state',
         'freshness',
         'reason_codes',
+        'source',
         'decision_revision',
         'observation_revision',
         'fanout_covered',
@@ -745,13 +740,7 @@ export function validateMachineQuotaSummary(
     ) {
       out.push(issue('MACHINE-QUOTA-DECISION', path, 'contains unknown or missing fields'));
     }
-    for (const field of [
-      'scope_digest',
-      'policy_digest',
-      'requirement_digest',
-      'decision_revision',
-      'observation_revision',
-    ]) {
+    for (const field of ['scope_digest', 'decision_revision', 'observation_revision']) {
       if (typeof decision[field] !== 'string' || !SHA256_DIGEST.test(decision[field])) {
         out.push(issue('MACHINE-QUOTA-DIGEST', `${path}.${field}`, 'must be a sha256 digest'));
       }
@@ -761,40 +750,14 @@ export function validateMachineQuotaSummary(
       out.push(issue('MACHINE-QUOTA-TARGET', `${path}.target`, 'must be an object'));
     } else {
       const target = decision.target;
-      if (
-        !exactKeys(target, [
-          'harness_id',
-          'surface_id',
-          'provider_id',
-          'identity_scope_digest',
-          'payer_scope',
-          'pool_scope_digest',
-          'bucket_id',
-          'unit',
-          'window',
-        ])
-      ) {
+      if (!exactKeys(target, ['harness_id', 'surface_id', 'provider_id', 'window'])) {
         out.push(
           issue('MACHINE-QUOTA-TARGET', `${path}.target`, 'contains unknown or missing fields'),
         );
       }
-      for (const field of [
-        'harness_id',
-        'surface_id',
-        'provider_id',
-        'payer_scope',
-        'bucket_id',
-        'unit',
-      ]) {
+      for (const field of ['harness_id', 'surface_id', 'provider_id']) {
         if (!boundedString(target[field], 128)) {
           out.push(issue('MACHINE-QUOTA-TARGET', `${path}.target.${field}`, 'must be bounded'));
-        }
-      }
-      for (const field of ['identity_scope_digest', 'pool_scope_digest']) {
-        if (typeof target[field] !== 'string' || !SHA256_DIGEST.test(target[field])) {
-          out.push(
-            issue('MACHINE-QUOTA-DIGEST', `${path}.target.${field}`, 'must be a sha256 digest'),
-          );
         }
       }
       if (
@@ -810,7 +773,7 @@ export function validateMachineQuotaSummary(
         );
       }
     }
-    if (!['healthy', 'tight', 'exhausted', 'stale', 'unknown'].includes(decision.state)) {
+    if (!['healthy', 'tight', 'exhausted', 'unknown'].includes(decision.state)) {
       out.push(issue('MACHINE-QUOTA-STATE', `${path}.state`, 'must be a closed quota state'));
     }
     if (!['fresh', 'soft-stale', 'hard-stale', 'unknown'].includes(decision.freshness)) {
@@ -826,6 +789,28 @@ export function validateMachineQuotaSummary(
       )
     ) {
       out.push(issue('MACHINE-QUOTA-REASONS', `${path}.reason_codes`, 'must be safe codes'));
+    }
+    if (
+      decision.quota_scope_digest !== null &&
+      (typeof decision.quota_scope_digest !== 'string' ||
+        !SHA256_DIGEST.test(decision.quota_scope_digest))
+    ) {
+      out.push(
+        issue(
+          'MACHINE-QUOTA-DIGEST',
+          `${path}.quota_scope_digest`,
+          'must be null or a sha256 digest',
+        ),
+      );
+    }
+    if (
+      !record(decision.source) ||
+      !exactKeys(decision.source, ['collector_id', 'source_schema', 'auth_source']) ||
+      !boundedString(decision.source.collector_id, 128) ||
+      !boundedString(decision.source.source_schema, 128) ||
+      !boundedString(decision.source.auth_source, 128)
+    ) {
+      out.push(issue('MACHINE-QUOTA-SOURCE', `${path}.source`, 'must be bounded exact provenance'));
     }
     if (typeof decision.fanout_covered !== 'boolean') {
       out.push(issue('MACHINE-QUOTA-COVERAGE', `${path}.fanout_covered`, 'must be boolean'));

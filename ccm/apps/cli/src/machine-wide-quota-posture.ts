@@ -1,11 +1,6 @@
+import { canonicalJson, evaluateQuotaObservation, pacingAdvice, sha256Hex } from '@ccm/engine';
 import {
-  canonicalJson,
-  deriveQuotaHeadroom,
-  evaluateQuotaObservation,
-  sha256Hex,
-} from '@ccm/engine';
-import {
-  type MachineQuotaAuthority,
+  type MachineQuotaSignalScope,
   type MachineQuotaState,
   projectMachineQuotaPosture as projectAgentSafePosture,
 } from './machine-wide-quota-notification.js';
@@ -26,9 +21,15 @@ export interface RawMachineQuotaPostureInput {
     identity_fingerprint: string | null;
     payer_scope: string | null;
     pool_id: string | null;
+    quota_scope_digest?: string | null;
     unit: string;
     bucket_id?: string;
     window?: Data;
+    source: {
+      collector_id: string;
+      source_schema: string;
+      auth_source: string;
+    };
   };
   observations: Data[];
   source_profiles: Array<{
@@ -38,16 +39,6 @@ export interface RawMachineQuotaPostureInput {
     hard_ttl_sec: number;
     max_clock_skew_sec: number;
   }>;
-  active_reservations: Data[];
-  policy: {
-    revision: string;
-    hard_ceiling_used_pct: Record<string, number>;
-  };
-  requirement: {
-    revision: string;
-    required_bucket_ids: string[];
-    safety_margin: Record<string, number>;
-  };
 }
 
 function digest(value: unknown): string {
@@ -55,9 +46,9 @@ function digest(value: unknown): string {
 }
 
 function requiredObservation(input: RawMachineQuotaPostureInput): Data | undefined {
-  const required = new Set(input.requirement.required_bucket_ids);
-  return input.observations.find((observation) =>
-    required.has(String(observation?.source_key?.bucket_id ?? '')),
+  return input.observations.find(
+    (observation) =>
+      String(observation?.source_key?.bucket_id ?? '') === String(input.authority.bucket_id ?? ''),
   );
 }
 
@@ -65,34 +56,6 @@ function object(value: unknown): Data {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? (value as Data)
     : {};
-}
-
-function percentage(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
-}
-
-function activeReservedPct(input: RawMachineQuotaPostureInput, aggregationKey: string): number {
-  const snapshots = input.active_reservations.filter(
-    (candidate) =>
-      candidate?.aggregation_key === aggregationKey && candidate?.active_reserved_pct !== undefined,
-  );
-  if (snapshots.length > 1) return Number.NaN;
-  if (snapshots.length === 1) {
-    const active = snapshots[0]?.active_reserved_pct;
-    return percentage(active) ? active : Number.NaN;
-  }
-  let total = 0;
-  for (const reservation of input.active_reservations) {
-    if (
-      reservation?.aggregation_key !== aggregationKey ||
-      !['held', 'committed', 'release_pending', 'orphaned'].includes(String(reservation?.state))
-    ) {
-      continue;
-    }
-    if (!percentage(reservation?.amount_pct)) return Number.NaN;
-    total += reservation.amount_pct;
-  }
-  return percentage(total) ? total : Number.NaN;
 }
 
 function deriveState(
@@ -107,7 +70,7 @@ function deriveState(
     return {
       state: 'unknown',
       freshness: 'unknown',
-      reasonCodes: [input.authority.reason_code || 'QUOTA_IDENTITY_AUTHORITY_UNKNOWN'],
+      reasonCodes: [input.authority.reason_code || 'QUOTA_SIGNAL_UNKNOWN'],
     };
   }
   if (!observation) {
@@ -147,71 +110,53 @@ function deriveState(
   const evaluation = evaluateQuotaObservation({
     provider: input.authority.provider_id,
     provider_window_rule: { name: window.name, duration_sec: window.duration_sec },
-    required_bucket_ids: input.requirement.required_bucket_ids,
+    required_bucket_ids: [String(input.authority.bucket_id ?? '')],
     checked_at: input.checked_at,
     profile,
     observations: engineObservations,
   });
   const freshness = String(evaluation.freshness ?? 'unknown');
   if (freshness !== 'fresh') {
-    return freshness === 'soft-stale' || freshness === 'hard-stale'
-      ? {
-          state: 'stale',
-          freshness,
-          reasonCodes: [String(evaluation.blocking_error ?? 'QUOTA_STALE')],
-        }
-      : {
-          state: 'unknown',
-          freshness,
-          reasonCodes: [String(evaluation.blocking_error ?? 'QUOTA_REQUIRED_WINDOW_UNKNOWN')],
-        };
+    return {
+      state: 'unknown',
+      freshness,
+      reasonCodes: [
+        freshness === 'soft-stale'
+          ? 'QUOTA_SIGNAL_STALE'
+          : String(evaluation.blocking_error ?? 'QUOTA_REQUIRED_WINDOW_UNKNOWN'),
+      ],
+    };
   }
-  const bucketId = String(sourceKey.bucket_id ?? '');
-  const aggregationKey = String(sourceKey.aggregation_key ?? '');
   const value = object(observation.value);
   const usedRaw = Number(value.used);
   const limit = Number(value.limit);
   const used = limit > 0 ? (usedRaw / limit) * 100 : Number.NaN;
-  const ceiling = Number(input.policy.hard_ceiling_used_pct[bucketId]);
-  const margin = Number(input.requirement.safety_margin[bucketId] ?? 0);
-  const active = activeReservedPct(input, aggregationKey);
-  if (
-    !percentage(used) ||
-    !percentage(ceiling) ||
-    ceiling === 0 ||
-    !percentage(margin) ||
-    !percentage(active) ||
-    !aggregationKey
-  ) {
+  if (!Number.isFinite(used) || used < 0 || used > 100) {
     return { state: 'unknown', freshness, reasonCodes: ['QUOTA_REQUIRED_WINDOW_UNKNOWN'] };
   }
-  const headroom = deriveQuotaHeadroom({
-    policy: { hard_ceiling_used_pct: ceiling },
-    required_aggregation_key: aggregationKey,
-    buckets: [
-      {
-        id: bucketId,
-        aggregation_key: aggregationKey,
-        freshness,
-        used_pct: used,
-        active_reserved_pct: active,
-        safety_margin_pct: margin,
-        projected_p80_pct: 0,
-      },
-    ],
+  const resetMs = value.resets_at ? Date.parse(String(value.resets_at)) : Number.NaN;
+  const windowSignal = {
+    used_percentage: used,
+    ...(Number.isFinite(resetMs) ? { resets_at: Math.floor(resetMs / 1000) } : {}),
+  };
+  const name = String(window.name ?? '');
+  const signal = {
+    five_hour: name === 'five_hour' ? windowSignal : null,
+    seven_day: name === 'seven_day' ? windowSignal : null,
+    billing_period: name === 'billing_period' ? windowSignal : null,
+  };
+  const checkedAtMs = Date.parse(input.checked_at);
+  const advice = pacingAdvice(signal, {
+    nowSec: Number.isFinite(checkedAtMs) ? Math.floor(checkedAtMs / 1000) : undefined,
   });
-  const state = String(headroom.state ?? 'unknown');
-  if (state === 'ample') return { state: 'healthy', freshness, reasonCodes: [] };
-  if (state === 'tight' || state === 'exhausted') {
-    return {
-      state,
-      freshness,
-      reasonCodes: Array.isArray(headroom.blocking_reasons)
-        ? headroom.blocking_reasons.map(String)
-        : [`QUOTA_${state.toUpperCase()}`],
-    };
+  if (!advice.available) {
+    return { state: 'unknown', freshness, reasonCodes: ['QUOTA_REQUIRED_WINDOW_UNKNOWN'] };
   }
-  return { state: 'unknown', freshness, reasonCodes: ['QUOTA_REQUIRED_WINDOW_UNKNOWN'] };
+  if (advice.verdict === 'hold') return { state: 'healthy', freshness, reasonCodes: [] };
+  if (advice.verdict === 'throttle' || advice.verdict === 'switch') {
+    return { state: 'tight', freshness, reasonCodes: ['QUOTA_TIGHT'] };
+  }
+  return { state: 'exhausted', freshness, reasonCodes: ['QUOTA_EXHAUSTED'] };
 }
 
 /**
@@ -222,10 +167,7 @@ function deriveState(
 export function projectMachineQuotaPosture(input: RawMachineQuotaPostureInput): Data {
   const observation = requiredObservation(input);
   const bucketId = String(
-    observation?.source_key?.bucket_id ??
-      input.authority.bucket_id ??
-      input.requirement.required_bucket_ids[0] ??
-      'unknown',
+    observation?.source_key?.bucket_id ?? input.authority.bucket_id ?? 'unknown',
   );
   const window = observation?.source_key?.window ??
     input.authority.window ?? {
@@ -233,31 +175,16 @@ export function projectMachineQuotaPosture(input: RawMachineQuotaPostureInput): 
       name: 'unknown',
       duration_sec: 0,
     };
-  const identityFingerprint =
-    typeof input.authority.identity_fingerprint === 'string' &&
-    input.authority.identity_fingerprint.length > 0
-      ? input.authority.identity_fingerprint
-      : `ccm/identity-unavailable/v1/${input.authority.harness_id}/${input.authority.surface_id}`;
-  const poolId =
-    typeof input.authority.pool_id === 'string' && input.authority.pool_id.length > 0
-      ? input.authority.pool_id
-      : `ccm/pool-unavailable/v1/${input.authority.harness_id}/${input.authority.surface_id}`;
-  const authority: MachineQuotaAuthority = {
+  const signal: MachineQuotaSignalScope = {
     harness_id: input.authority.harness_id,
     surface_id: input.authority.surface_id,
     provider_id: input.authority.provider_id,
-    identity_fingerprint: identityFingerprint,
-    payer_scope: input.authority.payer_scope || 'unknown',
-    pool_id: poolId,
-    bucket_id: bucketId,
-    unit: input.authority.unit,
     window,
-    policy_revision: input.policy.revision,
-    required_bucket_ids: [...input.requirement.required_bucket_ids],
-    safety_margin: structuredClone(input.requirement.safety_margin),
+    quota_scope_digest: input.authority.quota_scope_digest ?? null,
+    source: structuredClone(input.authority.source),
   };
   const posture = deriveState(input, observation);
-  return projectAgentSafePosture(authority, {
+  return projectAgentSafePosture(signal, {
     home_salt: input.home_scope_salt,
     state: posture.state,
     freshness: posture.freshness,
@@ -270,10 +197,9 @@ export function projectMachineQuotaPosture(input: RawMachineQuotaPostureInput): 
       source_raw_revision: observation?.source?.raw_revision ?? null,
     }),
     source: {
-      collector_id: String(
-        observation?.source?.collector ?? `${input.authority.provider_id}-quota-authority`,
-      ),
-      source_schema: String(observation?.source?.schema ?? 'ccm/quota-observation/v1'),
+      collector_id: String(observation?.source?.collector ?? input.authority.source.collector_id),
+      source_schema: String(observation?.source?.schema ?? input.authority.source.source_schema),
+      auth_source: String(observation?.source?.auth_source ?? input.authority.source.auth_source),
     },
     observed_at: observation?.observed_at,
     valid_until: observation?.valid_until,

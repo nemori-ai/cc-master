@@ -1,11 +1,12 @@
 // cursor-usage.test.ts — normalize Cursor GetCurrentPeriodUsage → UsageSignal.billing_period (TDD).
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { normalizeCursorPeriodUsage } from '../src/cursor-usage.js';
+import { inspectCursorCredential, normalizeCursorPeriodUsage } from '../src/cursor-usage.js';
 
 const FIXTURE = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -52,4 +53,64 @@ test('normalizeCursorPeriodUsage derives percent from spend when percent fields 
   });
   assert.ok(out);
   assert.equal(out.signal.billing_period?.used_percentage, 25);
+});
+
+test('Cursor Agent discovers its own file credential without inheriting Cursor IDE state', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-cursor-agent-auth-'));
+  const config = join(root, 'xdg');
+  const agentAuth = join(config, 'cursor', 'auth.json');
+  const ideDb = join(root, 'ide', 'state.vscdb');
+  mkdirSync(join(config, 'cursor'), { recursive: true });
+  mkdirSync(join(root, 'ide'), { recursive: true });
+  writeFileSync(agentAuth, JSON.stringify({ accessToken: 'agent-access-secret' }));
+  writeFileSync(ideDb, 'not-a-sqlite-db');
+
+  const env = {
+    HOME: root,
+    XDG_CONFIG_HOME: config,
+    CCM_CURSOR_STATE_DB: ideDb,
+  };
+  assert.deepEqual(inspectCursorCredential(env, 'cursor-agent-cli'), {
+    available: true,
+    auth_source: 'cursor-agent-current-login',
+  });
+  assert.deepEqual(inspectCursorCredential(env, 'cursor-ide-plugin'), {
+    available: false,
+    auth_source: 'cursor-ide-current-login',
+  });
+});
+
+test('Cursor IDE and Cursor Agent explicit credential overrides remain surface-scoped', () => {
+  const isolatedHome = mkdtempSync(join(tmpdir(), 'ccm-cursor-auth-scope-'));
+  const env = {
+    HOME: isolatedHome,
+    XDG_CONFIG_HOME: join(isolatedHome, '.config'),
+    CCM_CURSOR_ACCESS_TOKEN: 'ide-access-secret',
+    CCM_CURSOR_AGENT_ACCESS_TOKEN: 'agent-access-secret',
+  };
+  assert.equal(inspectCursorCredential(env, 'cursor-ide-plugin').available, true);
+  assert.equal(inspectCursorCredential(env, 'cursor-agent-cli').available, true);
+
+  assert.equal(
+    inspectCursorCredential(
+      {
+        HOME: isolatedHome,
+        XDG_CONFIG_HOME: join(isolatedHome, '.config'),
+        CCM_CURSOR_AGENT_ACCESS_TOKEN: 'agent-only',
+      },
+      'cursor-ide-plugin',
+    ).available,
+    false,
+  );
+  assert.equal(
+    inspectCursorCredential(
+      {
+        HOME: isolatedHome,
+        XDG_CONFIG_HOME: join(isolatedHome, '.config'),
+        CCM_CURSOR_ACCESS_TOKEN: 'ide-only',
+      },
+      'cursor-agent-cli',
+    ).available,
+    false,
+  );
 });

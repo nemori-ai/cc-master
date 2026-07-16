@@ -69,13 +69,13 @@ The cross-surface Capability Card owns intent/status; derived design docs only m
 
 ## 业务规则
 
-### Machine-wide quota target rules（contract frozen；production RED）
+### Machine-wide quota signal target rules（R2 contract frozen；production RED）
 
 - `rule-coordination-inbox-machine-quota-delta`: accept `kind:"quota_state_change"` only when payload
-  is exact `ccm/machine-quota-decision-delta/v1`, retains the complete agent-safe
-  harness/surface/provider/identity/payer/pool/bucket/unit/window target plus policy/requirement digests and
-  `decision_revision`/`delta_revision`, and carries the existing exact subscription/session/epoch
-  delivery provenance. Tight/exhausted/stale/unknown are strong advisories; recovery/reset are weak
+  is exact `ccm/machine-quota-decision-delta/v1`, retains the agent-safe
+  harness/surface/provider/window target, optional collector-proven `quota_scope_digest`, source provenance,
+  `decision_revision`/`delta_revision`, and the existing exact subscription/session/epoch delivery provenance.
+  Tight/exhausted/unknown are strong advisories; recovery/reset are weak
   advisories. They are target-scoped route inputs, never global stop/account-switch directives.
 - `rule-coordination-inbox-machine-quota-scope-dedup`: suppress an already present
   `producer+scope_digest+delta_revision`; retry must not create a suffixed id. Reconciliation and
@@ -87,6 +87,10 @@ The cross-surface Capability Card owns intent/status; derived design docs only m
 - `rule-coordination-inbox-machine-quota-no-account-mutation`: quota deltas are route-view advisories only.
   Codex five-hour/switch evidence never enters a delta, and Codex/Cursor delivery never invokes, recommends as
   automatic, or authorizes account switching.
+- `rule-coordination-inbox-machine-quota-shared-pool`: session fields belong only to delivery provenance.
+  Equal non-null `quota_scope_digest` rows are two surface views of one provider capacity and must not be added;
+  null means the relation is unknown and also does not authorize additive capacity. Identity/payer/pool diagnostics
+  are not posture gates.
 
 These target rules are executable RED and intentionally are not PARITY anchors until all three
 production implementations consume the new kind/schema. Cross-surface intent and maturity live in

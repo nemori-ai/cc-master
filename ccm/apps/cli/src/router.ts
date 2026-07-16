@@ -73,6 +73,7 @@ import type {
   MachineQuotaCollectorBoundary,
   MachineQuotaCoordinationBoundary,
 } from './machine-wide-quota.js';
+import type { MachineWideQuotaNotificationBoundary } from './machine-wide-quota-notification.js';
 import { createDefaultProviderRuntime, type ProviderRuntime } from './provider-runtime.js';
 import {
   ALIASES,
@@ -94,25 +95,38 @@ const DEFAULT_MACHINE_QUOTA_COLLECTORS: MachineQuotaCollectorBoundary = {
       return { status: 'unsupported', reason: 'surface-owned quota collector is unavailable' };
     }
     const adapter = knownHarnessAdapters().find((candidate) => candidate.id === harness);
-    if (!adapter || !adapter.inspectInstallation(env).installed) {
+    if (!adapter) {
       return { status: 'unknown', reason: 'harness is not installed' };
     }
+    const installation = adapter.inspectInstallation(env);
+    const requestedSurface = String(target.surface_id ?? '');
+    const surfaceInstalled = installation.surfaces.some(
+      (surface) =>
+        surface.installed &&
+        (surface.id === requestedSurface ||
+          (requestedSurface === 'cursor-agent-cli' && surface.id === 'cursor-agent')),
+    );
+    if (!installation.installed && !surfaceInstalled) {
+      return { status: 'unknown', reason: 'harness surface is not installed' };
+    }
     try {
-      const reading: CurrentUsageReading = adapter.readCurrentUsage(env);
-      return reading.signal && reading.authority
+      const reading: CurrentUsageReading = adapter.readCurrentUsageForSurface
+        ? adapter.readCurrentUsageForSurface(requestedSurface, env)
+        : adapter.readCurrentUsage(env);
+      return reading.signal
         ? {
             status: 'refreshed',
             signal: reading.signal,
             source: reading.source,
             authority: reading.authority,
+            authSource: reading.authSource,
+            quotaScopeFingerprint: reading.quotaScopeFingerprint,
           }
         : {
             status: 'unknown',
             signal: reading.signal,
             source: reading.source,
-            reason: reading.signal
-              ? 'authenticated quota identity authority is unavailable'
-              : reading.unavailableReason,
+            reason: reading.unavailableReason,
           };
     } catch (error) {
       return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
@@ -140,6 +154,7 @@ interface RunOpts {
   quotaEffects?: QuotaEffectBoundary;
   machineQuotaCollectors?: MachineQuotaCollectorBoundary;
   machineQuotaCoordination?: MachineQuotaCoordinationBoundary;
+  machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
   writeFileAtomicSync?: typeof io.writeFileAtomicSync;
@@ -602,6 +617,7 @@ export function runWithComposition(
           now,
         ),
     },
+    machineWideQuotaNotifications: opts.machineWideQuotaNotifications,
     nativeAttemptPrivateEvidence: opts.nativeAttemptPrivateEvidence,
     nativeAttemptAdmission: opts.nativeAttemptAdmission,
     writeFileAtomicSync: opts.writeFileAtomicSync,
@@ -660,6 +676,7 @@ function buildCtx({
   quotaEffects,
   machineQuotaCollectors,
   machineQuotaCoordination,
+  machineWideQuotaNotifications,
   nativeAttemptPrivateEvidence,
   nativeAttemptAdmission,
   writeFileAtomicSync,
@@ -676,6 +693,7 @@ function buildCtx({
   quotaEffects?: QuotaEffectBoundary;
   machineQuotaCollectors?: MachineQuotaCollectorBoundary;
   machineQuotaCoordination?: MachineQuotaCoordinationBoundary;
+  machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
   writeFileAtomicSync?: typeof io.writeFileAtomicSync;
@@ -711,6 +729,7 @@ function buildCtx({
     quotaEffects,
     machineQuotaCollectors,
     machineQuotaCoordination,
+    machineWideQuotaNotifications,
     nativeAttemptPrivateEvidence,
     nativeAttemptAdmission,
     writeFileAtomicSync,

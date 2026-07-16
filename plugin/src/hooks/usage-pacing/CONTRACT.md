@@ -20,6 +20,16 @@ remains Stop-time (plus Claude Code PostToolBatch) cached delivery, not a provid
   `scope_digest+decision_revision` already covered by machine-wide fan-out, direct injection and a
   second coordination notification are both silent. If not covered, the floor may surface only the
   explicit local target/revision, never an inferred remote provider.
+- `rule-usage-pacing-signal-scope`: quota is provider account/subscription/pool capacity shared across
+  harness sessions; session is only a current-login collection surface and notification destination. Cursor IDE
+  and Cursor Agent both require real `billing_period` signal collection. Equal collector-proven quota-scope digest
+  means one capacity view, never additive; missing identity/payer/pool diagnostics do not block a fresh signal.
+- `rule-usage-pacing-cursor-agent-query-surface`: the formal Cursor Agent current-login query path is
+  `ccm usage show --harness cursor-agent --accounts current --json` plus
+  `ccm usage advise --harness cursor-agent --json`. Show preserves
+  `current.billing_period.{used_percentage,resets_at}`; advise preserves
+  `window_billing_period_pct`, `billing_period_resets_at`, and observation `as_of`. Billing-cycle reset provenance
+  remains present for healthy/hold and non-stop throttle verdicts; `nearest_reset` may remain an action-only wakeup hint.
 - `rule-usage-pacing-codex-7d-only`: Codex ignores every 5h field for
   decision/revision/throttle/switch/stop/reset/wakeup/notification and never performs account switch. Only 7d is a hard ceiling;
   rolling-24h velocity is advisory. This does not remove provider-owned Claude 5h/7d semantics.
