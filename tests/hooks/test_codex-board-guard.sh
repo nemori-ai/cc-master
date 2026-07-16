@@ -37,6 +37,10 @@ json_patch_payload() {
   printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"apply_patch","tool_input":{"patch":%s}}' "$1" "$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$2")"
 }
 
+json_native_patch_payload() {
+  printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"apply_patch","tool_input":%s}' "$1" "$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$2")"
+}
+
 json_structured_payload() {
   printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"%s","tool_input":%s}' "$1" "$2" "$3"
 }
@@ -605,6 +609,41 @@ exercise_environment_near_neighbor() {
 
 chmod +x "$CORE"
 GOOD='{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-x"},"tasks":[{"id":"T0","status":"ready","deps":[]}]}'
+
+# Codex native FREEFORM apply_patch sends tool_input as the patch string itself. The launcher must
+# normalize that one host-native shape before board-guard classifies targets, without weakening the
+# parser's existing fail-closed behavior for malformed input.
+H="$(make_project)"
+seed_board "$H" "mine" "$GOOD"
+
+PATCH="*** Begin Patch
+*** Add File: $H/ordinary-absolute.txt
++ordinary
+*** End Patch"
+run_pretool "$(json_native_patch_payload "sess-x" "$PATCH")" "$H"
+assert_eq "" "$HOOK_OUT" "native FREEFORM apply_patch ordinary absolute path -> allow"
+
+PATCH='*** Begin Patch
+*** Add File: ordinary-relative.txt
++ordinary
+*** End Patch'
+run_pretool_in_cwd "$(json_native_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_eq "" "$HOOK_OUT" "native FREEFORM apply_patch ordinary relative path -> allow"
+
+PATCH="*** Begin Patch
+*** Update File: $H/boards/mine.board.json
+@@
+-old
++new
+*** End Patch"
+run_pretool "$(json_native_patch_payload "sess-x" "$PATCH")" "$H"
+assert_contains "$HOOK_OUT" '"decision":"block"' "native FREEFORM apply_patch real board path -> block"
+
+run_pretool "$(json_native_patch_payload "sess-x" "not a patch envelope")" "$H"
+assert_contains "$HOOK_OUT" '"decision":"block"' "native FREEFORM apply_patch malformed patch -> fail closed"
+run_pretool "$(json_structured_payload "sess-x" "apply_patch" "42")" "$H"
+assert_contains "$HOOK_OUT" '"decision":"block"' "native apply_patch malformed non-string/non-object input -> fail closed"
+rm -rf "$H"
 
 # Unarmed: allow silently.
 H="$(make_project)"
