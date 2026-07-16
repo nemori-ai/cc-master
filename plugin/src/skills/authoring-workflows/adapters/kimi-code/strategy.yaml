@@ -1,0 +1,13 @@
+host: kimi-code
+skill: authoring-workflows
+version: 1
+mode: unsupported_stub
+projection:
+  source: adapters/kimi-code/stub/
+  target: skills/authoring-workflows/
+unsupported:
+  - capability: dynamic_workflow
+    reason: "No verified kimi-code equivalent of the Claude Code Workflow tool."
+notes:
+  - Track B event-unavailable — see design_docs/harnesses/capabilities/workflow-authoring.md
+  - Dispatch substitutes: built-in Task subagent roles (coder/explore/plan/general), Agent Swarm, background Bash task.

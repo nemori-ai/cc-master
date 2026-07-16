@@ -1,0 +1,10 @@
+host: kimi-code
+command: distill
+version: 1
+mode: host_native
+projection:
+  source: body.md
+  target: commands/distill.md
+notes:
+  - kimi plugin commands map to the namespaced cc-master:distill in the agent chat.
+  - Body adapted from Claude Code host_native; path tokens removed; Bash not Shell.

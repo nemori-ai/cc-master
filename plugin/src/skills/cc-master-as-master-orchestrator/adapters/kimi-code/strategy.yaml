@@ -1,0 +1,15 @@
+host: kimi-code
+skill: cc-master-as-master-orchestrator
+version: 1
+mode: unsupported_stub
+projection:
+  source: adapters/kimi-code/stub/
+  target: skills/cc-master-as-master-orchestrator/
+unsupported:
+  - capability: command_surface
+    reason: "kimi-code 的触发入口由 plugin manifest commands[] 提供（namespaced cc-master:as-master-orchestrator），不是该 skill 的直接 command surface。"
+  - capability: direct_skill_invocation
+    reason: "命令入口已提升为 host_native 的 namespaced command；本 skill 仅作兼容占位。"
+notes:
+  - Mirrors Claude Code unsupported_stub pattern after kimi-code command promotion.
+  - Command entry: cc-master:as-master-orchestrator

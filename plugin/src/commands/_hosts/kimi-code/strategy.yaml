@@ -1,0 +1,15 @@
+host: kimi-code
+version: 1
+surface: commands
+native_surface: "plugin-commands-plus-UserPromptSubmit"
+projection:
+  required_mode: host_native
+  modes:
+    - host_native
+  output_extension: ".md"
+notes:
+  - All required commands project host_native to plugin/dist/kimi-code/commands/.
+  - kimi plugin commands are namespaced <plugin>:<command> = cc-master:<command> in the agent chat.
+  - stop projects as commands/stop.md (frontmatter name: stop); the namespaced cc-master:stop does not collide with any built-in, so no rename is needed.
+  - Bootstrap dual channel: host_native command body + UserPromptSubmit hook (first-line sentinel).
+  - Body uses kimi tools (Bash not Shell) and session_id arming semantics.

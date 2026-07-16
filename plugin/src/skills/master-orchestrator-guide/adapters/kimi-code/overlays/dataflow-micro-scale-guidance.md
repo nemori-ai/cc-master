@@ -1,0 +1,1 @@
+- **微观（kimi-code agent runtime 内部）—— dataflow 作为可追踪派发纪律。** kimi-code 当前没有 Claude Code Workflow API 的 `pipeline()` / `parallel()` 原语；微观 fan-out 用 Task subagents、后台 Bash 或外部 CI 来表达。能固定成同构批处理时，要求每个 worker 返回统一 artifact / summary，并记录 subagent id / Bash 任务 id / run URL；不要把 `Workflow` 代码示例当 kimi-code 可调用工具。

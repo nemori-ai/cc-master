@@ -1,0 +1,9 @@
+host: kimi-code
+skill: distilling-lessons-into-assets
+version: 1
+mode: copy
+projection:
+  source: canonical/
+  target: skills/distilling-lessons-into-assets/
+notes:
+  - Host-neutral method; safe to project to kimi-code unchanged.

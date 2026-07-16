@@ -1,0 +1,10 @@
+host: kimi-code
+command: discuss
+version: 1
+mode: host_native
+projection:
+  source: body.md
+  target: commands/discuss.md
+notes:
+  - kimi plugin commands map to the namespaced cc-master:discuss in the agent chat.
+  - Body adapted from Claude Code host_native; path tokens removed; Bash not Shell; session_id arming.

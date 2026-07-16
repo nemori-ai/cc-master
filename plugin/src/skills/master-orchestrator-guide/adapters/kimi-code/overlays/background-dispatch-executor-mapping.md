@@ -1,0 +1,5 @@
+- `subagent` executor → target harness 是本 host 时，用 **Task** tool 启动可 recon 的子代理；target 是其他本机 harness 时，在当前 origin 可追踪的后台 **Bash** 后台任务 中运行 `ccm` worker wrapper。此时 handle 来自外层后台机制，不是同步 wrapper 的返回结果；origin harness 不是默认。不要假设它会自动派发；没有真实返回值就不要标 `subagent` / `in_flight`。
+- `workflow` executor → 当前 kimi-code adapter 不支持 Claude Code Workflow API；不要把 `Workflow` / `agent()` / `parallel()` / `pipeline()` 当成 kimi-code 原语。需要 fan-out 时，用多个 Task 或把每个叶子建成独立 board task。
+- `external` executor → 后台 Bash 任务、CI run、GitHub issue、系统 cron 等可追踪工作。必须记录 Bash 任务 id / URL / run id，足以让后续 recon。
+- `user` executor → surface 给用户；用户回答是 async 依赖。
+- `master-orchestrator` executor → 只用于你的调度 / recon / 端点验收 / 记账，不用于实现工作。

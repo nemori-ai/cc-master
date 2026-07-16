@@ -1,0 +1,11 @@
+host: kimi-code
+command: stop
+version: 1
+mode: host_native
+projection:
+  source: body.md
+  target: commands/stop.md
+notes:
+  - kimi plugin commands map to the namespaced cc-master:stop in the agent chat.
+  - cc-master:stop is namespaced and does not collide with any kimi built-in, so no rename is needed (source dir stays stop, frontmatter name stop).
+  - Body adapted from Claude Code host_native; path tokens removed; Bash not Shell.

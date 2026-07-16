@@ -1,0 +1,10 @@
+host: kimi-code
+command: retro
+version: 1
+mode: host_native
+projection:
+  source: body.md
+  target: commands/retro.md
+notes:
+  - kimi plugin commands map to the namespaced cc-master:retro in the agent chat.
+  - Body adapted from Claude Code host_native; path tokens removed; Bash not Shell.

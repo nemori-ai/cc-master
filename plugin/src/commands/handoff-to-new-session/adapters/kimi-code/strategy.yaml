@@ -1,0 +1,10 @@
+host: kimi-code
+command: handoff-to-new-session
+version: 1
+mode: host_native
+projection:
+  source: body.md
+  target: commands/handoff-to-new-session.md
+notes:
+  - kimi plugin commands map to the namespaced cc-master:handoff-to-new-session in the agent chat.
+  - Body adapted from Claude Code host_native; path tokens removed; Bash not Shell; session_id arming.

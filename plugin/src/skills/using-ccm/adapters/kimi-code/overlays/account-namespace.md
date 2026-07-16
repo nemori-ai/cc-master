@@ -1,0 +1,1 @@
+kimi-code host 当前**不支持账号池管理 / 换号**。`ccm account add/delete/refresh/list/switch` 走到时必须显式报 `NotImplemented` 或 unsupported；不要读取或覆写其他 harness 的 credential store，也不要把账号池当 kimi-code 可用容量。kimi-code 本身也无 CLI 配额 / 用量信号：`ccm usage show/advise/burn-rate` 在 kimi-code 恒 `available:false`，不要伪造窗口或百分比。

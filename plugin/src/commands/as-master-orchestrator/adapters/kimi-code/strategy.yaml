@@ -1,0 +1,12 @@
+host: kimi-code
+command: as-master-orchestrator
+version: 1
+mode: host_native
+projection:
+  source: body.md
+  target: commands/as-master-orchestrator.md
+notes:
+  - kimi plugin commands map to the namespaced cc-master:as-master-orchestrator in the agent chat (ADR-031 Track A).
+  - Bootstrap dual channel: host_native command body (sentinel <!-- cc-master:bootstrap:v1 -->) + UserPromptSubmit hook.
+  - Body uses kimi tools (Bash not Shell) and session_id arming semantics.
+  - Capability: design_docs/harnesses/capabilities/path-token-resolution.md
