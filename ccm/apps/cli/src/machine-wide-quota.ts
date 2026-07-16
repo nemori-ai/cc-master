@@ -1,4 +1,5 @@
 import type { UsageSignal, WindowSignal } from '@ccm/engine';
+import { randomUUID } from 'node:crypto';
 import {
   canonicalJson,
   deriveQuotaHeadroom,
@@ -11,7 +12,10 @@ import {
 } from './handlers/coordination.js';
 import { knownHarnessAdapters } from './harnesses/registry.js';
 import type { CurrentUsageReading, Env } from './harnesses/types.js';
-import { projectMachineWideQuotaNotifications } from './machine-wide-quota-notification.js';
+import {
+  projectMachineQuotaPosture,
+  projectMachineWideQuotaNotifications,
+} from './machine-wide-quota-notification.js';
 
 type Data = Record<string, any>;
 
@@ -20,7 +24,7 @@ interface MachineQuotaTarget {
   surfaceId: string;
   providerId: string;
   payerScope: string;
-  poolRef: string;
+  poolId: string;
   bucketId: string;
   windowName: 'five_hour' | 'seven_day' | 'billing_period';
   durationSec: number;
@@ -58,7 +62,7 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     surfaceId: 'codex-cli',
     providerId: 'codex',
     payerScope: 'subscription',
-    poolRef: 'pool:opaque-codex-current',
+    poolId: 'pool:opaque-codex-current',
     bucketId: 'seven-day-global',
     windowName: 'seven_day',
     durationSec: 604_800,
@@ -73,7 +77,7 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     surfaceId: 'claude-cli',
     providerId: 'anthropic',
     payerScope: 'subscription',
-    poolRef: 'pool:opaque-claude-current',
+    poolId: 'pool:opaque-claude-current',
     bucketId: 'five-hour-global',
     windowName: 'five_hour',
     durationSec: 18_000,
@@ -88,7 +92,7 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     surfaceId: 'claude-cli',
     providerId: 'anthropic',
     payerScope: 'subscription',
-    poolRef: 'pool:opaque-claude-current',
+    poolId: 'pool:opaque-claude-current',
     bucketId: 'seven-day-global',
     windowName: 'seven_day',
     durationSec: 604_800,
@@ -103,7 +107,7 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     surfaceId: 'cursor-ide-plugin',
     providerId: 'cursor',
     payerScope: 'subscription',
-    poolRef: 'pool:opaque-cursor-ide-current',
+    poolId: 'pool:opaque-cursor-current',
     bucketId: 'billing-period-ide',
     windowName: 'billing_period',
     durationSec: 2_592_000,
@@ -118,7 +122,7 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     surfaceId: 'cursor-agent-cli',
     providerId: 'cursor',
     payerScope: 'subscription',
-    poolRef: 'pool:opaque-cursor-agent-current',
+    poolId: 'pool:opaque-cursor-current',
     bucketId: 'billing-period-agent',
     windowName: 'billing_period',
     durationSec: 2_592_000,
@@ -139,24 +143,20 @@ function strictIso(epochSec: number): string {
   return new Date(epochSec * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
-function targetScope(target: MachineQuotaTarget): Data {
+function collectionTarget(target: MachineQuotaTarget): Data {
   return {
     harness_id: target.harnessId,
     surface_id: target.surfaceId,
     provider_id: target.providerId,
     payer_scope: target.payerScope,
-    pool_ref: target.poolRef,
     bucket_id: target.bucketId,
+    unit: 'percent',
     window: {
       kind: target.windowName === 'billing_period' ? 'billing-cycle' : 'rolling',
       name: target.windowName,
       duration_sec: target.durationSec,
     },
   };
-}
-
-function scopeDigest(target: MachineQuotaTarget): string {
-  return digest(targetScope(target));
 }
 
 function sourceKey(target: MachineQuotaTarget): string {
@@ -194,7 +194,7 @@ function buildObservation(
     used >= 0 &&
     used <= 100;
   const semantic = {
-    target: targetScope(target),
+    target: collectionTarget(target),
     status: usable ? 'ok' : collection.status,
     used_pct: usable ? used : null,
     reset_marker: resetAt ?? null,
@@ -209,8 +209,9 @@ function buildObservation(
     provider: target.providerId,
     provider_rule_revision: target.policyRevision,
     account_id: `opaque:${target.providerId}:current`,
-    pool_id: target.poolRef,
-    identity_fingerprint: digest(`${target.providerId}\0${target.surfaceId}\0current`),
+    pool_id: target.poolId,
+    // Cursor IDE and Agent may share one authenticated identity while remaining distinct surfaces.
+    identity_fingerprint: digest(`${target.providerId}\0current`),
     observed_at: observedAt,
     valid_until: validUntil,
     hard_window: { name: target.windowName, duration_sec: target.durationSec },
@@ -246,32 +247,41 @@ function buildObservation(
   };
 }
 
-function missingDecision(target: MachineQuotaTarget): Data {
-  const scope = targetScope(target);
-  const base = {
-    schema: 'ccm/machine-quota-decision/v1',
-    scope_digest: scopeDigest(target),
-    target: scope,
-    observation_revision: digest(`missing:${sourceKey(target)}`),
-    state: 'unknown',
-    freshness: 'unknown',
-    reason_codes: ['QUOTA_REQUIRED_WINDOW_UNKNOWN'],
-    policy_revision: target.policyRevision,
-    reset_marker: null,
-    source: {
-      collector_id: target.collectorId,
-      source_schema: 'ccm/quota-authority-observation/v1',
-    },
-  };
-  return { ...base, decision_revision: digest(base) };
-}
-
 function projectDecision(
   target: MachineQuotaTarget,
   observation: Data | undefined,
   now: Date,
+  homeSalt: string,
 ): Data {
-  if (!observation) return missingDecision(target);
+  const authority = {
+    harness_id: target.harnessId,
+    surface_id: target.surfaceId,
+    provider_id: target.providerId,
+    identity_fingerprint: String(
+      observation?.identity_fingerprint ?? digest(`missing-identity:${target.providerId}`),
+    ),
+    payer_scope: target.payerScope,
+    pool_id: String(observation?.pool_id ?? target.poolId),
+    bucket_id: target.bucketId,
+    unit: 'percent',
+    window: collectionTarget(target).window,
+    policy_revision: target.policyRevision,
+    required_bucket_ids: [target.bucketId],
+    safety_margin: { [target.bucketId]: target.hardCeiling - target.warningLine },
+  };
+  if (!observation) {
+    return projectMachineQuotaPosture(authority, {
+      home_salt: homeSalt,
+      state: 'unknown',
+      freshness: 'unknown',
+      reason_codes: ['QUOTA_REQUIRED_WINDOW_UNKNOWN'],
+      observation_revision: digest(`missing:${sourceKey(target)}`),
+      source: {
+        collector_id: target.collectorId,
+        source_schema: 'ccm/quota-authority-observation/v1',
+      },
+    });
+  }
   const bucket = Array.isArray(observation.buckets) ? observation.buckets[0] : undefined;
   const observationEvaluation = evaluateQuotaObservation({
     provider: target.providerId,
@@ -313,30 +323,17 @@ function projectDecision(
           : Array.isArray(headroom.blocking_reasons)
             ? headroom.blocking_reasons.map(String)
             : [`QUOTA_${state.toUpperCase()}`];
-  const decisionSemantic = {
-    scope_digest: scopeDigest(target),
+  return projectMachineQuotaPosture(authority, {
+    home_salt: homeSalt,
     state,
     freshness,
     reason_codes: reasonCodes,
-    policy_revision: target.policyRevision,
+    observation_revision: digest(observation.source_revision ?? observation),
     reset_marker: bucket?.resets_at ?? null,
     source: { collector_id: target.collectorId, source_schema: String(observation.schema) },
-  };
-  return {
-    schema: 'ccm/machine-quota-decision/v1',
-    scope_digest: scopeDigest(target),
-    target: targetScope(target),
-    observation_revision: digest(observation.source_revision ?? observation),
-    decision_revision: digest(decisionSemantic),
-    state,
-    freshness,
-    reason_codes: reasonCodes,
-    policy_revision: target.policyRevision,
     observed_at: observation.observed_at,
     valid_until: observation.valid_until,
-    reset_marker: bucket?.resets_at ?? null,
-    source: decisionSemantic.source,
-  };
+  });
 }
 
 function defaultCollectors(): MachineQuotaCollectorBoundary {
@@ -373,11 +370,18 @@ function defaultCollectors(): MachineQuotaCollectorBoundary {
   };
 }
 
-async function decisionsFromStore(store: MachineQuotaStore, now: Date): Promise<Data[]> {
+async function decisionsFromStore(
+  store: MachineQuotaStore,
+  now: Date,
+  homeSalt: string | null,
+): Promise<Data[]> {
   return Promise.all(
-    TARGETS.map(async (target) =>
-      projectDecision(target, await store.readObservation(sourceKey(target)), now),
-    ),
+    TARGETS.map(async (target) => {
+      // Before the owner-only home salt exists, never correlate a real cached identity with a
+      // process-global fallback. The sentinel posture remains unknown until explicit refresh.
+      const observation = homeSalt ? await store.readObservation(sourceKey(target)) : undefined;
+      return projectDecision(target, observation, now, homeSalt ?? 'uninitialized-machine-quota');
+    }),
   );
 }
 
@@ -389,8 +393,13 @@ export async function readMachineWideQuotaStatus(
   store: MachineQuotaStore,
   now = new Date(),
 ): Promise<Data> {
-  const decisions = await decisionsFromStore(store, now);
-  const checkpoint = checkpointDecisions(await store.readMachineProjection());
+  const projection = await store.readMachineProjection();
+  const homeSalt =
+    typeof projection?.home_salt === 'string' && projection.home_salt.length > 0
+      ? projection.home_salt
+      : null;
+  const decisions = await decisionsFromStore(store, now, homeSalt);
+  const checkpoint = checkpointDecisions(projection);
   const covered = new Map(
     checkpoint.map((decision) => [decision.scope_digest, decision.decision_revision]),
   );
@@ -398,10 +407,11 @@ export async function readMachineWideQuotaStatus(
     .map((decision) => ({
       scope_digest: decision.scope_digest,
       target: {
-        harness_id: decision.target.harness_id,
-        surface_id: decision.target.surface_id,
-        provider_id: decision.target.provider_id,
+        ...decision.target,
       },
+      policy_digest: decision.policy_digest,
+      requirement_digest: decision.requirement_digest,
+      posture: decision.posture,
       state: decision.state,
       freshness: decision.freshness,
       reason_codes: decision.reason_codes,
@@ -425,12 +435,32 @@ export async function refreshMachineWideQuota(input: {
 }): Promise<Data> {
   const now = input.now ?? new Date();
   const collectors = input.collectors ?? defaultCollectors();
+  let previousProjection = await input.store.readMachineProjection();
+  let homeSalt =
+    typeof previousProjection?.home_salt === 'string' && previousProjection.home_salt.length > 0
+      ? previousProjection.home_salt
+      : null;
+  if (!homeSalt) {
+    homeSalt = randomUUID();
+    // Salt initialization is durable owner-only metadata, not a decision checkpoint. Persist it
+    // before fan-out so an interrupted first cycle retains deterministic scope and inbox ids.
+    await input.store.publishMachineProjection({
+      schema: 'ccm/machine-quota-projection/v1',
+      home_salt: homeSalt,
+      decisions: [],
+    });
+    previousProjection = {
+      schema: 'ccm/machine-quota-projection/v1',
+      home_salt: homeSalt,
+      decisions: [],
+    };
+  }
   const scopes: Data[] = [];
   for (const target of TARGETS) {
     let collection: MachineQuotaCollection;
     try {
       collection = await collectors.collect(
-        { ...targetScope(target), window_name: target.windowName },
+        { ...collectionTarget(target), window_name: target.windowName },
         input.env,
       );
     } catch (error) {
@@ -440,34 +470,38 @@ export async function refreshMachineWideQuota(input: {
       };
     }
     const observation = buildObservation(target, collection, now);
+    const projected = projectDecision(target, observation, now, homeSalt);
     try {
       await input.store.refreshObservation(
         { source_key: sourceKey(target), force: true },
         async () => observation,
       );
       scopes.push({
-        scope_digest: scopeDigest(target),
-        target: targetScope(target),
+        scope_digest: projected.scope_digest,
+        target: projected.target,
         status: collection.status,
         ...(collection.reason ? { reason: collection.reason } : {}),
       });
     } catch (error) {
       scopes.push({
-        scope_digest: scopeDigest(target),
-        target: targetScope(target),
+        scope_digest: projected.scope_digest,
+        target: projected.target,
         status: 'error',
         reason: error instanceof Error ? error.message : String(error),
       });
     }
   }
 
-  const decisions = await decisionsFromStore(input.store, now);
-  const previousProjection = await input.store.readMachineProjection();
+  const decisions = await decisionsFromStore(input.store, now, homeSalt);
   const destinations = listCurrentCoordinationSubscriptions(input.home);
   const projected = projectMachineWideQuotaNotifications({
     previous: checkpointDecisions(previousProjection),
     decisions,
-    subscriptions: destinations.map((destination) => ({ ...destination, valid: true })),
+    subscriptions: destinations.map((destination) => ({
+      ...destination,
+      authoritative_epoch: destination.session_epoch,
+      valid: true,
+    })),
   });
   const deliveries = projected.notifications.map((notification) => {
     const destination = destinations.find(
@@ -495,6 +529,7 @@ export async function refreshMachineWideQuota(input: {
   if (fanoutComplete) {
     await input.store.publishMachineProjection({
       schema: 'ccm/machine-quota-projection/v1',
+      home_salt: homeSalt,
       decisions,
     });
   }
