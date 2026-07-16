@@ -121,12 +121,157 @@ test('claude-code session-id: ~/.claude/projects/<slug>/<sid>.jsonl mtime', () =
   assert.equal(missing.observed, 'unknown'); // 文件缺 → unknown（mtime 类方法不判死）
 });
 
-test('session-id on unknown harness → method none, observed unknown (no path guessing)', () => {
-  const r = probeAgent(
-    { harness: 'cursor-agent', handleKind: 'session-id', handleValue: 'x' },
+test('session-id on harness without session roots → method none, observed unknown (no path guessing)', () => {
+  // cursor-agent / origin 经 adapter 注册表解析：无 session 根（generic adapter）→ 如实 method=none。
+  for (const harness of ['cursor-agent', 'origin']) {
+    const r = probeAgent({ harness, handleKind: 'session-id', handleValue: 'x' }, { nowMs: NOW });
+    assert.deepEqual(r, { method: 'none', observed: 'unknown' }, `harness=${harness}`);
+  }
+});
+
+// ── seen-before 判死（曾在而消失 = 真死亡证据·finding 2）─────────────────────────────────────────────
+test('seen-before: previously alive session file now missing → gone; never-seen stays unknown', () => {
+  const home = mkTmp('ccm-probe-seen-');
+  // 曾观测 alive（prev 同方法）+ 本次完整扫描确认缺失 → gone。
+  const wasAlive = probeAgent(
+    {
+      harness: 'codex',
+      handleKind: 'session-id',
+      handleValue: 'sid-vanished',
+      prevMethod: 'session-file-mtime',
+      prevObserved: 'alive',
+    },
+    { home, nowMs: NOW },
+  );
+  assert.deepEqual(wasAlive, { method: 'session-file-mtime', observed: 'gone' });
+  // 曾观测 silent 同样算「曾在」→ gone。
+  const wasSilent = probeAgent(
+    {
+      harness: 'codex',
+      handleKind: 'session-id',
+      handleValue: 'sid-vanished',
+      prevMethod: 'session-file-mtime',
+      prevObserved: 'silent',
+    },
+    { home, nowMs: NOW },
+  );
+  assert.equal(wasSilent.observed, 'gone');
+  // 从未见过（无 prev / prev unknown）→ unknown（启动竞态保护不回退）。
+  const neverSeen = probeAgent(
+    { harness: 'codex', handleKind: 'session-id', handleValue: 'sid-vanished' },
+    { home, nowMs: NOW },
+  );
+  assert.equal(neverSeen.observed, 'unknown');
+  const prevUnknown = probeAgent(
+    {
+      harness: 'codex',
+      handleKind: 'session-id',
+      handleValue: 'sid-vanished',
+      prevMethod: 'session-file-mtime',
+      prevObserved: 'unknown',
+    },
+    { home, nowMs: NOW },
+  );
+  assert.equal(prevUnknown.observed, 'unknown');
+  // prev 是不同方法（pid）→ 不构成本方法的「曾在」→ unknown。
+  const prevOtherMethod = probeAgent(
+    {
+      harness: 'codex',
+      handleKind: 'session-id',
+      handleValue: 'sid-vanished',
+      prevMethod: 'pid',
+      prevObserved: 'alive',
+    },
+    { home, nowMs: NOW },
+  );
+  assert.equal(prevOtherMethod.observed, 'unknown');
+});
+
+test('seen-before applies to transcript-mtime: previously alive transcript deleted → gone', () => {
+  const home = mkTmp('ccm-probe-seentr-');
+  const ref = join(home, 'gone-later.jsonl');
+  const wasAlive = probeAgent(
+    {
+      type: 'subagent',
+      handleKind: 'task-id',
+      transcriptRef: ref,
+      prevMethod: 'transcript-mtime',
+      prevObserved: 'alive',
+    },
     { nowMs: NOW },
   );
-  assert.deepEqual(r, { method: 'none', observed: 'unknown' });
+  assert.deepEqual(wasAlive, { method: 'transcript-mtime', observed: 'gone' });
+  // 从未见过 → unknown（不判死·与既有语义一致）。
+  const neverSeen = probeAgent(
+    { type: 'subagent', handleKind: 'task-id', transcriptRef: ref },
+    { nowMs: NOW },
+  );
+  assert.equal(neverSeen.observed, 'unknown');
+});
+
+// ── 文件名边界精确匹配（finding 6：裸 includes 短 sid 误命中他人 session）──────────────────────────────
+test('codex session-id: prefix/substring sid must not match another session file', () => {
+  const home = mkTmp('ccm-probe-bnd-');
+  mkCodexSession(home, 'sid-fresh', NOW - 60_000); // rollout-…-sid-fresh.jsonl（新鲜）
+  // 'sid' 是 'sid-fresh' 的前缀子串：裸 includes 会误命中取到假 alive——边界匹配须 unknown。
+  const prefix = probeAgent(
+    { harness: 'codex', handleKind: 'session-id', handleValue: 'sid' },
+    { home, nowMs: NOW },
+  );
+  assert.equal(prefix.observed, 'unknown', 'prefix sid must not match rollout-…-sid-fresh');
+  // 中段子串（'fre'）同样不命中。
+  const mid = probeAgent(
+    { harness: 'codex', handleKind: 'session-id', handleValue: 'fre' },
+    { home, nowMs: NOW },
+  );
+  assert.equal(mid.observed, 'unknown');
+  // 完整 sid 照常命中（rollout-*-<sid>.jsonl 结尾精确段）。
+  const exact = probeAgent(
+    { harness: 'codex', handleKind: 'session-id', handleValue: 'sid-fresh' },
+    { home, nowMs: NOW },
+  );
+  assert.equal(exact.observed, 'alive');
+});
+
+test('codex session-id: bare <sid>.jsonl (no rollout prefix) still matches exactly', () => {
+  const home = mkTmp('ccm-probe-bare-');
+  const dir = join(home, '.codex', 'sessions');
+  mkdirSync(dir, { recursive: true });
+  const f = join(dir, 'baresid.jsonl');
+  writeFileSync(f, '{}\n');
+  utimesSync(f, (NOW - 30_000) / 1000, (NOW - 30_000) / 1000);
+  const r = probeAgent(
+    { harness: 'codex', handleKind: 'session-id', handleValue: 'baresid' },
+    { home, nowMs: NOW },
+  );
+  assert.deepEqual(r, { method: 'session-file-mtime', observed: 'alive' });
+  // 'bare' 前缀不误命中 baresid.jsonl。
+  const prefix = probeAgent(
+    { harness: 'codex', handleKind: 'session-id', handleValue: 'bare' },
+    { home, nowMs: NOW },
+  );
+  assert.equal(prefix.observed, 'unknown');
+});
+
+// ── dirCache memo（finding 9：一次 probe 调用内共享目录遍历）────────────────────────────────────────────
+test('dirCache memoizes the directory walk across sids within one probe invocation', () => {
+  const home = mkTmp('ccm-probe-memo-');
+  mkCodexSession(home, 'sid-a', NOW - 30_000);
+  mkCodexSession(home, 'sid-b', NOW - 30_000);
+  const dirCache = new Map<string, unknown>();
+  const a = probeAgent(
+    { harness: 'codex', handleKind: 'session-id', handleValue: 'sid-a' },
+    { home, nowMs: NOW, dirCache },
+  );
+  assert.equal(a.observed, 'alive');
+  assert.ok(dirCache.size > 0, 'walk index cached');
+  // 删掉整个 sessions 树：第二个 sid 仍从 cache 命中（证明没有重复 readdir）。
+  rmSync(join(home, '.codex', 'sessions'), { recursive: true, force: true });
+  const b = probeAgent(
+    { harness: 'codex', handleKind: 'session-id', handleValue: 'sid-b' },
+    { home, nowMs: NOW, dirCache },
+  );
+  assert.equal(b.observed, 'alive', 'served from memoized walk index');
 });
 
 // ── task-id / subagent transcript ──────────────────────────────────────────────────────────────────
@@ -170,12 +315,41 @@ test('reconcileAgentState: active states downgrade on observation', () => {
   assert.equal(reconcileAgentState('starting', 'alive'), 'running');
 });
 
-test('reconcileAgentState: orphaned recovers to running on alive evidence (bidirectional reconcile)', () => {
-  assert.equal(reconcileAgentState('orphaned', 'alive'), 'running'); // 观测即证据·证据式恢复
+test('reconcileAgentState: orphaned recovers only on strong (mtime-class) alive evidence', () => {
+  // session-file / transcript：sid/路径内容寻址、身份强 → 够格复活。
+  assert.equal(reconcileAgentState('orphaned', 'alive', 'session-file-mtime'), 'running');
+  assert.equal(reconcileAgentState('orphaned', 'alive', 'transcript-mtime'), 'running');
+  // pid kill-0 无法验证进程身份（pid 复用假 alive / EPERM 也判 alive）→ 不作复活证据·棘轮保持。
+  assert.equal(reconcileAgentState('orphaned', 'alive', 'pid'), 'orphaned');
+  assert.equal(reconcileAgentState('orphaned', 'alive', 'none'), 'orphaned');
+  assert.equal(reconcileAgentState('orphaned', 'alive'), 'orphaned'); // 无 method 视为证据不足
   // 非 alive 观测不能证明复活——orphaned 保持。
-  assert.equal(reconcileAgentState('orphaned', 'gone'), 'orphaned');
-  assert.equal(reconcileAgentState('orphaned', 'silent'), 'orphaned');
-  assert.equal(reconcileAgentState('orphaned', 'unknown'), 'orphaned');
+  assert.equal(reconcileAgentState('orphaned', 'gone', 'pid'), 'orphaned');
+  assert.equal(reconcileAgentState('orphaned', 'silent', 'session-file-mtime'), 'orphaned');
+  assert.equal(reconcileAgentState('orphaned', 'unknown', 'none'), 'orphaned');
+});
+
+test('reconcileAgentState: uncertain + pid alive still recovers (uncertain is not a dead state)', () => {
+  assert.equal(reconcileAgentState('uncertain', 'alive', 'pid'), 'running');
+  assert.equal(reconcileAgentState('running', 'alive', 'pid'), 'running'); // pid alive 维持 running 照旧
+});
+
+test('reconcileAgentState outputs are always legal engine transitions (single SSOT·no parallel truth)', async () => {
+  const { AGENT_STATE_MACHINE, isLegalAgentTransition } = await import('@ccm/engine');
+  const states = [...Object.keys(AGENT_STATE_MACHINE), 'bogus-state'];
+  const observations = ['alive', 'silent', 'gone', 'unknown'];
+  const methods = ['pid', 'session-file-mtime', 'transcript-mtime', 'none', undefined];
+  for (const state of states) {
+    for (const observed of observations) {
+      for (const method of methods) {
+        const next = reconcileAgentState(state, observed, method);
+        assert.ok(
+          next === state || isLegalAgentTransition(state, next),
+          `reconcile(${state}, ${observed}, ${method}) → ${next} must be a legal transition`,
+        );
+      }
+    }
+  }
 });
 
 test('reconcileAgentState: terminal is the only true final state (never resurrected)', () => {

@@ -107,11 +107,13 @@ export function isAgentId(v: unknown): boolean {
 
 // ── Agent lifecycle 状态机（逐字复用 native-attempt 转移语义与错误词汇风格）。─────────────────────────
 //   starting→running（bind 交证据）· running/uncertain→terminal（登记 outcome·terminal ≠ done）·
+//   starting→terminal（启动失败收口：spawn 失败、无 handle 可 bind 的 agent 须能显式收口，对齐
+//     native-attempt 的 startup_failed 终类——否则成永久僵尸：terminal 被拒、probe method=none 永远 unknown）·
 //   uncertain→running（probe alive / 再 bind 复活）· {starting,running,uncertain}→{uncertain,orphaned}（probe 降级）·
 //   orphaned→running（probe alive 证据式恢复·双向 reconcile）· orphaned→terminal（由 orchestrator 显式收口）。
 //   terminal 是唯一终态（probe 永不复活）。
 export const AGENT_STATE_MACHINE: Record<string, string[]> = {
-  starting: ['running', 'uncertain', 'orphaned'],
+  starting: ['running', 'uncertain', 'orphaned', 'terminal'],
   running: ['terminal', 'uncertain', 'orphaned'],
   uncertain: ['running', 'terminal', 'orphaned'],
   // orphaned→running：证据式恢复（probe 观测 alive 即证据·orphaned 可能是启动竞态/误判死的产物）。

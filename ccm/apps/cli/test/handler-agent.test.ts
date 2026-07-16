@@ -229,14 +229,19 @@ test('terminal: running → terminal with outcome; task status untouched', () =>
   );
 });
 
-test('terminal on a starting agent → IllegalTransition (exit 3)', () => {
+test('terminal on a starting agent is legal (startup-failure closure·no permanent zombie)', () => {
+  // create 后 spawn 失败、无 handle 可 bind 的 agent 必须能收口——否则 terminal 被拒 exit 3、
+  //   probe method=none 永远 unknown → 永久僵尸（对齐 native-attempt 的 startup_failed 终类）。
   const bp = mkBoardHome();
   agent.create(mkCtx(bp, { values: { type: 'cli-worker', harness: 'codex', intent: 'x' } }));
-  const ctx = mkCtx(bp, { positionals: ['agt-001'], values: { outcome: 'x' } });
-  assert.throws(
-    () => agent.terminal(ctx),
-    (e: Error & { errKind?: string }) => e.errKind === 'IllegalTransition',
+  assert.equal(
+    agent.terminal(mkCtx(bp, { positionals: ['agt-001'], values: { outcome: 'spawn failed' } })),
+    EXIT.OK,
   );
+  const a = readBoard(bp).agents[0];
+  assert.equal(a.lifecycle.state, 'terminal');
+  assert.equal(a.lifecycle.outcome, 'spawn failed');
+  assert.ok(a.lifecycle.ended_at);
 });
 
 // ── probe（真进程降级）─────────────────────────────────────────────────────────────────────────────
@@ -328,6 +333,116 @@ test('probe pid semantics non-regression: kill -0 failure is still gone → orph
   const a = readBoard(bp).agents[0];
   assert.equal(a.probe.observed, 'gone', 'pid is a deterministic death check: stays gone');
   assert.equal(a.lifecycle.state, 'orphaned');
+});
+
+test('probe seen-before: previously alive session file gets deleted → gone → orphaned', () => {
+  // 真实缺陷（finding 2）：missing→unknown 修复后，session-bound worker 死亡 + 文件被清理的场景
+  //   若无 seen-before 判定将永远检测不到（unknown 是 no-op，state 卡 running）。
+  const claudeHome = mkTmp('ccm-hag-seen-');
+  const bp = mkBoardHome();
+  agent.create(mkCtx(bp, { values: { type: 'cli-worker', harness: 'claude-code', intent: 'x' } }));
+  agent.bind(mkCtx(bp, { positionals: ['agt-001'], values: { handle: 'session-id:sid-del-1' } }));
+  const slugDir = join(claudeHome, 'projects', '-repo-slug');
+  mkdirSync(slugDir, { recursive: true });
+  const sessionFile = join(slugDir, 'sid-del-1.jsonl');
+  writeFileSync(sessionFile, '{}\n', 'utf8');
+  const env = { CLAUDE_CONFIG_DIR: claudeHome };
+  // 第一次 probe：观测 alive（建立 seen-before 证据链）。
+  assert.equal(agent.probe(mkCtx(bp, { positionals: ['agt-001'], env })), EXIT.OK);
+  let a = readBoard(bp).agents[0];
+  assert.equal(a.probe.observed, 'alive');
+  assert.equal(a.lifecycle.state, 'running');
+  // 文件被清理：曾在而消失 = 真死亡证据 → gone → orphaned。
+  rmSync(sessionFile);
+  assert.equal(agent.probe(mkCtx(bp, { positionals: ['agt-001'], env })), EXIT.OK);
+  a = readBoard(bp).agents[0];
+  assert.equal(a.probe.observed, 'gone', 'seen-before + missing must be gone');
+  assert.equal(a.lifecycle.state, 'orphaned');
+});
+
+test('probe evidence gate: pid alive does NOT revive orphaned (pid reuse ratchet)', () => {
+  // 真实缺陷（finding 3）：kill-0 无法验证进程身份——pid 复用产生假 alive、EPERM 也判 alive；
+  //   orphaned 的复活只认 mtime 类强证据。用本测试进程自身 pid 制造确定性 alive。
+  const bp = mkBoardHome();
+  agent.create(mkCtx(bp, { values: { type: 'background-shell', harness: 'origin', intent: 'x' } }));
+  agent.bind(mkCtx(bp, { positionals: ['agt-001'], values: { handle: `pid:${process.pid}` } }));
+  {
+    const board = readBoard(bp);
+    board.agents[0].lifecycle.state = 'orphaned'; // 模拟历史判死
+    writeFileSync(bp, `${JSON.stringify(board, null, 2)}\n`, 'utf8');
+  }
+  assert.equal(agent.probe(mkCtx(bp, { positionals: ['agt-001'] })), EXIT.OK);
+  const a = readBoard(bp).agents[0];
+  assert.equal(a.probe.observed, 'alive', 'kill-0 on own pid is alive');
+  assert.equal(a.lifecycle.state, 'orphaned', 'pid alive must NOT revive orphaned (weak evidence)');
+});
+
+test('probe evidence gate: uncertain + pid alive still recovers to running (uncertain ≠ dead)', () => {
+  const bp = mkBoardHome();
+  agent.create(mkCtx(bp, { values: { type: 'background-shell', harness: 'origin', intent: 'x' } }));
+  agent.bind(mkCtx(bp, { positionals: ['agt-001'], values: { handle: `pid:${process.pid}` } }));
+  {
+    const board = readBoard(bp);
+    board.agents[0].lifecycle.state = 'uncertain';
+    writeFileSync(bp, `${JSON.stringify(board, null, 2)}\n`, 'utf8');
+  }
+  assert.equal(agent.probe(mkCtx(bp, { positionals: ['agt-001'] })), EXIT.OK);
+  assert.equal(readBoard(bp).agents[0].lifecycle.state, 'running');
+});
+
+test('malformed agents entries (null / string) are skipped without crashing probe/list', () => {
+  // 真实缺陷（finding 4）：agents:[null,…] 时 probe/list 对坏条目直接 TypeError 崩溃。
+  const bp = mkBoardHome();
+  agent.create(mkCtx(bp, { values: { type: 'subagent', harness: 'origin', intent: 'ok' } }));
+  {
+    const board = readBoard(bp);
+    board.agents = [null, 'garbage', board.agents[0], 42];
+    writeFileSync(bp, `${JSON.stringify(board, null, 2)}\n`, 'utf8');
+  }
+  const listCtx = mkCtx(bp, { flags: { json: true } });
+  assert.equal(agent.list(listCtx), EXIT.OK);
+  const data = JSON.parse(listCtx.outBuf.join('')).data;
+  assert.equal(data.count, 1, 'bad entries silently skipped');
+  assert.equal(data.agents[0].id, 'agt-001');
+  const probeCtx = mkCtx(bp, { flags: { json: true } });
+  assert.equal(agent.probe(probeCtx), EXIT.OK, 'probe must not crash on malformed entries');
+  const probed = JSON.parse(probeCtx.outBuf.join('')).data.probed;
+  assert.equal(probed.length, 1);
+  assert.ok(probed[0].probe, 'valid agent still probed');
+});
+
+test('probe --freshness-sec rejects NaN / zero / negative as Usage (exit 2·never enters write path)', () => {
+  const bp = mkBoardHome();
+  agent.create(mkCtx(bp, { values: { type: 'cli-worker', harness: 'codex', intent: 'x' } }));
+  // 真实缺陷（finding 5）：Number('5m')=NaN → 判活比较恒 false → 活 agent 恒 silent 被降级写盘。
+  for (const bad of ['5m', 'abc', '0', '-30', 'NaN']) {
+    const ctx = mkCtx(bp, { positionals: ['agt-001'], values: { 'freshness-sec': bad } });
+    assert.throws(
+      () => agent.probe(ctx),
+      (e: Error & { errKind?: string }) => e.errKind === 'Usage',
+      `--freshness-sec ${JSON.stringify(bad)} must be rejected`,
+    );
+  }
+  // 拒绝发生在写路径之前：board 未被写入 probe 字段。
+  assert.equal(readBoard(bp).agents[0].probe, undefined);
+  // 合法值照常工作。
+  assert.equal(
+    agent.probe(mkCtx(bp, { positionals: ['agt-001'], values: { 'freshness-sec': '600' } })),
+    EXIT.OK,
+  );
+});
+
+test('probe --json exposes reconcile_rejected channel (state-machine SSOT guard annotation)', () => {
+  const bp = mkBoardHome();
+  agent.create(mkCtx(bp, { values: { type: 'subagent', harness: 'origin', intent: 'a' } }));
+  const ctx = mkCtx(bp, { flags: { json: true } });
+  assert.equal(agent.probe(ctx), EXIT.OK);
+  const data = JSON.parse(ctx.outBuf.join('')).data;
+  assert.deepEqual(
+    data.reconcile_rejected,
+    [],
+    'channel present; empty when all transitions legal',
+  );
 });
 
 test('probe without id probes every agent on the board', () => {

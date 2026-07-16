@@ -7,7 +7,8 @@
 //   不选路、不派活）。所有写经 engine 既有写入关卡（runWrite·带锁 + lint after mutate）。
 //
 // 状态机（逐字复用 native-attempt 铁律）：starting→running（bind 交真实 handle 证据·无证据拒绝）·
-//   running/uncertain→terminal（登记 outcome·terminal ≠ task done·绝不碰 task status）·
+//   starting/running/uncertain/orphaned→terminal（登记 outcome·starting→terminal = 启动失败收口·
+//   terminal ≠ task done·绝不碰 task status）·
 //   uncertain→running（probe alive / 再 bind 复活）· probe 观测冲突以观测为准降级。
 //
 // agent↔task join 存 **agent 侧 links[]**（非 task.routing.attempts[]）：见 create/link 注。
@@ -18,7 +19,7 @@
 //
 // 红线1 / ADR-006：node/JS only，零 npm 依赖、纯 stdlib。武装闸豁免：纯 handler 模块（无 hook 入口）。
 
-import { isLegalAgentTransition } from '@ccm/engine';
+import { AGENT_STATE_MACHINE, isLegalAgentTransition } from '@ccm/engine';
 import { probeAgent, reconcileAgentState } from '../agent-probe.js';
 import * as mutations from '../mutations.js';
 import { type BoardArg, type Ctx, runRead, runWrite } from './_common.js';
@@ -34,8 +35,15 @@ function fail(message: string, errKind: string): KindedError {
 
 type AgentRecord = Record<string, any>;
 
+// 逐条过滤非对象条目（null / 字符串 / 数组·手改板产物）——坏条目静默跳过，对齐 FMT-AGENTS lint 的
+//   graceful 降级（坏条目 warn 不阻断）与 web-viewer 侧同名函数的做法；否则 probe/list 对 agents:[null,…]
+//   直接 TypeError 崩溃。
 function agentsOf(board: BoardArg): AgentRecord[] {
-  return Array.isArray(board.agents) ? (board.agents as AgentRecord[]) : [];
+  return Array.isArray(board.agents)
+    ? (board.agents as unknown[]).filter(
+        (a): a is AgentRecord => !!a && typeof a === 'object' && !Array.isArray(a),
+      )
+    : [];
 }
 
 function findAgent(board: BoardArg, id: string): AgentRecord | undefined {
@@ -113,8 +121,12 @@ export function bind(ctx: Ctx): number {
       if (!agent) throw fail(`agent ${id} 不存在（先 \`ccm agent create\`）`, 'NotFound');
       const state = agent.lifecycle?.state ?? 'starting';
       if (!isLegalAgentTransition(state, 'running')) {
+        // 文案从 AGENT_STATE_MACHINE 推导（单一 SSOT·不与机器漂移——机器允许 orphaned 再 bind 复活）。
+        const ok = Object.keys(AGENT_STATE_MACHINE).filter((s) =>
+          isLegalAgentTransition(s, 'running'),
+        );
         throw fail(
-          `agent ${id} 非法转移 ${state}→running（仅 starting/uncertain/running 可 bind 成 running）`,
+          `agent ${id} 非法转移 ${state}→running（仅 ${ok.join('/')} 可 bind 成 running）`,
           'IllegalTransition',
         );
       }
@@ -173,7 +185,8 @@ export function link(ctx: Ctx): number {
 }
 
 // ── agent terminal <id> --outcome "..." ───────────────────────────────────────
-//   running/uncertain/orphaned → terminal，登记 outcome。terminal ≠ task done——**绝不碰 task status**（父层独立验收）。
+//   starting/running/uncertain/orphaned → terminal，登记 outcome（starting→terminal = 启动失败收口）。
+//   terminal ≠ task done——**绝不碰 task status**（父层独立验收）。
 export function terminal(ctx: Ctx): number {
   const id = ctx.positionals[0] as string;
   const outcome = ctx.values.outcome as string;
@@ -185,8 +198,12 @@ export function terminal(ctx: Ctx): number {
       if (!agent) throw fail(`agent ${id} 不存在`, 'NotFound');
       const state = agent.lifecycle?.state ?? 'starting';
       if (state !== 'terminal' && !isLegalAgentTransition(state, 'terminal')) {
+        // 文案从 AGENT_STATE_MACHINE 推导（单一 SSOT·含 starting→terminal 启动失败收口）。
+        const ok = Object.keys(AGENT_STATE_MACHINE).filter(
+          (s) => s !== 'terminal' && isLegalAgentTransition(s, 'terminal'),
+        );
         throw fail(
-          `agent ${id} 非法转移 ${state}→terminal（仅 running/uncertain/orphaned 可收口为 terminal）`,
+          `agent ${id} 非法转移 ${state}→terminal（仅 ${ok.join('/')} 可收口为 terminal）`,
           'IllegalTransition',
         );
       }
@@ -204,11 +221,38 @@ export function terminal(ctx: Ctx): number {
   });
 }
 
+// --freshness-sec 校验（一次·probe 入口）：NaN（如 '5m'）会让判活比较恒 false → 活 agent 恒 silent
+//   被降级写盘；0/负数同理。非法值拒绝进入写路径（Usage·router 映射 exit 2，对齐其他 flag 校验模式）。
+function parseFreshnessSec(raw: unknown): number | undefined {
+  if (raw === undefined) return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) {
+    throw fail(
+      `--freshness-sec 须为正数（秒）——收到 ${JSON.stringify(raw)}（非法值会把活 agent 误判 silent 并降级写盘）`,
+      'Usage',
+    );
+  }
+  return n;
+}
+
+interface ReconcileRejection {
+  id: string;
+  from: string;
+  to: string;
+}
+
 // probe 一条 agent 记录（原地改其 probe/lifecycle）——只写 agents[] 自己的字段（M4）。
-function probeOne(agent: AgentRecord, ctx: Ctx, now: string): void {
-  const freshnessSec = ctx.values['freshness-sec']
-    ? Number(ctx.values['freshness-sec'])
-    : undefined;
+//   prevMethod/prevObserved 喂 seen-before 判死（读旧 probe 字段须在覆写之前）；
+//   reconcile 产出的转移写盘前经 isLegalAgentTransition 断言（引擎状态机是唯一 SSOT——
+//   不合法则保持原态并记入 rejected 供 --json 输出标注）。
+function probeOne(
+  agent: AgentRecord,
+  ctx: Ctx,
+  now: string,
+  freshnessSec: number | undefined,
+  dirCache: Map<string, unknown>,
+  rejected: ReconcileRejection[],
+): void {
   const res = probeAgent(
     {
       harness: agent.harness,
@@ -216,8 +260,10 @@ function probeOne(agent: AgentRecord, ctx: Ctx, now: string): void {
       handleValue: agent.handle?.value,
       transcriptRef: agent.handle?.transcript_ref,
       type: agent.type,
+      prevMethod: agent.probe?.method,
+      prevObserved: agent.probe?.observed,
     },
-    { env: ctx.env, freshnessSec },
+    { env: ctx.env, freshnessSec, dirCache },
   );
   agent.probe = {
     last_probe_at: now,
@@ -226,36 +272,53 @@ function probeOne(agent: AgentRecord, ctx: Ctx, now: string): void {
     as_of: now,
   };
   if (!agent.lifecycle || typeof agent.lifecycle !== 'object') agent.lifecycle = {};
-  agent.lifecycle.state = reconcileAgentState(agent.lifecycle.state ?? 'starting', res.observed);
+  const cur = agent.lifecycle.state ?? 'starting';
+  const next = reconcileAgentState(cur, res.observed, res.method);
+  if (next === cur || isLegalAgentTransition(cur, next)) {
+    agent.lifecycle.state = next;
+  } else {
+    rejected.push({ id: String(agent.id ?? '?'), from: cur, to: next });
+  }
 }
 
 // ── agent probe [<id> | --board <ref>] ────────────────────────────────────────
 //   活性探测 + reconcile（观测冲突以观测为准降级）。只写 agents[] 的 probe/lifecycle 字段——绝不碰 task/attempt 投影。
+//   全量 probe 共享一个 dirCache：N 个 session-id agent 只做一趟目录遍历（board lock 内的效率约束）。
 export function probe(ctx: Ctx): number {
   const id = ctx.positionals[0] as string | undefined;
+  const freshnessSec = parseFreshnessSec(ctx.values['freshness-sec']); // 写路径之前拒绝非法值
   let probed: AgentRecord[] = [];
+  let rejected: ReconcileRejection[] = [];
   return runWrite(ctx, {
     mutate: (board) => {
       const b = board as BoardArg;
       const now = mutations.stampNow();
+      const dirCache = new Map<string, unknown>();
+      probed = [];
+      rejected = [];
       if (id) {
         const agent = findAgent(b, id);
         if (!agent) throw fail(`agent ${id} 不存在`, 'NotFound');
-        probeOne(agent, ctx, now);
+        probeOne(agent, ctx, now, freshnessSec, dirCache, rejected);
         probed = [agent];
       } else {
         probed = agentsOf(b);
-        for (const agent of probed) probeOne(agent, ctx, now);
+        for (const agent of probed) probeOne(agent, ctx, now, freshnessSec, dirCache, rejected);
       }
       return mutations.touch(b);
     },
     render: (_next, c) => {
-      if (c.flags.json) return JSON.stringify({ ok: true, data: { probed } });
+      if (c.flags.json) {
+        return JSON.stringify({ ok: true, data: { probed, reconcile_rejected: rejected } });
+      }
       const lines = probed.map(
         (a) =>
           `  ${a.id}: observed=${a.probe?.observed}·method=${a.probe?.method}·state=${a.lifecycle?.state}`,
       );
-      return `probe ${probed.length} agent(s):\n${lines.join('\n')}\n`;
+      const rej = rejected.map(
+        (r) => `  ! ${r.id}: reconcile 提议 ${r.from}→${r.to} 非法（状态机拒绝）·已保持原态`,
+      );
+      return `probe ${probed.length} agent(s):\n${[...lines, ...rej].join('\n')}\n`;
     },
   });
 }

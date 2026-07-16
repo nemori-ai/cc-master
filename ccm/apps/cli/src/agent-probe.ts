@@ -5,20 +5,25 @@
 //
 // 探测手段按 handle.kind × harness 分级：
 //   · pid                    → process.kill(pid, 0) 存活判定（alive / gone / unknown）。
-//   · session-id (codex)     → ~/.codex/sessions/**/rollout-*-<sid>.json(l) 文件存在性 + mtime。
-//   · session-id (claude-code) → ~/.claude/projects/*/<sid>.jsonl 文件存在性 + mtime。
+//   · session-id             → 会话落盘根来自 harness adapter 的 `sessionStoreRoots(env)`（PathResolver SSOT·
+//     不再手写 ~/.codex / ~/.claude 平行实现）；匹配策略按 harness 表驱动（claude-code 走
+//     projects/<slug>/<sid>.jsonl 目标寻址，其余 harness 走递归 walk + 文件名边界精确匹配）。
+//     adapter 无 session 根（如 origin / 未知 harness）→ 如实 method=none。
 //   · task-id / subagent     → transcript_ref 路径存在则 mtime，否则 unknown。
 //   · 其余 / none             → method=none, observed=unknown。
 //
 // observed 语义：alive（进程活 / 文件 mtime 在 freshness 窗内）· silent（文件在但 mtime 陈旧）·
-//   gone（**仅确定性判死**：pid kill-0 ESRCH——进程不存在）· unknown（无可探测句柄 / 无已知落盘路径 /
-//   会话·transcript 文件不存在——「从未见过文件」≠「曾在而消失」，启动竞态下文件可能尚未写出，不判死）。
+//   gone（确定性判死：pid kill-0 ESRCH，或 **seen-before**——上一次同方法观测到 alive/silent、本次完整
+//   扫描确认文件消失：「曾在而消失」= 真死亡证据）· unknown（无可探测句柄 / 无已知落盘路径 /
+//   **从未见过**的会话·transcript 文件不存在——启动竞态下文件可能尚未写出，不判死；扫描不完整
+//   〔预算耗尽 / readdir·stat 失败〕同样不判死）。
 //
-// 会话落盘根目录可经 env 覆写（测试注入临时 home）：CODEX_HOME / CLAUDE_CONFIG_DIR，否则回落 os.homedir()。
+// 会话根目录经 harness adapter 解析（CODEX_HOME / CLAUDE_CONFIG_DIR 等 env 覆写由 adapter 契约承接）；
+//   测试注入口保留：opts.home 桥接为 env.HOME（adapter 的 homeBase 契约读 env.HOME 优先）。
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { resolveHarnessAdapter } from './harnesses/registry.js';
 
 export interface ProbeInput {
   harness?: string; // agentHarness
@@ -26,6 +31,8 @@ export interface ProbeInput {
   handleValue?: string;
   transcriptRef?: string | null;
   type?: string; // agentType（subagent 走 transcript 分支）
+  prevMethod?: string; // 上一次 probe 的 method（seen-before 判死用·来自 agent.probe.method）
+  prevObserved?: string; // 上一次 probe 的 observed（seen-before 判死用·来自 agent.probe.observed）
 }
 
 export interface ProbeResult {
@@ -35,16 +42,21 @@ export interface ProbeResult {
 
 export interface ProbeOpts {
   env?: Record<string, string | undefined>;
-  home?: string; // os home 覆写（测试用）
+  home?: string; // os home 覆写（测试用·桥接为 env.HOME 喂 adapter）
   nowMs?: number; // 当前时刻（测试可注入固定时钟）
   freshnessSec?: number; // mtime 判活窗口秒（默认 300）
   // 进程存活探针（测试可注入，默认 process.kill）。返回 'alive' | 'gone' | 'unknown'。
   pidProbe?: (pid: number) => 'alive' | 'gone' | 'unknown';
+  // 单次 probe 调用内的目录扫描 memo（同 handler 一次全量 probe 传同一 Map：N 个 session-id agent
+  //   共享一趟目录遍历，而非 N 次全树 readdir——board lock 内的效率约束）。
+  dirCache?: Map<string, unknown>;
 }
 
 const DEFAULT_FRESHNESS_SEC = 300;
 
 // pid 存活：kill(pid,0) 成功或 EPERM（存在但无权）→ alive；ESRCH → gone；其余 → unknown。
+//   注意：EPERM-alive 只用于维持 running——它不验证进程身份（pid 复用假 alive），不够格复活 orphaned
+//   （证据强度闸在 reconcileAgentState：pid 类 alive 不解开 orphaned 棘轮）。
 function defaultPidProbe(pid: number): 'alive' | 'gone' | 'unknown' {
   try {
     process.kill(pid, 0);
@@ -57,86 +69,182 @@ function defaultPidProbe(pid: number): 'alive' | 'gone' | 'unknown' {
   }
 }
 
-// 递归找一个文件名包含 sid 的 *.json(l) 文件，返回其 mtime(ms)；找不到返回 null。
-//   bounded：只走目录，命中即回报最新 mtime（多个匹配取最大）。
-function findSessionFileMtime(root: string, sid: string): number | null {
-  if (!sid || !existsSync(root)) return null;
-  let best: number | null = null;
-  const stack: string[] = [root];
-  let budget = 20000; // 目录条目预算上限（防病态大树·保真：预算耗尽即当未找到，不猜）
-  while (stack.length > 0 && budget > 0) {
-    const dir = stack.pop() as string;
-    let entries: import('node:fs').Dirent[];
-    try {
-      entries = readdirSync(dir, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    for (const ent of entries) {
-      budget--;
-      if (budget <= 0) break;
-      const full = join(dir, ent.name);
-      if (ent.isDirectory()) {
-        stack.push(full);
-      } else if (
-        ent.isFile() &&
-        ent.name.includes(sid) &&
-        (ent.name.endsWith('.json') || ent.name.endsWith('.jsonl'))
-      ) {
-        try {
-          const m = statSync(full).mtimeMs;
-          if (best === null || m > best) best = m;
-        } catch {
-          /* stat 失败：跳过（保真·不猜） */
+// ── 会话文件扫描（roots 来自 harness adapter·结果带完整性标记）───────────────────────────────────────
+//   complete=false（预算耗尽 / readdir·stat 失败）时「没找到」不可作「曾在而消失」的判死证据。
+
+interface SessionScan {
+  mtimeMs: number | null;
+  complete: boolean;
+}
+
+interface WalkFile {
+  base: string; // 文件名去掉 .json/.jsonl 后缀
+  mtimeMs: number; // 遍历时一次 stat（索引经 dirCache memo·匹配阶段零 fs 调用）
+}
+
+interface WalkIndex {
+  files: WalkFile[];
+  complete: boolean;
+}
+
+const WALK_BUDGET = 20000; // 目录条目预算上限（防病态大树·保真：预算耗尽即 complete=false，不猜）
+
+function stripSessionExt(name: string): string | null {
+  if (name.endsWith('.jsonl')) return name.slice(0, -'.jsonl'.length);
+  if (name.endsWith('.json')) return name.slice(0, -'.json'.length);
+  return null;
+}
+
+// 递归收集 root 下全部 *.json(l) 文件（一次遍历建索引·经 dirCache memo 供多个 sid 复用）。
+function walkSessionRoot(root: string, cache?: Map<string, unknown>): WalkIndex {
+  const key = `walk:${root}`;
+  const hit = cache?.get(key);
+  if (hit) return hit as WalkIndex;
+  const files: WalkFile[] = [];
+  let complete = true;
+  if (existsSync(root)) {
+    const stack: string[] = [root];
+    let budget = WALK_BUDGET;
+    while (stack.length > 0) {
+      if (budget <= 0) {
+        complete = false;
+        break;
+      }
+      const dir = stack.pop() as string;
+      let entries: import('node:fs').Dirent[];
+      try {
+        entries = readdirSync(dir, { withFileTypes: true });
+      } catch {
+        complete = false;
+        continue;
+      }
+      for (const ent of entries) {
+        budget--;
+        if (budget <= 0) {
+          complete = false;
+          break;
+        }
+        const full = join(dir, ent.name);
+        if (ent.isDirectory()) {
+          stack.push(full);
+        } else if (ent.isFile()) {
+          const base = stripSessionExt(ent.name);
+          if (base !== null) {
+            try {
+              files.push({ base, mtimeMs: statSync(full).mtimeMs });
+            } catch {
+              complete = false; // stat 失败：该文件「没拿到」——不可作消失证据
+            }
+          }
         }
       }
     }
   }
-  return best;
+  const idx: WalkIndex = { files, complete };
+  cache?.set(key, idx);
+  return idx;
 }
 
-function mtimeToObserved(mtimeMs: number | null, nowMs: number, freshnessSec: number): string {
-  // 文件不存在 → unknown（不是 gone）：无法区分「尚未写出」（启动竞态·worker 刚起、session 文件未落盘）
-  //   和「已清理」——gone 只保留给能确定性判死的方法（pid kill-0 ESRCH）。unknown 保真、不触发降级。
-  if (mtimeMs === null) return 'unknown';
-  return nowMs - mtimeMs <= freshnessSec * 1000 ? 'alive' : 'silent';
+// 文件名边界精确匹配（非裸 includes——短 sid 子串会误命中他人 session 取到假 alive）：
+//   base === sid（<sid>.jsonl）或 base 以 `-<sid>` 结尾（rollout-<ts>-<sid>.jsonl 的结尾精确段）。
+function baseMatchesSid(base: string, sid: string): boolean {
+  return base === sid || base.endsWith(`-${sid}`);
 }
 
-function codexSessionsDir(opts: ProbeOpts): string {
-  const env = opts.env || {};
-  const base = env.CODEX_HOME || join(opts.home || homedir(), '.codex');
-  return join(base, 'sessions');
-}
+type SessionScanner = (roots: string[], sid: string, cache?: Map<string, unknown>) => SessionScan;
 
-function claudeProjectsDir(opts: ProbeOpts): string {
-  const env = opts.env || {};
-  const base = env.CLAUDE_CONFIG_DIR || join(opts.home || homedir(), '.claude');
-  return join(base, 'projects');
-}
-
-// claude-code：~/.claude/projects/<slug>/<sid>.jsonl —— 扫 projects 下每个 slug 目录找 <sid>.jsonl。
-function findClaudeSessionMtime(projectsDir: string, sid: string): number | null {
-  if (!sid || !existsSync(projectsDir)) return null;
-  let slugs: import('node:fs').Dirent[];
-  try {
-    slugs = readdirSync(projectsDir, { withFileTypes: true });
-  } catch {
-    return null;
-  }
+// 通用策略：递归 walk 索引 + 边界匹配，多命中取最新 mtime（匹配阶段纯内存·索引已含 mtime）。
+const scanWalkRoots: SessionScanner = (roots, sid, cache) => {
   let best: number | null = null;
-  for (const slug of slugs) {
-    if (!slug.isDirectory()) continue;
-    const candidate = join(projectsDir, slug.name, `${sid}.jsonl`);
-    if (existsSync(candidate)) {
+  let complete = true;
+  for (const root of roots) {
+    const idx = walkSessionRoot(root, cache);
+    if (!idx.complete) complete = false;
+    for (const f of idx.files) {
+      if (!baseMatchesSid(f.base, sid)) continue;
+      if (best === null || f.mtimeMs > best) best = f.mtimeMs;
+    }
+  }
+  return { mtimeMs: best, complete };
+};
+
+// claude-code 策略：projects/<slug>/<sid>.jsonl 目标寻址（projects 树可能很大·不做全树 walk）。
+//   slug 目录清单经 dirCache memo（`slugs:<root>`），每个 sid 只做 O(slugs) 次 existsSync。
+const scanClaudeRoots: SessionScanner = (roots, sid, cache) => {
+  let best: number | null = null;
+  let complete = true;
+  for (const root of roots) {
+    const key = `slugs:${root}`;
+    let idx = cache?.get(key) as { slugs: string[]; complete: boolean } | undefined;
+    if (!idx) {
+      let slugs: string[] = [];
+      let ok = true;
+      if (existsSync(root)) {
+        try {
+          slugs = readdirSync(root, { withFileTypes: true })
+            .filter((d) => d.isDirectory())
+            .map((d) => d.name);
+        } catch {
+          ok = false;
+        }
+      }
+      idx = { slugs, complete: ok };
+      cache?.set(key, idx);
+    }
+    if (!idx.complete) complete = false;
+    for (const slug of idx.slugs) {
+      const candidate = join(root, slug, `${sid}.jsonl`);
+      if (!existsSync(candidate)) continue;
       try {
         const m = statSync(candidate).mtimeMs;
         if (best === null || m > best) best = m;
       } catch {
-        /* skip */
+        complete = false;
       }
     }
   }
-  return best;
+  return { mtimeMs: best, complete };
+};
+
+// 匹配策略表（roots 一律来自 adapter；只有匹配文件名的方式按 harness 特化）。
+const SESSION_SCANNERS: Record<string, SessionScanner> = {
+  'claude-code': scanClaudeRoots,
+};
+
+// 会话根来自 harness adapter 的 sessionStoreRoots（PathResolver SSOT）；opts.home 桥接为 env.HOME
+//   保留测试注入口（adapter 的 homeBase 契约：env.HOME 优先于 os.homedir()）。
+//   未知 harness（如 origin / cursor-agent）→ generic adapter → 空 roots → 调用方如实 method=none。
+function sessionRootsFor(harness: string, opts: ProbeOpts): string[] {
+  const env: Record<string, string | undefined> = { ...(opts.env || {}) };
+  if (opts.home && !env.HOME) env.HOME = opts.home;
+  try {
+    return resolveHarnessAdapter({ harnessFlag: harness, env }).sessionStoreRoots(env);
+  } catch {
+    return []; // adapter 解析失败：保真降级为「无已知落盘路径」
+  }
+}
+
+// seen-before 判定：上一次 probe 用同一 mtime 类方法观测到过 alive/silent → 文件「曾在」。
+function seenBefore(input: ProbeInput, method: string): boolean {
+  return (
+    input.prevMethod === method &&
+    (input.prevObserved === 'alive' || input.prevObserved === 'silent')
+  );
+}
+
+function mtimeToObserved(
+  scan: SessionScan,
+  nowMs: number,
+  freshnessSec: number,
+  wasSeen: boolean,
+): string {
+  if (scan.mtimeMs === null) {
+    // 「从未见过文件」≠「曾在而消失」：前者可能是启动竞态（尚未写出）→ unknown 不判死；
+    //   后者（上次同方法观测 alive/silent + 本次**完整**扫描确认缺失）= 真死亡证据 → gone。
+    //   扫描不完整（预算耗尽 / fs 失败）一律 unknown——拿不到不猜。
+    return scan.complete && wasSeen ? 'gone' : 'unknown';
+  }
+  return nowMs - scan.mtimeMs <= freshnessSec * 1000 ? 'alive' : 'silent';
 }
 
 // probeAgent — 主入口：吃一条 agent 的探测输入，出 {method, observed}。纯观测，不改状态（reconcile 在 handler）。
@@ -153,49 +261,65 @@ export function probeAgent(input: ProbeInput, opts: ProbeOpts = {}): ProbeResult
     return { method: 'pid', observed: pidProbe(Number(value)) };
   }
 
-  // session-id：按 harness 分流到会话文件 mtime。
+  // session-id：会话根来自 harness adapter，匹配策略表驱动。
   if (kind === 'session-id') {
-    if (input.harness === 'codex') {
-      const m = findSessionFileMtime(codexSessionsDir(opts), value);
-      return { method: 'session-file-mtime', observed: mtimeToObserved(m, nowMs, freshnessSec) };
-    }
-    if (input.harness === 'claude-code') {
-      const m = findClaudeSessionMtime(claudeProjectsDir(opts), value);
-      return { method: 'session-file-mtime', observed: mtimeToObserved(m, nowMs, freshnessSec) };
-    }
-    // 其它 harness 的 session-id 无已知落盘路径 → 保真 unknown（不猜路径）。
-    return { method: 'none', observed: 'unknown' };
+    if (!value || !input.harness) return { method: 'none', observed: 'unknown' };
+    const roots = sessionRootsFor(input.harness, opts);
+    // adapter 无 session 根（origin / 未知 harness）→ 保真 unknown（不猜路径）。
+    if (roots.length === 0) return { method: 'none', observed: 'unknown' };
+    const scanner = SESSION_SCANNERS[input.harness] ?? scanWalkRoots;
+    const scan = scanner(roots, value, opts.dirCache);
+    return {
+      method: 'session-file-mtime',
+      observed: mtimeToObserved(scan, nowMs, freshnessSec, seenBefore(input, 'session-file-mtime')),
+    };
   }
 
   // task-id / subagent：有 transcript_ref 路径则 mtime，否则 unknown。
   if (kind === 'task-id' || input.type === 'subagent') {
     const ref = (input.transcriptRef || '').trim();
-    if (ref && existsSync(ref)) {
+    if (!ref) return { method: 'none', observed: 'unknown' }; // 无 ref → 保真·不推导
+    if (existsSync(ref)) {
       try {
         const m = statSync(ref).mtimeMs;
-        return { method: 'transcript-mtime', observed: mtimeToObserved(m, nowMs, freshnessSec) };
+        return {
+          method: 'transcript-mtime',
+          observed: mtimeToObserved(
+            { mtimeMs: m, complete: true },
+            nowMs,
+            freshnessSec,
+            seenBefore(input, 'transcript-mtime'),
+          ),
+        };
       } catch {
         return { method: 'transcript-mtime', observed: 'unknown' };
       }
     }
-    // 有 ref 但文件缺 → unknown（可能尚未写出·mtime 类方法不判死）；无 ref → unknown（保真·不推导）。
-    return ref
-      ? { method: 'transcript-mtime', observed: 'unknown' }
-      : { method: 'none', observed: 'unknown' };
+    // ref 在但文件缺：曾观测 alive/silent（seen-before）→ gone（曾在而消失）；从未见过 → unknown（可能尚未写出）。
+    return {
+      method: 'transcript-mtime',
+      observed: seenBefore(input, 'transcript-mtime') ? 'gone' : 'unknown',
+    };
   }
 
   // 无可探测句柄（none / 缺失）→ 保真 unknown。
   return { method: 'none', observed: 'unknown' };
 }
 
+// mtime 类方法（sid/路径内容寻址·身份强）——orphaned 复活的证据强度门槛。
+const MTIME_METHODS = new Set(['session-file-mtime', 'transcript-mtime']);
+
 // reconcileAgentState — 观测与登记态冲突时以观测为准（双向 reconcile·M4：只改 agent 自己）。
 //   active {starting,running,uncertain}：gone→orphaned · silent→uncertain · alive→running · unknown→不变。
-//   orphaned：alive→running（**证据式恢复**——观测即证据；orphaned 可能来自误判死或 pid 复用，见 probe
-//     字段的 method/as_of 证据链），其余观测不动（gone/silent/unknown 都不能证明它复活）。
+//   orphaned：alive 且 method 为 mtime 类（session-file/transcript·sid 内容寻址、身份强）→ running
+//     （证据式恢复）；**pid 类 alive 不复活 orphaned**——kill-0 无法验证进程身份（pid 复用产生假 alive、
+//     EPERM 也被判 alive），证据强度不够解开棘轮（uncertain + pid alive 仍可回 running——uncertain 非死态）。
 //   terminal：唯一终态，probe 永不复活（收口是显式动作）。
-export function reconcileAgentState(state: string, observed: string): string {
+export function reconcileAgentState(state: string, observed: string, method?: string): string {
   if (state === 'terminal') return state;
-  if (state === 'orphaned') return observed === 'alive' ? 'running' : state;
+  if (state === 'orphaned') {
+    return observed === 'alive' && MTIME_METHODS.has(method ?? '') ? 'running' : state;
+  }
   if (state !== 'starting' && state !== 'running' && state !== 'uncertain') return state;
   switch (observed) {
     case 'gone':
