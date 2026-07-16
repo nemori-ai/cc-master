@@ -13,7 +13,8 @@
   - [Exit codes](#exit-codes)
   - [JSON 信封](#json-信封)
 - [跨 harness 主动查询目标事实](#跨-harness-主动查询目标事实)
-- [namespace worker（session-bound read-only MVP）](#namespace-workersession-bound-read-only-mvp)
+- [namespace worker（session-bound raw wrapper MVP）](#namespace-workersession-bound-raw-wrapper-mvp)
+  - [worker help](#worker-help)
   - [worker run](#worker-run)
 - [namespace orchestrator（cached context）](#namespace-orchestratorcached-context)
   - [orchestrator context](#orchestrator-context)
@@ -177,7 +178,7 @@ ccm <alias> [args] [flags]
 
 | ns | 职责 |
 |---|---|
-| `worker` | 显式启动一次 session-bound、只读的 Cursor Agent worker，等待并返回结构化 terminal result |
+| `worker` | 查看 resolver 选中的真实 agent-command help，或显式启动一次三 harness session-bound raw wrapper |
 | `provider` | 模型事实 snapshot 查询与 provider candidate 检查；facts 零 live probe，inspect 另走准入门 |
 | `orchestrator` | 从显式本地 cache 构造 frozen orchestrator context；cached-only、零 live probe |
 | `route` | 对 frozen task + context 给纯 shadow route advice；永远 `spawned:false`、不写 board |
@@ -306,22 +307,35 @@ ccm quota preflight --input <json|@file|-> --json
 
 ---
 
-## namespace worker（session-bound read-only MVP）
+## namespace worker（session-bound raw wrapper MVP）
+
+### worker help
+
+```text
+ccm worker help --harness <codex|claude-code|cursor-agent>
+```
+
+resolver 使用与 `run` 相同的 executable resolution，显示最终选中的本机真实 agent command 的真实 help；
+这才是 agent 组装 provider argv 的当下入口。`ccm worker run --help` 只显示 ccm 自己的 normalized wrapper
+help，不转发 provider help。
 
 ### worker run
 
-```bash
-ccm worker run --harness cursor-agent --model composer-2.5 --effort standard \
-  --workspace /abs/repo --prompt <text|@file|-> \
-  --timeout-ms <50..600000> --max-output-bytes <256..1048576> --json
+```text
+ccm worker run --harness <codex|claude-code|cursor-agent> [--cwd <path>] [--timeout-ms <n>] [--max-output-bytes <n>] -- <provider argv...>
 ```
 
-- 当前显式取值固定为 `cursor-agent` / `composer-2.5` / `standard`；不自动 route、fallback 或切换账号。
-- 启动 worker 前先核对冻结的 Cursor Agent 支持版本、fresh official first-party model snapshot 与 live `--list-models` 精确 selector；任一未知、不新鲜或不一致都 fail closed。真实 stream 只在 terminal subtype 为 `success`、`is_error:false`，且 resolved model / workspace 与请求精确一致时接纳。
-- 子进程 argv 固定为 Cursor Agent headless `--mode ask --sandbox enabled`，使用当前已登录账号。ccm 不请求或执行 login/logout/account switch/credential write，不导入或复制 credential，也不通过 argv / env 转发 API key / BYOK。
-- worker 仍继承当前 `HOME` 与 `XDG_CONFIG_HOME` / `XDG_CACHE_HOME` / `XDG_DATA_HOME` / `XDG_STATE_HOME`；Cursor CLI 自身可能维护 auth token、config、cache、data 或 state。因此本命令**不证明** provider-wide account / credential zero-write，也不会为追求该强声明而复制或隔离真实 credential。
-- 命令同步等待 terminal result；超时、取消与 stdout/stderr 都有界，结束前回收其 POSIX process group 并清理临时 staging 目录。
-- `data` schema 为 `ccm/session-bound-worker-result/v1`，并明示 `session_bound:true`；它不跨 parent exit、handoff 或 ccm update 存活。
+- `--` 是 ccm lifecycle options 与 provider argv 的硬边界；其后的参数逐项原样转发。ccm 不解析、补写或
+  规范化 provider 的 model、effort、permission、sandbox、prompt 或 output flags。
+- stdin 无条件原样转发给 child。`--cwd` 缺省为 `process.cwd()`；timeout 与 output bound 只管理本次
+  session-bound child process，不把 provider 结果解释成任务结果。
+- 返回统一 generic process envelope，字段为 `exit_code`、`signal`、`timed_out`、`cancelled`、`stdout`、
+  `stderr`、`truncated`。它只报告 process terminal；ccm 不解析 provider terminal，也不判断任务是否成功。
+- ccm 不自动 route、fallback、切换账号、登录或选择模型；调用方依据真实 help 显式给出 provider argv。
+  provider 仍可能通过继承的环境与 `HOME`/XDG 路径读写自己的状态，因此 raw wrapper 不提供 safe、
+  read-only、credential-zero-write 或 automatic-eligibility 声明。
+- 命令同步等待 child terminal，并管理 timeout、cancel、输出上限与自己创建的 process tree；它不跨
+  parent exit、handoff 或 ccm update 存活。
 
 ---
 
@@ -2502,12 +2516,9 @@ ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
 
 ### worker run
 
-`data` 是 `ccm/session-bound-worker-result/v1`。成功时 `state:"succeeded"` 且 exit 0；provider
-非零退出、timeout、cancel、输出越界或 stream 验证失败仍返回同一结构化 `data`，但 exit 1（真实
-SIGINT/SIGTERM 取消分别为 130/143）。字段含显式 `target`、`policy.ccm_effects`（ccm 未请求或执行
-account / credential mutation，且未转发 API key / BYOK）、`policy.provider_residual_effects`（继承的
-HOME/XDG 与 provider 可能写入；`account_credential_zero_write_attested:false`）、session-bound
-`lifecycle`、进程组 `handle`、Cursor `terminal`、有界 `transport`、`cleanup` 与脱敏 `error`。
+返回 generic process envelope：`exit_code`、`signal`、`timed_out`、`cancelled`、`stdout`、`stderr`、
+`truncated`。这是 child process 的 transport/lifecycle 结果，不是 provider-specific terminal adapter，
+也不是 parent task acceptance。
 
 ### quota status / preflight / reserve / audit
 

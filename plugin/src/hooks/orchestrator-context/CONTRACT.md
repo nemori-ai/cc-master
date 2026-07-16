@@ -31,7 +31,8 @@ to refresh facts, choose a route, or authorize dispatch.
   output, or local timeout returns RC0 with empty stdout or ccm's bounded unknown delivery; no live
   fallback exists.
 - `rule-orchestrator-context-shadow-only`: delivered authority always says shadow-only and
-  `dispatch_enabled:false`; host injection cannot authorize a worker.
+  `dispatch_enabled:false`; this disables only automatic/shadow route activation, not an explicit
+  caller-selected `ccm worker` raw wrapper. Host injection still cannot authorize a worker.
 - `rule-orchestrator-context-cursor-surfaces`: when ccm publishes the optional
   `ccm/cursor-surface-context/v1` cache block, every host accepts only the canonical ordered
   `cursor-ide-plugin` / `cursor-agent-cli` pair, verifies the four-state derivation, preserves

@@ -120,22 +120,18 @@ Cursor agent runtime 可用后台 Shell 等外部状态，但没有 Claude Code 
 
 ## 跨 harness 的当前最小闭环
 
-不要把「你运行在哪个 harness」当成 worker 选择边界。先把 **origin facts** 与 **selected
-target-worker facts** 分开：同品牌、同登录身份、origin 已安装或 origin-local 模型/配额信号，都不能替
-另一个 execution surface 补证。
+不要把 origin harness 当成 worker 的选择边界：如果另一种本机 harness 更适合这项工作，就可以显式
+选择它。每次调用前先按 [using-ccm 主动查询合同](../../using-ccm/references/command-catalog.md#跨-harness-主动查询目标事实) 查看 resolver 最终选中的真实
+agent-command help，再由你依据那份 help 组装 provider 自己的参数；不要靠记忆复制易变 flags，也不要把
+ccm 当成 model / effort 的 provider adapter。若选择需要 machine/model/quota 事实，再按
+[pacing-and-estimation 目标事实口径](../../pacing-and-estimation/references/cross-harness-target-facts.md) 读取 selected target 的只读解释；这些事实服务选择，不改变显式
+raw wrapper 的命令合同。
 
-当前 context 没有目标事实时，不要凭 prior 推断，也不要等 hook 替你补齐。先按
-[using-ccm 主动查询合同](../../using-ccm/references/command-catalog.md#跨-harness-主动查询目标事实) **主动查询目标事实**，再按
-[pacing-and-estimation 目标事实口径](../../pacing-and-estimation/references/cross-harness-target-facts.md)
-解释 selected target 的 inventory / model / quota envelope。把 target surface、认证、exact-model admission、
-payer、pool 与 quota authority 绑定到同一候选；任何必要事实 `unknown`、`stale`、`conflicting`、`tight`，
-或本次付费调用没有用户明确授权，都不派发。不得因此自动 fallback、自动换号或替用户改换 payer。
-
-通过决策闸后，仍只从 `using-ccm` 的 command catalog 读取 worker 的唯一操作合同；不要自行推断或在
-决策层复述 D 的命令、结果或副作用语义。真实后台 accountable handle 返回后，才把节点置为
-`in_flight`。worker 终态只触发
-parent 端点验收；没有独立验证、或结果与父任务要求不一致时都不能标 `done`。当前最小闭环不承诺自动
-路由、跨 session durability 或 daemon 接管，也不能把这些未来能力说成已经交付。
+只从 `using-ccm` 的 command catalog 读取 worker 的唯一操作合同；不要在决策层复述 exact syntax。
+`ccm` 的 terminal 只是 child process terminal，不是任务验收。真实后台 accountable handle 返回后，才把
+节点置为 `in_flight`；process terminal 返回后，parent 仍须独立验收 artifact、diff、tests 与 acceptance，
+不满足就不能标 `done`。当前最小闭环不承诺自动路由、fallback、safe eligibility、跨 session durability
+或 daemon 接管，也不能把这些未来能力说成已经交付。
 
 ---
 

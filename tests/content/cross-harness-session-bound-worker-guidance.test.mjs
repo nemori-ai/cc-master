@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { join } from 'node:path';
 import test from 'node:test';
 
 const ROOT = join(import.meta.dirname, '..', '..');
@@ -10,142 +10,138 @@ const read = (path) => readFileSync(join(ROOT, path), 'utf8');
 const A_SOURCE =
   'plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md';
 const D_SOURCE = 'plugin/src/skills/using-ccm/canonical/references/command-catalog.md';
-const H_TARGET_FACTS =
+const H_SOURCE =
   'plugin/src/skills/pacing-and-estimation/canonical/references/cross-harness-target-facts.md';
+const CARD =
+  'design_docs/harnesses/capabilities/cross-harness-session-bound-worker.md';
 
-const DIST_REFERENCES = {
-  a: 'skills/master-orchestrator-guide/references/dispatch.md',
-  d: 'skills/using-ccm/references/command-catalog.md',
-  h: 'skills/pacing-and-estimation/references/cross-harness-target-facts.md',
+const workerSection = (body) => {
+  const match = body.match(
+    /## namespace worker[\s\S]*?(?=\n## namespace provider)/u,
+  );
+  assert.ok(match, 'missing worker namespace');
+  return match[0];
 };
 
-const pointerHref = (body, label) => {
-  const match = body.match(new RegExp(`\\[${label}\\]\\(([^)]+)\\)`, 'u'));
-  assert.ok(match, `missing runtime pointer: ${label}`);
-  return match[1];
-};
-
-const resolveInstalledPointer = (host, source, href) => {
-  const withoutFragment = href.split('#', 1)[0];
-  const hostRoot = join(ROOT, 'plugin', 'dist', host);
-  if (withoutFragment.startsWith('${CLAUDE_PLUGIN_ROOT}/')) {
-    assert.equal(host, 'claude-code', `${host}: Claude-only token is invalid`);
-    return resolve(
-      hostRoot,
-      withoutFragment.slice('${CLAUDE_PLUGIN_ROOT}/'.length),
-    );
-  }
-  assert.doesNotMatch(withoutFragment, /\$\{[^}]+\}/u, `${host}: unresolved token`);
-  return resolve(dirname(join(hostRoot, source)), withoutFragment);
-};
-
-const D_ONLY_MECHANICS = [
-  /ccm worker run/u,
-  /--harness\s+cursor-agent/u,
+const RAW_HELP =
+  /ccm worker help --harness <codex\|claude-code\|cursor-agent>/u;
+const RAW_RUN =
+  /ccm worker run --harness <codex\|claude-code\|cursor-agent> \[--cwd <path>\] \[--timeout-ms <n>\] \[--max-output-bytes <n>\] -- <provider argv\.\.\.>/u;
+const NORMALIZED_PROVIDER_ADAPTER = [
   /--model\s+composer-2\.5/u,
   /--effort\s+standard/u,
   /ccm\/session-bound-worker-result\/v1/u,
   /live `--list-models`/u,
-  /HOME\/XDG/u,
+  /--mode ask --sandbox enabled/u,
 ];
 
-test('A makes target facts actively discoverable without becoming a CLI SSOT', () => {
+test('A selects across origins, reads real help first, and retains parent acceptance', () => {
   const source = read(A_SOURCE);
 
-  assert.match(source, /origin facts.*target-worker facts/us);
-  assert.match(source, /主动查询目标事实/u);
+  assert.match(source, /origin harness.*worker.*边界/us);
+  assert.match(source, /真实\s*agent-command help/u);
   assert.match(source, /\{\{CROSS_HARNESS_ACTIVE_QUERY_POINTER\}\}/u);
-  assert.match(source, /\{\{CROSS_HARNESS_TARGET_FACTS_POINTER\}\}/u);
-  assert.match(source, /unknown.*stale.*conflicting.*tight/us);
-  assert.match(source, /accountable handle[\s\S]{0,100}`in_flight`/u);
-  assert.match(source, /worker\s+终态只触发\s+parent\s+端点验收/u);
-  for (const pattern of D_ONLY_MECHANICS) assert.doesNotMatch(source, pattern);
-
-  for (const host of HOSTS) {
-    const projected = read(
-      `plugin/dist/${host}/skills/master-orchestrator-guide/references/dispatch.md`,
-    );
-    assert.match(projected, /主动查询目标事实/u, host);
-    assert.match(projected, /cross-harness-target-facts\.md/u, host);
+  assert.match(source, /process terminal.*parent.*独立验收/us);
+  assert.match(source, /accountable handle[\s\S]{0,120}`in_flight`/u);
+  assert.doesNotMatch(source, /ccm worker (?:help|run)/u);
+  for (const pattern of NORMALIZED_PROVIDER_ADAPTER) {
+    assert.doesNotMatch(source, pattern);
   }
 });
 
-test('D alone owns the executable active-query and worker contracts', () => {
+test('D is the only exact syntax SSOT for real help and raw provider argv', () => {
   const catalog = read(D_SOURCE);
-  assert.match(catalog, /## 跨 harness 主动查询目标事实/u);
-  assert.match(catalog, /ccm harness list --machine-wide --json/u);
-  assert.match(catalog, /ccm provider facts <target-provider> --json/u);
-  assert.match(catalog, /ccm quota status --json/u);
-  assert.match(catalog, /ccm quota preflight --input <json\|@file\|-> --json/u);
-  assert.match(catalog, /available:true.*不等于.*headroom/us);
-  for (const pattern of D_ONLY_MECHANICS) assert.match(catalog, pattern);
+  const worker = workerSection(catalog);
+
+  assert.match(worker, RAW_HELP);
+  assert.match(worker, RAW_RUN);
+  assert.match(worker, /resolver.*最终.*agent command.*真实.*help/isu);
+  assert.match(worker, /`ccm worker run --help`.*ccm.*wrapper\s*help/isu);
+  assert.match(worker, /`--`.*原样.*provider argv/isu);
+  assert.match(worker, /stdin.*无条件.*原样.*转发/isu);
+  assert.match(worker, /`--cwd`.*process\.cwd\(\)/isu);
+  assert.match(worker, /exit_code.*signal.*timed_out.*cancelled.*stdout.*stderr.*truncated/su);
+  assert.match(worker, /不解析.*provider.*terminal/isu);
+  assert.doesNotMatch(worker, /--json/u);
+  for (const pattern of NORMALIZED_PROVIDER_ADAPTER) {
+    assert.doesNotMatch(worker, pattern);
+  }
 });
 
-test('H registers one provider-neutral target-fact interpreter and no execution mechanics', () => {
-  assert.equal(existsSync(join(ROOT, H_TARGET_FACTS)), true);
-  const targetFacts = read(H_TARGET_FACTS);
-  assert.match(targetFacts, /selected target/u);
-  assert.match(targetFacts, /cursor-ide-plugin.*cursor-agent-cli/us);
-  assert.match(targetFacts, /(?:static|静态) provider facts.*live entitlement/us);
-  assert.match(targetFacts, /available:true.*headroom/us);
-  assert.match(targetFacts, /unknown.*tight.*fail closed/us);
-  for (const pattern of D_ONLY_MECHANICS) assert.doesNotMatch(targetFacts, pattern);
-  assert.doesNotMatch(targetFacts, /terminal|result schema|process group|workspace binding/iu);
+test('H interprets facts without copying volatile provider CLI mechanics', () => {
+  const source = read(H_SOURCE);
+
+  assert.match(source, /selected target/u);
+  assert.match(source, /cursor-ide-plugin.*cursor-agent-cli/us);
+  assert.match(source, /真实.*help.*using-ccm/isu);
+  assert.match(source, /不复制.*provider.*flags.*catalog/isu);
+  assert.doesNotMatch(source, /ccm worker (?:help|run)/u);
+  assert.doesNotMatch(source, /--model|--effort|--sandbox|--list-models/u);
+  assert.doesNotMatch(source, /terminal|process envelope|exit_code/iu);
 
   const capability = JSON.parse(
     read('plugin/src/skills/pacing-and-estimation/read-only-capability.json'),
   );
   assert.ok(capability.references.includes('references/cross-harness-target-facts.md'));
+});
 
+test('all host projections carry the same A/D/H raw-wrapper boundary', () => {
   for (const host of HOSTS) {
-    const projectedPath =
-      `plugin/dist/${host}/skills/pacing-and-estimation/references/cross-harness-target-facts.md`;
-    assert.equal(existsSync(join(ROOT, projectedPath)), true, host);
-    const projected = read(projectedPath);
-    assert.match(projected, /selected target/u, host);
-    assert.match(projected, /available:true.*headroom/us, host);
-    assert.ok(
-      Object.hasOwn(
-        capability.hosts[host].rendered_runtime_manifest.files,
-        'references/cross-harness-target-facts.md',
-      ),
-      host,
+    const a = read(
+      `plugin/dist/${host}/skills/master-orchestrator-guide/references/dispatch.md`,
     );
+    const d = workerSection(
+      read(`plugin/dist/${host}/skills/using-ccm/references/command-catalog.md`),
+    );
+    const hPath =
+      `plugin/dist/${host}/skills/pacing-and-estimation/references/cross-harness-target-facts.md`;
+    assert.equal(existsSync(join(ROOT, hPath)), true, host);
+    const h = read(hPath);
+
+    assert.match(a, /真实\s*agent-command help/u, host);
+    assert.match(d, RAW_HELP, host);
+    assert.match(d, RAW_RUN, host);
+    assert.match(h, /不复制.*provider.*flags.*catalog/isu, host);
   }
 });
 
-test('installed A→D→H runtime pointers are host-valid and resolve to shipped files', () => {
-  const edges = [
-    ['a', 'using-ccm 主动查询合同', 'd'],
-    ['a', 'pacing-and-estimation 目标事实口径', 'h'],
-    ['h', 'using-ccm 主动查询合同', 'd'],
-    ['d', 'pacing-and-estimation 目标事实口径', 'h'],
-  ];
-
-  for (const host of HOSTS) {
-    const hostRoot = join(ROOT, 'plugin', 'dist', host);
-    for (const [from, label, to] of edges) {
-      const source = DIST_REFERENCES[from];
-      const body = read(`plugin/dist/${host}/${source}`);
-      if (host !== 'claude-code') {
-        assert.doesNotMatch(body, /\$\{CLAUDE_PLUGIN_ROOT\}/u, `${host}: ${source}`);
-      }
-      const resolved = resolveInstalledPointer(host, source, pointerHref(body, label));
-      const expected = resolve(hostRoot, DIST_REFERENCES[to]);
-      assert.equal(resolved, expected, `${host}: ${from}→${to}`);
-      assert.equal(existsSync(resolved), true, `${host}: missing ${resolved}`);
-    }
+test('capability and gap surfaces make raw wrapper current only with its runtime', () => {
+  const card = read(CARD);
+  assert.match(card, /raw wrapper/u);
+  assert.match(card, /claude-code \| current/u);
+  assert.match(card, /codex \| current/u);
+  assert.match(card, /cursor \| current/u);
+  assert.match(card, /D.*only.*exact command grammar/isu);
+  assert.match(card, /process terminal.*parent acceptance/isu);
+  assert.match(card, /current.*same runtime PR/isu);
+  for (const pattern of [RAW_HELP, RAW_RUN, ...NORMALIZED_PROVIDER_ADAPTER]) {
+    assert.doesNotMatch(card, pattern);
   }
+
+  const matrix = read('design_docs/capability-parity-matrix.md');
+  assert.match(matrix, /cross-harness-session-bound-worker \| current \| current \| current/u);
+
+  const gap = read('design_docs/cross-harness-orchestration-capability-model.md');
+  assert.match(gap, /Provider execution \|[^\n]*raw wrapper[^\n]*current/iu);
+  assert.match(gap, /normalized.*provider adapter[^\n]*target/iu);
 });
 
-test('Capability Card records current partial parity without copying runtime mechanics', () => {
-  const card = read(
-    'design_docs/harnesses/capabilities/cross-harness-session-bound-worker.md',
-  );
-  assert.match(card, /current\/partial/u);
-  assert.match(card, /D.*only runtime owner/u);
-  assert.match(card, /active-query/u);
-  assert.match(card, /cross-harness-target-facts\.md/u);
-  assert.match(card, /unknown.*tight.*no spawn/isu);
-  for (const pattern of D_ONLY_MECHANICS) assert.doesNotMatch(card, pattern);
+test('cached shadow routing does not disable or authorize the explicit wrapper', () => {
+  const contract = read('plugin/src/hooks/orchestrator-context/CONTRACT.md');
+  assert.match(contract, /dispatch_enabled:false.*automatic.*shadow.*route/isu);
+  assert.match(contract, /not.*explicit.*ccm worker.*raw wrapper/isu);
+  assert.match(contract, /cannot authorize.*worker/isu);
+});
+
+test('roadmap keeps real help in R0 and normalized routing adapters post-MVP', () => {
+  const roadmap = read('design_docs/cross-harness-post-mvp-roadmap.md');
+  assert.match(roadmap, RAW_HELP);
+  assert.match(roadmap, RAW_RUN);
+  assert.match(roadmap, /raw argv.*stdin/isu);
+  assert.match(roadmap, /真实 agent-command help.*R0/isu);
+  assert.match(roadmap, /R0.*runtime.*PR.*current/isu);
+  assert.doesNotMatch(roadmap, /ccm worker inspect/u);
+  assert.match(roadmap, /normalized.*provider adapter.*post-MVP/isu);
+  assert.match(roadmap, /help.*agent.*观测.*操作入口/isu);
+  assert.match(roadmap, /不.*safe.*automatic eligibility/isu);
 });

@@ -1,6 +1,6 @@
 # Cross-harness post-MVP roadmap
 
-> 状态：**tracked roadmap；全部条目默认是 `target`，不是 shipped claim**
+> 状态：**R0 仅随同一 runtime 集成 PR 晋升 `current`；R1–R10 默认是 `target`，不是 shipped claim**
 > 基线日期：2026-07-16 UTC
 > 适用范围：`ccm worker` 最小闭环之后的 ccm control plane、provider runtime、quota、plugin hooks/skills 与跨平台资格化
 > 不改变的 SSOT：能力成熟度仍以 [`cross-harness-orchestration-capability-model.md`](cross-harness-orchestration-capability-model.md) 的 current / partial / target gap matrix 为准；本页只冻结 MVP 边界、后续切片顺序与晋升门。
@@ -9,30 +9,31 @@
 
 公共命令面固定为 **`ccm worker`**。不新增 `ccm dispatch` 作为同义 namespace，也不为了后续能力重命名已经存在的命令。自动选择、持久 run、quota admission 等能力将来仍从 `ccm worker` 的子命令或兼容扩展进入；内部可以有 router、supervisor、provider driver 等组件，但它们不是第二套用户命令面。
 
-当前 board 的最小交付闭环只回答一个问题：运行在任意受支持 origin harness 中的 master orchestrator，能否通过全局 `ccm` 进程边界，显式调用本机的 Codex、Claude Code 或 Cursor Agent CLI worker，并由 ccm 管住这次**同步、session-bound** 的子进程生命周期。安全隔离、持久恢复和自动经济调度都重要，但它们是后续独立增量，不再作为这条最小闭环的前置条件。
+当前 board 的最小交付闭环只回答一个问题：运行在任意受支持 origin harness 中的 master orchestrator，能否通过全局 `ccm` 进程边界，先查看 resolver 选中的真实 agent-command help，再把 caller 组装的 raw argv/stdin 交给本机 Codex、Claude Code 或 Cursor Agent CLI，并由 ccm 管住这次**同步、session-bound** 的子进程生命周期。安全隔离、provider 语义适配、持久恢复和自动经济调度都重要，但它们是后续独立增量，不再作为这条最小闭环的前置条件。
 
 ## 2. MVP closure contract
 
 ### 2.1 本轮验收边界
 
-唯一公共形状是：
+两条公共形状是：
 
 ```text
-ccm worker run --harness <codex|claude-code|cursor-agent> ...
+ccm worker help --harness <codex|claude-code|cursor-agent>
+ccm worker run --harness <codex|claude-code|cursor-agent> [--cwd <path>] [--timeout-ms <n>] [--max-output-bytes <n>] -- <provider argv...>
 ```
 
 本轮只有在以下条件全部成立时闭环：
 
-1. 三个 harness 共用一个 handler/adapter seam 和同一结构化 terminal envelope；每个 adapter 的 executable、argv、model/effort 映射可由 hermetic fake CLI 精确验证。
-2. 调用者显式选择 harness；不自动 route、不自动 fallback、不切换账号，也不把静态 model catalog 当作 live entitlement 或 quota 证明。
-3. ccm 同步等待 terminal；timeout、外部 cancel、origin 收到 SIGINT/SIGTERM、输出越界和 provider 非零退出都得到结构化结果。
+1. 三个 harness 共用一个 resolver/process seam；`help` 与 `run` 选中同一真实 executable，fake CLI 可验证真实 help、raw argv 和 stdin 无条件原样转发。
+2. 调用者显式选择 harness，并依据真实 help 自己组装 provider flags；ccm 不提供 model/effort 映射，不自动 route/fallback，也不切换账号。
+3. ccm 同步等待 process terminal；timeout、外部 cancel、origin signal、输出越界和 provider 非零退出都只进入 generic process envelope，不解析 provider terminal。
 4. ccm 只管理自己创建的 process tree，结束前完成 signal escalation、kill/reap、有界 stdout/stderr 和临时目录 cleanup。
 5. worker terminal 不是 parent task 的 `done`；master orchestrator 仍独立验收 artifact、测试和 acceptance。
-6. built CLI 的三条 hermetic E2E 全绿；本机真实 first-party smoke 要么成功，要么诚实记录 provider/host 阻塞。真实 smoke 不允许 BYOK、API pool、账号切换、credential mutation 或 release。
+6. built CLI 的三条 hermetic E2E 全绿；本机真实 smoke 要么成功，要么诚实记录 provider/host 阻塞。raw wrapper 本身不声明 BYOK、账号、credential 或 provider side-effect 安全性。
 
 ### 2.2 当前证据与闭环目标不得混写
 
-截至本页基线，tracked tree 的 [`cross-harness-session-bound-worker` capability card](harnesses/capabilities/cross-harness-session-bound-worker.md) 和 `ccm worker` command reference 只把**显式 Cursor Agent read-only session-bound worker**标为 current/partial；三 harness 统一集成仍是当前 MVP gate 的验收目标，不能在对应实现、tests 和 promotion review 合入前写成 shipped。
+[`cross-harness-session-bound-worker` capability card](harnesses/capabilities/cross-harness-session-bound-worker.md) 与 plugin guidance 只有和三 harness raw-wrapper runtime、tests、promotion review 位于同一集成 PR 时才可晋升 `current`；拆开合并会让文档先于实现，因此不允许。
 
 本页因此使用两个不同概念：
 
@@ -50,7 +51,7 @@ ccm worker run --harness <codex|claude-code|cursor-agent> ...
 | ccm 更新、重装、rollback 时 active run 存活 | 不支持 | R1 |
 | sandbox、permission、worktree side-effect enforcement | 不作为 MVP 安全晋升；只保留显式 residual | R2 |
 | 全机 quota live observation、admission、reservation | bounded local decision/store seam 已有 partial/current 证据；collector→spawn 闭环不存在 | R3–R4 |
-| 自动 route、fallback、model admission | 不支持；调用者显式选 harness/model | R5 |
+| normalized provider adapter、自动 route/fallback、model admission | 不支持；调用者显式选 harness 并提供 provider argv | R5 |
 | write-capable worker | 不支持；不宣称 repository/external side-effect containment | R6 |
 | 三 provider 自动 fallback、三 origin same-run management | 不支持 | R7 |
 | Cursor Linux/macOS sandbox safety canary | 未资格化 | R2/R8 |
@@ -97,13 +98,15 @@ plugin 不自行 probe provider，也不成为 quota truth writer。三个 origi
 4. fallback 只处理 allowlisted mechanical failures。policy/security/workspace/task block、acceptance failure 或用户决定不得靠换候选绕过；
 5. Codex/Cursor account mutation 和 automatic account switching 永久为零。
 
+normalized provider adapter 属于这一 post-MVP 层：只有在 provider-specific 版本/flags/result contract 有独立证据后才可加入，不回写或扩张 R0 raw wrapper。
+
 ### R6. One-provider safe writer
 
 只选一个 provider、一个 origin、一个 isolated worktree，跑一个可回滚的最小写任务。通过 worktree diff、tests 和 parent acceptance 后才可完成；provider success 仍不能直接把 task 标为 done。先证明 zero commit/push/nested/credential leak，再扩任务类型。
 
 ### R7. Three providers and three origins
 
-把已经通过 R1/R4/R6 的同一 contract 扩到 Codex、Claude Code、Cursor Agent 三个 provider driver，并让 Claude Code、Codex、Cursor IDE 三个 origin 对同一 `run_ref` 拥有等价的 bind/attach/poll/cancel/reconcile 与 decision-attention 语义。Cursor IDE plugin 和 Cursor Agent CLI 始终是两个 surface；品牌相同不产生 auth、quota、role 或 lifecycle 推导。
+把已经通过 R1/R4/R6 的 normalized/durable contract 扩到 Codex、Claude Code、Cursor Agent 三个 provider driver，并让 Claude Code、Codex、Cursor IDE 三个 origin 对同一 `run_ref` 拥有等价的 bind/attach/poll/cancel/reconcile 与 decision-attention 语义。Cursor IDE plugin 和 Cursor Agent CLI 始终是两个 surface；品牌相同不产生 auth、quota、role 或 lifecycle 推导。
 
 ### R8. Qualified Linux and macOS Cursor canaries
 
@@ -118,9 +121,16 @@ plugin 不自行 probe provider，也不成为 quota truth writer。三个 origi
 plugin 的最终形状是 harness-aware 的通知与行为指导层，不是 worker runtime：
 
 - hooks 在 ARM 时注册 subscription，消费 ccm-owned machine/quota/run decision delta；保持 cached-only、bounded、redacted，不在 hook 内做 live provider I/O 或 route 推理；
-- skills 教 master orchestrator 先查全机 surface/model/quota，再按任务 profile、quota posture 与 effect floor 选择 host-native 或 `ccm worker`；命令语法只由 `using-ccm` 拥有，配额/模型事实解释由 `pacing-and-estimation` 拥有，最终 route 决策由 `master-orchestrator-guide` 拥有；
+- skills 教 master orchestrator 跨 origin 选 harness、先看 resolver 选中的真实 help、显式传 provider argv，并把 process terminal 交回 parent 验收；命令语法只由 `using-ccm` 拥有，配额/模型事实解释由 `pacing-and-estimation` 拥有，最终 route 决策由 `master-orchestrator-guide` 拥有；
 - model catalog、price、benchmark 与 live entitlement 不复制成每个 host 的静态 slot。canonical evidence/CLI 是数据面，host adapter 只承载真实机制 divergence；
 - 最终 portfolio review 清除 dev-agent 注释、重复 SSOT、过时 current claim，并用 projection、skill-lint、trigger/behavior eval 验收。
+
+### R0 CLI help 与后续演进边界
+
+真实 agent-command help 是 R0 的 current surface，也是 agent 的观测与操作入口；它由 `worker help`
+通过与 `run` 相同的 resolver 取得。`worker run --help` 始终只说明 ccm wrapper。真实 help 会随本机 provider
+CLI 演进，但它只帮助 caller 组装 raw argv，不提供 safe 或 automatic eligibility，也不能替代未来 normalized
+provider adapter 的版本、effect、result 与 canary 合同。本轮不另造 `worker inspect` 或 per-run 探测层。
 
 ## 4. Canary host prerequisites
 
@@ -193,7 +203,7 @@ R7 + R8       -> R9 rollout/privacy -> R10 final plugin/skill hardening
 
 | Increment | Entry gate | Exit gate | 本增量故意不做 |
 | --- | --- | --- | --- |
-| R0 三 harness session-bound | frozen `ccm worker` grammar；三 adapter spec | 三 fake CLI E2E + 真实 first-party smoke/诚实阻塞；P0/P1=0 | daemon、quota、sandbox promotion、auto route |
+| R0 三 harness session-bound | frozen `ccm worker` raw-wrapper grammar；三 resolver spec | 三 fake CLI help/run E2E + 真实 smoke/诚实阻塞；P0/P1=0 | normalized provider adapter、daemon、quota、sandbox promotion、auto route |
 | R1a synthetic durable run | R0 result/lifecycle envelope稳定 | parent death/handoff 后 same `run_ref` attach/cancel/reconcile；board direct write=0 | live provider、update survival |
 | R1b active-run update survival | R1a journal/lease；runtime supply-chain gate | update/reinstall/rollback/GC 不打断 synthetic active run | writer、auto route |
 | R2a qualified read-only Cursor inspect | 合格 Linux host + frozen version/profile | workspace/network/profile 负例全绿；explicit canary terminal≠done | macOS、writer、fallback |

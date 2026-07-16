@@ -3,28 +3,29 @@
 ## Intent（host-neutral）
 
 A master orchestrator running on Claude Code, Codex, or Cursor can cross the same global `ccm`
-process boundary to actively query a selected worker target and explicitly launch the current read-only,
-session-bound Cursor Agent thin slice. The origin harness is not the worker-selection boundary.
+process boundary to inspect the resolver-selected real agent-command help and explicitly launch a
+session-bound Codex, Claude Code, or Cursor Agent raw wrapper. The origin harness is not the
+worker-selection boundary.
 
 ## Acceptance（可测等价类）
 
-1. All three origins project the same A-layer decision path. With no target facts pre-injected, the
-   orchestrator follows D's active-query surface before deciding and uses H's provider-neutral target-fact
-   interpretation. Origin-local facts never fill a target-worker gap.
-2. D is the only runtime owner of exact command grammar, output/terminal semantics and residual effects.
-   A owns the route/admission/lifecycle decision; H owns only inventory/model/quota interpretation.
-3. `cursor-ide-plugin` and `cursor-agent-cli` remain independent. Static model facts do not prove live
-   entitlement/exact admission, and quota-store availability does not prove headroom.
-4. Unknown, stale, conflicting, tight or unbound target evidence means no spawn. A real accountable handle
-   precedes `in_flight`, and worker terminal evidence still requires parent acceptance.
+1. All three origins project the same A-layer decision path: choose a target independent of origin, inspect
+   the resolver-selected real agent-command help, dispatch through D, then independently verify the parent task.
+2. D is the only skill owner of exact command grammar, raw argv/stdin transport, generic process terminal and
+   lifecycle residuals. A owns when/why to dispatch and parent acceptance; H owns only optional
+   inventory/model/quota interpretation and copies no provider flags or catalog.
+3. `cursor-ide-plugin` and `cursor-agent-cli` remain independent. The wrapper resolves only the requested
+   CLI surface and does not infer authentication, model entitlement, quota, permission or safety.
+4. A real accountable handle precedes `in_flight`. Process terminal is not parent acceptance; provider argv
+   correctness and produced artifacts remain the caller's and parent orchestrator's responsibility.
 
 ## Host mechanisms
 
 | host | status | mechanism | notes |
 | --- | --- | --- | --- |
-| claude-code | current-partial | projected A/D/H guidance + global `ccm` process boundary | same MVP contract |
-| codex | current-partial | projected A/D/H guidance + global `ccm` process boundary | same MVP contract |
-| cursor | current-partial | projected A/D/H guidance + global `ccm` process boundary | IDE origin and Agent CLI target stay separate |
+| claude-code | current | projected A/D/H guidance + global `ccm` raw wrapper | same R0 contract |
+| codex | current | projected A/D/H guidance + global `ccm` raw wrapper | same R0 contract |
+| cursor | current | projected A/D/H guidance + global `ccm` raw wrapper | IDE origin and Agent CLI target stay separate |
 
 ## Declared divergence
 
@@ -33,21 +34,22 @@ separate mechanisms and are not presented as equivalent to the CLI worker.
 
 ## Current / target boundary
 
-This card is **current/partial**. Current support is one explicit, read-only, session-bound Cursor Agent
-worker plus active read-only fact acquisition. The active query can honestly end in no-spawn when quota
-authority references, live exact-model evidence, or per-call authorization are absent. Automatic routing or
-fallback, account switching, write-capable workers, cross-session durability, daemon takeover and hook-owned
-dispatch remain outside this capability.
+This card is **current** only when cherry-picked and reviewed in the same runtime PR that implements the
+three-harness raw wrapper. The narrow support is resolver-backed real help plus caller-selected raw argv/stdin,
+bounded synchronous process lifecycle and a generic process envelope. It is not a normalized provider adapter.
+Automatic routing/fallback, model or quota admission, account switching, safe/read-only eligibility,
+cross-session durability, daemon takeover and hook-owned dispatch remain outside this capability.
 
 ## Linked surfaces
 
 - A decision: `plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md`
-- D active-query and worker contract: `plugin/src/skills/using-ccm/canonical/references/command-catalog.md`
-- H selected-target interpretation: `plugin/src/skills/pacing-and-estimation/canonical/references/cross-harness-target-facts.md`
+- D exact worker contract: `plugin/src/skills/using-ccm/canonical/references/command-catalog.md`
+- H optional selected-target interpretation: `plugin/src/skills/pacing-and-estimation/canonical/references/cross-harness-target-facts.md`
 - Runtime: `ccm/apps/cli/src/handlers/worker.ts`
 
 ## Probe deps
 
-Registry/help tests prove the four active-query surfaces and worker surface. Behavioral evaluation starts with
-no target facts in context and requires an active query before route judgment. Provider invocation tests use
-a controlled fake executable; they do not require a paid canary or prove provider-wide zero-write.
+Registry/help tests prove that help and run resolve the same fake executable. Provider invocation tests prove
+raw argv/stdin, cwd/default cwd, timeout/cancel/output bounds and generic process-terminal fields for all three
+harness ids. They do not prove provider-specific flag correctness, paid endpoint success, safety or automatic
+eligibility.
