@@ -1,6 +1,7 @@
 # machine-wide-quota-notification
 
-> Track B R2 signal contract frozen；ccm runtime candidate GREEN。Card 只拥有跨 surface intent/status；quota observation 与
+> Track B 已实现：ccm producer 于 PR #141 合入，三 origin plugin landing 于 PR #145 合入，PR #148
+> 加固 cached-only / Codex 7d-only 边界。Card 只拥有跨 surface intent/status；quota observation 与
 > derivation 仍由既有 quota admission contract 拥有，单 hook 规则由 linked CONTRACT 拥有。
 
 ## Intent（host-neutral）
@@ -39,9 +40,9 @@ fan-out。origin hook 零 provider/network/credential probe。
 
 | host | status | mechanism | notes |
 | --- | --- | --- | --- |
-| claude-code | contract-red | SessionStart cached summary + Stop coordination inbox | PostToolBatch 可更早 surface cached delta，但不是 producer |
-| codex | contract-red | SessionStart cached summary + Stop coordination inbox | no fake batch event；7d-only |
-| cursor | contract-red | verified postToolUse cached summary + Stop coordination inbox | SessionStart dynamic context gap沿用 cached-context Track B |
+| claude-code | implemented-track-b | SessionStart cached summary + Stop coordination inbox | 既有 PostToolBatch pacing 是 provider-local 早期采样，不冒充 machine-wide delta producer |
+| codex | implemented-track-b | SessionStart cached summary + Stop coordination inbox | 无 fake batch event；所有 agent-visible landing 都执行 7d-only 校验 |
+| cursor | implemented-track-b | verified postToolUse cached summary + Stop coordination inbox | SessionStart dynamic context gap 由 postToolUse + durable inbox 补偿；Cursor IDE/Agent target row 不互相推断 |
 
 ## Declared divergence
 
@@ -73,8 +74,14 @@ fan-out。origin hook 零 provider/network/credential probe。
 
 ## Current truth
 
-Subscription/inbox/context transport spine 已存在；ccm runtime candidate 已实现 Cursor IDE/Agent 各自 current-login
-dashboard collector、machine-wide cached aggregation、non-additive capacity view、edge projector、fan-out、显式 CLI
-refresh/status、Cursor Agent `usage show/advise` 与 monitor quota-source persistence，并由真实双凭据 HTTP probe验收。
-Plugin hook migration/三 origin adapter projection 仍由独立交付线完成；在其 GREEN 前不得把 origin hook 描述成
-已具备 machine-wide 通知能力。
+ccm 已实现 Cursor IDE/Agent 各自 current-login dashboard collector、machine-wide cached aggregation、
+non-additive capacity view、edge projector、fan-out、显式 CLI refresh/status、Cursor Agent `usage show/advise`
+与 monitor quota-source persistence，并由真实双凭据 HTTP probe 验收。PR #145 把同一 cached summary 与 exact
+subscription inbox delta 投递到 Claude Code、Codex、Cursor 三个 origin；PR #148 又证明只读子进程环境、严格 UTC
+reset marker 与 Codex 7d-only fail-closed。三 origin 的 hostile fixture 覆盖 target preservation、scope/delta 去重、
+secret/provenance 拒绝、Cursor 双 surface 保留及 5h/switch 静默。PR #151 统一了 orchestrator 消费该事实的 skills
+视角，但不改变 producer 或 hook authority。
+
+仍存在的机制差异只有上表与 Declared divergence 中列明的触发时机/envelope：Codex 无 verified mid-turn batch，
+Cursor 的动态 summary 走 postToolUse 而非失效的 SessionStart.additional_context；二者都由 durable inbox 在 Stop
+补偿，不是能力仍未实现。

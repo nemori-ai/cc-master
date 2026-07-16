@@ -41,7 +41,7 @@ skills 和/或 ccm，且各 host 机制不能 1:1 平移时，用 Capability Car
 | post-tool-batch-gate | [post-tool-batch-gate.md](post-tool-batch-gate.md) | B | `event-unavailable` |
 | workflow-authoring | [workflow-authoring.md](workflow-authoring.md) | B | `event-unavailable` — unsupported_stub |
 | usage-pacing-midflight | [usage-pacing-midflight.md](usage-pacing-midflight.md) | B | `event-unavailable` + gap |
-| machine-wide-quota-notification | [machine-wide-quota-notification.md](machine-wide-quota-notification.md) | B | `contract-red` — durable inbox substitute |
+| machine-wide-quota-notification | [machine-wide-quota-notification.md](machine-wide-quota-notification.md) | B | `implemented-track-b` — postToolUse + durable inbox substitute |
 | path-token-resolution | [path-token-resolution.md](path-token-resolution.md) | A/B | `protocol-capability-gap` |
 | ccm-quota-account | [ccm-quota-account.md](ccm-quota-account.md) | B | `protocol-capability-gap` — unsupported |
 | cross-harness-cached-context | [cross-harness-cached-context.md](cross-harness-cached-context.md) | A/B | `protocol-capability-gap` — postToolUse dynamic substitute |
