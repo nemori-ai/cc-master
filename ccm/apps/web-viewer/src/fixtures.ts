@@ -217,9 +217,14 @@ const fixtureTasks: CompactTask[] = [
     acceptance: {
       criteria: [
         { desc: 'terraform apply exits 0 on all three stages', kind: 'test', status: 'met' },
-        { desc: 'p99 cutover latency below 400ms', kind: 'metric', target: '400ms', status: 'pending' },
-        { desc: 'second reviewer signs off the runbook diff', kind: 'review', status: 'failed' }
-      ]
+        {
+          desc: 'p99 cutover latency below 400ms',
+          kind: 'metric',
+          target: '400ms',
+          status: 'pending',
+        },
+        { desc: 'second reviewer signs off the runbook diff', kind: 'review', status: 'failed' },
+      ],
     },
     execution: {
       state: 'routed',
@@ -233,7 +238,7 @@ const fixtureTasks: CompactTask[] = [
           scope: 'cross-module',
           context: 'large',
           coordination: 'multi-boundary',
-          reversibility: 'costly'
+          reversibility: 'costly',
         },
         estimate_confidence: 'high',
         quality: { effect_floor: 'T1' },
@@ -241,8 +246,8 @@ const fixtureTasks: CompactTask[] = [
         capabilities: {
           required: ['terraform-review'],
           preferred: ['architecture'],
-          forbidden: ['account-mutation']
-        }
+          forbidden: ['account-mutation'],
+        },
       },
       route: {
         outcome: 'other-harness-cli',
@@ -258,16 +263,16 @@ const fixtureTasks: CompactTask[] = [
           model: 'gpt-5.6-sol',
           capabilities: ['terraform-review'],
           role_grades: ['T1'],
-          chain: 'ample'
+          chain: 'ample',
         },
         chains: { ample: ['codex-cli', 'cursor-agent'], tight: ['cursor-agent'] },
         fallback: {
           on: ['quota-tight'],
           never_on: ['permission-blocked'],
           exhaustion: 'fail-closed',
-          same_harness: 'explicit-candidate-only'
+          same_harness: 'explicit-candidate-only',
         },
-        reason_codes: ['quality-floor-met', 'quota-healthy']
+        reason_codes: ['quality-floor-met', 'quota-healthy'],
       },
       attempts: [
         {
@@ -275,10 +280,10 @@ const fixtureTasks: CompactTask[] = [
           candidate_id: 'codex-cli',
           state: 'running',
           agent_ref: 'agt-001',
-          started_at: '2026-07-08T10:05:00Z'
-        }
-      ]
-    }
+          started_at: '2026-07-08T10:05:00Z',
+        },
+      ],
+    },
   },
   {
     id: 'secrets-sync',
@@ -681,7 +686,7 @@ export const fixtureViewModel: ViewModelPayload = {
     revision: 4,
     updated_at: '2026-07-08T12:00:00Z',
     brief: { present: true, ref: 'design_docs/release-plan.md' },
-    pending: false
+    pending: false,
   },
   rev: {
     boardHash: 'sha256:fixture-board',
@@ -742,9 +747,11 @@ export const fixtureViewModel: ViewModelPayload = {
       registered_at: '2026-07-08T10:05:00Z',
       elapsed_ms: 8_358_000,
     },
+    // Titles must match fixtureTasks — server-derived invariant (unclaimed_ready is a join
+    // over the board's own tasks, never free text).
     unclaimed_ready: [
-      { id: 'fetch-config', title: 'Fetch launch config' },
-      { id: 'mig-c', title: 'Migrate shard c' },
+      { id: 'fetch-config', title: 'Fetch environment config' },
+      { id: 'mig-c', title: 'Migrate archives shard' },
     ],
   },
   tasks: fixtureTasks,
@@ -777,7 +784,7 @@ export const fixtureViewModel: ViewModelPayload = {
         surface_label: selectedRoute?.surface_label,
         model: selectedRoute?.model,
         role_grades: selectedRoute?.role_grades,
-        agent_refs: fixtureAgentRefs.get(task.id) ?? []
+        agent_refs: fixtureAgentRefs.get(task.id) ?? [],
       };
     }),
     edges: derived.edges,

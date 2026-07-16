@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadAgentDetail, loadDecisions, loadPeers, loadTaskDetail, loadWorkspace } from './api';
-import { fixturePeers } from './fixtures';
 import { AgentInspector } from './components/AgentInspector';
 import { AgentRoster } from './components/AgentRoster';
 import { BoardBrief } from './components/BoardBrief';
@@ -13,6 +12,7 @@ import { MissionLine } from './components/MissionLine';
 import { StageToolbar, type ViewMode } from './components/StageToolbar';
 import { StatusStrip } from './components/StatusStrip';
 import { TimelineView } from './components/TimelineView';
+import { fixturePeers } from './fixtures';
 import type { GraphOrientation } from './graphLayout';
 import type { LocateRequest } from './locate';
 import { normalizeTaskFilters } from './taskFilters';
@@ -48,13 +48,13 @@ function filtersFromUrl(): Set<string> {
 function setWorkspaceStateInUrl(
   taskId: string | null,
   agentId: string | null,
-  filters: Set<string>
+  filters: Set<string>,
 ): void {
   if (typeof window === 'undefined') return;
   window.history.replaceState(
     null,
     '',
-    writeWorkspaceUrlState(window.location.href, { task: taskId, agent: agentId, filters })
+    writeWorkspaceUrlState(window.location.href, { task: taskId, agent: agentId, filters }),
   );
 }
 
@@ -122,6 +122,20 @@ function taskErrorPayload(taskId: string, message: string): TaskDetailPayload {
     dependencies: [],
     dependents: [],
     activity: [],
+  };
+}
+
+// Held-selection placeholder for a degraded (fixture / client-stale) frame: keeps the agent
+// rail mounted with an explicit error state instead of resolving against untrusted data —
+// the agent-path counterpart of taskErrorPayload.
+function agentHoldPayload(agentId: string, message: string): AgentDetailPayload {
+  return {
+    schema: 'ccm/web-viewer-agent/v1',
+    error: message,
+    agent: { id: agentId },
+    compact: { id: agentId, state: 'unknown' },
+    linked_tasks: [],
+    probe: null,
   };
 }
 
@@ -282,6 +296,10 @@ export function App() {
         if (boardChanged) {
           setDecisions([]);
           setPeers(null);
+          // Agent ids are board-scoped and collide across boards (every board numbers from
+          // agt-001), so the roster stale-drop cannot catch a cross-board carryover — an
+          // externally-driven board change must drop the agent selection, same as the task.
+          setSelectedAgentId(null);
           setLayoutResetKey((value) => value + 1);
         }
         setBoardSwitching(false);
@@ -390,43 +408,30 @@ export function App() {
     return () => controller.abort();
   }, [selectedTaskId, workspace]);
 
-  // Agent drill-down loader — fetch /agent.json for the selected agent. Fixture source
-  // synthesizes the detail from the compact roster + view-model task lookup (offline demo).
+  // Agent drill-down loader — fetch /agent.json for the selected agent.
   useEffect(() => {
     if (!workspace || !selectedAgentId) {
       setSelectedAgent(null);
+      return;
+    }
+    // Degraded frame (fixture fallback / last-known-good stale): the fixture roster's
+    // hardcoded ids (agt-001..) collide with real board ids, so resolving the selection
+    // against it shows another agent's data, and stale-dropping wipes a deep link over a
+    // transient failure. Hold the selection and the URL untouched; the right rail shows a
+    // held/stale placeholder until a live frame returns (mirrors the task path's
+    // keep-selection + error-payload semantics).
+    if (workspace.source === 'fixture' || workspace.clientStale) {
       return;
     }
     const compact = (workspace.viewModel.agents ?? []).find(
       (candidate) => candidate.id === selectedAgentId,
     );
     if (!compact) {
-      // Stale agent id fail-soft: the selected agent is absent from the freshly-loaded roster
-      // (deep-linked to a gone agent / board switch / terminal prune) — drop the selection and
-      // the URL-sync effect clears `?agent=`. Mirrors the stale-filter drop (normalizeTaskFilters).
+      // Stale agent id fail-soft: the selected agent is absent from the freshly-loaded LIVE
+      // roster (deep-linked to a gone agent / terminal prune) — drop the selection and the
+      // URL-sync effect clears `?agent=`. Mirrors the stale-filter drop (normalizeTaskFilters).
       setSelectedAgent(null);
       setSelectedAgentId(null);
-      return;
-    }
-
-    if (workspace.source === 'fixture') {
-      const byId = new Map(workspace.viewModel.graph.nodes.map((node) => [node.id, node]));
-      setSelectedAgent({
-        schema: 'ccm/web-viewer-agent/v1',
-        board: { filename: workspace.viewModel.board.filename },
-        agent: compact as unknown as Record<string, unknown>,
-        compact,
-        linked_tasks: (compact.links ?? []).map((taskId) => {
-          const node = byId.get(taskId);
-          return {
-            task_id: taskId,
-            title: node?.title ?? null,
-            status: node ? String(node.status) : null,
-            exists: !!node,
-          };
-        }),
-        probe: compact.probe ?? null,
-      });
       return;
     }
 
@@ -634,6 +639,21 @@ export function App() {
   const staleErrors = workspace.viewModel.freshness.errors ?? [];
   const isStale = workspace.viewModel.freshness.state !== 'live' || staleErrors.length > 0;
 
+  // Degraded frame (fixture fallback / client-stale last-known-good): the agent loader holds
+  // the selection instead of resolving/dropping it, so the rail renders an explicit held
+  // placeholder when no matching detail was ever loaded.
+  const degradedFrame = workspace.source === 'fixture' || workspace.clientStale === true;
+  const railAgent =
+    displayedAgent ??
+    (selectedAgentId && degradedFrame
+      ? agentHoldPayload(
+          selectedAgentId,
+          workspace.source === 'fixture'
+            ? 'Live board data is unavailable — holding the agent selection'
+            : 'Board read is stale — holding the agent selection',
+        )
+      : null);
+
   return (
     <div className="app-shell">
       <div className="header-block">
@@ -750,7 +770,7 @@ export function App() {
         </div>
         <aside
           aria-label={
-            displayedAgent
+            railAgent
               ? 'Selected agent detail'
               : displayedTask
                 ? 'Selected task detail'
@@ -759,10 +779,10 @@ export function App() {
           className="dpanel-wrap"
           id="detail"
         >
-          {displayedAgent ? (
+          {railAgent ? (
             <AgentInspector
               agentLoading={agentLoading}
-              detail={displayedAgent}
+              detail={railAgent}
               onClose={() => setSelectedAgentId(null)}
               onSelectTask={selectTaskFromClick}
             />

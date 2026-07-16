@@ -1920,22 +1920,31 @@ function agentLinkTaskIds(agent: JsonRecord): string[] {
 }
 
 function objectField(record: JsonRecord, key: string): JsonRecord {
-  const value = record[key];
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : {};
+  return recordOf(record[key]) ?? {};
+}
+
+// Probe projection shared by the compact roster row and the /agent.json drill-down — one
+// shape at both endpoints (last_probe_at included), verbatim with its `as_of` anchor.
+function probeProjection(agent: JsonRecord): JsonRecord | null {
+  const probe = recordOf(agent.probe);
+  if (!probe) return null;
+  return {
+    observed: typeof probe.observed === 'string' ? probe.observed : 'unknown',
+    as_of: typeof probe.as_of === 'string' ? probe.as_of : null,
+    method: typeof probe.method === 'string' ? probe.method : 'none',
+    last_probe_at: typeof probe.last_probe_at === 'string' ? probe.last_probe_at : null,
+  };
 }
 
 // Compact agent projection carried on the view-model top-level `agents[]`. Unknown-faithful:
 // `model` is omitted when the record never captured one (frontend shows unknown / —, never
-// derives it). Probe evidence passes through verbatim with its `as_of` freshness anchor.
+// derives it).
 function compactAgent(agent: JsonRecord): JsonRecord | null {
   const id = agentId(agent);
   if (!id) return null;
   const lifecycle = objectField(agent, 'lifecycle');
   const handle = objectField(agent, 'handle');
   const launch = objectField(agent, 'launch');
-  const probeRaw = objectField(agent, 'probe');
-  const hasProbe =
-    typeof agent.probe === 'object' && agent.probe !== null && !Array.isArray(agent.probe);
   const attachCmd = typeof handle.attach_cmd === 'string' ? handle.attach_cmd : '';
   const transcript = typeof handle.transcript_ref === 'string' ? handle.transcript_ref : '';
   const out: JsonRecord = {
@@ -1954,33 +1963,54 @@ function compactAgent(agent: JsonRecord): JsonRecord | null {
           ? launch.created_at
           : undefined,
     ended_at: typeof lifecycle.ended_at === 'string' ? lifecycle.ended_at : null,
-    probe: hasProbe
-      ? {
-          observed: typeof probeRaw.observed === 'string' ? probeRaw.observed : 'unknown',
-          as_of: typeof probeRaw.as_of === 'string' ? probeRaw.as_of : null,
-          method: typeof probeRaw.method === 'string' ? probeRaw.method : 'none',
-        }
-      : null,
+    probe: probeProjection(agent),
     links: agentLinkTaskIds(agent),
   };
   if (typeof agent.model === 'string' && agent.model) out.model = agent.model;
   return out;
 }
 
-// task_id -> agent ids (the reverse of agents[].links); powers node.agent_refs so the DAG /
-// task inspector can list who is working a node with a pure table lookup.
-function agentRefsByTask(agents: JsonRecord[]): Map<string, string[]> {
+// task_id -> agent ids (the reverse of the roster links); powers node.agent_refs so the DAG /
+// task inspector can list who is working a node with a pure table lookup. Built from the
+// already-projected compact agents (`links` is a plain task-id list) so buildViewModel parses
+// the raw roster once instead of re-walking it.
+function agentRefsByTask(compactAgents: JsonRecord[]): Map<string, string[]> {
   const map = new Map<string, string[]>();
-  for (const agent of agents) {
-    const id = agentId(agent);
+  for (const agent of compactAgents) {
+    const id = typeof agent.id === 'string' ? agent.id : '';
     if (!id) continue;
-    for (const taskIdValue of agentLinkTaskIds(agent)) {
+    for (const taskIdValue of stringList(agent.links)) {
       const arr = map.get(taskIdValue) ?? [];
       if (!arr.includes(id)) arr.push(id);
       map.set(taskIdValue, arr);
     }
   }
   return map;
+}
+
+// Attempt-side join fallback: dedicated cross-harness writers record the attempt→agent join
+// on the ATTEMPT (`routing.attempts[].agent_ref`) and may never write `agents[].links`.
+// Merge the refs that resolve to a registry agent id so node.agent_refs / unclaimed-ready
+// see the claim; unresolvable refs (run-store style handles) stay out of the join — the
+// inspector renders them as plain text instead of a dead jump.
+function mergeAttemptAgentRefs(
+  refsByTask: Map<string, string[]>,
+  tasks: JsonRecord[],
+  knownAgentIds: Set<string>,
+): void {
+  for (const task of tasks) {
+    const id = taskId(task);
+    if (!id) continue;
+    const routing = recordOf(task.routing);
+    const attempts = Array.isArray(routing?.attempts) ? routing.attempts : [];
+    for (const value of attempts) {
+      const ref = recordOf(value)?.agent_ref;
+      if (typeof ref !== 'string' || !knownAgentIds.has(ref)) continue;
+      const arr = refsByTask.get(id) ?? [];
+      if (!arr.includes(ref)) arr.push(ref);
+      refsByTask.set(id, arr);
+    }
+  }
 }
 
 // Macro readouts + the "ready but no agent claimed it" derived list — all server-derived so
@@ -2061,23 +2091,13 @@ function buildAgentDetail(boardPath: string, agentIdValue: string): JsonRecord |
     };
   });
   const filename = path.basename(boardPath);
-  const probeRaw = objectField(agent, 'probe');
-  const hasProbe =
-    typeof agent.probe === 'object' && agent.probe !== null && !Array.isArray(agent.probe);
   return {
     schema: AGENT_DETAIL_SCHEMA,
     board: { id: boardIdFromFilename(filename), filename },
     agent,
     compact: compactAgent(agent),
     linked_tasks: linkedTasks,
-    probe: hasProbe
-      ? {
-          observed: typeof probeRaw.observed === 'string' ? probeRaw.observed : 'unknown',
-          as_of: typeof probeRaw.as_of === 'string' ? probeRaw.as_of : null,
-          method: typeof probeRaw.method === 'string' ? probeRaw.method : 'none',
-          last_probe_at: typeof probeRaw.last_probe_at === 'string' ? probeRaw.last_probe_at : null,
-        }
-      : null,
+    probe: probeProjection(agent),
   };
 }
 
@@ -2178,7 +2198,8 @@ function buildViewModel(home: string, boardPath: string): JsonRecord {
   const boardExtras = buildBoardExtras(board);
   const agents = agentsOf(board);
   const compactAgents = agents.map(compactAgent).filter((a): a is JsonRecord => !!a);
-  const refsByTask = agentRefsByTask(agents);
+  const refsByTask = agentRefsByTask(compactAgents);
+  mergeAttemptAgentRefs(refsByTask, tasks, new Set(compactAgents.map((a) => String(a.id))));
   const agentInsights = buildAgentInsights(compactAgents, tasks, refsByTask);
   const wipInsight = insights.wip as { count: number; limit: number | null; over: boolean };
   const nodeTasks = compactTasks.map((task) => {

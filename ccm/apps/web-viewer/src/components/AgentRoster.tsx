@@ -1,4 +1,5 @@
 import {
+  AGENT_STATE_ORDER,
   agentElapsed,
   agentIsActive,
   agentStateLamp,
@@ -16,11 +17,9 @@ interface AgentRosterProps {
   onSelectAgent: (agentId: string) => void;
 }
 
-const STATE_ORDER = ['running', 'starting', 'uncertain', 'orphaned', 'terminal'];
-
 function stateRank(state: string | undefined): number {
-  const index = STATE_ORDER.indexOf(state ?? '');
-  return index === -1 ? STATE_ORDER.length : index;
+  const index = AGENT_STATE_ORDER.indexOf(state ?? '');
+  return index === -1 ? AGENT_STATE_ORDER.length : index;
 }
 
 /**

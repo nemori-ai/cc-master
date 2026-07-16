@@ -1,4 +1,5 @@
-import { fmtElapsed, normalizeStatus, statusText } from '../format';
+import { AGENT_STATE_ORDER } from '../agentFormat';
+import { fmtElapsed, statusText } from '../format';
 import { type TaskFilterGroup, taskFilterOptions } from '../taskFilters';
 import type { ViewModelPayload } from '../types';
 
@@ -11,8 +12,6 @@ interface LeftRailProps {
   onToggleFilter: (filter: string) => void;
   onClearFilters: () => void;
 }
-
-const AGENT_STATE_ORDER = ['running', 'starting', 'uncertain', 'orphaned', 'terminal'];
 
 const filterGroups: Array<{ id: TaskFilterGroup; label: string }> = [
   { id: 'status', label: 'Status' },

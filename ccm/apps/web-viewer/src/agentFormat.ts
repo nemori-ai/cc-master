@@ -4,6 +4,10 @@ import type { CompactAgent } from './types';
 // Agent Registry presentation helpers. Pure formatting / palette mapping over the
 // server-projected compact agent — no joins, no derivation (those live on the server).
 
+// Display order for agent lifecycle states (active first, terminal last) — shared by the
+// roster sort and the left rail's state buckets.
+export const AGENT_STATE_ORDER = ['running', 'starting', 'uncertain', 'orphaned', 'terminal'];
+
 // Lifecycle state -> a status-lamp CSS var, reusing the board status palette semantics so
 // running reads like in-flight, orphaned like failed, terminal like done, etc.
 export function agentStateLamp(state: string | undefined): string {

@@ -2218,10 +2218,13 @@ test('serve exposes the Agent Registry read-model (view-model agents + node agen
     assert.equal(a1.handle_kind, 'session-id');
     assert.equal(a1.has_attach_cmd, true);
     assert.equal(a1.registered_at, '2026-07-08T11:00:00Z');
+    // Shared probe projection: the compact roster row and /agent.json carry ONE shape,
+    // last_probe_at included at both endpoints.
     assert.deepEqual(a1.probe, {
       observed: 'alive',
       as_of: '2026-07-08T11:30:00Z',
       method: 'session-file-mtime',
+      last_probe_at: '2026-07-08T11:30:00Z',
     });
     assert.deepEqual(a1.links, ['B']);
     // unknown-faithful: agt-002 never had a model, so the compact projection omits it.
@@ -2304,6 +2307,123 @@ test('serve exposes the Agent Registry read-model (view-model agents + node agen
     );
   } finally {
     await httpJson({ port, path: '/_ccm/shutdown', token: 'agent-token', method: 'POST' }).catch(
+      () => {},
+    );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});
+
+test('serve merges resolvable attempt.agent_ref into node agent_refs; run-store refs stay out', async () => {
+  const home = mkHome();
+  // Dedicated cross-harness writers record the attempt→agent join on the attempt only
+  // (routing.attempts[].agent_ref) — no agents[].links entry is ever written.
+  const boardPath = seedBoard(home, {
+    file: '20260708T120000Z-2.board.json',
+    tasks: [
+      {
+        id: 'E',
+        title: 'Cutover',
+        status: 'in_flight',
+        deps: [],
+        routing: {
+          attempts: [
+            { id: 'attempt-1', candidate_id: 'codex-cli', state: 'running', agent_ref: 'agt-101' },
+          ],
+        },
+      },
+      {
+        id: 'F',
+        title: 'Report',
+        status: 'ready',
+        deps: [],
+        routing: {
+          // run-store style ref: resolves to no registry agent — must stay OUT of the join
+          // (the inspector renders it as plain text, never a jump).
+          attempts: [{ id: 'attempt-2', state: 'failed', agent_ref: 'run:0197-dead' }],
+        },
+      },
+      {
+        id: 'G',
+        title: 'Verify',
+        status: 'ready',
+        deps: [],
+        routing: {
+          attempts: [{ id: 'attempt-3', state: 'running', agent_ref: 'agt-101' }],
+        },
+      },
+    ],
+    agents: [
+      {
+        id: 'agt-101',
+        type: 'cli-worker',
+        harness: 'codex',
+        intent: 'drive E to acceptance',
+        lifecycle: { state: 'running', registered_at: '2026-07-08T11:00:00Z' },
+        // no links[] — the join must come from the attempt side.
+      },
+    ],
+  });
+  const { statePath } = writeServeState(home, 'wv_attemptref', 'ar-token', boardPath);
+  const { port, servePromise } = await startServe(statePath, home);
+  try {
+    const vm = await httpJson({
+      port,
+      path: '/view-model.json?board=20260708T120000Z-2.board.json',
+      token: 'ar-token',
+    });
+    assert.equal(vm.status, 200);
+    const nodeE = vm.body.graph.nodes.find((n: { id: string }) => n.id === 'E');
+    assert.deepEqual(nodeE.agent_refs, ['agt-101']);
+    const nodeF = vm.body.graph.nodes.find((n: { id: string }) => n.id === 'F');
+    assert.deepEqual(nodeF.agent_refs, []);
+    // G is ready but claimed via the attempt-side join; F's unresolvable ref claims nothing.
+    assert.deepEqual(
+      vm.body.agent_insights.unclaimed_ready.map((t: { id: string }) => t.id),
+      ['F'],
+    );
+  } finally {
+    await httpJson({ port, path: '/_ccm/shutdown', token: 'ar-token', method: 'POST' }).catch(
+      () => {},
+    );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});
+
+test('serve /agent.json answers a torn board read with 200 + error and no compact', async () => {
+  const home = mkHome();
+  const boardPath = seedBoard(home, {
+    file: '20260708T120000Z-3.board.json',
+    tasks: [{ id: 'A', title: 'Solo', status: 'ready', deps: [] }],
+    agents: [
+      {
+        id: 'agt-201',
+        type: 'cli-worker',
+        harness: 'codex',
+        intent: 'solo',
+        lifecycle: { state: 'running', registered_at: '2026-07-08T11:00:00Z' },
+      },
+    ],
+  });
+  const { statePath } = writeServeState(home, 'wv_tornagent', 'torn-token', boardPath);
+  const { port, servePromise } = await startServe(statePath, home);
+  try {
+    // Torn write: the board bytes are momentarily not valid JSON.
+    writeFileSync(boardPath, '{"schema": "cc-master/v2", "tasks": [', 'utf8');
+    const detail = await httpJson({
+      port,
+      path: '/agent.json?board=20260708T120000Z-3.board.json&agent=agt-201',
+      token: 'torn-token',
+    });
+    // Contract the frontend relies on: 200 + {schema, error} WITHOUT compact — the client
+    // treats it as a failure (keeps the selection, shows the detail-error state) instead of
+    // silently falling back to the mission brief.
+    assert.equal(detail.status, 200);
+    assert.equal(detail.body.schema, 'ccm/web-viewer-agent/v1');
+    assert.equal(typeof detail.body.error, 'string');
+    assert.ok(detail.body.error.length > 0);
+    assert.equal('compact' in detail.body, false);
+  } finally {
+    await httpJson({ port, path: '/_ccm/shutdown', token: 'torn-token', method: 'POST' }).catch(
       () => {},
     );
   }

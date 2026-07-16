@@ -59,10 +59,17 @@ export async function loadAgentDetail(
   boardFilename?: string,
   signal?: AbortSignal,
 ): Promise<AgentDetailPayload> {
-  return getJson<AgentDetailPayload>(
+  const payload = await getJson<AgentDetailPayload>(
     withParams('/agent.json', { agent: agentId, board: boardFilename }),
     signal,
   );
+  // The server answers an unreadable/torn board with 200 + `{schema, error}` (no compact).
+  // Surface that as a failure so the caller keeps the selection and renders the inspector's
+  // detail-error state instead of silently falling back to the mission brief.
+  if (payload.error && !payload.compact) {
+    throw new Error(String(payload.error));
+  }
+  return payload;
 }
 
 /**

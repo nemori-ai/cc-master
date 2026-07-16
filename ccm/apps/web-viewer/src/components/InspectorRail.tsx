@@ -1,5 +1,5 @@
-import { perNodeStructure, useSecondTick } from '../analytics';
 import { agentStateLamp, agentStateText, harnessBadge } from '../agentFormat';
+import { perNodeStructure, useSecondTick } from '../analytics';
 import {
   endStr,
   fmtDuration,
@@ -135,6 +135,7 @@ export function InspectorRail({
   const node = viewModel.graph.nodes.find((candidate) => candidate.id === t.id);
   // Server-joined agent ids working this node -> compact records by pure table lookup.
   const agentRefs = node?.agent_refs ?? [];
+  const rosterAgentIds = new Set((viewModel.agents ?? []).map((agent) => agent.id));
   const linkedAgents = agentRefs
     .map((agentId) => (viewModel.agents ?? []).find((agent) => agent.id === agentId))
     .filter((agent): agent is NonNullable<typeof agent> => !!agent);
@@ -309,7 +310,11 @@ export function InspectorRail({
             <div className="contract-subblock">
               <div className="contract-label">candidate routes</div>
               {route.candidates.map((candidate) => (
-                <div className="candidate-row" data-selected={candidate.id === selectedRoute?.id} key={candidate.id}>
+                <div
+                  className="candidate-row"
+                  data-selected={candidate.id === selectedRoute?.id}
+                  key={candidate.id}
+                >
                   <span className="mono">{candidate.id}</span>
                   <span>{candidate.surface_label}</span>
                   <span className="mono">
@@ -359,15 +364,19 @@ export function InspectorRail({
               <div className="contract-label">attempt lifecycle</div>
               {execution.attempts.map((attempt) => {
                 // Server-joined agent_ref → the attempt row is a jump into agent mode for the
-                // registry agent that ran it (no client inference: agent_ref comes off the board).
+                // registry agent that ran it (no client inference: agent_ref comes off the
+                // board). Only a ref that resolves in the roster is clickable; a run-store
+                // style ref the registry cannot resolve renders verbatim as plain text — a
+                // jump nowhere would be a silent dead button.
                 const agentRef = attempt.agent_ref;
+                const refResolves = !!agentRef && rosterAgentIds.has(agentRef);
                 const cells = (
                   <>
                     <span className="mono">{attempt.id}</span>
                     <span>
                       {attempt.state ?? 'unknown'}
                       {attempt.terminal_class ? ` · ${attempt.terminal_class}` : ''}
-                      {agentRef ? ' · ⚙ agent' : ''}
+                      {agentRef ? (refResolves ? ' · ⚙ agent' : ` · ${agentRef}`) : ''}
                     </span>
                     <span
                       className="mono"
@@ -380,7 +389,7 @@ export function InspectorRail({
                     </span>
                   </>
                 );
-                return agentRef ? (
+                return agentRef && refResolves ? (
                   <button
                     className="attempt-row attempt-row-agent"
                     key={attempt.id}
