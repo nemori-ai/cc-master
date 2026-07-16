@@ -1968,6 +1968,8 @@ function compactAgent(agent: JsonRecord): JsonRecord | null {
     links: agentLinkTaskIds(agent),
   };
   if (typeof agent.model === 'string' && agent.model) out.model = agent.model;
+  // terminal 归因 chip 的 hover title 需要 outcome 摘要（缺省优雅缺席，完整版仍在 /agent.json）
+  if (typeof lifecycle.outcome === 'string' && lifecycle.outcome) out.outcome = lifecycle.outcome;
   return out;
 }
 
