@@ -394,7 +394,14 @@ export function locateTranscriptFile(
   //   登记配方：`ccm agent bind <id> --handle task-id:<agentId> --transcript <父session.jsonl>`
   //   → 此处派生子文件路径，存在即优先；尚未落盘（启动竞态）→ 回退父文件（子文件出现后
   //   path/ino 变化触发 client 轮转检测清窗重 tail，自愈到子代理流）。
-  if (input.harness === 'claude-code' && input.handleKind === 'task-id' && value && ref) {
+  // harness 含 origin：in-session subagent 的登记惯例是 type=subagent/harness=origin，
+  // 其转录布局跟随宿主 Claude Code——派生同样适用（existsSync 已兜住不存在的情形）。
+  if (
+    (input.harness === 'claude-code' || input.harness === 'origin') &&
+    input.handleKind === 'task-id' &&
+    value &&
+    ref
+  ) {
     const base = basename(ref);
     if (base.endsWith('.jsonl')) {
       const derived = join(
