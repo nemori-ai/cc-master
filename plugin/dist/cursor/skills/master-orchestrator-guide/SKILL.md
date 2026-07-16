@@ -212,9 +212,9 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 1. `ccm harness list` —— 确认 machine-wide inventory 与真实 execution surface。
 2. `ccm worker help` —— 读取目标 CLI 的真实 help。
-3. `ccm model-policy show`、`ccm provider facts` —— 先按 task role 读取三路统一的 hard facts / project role evidence / community advisory；candidate 不是 certified。
+3. `ccm model-policy show --task <task-taxonomy> --json`、`ccm provider facts` —— 先按 task role 读取三路统一的 hard facts / project role evidence / community advisory；candidate 不是 certified。
 4. `ccm usage show`、`ccm quota status` / `ccm quota preflight` —— 收集 selected target 的用量与 authority 证据；missing / stale / unknown 不补成 ample。
-5. `ccm model-policy advise` / `ccm route advise` —— 前者只在已 qualification 候选间执行有界排序，后者给 board shadow advice 且稳定返回 `spawned=false`；两者都不启动 worker。
+5. `ccm model-policy advise --input <json|@file|-> --json` / `ccm route advise` —— 前者只在调用方提供的已 qualification 候选间执行有界排序，后者给 board shadow advice 且稳定返回 `spawned=false`；两者都不启动 worker。不要臆造 `--role`、`--taxonomy`、`--require` 等 flag；语法不确定时先运行 `ccm model-policy <verb> --help`，再查 `using-ccm`。
 6. `ccm worker run` —— 选定后显式 dispatch。
 
 usage / quota 只提供各自当前能证明的证据：**当前没有按 target harness 统一查询剩余额度的通用命令**，任何 missing / stale / unavailable / unknown 都保持 unknown，不推断为 ample；持有 authority reference 时才做 quota preflight。

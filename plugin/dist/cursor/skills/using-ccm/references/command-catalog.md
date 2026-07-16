@@ -445,6 +445,8 @@ ccm model-policy advise --input <json|@file|-> [--as-of <UTC>] [--json]
 
 输出 `ccm/model-policy-advice/v1`，机械顺序固定为：effect floor 与 target 硬门 → 按 posture 加权基础分 → 只在基础分等价带内应用有上限且会衰减的 community tie-break。stale、mixed、unknown 或无 evidence refs 的 affinity 归零；hard deny 进入 `rejected[].reason_codes`。命令只排序输入，不现场 qualification、不选择 CLI flags、不 reserve、不 spawn、不写 board。
 
+`--role`、`--taxonomy`、`--require` 不是该命令的 flag；不要把资格条件临时拼成 CLI 参数。先构造上述 request schema，再通过 `--input` 提交；实时语法以 `ccm model-policy advise --help` 为准。
+
 ---
 
 ## namespace orchestrator（cached context）

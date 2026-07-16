@@ -61,7 +61,7 @@ test('every host adapter source exposes local and cross-harness dispatch as one 
   }
 });
 
-test('the hot path orders stable ccm actions while leaving command grammar to using-ccm', () => {
+test('the hot path orders stable ccm actions and exposes only the high-frequency model-policy grammar', () => {
   const guide = read(GUIDE_PATH);
   const hotPath = section(guide, '### Cross-harness 调派热路径', '### 4.0 决策程序');
 
@@ -85,7 +85,19 @@ test('the hot path orders stable ccm actions while leaving command grammar to us
   assert.match(hotPath, /没有[^\n]+target harness[^\n]+剩余额度/u);
   assert.match(hotPath, /unknown[^\n]+不推断/u);
   assert.match(hotPath, /using-ccm/u);
-  assert.doesNotMatch(hotPath, /--[a-z]|<[^>]+>/u);
+  for (const command of [
+    'ccm model-policy show --task <task-taxonomy> --json',
+    'ccm model-policy advise --input <json|@file|-> --json',
+    'ccm model-policy <verb> --help',
+  ]) assert.match(hotPath, new RegExp(command.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+  const commandTokensWithGrammar = [...hotPath.matchAll(/`(ccm[^`]*(?:--|<)[^`]*)`/gu)].map(
+    (match) => match[1],
+  );
+  assert.deepEqual(commandTokensWithGrammar, [
+    'ccm model-policy show --task <task-taxonomy> --json',
+    'ccm model-policy advise --input <json|@file|-> --json',
+    'ccm model-policy <verb> --help',
+  ]);
   assert.doesNotMatch(hotPath, /stdout_bytes|exit_code|automatic_spawn_limit/u);
 });
 

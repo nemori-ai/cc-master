@@ -34,6 +34,13 @@ test('canonical allocation is role-first and consumes the cross-provider ccm rea
     'workspace',
   ]) assert.match(allocation, new RegExp(failure, 'u'));
   assert.doesNotMatch(allocation, /\{\{MASTER_HOST_MODEL_ALLOCATION\}\}/u);
+
+  const guide = read('plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md');
+  assert.match(guide, /ccm model-policy show --task <task-taxonomy> --json/u);
+  assert.match(guide, /ccm model-policy advise --input <json\|@file\|-> --json/u);
+  for (const invented of ['--role', '--taxonomy', '--require']) {
+    assert.match(guide, new RegExp(`不要臆造[^\\n]*${invented}`, 'u'));
+  }
 });
 
 test('origin-local model slots are removed while origin runtime mechanisms remain adapted', () => {
@@ -58,6 +65,7 @@ test('using-ccm documents the model-policy read/advice commands and board role/f
     'ccm model-policy show --task <task-taxonomy>',
     'ccm model-policy advise --input <json|@file|->',
   ]) assert.match(catalog, new RegExp(command.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+  assert.match(catalog, /`--role`、`--taxonomy`、`--require` 不是该命令的 flag/u);
   assert.match(board, /quality\.effect_floor[\s\S]*`O \| T1 \| T2 \| T3`/u);
   assert.match(board, /chains\.ample[\s\S]*chains\.tight[\s\S]*effect floor/u);
   assert.match(board, /异族[\s\S]*review/u);
@@ -108,6 +116,24 @@ test('the registered pressure baseline preserves task to role to candidate to fa
     'workspace-mismatch',
   ]) assert.match(baseline, new RegExp(failure, 'u'));
   assert.match(baseline, /do not fall back to T1 and do not spawn/u);
+  for (const trace of [
+    '2026-07-16T11:08:30Z',
+    'Claude Code `2.1.211` / `claude-fable-5`',
+    '2026-07-16T11:10:20Z',
+    'Codex `0.144.4` / `gpt-5.6-sol`',
+    '2026-07-16T11:10:53Z',
+    'Cursor Agent `2026.07.09-a3815c0` / first-party `cursor-grok-4.5-high`',
+    '2026-07-16T11:22:42Z',
+    'ccm model-policy show --task architecture-design --json',
+    'owned_tree_survived',
+    'ANTHROPIC_API_KEY',
+    'OPENAI_API_KEY',
+    'CURSOR_API_KEY',
+  ]) assert.match(baseline, new RegExp(trace.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+  assert.match(baseline, /没有 API、BYOK、on-demand、第三方 Cursor model route 或自动账号切换/u);
+  assert.match(baseline, /--role`、`--taxonomy` 或 `--require` flag/u);
+  assert.match(baseline, /命令语法 RED 已关闭/u);
+  assert.match(baseline, /整体压力场景[。\s\S]*PARTIAL/u);
 
   const guide = read('plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md');
   assert.match(guide, /`spawned=false`/u);
