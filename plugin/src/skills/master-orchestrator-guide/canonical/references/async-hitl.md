@@ -159,7 +159,7 @@ watchdog 的 ceiling（间隔 / fire_at）是一个**「回来看一眼」的触
 
 ### 被唤醒后 —— recon 对地面真相，再退役 watchdog（两件一起做）
 
-watchdog fire 把你叫回来后：跑决策程序 recon，**逐个 `in_flight` 对地面真相**（① 是否带真实 handle；② `git status` / 工具结果 / 输出文件 mtime 里有无真实产物或活动；③ 三者皆空 = phantom，降级回 `ready` 重派；④ 有活动但仍在飞 = 健康长跑，延长重 arm、**不杀**——验证法见 `dispatch.md` §派发卫生）。处置完静默失败的、该 re-arm 的 re-arm（仍有可能静默失败的 in_flight 就再 arm 一个），然后继续决策程序。
+watchdog fire 把你叫回来后：跑决策程序 recon，先用 `ccm agent list` 重建 runtime roster，再对关联条目执行 `ccm agent show` / `ccm agent probe`，逐个核对 `in_flight` 的真实 handle、task link 与活性证据。`ccm agent show` 返回已存的 attach command 时，只执行那条自包含命令；没有独立的 attach verb 可凭记忆编造。再把 registry 证据与 `git status` / transcript / 工具结果 / 输出文件 mtime 对照：证据皆空 = phantom，降回 `ready` 重派；有活动但仍在飞 = 健康长跑，延长重 arm、**不杀**。agent terminal ≠ task done，父 task 仍须独立验收。处置完静默失败的、该 re-arm 的 re-arm（仍有可能静默失败的 in_flight 就再 arm 一个），然后继续决策程序。
 
 **退役 watchdog = 两件一起做，缺一不可**：当一个 watchdog 不再需要时（recon 完毕无可监视的 in_flight、或某 `in_flight` 已正常完成被 harness 先叫回），退役它要**同时**：
 

@@ -1,27 +1,29 @@
-# Pacing levers —— 单侧收紧 + 走廊上界
+# Pacing levers —— target-bound 单侧收紧
 
-> **何时读：** `ccm usage advise` 出了当前 host 的单侧 verdict 时，把 verdict、可用 lever 类与 reset 事实整理成决策输入；具体取舍与编排动作由 `master-orchestrator-guide` 决定。
+> **何时读：** machine-wide posture 或 selected-target `ccm usage advise` 给出压力时，把 verdict、窗口与
+> reset 事实整理成决策输入；具体取舍与编排动作由 `master-orchestrator-guide` 决定。本页不调 WIP、不换号、
+> 不派发 worker，也不创建 watchdog。
 
-**pacing 是单侧的（只在逼近上界时出声）。** 没有「欠用侧加速」；走廊内一律 `hold`（静默）。
+## 只在上界收紧
 
-## 7d 硬边界与 rolling-24h advisory
+pacing 没有“额度空闲所以自动加速”的欠用侧。`healthy` / `hold` 只表示当前已证明的承重窗口未触发收紧；
+它不覆盖模型准入、任务质量、权限或安全条件。`tight` / `throttle` 表示需要决策层评估减速；
+`exhausted` / `stop_*` 表示该 target 的承重窗口已进入硬边界。unknown 永远不等于 healthy。
 
-7d 是 Codex 唯一的百分比硬边界：`used%` 逼近当前 policy 的上界时产生 7d hard-gate 事实。rolling-24h 只把 7d 快照的近期 burn 与 `100 / 7` 日预算比较，产生 `throttle-risk` advisory；它不能改变 hard eligibility、fallback、reset 或 wakeup。
+按精确 target 解读：
 
-任何历史或意外 `five_hour` / 5h 输入只保留为 **ignored provenance**，不得触发 throttle、switch、stop_5h、reset 或 wakeup，也不得污染一份 fresh、complete、ample 的 7d 事实。若旧输出仍把 5h 当 pacing 维度，视为 stale schema，不把它交给决策层。
+- **Claude Code**：5h 与 7d 都承重；`switch_candidate` 只是一份账号池候选事实，不是换号授权。
+- **Codex**：只接受 7d hard gate；5h、`stop_5h`、`switch` 与 `switch_candidate` 不属于有效 Codex pacing
+  合同。Codex 自动换号永久禁止；rolling-24h 只作 burn-risk advisory。
+- **Cursor**：IDE 与 Agent 各自只接受自己的 billing-period posture；`stop_billing_period` 只约束对应
+  surface。Cursor 自动换号永久禁止，两条 surface 不互相兜底事实。
 
-## Codex 下没有换号 lever
+## 可交给决策层的影响向量
 
-Codex 自动换号永久禁止，`switch` / `switch_candidate` 不是 Codex pacing 合同的有效 lever。模型 / reasoning effort、WIP 与 high-float 是独立的 burn 影响向量；7d hard gate 不能靠账号池绕过。具体取舍与编排动作由 `master-orchestrator-guide` 决定。
+1. **模型 / effort**：在不跌破任务 effect floor 的前提下，较低成本候选可能降低 burn，也可能增加返工。
+2. **WIP**：同时消耗同一 quota scope 的叶子越多，窗口内 burn 通常越高。
+3. **high-float**：非临界、token 重的工作可以跨 reset 推迟；临界链不能只因额度紧张就静默降质。
 
-## burn 影响向量
-
-1. **模型 / effort** —— 从 model-tiers.md 读取相对 token 成本与能力边界；降档可能降低 burn，也可能提高返工风险。Fast mode 更快消耗 credits，**不是**省配额档。
-2. **WIP** —— 并发叶子越多，同一 7d 容量内的 burn 通常越高。
-3. **high-float** —— 非临界、token 重的工作可延后，不把 rolling-24h advisory 伪装成硬停指令。
-
-## 决策输入边界
-
-- **7d hard gate**：继续消耗已进入用户拥有的决定边界；具体取舍、编排动作与抗合理化归 `master-orchestrator-guide`。
-- **rolling-24h advisory**：只报告 velocity、coverage、confidence 与来源，不单独产生硬停、reset 或 wakeup。
-- 若决策层选择建立 watchdog，必须先创建真实 wakeup 并取得 handle，再用 `ccm watchdog arm ... --job-id <handle> --checklist <事项>` 写 canonical `watchdog.checklist`；没有真实 handle 就不能 arm。该事实不赋予 5h 或 rolling-24h 任何调度 authority。
+这些只是决策输入，不是动作。是否减 WIP、换候选、延后任务、停派、请求用户拍板或建立 watchdog，全部交回
+`master-orchestrator-guide`。若决策层选择 wakeup，必须先取得真实 scheduler / background handle，再通过
+`using-ccm` 记录；`nearest_reset` 本身不是 handle，也不授权自动续跑。

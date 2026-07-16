@@ -1,1 +1,0 @@
-- 行为：只对 Cursor 当前 `billing_period` policy 上界计算“触顶先于 reset”还是“reset 先于触顶”；返回 `ample | will-exhaust-before-reset | unknown`。信号缺失时 `available:false`、exit 0。

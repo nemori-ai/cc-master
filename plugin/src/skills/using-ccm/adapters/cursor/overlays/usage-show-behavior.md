@@ -1,1 +1,0 @@
-- 行为：只列当前 Cursor 登录态的 `billing_period` `used_percent` / `remaining_percent` / `resets_at`；缺 dashboard 信号时 `available:false`、exit 0。它不列可切备号。

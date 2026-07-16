@@ -37,13 +37,13 @@
       "rendered_runtime_manifest": {
         "schema": "cc-master.pacing-runtime-manifest.v1",
         "files": {
-          "SKILL.md": "7f24307b48356786164b8fc0e7ff3d30af63ef37ff6ce01fc94b2316f03c4e7f",
-          "references/cross-harness-target-facts.md": "da4ef617d412b27d4cc19c613aa06a015b67f80d211af566364889b9c2868771",
-          "references/estimation.md": "6aeae595718ab64c9b02e991c10d4cefb161e15ddc6f8bcdb1a62fa6968653f7",
+          "SKILL.md": "86f543abf198c6822860a29a27fe01500fecfdc531e47e48547a353b2a5d7112",
+          "references/cross-harness-target-facts.md": "80d39b2102620947b5ec8e8c58b9d29fd0a2849fe787795d76bbcc8b6821cc6d",
+          "references/estimation.md": "f51f7ddecf44779cbb5cc106b028166478f01f6569c6b4404a48aa87c7ea6e18",
           "references/model-tiers.md": "62ae8337a3b33c8b0958169de6f9de70121edc1fe7f1f041ce49697feb2a098f",
-          "references/pacing-levers.md": "7ce1627f9e0995fd4bd3d7bb5df08502a0c71898f3adf0a6b54e2721e6311213",
-          "references/pool-aware-advice.md": "d5e76a941cae6045f942143c3cd8b6f8d3efb11ba3304fb2a6302acb4c66bdf4",
-          "references/usage-signals.md": "3b6f415b4c37e30f3aa4ac2a43951d5ffea29cad6a4973e1c4843d988a668843"
+          "references/pacing-levers.md": "b82c03f5fdb7922d2d36c5681a1a49d72ff1488e164768d736fb11cee108f850",
+          "references/pool-aware-advice.md": "907e1946f8703ed5590fca146062c3e14f90dec25e2d1b584f8cacc9e5434503",
+          "references/usage-signals.md": "06f9c3c69c40c33a10877cd6d010a7cd38fe8da99a58c930a2fb3cdd015c6829"
         }
       }
     },
@@ -53,13 +53,13 @@
       "rendered_runtime_manifest": {
         "schema": "cc-master.pacing-runtime-manifest.v1",
         "files": {
-          "SKILL.md": "95385bd533e99f0d85cd7a81eb56d0315b5e4a5097de224ae9ebd04640e5ccc0",
-          "references/cross-harness-target-facts.md": "6d94a8b7723ea0d5ec99fcb8ffec859d4d836d349e41c52b80e8fe6c9039ed63",
-          "references/estimation.md": "6aeae595718ab64c9b02e991c10d4cefb161e15ddc6f8bcdb1a62fa6968653f7",
+          "SKILL.md": "8c993d03ed0b65521a170da679e4376feab25a053d26eb6618ef5fd7d4093419",
+          "references/cross-harness-target-facts.md": "8ed21b268074edcff2bf7fb1ee28f6dff87b769f60dadb8f6e3f3e1b8e3b6e0d",
+          "references/estimation.md": "f51f7ddecf44779cbb5cc106b028166478f01f6569c6b4404a48aa87c7ea6e18",
           "references/model-tiers.md": "62ae8337a3b33c8b0958169de6f9de70121edc1fe7f1f041ce49697feb2a098f",
-          "references/pacing-levers.md": "13ddf4b0767e5f16983ceb2d88a13be049f13a6825ee253997f68c53252c60c0",
-          "references/pool-aware-advice.md": "d5e76a941cae6045f942143c3cd8b6f8d3efb11ba3304fb2a6302acb4c66bdf4",
-          "references/usage-signals.md": "701a0c6a4c993fc4188b07ee1c88ca13290c96b0a705b403bda2efa6e18779f8"
+          "references/pacing-levers.md": "b82c03f5fdb7922d2d36c5681a1a49d72ff1488e164768d736fb11cee108f850",
+          "references/pool-aware-advice.md": "907e1946f8703ed5590fca146062c3e14f90dec25e2d1b584f8cacc9e5434503",
+          "references/usage-signals.md": "06f9c3c69c40c33a10877cd6d010a7cd38fe8da99a58c930a2fb3cdd015c6829"
         }
       }
     },
@@ -69,13 +69,13 @@
       "rendered_runtime_manifest": {
         "schema": "cc-master.pacing-runtime-manifest.v1",
         "files": {
-          "SKILL.md": "d6a511f230c5654a8766824e8b7dd0fbe13ead4d592ed83c46195010b1634206",
-          "references/cross-harness-target-facts.md": "6d94a8b7723ea0d5ec99fcb8ffec859d4d836d349e41c52b80e8fe6c9039ed63",
-          "references/estimation.md": "6aeae595718ab64c9b02e991c10d4cefb161e15ddc6f8bcdb1a62fa6968653f7",
+          "SKILL.md": "3448428a8bd9cdf9511715cfa2693970ba2fcc62c08a83ca71fa7884b056ced0",
+          "references/cross-harness-target-facts.md": "8ed21b268074edcff2bf7fb1ee28f6dff87b769f60dadb8f6e3f3e1b8e3b6e0d",
+          "references/estimation.md": "f51f7ddecf44779cbb5cc106b028166478f01f6569c6b4404a48aa87c7ea6e18",
           "references/model-tiers.md": "62ae8337a3b33c8b0958169de6f9de70121edc1fe7f1f041ce49697feb2a098f",
-          "references/pacing-levers.md": "798782f575812588ae5697c4eb37a7201c956e15cb10c9c96067dc18e45df2bc",
-          "references/pool-aware-advice.md": "d5e76a941cae6045f942143c3cd8b6f8d3efb11ba3304fb2a6302acb4c66bdf4",
-          "references/usage-signals.md": "d64b9ea4f4e2347a816f6ac6bf2b9ab2f5277f02e785e8dee01c76042b4fe04b"
+          "references/pacing-levers.md": "b82c03f5fdb7922d2d36c5681a1a49d72ff1488e164768d736fb11cee108f850",
+          "references/pool-aware-advice.md": "907e1946f8703ed5590fca146062c3e14f90dec25e2d1b584f8cacc9e5434503",
+          "references/usage-signals.md": "06f9c3c69c40c33a10877cd6d010a7cd38fe8da99a58c930a2fb3cdd015c6829"
         }
       }
     }

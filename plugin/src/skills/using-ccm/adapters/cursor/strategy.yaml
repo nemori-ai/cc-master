@@ -43,8 +43,6 @@ slot_replacements:
   "{{USING_CCM_WATCHDOG_ARM_EXAMPLE}}": adapters/cursor/overlays/watchdog-arm-example.md
   "{{USING_CCM_SESSION_ID_FLAG}}": adapters/cursor/overlays/session-id-flag.md
   "{{USING_CCM_BOARD_ARCHIVE_BEHAVIOR}}": adapters/cursor/overlays/board-archive-behavior.md
-  "{{USING_CCM_USAGE_SIGNAL_SOURCE}}": adapters/cursor/overlays/usage-signal-source.md
-  "{{USING_CCM_USAGE_BURN_RATE_BEHAVIOR}}": adapters/cursor/overlays/usage-burn-rate-behavior.md
   "{{USING_CCM_ACCOUNT_NAMESPACE}}": adapters/cursor/overlays/account-namespace.md
   "{{USING_CCM_STATUSLINE_NAMESPACE}}": adapters/cursor/overlays/statusline-namespace.md
   "{{USING_CCM_STATUSLINE_NAMESPACE_ROW}}": adapters/cursor/overlays/statusline-namespace-row.md
@@ -57,14 +55,6 @@ slot_replacements:
   "{{USING_CCM_JC_HOOK_GUIDANCE}}": adapters/cursor/overlays/jc-hook-guidance.md
   "{{USING_CCM_WATCHDOG_JOB_ID_GUIDANCE}}": adapters/cursor/overlays/watchdog-job-id-guidance.md
   "{{USING_CCM_WAKEUP_SELF_HEAL_GUIDANCE}}": adapters/cursor/overlays/wakeup-self-heal-guidance.md
-  "{{USING_CCM_USAGE_NAMESPACE_ROW}}": adapters/cursor/overlays/usage-namespace-row.md
-  "{{USING_CCM_USAGE_OVERVIEW}}": adapters/cursor/overlays/usage-overview.md
-  "{{USING_CCM_USAGE_SHOW_BEHAVIOR}}": adapters/cursor/overlays/usage-show-behavior.md
-  "{{USING_CCM_USAGE_SHOW_SCOPE_FLAGS}}": adapters/cursor/overlays/usage-show-scope-flags.md
-  "{{USING_CCM_USAGE_ADVISE_BEHAVIOR}}": adapters/cursor/overlays/usage-advise-behavior.md
-  "{{USING_CCM_USAGE_ADVISE_SCOPE_FLAG}}": adapters/cursor/overlays/usage-advise-scope-flag.md
-  "{{USING_CCM_USAGE_RUNWAY_BEHAVIOR}}": adapters/cursor/overlays/usage-runway-behavior.md
-  "{{USING_CCM_USAGE_ADVISE_EXAMPLE}}": adapters/cursor/overlays/usage-advise-example.md
   "{{USING_CCM_EXIT_CODES}}": adapters/cursor/overlays/exit-codes.md
   "{{USING_CCM_POLICY_NAMESPACE_ROW}}": adapters/cursor/overlays/policy-namespace-row.md
   "{{USING_CCM_POLICY_DENY_EXIT_ROW}}": adapters/cursor/overlays/policy-deny-exit-row.md
@@ -73,9 +63,6 @@ slot_replacements:
   "{{USING_CCM_BOARD_POLICY_GUIDANCE}}": adapters/cursor/overlays/board-policy-guidance.md
   "{{USING_CCM_FMT_POLICY_ROW}}": adapters/cursor/overlays/fmt-policy-row.md
   "{{USING_CCM_COORDINATION_QUOTA_MODEL_EXAMPLE}}": adapters/cursor/overlays/coordination-quota-model-example.md
-  "{{USING_CCM_USAGE_SHOW_JSON_EXAMPLE}}": adapters/cursor/overlays/usage-show-json-example.md
-  "{{USING_CCM_USAGE_BURN_RATE_JSON_EXAMPLE}}": adapters/cursor/overlays/usage-burn-rate-json-example.md
-  "{{USING_CCM_USAGE_RUNWAY_JSON_EXAMPLE}}": adapters/cursor/overlays/usage-runway-json-example.md
   "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/cursor/overlays/cross-harness-target-facts-pointer.md
 host_slots:
   "{{USING_CCM_EXECUTOR_TABLE_ROWS}}":

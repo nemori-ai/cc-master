@@ -120,8 +120,9 @@ test('command catalog gives an honest discovery-to-raw-dispatch hot path', () =>
     'ccm harness list --machine-wide --json',
     'ccm worker help --harness <codex|claude-code|cursor-agent> --scope agent',
     'ccm provider facts <target-provider> --json',
-    'ccm --harness <claude-code|codex|cursor> usage show --accounts current --json',
-    'ccm quota status --json',
+    'ccm quota status --machine-wide --json',
+    'ccm --harness <claude-code|codex|cursor-agent> usage show --accounts current --json',
+    'ccm --harness <claude-code|codex|cursor-agent> usage advise --json',
     'ccm quota preflight --input <json|@file|-> --json',
     'ccm route advise <task-id>',
     'ccm worker run --harness <codex|claude-code|cursor-agent>',
@@ -129,7 +130,7 @@ test('command catalog gives an honest discovery-to-raw-dispatch hot path', () =>
     assert.ok(hotPath.includes(command), command);
   }
   assert.match(hotPath, /route advise[\s\S]*spawned:false[\s\S]*不 reserve[\s\S]*不写 board/iu);
-  assert.match(hotPath, /不存在[\s\S]*通用 `ccm quota \.\.\. --harness <X>`[\s\S]*unknown/iu);
+  assert.match(hotPath, /quota status --machine-wide[\s\S]*本机缓存[\s\S]*不调用 provider[\s\S]*unknown/iu);
   assert.match(hotPath, /quota preflight[\s\S]*只重验已有 authority evidence[\s\S]*不会现场查询/u);
   assert.match(hotPath, /worker run[\s\S]*origin harness[\s\S]*后台[\s\S]*handle/iu);
   assert.match(hotPath, /不会返回 running handle[\s\S]*ccm\/worker-process-result\/v1[\s\S]*不是 running handle/iu);
@@ -163,7 +164,7 @@ test('all three rendered host skills carry the same board routing contract after
     assert.match(catalog, /### task route-bind/u, host);
     assert.match(catalog, /ccm harness list --machine-wide --json/u, host);
     assert.match(catalog, /route advise[\s\S]*spawned:false/iu, host);
-    assert.match(catalog, /不存在[\s\S]*通用 `ccm quota \.\.\. --harness <X>`/iu, host);
+    assert.match(catalog, /quota status --machine-wide[\s\S]*本机缓存/iu, host);
     assert.match(catalog, /后台 handle 来自 origin harness/u, host);
     assertCurrentBoundary(guide, `${host} boundary`);
   }

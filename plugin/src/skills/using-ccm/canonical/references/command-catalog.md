@@ -25,6 +25,7 @@
   - [route advise](#route-advise)
 - [namespace quota（live admission authority）](#namespace-quotalive-admission-authority)
   - [quota status](#quota-status)
+  - [quota refresh](#quota-refresh)
   - [quota preflight](#quota-preflight)
   - [quota reserve](#quota-reserve)
   - [quota audit](#quota-audit)
@@ -215,7 +216,7 @@ ccm <alias> [args] [flags]
 | `agent` | Agent Registry：board ✎ `agents[]` 运行时 agent 登记簿——登记 / 交 handle 证据 / 关联 task / 收口 / 活性探测 / 只读花名册；**登记 / 探测 / 读取 noun，无任何 spawn/route/dispatch 语义**（dispatch 归 `worker`） |
 | `peers` | 多 orchestrator 协调**感知层**：跨板只读花名册（全体活+心跳新鲜 orchestrator 的 goal/workload/priority/liveness） |
 | `coordination` | 多 orchestrator 协调**入站通知面**：读/消费 `coordination.inbox`，低层 append 通知，运行 deterministic pool arbiter |
-{{USING_CCM_USAGE_NAMESPACE_ROW}}
+| `usage` | selected-target 配额只读 advisory：统一 current window、verdict、burn/runway 与 task token 成本；全机发现先用 `quota status --machine-wide` |
 | `status-report` | 生成式 board 状态报告：`ccm/status-report/v1` JSON / artifact；只读 board，artifact 写 `<home>/reports/status-report/` |
 | `web-viewer` | 本地只读 board web viewer lifecycle：open/start/status/stop/restart；home-scoped service，127.0.0.1 + token |
 | `monitor` | 可选本地 monitor daemon：连续扫 harness usage / active boards，复用 pool arbiter 边沿写 `coordination.inbox` |
@@ -310,8 +311,9 @@ ccm harness list --machine-wide --json
 ccm worker help --harness <codex|claude-code|cursor-agent> --scope agent
 ccm provider facts <target-provider> --json
 ccm model-policy show --task <task-taxonomy> --json
-ccm --harness <claude-code|codex|cursor> usage show --accounts current --json
-ccm quota status --json
+ccm quota status --machine-wide --json
+ccm --harness <claude-code|codex|cursor-agent> usage show --accounts current --json
+ccm --harness <claude-code|codex|cursor-agent> usage advise --json
 ccm quota preflight --input <json|@file|-> --json
 ```
 
@@ -321,8 +323,9 @@ ccm quota preflight --input <json|@file|-> --json
 - `provider facts` 的 `<target-provider>` 当前取 `claude-code | codex | cursor`。它返回静态、带来源与
   freshness 的模型事实，不执行 live provider probe，也不证明当前账号 entitlement 或 exact-model admission。
 - `model-policy show` 为三个 origin 返回同一份 `hard_facts / project_role_evidence / community_advisory` 分层 read model。它给出 task 的 `O / T1 / T2 / T3` effect floor 与候选，但 `candidate` 不等于 certified / admitted；社区 affinity 也绝不产生准入。
-- `ccm --harness <target> usage show --accounts current` 只读取该 adapter 当前登录账号已经实现的 usage source；它是 advisory，不是 automatic admission。`available:false`、窗口缺失或字段 unknown 必须原样保留，不能从 binary/auth/model facts、进程 RC0 或同品牌另一 surface 推出 ample。
-- `quota status` 只回答 home-scoped owner-only quota observation/reservation store 是否存在；`available:true` **不等于**某个 harness 有 ample headroom，`available:false` 也必须保留为 unknown。当前不存在一个把 harness id 当查询 key、统一返回各 harness 剩余额度的通用 `ccm quota ... --harness <X>` 读面；全局 harness selection 即使出现在进程上下文里，也不改变 `quota status` 的 store-availability 语义。
+- `quota status --machine-wide` 是一次读取所有受支持 target scope 的**本机缓存投影**：JSON 根是 `ccm/machine-quota-status/v1`，`summary.decisions[]` 给 target-bound posture，`readings[]` 给可得的百分比与 reset 事实。它不调用 provider collector；unknown / stale / missing 必须原样保留。Codex target 只有 `codex-cli + seven_day`；Cursor 的 `cursor-ide-plugin` 与 `cursor-agent-cli` 是两个独立 target，不能互补。
+- `ccm --harness <target> usage show|advise` 是选定 target 后的下钻 read；`show` 返回统一的 `current.{five_hour,seven_day,billing_period}` 形状，`advise` 返回单侧 verdict。它是 advisory，不是 automatic admission。`available:false`、窗口缺失或字段 unknown 必须原样保留，不能从 binary/auth/model facts、进程 RC0 或同品牌另一 surface 推出 ample。
+- 不带 `--machine-wide` 的 `quota status` 仍只回答 home-scoped owner-only quota observation/reservation store 是否存在；其中 `available:true` **不等于**某个 harness 有 ample headroom。
 - 只有已经持有 authority flow 给出的 `source_key`、committed `reservation_id` 与 `checked_at` 时，才把
   它们作为 `quota preflight` 输入。必须读取其 `decision`、`automatic_spawn_limit`、
   `blocking_reasons` 与 owner receipt；缺 authority reference、`automatic_spawn_limit:0` 或任一 blocker 都
@@ -502,11 +505,29 @@ observation 作 hard gate。rolling 24h 只给风险 advisory，不把 ample 硬
 ### quota status
 
 ```bash
-ccm quota status [--home <dir>] [--json]
+ccm quota status [--machine-wide] [--home <dir>] [--json]
 ```
 
-读取 owner-only quota store。空 store 也 exit 0，并诚实返回
-`{schema:"ccm/quota-status/v1",available:false}`；missing 绝不折算成 ample。本命令不是 per-harness remaining-quota reader：当前没有通用 `ccm quota ... --harness <X>` 读面，`available:true` 也只证明 store 可读。
+不带 `--machine-wide` 时读取 owner-only quota store。空 store 也 exit 0，并在通用成功信封的 `data` 中诚实返回
+`{schema:"ccm/quota-status/v1",available:false}`；missing 绝不折算成 ample，`available:true` 也只证明 store 可读。
+
+带 `--machine-wide` 时读取所有受支持 target scope 的本机**缓存**投影，exit 0，并直接返回根 schema
+`ccm/machine-quota-status/v1`（不套通用 `{ok,data}` 信封）。本命令不调用 provider collector；用
+`summary.decisions[]` 的精确 `target.harness_id + target.surface_id + target.window` 绑定候选。`state`、
+`freshness`、`reason_codes[]` 与 `fanout_covered` 都是承重事实；unknown / stale / missing 不能解释为 ample。
+Codex 只投影 `codex-cli + seven_day`；Cursor 分别投影 `cursor-ide-plugin + billing_period` 与
+`cursor-agent-cli + billing_period`，任一 surface 的信号不能补齐另一条。
+
+### quota refresh
+
+```bash
+ccm quota refresh --machine-wide [--home <dir>] [--json]
+```
+
+这是显式的 machine-wide **live producer**：刷新所有受支持 target、发布本机投影并把 posture edge fan-out
+给已订阅 session；缺 `--machine-wide` 是用法错误。它会调用 provider collector 并写本机 quota / notification
+状态，因而不属于普通只读巡检热路径。默认先用 `quota status --machine-wide` 读缓存；只有调用方明确需要刷新、
+接受其 provider 与写入副作用时才运行本命令。JSON 根是 `ccm/machine-quota-refresh/v1`，同样不套通用信封。
 
 ### quota preflight
 
@@ -1991,9 +2012,15 @@ ccm coordination arbitrate [flags]
 
 ## namespace usage（只读 advisory）
 
-{{USING_CCM_USAGE_OVERVIEW}}
+`usage` 用全局 `--harness <target>` 下钻一个 selected target 的当前登录态；它不是 machine-wide inventory。
+要一次看本机所有受支持 quota target，先用 `quota status --machine-wide`。全部 usage verb 纯 query / compute，
+不写 board、不切账号、不调 WIP、不启动 worker；信号不可得时 exit 0 + `available:false`。输出携带 source、
+confidence、as-of / freshness 等诚实字段，编排动作归 `master-orchestrator-guide`。
 
-{{USING_CCM_USAGE_SIGNAL_SOURCE}}
+> 信号按 target 绑定：Claude Code `claude-cli` 读当前 5h + 7d；Codex `codex-cli` 只把当前 7d 作为
+> hard pacing（实现若仍暴露 5h，只留作 ignored provenance）；Cursor `cursor-ide-plugin` 与
+> `cursor-agent-cli` 各读自己的 current-login `billing_period`，不能互补。Claude 的账号 registry snapshot
+> 只是历史弱信号；Codex / Cursor 自动换号永久禁止。任一 source 缺失都保持 `available:false`。
 
 ### usage show
 
@@ -2004,12 +2031,16 @@ ccm usage show [flags]
 ```
 
 - positional：无
-{{USING_CCM_USAGE_SHOW_BEHAVIOR}}
+- 行为：读取 `--harness` 选中的 target 当前登录态；顶层 `available` 只回答当前 signal 是否可用，缺信号时
+  `available:false`、exit 0。统一窗口形状在 `current.five_hour`、`current.seven_day`、
+  `current.billing_period`；不适用或不可得的窗口为 `null`。`accounts[]` 是本机 registry snapshot，不把
+  `available` 点亮，也不能替代 target-local quota。
 - flags：
 
 | flag | 短名 | 类型 | 取值 | 含义 |
 |---|---|---|---|---|
-{{USING_CCM_USAGE_SHOW_SCOPE_FLAGS}}
+| `--accounts <v>` | | enum | `all`（默认）\| `current` | 列全部 registry snapshot 或只列当前号 |
+| `--effective-n <n>` | | string | 正整数 | 覆写 advisory 的有效配额份数；不改变 provider 登录态，也不授权换号 |
 | `--json` | | bool | | 结构化输出 |
 
 - 例：`ccm usage show` · `ccm usage show --accounts current --json`
@@ -2023,12 +2054,15 @@ ccm usage advise [flags]
 ```
 
 - positional：无
-{{USING_CCM_USAGE_ADVISE_BEHAVIOR}}
+- 行为：读取 `--harness` 选中的 target current signal，返回单侧 `verdict`、`strength`、`levers[]`、
+  `nearest_reset`、各窗口百分比与 `available`。缺信号时 `hold + available:false`。这是 advisory，不执行
+  WIP、模型、账号或 dispatch 动作；Codex 只把 7d 当 hard pacing 维度，任何 5h 字段只作 ignored
+  provenance；Codex 与 Cursor 都禁止自动换号。Cursor 的 IDE / Agent quota 仍须在 machine-wide target 中分开绑定。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
 |---|---|---|---|
-{{USING_CCM_USAGE_ADVISE_SCOPE_FLAG}}
+| `--effective-n <n>` | | string | 覆写 advisory 的有效配额份数；不改变 provider 登录态，也不授权换号 |
 | `--json` | | bool | 结构化输出 |
 
 - 例：`ccm usage advise` · `ccm usage advise --effective-n 3 --json`
@@ -2062,7 +2096,10 @@ ccm usage burn-rate [flags]
 ```
 
 - positional：无
-- 行为：{{USING_CCM_USAGE_BURN_RATE_BEHAVIOR}}
+- 行为：当前实现只投影 `five_hour` 与 `seven_day` 的窗口已逝 burn（`used% / elapsed-hours`）；信号不可得
+  时相应窗口为 null / low confidence，全部缺失则 `available:false`、exit 0。Codex 只消费 `seven_day`，
+  任何 5h 结果必须忽略。**当前实现尚未投影 `billing_period` burn-rate**，因此 Cursor target 会诚实降级，
+  不得用空的 5h / 7d 结果伪造账期 burn。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
@@ -2081,7 +2118,9 @@ ccm usage runway [flags]
 ```
 
 - positional：无
-{{USING_CCM_USAGE_RUNWAY_BEHAVIOR}}
+- 行为：复用 burn-rate，只对 `five_hour`（90% corridor）与 `seven_day`（85% corridor）计算
+  `ample | will-exhaust-before-reset | unknown`。Codex 只消费 `seven_day`。**当前实现尚未投影
+  `billing_period` runway**，Cursor target 返回 unavailable / unknown；不要把它解释成 ample。
 - flags：
 
 | flag | 短名 | 类型 | 含义 |
@@ -2794,7 +2833,39 @@ ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
 
 ### quota status / preflight / reserve / audit
 
-- `quota status` 的 `data` 至少含 `{schema:"ccm/quota-status/v1",available:boolean}`。
+- 普通 `quota status` 的 `data` 至少含 `{schema:"ccm/quota-status/v1",available:boolean}`。
+- `quota status --machine-wide` 是通用信封的明确例外：JSON 根为
+  `{schema:"ccm/machine-quota-status/v1",summary:{schema:"ccm/machine-quota-summary/v1",decisions:[...]},readings:[...],capacity_views:{schema,known_capacities,unresolved_scope_digests,unresolved_capacity_units}}`。
+  `decisions[]` 至少含 `scope_digest`、`target.{harness_id,surface_id,provider_id,window}`、
+  `quota_scope_digest`、`state`、`freshness`、`reason_codes[]`、`source`、`decision_revision`、
+  `observation_revision`、`fanout_covered`；`readings[]` 至少含 target、`used_percentage`、`resets_at`、
+  `observed_at`、`valid_until` 与 `source`。unknown target 仍保留，通常表现为
+  `state:"unknown"`、`freshness:"unknown"`、`reason_codes:["QUOTA_SIGNAL_UNKNOWN"]` 与空 reading，而非 ample。
+
+  `capacity_views` 的精确对象形状：
+
+  ```json
+  {
+    "schema": "ccm/machine-quota-capacity-views/v1",
+    "known_capacities": [
+      {
+        "quota_scope_digest": "sha256:collector-proven-pool",
+        "capacity_units": 1,
+        "scope_digests": ["sha256:surface-a", "sha256:surface-b"]
+      }
+    ],
+    "unresolved_scope_digests": ["sha256:surface-c"],
+    "unresolved_capacity_units": null
+  }
+  ```
+
+  `known_capacities[]` 只把 collector 证明拥有相同非空 `quota_scope_digest` 的 scopes 折成一个
+  `capacity_units:1`；缺 correlation evidence 的 scope 留在 `unresolved_scope_digests[]`，且
+  `unresolved_capacity_units` 必须为 `null`，不得假设它们是可相加的独立容量。完整 CLI status 始终返回这个对象；
+  收窄的 hook / session 注入边界可以省略 `capacity_views`，该省略既不改变 CLI 合同，也不证明任何独立容量，
+  需要容量视图时重新查询 `ccm quota status --machine-wide --json`。
+- `quota refresh --machine-wide` 也不套通用信封；JSON 根为 `ccm/machine-quota-refresh/v1`，描述 scopes、
+  deltas、deliveries、fan-out 与 checkpoint 结果。
 - `quota preflight` 的 `data` 是从 authority store 重验后得到的 mechanical decision；caller 结论不进入
   authority。承重 gate 不成立时显式含 `automatic_spawn_limit:0` 与 `blocking_reasons[]`。
 - `quota reserve` 的成功 `data` 含 `action:"created"`、`reservation_id`、store-derived `request_hash`、`event_ref`、
@@ -3147,11 +3218,42 @@ wakeup，再带 `--job-id <handle>` 重新 arm。legacy `wakeup` 对象也按同
 }
 ```
 
-{{USING_CCM_USAGE_SHOW_JSON_EXAMPLE}}
+### usage show（`ccm --harness <target> usage show --json`）
+
+```jsonc
+{ "ok": true, "data": {
+  "available": true, "accounts_scope": "current", "effective_n": 1,
+  "current": {
+    "source": "<adapter-source>", "available": true,
+    "five_hour": null,
+    "seven_day": { "used_percentage": 18, "resets_at": 1784505600 },
+    "billing_period": null, "captured_at": 1784200000
+  },
+  "accounts": [], "registry_present": false,
+  "as_of": "2026-07-16T11:06:40Z", "source": "<adapter-source>", "confidence": "high"
+} }
+```
+
+三个窗口键始终位于 `data.current`；不适用 / 不可得为 `null`。Codex 即使 source 暂时暴露
+`five_hour`，决策层也必须忽略它，只用 7d；Cursor 使用 `current.billing_period.used_percentage`，不存在
+`used_percent` / `remaining_percent` 顶层合同。`accounts[]` 只记录 registry snapshot。
 
 ### usage advise（`ccm usage advise --json`）
 
-{{USING_CCM_USAGE_ADVISE_EXAMPLE}}
+```jsonc
+{ "ok": true, "data": {
+  "verdict": "hold", "reason": "...", "levers": [], "strength": "weak",
+  "stop_dimension": null, "nearest_reset": null,
+  "window_5h_pct": null, "window_7d_pct": 18, "window_billing_period_pct": null,
+  "billing_period_resets_at": null, "effective_n": 1, "switch_candidate": null,
+  "confidence": "high", "source": "<adapter-source>",
+  "as_of": "2026-07-16T11:06:40Z", "available": true
+} }
+```
+
+`available:false` 时保持 `verdict:"hold"` 与低置信来源，不能解释成 ample。Claude Code 可能产生
+`switch` / `stop_5h` / `stop_7d`；Codex 的有效 hard pacing 只包含 7d，Cursor 的有效 hard pacing 只包含
+各自 target 的 billing period。任何 `switch_candidate` 都只是候选事实；Codex 与 Cursor 不得自动换号。
 
 ### usage task-cost（`ccm usage task-cost [<id>] --json`）
 
@@ -3176,9 +3278,40 @@ wakeup，再带 `--job-id <handle>` 重新 arm。legacy `wakeup` 对象也按同
 
 `--scope`（默认 `this-board`）切语料范围：`this-board` 读本板全 tasks 的 observability（含非 done → 标 N/A）；`home` / `this-repo` 跨板聚归档 done 任务的 token（`this-repo` 过滤同 repo）。回显 `scope`。
 
-{{USING_CCM_USAGE_BURN_RATE_JSON_EXAMPLE}}
+### usage burn-rate（`ccm --harness <target> usage burn-rate --json`）
 
-{{USING_CCM_USAGE_RUNWAY_JSON_EXAMPLE}}
+```jsonc
+{ "ok": true, "data": {
+  "available": true,
+  "five_hour": { "used_pct": 42, "resets_at": 1784217600,
+    "burn_pct_per_hour": 8.4, "method": "window-elapsed", "confidence": "medium",
+    "source": "<adapter-source>", "unavailable_reason": null, "harness": "<label>" },
+  "seven_day": { "used_pct": 50, "resets_at": 1784764800,
+    "burn_pct_per_hour": 3.1, "method": "window-elapsed", "confidence": "medium",
+    "source": "<adapter-source>", "unavailable_reason": null, "harness": "<label>" },
+  "source": "<adapter-source>", "as_of": "2026-07-16T11:06:40Z", "confidence": "medium"
+} }
+```
+
+Codex 只读 `seven_day`；Cursor billing-period 尚未进入该输出，故会返回 `available:false`，不能据此声称账期 ample。
+
+### usage runway（`ccm --harness <target> usage runway --json`）
+
+```jsonc
+{ "ok": true, "data": {
+  "available": true,
+  "five_hour": { "used_pct": 42, "burn_pct_per_hour": 8.4,
+    "remaining_corridor_pct": 48, "hours_to_ceiling": 5.71, "hours_to_reset": 4,
+    "verdict": "will-exhaust-before-reset", "ceiling_pct": 90 },
+  "seven_day": { "used_pct": 50, "burn_pct_per_hour": 3.1,
+    "remaining_corridor_pct": 35, "hours_to_ceiling": 11.29, "hours_to_reset": 120,
+    "verdict": "will-exhaust-before-reset", "ceiling_pct": 85 },
+  "source": "<adapter-source>", "as_of": "2026-07-16T11:06:40Z", "confidence": "medium"
+} }
+```
+
+窗口不可得时对应 verdict 为 `unknown`；全部不可得时 `available:false`。Codex 忽略 5h；Cursor billing-period
+尚未进入该输出，不能用 `unknown` 反推 ample。
 
 ### estimate show（`ccm estimate show [<id>] --json`）
 

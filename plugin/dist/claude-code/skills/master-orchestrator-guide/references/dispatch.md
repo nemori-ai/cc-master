@@ -132,11 +132,17 @@ ccm 当成 model / effort 的 provider adapter。若选择需要 machine/model/q
 [pacing-and-estimation 目标事实口径](${CLAUDE_PLUGIN_ROOT}/skills/pacing-and-estimation/references/cross-harness-target-facts.md) 读取 selected target 的只读解释；这些事实服务选择，不改变显式
 raw wrapper 的命令合同。
 
-只从 `using-ccm` 的 command catalog 读取 worker 的唯一操作合同；不要在决策层复述 exact syntax。
-`ccm` 的 terminal 只是 child process terminal，不是任务验收。真实后台 accountable handle 返回后，才把
-节点置为 `in_flight`；process terminal 返回后，parent 仍须独立验收 artifact、diff、tests 与 acceptance，
-不满足就不能标 `done`。当前最小闭环不承诺自动路由、fallback、safe eligibility、跨 session durability
-或 daemon 接管，也不能把这些未来能力说成已经交付。
+只从 `using-ccm` 的 command catalog 读取 worker 与 Agent Registry 的唯一操作合同；不要在决策层复述
+exact flags。task / agent / attempt 是三层：task 是规划 / 交付单元，agent 是运行时行动者，attempt 是一次
+执行证据；它们可以关联，不能合并成同一个状态。
+
+派发时可以先 `ccm agent create` 登记 `starting`，再启动真实 worker；后台机制返回真实 handle 后依次
+`ccm agent bind`、`ccm agent link`，最后才让普通 lifecycle 的 task 经 `ccm task start` 进入 `in_flight`。
+没有真实 accountable handle，task 就不进入 `in_flight`；spawn 失败用 `ccm agent terminal` 收掉 `starting` 登记。native
+attempt 活跃时由它的专属 writer 维护等价 projection，不用 generic task verb 绕过。`ccm` 的 terminal
+只是 child process terminal，agent terminal ≠ task done；parent 仍须独立验收 artifact、diff、tests 与
+acceptance，不满足就不能标 `done`。当前最小闭环不承诺自动路由、fallback、safe eligibility 或 daemon
+接管，也不能把这些未来能力说成已经交付。
 
 ---
 
@@ -177,7 +183,7 @@ HITL 只是诸多轴之一；失败隔离、优先级、整合时机同样重要
 
 ## 派发卫生 —— 一跑真并行就咬人的机械细节
 
-- **派发先于 board 标注，handle 是 `in_flight` 的唯一入场券。** board 标注与真实派发是**两个独立动作**：`Write` board 把一个 task 标 `in_flight` 只是改了**模型**，真正派出 worker 的是那次 `Agent` / `Bash` 工具调用。两者一旦顺序颠倒（先标板、再去发调用），就极易在多线程编排里漏掉那次调用——尤其当一个 sibling 的完成通知插进本拍、把你引去验收它时，那次未发的 dispatch 就这样蒸发了。**纪律**：先调工具拿 handle（agentId / shell handle）、再 `Write` board 标 `in_flight`（`subagent`/`workflow` executor 的 handle 写进该 task 当 worker 实证）。没有 handle 的 `in_flight` 是**幽灵任务（phantom）**——board 与自报都「显示在跑」、背后却没有活 worker，你在空等一个不存在的进程并据此**虚构进度**。**为什么软纪律不够**：这条教训即便写进 board log，也会在同一场编排的压力下**再次**复发——一次性 log 拦不住它，故它升进了魂的决策程序（dispatch / recon 节点）作常驻护栏。**地面真相验证法**（recon 时逐个对账每个 `in_flight`）：① 该 task 是否带一个真实 handle（agentId / shell handle）；② `git status` / 工具结果里是否有它的真实产物或 transcript；③ 三者皆空 = phantom，立即降级回 `ready` 重派——别信 board 的字面、别信自报，只信 git 与工具结果这层地面真相。
+- **注册先于 task 起跑，handle 是 `in_flight` 的唯一入场券。** `agent create` 只是建立 `starting` runtime 记录，可以先于 spawn；它不证明 worker 已经运行。真正派出 worker 后，先把返回的真实 handle bind 到 agent、link 到 task，再经 `ccm` 生命周期 verb 让普通 task 进入 `in_flight`。没有 handle 或 link 的 `in_flight` 是**幽灵任务（phantom）**。recon 时先 `ccm agent list` 重建 roster，再对关联条目做 `ccm agent show` / `ccm agent probe`，核对 handle、task link、liveness 与 git / transcript / 工具产物；三者皆空就按 phantom 处置。若 `ccm agent show` 返回已存的 attach command，只执行那条自包含命令；不要凭记忆编造新的 attach 操作。agent terminal 仍只是 runtime 事实，父 task 必须独立验收。
 - **用绝对路径指向工作目标——绝不靠继承 cwd。** 你的 cwd 常常*不是*工作落地的那个 repo（你可能在从另一个 worktree 或一个父目录驱动）。每个被派发 agent 的 prompt 都必须给出指向目标的**绝对路径**、并告诉它别依赖继承来的 cwd——否则文件会落进错误的树。
 - **单一提交者：叶子负责写 + 自测，你负责提交。** 各自 `git commit` 的并行 agent 会抢 git index。要求每个叶子**写它的文件、跑它的测试证明是绿的，但绝不 commit**；由你在端点验收、再按依赖序提交。（又是 end-to-end argument——commit 完整性归你的端点，不归叶子。见 `resume-verify.md`。）
 - **对同一个共享可变文件的写者，跨波串行化。** 若几个任务都追加到同一个文件（一个共享测试文件、一个 registry），*同一*波里的两个会互相覆盖。把这些写者拆进**不同的波**，使任一时刻至多一个去碰那文件——你吸收这份协调成本，好让叶子保持独立、互不相交。

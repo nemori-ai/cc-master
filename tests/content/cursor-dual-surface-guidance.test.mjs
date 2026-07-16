@@ -127,16 +127,18 @@ test('three-host pacing projection rejects canonical references, overlays, descr
     }
   }
 
-  for (const [host, overlay, holdout] of [
-    ['claude-code', 'usage-signals-reference.md', HOLDOUTS[0]],
-    ['codex', 'levers-reference.md', HOLDOUTS[1]],
-    ['cursor', 'usage-signals-reference.md', HOLDOUTS[2]],
+  for (const [referenceName, holdout] of [
+    ['usage-signals.md', HOLDOUTS[0]],
+    ['pacing-levers.md', HOLDOUTS[1]],
   ]) {
     const root = makeProjectionFixture();
     try {
-      const path = join(root, `plugin/src/skills/pacing-and-estimation/adapters/${host}/overlays/${overlay}`);
+      const path = join(
+        root,
+        `plugin/src/skills/pacing-and-estimation/canonical/references/${referenceName}`,
+      );
       writeFileSync(path, `${readFileSync(path, 'utf8')}\n${holdout}\n`);
-      assertRejected(root, host, `${host} overlay mutant`);
+      for (const host of HOSTS) assertRejected(root, host, `${referenceName} canonical mutant`);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -28,10 +28,6 @@ slot_replacements:
   "{{BACKGROUND_EXTERNAL_WAIT_GUIDANCE}}": adapters/codex/overlays/background-external-wait-guidance.md
   "{{WATCHDOG_WAKEUP_TOOL_CHAIN}}": adapters/codex/overlays/watchdog-wakeup-tool-chain.md
   "{{WATCHDOG_WAKEUP_TOOL_CHAIN_INLINE}}": adapters/codex/overlays/watchdog-wakeup-tool-chain-inline.md
-  "{{PACING_COST_RESPONSIBILITY}}": adapters/codex/overlays/pacing-cost-responsibility.md
-  "{{PACING_BUDGET_STEWARDSHIP}}": adapters/codex/overlays/pacing-budget-stewardship.md
-  "{{CAPACITY_ACCOUNT_GUIDANCE}}": adapters/codex/overlays/capacity-account-guidance.md
-  "{{PACING_COMMAND_SUMMARY}}": adapters/codex/overlays/pacing-command-summary.md
   "{{AUTHORING_WORKFLOWS_ROW}}": adapters/codex/overlays/authoring-workflows-row.md
   "{{COST_DECISIONS_REFERENCE_ROW}}": adapters/codex/overlays/cost-decisions-reference-row.md
   "{{COMMAND_SURFACE_GUIDANCE}}": adapters/codex/overlays/command-surface-guidance.md
@@ -46,14 +42,9 @@ slot_replacements:
   "{{PLATFORM_RESUME_GUIDANCE}}": adapters/codex/overlays/platform-resume-guidance.md
   "{{HETEROGENEOUS_REVIEW_MECHANISM}}": adapters/codex/overlays/heterogeneous-review-mechanism.md
   "{{HANDOFF_REFERENCE_ROW}}": adapters/codex/overlays/handoff-reference-row.md
-  "{{HOST_QUOTA_DESERTION_EXAMPLE}}": adapters/codex/overlays/quota-desertion-example.md
-  "{{HOST_QUOTA_RATIONALIZATION_ROW}}": adapters/codex/overlays/quota-rationalization-row.md
-  "{{HOST_QUOTA_RED_FLAG}}": adapters/codex/overlays/quota-red-flag.md
-  "{{HOST_QUOTA_DECISION_GATE}}": adapters/codex/overlays/quota-decision-gate.md
-  "{{HOST_QUOTA_JUDGMENT_ROW}}": adapters/codex/overlays/quota-judgment-row.md
   "{{CROSS_HARNESS_WORKER_HELP_POINTER}}": adapters/codex/overlays/cross-harness-worker-help-pointer.md
   "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/codex/overlays/cross-harness-target-facts-pointer.md
 notes:
-  - Codex projection uses the host-neutral canonical body plus Codex-verified dispatch and watchdog slots.
+  - Codex projection uses the host-neutral canonical body, including machine-wide selected-target quota guidance, plus Codex-verified dispatch and watchdog slots.
   - Verified in Codex CLI 0.142.5 and current Codex manual: subagents are explicit, codex exec resume is scriptable, codex cloud tasks are addressable, and app thread automations are app-side rather than a CLI CronCreate equivalent.
   - In Codex API/tool sessions, multi-agent tools can be deferred; use tool_search to surface multi_agent_v1.spawn_agent before treating subagent dispatch as available.

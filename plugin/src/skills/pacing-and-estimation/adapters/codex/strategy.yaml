@@ -28,9 +28,7 @@ supported:
     reason: "Cost-to-complete estimation method is host-neutral when it consumes normalized board data."
 slot_replacements:
   "{{PACING_DESCRIPTION}}": adapters/codex/overlays/description.md
-  "{{PACING_USAGE_SIGNALS_REFERENCE}}": adapters/codex/overlays/usage-signals-reference.md
-  "{{PACING_LEVERS_REFERENCE}}": adapters/codex/overlays/levers-reference.md
   "{{CROSS_HARNESS_ACTIVE_QUERY_POINTER}}": adapters/codex/overlays/cross-harness-active-query-pointer.md
 notes:
-  - Codex projects the closed read-only capability block plus host-specific usage/model facts.
+  - Codex projects the closed read-only capability block; machine-wide quota consumption is canonical for every origin.
   - model-tiers.md maps GPT-5.6 family × effort from official OpenAI benchmark, Codex model, pricing, and availability guidance.

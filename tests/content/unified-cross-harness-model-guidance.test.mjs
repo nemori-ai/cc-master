@@ -1,11 +1,33 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const HOSTS = ['claude-code', 'codex', 'cursor'];
+const MASTER_QUOTA_SLOTS = [
+  'PACING_COST_RESPONSIBILITY',
+  'PACING_BUDGET_STEWARDSHIP',
+  'CAPACITY_ACCOUNT_GUIDANCE',
+  'PACING_COMMAND_SUMMARY',
+  'HOST_QUOTA_DESERTION_EXAMPLE',
+  'HOST_QUOTA_RATIONALIZATION_ROW',
+  'HOST_QUOTA_RED_FLAG',
+  'HOST_QUOTA_DECISION_GATE',
+  'HOST_QUOTA_JUDGMENT_ROW',
+];
+const MASTER_QUOTA_OVERLAYS = [
+  'pacing-cost-responsibility.md',
+  'pacing-budget-stewardship.md',
+  'capacity-account-guidance.md',
+  'pacing-command-summary.md',
+  'quota-desertion-example.md',
+  'quota-rationalization-row.md',
+  'quota-red-flag.md',
+  'quota-decision-gate.md',
+  'quota-judgment-row.md',
+];
 const read = (path) => readFileSync(join(ROOT, path), 'utf8');
 
 test('canonical allocation is role-first and consumes the cross-provider ccm read model', () => {
@@ -43,7 +65,7 @@ test('canonical allocation is role-first and consumes the cross-provider ccm rea
   }
 });
 
-test('origin-local model slots are removed while origin runtime mechanisms remain adapted', () => {
+test('origin-local model and quota interpretation slots are removed while origin runtime mechanisms remain adapted', () => {
   for (const host of HOSTS) {
     const masterStrategy = read(
       `plugin/src/skills/master-orchestrator-guide/adapters/${host}/strategy.yaml`,
@@ -54,8 +76,105 @@ test('origin-local model slots are removed while origin runtime mechanisms remai
     assert.doesNotMatch(masterStrategy, /MASTER_HOST_MODEL_ALLOCATION/u, host);
     assert.doesNotMatch(pacingStrategy, /PACING_MODEL_TIERS_REFERENCE/u, host);
     assert.match(masterStrategy, /BACKGROUND_DISPATCH_MECHANISM_LIST/u, host);
-    assert.match(pacingStrategy, /PACING_USAGE_SIGNALS_REFERENCE/u, host);
+    assert.doesNotMatch(pacingStrategy, /PACING_USAGE_SIGNALS_REFERENCE|PACING_LEVERS_REFERENCE/u, host);
   }
+});
+
+test('master quota and pacing discipline is canonical rather than 27 origin-local overlays', () => {
+  const guide = read('plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md');
+  for (const slot of MASTER_QUOTA_SLOTS) {
+    assert.doesNotMatch(guide, new RegExp(`\\{\\{${slot}\\}\\}`, 'u'), slot);
+  }
+  assert.match(guide, /ccm quota status --machine-wide --json/u);
+  assert.match(guide, /harness_id \+ surface_id \+ window/u);
+  assert.match(guide, /selected target/u);
+  assert.match(guide, /Claude Code `claude-cli`[\s\S]*5h \+ 7d/u);
+  assert.match(guide, /Codex `codex-cli`[\s\S]*只[^\n]*7d/u);
+  assert.match(guide, /cursor-ide-plugin[\s\S]*cursor-agent-cli[\s\S]*独立/u);
+  assert.match(guide, /unknown[^\n]*stale[^\n]*missing[^\n]*fail closed/u);
+  for (const host of HOSTS) {
+    const strategy = read(
+      `plugin/src/skills/master-orchestrator-guide/adapters/${host}/strategy.yaml`,
+    );
+    for (const slot of MASTER_QUOTA_SLOTS) assert.doesNotMatch(strategy, new RegExp(slot, 'u'), host);
+    for (const overlay of MASTER_QUOTA_OVERLAYS) {
+      assert.equal(
+        existsSync(
+          join(
+            ROOT,
+            `plugin/src/skills/master-orchestrator-guide/adapters/${host}/overlays/${overlay}`,
+          ),
+        ),
+        false,
+        `${host}/${overlay} must stay removed`,
+      );
+    }
+
+    const rendered = read(`plugin/dist/${host}/skills/master-orchestrator-guide/SKILL.md`);
+    assert.match(rendered, /ccm quota status --machine-wide --json/u, host);
+    assert.match(rendered, /selected target/u, host);
+    for (const slot of MASTER_QUOTA_SLOTS) {
+      assert.doesNotMatch(rendered, new RegExp(`\\{\\{${slot}\\}\\}`, 'u'), host);
+    }
+  }
+});
+
+test('all origins receive one machine-wide quota view and exact ccm quota contract', () => {
+  const guide = read('plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md');
+  const catalog = read('plugin/src/skills/using-ccm/canonical/references/command-catalog.md');
+  const signals = read(
+    'plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md',
+  );
+  const levers = read(
+    'plugin/src/skills/pacing-and-estimation/canonical/references/pacing-levers.md',
+  );
+
+  assert.match(guide, /ccm quota status --machine-wide --json/u);
+  assert.match(catalog, /ccm quota refresh --machine-wide/u);
+  assert.match(catalog, /ccm\/machine-quota-status\/v1/u);
+  assert.match(catalog, /cached|缓存/u);
+  assert.match(signals, /claude-cli[\s\S]*five_hour[\s\S]*seven_day/u);
+  assert.match(signals, /codex-cli[\s\S]*仅 `seven_day`/u);
+  assert.match(signals, /cursor-ide-plugin[\s\S]*cursor-agent-cli/u);
+  assert.match(levers, /Codex 自动换号永久禁止/u);
+  assert.match(levers, /Cursor 自动换号永久禁止/u);
+
+  for (const host of HOSTS) {
+    const usingStrategy = read(`plugin/src/skills/using-ccm/adapters/${host}/strategy.yaml`);
+    assert.doesNotMatch(
+      usingStrategy,
+      /USING_CCM_USAGE_(?:NAMESPACE_ROW|OVERVIEW|SIGNAL_SOURCE|SHOW_|ADVISE_|BURN_RATE_|RUNWAY_)/u,
+      host,
+    );
+  }
+});
+
+test('using-ccm pins capacity_views to the exact built CLI object schema', () => {
+  const catalog = read('plugin/src/skills/using-ccm/canonical/references/command-catalog.md');
+  const match = catalog.match(
+    /`capacity_views` 的精确对象形状：\n\n\s*```json\n([\s\S]*?)\n\s*```/u,
+  );
+  assert.ok(match, 'capacity_views JSON example must remain parseable');
+  const capacityViews = JSON.parse(match[1]);
+
+  assert.deepEqual(Object.keys(capacityViews), [
+    'schema',
+    'known_capacities',
+    'unresolved_scope_digests',
+    'unresolved_capacity_units',
+  ]);
+  assert.equal(capacityViews.schema, 'ccm/machine-quota-capacity-views/v1');
+  assert.ok(Array.isArray(capacityViews.known_capacities));
+  assert.deepEqual(Object.keys(capacityViews.known_capacities[0]), [
+    'quota_scope_digest',
+    'capacity_units',
+    'scope_digests',
+  ]);
+  assert.ok(Array.isArray(capacityViews.unresolved_scope_digests));
+  assert.equal(capacityViews.unresolved_capacity_units, null);
+  assert.match(catalog, /完整 CLI status 始终返回这个对象/u);
+  assert.match(catalog, /hook \/ session 注入边界可以省略 `capacity_views`/u);
+  assert.doesNotMatch(catalog, /capacity_views:\[\.\.\.\]/u);
 });
 
 test('using-ccm documents the model-policy read/advice commands and board role/fallback routing', () => {

@@ -13,9 +13,10 @@
    `fresh` 不等于 live entitlement，也不等于 exact-model admission；`unknown[]` 与 blocker 必须保真。
    用 `ccm model-policy show --task <task-taxonomy> --json` 把三路 provider facts、项目角色证据与社区 advisory
    投影成所有 origin 相同的 read model；三层仍须分开，不能用社区 taste 补 role certification。
-3. **Quota**：store status 的 `available:true` 只证明本地 authority store 可读，**不等于 ample headroom**。
-   只有 authority-bound preflight 的 freshness、payer/pool identity、decision、spawn limit 与 blockers 才能描述
-   该候选的 quota state。
+3. **Quota**：先用 `quota status --machine-wide` 的 target-bound cached posture 看所有本机候选；
+   `state:"healthy"` 仍只证明该 target 的承重窗口未触发收紧，unknown / stale / missing 不能补成 healthy。
+   普通 store status 的 `available:true` 只证明本地 store 可读，**不等于 headroom**；只有 authority-bound
+   preflight 的 freshness、payer/pool identity、decision、spawn limit 与 blockers 才能授权具体 spawn。
 4. **Binding**：surface、provider、account/payer、pool、model 与 quota evidence 必须指向同一候选和同一
    freshness 时点；跨 surface、跨 payer 或跨 pool 拼接的“完整证据”仍是不完整证据。
 

@@ -1,6 +1,6 @@
 ---
 name: pacing-and-estimation
-description: 'Use when 你（orchestrator/agent）在 Cursor origin 中要读取 ccm 的只读 advisory 与估算——包括三路统一 `model-policy` 的 O/T1/T2/T3 候选、角色证据、成本与 task affinity，以及 Cursor billing-period usage；当 target 是 Cursor 时仍严格区分 `cursor-ide-plugin` 与 `cursor-agent-cli`，各自缺 target-local 证据即保持 `unknown`。Triggers: 读 `ccm model-policy show|advise`、`ccm usage advise` / `ccm estimate`，解释跨 provider 候选、affinity、hold/throttle/stop_billing_period、`window_billing_period_pct`、`nearest_reset` 或 `has_baseline`。Do NOT use when 你要决定最终模型分配、停派/replan/请求用户拍板（归 master-orchestrator-guide），要建立 baseline、运行 coordination arbitration 或查 ccm 命令写法（归 using-ccm），或要执行真实 provider 请求。模型事实视图跨 provider 共享；usage 信号与 dispatch 机制仍按目标 surface / origin 各自证明。Cursor 自动换号永久禁止；不得用 `cursor-agent-cli` 证据补齐 `cursor-ide-plugin` 事实。'
+description: 'Use when 你（orchestrator/agent）从 Cursor origin 读取 ccm 的只读 advisory 与估算——包括全机 Claude Code / Codex / Cursor target 的 quota posture、三路统一 `model-policy` 的 O/T1/T2/T3 候选，以及 ETA、EVM、风险和 cost-to-complete。Triggers: 读 `ccm quota status --machine-wide`、`ccm usage show|advise`、`ccm model-policy show|advise`、estimate 输出或 pacing hook 通知，判断某个 target 的窗口、来源、freshness、verdict、affinity 或 forecast 是否可信。Do NOT use when要决定减速、换号、停派、replan、用户升级、最终模型分配、WIP、拆分、推迟、后台放置或 watchdog（归 master-orchestrator-guide）；不要在这里执行 ccm 命令、account 操作、baseline / coordination 写操作或填写 board 字段（归 using-ccm），也不要执行真实 provider 请求。所有 origin 共享同一 machine-wide target 视角；Cursor IDE 与 Agent 必须分别绑定，自动换号永久禁止。'
 ---
 
 # pacing-and-estimation — 消费 ccm 只读 advisory 配速 + 估算

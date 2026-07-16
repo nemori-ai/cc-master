@@ -1,6 +1,6 @@
 ---
 name: pacing-and-estimation
-description: 'Use when 你（orchestrator/agent）在 Claude Code origin 中要读取 ccm 的只读 advisory 与估算——包括三路统一 `model-policy` 的 O/T1/T2/T3 候选、角色证据、成本与 task affinity，以及 Claude-origin 的 5h/7d 配额、目标 ETA、EVM、综合风险和 cost-to-complete。Triggers: 读 `ccm model-policy show|advise`、ccm usage/estimate 输出或 EVM 的 `has_baseline` 字段、"跨 provider 哪些候选有证据 / 这个 affinity 或 forecast 信不信 / Claude 当前账号 5h 和 7d 怎么读"、配额逼顶时判读 usage、pacing/估算 hook 注入提示。Do NOT use when要决定减速、换号、停派、replan、用户升级、最终模型分配、WIP、拆分、推迟、后台放置或 watchdog（归 master-orchestrator-guide）；不要在这里执行 ccm 命令、account 操作、baseline / coordination 写操作或填写 board 字段（归 using-ccm），也不要写 workflow 脚本（归 authoring-workflows）。模型事实视图跨 provider 共享；usage 信号与 dispatch 机制仍按目标 surface / origin 各自证明。ccm 提供事实与 advisory，这里只整理决策输入。'
+description: 'Use when 你（orchestrator/agent）从 Claude Code origin 读取 ccm 的只读 advisory 与估算——包括全机 Claude Code / Codex / Cursor target 的 quota posture、三路统一 `model-policy` 的 O/T1/T2/T3 候选，以及 ETA、EVM、风险和 cost-to-complete。Triggers: 读 `ccm quota status --machine-wide`、`ccm usage show|advise`、`ccm model-policy show|advise`、estimate 输出或 pacing hook 通知，判断某个 target 的窗口、来源、freshness、verdict、affinity 或 forecast 是否可信。Do NOT use when要决定减速、换号、停派、replan、用户升级、最终模型分配、WIP、拆分、推迟、后台放置或 watchdog（归 master-orchestrator-guide）；不要在这里执行 ccm 命令、account 操作、baseline / coordination 写操作或填写 board 字段（归 using-ccm），也不要写 workflow 脚本（归 authoring-workflows）。所有 origin 共享同一 machine-wide target 视角；信号仍须绑定精确 surface，ccm 只提供事实与 advisory。'
 ---
 
 # pacing-and-estimation — 消费 ccm 只读 advisory 配速 + 估算
