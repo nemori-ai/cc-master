@@ -1,0 +1,12 @@
+{
+  "schema": "ccm/machine-wide-quota-notification-fixtures/v1",
+  "origins": ["claude-code", "codex", "cursor"],
+  "states": ["healthy", "tight", "exhausted", "stale", "unknown"],
+  "edges": ["entered_tight", "entered_exhausted", "became_stale", "became_unknown", "recovered", "reset"],
+  "targets": [
+    {"harness_id":"codex","surface_id":"codex-cli","provider_id":"codex","scope_digest":"sha256:codex-scope","window":"seven_day"},
+    {"harness_id":"claude-code","surface_id":"claude-cli","provider_id":"anthropic","scope_digest":"sha256:claude-scope","window":"seven_day"},
+    {"harness_id":"cursor","surface_id":"cursor-agent-cli","provider_id":"cursor","scope_digest":"sha256:cursor-agent-scope","window":"billing_period"}
+  ],
+  "counterfeits": ["origin-local-only", "kind-collapse", "duplicate-on-retry", "codex-five-hour-sensitive", "secret-leak"]
+}

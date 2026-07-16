@@ -69,6 +69,25 @@ The cross-surface Capability Card owns intent/status; derived design docs only m
 
 ## 业务规则
 
+### Machine-wide quota target rules（contract frozen；production RED）
+
+- `rule-coordination-inbox-machine-quota-delta`: accept `kind:"quota_state_change"` only when payload
+  is exact `ccm/machine-quota-decision-delta/v1`, retains an agent-safe target scope plus
+  `decision_revision`/`delta_revision`, and carries the existing exact subscription/session/epoch
+  delivery provenance. Tight/exhausted/stale/unknown are strong advisories; recovery/reset are weak
+  advisories. They are target-scoped route inputs, never global stop/account-switch directives.
+- `rule-coordination-inbox-machine-quota-scope-dedup`: suppress an already present
+  `producer+scope_digest+delta_revision`; retry must not create a suffixed id. Reconciliation and
+  supersession for `quota_state_change` are partitioned by `scope_digest`, so one provider cannot
+  expire another provider's unconsumed edge.
+- `rule-coordination-inbox-machine-quota-read-boundary`: delivery remains the canonical exact
+  current/list read-only path. The hook never invokes `quota refresh`, a collector, provider/network,
+  credential/account, monitor/service, or a weaker unbound inbox lookup.
+
+These target rules are executable RED and intentionally are not PARITY anchors until all three
+production implementations consume the new kind/schema. Cross-surface intent and maturity live in
+`machine-wide-quota-notification` Capability Card.
+
 - `rule-coordination-inbox-current-subscription`: for every armed host event, resolve exactly one
   current binding using the canonical `current` command above. The absolute lexical board path,
   normalized origin, exact native session id, and capability are mandatory. Only exact echoed
@@ -105,6 +124,8 @@ The cross-surface Capability Card owns intent/status; derived design docs only m
   before continuing, while still making the actual board / ack updates through ccm.
 - `pacing_throttle` / `pacing_yield` / `pacing_claim` / `pacing_switch` /
   `artifact_serialize` → **advisory** with the stored notification strength.
+- `quota_state_change` → **advisory** with producer-owned strength; it changes the route view for one
+  explicit target scope and never means all harness dispatch must stop.
 
 ## 武装语义
 

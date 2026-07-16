@@ -9,6 +9,20 @@ to refresh facts, choose a route, or authorize dispatch.
 
 ## 业务规则
 
+### Machine-wide quota target rule（contract frozen；production RED）
+
+- `rule-orchestrator-context-machine-quota-summary`: an optional cached machine quota summary is
+  ccm-owned and contains only ordered agent-safe
+  `target/state/freshness/reason_codes/decision_revision/observation_revision` rows from
+  `ccm/machine-quota-decision/v1`. The hook validates the same canonical hash/redaction/4096-byte
+  boundary, performs zero live refresh/provider/network/credential effects, and never infers quota
+  between Cursor IDE and Cursor Agent CLI. Missing/uninstalled/unauthenticated/unsupported is absent
+  or unknown, never healthy.
+
+This target rule is executable RED and intentionally is not a PARITY anchor until the shared payload
+and all three adapters land. Mid-turn decision edges belong to the durable coordination inbox rather
+than repeated full summaries.
+
 - `rule-orchestrator-context-ccm-owned`: every host consumes
   `ccm/origin-context-delivery/v1`; adapters do not recompute candidate eligibility, order, reason,
   freshness, or selection. Frozen candidate facts and CLI judgments remain identical; an

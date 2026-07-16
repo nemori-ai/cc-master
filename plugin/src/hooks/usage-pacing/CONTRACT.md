@@ -4,31 +4,46 @@ Host-neutral business-rule SSOT for the `usage-pacing` hook (HOOKPAR-DEC).
 
 ## 触发意图
 
-Consume `ccm usage advise`'s single-sided verdict (ADR-024) and turn it into an agent-facing pacing
-signal at Stop time (and, on Claude Code, at mid-turn PostToolBatch sampling points), so the
-orchestrator paces dispatch against the 5h/7d quota corridor without having to run its own advisory
-math.
+Provide an origin-local cached pacing floor when machine-wide refresh/monitor delivery is absent.
+The hook consumes ccm's provider-owned verdict and never claims it observed other harnesses. It
+remains Stop-time (plus Claude Code PostToolBatch) cached delivery, not a provider collector.
 
 ## 业务规则
 
+### Machine-wide migration rules（contract frozen；production RED）
+
+- `rule-usage-pacing-origin-local-floor`: the hook may consume only its origin-local cached
+  `ccm usage advise`; it performs zero live provider/network/credential effects and never labels that
+  result machine-wide. Machine-wide production belongs to explicit `quota refresh --machine-wide` or
+  a user-enabled monitor quota-source mode.
+- `rule-usage-pacing-machine-wide-dedup`: when ccm reports the same target
+  `scope_digest+decision_revision` already covered by machine-wide fan-out, direct injection and a
+  second coordination notification are both silent. If not covered, the floor may surface only the
+  explicit local target/revision, never an inferred remote provider.
+- `rule-usage-pacing-codex-7d-only`: Codex ignores every 5h field for
+  throttle/switch/stop/reset/wakeup and never performs account switch. Only 7d is a hard ceiling;
+  rolling-24h velocity is advisory. This does not remove provider-owned Claude 5h/7d semantics.
+
+These rules are executable RED and are not added to PARITY anchors before runtime migration.
+
 - `rule-usage-pacing-verdict-source`: `ccm usage advise --json` is the only source of truth for the
-  pacing verdict. Claude Code / Codex consume the 5h/7d set
-  (`hold`/`throttle`/`switch`/`stop_5h`/`stop_7d`); Cursor consumes the billing-period set
+  pacing verdict. Claude Code consumes its provider-owned 5h/7d set; Codex consumes its 7d-only set
+  (`hold`/`throttle`/`stop_7d`) and ignores historical 5h/switch values; Cursor consumes the billing-period set
   (`hold`/`throttle`/`stop_billing_period`). The hook never re-derives quota math locally.
 - `rule-usage-pacing-hold-silent`: verdict `hold` emits nothing.
 - `rule-usage-pacing-throttle`: verdict `throttle` emits an advisory to slow down (reduce WIP, defer
   non-critical work, consider a cheaper model tier). Cursor copy cites `billing_period` pct only —
   never 5h/7d/switch.
-- `rule-usage-pacing-switch`: verdict `switch` signals the quota/account should be rotated
-  (Claude Code / Codex path only; Cursor harness never emits this — defensive silent if seen).
-- `rule-usage-pacing-stop-5h`/`rule-usage-pacing-stop-7d`: signal the 5h or 7d gate is hit — pause
-  new dispatch (7d additionally means surface the decision to the user). Cursor path does not use
-  these; defensive silent if seen.
+- `rule-usage-pacing-switch`: Claude Code may signal an explicitly policy-gated account rotation.
+  Codex/Cursor never execute account switch and are defensive silent if this legacy verdict appears.
+- `rule-usage-pacing-stop-5h`/`rule-usage-pacing-stop-7d`: Claude Code can surface its provider-owned
+  5h/7d gates. Codex only surfaces `stop_7d`; `stop_5h` is defensive silent. Cursor uses neither.
 - `rule-usage-pacing-stop-billing-period`: Cursor-only — billing-cycle hard gate; pause dispatch
   until `nearest_reset` (billing cycle end). Never switch.
 - `rule-usage-pacing-strength-mapping`: each verdict maps to an ADR-018 advisory strength — prefer
   `data.strength` when ccm returns one, otherwise fall back to a fixed table:
-  Claude/Codex `{stop_7d: strong, stop_5h: strong, throttle: strong, switch: weak}`;
+  Claude `{stop_7d: strong, stop_5h: strong, throttle: strong, switch: weak}`;
+  Codex `{stop_7d: strong, throttle: strong}`;
   Cursor `{throttle: strong, stop_billing_period: strong}`.
 - `rule-usage-pacing-arming-gate`: dormant until the session is armed against a matching active
   board.
