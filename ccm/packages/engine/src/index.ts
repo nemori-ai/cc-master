@@ -83,6 +83,7 @@ export {
 } from './board-lock.js';
 export type {
   AcceptanceObject,
+  DeadlineView,
   EnumName,
   EstimateLike,
   FieldMeta,
@@ -95,6 +96,8 @@ export {
   AGENT_ID_RE,
   AGENT_STATE_MACHINE,
   acceptanceConverged,
+  DEADLINE_DAY_END_TIME,
+  DEADLINE_KIND_V1_ALLOWED,
   dependencySatisfied,
   durationHours,
   ENUMS,
@@ -106,6 +109,8 @@ export {
   isActiveStatus,
   isAgentId,
   isAwaitingUser,
+  isDeadlineSettled,
+  isDeadlineWellShaped,
   isDoneStatus,
   isEnumMember,
   isISOUTC,
@@ -114,8 +119,10 @@ export {
   isRetryTransition,
   isReviewDependencyGate,
   levelOf,
+  normalizeDeadlineAt,
   OPEN_ENUMS,
   RETRYABLE_STATUSES,
+  readDeadline,
   SCHEMA_VERSION,
   STATUS_MACHINE,
   TIERS,
@@ -233,6 +240,16 @@ export {
   empiricalQuantile,
   quantilesOf,
 } from './estimate/conformal.js';
+// deadline-risk verdict（issue #149 契约 §4.3·`ccm estimate deadline-risk` 单一 SSOT）
+export type {
+  DeadlineBands,
+  DeadlineDriver,
+  DeadlineRiskBand,
+  DeadlineRiskOptions,
+  DeadlineRiskResult,
+  DeadlineTaskStatus,
+} from './estimate/deadline-risk.js';
+export { computeDeadlineRisk, DEFAULT_BANDS } from './estimate/deadline-risk.js';
 // EVM + Earned Schedule（SPI(t)）
 export type { Baseline, EvmOptions, EvmResult } from './estimate/evm.js';
 export { computeEvm } from './estimate/evm.js';
@@ -246,14 +263,18 @@ export type {
   ForecastOptions,
   NodeMcParam,
   PctCostMcResult,
+  RcpspInTrialOptions,
+  RcpspInTrialResult,
   SensitivityEntry,
   ThroughputMcResult,
 } from './estimate/mc-scheduler.js';
 export {
   dailyThroughput,
   dualChannelConsistency,
+  empiricalCdfAtOrBefore,
   estimateDagMonteCarlo,
   pctCostToCompleteMonteCarlo,
+  rcpspInTrialMc,
   throughputMonteCarlo,
 } from './estimate/mc-scheduler.js';
 // ── estimate/（ADR-015 估算引擎算法层·plan §7）────────────────────────────────────────────────────

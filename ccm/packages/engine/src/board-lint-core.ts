@@ -30,12 +30,14 @@ import {
   isAbsolutePathOrUrl,
   isAgentId,
   isAwaitingUser,
+  isDeadlineWellShaped,
   isEnumMember,
   isISOUTC,
   isReviewDependencyGate,
   levelOf,
   ISO_UTC_RE as MODEL_ISO_UTC_RE,
   SCHEMA_VERSION as MODEL_SCHEMA_VERSION,
+  readDeadline,
   type TaskLike,
   taskTrulyDone,
 } from './board-model.js';
@@ -93,12 +95,23 @@ function acceptanceNonEmpty(a: unknown): boolean {
   return false;
 }
 
-// lintBoard(text) — text 是 board 文件的原始字符串。返回 { errors, warnings }，各为 [{ rule, message, task? }]。
+// lintBoard(text, opts?) — text 是 board 文件的原始字符串。返回 { errors, warnings }，各为 [{ rule, message, task? }]。
 //   绝不抛（FMT-JSON 把 JSON.parse 失败收成一条 error）。每条经 emit() 按 levelOf(id) 分流到 errors/warnings；
 //   level==='reserved' 的规则 emit 时被静默丢弃（登记在册但暂不强制）。
-export function lintBoard(text: string): LintResult {
+//   opts.now（可选·ISO-8601 UTC 串或毫秒数·缺省=Date.now()）：喂时间相关规则（BIZ-DEADLINE-OVERDUE），
+//     让测试/backtest 可注入确定性 now·与既有纯逻辑一致（现有规则全比板内时间戳，无需 now·只 overdue 需要挂钟）。
+export function lintBoard(text: string, opts?: { now?: number | string }): LintResult {
   const errors: LintEntry[] = [];
   const warnings: LintEntry[] = [];
+  const nowMs: number = ((): number => {
+    const n = opts?.now;
+    if (typeof n === 'number' && Number.isFinite(n)) return n;
+    if (typeof n === 'string') {
+      const parsed = Date.parse(n);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+    return Date.now();
+  })();
   // emit：唯一出口——级别从 board-model 注册表读，零漂移。reserved → 丢弃。未注册 id → 默认 hard（surface bug）。
   const emit: Emit = (id, message, task) => {
     const lvl = levelOf(id) || 'hard';
@@ -180,6 +193,30 @@ export function lintBoard(text: string): LintResult {
         'FMT-GOAL-CONTRACT',
         'goal_contract 必须符合 ccm/goal-contract/v1：revision>=1、assurance 合法、updated_at 为 UTC；brief（若有）须是受管 ref + sha256。',
       );
+    }
+    // FMT-DEADLINE（👁 交付 DDL·issue #149；present 才校验，legacy/无 deadline 键自动兼容）。
+    if (
+      goalContract &&
+      typeof goalContract === 'object' &&
+      !Array.isArray(goalContract) &&
+      (goalContract as Record<string, unknown>).deadline !== undefined
+    ) {
+      const deadline = (goalContract as Record<string, unknown>).deadline;
+      if (!isDeadlineWellShaped(deadline)) {
+        emit(
+          'FMT-DEADLINE',
+          'goal_contract.deadline 形状非法：state 须 ∈ {pending,asserted,confirmed,none}；asserted|confirmed 须带严格 ISO-8601 UTC 的 at；none 不得带 at；precision ∈ {minute,day}；kind v1 只接受 hard；rev 若有须整数≥1；provenance.source ∈ {goal-evidence,cli-flag,user-reply}。改用 `ccm goal deadline set|confirm|confirm-none|amend`。',
+        );
+      }
+      // deadline.updated_at 形状（warn·不拦写盘·同 owner.heartbeat 风格·走 FMT-TIME warn 分支）。
+      if (deadline && typeof deadline === 'object' && !Array.isArray(deadline)) {
+        if (badTimestamp((deadline as Record<string, unknown>).updated_at)) {
+          emit(
+            'FMT-TIME',
+            `goal_contract.deadline.updated_at 是 ${JSON.stringify((deadline as Record<string, unknown>).updated_at)}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：审计/去重 fingerprint 读它——格式不对退化为无审计时间锚（不拦写盘·建议补全 UTC）。`,
+          );
+        }
+      }
     }
   }
   // FMT-OWNER（owner 对象 + active:bool + session_id:string；heartbeat 非 ISO → FMT-TIME warn）
@@ -292,6 +329,44 @@ export function lintBoard(text: string): LintResult {
       'BIZ-GOAL-PENDING',
       'Goal Contract 仍为 pending，但 board 已含可执行任务；先收敛/确认目标，或只保留明确的需求侦察/用户等待节点。',
     );
+  }
+
+  // ── 交付 DDL 业务规则（BIZ-DEADLINE-*·issue #149）──────────────────────────────────────────────────
+  //   只在 goal_contract 存在（contract 已激活）时判——legacy board（无 goal_contract）不因缺 DDL 被 nag。
+  if (goalContract && typeof goalContract === 'object' && !Array.isArray(goalContract)) {
+    const dl = readDeadline(b);
+    const hasExecutable = tasks.some(
+      (task) =>
+        !!task &&
+        typeof task === 'object' &&
+        ['ready', 'in_flight', 'uncertain'].includes(
+          String((task as Record<string, unknown>).status || ''),
+        ),
+    );
+    // BIZ-DEADLINE-PENDING（warn·镜像 BIZ-GOAL-PENDING）：DDL 未 settle（键缺失或 pending）却已有可执行任务。
+    if (dl.gating && hasExecutable) {
+      emit(
+        'BIZ-DEADLINE-PENDING',
+        '交付 DDL 尚未 settle（未询问或仍 pending），但 board 已含可执行任务；先确认交付截止期（`ccm goal deadline set|confirm`）或明确无 DDL（`ccm goal deadline confirm-none`），再拆 DAG 派发。',
+      );
+    }
+    // BIZ-DEADLINE-OVERDUE（warn·v1 近似）：DDL(asserted|confirmed) 已过期(now>=at) ∧ 板未归档 ∧ 存在非 trulyDone task。
+    //   局限（v1）：owner.active 判「归档」、taskTrulyDone 判「未完成」——不做「project buffer / 全局验收」精细建模。
+    if (
+      (dl.state === 'asserted' || dl.state === 'confirmed') &&
+      dl.at_ms !== null &&
+      nowMs >= dl.at_ms
+    ) {
+      const owner = b.owner as Record<string, unknown> | undefined;
+      const archived = !!owner && owner.active === false;
+      const hasUnfinished = tasks.some((task) => !taskTrulyDone(task as TaskLike));
+      if (!archived && hasUnfinished) {
+        emit(
+          'BIZ-DEADLINE-OVERDUE',
+          `交付 DDL（${dl.at}）已过期而全局 acceptance 未完成；先向用户报告当前状态/剩余交付物/方案，再由用户裁决延期（\`ccm goal deadline amend --user-authorized\`）/缩范围（\`ccm goal amend\`）/分阶段/终止——不得为按期静默降低验收或伪造完成。`,
+        );
+      }
+    }
   }
 
   // ── 每个 task 的钉死契约 FMT（🔒：id / status / deps）+ id 唯一 ─────────────────────────────────────
@@ -1072,7 +1147,7 @@ function lintInbox(board: BoardLike, emit: Emit): void {
     if (!isEnumMember('notificationKind', n.kind)) {
       emit(
         'FMT-INBOX',
-        `${label}.kind 是 ${JSON.stringify(n.kind)}，应 ∈ {pacing_throttle, pacing_yield, pacing_claim, pacing_switch, pacing_stop, hitl_turn, artifact_serialize, quota_state_change}。`,
+        `${label}.kind 是 ${JSON.stringify(n.kind)}，应 ∈ {pacing_throttle, pacing_yield, pacing_claim, pacing_switch, pacing_stop, hitl_turn, artifact_serialize, quota_state_change, deadline_risk}。`,
       );
     }
     if (!['unconsumed', 'consumed', 'expired'].includes(n.status as string)) {
@@ -1178,6 +1253,21 @@ function lintRuntime(board: BoardLike, emit: Emit): void {
     emit(
       'FMT-RUNTIME',
       `runtime.stop_allow_until 是 ${JSON.stringify(r.stop_allow_until)}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：Codex Stop hook 读它判本次是否允许停止——格式不对则退化为继续阻止停止（fail-safe）。`,
+    );
+  }
+  if (badTimestamp(r.last_deadline_risk_check)) {
+    emit(
+      'FMT-RUNTIME',
+      `runtime.last_deadline_risk_check 是 ${JSON.stringify(r.last_deadline_risk_check)}，非严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ）。影响：deadline-risk hook 读它判周期重估阈值——格式不对则退化为「从未评估」(首次必评估·fail-safe·issue #149)。`,
+    );
+  }
+  if (
+    r.last_deadline_risk_fingerprint !== undefined &&
+    typeof r.last_deadline_risk_fingerprint !== 'string'
+  ) {
+    emit(
+      'FMT-RUNTIME',
+      `runtime.last_deadline_risk_fingerprint 若存在须为字符串（当前：${JSON.stringify(r.last_deadline_risk_fingerprint)}）。影响：deadline-risk hook 读它判 risk-input 是否变更——非字符串则退化为「输入已变」(强制重估·fail-safe·issue #149)。`,
     );
   }
 }

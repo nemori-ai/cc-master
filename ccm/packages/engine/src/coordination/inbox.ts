@@ -8,7 +8,8 @@ export type NotificationKind =
   | 'pacing_stop'
   | 'hitl_turn'
   | 'artifact_serialize'
-  | 'quota_state_change';
+  | 'quota_state_change'
+  | 'deadline_risk';
 
 export type NotificationStatus = 'unconsumed' | 'consumed' | 'expired';
 export type NotificationStrength = 'weak' | 'strong';

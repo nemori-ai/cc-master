@@ -46,6 +46,9 @@ export interface EstimateMcResult {
   makespan: Interval; // {p50,p80,p95}（小时·5% 硬墙）
   mean: number;
   criticality_index: SensitivityEntry[]; // 按 CI 降序
+  // 升序 makespan 样本（deadline-risk 的 on_time_probability = P(finish ≤ DDL) 载重·喂 empiricalCdfAtOrBefore）。
+  //   算完分位本就得到 sorted，一等暴露它，杜绝重算/重排（issue #149 契约 §4.3 引擎缺口）。含环/空图 → 空数组。
+  makespanSamplesSorted: Float64Array;
   runs: number;
   seed: number;
   node_count: number;
@@ -115,6 +118,7 @@ export function estimateDagMonteCarlo(
       makespan: { p50: NaN, p80: NaN, p95: NaN },
       mean: NaN,
       criticality_index: [],
+      makespanSamplesSorted: new Float64Array(0),
       runs,
       seed,
       node_count: 0,
@@ -215,6 +219,7 @@ export function estimateDagMonteCarlo(
     },
     mean: meanMakespan,
     criticality_index: sens,
+    makespanSamplesSorted: sortedMakespan,
     runs,
     seed,
     node_count: nodeCount,
@@ -234,6 +239,23 @@ function quantileFromSorted(sorted: Float64Array, p: number): number {
   return (sorted[lo] as number) * (1 - frac) + (sorted[hi] as number) * frac;
 }
 
+// empiricalCdfAtOrBefore(sortedSamples, target) → 升序样本里 ≤ target 的占比 ∈ [0,1]（经验 CDF·on-time 概率）。
+//   二分找「第一个 > target 的下标」= ≤ target 的计数（upper_bound）。sortedSamples 必须升序。
+//   空数组 / 非有限 target → NaN（诚实降级·调用方据此报 unknown·绝不假绿）。O(log n)。
+//   deadline-risk 载重：P(finish ≤ DDL) = empiricalCdfAtOrBefore(makespanSamplesSorted, time_remaining)。
+export function empiricalCdfAtOrBefore(sortedSamples: Float64Array, target: number): number {
+  const n = sortedSamples.length;
+  if (n === 0 || !Number.isFinite(target)) return NaN;
+  let lo = 0;
+  let hi = n;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if ((sortedSamples[mid] as number) <= target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo / n; // lo = ≤target 的数量
+}
+
 // ── 通道②：吞吐-MC（#NoEstimates·Vacanti·plan §3）────────────────────────────────────────────────
 // 不依赖 per-task 估值，对历史**吞吐**（每个 done 任务的完成节奏）采样「清空 M 个 backlog 任务要几天」。
 // 做法：从历史 done 任务的「天吞吐」样本（按 finishedAt 分桶到天 → 每天完成几个）里 bootstrap 采样，
@@ -243,6 +265,8 @@ export interface ThroughputMcResult {
   mean: number;
   backlog: number; // 待清空任务数
   daily_throughput_samples: number; // 用于 bootstrap 的天数样本量
+  // 升序清空天数样本（deadline-risk heuristic 参考通道·on-time 概率 = P(days ≤ time_remaining/24)·喂 empiricalCdfAtOrBefore）。
+  daysSamplesSorted: Float64Array;
   runs: number;
   seed: number;
   confidence: 'high' | 'medium' | 'low';
@@ -294,6 +318,7 @@ export function throughputMonteCarlo(
       mean: m === 0 ? 0 : NaN,
       backlog: m,
       daily_throughput_samples: daily.length,
+      daysSamplesSorted: new Float64Array(0),
       runs,
       seed,
       confidence: 'low',
@@ -333,10 +358,223 @@ export function throughputMonteCarlo(
     mean,
     backlog: m,
     daily_throughput_samples: daily.length,
+    daysSamplesSorted: sorted,
     runs,
     seed,
     confidence,
     source: 'throughput-mc',
+  };
+}
+
+// ── 通道 B：RCPSP-in-trial MC（资源约束调度·真吃 wip_limit·issue #149 契约 §6.1 B·deadline verdict 唯一源）──
+// 每 trial 内跑 serial SGS（串行调度生成式）注 wip 资源约束 → resource-feasible finish 分布，回答「真实 WIP
+//   并发下多久完成」——不同于 precedence-only（无资源闸·乐观下界）与 throughput（历史吞吐·不调度 DAG）。
+//
+// 性能（契约风险 top1·D3A latency spike 实测）：**必须堆化**（indeg-ready min-heap + slot min-heap·O(V log V)/
+//   trial）。naive 逐 trial filter-ready（rcpsp.ts 的 O(V²) 结构）在 283 任务真实板 2000 trials 要 ~30s 爆预算；
+//   堆化后同板仅 ~450ms。静态优先级（min-slack + LFT + id·来自确定性 CPM）循环外算一次。
+//
+// 资源槽语义 faithful to rcpsp.ts：slots.size < wip 开新槽，满则复用最早释放的槽（busy[] 逐字对应）。
+// 确定性：独立 seed 派生（seed ^ 0x51ed270b·避免与通道①共相）；Float64Array.sort() V8 确定。
+
+// 二叉最小堆（RCPSP-in-trial 的 ready 队列 + 资源槽·数值 payload·comparator 注入）。
+class NumMinHeap {
+  private a: number[] = [];
+  private lt: (x: number, y: number) => boolean;
+  constructor(lessThan: (x: number, y: number) => boolean) {
+    this.lt = lessThan;
+  }
+  get size(): number {
+    return this.a.length;
+  }
+  push(x: number): void {
+    const a = this.a;
+    a.push(x);
+    let i = a.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (this.lt(a[i] as number, a[p] as number)) {
+        const tmp = a[i] as number;
+        a[i] = a[p] as number;
+        a[p] = tmp;
+        i = p;
+      } else break;
+    }
+  }
+  pop(): number {
+    const a = this.a;
+    const top = a[0] as number;
+    const last = a.pop() as number;
+    if (a.length) {
+      a[0] = last;
+      let i = 0;
+      const n = a.length;
+      for (;;) {
+        let s = i;
+        const l = 2 * i + 1;
+        const r = 2 * i + 2;
+        if (l < n && this.lt(a[l] as number, a[s] as number)) s = l;
+        if (r < n && this.lt(a[r] as number, a[s] as number)) s = r;
+        if (s === i) break;
+        const tmp = a[i] as number;
+        a[i] = a[s] as number;
+        a[s] = tmp;
+        i = s;
+      }
+    }
+    return top;
+  }
+}
+
+export interface RcpspInTrialOptions extends ForecastOptions {
+  wip?: number; // 资源上限 k（缺 / ≤0 → ∞·无资源闸）
+}
+
+export interface RcpspInTrialResult {
+  makespan: Interval; // resource-feasible makespan {p50,p80,p95}（小时）
+  mean: number;
+  makespanSamplesSorted: Float64Array; // 升序·喂 empiricalCdfAtOrBefore 出 on_time_probability
+  runs: number;
+  seed: number;
+  wip: number; // 资源上限（∞ = Infinity）
+  node_count: number;
+  cycle: boolean;
+  source: 'rcpsp-in-trial-mc';
+}
+
+// rcpspInTrialMc(board, params, opts) → 资源约束 MC。含环 / 空图 → 退化空结果（node_count=0·NaN 分位·不抛）。
+export function rcpspInTrialMc(
+  board: BoardLike,
+  params: Map<string, NodeMcParam>,
+  opts: RcpspInTrialOptions = {},
+): RcpspInTrialResult {
+  const seed = opts.seed ?? 42;
+  const runs = Math.max(1, opts.runs ?? 2000);
+  const defaultCv = opts.defaultCv ?? 0.4;
+  const defaultMean = opts.defaultMeanHours ?? 1;
+  const wip = opts.wip != null && opts.wip > 0 ? opts.wip : Number.POSITIVE_INFINITY;
+  const g = analyzeGraph(board);
+  const { order, cycle } = g.topoSort();
+  const nodeCount = order.length;
+
+  if (cycle || nodeCount === 0) {
+    return {
+      makespan: { p50: NaN, p80: NaN, p95: NaN },
+      mean: NaN,
+      makespanSamplesSorted: new Float64Array(0),
+      runs,
+      seed,
+      wip,
+      node_count: 0,
+      cycle: !!cycle,
+      source: 'rcpsp-in-trial-mc',
+    };
+  }
+
+  // 索引化（拓扑序·pred/succ 下标邻接·入度）。
+  const idx = new Map<string, number>();
+  for (let i = 0; i < nodeCount; i++) idx.set(order[i] as string, i);
+  const predIdx: number[][] = order.map((id) =>
+    g
+      .predecessors(id)
+      .map((p) => idx.get(p))
+      .filter((x): x is number => x !== undefined),
+  );
+  const succIdx: number[][] = order.map(() => []);
+  for (let i = 0; i < nodeCount; i++)
+    for (const p of predIdx[i] as number[]) (succIdx[p] as number[]).push(i);
+  const indeg0 = new Int32Array(nodeCount);
+  for (let i = 0; i < nodeCount; i++) indeg0[i] = (predIdx[i] as number[]).length;
+
+  // 静态优先级：min-slack → LFT → id（来自确定性 CPM·循环外只算一次·faithful to rcpsp.ts 口径）。
+  const cp = g.criticalPath({ now: opts.nowMs ?? Date.now() });
+  const slackOf = (i: number): number => cp.schedule.get(order[i] as string)?.float ?? 0;
+  const lftOf = (i: number): number =>
+    cp.schedule.get(order[i] as string)?.lf ?? Number.POSITIVE_INFINITY;
+  const prioOrder = Array.from({ length: nodeCount }, (_, i) => i);
+  prioOrder.sort(
+    (a, b) =>
+      slackOf(a) - slackOf(b) ||
+      lftOf(a) - lftOf(b) ||
+      (order[a] as string).localeCompare(order[b] as string),
+  );
+  const prioRank = new Int32Array(nodeCount);
+  for (let r = 0; r < nodeCount; r++) prioRank[prioOrder[r] as number] = r;
+
+  const meanArr = new Float64Array(nodeCount);
+  const cvArr = new Float64Array(nodeCount);
+  for (let i = 0; i < nodeCount; i++) {
+    const p = params.get(order[i] as string);
+    meanArr[i] = p ? p.meanHours : defaultMean;
+    cvArr[i] = p && p.cv > 0 ? p.cv : defaultCv;
+  }
+
+  const makespanSamples = new Float64Array(runs);
+  const prng = new Sfc32(seed ^ 0x51ed270b); // 独立 seed 派生·避免与通道①共相
+  const durTrial = new Float64Array(nodeCount);
+  const finish = new Float64Array(nodeCount);
+  const indeg = new Int32Array(nodeCount);
+
+  for (let t = 0; t < runs; t++) {
+    for (let i = 0; i < nodeCount; i++) {
+      const m = meanArr[i] as number;
+      durTrial[i] = m > 0 ? sampleTaskDuration(() => prng.next(), m, cvArr[i] as number) : 0;
+      indeg[i] = indeg0[i] as number;
+      finish[i] = 0;
+    }
+    // ready 堆：按 prioRank 升序（min = 最高优先级）。
+    const ready = new NumMinHeap((x, y) => (prioRank[x] as number) < (prioRank[y] as number));
+    for (let i = 0; i < nodeCount; i++) if (indeg[i] === 0) ready.push(i);
+    // 资源槽：min-heap of freeAt；size<wip 开新槽，满则复用最早释放（faithful to rcpsp.ts busy[] 语义）。
+    const slots = new NumMinHeap((x, y) => x < y);
+    let makespan = 0;
+    while (ready.size > 0) {
+      const i = ready.pop();
+      let rt = 0;
+      for (const p of predIdx[i] as number[]) {
+        const f = finish[p] as number;
+        if (f > rt) rt = f;
+      }
+      let start: number;
+      if (slots.size < wip) {
+        start = rt;
+        slots.push(start + (durTrial[i] as number));
+      } else {
+        const slotFree = slots.pop();
+        start = rt > slotFree ? rt : slotFree;
+        slots.push(start + (durTrial[i] as number));
+      }
+      const fin = start + (durTrial[i] as number);
+      finish[i] = fin;
+      if (fin > makespan) makespan = fin;
+      for (const s of succIdx[i] as number[]) {
+        indeg[s] = (indeg[s] as number) - 1;
+        if (indeg[s] === 0) ready.push(s);
+      }
+    }
+    makespanSamples[t] = makespan;
+  }
+
+  const sorted = Float64Array.from(makespanSamples);
+  sorted.sort();
+  let mean = 0;
+  for (let t = 0; t < runs; t++) mean += makespanSamples[t] as number;
+  mean /= runs;
+
+  return {
+    makespan: {
+      p50: quantileFromSorted(sorted, 0.5),
+      p80: quantileFromSorted(sorted, 0.8),
+      p95: quantileFromSorted(sorted, 0.95),
+    },
+    mean,
+    makespanSamplesSorted: sorted,
+    runs,
+    seed,
+    wip,
+    node_count: nodeCount,
+    cycle: false,
+    source: 'rcpsp-in-trial-mc',
   };
 }
 

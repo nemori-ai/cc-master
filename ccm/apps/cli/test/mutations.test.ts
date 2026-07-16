@@ -1243,3 +1243,230 @@ test('all mutators stamp heartbeat and leave input board structurally untouched'
     assert.equal(snapshot(orig), snap, 'input board not mutated in place');
   }
 });
+
+// ══ 交付 DDL（goal_contract.deadline·issue #149）writer 突变 ═══════════════════════════════════════
+function ddlBoard(deadline?: unknown): AnyBoard {
+  const b = baseBoard();
+  b.goal_contract = {
+    schema: 'ccm/goal-contract/v1',
+    revision: 1,
+    assurance: 'asserted',
+    updated_at: '2026-07-16T10:00:00Z',
+  };
+  if (deadline !== undefined) b.goal_contract.deadline = deadline;
+  return b;
+}
+
+test('deadlineSet: asserted candidate with rev=1, does NOT bump goal revision, appends log', () => {
+  const out = m.deadlineSet(ddlBoard(), { at: '2026-08-01T09:00:00Z', source: 'cli-flag' });
+  const dl = out.goal_contract.deadline;
+  assert.equal(dl.state, 'asserted');
+  assert.equal(dl.at, '2026-08-01T09:00:00Z');
+  assert.equal(dl.kind, 'hard');
+  assert.equal(dl.rev, 1);
+  assert.equal(dl.precision, 'minute');
+  assert.equal(dl.provenance.source, 'cli-flag');
+  assert.equal(out.goal_contract.revision, 1, 'deadline set never bumps goal revision');
+  assert.ok(ISO.test(dl.updated_at));
+  assert.ok(
+    out.log.some((e: AnyBoard) => e.kind === 'decision' && /Delivery deadline set/.test(e.summary)),
+  );
+});
+
+test('deadlineSet: pending candidate allowed (识别到候选但仍歧义)', () => {
+  const out = m.deadlineSet(ddlBoard(), { at: '2026-08-01T09:00:00Z', assurance: 'pending' });
+  assert.equal(out.goal_contract.deadline.state, 'pending');
+});
+
+test('deadlineSet: precision=day requires --tz-input; lands on end-of-day', () => {
+  assert.throws(
+    () => m.deadlineSet(ddlBoard(), { at: '2026-08-01', precision: 'day' }),
+    /tz-input/,
+  );
+  const out = m.deadlineSet(ddlBoard(), {
+    at: '2026-08-01',
+    precision: 'day',
+    tzInput: 'Asia/Shanghai',
+  });
+  assert.equal(out.goal_contract.deadline.at, '2026-08-01T23:59:59Z');
+  assert.equal(out.goal_contract.deadline.precision, 'day');
+  assert.equal(out.goal_contract.deadline.provenance.tz_input, 'Asia/Shanghai');
+});
+
+test('deadlineSet: non-ISO --at rejected (tz normalization is agent-only)', () => {
+  assert.throws(() => m.deadlineSet(ddlBoard(), { at: '8月1日' }), /ISO-8601 UTC/);
+});
+
+test('deadlineSet: requires an active goal_contract', () => {
+  const legacy = baseBoard(); // no goal_contract
+  assert.throws(
+    () => m.deadlineSet(legacy, { at: '2026-08-01T09:00:00Z' }),
+    /no active Goal Contract/,
+  );
+});
+
+test('deadlineSet: refused after confirmed (points to amend)', () => {
+  const board = ddlBoard({
+    state: 'confirmed',
+    at: '2026-08-01T09:00:00Z',
+    rev: 2,
+    updated_at: '2026-07-16T10:00:00Z',
+  });
+  assert.throws(() => m.deadlineSet(board, { at: '2026-09-01T09:00:00Z' }), /already confirmed/);
+});
+
+test('deadlineConfirm: pending/asserted → confirmed with rev+1, requires --user-authorized', () => {
+  const board = ddlBoard({
+    state: 'asserted',
+    at: '2026-08-01T09:00:00Z',
+    kind: 'hard',
+    rev: 1,
+    updated_at: '2026-07-16T10:00:00Z',
+  });
+  assert.throws(() => m.deadlineConfirm(board, {}), /user-authorized/);
+  const out = m.deadlineConfirm(board, { userAuthorized: true });
+  assert.equal(out.goal_contract.deadline.state, 'confirmed');
+  assert.equal(out.goal_contract.deadline.at, '2026-08-01T09:00:00Z');
+  assert.equal(out.goal_contract.deadline.rev, 2);
+});
+
+test('deadlineConfirm: refuses when no candidate at', () => {
+  const board = ddlBoard({ state: 'pending', updated_at: '2026-07-16T10:00:00Z' });
+  assert.throws(() => m.deadlineConfirm(board, { userAuthorized: true }), /without a concrete/);
+});
+
+test('deadlineConfirmNone: state → none (no at), rev+1, requires --user-authorized', () => {
+  const board = ddlBoard();
+  assert.throws(() => m.deadlineConfirmNone(board, {}), /user-authorized/);
+  const out = m.deadlineConfirmNone(board, { userAuthorized: true });
+  assert.equal(out.goal_contract.deadline.state, 'none');
+  assert.equal(out.goal_contract.deadline.at, undefined, 'none must not carry at');
+  assert.equal(out.goal_contract.deadline.rev, 1);
+});
+
+test('deadlineAmend: requires --reason + --user-authorized, produces confirmed, records from/to, does NOT bump goal revision', () => {
+  const board = ddlBoard({
+    state: 'confirmed',
+    at: '2026-08-01T09:00:00Z',
+    kind: 'hard',
+    rev: 1,
+    updated_at: '2026-07-16T10:00:00Z',
+  });
+  assert.throws(
+    () => m.deadlineAmend(board, { at: '2026-08-05T09:00:00Z', userAuthorized: true }),
+    /reason/,
+  );
+  assert.throws(
+    () => m.deadlineAmend(board, { at: '2026-08-05T09:00:00Z', reason: 'r' }),
+    /user-authorized/,
+  );
+  const out = m.deadlineAmend(board, {
+    at: '2026-08-05T09:00:00Z',
+    reason: '用户批准延期 4 天',
+    userAuthorized: true,
+  });
+  assert.equal(out.goal_contract.deadline.state, 'confirmed');
+  assert.equal(out.goal_contract.deadline.at, '2026-08-05T09:00:00Z');
+  assert.equal(out.goal_contract.deadline.rev, 2);
+  assert.equal(out.goal_contract.revision, 1, 'deadline amend never bumps goal revision');
+  const logEntry = out.log.find((e: AnyBoard) => /Delivery deadline amended/.test(e.summary));
+  assert.ok(logEntry);
+  assert.equal(logEntry.detail.from_at, '2026-08-01T09:00:00Z');
+  assert.equal(logEntry.detail.to_at, '2026-08-05T09:00:00Z');
+  assert.equal(logEntry.detail.reason, '用户批准延期 4 天');
+});
+
+test('deadlineAmend: refuses when no existing deadline', () => {
+  assert.throws(
+    () =>
+      m.deadlineAmend(ddlBoard(), {
+        at: '2026-08-05T09:00:00Z',
+        reason: 'r',
+        userAuthorized: true,
+      }),
+    /no existing deadline/,
+  );
+});
+
+// ── codex review 修正 #1：goal amend 保留 deadline 子对象（regression） ─────────────────────────────
+test('goalAmend preserves the deadline sub-object (含确认态/rev) across a scope change', () => {
+  const board = ddlBoard({
+    state: 'confirmed',
+    at: '2026-08-01T09:00:00Z',
+    kind: 'hard',
+    rev: 3,
+    provenance: { source: 'user-reply' },
+    updated_at: '2026-07-16T10:00:00Z',
+  });
+  const out = m.goalAmend(board, {
+    summary: '收窄范围',
+    reason: '用户收窄',
+    assurance: 'asserted',
+  });
+  assert.equal(out.goal_contract.revision, 2, 'goal amend bumps goal revision');
+  assert.deepEqual(out.goal_contract.deadline, {
+    state: 'confirmed',
+    at: '2026-08-01T09:00:00Z',
+    kind: 'hard',
+    rev: 3,
+    provenance: { source: 'user-reply' },
+    updated_at: '2026-07-16T10:00:00Z',
+  });
+});
+
+// ── D2-FIX regression：goal set 保留 deadline 子对象（fresh-skeleton 重建路径） ─────────────────────
+//   端点复现：`goal deadline set` 在 fresh-skeleton 板上挂了候选 deadline（isFreshGoalSkeleton 只看
+//   revision/assurance/brief/goal 文本，不看 deadline），随后 `goal set --summary ...` 重建
+//   goal_contract 时若不像 goalAmend 那样搬运 deadline，deadline 会被静默清空（readDeadline 视缺失键为
+//   pending/未询问）——本测试钉死修复后 deadline 原样幸存。
+test('goalSet preserves an existing deadline sub-object when finalizing summary over a fresh skeleton', () => {
+  const board = baseBoard();
+  board.goal = '';
+  board.goal_contract = {
+    schema: 'ccm/goal-contract/v1',
+    revision: 1,
+    assurance: 'pending',
+    updated_at: '2026-07-16T10:00:00Z',
+    deadline: {
+      state: 'asserted',
+      at: '2026-08-01T09:00:00Z',
+      precision: 'minute',
+      kind: 'hard',
+      rev: 1,
+      provenance: { source: 'cli-flag' },
+      updated_at: '2026-07-16T10:00:00Z',
+    },
+  };
+  const out = m.goalSet(board, { summary: '交付 draft PR 并等待人工评审', assurance: 'asserted' });
+  assert.equal(out.goal, '交付 draft PR 并等待人工评审');
+  assert.equal(out.goal_contract.revision, 1, 'goal set on fresh skeleton stays revision 1');
+  assert.equal(out.goal_contract.assurance, 'asserted');
+  assert.deepEqual(out.goal_contract.deadline, {
+    state: 'asserted',
+    at: '2026-08-01T09:00:00Z',
+    precision: 'minute',
+    kind: 'hard',
+    rev: 1,
+    provenance: { source: 'cli-flag' },
+    updated_at: '2026-07-16T10:00:00Z',
+  });
+});
+
+test('goalSet on a genuinely first-ever contract (no prior goal_contract) carries no deadline key', () => {
+  const board = baseBoard();
+  delete board.goal_contract;
+  const out = m.goalSet(board, { summary: '首次立项', assurance: 'asserted' });
+  assert.equal(out.goal_contract.deadline, undefined);
+});
+
+// ── bypass 封堵：泛型 --set 不能改 goal_contract（含 deadline）─────────────────────────────────────
+test('applySet refuses to write goal_contract subtree (deadline bypass 封堵)', () => {
+  assert.throws(
+    () => m.applySet(ddlBoard(), 'goal_contract.deadline.at', '2026-09-01T09:00:00Z'),
+    /goal_contract/,
+  );
+  assert.throws(
+    () => m.applySet(ddlBoard(), 'goal_contract.assurance', 'confirmed'),
+    /goal_contract/,
+  );
+});

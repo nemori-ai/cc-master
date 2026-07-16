@@ -605,6 +605,55 @@ export const REGISTRY: Registry = {
       examples: ['ccm goal check --json'],
       handler: 'goal.check',
     },
+    deadline: {
+      summary:
+        '交付 DDL 生命周期：goal deadline set|confirm|confirm-none|amend|show（goal_contract.deadline·issue #149）',
+      read: false,
+      positionals: [{ name: 'set|confirm|confirm-none|amend|show', required: true }],
+      options: {
+        at: {
+          type: 'string',
+          desc: 'set/amend：严格 ISO-8601 UTC 交付时刻（precision=day 时可给 YYYY-MM-DD·落当日末刻 23:59:59Z）',
+        },
+        precision: {
+          type: 'string',
+          enum: ['minute', 'day'],
+          desc: '截止精度（默认 minute；day 落当日 UTC 末刻·须带 --tz-input）',
+        },
+        assurance: {
+          type: 'string',
+          enum: ['pending', 'asserted'],
+          desc: 'set：候选态（默认 asserted·无歧义绝对时刻/显式 --ddl；pending 用于识别到候选但仍歧义）',
+        },
+        'provenance-raw': {
+          type: 'string',
+          desc: '原始交付期表达（审计留痕·如「8月1日下午5点前（北京时间）」）',
+        },
+        source: {
+          type: 'string',
+          enum: ['goal-evidence', 'cli-flag', 'user-reply'],
+          desc: 'DDL 值来源（审计）',
+        },
+        'tz-input': {
+          type: 'string',
+          desc: 'IANA 时区名（用户给本地时刻/日期时的假定时区·precision=day 时必填）',
+        },
+        reason: { type: 'string', desc: 'amend：相对上一截止期的变更原因（强制·审计）' },
+        'user-authorized': {
+          type: 'boolean',
+          desc: 'confirm/confirm-none/amend：声明用户明确授权；agent 不得自授权',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm goal deadline set --at 2026-08-01T09:00:00Z --source cli-flag --assurance asserted --json',
+        'ccm goal deadline confirm --user-authorized --json',
+        'ccm goal deadline confirm-none --user-authorized --json',
+        'ccm goal deadline amend --at 2026-08-05T09:00:00Z --reason "用户批准延期 4 天" --user-authorized --json',
+        'ccm goal deadline show --json',
+      ],
+      handler: 'goal.deadline',
+    },
   },
 
   // ════════════════════ declared delivery/dependency truth（ADR-036）════════════════════════════
@@ -2331,6 +2380,32 @@ export const REGISTRY: Registry = {
         'ccm estimate cost-to-complete --scope this-repo --seed 42 --json',
       ],
       handler: 'estimate.costToComplete',
+    },
+    'deadline-risk': {
+      summary:
+        '交付 DDL 风险 verdict（on_time_probability 只来自 RCPSP-in-trial + 六态 risk band + top drivers·诚实降级）',
+      read: true,
+      positionals: [],
+      options: {
+        scope: {
+          type: 'string',
+          enum: ['home', 'this-repo', 'this-board'],
+          desc: '历史语料范围（默认 home·跨板多层收缩）',
+        },
+        'as-of': { type: 'string', desc: 'as-of 时刻（ISO-8601 UTC·backtest 用·默认 now）' },
+        runs: { type: 'string', desc: 'MC trials（默认 2000）' },
+        seed: { type: 'string', desc: 'PRNG 种子（复现·默认 42）' },
+        'effective-n': {
+          type: 'string',
+          desc: '号池有效配额份数覆写（只缩 throughput 参考·非 verdict）',
+        },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm estimate deadline-risk',
+        'ccm estimate deadline-risk --scope this-board --seed 42 --json',
+      ],
+      handler: 'estimate.deadlineRisk',
     },
   },
 

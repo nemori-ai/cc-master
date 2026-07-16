@@ -259,6 +259,10 @@ test('INVARIANTS catalog covers the key v2 rules at the agreed levels (spec §5)
   assert.equal(lvl('BIZ-EXTERNAL-ARTIFACT'), 'warn');
   // done 真语义：status=done 必须有 verified + artifact 证据。
   assert.equal(lvl('BIZ-DONE-VERIFIED'), 'hard');
+  // 交付 DDL（issue #149）：形状 hard、未 settle/已过期 warn。
+  assert.equal(lvl('FMT-DEADLINE'), 'hard');
+  assert.equal(lvl('BIZ-DEADLINE-PENDING'), 'warn');
+  assert.equal(lvl('BIZ-DEADLINE-OVERDUE'), 'warn');
 });
 
 test('invariant(id) looks up the full entry; unknown id → undefined', () => {

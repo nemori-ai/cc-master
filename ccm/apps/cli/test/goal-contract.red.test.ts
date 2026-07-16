@@ -8,6 +8,7 @@ test('GC-09: registry exposes the dedicated goal lifecycle', () => {
     'amend',
     'check',
     'confirm',
+    'deadline',
     'set',
     'show',
   ]);

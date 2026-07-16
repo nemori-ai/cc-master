@@ -39,7 +39,7 @@ const EXPECTED: Record<string, string[]> = {
     'stamp-harness',
     'enable-contract',
   ],
-  goal: ['set', 'confirm', 'amend', 'show', 'check'],
+  goal: ['set', 'confirm', 'amend', 'show', 'check', 'deadline'],
   baseline: ['snapshot', 'show', 'reset'],
   task: [
     'add',
@@ -75,7 +75,7 @@ const EXPECTED: Record<string, string[]> = {
   peers: ['list'],
   coordination: ['inbox', 'notify', 'arbitrate', 'subscription'],
   usage: ['show', 'advise', 'task-cost', 'burn-rate', 'runway'],
-  estimate: ['show', 'forecast', 'evm', 'velocity', 'risk', 'cost-to-complete'],
+  estimate: ['show', 'forecast', 'evm', 'velocity', 'risk', 'cost-to-complete', 'deadline-risk'],
   account: ['add', 'refresh', 'delete', 'list', 'switch'],
   'status-report': ['render', 'write', 'show', 'watch'],
   statusline: ['render', 'install', 'uninstall'],

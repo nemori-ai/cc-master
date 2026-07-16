@@ -27,9 +27,11 @@ import {
   boardRepo,
   calibrate,
   calibratedEstimate,
+  computeDeadlineRisk,
   computeEvm,
   conformalInterval,
   cycleTimeSle,
+  type DeadlineRiskResult,
   type DoneRecord,
   dispersionCv,
   dualChannelConsistency,
@@ -42,6 +44,7 @@ import {
   type NodeMcParam,
   pctCostToCompleteMonteCarlo,
   type QueryCase,
+  readDeadline,
   sizeProjectBuffer,
   throughputMonteCarlo,
   tokenWeightedShares,
@@ -367,6 +370,10 @@ export function forecast(ctx: Ctx): number {
       const confidence: 'high' | 'medium' | 'low' =
         records.length >= 10 ? 'medium' : records.length > 0 ? 'low' : 'low';
 
+      // DDL margin/risk 摘要（issue #149·D6）：板有 asserted/confirmed DDL 时附相对 DDL 的 margin + risk band
+      //   （复用 deadline-risk 单一 SSOT·不重算·红线3）。无 DDL → null（诚实 n/a·不假绿·不为无 DDL 板白跑 MC）。
+      const ddlRisk = deadlineRiskSummary(b, c);
+
       const data = {
         forecast: forecastEta,
         makespan: est
@@ -400,6 +407,8 @@ export function forecast(ctx: Ctx): number {
         effective_n: effectiveN,
         as_of: asOfISO(nowMs),
         source: records.length > 0 ? 'calibrated' : 'estimate',
+        // deadline_risk：相对交付 DDL 的 margin/风险摘要（null = 无已确认/断言 DDL·issue #149·D6）。
+        deadline_risk: ddlRisk,
         notes,
       };
 
@@ -429,6 +438,16 @@ export function forecast(ctx: Ctx): number {
         );
       if (data.consistency?.warning)
         lines.push(`  ⚠ consistency: deviation=${data.consistency.deviation}`);
+      if (ddlRisk) {
+        const m = ddlRisk.margin as { p50_h: number; p80_h: number; p95_h: number } | null;
+        lines.push(
+          `  DDL: ${ddlRisk.deadline}（${ddlRisk.deadline_state}）·remaining=${ddlRisk.time_remaining_hours != null ? `${ddlRisk.time_remaining_hours}h` : 'N/A'}·risk=${ddlRisk.risk_band}(${ddlRisk.strength})·P(on-time)=${ddlRisk.on_time_probability ?? 'unknown'}`,
+        );
+        if (m)
+          lines.push(
+            `  DDL margin: p50=${fmtMargin(m.p50_h)} p80=${fmtMargin(m.p80_h)} p95=${fmtMargin(m.p95_h)}（负=越过 DDL·基准 ${(ddlRisk.margin as { basis?: string })?.basis ?? 'n/a'}）`,
+          );
+      }
       for (const n of notes) lines.push(`  note: ${n}`);
       return `${lines.join('\n')}\n`;
     },
@@ -625,6 +644,158 @@ export function risk(ctx: Ctx): number {
   });
 }
 
+// ── estimate deadline-risk ──────────────────────────────────────────────────────────────
+//   交付 DDL 风险 verdict（issue #149·契约 §4.3）：读 goal_contract.deadline → 三通道 MC
+//   （precedence 乐观下界 + RCPSP-in-trial 唯一 verdict 源 + throughput heuristic 参考·绝不做 verdict）→
+//   on_time_probability（**只来自 RCPSP-in-trial**）/ 分位 margin / 六态 risk band / top drivers / 诚实降级。
+//   hook 只搬运不重算（红线3）。无 DDL / 含环 / 无估值 / 低置信 / 严重分歧 / RCPSP 不可用 → risk_band unknown（绝不假绿）。
+//   --scope·--as-of·--runs（默认 2000）·--seed（默认 42·确定性可复现）·--effective-n。runRead 纯只读零写。
+// deadlineRiskResult(b, c) → 完整 DeadlineRiskResult（契约 §4.3）。**单一计算路径 SSOT**：
+//   `deadline-risk` endpoint 与 `forecast` 的 DDL 摘要块共用它（复用 computeDeadlineRisk·不重算·红线3）。
+//   读 goal_contract.deadline（readDeadline）→ buildMcParams → 三通道 MC → verdict。无 DDL/含环/低置信 → unknown。
+function deadlineRiskResult(b: BoardArg, c: Ctx): DeadlineRiskResult {
+  const nowMs = nowMsOf(c);
+  const { records, scope } = loadScopedCorpus(b, c, nowMs);
+  const runs = intFlag(c.values.runs, 2000);
+  const seed = intFlag(c.values.seed, 42);
+  const effectiveN = effectiveNFlag(c.values['effective-n']);
+  const coverage = estimateCoverage(b, nowMs);
+  const backlog = backlogCount(b, nowMs);
+  const wip = wipLimitOf(b);
+  const params = buildMcParams(b, records, nowMs);
+
+  const dl = readDeadline(b);
+  // statusMap（top_drivers 的 blocked 类·id → {status, blocked_on}）。
+  const tasks = Array.isArray(b?.tasks) ? (b.tasks as Array<Record<string, unknown>>) : [];
+  const statusMap = new Map<string, { status?: string; blocked_on?: string }>();
+  for (const t of tasks) {
+    const id = typeof t.id === 'string' ? t.id : '';
+    if (!id) continue;
+    statusMap.set(id, {
+      status: typeof t.status === 'string' ? t.status : undefined,
+      blocked_on: typeof t.blocked_on === 'string' ? t.blocked_on : undefined,
+    });
+  }
+
+  // latency 降档阶梯（契约 latency 预算·D3A：RCPSP 线性于 trials·线性于 N）。埋好防极端大图、别真限时
+  //   （无 wall-clock 计时）：按 DAG 规模 × trials 保守乘积估降 rcpsp runs 2000→1000→500→disabled(unknown)。
+  const nodeCount = tasks.length;
+  const ladder = pickRcpspRuns(nodeCount, runs);
+
+  const data = computeDeadlineRisk(b, {
+    deadlineAtMs: dl.at_ms,
+    deadlineState: dl.state,
+    asOfMs: nowMs,
+    records,
+    calibParams: params,
+    backlog,
+    wip,
+    runs,
+    seed,
+    effectiveN,
+    scope,
+    historyN: records.length,
+    coveragePct: coverage,
+    statusMap,
+    rcpspRuns: ladder.rcpspRuns,
+    rcpspDisabled: ladder.rcpspDisabled,
+  });
+  if (ladder.rcpspRuns != null && ladder.rcpspRuns < runs && !ladder.rcpspDisabled)
+    data.notes.push(
+      `RCPSP-in-trial 按图规模降档 trials ${runs}→${ladder.rcpspRuns}（latency 预算·线性于 trials·别真限时）`,
+    );
+  return data;
+}
+
+// deadlineRiskSummary(b, c) → forecast 内嵌的 DDL margin/risk 摘要块（board 有 asserted/confirmed DDL 时）。
+//   复用 deadlineRiskResult（同 endpoint 单一 SSOT·margin/band 与 `estimate deadline-risk` 逐字段一致）。
+//   无已 settle 且带 at 的 DDL（pending / none / 键缺失）→ null（不显示·诚实 n/a·避免为无 DDL 板白跑 MC）。
+function deadlineRiskSummary(b: BoardArg, c: Ctx): Record<string, unknown> | null {
+  const dl = readDeadline(b);
+  if (!dl.settled || dl.at_ms == null) return null; // pending/none/缺失 → 不附摘要（n/a）
+  const dr = deadlineRiskResult(b, c);
+  return {
+    deadline: dr.deadline,
+    deadline_state: dr.deadline_state,
+    time_remaining_hours: dr.time_remaining_hours,
+    risk_band: dr.risk_band,
+    strength: dr.strength,
+    on_time_probability: dr.on_time_probability,
+    margin: dr.margin,
+    confidence: dr.confidence,
+    coverage_pct: dr.coverage_pct,
+    calibration_status: dr.calibration_status,
+  };
+}
+
+export function deadlineRisk(ctx: Ctx): number {
+  return runRead(ctx, {
+    render: (board, c) => {
+      const b = board as BoardArg;
+      const data = deadlineRiskResult(b, c);
+      const scope = data.scope;
+      const runs = data.runs;
+      const seed = data.seed;
+      const coverage = data.coverage_pct;
+
+      if (c.flags.json) return JSON.stringify({ ok: true, data });
+      const lines = [
+        `estimate deadline-risk（scope=${scope}·runs=${runs}·seed=${seed}·coverage=${coverage}%）`,
+        `  deadline=${data.deadline ?? 'N/A'}（state=${data.deadline_state}）·time_remaining=${data.time_remaining_hours != null ? `${data.time_remaining_hours}h` : 'N/A'}`,
+        `  risk_band=${data.risk_band}·strength=${data.strength}·on_time_probability=${data.on_time_probability ?? 'unknown'}（src=${data.on_time_probability_source}）`,
+        `  calibration=${data.calibration_status}·confidence=${data.confidence}·coverage=${data.coverage_pct}%·history_n=${data.history_n}`,
+      ];
+      if (data.channels.resource_aware)
+        lines.push(
+          `  rcpsp(verdict): P=${data.channels.resource_aware.on_time_probability}·makespan p50/p80/p95=${data.channels.resource_aware.makespan_p50_h}/${data.channels.resource_aware.makespan_p80_h}/${data.channels.resource_aware.makespan_p95_h}h·wip=${data.channels.resource_aware.wip ?? '∞'}`,
+        );
+      if (data.channels.precedence_only)
+        lines.push(
+          `  precedence(乐观下界): P=${data.channels.precedence_only.on_time_probability}·makespan p50/p80/p95=${data.channels.precedence_only.makespan_p50_h}/${data.channels.precedence_only.makespan_p80_h}/${data.channels.precedence_only.makespan_p95_h}h`,
+        );
+      if (data.channel_disagreement != null)
+        lines.push(`  channel_disagreement=${data.channel_disagreement}`);
+      if (data.top_drivers.length)
+        lines.push(
+          `  top_drivers: ${data.top_drivers
+            .slice(0, 3)
+            .map((d) => `${d.id}(${d.reason})`)
+            .join(', ')}`,
+        );
+      for (const n of data.notes) lines.push(`  note: ${n}`);
+      return `${lines.join('\n')}\n`;
+    },
+  });
+}
+
+// wipLimitOf(board) → scheduling.wip_limit（RCPSP 资源约束·缺/≤0 → ∞ 无资源闸）。
+function wipLimitOf(board: BoardArg): number {
+  const s =
+    board && typeof board === 'object' ? (board as Record<string, unknown>).scheduling : null;
+  const w =
+    s && typeof s === 'object' && !Array.isArray(s)
+      ? (s as Record<string, unknown>).wip_limit
+      : null;
+  return typeof w === 'number' && w > 0 ? w : Number.POSITIVE_INFINITY;
+}
+
+// pickRcpspRuns(nodeCount, runs) → RCPSP latency 降档阶梯（别真限时·按 DAG 规模 × trials 保守乘积估）。
+//   D3A 实测：283 节点·2000 trials ≈ 450ms（10s hook budget 下 19× headroom）·latency 线性于 nodeCount·trials。
+//   乘积 proxy（nodeCount × trials）：≤6M full → ≤12M 半 → ≤24M 四分之一 → >24M disabled（unknown·**绝不退 throughput**）。
+//   现实板（≤数百节点）永远落 full；仅极端大图（数千节点）才降档——埋好、不真限时。
+function pickRcpspRuns(
+  nodeCount: number,
+  runs: number,
+): { rcpspRuns: number | null; rcpspDisabled: boolean } {
+  const product = Math.max(0, nodeCount) * Math.max(1, runs);
+  if (product <= 6_000_000) return { rcpspRuns: runs, rcpspDisabled: false };
+  if (product <= 12_000_000)
+    return { rcpspRuns: Math.max(1, Math.floor(runs / 2)), rcpspDisabled: false };
+  if (product <= 24_000_000)
+    return { rcpspRuns: Math.max(1, Math.floor(runs / 4)), rcpspDisabled: false };
+  return { rcpspRuns: 0, rcpspDisabled: true };
+}
+
 // ── estimate cost-to-complete ──────────────────────────────────────────────────────────────
 //   %-cost-to-complete（偿付力维·plan §4）：剩余 backlog × 每单位工作的配额% 增量（throughput 式 MC·复用
 //   pctCostToCompleteMonteCarlo）→ 清空剩余工作的总配额% P50/P80/P95。**配额% 是权威预算账本**（plan §1.2）。
@@ -810,6 +981,11 @@ function effectiveNFlag(v: unknown): number {
 }
 function fmtH(h: number | null | undefined): string {
   return typeof h === 'number' && Number.isFinite(h) ? `${h}h` : 'N/A';
+}
+// fmtMargin(h) → 带符号的余量小时（+ = DDL 前完成·− = 越过 DDL·issue #149·D6 人读）。
+function fmtMargin(h: number | null | undefined): string {
+  if (typeof h !== 'number' || !Number.isFinite(h)) return 'N/A';
+  return `${h >= 0 ? '+' : ''}${h}h`;
 }
 function fmtNum(x: number | null | undefined): string {
   return typeof x === 'number' && Number.isFinite(x) ? String(x) : 'N/A';

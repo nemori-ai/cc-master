@@ -63,7 +63,9 @@ export const ENUMS = {
   // coordPriority：board.coordination.priority 板级优先级五挡（COORD·跨板协调 hint·非板内任务排序·见 §5.1）。
   //   有序高→低：urgent > high > normal（默认）> low > trivial。
   coordPriority: ['urgent', 'high', 'normal', 'low', 'trivial'],
-  // notificationKind：coordination.inbox[] 的闭合通知类型（ADR-032·池中介 + HITL / artifact Tier2）。
+  // notificationKind：coordination.inbox[] 的闭合通知类型（ADR-032·池中介 + HITL / artifact Tier2·
+  //   deadline_risk = 交付 DDL 风险 durable 审计条目·issue #149·deadline-risk hook 直接注入后立即 self-ack·
+  //   durable 只作审计 / 跨 session 留痕、不二次投递）。
   notificationKind: [
     'pacing_throttle',
     'pacing_yield',
@@ -73,6 +75,7 @@ export const ENUMS = {
     'hitl_turn',
     'artifact_serialize',
     'quota_state_change',
+    'deadline_risk',
   ],
   // acceptance 目标函数 criterion 的 kind / status（spec §4.1）。
   acceptanceKind: ['test', 'metric', 'manual', 'review'],
@@ -81,6 +84,17 @@ export const ENUMS = {
   reviewVerdict: ['APPROVE', 'REQUEST-CHANGES'],
   // Goal Contract 的确认级别（ADR-035）。pending/ asserted 可由 agent 写；confirmed 由 CLI 授权闸控制。
   goalAssurance: ['pending', 'asserted', 'confirmed'],
+  // ── 交付 DDL（goal_contract.deadline·issue #149）───────────────────────────────────────────────────
+  // deadlineState：交付截止期的 settledness 状态机（与 goal assurance 正交·四态）。
+  //   pending = 已询问/识别候选但未 settle；asserted = 无歧义 evidence/--ddl 转写的候选（可逆推进）；
+  //   confirmed = 用户明确确认（--user-authorized）；none = 用户明确确认「本目标无 DDL」（≠ 键缺失/未询问）。
+  deadlineState: ['pending', 'asserted', 'confirmed', 'none'],
+  // deadlineKind：硬承诺 vs 软目标（v1 恒 hard·soft 的行为差异作 follow-up·字段名预留）。
+  deadlineKind: ['hard', 'soft'],
+  // deadlinePrecision：截止时刻精度。minute = 精确到秒的挂钟时刻；day = 只给日期（落当日 UTC 末刻 23:59:59Z）。
+  deadlinePrecision: ['minute', 'day'],
+  // deadlineSource：deadline 值的来源（审计·不参与 risk 计算）。
+  deadlineSource: ['goal-evidence', 'cli-flag', 'user-reply'],
   // ── Agent Registry（board ✎ 段 agents[]·跨所有派发类型的统一运行时登记簿）──────────────────────────
   //   agent = 实际跑起来的运行时实例（runtime 层），与 task.executor（planning 层的计划执行者类型）正交、不合并。
   // agentType：被登记的运行时实例种类（凡派发皆登记·闭合）。
@@ -200,13 +214,16 @@ export const FIELDS = {
     },
     goal_contract: {
       tier: '👁',
-      type: 'object{schema:"ccm/goal-contract/v1",revision:int>=1,assurance:pending|asserted|confirmed,brief?:{ref,sha256},updated_at:ISO}?',
-      default: 'legacy board 可缺；fresh board 建 revision=1,pending skeleton',
-      readers: 'orchestrator resume/re-ground + reinject/verify-board lifecycle guard + viewer',
-      writers: 'ccm goal set|confirm|amend（专属生命周期）',
-      when: 'fresh framing / 用户确认 / 目标语义 amendment',
+      type: 'object{schema:"ccm/goal-contract/v1",revision:int>=1,assurance:pending|asserted|confirmed,brief?:{ref,sha256},deadline?:{state:pending|asserted|confirmed|none,at?:ISO,precision?:minute|day,kind?:hard|soft,provenance?:{raw?,source?,tz_input?},updated_at:ISO},updated_at:ISO}?',
+      default:
+        'legacy board 可缺；fresh board 建 revision=1,pending skeleton；deadline 子对象缺=未询问(视同 pending)',
+      readers:
+        'orchestrator resume/re-ground + reinject/verify-board lifecycle guard + viewer + deadline-risk endpoint 读 deadline.at 比 forecast',
+      writers:
+        'ccm goal set|confirm|amend + ccm goal deadline set|confirm|confirm-none|amend（专属生命周期）',
+      when: 'fresh framing / 用户确认 / 目标语义 amendment / 截止期设定与变更',
       degrade:
-        '缺→legacy；形状坏→hard(FMT-GOAL-CONTRACT)；pending+可执行任务→warn(BIZ-GOAL-PENDING)',
+        '缺→legacy；形状坏→hard(FMT-GOAL-CONTRACT)；pending+可执行任务→warn(BIZ-GOAL-PENDING)；deadline 形状坏→hard(FMT-DEADLINE)；deadline 未 settle+可执行任务→warn(BIZ-DEADLINE-PENDING)；已过期→warn(BIZ-DEADLINE-OVERDUE)',
     },
     owner: {
       tier: '🔒',
@@ -325,12 +342,12 @@ export const FIELDS = {
     },
     runtime: {
       tier: '✎',
-      type: 'object{ last_identity_remind?: ISO, last_critpath_remind?: ISO, last_goal_remind?: ISO, last_account_switch?: ISO, stop_allow_until?: ISO, ... }?',
+      type: 'object{ last_identity_remind?: ISO, last_critpath_remind?: ISO, last_goal_remind?: ISO, last_account_switch?: ISO, stop_allow_until?: ISO, last_deadline_risk_check?: ISO, last_deadline_risk_fingerprint?: string, ... }?',
       default: '缺省(无 runtime 参数)',
       readers:
-        'IDNUDGE hook 读 last_identity_remind / critpath-nudge hook 读 last_critpath_remind 判阈值 / goal-alignment nudge 读 last_goal_remind 对齐 Goal Contract revision / usage-pacing hook 读 last_account_switch 注入换号 ambient(ADR-024) / Codex Stop hook 读 stop_allow_until 判是否释放 decision:block；未来其它周期 hook/script',
+        'IDNUDGE hook 读 last_identity_remind / critpath-nudge hook 读 last_critpath_remind 判阈值 / goal-alignment nudge 读 last_goal_remind 对齐 Goal Contract revision / usage-pacing hook 读 last_account_switch 注入换号 ambient(ADR-024) / Codex Stop hook 读 stop_allow_until 判是否释放 decision:block / deadline-risk hook 读 last_deadline_risk_check 判周期重估阈值 + last_deadline_risk_fingerprint 判 risk-input 是否变更(issue #149)；未来其它周期 hook/script',
       writers: 'hook 经 ccm board set-param（带锁·hook-owned 参数区·ADR-020）/ agent 经 ccm',
-      when: '周期 identity/critpath/goal hook 注入提示后刷簿记时间戳；agent 独立确认本板可停止后写短期 stop_allow_until',
+      when: '周期 identity/critpath/goal/deadline-risk hook 注入提示后刷簿记时间戳；agent 独立确认本板可停止后写短期 stop_allow_until',
       degrade: '缺→视为「从未提示」(首次必提示)；形状坏→warn(FMT-RUNTIME)·不拦写盘',
     },
     agents: {
@@ -744,6 +761,29 @@ export const INVARIANTS: Invariant[] = [
     family: 'BIZ',
     scope: 'board',
     summary: 'pending Goal Contract 不应已有 ready/in_flight/uncertain 执行任务',
+  },
+  {
+    id: 'FMT-DEADLINE',
+    level: 'hard',
+    family: 'FMT',
+    scope: 'board',
+    summary:
+      'goal_contract.deadline 若存在，state/at/precision/kind/provenance 形状合法（asserted|confirmed 须带 ISO at；none 不带 at）',
+  },
+  {
+    id: 'BIZ-DEADLINE-PENDING',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'board',
+    summary:
+      '交付 DDL 未 settle（键缺失或 state==pending）却已有 ready/in_flight/uncertain 执行任务',
+  },
+  {
+    id: 'BIZ-DEADLINE-OVERDUE',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'board',
+    summary: '交付 DDL（asserted|confirmed）已过期（now>=at）而全局 acceptance 未完成',
   },
   {
     id: 'FMT-GIT',
@@ -1282,6 +1322,147 @@ export function levelOf(id: string): Invariant['level'] | undefined {
 export const ISO_UTC_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 export function isISOUTC(v: unknown): boolean {
   return typeof v === 'string' && ISO_UTC_RE.test(v);
+}
+
+// ── 交付 DDL（goal_contract.deadline·issue #149）共享谓词/reader（lint 与 CLI 与下游 endpoint 一份口径）──
+//   deadline 是 👁 非窄腰字段（嵌在已是 👁 的 goal_contract 内）——hook 缺则优雅降级，不属 🔒。
+//   这里收口「什么是合法 deadline 形状 + 怎么读它 + 怎么判 settle/门控」三件事，杜绝 lint/mutation/endpoint 三处漂移。
+
+// DATE_PREFIX_RE：从 --at 值抽取 YYYY-MM-DD 日期前缀（precision=day 归一到当日末刻用）。
+export const DATE_PREFIX_RE = /^(\d{4}-\d{2}-\d{2})/;
+// precision=day 的约定末刻：当日 UTC 23:59:59Z（「8/1 交付」= 8/1 当天任意时刻到期，取当日末刻，
+//   避免把「当日交付」误当「当日 00:00 交付」而虚增紧迫）。
+export const DEADLINE_DAY_END_TIME = 'T23:59:59Z';
+
+// normalizeDeadlineAt(rawAt, precision) → 规范化后的严格 ISO-8601 UTC；非法 → null。
+//   · precision='day'：接受裸日期 YYYY-MM-DD 或完整 ISO，抽日期前缀落当日末刻 23:59:59Z。
+//   · precision='minute'（默认）：要求已是严格 ISO-8601 UTC，原样返回；否则 null（时区/相对日期归 agent·ccm 不解析）。
+export function normalizeDeadlineAt(
+  rawAt: unknown,
+  precision: 'minute' | 'day' = 'minute',
+): string | null {
+  if (typeof rawAt !== 'string' || rawAt.trim() === '') return null;
+  const at = rawAt.trim();
+  if (precision === 'day') {
+    const m = DATE_PREFIX_RE.exec(at);
+    if (!m) return null;
+    const candidate = `${m[1]}${DEADLINE_DAY_END_TIME}`;
+    // 校验日期本身合法（如 2026-13-40 会被 Date 归一/拒绝）：round-trip 回 ISO 秒级须一致。
+    const parsed = new Date(candidate);
+    if (Number.isNaN(parsed.getTime())) return null;
+    if (parsed.toISOString().replace(/\.\d{3}Z$/, 'Z') !== candidate) return null;
+    return candidate;
+  }
+  return isISOUTC(at) ? at : null;
+}
+
+// DeadlineView：deadline 的规范化只读视图（供 CLI show / goal check / 下游 deadline-risk endpoint / viewer 复用）。
+export interface DeadlineView {
+  present: boolean; // deadline 键是否存在（false = 未询问）
+  state: 'pending' | 'asserted' | 'confirmed' | 'none';
+  at: string | null; // ISO-8601 UTC 或 null
+  at_ms: number | null; // Date.parse(at) 或 null
+  precision: 'minute' | 'day';
+  kind: 'hard' | 'soft';
+  rev: number | null; // 单调递增修订号（每次 set/confirm/confirm-none/amend +1·与 board.log 审计配套）
+  provenance: { raw?: string; source?: string; tz_input?: string } | null;
+  updated_at: string | null;
+  settled: boolean; // state ∈ {asserted, confirmed, none} —— 放行 dispatch
+  gating: boolean; // 键缺失 或 state==pending —— 门控 dispatch（未 settle 不派发）
+}
+
+// readDeadline(board) → DeadlineView：从 board.goal_contract.deadline 读规范化视图。
+//   键缺失（含 goal_contract 缺失）→ present:false, state:'pending', gating:true（「未询问」视同门控态）。
+//   形状坏字段做保守降级（不 throw）——严格形状校验归 lint（isDeadlineWellShaped / FMT-DEADLINE）。
+export function readDeadline(board: unknown): DeadlineView {
+  const empty: DeadlineView = {
+    present: false,
+    state: 'pending',
+    at: null,
+    at_ms: null,
+    precision: 'minute',
+    kind: 'hard',
+    rev: null,
+    provenance: null,
+    updated_at: null,
+    settled: false,
+    gating: true,
+  };
+  if (!board || typeof board !== 'object' || Array.isArray(board)) return empty;
+  const contract = (board as Record<string, unknown>).goal_contract;
+  if (!contract || typeof contract !== 'object' || Array.isArray(contract)) return empty;
+  const dl = (contract as Record<string, unknown>).deadline;
+  if (dl === undefined || dl === null || typeof dl !== 'object' || Array.isArray(dl)) return empty;
+  const d = dl as Record<string, unknown>;
+  const state = isEnumMember('deadlineState', d.state)
+    ? (d.state as DeadlineView['state'])
+    : 'pending';
+  const at = isISOUTC(d.at) ? (d.at as string) : null;
+  const precision = isEnumMember('deadlinePrecision', d.precision)
+    ? (d.precision as 'minute' | 'day')
+    : 'minute';
+  const kind = isEnumMember('deadlineKind', d.kind) ? (d.kind as 'hard' | 'soft') : 'hard';
+  const prov =
+    d.provenance && typeof d.provenance === 'object' && !Array.isArray(d.provenance)
+      ? (d.provenance as DeadlineView['provenance'])
+      : null;
+  const settled = state === 'asserted' || state === 'confirmed' || state === 'none';
+  return {
+    present: true,
+    state,
+    at,
+    at_ms: at ? Date.parse(at) : null,
+    precision,
+    kind,
+    rev: Number.isInteger(d.rev) && (d.rev as number) >= 1 ? (d.rev as number) : null,
+    provenance: prov,
+    updated_at: isISOUTC(d.updated_at) ? (d.updated_at as string) : null,
+    settled,
+    gating: !settled, // 键存在但 state==pending → 门控
+  };
+}
+
+// isDeadlineSettled(board) → deadline 是否已 settle（asserted|confirmed|none·放行 dispatch）。
+export function isDeadlineSettled(board: unknown): boolean {
+  return readDeadline(board).settled;
+}
+
+// DEADLINE_KIND_V1_ALLOWED：v1 只接受 hard（soft 在 deadlineKind 枚举里预留但行为未定义——FMT-DEADLINE
+//   拒它，避免「schema 合法但语义未定义」的状态·codex review 修正 #3）。将来落 soft 行为差异时放开这里。
+export const DEADLINE_KIND_V1_ALLOWED = ['hard'];
+
+// isDeadlineWellShaped(deadline) → deadline 子对象形状是否合法（FMT-DEADLINE hard 判据·present 才校验）。
+//   · state 须 ∈ deadlineState 枚举。
+//   · state ∈ {asserted, confirmed}：at 必存在且严格 ISO-8601 UTC。
+//   · state === 'none'：不得带 at（none = 无 DDL）。
+//   · state === 'pending'：at 可无；若有须严格 ISO-8601 UTC（暂定候选）。
+//   · precision/provenance.source 若存在须合法枚举；kind 若存在 v1 只接受 'hard'；
+//     provenance.raw/tz_input 若存在须字符串；rev 若存在须整数 >=1。
+//   注：updated_at 不在本硬判据内（缺/坏走 FMT-TIME warn·不拦写盘·同 owner.heartbeat 风格）。
+export function isDeadlineWellShaped(deadline: unknown): boolean {
+  if (!deadline || typeof deadline !== 'object' || Array.isArray(deadline)) return false;
+  const d = deadline as Record<string, unknown>;
+  if (!isEnumMember('deadlineState', d.state)) return false;
+  const state = d.state as string;
+  const hasAt = d.at !== undefined && d.at !== null;
+  if (state === 'asserted' || state === 'confirmed') {
+    if (!isISOUTC(d.at)) return false;
+  } else if (state === 'none') {
+    if (hasAt) return false;
+  } else if (state === 'pending') {
+    if (hasAt && !isISOUTC(d.at)) return false;
+  }
+  if (d.precision !== undefined && !isEnumMember('deadlinePrecision', d.precision)) return false;
+  if (d.kind !== undefined && !DEADLINE_KIND_V1_ALLOWED.includes(d.kind as string)) return false;
+  if (d.rev !== undefined && (!Number.isInteger(d.rev) || (d.rev as number) < 1)) return false;
+  if (d.provenance !== undefined && d.provenance !== null) {
+    if (typeof d.provenance !== 'object' || Array.isArray(d.provenance)) return false;
+    const p = d.provenance as Record<string, unknown>;
+    if (p.source !== undefined && !isEnumMember('deadlineSource', p.source)) return false;
+    if (p.raw !== undefined && typeof p.raw !== 'string') return false;
+    if (p.tz_input !== undefined && typeof p.tz_input !== 'string') return false;
+  }
+  return true;
 }
 
 // ── 跨消费者共享谓词（lint 与 graph 一份口径，杜绝两处漂移）───────────────────────────────────────
