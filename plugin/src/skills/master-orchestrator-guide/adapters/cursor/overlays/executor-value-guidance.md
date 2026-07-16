@@ -1,4 +1,4 @@
-- **`subagent`** —— 一个终端推理单元负责：单一证据面 + 单一推理链 + 单一交付物 + context-safe + 携带 escalation 路径。默认把独立、可并行的实现工作派给 Cursor **Task** subagent。必须记录真实返回的 subagent id；没有真实 handle 就不能写 `subagent` / `in_flight`。
+- **`subagent`** —— 先从本机 harness worker pool 选择 target harness；origin harness 不是默认。一个终端推理单元负责：单一证据面 + 单一推理链 + 单一交付物 + context-safe + 携带 escalation 路径。target 是本 host 时派给 Cursor **Task** subagent；target 是其他 harness 时，在当前 origin 可追踪的后台 **Shell** session 中运行 `ccm` worker wrapper。此时 handle 来自外层后台机制，不是 wrapper 自己；没有真实 handle 就不能进入 `in_flight`。
 - **`workflow`** —— board 字段可保留这个 executor 值表达“结构化 fan-out/fan-in 工作”，但 Cursor adapter 当前不支持 Claude Code Workflow API。需要多叶子确定性控制时，用多个 Task / 后台 Shell 组合实现，并记录每个 handle；不要调用 `Workflow`。
 - **`master-orchestrator`** —— **你自己**做的那几件不可外包的活：调度决策、replan、端点验收、整合。你不为它起后台机制——它就是你在指挥台上亲手做的。
 - **`user`** —— 人类操作者负责：需判断 / 授权 / 拍板的（merge / 不可逆 / 对外 / 方向性）。surface 给用户、把回答当一条 async 依赖，别越权替他决。

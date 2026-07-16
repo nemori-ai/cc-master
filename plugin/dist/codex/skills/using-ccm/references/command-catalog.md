@@ -36,6 +36,7 @@
   - [board archive](#board-archive)
   - [board set-param](#board-set-param)
   - [board stamp-harness](#board-stamp-harness)
+  - [board enable-contract](#board-enable-contract)
 - [namespace goal](#namespace-goal)
   - [goal set](#goal-set)
   - [goal confirm](#goal-confirm)
@@ -61,6 +62,9 @@
   - [task show](#task-show)
   - [task list](#task-list)
   - [task update](#task-update)
+  - [task set-planning](#task-set-planning)
+  - [task set-routing](#task-set-routing)
+  - [task route-bind](#task-route-bind)
   - [task native-attempt-create](#task-native-attempt-create)
   - [task native-attempt-bind](#task-native-attempt-bind)
   - [task native-attempt-cancel](#task-native-attempt-cancel)
@@ -189,7 +193,7 @@ ccm <alias> [args] [flags]
 | `target` | declared delivery target：本地解析 / 显示 / 刷新冻结 snapshot；不 fetch |
 | `delivery` | candidate 对 target 的 delivered 三态检查 + ephemeral strict dry-run audit |
 | `dependency` | downstream/dependency edge 的 requirement / explain / user-authorized waiver |
-| `task` | 任务：增删改查 + 状态机（DAG 节点） |
+| `task` | 任务：增删改查 + 状态机（DAG 节点）+ opt-in planning/routing dedicated writers |
 | `log` | append-only 审计轨迹 |
 | `jc` | judgment_calls 自驱决策记录 |
 | `cadence` | 节奏 / iteration 收口 |
@@ -281,29 +285,54 @@ ccm <alias> [args] [flags]
 
 ## 跨 harness 主动查询目标事实
 
+这是 `master-orchestrator-guide` 高频派发热路径的命令面 SSOT。顺序是**发现 → 查真实 CLI → 查模型事实 → 查可证 usage/quota → 可选 shadow advice → 经 origin 后台机制显式 raw dispatch → 记真实后台 handle**；其中没有一步会自动替 orchestrator 选择或启动 worker。
+
+### 1. 发现与目标事实
+
 当前上下文没有 selected target 的事实时，用下面的只读命令面主动取得 envelope；不要从 origin-local
 事实、同品牌登录态或模型 prior 补造目标事实。
 
 ```bash
 ccm harness list --machine-wide --json
+ccm worker help --harness <codex|claude-code|cursor-agent> --scope agent
 ccm provider facts <target-provider> --json
+ccm --harness <claude-code|codex|cursor> usage show --accounts current --json
 ccm quota status --json
 ccm quota preflight --input <json|@file|-> --json
 ```
 
 - `harness list --machine-wide` 用于选择精确 execution surface；`cursor-ide-plugin` 与
   `cursor-agent-cli` 是两个 descriptor，安装、认证与资格不可互推。
+- `worker help` 经与 `worker run` 相同的 resolver，读取这台机器上**实际被选中的 executable** 的 agent-command help；provider flags 以它为准。需要 executable 顶层 flags 时另跑 `--scope root`。这比把某版 CLI 参数表复制进 skill 更抗版本漂移。
 - `provider facts` 的 `<target-provider>` 当前取 `claude-code | codex | cursor`。它返回静态、带来源与
   freshness 的模型事实，不执行 live provider probe，也不证明当前账号 entitlement 或 exact-model admission。
-- `quota status` 只回答 owner-only quota store 是否存在；`available:true` **不等于** ample headroom，
-  `available:false` 也必须保留为 unknown。
+- `ccm --harness <target> usage show --accounts current` 只读取该 adapter 当前登录账号已经实现的 usage source；它是 advisory，不是 automatic admission。`available:false`、窗口缺失或字段 unknown 必须原样保留，不能从 binary/auth/model facts、进程 RC0 或同品牌另一 surface 推出 ample。
+- `quota status` 只回答 home-scoped owner-only quota observation/reservation store 是否存在；`available:true` **不等于**某个 harness 有 ample headroom，`available:false` 也必须保留为 unknown。当前不存在一个把 harness id 当查询 key、统一返回各 harness 剩余额度的通用 `ccm quota ... --harness <X>` 读面；全局 harness selection 即使出现在进程上下文里，也不改变 `quota status` 的 store-availability 语义。
 - 只有已经持有 authority flow 给出的 `source_key`、committed `reservation_id` 与 `checked_at` 时，才把
   它们作为 `quota preflight` 输入。必须读取其 `decision`、`automatic_spawn_limit`、
   `blocking_reasons` 与 owner receipt；缺 authority reference、`automatic_spawn_limit:0` 或任一 blocker 都
-  不能授权 spawn。不要由 caller 自铸 live / policy / effect 结论。
+  不能授权 spawn。`preflight` 只重验已有 authority evidence，不会现场查询某个 harness 的剩余额度，也不会创建 observation/reservation；不要由 caller 自铸 live / policy / effect 结论。
 - 这些命令只取得和重验事实，不代替 orchestrator 的选择、用户对一次付费调用的授权或 parent 验收。
   字段如何解释查 [pacing-and-estimation 目标事实口径](../../pacing-and-estimation/references/cross-harness-target-facts.md)；是否派发归
   `master-orchestrator-guide`。
+
+### 2. advise 与显式 raw dispatch
+
+若 task 已有 planning/routing policy 且拿到了匹配 board revision 的 frozen context，可先跑：
+
+```bash
+ccm route advise <task-id> --context <json|@file|-> --origin <origin-harness> --as-of <UTC> --json
+```
+
+它永远是 pure shadow advice：输出固定 `spawned:false`，不 reserve、不建 attempt、不写 board。no-route / unknown / stale 不是“请自行猜一个候选”，而是 fail closed；即使得到 selected candidate，也仍须由 orchestrator 显式决定是否派发。
+
+真正的最小 dispatch 是：让 **origin harness 自己的后台 terminal / Shell 机制**启动下列同步 raw wrapper，并保存 origin 机制立即返回的 job/session/process handle：
+
+```bash
+ccm worker run --harness <codex|claude-code|cursor-agent> --cwd /abs/repo -- <按 worker help 组装的完整 provider argv...>
+```
+
+`worker run` 逐项透传 argv/stdin/cwd，管理 child 到 terminal，但它本身同步等待、不会返回 running handle、不会 route/fallback/选模型/切号，也不会自动写 board。**可 recon 的后台 handle 来自 origin harness 的后台机制；最终的 `ccm/worker-process-result/v1` terminal envelope 不是 running handle。**先真派发并拿到该 handle；若 board 已 opt in routing contract、selection evidence 也满足专属 gate，再用 `task route-bind` 原子记 selection/attempt/handle。只用 legacy lifecycle 时按既有 handle/status 记账，不为追求字段完整而伪造 selection。
 
 ---
 
@@ -353,6 +382,7 @@ ccm worker run --harness <codex|claude-code|cursor-agent> [--cwd <path>] [--time
   read-only、credential-zero-write 或 automatic-eligibility 声明。
 - 命令同步等待 child terminal，并管理 timeout、cancel、输出上限与自己创建的 process tree；它不跨
   parent exit、handoff 或 ccm update 存活。
+- 要把它用于长时后台 worker，必须由 origin harness 的后台 terminal / Shell 机制包住本命令；可 recon handle 是该 origin 机制返回的 job/session/process handle。最终 `ccm/worker-process-result/v1` 是 terminal 结果，不是 running handle，也不能倒推出 provider task acceptance。
 
 ---
 
@@ -434,7 +464,7 @@ ccm quota status [--home <dir>] [--json]
 ```
 
 读取 owner-only quota store。空 store 也 exit 0，并诚实返回
-`{schema:"ccm/quota-status/v1",available:false}`；missing 绝不折算成 ample。
+`{schema:"ccm/quota-status/v1",available:false}`；missing 绝不折算成 ample。本命令不是 per-harness remaining-quota reader：当前没有通用 `ccm quota ... --harness <X>` 读面，`available:true` 也只证明 store 可读。
 
 ### quota preflight
 
@@ -448,6 +478,7 @@ ticket digest 与 run lineage 后重验，caller 自给的 `live` / `policy` / `
 unknown / empty / tight / hard-stale / observation conflict / identity conflict / invalid commit 均返回
 `automatic_spawn_limit:0`。带 `requested_effect` 的 lifecycle deny 仍是零副作用纯机械判定；
 Codex/Cursor 的 account/session/credential/auth mutation request 固定 deny，effect count 为 0。
+它不以 harness id 主动抓取剩余额度、不创建 authority observation/reservation；没有既存 authority refs 就没有可重验的 allow。
 
 ### quota reserve
 
@@ -682,6 +713,21 @@ ccm board stamp-harness [flags]
 - 作用域：只写 `owner.harness`（观察字段，非武装闸）。hook arming 仍只看 `owner.active` + `owner.session_id`。
 - flags：`--json`（结构化输出 `{ok,data:{stamped,trusted_harness,owner:{harness}}}`）；`--dry-run` 跑完整校验不落盘。
 - 例：`ccm board stamp-harness --board <path> --json`
+
+### board enable-contract
+
+**预检（只读）/ 写入成对 activation marker**
+
+```text
+ccm board enable-contract [--preflight] [--json]
+```
+
+- `--preflight`：只读返回 `ccm/routing-contract-preflight/v1`，列 `activation`、`ready`、每个非 grandfathered `subagent` 的 planning/routing/estimate gaps，以及可 grandfather 的历史 terminal task；不写 board。
+- 不带 `--preflight`：只有 report 无 task gaps 时，原子写 `meta.contracts.task_planning:"ccm/task-planning/v1"`、`agent_routing:"ccm/agent-routing/v1"`、严格 UTC `agent_routing_activated_at` 与 terminal fingerprint 数组。部分 activation 永远不落盘。
+- 历史 `done|failed|escalated` subagent 按 `task_id + created_at` 精确 grandfather；它们之后 retry 会进入新 attempt，不再豁免。
+- 两个 marker 都缺是合法 legacy；本命令没有 disable verb。generic `--set-json meta...`、祖先替换与 `--force` 不能绕 dedicated writer / preflight。
+- activation 本身不读取 provider、不 route、不 spawn、不 reserve，也不让同步 `ccm worker run` 自动回填 board。
+- 例：`ccm board enable-contract --preflight --json` · `ccm board enable-contract`
 
 ---
 
@@ -956,6 +1002,48 @@ ccm task update <id> [flags]
   直达的 `Usage` 错误（**exit 2**，不是 exit 3），指路"同时加 `--verified` 或改用 `task done --verified
   --artifact`"。这是体验性提前诊断（lint 仍是唯一校验权威），不是新增校验规则——同时给 `--verified` 或目标
   不是"已 done 且未 verified"时不触发，正常交给 lint 判。
+
+### task set-planning
+
+**写（dedicated whole-object writer；不派发）**
+
+```text
+ccm task set-planning <id> --profile <json|@file|-> [--json]
+```
+
+- `--profile` 必填：`ccm/task-planning/v1` JSON 字面量、`@/absolute/file.json` 或 stdin `-`。
+- writer 一次替换完整 `task.planning`，并在落盘前校验七维任务画像、estimate confidence、quality effect floor、budget posture/max attempts 与 required/preferred/forbidden capability sets；精确字段见 board-model-guide §C.5。
+- 这是 route-independent task profile；命令不选 harness/provider/model、不 spawn。generic `task update --set-json planning=...` 与 `--force` 都不能替代它。
+- 例：`ccm task set-planning T7 --profile @/abs/planning.json`
+
+### task set-routing
+
+**写（dedicated policy writer；不 selection / 不 spawn）**
+
+```text
+ccm task set-routing <id> --policy <json|@file|-> [--json]
+```
+
+- `--policy` 必填：provider-neutral policy JSON，含 `objective`、`constraints`、`candidates[]`、`chains.ample/tight` 与 `fallback`；精确字段与闭合 fallback classes 见 board-model-guide §C.5。
+- writer 包装成 `ccm/agent-routing/v1` + `mode:"cross-harness"` + `selected:null` + `attempts:[]`，并与已有 planning 做 capability/effect/permission 交叉校验。
+- 一旦已有 selection 或 attempt history，policy 不可替换；`attempts[]` append-only。generic setter / `--force` 不能覆盖。
+- 命令不读取 provider、不选择 candidate、不 reserve、不 spawn、不 fallback。
+- 例：`ccm task set-routing T7 --policy @/abs/routing-policy.json`
+
+### task route-bind
+
+**写（原子 selection + running attempt ledger projection；不 spawn）**
+
+```text
+ccm task route-bind <id> --selection <json|@file|-> --attempt <json|@file|-> [--json]
+```
+
+- 仅适用于 `executor=subagent` 且已有 routing policy 的 `ready`（或迁移中的 legacy `in_flight`）task。opt-in native-attempt board 改走 `native-attempt-bind`，不能由本 verb 绕过。
+- `--selection` 必须引用 policy candidate 与 `ample|tight` chain，带 strict-UTC freshness window、每个 candidate `requires` predicate 恰好一次 `pass` 的 qualification results 和非空 reason codes。
+- `--attempt` 必须是 `state:"running"`、candidate 与 selection 一致、带 strict-UTC `started_at` 和非空 opaque `handle`；requested model/effort 若存在必须等于 candidate。writer 自动冻结完整 `selection_snapshot`。
+- 成功时原子写 `routing.selected`、append attempt、投影 task `handle`、把 task 置 `in_flight` 并在从 ready 转入时盖 `started_at`。重复 attempt id 或第二个 running attempt 拒绝。
+- opaque handle 当前只是 syntactic claim，不是 live provider attestation。本命令不启动 worker；显式同步 `ccm worker run` 也不会自动调用它。generic start/handle setter/`--force` 不能替代 route-bind gate。
+- 例：`ccm task route-bind T7 --selection @/abs/selection.json --attempt @/abs/attempt.json`
 
 ### task native-attempt-create
 
@@ -2666,6 +2754,23 @@ id 不存在时 `data` = `null`，exit 0。
 artifact。消费者应先用 `ccm board init --capabilities --json` 做兼容性握手；该只读端点返回
 `{"ok":true,"data":{"capabilities":["board-init/structured-board-path-v1","goal-contract/v1"]}}`，不解析或创建任何路径。
 不得从人读 stdout 抓路径，也不得把 dry-run 当成已创建。
+
+### board enable-contract / task planning-routing writers
+
+- `ccm board enable-contract --preflight --json` 的 `data`：
+
+```json
+{
+  "schema": "ccm/routing-contract-preflight/v1",
+  "activation": "legacy",
+  "ready": false,
+  "tasks": [{ "task_id": "T7", "issues": [{ "code": "PLANNING-SHAPE", "path": "planning", "message": "must be an object" }] }],
+  "grandfathered_terminal_task_ids": []
+}
+```
+
+`activation` 只取 `legacy|enabled|invalid`。`ready:true` 才能执行写形态；写形态成功的 `data` 是 activation 后 board 摘要。
+- `task set-planning --json`、`task set-routing --json`、`task route-bind --json` 的 `data` 都是写后完整 task JSON。前两者分别出现 `planning` 与初始 routing envelope；`route-bind` 还出现 `routing.selected`、append 后 `routing.attempts[]`、task `handle` 与 `status:"in_flight"`。这些 JSON 只证明 ledger 写入成功，不证明 provider spawn / liveness / parent acceptance。
 
 ### board lint（`ccm board lint --json` / `ccm lint --json`）
 

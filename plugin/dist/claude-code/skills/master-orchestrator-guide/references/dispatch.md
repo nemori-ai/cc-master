@@ -30,7 +30,7 @@
 
 两层怎么对上：
 
-- `subagent` executor → 经 **sub-agent（`run_in_background`）机制**派，记下它返回的 agentId 当 handle。
+- `subagent` executor → target harness 是本 host 时，经 **sub-agent（`run_in_background`）机制**派并记录 agent handle；target 是其他本机 harness 时，在当前 origin 可追踪的后台 shell 中运行 `ccm` worker wrapper。此时 handle 来自外层后台机制，不是同步 wrapper 的返回结果；origin harness 不是默认。
 - `workflow` executor → 经 **Workflow 工具**跑，记下 workflow 句柄当 handle。
 - **后台 shell（`until` 轮询）不对应单一 executor**——它是你**等外部状态**的方式：等一个 `external` 的 CI run、或等一个你（`master-orchestrator`）自己要处置的远程队列 / 审批超时。轮询关进一个零 token 的后台 shell、骑完成通知重入。
 - **`user` / `external` 不是后台运行机制**——它们是「谁负责」而非「你怎么跑」：`user` 靠 surface 给用户 + 把他的回答当一条 async 依赖，`external` 靠一个引用（issue / CI URL）去外部系统查——两者你都不在本 session 里「跑」它。
@@ -74,7 +74,7 @@
 
 给每个节点定一个 executor 值。高层 min-max（默认把派出去的实现工作当 `subagent`、`master-orchestrator` 只留调度 / 验收给自己）在编排魂的决策模块；这里给逐值的语义 + 什么样的活配它：
 
-- **`subagent`** —— 一个**终端（terminal）推理单元**负责：单一证据面 + 单一推理链 + 单一交付物 + 无需 fan out + 无需统一 schema + context-safe + 携带一条显式 escalation 路径。默认把独立、可并行的实现工作派成它（指挥不演奏，把乐器交出去）。经 sub-agent（`run_in_background`）机制真跑·必给 handle。
+- **`subagent`** —— 先从本机 harness worker pool 选择 target harness；origin harness 不是默认。一个**终端（terminal）推理单元**负责：单一证据面 + 单一推理链 + 单一交付物 + 无需 fan out + 无需统一 schema + context-safe + 携带一条显式 escalation 路径。target 是本 host 时经 sub-agent（`run_in_background`）机制真跑；target 是其他 harness 时，在当前 origin 可追踪的后台 shell 中运行 `ccm` worker wrapper。此时 handle 来自外层后台机制，不是 wrapper 自己；没有真实 handle 就不能进入 `in_flight`。
 - **`workflow`** —— 一次**确定性多-agent 编排**负责：你需要**对多个叶子的确定性控制**时（fan-out / fan-in · 统一叶子 schema · 对抗式验证 / retry / loop · 联合综合 · context-flood 风险 · journal-resume）——**哪怕叶子数很少也选它**。经 Workflow 工具真跑·必给 handle。
 - **`master-orchestrator`** —— **你自己**做的那几件不可外包的活：调度决策、replan、端点验收、整合。你不为它起后台机制——它就是你在指挥台上亲手做的。
 - **`user`** —— 人类操作者负责：需判断 / 授权 / 拍板的（merge / 不可逆 / 对外 / 方向性）。surface 给用户、把回答当一条 async 依赖，别越权替他决。
