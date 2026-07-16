@@ -2,7 +2,7 @@
 
 [![plugin](https://img.shields.io/badge/plugin-v0.20.1-0A7EA4)](https://github.com/nemori-ai/cc-master/releases/tag/v0.20.1)
 [![ccm](https://img.shields.io/badge/ccm-v0.21.0-111827)](https://github.com/nemori-ai/cc-master/releases/tag/ccm-v0.21.0)
-[![harness](https://img.shields.io/badge/harness-Claude%20Code%20%7C%20Codex%20%7C%20Cursor-4B5563)](design_docs/harnesses/)
+[![harness](https://img.shields.io/badge/harness-Claude%20Code%20%7C%20Codex%20%7C%20Cursor%20%7C%20Kimi-4B5563)](design_docs/harnesses/)
 [![ccm CI](https://img.shields.io/github/actions/workflow/status/nemori-ai/cc-master/ccm-ci.yml?branch=main&label=ccm%20CI)](https://github.com/nemori-ai/cc-master/actions/workflows/ccm-ci.yml)
 [![license](https://img.shields.io/github/license/nemori-ai/cc-master)](LICENSE)
 
@@ -12,7 +12,7 @@
 
 cc-master turns a supported coding-agent session into a project lead for long-running work. You bring the idea and make the handful of calls that truly need you; it helps break the work down, run independent pieces in parallel, track progress and quota, and verify the result against an explicit goal. The board survives context resets and session handoffs, so the work can continue without relying on one conversation's memory.
 
-And there's real machinery behind the warmth: it can **simulate the schedule thousands of times** to estimate when you may ship and which step is most likely to slip; it surfaces **machine-wide cached quota posture** so the orchestrator can adjust pace with explicit evidence; and Claude Code can use an authorized account pool when that host supports it. Codex and Cursor never auto-switch accounts. These are decision aids and operational guardrails, not a guarantee that a provider limit, estimate, or delivery date will never surprise you.
+And there's real machinery behind the warmth: it can **simulate the schedule thousands of times** to estimate when you may ship and which step is most likely to slip; it surfaces **machine-wide cached quota posture** so the orchestrator can adjust pace with explicit evidence; and Claude Code can use an authorized account pool when that host supports it. Codex, Cursor, and kimi-code never auto-switch accounts. These are decision aids and operational guardrails, not a guarantee that a provider limit, estimate, or delivery date will never surprise you.
 
 > **You stop being the one who has to watch everything.**
 
@@ -47,10 +47,10 @@ Hand a big job to a plain AI and you'll find out fast: it loses the plot mid-con
 cc-master takes all of that off your hands, like a project lead who can actually do the math:
 
 - **🧩 Break it down, put a crew on it.** It splits your big goal into ordered steps and runs the ones that can go at once in parallel. And it doesn't split blindly — it works out **which chain decides when the whole thing finishes** (the critical path) and leans on that.
-- **🌐 Use the whole machine as a worker pool.** The orchestrator is not confined to its origin harness: it can inventory installed Claude Code, Codex, Cursor IDE, and Cursor Agent surfaces, inspect a target CLI's real help, and explicitly run a session-bound worker through `ccm worker`. The origin session still owns the decision and independently verifies the result.
+- **🌐 Use the whole machine as a worker pool.** The orchestrator is not confined to its origin harness: it can inventory installed Claude Code, Codex, Cursor IDE, Cursor Agent, and kimi-code surfaces, inspect a target CLI's real help, and explicitly run a session-bound worker through `ccm worker`. The origin session still owns the decision and independently verifies the result.
 - **🔮 It tells you when you'll finish before it starts.** It runs thousands of simulations and gives you odds — *"50% chance Wednesday, 95% chance Friday"* — and flags which step is most likely to slip. That used to be a project manager with a spreadsheet for an afternoon. Now it's one command, milliseconds.
 - **💰 It makes budget decisions visible.** Cached machine-wide posture and selected-target usage advice help it choose a pace; missing, stale, or unknown signals stay unknown. If spending authority or headroom is unclear, it should slow down or ask rather than invent certainty.
-- **⚡ It manages limits instead of ignoring them.** Claude Code can switch to another account only under an existing policy or explicit authorization. Codex paces against its 7-day hard window (rolling 24 hours is advisory); Cursor uses its subscription **billing period**. Codex and Cursor do not auto-switch accounts.
+- **⚡ It manages limits instead of ignoring them.** Claude Code can switch to another account only under an existing policy or explicit authorization. Codex paces against its 7-day hard window (rolling 24 hours is advisory); Cursor uses its subscription **billing period**; kimi-code exposes no CLI quota signal at all, so it is not paced against any window. Codex, Cursor, and kimi-code do not auto-switch accounts.
 - **🧠 It keeps a durable ledger.** The board records the goal revision, tasks, decisions, and registered runtime agents across context resets and explicit session handoffs. A resume still reconciles live evidence; durability does not mean every child process survives the handoff.
 - **🙋 It only asks you about the things that matter.** Small calls it makes itself; only when something genuinely needs you does it stop, lay out the context, and wait for your word.
 - **🏁 It has an explicit completion gate.** Before it wraps, it checks the current Goal Contract revision point by point: is every piece actually done, did it ask you everything it should have, and did anything quietly die in the background? A terminal worker is evidence, not automatic task acceptance.
@@ -66,7 +66,7 @@ The intended experience is one clear idea at the start, then a small number of w
 - **It figures out the order first**: the strings have to be pulled out and the framework wired up before any language can be translated. So it does the groundwork, then fans out all 6 languages **at once**.
 - **Groundwork gets the better (pricier, steadier) AI; the translations get the cheap one** — saving money without cutting quality. It does the math wherever the math matters.
 - Halfway through, **a question only you can answer comes up**: "Product terms — translate them, or keep them in English?" It **notes it for you and moves on**, while every other language keeps going.
-- As it runs, **quota gets tight** — cached posture and selected-target advice tell it to slow down; on Claude Code an already authorized account policy may offer another account, while Codex and Cursor stay on their current login.
+- As it runs, **quota gets tight** — cached posture and selected-target advice tell it to slow down; on Claude Code an already authorized account policy may offer another account, while Codex and Cursor stay on their current login and kimi-code has no quota signal to pace against.
 - **When you come back**, the board shows what finished, what was independently checked, and whether your product-term decision is still blocking acceptance.
 
 Start to finish, you said one sentence and made one decision.
@@ -85,18 +85,19 @@ A one-or-two-line fix you can knock out in ten minutes? Just do it — don't bri
 
 cc-master is a **multi-agent-harness plugin system** built from three things: a thin layer of **orchestration logic** (teaching the AI how to be the lead), an **engine** that does operations-research forecasting and pacing, and harness adapters that project that logic into the command, prompt, skill, hook, and settings surfaces each agent host actually supports.
 
-The source follows a paragoge-style `plugin/src -> plugin/dist/<host>` model: shared runtime skills live in canonical source, hooks are modeled as host-independent product contracts with host-native implementations, and each harness gets its own adapter artifact. The plugin version line is shared; release assets are split by harness, for example `cc-master-plugin-claude-code-<version>.zip`, `cc-master-plugin-codex-<version>.zip`, and `cc-master-plugin-cursor-<version>.zip`.
+The source follows a paragoge-style `plugin/src -> plugin/dist/<host>` model: shared runtime skills live in canonical source, hooks are modeled as host-independent product contracts with host-native implementations, and each harness gets its own adapter artifact. The plugin version line is shared; release assets are split by harness, for example `cc-master-plugin-claude-code-<version>.zip`, `cc-master-plugin-codex-<version>.zip`, `cc-master-plugin-cursor-<version>.zip`, and `cc-master-plugin-kimi-code-<version>.zip`.
 
-We keep a clear line between "what it does today" and "what we're still building." Current adapters include Claude Code, Codex, and Cursor, while the global `ccm` process boundary exposes the same machine-wide inventory, cached quota posture, model-policy view, raw worker wrapper, and Agent Registry to every origin. Cursor IDE plugin and Cursor Agent CLI are separate surfaces: installing or authenticating one does not prove the other is available. Board and registered-agent status live in `ccm` and its read-only web viewer. **The exact current / partial / target boundary lives in the [Feature Manual](design_docs/feature-manual.md) and the [cross-harness capability model](design_docs/cross-harness-orchestration-capability-model.md)** — the README deliberately does not reproduce either matrix.
+We keep a clear line between "what it does today" and "what we're still building." Current adapters include Claude Code, Codex, Cursor, and kimi-code, while the global `ccm` process boundary exposes the same machine-wide inventory, cached quota posture, model-policy view, raw worker wrapper, and Agent Registry to every origin. The kimi-code adapter ships the distributed skills, host-native namespaced commands, and core orchestration hooks; it does not have custom subagent roles, a Workflow equivalent, a batch-boundary event, or any CLI quota signal. Cursor IDE plugin and Cursor Agent CLI are separate surfaces: installing or authenticating one does not prove the other is available. Board and registered-agent status live in `ccm` and its read-only web viewer. **The exact current / partial / target boundary lives in the [Feature Manual](design_docs/feature-manual.md) and the [cross-harness capability model](design_docs/cross-harness-orchestration-capability-model.md)** — the README deliberately does not reproduce either matrix.
 
 The current cross-harness worker is intentionally narrow: `ccm worker help` resolves the installed target CLI's real agent-command help, and `ccm worker run` forwards caller-selected arguments, stdin, and cwd while managing one bounded synchronous, session-bound process. It is not automatic routing or fallback, a normalized provider API, a durable daemon, or a safety certification. Likewise, `ccm agent` is an observability registry for recording, linking, probing, and viewing workers; it does not spawn them. Model-policy entries are candidates and advisories until live qualification and admission evidence says otherwise.
 
 For contributors: edit `plugin/src`, not `plugin/dist`. Skills use SAP (`canonical/` plus `adapters/<host>/strategy.yaml`); hooks use PHIP (`_manifest/`, `_hosts/<host>/`, and `implementations/<host>/`). Regenerate adapters with:
 
 ```bash
-bash scripts/sync-plugin-dist.sh              # Claude Code adapter
-bash scripts/sync-plugin-dist.sh --host codex # Codex adapter
-bash scripts/sync-plugin-dist.sh --host cursor # Cursor adapter
+bash scripts/sync-plugin-dist.sh                  # Claude Code adapter
+bash scripts/sync-plugin-dist.sh --host codex     # Codex adapter
+bash scripts/sync-plugin-dist.sh --host cursor    # Cursor adapter
+bash scripts/sync-plugin-dist.sh --host kimi-code # kimi-code adapter
 ```
 
 Before pushing source changes that affect the plugin, install the repo hook once with `bash scripts/install-git-hooks.sh`. It runs `bash scripts/check-plugin-dist-sync.sh` before every push and blocks if `plugin/dist` needs to be regenerated and committed.
@@ -107,7 +108,7 @@ Project meta-skills live in `.claude/skills`. Codex discovers repo skills from `
 bash scripts/sync-codex-skills.sh
 ```
 
-Harness compatibility notes live in [`design_docs/harnesses/`](design_docs/harnesses/). That directory is the local, corrected source for the paragoge-derived adapter model plus the current Claude Code, Codex, and Cursor facts.
+Harness compatibility notes live in [`design_docs/harnesses/`](design_docs/harnesses/). That directory is the local, corrected source for the paragoge-derived adapter model plus the current Claude Code, Codex, Cursor, and kimi-code facts.
 
 ---
 
@@ -130,14 +131,15 @@ curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh
 # target a harness explicitly, or fan out to every installed supported harness:
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness claude-code
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness cursor
+curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --harness kimi-code
 curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash -s -- --all-harnesses
 ```
 
-It detects your OS and architecture, downloads the right `ccm` binary and puts it on your PATH, then detects installed harnesses and distributes the matching adapter package to each supported target. Before installing either downloaded asset, it fetches that release's `SHA256SUMS` and verifies the asset by exact filename; a missing manifest, missing entry, or digest mismatch stops the install. Claude Code installation uses the `claude` CLI (≥ v2.1.195). Codex installation registers a local Codex marketplace/plugin entry for this local adapter; command entrypoints are exposed as skills (for example `$cc-master-as-master-orchestrator ...`). Cursor installation publishes the adapter at `~/.cursor/plugins/local/cc-master` through the local plugin surface. The installer requires **Node.js 22 or newer in every mode**, including pinned and `CC_MASTER_INSTALL_LOCAL` offline installs, plus `unzip` and a SHA256 tool (`sha256sum`, `shasum`, or `openssl`); online installs also need `curl` or `wget`. Each harness adapter may additionally need that harness's own CLI/config directory to be present. The `ccm` engine is a **hard prerequisite** — without it the plugin won't start an orchestration — which is exactly why the installer puts it in place first.
+It detects your OS and architecture, downloads the right `ccm` binary and puts it on your PATH, then detects installed harnesses and distributes the matching adapter package to each supported target. Before installing either downloaded asset, it fetches that release's `SHA256SUMS` and verifies the asset by exact filename; a missing manifest, missing entry, or digest mismatch stops the install. Claude Code installation uses the `claude` CLI (≥ v2.1.195). Codex installation registers a local Codex marketplace/plugin entry for this local adapter; command entrypoints are exposed as skills (for example `$cc-master-as-master-orchestrator ...`). Cursor installation publishes the adapter at `~/.cursor/plugins/local/cc-master` through the local plugin surface. kimi-code installation copies the adapter into `$KIMI_CODE_HOME/plugins/managed/cc-master/` and registers it in `installed.json` (a managed-dir install; no TUI step needed). The installer requires **Node.js 22 or newer in every mode**, including pinned and `CC_MASTER_INSTALL_LOCAL` offline installs, plus `unzip` and a SHA256 tool (`sha256sum`, `shasum`, or `openssl`); online installs also need `curl` or `wget`. Each harness adapter may additionally need that harness's own CLI/config directory to be present. The `ccm` engine is a **hard prerequisite** — without it the plugin won't start an orchestration — which is exactly why the installer puts it in place first.
 
 Checksum failures are treated as release integrity failures, not as prompts to bypass verification. Retry the install; if it still fails, inspect the GitHub release assets before proceeding. `CC_MASTER_INSTALL_LOCAL` remains offline: it verifies `<local-dir>/SHA256SUMS` when present, otherwise it explicitly trusts the local directory without contacting GitHub.
 
-> **Rather do it by hand, or run from source?** Clone the repo, generate the adapter you want with `bash scripts/sync-plugin-dist.sh --host <harness>`, then install that adapter through the harness-native route. Claude Code can point at `plugin/dist/claude-code`; Codex should be registered through a local marketplace that points at `plugin/dist/codex` (with only skill/hooks packaged there); Cursor can copy `plugin/dist/cursor` to `~/.cursor/plugins/local/cc-master`. You'll still need `ccm` on your PATH — download `ccm-<os>-<arch>` from the latest `ccm-v*` release's **Assets**, rename it to `ccm`, `chmod +x`, and drop it in `~/.local/bin`.
+> **Rather do it by hand, or run from source?** Clone the repo, generate the adapter you want with `bash scripts/sync-plugin-dist.sh --host <harness>`, then install that adapter through the harness-native route. Claude Code can point at `plugin/dist/claude-code`; Codex should be registered through a local marketplace that points at `plugin/dist/codex` (with only skill/hooks packaged there); Cursor can copy `plugin/dist/cursor` to `~/.cursor/plugins/local/cc-master`; kimi-code can copy `plugin/dist/kimi-code` to `$KIMI_CODE_HOME/plugins/managed/cc-master` and add a `cc-master` entry to `installed.json`. You'll still need `ccm` on your PATH — download `ccm-<os>-<arch>` from the latest `ccm-v*` release's **Assets**, rename it to `ccm`, `chmod +x`, and drop it in `~/.local/bin`.
 
 **Moved your harness config?** `CLAUDE_CONFIG_DIR` still controls Claude Code's own settings, credentials, and transcript project files; `CODEX_HOME` controls Codex's home. cc-master's runtime state is harness-neutral: boards, versioned Goal Briefs, account registry, file vault, and quota sidecar live under `${CC_MASTER_HOME:-$HOME/.cc_master}` unless you pass `--home`.
 
@@ -168,6 +170,9 @@ $cc-master-as-master-orchestrator <your goal>
 
 # Cursor (Agent chat slash command)
 /as-master-orchestrator <your goal>
+
+# kimi-code (namespaced plugin command)
+cc-master:as-master-orchestrator <your goal>
 ```
 
 ---
@@ -176,19 +181,19 @@ $cc-master-as-master-orchestrator <your goal>
 
 The handful of commands you'll actually type. The in-session entrypoint is harness-specific; `ccm …` always runs in your **terminal**.
 
-- **Start / resume** — Claude Code: `/cc-master:as-master-orchestrator <goal>` or `/cc-master:as-master-orchestrator --resume`; Codex: `$cc-master-as-master-orchestrator <goal>` or `$cc-master-as-master-orchestrator --resume`; Cursor: `/as-master-orchestrator <goal>` or `/as-master-orchestrator --resume` (reopen the Agent session after install so hooks/rules load). Fresh runs frame and check a Goal Contract before creating tasks; resume checks the current revision and Goal Brief before dispatch.
+- **Start / resume** — Claude Code: `/cc-master:as-master-orchestrator <goal>` or `/cc-master:as-master-orchestrator --resume`; Codex: `$cc-master-as-master-orchestrator <goal>` or `$cc-master-as-master-orchestrator --resume`; Cursor: `/as-master-orchestrator <goal>` or `/as-master-orchestrator --resume` (reopen the Agent session after install so hooks/rules load); kimi-code: `cc-master:as-master-orchestrator <goal>` or `cc-master:as-master-orchestrator --resume`. Fresh runs frame and check a Goal Contract before creating tasks; resume checks the current revision and Goal Brief before dispatch.
 - **Discover the machine** — `ccm harness list --machine-wide --json` lists supported harnesses and their separate execution surfaces. `ccm quota status --machine-wide --json` reads their cached quota posture without refreshing providers.
 - **Choose a model role** — `ccm model-policy show --task <task-taxonomy> --json` presents the shared O / T1 / T2 / T3 role view and evidence; candidate entries are advisory, not certified or automatically selected.
 - **Inspect / run a worker** — `ccm worker help --harness <codex|claude-code|cursor-agent>` reads the installed target's real agent-command help. Then explicitly run `ccm worker run --harness <...> --cwd /abs/repo -- <provider argv...>`; ccm does not invent provider flags or a fallback chain.
 - **See registered workers** — `ccm agent list --json` shows the board's runtime roster and lifecycle evidence. Registration and probing improve observability; they do not spawn a worker or mark its parent task done.
 - **Status** — `ccm status-report show`. Generates the shared JSON-backed board status report for CLI and the web viewer.
 - **View** — `ccm web-viewer open`. Opens the live plan as a read-only graph in your browser; lifecycle commands are `ccm web-viewer start/open/status/stop/restart` (OS-assigned port by default; survives `ccm upgrade` when the service was already wanted).
-- **Discuss** — Claude Code: `/cc-master:discuss <decision>`; Cursor: `/discuss <decision>`; Codex: `$cc-master-discuss <decision>`. Use it when a decision is waiting on you.
-- **Stop** — Claude Code: `/cc-master:stop`; Codex: `$cc-master-stop`; Cursor: `/cc-master-stop` (Cursor's built-in `/stop` is unrelated). Wraps up and archives the board; you can resume later.
-- **Handoff** — Claude Code: `/cc-master:handoff-to-new-session`; Codex: `$cc-master-handoff-to-new-session`; Cursor: `/handoff-to-new-session`. Use it before moving the run to a fresh session.
-- **Retro** — Claude Code: `/cc-master:retro`; Codex: `$cc-master-retro`; Cursor: `/retro`. Read-only retrospective on an in-progress or archived board — writes a lessons-learned document into the project itself (not the board, not GitHub).
-- **Distill** — Claude Code: `/cc-master:distill <retro-path...>`; Codex: `$cc-master-distill <retro-path...>`; Cursor: `/distill <retro-path...>`. Turns a retro's candidate lessons into real project assets (discipline-doc note, skill, workflow, or subagent) — always gated by a single user-approved plan and collected via a feature-branch PR (or a draft directory for non-git projects). Never touches the board or `ccm`.
-- **`ccm account add|list|switch <email>`** — on Claude Code, build and steer a pool of backup accounts so an authorized policy can switch when one window runs low. You run these in your terminal; tokens stay token-blind and never reach the AI's context. Codex and Cursor have no account autoswitch.
+- **Discuss** — Claude Code: `/cc-master:discuss <decision>`; Cursor: `/discuss <decision>`; Codex: `$cc-master-discuss <decision>`; kimi-code: `cc-master:discuss <decision>`. Use it when a decision is waiting on you.
+- **Stop** — Claude Code: `/cc-master:stop`; Codex: `$cc-master-stop`; Cursor: `/cc-master-stop` (Cursor's built-in `/stop` is unrelated); kimi-code: `cc-master:stop` (namespaced, so it does not collide with any built-in). Wraps up and archives the board; you can resume later.
+- **Handoff** — Claude Code: `/cc-master:handoff-to-new-session`; Codex: `$cc-master-handoff-to-new-session`; Cursor: `/handoff-to-new-session`; kimi-code: `cc-master:handoff-to-new-session`. Use it before moving the run to a fresh session.
+- **Retro** — Claude Code: `/cc-master:retro`; Codex: `$cc-master-retro`; Cursor: `/retro`; kimi-code: `cc-master:retro`. Read-only retrospective on an in-progress or archived board — writes a lessons-learned document into the project itself (not the board, not GitHub).
+- **Distill** — Claude Code: `/cc-master:distill <retro-path...>`; Codex: `$cc-master-distill <retro-path...>`; Cursor: `/distill <retro-path...>`; kimi-code: `cc-master:distill <retro-path...>`. Turns a retro's candidate lessons into real project assets (discipline-doc note, skill, workflow, or subagent) — always gated by a single user-approved plan and collected via a feature-branch PR (or a draft directory for non-git projects). Never touches the board or `ccm`.
+- **`ccm account add|list|switch <email>`** — on Claude Code, build and steer a pool of backup accounts so an authorized policy can switch when one window runs low. You run these in your terminal; tokens stay token-blind and never reach the AI's context. Codex, Cursor, and kimi-code have no account autoswitch.
 
 Running several orchestrations at once? Every live board in your home is one click away in the viewer:
 
