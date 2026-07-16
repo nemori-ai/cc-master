@@ -96,11 +96,15 @@ alwaysApply rule + Capability Card (not byte-identical SessionStart substrate).
     cannot re-inject the role substrate after compaction, nor carry the dynamic board list /
     empty-board hard-stop / stale nodes.
   compensating_mechanism: >
-    Track B static substrate: the manifest `sessionStart.skill` field names a slim role-substrate
-    skill; PluginSessionStartInjector is a DynamicInjector whose onContextCompacted() resets injectedAt
-    and injectAfterCompaction() re-runs inject(), so that skill content is RE-INJECTED after every
-    compaction natively (stronger than Cursor's alwaysApply, which cannot re-fire after compact). The
-    PostCompact reinject-core.js is a documented silent no-op. Dynamic board data is lost (Track B).
-    Acceptance = Capability Card equivalence classes.
+    Track B static substrate: the manifest `sessionStart.skill` field is wired to
+    `master-orchestrator-guide` (the same canonical skill body Claude Code's own PostCompact reinject
+    re-injects verbatim — not a separate slim substrate skill), so kimi-code gets full-text content
+    parity with Claude Code's reinject rather than a degraded summary. PluginSessionStartInjector is a
+    DynamicInjector whose onContextCompacted() resets injectedAt and injectAfterCompaction() re-runs
+    inject(), so that skill content is RE-INJECTED after every compaction natively (stronger than
+    Cursor's alwaysApply, which cannot re-fire after compact). The PostCompact reinject-core.js is a
+    documented silent no-op. What is still lost vs Claude Code's hook-carried message: the dynamic
+    board list / empty-board hard-stop / stale-node reminder (those need a hook `message` channel; no
+    such channel survives compaction on kimi). Acceptance = Capability Card equivalence classes.
   tracked_by: design_docs/harnesses/capabilities/role-substrate-reinject.md + kimi-code.md §6
 ```
