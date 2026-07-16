@@ -7,6 +7,7 @@ import {
   canonicalJson,
   dependencyQualified,
   lintBoard,
+  readDeadline,
   taskTrulyDone,
   withLock,
 } from '@ccm/engine';
@@ -234,6 +235,33 @@ function advisoryHash(): string {
   return sha(canonicalJson({ usage: null, estimate: null }));
 }
 
+// deadlineSummary(board, nowMs, hasUnfinished) → 交付 DDL 的**确定性**只读视图（issue #149·D6）。
+//   纯从 board.goal_contract.deadline（readDeadline·board-derived）+ 挂钟 now 派生——截止时刻 / 状态 / 剩余
+//   时间 / overdue。**不跑 MC / 不读跨板语料**（保 status-report 纯计算 + board-hash 缓存语义）；相对 forecast
+//   的 margin / risk band 归 `ccm estimate deadline-risk`（那才是 verdict SSOT）。无/pending/none 诚实降级、不假绿。
+function deadlineSummary(
+  board: BoardRecord,
+  nowMs: number,
+  hasUnfinished: boolean,
+): Record<string, unknown> {
+  const dl = readDeadline(board);
+  const atMs = dl.at_ms;
+  const settled = dl.settled && atMs != null; // asserted/confirmed 且有 at（none 无 at → 非此支）
+  const timeRemainingHours = settled ? Math.round(((atMs as number) - nowMs) / 3600000) : null;
+  const overdue = settled && (atMs as number) <= nowMs && hasUnfinished;
+  return {
+    present: dl.present,
+    state: dl.state,
+    at: dl.at,
+    precision: dl.precision,
+    kind: dl.kind,
+    time_remaining_hours: timeRemainingHours,
+    overdue,
+    // margin / risk band（相对 forecast 的准时概率）见 `ccm estimate deadline-risk --json`（verdict SSOT）。
+    risk_ref: 'ccm estimate deadline-risk',
+  };
+}
+
 function criticalPathView(cp: CriticalPathResult): Record<string, unknown> {
   return {
     task_ids: Array.isArray(cp.chain) ? cp.chain : [],
@@ -327,6 +355,8 @@ function computeReport(input: ResolvedInput, opts: ComputeOpts = {}): ReportEnve
       git: input.board.git && typeof input.board.git === 'object' ? input.board.git : {},
     },
     summary,
+    // 交付 DDL 只读视图（board-derived·确定性·issue #149·D6）。
+    deadline: deadlineSummary(input.board, now.getTime(), summary.verified_done < summary.total),
     delivery: {
       mode:
         input.board.delivery_contract && typeof input.board.delivery_contract === 'object'
@@ -461,6 +491,20 @@ function renderHuman(env: ReportEnvelope): string {
   lines.push(
     `critical_path: ${cpIds.length ? cpIds.join(' -> ') : '(none)'} (${ms}, ${cp.weight_source || 'n/a'})`,
   );
+  const dl = report.deadline as Record<string, any> | undefined;
+  if (dl?.present) {
+    if (dl.state === 'asserted' || dl.state === 'confirmed') {
+      const rem =
+        dl.time_remaining_hours != null ? `remaining ${dl.time_remaining_hours}h` : 'remaining n/a';
+      lines.push(
+        `deadline: ${dl.at} (${dl.state}) · ${rem}${dl.overdue ? ' · OVERDUE' : ''} · risk via ccm estimate deadline-risk`,
+      );
+    } else if (dl.state === 'none') {
+      lines.push('deadline: none (confirmed no-ddl)');
+    } else {
+      lines.push('deadline: pending (not yet settled)');
+    }
+  }
   const ready = Array.isArray(actions.ready_to_dispatch) ? actions.ready_to_dispatch : [];
   const awaiting = Array.isArray(actions.awaiting_user) ? actions.awaiting_user : [];
   if (awaiting.length) lines.push(`awaiting_user: ${awaiting.map((t: any) => t.id).join(', ')}`);

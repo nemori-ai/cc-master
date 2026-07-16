@@ -71,6 +71,15 @@ export interface MissionReadModel {
   revision?: number;
   updated_at?: string;
   brief?: { present: boolean; ref?: string };
+  /** Delivery DDL board-derived facts (issue #149). Absent when the DDL was never engaged.
+   *  Remaining time / overdue are rendered client-side against the live clock; margin / risk
+   *  band come from `ccm estimate deadline-risk` (the verdict SSOT — the viewer runs no MC). */
+  deadline?: {
+    state: 'pending' | 'asserted' | 'confirmed' | 'none';
+    at?: string;
+    precision?: 'minute' | 'day';
+    kind?: 'hard' | 'soft';
+  };
   pending: boolean;
 }
 
