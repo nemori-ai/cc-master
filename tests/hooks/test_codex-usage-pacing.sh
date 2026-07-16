@@ -50,6 +50,11 @@ process.stdin.on("end", () => {
     decision.target.window = { kind: "rolling", name: "five_hour", duration_sec: 18000 };
   }
   if (process.env.KIND === "legacy-switch") decision.reason_codes = ["QUOTA_SWITCH"];
+  if (process.env.KIND === "legacy-stop-5h") decision.reason_codes = ["QUOTA_STOP_5H"];
+  if (process.env.KIND === "source-five-hour") decision.source.collector_id = "codex-five_hour";
+  if (process.env.KIND === "source-five-hour-dotted") decision.source.collector_id = "codex.five.hour";
+  if (process.env.KIND === "source-switch") decision.source.source_schema = "codex/switch-action/v1";
+  if (process.env.KIND === "source-stop-5h") decision.source.auth_source = "codex-stop_5h";
   process.stdout.write(JSON.stringify(value));
 });
 '
@@ -113,7 +118,7 @@ assert_not_contains "$CALLS" "coordination notify" "hook does not duplicate ccm 
 assert_not_contains "$CALLS" "account switch" "Codex never switches accounts"
 rm -rf "$H"
 
-for BAD_KIND in five-hour legacy-switch; do
+for BAD_KIND in five-hour legacy-switch legacy-stop-5h source-five-hour source-five-hour-dotted source-switch source-stop-5h; do
   H="$(make_project)"
   seed_board "$H" "sess-codex-negative-$BAD_KIND"
   write_stub "$H" "$(status_json tight 6 false | mutate_status "$BAD_KIND")"
@@ -122,6 +127,14 @@ for BAD_KIND in five-hour legacy-switch; do
   assert_no_file "$H/hooks/usage-pacing-machine-quota" "Codex $BAD_KIND creates no agent line or sidecar"
   rm -rf "$H"
 done
+
+META="$(cat "$REPO_ROOT/plugin/src/hooks/usage-pacing/implementations/codex/meta.yaml")"
+STRATEGY="$(sed -n '/^usage_pacing:/,/^[a-z_]*:/p' "$REPO_ROOT/plugin/src/hooks/_hosts/codex/strategy.yaml")"
+assert_contains "$META" "quota status --machine-wide --json" "Codex adapter metadata names cached machine-wide status"
+assert_not_contains "$META" "usage advise" "Codex adapter metadata does not advertise legacy usage advise"
+assert_contains "$STRATEGY" "seven_day" "Codex host strategy declares seven-day-only decision authority"
+assert_not_contains "$STRATEGY" "stop_5h" "Codex host strategy no longer declares stop_5h output"
+assert_not_contains "$STRATEGY" "switch," "Codex host strategy no longer declares switch output"
 
 H="$(make_project)"
 write_stub "$H" "$(status_json tight 5 false)"

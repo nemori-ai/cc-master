@@ -76,6 +76,8 @@ const payload = {
   observed_at: "2026-07-16T11:59:00Z",
   valid_until: "2026-07-16T12:04:00Z",
 };
+if (kind === "source-action") payload.source.source_schema = "codex/stop_5h-switch-action/v1";
+if (kind === "reset-action") payload.reset_marker = "stop_5h";
 process.stdout.write(JSON.stringify(payload));
 ' "$1"
 }
@@ -156,16 +158,35 @@ GOOD_PAYLOAD="$(quota_payload good)"
 BAD_PAYLOAD="$(quota_payload bad)"
 BAD_OUTER_PAYLOAD="$(node -e 'const p=JSON.parse(process.argv[1]); p.delta_revision=`sha256:${"1".repeat(64)}`; process.stdout.write(JSON.stringify(p));' "$GOOD_PAYLOAD")"
 BAD_PROVENANCE_PAYLOAD="$(node -e 'const p=JSON.parse(process.argv[1]); p.delta_revision=`sha256:${"2".repeat(64)}`; process.stdout.write(JSON.stringify(p));' "$GOOD_PAYLOAD")"
+LEGAL_RESET_PAYLOAD="$(node -e '
+const p=JSON.parse(process.argv[1]);
+p.delta_revision=`sha256:${"3".repeat(64)}`;
+p.scope_digest=`sha256:${"4".repeat(64)}`;
+p.previous_state="tight";
+p.current_state="healthy";
+p.edge="reset";
+p.reason_codes=[];
+p.decision_revision=`sha256:${"5".repeat(64)}`;
+p.reset_marker="2026-07-23T00:00:00Z";
+process.stdout.write(JSON.stringify(p));
+' "$GOOD_PAYLOAD")"
+MALFORMED_RESET_PAYLOAD="$(node -e 'const p=JSON.parse(process.argv[1]); p.delta_revision=`sha256:${"6".repeat(64)}`; p.reset_marker="not-a-reset"; process.stdout.write(JSON.stringify(p));' "$LEGAL_RESET_PAYLOAD")"
 CODEX_FIVE_HOUR_PAYLOAD="$(codex_hostile_payload five-hour)"
 CODEX_SWITCH_PAYLOAD="$(codex_hostile_payload switch)"
+CODEX_SOURCE_ACTION_PAYLOAD="$(codex_hostile_payload source-action)"
+CODEX_RESET_ACTION_PAYLOAD="$(codex_hostile_payload reset-action)"
 OLD_ITEM='{"id":"ntf-old","kind":"pacing_throttle","strength":"strong","summary":"old pacing event","payload":{"verdict":"throttle"}}'
 GOOD_ITEM="{\"id\":\"ntf-quota-good\",\"kind\":\"quota_state_change\",\"strength\":\"strong\",\"summary\":\"machine quota changed\",\"payload\":$GOOD_PAYLOAD}"
 DUP_ITEM="{\"id\":\"ntf-quota-duplicate-id\",\"kind\":\"quota_state_change\",\"strength\":\"strong\",\"summary\":\"duplicate machine quota edge\",\"payload\":$GOOD_PAYLOAD}"
 BAD_ITEM="{\"id\":\"ntf-quota-bad\",\"kind\":\"quota_state_change\",\"strength\":\"strong\",\"summary\":\"unsafe machine quota\",\"payload\":$BAD_PAYLOAD}"
 BAD_OUTER_ITEM="{\"id\":\"ntf-quota-bad-outer\",\"kind\":\"quota_state_change\",\"strength\":\"strong\",\"summary\":\"unsafe outer machine quota\",\"credential_token\":\"sk-outer-must-not-land\",\"payload\":$BAD_OUTER_PAYLOAD}"
 BAD_PROVENANCE_ITEM="{\"id\":\"ntf-quota-bad-provenance\",\"kind\":\"quota_state_change\",\"strength\":\"strong\",\"summary\":\"unsafe provenance machine quota\",\"inject_bad_provenance\":true,\"payload\":$BAD_PROVENANCE_PAYLOAD}"
+LEGAL_RESET_ITEM="{\"id\":\"ntf-quota-legal-reset\",\"kind\":\"quota_state_change\",\"strength\":\"weak\",\"summary\":\"legal machine quota reset\",\"payload\":$LEGAL_RESET_PAYLOAD}"
+MALFORMED_RESET_ITEM="{\"id\":\"ntf-quota-malformed-reset\",\"kind\":\"quota_state_change\",\"strength\":\"weak\",\"summary\":\"malformed machine quota reset\",\"payload\":$MALFORMED_RESET_PAYLOAD}"
 CODEX_FIVE_HOUR_ITEM="{\"id\":\"ntf-codex-five-hour\",\"kind\":\"quota_state_change\",\"strength\":\"strong\",\"summary\":\"forbidden Codex five-hour quota\",\"payload\":$CODEX_FIVE_HOUR_PAYLOAD}"
 CODEX_SWITCH_ITEM="{\"id\":\"ntf-codex-switch\",\"kind\":\"quota_state_change\",\"strength\":\"strong\",\"summary\":\"forbidden Codex switch quota\",\"payload\":$CODEX_SWITCH_PAYLOAD}"
+CODEX_SOURCE_ACTION_ITEM="{\"id\":\"ntf-codex-source-action\",\"kind\":\"quota_state_change\",\"strength\":\"strong\",\"summary\":\"forbidden Codex source action\",\"payload\":$CODEX_SOURCE_ACTION_PAYLOAD}"
+CODEX_RESET_ACTION_ITEM="{\"id\":\"ntf-codex-reset-action\",\"kind\":\"quota_state_change\",\"strength\":\"strong\",\"summary\":\"forbidden Codex reset action\",\"payload\":$CODEX_RESET_ACTION_PAYLOAD}"
 
 # A new quota id surfaces immediately without replaying an older unconsumed batch. Unsafe quota
 # payloads are suppressed before they reach any host envelope. Only exact current/list reads occur.
@@ -202,6 +223,26 @@ for ORIGIN in claude-code codex cursor; do
   rm -rf "$H"
 done
 
+# A producer-shaped UTC reset marker survives every origin envelope. Arbitrary strings remain
+# invalid and do not advance the delivery sidecar.
+for ORIGIN in claude-code codex cursor; do
+  H="$(make_project)"
+  SID="sid-$ORIGIN-legal-reset"
+  seed_board "$H" "$SID"
+  mk_inbox_stub "$H" "$ORIGIN" "$SID" "epoch-legal-reset"
+  write_inbox "$H/inbox.json" "$ORIGIN" "$SID" "epoch-legal-reset" "[$LEGAL_RESET_ITEM]"
+  RESET_OUT="$(run_inbox "$ORIGIN" "$H" "$H/ccm" "$H/state.json" "$SID")"
+  assert_contains "$RESET_OUT" "quota_state_change" "$ORIGIN accepts a producer-shaped reset delta"
+  assert_contains "$RESET_OUT" "2026-07-23T00:00:00Z" "$ORIGIN preserves the UTC reset marker"
+  RESET_STATE_BEFORE="$(sha256sum "$H/state.json")"
+  write_inbox "$H/inbox.json" "$ORIGIN" "$SID" "epoch-legal-reset" "[$LEGAL_RESET_ITEM,$MALFORMED_RESET_ITEM]"
+  MALFORMED_OUT="$(run_inbox "$ORIGIN" "$H" "$H/ccm" "$H/state.json" "$SID")"
+  assert_eq "" "$MALFORMED_OUT" "$ORIGIN suppresses an arbitrary reset marker"
+  assert_eq "$RESET_STATE_BEFORE" "$(sha256sum "$H/state.json")" "$ORIGIN malformed reset does not update the inbox sidecar"
+  assert_not_contains "$(cat "$H/state.json")" "ntf-quota-malformed-reset" "$ORIGIN malformed reset id never enters the sidecar"
+  rm -rf "$H"
+done
+
 # Codex five-hour and switch-shaped deltas are invalid for every origin. Keeping one canonical item
 # in the same list proves that rejecting the hostile rows neither emits them nor mutates dedupe state.
 for ORIGIN in claude-code codex cursor; do
@@ -213,12 +254,14 @@ for ORIGIN in claude-code codex cursor; do
   FIRST="$(run_inbox "$ORIGIN" "$H" "$H/ccm" "$H/state.json" "$SID")"
   assert_contains "$FIRST" "ntf-quota-good" "$ORIGIN primes canonical inbox dedupe state"
   STATE_BEFORE="$(sha256sum "$H/state.json")"
-  write_inbox "$H/inbox.json" "$ORIGIN" "$SID" "epoch-codex-hostile" "[$GOOD_ITEM,$CODEX_FIVE_HOUR_ITEM,$CODEX_SWITCH_ITEM]"
+  write_inbox "$H/inbox.json" "$ORIGIN" "$SID" "epoch-codex-hostile" "[$GOOD_ITEM,$CODEX_FIVE_HOUR_ITEM,$CODEX_SWITCH_ITEM,$CODEX_SOURCE_ACTION_ITEM,$CODEX_RESET_ACTION_ITEM]"
   HOSTILE_OUT="$(run_inbox "$ORIGIN" "$H" "$H/ccm" "$H/state.json" "$SID")"
   assert_eq "" "$HOSTILE_OUT" "$ORIGIN Codex five-hour/switch deltas are silent"
   assert_eq "$STATE_BEFORE" "$(sha256sum "$H/state.json")" "$ORIGIN hostile deltas do not update inbox dedupe sidecar"
   assert_not_contains "$(cat "$H/state.json")" "ntf-codex-five-hour" "$ORIGIN five-hour id never enters sidecar"
   assert_not_contains "$(cat "$H/state.json")" "ntf-codex-switch" "$ORIGIN switch id never enters sidecar"
+  assert_not_contains "$(cat "$H/state.json")" "ntf-codex-source-action" "$ORIGIN source action id never enters sidecar"
+  assert_not_contains "$(cat "$H/state.json")" "ntf-codex-reset-action" "$ORIGIN reset action id never enters sidecar"
   rm -rf "$H"
 done
 
@@ -248,6 +291,18 @@ if (existsSync(`${process.env.CC_MASTER_HOME}/inject-codex-five-hour`)) {
     quota_scope_digest: null,
     state: 'tight', freshness: 'fresh', reason_codes: ['QUOTA_TIGHT'],
     source: { collector_id: 'codex-app-server', source_schema: 'codex/account-rate-limits/v1', auth_source: 'codex-cli-current-login' },
+    decision_revision: `sha256:${'1'.repeat(64)}`,
+    observation_revision: `sha256:${'2'.repeat(64)}`,
+    fanout_covered: false,
+  };
+}
+if (existsSync(`${process.env.CC_MASTER_HOME}/inject-codex-source-action`)) {
+  machine_quota.decisions[0] = {
+    scope_digest: `sha256:${'a'.repeat(64)}`,
+    target: { harness_id: 'codex', surface_id: 'codex-cli', provider_id: 'codex', window: { kind: 'rolling', name: 'seven_day', duration_sec: 604800 } },
+    quota_scope_digest: null,
+    state: 'tight', freshness: 'fresh', reason_codes: ['QUOTA_TIGHT'],
+    source: { collector_id: 'codex-app-server', source_schema: 'codex/stop_5h-switch-action/v1', auth_source: 'codex-cli-current-login' },
     decision_revision: `sha256:${'1'.repeat(64)}`,
     observation_revision: `sha256:${'2'.repeat(64)}`,
     fanout_covered: false,
@@ -309,6 +364,20 @@ for ORIGIN_OUT in "$HOSTILE_CLAUDE_CONTEXT" "$HOSTILE_CODEX_CONTEXT" "$HOSTILE_C
 done
 assert_eq "$CONTEXT_STATE_BEFORE" "$(find "$CTX/hooks/orchestrator-context" -type f -exec sha256sum {} + | sort | sha256sum)" "Codex five-hour summary does not update any origin context sidecar"
 rm -f "$CTX/inject-codex-five-hour"
+
+touch "$CTX/inject-codex-source-action"
+HOSTILE_CLAUDE_CONTEXT="$(printf '{"hook_event_name":"SessionStart","session_id":"sid-context"}' |
+  CC_MASTER_HOME="$CTX" CC_MASTER_HARNESS=claude-code CCM_BIN="$CTX/ccm" node "$CLAUDE_CONTEXT" 2>/dev/null)"
+HOSTILE_CODEX_CONTEXT="$(printf '{"hook_event_name":"SessionStart","session_id":"sid-context"}' |
+  CC_MASTER_HOME="$CTX" CC_MASTER_PLUGIN_ROOT="$REPO_ROOT/plugin/src" CCM_BIN="$CTX/ccm" \
+  node "$CODEX_LAUNCHER" --event SessionStart --core "$CODEX_CONTEXT" 2>/dev/null)"
+HOSTILE_CURSOR_CONTEXT="$(cd "$REPO_ROOT/plugin/src" && printf '{"hook_event_name":"postToolUse","conversation_id":"sid-context","session_id":"sid-context","tool_name":"Shell"}' |
+  CC_MASTER_HOME="$CTX" CCM_BIN="$CTX/ccm" node "$CURSOR_LAUNCHER" --event postToolUse --core './hooks/orchestrator-context/implementations/cursor/orchestrator-context-core.js' 2>/dev/null)"
+for ORIGIN_OUT in "$HOSTILE_CLAUDE_CONTEXT" "$HOSTILE_CODEX_CONTEXT" "$HOSTILE_CURSOR_CONTEXT"; do
+  assert_eq "" "$ORIGIN_OUT" "Codex five-hour action provenance is silent on every origin"
+done
+assert_eq "$CONTEXT_STATE_BEFORE" "$(find "$CTX/hooks/orchestrator-context" -type f -exec sha256sum {} + | sort | sha256sum)" "Codex source-action summary does not update any origin context sidecar"
+rm -f "$CTX/inject-codex-source-action"
 
 touch "$CTX/truncate-one-quota-scope"
 TRUNCATED_CONTEXT_OUT="$(printf '{"hook_event_name":"SessionStart","session_id":"sid-context"}' |

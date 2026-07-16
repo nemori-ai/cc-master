@@ -43,6 +43,15 @@ write_stub() {
   cat >"$home/ccm" <<STUB
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >>"$home/calls"
+if [ -n "\${CCM_CURSOR_ACCESS_TOKEN:-}" ] || [ -n "\${CCM_CURSOR_API_BASE:-}" ] ||
+   [ -n "\${CURSOR_API_KEY:-}" ] || [ -n "\${ANTHROPIC_API_KEY:-}" ] ||
+   [ -n "\${OPENAI_API_KEY:-}" ] || [ -n "\${CLAUDE_CODE_OAUTH_TOKEN:-}" ] ||
+   [ -n "\${HTTPS_PROXY:-}" ] || [ -n "\${HTTP_PROXY:-}" ] || [ -n "\${ALL_PROXY:-}" ] ||
+   [ -n "\${CLAUDE_CONFIG_DIR:-}" ] || [ -n "\${CODEX_HOME:-}" ] ||
+   [ -n "\${XDG_CONFIG_HOME:-}" ] || [ -n "\${NODE_OPTIONS:-}" ]; then
+  printf '%s\n' credential-or-provider-endpoint-reached-cached-reader >"$home/credential-leak"
+  exit 97
+fi
 if [ "\$1 \$2" = "quota status" ]; then cat "$home/status.json"; exit 0; fi
 exit 29
 STUB
@@ -51,9 +60,36 @@ STUB
 
 run_stop() {
   local home="$1" sid="$2" active="${3:-false}"
+  cat >"$home/deny-network.cjs" <<'JS'
+const fs = require('fs');
+const Module = require('module');
+const marker = process.env.CC_MASTER_NETWORK_MARKER;
+const denied = new Set(['http', 'https', 'net', 'tls', 'node:http', 'node:https', 'node:net', 'node:tls']);
+const originalLoad = Module._load;
+Module._load = function (request, parent, isMain) {
+  if (denied.has(request)) {
+    if (marker) fs.writeFileSync(marker, request);
+    throw new Error(`provider network module denied: ${request}`);
+  }
+  return originalLoad.call(this, request, parent, isMain);
+};
+globalThis.fetch = async () => {
+  if (marker) fs.writeFileSync(marker, 'fetch');
+  throw new Error('provider fetch denied');
+};
+JS
   HOOK_OUT="$(
     printf '{"conversation_id":"%s","session_id":"%s","hook_event_name":"stop","stop_hook_active":%s}' "$sid" "$sid" "$active" |
-      CC_MASTER_HOME="$home" CCM_BIN="$home/ccm" node "$LAUNCHER" --event stop --core "$CORE" 2>/dev/null
+      CC_MASTER_HOME="$home" CCM_BIN="$home/ccm" \
+      CCM_CURSOR_ACCESS_TOKEN="cursor-secret-must-not-reach-cached-reader" \
+      CCM_CURSOR_API_BASE="https://provider.invalid" \
+      CURSOR_API_KEY="cursor-api-secret" ANTHROPIC_API_KEY="anthropic-secret" \
+      OPENAI_API_KEY="openai-secret" CLAUDE_CODE_OAUTH_TOKEN="claude-secret" \
+      HTTPS_PROXY="https://proxy.invalid" HTTP_PROXY="http://proxy.invalid" ALL_PROXY="socks5://proxy.invalid" \
+      CLAUDE_CONFIG_DIR="$home/claude-config" CODEX_HOME="$home/codex-home" XDG_CONFIG_HOME="$home/xdg-config" \
+      CC_MASTER_NETWORK_MARKER="$home/network-attempt" \
+      NODE_OPTIONS="--require=$home/deny-network.cjs" \
+      node "$LAUNCHER" --event stop --core "$CORE" 2>/dev/null
   )"
   HOOK_RC=$?
 }
@@ -94,6 +130,8 @@ assert_contains "$CALLS" "quota status --machine-wide --json" "cached machine-wi
 assert_not_contains "$CALLS" "usage advise" "dashboard-backed legacy usage adapter is never invoked"
 assert_not_contains "$CALLS" "coordination notify" "hook does not duplicate ccm fan-out"
 assert_not_contains "$CALLS" "account switch" "Cursor never switches accounts"
+assert_no_file "$H/network-attempt" "Cursor hook performs no direct provider network call"
+assert_no_file "$H/credential-leak" "cached status child receives no Cursor credential or provider endpoint"
 rm -rf "$H"
 
 H="$(make_project)"
@@ -135,5 +173,13 @@ run_stop "$H" "sess-unarmed"
 assert_eq "" "$HOOK_OUT" "unarmed -> silent"
 assert_no_file "$H/calls" "unarmed -> no ccm read"
 rm -rf "$H"
+
+META="$(cat "$REPO_ROOT/plugin/src/hooks/usage-pacing/implementations/cursor/meta.yaml")"
+STRATEGY="$(sed -n '/^  usage-pacing:/,/^  [a-z-]*:/p' "$REPO_ROOT/plugin/src/hooks/_hosts/cursor/strategy.yaml")"
+assert_contains "$META" "quota status --machine-wide --json" "Cursor adapter metadata names cached machine-wide status"
+assert_not_contains "$META" "usage advise" "Cursor adapter metadata does not advertise dashboard-backed usage advise"
+assert_contains "$STRATEGY" "cached" "Cursor host strategy declares cached pacing input"
+assert_contains "$STRATEGY" "cursor-agent-cli" "Cursor host strategy preserves Cursor Agent surface"
+assert_contains "$STRATEGY" "cursor-ide-plugin" "Cursor host strategy preserves Cursor IDE surface"
 
 finish

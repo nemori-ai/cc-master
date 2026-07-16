@@ -173,9 +173,10 @@ usage_pacing:
     stop_system_message: passed
   behavior:
     - dormant until a matching active board exists under CC_MASTER_HOME.
-    - reads ccm usage advise --json as the only pacing verdict source.
-    - emits non-blocking Stop systemMessage for throttle, switch, stop_5h, and stop_7d.
-    - treats switch as advisory only because Codex account-pool switching is not implemented.
+    - reads cached ccm quota status --machine-wide --json as the only pacing input.
+    - accepts only codex-cli/codex rolling seven_day/604800 decisions; five-hour and action provenance are silent.
+    - emits a non-blocking Stop systemMessage for uncovered non-healthy seven_day decisions only.
+    - never switches accounts for Codex.
     - does not implement Claude Code PostToolBatch mid-turn sampling; Codex has no verified equivalent event.
 identity_nudge:
   status: replacement-stop-system-message

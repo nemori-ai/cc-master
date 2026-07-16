@@ -101,6 +101,7 @@ hooks:
   usage-pacing:
     event: stop
     status: implemented-followup-advisory
+    behavior: cached ccm quota status only; cursor-ide-plugin and cursor-agent-cli stay distinct; no provider network, credential read, or account switch
   identity-nudge:
     event: stop
     status: implemented-followup-advisory

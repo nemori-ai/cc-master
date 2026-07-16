@@ -14,6 +14,11 @@ const SAFE_HARNESS = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const SAFE_REASON = /^[A-Z0-9][A-Z0-9_:-]{0,127}$/;
 const SAFE_DIGEST = /^sha256:[0-9a-f]{64}$/;
 const SAFE_PROVENANCE = /^[A-Za-z0-9][A-Za-z0-9_./:-]{0,127}$/;
+const CACHED_READ_ENV = new Set([
+  'PATH', 'HOME', 'USER', 'LOGNAME',
+  'TMPDIR', 'TMP', 'TEMP',
+  'LANG', 'LANGUAGE', 'TZ', 'TERM', 'NO_COLOR',
+]);
 
 function record(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -73,7 +78,7 @@ function rebuildDecision(value) {
   if (!STATES.has(value.state) || !FRESHNESS.has(value.freshness)) return null;
   if (!Array.isArray(value.reason_codes) || !value.reason_codes.every((code) => typeof code === 'string' && SAFE_REASON.test(code))) return null;
   if (new Set(value.reason_codes).size !== value.reason_codes.length || typeof value.fanout_covered !== 'boolean') return null;
-  if (!codexSevenDayOnly(target, value.reason_codes)) return null;
+  if (!codexSevenDayOnly(target, value.reason_codes, Object.values(source))) return null;
   return {
     scope_digest: value.scope_digest,
     target,
@@ -118,13 +123,25 @@ function readCachedStatus(options) {
       encoding: 'utf8',
       timeout: 5000,
       shell: false,
-      env: { ...process.env, CC_MASTER_HOME: options.home, CC_MASTER_NO_AUTOINSTALL: '1' },
+      env: cachedReadEnv(options.home, process.env),
     });
   } catch {
     return null;
   }
   if (!child || child.error || child.signal || child.status !== 0) return null;
   return parseStatus(child.stdout);
+}
+
+function cachedReadEnv(home, source) {
+  const env = {
+    CC_MASTER_HOME: home,
+    CC_MASTER_NO_AUTOINSTALL: '1',
+  };
+  for (const [key, value] of Object.entries(source || {})) {
+    if (typeof value !== 'string') continue;
+    if (CACHED_READ_ENV.has(key) || /^LC_[A-Z0-9_]+$/.test(key)) env[key] = value;
+  }
+  return env;
 }
 
 function statePath(home, harness, sessionId, boardPath) {

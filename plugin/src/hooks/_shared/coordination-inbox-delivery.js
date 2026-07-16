@@ -17,6 +17,7 @@ const SAFE_PROVENANCE = /^[A-Za-z0-9][A-Za-z0-9_./:-]{0,127}$/;
 const SAFE_REVISION = /^sha256:[0-9a-f]{64}$/;
 const SAFE_REASON = /^[A-Z0-9][A-Z0-9_:-]{0,127}$/;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
+const RESET_MARKER_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const SENSITIVE_KEY = /(?:^|_)(?:account|email|identity|fingerprint|credential|token|secret|argv|env|path|balance|used_pct|used_percentage|provider_response|raw)(?:_|$)/i;
 const SENSITIVE_VALUE = /(?:\bBearer\s+|\bsk-[A-Za-z0-9_-]{8,}|\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b|\/home\/|\/Users\/|\\Users\\|eyJhbGciOi)/i;
 const DELIVERY_PROVENANCE_FIELDS = [
@@ -45,6 +46,12 @@ function safeName(value) {
 
 function safeRevision(value) {
   return typeof value === 'string' && SAFE_REVISION.test(value);
+}
+
+function validResetMarker(value) {
+  if (typeof value !== 'string' || !RESET_MARKER_UTC.test(value)) return false;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString().replace('.000Z', 'Z') === value;
 }
 
 function containsPrivate(value, key = '') {
@@ -139,8 +146,11 @@ function rebuildQuotaDelta(value) {
   if (!FRESHNESS.has(value.freshness)) return null;
   if (!Array.isArray(value.reason_codes) || !value.reason_codes.every((code) => typeof code === 'string' && SAFE_REASON.test(code))) return null;
   if (new Set(value.reason_codes).size !== value.reason_codes.length) return null;
-  if (!codexSevenDayOnly(target, value.reason_codes)) return null;
-  if (value.reset_marker !== null && !safeName(value.reset_marker)) return null;
+  if (!codexSevenDayOnly(target, value.reason_codes, [
+    ...Object.values(source),
+    ...(value.reset_marker === null ? [] : [value.reset_marker]),
+  ])) return null;
+  if (value.reset_marker !== null && !validResetMarker(value.reset_marker)) return null;
   for (const key of optional) {
     if (value[key] !== undefined && (typeof value[key] !== 'string' || !ISO_UTC.test(value[key]) || !Number.isFinite(Date.parse(value[key])))) return null;
   }

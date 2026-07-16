@@ -3,6 +3,7 @@ host: codex
 event: Stop
 mode: replacement-stop-advisory
 notes:
-  - Uses ccm usage advise as the only pacing verdict source.
+  - Uses cached ccm quota status --machine-wide --json as the only pacing input.
+  - Accepts only Codex seven_day/604800 decisions; five_hour, switch, stop_5h, and matching source provenance are silent.
   - Emits Stop systemMessage advisory only; Codex has no PostToolBatch equivalent.
   - Does not run autonomous account switching for Codex.

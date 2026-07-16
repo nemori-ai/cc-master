@@ -1,11 +1,17 @@
 #!/usr/bin/env node
 'use strict';
 
-const FORBIDDEN_CODEX_SIGNAL = /(?:FIVE_HOUR|FIVE-HOUR|5H|SWITCH)/i;
+function forbiddenCodexSignal(value) {
+  if (typeof value !== 'string') return true;
+  const normalized = value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  return normalized.includes('FIVEHOUR') || normalized.includes('5H') || normalized.includes('SWITCH');
+}
 
-function codexSevenDayOnly(target, reasonCodes) {
+function codexSevenDayOnly(target, reasonCodes, provenance) {
   if (!target || target.harness_id !== 'codex') return true;
+  if (!Array.isArray(reasonCodes) || !Array.isArray(provenance)) return false;
   const window = target.window;
+  const evidence = [...reasonCodes, ...provenance];
   return (
     target.surface_id === 'codex-cli' &&
     target.provider_id === 'codex' &&
@@ -13,8 +19,7 @@ function codexSevenDayOnly(target, reasonCodes) {
     window.kind === 'rolling' &&
     window.name === 'seven_day' &&
     window.duration_sec === 604800 &&
-    Array.isArray(reasonCodes) &&
-    !reasonCodes.some((code) => typeof code !== 'string' || FORBIDDEN_CODEX_SIGNAL.test(code))
+    !evidence.some(forbiddenCodexSignal)
   );
 }
 
