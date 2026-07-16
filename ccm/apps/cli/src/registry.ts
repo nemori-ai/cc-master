@@ -65,37 +65,46 @@ export const REGISTRY: Registry = {
       handler: 'capability.check',
     },
   },
-  // ════════════════════ worker（MVP：显式、session-bound、只读）════════════════════════════════════
+  // ════════════════════ worker（R0：raw agent-command passthrough + session lifecycle）══════════════
   worker: {
-    run: {
-      summary: '显式启动一次 session-bound、只读的 Cursor Agent worker 并等待结构化结果',
+    help: {
+      summary: '运行目标 agent command 的真实 --help 并原样返回 stdout/stderr/exit',
       read: true,
       positionals: [],
       options: {
-        model: {
+        harness: {
           type: 'string',
           required: true,
-          enum: ['composer-2.5'],
-          desc: 'Cursor first-party 模型',
+          enum: ['codex', 'claude-code', 'cursor-agent'],
+          desc: '目标 harness CLI',
         },
-        effort: { type: 'string', required: true, enum: ['standard'], desc: 'MVP 固定档位' },
-        workspace: { type: 'string', required: true, desc: '只读检查的绝对工作区路径' },
-        prompt: {
+      },
+      examples: ['ccm worker help --harness codex'],
+      handler: 'worker.help',
+    },
+    run: {
+      summary: '原样透传 provider argv/stdin/cwd，并管理一次 session-bound 进程生命周期',
+      read: true,
+      positionals: [{ name: 'provider-argv...', required: false }],
+      options: {
+        harness: {
           type: 'string',
           required: true,
-          transform: 'input',
-          desc: 'worker prompt（@file / - / 字面量）',
+          enum: ['codex', 'claude-code', 'cursor-agent'],
+          desc: '目标 harness CLI',
         },
-        'timeout-ms': { type: 'string', required: true, desc: '总超时，50..600000 毫秒' },
+        cwd: { type: 'string', required: false, desc: 'child cwd 的绝对路径（默认当前目录）' },
+        'timeout-ms': { type: 'string', required: false, desc: '总超时，50..600000 毫秒' },
         'max-output-bytes': {
           type: 'string',
-          required: true,
-          desc: 'stdout 上限，256..1048576 字节',
+          required: false,
+          desc: '每个 output stream 上限，256..1048576 字节',
         },
-        json: { type: 'boolean', required: true, desc: '输出结构化 terminal result' },
       },
       examples: [
-        'ccm worker run --harness cursor-agent --model composer-2.5 --effort standard --workspace /abs/repo --prompt @/abs/task.txt --timeout-ms 120000 --max-output-bytes 262144 --json',
+        'ccm worker run --harness codex --cwd /abs/repo -- "review this repo"',
+        'ccm worker run --harness claude-code --cwd /abs/repo -- --print "review this repo"',
+        'ccm worker run --harness cursor-agent --cwd /abs/repo -- --print "review this repo"',
       ],
       handler: 'worker.run',
     },

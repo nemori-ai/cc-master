@@ -122,11 +122,15 @@ export function createDefaultProviderRuntime(
     schema: PROVIDER_RUNTIME_SCHEMA,
     process: {
       resolveExecutable(provider: string): string | null {
-        if (provider !== 'codex' && provider !== 'cursor-agent') return null;
+        if (provider !== 'codex' && provider !== 'claude' && provider !== 'cursor-agent') {
+          return null;
+        }
         const explicit =
           provider === 'codex'
             ? env.CCM_CODEX_BIN || env.CODEX_BIN
-            : env.CCM_CURSOR_AGENT_BIN || env.CURSOR_AGENT_BIN;
+            : provider === 'claude'
+              ? env.CCM_CLAUDE_BIN || env.CLAUDE_BIN
+              : env.CCM_CURSOR_AGENT_BIN || env.CURSOR_AGENT_BIN;
         if (explicit) {
           try {
             fs.accessSync(explicit, fs.constants.X_OK);
@@ -136,6 +140,7 @@ export function createDefaultProviderRuntime(
           }
         }
         if (provider === 'codex') return executableOnPath('codex', env.PATH);
+        if (provider === 'claude') return executableOnPath('claude', env.PATH);
         return executableOnPath('cursor-agent', env.PATH) ?? executableOnPath('agent', env.PATH);
       },
       spawnProvider(spec: ProviderSpawnSpec): ProviderOwnedChild {
