@@ -546,7 +546,7 @@ export function buildAgentStream(req: AgentStreamRequest): AgentStreamPayload {
         ? 'transcript file not found yet for this session'
         : req.transcriptRef
           ? 'transcript reference does not resolve to a readable file'
-          : 'this agent handle exposes no transcript source';
+          : 'no readable stream source for this agent type yet';
     return noSourcePayload(req, reason, nowIso);
   }
 

@@ -83,3 +83,18 @@ export function agentIsActive(state: string | undefined): boolean {
 export function harnessBadge(harness: string | undefined): string {
   return (harness ?? 'unknown').replace(/-agent$/, '');
 }
+
+/**
+ * Whether an attach_cmd is plausibly a runnable shell command (vs an internal semantic handle
+ * like "SendMessage to a94c…" that must never be rendered as a copyable command with a `cd`
+ * prefix). Deliberately conservative — only an all-lowercase leading token shaped like a
+ * binary or path (`claude`, `codex`, `tmux`, `./run.sh`, `~/bin/x`, `/usr/bin/x`) qualifies;
+ * anything with uppercase in the head token (tool names are CamelCase by convention) or an
+ * empty/odd head renders as an info line instead. Misclassifying a real command as info-only
+ * costs a copy button; misclassifying a handle as a command ships a broken instruction.
+ */
+export function looksLikeShellCommand(cmd: string): boolean {
+  const head = cmd.trim().split(/\s+/)[0] ?? '';
+  if (!head) return false;
+  return /^(?:\.{0,2}\/|~\/)?[a-z0-9][a-z0-9_./-]*$/.test(head);
+}

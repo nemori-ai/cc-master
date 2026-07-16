@@ -369,7 +369,8 @@ export function AgentStreamDrawer({
             <div className="stream-empty">stream unavailable — {initialError}</div>
           ) : noSource ? (
             <div className="stream-empty">
-              no live stream · {source?.reason ?? 'this agent exposes no transcript source'}
+              no live stream ·{' '}
+              {source?.reason ?? 'no readable stream source for this agent type yet'}
             </div>
           ) : !ready ? (
             <div className="stream-empty">loading stream…</div>
