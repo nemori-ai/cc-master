@@ -1,6 +1,7 @@
 import * as io from '../io.js';
 import { workerDescriptor } from '../worker-descriptors.js';
 import {
+  rejectedWorkerProcess,
   runWorkerProcess,
   type WorkerProcessRequest,
   type WorkerProcessResult,
@@ -73,12 +74,11 @@ async function withSignalRelay(
 
 function commonRequest(
   ctx: Ctx,
+  descriptor: NonNullable<ReturnType<typeof workerDescriptor>>,
   providerArgv: string[],
   help: boolean,
 ): Omit<WorkerProcessRequest, 'signal'> | null {
   if (!ctx.providerRuntime) return null;
-  const descriptor = workerDescriptor(String(ctx.values.harness || ''));
-  if (!descriptor) return null;
   return {
     descriptor,
     providerArgv,
@@ -92,7 +92,13 @@ function commonRequest(
 }
 
 export async function help(ctx: Ctx): Promise<number> {
-  const request = commonRequest(ctx, ['--help'], true);
+  const descriptor = workerDescriptor(String(ctx.values.harness || ''));
+  const scope = String(ctx.values.scope || 'agent');
+  const providerArgv = [
+    ...(scope === 'root' ? [] : (descriptor?.defaultAgentHelpPrefix ?? [])),
+    '--help',
+  ];
+  const request = descriptor ? commonRequest(ctx, descriptor, providerArgv, true) : null;
   if (!request) {
     ctx.err('worker runtime or harness descriptor is unavailable');
     return io.EXIT.ERROR;
@@ -107,7 +113,23 @@ export async function help(ctx: Ctx): Promise<number> {
 }
 
 export async function run(ctx: Ctx): Promise<number> {
-  const request = commonRequest(ctx, ctx.positionals.slice(), false);
+  const harness = String(ctx.values.harness || '');
+  const descriptor = workerDescriptor(harness);
+  if (!descriptor) {
+    ctx.out(
+      `${io.jsonOk(
+        rejectedWorkerProcess({
+          harness,
+          providerArgv: ctx.positionals.slice(),
+          cwd: String(ctx.values.cwd || process.cwd()),
+          code: 'unknown_harness',
+          message: `unsupported worker harness: ${harness}`,
+        }),
+      )}\n`,
+    );
+    return io.EXIT.ERROR;
+  }
+  const request = commonRequest(ctx, descriptor, ctx.positionals.slice(), false);
   if (!request) {
     ctx.err('worker runtime or harness descriptor is unavailable');
     return io.EXIT.ERROR;

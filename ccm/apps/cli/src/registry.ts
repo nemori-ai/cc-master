@@ -78,6 +78,12 @@ export const REGISTRY: Registry = {
           enum: ['codex', 'claude-code', 'cursor-agent'],
           desc: '目标 harness CLI',
         },
+        scope: {
+          type: 'string',
+          required: false,
+          enum: ['agent', 'root'],
+          desc: 'help 层级（默认 agent；root 为 executable 顶层）',
+        },
       },
       examples: ['ccm worker help --harness codex'],
       handler: 'worker.help',
@@ -90,7 +96,6 @@ export const REGISTRY: Registry = {
         harness: {
           type: 'string',
           required: true,
-          enum: ['codex', 'claude-code', 'cursor-agent'],
           desc: '目标 harness CLI',
         },
         cwd: { type: 'string', required: false, desc: 'child cwd 的绝对路径（默认当前目录）' },
@@ -102,7 +107,7 @@ export const REGISTRY: Registry = {
         },
       },
       examples: [
-        'ccm worker run --harness codex --cwd /abs/repo -- "review this repo"',
+        'ccm worker run --harness codex --cwd /abs/repo -- --ask-for-approval never exec "review this repo"',
         'ccm worker run --harness claude-code --cwd /abs/repo -- --print "review this repo"',
         'ccm worker run --harness cursor-agent --cwd /abs/repo -- --print "review this repo"',
       ],

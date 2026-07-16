@@ -106,6 +106,7 @@ interface WorkerEnvelope {
 function runtime(
   env: Record<string, string | undefined>,
   spawns: ProviderSpawnSpec[],
+  afterSpawn?: () => void,
 ): ProviderRuntime {
   const actual = createDefaultProviderRuntime(env);
   return {
@@ -114,7 +115,9 @@ function runtime(
       resolveExecutable: actual.process.resolveExecutable,
       spawnProvider(spec) {
         spawns.push(structuredClone(spec));
-        return actual.process.spawnProvider(spec);
+        const child = actual.process.spawnProvider(spec);
+        afterSpawn?.();
+        return child;
       },
     },
   };
@@ -135,23 +138,32 @@ function testEnv(): Record<string, string | undefined> {
 
 async function invokeHelp(
   harness: string,
-  overrideEnv: Record<string, string | undefined> = {},
+  input: { scope?: 'agent' | 'root'; overrideEnv?: Record<string, string | undefined> } = {},
 ): Promise<{
   code: number;
   stdout: string;
   stderr: string;
   spawns: ProviderSpawnSpec[];
 }> {
-  const env = { ...testEnv(), ...overrideEnv };
+  const env = { ...testEnv(), ...input.overrideEnv };
   const stdout: string[] = [];
   const stderr: string[] = [];
   const spawns: ProviderSpawnSpec[] = [];
-  const code = await run(['worker', 'help', '--harness', harness], {
-    env,
-    out: (value) => stdout.push(value),
-    err: (value) => stderr.push(value),
-    providerRuntime: runtime(env, spawns),
-  });
+  const code = await run(
+    [
+      'worker',
+      'help',
+      '--harness',
+      harness,
+      ...(input.scope === undefined ? [] : ['--scope', input.scope]),
+    ],
+    {
+      env,
+      out: (value) => stdout.push(value),
+      err: (value) => stderr.push(value),
+      providerRuntime: runtime(env, spawns),
+    },
+  );
   return { code, stdout: stdout.join(''), stderr: stderr.join(''), spawns };
 }
 
@@ -163,6 +175,7 @@ async function invokeRun(input: {
   timeoutMs?: number;
   maxOutputBytes?: number;
   signal?: AbortSignal;
+  processSignal?: NodeJS.Signals;
   providerRuntime?: ProviderRuntime;
 }): Promise<{
   code: number;
@@ -196,7 +209,15 @@ async function invokeRun(input: {
       stdin: { fd },
       out: (value) => stdout.push(value),
       err: (value) => stderr.push(value),
-      providerRuntime: input.providerRuntime ?? runtime(env, spawns),
+      providerRuntime:
+        input.providerRuntime ??
+        runtime(env, spawns, () => {
+          if (input.processSignal) {
+            queueMicrotask(() =>
+              process.emit(input.processSignal as NodeJS.Signals, input.processSignal),
+            );
+          }
+        }),
       workerSignal: input.signal,
     });
     const text = stdout.join('');
@@ -215,18 +236,15 @@ test('registry freezes one raw worker namespace with help and run', () => {
     'claude-code',
     'cursor-agent',
   ]);
-  assert.deepEqual(REGISTRY.worker?.run?.options.harness?.enum, [
-    'codex',
-    'claude-code',
-    'cursor-agent',
-  ]);
+  assert.deepEqual(REGISTRY.worker?.help?.options.scope?.enum, ['agent', 'root']);
+  assert.equal(REGISTRY.worker?.run?.options.harness?.enum, undefined);
   assert.equal(REGISTRY.worker?.run?.options.model, undefined);
   assert.equal(REGISTRY.worker?.run?.options.effort, undefined);
   assert.equal(REGISTRY.worker?.run?.options.cwd?.required, false);
   assert.equal(REGISTRY.dispatch, undefined);
 });
 
-test('worker help launches exactly one real agent-command help for each harness', async () => {
+test('worker help defaults to agent scope and root scope launches executable help', async () => {
   const expected = {
     codex: ['exec', '--help'],
     'claude-code': ['--help'],
@@ -240,11 +258,24 @@ test('worker help launches exactly one real agent-command help for each harness'
     assert.equal(invoked.stdout, `REAL-HELP:${JSON.stringify(argv)}\n`, harness);
     assert.equal(invoked.stderr, 'REAL-HELP-ERR\n', harness);
   }
+
+  for (const harness of Object.keys(expected)) {
+    const invoked = await invokeHelp(harness, { scope: 'root' });
+    assert.equal(invoked.code, 0, harness);
+    assert.equal(invoked.spawns.length, 1, harness);
+    assert.deepEqual(invoked.spawns[0]?.argv, ['--help'], harness);
+    assert.equal(invoked.stdout, 'REAL-HELP:["--help"]\n', harness);
+    assert.equal(invoked.stderr, 'REAL-HELP-ERR\n', harness);
+  }
+
+  const unknown = await invokeHelp('unknown');
+  assert.equal(unknown.code, 2);
+  assert.equal(unknown.spawns.length, 0);
 });
 
 test('worker help raw-mirrors a provider nonzero exit', async () => {
   const invoked = await invokeHelp('claude-code', {
-    CCM_CLAUDE_BIN: executables.helpExit23,
+    overrideEnv: { CCM_CLAUDE_BIN: executables.helpExit23 },
   });
   assert.equal(invoked.code, 23);
   assert.equal(invoked.spawns.length, 1);
@@ -302,7 +333,7 @@ test('worker run preserves raw argv order/metacharacters, inherited stdin bytes,
 
   assert.equal(invoked.code, 0);
   assert.equal(invoked.spawns.length, 1);
-  assert.deepEqual(invoked.spawns[0]?.argv, ['exec', ...rawArgv]);
+  assert.deepEqual(invoked.spawns[0]?.argv, rawArgv);
   assert.equal(invoked.spawns[0]?.cwd, realpathSync(workspace));
   assert.equal(existsSync(sentinel), false);
   assert.equal(invoked.envelope?.schema, 'ccm/worker-process-result/v1');
@@ -315,7 +346,7 @@ test('worker run preserves raw argv order/metacharacters, inherited stdin bytes,
     stdin: string;
     forbidden_env: boolean;
   };
-  assert.deepEqual(child.argv, ['exec', ...rawArgv]);
+  assert.deepEqual(child.argv, rawArgv);
   assert.equal(child.cwd, realpathSync(workspace));
   assert.equal(child.stdin, 'byte-for-byte stdin\nsecond line\u0000tail');
   assert.equal(child.forbidden_env, false);
@@ -325,24 +356,28 @@ test('worker run preserves raw argv order/metacharacters, inherited stdin bytes,
   assert.equal(invoked.envelope?.cancelled, false);
 });
 
-test('worker run adds only the descriptor prefix and defaults cwd to process.cwd()', async () => {
-  for (const [harness, prefix] of [
-    ['codex', ['exec']],
-    ['claude-code', []],
-    ['cursor-agent', []],
-  ] as const) {
-    const invoked = await invokeRun({ harness, providerArgv: ['--flag', 'value'] });
+test('worker run passes the complete provider argv unchanged and defaults cwd to process.cwd()', async () => {
+  for (const harness of ['codex', 'claude-code', 'cursor-agent'] as const) {
+    const providerArgv =
+      harness === 'codex'
+        ? ['--ask-for-approval', 'never', 'exec', '--flag', 'value']
+        : ['--flag', 'value'];
+    const invoked = await invokeRun({ harness, providerArgv });
     assert.equal(invoked.code, 0, harness);
     assert.equal(invoked.spawns.length, 1, harness);
-    assert.deepEqual(invoked.spawns[0]?.argv, [...prefix, '--flag', 'value'], harness);
+    assert.deepEqual(invoked.spawns[0]?.argv, providerArgv, harness);
     assert.equal(invoked.spawns[0]?.cwd, realpathSync(process.cwd()), harness);
   }
 });
 
 test('worker rejects unknown harness, bad cwd, and unavailable executable before spawn', async () => {
-  const unknown = await invokeRun({ harness: 'unknown', providerArgv: [] });
-  assert.equal(unknown.code, 2);
-  assert.equal(unknown.envelope, null);
+  const unknown = await invokeRun({ harness: 'unknown', providerArgv: ['--mystery'] });
+  assert.equal(unknown.code, 1);
+  assert.equal(unknown.envelope?.schema, 'ccm/worker-process-result/v1');
+  assert.equal(unknown.envelope?.state, 'rejected');
+  assert.equal(unknown.envelope?.error?.code, 'unknown_harness');
+  assert.equal(unknown.envelope?.harness, 'unknown');
+  assert.deepEqual(unknown.envelope?.argv, ['--mystery']);
   assert.equal(unknown.spawns.length, 0);
 
   const badCwd = await invokeRun({ harness: 'codex', providerArgv: [], cwd: 'relative' });
@@ -414,4 +449,22 @@ test('worker reports bounded timeout, cancellation, and output truncation after 
   assert.equal(truncated.envelope?.error?.code, 'output_limit');
   assert.deepEqual(truncated.envelope?.truncated, { stdout: true, stderr: false });
   assert.equal(truncated.envelope?.reaped, true);
+});
+
+test('worker endpoint relays SIGINT, SIGTERM, and SIGHUP with conventional exits', async () => {
+  for (const [processSignal, expectedExit] of [
+    ['SIGINT', 130],
+    ['SIGTERM', 143],
+    ['SIGHUP', 129],
+  ] as const) {
+    const invoked = await invokeRun({
+      harness: 'cursor-agent',
+      providerArgv: ['--started-hang'],
+      processSignal,
+    });
+    assert.equal(invoked.code, expectedExit, processSignal);
+    assert.equal(invoked.envelope?.state, 'cancelled', processSignal);
+    assert.equal(invoked.envelope?.cancelled, true, processSignal);
+    assert.equal(invoked.envelope?.reaped, true, processSignal);
+  }
 });

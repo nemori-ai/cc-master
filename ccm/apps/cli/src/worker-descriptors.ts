@@ -4,22 +4,26 @@ export type WorkerExecutableKey = 'codex' | 'claude' | 'cursor-agent';
 export interface WorkerDescriptor {
   harness: WorkerHarness;
   executableKey: WorkerExecutableKey;
-  agentPrefix: readonly string[];
+  defaultAgentHelpPrefix: readonly string[];
 }
 
 export const WORKER_HARNESSES = ['codex', 'claude-code', 'cursor-agent'] as const;
 
 const DESCRIPTORS: Readonly<Record<WorkerHarness, WorkerDescriptor>> = Object.freeze({
-  codex: Object.freeze({ harness: 'codex', executableKey: 'codex', agentPrefix: ['exec'] }),
+  codex: Object.freeze({
+    harness: 'codex',
+    executableKey: 'codex',
+    defaultAgentHelpPrefix: ['exec'],
+  }),
   'claude-code': Object.freeze({
     harness: 'claude-code',
     executableKey: 'claude',
-    agentPrefix: [],
+    defaultAgentHelpPrefix: [],
   }),
   'cursor-agent': Object.freeze({
     harness: 'cursor-agent',
     executableKey: 'cursor-agent',
-    agentPrefix: [],
+    defaultAgentHelpPrefix: [],
   }),
 });
 

@@ -28,7 +28,7 @@ export interface WorkerProcessRequest {
 
 export interface WorkerProcessResult {
   schema: typeof WORKER_PROCESS_RESULT_SCHEMA;
-  harness: WorkerDescriptor['harness'];
+  harness: string;
   executable: string | null;
   argv: string[];
   cwd: string;
@@ -52,13 +52,13 @@ const MAX_TIMEOUT_MS = 600_000;
 const MAX_OUTPUT_BYTES = 1_048_576;
 const STDERR_LIMIT_BYTES = 1_048_576;
 
-function baseResult(request: WorkerProcessRequest): WorkerProcessResult {
+function initialResult(harness: string, argv: string[], cwd: string): WorkerProcessResult {
   return {
     schema: WORKER_PROCESS_RESULT_SCHEMA,
-    harness: request.descriptor.harness,
+    harness,
     executable: null,
-    argv: [...request.descriptor.agentPrefix, ...request.providerArgv],
-    cwd: request.cwd,
+    argv: [...argv],
+    cwd,
     state: 'rejected',
     exit_code: null,
     signal: null,
@@ -76,6 +76,10 @@ function baseResult(request: WorkerProcessRequest): WorkerProcessResult {
   };
 }
 
+function baseResult(request: WorkerProcessRequest): WorkerProcessResult {
+  return initialResult(request.descriptor.harness, request.providerArgv, request.cwd);
+}
+
 function fail(
   result: WorkerProcessResult,
   state: WorkerProcessState,
@@ -85,6 +89,21 @@ function fail(
   result.state = state;
   result.error = { code, message };
   return result;
+}
+
+export function rejectedWorkerProcess(input: {
+  harness: string;
+  providerArgv: string[];
+  cwd: string;
+  code: string;
+  message: string;
+}): WorkerProcessResult {
+  return fail(
+    initialResult(input.harness, input.providerArgv, input.cwd),
+    'rejected',
+    input.code,
+    input.message,
+  );
 }
 
 function validate(request: WorkerProcessRequest): string | null {
