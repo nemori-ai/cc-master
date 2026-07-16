@@ -22,7 +22,7 @@
 //   测试注入口保留：opts.home 桥接为 env.HOME（adapter 的 homeBase 契约读 env.HOME 优先）。
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { resolveHarnessAdapter } from './harnesses/registry.js';
 
 export interface ProbeInput {
@@ -384,6 +384,38 @@ export function locateTranscriptFile(
   opts: ProbeOpts = {},
 ): TranscriptLocation | null {
   const ref = (input.transcriptRef || '').trim();
+  const value = (input.handleValue || '').trim();
+
+  // claude-code in-session subagent（Task tool 派生）：实证（真实 orchestration 转录）——子代理
+  //   消息**不内嵌**父转录（父转录全行 isSidechain:false，仅 Task tool_result 提及 agentId），
+  //   而是独立落盘：`<父转录去 .jsonl>/subagents/agent-<agentId>.jsonl`（行结构同主 claude 格式，
+  //   信封多 isSidechain:true / agentId / sessionId=父 sid；旁有 agent-<id>.meta.json：
+  //   {agentType, description, toolUseId, spawnDepth}）。
+  //   登记配方：`ccm agent bind <id> --handle task-id:<agentId> --transcript <父session.jsonl>`
+  //   → 此处派生子文件路径，存在即优先；尚未落盘（启动竞态）→ 回退父文件（子文件出现后
+  //   path/ino 变化触发 client 轮转检测清窗重 tail，自愈到子代理流）。
+  if (input.harness === 'claude-code' && input.handleKind === 'task-id' && value && ref) {
+    const base = basename(ref);
+    if (base.endsWith('.jsonl')) {
+      const derived = join(
+        dirname(ref),
+        base.slice(0, -'.jsonl'.length),
+        'subagents',
+        `agent-${value}.jsonl`,
+      );
+      if (existsSync(derived)) {
+        try {
+          return { path: derived, mtimeMs: statSync(derived).mtimeMs };
+        } catch {
+          /* stat 失败：走通用回退 */
+        }
+      }
+    }
+  }
+  // TODO(codex subagent/collab)：codex rollout 里也见到 multi_agent_v1 spawn_agent 工具面——
+  //   若其子代理消息在 rollout 内有等价可寻址结构（独立文件或行级身份），可在此加对应派生；
+  //   目前未实证，不猜。
+
   if (ref && existsSync(ref)) {
     try {
       return { path: ref, mtimeMs: statSync(ref).mtimeMs };

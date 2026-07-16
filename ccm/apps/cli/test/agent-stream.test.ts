@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
@@ -539,4 +539,71 @@ test('event text truncation never tears a surrogate pair', () => {
   // String#isWellFormed, so check with a lone-surrogate regex).
   const loneSurrogate = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
   assert.doesNotMatch(ev.text, loneSurrogate, 'clipped text stays well-formed');
+});
+
+test('claude subagent stream resolves the derived subagents file from parent ref + task-id handle', () => {
+  // Empirical layout (real orchestration transcripts): an in-session subagent (Task tool) does
+  // NOT write into the parent transcript — it gets its own file at
+  // `<parent-transcript-minus-.jsonl>/subagents/agent-<agentId>.jsonl`, same claude line format
+  // with an `isSidechain:true` + `agentId` envelope. Registration recipe:
+  // `ccm agent bind --handle task-id:<agentId> --transcript <parent-session.jsonl>`.
+  const dir = mkdtempSync(join(tmpdir(), 'ccm-subagent-'));
+  TMPDIRS.push(dir);
+  const parentPath = join(dir, '102faf35-8308-4b30-ad47-52b9e10e06e7.jsonl');
+  writeFileSync(
+    parentPath,
+    `${[
+      '{"parentUuid":null,"isSidechain":false,"type":"user","timestamp":"2026-07-16T15:00:00Z","message":{"role":"user","content":"orchestrate the demo"},"sessionId":"102faf35-8308-4b30-ad47-52b9e10e06e7"}',
+      '{"parentUuid":"x","isSidechain":false,"type":"assistant","timestamp":"2026-07-16T15:00:05Z","message":{"role":"assistant","content":[{"type":"text","text":"parent line — must NOT stream under the subagent"}]}}',
+    ].join('\n')}\n`,
+    'utf8',
+  );
+  // Redacted sample of the real subagent file shape (envelope fields preserved).
+  const subDir = join(dir, '102faf35-8308-4b30-ad47-52b9e10e06e7', 'subagents');
+  mkdirSync(subDir, { recursive: true });
+  const agentId = 'a94c182d71804bad4';
+  writeFileSync(
+    join(subDir, `agent-${agentId}.jsonl`),
+    `${[
+      `{"parentUuid":null,"isSidechain":true,"agentId":"${agentId}","sessionId":"102faf35-8308-4b30-ad47-52b9e10e06e7","type":"user","timestamp":"2026-07-16T15:01:00Z","message":{"role":"user","content":"Write and run md2html self-tests"},"userType":"agent"}`,
+      `{"parentUuid":"y","isSidechain":true,"agentId":"${agentId}","type":"assistant","timestamp":"2026-07-16T15:01:10Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"tu1","name":"Read","input":{"file_path":"md2html.py"}}]}}`,
+      `{"parentUuid":"z","isSidechain":true,"agentId":"${agentId}","type":"user","timestamp":"2026-07-16T15:01:12Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu1","content":"def md2html(text): ..."}]}}`,
+      `{"parentUuid":"w","isSidechain":true,"agentId":"${agentId}","type":"assistant","timestamp":"2026-07-16T15:01:20Z","message":{"role":"assistant","content":[{"type":"text","text":"self-tests pass"}]}}`,
+    ].join('\n')}\n`,
+    'utf8',
+  );
+
+  const p = buildAgentStream({
+    agentId: 'agt-sub',
+    harness: 'claude-code',
+    handleKind: 'task-id',
+    handleValue: agentId,
+    transcriptRef: parentPath,
+  });
+  assert.equal(p.source.kind, 'transcript');
+  assert.ok(
+    String(p.source.path).endsWith(`subagents/agent-${agentId}.jsonl`),
+    'derived subagent file wins over the parent ref',
+  );
+  assert.deepEqual(
+    p.events.map((e) => e.kind),
+    ['user', 'tool', 'tool_result', 'assistant'],
+  );
+  assert.equal(p.events[3]?.text, 'self-tests pass');
+  assert.ok(
+    p.events.every((e) => !e.text.includes('parent line')),
+    'no parent events leak into the subagent stream',
+  );
+
+  // Startup race / unknown agentId: derived file absent -> honest fallback to the parent ref
+  // (once the subagent file appears, path+ino change and the client re-tails onto it).
+  const fallback = buildAgentStream({
+    agentId: 'agt-sub2',
+    harness: 'claude-code',
+    handleKind: 'task-id',
+    handleValue: 'anotheragentid000',
+    transcriptRef: parentPath,
+  });
+  assert.equal(fallback.source.path, parentPath);
+  assert.ok(fallback.events.some((e) => e.text.includes('parent line')));
 });
