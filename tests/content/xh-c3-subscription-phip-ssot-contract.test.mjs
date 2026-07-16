@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -13,16 +14,32 @@ const MANIFEST = JSON.parse(
   ),
 );
 
-function walkMarkdown(root) {
-  if (!existsSync(root)) return [];
-  const out = [];
-  for (const name of readdirSync(root)) {
-    const path = join(root, name);
-    const stat = statSync(path);
-    if (stat.isDirectory()) out.push(...walkMarkdown(path));
-    else if (name.endsWith('.md')) out.push(path);
+function publishableMarkdownPaths(failures) {
+  const result = spawnSync(
+    'git',
+    [
+      '-C',
+      TARGET_ROOT,
+      'ls-files',
+      '--cached',
+      '--others',
+      '--exclude-standard',
+      '-z',
+      '--',
+      'design_docs',
+      'plugin/src/hooks',
+    ],
+    { encoding: 'utf8' },
+  );
+  if (result.status !== 0) {
+    failures.push(
+      `publishable authority discovery failed: ${result.error?.message || result.stderr.trim() || `git exited ${result.status}`}`,
+    );
+    return [];
   }
-  return out;
+  return result.stdout
+    .split('\0')
+    .filter((path) => path.endsWith('.md') && existsSync(join(TARGET_ROOT, path)));
 }
 
 function readTarget(path, failures, label) {
@@ -154,12 +171,12 @@ test('XH C3 Track-B capability has one mapped authority per subject and executab
     Object.values(MANIFEST.canonical).map((entry) => [entry.marker, entry]),
   );
   const discovered = [];
+  const publishableMarkdown = publishableMarkdownPaths(failures);
 
-  for (const root of ['design_docs', 'plugin/src/hooks']) {
-    for (const file of walkMarkdown(join(TARGET_ROOT, root))) {
-      const path = relative(TARGET_ROOT, file);
-      discovered.push(...authorityBlocks(readFileSync(file, 'utf8'), path, failures));
-    }
+  for (const path of publishableMarkdown) {
+    discovered.push(
+      ...authorityBlocks(readFileSync(join(TARGET_ROOT, path), 'utf8'), path, failures),
+    );
   }
 
   for (const block of discovered) {
@@ -310,10 +327,8 @@ test('XH C3 Track-B capability has one mapped authority per subject and executab
   for (const entry of Object.values(MANIFEST.canonical)) {
     for (const anchor of entry.exclusive_semantic_anchors || []) {
       const owners = [];
-      for (const root of ['design_docs', 'plugin/src/hooks']) {
-        for (const file of walkMarkdown(join(TARGET_ROOT, root))) {
-          if (readFileSync(file, 'utf8').includes(anchor)) owners.push(relative(TARGET_ROOT, file));
-        }
+      for (const path of publishableMarkdown) {
+        if (readFileSync(join(TARGET_ROOT, path), 'utf8').includes(anchor)) owners.push(path);
       }
       expectExact(failures, `exclusive semantic anchor ${anchor}`, owners.sort(), [entry.path]);
     }

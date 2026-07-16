@@ -11,10 +11,15 @@ const CHECKER = join(SUITE_ROOT, 'tests/content/xh-c3-subscription-phip-ssot-con
 function mutationTarget(t, label) {
   const root = mkdtempSync(join(tmpdir(), `ccm-xh-c3-phip-${label}-`));
   t.after(() => rmSync(root, { recursive: true, force: true }));
+  cpSync(join(SUITE_ROOT, '.gitignore'), join(root, '.gitignore'));
   cpSync(join(SUITE_ROOT, 'design_docs'), join(root, 'design_docs'), { recursive: true });
   cpSync(join(SUITE_ROOT, 'plugin/src/hooks'), join(root, 'plugin/src/hooks'), {
     recursive: true,
   });
+  const init = spawnSync('git', ['init', '--quiet'], { cwd: root, encoding: 'utf8' });
+  assert.equal(init.status, 0, `failed to initialize mutation fixture:\n${init.stderr}`);
+  const add = spawnSync('git', ['add', '.'], { cwd: root, encoding: 'utf8' });
+  assert.equal(add.status, 0, `failed to stage mutation fixture:\n${add.stderr}`);
   return root;
 }
 
@@ -71,10 +76,47 @@ test('all structured markers reject an alternate owner of a canonical subject', 
       '',
     ].join('\n'),
   );
+  const add = spawnSync('git', ['add', 'design_docs/xh-c3-alternate-authority.md'], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  assert.equal(add.status, 0, `failed to track alternate authority fixture:\n${add.stderr}`);
 
   const result = runChecker(root);
   assertRejected(result, /unapproved authority marker XH-C3-ALTERNATE-AUTHORITY/);
   assert.match(`${result.stdout}\n${result.stderr}`, /duplicate authority for bounded-inbox-list/);
+});
+
+test('ignored local plan cannot become an authority surface', (t) => {
+  const root = mutationTarget(t, 'ignored-plan');
+  const ignoredPlan = join(root, 'design_docs/plans/hostile-local-review.md');
+  writeFileSync(
+    ignoredPlan,
+    [
+      '# Local review scratchpad',
+      '',
+      '<!-- XH-C3-ALTERNATE-AUTHORITY:BEGIN -->',
+      '```json',
+      '{"owns":["bounded-inbox-list"]}',
+      '```',
+      '<!-- XH-C3-ALTERNATE-AUTHORITY:END -->',
+      '',
+      'cc-master/xh-c3-inbox-authority/v1',
+      '',
+    ].join('\n'),
+  );
+  const ignored = spawnSync('git', ['check-ignore', '--quiet', ignoredPlan], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  assert.equal(ignored.status, 0, 'hostile local review fixture must remain gitignored');
+
+  const result = runChecker(root);
+  assert.equal(
+    result.status,
+    0,
+    `ignored plan leaked into publishable authority scan:\n${result.stdout}\n${result.stderr}`,
+  );
 });
 
 test('implemented runtime cannot regress to target-only card or generated matrix truth', (t) => {
