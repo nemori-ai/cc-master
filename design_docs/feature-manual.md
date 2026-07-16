@@ -2,7 +2,7 @@
 
 > 本手册是 cc-master 已交付能力和明确边界的面向人索引。README 负责快速理解和上手；协议、字段和算法的单一真相源仍分别在 `@ccm/engine`、CLI registry、hook CONTRACT 和分发 skills 中。
 >
-> 末次全量同步：2026-07-16，plugin `0.20.0` / `ccm 0.21.0` / web-viewer `0.19.0` release candidate。
+> 末次全量同步：2026-07-16，plugin `0.20.1` / `ccm 0.21.0` / web-viewer `0.19.0` release candidate。
 
 ## 1. 产品模型
 
