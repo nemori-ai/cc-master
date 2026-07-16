@@ -57,6 +57,7 @@ function candidate(id: string, overrides: Record<string, unknown> = {}): Record<
       permission_compatible: true,
       workspace_compatible: true,
       task_unblocked: true,
+      acceptance_satisfied: true,
       paid_use_authorized: true,
       retention_compatible: true,
     },
@@ -184,6 +185,7 @@ test('model-policy advise hard-gates role/admission and only lets fresh taste br
           permission_compatible: true,
           workspace_compatible: true,
           task_unblocked: true,
+          acceptance_satisfied: true,
           paid_use_authorized: true,
           retention_compatible: true,
         },
@@ -394,11 +396,58 @@ test('advice rejects untracked or target-mismatched candidates and string boolea
           permission_compatible: true,
           workspace_compatible: true,
           task_unblocked: true,
+          acceptance_satisfied: true,
           paid_use_authorized: true,
           retention_compatible: true,
         },
       }),
       /exact_selector must be a boolean/u,
+    ],
+    [
+      'missing acceptance gate',
+      (() => {
+        const value = candidate('codex-cli:gpt-5.6-sol') as any;
+        delete value.hard_gate.acceptance_satisfied;
+        return value;
+      })(),
+      /hard_gate keys must be exactly/u,
+    ],
+    [
+      'truthy string acceptance gate',
+      candidate('codex-cli:gpt-5.6-sol', {
+        hard_gate: {
+          exact_selector: true,
+          quota_state: 'ample',
+          policy_compatible: true,
+          security_compatible: true,
+          permission_compatible: true,
+          workspace_compatible: true,
+          task_unblocked: true,
+          acceptance_satisfied: 'true',
+          paid_use_authorized: true,
+          retention_compatible: true,
+        },
+      }),
+      /acceptance_satisfied must be a boolean/u,
+    ],
+    [
+      'extra hard gate key',
+      candidate('codex-cli:gpt-5.6-sol', {
+        hard_gate: {
+          exact_selector: true,
+          quota_state: 'ample',
+          policy_compatible: true,
+          security_compatible: true,
+          permission_compatible: true,
+          workspace_compatible: true,
+          task_unblocked: true,
+          acceptance_satisfied: true,
+          paid_use_authorized: true,
+          retention_compatible: true,
+          caller_override: true,
+        },
+      }),
+      /hard_gate keys must be exactly/u,
     ],
     [
       'admission bound to another candidate',
@@ -496,7 +545,7 @@ test('advice derives taste only from exact current tracked evidence and rejects 
   }
 });
 
-test('policy/security/permission/workspace/task-blocked gates are never-on rejections', () => {
+test('policy/security/permission/workspace/task/acceptance gates are never-on rejections', () => {
   const hardGate = (blocked: string) => ({
     exact_selector: true,
     quota_state: 'ample',
@@ -505,6 +554,7 @@ test('policy/security/permission/workspace/task-blocked gates are never-on rejec
     permission_compatible: blocked !== 'permission',
     workspace_compatible: blocked !== 'workspace',
     task_unblocked: blocked !== 'task',
+    acceptance_satisfied: blocked !== 'acceptance',
     paid_use_authorized: true,
     retention_compatible: true,
   });
@@ -514,6 +564,7 @@ test('policy/security/permission/workspace/task-blocked gates are never-on rejec
     ['permission', 'permission-blocked'],
     ['workspace', 'workspace-mismatch'],
     ['task', 'task-blocked'],
+    ['acceptance', 'acceptance-failed'],
   ] as const) {
     const result = invoke([
       'model-policy',

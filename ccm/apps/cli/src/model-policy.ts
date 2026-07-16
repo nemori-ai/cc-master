@@ -139,6 +139,7 @@ interface AdviceCandidate {
     permission_compatible: boolean;
     workspace_compatible: boolean;
     task_unblocked: boolean;
+    acceptance_satisfied: boolean;
     paid_use_authorized: boolean;
     retention_compatible: boolean;
   };
@@ -601,6 +602,7 @@ function validateAdviceRequest(value: unknown): AdviceRequest {
         'permission_compatible',
         'workspace_compatible',
         'task_unblocked',
+        'acceptance_satisfied',
         'paid_use_authorized',
         'retention_compatible',
       ],
@@ -613,6 +615,7 @@ function validateAdviceRequest(value: unknown): AdviceRequest {
       'permission_compatible',
       'workspace_compatible',
       'task_unblocked',
+      'acceptance_satisfied',
       'paid_use_authorized',
       'retention_compatible',
     ]) {
@@ -690,6 +693,7 @@ function rejectionReasons(
   if (!candidate.hard_gate.permission_compatible) reasons.push('permission-blocked');
   if (!candidate.hard_gate.workspace_compatible) reasons.push('workspace-mismatch');
   if (!candidate.hard_gate.task_unblocked) reasons.push('task-blocked');
+  if (!candidate.hard_gate.acceptance_satisfied) reasons.push('acceptance-failed');
   if (!candidate.hard_gate.paid_use_authorized) reasons.push('paid-use-not-authorized');
   if (!candidate.hard_gate.retention_compatible) reasons.push('retention-incompatible');
   return reasons;
