@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Outside-in alignment discipline for the orchestrator** — `master-orchestrator-guide` gains a new `references/outside-in.md` plus four delta-only main-line anchors (a decision-program item, a rationalization-table row, a red flag, and a reference-index entry) that guard a third orthogonal axis beyond goal-alignment and endpoint-verification: the *external validity of load-bearing assumptions*. Before large or irreversible investment the orchestrator now surfaces judgments supported only by internal inference (internal consensus is not external validation), asks which single external fact would most cheaply refute each one, and calibrates against reality at cost proportional to risk — while an explicit low-risk/reversible/fact-sufficient exemption keeps it from over-validating trivial work. Evidence state reuses the existing flexible board fields (`log` / `judgment_calls` / `references`); no narrow-waist field, no new hook, and the Claude Code / Codex / Cursor projections stay in lockstep.
+
 ## [0.20.1] — 2026-07-16
 
 > **Transactional installer mode-preservation hotfix** — pairs with the unchanged **ccm-v0.21.0**.
