@@ -3,8 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
-import { readVersion } from '../src/help.js';
 import { WEB_VIEWER_APP_DIST_FILES } from '../src/generated/web-viewer-assets.js';
+import { readVersion } from '../src/help.js';
 import {
   __resetWebViewerAppDistTestHooks,
   __setWebViewerAppDistTestHooks,

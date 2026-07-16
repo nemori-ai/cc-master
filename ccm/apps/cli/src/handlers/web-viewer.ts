@@ -1134,9 +1134,7 @@ function statusOf(task: JsonRecord): string {
 }
 
 function recordOf(value: unknown): JsonRecord | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as JsonRecord)
-    : null;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : null;
 }
 
 function stringList(value: unknown): string[] {
@@ -1299,9 +1297,7 @@ function executionProjection(task: JsonRecord, originHarness: string): JsonRecor
         fallback: {
           on: stringList(fallback?.on),
           never_on: stringList(fallback?.never_on),
-          ...(typeof fallback?.exhaustion === 'string'
-            ? { exhaustion: fallback.exhaustion }
-            : {}),
+          ...(typeof fallback?.exhaustion === 'string' ? { exhaustion: fallback.exhaustion } : {}),
           ...(typeof fallback?.same_harness === 'string'
             ? { same_harness: fallback.same_harness }
             : {}),
