@@ -22,6 +22,7 @@ interface Implementation {
 
 const subscriptions = manifest.origins.map((origin: string) => ({
   subscription_id: `sub-${origin}`,
+  board_id: `board-${origin}-primary`,
   session_id: `session-${origin}`,
   session_epoch: `epoch-${origin}`,
   authoritative_epoch: `epoch-${origin}`,
@@ -30,6 +31,20 @@ const subscriptions = manifest.origins.map((origin: string) => ({
   state: 'current',
   valid: true,
 }));
+
+subscriptions.push({
+  subscription_id: 'sub-codex-second-board',
+  board_id: 'board-codex-secondary',
+  session_id: 'session-codex-second-board',
+  session_epoch: 'epoch-codex-second-board',
+  authoritative_epoch: 'epoch-codex-second-board',
+  origin: 'codex',
+  capability: 'coordination-inbox',
+  state: 'current',
+  valid: true,
+});
+
+const expectedCurrentSubscriptions = 4;
 
 const rejectedSubscriptions = [
   {
@@ -118,6 +133,7 @@ async function exercise(implementation: Implementation) {
     decisions: [swapped],
     subscriptions,
   });
+  assert.equal(swappedOut.notifications.length, expectedCurrentSubscriptions);
   assert.ok(
     swappedOut.notifications.every(
       (item: any) => item.payload.previous_state === null && item.payload.edge === 'entered_tight',
@@ -131,11 +147,21 @@ async function exercise(implementation: Implementation) {
       decisions: [tight[index]],
       subscriptions: [...subscriptions, ...rejectedSubscriptions],
     });
-    assert.equal(out.notifications.length, 3, 'fan-out only to three exact current subscriptions');
+    assert.equal(
+      out.notifications.length,
+      expectedCurrentSubscriptions,
+      'fan-out reaches every exact current board/session subscription',
+    );
     assert.deepEqual(
       [...new Set(out.notifications.map((item: any) => item.destination.origin))].sort(),
       [...manifest.origins].sort(),
     );
+    const codexDestinations = out.notifications.filter(
+      (item: any) => item.destination.origin === 'codex',
+    );
+    assert.equal(codexDestinations.length, 2);
+    assert.equal(new Set(codexDestinations.map((item: any) => item.destination.board_id)).size, 2);
+    assert.equal(new Set(codexDestinations.map((item: any) => item.destination.session_id)).size, 2);
     assert.equal(new Set(out.notifications.map((item: any) => item.payload.delta_revision)).size, 1);
     assert.ok(out.notifications.every((item: any) => item.payload.edge === 'entered_tight'));
     assertSafe(out);
@@ -153,7 +179,7 @@ async function exercise(implementation: Implementation) {
       decisions: [implementation.projectPosture(codexAuthority, { state })],
       subscriptions,
     });
-    assert.equal(out.notifications.length, 3);
+    assert.equal(out.notifications.length, expectedCurrentSubscriptions);
     assert.ok(out.notifications.every((item: any) => item.payload.edge === edge));
   }
   const recovery = implementation.projectNotifications({
@@ -161,6 +187,7 @@ async function exercise(implementation: Implementation) {
     decisions: [implementation.projectPosture(codexAuthority, { state: 'healthy' })],
     subscriptions,
   });
+  assert.equal(recovery.notifications.length, expectedCurrentSubscriptions);
   assert.ok(
     recovery.notifications.every((item: any) => item.payload.edge === 'recovered' && item.strength === 'weak'),
   );
@@ -169,7 +196,31 @@ async function exercise(implementation: Implementation) {
     decisions: [implementation.projectPosture(codexAuthority, { state: 'healthy', reset_marker: 'r2' })],
     subscriptions,
   });
+  assert.equal(reset.notifications.length, expectedCurrentSubscriptions);
   assert.ok(reset.notifications.every((item: any) => item.payload.edge === 'reset'));
+
+  const initialHealthyWithMarker = implementation.projectNotifications({
+    previous: [],
+    decisions: [
+      implementation.projectPosture(codexAuthority, { state: 'healthy', reset_marker: 'initial-r1' }),
+    ],
+    subscriptions,
+  });
+  assert.equal(initialHealthyWithMarker.notifications.length, 0, 'initial healthy only establishes baseline');
+  const initialTightWithMarker = implementation.projectNotifications({
+    previous: [],
+    decisions: [
+      implementation.projectPosture(codexAuthority, { state: 'tight', reset_marker: 'initial-r1' }),
+    ],
+    subscriptions,
+  });
+  assert.equal(initialTightWithMarker.notifications.length, expectedCurrentSubscriptions);
+  assert.ok(
+    initialTightWithMarker.notifications.every(
+      (item: any) => item.payload.edge === 'entered_tight' && item.payload.previous_state === null,
+    ),
+    'an initial reset marker does not counterfeit a reset edge',
+  );
 
   const unchanged = implementation.projectPosture(codexAuthority, { state: 'healthy' });
   const reobserved = { ...unchanged, observation_revision: `sha256:${'f'.repeat(64)}` };
@@ -195,7 +246,7 @@ async function exercise(implementation: Implementation) {
     decisions: tight.slice(0, 2),
     subscriptions,
   });
-  assert.equal(two.notifications.length, 6, 'same kind retains both provider scopes');
+  assert.equal(two.notifications.length, 8, 'same kind retains both provider scopes and both Codex sessions');
   assert.equal(new Set(two.notifications.map((item: any) => item.payload.scope_digest)).size, 2);
   assert.equal(new Set(two.notifications.map((item: any) => item.id)).size, two.notifications.length);
 
@@ -216,7 +267,7 @@ async function exercise(implementation: Implementation) {
     checkpoint: effects.checkpoint,
     inbox: effects.inbox,
   });
-  assert.equal(effects.items.size, 3, 'retry delivers every current destination exactly once');
+  assert.equal(effects.items.size, expectedCurrentSubscriptions, 'retry delivers every current destination exactly once');
   assert.equal(effects.checkpoints.get(tight[0].scope_digest).decision_revision, tight[0].decision_revision);
   assert.ok(
     [...effects.items.values()].every((item) =>
@@ -241,6 +292,127 @@ test('fixture oracle kills bounded R1 counterfeit classes', async () => {
     assert.ok(counterfeit, id);
     await assert.rejects(() => exercise(counterfeit));
   }
+});
+
+function rawProjectorInput(
+  authority: Record<string, any>,
+  overrides: {
+    identity_fingerprint?: string;
+    seven_day_used_pct?: number;
+    five_hour_used_pct?: number;
+    five_hour_reset_marker?: string;
+  } = {},
+) {
+  const identityFingerprint = overrides.identity_fingerprint || authority.identity_fingerprint;
+  const observation = {
+    schema: 'ccm/quota-observation/v1',
+    revision: `sha256:${'1'.repeat(64)}`,
+    source_key: {
+      harness: authority.harness_id,
+      surface_id: authority.surface_id,
+      provider: authority.provider_id,
+      identity_fingerprint: identityFingerprint,
+      payer_scope: authority.payer_scope,
+      pool_id: authority.pool_id,
+      bucket_id: authority.bucket_id,
+      unit: authority.unit,
+      window: structuredClone(authority.window),
+    },
+    value: { used_pct: overrides.seven_day_used_pct ?? 20 },
+    freshness: 'fresh',
+    observed_at: '2026-07-16T08:00:00Z',
+    valid_until: '2026-07-16T08:05:00Z',
+  };
+  const observations: Array<Record<string, any>> = [observation];
+  if (authority.provider_id === 'codex' && overrides.five_hour_used_pct !== undefined) {
+    observations.push({
+      ...structuredClone(observation),
+      revision: `sha256:${'2'.repeat(64)}`,
+      source_key: {
+        ...structuredClone(observation.source_key),
+        bucket_id: 'five-hour',
+        window: { kind: 'rolling', name: 'five_hour', duration_sec: 18000 },
+      },
+      value: {
+        used_pct: overrides.five_hour_used_pct,
+        reset_marker: overrides.five_hour_reset_marker || null,
+      },
+    });
+  }
+  return {
+    schema: 'ccm/machine-quota-posture-input/v1',
+    home_scope_salt: 'owner-only-fixture-home-salt',
+    checked_at: '2026-07-16T08:01:00Z',
+    authority: {
+      harness_id: authority.harness_id,
+      surface_id: authority.surface_id,
+      provider_id: authority.provider_id,
+      identity_fingerprint: identityFingerprint,
+      payer_scope: authority.payer_scope,
+      pool_id: authority.pool_id,
+      unit: authority.unit,
+    },
+    observations,
+    active_reservations: [],
+    policy: {
+      revision: authority.policy_revision,
+      hard_ceiling_used_pct: { [authority.bucket_id]: 85 },
+    },
+    requirement: {
+      revision: `requirement:${authority.surface_id}:ambient-v1`,
+      required_bucket_ids: structuredClone(authority.required_bucket_ids),
+      safety_margin: structuredClone(authority.safety_margin),
+    },
+  };
+}
+
+test('production pure projector derives posture from raw authority rather than injected decisions', { skip: !runProduction }, async () => {
+  const modulePath: string = '../src/machine-wide-quota-posture.js';
+  const production = await import(modulePath);
+  assert.equal(typeof production.projectMachineQuotaPosture, 'function');
+  const project = production.projectMachineQuotaPosture as (
+    input: ReturnType<typeof rawProjectorInput>,
+  ) => any;
+  const authorities = manifest.authorities as Record<string, any>[];
+
+  const codexInput = rawProjectorInput(authorities[0]!);
+  const codex = project(codexInput);
+  assert.equal(codex.state, 'healthy');
+  assert.deepEqual(codex.posture.projected_p80, { 'seven-day-global': 0 });
+  assert.match(codex.scope_digest, /^sha256:[0-9a-f]{64}$/);
+  assert.match(codex.target.identity_scope_digest, /^sha256:[0-9a-f]{64}$/);
+  assert.match(codex.target.pool_scope_digest, /^sha256:[0-9a-f]{64}$/);
+  assert.doesNotMatch(JSON.stringify(codex), /identity-codex-a|pool-codex-shared|owner-only-fixture-home-salt/);
+
+  const identitySwap = project(
+    rawProjectorInput(authorities[0]!, { identity_fingerprint: 'identity-codex-b' }),
+  );
+  assert.equal(identitySwap.target.pool_scope_digest, codex.target.pool_scope_digest);
+  assert.notEqual(identitySwap.target.identity_scope_digest, codex.target.identity_scope_digest);
+  assert.notEqual(identitySwap.scope_digest, codex.scope_digest);
+
+  const cursorIde = project(rawProjectorInput(authorities[2]!));
+  const cursorAgent = project(rawProjectorInput(authorities[3]!));
+  assert.equal(cursorIde.target.identity_scope_digest, cursorAgent.target.identity_scope_digest);
+  assert.equal(cursorIde.target.pool_scope_digest, cursorAgent.target.pool_scope_digest);
+  assert.notEqual(cursorIde.scope_digest, cursorAgent.scope_digest);
+
+  const poisonedFiveHour = project(
+    rawProjectorInput(authorities[0]!, {
+      five_hour_used_pct: 100,
+      five_hour_reset_marker: 'legacy-reset-must-be-ignored',
+    }),
+  );
+  assert.equal(poisonedFiveHour.state, codex.state);
+  assert.equal(poisonedFiveHour.scope_digest, codex.scope_digest);
+  assert.equal(poisonedFiveHour.decision_revision, codex.decision_revision);
+  assert.doesNotMatch(JSON.stringify(poisonedFiveHour), /five_hour|legacy-reset/);
+
+  const changedSevenDay = project(
+    rawProjectorInput(authorities[0]!, { seven_day_used_pct: 90 }),
+  );
+  assert.equal(changedSevenDay.state, 'exhausted');
+  assert.notEqual(changedSevenDay.decision_revision, codex.decision_revision);
 });
 
 function productionBoundary() {
@@ -306,7 +478,7 @@ test('production explicit refresh retries partial fan-out without checkpoint los
   const second = await runCli(['quota', 'refresh', '--machine-wide', '--json'], production.boundary);
   assert.equal(second.code, 0, second.stderr.join('\n'));
   assert.equal(production.counters.live_reads, 2);
-  assert.equal(production.effects.items.size, 3);
+  assert.equal(production.effects.items.size, expectedCurrentSubscriptions);
   assert.equal(production.effects.checkpoints.size, 1);
   assert.equal(production.counters.account_switches, 0);
   const retried = production.effects.attempts.filter(

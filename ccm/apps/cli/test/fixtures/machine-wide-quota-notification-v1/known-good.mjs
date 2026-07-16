@@ -55,7 +55,7 @@ export function projectMachineQuotaPosture(authority, input = {}) {
 }
 
 const edgeFor = (previous, current) => {
-  if (current.reset_marker && current.reset_marker !== previous?.reset_marker) return 'reset';
+  if (previous && current.reset_marker && current.reset_marker !== previous.reset_marker) return 'reset';
   if (current.state === previous?.state && current.decision_revision === previous?.decision_revision) return null;
   if (current.state === 'tight' && previous?.state !== 'tight') return 'entered_tight';
   if (current.state === 'exhausted' && previous?.state !== 'exhausted') return 'entered_exhausted';
@@ -90,7 +90,13 @@ export function projectMachineWideQuotaNotifications(input) {
         id,
         kind: 'quota_state_change',
         strength: ['recovered', 'reset'].includes(edge) ? 'weak' : 'strong',
-        destination: { subscription_id: subscription.subscription_id, origin: subscription.origin },
+        destination: {
+          subscription_id: subscription.subscription_id,
+          board_id: subscription.board_id,
+          session_id: subscription.session_id,
+          session_epoch: subscription.session_epoch,
+          origin: subscription.origin,
+        },
         payload: {
           schema: 'ccm/machine-quota-decision-delta/v1',
           producer: 'machine-wide-quota-observer',
