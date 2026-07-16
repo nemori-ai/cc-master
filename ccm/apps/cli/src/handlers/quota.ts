@@ -6,6 +6,10 @@ import {
   readMachineWideQuotaStatus,
   refreshMachineWideQuota,
 } from '../machine-wide-quota.js';
+import {
+  runMachineWideQuotaBoundaryCycle,
+  type MachineWideQuotaNotificationBoundary,
+} from '../machine-wide-quota-notification.js';
 import { createQuotaAdmissionStore } from '../quota-admission-store.js';
 import {
   QUOTA_FILESYSTEM_CAPABILITIES,
@@ -71,9 +75,36 @@ function emit(ctx: Ctx, data: unknown): number {
   return EXIT.OK;
 }
 
+function emitMachineWide(ctx: Ctx, data: unknown): number {
+  // Machine-wide quota is itself a versioned projection consumed by hooks and plugins. Keep the
+  // schema at the JSON root instead of hiding it under the generic CLI success envelope.
+  ctx.out(ctx.flags.json ? JSON.stringify(data) : JSON.stringify(data, null, 2));
+  return EXIT.OK;
+}
+
+async function boundaryStatus(boundary: MachineWideQuotaNotificationBoundary): Promise<unknown> {
+  const decisions = await boundary.readPostures({ refresh: false });
+  const withCoverage = await Promise.all(
+    decisions.map(async (decision) => {
+      const checkpoint = await boundary.readCheckpoint(String(decision.scope_digest));
+      return {
+        ...decision,
+        fanout_covered: checkpoint?.decision_revision === decision.decision_revision,
+      };
+    }),
+  );
+  return {
+    schema: 'ccm/machine-quota-status/v1',
+    summary: { schema: 'ccm/machine-quota-summary/v1', decisions: withCoverage },
+  };
+}
+
 export async function status(ctx: Ctx): Promise<number> {
   if (ctx.values['machine-wide'] === true) {
-    return emit(ctx, await readMachineWideQuotaStatus(store(ctx) as MachineQuotaStore));
+    const data = ctx.machineWideQuotaNotifications
+      ? await boundaryStatus(ctx.machineWideQuotaNotifications)
+      : await readMachineWideQuotaStatus(store(ctx) as MachineQuotaStore);
+    return emitMachineWide(ctx, data);
   }
   return emit(ctx, await store(ctx, ['filesystem.quota.stat']).status());
 }
@@ -90,7 +121,19 @@ export async function refresh(ctx: Ctx): Promise<number> {
     homeFlag: ctx.values.home as string | undefined,
     env: ctx.env,
   });
-  return emit(
+  if (ctx.machineWideQuotaNotifications) {
+    const result = await runMachineWideQuotaBoundaryCycle(
+      ctx.machineWideQuotaNotifications,
+      true,
+    );
+    return emitMachineWide(ctx, {
+      schema: 'ccm/machine-quota-refresh/v1',
+      fanout_complete: true,
+      checkpoint_advanced: true,
+      notifications: result.notifications,
+    });
+  }
+  return emitMachineWide(
     ctx,
     await refreshMachineWideQuota({
       home,

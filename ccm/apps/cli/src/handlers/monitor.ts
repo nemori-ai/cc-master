@@ -24,6 +24,7 @@ import { MachineHarnessRegistry } from '../harnesses/registry.js';
 import { readVersion } from '../help.js';
 import * as io from '../io.js';
 import { refreshMachineWideQuota } from '../machine-wide-quota.js';
+import { runMachineWideQuotaBoundaryCycle } from '../machine-wide-quota-notification.js';
 import { createQuotaAdmissionStore } from '../quota-admission-store.js';
 import { quotaFilesystemFromBoundary } from '../quota-production-effects.js';
 import type { Ctx } from './_common.js';
@@ -503,6 +504,9 @@ async function tickOnce(ctx: Ctx, state: MonitorState): Promise<TickResult> {
     ...(state.quota_source_mode === 'machine-wide'
       ? {
           refreshMachineWide: async () => {
+            if (ctx.machineWideQuotaNotifications) {
+              return runMachineWideQuotaBoundaryCycle(ctx.machineWideQuotaNotifications, true);
+            }
             if (!ctx.quotaEffects) throw new Error('quota effect boundary is required');
             const store = createQuotaAdmissionStore({
               home: state.home,

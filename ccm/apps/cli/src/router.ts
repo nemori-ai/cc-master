@@ -68,6 +68,7 @@ import { harnessSessionId } from './harnesses/registry.js';
 import * as help from './help.js';
 import * as io from './io.js';
 import type { MachineQuotaCollectorBoundary } from './machine-wide-quota.js';
+import type { MachineWideQuotaNotificationBoundary } from './machine-wide-quota-notification.js';
 import { createDefaultProviderRuntime, type ProviderRuntime } from './provider-runtime.js';
 import {
   ALIASES,
@@ -101,6 +102,7 @@ interface RunOpts {
   workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
   machineQuotaCollectors?: MachineQuotaCollectorBoundary;
+  machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
   writeFileAtomicSync?: typeof io.writeFileAtomicSync;
@@ -553,6 +555,7 @@ export function runWithComposition(
     workerSignal: opts.workerSignal,
     quotaEffects: opts.quotaEffects,
     machineQuotaCollectors: opts.machineQuotaCollectors,
+    machineWideQuotaNotifications: opts.machineWideQuotaNotifications,
     nativeAttemptPrivateEvidence: opts.nativeAttemptPrivateEvidence,
     nativeAttemptAdmission: opts.nativeAttemptAdmission,
     writeFileAtomicSync: opts.writeFileAtomicSync,
@@ -610,6 +613,7 @@ function buildCtx({
   workerSignal,
   quotaEffects,
   machineQuotaCollectors,
+  machineWideQuotaNotifications,
   nativeAttemptPrivateEvidence,
   nativeAttemptAdmission,
   writeFileAtomicSync,
@@ -625,6 +629,7 @@ function buildCtx({
   workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
   machineQuotaCollectors?: MachineQuotaCollectorBoundary;
+  machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
   writeFileAtomicSync?: typeof io.writeFileAtomicSync;
@@ -659,6 +664,7 @@ function buildCtx({
     workerSignal,
     quotaEffects,
     machineQuotaCollectors,
+    machineWideQuotaNotifications,
     nativeAttemptPrivateEvidence,
     nativeAttemptAdmission,
     writeFileAtomicSync,

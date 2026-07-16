@@ -210,6 +210,7 @@ export function projectMachineWideQuotaNotifications(input: MachineQuotaProjecti
         summary: `${decision.target?.provider_id ?? 'provider'} quota ${transition.replaceAll('_', ' ')}`,
         destination: {
           subscription_id: subscription.subscription_id,
+          board_id: subscription.board_id,
           session_id: subscription.session_id,
           session_epoch: subscription.session_epoch,
           origin: subscription.origin,

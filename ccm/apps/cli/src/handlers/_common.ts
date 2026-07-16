@@ -32,6 +32,7 @@ import * as discover from '../discover.js';
 import * as io from '../io.js';
 import type { ProviderRuntime } from '../provider-runtime.js';
 import type { MachineQuotaCollectorBoundary } from '../machine-wide-quota.js';
+import type { MachineWideQuotaNotificationBoundary } from '../machine-wide-quota-notification.js';
 import type { OptionSpec, VerbSpec } from '../registry.js';
 
 const EXIT = io.EXIT;
@@ -181,6 +182,7 @@ export interface Ctx {
   workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
   machineQuotaCollectors?: MachineQuotaCollectorBoundary;
+  machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;
   nativeAttemptPrivateEvidence?: NativeAttemptPrivateEvidenceBoundary;
   nativeAttemptAdmission?: NativeAttemptAdmissionBoundary;
   writeFileAtomicSync?: typeof io.writeFileAtomicSync;

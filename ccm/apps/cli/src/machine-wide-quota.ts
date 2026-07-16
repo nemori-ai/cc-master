@@ -13,6 +13,7 @@ import {
 import { knownHarnessAdapters } from './harnesses/registry.js';
 import type { CurrentUsageReading, Env } from './harnesses/types.js';
 import {
+  type MachineQuotaState,
   projectMachineQuotaPosture,
   projectMachineWideQuotaNotifications,
 } from './machine-wide-quota-notification.js';
@@ -305,14 +306,14 @@ function projectDecision(
     required_aggregation_key: aggregationKey,
   });
   const rawState = String(headroom.state ?? 'unknown');
-  const state =
+  const state: MachineQuotaState =
     freshness === 'soft-stale' || freshness === 'hard-stale'
       ? 'stale'
       : freshness !== 'fresh' || rawState === 'unknown'
         ? 'unknown'
         : rawState === 'ample'
           ? 'healthy'
-          : rawState;
+          : (rawState as MachineQuotaState);
   const reasonCodes =
     state === 'healthy'
       ? []
