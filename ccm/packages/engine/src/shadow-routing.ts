@@ -16,6 +16,7 @@ export const ORCHESTRATOR_CONTEXT_SCHEMA = 'ccm/orchestrator-context/v1';
 export const SHADOW_ROUTE_ADVICE_SCHEMA = 'ccm/shadow-route-advice/v1';
 export const ORIGIN_CONTEXT_SCHEMA = 'ccm/origin-context/v1';
 export const CURSOR_SURFACE_CONTEXT_SCHEMA = 'ccm/cursor-surface-context/v1';
+export const MACHINE_QUOTA_SUMMARY_SCHEMA = 'ccm/machine-quota-summary/v1';
 
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const AVAILABILITY = ['available', 'unavailable', 'unknown'] as const;
@@ -35,6 +36,8 @@ const MAX_WARNING_LENGTH = 256;
 const MAX_AGENT_ROUTE_SUMMARIES = 12;
 const SAFE_PUBLIC_CODE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const SAFE_PUBLIC_ID = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
+const MACHINE_QUOTA_REASON = /^[A-Z0-9][A-Z0-9_:-]{0,127}$/;
+const SHA256_DIGEST = /^sha256:[a-f0-9]{64}$/;
 const SECRET_KEY =
   /credential|token|(?:^|_)argv(?:_|$)|(?:^|_)env(?:ironment)?(?:_|$)|raw.*response|transcript|balance/i;
 // BEGIN ORIGIN_PRIVATE_VALUE_LANGUAGE
@@ -155,6 +158,34 @@ export interface CursorSurfaceContext {
   surfaces: [CursorSurfaceContextFact, CursorSurfaceContextFact];
 }
 
+export interface MachineQuotaSummaryDecision {
+  scope_digest: string;
+  target: {
+    harness_id: string;
+    surface_id: string;
+    provider_id: string;
+    identity_scope_digest: string;
+    payer_scope: string;
+    pool_scope_digest: string;
+    bucket_id: string;
+    unit: string;
+    window: { kind: string; name: string; duration_sec: number };
+  };
+  policy_digest: string;
+  requirement_digest: string;
+  state: 'healthy' | 'tight' | 'exhausted' | 'stale' | 'unknown';
+  freshness: 'fresh' | 'soft-stale' | 'hard-stale' | 'unknown';
+  reason_codes: string[];
+  decision_revision: string;
+  observation_revision: string;
+  fanout_covered: boolean;
+}
+
+export interface MachineQuotaSummary {
+  schema: typeof MACHINE_QUOTA_SUMMARY_SCHEMA;
+  decisions: MachineQuotaSummaryDecision[];
+}
+
 export interface MachineContextCache {
   schema: typeof MACHINE_CONTEXT_CACHE_SCHEMA;
   revision: string;
@@ -180,12 +211,14 @@ export interface OrchestratorContext {
   };
   candidates: CachedCandidateFact[];
   cursor_surfaces?: CursorSurfaceContext;
+  machine_quota?: MachineQuotaSummary;
   warnings: string[];
   truncation: {
     applied: boolean;
     omitted_candidates: number;
     omitted_warnings: number;
     shortened_fields: number;
+    omitted_quota_scopes: number;
     max_bytes: typeof ORCHESTRATOR_CONTEXT_MAX_BYTES;
   };
 }
@@ -261,6 +294,7 @@ export interface OriginContextPayload {
   contract_activation: 'legacy' | 'enabled' | 'invalid';
   candidates: OriginContextCandidate[];
   cursor_surfaces?: CursorSurfaceContext;
+  machine_quota?: MachineQuotaSummary;
   routes: OriginContextRouteSummary[];
   warnings: string[];
   truncation: {
@@ -268,6 +302,7 @@ export interface OriginContextPayload {
     omitted_candidates: number;
     omitted_routes: number;
     omitted_warnings: number;
+    omitted_quota_scopes: number;
     max_bytes: typeof ORCHESTRATOR_CONTEXT_MAX_BYTES;
   };
 }
@@ -288,6 +323,12 @@ function nonEmpty(value: unknown): value is string {
 
 function boundedString(value: unknown, max: number): value is string {
   return nonEmpty(value) && value.length <= max;
+}
+
+function exactKeys(value: RecordLike, keys: readonly string[]): boolean {
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 }
 
 function strictIso(value: unknown): value is string {
@@ -661,6 +702,150 @@ function validateCursorSurfaceContext(value: unknown): ContractIssue[] {
   return out;
 }
 
+export function validateMachineQuotaSummary(
+  value: unknown,
+  rootPath = 'machine_quota',
+): ContractIssue[] {
+  if (!record(value)) return [issue('MACHINE-QUOTA-SHAPE', rootPath, 'must be an object')];
+  const out: ContractIssue[] = [];
+  scanSecrets(value, rootPath, out);
+  if (!exactKeys(value, ['schema', 'decisions']) || value.schema !== MACHINE_QUOTA_SUMMARY_SCHEMA) {
+    out.push(
+      issue(
+        'MACHINE-QUOTA-SCHEMA',
+        rootPath,
+        `must contain exactly schema=${MACHINE_QUOTA_SUMMARY_SCHEMA} and decisions`,
+      ),
+    );
+  }
+  if (!Array.isArray(value.decisions)) {
+    out.push(issue('MACHINE-QUOTA-DECISIONS', `${rootPath}.decisions`, 'must be an array'));
+    return out;
+  }
+  const scopes: string[] = [];
+  value.decisions.forEach((decision: unknown, index: number) => {
+    const path = `${rootPath}.decisions[${index}]`;
+    if (!record(decision)) {
+      out.push(issue('MACHINE-QUOTA-DECISION', path, 'must be an object'));
+      return;
+    }
+    if (
+      !exactKeys(decision, [
+        'scope_digest',
+        'target',
+        'policy_digest',
+        'requirement_digest',
+        'state',
+        'freshness',
+        'reason_codes',
+        'decision_revision',
+        'observation_revision',
+        'fanout_covered',
+      ])
+    ) {
+      out.push(issue('MACHINE-QUOTA-DECISION', path, 'contains unknown or missing fields'));
+    }
+    for (const field of [
+      'scope_digest',
+      'policy_digest',
+      'requirement_digest',
+      'decision_revision',
+      'observation_revision',
+    ]) {
+      if (typeof decision[field] !== 'string' || !SHA256_DIGEST.test(decision[field])) {
+        out.push(issue('MACHINE-QUOTA-DIGEST', `${path}.${field}`, 'must be a sha256 digest'));
+      }
+    }
+    if (typeof decision.scope_digest === 'string') scopes.push(decision.scope_digest);
+    if (!record(decision.target)) {
+      out.push(issue('MACHINE-QUOTA-TARGET', `${path}.target`, 'must be an object'));
+    } else {
+      const target = decision.target;
+      if (
+        !exactKeys(target, [
+          'harness_id',
+          'surface_id',
+          'provider_id',
+          'identity_scope_digest',
+          'payer_scope',
+          'pool_scope_digest',
+          'bucket_id',
+          'unit',
+          'window',
+        ])
+      ) {
+        out.push(
+          issue('MACHINE-QUOTA-TARGET', `${path}.target`, 'contains unknown or missing fields'),
+        );
+      }
+      for (const field of [
+        'harness_id',
+        'surface_id',
+        'provider_id',
+        'payer_scope',
+        'bucket_id',
+        'unit',
+      ]) {
+        if (!boundedString(target[field], 128)) {
+          out.push(issue('MACHINE-QUOTA-TARGET', `${path}.target.${field}`, 'must be bounded'));
+        }
+      }
+      for (const field of ['identity_scope_digest', 'pool_scope_digest']) {
+        if (typeof target[field] !== 'string' || !SHA256_DIGEST.test(target[field])) {
+          out.push(
+            issue('MACHINE-QUOTA-DIGEST', `${path}.target.${field}`, 'must be a sha256 digest'),
+          );
+        }
+      }
+      if (
+        !record(target.window) ||
+        !exactKeys(target.window, ['kind', 'name', 'duration_sec']) ||
+        !boundedString(target.window.kind, 64) ||
+        !boundedString(target.window.name, 64) ||
+        !Number.isSafeInteger(target.window.duration_sec) ||
+        target.window.duration_sec <= 0
+      ) {
+        out.push(
+          issue('MACHINE-QUOTA-WINDOW', `${path}.target.window`, 'must be a bounded window'),
+        );
+      }
+    }
+    if (!['healthy', 'tight', 'exhausted', 'stale', 'unknown'].includes(decision.state)) {
+      out.push(issue('MACHINE-QUOTA-STATE', `${path}.state`, 'must be a closed quota state'));
+    }
+    if (!['fresh', 'soft-stale', 'hard-stale', 'unknown'].includes(decision.freshness)) {
+      out.push(
+        issue('MACHINE-QUOTA-FRESHNESS', `${path}.freshness`, 'must be a closed freshness state'),
+      );
+    }
+    if (
+      !Array.isArray(decision.reason_codes) ||
+      decision.reason_codes.some(
+        (candidate: unknown) =>
+          typeof candidate !== 'string' || !MACHINE_QUOTA_REASON.test(candidate),
+      )
+    ) {
+      out.push(issue('MACHINE-QUOTA-REASONS', `${path}.reason_codes`, 'must be safe codes'));
+    }
+    if (typeof decision.fanout_covered !== 'boolean') {
+      out.push(issue('MACHINE-QUOTA-COVERAGE', `${path}.fanout_covered`, 'must be boolean'));
+    }
+  });
+  if (
+    new Set(scopes).size !== scopes.length ||
+    scopes.some((scope, i) => i > 0 && scopes[i - 1]! > scope)
+  ) {
+    out.push(
+      issue(
+        'MACHINE-QUOTA-ORDER',
+        `${rootPath}.decisions`,
+        'must be unique and ordered by scope_digest',
+      ),
+    );
+  }
+  return out;
+}
+
 export function validateMachineContextCache(value: unknown): ContractIssue[] {
   if (!record(value)) return [issue('MACHINE-CONTEXT-SHAPE', 'snapshot', 'must be an object')];
   const out: ContractIssue[] = [];
@@ -910,17 +1095,20 @@ function boundContextProjection(
   const shortened = { value: 0 };
   const originalCandidates = value.candidates.length;
   const originalWarnings = value.warnings.length;
+  const originalQuotaScopes = value.machine_quota?.decisions.length ?? 0;
   const result: OrchestratorContext = {
     ...value,
     candidates: value.candidates.map((candidate) => projectCandidate(candidate, shortened)),
     warnings: value.warnings.map((warning) =>
       shortenPublic(warning, MAX_WARNING_LENGTH, shortened),
     ),
+    ...(value.machine_quota ? { machine_quota: structuredClone(value.machine_quota) } : {}),
     truncation: {
       applied: shortened.value > 0,
       omitted_candidates: 0,
       omitted_warnings: 0,
       shortened_fields: shortened.value,
+      omitted_quota_scopes: 0,
       max_bytes: ORCHESTRATOR_CONTEXT_MAX_BYTES,
     },
   };
@@ -928,6 +1116,16 @@ function boundContextProjection(
   while (contextBytes(result) > ORCHESTRATOR_CONTEXT_MAX_BYTES && result.warnings.length > 0) {
     result.warnings.pop();
     result.truncation.omitted_warnings = originalWarnings - result.warnings.length;
+    result.truncation.applied = true;
+  }
+  while (
+    contextBytes(result) > ORCHESTRATOR_CONTEXT_MAX_BYTES &&
+    result.machine_quota &&
+    result.machine_quota.decisions.length > 0
+  ) {
+    result.machine_quota.decisions.pop();
+    result.truncation.omitted_quota_scopes =
+      originalQuotaScopes - result.machine_quota.decisions.length;
     result.truncation.applied = true;
   }
   while (contextBytes(result) > ORCHESTRATOR_CONTEXT_MAX_BYTES && result.candidates.length > 0) {
@@ -946,8 +1144,12 @@ export function buildCachedOrchestratorContext(input: {
   boardRevision: string;
   snapshot: unknown;
   asOf: string;
+  machineQuota?: unknown;
 }): OrchestratorContext {
   const issues = validateMachineContextCache(input.snapshot);
+  if (input.machineQuota !== undefined) {
+    issues.push(...validateMachineQuotaSummary(input.machineQuota));
+  }
   if (!boundedString(input.originHarness, MAX_ORIGIN_LENGTH)) {
     issues.push(
       issue(
@@ -994,7 +1196,23 @@ export function buildCachedOrchestratorContext(input: {
     ...(snapshot.cursor_surfaces
       ? { cursor_surfaces: structuredClone(snapshot.cursor_surfaces) }
       : {}),
+    ...(input.machineQuota
+      ? { machine_quota: structuredClone(input.machineQuota) as MachineQuotaSummary }
+      : {}),
     warnings: [...new Set(warnings)],
+  });
+}
+
+export function attachMachineQuotaSummary(
+  context: OrchestratorContext,
+  summary: unknown,
+): OrchestratorContext {
+  const issues = [...validateContext(context), ...validateMachineQuotaSummary(summary)];
+  if (issues.length) throw contractError('invalid machine quota context attachment', issues);
+  const { truncation: _truncation, ...base } = context;
+  return boundContextProjection({
+    ...base,
+    machine_quota: structuredClone(summary) as MachineQuotaSummary,
   });
 }
 
@@ -1084,6 +1302,9 @@ function validateContext(value: unknown): ContractIssue[] {
   if (!strings(value.warnings)) {
     out.push(issue('ORCHESTRATOR-CONTEXT-WARNINGS', 'context.warnings', 'must be string[]'));
   }
+  if (value.machine_quota !== undefined) {
+    out.push(...validateMachineQuotaSummary(value.machine_quota, 'context.machine_quota'));
+  }
   if (
     !record(value.truncation) ||
     typeof value.truncation.applied !== 'boolean' ||
@@ -1093,6 +1314,8 @@ function validateContext(value: unknown): ContractIssue[] {
     value.truncation.omitted_warnings < 0 ||
     !Number.isInteger(value.truncation.shortened_fields) ||
     value.truncation.shortened_fields < 0 ||
+    !Number.isInteger(value.truncation.omitted_quota_scopes) ||
+    value.truncation.omitted_quota_scopes < 0 ||
     value.truncation.max_bytes !== ORCHESTRATOR_CONTEXT_MAX_BYTES
   ) {
     out.push(
@@ -1106,7 +1329,8 @@ function validateContext(value: unknown): ContractIssue[] {
     value.truncation.applied !==
     (value.truncation.omitted_candidates > 0 ||
       value.truncation.omitted_warnings > 0 ||
-      value.truncation.shortened_fields > 0)
+      value.truncation.shortened_fields > 0 ||
+      value.truncation.omitted_quota_scopes > 0)
   ) {
     out.push(
       issue(
@@ -1500,6 +1724,7 @@ export function buildOriginContextContent(input: {
     ...(context.cursor_surfaces
       ? { cursor_surfaces: structuredClone(context.cursor_surfaces) }
       : {}),
+    ...(context.machine_quota ? { machine_quota: structuredClone(context.machine_quota) } : {}),
     routes,
     warnings: safeWarningCodes(warnings),
     truncation: {
@@ -1507,6 +1732,7 @@ export function buildOriginContextContent(input: {
       omitted_candidates: 0,
       omitted_routes: Math.max(0, readyTasks.length - routes.length),
       omitted_warnings: 0,
+      omitted_quota_scopes: 0,
       max_bytes: ORCHESTRATOR_CONTEXT_MAX_BYTES,
     },
   };
@@ -1514,6 +1740,7 @@ export function buildOriginContextContent(input: {
   const originalCandidateCount = payload.candidates.length;
   const originalRouteCount = payload.routes.length;
   const originalWarningCount = payload.warnings.length;
+  const originalQuotaScopeCount = payload.machine_quota?.decisions.length ?? 0;
   let content = originAmbient(payload);
   while (
     new TextEncoder().encode(content).byteLength > ORCHESTRATOR_CONTEXT_MAX_BYTES &&
@@ -1521,6 +1748,17 @@ export function buildOriginContextContent(input: {
   ) {
     payload.warnings.pop();
     payload.truncation.omitted_warnings = originalWarningCount - payload.warnings.length;
+    payload.truncation.applied = true;
+    content = originAmbient(payload);
+  }
+  while (
+    new TextEncoder().encode(content).byteLength > ORCHESTRATOR_CONTEXT_MAX_BYTES &&
+    payload.machine_quota &&
+    payload.machine_quota.decisions.length > 0
+  ) {
+    payload.machine_quota.decisions.pop();
+    payload.truncation.omitted_quota_scopes =
+      originalQuotaScopeCount - payload.machine_quota.decisions.length;
     payload.truncation.applied = true;
     content = originAmbient(payload);
   }
@@ -1551,7 +1789,8 @@ export function buildOriginContextContent(input: {
     payload.truncation.applied ||
     payload.truncation.omitted_routes > 0 ||
     payload.truncation.omitted_candidates > 0 ||
-    payload.truncation.omitted_warnings > 0;
+    payload.truncation.omitted_warnings > 0 ||
+    payload.truncation.omitted_quota_scopes > 0;
   content = originAmbient(payload);
   const contentBytes = new TextEncoder().encode(content).byteLength;
   if (contentBytes > ORCHESTRATOR_CONTEXT_MAX_BYTES) {

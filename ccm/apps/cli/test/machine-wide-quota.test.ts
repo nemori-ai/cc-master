@@ -205,7 +205,14 @@ test('a current destination write failure prevents checkpoint advance for crash-
   const result = await refreshMachineWideQuota({ home, env: {}, store, collectors, now: NOW });
   assert.equal(result.fanout_complete, false);
   assert.equal(result.checkpoint_advanced, false);
-  assert.equal(await store.readMachineProjection(), undefined);
+  const projection = await store.readMachineProjection();
+  assert.equal(projection?.schema, 'ccm/machine-quota-projection/v1');
+  assert.match(String(projection?.home_salt), /^[0-9a-f-]{36}$/i);
+  assert.deepEqual(
+    projection?.decisions,
+    [],
+    'salt metadata is durable but decision checkpoint stays empty',
+  );
   assert.ok(result.deliveries.some((delivery: Data) => delivery.status === 'error'));
 });
 
@@ -280,7 +287,7 @@ test('CLI status is cached-only and refresh is an explicit machine-wide live sea
   const cached = await invoke(['quota', 'status', '--machine-wide', '--json']);
   assert.equal(cached.code, 0, cached.stderr);
   assert.equal(collectionCount, 0, 'status cannot call a provider collector');
-  assert.equal(JSON.parse(cached.stdout).data.schema, 'ccm/machine-quota-status/v1');
+  assert.equal(JSON.parse(cached.stdout).schema, 'ccm/machine-quota-status/v1');
 
   const missingFlag = await invoke(['quota', 'refresh', '--json']);
   assert.equal(missingFlag.code, 2);
@@ -289,5 +296,5 @@ test('CLI status is cached-only and refresh is an explicit machine-wide live sea
   const refreshed = await invoke(['quota', 'refresh', '--machine-wide', '--json']);
   assert.equal(refreshed.code, 0, refreshed.stderr);
   assert.equal(collectionCount, 5);
-  assert.equal(JSON.parse(refreshed.stdout).data.schema, 'ccm/machine-quota-refresh/v1');
+  assert.equal(JSON.parse(refreshed.stdout).schema, 'ccm/machine-quota-refresh/v1');
 });

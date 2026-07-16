@@ -430,6 +430,8 @@ export type {
   CursorSurfaceContextFact,
   CursorSurfaceState,
   MachineContextCache,
+  MachineQuotaSummary,
+  MachineQuotaSummaryDecision,
   OrchestratorContext,
   OriginContextCandidate,
   OriginContextContent,
@@ -440,15 +442,18 @@ export type {
 } from './shadow-routing.js';
 export {
   adviseShadowRoute,
+  attachMachineQuotaSummary,
   buildCachedOrchestratorContext,
   buildOriginContextContent,
   CURSOR_SURFACE_CONTEXT_SCHEMA,
   MACHINE_CONTEXT_CACHE_SCHEMA,
+  MACHINE_QUOTA_SUMMARY_SCHEMA,
   ORCHESTRATOR_CONTEXT_MAX_BYTES,
   ORCHESTRATOR_CONTEXT_SCHEMA,
   ORIGIN_CONTEXT_SCHEMA,
   SHADOW_ROUTE_ADVICE_SCHEMA,
   validateMachineContextCache,
+  validateMachineQuotaSummary,
 } from './shadow-routing.js';
 // ── statusline/（self-contained status line·0.10.0：渲染单行 ANSI + sidecar 捕获 + 安装/卸载/自动安装）──
 export type {

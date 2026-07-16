@@ -30,9 +30,9 @@ import {
 import { resolveDeliveryFacts } from '../delivery-proof.js';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
-import type { ProviderRuntime } from '../provider-runtime.js';
 import type { MachineQuotaCollectorBoundary } from '../machine-wide-quota.js';
 import type { MachineWideQuotaNotificationBoundary } from '../machine-wide-quota-notification.js';
+import type { ProviderRuntime } from '../provider-runtime.js';
 import type { OptionSpec, VerbSpec } from '../registry.js';
 
 const EXIT = io.EXIT;

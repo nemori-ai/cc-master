@@ -7,8 +7,8 @@ import {
   refreshMachineWideQuota,
 } from '../machine-wide-quota.js';
 import {
-  runMachineWideQuotaBoundaryCycle,
   type MachineWideQuotaNotificationBoundary,
+  runMachineWideQuotaBoundaryCycle,
 } from '../machine-wide-quota-notification.js';
 import { createQuotaAdmissionStore } from '../quota-admission-store.js';
 import {
@@ -122,10 +122,7 @@ export async function refresh(ctx: Ctx): Promise<number> {
     env: ctx.env,
   });
   if (ctx.machineWideQuotaNotifications) {
-    const result = await runMachineWideQuotaBoundaryCycle(
-      ctx.machineWideQuotaNotifications,
-      true,
-    );
+    const result = await runMachineWideQuotaBoundaryCycle(ctx.machineWideQuotaNotifications, true);
     return emitMachineWide(ctx, {
       schema: 'ccm/machine-quota-refresh/v1',
       fanout_complete: true,

@@ -1,5 +1,7 @@
+import { createHash, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { UsageSignal, WindowSignal } from '@ccm/engine';
-import { randomUUID } from 'node:crypto';
 import {
   canonicalJson,
   deriveQuotaHeadroom,
@@ -390,16 +392,7 @@ function checkpointDecisions(projection: Data | undefined): Data[] {
   return Array.isArray(projection?.decisions) ? projection.decisions : [];
 }
 
-export async function readMachineWideQuotaStatus(
-  store: MachineQuotaStore,
-  now = new Date(),
-): Promise<Data> {
-  const projection = await store.readMachineProjection();
-  const homeSalt =
-    typeof projection?.home_salt === 'string' && projection.home_salt.length > 0
-      ? projection.home_salt
-      : null;
-  const decisions = await decisionsFromStore(store, now, homeSalt);
+function machineQuotaStatus(decisions: Data[], projection: Data | undefined): Data {
   const checkpoint = checkpointDecisions(projection);
   const covered = new Map(
     checkpoint.map((decision) => [decision.scope_digest, decision.decision_revision]),
@@ -407,9 +400,7 @@ export async function readMachineWideQuotaStatus(
   const summaryDecisions = decisions
     .map((decision) => ({
       scope_digest: decision.scope_digest,
-      target: {
-        ...decision.target,
-      },
+      target: { ...decision.target },
       policy_digest: decision.policy_digest,
       requirement_digest: decision.requirement_digest,
       posture: decision.posture,
@@ -425,6 +416,95 @@ export async function readMachineWideQuotaStatus(
     schema: 'ccm/machine-quota-status/v1',
     summary: { schema: 'ccm/machine-quota-summary/v1', decisions: summaryDecisions },
   };
+}
+
+export async function readMachineWideQuotaStatus(
+  store: MachineQuotaStore,
+  now = new Date(),
+): Promise<Data> {
+  const projection = await store.readMachineProjection();
+  const homeSalt =
+    typeof projection?.home_salt === 'string' && projection.home_salt.length > 0
+      ? projection.home_salt
+      : null;
+  const decisions = await decisionsFromStore(store, now, homeSalt);
+  return machineQuotaStatus(decisions, projection);
+}
+
+function readCachedJson(path: string): Data | undefined {
+  try {
+    const value: unknown = JSON.parse(readFileSync(path, 'utf8'));
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Data)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Synchronous cached-only reader for the existing synchronous orchestrator-context command. */
+export function readMachineWideQuotaStatusCached(home: string, now = new Date()): Data {
+  const quotaRoot = join(home, 'quota', 'v1');
+  const projection = readCachedJson(join(quotaRoot, 'machine-wide', 'projection.json'));
+  const homeSalt =
+    typeof projection?.home_salt === 'string' && projection.home_salt.length > 0
+      ? projection.home_salt
+      : null;
+  const decisions = TARGETS.map((target) => {
+    let observation: Data | undefined;
+    if (homeSalt) {
+      const sourceDigest = createHash('sha256').update(sourceKey(target)).digest('hex');
+      const candidate = readCachedJson(
+        join(quotaRoot, 'observations', sourceDigest, 'current.json'),
+      );
+      // Keep the synchronous cache reader narrower than authority publication. Invalid or
+      // mismatched owner-only rows become unknown and cannot contribute arbitrary public fields.
+      if (
+        candidate?.schema === 'ccm/quota-authority-observation/v1' &&
+        candidate.source_key === sourceKey(target) &&
+        candidate.provider === target.providerId &&
+        candidate.provider_rule_revision === target.policyRevision
+      ) {
+        observation = candidate;
+      }
+    }
+    return projectDecision(target, observation, now, homeSalt ?? 'uninitialized-machine-quota');
+  });
+  return machineQuotaStatus(decisions, projection);
+}
+
+export function projectMachineQuotaContextSummary(status: Data): Data | undefined {
+  if (
+    status.schema !== 'ccm/machine-quota-status/v1' ||
+    !Array.isArray(status.summary?.decisions)
+  ) {
+    return undefined;
+  }
+  return {
+    schema: 'ccm/machine-quota-summary/v1',
+    decisions: status.summary.decisions.map((decision: Data) => ({
+      scope_digest: decision.scope_digest,
+      target: structuredClone(decision.target),
+      policy_digest: decision.policy_digest,
+      requirement_digest: decision.requirement_digest,
+      state: decision.state,
+      freshness: decision.freshness,
+      reason_codes: structuredClone(decision.reason_codes),
+      decision_revision: decision.decision_revision,
+      observation_revision: decision.observation_revision,
+      fanout_covered: decision.fanout_covered,
+    })),
+  };
+}
+
+export function readMachineWideQuotaContextSummaryCached(
+  home: string,
+  now = new Date(),
+): Data | undefined {
+  const projection = readCachedJson(join(home, 'quota', 'v1', 'machine-wide', 'projection.json'));
+  if (typeof projection?.home_salt !== 'string' || projection.home_salt.length === 0)
+    return undefined;
+  return projectMachineQuotaContextSummary(readMachineWideQuotaStatusCached(home, now));
 }
 
 export async function refreshMachineWideQuota(input: {

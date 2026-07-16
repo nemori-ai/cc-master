@@ -91,7 +91,8 @@ function memoryEffects(failSubscriptionOnce: string | null = null) {
           throw new Error('INJECTED_PARTIAL_INBOX_FAILURE');
         }
         const prior = items.get(notification.id);
-        if (prior) assert.deepEqual(prior, notification, 'same deterministic id must be an exact no-op');
+        if (prior)
+          assert.deepEqual(prior, notification, 'same deterministic id must be an exact no-op');
         else items.set(notification.id, structuredClone(notification));
       },
     },
@@ -121,13 +122,21 @@ async function exercise(implementation: Implementation) {
   const cursorAgent = healthy[3];
   assert.equal(cursorIde.target.identity_scope_digest, cursorAgent.target.identity_scope_digest);
   assert.equal(cursorIde.target.pool_scope_digest, cursorAgent.target.pool_scope_digest);
-  assert.notEqual(cursorIde.scope_digest, cursorAgent.scope_digest, 'Cursor IDE/Agent are distinct surfaces');
+  assert.notEqual(
+    cursorIde.scope_digest,
+    cursorAgent.scope_digest,
+    'Cursor IDE/Agent are distinct surfaces',
+  );
 
   const swappedAuthority = { ...authorities[0], identity_fingerprint: 'identity-codex-b' };
   const swapped = implementation.projectPosture(swappedAuthority, { state: 'tight' });
   assert.equal(healthy[0].target.pool_scope_digest, swapped.target.pool_scope_digest);
   assert.notEqual(healthy[0].target.identity_scope_digest, swapped.target.identity_scope_digest);
-  assert.notEqual(healthy[0].scope_digest, swapped.scope_digest, 'same pool identity swap is a new scope');
+  assert.notEqual(
+    healthy[0].scope_digest,
+    swapped.scope_digest,
+    'same pool identity swap is a new scope',
+  );
   const swappedOut = implementation.projectNotifications({
     previous: [healthy[0]],
     decisions: [swapped],
@@ -161,8 +170,14 @@ async function exercise(implementation: Implementation) {
     );
     assert.equal(codexDestinations.length, 2);
     assert.equal(new Set(codexDestinations.map((item: any) => item.destination.board_id)).size, 2);
-    assert.equal(new Set(codexDestinations.map((item: any) => item.destination.session_id)).size, 2);
-    assert.equal(new Set(out.notifications.map((item: any) => item.payload.delta_revision)).size, 1);
+    assert.equal(
+      new Set(codexDestinations.map((item: any) => item.destination.session_id)).size,
+      2,
+    );
+    assert.equal(
+      new Set(out.notifications.map((item: any) => item.payload.delta_revision)).size,
+      1,
+    );
     assert.ok(out.notifications.every((item: any) => item.payload.edge === 'entered_tight'));
     assertSafe(out);
   }
@@ -189,11 +204,17 @@ async function exercise(implementation: Implementation) {
   });
   assert.equal(recovery.notifications.length, expectedCurrentSubscriptions);
   assert.ok(
-    recovery.notifications.every((item: any) => item.payload.edge === 'recovered' && item.strength === 'weak'),
+    recovery.notifications.every(
+      (item: any) => item.payload.edge === 'recovered' && item.strength === 'weak',
+    ),
   );
   const reset = implementation.projectNotifications({
-    previous: [implementation.projectPosture(codexAuthority, { state: 'exhausted', reset_marker: 'r1' })],
-    decisions: [implementation.projectPosture(codexAuthority, { state: 'healthy', reset_marker: 'r2' })],
+    previous: [
+      implementation.projectPosture(codexAuthority, { state: 'exhausted', reset_marker: 'r1' }),
+    ],
+    decisions: [
+      implementation.projectPosture(codexAuthority, { state: 'healthy', reset_marker: 'r2' }),
+    ],
     subscriptions,
   });
   assert.equal(reset.notifications.length, expectedCurrentSubscriptions);
@@ -202,11 +223,18 @@ async function exercise(implementation: Implementation) {
   const initialHealthyWithMarker = implementation.projectNotifications({
     previous: [],
     decisions: [
-      implementation.projectPosture(codexAuthority, { state: 'healthy', reset_marker: 'initial-r1' }),
+      implementation.projectPosture(codexAuthority, {
+        state: 'healthy',
+        reset_marker: 'initial-r1',
+      }),
     ],
     subscriptions,
   });
-  assert.equal(initialHealthyWithMarker.notifications.length, 0, 'initial healthy only establishes baseline');
+  assert.equal(
+    initialHealthyWithMarker.notifications.length,
+    0,
+    'initial healthy only establishes baseline',
+  );
   const initialTightWithMarker = implementation.projectNotifications({
     previous: [],
     decisions: [
@@ -225,8 +253,11 @@ async function exercise(implementation: Implementation) {
   const unchanged = implementation.projectPosture(codexAuthority, { state: 'healthy' });
   const reobserved = { ...unchanged, observation_revision: `sha256:${'f'.repeat(64)}` };
   assert.equal(
-    implementation.projectNotifications({ previous: [unchanged], decisions: [reobserved], subscriptions })
-      .notifications.length,
+    implementation.projectNotifications({
+      previous: [unchanged],
+      decisions: [reobserved],
+      subscriptions,
+    }).notifications.length,
     0,
   );
   assert.equal(
@@ -246,9 +277,16 @@ async function exercise(implementation: Implementation) {
     decisions: tight.slice(0, 2),
     subscriptions,
   });
-  assert.equal(two.notifications.length, 8, 'same kind retains both provider scopes and both Codex sessions');
+  assert.equal(
+    two.notifications.length,
+    8,
+    'same kind retains both provider scopes and both Codex sessions',
+  );
   assert.equal(new Set(two.notifications.map((item: any) => item.payload.scope_digest)).size, 2);
-  assert.equal(new Set(two.notifications.map((item: any) => item.id)).size, two.notifications.length);
+  assert.equal(
+    new Set(two.notifications.map((item: any) => item.id)).size,
+    two.notifications.length,
+  );
 
   const effects = memoryEffects('sub-codex');
   await assert.rejects(
@@ -267,8 +305,15 @@ async function exercise(implementation: Implementation) {
     checkpoint: effects.checkpoint,
     inbox: effects.inbox,
   });
-  assert.equal(effects.items.size, expectedCurrentSubscriptions, 'retry delivers every current destination exactly once');
-  assert.equal(effects.checkpoints.get(tight[0].scope_digest).decision_revision, tight[0].decision_revision);
+  assert.equal(
+    effects.items.size,
+    expectedCurrentSubscriptions,
+    'retry delivers every current destination exactly once',
+  );
+  assert.equal(
+    effects.checkpoints.get(tight[0].scope_digest).decision_revision,
+    tight[0].decision_revision,
+  );
   assert.ok(
     [...effects.items.values()].every((item) =>
       subscriptions.some(
@@ -396,7 +441,9 @@ function rawProjectorInput(
   };
 }
 
-test('production pure projector derives posture from raw authority rather than injected decisions', { skip: !runProduction }, async () => {
+test('production pure projector derives posture from raw authority rather than injected decisions', {
+  skip: !runProduction,
+}, async () => {
   const modulePath: string = '../src/machine-wide-quota-posture.js';
   const production = await import(modulePath);
   assert.equal(typeof production.projectMachineQuotaPosture, 'function');
@@ -412,7 +459,10 @@ test('production pure projector derives posture from raw authority rather than i
   assert.match(codex.scope_digest, /^sha256:[0-9a-f]{64}$/);
   assert.match(codex.target.identity_scope_digest, /^sha256:[0-9a-f]{64}$/);
   assert.match(codex.target.pool_scope_digest, /^sha256:[0-9a-f]{64}$/);
-  assert.doesNotMatch(JSON.stringify(codex), /identity-codex-a|pool-codex-shared|owner-only-fixture-home-salt/);
+  assert.doesNotMatch(
+    JSON.stringify(codex),
+    /identity-codex-a|pool-codex-shared|owner-only-fixture-home-salt/,
+  );
 
   const identitySwap = project(
     rawProjectorInput(authorities[0]!, { identity_fingerprint: 'identity-codex-b' }),
@@ -438,9 +488,7 @@ test('production pure projector derives posture from raw authority rather than i
   assert.equal(poisonedFiveHour.decision_revision, codex.decision_revision);
   assert.doesNotMatch(JSON.stringify(poisonedFiveHour), /five_hour|legacy-reset/);
 
-  const changedSevenDay = project(
-    rawProjectorInput(authorities[0]!, { seven_day_used_pct: 90 }),
-  );
+  const changedSevenDay = project(rawProjectorInput(authorities[0]!, { seven_day_used_pct: 90 }));
   assert.equal(changedSevenDay.state, 'exhausted');
   assert.notEqual(changedSevenDay.decision_revision, codex.decision_revision);
 });
@@ -485,7 +533,9 @@ async function runCli(argv: string[], boundary: any, env: Record<string, string 
   return { code, stdout, stderr };
 }
 
-test('production quota status is zero-effect through the real registry/handler seam', { skip: !runProduction }, async () => {
+test('production quota status is zero-effect through the real registry/handler seam', {
+  skip: !runProduction,
+}, async () => {
   const production = productionBoundary();
   const result = await runCli(['quota', 'status', '--machine-wide', '--json'], production.boundary);
   assert.equal(result.code, 0, result.stderr.join('\n'));
@@ -496,7 +546,9 @@ test('production quota status is zero-effect through the real registry/handler s
   assert.equal(JSON.parse(result.stdout.at(-1) || '{}').schema, 'ccm/machine-quota-status/v1');
 });
 
-test('production explicit refresh retries partial fan-out without checkpoint loss', { skip: !runProduction }, async () => {
+test('production explicit refresh retries partial fan-out without checkpoint loss', {
+  skip: !runProduction,
+}, async () => {
   const production = productionBoundary();
   const implicit = await runCli(['quota', 'refresh', '--json'], production.boundary);
   assert.equal(implicit.code, 2, 'refresh without --machine-wide is a usage error');
@@ -505,7 +557,10 @@ test('production explicit refresh retries partial fan-out without checkpoint los
   const first = await runCli(['quota', 'refresh', '--machine-wide', '--json'], production.boundary);
   assert.notEqual(first.code, 0, 'injected partial inbox failure must be observable');
   assert.equal(production.effects.checkpoints.size, 0, 'checkpoint cannot run ahead of fan-out');
-  const second = await runCli(['quota', 'refresh', '--machine-wide', '--json'], production.boundary);
+  const second = await runCli(
+    ['quota', 'refresh', '--machine-wide', '--json'],
+    production.boundary,
+  );
   assert.equal(second.code, 0, second.stderr.join('\n'));
   assert.equal(production.counters.live_reads, 2);
   assert.equal(production.effects.items.size, expectedCurrentSubscriptions);
@@ -518,8 +573,12 @@ test('production explicit refresh retries partial fan-out without checkpoint los
   assert.equal(retried[0]!.id, retried[1]!.id);
 });
 
-test('production monitor keeps cached-only default and persists explicit source mode', { skip: !runProduction }, async () => {
-  const { __resetMonitorTestHooks, __setMonitorTestHooks } = await import('../src/handlers/monitor.js');
+test('production monitor keeps cached-only default and persists explicit source mode', {
+  skip: !runProduction,
+}, async () => {
+  const { __resetMonitorTestHooks, __setMonitorTestHooks } = await import(
+    '../src/handlers/monitor.js'
+  );
   const root = mkdtempSync(join(tmpdir(), 'ccm-machine-quota-monitor-'));
   const env = { HOME: join(root, 'user'), XDG_CONFIG_HOME: join(root, 'xdg') };
   const production = productionBoundary();
@@ -541,12 +600,27 @@ test('production monitor keeps cached-only default and persists explicit source 
       production.boundary,
       env,
     );
-    assert.equal(JSON.parse(cachedStatus.stdout.at(-1) || '{}').service.quota_source_mode, 'cached-only');
-    assert.equal(production.counters.live_reads, 0, 'install/default cannot autostart live quota refresh');
+    assert.equal(
+      JSON.parse(cachedStatus.stdout.at(-1) || '{}').service.quota_source_mode,
+      'cached-only',
+    );
+    assert.equal(
+      production.counters.live_reads,
+      0,
+      'install/default cannot autostart live quota refresh',
+    );
 
     const liveHome = join(root, 'live-home');
     const live = await runCli(
-      ['monitor', 'install-service', '--quota-source', 'machine-wide', '--home', liveHome, '--json'],
+      [
+        'monitor',
+        'install-service',
+        '--quota-source',
+        'machine-wide',
+        '--home',
+        liveHome,
+        '--json',
+      ],
       production.boundary,
       env,
     );
@@ -556,8 +630,15 @@ test('production monitor keeps cached-only default and persists explicit source 
       production.boundary,
       env,
     );
-    assert.equal(JSON.parse(liveStatus.stdout.at(-1) || '{}').service.quota_source_mode, 'machine-wide');
-    assert.equal(production.counters.live_reads, 0, 'install persists mode but does not itself collect');
+    assert.equal(
+      JSON.parse(liveStatus.stdout.at(-1) || '{}').service.quota_source_mode,
+      'machine-wide',
+    );
+    assert.equal(
+      production.counters.live_reads,
+      0,
+      'install persists mode but does not itself collect',
+    );
   } finally {
     __resetMonitorTestHooks();
     rmSync(root, { recursive: true, force: true });
