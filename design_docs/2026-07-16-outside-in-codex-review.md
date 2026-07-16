@@ -43,3 +43,32 @@
 codex 的 `needs-attention` 判定**站得住**——三条 blocking finding 里，jc 语义冲突和两处命令示例错误是**明确、可核实、需要修的真实缺陷**（分发文本里的错误命令示例尤其不该带着合入）；baseline 方法学那条是可辩护但值得 orchestrator 知晓的分歧点，不构成同等确定性的阻塞。
 
 **建议不直接合并**：至少应修正两处命令示例 + 重新措辞组件 A 对 jc 的用法（改用 `ccm log add --kind note`/`finding` 记未决假设，而非借用 `pending_review` jc 状态机；或改造成一个新的、不与既有 jc 生命周期冲突的落点），并考虑把 B/F 两组三元条件合成一张表消歧义。是否需要为方案 4（baseline 方法学）单独补一轮验证，留给 orchestrator 判断是否值当。
+
+---
+
+## 修复记录（coordinator 复核后·commit `8557d916`）
+
+coordinator 复核了上述四条发现，裁决：**缺陷1（jc 语义冲突）与缺陷2（两处非法命令示例）需修**；**第4条（baseline 方法学 3 轮 9/9 PASS）判「defensible but debatable」、认同 baseline-log 已显式援引 `cc-master-skillsmith` §9 强模型天花板并相应收窄 prose 主张、未违铁律——**保留现状，不改**。B/F 双三元组的可读性问题（non-blocking）本轮未动，留作后续可选打磨。
+
+### 缺陷1 修法：选 (a)（jc 只记「已做判断」）
+
+按 coordinator 指定的更干净选项，把「待验证假设」这一档的落点从 `pending_review` jc 改为 `ccm log add --kind note` 记未验证事实 + 一个真实 `ccm task add` 校准节点；`jc` 收窄为只记录**已做的判断**（「决定基于假设 X 推进 Y」），其 `pending_review → upheld/overturned` 生命周期追踪的是**这个决定**被证实/证伪，不是假设本身待验证的占位。同步改了三处：
+
+- **组件 A** 证据五分级表：「agent 推断」行拆成「先 log note 记推断本身；决定推进才追加 jc」；「待验证假设」行改成「log note + task add，不占用 jc」；表格下方段落重写，去掉「一个未验证假设 = 一条 pending_review 的 jc」这句直接冲突表述。
+- **组件 D**（无外部通道协议）第 1 步：拆成「log add 记假设本身」+「若决定可逆推进才追加 jc（记的是这个决定）」；第 3 步补上具体 `ccm task add` 校准节点命令（原文只说「记成一个待验证节点」没给机制）。
+- **组件 E**（amendment 触发）：`jc resolve` 改成条件句——只有此前真记过「决定推进」的 jc 才 resolve 成 `overturned`；若只是待验证假设（log note + task，从未决定推进），直接收尾那条校准 task + log 记证伪结果，不牵扯 jc。
+
+**修复过程中的一个插曲**：第一版修复措辞里写了「与 **SKILL A**『自驱决策记录不是待办队列』保持一致」，用了 `SKILL A` 这个内部代号——`bash run-tests.sh` 内嵌的 `scripts/skill-lint.sh` 当场抓到（AGENTS.md §6 自包含纪律：分发 skills/ 正文禁用内部代号），判 `TESTS FAILED`。已在合入前改成不带代号的措辞（「与『自驱决策记录不是待办队列』这条既有纪律保持一致」）。这本身是这条自包含红线机械把关生效的一个真实例子，记此存证。
+
+### 缺陷2 修法：命令语法对齐 command-catalog
+
+- `ccm task block --on user --decision @file` → `ccm task block <id> --on user --decision @file`（补 `<id>`，对照 `command-catalog.md:1331/1349`）。
+- `--category architecture/drift` → `--category <architecture\|drift\|spec-impl-misalignment\|other 按内容择一；单选枚举，不可斜杠组合>`（组件 A）与具体单值 `--category drift`（组件 D，语境明确时直接给合法单值）；对照 `ccm/packages/engine/src/board-model.ts:48` 的 `jcCategory` 枚举、以及本仓既有文档用 `<a\|b>` 表示「多选一」的惯例（如 `jc resolve --status <upheld\|overturned>`）。
+- 顺手把「待验证假设」「无外部通道」两处的 `ccm task add` 落点也补成合法语法：`ccm task add <id> --title "..."`（原文写成「`ccm task add`「用 X 手段验假设 Y」」，容易被误读成把中文摘要当裸positional；`task add` 的摘要实际走 `--title`，非裸 positional——`log add`/`jc add` 才是裸 positional summary，两者语法不同，已按各自真实签名分别改对）。
+- 全文件 grep 复核：`references/outside-in.md` 里现存的全部 `ccm` 命令片段（`log add` ×4、`jc add` ×2、`task add` ×2、`task block` ×1、`jc resolve` ×1）逐条对照 `command-catalog.md` 的 `log add` / `jc add` / `jc resolve` / `task add` / `task block` 章节核对签名，未再发现第三个 footgun。
+
+### 修复后复核
+
+- 四门重跑：`bash run-tests.sh` → `ALL TESTS PASSED`（123/123，含内嵌 `skill-lint.sh` 与 `glossary-lint.sh` 均 OK）；`bash scripts/skill-lint.sh` → `36 SKILL.md checked, 0 violations`；`bash scripts/check-plugin-dist-sync.sh` → `plugin/dist is in sync`；`claude plugin validate plugin/dist/claude-code` → `Validation passed`。
+- 三处 host 投影（`plugin/dist/{claude-code,codex,cursor}`）+ 归因清单（`plugin/src/skills/provider-guidance-runtime.json`）已随源码改动同步重新生成，字节级核对与 canonical 一致。
+- 修复 commit：`8557d916`（`fix(skills): repair jc semantics and invalid ccm command examples in outside-in.md`），已 push 到 `feat/issue-142-outside-in` / PR #161。
