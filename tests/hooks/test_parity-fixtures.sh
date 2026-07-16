@@ -250,4 +250,65 @@ run_verify_board_kimi "$FIXTUREK_STOP" "$HK"
 assert_eq "" "$HOOK_OUT" "fixtureK verify-board round 5 -> fuse trips, release is silent (no non-blocking Stop advisory channel — declared divergence)"
 rm -rf "$HK"
 
+# ── FIXTURE 4: deadline-risk periodic entry (issue #149) — same host-neutral stdin + settled-DDL board +
+#    stub ccm through all three hosts; each must land in the SAME equivalence class (band=watch, strength=weak,
+#    a deadline-risk advisory), differing only in the host envelope (additionalContext / systemMessage /
+#    followup_message). The business logic is a single shared core (_shared/deadline-risk-core.js), so this
+#    fixture guards that all three hosts actually route through it and wrap identically. ──────────────────
+IDENTITY_NUDGE_CLAUDE="$PLUGIN_ROOT/hooks/scripts/identity-nudge.js"
+IDENTITY_NUDGE_CODEX_CORE="$REPO_ROOT/plugin/src/hooks/identity-nudge/implementations/codex/identity-nudge-core.js"
+IDENTITY_NUDGE_CURSOR_CORE="$REPO_ROOT/plugin/src/hooks/identity-nudge/implementations/cursor/identity-nudge-core.js"
+DR_NOW="2026-07-16T12:00:00Z"
+DR_RECENT="2026-07-16T11:58:00Z"
+DR_STUB_DIR="$(make_project)"
+DR_STUB="$DR_STUB_DIR/ccm.sh"
+cat > "$DR_STUB" <<'STUB'
+#!/usr/bin/env bash
+noun="$1"; verb="$2"
+if [ "$noun" = "board" ] && [ "$verb" = "set-param" ]; then
+  shift 2; key="$1"; val="$2"; shift 2; board=""
+  while [ $# -gt 0 ]; do case "$1" in --board) board="$2"; shift 2;; --home) shift 2;; *) shift;; esac; done
+  case "$key" in last_identity_remind|last_critpath_remind|last_goal_remind|last_deadline_risk_check|last_deadline_risk_fingerprint) ;; *) echo "not whitelisted:$key" >&2; exit 2;; esac
+  node -e 'const fs=require("fs");const[b,k,v]=process.argv.slice(1);const o=JSON.parse(fs.readFileSync(b,"utf8"));o.runtime=o.runtime||{};o.runtime[k]=v;fs.writeFileSync(b,JSON.stringify(o));' "$board" "$key" "$val"; exit 0
+fi
+if [ "$noun" = "estimate" ] && [ "$verb" = "deadline-risk" ]; then
+  printf '{"ok":true,"data":{"deadline":"2026-08-01T09:00:00Z","deadline_state":"confirmed","as_of":"2026-07-16T12:00:00Z","time_remaining_hours":381.0,"on_time_probability":0.85,"on_time_probability_source":"rcpsp-in-trial","risk_band":"watch","strength":"weak","margin":{"p50_h":40,"p80_h":12,"p95_h":-6,"basis":"x"},"channel_disagreement":0.12,"coverage_pct":60,"confidence":"medium","history_n":20,"calibration_status":"uncalibrated-conservative","top_drivers":[{"id":"T1","criticality":0.8,"sensitivity":0.6,"reason":"critical"}],"scope":"home","runs":2000,"seed":42,"source":"estimate","notes":[]}}'; exit 0
+fi
+if [ "$noun" = "coordination" ] && [ "$verb" = "notify" ]; then printf '{"ok":true,"data":{"notification":{"id":"ntf-1"}}}'; exit 0; fi
+if [ "$noun" = "coordination" ] && [ "$verb" = "inbox" ]; then printf '{"ok":true,"data":{"acked":["ntf-1"]}}'; exit 0; fi
+if [ "$noun" = "board" ] && [ "$verb" = "critical-path" ]; then
+  board=""; while [ $# -gt 0 ]; do case "$1" in --board) board="$2"; shift 2;; *) shift;; esac; done
+  node -e 'const fs=require("fs");const o=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(JSON.stringify({ok:true,data:{chain:(o.tasks||[]).map(t=>t.id).filter(Boolean)}}));' "$board"; exit 0
+fi
+exit 2
+STUB
+chmod +x "$DR_STUB"
+dr_board() { printf '{"schema":"cc-master/v2","goal":"ship DDL","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"confirmed","deadline":{"state":"confirmed","at":"2026-08-01T09:00:00Z","precision":"minute","kind":"hard","rev":1,"updated_at":"2026-07-16T00:00:00Z"},"updated_at":"2026-07-16T00:00:00Z"},"owner":{"active":true,"session_id":"%s"},"tasks":[{"id":"T1","status":"in_flight","deps":[]}],"runtime":{"last_identity_remind":"%s","last_critpath_remind":"%s","last_goal_remind":"%s"}}' "$1" "$DR_RECENT" "$DR_RECENT" "$DR_RECENT"; }
+DR_FIXTURE="$(stop_payload sess-dr)"
+
+# claude-code
+H="$(make_project)"; seed_board "$H" "mine" "$(dr_board sess-dr)"
+HOOK_OUT="$(printf '%s' "$DR_FIXTURE" | CC_MASTER_HOME="$H" CC_MASTER_NOW="$DR_NOW" CCM_BIN="$DR_STUB" CC_MASTER_DEADLINE_RISK_SIDECAR="$H/dr.json" node "$IDENTITY_NUDGE_CLAUDE" 2>/dev/null)"
+assert_contains "$HOOK_OUT" '<advisory source=\"deadline-risk\" strength=\"weak\">' "fixture4 claude-code deadline-risk watch -> weak advisory"
+assert_contains "$HOOK_OUT" "risk band=watch" "fixture4 claude-code reports band=watch"
+assert_contains "$HOOK_OUT" '"additionalContext"' "fixture4 claude-code envelope = additionalContext"
+rm -rf "$H"
+
+# codex (launcher + SRC core → systemMessage envelope)
+H="$(make_project)"; seed_board "$H" "mine" "$(dr_board sess-dr)"
+HOOK_OUT="$(printf '%s' "$DR_FIXTURE" | CC_MASTER_HOME="$H" CC_MASTER_NOW="$DR_NOW" CCM_BIN="$DR_STUB" CC_MASTER_DEADLINE_RISK_SIDECAR="$H/dr.json" node "$CODEX_LAUNCHER" --event Stop --core "$IDENTITY_NUDGE_CODEX_CORE" 2>/dev/null)"
+assert_contains "$HOOK_OUT" '<advisory source=\"deadline-risk\" strength=\"weak\">' "fixture4 codex deadline-risk watch -> same weak advisory (equivalence class)"
+assert_contains "$HOOK_OUT" "risk band=watch" "fixture4 codex reports band=watch"
+assert_contains "$HOOK_OUT" '"systemMessage"' "fixture4 codex envelope = systemMessage (declared divergence)"
+rm -rf "$H"
+
+# cursor (launcher + SRC core → followup_message envelope)
+H="$(make_project)"; seed_board "$H" "mine" "$(dr_board sess-dr)"
+HOOK_OUT="$(printf '%s' "$DR_FIXTURE" | CC_MASTER_HOME="$H" CC_MASTER_NOW="$DR_NOW" CCM_BIN="$DR_STUB" CC_MASTER_DEADLINE_RISK_SIDECAR="$H/dr.json" node "$CURSOR_LAUNCHER" --event stop --core "$IDENTITY_NUDGE_CURSOR_CORE" 2>/dev/null)"
+assert_contains "$HOOK_OUT" '<advisory source=\"deadline-risk\" strength=\"weak\">' "fixture4 cursor deadline-risk watch -> same weak advisory (equivalence class)"
+assert_contains "$HOOK_OUT" "risk band=watch" "fixture4 cursor reports band=watch"
+assert_contains "$HOOK_OUT" '"followup_message"' "fixture4 cursor envelope = followup_message (declared divergence)"
+rm -rf "$H"
+rm -rf "$DR_STUB_DIR"
+
 finish

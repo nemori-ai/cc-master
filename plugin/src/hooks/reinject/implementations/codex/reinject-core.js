@@ -69,7 +69,9 @@ function goalCheck(boardPath, home) {
     });
     if (!result || result.error || result.signal) return { verdict: 'check_unavailable' };
     const parsed = JSON.parse(result.stdout || '{}');
-    return parsed && parsed.data && ['legacy', 'pending', 'ok', 'malformed', 'missing_brief', 'hash_mismatch'].includes(parsed.data.verdict)
+    // deadline_pending（issue #149）是闭集新成员：goal 语义 settled 但交付 DDL 未 settle（exit 0·advisory）。
+    //   不加进闭集会被误判成 check_unavailable（把「DDL 未 settle」当成「探针挂了」·错报）。
+    return parsed && parsed.data && ['legacy', 'pending', 'deadline_pending', 'ok', 'malformed', 'missing_brief', 'hash_mismatch'].includes(parsed.data.verdict)
       ? parsed.data
       : { verdict: 'check_unavailable' };
   } catch (_) {
@@ -91,6 +93,7 @@ function main() {
   const emptyBoards = [];
   const goalStops = [];
   const goalCheckUnavailable = [];
+  const deadlinePending = [];
   for (const { name, path: boardPath, board } of boards) {
     const label = goalLabel(board);
     listing += ` • ${name} [${label}]`;
@@ -98,7 +101,10 @@ function main() {
     const hasContract = !!(board.goal_contract && board.goal_contract.schema === 'ccm/goal-contract/v1');
     if (hasContract) {
       const check = goalCheck(boardPath, home);
+      // deadline_pending（issue #149）: goal 语义 OK 但交付 DDL 未 settle → advisory（提示去确认 DDL），
+      //   不是 goal-integrity HARD STOP。必须在 `!== 'ok'` 的 goalStops 分支之前拦下，否则会被误当硬闸。
       if (check.verdict === 'check_unavailable') goalCheckUnavailable.push(`${name} [${label}]`);
+      else if (check.verdict === 'deadline_pending') deadlinePending.push(`${name} [${label}]`);
       else if (check.verdict !== 'ok') goalStops.push(`${name} [${label}] verdict=${check.verdict || 'malformed'}`);
     }
     if (tasks.length === 0) emptyBoards.push({ text: `${name} [${label}]`, pending: hasContract && board.goal_contract.assurance === 'pending' });
@@ -125,6 +131,14 @@ function main() {
   if (goalCheckUnavailable.length > 0) {
     context += ` STRONG ADVISORY: Goal Contract integrity probe unavailable for ${goalCheckUnavailable.join(', ')}. ` +
       'This transport failure is not proof of contract corruption and does not by itself prohibit dispatch; retry ccm goal check while continuing the other local reconciliation gates.';
+  }
+
+  // PARITY: rule-reinject-deadline-pending
+  // deadline_pending：goal 语义已 settle 但交付 DDL 未 settle。这是 advisory（决策归你），不阻断——
+  //   但拆 DAG / 派发前应先 settle DDL，让 ccm goal check 从 deadline_pending 回到 ok。
+  if (deadlinePending.length > 0) {
+    context += ` ADVISORY: goal semantics are settled but the delivery deadline is not yet settled for ${deadlinePending.join(', ')}. ` +
+      'Before decomposing/dispatching, settle the DDL — identify/confirm a delivery deadline (ccm goal deadline set/confirm --user-authorized) or confirm no-DDL (ccm goal deadline confirm-none --user-authorized) so ccm goal check returns ok. This is advisory, not a hard stop.';
   }
 
   // PARITY: rule-reinject-empty-board-hard-stop

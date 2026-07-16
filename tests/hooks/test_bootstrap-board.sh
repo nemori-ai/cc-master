@@ -835,6 +835,14 @@ board_task_count() {
 board_github_issue_source() {
   node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const s=b.source&&typeof b.source==="object"?b.source:{};process.stdout.write(s.kind==="github_issue"&&typeof s.url==="string"?s.url:"");' "$1";
 }
+# goal_contract.deadline.state / .at (issue #149 --ddl init flag). Empty when the deadline sub-object
+#   is absent (--ddl skipped / invalid), which is exactly what the invalid-shape assertions check.
+board_deadline_state() {
+  node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const d=b.goal_contract&&b.goal_contract.deadline;process.stdout.write(d&&typeof d.state==="string"?d.state:"");' "$1";
+}
+board_deadline_at() {
+  node -e 'const fs=require("fs");const b=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const d=b.goal_contract&&b.goal_contract.deadline;process.stdout.write(d&&typeof d.at==="string"?d.at:"");' "$1";
+}
 
 if [ -n "${CCM_BIN:-}" ] && [ -x "${CCM_BIN:-}" ]; then
   # ── IF1 (raw-command path): all four flags valid → board update + policy set applied to the new board.
@@ -923,6 +931,58 @@ if [ -n "${CCM_BIN:-}" ] && [ -x "${CCM_BIN:-}" ]; then
   run_resume "$P/resume" "new-sess" '/cc-master:as-master-orchestrator --resume existing --github-issue https://github.com/example/repo/issues/456'
   assert_eq 2 "$(board_task_count "$ISSUE_BOARD")" "IF7: resume path keeps existing tasks (including bootstrap seed from seed_board fixture)"
   assert_eq "" "$(board_github_issue_source "$ISSUE_BOARD")" "IF7: resume ignores --github-issue"
+  rm -rf "$P"
+
+  # ════════════════════════════════════════════════════════════════════════════════════════════════
+  # ── DDL series (issue #149·--ddl init flag)：fresh 路径据用户亲手敲的 --ddl 经 ccm goal deadline set
+  #    落 asserted。best-effort·形状轻校验（严格 ISO-8601 UTC·bootstrap 不猜 NL 日期）·失败/非法不 block。
+  # ════════════════════════════════════════════════════════════════════════════════════════════════
+  # ── IF8 (raw-command path·valid ISO): --ddl <ISO-UTC> → goal_contract.deadline.state=asserted + at 落板。
+  P="$(make_project)"
+  HOOK_OUT="$(printf '%s' '{"session_id":"sess-if8","prompt":"/cc-master:as-master-orchestrator build the widget --ddl 2026-08-01T09:00:00Z"}' \
+    | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
+      bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+  IF8_BOARD="$(only_board "$P/.claude/cc-master")"
+  assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "IF8: board created with --ddl"
+  assert_eq "asserted" "$(board_deadline_state "$IF8_BOARD")" "IF8: --ddl valid ISO → deadline.state asserted"
+  assert_eq "2026-08-01T09:00:00Z" "$(board_deadline_at "$IF8_BOARD")" "IF8: --ddl valid ISO → deadline.at landed"
+  assert_contains "$HOOK_OUT" "ddl=2026-08-01T09:00:00Z(asserted)" "IF8: ctx notes ddl applied (asserted)"
+  assert_contains "$HOOK_OUT" "<advisory source=" "IF8: ctx carries a DDL evidence advisory for the agent"
+  assert_valid_json "$HOOK_OUT" "IF8: ctx with DDL advisory is valid JSON"
+  rm -rf "$P"
+
+  # ── IF9 (body-sentinel path·valid ISO): --ddl recovered from the args sentinel lands too.
+  P="$(make_project)"
+  HOOK_OUT="$(printf '%s' '{"session_id":"sess-if9","prompt":"<!-- cc-master:bootstrap:v1 -->\n<!-- cc-master:args: ship it --ddl 2026-09-15T17:30:00Z -->\nbody..."}' \
+    | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
+      bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+  IF9_BOARD="$(only_board "$P/.claude/cc-master")"
+  assert_eq "asserted" "$(board_deadline_state "$IF9_BOARD")" "IF9: body-sentinel --ddl → deadline.state asserted"
+  assert_eq "2026-09-15T17:30:00Z" "$(board_deadline_at "$IF9_BOARD")" "IF9: body-sentinel --ddl.at landed"
+  rm -rf "$P"
+
+  # ── IF10 (invalid --ddl·non-ISO): NL/date-only value is NOT landed, board still created, evidence
+  #    advisory + non-ISO note surfaced, hook exits 0 (best-effort·never blocks arming).
+  P="$(make_project)"
+  HOOK_OUT="$(printf '%s' '{"session_id":"sess-if10","prompt":"/cc-master:as-master-orchestrator do it --ddl 2026-08-01"}' \
+    | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
+      bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"; IF10_RC=$?
+  IF10_BOARD="$(only_board "$P/.claude/cc-master")"
+  assert_eq 0 "$IF10_RC" "IF10: invalid --ddl still exits 0 (best-effort)"
+  assert_eq 1 "$(count_boards "$P/.claude/cc-master")" "IF10: board still created despite invalid --ddl"
+  assert_eq "" "$(board_deadline_state "$IF10_BOARD")" "IF10: date-only --ddl (non-ISO) NOT landed → no deadline"
+  assert_contains "$HOOK_OUT" "非严格 ISO-8601 UTC" "IF10: ctx notes the non-ISO --ddl was skipped"
+  assert_contains "$HOOK_OUT" "<advisory source=" "IF10: ctx carries evidence advisory for the raw --ddl value"
+  assert_valid_json "$HOOK_OUT" "IF10: ctx with skipped-DDL advisory is valid JSON"
+  rm -rf "$P"
+
+  # ── IF11 (no --ddl): a plain goal leaves goal_contract with no deadline sub-object (no spurious write).
+  P="$(make_project)"
+  HOOK_OUT="$(printf '%s' '{"session_id":"sess-if11","prompt":"/cc-master:as-master-orchestrator plain goal no ddl"}' \
+    | CLAUDE_PROJECT_DIR="$P" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" CC_MASTER_HOME="$P/.claude/cc-master" \
+      bash "$PLUGIN_ROOT/hooks/scripts/bootstrap-board.sh" 2>/dev/null)"
+  IF11_BOARD="$(only_board "$P/.claude/cc-master")"
+  assert_eq "" "$(board_deadline_state "$IF11_BOARD")" "IF11: no --ddl → no deadline sub-object"
   rm -rf "$P"
 else
   echo "(INIT-FLAGS series skipped — no executable CCM_BIN/ccm to apply board update/policy set)"

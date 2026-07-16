@@ -34,6 +34,12 @@ whether stopping now would abandon unfinished/unverified/un-surfaced work.
   fields, plus options for a decision), so the user can supply the information needed to
   refine/confirm the goal. A status label without that package does not qualify. Legacy boards retain
   their pre-contract behavior.
+- `rule-verify-board-deadline-pending`: the `deadline_pending` verdict (issue #149 — goal semantics
+  settled but the delivery DDL not yet settled, exit 0) is treated as a **pass** for the goal-integrity
+  gate (same tier as `ok`/`legacy`): it is not a malformed/tampered contract, must never be reported
+  as an integrity failure, and must never hard-block the Stop on deadline grounds. DDL settledness is
+  advisory (dispatch gating lives at the agent level and reinject already surfaces the reminder); the
+  Stop gate proceeds on task-status semantics exactly as it would for a settled goal.
 - `rule-verify-board-pending-user`: on a settled/legacy goal, any task with `status:"blocked"` and
   `blocked_on:"user"` is named explicitly in the completion-handshake block reason — the agent must
   not silently claim completion over an open decision. The pending-goal handoff above is the narrow
@@ -94,6 +100,8 @@ only proves "both hosts' source at least declares awareness of this rule."
 - rule: rule-verify-board-tag-protocol
   required_hosts: [claude-code, codex, cursor]
 - rule: rule-verify-board-goal-integrity
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-verify-board-deadline-pending
   required_hosts: [claude-code, codex, cursor]
 ```
 

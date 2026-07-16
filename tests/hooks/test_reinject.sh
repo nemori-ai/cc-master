@@ -83,6 +83,31 @@ assert_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "dete
 assert_contains "$HOOK_OUT" "verdict=missing_brief" "semantic failure preserves the ccm verdict despite non-zero exit"
 rm -rf "$H"
 
+# deadline_pending (issue #149): goal semantics settled but the delivery DDL not yet settled. This is
+# an ADVISORY (settle the DDL before dispatch), NOT a goal-integrity HARD STOP and NOT a check_unavailable
+# transport failure. (1) stub-based deterministic boundary case:
+H="$(make_project)"
+DP_STUB="$H/goal-check-dp-stub"
+printf '%s\n' '#!/usr/bin/env node' \
+  'process.stdout.write(JSON.stringify({ok:true,data:{schema:"ccm/goal-check/v1",verdict:"deadline_pending",deadline:{present:false,state:"pending",settled:false}}}));' \
+  'process.exit(0);' >"$DP_STUB"
+chmod +x "$DP_STUB"
+mkactive "$H" "dp-board" '{"schema":"cc-master/v2","goal":"SETTLED GOAL PENDING DDL","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"asserted","updated_at":"2026-07-16T00:00:00Z"},"owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_ss_with_ccm "$H" "$DP_STUB" "deadline_pending" 0
+assert_contains "$HOOK_OUT" "delivery deadline is not yet settled" "deadline_pending → DDL-settle advisory injected"
+assert_not_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "deadline_pending is NOT a goal-integrity hard stop"
+assert_not_contains "$HOOK_OUT" "integrity probe unavailable" "deadline_pending is NOT mis-classified as check_unavailable"
+rm -rf "$H"
+
+# (2) real-ccm end-to-end: a settled goal (asserted, no brief) with no deadline key → ccm goal check
+# returns deadline_pending → reinject surfaces the advisory (proves the closed-set membership is real).
+H="$(make_project)"
+mkactive "$H" "dp-real" '{"schema":"cc-master/v2","goal":"SHIP THE WIDGET","goal_contract":{"schema":"ccm/goal-contract/v1","revision":1,"assurance":"asserted","updated_at":"2026-07-16T00:00:00Z"},"owner":{"active":true},"tasks":[{"id":"T1","status":"ready","deps":[]}]}'
+run_ss_with_ccm "$H" "${CCM_BIN:-$REPO_ROOT/ccm/apps/cli/dev-bin/ccm}"
+assert_contains "$HOOK_OUT" "delivery deadline is not yet settled" "real ccm deadline_pending → DDL-settle advisory (not crash / not misreport)"
+assert_not_contains "$HOOK_OUT" "HARD STOP: Goal Contract integrity/assurance" "real ccm deadline_pending is not a hard stop"
+rm -rf "$H"
+
 # A parseable JSON envelope with a future/corrupt verdict is schema-invalid transport, not a
 # determined integrity verdict. Pin the allowlist boundary and keep all frozen failure verdicts hard.
 H="$(make_project)"
