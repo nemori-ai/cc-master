@@ -4,6 +4,11 @@
 
 本盘点覆盖 `plugin/src/skills/*/canonical` 的 runtime skill 正文与 references。目标是找出写死 Claude Code harness 的指导，并给出后续 adapter 化时应抽出的模块 / 变量 / overlay 面。
 
+> 本文保留“从单 host 拆出 adapter”的历史审计。cross-harness worker pool 建立后，哪些 target
+> 模型/额度/worker/route 信息应重新上收 canonical、哪些 origin-native 机制仍须保留 adapter，以及
+> 100 次 slot occurrence（92 个 per-skill unique、91 个 global unique）/ 273 个 overlay 的逐项收敛计划，见
+> [`cross-harness-skill-view-convergence.md`](cross-harness-skill-view-convergence.md)。
+
 ## 分类标准
 
 | 类别 | 含义 | 处理方式 |
