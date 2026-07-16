@@ -5,6 +5,35 @@
   "owner": { "active": true, "session_id": "abc123", "heartbeat": "2026-06-05T12:30:00Z" },
   "git": { "worktree": "/repo/.worktrees/i18n", "branch": "feat/i18n-rollout" },
   "scheduling": { "wip_limit": 4, "owner_wip_limit": 2 },
+  "agents": [
+    {
+      "id": "agt-001",
+      "type": "subagent",
+      "harness": "origin",
+      "intent": "Complete the translation pass for all six locales",
+      "launch": { "created_at": "2026-06-05T12:15:00Z", "cwd": "/repo/.worktrees/i18n" },
+      "handle": { "kind": "task-id", "value": "bg-7a" },
+      "lifecycle": { "state": "running", "registered_at": "2026-06-05T12:15:00Z", "ended_at": null, "outcome": null },
+      "links": [ { "task_id": "T1", "linked_at": "2026-06-05T12:18:00Z" } ],
+      "account_ref": null,
+      "quota_pool_ref": null
+    },
+    {
+      "id": "agt-002",
+      "type": "subagent",
+      "harness": "origin",
+      "intent": "Own the locale-routing module and implement the current route-binding slice",
+      "launch": { "created_at": "2026-06-05T12:19:00Z", "cwd": "/repo/.worktrees/i18n" },
+      "handle": { "kind": "task-id", "value": "bg-route-4d" },
+      "lifecycle": { "state": "running", "registered_at": "2026-06-05T12:19:00Z", "ended_at": null, "outcome": null },
+      "links": [
+        { "task_id": "M1", "linked_at": "2026-06-05T12:20:00Z" },
+        { "task_id": "M1.b", "linked_at": "2026-06-05T12:36:00Z" }
+      ],
+      "account_ref": null,
+      "quota_pool_ref": null
+    }
+  ],
   "cadence": {
     "target": { "ship_every": "3h", "min_unit": "1 PR" },
     "iterations": [
