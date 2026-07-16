@@ -508,6 +508,12 @@ async function tickOnce(ctx: Ctx, state: MonitorState): Promise<TickResult> {
               return runMachineWideQuotaBoundaryCycle(ctx.machineWideQuotaNotifications, true);
             }
             if (!ctx.quotaEffects) throw new Error('quota effect boundary is required');
+            if (!ctx.machineQuotaCoordination) {
+              throw new Error('machine-wide quota coordination boundary is required');
+            }
+            if (!ctx.machineQuotaCollectors) {
+              throw new Error('machine-wide quota collector boundary is required');
+            }
             const store = createQuotaAdmissionStore({
               home: state.home,
               filesystem: quotaFilesystemFromBoundary(ctx.quotaEffects),
@@ -517,6 +523,7 @@ async function tickOnce(ctx: Ctx, state: MonitorState): Promise<TickResult> {
               env: ctx.env,
               store,
               collectors: ctx.machineQuotaCollectors,
+              coordination: ctx.machineQuotaCoordination,
             });
           },
         }

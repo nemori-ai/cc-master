@@ -8,12 +8,7 @@ import {
   evaluateQuotaObservation,
   sha256Hex,
 } from '@ccm/engine';
-import {
-  deliverCoordinationNotification,
-  listCurrentCoordinationSubscriptions,
-} from './handlers/coordination.js';
-import { knownHarnessAdapters } from './harnesses/registry.js';
-import type { CurrentUsageReading, Env } from './harnesses/types.js';
+import type { Env } from './harnesses/types.js';
 import {
   type MachineQuotaState,
   projectMachineQuotaPosture,
@@ -50,6 +45,11 @@ export interface MachineQuotaCollectorBoundary {
     target: Readonly<Data>,
     env: Env,
   ): MachineQuotaCollection | Promise<MachineQuotaCollection>;
+}
+
+export interface MachineQuotaCoordinationBoundary {
+  listSubscriptions(home: string): Data[];
+  deliverNotification(home: string, destination: Data, notification: Data, now: string): Data;
 }
 
 export interface MachineQuotaStore {
@@ -339,40 +339,6 @@ function projectDecision(
   });
 }
 
-function defaultCollectors(): MachineQuotaCollectorBoundary {
-  return {
-    collect(targetData, env): MachineQuotaCollection {
-      const target = TARGETS.find(
-        (candidate) =>
-          candidate.surfaceId === targetData.surface_id &&
-          candidate.windowName === targetData.window_name,
-      );
-      if (!target?.defaultCollectorHarness) {
-        return { status: 'unsupported', reason: 'surface-owned quota collector is unavailable' };
-      }
-      const adapter = knownHarnessAdapters().find(
-        (item) => item.id === target.defaultCollectorHarness,
-      );
-      if (!adapter || !adapter.inspectInstallation(env).installed) {
-        return { status: 'unknown', reason: 'harness is not installed' };
-      }
-      try {
-        const reading: CurrentUsageReading = adapter.readCurrentUsage(env);
-        return reading.signal
-          ? { status: 'refreshed', signal: reading.signal, source: reading.source }
-          : {
-              status: 'unknown',
-              signal: null,
-              source: reading.source,
-              reason: reading.unavailableReason,
-            };
-      } catch (error) {
-        return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
-      }
-    },
-  };
-}
-
 async function decisionsFromStore(
   store: MachineQuotaStore,
   now: Date,
@@ -511,11 +477,12 @@ export async function refreshMachineWideQuota(input: {
   home: string;
   env: Env;
   store: MachineQuotaStore;
-  collectors?: MachineQuotaCollectorBoundary;
+  collectors: MachineQuotaCollectorBoundary;
+  coordination: MachineQuotaCoordinationBoundary;
   now?: Date;
 }): Promise<Data> {
   const now = input.now ?? new Date();
-  const collectors = input.collectors ?? defaultCollectors();
+  const collectors = input.collectors;
   let previousProjection = await input.store.readMachineProjection();
   let homeSalt =
     typeof previousProjection?.home_salt === 'string' && previousProjection.home_salt.length > 0
@@ -541,7 +508,12 @@ export async function refreshMachineWideQuota(input: {
     let collection: MachineQuotaCollection;
     try {
       collection = await collectors.collect(
-        { ...collectionTarget(target), window_name: target.windowName },
+        {
+          ...collectionTarget(target),
+          window_name: target.windowName,
+          default_collector_harness: target.defaultCollectorHarness,
+          collector_id: target.collectorId,
+        },
         input.env,
       );
     } catch (error) {
@@ -574,7 +546,7 @@ export async function refreshMachineWideQuota(input: {
   }
 
   const decisions = await decisionsFromStore(input.store, now, homeSalt);
-  const destinations = listCurrentCoordinationSubscriptions(input.home);
+  const destinations = input.coordination.listSubscriptions(input.home);
   const projected = projectMachineWideQuotaNotifications({
     previous: checkpointDecisions(previousProjection),
     decisions,
@@ -591,7 +563,7 @@ export async function refreshMachineWideQuota(input: {
     if (!destination) {
       return { status: 'invalid', subscription_id: notification.destination.subscription_id };
     }
-    return deliverCoordinationNotification(
+    return input.coordination.deliverNotification(
       input.home,
       destination,
       {

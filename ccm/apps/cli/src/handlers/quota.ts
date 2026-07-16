@@ -130,6 +130,12 @@ export async function refresh(ctx: Ctx): Promise<number> {
       notifications: result.notifications,
     });
   }
+  if (!ctx.machineQuotaCoordination) {
+    throw new Error('machine-wide quota coordination boundary is required');
+  }
+  if (!ctx.machineQuotaCollectors) {
+    throw new Error('machine-wide quota collector boundary is required');
+  }
   return emitMachineWide(
     ctx,
     await refreshMachineWideQuota({
@@ -137,6 +143,7 @@ export async function refresh(ctx: Ctx): Promise<number> {
       env: ctx.env,
       store: store(ctx) as MachineQuotaStore,
       collectors: ctx.machineQuotaCollectors,
+      coordination: ctx.machineQuotaCoordination,
     }),
   );
 }

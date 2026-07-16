@@ -4,6 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, test } from 'node:test';
 import {
+  deliverCoordinationNotification,
+  listCurrentCoordinationSubscriptions,
+} from '../src/handlers/coordination.js';
+import {
   type MachineQuotaCollection,
   type MachineQuotaCollectorBoundary,
   type MachineQuotaStore,
@@ -131,10 +135,22 @@ const collectors: MachineQuotaCollectorBoundary = {
   collect: (target) => collectionFor(target),
 };
 
+const coordination = {
+  listSubscriptions: listCurrentCoordinationSubscriptions,
+  deliverNotification: deliverCoordinationNotification,
+};
+
 test('explicit refresh fans out scoped deltas, checkpoints, and retry is duplicate-free', async () => {
   const { home, boardPath } = setupSubscription();
   const store = fakeStore();
-  const first = await refreshMachineWideQuota({ home, env: {}, store, collectors, now: NOW });
+  const first = await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors,
+    coordination,
+    now: NOW,
+  });
   assert.equal(first.fanout_complete, true);
   assert.equal(first.checkpoint_advanced, true);
   assert.deepEqual(
@@ -150,7 +166,14 @@ test('explicit refresh fans out scoped deltas, checkpoints, and retry is duplica
   assert.ok(board.coordination.inbox.every((item: Data) => item.kind === 'quota_state_change'));
   assert.doesNotMatch(JSON.stringify(board.coordination.inbox), /identity_fingerprint|account_id/);
 
-  const retry = await refreshMachineWideQuota({ home, env: {}, store, collectors, now: NOW });
+  const retry = await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors,
+    coordination,
+    now: NOW,
+  });
   assert.equal(retry.deltas.length, 0);
   assert.equal(JSON.parse(readFileSync(boardPath, 'utf8')).coordination.inbox.length, 3);
 
@@ -172,7 +195,7 @@ test('explicit refresh fans out scoped deltas, checkpoints, and retry is duplica
 test('Codex five-hour-only changes do not change the decision revision or emit an edge', async () => {
   const { home } = setupSubscription();
   const store = fakeStore();
-  await refreshMachineWideQuota({ home, env: {}, store, collectors, now: NOW });
+  await refreshMachineWideQuota({ home, env: {}, store, collectors, coordination, now: NOW });
   const before = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.find(
     (decision: Data) => decision.target.surface_id === 'codex-cli',
   );
@@ -190,6 +213,7 @@ test('Codex five-hour-only changes do not change the decision revision or emit a
     env: {},
     store,
     collectors: fiveHourChanged,
+    coordination,
     now: NOW,
   });
   const after = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.find(
@@ -202,7 +226,14 @@ test('Codex five-hour-only changes do not change the decision revision or emit a
 test('a current destination write failure prevents checkpoint advance for crash-safe replay', async () => {
   const { home } = setupSubscription({ brokenBoard: true });
   const store = fakeStore();
-  const result = await refreshMachineWideQuota({ home, env: {}, store, collectors, now: NOW });
+  const result = await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors,
+    coordination,
+    now: NOW,
+  });
   assert.equal(result.fanout_complete, false);
   assert.equal(result.checkpoint_advanced, false);
   const projection = await store.readMachineProjection();
@@ -232,6 +263,7 @@ test('one provider collector failure is scope-local and cannot erase successful 
     env: {},
     store,
     collectors: partial,
+    coordination,
     now: NOW,
   });
   assert.equal(
