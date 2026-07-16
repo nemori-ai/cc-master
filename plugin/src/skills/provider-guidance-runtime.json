@@ -8,12 +8,12 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "8a9dd04ac8193fba2cb1df48ca1bfc9d51f4c91a09f75f6a6c131aa0b06fa789",
+            "SKILL.md": "9457af96aceace201fb2cf6761bcf61bbf5bf7c495cc35fd06e3ea6915bebb3f",
             "references/async-hitl.md": "9870b752f3555d1495ef3ee6938dd0fbaf11d4c3b86684477868e2c232c43dbb",
             "references/board.md": "3014c12249c5a28d2d8494c61b99506ef5dfacdc52692cbe8aab5aa4edfdfacf",
             "references/cost-decisions.md": "f9cb9122199c13c8a14ba35ed5b25b0b8bc464749d76ce1d7a0ce2dc80bf4237",
             "references/decomposition.md": "9c2917509e1bc3afb87221fa0fba138a7de5ad3cf69875aaf36964eca012b5b7",
-            "references/dispatch.md": "28c378e08c5d1740e12956acc25d51a9c50f9dff43971a93396f2f5799de9162",
+            "references/dispatch.md": "4732088e26a10e8d7e32fd90f5e0e6b7b040eac58bbfef9ff58d4f40fb1702f9",
             "references/goal-contract.md": "95f8e8344e03e1271403191f09163784420108780bc18149d6ad4f78f86d5d19",
             "references/handoff.md": "25b88ef2efc945f139d18484ee179483a2e767b9414710e9b0c1308994a25c2f",
             "references/model-allocation.md": "d5045e325564deaab0e35a21312f23b412d5a31f327b68f52e3ba73c62b4de33",
@@ -37,10 +37,10 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "1d5ebed81eb3efd3bfdedcd727b58c0547c300a0b22331171152e7f69a968a88",
+            "SKILL.md": "a8bac4b54309c1e571d1508898d5ca409b4a95ae97608a59bf855760cde470c5",
             "references/account-pool.md": "da7a5826ba8ceb1eefc26722b4e305df6042ea30264abade27f896ef1fb2a8d6",
-            "references/board-model-guide.md": "a1837fe40a6f230ae10a114d335c8ff63e73e6869e51b34dc4d92083b57b0c59",
-            "references/command-catalog.md": "838f93d2a298d3cddaa5f19095e1d9dfd7da2ff37e1c1bb61e43bcd81a2015e7"
+            "references/board-model-guide.md": "79c512df2704d13f42838d21646cfeb2ad57cfacd51be7fdc216a5a0476686e4",
+            "references/command-catalog.md": "076216f5d574772c9edb140af0ad48c5a46007b56496e0f044052c081e79f876"
           }
         }
       }
@@ -50,11 +50,11 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "8d0ae2e09008db8ab61a14fa4435b916299df67f6d8380f23c5aec4c59efce71",
+            "SKILL.md": "5367c3d851eb68495e3a89d09e2c0729dc0ed93e5917d37eb18b7bcf45f7f9ec",
             "references/async-hitl.md": "9877ad38d12e71ddeddbd8a12747e61e792720b3d6504f17c74fb001da4142ab",
             "references/board.md": "39dfec8792054c707407083b5c9b1e786f36071a56be5b29719ee8b183a4d991",
             "references/decomposition.md": "9d3fc377a4d8e4cd4c9c4d312ce47ab58a74f7faa9d071dda6e8a6c22609ced7",
-            "references/dispatch.md": "ca3372e53b2bdbca14f7a59484b39a938e9310838747909ca80baaab2a7c73d2",
+            "references/dispatch.md": "960677624de85a86bab0a340ef4afb2d239a601309d5ca91e5b51bd9e4db6dfe",
             "references/goal-contract.md": "95f8e8344e03e1271403191f09163784420108780bc18149d6ad4f78f86d5d19",
             "references/model-allocation.md": "1ce7e299811af74df987c4d845812fa068626934347a423c4f5407e4357ff942",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
@@ -76,9 +76,9 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "37675ca6e70add3c16fd6f436251dc2b554cdefb9391a47cc5eced18ae468093",
-            "references/board-model-guide.md": "9bdc9890dae2201186e2950192b817b67fcb92a19e0aa938342baea3d1b1eb36",
-            "references/command-catalog.md": "c74daa5170ca3a4357590422cabf795709c8a808056448764f349aaef7fc8317"
+            "SKILL.md": "f03f510bf8512e08860d66127553d78ea9962187b40730e1d4f48ed929f45144",
+            "references/board-model-guide.md": "ed6454c274968dc4ab9f6ce9114f4da99a9f938baf4660b45d17cc878f18cad4",
+            "references/command-catalog.md": "0069498b2598d13e7cc598fb91150066c55f34c2b64365bddb6ab2759d4fe89e"
           }
         }
       }
@@ -88,11 +88,11 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "42b7bac5afc3bb284786e2b4d005df9378c5953a3878693b70e87ffa0ba33f8f",
+            "SKILL.md": "78e3541746646599c9ea0e7393e7a15857e75b7af3517bcfe40d03035c453d85",
             "references/async-hitl.md": "90f061a14d431bc1abc9000931cb9575c237b272e430f3899c176225f1f11281",
             "references/board.md": "f3669b71cdab613e4c559ee6839109575bc3edd7d4288759b8ff19088d281c29",
             "references/decomposition.md": "9d3fc377a4d8e4cd4c9c4d312ce47ab58a74f7faa9d071dda6e8a6c22609ced7",
-            "references/dispatch.md": "28c22e6f4fb0e41c90bda33ec8dd9f9a311f52f9e94e1f4d5e30548017fba8c4",
+            "references/dispatch.md": "6de4700881d0c6185963942d9f9cf7278163ed28a150adf973956f69b5c9062b",
             "references/goal-contract.md": "95f8e8344e03e1271403191f09163784420108780bc18149d6ad4f78f86d5d19",
             "references/model-allocation.md": "adf91ecc673e8b10f6ae3b1852fb886258716c56a211bc230e4b9119c54640f9",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
@@ -114,9 +114,9 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "7f006bca163a58a90e3a43155176843257e1c6339dbd9b71c7737b7dc9b87b0e",
-            "references/board-model-guide.md": "a4c78fd97549562cb9f9f26d78c71ada5416df97b8f0a3077fadb0435ff465dc",
-            "references/command-catalog.md": "eda7b6192591de31a99a0bae8f1f82b1b6695a4ac2a8331a21676a041021d774"
+            "SKILL.md": "2596e78d15ea6d16cdcae074084535a7ecec1685edaef78f55a86f1960903a8b",
+            "references/board-model-guide.md": "a8b3f5ddee70e122846b691828d03fb3ccc27e6829519422c98b66cad76d5f16",
+            "references/command-catalog.md": "5f9cb3bd9f33ae025558f5235b6f279f2a261336c67ca6b4e80dfff01f4ba603"
           }
         }
       }

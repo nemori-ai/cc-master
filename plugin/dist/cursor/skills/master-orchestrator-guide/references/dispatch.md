@@ -30,7 +30,7 @@
 
 两层怎么对上：
 
-- `subagent` executor → 用 **Task** tool 启动可 recon 的子代理，并记录返回的 subagent id。不要假设它会自动派发；没有真实 Task 返回值就不要标 `subagent` / `in_flight`。
+- `subagent` executor → target harness 是本 host 时，用 **Task** tool 启动可 recon 的子代理；target 是其他本机 harness 时，在当前 origin 可追踪的后台 **Shell** session 中运行 `ccm` worker wrapper。此时 handle 来自外层后台机制，不是同步 wrapper 的返回结果；origin harness 不是默认。不要假设它会自动派发；没有真实返回值就不要标 `subagent` / `in_flight`。
 - `workflow` executor → 当前 Cursor adapter 不支持 Claude Code Workflow API；不要把 `Workflow` / `agent()` / `parallel()` / `pipeline()` 当成 Cursor 原语。需要 fan-out 时，用多个 Task 或把每个叶子建成独立 board task。
 - `external` executor → 后台 Shell session、CI run、GitHub issue、系统 cron 等可追踪工作。必须记录 shell id / URL / run id，足以让后续 recon。
 - `user` executor → surface 给用户；用户回答是 async 依赖。
@@ -75,7 +75,7 @@
 
 给每个节点定一个 executor 值。高层 min-max（默认把派出去的实现工作当 `subagent`、`master-orchestrator` 只留调度 / 验收给自己）在编排魂的决策模块；这里给逐值的语义 + 什么样的活配它：
 
-- **`subagent`** —— 一个终端推理单元负责：单一证据面 + 单一推理链 + 单一交付物 + context-safe + 携带 escalation 路径。默认把独立、可并行的实现工作派给 Cursor **Task** subagent。必须记录真实返回的 subagent id；没有真实 handle 就不能写 `subagent` / `in_flight`。
+- **`subagent`** —— 先从本机 harness worker pool 选择 target harness；origin harness 不是默认。一个终端推理单元负责：单一证据面 + 单一推理链 + 单一交付物 + context-safe + 携带 escalation 路径。target 是本 host 时派给 Cursor **Task** subagent；target 是其他 harness 时，在当前 origin 可追踪的后台 **Shell** session 中运行 `ccm` worker wrapper。此时 handle 来自外层后台机制，不是 wrapper 自己；没有真实 handle 就不能进入 `in_flight`。
 - **`workflow`** —— board 字段可保留这个 executor 值表达“结构化 fan-out/fan-in 工作”，但 Cursor adapter 当前不支持 Claude Code Workflow API。需要多叶子确定性控制时，用多个 Task / 后台 Shell 组合实现，并记录每个 handle；不要调用 `Workflow`。
 - **`master-orchestrator`** —— **你自己**做的那几件不可外包的活：调度决策、replan、端点验收、整合。你不为它起后台机制——它就是你在指挥台上亲手做的。
 - **`user`** —— 人类操作者负责：需判断 / 授权 / 拍板的（merge / 不可逆 / 对外 / 方向性）。surface 给用户、把回答当一条 async 依赖，别越权替他决。

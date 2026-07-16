@@ -18,6 +18,7 @@
 - [C. executor 五种语义 + 选择决策树](#c-executor-五种语义--选择决策树)
   - [各 executor 语义](#各-executor-语义)
   - [executor 选择决策树](#executor-选择决策树)
+- [C.5 cross-harness planning / routing 合同](#c5-cross-harness-planning--routing-合同)
 - [D. acceptance 怎么写好](#d-acceptance-怎么写好)
 - [E. estimate 怎么估](#e-estimate-怎么估)
 - [F. deps 怎么连](#f-deps-怎么连)
@@ -64,6 +65,8 @@
 | `references` | 开发类 task 必须，其余推荐 | ref 只能绝对路径或 URL，禁相对（FMT-REF·exit 3） |
 | `estimate` | 估点时 | 见 [E. estimate 怎么估](#e-estimate-怎么估) |
 | `executor` | 派发前必须设 | 见 [C. executor 五种语义](#c-executor-五种语义--选择决策树) |
+| `planning` | opt-in cross-harness route 前，先把 task 自身画像评估完整 | `ccm/task-planning/v1` whole object；只走 `ccm task set-planning`，不能用 generic setter；字段与顺序见 [C.5](#c5-cross-harness-planning--routing-合同) |
+| `routing` | planning 后，为 `subagent` 声明 provider-neutral candidates、ample/tight 链与 fallback | `ccm/agent-routing/v1`；policy 只走 `task set-routing`，selection/attempt/handle 只走 `route-bind`；attempts append-only；见 [C.5](#c5-cross-harness-planning--routing-合同) |
 | `handle` | legacy 真实派发后、任务进入 `in_flight` 前必须；native bind/reconcile 时由专属 writer 投影 | 记录真实 opaque 句柄，resume 靠它 recon；`ready` / `blocked` future task 不预填，native-active 时禁止 `task update --handle` / 通用 setter 自填 |
 | `artifact` | 产出落盘后（`task done` 时带 `--artifact`） | 绝对路径或 URL；done 真语义（verified+artifact）靠它；`task retry` 会归档旧值并从当前 attempt 清除 |
 | `verified` | 端点验收通过后 | `task done --verified` 一步到位，或 `task update --verified`；`task retry` 原子复位为布尔 `false` |
@@ -81,7 +84,7 @@
 | `type` | 建 task 时 | 见下方 taskType 枚举说明 |
 | `output_schema` | 需约束结构化产出时（低频） | workflow 节点的产出契约 |
 | `dep_pins` | 钉依赖快照时（低频） | freshness / inputs_hash 用 |
-| `model` | 派发 / 完成时记录该 task 实际使用的模型 selector | 先用 `ccm provider facts <provider> --json` 取得 fresh catalog、再用对应 transport 证明 live admission，最后 `ccm task update <id> --set model=<admitted-provider-model-id>`（无具名 flag·裸 path 即本 task）；estimate 层按档分层校准读它，缺→无 tier 校准 |
+| `model` | 派发 / 完成时记录该 task **实际使用**的模型 selector | 先用 `ccm provider facts <provider> --json` 取得 fresh catalog、再用对应 transport 证明 live admission，最后 `ccm task update <id> --set model=<admitted-provider-model-id>`（无具名 flag·裸 path 即本 task）；它不是候选 / fallback 字段——计划中的 provider/model/effort 候选归 `routing.policy.candidates`；estimate 层按档分层校准读实际值，缺→无 tier 校准 |
 
 **taskType 枚举参考**（开放枚举，未知值 warn 不 fail）：
 
@@ -109,6 +112,7 @@
 **board 级 ✎ 字段（走专属 noun、不经 `--set`）：**
 
 - `baseline`——EVM 计划基线（plan 基线 SSOT），用 `ccm baseline snapshot / show / reset` 维护；缺→无 EVM baseline，形状坏→`FMT-BASELINE` warn。命令详见 command-catalog 的 baseline namespace、规则见下方 [N 节](#n-校验规则全集速查fmt--graph--biz) `FMT-BASELINE`。
+- `meta.contracts.task_planning` + `meta.contracts.agent_routing`——routing contract 的成对 activation marker，只用 `ccm board enable-contract` 写；两者都缺表示 legacy，成对精确启用才是 enabled，部分写入 / 版本不匹配 / activation 元数据坏会触发 `FMT-CONTRACTS` hard。`--preflight` 只读列 gap；启用时精确 grandfather 已 terminal 的历史 subagent attempt，terminal 后 retry 会失去豁免。不要用 `board update --set-json meta...` 绕 dedicated writer。
 - `policy`——可读取历史 `autonomous_account_switch`，但 Cursor account switch 永久不可用；stored `allow` 不产生能力。不要把它用作 dispatch、login/logout 或 credential mutation 输入；形状坏仍触发 `FMT-POLICY` warn。
 - `delivery_contract`——declared-mode v1 的 target 声明与冻结 snapshot。用 `ccm target set/show/refresh` 维护；缺失的历史 board 逐字保持现有 dependency/ready/reconcile 行为。当前唯一可持久化 mode 是 `declared`；`strict` 只存在于只读 `--strict-dry-run` preview，不能写板。Git target 只用本地 objects，artifact target 绑定 immutable manifest digest；branch/worktree 只定位 repository，不是交付证据。
 - `coordination`——多 orchestrator 协调**感知**块，让 M 个并行 orchestrator 互相看见、各自独立配速（**hook 不读**·跨板只读读侧是 `ccm peers`）。可扩展对象，字段全 optional：
@@ -264,6 +268,105 @@ Cursor 下，`executor` 仍是 board 的领域字段，不是 Cursor API 名。`
 - 把 `user` 任务标成 `subagent`——看起来在跑、其实没人做。
 - 真实派发后把 `executor: subagent` 任务标成 `in_flight`，却不带派发工具返回的真实 `handle`——会触发 `BIZ-EXECUTOR-HANDLE` warn，resume 时也找不到后台任务；唯一例外是通过 hard native projection 校验、尚不应有 active handle 的 native attempt 状态。反之，future `ready` / `blocked` 任务不应为了消 warning 预填 phantom handle。
 - 把 orchestrator 自己的整合工作标 `subagent`——指挥不演奏（orchestrator 协调、不亲手做单元工作），orchestrator 的工作应标 `master-orchestrator`。
+
+---
+
+## C.5 cross-harness planning / routing 合同
+
+这是 **opt-in 的 board planning / ledger / activation contract**，不是自动派发器。它把「任务需要什么」和「有哪些合格执行候选」分开持久化，使换 session、换 origin harness 或 resume 后仍能重建选择依据：
+
+| 对象 | 回答的问题 | 写口 |
+|---|---|---|
+| `task.planning` · `ccm/task-planning/v1` | 任务本身有多难、多险、上下文多大，质量底线、预算姿态与能力边界是什么 | `ccm task set-planning <id> --profile @/abs/planning.json` |
+| `task.routing` · `ccm/agent-routing/v1` | 哪些 host-native / cli-headless candidate 合格，ample / tight 各按什么链尝试，哪些失败可 fallback | `ccm task set-routing <id> --policy @/abs/routing-policy.json` |
+| `routing.selected` + `routing.attempts[]` + task `handle/status` projection | 实际选了谁、依据何在、哪个 running attempt 与 opaque handle 对应 | `ccm task route-bind <id> --selection @/abs/selection.json --attempt @/abs/attempt.json` |
+| `board.meta.contracts` | 本板是否要求非 grandfathered `subagent` 都遵守上述合同 | `ccm board enable-contract [--preflight]` |
+
+### planning：先评估任务，不先选品牌
+
+`planning.dimensions` 七维都必填；它们描述任务，不描述当前 session 所在 harness：
+
+| 维度 | 合法值 |
+|---|---|
+| `reasoning` | `routine | multi-step | novel | frontier` |
+| `uncertainty` | `low | medium | high | unknown` |
+| `risk` | `low | medium | high | critical` |
+| `scope` | `local | multi-file | cross-module | cross-repo` |
+| `context` | `small | medium | large | oversized` |
+| `coordination` | `none | single-boundary | multi-boundary` |
+| `reversibility` | `reversible | costly | irreversible` |
+
+同一 profile 还必须带：严格 UTC `assessed_at`、非空 `assessor`、`estimate_confidence: low|medium|high`、`quality.effect_floor`、`budget.posture: ample|tight`、正整数 `budget.max_attempts`，以及 `capabilities.required/preferred/forbidden` 三组 capability object。`required` 至少一个；三组 id 各自唯一且不可跨组重叠。task 本身还要有正数 `estimate`。
+
+```json
+{
+  "schema": "ccm/task-planning/v1",
+  "assessed_at": "2026-07-16T08:00:00Z",
+  "assessor": "master-orchestrator",
+  "dimensions": {
+    "reasoning": "multi-step",
+    "uncertainty": "medium",
+    "risk": "medium",
+    "scope": "multi-file",
+    "context": "medium",
+    "coordination": "single-boundary",
+    "reversibility": "reversible"
+  },
+  "estimate_confidence": "medium",
+  "quality": { "effect_floor": "acceptance-capable" },
+  "budget": { "posture": "ample", "max_attempts": 2 },
+  "capabilities": {
+    "required": [{ "id": "repository-reasoning" }],
+    "preferred": [{ "id": "structured-output" }],
+    "forbidden": [{ "id": "account-mutation" }]
+  }
+}
+```
+
+### routing：候选是跨 harness 资源，不是 origin-local 默认值
+
+`routing.policy` 精确承载：
+
+- `objective`：`quality-first | balanced | cost-first`。
+- `constraints`：非空 `effect_floor`；`quota_unknown` 必须是 `ineligible`；`cross_harness_quota_admission` 必须是 `ample-only`。
+- `candidates[]`：每项显式给 `id`、`surface: host-native|cli-headless`、`adapter`、`harness`、`provider`、**精确** `model`（禁止 `auto`）、`effort`、`capabilities[]`、`effect_floors_met[]`、`permission{profile,denies[]}`、`account_mutation:"forbidden"`、`requires[]`。候选能力必须覆盖 planning.required、满足 effect floor，permission.denies 必须覆盖 planning.forbidden 和 `account-mutation`。
+- `requires[]` 至少含 `capability-match`、`effect-floor`、`permission-compatible`、`account-mutation-forbidden`；其它机械资格（例如 runtime health）可显式追加。
+- `chains.ample` / `chains.tight`：candidate id 的有序、无重复链；同 harness 也只有显式列成 candidate 才能 fallback 回去。
+- `fallback.on` 只允许机械失败：`binary-unavailable | auth-expired | model-unavailable | model-mismatch | quota-tight | rate-limited | startup-timeout | transport-error`。
+- `fallback.never_on` 必须覆盖：`policy-blocked | permission-blocked | security-blocked | workspace-mismatch | task-blocked | acceptance-failed`；`exhaustion:"fail-closed"`、`same_harness:"explicit-candidate-only"` 固定 fail-closed。
+
+`set-routing` 只生成 `mode:"cross-harness"`、`selected:null`、`attempts:[]` 的 envelope；**它不读取 provider、不选择 candidate、不 reserve、不 spawn、不 fallback**。candidate 的 `harness/provider/model/effort/surface` 是 ledger 中的计划事实，不是 ccm 对各家 CLI flags 的复制。
+
+### activation 与写入顺序
+
+**在 legacy board 上准备现有 subagent task：**
+
+```bash
+ccm task update T7 --estimate 3h
+ccm task set-planning T7 --profile @/abs/planning.json
+ccm task set-routing T7 --policy @/abs/routing-policy.json
+ccm board enable-contract --preflight --json   # 只读；ready:true 才继续
+ccm board enable-contract
+```
+
+`enable-contract` 会为现有 `done|failed|escalated` subagent 记录精确 grandfather fingerprint；它们不必伪造历史 planning/routing。若之后 retry，该新 attempt 不再豁免。activation 没有 generic setter 或 disable 旁路，先 preflight 再启用。
+
+**已 enabled 的 board 新建 subagent task：**先建 planned task，完整准备 `estimate` / planning / routing，最后一次性把 executor 定成 `subagent`；启用后的 subagent executor 会冻结，不能靠改 executor 绕 route gate。
+
+```bash
+ccm task add T8 --type planning --estimate 2h
+ccm task set-planning T8 --profile @/abs/planning.json
+ccm task set-routing T8 --policy @/abs/routing-policy.json
+ccm task update T8 --executor subagent
+```
+
+只有派发面已经返回非空 opaque running handle、且 selection evidence 在有效时间窗内把 candidate 的每个 `requires` predicate **恰好一次**证明为 `pass` 时，才调用 `route-bind`。它原子写 `routing.selected`、append running attempt（并冻结完整 `selection_snapshot`）、投影 task `handle`，再把 task 转为 `in_flight`；attempt 的 candidate/model/effort 必须与 selection/candidate 一致。当前合同只校验 handle 的非空 syntactic claim，不把它升级成 live provider attestation。
+
+### 与显式 `ccm worker` raw wrapper 的当前边界
+
+`ccm worker help/run` 已是 current 的 session-bound raw wrapper，但它与 routing ledger **没有自动接线**：不会读 policy 自动选 route，不会把 process terminal 当 running handle，不会调用 `route-bind`，也不会自动 fallback。同步 `worker run` 只在 child terminal 后返回 process envelope；provider exit 0 也不等于 parent acceptance 通过。
+
+因此，只使用 raw wrapper 的 board 可以保持 legacy lifecycle；不要为了“看起来先进”启用一个当前派发面拿不到 opaque running handle 的 routing contract。等实际 dispatch surface 能返回 handle 时再按上面的 activation/bind 顺序 opt in。无 `meta.contracts`、无 `planning/routing` 的历史 board/task 继续逐字保持 legacy 行为。
 
 ---
 
@@ -937,6 +1040,9 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `FMT-ACCEPTANCE` | warn | `acceptance` 既非字符串也非对象，或对象 `criteria` 空、`criterion.status` 不在 {pending,met,failed} | `--accept "一句话"` 或 `--set-json acceptance={criteria:[...]}`——见 [D 节](#d-acceptance-怎么写好) |
 | `FMT-DEPENDENCY-GATE` | hard | `dependency_gate` 存在但不是 `{kind:"review",required_verdict:"APPROVE"}` | 用 `task add|update --review-gate APPROVE` 声明；非法 gate fail closed |
 | `FMT-REVIEW-VERDICT` | hard | 非空 `review_verdict` 不在 `{APPROVE,REQUEST-CHANGES}` | 用 `task done --review-verdict APPROVE|REQUEST-CHANGES`；缺失/null 表示尚无结论 |
+| `FMT-CONTRACTS` | hard | `meta.contracts` 只出现 planning/routing 一半、版本不是精确 v1、activation time / grandfathered terminal 形状坏 | 只用 `ccm board enable-contract` 成对启用；两者都缺就是合法 legacy；不要手写 `meta.contracts` |
+| `FMT-TASK-PLANNING` | warn | `task.planning` 存在但不满足 `ccm/task-planning/v1` | 用 `task set-planning --profile` whole-object writer；enabled subagent 的缺/坏还会升级命中 `BIZ-ROUTED-PLANNING-REQUIRED` hard |
+| `FMT-TASK-ROUTING` | warn | `task.routing` 存在但不满足 `ccm/agent-routing/v1` | 用 `task set-routing --policy` 建 envelope、`route-bind` 写 selection/attempt；enabled subagent 的缺/坏还会命中 route BIZ hard gate |
 | `FMT-DELIVERY-CONTRACT` | hard | `delivery_contract` 不是 declared v1、target/snapshot 形状坏，或试图持久化 strict | 用 `target set/refresh`；只持久化 `mode:declared`，strict 仅 dry-run preview |
 | `FMT-TASK-DELIVERY` | hard | candidate/observation/proof 形状或 immutable binding 坏，或持久化 derived qualification | 只用 `task attest-delivery`；proof 必须精确绑定当前 candidate 与冻结 target snapshot |
 | `FMT-DEPENDENCY-REQUIREMENTS` | hard | requirement 不是 candidate/delivered、delivered target 未声明、waiver authority/scope/expiry 坏，或写了 `qualified` bool | 用 `dependency require/default/waive`；qualification 永远读取时派生 |
@@ -974,6 +1080,10 @@ ccm board show --board /abs/path/to/20260625T120000Z-12345.board.json
 | `BIZ-DEV-REFS` | **hard** | `type=development` 的 task 缺 `kind=spec`≥1 或 `kind=plan`≥1 引用 | development task 加 `--ref spec:/abs/spec.md --ref plan:/abs/plan.md`（`task add`）或 `--add-ref`（`task update`）；`--force` 可越——见 [L 节](#l-referencesartifactverified-语义) |
 | `BIZ-ACCEPTANCE-REQUIRED` | warn | type ∈ {development, development-demo, acceptance, e2e-integration} 但 `acceptance` 为空 | 这些 type 必须带 `--accept`——见 [D 节](#d-acceptance-怎么写好) |
 | `BIZ-EXECUTOR-HANDLE` | warn | `status=in_flight` 且 `executor` ∈ {subagent, workflow}，但缺真实 `handle`；valid native no-handle projection 除外 | legacy 派发工具返回句柄后 `task update --handle <后台句柄>`，再转 `in_flight`；`ready` / `blocked` future task 不预填；native attempt 只走 dedicated writer，由 hard rule 接管——见 [C 节](#c-executor-五种语义--选择决策树) |
+| `BIZ-ROUTED-PLANNING-REQUIRED` | hard | contract-enabled、非 grandfathered `subagent` 缺合法 planning 或正数 estimate | 先补 estimate，再用 `task set-planning` 写完整画像；enabled 新 task 最后才把 executor 定成 subagent——见 [C.5](#c5-cross-harness-planning--routing-合同) |
+| `BIZ-ROUTE-POLICY-REQUIRED` | hard | contract-enabled、非 grandfathered `subagent` 缺合法 provider-neutral routing policy / ample+tight chains | 用 `task set-routing`；candidate 必须满足 planning capability/effect/permission 交叉约束 |
+| `BIZ-ROUTE-SELECTION-REQUIRED` | hard | contract-enabled `in_flight` subagent 没有合格 current selection，或 selection 不在声明 chain / evidence 失效 | 不用 generic start/force；取得 fresh qualification evidence与真实 handle 后走 `route-bind` |
+| `BIZ-ROUTE-ATTEMPT-REQUIRED` | hard | contract-enabled `in_flight` subagent 不是恰好一个 running attempt，或 attempt/selection/handle/snapshot 不一致 | selection + running attempt 只经 `route-bind` 原子写；attempts append-only，不手改 |
 | `BIZ-EXTERNAL-ISSUE` | warn | `executor=external` 但缺 `kind=issue` 引用 | external task 加 `--ref issue:https://github.com/o/r/issues/N` 做外部追踪锚点 |
 | `BIZ-EXTERNAL-ARTIFACT` | warn | `executor=external` 且 `status=done`，但 `artifact` 等于同一个 `kind=issue` tracking URL | 把 artifact 改成外部实际产出（PR / commit / release / report / CI run）；若 issue closed 但尚未验收，别标 done，先用 `uncertain` / `in_flight` / `stale` |
 | `BIZ-TIME-ORDER` | warn | 时间序乱：`started_at` 早于 `created_at` / `finished_at` 早于 `started_at` / 有 finished 无 started / `in_flight` 无 started / `done` 无 finished | 用 ccm verb（`start`/`done`）按序盖戳，别手填出乱序时间 |

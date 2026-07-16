@@ -107,7 +107,10 @@ test('projection rejects missing, future, expired, superseded and falsely-global
   );
   const cases = [
     ['missing source', (facts) => { facts.providers['claude-code'].source = []; }],
-    ['future observation', (facts) => { facts.providers['claude-code'].observed_at = '2026-07-16T00:00:00Z'; }],
+    ['future observation', (facts) => {
+      facts.providers['claude-code'].observed_at = '2999-01-01T00:00:00Z';
+      facts.providers['claude-code'].valid_until = '2999-01-02T00:00:00Z';
+    }],
     ['expired evidence', (facts) => { facts.providers['claude-code'].valid_until = '2026-07-14T00:00:00Z'; }],
     ['superseded current', (facts) => {
       facts.providers['claude-code'].models.push({
