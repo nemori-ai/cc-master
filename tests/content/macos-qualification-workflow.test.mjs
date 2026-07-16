@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
   cpSync,
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -365,10 +366,14 @@ test('live operator supplies an independent trusted launchd identity before unin
 });
 
 test('ccm launchd fix and using-ccm projections carry separate release-line truth', () => {
-  const changeset = readFileSync('ccm/.changeset/honest-launchd-uninstall.md', 'utf8');
-  assert.match(changeset, /'ccm': patch/);
-  assert.match(changeset, /unit removal/i);
-  assert.match(changeset, /nonzero/i);
+  const changesetPath = 'ccm/.changeset/honest-launchd-uninstall.md';
+  const ccmReleaseIntent = readFileSync(
+    existsSync(changesetPath) ? changesetPath : 'ccm/apps/cli/CHANGELOG.md',
+    'utf8',
+  );
+  if (existsSync(changesetPath)) assert.match(ccmReleaseIntent, /'ccm': patch/);
+  assert.match(ccmReleaseIntent, /unit removal/i);
+  assert.match(ccmReleaseIntent, /nonzero/i);
 
   const canonical = readFileSync(
     'plugin/src/skills/using-ccm/canonical/references/command-catalog.md',
@@ -401,8 +406,8 @@ test('ccm launchd fix and using-ccm projections carry separate release-line trut
   assert.match(rootChangelog, /macOS monitor uninstall guidance/);
   assert.doesNotMatch(rootChangelog, /macOS launchd deactivation truth/);
   assert.ok(
-    readdirSync('ccm/.changeset').includes('honest-launchd-uninstall.md'),
-    'ccm behavior must carry ccm-line release intent',
+    existsSync(changesetPath) || ccmReleaseIntent.includes('## 0.21.0'),
+    'ccm behavior must carry pending changeset or versioned ccm-line release intent',
   );
 });
 

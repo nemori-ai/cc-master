@@ -172,7 +172,9 @@ sea_stage() {
   rm -rf "${shome}"; mkdir -p "${shome}"
   CC_MASTER_HOME="${shome}" "${REPO_ROOT}/${binpath}" board init --goal "release-harness smoke" >/dev/null \
     || die "SEA board init 失败"
-  CC_MASTER_HOME="${shome}" "${REPO_ROOT}/${binpath}" task add t1 --type development --title "smoke slice" >/dev/null 2>&1 \
+  # Keep the transport smoke independent from development-task evidence gates: a development
+  # node intentionally requires spec+plan refs, while this node only proves SEA board I/O.
+  CC_MASTER_HOME="${shome}" "${REPO_ROOT}/${binpath}" task add t1 --type research --title "smoke slice" >/dev/null 2>&1 \
     || die "SEA task add 失败"
   local nxt; nxt="$(CC_MASTER_HOME="${shome}" "${REPO_ROOT}/${binpath}" board next 2>/dev/null | tr -d '[:space:]')"
   [ "${nxt}" = "t1" ] || die "SEA board next 期望 t1，实得 '${nxt}'"

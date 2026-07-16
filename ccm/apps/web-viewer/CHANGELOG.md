@@ -1,5 +1,15 @@
 # @ccm/web-viewer
 
+## 0.19.0
+
+### Minor Changes
+
+- 2cd3f3d: Expose Goal Contract and safe cross-harness planning/routing read models in Web Viewer, with route-aware mission, inspector, DAG/list badges, filters, and shareable URL state.
+
+### Patch Changes
+
+- a43b29f: Fix the graph view's "reset layout" button not clearing manually dragged node positions: the node/edge builder's memo was missing `resetKey` from its dependency list, so it kept returning the stale (dragged) positions even after the underlying dagre layout was recomputed. Reset now snaps every node back to its dagre position and refits, while manual drag persistence across polls and zero-repositioning on status-only updates are unaffected.
+
 ## 0.18.0
 
 ### Minor Changes

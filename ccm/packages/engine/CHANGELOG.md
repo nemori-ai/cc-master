@@ -1,5 +1,44 @@
 # @ccm/engine
 
+## 0.21.0
+
+### Minor Changes
+
+- fae016b: Agent Registry v1：board 新增 ✎ `agents[]` 运行时 agent 登记簿（凡派发皆登记的统一花名册·agent↔task join 存 agent 侧 `links[]`·id 遵守 run-store v2 ID 文法）+ 新 namespace `ccm agent` 七 verb（create/bind/link/terminal/probe/list/show·登记/探测/读取 noun，无任何 spawn/route/dispatch 语义）+ 按 handle 分级的活性探测与 reconcile（pid 存活 / codex·claude-code 会话文件 mtime / transcript mtime·拿不到即 unknown 保真·只写 agents[] 自己的 probe/lifecycle 字段）+ 两条 warn 级 lint（`FMT-AGENTS` 段形状 / `BIZ-INFLIGHT-AGENT` in_flight 未登记软提示）+ viewer agent 观测面。
+- f68e380: Project cached Cursor IDE and Cursor Agent surface inventory into orchestrator pre-context without
+  probing providers or enabling dispatch.
+- 27e9330: 新增三路 origin 共用的 cached-only、shadow-only、4KiB 脱敏 orchestrator context delivery，
+  并为 `ccm orchestrator context` 增加 additive `--agent-visible` 输出面。
+- 4776c04: Separate review execution completion from dependency approval. Explicit review gates now keep downstream tasks blocked until the current attempt records an `APPROVE` verdict, invalidate prior verdicts at retry boundaries, and never reuse an omitted verdict from an earlier attempt.
+- 96ca94c: Add opt-in declared delivery/dependency truth with candidate, target-delivery, and edge-qualification semantics; local-only Git, reviewed-reconciliation, and immutable-artifact proof; retry-safe evidence lifecycle; strict dry-run surfaces; and target, delivery, dependency, and attestation CLI commands. Existing boards and undeclared edges retain legacy readiness behavior, and strict-default remains disabled.
+- Add machine-wide, cross-session quota posture and notification read models for all locally supported harnesses. Provider-scoped cached observations feed coordination, monitor, usage, quota, and shadow-routing consumers without allowing caller-invented authority or automatic account switching.
+- 4b52f57: Add a fail-closed managed-attempt write-set compiler and diagnostic CLI preflight for isolated linked worktrees, with explicit artifact roots and fixed remote/account/network deny boundaries.
+- afedfe8: Add a public RuntimeEnvironment and PathResolver contract for deterministic Linux and macOS home, host-config, plugin-root, session-pointer, and executable resolution, and align CLI discovery and runtime consumers with that single portable path policy.
+- 4776c04: Add an atomic `task retry` lifecycle operation that archives prior attempt evidence, resets current attempt timestamps, artifact, and typed verification state, and applies the same safety contract to legal retry transitions through `task set-status`.
+- Add opt-in cross-harness task-planning and agent-routing board contracts, validated transition gates, and dedicated CLI writers. Legacy boards remain compatible while contract-enabled attempts must carry difficulty, capability, permission, fallback, and immutable selection evidence before execution.
+- 5d08d83: Add the fail-closed Codex native-attempt ledger, shared canonical launch identity, production owner-store admission/evidence composition, and crash-recoverable dedicated CLI transactions while keeping host invocation unsupported by default.
+- 27e9330: Add fail-closed machine-surface eligibility and independent read-only Cursor IDE/Agent CLI discovery to the machine-wide harness inventory.
+- 99c3189: 新增 Goal Contract v1：fresh board 以 pending skeleton 启动，`ccm goal set|confirm|amend|show|check` 原子管理 normalized goal 与受管、不可变、可校验的 Goal Brief；contract 激活后禁止通用 `board update --goal` 绕过 revision 审计，并新增对应 lint/capability。
+- 01dc896: Add a provider-neutral live quota admission engine, owner-only crash-durable observation and
+  reservation store, strict held-to-committed ticket/run lineage, recoverable multi-key transaction
+  coordination, payer+pool concurrency control, and `quota status/preflight/reserve/audit` CLI surface.
+  Preflight derives authority from stored observation, policy, effect, reservation, and committed
+  ticket facts rather than caller conclusions. Codex admission treats only the seven-day window as a
+  hard quota signal; rolling 24-hour velocity remains advisory and account or credential mutation
+  stays forbidden. Reserve capacity and canonical request digests are store-derived; reservation IDs
+  are authority-scope unique. Multi-key journals own lookup and every capacity-changing transition,
+  while terminal audit retries remain monotonic and cannot reoccupy released capacity. Machine-scope
+  idempotency-key locks and durable indexes prevent cross-aggregation duplicate holds, Codex policy and
+  percentage domains fail closed before admission, source coordinates are validated symmetrically, and
+  single-key terminal retries repair event-durable snapshot projections.
+
+### Patch Changes
+
+- cd8e495: Require every armed watchdog to carry a non-blank real wakeup handle, diagnose legacy missing-handle or expired records without blocking unrelated writes, and make disarm delete canonical and legacy records completely.
+- e52dfd8: Scope `BIZ-EXECUTOR-HANDLE` to in-flight subagent and workflow tasks so future ready or blocked tasks do not produce false-positive warnings or invite placeholder handles.
+- 7ab0a9a: Add one crash-durable owner-only writer for persistent account, board, monitor, and web-viewer state, with explicit file/directory fsync outcomes and fail-closed hard errors.
+- e904207: Prevent statusline auto-install's development guard from trusting repository markers placed at the shared system temporary-directory root. Real repositories below that boundary and worktree invocations remain suppressed, while isolated install paths no longer inherit transient `.git` markers from concurrent workers.
+
 ## 0.20.0
 
 ### Minor Changes
