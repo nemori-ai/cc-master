@@ -24,7 +24,7 @@ const workerSection = (body) => {
 };
 
 const RAW_HELP =
-  /ccm worker help --harness <codex\|claude-code\|cursor-agent>/u;
+  /ccm worker help --harness <codex\|claude-code\|cursor-agent> \[--scope <agent\|root>\]/u;
 const RAW_RUN =
   /ccm worker run --harness <codex\|claude-code\|cursor-agent> \[--cwd <path>\] \[--timeout-ms <n>\] \[--max-output-bytes <n>\] -- <provider argv\.\.\.>/u;
 const NORMALIZED_PROVIDER_ADAPTER = [
@@ -34,13 +34,35 @@ const NORMALIZED_PROVIDER_ADAPTER = [
   /live `--list-models`/u,
   /--mode ask --sandbox enabled/u,
 ];
+const PROCESS_FIELDS = [
+  'schema',
+  'harness',
+  'state',
+  'executable',
+  'argv',
+  'cwd',
+  'stdout',
+  'stderr',
+  'stdout_bytes',
+  'stderr_bytes',
+  'truncated',
+  'timed_out',
+  'cancelled',
+  'signal',
+  'exit_code',
+  'reaped',
+  'duration_ms',
+  'cleanup',
+  'error',
+];
 
 test('A selects across origins, reads real help first, and retains parent acceptance', () => {
   const source = read(A_SOURCE);
 
   assert.match(source, /origin harness.*worker.*边界/us);
   assert.match(source, /真实\s*agent-command help/u);
-  assert.match(source, /\{\{CROSS_HARNESS_ACTIVE_QUERY_POINTER\}\}/u);
+  assert.match(source, /\{\{CROSS_HARNESS_WORKER_HELP_POINTER\}\}/u);
+  assert.doesNotMatch(source, /\{\{CROSS_HARNESS_ACTIVE_QUERY_POINTER\}\}/u);
   assert.match(source, /process terminal.*parent.*独立验收/us);
   assert.match(source, /accountable handle[\s\S]{0,120}`in_flight`/u);
   assert.doesNotMatch(source, /ccm worker (?:help|run)/u);
@@ -56,13 +78,27 @@ test('D is the only exact syntax SSOT for real help and raw provider argv', () =
   assert.match(worker, RAW_HELP);
   assert.match(worker, RAW_RUN);
   assert.match(worker, /resolver.*最终.*agent command.*真实.*help/isu);
+  assert.match(worker, /`--scope`.*`agent`.*默认.*agent command help.*`root`.*root\/global help/isu);
   assert.match(worker, /`ccm worker run --help`.*ccm.*wrapper\s*help/isu);
+  assert.match(worker, /help.*stdout.*stderr.*原样.*exit.*mirror/isu);
   assert.match(worker, /`--`.*原样.*provider argv/isu);
+  assert.match(worker, /完整 provider argv.*不自动.*prefix/isu);
   assert.match(worker, /stdin.*无条件.*原样.*转发/isu);
-  assert.match(worker, /`--cwd`.*process\.cwd\(\)/isu);
-  assert.match(worker, /exit_code.*signal.*timed_out.*cancelled.*stdout.*stderr.*truncated/su);
+  assert.match(worker, /`--cwd`.*绝对.*存在.*目录.*process\.cwd\(\)/isu);
+  assert.match(worker, /`--timeout-ms`.*50\.\.600000.*120000/isu);
+  assert.match(worker, /help.*10000.*timeout/isu);
+  assert.match(worker, /`--max-output-bytes`.*256\.\.1048576.*1048576/isu);
+  assert.match(worker, /ccm\/worker-process-result\/v1/u);
+  assert.match(worker, /state.*exited.*timed_out.*cancelled.*failed.*rejected/isu);
+  for (const field of PROCESS_FIELDS) {
+    assert.match(worker, new RegExp(`\\b${field}\\b`, 'u'), field);
+  }
   assert.match(worker, /不解析.*provider.*terminal/isu);
-  assert.doesNotMatch(worker, /--json/u);
+  assert.match(worker, /provider.*非零.*wrapper.*同一.*exit/isu);
+  assert.match(worker, /run.*unknown harness.*structured.*rejected envelope/isu);
+  assert.match(worker, /help.*unknown harness.*usage error/isu);
+  assert.match(worker, /无 `--json`.*例外/isu);
+  assert.doesNotMatch(worker, /ccm worker run[^\n]*--json/u);
   for (const pattern of NORMALIZED_PROVIDER_ADAPTER) {
     assert.doesNotMatch(worker, pattern);
   }
@@ -99,6 +135,9 @@ test('all host projections carry the same A/D/H raw-wrapper boundary', () => {
     const h = read(hPath);
 
     assert.match(a, /真实\s*agent-command help/u, host);
+    const helpPointer = a.match(/\[using-ccm worker help\]\(([^)]+)\)/u);
+    assert.ok(helpPointer, `${host}: missing worker-help pointer`);
+    assert.equal(helpPointer[1]?.split('#')[1], 'worker-help', host);
     assert.match(d, RAW_HELP, host);
     assert.match(d, RAW_RUN, host);
     assert.match(h, /不复制.*provider.*flags.*catalog/isu, host);
@@ -138,10 +177,15 @@ test('roadmap keeps real help in R0 and normalized routing adapters post-MVP', (
   assert.match(roadmap, RAW_HELP);
   assert.match(roadmap, RAW_RUN);
   assert.match(roadmap, /raw argv.*stdin/isu);
+  assert.match(roadmap, /run.*完整 provider argv.*不自动.*prefix/isu);
+  assert.match(roadmap, /help.*scope.*agent.*root\/global help/isu);
   assert.match(roadmap, /真实 agent-command help.*R0/isu);
   assert.match(roadmap, /R0.*runtime.*PR.*current/isu);
   assert.doesNotMatch(roadmap, /ccm worker inspect/u);
   assert.match(roadmap, /normalized.*provider adapter.*post-MVP/isu);
   assert.match(roadmap, /help.*agent.*观测.*操作入口/isu);
   assert.match(roadmap, /不.*safe.*automatic eligibility/isu);
+  assert.match(roadmap, /ccm.*不主动注入.*API\/BYOK env/isu);
+  assert.match(roadmap, /R0.*不声明.*provider.*credential\/account.*side-effect safety/isu);
+  assert.doesNotMatch(roadmap, /API\/BYOK env 不转发；账号 mutation=0/u);
 });

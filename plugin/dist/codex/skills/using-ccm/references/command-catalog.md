@@ -312,12 +312,15 @@ ccm quota preflight --input <json|@file|-> --json
 ### worker help
 
 ```text
-ccm worker help --harness <codex|claude-code|cursor-agent>
+ccm worker help --harness <codex|claude-code|cursor-agent> [--scope <agent|root>]
 ```
 
 resolver 使用与 `run` 相同的 executable resolution，显示最终选中的本机真实 agent command 的真实 help；
-这才是 agent 组装 provider argv 的当下入口。`ccm worker run --help` 只显示 ccm 自己的 normalized wrapper
-help，不转发 provider help。
+这才是 agent 组装 provider argv 的当下入口。`--scope` 的 `agent` 是默认值，显示 descriptor 定义的
+agent command help；`root` 显示该 executable 的 root/global help，供调用者确认必须放在 agent 子命令
+之前的全局 flags。`ccm worker run --help` 只显示 ccm 自己的 wrapper help，不转发 provider help。`worker help` 把真实
+child stdout / stderr 原样写回相应 stream，并对 provider exit 作 mirror；它的固定 timeout 为 10000 ms、
+每个 output stream 上限为 1048576 bytes。unknown harness 在进入 provider resolver 前作为 usage error 拒绝。
 
 ### worker run
 
@@ -325,12 +328,26 @@ help，不转发 provider help。
 ccm worker run --harness <codex|claude-code|cursor-agent> [--cwd <path>] [--timeout-ms <n>] [--max-output-bytes <n>] -- <provider argv...>
 ```
 
-- `--` 是 ccm lifecycle options 与 provider argv 的硬边界；其后的参数逐项原样转发。ccm 不解析、补写或
-  规范化 provider 的 model、effort、permission、sandbox、prompt 或 output flags。
-- stdin 无条件原样转发给 child。`--cwd` 缺省为 `process.cwd()`；timeout 与 output bound 只管理本次
-  session-bound child process，不把 provider 结果解释成任务结果。
-- 返回统一 generic process envelope，字段为 `exit_code`、`signal`、`timed_out`、`cancelled`、`stdout`、
-  `stderr`、`truncated`。它只报告 process terminal；ccm 不解析 provider terminal，也不判断任务是否成功。
+- `--` 是 ccm lifecycle options 与 provider argv 的硬边界；其后必须是调用者组装的**完整 provider argv**，
+  ccm 逐项原样转发，绝不自动拼接任何 command prefix。Codex 调用者需要按真实 help 自己包含 `exec`，并把
+  root/global flags 放在 provider 要求的位置。ccm 不解析、补写或规范化 provider 的 model、effort、
+  permission、sandbox、prompt 或 output flags。
+- stdin 无条件原样转发给 child。`--cwd` 必须是 absolute、existing directory（绝对、存在的目录），缺省为
+  `process.cwd()`；结果里的 cwd 是解析后的真实路径。
+- `--timeout-ms` 允许 50..600000，`run` 默认 120000；`worker help` 使用固定 10000 timeout。
+  `--max-output-bytes` 允许 256..1048576，默认 1048576，并分别约束 stdout 与 stderr。
+- `run` 是无 `--json` 分叉的显式例外：它始终把 ccm 通用成功信封写到 stdout，其中 `data.schema` 固定为
+  `ccm/worker-process-result/v1`。承重字段完整固定为 `schema`、`harness`、`state`、`executable`、`argv`、
+  `cwd`、`stdout`、`stderr`、`stdout_bytes`、`stderr_bytes`、`truncated`、`timed_out`、`cancelled`、
+  `signal`、`exit_code`、`reaped`、`duration_ms`、`cleanup`、`error`；`state` 只取 `exited`、
+  `timed_out`、`cancelled`、`failed`、`rejected`。它只报告 process terminal；ccm 不解析 provider terminal，
+  也不判断任务是否成功。
+- provider 非零退出仍返回上述 envelope；当 `state:exited` 且 exit code 为 0..255 时，wrapper 以同一 exit
+  code 结束。SIGHUP / SIGINT / SIGTERM 分别 mirror 为 129 / 130 / 143；其它 signal、timeout、rejection
+  或内部 failure 返回 1。origin signal 触发的 cancel 同样 mirror 对应 signal exit。
+- `run` 的 unknown harness 会进入 handler 并返回同一 schema 的 structured rejected envelope
+  （`state:rejected`）；`help` 的 unknown harness 则是 usage error。两者有意不同，确保调用者对每次 run
+  都只消费一种 terminal 合同。
 - ccm 不自动 route、fallback、切换账号、登录或选择模型；调用方依据真实 help 显式给出 provider argv。
   provider 仍可能通过继承的环境与 `HOME`/XDG 路径读写自己的状态，因此 raw wrapper 不提供 safe、
   read-only、credential-zero-write 或 automatic-eligibility 声明。
@@ -2507,12 +2524,6 @@ ccm upgrade plugin [--to <v*tag>] [--json] [--harness <id>] [--all-harnesses]
 ## --json 输出形状
 
 通用信封：成功 `{"ok": true, "data": <below>}`，失败 `{"ok": false, "exit": N, "error": "…", "violations": []}`。以下只列 `data` 形状。
-
-### worker run
-
-返回 generic process envelope：`exit_code`、`signal`、`timed_out`、`cancelled`、`stdout`、`stderr`、
-`truncated`。这是 child process 的 transport/lifecycle 结果，不是 provider-specific terminal adapter，
-也不是 parent task acceptance。
 
 ### quota status / preflight / reserve / audit
 

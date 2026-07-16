@@ -105,7 +105,7 @@
 ## 跨 harness 的当前最小闭环
 
 不要把 origin harness 当成 worker 的选择边界：如果另一种本机 harness 更适合这项工作，就可以显式
-选择它。每次调用前先按 {{CROSS_HARNESS_ACTIVE_QUERY_POINTER}} 查看 resolver 最终选中的真实
+选择它。每次调用前先按 {{CROSS_HARNESS_WORKER_HELP_POINTER}} 查看 resolver 最终选中的真实
 agent-command help，再由你依据那份 help 组装 provider 自己的参数；不要靠记忆复制易变 flags，也不要把
 ccm 当成 model / effort 的 provider adapter。若选择需要 machine/model/quota 事实，再按
 {{CROSS_HARNESS_TARGET_FACTS_POINTER}} 读取 selected target 的只读解释；这些事实服务选择，不改变显式

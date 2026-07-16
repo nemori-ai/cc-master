@@ -18,18 +18,19 @@
 两条公共形状是：
 
 ```text
-ccm worker help --harness <codex|claude-code|cursor-agent>
+ccm worker help --harness <codex|claude-code|cursor-agent> [--scope <agent|root>]
 ccm worker run --harness <codex|claude-code|cursor-agent> [--cwd <path>] [--timeout-ms <n>] [--max-output-bytes <n>] -- <provider argv...>
 ```
 
 本轮只有在以下条件全部成立时闭环：
 
-1. 三个 harness 共用一个 resolver/process seam；`help` 与 `run` 选中同一真实 executable，fake CLI 可验证真实 help、raw argv 和 stdin 无条件原样转发。
+1. 三个 harness 共用一个 resolver/process seam；`help` 与 `run` 选中同一真实 executable，fake CLI 可验证真实 help、raw argv 和 stdin 无条件原样转发。`help --scope agent`（默认）取 descriptor 的 agent-command help，`--scope root` 取 executable 的 root/global help。
 2. 调用者显式选择 harness，并依据真实 help 自己组装 provider flags；ccm 不提供 model/effort 映射，不自动 route/fallback，也不切换账号。
-3. ccm 同步等待 process terminal；timeout、外部 cancel、origin signal、输出越界和 provider 非零退出都只进入 generic process envelope，不解析 provider terminal。
-4. ccm 只管理自己创建的 process tree，结束前完成 signal escalation、kill/reap、有界 stdout/stderr 和临时目录 cleanup。
-5. worker terminal 不是 parent task 的 `done`；master orchestrator 仍独立验收 artifact、测试和 acceptance。
-6. built CLI 的三条 hermetic E2E 全绿；本机真实 smoke 要么成功，要么诚实记录 provider/host 阻塞。raw wrapper 本身不声明 BYOK、账号、credential 或 provider side-effect 安全性。
+3. `run` 在 `--` 后接收完整 provider argv，绝不自动拼 command prefix；例如 Codex 调用者自己包含 `exec`，并按 root help 放置 global flags。
+4. ccm 同步等待 process terminal；timeout、外部 cancel、origin signal、输出越界和 provider 非零退出都只进入 generic process envelope，不解析 provider terminal。
+5. ccm 只管理自己创建的 process tree，结束前完成 signal escalation、kill/reap、有界 stdout/stderr 和临时目录 cleanup。
+6. worker terminal 不是 parent task 的 `done`；master orchestrator 仍独立验收 artifact、测试和 acceptance。
+7. built CLI 的三条 hermetic E2E 全绿；本机真实 smoke 要么成功，要么诚实记录 provider/host 阻塞。raw wrapper 本身不声明 BYOK、账号、credential 或 provider side-effect 安全性。
 
 ### 2.2 当前证据与闭环目标不得混写
 
@@ -128,9 +129,11 @@ plugin 的最终形状是 harness-aware 的通知与行为指导层，不是 wor
 ### R0 CLI help 与后续演进边界
 
 真实 agent-command help 是 R0 的 current surface，也是 agent 的观测与操作入口；它由 `worker help`
-通过与 `run` 相同的 resolver 取得。`worker run --help` 始终只说明 ccm wrapper。真实 help 会随本机 provider
-CLI 演进，但它只帮助 caller 组装 raw argv，不提供 safe 或 automatic eligibility，也不能替代未来 normalized
-provider adapter 的版本、effect、result 与 canary 合同。本轮不另造 `worker inspect` 或 per-run 探测层。
+通过与 `run` 相同的 resolver 取得。`help` 的 `scope=agent` 默认返回 agent-command help，`scope=root` 返回
+executable 的 root/global help；两者共同帮助 caller 组装完整 argv。`worker run --help` 始终只说明 ccm
+wrapper。真实 help 会随本机 provider CLI 演进，但它只帮助 caller 组装 raw argv，不提供 safe 或 automatic
+eligibility，也不能替代未来 normalized provider adapter 的版本、effect、result 与 canary 合同。本轮不另造
+`worker inspect` 或 per-run 探测层。
 
 ## 4. Canary host prerequisites
 
@@ -154,7 +157,7 @@ bwrap: not found on PATH
 
 | Gate | Linux host prerequisite | macOS host prerequisite | 必须保存的证据 | 不可替代的负例 |
 | --- | --- | --- | --- | --- |
-| Session-bound worker smoke | supported CLI version、手动 auth、显式 first-party model、可执行 workspace；sandbox 可按本轮诚实 residual 单独关闭 | 同左，且独立验证 argv/result | version/catalog snapshot、requested/resolved model、terminal、cleanup | API/BYOK env 不转发；账号 mutation=0 |
+| Session-bound worker smoke | supported CLI version、手动 auth、显式 first-party model、可执行 workspace；sandbox 可按本轮诚实 residual 单独关闭 | 同左，且独立验证 argv/result | version/catalog snapshot、requested/resolved model、terminal、cleanup | ccm 不主动注入 API/BYOK env；R0 不声明 provider 自身 credential/account side-effect safety |
 | Cursor sandbox inspect | Cursor 当前 profile 可用的 Landlock ABI，或 Cursor 支持的 root-owned bubblewrap backend；unprivileged user namespace 与 LSM/preflight 满足 | 对目标 Cursor version 的 macOS sandbox/profile 做独立 runtime qualification；不得继承 Linux 结论 | OS/kernel/CLI/profile identity，workspace/network/MCP 边界，pre-exec attribution | workspace escape、network/profile mismatch、sandbox unavailable 均 fail closed |
 | Isolated writer | 上一 gate + isolated worktree/lease、permission/env compiler、process-tree cleanup | 同左，且由真实 macOS runner 重放 | diff、lease、effective deny set、cleanup、parent acceptance | commit/push/nested master/credential leak=0 |
 | Durable run/update | Linux exact runtime assurance、detached process/control primitives、lease-aware GC | Darwin path-attested assurance及其 same-UID residual 明示；arm64/x64 当前 tree 各自资格化 | parent death、handoff、update/reinstall/rollback、same `run_ref` | duplicate worker=0；old supervisor board write=0；active image误 GC=0 |

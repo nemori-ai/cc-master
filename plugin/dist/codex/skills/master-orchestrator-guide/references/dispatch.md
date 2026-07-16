@@ -130,7 +130,7 @@ codex exec resume --last "cc-master watchdog: recon board, check <predicate>, up
 ## 跨 harness 的当前最小闭环
 
 不要把 origin harness 当成 worker 的选择边界：如果另一种本机 harness 更适合这项工作，就可以显式
-选择它。每次调用前先按 [using-ccm 主动查询合同](../../using-ccm/references/command-catalog.md#跨-harness-主动查询目标事实) 查看 resolver 最终选中的真实
+选择它。每次调用前先按 [using-ccm worker help](../../using-ccm/references/command-catalog.md#worker-help) 查看 resolver 最终选中的真实
 agent-command help，再由你依据那份 help 组装 provider 自己的参数；不要靠记忆复制易变 flags，也不要把
 ccm 当成 model / effort 的 provider adapter。若选择需要 machine/model/quota 事实，再按
 [pacing-and-estimation 目标事实口径](../../pacing-and-estimation/references/cross-harness-target-facts.md) 读取 selected target 的只读解释；这些事实服务选择，不改变显式
