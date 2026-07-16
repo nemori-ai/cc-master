@@ -39,8 +39,8 @@
           "files": {
             "SKILL.md": "f6b9ae935fbdec43a939640433a5952a2ec3968d388a80ec904b5170c754383a",
             "references/account-pool.md": "da7a5826ba8ceb1eefc26722b4e305df6042ea30264abade27f896ef1fb2a8d6",
-            "references/board-model-guide.md": "90ed099898f51b1657b7eb4e82f893a3f4cf8d3fae4f1bfa9527cf5141ff72a9",
-            "references/command-catalog.md": "54fa9daacbd9916ff41e1e0f8ddd10ca69089378ea7c2b26180a86885f223b26"
+            "references/board-model-guide.md": "f5569495b4f432d898df436d5a6742fa92c9f7c435c18c06e509e521f9555d75",
+            "references/command-catalog.md": "0092f13b8016df41ad4936e6257883550d385df67347c186d94ce9743a284260"
           }
         }
       }
@@ -77,8 +77,8 @@
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
             "SKILL.md": "ba1a8364c0700c74018b4f7797b32f0739962c711b44855c92d43768aad42078",
-            "references/board-model-guide.md": "b47299a2155408d5b84b3dde2e61e4d9411d33ea90313f96b9d4071af5a31ff3",
-            "references/command-catalog.md": "cc0c977980b1b093d5db6ea48645b1cca071ba34a24f588bdb1084512d0470ad"
+            "references/board-model-guide.md": "a62fd86d053107e3a2a6eb20bb8150f8e871b953bce4e987a37bd057e8a22ccc",
+            "references/command-catalog.md": "0da9ccc82a04dcc1fcf15303b46d765ec94f3c7d27d29db721ff60460acc6fba"
           }
         }
       }
@@ -115,8 +115,8 @@
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
             "SKILL.md": "41bc26768a60c536696c2b22d7a7a037edd3a966ac6e363a7545d7a6ce834e84",
-            "references/board-model-guide.md": "c68fb5d870515dbdc4c8ecc2703c871b35dc349aab26c30906052c067876026c",
-            "references/command-catalog.md": "a9669ab60dcd05a240bf5b8fbc3ceab2a1708a5b9d3db023ae4fece79e92e126"
+            "references/board-model-guide.md": "6acfd897e191caead882035e299fa74997b38ed467e086227bb7d32d11e824fa",
+            "references/command-catalog.md": "1755b16b66dfe7d92fad0ede1222a1a4fb73ddaa9e66be31967b89addd2f2317"
           }
         }
       }

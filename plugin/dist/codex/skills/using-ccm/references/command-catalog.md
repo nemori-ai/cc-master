@@ -1728,8 +1728,8 @@ agent 生命周期状态机（写 verb 强制·同态重入幂等）：
 starting  → running, uncertain, orphaned
 running   → terminal, uncertain, orphaned
 uncertain → running, terminal, orphaned
-orphaned  → terminal
-terminal  → （终态）
+orphaned  → running, terminal
+terminal  → （唯一终态·probe 永不复活）
 ```
 
 本 namespace 专属 exit code 语义：`3` = 无 handle 证据 / 非法状态转移 / `link` 目标 task 不存在；`5` = agent id 不存在（**注意**：与 `task show` 的 `data:null` + exit 0 不同，`agent show` 查不到 id 直接 exit 5）。
@@ -1766,7 +1766,7 @@ ccm agent bind <id> --handle <kind:value> [flags]
 ```
 
 - positional：`<id>`（必填）
-- 行为：交真实 handle 证据，`starting→running`（`uncertain→running` 复活、`running→running` 幂等重绑也合法）。**无证据拒绝（exit 3）**：`kind` 必须 ∈ `session-id|pid|task-id` 且 value 非空——无真实 handle 不算 running。`terminal` / `orphaned` 态 bind → 非法转移（exit 3）
+- 行为：交真实 handle 证据，`starting→running`（`uncertain→running` / `orphaned→running` 复活、`running→running` 幂等重绑也合法——新 handle 即证据）。**无证据拒绝（exit 3）**：`kind` 必须 ∈ `session-id|pid|task-id` 且 value 非空——无真实 handle 不算 running。`terminal` 态 bind → 非法转移（exit 3·终态不复活）
 - flags：
 
 | flag | 短名 | 类型 | 必填 | 含义 |
@@ -1814,11 +1814,11 @@ ccm agent probe [<id>] [flags]
 
 - positional：`<id>`（可选；缺省探测本板全体 agent）
 - 行为：活性探测 + reconcile。**只写 agent 自己的 `probe` / `lifecycle` 字段，绝不碰 `task.handle` / attempt 投影**。探测手段按 handle 分级：
-  - `pid` → 进程存活判定（存在 / 无权限 → `alive`；不存在 → `gone`）；
-  - `session-id` × `codex` → `~/.codex/sessions/**` 会话文件存在性 + mtime；`session-id` × `claude-code` → `~/.claude/projects/*/<sid>.jsonl` mtime（mtime 在 freshness 窗内 → `alive`，在但陈旧 → `silent`，文件缺 → `gone`）；
-  - `task-id` 或 `type=subagent` → `handle.transcript_ref` 路径 mtime（有 ref 但文件缺 → `gone`；无 ref → `unknown`）；
+  - `pid` → 进程存活判定（存在 / 无权限 → `alive`；kill-0 确定进程不存在 → `gone`）——**`gone` 只出自这条确定性判死路径**；
+  - `session-id` × `codex` → `~/.codex/sessions/**` 会话文件 mtime；`session-id` × `claude-code` → `~/.claude/projects/*/<sid>.jsonl` mtime（mtime 在 freshness 窗内 → `alive`，在但陈旧 → `silent`，**文件不存在 → `unknown`**——「从未见过文件」≠「曾在而消失」，启动竞态下 session 文件可能尚未落盘，mtime 类方法不判死）；
+  - `task-id` 或 `type=subagent` → `handle.transcript_ref` 路径 mtime（有 ref 但文件不存在 → `unknown`·同上不判死；无 ref → `unknown`）；
   - 其余 / 无句柄 → `method=none`、`observed=unknown`（**保真**：拿不到就 unknown，绝不用相邻字段推导补齐）。
-  - reconcile 只对 active 态（`starting/running/uncertain`）生效：`gone→orphaned`、`silent→uncertain`、`alive→running`、`unknown→不变`；`terminal` / `orphaned` 是终态，probe 记录观测但不自动复活
+  - reconcile 双向、以观测为准：active 态（`starting/running/uncertain`）按 `gone→orphaned`、`silent→uncertain`、`alive→running`、`unknown→不变`；**`orphaned` 观测 `alive` → 恢复 `running`**（观测即证据——误判死 / 文件后到可自愈），其余观测保持 orphaned；`terminal` 是唯一终态，probe 记录观测但永不复活
 - flags：
 
 | flag | 短名 | 类型 | 含义 |

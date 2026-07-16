@@ -397,9 +397,9 @@ ccm task update T8 --executor subagent
 | 刚发起派发、还没拿到句柄 | `starting` | `agent create --type ... --harness ... --intent "..."` |
 | 拿到真实句柄（session id / pid） | `running` | `agent bind <id> --handle <kind:value>`——**无真实证据会被拒（exit 3）**，别用占位值硬凑 |
 | probe 发现会话文件陈旧（在但不动了） | `uncertain` | `agent probe` 自动降级，不用手转 |
-| probe 发现进程 / 会话文件消失 | `orphaned` | `agent probe` 自动降级，不用手转 |
-| worker 收工（成功或失败都算收工） | `terminal` | `agent terminal <id> --outcome "..."`——**terminal ≠ task done**，task 仍走父层独立验收 |
-| `uncertain` 后确认还活着 | `running` | `agent probe`（观测 alive 自动归回）或重新 `bind` |
+| probe 确定性判死（`pid` kill-0 进程不存在） | `orphaned` | `agent probe` 自动降级，不用手转。**mtime 类方法不判死**：会话 / transcript 文件不存在只出 `unknown`、state 不动——启动竞态下文件可能尚未落盘，「从未见过文件」≠「曾在而消失」 |
+| worker 收工（成功或失败都算收工） | `terminal` | `agent terminal <id> --outcome "..."`——**terminal ≠ task done**，task 仍走父层独立验收；terminal 是唯一终态，probe 永不复活 |
+| `uncertain` / `orphaned` 后观测到还活着 | `running` | `agent probe`（观测 `alive` 即证据，双向 reconcile 自动归回——误判死 / 文件后到可自愈）或重新 `bind` 交新 handle |
 
 **handle.kind 怎么选：**
 
@@ -410,7 +410,7 @@ ccm task update T8 --executor subagent
 | `task-id` | 以 task 粒度跟踪、只有 transcript 可查的派发 | `--transcript` 记 transcript 路径引用（绝不内嵌内容） |
 | `none` | 尚无证据（create 后的缺省态） | 不可手选——bind 不接受 `none` |
 
-**probe 字段是 ccm 写的，别手填。** `probe.{last_probe_at, method, observed, as_of}` 与 probe 引发的 lifecycle 降级全部由 `ccm agent probe` 落盘；`observed` 的语义是保真观测（`alive` / `silent` / `gone` / `unknown`）——拿不到就 `unknown`，ccm 不会用相邻字段推导补齐，你也不要手拼一个「看起来合理」的观测值伪造活性。同理 `account_ref` / `quota_pool_ref` 当前是预留位（保持 `null`），别自创取值。
+**probe 字段是 ccm 写的，别手填。** `probe.{last_probe_at, method, observed, as_of}` 与 probe 引发的 lifecycle 升降级全部由 `ccm agent probe` 落盘；`observed` 的语义是保真观测（`alive` / `silent` / `gone` / `unknown`）——`gone` 只出自 pid 确定性判死，mtime 类方法文件不存在只出 `unknown`；拿不到就 `unknown`，ccm 不会用相邻字段推导补齐，你也不要手拼一个「看起来合理」的观测值伪造活性。同理 `account_ref` / `quota_pool_ref` 当前是预留位（保持 `null`），别自创取值。
 
 **会撞的规则**（详见 [N 节](#n-校验规则全集速查fmt--graph--biz)）：段形状坏 → `FMT-AGENTS` warn（graceful·不拦写盘，但 `ccm agent list/show` 与 viewer 花名册会读不出坏条目）；task 已 `in_flight` 却无任何 agent 登记指向它 → `BIZ-INFLIGHT-AGENT` warn（软提示补登记）。
 
