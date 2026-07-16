@@ -347,6 +347,8 @@ export interface AgentStreamPayload {
     path?: string;
     size?: number;
     mtime?: string;
+    /** File identity (inode) — the client compares across pages to detect rotation. */
+    ino?: number;
     reason?: string;
   };
   live: { active: boolean; as_of: string };

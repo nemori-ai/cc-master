@@ -426,3 +426,117 @@ test('pathological line beyond the boundary-scan budget still progresses in both
     'forward emits a truncated raw fragment for the monster line',
   );
 });
+
+test('giant line at the FILE HEAD is emitted, not dropped behind a false at_start', () => {
+  // Review F2: every earlier giant-line fixture put normal lines before the giant, so the
+  // backward boundary scan always found a preceding newline. When the giant IS the first line,
+  // the scan bottoms at offset 0 without a newline — 0 is the line start, and falling into the
+  // beyond-budget fallback dropped the first line forever while reporting at_start=true.
+  const giant = `{"type":"user","timestamp":"2026-07-08T12:00:00Z","message":{"role":"user","content":"${'G'.repeat(100_000)}"}}`;
+  const lines = [
+    giant,
+    ...Array.from(
+      { length: 5 },
+      (_v, i) =>
+        `{"type":"user","timestamp":"2026-07-08T12:00:01Z","message":{"role":"user","content":"post ${i}"}}`,
+    ),
+  ];
+  const ref = tmpFile('first-giant.jsonl', fileFrom(lines));
+
+  const tail = buildAgentStream({
+    agentId: 'a',
+    harness: 'claude-code',
+    handleKind: 'task-id',
+    handleValue: '',
+    transcriptRef: ref,
+  });
+  assert.equal(tail.cursor.at_start, false);
+  const back = buildAgentStream({
+    agentId: 'a',
+    harness: 'claude-code',
+    handleKind: 'task-id',
+    handleValue: '',
+    transcriptRef: ref,
+    beforeParam: String(tail.cursor.prev),
+  });
+  assert.equal(back.events.length, 1, 'the head giant line is emitted');
+  assert.equal(back.events[0]?.kind, 'user');
+  assert.equal(back.events[0]?.truncated, true);
+  assert.equal(back.cursor.prev, 0);
+  assert.equal(back.cursor.at_start, true, 'at_start only once the head line is delivered');
+
+  // Lossless tiling holds with the giant at the head.
+  const forward = collectForward(ref, 'claude-code');
+  const backward = collectBackward(ref, 'claude-code');
+  assert.equal(forward.length, 6);
+  assert.deepEqual(
+    backward.map((e) => e.id),
+    forward.map((e) => e.id),
+  );
+});
+
+test('forward page over an all-noise window advances the cursor with zero events', () => {
+  // Review F1 (server half): a full window of server-dropped line types must still move
+  // cursor.next — the client mirrors this by adopting empty-page cursors during live follow.
+  const noise = Array.from(
+    { length: 120 },
+    (_v, i) =>
+      `{"type":"file-history-snapshot","snapshot":{"seq":${i},"pad":"${'x'.repeat(3000)}"}}`,
+  );
+  const ref = tmpFile('noise.jsonl', fileFrom(noise));
+  const p = buildAgentStream({
+    agentId: 'a',
+    harness: 'claude-code',
+    handleKind: 'task-id',
+    handleValue: '',
+    transcriptRef: ref,
+    cursorParam: '0',
+  });
+  assert.equal(p.mode, 'forward');
+  assert.equal(p.events.length, 0);
+  assert.ok(p.cursor.next > 0, 'cursor progresses through the noise window');
+});
+
+test('source carries a stable file identity (ino) that changes when the path is re-created', () => {
+  const ref = tmpFile('ident.jsonl', fileFrom(CLAUDE_LINES.slice(0, 2)));
+  const args = {
+    agentId: 'a',
+    harness: 'claude-code',
+    handleKind: 'task-id',
+    handleValue: '',
+    transcriptRef: ref,
+  };
+  const a = buildAgentStream(args);
+  const b = buildAgentStream(args);
+  assert.equal(typeof a.source.ino, 'number');
+  assert.equal(a.source.ino, b.source.ino, 'identity stable across reads of the same file');
+
+  // Rotation the size check cannot see: replace the file (new inode) and grow it PAST the old
+  // cursor — the client detects the ino change and re-tails.
+  rmSync(ref);
+  writeFileSync(ref, fileFrom([...CLAUDE_LINES.slice(0, 2), ...CLAUDE_LINES.slice(0, 2)]), 'utf8');
+  const c = buildAgentStream(args);
+  assert.equal(typeof c.source.ino, 'number');
+  assert.notEqual(c.source.ino, a.source.ino, 'replaced file exposes a new identity');
+});
+
+test('event text truncation never tears a surrogate pair', () => {
+  // Review F8: a clip boundary landing inside an astral-plane character must not emit a lone
+  // surrogate (ill-formed string -> invalid UTF-8 on the wire).
+  const body = `${'a'.repeat(4095)}😀${'b'.repeat(200)}`; // high surrogate sits exactly at index 4095
+  const line = `{"type":"user","timestamp":"2026-07-08T12:00:00Z","message":{"role":"user","content":${JSON.stringify(body)}}}`;
+  const ref = tmpFile('emoji.jsonl', `${line}\n`);
+  const p = buildAgentStream({
+    agentId: 'a',
+    harness: 'claude-code',
+    handleKind: 'task-id',
+    handleValue: '',
+    transcriptRef: ref,
+  });
+  const ev = p.events[0];
+  assert.ok(ev?.truncated, 'the 4KiB cap applies');
+  // Well-formedness: no unpaired surrogate anywhere in the clipped text (lib target predates
+  // String#isWellFormed, so check with a lone-surrogate regex).
+  const loneSurrogate = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  assert.doesNotMatch(ev.text, loneSurrogate, 'clipped text stays well-formed');
+});

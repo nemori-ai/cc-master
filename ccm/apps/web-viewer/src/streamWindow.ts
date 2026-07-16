@@ -45,7 +45,36 @@ export function resetToTail(page: AgentStreamPayload): StreamWindow {
   };
 }
 
-/** Merge a forward (newer) page: append, dedup, evict oldest from the top past the cap. */
+// Eviction is line-group aware: one transcript line can yield several events sharing the same
+// byte-offset prefix (`${lineStart}.0/.1/.2`). Cutting inside such a group would tear a turn
+// apart AND break the cursorPrev "line start" anchor semantics — so both evictors move the cut
+// to a group boundary (evicting slightly more than the raw cap overflow when needed).
+
+/** Index of the first event at or after `from` that starts a new line group. */
+function groupStartAtOrAfter(events: StreamEvent[], from: number): number {
+  let cut = from;
+  while (cut > 0 && cut < events.length) {
+    const here = events[cut];
+    const prev = events[cut - 1];
+    if (!here || !prev || offsetOfEvent(here) !== offsetOfEvent(prev)) break;
+    cut++;
+  }
+  return cut;
+}
+
+/** Index just past the last event before `until` that ends a line group. */
+function groupEndAtOrBefore(events: StreamEvent[], until: number): number {
+  let cut = until;
+  while (cut > 0 && cut < events.length) {
+    const here = events[cut];
+    const prev = events[cut - 1];
+    if (!here || !prev || offsetOfEvent(here) !== offsetOfEvent(prev)) break;
+    cut--;
+  }
+  return cut;
+}
+
+/** Merge a forward (newer) page: append, dedup, evict oldest whole line groups past the cap. */
 export function mergeForward(win: StreamWindow, page: AgentStreamPayload): StreamWindow {
   const held = new Set(win.events.map((e) => e.id));
   const fresh = page.events.filter((e) => !held.has(e.id));
@@ -54,11 +83,14 @@ export function mergeForward(win: StreamWindow, page: AgentStreamPayload): Strea
   let cursorPrev = win.cursorPrev;
   let atStart = win.atStart;
   if (events.length > STREAM_WINDOW_CAP) {
-    events = events.slice(events.length - STREAM_WINDOW_CAP);
-    omittedTop = true;
-    atStart = false;
-    const first = events[0];
-    if (first) cursorPrev = offsetOfEvent(first);
+    const cut = groupStartAtOrAfter(events, events.length - STREAM_WINDOW_CAP);
+    if (cut > 0 && cut < events.length) {
+      events = events.slice(cut);
+      omittedTop = true;
+      atStart = false;
+      const first = events[0];
+      if (first) cursorPrev = offsetOfEvent(first);
+    }
   }
   return {
     events,
@@ -70,15 +102,18 @@ export function mergeForward(win: StreamWindow, page: AgentStreamPayload): Strea
   };
 }
 
-/** Merge a backward (older) page: prepend, dedup, evict newest from the bottom past the cap. */
+/** Merge a backward (older) page: prepend, dedup, evict newest whole line groups past the cap. */
 export function mergeBackward(win: StreamWindow, page: AgentStreamPayload): StreamWindow {
   const held = new Set(win.events.map((e) => e.id));
   const fresh = page.events.filter((e) => !held.has(e.id));
   let events = fresh.length ? [...fresh, ...win.events] : win.events;
   let omittedBottom = win.omittedBottom;
   if (events.length > STREAM_WINDOW_CAP) {
-    events = events.slice(0, STREAM_WINDOW_CAP);
-    omittedBottom = true;
+    const cut = groupEndAtOrBefore(events, STREAM_WINDOW_CAP);
+    if (cut > 0 && cut < events.length) {
+      events = events.slice(0, cut);
+      omittedBottom = true;
+    }
   }
   return {
     events,

@@ -17,6 +17,8 @@ const TOP_THRESHOLD = 200; // px from top triggers an older-history fetch
 // of server-dropped line types, oversized-line skips). Auto-follow up to this many consecutive
 // empty pages per fetch, then pause auto-triggering and hand control back to the button.
 const MAX_EMPTY_BACK_HOPS = 10;
+// Consecutive forward-poll transport failures before the loop stops and surfaces a retry state.
+const MAX_POLL_FAILURES = 4;
 
 interface AgentStreamDrawerProps {
   agentId: string;
@@ -71,10 +73,14 @@ export function AgentStreamDrawer({
   const [source, setSource] = useState<AgentStreamPayload['source'] | null>(null);
   const [live, setLive] = useState(false);
   const [initialError, setInitialError] = useState<string | null>(null);
+  const [pollError, setPollError] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [following, setFollowing] = useState(true);
   const [pendingBelow, setPendingBelow] = useState(0);
   const [ready, setReady] = useState(false);
+  // Bumping remounts the whole load cycle: manual retry after a dead poll loop, and the
+  // client-side rotation reaction (source inode changed under the same path).
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const winRef = useRef(win);
@@ -85,24 +91,44 @@ export function AgentStreamDrawer({
   loadingOlderRef.current = loadingOlder;
   // Set before a backward prepend so the layout effect can restore the viewport anchor.
   const prependAnchor = useRef<{ prevHeight: number; prevTop: number } | null>(null);
+  // File identity from the last accepted page. A changed inode means the path now names a
+  // different file (truncate-then-regrow rotation the server's size check cannot see) — every
+  // held offset is garbage, so the whole window reloads.
+  const sourceInoRef = useRef<number | null>(null);
 
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, []);
 
-  // Initial / agent-change load: fresh tail, pinned to live.
+  // Returns true (and schedules a full reload) when the page reveals a different file identity.
+  const detectRotation = useCallback((page: AgentStreamPayload): boolean => {
+    const ino = page.source.ino;
+    if (typeof ino !== 'number') return false;
+    if (sourceInoRef.current !== null && sourceInoRef.current !== ino) {
+      setReloadNonce((n) => n + 1);
+      return true;
+    }
+    sourceInoRef.current = ino;
+    return false;
+  }, []);
+
+  // Initial / agent-change / retry / rotation load: fresh tail, pinned to live.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `reloadNonce` is the re-run trigger (manual retry / rotation), not an input read by the effect body.
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
     setReady(false);
     setInitialError(null);
+    setPollError(null);
     setWin(EMPTY_WINDOW);
     setFollowing(true);
     setPendingBelow(0);
+    sourceInoRef.current = null;
     loadAgentStream(agentId, { boardFilename, cursor: 'tail' }, controller.signal)
       .then((page) => {
         if (cancelled) return;
+        sourceInoRef.current = typeof page.source.ino === 'number' ? page.source.ino : null;
         setSource(page.source);
         setLive(page.live.active);
         setWin(resetToTail(page));
@@ -117,7 +143,7 @@ export function AgentStreamDrawer({
       cancelled = true;
       controller.abort();
     };
-  }, [agentId, boardFilename]);
+  }, [agentId, boardFilename, reloadNonce]);
 
   // Pin to bottom after the first successful tail render.
   useLayoutEffect(() => {
@@ -125,10 +151,15 @@ export function AgentStreamDrawer({
   }, [ready, initialError, scrollToBottom]);
 
   // Forward poll loop — runs while open. When following, merges + auto-scrolls; when browsing
-  // history, only peeks the new-event count (no merge, so the viewport never jumps).
+  // history, peeks the new-event count without merging events (viewport never jumps). Empty
+  // pages must still adopt cursor.next in BOTH modes — a window full of server-dropped noise
+  // lines progresses the cursor with zero events, and dropping that progress stalls the live
+  // follow forever. Consecutive transport failures stop the loop after a few tries (manual
+  // retry) instead of hammering a dead server silently.
   useEffect(() => {
-    if (!ready || initialError) return;
+    if (!ready || initialError || pollError) return;
     let stopped = false;
+    let failures = 0;
     let timer: number | undefined;
     const tick = async () => {
       if (stopped) return;
@@ -139,24 +170,34 @@ export function AgentStreamDrawer({
           cursor: String(w.cursorNext),
         });
         if (stopped) return;
+        failures = 0;
+        if (detectRotation(page)) return; // identity changed — reload effect takes over
         setSource(page.source);
         setLive(page.live.active);
         if (page.reset) {
-          // File truncated/rotated — re-tail from scratch.
+          // Server-detected truncation/rotation — re-tail from scratch.
           setWin(resetToTail(page));
           if (followingRef.current) requestAnimationFrame(scrollToBottom);
         } else if (followingRef.current) {
-          if (page.events.length) {
-            setWin((cur) => mergeForward(cur, page));
-            requestAnimationFrame(scrollToBottom);
-          }
+          setWin((cur) => mergeForward(cur, page));
+          if (page.events.length) requestAnimationFrame(scrollToBottom);
         } else if (page.events.length) {
           setPendingBelow(page.events.length);
+        } else {
+          // Empty-but-progressing page while browsing history: absorb the cursor advance
+          // (no visual change) so the poll does not rescan the same noise window each tick.
+          setWin((cur) => mergeForward(cur, page));
         }
-      } catch {
-        /* transient poll failure — keep the last frame, try again next tick */
+      } catch (error) {
+        failures += 1;
+        if (failures >= MAX_POLL_FAILURES && !stopped) {
+          setPollError(error instanceof Error ? error.message : 'stream polling failed');
+          return; // stop the loop — the retry button re-arms it
+        }
       } finally {
-        if (!stopped) timer = window.setTimeout(tick, POLL_MS);
+        if (!stopped && failures < MAX_POLL_FAILURES) {
+          timer = window.setTimeout(tick, POLL_MS);
+        }
       }
     };
     timer = window.setTimeout(tick, POLL_MS);
@@ -164,7 +205,7 @@ export function AgentStreamDrawer({
       stopped = true;
       if (timer) window.clearTimeout(timer);
     };
-  }, [ready, initialError, agentId, boardFilename, scrollToBottom]);
+  }, [ready, initialError, pollError, agentId, boardFilename, scrollToBottom, detectRotation]);
 
   // Restore the viewport anchor after an older-history prepend so the content the user was
   // reading stays put (record scrollHeight before, correct scrollTop by the delta after).
@@ -202,6 +243,7 @@ export function AgentStreamDrawer({
             boardFilename,
             before: String(w.cursorPrev),
           });
+          if (detectRotation(page)) return; // identity changed — reload effect takes over
           const merged = mergeBackward(w, page);
           // Server contract: prev strictly decreases. Guard anyway — a stalled cursor must
           // never spin this loop.
@@ -209,9 +251,11 @@ export function AgentStreamDrawer({
           if (page.events.length && el) {
             prependAnchor.current = { prevHeight: el.scrollHeight, prevTop: el.scrollTop };
           }
-          winRef.current = merged;
+          // Functional merge so a concurrently-landed forward poll commit is never clobbered
+          // (mergeBackward dedups by id, so re-applying the page to a newer window is safe);
+          // the local `w` copy only drives this loop's next-hop anchor.
           w = merged;
-          setWin(merged);
+          setWin((cur) => mergeBackward(cur, page));
           if (page.events.length > 0 || merged.atStart || !progressed) return;
         }
         autoBackPausedRef.current = true;
@@ -222,7 +266,7 @@ export function AgentStreamDrawer({
         setLoadingOlder(false);
       }
     },
-    [agentId, boardFilename],
+    [agentId, boardFilename, detectRotation],
   );
 
   // Auto-fill: when the held window is shorter than the viewport (no scrollbar -> scroll events
@@ -238,9 +282,11 @@ export function AgentStreamDrawer({
   const jumpToLatest = useCallback(() => {
     setFollowing(true);
     setPendingBelow(0);
-    // Re-tail so the window is the true latest even after long history browsing.
+    // Re-tail so the window is the true latest even after long history browsing — a fresh tail
+    // is the identity anchor too (adopt its inode instead of diffing against the stale one).
     loadAgentStream(agentId, { boardFilename, cursor: 'tail' })
       .then((page) => {
+        sourceInoRef.current = typeof page.source.ino === 'number' ? page.source.ino : null;
         setSource(page.source);
         setLive(page.live.active);
         setWin(resetToTail(page));
@@ -257,8 +303,13 @@ export function AgentStreamDrawer({
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     const pinned = distanceFromBottom <= BOTTOM_THRESHOLD;
     if (pinned && !followingRef.current) {
-      setFollowing(true);
-      setPendingBelow(0);
+      // With the newest events evicted (deep history browsing), silently resuming the live
+      // append would splice a gap into the timeline — only the explicit jump-to-latest button
+      // (which re-tails from scratch) may resume following.
+      if (!winRef.current.omittedBottom) {
+        setFollowing(true);
+        setPendingBelow(0);
+      }
     } else if (!pinned && followingRef.current) {
       setFollowing(false);
     }
@@ -298,6 +349,19 @@ export function AgentStreamDrawer({
         {source?.path ? (
           <div className="stream-source mono" title={source.path}>
             {source.path}
+          </div>
+        ) : null}
+
+        {pollError ? (
+          <div className="stream-errbar" role="status">
+            <span>live polling stopped — {pollError}</span>
+            <button
+              className="stream-retry"
+              onClick={() => setReloadNonce((n) => n + 1)}
+              type="button"
+            >
+              retry
+            </button>
           </div>
         ) : null}
 

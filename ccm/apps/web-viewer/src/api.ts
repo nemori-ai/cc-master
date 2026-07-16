@@ -85,7 +85,7 @@ export async function loadAgentStream(
   opts: { boardFilename?: string; cursor?: string; before?: string } = {},
   signal?: AbortSignal,
 ): Promise<AgentStreamPayload> {
-  return getJson<AgentStreamPayload>(
+  const payload = await getJson<AgentStreamPayload>(
     withParams('/agent-stream.json', {
       agent: agentId,
       board: opts.boardFilename,
@@ -94,6 +94,13 @@ export async function loadAgentStream(
     }),
     signal,
   );
+  // The server answers an unexpected read/parse failure with 200 + `{schema, error}` (no events
+  // array). Surface it as a failure — same contract as loadAgentDetail — so the drawer shows the
+  // server's message instead of treating a torn payload as an empty page.
+  if (payload.error && !Array.isArray(payload.events)) {
+    throw new Error(String(payload.error));
+  }
+  return payload;
 }
 
 /**

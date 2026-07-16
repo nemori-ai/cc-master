@@ -3026,6 +3026,10 @@ export function serve(ctx: Ctx): Promise<number> {
         }
         return;
       }
+      // Trust boundary note: the stream source resolves from the agent's board-recorded handle
+      // (`transcript_ref` may point at ANY local file — bg-shell/worker logs are legitimate
+      // targets, so no path allowlist by design). Read-only exposure is gated by the same
+      // perimeter as every endpoint here: 127.0.0.1 bind + bearer token + operator-owned board.
       if (url.pathname === '/agent-stream.json') {
         const runtimeState = latestRuntimeState(state);
         const boardPath = resolveHttpBoard(

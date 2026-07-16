@@ -842,9 +842,13 @@ export function App() {
       </div>
 
       {streamOpen && selectedAgentId && !degradedFrame ? (
+        // key forces a full remount on any agent/board switch: in-flight fetches from the old
+        // identity resolve inside the unmounted instance (inert setState) instead of racing
+        // their stale closures into the new window.
         <AgentStreamDrawer
           agentId={selectedAgentId}
           boardFilename={workspace.viewModel.board.filename}
+          key={`${workspace.viewModel.board.filename}:${selectedAgentId}`}
           intent={
             (typeof railAgent?.agent?.intent === 'string' ? railAgent.agent.intent : null) ??
             railAgent?.compact?.intent ??

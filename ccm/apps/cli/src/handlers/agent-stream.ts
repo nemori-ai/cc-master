@@ -69,6 +69,8 @@ export interface AgentStreamPayload {
     path?: string;
     size?: number;
     mtime?: string;
+    /** 文件身份（inode）——client 对比相邻页识别轮转（truncate 后再涨过旧 cursor 的形状）。 */
+    ino?: number;
     reason?: string;
   };
   live: { active: boolean; as_of: string };
@@ -82,7 +84,12 @@ export interface AgentStreamPayload {
 function clip(value: unknown, max: number): { text: string; truncated: boolean } {
   const s = typeof value === 'string' ? value : value == null ? '' : stringifyCompact(value);
   if (s.length <= max) return { text: s, truncated: false };
-  return { text: `${s.slice(0, max)}…`, truncated: true };
+  // codepoint 安全截断：切点落在 surrogate pair 中间会产生孤立高位半对（lone surrogate·
+  //   JSON.stringify 输出非法 UTF-8）——回退一位保持 well-formed。
+  let end = max;
+  const last = s.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+  return { text: `${s.slice(0, end)}…`, truncated: true };
 }
 
 function stringifyCompact(value: unknown): string {
@@ -545,12 +552,15 @@ export function buildAgentStream(req: AgentStreamRequest): AgentStreamPayload {
 
   let size: number;
   let mtimeMs: number;
+  let ino: number;
   let fd: number;
   try {
-    const st = fs.statSync(location.path);
+    // 先 open 再 fstat：对同一个打开的文件取 size/mtime/ino（无 stat→open 竞态窗口）。
+    fd = fs.openSync(location.path, 'r');
+    const st = fs.fstatSync(fd);
     size = st.size;
     mtimeMs = st.mtimeMs;
-    fd = fs.openSync(location.path, 'r');
+    ino = st.ino;
   } catch {
     return noSourcePayload(req, 'transcript became unreadable', nowIso);
   }
@@ -559,12 +569,15 @@ export function buildAgentStream(req: AgentStreamRequest): AgentStreamPayload {
     const parser = parserFor(req.harness);
     const mtimeIso = new Date(mtimeMs).toISOString().replace(/\.\d{3}Z$/, 'Z');
     const live = { active: nowMs - mtimeMs <= freshnessSec * 1000, as_of: nowIso };
+    // ino = 文件身份锚：truncate 后再涨回旧 cursor 之上的轮转 server 侧检测不到（size 比较失效），
+    //   client 对比相邻页的 ino 变化即识别「同路径换了文件」→ 清窗重 tail。server 保持无状态。
     const sourceBase = {
       kind: 'transcript' as const,
       harness: req.harness,
       path: location.path,
       size,
       mtime: mtimeIso,
+      ino,
     };
 
     // ── backward：before=<n>，读 [行首对齐, n) ────────────────────────────────────────────────
@@ -581,8 +594,10 @@ export function buildAgentStream(req: AgentStreamRequest): AgentStreamPayload {
       //   永远无进展）。用行边界扫描预算向前找它的行首，把这一整行读入解析。
       if (lines.length === 0 && rawStart > 0) {
         const nl = scanPrevNewline(fd, before - 1, GIANT_LINE_SCAN);
-        if (nl !== null) {
-          const lineStart = nl + 1;
+        // 扫描触底文件头仍无 \n（before-1 ≤ 预算 ⟺ floor 已到 0）：偏移 0 就是行首——文件的
+        //   **第一行**本身就是巨行，绝不能落进怪物 fallback（那会把首行永久丢掉 + 伪报 at_start）。
+        const lineStart = nl !== null ? nl + 1 : before - 1 <= GIANT_LINE_SCAN ? 0 : null;
+        if (lineStart !== null) {
           const lineBuf = readRange(fd, lineStart, before);
           alignedStart = lineStart;
           ({ lines } = splitLines(lineBuf, lineStart));

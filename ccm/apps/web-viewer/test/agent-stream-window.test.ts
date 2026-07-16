@@ -128,6 +128,62 @@ test('mergeBackward on an empty progressing page advances the cursor without tou
   assert.equal(w2.atStart, true, 'empty final page still lands at_start');
 });
 
+test('mergeForward on an empty progressing page advances cursorNext without touching events', () => {
+  // Review F1: a 256KiB window of server-dropped noise lines yields events:[] with cursor.next
+  // advanced. The live-follow tick must adopt that cursor — dropping it refetches the same
+  // window forever and the stream never reaches real events behind the noise.
+  const w0 = resetToTail(page([ev(100)], { next: 200, prev: 100, at_start: true }));
+  const w1 = mergeForward(w0, page([], { next: 262_144, prev: 200, at_start: false }));
+  assert.deepEqual(
+    w1.events.map((e) => e.id),
+    ['100.0'],
+    'held events untouched',
+  );
+  assert.equal(w1.cursorNext, 262_144, 'forward frontier adopts the empty page cursor');
+  assert.equal(w1.cursorPrev, 100, 'backward anchor untouched by forward paging');
+});
+
+test('window eviction never tears a multi-event line group', () => {
+  // Review F6: one transcript line can yield several events (`${lineStart}.0/.1/.2`). Evicting
+  // part of a group would tear a turn apart and break cursorPrev's line-start semantics — the
+  // cut must move to a group boundary in both directions.
+  const groupOf = (offset: number, n: number): StreamEvent[] =>
+    Array.from({ length: n }, (_v, i) => ev(offset, i));
+
+  // Forward eviction: cap-1 singles + a 3-block group at the very top. Appending 2 more events
+  // overflows by 2 — a naive slice would keep only `.1/.2` of the top group.
+  const top = groupOf(10, 3);
+  const singles = Array.from({ length: STREAM_WINDOW_CAP - 3 }, (_v, i) => ev(1000 + i));
+  let w = resetToTail(page([...top, ...singles], { next: 90_000, prev: 10, at_start: true }));
+  w = mergeForward(w, page(groupOf(95_000, 2), { next: 96_000, prev: 10, at_start: true }));
+  assert.ok(w.events.length <= STREAM_WINDOW_CAP);
+  assert.equal(
+    w.events.filter((e) => offsetOfEvent(e) === 10).length,
+    0,
+    'the whole top group is evicted together (never a partial group)',
+  );
+  assert.equal(w.cursorPrev, 1000, 'cursorPrev re-anchors to a line start');
+  assert.equal(w.omittedTop, true);
+
+  // Backward eviction: a 3-block group straddles the cap boundary after a prepend. resetToTail
+  // applies no cap (only merges evict), so the straddle is constructible directly: CAP+1 held,
+  // prepend 1 -> the cut lands on the group's 2nd block and must walk down past the whole group.
+  const heldB = [
+    ...Array.from({ length: STREAM_WINDOW_CAP - 2 }, (_v, i) => ev(2000 + i)),
+    ...groupOf(80_000, 3),
+  ];
+  let wb = resetToTail(page(heldB, { next: 81_000, prev: 2000, at_start: false }));
+  wb = mergeBackward(wb, page(groupOf(500, 1), { next: 2000, prev: 500, at_start: true }));
+  assert.ok(wb.omittedBottom, 'bottom eviction engaged');
+  assert.equal(
+    wb.events.filter((e) => offsetOfEvent(e) === 80_000).length,
+    0,
+    'the straddling bottom group is evicted whole',
+  );
+  assert.equal(wb.events.length, STREAM_WINDOW_CAP - 1, 'cut moved down to the group boundary');
+  assert.equal(wb.events[0]?.id, '500.0', 'prepended event retained at the top');
+});
+
 test('stream URL flag round-trips only alongside an agent selection', () => {
   const withAgent = readWorkspaceUrlState('http://x/?agent=agt-1&stream=1');
   assert.equal(withAgent.agent, 'agt-1');

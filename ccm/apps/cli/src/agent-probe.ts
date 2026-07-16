@@ -374,6 +374,11 @@ function locateWalkTranscript(
 
 // locateTranscriptFile — 按 agent handle 解析其 transcript 文件路径（实时流的源定位单点）。
 //   优先级：transcript_ref 存在即用 → session-id 经 harness adapter roots + 匹配 → 否则 null。
+//
+//   信任边界（有意不做路径 allowlist）：transcript_ref 是 board 内容 ⇒ 指向任意本地文件的只读
+//   tail。这是正当功能——bg-shell / workflow worker 的日志文件就登记在这里，圈死到 session 目录
+//   会杀掉这类用法。防线由外层承担：web-viewer 只绑 127.0.0.1 + bearer token 门 + board 本身是
+//   operator 自有文件（能写 board 的人本就能读这台机器上的文件）。此处不再重复鉴权。
 export function locateTranscriptFile(
   input: ProbeInput,
   opts: ProbeOpts = {},
