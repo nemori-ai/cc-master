@@ -381,3 +381,35 @@ test('dependencySatisfied separates review execution completion from approval (F
     'approval does not replace execution completion',
   );
 });
+
+// ── AGENT_STATE_MACHINE：agent lifecycle 状态机契约 ──────────────────────────────────────────────
+test('AGENT_STATE_MACHINE: starting can close out to terminal (startup-failure·no permanent zombie)', () => {
+  // create 后 spawn 失败、无 handle 可 bind 的 agent 必须能收口——否则 terminal 被拒、
+  //   probe method=none 永远 unknown → 永久僵尸（对齐 native-attempt 的 startup_failed 终类）。
+  assert.ok(M.AGENT_STATE_MACHINE.starting.includes('terminal'));
+  assert.equal(M.isLegalAgentTransition('starting', 'terminal'), true);
+});
+
+test('AGENT_STATE_MACHINE: full transition table', () => {
+  assert.deepEqual([...M.AGENT_STATE_MACHINE.starting].sort(), [
+    'orphaned',
+    'running',
+    'terminal',
+    'uncertain',
+  ]);
+  assert.deepEqual([...M.AGENT_STATE_MACHINE.running].sort(), [
+    'orphaned',
+    'terminal',
+    'uncertain',
+  ]);
+  assert.deepEqual([...M.AGENT_STATE_MACHINE.uncertain].sort(), [
+    'orphaned',
+    'running',
+    'terminal',
+  ]);
+  assert.deepEqual([...M.AGENT_STATE_MACHINE.orphaned].sort(), ['running', 'terminal']);
+  assert.deepEqual(M.AGENT_STATE_MACHINE.terminal, [], 'terminal is the only true final state');
+  // 幂等同态重入合法；terminal 之外全部可收口。
+  assert.equal(M.isLegalAgentTransition('running', 'running'), true);
+  assert.equal(M.isLegalAgentTransition('terminal', 'running'), false);
+});

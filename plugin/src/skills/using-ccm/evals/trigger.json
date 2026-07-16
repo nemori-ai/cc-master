@@ -14,6 +14,9 @@
   {"query": "ccm board lint 进程退出码是 3,但 stdout 那段 json 里 ok 字段是 true,这板到底过没过 lint?", "should_trigger": true},
   {"query": "要给一个外部 github issue 在 board 上建对应任务、executor 设成 external,ccm 怎么加、还得带 issue 引用吗?", "should_trigger": true},
   {"query": "想给 T3 同时改 estimate 和 title、再加一条对 T2 的依赖,ccm task update 一条命令能不能写全?", "should_trigger": true},
+  {"query": "我刚派了一个 codex 后台 worker,怎么用 ccm 把它登记进 board 的 agent 花名册、再把 session id 当证据绑上去?", "should_trigger": true},
+  {"query": "ccm agent probe 把我的 agent 标成 orphaned 了,可那个进程明明还活着,这是怎么回事、怎么让它恢复 running?", "should_trigger": true},
+  {"query": "how do I list all runtime agents registered on the cc-master board with ccm and see which task each agent is linked to?", "should_trigger": true},
 
   {"query": "我手上有 6 个彼此独立的子任务,该不该全并行派出去?这个依赖图怎么拆才不至于画出假串行边?", "should_trigger": false},
   {"query": "一个跨天的大目标,compaction 之后我常忘了拆到哪步、哪些后台 job 还活着,怎么盯住全局别空转?", "should_trigger": false},

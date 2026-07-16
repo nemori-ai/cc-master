@@ -102,6 +102,14 @@
 - [namespace policy](#namespace-policy)
   - [policy show](#policy-show)
   - [policy set](#policy-set)
+- [namespace agent（Agent Registry·登记/探测/读取）](#namespace-agentagent-registry登记探测读取)
+  - [agent create](#agent-create)
+  - [agent bind](#agent-bind)
+  - [agent link](#agent-link)
+  - [agent terminal](#agent-terminal)
+  - [agent probe](#agent-probe)
+  - [agent list](#agent-list)
+  - [agent show](#agent-show)
 - [namespace peers（协调感知·只读跨板）](#namespace-peers协调感知只读跨板)
   - [peers list](#peers-list)
 - [namespace coordination（通知收件箱）](#namespace-coordination通知收件箱)
@@ -200,6 +208,7 @@ ccm <alias> [args] [flags]
 | `watchdog` | 自我唤醒 watchdog |
 | `baseline` | EVM 计划基线快照（estimate 引擎的 plan SSOT·board 内唯一写 noun） |
 | `policy` | 兼容读取 board policy；Codex account switch 永久不可用，stored allow 不产生能力 |
+| `agent` | Agent Registry：board ✎ `agents[]` 运行时 agent 登记簿——登记 / 交 handle 证据 / 关联 task / 收口 / 活性探测 / 只读花名册；**登记 / 探测 / 读取 noun，无任何 spawn/route/dispatch 语义**（dispatch 归 `worker`） |
 | `peers` | 多 orchestrator 协调**感知层**：跨板只读花名册（全体活+心跳新鲜 orchestrator 的 goal/workload/priority/liveness） |
 | `coordination` | 多 orchestrator 协调**入站通知面**：读/消费 `coordination.inbox`，低层 append 通知，运行 deterministic pool arbiter |
 | `usage` | Codex 当前账号 7d hard ceiling、rolling-24h burn advisory 与任务 token 成本；无换号 |
@@ -1706,6 +1715,146 @@ ccm baseline reset [flags]
 ## namespace policy（Codex 兼容读取）
 
 `ccm policy show --json` 可以诊断旧板保存的 `autonomous_account_switch`，但 Codex adapter 的 account switch 永久不可用：stored `allow` 不创建 candidate、不授权 credential mutation，也不改变 `effective_n=1`。不要在 Codex 下把 policy 翻成 `allow`；若需收紧旧板，只能在用户明确授权下写 `deny`。
+
+---
+
+## namespace agent（Agent Registry·登记/探测/读取）
+
+运行时 agent 登记簿：凡派发皆登记——sub-agent / 后台 shell / workflow / 跨 harness CLI worker 全进本板 ✎ `agents[]` 花名册。**它是登记 / 探测 / 读取 noun**：七个 verb 不含任何 spawn / route / dispatch 语义（不起进程、不选路、不派活；dispatch 命令面归 `worker`）。agent = 实际跑起来的运行时实例（runtime 层），与 task 的 `executor`（planning 层的计划执行者类型）分层不合并——概念与字段取值见 [board-model-guide.md §C.6](board-model-guide.md#c6-agents运行时-agent-登记簿)。
+
+agent 生命周期状态机（写 verb 强制·同态重入幂等）：
+
+```
+starting  → running, uncertain, orphaned, terminal
+running   → terminal, uncertain, orphaned
+uncertain → running, terminal, orphaned
+orphaned  → running, terminal
+terminal  → （唯一终态·probe 永不复活）
+```
+
+本 namespace 专属 exit code 语义：`3` = 无 handle 证据 / 非法状态转移 / `link` 目标 task 不存在；`5` = agent id 不存在（**注意**：与 `task show` 的 `data:null` + exit 0 不同，`agent show` 查不到 id 直接 exit 5）。
+
+### agent create
+
+**写**
+
+```
+ccm agent create --type <t> --harness <h> --intent <str> [flags]
+```
+
+- positional：无
+- 行为：往本板 `agents[]` append 一条登记（`lifecycle.state=starting`·`handle.kind=none`），agent id 自动生成（`agt-NNN` 递增零填充）；`account_ref` / `quota_pool_ref` 预留 `null`（只存 ref 不存数值）。返回 `agent_id`
+- flags：
+
+| flag | 短名 | 类型 | enum 取值 | 必填 | 含义 |
+|---|---|---|---|---|---|
+| `--type <enum>` | | enum | `cli-worker, subagent, background-shell, workflow` | 是 | agent 类型 |
+| `--harness <enum>` | | enum | `codex, claude-code, cursor-agent, origin` | 是 | agent 所在 harness（`origin` = 本 orchestrator 进程内 sub-agent） |
+| `--intent <str>` | | string | | 是 | 一句话：派它去干什么 |
+| `--model <str>` | | string | | | 已知才填的模型（unknown 保真·缺则不填） |
+| `--cwd <str>` | | string | | | agent 工作目录 |
+| `--json` | | bool | | | 结构化输出（`{agent_id, agent}`） |
+
+- 例：`ccm agent create --type cli-worker --harness codex --intent "review repo diff"` · `ccm agent create --board /abs/x.board.json --type subagent --harness origin --intent "写 i18n" --json`
+
+### agent bind
+
+**写**
+
+```
+ccm agent bind <id> --handle <kind:value> [flags]
+```
+
+- positional：`<id>`（必填）
+- 行为：交真实 handle 证据，`starting→running`（`uncertain→running` / `orphaned→running` 复活、`running→running` 幂等重绑也合法——新 handle 即证据）。**无证据拒绝（exit 3）**：`kind` 必须 ∈ `session-id|pid|task-id` 且 value 非空——无真实 handle 不算 running。`terminal` 态 bind → 非法转移（exit 3·终态不复活）
+- flags：
+
+| flag | 短名 | 类型 | 必填 | 含义 |
+|---|---|---|---|---|
+| `--handle <kind:value>` | | string | 是 | handle 证据，`kind ∈ session-id\|pid\|task-id`，value 非空 |
+| `--attach-cmd <str>` | | string | | 一键接入命令。**必须自包含**：登记的是「复制到任意 shell 都能跑」的完整命令——凡执行位置敏感的，把 `cd <工作目录> && ` 一并写进去（claude-code 是典型：`claude --resume <sid>` 必须在原 cwd 执行，session 按项目目录归档，写成 `cd /abs/worktree && claude --resume <sid>`） |
+| `--transcript <str>` | | string | | transcript 路径引用（绝不内嵌内容） |
+| `--json` | | bool | | 结构化输出 |
+
+- 例：`ccm agent bind agt-001 --handle session-id:0197-abc --attach-cmd "cd /abs/worktree && codex resume 0197-abc"` · `ccm agent bind agt-002 --handle pid:48213`
+
+### agent link
+
+**写**
+
+```
+ccm agent link <id> --task <task-id> [flags]
+```
+
+- positional：`<id>`（必填）
+- 行为：建 agent↔task 关联，**join 存 agent 侧 `links[]`**（`{task_id, linked_at}`·非 `task.routing.attempts[]`——冻结 routing envelope 与 native-attempt dedicated writer 都不允许通用写，agent 侧 links 保持冻结合同零触碰）。**幂等**：已有指向同一 task 的 link 不重复追加（`--json` 回 `idempotent:true`）。目标 task 必须存在于本板，否则 exit 3
+- flags：`--task <task-id>`（必填）· `--json`
+- 例：`ccm agent link agt-001 --task T7`
+
+### agent terminal
+
+**写**
+
+```
+ccm agent terminal <id> --outcome <str> [flags]
+```
+
+- positional：`<id>`（必填）
+- 行为：`starting/running/uncertain/orphaned → terminal`，盖 `ended_at` + 登记 `outcome`（`starting→terminal` = **启动失败收口**——spawn 失败、无 handle 可 bind 的 agent 也要能收口，别留永久僵尸；`terminal→terminal` 幂等）。**terminal ≠ task done**——本命令绝不碰 task status，父层仍须独立验收后走 `task done --verified --artifact`
+- flags：`--outcome <str>`（必填·收口结论一句话）· `--json`
+- 例：`ccm agent terminal agt-001 --outcome "review approved, 3 findings filed"`
+
+### agent probe
+
+**写**（仅写 `agents[]` 段）
+
+```
+ccm agent probe [<id>] [flags]
+```
+
+- positional：`<id>`（可选；缺省探测本板全体 agent）
+- 行为：活性探测 + reconcile。**只写 agent 自己的 `probe` / `lifecycle` 字段，绝不碰 `task.handle` / attempt 投影**。探测手段按 handle 分级：
+  - `pid` → 进程存活判定（进程在 / 存在但无权限 → `alive`；kill-0 确定进程不存在 → `gone`）；
+  - `session-id` → 按 harness 的会话落盘根扫描会话文件 mtime（codex 默认 `~/.codex/sessions/**`·递归扫描 + 文件名精确匹配；claude-code 默认 `~/.claude/projects/*/<sid>.jsonl`·定向寻址；`origin` 等无会话落盘的 harness → `method=none`、`observed=unknown`）；
+  - `task-id` 或 `type=subagent` → `handle.transcript_ref` 路径 mtime；无 ref → `unknown`；
+  - 其余 / 无句柄 → `method=none`、`observed=unknown`（**保真**：拿不到就 unknown，绝不用相邻字段推导补齐）。
+  - mtime 类观测（session-file / transcript）：mtime 在 freshness 窗内 → `alive`，在但陈旧 → `silent`；**文件不存在分两种**——上一次**同方法**观测到过 `alive`/`silent` 且本次**完整**扫描确认缺失 → `gone`（「曾在而消失」= 真死亡证据·seen-before 判死），**从未见过 → `unknown`** 不判死（启动竞态下 session 文件可能尚未落盘）；扫描不完整（目录预算耗尽 / 读取失败）不作判死证据、一律 `unknown`。
+  - reconcile 双向、以观测为准、按证据强度分级：active 态（`starting/running/uncertain`）按 `gone→orphaned`、`silent→uncertain`、`alive→running`、`unknown→不变`；**`orphaned` 只被 mtime 类方法的 `alive` 复活为 `running`**（session/transcript 按 sid / 路径寻址、身份强）——`pid` 的 `alive` **不**复活 orphaned（kill-0 不验进程身份：pid 复用、存在但无权限都会产生假 alive；`uncertain` + pid `alive` 仍可回 `running`）；`terminal` 是唯一终态，probe 记录观测但永不复活。
+  - reconcile 提议的转移在写盘前再过一道引擎状态机闸：不合法则该 agent 保持原态，并记入 `--json` 输出的 `reconcile_rejected`（人类输出以 `!` 行标注）
+- flags：
+
+| flag | 短名 | 类型 | 含义 |
+|---|---|---|---|
+| `--freshness-sec <n>` | | string | mtime 判活窗口秒（默认 300·须正数——非法值 exit 2 拒绝进入写路径，不带病判活） |
+| `--json` | | bool | 结构化输出（`{probed, reconcile_rejected}`） |
+
+- 例：`ccm agent probe agt-001` · `ccm agent probe --board /abs/x.board.json --json`
+
+### agent list
+
+**读**
+
+```
+ccm agent list [flags]
+```
+
+- positional：无
+- 行为：只读花名册：全体 agent + 按 `lifecycle.state` 分桶计数；每行含 state / harness / type / intent / 已关联 task
+- flags：`--json`（`{count, buckets, agents}`）
+- 例：`ccm agent list` · `ccm agent list --board /abs/x.board.json --json`
+
+### agent show
+
+**读**
+
+```
+ccm agent show <id> [flags]
+```
+
+- positional：`<id>`（必填；不存在 → exit 5，**不是** `data:null`）
+- 行为：单 agent 钻取：record + attach 命令 + transcript 路径 + probe 观测与新鲜度 + links
+- flags：`--json`（`{agent}`）
+- 例：`ccm agent show agt-001 --json`
 
 ---
 

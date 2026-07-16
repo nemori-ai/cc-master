@@ -1,3 +1,4 @@
+import { agentStateLamp, agentStateText, harnessBadge } from '../agentFormat';
 import { perNodeStructure, useSecondTick } from '../analytics';
 import {
   endStr,
@@ -11,7 +12,7 @@ import {
   statusLampVar,
   statusText,
   taskDuration,
-  watchdogReadout
+  watchdogReadout,
 } from '../format';
 import type {
   AcceptanceCriterion,
@@ -19,7 +20,7 @@ import type {
   DecisionEntry,
   DecisionPackage,
   TaskDetailPayload,
-  ViewModelPayload
+  ViewModelPayload,
 } from '../types';
 import { DecisionCard } from './DecisionCard';
 import { DiscussHistory } from './DiscussHistory';
@@ -31,6 +32,7 @@ interface InspectorRailProps {
   taskLoading?: boolean;
   onClose?: () => void;
   onSelectTask: (taskId: string) => void;
+  onSelectAgent: (agentId: string) => void;
 }
 
 interface DepItemProps {
@@ -77,7 +79,7 @@ function acceptanceView(acceptance: unknown): AcceptanceView | null {
     const criteria = (acceptance as { criteria?: unknown }).criteria;
     if (Array.isArray(criteria)) {
       const rows = criteria.filter(
-        (c): c is AcceptanceCriterion => !!c && typeof c === 'object' && !Array.isArray(c)
+        (c): c is AcceptanceCriterion => !!c && typeof c === 'object' && !Array.isArray(c),
       );
       return rows.length ? { prose: [], criteria: rows } : null;
     }
@@ -109,7 +111,7 @@ const taskFieldKeys = [
   'started_at',
   'finished_at',
   'updated_at',
-  'decision_package'
+  'decision_package',
 ];
 
 /**
@@ -125,11 +127,18 @@ export function InspectorRail({
   decisions,
   taskLoading = false,
   onClose,
-  onSelectTask
+  onSelectTask,
+  onSelectAgent,
 }: InspectorRailProps) {
   const t = task.task;
   const status = normalizeStatus(String(t.status ?? ''));
   const node = viewModel.graph.nodes.find((candidate) => candidate.id === t.id);
+  // Server-joined agent ids working this node -> compact records by pure table lookup.
+  const agentRefs = node?.agent_refs ?? [];
+  const rosterAgentIds = new Set((viewModel.agents ?? []).map((agent) => agent.id));
+  const linkedAgents = agentRefs
+    .map((agentId) => (viewModel.agents ?? []).find((agent) => agent.id === agentId))
+    .filter((agent): agent is NonNullable<typeof agent> => !!agent);
   const userGate = node?.awaiting_user === true;
   const lamp = userGate ? 'var(--alert)' : statusLampVar(status);
   const isCrit = (viewModel.graph.critical_path ?? []).includes(t.id);
@@ -301,7 +310,11 @@ export function InspectorRail({
             <div className="contract-subblock">
               <div className="contract-label">candidate routes</div>
               {route.candidates.map((candidate) => (
-                <div className="candidate-row" data-selected={candidate.id === selectedRoute?.id} key={candidate.id}>
+                <div
+                  className="candidate-row"
+                  data-selected={candidate.id === selectedRoute?.id}
+                  key={candidate.id}
+                >
                   <span className="mono">{candidate.id}</span>
                   <span>{candidate.surface_label}</span>
                   <span className="mono">
@@ -349,24 +362,49 @@ export function InspectorRail({
           {execution.attempts.length ? (
             <div className="contract-subblock">
               <div className="contract-label">attempt lifecycle</div>
-              {execution.attempts.map((attempt) => (
-                <div className="attempt-row" key={attempt.id}>
-                  <span className="mono">{attempt.id}</span>
-                  <span>
-                    {attempt.state ?? 'unknown'}
-                    {attempt.terminal_class ? ` · ${attempt.terminal_class}` : ''}
-                  </span>
-                  <span
-                    className="mono"
-                    title={attempt.terminal_at ?? attempt.started_at ?? undefined}
+              {execution.attempts.map((attempt) => {
+                // Server-joined agent_ref → the attempt row is a jump into agent mode for the
+                // registry agent that ran it (no client inference: agent_ref comes off the
+                // board). Only a ref that resolves in the roster is clickable; a run-store
+                // style ref the registry cannot resolve renders verbatim as plain text — a
+                // jump nowhere would be a silent dead button.
+                const agentRef = attempt.agent_ref;
+                const refResolves = !!agentRef && rosterAgentIds.has(agentRef);
+                const cells = (
+                  <>
+                    <span className="mono">{attempt.id}</span>
+                    <span>
+                      {attempt.state ?? 'unknown'}
+                      {attempt.terminal_class ? ` · ${attempt.terminal_class}` : ''}
+                      {agentRef ? (refResolves ? ' · ⚙ agent' : ` · ${agentRef}`) : ''}
+                    </span>
+                    <span
+                      className="mono"
+                      title={attempt.terminal_at ?? attempt.started_at ?? undefined}
+                    >
+                      {attempt.candidate_id ?? 'unassigned'}
+                      {attempt.terminal_at || attempt.started_at
+                        ? ` · ${attempt.terminal_at ?? attempt.started_at}`
+                        : ''}
+                    </span>
+                  </>
+                );
+                return agentRef && refResolves ? (
+                  <button
+                    className="attempt-row attempt-row-agent"
+                    key={attempt.id}
+                    onClick={() => onSelectAgent(agentRef)}
+                    title={`Inspect agent ${agentRef}`}
+                    type="button"
                   >
-                    {attempt.candidate_id ?? 'unassigned'}
-                    {attempt.terminal_at || attempt.started_at
-                      ? ` · ${attempt.terminal_at ?? attempt.started_at}`
-                      : ''}
-                  </span>
-                </div>
-              ))}
+                    {cells}
+                  </button>
+                ) : (
+                  <div className="attempt-row" key={attempt.id}>
+                    {cells}
+                  </div>
+                );
+              })}
             </div>
           ) : null}
         </div>
@@ -396,6 +434,36 @@ export function InspectorRail({
                 <span className={`v${mono ? ' mono' : ''}`}>{value}</span>
               </div>
             ))}
+          </div>
+        </div>
+      ) : null}
+
+      {linkedAgents.length ? (
+        <div className="dsect agents-sect">
+          <div className="sl">⚙ agents</div>
+          <div className="deplist">
+            {linkedAgents.map((agent) => {
+              const lampVar = agentStateLamp(agent.state);
+              return (
+                <button
+                  className="depitem"
+                  key={agent.id}
+                  onClick={() => onSelectAgent(agent.id)}
+                  type="button"
+                >
+                  <span className="lamp" style={{ background: lampVar, color: lampVar }} />
+                  <span className="dt">
+                    <span className="did">{agent.id}</span>
+                    {agent.intent || (
+                      <span className="untitled">{harnessBadge(agent.harness)}</span>
+                    )}
+                  </span>
+                  <span className="ds" style={{ color: lampVar }}>
+                    {agentStateText(agent.state)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : null}

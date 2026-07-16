@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { loadDecisions, loadPeers, loadTaskDetail, loadWorkspace } from './api';
-import { fixturePeers } from './fixtures';
+import { loadAgentDetail, loadDecisions, loadPeers, loadTaskDetail, loadWorkspace } from './api';
+import { AgentInspector } from './components/AgentInspector';
+import { AgentRoster } from './components/AgentRoster';
 import { BoardBrief } from './components/BoardBrief';
 import { BoardView } from './components/BoardView';
 import { DagWorkspace } from './components/DagWorkspace';
@@ -11,10 +12,17 @@ import { MissionLine } from './components/MissionLine';
 import { StageToolbar, type ViewMode } from './components/StageToolbar';
 import { StatusStrip } from './components/StatusStrip';
 import { TimelineView } from './components/TimelineView';
+import { fixturePeers } from './fixtures';
 import type { GraphOrientation } from './graphLayout';
 import type { LocateRequest } from './locate';
 import { normalizeTaskFilters } from './taskFilters';
-import type { DecisionEntry, PeersPayload, TaskDetailPayload, WorkspaceData } from './types';
+import type {
+  AgentDetailPayload,
+  DecisionEntry,
+  PeersPayload,
+  TaskDetailPayload,
+  WorkspaceData,
+} from './types';
 import { readWorkspaceUrlState, writeWorkspaceUrlState } from './workspaceUrlState';
 
 const VIEW_KEY = 'ccm-view';
@@ -37,12 +45,16 @@ function filtersFromUrl(): Set<string> {
   return readWorkspaceUrlState(window.location.href).filters;
 }
 
-function setWorkspaceStateInUrl(taskId: string | null, filters: Set<string>): void {
+function setWorkspaceStateInUrl(
+  taskId: string | null,
+  agentId: string | null,
+  filters: Set<string>,
+): void {
   if (typeof window === 'undefined') return;
   window.history.replaceState(
     null,
     '',
-    writeWorkspaceUrlState(window.location.href, { task: taskId, filters })
+    writeWorkspaceUrlState(window.location.href, { task: taskId, agent: agentId, filters }),
   );
 }
 
@@ -62,12 +74,23 @@ function setBoardInUrl(boardFilename: string | undefined): void {
 function initialView(): ViewMode {
   try {
     const value = localStorage.getItem(VIEW_KEY);
-    return value === 'list' || value === 'board' || value === 'timeline' || value === 'graph'
+    return value === 'list' ||
+      value === 'board' ||
+      value === 'timeline' ||
+      value === 'graph' ||
+      value === 'agents'
       ? value
       : 'graph';
   } catch {
     return 'graph';
   }
+}
+
+function agentFromUrl(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  return readWorkspaceUrlState(window.location.href).agent;
 }
 
 function initialTheme(): 'dark' | 'light' {
@@ -94,17 +117,31 @@ function taskErrorPayload(taskId: string, message: string): TaskDetailPayload {
       title: taskId,
       status: 'stale',
       summary: message,
-      next_actions: ['Reload the viewer or choose another task']
+      next_actions: ['Reload the viewer or choose another task'],
     },
     dependencies: [],
     dependents: [],
-    activity: []
+    activity: [],
+  };
+}
+
+// Held-selection placeholder for a degraded (fixture / client-stale) frame: keeps the agent
+// rail mounted with an explicit error state instead of resolving against untrusted data —
+// the agent-path counterpart of taskErrorPayload.
+function agentHoldPayload(agentId: string, message: string): AgentDetailPayload {
+  return {
+    schema: 'ccm/web-viewer-agent/v1',
+    error: message,
+    agent: { id: agentId },
+    compact: { id: agentId, state: 'unknown' },
+    linked_tasks: [],
+    probe: null,
   };
 }
 
 function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(() =>
-    typeof window === 'undefined' ? false : window.matchMedia(query).matches
+    typeof window === 'undefined' ? false : window.matchMedia(query).matches,
   );
 
   useEffect(() => {
@@ -122,9 +159,12 @@ export function App() {
   const [workspace, setWorkspace] = useState<WorkspaceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedBoardFilename, setSelectedBoardFilename] = useState<string | undefined>(() =>
-    boardFromUrl()
+    boardFromUrl(),
   );
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => taskFromUrl());
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(() => agentFromUrl());
+  const [selectedAgent, setSelectedAgent] = useState<AgentDetailPayload | null>(null);
+  const [agentLoading, setAgentLoading] = useState(false);
   const [locateRequest, setLocateRequest] = useState<LocateRequest | null>(null);
   const [selectedTask, setSelectedTask] = useState<TaskDetailPayload | null>(null);
   const [taskLoading, setTaskLoading] = useState(false);
@@ -173,9 +213,11 @@ export function App() {
     selectedTaskIdRef.current = selectedTaskId;
   }, [selectedTaskId]);
 
+  // Single URL-sync point: task, agent (mutually exclusive selection), and filters are
+  // mirrored into the querystring from state — handlers only mutate state, never the URL.
   useEffect(() => {
-    setWorkspaceStateInUrl(selectedTaskId, activeFilters);
-  }, [selectedTaskId, activeFilters]);
+    setWorkspaceStateInUrl(selectedTaskId, selectedAgentId, activeFilters);
+  }, [selectedTaskId, selectedAgentId, activeFilters]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -197,7 +239,7 @@ export function App() {
       selectedBoardFilename,
       controller.signal,
       selectedTaskIdRef.current,
-      workspaceRef.current
+      workspaceRef.current,
     )
       .then((data) => {
         const previous = workspaceRef.current;
@@ -228,7 +270,7 @@ export function App() {
             setWorkspace({
               ...previous,
               boards: boardsChanged ? data.boards : previous.boards,
-              statusReport: reportChanged ? data.statusReport : previous.statusReport
+              statusReport: reportChanged ? data.statusReport : previous.statusReport,
             });
           }
           return;
@@ -237,8 +279,7 @@ export function App() {
         // swap data + selection in one batch, drop the old board's sidecar rows, and
         // re-fit the layout for the new topology.
         const boardChanged =
-          previous !== null &&
-          previous.viewModel.board.filename !== data.viewModel.board.filename;
+          previous !== null && previous.viewModel.board.filename !== data.viewModel.board.filename;
         const preferredTaskId = boardChanged ? null : selectedTaskIdRef.current;
         // Dual-mode right rail: NO default auto-selection — no selection means the rail
         // shows the board-level mission brief. A user's selection is retained across
@@ -255,6 +296,10 @@ export function App() {
         if (boardChanged) {
           setDecisions([]);
           setPeers(null);
+          // Agent ids are board-scoped and collide across boards (every board numbers from
+          // agt-001), so the roster stale-drop cannot catch a cross-board carryover — an
+          // externally-driven board change must drop the agent selection, same as the task.
+          setSelectedAgentId(null);
           setLayoutResetKey((value) => value + 1);
         }
         setBoardSwitching(false);
@@ -312,7 +357,7 @@ export function App() {
 
     if (workspace.source === 'fixture') {
       const node = workspace.viewModel.graph.nodes.find(
-        (candidate) => candidate.id === selectedTaskId
+        (candidate) => candidate.id === selectedTaskId,
       );
       const compact = workspace.viewModel.tasks?.find((task) => task.id === selectedTaskId);
       setSelectedTask(
@@ -330,13 +375,13 @@ export function App() {
                 tags: node.tags,
                 ...(compact ?? {}),
                 summary: 'Fixture fallback does not include full task detail for this node.',
-                next_actions: []
+                next_actions: [],
               },
               dependencies: [],
               dependents: [],
-              activity: []
+              activity: [],
             }
-          : null
+          : null,
       );
       return;
     }
@@ -350,8 +395,8 @@ export function App() {
           setSelectedTask(
             taskErrorPayload(
               selectedTaskId,
-              error instanceof Error ? error.message : 'Task detail unavailable'
-            )
+              error instanceof Error ? error.message : 'Task detail unavailable',
+            ),
           );
         }
       })
@@ -362,6 +407,57 @@ export function App() {
       });
     return () => controller.abort();
   }, [selectedTaskId, workspace]);
+
+  // Agent drill-down loader — fetch /agent.json for the selected agent.
+  useEffect(() => {
+    if (!workspace || !selectedAgentId) {
+      setSelectedAgent(null);
+      return;
+    }
+    // Degraded frame (fixture fallback / last-known-good stale): the fixture roster's
+    // hardcoded ids (agt-001..) collide with real board ids, so resolving the selection
+    // against it shows another agent's data, and stale-dropping wipes a deep link over a
+    // transient failure. Hold the selection and the URL untouched; the right rail shows a
+    // held/stale placeholder until a live frame returns (mirrors the task path's
+    // keep-selection + error-payload semantics).
+    if (workspace.source === 'fixture' || workspace.clientStale) {
+      return;
+    }
+    const compact = (workspace.viewModel.agents ?? []).find(
+      (candidate) => candidate.id === selectedAgentId,
+    );
+    if (!compact) {
+      // Stale agent id fail-soft: the selected agent is absent from the freshly-loaded LIVE
+      // roster (deep-linked to a gone agent / terminal prune) — drop the selection and the
+      // URL-sync effect clears `?agent=`. Mirrors the stale-filter drop (normalizeTaskFilters).
+      setSelectedAgent(null);
+      setSelectedAgentId(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    setAgentLoading(true);
+    loadAgentDetail(selectedAgentId, workspace.viewModel.board.filename, controller.signal)
+      .then(setSelectedAgent)
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setSelectedAgent({
+            schema: 'ccm/web-viewer-agent/v1',
+            error: error instanceof Error ? error.message : 'Agent detail unavailable',
+            agent: compact as unknown as Record<string, unknown>,
+            compact,
+            linked_tasks: [],
+            probe: compact.probe ?? null,
+          });
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setAgentLoading(false);
+        }
+      });
+    return () => controller.abort();
+  }, [selectedAgentId, workspace]);
 
   // Transient toast: readouts stay, notices fade — auto-dismiss unless it is carrying
   // the visible share-URL fallback input.
@@ -376,6 +472,7 @@ export function App() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setSelectedTaskId(null);
+        setSelectedAgentId(null);
         return;
       }
       if (event.key === '/') {
@@ -400,6 +497,7 @@ export function App() {
     setBoardInUrl(boardFilename);
     setSelectedBoardFilename(boardFilename);
     setBoardSwitching(true);
+    setSelectedAgentId(null);
     setTopNotice(`Switched to ${boardFilename}`);
     setShareFallbackUrl(null);
   }, []);
@@ -407,10 +505,28 @@ export function App() {
   // User-click selection: same state write as a programmatic selection PLUS a locate
   // request (nonce bump) so the CURRENT view centers/scrolls to the task. Background
   // polls go through setSelectedTaskId directly and can never mint a locate request.
+  // Task and agent selection are mutually exclusive: selecting a task drops any agent.
   const selectTaskFromClick = useCallback((taskId: string | null) => {
     setSelectedTaskId(taskId);
     if (taskId) {
+      setSelectedAgentId(null);
       setLocateRequest((previous) => ({ taskId, nonce: (previous?.nonce ?? 0) + 1 }));
+    }
+  }, []);
+
+  // Agent selection: drops any task selection, deep-links `?agent=<id>`, and (when a linked
+  // node exists) locates the first one so the DAG re-centers on the agent's work.
+  const selectAgentFromClick = useCallback((agentId: string | null) => {
+    setSelectedAgentId(agentId);
+    if (agentId) {
+      setSelectedTaskId(null);
+      const agent = (workspaceRef.current?.viewModel.agents ?? []).find(
+        (candidate) => candidate.id === agentId,
+      );
+      const firstLink = agent?.links?.[0];
+      if (firstLink) {
+        setLocateRequest((previous) => ({ taskId: firstLink, nonce: (previous?.nonce ?? 0) + 1 }));
+      }
     }
   }, []);
 
@@ -449,7 +565,7 @@ export function App() {
       boards: workspace.boards,
       viewModel: workspace.viewModel,
       statusReport: workspace.statusReport,
-      selectedTask: selectedTask ?? workspace.selectedTask
+      selectedTask: selectedTask ?? workspace.selectedTask,
     };
     const blob = new Blob([`${JSON.stringify(snapshot, null, 2)}\n`], { type: 'application/json' });
     const href = URL.createObjectURL(blob);
@@ -480,6 +596,22 @@ export function App() {
     return decisions.filter((entry) => entry.node_id === displayedTask.task.id);
   }, [decisions, displayedTask]);
 
+  // When an agent is selected, the DAG dims everything except the nodes it is linked to
+  // (server-joined links — no client derivation). Null means "no agent highlight active".
+  const agentHighlightNodeIds = useMemo(() => {
+    if (!selectedAgentId || !workspace) return null;
+    const agent = (workspace.viewModel.agents ?? []).find(
+      (candidate) => candidate.id === selectedAgentId,
+    );
+    if (!agent || !(agent.links ?? []).length) return null;
+    return new Set(agent.links ?? []);
+  }, [selectedAgentId, workspace]);
+
+  // Right rail is tri-modal: agent selected -> agent inspector; task selected -> task
+  // inspector; neither -> board mission brief. Agent takes precedence (selection is exclusive).
+  const displayedAgent =
+    selectedAgentId && selectedAgent?.compact?.id === selectedAgentId ? selectedAgent : null;
+
   // Gate only on the workspace itself — an EMPTY board (zero tasks -> no selectable task)
   // must still render the shell with the canvas/inspector empty states, never a stuck
   // loading screen.
@@ -506,6 +638,21 @@ export function App() {
 
   const staleErrors = workspace.viewModel.freshness.errors ?? [];
   const isStale = workspace.viewModel.freshness.state !== 'live' || staleErrors.length > 0;
+
+  // Degraded frame (fixture fallback / client-stale last-known-good): the agent loader holds
+  // the selection instead of resolving/dropping it, so the rail renders an explicit held
+  // placeholder when no matching detail was ever loaded.
+  const degradedFrame = workspace.source === 'fixture' || workspace.clientStale === true;
+  const railAgent =
+    displayedAgent ??
+    (selectedAgentId && degradedFrame
+      ? agentHoldPayload(
+          selectedAgentId,
+          workspace.source === 'fixture'
+            ? 'Live board data is unavailable — holding the agent selection'
+            : 'Board read is stale — holding the agent selection',
+        )
+      : null);
 
   return (
     <div className="app-shell">
@@ -547,6 +694,7 @@ export function App() {
           activeFilters={activeFilters}
           onClearFilters={() => setActiveFilters(new Set())}
           onSelectTask={selectTaskFromClick}
+          onShowAgents={() => setViewPersist('agents')}
           onToggleFilter={toggleFilter}
           selectedTaskId={selectedTaskId}
           viewModel={workspace.viewModel}
@@ -573,8 +721,10 @@ export function App() {
           {view === 'graph' ? (
             <DagWorkspace
               activeFilters={activeFilters}
+              highlightNodeIds={agentHighlightNodeIds}
               locateRequest={locateRequest}
               onResetLayout={resetLayout}
+              onSelectAgent={selectAgentFromClick}
               onSelectTask={selectTaskFromClick}
               onToggleFilter={toggleFilter}
               orientation={orientation}
@@ -582,6 +732,13 @@ export function App() {
               resetKey={layoutResetKey}
               selectedTaskId={selectedTaskId}
               theme={theme}
+              viewModel={workspace.viewModel}
+            />
+          ) : null}
+          {view === 'agents' ? (
+            <AgentRoster
+              onSelectAgent={selectAgentFromClick}
+              selectedAgentId={selectedAgentId}
               viewModel={workspace.viewModel}
             />
           ) : null}
@@ -613,14 +770,28 @@ export function App() {
           ) : null}
         </div>
         <aside
-          aria-label={displayedTask ? 'Selected task detail' : 'Board mission brief'}
+          aria-label={
+            railAgent
+              ? 'Selected agent detail'
+              : displayedTask
+                ? 'Selected task detail'
+                : 'Board mission brief'
+          }
           className="dpanel-wrap"
           id="detail"
         >
-          {displayedTask ? (
+          {railAgent ? (
+            <AgentInspector
+              agentLoading={agentLoading}
+              detail={railAgent}
+              onClose={() => setSelectedAgentId(null)}
+              onSelectTask={selectTaskFromClick}
+            />
+          ) : displayedTask ? (
             <InspectorRail
               decisions={selectedDecisions}
               onClose={() => setSelectedTaskId(null)}
+              onSelectAgent={selectAgentFromClick}
               onSelectTask={selectTaskFromClick}
               task={displayedTask}
               taskLoading={taskLoading}

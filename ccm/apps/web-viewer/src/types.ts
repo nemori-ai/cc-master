@@ -59,6 +59,9 @@ export interface GraphNode {
   surface_label?: string;
   model?: string;
   role_grades?: string[];
+  /** Server-joined agent ids working this node (reverse of agents[].links). Table-look-up
+   * into `ViewModelPayload.agents` for the compact record — the frontend never derives it. */
+  agent_refs?: string[];
 }
 
 export interface MissionReadModel {
@@ -119,6 +122,9 @@ export interface ExecutionReadModel {
     id: string;
     candidate_id?: string;
     state?: string;
+    /** Server-passed agent registry ref (agents[].id) that ran this attempt, when the board
+     * writer recorded one — table look-up into `ViewModelPayload.agents`, never derived. */
+    agent_ref?: string;
     started_at?: string;
     terminal_at?: string;
     terminal_class?: string;
@@ -249,6 +255,64 @@ export interface BoardExtrasPayload {
   coordination?: CoordinationPayload;
 }
 
+// ---- Agent Registry read-model (server-joined; frontend renders + table-looks-up only) ----
+
+/** Probe evidence passed through verbatim (unknown-faithful; `as_of` is the freshness anchor). */
+export interface AgentProbe {
+  observed?: string; // alive | silent | gone | unknown
+  as_of?: string | null;
+  method?: string; // pid | session-file-mtime | transcript-mtime | none
+  last_probe_at?: string | null;
+}
+
+/** Compact agent projection on the view-model top-level `agents[]` (server `compactAgent`). */
+export interface CompactAgent {
+  id: string;
+  type?: string; // cli-worker | subagent | background-shell | workflow
+  harness?: string; // codex | claude-code | cursor-agent | origin
+  model?: string; // omitted when never captured — render unknown / —, never derive
+  intent?: string;
+  state: string; // starting | running | uncertain | terminal | orphaned
+  handle_kind?: string; // session-id | pid | task-id | none
+  has_attach_cmd?: boolean;
+  has_transcript?: boolean;
+  registered_at?: string; // elapsed anchor
+  ended_at?: string | null;
+  probe?: AgentProbe | null;
+  links?: string[]; // linked task ids
+}
+
+/** Macro roster aggregates + the derived "ready but unclaimed" list (server `buildAgentInsights`). */
+export interface AgentInsights {
+  total: number;
+  active: number;
+  running: number;
+  by_state: Record<string, number>;
+  by_harness: Record<string, number>;
+  oldest_in_flight: { id: string; registered_at?: string; elapsed_ms: number } | null;
+  unclaimed_ready: Array<{ id: string; title: string }>;
+}
+
+/** One linked-task row on `/agent.json` (server join of agents[].links -> tasks). */
+export interface AgentLinkedTask {
+  task_id: string;
+  linked_at?: string;
+  title?: string | null;
+  status?: string | null;
+  exists?: boolean;
+}
+
+/** `/agent.json` single-agent drill-down payload. */
+export interface AgentDetailPayload {
+  schema?: string;
+  board?: { id?: string; filename?: string };
+  agent: Record<string, unknown>; // full record verbatim
+  compact?: CompactAgent;
+  linked_tasks?: AgentLinkedTask[];
+  probe?: AgentProbe | null;
+  error?: string;
+}
+
 /** One same-home peer board row from `/peers.json` (read-only roster). */
 export interface PeerSummary {
   board_file: string;
@@ -259,7 +323,11 @@ export interface PeerSummary {
   health?: string;
   heartbeat?: string | null;
   heartbeat_age_sec?: number | null;
-  current?: { active_tasks?: number | null; workload?: string | null; burn_contribution?: number | null } | null;
+  current?: {
+    active_tasks?: number | null;
+    workload?: string | null;
+    burn_contribution?: number | null;
+  } | null;
   planned?: { remaining_work?: string | null; cost_to_complete_pct?: number | null } | null;
 }
 
@@ -372,6 +440,9 @@ export interface ViewModelPayload {
   };
   insights?: InsightsPayload;
   board_extras?: BoardExtrasPayload;
+  /** Agent Registry compact roster (additive; absent on older servers). */
+  agents?: CompactAgent[];
+  agent_insights?: AgentInsights;
   tasks?: CompactTask[];
   graph: {
     family?: 'task-dag' | string;

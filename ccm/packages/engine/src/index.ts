@@ -92,6 +92,8 @@ export type {
 } from './board-model.js';
 // ── board-model（数据模型 SSOT：enums / FIELDS / INVARIANTS / STATUS_MACHINE / predicates）──
 export {
+  AGENT_ID_RE,
+  AGENT_STATE_MACHINE,
   acceptanceConverged,
   dependencySatisfied,
   durationHours,
@@ -102,10 +104,12 @@ export {
   invariant,
   isAbsolutePathOrUrl,
   isActiveStatus,
+  isAgentId,
   isAwaitingUser,
   isDoneStatus,
   isEnumMember,
   isISOUTC,
+  isLegalAgentTransition,
   isLegalTransition,
   isRetryTransition,
   isReviewDependencyGate,

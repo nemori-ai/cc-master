@@ -1507,6 +1507,109 @@ export const REGISTRY: Registry = {
     },
   },
 
+  // ════════════════════ agent（Agent Registry·登记/探测/读取 noun·无 spawn/route/dispatch 语义）═══════════
+  //   凡派发皆登记：sub-agent / 后台 shell / workflow / 跨 harness worker 全进 board.agents[] ✎ 花名册。
+  //   命令面冻结：verbs 只登记/探测/读取——不起进程、不选路、不派活（dispatch 归 worker）。
+  agent: {
+    create: {
+      summary: '登记一个运行时 agent（state=starting），返回 agent_id（凡派发皆登记）',
+      read: false,
+      positionals: [],
+      options: {
+        type: {
+          type: 'string',
+          enum: E.agentType,
+          required: true,
+          desc: 'agent 类型（cli-worker|subagent|background-shell|workflow）',
+        },
+        harness: {
+          type: 'string',
+          enum: E.agentHarness,
+          required: true,
+          desc: 'agent 所在 harness（codex|claude-code|cursor-agent|origin）',
+        },
+        intent: { type: 'string', required: true, desc: '一句话：派它去干什么' },
+        model: { type: 'string', desc: '已知才填的模型（unknown 保真·缺则不填）' },
+        cwd: { type: 'string', desc: 'agent 工作目录（可选）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm agent create --type cli-worker --harness codex --intent "review repo diff"',
+        'ccm agent create --board /abs/x.board.json --type subagent --harness origin --intent "写 i18n" --json',
+      ],
+      handler: 'agent.create',
+    },
+    bind: {
+      summary: '交真实 handle 证据 starting→running（无证据拒绝·「无真实 handle 不算 running」）',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        handle: {
+          type: 'string',
+          required: true,
+          desc: 'handle 证据 <kind:value>（kind ∈ session-id|pid|task-id）',
+        },
+        'attach-cmd': { type: 'string', desc: '一键接入命令（如 codex resume <sid>）' },
+        transcript: { type: 'string', desc: 'transcript 路径引用（绝不内嵌内容）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: [
+        'ccm agent bind agt-001 --handle session-id:0197-abc --attach-cmd "codex resume 0197-abc"',
+        'ccm agent bind agt-002 --handle pid:48213',
+      ],
+      handler: 'agent.bind',
+    },
+    link: {
+      summary: '建 agent↔task 关联（存 agent 侧 links[]·幂等·维持 single-writer）',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        task: { type: 'string', required: true, desc: '关联的 task id（须存在于本 board）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm agent link agt-001 --task T7'],
+      handler: 'agent.link',
+    },
+    terminal: {
+      summary: 'running/uncertain/orphaned→terminal 登记 outcome（terminal ≠ task done）',
+      read: false,
+      positionals: [{ name: 'id', required: true }],
+      options: {
+        outcome: { type: 'string', required: true, desc: '收口结论一句话' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm agent terminal agt-001 --outcome "review approved, 3 findings filed"'],
+      handler: 'agent.terminal',
+    },
+    probe: {
+      summary: '活性探测 + reconcile（只写 agents[] 的 probe/lifecycle·观测冲突以观测为准降级）',
+      read: false,
+      positionals: [{ name: 'id', required: false }],
+      options: {
+        'freshness-sec': { type: 'string', desc: 'mtime 判活窗口秒（默认 300）' },
+        json: { type: 'boolean', desc: '结构化输出' },
+      },
+      examples: ['ccm agent probe agt-001', 'ccm agent probe --board /abs/x.board.json --json'],
+      handler: 'agent.probe',
+    },
+    list: {
+      summary: '只读花名册：全体 agent + 按 state 分桶计数',
+      read: true,
+      positionals: [],
+      options: { json: { type: 'boolean', desc: '结构化输出' } },
+      examples: ['ccm agent list', 'ccm agent list --board /abs/x.board.json --json'],
+      handler: 'agent.list',
+    },
+    show: {
+      summary: '单 agent 钻取（record + attach 命令 + transcript 路径 + probe 新鲜度 + links）',
+      read: true,
+      positionals: [{ name: 'id', required: true }],
+      options: { json: { type: 'boolean', desc: '结构化输出' } },
+      examples: ['ccm agent show agt-001 --json'],
+      handler: 'agent.show',
+    },
+  },
+
   // ════════════════════ peers（COORD 多 orchestrator 感知·只读跨板）════════════════════════════════════
   //   感知通道（设计稿 §3.2）：扫 home/boards/ 全体 active+心跳新鲜板 → 花名册（goal/workload/priority/liveness），
   //   喂价值感知的独立自我配速（不必协商即可合理让路 / 认领 slack）。**纯只读跨板**——零写、不抢 board-lock、

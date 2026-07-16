@@ -119,5 +119,31 @@
       "kind": "note",
       "summary": "baseline snapshot taken at sprint start"
     }
+  ],
+  "agents": [
+    {
+      "id": "agt-001",
+      "type": "subagent",
+      "harness": "claude-code",
+      "model": "claude-sonnet-4-5",
+      "intent": "drive T4 integration to acceptance",
+      "launch": { "created_at": "2026-06-25T12:35:00Z" },
+      "handle": { "kind": "task-id", "value": "bg-4d" },
+      "lifecycle": {
+        "state": "running",
+        "registered_at": "2026-06-25T12:35:00Z",
+        "ended_at": null,
+        "outcome": null
+      },
+      "probe": {
+        "last_probe_at": "2026-06-25T12:40:00Z",
+        "method": "none",
+        "observed": "unknown",
+        "as_of": "2026-06-25T12:40:00Z"
+      },
+      "links": [{ "task_id": "T4", "linked_at": "2026-06-25T12:35:00Z" }],
+      "account_ref": null,
+      "quota_pool_ref": null
+    }
   ]
 }

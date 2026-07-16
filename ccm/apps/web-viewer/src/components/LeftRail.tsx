@@ -1,4 +1,5 @@
-import { fmtElapsed, normalizeStatus, statusText } from '../format';
+import { AGENT_STATE_ORDER } from '../agentFormat';
+import { fmtElapsed, statusText } from '../format';
 import { type TaskFilterGroup, taskFilterOptions } from '../taskFilters';
 import type { ViewModelPayload } from '../types';
 
@@ -6,6 +7,7 @@ interface LeftRailProps {
   viewModel: ViewModelPayload;
   selectedTaskId: string | null;
   onSelectTask: (taskId: string) => void;
+  onShowAgents: () => void;
   activeFilters: Set<string>;
   onToggleFilter: (filter: string) => void;
   onClearFilters: () => void;
@@ -18,7 +20,7 @@ const filterGroups: Array<{ id: TaskFilterGroup; label: string }> = [
   { id: 'model-tier', label: 'Model tier' },
   { id: 'route-outcome', label: 'Route outcome' },
   { id: 'executor', label: 'Executor' },
-  { id: 'type', label: 'Type' }
+  { id: 'type', label: 'Type' },
 ];
 
 /**
@@ -32,9 +34,10 @@ export function LeftRail({
   viewModel,
   selectedTaskId,
   onSelectTask,
+  onShowAgents,
   activeFilters,
   onToggleFilter,
-  onClearFilters
+  onClearFilters,
 }: LeftRailProps) {
   const nodesById = new Map(viewModel.graph.nodes.map((node) => [node.id, node]));
   const criticalPath = viewModel.graph.critical_path ?? [];
@@ -57,6 +60,8 @@ export function LeftRail({
   const makespan = viewModel.summary?.criticalPath?.makespan ?? null;
   const oldestGate = fmtElapsed(awaiting.oldest_gate_elapsed_ms);
   const age = fmtElapsed(insights.age_ms ?? null);
+  const agentInsights = viewModel.agent_insights ?? null;
+  const unclaimedReady = agentInsights?.unclaimed_ready ?? [];
 
   const pill = (id: string) => (
     <button className="pill-id" onClick={() => onSelectTask(id)} title={idTitle(id)} type="button">
@@ -91,7 +96,9 @@ export function LeftRail({
         ) : (
           <div className="mv dim">no node gates others</div>
         )}
-        {impact.count > 0 ? <div className="msub">gates {impact.count} downstream tasks</div> : null}
+        {impact.count > 0 ? (
+          <div className="msub">gates {impact.count} downstream tasks</div>
+        ) : null}
       </div>
 
       <div className="metric">
@@ -165,6 +172,48 @@ export function LeftRail({
         <div className="mv mono">{age ?? '—'}</div>
         <div className="msub">since the first task started</div>
       </div>
+
+      {agentInsights && agentInsights.total > 0 ? (
+        <button className="metric metric-btn" onClick={onShowAgents} type="button">
+          <div className="ml">
+            <span className="ic">⚙</span>agents
+          </div>
+          <div className="mv mono">
+            {agentInsights.running}
+            {agentInsights.active > agentInsights.running
+              ? ` / ${agentInsights.active} active`
+              : ''}
+          </div>
+          <div className="agent-buckets">
+            {AGENT_STATE_ORDER.filter((state) => (agentInsights.by_state[state] ?? 0) > 0).map(
+              (state) => (
+                <span className="agent-bucket" data-state={state} key={state}>
+                  {state} {agentInsights.by_state[state]}
+                </span>
+              ),
+            )}
+          </div>
+          <div className="msub">open the agent roster</div>
+        </button>
+      ) : null}
+
+      {unclaimedReady.length ? (
+        <div className="metric flag">
+          <div className="ml">
+            <span className="ic">◇</span>ready · unclaimed
+          </div>
+          <div className="mv">
+            {unclaimedReady.slice(0, 4).map((item) => pill(item.id))}
+            {unclaimedReady.length > 4 ? (
+              <span className="msub-inline">+{unclaimedReady.length - 4}</span>
+            ) : null}
+          </div>
+          <div className="msub">
+            {unclaimedReady.length} ready task{unclaimedReady.length === 1 ? '' : 's'} with no agent
+            registered
+          </div>
+        </div>
+      ) : null}
 
       <section className="rail-section">
         <div className="rail-heading">

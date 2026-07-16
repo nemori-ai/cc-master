@@ -37,10 +37,10 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "a8bac4b54309c1e571d1508898d5ca409b4a95ae97608a59bf855760cde470c5",
+            "SKILL.md": "f6b9ae935fbdec43a939640433a5952a2ec3968d388a80ec904b5170c754383a",
             "references/account-pool.md": "da7a5826ba8ceb1eefc26722b4e305df6042ea30264abade27f896ef1fb2a8d6",
-            "references/board-model-guide.md": "79c512df2704d13f42838d21646cfeb2ad57cfacd51be7fdc216a5a0476686e4",
-            "references/command-catalog.md": "076216f5d574772c9edb140af0ad48c5a46007b56496e0f044052c081e79f876"
+            "references/board-model-guide.md": "35b374ab281a02f8e1f53689d3c2cb5c39d7033db906ee0305ed317d93f6727c",
+            "references/command-catalog.md": "e3ff7c701469ed4114c34812378d3d051f2c782a8d2ed16850236d234d3f408f"
           }
         }
       }
@@ -76,9 +76,9 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "f03f510bf8512e08860d66127553d78ea9962187b40730e1d4f48ed929f45144",
-            "references/board-model-guide.md": "ed6454c274968dc4ab9f6ce9114f4da99a9f938baf4660b45d17cc878f18cad4",
-            "references/command-catalog.md": "0069498b2598d13e7cc598fb91150066c55f34c2b64365bddb6ab2759d4fe89e"
+            "SKILL.md": "ba1a8364c0700c74018b4f7797b32f0739962c711b44855c92d43768aad42078",
+            "references/board-model-guide.md": "b320c16a881ff4335148be2ee2a8eeabb7eeb1ce1b2ecb9fe043617ed559feab",
+            "references/command-catalog.md": "5868a2c8d644c677529fcd9b982212f98f8a5ac894a4f1d5c3c9c835ff3b7a11"
           }
         }
       }
@@ -114,9 +114,9 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "2596e78d15ea6d16cdcae074084535a7ecec1685edaef78f55a86f1960903a8b",
-            "references/board-model-guide.md": "a8b3f5ddee70e122846b691828d03fb3ccc27e6829519422c98b66cad76d5f16",
-            "references/command-catalog.md": "5f9cb3bd9f33ae025558f5235b6f279f2a261336c67ca6b4e80dfff01f4ba603"
+            "SKILL.md": "41bc26768a60c536696c2b22d7a7a037edd3a966ac6e363a7545d7a6ce834e84",
+            "references/board-model-guide.md": "a2f3964c371aed2e9abef46afc3ed429966efcd4fa60d26985dcbe4ae34b038c",
+            "references/command-catalog.md": "492d6661b879e5e3952150033f253b9a6765ee4072f88faf0811549e64f51917"
           }
         }
       }

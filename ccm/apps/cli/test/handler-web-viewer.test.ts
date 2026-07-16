@@ -53,16 +53,20 @@ function seedBoard(
     sid = SID,
     tasks = [],
     extras = {},
+    agents,
+    policy,
   }: {
     file?: string;
     goal?: string;
     sid?: string;
     tasks?: Array<Record<string, unknown>>;
     extras?: Record<string, unknown>;
+    agents?: Array<Record<string, unknown>>;
+    policy?: Record<string, unknown>;
   } = {},
 ): string {
   const boardPath = join(home, 'boards', file);
-  const board = {
+  const board: Record<string, unknown> = {
     schema: 'cc-master/v2',
     meta: { template_version: 3 },
     goal,
@@ -73,6 +77,8 @@ function seedBoard(
     log: [],
     ...extras,
   };
+  if (agents) board.agents = agents;
+  if (policy) board.policy = policy;
   writeFileSync(boardPath, `${JSON.stringify(board, null, 2)}\n`, 'utf8');
   return boardPath;
 }
@@ -2133,6 +2139,313 @@ test('serve peers.json degrades to an empty roster when no board is fresh (singl
     assert.equal(payload.body.roster.count, 0);
   } finally {
     await httpJson({ port, path: '/_ccm/shutdown', token: 'solo-token', method: 'POST' }).catch(
+      () => {},
+    );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});
+
+test('serve exposes the Agent Registry read-model (view-model agents + node agent_refs + /agent.json)', async () => {
+  const home = mkHome();
+  const boardPath = seedBoard(home, {
+    tasks: [
+      { id: 'A', title: 'Design shell', status: 'done', deps: [], verified: true },
+      { id: 'B', title: 'Wire model', status: 'in_flight', deps: ['A'] },
+      { id: 'C', title: 'Polish', status: 'ready', deps: ['A'] },
+      { id: 'D', title: 'Ready unclaimed', status: 'ready', deps: [] },
+    ],
+    agents: [
+      {
+        id: 'agt-001',
+        type: 'cli-worker',
+        harness: 'codex',
+        model: 'gpt-5.6-luna',
+        intent: 'drive B to acceptance',
+        launch: { created_at: '2026-07-08T11:00:00Z' },
+        handle: { kind: 'session-id', value: '0197-abc', attach_cmd: 'codex resume 0197-abc' },
+        lifecycle: {
+          state: 'running',
+          registered_at: '2026-07-08T11:00:00Z',
+          ended_at: null,
+          outcome: null,
+        },
+        probe: {
+          last_probe_at: '2026-07-08T11:30:00Z',
+          method: 'session-file-mtime',
+          observed: 'alive',
+          as_of: '2026-07-08T11:30:00Z',
+        },
+        links: [{ task_id: 'B', linked_at: '2026-07-08T11:00:00Z' }],
+        account_ref: null,
+        quota_pool_ref: null,
+      },
+      {
+        id: 'agt-002',
+        type: 'subagent',
+        harness: 'origin',
+        // model intentionally absent (unknown-faithful)
+        intent: 'watchdog on C',
+        handle: { kind: 'none', value: '' },
+        lifecycle: {
+          state: 'terminal',
+          registered_at: '2026-07-08T10:00:00Z',
+          ended_at: '2026-07-08T10:40:00Z',
+          outcome: 'done',
+        },
+        links: [{ task_id: 'C', linked_at: '2026-07-08T10:00:00Z' }],
+      },
+    ],
+  });
+  const before = readFileSync(boardPath, 'utf8');
+  const { statePath } = writeServeState(home, 'wv_agents', 'agent-token', boardPath);
+  const { port, servePromise } = await startServe(statePath, home);
+  try {
+    // --- view-model top-level agents[] (compact projection) ---
+    const vm = await httpJson({
+      port,
+      path: '/view-model.json?board=20260708T120000Z-1.board.json',
+      token: 'agent-token',
+    });
+    assert.equal(vm.status, 200);
+    assert.equal(vm.body.schema, 'ccm/web-viewer-view-model/v1');
+    assert.equal(Array.isArray(vm.body.agents), true);
+    assert.equal(vm.body.agents.length, 2);
+    const a1 = vm.body.agents.find((a: { id: string }) => a.id === 'agt-001');
+    assert.equal(a1.type, 'cli-worker');
+    assert.equal(a1.harness, 'codex');
+    assert.equal(a1.model, 'gpt-5.6-luna');
+    assert.equal(a1.state, 'running');
+    assert.equal(a1.handle_kind, 'session-id');
+    assert.equal(a1.has_attach_cmd, true);
+    assert.equal(a1.registered_at, '2026-07-08T11:00:00Z');
+    // Shared probe projection: the compact roster row and /agent.json carry ONE shape,
+    // last_probe_at included at both endpoints.
+    assert.deepEqual(a1.probe, {
+      observed: 'alive',
+      as_of: '2026-07-08T11:30:00Z',
+      method: 'session-file-mtime',
+      last_probe_at: '2026-07-08T11:30:00Z',
+    });
+    assert.deepEqual(a1.links, ['B']);
+    // unknown-faithful: agt-002 never had a model, so the compact projection omits it.
+    const a2 = vm.body.agents.find((a: { id: string }) => a.id === 'agt-002');
+    assert.equal('model' in a2, false);
+    assert.equal(a2.has_attach_cmd, false);
+    assert.equal(a2.state, 'terminal');
+
+    // --- node.agent_refs — server join of agents[].links ---
+    const nodeB = vm.body.graph.nodes.find((n: { id: string }) => n.id === 'B');
+    assert.deepEqual(nodeB.agent_refs, ['agt-001']);
+    const nodeC = vm.body.graph.nodes.find((n: { id: string }) => n.id === 'C');
+    assert.deepEqual(nodeC.agent_refs, ['agt-002']);
+    const nodeA = vm.body.graph.nodes.find((n: { id: string }) => n.id === 'A');
+    assert.deepEqual(nodeA.agent_refs, []);
+
+    // --- agent_insights macro + derived unclaimed-ready ---
+    const ins = vm.body.agent_insights;
+    assert.equal(ins.total, 2);
+    assert.equal(ins.running, 1);
+    assert.equal(ins.active, 1);
+    assert.equal(ins.by_state.running, 1);
+    assert.equal(ins.by_state.terminal, 1);
+    assert.equal(ins.by_harness.codex, 1);
+    assert.equal(ins.oldest_in_flight.id, 'agt-001');
+    assert.ok(typeof ins.oldest_in_flight.elapsed_ms === 'number');
+    // C is ready but claimed by agt-002; D is ready + unclaimed -> only D listed.
+    assert.deepEqual(
+      ins.unclaimed_ready.map((t: { id: string }) => t.id),
+      ['D'],
+    );
+
+    // --- /agent.json single-agent drill-down (record + linked-task join + probe) ---
+    const detail = await httpJson({
+      port,
+      path: '/agent.json?board=20260708T120000Z-1.board.json&agent=agt-001',
+      token: 'agent-token',
+    });
+    assert.equal(detail.status, 200);
+    assert.equal(detail.body.schema, 'ccm/web-viewer-agent/v1');
+    assert.equal(detail.body.agent.id, 'agt-001');
+    assert.equal(detail.body.agent.handle.attach_cmd, 'codex resume 0197-abc');
+    assert.deepEqual(detail.body.probe, {
+      observed: 'alive',
+      as_of: '2026-07-08T11:30:00Z',
+      method: 'session-file-mtime',
+      last_probe_at: '2026-07-08T11:30:00Z',
+    });
+    assert.equal(detail.body.linked_tasks.length, 1);
+    assert.equal(detail.body.linked_tasks[0].task_id, 'B');
+    assert.equal(detail.body.linked_tasks[0].title, 'Wire model');
+    assert.equal(detail.body.linked_tasks[0].status, 'in_flight');
+    assert.equal(detail.body.linked_tasks[0].exists, true);
+
+    // --- error contracts: missing param (400), unknown agent (404) ---
+    const noParam = await httpJson({
+      port,
+      path: '/agent.json?board=20260708T120000Z-1.board.json',
+      token: 'agent-token',
+    });
+    assert.equal(noParam.status, 400);
+    assert.equal(noParam.body.schema, 'ccm/web-viewer-agent/v1');
+    const missing = await httpJson({
+      port,
+      path: '/agent.json?board=20260708T120000Z-1.board.json&agent=agt-999',
+      token: 'agent-token',
+    });
+    assert.equal(missing.status, 404);
+    const unauth = await httpJson({
+      port,
+      path: '/agent.json?board=20260708T120000Z-1.board.json&agent=agt-001',
+    });
+    assert.equal(unauth.status, 403);
+
+    // server stays read-only on the agent read-model path (no board mutation).
+    assert.equal(
+      readFileSync(boardPath, 'utf8'),
+      before,
+      'agent read-model leaves board byte-identical',
+    );
+  } finally {
+    await httpJson({ port, path: '/_ccm/shutdown', token: 'agent-token', method: 'POST' }).catch(
+      () => {},
+    );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});
+
+test('serve merges resolvable attempt.agent_ref into node agent_refs; run-store refs stay out', async () => {
+  const home = mkHome();
+  // Dedicated cross-harness writers record the attempt→agent join on the attempt only
+  // (routing.attempts[].agent_ref) — no agents[].links entry is ever written.
+  const boardPath = seedBoard(home, {
+    file: '20260708T120000Z-2.board.json',
+    tasks: [
+      {
+        id: 'E',
+        title: 'Cutover',
+        status: 'in_flight',
+        deps: [],
+        routing: {
+          attempts: [
+            { id: 'attempt-1', candidate_id: 'codex-cli', state: 'running', agent_ref: 'agt-101' },
+          ],
+        },
+      },
+      {
+        id: 'F',
+        title: 'Report',
+        status: 'ready',
+        deps: [],
+        routing: {
+          // run-store style ref: resolves to no registry agent — must stay OUT of the join
+          // (the inspector renders it as plain text, never a jump).
+          attempts: [{ id: 'attempt-2', state: 'failed', agent_ref: 'run:0197-dead' }],
+        },
+      },
+      {
+        id: 'G',
+        title: 'Verify',
+        status: 'ready',
+        deps: [],
+        routing: {
+          attempts: [{ id: 'attempt-3', state: 'running', agent_ref: 'agt-101' }],
+        },
+      },
+    ],
+    agents: [
+      {
+        id: 'agt-101',
+        type: 'cli-worker',
+        harness: 'codex',
+        intent: 'drive E to acceptance',
+        lifecycle: { state: 'running', registered_at: '2026-07-08T11:00:00Z' },
+        // no links[] — the join must come from the attempt side.
+      },
+    ],
+  });
+  const { statePath } = writeServeState(home, 'wv_attemptref', 'ar-token', boardPath);
+  const { port, servePromise } = await startServe(statePath, home);
+  try {
+    const vm = await httpJson({
+      port,
+      path: '/view-model.json?board=20260708T120000Z-2.board.json',
+      token: 'ar-token',
+    });
+    assert.equal(vm.status, 200);
+    const nodeE = vm.body.graph.nodes.find((n: { id: string }) => n.id === 'E');
+    assert.deepEqual(nodeE.agent_refs, ['agt-101']);
+    const nodeF = vm.body.graph.nodes.find((n: { id: string }) => n.id === 'F');
+    assert.deepEqual(nodeF.agent_refs, []);
+    // G is ready but claimed via the attempt-side join; F's unresolvable ref claims nothing.
+    assert.deepEqual(
+      vm.body.agent_insights.unclaimed_ready.map((t: { id: string }) => t.id),
+      ['F'],
+    );
+  } finally {
+    await httpJson({ port, path: '/_ccm/shutdown', token: 'ar-token', method: 'POST' }).catch(
+      () => {},
+    );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});
+
+test('serve /agent.json answers a torn board read with 200 + error and no compact', async () => {
+  const home = mkHome();
+  const boardPath = seedBoard(home, {
+    file: '20260708T120000Z-3.board.json',
+    tasks: [{ id: 'A', title: 'Solo', status: 'ready', deps: [] }],
+    agents: [
+      {
+        id: 'agt-201',
+        type: 'cli-worker',
+        harness: 'codex',
+        intent: 'solo',
+        lifecycle: { state: 'running', registered_at: '2026-07-08T11:00:00Z' },
+      },
+    ],
+  });
+  const { statePath } = writeServeState(home, 'wv_tornagent', 'torn-token', boardPath);
+  const { port, servePromise } = await startServe(statePath, home);
+  try {
+    // Torn write: the board bytes are momentarily not valid JSON.
+    writeFileSync(boardPath, '{"schema": "cc-master/v2", "tasks": [', 'utf8');
+    const detail = await httpJson({
+      port,
+      path: '/agent.json?board=20260708T120000Z-3.board.json&agent=agt-201',
+      token: 'torn-token',
+    });
+    // Contract the frontend relies on: 200 + {schema, error} WITHOUT compact — the client
+    // treats it as a failure (keeps the selection, shows the detail-error state) instead of
+    // silently falling back to the mission brief.
+    assert.equal(detail.status, 200);
+    assert.equal(detail.body.schema, 'ccm/web-viewer-agent/v1');
+    assert.equal(typeof detail.body.error, 'string');
+    assert.ok(detail.body.error.length > 0);
+    assert.equal('compact' in detail.body, false);
+  } finally {
+    await httpJson({ port, path: '/_ccm/shutdown', token: 'torn-token', method: 'POST' }).catch(
+      () => {},
+    );
+  }
+  assert.equal(await servePromise, EXIT.OK);
+});
+
+test('serve view-model agents[] is empty and node agent_refs absent-safe when board has no agents', async () => {
+  const home = mkHome();
+  const boardPath = seedBoard(home, {
+    tasks: [{ id: 'A', title: 'Solo', status: 'ready', deps: [] }],
+  });
+  const { statePath } = writeServeState(home, 'wv_noagents', 'na-token', boardPath);
+  const { port, servePromise } = await startServe(statePath, home);
+  try {
+    const vm = await httpJson({ port, path: '/view-model.json', token: 'na-token' });
+    assert.equal(vm.status, 200);
+    assert.deepEqual(vm.body.agents, []);
+    assert.equal(vm.body.agent_insights.total, 0);
+    assert.deepEqual(vm.body.agent_insights.unclaimed_ready, [{ id: 'A', title: 'Solo' }]);
+    assert.deepEqual(vm.body.graph.nodes[0].agent_refs, []);
+  } finally {
+    await httpJson({ port, path: '/_ccm/shutdown', token: 'na-token', method: 'POST' }).catch(
       () => {},
     );
   }

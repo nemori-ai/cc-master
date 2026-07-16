@@ -14,9 +14,9 @@ import {
 } from '@xyflow/react';
 import { RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AGENT_CHIP_STATES, agentStateRank } from '../agentFormat';
 import { lineageFor, perNodeStructure, tasksOf } from '../analytics';
 import { minimapColor, normalizeStatus, startTs } from '../format';
-import { type LocateRequest, prefersReducedMotion } from '../locate';
 import {
   computeVisibleGraph,
   type GraphOrientation,
@@ -25,8 +25,9 @@ import {
   NODE_W,
   type RankBand,
 } from '../graphLayout';
+import { type LocateRequest, prefersReducedMotion } from '../locate';
 import { nodeMatchesTaskFilters } from '../taskFilters';
-import type { CompactTask, ViewModelPayload } from '../types';
+import type { CompactAgent, CompactTask, ViewModelPayload } from '../types';
 import { type CcFlowNode, CcNode, type CcNodeData } from './CcNode';
 import { Legend } from './Legend';
 
@@ -39,11 +40,14 @@ interface DagWorkspaceProps {
   activeFilters: Set<string>;
   selectedTaskId: string | null;
   onSelectTask: (taskId: string | null) => void;
+  onSelectAgent: (agentId: string) => void;
   onToggleFilter: (filter: string) => void;
   resetKey: number;
   theme: 'dark' | 'light';
   locateRequest: LocateRequest | null;
   onResetLayout: () => void;
+  /** When set, dim every node NOT in this set (selected agent's linked nodes). */
+  highlightNodeIds?: Set<string> | null;
 }
 
 const nodeTypes = { cc: CcNode };
@@ -112,11 +116,13 @@ function DagCanvas({
   activeFilters,
   selectedTaskId,
   onSelectTask,
+  onSelectAgent,
   onToggleFilter,
   resetKey,
   theme,
   locateRequest,
   onResetLayout,
+  highlightNodeIds = null,
 }: DagWorkspaceProps) {
   const rf = useReactFlow();
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
@@ -211,6 +217,11 @@ function DagCanvas({
     const tasksById = new Map<string, CompactTask>(
       tasksOf(viewModel).map((task) => [task.id, task]),
     );
+    // Agent chips: pure table lookup over the server join (node.agent_refs -> compact
+    // agents[]) — only non-terminal states surface on the node face, active-first.
+    const agentsById = new Map<string, CompactAgent>(
+      (viewModel.agents ?? []).map((agent) => [agent.id, agent]),
+    );
     const statusById = new Map(viewModel.graph.nodes.map((node) => [node.id, node.status]));
     const lineage = lineageFor(viewModel, selectedTaskId);
     const bottleneckId = insights?.bottleneck?.id ?? null;
@@ -242,9 +253,14 @@ function DagCanvas({
       }).length;
       const childOf = parents[node.id] ?? null;
       const structure = perNodeStructure(insights, node.id);
+      const nodeAgents = (node.agent_refs ?? [])
+        .map((ref) => agentsById.get(ref))
+        .filter((agent): agent is CompactAgent => !!agent && AGENT_CHIP_STATES.has(agent.state))
+        .sort((a, b) => agentStateRank(a.state) - agentStateRank(b.state));
       const dimmed =
-        filtersActive &&
-        !(nodeMatchesTaskFilters(node, activeFilters) && queryMatches(node, query));
+        (filtersActive &&
+          !(nodeMatchesTaskFilters(node, activeFilters) && queryMatches(node, query))) ||
+        (highlightNodeIds != null && !highlightNodeIds.has(node.id));
       return {
         id: node.id,
         type: 'cc' as const,
@@ -277,7 +293,9 @@ function DagCanvas({
           modelLabel: node.model
             ? `${node.model}${node.role_grades?.length ? ` · ${node.role_grades.join('/')}` : ''}`
             : null,
+          agents: nodeAgents,
           onToggleCollapse: toggleCollapse,
+          onSelectAgent,
         },
       };
     });
@@ -330,9 +348,11 @@ function DagCanvas({
     collapsed,
     orientation,
     toggleCollapse,
+    onSelectAgent,
     filtersActive,
     dragNonce,
     resetKey,
+    highlightNodeIds,
   ]);
 
   useEffect(() => {

@@ -1771,6 +1771,76 @@ header.missionline {
   letter-spacing: 0.02em;
 }
 
+/* Agent chips on the node face — "who is ON this node" realtime row. Single fixed-height
+   line (overflow hidden; the render folds extras into "+N") so tile height stays bounded. */
+.cc-node .agentrow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  height: 18px;
+  overflow: hidden;
+}
+.cc-node .agentchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--chip-bg);
+  color: var(--ink-dim);
+  border: 1px solid var(--hair-soft);
+  cursor: pointer;
+}
+.cc-node .agentchip:hover {
+  color: var(--ink);
+  border-color: var(--ready);
+}
+.cc-node .agentchip .alamp,
+.lvrow .lchip.agents .alamp {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: 0 0 4px currentColor;
+}
+.cc-node .agentchip .ae {
+  color: var(--inflight);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+/* orphaned agents are an anomaly that must jump out of the graph */
+.cc-node .agentchip.orphaned {
+  background: oklch(0.62 0.19 25 / 0.14);
+  border-color: oklch(0.62 0.19 25 / 0.5);
+  color: var(--failed);
+}
+.cc-node .agentchip.orphaned:hover {
+  border-color: var(--failed);
+}
+.cc-node .agentmore {
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 8px;
+  color: var(--ink-dim);
+  flex: 0 0 auto;
+}
+.lvrow .lchip.agents {
+  gap: 3px;
+}
+.lvrow .lchip.agents.orphaned {
+  background: oklch(0.62 0.19 25 / 0.14);
+  border-color: oklch(0.62 0.19 25 / 0.5);
+  color: var(--failed);
+}
+.lvrow .lchip.agents.orphaned .cn {
+  color: var(--failed);
+}
+
 /* nesting: owner / child */
 .cc-node.owner {
   border-color: oklch(0.7 0.115 244 / 0.42);
@@ -2554,6 +2624,23 @@ header.missionline {
 
 .candidate-row[data-selected='true'] {
   color: var(--ready);
+}
+/* Clickable attempt row (server-joined agent_ref) — button reset, keeps the attempt grid,
+   adds a subtle affordance so it reads as a jump into agent mode. */
+button.attempt-row-agent {
+  width: 100%;
+  margin: 0;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--hair-soft);
+  font: inherit;
+  text-align: left;
+  align-items: center;
+  cursor: pointer;
+}
+button.attempt-row-agent:hover {
+  color: var(--ready);
+  background: color-mix(in oklch, var(--ready) 6%, transparent);
 }
 .badge {
   display: inline-flex;
@@ -4447,4 +4534,353 @@ header.missionline {
   color: var(--done);
   border-color: oklch(0.74 0.135 162 / 0.4);
   background: oklch(0.74 0.135 162 / 0.1);
+}
+
+/* ============================================================================
+   Agent Registry (S4) — roster stage view, agent inspector, macro / rail bits.
+   Reuses the shared .dpanel / .dsect / .depitem / .metric primitives; only the
+   agent-specific surfaces are styled here.
+   ============================================================================ */
+
+/* --- Agent roster (fifth stage view) --- */
+.agent-roster {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.agent-roster.empty {
+  align-items: center;
+  justify-content: center;
+}
+.agent-roster-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+.agent-roster-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--hair-soft);
+}
+.arh-count {
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.arh-summary {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.agent-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Horizontal-scroll floor: when the center column is squeezed (left rail + inspector
+     open), the row's min-width kicks in and the table scrolls sideways instead of letting
+     the fr tracks collapse to 0 and the cells paint over each other. */
+  overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+}
+.agent-row {
+  display: grid;
+  /* Every column has its own non-collapsible track: flexible columns (agent / harness /
+     intent / probe) carry a minmax() floor so a squeeze truncates them (ellipsis) rather
+     than resolving 1fr/2fr to 0px and stacking neighbours' text. */
+  grid-template-columns:
+    96px minmax(76px, 1fr) minmax(88px, 130px) minmax(100px, 2fr) 44px 72px minmax(86px, 108px);
+  /* Sum of the track floors + gaps + padding — below this the table scrolls, never overlaps. */
+  min-width: 654px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  border: none;
+  border-bottom: 1px solid var(--hair-soft);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink);
+  width: 100%;
+  font: inherit;
+}
+.agent-row:hover {
+  background: var(--panel-hi);
+}
+.agent-row[data-selected='true'] {
+  background: var(--panel-hi);
+  box-shadow: inset 3px 0 0 var(--spine);
+}
+.agent-row-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  cursor: default;
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.agent-row-head:hover {
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+}
+.agent-row .lamp {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  box-shadow: 0 0 6px currentColor;
+}
+.ac-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ac-state-text {
+  font-size: 10.5px;
+  color: var(--ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-id {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+}
+.ac-id-code {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-type {
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-harness {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+.harness-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 5px;
+  /* Reuse the route-facet chip token (.chip.route / .lchip.route) so the harness badge in the
+     roster reads as the same facet language as the node/list harness+surface chips. */
+  border: 1px solid color-mix(in oklch, var(--ready) 25%, var(--hair));
+  background: color-mix(in oklch, var(--ready) 7%, var(--panel));
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+  /* Cap at the harness track: a long harness name truncates inside its own cell instead
+     of a max-content chip painting across the neighbouring columns. */
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-model {
+  font-size: 9.5px;
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-intent {
+  font-size: 11.5px;
+  color: var(--ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ac-intent .dim {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+.ac-links,
+.ac-elapsed {
+  font-size: 11px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+.ac-probe {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+}
+.ac-probe-text {
+  font-size: 10.5px;
+  color: var(--ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-probe-asof {
+  font-size: 9px;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 720px) {
+  .agent-row {
+    /* Five visible cells (state / agent / tasks / elapsed / probe) — one track each so the
+       probe cell never wraps onto an implicit second row. */
+    grid-template-columns: 84px minmax(64px, 1fr) 36px 56px minmax(72px, 88px);
+    /* Track floors (312) + gaps (40) + padding (32) — matches the tracks so nothing crushes. */
+    min-width: 384px;
+  }
+  .agent-row .ac-harness,
+  .agent-row .ac-intent,
+  .agent-row .ac-probe-asof {
+    display: none;
+  }
+  .agent-row-head .ac-harness,
+  .agent-row-head .ac-intent {
+    display: none;
+  }
+}
+
+/* --- Agent inspector (right rail, third mode) --- */
+.dpanel[data-mode='agent'] .v .lamp {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  box-shadow: 0 0 5px currentColor;
+}
+.attach-cwd {
+  margin-bottom: 5px;
+  font-size: 10px;
+  color: var(--ink-dim);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.attach-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.attach-cmd {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--hair);
+  border-radius: 7px;
+  background: var(--panel-hi);
+  font-size: 11px;
+  color: var(--ink);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.attach-copy {
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border: 1px solid var(--hair);
+  border-radius: 7px;
+  background: var(--panel-hi);
+  color: var(--ink-dim);
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.attach-copy:hover {
+  color: var(--spine);
+  border-color: var(--spine);
+}
+.depitem:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* --- Left-rail agents metric (bucket counts) --- */
+.metric-btn {
+  border: none;
+  border-bottom: 1px solid var(--hair-soft);
+  background: none;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  color: var(--ink);
+  font: inherit;
+}
+.metric-btn:hover {
+  background: var(--panel-hi);
+}
+.agent-buckets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.agent-bucket {
+  font-family: 'Martian Mono', ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.02em;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--hair);
+  background: var(--panel);
+  color: var(--ink-dim);
+}
+.agent-bucket[data-state='running'] {
+  color: var(--inflight);
+  border-color: color-mix(in oklch, var(--inflight) 40%, transparent);
+}
+.agent-bucket[data-state='uncertain'] {
+  color: var(--uncertain);
+  border-color: color-mix(in oklch, var(--uncertain) 40%, transparent);
+}
+.agent-bucket[data-state='orphaned'] {
+  color: var(--failed);
+  border-color: color-mix(in oklch, var(--failed) 40%, transparent);
+}
+.agent-bucket[data-state='terminal'] {
+  color: var(--done);
+  border-color: color-mix(in oklch, var(--done) 40%, transparent);
+}
+.msub-inline {
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-left: 4px;
+}
+
+/* --- Board-brief policy readout --- */
+.policy .policy-allow {
+  color: var(--done);
+}
+.policy .policy-deny {
+  color: var(--failed);
 }

@@ -1,8 +1,20 @@
-import { Handle, Position } from '@xyflow/react';
 import type { Node, NodeProps } from '@xyflow/react';
+import { Handle, Position } from '@xyflow/react';
 import type { CSSProperties } from 'react';
-import { fmtElapsed, statusLampVar, statusText } from '../format';
+import {
+  agentElapsed,
+  agentIsActive,
+  agentStateLamp,
+  agentStateText,
+  harnessBadge,
+} from '../agentFormat';
 import { CONV_MIN, IMPACT_HOT, useSecondTick } from '../analytics';
+import { fmtElapsed, statusLampVar, statusText } from '../format';
+import type { CompactAgent } from '../types';
+
+// At most this many agent chips on the node face; the rest fold into a "+N" tail (the task
+// inspector's agents section lists them all).
+const AGENT_CHIP_MAX = 3;
 
 export interface CcNodeData extends Record<string, unknown> {
   id: string;
@@ -27,7 +39,10 @@ export interface CcNodeData extends Record<string, unknown> {
   routeOutcome: string | null;
   routeLabel: string | null;
   modelLabel: string | null;
+  /** Active (non-terminal) registry agents on this node — server-joined, table-lookup only. */
+  agents: CompactAgent[];
   onToggleCollapse: (id: string) => void;
+  onSelectAgent: (agentId: string) => void;
 }
 
 export type CcFlowNode = Node<CcNodeData, 'cc'>;
@@ -49,8 +64,10 @@ export function CcNode({ data }: NodeProps<CcFlowNode>) {
   const title = (data.title || '').trim();
 
   // Live running clock: in_flight tiles tick once per second off the dispatch anchor.
+  // Agent chips with a live elapsed readout share the same ticker.
+  const nodeAgents = data.agents ?? [];
   const running = data.status === 'in_flight' && data.dispatchedAt != null;
-  useSecondTick(running);
+  useSecondTick(running || nodeAgents.some((agent) => agentIsActive(agent.state)));
   let clockStr: string | null = null;
   if (running && data.dispatchedAt != null) {
     clockStr = fmtElapsed(Date.now() - data.dispatchedAt);
@@ -69,7 +86,7 @@ export function CcNode({ data }: NodeProps<CcFlowNode>) {
         <span className="cn">
           {data.ownerDone}/{data.ownerChildCount}
         </span>
-      </span>
+      </span>,
     );
   }
   if (data.impact > 0) {
@@ -77,7 +94,7 @@ export function CcNode({ data }: NodeProps<CcFlowNode>) {
       <span className={`chip impact${data.impact >= IMPACT_HOT ? ' hot' : ''}`} key="imp">
         gates
         <span className="cn">{data.impact}</span>
-      </span>
+      </span>,
     );
   }
   if (data.inDeg >= CONV_MIN) {
@@ -85,7 +102,7 @@ export function CcNode({ data }: NodeProps<CcFlowNode>) {
       <span className="chip conv" key="cv" title="convergence join">
         ⋈ in
         <span className="cn">{data.inDeg}</span>
-      </span>
+      </span>,
     );
   }
   if (clockStr) {
@@ -93,21 +110,21 @@ export function CcNode({ data }: NodeProps<CcFlowNode>) {
       <span className="chip dur" key="dur" title={`running ${clockStr} since dispatch`}>
         <span className="cglyph">◷</span>
         <span className="cn">{clockStr}</span>
-      </span>
+      </span>,
     );
   }
   if (data.routeLabel) {
     chips.push(
       <span className="chip route" key="route" title={data.routeOutcome ?? 'routed task'}>
         {data.routeLabel}
-      </span>
+      </span>,
     );
   }
   if (data.modelLabel) {
     chips.push(
       <span className="chip model" key="model" title="selected model and role grade">
         {data.modelLabel}
-      </span>
+      </span>,
     );
   }
 
@@ -141,6 +158,43 @@ export function CcNode({ data }: NodeProps<CcFlowNode>) {
         {title || 'untitled'}
       </div>
       {chips.length ? <div className="meta">{chips}</div> : null}
+      {nodeAgents.length ? (
+        // Realtime "who is ON this node" row: one chip per active registry agent (state lamp
+        // + harness badge + live elapsed while running). Single fixed-height line — overflow
+        // folds into "+N" so the tile height stays bounded (rank-band contract).
+        <div className="agentrow">
+          {nodeAgents.slice(0, AGENT_CHIP_MAX).map((agent) => {
+            const chipLamp = agentStateLamp(agent.state);
+            const elapsed = agentElapsed(agent);
+            return (
+              <button
+                className={`agentchip${agent.state === 'orphaned' ? ' orphaned' : ''}`}
+                key={agent.id}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  data.onSelectAgent(agent.id);
+                }}
+                title={`${agent.id}${agent.intent ? ` — ${agent.intent}` : ''} · ${agentStateText(agent.state)}${elapsed ? ` · ${elapsed}` : ''}`}
+                type="button"
+              >
+                <span className="alamp" style={{ background: chipLamp, color: chipLamp }} />
+                <span className="ah">{harnessBadge(agent.harness)}</span>
+                {agent.state === 'running' && elapsed ? (
+                  <span className="ae">{elapsed}</span>
+                ) : null}
+              </button>
+            );
+          })}
+          {nodeAgents.length > AGENT_CHIP_MAX ? (
+            <span
+              className="agentmore"
+              title={`${nodeAgents.length - AGENT_CHIP_MAX} more active agents — open the task to see all`}
+            >
+              +{nodeAgents.length - AGENT_CHIP_MAX}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       {data.userGate ? (
         <div className="gateflag" title="paused — waiting on your decision">
           <span className="gpause">

@@ -81,7 +81,50 @@ export const ENUMS = {
   reviewVerdict: ['APPROVE', 'REQUEST-CHANGES'],
   // Goal Contract 的确认级别（ADR-035）。pending/ asserted 可由 agent 写；confirmed 由 CLI 授权闸控制。
   goalAssurance: ['pending', 'asserted', 'confirmed'],
+  // ── Agent Registry（board ✎ 段 agents[]·跨所有派发类型的统一运行时登记簿）──────────────────────────
+  //   agent = 实际跑起来的运行时实例（runtime 层），与 task.executor（planning 层的计划执行者类型）正交、不合并。
+  // agentType：被登记的运行时实例种类（凡派发皆登记·闭合）。
+  agentType: ['cli-worker', 'subagent', 'background-shell', 'workflow'],
+  // agentHarness：实例所在 harness（配额/attach 语义分区键·闭合）。origin = 本 orchestrator 进程内 sub-agent。
+  agentHarness: ['codex', 'claude-code', 'cursor-agent', 'origin'],
+  // agentState：agent lifecycle 状态机（逐字复用 native-attempt 铁律语义·闭合）。
+  //   starting→running 须交真实 handle 证据；terminal ≠ task done；probe 观测冲突以观测为准降级。
+  agentState: ['starting', 'running', 'uncertain', 'terminal', 'orphaned'],
+  // agentHandleKind：bind 交出的证据句柄类型（none = 尚无证据·starting 缺省）。
+  agentHandleKind: ['session-id', 'pid', 'task-id', 'none'],
+  // agentObserved：probe 活性观测结果（保真·拿不到即 unknown，绝不用相邻字段推导补齐）。
+  agentObserved: ['alive', 'silent', 'gone', 'unknown'],
+  // agentProbeMethod：probe 采用的探测手段（按 handle 类型分级·none = 无可探测句柄）。
+  agentProbeMethod: ['pid', 'session-file-mtime', 'transcript-mtime', 'none'],
 } satisfies Record<string, string[]>;
+
+// ── AGENT_ID_RE：agents[].id 语法（遵守 run-store v2 ID 文法·未来平滑升级为 run_ref）。────────────────
+//   建议生成形如 agt-001；语法允许更广，供未来 run store 收敛时复用同一文法。
+export const AGENT_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+export function isAgentId(v: unknown): boolean {
+  return typeof v === 'string' && AGENT_ID_RE.test(v);
+}
+
+// ── Agent lifecycle 状态机（逐字复用 native-attempt 转移语义与错误词汇风格）。─────────────────────────
+//   starting→running（bind 交证据）· running/uncertain→terminal（登记 outcome·terminal ≠ done）·
+//   starting→terminal（启动失败收口：spawn 失败、无 handle 可 bind 的 agent 须能显式收口，对齐
+//     native-attempt 的 startup_failed 终类——否则成永久僵尸：terminal 被拒、probe method=none 永远 unknown）·
+//   uncertain→running（probe alive / 再 bind 复活）· {starting,running,uncertain}→{uncertain,orphaned}（probe 降级）·
+//   orphaned→running（probe alive 证据式恢复·双向 reconcile）· orphaned→terminal（由 orchestrator 显式收口）。
+//   terminal 是唯一终态（probe 永不复活）。
+export const AGENT_STATE_MACHINE: Record<string, string[]> = {
+  starting: ['running', 'uncertain', 'orphaned', 'terminal'],
+  running: ['terminal', 'uncertain', 'orphaned'],
+  uncertain: ['running', 'terminal', 'orphaned'],
+  // orphaned→running：证据式恢复（probe 观测 alive 即证据·orphaned 可能是启动竞态/误判死的产物）。
+  orphaned: ['terminal', 'running'],
+  terminal: [],
+};
+export function isLegalAgentTransition(from: string, to: string): boolean {
+  if (from === to) return true; // 幂等（同态重入·如 running→running·probe alive）。
+  const next = AGENT_STATE_MACHINE[from];
+  return Array.isArray(next) && next.includes(to);
+}
 
 // 枚举名（ENUMS 的 key）——isEnumMember 的 name 形参类型。
 export type EnumName = keyof typeof ENUMS;
@@ -289,6 +332,18 @@ export const FIELDS = {
       writers: 'hook 经 ccm board set-param（带锁·hook-owned 参数区·ADR-020）/ agent 经 ccm',
       when: '周期 identity/critpath/goal hook 注入提示后刷簿记时间戳；agent 独立确认本板可停止后写短期 stop_allow_until',
       degrade: '缺→视为「从未提示」(首次必提示)；形状坏→warn(FMT-RUNTIME)·不拦写盘',
+    },
+    agents: {
+      tier: '✎',
+      type: 'array<{id, type, harness, model?, intent, launch?, handle?, lifecycle, probe?, links?, account_ref, quota_pool_ref}>?',
+      default: '缺省(无 agent 登记)',
+      readers:
+        'ccm agent list|show / viewer 花名册与 agent 模式 / BIZ-INFLIGHT-AGENT 判 in_flight task 是否已登记 agent',
+      writers:
+        'ccm agent create|bind|link|terminal|probe（probe 只写 agents[] 自己的 probe/lifecycle 字段）',
+      when: '凡派发（sub-agent / 后台 shell / workflow / 跨 harness worker）即登记；bind 交证据 / link 建关联 / probe 探活',
+      degrade:
+        '缺→无 agent 登记(viewer 花名册空)；形状坏→warn(FMT-AGENTS)·不拦写盘(✎ hook 不读·窄腰零碰撞)',
     },
   },
   task: {
@@ -1195,6 +1250,22 @@ export const INVARIANTS: Invariant[] = [
     scope: 'board',
     summary:
       'runtime 非对象、或已知键（last_identity_remind 等）类型不合法（时间锚须 ISO-8601 UTC）',
+  },
+  {
+    id: 'FMT-AGENTS',
+    level: 'warn',
+    family: 'FMT',
+    scope: 'board',
+    summary:
+      'agents 若存在须为数组；条目 id 语法/唯一、type/harness/handle.kind/lifecycle.state/probe.observed/probe.method 合法、时间字段 ISO、links[].task_id 非空、account_ref/quota_pool_ref 为 null 或字符串',
+  },
+  {
+    id: 'BIZ-INFLIGHT-AGENT',
+    level: 'warn',
+    family: 'BIZ',
+    scope: 'board',
+    summary:
+      'task 为 in_flight 但无任何 agent 登记指向它（agents[].links[].task_id 或 attempt.agent_ref）——提示补登记',
   },
 ];
 
