@@ -15,7 +15,7 @@ import test from 'node:test';
 import guidanceAttestation from '../../scripts/provider-guidance-attestation.cjs';
 
 const ROOT = join(import.meta.dirname, '..', '..');
-const HOSTS = ['claude-code', 'codex', 'cursor'];
+const HOSTS = ['claude-code', 'codex', 'cursor', 'kimi-code'];
 const SKILLS = ['master-orchestrator-guide', 'pacing-and-estimation', 'using-ccm'];
 
 const fixture = () => {

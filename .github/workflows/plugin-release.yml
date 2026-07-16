@@ -11,6 +11,7 @@
 #   - cc-master-plugin-claude-code-<tag>.zip
 #   - cc-master-plugin-codex-<tag>.zip
 #   - cc-master-plugin-cursor-<tag>.zip
+#   - cc-master-plugin-kimi-code-<tag>.zip
 #   - SHA256SUMS（install.sh 安装前必须校验）
 name: plugin-release
 
@@ -87,6 +88,16 @@ jobs:
           test -d "${DEST}/cc-master/hooks"
           test -d "${DEST}/cc-master/skills"
           test -d "${DEST}/cc-master/rules"
+
+      # kimi manifest is a root file (kimi.plugin.json), not a .{host}-plugin/ dir; commands project
+      # host-native. hooks/ ships once the kimi PHIP adapter lands (registered inline in the manifest).
+      - name: Validate kimi-code packaged adapter
+        run: |
+          DEST="$(mktemp -d)"
+          unzip -q "dist/cc-master-plugin-kimi-code-${{ steps.pkg.outputs.tag }}.zip" -d "${DEST}"
+          test -f "${DEST}/cc-master/kimi.plugin.json"
+          test -d "${DEST}/cc-master/skills"
+          test -d "${DEST}/cc-master/commands"
 
       # 上传 artifact（workflow_dispatch / 非 tag 触发时也留存可下载）。
       - name: Upload artifact

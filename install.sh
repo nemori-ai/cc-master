@@ -92,8 +92,8 @@ while [ $# -gt 0 ]; do
     --ccm-version=*) CCM_VERSION="${1#*=}"; [ -n "$CCM_VERSION" ] || die "--ccm-version 需要一个值（如 ccm-v0.11.0）"; shift ;;
     --plugin-version) PLUGIN_VERSION="${2:-}"; [ -n "$PLUGIN_VERSION" ] || die "--plugin-version 需要一个值（如 v0.10.1）"; shift 2 ;;
     --plugin-version=*) PLUGIN_VERSION="${1#*=}"; [ -n "$PLUGIN_VERSION" ] || die "--plugin-version 需要一个值（如 v0.10.1）"; shift ;;
-    --harness) HARNESS_TARGET="${2:-}"; [ -n "$HARNESS_TARGET" ] || die "--harness 需要一个值（auto / claude-code / codex / cursor）"; shift 2 ;;
-    --harness=*) HARNESS_TARGET="${1#*=}"; [ -n "$HARNESS_TARGET" ] || die "--harness 需要一个值（auto / claude-code / codex / cursor）"; shift ;;
+    --harness) HARNESS_TARGET="${2:-}"; [ -n "$HARNESS_TARGET" ] || die "--harness 需要一个值（auto / claude-code / codex / cursor / kimi-code）"; shift 2 ;;
+    --harness=*) HARNESS_TARGET="${1#*=}"; [ -n "$HARNESS_TARGET" ] || die "--harness 需要一个值（auto / claude-code / codex / cursor / kimi-code）"; shift ;;
     --all-harnesses) ALL_HARNESSES=1; shift ;;
     --version|--version=*) die "$LEGACY_VERSION_HINT" ;;
     -h|--help) usage ;;
@@ -227,7 +227,7 @@ verify_downloaded_release_asset() {
 }
 
 # ── Target-adjacent transactional publisher ──────────────────────────────────────────────────────
-# Usage: transactional_publish <binary|plugin:claude-code|plugin:codex|plugin:cursor> <source> <target>
+# Usage: transactional_publish <binary|plugin:claude-code|plugin:codex|plugin:cursor|plugin:kimi-code> <source> <target>
 #
 # Source acquisition may cross filesystems. Publication never does: the candidate is copied into a
 # target-adjacent stage, re-checksummed/validated there, fsync'd, then activated by rename. Binary
@@ -403,6 +403,7 @@ function validatePlugin(root, host) {
     'claude-code': '.claude-plugin/marketplace.json',
     codex: '.codex-plugin/plugin.json',
     cursor: '.cursor-plugin/plugin.json',
+    'kimi-code': 'kimi.plugin.json',
   };
   const relative = manifests[host];
   if (!relative) fail(`unsupported plugin host: ${host}`, 'KIND');
@@ -811,6 +812,7 @@ normalize_harness() {
     claude|claude-code|claudecode) printf '%s\n' "claude-code" ;;
     codex|openai-codex) printf '%s\n' "codex" ;;
     cursor|cursor-ide) printf '%s\n' "cursor" ;;
+    kimi|kimi-code|kimicode) printf '%s\n' "kimi-code" ;;
     *) return 1 ;;
   esac
 }
@@ -818,6 +820,7 @@ normalize_harness() {
 claude_bin() { printf '%s\n' "${CCM_CLAUDE_BIN:-${CLAUDE_BIN:-claude}}"; }
 codex_bin() { printf '%s\n' "${CCM_CODEX_BIN:-${CODEX_BIN:-codex}}"; }
 cursor_bin() { printf '%s\n' "${CCM_CURSOR_BIN:-${CURSOR_BIN:-cursor}}"; }
+kimi_bin() { printf '%s\n' "${CCM_KIMI_BIN:-${KIMI_BIN:-kimi}}"; }
 
 claude_config_dir() {
   if [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then
@@ -848,6 +851,17 @@ cursor_config_dir() {
   fi
 }
 
+# kimi home resolves KIMI_CODE_HOME > ~/.kimi-code (binary resolveKimiHome).
+kimi_config_dir() {
+  if [ -n "${KIMI_CODE_HOME:-}" ]; then
+    printf '%s\n' "$KIMI_CODE_HOME"
+  elif [ -n "${HOME:-}" ]; then
+    printf '%s\n' "$HOME/.kimi-code"
+  else
+    printf '\n'
+  fi
+}
+
 is_harness_installed() {
   local id="$1" bin dir
   case "$id" in
@@ -869,18 +883,25 @@ is_harness_installed() {
       dir="$(cursor_config_dir)"
       [ -n "$dir" ] && [ -d "$dir" ]
       ;;
+    kimi-code)
+      bin="$(kimi_bin)"
+      command -v "$bin" >/dev/null 2>&1 && return 0
+      dir="$(kimi_config_dir)"
+      [ -n "$dir" ] && [ -d "$dir" ]
+      ;;
     *) return 1 ;;
   esac
 }
 
 harness_supports_plugin_distribution() {
-  [ "$1" = "claude-code" ] || [ "$1" = "codex" ] || [ "$1" = "cursor" ]
+  [ "$1" = "claude-code" ] || [ "$1" = "codex" ] || [ "$1" = "cursor" ] || [ "$1" = "kimi-code" ]
 }
 
 detect_installed_harnesses() {
   is_harness_installed "claude-code" && printf '%s\n' "claude-code"
   is_harness_installed "codex" && printf '%s\n' "codex"
   is_harness_installed "cursor" && printf '%s\n' "cursor"
+  is_harness_installed "kimi-code" && printf '%s\n' "kimi-code"
 }
 
 selected_harnesses() {
@@ -890,7 +911,7 @@ selected_harnesses() {
     return
   fi
 
-  normalized="$(normalize_harness "$requested")" || die "未知 harness：$requested（支持：auto / claude-code / codex / cursor）。"
+  normalized="$(normalize_harness "$requested")" || die "未知 harness：$requested（支持：auto / claude-code / codex / cursor / kimi-code）。"
   if [ "$normalized" = "auto" ]; then
     detect_installed_harnesses
   else
@@ -899,11 +920,12 @@ selected_harnesses() {
 }
 
 log_harness_inventory() {
-  local cc_state codex_state cursor_state
+  local cc_state codex_state cursor_state kimi_state
   if is_harness_installed "claude-code"; then cc_state="installed"; else cc_state="missing"; fi
   if is_harness_installed "codex"; then codex_state="installed"; else codex_state="missing"; fi
   if is_harness_installed "cursor"; then cursor_state="installed"; else cursor_state="missing"; fi
-  log "harness inventory：claude-code=${cc_state}, plugin=yes; codex=${codex_state}, plugin=yes; cursor=${cursor_state}, plugin=yes"
+  if is_harness_installed "kimi-code"; then kimi_state="installed"; else kimi_state="missing"; fi
+  log "harness inventory：claude-code=${cc_state}, plugin=yes; codex=${codex_state}, plugin=yes; cursor=${cursor_state}, plugin=yes; kimi-code=${kimi_state}, plugin=yes"
 }
 
 install_plugin_claude_code() {
@@ -1029,6 +1051,69 @@ install_plugin_cursor() {
   ok "Cursor 插件已安装：$dest。重开 Cursor Agent session 后 hooks/rules/skills 生效。"
 }
 
+# kimi-code managed plugin install (K1 probe): copy unpacked adapter → $KIMI_CODE_HOME/plugins/managed/cc-master
+# and register it in $KIMI_CODE_HOME/plugins/installed.json. No TUI `/plugins install` needed.
+install_plugin_kimi_code() {
+  local plugin_root="$1" kimi_home managed_root installed_json abs_root publish_state now
+  kimi_home="$(kimi_config_dir)"
+  [ -n "$kimi_home" ] || die "无法解析 kimi-code home（请设置 KIMI_CODE_HOME 或 HOME）。"
+  [ -f "$plugin_root/kimi.plugin.json" ] \
+    || die "kimi-code adapter 缺失：$plugin_root/kimi.plugin.json。请确认是合法的 cc-master kimi-code 包。"
+
+  managed_root="$kimi_home/plugins/managed/cc-master"
+  mkdir -p "$(dirname "$managed_root")"
+  publish_state="$(transactional_publish "plugin:kimi-code" "$plugin_root" "$managed_root")" \
+    || die "kimi-code plugin 事务发布失败（旧版本已保留）。"
+  log "kimi-code plugin publish：$publish_state"
+
+  [ -f "$managed_root/kimi.plugin.json" ] \
+    || die "kimi-code 安装后校验失败：缺 $managed_root/kimi.plugin.json。"
+
+  abs_root="$(abspath_dir "$managed_root")"
+  installed_json="$kimi_home/plugins/installed.json"
+  now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  if ! ABS_ROOT="$abs_root" INSTALLED_JSON="$installed_json" NOW="$now" node <<'NODE'
+const fs = require('fs');
+const path = require('path');
+const file = process.env.INSTALLED_JSON;
+const root = process.env.ABS_ROOT;
+const now = process.env.NOW;
+let doc = { version: 1, plugins: [] };
+if (fs.existsSync(file)) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      doc = parsed;
+      if (typeof doc.version !== 'number') doc.version = 1;
+      if (!Array.isArray(doc.plugins)) doc.plugins = [];
+    }
+  } catch (e) {
+    // Corrupt installed.json → rewrite from a clean base rather than crash the install.
+    doc = { version: 1, plugins: [] };
+  }
+}
+const idx = doc.plugins.findIndex((p) => p && p.id === 'cc-master');
+const prev = idx >= 0 ? doc.plugins[idx] : null;
+const entry = {
+  id: 'cc-master',
+  root,
+  source: 'local-path',
+  enabled: true,
+  installedAt: prev && typeof prev.installedAt === 'string' ? prev.installedAt : now,
+  updatedAt: now,
+};
+if (idx >= 0) doc.plugins[idx] = { ...prev, ...entry };
+else doc.plugins.push(entry);
+fs.mkdirSync(path.dirname(file), { recursive: true });
+fs.writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
+NODE
+  then
+    die "写 kimi-code installed.json 失败：$installed_json"
+  fi
+
+  ok "kimi-code 插件已安装：$managed_root（installed.json 已登记）。重开 kimi session 后 skills/commands/hooks 生效。"
+}
+
 # ── 双线版本 tag 解析 ──────────────────────────────────────────────────────────────────────────────
 # GitHub /releases/latest 只返回**整仓**最新、不分 tag 前缀——两条线共仓后会串味。
 # 故改用 /releases 列表 + 按 tag 前缀过滤 + semver 排序取最高。用 node 解析 JSON 数组
@@ -1112,12 +1197,14 @@ resolve_plugin_tag() {
   if [ -n "$LOCAL_SRC" ]; then
     # 本地源模式：从 cc-master-plugin-<harness>-<tag>.zip 文件名推 tag（兼容旧 cc-master-plugin-<tag>.zip）。
     local zip
-    zip="$(ls -1 "$LOCAL_SRC"/cc-master-plugin-claude-code-*.zip "$LOCAL_SRC"/cc-master-plugin-codex-*.zip "$LOCAL_SRC"/cc-master-plugin-*.zip 2>/dev/null | head -1 || true)"
+    zip="$(ls -1 "$LOCAL_SRC"/cc-master-plugin-claude-code-*.zip "$LOCAL_SRC"/cc-master-plugin-codex-*.zip "$LOCAL_SRC"/cc-master-plugin-cursor-*.zip "$LOCAL_SRC"/cc-master-plugin-kimi-code-*.zip "$LOCAL_SRC"/cc-master-plugin-*.zip 2>/dev/null | head -1 || true)"
     [ -n "$zip" ] || die "本地源 $LOCAL_SRC 里找不到 cc-master-plugin-<harness>-*.zip（无法推断 plugin 版本，请加 --plugin-version）。"
     local base="${zip##*/}"; base="${base#cc-master-plugin-}"; base="${base%.zip}"
     case "$base" in
       claude-code-*) base="${base#claude-code-}" ;;
       codex-*) base="${base#codex-}" ;;
+      cursor-*) base="${base#cursor-}" ;;
+      kimi-code-*) base="${base#kimi-code-}" ;;
     esac
     printf '%s\n' "$base"; return
   fi
@@ -1184,12 +1271,12 @@ log "② 安装 cc-master 插件 …"
 log_harness_inventory
 
 REQUESTED_HARNESS_RAW="${HARNESS_TARGET:-${CC_MASTER_HARNESS:-${CC_MASTER_HOST:-${CCM_HOST:-${CC_MASTER_HARNESS_HOST:-auto}}}}}"
-REQUESTED_HARNESS_NORMALIZED="$(normalize_harness "$REQUESTED_HARNESS_RAW")" || die "未知 harness：$REQUESTED_HARNESS_RAW（支持：auto / claude-code / codex / cursor）。"
+REQUESTED_HARNESS_NORMALIZED="$(normalize_harness "$REQUESTED_HARNESS_RAW")" || die "未知 harness：$REQUESTED_HARNESS_RAW（支持：auto / claude-code / codex / cursor / kimi-code）。"
 EXPLICIT_SINGLE_HARNESS=0
 [ "$ALL_HARNESSES" = "0" ] && [ "$REQUESTED_HARNESS_NORMALIZED" != "auto" ] && EXPLICIT_SINGLE_HARNESS=1
 
 TARGET_HARNESSES="$(selected_harnesses | awk 'NF && !seen[$0]++')"
-[ -n "$TARGET_HARNESSES" ] || die "未发现已安装的 supported harness。请先安装 Claude Code、Codex 或 Cursor。"
+[ -n "$TARGET_HARNESSES" ] || die "未发现已安装的 supported harness。请先安装 Claude Code、Codex、Cursor 或 kimi-code。"
 
 SUPPORTED_TARGETS=""
 UNSUPPORTED_TARGETS=""
@@ -1218,7 +1305,7 @@ $UNSUPPORTED_TARGETS
 EOF
 fi
 
-[ -n "$SUPPORTED_TARGETS" ] || die "本机未发现任何支持 cc-master plugin 分发的 harness。当前可安装目标：claude-code / codex / cursor。"
+[ -n "$SUPPORTED_TARGETS" ] || die "本机未发现任何支持 cc-master plugin 分发的 harness。当前可安装目标：claude-code / codex / cursor / kimi-code。"
 
 PLUGIN_TAG="$(resolve_plugin_tag)"         # 如 v0.10.1
 log "plugin：${PLUGIN_TAG}"
@@ -1252,6 +1339,10 @@ unpack_plugin_for_harness() {
       [ -f "$root/.cursor-plugin/plugin.json" ] \
         || die "解压结果不是合法 Cursor adapter（缺 $root/.cursor-plugin/plugin.json）。"
       ;;
+    kimi-code)
+      [ -f "$root/kimi.plugin.json" ] \
+        || die "解压结果不是合法 kimi-code adapter（缺 $root/kimi.plugin.json）。"
+      ;;
   esac
   abspath_dir "$root"
 }
@@ -1274,6 +1365,10 @@ while IFS= read -r harness; do
       install_plugin_cursor "$PLUGIN_ROOT"
       INSTALLED_HARNESSES="${INSTALLED_HARNESSES}${INSTALLED_HARNESSES:+, }${harness}"
       ;;
+    kimi-code)
+      install_plugin_kimi_code "$PLUGIN_ROOT"
+      INSTALLED_HARNESSES="${INSTALLED_HARNESSES}${INSTALLED_HARNESSES:+, }${harness}"
+      ;;
     *)
       die "内部错误：$harness 被标记为支持 pluginDistribution，但 install.sh 没有对应 adapter。"
       ;;
@@ -1284,4 +1379,4 @@ EOF
 
 # ── 收尾 ────────────────────────────────────────────────────────────────────────────────────────────
 ok "完成 ✓  ccm（${CCM_TAG}）+ cc-master 插件（${PLUGIN_TAG}）已安装到：${INSTALLED_HARNESSES}。"
-log "下一步：Claude Code 跑 /cc-master:as-master-orchestrator <目标>；Codex 跑 \$cc-master-as-master-orchestrator <目标>；Cursor 装好后重开 Agent session（local plugin：~/.cursor/plugins/local/cc-master）。"
+log "下一步：Claude Code 跑 /cc-master:as-master-orchestrator <目标>；Codex 跑 \$cc-master-as-master-orchestrator <目标>；Cursor 装好后重开 Agent session（local plugin：~/.cursor/plugins/local/cc-master）；kimi-code 跑 cc-master:as-master-orchestrator <目标>（managed plugin：\$KIMI_CODE_HOME/plugins/managed/cc-master）。"
