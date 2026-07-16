@@ -122,6 +122,9 @@ export interface ExecutionReadModel {
     id: string;
     candidate_id?: string;
     state?: string;
+    /** Server-passed agent registry ref (agents[].id) that ran this attempt, when the board
+     * writer recorded one — table look-up into `ViewModelPayload.agents`, never derived. */
+    agent_ref?: string;
     started_at?: string;
     terminal_at?: string;
     terminal_class?: string;

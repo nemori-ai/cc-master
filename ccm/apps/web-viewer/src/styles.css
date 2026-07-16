@@ -2555,6 +2555,23 @@ header.missionline {
 .candidate-row[data-selected='true'] {
   color: var(--ready);
 }
+/* Clickable attempt row (server-joined agent_ref) — button reset, keeps the attempt grid,
+   adds a subtle affordance so it reads as a jump into agent mode. */
+button.attempt-row-agent {
+  width: 100%;
+  margin: 0;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--hair-soft);
+  font: inherit;
+  text-align: left;
+  align-items: center;
+  cursor: pointer;
+}
+button.attempt-row-agent:hover {
+  color: var(--ready);
+  background: color-mix(in oklch, var(--ready) 6%, transparent);
+}
 .badge {
   display: inline-flex;
   align-items: center;
@@ -4586,8 +4603,10 @@ header.missionline {
   display: inline-block;
   padding: 1px 6px;
   border-radius: 5px;
-  border: 1px solid var(--hair);
-  background: var(--panel-hi);
+  /* Reuse the route-facet chip token (.chip.route / .lchip.route) so the harness badge in the
+     roster reads as the same facet language as the node/list harness+surface chips. */
+  border: 1px solid color-mix(in oklch, var(--ready) 25%, var(--hair));
+  background: color-mix(in oklch, var(--ready) 7%, var(--panel));
   font-family: 'Martian Mono', ui-monospace, monospace;
   font-size: 9px;
   letter-spacing: 0.04em;

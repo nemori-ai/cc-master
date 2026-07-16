@@ -45,12 +45,16 @@ function filtersFromUrl(): Set<string> {
   return readWorkspaceUrlState(window.location.href).filters;
 }
 
-function setWorkspaceStateInUrl(taskId: string | null, filters: Set<string>): void {
+function setWorkspaceStateInUrl(
+  taskId: string | null,
+  agentId: string | null,
+  filters: Set<string>
+): void {
   if (typeof window === 'undefined') return;
   window.history.replaceState(
     null,
     '',
-    writeWorkspaceUrlState(window.location.href, { task: taskId, filters })
+    writeWorkspaceUrlState(window.location.href, { task: taskId, agent: agentId, filters })
   );
 }
 
@@ -86,20 +90,7 @@ function agentFromUrl(): string | null {
   if (typeof window === 'undefined') {
     return null;
   }
-  return new URL(window.location.href).searchParams.get('agent');
-}
-
-function setAgentInUrl(agentId: string | null): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  const url = new URL(window.location.href);
-  if (agentId) {
-    url.searchParams.set('agent', agentId);
-  } else {
-    url.searchParams.delete('agent');
-  }
-  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  return readWorkspaceUrlState(window.location.href).agent;
 }
 
 function initialTheme(): 'dark' | 'light' {
@@ -208,9 +199,11 @@ export function App() {
     selectedTaskIdRef.current = selectedTaskId;
   }, [selectedTaskId]);
 
+  // Single URL-sync point: task, agent (mutually exclusive selection), and filters are
+  // mirrored into the querystring from state — handlers only mutate state, never the URL.
   useEffect(() => {
-    setWorkspaceStateInUrl(selectedTaskId, activeFilters);
-  }, [selectedTaskId, activeFilters]);
+    setWorkspaceStateInUrl(selectedTaskId, selectedAgentId, activeFilters);
+  }, [selectedTaskId, selectedAgentId, activeFilters]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -408,10 +401,11 @@ export function App() {
       (candidate) => candidate.id === selectedAgentId,
     );
     if (!compact) {
-      // Selected agent vanished from the roster (board switch / terminal prune): drop back.
+      // Stale agent id fail-soft: the selected agent is absent from the freshly-loaded roster
+      // (deep-linked to a gone agent / board switch / terminal prune) — drop the selection and
+      // the URL-sync effect clears `?agent=`. Mirrors the stale-filter drop (normalizeTaskFilters).
       setSelectedAgent(null);
       setSelectedAgentId(null);
-      setAgentInUrl(null);
       return;
     }
 
@@ -474,7 +468,6 @@ export function App() {
       if (event.key === 'Escape') {
         setSelectedTaskId(null);
         setSelectedAgentId(null);
-        setAgentInUrl(null);
         return;
       }
       if (event.key === '/') {
@@ -500,7 +493,6 @@ export function App() {
     setSelectedBoardFilename(boardFilename);
     setBoardSwitching(true);
     setSelectedAgentId(null);
-    setAgentInUrl(null);
     setTopNotice(`Switched to ${boardFilename}`);
     setShareFallbackUrl(null);
   }, []);
@@ -513,7 +505,6 @@ export function App() {
     setSelectedTaskId(taskId);
     if (taskId) {
       setSelectedAgentId(null);
-      setAgentInUrl(null);
       setLocateRequest((previous) => ({ taskId, nonce: (previous?.nonce ?? 0) + 1 }));
     }
   }, []);
@@ -522,7 +513,6 @@ export function App() {
   // node exists) locates the first one so the DAG re-centers on the agent's work.
   const selectAgentFromClick = useCallback((agentId: string | null) => {
     setSelectedAgentId(agentId);
-    setAgentInUrl(agentId);
     if (agentId) {
       setSelectedTaskId(null);
       const agent = (workspaceRef.current?.viewModel.agents ?? []).find(
@@ -773,10 +763,7 @@ export function App() {
             <AgentInspector
               agentLoading={agentLoading}
               detail={displayedAgent}
-              onClose={() => {
-                setSelectedAgentId(null);
-                setAgentInUrl(null);
-              }}
+              onClose={() => setSelectedAgentId(null)}
               onSelectTask={selectTaskFromClick}
             />
           ) : displayedTask ? (

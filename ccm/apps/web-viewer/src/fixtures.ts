@@ -274,6 +274,7 @@ const fixtureTasks: CompactTask[] = [
           id: 'attempt-1',
           candidate_id: 'codex-cli',
           state: 'running',
+          agent_ref: 'agt-001',
           started_at: '2026-07-08T10:05:00Z'
         }
       ]

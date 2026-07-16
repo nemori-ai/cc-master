@@ -357,24 +357,45 @@ export function InspectorRail({
           {execution.attempts.length ? (
             <div className="contract-subblock">
               <div className="contract-label">attempt lifecycle</div>
-              {execution.attempts.map((attempt) => (
-                <div className="attempt-row" key={attempt.id}>
-                  <span className="mono">{attempt.id}</span>
-                  <span>
-                    {attempt.state ?? 'unknown'}
-                    {attempt.terminal_class ? ` · ${attempt.terminal_class}` : ''}
-                  </span>
-                  <span
-                    className="mono"
-                    title={attempt.terminal_at ?? attempt.started_at ?? undefined}
+              {execution.attempts.map((attempt) => {
+                // Server-joined agent_ref → the attempt row is a jump into agent mode for the
+                // registry agent that ran it (no client inference: agent_ref comes off the board).
+                const agentRef = attempt.agent_ref;
+                const cells = (
+                  <>
+                    <span className="mono">{attempt.id}</span>
+                    <span>
+                      {attempt.state ?? 'unknown'}
+                      {attempt.terminal_class ? ` · ${attempt.terminal_class}` : ''}
+                      {agentRef ? ' · ⚙ agent' : ''}
+                    </span>
+                    <span
+                      className="mono"
+                      title={attempt.terminal_at ?? attempt.started_at ?? undefined}
+                    >
+                      {attempt.candidate_id ?? 'unassigned'}
+                      {attempt.terminal_at || attempt.started_at
+                        ? ` · ${attempt.terminal_at ?? attempt.started_at}`
+                        : ''}
+                    </span>
+                  </>
+                );
+                return agentRef ? (
+                  <button
+                    className="attempt-row attempt-row-agent"
+                    key={attempt.id}
+                    onClick={() => onSelectAgent(agentRef)}
+                    title={`Inspect agent ${agentRef}`}
+                    type="button"
                   >
-                    {attempt.candidate_id ?? 'unassigned'}
-                    {attempt.terminal_at || attempt.started_at
-                      ? ` · ${attempt.terminal_at ?? attempt.started_at}`
-                      : ''}
-                  </span>
-                </div>
-              ))}
+                    {cells}
+                  </button>
+                ) : (
+                  <div className="attempt-row" key={attempt.id}>
+                    {cells}
+                  </div>
+                );
+              })}
             </div>
           ) : null}
         </div>

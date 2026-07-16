@@ -1246,7 +1246,7 @@ function executionProjection(task: JsonRecord, originHarness: string): JsonRecor
       if (!attempt || typeof attempt.id !== 'string') return null;
       const terminal = recordOf(attempt.terminal);
       const out: JsonRecord = { id: attempt.id };
-      for (const key of ['candidate_id', 'state']) {
+      for (const key of ['candidate_id', 'state', 'agent_ref']) {
         if (typeof attempt[key] === 'string') out[key] = attempt[key];
       }
       const startedAt =
