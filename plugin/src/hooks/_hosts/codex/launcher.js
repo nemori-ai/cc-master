@@ -283,9 +283,13 @@ function normalize(raw, fallbackEvent) {
     },
   };
   if (toolName) {
+    const rawToolInput = raw ? raw.tool_input : undefined;
+    const toolInput = toolName === 'apply_patch' && typeof rawToolInput === 'string'
+      ? { patch: rawToolInput }
+      : (rawToolInput || {});
     normalized.tool = {
       name: toolName,
-      input: raw.tool_input || {},
+      input: toolInput,
       response: raw.tool_response,
       id: raw.tool_use_id ? String(raw.tool_use_id) : '',
     };

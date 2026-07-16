@@ -76,6 +76,7 @@ launcher:
   responsibilities:
     - parse Codex hook stdin JSON.
     - normalize payload to the shared hook contract.
+    - "normalize Codex native FREEFORM apply_patch string input to the shared `{patch: string}` object shape; preserve object inputs and leave malformed inputs fail-closed in board-guard."
     - inject CC_MASTER_HARNESS=codex and related standard env for shared core.
     - resolve the active session board and inject CC_MASTER_BOARD / CC_MASTER_BOARD_STEM when the session is armed.
     - convert normalized core result back to Codex hook output.
