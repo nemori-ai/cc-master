@@ -32,6 +32,10 @@ deeper:
 
 每条命令都接受 `--json`（机器可读信封：`{"ok": true, "data": …}`），共享 `--board`、`--home`、`--dry-run` 等全局 flag。逐 verb 的完整命令面见下方链接的命令手册。
 
+## agent 生命周期，双向闭环
+
+每次派发都登记一个运行时 actor（`ccm agent create|bind|link`）；产出被收割并验收后，orchestrator 用 `ccm agent terminal` 收口——terminal 只是证据，绝不等于任务自动通过。`ccm agent probe` 只对账活性、不关闭任何东西；`ccm agent list` 的 `stale_candidates` 会指出静默的登记 agent。注册表只观察，不拉起。
+
 ## ccm 出 verdict，orchestrator 决策
 
 只读 namespace（`usage`、`estimate`、`model-policy`、`route`）被刻意设计成 **advisory**。`ccm usage advise` 返回一个 verdict（`hold`、`throttle`、`switch`、`stop_5h`、`stop_7d`），附证据和诚实字段（来源、置信度、新鲜度）；`ccm estimate forecast` 返回数千次模拟算出的 P50/P80/P95 ETA。它们都不执行任何动作——减速、换号、派发永远是 orchestrator 的判断。事实由引擎出，判断归 agent，授权归你。

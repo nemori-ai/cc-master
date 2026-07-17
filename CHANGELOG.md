@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Bootstrap refusal no longer crashes on macOS stock bash** — the previous-ccm refusal path in the Claude Code bootstrap hook referenced `$ccm_version` immediately before CJK punctuation; macOS's bash 3.2 in a UTF-8 locale parses that as one variable name and aborts under `set -u`, so the refusal directive never reached the user. Variable expansions are now brace-wrapped (`${var}`), documented in the hook's CONTRACT.md (other hosts' node implementations were immune by construction).
+- **Test suite portability on macOS** — hook tests no longer depend on bash 4+ constructs (`$'\uXXXX'` escapes, `mapfile`, heredoc-inside-process-substitution), and path assertions compare canonical paths where the launcher resolves them (`/var` vs `/private/var` on macOS). Local `bash run-tests.sh` is green again on stock macOS.
+
 ## [0.21.0-rc.0] — 2026-07-17
 
 > **Agent-registry lifecycle closure + outside-in external-validity discipline + kimi-code 4th host adapter (release candidate)** — pairs with **ccm-v0.22.0-rc.0**.

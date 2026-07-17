@@ -32,6 +32,10 @@ The architectural line is a **process boundary**: plugin hooks and skills never 
 
 Every command accepts `--json` (machine-readable envelope: `{"ok": true, "data": …}`) and shares global flags like `--board`, `--home`, and `--dry-run`. The full verb-by-verb surface is the command catalog linked below.
 
+## The agent lifecycle, closed both ways
+
+Every dispatch registers a runtime actor (`ccm agent create|bind|link`), and once its output is harvested and verified the orchestrator closes the loop with `ccm agent terminal` — a terminal agent is evidence, never automatic task acceptance. `ccm agent probe` reconciles liveness without closing anything, and `ccm agent list` surfaces `stale_candidates` when a registered agent has gone quiet. The registry observes; it never spawns.
+
 ## ccm advises; the orchestrator decides
 
 The read-only namespaces (`usage`, `estimate`, `model-policy`, `route`) are deliberately **advisory**. `ccm usage advise` returns a verdict (`hold`, `throttle`, `switch`, `stop_5h`, `stop_7d`) with evidence and honesty fields (source, confidence, freshness); `ccm estimate forecast` returns P50/P80/P95 ETAs from thousands of simulations. Neither executes anything — slowing down, switching accounts, or dispatching is always the orchestrator's call. Facts come from the engine; judgment stays with the agent, and authority with you.
