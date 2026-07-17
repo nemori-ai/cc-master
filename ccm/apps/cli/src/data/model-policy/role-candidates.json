@@ -1,6 +1,6 @@
 {
   "schema": "ccm/model-role-candidate-registry/v1",
-  "revision": "2026-07-16.3",
+  "revision": "2026-07-16.4",
   "role_grades": {
     "O": "orchestrator-grade system, architecture, specification and high-risk adversarial judgment",
     "T1": "implementation from a complete specification and routine heterogeneous review",
@@ -127,7 +127,7 @@
       "blockers": [
         "project-role-certification-required",
         "live-target-admission-required",
-        "official-benchmarks-unpublished"
+        "official-independent-standard-benchmarks-unverified"
       ]
     },
     {
