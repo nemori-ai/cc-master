@@ -21,3 +21,8 @@ ccm/**/*.tsbuildinfo
 .turbo/
 # package-plugin.sh 产物（plugin 分发 zip，构建物不入版本控制）
 /dist/
+# 官网（Astro 构建物 + 依赖 + wrangler 本地态 + 截图原始产物）
+website/node_modules/
+website/dist/
+website/.wrangler/
+website/assets-src/
