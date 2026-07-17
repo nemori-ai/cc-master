@@ -187,12 +187,20 @@ export interface PoolDescriptor {
 
 export type AccountSwitchPreflight = { action: 'continue' } | { action: 'noop'; reason: string };
 
+export interface InspectInstallationOptions {
+  // 是否对 headless worker surface（cursor-agent）真正探测认证态（spawn 只读 `status --format json`）。
+  //   默认 false：inspectInstallation 保持轻量、绝不 spawn 子进程（routing / upgrade 等热路径不受影响）。
+  //   仅面向用户的 harness 清单展示路径（harness list / current / machine-wide sweep）按需 opt-in，
+  //   让清单如实反映登录态而非硬编码 unknown。非 cursor adapter 忽略本选项。
+  probeHeadlessAuth?: boolean;
+}
+
 export interface HarnessAdapter {
   id: HarnessId;
   displayName: string;
   aliases: readonly string[];
   detect(env: Env): boolean;
-  inspectInstallation(env: Env): HarnessInstallation;
+  inspectInstallation(env: Env, opts?: InspectInstallationOptions): HarnessInstallation;
   session(env: Env): HarnessSession;
   sessionStoreRoots(env: Env): string[];
   usageSource(env: Env): HarnessUsageSource;
