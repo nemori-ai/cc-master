@@ -383,7 +383,7 @@ ccm worker run --harness <codex|claude-code|cursor-agent|kimi-code> [--cwd <path
   permission、sandbox、prompt 或 output flags。
 - stdin 无条件原样转发给 child。`--cwd` 必须是 absolute、existing directory（绝对、存在的目录），缺省为
   `process.cwd()`；结果里的 cwd 是解析后的真实路径。
-- `--timeout-ms` 允许 50..600000，`run` 默认 120000；`worker help` 使用固定 10000 timeout。
+- `--timeout-ms` 允许 50..1800000，`run` 默认 120000；`worker help` 使用固定 10000 timeout。
   `--max-output-bytes` 允许 256..1048576，默认 1048576，并分别约束 stdout 与 stderr。
 - `run` 是无 `--json` 分叉的显式例外：它始终把 ccm 通用成功信封写到 stdout，其中 `data.schema` 固定为
   `ccm/worker-process-result/v1`。承重字段完整固定为 `schema`、`harness`、`state`、`executable`、`argv`、

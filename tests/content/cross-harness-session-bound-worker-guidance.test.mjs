@@ -85,7 +85,7 @@ test('D is the only exact syntax SSOT for real help and raw provider argv', () =
   assert.match(worker, /完整 provider argv.*不自动.*prefix/isu);
   assert.match(worker, /stdin.*无条件.*原样.*转发/isu);
   assert.match(worker, /`--cwd`.*绝对.*存在.*目录.*process\.cwd\(\)/isu);
-  assert.match(worker, /`--timeout-ms`.*50\.\.600000.*120000/isu);
+  assert.match(worker, /`--timeout-ms`.*50\.\.1800000.*120000/isu);
   assert.match(worker, /help.*10000.*timeout/isu);
   assert.match(worker, /`--max-output-bytes`.*256\.\.1048576.*1048576/isu);
   assert.match(worker, /ccm\/worker-process-result\/v1/u);

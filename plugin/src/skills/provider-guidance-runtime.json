@@ -42,7 +42,7 @@
             "SKILL.md": "69a2d62489e9c590a8f3f01023d268ac74cb6a3a92fa60cde0b809d43c31d9bd",
             "references/account-pool.md": "da7a5826ba8ceb1eefc26722b4e305df6042ea30264abade27f896ef1fb2a8d6",
             "references/board-model-guide.md": "9c708a70079d3490605299bb203ffabe1f91e2e22658223acbc84ac32439f688",
-            "references/command-catalog.md": "90e51d2b8dfe9de0c01bc10c5970d0a7ceecbf0a0fd0510c545c86ae275d61ae"
+            "references/command-catalog.md": "f233cbff13000b435e787b2b274c9689a573d8b813bdb36fb18ba37648714cc3"
           }
         }
       }
@@ -82,7 +82,7 @@
           "files": {
             "SKILL.md": "105343bdbd5be285437e2cd9ec57b930922721241c28702db9c8905cd3195173",
             "references/board-model-guide.md": "af40b5f94695cdfd0a4a3009feeb89bb139862a1f0839da50dd28733517ab416",
-            "references/command-catalog.md": "0137b2215af1759c9c1ee0c6ff58d0c4ca292bc619712136356dc2a1fdb22f62"
+            "references/command-catalog.md": "4d8eb6688dff44e7d6c854207a3c39114019d9206bf6518f06619ae64d8415fb"
           }
         }
       }
@@ -122,7 +122,7 @@
           "files": {
             "SKILL.md": "af98d3ee6b3296b11a1199ab6c47c3ce6cd3e5eeb23ac74c88cc8d06d68db11e",
             "references/board-model-guide.md": "e86a4e44959580f931b9f42b9009d8b3cbd729a24c52b0833d61e47294360059",
-            "references/command-catalog.md": "9f6d80b4b3e196098867947a5a49b7998b0f07b679dc2fd7e42abbb849d5b079"
+            "references/command-catalog.md": "b5c908054a104b159fdb23325df89379b0248f2ac865a68e62214205ec44e45c"
           }
         }
       }
@@ -163,7 +163,7 @@
           "files": {
             "SKILL.md": "bca4775b22bb1716228c92c5cac3edeb8d0d7f8cb97aaf20cc0d9f25df78830a",
             "references/board-model-guide.md": "6fdae1da11a51b6709d45d88ab3b35b765715ba902cf58ac3d4193ee7c7144af",
-            "references/command-catalog.md": "1eafea93433765e1ee1c4fe3eaa293bd32d4a4a32f18f3fd30a371e330d179e4"
+            "references/command-catalog.md": "4b3a761007363345ab949d8ece8055701150f7438d001386734c8d1ecb488c22"
           }
         }
       }
