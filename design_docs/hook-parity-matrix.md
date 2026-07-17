@@ -47,7 +47,7 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | bootstrap-slash-command-expansion | protocol-capability-gap | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md |
 | bootstrap-beforeSubmitPrompt-envelope | protocol-capability-gap | cursor | plugin v0.17.2 envelope fix |
 | bootstrap-kimi-trigger-and-envelope | host-convention-divergence | kimi-code | design_docs/2026-07-16-kimi-code-adapter-design.md §3,§4 |
-| bootstrap-ddl-capability-skew | host-convention-divergence | claude-code, codex, cursor | design_docs/2026-07-16-ddl-review-triage.md (finding #1) |
+| bootstrap-ddl-capability-skew | host-convention-divergence | claude-code, codex, cursor, kimi-code | design_docs/2026-07-16-ddl-review-triage.md (finding #1) |
 
 ### coordination-inbox
 
