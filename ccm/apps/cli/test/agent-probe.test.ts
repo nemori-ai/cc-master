@@ -142,6 +142,90 @@ test('session-id on cursor-agent (adapter alias with session roots) → method s
   }
 });
 
+// ── kimi-code session-id：sid 在路径段（session 目录名），文件名恒 wire.jsonl ──────────────────────────
+function mkKimiSession(
+  home: string,
+  sid: string,
+  mtimeMs: number,
+  opts: { wd?: string; agent?: string } = {},
+): string {
+  const wd = opts.wd ?? 'wd_repo_deadbeef';
+  const agent = opts.agent ?? 'main';
+  const dir = join(home, '.kimi-code', 'sessions', wd, sid, 'agents', agent);
+  mkdirSync(dir, { recursive: true });
+  const f = join(dir, 'wire.jsonl');
+  writeFileSync(f, '{"type":"metadata","protocol_version":"1.4"}\n');
+  utimesSync(f, mtimeMs / 1000, mtimeMs / 1000);
+  // 每个 session 目录旁常伴 state.json（walk 会一并收集 .json）——确保不被误当 transcript。
+  const stateF = join(home, '.kimi-code', 'sessions', wd, sid, 'state.json');
+  writeFileSync(stateF, '{"workDir":"/repo"}\n');
+  return f;
+}
+
+test('kimi-code session-id: path-segment sid match (wire.jsonl filename never carries sid) → alive/silent', () => {
+  const home = mkTmp('ccm-probe-kimi-');
+  mkKimiSession(home, 'session_fresh', NOW - 60_000);
+  const fresh = probeAgent(
+    { harness: 'kimi-code', handleKind: 'session-id', handleValue: 'session_fresh' },
+    { env: { KIMI_CODE_HOME: join(home, '.kimi-code') }, nowMs: NOW },
+  );
+  assert.deepEqual(fresh, { method: 'session-file-mtime', observed: 'alive' });
+
+  mkKimiSession(home, 'session_stale', NOW - 3600_000);
+  const stale = probeAgent(
+    { harness: 'kimi-code', handleKind: 'session-id', handleValue: 'session_stale' },
+    { env: { KIMI_CODE_HOME: join(home, '.kimi-code') }, nowMs: NOW },
+  );
+  assert.equal(stale.observed, 'silent');
+
+  // 未见过的 sid（无匹配路径段）→ unknown（启动竞态保护·mtime 类不判死）。
+  const missing = probeAgent(
+    { harness: 'kimi-code', handleKind: 'session-id', handleValue: 'session_nope' },
+    { env: { KIMI_CODE_HOME: join(home, '.kimi-code') }, nowMs: NOW },
+  );
+  assert.equal(missing.observed, 'unknown');
+});
+
+test('kimi-code session-id: default ~/.kimi-code home root (no env override)', () => {
+  const home = mkTmp('ccm-probe-kimi-def-');
+  mkKimiSession(home, 'session_default', NOW - 30_000);
+  const r = probeAgent(
+    { harness: 'kimi-code', handleKind: 'session-id', handleValue: 'session_default' },
+    { home, nowMs: NOW },
+  );
+  assert.deepEqual(r, { method: 'session-file-mtime', observed: 'alive' });
+});
+
+test('kimi-code session-id: prefers agents/main and does not substring-match a longer sid segment', () => {
+  const home = mkTmp('ccm-probe-kimi-main-');
+  const kimiHome = join(home, '.kimi-code');
+  // 同一 session 下 main + 一个 subagent wire.jsonl：main 陈旧（>300s→silent）、subagent 新鲜——
+  //   仍优先 main，故 observed 反映 main 的 silent 而非 subagent 的 alive。
+  mkKimiSession(home, 'session_x', NOW - 3600_000, { agent: 'main' });
+  mkKimiSession(home, 'session_x', NOW - 10_000, { agent: 'sub-9f' });
+  const r = probeAgent(
+    { harness: 'kimi-code', handleKind: 'session-id', handleValue: 'session_x' },
+    { env: { KIMI_CODE_HOME: kimiHome }, nowMs: NOW },
+  );
+  assert.equal(
+    r.observed,
+    'silent',
+    'main (120s old) wins over newer subagent → silent, not alive',
+  );
+
+  // 段级精确匹配：`session_x` 不得命中路径段 `session_xy` 的 session。
+  mkKimiSession(home, 'session_xy', NOW - 30_000);
+  const prefix = probeAgent(
+    { harness: 'kimi-code', handleKind: 'session-id', handleValue: 'session_x' },
+    { env: { KIMI_CODE_HOME: kimiHome }, nowMs: NOW },
+  );
+  assert.equal(
+    prefix.observed,
+    'silent',
+    'still resolves session_x/main, not the fresher session_xy',
+  );
+});
+
 // ── seen-before 判死（曾在而消失 = 真死亡证据·finding 2）─────────────────────────────────────────────
 test('seen-before: previously alive session file now missing → gone; never-seen stays unknown', () => {
   const home = mkTmp('ccm-probe-seen-');

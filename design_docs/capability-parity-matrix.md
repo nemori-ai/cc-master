@@ -9,6 +9,7 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 
 | capability | claude-code | codex | cursor | kimi-code | card |
 | --- | --- | --- | --- | --- | --- |
+| agent-stream-transcript | implemented | implemented | partial | implemented | [agent-stream-transcript.md](harnesses/capabilities/agent-stream-transcript.md) |
 | ccm-quota-account | implemented | partial; read-only provider candidate implemented, usage migration pending | partial | unsupported | [ccm-quota-account.md](harnesses/capabilities/ccm-quota-account.md) |
 | cross-harness-cached-context | implemented | implemented | implemented-track-b | unsupported | [cross-harness-cached-context.md](harnesses/capabilities/cross-harness-cached-context.md) |
 | cross-harness-notification-subscription | implemented-track-b | implemented-track-b | implemented-track-b | partial | [cross-harness-notification-subscription.md](harnesses/capabilities/cross-harness-notification-subscription.md) |
@@ -26,6 +27,12 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 
 `kind`: `event-unavailable` · `protocol-capability-gap` · `host-convention-divergence`
 (see ADR-028 / ADR-031).
+
+### agent-stream-transcript
+
+| rule | kind | affected hosts | tracked by |
+| --- | --- | --- | --- |
+| cursor-structured-transcript-stream | protocol-capability-gap | cursor | ccm/apps/cli/src/handlers/agent-stream.ts (SQLite reader deferred) · issue #180 |
 
 ### ccm-quota-account
 

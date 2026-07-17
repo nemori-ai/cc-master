@@ -355,7 +355,129 @@ function parseCodexLine(raw: string): NormalizedEvent[] {
   return events;
 }
 
-// ── transcript 纯文本 fallback（未知 harness）：整行为 raw 事件 ────────────────────────────────
+// ── kimi-code parser ──────────────────────────────────────────────────────────────────────────
+//   wire.jsonl（`sessions/<wd>/<sid>/agents/main/wire.jsonl`）是 kimi 的**内部 typed 转录**，
+//   非 `kimi -p --output-format stream-json` 的 OpenAI-message 形状。顶层 {type, time?}。会话内容分两处：
+//     · context.append_message {message:{role, content:[{type:'text',text}]}} —— 规范消息（实测仅 user）。
+//     · context.append_loop_event {event:{type, …}} —— 一个 turn 的流式产出：
+//         content.part {part:{type:'text',text}|{type:'think',think}} · tool.call {name,args,…} ·
+//         tool.result {result:{output,note}} · step.begin/step.end（turn-step 遥测，非会话内容）。
+//   丢弃：turn.prompt（user 输入的重复触发视图·append_message 才是规范来源）+ metadata/config/permission/
+//   tools.*/llm.*/usage.record/turn.cancel（配置与遥测噪声）。解析不了 / 未知 → raw 透传（保真·不猜）。
+//   time 是 epoch ms（数值）→ 转 ISO 挂到 event.ts（claude/codex 是 ISO 字符串，此处对齐）。
+
+const KIMI_NOISE = new Set([
+  'metadata',
+  'config.update',
+  'permission.set_mode',
+  'tools.set_active_tools',
+  'tools.update_store',
+  'llm.request',
+  'llm.tools_snapshot',
+  'usage.record',
+  'turn.cancel',
+  'turn.prompt', // user 输入的重复触发视图——context.append_message 是规范来源，跳过防重复。
+]);
+
+function kimiMessageText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((block) => (isRecord(block) && typeof block.text === 'string' ? block.text : ''))
+      .filter(Boolean)
+      .join('');
+  }
+  return '';
+}
+
+// wire.jsonl 的 time / created_at 是 epoch ms 数值；转 ISO（去毫秒·对齐 claude/codex 的字符串 ts）。
+function kimiTs(obj: Record<string, unknown>): string | undefined {
+  const t = obj.time ?? obj.created_at;
+  if (typeof t === 'number' && Number.isFinite(t)) {
+    return new Date(t).toISOString().replace(/\.\d{3}Z$/, 'Z');
+  }
+  return typeof t === 'string' && t ? t : undefined;
+}
+
+function kimiLoopEvent(event: Record<string, unknown>, raw: string): NormalizedEvent[] {
+  const et = str(event.type);
+  switch (et) {
+    case 'content.part': {
+      const part = isRecord(event.part) ? event.part : null;
+      if (!part) return [];
+      const pt = str(part.type);
+      if (pt === 'think') {
+        const think = str(part.think);
+        return think ? [{ kind: 'thinking', title: 'thinking', text: think }] : [];
+      }
+      if (pt === 'text') {
+        const text = str(part.text);
+        return text ? [{ kind: 'assistant', title: 'assistant', text }] : [];
+      }
+      // 未知 part 变体 → raw 透传（保真·不静默丢弃新内容类型）。
+      return [{ kind: 'raw', title: `content.part:${pt || 'part'}`, text: raw }];
+    }
+    case 'tool.call':
+      return [
+        {
+          kind: 'tool',
+          title: str(event.name) || 'tool',
+          text: str(event.name) || 'tool',
+          detail: stringifyCompact(event.args),
+        },
+      ];
+    case 'tool.result': {
+      const result = isRecord(event.result) ? event.result : null;
+      const text =
+        result && typeof result.output === 'string'
+          ? result.output
+          : result
+            ? stringifyCompact(result.output ?? result)
+            : stringifyCompact(event.result);
+      return [{ kind: 'tool_result', title: 'tool result', text }];
+    }
+    case 'step.begin':
+    case 'step.end':
+      return []; // turn-step 遥测（usage / latency）——非会话内容，丢弃。
+    default:
+      return [{ kind: 'raw', title: et || 'loop-event', text: raw }]; // 未知 loop 事件 → raw 保真。
+  }
+}
+
+function parseKimiLine(raw: string): NormalizedEvent[] {
+  const trimmed = raw.trim();
+  if (!trimmed) return [];
+  let obj: unknown;
+  try {
+    obj = JSON.parse(trimmed);
+  } catch {
+    return [{ kind: 'raw', title: 'raw', text: raw }];
+  }
+  if (!isRecord(obj)) return [{ kind: 'raw', title: 'raw', text: raw }];
+  const type = str(obj.type);
+  if (KIMI_NOISE.has(type)) return [];
+  const ts = kimiTs(obj);
+
+  let events: NormalizedEvent[];
+  if (type === 'context.append_message') {
+    const message = isRecord(obj.message) ? obj.message : null;
+    const role = message ? str(message.role) : '';
+    const text = message ? kimiMessageText(message.content) : '';
+    if (!text) events = [];
+    else if (role === 'assistant') events = [{ kind: 'assistant', title: 'assistant', text }];
+    else if (role === 'user') events = [{ kind: 'user', title: 'user', text }];
+    else events = [{ kind: 'system', title: role || 'system', text }];
+  } else if (type === 'context.append_loop_event') {
+    const event = isRecord(obj.event) ? obj.event : null;
+    events = event ? kimiLoopEvent(event, raw) : [];
+  } else {
+    events = [{ kind: 'raw', title: type || 'raw', text: raw }];
+  }
+  for (const e of events) if (ts && !e.ts) e.ts = ts;
+  return events;
+}
+
+// ── transcript 纯文本 fallback（未知 harness / cursor 短期外部 transcript）：整行为 raw 事件 ──────────
 function parseRawLine(raw: string): NormalizedEvent[] {
   if (!raw.trim()) return [];
   return [{ kind: 'raw', title: 'line', text: raw }];
@@ -367,6 +489,10 @@ export function parserFor(harness: string): (raw: string) => NormalizedEvent[] {
   // 的行结构就是主 claude 格式（多 isSidechain/agentId 信封字段，parser 天然容忍）。
   if (harness === 'origin') return parseClaudeLine;
   if (harness === 'codex') return parseCodexLine;
+  // kimi-code：wire.jsonl 是内部 typed 转录（可结构化·见上）。
+  if (harness === 'kimi-code') return parseKimiLine;
+  // cursor（cursor-agent）：结构化需 SQLite state.vscdb reader（未实现）；短期以外部纯文本
+  //   transcript 走 raw fallback（源定位见 agent-probe.ts 的 CURSOR_TRANSCRIPT_PATH / transcript_ref）。
   return parseRawLine;
 }
 
