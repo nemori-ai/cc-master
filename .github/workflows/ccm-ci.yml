@@ -4,10 +4,12 @@
 name: ccm-ci
 
 on:
+  # pull_request 不限 paths：build-and-check 是 main 分支保护的 required status check，
+  # 必须对每个 PR 都 report success——否则不碰 ccm/ 的 PR（skills / docs / hooks 改动）
+  # 因这个 check 从不运行而永久 BLOCKED（required check 永不满足）。ccm 未变时
+  # turbo/pnpm 缓存让 build/typecheck/lint/test 四步快速过，代价可接受。
   pull_request:
-    paths:
-      - 'ccm/**'
-      - '.github/workflows/ccm-ci.yml'
+  # push 仍按 paths 收窄：main 上非 ccm 改动无需重复跑 ccm CI（push 不是 PR merge 门）。
   push:
     paths:
       - 'ccm/**'
