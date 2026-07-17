@@ -25,4 +25,5 @@ ccm/**/*.tsbuildinfo
 website/node_modules/
 website/dist/
 website/.wrangler/
+website/.astro/
 website/assets-src/
