@@ -1,5 +1,73 @@
 # ccm
 
+## 0.22.0-rc.0
+
+### Minor Changes
+
+- 42fb45e: 交付 DDL（delivery deadline）核心（issue #149）：board 的 `goal_contract` 新增 👁 `deadline` 子对象（四态 settledness 状态机 `pending|asserted|confirmed|none` + `at`/`precision`/`kind`/`rev`/`provenance`/`updated_at`，与 goal `assurance` 正交、单一 SSOT、窄腰一字不动）+ 新 writer verb `ccm goal deadline set|confirm|confirm-none|amend|show`（带锁 + board.log 审计 + rev 单调递增；confirm/confirm-none/amend 强制 `--user-authorized`、amend 强制 `--reason`；deadline 写绝不 bump goal revision；`--precision day` 落当日末刻 23:59:59Z 且强制 `--tz-input`；`--at` 只收严格 ISO-8601 UTC，时区/自然语言归 agent）+ 三条新 lint 规则（`FMT-DEADLINE` hard 形状 / `BIZ-DEADLINE-PENDING` warn 未 settle 却有可执行任务 / `BIZ-DEADLINE-OVERDUE` warn 已过期未完成，`lintBoard` 加可选 `now` 注入）+ `ccm goal check` verdict 扩展（新增 `deadline_pending`·exit 0，`ok` 收紧为 goal settled 且 deadline settled，`malformed` 覆盖 deadline 形状错，`--json` 附 `deadline` 子块）+ 引擎新增 `readDeadline`/`isDeadlineSettled`/`isDeadlineWellShaped`/`normalizeDeadlineAt` 纯 helper 供下游 endpoint / hook 复用 + 泛型 `--set goal_contract.*` bypass 封堵。`goal amend` 现原样保留 deadline 子对象（scope 变更 ≠ deadline 变更）。legacy board 自动兼容（无 deadline 键三规则皆早返回）。
+- 42fb45e: 交付 DDL margin/风险状态暴露到用户可见面（issue #149·契约 §4.3 验收项 8·D6）：把 `ccm estimate deadline-risk` 的 verdict 接进既有的只读展示面，**不重算算法**（复用单一 SSOT·红线 3）。
+
+  - **`ccm estimate forecast`**：板有 `asserted`/`confirmed` DDL 时，`--json` 输出附 `deadline_risk` 摘要块（`deadline`/`deadline_state`/`time_remaining_hours`/`risk_band`/`strength`/`on_time_probability`/`margin`/`confidence`），人读输出加 `DDL:` + `DDL margin:` 两行（margin 带符号·负=越过 DDL）。摘要 margin 与 `estimate deadline-risk` endpoint 逐字段一致（复用 `computeDeadlineRisk`·单一计算路径）。无 DDL / `none` / `pending` → `deadline_risk: null`（诚实 n/a·不假绿·不为无 DDL 板白跑 MC）。
+  - **`ccm status-report`**：report 附一个**确定性、board-derived** 的 `deadline` 块（`present`/`state`/`at`/`precision`/`kind`/`time_remaining_hours`/`overdue`）+ 人读一行（settled → 截止时刻/剩余/OVERDUE；`none` → confirmed no-ddl；缺失 → 无行）。不跑 MC/不读跨板语料（保 board-hash 缓存语义）；相对 forecast 的 margin/risk band 指向 `ccm estimate deadline-risk`。
+  - **web-viewer**：mission 只读投影新增 board-derived `deadline` 事实（截止时刻/状态/精度/硬软）；goal-contract 面板渲染 deadline 行 + 实时倒计时/OVERDUE 徽章（客户端挂钟·同 board-watchdog 倒计时）+ overdue 提示 callout。viewer 不跑 MC——margin/risk band verdict 归 `ccm estimate deadline-risk`。
+
+  诚实降级贯穿三面：无 DDL 不崩、不假显示；`unknown` band 照实透出、绝不映射绿色。
+
+- 42fb45e: 新增 `ccm estimate deadline-risk --json` 只读 endpoint（交付 DDL 风险 verdict·issue #149·契约 §4.3）：三通道 Monte Carlo 出**准时概率** `on_time_probability` + 分位 margin + 六态 `risk_band`（on_track/watch/at_risk/likely_late/overdue/unknown）+ `top_drivers` + 诚实字段（coverage/confidence/channel_disagreement/calibration_status/notes）。**通道诚实性**：`on_time_probability` **只来自 RCPSP-in-trial 通道**（真调度当前 DAG + 吃 `scheduling.wip_limit` 资源竞争）——`on_time_probability_source` 恒为 `rcpsp-in-trial` 或 `unknown`；precedence-only 只作显式标注的乐观下界（喂 forecast/margin + 双通道分歧信号）；throughput 降为 `channels.throughput_reference`（`kind:"heuristic-reference"`）**绝不映射 verdict**。**诚实降级**（绝不假绿）：无 DDL / 图含环 / 无有效预测 / coverage·history 太弱 / 双通道严重分歧（>0.25）/ RCPSP 不可用 → `risk_band:"unknown"` + `on_time_probability:null`（**绝不退 throughput 冒充 resource-aware**）；`now≥DDL` 且未完成 → `overdue`。band 阈值为 **explicitly uncalibrated 保守起点**（`calibration_status:"uncalibrated-conservative"`·待 labeled 语料校准）。
+
+  引擎（`@ccm/engine`）新增：`empiricalCdfAtOrBefore(sortedSamples, target)`（经验 CDF·on-time 概率载重·二分 O(log n)）+ `rcpspInTrialMc(board, params, opts)`（资源约束 MC·**堆化 serial SGS**·indeg-ready min-heap + slot min-heap·O(V log V)/trial·注入 wip 资源约束·复用现成 CPM 的 min-slack/LFT 优先规则）+ `computeDeadlineRisk(board, opts)`（§4.3 verdict SSOT）；`estimateDagMonteCarlo`/`throughputMonteCarlo` 现暴露升序样本（`makespanSamplesSorted`/`daysSamplesSorted`·零算法重写）。CLI 侧 `estimate deadline-risk` 复用引擎 `buildMcParams` + `readDeadline`（D2）；latency 降档阶梯（trials 2000→1000→500→unknown）按 DAG 规模埋好（防极端大图·别真限时）。纯只读零写（runRead），hook 只搬运不重算（红线 3）。
+
+- 707c2e5: feat: add kimi-code (Moonshot AI Kimi Code CLI) as a 4th supported harness (MVP)
+
+  - Harness registry: new `kimiCodeAdapter` (`ccm harness list` now reports `kimi-code`,
+    detects `kimi` binary / `$KIMI_CODE_HOME`; account pool + external statusline unsupported,
+    plugin distribution supported via managed-dir install).
+  - Worker driver: `ccm worker help/run --harness kimi-code` passes argv straight through to the
+    `kimi` executable (`kimi -p ... --output-format stream-json`); adds `KIMI_CODE_HOME` to the
+    worker child env allow-list and a `kimi` executable-resolution branch (`CCM_KIMI_BIN`/`KIMI_BIN`/PATH).
+  - Board model (`@ccm/engine`): `owner.harness` and `agents[].harness` enums gain `kimi-code`;
+    `FMT-HARNESS` / `FMT-AGENTS` messages updated accordingly.
+  - Usage stays intentionally unavailable for this MVP: `readCurrentUsage` returns
+    `signal: null, source: 'unavailable'` (no CLI quota signal). A read-only `/coding/v1/usages`
+    collector is a documented follow-up — it must never refresh/rotate the stored credential.
+
+- 707c2e5: feat(model-policy): add Kimi K3 and Kimi K2.7 Code as worker-target model candidates
+
+  - Provider facts: new `kimi-code` provider in `provider-model-facts.json` with two
+    models — `kimi-k3` (frontier, 1M context, official benchmarks/model card not yet
+    published) and `kimi-k2.7-code` (balanced, open-weight, forced-thinking, strong
+    tool-use, 256K context). Both carry `benchmarks: null` on purpose: K3 has zero
+    official benchmarks and K2.7's numbers are vendor self-selected sets that are not
+    comparable to the cross-vendor `swe_bench_pro_pct` / `terminal_bench_2_1_pct`
+    columns other providers use.
+  - Provider whitelist + OFFICIAL_HOSTS gain `kimi-code` and Moonshot official hosts
+    (`platform.kimi.ai`, `kimi.com`, `www.kimi.com`) so `ccm provider facts kimi-code`
+    and `ccm model-policy show` expose the new snapshot.
+  - Role candidates: `kimi-code-cli:kimi-k3` → `["T1","T2"]` (low confidence: benchmarks
+    unpublished, carries an extra `official-benchmarks-unpublished` blocker) and
+    `kimi-code-cli:kimi-k2.7-code` → `["T1","T2","T3"]` (medium confidence). Neither is
+    an O candidate — conservative effect floor until benchmarks/certification arrive.
+  - Community advisory: one bounded-tie-break-only Kimi K2.7 implementation-from-spec
+    signal with honest limitations (vendor-self-benchmark context, single community
+    review, coding below frontier on standard comparators).
+
+  This only wires Kimi as a worker-target model provider into model-policy; it does not
+  touch the origin-harness (`ORIGINS`) axis or the worker/harness enums.
+
+- web-viewer #178 缓存 invalidation + agent-stream #180 per-harness 适配 + agent list stale advisory
+
+  - **#178 web-viewer same-version 缓存永不失效修复**：`web-viewer-app-dist.ts` 加 build-id marker（sha256 over bundled base64 asset map）版本内 invalidation——快路径只在 marker 匹配时返回缓存，否则 rmSync 清孤儿 + 重 materialize + marker 写最后（crash-safe）。同版本号换前端构建时缓存自动失效，不再永久遮蔽（此前 VIEW STREAM/DDL 倒计时被旧 bundle 遮蔽看不到的根因）。
+  - **#180 agent-stream per-harness 适配 + N-host parity**：kimi 结构化（源定位改 path-segment sid 匹配 + `parseKimiLine` 从 live wire.jsonl 推导 typed schema）；cursor 外部文本 transcript 短期方案（`CURSOR_TRANSCRIPT_PATH`）+ SQLite reader 声明 Track B；新增 agent-stream capability card 纳入 N-host parity matrix。
+  - **agent list stale-running advisory**：`ccm agent list` 新增只读 `stale_candidates`（active agent 的 linked task 全 `done` → 疑似漏收口候选·**绝不自动 terminal**·保守判据），落在 recon roster-rebuild 触点机械兜住"收割后忘 terminal"的注意力遗漏。
+
+### Patch Changes
+
+- Updated dependencies [42fb45e]
+- Updated dependencies [42fb45e]
+- Updated dependencies [42fb45e]
+- Updated dependencies [707c2e5]
+  - @ccm/engine@0.22.0-rc.0
+
 ## 0.21.0
 
 ### Minor Changes
