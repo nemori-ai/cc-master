@@ -441,3 +441,85 @@ function snapshotTree(root: string): Record<string, unknown> {
   walk(root, '');
   return result;
 }
+
+test('cursorAgentQuotaReadingToFact binds a live billing-period reading to a bounded quota fact', async () => {
+  const { cursorAgentQuotaReadingToFact } = await import('../src/harnesses/cursor-surfaces.js');
+  const observedAt = '2026-07-13T04:00:00.000Z';
+  const fact = cursorAgentQuotaReadingToFact(
+    {
+      state: 'ample',
+      used_percentage: 22.5,
+      resets_at: 1_785_398_752,
+      quota_scope_fingerprint: 'sha256:deadbeef',
+      source: 'cursor-agent-dashboard',
+    },
+    observedAt,
+  );
+  assert.equal(fact.state, 'ample');
+  assert.equal(fact.source, 'cursor-agent-dashboard');
+  assert.deepEqual(fact.pool_refs, ['sha256:deadbeef']);
+  assert.equal(fact.observed_at, observedAt);
+  assert.ok(fact.valid_until);
+  const window = Date.parse(fact.valid_until as string) - Date.parse(observedAt);
+  assert.ok(window > 0 && window <= 5 * 60 * 1000, 'valid_until within the 5-minute quota TTL');
+});
+
+test('cursorAgentQuotaReadingToFact fails closed to unknown without a quota-scope fingerprint', async () => {
+  const { cursorAgentQuotaReadingToFact } = await import('../src/harnesses/cursor-surfaces.js');
+  const observedAt = '2026-07-13T04:00:00.000Z';
+  const noFingerprint = cursorAgentQuotaReadingToFact(
+    {
+      state: 'ample',
+      used_percentage: 22.5,
+      resets_at: null,
+      quota_scope_fingerprint: null,
+      source: 'cursor-agent-dashboard',
+    },
+    observedAt,
+  );
+  assert.equal(noFingerprint.state, 'unknown');
+  assert.deepEqual(noFingerprint.pool_refs, []);
+  assert.equal(noFingerprint.valid_until, null);
+
+  const unreadable = cursorAgentQuotaReadingToFact(
+    {
+      state: 'unknown',
+      used_percentage: null,
+      resets_at: null,
+      quota_scope_fingerprint: null,
+      source: 'cursor-agent:quota-unavailable',
+    },
+    observedAt,
+  );
+  assert.equal(unreadable.state, 'unknown');
+  assert.deepEqual(unreadable.pool_refs, []);
+});
+
+test('cursorQuotaReadingToSurfaceFact maps ample/tight to available and exhausted to unavailable', async () => {
+  const { cursorQuotaReadingToSurfaceFact } = await import('../src/harnesses/cursor.js');
+  const base = { used_percentage: null, resets_at: null, quota_scope_fingerprint: null };
+  assert.deepEqual(
+    cursorQuotaReadingToSurfaceFact({ ...base, state: 'ample', source: 'cursor-agent-dashboard' }),
+    { state: 'available', source: 'cursor-agent-dashboard:ample' },
+  );
+  assert.deepEqual(
+    cursorQuotaReadingToSurfaceFact({ ...base, state: 'tight', source: 'cursor-agent-dashboard' }),
+    { state: 'available', source: 'cursor-agent-dashboard:tight' },
+  );
+  assert.deepEqual(
+    cursorQuotaReadingToSurfaceFact({
+      ...base,
+      state: 'exhausted',
+      source: 'cursor-agent-dashboard',
+    }),
+    { state: 'unavailable', source: 'cursor-agent-dashboard:exhausted' },
+  );
+  assert.deepEqual(
+    cursorQuotaReadingToSurfaceFact({
+      ...base,
+      state: 'unknown',
+      source: 'cursor-agent:quota-unavailable',
+    }),
+    { state: 'unknown', source: 'cursor-agent:quota-unavailable' },
+  );
+});

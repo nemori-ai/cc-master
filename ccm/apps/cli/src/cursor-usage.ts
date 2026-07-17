@@ -11,7 +11,7 @@ import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { MessageChannel, receiveMessageOnPort, Worker } from 'node:worker_threads';
-import type { UsageSignal } from '@ccm/engine';
+import { pacingAdvice, type UsageSignal } from '@ccm/engine';
 
 // Lazy-load node:sqlite — a top-level import emits ExperimentalWarning on every ccm
 // invocation (including --version / --json), which breaks e2e stderr/JSON contracts.
@@ -123,6 +123,85 @@ export function readCursorUsageSignal(
     }
     port1.close();
   }
+}
+
+/** Coarse billing-period quota classification (mirrors `@ccm/engine` machine-surface QuotaFactState). */
+export type CursorQuotaClass = 'ample' | 'tight' | 'exhausted' | 'unknown';
+
+export interface CursorAgentQuotaReading {
+  state: CursorQuotaClass;
+  used_percentage: number | null;
+  resets_at: number | null; // epoch seconds
+  quota_scope_fingerprint: string | null;
+  source: string; // provenance (e.g. 'cursor-agent-dashboard' | 'cursor-agent:quota-unavailable')
+}
+
+/**
+ * Classify a billing-period UsageSignal into ample/tight/exhausted/unknown.
+ *
+ * Reuses the pacing SSOT (`pacingAdvice`) so this coarse surface fact never drifts from the verdict
+ * `ccm quota status --machine-wide` derives from the same signal. Cursor exposes a ~30d billing-cycle
+ * quota (no 5h/7d rolling windows), so `pacingAdvice` takes its billing-period-only path:
+ *   hold (<80% warn line) → ample · throttle (≥80%) → tight · stop_billing_period (≥85%) → exhausted.
+ */
+export function classifyCursorBillingQuota(
+  signal: UsageSignal | null | undefined,
+  nowSec?: number,
+): CursorQuotaClass {
+  const advice = pacingAdvice(signal ?? null, typeof nowSec === 'number' ? { nowSec } : {});
+  if (!advice.available) return 'unknown';
+  switch (advice.verdict) {
+    case 'hold':
+      return 'ample';
+    case 'throttle':
+    case 'switch': // defensive: the billing-period-only path never emits switch, but stay total.
+      return 'tight';
+    case 'stop_billing_period':
+    case 'stop_5h':
+    case 'stop_7d':
+      return 'exhausted';
+    default:
+      return 'unknown';
+  }
+}
+
+/**
+ * Read the cursor-agent billing-period quota as a coarse classification for surface/admission facts.
+ *
+ * The cursor-agent CLI carries its own first-party subscription; its accessToken (from the Agent's
+ * `auth.json`) authorizes the same dashboard `GetCurrentPeriodUsage` read the machine-wide collector
+ * uses. Fail-open: unreadable signal (logged out / no token / API change) → `unknown`. Zero npm deps.
+ */
+export function readCursorAgentQuotaFact(
+  env: Record<string, string | undefined>,
+  opts?: {
+    nowSec?: number;
+    // Injectable signal reader (tests supply a deterministic reading; production uses the real dashboard read).
+    readSignal?: (
+      env: Record<string, string | undefined>,
+      surface: CursorUsageSurface,
+    ) => CursorUsageSignal | null;
+  },
+): CursorAgentQuotaReading {
+  const readSignal = opts?.readSignal ?? readCursorUsageSignal;
+  const reading = readSignal(env, 'cursor-agent-cli');
+  if (!reading?.signal) {
+    return {
+      state: 'unknown',
+      used_percentage: null,
+      resets_at: null,
+      quota_scope_fingerprint: null,
+      source: 'cursor-agent:quota-unavailable',
+    };
+  }
+  const bp = reading.signal.billing_period ?? null;
+  return {
+    state: classifyCursorBillingQuota(reading.signal, opts?.nowSec),
+    used_percentage: typeof bp?.used_percentage === 'number' ? bp.used_percentage : null,
+    resets_at: typeof bp?.resets_at === 'number' ? bp.resets_at : null,
+    quota_scope_fingerprint: reading.quota_scope_fingerprint,
+    source: reading.source,
+  };
 }
 
 const WORKER_SOURCE = `

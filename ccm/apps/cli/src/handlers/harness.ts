@@ -3,6 +3,7 @@
 import {
   buildCursorSurfaceInventory,
   type CursorExecutionSurfaceDescriptor,
+  defaultCursorAgentQuotaReader,
   inspectCursorExecutionSurfaces,
 } from '../harnesses/cursor-surfaces.js';
 import {
@@ -25,7 +26,9 @@ export function list(ctx: Ctx): number {
   if (ctx.values['machine-wide']) {
     const registry = MachineHarnessRegistry.sweep(ctx.env, { probeHeadlessAuth: true });
     const snapshot = registry.toJSON();
-    const surfaces = inspectCursorExecutionSurfaces(ctx.env);
+    const surfaces = inspectCursorExecutionSurfaces(ctx.env, {
+      readQuota: defaultCursorAgentQuotaReader,
+    });
     const surfaceInventory = buildCursorSurfaceInventory(surfaces);
     if (ctx.flags.json) {
       ctx.out(

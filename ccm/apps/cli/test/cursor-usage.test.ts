@@ -6,7 +6,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { inspectCursorCredential, normalizeCursorPeriodUsage } from '../src/cursor-usage.js';
+import type { UsageSignal } from '@ccm/engine';
+import {
+  classifyCursorBillingQuota,
+  type CursorUsageSignal,
+  inspectCursorCredential,
+  normalizeCursorPeriodUsage,
+  readCursorAgentQuotaFact,
+} from '../src/cursor-usage.js';
 
 const FIXTURE = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -77,6 +84,98 @@ test('Cursor Agent discovers its own file credential without inheriting Cursor I
   assert.deepEqual(inspectCursorCredential(env, 'cursor-ide-plugin'), {
     available: false,
     auth_source: 'cursor-ide-current-login',
+  });
+});
+
+const NOW_SEC = 1_782_900_000;
+const FUTURE_RESET = NOW_SEC + 1_000_000;
+
+function billingSignal(usedPct: number): UsageSignal {
+  return {
+    five_hour: null,
+    seven_day: null,
+    billing_period: { used_percentage: usedPct, resets_at: FUTURE_RESET },
+    captured_at: NOW_SEC,
+  };
+}
+
+function cursorReading(usedPct: number, fingerprint: string | null): CursorUsageSignal {
+  return {
+    signal: billingSignal(usedPct),
+    source: 'cursor-agent-dashboard',
+    auth_source: 'cursor-agent-current-login',
+    quota_scope_fingerprint: fingerprint,
+    cycle_start_ms: null,
+    cycle_end_ms: FUTURE_RESET * 1000,
+  };
+}
+
+test('classifyCursorBillingQuota maps billing-period used% via the pacing SSOT thresholds', () => {
+  // hold (<80% warn line) → ample · throttle (≥80%) → tight · stop_billing_period (≥85%) → exhausted.
+  assert.equal(classifyCursorBillingQuota(billingSignal(22.5), NOW_SEC), 'ample');
+  assert.equal(classifyCursorBillingQuota(billingSignal(79.9), NOW_SEC), 'ample');
+  assert.equal(classifyCursorBillingQuota(billingSignal(80), NOW_SEC), 'tight');
+  assert.equal(classifyCursorBillingQuota(billingSignal(84.9), NOW_SEC), 'tight');
+  assert.equal(classifyCursorBillingQuota(billingSignal(85), NOW_SEC), 'exhausted');
+  assert.equal(classifyCursorBillingQuota(billingSignal(100), NOW_SEC), 'exhausted');
+});
+
+test('classifyCursorBillingQuota returns unknown when the signal is absent / unreadable', () => {
+  assert.equal(classifyCursorBillingQuota(null, NOW_SEC), 'unknown');
+  assert.equal(
+    classifyCursorBillingQuota(
+      { five_hour: null, seven_day: null, billing_period: null, captured_at: NOW_SEC },
+      NOW_SEC,
+    ),
+    'unknown',
+  );
+  // Stale window (reset already past) → unreadable → unknown, never a stale healthy reading.
+  assert.equal(
+    classifyCursorBillingQuota(
+      {
+        five_hour: null,
+        seven_day: null,
+        billing_period: { used_percentage: 10, resets_at: NOW_SEC - 10 },
+        captured_at: NOW_SEC,
+      },
+      NOW_SEC,
+    ),
+    'unknown',
+  );
+});
+
+test('readCursorAgentQuotaFact classifies an injected billing-period reading and echoes provenance', () => {
+  const ample = readCursorAgentQuotaFact(
+    {},
+    { nowSec: NOW_SEC, readSignal: () => cursorReading(22.5, 'sha256:abc') },
+  );
+  assert.deepEqual(ample, {
+    state: 'ample',
+    used_percentage: 22.5,
+    resets_at: FUTURE_RESET,
+    quota_scope_fingerprint: 'sha256:abc',
+    source: 'cursor-agent-dashboard',
+  });
+
+  const exhausted = readCursorAgentQuotaFact(
+    {},
+    { nowSec: NOW_SEC, readSignal: () => cursorReading(92, 'sha256:abc') },
+  );
+  assert.equal(exhausted.state, 'exhausted');
+  assert.equal(exhausted.used_percentage, 92);
+});
+
+test('readCursorAgentQuotaFact fails open to unknown when the dashboard read is unavailable', () => {
+  const fact = readCursorAgentQuotaFact(
+    {},
+    { nowSec: NOW_SEC, readSignal: () => null },
+  );
+  assert.deepEqual(fact, {
+    state: 'unknown',
+    used_percentage: null,
+    resets_at: null,
+    quota_scope_fingerprint: null,
+    source: 'cursor-agent:quota-unavailable',
   });
 });
 
