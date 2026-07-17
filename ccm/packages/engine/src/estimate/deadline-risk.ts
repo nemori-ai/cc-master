@@ -300,7 +300,9 @@ export function computeDeadlineRisk(
   if (complete) {
     riskBand = 'on_track';
     strength = 'weak';
-    notes.push('全部任务已完成（backlog=0）——已交付，无 late risk（复用 on_track 表完成态·非「要迟到」）');
+    notes.push(
+      '全部任务已完成（backlog=0）——已交付，无 late risk（复用 on_track 表完成态·非「要迟到」）',
+    );
   } else if (trh <= 0) {
     // now >= DDL 且未完成 → overdue。
     riskBand = 'overdue';

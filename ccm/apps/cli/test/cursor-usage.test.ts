@@ -8,8 +8,8 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import type { UsageSignal } from '@ccm/engine';
 import {
-  classifyCursorBillingQuota,
   type CursorUsageSignal,
+  classifyCursorBillingQuota,
   inspectCursorCredential,
   normalizeCursorPeriodUsage,
   readCursorAgentQuotaFact,
@@ -166,10 +166,7 @@ test('readCursorAgentQuotaFact classifies an injected billing-period reading and
 });
 
 test('readCursorAgentQuotaFact fails open to unknown when the dashboard read is unavailable', () => {
-  const fact = readCursorAgentQuotaFact(
-    {},
-    { nowSec: NOW_SEC, readSignal: () => null },
-  );
+  const fact = readCursorAgentQuotaFact({}, { nowSec: NOW_SEC, readSignal: () => null });
   assert.deepEqual(fact, {
     state: 'unknown',
     used_percentage: null,
