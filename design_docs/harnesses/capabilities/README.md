@@ -48,6 +48,7 @@ skills 和/或 ccm，且各 host 机制不能 1:1 平移时，用 Capability Car
 | cross-harness-notification-subscription | [cross-harness-notification-subscription.md](cross-harness-notification-subscription.md) | B | `implemented-track-b` — exact session/epoch contract |
 | cross-harness-session-bound-worker | [cross-harness-session-bound-worker.md](cross-harness-session-bound-worker.md) | B | `current` — three-harness session-bound raw wrapper |
 | goal-contract-lifecycle | [goal-contract-lifecycle.md](goal-contract-lifecycle.md) | B | `protocol-capability-gap` — alwaysApply + PreCompact + completion gate |
+| agent-stream-transcript | [agent-stream-transcript.md](agent-stream-transcript.md) | A/B | `protocol-capability-gap` — external plain-text transcript (SQLite reader deferred) |
 
 ## 维护纪律
 
