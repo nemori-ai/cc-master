@@ -352,7 +352,7 @@ ccm route advise <task-id> --context <json|@file|-> --origin <origin-harness> --
 ccm worker run --harness <codex|claude-code|cursor-agent|kimi-code> --cwd /abs/repo -- <按 worker help 组装的完整 provider argv...>
 ```
 
-`worker run` 逐项透传 argv/stdin/cwd，管理 child 到 terminal，但它本身同步等待、不会返回 running handle、不会 route/fallback/选模型/切号，也不会自动写 board。**可 recon 的后台 handle 来自 origin harness 的后台机制；最终的 `ccm/worker-process-result/v1` terminal envelope 不是 running handle。**先真派发并拿到该 handle；若 board 已 opt in routing contract、selection evidence 也满足专属 gate，再用 `task route-bind` 原子记 selection/attempt/handle。只用 legacy lifecycle 时按既有 handle/status 记账，不为追求字段完整而伪造 selection。
+`worker run` 逐项透传 argv/stdin/cwd，管理 child 到 terminal，但它本身同步等待、不会返回 running handle、不会 route/fallback/选模型/切号，也不会自动写 board。**可 recon 的后台 handle 来自 origin harness 的后台机制；最终的 `ccm/worker-process-result/v1` terminal envelope 不是 running handle。**先真派发并拿到该 handle；若 board 已 opt in routing contract、selection evidence 也满足专属 gate，再用 `task route-bind` 原子记 selection/attempt/handle。只用 legacy lifecycle 时按既有 handle/status 记账，不为追求字段完整而伪造 selection。**记 task handle 只是 task/attempt 一侧的账**——同一次跨 harness 派发还要按**凡派发皆登记**把这个 runtime worker 登进本板 `agents[]` 花名册：`ccm agent create` → 拿到真实 handle 后 `bind` → `link <id> --task <task-id>`，让花名册 / viewer / resume 后的自己都看得见谁在跑（命令面见本文 [namespace agent](#namespace-agentagent-registry登记探测读取)，字段取值与它同 task `executor` 的分层见 [board-model-guide.md §C.6](board-model-guide.md#c6-agents运行时-agent-登记簿)）。
 
 ---
 
