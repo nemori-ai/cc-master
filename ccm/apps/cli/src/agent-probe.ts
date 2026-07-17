@@ -7,7 +7,8 @@
 //   · pid                    → process.kill(pid, 0) 存活判定（alive / gone / unknown）。
 //   · session-id             → 会话落盘根来自 harness adapter 的 `sessionStoreRoots(env)`（PathResolver SSOT·
 //     不再手写 ~/.codex / ~/.claude 平行实现）；匹配策略按 harness 表驱动（claude-code 走
-//     projects/<slug>/<sid>.jsonl 目标寻址，其余 harness 走递归 walk + 文件名边界精确匹配）。
+//     projects/<slug>/<sid>.jsonl 目标寻址，kimi-code 走 sessions 树的**路径段**匹配 sid〔文件名恒
+//     wire.jsonl·sid 是 session 目录段〕优先 agents/main，其余 harness 走递归 walk + 文件名边界精确匹配）。
 //     adapter 无 session 根（如 origin / 未知 harness）→ 如实 method=none。
 //   · task-id / subagent     → transcript_ref 路径存在则 mtime，否则 unknown。
 //   · 其余 / none             → method=none, observed=unknown。
@@ -207,9 +208,68 @@ const scanClaudeRoots: SessionScanner = (roots, sid, cache) => {
   return { mtimeMs: best, complete };
 };
 
+// ── kimi-code 策略：sid 在**路径段**（session 目录名），非文件名 ────────────────────────────────
+//   转录布局 `<root>/<wd>/<sid>/agents/<agentId>/wire.jsonl`（主 agent = `agents/main`）——文件名恒
+//   `wire.jsonl`、sid 是 `session_<uuid>` 目录段，故 baseMatchesSid（文件名匹配）对 kimi 恒 false。
+//   改按路径段精确匹配 sid（`session_<uuid>` 是完整段·非子串），优先 `agents/main/wire.jsonl`
+//   （session-id handle 指整个会话 = 主 agent；subagent 走各自 task-id + transcript_ref 登记）。
+
+interface KimiWireMatch {
+  path: string;
+  mtimeMs: number;
+  isMain: boolean;
+}
+
+// 路径段拆分（POSIX `/` 与 Windows `\` 均可），sid 须作为完整一段命中。
+function pathSegments(full: string): string[] {
+  return full.split(/[\\/]/);
+}
+
+function isKimiMainWire(full: string): boolean {
+  return full.replace(/\\/g, '/').endsWith('/agents/main/wire.jsonl');
+}
+
+// 从 walk 索引里挑出 sid 命中的 wire.jsonl（复用共享/memo 的 walkSessionRoot·与 codex 同一趟遍历）。
+function collectKimiWire(
+  roots: string[],
+  sid: string,
+  cache?: Map<string, unknown>,
+): { matches: KimiWireMatch[]; complete: boolean } {
+  const matches: KimiWireMatch[] = [];
+  let complete = true;
+  for (const root of roots) {
+    const idx = walkSessionRoot(root, cache);
+    if (!idx.complete) complete = false;
+    for (const f of idx.files) {
+      if (basename(f.full) !== 'wire.jsonl') continue;
+      if (!pathSegments(f.full).includes(sid)) continue;
+      matches.push({ path: f.full, mtimeMs: f.mtimeMs, isMain: isKimiMainWire(f.full) });
+    }
+  }
+  return { matches, complete };
+}
+
+// 命中排序偏好：主 agent 优先，再取最新 mtime（多命中·如同一 sid 的 main + subagent wire）。
+function pickKimiWire(matches: KimiWireMatch[]): KimiWireMatch | null {
+  if (matches.length === 0) return null;
+  return (
+    matches
+      .slice()
+      .sort((a, b) => (a.isMain === b.isMain ? b.mtimeMs - a.mtimeMs : a.isMain ? -1 : 1))[0] ??
+    null
+  );
+}
+
+const scanKimiRoots: SessionScanner = (roots, sid, cache) => {
+  const { matches, complete } = collectKimiWire(roots, sid, cache);
+  const best = pickKimiWire(matches);
+  return { mtimeMs: best ? best.mtimeMs : null, complete };
+};
+
 // 匹配策略表（roots 一律来自 adapter；只有匹配文件名的方式按 harness 特化）。
 const SESSION_SCANNERS: Record<string, SessionScanner> = {
   'claude-code': scanClaudeRoots,
+  'kimi-code': scanKimiRoots,
 };
 
 // 会话根来自 harness adapter 的 sessionStoreRoots（PathResolver SSOT）；opts.home 桥接为 env.HOME
@@ -372,6 +432,37 @@ function locateWalkTranscript(
   return best;
 }
 
+// kimi-code 策略：sid 是路径段（session 目录名），转录文件恒 `wire.jsonl`——按路径段匹配 sid，
+//   优先 `agents/main/wire.jsonl`（复用与 probe 同一套匹配·collectKimiWire/pickKimiWire）。
+function locateKimiTranscript(
+  roots: string[],
+  sid: string,
+  cache?: Map<string, unknown>,
+): TranscriptLocation | null {
+  const best = pickKimiWire(collectKimiWire(roots, sid, cache).matches);
+  return best ? { path: best.path, mtimeMs: best.mtimeMs } : null;
+}
+
+// cursor 短期外部 transcript：结构化需 SQLite state.vscdb reader（未实现·架构改动大）。短期支持一个
+//   外部提供的纯文本 transcript 路径（CURSOR_TRANSCRIPT_PATH），让 cursor hook / wrapper 无需显式
+//   `ccm agent bind --transcript` 也能挂上可 tail 的日志（走 raw parser·见 parserFor）。显式登记的
+//   transcript_ref 优先级更高（在本函数更早处命中）。
+const CURSOR_HARNESSES = new Set(['cursor-agent', 'cursor', 'cursor-agent-cli', 'cursor-ide']);
+
+function locateCursorEnvTranscript(
+  harness: string | undefined,
+  opts: ProbeOpts,
+): TranscriptLocation | null {
+  if (!harness || !CURSOR_HARNESSES.has(harness)) return null;
+  const envPath = (opts.env?.CURSOR_TRANSCRIPT_PATH || '').trim();
+  if (!envPath || !existsSync(envPath)) return null;
+  try {
+    return { path: envPath, mtimeMs: statSync(envPath).mtimeMs };
+  } catch {
+    return null; // 不可读 → 保真 null（调用方降级 source.kind='none'）
+  }
+}
+
 // locateTranscriptFile — 按 agent handle 解析其 transcript 文件路径（实时流的源定位单点）。
 //   优先级：transcript_ref 存在即用 → session-id 经 harness adapter roots + 匹配 → 否则 null。
 //
@@ -430,14 +521,18 @@ export function locateTranscriptFile(
       return null;
     }
   }
+  // cursor 短期：显式 transcript_ref 之后、session-id walk（对 cursor 恒 null·.vscdb 不入 walk）之前，
+  //   兜一个外部提供的纯文本 transcript（CURSOR_TRANSCRIPT_PATH）。
+  const cursorEnv = locateCursorEnvTranscript(input.harness, opts);
+  if (cursorEnv) return cursorEnv;
   if (input.handleKind === 'session-id' && input.harness) {
     const value = (input.handleValue || '').trim();
     if (!value) return null;
     const roots = sessionRootsFor(input.harness, opts);
     if (roots.length === 0) return null;
-    return input.harness === 'claude-code'
-      ? locateClaudeTranscript(roots, value, opts.dirCache)
-      : locateWalkTranscript(roots, value, opts.dirCache);
+    if (input.harness === 'claude-code') return locateClaudeTranscript(roots, value, opts.dirCache);
+    if (input.harness === 'kimi-code') return locateKimiTranscript(roots, value, opts.dirCache);
+    return locateWalkTranscript(roots, value, opts.dirCache);
   }
   return null;
 }

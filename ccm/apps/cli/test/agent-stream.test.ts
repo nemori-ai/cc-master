@@ -50,6 +50,27 @@ const CODEX_LINES = [
   '{"timestamp":"2026-07-08T12:00:05Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c1","output":"file.txt\\n"}}',
 ];
 
+// kimi-code: sessions/<wd>/<sid>/agents/main/wire.jsonl — internal typed transcript (NOT the
+// `-p` stream-json OpenAI-message shape). Verified empirically against real wire.jsonl on disk:
+// metadata / config.update / usage.record etc. are config/telemetry noise; turn.prompt is a
+// duplicate of the canonical context.append_message(user); assistant output + tools flow through
+// context.append_loop_event (content.part text/think, tool.call, tool.result); step.* is telemetry.
+const KIMI_LINES = [
+  '{"type":"metadata","protocol_version":"1.4","created_at":1784270606378}',
+  '{"type":"config.update","profileName":"agent","systemPrompt":"You are Kimi Code","time":1784270606380}',
+  '{"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"Add retries to the upload client"}],"toolCalls":[]},"time":1784270606400}',
+  '{"type":"turn.prompt","input":[{"type":"text","text":"Add retries to the upload client"}],"origin":{"kind":"user"},"time":1784270606401}',
+  '{"type":"context.append_loop_event","event":{"type":"step.begin","uuid":"u1","turnId":"t1","step":0},"time":1784270606402}',
+  '{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"think","think":"I should wrap post() in backoff"}},"time":1784270606410}',
+  '{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"text","text":"Adding exponential backoff."}},"time":1784270606420}',
+  '{"type":"context.append_loop_event","event":{"type":"tool.call","toolCallId":"tc1","name":"Edit","args":{"path":"src/upload.ts"},"description":"edit file"},"time":1784270606430}',
+  '{"type":"context.append_loop_event","event":{"type":"tool.result","toolCallId":"tc1","result":{"output":"Applied edit to src/upload.ts","note":""}},"time":1784270606440}',
+  '{"type":"context.append_loop_event","event":{"type":"step.end","uuid":"u1","turnId":"t1","step":0,"finishReason":"stop"},"time":1784270606450}',
+  '{"type":"usage.record","model":"kimi-code/k3","usage":{"output":42},"time":1784270606460}',
+  '{"type":"context.append_loop_event","event":{"type":"future.unknown.event","blob":"x"},"time":1784270606470}',
+  'this-is-not-json',
+];
+
 function fileFrom(lines: string[]): string {
   return `${lines.join('\n')}\n`;
 }
@@ -163,6 +184,112 @@ test('codex tail uses response_item canonical stream and skips duplicate/config 
   assert.equal(p.events[1]?.text, 'plan the change');
   assert.equal(p.events[3]?.title, 'exec_command');
   assert.match(String(p.events[4]?.text), /file\.txt/);
+});
+
+test('kimi-code tail normalizes typed wire.jsonl, drops noise + turn.prompt dup, raws unknowns', () => {
+  const ref = tmpFile('wire.jsonl', fileFrom(KIMI_LINES));
+  const p = buildAgentStream({
+    agentId: 'a',
+    harness: 'kimi-code',
+    handleKind: 'task-id',
+    handleValue: '',
+    transcriptRef: ref,
+  });
+  assert.equal(p.source.kind, 'transcript');
+  const kinds = p.events.map((e) => e.kind);
+  // metadata + config.update + turn.prompt(dup) + step.begin/step.end + usage.record dropped;
+  // append_message(user), content.part(think→thinking), content.part(text→assistant),
+  // tool.call(→tool), tool.result(→tool_result), unknown loop event (→raw), non-json (→raw).
+  assert.deepEqual(kinds, ['user', 'thinking', 'assistant', 'tool', 'tool_result', 'raw', 'raw']);
+  assert.equal(p.events[0]?.text, 'Add retries to the upload client');
+  assert.equal(p.events[1]?.text, 'I should wrap post() in backoff');
+  assert.equal(p.events[2]?.text, 'Adding exponential backoff.');
+  const tool = p.events[3];
+  assert.equal(tool?.title, 'Edit');
+  assert.match(String(tool?.detail), /src\/upload\.ts/);
+  assert.equal(p.events[4]?.text, 'Applied edit to src/upload.ts');
+  // epoch-ms `time` is converted to an ISO ts on emitted events.
+  assert.match(String(p.events[0]?.ts), /^2026-.*Z$/);
+  // The last raw is the non-JSON line passed through verbatim.
+  assert.equal(p.events[6]?.text, 'this-is-not-json');
+  // parserFor dispatch is public + stable for kimi.
+  assert.equal(parserFor('kimi-code')('  ').length, 0);
+});
+
+test('kimi-code locates wire.jsonl by path-segment sid (session-id handle, no transcript_ref)', () => {
+  // Real layout: <KIMI_CODE_HOME>/sessions/<wd>/<sid>/agents/main/wire.jsonl — the sid is the
+  // session directory segment, the filename is always `wire.jsonl`. The stream must resolve the
+  // source from the session-id handle alone (agent-probe path-segment match).
+  const home = mkdtempSync(join(tmpdir(), 'ccm-kimi-home-'));
+  TMPDIRS.push(home);
+  const sid = 'session_7cfabeb1-ad90-41bc-b9a3-bc4e2f105bbc';
+  const dir = join(home, 'sessions', 'wd_repo_deadbeef', sid, 'agents', 'main');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'wire.jsonl'), fileFrom(KIMI_LINES), 'utf8');
+
+  const p = buildAgentStream({
+    agentId: 'a',
+    harness: 'kimi-code',
+    handleKind: 'session-id',
+    handleValue: sid,
+    transcriptRef: null,
+    env: { KIMI_CODE_HOME: home },
+  });
+  assert.equal(p.source.kind, 'transcript');
+  assert.ok(String(p.source.path).endsWith(`${sid}/agents/main/wire.jsonl`));
+  assert.deepEqual(
+    p.events.map((e) => e.kind),
+    ['user', 'thinking', 'assistant', 'tool', 'tool_result', 'raw', 'raw'],
+  );
+});
+
+test('cursor short-term: external transcript via CURSOR_TRANSCRIPT_PATH tails as raw lines', () => {
+  // Cursor's native store is SQLite (state.vscdb) — not tailable. Short-term: an externally
+  // provided plain-text transcript path is honored as a raw-line source when no explicit
+  // transcript_ref is registered (session-id walk finds nothing for cursor).
+  const path = tmpFile('cursor.log', 'agent: reading file\nassistant: done\n');
+  const p = buildAgentStream({
+    agentId: 'a',
+    harness: 'cursor-agent',
+    handleKind: 'session-id',
+    handleValue: 'conv-123',
+    transcriptRef: null,
+    env: { CURSOR_TRANSCRIPT_PATH: path },
+  });
+  assert.equal(p.source.kind, 'transcript');
+  assert.equal(p.source.path, path);
+  assert.equal(p.events.length, 2);
+  assert.ok(p.events.every((e) => e.kind === 'raw'));
+  assert.equal(p.events[0]?.text, 'agent: reading file');
+});
+
+test('cursor: explicit transcript_ref wins over CURSOR_TRANSCRIPT_PATH env', () => {
+  const registered = tmpFile('registered.log', 'registered line\n');
+  const envPath = tmpFile('env.log', 'env line\n');
+  const p = buildAgentStream({
+    agentId: 'a',
+    harness: 'cursor-agent',
+    handleKind: 'session-id',
+    handleValue: 'conv-123',
+    transcriptRef: registered,
+    env: { CURSOR_TRANSCRIPT_PATH: envPath },
+  });
+  assert.equal(p.source.path, registered);
+  assert.equal(p.events[0]?.text, 'registered line');
+});
+
+test('cursor: no external transcript → honest source.kind none (SQLite state.vscdb not tailable)', () => {
+  const p = buildAgentStream({
+    agentId: 'a',
+    harness: 'cursor-agent',
+    handleKind: 'session-id',
+    handleValue: 'conv-123',
+    transcriptRef: null,
+    env: {},
+  });
+  assert.equal(p.source.kind, 'none');
+  assert.equal(p.mode, 'none');
+  assert.ok(p.source.reason && p.source.reason.length > 0);
 });
 
 test('forward, tail, and backward pages tile identically (no gap, no dup, no tear)', () => {
