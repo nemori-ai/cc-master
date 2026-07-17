@@ -813,7 +813,8 @@ sed "s/\"session_id\"[[:space:]]*:[[:space:]]*\"\"/\"session_id\": \"$sid_esc\"/
 #   `rest != trimmed` ⟺ raw-command 前缀真匹配过（剥掉了前缀）；否则走 body-sentinel 的 body_args（可能未设）。
 flag_notes=""    # 非法值 / 应用失败的 advisory 文案（单行·无换行·下方 per-line sed 量化才安全）
 applied=""       # 成功落板的旋钮摘要（喂 agent「原样保留别覆写」）
-init_pri=""; init_wip=""; init_ownerwip=""; init_pol=""; init_issue=""
+ddl_evidence=""  # --ddl 原值作 evidence 传 agent 的单行文案（landed 或 skipped 都留痕·语义归 agent）
+init_pri=""; init_wip=""; init_ownerwip=""; init_pol=""; init_issue=""; init_ddl=""
 if ! CC_MASTER_HOME="$HOME_DIR" "$CCM_CMD" board stamp-harness --board "$BOARD" --json >/dev/null 2>&1; then
   flag_notes="${flag_notes} ccm board stamp-harness 未能写入 owner.harness（peers 将退 unknown 单例池·可手动重跑）；"
 fi
@@ -836,6 +837,8 @@ while [ "$#" -gt 0 ]; do
     --policy-switch=*) init_pol="${1#--policy-switch=}";      shift ;;
     --github-issue)    init_issue="${2:-}";      shift; [ "$#" -gt 0 ] && shift ;;
     --github-issue=*)  init_issue="${1#--github-issue=}";      shift ;;
+    --ddl)             init_ddl="${2:-}";        shift; [ "$#" -gt 0 ] && shift ;;
+    --ddl=*)           init_ddl="${1#--ddl=}";                 shift ;;
     *) shift ;;
   esac
 done
@@ -886,6 +889,30 @@ if [ -n "$init_issue" ]; then
   fi
 fi
 
+# ── DDL（交付截止期·issue #149）：--ddl 显式启动 flag → ccm goal deadline set（best-effort·同 INIT-FLAGS 纪律）─
+# PARITY: rule-bootstrap-ddl-flag
+# bootstrap **不猜自然语言日期**（语义归 agent·红线）——只对 --ddl 值做**形状轻校验**：严格 ISO-8601 UTC
+#   `YYYY-MM-DDTHH:MM:SSZ`（与引擎 isISOUTC / ISO_UTC_RE 同口径）。三条分支：
+#   ① 合法 ISO → `ccm goal deadline set --at <值> --source cli-flag --assurance asserted`（落 asserted·可逆推进）。
+#      成功 → applied += ddl；失败（如 ccm 过旧不支持 goal deadline·capability skew）→ note「建议升级」+ 原值作 evidence。
+#   ② 非 ISO（如 `--ddl 8月1日` / date-only `2026-08-01` / 相对/模糊表达）→ **不落地**、记 note、原值作 evidence
+#      传 agent，由 agent 在 Goal Framing 阶段规范化（换算 UTC·补时区）或向用户澄清。
+#   无论 landed / skipped，原始 --ddl 值都作 evidence 注入，绝不静默丢弃（issue #149 §7.1）。
+if [ -n "$init_ddl" ]; then
+  if printf '%s' "$init_ddl" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'; then
+    if "$CCM_CMD" goal deadline set --board "$BOARD" --at "$init_ddl" --source cli-flag --assurance asserted --json >/dev/null 2>&1; then
+      applied="${applied} ddl=${init_ddl}(asserted)"
+      ddl_evidence="用户经 --ddl 预设了交付截止期 ${init_ddl}（已落板为 asserted）。在 Goal Framing 阶段与用户确认这个截止期，经 ccm goal deadline confirm --user-authorized 升为 confirmed；确认无误后 ccm goal check 应返回 ok（非 deadline_pending）才可拆 DAG。"
+    else
+      flag_notes="${flag_notes} ccm goal deadline set 失败——DDL '${init_ddl}' 未落地（可能当前 ccm 过旧、不支持 goal deadline 生命周期·建议升级 ccm；DDL 闸暂不可用，但原值已作 evidence 保留）；"
+      ddl_evidence="用户经 --ddl 表达了交付截止期意图 ${init_ddl}，但 ccm 未能落地（可能版本过旧）。在 Goal Framing 阶段经 ccm goal deadline set --at ${init_ddl} --source cli-flag 亲手落地并与用户确认；ccm 若确不支持则提示用户升级。"
+    fi
+  else
+    flag_notes="${flag_notes} --ddl 取值 '${init_ddl}' 非严格 ISO-8601 UTC（须 YYYY-MM-DDTHH:MM:SSZ）·未落地·原值作 evidence 传你；"
+    ddl_evidence="用户经 --ddl 表达了交付截止期意图 '${init_ddl}'，但它不是无歧义的 ISO-8601 UTC（bootstrap 不解析自然语言日期/时区/相对表达·语义归你）。在 Goal Framing 阶段把它规范化成 UTC（如「北京时间 8/1 下午5点」→ 换算 UTC），再经 ccm goal deadline set --at <ISO-UTC> --source cli-flag [--precision day --tz-input <IANA>] 落地并与用户确认；只有日期无时间且无时区证据时视为歧义、向用户澄清后保持 deadline pending。"
+  fi
+fi
+
 ctx="cc-master: a fresh orchestration board was created at ${BOARD}. You are now the master orchestrator for this task — remember that path, it is YOUR board. MANDATORY NEXT STEP: 原始请求只是需求证据，不是 canonical goal。先调用 master-orchestrator-guide，澄清并改写成无歧义 Goal Contract，用 ccm goal set --board ${BOARD} --summary <refined-goal> [--brief-file <file>] --assurance asserted 持久化，再运行 ccm goal check --board ${BOARD} --json。只有 goal check 通过后才能拆 DAG，并用 ccm task add --board ${BOARD} 写任务与验收标准。pending Goal Contract + zero tasks 不是可运行编排。"
 # applied / flag_notes 都是**单行**（无内嵌换行）——下方 per-line sed 量化（s/^/"/; s/$/"/）才不破 JSON。
 if [ -n "$applied" ]; then
@@ -893,6 +920,10 @@ if [ -n "$applied" ]; then
 fi
 if [ -n "$flag_notes" ]; then
   ctx="${ctx} <advisory source=\"bootstrap\" strength=\"weak\">部分启动 flag 未落地：${flag_notes}这些旋钮你可用 ccm（board update / policy set）手动补设，或请用户重发一条带正确 flag 的命令。</advisory>"
+fi
+# --ddl evidence（strong·截止期约束影响倒排/范围控制/风险升级·agent 决策归 agent，但默认应认真响应·ADR-018）。
+if [ -n "$ddl_evidence" ]; then
+  ctx="${ctx} <advisory source=\"bootstrap\" strength=\"strong\">${ddl_evidence}</advisory>"
 fi
 printf '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":%s}}\n' "$(printf '%s' "$ctx" | sed 's/\\/\\\\/g; s/"/\\"/g; s/^/"/; s/$/"/')"
 exit 0

@@ -196,3 +196,88 @@ test('show refreshes stale artifacts when board hash changes', () => {
   assert.notEqual(env.artifact.board_hash, firstHash);
   assert.equal(env.report.summary.total, 5);
 });
+
+// ── delivery DDL block（D6·issue #149 验收项 8）────────────────────────────────────────────
+//   status-report 附一个确定性、board-derived 的 deadline 只读块（截止时刻 / 状态 / 剩余 / overdue）。
+//   margin / risk band 不在此（那是 ccm estimate deadline-risk）。三态：settled / none / 无。
+function seedBoardWithDeadline(home: string, deadline: Record<string, unknown> | null): string {
+  const boardPath = seedBoard(home);
+  const board = JSON.parse(readFileSync(boardPath, 'utf8'));
+  board.goal_contract = {
+    schema: 'ccm/goal-contract/v1',
+    revision: 1,
+    assurance: 'confirmed',
+    updated_at: '2026-07-08T10:00:00Z',
+  };
+  if (deadline) board.goal_contract.deadline = deadline;
+  writeFileSync(boardPath, `${JSON.stringify(board, null, 2)}\n`, 'utf8');
+  return boardPath;
+}
+
+test('status-report: confirmed DDL → deterministic deadline block + human line', () => {
+  const home = mkHome();
+  seedBoardWithDeadline(home, {
+    state: 'confirmed',
+    at: '2026-07-10T12:00:00Z',
+    precision: 'minute',
+    kind: 'hard',
+    rev: 1,
+    updated_at: '2026-07-08T10:00:00Z',
+  });
+  const r = invoke(['status-report', 'render', '--json', '--as-of', '2026-07-08T12:00:00Z'], home);
+  assert.equal(r.code, EXIT.OK, r.stderr);
+  const dl = json(r.stdout).report.deadline;
+  assert.equal(dl.present, true);
+  assert.equal(dl.state, 'confirmed');
+  assert.equal(dl.at, '2026-07-10T12:00:00Z');
+  assert.equal(dl.time_remaining_hours, 48);
+  assert.equal(dl.overdue, false);
+
+  const human = invoke(['status-report', 'render', '--as-of', '2026-07-08T12:00:00Z'], home);
+  assert.match(human.stdout, /deadline: 2026-07-10T12:00:00Z \(confirmed\) · remaining 48h/);
+});
+
+test('status-report: past DDL with unfinished work → overdue (block + human)', () => {
+  const home = mkHome();
+  seedBoardWithDeadline(home, {
+    state: 'confirmed',
+    at: '2026-07-08T09:00:00Z',
+    precision: 'minute',
+    kind: 'hard',
+    rev: 1,
+    updated_at: '2026-07-08T08:00:00Z',
+  });
+  const r = invoke(['status-report', 'render', '--json', '--as-of', '2026-07-08T12:00:00Z'], home);
+  const dl = json(r.stdout).report.deadline;
+  assert.equal(dl.overdue, true);
+  assert.equal(dl.time_remaining_hours, -3);
+  const human = invoke(['status-report', 'render', '--as-of', '2026-07-08T12:00:00Z'], home);
+  assert.match(human.stdout, /OVERDUE/);
+});
+
+test('status-report: legacy board (no goal_contract) → deadline present:false, no human line', () => {
+  const home = mkHome();
+  seedBoard(home); // no goal_contract
+  const r = invoke(['status-report', 'render', '--json', '--as-of', '2026-07-08T12:00:00Z'], home);
+  const dl = json(r.stdout).report.deadline;
+  assert.equal(dl.present, false);
+  assert.equal(dl.state, 'pending');
+  assert.equal(dl.at, null);
+  assert.equal(dl.time_remaining_hours, null);
+  assert.equal(dl.overdue, false);
+  const human = invoke(['status-report', 'render', '--as-of', '2026-07-08T12:00:00Z'], home);
+  assert.doesNotMatch(human.stdout, /deadline:/);
+});
+
+test('status-report: confirmed no-DDL (state none) → deadline none, no false-green', () => {
+  const home = mkHome();
+  seedBoardWithDeadline(home, { state: 'none', rev: 2, updated_at: '2026-07-08T10:00:00Z' });
+  const r = invoke(['status-report', 'render', '--json', '--as-of', '2026-07-08T12:00:00Z'], home);
+  const dl = json(r.stdout).report.deadline;
+  assert.equal(dl.present, true);
+  assert.equal(dl.state, 'none');
+  assert.equal(dl.at, null);
+  assert.equal(dl.overdue, false);
+  const human = invoke(['status-report', 'render', '--as-of', '2026-07-08T12:00:00Z'], home);
+  assert.match(human.stdout, /deadline: none \(confirmed no-ddl\)/);
+});

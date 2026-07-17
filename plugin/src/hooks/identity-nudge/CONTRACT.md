@@ -29,16 +29,62 @@ critical-path status) that re-grounds the agent without gating anything.
   `<advisory strength="weak" source="identity-nudge"|"critpath-nudge">` — periodic, low-stakes,
   reasonably ignorable nudges, never a gate.
 
+### deadline-risk periodic entry (issue #149·契约 §5)
+
+The periodic-prompt table gains a fourth entry, `deadline-risk`, that fires only when the board's
+`goal_contract.deadline` is settled (state ∈ {asserted, confirmed} with an `at`). All schedule-risk
+algorithms / verdicts stay in the ccm engine — this entry is pure transport (red line 3). The
+host-neutral core lives in `plugin/src/hooks/_shared/deadline-risk-core.js` and is shared by all three
+host implementations (single source ⇒ agent-facing text is identical by construction, so no separate
+injection-contract anchors are needed).
+
+- `rule-deadline-risk-cadence-and-change-trigger`: bounded hybrid trigger — a periodic check whose base
+  cadence (default 2h, overridable) self-shortens as `time_to_ddl` shrinks and when the last band was
+  risky, PLUS a risk-input fingerprint change trigger (窄腰 `tasks[].{id,status,deps,blocked_on}` +
+  `goal_contract.deadline.{at,rev}` + `scheduling.wip_limit/owner_wip_limit`), floored by a min-recheck
+  interval. On a due check the hook spawns `ccm estimate deadline-risk --board <path> --json` and writes
+  `runtime.last_deadline_risk_check` (ISO) + `runtime.last_deadline_risk_fingerprint` (string) back
+  through `ccm board set-param`; injection only proceeds after the check write-back succeeds (never spam
+  when `ccm` is unavailable).
+- `rule-deadline-risk-notification-state-machine`: a hook-owned sidecar (not the board) tracks last
+  notified band / on-time probability / notification fingerprint / notified-at / top driver. The hook
+  (re)notifies only on first entry into risk, band worsening, a significant on-time-probability drop,
+  a top-driver change, a long-unhandled reminder interval, or a recovery (band falling back). Same
+  notification fingerprint + not reminder-due ⇒ suppressed (identical risk never spams). `unknown` band
+  is never mapped to green and never notified (honest low-confidence silence).
+- `rule-deadline-risk-single-delivery-self-ack`: single delivery path (codex triage #6) — the Stop
+  injection is the delivery; the hook additionally appends a durable `deadline_risk` coordination
+  notification and immediately self-acks it (`ccm coordination inbox ack <id>`), so the durable record
+  is audit / cross-session only and is never re-surfaced by `coordination-inbox`.
+- `rule-deadline-risk-critpath-dedup`: when a settled DDL exists the `critpath` entry drops its
+  on-track/behind schedule clause (and skips its `ccm estimate evm` call), reporting only X/Y — the
+  schedule verdict belongs to the deadline-risk entry (one `deadline-risk` call replaces the DDL-scenario
+  `evm` call; no duplicated compute or duplicated schedule notification).
+- `rule-deadline-risk-tag-protocol`: the deadline-risk reminder is wrapped as
+  `<advisory source="deadline-risk" strength="weak|strong">` — `watch` ⇒ weak, `at_risk`/`likely_late`/
+  `overdue` ⇒ strong (the engine emits the ADR-018 strength; the hook fills it directly), recovery ⇒
+  weak. Never a Stop block, never mutates the board goal.
+- `rule-deadline-risk-fail-safe`: `ccm` absent / spawn failure / lock timeout / malformed JSON / no
+  settled DDL ⇒ silent degrade (feature off — no error, no block, no board mutation, no fabricated
+  verdict); retried on the next Stop per freshness.
+
 ## 注入 taxonomy
 
-- Both reminders are **advisory, weak** — background grounding, not action-forcing.
+- The identity / critical-path / goal reminders are **advisory, weak** — background grounding, not
+  action-forcing.
+- The deadline-risk reminder is **advisory**, strength emitted by the ccm engine (`watch` weak;
+  `at_risk`/`likely_late`/`overdue` strong; recovery weak). Default never blocks Stop (issue #149: an
+  `overdue` → directive escalation would need a separate pressure-baseline argument; v1 stays advisory).
 
 ## 武装语义
 
 Single-active-board gate (stricter than the general `arm:'boards'` multi-board pattern — see
 `rule-identity-nudge-single-board-gate`). Writes only `runtime.last_identity_remind` /
-`runtime.last_critpath_remind` / `runtime.last_goal_remind` through the `ccm board set-param` whitelisted-key path (ADR-020) —
-never touches the narrow waist.
+`runtime.last_critpath_remind` / `runtime.last_goal_remind` / `runtime.last_deadline_risk_check` (ISO) /
+`runtime.last_deadline_risk_fingerprint` (string) through the `ccm board set-param` whitelisted-key path
+(ADR-020) — never touches the narrow waist. The deadline-risk notification-dedup state lives in a
+hook-owned sidecar (not the board). Only `goal_contract.deadline` (👁, read-only) and 窄腰
+`tasks[].{id,status,deps}` are read for arming / fingerprinting.
 
 ## PARITY anchors
 
@@ -46,6 +92,18 @@ never touches the narrow waist.
 - rule: rule-identity-nudge-tag-protocol
   required_hosts: [claude-code, codex, cursor]
 - rule: rule-identity-nudge-goal-cadence
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-deadline-risk-cadence-and-change-trigger
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-deadline-risk-notification-state-machine
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-deadline-risk-single-delivery-self-ack
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-deadline-risk-critpath-dedup
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-deadline-risk-tag-protocol
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-deadline-risk-fail-safe
   required_hosts: [claude-code, codex, cursor]
 ```
 
@@ -97,4 +155,38 @@ never touches the narrow waist.
     compaction natively). Periodic mid-flight identity nudges have no kimi channel; a UserPromptSubmit
     delivery is the candidate follow-up.
   tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §3
+
+- rule: deadline-risk-shared-core
+  kind: host-convention-divergence
+  affected_hosts: [claude-code, codex, cursor]
+  reason: >
+    The deadline-risk periodic entry's business logic (cadence, change trigger, notification state
+    machine, durable self-ack, critpath dedup) is host-neutral and lives once in
+    plugin/src/hooks/_shared/deadline-risk-core.js. Each host's identity-nudge implementation requires
+    it and only differs in the reminder envelope (Claude Code additionalContext / Codex systemMessage /
+    Cursor followup_message), matching the existing identity/critpath envelope divergence above.
+  compensating_mechanism: >
+    Single shared core ⇒ band → strength mapping, fingerprint dedup, and agent-facing text are identical
+    by construction across the three hosts; each host wraps the returned { text, strength } with its own
+    local advisory() and the launcher maps kind:'system' to the host-native Stop envelope. Cursor's
+    followup_message auto-continues the agent (product requirement: the notification must reach the
+    agent), throttled by the periodic cadence + notification-fingerprint dedup + verify-board loop_limit.
+  tracked_by: "design_docs/2026-07-16-ddl-design-contract.md §5.3; issue #149"
+
+- rule: deadline-risk-kimi-code
+  kind: protocol-capability-gap
+  affected_hosts: [kimi-code]
+  reason: >
+    kimi-code has no identity-nudge hook — it exposes no non-blocking Stop advisory channel (mirroring
+    identity-nudge-kimi-no-advisory-channel above). The deadline-risk periodic engine lives inside
+    identity-nudge, so on kimi-code it has no landing point and the periodic deadline-risk advisory
+    cannot be delivered.
+  compensating_mechanism: >
+    Out-of-scope for v1 — declared here explicitly rather than silently omitted. Deadline pressure still
+    surfaces on kimi-code through the non-periodic channels that are wired: bootstrap `--ddl` records the
+    deadline (strong advisory on ARM) and verify-board accepts the `deadline_pending` goal-check verdict
+    (no false Stop hard-block). A periodic mid-flight deadline nudge would need a kimi non-blocking
+    advisory channel (a UserPromptSubmit delivery is the candidate follow-up), tracked with the
+    identity-nudge gap.
+  tracked_by: "design_docs/2026-07-16-ddl-design-contract.md §5.3 (kimi-code conditional); issue #149"
 ```

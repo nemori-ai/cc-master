@@ -24,6 +24,7 @@ init_surface:
     - owner-wip flag
     - github issue board source flag
     - policy-switch flag persistence
+    - ddl (delivery deadline) flag persistence → goal_contract.deadline via ccm goal deadline set
     - session state for later hook environment reconstruction
   unsupported:
     - plugin-distributed slash command menu entry

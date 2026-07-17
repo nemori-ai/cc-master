@@ -31,6 +31,7 @@ test('FIELDS/ENUMS/INVARIANTS expose coordination inbox model facts', () => {
     'hitl_turn',
     'artifact_serialize',
     'quota_state_change',
+    'deadline_risk',
   ]);
   const inv = M.INVARIANTS.find((item: { id: string }) => item.id === 'FMT-INBOX');
   assert.ok(inv, 'FMT-INBOX must be registered');

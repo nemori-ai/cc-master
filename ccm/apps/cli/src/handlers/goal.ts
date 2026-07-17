@@ -14,7 +14,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
-import { lintBoard } from '@ccm/engine';
+import { type DeadlineView, lintBoard, readDeadline } from '@ccm/engine';
 import * as discover from '../discover.js';
 import * as io from '../io.js';
 import * as mutations from '../mutations.js';
@@ -325,9 +325,111 @@ export function amend(ctx: Ctx): number {
   });
 }
 
+// ── ccm goal deadline <set|confirm|confirm-none|amend|show>（交付 DDL·issue #149·三级命令走 positional 分发）──
+//   deadline verbs 嵌在 goal 下（deadline 是 goal_contract 约束）；positionals[0] 选子动作（同 coordination inbox 先例）。
+function deadlineWriteArgs(ctx: Ctx) {
+  const s = (k: string): string | undefined =>
+    typeof ctx.values[k] === 'string' ? (ctx.values[k] as string) : undefined;
+  return {
+    at: s('at'),
+    precision: s('precision'),
+    assurance: s('assurance'),
+    provenanceRaw: s('provenance-raw'),
+    source: s('source'),
+    tzInput: s('tz-input'),
+    reason: s('reason'),
+    userAuthorized: ctx.values['user-authorized'] === true,
+  };
+}
+
+function renderDeadlineWrite(board: BoardArg, ctx: Ctx, dryRun: boolean): string {
+  const block = deadlineBlock(board);
+  if (ctx.flags.json) return render.jsonString({ deadline: block, dry_run: dryRun });
+  const prefix = dryRun ? '[dry-run] ' : '';
+  return `${prefix}delivery deadline r${block.rev ?? '?'} state=${block.state}${block.at ? ` at ${block.at}` : ''}`;
+}
+
+function deadlineShow(ctx: Ctx): number {
+  const found = resolve(ctx);
+  const block = deadlineBlock(found.board);
+  const dl = readDeadline(found.board);
+  const remainingHours =
+    dl.at_ms !== null ? Math.round(((dl.at_ms - Date.now()) / 3600000) * 10) / 10 : null;
+  ctx.out(
+    ctx.flags.json
+      ? render.jsonString({ ...block, time_remaining_hours: remainingHours })
+      : [
+          `deadline state: ${block.state}${block.present ? '' : ' (未询问)'}`,
+          `at: ${block.at || '(none)'}`,
+          `precision: ${block.precision} · kind: ${block.kind} · rev: ${block.rev ?? '(none)'}`,
+          `time remaining: ${remainingHours === null ? '(n/a)' : `${remainingHours}h`}`,
+        ].join('\n'),
+  );
+  return io.EXIT.OK;
+}
+
+export function deadline(ctx: Ctx): number {
+  const action = String(ctx.positionals[0] || '');
+  switch (action) {
+    case 'set':
+      return runWrite(ctx, {
+        mutate: (board) => mutations.deadlineSet(board as BoardArg, deadlineWriteArgs(ctx)),
+        render: (board, c, { dryRun }) => renderDeadlineWrite(board as BoardArg, c, dryRun),
+      });
+    case 'confirm':
+      return runWrite(ctx, {
+        mutate: (board) =>
+          mutations.deadlineConfirm(board as BoardArg, {
+            userAuthorized: ctx.values['user-authorized'] === true,
+          }),
+        render: (board, c, { dryRun }) => renderDeadlineWrite(board as BoardArg, c, dryRun),
+      });
+    case 'confirm-none':
+      return runWrite(ctx, {
+        mutate: (board) =>
+          mutations.deadlineConfirmNone(board as BoardArg, {
+            userAuthorized: ctx.values['user-authorized'] === true,
+          }),
+        render: (board, c, { dryRun }) => renderDeadlineWrite(board as BoardArg, c, dryRun),
+      });
+    case 'amend':
+      return runWrite(ctx, {
+        mutate: (board) => mutations.deadlineAmend(board as BoardArg, deadlineWriteArgs(ctx)),
+        render: (board, c, { dryRun }) => renderDeadlineWrite(board as BoardArg, c, dryRun),
+      });
+    case 'show':
+      return deadlineShow(ctx);
+    default:
+      fail(
+        'goal deadline requires a subcommand: set | confirm | confirm-none | amend | show',
+        'Usage',
+      );
+  }
+}
+
+// deadline 子块（供 agent / viewer 读·goal check --json 稳定 schema 的一部分）。
+interface DeadlineCheckBlock {
+  present: boolean;
+  state: DeadlineView['state'];
+  at: string | null;
+  precision: 'minute' | 'day';
+  kind: 'hard' | 'soft';
+  rev: number | null;
+  settled: boolean;
+}
+
 interface GoalCheckResult {
   schema: typeof GOAL_CHECK_SCHEMA;
-  verdict: 'legacy' | 'pending' | 'ok' | 'malformed' | 'missing_brief' | 'hash_mismatch';
+  // deadline_pending（issue #149）：goal 语义 settled（assurance ∈ asserted/confirmed）但交付 DDL 未 settle
+  //   （键缺失或 state==pending）——exit 0·与 pending 同档·在 agent 层门控 dispatch，非 exit 3 结构损坏。
+  verdict:
+    | 'legacy'
+    | 'pending'
+    | 'deadline_pending'
+    | 'ok'
+    | 'malformed'
+    | 'missing_brief'
+    | 'hash_mismatch';
   reason: string;
   board_path: string;
   summary: string;
@@ -335,6 +437,34 @@ interface GoalCheckResult {
   assurance: string | null;
   brief_ref: string | null;
   brief_path: string | null;
+  deadline: DeadlineCheckBlock;
+}
+
+function deadlineBlock(board: BoardArg): DeadlineCheckBlock {
+  const dl = readDeadline(board);
+  return {
+    present: dl.present,
+    state: dl.state,
+    at: dl.at,
+    precision: dl.precision,
+    kind: dl.kind,
+    rev: dl.rev,
+    settled: dl.settled,
+  };
+}
+
+// settledVerdict：goal 语义 settled 后，再看交付 DDL——DDL 也 settle → ok；未 settle → deadline_pending（exit 0）。
+//   issue #149 §2.4：`ok` 收紧为「goal settled 且 deadline settled」；`none`（确认无 DDL）算 settle。
+function settledVerdict(dl: DeadlineView): { verdict: 'ok' | 'deadline_pending'; reason: string } {
+  if (dl.gating) {
+    return {
+      verdict: 'deadline_pending',
+      reason: dl.present
+        ? 'Goal Contract settled but delivery deadline still pending; confirm the deadline or confirm no-DDL before dispatch'
+        : 'Goal Contract settled but delivery deadline not yet asked; set/confirm a deadline or confirm no-DDL before dispatch',
+    };
+  }
+  return { verdict: 'ok', reason: 'Goal Contract and delivery deadline are settled' };
 }
 
 function inspectGoal(board: BoardArg, boardPath: string, home: string): GoalCheckResult {
@@ -346,15 +476,23 @@ function inspectGoal(board: BoardArg, boardPath: string, home: string): GoalChec
     assurance: null as string | null,
     brief_ref: null as string | null,
     brief_path: null as string | null,
+    deadline: deadlineBlock(board),
   };
   const contract = board.goal_contract;
   if (contract === undefined) {
     return { ...base, verdict: 'legacy', reason: 'board has no Goal Contract' };
   }
   const lint = lintBoard(JSON.stringify(board));
-  if (lint.errors.some((entry) => entry.rule === 'FMT-GOAL-CONTRACT')) {
-    return { ...base, verdict: 'malformed', reason: 'goal_contract failed schema validation' };
+  if (
+    lint.errors.some((entry) => entry.rule === 'FMT-GOAL-CONTRACT' || entry.rule === 'FMT-DEADLINE')
+  ) {
+    return {
+      ...base,
+      verdict: 'malformed',
+      reason: 'goal_contract (or its deadline) failed schema validation',
+    };
   }
+  const deadlineView = readDeadline(board);
   const revision = Number(contract.revision);
   const assurance = String(contract.assurance);
   const common = { ...base, revision, assurance };
@@ -404,7 +542,7 @@ function inspectGoal(board: BoardArg, boardPath: string, home: string): GoalChec
         reason: 'Goal Contract still needs clarification/confirmation',
       };
     }
-    return { ...withBrief, verdict: 'ok', reason: 'Goal Contract and Brief integrity are valid' };
+    return { ...withBrief, ...settledVerdict(deadlineView) };
   }
   if (assurance === 'pending') {
     return {
@@ -413,7 +551,7 @@ function inspectGoal(board: BoardArg, boardPath: string, home: string): GoalChec
       reason: 'Goal Contract still needs clarification/confirmation',
     };
   }
-  return { ...common, verdict: 'ok', reason: 'Goal Contract is valid (inline-simple, no Brief)' };
+  return { ...common, ...settledVerdict(deadlineView) };
 }
 
 function resolve(ctx: Ctx): { boardPath: string; board: BoardArg; home: string } {

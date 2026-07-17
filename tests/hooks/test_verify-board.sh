@@ -107,6 +107,17 @@ assert_contains "$HOOK_OUT" "integrity check failed" "confirmed missing Brief bl
 assert_contains "$HOOK_OUT" "missing_brief" "Claude names the confirmed integrity verdict"
 rm -rf "$H"
 
+# deadline_pending (issue #149): a settled goal (asserted, no brief) with no deadline key → ccm goal
+# check returns deadline_pending. verify-board must NOT report it as a goal-integrity failure and must
+# NOT hard-block the Stop on deadline grounds; it is treated like a settled goal (normal task-status
+# gating — here a single done task → the settled-goal self-check handshake, never an integrity block).
+H="$(make_project)"; SID="sess-goal-deadline-pending"
+mkactive "$H" "dp" "{\"schema\":\"cc-master/v2\",\"goal\":\"ship the widget\",\"goal_contract\":{\"schema\":\"ccm/goal-contract/v1\",\"revision\":1,\"assurance\":\"asserted\",\"updated_at\":\"2026-07-16T00:00:00Z\"},\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"T1\",\"status\":\"done\",\"verified\":true,\"artifact\":\"pr#1\",\"deps\":[]}]}"
+run_stop_sid_with_ccm "$H" "$SID" "${CCM_BIN:-$REPO_ROOT/ccm/apps/cli/dev-bin/ccm}"
+assert_not_contains "$HOOK_OUT" "integrity check failed" "deadline_pending is NOT reported as a goal-integrity failure"
+assert_not_contains "$HOOK_OUT" "deadline_pending" "deadline_pending verdict is not leaked as an integrity problem string"
+rm -rf "$H"
+
 # A transiently unavailable ccm cannot prove tampering and therefore must not become a hard integrity block.
 H="$(make_project)"; SID="sess-goal-unavailable"
 mkactive "$H" "unavailable" "{\"schema\":\"cc-master/v2\",\"goal\":\"\",\"goal_contract\":{\"schema\":\"ccm/goal-contract/v1\",\"revision\":1,\"assurance\":\"pending\",\"updated_at\":\"2026-07-15T00:00:00Z\"},\"owner\":{\"active\":true,\"session_id\":\"$SID\"},\"tasks\":[{\"id\":\"D1\",\"status\":\"blocked\",\"blocked_on\":\"user\",\"deps\":[],\"decision_package\":{\"inputs_hash\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"ask_type\":\"decision\",\"context_md\":\"Need authority.\",\"what_i_need\":\"Choose an option.\",\"options\":[{\"id\":\"a\",\"label\":\"A\"}],\"enter_cmd\":\"ccm discuss D1\"}}]}"

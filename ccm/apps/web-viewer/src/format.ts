@@ -373,3 +373,39 @@ export function watchdogReadout(watchdog: unknown, nowMs = Date.now()): Watchdog
   const agoText = fmtElapsed(nowMs - fireMs) ?? '<1m';
   return { mechanism, text: `${mechanism} · fire_at passed ${agoText} ago`, expired: true };
 }
+
+// ---- delivery deadline rendering (issue #149) --------------------------------------------
+export interface DeadlineReadout {
+  state: string;
+  at: string | null;
+  /** Live remaining-time / overdue phrasing (recomputed each render against the clock). */
+  text: string;
+  overdue: boolean;
+  /** state ∈ {asserted, confirmed, none} — the DDL question is answered (drives the tick). */
+  settled: boolean;
+}
+
+/**
+ * Mission `deadline` {state, at} -> live readout. A settled DDL in the future counts down
+ * ("due in 2d 4h"); a past one flips to overdue ("overdue by 3h"). `none` reads as an
+ * explicit no-DDL, `pending`/missing as unsettled. Margin / risk band are NOT computed here —
+ * they come from `ccm estimate deadline-risk` (the verdict SSOT; the viewer runs no MC).
+ */
+export function deadlineReadout(deadline: unknown, nowMs = Date.now()): DeadlineReadout | null {
+  if (!deadline || typeof deadline !== 'object' || Array.isArray(deadline)) return null;
+  const rec = deadline as { state?: unknown; at?: unknown };
+  const state = typeof rec.state === 'string' ? rec.state : 'pending';
+  const at = typeof rec.at === 'string' ? rec.at : null;
+  if (state === 'none')
+    return { state, at: null, text: 'no delivery deadline (confirmed)', overdue: false, settled: true };
+  if (state !== 'asserted' && state !== 'confirmed')
+    return { state, at, text: 'pending — not yet settled', overdue: false, settled: false };
+  const atMs = at ? parseTs(at) : null;
+  if (atMs == null) return { state, at, text: `${state} — no time set`, overdue: false, settled: true };
+  if (atMs >= nowMs) {
+    const inText = fmtElapsed(atMs - nowMs) ?? '<1m';
+    return { state, at, text: `due in ${inText}`, overdue: false, settled: true };
+  }
+  const agoText = fmtElapsed(nowMs - atMs) ?? '<1m';
+  return { state, at, text: `overdue by ${agoText}`, overdue: true, settled: true };
+}

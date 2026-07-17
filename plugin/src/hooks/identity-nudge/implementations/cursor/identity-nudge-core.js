@@ -8,6 +8,19 @@ const CCM_BIN = process.env.CCM_BIN || 'ccm';
 const DEFAULT_IDENTITY_INTERVAL_SEC = 6 * 60 * 60;
 const DEFAULT_CRITPATH_INTERVAL_SEC = 2 * 60 * 60;
 const DEFAULT_GOAL_INTERVAL_SEC = 2 * 60 * 60;
+const DEFAULT_DEADLINE_RISK_INTERVAL_SEC = 2 * 60 * 60;
+const DEFAULT_DEADLINE_RISK_REMINDER_SEC = 6 * 60 * 60;
+
+// deadline-risk 核心（issue #149·host-neutral _shared·三 host 复用同一份·dual-path 兼容 src / dist）。
+const deadlineRiskCorePath = [
+  path.resolve(__dirname, '../../../_shared/deadline-risk-core.js'),
+  path.resolve(__dirname, '../_shared/deadline-risk-core.js'),
+].find((c) => {
+  try { return fs.existsSync(c); } catch { return false; }
+});
+const { deadlineRiskBlock } = deadlineRiskCorePath
+  ? require(deadlineRiskCorePath)
+  : { deadlineRiskBlock: () => ({ hasSettledDdl: false, block: null }) };
 
 const IDENTITY_TEXT =
   '[身份周期提示] 你是一个 cc-master master orchestrator，正在把某个长程目标编排到完成。' +
@@ -123,7 +136,7 @@ function ccmJson(args, home) {
     : parsed;
 }
 
-function critpathText(board, boardPath, home) {
+function critpathText(board, boardPath, home, suppressSchedule) {
   const cp = ccmJson(['board', 'critical-path', '--json', '--board', boardPath], home);
   const chain = cp && Array.isArray(cp.chain) ? cp.chain : [];
   if (chain.length === 0) return '';
@@ -136,6 +149,11 @@ function critpathText(board, boardPath, home) {
   for (const id of chain) {
     const status = statusById.get(id);
     if (status === 'done' || status === 'verified') done += 1;
+  }
+  // deadline-risk 去重（契约 §5.1）：本板有已 settle 的 DDL 时 schedule verdict 归 deadline-risk·critpath 退纯计数。
+  // PARITY: rule-deadline-risk-critpath-dedup
+  if (suppressSchedule) {
+    return `[临界路径周期提示] 当前临界路径：${done}/${chain.length} 个任务已完成（本板有交付 DDL·按期/落后判定见 deadline-risk 提示）。这是周期性弱提示，最终调度仍由你拍。`;
   }
   const evm = ccmJson(['estimate', 'evm', '--json', '--board', boardPath], home);
   let verdictClause = '';
@@ -192,9 +210,28 @@ function main() {
       if (text) messages.push(advisory('goal-alignment-nudge', 'weak', text));
     }
   }
+  // deadline-risk 周期条目（issue #149·三 host 复用 _shared 核心·同 claude-code 语义）。
+  // PARITY: rule-deadline-risk-cadence-and-change-trigger
+  // PARITY: rule-deadline-risk-notification-state-machine
+  // PARITY: rule-deadline-risk-single-delivery-self-ack
+  // PARITY: rule-deadline-risk-tag-protocol
+  // PARITY: rule-deadline-risk-fail-safe
+  const dr = deadlineRiskBlock({
+    board,
+    boardPath,
+    homeDir: home,
+    ccmBin: CCM_BIN,
+    nowMs,
+    timeoutMs: 10000,
+    cadenceSec: intervalSec(process.env.CC_MASTER_DEADLINE_RISK_INTERVAL_SEC, DEFAULT_DEADLINE_RISK_INTERVAL_SEC),
+    reminderSec: intervalSec(process.env.CC_MASTER_DEADLINE_RISK_REMINDER_SEC, DEFAULT_DEADLINE_RISK_REMINDER_SEC),
+    sidecarPath: process.env.CC_MASTER_DEADLINE_RISK_SIDECAR || path.join(home, '.cc-master-deadline-risk.json'),
+  });
+  if (dr.block) messages.push(advisory('deadline-risk', dr.block.strength, dr.block.text));
+
   if (due(board, 'last_critpath_remind', nowMs, intervalSec(process.env.CC_MASTER_CRITPATH_INTERVAL_SEC, DEFAULT_CRITPATH_INTERVAL_SEC))) {
     if (setParam(home, boardPath, 'last_critpath_remind', nowIso)) {
-      const text = critpathText(board, boardPath, home);
+      const text = critpathText(board, boardPath, home, dr.hasSettledDdl);
       if (text) messages.push(advisory('critpath-nudge', 'weak', text));
     }
   }

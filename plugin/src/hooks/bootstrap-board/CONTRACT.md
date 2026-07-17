@@ -91,6 +91,21 @@ must not restate their command or failure schema.
 - `rule-bootstrap-init-flags`: `--priority` / `--wip` / `--owner-wip` / `--policy-switch` passed on the
   triggering prompt are applied to the newly-armed board's coordination/scheduling/policy fields at
   init time (best-effort — a flag-apply failure must not block arming).
+- `rule-bootstrap-ddl-flag`: `--ddl <value>` passed on the triggering prompt records a delivery
+  deadline (issue #149) on the newly-armed board, best-effort at init time (same INIT-FLAGS discipline
+  — a failure never blocks arming). The hook does **shape-only** validation — strict ISO-8601 UTC
+  (`YYYY-MM-DDTHH:MM:SSZ`, same as the engine's `ISO_UTC_RE`); it never parses natural-language dates,
+  timezones, or relative expressions (semantics belong to the agent). Three cases: (1) valid ISO-8601
+  UTC → `ccm goal deadline set --at <value> --source cli-flag --assurance asserted` (deadline state
+  `asserted`); (2) valid ISO but the ccm write fails (e.g. an older ccm without `goal deadline` — a
+  lightweight capability probe by attempt) → not landed, note recommends upgrading ccm, raw value kept
+  as evidence; (3) not strict ISO-8601 UTC (NL date, date-only, relative/ambiguous) → not landed, raw
+  value kept as evidence. In every landed/skipped case the raw `--ddl` value is surfaced to the agent
+  as a **strong advisory** so the agent normalizes/confirms it during Goal Framing; a landed `asserted`
+  deadline still passes through the agent's confirm gate (`ccm goal deadline confirm --user-authorized`)
+  before `ccm goal check` returns `ok` (not `deadline_pending`). Explicit `--ddl` takes precedence over
+  any deadline the agent later infers from the goal evidence; a conflict is never auto-resolved (the
+  agent surfaces it to the user).
 - `rule-bootstrap-ccm-hard-precheck`: before creating/arming a board, the hook hard-checks that the
   `ccm` binary is present (`command -v ccm`, or `$CCM_BIN` if set). If absent, the hook **refuses to
   arm** (no board is created/re-armed) and relays a user-facing reminder to install `ccm` (ADR-021).
@@ -130,6 +145,8 @@ from AGENTS.md §12's `runHook`/`isArmed` grep door). Its own "gate" is the trig
 - rule: rule-bootstrap-structured-path-capability
   required_hosts: [claude-code, codex, cursor]
 - rule: rule-bootstrap-raw-request-is-evidence
+  required_hosts: [claude-code, codex, cursor]
+- rule: rule-bootstrap-ddl-flag
   required_hosts: [claude-code, codex, cursor]
 - rule: rule-bootstrap-subscription-register
   required_hosts: [claude-code, codex, cursor]
@@ -188,4 +205,20 @@ proves their host-native projections without broadening registration beyond the 
     kind:context -> { message }, kind:block -> { hookSpecificOutput: { permissionDecision: "deny" } }.
     SSOT: _hosts/kimi-code/ENVELOPE.md.
   tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §3,§4
+
+- rule: bootstrap-ddl-capability-skew
+  kind: host-convention-divergence
+  affected_hosts: [claude-code, codex, cursor, kimi-code]
+  reason: >
+    `--ddl` landing depends on the ccm build advertising the `goal deadline` verbs (issue #149). The
+    bootstrap capability gate (`rule-bootstrap-structured-path-capability`) only requires
+    `board-init/structured-board-path-v1` + `goal-contract/v1`; a ccm that advertises those but
+    predates `goal deadline` would let arming proceed yet reject `ccm goal deadline set`. Per the
+    codex review triage (#1) v1 uses a lightweight probe-by-attempt rather than a full versioned
+    capability contract.
+  compensating_mechanism: >
+    All four hosts treat a failed `ccm goal deadline set` as best-effort: the board is still armed,
+    the raw `--ddl` value is kept as evidence, and a note recommends upgrading ccm. No board mutation
+    or arming is rolled back. Full DDL capability versioning is deferred to a follow-up issue.
+  tracked_by: "design_docs/2026-07-16-ddl-review-triage.md (finding #1)"
 ```

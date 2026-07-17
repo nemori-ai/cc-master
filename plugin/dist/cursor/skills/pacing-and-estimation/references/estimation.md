@@ -1,10 +1,10 @@
-# 估算消费 —— 5 个 estimate verb + baseline 生命周期 + 诚实字段
+# 估算消费 —— 6 个 estimate verb + baseline 生命周期 + 诚实字段
 
-> **何时读：** 要估目标 ETA、查进度/成本偏差（EVM）、看 velocity / 综合风险 / cost-to-complete，或要读懂 `ccm estimate` 的输出字段、判一个预测信不信时。模型**默认想不到**去查估算——能力就绪却不被召回，agent「该 forecast 工期 / 查 EVM 偏差 / 读 risk flag」时想不起来。按「何时查 → 读哪个字段 → 形成什么决策输入」消费。**ccm 出区间/数据，`master-orchestrator-guide` 作编排决策**；直接读取当前字段，不要重算估算数学。
+> **何时读：** 要估目标 ETA、查进度/成本偏差（EVM）、看 velocity / 综合风险 / cost-to-complete、查**交付准时性**（板背交付 DDL 时相对 DDL 的 margin / risk band），或要读懂 `ccm estimate` 的输出字段、判一个预测信不信时。模型**默认想不到**去查估算——能力就绪却不被召回，agent「该 forecast 工期 / 查 EVM 偏差 / 读 risk flag」时想不起来。按「何时查 → 读哪个字段 → 形成什么决策输入」消费。**ccm 出区间/数据，`master-orchestrator-guide` 作编排决策**；直接读取当前字段，不要重算估算数学。
 
 `ccm estimate` 是**只读 advisory**：全 verb compute、零写、不抢 board-lock。历史语料范围 `--scope home|this-repo|this-board`（默认 `home`·跨板多层收缩）。seeded 确定性 `--seed`（默认 42·MC 复现）。**5% 硬墙**：所有 `p95` = 95% 分位，**绝不算到 100%**（真上限是 session hard-stop）。
 
-## 5 个 verb 的消费映射（query → read → input）
+## 6 个 verb 的消费映射（query → read → input）
 
 | verb | 何时查 | 读哪个字段 | 形成的决策输入 |
 |---|---|---|---|
@@ -13,8 +13,20 @@
 | **`estimate velocity`** | 规划拍——backlog 还要多久清空 | `velocity_tasks_per_day` + `eta_days.{p50,p80,p95}` + `sle.{p50,p85,p95}`（cycle-time 服务水平） | backlog 清空 ETA 是否撑得住目标期限；SLE 给「单任务多久算正常」的基线（喂 risk 的 WIP-aging）。 |
 | **`estimate risk`** | replan / 风险拍——看综合风险 | `criticality_index`（CI/CRI/SSI·MC 高临界节点）+ `wip_aging[].status`（`at_risk`/`critical`）+ `ccpm.zone`（绿/黄/红缓冲区） | 高 CI 节点集合、超过 SLE_P95 的在飞任务集合与项目缓冲区状态。 |
 | **`estimate cost-to-complete`** | pacing 拍——清空 backlog 还要烧多少配额 | `cost_to_complete_pct.{p50,p80,p95}`（剩余总**配额%**）+ `available` | p80 配额% 对照 selected target 的可证余量：装不下 → 这是 usage⊗estimate 张力（见下）。`available:false` → 账户 burn 不可得、`cost_to_complete_pct:null`、降级。`token_sizing` 是**辅助相对量计、非预算账本**——配额% 才是账本。 |
+| **`estimate deadline-risk`** | 板背 `asserted`/`confirmed` 交付 DDL 时·pacing / 风险拍——查交付准时性 | `risk_band`（六态）+ `on_time_probability`（P(finish≤DDL)）+ `margin.{p50_h,p80_h,p95_h}`（DDL−forecast_pX·负=越过）+ 诚实字段（`coverage_pct`/`confidence`/`channel_disagreement`/`calibration_status`）+ `top_drivers` | 相对 DDL 的准时概率与分位裕度、先动哪个节点（详见下节）。`risk_band:"unknown"` / `on_time_probability:null` 绝不当绿。 |
 
 （`estimate show [<id>]` 给每任务 raw vs `calibrated_h` + conformal `interval`——快速瞥单任务校准后工期。）
+
+## 交付 DDL 风险消费（estimate deadline-risk）
+
+当板背一个 `asserted` / `confirmed` 交付 DDL（`goal_contract.deadline`）时，`estimate deadline-risk` 出**单一 verdict**：准时概率 + 相对 DDL 的分位 margin + 六态 risk band。它是 DDL-aware 的进度 verdict（`evm` 只看 baseline SPI/SV、对 DDL 无感）。按「读 verdict → 形成决策输入」消费，**绝不重算风险数学**：
+
+- **`risk_band`**（`on_track|watch|at_risk|likely_late|overdue|unknown`）+ **`strength`**（`weak|strong`·引擎按 band emit：watch=weak，at_risk/likely_late/overdue=strong）：band 升高即交付风险升高。
+- **`on_time_probability`** = P(finish ≤ DDL)，**只来自资源感知（RCPSP-in-trial）通道**；`null` = 算不出（unknown），不是 0。`margin.{p50_h,p80_h,p95_h}` = DDL − forecast_pX（小时·负=越过 DDL）；p80 margin 由正转负是「按 p80 口径将越期」的早信号。
+- **诚实字段（命中即降低信任 / 触发 unknown·绝不假绿）**：`coverage_pct` 低、`confidence:"low"`、`channel_disagreement` 超阈值（乐观下界通道与资源通道分歧大）、`calibration_status:"uncalibrated-conservative"`（band 阈值是未经经验校准的保守起点）、无 DDL / 图含环 / RCPSP 不可用 → `risk_band:"unknown"` + `on_time_probability:null`。**「算不出」绝不映射成绿色。**
+- **`top_drivers`** = 先动哪里（critical / sensitive / blocked / escalated / wip-aging / resource-conflict）。
+
+**surface 门槛是 actionability 不是 certainty**：band 越过风险阈值就是把它作决策输入 surface 的时机，别等 `overdue`。verdict 出自 ccm；何时 surface / replan / 缩范围的编排决策归 `master-orchestrator-guide`——读数在这里，拍板在那边。
 
 ## baseline 事实（EVM 的 plan 前置）
 

@@ -32,6 +32,7 @@ import {
   isReviewDependencyGate,
   NATIVE_ATTEMPT_CONTRACT,
   nativeAttemptApply,
+  normalizeDeadlineAt,
   routingContractPreflight,
   SCHEMA_VERSION,
   STATUS_MACHINE,
@@ -222,11 +223,25 @@ export function goalSet(
   const b = clone(board);
   const now = stampNow();
   b.goal = summary;
+  // D2-FIX（镜像 goalAmend 的 codex review 修正 #1 / #3）：goal set 走 fresh-skeleton 重建路径时
+  //   （board.goal_contract 已存在且 isFreshGoalSkeleton 为真——例如先 `goal deadline set` 挂了候选
+  //   deadline，再补 `goal set` 落定 summary），必须原样保留已有 deadline 子对象，绝不因 goal
+  //   summary/assurance 变更而静默丢弃。deadline 的实质变更走专属 `ccm goal deadline *`，不由 goal set 触碰。
+  const priorContract = board.goal_contract;
+  const carriedDeadline =
+    priorContract &&
+    typeof priorContract === 'object' &&
+    priorContract.deadline &&
+    typeof priorContract.deadline === 'object' &&
+    !Array.isArray(priorContract.deadline)
+      ? structuredClone(priorContract.deadline)
+      : undefined;
   b.goal_contract = {
     schema: 'ccm/goal-contract/v1',
     revision: 1,
     assurance,
     ...(args.brief ? { brief: structuredClone(args.brief) } : {}),
+    ...(carriedDeadline ? { deadline: carriedDeadline } : {}),
     updated_at: now,
   };
   appendGoalLog(
@@ -290,17 +305,261 @@ export function goalAmend(
   const b = clone(board);
   const now = stampNow();
   b.goal = summary;
+  // codex review 修正 #1：goal amend 重建 goal_contract 时**必须原样保留 deadline 子对象**（含其确认态 /
+  //   rev / provenance）——scope 变更 ≠ deadline 变更，绝不静默丢弃截止期承诺（issue #149 非目标）。
+  //   deadline 的实质变更走专属 `ccm goal deadline amend`，不由 goal amend 触碰。
+  const carriedDeadline =
+    c.deadline && typeof c.deadline === 'object' && !Array.isArray(c.deadline)
+      ? structuredClone(c.deadline)
+      : undefined;
   b.goal_contract = {
     schema: 'ccm/goal-contract/v1',
     revision,
     assurance,
     ...(args.brief ? { brief: structuredClone(args.brief) } : {}),
+    ...(carriedDeadline ? { deadline: carriedDeadline } : {}),
     updated_at: now,
   };
   appendGoalLog(
     b,
     `Goal Contract amended r${revision - 1} → r${revision} (${assurance})`,
     { from_revision: revision - 1, revision, assurance, reason, brief: args.brief?.ref },
+    now,
+  );
+  return touch(b);
+}
+
+// ── 交付 DDL（goal_contract.deadline·issue #149）writer 突变 ────────────────────────────────────────
+//   deadline 嵌在 👁 goal_contract 内（单一 SSOT·§2.1）。四个 verb（set/confirm/confirm-none/amend）镜像
+//   goalSet/Confirm/Amend 骨架 + runWrite 带锁 + board.log 审计；deadline 变更**绝不 bump goal_contract.revision**
+//   （延长/改期不是目标 scope 变更·§2.1 子决策），只刷 deadline.updated_at + goal_contract.updated_at + rev+1。
+type DeadlineStateWritable = 'pending' | 'asserted' | 'confirmed' | 'none';
+// 入参用宽松 string（enum 合法性由 registry 层 + lint FMT-DEADLINE 守；mutation 只机械写形状·与其它 verb 同语境）。
+export interface DeadlineWriteArgs {
+  at?: string;
+  precision?: string;
+  assurance?: string;
+  provenanceRaw?: string;
+  source?: string;
+  tzInput?: string;
+  reason?: string;
+  userAuthorized?: boolean;
+}
+
+// requireActiveGoalContract：deadline 只能存在于已激活的 goal_contract 内（legacy 板须先 `ccm goal set`）。
+function requireActiveGoalContract(board: Board): Record<string, any> {
+  const c = board.goal_contract;
+  if (!c || typeof c !== 'object' || c.schema !== 'ccm/goal-contract/v1') {
+    throw err(
+      'refused: no active Goal Contract; run `ccm goal set` before setting a delivery deadline',
+      'Validation',
+    );
+  }
+  return c;
+}
+
+// nextDeadlineRev：从现有 deadline.rev（int≥1）派生下一 rev（单调递增·首次=1·codex review 修正 #2）。
+function nextDeadlineRev(existing: unknown): number {
+  const rev =
+    existing && typeof existing === 'object' && !Array.isArray(existing)
+      ? (existing as Record<string, unknown>).rev
+      : undefined;
+  return (Number.isInteger(rev) && (rev as number) >= 1 ? (rev as number) : 0) + 1;
+}
+
+// buildProvenance：只放入实际提供的 raw/source/tz_input（缺则不留键·诚实）。
+function buildProvenance(args: DeadlineWriteArgs): Record<string, string> | undefined {
+  const p: Record<string, string> = {};
+  if (args.provenanceRaw !== undefined && args.provenanceRaw !== '') p.raw = args.provenanceRaw;
+  if (args.source !== undefined) p.source = args.source;
+  if (args.tzInput !== undefined && args.tzInput !== '') p.tz_input = args.tzInput;
+  return Object.keys(p).length ? p : undefined;
+}
+
+// normalizedDeadlineAtOrThrow：把 --at 规范化成严格 ISO-8601 UTC（precision=day 落当日末刻 23:59:59Z）。
+//   precision=day 时**强制** tz_input（codex review 修正 #4：date-only 无时区证据不可落板·ccm 仍只收严格 ISO UTC）。
+function normalizedDeadlineAtOrThrow(args: DeadlineWriteArgs): {
+  at: string;
+  precision: 'minute' | 'day';
+} {
+  const precision: 'minute' | 'day' = args.precision === 'day' ? 'day' : 'minute';
+  if (precision === 'day' && (args.tzInput === undefined || args.tzInput === '')) {
+    throw err(
+      'refused: --precision day requires --tz-input <IANA tz>（date-only 交付须带时区证据；ccm 只落严格 ISO UTC）',
+      'Usage',
+    );
+  }
+  const normalized = normalizeDeadlineAt(args.at, precision);
+  if (normalized === null) {
+    throw err(
+      `refused: --at must be strict ISO-8601 UTC (YYYY-MM-DDTHH:MM:SSZ)${precision === 'day' ? ' or a YYYY-MM-DD date' : ''}; got ${JSON.stringify(args.at)}. 时区/相对日期由 agent 换算后传入`,
+      'Usage',
+    );
+  }
+  return { at: normalized, precision };
+}
+
+// deadlineSet：设候选/断言截止期（fresh framing 或 legacy 首次；state → asserted 或 pending）。
+//   未 confirmed 前可幂等重设候选；已 confirmed / none 后拒绝（指向 amend）。
+export function deadlineSet(board: Board, args: DeadlineWriteArgs = {}): Board {
+  const c = requireActiveGoalContract(board);
+  const state: DeadlineStateWritable = args.assurance === 'pending' ? 'pending' : 'asserted';
+  const existing = c.deadline;
+  const existingState =
+    existing && typeof existing === 'object'
+      ? (existing as Record<string, unknown>).state
+      : undefined;
+  if (existingState === 'confirmed' || existingState === 'none') {
+    throw err(
+      'refused: delivery deadline already confirmed; use `ccm goal deadline amend --user-authorized`',
+      'Validation',
+    );
+  }
+  const { at, precision } = normalizedDeadlineAtOrThrow(args);
+  const b = clone(board);
+  const now = stampNow();
+  const rev = nextDeadlineRev(existing);
+  const provenance = buildProvenance(args);
+  const deadline: Record<string, unknown> = {
+    state,
+    at,
+    precision,
+    kind: 'hard',
+    rev,
+    ...(provenance ? { provenance } : {}),
+    updated_at: now,
+  };
+  b.goal_contract.deadline = deadline;
+  b.goal_contract.updated_at = now;
+  appendGoalLog(
+    b,
+    `Delivery deadline set r${rev} (${state}) at ${at}`,
+    {
+      deadline_rev: rev,
+      from: existingState ?? null,
+      to: state,
+      at,
+      precision,
+      source: args.source,
+    },
+    now,
+  );
+  return touch(b);
+}
+
+// deadlineConfirm：把当前 pending/asserted 候选升为 confirmed（要 --user-authorized·镜像 goal confirm）。
+export function deadlineConfirm(board: Board, args: DeadlineWriteArgs = {}): Board {
+  if (args.userAuthorized !== true) {
+    throw err('refused: goal deadline confirm requires explicit --user-authorized', 'Validation');
+  }
+  const c = requireActiveGoalContract(board);
+  const existing = c.deadline;
+  if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+    throw err(
+      'refused: no candidate deadline to confirm; use `ccm goal deadline set` first',
+      'Validation',
+    );
+  }
+  const e = existing as Record<string, unknown>;
+  if (e.state !== 'pending' && e.state !== 'asserted') {
+    throw err(
+      `refused: cannot confirm a deadline in state ${JSON.stringify(e.state)}; only pending/asserted candidates`,
+      'Validation',
+    );
+  }
+  if (!isISOUTC(e.at)) {
+    throw err(
+      'refused: cannot confirm a deadline without a concrete ISO-8601 UTC at',
+      'Validation',
+    );
+  }
+  const b = clone(board);
+  const now = stampNow();
+  const rev = nextDeadlineRev(existing);
+  b.goal_contract.deadline = { ...structuredClone(e), state: 'confirmed', rev, updated_at: now };
+  b.goal_contract.updated_at = now;
+  appendGoalLog(
+    b,
+    `Delivery deadline confirmed r${rev} by user at ${String(e.at)}`,
+    { deadline_rev: rev, from: e.state, to: 'confirmed', at: e.at, user_authorized: true },
+    now,
+  );
+  return touch(b);
+}
+
+// deadlineConfirmNone：用户明确确认「本目标无 DDL」（state → none·要 --user-authorized）。
+//   none 是显式持久状态（≠ 键缺失/未询问）——此后 goal check 见 none 即 ok（不再 deadline_pending·不再追问）。
+export function deadlineConfirmNone(board: Board, args: DeadlineWriteArgs = {}): Board {
+  if (args.userAuthorized !== true) {
+    throw err(
+      'refused: goal deadline confirm-none requires explicit --user-authorized',
+      'Validation',
+    );
+  }
+  const c = requireActiveGoalContract(board);
+  const b = clone(board);
+  const now = stampNow();
+  const rev = nextDeadlineRev(c.deadline);
+  const from =
+    c.deadline && typeof c.deadline === 'object'
+      ? (c.deadline as Record<string, unknown>).state
+      : null;
+  // none 不得带 at（isDeadlineWellShaped 硬约束）——建干净的 none 子对象。
+  b.goal_contract.deadline = { state: 'none', kind: 'hard', rev, updated_at: now };
+  b.goal_contract.updated_at = now;
+  appendGoalLog(
+    b,
+    `Delivery deadline confirmed as none (no DDL) r${rev} by user`,
+    { deadline_rev: rev, from: from ?? null, to: 'none', user_authorized: true },
+    now,
+  );
+  return touch(b);
+}
+
+// deadlineAmend：变更已存在截止期（延长/改期/改精度·要 --reason + --user-authorized·produces confirmed）。
+//   强制 --reason + --user-authorized（agent 绝不静默延期·issue 非目标）；记 board.log；不 bump goal revision。
+export function deadlineAmend(board: Board, args: DeadlineWriteArgs = {}): Board {
+  if (args.userAuthorized !== true) {
+    throw err('refused: goal deadline amend requires explicit --user-authorized', 'Validation');
+  }
+  const reason = String(args.reason || '').trim();
+  if (!reason) throw err('refused: goal deadline amend requires a non-empty --reason', 'Usage');
+  const c = requireActiveGoalContract(board);
+  const existing = c.deadline;
+  if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+    throw err(
+      'refused: no existing deadline to amend; use `ccm goal deadline set` to establish one',
+      'Validation',
+    );
+  }
+  const { at, precision } = normalizedDeadlineAtOrThrow(args);
+  const e = existing as Record<string, unknown>;
+  const b = clone(board);
+  const now = stampNow();
+  const rev = nextDeadlineRev(existing);
+  const provenance = buildProvenance(args);
+  b.goal_contract.deadline = {
+    state: 'confirmed',
+    at,
+    precision,
+    kind: 'hard',
+    rev,
+    ...(provenance ? { provenance } : {}),
+    updated_at: now,
+  };
+  b.goal_contract.updated_at = now;
+  appendGoalLog(
+    b,
+    `Delivery deadline amended r${rev} → ${at} (${reason})`,
+    {
+      deadline_rev: rev,
+      from_at: e.at ?? null,
+      to_at: at,
+      from_state: e.state,
+      to: 'confirmed',
+      reason,
+      source: args.source,
+    },
     now,
   );
   return touch(b);
@@ -326,14 +585,16 @@ export function boardArchive(board: Board): Board {
 //   只允许写 `board.runtime.<白名单 key>`——绝不触碰 🔒/👁 窄腰（白名单是第一道闸，applySet 的 assertFlexible
 //   是第二道兜底·但本函数直写 runtime 不经 applySet）。touch 刷 owner.heartbeat（与所有写 verb 同口径）。
 //
-// RUNTIME_PARAM_KEYS：runtime 参数区的键白名单 + 每个键的值校验器（'iso' = 严格 ISO-8601 UTC）。
+// RUNTIME_PARAM_KEYS：runtime 参数区的键白名单 + 每个键的值校验器（'iso' = 严格 ISO-8601 UTC·'string' = 任意非空字符串）。
 //   开放扩展：未来加一个周期 hook 簿记键 = 在此加一条（+ board-model FIELDS.runtime 字段说明），复用 set-param。
-const RUNTIME_PARAM_KEYS: Record<string, 'iso'> = {
+const RUNTIME_PARAM_KEYS: Record<string, 'iso' | 'string'> = {
   last_identity_remind: 'iso',
   last_critpath_remind: 'iso', // critpath-nudge（周期临界路径提示·hooks-enhancements-v2 ②）写回时间戳
   last_goal_remind: 'iso', // goal-alignment nudge 写回时间戳（Goal Contract revision 对齐）
   last_account_switch: 'iso', // 换号发生时刻（ADR-024·usage-pacing hook 每 Stop 读它注入 ambient·含手动 switch）
   stop_allow_until: 'iso', // Codex Stop decision:block 释放闸：agent 确认可停后写一个短期未来时间
+  last_deadline_risk_check: 'iso', // deadline-risk hook（交付 DDL·issue #149）cadence 节流时间戳
+  last_deadline_risk_fingerprint: 'string', // deadline-risk hook 去重指纹（verdict+driver+bucket 摘要·非时间戳）
 };
 export function boardSetParam(board: Board, args?: { key?: string; value?: string }): Board {
   const key = args && typeof args.key === 'string' ? args.key : '';
@@ -349,6 +610,12 @@ export function boardSetParam(board: Board, args?: { key?: string; value?: strin
   if (valKind === 'iso' && !isISOUTC(value)) {
     throw err(
       `refused: runtime.${key} 须是严格 ISO-8601 UTC（YYYY-MM-DDTHH:MM:SSZ），收到 ${JSON.stringify(value)}。`,
+      'Usage',
+    );
+  }
+  if (valKind === 'string' && value === '') {
+    throw err(
+      `refused: runtime.${key} 须是非空字符串，收到空值。`,
       'Usage',
     );
   }
@@ -1248,6 +1515,15 @@ function assertFlexible(board: Board, parsed: ParsedPath): void {
     if (LB_BOARD.has(head)) {
       throw err(
         `refused: "${head}" is a load-bearing (🔒) field; use the dedicated command (e.g. task add/start/set-status, board update, task add-dep) instead of --set`,
+        'Validation',
+      );
+    }
+    // goal_contract（含 deadline 子对象）是专属生命周期字段（ADR-035 + issue #149·👁 但 dedicated-verb-managed）：
+    //   泛型 --set 绕过授权/审计/形状闸（confirm 的 --user-authorized、deadline amend 的 --reason、rev 递增）——
+    //   一律封堵，指向专属 verb（issue #149 §4.4 bypass 封堵）。
+    if (head === 'goal_contract') {
+      throw err(
+        'refused: "goal_contract" is managed by dedicated lifecycle verbs; use `ccm goal set|confirm|amend` or `ccm goal deadline set|confirm|confirm-none|amend` instead of --set',
         'Validation',
       );
     }

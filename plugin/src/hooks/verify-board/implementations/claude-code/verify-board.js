@@ -251,7 +251,11 @@ function body(ctx) {
       goalCheckUnavailable.push(name);
       goalState = { verdict: goalState.local_assurance === 'pending' ? 'pending' : 'ok' };
     }
-    if (!['ok', 'legacy', 'pending'].includes(goalState.verdict)) {
+    // PARITY: rule-verify-board-deadline-pending
+    // deadline_pending（issue #149）：goal 语义 settled 但交付 DDL 未 settle（exit 0·advisory）。它**不是**
+    //   integrity 损坏——收进放行闭集（同 ok/legacy），绝不误报 goal-integrity failure、绝不据它硬 block Stop。
+    //   DDL settledness 是 advisory（dispatch 门控在 agent 层·reinject 已注提示），非 Stop 收口闸的职责。
+    if (!['ok', 'legacy', 'pending', 'deadline_pending'].includes(goalState.verdict)) {
       goalIntegrityProblem += `${name}: ${goalState.verdict || 'malformed'}; `;
     }
     if (goalState.verdict === 'pending') {

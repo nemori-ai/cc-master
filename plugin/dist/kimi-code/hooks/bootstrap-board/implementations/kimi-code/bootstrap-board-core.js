@@ -149,6 +149,8 @@ function parseArgs(args) {
         flags.policySwitch = value;
       } else if (name === 'github-issue') {
         flags.githubIssue = value;
+      } else if (name === 'ddl') {
+        flags.ddl = value;
       } else if (!name.startsWith('no-')) {
         const next = tokens[i + 1];
         if (next && !next.startsWith('--')) i += 1;
@@ -167,6 +169,8 @@ function parseArgs(args) {
       flags.policySwitch = tokens[++i] || '';
     } else if (token === '--github-issue') {
       flags.githubIssue = tokens[++i] || '';
+    } else if (token === '--ddl') {
+      flags.ddl = tokens[++i] || '';
     } else if (token === '-p') {
       flags.priority = tokens[++i] || '';
     } else if (token === '-w') {
@@ -252,6 +256,13 @@ function isGithubIssueUrl(value) {
   return /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/issues\/[0-9]+(?:[?#].*)?$/.test(
     String(value || '').trim()
   );
+}
+
+// isISOUTC — strict ISO-8601 UTC shape (YYYY-MM-DDTHH:MM:SSZ), same as the engine's ISO_UTC_RE.
+// bootstrap does shape-only validation for --ddl; it never parses NL dates / timezones (semantics
+// belong to the agent). A date-only or relative/ambiguous value fails this and is kept as evidence.
+function isISOUTC(value) {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(value || '').trim());
 }
 
 function restampOwner(boardPath, sessionId) {
@@ -532,6 +543,31 @@ function main() {
     }
   }
 
+  // PARITY: rule-bootstrap-ddl-flag
+  // --ddl (delivery deadline·issue #149): shape-only validation, best-effort ccm goal deadline set.
+  //   valid ISO-8601 UTC → set asserted (source cli-flag); invalid/failed → keep raw as evidence for
+  //   the agent to normalize/confirm during Goal Framing. Never blocks arming; never guesses NL dates.
+  let ddlEvidence = '';
+  if (flags.ddl) {
+    const ddl = String(flags.ddl).trim();
+    if (isISOUTC(ddl)) {
+      try {
+        run('ccm', [
+          '--board', boardPath, 'goal', 'deadline', 'set',
+          '--at', ddl, '--source', 'cli-flag', '--assurance', 'asserted', '--json', '--no-input',
+        ], { env: { ...process.env, CC_MASTER_HOME: home } });
+        applied.push(`ddl=${ddl}(asserted)`);
+        ddlEvidence = `delivery_deadline=${ddl} preset asserted from --ddl; during Goal Framing confirm it with the user via ccm goal deadline confirm --user-authorized so ccm goal check returns ok (not deadline_pending) before DAG dispatch`;
+      } catch (error) {
+        notes.push(`ccm goal deadline set failed; --ddl ${ddl} not landed (ccm may be too old to support goal deadline; upgrade recommended). Raw value kept as evidence: ${error.message}`);
+        ddlEvidence = `delivery_deadline_intent=${ddl} (from --ddl) — ccm could not land it (possibly an old ccm); during Goal Framing run ccm goal deadline set --at ${ddl} --source cli-flag yourself, and prompt the user to upgrade ccm if goal deadline stays unsupported`;
+      }
+    } else {
+      notes.push(`--ddl value ${ddl} is not strict ISO-8601 UTC (YYYY-MM-DDTHH:MM:SSZ); not landed, kept as evidence`);
+      ddlEvidence = `delivery_deadline_intent="${ddl}" (from --ddl) is not unambiguous ISO-8601 UTC; bootstrap does not parse NL dates/timezones. During Goal Framing normalize it to UTC, then ccm goal deadline set --at <ISO-UTC> --source cli-flag [--precision day --tz-input <IANA>]; if it is date-only with no timezone evidence, treat it as ambiguous, ask the user, and keep the deadline pending`;
+    }
+  }
+
   const bits = [
     `cc-master fresh: created and armed kimi-code orchestration board at ${boardPath}`,
     'MANDATORY NEXT STEP: the raw request is source evidence, not the canonical goal. Invoke master-orchestrator-guide, clarify/refine an unambiguous Goal Contract, persist it with ccm goal set --board <board> --summary <refined-goal> [--brief-file <file>] --assurance asserted, then run ccm goal check --board <board> --json. Only after that may you decompose the settled goal into a DAG. An armed fresh board with a pending Goal Contract and zero tasks is not a runnable orchestration.',
@@ -541,6 +577,7 @@ function main() {
   if (rawRequest) bits.push('raw_request_present=true (kept as evidence; not copied into board.goal)');
   if (applied.length > 0) bits.push(`bootstrap_applied=${applied.join(' ')}`);
   if (notes.length > 0) bits.push(`bootstrap_advisory=${notes.join('; ')}`);
+  if (ddlEvidence) bits.push(`<advisory source="bootstrap-board" strength="strong">${ddlEvidence}</advisory>`);
   say('context', bits.join('\n'));
 }
 

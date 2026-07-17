@@ -133,6 +133,42 @@ test('FMT-RUNTIME warns when stop_allow_until is a non-ISO string', () => {
   );
 });
 
+// last_deadline_risk_check（deadline-risk hook·issue #149）：ISO 时间锚·合法 ISO 0 warn，非 ISO → FMT-RUNTIME warn。
+test('valid runtime {last_deadline_risk_check: ISO} → 0 errors 0 FMT-RUNTIME warnings', () => {
+  const result = M.lintBoard(
+    JSON.stringify(makeBoard({ last_deadline_risk_check: '2026-07-16T12:00:00Z' })),
+  );
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.warnings.filter((w: { rule: string }) => w.rule === 'FMT-RUNTIME').length, 0);
+});
+
+test('FMT-RUNTIME warns when last_deadline_risk_check is a non-ISO string', () => {
+  const result = M.lintBoard(JSON.stringify(makeBoard({ last_deadline_risk_check: 'not-iso' })));
+  assert.equal(result.errors.length, 0);
+  assert.ok(
+    result.warnings.find((w: { rule: string }) => w.rule === 'FMT-RUNTIME'),
+    'non-ISO last_deadline_risk_check → FMT-RUNTIME warn',
+  );
+});
+
+// last_deadline_risk_fingerprint（deadline-risk hook）：string 摘要（非 ISO）·合法字符串 0 warn，非字符串 → FMT-RUNTIME warn。
+test('valid runtime {last_deadline_risk_fingerprint: string} → 0 errors 0 FMT-RUNTIME warnings', () => {
+  const result = M.lintBoard(
+    JSON.stringify(makeBoard({ last_deadline_risk_fingerprint: 'abc123' })),
+  );
+  assert.equal(result.errors.length, 0);
+  assert.equal(result.warnings.filter((w: { rule: string }) => w.rule === 'FMT-RUNTIME').length, 0);
+});
+
+test('FMT-RUNTIME warns when last_deadline_risk_fingerprint is not a string', () => {
+  const result = M.lintBoard(JSON.stringify(makeBoard({ last_deadline_risk_fingerprint: 42 })));
+  assert.equal(result.errors.length, 0);
+  assert.ok(
+    result.warnings.find((w: { rule: string }) => w.rule === 'FMT-RUNTIME'),
+    'non-string last_deadline_risk_fingerprint → FMT-RUNTIME warn',
+  );
+});
+
 // 未知键 silent-on-unknown：未来同形成员复用本规则·扩展位无须改 lint（只校验已知键）。
 test('unknown runtime key (silent-on-unknown) → no FMT-RUNTIME warning', () => {
   const result = M.lintBoard(JSON.stringify(makeBoard({ some_future_hook_key: 'whatever' })));

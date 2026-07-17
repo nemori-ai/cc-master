@@ -22,6 +22,13 @@ before new work is scheduled.
   not semantic evidence: inject a strong advisory, keep evaluating local gates, and do not prohibit
   dispatch on that transport failure alone. A `pending` empty board is a goal-framing stop: refine
   and persist the Goal Contract before decomposition; it is not a task-decomposition stop.
+- `rule-reinject-deadline-pending`: the `deadline_pending` verdict (issue #149 — goal semantics
+  settled but the delivery DDL not yet settled, exit 0) is a member of the known-verdict closed set
+  (not `check_unavailable`, not a goal-integrity HARD STOP). It is surfaced as a plain **advisory**:
+  before decomposing/dispatching, settle the DDL (`ccm goal deadline set/confirm --user-authorized`)
+  or confirm no-DDL (`ccm goal deadline confirm-none --user-authorized`) so `ccm goal check` returns
+  `ok`. Advisory, not a hard stop — DDL dispatch gating is an agent-level judgment, not a reinject
+  hard block.
 - `rule-reinject-empty-board-hard-stop`: any listed board with zero tasks triggers a HARD STOP note
   — an armed-but-undecomposed board must never be read as permission to start implementation/tests/
   git/PR work.
@@ -48,6 +55,8 @@ tagged ambient/advisory/directive message.
 - rule: rule-reinject-dangling-nodes
   required_hosts: [claude-code, codex]
 - rule: rule-reinject-goal-integrity
+  required_hosts: [claude-code, codex]
+- rule: rule-reinject-deadline-pending
   required_hosts: [claude-code, codex]
 ```
 

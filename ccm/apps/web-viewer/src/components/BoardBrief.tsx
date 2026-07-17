@@ -1,5 +1,12 @@
 import { useSecondTick } from '../analytics';
-import { fmtElapsed, fmtEstimate, normalizeStatus, recorded, watchdogReadout } from '../format';
+import {
+  deadlineReadout,
+  fmtElapsed,
+  fmtEstimate,
+  normalizeStatus,
+  recorded,
+  watchdogReadout,
+} from '../format';
 import type {
   CadenceIteration,
   InboxNotification,
@@ -52,8 +59,10 @@ export function BoardBrief({
   const extras = viewModel.board_extras ?? {};
   const mission = viewModel.mission;
   const boardWatchdog = watchdogReadout(extras.watchdog);
-  // Second ticker drives the board-watchdog countdown (re-renders each second).
-  useSecondTick(boardWatchdog != null);
+  // Delivery DDL live readout (issue #149): countdown / overdue against the clock.
+  const deadline = deadlineReadout(mission?.deadline);
+  // Second ticker drives the board-watchdog + DDL countdowns (re-renders each second).
+  useSecondTick(boardWatchdog != null || (deadline?.settled ?? false));
 
   const diagnostics = [
     ...(viewModel.freshness.errors ?? []).map((item) => ({
@@ -165,9 +174,24 @@ export function BoardBrief({
               <span className="v mono">{mission.updated_at}</span>
             </div>
           ) : null}
+          {deadline ? (
+            <div className="row">
+              <span className="k">deadline</span>
+              <span className={`v mono${deadline.overdue ? ' wd-expired' : ''}`}>
+                {deadline.at ? `${deadline.at} · ` : ''}
+                {deadline.text}
+              </span>
+            </div>
+          ) : null}
         </div>
         {mission?.pending ? (
           <div className="contract-callout">Goal assurance is pending; treat execution as provisional.</div>
+        ) : null}
+        {deadline?.overdue ? (
+          <div className="contract-callout">
+            Delivery deadline is overdue; report status and options before pushing further — see
+            ccm estimate deadline-risk.
+          </div>
         ) : null}
       </div>
 
