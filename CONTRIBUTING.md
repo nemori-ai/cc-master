@@ -69,6 +69,38 @@ claude plugin validate plugin/dist/claude-code
 must leave no `plugin/dist` diff, and `claude plugin validate plugin/dist/claude-code`
 must report no errors.
 
+### ccm 改动：本地验收必须对齐 CI `build-and-check`
+
+上面三道门覆盖 hook 行为 + content contract + plugin 结构，**但不含 ccm 的严格类型检查与
+lint**。CI 的 `ccm-ci` workflow 有一个 `build-and-check` job，它是**复合门（Typecheck →
+Lint → Build）**，碰 `ccm/**` 的 PR 必过。本地 / subagent 常只跑 `pnpm -C ccm build`（tsdown
+**非严格**、不做 `tsc --noEmit`）+ `run-tests.sh`（**不含** ccm typecheck / lint）就自报绿——
+于是**本地绿、CI 红**（曾发生 CI 红被 merge 的事故，见下）。
+
+所以**任何 `ccm/` 改动，除上面三道门，必跑这两条对齐 `build-and-check`**：
+
+```bash
+pnpm -C ccm typecheck   # 严格 tsc --noEmit —— tsdown build 不做，只此处能抓
+pnpm -C ccm lint        # biome check —— 含 lint 规则 + formatter
+```
+
+biome format 欠账的修法：`cd ccm/<pkg> && pnpm exec biome check --write .` 自动改格式；
+`noUnusedImports` 一类**非** auto-fixable，须手动删。
+
+### merge 前 CI 必须绿（branch protection · 硬闸）
+
+main 已设 **branch protection**：`build-and-check` 是 required check + **strict**（分支须与
+main up-to-date）+ **enforce_admins**（连 admin 都不能红着 merge）。所以 **CI 红的 PR 任何人
+（含 admin）都 merge 不进 main**——把「gate 红也能 squash 进 main」这个曾经踩过的事故从机制上
+堵死。`gh pr merge <N> --squash` 之前先确认 `build-and-check` = pass：
+
+```bash
+gh pr checks <N>                            # 确认 build-and-check = pass
+gh pr merge <N> --squash --delete-branch
+# 或让 CI 跑完自动 merge（省得手动等）：
+gh pr merge <N> --squash --auto --delete-branch
+```
+
 ### 机制 ↔ skill 对账步（改了 command / hook / script 业务逻辑就做）
 
 如果你这次 PR 改动了任何 `plugin/src/commands/` / `plugin/src/hooks/*/implementations/claude-code/` / `plugin/src/skills/*/canonical/scripts/`（或顶层

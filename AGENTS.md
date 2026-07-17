@@ -212,6 +212,7 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 
 - **feature branch**——不在 default 分支直接动手（先 branch）。
 - **PR 走 `gh` CLI 手工收口**——`gh pr create`（PR body 末尾带 Claude 署名 `🤖 Generated with [Claude Code]`）→ `gh pr merge <N> --squash --delete-branch`（本仓惯例 squash，main 上 commit 形如 `… (#N)`）。本仓**没有** `github-pr` / `github-tag-release` skill（历史占位、实物不存在，别去找）；不用 gstack `/ship`。
+- **merge 前 CI 必须绿（branch protection · 硬闸）**——main 已设 branch protection（`build-and-check` required + strict + enforce_admins），**CI 红任何人（含 admin）都 merge 不进 main**（曾发生 gate 红被 squash 进 main 的事故，现已机制堵死）；`gh pr merge` 前先 `gh pr checks <N>` 确认 `build-and-check` = pass（或 `--auto` 等 CI）。**ccm 改动的本地验收须对齐这道复合门**——除 §10 三道门另跑 `pnpm -C ccm typecheck` + `pnpm -C ccm lint`（`ccm build` 不做严格 tsc、`run-tests.sh` 不含 ccm typecheck/lint，漏跑必本地绿 CI 红）。细节见 [`CONTRIBUTING.md`](CONTRIBUTING.md)「Before you open a PR」段，本文不复述。
 - **发版（release）——两条独立版本线，各自 tag、各自触发**（决策快照 [`adrs/ADR-022-version-line-decoupling.md`](adrs/ADR-022-version-line-decoupling.md)·本段是它的操作纲领·不复述正文）。`ccm`（独立 TS 引擎/CLI·ADR-014）与 cc-master plugin 的**版本号 + 发版触发 + changelog 节奏完全解耦**，互不绑定。**未来发版者先回答「这次该 bump 哪条线」**：
   - **改 plugin 面**（`plugin/src/commands/` / `plugin/src/skills/` / `plugin/src/hooks/` / 命令体 / README·凡随 plugin zip 分发的物）→ **bump plugin 线**（裸 `v*`）。
   - **改 `ccm/` 包**（`@ccm/engine` 引擎 / `ccm` CLI 命令面 / lint 规则 / 估算配速数学·凡进 SEA 二进制的物）→ **走 ccm changeset**（`ccm-v*`），且若动命令面/规则必同 PR 同步 `using-ccm`（§6 锁步）。
