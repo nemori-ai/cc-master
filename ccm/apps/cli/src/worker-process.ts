@@ -48,7 +48,7 @@ export interface WorkerProcessResult {
   error: { code: string; message: string } | null;
 }
 
-const MAX_TIMEOUT_MS = 600_000;
+const MAX_TIMEOUT_MS = 1_800_000;
 const MAX_OUTPUT_BYTES = 1_048_576;
 const STDERR_LIMIT_BYTES = 1_048_576;
 

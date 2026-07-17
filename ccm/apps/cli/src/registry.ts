@@ -99,7 +99,7 @@ export const REGISTRY: Registry = {
           desc: '目标 harness CLI',
         },
         cwd: { type: 'string', required: false, desc: 'child cwd 的绝对路径（默认当前目录）' },
-        'timeout-ms': { type: 'string', required: false, desc: '总超时，50..600000 毫秒' },
+        'timeout-ms': { type: 'string', required: false, desc: '总超时，50..1800000 毫秒' },
         'max-output-bytes': {
           type: 'string',
           required: false,
