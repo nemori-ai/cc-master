@@ -8,7 +8,11 @@ import {
   pluginInstallRoot,
   localPluginBase as resolvePluginBase,
 } from '@ccm/engine';
-import { readCursorUsageSignal } from '../cursor-usage.js';
+import {
+  type CursorAgentQuotaReading,
+  readCursorAgentQuotaFact,
+  readCursorUsageSignal,
+} from '../cursor-usage.js';
 import { createUnprobedCursorAgentAdmission } from './cursor-agent-admission.js';
 import { probeExecutable } from './probe.js';
 import type {
@@ -156,12 +160,19 @@ function cursorSurfaces(input: {
 }): HarnessSurfaceDescriptor[] {
   const ideFacts = unprobedFacts();
   // headless（cursor-agent）认证态：opt-in 时经官方机读接口 `status --format json` 探测；
-  //   否则维持轻量 unprobed（默认零 spawn）。quota 无只读源→始终 unknown（与 machine-surface 一致）。
+  //   否则维持轻量 unprobed（默认零 spawn）。
+  const headlessAuth = input.probeHeadlessAuth
+    ? probeCursorAgentAuthFact(input.headlessCli, input.env)
+    : unprobedFacts().authentication;
+  // headless quota：opt-in 且已认证时经 cursor-agent 自己的 accessToken 读 dashboard billing-period
+  //   （与 machine-wide collector 同一只读源·pacing SSOT 分档）；否则 / 未认证 / 读不到 → unknown（fail-open·
+  //   no-token 早返回不 spawn Worker）。有 quota 信号即让 admission 不再对可读额度 fail-closed 误拒。
   const headlessFacts: HarnessSurfaceDescriptor['facts'] = {
-    authentication: input.probeHeadlessAuth
-      ? probeCursorAgentAuthFact(input.headlessCli, input.env)
-      : unprobedFacts().authentication,
-    quota: unprobedFacts().quota,
+    authentication: headlessAuth,
+    quota:
+      input.probeHeadlessAuth && headlessAuth.state === 'available'
+        ? probeCursorAgentQuotaFact(input.env)
+        : unprobedFacts().quota,
   };
   return [
     {
@@ -276,6 +287,24 @@ export function probeCursorAgentAuthFact(
   if (authenticated === false) return { state: 'unavailable', source: 'cursor-agent:status-json' };
   // 布尔缺失 / 非布尔：schema 变更→unknown（不猜、绝不默认 authed）。
   return { state: 'unknown', source: 'cursor-agent:status-schema-unknown' };
+}
+
+// cursorQuotaReadingToSurfaceFact — 把 cursor-agent billing-period 额度分档映射成粗粒度 SurfaceFact（admission 用）。
+//   ample/tight（本账单周期仍有余量）→ available（可调度·pacing 是 advisory·由 quota status 承载细档）；
+//   exhausted（≥停机线）→ unavailable（本周期无余量·fail-closed）；读不到 → unknown（不猜、不据此放行）。
+export function cursorQuotaReadingToSurfaceFact(fact: CursorAgentQuotaReading): SurfaceFact {
+  if (fact.state === 'ample' || fact.state === 'tight') {
+    return { state: 'available', source: `${fact.source}:${fact.state}` };
+  }
+  if (fact.state === 'exhausted') {
+    return { state: 'unavailable', source: `${fact.source}:exhausted` };
+  }
+  return { state: 'unknown', source: fact.source };
+}
+
+// probeCursorAgentQuotaFact — 读 cursor-agent 自己的 accessToken → dashboard billing-period → 映射 SurfaceFact。
+export function probeCursorAgentQuotaFact(env: Env): SurfaceFact {
+  return cursorQuotaReadingToSurfaceFact(readCursorAgentQuotaFact(env));
 }
 
 function pathExists(p: string): boolean {

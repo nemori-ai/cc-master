@@ -15,6 +15,7 @@ import {
   type NegativeCapabilityState,
   type QuotaFactState,
 } from '@ccm/engine';
+import { type CursorAgentQuotaReading, readCursorAgentQuotaFact } from '../cursor-usage.js';
 import { cursorAdapter } from './cursor.js';
 import { probeExecutable } from './probe.js';
 import type { Env } from './types.js';
@@ -163,6 +164,46 @@ export function inspectCursorExecutionSurfaces(
   const now = deps.now?.() ?? new Date();
   const observedAt = now.toISOString();
   return [inspectIdeSurface(env, now), inspectHeadlessSurface(env, now, observedAt, deps)];
+}
+
+// defaultCursorAgentQuotaReader — composition-root `readQuota` dep wiring the machine-wide billing-period
+//   collector's read (cursor-agent accessToken → dashboard GetCurrentPeriodUsage → pacing-classified
+//   ample/tight/exhausted) into a bounded CursorQuotaFact. Fail-closed: unreadable signal or a missing
+//   quota-scope fingerprint (can't bind a pool ref) → unknown. No subscription-pool inference across surfaces
+//   — the ref is the Agent's own login scope only.
+export function cursorAgentQuotaReadingToFact(
+  fact: CursorAgentQuotaReading,
+  observedAt: string,
+): CursorQuotaFact {
+  const poolRef = fact.quota_scope_fingerprint;
+  if (fact.state === 'unknown' || !poolRef) {
+    return {
+      state: 'unknown',
+      source: fact.source,
+      pool_refs: [],
+      observed_at: observedAt,
+      valid_until: null,
+      reason:
+        fact.state === 'unknown'
+          ? 'Cursor Agent dashboard billing-period usage is unreadable (logged out / token invalid / API change).'
+          : 'Cursor Agent billing-period usage lacks a stable quota-scope fingerprint to bind a pool ref.',
+    };
+  }
+  return {
+    state: fact.state,
+    source: fact.source,
+    pool_refs: [poolRef],
+    observed_at: observedAt,
+    valid_until: expiresAt(new Date(observedAt), QUOTA_TTL_MS),
+  };
+}
+
+export function defaultCursorAgentQuotaReader(input: {
+  surface_id: 'cursor-agent-cli';
+  env: Env;
+  observed_at: string;
+}): CursorQuotaFact {
+  return cursorAgentQuotaReadingToFact(readCursorAgentQuotaFact(input.env), input.observed_at);
 }
 
 export function buildCursorSurfaceInventory(
