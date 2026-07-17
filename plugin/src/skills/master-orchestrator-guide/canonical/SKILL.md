@@ -214,11 +214,11 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 3. `ccm model-policy show --task <task-taxonomy> --json`、`ccm provider facts` —— 先按 task role 读取三路统一的 hard facts / project role evidence / community advisory；candidate 不是 certified。
 4. `ccm quota status --machine-wide --json` —— 一次读取本机所有受支持 target 的缓存 quota posture；按 `harness_id + surface_id + window` 绑定候选，missing / stale / unknown 不补成 ample。Codex 只看 7d；Cursor IDE 与 Cursor Agent 是两条独立 surface。选中目标后才用 `ccm --harness <target> usage show|advise --json` 下钻；持有 authority reference 时才做 `ccm quota preflight`。
 5. `ccm model-policy advise --input <json|@file|-> --json` / `ccm route advise` —— 前者只在调用方提供的已 qualification 候选间执行有界排序，后者给 board shadow advice 且稳定返回 `spawned=false`；两者都不启动 worker。不要臆造 `--role`、`--taxonomy`、`--require` 等 flag；语法不确定时先运行 `ccm model-policy <verb> --help`，再查 `using-ccm`。
-6. `ccm worker run` —— 选定后显式 dispatch。
+6. `ccm worker run` —— 选定后显式 dispatch。**派发即两笔账：`ccm agent create/bind/link` 把这个 runtime worker 登进 `agents[]` 花名册（凡派发皆登记）＋ `task start` 让 task 进 `in_flight`——只记 task handle、漏掉 agent 登记，花名册与 resume 后的自己就数不清谁在跑。**
 
 `quota status --machine-wide` 是全机缓存读面，不触发 provider refresh，也不授权 spawn；`usage show|advise` 是 selected target 下钻。两者只提供各自当前能证明的证据，任何 missing / stale / unavailable / unknown 都保持 unknown，不推断为 ample。
 
-选定后才显式 dispatch，并按一个不可倒置的注册顺序记账：可以先用 `ccm agent create` 建立 `starting` 登记，再真实启动 `ccm worker` / native subagent / background process；拿到**真实 handle**后依次 `ccm agent bind`、`ccm agent link`，最后才用 `ccm task start` 让普通 lifecycle 的 task 进入 `in_flight`。没有真实 handle，task 不得进入 `in_flight`；spawn 失败则用 `ccm agent terminal` 收掉那条 `starting` 登记，不能留下僵尸 agent。若 task 已启用 native attempt 合同，则由它的专属 dedicated writer 维护等价 attempt / task projection，不用 generic `ccm task start` 绕过边界。精确 flag、字段与状态机语法全部查 `using-ccm`，这里不复制命令表。
+这两笔账有一个不可倒置的注册顺序：可以先用 `ccm agent create` 建立 `starting` 登记，再真实启动 `ccm worker` / native subagent / background process；拿到**真实 handle**后依次 `ccm agent bind`、`ccm agent link`，最后才用 `ccm task start` 让普通 lifecycle 的 task 进入 `in_flight`。没有真实 handle，task 不得进入 `in_flight`；spawn 失败则用 `ccm agent terminal` 收掉那条 `starting` 登记，不能留下僵尸 agent。若 task 已启用 native attempt 合同，则由它的专属 dedicated writer 维护等价 attempt / task projection，不用 generic `ccm task start` 绕过边界。精确 flag、字段与状态机语法全部查 `using-ccm`，这里不复制命令表。
 
 `ccm` worker 是同步 raw wrapper；要让跨 harness 任务成为可 recon 的后台工作，必须从**当前 origin 可追踪的后台 shell / terminal / session**中运行它，真实 handle 来自该后台机制，而非同步 wrapper 的 terminal envelope。agent process terminal ≠ task done：父 task 仍须独立验收 artifact / diff / tests / acceptance 后才可 `done`。
 
