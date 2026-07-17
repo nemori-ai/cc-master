@@ -29,6 +29,7 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | rule | kind | affected hosts | tracked by |
 | --- | --- | --- | --- |
 | board-guard-apply-patch | host-convention-divergence | claude-code | n/a — legitimate host-tool-surface difference, not a bug |
+| board-guard-apply-patch-envelope-normalization | host-convention-divergence | claude-code, cursor, kimi-code | GitHub issue #156 (fixed, this PR) |
 | board-guard-bash-fallback-false-positive | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
 | board-guard-directive-tag-protocol | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
 | board-guard-kimi-envelope | host-convention-divergence | kimi-code | design_docs/2026-07-16-kimi-code-adapter-design.md §3 |
