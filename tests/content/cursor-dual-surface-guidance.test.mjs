@@ -37,6 +37,7 @@ const makeProjectionFixture = () => {
   );
   for (const script of [
     'sync-plugin-dist.sh',
+    'project-skill.cjs',
     'pacing-read-only-capability.cjs',
     'pacing-read-only-attestation.cjs',
     'provider-guidance-attestation.cjs',
