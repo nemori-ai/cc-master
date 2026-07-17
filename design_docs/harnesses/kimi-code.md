@@ -44,7 +44,7 @@ grep -nF "<token>" /tmp/kimi.strings.txt
   - `--output-format <text|stream-json>` — prompt 模式输出格式（默认 text）。
   - `-S, --session [id]` — resume session（带 id 恢复该 session；不带 id 交互选）。
   - `-c, --continue` — 继续该 workDir 的上一个 session。
-  - `-y, --yolo` — 自动批准所有动作。`--auto` — auto permission mode。
+  - `-y, --yolo` — 自动批准所有动作。`--auto` — auto permission mode。**注意 [tested]：这两个权限 flag 均与 `-p/--prompt` 互斥**——`kimi -p '…' -y` 报 `error: Cannot combine --prompt with --yolo.`、`kimi -p '…' --auto` 报 `error: Cannot combine --prompt with --auto.`，均秒退 exit 1。`-p` headless 单发**自身即以非交互模式自动执行工具**（无需也不能叠这两个 flag，见 §10 Approval）。
   - `-m, --model <alias>` — 选模型 alias（默认 `default_model`）。
   - `--skills-dir <dir>`（可重复）— 用指定目录 skills 覆盖自动发现的用户/项目 skills。
   - `--add-dir <dir>`（可重复）— 追加 workspace 目录。`--plan` — plan mode 启动。
@@ -225,7 +225,7 @@ KIMI_CODE_HOME=<隔离home> kimi -p "Reply with exactly: PING. No tools." --outp
 
 ## 10. Headless 与 Worker 可行性 [tested]
 
-**结论：kimi-code 具备可用的 headless worker 面（`kimi -p` 单发 + stream-json + session/transcript recon），可行性高于 Codex/Cursor 的降级形态；主要缺口在 quota 信号与 approval 自动化。**
+**结论：kimi-code 具备可用的 headless worker 面（`kimi -p` 单发 + stream-json + session/transcript recon），可行性高于 Codex/Cursor 的降级形态；主要缺口在 quota 信号。approval 无缺口——`-p` 单发自身即以非交互模式自动执行工具（含写文件），无需也不能加 `-y`/`--auto`（二者与 `-p` 互斥，见 §10 Approval）[tested]。**
 
 ### 单发调用
 
@@ -259,7 +259,9 @@ kimi -p "<prompt>" --output-format stream-json  # exit 0；stdout = JSONL
 
 ### Approval / 背景执行
 
-- 默认需批准。`-p` 非交互无 TTY，需批准的工具调用会阻塞/被拒；`-y`/`--yolo` 全自动批准、`--auto` auto mode、或 config `[permission.rules]`（首条命中）做 allowlist。
+- **`-p` headless 单发自身即以非交互模式自动执行工具（含写文件），无需也不能加显式权限 flag [tested]。** 实测 `kimi -p '在当前目录创建 probe.txt 写一行 hello'`（不加任何权限 flag）→ exit 0 且 **probe.txt 被真实创建**（headless 无 TTY 下工具调用自动执行，不阻塞、不被拒）。
+- **权限 flag 互斥于 `-p` [tested]**：`-y`/`--yolo` 与 `--auto` **都不能与 `-p/--prompt` 组合**——`kimi -p '…' -y` → `error: Cannot combine --prompt with --yolo.`、`kimi -p '…' --auto` → `error: Cannot combine --prompt with --auto.`，两者均秒退 **exit 1、不产出任何文件**。故 headless worker **绝不要**给 `-p` 叠 `-y`/`--auto`（会直接失败）。`-y`/`--auto` 是**交互（TUI）模式**下的自动批准开关，不适用于 `-p` 单发。
+- config `[permission.rules]`（首条命中）allowlist 仍是**可选**的额外约束层——`-p` 已自动执行工具，rules 只用于进一步收窄可执行的工具面（如需最小权限），非启用工具执行的前提。
 - `BackgroundConfigSchema`（binary）：Bash 工具支持后台任务（`bashTaskTimeoutS` 默认 600s、`bashAutoBackgroundOnTimeout`、`maxRunningTasks`、`keepAliveOnExit`）；print 模式有 `printBackgroundMode: exit|drain|steer` + `printMaxTurns`——`steer` 提示 print 模式下可多轮 steer。
 - **更强的编程 driver 面**（未深测 [docs]）：`kimi acp`（Agent Client Protocol over stdio）、`kimi server`（REST+WebSocket JSON-RPC）——比 `-p` 更适合结构化编排的 worker transport，值得后续 probe。
 
@@ -291,7 +293,7 @@ kimi -p "<prompt>" --output-format stream-json  # exit 0；stdout = JSONL
 
 ## 13. 对 ccm worker driver 的关键落点
 
-1. **headless 调用形态**：`kimi -p "<prompt>" --output-format stream-json [-m <alias>] [--add-dir <dir>]`；exit 0 成功。approval 用 `--auto` 或预置 config `[permission.rules]` allowlist（避免 `-y` 全放开的安全面）。
+1. **headless 调用形态 [tested]**：`kimi -p "<prompt>" --output-format stream-json [-m <alias>] [--add-dir <dir>]`；exit 0 成功。**`-p` 单发自身即以非交互模式自动执行工具（含写文件），不要叠任何权限 flag**——`-y`/`--auto` 均与 `-p` **互斥**（`kimi -p '…' -y` → `Cannot combine --prompt with --yolo.` exit 1；`kimi -p '…' --auto` → `Cannot combine --prompt with --auto.` exit 1，均不产出文件）。若要收窄可执行的工具面，用 config `[permission.rules]` allowlist（可选的额外约束层，非启用工具执行的前提）。
 2. **session/transcript 路径**：`session_index.jsonl`（home 级，`{sessionId,sessionDir,workDir}`）→ `sessions/<wd>/<sid>/agents/main/wire.jsonl` + `state.json`；或 `kimi export <sid>` 出 zip。stream-json 的 `session.resume_hint.session_id` 直接给 recon 键。
 3. **退出码语义**：实测 exit 0 = 成功；错误/退出码全谱未穷举 [unresolved-minor]（provider/auth 失败退出码待补 probe）。
 4. **可 recon 的 handle**：`session_<uuid>` 即 handle；`kimi -S <sid> -p "..."`（或 `-c`）续跑同 session，`kimi export <sid>` 拉 transcript——**满足 worker driver 的 spawn→poll(read wire.jsonl)→resume/attach 需求**。
