@@ -5,6 +5,7 @@ import { chmodSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { test } from 'node:test';
+import { probeCursorAgentAuthFact } from '../src/harnesses/cursor.js';
 import {
   detectTrustedHarnessId,
   harnessSessionId,
@@ -13,6 +14,7 @@ import {
   resolveHarnessAdapter,
   resolveHarnessId,
 } from '../src/harnesses/registry.js';
+import type { HarnessCliProbe } from '../src/harnesses/types.js';
 
 test('--harness flag wins over env aliases', () => {
   const adapter = resolveHarnessAdapter({
@@ -168,6 +170,132 @@ test('Cursor inventory keeps IDE plugin and headless agent as independent surfac
     assert.equal(agent.capabilities.accountAutoswitch.state, 'unsupported');
     assert.equal(agent.capabilities.pluginDistribution.state, 'unsupported');
   }
+});
+
+// ── cursor-agent 认证态探测（probeCursorAgentAuthFact·mock runner 三态 + 边界）────────────────
+//   fail-closed 铁律：仅在官方机读接口 `status --format json` 明确 isAuthenticated:true 时判 available。
+const AGENT_BIN: HarnessCliProbe = {
+  name: 'cursor-agent',
+  path: '/opt/bin/cursor-agent',
+  available: true,
+};
+
+test('probeCursorAgentAuthFact: 已登录（isAuthenticated:true）→ available', () => {
+  const fact = probeCursorAgentAuthFact(AGENT_BIN, {}, () => ({
+    ok: true,
+    stdout: '{"status":"authenticated","isAuthenticated":true,"userInfo":{"email":"x@y.z"}}',
+  }));
+  assert.deepEqual(fact, { state: 'available', source: 'cursor-agent:status-json' });
+});
+
+test('probeCursorAgentAuthFact: 未登录（isAuthenticated:false）→ unavailable（observed negative·仍不放行）', () => {
+  const fact = probeCursorAgentAuthFact(AGENT_BIN, {}, () => ({
+    ok: true,
+    stdout: '{"isAuthenticated":false}',
+  }));
+  assert.deepEqual(fact, { state: 'unavailable', source: 'cursor-agent:status-json' });
+  assert.notEqual(fact.state, 'available'); // 绝不误放行
+});
+
+test('probeCursorAgentAuthFact: 进程错误（非零退出 / 超时 / spawn 失败）→ unknown（fail-closed）', () => {
+  const fact = probeCursorAgentAuthFact(AGENT_BIN, {}, () => ({ ok: false, stdout: '' }));
+  assert.equal(fact.state, 'unknown');
+  assert.equal(fact.source, 'cursor-agent:status-unavailable');
+});
+
+test('probeCursorAgentAuthFact: 无法解析的人类可读文案 → unknown（不 grep 文案）', () => {
+  const fact = probeCursorAgentAuthFact(AGENT_BIN, {}, () => ({
+    ok: true,
+    stdout: '✓ Logged in as x@y.z',
+  }));
+  assert.equal(fact.state, 'unknown');
+  assert.equal(fact.source, 'cursor-agent:status-unparseable');
+});
+
+test('probeCursorAgentAuthFact: schema 变更（认证布尔缺失）→ unknown（绝不默认 authed）', () => {
+  const fact = probeCursorAgentAuthFact(AGENT_BIN, {}, () => ({
+    ok: true,
+    stdout: '{"status":"weird","some":"field"}',
+  }));
+  assert.equal(fact.state, 'unknown');
+  assert.equal(fact.source, 'cursor-agent:status-schema-unknown');
+});
+
+test('probeCursorAgentAuthFact: 兼容旧键 authenticated:true → available', () => {
+  const fact = probeCursorAgentAuthFact(AGENT_BIN, {}, () => ({
+    ok: true,
+    stdout: '{"authenticated":true}',
+  }));
+  assert.deepEqual(fact, { state: 'available', source: 'cursor-agent:status-json' });
+});
+
+test('probeCursorAgentAuthFact: 二进制不可用 → not-probed unknown，runner 绝不被调用', () => {
+  let called = false;
+  const fact = probeCursorAgentAuthFact(
+    { name: 'cursor-agent', path: null, available: false },
+    {},
+    () => {
+      called = true;
+      return { ok: true, stdout: '{"isAuthenticated":true}' };
+    },
+  );
+  assert.deepEqual(fact, { state: 'unknown', source: 'not-probed' });
+  assert.equal(called, false);
+});
+
+test('harness list opt-in 探测：已登录 cursor-agent → facts available + admission 去掉 auth blocker', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-cursor-authprobe-in-'));
+  const bin = join(root, 'bin');
+  mkdirSync(bin, { recursive: true });
+  writeStatusStub(join(bin, 'cursor-agent'), '{"isAuthenticated":true}');
+
+  const cursor = inspectKnownHarnesses(
+    { PATH: bin, HOME: join(root, 'home') },
+    { probeHeadlessAuth: true },
+  ).find((h) => h.id === 'cursor');
+  const agent = cursor?.surfaces.find((surface) => surface.id === 'cursor-agent');
+  assert.ok(agent);
+  assert.deepEqual(agent.facts.authentication, {
+    state: 'available',
+    source: 'cursor-agent:status-json',
+  });
+  assert.equal(agent.admission?.authentication.state, 'available');
+  // auth 不再是 blocker（quota 无只读源仍 unknown → admission 整体仍 fail-closed·非误放行）。
+  assert.equal(
+    agent.admission?.blockers.some((b) => b.startsWith('authentication.')),
+    false,
+  );
+  assert.equal(agent.facts.quota.state, 'unknown');
+  assert.equal(agent.admission?.schedulable, false);
+});
+
+test('harness list opt-in 探测：未登录 cursor-agent → unavailable，admission 仍 blocked', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-cursor-authprobe-out-'));
+  const bin = join(root, 'bin');
+  mkdirSync(bin, { recursive: true });
+  writeStatusStub(join(bin, 'cursor-agent'), '{"isAuthenticated":false}');
+
+  const cursor = inspectKnownHarnesses(
+    { PATH: bin, HOME: join(root, 'home') },
+    { probeHeadlessAuth: true },
+  ).find((h) => h.id === 'cursor');
+  const agent = cursor?.surfaces.find((surface) => surface.id === 'cursor-agent');
+  assert.equal(agent?.facts.authentication.state, 'unavailable');
+  assert.equal(agent?.admission?.schedulable, false);
+});
+
+test('harness list 默认路径不 opt-in → 保持轻量 unprobed（零回归·不 spawn）', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ccm-cursor-authprobe-cheap-'));
+  const bin = join(root, 'bin');
+  mkdirSync(bin, { recursive: true });
+  // 该 stub 若被调用会返回 authed；默认路径不得触发它，认证态须维持 not-probed。
+  writeStatusStub(join(bin, 'cursor-agent'), '{"isAuthenticated":true}');
+
+  const cursor = inspectKnownHarnesses({ PATH: bin, HOME: join(root, 'home') }).find(
+    (h) => h.id === 'cursor',
+  );
+  const agent = cursor?.surfaces.find((surface) => surface.id === 'cursor-agent');
+  assert.deepEqual(agent?.facts.authentication, { state: 'unknown', source: 'not-probed' });
 });
 
 test('Cursor headless executable probe accepts symlinks and rejects non-executable files', () => {
@@ -362,5 +490,20 @@ test('MachineHarnessRegistry.sweep walks all known adapters into an immutable sn
 
 function writeExecutable(path: string): void {
   writeFileSync(path, '#!/bin/sh\nexit 0\n');
+  chmodSync(path, 0o755);
+}
+
+// 可执行 stub：对 `status --format json` 回 statusJson，其余 arg 静默 exit 0。
+function writeStatusStub(path: string, statusJson: string): void {
+  const body = [
+    '#!/bin/sh',
+    'if [ "$1" = "status" ]; then',
+    `  printf '%s' '${statusJson}'`,
+    '  exit 0',
+    'fi',
+    'exit 0',
+    '',
+  ].join('\n');
+  writeFileSync(path, body);
   chmodSync(path, 0o755);
 }

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -17,6 +18,7 @@ import type {
   HarnessSurfaceDescriptor,
   PluginUpgradeRequest,
   PluginUpgradeResult,
+  SurfaceFact,
 } from './types.js';
 
 const EXIT_OK = 0;
@@ -47,7 +49,7 @@ export const cursorAdapter: HarnessAdapter = {
       env.CURSOR_CONVERSATION_ID
     );
   },
-  inspectInstallation(env) {
+  inspectInstallation(env, opts) {
     const cli = probeExecutable(env.CCM_CURSOR_BIN || env.CURSOR_BIN || 'cursor', env);
     const pluginRoot = cursorPluginRoot(env);
     const configDir = cursorConfigDir(env);
@@ -73,6 +75,8 @@ export const cursorAdapter: HarnessAdapter = {
         ideInstalled: installed,
         ideConfigPaths: [configDir, pluginRoot],
         headlessCli,
+        env,
+        probeHeadlessAuth: opts?.probeHeadlessAuth === true,
       }),
       capabilities: {
         accountPool: this.accountPool,
@@ -147,9 +151,18 @@ function cursorSurfaces(input: {
   ideInstalled: boolean;
   ideConfigPaths: string[];
   headlessCli: HarnessCliProbe;
+  env: Env;
+  probeHeadlessAuth: boolean;
 }): HarnessSurfaceDescriptor[] {
   const ideFacts = unprobedFacts();
-  const headlessFacts = unprobedFacts();
+  // headless（cursor-agent）认证态：opt-in 时经官方机读接口 `status --format json` 探测；
+  //   否则维持轻量 unprobed（默认零 spawn）。quota 无只读源→始终 unknown（与 machine-surface 一致）。
+  const headlessFacts: HarnessSurfaceDescriptor['facts'] = {
+    authentication: input.probeHeadlessAuth
+      ? probeCursorAgentAuthFact(input.headlessCli, input.env)
+      : unprobedFacts().authentication,
+    quota: unprobedFacts().quota,
+  };
   return [
     {
       id: 'cursor-ide-plugin',
@@ -197,6 +210,72 @@ function unprobedFacts(): HarnessSurfaceDescriptor['facts'] {
     authentication: { state: 'unknown', source: 'not-probed' },
     quota: { state: 'unknown', source: 'not-probed' },
   };
+}
+
+// cursor-agent 认证态探测的可注入 runner（测试注入 mock；默认跑真实只读子进程）。
+export type CursorStatusRunner = (binaryPath: string, env: Env) => { ok: boolean; stdout: string };
+
+const CURSOR_STATUS_PROBE_TIMEOUT_MS = 3_000;
+
+// 默认 runner：只读跑 `cursor-agent status --format json`（净化子进程 env·超时·失败即 ok=false）。
+function runCursorStatusJson(binaryPath: string, env: Env): { ok: boolean; stdout: string } {
+  try {
+    const stdout = execFileSync(binaryPath, ['status', '--format', 'json'], {
+      encoding: 'utf8',
+      timeout: CURSOR_STATUS_PROBE_TIMEOUT_MS,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: cursorProbeChildEnv(env),
+    });
+    return { ok: true, stdout: String(stdout) };
+  } catch {
+    // 非零退出 / 超时 / spawn 失败：拿不到→ok=false（上游 fail-closed 判 unknown）。
+    return { ok: false, stdout: '' };
+  }
+}
+
+// 只转发 cursor-agent 定位配置所需的最小 env（不泄露任意/凭据 env 给子进程）。
+function cursorProbeChildEnv(env: Env): NodeJS.ProcessEnv {
+  const child: NodeJS.ProcessEnv = {
+    PATH: env.PATH || process.env.PATH,
+    HOME: env.HOME || os.homedir(),
+    NO_OPEN_BROWSER: '1',
+  };
+  for (const key of ['XDG_CONFIG_HOME', 'APPDATA', 'LOCALAPPDATA']) {
+    if (env[key]) child[key] = env[key];
+  }
+  return child;
+}
+
+// probeCursorAgentAuthFact — 由 cursor-agent 官方机读接口 `status --format json` 判定认证态。
+//   fail-closed：仅在明确读到 `isAuthenticated: true`（兼容旧键 `authenticated`）时判 available（放行）；
+//   明确未登录→unavailable（observed negative·如实报告、同样不放行）；进程失败 / 无法解析 / schema 变更
+//   / 二进制不可用→unknown（拿不到就不猜、绝不据此放行）。绝不 grep 人类可读文案。
+export function probeCursorAgentAuthFact(
+  binary: HarnessCliProbe,
+  env: Env,
+  run: CursorStatusRunner = runCursorStatusJson,
+): SurfaceFact {
+  // 二进制不可用：未探测（保真·不 spawn）。
+  if (!binary.available || !binary.path) return { state: 'unknown', source: 'not-probed' };
+  const result = run(binary.path, env);
+  if (!result.ok) return { state: 'unknown', source: 'cursor-agent:status-unavailable' };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.stdout);
+  } catch {
+    return { state: 'unknown', source: 'cursor-agent:status-unparseable' };
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { state: 'unknown', source: 'cursor-agent:status-schema-unknown' };
+  }
+
+  const record = parsed as Record<string, unknown>;
+  const authenticated = record.isAuthenticated ?? record.authenticated;
+  if (authenticated === true) return { state: 'available', source: 'cursor-agent:status-json' };
+  if (authenticated === false) return { state: 'unavailable', source: 'cursor-agent:status-json' };
+  // 布尔缺失 / 非布尔：schema 变更→unknown（不猜、绝不默认 authed）。
+  return { state: 'unknown', source: 'cursor-agent:status-schema-unknown' };
 }
 
 function pathExists(p: string): boolean {

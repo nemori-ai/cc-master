@@ -10,6 +10,7 @@ import type {
   HarnessId,
   HarnessInstallation,
   HarnessSelection,
+  InspectInstallationOptions,
   PoolDescriptor,
 } from './types.js';
 
@@ -60,8 +61,11 @@ export function knownHarnessAdapters(): readonly HarnessAdapter[] {
   return KNOWN_ADAPTERS;
 }
 
-export function inspectKnownHarnesses(env: Env = process.env): HarnessInstallation[] {
-  return KNOWN_ADAPTERS.map((adapter) => adapter.inspectInstallation(env));
+export function inspectKnownHarnesses(
+  env: Env = process.env,
+  opts?: InspectInstallationOptions,
+): HarnessInstallation[] {
+  return KNOWN_ADAPTERS.map((adapter) => adapter.inspectInstallation(env, opts));
 }
 
 export function installedKnownHarnesses(env: Env = process.env): HarnessInstallation[] {
@@ -77,9 +81,9 @@ export class MachineHarnessRegistry {
     );
   }
 
-  static sweep(env: Env = process.env): MachineHarnessRegistry {
+  static sweep(env: Env = process.env, opts?: InspectInstallationOptions): MachineHarnessRegistry {
     const descriptors = KNOWN_ADAPTERS.map((adapter) => {
-      const installation = adapter.inspectInstallation(env);
+      const installation = adapter.inspectInstallation(env, opts);
       return {
         ...installation,
         sessionStoreRoots: freezeStrings(adapter.sessionStoreRoots(env)),

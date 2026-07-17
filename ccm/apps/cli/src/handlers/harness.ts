@@ -23,7 +23,7 @@ export function list(ctx: Ctx): number {
     harnessFlag: ctx.values.harness as string | undefined,
   });
   if (ctx.values['machine-wide']) {
-    const registry = MachineHarnessRegistry.sweep(ctx.env);
+    const registry = MachineHarnessRegistry.sweep(ctx.env, { probeHeadlessAuth: true });
     const snapshot = registry.toJSON();
     const surfaces = inspectCursorExecutionSurfaces(ctx.env);
     const surfaceInventory = buildCursorSurfaceInventory(surfaces);
@@ -48,7 +48,7 @@ export function list(ctx: Ctx): number {
     return EXIT.OK;
   }
 
-  const harnesses = inspectKnownHarnesses(ctx.env);
+  const harnesses = inspectKnownHarnesses(ctx.env, { probeHeadlessAuth: true });
   if (ctx.flags.json) {
     ctx.out(
       io.jsonOk({
@@ -82,7 +82,7 @@ export function current(ctx: Ctx): number {
     env: ctx.env,
     harnessFlag: ctx.values.harness as string | undefined,
   });
-  const info = selected.inspectInstallation(ctx.env);
+  const info = selected.inspectInstallation(ctx.env, { probeHeadlessAuth: true });
   if (ctx.flags.json) {
     ctx.out(io.jsonOk({ current: selected.id, harness: info }));
     return EXIT.OK;
