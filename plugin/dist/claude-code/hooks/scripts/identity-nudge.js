@@ -29,8 +29,20 @@
 
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
 const { spawnSync } = require('child_process');
 const { advisory, runHook, parseIsoMs, periodicNudge } = require('./hook-common.js');
+// deadline-risk 核心（issue #149）住 host-neutral _shared（三 host 复用同一份·dual-path 兼容 src / dist 布局）。
+const deadlineRiskCorePath = [
+  path.resolve(__dirname, '../../../_shared/deadline-risk-core.js'), // src: hooks/identity-nudge/implementations/claude-code
+  path.resolve(__dirname, '../_shared/deadline-risk-core.js'), // dist: hooks/scripts
+].find((candidate) => {
+  try { return fs.existsSync(candidate); } catch (_e) { return false; }
+});
+const { deadlineRiskBlock } = deadlineRiskCorePath
+  ? require(deadlineRiskCorePath)
+  : { deadlineRiskBlock: () => ({ hasSettledDdl: false, block: null }) };
 
 // CCM_BIN：进程边界 spawn 的 ccm 可执行（与 usage-pacing / board-lint 同口径）。缺则用 PATH 上的 `ccm`；
 //   指向不存在路径即强制走「ccm 缺→静默」降级（测试用）。
@@ -52,6 +64,15 @@ const CCM_TIMEOUT_MS = (() => {
 const DEFAULT_IDENTITY_INTERVAL_SEC = 6 * 60 * 60; // 6h
 const DEFAULT_CRITPATH_INTERVAL_SEC = 2 * 60 * 60; // 2h
 const DEFAULT_GOAL_INTERVAL_SEC = 2 * 60 * 60; // 2h
+
+// ── deadline-risk（交付 DDL 风险·issue #149）覆写点 ────────────────────────────────────────────────────
+//   CC_MASTER_DEADLINE_RISK_INTERVAL_SEC   周期重估基础 cadence（秒·默认 2h·随 time_to_ddl / band 自适应缩短）。
+//   CC_MASTER_DEADLINE_RISK_REMINDER_SEC   高风险长期未处理 reminder 间隔（秒·默认 6h）。
+//   CC_MASTER_DEADLINE_RISK_SIDECAR        通知去重 sidecar 路径（默认 <home>/.cc-master-deadline-risk.json）。
+const DEADLINE_RISK_INTERVAL_RAW = process.env.CC_MASTER_DEADLINE_RISK_INTERVAL_SEC || '';
+const DEADLINE_RISK_REMINDER_RAW = process.env.CC_MASTER_DEADLINE_RISK_REMINDER_SEC || '';
+const DEFAULT_DEADLINE_RISK_INTERVAL_SEC = 2 * 60 * 60; // 2h
+const DEFAULT_DEADLINE_RISK_REMINDER_SEC = 6 * 60 * 60; // 6h
 
 // intervalSecOf(raw, dflt) → 周期阈值（秒）。空/非正/非数 → 默认（先判空串：Number('')===0 的 JS footgun）。
 function intervalSecOf(raw, dflt) {
@@ -104,7 +125,7 @@ function spawnCcmJson(args, homeDir) {
 //      {done,verified} 的数·读窄腰·红线2）。board 已被 harness 解析·无需再 spawn。
 //   ③ on-track/behind ← spawn `ccm estimate evm --json`（red line 3·ccm 出 verdict）。has_baseline:false /
 //      spawn 失败 → 优雅降级：省「按期/落后」从句，只报 X/Y（不假装有 schedule verdict·诚实记账）。
-function buildCritpathText(board, boardPath, homeDir) {
+function buildCritpathText(board, boardPath, homeDir, suppressSchedule) {
   const cp = spawnCcmJson(['board', 'critical-path', '--json', '--board', boardPath], homeDir);
   const chain = cp && Array.isArray(cp.chain) ? cp.chain : [];
   if (!chain.length) return null; // 空图 / spawn 失败 → 无临界链可报 → 弃权（本回合不注入）
@@ -119,6 +140,16 @@ function buildCritpathText(board, boardPath, homeDir) {
   for (const id of chain) {
     const st = statusById.get(id);
     if (st === 'done' || st === 'verified') X += 1;
+  }
+
+  // deadline-risk 去重（契约 §5.1）：本板有已 settle 的 DDL 时，schedule verdict（按期/落后）归 deadline-risk
+  //   条目——critpath 退为纯 X/Y 计数，**省掉 evm spawn + 按期/落后从句**（一次 deadline-risk 调用替代独立 evm）。
+  // PARITY: rule-deadline-risk-critpath-dedup
+  if (suppressSchedule) {
+    return (
+      `[临界路径周期提示] 当前临界路径：${X}/${Y} 关键任务已完成` +
+      `（本板有交付 DDL·按期/落后判定见 deadline-risk 提示）。这是周期性弱提示，最终调度仍由你拍。`
+    );
   }
 
   // verdict（on-track / behind）← ccm estimate evm（无 baseline 降级省从句）。spi_t < 1（或 sv_t < 0）= behind。
@@ -193,8 +224,32 @@ function body(ctx) {
     if (goalText) blocks.push(advisory('goal-alignment-nudge', 'weak', goalText));
   }
 
+  // ③ DEADLINE-RISK 周期提示（issue #149·PARITY: rule-deadline-risk-*）。本板有已 settle 的 DDL 时才 fire：
+  //   周期 / risk-input fingerprint 变 / 恢复触发地经进程边界调 `ccm estimate deadline-risk`（红线3 只搬运），
+  //   band 恶化 / 恢复带 fingerprint 去重节流地注入 advisory + durable self-ack。hasSettledDdl 供 critpath 去重。
+  // PARITY: rule-deadline-risk-cadence-and-change-trigger
+  // PARITY: rule-deadline-risk-notification-state-machine
+  // PARITY: rule-deadline-risk-single-delivery-self-ack
+  // PARITY: rule-deadline-risk-tag-protocol
+  // PARITY: rule-deadline-risk-fail-safe
+  const dr = deadlineRiskBlock({
+    board,
+    boardPath,
+    homeDir: ctx.homeDir,
+    ccmBin: CCM_BIN,
+    nowMs,
+    timeoutMs: CCM_TIMEOUT_MS,
+    cadenceSec: intervalSecOf(DEADLINE_RISK_INTERVAL_RAW, DEFAULT_DEADLINE_RISK_INTERVAL_SEC),
+    reminderSec: intervalSecOf(DEADLINE_RISK_REMINDER_RAW, DEFAULT_DEADLINE_RISK_REMINDER_SEC),
+    sidecarPath:
+      process.env.CC_MASTER_DEADLINE_RISK_SIDECAR ||
+      path.join(ctx.homeDir, '.cc-master-deadline-risk.json'),
+  });
+  if (dr.block) blocks.push(advisory('deadline-risk', dr.block.strength, dr.block.text));
+
   // ② CRITPATH 周期提示（advisory weak·source critpath-nudge）。build 在 due 且写回成功后才 spawn ccm 读图
   //   （被 interval 门控·罕见·spawn 节制）；chain 空 → build 弃权 → 不注入（但时间戳已前移·下个 interval 再 due）。
+  //   本板有已 settle 的 DDL（dr.hasSettledDdl）→ schedule verdict 归 deadline-risk·critpath 退纯 X/Y 计数（去重）。
   const critpathText = periodicNudge({
     board,
     boardPath,
@@ -204,11 +259,11 @@ function body(ctx) {
     intervalSec: intervalSecOf(CRITPATH_INTERVAL_RAW, DEFAULT_CRITPATH_INTERVAL_SEC),
     nowMs,
     setparamTimeoutMs: CCM_TIMEOUT_MS,
-    build: () => buildCritpathText(board, boardPath, ctx.homeDir),
+    build: () => buildCritpathText(board, boardPath, ctx.homeDir, dr.hasSettledDdl),
   });
   if (critpathText) blocks.push(advisory('critpath-nudge', 'weak', critpathText));
 
-  if (!blocks.length) return; // 两条都未 due / 写回失败 / 弃权 → 静默
+  if (!blocks.length) return; // 全未 due / 写回失败 / 弃权 → 静默
   return { additionalContext: blocks.join('\n') };
 }
 
