@@ -257,6 +257,60 @@ test('terminal on a starting agent is legal (startup-failure closure·no permane
   assert.ok(a.lifecycle.ended_at);
 });
 
+// ── stale-running advisory（收割闭环缺口的机械兜底·只读·绝不自动 terminal）────────────────────────────
+test('list stale-running advisory: active agent whose every linked task is done → surfaced (never auto-terminal)', () => {
+  // 产出被收割（linked task 全 done）却漏了 `agent terminal`，roster 永停 running。list 在 recon 的
+  //   roster-rebuild 触点把候选交到手上（advisory）——但绝不改状态（三层解耦：收口判断归 orchestrator）。
+  const bp = mkBoardHome([
+    { id: 'T1', status: 'done', deps: [], verified: true, artifact: '/tmp/t1.md' },
+    { id: 'T2', status: 'in_flight', deps: [], started_at: '2026-07-16T08:00:00Z' },
+  ]);
+  // agt-001：linked task 全 done → stale 候选
+  agent.create(mkCtx(bp, { values: { type: 'subagent', harness: 'origin', intent: 'harvested' } }));
+  agent.bind(mkCtx(bp, { positionals: ['agt-001'], values: { handle: 'pid:1' } }));
+  agent.link(mkCtx(bp, { positionals: ['agt-001'], values: { task: 'T1' } }));
+  // agt-002：linked task 仍 in_flight → 不算 stale（仍在干活）
+  agent.create(mkCtx(bp, { values: { type: 'subagent', harness: 'origin', intent: 'working' } }));
+  agent.bind(mkCtx(bp, { positionals: ['agt-002'], values: { handle: 'pid:2' } }));
+  agent.link(mkCtx(bp, { positionals: ['agt-002'], values: { task: 'T2' } }));
+
+  const listCtx = mkCtx(bp, { flags: { json: true } });
+  assert.equal(agent.list(listCtx), EXIT.OK);
+  const data = JSON.parse(listCtx.outBuf.join('')).data;
+  assert.equal(data.stale_candidates.length, 1, 'only the all-linked-done agent is a candidate');
+  assert.equal(data.stale_candidates[0].id, 'agt-001');
+  assert.deepEqual(data.stale_candidates[0].links, ['T1']);
+
+  // advisory 绝不改状态：agt-001 仍 running（never auto-terminal·三层解耦）
+  assert.equal(readBoard(bp).agents[0].lifecycle.state, 'running');
+
+  // human 输出含 advisory 提示行，指名 agt-001
+  const humanCtx = mkCtx(bp, { flags: { json: false } });
+  assert.equal(agent.list(humanCtx), EXIT.OK);
+  assert.match(humanCtx.outBuf.join(''), /advisory:[\s\S]*agt-001/);
+});
+
+test('list stale-running advisory: terminal agent and no-link agent are not candidates', () => {
+  const bp = mkBoardHome([
+    { id: 'T1', status: 'done', deps: [], verified: true, artifact: '/tmp/t1.md' },
+  ]);
+  // agt-001：已 terminal（已收口）→ 不再是候选
+  agent.create(mkCtx(bp, { values: { type: 'subagent', harness: 'origin', intent: 'x' } }));
+  agent.link(mkCtx(bp, { positionals: ['agt-001'], values: { task: 'T1' } }));
+  agent.terminal(mkCtx(bp, { positionals: ['agt-001'], values: { outcome: 'closed' } }));
+  // agt-002：无 link → 不算候选（不确定它在干什么）
+  agent.create(mkCtx(bp, { values: { type: 'subagent', harness: 'origin', intent: 'y' } }));
+
+  const listCtx = mkCtx(bp, { flags: { json: true } });
+  assert.equal(agent.list(listCtx), EXIT.OK);
+  const data = JSON.parse(listCtx.outBuf.join('')).data;
+  assert.equal(data.stale_candidates.length, 0);
+  // 无候选时 human 输出不带 advisory 行
+  const humanCtx = mkCtx(bp, { flags: { json: false } });
+  assert.equal(agent.list(humanCtx), EXIT.OK);
+  assert.doesNotMatch(humanCtx.outBuf.join(''), /advisory:/);
+});
+
 // ── probe（真进程降级）─────────────────────────────────────────────────────────────────────────────
 test('probe: live pid → running; after kill → orphaned (only agents[] segment written)', async () => {
   const { spawn } = await import('node:child_process');

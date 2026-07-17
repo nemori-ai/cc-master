@@ -8,7 +8,7 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "187bccca014f4a2731043cf13a607c1125f5821a537bf5deebc78af489aa27c5",
+            "SKILL.md": "795b96ce6fef20230b37dfc620521c782bc06ea95f3e642cdddfad5b786642af",
             "references/async-hitl.md": "57d269b2b91bcfcf4c656cb3e4b7e6e605c20b504ecc92beef99dac7f9e2d1c8",
             "references/board.md": "3014c12249c5a28d2d8494c61b99506ef5dfacdc52692cbe8aab5aa4edfdfacf",
             "references/cost-decisions.md": "f9cb9122199c13c8a14ba35ed5b25b0b8bc464749d76ce1d7a0ce2dc80bf4237",
@@ -39,10 +39,10 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "69a2d62489e9c590a8f3f01023d268ac74cb6a3a92fa60cde0b809d43c31d9bd",
+            "SKILL.md": "6ab2a559ae4f08e39291868f5bffb070d65c571808ecf800a04b506520b5ead6",
             "references/account-pool.md": "da7a5826ba8ceb1eefc26722b4e305df6042ea30264abade27f896ef1fb2a8d6",
-            "references/board-model-guide.md": "9c708a70079d3490605299bb203ffabe1f91e2e22658223acbc84ac32439f688",
-            "references/command-catalog.md": "a5bd81fd70c9891357b826e776cf396691adffa4b08d2ddd0a8d0063e338a963"
+            "references/board-model-guide.md": "bc46497619b2ca0f64817ef1d31a3c882affd2680378ad0cb0672ab1aec7ca29",
+            "references/command-catalog.md": "ea3e1e58c5ddb97abecbb660934bf7594aa2d43b1a823ef3ce26c87569dc10a9"
           }
         }
       }
@@ -52,7 +52,7 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "341be3e4fe996f5330cc1f3b804cae2d4d771e0b47429beb91bf72f95e7b1129",
+            "SKILL.md": "ff6cd299724da98d3fd1b9f08abaf5842f55fb27f7bf022e3236e3a8de636438",
             "references/async-hitl.md": "4a56ab3e551879e654747c54c9b22f9b221e92e526f5bd0f4de8a3acceef8a62",
             "references/board.md": "39dfec8792054c707407083b5c9b1e786f36071a56be5b29719ee8b183a4d991",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
@@ -80,9 +80,9 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "105343bdbd5be285437e2cd9ec57b930922721241c28702db9c8905cd3195173",
-            "references/board-model-guide.md": "af40b5f94695cdfd0a4a3009feeb89bb139862a1f0839da50dd28733517ab416",
-            "references/command-catalog.md": "cb14595d223a0337f73898475357321402ad4cbb932f1fc843630776090818c2"
+            "SKILL.md": "b6bdc584aa2cec3f79181d82469a105383566fe2fa966aaf875295ab3b5d38ac",
+            "references/board-model-guide.md": "81bf336a2d8f116f011f70ba15d40d77efb5304e56598fe85ce31b1c37686780",
+            "references/command-catalog.md": "197b74a5f8607dc9dd7384417d04d2f8575a1d364cbcb3aa0d3c75dcf50cf973"
           }
         }
       }
@@ -92,7 +92,7 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "c87c151ce122bfe7bd212d71c552d515c4b9c21e72dc2105f61382713ebaca01",
+            "SKILL.md": "751c217f063598f6c8bc7ae8564c6f123a8f65938054dcfde624d49e681c7579",
             "references/async-hitl.md": "622768b1f2ed0ccab493b78b057b91594b15242c2c3f7426866dfd8234c5f41b",
             "references/board.md": "f3669b71cdab613e4c559ee6839109575bc3edd7d4288759b8ff19088d281c29",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
@@ -120,9 +120,9 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "af98d3ee6b3296b11a1199ab6c47c3ce6cd3e5eeb23ac74c88cc8d06d68db11e",
-            "references/board-model-guide.md": "e86a4e44959580f931b9f42b9009d8b3cbd729a24c52b0833d61e47294360059",
-            "references/command-catalog.md": "5b55747801f1932d1b13dd78b383549d82a3f4527c417f129663241f3413c3f9"
+            "SKILL.md": "3c59a7bb79683d037eb4725edf8c6e8474afcd15e352d5c78f3576d61b8fe6df",
+            "references/board-model-guide.md": "12e6af860a9b6aecf14c87701dcd1d881f2bd3d57225e18a87108759245933e4",
+            "references/command-catalog.md": "906c8d3d7a1de6b0b32d93ba58e0b40f58c14c2a7a157e26bf00b9f3c6ea45e6"
           }
         }
       }
@@ -132,7 +132,7 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "5aa4d649595c3c40e105333c89798e62b187fb88f63575be43c54b5f41ed05af",
+            "SKILL.md": "f4f33f1caaaa837d3b4a66bf8a0a97a4d4a300053810427a7e95cbddc289faa3",
             "references/async-hitl.md": "f435d6abdcd7f524f847817b2308405b6fc9a4f6e6e7de7e758b676bfea27c35",
             "references/board.md": "913124607f420c52e1d884c1209b2d4454b04a9a38c8bc9f8889278bec0f0e55",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
@@ -161,9 +161,9 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "bca4775b22bb1716228c92c5cac3edeb8d0d7f8cb97aaf20cc0d9f25df78830a",
-            "references/board-model-guide.md": "6fdae1da11a51b6709d45d88ab3b35b765715ba902cf58ac3d4193ee7c7144af",
-            "references/command-catalog.md": "a3ce24701fcc81ff03928c565f66fbd51f542b2c35f1e0537d107ccac9766dd3"
+            "SKILL.md": "d1df3a4648f4b3bedf6e1ea69f4f08f86fea8727ecd0fd124be2589bf7caf56f",
+            "references/board-model-guide.md": "96fb244b007a9b92c1448be67affe3f26f725b89992ed45abac0ec20c335f496",
+            "references/command-catalog.md": "db12e8fd2578081b4bd4292193f4e9b0ae8f54c45633215ed352e607978b790b"
           }
         }
       }

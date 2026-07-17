@@ -178,6 +178,8 @@ ccm watchdog arm --fire-at 2026-06-25T12:00:00Z --mechanism shell --job-id curso
 | 多个 active 板时命令报 Ambiguous | 用 `--goal <子串>` 或 `--board <path>` 消歧。 |
 | open cadence iteration 出 overbooked / critical-path / oversized warn | 这不是 hard gate,但说明本轮节奏不健康。先拆小、移出 scope、删假依赖或重估;不要靠 `cadence ship` 把超载藏起来。 |
 | 想用 `--set-json` 手拼 `agents` 段 / 手改 agent 状态 | agent 生命周期走专属 verb:`agent create/bind/link/terminal/probe`——bind 无真实 handle 证据被拒(exit 3)、状态转移有校验、link 幂等、probe 字段由 ccm 落盘;通用 setter 手拼会把这些全绕过。 |
+| 收割完 agent 产出、roster 却还满是 `running` | 收割 / 端点验收掉 agent 产出后要显式 `ccm agent terminal <id> --outcome "..."` 收口——「凡派发皆登记」的对称另一半是「凡收割皆收口」。`agent probe` 只判死活、**永不 →terminal**;不收口 = 永久 `running` 僵尸污染 recon 的 in_flight/phantom 判定(`agent terminal ≠ task done` 只挡正向,不豁免这条反向闭环)。 |
+| 以为批量 `agent terminal` 要一个个小心防锁竞态 | 顺序 bash 背靠背跑多条 `ccm agent terminal`(已知 id)**无 race**——每条各抢一次 O_EXCL board 锁·天然串行。别 `&` 后台并行 ccm 写(争锁 exit 4)。真正要定序的是**单 agent 的 create→bind→link 三连**(bind/link 吃 create 返回的 id·靠数据依赖定序),不是「所有 agent 操作都必须逐个」。 |
 
 ---
 
