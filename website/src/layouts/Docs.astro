@@ -1,0 +1,115 @@
+---
+import Base from './Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { getCollection } from 'astro:content';
+import { en } from '../i18n/ui';
+import { zh } from '../i18n/ui.zh';
+
+interface Props {
+  lang: 'en' | 'zh';
+  title: string;
+  description: string;
+  section: 'start' | 'concepts' | 'guides';
+  currentId: string; // e.g. "concepts/board"
+}
+
+const { lang, title, description, section, currentId } = Astro.props;
+const ui = lang === 'zh' ? zh : en;
+const home = lang === 'zh' ? '/zh/' : '/';
+
+const sectionLabels: Record<string, { en: string; zh: string }> = {
+  start: { en: 'Start', zh: '开始' },
+  concepts: { en: 'Concepts', zh: '核心概念' },
+  guides: { en: 'Guides · usecases', zh: '指南 · 用例' },
+};
+
+const all = await getCollection('docs');
+const entries = all
+  .filter((e) => e.id.startsWith(`${lang}/`))
+  .map((e) => ({ ...e, slug: e.id.slice(lang.length + 1) }))
+  .sort((a, b) => a.data.order - b.data.order);
+
+const sections = (['start', 'concepts', 'guides'] as const).map((s) => ({
+  key: s,
+  label: sectionLabels[s][lang],
+  items: entries.filter((e) => e.data.section === s),
+}));
+---
+
+<Base title={`${title} — cc-master docs`} description={description} lang={lang}>
+  <Header lang={lang} ui={ui} />
+  <div class="mx-auto flex max-w-6xl gap-10 px-6 py-12">
+    <aside class="sticky top-24 hidden h-fit w-52 shrink-0 self-start md:block">
+      <a href={home} class="tele text-[10.5px] tracking-[0.16em] text-ink-faint uppercase">← cc-master</a>
+      <nav class="mt-5 space-y-6">
+        {sections.map((s) => (
+          <div>
+            <p class="eyebrow">{s.label}</p>
+            <ul class="mt-2.5 space-y-1.5 border-l border-hair-soft">
+              {s.items.map((e) => (
+                <li>
+                  <a
+                    href={`${home}docs/${e.slug}`}
+                    class={`-ml-px block border-l-2 py-0.5 pl-3 text-[13px] ${
+                      e.slug === currentId
+                        ? 'border-spine font-semibold text-ink'
+                        : 'border-transparent text-ink-dim hover:text-ink'
+                    }`}
+                  >{e.data.title}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </nav>
+    </aside>
+
+    <article class="prose-cc min-w-0 max-w-3xl flex-1 pb-16">
+      <h1>{title}</h1>
+      <p class="lede">{description}</p>
+      <slot />
+    </article>
+  </div>
+  <Footer lang={lang} ui={ui} />
+</Base>
+
+<style is:global>
+  .prose-cc { color: var(--ink-dim); font-size: 14.5px; line-height: 1.75; }
+  .prose-cc h1 { color: var(--ink); font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+  .prose-cc .lede { margin-top: 12px; font-size: 15.5px; color: var(--ink-dim); }
+  .prose-cc h2 { color: var(--ink); font-size: 19px; font-weight: 700; margin-top: 40px; margin-bottom: 10px; letter-spacing: -0.01em; }
+  .prose-cc h3 { color: var(--ink); font-size: 15.5px; font-weight: 700; margin-top: 28px; margin-bottom: 8px; }
+  .prose-cc p { margin-top: 12px; }
+  .prose-cc ul, .prose-cc ol { margin-top: 10px; padding-left: 20px; display: grid; gap: 5px; }
+  .prose-cc ul { list-style: disc; }
+  .prose-cc ol { list-style: decimal; }
+  .prose-cc li::marker { color: var(--ink-faint); }
+  .prose-cc strong { color: var(--ink); font-weight: 650; }
+  .prose-cc a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--hair); text-underline-offset: 3px; }
+  .prose-cc a:hover { text-decoration-color: var(--spine); }
+  .prose-cc code:not(pre code) {
+    font-family: var(--font-mono); font-size: 0.86em;
+    background: var(--chip-bg); border: 1px solid var(--hair-soft);
+    padding: 0.1em 0.35em; border-radius: 4px; color: var(--ink);
+  }
+  .prose-cc pre {
+    margin-top: 14px; padding: 14px 16px; border-radius: 8px; overflow-x: auto;
+    background: oklch(0.145 0.012 255); border: 1px solid var(--hair);
+    font-family: var(--font-mono); font-size: 12.5px; line-height: 1.65;
+  }
+  .prose-cc pre code { color: oklch(0.85 0.01 255); }
+  .prose-cc blockquote {
+    margin-top: 14px; border-left: 2px solid var(--spine); padding-left: 14px;
+    color: var(--ink-dim); font-style: italic;
+  }
+  .prose-cc table { margin-top: 16px; width: 100%; border-collapse: collapse; font-size: 13px; }
+  .prose-cc th { text-align: left; color: var(--ink); font-weight: 700; border-bottom: 1px solid var(--hair); padding: 6px 10px 6px 0; }
+  .prose-cc td { border-bottom: 1px solid var(--hair-soft); padding: 7px 10px 7px 0; vertical-align: top; }
+  .prose-cc img { margin-top: 16px; border-radius: 8px; border: 1px solid var(--hair); }
+  .prose-cc hr { margin-top: 32px; border-color: var(--hair-soft); }
+  .prose-cc .deeper {
+    margin-top: 44px; border: 1px solid var(--hair); border-radius: 11px;
+    background: var(--panel); padding: 18px 20px;
+  }
+</style>

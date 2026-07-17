@@ -1,0 +1,17 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { en as ui } from '../i18n/ui';
+---
+
+<Base title="404 — cc-master" description="page not found" lang="en">
+  <Header lang="en" ui={ui} />
+  <main class="mx-auto flex max-w-3xl flex-col items-center px-6 py-32 text-center">
+    <p class="eyebrow">LOST SIGNAL</p>
+    <h1 class="tele mt-6 text-6xl font-bold tracking-tight">404</h1>
+    <p class="mt-4 text-ink-dim">This board doesn't exist — it may have been archived.</p>
+    <a href="/" class="mt-8 rounded-[7px] bg-spine px-5 py-2.5 text-[14px] font-semibold text-[oklch(0.99_0.01_90)]">Back to mission control</a>
+  </main>
+  <Footer lang="en" ui={ui} />
+</Base>

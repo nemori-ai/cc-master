@@ -1,0 +1,40 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Hero from '../components/sections/Hero.astro';
+import Deaths from '../components/sections/Deaths.astro';
+import Philosophy from '../components/sections/Philosophy.astro';
+import Attention from '../components/sections/Attention.astro';
+import Watch from '../components/sections/Watch.astro';
+import Story from '../components/sections/Story.astro';
+import Evolution from '../components/sections/Evolution.astro';
+import Architecture from '../components/sections/Architecture.astro';
+import Quickstart from '../components/sections/Quickstart.astro';
+import { en as ui } from '../i18n/ui';
+
+const description =
+  'cc-master turns any supported coding-agent session into a master orchestrator — it decomposes your goal into a DAG, runs it in parallel, paces quota, and asks you only what matters.';
+---
+
+<Base title="cc-master — mission control for long-horizon agents" description={description} lang="en">
+  <Header lang="en" ui={ui} />
+  <main>
+    <Hero ui={ui} />
+    <Deaths ui={ui} />
+    <Philosophy ui={ui} />
+    <Attention ui={ui} />
+    <Watch ui={ui} />
+    <Story ui={ui} />
+    <Evolution ui={ui} />
+    <Architecture ui={ui} />
+    <Quickstart ui={ui} />
+  </main>
+  <Footer lang="en" ui={ui} />
+  <script>
+    import '../islands/reveal.ts';
+    import '../islands/dag-canvas.ts';
+    import '../islands/typing.ts';
+    import '../islands/theme-toggle.ts';
+  </script>
+</Base>

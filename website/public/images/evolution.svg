@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  <style>
+    @media (prefers-color-scheme: dark) {
+      [fill='#4a5368'] { fill: #d6dbe6; }
+      [fill='#6b7280'] { fill: #a8b0c0; }
+      [fill='#b96a04'] { fill: #eda33a; }
+      [fill='#c98a2e'] { fill: #e0a34e; }
+    }
+  </style>
+  <defs>
+    <marker id="evArr" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#8b93a7"/>
+    </marker>
+  </defs>
+
+  <!-- spine -->
+  <path d="M60 268 L 1136 268" stroke="#8b93a7" stroke-opacity="0.55" stroke-width="2" marker-end="url(#evArr)"/>
+
+  <!-- ===== ACT I ===== -->
+  <rect x="60" y="52" width="330" height="168" rx="10" fill="#8b93a7" fill-opacity="0.07" stroke="#8b93a7" stroke-opacity="0.45"/>
+  <text x="80" y="82" font-size="10.5" letter-spacing="2" fill="#8b93a7" font-family="ui-monospace, monospace">ACT I · 2026-06 · v0.1 – v0.9</text>
+  <text x="80" y="108" font-size="16" font-weight="700" fill="#4a5368">The plugin era</text>
+  <text x="80" y="126" font-size="11" fill="#8b93a7">one Claude Code plugin, born to teach agents dynamic workflows</text>
+  <text x="80" y="156" font-size="11.5" fill="#6b7280">· board — a durable plan that survives compaction</text>
+  <text x="80" y="178" font-size="11.5" fill="#6b7280">· hooks go deterministic — armed only by a board</text>
+  <text x="80" y="200" font-size="11.5" fill="#6b7280">· cross-session resume · watchdog · pacing v1</text>
+
+  <!-- ===== ACT II ===== -->
+  <rect x="435" y="52" width="330" height="168" rx="10" fill="#8b93a7" fill-opacity="0.07" stroke="#8b93a7" stroke-opacity="0.45"/>
+  <text x="455" y="82" font-size="10.5" letter-spacing="2" fill="#8b93a7" font-family="ui-monospace, monospace">ACT II · 2026-06/07 · v0.10 – v0.11</text>
+  <text x="455" y="108" font-size="16" font-weight="700" fill="#4a5368">The engine era</text>
+  <text x="455" y="126" font-size="11" fill="#8b93a7">board logic leaves the plugin, becomes a product</text>
+  <text x="455" y="156" font-size="11.5" fill="#6b7280">· ccm — board engine decoupled, one binary (ADR-014)</text>
+  <text x="455" y="178" font-size="11.5" fill="#6b7280">· OR/ML estimation &amp; pacing — Monte Carlo, EVM (ADR-015)</text>
+  <text x="455" y="200" font-size="11.5" fill="#6b7280">· two version lines — plugin v* ‖ ccm-v* (ADR-022)</text>
+
+  <!-- ===== ACT III ===== -->
+  <rect x="810" y="52" width="330" height="168" rx="10" fill="#d97f06" fill-opacity="0.08" stroke="#d97f06" stroke-opacity="0.7" stroke-width="1.5"/>
+  <text x="830" y="82" font-size="10.5" letter-spacing="2" fill="#b96a04" font-family="ui-monospace, monospace">ACT III · 2026-07 · v0.12 →</text>
+  <text x="830" y="108" font-size="16" font-weight="700" fill="#b96a04">The meta-harness era</text>
+  <text x="830" y="126" font-size="11" fill="#c98a2e">the orchestrator outgrows its origin harness</text>
+  <text x="830" y="156" font-size="11.5" fill="#6b7280">· source-to-adapter — Codex · Cursor · kimi-code</text>
+  <text x="830" y="178" font-size="11.5" fill="#6b7280">· N-host parity becomes a mechanism (ADR-031)</text>
+  <text x="830" y="200" font-size="11.5" fill="#6b7280">· cross-harness worker pool — one machine, one roster</text>
+
+  <!-- act braces -->
+  <path d="M70 232 L 380 232" stroke="#8b93a7" stroke-opacity="0.4"/>
+  <path d="M445 232 L 700 232" stroke="#8b93a7" stroke-opacity="0.4"/>
+  <path d="M755 232 L 1130 232" stroke="#d97f06" stroke-opacity="0.5"/>
+
+  <!-- milestone ticks -->
+  <g font-size="9.5" font-family="ui-monospace, monospace" fill="#8b93a7" text-anchor="middle">
+    <circle cx="90" cy="268" r="4" fill="#4a7ddb"/>
+    <text x="90" y="292">06-05 v0.1.0</text><text x="90" y="306">plugin born</text>
+    <circle cx="210" cy="268" r="4" fill="#4a7ddb"/>
+    <text x="210" y="292">06-12 v0.3.0</text><text x="210" y="306">armed hooks</text>
+    <circle cx="330" cy="268" r="4" fill="#4a7ddb"/>
+    <text x="330" y="292">06-16 v0.6.0</text><text x="330" y="306">resume · watchdog</text>
+    <circle cx="470" cy="268" r="4" fill="#d97f06"/>
+    <text x="470" y="292">06-24 ADR-014</text><text x="470" y="306">ccm decoupled</text>
+    <circle cx="600" cy="268" r="4" fill="#d97f06"/>
+    <text x="600" y="292">07-01 two</text><text x="600" y="306">version lines</text>
+    <circle cx="770" cy="268" r="4" fill="#d97f06"/>
+    <text x="770" y="292">07-03 v0.12.1</text><text x="770" y="306">Codex · adapters</text>
+    <circle cx="895" cy="268" r="4" fill="#d97f06"/>
+    <text x="895" y="292">07-09 v0.17.0</text><text x="895" y="306">Cursor · parity</text>
+    <circle cx="1000" cy="268" r="4" fill="#d97f06"/>
+    <text x="1000" y="292">07-16 v0.20.0</text><text x="1000" y="306">worker pool MVP</text>
+    <circle cx="1110" cy="268" r="4" fill="#2fa77a"/>
+    <text x="1110" y="292">07-17+ kimi-code</text><text x="1110" y="306">4th harness</text>
+  </g>
+
+  <text x="600" y="356" font-size="11" text-anchor="middle" fill="#8b93a7" font-style="italic">from "teach one agent to write workflows" — to "give every agent the same conductor"</text>
+</svg>

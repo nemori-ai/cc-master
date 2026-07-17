@@ -1,0 +1,35 @@
+---
+interface Props {
+  name: string; // base filename under /images/viewer/
+  caption: string;
+  alt?: string;
+  eager?: boolean;
+  class?: string;
+}
+const { name, caption, alt = 'ccm web-viewer', eager = false, class: cls = '' } = Astro.props;
+---
+
+<figure class={`shot ${cls}`}>
+  <div class="overflow-hidden rounded-[11px] border border-hair bg-[oklch(0.145_0.012_255)] shadow-[var(--elev-shot)]">
+    <div class="flex items-center gap-1.5 border-b border-white/10 px-3 py-2">
+      <span class="lamp text-done" style="width:6px;height:6px"></span>
+      <span class="lamp text-inflight" style="width:6px;height:6px"></span>
+      <span class="lamp text-ready" style="width:6px;height:6px"></span>
+      <span class="tele ml-2 text-[10px] tracking-[0.14em] text-white/40 uppercase">ccm web-viewer · read-only</span>
+    </div>
+    <picture>
+      <source srcset={`/images/viewer/${name}.webp`} type="image/webp" />
+      <img
+        src={`/images/viewer/${name}.png`}
+        {alt}
+        width="3200"
+        height="2000"
+        loading={eager ? 'eager' : 'lazy'}
+        decoding="async"
+        fetchpriority={eager ? 'high' : 'auto'}
+        class="block h-auto w-full"
+      />
+    </picture>
+  </div>
+  <figcaption class="tele mt-3 text-[11px] tracking-wide text-ink-faint">{caption}</figcaption>
+</figure>

@@ -1,0 +1,203 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+ * cc-master site design tokens — ported from ccm web-viewer styles.css
+ * (MISSION CONTROL · daylight control room light theme / dark telemetry console)
+ * Single source of truth for both themes; utilities mapped via @theme inline.
+ * ------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* surfaces — daylight control room */
+  --ground: oklch(0.967 0.006 255);
+  --panel: oklch(0.988 0.005 255);
+  --panel-hi: oklch(0.998 0.004 255);
+  --grid: oklch(0.86 0.01 255);
+  --hair: oklch(0.83 0.012 255);
+  --hair-soft: oklch(0.88 0.009 255);
+  --ink: oklch(0.27 0.02 255);
+  --ink-dim: oklch(0.44 0.02 255);
+  --ink-faint: oklch(0.56 0.018 255);
+  --edge: oklch(0.62 0.03 252);
+  --band: oklch(0.945 0.008 255 / 0.55);
+  --inset: oklch(0.93 0.008 255 / 0.7);
+  --chip-bg: oklch(0.9 0.01 255 / 0.8);
+  --canvas-glow: oklch(0.995 0.004 255);
+
+  /* status lamps (light) */
+  --done: oklch(0.6 0.15 162);
+  --inflight: oklch(0.66 0.165 64);
+  --blocked: oklch(0.58 0.03 250);
+  --ready: oklch(0.57 0.15 250);
+  --escalated: oklch(0.55 0.2 300);
+  --failed: oklch(0.56 0.215 27);
+  --stale: oklch(0.62 0.14 90);
+  --uncertain: oklch(0.6 0.17 352);
+
+  /* the one allowed alarm */
+  --spine: oklch(0.66 0.175 65);
+  --alert: oklch(0.64 0.18 58);
+
+  --shadow-color: oklch(0.6 0.02 255 / 0.5);
+  --elev-1:
+    0 1px 2px oklch(0.55 0.02 255 / 0.1),
+    0 6px 16px oklch(0.55 0.02 255 / 0.12);
+  --elev-2:
+    0 1px 2px oklch(0.55 0.02 255 / 0.1),
+    0 10px 24px oklch(0.55 0.02 255 / 0.16);
+  --elev-shot: 0 18px 48px oklch(0.55 0.02 255 / 0.28);
+
+  --font-display: "Archivo", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --radius-s: 4px;
+  --radius-m: 7px;
+  --radius-l: 11px;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ground: oklch(0.145 0.012 255);
+  --panel: oklch(0.185 0.014 255);
+  --panel-hi: oklch(0.225 0.016 255);
+  --grid: oklch(0.255 0.012 255);
+  --hair: oklch(0.3 0.012 255);
+  --hair-soft: oklch(0.26 0.01 255);
+  --ink: oklch(0.93 0.008 255);
+  --ink-dim: oklch(0.66 0.013 255);
+  --ink-faint: oklch(0.5 0.013 255);
+  --edge: oklch(0.46 0.018 252);
+  --band: oklch(0.195 0.014 255 / 0.42);
+  --inset: oklch(0.16 0.012 255 / 0.6);
+  --chip-bg: oklch(0.26 0.012 255 / 0.7);
+  --canvas-glow: oklch(0.2 0.016 255);
+
+  --done: oklch(0.74 0.135 162);
+  --inflight: oklch(0.79 0.15 74);
+  --blocked: oklch(0.56 0.022 250);
+  --ready: oklch(0.7 0.115 244);
+  --escalated: oklch(0.64 0.165 300);
+  --failed: oklch(0.63 0.19 26);
+  --stale: oklch(0.72 0.115 96);
+  --uncertain: oklch(0.71 0.13 352);
+
+  --spine: oklch(0.8 0.16 70);
+  --alert: oklch(0.8 0.15 66);
+
+  --shadow-color: oklch(0.1 0.01 255);
+  --elev-1: 0 1px 2px oklch(0.1 0.01 255 / 0.4), 0 6px 16px oklch(0.1 0.01 255 / 0.4);
+  --elev-2: 0 1px 2px oklch(0.1 0.01 255 / 0.4), 0 10px 24px oklch(0.1 0.01 255 / 0.5);
+  --elev-shot: 0 18px 48px oklch(0.08 0.01 255 / 0.55);
+}
+
+/* Tailwind 4 utility mapping (runtime vars → theme-switchable utilities) */
+@theme inline {
+  --color-ground: var(--ground);
+  --color-panel: var(--panel);
+  --color-panel-hi: var(--panel-hi);
+  --color-grid: var(--grid);
+  --color-hair: var(--hair);
+  --color-hair-soft: var(--hair-soft);
+  --color-ink: var(--ink);
+  --color-ink-dim: var(--ink-dim);
+  --color-ink-faint: var(--ink-faint);
+  --color-edge: var(--edge);
+  --color-band: var(--band);
+  --color-chip: var(--chip-bg);
+  --color-done: var(--done);
+  --color-inflight: var(--inflight);
+  --color-blocked: var(--blocked);
+  --color-ready: var(--ready);
+  --color-escalated: var(--escalated);
+  --color-failed: var(--failed);
+  --color-stale: var(--stale);
+  --color-uncertain: var(--uncertain);
+  --color-spine: var(--spine);
+  --color-alert: var(--alert);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+/* ------------------------------------------------------------------------- */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: oklch(0.8 0.16 70 / 0.28);
+}
+
+/* telemetry / readout voice */
+.tele {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* hairline panel card */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-l);
+  box-shadow: var(--elev-1);
+}
+
+.panel-hi {
+  background: var(--panel-hi);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-m);
+}
+
+/* status lamp */
+.lamp {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* section eyebrow label */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* scroll reveal (driven by islands/reveal.ts) */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

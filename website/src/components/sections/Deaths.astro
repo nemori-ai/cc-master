@@ -1,0 +1,28 @@
+---
+import SectionHead from '../SectionHead.astro';
+import type { Ui } from '../../i18n/ui';
+
+interface Props { ui: Ui }
+const { ui } = Astro.props;
+---
+
+<section class="border-t border-hair-soft py-20 md:py-24">
+  <div class="mx-auto max-w-6xl px-6">
+    <SectionHead eyebrow={ui.deaths.eyebrow} title={ui.deaths.title} lead={ui.deaths.lead} />
+
+    <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {ui.deaths.items.map((d, i) => (
+        <div class="reveal panel-hi flex flex-col p-5" style={`--reveal-delay:${i * 70}ms`}>
+          <span class="tele text-[10px] tracking-[0.18em] text-failed uppercase">death {String(i + 1).padStart(2, '0')}</span>
+          <h3 class="mt-2.5 text-[15.5px] font-bold">{d.title}</h3>
+          <p class="mt-2 flex-1 text-[13px] leading-relaxed text-ink-dim">{d.body}</p>
+          <p class="mt-4 border-t border-hair-soft pt-3 text-[12px] leading-snug text-ink-dim">
+            <span class="lamp mr-1.5 text-done" style="width:6px;height:6px"></span>{d.cure}
+          </p>
+        </div>
+      ))}
+    </div>
+
+    <p class="reveal mt-10 text-center text-[15px] font-medium text-ink-dim italic">{ui.deaths.kicker}</p>
+  </div>
+</section>

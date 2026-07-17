@@ -1,0 +1,44 @@
+---
+interface Props {
+  command: string;
+  note?: string;
+  class?: string;
+}
+const { command, note, class: cls = '' } = Astro.props;
+---
+
+<div class={`${cls}`}>
+  <div class="overflow-hidden rounded-[11px] border border-hair bg-[oklch(0.145_0.012_255)] shadow-[var(--elev-2)]">
+    <div class="flex items-center gap-1.5 border-b border-white/10 px-3 py-2">
+      <span class="inline-block h-[9px] w-[9px] rounded-full bg-white/15"></span>
+      <span class="inline-block h-[9px] w-[9px] rounded-full bg-white/15"></span>
+      <span class="inline-block h-[9px] w-[9px] rounded-full bg-white/15"></span>
+      <span class="tele ml-2 text-[10px] tracking-[0.14em] text-white/40 uppercase">terminal</span>
+    </div>
+    <div class="px-4 py-3.5">
+      <code
+        class="tele block text-[13px] leading-relaxed break-all text-[oklch(0.93_0.008_255)]"
+        data-typing
+        data-text={command}
+      ></code>
+    </div>
+  </div>
+  {note && <p class="tele mt-2.5 text-[11px] text-ink-faint">{note}</p>}
+</div>
+
+<style>
+  [data-typing]::after {
+    content: '▌';
+    margin-left: 2px;
+    color: var(--spine);
+    opacity: 0;
+  }
+  [data-typing].is-typing::after,
+  [data-typing]:not(:empty)::after {
+    opacity: 1;
+    animation: caret 0.9s steps(1) infinite;
+  }
+  @keyframes caret {
+    50% { opacity: 0; }
+  }
+</style>

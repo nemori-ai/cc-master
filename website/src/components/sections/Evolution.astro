@@ -1,0 +1,38 @@
+---
+import SectionHead from '../SectionHead.astro';
+import type { Ui } from '../../i18n/ui';
+
+interface Props { ui: Ui }
+const { ui } = Astro.props;
+---
+
+<section id="evolution" class="border-t border-hair-soft py-20 md:py-24">
+  <div class="mx-auto max-w-6xl px-6">
+    <SectionHead eyebrow={ui.evolution.eyebrow} title={ui.evolution.title} lead={ui.evolution.lead} />
+
+    <div class="reveal mt-12 overflow-x-auto rounded-[11px] border border-hair bg-panel p-4 md:p-6">
+      <img
+        src="/images/evolution.svg"
+        alt="the cc-master evolution timeline: plugin era, engine era, meta-harness era"
+        width="1200"
+        height="400"
+        loading="lazy"
+        decoding="async"
+        class="mx-auto h-auto w-full min-w-[720px]"
+      />
+    </div>
+
+    <div class="mt-10 grid gap-4 md:grid-cols-3">
+      {ui.evolution.acts.map((act, i) => (
+        <div
+          class={`reveal p-6 ${i === 2 ? 'rounded-[11px] border border-spine/50 bg-spine/5' : 'panel'}`}
+          style={`--reveal-delay:${i * 90}ms`}
+        >
+          <span class={`tele text-[10px] tracking-[0.18em] uppercase ${i === 2 ? 'text-spine' : 'text-ink-faint'}`}>{act.label}</span>
+          <h3 class="mt-2.5 text-[17px] font-bold">{act.name}</h3>
+          <p class="mt-2.5 text-[13px] leading-relaxed text-ink-dim">{act.body}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

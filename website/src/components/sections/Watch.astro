@@ -1,0 +1,40 @@
+---
+import SectionHead from '../SectionHead.astro';
+import ShotFrame from '../ShotFrame.astro';
+import type { Ui } from '../../i18n/ui';
+
+interface Props { ui: Ui }
+const { ui } = Astro.props;
+---
+
+<section id="watch" class="border-t border-hair-soft py-20 md:py-24">
+  <div class="mx-auto max-w-6xl px-6">
+    <SectionHead eyebrow={ui.watch.eyebrow} title={ui.watch.title} lead={ui.watch.lead} />
+
+    <div class="reveal mt-12">
+      <figure>
+        <div class="overflow-hidden rounded-[11px] border border-hair bg-[oklch(0.145_0.012_255)] shadow-[var(--elev-shot)]">
+          <div class="flex items-center gap-1.5 border-b border-white/10 px-3 py-2">
+            <span class="lamp text-done" style="width:6px;height:6px"></span>
+            <span class="lamp text-inflight" style="width:6px;height:6px"></span>
+            <span class="lamp text-ready" style="width:6px;height:6px"></span>
+            <span class="tele ml-2 text-[10px] tracking-[0.14em] text-white/40 uppercase">ccm web-viewer · live</span>
+          </div>
+          <video autoplay muted loop playsinline preload="metadata" class="block h-auto w-full" aria-label="live recording of the ccm web-viewer: panning the dependency graph and opening a decision card">
+            <source src="/images/viewer/viewer-loop.webm" type="video/webm" />
+            <source src="/images/viewer/viewer-loop.mp4" type="video/mp4" />
+          </video>
+        </div>
+        <figcaption class="tele mt-3 text-[11px] tracking-wide text-ink-faint">{ui.watch.videoCaption}</figcaption>
+      </figure>
+    </div>
+
+    <div class="mt-10 grid gap-6 md:grid-cols-2">
+      {ui.watch.shots.map(([name, caption], i) => (
+        <div class="reveal" style={`--reveal-delay:${(i % 2) * 90}ms`}>
+          <ShotFrame name={name} caption={caption} alt={caption} />
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

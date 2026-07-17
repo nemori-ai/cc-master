@@ -1,0 +1,27 @@
+{
+  "name": "cc-master-website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "capture": "node tools/capture.mjs",
+    "optimize-images": "node tools/optimize-images.mjs",
+    "deploy": "astro build && wrangler deploy"
+  },
+  "dependencies": {
+    "@fontsource/archivo": "5.2.8",
+    "@fontsource/martian-mono": "5.2.7",
+    "astro": "7.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "playwright-core": "^1.61.1",
+    "sharp": "0.35.3",
+    "tailwindcss": "4.3.3",
+    "wrangler": "4.111.0"
+  },
+  "packageManager": "pnpm@10.28.1+sha512.7d7dbbca9e99447b7c3bf7a73286afaaf6be99251eb9498baefa7d406892f67b879adb3a1d7e687fc4ccc1a388c7175fbaae567a26ab44d1067b54fcb0d6a316"
+}

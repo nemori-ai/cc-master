@@ -1,0 +1,34 @@
+---
+import SectionHead from '../SectionHead.astro';
+import type { Ui } from '../../i18n/ui';
+
+interface Props { ui: Ui }
+const { ui } = Astro.props;
+---
+
+<section id="architecture" class="border-t border-hair-soft py-20 md:py-24">
+  <div class="mx-auto max-w-6xl px-6">
+    <SectionHead eyebrow={ui.architecture.eyebrow} title={ui.architecture.title} lead={ui.architecture.lead} />
+
+    <div class="reveal mt-12 overflow-x-auto rounded-[11px] border border-hair bg-panel p-4 md:p-6">
+      <img
+        src="/images/architecture.svg"
+        alt="cc-master architecture: four harnesses, the plugin adapter, the master orchestrator, the ccm engine, boards, and the read-only web-viewer"
+        width="1200"
+        height="640"
+        loading="lazy"
+        decoding="async"
+        class="mx-auto h-auto w-full min-w-[820px]"
+      />
+    </div>
+
+    <div class="mt-10 grid gap-4 md:grid-cols-3">
+      {ui.architecture.points.map(([name, desc], i) => (
+        <div class="reveal panel-hi p-5" style={`--reveal-delay:${i * 90}ms`}>
+          <code class="tele text-[13px] font-bold text-ink">{name}</code>
+          <p class="mt-2 text-[13px] leading-relaxed text-ink-dim">{desc}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

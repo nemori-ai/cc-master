@@ -1,0 +1,44 @@
+---
+import '@fontsource/archivo/400.css';
+import '@fontsource/archivo/500.css';
+import '@fontsource/archivo/600.css';
+import '@fontsource/archivo/700.css';
+import '@fontsource/archivo/800.css';
+import '@fontsource/martian-mono/400.css';
+import '@fontsource/martian-mono/600.css';
+import '../styles/tokens.css';
+
+interface Props {
+  title: string;
+  description: string;
+  lang?: 'en' | 'zh';
+}
+
+const { title, description, lang = 'en' } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang={lang === 'zh' ? 'zh-CN' : 'en'}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script is:inline>
+      // theme bootstrap — runs before first paint to avoid FOUC; default light
+      (() => {
+        try {
+          const saved = localStorage.getItem('ccm-theme');
+          const theme = saved === 'dark' || saved === 'light' ? saved : 'light';
+          document.documentElement.dataset.theme = theme;
+        } catch { document.documentElement.dataset.theme = 'light'; }
+      })();
+    </script>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

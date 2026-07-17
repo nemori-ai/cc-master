@@ -1,0 +1,57 @@
+---
+import Terminal from '../Terminal.astro';
+import type { Ui } from '../../i18n/ui';
+
+interface Props { ui: Ui }
+const { ui } = Astro.props;
+const GH = 'https://github.com/nemori-ai/cc-master';
+---
+
+<section class="relative overflow-hidden pt-20 pb-16 md:pt-28 md:pb-20">
+  <div class="mx-auto max-w-6xl px-6">
+    <div class="mx-auto max-w-3xl text-center">
+      <p class="eyebrow reveal justify-center">{ui.hero.eyebrow}</p>
+      <h1 class="reveal mt-6 text-[2.6rem] leading-[1.06] font-extrabold tracking-tight text-balance md:text-6xl" style="--reveal-delay:80ms">
+        {ui.hero.titleA}<br />
+        <span class="text-spine">{ui.hero.titleB}</span><br />
+        <span class="text-ink-faint">{ui.hero.titleC}</span>
+      </h1>
+      <p class="reveal mx-auto mt-6 max-w-2xl text-[15.5px] leading-relaxed text-ink-dim text-pretty md:text-[17px]" style="--reveal-delay:160ms">
+        {ui.hero.sub}
+      </p>
+      <div class="reveal mx-auto mt-8 max-w-2xl text-left" style="--reveal-delay:240ms">
+        <Terminal command={ui.hero.install} note={ui.hero.installNote} />
+      </div>
+      <div class="reveal mt-8 flex items-center justify-center gap-3" style="--reveal-delay:320ms">
+        <a
+          href="/docs/getting-started"
+          class="rounded-[7px] bg-spine px-5 py-2.5 text-[14px] font-semibold text-[oklch(0.99_0.01_90)] shadow-[var(--elev-1)] transition-transform hover:-translate-y-px"
+        >{ui.hero.ctaDocs}</a>
+        <a
+          href={GH}
+          target="_blank"
+          rel="noopener"
+          class="rounded-[7px] border border-hair bg-panel px-5 py-2.5 text-[14px] font-semibold text-ink transition-transform hover:-translate-y-px"
+        >{ui.hero.ctaGithub}</a>
+      </div>
+      <p class="tele reveal mt-6 text-[11px] tracking-[0.2em] text-ink-faint uppercase" style="--reveal-delay:380ms">
+        {ui.hero.harnessLine}
+      </p>
+    </div>
+
+    <div class="reveal mt-14 md:mt-16" style="--reveal-delay:220ms">
+      <div class="panel overflow-hidden">
+        <div class="flex items-center justify-between border-b border-hair-soft px-4 py-2.5">
+          <span class="tele text-[10px] tracking-[0.16em] text-ink-faint uppercase">goal → dag</span>
+          <span class="flex items-center gap-3">
+            <span class="tele flex items-center gap-1.5 text-[10px] text-ink-faint"><span class="lamp text-done" style="width:6px;height:6px"></span>done</span>
+            <span class="tele flex items-center gap-1.5 text-[10px] text-ink-faint"><span class="lamp text-inflight" style="width:6px;height:6px"></span>in flight</span>
+            <span class="tele flex items-center gap-1.5 text-[10px] text-ink-faint"><span class="inline-block h-[2px] w-4 bg-spine"></span>critical path</span>
+          </span>
+        </div>
+        <canvas data-dag class="block h-[300px] w-full md:h-[400px]" aria-label="animated dependency graph: a goal decomposes, parallel branches light up, the critical path traces in amber"></canvas>
+      </div>
+      <p class="tele mt-3 text-center text-[11px] text-ink-faint">{ui.hero.canvasCaption}</p>
+    </div>
+  </div>
+</section>

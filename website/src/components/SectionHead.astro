@@ -1,0 +1,18 @@
+---
+interface Props {
+  eyebrow: string;
+  title: string;
+  lead?: string;
+  id?: string;
+  class?: string;
+}
+const { eyebrow, title, lead, id, class: cls = '' } = Astro.props;
+---
+
+<div class={`reveal ${cls}`} {id}>
+  <p class="eyebrow flex items-center gap-2.5">
+    <span class="inline-block h-px w-8 bg-spine"></span>{eyebrow}
+  </p>
+  <h2 class="mt-4 max-w-3xl text-3xl font-extrabold tracking-tight text-balance md:text-4xl">{title}</h2>
+  {lead && <p class="mt-4 max-w-2xl text-[15.5px] leading-relaxed text-ink-dim text-pretty">{lead}</p>}
+</div>

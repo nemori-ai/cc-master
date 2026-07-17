@@ -1,0 +1,44 @@
+---
+import SectionHead from '../SectionHead.astro';
+import type { Ui } from '../../i18n/ui';
+
+interface Props { ui: Ui }
+const { ui } = Astro.props;
+---
+
+<section id="philosophy" class="border-t border-hair-soft py-20 md:py-24">
+  <div class="mx-auto max-w-6xl px-6">
+    <SectionHead eyebrow={ui.philosophy.eyebrow} title={ui.philosophy.title} lead={ui.philosophy.lead} />
+
+    <div class="mt-12 grid gap-4 md:grid-cols-2">
+      {ui.philosophy.lenses.map((l, i) => (
+        <div
+          class={`reveal panel group p-6 transition-transform hover:-translate-y-0.5 ${i === 0 ? 'md:col-span-2 md:p-8' : ''} ${i === ui.philosophy.lenses.length - 1 && (ui.philosophy.lenses.length - 1) % 2 === 0 ? '' : ''}`}
+          style={`--reveal-delay:${(i % 2) * 80}ms`}
+        >
+          <div class="flex items-baseline gap-3">
+            <span class="tele text-[11px] font-semibold tracking-[0.18em] text-spine">{l.n}</span>
+            <h3 class={`font-bold tracking-tight ${i === 0 ? 'text-xl md:text-2xl' : 'text-[17px]'}`}>{l.name}</h3>
+          </div>
+          <p class={`mt-3 leading-relaxed text-ink-dim ${i === 0 ? 'max-w-3xl text-[15px]' : 'text-[13.5px]'}`}>{l.body}</p>
+          <p class="mt-4 border-l-2 border-spine pl-3 text-[13px] font-medium text-ink-dim italic">“{l.quote}”</p>
+        </div>
+      ))}
+    </div>
+
+    <div class="reveal mt-16">
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 class="text-lg font-bold">{ui.philosophy.skillsTitle}</h3>
+        <p class="text-[12.5px] text-ink-faint">{ui.philosophy.skillsLead}</p>
+      </div>
+      <div class="mt-5 grid gap-px overflow-hidden rounded-[11px] border border-hair bg-hair-soft sm:grid-cols-2 lg:grid-cols-4">
+        {ui.philosophy.skills.map(([name, desc]) => (
+          <div class="bg-panel p-4">
+            <code class="tele text-[12px] font-semibold text-ink">{name}</code>
+            <p class="mt-1.5 text-[12px] leading-snug text-ink-dim">{desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>

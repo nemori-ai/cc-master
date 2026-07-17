@@ -1,0 +1,38 @@
+---
+import SectionHead from '../SectionHead.astro';
+import Terminal from '../Terminal.astro';
+import type { Ui } from '../../i18n/ui';
+
+interface Props { ui: Ui; lang?: 'en' | 'zh' }
+const { ui, lang = 'en' } = Astro.props;
+const home = lang === 'zh' ? '/zh/' : '/';
+---
+
+<section class="border-t border-hair-soft py-20 md:py-24">
+  <div class="mx-auto max-w-6xl px-6">
+    <SectionHead eyebrow={ui.quickstart.eyebrow} title={ui.quickstart.title} />
+
+    <div class="mt-10 grid gap-10 lg:grid-cols-2">
+      <div class="reveal">
+        <Terminal command={ui.quickstart.install} />
+        <p class="mt-4 text-[13px] leading-relaxed text-ink-dim">{ui.quickstart.note}</p>
+        <a
+          href={`${home}docs/getting-started`}
+          class="mt-6 inline-block rounded-[7px] bg-spine px-5 py-2.5 text-[14px] font-semibold text-[oklch(0.99_0.01_90)] shadow-[var(--elev-1)] transition-transform hover:-translate-y-px"
+        >{ui.quickstart.cta}</a>
+      </div>
+
+      <div class="reveal" style="--reveal-delay:120ms">
+        <p class="text-[13.5px] font-semibold text-ink">{ui.quickstart.entryTitle}</p>
+        <div class="mt-4 space-y-2.5">
+          {ui.quickstart.entries.map(([harness, cmd]) => (
+            <div class="panel-hi flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <span class="text-[13px] font-semibold whitespace-nowrap">{harness}</span>
+              <code class="tele text-[12px] break-all text-ink-dim">{cmd}</code>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

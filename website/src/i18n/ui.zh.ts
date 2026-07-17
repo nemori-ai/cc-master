@@ -1,0 +1,268 @@
+import type { Ui } from './ui';
+
+/**
+ * Landing copy — 中文。事实与英文版一致，表达按中文自然节奏重写（非逐句翻译）。
+ */
+export const zh: Ui = {
+  lang: 'zh',
+  nav: {
+    philosophy: '设计哲学',
+    watch: '看它思考',
+    story: '一次完整编排',
+    evolution: '演进',
+    architecture: '架构',
+    docs: '文档',
+    github: 'GitHub',
+  },
+  hero: {
+    eyebrow: '长程 AGENT 的指挥台',
+    titleA: '给它一个大目标——',
+    titleB: '和一个预算。',
+    titleC: '然后去做点别的。',
+    sub: 'cc-master 把任意受支持的 coding-agent 会话的主 agent 初始化成 master orchestrator——一个项目负责人：把目标拆成依赖图，让独立的部分并行推进，按真实配额限制调节节奏，并且清楚地知道什么时候该停下来问你。',
+    install: 'curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash',
+    installNote: '一条命令装好 ccm 引擎 + 插件——两条独立版本线',
+    ctaDocs: '快速上手',
+    ctaGithub: 'GitHub',
+    harnessLine: 'Claude Code · Codex · Cursor · kimi-code',
+    canvasCaption: '一个目标，被拆成依赖图——琥珀色的链是临界路径',
+  },
+  deaths: {
+    eyebrow: '为什么存在',
+    title: '裸 agent 接大活，有五种死法',
+    lead: '把一个要跑好几天的目标交给裸 coding agent，结局你早就知道。cc-master 的存在理由，就是这五种死法的逐条否定。',
+    items: [
+      {
+        title: '它会忘。',
+        body: '聊着聊着就丢了主线；一次 context compaction，任务就没了。',
+        cure: 'board——一份比记忆更持久的计划',
+      },
+      {
+        title: '它只会串行。',
+        body: '一次一件事，要你一勺一勺喂。你买的是并行度，到手的却是排队。',
+        cure: 'dataflow 派发——就绪的立刻开跑',
+      },
+      {
+        title: '它会烧钱。',
+        body: '闷头猛跑，一个下午就能把配额窗口烧穿。',
+        cure: '配速——配额被感知、被定价、被预算',
+      },
+      {
+        title: '它要么烦你，要么跑飞。',
+        body: '三句话一请示，或者悄悄替你把不该它拍的板拍了。',
+        cure: 'HITL 边界——知道哪个决定该归哪一边',
+      },
+      {
+        title: '它会说"差不多了"。',
+        body: 'Gate-green ≠ passed。"看起来做完了"不是做完了——而且总会事后暴雷。',
+        cure: '端点验收——指挥亲自到场',
+      },
+    ],
+    kicker: 'cc-master 的每条纪律，都是对其中一种死法的回答。',
+  },
+  philosophy: {
+    eyebrow: '设计哲学',
+    title: 'master orchestrator 的七只镜头',
+    lead: '不是要遵守的规矩，而是一个角色的定义展开——一套任何 harness 上的任何 agent 都能被初始化进去的方法论。',
+    lenses: [
+      {
+        n: '01',
+        name: '指挥不演奏',
+        body: 'orchestrator 只做拆图、派发、验收、整合——绝不亲手实现。你下场抄乐器的每一拍，都是把最稀缺的资源——装着整张图的注意力——花在最便宜的活上。',
+        quote: '指挥永不演奏。',
+      },
+      {
+        n: '02',
+        name: '目标即依赖图',
+        body: '目标先落成 Goal Contract，再拆成 DAG。每条依赖边都是债务、默认有错、必须自证；除此之外一律并行。资源压向临界路径；float 是免费的并行预算。',
+        quote: '每条依赖边都是债务，默认错。',
+      },
+      {
+        n: '03',
+        name: '就绪即发',
+        body: '依赖一满足立刻派发，绝不在 barrier 干等。board 上的标注不是派发——拿到真实 handle 才是。',
+        quote: '用户买的是并行度。',
+      },
+      {
+        n: '04',
+        name: '主观能动，绝不空转',
+        body: '只有当每条路径都悬于后台任务或用户待答时，等待才合法——在此之前先榨干可做工作池。并为静默失败的盲区 arm 一只 watchdog。',
+        quote: '此刻的安静是调度的成果，不是懈怠的遮羞布。',
+      },
+      {
+        n: '05',
+        name: '量力而行',
+        body: 'Little 定律与利用率悬崖：瞄着走廊上界跑，不是 100%。配额信号一律 fail closed。预算是受托资产，不是你的燃料。',
+        quote: '预算是受托资产，不是你的燃料。',
+      },
+      {
+        n: '06',
+        name: '只信端点验收',
+        body: '自报不是证据，绿灯不是证明。指挥在端点亲验——读 diff、亲跑闸——这样"done"才值得被信任。',
+        quote: 'Gate-green ≠ passed。',
+      },
+      {
+        n: '07',
+        name: '该问就问',
+        body: '用户是一种特殊的异步 worker。决策真的归他时立刻抛出——连同备好的决策包——而其他独立的路径一条不停。',
+        quote: '判断权是分层的，用户从未交出他那层。',
+      },
+    ],
+    skillsTitle: '八个 skill，一位指挥',
+    skillsLead: '每个 skill 守一个平面，互不重叠——渐进式披露让灵魂保持瘦。',
+    skills: [
+      ['master-orchestrator-guide', '魂——决策、排期、红线'],
+      ['slicing-goals-into-dags', '怎么把目标切成 DAG'],
+      ['authoring-workflows', '怎么写确定性 workflow 脚本'],
+      ['using-ccm', 'ccm CLI 与 board 操作手册'],
+      ['dev-as-ml-loop', '单任务执行循环的形状'],
+      ['engineering-with-craft', '循环里的手艺——DDD/OOP/TDD'],
+      ['pacing-and-estimation', '读 advisory、配速与估算'],
+      ['distilling-lessons-into-assets', '把经验路由成耐久的资产'],
+    ],
+  },
+  attention: {
+    eyebrow: '人 ↔ AGENT 交互范式',
+    title: '注意力，重新分配',
+    lead: '不存在中性的注入：agent context 里的每个 token 都在塑造下一个 token。所以 cc-master 把 context 当作稀缺信道，每条消息都按两个轴打标——决策归谁、该拉动多少注意力。',
+    tags: [
+      {
+        tag: '<ambient>',
+        strength: '低',
+        body: '背景。更新世界模型即可，不是待办——但它诚实地承认：它仍在潜移默化地影响你。',
+        example: '<ambient source="usage-pacing">5h 窗口已用 62%，1h 40m 后重置</ambient>',
+      },
+      {
+        tag: '<advisory>',
+        strength: 'weak | strong',
+        body: '建议。认真权衡、推理它的前提——但最终仍由你拍板。绝大多数 hook 通信落在这里。',
+        example: '<advisory source="usage-pacing" strength="strong">verdict: throttle——燃烧速率将烧穿 5h 窗口</advisory>',
+      },
+      {
+        tag: '<directive>',
+        strength: '满',
+        body: '闸门。遵从它——并理解它自带的 why，这样你才能识别规则误触。只留给硬约束，刻意保持稀有。',
+        example: '<directive source="board-guard">board 只经 ccm 写——请用 `ccm task update`（why：锁 + 82 条不变式让计划可信）</directive>',
+      },
+    ],
+    decisionTitle: '当决定真的归你，它是带着准备来的',
+    decisionBody: '决策包带来一次性高质量决策所需的一切：上下文、需要你给什么、为什么重要、选项与各自代价——外加新鲜度校验，让你永远不用回答一个已经被世界架空的问题。',
+    decisionCta: '去 viewer 里看一个真的',
+    explainTitle: '内建于构造的可解释性',
+    explain: [
+      ['单一真相源', 'board 是计划、记忆与审计轨迹——任何新 session 拿起它就能续跑'],
+      ['只读指挥台', 'ccm web-viewer 呈现整个编排现场，一个字节都不碰'],
+      ['异构族系第二验收', '高杠杆判断由另一族系的模型复核——同族复读不算第二视角'],
+      ['收尾台账', '收工必须逐条路径写下证据——"看起来做完了"关不掉一场编排'],
+    ],
+  },
+  watch: {
+    eyebrow: '看它思考',
+    title: '它替你守着的计划，有一座指挥台',
+    lead: '每场编排都有一份活着的 board。ccm web-viewer 在你本机只读呈现它——依赖图、临界路径、等你的决策、在飞的 agent。',
+    videoCaption: '一块活着的 board：平移 DAG，打开那个等你的决策',
+    shots: [
+      ['viewer-graph-dark', '依赖 DAG——琥珀色是临界路径'],
+      ['viewer-decision-dark', '决策卡——问题、上下文、选项、代价'],
+      ['viewer-board-dark', '看板——等你的事项永远排在最前'],
+      ['viewer-timeline-dark', '时间线——时长、重叠、长杆子'],
+      ['viewer-agents-dark', 'agent 花名册——谁在跑什么、跑在哪'],
+      ['viewer-switcher-dark', 'home 里每块 board，一键之隔'],
+    ],
+  },
+  story: {
+    eyebrow: '一个目标，从头到尾',
+    title: '"把我的 app 翻成 6 种语言。"然后去睡觉。',
+    steps: [
+      {
+        k: '01 · 你',
+        title: '一句话',
+        body: '/cc-master:as-master-orchestrator——这就是全部brief。你出想法，它不问你要规格说明书。',
+        shot: null,
+      },
+      {
+        k: '02 · 契约',
+        title: '先立 Goal Contract',
+        body: '你的话是证据，不是目标本身。它把话改写成一份短小、可验收的契约，只就那些会改变结果的歧义问你。',
+        shot: 'viewer-graph-light',
+      },
+      {
+        k: '03 · 计划',
+        title: '先地基，再扇出',
+        body: '字符串得先抽出来、框架得先搭好，才谈得上翻译——所以它先做地基，再把 6 种语言同时铺开。地基用更稳的模型，翻译用便宜的模型。',
+        shot: 'viewer-graph-dark',
+      },
+      {
+        k: '04 · 你的一票',
+        title: '一个只有你能答的问题',
+        body: '"产品术语，翻还是不翻？"它把上下文、选项、代价打包好记给你——其他语言一刻不停。',
+        shot: 'viewer-decision-dark',
+      },
+      {
+        k: '05 · done 是真 done',
+        title: '端点验收',
+        body: '收尾前逐条对照契约：每块是否真的完成、该问的是否都问过、后台有没有悄悄死掉的东西。你回来看到的是一个决定，不是一个惊吓。',
+        shot: 'viewer-board-dark',
+      },
+    ],
+    kicker: '从头到尾：你说了一句话，做了一个决定。',
+  },
+  evolution: {
+    eyebrow: '技术路线演进',
+    title: '从一个 workflow 插件，到 meta-harness',
+    lead: '它起点是一个教 Claude Code agent 写好 dynamic workflow 的插件。每一幕都把上一幕一般化——今天，它是我们自研 harness 的 meta-harness：任何 agent，都能被初始化成同一个指挥。',
+    acts: [
+      {
+        label: '第一幕 · 2026-06 · v0.1–v0.9',
+        name: '插件期',
+        body: '一个 Claude Code 插件。沉淀下来的发明：作为持久计划的 board、武装后才激活的 hooks、跨 session 续跑、最早的配速。',
+      },
+      {
+        label: '第二幕 · 2026-06/07 · v0.10–v0.11',
+        name: '引擎期',
+        body: 'board 逻辑离开插件成为 ccm——一个二进制、单一真相源——并长出 OR/ML 估算配速引擎。plugin 与引擎从此各自独立发版。',
+      },
+      {
+        label: '第三幕 · 2026-07 · v0.12 →',
+        name: 'meta-harness 期',
+        body: 'source-to-adapter 投影把同一个灵魂带进 Codex、Cursor、kimi-code，N-host 对齐成为机制而非承诺。有了 ccm worker，orchestrator 指挥的是全机器的无头 agent 池——出身只决定它坐在哪，不决定它能指挥谁。',
+      },
+    ],
+  },
+  architecture: {
+    eyebrow: '架构',
+    title: '一个总指挥，一个引擎，任意 harness',
+    lead: 'plugin 是薄投影——commands、skills、hooks——落进每个 harness；引擎 ccm 是状态、配额、估算与 worker 池的单一真相源。二者在进程边界相遇：shell + JSON，绝不 import。',
+    points: [
+      ['cc-master plugin', '把会话的主 agent 初始化成 master orchestrator——adapter 只携带宿主原生差异'],
+      ['ccm 引擎', 'board · Goal Contract · 配额配速 · 蒙特卡洛估算 · worker 池 · agent 注册表——82 条不变式守住每一次写入'],
+      ['ccm web-viewer', '机器上每块 board 的只读指挥台'],
+    ],
+  },
+  quickstart: {
+    eyebrow: '快速上手',
+    title: '一条命令，然后一句话',
+    install: 'curl -fsSL https://raw.githubusercontent.com/nemori-ai/cc-master/main/install.sh | bash',
+    note: '安装器先把 ccm 引擎放上你的 PATH——它是硬前置——再把 adapter 分发给检测到的每个受支持 harness。两条版本线各自解析最新；逐文件 SHA256 校验。',
+    entryTitle: '然后从你的 harness 给它一个目标：',
+    entries: [
+      ['Claude Code', '/cc-master:as-master-orchestrator <你的目标>'],
+      ['Codex', '$cc-master-as-master-orchestrator <你的目标>'],
+      ['Cursor', '/as-master-orchestrator <你的目标>'],
+      ['kimi-code', 'cc-master:as-master-orchestrator <你的目标>'],
+    ],
+    cta: '阅读上手指南',
+  },
+  footer: {
+    honesty: '六项编排能力是北极星，我们持续诚实地追踪它的落地差距——不是一张宣称全兑现的清单。当前状态见功能手册。',
+    links: {
+      docs: '文档',
+      featureManual: '功能手册',
+      releases: 'Releases',
+      github: 'GitHub',
+      license: 'MIT License',
+    },
+    built: 'cc-master——长程 agent 的指挥台',
+  },
+  shotFrameAlt: 'ccm web-viewer',
+};
