@@ -614,10 +614,7 @@ export function boardSetParam(board: Board, args?: { key?: string; value?: strin
     );
   }
   if (valKind === 'string' && value === '') {
-    throw err(
-      `refused: runtime.${key} 须是非空字符串，收到空值。`,
-      'Usage',
-    );
+    throw err(`refused: runtime.${key} 须是非空字符串，收到空值。`, 'Usage');
   }
   const b = clone(board);
   if (!b.runtime || typeof b.runtime !== 'object' || Array.isArray(b.runtime)) b.runtime = {};

@@ -9,13 +9,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import {
-  computeDeadlineRisk,
-  empiricalCdfAtOrBefore,
-  estimateDagMonteCarlo,
-  rcpspInTrialMc,
-  throughputMonteCarlo,
-} from '../dist/index.mjs';
+import { computeDeadlineRisk, empiricalCdfAtOrBefore, rcpspInTrialMc } from '../dist/index.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BOARDS = join(HERE, 'fixtures', 'boards');
