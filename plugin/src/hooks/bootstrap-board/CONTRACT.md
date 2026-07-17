@@ -221,4 +221,19 @@ proves their host-native projections without broadening registration beyond the 
     the raw `--ddl` value is kept as evidence, and a note recommends upgrading ccm. No board mutation
     or arming is rolled back. Full DDL capability versioning is deferred to a follow-up issue.
   tracked_by: "design_docs/2026-07-16-ddl-review-triage.md (finding #1)"
+
+- rule: bootstrap-bash-varname-cjk-boundary
+  kind: host-convention-divergence
+  affected_hosts: [claude-code]
+  reason: >
+    claude-code is the only bash implementation. macOS stock bash 3.2 in a UTF-8 locale misparses
+    `$var` immediately followed by a non-ASCII character (e.g. CJK punctuation `；`) as one variable
+    name, which under `set -u` aborts the script with "unbound variable"; codex/cursor/kimi-code
+    implement bootstrap in node (`bootstrap-board-core.js`) and are immune by construction.
+  compensating_mechanism: >
+    Variable expansions in the bash implementation are brace-wrapped (`${var}`) wherever CJK
+    punctuation can follow, making the name boundary explicit; behavior in C/POSIX locales and on
+    Linux CI is unchanged. Regression coverage lives in
+    tests/content/hook-installed-path-portability.test.mjs (previous-ccm refusal path).
+  tracked_by: "release-prep fix on the website branch (2026-07-17)"
 ```

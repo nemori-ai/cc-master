@@ -49,6 +49,7 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | bootstrap-beforeSubmitPrompt-envelope | protocol-capability-gap | cursor | plugin v0.17.2 envelope fix |
 | bootstrap-kimi-trigger-and-envelope | host-convention-divergence | kimi-code | design_docs/2026-07-16-kimi-code-adapter-design.md §3,§4 |
 | bootstrap-ddl-capability-skew | host-convention-divergence | claude-code, codex, cursor, kimi-code | design_docs/2026-07-16-ddl-review-triage.md (finding #1) |
+| bootstrap-bash-varname-cjk-boundary | host-convention-divergence | claude-code | release-prep fix on the website branch (2026-07-17) |
 
 ### coordination-inbox
 
