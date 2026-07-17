@@ -313,7 +313,7 @@ exercise_nel_header_patch_case() {
   kind_lc="$(printf '%s' "$kind" | tr '[:upper:]' '[:lower:]')"
   h="$(make_project)"
   seed_board "$h" "armed" "$GOOD"
-  nel=$'\u0085'
+  nel="$(printf '\302\205')"
   label="apply_patch Rust-whitespace trailing NEL $kind $target_class target"
   if [ "$target_class" = "board" ]; then
     target="$h/boards/$kind_lc-nel.board.json"
@@ -1077,7 +1077,7 @@ fi
 # `char::is_whitespace`, whose Unicode White_Space set includes U+0085 NEL while JavaScript trim
 # does not. These filesystem-effect rows pin the cross-runtime boundary without ever trimming hunk
 # data globally.
-NEL=$'\u0085'
+NEL="$(printf '\302\205')"
 CONTROL_NEL_TOPLEVEL="$H/control-nel-toplevel.txt"
 printf -v PATCH '%s*** Begin Patch%s\n%s*** Add File: %s%s\n+nel-toplevel\n%s*** End Patch%s' \
   "$NEL" "$NEL" "$NEL" "$CONTROL_NEL_TOPLEVEL" "$NEL" "$NEL" "$NEL"
@@ -1127,7 +1127,7 @@ fi
 # U+FEFF is intentionally not in Rust Unicode White_Space. It cannot prefix a control, and a
 # filename ending in FEFF is a distinct non-board path even when the preceding suffix is
 # `.board.json`.
-FEFF=$'\ufeff'
+FEFF="$(printf '\357\273\277')"
 CONTROL_FEFF_BEGIN="$H/control-feff-begin.txt"
 printf -v PATCH '%s*** Begin Patch\n*** Add File: %s\n+feff-begin\n*** End Patch' \
   "$FEFF" "$CONTROL_FEFF_BEGIN"
@@ -1319,7 +1319,7 @@ exercise_environment_near_neighbor $'\t*** Environment ID: remote' leading-tab
 exercise_environment_near_neighbor '*** Environment ID:  remote' double-space
 exercise_environment_near_neighbor '*** Environment ID: remote ' trailing-space
 exercise_environment_near_neighbor $'*** Environment ID: remote\t' trailing-tab
-exercise_environment_near_neighbor $'*** Environment ID:\u0085remote\u0085' rust-nel-padding
+exercise_environment_near_neighbor "$(printf '*** Environment ID:\302\205remote\302\205')" rust-nel-padding
 
 # The same directive is malformed when empty, repeated, or placed after the first file header. The
 # installed parser rejects each shape and the armed guard must fail closed before any target allow.
@@ -1334,7 +1334,7 @@ assert_real_patch_rejected "$PATCH" "$H" "apply_patch empty Environment ID"
 
 PATCH="$(printf '%s\n' \
   '*** Begin Patch' \
-  $'*** Environment ID:\u0085' \
+  "$(printf '*** Environment ID:\302\205')" \
   "*** Add File: $H/environment-rust-empty.txt" \
   '+body' \
   '*** End Patch')"

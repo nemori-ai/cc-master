@@ -10,6 +10,7 @@ import {
   readlinkSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -276,7 +277,9 @@ test('installed Codex and Cursor launchers conform to RuntimeEnvironment under o
       const payload = hostPayload(host, `${host}-portable`, 'ordinary prompt');
       const echo = normalized(host, fixture, env, payload, host === 'cursor' ? 'beforeSubmitPrompt' : 'UserPromptSubmit');
       assert.equal(echo.env.CC_MASTER_HOME, ccMasterHome(rt));
-      assert.equal(echo.env.CC_MASTER_PLUGIN_ROOT, fixture.installed);
+      // node realpaths the launcher's own module path (relevant on macOS where TMPDIR is a
+      // /var→/private/var symlink), so the plugin root is canonical by construction.
+      assert.equal(echo.env.CC_MASTER_PLUGIN_ROOT, realpathSync(fixture.installed));
       assert.equal(echo.env.CC_MASTER_HOME, fixture.linkedHome, 'launcher preserves lexical symlink home');
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });

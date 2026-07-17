@@ -289,7 +289,8 @@ test -s "$TMP/dist-cursor"
 # A correctly hashed delivery still fails closed at the content boundary for both unknown nested
 # fields and private-shaped values in an otherwise allowlisted field. Exercise all three origins and
 # the registered Codex/Cursor launcher envelopes.
-mapfile -t PRIVATE_VALUE_MODES < <(node - "$TMP/token-vectors.json" <<'NODE'
+# (bash 3.2 has no mapfile and rejects heredoc-inside-process-substitution — script file + while-read)
+cat >"$TMP/private-modes.js" <<'NODE'
 const fs = require('fs');
 const vectors = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const safeId = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
@@ -299,7 +300,8 @@ for (const [family, entries] of Object.entries(vectors.families)) {
   }
 }
 NODE
-)
+PRIVATE_VALUE_MODES=()
+while IFS= read -r line; do PRIVATE_VALUE_MODES+=("$line"); done < <(node "$TMP/private-modes.js" "$TMP/token-vectors.json")
 NEGATIVE_MODES=( \
   malicious-unknown malicious-value malicious-duplicate malicious-jwt malicious-stale-selected \
   malicious-global-unavailable malicious-stale malicious-freshness-unknown malicious-candidate-unavailable \
@@ -309,7 +311,7 @@ NEGATIVE_MODES=( \
   malicious-cursor-state malicious-cursor-cross-provenance malicious-cursor-eligible-uninstalled \
   malicious-cursor-auth-uninstalled \
 )
-for MODE in "${NEGATIVE_MODES[@]}" "${PRIVATE_VALUE_MODES[@]}"; do
+for MODE in "${NEGATIVE_MODES[@]}" ${PRIVATE_VALUE_MODES[@]+"${PRIVATE_VALUE_MODES[@]}"}; do
   rm -f "$HOME_DIR/hooks/orchestrator-context"/*.json 2>/dev/null || true
   touch "$TMP/$MODE"
   "$CCM_BIN" orchestrator context --cached-only --agent-visible --harness codex >"$TMP/$MODE-fixture.json"
@@ -436,7 +438,8 @@ rm -f "$TMP/positive-native-tight"
 # Counterexamples from the same producer/consumer conformance table must stay public. Each vector is
 # self-checked, then crosses Claude additionalContext, Codex systemMessage, and Cursor
 # additional_context so boundary hardening cannot become a blanket token-family ban.
-mapfile -t PUBLIC_VALUE_MODES < <(node - "$TMP/token-vectors.json" <<'NODE'
+# (bash 3.2 has no mapfile and rejects heredoc-inside-process-substitution — script file + while-read)
+cat >"$TMP/public-modes.js" <<'NODE'
 const fs = require('fs');
 const vectors = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const safeId = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
@@ -446,8 +449,9 @@ for (const [family, entries] of Object.entries(vectors.families)) {
   }
 }
 NODE
-)
-for MODE in "${PUBLIC_VALUE_MODES[@]}"; do
+PUBLIC_VALUE_MODES=()
+while IFS= read -r line; do PUBLIC_VALUE_MODES+=("$line"); done < <(node "$TMP/public-modes.js" "$TMP/token-vectors.json")
+for MODE in ${PUBLIC_VALUE_MODES[@]+"${PUBLIC_VALUE_MODES[@]}"}; do
   rm -f "$HOME_DIR/hooks/orchestrator-context"/*.json 2>/dev/null || true
   touch "$TMP/$MODE"
   printf '%s\n' '{"hook_event_name":"SessionStart","session_id":"sid-context"}' |

@@ -65,7 +65,8 @@ ECHO_BOARD="$(printf '%s' "$ECHO_OUT" | node -e 'let s="";process.stdin.on("data
 ECHO_STEM="$(printf '%s' "$ECHO_OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const j=JSON.parse(s);process.stdout.write(String(j.env.CC_MASTER_BOARD_STEM||""));});')"
 ECHO_HARNESS="$(printf '%s' "$ECHO_OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const j=JSON.parse(s);process.stdout.write(String(j.env.CC_MASTER_HARNESS||""));});')"
 ECHO_SESSION="$(printf '%s' "$ECHO_OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const j=JSON.parse(s);process.stdout.write(String(j.env.CC_MASTER_SESSION_ID||""));});')"
-assert_eq "$BOARD" "$ECHO_BOARD" "codex launcher injects CC_MASTER_BOARD for later hooks"
+# the launcher realpaths the board (containment check) — compare canonical paths (macOS TMPDIR is a /var→/private/var symlink)
+assert_eq "$(node -p 'require("node:fs").realpathSync(process.argv[1])' "$BOARD")" "$ECHO_BOARD" "codex launcher injects CC_MASTER_BOARD for later hooks"
 assert_eq "$(basename "$BOARD" .board.json)" "$ECHO_STEM" "codex launcher injects CC_MASTER_BOARD_STEM"
 assert_eq "codex" "$ECHO_HARNESS" "codex launcher injects CC_MASTER_HARNESS"
 assert_eq "codex-sess-1" "$ECHO_SESSION" "codex launcher injects CC_MASTER_SESSION_ID"
