@@ -1923,6 +1923,7 @@ ccm agent terminal <id> --outcome <str> [flags]
 - 行为：`starting/running/uncertain/orphaned → terminal`，盖 `ended_at` + 登记 `outcome`（`starting→terminal` = **启动失败收口**——spawn 失败、无 handle 可 bind 的 agent 也要能收口，别留永久僵尸；`terminal→terminal` 幂等）。**terminal ≠ task done**——本命令绝不碰 task status，父层仍须独立验收后走 `task done --verified --artifact`
 - flags：`--outcome <str>`（必填·收口结论一句话）· `--json`
 - 例：`ccm agent terminal agt-001 --outcome "review approved, 3 findings filed"`
+- **收口是「凡派发皆登记」的对称后半段**：一个 agent 的产出被收割 / 端点验收掉（成功收工，非只 spawn 失败）后就 `terminal` 它——漏了它 agent 永停 `running`、堆成僵尸污染 recon 的 in_flight/phantom 判定。`ccm agent probe` **只判死活、永不 →terminal**，替不了这一步。批量收口：`ccm agent terminal <id>` 每次一个 id，多个 agent 就顺序 bash 背靠背跑（各自抢一次 board 锁·天然串行·零 race），别 `&` 后台并行 ccm 写。
 
 ### agent probe
 
@@ -1959,8 +1960,8 @@ ccm agent list [flags]
 ```
 
 - positional：无
-- 行为：只读花名册：全体 agent + 按 `lifecycle.state` 分桶计数；每行含 state / harness / type / intent / 已关联 task
-- flags：`--json`（`{count, buckets, agents}`）
+- 行为：只读花名册：全体 agent + 按 `lifecycle.state` 分桶计数；每行含 state / harness / type / intent / 已关联 task。**附带 stale-running advisory**：凡 active-state（非 `terminal`）agent 的 linked task **全部已 `done`**，就列为「疑似产出已收割却漏收口」候选（json 落 `stale_candidates:[{id,links}]`·human 输出末尾一条 advisory 行指名候选）。**纯只读提示、绝不自动 terminal**——收口终态判断归 orchestrator，复核后自己 `ccm agent terminal <id>`。保守判据：链非空 + 每条 link 都指向存在且 `done` 的 task 才入选（任一 link 指向不存在 / 未 done 的 task → 不提示）
+- flags：`--json`（`{count, buckets, agents, stale_candidates}`）
 - 例：`ccm agent list` · `ccm agent list --board /abs/x.board.json --json`
 
 ### agent show

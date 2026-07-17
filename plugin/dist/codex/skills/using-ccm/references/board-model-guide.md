@@ -409,6 +409,10 @@ ccm task update T8 --executor subagent
 | worker 收工或起跑失败（成功 / 失败 / 根本没起来都要收口） | `terminal` | `agent terminal <id> --outcome "..."`——`starting` 也能直接收口（启动失败别留永久僵尸）。**terminal ≠ task done**，task 仍走父层独立验收；terminal 是唯一终态，probe 永不复活 |
 | `uncertain` / `orphaned` 后观测到还活着 | `running` | `agent probe` 双向 reconcile 自动归回，但复活按证据强度分级：`uncertain` 任何方法的 `alive` 都归回；**`orphaned` 只被 session / transcript 文件类的 `alive` 复活**（按 sid / 路径寻址、身份强），`pid` 的 `alive` 不够格（kill-0 不验进程身份·pid 复用会产生假 alive）。也可重新 `bind` 交新 handle |
 
+**收口闭环纪律：凡派发皆登记，凡收割皆收口。** 把 agent 登进花名册（`create`→`bind`→`link`）是前半段；**它的产出被你收割 / 端点验收掉（subagent 返回、后台 shell 收工、PR 已合）后显式 `ccm agent terminal <id> --outcome "..."` 收口，是不可省的后半段**——两段都做，`ccm agent list` 才反映真实（现在到底几个 agent 真在跑）。漏掉收口，agent 永远停在 `running`：花名册堆满「其实早完工」的僵尸，viewer 与 resume 后的自己都数错在跑的 agent，orchestrator 端 recon 的 in_flight/phantom 判定被污染。**别指望 `ccm agent probe` 替你收口**——probe 只 reconcile 死活（`gone→orphaned` / `silent→uncertain` / `alive→running`），**永不产生 `terminal`**；terminal 编码的是「我收割并接受了它的产出」这个判断，只有你能下、只走 `agent terminal`。`agent terminal ≠ task done` 只挡正向（agent 收口不替父 task 完成验收），**不豁免**这条反向闭环。
+
+**批量收口顺序 bash 安全无 race。** 一次收割多个 agent 时，`ccm agent terminal agt-019`、`ccm agent terminal agt-026`…作为**顺序 bash 命令**背靠背跑就行——每条 ccm 写各自抢一次 O_EXCL board 锁、天然串行化，同一命令重复零竞态；不必也别把它们 `&` 后台并行（并行 ccm 写会争锁、超时 `exit 4`）。真正需要 one-at-a-time 的是**单个 agent 的 `create`→`bind`→`link` 复合三连**：`bind`/`link` 要吃 `create` 返回的 `agent_id`，靠数据依赖定序（先建、拿到 id、再 bind、再 link），跨多个 agent 也是一个 agent 的三连做完再下一个。这是**定序**，不是「所有 agent 操作都必须逐个小心防锁竞态」——已知 id 的批量 `terminal` / `probe` 顺序跑永远安全。
+
 **登记后要修正 handle：用 `amend`，别重复 `create`。** 发现 handle 拼错、attach 命令漏了 `cd`、transcript 路径写错——`ccm agent amend <id> --handle/--attach-cmd/--transcript` 就地补正 handle 域三件套（任何状态可用，含 `terminal`；不做状态转移、不碰 `lifecycle.state` / `probe` / `links` / `intent`）。**绝不重复 `create` 一条新登记**——同一个真实 worker 两行 roster 是撕裂，花名册 / viewer / resume 后的自己会数错在跑的 agent。真多登记 / 误登记出来的多余行用 `ccm agent rm <id>`（破坏性·非 TTY 须 `--yes`）清除；`amend` 补正保留的那条、`rm` 删多出来的那条。两者都不经状态机。
 
 **handle.kind 怎么选：**

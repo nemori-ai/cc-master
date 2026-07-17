@@ -378,6 +378,39 @@ export function probe(ctx: Ctx): number {
   });
 }
 
+// stale-running advisory —— active-state（非 terminal）agent，其 linked task **全部**已 done：
+//   产出疑似已被收割却漏了 `agent terminal` 收口，roster 会永久 `running` 堆积、污染 orchestrator
+//   端 recon 的 in_flight/phantom 判定。这是**只读 advisory**（在 recon 的 roster-rebuild 触点
+//   `ccm agent list` 处把候选交到手上）——**绝不自动 terminal**：保持 task/agent/attempt 三层解耦，
+//   收口是「我收割并接受了产出」的判断、只归 orchestrator，ccm 只指出候选。
+//   保守判据：链非空 + 每条 link 都指向一个**存在且 status===done** 的 task 才算候选（任一 link
+//   指向不存在 / 未 done 的 task → 不确定 → 不提示，避免误报把仍在干活的 agent 标为 stale）。
+function staleCandidates(
+  board: BoardArg,
+  agents: AgentRecord[],
+): { id: string; links: string[] }[] {
+  const status = new Map<string, unknown>();
+  if (Array.isArray(board.tasks)) {
+    for (const t of board.tasks as AgentRecord[]) {
+      if (t && typeof t === 'object' && typeof t.id === 'string') status.set(t.id, t.status);
+    }
+  }
+  const out: { id: string; links: string[] }[] = [];
+  for (const a of agents) {
+    if (a?.lifecycle?.state === 'terminal') continue;
+    const links = Array.isArray(a.links)
+      ? (a.links as AgentRecord[])
+          .map((l) => (l && typeof l === 'object' ? l.task_id : undefined))
+          .filter((x): x is string => typeof x === 'string' && x !== '')
+      : [];
+    if (links.length === 0) continue;
+    if (links.every((tid) => status.get(tid) === 'done')) {
+      out.push({ id: String(a.id ?? '?'), links });
+    }
+  }
+  return out;
+}
+
 // ── agent list --board <ref> --json ───────────────────────────────────────────
 export function list(ctx: Ctx): number {
   return runRead(ctx, {
@@ -389,8 +422,12 @@ export function list(ctx: Ctx): number {
         const st = a?.lifecycle?.state ?? 'unknown';
         buckets[st] = (buckets[st] ?? 0) + 1;
       }
+      const stale = staleCandidates(b, agents);
       if (c.flags.json) {
-        return JSON.stringify({ ok: true, data: { count: agents.length, buckets, agents } });
+        return JSON.stringify({
+          ok: true,
+          data: { count: agents.length, buckets, agents, stale_candidates: stale },
+        });
       }
       if (agents.length === 0) return 'agents: (none)\n';
       const bucketLine = Object.entries(buckets)
@@ -402,7 +439,13 @@ export function list(ctx: Ctx): number {
           : '';
         return `  ${a.id}  ${a.lifecycle?.state ?? '?'}  ${a.harness}/${a.type}  ${a.intent ?? ''}${links ? `  →[${links}]` : ''}`;
       });
-      return `agents (${agents.length})  [${bucketLine}]\n${rows.join('\n')}\n`;
+      const advisory =
+        stale.length > 0
+          ? `advisory: ${stale.length} 个 active agent 的 linked task 已全部 done、疑似产出已收割未收口——复核后 \`ccm agent terminal <id> --outcome ...\` 收口（绝不自动收口·终态判断归你）:\n${stale
+              .map((s) => `  ${s.id}  →[${s.links.join(',')}]`)
+              .join('\n')}\n`
+          : '';
+      return `agents (${agents.length})  [${bucketLine}]\n${rows.join('\n')}\n${advisory}`;
     },
   });
 }
