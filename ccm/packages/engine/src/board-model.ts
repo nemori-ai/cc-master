@@ -1356,7 +1356,7 @@ export function normalizeDeadlineAt(
       datePart = at;
     } else if (isISOUTC(at)) {
       const m = DATE_PREFIX_RE.exec(at); // 整串已是合法 ISO UTC·此处仅取其日期段（必命中）
-      datePart = m ? m[1] : null;
+      datePart = m?.[1] ?? null;
     }
     if (datePart === null) return null;
     const candidate = `${datePart}${DEADLINE_DAY_END_TIME}`;
