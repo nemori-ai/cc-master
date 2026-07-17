@@ -19,6 +19,13 @@ attempt to hand-edit a `*.board.json` file directly, redirecting the agent to th
   targets conflict. A single valid non-board alias remains allowed.
 - `rule-board-guard-apply-patch-targets`: an `apply_patch` call is classified only from its
   structured `*** Add File:` / `*** Delete File:` / `*** Update File:` / `*** Move to:` headers.
+  Codex surfaces the patch through more than one carrier shape, so the host normalization bridge
+  (`_hosts/codex/launcher.js`) collapses each recognized carrier to the single `{ patch: string }`
+  object the parser expects before classification: a native FREEFORM bare string, an already-canonical
+  `{ patch: <string> }` object, and the nested `functions.exec` -> `tools.apply_patch` FREEFORM
+  carrier `{ input: <patch string> }`. An unrecognized carrier (non-string, array, or an object with
+  no string `patch`/`input`) is passed through unchanged so the parser still sees no usable patch and
+  denies fail-closed.
   One optional non-empty `*** Environment ID: ...` control directive is accepted only immediately
   after `*** Begin Patch`; its value uses the same exact Rust `char::is_whitespace` normalization as
   controls. It, the known non-target `*** End of File` marker, and patch hunk content are never
@@ -136,6 +143,26 @@ equivalent inline `isArmed` check at the top of `main()` on Codex. Reads only `o
     host-native tool surface, not a divergence to reconcile — declared here so it is not mistaken
     for an accidental omission on the Claude Code side.
   tracked_by: "n/a — legitimate host-tool-surface difference, not a bug"
+
+- rule: board-guard-apply-patch-envelope-normalization
+  kind: host-convention-divergence
+  affected_hosts: [claude-code, cursor, kimi-code]
+  reason: >
+    `apply_patch` is a Codex- (and Codex-family-) only tool surface. Codex delivers the patch under
+    several carrier shapes — a native FREEFORM bare string, an already-canonical `{ patch: <string> }`
+    object, and the nested `functions.exec` -> `tools.apply_patch` FREEFORM carrier
+    `{ input: <patch string> }`. The parser needs a single `{ patch: string }` object. claude-code,
+    cursor, and kimi-code have no `apply_patch` tool at all (they edit through Write/Edit/MultiEdit or
+    Shell/Bash), so there is no carrier for them to normalize — not a gap on their side.
+  compensating_mechanism: >
+    The Codex host normalization bridge (`_hosts/codex/launcher.js` `normalizeApplyPatchInput`)
+    collapses each recognized carrier to `{ patch: string }` before board-guard / board-lint classify
+    targets, so an ordinary non-board `apply_patch` source edit is allowed. An unrecognized carrier
+    (non-string, array, or an object with no string `patch`/`input`) is passed through unchanged so the
+    parser still sees no usable patch and denies fail-closed; real board targets and symlink/effect-path
+    ambiguity remain denied. This lives at the single Codex normalization bridge, so board-lint's
+    `apply_patch` path benefits from the same collapse.
+  tracked_by: "GitHub issue #156 (fixed, this PR)"
 
 - rule: board-guard-bash-fallback-false-positive
   kind: host-convention-divergence

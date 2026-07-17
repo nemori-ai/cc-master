@@ -41,6 +41,13 @@ json_native_patch_payload() {
   printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"apply_patch","tool_input":%s}' "$1" "$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$2")"
 }
 
+# functions.exec -> tools.apply_patch FREEFORM envelope (issue #156): the patch string arrives under
+# tool_input.input rather than as a bare string or {patch}. The launcher must collapse it to
+# {patch:string} before board-guard classifies targets.
+json_input_wrapped_patch_payload() {
+  printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"apply_patch","tool_input":{"input":%s}}' "$1" "$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$2")"
+}
+
 json_structured_payload() {
   printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"%s","tool_input":%s}' "$1" "$2" "$3"
 }
@@ -682,6 +689,46 @@ run_pretool "$(json_native_patch_payload "sess-x" "not a patch envelope")" "$H"
 assert_contains "$HOOK_OUT" '"decision":"block"' "native FREEFORM apply_patch malformed patch -> fail closed"
 run_pretool "$(json_structured_payload "sess-x" "apply_patch" "42")" "$H"
 assert_contains "$HOOK_OUT" '"decision":"block"' "native apply_patch malformed non-string/non-object input -> fail closed"
+rm -rf "$H"
+
+# functions.exec -> tools.apply_patch FREEFORM envelope (issue #156). The nested Codex tool contract
+# delivers the patch as tool_input.input (a freeform string), not a bare string or {patch}. The
+# launcher normalization bridge must collapse that carrier to {patch:string} so board-guard classifies
+# the declared target instead of failing closed on an ordinary non-board source edit — while still
+# denying real board targets and failing closed on a malformed envelope.
+H="$(make_project)"
+seed_board "$H" "mine" "$GOOD"
+
+PATCH="*** Begin Patch
+*** Add File: $H/ordinary-absolute-input.txt
++ordinary
+*** End Patch"
+run_pretool "$(json_input_wrapped_patch_payload "sess-x" "$PATCH")" "$H"
+assert_eq "" "$HOOK_OUT" "functions.exec apply_patch envelope ordinary absolute path -> allow"
+
+PATCH='*** Begin Patch
+*** Add File: ordinary-relative-input.txt
++ordinary
+*** End Patch'
+run_pretool_in_cwd "$(json_input_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_eq "" "$HOOK_OUT" "functions.exec apply_patch envelope ordinary relative path -> allow"
+
+PATCH="*** Begin Patch
+*** Update File: $H/boards/mine.board.json
+@@
+-old
++new
+*** End Patch"
+run_pretool "$(json_input_wrapped_patch_payload "sess-x" "$PATCH")" "$H"
+assert_contains "$HOOK_OUT" '"decision":"block"' "functions.exec apply_patch envelope real board path -> block"
+
+run_pretool "$(json_input_wrapped_patch_payload "sess-x" "not a patch envelope")" "$H"
+assert_contains "$HOOK_OUT" '"decision":"block"' "functions.exec apply_patch envelope malformed patch -> fail closed"
+
+# Malformed nested envelope: the carrier field is not a string, so no patch can be extracted and the
+# core must fail closed rather than allow.
+run_pretool "$(json_structured_payload "sess-x" "apply_patch" '{"input":42}')" "$H"
+assert_contains "$HOOK_OUT" '"decision":"block"' "functions.exec apply_patch envelope non-string carrier -> fail closed"
 rm -rf "$H"
 
 # Unarmed: allow silently.
