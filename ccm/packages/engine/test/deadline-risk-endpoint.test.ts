@@ -155,6 +155,18 @@ test('deadline-risk band: overdue (now ≥ DDL, backlog>0·strong·P=0)', () => 
   assert.ok(d.notes.some((n) => n.includes('overdue')));
 });
 
+test('deadline-risk band: completed board past DDL is NOT likely_late/overdue (backlog=0·已交付·weak)', () => {
+  // 全部任务已完成（backlog=0）+ as_of 已过 DDL：工作全做完，不该报「要迟到」/overdue。
+  // 未修复前：complete 落 classifyBand，completed 的 onTimeProb=0 → 误判 likely_late。
+  const d = risk({ deadlineAtMs: NOW - 50 * 3600000, backlog: 0 });
+  assert.notEqual(d.risk_band, 'likely_late');
+  assert.notEqual(d.risk_band, 'overdue');
+  assert.equal(d.risk_band, 'on_track'); // 复用 on_track 表完成态
+  assert.equal(d.strength, 'weak'); // 已交付·无需强推
+  assert.equal(d.time_remaining_hours, -50);
+  assert.ok(d.notes.some((n) => n.includes('全部任务已完成')));
+});
+
 test('deadline-risk band: unknown when no DDL (state pending·null·不假绿)', () => {
   const d = risk({ deadlineAtMs: null, deadlineState: 'pending' });
   assert.equal(d.risk_band, 'unknown');

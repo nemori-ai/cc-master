@@ -289,11 +289,20 @@ export function computeDeadlineRisk(
   if (coveragePct < bands.min_coverage || historyN < bands.min_history) confidence = 'low';
   else if (coveragePct < 60 || historyN < 10) confidence = 'medium';
 
-  // ── overdue：now >= DDL 且未完成 ──
+  // ── band 判定：先短路完成态，再 overdue，最后 classify ──
+  //   完成态（backlog=0）= 全部任务已完成 → 已交付，无未来 late risk。即便 as_of 已过 DDL 也不该报「要迟到」：
+  //   MC makespan 反映的是整张 DAG 从零跑完的时长（非「剩余工作」），completed board 的 onTimeProb 会被压成 0，
+  //   若落 classifyBand 会被误判成 likely_late。复用 on_track 表完成态（保持 band 闭集不膨胀·消费方零改动·
+  //   hook bandRank/RISK_BANDS 天然识别），strength=weak（已交付·无需强推），note 显式说明「全部任务已完成」。
   const complete = backlog === 0;
   let riskBand: DeadlineRiskBand;
   let strength: 'weak' | 'strong';
-  if (trh <= 0 && !complete) {
+  if (complete) {
+    riskBand = 'on_track';
+    strength = 'weak';
+    notes.push('全部任务已完成（backlog=0）——已交付，无 late risk（复用 on_track 表完成态·非「要迟到」）');
+  } else if (trh <= 0) {
+    // now >= DDL 且未完成 → overdue。
     riskBand = 'overdue';
     strength = 'strong';
     notes.push('已过 DDL 且未完成——overdue·须向用户报告并决策（延期/缩范围/分阶段/终止）');

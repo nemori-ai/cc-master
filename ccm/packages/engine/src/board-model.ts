@@ -1328,8 +1328,12 @@ export function isISOUTC(v: unknown): boolean {
 //   deadline 是 👁 非窄腰字段（嵌在已是 👁 的 goal_contract 内）——hook 缺则优雅降级，不属 🔒。
 //   这里收口「什么是合法 deadline 形状 + 怎么读它 + 怎么判 settle/门控」三件事，杜绝 lint/mutation/endpoint 三处漂移。
 
-// DATE_PREFIX_RE：从 --at 值抽取 YYYY-MM-DD 日期前缀（precision=day 归一到当日末刻用）。
+// DATE_PREFIX_RE：从**已确认合法**的 --at 值抽取 YYYY-MM-DD 日期前缀（precision=day 归一到当日末刻用）。
+//   ⚠ 这是 prefix match（非锚定）——只可对已过整串校验（裸日期锚定 or isISOUTC）的字符串用，绝不单独当接受判据
+//   （否则 2026-08-01oops / 2026-08-01T09:00:00Z garbage 会被抽出合法前缀而误收·见 normalizeDeadlineAt）。
 export const DATE_PREFIX_RE = /^(\d{4}-\d{2}-\d{2})/;
+// BARE_DATE_RE：裸日期整串锚定（precision=day 接受的第一种形态·拒绝任何尾部垃圾如 2026-08-01oops）。
+export const BARE_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // precision=day 的约定末刻：当日 UTC 23:59:59Z（「8/1 交付」= 8/1 当天任意时刻到期，取当日末刻，
 //   避免把「当日交付」误当「当日 00:00 交付」而虚增紧迫）。
 export const DEADLINE_DAY_END_TIME = 'T23:59:59Z';
@@ -1344,9 +1348,18 @@ export function normalizeDeadlineAt(
   if (typeof rawAt !== 'string' || rawAt.trim() === '') return null;
   const at = rawAt.trim();
   if (precision === 'day') {
-    const m = DATE_PREFIX_RE.exec(at);
-    if (!m) return null;
-    const candidate = `${m[1]}${DEADLINE_DAY_END_TIME}`;
+    // anchored 接受（拒绝尾部垃圾）：① 裸日期整串 YYYY-MM-DD；或 ② 完整严格 ISO-8601 UTC（isISOUTC 整串判定）
+    //   ——两者都通过后再抽日期前缀落当日末刻。绝不用 prefix match 单独接受（否则 2026-08-01oops /
+    //   2026-08-01T09:00:00Z garbage 被抽出合法前缀误收）。
+    let datePart: string | null = null;
+    if (BARE_DATE_RE.test(at)) {
+      datePart = at;
+    } else if (isISOUTC(at)) {
+      const m = DATE_PREFIX_RE.exec(at); // 整串已是合法 ISO UTC·此处仅取其日期段（必命中）
+      datePart = m ? m[1] : null;
+    }
+    if (datePart === null) return null;
+    const candidate = `${datePart}${DEADLINE_DAY_END_TIME}`;
     // 校验日期本身合法（如 2026-13-40 会被 Date 归一/拒绝）：round-trip 回 ISO 秒级须一致。
     const parsed = new Date(candidate);
     if (Number.isNaN(parsed.getTime())) return null;

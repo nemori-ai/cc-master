@@ -77,6 +77,19 @@ test('normalizeDeadlineAt: day lands on end-of-day 23:59:59Z from date prefix', 
   assert.equal(normalizeDeadlineAt('nope', 'day'), null);
 });
 
+test('normalizeDeadlineAt: day rejects trailing garbage (anchored·非 prefix match)', () => {
+  // 裸日期尾部垃圾 → null（旧 prefix match 会抽出 2026-08-01 误收）。
+  assert.equal(normalizeDeadlineAt('2026-08-01oops', 'day'), null);
+  // 完整 ISO 后接垃圾 → null（旧 prefix match 会抽日期前缀丢尾部误收）。
+  assert.equal(normalizeDeadlineAt('2026-08-01T09:00:00Z garbage', 'day'), null);
+  // 非严格 ISO 形态（无 Z / 带毫秒）在 day 下也不作完整 ISO 接受。
+  assert.equal(normalizeDeadlineAt('2026-08-01T09:00:00', 'day'), null);
+  assert.equal(normalizeDeadlineAt('2026-08-01T09:00:00.123Z', 'day'), null);
+  // 回归保护：合法裸日期 + 合法完整 ISO 仍被接受、落当日末刻。
+  assert.equal(normalizeDeadlineAt('2026-08-01', 'day'), '2026-08-01T23:59:59Z');
+  assert.equal(normalizeDeadlineAt('2026-08-01T09:00:00Z', 'day'), '2026-08-01T23:59:59Z');
+});
+
 // ── readDeadline ────────────────────────────────────────────────────────────────────────────────────
 test('readDeadline: missing key = pending/gating (未询问·≠ none)', () => {
   const view = readDeadline(baseBoard());
