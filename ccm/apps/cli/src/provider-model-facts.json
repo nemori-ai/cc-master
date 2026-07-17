@@ -253,7 +253,7 @@
     "kimi-code": {
       "schema": "ccm/provider-model-facts/v1",
       "provider": "kimi-code",
-      "revision": "2026-07-16.1",
+      "revision": "2026-07-16.2",
       "supported_surfaces": ["kimi-code-cli"],
       "supported_client_versions": ["current"],
       "source": [
@@ -271,16 +271,21 @@
           "id": "moonshot-kimi-k27-code-card",
           "url": "https://www.kimi.com/resources/kimi-k2-7-code",
           "retrieved_at": "2026-07-16T00:00:00Z"
+        },
+        {
+          "id": "moonshot-kimi-k3-blog",
+          "url": "https://www.kimi.com/blog/kimi-k3",
+          "retrieved_at": "2026-07-16T00:00:00Z"
         }
       ],
       "observed_at": "2026-07-16T00:00:00Z",
       "valid_until": "2026-07-23T00:00:00Z",
       "account_scope": "managed:kimi-code OAuth subscription; live account entitlement separate",
-      "confidence": "official-published-snapshot-with-k3-benchmark-unknowns",
+      "confidence": "official-published-snapshot-with-k3-limitations-documented-and-independent-benchmark-unknowns",
       "unknown": [
         "live_account_model_entitlement",
         "live_account_quota",
-        "kimi_k3_official_benchmarks",
+        "kimi_k3_independent_standard_benchmarks",
         "kimi_k3_open_weights",
         "kimi_code_cli_headless_quota_signal"
       ],
@@ -298,11 +303,11 @@
             "currency": "USD",
             "input_per_million_tokens": 3.0,
             "output_per_million_tokens": 15.0,
-            "note": "cache-hit input $0.30/M; launched 2026-07-16; official benchmarks/model card not yet published; 1M context"
+            "note": "cache-hit input $0.30/M; launched 2026-07-16; 1M context; reasoning_effort is max-only at launch (low/high effort planned in later updates), so every call pays full max-deliberation cost and K3 is cost-inappropriate for cheap mechanical work; official Limitations (moonshot-kimi-k3-blog): (1) trained in preserved-thinking-history mode, so generation quality can become highly unstable if the agent harness drops historical thinking content or if a session is switched to K3 mid-stream from another model — run K3 in a verified-compatible harness (Kimi Code) on a fresh session and never a mid-session model switch; (2) tuned for long-horizon tasks and over-proactive under ambiguity, so on minor issues or ambiguous intent it may make unexpected decisions on the user's behalf — set explicit behavioral boundaries in the system prompt or AGENTS.md when tight guardrails are required; (3) noticeable user-experience gap vs Claude Fable 5 and GPT-5.6 Sol; vendor self-reported benchmarks published in the launch blog but not independently cross-vendor verified"
           },
           "benchmarks": null,
           "selectors": ["kimi-code/k3"],
-          "source_refs": ["moonshot-kimi-k3-pricing"],
+          "source_refs": ["moonshot-kimi-k3-pricing", "moonshot-kimi-k3-blog"],
           "supersedes": []
         },
         {

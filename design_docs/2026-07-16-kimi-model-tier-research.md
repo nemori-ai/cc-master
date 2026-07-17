@@ -4,6 +4,8 @@
 > 下游：K8B 据本报告把两模型写进 ccm model-policy registry 并同步 skill 指导。
 > **约束诚实声明**：所有结论显式分层为 `[官方硬事实]` / `[本机实测·tested]` / `[第三方/press]` / `[社区·advisory]` / `[推断]`。凡证据不足处如实标注缺口，不硬凑。
 
+> **附录（2026-07-17 更新，来源 <https://www.kimi.com/blog/kimi-k3>）**：月之暗面 K3 发布 blog 现含一节官方 **Limitations** + 官方自评 benchmark 表，超越本报告 §4.3「K3 benchmark 目前为空」与「model card 尚未公布」的原始判断。官方明列三条局限性：① K3 在 preserved-thinking-history 模式下训练——若 harness 未回传全部历史 thinking 内容、或把别的模型的进行中 session 中途切到 K3，生成质量会高度不稳定（官方建议用已验证兼容的 harness 如 Kimi Code，且不要在 session 中途切到 K3）；② K3 偏重长程高难任务，遇到小问题或用户意图含糊时可能擅自替用户做决定（需要边界约束时官方建议在 system prompt 或 `AGENTS.md` 里显式约束）；③ 相比 Claude Fable 5 与 GPT-5.6 Sol 在用户体验上仍有可见差距。另：K3 发布时 `reasoning_effort` 只支持 `max`，low/high 档位后续更新才引入（每次调用都付满档推理成本）。这些已回流进 `ccm/apps/cli/src/provider-model-facts.json` 的 K3 fact note（`moonshot-kimi-k3-blog` source）与 `role-candidates.json` 的 K3 blocker。官方自评 benchmark 仍属厂商自选口径、未经独立跨厂商标准集复现，故 `hard_facts.benchmarks` 仍保持 `null`、`unknown` 保留 `kimi_k3_independent_standard_benchmarks`。
+
 ---
 
 ## 0. 摘要（TL;DR）

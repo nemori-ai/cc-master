@@ -92,9 +92,16 @@ test('Kimi facts expose K3/K2.7-code with honest benchmark and quota unknowns', 
   assert.equal(byId.get('kimi-k2.7-code').tier, 'balanced');
   assert.equal(byId.get('kimi-k2.7-code').benchmarks, null);
   assert.ok(byId.get('kimi-k2.7-code').selectors.includes('kimi-code/kimi-for-coding'));
-  assert.ok(facts.unknown.includes('kimi_k3_official_benchmarks'));
+  assert.ok(facts.unknown.includes('kimi_k3_independent_standard_benchmarks'));
   assert.ok(facts.unknown.includes('kimi_code_cli_headless_quota_signal'));
-  assert.equal(facts.revision, '2026-07-16.1');
+  assert.equal(facts.revision, '2026-07-16.2');
+  // Official Moonshot K3 launch-blog limitations must surface on the K3 fact note.
+  const k3Note = byId.get('kimi-k3').pricing.note;
+  assert.ok(k3Note.includes('preserved-thinking-history'), 'K3 note must warn on preserved-thinking-history fragility');
+  assert.ok(k3Note.includes('mid-session model switch'), 'K3 note must warn against mid-session model switch');
+  assert.ok(k3Note.includes('AGENTS.md'), 'K3 note must point to explicit boundaries in system prompt / AGENTS.md');
+  assert.ok(k3Note.includes('Claude Fable 5 and GPT-5.6 Sol'), 'K3 note must state the UX gap vs frontier');
+  assert.ok(k3Note.includes('reasoning_effort is max-only'), 'K3 note must state reasoning_effort max-only at launch');
 });
 
 test('expired snapshots remain observable but fail closed for automatic selection', () => {
