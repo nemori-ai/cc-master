@@ -84,11 +84,6 @@ SYNC_HOST="${HOST}" SYNC_SURFACE="${SURFACE}" node <<'NODE'
 const fs = require('fs');
 const path = require('path');
 const {
-  assertPacingCanonicalTemplate,
-  loadPacingReadOnlyRegistry,
-  renderPacingReadOnlyCapability,
-} = require('./scripts/pacing-read-only-capability.cjs');
-const {
   assertPacingRenderedArtifact,
   assertPacingRuntimeTree,
 } = require('./scripts/pacing-read-only-attestation.cjs');
@@ -96,221 +91,24 @@ const {
   assertProviderGuidanceRuntimeTree,
   loadProviderGuidanceRegistry,
 } = require('./scripts/provider-guidance-attestation.cjs');
+// Skill projection (copy / slot render / stub / overlay + attested pacing-slot render) lives in the
+// single SSOT project-skill.cjs, shared with update-*-attestations.cjs so a registry regenerated
+// from a fresh canonical projection always matches what sync asserts here (issue #163). The module
+// owns the projection; sync owns the attestation asserts + the staging→dist rename below.
+const {
+  applySkillProjection,
+  copyDir,
+  copyFileWithMode,
+  planSkillProjection,
+  readStrategyMode,
+  readYamlString,
+  requireDir,
+} = require('./scripts/project-skill.cjs');
 
 const src = 'plugin/src';
 const host = process.env.SYNC_HOST || 'claude-code';
 const surface = process.env.SYNC_SURFACE || 'all';
 const dst = `plugin/dist/${host}`;
-const SKILL_DIST_EXCLUDES = ['AGENTS.md', 'CLAUDE.md', '.design', 'evals'];
-
-function copyDir(from, to, options = {}) {
-  const exclude = new Set(options.exclude || []);
-  const replacements = options.replacements || new Map();
-  fs.mkdirSync(to, { recursive: true });
-  for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
-    if (exclude.has(entry.name)) continue;
-    if (entry.name === '.DS_Store' || entry.name === '.gitkeep') continue;
-    const sourcePath = path.join(from, entry.name);
-    const targetPath = path.join(to, entry.name);
-    if (entry.isDirectory()) {
-      copyDir(sourcePath, targetPath, options);
-    } else if (entry.isFile()) {
-      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-      if (replacements.size > 0 && entry.name.endsWith('.md')) {
-        let text = fs.readFileSync(sourcePath, 'utf8');
-        for (const [token, replacement] of replacements.entries()) {
-          text = text.split(token).join(replacement);
-        }
-        const unresolved = text.match(/\{\{[A-Z0-9_]+\}\}/);
-        if (unresolved) {
-          throw new Error(`unresolved adapter slot ${unresolved[0]} in ${sourcePath}`);
-        }
-        fs.writeFileSync(targetPath, text);
-      } else {
-        fs.copyFileSync(sourcePath, targetPath);
-      }
-      fs.chmodSync(targetPath, fs.statSync(sourcePath).mode);
-    }
-  }
-}
-
-function requireDir(dir) {
-  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
-    throw new Error(`missing ${dir}`);
-  }
-}
-
-function readStrategyMode(file) {
-  const text = fs.readFileSync(file, 'utf8');
-  const match = text.match(/^\s*mode:\s*([A-Za-z0-9_-]+)\s*$/m);
-  return match ? match[1] : 'copy';
-}
-
-function readSlotReplacements(file, baseDir) {
-  const text = fs.readFileSync(file, 'utf8');
-  const replacements = new Map();
-  let inSection = false;
-  let sectionIndent = 0;
-  for (const line of text.split(/\r?\n/)) {
-    const section = line.match(/^(\s*)slot_replacements:\s*$/);
-    if (section) {
-      inSection = true;
-      sectionIndent = section[1].length;
-      continue;
-    }
-    if (!inSection) continue;
-    if (/^\s*$/.test(line) || /^\s*#/.test(line)) continue;
-    const indent = line.match(/^(\s*)/)[1].length;
-    if (indent <= sectionIndent) break;
-    const match = line.match(/^\s*["']?(\{\{[A-Z0-9_]+\}\})["']?\s*:\s*["']?([^"'\n]+)["']?\s*$/);
-    if (!match) continue;
-    const token = match[1];
-    const rel = match[2].trim();
-    const replacementPath = path.join(baseDir, rel);
-    if (!fs.existsSync(replacementPath)) {
-      throw new Error(`missing slot replacement ${replacementPath} for ${token} in ${file}`);
-    }
-    replacements.set(token, fs.readFileSync(replacementPath, 'utf8').replace(/\s+$/u, ''));
-  }
-  return replacements;
-}
-
-function readYamlString(file, key) {
-  const text = fs.readFileSync(file, 'utf8');
-  const match = text.match(new RegExp(`^\\s*${key}:\\s*["']?([^"'\\n]+)["']?\\s*$`, 'm'));
-  return match ? match[1].trim() : null;
-}
-
-function readYamlList(file, key) {
-  const text = fs.readFileSync(file, 'utf8');
-  const values = [];
-  let inSection = false;
-  let sectionIndent = 0;
-  for (const line of text.split(/\r?\n/)) {
-    const section = line.match(new RegExp(`^(\\s*)${key}:\\s*$`));
-    if (section) {
-      inSection = true;
-      sectionIndent = section[1].length;
-      continue;
-    }
-    if (!inSection) continue;
-    if (/^\s*$/.test(line) || /^\s*#/.test(line)) continue;
-    const indent = line.match(/^(\s*)/)[1].length;
-    if (indent <= sectionIndent) break;
-    const item = line.match(/^\s*-\s*["']?([^"'\n]+)["']?\s*$/);
-    if (!item) continue;
-    values.push(item[1].trim());
-  }
-  return values;
-}
-
-function readIndentedYamlBlock(text, key, indent = 0) {
-  const lines = text.split(/\r?\n/);
-  const prefix = ' '.repeat(indent);
-  const start = lines.findIndex((line) => line === `${prefix}${key}:`);
-  if (start < 0) return null;
-  const block = [];
-  for (let index = start + 1; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (/^\s*$/u.test(line) || /^\s*#/u.test(line)) {
-      block.push(line);
-      continue;
-    }
-    const lineIndent = line.match(/^(\s*)/u)[1].length;
-    if (lineIndent <= indent) break;
-    block.push(line);
-  }
-  return block.join('\n');
-}
-
-function readReadOnlyCapabilityContract(file) {
-  const text = fs.readFileSync(file, 'utf8');
-  const runtimeContracts = readIndentedYamlBlock(text, 'runtime_contracts');
-  if (runtimeContracts === null) return null;
-  const contract = readIndentedYamlBlock(runtimeContracts, 'read_only_capability', 2);
-  if (contract === null) return null;
-  const value = (key) => {
-    const match = contract.match(
-      new RegExp(`^ {4}${key}:\\s*["']?([^"'\\n]+)["']?\\s*$`, 'm'),
-    );
-    if (!match) throw new Error(`missing runtime_contracts.read_only_capability.${key} in ${file}`);
-    return match[1].trim();
-  };
-  return {
-    registry: value('registry'),
-    slot: value('slot'),
-    host: value('host'),
-  };
-}
-
-function readProviderGuidanceContract(file) {
-  const text = fs.readFileSync(file, 'utf8');
-  const runtimeContracts = readIndentedYamlBlock(text, 'runtime_contracts');
-  if (runtimeContracts === null) return null;
-  const contract = readIndentedYamlBlock(runtimeContracts, 'provider_guidance', 2);
-  if (contract === null) return null;
-  const value = (key) => {
-    const match = contract.match(
-      new RegExp(`^ {4}${key}:\\s*["']?([^"'\\n]+)["']?\\s*$`, 'm'),
-    );
-    if (!match) throw new Error(`missing runtime_contracts.provider_guidance.${key} in ${file}`);
-    return match[1].trim();
-  };
-  return {
-    registry: value('registry'),
-    host: value('host'),
-    skill: value('skill'),
-  };
-}
-
-function projectText(text, replacements, sourcePath) {
-  let projected = text;
-  for (const [token, replacement] of replacements.entries()) {
-    projected = projected.split(token).join(replacement);
-  }
-  const unresolved = projected.match(/\{\{[A-Z0-9_]+\}\}/);
-  if (unresolved) {
-    throw new Error(`unresolved adapter slot ${unresolved[0]} in ${sourcePath}`);
-  }
-  return projected;
-}
-
-function copyFileWithMode(from, to, replacements = new Map()) {
-  fs.mkdirSync(path.dirname(to), { recursive: true });
-  if (replacements.size > 0 && from.endsWith('.md')) {
-    fs.writeFileSync(to, projectText(fs.readFileSync(from, 'utf8'), replacements, from));
-  } else {
-    fs.copyFileSync(from, to);
-  }
-  fs.chmodSync(to, fs.statSync(from).mode);
-}
-
-function copyCanonicalIncludes(canonical, target, includes, replacements) {
-  for (const rel of includes) {
-    const sourcePath = path.join(canonical, rel);
-    const targetPath = path.join(target, rel);
-    if (!fs.existsSync(sourcePath)) throw new Error(`missing include ${sourcePath}`);
-    const stat = fs.statSync(sourcePath);
-    if (stat.isDirectory()) {
-      copyDir(sourcePath, targetPath, {
-        exclude: ['AGENTS.md', 'CLAUDE.md'],
-        replacements,
-      });
-    } else if (stat.isFile()) {
-      copyFileWithMode(sourcePath, targetPath, replacements);
-    } else {
-      throw new Error(`unsupported include type ${sourcePath}`);
-    }
-  }
-}
-
-function removeProjectedPaths(target, rels) {
-  for (const rel of rels) {
-    const targetPath = path.join(target, rel);
-    if (!fs.existsSync(targetPath)) continue;
-    fs.rmSync(targetPath, { recursive: true, force: true });
-  }
-}
 
 // kimi-code manifest: synthesize root kimi.plugin.json from .kimi-plugin/plugin.json plus an
 // inlined hooks[] array read from _hosts/kimi-code/hooks.fragment.json (K4-owned). kimi does not
@@ -401,122 +199,50 @@ if (surface === 'all') {
 }
 
 // SAP: project every skill canonical tree to dist/<host>/skills/<skill>.
+// planSkillProjection + applySkillProjection (project-skill.cjs) are the shared projection SSOT;
+// sync owns the attestation asserts + the staging→dist rename. An attested skill is projected into
+// a scratch staging dir first, asserted against its committed registry, and only renamed into dist
+// on a clean assert — so a stale registry can never publish a mismatched tree.
 const skillsSrc = path.join(src, 'skills');
 const skillsDst = path.join(dst, 'skills');
 requireDir(skillsSrc);
 fs.mkdirSync(skillsDst, { recursive: true });
 for (const skill of fs.readdirSync(skillsSrc).sort()) {
   if (skill.startsWith('_')) continue;
-  const skillDir = path.join(skillsSrc, skill);
-  if (!fs.statSync(skillDir).isDirectory()) continue;
-  const canonical = path.join(skillDir, 'canonical');
-  const strategy = path.join(skillDir, 'adapters', host, 'strategy.yaml');
-  requireDir(canonical);
-  if (!fs.existsSync(strategy)) throw new Error(`missing ${strategy}`);
-  const mode = readStrategyMode(strategy);
-  const slotReplacements = readSlotReplacements(strategy, skillDir);
-  const readOnlyContract = readReadOnlyCapabilityContract(strategy);
-  const providerGuidanceContract = readProviderGuidanceContract(strategy);
-  let readOnlyRegistry = null;
-  let providerGuidanceRegistry = null;
-  if (readOnlyContract) {
-    if (readOnlyContract.host !== host) {
-      throw new Error(
-        `runtime read-only capability host ${readOnlyContract.host} does not match ${host} in ${strategy}`,
-      );
-    }
-    if (slotReplacements.has(readOnlyContract.slot)) {
-      throw new Error(`duplicate replacement for ${readOnlyContract.slot} in ${strategy}`);
-    }
-    const registryPath = path.join(skillDir, readOnlyContract.registry);
-    if (!fs.existsSync(registryPath)) throw new Error(`missing ${registryPath}`);
-    const registry = loadPacingReadOnlyRegistry(registryPath);
-    readOnlyRegistry = registry;
-    if (readOnlyContract.slot !== registry.slot) {
-      throw new Error(
-        `runtime read-only capability slot ${readOnlyContract.slot} does not match registry ${registry.slot}`,
-      );
-    }
-    assertPacingCanonicalTemplate(
-      fs.readFileSync(path.join(canonical, 'SKILL.md'), 'utf8'),
-      registry.slot,
-    );
-    const rendered = renderPacingReadOnlyCapability(registry, readOnlyContract.host);
-    assertPacingRenderedArtifact(registry, readOnlyContract.host, rendered);
-    slotReplacements.set(registry.slot, rendered.replace(/\s+$/u, ''));
-  }
-  if (providerGuidanceContract) {
-    if (providerGuidanceContract.host !== host) {
-      throw new Error(
-        `runtime provider guidance host ${providerGuidanceContract.host} does not match ${host} in ${strategy}`,
-      );
-    }
-    if (providerGuidanceContract.skill !== skill) {
-      throw new Error(
-        `runtime provider guidance skill ${providerGuidanceContract.skill} does not match ${skill} in ${strategy}`,
-      );
-    }
-    const registryPath = path.join(skillDir, providerGuidanceContract.registry);
-    if (!fs.existsSync(registryPath)) throw new Error(`missing ${registryPath}`);
-    providerGuidanceRegistry = loadProviderGuidanceRegistry(registryPath, process.cwd());
-  }
-  const target = path.join(skillsDst, skill);
-  if (mode === 'planned') {
+  if (!fs.statSync(path.join(skillsSrc, skill)).isDirectory()) continue;
+  const plan = planSkillProjection({ repoRoot: process.cwd(), host, skill });
+  if (plan.mode === 'planned') {
     // Phase B: cursor (and future hosts) may declare planned until overlays exist.
     continue;
   }
-  const attested = readOnlyContract || providerGuidanceContract;
-  const staging = attested
+  const target = path.join(skillsDst, skill);
+  const staging = plan.attested
     ? fs.mkdtempSync(path.join(skillsDst, `.${skill}-stage-`))
     : null;
   const projectionTarget = staging || target;
   try {
-    if (mode === 'copy') {
-      copyDir(canonical, projectionTarget, {
-        exclude: SKILL_DIST_EXCLUDES,
-        replacements: slotReplacements,
-      });
-      removeProjectedPaths(projectionTarget, readYamlList(strategy, 'exclude_canonical'));
-      copyCanonicalIncludes(
-        skillDir,
-        projectionTarget,
-        readYamlList(strategy, 'include_adapter'),
-        slotReplacements,
+    applySkillProjection(plan, projectionTarget);
+    if (plan.providerGuidanceContract) {
+      const registry = loadProviderGuidanceRegistry(
+        plan.providerGuidanceRegistryPath,
+        process.cwd(),
       );
-    } else if (mode === 'unsupported_stub') {
-      const stub = path.join(skillDir, 'adapters', host, 'stub');
-      requireDir(stub);
-      copyDir(stub, projectionTarget, {
-        exclude: SKILL_DIST_EXCLUDES,
-      });
-    } else if (mode === 'partial_overlay') {
-      const sourceRel = readYamlString(strategy, 'source') || path.join('adapters', host, 'partial');
-      const partial = path.join(skillDir, sourceRel);
-      requireDir(partial);
-      copyDir(partial, projectionTarget, {
-        exclude: SKILL_DIST_EXCLUDES,
-      });
-      copyCanonicalIncludes(
-        canonical,
-        projectionTarget,
-        readYamlList(strategy, 'include_canonical'),
-        slotReplacements,
-      );
-    } else {
-      throw new Error(`unsupported projection mode "${mode}" in ${strategy}`);
-    }
-    if (providerGuidanceContract) {
       assertProviderGuidanceRuntimeTree(
-        providerGuidanceRegistry,
-        providerGuidanceContract.host,
-        providerGuidanceContract.skill,
+        registry,
+        plan.providerGuidanceContract.host,
+        plan.providerGuidanceContract.skill,
         projectionTarget,
       );
     }
-    if (readOnlyContract) {
-      assertPacingRuntimeTree(readOnlyRegistry, readOnlyContract.host, projectionTarget);
+    if (plan.readOnlyContract) {
+      assertPacingRenderedArtifact(
+        plan.pacingRegistry,
+        plan.readOnlyContract.host,
+        plan.pacingRenderedBody,
+      );
+      assertPacingRuntimeTree(plan.pacingRegistry, plan.readOnlyContract.host, projectionTarget);
     }
-    if (attested) {
+    if (plan.attested) {
       if (fs.existsSync(target)) throw new Error(`refusing to replace existing attested target ${target}`);
       fs.renameSync(projectionTarget, target);
     }
