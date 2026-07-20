@@ -19,6 +19,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { MessageChannel, receiveMessageOnPort, Worker } from 'node:worker_threads';
 import type { UsageSignal, WindowSignal } from '@ccm/engine';
+import type { UsageRefreshHint } from './harnesses/types.js';
+import {
+  type ShortLivedTokenState,
+  shortLivedTokenRefreshHint,
+} from './harnesses/usage-refresh-hint.js';
 
 const DEFAULT_TIMEOUT_MS = 8_000; // kimi managed-usage.ts default AbortController timeout.
 const DEFAULT_API_BASE = 'https://api.kimi.com/coding/v1';
@@ -118,20 +123,49 @@ export function readKimiUsageSignal(
   }
 }
 
+// kimi's short-lived-token recovery recipe. kimi's access_token is refreshed *by kimi itself* on its
+// next managed call — running `kimi -p 'hi'` (or sending any message in an active kimi session)
+// triggers kimi's own ensureFresh, which rewrites the stored credential. ccm never does this; it only
+// tells the user which kimi command to run, then how to re-query. `kimi login` is the fuller
+// device-code re-auth when there is no credential to refresh from.
+const KIMI_RECOVERY = {
+  harnessLabel: 'kimi-code',
+  recheckHarness: 'kimi-code',
+  reasons: {
+    expired:
+      'kimi-code access_token 已过期——仅在活跃 kimi session 期间新鲜（ccm 只读、绝不刷新凭证）',
+    absent: '无 kimi-code 凭证（$KIMI_CODE_HOME/credentials/kimi-code.json 缺失或无 access_token）',
+    opaque: 'kimi-code /usages 读取失败（网络 / 401 / API 变更）',
+  },
+  refreshCommand: "kimi -p 'hi'",
+  reauthCommand: 'kimi login',
+} as const;
+
+function kimiTokenStateToRecovery(kind: KimiTokenState['kind']): ShortLivedTokenState {
+  if (kind === 'expired') return 'expired';
+  if (kind === 'absent') return 'absent';
+  return 'opaque'; // token was 'ok' but the read still failed → non-credential (network / 401 / API).
+}
+
+/**
+ * Actionable, secret-free recovery hint for why the kimi usage signal is unavailable + how the user
+ * can restore it (kimi self-refreshes its own token; ccm never touches credentials). Structured so
+ * the usage output layer can surface a concrete remedy instead of a bare `unknown`.
+ */
+export function describeKimiUsageRefresh(
+  env: Record<string, string | undefined>,
+  nowSec?: number,
+): UsageRefreshHint {
+  const state = resolveKimiToken(env, nowSec);
+  return shortLivedTokenRefreshHint(kimiTokenStateToRecovery(state.kind), KIMI_RECOVERY);
+}
+
 /** Honest, secret-free reason for why the kimi usage signal is unavailable (adapter-facing). */
 export function describeKimiUsageUnavailable(
   env: Record<string, string | undefined>,
   nowSec?: number,
 ): string {
-  const state = resolveKimiToken(env, nowSec);
-  switch (state.kind) {
-    case 'expired':
-      return 'kimi-code access_token 已过期——仅在活跃 kimi session 期间新鲜（collector 只读不刷新凭证）';
-    case 'absent':
-      return '无 kimi-code 凭证（$KIMI_CODE_HOME/credentials/kimi-code.json 缺失或无 access_token）';
-    default:
-      return 'kimi-code /usages 读取失败（网络 / 401 / API 变更）';
-  }
+  return describeKimiUsageRefresh(env, nowSec).reason;
 }
 
 const WORKER_SOURCE = `

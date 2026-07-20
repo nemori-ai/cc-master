@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { type ChildProcess, type SpawnOptions, spawn } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
@@ -39,6 +42,47 @@ test('POSIX tree authority treats ESRCH as proof that the owned group is gone', 
 
   assert.equal(tree.signal('SIGKILL'), false);
   assert.equal(tree.isAlive(), false);
+});
+
+test('resolveExecutable falls back to well-known install locations when a stripped PATH misses every harness', () => {
+  // Regression: a non-interactive / hook / subagent PATH is routinely stripped of the per-harness
+  // install dirs (fnm shims, ~/.local/bin, ~/.kimi-code/bin), so a genuinely-installed CLI resolved
+  // to null and dispatch rejected with executable_unavailable. kimi (~/.kimi-code/bin) was the most
+  // visible victim, but the gap was identical for all four harnesses.
+  const home = mkdtempSync(join(tmpdir(), 'ccm-wellknown-home-'));
+  const makeExecutable = (relative: string): string => {
+    const abs = join(home, relative);
+    mkdirSync(join(abs, '..'), { recursive: true });
+    writeFileSync(abs, '#!/bin/sh\nexit 0\n', 'utf8');
+    chmodSync(abs, 0o755);
+    return abs;
+  };
+  try {
+    const kimi = makeExecutable('.kimi-code/bin/kimi');
+    const cursorAgent = makeExecutable('.local/bin/cursor-agent');
+    const codex = makeExecutable('.local/bin/codex');
+    const claude = makeExecutable('.claude/local/claude');
+    // A PATH that contains none of the install dirs above.
+    const strippedPath = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
+    const runtime = createDefaultProviderRuntime({ HOME: home, PATH: strippedPath });
+
+    assert.equal(runtime.process.resolveExecutable('kimi'), kimi);
+    assert.equal(runtime.process.resolveExecutable('cursor-agent'), cursorAgent);
+    assert.equal(runtime.process.resolveExecutable('codex'), codex);
+    assert.equal(runtime.process.resolveExecutable('claude'), claude);
+    assert.equal(runtime.process.resolveExecutable('unknown-harness'), null);
+
+    // An explicit CCM_*_BIN override stays authoritative: a bad path resolves to null (surfaced as
+    // unavailable) rather than silently falling back to a well-known location.
+    const badOverride = createDefaultProviderRuntime({
+      HOME: home,
+      PATH: strippedPath,
+      CCM_KIMI_BIN: join(home, 'does-not-exist'),
+    });
+    assert.equal(badOverride.process.resolveExecutable('kimi'), null);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test('unsupported platforms fail closed before invoking the spawn primitive', () => {

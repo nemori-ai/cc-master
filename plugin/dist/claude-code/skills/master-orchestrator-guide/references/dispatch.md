@@ -132,6 +132,11 @@ ccm 当成 model / effort 的 provider adapter。若选择需要 machine/model/q
 [pacing-and-estimation 目标事实口径](${CLAUDE_PLUGIN_ROOT}/skills/pacing-and-estimation/references/cross-harness-target-facts.md) 读取 selected target 的只读解释；这些事实服务选择，不改变显式
 raw wrapper 的命令合同。
 
+派发一个需要写文件 / 改代码的 worker 时多留一手：harness CLI headless 默认常把 worker 关进只读沙箱或审批
+闸（如 codex 默认只读），你不主动放开、它就只会拿到一个改不动盘的 worker。ccm 是 raw passthrough、不替你
+放开，所以放开写入的标志必须由你组装进 provider argv——各 harness 的确切放开标志见 [using-ccm worker help](${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/command-catalog.md#worker-help)
+的 worker run 段，别只凭默认就把写类活派出去。
+
 只从 `using-ccm` 的 command catalog 读取 worker 与 Agent Registry 的唯一操作合同；不要在决策层复述
 exact flags。task / agent / attempt 是三层：task 是规划 / 交付单元，agent 是运行时行动者，attempt 是一次
 执行证据；它们可以关联，不能合并成同一个状态。

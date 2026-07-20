@@ -9,8 +9,14 @@ import {
 import type { Ctx } from './_common.js';
 
 const HELP_TIMEOUT_MS = 10_000;
-const RUN_TIMEOUT_MS = 120_000;
-const DEFAULT_MAX_OUTPUT_BYTES = 1_048_576;
+// A real agent dispatch (codex/claude/cursor/kimi producing a plan, diff, or state) routinely runs
+// well past two minutes; the former 120 s default silently killed long tasks whenever the caller
+// omitted --timeout-ms. Default generously (still bounded by MAX_TIMEOUT_MS = 2 h) so the common
+// documented `ccm worker run ... -- <argv>` path does not truncate honest long-running work.
+const RUN_TIMEOUT_MS = 600_000;
+// Match worker-process MAX_OUTPUT_BYTES so callers that omit --max-output-bytes get the full stdout
+// ceiling instead of a 1 MiB cap that kills large-output dispatches mid-task.
+const DEFAULT_MAX_OUTPUT_BYTES = 33_554_432;
 
 function positiveInteger(value: unknown, fallback: number): number {
   if (value === undefined) return fallback;

@@ -7,7 +7,9 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { shortLivedTokenRefreshHint } from '../src/harnesses/usage-refresh-hint.js';
 import {
+  describeKimiUsageRefresh,
   describeKimiUsageUnavailable,
   normalizeKimiUsagePayload,
   readKimiUsageSignal,
@@ -109,4 +111,58 @@ test('describeKimiUsageUnavailable reports absent credential when none is discov
     describeKimiUsageUnavailable({ KIMI_CODE_HOME: '/nonexistent-ccm-kimi-home' }, NOW),
     /凭证/,
   );
+});
+
+// ── actionable refresh hint (E1): expired / absent → a concrete, secret-free recovery command ────────
+test('describeKimiUsageRefresh: expired token → actionable self-refresh hint (kimi -p + recheck)', () => {
+  const home = mkdtempSync(join(tmpdir(), 'ccm-kimi-hint-'));
+  mkdirSync(join(home, 'credentials'), { recursive: true });
+  writeFileSync(
+    join(home, 'credentials', 'kimi-code.json'),
+    JSON.stringify({ access_token: 'jwt.header.body', expires_at: NOW - 60, token_type: 'Bearer' }),
+  );
+  const hint = describeKimiUsageRefresh({ KIMI_CODE_HOME: home }, NOW);
+  assert.equal(hint.recoverable, true, 'expired token is user-recoverable');
+  assert.match(hint.reason, /过期/);
+  assert.equal(hint.command, "kimi -p 'hi'", 'kimi self-refreshes its own token on a managed call');
+  assert.match(hint.remedy ?? '', /kimi -p 'hi'/);
+  assert.match(
+    hint.remedy ?? '',
+    /ccm 只读、绝不写凭证/,
+    'remedy states ccm never writes credentials',
+  );
+  assert.equal(hint.recheck, 'ccm usage show --harness kimi-code', 'recheck re-queries the signal');
+  assert.match(hint.remedy ?? '', /ccm usage show --harness kimi-code/);
+});
+
+test('describeKimiUsageRefresh: absent credential → re-auth hint (kimi login + recheck)', () => {
+  const hint = describeKimiUsageRefresh({ KIMI_CODE_HOME: '/nonexistent-ccm-kimi-home' }, NOW);
+  assert.equal(hint.recoverable, true, 'absent credential is user-recoverable via login');
+  assert.match(hint.reason, /凭证/);
+  assert.equal(hint.command, 'kimi login');
+  assert.match(hint.remedy ?? '', /kimi login/);
+  assert.equal(hint.recheck, 'ccm usage show --harness kimi-code');
+});
+
+// ── generalization proof: the builder is harness-agnostic (any short-lived-token harness reuses it) ──
+test('shortLivedTokenRefreshHint is generic — a second harness reuses the same structure', () => {
+  const recovery = {
+    harnessLabel: 'acme-code',
+    recheckHarness: 'acme-code',
+    reasons: { expired: 'acme token 过期', absent: '无 acme 凭证', opaque: 'acme 读取失败' },
+    refreshCommand: 'acme refresh',
+    reauthCommand: 'acme login',
+  };
+  const expired = shortLivedTokenRefreshHint('expired', recovery);
+  assert.equal(expired.recoverable, true);
+  assert.equal(expired.command, 'acme refresh');
+  assert.equal(expired.recheck, 'ccm usage show --harness acme-code');
+  const absent = shortLivedTokenRefreshHint('absent', recovery);
+  assert.equal(absent.command, 'acme login');
+  // opaque (network / 401 / API change) is NOT user-fixable → no command / remedy.
+  const opaque = shortLivedTokenRefreshHint('opaque', recovery);
+  assert.equal(opaque.recoverable, false);
+  assert.equal(opaque.command, null);
+  assert.equal(opaque.remedy, null);
+  assert.match(opaque.reason, /读取失败/);
 });

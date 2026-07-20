@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { captureRuntimeEnvironment, localPluginBase as resolvePluginBase } from '@ccm/engine';
-import { describeKimiUsageUnavailable, readKimiUsageSignal } from '../kimi-usage.js';
+import { describeKimiUsageRefresh, readKimiUsageSignal } from '../kimi-usage.js';
 import { probeExecutable } from './probe.js';
 import type { Env, HarnessAdapter, PluginUpgradeRequest, PluginUpgradeResult } from './types.js';
 
@@ -73,10 +73,14 @@ export const kimiCodeAdapter: HarnessAdapter = {
     if (reading?.signal) {
       return { signal: reading.signal, source: reading.source, unavailableReason: '' };
     }
+    // Signal unavailable → attach an actionable recovery hint (which kimi command self-refreshes the
+    // token + how to re-query). ccm stays read-only on the credential; the hint is text only.
+    const hint = describeKimiUsageRefresh(env);
     return {
       signal: null,
       source: 'unavailable',
-      unavailableReason: describeKimiUsageUnavailable(env),
+      unavailableReason: hint.reason,
+      refreshHint: hint,
     };
   },
   accountSwitchPreflight: () => ({

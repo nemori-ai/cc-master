@@ -84,10 +84,12 @@ export {
 export type {
   AcceptanceObject,
   DeadlineView,
+  DeliveryAcceptanceView,
   EnumName,
   EstimateLike,
   FieldMeta,
   Invariant,
+  OverdueView,
   RetryableStatus,
   TaskLike,
 } from './board-model.js';
@@ -101,6 +103,7 @@ export {
   dependencySatisfied,
   durationHours,
   ENUMS,
+  evaluateOverdue,
   FIELDS,
   INVARIANTS,
   ISO_UTC_RE,
@@ -123,6 +126,7 @@ export {
   OPEN_ENUMS,
   RETRYABLE_STATUSES,
   readDeadline,
+  readDeliveryAcceptance,
   SCHEMA_VERSION,
   STATUS_MACHINE,
   TIERS,
@@ -240,6 +244,43 @@ export {
   empiricalQuantile,
   quantilesOf,
 } from './estimate/conformal.js';
+// deadline 经验校准框架（issue #168 follow-up·labeled snapshot 采集 + backtest 脚手架·诚实闸）
+export type {
+  BacktestBands,
+  BacktestMetrics,
+  BacktestOptions,
+  BacktestResult,
+  DeadlineLabel,
+  DeadlineSnapshot,
+  ReliabilityBin,
+  SnapshotProvenance,
+  SweepCandidate,
+  SweepOptions,
+  SweepResult,
+  SyntheticOptions,
+  TerminalBoardOutcome,
+} from './estimate/deadline-calibration.js';
+export {
+  appendDeadlineSnapshot,
+  assessProvenance,
+  BACKTEST_SCHEMA,
+  backtestDeadlineBands,
+  bandsSignature,
+  buildDeadlineSnapshot,
+  defaultThresholdGrid,
+  deriveTerminalOutcome,
+  loadDeadlineSnapshots,
+  MIN_OBSERVED_FOR_CALIBRATION,
+  makeSyntheticSnapshots,
+  reconcileSnapshotLabels,
+  resolveLabel,
+  SNAPSHOT_SCHEMA,
+  SWEEP_SCHEMA,
+  snapshotId,
+  snapshotStorePath,
+  sweepDeadlineBands,
+  writeDeadlineSnapshots,
+} from './estimate/deadline-calibration.js';
 // deadline-risk verdict（issue #149 契约 §4.3·`ccm estimate deadline-risk` 单一 SSOT）
 export type {
   DeadlineBands,

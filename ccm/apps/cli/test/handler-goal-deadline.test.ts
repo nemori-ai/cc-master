@@ -121,6 +121,54 @@ test('goal deadline set writes an asserted deadline to disk', () => {
   assert.equal(dl.rev, 1);
 });
 
+test('goal deadline set defaults kind=hard', () => {
+  const boardPath = mkBoardHome();
+  const ctx = mkCtx(boardPath, {
+    positionals: ['set'],
+    values: { at: '2027-08-01T09:00:00Z' },
+  });
+  assert.equal(goalHandler.deadline(ctx), EXIT.OK);
+  assert.equal(readBoard(boardPath).goal_contract.deadline.kind, 'hard');
+});
+
+test('goal deadline set --kind soft persists soft (issue #170)', () => {
+  const boardPath = mkBoardHome();
+  const ctx = mkCtx(boardPath, {
+    positionals: ['set'],
+    values: { at: '2027-08-01T09:00:00Z', kind: 'soft' },
+  });
+  assert.equal(goalHandler.deadline(ctx), EXIT.OK);
+  assert.equal(readBoard(boardPath).goal_contract.deadline.kind, 'soft');
+});
+
+test('goal deadline set --kind bogus → mutation throws (router maps exit 2·no silent)', () => {
+  const boardPath = mkBoardHome();
+  const ctx = mkCtx(boardPath, {
+    positionals: ['set'],
+    values: { at: '2027-08-01T09:00:00Z', kind: 'bogus' },
+  });
+  // mutation throw errKind='Usage'（router 映射 exit 2）——handler 直调时 throw 冒泡。
+  assert.throws(() => goalHandler.deadline(ctx), /--kind must be hard or soft/);
+});
+
+test('goal deadline amend preserves soft kind when --kind omitted', () => {
+  const boardPath = mkBoardHome({
+    deadline: {
+      state: 'asserted',
+      at: '2027-08-01T09:00:00Z',
+      kind: 'soft',
+      rev: 1,
+      updated_at: '2026-07-16T10:00:00Z',
+    },
+  });
+  const ctx = mkCtx(boardPath, {
+    positionals: ['amend'],
+    values: { at: '2027-08-05T09:00:00Z', reason: 'user approved slip', 'user-authorized': true },
+  });
+  assert.equal(goalHandler.deadline(ctx), EXIT.OK);
+  assert.equal(readBoard(boardPath).goal_contract.deadline.kind, 'soft');
+});
+
 test('goal deadline set --json returns ok:true with deadline block', () => {
   const boardPath = mkBoardHome();
   const ctx = mkCtx(boardPath, {

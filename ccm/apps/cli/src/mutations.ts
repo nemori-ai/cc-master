@@ -339,11 +339,35 @@ export interface DeadlineWriteArgs {
   at?: string;
   precision?: string;
   assurance?: string;
+  kind?: string;
   provenanceRaw?: string;
   source?: string;
   tzInput?: string;
   reason?: string;
   userAuthorized?: boolean;
+}
+
+// resolveDeadlineKind：--kind 的取值（hard 硬承诺 / soft 软目标·issue #170）。
+//   缺省沿用 fallback（set = 'hard'；amend / re-set 沿用既有 kind，避免静默把 soft 翻成 hard）。
+//   给了非法值 → fail-loud（Usage·no silent failure·enum 合法性另由 lint FMT-DEADLINE 兜）。
+function resolveDeadlineKind(
+  args: DeadlineWriteArgs,
+  fallback: 'hard' | 'soft' = 'hard',
+): 'hard' | 'soft' {
+  const k = args.kind;
+  if (k === undefined || k === '') return fallback;
+  if (k === 'hard' || k === 'soft') return k;
+  throw err(`refused: --kind must be hard or soft; got ${JSON.stringify(k)}`, 'Usage');
+}
+
+// existingDeadlineKind：从既有 deadline 子对象读回 kind（soft 才返回 soft·否则 hard·供 re-set/amend fallback）。
+function existingDeadlineKind(existing: unknown): 'hard' | 'soft' {
+  return existing &&
+    typeof existing === 'object' &&
+    !Array.isArray(existing) &&
+    (existing as Record<string, unknown>).kind === 'soft'
+    ? 'soft'
+    : 'hard';
 }
 
 // requireActiveGoalContract：deadline 只能存在于已激活的 goal_contract 内（legacy 板须先 `ccm goal set`）。
@@ -424,7 +448,7 @@ export function deadlineSet(board: Board, args: DeadlineWriteArgs = {}): Board {
     state,
     at,
     precision,
-    kind: 'hard',
+    kind: resolveDeadlineKind(args, existingDeadlineKind(existing)),
     rev,
     ...(provenance ? { provenance } : {}),
     updated_at: now,
@@ -542,7 +566,7 @@ export function deadlineAmend(board: Board, args: DeadlineWriteArgs = {}): Board
     state: 'confirmed',
     at,
     precision,
-    kind: 'hard',
+    kind: resolveDeadlineKind(args, existingDeadlineKind(existing)),
     rev,
     ...(provenance ? { provenance } : {}),
     updated_at: now,

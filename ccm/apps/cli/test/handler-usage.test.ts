@@ -974,6 +974,110 @@ test('usage runway with no sidecar → available:false (degrade)', () => {
   assert.equal(out.data.five_hour.verdict, 'unknown');
 });
 
+// ══ kimi-code 短命 token 过期 → 可执行刷新提示（E1·show / advise 输出层可见）═══════════════════════
+// kimi 的 access_token 短命，过期后 usage 信号降级 unavailable。此前只回裸 reason；现在带一条 actionable
+//   refresh_hint（跑哪个 kimi 命令自刷 token + 刷完重查），且对人读 + --json 都可见。ccm 全程零凭证写。
+//   ★恒过去的 expires_at（2020）确保对真实 Date.now() 恒判过期（adapter 用真时钟，不注入 nowSec）。
+const KIMI_EXPIRED_EPOCH = 1_577_836_800; // 2020-01-01T00:00:00Z（恒 < now → 恒过期）
+function setupExpiredKimiHome(): string {
+  const root = mkTmp('ccm-kimi-home-');
+  mkdirSync(join(root, 'credentials'), { recursive: true });
+  writeFileSync(
+    join(root, 'credentials', 'kimi-code.json'),
+    JSON.stringify({
+      access_token: 'jwt.header.body',
+      refresh_token: 'jwt.refresh.body',
+      expires_at: KIMI_EXPIRED_EPOCH,
+      token_type: 'Bearer',
+    }),
+  );
+  return root;
+}
+
+test('usage show --harness kimi-code (expired token) surfaces actionable refresh_hint in --json', () => {
+  const { home, boardPath } = setupHome();
+  const kimiHome = setupExpiredKimiHome();
+  const ctx = mkCtx(home, boardPath, { values: { harness: 'kimi-code' }, flags: { json: true } });
+  ctx.env.KIMI_CODE_HOME = kimiHome;
+  const code = usageHandler.show(ctx);
+  assert.equal(code, EXIT.OK, 'unavailable signal is graceful exit 0');
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, false, 'expired kimi token → account signal unavailable');
+  assert.ok(out.data.refresh_hint, 'refresh_hint present (not a bare unknown)');
+  assert.equal(out.data.refresh_hint.recoverable, true);
+  assert.equal(out.data.refresh_hint.command, "kimi -p 'hi'", 'concrete self-refresh command');
+  assert.equal(out.data.refresh_hint.recheck, 'ccm usage show --harness kimi-code');
+  assert.match(out.data.refresh_hint.reason, /过期/);
+});
+
+test('usage show --harness kimi-code (expired token) prints the remedy line in human output', () => {
+  const { home, boardPath } = setupHome();
+  const kimiHome = setupExpiredKimiHome();
+  const ctx = mkCtx(home, boardPath, { values: { harness: 'kimi-code' } }); // human (no --json)
+  ctx.env.KIMI_CODE_HOME = kimiHome;
+  usageHandler.show(ctx);
+  const text = ctx.outBuf.join('\n');
+  assert.match(text, /账户权威信号不可用/, 'still states unavailable');
+  assert.match(text, /kimi -p 'hi'/, 'human output carries the concrete refresh command');
+  assert.match(text, /ccm usage show --harness kimi-code/, 'and the recheck command');
+});
+
+test('usage advise --harness kimi-code (expired token) carries refresh_hint (--json + human)', () => {
+  const { home, boardPath } = setupHome();
+  const kimiHome = setupExpiredKimiHome();
+  const jsonCtx = mkCtx(home, boardPath, {
+    values: { harness: 'kimi-code' },
+    flags: { json: true },
+  });
+  jsonCtx.env.KIMI_CODE_HOME = kimiHome;
+  usageHandler.advise(jsonCtx);
+  const out = JSON.parse(jsonCtx.outBuf.join(''));
+  assert.equal(out.data.available, false);
+  assert.ok(out.data.refresh_hint, 'advise --json also surfaces refresh_hint (not buried)');
+  assert.equal(out.data.refresh_hint.command, "kimi -p 'hi'");
+  // human face
+  const humanCtx = mkCtx(home, boardPath, { values: { harness: 'kimi-code' } });
+  humanCtx.env.KIMI_CODE_HOME = kimiHome;
+  usageHandler.advise(humanCtx);
+  assert.match(
+    humanCtx.outBuf.join('\n'),
+    /kimi -p 'hi'/,
+    'advise human output carries the remedy',
+  );
+});
+
+test('usage show --harness kimi-code (absent credential) → login re-auth hint', () => {
+  const { home, boardPath } = setupHome();
+  const ctx = mkCtx(home, boardPath, { values: { harness: 'kimi-code' }, flags: { json: true } });
+  ctx.env.KIMI_CODE_HOME = '/nonexistent-ccm-kimi-home-xyz';
+  usageHandler.show(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, false);
+  assert.ok(out.data.refresh_hint);
+  assert.equal(out.data.refresh_hint.command, 'kimi login', 'absent → device-code re-auth');
+  assert.match(out.data.refresh_hint.reason, /凭证/);
+});
+
+test('usage refresh_hint is null when the account signal IS available (Codex app-server)', () => {
+  // Regression: the hint must only appear on unavailable degradation, never on a healthy signal.
+  const { home, boardPath } = setupHome();
+  const root = mkTmp('ccm-codex-hint-');
+  const codexBin = codexStub(root, {
+    rateLimits: {
+      limitId: 'codex',
+      primary: { usedPercent: 40, windowDurationMins: 300, resetsAt: 1893456000 },
+      secondary: { usedPercent: 10, windowDurationMins: 10080, resetsAt: 1925078400 },
+    },
+  });
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
+  ctx.env.CC_MASTER_HOST = 'codex';
+  ctx.env.CCM_CODEX_BIN = codexBin;
+  usageHandler.show(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, true);
+  assert.equal(out.data.refresh_hint, null, 'no hint when signal is available');
+});
+
 // ══ 零写不变式（usage 纯只读·绝不落盘）═══════════════════════════════════════════════════════════
 
 test('usage handlers never write the board (zero-write invariant)', () => {

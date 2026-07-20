@@ -119,6 +119,30 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     // The Agent owns its credential discovery, while both surfaces may observe one subscription pool.
     defaultCollectorHarness: 'cursor',
   },
+  {
+    harnessId: 'kimi-code',
+    surfaceId: 'kimi-cli',
+    providerId: 'moonshot',
+    bucketId: 'five-hour-global',
+    windowName: 'five_hour',
+    durationSec: 18_000,
+    collectorId: 'kimi-usages-api',
+    sourceSchema: 'kimi-code/usages/v1',
+    authSource: 'kimi-code-current-login',
+    defaultCollectorHarness: 'kimi-code',
+  },
+  {
+    harnessId: 'kimi-code',
+    surfaceId: 'kimi-cli',
+    providerId: 'moonshot',
+    bucketId: 'seven-day-global',
+    windowName: 'seven_day',
+    durationSec: 604_800,
+    collectorId: 'kimi-usages-api',
+    sourceSchema: 'kimi-code/usages/v1',
+    authSource: 'kimi-code-current-login',
+    defaultCollectorHarness: 'kimi-code',
+  },
 ]);
 
 function digest(value: unknown): string {
@@ -593,6 +617,67 @@ export async function readMachineWideQuotaStatus(
       : null;
   const decisions = await decisionsFromStore(store, now, homeSalt);
   return machineQuotaStatus(decisions, projection, await safeReadingsFromStore(store));
+}
+
+/**
+ * On-demand machine-wide fill for `quota status --machine-wide --refresh`: the explicit live seam a
+ * user/agent can pull without a monitor daemon. It collects every target through the same per-harness
+ * collector (the UsageReading strategy), persists the observations, and initializes the owner-only
+ * home salt if absent — so a subsequent cached `quota status` reads real used% AND lit-up decisions
+ * instead of a permanent all-unknown. Unlike refreshMachineWideQuota this performs NO subscriber
+ * fan-out, so it works in production where no coordination boundary is wired. Per-target collect is
+ * best-effort: a collector throw persists an honest error/unknown observation, never a fabricated
+ * value. Writes only the machine-local quota cache (never board/account/provider/token).
+ */
+export async function refreshMachineWideQuotaObservations(input: {
+  env: Env;
+  store: MachineQuotaStore;
+  collectors: MachineQuotaCollectorBoundary;
+  now?: Date;
+}): Promise<Data> {
+  const now = input.now ?? new Date();
+  // Establish the owner-only durable home salt if missing, so decisions can correlate scope.
+  const previous = await input.store.readMachineProjection();
+  const homeSalt =
+    typeof previous?.home_salt === 'string' && previous.home_salt.length > 0
+      ? previous.home_salt
+      : randomUUID();
+  if (homeSalt !== previous?.home_salt) {
+    await input.store.publishMachineProjection({
+      schema: 'ccm/machine-quota-projection/v1',
+      home_salt: homeSalt,
+      decisions: Array.isArray(previous?.decisions) ? previous.decisions : [],
+    });
+  }
+  for (const target of TARGETS) {
+    let collection: MachineQuotaCollection;
+    try {
+      collection = await input.collectors.collect(
+        {
+          ...collectionTarget(target),
+          window_name: target.windowName,
+          default_collector_harness: target.defaultCollectorHarness,
+          collector_id: target.collectorId,
+        },
+        input.env,
+      );
+    } catch (error) {
+      collection = {
+        status: 'error',
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    }
+    const observation = normalizeCollectedAuthorityObservation(target, collection, now);
+    try {
+      await input.store.refreshObservation(
+        { source_key: sourceKey(target), force: true },
+        async () => observation,
+      );
+    } catch {
+      // best-effort per target: one surface's persist failure must not abort the whole fill.
+    }
+  }
+  return readMachineWideQuotaStatus(input.store, now);
 }
 
 function readCachedJson(path: string): Data | undefined {

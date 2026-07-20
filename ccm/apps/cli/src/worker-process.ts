@@ -7,7 +7,11 @@ import {
   ProviderChildSupervisorError,
   superviseProviderChild,
 } from './provider-child-supervisor.js';
-import { ProviderProcessTreeOwnershipError, type ProviderRuntime } from './provider-runtime.js';
+import {
+  type ProviderProcessIdentity,
+  ProviderProcessTreeOwnershipError,
+  type ProviderRuntime,
+} from './provider-runtime.js';
 import type { WorkerDescriptor } from './worker-descriptors.js';
 
 export const WORKER_PROCESS_RESULT_SCHEMA = 'ccm/worker-process-result/v1' as const;
@@ -48,9 +52,90 @@ export interface WorkerProcessResult {
   error: { code: string; message: string } | null;
 }
 
-const MAX_TIMEOUT_MS = 1_800_000;
-const MAX_OUTPUT_BYTES = 1_048_576;
-const STDERR_LIMIT_BYTES = 1_048_576;
+const MAX_TIMEOUT_MS = 7_200_000;
+// Raw-worker output ceilings. A real agent dispatch (e.g. `codex exec --json` emitting a large
+// blueprint/state JSONL, or a long claude/cursor/kimi transcript) routinely exceeds a 1 MiB stream;
+// the former 1 MiB cap tripped `output_limit`, which TERM/KILLs the child mid-task and discards the
+// transcript. stdout carries the real payload so it gets the generous ceiling; stderr is diagnostics
+// and keeps a smaller, independent cap so a chatty stderr can never starve the stdout budget.
+const MAX_OUTPUT_BYTES = 33_554_432; // 32 MiB — hard ceiling for --max-output-bytes and stdout.
+const STDERR_LIMIT_BYTES = 8_388_608; // 8 MiB — independent stderr cap.
+
+// Post-close settlement / reap budget for the owned process tree. Well-behaved harnesses reap their
+// tree the instant the launcher closes and never touch this window; it only applies when a launcher
+// exits leaving a short-lived owned helper (observed with cursor-agent), which used to trip
+// `owned_tree_survived` and throw away an otherwise-complete transcript because the former 1 s budget
+// was too tight. Generous by default, still fail-closed on a tree that never drains. Overridable via
+// CCM_WORKER_REAP_TIMEOUT_MS (bounded) so slow hosts can widen it and tests can shrink it.
+const RAW_WORKER_REAP_TIMEOUT_MS = 5_000;
+const RAW_WORKER_REAP_TIMEOUT_MIN_MS = 100;
+const RAW_WORKER_REAP_TIMEOUT_MAX_MS = 60_000;
+
+function resolveReapTimeoutMs(env: Record<string, string | undefined>): number {
+  const raw = env.CCM_WORKER_REAP_TIMEOUT_MS;
+  if (typeof raw === 'string' && /^\d+$/u.test(raw)) {
+    const value = Number(raw);
+    if (
+      Number.isSafeInteger(value) &&
+      value >= RAW_WORKER_REAP_TIMEOUT_MIN_MS &&
+      value <= RAW_WORKER_REAP_TIMEOUT_MAX_MS
+    ) {
+      return value;
+    }
+  }
+  return RAW_WORKER_REAP_TIMEOUT_MS;
+}
+
+function normalizeProcessCommandLine(commandLine: string): string {
+  return commandLine.trim().replace(/\s+/gu, ' ');
+}
+
+function cursorAgentServiceTreePolicy(
+  cursorExecutable: string,
+  homeDir: string,
+): (members: readonly ProviderProcessIdentity[]) => boolean {
+  const installDir = path.dirname(cursorExecutable);
+  // Cursor Agent 2026.07.16 leaves this packaged daemon in the launcher's process group after a
+  // successful print-mode request: <version-dir>/node <version-dir>/index.js worker-server. Bind
+  // both executables to the resolved launcher's version directory and require the exact terminal
+  // subcommand. Do not consult ps(1)'s `comm`: Node 24 changes it to `MainThread` at runtime while
+  // `args` remains authoritative. Cursor may also leave the exact npm/sh/node chain for its
+  // TypeScript language server in the same group; it is accepted only beside this packaged server
+  // and only under the caller's npm cache. Any other mixed survivor stays request-owned.
+  const expectedCommandLine = `${path.join(installDir, 'node')} ${path.join(
+    installDir,
+    'index.js',
+  )} worker-server`;
+  const npmTypeScriptLsp = 'exec typesc npm exec typescript-language-server --stdio';
+  const shellTypeScriptLsp = 'sh -c "typescript-language-server" --stdio';
+  const npxCachePrefix = `node ${path.join(homeDir, '.npm', '_npx')}${path.sep}`;
+  const npxCacheSuffix = `${path.sep}${path.join(
+    'node_modules',
+    '.bin',
+    'typescript-language-server',
+  )} --stdio`;
+
+  return (members) => {
+    if (members.length === 0) return false;
+    let hasWorkerServer = false;
+    for (const member of members) {
+      const commandLine = normalizeProcessCommandLine(member.commandLine);
+      if (commandLine === expectedCommandLine) {
+        hasWorkerServer = true;
+        continue;
+      }
+      if (commandLine === npmTypeScriptLsp || commandLine === shellTypeScriptLsp) continue;
+      if (commandLine.startsWith(npxCachePrefix) && commandLine.endsWith(npxCacheSuffix)) {
+        const cacheKey = commandLine.slice(npxCachePrefix.length, -npxCacheSuffix.length);
+        if (/^[0-9a-f]+$/u.test(cacheKey)) continue;
+      }
+      return false;
+    }
+    // The language-service chain is accepted only as an adjunct to Cursor's packaged server. A
+    // standalone lookalike LSP cannot turn an otherwise-owned tree into a benign service tree.
+    return hasWorkerServer;
+  };
+}
 
 function initialResult(harness: string, argv: string[], cwd: string): WorkerProcessResult {
   return {
@@ -256,9 +341,20 @@ export async function runWorkerProcess(
         stdoutLimitBytes: request.maxOutputBytes,
         stderrLimitBytes: Math.min(request.maxOutputBytes, STDERR_LIMIT_BYTES),
         terminationGraceMs: 100,
-        reapTimeoutMs: 1_000,
+        reapTimeoutMs: resolveReapTimeoutMs(request.env),
       },
       signal: request.signal,
+      ...(request.descriptor.harness === 'cursor-agent'
+        ? {
+            // Cursor's packaged worker-server and the exact TypeScript language-service chain it
+            // starts are request-independent. A real task, unrelated helper, mixed tree, lookalike
+            // outside the bound install/home roots, or unavailable inspection stays fail-closed.
+            isBenignSurvivingTree: cursorAgentServiceTreePolicy(
+              result.executable,
+              request.env.HOME || os.homedir(),
+            ),
+          }
+        : {}),
     });
     return recordChild(result, child);
   } catch (error) {

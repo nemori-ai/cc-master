@@ -150,7 +150,7 @@
       "origin_harness": ["claude-code", "codex", "cursor"],
       "auth_state": ["authenticated", "unauthenticated", "unknown"],
       "binary_name": ["agent", "cursor-agent"],
-      "binary_version": ["2026.07.09-a3815c0"],
+      "binary_version": ["2026.07.09-a3815c0", "2026.07.16-899851b"],
       "quota_state": ["ample", "tight", "exhausted", "unknown"],
       "reservation_state": [
         "held",

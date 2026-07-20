@@ -4,7 +4,7 @@
 // boundary, then immediately hand the ChildProcess to this supervisor. A request creates one
 // absolute deadline and shares it across every version/help/app-server/exec child.
 
-import type { ProviderOwnedChild } from './provider-runtime.js';
+import type { ProviderOwnedChild, ProviderProcessIdentity } from './provider-runtime.js';
 
 export const PROVIDER_REQUEST_DEADLINE_SCHEMA = 'ccm/provider-request-deadline/v1' as const;
 
@@ -105,6 +105,11 @@ export interface SuperviseProviderChildOptions {
   onStderrText?: (text: string) => void;
   /** OS-spawn notification for stdin handoff; only the first provider output byte ends startup. */
   onStarted?: () => void;
+  /**
+   * Clean-close-only escape hatch for a precisely identified provider service that intentionally
+   * outlives the request. Missing/empty inspection or any unrecognized member stays fail-closed.
+   */
+  isBenignSurvivingTree?: (members: readonly ProviderProcessIdentity[]) => boolean;
 }
 
 interface StreamCollector {
@@ -248,6 +253,7 @@ export function superviseProviderChild(
     let reapTimer: NodeJS.Timeout | null = null;
     let reapPollTimer: NodeJS.Timeout | null = null;
     let closeSettlementTimer: NodeJS.Timeout | null = null;
+    let benignInspectionAttempted = false;
     // Child events are normally immediate. Only a consumer callback opens an atomic boundary:
     // terminal effects queue until the outermost callback returns and fixes its own outcome. One
     // drain transaction owns that FIFO even when processing an effect invokes another callback.
@@ -315,6 +321,17 @@ export function superviseProviderChild(
         // report the original failure without silently claiming tree cleanup.
       }
       return treeGone;
+    };
+
+    const observeBenignSurvivingTree = (): boolean => {
+      if (!options.isBenignSurvivingTree || tree === null || !tree.listMembers) return false;
+      try {
+        const members = tree.listMembers();
+        return !!members && members.length > 0 && options.isBenignSurvivingTree(members);
+      } catch {
+        // Process inspection is proof, not a convenience. Any inability to inspect stays fail-closed.
+        return false;
+      }
     };
 
     const maybeRejectAfterCleanup = (): boolean => {
@@ -666,6 +683,16 @@ export function superviseProviderChild(
           return;
         }
         const remainingMs = settlementDeadlineMs - Date.now();
+        const shouldInspectBenignTree = !benignInspectionAttempted || remainingMs <= 0;
+        benignInspectionAttempted = true;
+        if (shouldInspectBenignTree && observeBenignSurvivingTree()) {
+          // The policy has removed every remaining member from request ownership. Reporting reaped
+          // now means the launcher plus all request-owned work are gone; the known provider service
+          // intentionally continues outside the request lifecycle and must not receive TERM/KILL.
+          treeGone = true;
+          resolveSuccessfulClose(exitCode, signal, closedAtMs);
+          return;
+        }
         if (remainingMs <= 0) {
           fail(
             new ProviderChildSupervisorError({

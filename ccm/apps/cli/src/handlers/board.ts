@@ -32,6 +32,10 @@ import {
   lintBoard,
   routingContractPreflight,
 } from '@ccm/engine';
+import {
+  BOARD_INIT_STRUCTURED_PATH_CAPABILITY,
+  GOAL_CONTRACT_CAPABILITY,
+} from '../capability-manifest.js';
 import { resolveDeliveryFacts } from '../delivery-proof.js';
 import * as discover from '../discover.js';
 import { detectTrustedHarnessId } from '../harnesses/registry.js';
@@ -196,8 +200,9 @@ export function enableContract(ctx: Ctx): number {
 //   自定义 resolve：--board 显式路径优先，否则在 resolveHome 内生成时间序文件名（与 bootstrap-board.sh 同口径）。
 //     resolve 返回 { boardPath, board:null }——mutate 忽略 raw 直接 boardInit 产板（owner.active:true / session_id:""）。
 //   仍走 runWrite 的 lock + lint + 原子写同一管线（模板含 hard error → EXIT.VALIDATION）。
-export const BOARD_INIT_STRUCTURED_PATH_CAPABILITY = 'board-init/structured-board-path-v1';
-export const GOAL_CONTRACT_CAPABILITY = 'goal-contract/v1';
+// board-init / arming 握手所需的两个 capability id 从 capability-manifest SSOT 复用（去重·单一真相源·
+//   issue #167）；此处 re-export 保持 board.ts 既有公共导出面不变。
+export { BOARD_INIT_STRUCTURED_PATH_CAPABILITY, GOAL_CONTRACT_CAPABILITY };
 
 function initResolve(ctx: Ctx): { boardPath: string; board: null } {
   const explicit =

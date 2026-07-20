@@ -334,6 +334,7 @@ function deadlineWriteArgs(ctx: Ctx) {
     at: s('at'),
     precision: s('precision'),
     assurance: s('assurance'),
+    kind: s('kind'),
     provenanceRaw: s('provenance-raw'),
     source: s('source'),
     tzInput: s('tz-input'),

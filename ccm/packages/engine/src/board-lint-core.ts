@@ -27,6 +27,7 @@
 import {
   durationHours,
   ENUMS,
+  evaluateOverdue,
   isAbsolutePathOrUrl,
   isAgentId,
   isAwaitingUser,
@@ -205,7 +206,7 @@ export function lintBoard(text: string, opts?: { now?: number | string }): LintR
       if (!isDeadlineWellShaped(deadline)) {
         emit(
           'FMT-DEADLINE',
-          'goal_contract.deadline 形状非法：state 须 ∈ {pending,asserted,confirmed,none}；asserted|confirmed 须带严格 ISO-8601 UTC 的 at；none 不得带 at；precision ∈ {minute,day}；kind v1 只接受 hard；rev 若有须整数≥1；provenance.source ∈ {goal-evidence,cli-flag,user-reply}。改用 `ccm goal deadline set|confirm|confirm-none|amend`。',
+          'goal_contract.deadline 形状非法：state 须 ∈ {pending,asserted,confirmed,none}；asserted|confirmed 须带严格 ISO-8601 UTC 的 at；none 不得带 at；precision ∈ {minute,day}；kind ∈ {hard,soft}；rev 若有须整数≥1；provenance.source ∈ {goal-evidence,cli-flag,user-reply}。改用 `ccm goal deadline set|confirm|confirm-none|amend`。',
         );
       }
       // deadline.updated_at 形状（warn·不拦写盘·同 owner.heartbeat 风格·走 FMT-TIME warn 分支）。
@@ -350,22 +351,17 @@ export function lintBoard(text: string, opts?: { now?: number | string }): LintR
         '交付 DDL 尚未 settle（未询问或仍 pending），但 board 已含可执行任务；先确认交付截止期（`ccm goal deadline set|confirm`）或明确无 DDL（`ccm goal deadline confirm-none`），再拆 DAG 派发。',
       );
     }
-    // BIZ-DEADLINE-OVERDUE（warn·v1 近似）：DDL(asserted|confirmed) 已过期(now>=at) ∧ 板未归档 ∧ 存在非 trulyDone task。
-    //   局限（v1）：owner.active 判「归档」、taskTrulyDone 判「未完成」——不做「project buffer / 全局验收」精细建模。
-    if (
-      (dl.state === 'asserted' || dl.state === 'confirmed') &&
-      dl.at_ms !== null &&
-      nowMs >= dl.at_ms
-    ) {
-      const owner = b.owner as Record<string, unknown> | undefined;
-      const archived = !!owner && owner.active === false;
-      const hasUnfinished = tasks.some((task) => !taskTrulyDone(task as TaskLike));
-      if (!archived && hasUnfinished) {
-        emit(
-          'BIZ-DEADLINE-OVERDUE',
-          `交付 DDL（${dl.at}）已过期而全局 acceptance 未完成；先向用户报告当前状态/剩余交付物/方案，再由用户裁决延期（\`ccm goal deadline amend --user-authorized\`）/缩范围（\`ccm goal amend\`）/分阶段/终止——不得为按期静默降低验收或伪造完成。`,
-        );
-      }
+    // BIZ-DEADLINE-OVERDUE（warn·canonical 谓词·issue #170）：DDL(asserted|confirmed) 已过期 ∧ 板未归档 ∧
+    //   交付未验收完成。overdue 判据 + 交付验收 marker 收口进 engine 的 evaluateOverdue（唯一 SSOT·杜绝各
+    //   消费者各自近似而漂移）。soft/hard（issue #170）只改超期后的响应措辞：hard→directive（须报告用户裁决）；
+    //   soft→advisory（提示但不阻断·软目标超期不强制停派）——判据本身两者一致。
+    const overdue = evaluateOverdue(b, { now: nowMs });
+    if (overdue.overdue) {
+      const msg =
+        overdue.kind === 'soft'
+          ? `软性交付 DDL（${overdue.at}）已过期而交付未验收完成——提示但不阻断：建议向用户同步当前进度/剩余交付物，可继续推进（软目标超期不强制停派）。`
+          : `交付 DDL（${overdue.at}）已过期而全局 acceptance 未完成；先向用户报告当前状态/剩余交付物/方案，再由用户裁决延期（\`ccm goal deadline amend --user-authorized\`）/缩范围（\`ccm goal amend\`）/分阶段/终止——不得为按期静默降低验收或伪造完成。`;
+      emit('BIZ-DEADLINE-OVERDUE', msg);
     }
   }
 

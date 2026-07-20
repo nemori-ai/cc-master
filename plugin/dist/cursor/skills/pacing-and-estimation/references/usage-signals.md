@@ -17,6 +17,15 @@
 
 完整 flags 与 JSON schema 查 `using-ccm`；不要在这里复制 provider CLI 参数。
 
+## `available:false` 且带 `refresh_hint`：短命 token 可手动恢复
+
+`usage advise` / `usage show` 返回 `available:false` 且 `refresh_hint.recoverable:true` 时，不是配额真耗尽，
+而是该 harness 的短命 token 过期、usage 信号暂时读不到（这类凭证由 harness 自己在活跃 session 刷新，ccm 全程
+只读）。别把它当 `stop_*` 处理——照 `refresh_hint` 恢复：运行 `refresh_hint.command` 让该 harness 自行刷新
+token（完整人读步骤在 `refresh_hint.remedy`），再重跑 `refresh_hint.recheck` 确认信号回来。`recoverable:false`
+（网络 / 401 / API 变更）时 `command` / `remedy` 为 `null`，不是你能就地修的，按普通 unknown 处理、不推断为
+healthy。**ccm 绝不替你刷新或写凭证**——它只出可执行提示，恢复动作由你或用户执行。
+
 ## 三路窗口合同
 
 | target | 承重窗口 | 信号语义 |
