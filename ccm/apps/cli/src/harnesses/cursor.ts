@@ -109,6 +109,15 @@ export const cursorAdapter: HarnessAdapter = {
   }),
   accountPoolLocation: () => null,
   readCurrentUsage(env) {
+    // Cursor's billing-period quota is one first-party subscription observed by either surface;
+    // the only difference is where the accessToken is stored (cursor-agent → auth.json, IDE →
+    // state.vscdb). A bare `--harness cursor` read must not hard-code the IDE surface: when only
+    // the headless cursor-agent is logged in (worker hosts, or IDE token absent), that would report
+    // `unavailable` even though the subscription usage is fully readable. Prefer the cursor-agent
+    // surface (self-contained auth.json, the reliable machine reader) and fall back to the IDE
+    // surface, returning the first surface that yields a live signal. Fail-open: neither → unavailable.
+    const agent = readCursorSurfaceUsage('cursor-agent-cli', env);
+    if (agent.signal) return agent;
     return readCursorSurfaceUsage('cursor-ide-plugin', env);
   },
   readCurrentUsageForSurface(surfaceId, env) {

@@ -413,22 +413,25 @@ test('harness adapters expose machine-wide registry coordinates', () => {
   ]);
   assert.deepEqual(kimi.usageSource({}), {
     kind: 'dashboard-api',
-    pollable: false,
+    pollable: true,
     quotaModel: 'rolling-5h-7d',
   });
   assert.equal(kimi.accountPoolLocation({ HOME: root }), null);
 });
 
-test('kimi-code adapter: detection, aliases, unsupported usage/account, plugin distribution', () => {
+test('kimi-code adapter: detection, aliases, credential-gated usage/account, plugin distribution', () => {
   assert.equal(resolveHarnessId({ env: { KIMI_CODE_HOME: '/tmp/kimi-home' } }), 'kimi-code');
   assert.equal(detectTrustedHarnessId({ KIMI_CODE_HOME: '/tmp/kimi-home' }), 'kimi-code');
 
   const kimi = resolveHarnessAdapter({ harnessFlag: 'kimi', env: {} });
   assert.equal(kimi.id, 'kimi-code');
 
-  const usage = kimi.readCurrentUsage({});
+  // With no discoverable credential (isolated KIMI_CODE_HOME), the /usages collector degrades to an
+  // honest `unavailable` reason — never a crash, never a credential mutation.
+  const usage = kimi.readCurrentUsage({ KIMI_CODE_HOME: '/nonexistent-ccm-kimi-home' });
   assert.equal(usage.signal, null);
   assert.equal(usage.source, 'unavailable');
+  assert.match(usage.unavailableReason, /凭证/);
 
   assert.equal(kimi.accountPool.supported, false);
   assert.equal(kimi.externalStatusline.supported, false);
