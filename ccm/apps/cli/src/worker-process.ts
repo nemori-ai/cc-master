@@ -106,10 +106,9 @@ export function rejectedWorkerProcess(input: {
   );
 }
 
-function validate(request: WorkerProcessRequest): string | null {
-  if (!path.isAbsolute(request.cwd)) return '--cwd must be an absolute path';
+function validate(request: WorkerProcessRequest, cwd: string): string | null {
   try {
-    if (!fs.statSync(request.cwd).isDirectory()) return '--cwd must name a directory';
+    if (!fs.statSync(cwd).isDirectory()) return '--cwd must name a directory';
   } catch {
     return '--cwd must name an existing directory';
   }
@@ -201,12 +200,18 @@ export async function runWorkerProcess(
   request: WorkerProcessRequest,
 ): Promise<WorkerProcessResult> {
   const result = baseResult(request);
-  const validation = validate(request);
+  // A relative --cwd resolves against the launching process cwd (the shell the caller ran ccm in),
+  // mirroring the run/help defaults that already fall back to process.cwd() when --cwd is omitted.
+  // Without this, `--cwd .` was rejected before executable resolution ran, surfacing a confusing
+  // executable:null envelope that masked the real "cwd" error. The child always gets an absolute,
+  // realpath-normalized cwd.
+  const requestedCwd = path.resolve(request.cwd);
+  const validation = validate(request, requestedCwd);
   if (validation) return fail(result, 'rejected', 'request_rejected', validation);
 
   let cwd: string;
   try {
-    cwd = fs.realpathSync(request.cwd);
+    cwd = fs.realpathSync(requestedCwd);
   } catch (error) {
     return fail(result, 'rejected', 'request_rejected', String((error as Error)?.message || error));
   }

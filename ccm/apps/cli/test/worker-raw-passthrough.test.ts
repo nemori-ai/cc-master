@@ -425,6 +425,24 @@ test('worker run passes the complete provider argv unchanged and defaults cwd to
   }
 });
 
+test('worker run resolves a relative --cwd against the process cwd instead of rejecting it', async () => {
+  // Regression: `--cwd .` (any relative path) used to fail cwd validation before executable
+  // resolution ran, returning an executable:null / request_rejected envelope that masked the real
+  // cause and read as a per-harness "executable resolution regression". A relative --cwd now
+  // resolves against process.cwd() (mirroring the omitted-cwd default), so the worker launches with
+  // an absolute, realpath-normalized cwd for every harness.
+  for (const harness of ['codex', 'claude-code', 'cursor-agent', 'kimi-code'] as const) {
+    const invoked = await invokeRun({ harness, providerArgv: ['--flag', 'value'], cwd: '.' });
+    assert.equal(invoked.code, 0, harness);
+    assert.equal(invoked.spawns.length, 1, harness);
+    assert.notEqual(invoked.envelope?.executable, null, harness);
+    assert.equal(invoked.envelope?.state, 'exited', harness);
+    assert.equal(invoked.envelope?.error, null, harness);
+    assert.equal(invoked.spawns[0]?.cwd, realpathSync(process.cwd()), harness);
+    assert.equal(invoked.envelope?.cwd, realpathSync(process.cwd()), harness);
+  }
+});
+
 test('worker rejects unknown harness, bad cwd, and unavailable executable before spawn', async () => {
   const unknown = await invokeRun({ harness: 'unknown', providerArgv: ['--mystery'] });
   assert.equal(unknown.code, 1);
@@ -435,7 +453,13 @@ test('worker rejects unknown harness, bad cwd, and unavailable executable before
   assert.deepEqual(unknown.envelope?.argv, ['--mystery']);
   assert.equal(unknown.spawns.length, 0);
 
-  const badCwd = await invokeRun({ harness: 'codex', providerArgv: [], cwd: 'relative' });
+  // A relative --cwd is resolved against process.cwd(); a cwd that resolves to a non-existent
+  // directory is still rejected before spawn (request_rejected), just not for being relative.
+  const badCwd = await invokeRun({
+    harness: 'codex',
+    providerArgv: [],
+    cwd: 'no-such-dir-worker-regression',
+  });
   assert.equal(badCwd.code, 1);
   assert.equal(badCwd.envelope?.state, 'rejected');
   assert.equal(badCwd.envelope?.error?.code, 'request_rejected');
