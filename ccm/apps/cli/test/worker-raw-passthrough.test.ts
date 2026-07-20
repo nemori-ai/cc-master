@@ -49,6 +49,9 @@ if (argv.includes('--no-output-hang')) {
   setInterval(() => {}, 1000);
 } else if (argv.includes('--large-output')) {
   process.stdout.write('x'.repeat(4096));
+} else if (argv.find((value) => value.startsWith('--emit-bytes='))) {
+  const spec = argv.find((value) => value.startsWith('--emit-bytes='));
+  process.stdout.write('x'.repeat(Number(spec.slice('--emit-bytes='.length))));
 } else {
   let stdin = '';
   process.stdin.setEncoding('utf8');
@@ -128,6 +131,8 @@ function runtime(
 function runtimeWithPostCloseTree(
   env: Record<string, string | undefined>,
   mode: 'settles' | 'survives',
+  settleProbes = 30,
+  survivors?: Array<{ pid: number; name: string; commandLine: string }>,
 ): { providerRuntime: ProviderRuntime; signals: NodeJS.Signals[] } {
   const actual = createDefaultProviderRuntime(env);
   const signals: NodeJS.Signals[] = [];
@@ -160,19 +165,63 @@ function runtimeWithPostCloseTree(
                 if (!launcherClosed) return true;
                 if (mode === 'settles') {
                   postCloseProbes += 1;
-                  // Raw workers use a 100ms TERM grace and a 1s reap budget. Keep the fake tree
-                  // alive beyond the former so the regression proves close settlement is tied to
-                  // full-tree reap observation, not to signal escalation timing.
-                  return postCloseProbes <= 30;
+                  // Keep the fake tree alive across `settleProbes` post-close polls (~5ms each) so the
+                  // regression proves close settlement is tied to full-tree reap observation across the
+                  // configurable reap window, not to signal escalation timing.
+                  return postCloseProbes <= settleProbes;
                 }
                 return survivorAlive;
               },
+              ...(survivors === undefined
+                ? {}
+                : {
+                    listMembers: () => (launcherClosed && survivorAlive ? survivors : []),
+                  }),
             },
           };
         },
       },
     },
   };
+}
+
+function realCursorServiceSurvivors(cursorInstallDir: string, cursorHome: string) {
+  return [
+    {
+      pid: 7_001,
+      // Node 24 reports `MainThread` in ps(1)'s comm column even though args starts with the
+      // packaged node binary. Classification must be bound to the exact argv, not this mutable
+      // process title.
+      name: 'MainThread',
+      commandLine: `${join(cursorInstallDir, 'node')} ${join(
+        cursorInstallDir,
+        'index.js',
+      )} worker-server`,
+    },
+    {
+      pid: 7_002,
+      name: 'npm',
+      commandLine: 'exec typesc npm exec typescript-language-server --stdio',
+    },
+    {
+      pid: 7_003,
+      name: 'sh',
+      commandLine: 'sh -c "typescript-language-server" --stdio',
+    },
+    {
+      pid: 7_004,
+      name: 'MainThread',
+      commandLine: `node ${join(
+        cursorHome,
+        '.npm',
+        '_npx',
+        '94207acffe67148d',
+        'node_modules',
+        '.bin',
+        'typescript-language-server',
+      )} --stdio`,
+    },
+  ];
 }
 
 function testEnv(): Record<string, string | undefined> {
@@ -227,6 +276,8 @@ async function invokeRun(input: {
   cwd?: string;
   timeoutMs?: number;
   maxOutputBytes?: number;
+  omitMaxOutputBytes?: boolean;
+  envOverride?: Record<string, string | undefined>;
   signal?: AbortSignal;
   processSignal?: NodeJS.Signals;
   providerRuntime?: ProviderRuntime;
@@ -236,7 +287,7 @@ async function invokeRun(input: {
   stderr: string;
   spawns: ProviderSpawnSpec[];
 }> {
-  const env = testEnv();
+  const env = { ...testEnv(), ...input.envOverride };
   const stdout: string[] = [];
   const stderr: string[] = [];
   const spawns: ProviderSpawnSpec[] = [];
@@ -252,8 +303,9 @@ async function invokeRun(input: {
       ...(input.cwd === undefined ? [] : ['--cwd', input.cwd]),
       '--timeout-ms',
       String(input.timeoutMs ?? 2_000),
-      '--max-output-bytes',
-      String(input.maxOutputBytes ?? 65_536),
+      ...(input.omitMaxOutputBytes
+        ? []
+        : ['--max-output-bytes', String(input.maxOutputBytes ?? 65_536)]),
       '--',
       ...input.providerArgv,
     ];
@@ -295,6 +347,7 @@ test('registry freezes one raw worker namespace with help and run', () => {
   assert.equal(REGISTRY.worker?.run?.options.model, undefined);
   assert.equal(REGISTRY.worker?.run?.options.effort, undefined);
   assert.equal(REGISTRY.worker?.run?.options.cwd?.required, false);
+  assert.match(REGISTRY.worker?.run?.options['timeout-ms']?.desc ?? '', /50\.\.7200000/u);
   assert.equal(REGISTRY.dispatch, undefined);
 });
 
@@ -425,6 +478,32 @@ test('worker run passes the complete provider argv unchanged and defaults cwd to
   }
 });
 
+test('worker run defaults sandbox OFF for every harness yet preserves a caller-supplied sandbox flag', async () => {
+  // Default dispatch is a raw argv/env passthrough (registry R0): ccm must never inject a sandbox
+  // for any harness. The spawned argv carries no `--sandbox` and the child env carries no
+  // `CODEX_SANDBOX` unless the caller put them there. This pins "dispatch defaults to no sandbox".
+  for (const harness of ['codex', 'claude-code', 'cursor-agent', 'kimi-code'] as const) {
+    const providerArgv = harness === 'codex' ? ['exec', '--flag', 'value'] : ['--flag', 'value'];
+    const invoked = await invokeRun({ harness, providerArgv });
+    assert.equal(invoked.code, 0, harness);
+    assert.equal(invoked.spawns.length, 1, harness);
+    const spec = invoked.spawns[0];
+    assert.equal(spec?.argv.includes('--sandbox'), false, `${harness}: no injected --sandbox`);
+    assert.deepEqual(spec?.argv, providerArgv, harness);
+    assert.equal(spec?.env.CODEX_SANDBOX, undefined, `${harness}: no injected CODEX_SANDBOX`);
+  }
+
+  // Explicit opt-in is untouched: a caller-supplied `--sandbox <mode>` flows through verbatim, so
+  // users who *want* a sandbox keep that capability — only the default changed, not the ability.
+  const explicit = await invokeRun({
+    harness: 'codex',
+    providerArgv: ['exec', '--sandbox', 'read-only', '--flag', 'value'],
+  });
+  assert.equal(explicit.code, 0);
+  assert.equal(explicit.spawns.length, 1);
+  assert.deepEqual(explicit.spawns[0]?.argv, ['exec', '--sandbox', 'read-only', '--flag', 'value']);
+});
+
 test('worker run resolves a relative --cwd against the process cwd instead of rejecting it', async () => {
   // Regression: `--cwd .` (any relative path) used to fail cwd validation before executable
   // resolution ran, returning an executable:null / request_rejected envelope that masked the real
@@ -518,11 +597,18 @@ test('worker preserves a completed provider transcript while its owned tree natu
 });
 
 test('worker still fails closed when an owned descendant survives the post-close settlement window', async () => {
-  const fixture = runtimeWithPostCloseTree(testEnv(), 'survives');
+  const cursorInstallDir = resolve(join(executables.cursor, '..'));
+  const fixture = runtimeWithPostCloseTree(testEnv(), 'survives', 30, [
+    ...realCursorServiceSurvivors(cursorInstallDir, home),
+    { pid: 7_005, name: 'bash', commandLine: 'bash -c run-real-worker-task-forever' },
+  ]);
   const invoked = await invokeRun({
     harness: 'cursor-agent',
     providerArgv: ['--model', 'cursor-first-party-test'],
     stdin: 'offline cursor request',
+    // Shrink the reap window so this fail-closed regression stays fast; also proves
+    // CCM_WORKER_REAP_TIMEOUT_MS is honored and bounded.
+    envOverride: { CCM_WORKER_REAP_TIMEOUT_MS: '300' },
     providerRuntime: fixture.providerRuntime,
   });
 
@@ -531,6 +617,141 @@ test('worker still fails closed when an owned descendant survives the post-close
   assert.equal(invoked.envelope?.error?.code, 'owned_tree_survived');
   assert.equal(invoked.envelope?.reaped, true);
   assert.deepEqual(fixture.signals, ['SIGTERM']);
+});
+
+test('cursor worker treats its exact packaged worker-server as benign after launcher close', async () => {
+  const cursorInstallDir = resolve(join(executables.cursor, '..'));
+  const fixture = runtimeWithPostCloseTree(testEnv(), 'survives', 30, [
+    {
+      pid: 7_001,
+      // Ground truth from the real Cursor 2026.07.16 worker-server on Node 24.
+      name: 'MainThread',
+      commandLine: `${join(cursorInstallDir, 'node')} ${join(
+        cursorInstallDir,
+        'index.js',
+      )} worker-server`,
+    },
+  ]);
+  const invoked = await invokeRun({
+    harness: 'cursor-agent',
+    providerArgv: ['--model', 'cursor-first-party-test'],
+    stdin: 'offline cursor request',
+    envOverride: { CCM_WORKER_REAP_TIMEOUT_MS: '300' },
+    providerRuntime: fixture.providerRuntime,
+  });
+
+  assert.equal(invoked.code, 0);
+  assert.equal(invoked.envelope?.state, 'exited');
+  assert.equal(invoked.envelope?.exit_code, 0);
+  assert.equal(invoked.envelope?.error, null);
+  assert.equal(invoked.envelope?.reaped, true);
+  assert.deepEqual(fixture.signals, [], 'the exact Cursor worker-server is not request-owned');
+});
+
+test('cursor worker treats the real worker-server plus TypeScript language-service tree as benign', async () => {
+  const cursorInstallDir = resolve(join(executables.cursor, '..'));
+  const fixture = runtimeWithPostCloseTree(
+    testEnv(),
+    'survives',
+    30,
+    realCursorServiceSurvivors(cursorInstallDir, home),
+  );
+  const invoked = await invokeRun({
+    harness: 'cursor-agent',
+    providerArgv: ['--model', 'cursor-first-party-test'],
+    stdin: 'offline cursor request',
+    envOverride: { CCM_WORKER_REAP_TIMEOUT_MS: '300' },
+    providerRuntime: fixture.providerRuntime,
+  });
+
+  assert.equal(invoked.code, 0);
+  assert.equal(invoked.envelope?.state, 'exited');
+  assert.equal(invoked.envelope?.exit_code, 0);
+  assert.equal(invoked.envelope?.error, null);
+  assert.equal(invoked.envelope?.reaped, true);
+  assert.deepEqual(fixture.signals, [], 'Cursor-owned language services are not request work');
+});
+
+test('worker preserves a completed transcript when a benign helper drains past the former 1s window', async () => {
+  // Regression: cursor-agent's launcher can exit leaving a short-lived owned helper that outlives the
+  // old 1s reap budget. That tripped owned_tree_survived and discarded an otherwise-complete
+  // transcript. With a generous (here overridden) reap window the helper drains naturally, so the run
+  // succeeds with its transcript intact and no termination signal is ever sent.
+  const fixture = runtimeWithPostCloseTree(testEnv(), 'settles', 260); // ~1.3s drain, past the old 1s.
+  const invoked = await invokeRun({
+    harness: 'cursor-agent',
+    providerArgv: ['--model', 'cursor-first-party-test'],
+    stdin: 'offline cursor request',
+    envOverride: { CCM_WORKER_REAP_TIMEOUT_MS: '3000' },
+    providerRuntime: fixture.providerRuntime,
+  });
+
+  assert.equal(invoked.code, 0);
+  assert.equal(invoked.envelope?.state, 'exited');
+  assert.equal(invoked.envelope?.exit_code, 0);
+  assert.equal(invoked.envelope?.reaped, true);
+  assert.equal(invoked.envelope?.error, null);
+  const transcript = JSON.parse(invoked.envelope?.stdout ?? '{}') as { stdin: string };
+  assert.equal(transcript.stdin, 'offline cursor request');
+  assert.deepEqual(fixture.signals, [], 'a naturally-draining helper must not be force-terminated');
+});
+
+test('worker no longer kills a large-output dispatch: raised ceiling + default accept multi-MiB stdout', async () => {
+  // Regression: the former 1 MiB per-stream cap tripped output_limit and TERM/KILLed large-output
+  // dispatches (e.g. codex emitting a big blueprint/state) mid-task. A 1.5 MiB stdout must now flow
+  // through both an explicit >1 MiB budget and the default budget without truncation.
+  const emitBytes = 1_572_864; // 1.5 MiB, over the former 1 MiB ceiling.
+  const explicit = await invokeRun({
+    harness: 'codex',
+    providerArgv: [`--emit-bytes=${emitBytes}`],
+    maxOutputBytes: 2_097_152, // 2 MiB — previously rejected as above the 1 MiB ceiling.
+  });
+  assert.equal(explicit.code, 0);
+  assert.equal(explicit.envelope?.state, 'exited');
+  assert.deepEqual(explicit.envelope?.truncated, { stdout: false, stderr: false });
+  assert.equal(explicit.envelope?.stdout_bytes, emitBytes);
+
+  const byDefault = await invokeRun({
+    harness: 'codex',
+    providerArgv: [`--emit-bytes=${emitBytes}`],
+    omitMaxOutputBytes: true, // exercise DEFAULT_MAX_OUTPUT_BYTES (now 32 MiB, was 1 MiB).
+  });
+  assert.equal(byDefault.code, 0);
+  assert.equal(byDefault.envelope?.state, 'exited');
+  assert.deepEqual(byDefault.envelope?.truncated, { stdout: false, stderr: false });
+  assert.equal(byDefault.envelope?.stdout_bytes, emitBytes);
+});
+
+test('worker still bounds --max-output-bytes at the 32 MiB ceiling', async () => {
+  const rejected = await invokeRun({
+    harness: 'codex',
+    providerArgv: ['--flag', 'value'],
+    maxOutputBytes: 33_554_433, // one byte over the 32 MiB ceiling.
+  });
+  assert.equal(rejected.code, 1);
+  assert.equal(rejected.envelope?.state, 'rejected');
+  assert.equal(rejected.envelope?.error?.code, 'request_rejected');
+  assert.equal(rejected.spawns.length, 0);
+});
+
+test('worker accepts a two-hour timeout and rejects one millisecond above it', async () => {
+  const accepted = await invokeRun({
+    harness: 'codex',
+    providerArgv: ['--flag', 'value'],
+    timeoutMs: 7_200_000,
+  });
+  assert.equal(accepted.code, 0);
+  assert.equal(accepted.envelope?.state, 'exited');
+
+  const rejected = await invokeRun({
+    harness: 'codex',
+    providerArgv: ['--flag', 'value'],
+    timeoutMs: 7_200_001,
+  });
+  assert.equal(rejected.code, 1);
+  assert.equal(rejected.envelope?.state, 'rejected');
+  assert.equal(rejected.envelope?.error?.code, 'request_rejected');
+  assert.equal(rejected.spawns.length, 0);
 });
 
 test('worker reports bounded timeout, cancellation, and output truncation after reaping', async () => {

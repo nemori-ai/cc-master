@@ -31,21 +31,19 @@ import {
   pctOf,
   pctRunway,
   tokenExpired,
-  type UsageSignal,
   WINDOW_5H_SEC,
   WINDOW_7D_SEC,
   type WindowSignal,
 } from '@ccm/engine';
 import * as discover from '../discover.js';
-import { resolveHarnessAdapter } from '../harnesses/registry.js';
-import type { UsageSignalSource } from '../harnesses/types.js';
+import type { UsageRefreshHint, UsageSignalSource } from '../harnesses/types.js';
 import {
   type MachineQuotaStore,
-  readMachineWideQuotaStatusCached,
   readOrRefreshMachineQuotaSurfaceReading,
 } from '../machine-wide-quota.js';
 import { createQuotaAdmissionStore } from '../quota-admission-store.js';
 import { quotaFilesystemFromBoundary } from '../quota-production-effects.js';
+import { type UsageReading, usageReading } from '../usage-reading.js';
 import { type BoardArg, type Ctx, runRead } from './_common.js';
 
 // 备号窗口快照（registry SwitchSnapshot 投影）。
@@ -189,89 +187,40 @@ function readBackups(
   return { accounts: out, raw: accounts };
 }
 
-interface CurrentUsageSignalReading {
-  signal: UsageSignal | null;
-  source: UsageSignalSource;
-  unavailableReason: string;
-  harnessLabel: string;
+// The reading value object is owned by the UsageReading domain service (usage-reading.ts); this
+//   handler consumes it as-is. `CurrentUsageSignalReading` stays as a local alias to keep the many
+//   render/recovery call sites unchanged while the single authoritative shape lives in one place.
+type CurrentUsageSignalReading = UsageReading;
+
+// ── unavailable recovery hint rendering helpers (shared across show / advise / burn-rate / runway) ──
+//   Surface the actionable remedy so users/agents see "run X, then recheck" instead of a bare unknown.
+function recoveryLine(reading: CurrentUsageSignalReading): string | null {
+  const hint = reading.refreshHint;
+  return hint?.recoverable && hint.remedy ? `  → ${hint.remedy}` : null;
+}
+function recoveryHintForJson(reading: CurrentUsageSignalReading): UsageRefreshHint | null {
+  return reading.refreshHint ?? null;
 }
 
-function cursorAgentRequested(harnessFlag?: string): boolean {
-  const requested = String(harnessFlag ?? '')
-    .trim()
-    .toLowerCase()
-    .replaceAll('_', '-');
-  return requested === 'cursor-agent' || requested === 'cursor-agent-cli';
-}
+// cursorAgentRequested — delegate to the domain service so the surface-selection predicate has one
+//   definition (show/advise use it to decide the async shared-store path).
+const cursorAgentRequested = usageReading.cursorAgentRequested;
 
-function projectMachineReading(
-  reading: Record<string, any> | undefined,
-): CurrentUsageSignalReading | undefined {
-  const used = reading?.used_percentage;
-  const resetMs =
-    typeof reading?.resets_at === 'string' ? Date.parse(reading.resets_at) : Number.NaN;
-  const observedMs =
-    typeof reading?.observed_at === 'string' ? Date.parse(reading.observed_at) : Number.NaN;
-  const validUntilMs =
-    typeof reading?.valid_until === 'string' ? Date.parse(reading.valid_until) : Number.NaN;
-  if (
-    typeof used !== 'number' ||
-    !Number.isFinite(used) ||
-    used < 0 ||
-    used > 100 ||
-    !Number.isFinite(resetMs) ||
-    !Number.isFinite(observedMs) ||
-    !Number.isFinite(validUntilMs) ||
-    validUntilMs < Date.now()
-  ) {
-    return undefined;
-  }
-  return {
-    signal: {
-      five_hour: null,
-      seven_day: null,
-      billing_period: {
-        used_percentage: used,
-        resets_at: Math.floor(resetMs / 1000),
-      },
-      captured_at: Math.floor(observedMs / 1000),
-    },
-    source: String(reading?.source?.collector_id ?? 'cursor-agent-dashboard'),
-    unavailableReason: 'Cursor Agent machine-wide quota cache 不可用或已过期',
-    harnessLabel: 'Cursor Agent',
-  };
-}
-
+// readCurrentUsageSignal — thin handler-side alias onto the UsageReading domain service's ambient read.
+//   Every usage render path (show/advise/burn-rate/runway) reads through here → through the one service,
+//   which owns harness resolution + the cursor-agent cache-first strategy (no adapter access in-handler).
 function readCurrentUsageSignal(
   env: Record<string, string | undefined>,
   harnessFlag?: string,
   homeFlag?: string,
 ): CurrentUsageSignalReading {
-  const wantsCursorAgent = cursorAgentRequested(harnessFlag);
-  if (wantsCursorAgent) {
-    const home = resolveHomeDir(env, homeFlag);
-    const status = readMachineWideQuotaStatusCached(home);
-    const reading = Array.isArray(status.readings)
-      ? status.readings.find(
-          (candidate: Record<string, any>) => candidate?.target?.surface_id === 'cursor-agent-cli',
-        )
-      : undefined;
-    const projected = projectMachineReading(reading);
-    if (projected) return projected;
-  }
-  const adapter = resolveHarnessAdapter({ env, harnessFlag });
-  const reading =
-    wantsCursorAgent && adapter.readCurrentUsageForSurface
-      ? adapter.readCurrentUsageForSurface('cursor-agent-cli', env)
-      : adapter.readCurrentUsage(env);
-  return {
-    signal: reading.signal,
-    source: reading.source,
-    unavailableReason: reading.unavailableReason,
-    harnessLabel: adapter.displayName,
-  };
+  return usageReading.readCurrent({ env, harnessFlag, homeFlag });
 }
 
+// readSharedCurrentUsageSignal — cursor-agent live shared-store read (refreshes the authoritative
+//   observation store once, so adjacent commands share a live read). Non-cursor-agent / no collectors
+//   fall straight back to the domain service. Projection + fallback reuse the same service helper so
+//   the machine-cache reading shape stays single-sourced.
 async function readSharedCurrentUsageSignal(
   ctx: Ctx,
   harnessFlag?: string,
@@ -292,11 +241,14 @@ async function readSharedCurrentUsageSignal(
     collectors: ctx.machineQuotaCollectors,
   });
   return (
-    projectMachineReading(reading) ?? {
+    usageReading.projectMachineCacheReading(reading) ?? {
       signal: null,
       source: 'unavailable',
       unavailableReason: 'Cursor Agent machine-wide quota cache 不可用或已过期',
+      refreshHint: null,
+      harnessId: 'cursor',
       harnessLabel: 'Cursor Agent',
+      usageSource: { kind: 'dashboard-api', pollable: true, quotaModel: 'billing-period' },
     }
   );
 }
@@ -481,6 +433,10 @@ function renderShow(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading):
             : null,
         source: backups != null ? 'registry-snapshot' : currentUsage.source,
         confidence: current.available ? 'high' : backups != null ? 'medium' : 'low',
+        // Actionable recovery hint when the current account signal is unavailable (e.g. kimi token
+        //   expired → which kimi command self-refreshes it + how to recheck). null when available or
+        //   not user-recoverable. Surfaced top-level so it's visible, not buried.
+        refresh_hint: current.available ? null : recoveryHintForJson(currentUsage),
       };
 
       if (c.flags.json) return JSON.stringify({ ok: true, data });
@@ -500,6 +456,8 @@ function renderShow(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading):
         lines.push(
           `  current: 账户权威信号不可用（${currentUsage.unavailableReason}·available:false·降级）`,
         );
+        const recovery = recoveryLine(currentUsage);
+        if (recovery) lines.push(recovery);
       }
       if (backups == null) {
         lines.push('  备号: 无 accounts.json registry（单账号·effective_n=1）');
@@ -595,6 +553,9 @@ function renderAdvice(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading
             ? new Date(sidecar.captured_at * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')
             : null,
         available: advice.available,
+        // Actionable recovery hint when the account signal is unavailable (mirrors show·top-level·
+        //   e.g. kimi token expired → `kimi -p 'hi'` self-refresh + recheck). null when available.
+        refresh_hint: advice.available ? null : recoveryHintForJson(currentUsage),
       };
 
       if (c.flags.json) return JSON.stringify({ ok: true, data });
@@ -611,8 +572,11 @@ function renderAdvice(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading
       if (data.switch_candidate) lines.push(`  switch_candidate: ${data.switch_candidate}`);
       if (data.nearest_reset)
         lines.push(`  nearest_reset: ${asOfISOFromSec(data.nearest_reset)}（arm wakeup）`);
-      if (!data.available)
+      if (!data.available) {
         lines.push('  （账户权威信号不可用·source=local-derived-approx·pacing 降级）');
+        const recovery = recoveryLine(currentUsage);
+        if (recovery) lines.push(recovery);
+      }
       return `${lines.join('\n')}\n`;
     },
   });
@@ -652,6 +616,7 @@ export function burnRate(ctx: Ctx): number {
               ? asOfISOFromSec(nowSec)
               : null,
         confidence,
+        refresh_hint: available ? null : recoveryHintForJson(currentUsage),
       };
 
       if (c.flags.json) return JSON.stringify({ ok: true, data });
@@ -662,10 +627,13 @@ export function burnRate(ctx: Ctx): number {
           : `N/A（used=${fmtPct(v.used_pct)}）`;
       lines.push(`  5h: ${fmtBurn(fiveHour)}`);
       lines.push(`  7d: ${fmtBurn(sevenDay)}`);
-      if (!available)
+      if (!available) {
         lines.push(
           `  （账户权威信号不可用·${currentUsage.unavailableReason}·available:false·降级）`,
         );
+        const recovery = recoveryLine(currentUsage);
+        if (recovery) lines.push(recovery);
+      }
       return `${lines.join('\n')}\n`;
     },
   });
@@ -722,6 +690,7 @@ export function runway(ctx: Ctx): number {
               ? asOfISOFromSec(nowSec)
               : null,
         confidence: available ? (fiveView.used_pct != null ? fiveView.confidence : 'low') : 'low',
+        refresh_hint: available ? null : recoveryHintForJson(currentUsage),
       };
 
       if (c.flags.json) return JSON.stringify({ ok: true, data });
@@ -732,10 +701,13 @@ export function runway(ctx: Ctx): number {
           : `remaining=${fmtPct(r.remaining_corridor_pct)}（上界 ${r.ceiling_pct}%）·to_ceiling=${fmtH(r.hours_to_ceiling)}·to_reset=${fmtH(r.hours_to_reset)}·${r.verdict}`;
       lines.push(`  5h: ${fmtRw(fiveHour)}`);
       lines.push(`  7d: ${fmtRw(sevenDay)}`);
-      if (!available)
+      if (!available) {
         lines.push(
           `  （账户权威信号不可用·${currentUsage.unavailableReason}·available:false·降级）`,
         );
+        const recovery = recoveryLine(currentUsage);
+        if (recovery) lines.push(recovery);
+      }
       return `${lines.join('\n')}\n`;
     },
   });

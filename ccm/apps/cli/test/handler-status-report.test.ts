@@ -250,9 +250,27 @@ test('status-report: past DDL with unfinished work → overdue (block + human)',
   const r = invoke(['status-report', 'render', '--json', '--as-of', '2026-07-08T12:00:00Z'], home);
   const dl = json(r.stdout).report.deadline;
   assert.equal(dl.overdue, true);
+  assert.equal(dl.overdue_response, 'directive'); // hard 超期 → directive（issue #170）
   assert.equal(dl.time_remaining_hours, -3);
   const human = invoke(['status-report', 'render', '--as-of', '2026-07-08T12:00:00Z'], home);
   assert.match(human.stdout, /OVERDUE/);
+});
+
+test('status-report: past soft DDL → overdue with advisory response (issue #170)', () => {
+  const home = mkHome();
+  seedBoardWithDeadline(home, {
+    state: 'confirmed',
+    at: '2026-07-08T09:00:00Z',
+    precision: 'minute',
+    kind: 'soft',
+    rev: 1,
+    updated_at: '2026-07-08T08:00:00Z',
+  });
+  const r = invoke(['status-report', 'render', '--json', '--as-of', '2026-07-08T12:00:00Z'], home);
+  const dl = json(r.stdout).report.deadline;
+  assert.equal(dl.overdue, true);
+  assert.equal(dl.kind, 'soft');
+  assert.equal(dl.overdue_response, 'advisory'); // soft 超期 → advisory nudge，不阻断
 });
 
 test('status-report: legacy board (no goal_contract) → deadline present:false, no human line', () => {

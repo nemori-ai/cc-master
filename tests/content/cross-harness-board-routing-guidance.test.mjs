@@ -120,7 +120,7 @@ test('command catalog gives an honest discovery-to-raw-dispatch hot path', () =>
     'ccm harness list --machine-wide --json',
     'ccm worker help --harness <codex|claude-code|cursor-agent|kimi-code> --scope agent',
     'ccm provider facts <target-provider> --json',
-    'ccm quota status --machine-wide --json',
+    'ccm quota status --machine-wide --refresh --json',
     'ccm --harness <claude-code|codex|cursor-agent> usage show --accounts current --json',
     'ccm --harness <claude-code|codex|cursor-agent> usage advise --json',
     'ccm quota preflight --input <json|@file|-> --json',
@@ -130,7 +130,10 @@ test('command catalog gives an honest discovery-to-raw-dispatch hot path', () =>
     assert.ok(hotPath.includes(command), command);
   }
   assert.match(hotPath, /route advise[\s\S]*spawned:false[\s\S]*不 reserve[\s\S]*不写 board/iu);
-  assert.match(hotPath, /quota status --machine-wide[\s\S]*本机缓存[\s\S]*不调用 provider[\s\S]*unknown/iu);
+  assert.match(
+    hotPath,
+    /quota status --machine-wide[\s\S]*默认[\s\S]*本机缓存[\s\S]*--refresh[\s\S]*live collector[\s\S]*unknown/iu,
+  );
   assert.match(hotPath, /quota preflight[\s\S]*只重验已有 authority evidence[\s\S]*不会现场查询/u);
   assert.match(hotPath, /worker run[\s\S]*origin harness[\s\S]*后台[\s\S]*handle/iu);
   assert.match(hotPath, /不会返回 running handle[\s\S]*ccm\/worker-process-result\/v1[\s\S]*不是 running handle/iu);

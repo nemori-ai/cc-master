@@ -19,10 +19,37 @@ export interface HarnessSession {
   source: 'env' | 'none' | string;
 }
 
+/**
+ * Actionable, secret-free recovery hint for when a harness's usage signal is unavailable because a
+ * short-lived credential must be manually refreshed *by the harness itself*. ccm is observe-only on
+ * credentials — it NEVER refreshes / rotates / writes them. This structure only tells the user/agent
+ * which harness-native command refreshes the credential and how to re-query afterward.
+ *
+ * Generic across harnesses: any short-lived-token harness can populate it (kimi-code is the first
+ * instance). Persistent-credential harnesses (claude-code / codex / cursor) leave it unset.
+ */
+export interface UsageRefreshHint {
+  /** Honest, secret-free reason the signal is unavailable (same text as unavailableReason). */
+  reason: string;
+  /** True when the user can self-recover without ccm touching any credential. */
+  recoverable: boolean;
+  /** Exact harness-native command to run to recover (e.g. `kimi -p 'hi'`), or null when nothing is user-actionable. */
+  command: string | null;
+  /** One-line instruction combining the command + why + recheck; null when not user-recoverable. */
+  remedy: string | null;
+  /** Command to re-query the signal after recovery (e.g. `ccm usage show --harness kimi-code`), or null. */
+  recheck: string | null;
+}
+
 export interface CurrentUsageReading {
   signal: UsageSignal | null;
   source: UsageSignalSource;
   unavailableReason: string;
+  /**
+   * Present only when signal is null and the harness can describe a user-actionable manual recovery
+   * (short-lived credential that the harness itself refreshes). ccm never mutates credentials.
+   */
+  refreshHint?: UsageRefreshHint | null;
   authority?: CurrentQuotaAuthorityRefs;
   authSource?: string;
   quotaScopeFingerprint?: string | null;

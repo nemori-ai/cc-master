@@ -89,7 +89,9 @@ export const ENUMS = {
   //   pending = 已询问/识别候选但未 settle；asserted = 无歧义 evidence/--ddl 转写的候选（可逆推进）；
   //   confirmed = 用户明确确认（--user-authorized）；none = 用户明确确认「本目标无 DDL」（≠ 键缺失/未询问）。
   deadlineState: ['pending', 'asserted', 'confirmed', 'none'],
-  // deadlineKind：硬承诺 vs 软目标（v1 恒 hard·soft 的行为差异作 follow-up·字段名预留）。
+  // deadlineKind：硬承诺 vs 软目标（issue #170·overdue 后行为分支）。
+  //   hard = 硬承诺：超期升级为 directive——须向用户报告并由用户裁决（延期/缩范围/分阶段/终止）。
+  //   soft = 软目标：超期只 advisory nudge——提示但不阻断，可继续推进（软目标超期不强制停派）。
   deadlineKind: ['hard', 'soft'],
   // deadlinePrecision：截止时刻精度。minute = 精确到秒的挂钟时刻；day = 只给日期（落当日 UTC 末刻 23:59:59Z）。
   deadlinePrecision: ['minute', 'day'],
@@ -783,7 +785,8 @@ export const INVARIANTS: Invariant[] = [
     level: 'warn',
     family: 'BIZ',
     scope: 'board',
-    summary: '交付 DDL（asserted|confirmed）已过期（now>=at）而全局 acceptance 未完成',
+    summary:
+      '交付 DDL（asserted|confirmed）已过期（now>=at）而交付未验收完成（canonical evaluateOverdue·soft→advisory / hard→directive）',
   },
   {
     id: 'FMT-GIT',
@@ -1440,16 +1443,16 @@ export function isDeadlineSettled(board: unknown): boolean {
   return readDeadline(board).settled;
 }
 
-// DEADLINE_KIND_V1_ALLOWED：v1 只接受 hard（soft 在 deadlineKind 枚举里预留但行为未定义——FMT-DEADLINE
-//   拒它，避免「schema 合法但语义未定义」的状态·codex review 修正 #3）。将来落 soft 行为差异时放开这里。
-export const DEADLINE_KIND_V1_ALLOWED = ['hard'];
+// DEADLINE_KIND_V1_ALLOWED：deadline.kind 的合法取值集合（issue #170 起 hard 与 soft 均放行，行为差异见
+//   deadlineKind 枚举说明 + evaluateOverdue 的 response 分支）。名字保留 V1 后缀仅为向后兼容旧导出符号。
+export const DEADLINE_KIND_V1_ALLOWED = ['hard', 'soft'];
 
 // isDeadlineWellShaped(deadline) → deadline 子对象形状是否合法（FMT-DEADLINE hard 判据·present 才校验）。
 //   · state 须 ∈ deadlineState 枚举。
 //   · state ∈ {asserted, confirmed}：at 必存在且严格 ISO-8601 UTC。
 //   · state === 'none'：不得带 at（none = 无 DDL）。
 //   · state === 'pending'：at 可无；若有须严格 ISO-8601 UTC（暂定候选）。
-//   · precision/provenance.source 若存在须合法枚举；kind 若存在 v1 只接受 'hard'；
+//   · precision/provenance.source 若存在须合法枚举；kind 若存在须 ∈ {hard, soft}（issue #170）；
 //     provenance.raw/tz_input 若存在须字符串；rev 若存在须整数 >=1。
 //   注：updated_at 不在本硬判据内（缺/坏走 FMT-TIME warn·不拦写盘·同 owner.heartbeat 风格）。
 export function isDeadlineWellShaped(deadline: unknown): boolean {
@@ -1573,6 +1576,105 @@ export function taskTrulyDone(task: TaskLike | null | undefined): boolean {
   if (!task || typeof task !== 'object') return false;
   const hasArtifact = task.artifact !== undefined && task.artifact !== null && task.artifact !== '';
   return task.status === 'done' && task.verified === true && hasArtifact;
+}
+
+// ── 交付验收 marker + canonical overdue 谓词（issue #170）─────────────────────────────────────────────
+//   engine 拥有唯一「交付已验收完成」判据（readDeliveryAcceptance）+ 唯一 overdue 谓词（evaluateOverdue），
+//   杜绝各消费者（lint / status-report / 下游 hook）各自用近似谓词判 overdue 而漂移。overdue 判定读交付
+//   验收 marker，而非每处重推「所有 task trulyDone」这一近似。deadline 是 👁 非窄腰字段——marker 同为 👁。
+
+// DeliveryAcceptanceView：交付整体是否已验收完成的规范化只读视图。
+//   accepted：交付是否已验收完成（overdue 谓词读它——已验收即不再 overdue）。
+//   source：'explicit'=采信了显式 marker（goal_contract.delivery.accepted:boolean）；
+//           'derived'=无显式 marker，从 tasks 派生（board 有 goal_contract 且所有 task trulyDone）。
+export interface DeliveryAcceptanceView {
+  accepted: boolean;
+  source: 'explicit' | 'derived';
+}
+
+// readDeliveryAcceptance(board) → canonical 交付验收判据（唯一 SSOT）。
+//   ① 显式 marker：goal_contract.delivery.accepted 为 boolean → 直接采信（source:'explicit'）——让
+//      orchestrator 能在「缩范围 / 分阶段 / 用户验收」等场景显式声明交付已验收，不被「某 task 尚未 trulyDone」
+//      的机械派生误判 overdue。
+//   ② 无显式 marker → 派生：所有 task trulyDone 即视作交付验收完成（source:'derived'）。空任务数组 →
+//      every 为真 → accepted（保 pre-#170 行为：BIZ-DEADLINE-OVERDUE 的近似谓词「存在非 trulyDone task」
+//      的取反，空板不触 overdue）。非对象 board / 无 goal_contract 的派生仍走 tasks（缺则 []）。
+export function readDeliveryAcceptance(board: unknown): DeliveryAcceptanceView {
+  if (board && typeof board === 'object' && !Array.isArray(board)) {
+    const contract = (board as Record<string, unknown>).goal_contract;
+    if (contract && typeof contract === 'object' && !Array.isArray(contract)) {
+      const delivery = (contract as Record<string, unknown>).delivery;
+      if (delivery && typeof delivery === 'object' && !Array.isArray(delivery)) {
+        const accepted = (delivery as Record<string, unknown>).accepted;
+        if (typeof accepted === 'boolean') return { accepted, source: 'explicit' };
+      }
+    }
+    const tasks = (board as Record<string, unknown>).tasks;
+    const list = Array.isArray(tasks) ? tasks : [];
+    return { accepted: list.every((t) => taskTrulyDone(t as TaskLike)), source: 'derived' };
+  }
+  return { accepted: false, source: 'derived' };
+}
+
+// OverdueView：canonical 交付 DDL overdue 判据的结构化结果（issue #170·含 issue #170 soft/hard 分支）。
+//   overdue：DDL 已过期且交付未验收（asserted|confirmed ∧ now>=at ∧ 板未归档 ∧ 交付未验收）。
+//   kind：DDL 软硬（issue #170）——hard=硬承诺 / soft=软目标。
+//   response：overdue 时按 kind 派生的建议响应强度——'directive'（hard·须报告用户裁决）/ 'advisory'
+//     （soft·提示但不阻断）/ 'none'（未 overdue）。消费者（lint 措辞 / status-report 展示 / 下游注入标签）
+//     据此分档，soft 超期只 advisory nudge、hard 超期升级 directive，不再各自近似。
+export interface OverdueView {
+  overdue: boolean;
+  kind: 'hard' | 'soft';
+  at: string | null;
+  at_ms: number | null;
+  archived: boolean;
+  accepted: boolean;
+  acceptance_source: 'explicit' | 'derived';
+  response: 'directive' | 'advisory' | 'none';
+}
+
+// evaluateOverdue(board, opts) → canonical overdue 谓词（唯一 SSOT·lint / status-report / 下游 hook 共用）。
+//   opts.now：ISO-8601 UTC 串或毫秒数（缺省 Date.now()）——供测试 / backtest 注入确定性挂钟。
+//   overdue ⟺ deadline.state ∈ {asserted, confirmed} ∧ 有合法 at ∧ now>=at ∧ owner.active!==false（未归档）
+//     ∧ readDeliveryAcceptance(board).accepted===false（交付未验收完成）。
+//   soft/hard 只决定「overdue 后怎么响应」（response 字段·issue #170），不改「是否 overdue」的判据本身。
+export function evaluateOverdue(board: unknown, opts: { now?: string | number } = {}): OverdueView {
+  const dl = readDeadline(board);
+  const acc = readDeliveryAcceptance(board);
+  const nowMs =
+    typeof opts.now === 'number'
+      ? opts.now
+      : typeof opts.now === 'string' && isISOUTC(opts.now)
+        ? Date.parse(opts.now)
+        : Date.now();
+  const owner =
+    board && typeof board === 'object' && !Array.isArray(board)
+      ? ((board as Record<string, unknown>).owner as Record<string, unknown> | undefined)
+      : undefined;
+  const archived = !!owner && owner.active === false;
+  const settled = dl.state === 'asserted' || dl.state === 'confirmed';
+  const overdue =
+    settled &&
+    dl.at_ms !== null &&
+    Number.isFinite(nowMs) &&
+    nowMs >= dl.at_ms &&
+    !archived &&
+    !acc.accepted;
+  const response: OverdueView['response'] = !overdue
+    ? 'none'
+    : dl.kind === 'soft'
+      ? 'advisory'
+      : 'directive';
+  return {
+    overdue,
+    kind: dl.kind,
+    at: dl.at,
+    at_ms: dl.at_ms,
+    archived,
+    accepted: acc.accepted,
+    acceptance_source: acc.source,
+    response,
+  };
 }
 
 // isReviewDependencyGate(value) → v1 review gate 的唯一合法声明形状。

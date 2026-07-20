@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0-rc.2] — 2026-07-20
+
+> **Four-harness cross-harness reliability — cursor headless fix, 2h worker timeout, kimi machine-wide quota (release candidate)** — pairs with **ccm-v0.22.0-rc.2**.
+
+### Skills / docs (lockstep with ccm-v0.22.0-rc.2)
+
+- `using-ccm` `command-catalog.md`: documents `quota status --refresh`, the raised `worker run --timeout-ms` ceiling (50..7_200_000, max 2h), and `kimi-code` as a `ccm quota status --machine-wide` target.
+- `using-ccm` `board-model-guide.md`, `master-orchestrator-guide` `dispatch.md`, `pacing-and-estimation` `usage-signals.md`: aligned with the four-harness quota/dispatch behavior.
+- Regenerated `plugin/dist/{claude-code,codex,cursor,kimi-code}` from source (skills projection).
+
+### Delivered behavior (engine side — see ccm-v0.22.0-rc.2)
+
+- **Four-harness hard gate met**: codex / cursor / claude / kimi all pass quota on every call path (`usage show`/`advise`, `quota status --machine-wide`) and read/write worker dispatch, endpoint-verified.
+- cursor `worker run` no longer misfires `owned_tree_survived` on its benign `worker-server`; `2026.07.16-899851b` admitted; worker timeout ceiling raised to 2h; `kimi-code` added to machine-wide quota.
+
 ## [0.21.0-rc.1] — 2026-07-20
 
 > **Skills quality-review fixes — self-containment & engine-drift cleanup (release candidate)** — pairs with **ccm-v0.22.0-rc.1**.

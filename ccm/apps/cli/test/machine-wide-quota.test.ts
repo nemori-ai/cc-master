@@ -148,6 +148,18 @@ function authorityFor(
 
 function collectionFor(target: Readonly<Data>): MachineQuotaCollection {
   const common = { captured_at: NOW.getTime() / 1000 };
+  if (target.surface_id === 'kimi-cli') {
+    return {
+      status: 'refreshed',
+      source: 'kimi-usages-api',
+      authSource: 'kimi-code-current-login',
+      signal: {
+        ...common,
+        five_hour: { used_percentage: 22, resets_at: RESET },
+        seven_day: { used_percentage: 61, resets_at: RESET },
+      },
+    };
+  }
   if (target.surface_id === 'codex-cli') {
     return {
       status: 'refreshed',
@@ -246,7 +258,7 @@ test('explicit refresh fans out scoped deltas, checkpoints, and retry is duplica
 
   const status = await readMachineWideQuotaStatus(store, NOW);
   assert.equal(status.schema, 'ccm/machine-quota-status/v1');
-  assert.equal(status.readings.length, 5);
+  assert.equal(status.readings.length, 7);
   const cursorAgentReading = status.readings.find(
     (reading: Data) => reading.target.surface_id === 'cursor-agent-cli',
   );
@@ -526,6 +538,163 @@ test('refreshed usage without identity/payer authority still produces signal pos
   assert.deepEqual(decision.reason_codes, ['QUOTA_TIGHT']);
 });
 
+test('machine-wide target catalog includes exact kimi five-hour and seven-day quota faces', async () => {
+  const { home } = setupSubscription();
+  const store = fakeStore();
+  const capturedTargets: Data[] = [];
+  const captureCollector: MachineQuotaCollectorBoundary = {
+    collect(target) {
+      capturedTargets.push(structuredClone(target));
+      return collectionFor(target);
+    },
+  };
+  await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors: captureCollector,
+    coordination,
+    now: NOW,
+  });
+
+  assert.deepEqual(
+    capturedTargets
+      .filter((target) => target.harness_id === 'kimi-code')
+      .map((target) => ({
+        harness_id: target.harness_id,
+        surface_id: target.surface_id,
+        provider_id: target.provider_id,
+        bucket_id: target.bucket_id,
+        window: target.window,
+        window_name: target.window_name,
+        collector_id: target.collector_id,
+        default_collector_harness: target.default_collector_harness,
+      }))
+      .sort((left, right) => left.window_name.localeCompare(right.window_name)),
+    [
+      {
+        harness_id: 'kimi-code',
+        surface_id: 'kimi-cli',
+        provider_id: 'moonshot',
+        bucket_id: 'five-hour-global',
+        window: { kind: 'rolling', name: 'five_hour', duration_sec: 18_000 },
+        window_name: 'five_hour',
+        collector_id: 'kimi-usages-api',
+        default_collector_harness: 'kimi-code',
+      },
+      {
+        harness_id: 'kimi-code',
+        surface_id: 'kimi-cli',
+        provider_id: 'moonshot',
+        bucket_id: 'seven-day-global',
+        window: { kind: 'rolling', name: 'seven_day', duration_sec: 604_800 },
+        window_name: 'seven_day',
+        collector_id: 'kimi-usages-api',
+        default_collector_harness: 'kimi-code',
+      },
+    ],
+  );
+});
+
+test('fresh kimi signal produces healthy fresh five-hour and seven-day machine-wide decisions', async () => {
+  const { home } = setupSubscription();
+  const store = fakeStore();
+  await refreshMachineWideQuota({ home, env: {}, store, collectors, coordination, now: NOW });
+
+  const status = await readMachineWideQuotaStatus(store, NOW);
+  const decisions = status.summary.decisions
+    .filter((decision: Data) => decision.target.harness_id === 'kimi-code')
+    .sort((left: Data, right: Data) =>
+      left.target.window.name.localeCompare(right.target.window.name),
+    );
+  assert.equal(decisions.length, 2);
+  assert.deepEqual(
+    decisions.map((decision: Data) => [
+      decision.target.window.name,
+      decision.state,
+      decision.freshness,
+      decision.reason_codes,
+    ]),
+    [
+      ['five_hour', 'healthy', 'fresh', []],
+      ['seven_day', 'healthy', 'fresh', []],
+    ],
+  );
+  const readings = status.readings
+    .filter((reading: Data) => reading.target.harness_id === 'kimi-code')
+    .sort((left: Data, right: Data) =>
+      left.target.window.name.localeCompare(right.target.window.name),
+    );
+  assert.deepEqual(
+    readings.map((reading: Data) => [
+      reading.target.window.name,
+      reading.used_percentage,
+      reading.source,
+    ]),
+    [
+      [
+        'five_hour',
+        22,
+        {
+          collector_id: 'kimi-usages-api',
+          source_schema: 'kimi-code/usages/v1',
+          auth_source: 'kimi-code-current-login',
+        },
+      ],
+      [
+        'seven_day',
+        61,
+        {
+          collector_id: 'kimi-usages-api',
+          source_schema: 'kimi-code/usages/v1',
+          auth_source: 'kimi-code-current-login',
+        },
+      ],
+    ],
+  );
+});
+
+test('expired or absent kimi signal degrades both machine-wide windows to honest unknown', async () => {
+  const { home } = setupSubscription();
+  const store = fakeStore();
+  const expiredKimi: MachineQuotaCollectorBoundary = {
+    collect(target) {
+      if (target.harness_id === 'kimi-code') {
+        return { status: 'unknown', reason: 'kimi-code access_token expired' };
+      }
+      return collectionFor(target);
+    },
+  };
+  await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors: expiredKimi,
+    coordination,
+    now: NOW,
+  });
+
+  const status = await readMachineWideQuotaStatus(store, NOW);
+  const decisions = status.summary.decisions.filter(
+    (decision: Data) => decision.target.harness_id === 'kimi-code',
+  );
+  assert.equal(decisions.length, 2);
+  assert.ok(decisions.every((decision: Data) => decision.state === 'unknown'));
+  assert.ok(decisions.every((decision: Data) => decision.freshness === 'unknown'));
+  assert.ok(
+    decisions.every(
+      (decision: Data) =>
+        decision.reason_codes.length === 1 && decision.reason_codes[0] === 'QUOTA_SIGNAL_UNKNOWN',
+    ),
+  );
+  const readings = status.readings.filter(
+    (reading: Data) => reading.target.harness_id === 'kimi-code',
+  );
+  assert.equal(readings.length, 2);
+  assert.ok(readings.every((reading: Data) => reading.used_percentage === null));
+  assert.ok(readings.every((reading: Data) => reading.resets_at === null));
+});
+
 test('Cursor IDE and Agent independently observe one shared billing pool with explicit provenance', async () => {
   const { home } = setupSubscription();
   const store = fakeStore();
@@ -720,6 +889,6 @@ test('CLI status is cached-only and refresh is an explicit machine-wide live sea
 
   const refreshed = await invoke(['quota', 'refresh', '--machine-wide', '--json']);
   assert.equal(refreshed.code, 0, refreshed.stderr);
-  assert.equal(collectionCount, 5);
+  assert.equal(collectionCount, 7);
   assert.equal(JSON.parse(refreshed.stdout).schema, 'ccm/machine-quota-refresh/v1');
 });

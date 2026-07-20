@@ -5,6 +5,7 @@ import {
   type MachineQuotaStore,
   readMachineWideQuotaStatus,
   refreshMachineWideQuota,
+  refreshMachineWideQuotaObservations,
 } from '../machine-wide-quota.js';
 import { runMachineWideQuotaNotificationCycle } from '../machine-wide-quota-notification.js';
 import { createQuotaAdmissionStore } from '../quota-admission-store.js';
@@ -82,6 +83,21 @@ function emitMachineWide(ctx: Ctx, data: unknown): number {
 
 export async function status(ctx: Ctx): Promise<number> {
   if (ctx.values['machine-wide'] === true) {
+    // --refresh: explicit on-demand live fill (no monitor daemon needed). Collects every target
+    //   through the same per-harness UsageReading strategy, persists observations + inits the home
+    //   salt, then reads — so a machine with no daemon is never permanently all-unknown. Default
+    //   (no flag) stays a cheap cached read that never calls a provider collector.
+    if (ctx.values.refresh === true) {
+      if (!ctx.machineQuotaCollectors) {
+        throw new Error('machine-wide quota collector boundary is required');
+      }
+      const data = await refreshMachineWideQuotaObservations({
+        env: ctx.env,
+        store: store(ctx) as MachineQuotaStore,
+        collectors: ctx.machineQuotaCollectors,
+      });
+      return emitMachineWide(ctx, data);
+    }
     if (ctx.machineWideQuotaNotifications) {
       const decisions = await ctx.machineWideQuotaNotifications.readPostures({ refresh: false });
       return emitMachineWide(ctx, {

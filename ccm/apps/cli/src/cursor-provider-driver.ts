@@ -209,7 +209,7 @@ const CONTRACT_ENUMS = Object.freeze({
   origin_harness: Object.freeze(['claude-code', 'codex', 'cursor']),
   auth_state: Object.freeze(['authenticated', 'unauthenticated', 'unknown']),
   binary_name: Object.freeze(['agent', 'cursor-agent']),
-  binary_version: Object.freeze(['2026.07.09-a3815c0']),
+  binary_version: Object.freeze(['2026.07.09-a3815c0', '2026.07.16-899851b']),
   quota_state: Object.freeze(['ample', 'tight', 'exhausted', 'unknown']),
   reservation_state: Object.freeze([
     'held',

@@ -6,6 +6,7 @@ import {
   type CriticalPathResult,
   canonicalJson,
   dependencyQualified,
+  evaluateOverdue,
   lintBoard,
   readDeadline,
   taskTrulyDone,
@@ -235,20 +236,18 @@ function advisoryHash(): string {
   return sha(canonicalJson({ usage: null, estimate: null }));
 }
 
-// deadlineSummary(board, nowMs, hasUnfinished) → 交付 DDL 的**确定性**只读视图（issue #149·D6）。
+// deadlineSummary(board, nowMs) → 交付 DDL 的**确定性**只读视图（issue #149·D6）。
 //   纯从 board.goal_contract.deadline（readDeadline·board-derived）+ 挂钟 now 派生——截止时刻 / 状态 / 剩余
-//   时间 / overdue。**不跑 MC / 不读跨板语料**（保 status-report 纯计算 + board-hash 缓存语义）；相对 forecast
-//   的 margin / risk band 归 `ccm estimate deadline-risk`（那才是 verdict SSOT）。无/pending/none 诚实降级、不假绿。
-function deadlineSummary(
-  board: BoardRecord,
-  nowMs: number,
-  hasUnfinished: boolean,
-): Record<string, unknown> {
+//   时间 / overdue。overdue 走 engine canonical evaluateOverdue（issue #170·与 lint 一份口径·读交付验收 marker
+//   而非本地近似），overdue_response 暴露 soft/hard 分档（advisory / directive）。**不跑 MC / 不读跨板语料**
+//   （保 status-report 纯计算 + board-hash 缓存语义）；相对 forecast 的 margin / risk band 归
+//   `ccm estimate deadline-risk`（那才是 verdict SSOT）。无/pending/none 诚实降级、不假绿。
+function deadlineSummary(board: BoardRecord, nowMs: number): Record<string, unknown> {
   const dl = readDeadline(board);
   const atMs = dl.at_ms;
   const settled = dl.settled && atMs != null; // asserted/confirmed 且有 at（none 无 at → 非此支）
   const timeRemainingHours = settled ? Math.round(((atMs as number) - nowMs) / 3600000) : null;
-  const overdue = settled && (atMs as number) <= nowMs && hasUnfinished;
+  const overdue = evaluateOverdue(board, { now: nowMs });
   return {
     present: dl.present,
     state: dl.state,
@@ -256,7 +255,10 @@ function deadlineSummary(
     precision: dl.precision,
     kind: dl.kind,
     time_remaining_hours: timeRemainingHours,
-    overdue,
+    overdue: overdue.overdue,
+    // overdue 后的建议响应强度（issue #170）：'directive'(hard 超期·须报告用户裁决) / 'advisory'(soft 超期·
+    //   提示但不阻断) / 'none'(未 overdue)。让 viewer / agent 分档 soft vs hard。
+    overdue_response: overdue.response,
     // margin / risk band（相对 forecast 的准时概率）见 `ccm estimate deadline-risk --json`（verdict SSOT）。
     risk_ref: 'ccm estimate deadline-risk',
   };
@@ -356,7 +358,7 @@ function computeReport(input: ResolvedInput, opts: ComputeOpts = {}): ReportEnve
     },
     summary,
     // 交付 DDL 只读视图（board-derived·确定性·issue #149·D6）。
-    deadline: deadlineSummary(input.board, now.getTime(), summary.verified_done < summary.total),
+    deadline: deadlineSummary(input.board, now.getTime()),
     delivery: {
       mode:
         input.board.delivery_contract && typeof input.board.delivery_contract === 'object'

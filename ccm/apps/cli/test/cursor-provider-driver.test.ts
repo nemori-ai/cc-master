@@ -644,6 +644,20 @@ test('versioned oracle is exact against production-owned closed registries', asy
   }
 });
 
+test('provider preflight admits the verified 2026.07.16 Cursor Agent binary version', () => {
+  const request = merge(catalog.defaults, {
+    surfaces: {
+      'cursor-agent-cli': {
+        binary: { version: '2026.07.16-899851b' },
+      },
+    },
+  });
+  const decision = preflightCursorProvider(request);
+
+  assert.equal(decision.eligible, true);
+  assert.equal(decision.blockers.includes('headless.binary-unsupported'), false);
+});
+
 test('owner receipt mutations kill every exported grammar predicate class', () => {
   const mutants: Record<string, Record<string, unknown>> = {
     'closed-fields': { ...catalog.owner_receipt, unexpected: true },

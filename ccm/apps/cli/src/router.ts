@@ -67,7 +67,6 @@ import * as watchdogHandler from './handlers/watchdog.js';
 import * as webViewerHandler from './handlers/web-viewer.js';
 import * as workerHandler from './handlers/worker.js';
 import { harnessSessionId, knownHarnessAdapters } from './harnesses/registry.js';
-import type { CurrentUsageReading } from './harnesses/types.js';
 import * as help from './help.js';
 import * as io from './io.js';
 import type {
@@ -87,6 +86,7 @@ import {
   type VerbSpec,
 } from './registry.js';
 import * as suggest from './suggest.js';
+import { usageReading } from './usage-reading.js';
 
 const EXIT = io.EXIT;
 
@@ -112,9 +112,16 @@ const DEFAULT_MACHINE_QUOTA_COLLECTORS: MachineQuotaCollectorBoundary = {
       return { status: 'unknown', reason: 'harness surface is not installed' };
     }
     try {
-      const reading: CurrentUsageReading = adapter.readCurrentUsageForSurface
-        ? adapter.readCurrentUsageForSurface(requestedSurface, env)
-        : adapter.readCurrentUsage(env);
+      // Read the surface through the one UsageReading domain service so the machine-wide collect path
+      //   and every other command space resolve the same per-harness adapter (single read strategy).
+      const reading = usageReading.readSurface({
+        env,
+        harnessId: harness,
+        surfaceId: requestedSurface,
+      });
+      if (!reading) {
+        return { status: 'unknown', reason: 'harness is not installed' };
+      }
       return reading.signal
         ? {
             status: 'refreshed',

@@ -176,6 +176,19 @@ for (const versionCase of [
   });
 }
 
+test('current 2026.07.16 Cursor Agent version satisfies the frozen read-only probe contract', () => {
+  const fixture = makeFixture([
+    { name: 'agent', authenticated: true, version: '2026.07.16-899851b' },
+  ]);
+  const headless = byId(inspectCursorExecutionSurfaces(fixture.env, deps()), 'cursor-agent-cli');
+
+  assert.equal(headless.binary.version, '2026.07.16-899851b');
+  assert.equal(headless.binary.state, 'available');
+  assert.equal(headless.compatibility, 'supported');
+  assert.equal(headless.auth.state, 'authenticated');
+  assert.equal(headless.eligibility.reason_codes.includes('binary-unsupported'), false);
+});
+
 test('positive auth/quota fixture admits only the headless surface, never the IDE surface', () => {
   const fixture = makeFixture([{ name: 'cursor' }, { name: 'agent', authenticated: true }]);
   let collectorSawCredential = false;

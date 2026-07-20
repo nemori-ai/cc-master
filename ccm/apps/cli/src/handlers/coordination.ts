@@ -26,9 +26,9 @@ import {
   withLock,
 } from '@ccm/engine';
 import * as discover from '../discover.js';
-import { resolveHarnessAdapter } from '../harnesses/registry.js';
 import * as io from '../io.js';
 import * as mutations from '../mutations.js';
+import { usageReading } from '../usage-reading.js';
 import { type BoardArg, type Ctx, runRead, runWrite } from './_common.js';
 
 interface KindedError extends Error {
@@ -638,10 +638,12 @@ function arbitrateMutate(
   const selfFile = path.basename(boardPath);
   const selfSession = boardOwner(b).session_id;
   const harnessFlag = boardHarness(b) ?? (ctx.values.harness as string | undefined);
-  const adapter = resolveHarnessAdapter({ env: ctx.env, harnessFlag });
+  // Read the current-account usage signal + this harness's usage-source descriptor through the one
+  //   UsageReading domain service (same per-harness adapter every other command space reads through).
+  const reading = usageReading.readCurrent({ env: ctx.env, harnessFlag });
   const usage = opts.usage ?? {
-    signal: adapter.readCurrentUsage(ctx.env).signal,
-    ...adapter.usageSource(ctx.env),
+    signal: reading.signal,
+    ...reading.usageSource,
   };
   const accountsMap =
     opts.accountsMap === undefined ? readRegistry(ctx.env, homeFlag) : opts.accountsMap;

@@ -4,9 +4,11 @@
 //   · ENUMS deadlineState/Kind/Precision/Source 闭集。
 //   · normalizeDeadlineAt：minute 只收严格 ISO UTC；day 落当日末刻 23:59:59Z；非 ISO / 坏日期 → null。
 //   · readDeadline：键缺失=pending/gating；none/asserted/confirmed 视图；rev 读取。
-//   · isDeadlineWellShaped：state/at/none/precision/kind(v1 hard-only)/rev/provenance 全谱。
+//   · isDeadlineWellShaped：state/at/none/precision/kind(hard|soft·issue #170)/rev/provenance 全谱。
 //   · isDeadlineSettled。
 //   · lintBoard 三规则：FMT-DEADLINE hard、BIZ-DEADLINE-PENDING warn、BIZ-DEADLINE-OVERDUE warn（含 now 注入）。
+//   · issue #170：kind:soft 放行 + soft/hard overdue 行为分支。
+//   · issue #170：canonical 交付验收 marker（readDeliveryAcceptance）+ overdue 谓词（evaluateOverdue）。
 //   · legacy 兼容（无 goal_contract / 无 deadline → 三规则早返回·板仍合法）。
 
 import assert from 'node:assert/strict';
@@ -15,11 +17,13 @@ import { test } from 'node:test';
 //   （与 board-model.test.ts / board-lint-core.test.ts 同型·turbo test 依赖 build）。
 import {
   ENUMS,
+  evaluateOverdue,
   isDeadlineSettled,
   isDeadlineWellShaped,
   lintBoard,
   normalizeDeadlineAt,
   readDeadline,
+  readDeliveryAcceptance,
 } from '../dist/index.mjs';
 
 // ── 基线合法板（含已激活 goal_contract）────────────────────────────────────────────────────────────
@@ -178,6 +182,10 @@ test('isDeadlineWellShaped: valid shapes', () => {
   );
   assert.equal(isDeadlineWellShaped({ state: 'none' }), true);
   assert.equal(
+    isDeadlineWellShaped({ state: 'asserted', at: '2026-08-01T09:00:00Z', kind: 'soft' }),
+    true, // issue #170：soft 现放行（v1 曾 hard-only）
+  );
+  assert.equal(
     isDeadlineWellShaped({
       state: 'asserted',
       at: '2026-08-01T09:00:00Z',
@@ -198,9 +206,9 @@ test('isDeadlineWellShaped: invalid shapes rejected', () => {
     false,
   );
   assert.equal(
-    isDeadlineWellShaped({ state: 'asserted', at: '2026-08-01T09:00:00Z', kind: 'soft' }),
+    isDeadlineWellShaped({ state: 'asserted', at: '2026-08-01T09:00:00Z', kind: 'bogus' }),
     false,
-  ); // v1 hard-only
+  ); // kind ∈ {hard, soft} only
   assert.equal(
     isDeadlineWellShaped({ state: 'asserted', at: '2026-08-01T09:00:00Z', rev: 0 }),
     false,
@@ -248,8 +256,13 @@ test('lint: FMT-DEADLINE hard error on malformed deadline shape', () => {
   assert.equal(ruleHit(res, 'FMT-DEADLINE'), 'hard');
 });
 
-test('lint: FMT-DEADLINE hard error rejects kind soft (v1)', () => {
-  const bad = withDeadline({ state: 'asserted', at: '2026-08-01T09:00:00Z', kind: 'soft' });
+test('lint: FMT-DEADLINE accepts kind soft (issue #170·soft 放行)', () => {
+  const ok = withDeadline({ state: 'asserted', at: '2026-08-01T09:00:00Z', kind: 'soft' });
+  assert.equal(ruleHit(lintBoard(JSON.stringify(ok)), 'FMT-DEADLINE'), null);
+});
+
+test('lint: FMT-DEADLINE hard error rejects bogus kind', () => {
+  const bad = withDeadline({ state: 'asserted', at: '2026-08-01T09:00:00Z', kind: 'bogus' });
   assert.equal(ruleHit(lintBoard(JSON.stringify(bad)), 'FMT-DEADLINE'), 'hard');
 });
 
@@ -323,4 +336,151 @@ test('lint: BIZ-DEADLINE-OVERDUE silent when all tasks trulyDone', () => {
   );
   const res = lintBoard(JSON.stringify(b), { now: '2026-08-02T00:00:00Z' });
   assert.equal(ruleHit(res, 'BIZ-DEADLINE-OVERDUE'), null);
+});
+
+// ── issue #170：soft/hard overdue 行为分支（lint 措辞层）─────────────────────────────────────────────
+function overdueMsg(res: { warnings: { rule: string; message: string }[] }): string | null {
+  const w = res.warnings.find((e) => e.rule === 'BIZ-DEADLINE-OVERDUE');
+  return w ? w.message : null;
+}
+
+test('lint: soft DDL overdue still warns but with advisory (non-blocking) wording', () => {
+  const b = withDeadline(
+    {
+      state: 'confirmed',
+      at: '2026-08-01T09:00:00Z',
+      kind: 'soft',
+      updated_at: '2026-07-16T11:00:00Z',
+    },
+    { tasks: [{ id: 'T1', status: 'ready', deps: [] }] },
+  );
+  const res = lintBoard(JSON.stringify(b), { now: '2026-08-02T00:00:00Z' });
+  assert.equal(ruleHit(res, 'BIZ-DEADLINE-OVERDUE'), 'warn');
+  const msg = overdueMsg(res) ?? '';
+  assert.match(msg, /提示但不阻断|软目标超期不强制停派/); // advisory nudge，不含 hard 的「须由用户裁决」升级语
+  assert.doesNotMatch(msg, /由用户裁决延期/);
+});
+
+test('lint: hard DDL overdue keeps directive (escalation) wording', () => {
+  const b = withDeadline(
+    {
+      state: 'confirmed',
+      at: '2026-08-01T09:00:00Z',
+      kind: 'hard',
+      updated_at: '2026-07-16T11:00:00Z',
+    },
+    { tasks: [{ id: 'T1', status: 'ready', deps: [] }] },
+  );
+  const res = lintBoard(JSON.stringify(b), { now: '2026-08-02T00:00:00Z' });
+  assert.equal(ruleHit(res, 'BIZ-DEADLINE-OVERDUE'), 'warn');
+  assert.match(overdueMsg(res) ?? '', /由用户裁决延期/);
+});
+
+// ── issue #170：readDeliveryAcceptance（canonical 交付验收 marker）───────────────────────────────────
+test('readDeliveryAcceptance: derived from tasks (all trulyDone → accepted)', () => {
+  const done = baseBoard({
+    tasks: [{ id: 'T1', status: 'done', verified: true, artifact: 'PR#1', deps: [] }],
+  });
+  assert.deepEqual(readDeliveryAcceptance(done), { accepted: true, source: 'derived' });
+
+  const partial = baseBoard({
+    tasks: [
+      { id: 'T1', status: 'done', verified: true, artifact: 'PR#1', deps: [] },
+      { id: 'T2', status: 'ready', deps: [] },
+    ],
+  });
+  assert.deepEqual(readDeliveryAcceptance(partial), { accepted: false, source: 'derived' });
+
+  // 空任务数组 → every 真 → accepted（保 pre-#170「存在非 trulyDone task」取反的空板行为）。
+  assert.deepEqual(readDeliveryAcceptance(baseBoard()), { accepted: true, source: 'derived' });
+});
+
+test('readDeliveryAcceptance: explicit marker overrides derived (both directions)', () => {
+  // 显式 accepted:true 即便仍有未完成 task 也采信（缩范围/用户验收场景）。
+  const explicitTrue = baseBoard({ tasks: [{ id: 'T1', status: 'ready', deps: [] }] });
+  (explicitTrue.goal_contract as Record<string, unknown>).delivery = { accepted: true };
+  assert.deepEqual(readDeliveryAcceptance(explicitTrue), { accepted: true, source: 'explicit' });
+
+  // 显式 accepted:false 即便所有 task trulyDone 也采信为未验收。
+  const explicitFalse = baseBoard({
+    tasks: [{ id: 'T1', status: 'done', verified: true, artifact: 'PR#1', deps: [] }],
+  });
+  (explicitFalse.goal_contract as Record<string, unknown>).delivery = { accepted: false };
+  assert.deepEqual(readDeliveryAcceptance(explicitFalse), { accepted: false, source: 'explicit' });
+});
+
+// ── issue #170：evaluateOverdue（canonical overdue 谓词）─────────────────────────────────────────────
+test('evaluateOverdue: equivalence with legacy predicate (asserted|confirmed ∧ past ∧ !archived ∧ !accepted)', () => {
+  const b = withDeadline(
+    {
+      state: 'confirmed',
+      at: '2026-08-01T09:00:00Z',
+      kind: 'hard',
+      updated_at: '2026-07-16T11:00:00Z',
+    },
+    { tasks: [{ id: 'T1', status: 'ready', deps: [] }] },
+  );
+  const past = evaluateOverdue(b, { now: '2026-08-02T00:00:00Z' });
+  assert.equal(past.overdue, true);
+  assert.equal(past.kind, 'hard');
+  assert.equal(past.response, 'directive');
+  assert.equal(past.acceptance_source, 'derived');
+  // 未到期 → 非 overdue。
+  assert.equal(evaluateOverdue(b, { now: '2026-07-20T00:00:00Z' }).overdue, false);
+});
+
+test('evaluateOverdue: soft past DDL → advisory response', () => {
+  const b = withDeadline(
+    {
+      state: 'confirmed',
+      at: '2026-08-01T09:00:00Z',
+      kind: 'soft',
+      updated_at: '2026-07-16T11:00:00Z',
+    },
+    { tasks: [{ id: 'T1', status: 'ready', deps: [] }] },
+  );
+  const od = evaluateOverdue(b, { now: '2026-08-02T00:00:00Z' });
+  assert.equal(od.overdue, true);
+  assert.equal(od.kind, 'soft');
+  assert.equal(od.response, 'advisory');
+});
+
+test('evaluateOverdue: archived / accepted / pending short-circuit to not-overdue', () => {
+  const at = '2026-08-01T09:00:00Z';
+  const now = '2026-08-02T00:00:00Z';
+  const archived = withDeadline(
+    { state: 'confirmed', at, updated_at: '2026-07-16T11:00:00Z' },
+    {
+      owner: { active: false, session_id: '', heartbeat: '2026-07-16T10:00:00Z' },
+      tasks: [{ id: 'T1', status: 'ready', deps: [] }],
+    },
+  );
+  assert.equal(evaluateOverdue(archived, { now }).overdue, false);
+  assert.equal(evaluateOverdue(archived, { now }).archived, true);
+
+  const accepted = withDeadline(
+    { state: 'confirmed', at, updated_at: '2026-07-16T11:00:00Z' },
+    { tasks: [{ id: 'T1', status: 'done', verified: true, artifact: 'PR#1', deps: [] }] },
+  );
+  assert.equal(evaluateOverdue(accepted, { now }).overdue, false);
+  assert.equal(evaluateOverdue(accepted, { now }).accepted, true);
+
+  // explicit accepted marker → 不 overdue（即便仍有未完成 task）。
+  const explicitAccepted = withDeadline(
+    { state: 'confirmed', at, updated_at: '2026-07-16T11:00:00Z' },
+    { tasks: [{ id: 'T1', status: 'ready', deps: [] }] },
+  );
+  (explicitAccepted.goal_contract as Record<string, unknown>).delivery = { accepted: true };
+  const explOd = evaluateOverdue(explicitAccepted, { now });
+  assert.equal(explOd.overdue, false);
+  assert.equal(explOd.acceptance_source, 'explicit');
+
+  // pending（未 settle）→ 不 overdue。
+  const pending = withDeadline(
+    { state: 'pending', at, updated_at: '2026-07-16T11:00:00Z' },
+    { tasks: [{ id: 'T1', status: 'ready', deps: [] }] },
+  );
+  const pendOd = evaluateOverdue(pending, { now });
+  assert.equal(pendOd.overdue, false);
+  assert.equal(pendOd.response, 'none');
 });

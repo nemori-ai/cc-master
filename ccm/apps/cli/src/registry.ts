@@ -64,6 +64,16 @@ export const REGISTRY: Registry = {
       examples: ['ccm capability check goal-contract/v1 --json'],
       handler: 'capability.check',
     },
+    list: {
+      summary: '声明本 ccm 兑现的全部 capability + 版本（跨版本斜错协商基础）',
+      read: true,
+      positionals: [],
+      options: {
+        json: { type: 'boolean', desc: '结构化清单输出（schema + ccm_version + capabilities[]）' },
+      },
+      examples: ['ccm capability list --json'],
+      handler: 'capability.list',
+    },
   },
   // ════════════════════ worker（R0：raw agent-command passthrough + session lifecycle）══════════════
   worker: {
@@ -99,11 +109,11 @@ export const REGISTRY: Registry = {
           desc: '目标 harness CLI',
         },
         cwd: { type: 'string', required: false, desc: 'child cwd 的绝对路径（默认当前目录）' },
-        'timeout-ms': { type: 'string', required: false, desc: '总超时，50..1800000 毫秒' },
+        'timeout-ms': { type: 'string', required: false, desc: '总超时，50..7200000 毫秒' },
         'max-output-bytes': {
           type: 'string',
           required: false,
-          desc: '每个 output stream 上限，256..1048576 字节',
+          desc: 'stdout 上限，256..33554432 字节（默认 33554432；stderr 独立上限 8388608）',
         },
       },
       examples: [
@@ -123,9 +133,17 @@ export const REGISTRY: Registry = {
       positionals: [],
       options: {
         'machine-wide': { type: 'boolean', desc: '读取所有受支持 target scope 的本机缓存投影' },
+        refresh: {
+          type: 'boolean',
+          desc: '（配合 --machine-wide）按需 live 采集填充缓存后再读，冷缓存无需 monitor daemon 也不全 unknown',
+        },
         json: { type: 'boolean', desc: '结构化输出' },
       },
-      examples: ['ccm quota status --json', 'ccm quota status --machine-wide --json'],
+      examples: [
+        'ccm quota status --json',
+        'ccm quota status --machine-wide --json',
+        'ccm quota status --machine-wide --refresh --json',
+      ],
       handler: 'quota.status',
     },
     refresh: {
@@ -624,6 +642,11 @@ export const REGISTRY: Registry = {
           type: 'string',
           enum: ['pending', 'asserted'],
           desc: 'set：候选态（默认 asserted·无歧义绝对时刻/显式 --ddl；pending 用于识别到候选但仍歧义）',
+        },
+        kind: {
+          type: 'string',
+          enum: ['hard', 'soft'],
+          desc: 'set/amend：DDL 软硬（默认 hard·超期升级 directive；soft=软目标·超期只 advisory nudge 不阻断·issue #170）',
         },
         'provenance-raw': {
           type: 'string',

@@ -12,6 +12,7 @@
     "deadline-risk-endpoint",
     "kimi-code-harness-support",
     "kimi-model-policy-registry",
+    "rc2-cursor-timeout-kimi-machinewide",
     "viewer-cache-agent-stream-lifecycle",
     "worker-usage-four-harness-parity"
   ]
