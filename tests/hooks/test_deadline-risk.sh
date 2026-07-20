@@ -18,6 +18,7 @@ HOOK="$PLUGIN_ROOT/hooks/scripts/identity-nudge.js"
 #   · board set-param <key> <value> --board P            → write runtime.<key>=<value> (whitelist incl. the two
 #                                                          new deadline-risk keys), exit 0.
 #   · estimate deadline-risk --board P --json            → emit {ok,data:<CCM_STUB_DR>} (env drives the band).
+#   · capability negotiate goal-deadline --accept …      → emit negotiated goal-deadline/v1 (issue #167).
 #   · coordination notify --kind deadline_risk … --json  → emit a deterministic id, log the call to $CALL_LOG.
 #   · coordination inbox ack <id> … --json               → emit {ok}, log the ack to $CALL_LOG.
 #   · board critical-path --json --board P               → chain = board task ids (for the X/Y count).
@@ -43,6 +44,11 @@ fi
 if [ "$noun" = "estimate" ] && [ "$verb" = "deadline-risk" ]; then
   log "estimate-deadline-risk"
   if [ -n "${CCM_STUB_DR:-}" ]; then printf '{"ok":true,"data":%s}' "$CCM_STUB_DR"; else printf '{"ok":true,"data":{"risk_band":"unknown"}}'; fi
+  exit 0
+fi
+if [ "$noun" = "capability" ] && [ "$verb" = "negotiate" ]; then
+  log "capability-negotiate-goal-deadline"
+  printf '{"ok":true,"data":{"schema":"ccm/capability-negotiation/v1","family":"goal-deadline","capability":"goal-deadline/v1","version":1,"negotiated":true}}'
   exit 0
 fi
 if [ "$noun" = "coordination" ] && [ "$verb" = "notify" ]; then

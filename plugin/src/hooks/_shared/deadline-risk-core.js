@@ -23,6 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { negotiateGoalDeadlineCapability } = require('./capability-negotiation.js');
 
 const RISK_BANDS = ['on_track', 'watch', 'at_risk', 'likely_late', 'overdue', 'unknown'];
 const RISKY_BANDS = new Set(['watch', 'at_risk', 'likely_late', 'overdue']);
@@ -288,6 +289,12 @@ function deadlineRiskBlock(cfg) {
   const fingerprintChanged = lastFp !== fp;
   const due = cadenceDue || (fingerprintChanged && floorOk);
   if (!due) return { hasSettledDdl: true, block: null };
+
+  // goal-deadline capability version negotiation (issue #167): degrade silently when ccm cannot
+  //   satisfy the consumer accept set — same fail-safe as ccm absent / bad estimate JSON.
+  if (!negotiateGoalDeadlineCapability({ ccmBin: cfg.ccmBin, homeDir: cfg.homeDir, timeoutMs })) {
+    return { hasSettledDdl: true, block: null };
+  }
 
   // ── 重估：调 ccm estimate deadline-risk（红线3 只搬运·ccm 缺 / 坏 JSON → 静默降级不写回·下 Stop 重试）──
   const data = spawnCcmJson(

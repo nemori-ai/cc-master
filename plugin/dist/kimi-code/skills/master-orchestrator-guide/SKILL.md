@@ -195,6 +195,18 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | `multi-layer-planning.md` | 派发的大节点**内部**本身是复杂规划问题时（board ⊥ 项目自身 planning 层） |
 | `handoff.md` | 优雅交接给新 session（quiesce / drain / 叙事层文档 + 归档）；kimi-code 走 `cc-master:handoff-to-new-session` + `cc-master:as-master-orchestrator --resume` |
 
+### 派发与选型导航：按决策反查
+
+上面两张表按「资源」组织（每个 skill / reference 各管什么）；这张按**你要做的决策**反查——「派发 + 选型」的答案散在多处，从这一处按序路由，不靠记忆连跳：
+
+| 你要做的决策 | 按这个顺序读 |
+|---|---|
+| 选 executor 值 + 后台机制（shell / subagent / workflow） | §4.2 拿 executor min-max 与派发 prompt 六件事；机制细节（后台机制对比 / parallel vs pipeline / escalation / 派发卫生）drill `references/dispatch.md`；workflow 脚本写法归 `authoring-workflows` |
+| 跨 harness worker 选择（从全机 worker pool 选 target） | 流程走 §④「Cross-harness 调派热路径」；判断框架 drill `references/dispatch.md` §跨 harness 的当前最小闭环；命令合同（harness inventory / worker run / agent 登记收口）归 `using-ccm` |
+| 模型档选型 / effect floor（`O / T1 / T2 / T3`） | 编排决策（工作角色定 floor → 候选排序 → fallback → 配额收紧时的容量动作）drill `references/model-allocation.md`；模型事实与相对成本归 `pacing-and-estimation` |
+| 读 `usage` / `estimate` advisory 配速 | 热路径在 §4.3；verdict / 窗口合同 / 信号源 / 估算诚实字段的消费机制归 `pacing-and-estimation`；精确命令语法归 `using-ccm` |
+| 号池换号决策 | 决策锚（lever 阶梯 / policy 授权 / 绝不自授权）按上方 references 表 `cost-decisions.md` 行的 host 适用标注 drill；号池机制（录号 / 换号 / 选号）归 `using-ccm` |
+
 ### 你与用户之间的 commands（知道它们存在）
 
 用户在前台敲这些 kimi-code slash commands；你该知道它们的存在与语义，好配合：

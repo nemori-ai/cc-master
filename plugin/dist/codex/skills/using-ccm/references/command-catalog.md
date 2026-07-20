@@ -51,6 +51,7 @@
 - [namespace capability](#namespace-capability)
   - [capability check](#capability-check)
   - [capability list](#capability-list)
+  - [capability negotiate](#capability-negotiate)
 - [namespace target](#namespace-target)
   - [target set](#target-set)
   - [target show](#target-show)
@@ -165,6 +166,8 @@
   - [estimate risk](#estimate-risk)
   - [estimate cost-to-complete](#estimate-cost-to-complete)
   - [estimate deadline-risk](#estimate-deadline-risk)
+- [namespace calibration（显式写校准语料）](#namespace-calibration显式写校准语料)
+  - [calibration capture](#calibration-capture)
 - [namespace statusline](#namespace-statusline)
   - [statusline render](#statusline-render)
   - [statusline install](#statusline-install)
@@ -922,6 +925,20 @@ ccm capability list [--json]
 - `--json` 输出结构化清单：`{ "schema": "ccm/capability-manifest/v1", "ccm_version": "<本 ccm 版本>", "capabilities": [ { "id", "name", "version" } ] }`。
 - 当前 capabilities（append-only·顺序稳定）：`board-init/structured-board-path-v1`、`goal-contract/v1`、`goal-deadline/v1`。
 - 新 plugin 遇旧 ccm 时枚举它做降级判断：想用的 id 不在清单里 → 关掉对应功能或提示用户「升级 ccm 到兑现该 id 的版本」。
+
+### capability negotiate
+
+**只读、零写**：consumer 声明可接受的 capability id 集，engine 返回双方交集里版本最高的一项，或 exit 3 明确拒绝。
+
+```bash
+ccm capability negotiate <capability-family> --accept <capability-id> [--accept <capability-id>...] [--json]
+```
+
+- `<capability-family>`：能力族名（如 `goal-deadline`）。
+- `--accept`：可重复；每项为完整 id（如 `goal-deadline/v1`）或同族版本后缀（如 `v1`）。
+- 成功时 `--json` 输出：`{ "schema": "ccm/capability-negotiation/v1", "family", "capability", "version", "negotiated": true }`。
+- 无兼容版本时 exit 3，错误信息列出 consumer 接受集与本 ccm 声明集。
+- 与 `check` 互补：`check` 断言单个 id；`negotiate` 供 consumer 前向声明多版本（含未来 vN）后由 engine 选定实际兑现项。plugin `deadline-risk` 周期条目经此协商 `goal-deadline` 后再调 `ccm estimate deadline-risk`。
 
 ## namespace target
 
@@ -2822,6 +2839,36 @@ ccm estimate deadline-risk [flags]
 | `--json` | | bool | | 结构化输出 |
 
 - 例：`ccm estimate deadline-risk --json` · `ccm estimate deadline-risk --scope this-board --seed 42 --json`
+
+---
+
+## namespace calibration（显式写校准语料）
+
+### calibration capture
+
+**写 home-level calibration store；只读 board**
+
+```
+ccm calibration capture [flags]
+```
+
+- positional：无
+- 行为：复用 `estimate deadline-risk` 的同一预测计算路径，将捕获时的真实 backlog、预测 band / probability、coverage / confidence、WIP 与未回填 label 一起追加到 `<home>/calibration/deadline-snapshots.jsonl`。board 本身只读、不改窄腰字段。
+- 稳定身份：`board_id` 是 canonical board 文件路径的 SHA-256 身份；同一 board 在不同采集时刻保持同一 `board_id`，避免用可变 goal / session 当实体键。
+- 幂等：`snapshot_id = <board_id>@<captured_at_ms>`；同 board + 同 `--as-of` 重放不重复计数（`captured:false, duplicate:true`），不同 `--as-of` 是该 board 的新观察。无 deadline 时跳过落盘。
+- 边界：本命令只采预测侧 observed snapshot；label 回填与 calibration flip 不在此命令内。`ccm estimate deadline-risk` 仍是纯只读、绝不创建 store。
+- flags：
+
+| flag | 短名 | 类型 | 取值 | 含义 |
+|---|---|---|---|---|
+| `--scope <v>` | | enum | `home`（默认）\| `this-repo` \| `this-board` | 历史语料范围（与 deadline-risk 同口径） |
+| `--as-of <str>` | | ISO-8601 UTC | | 采集时刻；同 board+as-of 是幂等键（默认 now） |
+| `--runs <n>` | | string | | MC trials（默认 2000） |
+| `--seed <n>` | | string | | PRNG 种子（默认 42） |
+| `--effective-n <n>` | | string | | 只缩 throughput 参考，不改 RCPSP verdict |
+| `--json` | | bool | | 输出 `{captured,duplicate,dry_run,skipped_reason,store_path,snapshot}` |
+
+- 例：`ccm calibration capture --json` · `ccm calibration capture --scope this-board --as-of 2026-07-20T12:00:00Z --json`
 
 ---
 
