@@ -384,12 +384,14 @@ function renderShow(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading):
       };
       const cur5h = sidecar ? projectWindow(sidecar.five_hour) : null;
       const cur7d = sidecar ? projectWindow(sidecar.seven_day) : null;
+      const curFable7d = sidecar ? projectWindow(sidecar.fable_seven_day) : null;
       const curBilling = sidecar ? projectWindow(sidecar.billing_period) : null;
       // 至少一个非过期窗口有有效 used% → 账户口径可用。
       const currentAvailable =
         sidecar != null &&
         ((cur5h?.used_percentage ?? null) !== null ||
           (cur7d?.used_percentage ?? null) !== null ||
+          (curFable7d?.used_percentage ?? null) !== null ||
           (curBilling?.used_percentage ?? null) !== null);
       const current = sidecar
         ? {
@@ -397,6 +399,7 @@ function renderShow(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading):
             available: currentAvailable,
             five_hour: cur5h,
             seven_day: cur7d,
+            fable_seven_day: curFable7d,
             billing_period: curBilling,
             captured_at: sidecar.captured_at ?? null,
           }
@@ -405,6 +408,7 @@ function renderShow(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading):
             available: false,
             five_hour: null,
             seven_day: null,
+            fable_seven_day: null,
             billing_period: null,
             captured_at: null,
           };
@@ -446,11 +450,13 @@ function renderShow(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading):
       if (current.available) {
         const p5 = current.five_hour?.used_percentage;
         const p7 = current.seven_day?.used_percentage;
+        const pFable7d = current.fable_seven_day?.used_percentage;
         const billing = current.billing_period?.used_percentage;
         const label =
           currentUsage.source === 'codex-app-server' ? 'Codex app-server' : 'account 权威';
+        const fablePart = pFable7d != null ? ` fable_7d=${fmtPct(pFable7d)}` : '';
         lines.push(
-          `  current（${label}）: 5h=${fmtPct(p5)} 7d=${fmtPct(p7)}${billing != null ? ` billing_period=${fmtPct(billing)}` : ''}`,
+          `  current（${label}）: 5h=${fmtPct(p5)} 7d=${fmtPct(p7)}${fablePart}${billing != null ? ` billing_period=${fmtPct(billing)}` : ''}`,
         );
       } else {
         lines.push(

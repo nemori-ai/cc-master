@@ -184,6 +184,18 @@ function collectionFor(target: Readonly<Data>): MachineQuotaCollection {
       },
     };
   }
+  if (target.surface_id === 'claude-fable-5-cli') {
+    return {
+      status: 'refreshed',
+      source: 'fake-claude-fable',
+      authority: authorityFor(target),
+      signal: {
+        ...common,
+        five_hour: null,
+        seven_day: { used_percentage: 52, resets_at: RESET },
+      },
+    };
+  }
   if (target.surface_id === 'cursor-ide-plugin') {
     return {
       status: 'refreshed',
@@ -258,7 +270,7 @@ test('explicit refresh fans out scoped deltas, checkpoints, and retry is duplica
 
   const status = await readMachineWideQuotaStatus(store, NOW);
   assert.equal(status.schema, 'ccm/machine-quota-status/v1');
-  assert.equal(status.readings.length, 7);
+  assert.equal(status.readings.length, 8);
   const cursorAgentReading = status.readings.find(
     (reading: Data) => reading.target.surface_id === 'cursor-agent-cli',
   );
@@ -654,6 +666,51 @@ test('fresh kimi signal produces healthy fresh five-hour and seven-day machine-w
   );
 });
 
+test('machine-wide target catalog includes claude-fable-5 independent seven-day quota face', async () => {
+  const { home } = setupSubscription();
+  const store = fakeStore();
+  const capturedTargets: Data[] = [];
+  const captureCollector: MachineQuotaCollectorBoundary = {
+    collect(target) {
+      capturedTargets.push(structuredClone(target));
+      return collectionFor(target);
+    },
+  };
+  await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors: captureCollector,
+    coordination,
+    now: NOW,
+  });
+
+  const fableTarget = capturedTargets.find((target) => target.surface_id === 'claude-fable-5-cli');
+  assert.ok(fableTarget);
+  assert.equal(fableTarget.bucket_id, 'seven-day-fable-global');
+  assert.equal(fableTarget.window_name, 'seven_day');
+  assert.equal(fableTarget.collector_id, 'claude-statusline-sidecar');
+});
+
+test('fresh fable 7d signal produces healthy machine-wide decision + reading', async () => {
+  const { home } = setupSubscription();
+  const store = fakeStore();
+  await refreshMachineWideQuota({ home, env: {}, store, collectors, coordination, now: NOW });
+
+  const status = await readMachineWideQuotaStatus(store, NOW);
+  const decision = status.summary.decisions.find(
+    (candidate: Data) => candidate.target.surface_id === 'claude-fable-5-cli',
+  );
+  assert.ok(decision);
+  assert.equal(decision.target.window.name, 'seven_day');
+  assert.equal(decision.state, 'healthy');
+  const reading = status.readings.find(
+    (candidate: Data) => candidate.target.surface_id === 'claude-fable-5-cli',
+  );
+  assert.equal(reading?.used_percentage, 52);
+  assert.equal(reading?.source.collector_id, 'claude-statusline-sidecar');
+});
+
 test('expired or absent kimi signal degrades both machine-wide windows to honest unknown', async () => {
   const { home } = setupSubscription();
   const store = fakeStore();
@@ -889,6 +946,6 @@ test('CLI status is cached-only and refresh is an explicit machine-wide live sea
 
   const refreshed = await invoke(['quota', 'refresh', '--machine-wide', '--json']);
   assert.equal(refreshed.code, 0, refreshed.stderr);
-  assert.equal(collectionCount, 7);
+  assert.equal(collectionCount, 8);
   assert.equal(JSON.parse(refreshed.stdout).schema, 'ccm/machine-quota-refresh/v1');
 });

@@ -36,7 +36,7 @@ const TASK_DETAIL_SCHEMA = 'ccm/web-viewer-task/v1';
 const AGENT_DETAIL_SCHEMA = 'ccm/web-viewer-agent/v1';
 const PEERS_SCHEMA = 'ccm/web-viewer-peers/v1';
 const DEFAULT_HOST = '127.0.0.1';
-/** 0 = OS-assigned ephemeral port (never hardcode a fixed listener port on install/start/restart). */
+/** 0 = OS-assigned ephemeral port when no prior port is reused or --port is omitted. */
 const DEFAULT_LISTEN_PORT = 0;
 const REDACTED_TOKEN = '<redacted>';
 
@@ -125,6 +125,7 @@ interface TestHooks {
   now?: () => Date;
   randomToken?: () => string;
   isPidAlive?: (pid: number) => boolean;
+  isPortAvailable?: (host: string, port: number) => boolean;
   healthCheck?: (service: ServiceState, token: string | null) => HealthResult;
   spawnService?: (args: SpawnArgs) => SpawnResult;
   openUrl?: (url: string) => OpenResult;
@@ -169,6 +170,13 @@ function canonicalHome(ctx: Ctx): string {
 function serviceId(home: string): string {
   const hash = crypto.createHash('sha256').update(home).digest('hex').slice(0, 8);
   return `wv_${hash}`;
+}
+
+// The canonical instance id for a home. `restart` always re-creates the instance under this id
+//   (any prior non-canonical id is cleaned up), so post-restart callers (e.g. `services reconcile`
+//   binary-match verification) must look here — the same instance `probeRunningServiceHealth` checks.
+export function canonicalServiceId(home: string): string {
+  return serviceId(home);
 }
 
 function servicePaths(home: string): ServicePaths {
@@ -235,6 +243,59 @@ function parsePort(raw: unknown): number {
     throw kinded(`invalid --port ${JSON.stringify(raw)} (must be 0..65535)`, 'Usage');
   }
   return n;
+}
+
+function isPortAvailableSync(host: string, port: number): boolean {
+  if (testHooks.isPortAvailable) return testHooks.isPortAvailable(host, port);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) return false;
+  const script = `
+    const net = require('node:net');
+    const host = process.argv[1];
+    const port = Number(process.argv[2]);
+    const socket = net.connect({ host, port });
+    socket.setTimeout(400);
+    socket.once('connect', () => { socket.destroy(); process.exit(1); });
+    socket.once('timeout', () => { socket.destroy(); process.exit(1); });
+    socket.once('error', (err) => {
+      socket.destroy();
+      process.exit(err.code === 'ECONNREFUSED' || err.code === 'EHOSTUNREACH' ? 0 : 2);
+    });
+  `;
+  const r = spawnSync(nodeEvalCommand(), ['-e', script, host, String(port)], { timeout: 800 });
+  return r.status === 0;
+}
+
+function waitForPidExitSync(pid: number, timeoutMs = 5000): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return true;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isPidAlive(pid)) return true;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+  }
+  return !isPidAlive(pid);
+}
+
+function waitForPortAvailableSync(host: string, port: number, timeoutMs = 2500): boolean {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (isPortAvailableSync(host, port)) return true;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+  }
+  return isPortAvailableSync(host, port);
+}
+
+/** Explicit --port wins; otherwise reuse a free prior port on restart; else OS-assign (0). */
+function resolveListenPort(ctx: Ctx, previousPort?: number): number {
+  if (ctx.values.port !== undefined) return parsePort(ctx.values.port);
+  const host = parseHost(ctx.values.host);
+  if (
+    typeof previousPort === 'number' &&
+    previousPort > 0 &&
+    waitForPortAvailableSync(host, previousPort)
+  ) {
+    return previousPort;
+  }
+  return DEFAULT_LISTEN_PORT;
 }
 
 function parseHost(raw: unknown): string {
@@ -584,7 +645,12 @@ function spawnService(args: SpawnArgs): SpawnResult {
 }
 
 function waitForHealthyService(statePath: string, startedAt: string): ServiceState {
-  const deadline = Date.now() + 5000;
+  // Poll (retry) until the freshly spawned service serves a healthy HTTP response, then return
+  //   immediately. The window is generous because a cold Node-SEA start plus binding a port and
+  //   the first request can take several seconds; only genuine failure waits out the full deadline.
+  //   5s was too tight for post-binary-replace restarts and produced false timeouts that then threw
+  //   and were dropped.
+  const deadline = Date.now() + 12000;
   let last: ServiceState | null = null;
   while (Date.now() < deadline) {
     last = readState(statePath);
@@ -600,7 +666,10 @@ function waitForHealthyService(statePath: string, startedAt: string): ServiceSta
   );
 }
 
-function startService(ctx: Ctx): { service: ServiceState; token: string; reused: boolean } {
+function startService(
+  ctx: Ctx,
+  opts?: { previousPort?: number },
+): { service: ServiceState; token: string; reused: boolean } {
   const home = canonicalHome(ctx);
   const paths = servicePaths(home);
   ensureServiceDirs(paths);
@@ -616,7 +685,7 @@ function startService(ctx: Ctx): { service: ServiceState; token: string; reused:
     if (existing) cleanupState(existing);
 
     const host = parseHost(ctx.values.host);
-    const port = parsePort(ctx.values.port);
+    const port = resolveListenPort(ctx, opts?.previousPort);
     const selection = resolveInitialSelection(ctx, home);
     const token = randomToken();
     const state = buildState({ home, host, port, token, selection, sid: ctx.sid });
@@ -816,11 +885,20 @@ export function restart(ctx: Ctx): number {
   const paths = servicePaths(home);
   ensureServiceDirs(paths);
   let previous: ServiceState | null = null;
+  let previousPort: number | undefined;
+  let previousPid: number | undefined;
   withLock(paths.lockTarget, () => {
     const existing = readState(statePathFromCtx(ctx, home));
+    if (existing && typeof existing.port === 'number' && existing.port > 0) {
+      previousPort = existing.port;
+    }
+    if (existing && typeof existing.pid === 'number' && existing.pid > 0) {
+      previousPid = existing.pid;
+    }
     previous = stopOne(existing).service;
   });
-  const started = startService(ctx);
+  if (previousPid) waitForPidExitSync(previousPid);
+  const started = startService(ctx, { previousPort });
   output(
     ctx,
     {
@@ -3208,21 +3286,26 @@ export function serve(ctx: Ctx): Promise<number> {
       ctx.err(`web-viewer serve error: ${e instanceof Error ? e.message : String(e)}`);
       resolve(EXIT.ERROR);
     });
-    server.listen(state.port, state.host, () => {
-      const addr = server.address();
-      const port = typeof addr === 'object' && addr ? addr.port : state.port;
-      const baseUrl = `http://${state.host}:${port}`;
-      const next = {
-        ...state,
-        pid: process.pid,
-        port,
-        base_url: baseUrl,
-        url: redactedUrl(baseUrl),
-        health: 'ok',
-        stale: false,
-      };
-      writeJson(state.state_path, next);
-      ctx.out(JSON.stringify({ ok: true }));
-    });
+    server.listen(
+      state.port > 0
+        ? { port: state.port, host: state.host, reuseAddress: true }
+        : { port: state.port, host: state.host },
+      () => {
+        const addr = server.address();
+        const port = typeof addr === 'object' && addr ? addr.port : state.port;
+        const baseUrl = `http://${state.host}:${port}`;
+        const next = {
+          ...state,
+          pid: process.pid,
+          port,
+          base_url: baseUrl,
+          url: redactedUrl(baseUrl),
+          health: 'ok',
+          stale: false,
+        };
+        writeJson(state.state_path, next);
+        ctx.out(JSON.stringify({ ok: true }));
+      },
+    );
   });
 }

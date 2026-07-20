@@ -333,3 +333,23 @@ test('capture: 非数值 used_percentage → 视缺失（不写）', () => {
   assert.equal(r.captured, false);
   assert.ok(!exists(cache), '未建文件');
 });
+
+test('capture: model_scoped Fable 5 → fable_seven_day sidecar (schema from Claude Code binary; live statusline unverified here)', () => {
+  const dir = mkdir();
+  const cache = join(dir, 'rate.json');
+  const env = { CC_MASTER_RATE_CACHE: cache, CC_MASTER_NOW: '2026-07-20T12:00:00Z' };
+  const resetSec = Math.floor(Date.parse('2026-07-24T18:00:00Z') / 1000);
+  const r = captureRateLimits(
+    {
+      rate_limits: {
+        model_scoped: [
+          { display_name: 'Fable 5', utilization: 41, resets_at: '2026-07-24T18:00:00Z' },
+        ],
+      },
+    },
+    env,
+  );
+  assert.equal(r.captured, true);
+  const sc = JSON.parse(readFileSync(cache, 'utf8'));
+  assert.deepEqual(sc.fable_seven_day, { used_percentage: 41, resets_at: resetSec });
+});

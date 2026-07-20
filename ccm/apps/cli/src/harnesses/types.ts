@@ -39,6 +39,30 @@ export interface UsageRefreshHint {
   remedy: string | null;
   /** Command to re-query the signal after recovery (e.g. `ccm usage show --harness kimi-code`), or null. */
   recheck: string | null;
+  /**
+   * Machine-readable authorization signal (ADR-018 authority-must-be-machine-readable). true ⟺ the
+   * consuming agent is authorized to personally execute `command` to recover — i.e. `command` is an
+   * *ordinary harness call* that makes the harness self-refresh its own short-lived token, with
+   * neither the agent nor ccm ever touching a credential. false when there is no agent-executable
+   * self-refresh: an absent credential needs an interactive user login (not agent-autonomous), and an
+   * opaque network / 401 / API failure has no recovery action at all.
+   *
+   * Load-bearing: a well-behaved orchestrator bound by "never touch credentials" will otherwise
+   * fail-closed and leave the harness idle, because it cannot confirm the poke is red-line-safe. The
+   * explicit `true` is what unblocks it.
+   */
+  agent_authorized: boolean;
+  /**
+   * Imperative, second-person authorization prose addressed to the consuming agent. When
+   * `agent_authorized` is true it states three things: (1) you may directly run `command` to recover;
+   * (2) why that does not violate never-touch-credentials (it is an ordinary harness call; the harness
+   * self-refreshes its own token; neither you nor ccm reads/writes/rotates any credential); (3) the
+   * boundary — this authorization covers ONLY the self-refresh triggered by that ordinary call; you
+   * are STILL never authorized to directly refresh/rotate/modify/move/delete any credential or
+   * credential file. When `agent_authorized` is false it states honestly that there is no
+   * agent-executable recovery here and that the same never-touch-credentials red line still holds.
+   */
+  authorization: string;
 }
 
 export interface CurrentUsageReading {

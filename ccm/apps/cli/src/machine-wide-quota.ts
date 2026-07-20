@@ -95,6 +95,18 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     defaultCollectorHarness: 'claude-code',
   },
   {
+    harnessId: 'claude-code',
+    surfaceId: 'claude-fable-5-cli',
+    providerId: 'anthropic',
+    bucketId: 'seven-day-fable-global',
+    windowName: 'seven_day',
+    durationSec: 604_800,
+    collectorId: 'claude-statusline-sidecar',
+    sourceSchema: 'claude-code/rate-limits/v1',
+    authSource: 'claude-cli-current-login',
+    defaultCollectorHarness: 'claude-code',
+  },
+  {
     harnessId: 'cursor',
     surfaceId: 'cursor-ide-plugin',
     providerId: 'cursor',

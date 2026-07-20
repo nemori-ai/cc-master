@@ -166,6 +166,7 @@ function _namespaceBlurb(noun: string): string {
     peers: '多-orchestrator 跨板只读花名册（ADR-017）',
     usage: '配额用量 / 单侧配速 advisory（只读·ADR-015）',
     estimate: 'OR/ML 估算引擎：用时 / 关键路径 / EVM / 风险（只读·ADR-015）',
+    calibration: 'deadline forecast 校准语料：显式采集 observed predict-then-observe snapshot',
     'status-report': '生成式 board 状态报告 artifact（只读 board·ADR-030）',
     harness: '本机 supported harness inventory：探测安装状态 / 能力 / 当前选择',
     account: '换号号池：录号 / 刷新 / 删 / 列 / 无重启换号（token-blind·ADR-019）',

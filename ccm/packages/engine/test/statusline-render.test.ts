@@ -168,3 +168,17 @@ test('render: 非数值 / 越界 used_percentage 优雅处理（不抛）', () =
   );
   assert.deepEqual((over.match(/█/g) || []).length, 10); // 夹到 100 → 满格
 });
+
+test('render: model_scoped Fable 5 → fab segment (live statusline field shape unverified in sandbox)', () => {
+  const line = strip(
+    renderStatusline(
+      {
+        rate_limits: {
+          model_scoped: [{ display_name: 'Fable 5', utilization: 28, resets_at: null }],
+        },
+      },
+      { color: false },
+    ),
+  );
+  assert.match(line, /fab 28%/);
+});

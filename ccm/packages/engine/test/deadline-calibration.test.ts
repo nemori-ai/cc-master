@@ -23,6 +23,7 @@ import {
   resolveLabel,
   snapshotId,
   snapshotStorePath,
+  stableDeadlineBoardId,
   sweepDeadlineBands,
   writeDeadlineSnapshots,
 } from '../dist/index.mjs';
@@ -72,13 +73,14 @@ function riskStub(over = {}) {
 // ── ① 采集：buildDeadlineSnapshot 定格预测 band + 保留校准诚实标注 ────────────────────────────────
 test('buildDeadlineSnapshot: 定格 predicted_band + 保留 calibration_status（诚实·label 待定）', () => {
   const risk = riskStub();
-  const snap = buildDeadlineSnapshot(risk, { boardId: 'b1', capturedAtMs: 1000 });
+  const snap = buildDeadlineSnapshot(risk, { boardId: 'b1', capturedAtMs: 1000, backlog: 7 });
   assert.equal(snap.schema, 'ccm.deadline-snapshot.v1');
   assert.equal(snap.snapshot_id, snapshotId('b1', 1000));
   assert.equal(snap.predicted_band, 'watch'); // 预测被定格
   assert.equal(snap.on_time_probability, 0.72);
   assert.equal(snap.calibration_status_at_capture, 'uncalibrated-conservative'); // 诚实链
   assert.equal(snap.provenance, 'observed'); // 默认真实采集
+  assert.equal(snap.backlog, 7); // producer 必须显式传真实 backlog，绝不落 -1 占位
   assert.equal(snap.label, 'unknown'); // 终态未知
   assert.equal(snap.resolved_at_ms, null);
 });
@@ -87,6 +89,7 @@ test('buildDeadlineSnapshot: provenance 可显式标 synthetic', () => {
   const snap = buildDeadlineSnapshot(riskStub(), {
     boardId: 'b1',
     capturedAtMs: 1,
+    backlog: 3,
     provenance: 'synthetic',
   });
   assert.equal(snap.provenance, 'synthetic');
@@ -175,7 +178,11 @@ test('deriveTerminalOutcome: 有未完成任务 → 未交付', () => {
 
 // ── ④ reconcile 回填 label ──────────────────────────────────────────────────────────────────────
 test('reconcileSnapshotLabels: 用终态 outcome 回填 unknown snapshot 的 label', () => {
-  const snap = buildDeadlineSnapshot(riskStub(), { boardId: 'bX', capturedAtMs: 5 });
+  const snap = buildDeadlineSnapshot(riskStub(), {
+    boardId: 'bX',
+    capturedAtMs: 5,
+    backlog: 2,
+  });
   assert.equal(snap.label, 'unknown');
   const outcome = {
     board_id: 'bX',
@@ -191,7 +198,7 @@ test('reconcileSnapshotLabels: 用终态 outcome 回填 unknown snapshot 的 lab
 });
 test('reconcileSnapshotLabels: 已 label 的不回退', () => {
   const snap = {
-    ...buildDeadlineSnapshot(riskStub(), { boardId: 'bX', capturedAtMs: 5 }),
+    ...buildDeadlineSnapshot(riskStub(), { boardId: 'bX', capturedAtMs: 5, backlog: 2 }),
     label: 'on_time',
   };
   const outcome = {
@@ -206,16 +213,29 @@ test('reconcileSnapshotLabels: 已 label 的不回退', () => {
 });
 
 // ── ⑤ store JSONL roundtrip（唯一碰 fs 的一段）────────────────────────────────────────────────────
+test('stableDeadlineBoardId: 同一 board 的等价路径得到同一稳定实体 ID', () => {
+  const a = stableDeadlineBoardId('/tmp/ccm-home/boards/../boards/2026.board.json');
+  const b = stableDeadlineBoardId('/tmp/ccm-home/boards/2026.board.json');
+  assert.equal(a, b);
+  assert.match(a, /^board:sha256:[a-f0-9]{64}$/);
+});
+
 test('store: append → load roundtrip + 坏行跳过', () => {
   const dir = mkdtempSync(join(tmpdir(), 'ddl-calib-'));
   try {
-    const s1 = buildDeadlineSnapshot(riskStub(), { boardId: 'a', capturedAtMs: 1 });
+    const s1 = buildDeadlineSnapshot(riskStub(), {
+      boardId: 'a',
+      capturedAtMs: 1,
+      backlog: 3,
+    });
     const s2 = buildDeadlineSnapshot(riskStub({ risk_band: 'at_risk' }), {
       boardId: 'b',
       capturedAtMs: 2,
+      backlog: 4,
     });
-    appendDeadlineSnapshot(dir, s1);
-    appendDeadlineSnapshot(dir, s2);
+    assert.equal(appendDeadlineSnapshot(dir, s1), true);
+    assert.equal(appendDeadlineSnapshot(dir, s1), false, 'same snapshot id is idempotent');
+    assert.equal(appendDeadlineSnapshot(dir, s2), true);
     const loaded = loadDeadlineSnapshots(dir);
     assert.equal(loaded.length, 2);
     assert.equal(loaded[0].board_id, 'a');

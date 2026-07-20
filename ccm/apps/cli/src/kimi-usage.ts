@@ -81,6 +81,14 @@ export function readKimiUsageSignal(
   env: Record<string, string | undefined>,
   opts?: { nowSec?: number },
 ): KimiUsageSignal | null {
+  const fixtureRaw = env.CCM_KIMI_USAGE_FIXTURE_JSON;
+  if (fixtureRaw) {
+    try {
+      return normalizeKimiUsagePayload(JSON.parse(fixtureRaw), { nowSec: opts?.nowSec });
+    } catch {
+      return null;
+    }
+  }
   const tokenState = resolveKimiToken(env, opts?.nowSec);
   if (tokenState.kind !== 'ok') return null; // expired / absent → skip doomed HTTP, degrade cleanly.
 

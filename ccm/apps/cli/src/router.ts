@@ -38,6 +38,7 @@ import * as attemptHandler from './handlers/attempt.js';
 import * as baselineHandler from './handlers/baseline.js';
 import * as boardHandler from './handlers/board.js';
 import * as cadenceHandler from './handlers/cadence.js';
+import * as calibrationHandler from './handlers/calibration.js';
 import * as capabilityHandler from './handlers/capability.js';
 import * as coordinationHandler from './handlers/coordination.js';
 import * as deliveryHandler from './handlers/delivery.js';
@@ -196,6 +197,7 @@ const HANDLERS: Record<string, HandlerModule> = {
   log: logHandler as unknown as HandlerModule,
   jc: jcHandler as unknown as HandlerModule,
   cadence: cadenceHandler as unknown as HandlerModule,
+  calibration: calibrationHandler as unknown as HandlerModule,
   coordination: coordinationHandler as unknown as HandlerModule,
   watchdog: watchdogHandler as unknown as HandlerModule,
   baseline: baselineHandler as unknown as HandlerModule,

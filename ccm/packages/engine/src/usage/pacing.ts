@@ -41,6 +41,8 @@ export interface WindowSignal {
 export interface UsageSignal {
   five_hour?: WindowSignal | null;
   seven_day?: WindowSignal | null;
+  /** Claude Fable 5 independent 7d rolling window (statusline model_scoped; separate from seven_day). */
+  fable_seven_day?: WindowSignal | null;
   /** Cursor (~30d) subscription billing cycle — used when 5h/7d are absent. */
   billing_period?: WindowSignal | null;
   captured_at?: number | null; // sidecar 捕获时刻（epoch 秒·保留字段·当前无欠用新鲜度闸）

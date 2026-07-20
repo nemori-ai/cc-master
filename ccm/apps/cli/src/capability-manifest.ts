@@ -19,6 +19,7 @@
 // 武装闸豁免：纯数据 / 纯函数 leaf 模块（无 hook 入口，只被 handler / CLI import）——见 AGENTS.md §3 红线6。
 
 export const CAPABILITY_MANIFEST_SCHEMA = 'ccm/capability-manifest/v1';
+export const CAPABILITY_NEGOTIATION_SCHEMA = 'ccm/capability-negotiation/v1';
 
 export interface CapabilityEntry {
   /** 稳定 capability id（含版本后缀）——跨版本协商的握手键，一经发布永不改。 */
@@ -34,6 +35,25 @@ export interface CapabilityManifest {
   /** 声明本清单的 ccm 构建版本（consumer 可据它给出「升级到 X」的明确提示）。 */
   ccm_version: string;
   capabilities: CapabilityEntry[];
+}
+
+/** Successful version negotiation payload (`ccm capability negotiate`). */
+export interface CapabilityNegotiationResult {
+  schema: typeof CAPABILITY_NEGOTIATION_SCHEMA;
+  /** Capability family (e.g. `goal-deadline`). */
+  family: string;
+  /** Negotiated stable capability id (e.g. `goal-deadline/v1`). */
+  capability: string;
+  /** Negotiated integer version. */
+  version: number;
+  negotiated: true;
+}
+
+/** Structured rejection when no consumer-accepted id is advertised by this ccm build. */
+export interface CapabilityNegotiationFailure {
+  family: string;
+  consumer_accepts: string[];
+  engine_advertises: string[];
 }
 
 // board-init / arming 握手所需的两个 capability id（board.init --capabilities 端点复用·非全集·稳定字符串）。
@@ -70,5 +90,65 @@ export function buildManifest(ccmVersion: string): CapabilityManifest {
     schema: CAPABILITY_MANIFEST_SCHEMA,
     ccm_version: ccmVersion,
     capabilities: CAPABILITIES.map((c) => ({ ...c })),
+  };
+}
+
+// 列出某 capability 族在 engine 侧已声明的全部 id（append-only·只增不改）。
+export function advertisedCapabilityIdsForFamily(family: string): string[] {
+  const normalized = family.trim();
+  if (!normalized) return [];
+  return CAPABILITIES.filter((c) => c.name === normalized).map((c) => c.id);
+}
+
+function normalizeConsumerAcceptId(family: string, raw: string): string {
+  const token = raw.trim();
+  if (!token) return '';
+  if (token.includes('/v')) return token;
+  if (/^v\d+$/i.test(token)) return `${family}/${token.toLowerCase()}`;
+  if (/^\d+$/.test(token)) return `${family}/v${token}`;
+  return token;
+}
+
+// 版本协商（issue #167 walking skeleton）：consumer 声明可接受的 id 集 → engine 返回双方交集里
+//   版本号最高的一项，或结构化拒绝。`check` 仍是精确 id 断言；`negotiate` 供 consumer 声明多版本
+//   偏好（含未来 vN）后由 engine 选定实际兑现项。
+export function negotiateCapability(
+  family: string,
+  consumerAccepts: readonly string[],
+): CapabilityNegotiationResult | CapabilityNegotiationFailure {
+  const normalizedFamily = family.trim();
+  const engineAdvertised = advertisedCapabilityIdsForFamily(normalizedFamily);
+  const acceptedIds = [
+    ...new Set(
+      consumerAccepts
+        .map((raw) => normalizeConsumerAcceptId(normalizedFamily, raw))
+        .filter((id) => id.length > 0),
+    ),
+  ];
+  const engineIdSet = new Set(engineAdvertised);
+  const compatible = acceptedIds.filter((id) => engineIdSet.has(id));
+  if (compatible.length === 0) {
+    return {
+      family: normalizedFamily,
+      consumer_accepts: acceptedIds,
+      engine_advertises: engineAdvertised,
+    };
+  }
+  let bestId = compatible[0]!;
+  let bestVersion = -1;
+  for (const id of compatible) {
+    const entry = CAPABILITIES.find((c) => c.id === id);
+    if (entry && entry.version > bestVersion) {
+      bestId = id;
+      bestVersion = entry.version;
+    }
+  }
+  const chosen = CAPABILITIES.find((c) => c.id === bestId);
+  return {
+    schema: CAPABILITY_NEGOTIATION_SCHEMA,
+    family: normalizedFamily,
+    capability: bestId,
+    version: chosen?.version ?? bestVersion,
+    negotiated: true,
   };
 }

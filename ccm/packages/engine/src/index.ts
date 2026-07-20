@@ -278,6 +278,7 @@ export {
   SWEEP_SCHEMA,
   snapshotId,
   snapshotStorePath,
+  stableDeadlineBoardId,
   sweepDeadlineBands,
   writeDeadlineSnapshots,
 } from './estimate/deadline-calibration.js';
@@ -524,6 +525,7 @@ export {
 // ── statusline/（self-contained status line·0.10.0：渲染单行 ANSI + sidecar 捕获 + 安装/卸载/自动安装）──
 export type {
   CaptureResult,
+  ParsedRateWindow,
   RenderOptions,
   StatuslineActionResult,
 } from './statusline/index.js';
@@ -532,6 +534,8 @@ export {
   captureRateLimits,
   installStatusline,
   looksLikeDevInvocation,
+  pickFableSevenDayFromRateLimits,
+  pickRateLimitWindow,
   renderStatusline,
   settingsPath as statuslineSettingsPath,
   uninstallStatusline,

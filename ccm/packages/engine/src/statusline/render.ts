@@ -8,6 +8,7 @@
 //   · context_window.context_window_size  token（当前未直接渲染·留作扩展）
 //   · rate_limits.five_hour.{used_percentage(0–100), resets_at(epoch 秒)}   均 Optional（非 Pro/Max 或窗口未现 → 缺席）
 //   · rate_limits.seven_day.{...}                                            同上
+//   · rate_limits.model_scoped[] → { display_name, utilization, resets_at }  独立模型周窗（Fable 5 等·additive）
 //   · model.display_name / workspace.current_dir
 //   **无 cost 字段。**
 //
@@ -21,6 +22,8 @@
 //   **单行**：返回串内绝无换行。
 //
 // 红线1 / ADR-006：node/JS only，纯计算、零 fs / 零网络 / 零依赖（webview IIFE 也能安全 bundle）。
+
+import { pickFableSevenDayFromRateLimits } from './rate-limits-parse.js';
 
 // ── ANSI SGR（raw escape·不引 npm）─────────────────────────────────────────────────────────────────
 const ANSI = {
@@ -129,6 +132,13 @@ export function renderStatusline(input: unknown, opts: RenderOptions = {}): stri
     if (sd !== null) {
       const band = bandFor('7d', sd);
       segments.push(`7d ${paint(`${Math.round(sd)}%`, colorOf(band), enabled)}`);
+    }
+    const fableWindow = pickFableSevenDayFromRateLimits(rlObj);
+    if (fableWindow !== null) {
+      const band = bandFor('7d', fableWindow.used_percentage);
+      segments.push(
+        `fab ${paint(`${Math.round(fableWindow.used_percentage)}%`, colorOf(band), enabled)}`,
+      );
     }
   }
 

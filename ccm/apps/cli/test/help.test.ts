@@ -37,12 +37,14 @@ test('printHelp top-level lists all namespaces (incl now-live account/usage/esti
     'account',
     'usage',
     'estimate',
+    'calibration',
   ]) {
     assert.ok(t.includes(noun), `top-level mentions namespace ${noun}`);
   }
   // account/usage/estimate 现是 live namespace（CORE NAMESPACES 带 blurb），不再列 RESERVED。
   assert.ok(!t.includes('RESERVED'), 'no RESERVED section (all placeholders now live)');
   assert.ok(t.includes('换号号池'), 'account namespace has a live blurb');
+  assert.ok(t.includes('校准语料'), 'calibration namespace has a live blurb');
   // 别名 next / lint（command 级）+ viewer（namespace 级 NOUN_ALIASES → web-viewer）。
   assert.ok(t.includes('next'), 'mentions alias next');
   assert.ok(t.includes('lint'), 'mentions alias lint');

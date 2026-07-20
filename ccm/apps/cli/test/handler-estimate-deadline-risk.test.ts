@@ -166,6 +166,17 @@ test('deadline-risk: overdue when DDL in the past + unfinished backlog', () => {
   assert.ok(d.time_remaining_hours < 0);
 });
 
+test('deadline-risk: soft overdue → weak advisory (issue #169)', () => {
+  const dl = confirmedDeadline(-2);
+  dl.kind = 'soft';
+  const bp = mkBoardWithDeadline(dl);
+  const ctx = mkCtx(bp, { scope: 'home', seed: '42' });
+  estimateHandler.deadlineRisk(ctx);
+  const d = dataOf(ctx);
+  assert.equal(d.risk_band, 'overdue');
+  assert.equal(d.strength, 'weak');
+});
+
 test('deadline-risk: no deadline key (pending) → unknown, null probability (不假绿)', () => {
   const bp = mkBoardWithDeadline(null); // goal_contract 存在但无 deadline 键
   const ctx = mkCtx(bp, { scope: 'home', seed: '42' });

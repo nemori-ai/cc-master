@@ -1253,10 +1253,20 @@ fi
 # ccm binary lifecycle hook (ADR-033): after replacing/verifying the ccm binary,
 # restart only services that were already wanted/running. This is best-effort:
 # plugin install failures and service reconciliation failures must stay separate.
-if "$CCM_BIN" services reconcile --after-binary-replace >/dev/null 2>&1; then
+# reconcile 现在 fail-loud（任一 wanted 服务没切到新二进制 → 非 0 退出；旧行为恒 0，下面的 else 分支曾是死代码）。
+# 用 --json 捕获输出、解析失败数，别再 `>/dev/null 2>&1` 吞掉，才能把"装了但服务没收口"如实告知用户。
+# 赋值放进 if 条件：在 `set -e` 下把命令替换的非 0 退出接住（裸赋值会让 set -e 直接中止安装），并保留真实 RC。
+if RECONCILE_OUT="$("$CCM_BIN" services reconcile --after-binary-replace --json 2>&1)"; then
+  RECONCILE_RC=0
+else
+  RECONCILE_RC=$?
+fi
+RECONCILE_FAILED="$(printf '%s' "$RECONCILE_OUT" | grep -o '"failed":[0-9]*' | grep -o '[0-9]*' | head -1 || true)"
+if [ "$RECONCILE_RC" -eq 0 ]; then
   log "services reconcile OK（monitor / web-viewer wanted 服务已按需收口）"
 else
-  warn "ccm 已安装，但 services reconcile 未成功；如你有 monitor/web-viewer 常驻服务，可稍后手动运行：$CCM_BIN services reconcile --after-binary-replace"
+  warn "ccm 已安装，但 ${RECONCILE_FAILED:-?} 个常驻服务 reconcile 失败（可能仍跑在旧二进制上）；可稍后手动重试：$CCM_BIN services reconcile --after-binary-replace"
+  warn "reconcile 输出：${RECONCILE_OUT}"
 fi
 
 # PATH 提示。

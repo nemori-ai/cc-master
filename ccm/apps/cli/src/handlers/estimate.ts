@@ -653,7 +653,13 @@ export function risk(ctx: Ctx): number {
 // deadlineRiskResult(b, c) → 完整 DeadlineRiskResult（契约 §4.3）。**单一计算路径 SSOT**：
 //   `deadline-risk` endpoint 与 `forecast` 的 DDL 摘要块共用它（复用 computeDeadlineRisk·不重算·红线3）。
 //   读 goal_contract.deadline（readDeadline）→ buildMcParams → 三通道 MC → verdict。无 DDL/含环/低置信 → unknown。
-function deadlineRiskResult(b: BoardArg, c: Ctx): DeadlineRiskResult {
+export interface DeadlineRiskObservation {
+  result: DeadlineRiskResult;
+  backlog: number;
+  capturedAtMs: number;
+}
+
+export function deadlineRiskObservation(b: BoardArg, c: Ctx): DeadlineRiskObservation {
   const nowMs = nowMsOf(c);
   const { records, scope } = loadScopedCorpus(b, c, nowMs);
   const runs = intFlag(c.values.runs, 2000);
@@ -685,6 +691,7 @@ function deadlineRiskResult(b: BoardArg, c: Ctx): DeadlineRiskResult {
   const data = computeDeadlineRisk(b, {
     deadlineAtMs: dl.at_ms,
     deadlineState: dl.state,
+    deadlineKind: dl.kind,
     asOfMs: nowMs,
     records,
     calibParams: params,
@@ -704,7 +711,11 @@ function deadlineRiskResult(b: BoardArg, c: Ctx): DeadlineRiskResult {
     data.notes.push(
       `RCPSP-in-trial 按图规模降档 trials ${runs}→${ladder.rcpspRuns}（latency 预算·线性于 trials·别真限时）`,
     );
-  return data;
+  return { result: data, backlog, capturedAtMs: nowMs };
+}
+
+function deadlineRiskResult(b: BoardArg, c: Ctx): DeadlineRiskResult {
+  return deadlineRiskObservation(b, c).result;
 }
 
 // deadlineRiskSummary(b, c) → forecast 内嵌的 DDL margin/risk 摘要块（board 有 asserted/confirmed DDL 时）。

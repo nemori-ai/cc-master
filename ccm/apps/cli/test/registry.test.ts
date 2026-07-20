@@ -19,7 +19,7 @@ const model = { ENUMS, FIELDS, TIERS };
 
 // ── 覆盖全部 namespace 的全部 verb（cli-design §3·ADR-015 加 usage/estimate·Phase 2a 加 account·COORD 加 peers·0.10.0 加 statusline·加 upgrade 自升级·harness inventory·ADR-029 加 web-viewer）──────
 const EXPECTED: Record<string, string[]> = {
-  capability: ['check', 'list'],
+  capability: ['check', 'list', 'negotiate'],
   worker: ['help', 'run'],
   provider: ['facts', 'inspect'],
   'model-policy': ['show', 'advise'],
@@ -76,6 +76,7 @@ const EXPECTED: Record<string, string[]> = {
   coordination: ['inbox', 'notify', 'arbitrate', 'subscription'],
   usage: ['show', 'advise', 'task-cost', 'burn-rate', 'runway'],
   estimate: ['show', 'forecast', 'evm', 'velocity', 'risk', 'cost-to-complete', 'deadline-risk'],
+  calibration: ['capture'],
   account: ['add', 'refresh', 'delete', 'list', 'switch'],
   'status-report': ['render', 'write', 'show', 'watch'],
   statusline: ['render', 'install', 'uninstall'],
@@ -178,6 +179,11 @@ test('usage and estimate namespaces are read-only (every verb read:true)', () =>
       );
     }
   }
+});
+
+test('calibration capture is explicitly side-effecting (never hidden under estimate read verbs)', () => {
+  assert.equal(REGISTRY.calibration?.capture?.read, false);
+  assert.ok(Object.values(REGISTRY.estimate || {}).every((spec) => spec.read === true));
 });
 
 // usage/estimate flag 的 enum 是 CLI-local 呈现枚举（scope/mode/group-by/accounts/ac-source）——非

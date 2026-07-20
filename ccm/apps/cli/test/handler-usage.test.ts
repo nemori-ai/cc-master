@@ -974,6 +974,74 @@ test('usage runway with no sidecar → available:false (degrade)', () => {
   assert.equal(out.data.five_hour.verdict, 'unknown');
 });
 
+// ══ kimi-code 双窗完整性（5h + 7d·fixture 注入·无 live HTTP）══════════════════════════════════════
+
+const KIMI_DUAL_WINDOW_FIXTURE = JSON.stringify({
+  usage: { used: 200, limit: 1000, resetAt: '2026-07-25T00:00:00Z' },
+  limits: [
+    {
+      detail: { used: 45, limit: 100 },
+      window: { duration: 300, timeUnit: 'MINUTE' },
+      resetAt: '2026-07-20T20:00:00Z',
+    },
+  ],
+});
+
+function kimiDualWindowCtx(home: string, boardPath: string, json = true) {
+  const ctx = mkCtx(home, boardPath, {
+    values: { harness: 'kimi-code' },
+    flags: json ? { json: true } : {},
+  });
+  ctx.env.CCM_KIMI_USAGE_FIXTURE_JSON = KIMI_DUAL_WINDOW_FIXTURE;
+  return ctx;
+}
+
+test('usage show --harness kimi-code surfaces both five_hour and seven_day with resets_at', () => {
+  const { home, boardPath } = setupHome();
+  const ctx = kimiDualWindowCtx(home, boardPath);
+  usageHandler.show(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, true);
+  assert.equal(out.data.current.five_hour.used_percentage, 45);
+  assert.equal(out.data.current.seven_day.used_percentage, 20);
+  assert.equal(
+    out.data.current.seven_day.resets_at,
+    Math.floor(Date.parse('2026-07-25T00:00:00Z') / 1000),
+  );
+  assert.equal(
+    out.data.current.five_hour.resets_at,
+    Math.floor(Date.parse('2026-07-20T20:00:00Z') / 1000),
+  );
+});
+
+test('usage advise --harness kimi-code considers both windows in pacing verdict', () => {
+  const { home, boardPath } = setupHome();
+  const ctx = kimiDualWindowCtx(home, boardPath);
+  usageHandler.advise(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, true);
+  assert.equal(out.data.window_5h_pct, 45);
+  assert.equal(out.data.window_7d_pct, 20);
+  assert.equal(out.data.verdict, 'hold');
+});
+
+test('usage burn-rate + runway --harness kimi-code cover 5h and 7d windows', () => {
+  const { home, boardPath } = setupHome();
+  const burnCtx = kimiDualWindowCtx(home, boardPath);
+  usageHandler.burnRate(burnCtx);
+  const burn = JSON.parse(burnCtx.outBuf.join(''));
+  assert.equal(burn.data.available, true);
+  assert.equal(burn.data.five_hour.used_pct, 45);
+  assert.equal(burn.data.seven_day.used_pct, 20);
+
+  const runwayCtx = kimiDualWindowCtx(home, boardPath);
+  usageHandler.runway(runwayCtx);
+  const runway = JSON.parse(runwayCtx.outBuf.join(''));
+  assert.equal(runway.data.available, true);
+  assert.equal(runway.data.five_hour.used_pct, 45);
+  assert.equal(runway.data.seven_day.used_pct, 20);
+});
+
 // ══ kimi-code 短命 token 过期 → 可执行刷新提示（E1·show / advise 输出层可见）═══════════════════════
 // kimi 的 access_token 短命，过期后 usage 信号降级 unavailable。此前只回裸 reason；现在带一条 actionable
 //   refresh_hint（跑哪个 kimi 命令自刷 token + 刷完重查），且对人读 + --json 都可见。ccm 全程零凭证写。
@@ -1008,6 +1076,15 @@ test('usage show --harness kimi-code (expired token) surfaces actionable refresh
   assert.equal(out.data.refresh_hint.command, "kimi -p 'hi'", 'concrete self-refresh command');
   assert.equal(out.data.refresh_hint.recheck, 'ccm usage show --harness kimi-code');
   assert.match(out.data.refresh_hint.reason, /过期/);
+  // ADR-018 authority signal flows through --json end-to-end: the consuming agent sees it IS
+  // authorized to self-recover, with the never-touch-credentials boundary intact.
+  assert.equal(
+    out.data.refresh_hint.agent_authorized,
+    true,
+    'agent_authorized passes through --json',
+  );
+  assert.match(out.data.refresh_hint.authorization, /此授权仅限这次普通调用触发的自刷/);
+  assert.match(out.data.refresh_hint.authorization, /绝不被授权直接[^。]*凭证/);
 });
 
 test('usage show --harness kimi-code (expired token) prints the remedy line in human output', () => {
@@ -1056,6 +1133,20 @@ test('usage show --harness kimi-code (absent credential) → login re-auth hint'
   assert.ok(out.data.refresh_hint);
   assert.equal(out.data.refresh_hint.command, 'kimi login', 'absent → device-code re-auth');
   assert.match(out.data.refresh_hint.reason, /凭证/);
+});
+
+test('usage show exposes fable_seven_day from sidecar independently of seven_day', () => {
+  const { home, boardPath } = setupHome({
+    sidecar: {
+      ...SIDECAR_CRITICAL,
+      fable_seven_day: { used_percentage: 61, resets_at: 1893456000 },
+    },
+  });
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
+  usageHandler.show(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.current.fable_seven_day.used_percentage, 61);
+  assert.equal(out.data.current.seven_day.used_percentage, 50);
 });
 
 test('usage refresh_hint is null when the account signal IS available (Codex app-server)', () => {

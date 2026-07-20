@@ -135,6 +135,37 @@ test('describeKimiUsageRefresh: expired token → actionable self-refresh hint (
   assert.match(hint.remedy ?? '', /ccm usage show --harness kimi-code/);
 });
 
+// ── agent authorization signal (ADR-018): expired → the agent is explicitly authorized to self-recover ─
+test('describeKimiUsageRefresh: expired token → agent_authorized:true + bounded authorization prose', () => {
+  const home = mkdtempSync(join(tmpdir(), 'ccm-kimi-auth-'));
+  mkdirSync(join(home, 'credentials'), { recursive: true });
+  writeFileSync(
+    join(home, 'credentials', 'kimi-code.json'),
+    JSON.stringify({ access_token: 'jwt.header.body', expires_at: NOW - 60, token_type: 'Bearer' }),
+  );
+  const hint = describeKimiUsageRefresh({ KIMI_CODE_HOME: home }, NOW);
+  // Machine-readable authority: the consuming agent MAY personally run the self-refresh command.
+  assert.equal(hint.agent_authorized, true, 'expired self-refresh is agent-authorized');
+  // (1) you may directly run the recovery command.
+  assert.match(hint.authorization, /有权直接执行此恢复/);
+  assert.match(hint.authorization, /kimi -p 'hi'/, 'authorization names the concrete command');
+  // (2) why it does not violate never-touch-credentials (ordinary harness call, harness self-refreshes).
+  assert.match(hint.authorization, /不违反「绝不碰凭证」红线/);
+  assert.match(hint.authorization, /普通的 harness 调用/);
+  // (3) authorization boundary: ONLY this ordinary-call self-refresh.
+  assert.match(
+    hint.authorization,
+    /此授权仅限这次普通调用触发的自刷/,
+    'authorization is scoped to the ordinary-call self-refresh only',
+  );
+  // (3) the never-touch-credentials red line still holds, unloosened.
+  assert.match(
+    hint.authorization,
+    /绝不被授权直接[^。]*凭证/,
+    'red line preserved: never authorized to directly touch credentials',
+  );
+});
+
 test('describeKimiUsageRefresh: absent credential → re-auth hint (kimi login + recheck)', () => {
   const hint = describeKimiUsageRefresh({ KIMI_CODE_HOME: '/nonexistent-ccm-kimi-home' }, NOW);
   assert.equal(hint.recoverable, true, 'absent credential is user-recoverable via login');
@@ -142,6 +173,11 @@ test('describeKimiUsageRefresh: absent credential → re-auth hint (kimi login +
   assert.equal(hint.command, 'kimi login');
   assert.match(hint.remedy ?? '', /kimi login/);
   assert.equal(hint.recheck, 'ccm usage show --harness kimi-code');
+  // Absent credential = interactive login, NOT an agent-autonomous self-refresh → not authorized,
+  // but the never-touch-credentials red line still holds in the prose.
+  assert.equal(hint.agent_authorized, false, 'interactive login is not agent-authorized');
+  assert.match(hint.authorization, /你不要自行登录/);
+  assert.match(hint.authorization, /绝不被授权直接[^。]*凭证/, 'red line preserved for absent');
 });
 
 // ── generalization proof: the builder is harness-agnostic (any short-lived-token harness reuses it) ──
@@ -165,4 +201,22 @@ test('shortLivedTokenRefreshHint is generic — a second harness reuses the same
   assert.equal(opaque.command, null);
   assert.equal(opaque.remedy, null);
   assert.match(opaque.reason, /读取失败/);
+
+  // Authorization skeleton is generic (parameterized by harness name, not hardcoded to kimi):
+  //   expired = agent-authorized self-refresh; absent/opaque = not agent-authorized. Every branch
+  //   restates the never-touch-credentials red line.
+  assert.equal(expired.agent_authorized, true, 'expired self-refresh authorized for any harness');
+  assert.match(expired.authorization, /acme refresh/, 'authorization names this harness command');
+  assert.match(
+    expired.authorization,
+    /acme-code/,
+    'authorization worded by harness name, not kimi',
+  );
+  assert.doesNotMatch(expired.authorization, /kimi/, 'generic skeleton never hardcodes kimi');
+  assert.match(expired.authorization, /此授权仅限这次普通调用触发的自刷/);
+  assert.equal(absent.agent_authorized, false, 'absent (login) is not agent-authorized');
+  assert.equal(opaque.agent_authorized, false, 'opaque failure is not agent-authorized');
+  for (const h of [expired, absent, opaque]) {
+    assert.match(h.authorization, /绝不被授权直接[^。]*凭证/, 'red line preserved in every branch');
+  }
 });

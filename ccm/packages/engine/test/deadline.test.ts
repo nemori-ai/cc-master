@@ -135,6 +135,17 @@ test('readDeadline: confirmed exposes at/at_ms/precision/kind/rev', () => {
   assert.equal(view.rev, 3);
 });
 
+test('readDeadline: missing kind defaults to hard (legacy board compat·issue #169)', () => {
+  const view = readDeadline(
+    withDeadline({
+      state: 'confirmed',
+      at: '2026-08-01T09:00:00Z',
+      updated_at: '2026-07-16T11:00:00Z',
+    }),
+  );
+  assert.equal(view.kind, 'hard');
+});
+
 test('isDeadlineSettled: pending/absent false; asserted/confirmed/none true', () => {
   assert.equal(isDeadlineSettled(baseBoard()), false);
   assert.equal(

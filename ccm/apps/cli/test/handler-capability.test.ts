@@ -15,10 +15,12 @@ import {
   buildManifest,
   CAPABILITIES,
   CAPABILITY_MANIFEST_SCHEMA,
+  CAPABILITY_NEGOTIATION_SCHEMA,
   capabilityIds,
   GOAL_CONTRACT_CAPABILITY,
   GOAL_DEADLINE_CAPABILITY,
   isCapabilitySupported,
+  negotiateCapability,
 } from '../src/capability-manifest.js';
 import type { Ctx } from '../src/handlers/_common.js';
 import * as capability from '../src/handlers/capability.js';
@@ -34,14 +36,18 @@ interface TestCtx extends Ctx {
 function mkCtx({
   positionals = [],
   json = false,
+  accept,
 }: {
   positionals?: string[];
   json?: boolean;
+  accept?: string | string[];
 } = {}): TestCtx {
   const outBuf: string[] = [];
   const errBuf: string[] = [];
+  const values: Record<string, unknown> = {};
+  if (accept !== undefined) values.accept = accept;
   return {
-    values: {},
+    values,
     positionals,
     flags: {
       json,
@@ -183,4 +189,57 @@ test('capability ids are unique and each carries a name + integer version', () =
     assert.ok(c.name.length > 0);
     assert.ok(Number.isInteger(c.version) && c.version >= 1);
   }
+});
+
+// ── 版本协商（negotiate·issue #167 walking skeleton）──────────────────────────────────────────────
+test('negotiateCapability picks the highest mutually compatible goal-deadline version', () => {
+  const ok = negotiateCapability('goal-deadline', [GOAL_DEADLINE_CAPABILITY, 'goal-deadline/v2']);
+  assert.ok('negotiated' in ok && ok.negotiated === true);
+  assert.equal(ok.capability, GOAL_DEADLINE_CAPABILITY);
+  assert.equal(ok.version, 1);
+  assert.equal(ok.schema, CAPABILITY_NEGOTIATION_SCHEMA);
+});
+
+test('capability negotiate returns OK when consumer accepts a supported goal-deadline version', () => {
+  const ctx = mkCtx({
+    positionals: ['goal-deadline'],
+    accept: [GOAL_DEADLINE_CAPABILITY, 'goal-deadline/v2'],
+    json: true,
+  });
+  const code = capability.negotiate(ctx);
+  assert.equal(code, EXIT.OK);
+  const payload = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(payload.ok, true);
+  assert.equal(payload.data.capability, GOAL_DEADLINE_CAPABILITY);
+  assert.equal(payload.data.negotiated, true);
+});
+
+test('capability negotiate rejects when consumer only accepts unsupported future versions', () => {
+  const ctx = mkCtx({
+    positionals: ['goal-deadline'],
+    accept: ['goal-deadline/v2'],
+    json: true,
+  });
+  const code = capability.negotiate(ctx);
+  assert.equal(code, EXIT.VALIDATION);
+  const payload = JSON.parse(ctx.errBuf.join(''));
+  assert.equal(payload.ok, false);
+  assert.match(payload.error, /no compatible capability version for goal-deadline/);
+  assert.match(payload.error, /goal-deadline\/v2/);
+  assert.ok(payload.error.includes(GOAL_DEADLINE_CAPABILITY));
+});
+
+test('capability negotiate requires family and at least one --accept', () => {
+  const ctx = mkCtx({ positionals: ['goal-deadline'], json: true });
+  assert.equal(capability.negotiate(ctx), EXIT.VALIDATION);
+  assert.match(ctx.errBuf.join(''), /requires a family positional and at least one --accept/);
+});
+
+test('old boards stay compatible: negotiate goal-deadline/v1 alone still succeeds (legacy consumer path)', () => {
+  const ctx = mkCtx({
+    positionals: ['goal-deadline'],
+    accept: GOAL_DEADLINE_CAPABILITY,
+  });
+  assert.equal(capability.negotiate(ctx), EXIT.OK);
+  assert.match(ctx.outBuf.join(''), /goal-deadline\/v1: negotiated/);
 });
