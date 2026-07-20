@@ -19,7 +19,7 @@
 - [board lint —— 自检真相源](#board-lint--自检真相源)
 - [图分析 advisory —— 机器算的临界路径](#图分析-advisory--机器算的临界路径只读永不回写-board)
 - [`owner.heartbeat` —— resume 探测信号](#ownerheartbeat--resume-探测信号)
-- [`owner.session_id` 与武装 / 续跑](#ownersession_id-与武装--续跑ssot-在-adr-007此处只给落地心智)
+- [`owner.session_id` 与武装 / 续跑](#ownersession_id-与武装--续跑此处只给落地心智)
 - [`decision_package` 采访协议](#decision_package-采访协议--awaiting-user-节点的采访式决策)
 - [示例](#示例与-boardexamplejson-一致)
 

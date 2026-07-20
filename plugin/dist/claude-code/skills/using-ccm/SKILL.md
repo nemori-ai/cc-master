@@ -5,7 +5,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 
 # using-ccm — 用 ccm CLI 驱动 board
 
-> **分发 skill(随插件 ship)。** `ccm` 是 cc-master 的 board 命令行——board 数据模型 SSOT 的**唯一写入关卡**。本 skill 是它的**操作手册**:不是"该编排什么"(那是 master-orchestrator-guide),而是"既然要动 board,怎么用 ccm 动得对"。
+> `ccm` 是 cc-master 的 board 命令行——board 数据模型 SSOT 的**唯一写入关卡**。本 skill 是它的**操作手册**:不是"该编排什么"(那是 master-orchestrator-guide),而是"既然要动 board,怎么用 ccm 动得对"。
 > **它一体两面**:面1=**ccm 命令怎么敲**(命令面在 `command-catalog.md`);面2=**board 模型怎么理解 + 字段什么时候设什么值**(领域概念解释 + 字段取值指导在 `board-model-guide.md`)。心智锚在主文件,两面的深度各进一个 reference。
 >
 > **职责边界:** 编排决策归 `master-orchestrator-guide`、读 usage/estimate verdict 配速估算归 `pacing-and-estimation`、workflow 脚本归 `authoring-workflows`;**怎么用 ccm 这把工具操作 board + 号池(account 录号/换号/选号)** 归本 skill。`master-orchestrator-guide` 在它的决策点说"现在把 T7 标完成 / 派发 T3 / 阻塞等用户 / 该换号了",**怎么落成 ccm 命令**翻到这里;换号**机制 / 概念叙事**深入见 [references/account-pool.md](references/account-pool.md)。

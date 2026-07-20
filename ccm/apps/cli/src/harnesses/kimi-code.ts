@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { captureRuntimeEnvironment, localPluginBase as resolvePluginBase } from '@ccm/engine';
+import { describeKimiUsageUnavailable, readKimiUsageSignal } from '../kimi-usage.js';
 import { probeExecutable } from './probe.js';
 import type { Env, HarnessAdapter, PluginUpgradeRequest, PluginUpgradeResult } from './types.js';
 
@@ -15,8 +16,6 @@ const STATUSLINE_REASON =
   'kimi-code has no Claude Code-style external statusLine.command hook; its /usage panel is TUI-internal.';
 const PLUGIN_DISTRIBUTION_REASON =
   'kimi-code installs cc-master as a managed plugin under $KIMI_CODE_HOME/plugins/managed/cc-master registered in plugins/installed.json.';
-const USAGE_UNAVAILABLE_REASON =
-  'kimi-code exposes no CLI/headless quota signal in this MVP; usage reads degrade to unavailable.';
 
 export const kimiCodeAdapter: HarnessAdapter = {
   id: 'kimi-code',
@@ -58,21 +57,26 @@ export const kimiCodeAdapter: HarnessAdapter = {
     return [path.join(kimiHome(env), 'sessions')];
   },
   usageSource: () => ({
-    // kimi's account quota is a rolling 5h/weekly model served by the managed dashboard API,
-    // but the MVP does not wire a collector, so it is not pollable yet (readCurrentUsage → null).
+    // kimi's account quota is a rolling 5h/weekly model served by the managed /usages dashboard API.
+    // Poll-on-demand against the stored OAuth token; freshness = stored-token validity (see readCurrentUsage).
     kind: 'dashboard-api',
-    pollable: false,
+    pollable: true,
     quotaModel: 'rolling-5h-7d',
   }),
   accountPoolLocation: () => null,
-  readCurrentUsage() {
-    // MVP: kimi-code returns no usage signal.
-    // follow-up: kimi exposes GET /coding/v1/usages (Bearer OAuth); collector MUST be read-only on the
-    // stored token — never refresh/rotate the credential file. See design_docs/2026-07-16-kimi-quota-signal-research.md
+  readCurrentUsage(env) {
+    // kimi exposes GET /coding/v1/usages (Bearer OAuth) → rolling 5h + weekly quota. The collector is
+    // strictly read-only on the stored token — it never refreshes/rotates the credential file. When the
+    // stored access_token is expired (kimi only refreshes it during an active session) or absent, the
+    // read degrades to an honest `unavailable` reason instead of mutating credentials.
+    const reading = readKimiUsageSignal(env);
+    if (reading?.signal) {
+      return { signal: reading.signal, source: reading.source, unavailableReason: '' };
+    }
     return {
       signal: null,
       source: 'unavailable',
-      unavailableReason: USAGE_UNAVAILABLE_REASON,
+      unavailableReason: describeKimiUsageUnavailable(env),
     };
   },
   accountSwitchPreflight: () => ({

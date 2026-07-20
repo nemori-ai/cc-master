@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0-rc.1] — 2026-07-20
+
+> **Skills quality-review fixes — self-containment & engine-drift cleanup (release candidate)** — pairs with **ccm-v0.22.0-rc.1**.
+
+### Fixed
+
+- **Distributed-skill self-containment & drift cleanup** — a skills-quality-review pass against the repository's authoring red lines fixed five issues that lint's greps cannot catch: the `pacing-and-estimation` estimation reference's `top_drivers` list was corrected from six categories to the three the engine actually emits (`critical` / `sensitive` / `blocked`); an internal codename leak (`R7d` → the public rule name `GRAPH-ROLLUP`) and a repo-path leak (`hooks/` → `hook 层`) in `master-orchestrator-guide` references were removed; a forbidden maintainer-voice meta-label was dropped from `using-ccm`; and a stale/leaky table-of-contents anchor in the board reference was fixed. All attested-skill registries and per-host dist were regenerated; `run-tests.sh`, `skill-lint`, and `claude plugin validate` stay green.
+
 ## [0.21.0-rc.0] — 2026-07-17
 
 > **Agent-registry lifecycle closure + outside-in external-validity discipline + kimi-code 4th host adapter (release candidate)** — pairs with **ccm-v0.22.0-rc.0**.

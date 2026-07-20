@@ -10,10 +10,10 @@
           "files": {
             "SKILL.md": "795b96ce6fef20230b37dfc620521c782bc06ea95f3e642cdddfad5b786642af",
             "references/async-hitl.md": "57d269b2b91bcfcf4c656cb3e4b7e6e605c20b504ecc92beef99dac7f9e2d1c8",
-            "references/board.md": "3014c12249c5a28d2d8494c61b99506ef5dfacdc52692cbe8aab5aa4edfdfacf",
-            "references/cost-decisions.md": "f9cb9122199c13c8a14ba35ed5b25b0b8bc464749d76ce1d7a0ce2dc80bf4237",
+            "references/board.md": "19cbcdb4bc43302f170b7449c938d8bc3473b37d7e0cc8285c543a2aac37a299",
+            "references/cost-decisions.md": "a0aee1ba59dffd34ede23e022c49d117bed9427e8c3d80cebd6c7f1c4f25eeed",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
-            "references/decomposition.md": "9c2917509e1bc3afb87221fa0fba138a7de5ad3cf69875aaf36964eca012b5b7",
+            "references/decomposition.md": "f03ee5b285e9d0c95a24596069f662a785e6e717fa1438b3f01bfdc6c94adce9",
             "references/dispatch.md": "9a40ad9d5b36e13a97ecef22bb1ad06bda40c48b5ca0d23cfffe074d4d3022f6",
             "references/goal-contract.md": "3047b3ed1fc4874af7a414c64d2e8a542c1546fc885a027fa05ea2fa9ecd6e05",
             "references/handoff.md": "253b1227fec8ae9306c236db594052785bf374fab7a0401d972ecaace1dc5c39",
@@ -29,7 +29,7 @@
           "files": {
             "SKILL.md": "86f543abf198c6822860a29a27fe01500fecfdc531e47e48547a353b2a5d7112",
             "references/cross-harness-target-facts.md": "80d39b2102620947b5ec8e8c58b9d29fd0a2849fe787795d76bbcc8b6821cc6d",
-            "references/estimation.md": "fed409cc0631a118b45650eb509a37ed876efad2d9b37997a9b0653feb5ea907",
+            "references/estimation.md": "f7d378db198c03d7442632b2c5d250495e29edcbd1ac341a88c5256c162d1664",
             "references/model-tiers.md": "62ae8337a3b33c8b0958169de6f9de70121edc1fe7f1f041ce49697feb2a098f",
             "references/pacing-levers.md": "b82c03f5fdb7922d2d36c5681a1a49d72ff1488e164768d736fb11cee108f850",
             "references/pool-aware-advice.md": "907e1946f8703ed5590fca146062c3e14f90dec25e2d1b584f8cacc9e5434503",
@@ -39,7 +39,7 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "6ab2a559ae4f08e39291868f5bffb070d65c571808ecf800a04b506520b5ead6",
+            "SKILL.md": "103f9a2db2eea9384729b46ab2d90a7b0abc3c8e650283a7e545e1210273fdd4",
             "references/account-pool.md": "da7a5826ba8ceb1eefc26722b4e305df6042ea30264abade27f896ef1fb2a8d6",
             "references/board-model-guide.md": "bc46497619b2ca0f64817ef1d31a3c882affd2680378ad0cb0672ab1aec7ca29",
             "references/command-catalog.md": "ea3e1e58c5ddb97abecbb660934bf7594aa2d43b1a823ef3ce26c87569dc10a9"
@@ -54,9 +54,9 @@
           "files": {
             "SKILL.md": "ff6cd299724da98d3fd1b9f08abaf5842f55fb27f7bf022e3236e3a8de636438",
             "references/async-hitl.md": "4a56ab3e551879e654747c54c9b22f9b221e92e526f5bd0f4de8a3acceef8a62",
-            "references/board.md": "39dfec8792054c707407083b5c9b1e786f36071a56be5b29719ee8b183a4d991",
+            "references/board.md": "5d96b0df290d78b93ed50315724d45f8770ee897506107c7c77310ad9789ccba",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
-            "references/decomposition.md": "9d3fc377a4d8e4cd4c9c4d312ce47ab58a74f7faa9d071dda6e8a6c22609ced7",
+            "references/decomposition.md": "2e33007812fe7e15b9747e38119b07407ca732960b5df78df7558b9670abf632",
             "references/dispatch.md": "7cb9a58618a4b7a5fdec7445c36d31d50e29370df3128e00ac9f242f35a362fb",
             "references/goal-contract.md": "3047b3ed1fc4874af7a414c64d2e8a542c1546fc885a027fa05ea2fa9ecd6e05",
             "references/model-allocation.md": "57c59f86b137bcca50aa8f9dc10e56f097052d86afe467e2bfe33a681fefddbc",
@@ -70,7 +70,7 @@
           "files": {
             "SKILL.md": "8c993d03ed0b65521a170da679e4376feab25a053d26eb6618ef5fd7d4093419",
             "references/cross-harness-target-facts.md": "8ed21b268074edcff2bf7fb1ee28f6dff87b769f60dadb8f6e3f3e1b8e3b6e0d",
-            "references/estimation.md": "fed409cc0631a118b45650eb509a37ed876efad2d9b37997a9b0653feb5ea907",
+            "references/estimation.md": "f7d378db198c03d7442632b2c5d250495e29edcbd1ac341a88c5256c162d1664",
             "references/model-tiers.md": "62ae8337a3b33c8b0958169de6f9de70121edc1fe7f1f041ce49697feb2a098f",
             "references/pacing-levers.md": "b82c03f5fdb7922d2d36c5681a1a49d72ff1488e164768d736fb11cee108f850",
             "references/pool-aware-advice.md": "907e1946f8703ed5590fca146062c3e14f90dec25e2d1b584f8cacc9e5434503",
@@ -80,7 +80,7 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "b6bdc584aa2cec3f79181d82469a105383566fe2fa966aaf875295ab3b5d38ac",
+            "SKILL.md": "985331b9cff080545b6f01c3e2891bce858fe4853b9fb4fa77fd92f174f7cf3b",
             "references/board-model-guide.md": "81bf336a2d8f116f011f70ba15d40d77efb5304e56598fe85ce31b1c37686780",
             "references/command-catalog.md": "197b74a5f8607dc9dd7384417d04d2f8575a1d364cbcb3aa0d3c75dcf50cf973"
           }
@@ -94,9 +94,9 @@
           "files": {
             "SKILL.md": "751c217f063598f6c8bc7ae8564c6f123a8f65938054dcfde624d49e681c7579",
             "references/async-hitl.md": "622768b1f2ed0ccab493b78b057b91594b15242c2c3f7426866dfd8234c5f41b",
-            "references/board.md": "f3669b71cdab613e4c559ee6839109575bc3edd7d4288759b8ff19088d281c29",
+            "references/board.md": "4d5fb019b42e1852b2ab62ca811532e951742c38b8c764f8d6072f6dff44f5e5",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
-            "references/decomposition.md": "9d3fc377a4d8e4cd4c9c4d312ce47ab58a74f7faa9d071dda6e8a6c22609ced7",
+            "references/decomposition.md": "2e33007812fe7e15b9747e38119b07407ca732960b5df78df7558b9670abf632",
             "references/dispatch.md": "622cf948b53a5533942d4318addb118763d6667b73c4d4149e390368d3c860c6",
             "references/goal-contract.md": "3047b3ed1fc4874af7a414c64d2e8a542c1546fc885a027fa05ea2fa9ecd6e05",
             "references/model-allocation.md": "57c59f86b137bcca50aa8f9dc10e56f097052d86afe467e2bfe33a681fefddbc",
@@ -110,7 +110,7 @@
           "files": {
             "SKILL.md": "3448428a8bd9cdf9511715cfa2693970ba2fcc62c08a83ca71fa7884b056ced0",
             "references/cross-harness-target-facts.md": "8ed21b268074edcff2bf7fb1ee28f6dff87b769f60dadb8f6e3f3e1b8e3b6e0d",
-            "references/estimation.md": "fed409cc0631a118b45650eb509a37ed876efad2d9b37997a9b0653feb5ea907",
+            "references/estimation.md": "f7d378db198c03d7442632b2c5d250495e29edcbd1ac341a88c5256c162d1664",
             "references/model-tiers.md": "62ae8337a3b33c8b0958169de6f9de70121edc1fe7f1f041ce49697feb2a098f",
             "references/pacing-levers.md": "b82c03f5fdb7922d2d36c5681a1a49d72ff1488e164768d736fb11cee108f850",
             "references/pool-aware-advice.md": "907e1946f8703ed5590fca146062c3e14f90dec25e2d1b584f8cacc9e5434503",
@@ -120,7 +120,7 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "3c59a7bb79683d037eb4725edf8c6e8474afcd15e352d5c78f3576d61b8fe6df",
+            "SKILL.md": "a40ecfb69422e4bdac1530982b341aa585a671772f2f164bfda87112ac28646b",
             "references/board-model-guide.md": "12e6af860a9b6aecf14c87701dcd1d881f2bd3d57225e18a87108759245933e4",
             "references/command-catalog.md": "906c8d3d7a1de6b0b32d93ba58e0b40f58c14c2a7a157e26bf00b9f3c6ea45e6"
           }
@@ -134,9 +134,9 @@
           "files": {
             "SKILL.md": "f4f33f1caaaa837d3b4a66bf8a0a97a4d4a300053810427a7e95cbddc289faa3",
             "references/async-hitl.md": "f435d6abdcd7f524f847817b2308405b6fc9a4f6e6e7de7e758b676bfea27c35",
-            "references/board.md": "913124607f420c52e1d884c1209b2d4454b04a9a38c8bc9f8889278bec0f0e55",
+            "references/board.md": "9f906fa3e5254a699b082c8923be75438741fe401c99e832050acd87b4b0f558",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
-            "references/decomposition.md": "9d3fc377a4d8e4cd4c9c4d312ce47ab58a74f7faa9d071dda6e8a6c22609ced7",
+            "references/decomposition.md": "2e33007812fe7e15b9747e38119b07407ca732960b5df78df7558b9670abf632",
             "references/dispatch.md": "89745681ba59f5c2b074b50a18004b9df1690abfdf2cf988ecad3126b74c6737",
             "references/goal-contract.md": "3047b3ed1fc4874af7a414c64d2e8a542c1546fc885a027fa05ea2fa9ecd6e05",
             "references/handoff.md": "253b1227fec8ae9306c236db594052785bf374fab7a0401d972ecaace1dc5c39",
@@ -151,7 +151,7 @@
           "files": {
             "SKILL.md": "2cb69119fa515c88a52e2052168adcbf8f5eda590d708f54ac8a6927c55dd485",
             "references/cross-harness-target-facts.md": "8ed21b268074edcff2bf7fb1ee28f6dff87b769f60dadb8f6e3f3e1b8e3b6e0d",
-            "references/estimation.md": "fed409cc0631a118b45650eb509a37ed876efad2d9b37997a9b0653feb5ea907",
+            "references/estimation.md": "f7d378db198c03d7442632b2c5d250495e29edcbd1ac341a88c5256c162d1664",
             "references/model-tiers.md": "62ae8337a3b33c8b0958169de6f9de70121edc1fe7f1f041ce49697feb2a098f",
             "references/pacing-levers.md": "b82c03f5fdb7922d2d36c5681a1a49d72ff1488e164768d736fb11cee108f850",
             "references/pool-aware-advice.md": "907e1946f8703ed5590fca146062c3e14f90dec25e2d1b584f8cacc9e5434503",
@@ -161,7 +161,7 @@
         "using-ccm": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "d1df3a4648f4b3bedf6e1ea69f4f08f86fea8727ecd0fd124be2589bf7caf56f",
+            "SKILL.md": "3ea2fa9ec43795e094099f4252c6305caca570160a56a8d342e6ebcbe792f032",
             "references/board-model-guide.md": "96fb244b007a9b92c1448be67affe3f26f725b89992ed45abac0ec20c335f496",
             "references/command-catalog.md": "db12e8fd2578081b4bd4292193f4e9b0ae8f54c45633215ed352e607978b790b"
           }
