@@ -1,6 +1,6 @@
 # 派发 —— executor 值 vs 后台机制 + 编排并行
 
-> **何时读：** 给每个 task 定派给哪个 `executor`、再选你怎么真跑你负责执行的那些、并把这些道编排起来时——五个 executor 值 vs 三种后台机制、intra-vs-inter workflow、靠 escalation 重新定位（re-altitude）、admission control、**派发卫生 + watchdog/liveness 安全网（含 watchdog 工具降级链）**。
+> **何时读：** 给每个 task 定派给哪个 `executor`、为 harness × model 选择取证、给并行 writer 建立隔离工作树、再选你怎么真跑你负责执行的那些并把这些道编排起来时——五个 executor 值 vs 三种后台机制、intra-vs-inter workflow、靠 escalation 重新定位（re-altitude）、admission control、**派发卫生 + watchdog/liveness 安全网（含 watchdog 工具降级链）**。
 
 主线编排的核心：给每个节点定**谁执行**（board 上的 `executor` 值）、选你怎么把你负责执行的那些**真跑起来**（后台机制）、再把这些道编排起来。
 
@@ -12,6 +12,8 @@
 - [五个 executor 值 —— board 上「谁执行」](#五个-executor-值--board-上谁执行)
 - [三种后台机制 —— 你怎么真跑你负责执行的那些](#三种后台机制--你怎么真跑你负责执行的那些)
 - [选择标准 —— 控制 / 综合 / context](#选择标准--控制--综合--context不是数量)
+- [派前取证 —— harness × model 不是默认值](#派前取证--harness--model-不是默认值)
+- [并行 writer 的隔离前置条件](#并行-writer-的隔离前置条件)
 - [跨 harness 的当前最小闭环](#跨-harness-的当前最小闭环)
 - [Intra vs inter workflow](#intra-vs-inter-workflow--轴--生命周期耦合)
 - [靠 escalation 重新定位](#靠-escalation-重新定位core--绝不盲杀)
@@ -118,6 +120,31 @@ Cursor agent runtime 可用后台 Shell 等外部状态，但没有 Claude Code 
 
 ---
 
+## 派前取证 —— harness × model 不是默认值
+
+把每次 harness × model 选择当成一项待证判断，不要让 worker 默默吃默认档。派发前按这个顺序拿证据：
+
+1. **先定 effect floor**——按任务角色、判断密度与出错代价定最低能力；duration 与临界性只影响成本 / 排期，不能代替能力判断。
+2. **再查真实能力**——读当前模型策略证据，并运行解析后目标 CLI 的真实 help。CLI worker 可通过 passthrough argv 的 `--model` 逐任务指定模型；reasoning 分级同样透传该 CLI 自带的参数或配置。确切形状以这次 help 为准，不凭记忆、不假定只能用默认档。
+3. **只在满足 floor 的候选中权衡**——结合资源 posture、cost、quota headroom 与 task affinity 选档；missing / stale / unknown 不得被感觉补成「应该可用」。完整 floor 与候选排序见 `references/model-allocation.md`。
+4. **显式派发并留证**——把最终 model / reasoning 选择写入实际 argv，并记录支撑它的策略版本、候选与取舍理由；不要只在计划文字里说「用强档」却让 CLI 吃默认值。
+
+**cost-appropriateness 是硬约束：**机械、确定性、可机械验收的工作使用满足 floor 的最低成本档；强 reasoning 档留给判断密集或 correctness 关键的工作。最贵不是最稳妥，临界也不自动等于最强。
+
+需要解释 `usage` / `estimate` advisory、窗口 freshness、配速或 forecast 时，调用 `pacing-and-estimation`；这里只规定派前决策顺序，不复制它的消费合同。
+
+---
+
+## 并行 writer 的隔离前置条件
+
+**硬纪律：派发任何并行 writer / subagent 之前，先给每个 writer 指定一棵独立的隔离工作树（例如各自的 git worktree），并把它的绝对路径与位置核对写进派发 prompt。多个 writer 绝不共享同一路径；只读 agent 才可共享。**没有独立工作树，就不要并行派 writer——先建立隔离，或改为串行。
+
+共享一棵树会让并行结果失去可信度：co-edit 同一文件会互撞；一个 worker 会读到另一个尚未完成的中间态，产出假绿；你也无法在端点按任务干净验收、归因与落 commit。隔离不是整洁偏好，而是端点证据成立的前提。
+
+每个 writer 只在自己的树里写、自测并报告 artifact；你在各树端点独立验收，再统一集成。即使任务预计修改不同文件，也不把「大概不会撞」当成共享路径的许可证。
+
+---
+
 ## 跨 harness 的当前最小闭环
 
 不要把 origin harness 当成 worker 的选择边界：如果另一种本机 harness 更适合这项工作，就可以显式
@@ -184,9 +211,9 @@ HITL 只是诸多轴之一；失败隔离、优先级、整合时机同样重要
 ## 派发卫生 —— 一跑真并行就咬人的机械细节
 
 - **注册先于 task 起跑，handle 是 `in_flight` 的唯一入场券。** `agent create` 只是建立 `starting` runtime 记录，可以先于 spawn；它不证明 worker 已经运行。真正派出 worker 后，先把返回的真实 handle bind 到 agent、link 到 task，再经 `ccm` 生命周期 verb 让普通 task 进入 `in_flight`。没有 handle 或 link 的 `in_flight` 是**幽灵任务（phantom）**。recon 时先 `ccm agent list` 重建 roster，再对关联条目做 `ccm agent show` / `ccm agent probe`，核对 handle、task link、liveness 与 git / transcript / 工具产物；三者皆空就按 phantom 处置。若 `ccm agent show` 返回已存的 attach command，只执行那条自包含命令；不要凭记忆编造新的 attach 操作。agent terminal 仍只是 runtime 事实，父 task 必须独立验收。
-- **用绝对路径指向工作目标——绝不靠继承 cwd。** 你的 cwd 常常*不是*工作落地的那个 repo（你可能在从另一个 worktree 或一个父目录驱动）。每个被派发 agent 的 prompt 都必须给出指向目标的**绝对路径**、并告诉它别依赖继承来的 cwd——否则文件会落进错误的树。
-- **单一提交者：叶子负责写 + 自测，你负责提交。** 各自 `git commit` 的并行 agent 会抢 git index。要求每个叶子**写它的文件、跑它的测试证明是绿的，但绝不 commit**；由你在端点验收、再按依赖序提交。（又是 end-to-end argument——commit 完整性归你的端点，不归叶子。见 `resume-verify.md`。）
-- **对同一个共享可变文件的写者，跨波串行化。** 若几个任务都追加到同一个文件（一个共享测试文件、一个 registry），*同一*波里的两个会互相覆盖。把这些写者拆进**不同的波**，使任一时刻至多一个去碰那文件——你吸收这份协调成本，好让叶子保持独立、互不相交。
+- **用隔离树的绝对路径指向工作目标——绝不靠继承 cwd。** 你的 cwd 常常*不是*工作落地的那棵树。每个被派发 writer 的 prompt 都必须给出其专属工作树的**绝对路径**、要求先核对位置，并告诉它别依赖继承来的 cwd——否则文件会落进错误的树。
+- **单一提交者：叶子负责写 + 自测，你负责提交。** 独立 worktree 解决并行写入隔离，不授予叶子提交权。要求每个叶子**写它的文件、跑它的测试证明是绿的，但绝不 commit**；由你在各树端点验收、统一集成，再按依赖序提交。（又是 end-to-end argument——commit 完整性归你的端点，不归叶子。见 `resume-verify.md`。）
+- **隔离不消除语义冲突。** 若几个任务都修改同一个共享文件（一个共享测试文件、一个 registry），它们不会在执行中彼此覆盖，却可能在集成时冲突。能错峰就拆进不同的波；必须同波就预建显式 integration 节点，由你在端点合并并重跑集成验收。
 
 ---
 

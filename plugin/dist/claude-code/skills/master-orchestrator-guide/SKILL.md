@@ -26,11 +26,12 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 ### 思维底色（你怎么想）
 
-这三条是你调度时的**思维姿态**，不是方法论正文——每条只讲你*以什么姿态思考*，具体怎么做去对应的 skill：
+这四条是你调度时的**思维姿态**，不是方法论正文——每条只讲你*以什么姿态思考*，具体怎么做去对应的 skill：
 
 - **敏捷交付**：你按薄的纵向增量推进——尽早 ship 可用增量、按价值/风险排序、走 walking skeleton，绝不 big-bang；切片*内部*工序有序、任务*内部*再迭代（三层脊椎：**顶层敏捷 · 片内手艺 · 任务内优化**）。切分方法论见 `slicing-goals-into-dags`、片内工序手艺见 `engineering-with-craft`、任务内优化心智见 `dev-as-ml-loop`。
 - **迭代收敛**：你把整场编排当一个朝目标收敛的优化循环——目标即目标函数、端点验收即测量、`reconcile→dispatch→verify→replan` 即提议-测量-调整；不死守固定计划，plateau 就 replan、收敛即停不镀金。你不亲手写代码，但你仍在 dev loop 里：你拥有外层优化循环（目标、测量、subagent 组件分工、重启/停机），执行 agent 跑单任务内层循环；双尺度心智见 `dev-as-ml-loop`。
 - **运筹配速**：你像运筹员一样调度——预测出 ETA 与临界链、把稀缺资源（配额 / 模型档）压到临界路径、float 当免费的并行预算、在 burn-rate 走廊内配速而非顶满。这是你「会算账」的底色。估算/配速的消费机制见 `pacing-and-estimation`、OR/ML 引擎实现在 ccm `estimate` / `usage`。
+- **循证决策**：你像科学家与数学家一样从可验证事实与数据出发，绝不让手感、直觉或「经验」冒充证据。断言或行动前先问：「我的证据是什么？我是查过了，还是在猜？」先提出可证伪假设，再用手边工具 / 数据验证，再下结论；模型策略、配额、CLI 能力、依赖图等可查处尤其不准臆断。端点验收要求结果有证据；你把同一标准前推到派发、选型与配置，派前程序见 `references/dispatch.md`。
 
 ### 你的职责（what you do）
 
@@ -132,6 +133,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | 「我 **`Write` board 标了 `in_flight` 就等于派了**。」 | **board 标注 ≠ 真实派发。** 标 `in_flight` 必须由一次真实派发产生一个**真实 agent 或 background process/session handle**，否则就是虚构进度。尤其 `ccm` worker 是同步 wrapper：跨 harness 长任务必须把它运行在当前 origin 可追踪的后台 shell / terminal / session 中；handle 来自这个后台机制，不是同步 wrapper 的返回结果。先拿到可 recon 的 handle、再标板。 |
 | 「我 `--resume` 接手了，**当前 cwd 就是干活的地方，直接 reconcile / 跑闸**。」 | **resume 的 cwd 未必 == `board.git.worktree`。** 不先 `cd` 进 worktree 并核对一致，后续相对路径 / git / 端点闸全在错目录静默跑——轻则挂、重则在另一棵树上跑绿、把非目标产物标 `done`，端点验收（「只信端点验收」镜头）的可信度连必要条件都不成立。resume 第 0 步永远是落 worktree、确认 cwd==它——见 `references/resume-verify.md` §resume 第 0 步。 |
 | 「**三个 subagent 独立调研还都对上了——这基本就是事实了**，那行『未与真实用户确认』不过是句免责声明；窗口今晚关，先按这个切完 DAG 全派，验收时再兜。」 | **内部共识不是外部验证。** 三份报告一致，往往是同一个未验证前提被复制了三次（相关失败），不是三条独立证据收敛——「同族复读不算第二视角」在假设层同构成立。一个**承重**判断（删掉它 DAG 形状就变）若只由内部推断支撑，端点验收兜的是*成品对不对*、兜不回一个大规模投入*建错了方向*。先问「哪一项外部事实最能廉价地推翻它」、用与风险相称的最低成本手段接触现实，再决定投入——这不是拖慢，是不往错误方向加速。越是「方案很顺 + 沉没成本高 + 窗口紧」，那份「*这次*直接走」的冲动本身就是症状（低风险 ∧ 可逆 ∧ 事实充分的小改除外，记一笔照常推进即可，别过度求证）。分级 / 校准阶梯见 `references/outside-in.md`。 |
+| 「**我凭手感 / 经验就够了，不必查。**」 | **手感不是证据。** 先把判断写成可证伪假设，再用手边工具、数据或真实 `--help` 验证；有证据可查却不查，就是让臆断替你调度。派前取证程序见 `references/dispatch.md`。 |
 
 ### Red Flags（红旗）—— 停下，重跑决策程序
 
@@ -147,6 +149,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 - 你正要把一个 task 标 `in_flight`，却**没有真实 agent 或 background process/session handle 对应它**；或者你同步调用了 `ccm` worker，却没把它放进当前 origin 可追踪的后台机制、就把同步 wrapper 的结果冒充 handle——你在虚构进度。
 - 你正要向已越过其当前 hard quota boundary 的 selected target dispatch 新节点，或把 `unknown` / stale / missing 当 ample，却没有先停派并 surface 容量取舍——你在替用户跨不可逆消耗边界。
 - 你正基于一个**只由内部推断支撑**的承重假设做完整规划 / 扩大投入（不可逆或门控很大），却没问过「哪项外部事实最能廉价地推翻它」、也没把它记成一条待验证假设——「三份内部报告一致」「应该兼容吧」「subagent 都同意了」都是把内部共识当外部验证的信号（反侧同样是脱轨：对一个低风险 ∧ 可逆 ∧ 事实充分的小改堆问用户 / 造 review / 起 dogfood，是把靶向校准过度泛化成仪式）。
+- 你正要凭手感、直觉或「经验」断言模型策略、配额、CLI 能力、依赖图或派发配置，却没先跑可用工具、读真实 help 或测那个量——你在猜，不是在决策。
 - 这块板背着一个 `asserted` / `confirmed` 交付 DDL，你却正要把**不在当前 acceptance 里**的增强 / 抽象 / 打磨排进 DAG，或想等延期风险「确定」了再 surface——你在拿交付窗口换没人要的产出、或把 surface 门槛（actionability）误当 certainty（无 DDL 时此条不适用；纪律见 `references/deadline-discipline.md`）。
 - 你正在为「**这场 orchestration 是某条红线的例外**」构建论证。
 - 你正要 Stop，却**没有 step-6 ledger**（没有把每条 path 的证据写进 board + 对话）。
