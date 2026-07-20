@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { UsageSignal, WindowSignal } from '@ccm/engine';
 import { canonicalJson, sha256Hex } from '@ccm/engine';
-import type { CurrentQuotaAuthorityRefs, Env } from './harnesses/types.js';
+import type { CurrentQuotaAuthorityRefs, Env, UsageRefreshHint } from './harnesses/types.js';
 import { projectMachineWideQuotaNotifications } from './machine-wide-quota-notification.js';
 import {
   projectMachineQuotaPosture,
@@ -17,7 +17,9 @@ interface MachineQuotaTarget {
   surfaceId: string;
   providerId: string;
   bucketId: string;
-  windowName: 'five_hour' | 'seven_day' | 'billing_period';
+  windowName: 'five_hour' | 'seven_day' | 'billing_period' | 'billing_period_usage_based';
+  poolKind?: 'first_party' | 'usage_based';
+  poolIds?: readonly string[];
   durationSec: number;
   collectorId: string;
   sourceSchema: string;
@@ -35,6 +37,7 @@ export interface MachineQuotaCollection {
   authority?: MachineQuotaAuthorityRefs;
   authSource?: string;
   quotaScopeFingerprint?: string | null;
+  refreshHint?: UsageRefreshHint | null;
 }
 
 export interface MachineQuotaCollectorBoundary {
@@ -112,6 +115,22 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     providerId: 'cursor',
     bucketId: 'billing-period-global',
     windowName: 'billing_period',
+    poolKind: 'first_party',
+    poolIds: ['cursor-total', 'cursor-auto'],
+    durationSec: 2_592_000,
+    collectorId: 'cursor-dashboard',
+    sourceSchema: 'cursor/GetCurrentPeriodUsage/v1',
+    authSource: 'cursor-ide-current-login',
+    defaultCollectorHarness: 'cursor',
+  },
+  {
+    harnessId: 'cursor',
+    surfaceId: 'cursor-ide-plugin',
+    providerId: 'cursor',
+    bucketId: 'billing-period-usage-based',
+    windowName: 'billing_period_usage_based',
+    poolKind: 'usage_based',
+    poolIds: ['cursor-api', 'cursor-spend-limit'],
     durationSec: 2_592_000,
     collectorId: 'cursor-dashboard',
     sourceSchema: 'cursor/GetCurrentPeriodUsage/v1',
@@ -124,11 +143,27 @@ const TARGETS: readonly MachineQuotaTarget[] = Object.freeze([
     providerId: 'cursor',
     bucketId: 'billing-period-global',
     windowName: 'billing_period',
+    poolKind: 'first_party',
+    poolIds: ['cursor-total', 'cursor-auto'],
     durationSec: 2_592_000,
     collectorId: 'cursor-agent-dashboard',
     sourceSchema: 'cursor/GetCurrentPeriodUsage/v1',
     authSource: 'cursor-agent-current-login',
     // The Agent owns its credential discovery, while both surfaces may observe one subscription pool.
+    defaultCollectorHarness: 'cursor',
+  },
+  {
+    harnessId: 'cursor',
+    surfaceId: 'cursor-agent-cli',
+    providerId: 'cursor',
+    bucketId: 'billing-period-usage-based',
+    windowName: 'billing_period_usage_based',
+    poolKind: 'usage_based',
+    poolIds: ['cursor-api', 'cursor-spend-limit'],
+    durationSec: 2_592_000,
+    collectorId: 'cursor-agent-dashboard',
+    sourceSchema: 'cursor/GetCurrentPeriodUsage/v1',
+    authSource: 'cursor-agent-current-login',
     defaultCollectorHarness: 'cursor',
   },
   {
@@ -171,9 +206,10 @@ function collectionTarget(target: MachineQuotaTarget): Data {
     surface_id: target.surfaceId,
     provider_id: target.providerId,
     bucket_id: target.bucketId,
+    ...(target.poolKind ? { pool_kind: target.poolKind } : {}),
     unit: 'percent',
     window: {
-      kind: target.windowName === 'billing_period' ? 'billing-cycle' : 'rolling',
+      kind: target.windowName.startsWith('billing_period') ? 'billing-cycle' : 'rolling',
       name: target.windowName,
       duration_sec: target.durationSec,
     },
@@ -186,9 +222,23 @@ function sourceKey(target: MachineQuotaTarget): string {
 
 function signalWindow(
   signal: UsageSignal | null | undefined,
-  name: MachineQuotaTarget['windowName'],
+  target: MachineQuotaTarget,
 ): WindowSignal | null {
-  return signal?.[name] ?? null;
+  if (!signal) return null;
+  if (target.poolIds?.length) {
+    const candidates = (signal.pools ?? []).filter(
+      (pool) => target.poolIds?.includes(pool.id) && typeof pool.used_percentage === 'number',
+    );
+    if (candidates.length > 0) {
+      const highest = candidates.reduce((left, right) =>
+        (right.used_percentage ?? -1) > (left.used_percentage ?? -1) ? right : left,
+      );
+      return { used_percentage: highest.used_percentage, resets_at: highest.resets_at ?? null };
+    }
+  }
+  return target.windowName === 'billing_period_usage_based'
+    ? null
+    : (signal[target.windowName] ?? null);
 }
 
 function object(value: unknown): Data {
@@ -238,7 +288,7 @@ function normalizeCollectedAuthorityObservation(
   now: Date,
 ): Data {
   const nowSec = Math.floor(now.getTime() / 1000);
-  const window = signalWindow(collection.signal, target.windowName);
+  const window = signalWindow(collection.signal, target);
   const used = window?.used_percentage;
   const capturedAt = collection.signal?.captured_at;
   const observedSec =
@@ -272,6 +322,7 @@ function normalizeCollectedAuthorityObservation(
     source: collection.source ?? target.collectorId,
     auth_source: collection.authSource ?? target.authSource,
     quota_scope_fingerprint: quotaScopeFingerprint,
+    refresh_hint: collection.refreshHint ?? null,
     authority: authority
       ? {
           account_key: authority.account_key,
@@ -307,6 +358,8 @@ function normalizeCollectedAuthorityObservation(
       quota_scope_fingerprint: quotaScopeFingerprint,
     },
     authentication_source: collection.authSource ?? target.authSource,
+    unavailable_reason: collection.reason ?? null,
+    refresh_hint: collection.refreshHint ?? null,
     observed_at: observedAt,
     valid_until: validUntil,
     hard_window: { name: target.windowName, duration_sec: target.durationSec },
@@ -417,8 +470,14 @@ function postureInputFromObservation(
     : nonempty(observation.identity_fingerprint)
       ? String(observation.identity_fingerprint)
       : null;
-  const quotaScopeDigest = quotaScopeFingerprint
-    ? digest(`ccm/quota-scope/v1|${homeSalt}|${quotaScopeFingerprint}`)
+  // Preserve the existing first-party digest while giving separately billed usage a non-complementary
+  // capacity identity even when both pools share one authenticated Cursor account fingerprint.
+  const quotaScopeIdentity =
+    quotaScopeFingerprint && target.poolKind === 'usage_based'
+      ? `${quotaScopeFingerprint}|pool=usage_based`
+      : quotaScopeFingerprint;
+  const quotaScopeDigest = quotaScopeIdentity
+    ? digest(`ccm/quota-scope/v1|${homeSalt}|${quotaScopeIdentity}`)
     : nonempty(observation.pool_id)
       ? digest(`ccm/quota-scope/v1|${homeSalt}|${String(observation.pool_id)}`)
       : null;
@@ -517,7 +576,53 @@ function checkpointDecisions(projection: Data | undefined): Data[] {
   return Array.isArray(projection?.decisions) ? projection.decisions : [];
 }
 
-function safeQuotaReading(target: MachineQuotaTarget, observation: Data | undefined): Data {
+function machineReadingRefreshHint(
+  target: MachineQuotaTarget,
+  observation: Data | undefined,
+  now: Date,
+  hasUsableBucket: boolean,
+): UsageRefreshHint | null {
+  const validUntilMs = nonempty(observation?.valid_until)
+    ? Date.parse(observation.valid_until)
+    : Number.NaN;
+  const expired = Number.isFinite(validUntilMs) && validUntilMs < now.getTime();
+  const unavailable = !observation || observation.observation_status !== 'ok' || !hasUsableBucket;
+  if (!expired && !unavailable) return null;
+  const stored = object(observation?.refresh_hint);
+  if (
+    nonempty(stored.reason) &&
+    typeof stored.recoverable === 'boolean' &&
+    (stored.command === null || typeof stored.command === 'string') &&
+    (stored.remedy === null || typeof stored.remedy === 'string') &&
+    (stored.recheck === null || typeof stored.recheck === 'string') &&
+    typeof stored.agent_authorized === 'boolean' &&
+    typeof stored.authorization === 'string'
+  ) {
+    return structuredClone(stored) as UsageRefreshHint;
+  }
+  const command = 'ccm quota status --machine-wide --refresh --json';
+  const targetLabel = `${target.harnessId}/${target.surfaceId}/${target.windowName}`;
+  const reason = expired
+    ? `${targetLabel} 本机 quota 缓存已过期`
+    : nonempty(observation?.unavailable_reason)
+      ? observation.unavailable_reason
+      : `${targetLabel} quota 信号不可用`;
+  return {
+    reason,
+    recoverable: true,
+    command,
+    remedy: `运行 ${command} 按需重新采集，然后重查该 target reading；若仍不可用，保持 unknown 并 surface 用户。`,
+    recheck: 'ccm quota status --machine-wide --json',
+    agent_authorized: true,
+    authorization: `你被授权运行 ${command} 做一次只读 quota 重采集；该授权不包括直接刷新、轮换、修改、移动或删除任何凭证或凭证文件。`,
+  };
+}
+
+function safeQuotaReading(
+  target: MachineQuotaTarget,
+  observation: Data | undefined,
+  now: Date,
+): Data {
   const bucket = Array.isArray(observation?.buckets)
     ? observation.buckets
         .map(object)
@@ -528,9 +633,11 @@ function safeQuotaReading(target: MachineQuotaTarget, observation: Data | undefi
             candidate.duration_sec === target.durationSec,
         )
     : undefined;
+  const hasUsableBucket = percentage(bucket?.used_pct);
+  const refreshHint = machineReadingRefreshHint(target, observation, now, hasUsableBucket);
   return {
     target: collectionTarget(target),
-    used_percentage: percentage(bucket?.used_pct) ? bucket.used_pct : null,
+    used_percentage: hasUsableBucket ? bucket.used_pct : null,
     resets_at: nonempty(bucket?.resets_at) ? bucket.resets_at : null,
     observed_at: nonempty(observation?.observed_at) ? observation.observed_at : null,
     valid_until: nonempty(observation?.valid_until) ? observation.valid_until : null,
@@ -541,13 +648,14 @@ function safeQuotaReading(target: MachineQuotaTarget, observation: Data | undefi
         ? observation.authentication_source
         : target.authSource,
     },
+    ...(refreshHint ? { refresh_hint: refreshHint } : {}),
   };
 }
 
-async function safeReadingsFromStore(store: MachineQuotaStore): Promise<Data[]> {
+async function safeReadingsFromStore(store: MachineQuotaStore, now: Date): Promise<Data[]> {
   return Promise.all(
     TARGETS.map(async (target) =>
-      safeQuotaReading(target, await store.readObservation(sourceKey(target))),
+      safeQuotaReading(target, await store.readObservation(sourceKey(target)), now),
     ),
   );
 }
@@ -628,7 +736,7 @@ export async function readMachineWideQuotaStatus(
       ? projection.home_salt
       : null;
   const decisions = await decisionsFromStore(store, now, homeSalt);
-  return machineQuotaStatus(decisions, projection, await safeReadingsFromStore(store));
+  return machineQuotaStatus(decisions, projection, await safeReadingsFromStore(store, now));
 }
 
 /**
@@ -668,6 +776,7 @@ export async function refreshMachineWideQuotaObservations(input: {
         {
           ...collectionTarget(target),
           window_name: target.windowName,
+          pool_kind: target.poolKind ?? null,
           default_collector_harness: target.defaultCollectorHarness,
           collector_id: target.collectorId,
         },
@@ -729,7 +838,7 @@ export function readMachineWideQuotaStatusCached(home: string, now = new Date())
         observation = candidate;
       }
     }
-    readings.push(safeQuotaReading(target, observation));
+    readings.push(safeQuotaReading(target, observation, now));
     return projectMachineQuotaPosture(
       homeSalt
         ? postureInputFromObservation(target, observation, now, homeSalt)
@@ -796,6 +905,7 @@ export async function readOrRefreshMachineQuotaSurfaceReading(input: {
           {
             ...collectionTarget(target),
             window_name: target.windowName,
+            pool_kind: target.poolKind ?? null,
             default_collector_harness: target.defaultCollectorHarness,
             collector_id: target.collectorId,
           },
@@ -810,7 +920,7 @@ export async function readOrRefreshMachineQuotaSurfaceReading(input: {
       return normalizeCollectedAuthorityObservation(target, collection, now);
     },
   );
-  return safeQuotaReading(target, observation);
+  return safeQuotaReading(target, observation, now);
 }
 
 export async function refreshMachineWideQuota(input: {
@@ -851,6 +961,7 @@ export async function refreshMachineWideQuota(input: {
         {
           ...collectionTarget(target),
           window_name: target.windowName,
+          pool_kind: target.poolKind ?? null,
           default_collector_harness: target.defaultCollectorHarness,
           collector_id: target.collectorId,
         },

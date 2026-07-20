@@ -566,6 +566,8 @@ export type {
   PacingVerdict,
   PoolAccount,
   PoolStatus,
+  UsagePoolKind,
+  UsagePoolSignal,
   UsageSignal,
   WindowSignal,
 } from './usage/pacing.js';

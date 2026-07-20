@@ -11,7 +11,7 @@ import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { MessageChannel, receiveMessageOnPort, Worker } from 'node:worker_threads';
-import { pacingAdvice, type UsageSignal } from '@ccm/engine';
+import { pacingAdvice, type UsagePoolSignal, type UsageSignal } from '@ccm/engine';
 
 // Lazy-load node:sqlite — a top-level import emits ExperimentalWarning on every ccm
 // invocation (including --version / --json), which breaks e2e stderr/JSON contracts.
@@ -45,13 +45,13 @@ export function normalizeCursorPeriodUsage(
   const plan = isRecord(raw.planUsage) ? raw.planUsage : null;
   if (!plan) return null;
 
-  const usedPct = resolveUsedPercent(plan);
-  if (usedPct === null) return null;
-
   const cycleStartMs = parseMs(raw.billingCycleStart);
   const cycleEndMs = parseMs(raw.billingCycleEnd);
   const resetsAt =
     cycleEndMs !== null && Number.isFinite(cycleEndMs) ? Math.floor(cycleEndMs / 1000) : null;
+  const pools = resolveNamedPools(raw, plan, resetsAt);
+  const usedPct = resolveUsedPercent(plan) ?? pools[0]?.used_percentage ?? null;
+  if (usedPct === null) return null;
 
   const capturedAt =
     typeof opts?.capturedAtSec === 'number' && Number.isFinite(opts.capturedAtSec)
@@ -74,6 +74,7 @@ export function normalizeCursorPeriodUsage(
         used_percentage: usedPct,
         resets_at: resetsAt,
       },
+      pools,
       captured_at: capturedAt,
     },
   };
@@ -265,7 +266,67 @@ function resolveUsedPercent(plan: Record<string, unknown>): number | null {
   ) {
     return (spend / limit) * 100;
   }
+  if (typeof plan.autoPercentUsed === 'number' && Number.isFinite(plan.autoPercentUsed)) {
+    return plan.autoPercentUsed;
+  }
   return null;
+}
+
+function resolveNamedPools(
+  raw: Record<string, unknown>,
+  plan: Record<string, unknown>,
+  resetsAt: number | null,
+): UsagePoolSignal[] {
+  const pools: UsagePoolSignal[] = [];
+  pushPool(pools, 'cursor-total', 'Cursor total', 'first_party', plan.totalPercentUsed, resetsAt);
+  pushPool(pools, 'cursor-auto', 'Cursor Auto', 'first_party', plan.autoPercentUsed, resetsAt);
+  pushPool(
+    pools,
+    'cursor-api',
+    'Cursor API / usage-based',
+    'usage_based',
+    plan.apiPercentUsed,
+    resetsAt,
+  );
+  const spendLimit = isRecord(raw.spendLimitUsage) ? raw.spendLimitUsage : null;
+  if (spendLimit) {
+    const limit = finiteNumber(spendLimit.individualLimit);
+    const remaining = finiteNumber(spendLimit.individualRemaining);
+    const usedPct =
+      limit !== null && limit > 0 && remaining !== null
+        ? Math.min(100, Math.max(0, ((limit - remaining) / limit) * 100))
+        : null;
+    const limitType =
+      typeof spendLimit.limitType === 'string' && spendLimit.limitType.trim()
+        ? spendLimit.limitType.trim()
+        : 'unknown';
+    pushPool(
+      pools,
+      'cursor-spend-limit',
+      `Cursor pay-as-you-go spend limit (${limitType})`,
+      'usage_based',
+      usedPct,
+      resetsAt,
+    );
+  }
+  return pools;
+}
+
+function pushPool(
+  pools: UsagePoolSignal[],
+  id: string,
+  label: string,
+  kind: UsagePoolSignal['kind'],
+  rawUsed: unknown,
+  resetsAt: number | null,
+): void {
+  const used = finiteNumber(rawUsed);
+  if (used === null || used < 0 || used > 100) return;
+  pools.push({ id, label, kind, used_percentage: used, resets_at: resetsAt });
+}
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function resolveCursorAccessToken(

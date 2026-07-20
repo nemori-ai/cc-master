@@ -137,6 +137,7 @@ const DEFAULT_MACHINE_QUOTA_COLLECTORS: MachineQuotaCollectorBoundary = {
             signal: reading.signal,
             source: reading.source,
             reason: reading.unavailableReason,
+            refreshHint: reading.refreshHint,
           };
     } catch (error) {
       return { status: 'error', reason: error instanceof Error ? error.message : String(error) };

@@ -33,7 +33,7 @@
             "references/model-tiers.md": "62ae8337a3b33c8b0958169de6f9de70121edc1fe7f1f041ce49697feb2a098f",
             "references/pacing-levers.md": "b82c03f5fdb7922d2d36c5681a1a49d72ff1488e164768d736fb11cee108f850",
             "references/pool-aware-advice.md": "907e1946f8703ed5590fca146062c3e14f90dec25e2d1b584f8cacc9e5434503",
-            "references/usage-signals.md": "51d81f62178a936777b0af9ac15cb84202dff2ea91e28c557c0e27f41d1c7fdb"
+            "references/usage-signals.md": "8616087178b73857b3a2b3c82dc642807e405a480938d6c50b578c29a4b87181"
           }
         },
         "using-ccm": {
@@ -42,7 +42,7 @@
             "SKILL.md": "103f9a2db2eea9384729b46ab2d90a7b0abc3c8e650283a7e545e1210273fdd4",
             "references/account-pool.md": "da7a5826ba8ceb1eefc26722b4e305df6042ea30264abade27f896ef1fb2a8d6",
             "references/board-model-guide.md": "604a83fa98bfd15ab3de0bdf3c25d349acbe830631f4c7a5fcd3538998b8179e",
-            "references/command-catalog.md": "3e36723e1a90588588819443b57d1039e729b4b07997034784b63f59e38064ac"
+            "references/command-catalog.md": "c9ef8cb8e8f9fd08786b56f25c2932e87df2f93a2ff65c8d777f332f9d33817f"
           }
         }
       }
@@ -74,7 +74,7 @@
             "references/model-tiers.md": "62ae8337a3b33c8b0958169de6f9de70121edc1fe7f1f041ce49697feb2a098f",
             "references/pacing-levers.md": "b82c03f5fdb7922d2d36c5681a1a49d72ff1488e164768d736fb11cee108f850",
             "references/pool-aware-advice.md": "907e1946f8703ed5590fca146062c3e14f90dec25e2d1b584f8cacc9e5434503",
-            "references/usage-signals.md": "51d81f62178a936777b0af9ac15cb84202dff2ea91e28c557c0e27f41d1c7fdb"
+            "references/usage-signals.md": "8616087178b73857b3a2b3c82dc642807e405a480938d6c50b578c29a4b87181"
           }
         },
         "using-ccm": {
@@ -82,7 +82,7 @@
           "files": {
             "SKILL.md": "985331b9cff080545b6f01c3e2891bce858fe4853b9fb4fa77fd92f174f7cf3b",
             "references/board-model-guide.md": "65b50557fddf847ef5115701ba33ece28b5717ae70a4f31adbbbbe14ca58b8c6",
-            "references/command-catalog.md": "d4f7d0ec22455cc0c49a241ae800a1a6cf4dbc8f1ba346af0ad02abba20befc9"
+            "references/command-catalog.md": "ea4cf6327c02ee3502de7e522c6d6e82c2cbd44a499d71dbb6187cacbc9d4b15"
           }
         }
       }
@@ -114,7 +114,7 @@
             "references/model-tiers.md": "62ae8337a3b33c8b0958169de6f9de70121edc1fe7f1f041ce49697feb2a098f",
             "references/pacing-levers.md": "b82c03f5fdb7922d2d36c5681a1a49d72ff1488e164768d736fb11cee108f850",
             "references/pool-aware-advice.md": "907e1946f8703ed5590fca146062c3e14f90dec25e2d1b584f8cacc9e5434503",
-            "references/usage-signals.md": "51d81f62178a936777b0af9ac15cb84202dff2ea91e28c557c0e27f41d1c7fdb"
+            "references/usage-signals.md": "8616087178b73857b3a2b3c82dc642807e405a480938d6c50b578c29a4b87181"
           }
         },
         "using-ccm": {
@@ -122,7 +122,7 @@
           "files": {
             "SKILL.md": "a40ecfb69422e4bdac1530982b341aa585a671772f2f164bfda87112ac28646b",
             "references/board-model-guide.md": "2beffd1a45dd227e547cc5a22f1602cde43966a481ff21d67288c4c4ec0149ce",
-            "references/command-catalog.md": "6727e670e53fa3fa7f42b208e438b9468b1ebb4aa2ad96d8813f952aa435a260"
+            "references/command-catalog.md": "0580c3edd618c29cbf5a1681057ca94727655cc536dd3f358717a9d7575398c9"
           }
         }
       }
@@ -155,7 +155,7 @@
             "references/model-tiers.md": "62ae8337a3b33c8b0958169de6f9de70121edc1fe7f1f041ce49697feb2a098f",
             "references/pacing-levers.md": "b82c03f5fdb7922d2d36c5681a1a49d72ff1488e164768d736fb11cee108f850",
             "references/pool-aware-advice.md": "907e1946f8703ed5590fca146062c3e14f90dec25e2d1b584f8cacc9e5434503",
-            "references/usage-signals.md": "51d81f62178a936777b0af9ac15cb84202dff2ea91e28c557c0e27f41d1c7fdb"
+            "references/usage-signals.md": "8616087178b73857b3a2b3c82dc642807e405a480938d6c50b578c29a4b87181"
           }
         },
         "using-ccm": {
@@ -163,7 +163,7 @@
           "files": {
             "SKILL.md": "3ea2fa9ec43795e094099f4252c6305caca570160a56a8d342e6ebcbe792f032",
             "references/board-model-guide.md": "10ee71d86bd5a5b49ce72f8c24e9cacf9cd659f3eda22069e5e77f922ec19ade",
-            "references/command-catalog.md": "bdb8a127679f67fde2c463b966d7aae23e7647b641a1a6679536affd8155f7e7"
+            "references/command-catalog.md": "fdf4617c40360a5618bd94e337c891be5f6fa52e7afd9acf6e1045d15d9e79c5"
           }
         }
       }

@@ -26,25 +26,31 @@ token（完整人读步骤在 `refresh_hint.remedy`），再重跑 `refresh_hint
 （网络 / 401 / API 变更）时 `command` / `remedy` 为 `null`，不是你能就地修的，按普通 unknown 处理、不推断为
 healthy。**ccm 绝不替你刷新或写凭证**——它只出可执行提示，恢复动作由你或用户执行。
 
-## 三路窗口合同
+## 四类 harness 的窗口与独立池合同
 
 | target | 承重窗口 | 信号语义 |
 |---|---|---|
 | Claude Code `claude-cli` | `five_hour` + `seven_day` | 两个窗口各自绑定 statusline sidecar 的当前登录态；账号 registry snapshot 只是历史弱信号 |
 | Codex `codex-cli` | **仅 `seven_day`** | app-server 的 7d 是唯一 hard pacing 窗口；任何 5h 字段只保留为 ignored provenance，不得触发 throttle / switch / stop / reset / wakeup |
-| Cursor `cursor-ide-plugin` | `billing_period` | IDE 当前登录态的账期信号，只适用于 IDE surface |
-| Cursor `cursor-agent-cli` | `billing_period` | Agent CLI 当前登录态的独立账期信号，只适用于 Agent surface |
+| Cursor `cursor-ide-plugin` | `billing_period` + `billing_period_usage_based` | IDE 当前登录态内，first-party（total / Auto）与 usage-based（API / spend limit）是两个独立、不互补的池 |
+| Cursor `cursor-agent-cli` | `billing_period` + `billing_period_usage_based` | Agent CLI 当前登录态内，同样分别保留 first-party 与 usage-based 两池；只适用于 Agent surface |
+| Kimi Code `kimi-cli` | `five_hour` + `seven_day` | `kimi-usages-api` 只读当前登录态的两个独立滚动窗口 |
 
-Cursor 两条 surface 即使可能落到同一订阅池，也必须分别保留 target / source / freshness；一条可用不证明另一条可用。
+Cursor 两条 surface 即使可能观察到同一订阅，也必须分别保留 target / source / freshness；一条可用不证明另一条
+可用。同一 surface 内 first-party 与 usage-based 也不是可相加或可互补的容量：machine-wide target 分开投影，
+`usage show` 则在兼容的 `billing_period` 之外用 named pools 保留原始分池事实。
 Codex 的 rolling-24h（若另有足够样本导出）只能提示相对 7d 平均日预算的 burn risk，不能成为第二个 hard window。
 
 ## 信号源与诚实天花板
 
 - machine-wide `readings[]` 暴露 target、`used_percentage`、reset / observation / validity 时间与 source；
-  `summary.decisions[]` 是它的 agent-safe posture。它们不证明模型 entitlement，也不替代 quota preflight 的
-  authority-bound spawn limit。
-- `usage show` 的统一窗口都位于 `data.current.{five_hour,seven_day,billing_period}`；不适用或不可得为
-  `null`。`accounts[]` 不把 current signal 的 `available` 点亮。
+  unavailable / expired reading 另带可选 `refresh_hint`，先读其中的 `agent_authorized` / `authorization` 再决定
+  是否执行 `command`。`summary.decisions[]` 是它的 agent-safe posture。它们不证明模型 entitlement，也不替代
+  quota preflight 的 authority-bound spawn limit。
+- `usage show` 的统一窗口都位于 `data.current.{five_hour,seven_day,fable_seven_day,billing_period}`，named pools
+  位于 `data.current.pools[]`；不适用或不可得为 `null` / 空数组。**不要读取不存在的 `data.five_hour` 等顶层
+  窗口。**`data.agent_summary` 是一句 plain-language 状态 + 可执行动作，`data.refresh_hint` 是结构化恢复提示；
+  两者都在 `current` 外的 `data` 顶层。`accounts[]` 不把 current signal 的 `available` 点亮。
 - 这些信号给百分比与 reset，不给绝对 token 分母；因此只能表达压力方向、强度与重判时间，不能承诺把
   used% 精确收敛到某点。
 - 账户级 pacing 与 per-node observability 正交。task token / duration / tool uses 来自对应后台任务的真实

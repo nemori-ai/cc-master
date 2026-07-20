@@ -204,6 +204,36 @@ function collectionFor(target: Readonly<Data>): MachineQuotaCollection {
       signal: {
         ...common,
         billing_period: { used_percentage: 86, resets_at: RESET },
+        pools: [
+          {
+            id: 'cursor-total',
+            label: 'Cursor total',
+            kind: 'first_party',
+            used_percentage: 86,
+            resets_at: RESET,
+          },
+          {
+            id: 'cursor-auto',
+            label: 'Cursor Auto',
+            kind: 'first_party',
+            used_percentage: 84,
+            resets_at: RESET,
+          },
+          {
+            id: 'cursor-api',
+            label: 'Cursor API / usage-based',
+            kind: 'usage_based',
+            used_percentage: 45,
+            resets_at: RESET,
+          },
+          {
+            id: 'cursor-spend-limit',
+            label: 'Cursor pay-as-you-go spend limit (user)',
+            kind: 'usage_based',
+            used_percentage: 20,
+            resets_at: RESET,
+          },
+        ],
       },
     };
   }
@@ -216,6 +246,36 @@ function collectionFor(target: Readonly<Data>): MachineQuotaCollection {
       signal: {
         ...common,
         billing_period: { used_percentage: 86, resets_at: RESET },
+        pools: [
+          {
+            id: 'cursor-total',
+            label: 'Cursor total',
+            kind: 'first_party',
+            used_percentage: 86,
+            resets_at: RESET,
+          },
+          {
+            id: 'cursor-auto',
+            label: 'Cursor Auto',
+            kind: 'first_party',
+            used_percentage: 84,
+            resets_at: RESET,
+          },
+          {
+            id: 'cursor-api',
+            label: 'Cursor API / usage-based',
+            kind: 'usage_based',
+            used_percentage: 45,
+            resets_at: RESET,
+          },
+          {
+            id: 'cursor-spend-limit',
+            label: 'Cursor pay-as-you-go spend limit (user)',
+            kind: 'usage_based',
+            used_percentage: 20,
+            resets_at: RESET,
+          },
+        ],
       },
     };
   }
@@ -270,7 +330,7 @@ test('explicit refresh fans out scoped deltas, checkpoints, and retry is duplica
 
   const status = await readMachineWideQuotaStatus(store, NOW);
   assert.equal(status.schema, 'ccm/machine-quota-status/v1');
-  assert.equal(status.readings.length, 8);
+  assert.equal(status.readings.length, 10);
   const cursorAgentReading = status.readings.find(
     (reading: Data) => reading.target.surface_id === 'cursor-agent-cli',
   );
@@ -281,16 +341,25 @@ test('explicit refresh fans out scoped deltas, checkpoints, and retry is duplica
     source_schema: 'cursor/GetCurrentPeriodUsage/v1',
     auth_source: 'cursor-agent-current-login',
   });
+  assert.equal(cursorAgentReading.refresh_hint, undefined, 'fresh available reading needs no hint');
   assert.doesNotMatch(JSON.stringify(status.readings), /access_token|refresh_token|credential/i);
   assert.ok(status.summary.decisions.every((decision: Data) => decision.fanout_covered === true));
   const cursor = status.summary.decisions.filter(
     (decision: Data) => decision.target.harness_id === 'cursor',
   );
   assert.deepEqual(
-    cursor.map((decision: Data) => [decision.target.surface_id, decision.state]).sort(),
+    cursor
+      .map((decision: Data) => [
+        decision.target.surface_id,
+        decision.target.window.name,
+        decision.state,
+      ])
+      .sort(),
     [
-      ['cursor-agent-cli', 'exhausted'],
-      ['cursor-ide-plugin', 'exhausted'],
+      ['cursor-agent-cli', 'billing_period', 'exhausted'],
+      ['cursor-agent-cli', 'billing_period_usage_based', 'healthy'],
+      ['cursor-ide-plugin', 'billing_period', 'exhausted'],
+      ['cursor-ide-plugin', 'billing_period_usage_based', 'healthy'],
     ],
   );
 });
@@ -456,6 +525,9 @@ test('machine posture reuses provider pacing boundaries for Cursor 80% and Claud
       if (!result.signal) return result;
       if (target.surface_id === 'cursor-agent-cli') {
         result.signal.billing_period = { used_percentage: 80, resets_at: RESET };
+        result.signal.pools = result.signal.pools?.map((pool) =>
+          pool.kind === 'first_party' ? { ...pool, used_percentage: 80 } : pool,
+        );
       }
       if (target.surface_id === 'claude-cli' && target.window_name === 'seven_day') {
         result.signal.seven_day = { used_percentage: 87, resets_at: RESET };
@@ -473,7 +545,9 @@ test('machine posture reuses provider pacing boundaries for Cursor 80% and Claud
   });
   const decisions = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions;
   const cursor = decisions.find(
-    (decision: Data) => decision.target.surface_id === 'cursor-agent-cli',
+    (decision: Data) =>
+      decision.target.surface_id === 'cursor-agent-cli' &&
+      decision.target.window.name === 'billing_period',
   );
   const claude7d = decisions.find(
     (decision: Data) =>
@@ -608,6 +682,40 @@ test('machine-wide target catalog includes exact kimi five-hour and seven-day qu
   );
 });
 
+test('machine-wide Cursor catalog keeps first-party and adds an independent usage-based bucket per surface', async () => {
+  const { home } = setupSubscription();
+  const store = fakeStore();
+  const capturedTargets: Data[] = [];
+  const captureCollector: MachineQuotaCollectorBoundary = {
+    collect(target) {
+      capturedTargets.push(structuredClone(target));
+      return collectionFor(target);
+    },
+  };
+  await refreshMachineWideQuota({
+    home,
+    env: {},
+    store,
+    collectors: captureCollector,
+    coordination,
+    now: NOW,
+  });
+  const cursorTargets = capturedTargets.filter((target) => target.harness_id === 'cursor');
+  assert.equal(cursorTargets.length, 4);
+  for (const surface of ['cursor-ide-plugin', 'cursor-agent-cli']) {
+    assert.deepEqual(
+      cursorTargets
+        .filter((target) => target.surface_id === surface)
+        .map((target) => [target.bucket_id, target.pool_kind, target.window_name])
+        .sort(),
+      [
+        ['billing-period-global', 'first_party', 'billing_period'],
+        ['billing-period-usage-based', 'usage_based', 'billing_period_usage_based'],
+      ],
+    );
+  }
+});
+
 test('fresh kimi signal produces healthy fresh five-hour and seven-day machine-wide decisions', async () => {
   const { home } = setupSubscription();
   const store = fakeStore();
@@ -717,7 +825,19 @@ test('expired or absent kimi signal degrades both machine-wide windows to honest
   const expiredKimi: MachineQuotaCollectorBoundary = {
     collect(target) {
       if (target.harness_id === 'kimi-code') {
-        return { status: 'unknown', reason: 'kimi-code access_token expired' };
+        return {
+          status: 'unknown',
+          reason: 'kimi-code access_token expired',
+          refreshHint: {
+            reason: 'kimi-code access_token 已过期',
+            recoverable: true,
+            command: "kimi -p 'hi'",
+            remedy: "运行 kimi -p 'hi' 后重查",
+            recheck: 'ccm usage show --harness kimi-code',
+            agent_authorized: true,
+            authorization: '你被授权运行普通 kimi 调用；ccm 不读写凭证。',
+          },
+        };
       }
       return collectionFor(target);
     },
@@ -750,9 +870,11 @@ test('expired or absent kimi signal degrades both machine-wide windows to honest
   assert.equal(readings.length, 2);
   assert.ok(readings.every((reading: Data) => reading.used_percentage === null));
   assert.ok(readings.every((reading: Data) => reading.resets_at === null));
+  assert.ok(readings.every((reading: Data) => reading.refresh_hint?.agent_authorized === true));
+  assert.ok(readings.every((reading: Data) => reading.refresh_hint?.command === "kimi -p 'hi'"));
 });
 
-test('Cursor IDE and Agent independently observe one shared billing pool with explicit provenance', async () => {
+test('Cursor IDE and Agent independently observe two shared, non-complementary pools', async () => {
   const { home } = setupSubscription();
   const store = fakeStore();
   const sharedCursorPool: MachineQuotaCollectorBoundary = {
@@ -779,20 +901,47 @@ test('Cursor IDE and Agent independently observe one shared billing pool with ex
   const decisions = (await readMachineWideQuotaStatus(store, NOW)).summary.decisions.filter(
     (candidate: Data) => candidate.target.provider_id === 'cursor',
   );
-  assert.equal(decisions.length, 2);
-  assert.ok(decisions.every((decision: Data) => decision.state === 'exhausted'));
-  assert.equal(decisions[0].quota_scope_digest, decisions[1].quota_scope_digest);
-  assert.notEqual(decisions[0].scope_digest, decisions[1].scope_digest);
+  assert.equal(decisions.length, 4);
+  const firstParty = decisions.filter(
+    (decision: Data) => decision.target.window.name === 'billing_period',
+  );
+  const usageBased = decisions.filter(
+    (decision: Data) => decision.target.window.name === 'billing_period_usage_based',
+  );
+  assert.equal(firstParty.length, 2);
+  assert.equal(usageBased.length, 2);
+  assert.ok(firstParty.every((decision: Data) => decision.state === 'exhausted'));
+  assert.ok(usageBased.every((decision: Data) => decision.state === 'healthy'));
+  assert.equal(firstParty[0].quota_scope_digest, firstParty[1].quota_scope_digest);
+  assert.equal(usageBased[0].quota_scope_digest, usageBased[1].quota_scope_digest);
+  assert.notEqual(firstParty[0].quota_scope_digest, usageBased[0].quota_scope_digest);
+  assert.ok(
+    decisions.every((decision: Data, index: number) =>
+      decisions.every(
+        (other: Data, otherIndex: number) =>
+          index === otherIndex || decision.scope_digest !== other.scope_digest,
+      ),
+    ),
+  );
   assert.deepEqual(decisions.map((decision: Data) => decision.source.auth_source).sort(), [
     'cursor-agent-current-login',
+    'cursor-agent-current-login',
+    'cursor-ide-current-login',
     'cursor-ide-current-login',
   ]);
-  assert.ok(decisions.every((decision: Data) => decision.target.window.name === 'billing_period'));
+  assert.deepEqual(decisions.map((decision: Data) => decision.target.window.name).sort(), [
+    'billing_period',
+    'billing_period',
+    'billing_period_usage_based',
+    'billing_period_usage_based',
+  ]);
   const sharedCapacity = aggregateMachineQuotaCapacityViews(decisions);
-  assert.equal(sharedCapacity.known_capacities.length, 1);
-  assert.equal(sharedCapacity.known_capacities[0].capacity_units, 1);
+  assert.equal(sharedCapacity.known_capacities.length, 2);
+  assert.ok(
+    sharedCapacity.known_capacities.every((capacity: Data) => capacity.capacity_units === 1),
+  );
   assert.deepEqual(
-    sharedCapacity.known_capacities[0].scope_digests,
+    sharedCapacity.known_capacities.flatMap((capacity: Data) => capacity.scope_digests).sort(),
     decisions.map((decision: Data) => decision.scope_digest).sort(),
   );
   const unresolvedCapacity = aggregateMachineQuotaCapacityViews(
@@ -840,6 +989,18 @@ test('missing and hard-stale provider signals both degrade to unknown with expli
   assert.equal(hardStale.state, 'unknown');
   assert.equal(hardStale.freshness, 'hard-stale');
   assert.deepEqual(hardStale.reason_codes, ['QUOTA_HARD_STALE']);
+  const cursorReadings = (await readMachineWideQuotaStatus(store, NOW)).readings.filter(
+    (reading: Data) => reading.target.provider_id === 'cursor',
+  );
+  assert.ok(
+    cursorReadings.every((reading: Data) => reading.refresh_hint?.agent_authorized === true),
+  );
+  assert.ok(
+    cursorReadings.every(
+      (reading: Data) =>
+        reading.refresh_hint?.command === 'ccm quota status --machine-wide --refresh --json',
+    ),
+  );
 });
 
 test('a current destination write failure prevents checkpoint advance for crash-safe replay', async () => {
@@ -946,6 +1107,6 @@ test('CLI status is cached-only and refresh is an explicit machine-wide live sea
 
   const refreshed = await invoke(['quota', 'refresh', '--machine-wide', '--json']);
   assert.equal(refreshed.code, 0, refreshed.stderr);
-  assert.equal(collectionCount, 8);
+  assert.equal(collectionCount, 10);
   assert.equal(JSON.parse(refreshed.stdout).schema, 'ccm/machine-quota-refresh/v1');
 });
