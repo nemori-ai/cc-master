@@ -29,4 +29,4 @@
 3. **切（机制归 using-ccm / ccm 引擎）** —— 跑 `ccm account switch`：续期新号 → 覆写官方共享凭证三存储（`$USER` 视角·原子写·全或无回滚）→ 翻 registry `active`。token 全程经 vault 读 / refresh POST body / 三存储写，**绝不进 agent / 绝不进 registry**（机制 / 失败模式 / token 安全见 `using-ccm` 的 `${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/account-pool.md`）。
 4. **续跑** —— claude 进程惰性 re-read 接管新号后照常推进；board 没动、整张 DAG 没忘。账号切了，目标没忘。无重启凭证覆写**不换进程、不换 session**——所以从前那套「换号前 drain 在飞 / 带飞切后孤儿 reconcile」**不再需要**：sub-agent / workflow 的 handle 不失效、board 连续性锚 `owner.session_id` 不变，在飞工作继续跑、照常在端点回收。
 
-> **ship-anywhere**：换号概念只在订阅口径（Pro/Max/Team/Enterprise）适用——Bedrock/Vertex/Foundry 云后端**无订阅 5h/7d 配额窗口**，探测拿不到订阅 `used_percentage` → 换号 lever **自然不触发**（`available:false`/switch no-op），不破 ship-anywhere。账号机制全在 ccm `account` 引擎 + 带外操作、**绝不进 hooks/**。
+> **ship-anywhere**：换号概念只在订阅口径（Pro/Max/Team/Enterprise）适用——Bedrock/Vertex/Foundry 云后端**无订阅 5h/7d 配额窗口**，探测拿不到订阅 `used_percentage` → 换号 lever **自然不触发**（`available:false`/switch no-op），不破 ship-anywhere。账号机制全在 ccm `account` 引擎 + 带外操作、**绝不进 hook 层**。

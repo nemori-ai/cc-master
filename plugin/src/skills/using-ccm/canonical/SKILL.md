@@ -5,7 +5,7 @@ description: '{{USING_CCM_DESCRIPTION}}'
 
 # using-ccm — 用 ccm CLI 驱动 board
 
-> **分发 skill(随插件 ship)。** `ccm` 是 cc-master 的 board 命令行——board 数据模型 SSOT 的**唯一写入关卡**。本 skill 是它的**操作手册**:不是"该编排什么"(那是 master-orchestrator-guide),而是"既然要动 board,怎么用 ccm 动得对"。
+> `ccm` 是 cc-master 的 board 命令行——board 数据模型 SSOT 的**唯一写入关卡**。本 skill 是它的**操作手册**:不是"该编排什么"(那是 master-orchestrator-guide),而是"既然要动 board,怎么用 ccm 动得对"。
 > **它一体两面**:面1=**ccm 命令怎么敲**(命令面在 `command-catalog.md`);面2=**board 模型怎么理解 + 字段什么时候设什么值**(领域概念解释 + 字段取值指导在 `board-model-guide.md`)。心智锚在主文件,两面的深度各进一个 reference。
 >
 > {{USING_CCM_BOUNDARY}}
