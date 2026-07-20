@@ -3,17 +3,14 @@
 // kimi-code serves a rolling 5h + weekly quota from `GET {base}/usages` (Authorization: Bearer
 // <OAuth access_token>, Accept: application/json). Auth: CCM_KIMI_ACCESS_TOKEN, or the stored
 // access_token in $KIMI_CODE_HOME/credentials/kimi-code.json. HTTP is sync-bridged with Worker +
-// Atomics (same pattern as cursor-usage.ts / codex-rate-limits.ts). Fail-open: any error → null.
-// Zero npm deps.
-//
-// Read-only credential discipline (design_docs/2026-07-16-kimi-quota-signal-research.md §6.2): this
-// collector NEVER refreshes or rotates the stored token. kimi's access_token is short-lived and is
-// only refreshed by kimi itself during an active session; when the stored token is expired we skip
-// the doomed HTTP and degrade to `unknown` (honest, non-mutating) rather than refreshing it.
+// Atomics (same pattern as cursor-usage.ts / codex-rate-limits.ts). An expired stored credential is
+// refreshed under a cross-process advisory lock, re-read inside the lock, and atomically replaced.
+// Fail-open: any error → null, with no token material emitted. Zero npm deps.
 //
 // Response schema + field aliases per the same research doc §1.3 (kimi-code MIT source
 // packages/oauth/src/managed-usage.ts `parseManagedUsagePayload`, deliberately lenient).
 
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -27,7 +24,12 @@ import {
 
 const DEFAULT_TIMEOUT_MS = 8_000; // kimi managed-usage.ts default AbortController timeout.
 const DEFAULT_API_BASE = 'https://api.kimi.com/coding/v1';
+const DEFAULT_OAUTH_HOST = 'https://auth.kimi.com';
 const USAGE_PATH = '/usages';
+const OAUTH_TOKEN_PATH = '/api/oauth/token';
+const OAUTH_CLIENT_ID = '17e5f671-d194-4dfb-9706-5516cb48c098';
+const LOCK_RETRY_MIN_MS = 15;
+const LOCK_RETRY_JITTER_MS = 10;
 const FIVE_HOUR_MINUTES = 300; // kimi's 5h rolling window = 300 MINUTE (research §1.3 fixture).
 
 export type KimiUsageSource = 'kimi-usages-api';
@@ -43,6 +45,34 @@ export type KimiTokenState =
   | { kind: 'ok'; token: string }
   | { kind: 'expired'; expiresAt: number }
   | { kind: 'absent' };
+
+export interface KimiRefreshOptions {
+  nowSec?: number;
+  timeoutMs?: number;
+  http?: KimiHttpTransport;
+}
+
+export interface KimiHttpRequest {
+  url: string;
+  method: 'GET' | 'POST';
+  headers: Record<string, string>;
+  body?: string;
+}
+
+export type KimiHttpTransport = (request: KimiHttpRequest, timeoutMs: number) => unknown | null;
+
+interface KimiCredentialSnapshot {
+  value: Record<string, unknown>;
+  token: string | null;
+  refreshToken: string | null;
+  expiresAt: number | null;
+  mode: number;
+}
+
+interface CredentialLockHandle {
+  path: string;
+  owner: string;
+}
 
 export function normalizeKimiUsagePayload(
   raw: unknown,
@@ -79,7 +109,7 @@ export function normalizeKimiUsagePayload(
 
 export function readKimiUsageSignal(
   env: Record<string, string | undefined>,
-  opts?: { nowSec?: number },
+  opts?: { nowSec?: number; http?: KimiHttpTransport },
 ): KimiUsageSignal | null {
   const fixtureRaw = env.CCM_KIMI_USAGE_FIXTURE_JSON;
   if (fixtureRaw) {
@@ -89,59 +119,151 @@ export function readKimiUsageSignal(
       return null;
     }
   }
-  const tokenState = resolveKimiToken(env, opts?.nowSec);
+  const timeoutMs = parseTimeout(env.CCM_KIMI_USAGE_TIMEOUT_MS) ?? DEFAULT_TIMEOUT_MS;
+  let tokenState = resolveKimiToken(env, opts?.nowSec);
+  if (tokenState.kind === 'expired' && kimiAutoRefreshEnabled(env.CCM_KIMI_AUTO_REFRESH)) {
+    tokenState = refreshKimiToken(env, {
+      nowSec: opts?.nowSec,
+      timeoutMs,
+      http: opts?.http,
+    });
+  }
   if (tokenState.kind !== 'ok') return null; // expired / absent → skip doomed HTTP, degrade cleanly.
 
-  const timeoutMs = parseTimeout(env.CCM_KIMI_USAGE_TIMEOUT_MS) ?? DEFAULT_TIMEOUT_MS;
   const apiBase = (env.CCM_KIMI_API_BASE || env.KIMI_CODE_BASE_URL || DEFAULT_API_BASE).replace(
     /\/+$/,
     '',
   );
-  const sab = new SharedArrayBuffer(4);
-  const flag = new Int32Array(sab);
-  const { port1, port2 } = new MessageChannel();
-  let worker: Worker | null = null;
-  try {
-    worker = new Worker(WORKER_SOURCE, {
-      eval: true,
-      workerData: {
-        url: `${apiBase}${USAGE_PATH}`,
-        token: tokenState.token,
-        timeoutMs,
-        sab,
-        port: port2,
+  const result = (opts?.http ?? fetchJsonSync)(
+    {
+      url: `${apiBase}${USAGE_PATH}`,
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${tokenState.token}`,
+        Accept: 'application/json',
       },
-      transferList: [port2],
-    });
-    Atomics.wait(flag, 0, 0, timeoutMs + 1000);
-    const msg = receiveMessageOnPort(port1)?.message as
-      | { ok?: boolean; result?: unknown }
-      | undefined;
-    if (!msg?.ok) return null;
-    return normalizeKimiUsagePayload(msg.result, { nowSec: opts?.nowSec });
-  } catch {
-    return null;
-  } finally {
-    try {
-      worker?.terminate();
-    } catch {
-      /* ignore */
+    },
+    timeoutMs,
+  );
+  return result === null ? null : normalizeKimiUsagePayload(result, { nowSec: opts?.nowSec });
+}
+
+/**
+ * Refresh an expired stored credential under an adjacent O_EXCL lock. The credential is always
+ * re-read after lock acquisition, so a concurrent winner turns this call into a no-op. Every
+ * failure returns an honest token state without modifying the credential or exposing token bytes.
+ */
+export function refreshKimiToken(
+  env: Record<string, string | undefined>,
+  opts: KimiRefreshOptions = {},
+): KimiTokenState {
+  const nowSec = normalizedNowSec(opts.nowSec);
+  const credentialPath = resolveKimiCredentialsPath(env);
+  if (!credentialPath) return { kind: 'absent' };
+  const timeoutMs =
+    opts.timeoutMs ?? parseTimeout(env.CCM_KIMI_USAGE_TIMEOUT_MS) ?? DEFAULT_TIMEOUT_MS;
+  let lock: CredentialLockHandle | null = null;
+  try {
+    lock = acquireCredentialLock(credentialPath, timeoutMs + 1000);
+    if (!lock) return resolveKimiToken(env, nowSec);
+
+    const snapshot = readKimiCredentials(credentialPath);
+    const state = kimiCredentialState(snapshot, nowSec);
+    if (state.kind !== 'expired' || !snapshot?.refreshToken) return state;
+
+    const refreshed = requestKimiTokenRefresh(
+      env,
+      snapshot.refreshToken,
+      timeoutMs,
+      opts.http ?? fetchJsonSync,
+    );
+    if (!refreshed) return state;
+
+    // A non-ccm Kimi process does not necessarily honor our advisory lock. Re-read once more before
+    // publishing: never overwrite a credential that changed while the HTTP request was in flight.
+    const latest = readKimiCredentials(credentialPath);
+    const latestState = kimiCredentialState(latest, nowSec);
+    if (!latest) return latestState;
+    if (latest.token !== snapshot.token || latest.refreshToken !== snapshot.refreshToken) {
+      return latestState;
     }
-    port1.close();
+
+    const nextValue: Record<string, unknown> = {
+      ...latest.value,
+      access_token: refreshed.accessToken,
+      refresh_token: refreshed.refreshToken,
+      expires_in: refreshed.expiresIn,
+      expires_at: nowSec + refreshed.expiresIn,
+    };
+    if (refreshed.scope !== null) nextValue.scope = refreshed.scope;
+    if (refreshed.tokenType !== null) nextValue.token_type = refreshed.tokenType;
+    atomicWriteKimiCredentials(credentialPath, nextValue, latest.mode);
+    return { kind: 'ok', token: refreshed.accessToken };
+  } catch {
+    return resolveKimiToken(env, nowSec);
+  } finally {
+    releaseCredentialLock(lock);
   }
 }
 
-// kimi's short-lived-token recovery recipe. kimi's access_token is refreshed *by kimi itself* on its
-// next managed call — running `kimi -p 'hi'` (or sending any message in an active kimi session)
-// triggers kimi's own ensureFresh, which rewrites the stored credential. ccm never does this; it only
-// tells the user which kimi command to run, then how to re-query. `kimi login` is the fuller
-// device-code re-auth when there is no credential to refresh from.
+interface RefreshedKimiCredential {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  scope: string | null;
+  tokenType: string | null;
+}
+
+function requestKimiTokenRefresh(
+  env: Record<string, string | undefined>,
+  refreshToken: string,
+  timeoutMs: number,
+  http: KimiHttpTransport,
+): RefreshedKimiCredential | null {
+  const oauthHost = (env.KIMI_CODE_OAUTH_HOST || env.KIMI_OAUTH_HOST || DEFAULT_OAUTH_HOST).replace(
+    /\/+$/,
+    '',
+  );
+  const body = new URLSearchParams({
+    client_id: OAUTH_CLIENT_ID,
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+  }).toString();
+  const raw = http(
+    {
+      url: `${oauthHost}${OAUTH_TOKEN_PATH}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body,
+    },
+    timeoutMs,
+  );
+  if (!isRecord(raw)) return null;
+  const accessToken = nonEmptyString(raw.access_token);
+  const rotatedRefreshToken = nonEmptyString(raw.refresh_token);
+  const expiresInRaw = finiteNumber(raw.expires_in);
+  const expiresIn = expiresInRaw === null ? 0 : Math.floor(expiresInRaw);
+  if (!accessToken || !rotatedRefreshToken || expiresIn <= 0) return null;
+  return {
+    accessToken,
+    refreshToken: rotatedRefreshToken,
+    expiresIn,
+    scope: optionalString(raw.scope),
+    tokenType: optionalString(raw.token_type),
+  };
+}
+
+// Recovery semantics come from the stored credential state, not the transient result of an automatic
+// refresh attempt. A failed optimization must preserve kimi's existing self-refresh path; a successful
+// refresh returns a signal before this hint is needed.
 const KIMI_RECOVERY = {
   harnessLabel: 'kimi-code',
   recheckHarness: 'kimi-code',
   reasons: {
-    expired:
-      'kimi-code access_token 已过期——仅在活跃 kimi session 期间新鲜（ccm 只读、绝不刷新凭证）',
+    expired: 'kimi-code access_token 已过期——自动刷新未成功，仍可由 kimi 自行刷新',
     absent: '无 kimi-code 凭证（$KIMI_CODE_HOME/credentials/kimi-code.json 缺失或无 access_token）',
     opaque: 'kimi-code /usages 读取失败（网络 / 401 / API 变更）',
   },
@@ -156,9 +278,9 @@ function kimiTokenStateToRecovery(kind: KimiTokenState['kind']): ShortLivedToken
 }
 
 /**
- * Actionable, secret-free recovery hint for why the kimi usage signal is unavailable + how the user
- * can restore it (kimi self-refreshes its own token; ccm never touches credentials). Structured so
- * the usage output layer can surface a concrete remedy instead of a bare `unknown`.
+ * Actionable, secret-free recovery hint derived from the stored credential's original state. Automatic
+ * refresh is only an optimization: if it fails, an expired credential remains expired and retains its
+ * existing harness-native recovery command.
  */
 export function describeKimiUsageRefresh(
   env: Record<string, string | undefined>,
@@ -196,11 +318,9 @@ const timer = setTimeout(() => finish({ ok: false }), workerData.timeoutMs);
 (async () => {
   try {
     const res = await fetch(workerData.url, {
-      method: 'GET',
-      headers: {
-        Authorization: 'Bearer ' + workerData.token,
-        Accept: 'application/json',
-      },
+      method: workerData.request.method,
+      headers: workerData.request.headers,
+      body: workerData.request.body,
       signal: AbortSignal.timeout(workerData.timeoutMs),
     });
     clearTimeout(timer);
@@ -216,6 +336,34 @@ const timer = setTimeout(() => finish({ ok: false }), workerData.timeoutMs);
   }
 })();
 `;
+
+function fetchJsonSync(request: KimiHttpRequest, timeoutMs: number): unknown | null {
+  const sab = new SharedArrayBuffer(4);
+  const flag = new Int32Array(sab);
+  const { port1, port2 } = new MessageChannel();
+  let worker: Worker | null = null;
+  try {
+    worker = new Worker(WORKER_SOURCE, {
+      eval: true,
+      workerData: { url: request.url, request, timeoutMs, sab, port: port2 },
+      transferList: [port2],
+    });
+    Atomics.wait(flag, 0, 0, timeoutMs + 1000);
+    const msg = receiveMessageOnPort(port1)?.message as
+      | { ok?: boolean; result?: unknown }
+      | undefined;
+    return msg?.ok ? msg.result : null;
+  } catch {
+    return null;
+  } finally {
+    try {
+      worker?.terminate();
+    } catch {
+      /* worker already stopped */
+    }
+    port1.close();
+  }
+}
 
 // ── weekly ("Weekly limit") summary → seven_day WindowSignal. ──────────────────────────────────────
 function parseWeeklySummary(
@@ -291,23 +439,18 @@ function windowMinutes(window: Record<string, unknown> | null): number | null {
   return null;
 }
 
-// ── credential discovery (read-only; expiry pre-check skips a doomed HTTP round trip). ──────────────
+// ── credential discovery + serialized refresh. ────────────────────────────────────────────────────
 function resolveKimiToken(
   env: Record<string, string | undefined>,
   nowSec?: number,
 ): KimiTokenState {
-  const now = typeof nowSec === 'number' && Number.isFinite(nowSec) ? nowSec : Date.now() / 1000;
+  const now = normalizedNowSec(nowSec);
   const fromEnv = env.CCM_KIMI_ACCESS_TOKEN?.trim();
   if (fromEnv) return { kind: 'ok', token: fromEnv };
 
   const credPath = resolveKimiCredentialsPath(env);
   if (!credPath) return { kind: 'absent' };
-  const parsed = readKimiCredentials(credPath);
-  if (!parsed?.token) return { kind: 'absent' };
-  if (typeof parsed.expiresAt === 'number' && parsed.expiresAt <= now) {
-    return { kind: 'expired', expiresAt: parsed.expiresAt };
-  }
-  return { kind: 'ok', token: parsed.token };
+  return kimiCredentialState(readKimiCredentials(credPath), now);
 }
 
 function resolveKimiCredentialsPath(env: Record<string, string | undefined>): string | null {
@@ -324,31 +467,201 @@ function kimiHome(env: Record<string, string | undefined>): string {
   return path.join(env.HOME || env.USERPROFILE || os.homedir(), '.kimi-code');
 }
 
-function readKimiCredentials(
-  credPath: string,
-): { token: string | null; expiresAt: number | null } | null {
+function readKimiCredentials(credPath: string): KimiCredentialSnapshot | null {
   try {
     const stat = fs.statSync(credPath);
     if (!stat.isFile() || stat.size > 1024 * 1024) return null;
     const value: unknown = JSON.parse(fs.readFileSync(credPath, 'utf8'));
     if (!isRecord(value)) return null;
-    const token =
-      typeof value.access_token === 'string' && value.access_token.trim()
-        ? value.access_token.trim()
-        : null;
-    const expiresAt = finiteNumber(value.expires_at);
-    return { token, expiresAt };
+    return {
+      value,
+      token: nonEmptyString(value.access_token),
+      refreshToken: nonEmptyString(value.refresh_token),
+      expiresAt: finiteNumber(value.expires_at),
+      mode: stat.mode & 0o777,
+    };
   } catch {
     return null;
   }
 }
 
+function kimiCredentialState(
+  credential: KimiCredentialSnapshot | null,
+  nowSec: number,
+): KimiTokenState {
+  if (!credential?.token) return { kind: 'absent' };
+  if (credential.expiresAt !== null && credential.expiresAt <= nowSec) {
+    return { kind: 'expired', expiresAt: credential.expiresAt };
+  }
+  return { kind: 'ok', token: credential.token };
+}
+
+function normalizedNowSec(nowSec?: number): number {
+  return typeof nowSec === 'number' && Number.isFinite(nowSec)
+    ? Math.floor(nowSec)
+    : Math.floor(Date.now() / 1000);
+}
+
+function kimiAutoRefreshEnabled(raw: string | undefined): boolean {
+  if (raw === undefined) return true;
+  return !['0', 'false', 'off', 'no'].includes(raw.trim().toLowerCase());
+}
+
+function acquireCredentialLock(
+  credentialPath: string,
+  timeoutMs: number,
+): CredentialLockHandle | null {
+  const lockPath = `${credentialPath}.ccm-refresh.lock`;
+  const owner = `${process.pid}:${randomUUID()}`;
+  const startedAt = Date.now();
+  const staleMs = Math.max(30_000, timeoutMs * 3);
+  for (;;) {
+    try {
+      const fd = fs.openSync(lockPath, 'wx', 0o600);
+      try {
+        fs.writeFileSync(fd, JSON.stringify({ owner, pid: process.pid, created_at: Date.now() }));
+        fs.fsyncSync(fd);
+      } catch (error) {
+        try {
+          fs.closeSync(fd);
+        } catch {
+          // Preserve the lock initialization failure.
+        }
+        try {
+          fs.unlinkSync(lockPath);
+        } catch {
+          // The failed owner may already have lost the path; never expose lock contents.
+        }
+        throw error;
+      }
+      fs.closeSync(fd);
+      return { path: lockPath, owner };
+    } catch (error) {
+      const errno = error as NodeJS.ErrnoException;
+      if (errno.code !== 'EEXIST') throw error;
+      if (reclaimStaleCredentialLock(lockPath, staleMs)) continue;
+      if (Date.now() - startedAt >= timeoutMs) return null;
+      sleepSync(LOCK_RETRY_MIN_MS + Math.floor(Math.random() * LOCK_RETRY_JITTER_MS));
+    }
+  }
+}
+
+function reclaimStaleCredentialLock(lockPath: string, staleMs: number): boolean {
+  try {
+    const observedRaw = fs.readFileSync(lockPath, 'utf8');
+    const observed = JSON.parse(observedRaw) as { pid?: unknown };
+    const stat = fs.statSync(lockPath);
+    let stale = false;
+    if (Number.isInteger(observed.pid) && (observed.pid as number) > 0) {
+      try {
+        process.kill(observed.pid as number, 0);
+      } catch (error) {
+        stale = (error as NodeJS.ErrnoException).code === 'ESRCH';
+      }
+    } else {
+      stale = Date.now() - stat.mtimeMs > staleMs;
+    }
+    if (!stale || fs.readFileSync(lockPath, 'utf8') !== observedRaw) return false;
+    fs.unlinkSync(lockPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function releaseCredentialLock(lock: CredentialLockHandle | null): void {
+  if (!lock) return;
+  try {
+    const current = JSON.parse(fs.readFileSync(lock.path, 'utf8')) as { owner?: unknown };
+    if (current.owner === lock.owner) fs.unlinkSync(lock.path);
+  } catch {
+    // Already removed or replaced: never unlink a lock whose ownership cannot be proven.
+  }
+}
+
+function sleepSync(ms: number): void {
+  try {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  } catch {
+    const until = Date.now() + ms;
+    while (Date.now() < until) {
+      // Last-resort fallback for runtimes without SharedArrayBuffer.
+    }
+  }
+}
+
+function atomicWriteKimiCredentials(
+  credentialPath: string,
+  value: Record<string, unknown>,
+  originalMode: number,
+): void {
+  const directory = path.dirname(credentialPath);
+  const tempPath = path.join(
+    directory,
+    `.${path.basename(credentialPath)}.${process.pid}.${randomUUID()}.tmp`,
+  );
+  let fd: number | null = null;
+  let published = false;
+  try {
+    fd = fs.openSync(tempPath, 'wx', 0o600);
+    fs.fchmodSync(fd, originalMode);
+    fs.writeFileSync(fd, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    fd = null;
+    fs.renameSync(tempPath, credentialPath);
+    published = true;
+    syncDirectoryBestEffort(directory);
+  } finally {
+    if (fd !== null) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // Preserve the original write failure.
+      }
+    }
+    if (!published) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {
+        // Temp file may not have been created or may already be gone.
+      }
+    }
+  }
+}
+
+function syncDirectoryBestEffort(directory: string): void {
+  let fd: number | null = null;
+  try {
+    fd = fs.openSync(directory, 'r');
+    fs.fsyncSync(fd);
+  } catch {
+    // Some supported hosts do not permit directory fsync; file fsync + rename still prevents tears.
+  } finally {
+    if (fd !== null) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        // Directory sync is best-effort on hosts that do not support it.
+      }
+    }
+  }
+}
+
 function firstString(source: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
-    const v = source[key];
-    if (typeof v === 'string' && v.trim()) return v.trim();
+    const v = nonEmptyString(source[key]);
+    if (v) return v;
   }
   return null;
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
 }
 
 function firstNumber(source: Record<string, unknown>, keys: string[]): number | null {
