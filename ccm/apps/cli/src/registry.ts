@@ -131,7 +131,7 @@ export const REGISTRY: Registry = {
         'max-output-bytes': {
           type: 'string',
           required: false,
-          desc: 'stdout 上限，256..33554432 字节（默认 33554432；stderr 独立上限 8388608）',
+          desc: 'stdout 上限，256..536870912 字节（默认 536870912；stderr 独立上限 536870912）',
         },
       },
       examples: [

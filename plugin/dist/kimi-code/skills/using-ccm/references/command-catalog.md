@@ -373,7 +373,7 @@ resolver 使用与 `run` 相同的 executable resolution，显示最终选中的
 agent command help；`root` 显示该 executable 的 root/global help，供调用者确认必须放在 agent 子命令
 之前的全局 flags。`ccm worker run --help` 只显示 ccm 自己的 wrapper help，不转发 provider help。`worker help` 把真实
 child stdout / stderr 原样写回相应 stream，并对 provider exit 作 mirror；它的固定 timeout 为 10000 ms、
-stdout 上限 33554432 bytes、stderr 上限 8388608 bytes。unknown harness 在进入 provider resolver 前作为 usage error 拒绝。
+stdout 上限 536870912 bytes、stderr 上限 536870912 bytes。unknown harness 在进入 provider resolver 前作为 usage error 拒绝。
 
 ### worker run
 
@@ -393,7 +393,7 @@ ccm worker run --harness <codex|claude-code|cursor-agent|kimi-code> [--cwd <path
 - stdin 无条件原样转发给 child。`--cwd` 必须是 absolute、existing directory（绝对、存在的目录），缺省为
   `process.cwd()`；结果里的 cwd 是解析后的真实路径。
 - `--timeout-ms` 允许 50..7200000（最长 2 小时），`run` 默认 600000；`worker help` 使用固定 10000 timeout。默认给真实 agent 派发足够跑完的预算，省略时不会在两分钟处误杀长任务。
-  `--max-output-bytes` 允许 256..33554432，默认 33554432，并分别约束 stdout 与 stderr（stderr 另有独立上限 8388608）。上限足够容纳大输出（如 codex 的 blueprint/state），不会在 1 MiB 处截断并 kill 长任务。
+  `--max-output-bytes` 允许 256..536870912，默认 536870912，并分别约束 stdout 与 stderr（stderr 另有独立上限 536870912）。上限足够容纳大输出（如 codex 的 blueprint/state，或其动辄几十 MB 的 stderr 诊断流），不会在 1 MiB / 32 MiB 处截断并 kill 长任务。
 - `run` 是无 `--json` 分叉的显式例外：它始终把 ccm 通用成功信封写到 stdout，其中 `data.schema` 固定为
   `ccm/worker-process-result/v1`。承重字段完整固定为 `schema`、`harness`、`state`、`executable`、`argv`、
   `cwd`、`stdout`、`stderr`、`stdout_bytes`、`stderr_bytes`、`truncated`、`timed_out`、`cancelled`、

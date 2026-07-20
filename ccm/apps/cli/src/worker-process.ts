@@ -56,10 +56,13 @@ const MAX_TIMEOUT_MS = 7_200_000;
 // Raw-worker output ceilings. A real agent dispatch (e.g. `codex exec --json` emitting a large
 // blueprint/state JSONL, or a long claude/cursor/kimi transcript) routinely exceeds a 1 MiB stream;
 // the former 1 MiB cap tripped `output_limit`, which TERM/KILLs the child mid-task and discards the
-// transcript. stdout carries the real payload so it gets the generous ceiling; stderr is diagnostics
-// and keeps a smaller, independent cap so a chatty stderr can never starve the stdout budget.
-const MAX_OUTPUT_BYTES = 33_554_432; // 32 MiB — hard ceiling for --max-output-bytes and stdout.
-const STDERR_LIMIT_BYTES = 8_388_608; // 8 MiB — independent stderr cap.
+// transcript. The later 32 MiB stdout / 8 MiB stderr pair still truncated real work: a codex
+// worker's stderr alone routinely runs to tens of MiB, and losing it discards exactly the
+// diagnostics a failed dispatch needs. Both streams now get a 512 MiB ceiling — enough headroom
+// for multi-ten-MiB payloads and diagnostics while still bounding a runaway child. The ceilings
+// are caps, not allocations: a quiet worker buffers only what it actually emits.
+const MAX_OUTPUT_BYTES = 536_870_912; // 512 MiB — hard ceiling for --max-output-bytes and stdout.
+const STDERR_LIMIT_BYTES = 536_870_912; // 512 MiB — independent stderr cap.
 
 // Post-close settlement / reap budget for the owned process tree. Well-behaved harnesses reap their
 // tree the instant the launcher closes and never touch this window; it only applies when a launcher
