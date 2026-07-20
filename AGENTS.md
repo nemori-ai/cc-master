@@ -1,7 +1,7 @@
 ---
 path: AGENTS.md
 version: v1.0
-last-edited: 2026-07-10
+last-edited: 2026-07-20
 agent-edit-policy: |
   仓库根 AGENTS.md——agent / 贡献者进入 cc-master 的着陆页与导航地图。三类编辑分级：
   - 自主刷新（无需 PR 人审）：§12 目录/文件约定在子目录增减时刷新行级；§N 触发式深入阅读表新增行；§9 findings 台账新增条目的指针；frontmatter 的 last-edited / version 字段；命令或脚本落地后在对应表追加行。
@@ -339,4 +339,5 @@ cc-master 用**本插件改本插件**——任何 behavioral 改动**必须 dog
 | 追踪六条愿景的落地 gap / 重审某能力兑现度 | [`design_docs/vision-landing-tracker.md`](design_docs/vision-landing-tracker.md)（兑现度矩阵 + 六张 gap 卡 + 排序讨论清单，living 追踪）|
 | 临时计划 / 草稿（不进版本控制）| 写在 `design_docs/plans/`（gitignored），不进正式 design_docs |
 | 装 / 用插件（用户视角）| [`README.md`](README.md) / [`README_zh.md`](README_zh.md) |
+| 写面向人类的技术问答 / 故障解释 / 操作说明（借鉴 ASD-STE100、区分英文规则与中文信息结构）| [`CONTRIBUTING.md`「技术问答与解释性技术文本」](CONTRIBUTING.md#技术问答与解释性技术文本) + [ASD-STE100 官方 current issue](https://www.asd-ste100.org/) |
 | 跑 dev loop / before-PR 三道门 | [`CONTRIBUTING.md`](CONTRIBUTING.md)（红线 SSOT 见本文 §3）|

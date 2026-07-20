@@ -153,6 +153,24 @@ opening a PR; a PR that violates one will be sent back.
   user-visible change.
 - Don't commit a real runtime board; `.claude/cc-master/` is gitignored.
 
+### 技术问答与解释性技术文本
+
+在 issue / PR 讨论、文档或 agent 会话中编写面向人类的技术问答、故障解释、操作说明时，
+借鉴 [ASD-STE100 Simplified Technical English 官方当前正式版](https://www.asd-ste100.org/)
+的清晰写作原则。截至 2026-07-20，当前正式版为 Issue 9（2025-01-15）。这是一条编辑基线，
+不表示本仓文本已经通过正式 STE 合规审核。
+
+- **准确优先**：不得为缩短文本改变技术含义或省略必要条件；项目 canonical 术语优先，
+  同一对象始终使用同一名称，不为文风变化改用同义词。
+- **直接且单一**：先给结论，再写条件、动作和结果；使用短句，每句只承载一个主要判断或
+  动作；必须预先知道的条件放在动作之前；优先使用主动语态，操作步骤使用祈使句。
+- **风险说完整**：安全说明明确标出风险级别，并写清命令或条件以及可能后果。
+- **字面值不改写**：代码、API、CLI、协议字段、标识符、报错原文和直接引语保持原样。
+- **按语言应用**：英文文本可直接借鉴 STE 写作规则和受控词典；中文文本只借鉴术语一致、
+  信息渐进和句式直接等结构原则，不机械套用英文词典或每句 20/25 词的限制。
+- **合规声明从严**：只有任务明确要求正式 STE 合规、已核对官方当前版全文并完成逐条审核时，
+  才能声称“符合 ASD-STE100”；其他情况只称“借鉴 ASD-STE100”。
+
 ## Reporting bugs / requesting features
 
 Use the issue templates under `.github/ISSUE_TEMPLATE/`. For anything security-
