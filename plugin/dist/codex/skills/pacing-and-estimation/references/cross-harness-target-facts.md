@@ -11,7 +11,7 @@
    `cursor-ide-plugin` 和 `cursor-agent-cli` 是独立 surface；任一方 installed/authenticated 都不能补齐另一方。
 2. **Model**：静态 provider facts 只证明 catalog snapshot 的来源、有效期与 admission-check 资格。
    `fresh` 不等于 live entitlement，也不等于 exact-model admission；`unknown[]` 与 blocker 必须保真。
-   用 `ccm model-policy show --task <task-taxonomy> --json` 把三路 provider facts、项目角色证据与社区 advisory
+   用 `ccm model-policy show --task <task-taxonomy> --json` 把四路 provider facts、项目角色证据与社区 advisory
    投影成所有 origin 相同的 read model；三层仍须分开，不能用社区 taste 补 role certification。
 3. **Quota**：先用 `quota status --machine-wide` 的 target-bound cached posture 看所有本机候选；
    `state:"healthy"` 仍只证明该 target 的承重窗口未触发收紧，unknown / stale / missing 不能补成 healthy。

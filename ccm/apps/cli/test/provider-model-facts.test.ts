@@ -73,6 +73,12 @@ test('Cursor facts separate Agent CLI first-party selectors from unknown IDE fac
     assert.ok(selectors.includes(selector), `missing ${selector}`);
   }
   assert.equal(facts.account_scope, 'cursor-subscription-first-party; live entitlement separate');
+  const byId = new Map<string, any>(
+    facts.models.map((model: { model_id: string }) => [model.model_id, model]),
+  );
+  assert.equal(byId.get('cursor-auto').quota_pool, 'first_party');
+  assert.equal(byId.get('cursor-composer-2-5').quota_pool, 'first_party');
+  assert.equal(byId.get('cursor-grok-4-5').quota_pool, 'usage_based');
 });
 
 test('Kimi facts expose K3/K2.7-code with honest benchmark and quota unknowns', () => {
@@ -129,7 +135,7 @@ test('expired snapshots remain observable but fail closed for automatic selectio
 
 test('registry validation rejects freshness and provenance hostile mutants', async () => {
   const module = await import('../src/provider-model-facts.js');
-  assert.equal(module.PROVIDER_MODEL_FACTS_REGISTRY.revision, '2026-07-16.2');
+  assert.equal(module.PROVIDER_MODEL_FACTS_REGISTRY.revision, '2026-07-20.1');
   assert.equal(
     module.PROVIDER_MODEL_FACTS_REGISTRY.providers['claude-code'].revision,
     '2026-07-16.1',

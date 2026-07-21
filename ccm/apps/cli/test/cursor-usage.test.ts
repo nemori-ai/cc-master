@@ -36,6 +36,47 @@ test('normalizeCursorPeriodUsage maps totalPercentUsed + billingCycleEnd into bi
   assert.equal(out.cycle_end_ms, 1_706_745_600_000);
 });
 
+test('normalizeCursorPeriodUsage preserves all first-party and usage-based named pools', () => {
+  const raw = JSON.parse(readFileSync(FIXTURE, 'utf8'));
+  const out = normalizeCursorPeriodUsage(raw, { capturedAtSec: 1_700_000_000 });
+  assert.ok(out);
+  assert.deepEqual(out.signal.pools, [
+    {
+      id: 'cursor-total',
+      label: 'Cursor total',
+      kind: 'first_party',
+      used_percentage: 5.208,
+      resets_at: 1_706_745_600,
+    },
+    {
+      id: 'cursor-auto',
+      label: 'Cursor Auto',
+      kind: 'first_party',
+      used_percentage: 5.455,
+      resets_at: 1_706_745_600,
+    },
+    {
+      id: 'cursor-api',
+      label: 'Cursor API / usage-based',
+      kind: 'usage_based',
+      used_percentage: 4.309,
+      resets_at: 1_706_745_600,
+    },
+    {
+      id: 'cursor-spend-limit',
+      label: 'Cursor pay-as-you-go spend limit (user)',
+      kind: 'usage_based',
+      used_percentage: 0,
+      resets_at: 1_706_745_600,
+    },
+  ]);
+  assert.equal(
+    out.signal.billing_period?.used_percentage,
+    5.208,
+    'legacy billing_period remains the compatible totalPercentUsed view',
+  );
+});
+
 test('normalizeCursorPeriodUsage returns null for empty / malformed payloads', () => {
   assert.equal(normalizeCursorPeriodUsage(null), null);
   assert.equal(normalizeCursorPeriodUsage({}), null);

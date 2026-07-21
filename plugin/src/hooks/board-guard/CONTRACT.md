@@ -164,35 +164,6 @@ equivalent inline `isArmed` check at the top of `main()` on Codex. Reads only `o
     `apply_patch` path benefits from the same collapse.
   tracked_by: "GitHub issue #156 (fixed, this PR)"
 
-- rule: board-guard-bash-fallback-false-positive
-  kind: host-convention-divergence
-  affected_hosts: [codex]
-  reason: >
-    Prior to HOOKPAR-DEC, the Codex `bashWritesBoard` had no `segmentTouchesRealBoard` equivalent
-    and carried an extra fallback branch (`sawBoardWrite ? false : WRITE_OP_RE.test(wholeCommand)`)
-    that denied whenever any write-operator appeared anywhere in the command and any `.board.json`
-    mention appeared anywhere else, even in an unrelated segment or a scratch/test path outside the
-    boards directory (see design_docs/plans/2026-07-07-hook-parity-system.md §2.5 for the exact
-    repro: `echo hi > /tmp/scratch.txt; cat notes.board.json`).
-  compensating_mechanism: >
-    Fixed in this round — codex board-guard-core.js now ports segmentTouchesRealBoard and drops
-    the fallback branch, matching claude-code board-guard.js's judgment table byte-for-byte.
-  tracked_by: "adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR)"
-
-- rule: board-guard-directive-tag-protocol
-  kind: host-convention-divergence
-  affected_hosts: [codex]
-  reason: >
-    Prior to HOOKPAR-DEC, Codex board-guard-core.js emitted a bare `{kind:'block', message}` with no
-    ADR-018 tag wrapper, so the agent had no machine-readable signal for how much attention the deny
-    reason deserved (it always deserves full attention — deny reasons are hard gates).
-  compensating_mechanism: >
-    Fixed in this round — codex board-guard-core.js now wraps the deny message in a local
-    `directive('board-guard', body)` helper (no shared hook-common on the Codex side to import from,
-    so the wrapper is a small local duplicate matching claude-code's hook-common.js directive()
-    byte-for-byte in output shape).
-  tracked_by: "adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR)"
-
 - rule: board-guard-kimi-envelope
   kind: host-convention-divergence
   affected_hosts: [kimi-code]

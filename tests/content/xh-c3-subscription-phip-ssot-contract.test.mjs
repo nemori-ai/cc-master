@@ -280,9 +280,15 @@ test('XH C3 Track-B capability has one mapped authority per subject and executab
     const contractPath = MANIFEST.canonical[name].path;
     const contractText = readTarget(contractPath, failures, `${name}-contract`);
     const anchors = parityAnchors(contractText);
+    // Kimi can register the subscription while lacking a non-blocking inbox delivery event.
+    // The capability card therefore remains unsupported for Kimi, but bootstrap's executable
+    // registration slice must still be kept in parity with the three delivery-capable hosts.
+    const ruleRequiredHosts = name === 'bootstrap'
+      ? [...requiredHosts, 'kimi-code']
+      : requiredHosts;
     for (const rule of authority.rule_ids) {
-      expectExact(failures, `${name}.parity.${rule}`, anchors.get(rule) || [], requiredHosts);
-      for (const host of requiredHosts) {
+      expectExact(failures, `${name}.parity.${rule}`, anchors.get(rule) || [], ruleRequiredHosts);
+      for (const host of ruleRequiredHosts) {
         const implementation = implementationText(hook, host, failures);
         if (!implementation.includes(`PARITY: ${rule}`)) {
           failures.push(`${hook}/${host}: executable runtime missing PARITY: ${rule}`);
@@ -297,9 +303,12 @@ test('XH C3 Track-B capability has one mapped authority per subject and executab
     'hooks-manifest',
   );
   if (hooksManifest) {
-    for (const hook of ['bootstrap-board', 'coordination-inbox']) {
-      const coverage = hookCoverage(hooksManifest, hook, requiredHosts);
-      for (const host of requiredHosts) {
+    for (const [hook, hosts] of [
+      ['bootstrap-board', [...requiredHosts, 'kimi-code']],
+      ['coordination-inbox', requiredHosts],
+    ]) {
+      const coverage = hookCoverage(hooksManifest, hook, hosts);
+      for (const host of hosts) {
         if (!coverage[host]) failures.push(`hooks-manifest: ${hook} missing host_coverage.${host}`);
       }
     }

@@ -20,6 +20,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { type PathEnv, resolveRateCachePath } from '../paths.js';
+import { pickFableSevenDayFromRateLimits, pickRateLimitWindow } from './rate-limits-parse.js';
 
 // nowEpoch(env) → 现在（epoch 秒）。`CC_MASTER_NOW`（ISO-8601）覆写让 captured_at 确定可复现（测试用）。
 function nowEpoch(env: PathEnv): number {
@@ -33,14 +34,7 @@ function nowEpoch(env: PathEnv): number {
 
 // pickWindow(w) → 只收一个「真出现且带数值 used_percentage」的窗口；resets_at 有就一并带上。其余视缺失（null）。
 function pickWindow(w: unknown): { used_percentage: number; resets_at?: number } | null {
-  if (!w || typeof w !== 'object') return null;
-  const o = w as Record<string, unknown>;
-  if (typeof o.used_percentage !== 'number' || !Number.isFinite(o.used_percentage)) return null;
-  const out: { used_percentage: number; resets_at?: number } = {
-    used_percentage: o.used_percentage,
-  };
-  if (typeof o.resets_at === 'number' && Number.isFinite(o.resets_at)) out.resets_at = o.resets_at;
-  return out;
+  return pickRateLimitWindow(w);
 }
 
 // writeAtomic(file, data) → 同目录 temp + rename 原子写。失败抛（由 captureRateLimits 外层兜）。
@@ -75,10 +69,12 @@ export function captureRateLimits(input: unknown, env?: PathEnv): CaptureResult 
     if (!rl) return { captured: false, path: file };
     const fh = pickWindow(rl.five_hour);
     const sd = pickWindow(rl.seven_day);
-    if (!fh && !sd) return { captured: false, path: file };
+    const fable7d = pickFableSevenDayFromRateLimits(rl);
+    if (!fh && !sd && !fable7d) return { captured: false, path: file };
     const payload: Record<string, unknown> = { captured_at: nowEpoch(e) };
     if (fh) payload.five_hour = fh;
     if (sd) payload.seven_day = sd;
+    if (fable7d) payload.fable_seven_day = fable7d;
     writeAtomic(file, JSON.stringify(payload));
     return { captured: true, path: file };
   } catch {

@@ -117,17 +117,22 @@ function mkCtx(
 }
 
 function codexStub(root: string, result: unknown): string {
-  const p = join(root, 'codex-stub.mjs');
+  const p = join(root, 'codex-stub.sh');
+  const initializeResponse = JSON.stringify({
+    id: 0,
+    result: { protocolVersion: '0.1.0' },
+  });
+  const rateLimitsResponse = JSON.stringify({ id: 6, result });
+  const shellLiteral = (value: string): string => `'${value.replaceAll("'", `'"'"'`)}'`;
   writeFileSync(
     p,
-    `#!/usr/bin/env node
-import readline from 'node:readline';
-const rl = readline.createInterface({ input: process.stdin });
-rl.on('line', (line) => {
-  const msg = JSON.parse(line);
-  if (msg.id === 0) process.stdout.write(JSON.stringify({ id: 0, result: { protocolVersion: '0.1.0' } }) + '\\n');
-  if (msg.id === 6) process.stdout.write(JSON.stringify({ id: 6, result: ${JSON.stringify(result)} }) + '\\n');
-});
+    `#!/bin/sh
+while IFS= read -r line; do
+  case "$line" in
+    *'"id":0'*) printf '%s\\n' ${shellLiteral(initializeResponse)} ;;
+    *'"id":6'*) printf '%s\\n' ${shellLiteral(rateLimitsResponse)} ;;
+  esac
+done
 `,
     'utf8',
   );
@@ -202,6 +207,18 @@ test('usage show on Codex reads current 5h/7d from app-server rate limits', () =
       primary: { usedPercent: 57, windowDurationMins: 300, resetsAt: 1893456000 },
       secondary: { usedPercent: 15, windowDurationMins: 10080, resetsAt: 1925078400 },
     },
+    rateLimitsByLimitId: {
+      codex: {
+        limitId: 'codex',
+        limitName: 'Codex default',
+        secondary: { usedPercent: 15, windowDurationMins: 10080, resetsAt: 1925078400 },
+      },
+      codex_bengalfox: {
+        limitId: 'codex_bengalfox',
+        limitName: 'GPT-5.3-Codex-Spark',
+        secondary: { usedPercent: 0, windowDurationMins: 10080, resetsAt: 1925078400 },
+      },
+    },
   });
   const ctx = mkCtx(home, boardPath, {
     flags: { json: true },
@@ -217,6 +234,20 @@ test('usage show on Codex reads current 5h/7d from app-server rate limits', () =
   assert.equal(out.data.current.seven_day.used_percentage, 15);
   assert.equal(out.data.current.five_hour.resets_at, 1893456000);
   assert.equal(out.data.current.seven_day.resets_at, 1925078400);
+  assert.deepEqual(
+    out.data.current.pools.map((pool: { id: string; used_percentage: number }) => [
+      pool.id,
+      pool.used_percentage,
+    ]),
+    [
+      ['codex', 15],
+      ['codex_bengalfox', 0],
+    ],
+  );
+  assert.equal(
+    out.data.agent_summary,
+    'codex: available · 5h=57% 7d=15% codex=15% codex_bengalfox=0%',
+  );
 });
 
 test('usage show with explicit unknown harness does not fall back to Claude sidecar', () => {
@@ -231,6 +262,8 @@ test('usage show with explicit unknown harness does not fall back to Claude side
   assert.equal(out.data.available, false);
   assert.equal(out.data.current.source, 'unavailable');
   assert.equal(out.data.current.available, false);
+  assert.match(out.data.agent_summary, /^future-agent: UNAVAILABLE /);
+  assert.match(out.data.agent_summary, /等待或 surface 用户 · 不可自刷$/);
 });
 
 test('usage show with registry lists all accounts with snapshot fields', () => {
@@ -974,6 +1007,76 @@ test('usage runway with no sidecar → available:false (degrade)', () => {
   assert.equal(out.data.five_hour.verdict, 'unknown');
 });
 
+// ══ kimi-code 双窗完整性（5h + 7d·fixture 注入·无 live HTTP）══════════════════════════════════════
+
+// resetAt 取远未来（2030/2031）让两个窗口对 wall-clock now 绝不过期——这些 case 测的是双窗口 surface，
+// 非过期闸；近期 resetAt 一旦落到运行时之前会被过期闸正确判 stale（同 SIDECAR_CRITICAL 约定）。
+const KIMI_DUAL_WINDOW_FIXTURE = JSON.stringify({
+  usage: { used: 200, limit: 1000, resetAt: '2031-01-01T00:00:00Z' },
+  limits: [
+    {
+      detail: { used: 45, limit: 100 },
+      window: { duration: 300, timeUnit: 'MINUTE' },
+      resetAt: '2030-01-01T00:00:00Z',
+    },
+  ],
+});
+
+function kimiDualWindowCtx(home: string, boardPath: string, json = true) {
+  const ctx = mkCtx(home, boardPath, {
+    values: { harness: 'kimi-code' },
+    flags: json ? { json: true } : {},
+  });
+  ctx.env.CCM_KIMI_USAGE_FIXTURE_JSON = KIMI_DUAL_WINDOW_FIXTURE;
+  return ctx;
+}
+
+test('usage show --harness kimi-code surfaces both five_hour and seven_day with resets_at', () => {
+  const { home, boardPath } = setupHome();
+  const ctx = kimiDualWindowCtx(home, boardPath);
+  usageHandler.show(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, true);
+  assert.equal(out.data.current.five_hour.used_percentage, 45);
+  assert.equal(out.data.current.seven_day.used_percentage, 20);
+  assert.equal(
+    out.data.current.seven_day.resets_at,
+    Math.floor(Date.parse('2031-01-01T00:00:00Z') / 1000),
+  );
+  assert.equal(
+    out.data.current.five_hour.resets_at,
+    Math.floor(Date.parse('2030-01-01T00:00:00Z') / 1000),
+  );
+});
+
+test('usage advise --harness kimi-code considers both windows in pacing verdict', () => {
+  const { home, boardPath } = setupHome();
+  const ctx = kimiDualWindowCtx(home, boardPath);
+  usageHandler.advise(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, true);
+  assert.equal(out.data.window_5h_pct, 45);
+  assert.equal(out.data.window_7d_pct, 20);
+  assert.equal(out.data.verdict, 'hold');
+});
+
+test('usage burn-rate + runway --harness kimi-code cover 5h and 7d windows', () => {
+  const { home, boardPath } = setupHome();
+  const burnCtx = kimiDualWindowCtx(home, boardPath);
+  usageHandler.burnRate(burnCtx);
+  const burn = JSON.parse(burnCtx.outBuf.join(''));
+  assert.equal(burn.data.available, true);
+  assert.equal(burn.data.five_hour.used_pct, 45);
+  assert.equal(burn.data.seven_day.used_pct, 20);
+
+  const runwayCtx = kimiDualWindowCtx(home, boardPath);
+  usageHandler.runway(runwayCtx);
+  const runway = JSON.parse(runwayCtx.outBuf.join(''));
+  assert.equal(runway.data.available, true);
+  assert.equal(runway.data.five_hour.used_pct, 45);
+  assert.equal(runway.data.seven_day.used_pct, 20);
+});
+
 // ══ kimi-code 短命 token 过期 → 可执行刷新提示（E1·show / advise 输出层可见）═══════════════════════
 // kimi 的 access_token 短命，过期后 usage 信号降级 unavailable。此前只回裸 reason；现在带一条 actionable
 //   refresh_hint（跑哪个 kimi 命令自刷 token + 刷完重查），且对人读 + --json 都可见。ccm 全程零凭证写。
@@ -1008,6 +1111,36 @@ test('usage show --harness kimi-code (expired token) surfaces actionable refresh
   assert.equal(out.data.refresh_hint.command, "kimi -p 'hi'", 'concrete self-refresh command');
   assert.equal(out.data.refresh_hint.recheck, 'ccm usage show --harness kimi-code');
   assert.match(out.data.refresh_hint.reason, /过期/);
+  // ADR-018 authority signal flows through --json end-to-end: the consuming agent sees it IS
+  // authorized to self-recover, with the never-touch-credentials boundary intact.
+  assert.equal(
+    out.data.refresh_hint.agent_authorized,
+    true,
+    'agent_authorized passes through --json',
+  );
+  assert.match(out.data.refresh_hint.authorization, /此授权仅限这次普通调用触发的自刷/);
+  assert.match(out.data.refresh_hint.authorization, /绝不被授权直接[^。]*凭证/);
+  assert.match(out.data.agent_summary, /^kimi-code: UNAVAILABLE \(.+过期.+\)/);
+  assert.match(out.data.agent_summary, /你被授权运行 `kimi -p 'hi'` 刷新后重查 · 见 refresh_hint$/);
+});
+
+test('usage show agent_summary marks opaque kimi failures as non-self-refreshable', () => {
+  const { home, boardPath } = setupHome();
+  const kimiHome = mkTmp('ccm-kimi-opaque-home-');
+  mkdirSync(join(kimiHome, 'credentials'), { recursive: true });
+  writeFileSync(
+    join(kimiHome, 'credentials', 'kimi-code.json'),
+    JSON.stringify({ access_token: 'jwt.header.body', expires_at: 4_102_444_800 }),
+  );
+  const ctx = mkCtx(home, boardPath, { values: { harness: 'kimi-code' }, flags: { json: true } });
+  ctx.env.KIMI_CODE_HOME = kimiHome;
+  ctx.env.CCM_KIMI_USAGE_FIXTURE_JSON = '{}';
+  usageHandler.show(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.available, false);
+  assert.equal(out.data.refresh_hint.recoverable, false);
+  assert.match(out.data.agent_summary, /^kimi-code: UNAVAILABLE \(.+网络 \/ 401 \/ API.+\)/);
+  assert.match(out.data.agent_summary, /等待或 surface 用户 · 不可自刷 · 见 refresh_hint$/);
 });
 
 test('usage show --harness kimi-code (expired token) prints the remedy line in human output', () => {
@@ -1056,6 +1189,21 @@ test('usage show --harness kimi-code (absent credential) → login re-auth hint'
   assert.ok(out.data.refresh_hint);
   assert.equal(out.data.refresh_hint.command, 'kimi login', 'absent → device-code re-auth');
   assert.match(out.data.refresh_hint.reason, /凭证/);
+  assert.match(out.data.agent_summary, /需要用户运行 `kimi login` 后重查 · 见 refresh_hint$/);
+});
+
+test('usage show exposes fable_seven_day from sidecar independently of seven_day', () => {
+  const { home, boardPath } = setupHome({
+    sidecar: {
+      ...SIDECAR_CRITICAL,
+      fable_seven_day: { used_percentage: 61, resets_at: 1893456000 },
+    },
+  });
+  const ctx = mkCtx(home, boardPath, { flags: { json: true } });
+  usageHandler.show(ctx);
+  const out = JSON.parse(ctx.outBuf.join(''));
+  assert.equal(out.data.current.fable_seven_day.used_percentage, 61);
+  assert.equal(out.data.current.seven_day.used_percentage, 50);
 });
 
 test('usage refresh_hint is null when the account signal IS available (Codex app-server)', () => {

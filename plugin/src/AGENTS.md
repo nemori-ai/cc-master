@@ -1,7 +1,7 @@
 ---
 path: plugin/src/AGENTS.md
-version: v0.1
-last-edited: 2026-07-03
+version: v0.2
+last-edited: 2026-07-21
 content-summary: |
   cc-master plugin source tree 入口。定义 paragoge-style source-of-truth：skills 使用 SAP，hooks 使用 PHIP，dist 只由 sync 生成。
 ---
@@ -18,7 +18,7 @@ content-summary: |
 | `adapters/` | 跨 surface capability 的 origin host-native invocation 映射；只调 host tool/归一观察，不拥有 ccm 状态机或 board writer |
 | `skills/` | SAP：每个 skill 的 `canonical/` runtime body + `adapters/<host>/strategy.yaml` |
 | `hooks/` | PHIP：hook contract、host base、每个 hook 的 `implementations/<host>/` |
-| `.claude-plugin/` | Claude Code adapter manifest source；第二阶段可下沉为 host adapter manifest |
+| `.{claude,codex,cursor,kimi}-plugin/` | 四个 host 的 adapter manifest source；Kimi 最终投影为根 `kimi.plugin.json` |
 
 ## Source 纪律
 

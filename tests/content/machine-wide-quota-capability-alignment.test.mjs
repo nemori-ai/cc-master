@@ -55,7 +55,10 @@ test('only executable machine-wide quota hook rules are promoted to PARITY ancho
     pacing,
     /emits `kind:system` only when `uncoveredChanges` returns one or more validated[\s\S]*empty selection[\s\S]*silent/u,
   );
-  assert.match(pacing, /`advisory\('usage-pacing', 'strong', body\)`[\s\S]*does not reuse Claude Code's verdict strength table/u);
+  assert.match(
+    pacing,
+    /- rule: usage-pacing-kimi-no-channel[\s\S]*affected_hosts: \[kimi-code\][\s\S]*`kimi-usages-api`[\s\S]*hook is not registered on kimi/u,
+  );
   assert.doesNotMatch(
     pacing,
     /surfaces hold\/throttle\/stop_billing_period|emits kind:system on throttle\/stop_billing_period|same\s+rule-usage-pacing-strength-mapping table/iu,

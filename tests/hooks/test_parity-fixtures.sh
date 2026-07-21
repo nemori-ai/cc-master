@@ -272,7 +272,10 @@ if [ "$noun" = "board" ] && [ "$verb" = "set-param" ]; then
   node -e 'const fs=require("fs");const[b,k,v]=process.argv.slice(1);const o=JSON.parse(fs.readFileSync(b,"utf8"));o.runtime=o.runtime||{};o.runtime[k]=v;fs.writeFileSync(b,JSON.stringify(o));' "$board" "$key" "$val"; exit 0
 fi
 if [ "$noun" = "estimate" ] && [ "$verb" = "deadline-risk" ]; then
-  printf '{"ok":true,"data":{"deadline":"2026-08-01T09:00:00Z","deadline_state":"confirmed","as_of":"2026-07-16T12:00:00Z","time_remaining_hours":381.0,"on_time_probability":0.85,"on_time_probability_source":"rcpsp-in-trial","risk_band":"watch","strength":"weak","margin":{"p50_h":40,"p80_h":12,"p95_h":-6,"basis":"x"},"channel_disagreement":0.12,"coverage_pct":60,"confidence":"medium","history_n":20,"calibration_status":"uncalibrated-conservative","top_drivers":[{"id":"T1","criticality":0.8,"sensitivity":0.6,"reason":"critical"}],"scope":"home","runs":2000,"seed":42,"source":"estimate","notes":[]}}'; exit 0
+  printf '{"ok":true,"data":{"deadline":"2026-08-01T09:00:00Z","deadline_state":"confirmed","as_of":"2026-07-16T12:00:00Z","time_remaining_hours":381.0,"on_time_probability":0.85,"on_time_probability_source":"rcpsp-in-trial","risk_band":"watch","strength":"weak","margin":{"p50_h":40,"p80_h":12,"p95_h":-6,"basis":"x"},"channel_disagreement":0.12,"coverage_pct":60,"confidence":"medium","history_n":60,"calibration_status":"uncalibrated-conservative","top_drivers":[{"id":"T1","criticality":0.8,"sensitivity":0.6,"reason":"critical"}],"scope":"home","runs":2000,"seed":42,"source":"estimate","notes":[]}}'; exit 0
+fi
+if [ "$noun" = "capability" ] && [ "$verb" = "negotiate" ]; then
+  printf '{"ok":true,"data":{"schema":"ccm/capability-negotiation/v1","family":"goal-deadline","capability":"goal-deadline/v1","version":1,"negotiated":true}}'; exit 0
 fi
 if [ "$noun" = "coordination" ] && [ "$verb" = "notify" ]; then printf '{"ok":true,"data":{"notification":{"id":"ntf-1"}}}'; exit 0; fi
 if [ "$noun" = "coordination" ] && [ "$verb" = "inbox" ]; then printf '{"ok":true,"data":{"acked":["ntf-1"]}}'; exit 0; fi

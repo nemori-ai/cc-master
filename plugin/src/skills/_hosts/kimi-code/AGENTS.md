@@ -1,7 +1,7 @@
 ---
 path: plugin/src/skills/_hosts/kimi-code/AGENTS.md
-version: v0.1
-last-edited: 2026-07-16
+version: v0.2
+last-edited: 2026-07-21
 content-summary: |
   kimi-code skill adapter host base. Shared SAP projection rules for the Moonshot kimi-code CLI agent.
 ---
@@ -29,5 +29,5 @@ Dispatch / quota facts live in `capabilities.yaml`:
 - Background dispatch: built-in subagent roles (coder/explore/plan/general + Agent Swarm; no custom roles) via the Task tool, plus the `Bash` tool background task (not Cursor's `Shell`).
 - Workflow: unsupported → `authoring-workflows` stays `unsupported_stub`.
 - Watchdog: degrade to the background-Bash floor (no agent-facing CronCreate / ScheduleWakeup / Monitor).
-- Quota: **no CLI quota signal at all** — `ccm usage` returns `available:false`; no 5h/7d/billing-period pacing, no account switch.
+- Quota: Kimi CLI 本身没有 headless usage 命令，但 `ccm usage show|advise` 已通过 `kimi-usages-api` 读取当前登录态滚动 5h/7d；过期 stored OAuth 可带锁自动刷新。仍无 billing-period、非阻断 Stop pacing hook或 account switch。
 - Command surface: host-native plugin `commands[]`, namespaced `cc-master:<command>`.

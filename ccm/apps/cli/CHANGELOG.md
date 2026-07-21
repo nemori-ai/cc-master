@@ -1,5 +1,17 @@
 # ccm
 
+## 0.22.0-rc.3
+
+### Patch Changes
+
+- rc3: multi-pool usage signals, agent-parse-proof output, kimi active token refresh, deadline engine
+
+  - **multi-pool usage**: `usage show` / `quota status` model cursor first-party vs usage-based as independent, non-additive pools; codex per-model buckets via `rateLimitsByLimitId`; Claude fable 7d as an independent target. `UsageSignal` carries named `pools[]`.
+  - **agent-parse-proof output**: top-level `agent_summary` + `refresh_hint` on `usage show`, and `refresh_hint` on machine-wide readings — a naive consumer reaches the correct state + action instead of reading a null nested window and giving up.
+  - **kimi active refresh**: the kimi collector refreshes an expired short-lived access_token via the stored refresh_token under an advisory lock (re-read → refresh-only-if-expired → atomic write-back; the token never enters agent context); a failed auto-refresh falls back losslessly to the expired-recovery hint.
+  - **worker output ceiling**: `worker run` stdout/stderr ceiling raised to 512 MiB.
+  - **deadline engine**: DDL contract fields + `estimate deadline-risk` endpoint + notification state machine.
+
 ## 0.22.0-rc.2
 
 ### Patch Changes

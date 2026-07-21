@@ -10,17 +10,17 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 | capability | claude-code | codex | cursor | kimi-code | card |
 | --- | --- | --- | --- | --- | --- |
 | agent-stream-transcript | implemented | implemented | partial | implemented | [agent-stream-transcript.md](harnesses/capabilities/agent-stream-transcript.md) |
-| ccm-quota-account | implemented | partial; read-only provider candidate implemented, usage migration pending | partial | unsupported | [ccm-quota-account.md](harnesses/capabilities/ccm-quota-account.md) |
+| ccm-quota-account | implemented | partial | partial | partial | [ccm-quota-account.md](harnesses/capabilities/ccm-quota-account.md) |
 | cross-harness-cached-context | implemented | implemented | implemented-track-b | unsupported | [cross-harness-cached-context.md](harnesses/capabilities/cross-harness-cached-context.md) |
 | cross-harness-notification-subscription | implemented-track-b | implemented-track-b | implemented-track-b | partial | [cross-harness-notification-subscription.md](harnesses/capabilities/cross-harness-notification-subscription.md) |
-| cross-harness-session-bound-worker | current | current | current | partial | [cross-harness-session-bound-worker.md](harnesses/capabilities/cross-harness-session-bound-worker.md) |
+| cross-harness-session-bound-worker | current | current | current | current | [cross-harness-session-bound-worker.md](harnesses/capabilities/cross-harness-session-bound-worker.md) |
 | goal-contract-lifecycle | implemented | implemented | implemented-track-b | implemented | [goal-contract-lifecycle.md](harnesses/capabilities/goal-contract-lifecycle.md) |
-| machine-wide-quota-notification | implemented-track-b | implemented-track-b | implemented-track-b | supported | [machine-wide-quota-notification.md](harnesses/capabilities/machine-wide-quota-notification.md) |
+| machine-wide-quota-notification | implemented-track-b | implemented-track-b | implemented-track-b | partial | [machine-wide-quota-notification.md](harnesses/capabilities/machine-wide-quota-notification.md) |
 | path-token-resolution | implemented | implemented | implemented | implemented | [path-token-resolution.md](harnesses/capabilities/path-token-resolution.md) |
 | post-tool-batch-gate | implemented | unsupported | unsupported | unsupported | [post-tool-batch-gate.md](harnesses/capabilities/post-tool-batch-gate.md) |
 | role-substrate-reinject | implemented | implemented | implemented | implemented | [role-substrate-reinject.md](harnesses/capabilities/role-substrate-reinject.md) |
 | stop-continuation-gate | implemented | implemented-blocking | implemented | implemented | [stop-continuation-gate.md](harnesses/capabilities/stop-continuation-gate.md) |
-| usage-pacing-midflight | implemented | implemented-stop-advisory; runtime migration pending | implemented-stop-advisory | unsupported | [usage-pacing-midflight.md](harnesses/capabilities/usage-pacing-midflight.md) |
+| usage-pacing-midflight | implemented | implemented-stop-advisory | implemented-stop-advisory | unsupported | [usage-pacing-midflight.md](harnesses/capabilities/usage-pacing-midflight.md) |
 | workflow-authoring | implemented | unsupported_stub | unsupported_stub | unsupported | [workflow-authoring.md](harnesses/capabilities/workflow-authoring.md) |
 
 ## Declared divergences by kind
@@ -38,9 +38,9 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 
 | rule | kind | affected hosts | tracked by |
 | --- | --- | --- | --- |
-| ccm-external-statusline | protocol-capability-gap | codex, cursor | ccm-host-coupling-audit.md §Status Line |
-| ccm-account-pool | protocol-capability-gap | codex, cursor | ccm/apps/cli/src/harnesses/codex.ts, ccm/apps/cli/src/harnesses/cursor.ts |
-| ccm-quota-account-kimi-gap | protocol-capability-gap | kimi-code | design_docs/2026-07-16-kimi-code-adapter-design.md §7 |
+| ccm-external-statusline | protocol-capability-gap | codex, cursor, kimi-code | ccm-host-coupling-audit.md §Status Line |
+| ccm-account-pool | protocol-capability-gap | codex, cursor, kimi-code | ccm/apps/cli/src/harnesses/codex.ts, ccm/apps/cli/src/harnesses/cursor.ts, ccm/apps/cli/src/harnesses/kimi-code.ts |
+| ccm-quota-account-kimi-gap | protocol-capability-gap | kimi-code | ccm/apps/cli/src/harnesses/kimi-code.ts, ccm/apps/cli/src/kimi-usage.ts |
 
 ### cross-harness-cached-context
 
@@ -68,6 +68,7 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 | --- | --- | --- | --- |
 | machine-wide-quota-codex-midturn | event-unavailable | codex | plugin/src/hooks/coordination-inbox/CONTRACT.md |
 | machine-wide-quota-cursor-start | protocol-capability-gap | cursor | plugin/src/hooks/orchestrator-context/CONTRACT.md |
+| machine-wide-quota-kimi-origin-delivery | protocol-capability-gap | kimi-code | design_docs/harnesses/capabilities/cross-harness-notification-subscription.md |
 
 ### path-token-resolution
 
@@ -107,7 +108,7 @@ See [ADR-031](../adrs/ADR-031-n-host-capability-parity.md) and
 | usage-pacing-post-tool-batch-sampling | event-unavailable | codex, cursor | plugin/src/hooks/usage-pacing/CONTRACT.md |
 | usage-pacing-mechanical-switch | protocol-capability-gap | codex, cursor | design_docs/harnesses/ccm-host-coupling-audit.md |
 | usage-pacing-quota-signal-source | protocol-capability-gap | cursor | ccm/apps/cli/src/cursor-usage.ts + design_docs/harnesses/capabilities/ccm-quota-account.md |
-| usage-pacing-kimi-no-signal-no-channel | event-unavailable | kimi-code | design_docs/2026-07-16-kimi-code-adapter-design.md §3,§7 |
+| usage-pacing-kimi-no-channel | event-unavailable | kimi-code | plugin/src/hooks/usage-pacing/CONTRACT.md, ccm/apps/cli/src/kimi-usage.ts |
 
 ### workflow-authoring
 

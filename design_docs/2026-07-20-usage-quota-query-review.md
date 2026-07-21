@@ -2,6 +2,12 @@
 
 > 任务：四 harness（claude-code / codex / cursor / kimi-code）账号用量余额查询都不许 unknown（unknown=bug）；多命令空间查余额应共享同一底层实现。本机四 harness 均已登录。
 > 单独成篇（非 `dogfood-findings.md`）以避开并行 agent 对该台账的并发编辑；由 orchestrator 决定是否并入台账。
+>
+> **2026-07-21 后续实现注记：**本文保留当时的“修前 → 修后”证据；§4 的 Kimi
+> machine-wide follow-up 现已落地，`TARGETS` 含 `kimi-cli` 5h/7d。Kimi collector 也已从
+> “过期即降级”收敛为带锁自动刷新 stored OAuth，失败才保留 recovery hint。
+> 当前能力以 capability cards、`ccm/apps/cli/src/machine-wide-quota.ts` 与
+> `ccm/apps/cli/src/kimi-usage.ts` 为准，下文未逐行改写的旧红线 / follow-up 是历史快照。
 
 ## 1. 现状盘点（修前 → 修后，freshly-built `ccm.cjs` 实测）
 

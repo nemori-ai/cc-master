@@ -127,47 +127,6 @@ only proves "both hosts' source at least declares awareness of this rule."
     rule-verify-board-fuse, which is host-symmetric).
   tracked_by: "n/a — intentional protocol adaptation, not tracked as a bug"
 
-- rule: verify-board-fuse-missing-on-codex
-  kind: host-convention-divergence
-  affected_hosts: [codex]
-  reason: >
-    Prior to HOOKPAR-DEC, Codex verify-board-core.js had no fuse/circuit-breaker at all — with no
-    fingerprint dedup (see above) and no fuse, a misjudging Stop gate (or an agent that never sets
-    `stop_allow_until`) could block every single Stop indefinitely with no host-side escape hatch.
-  compensating_mechanism: >
-    Fixed in this round — codex verify-board-core.js now tracks a session-scoped consecutive-block
-    streak sidecar and force-allows + strong-advisory-warns at streak >= 5, matching the safety goal
-    of claude-code verify-board.js's FUSE (not the same trigger key — Claude keys release on an
-    unchanged fingerprint, Codex keys on raw consecutive-block count — but both bound worst-case
-    Stop-loop duration).
-  tracked_by: "adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR)"
-
-- rule: verify-board-rollup-missing-on-codex
-  kind: host-convention-divergence
-  affected_hosts: [codex]
-  reason: >
-    Prior to HOOKPAR-DEC, Codex verify-board-core.js never called `ccm board lint`, so it had no
-    rollup-consistency reminder at all (silent omission, not declared anywhere).
-  compensating_mechanism: >
-    Fixed in this round — codex verify-board-core.js now spawns `ccm board lint --board <path>
-    --json` per board (mirroring claude-code's rollupOwnersViaCcm), extracts GRAPH-ROLLUP violation
-    owners, and appends the same "owner X is done but child Y is <status>" note. `ccm` unavailable →
-    skip this soft reminder for that board (graceful degrade, other Stop-gate logic still runs).
-  tracked_by: "adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR)"
-
-- rule: verify-board-tag-protocol-missing-on-codex
-  kind: host-convention-divergence
-  affected_hosts: [codex]
-  reason: >
-    Prior to HOOKPAR-DEC, Codex verify-board-core.js emitted bare `{kind:'block'|'system', message}`
-    with no ADR-018 tag wrapper.
-  compensating_mechanism: >
-    Fixed in this round — codex verify-board-core.js now wraps block reasons in a local
-    `directive('verify-board', body)` and the fuse-release warning in
-    `advisory('verify-board', 'strong', body)` (local duplicates matching claude-code hook-common.js
-    wrapper output shape byte-for-byte, since Codex has no shared hook-common to import).
-  tracked_by: "adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR)"
-
 - rule: verify-board-cursor-stop-envelope
   kind: protocol-capability-gap
   affected_hosts: [cursor]

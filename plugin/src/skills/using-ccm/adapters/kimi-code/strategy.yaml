@@ -17,8 +17,6 @@ unsupported:
     reason: "ccm account backend currently targets Claude Code OAuth credential stores; kimi returns NotImplemented."
   - capability: statusline_install
     reason: "kimi has no Claude-style external statusline hook; statusline install/uninstall is NotImplemented."
-  - capability: current_quota_signal
-    reason: "kimi exposes no CLI quota/usage output; ccm usage show/advise returns available:false / signal:null."
 supported:
   - capability: board_operations
     reason: "ccm board/task/log/jc/cadence/watchdog commands are harness-neutral."
@@ -26,6 +24,8 @@ supported:
     reason: "ccm upgrade plugin may refresh local kimi plugin registration from plugin/dist/kimi-code (managed-dir reinstall) when the kimi upgrade adapter is available; otherwise manual reinstall."
   - capability: plugin_skills_distribution
     reason: "kimi command-like入口与 hooks 通过 plugin skills + host-native manifest commands 实现。"
+  - capability: current_quota_signal
+    reason: "ccm reads Kimi current-login rolling 5h/7d windows through kimi-usages-api; expired stored OAuth may be auto-refreshed under a lock."
 slot_replacements:
   "{{USING_CCM_DESCRIPTION}}": adapters/kimi-code/overlays/description.md
   "{{USING_CCM_BOUNDARY}}": adapters/kimi-code/overlays/boundary.md
@@ -65,4 +65,4 @@ slot_replacements:
   "{{USING_CCM_COORDINATION_QUOTA_MODEL_EXAMPLE}}": adapters/kimi-code/overlays/coordination-quota-model-example.md
   "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/kimi-code/overlays/cross-harness-target-facts-pointer.md
 notes:
-  - kimi projects the canonical ccm guide plus host-specific account/statusline/upgrade and executor/watchdog slots (no quota signal; built-in subagent roles + background Bash; no account switch).
+  - kimi projects the canonical ccm guide plus host-specific account/statusline/upgrade and executor/watchdog slots (5h/7d read-only quota signal; built-in subagent roles + background Bash; no account switch or external statusline).

@@ -1,24 +1,24 @@
 ---
 path: plugin/AGENTS.md
-version: v0.1
-last-edited: 2026-07-03
+version: v0.2
+last-edited: 2026-07-21
 content-summary: |
-  cc-master plugin 子树入口。定义 paragoge-style source/dist 边界：plugin/src 是语义源，plugin/dist/claude-code 是当前唯一 adapter host 的可安装产物。
+  cc-master plugin 子树入口。定义 paragoge-style source/dist 边界：plugin/src 是语义源，plugin/dist/<host> 是四个 adapter host 的可安装产物。
 ---
 
 # plugin/
 
-`plugin/` 存放 cc-master 的 harness plugin。当前支持 `claude-code`、`codex`、`cursor` 三个 adapter host。
+`plugin/` 存放 cc-master 的 harness plugin。当前支持 `claude-code`、`codex`、`cursor`、`kimi-code` 四个 adapter host。
 
 ## 边界
 
-- `src/` 是唯一语义源：`.claude-plugin/` / `.codex-plugin/` / `.cursor-plugin/`、`commands/`、`hooks/`、`skills/` 都从这里改。
+- `src/` 是唯一语义源：各 host manifest source（`.claude-plugin/` / `.codex-plugin/` / `.cursor-plugin/` / `.kimi-plugin/`）、`commands/`、`hooks/`、`skills/` 都从这里改。
 - `dist/<host>/` 是可安装产物：由 `scripts/sync-plugin-dist.sh` 从 `src/` 按 host 投影生成。
-- 不手编 `dist/{claude-code,codex,cursor}/{commands,hooks,skills,*-plugin}/`。需要改行为时先改 `src/`，再运行 `bash scripts/sync-plugin-dist.sh`。
+- 不手编 `dist/{claude-code,codex,cursor,kimi-code}/{commands,hooks,skills,*-plugin}/`。需要改行为时先改 `src/`，再运行 `bash scripts/sync-plugin-dist.sh`。
 
 ## Adapter path token 纪律
 
-第一阶段只有 Claude Code adapter，因此 `plugin/src/` 里仍允许出现 Claude Code 运行时变量；这只是阶段性落点，不代表这些变量是跨 harness canonical source。
+共享 canonical source 不写死 host runtime token；host-specific token 只落对应 adapter strategy / overlay / launcher。四个 adapter 已存在，任何“第一阶段只有 Claude Code”的旧假设都视为漂移。
 
 从 paragoge 学到的策略是：host 差异不直接写死在共享语义层，而是通过 adapter projection 的 slot / placeholder 展开。后续新增 Codex adapter 前，应先把共享文件里的 host-specific 路径前缀抽成中性 slot，再由各 adapter 投影成自己的运行时写法。
 
@@ -48,4 +48,4 @@ claude plugin validate plugin/dist/claude-code
 | --- | --- |
 | 改 skill / command / hook 的运行时内容 | `plugin/src/` 下对应文件 |
 | 改 Claude Code 安装产物形态 | `plugin/dist/claude-code/`，并同步更新投影脚本 |
-| 新增 Codex adapter | 先验证 Codex path token / hook / skill 机制，再补 projection 设计与 compatibility matrix，最后新增 `plugin/dist/codex/` |
+| 改任一 host adapter | 先核对 `design_docs/harnesses/` 的 host 事实与 Capability Card，再改 projection source，最后用 sync/check 验证对应 `plugin/dist/<host>/` |

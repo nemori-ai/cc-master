@@ -52,6 +52,9 @@ if (argv.includes('--no-output-hang')) {
 } else if (argv.find((value) => value.startsWith('--emit-bytes='))) {
   const spec = argv.find((value) => value.startsWith('--emit-bytes='));
   process.stdout.write('x'.repeat(Number(spec.slice('--emit-bytes='.length))));
+} else if (argv.find((value) => value.startsWith('--emit-stderr-bytes='))) {
+  const spec = argv.find((value) => value.startsWith('--emit-stderr-bytes='));
+  process.stderr.write('e'.repeat(Number(spec.slice('--emit-stderr-bytes='.length))));
 } else {
   let stdin = '';
   process.stdin.setEncoding('utf8');
@@ -714,7 +717,7 @@ test('worker no longer kills a large-output dispatch: raised ceiling + default a
   const byDefault = await invokeRun({
     harness: 'codex',
     providerArgv: [`--emit-bytes=${emitBytes}`],
-    omitMaxOutputBytes: true, // exercise DEFAULT_MAX_OUTPUT_BYTES (now 32 MiB, was 1 MiB).
+    omitMaxOutputBytes: true, // exercise DEFAULT_MAX_OUTPUT_BYTES (now 512 MiB, was 1 MiB).
   });
   assert.equal(byDefault.code, 0);
   assert.equal(byDefault.envelope?.state, 'exited');
@@ -722,11 +725,60 @@ test('worker no longer kills a large-output dispatch: raised ceiling + default a
   assert.equal(byDefault.envelope?.stdout_bytes, emitBytes);
 });
 
-test('worker still bounds --max-output-bytes at the 32 MiB ceiling', async () => {
+test('worker default budget now flows stdout past the former 32 MiB ceiling without truncation', async () => {
+  // Regression: the 32 MiB ceiling truncated real multi-ten-MiB payloads mid-task. One byte over
+  // the former ceiling must now stream through the default (512 MiB) budget with no output_limit.
+  const emitBytes = 33_554_433; // one byte over the former 32 MiB ceiling.
+  const invoked = await invokeRun({
+    harness: 'codex',
+    providerArgv: [`--emit-bytes=${emitBytes}`],
+    omitMaxOutputBytes: true,
+  });
+  assert.equal(invoked.code, 0);
+  assert.equal(invoked.envelope?.state, 'exited');
+  assert.deepEqual(invoked.envelope?.truncated, { stdout: false, stderr: false });
+  assert.equal(invoked.envelope?.stdout_bytes, emitBytes);
+});
+
+test('worker default budget now flows a multi-MiB stderr past the former 8 MiB cap', async () => {
+  // Regression: a codex worker's stderr routinely runs to tens of MiB; the former 8 MiB
+  // independent cap discarded exactly the diagnostics a failed dispatch needs. 16 MiB must now
+  // pass untruncated.
+  const emitBytes = 16_777_216; // 16 MiB, over the former 8 MiB stderr cap.
+  const invoked = await invokeRun({
+    harness: 'codex',
+    providerArgv: [`--emit-stderr-bytes=${emitBytes}`],
+    omitMaxOutputBytes: true,
+  });
+  assert.equal(invoked.code, 0);
+  assert.equal(invoked.envelope?.state, 'exited');
+  assert.deepEqual(invoked.envelope?.truncated, { stdout: false, stderr: false });
+  assert.equal(invoked.envelope?.stderr_bytes, emitBytes);
+});
+
+test('worker still bounds --max-output-bytes at the 512 MiB ceiling', async () => {
+  // Values over the former 32 MiB ceiling but under the new 512 MiB one must now be accepted,
+  // exactly at the ceiling included; one byte above must still be rejected before any spawn.
+  const underCeiling = await invokeRun({
+    harness: 'codex',
+    providerArgv: ['--flag', 'value'],
+    maxOutputBytes: 268_435_456, // 256 MiB — over the former 32 MiB ceiling, under the new one.
+  });
+  assert.equal(underCeiling.code, 0);
+  assert.equal(underCeiling.envelope?.state, 'exited');
+
+  const atCeiling = await invokeRun({
+    harness: 'codex',
+    providerArgv: ['--flag', 'value'],
+    maxOutputBytes: 536_870_912, // exactly the 512 MiB ceiling.
+  });
+  assert.equal(atCeiling.code, 0);
+  assert.equal(atCeiling.envelope?.state, 'exited');
+
   const rejected = await invokeRun({
     harness: 'codex',
     providerArgv: ['--flag', 'value'],
-    maxOutputBytes: 33_554_433, // one byte over the 32 MiB ceiling.
+    maxOutputBytes: 536_870_913, // one byte over the 512 MiB ceiling.
   });
   assert.equal(rejected.code, 1);
   assert.equal(rejected.envelope?.state, 'rejected');

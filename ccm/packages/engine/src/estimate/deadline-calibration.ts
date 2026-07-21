@@ -20,8 +20,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { withLock } from '../board-lock.js';
 import type { TaskLike } from '../board-model.js';
 import { readDeadline } from '../board-model.js';
+import { sha256Digest } from '../sha256.js';
 import type { DeadlineRiskBand, DeadlineRiskResult } from './deadline-risk.js';
 import { Sfc32 } from './prng.js';
 
@@ -77,6 +79,19 @@ export function snapshotId(boardId: string, capturedAtMs: number): string {
   return `${boardId}@${capturedAtMs}`;
 }
 
+// stableDeadlineBoardId(boardPath) → 基于 canonical board 文件路径的稳定、非泄露实体 ID。
+//   board schema 没有 durable id，且本片不碰 board 窄腰；因此 producer 以真实文件身份作 home-level join key。
+//   同一路径的 `..`/相对写法、以及已存在文件的 symlink 写法都会收敛到同一 canonical path。
+export function stableDeadlineBoardId(boardPath: string): string {
+  let canonical = path.resolve(boardPath);
+  try {
+    canonical = fs.realpathSync.native(canonical);
+  } catch {
+    // 测试/预计算可能在文件出现前求 ID；path.resolve 仍提供确定性、不会退 goal/session 等易变字段。
+  }
+  return `board:${sha256Digest(canonical)}`;
+}
+
 // bandsSignature(bands) → band 阈值的紧凑签名（可追溯「这条 snapshot 的 band 是哪套阈值判的」）。
 //   校准前后阈值不同→签名不同→backtest 能区分「用旧阈值采的 snapshot」，避免混采污染。
 export function bandsSignature(bands: {
@@ -88,7 +103,8 @@ export function bandsSignature(bands: {
 }
 
 // buildDeadlineSnapshot(risk, meta) → 从一次 deadline-risk verdict 造一条 **未 label** 的 snapshot（纯函数）。
-//   这是采集机制的核心：`ccm estimate deadline-risk` 算出 DeadlineRiskResult 后，把它连同预测的 band 定格。
+//   这是采集机制的核心：`ccm calibration capture` 复用 deadline-risk 算法后，把预测 band 定格；只读
+//   `ccm estimate deadline-risk` 本身绝不调用本函数落盘。
 //   label 恒 'unknown'（终态未知）——后续经 reconcileSnapshotLabels 回填。provenance 默认 'observed'
 //   （真实编排采集）；合成/构造场景显式传 'synthetic'。
 export function buildDeadlineSnapshot(
@@ -96,6 +112,7 @@ export function buildDeadlineSnapshot(
   meta: {
     boardId: string;
     capturedAtMs: number;
+    backlog: number;
     scope?: string;
     provenance?: SnapshotProvenance;
     bandsSig?: string;
@@ -103,6 +120,11 @@ export function buildDeadlineSnapshot(
 ): DeadlineSnapshot {
   const boardId = meta.boardId || 'unknown';
   const capturedAtMs = meta.capturedAtMs;
+  if (!Number.isInteger(meta.backlog) || meta.backlog < 0) {
+    throw new RangeError(
+      `deadline snapshot backlog must be a non-negative integer: ${meta.backlog}`,
+    );
+  }
   return {
     schema: SNAPSHOT_SCHEMA,
     snapshot_id: snapshotId(boardId, capturedAtMs),
@@ -117,7 +139,7 @@ export function buildDeadlineSnapshot(
     predicted_band: risk.risk_band,
     strength: risk.strength,
     channel_disagreement: risk.channel_disagreement,
-    backlog: extractBacklog(risk),
+    backlog: meta.backlog,
     wip: risk.channels.resource_aware?.wip ?? null,
     coverage_pct: risk.coverage_pct,
     confidence: risk.confidence,
@@ -129,12 +151,6 @@ export function buildDeadlineSnapshot(
     actual_finish_ms: null,
     resolution_basis: 'pending',
   };
-}
-
-// extractBacklog(risk) — DeadlineRiskResult 未直接携带 backlog，用 throughput 参考块无则退 -1（未知·诚实）。
-//   backlog 是采集期望字段（供未来 feature），当前从可得字段尽力还原；采集器可覆写（见 CLI 埋点建议）。
-function extractBacklog(_risk: DeadlineRiskResult): number {
-  return -1; // 未直接可得——采集埋点侧应显式补（buildDeadlineSnapshot 后覆写 .backlog）；-1 = 未采到
 }
 
 // ── label 判定（终态回填）─────────────────────────────────────────────────────────────────────────
@@ -263,11 +279,23 @@ export function snapshotStorePath(homeDir: string): string {
   return path.join(homeDir, SNAPSHOT_STORE_SUBDIR, SNAPSHOT_STORE_FILE);
 }
 
-// appendDeadlineSnapshot(homeDir, snap) → 追加一条 snapshot（JSONL 一行·采集）。必要时建目录。best-effort。
-export function appendDeadlineSnapshot(homeDir: string, snap: DeadlineSnapshot): void {
+// appendDeadlineSnapshot(homeDir, snap) → 幂等追加 snapshot。必要时建目录；同 snapshot_id 重放返回 false。
+//   load→dedupe→append 全部在 store lock 内，避免并发 producer 重复计数；同 id 不同 payload 则 fail-loud。
+export function appendDeadlineSnapshot(homeDir: string, snap: DeadlineSnapshot): boolean {
   const file = snapshotStorePath(homeDir);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.appendFileSync(file, `${JSON.stringify(snap)}\n`, 'utf8');
+  return withLock(file, () => {
+    const existing = loadDeadlineSnapshotsStrict(file);
+    const duplicate = existing.find((item) => item.snapshot_id === snap.snapshot_id);
+    if (duplicate) {
+      if (JSON.stringify(duplicate) !== JSON.stringify(snap)) {
+        throw new Error(`deadline snapshot id collision: ${snap.snapshot_id}`);
+      }
+      return false;
+    }
+    fs.appendFileSync(file, `${JSON.stringify(snap)}\n`, 'utf8');
+    return true;
+  });
 }
 
 // loadDeadlineSnapshots(homeDir) → 读全部 snapshot（坏行/坏 schema 跳过·绝不抛·文件缺 → 空）。
@@ -279,6 +307,22 @@ export function loadDeadlineSnapshots(homeDir: string): DeadlineSnapshot[] {
   } catch {
     return []; // 文件不存在 → 冷启动·空语料
   }
+  return parseDeadlineSnapshots(raw);
+}
+
+// producer 的 dedupe read：仅 ENOENT 当冷启动；权限/I/O 错误必须 fail-loud，不能把“读失败”当空 store。
+function loadDeadlineSnapshotsStrict(file: string): DeadlineSnapshot[] {
+  let raw: string;
+  try {
+    raw = fs.readFileSync(file, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+  return parseDeadlineSnapshots(raw);
+}
+
+function parseDeadlineSnapshots(raw: string): DeadlineSnapshot[] {
   const out: DeadlineSnapshot[] = [];
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();

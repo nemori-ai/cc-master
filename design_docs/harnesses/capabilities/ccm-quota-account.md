@@ -19,33 +19,33 @@ account switch is policy-gated on board.
 | host | status | mechanism | notes |
 | --- | --- | --- | --- |
 | claude-code | implemented | statusline sidecar, account vault/keychain, plugin upgrade via claude CLI | ccm-host-coupling-audit |
-| codex | partial; read-only provider candidate implemented, usage migration pending | `ccm provider inspect codex` preserves multi-bucket provenance and uses 7d-only hard ceiling + rolling-24h advisory; current `readCodexUsageSignal` migration remains pending; account NotImplemented; statusline unsupported | codex.ts adapter + Codex provider contract v1 |
+| codex | partial | `readCodexUsageSignal` reads current-login app-server rate limits; `ccm usage` keeps 7d as the only hard ceiling and rolling-24h as advisory provenance | account pool / switch and external statusline remain unsupported; codex.ts adapter + Codex provider contract v1 |
 | cursor | partial | `readCursorUsageSignal` → dashboard `GetCurrentPeriodUsage` → `UsageSignal.billing_period` (~30d); local-plugin upgrade implemented; account pool / statusline / autoswitch unsupported | `cursor-usage.ts` + `harnesses/cursor.ts` |
-| kimi-code | unsupported | No CLI quota face (kimi-code.md §10); account pool binds Claude OAuth | `ccm usage advise` → available:false; `ccm account *` NotImplemented |
+| kimi-code | partial | `kimi-usages-api` current-login collector exposes independent rolling 5h + 7d windows; expired stored OAuth is auto-refreshed under a lock when possible | account pool / external statusline unsupported; failed refresh preserves the harness-native recovery hint |
 
 ## Declared divergence
 
 ```yaml
 - rule: ccm-external-statusline
   kind: protocol-capability-gap
-  affected_hosts: [codex, cursor]
-  reason: Claude Code settings.json statusLine schema has no verified equivalent on Codex/Cursor IDE.
+  affected_hosts: [codex, cursor, kimi-code]
+  reason: Claude Code settings.json statusLine schema has no verified equivalent on Codex/Cursor IDE/Kimi Code.
   compensating_mechanism: ccm statusline install/uninstall returns unsupported; usage reads alternate provider or unavailable.
   tracked_by: ccm-host-coupling-audit.md §Status Line
 
 - rule: ccm-account-pool
   kind: protocol-capability-gap
-  affected_hosts: [codex, cursor]
+  affected_hosts: [codex, cursor, kimi-code]
   reason: Account capture/switch binds Claude OAuth stores.
   compensating_mechanism: account handlers return NotImplemented under non-claude-code harness.
-  tracked_by: ccm/apps/cli/src/harnesses/codex.ts, ccm/apps/cli/src/harnesses/cursor.ts
+  tracked_by: ccm/apps/cli/src/harnesses/codex.ts, ccm/apps/cli/src/harnesses/cursor.ts, ccm/apps/cli/src/harnesses/kimi-code.ts
 
 - rule: ccm-quota-account-kimi-gap
   kind: protocol-capability-gap
   affected_hosts: [kimi-code]
-  reason: kimi exposes no CLI quota face (kimi-code.md §10); account pool binds Claude OAuth.
-  compensating_mechanism: ccm usage advise → available:false; ccm account * NotImplemented (honest, no fabricated window).
-  tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §7
+  reason: Kimi quota is implemented, but account-pool mutation and the Claude-style external statusline are not.
+  compensating_mechanism: ccm usage show/advise remains read-only; ccm account * returns NotImplemented and statusline install remains unsupported.
+  tracked_by: ccm/apps/cli/src/harnesses/kimi-code.ts, ccm/apps/cli/src/kimi-usage.ts
 ```
 
 ## Linked surfaces

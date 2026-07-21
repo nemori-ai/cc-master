@@ -45,7 +45,7 @@ slot_replacements:
   "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/kimi-code/overlays/cross-harness-target-facts-pointer.md
 notes:
   - kimi-code projection uses the host-neutral canonical body, including machine-wide selected-target quota guidance, plus kimi built-in subagent / Bash dispatch and background-Bash-floor watchdog slots.
-  - kimi has no CLI quota signal; Workflow remains unsupported.
+  - Kimi current-login 5h/7d quota is readable through ccm's kimi-usages-api collector; non-blocking Stop pacing delivery, account switching, and Workflow remain unsupported.
   - Exclude cost-decisions.md (Claude Code account-pool switching is unsupported on kimi-code); keep
     codex-review.sh excluded (optional external). Unlike Codex/Cursor, DO project handoff.md — its
     content is host-neutral (no Claude-specific tokens) and the `cc-master:handoff-to-new-session`

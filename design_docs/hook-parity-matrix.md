@@ -30,8 +30,6 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | --- | --- | --- | --- |
 | board-guard-apply-patch | host-convention-divergence | claude-code | n/a — legitimate host-tool-surface difference, not a bug |
 | board-guard-apply-patch-envelope-normalization | host-convention-divergence | claude-code, cursor, kimi-code | GitHub issue #156 (fixed, this PR) |
-| board-guard-bash-fallback-false-positive | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
-| board-guard-directive-tag-protocol | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
 | board-guard-kimi-envelope | host-convention-divergence | kimi-code | design_docs/2026-07-16-kimi-code-adapter-design.md §3 |
 
 ### board-lint
@@ -64,7 +62,6 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | --- | --- | --- | --- |
 | identity-nudge-envelope | protocol-capability-gap | codex | n/a — declared launcher-level envelope conversion, not a business-logic gap |
 | identity-nudge-cursor-envelope | host-convention-divergence | cursor | _hosts/cursor/ENVELOPE.md; plugin v0.17.2 |
-| identity-nudge-tag-protocol-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
 | identity-nudge-kimi-no-advisory-channel | protocol-capability-gap | kimi-code | design_docs/2026-07-16-kimi-code-adapter-design.md §3 |
 | deadline-risk-shared-core | host-convention-divergence | claude-code, codex, cursor | design_docs/2026-07-16-ddl-design-contract.md §5.3; issue #149 |
 | deadline-risk-kimi-code | protocol-capability-gap | kimi-code | design_docs/2026-07-16-ddl-design-contract.md §5.3 (kimi-code conditional); issue #149 |
@@ -94,16 +91,12 @@ must carry a `tracked_by`, treated as backlog, not an acceptable permanent state
 | usage-pacing-account-switch-ambient | protocol-capability-gap | codex, cursor | n/a — downstream of usage-pacing-mechanical-switch |
 | usage-pacing-billing-period-cursor | host-convention-divergence | cursor | ccm packages/engine usage/pacing.ts billing_period path; ADR-031 Track A |
 | usage-pacing-cursor-stop-envelope | host-convention-divergence | cursor | _hosts/cursor/ENVELOPE.md; plugin v0.17.2 |
-| usage-pacing-tag-protocol-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
-| usage-pacing-kimi-no-signal-no-channel | protocol-capability-gap | kimi-code | design_docs/harnesses/capabilities/usage-pacing-midflight.md |
+| usage-pacing-kimi-no-channel | protocol-capability-gap | kimi-code | design_docs/harnesses/capabilities/usage-pacing-midflight.md |
 
 ### verify-board
 
 | rule | kind | affected hosts | tracked by |
 | --- | --- | --- | --- |
 | verify-board-fingerprint-dedup | protocol-capability-gap | codex | n/a — intentional protocol adaptation, not tracked as a bug |
-| verify-board-fuse-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
-| verify-board-rollup-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
-| verify-board-tag-protocol-missing-on-codex | host-convention-divergence | codex | adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR) |
 | verify-board-cursor-stop-envelope | protocol-capability-gap | cursor | plugin v0.17.2 envelope fix |
 | verify-board-kimi-stop-envelope | host-convention-divergence | kimi-code | design_docs/2026-07-16-kimi-code-adapter-design.md §3.4 |

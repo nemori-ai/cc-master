@@ -1,1 +1,1 @@
-statusline namespace 仅作兼容告知：kimi-code 无外部命令式 status-line hook；`statusline install/uninstall` 为 `NotImplemented`；kimi-code 无任何 CLI 用量源，`ccm usage` 恒 `available:false`。
+statusline namespace 仅作兼容告知：kimi-code 无外部命令式 status-line hook，`statusline install/uninstall` 为 `NotImplemented`。这不影响独立的 `kimi-usages-api` collector；`ccm usage show/advise` 可读当前登录态 5h/7d。

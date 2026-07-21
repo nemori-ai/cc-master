@@ -1,6 +1,6 @@
 # kimi-code Harness Facts
 
-更新时间：2026-07-16。
+更新时间：2026-07-21。
 
 本页是 kimi-code（Moonshot AI 官方终端 AI coding agent CLI）作为 cc-master 目标 harness 的权威事实文档，供后续 adapter 设计（plugin 投影 + ccm worker driver）直接消费。
 
@@ -225,7 +225,7 @@ KIMI_CODE_HOME=<隔离home> kimi -p "Reply with exactly: PING. No tools." --outp
 
 ## 10. Headless 与 Worker 可行性 [tested]
 
-**结论：kimi-code 具备可用的 headless worker 面（`kimi -p` 单发 + stream-json + session/transcript recon），可行性高于 Codex/Cursor 的降级形态；主要缺口在 quota 信号。approval 无缺口——`-p` 单发自身即以非交互模式自动执行工具（含写文件），无需也不能加 `-y`/`--auto`（二者与 `-p` 互斥，见 §10 Approval）[tested]。**
+**结论：kimi-code 具备可用的 headless worker 面（`kimi -p` 单发 + stream-json + session/transcript recon），可行性高于 Codex/Cursor 的降级形态；5h/7d 只读 quota 已由 ccm collector 补齐，剩余缺口是 account pool / external statusline 与非阻断 Stop pacing channel。approval 无缺口——`-p` 单发自身即以非交互模式自动执行工具（含写文件），无需也不能加 `-y`/`--auto`（二者与 `-p` 互斥，见 §10 Approval）[tested]。**
 
 ### 单发调用
 
@@ -265,9 +265,9 @@ kimi -p "<prompt>" --output-format stream-json  # exit 0；stdout = JSONL
 - `BackgroundConfigSchema`（binary）：Bash 工具支持后台任务（`bashTaskTimeoutS` 默认 600s、`bashAutoBackgroundOnTimeout`、`maxRunningTasks`、`keepAliveOnExit`）；print 模式有 `printBackgroundMode: exit|drain|steer` + `printMaxTurns`——`steer` 提示 print 模式下可多轮 steer。
 - **更强的编程 driver 面**（未深测 [docs]）：`kimi acp`（Agent Client Protocol over stdio）、`kimi server`（REST+WebSocket JSON-RPC）——比 `-p` 更适合结构化编排的 worker transport，值得后续 probe。
 
-### Quota / 配额信号 [tested — 无]
+### Quota / 配额信号 [tested CLI gap + implemented ccm collector]
 
-**CLI 无 headless quota/usage 输出**：无 `kimi usage` 命令（落根 help）；`/usage` 是 TUI slash command；`strings` 无 CLI 侧配额结构。**worker driver 拿不到 kimi 的 5h/7d 类配额信号**——须走 `unsupported`（同 Cursor account pool / Codex 5h 退役后的诚实标注）。
+**CLI 无 headless quota/usage 输出**：无 `kimi usage` 命令（落根 help）；`/usage` 是 TUI slash command；`strings` 无 CLI 侧配额结构。这个 CLI 缺口仍成立，但不再等于 ccm 无信号：现行 `kimi-usages-api` collector 使用 current-login OAuth 读取 provider `/usages`，投影独立滚动 5h + 7d，并可在相邻锁内对过期 stored OAuth 做自动刷新。失败保持 `available:false` + recovery hint，不伪造窗口；account pool / external statusline 与非阻断 Stop pacing channel 仍 unsupported。
 
 ---
 
@@ -285,10 +285,10 @@ kimi -p "<prompt>" --output-format stream-json  # exit 0；stdout = JSONL
 2. **hook→agent 注入协议改写**：cc-master 的 `additionalContext`（CC）/ `systemMessage`（Codex）在 kimi 下要改写成 **`message`**；阻断改写成 `hookSpecificOutput.permissionDecision="deny"` + `permissionDecisionReason`。ADR-018 的 ambient/advisory/directive 标签仍写进 `message` 文本体。
 3. **路径 token 落点**：skill 正文引用随 skill 分发资源用 `${KIMI_SKILL_DIR}`（文本替换，可靠）；hook 脚本用 `$KIMI_PLUGIN_ROOT`（子进程 env，command 里由 shell 展开或脚本 `__dirname` 自解析）——**不要**假设 `${KIMI_PLUGIN_ROOT}` 会在 command 字符串或 skill 正文里被展开。canonical 正文禁写 `${CLAUDE_*}`。
 4. **hook 只从全局 config.toml + plugin manifest 加载**——bootstrap/reinject/board-guard 等必须走 plugin manifest `hooks[]`；**不能**依赖项目 `.kimi-code/local.toml` 的 `[[hooks]]`（不生效）。武装闸的 dormant-until-armed 语义可平移（红线6），但 stdin 是 snake_case、`prompt` 是数组、注入走 `message`。
-5. **reinject（魂重注）缺口**：kimi 有 `PreCompact`/`PostCompact` 事件——**比 Cursor 强**（Cursor 只有观察型 preCompact）。`PostCompact` 是否能注入 `message` 进 compaction 后的 context 需 probe；若可，则 reinject 有原生落点（优于 Cursor 的 Track B 降级），这是 kimi adapter 的一个潜在优势项，应优先实测。
+5. **reinject（魂重注）结论**：probe 已确认 `PostCompact` hook output 被丢弃；manifest `sessionStart.skill` 会在 compaction 后原生重触发，故静态角色基座可重注，动态板列表 / 空板硬停 / stale 节点仍是 Track B 缺口。
 6. **command 投影**：无独立 commands 目录 → 落 plugin manifest `commands[]`（`<plugin>:<command>`），或 skill `/skill:<name>`；bootstrap 入口可同 Codex/Cursor 走「plugin command + UserPromptSubmit hook 识别第一行 sentinel」双通道（kimi 有 `UserPromptSubmit`，`prompt` 数组第一 block 的 text 判 sentinel）。
 7. **install.sh 落点**：非交互安装 = 复制 `plugin/dist/kimi-code` 进 `$KIMI_CODE_HOME/plugins/managed/cc-master/` + 写 `plugins/installed.json` 条目（实测可用）；无需驱动 TUI `/plugins install`。
-8. **能力缺口须建 Capability Card**：自定义 subagent（无）、Workflow（无已验证等价物）、PostToolBatch（无）、config account pool / quota 信号（无 CLI 面）——都记 `event-unavailable` / `protocol-capability-gap`。
+8. **能力缺口须建 Capability Card**：自定义 subagent（无）、Workflow（无已验证等价物）、PostToolBatch（无）、account pool / external statusline 与非阻断 Stop advisory（无）——都记 `event-unavailable` / `protocol-capability-gap`；5h/7d 只读 quota 已由 ccm dashboard collector 实现，不再列作能力缺口。
 9. **AGENTS.md 现实约束**：kimi 读项目根 `AGENTS.md` 且 >32KB 告警；cc-master 本仓 AGENTS.md 94.7KB 会触发告警（性能/成本提示，非致命）——作 origin host 时值得留意。
 
 ## 13. 对 ccm worker driver 的关键落点
@@ -299,7 +299,7 @@ kimi -p "<prompt>" --output-format stream-json  # exit 0；stdout = JSONL
 4. **可 recon 的 handle**：`session_<uuid>` 即 handle；`kimi -S <sid> -p "..."`（或 `-c`）续跑同 session，`kimi export <sid>` 拉 transcript——**满足 worker driver 的 spawn→poll(read wire.jsonl)→resume/attach 需求**。
 5. **stream-json 解析**：按 OpenAI-message JSONL（`role` 分派：`assistant`/`tool`/`meta`），**不要**套 Claude Code 的 `{type:...}` 解析器。`tool_calls[].function.arguments` 是 JSON 字符串。
 6. **model 选择**：`-m kimi-code/k3`（1M ctx，默认，effort max）/ `kimi-code/kimi-for-coding`(-highspeed)（256K）；provider 由 `managed:kimi-code` OAuth 提供，`kimi provider list` 可读。
-7. **quota admission 无 CLI 信号**：worker driver 对 kimi 的配额准入只能 `unknown`/`unsupported`，不得伪造窗口；与 Cursor account pool、Codex 5h 退役同类诚实标注。
+7. **quota admission 的来源边界**：Kimi CLI 自身无 usage 子命令；ccm 只允许使用 `kimi-usages-api` current-login collector 的 fresh 5h/7d 事实。collector unavailable / stale 时保持 `unknown`，不得从 binary/auth/model 或同品牌 TUI 推出 headroom。
 8. **候选更强 transport**：`kimi acp`（ACP over stdio）/ `kimi server`（JSON-RPC）是比 `-p` 更结构化的 worker 面，若要做 attach/journal/supervisor 级别控制，应优先 probe 这两个（本轮未深入）。
 
 ---

@@ -1,4 +1,9 @@
-import { buildManifest, capabilityIds, isCapabilitySupported } from '../capability-manifest.js';
+import {
+  buildManifest,
+  capabilityIds,
+  isCapabilitySupported,
+  negotiateCapability,
+} from '../capability-manifest.js';
 import { readVersion } from '../help.js';
 import * as io from '../io.js';
 import * as render from '../render.js';
@@ -39,5 +44,38 @@ export function list(ctx: Ctx): number {
     ...manifest.capabilities.map((c) => `  ${c.id} (${c.name} v${c.version})`),
   ];
   ctx.out(lines.join('\n'));
+  return io.EXIT.OK;
+}
+
+// ── ccm capability negotiate <family> ───────────────────────────────────────────────────────────
+// 版本协商：consumer 用 --accept 声明可接受的 capability id（可重复·可写完整 id 或 vN），engine 在
+//   双方交集里选版本最高的一项返回；无交集 → exit VALIDATION + 明确列出 consumer 接受集与 engine 声明集。
+//   只读、零写——与 `check` 互补：`check` 断言单个 id；`negotiate` 处理 consumer 对未来 vN 的前向声明。
+export function negotiate(ctx: Ctx): number {
+  const family = String(ctx.positionals[0] || '').trim();
+  const rawAccept = ctx.values.accept;
+  const accepts = Array.isArray(rawAccept)
+    ? rawAccept.map((v) => String(v))
+    : rawAccept !== undefined
+      ? [String(rawAccept)]
+      : [];
+  if (!family || accepts.length === 0) {
+    const error =
+      'capability negotiate requires a family positional and at least one --accept <capability-id>';
+    ctx.err(ctx.flags.json ? io.jsonErr({ exit: io.EXIT.VALIDATION, error }) : error);
+    return io.EXIT.VALIDATION;
+  }
+  const result = negotiateCapability(family, accepts);
+  if (!('negotiated' in result)) {
+    const advertised = result.engine_advertises.join(', ') || '(none)';
+    const requested = result.consumer_accepts.join(', ') || '(empty)';
+    const error =
+      `no compatible capability version for ${result.family} — consumer accepts: ${requested}; ` +
+      `this ccm ${readVersion()} advertises: ${advertised}. ` +
+      'Upgrade ccm or let the feature degrade gracefully.';
+    ctx.err(ctx.flags.json ? io.jsonErr({ exit: io.EXIT.VALIDATION, error }) : error);
+    return io.EXIT.VALIDATION;
+  }
+  ctx.out(ctx.flags.json ? render.jsonString(result) : `${result.capability}: negotiated`);
   return io.EXIT.OK;
 }

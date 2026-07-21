@@ -630,6 +630,165 @@ test('stop removes stale state and restart creates a new token', () => {
   assert.equal(parsed.open_url, 'http://127.0.0.1:55000/?token=token-b');
 });
 
+test('restart reuses the previous listener port when it is still free', () => {
+  const home = mkHome();
+  seedBoard(home);
+  const reusedPort = 55123;
+  let spawnCount = 0;
+  webViewer.__setWebViewerTestHooks({
+    randomToken: () => (spawnCount === 0 ? 'token-a' : 'token-b'),
+    isPortAvailable: (host, port) => host === '127.0.0.1' && port === reusedPort,
+    isPidAlive: (pid) => pid === 321 || pid === 654,
+    spawnService: ({ statePath }) => {
+      spawnCount += 1;
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      if (spawnCount > 1) {
+        assert.equal(state.port, reusedPort, 'restart seeds buildState with the prior port');
+      } else {
+        assert.equal(state.port, 0, 'fresh start still uses OS-assigned port');
+      }
+      writeFileSync(
+        statePath,
+        `${JSON.stringify(
+          {
+            ...state,
+            pid: spawnCount === 1 ? 321 : 654,
+            port: reusedPort,
+            base_url: `http://127.0.0.1:${reusedPort}`,
+          },
+          null,
+          2,
+        )}\n`,
+        'utf8',
+      );
+      return { pid: spawnCount === 1 ? 321 : 654 };
+    },
+    healthCheck: (service) => ({
+      ok: true,
+      body: {
+        schema: 'ccm/web-viewer-health/v1',
+        id: service.id,
+        pid: service.pid,
+        started_at: service.server.started_at,
+      },
+    }),
+  });
+
+  assert.equal(invoke(['web-viewer', 'start', '--json'], home).code, EXIT.OK);
+  const restarted = invoke(['web-viewer', 'restart', '--json'], home);
+  assert.equal(restarted.code, EXIT.OK, restarted.stderr);
+  const parsed = json(restarted.stdout);
+  assert.equal(parsed.service.port, reusedPort);
+  assert.equal(parsed.open_url, `http://127.0.0.1:${reusedPort}/?token=token-b`);
+  assert.equal(spawnCount, 2);
+});
+
+test('restart falls back to OS-assigned port when the previous port is busy', () => {
+  const home = mkHome();
+  seedBoard(home);
+  const busyPort = 55124;
+  const fallbackPort = 55125;
+  let spawnCount = 0;
+  webViewer.__setWebViewerTestHooks({
+    randomToken: () => (spawnCount === 0 ? 'token-a' : 'token-b'),
+    isPortAvailable: (host, port) => host === '127.0.0.1' && port === fallbackPort,
+    isPidAlive: (pid) => pid === 321 || pid === 654,
+    spawnService: ({ statePath }) => {
+      spawnCount += 1;
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      if (spawnCount === 1) {
+        assert.equal(state.port, 0);
+      } else {
+        assert.equal(state.port, 0, 'busy prior port forces ephemeral bind');
+      }
+      const boundPort = spawnCount === 1 ? busyPort : fallbackPort;
+      writeFileSync(
+        statePath,
+        `${JSON.stringify(
+          {
+            ...state,
+            pid: spawnCount === 1 ? 321 : 654,
+            port: boundPort,
+            base_url: `http://127.0.0.1:${boundPort}`,
+          },
+          null,
+          2,
+        )}\n`,
+        'utf8',
+      );
+      return { pid: spawnCount === 1 ? 321 : 654 };
+    },
+    healthCheck: (service) => ({
+      ok: true,
+      body: {
+        schema: 'ccm/web-viewer-health/v1',
+        id: service.id,
+        pid: service.pid,
+        started_at: service.server.started_at,
+      },
+    }),
+  });
+
+  assert.equal(invoke(['web-viewer', 'start', '--json'], home).code, EXIT.OK);
+  const restarted = invoke(['web-viewer', 'restart', '--json'], home);
+  assert.equal(restarted.code, EXIT.OK, restarted.stderr);
+  const parsed = json(restarted.stdout);
+  assert.equal(parsed.service.port, fallbackPort);
+  assert.equal(parsed.open_url, `http://127.0.0.1:${fallbackPort}/?token=token-b`);
+});
+
+test('restart --port pin overrides previous-port reuse', () => {
+  const home = mkHome();
+  seedBoard(home);
+  const previousPort = 55126;
+  const pinnedPort = 55127;
+  let spawnCount = 0;
+  webViewer.__setWebViewerTestHooks({
+    randomToken: () => (spawnCount === 0 ? 'token-a' : 'token-b'),
+    isPortAvailable: (host, port) =>
+      host === '127.0.0.1' && (port === previousPort || port === pinnedPort),
+    isPidAlive: (pid) => pid === 321 || pid === 654,
+    spawnService: ({ statePath }) => {
+      spawnCount += 1;
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      const boundPort = spawnCount === 1 ? 0 : pinnedPort;
+      assert.equal(state.port, boundPort);
+      const runtimePort = spawnCount === 1 ? previousPort : pinnedPort;
+      writeFileSync(
+        statePath,
+        `${JSON.stringify(
+          {
+            ...state,
+            pid: spawnCount === 1 ? 321 : 654,
+            port: runtimePort,
+            base_url: `http://127.0.0.1:${runtimePort}`,
+          },
+          null,
+          2,
+        )}\n`,
+        'utf8',
+      );
+      return { pid: spawnCount === 1 ? 321 : 654 };
+    },
+    healthCheck: (service) => ({
+      ok: true,
+      body: {
+        schema: 'ccm/web-viewer-health/v1',
+        id: service.id,
+        pid: service.pid,
+        started_at: service.server.started_at,
+      },
+    }),
+  });
+
+  assert.equal(invoke(['web-viewer', 'start', '--json'], home).code, EXIT.OK);
+  const restarted = invoke(['web-viewer', 'restart', '--port', String(pinnedPort), '--json'], home);
+  assert.equal(restarted.code, EXIT.OK, restarted.stderr);
+  const parsed = json(restarted.stdout);
+  assert.equal(parsed.service.port, pinnedPort);
+  assert.equal(parsed.open_url, `http://127.0.0.1:${pinnedPort}/?token=token-b`);
+});
+
 test('start rejects non-localhost host and boards outside the selected home', () => {
   const home = mkHome();
   const other = mkHome();

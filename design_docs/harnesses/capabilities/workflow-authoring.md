@@ -50,4 +50,4 @@ dispatch mechanism for complex fan-out.
 
 ## Probe deps
 
-None — capability gap is structural (no Workflow tool on Cursor).
+None — capability gap is structural on every unsupported host (no Workflow tool equivalent).

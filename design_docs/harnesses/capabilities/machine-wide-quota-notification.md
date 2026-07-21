@@ -43,7 +43,7 @@ fan-out。origin hook 零 provider/network/credential probe。
 | claude-code | implemented-track-b | SessionStart cached summary + Stop coordination inbox | 既有 PostToolBatch pacing 是 provider-local 早期采样，不冒充 machine-wide delta producer |
 | codex | implemented-track-b | SessionStart cached summary + Stop coordination inbox | 无 fake batch event；所有 agent-visible landing 都执行 7d-only 校验 |
 | cursor | implemented-track-b | verified postToolUse cached summary + Stop coordination inbox | SessionStart dynamic context gap 由 postToolUse + durable inbox 补偿；Cursor IDE/Agent target row 不互相推断 |
-| kimi-code | supported | `kimi-usages-api` current-login quota face → `kimi-cli` five_hour + seven_day targets | machine-wide target 已接入；Kimi origin 的通知投递通道仍由 notification-subscription 卡单独跟踪 |
+| kimi-code | partial | `kimi-usages-api` current-login quota face → `kimi-cli` five_hour + seven_day targets | producer target / fan-out 已接入；Kimi origin 无 cached-summary / inbox 非阻断投递通道 |
 
 ## Declared divergence
 
@@ -61,6 +61,13 @@ fan-out。origin hook 零 provider/network/credential probe。
   reason: Cursor sessionStart.additional_context 是已确认 drop bug。
   compensating_mechanism: 使用 verified postToolUse.additional_context 投递 cached summary；decision edge 使用 durable inbox。
   tracked_by: plugin/src/hooks/orchestrator-context/CONTRACT.md
+
+- rule: machine-wide-quota-kimi-origin-delivery
+  kind: protocol-capability-gap
+  affected_hosts: [kimi-code]
+  reason: Kimi target collector/fan-out 已实现，但 SessionStart/PostToolUse output 被丢弃，且无非阻断 Stop inbox channel。
+  compensating_mechanism: 通过显式 `ccm usage show|advise` / machine-wide cached read 消费；bootstrap 只承载初始上下文，不冒充 mid-flight notification。
+  tracked_by: design_docs/harnesses/capabilities/cross-harness-notification-subscription.md
 
 ```
 
@@ -87,4 +94,5 @@ secret/provenance 拒绝、Cursor 双 surface 保留及 5h/switch 静默。PR #1
 
 仍存在的机制差异只有上表与 Declared divergence 中列明的触发时机/envelope：Codex 无 verified mid-turn batch，
 Cursor 的动态 summary 走 postToolUse 而非失效的 SessionStart.additional_context；二者都由 durable inbox 在 Stop
-补偿，不是能力仍未实现。
+补偿。Kimi 的 target collector/fan-out 已实现，但 origin landing 仍是明确的 partial gap，只能显式读取，不能把
+producer 支持误写成 agent-visible notification 已全实现。

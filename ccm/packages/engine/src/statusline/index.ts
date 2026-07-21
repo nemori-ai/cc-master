@@ -10,4 +10,9 @@ export {
   settingsPath,
   uninstallStatusline,
 } from './install.js';
+export {
+  type ParsedRateWindow,
+  pickFableSevenDayFromRateLimits,
+  pickRateLimitWindow,
+} from './rate-limits-parse.js';
 export { type RenderOptions, renderStatusline } from './render.js';

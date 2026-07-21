@@ -1,1 +1,1 @@
-账号池 namespace 不对 kimi-code 可用：`ccm account add` / `refresh` / `list` / `switch` 统一走 `NotImplemented`；kimi-code 也无 CLI 配额信号，`ccm usage` 恒 `available:false`。
+账号池 namespace 不对 kimi-code 可用：`ccm account add` / `refresh` / `list` / `switch` 统一走 `NotImplemented`。配额读取是另一条只读能力：`ccm usage show/advise` 可读取当前登录态的独立滚动 5h + 7d 窗口；过期 OAuth 会先尝试带锁自动刷新，失败才返回 harness-native recovery hint。

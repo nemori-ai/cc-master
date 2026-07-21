@@ -15,13 +15,13 @@ runtime_contracts:
     host: kimi-code
     skill: pacing-and-estimation
 unsupported:
-  - capability: current_quota_signal
-    reason: "kimi exposes no CLI quota/usage signal; ccm usage show/advise returns available:false; no window pacing verdicts."
   - capability: account_switch_pacing
     reason: "kimi automatic account switching is unsupported (ccm account binds Claude OAuth); no switch verdict."
   - capability: statusline_sidecar
-    reason: "Claude Code statusline sidecar does not exist in the kimi adapter; there is no kimi usage source."
+    reason: "Claude Code statusline sidecar does not exist in the kimi adapter; Kimi usage comes from an independent dashboard API collector."
 supported:
+  - capability: current_quota_signal
+    reason: "ccm usage show/advise reads Kimi current-login rolling 5h/7d windows through kimi-usages-api; this does not create a Stop-time hook channel."
   - capability: estimation_method
     reason: "Cost-to-complete estimation method is host-neutral when it consumes normalized board data."
   - capability: model_tier_provider
@@ -30,4 +30,4 @@ slot_replacements:
   "{{PACING_DESCRIPTION}}": adapters/kimi-code/overlays/description.md
   "{{CROSS_HARNESS_ACTIVE_QUERY_POINTER}}": adapters/kimi-code/overlays/cross-harness-active-query-pointer.md
 notes:
-  - kimi projects the closed read-only capability block plus first-party-only model facts; kimi has no CLI quota window (usage available:false), so no window pacing verdicts.
+  - kimi projects the closed read-only capability block plus first-party-only model facts; explicit usage reads have 5h/7d verdicts, while Stop-time pacing delivery and account switching remain unsupported.

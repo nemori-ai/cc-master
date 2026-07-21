@@ -1,6 +1,6 @@
 {
   "schema": "ccm/provider-model-facts-registry/v1",
-  "revision": "2026-07-16.2",
+  "revision": "2026-07-20.1",
   "providers": {
     "claude-code": {
       "schema": "ccm/provider-model-facts/v1",
@@ -175,7 +175,7 @@
     "cursor": {
       "schema": "ccm/provider-model-facts/v1",
       "provider": "cursor",
-      "revision": "2026-07-15.1",
+      "revision": "2026-07-20.1",
       "supported_surfaces": ["cursor-agent-cli", "cursor-ide"],
       "supported_client_versions": ["current"],
       "source": [
@@ -200,6 +200,7 @@
           "model_id": "cursor-auto",
           "display_name": "Cursor Auto",
           "tier": "adaptive",
+          "quota_pool": "first_party",
           "relative_output_cost": null,
           "availability": {
             "state": "published",
@@ -215,6 +216,7 @@
           "model_id": "cursor-composer-2-5",
           "display_name": "Cursor Composer 2.5",
           "tier": "balanced",
+          "quota_pool": "first_party",
           "relative_output_cost": null,
           "availability": {
             "state": "published",
@@ -230,6 +232,7 @@
           "model_id": "cursor-grok-4-5",
           "display_name": "Cursor Grok 4.5",
           "tier": "frontier",
+          "quota_pool": "usage_based",
           "relative_output_cost": null,
           "availability": {
             "state": "published",

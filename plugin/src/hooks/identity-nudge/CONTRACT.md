@@ -133,17 +133,6 @@ hook-owned sidecar (not the board). Only `goal_contract.deadline` (👁, read-on
     periodic intervals and verify-board `loop_limit`.
   tracked_by: "_hosts/cursor/ENVELOPE.md; plugin v0.17.2"
 
-- rule: identity-nudge-tag-protocol-missing-on-codex
-  kind: host-convention-divergence
-  affected_hosts: [codex]
-  reason: >
-    Prior to HOOKPAR-DEC, Codex identity-nudge-core.js emitted the two reminder texts unwrapped
-    (no ADR-018 advisory tag), even though claude-code identity-nudge.js has always wrapped them.
-  compensating_mechanism: >
-    Fixed in this round — codex identity-nudge-core.js now wraps both reminders in a local
-    `advisory(source, 'weak', body)` helper matching claude-code's wrapper output shape byte-for-byte.
-  tracked_by: "adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR)"
-
 - rule: identity-nudge-kimi-no-advisory-channel
   kind: protocol-capability-gap
   affected_hosts: [kimi-code]

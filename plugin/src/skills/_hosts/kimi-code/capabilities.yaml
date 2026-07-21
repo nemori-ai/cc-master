@@ -1,5 +1,5 @@
 host: kimi-code
-updated: 2026-07-16
+updated: 2026-07-21
 status: runtime_adapter_with_verified_dispatch_primitives
 capabilities:
   project_skills:
@@ -119,12 +119,6 @@ capabilities:
       verify-board:
         event: Stop
         mode: followup_message
-      usage-pacing:
-        event: Stop
-        mode: message_when_signal_present
-      identity-nudge:
-        event: Stop
-        mode: message
       board-guard:
         event: PreToolUse
         mode: permission_deny
@@ -134,6 +128,14 @@ capabilities:
         mode: message
         matcher: "Write|Edit|MultiEdit"
     unsupported:
+      usage-pacing:
+        reason: "Kimi quota reads are implemented, but no non-blocking Stop advisory channel is registered."
+      coordination-inbox:
+        reason: "Bootstrap subscription registration works; inbox delivery has no non-blocking Kimi event channel."
+      identity-nudge:
+        reason: "Kimi has no non-blocking Stop advisory channel for periodic nudges."
+      orchestrator-context:
+        reason: "SessionStart/PostToolUse hook output is discarded; static sessionStart.skill is only the role substrate."
       posttool-batch:
         reason: "No PostToolBatch-equivalent batch boundary event on kimi."
     output_envelopes:
@@ -144,18 +146,20 @@ capabilities:
         verified_events: [PreToolUse]
         note: "hookSpecificOutput.permissionDecision=deny + permissionDecisionReason."
   quota_signal:
-    source: "none — kimi exposes no CLI quota/usage output"
-    status: unsupported
-    window: null
-    supported: []
+    source: "kimi-usages-api current-login collector"
+    status: implemented_read_only
+    window: rolling
+    supported:
+      - "independent rolling 5h window"
+      - "independent rolling 7d window"
+      - "locked automatic refresh of expired stored OAuth when possible"
     unsupported:
-      - "5h rolling window (window_5h_pct is null on kimi)"
-      - "7d rolling window (window_7d_pct is null on kimi)"
       - "billing_period window (kimi has no CLI usage command)"
-      - "stop_5h / stop_7d / stop_billing_period / switch verdicts as kimi pacing targets"
+      - "non-blocking Stop-time pacing delivery"
+      - "account-pool switching"
     notes:
-      - "kimi has no `kimi usage` command and no CLI-side quota structure; ccm usage show/advise returns available:false / signal:null."
-      - "Do not pace kimi against any window. Do not invent percentages; hooks stay silent when there is no signal."
+      - "Kimi has no `kimi usage` command; ccm reads the provider dashboard API rather than inventing a CLI surface."
+      - "Explicit ccm usage and machine-wide reads may pace against proven 5h/7d facts; mid-flight hook delivery remains unsupported."
   account_switch:
     backend: null
     status: unsupported

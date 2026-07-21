@@ -1,15 +1,15 @@
 # 模型档位事实 —— 可用性、相对成本与能力边界
 
-> **何时读：** 需要从任意 origin 确认全机三个 provider 有哪些模型候选、角色证据、相对成本、任务亲和度、provenance 或不确定性时读取；把事实交给 `master-orchestrator-guide` 的 `references/model-allocation.md` 作具体分档、主线固定与容量动作。
+> **何时读：** 需要从任意 origin 确认全机四个 provider 有哪些模型候选、角色证据、相对成本、任务亲和度、provenance 或不确定性时读取；把事实交给 `master-orchestrator-guide` 的 `references/model-allocation.md` 作具体分档、主线固定与容量动作。
 
 不要读“当前 host 的内嵌型号表”。统一查询当前安装的 ccm registry：
 
 ```bash
 ccm model-policy show --task <task-taxonomy> --json
-ccm provider facts <claude-code|codex|cursor> --json
+ccm provider facts <claude-code|codex|cursor|kimi-code> --json
 ```
 
-三个 origin 得到相同的 selected-target 事实视图；origin-specific slot 只保留 usage 信号与发车机制，不再改变目标模型表。读输出时始终分三层：
+四个 origin 得到相同的 selected-target 事实视图；origin-specific slot 只保留 usage 信号与发车机制，不再改变目标模型表。读输出时始终分三层：
 
 1. `hard_facts`：厂商官方 model / surface / availability / price / benchmark snapshot。它能产生 candidate，不能证明当前账号 entitlement、exact selector 或 role grade。
 2. `project_role_evidence`：本项目对 `O / T1 / T2 / T3` 的候选、认证状态和 blockers。`candidate` 不等于 `certified`；认证过期或 target version 漂移后按 unknown 处理。

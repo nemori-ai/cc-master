@@ -143,7 +143,7 @@ function deriveState(
   const signal = {
     five_hour: name === 'five_hour' ? windowSignal : null,
     seven_day: name === 'seven_day' ? windowSignal : null,
-    billing_period: name === 'billing_period' ? windowSignal : null,
+    billing_period: name.startsWith('billing_period') ? windowSignal : null,
   };
   const checkedAtMs = Date.parse(input.checked_at);
   const advice = pacingAdvice(signal, {

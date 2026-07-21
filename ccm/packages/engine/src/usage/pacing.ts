@@ -38,11 +38,27 @@ export interface WindowSignal {
   used_percentage?: number | null; // 该窗口已用 %（账户权威·null/缺 → 不可判）
   resets_at?: number | null; // reset 的 epoch 秒（缺 → 不判临近 reset / nearest）
 }
+export type UsagePoolKind = 'first_party' | 'usage_based';
+export interface UsagePoolSignal extends WindowSignal {
+  /** Provider-stable named pool id (for example cursor-api or a Codex rate-limit id). */
+  id: string;
+  /** Plain-language display label; never used as authority identity. */
+  label: string;
+  /** Whether the pool is included first-party capacity or separately billed usage. */
+  kind: UsagePoolKind;
+}
 export interface UsageSignal {
   five_hour?: WindowSignal | null;
   seven_day?: WindowSignal | null;
+  /** Claude Fable 5 independent 7d rolling window (statusline model_scoped; separate from seven_day). */
+  fable_seven_day?: WindowSignal | null;
   /** Cursor (~30d) subscription billing cycle — used when 5h/7d are absent. */
   billing_period?: WindowSignal | null;
+  /**
+   * Optional provider-named independent pools. Legacy windows above remain the pacing compatibility
+   * surface; consumers that do not understand pools can continue reading them unchanged.
+   */
+  pools?: UsagePoolSignal[] | null;
   captured_at?: number | null; // sidecar 捕获时刻（epoch 秒·保留字段·当前无欠用新鲜度闸）
 }
 
