@@ -35,8 +35,10 @@
 | 2026-06-22 | Boris Cherny 参加 @Scale fireside chat | [活动原视频页](https://atscaleconference.com/videos/fireside-chat-with-boris-cherny-head-of-claude-code/)可确认活动；本轮未逐字复听，不能提供无 timestamp 的精确引语 |
 | 2026-06-30 | Claude 官方发布 “Getting started with loops” | [官方教程](https://claude.com/blog/getting-started-with-loops)是 Anthropic/Claude 采用 loop engineering 命名的直接证据 |
 | 2026-07-18 起 | 多条 X 帖子/文章推动 “Loop Engineering Is Dead” | [Peter Steinberger](https://x.com/steipete/status/2078277297791189132)、[Hamel Husain](https://x.com/HamelHusain/article/2078346425621237935)、[Santiago Valdarrama](https://x.com/svpino/status/2078516761318584774)；未登录正文受限，只能记 URL/metadata，不转述细节 |
+| 2026-07-20 | AI Builder Club 发布社区 guide | [Graph Engineering Guide (2026)](https://www.aibuilderclub.com/blog/graph-engineering-guide-2026)以 nodes/edges/shared state 解释该标签，同时明确多数任务不需要 graph、既有框架早已实现相关机制，并自述不是一手 benchmark |
+| 2026-07-20 | Codez 发布 Claude Dynamic Workflows 社区课程 | [原始 X Article](https://x.com/0xCodez/status/2079165300625330317)给出 node/edge contracts、fan-out/fan-in、conditional routing、verifier、failure isolation、bounded convergence、model tier 与 self-routing 路线；原文非 Anthropic 官方材料，本轮未核实作者是否为 Anthropic 员工 |
 
-这条时间线反驳两种过度简化：一是把术语发明归于 2026-07 的某一条同期帖子；二是把 Anthropic 的 loop 实践倒写成其已采用 graph 命名。
+这条时间线反驳两种过度简化：一是把术语发明归于 2026-07 的某一条同期帖子——2026-07-20 两篇文章是集中讨论期的综合/教学材料，不是首次用词证据；二是把 Anthropic 的 loop 或 Dynamic Workflows 实践倒写成其已采用 graph 命名。
 
 ## 社区在用同一个词谈四类对象
 
@@ -88,6 +90,19 @@ Anthropic 在 [Building effective agents](https://www.anthropic.com/engineering/
 ## 第三方与本报告推断
 
 第三方评论可用于观察话语扩散或发现分类线索，例如 [Turing Post](https://www.turingpost.com/p/is-graph-engineering-real-why-everyone-is-talking-about-it)区分 control、knowledge、trace、improvement graph，[SmartScope](https://smartscope.blog/en/blog/graph-engineering-loop-engineering-logic-review/)质疑 category error 与 benchmark 缺失，[TechCrunch](https://techcrunch.com/2026/06/22/the-ai-world-is-getting-loopy/)报道 loop 话语。它们不能承担 Anthropic 立场或 graph 性能事实。
+
+### 两篇 2026-07-20 社区材料的可吸收内容
+
+| 来源与身份 | 有价值且可验证的社区主张 | 本报告限制/纠偏 |
+| --- | --- | --- |
+| [AI Builder Club guide](https://www.aibuilderclub.com/blog/graph-engineering-guide-2026)；社区教育文章 | Graph 可用 nodes、routing edges 与 shared state 描述；只有工作确实需要 specialty handoff、fan-out/join、异构工具/模型、显式路由、failure isolation 或独立 verifier 时，复杂度才可能值得 | 该文明确承认多数任务应保留单 loop、机制早于标签、文章不是 benchmark。Shared state 仍需 writer ownership、version、schema 与 provenance，不能理解成所有节点任意读写同一对象 |
+| [Codez 的原始 X Article](https://x.com/0xCodez/status/2079165300625330317)；非 Anthropic 官方材料，本轮未核实作者是否为 Anthropic 员工 | 强调 bounded node I/O contract、fan-out→barrier/fan-in、diamond、conditional route、verifier gate、node failure isolation、bounded convergence、按节点分配 model tier，以及 topology 对成本/延迟的影响 | 这些是社区文章中的设计模式，不是官方 API 合同或性能 benchmark。“Edge 只是 data dependency”过窄，本报告继续采用 data/control/qualification/communication/evidence/resource/HITL 等 typed edges；self-routing 只可作为待 validation、revision 与 authority gate 的 proposal |
+
+Codez 把“coordination costs zero model tokens”解释为 orchestration code 不占用主 conversation 的额外推理轮次；可安全吸收的窄表述只是**协调发生在 conversation 外**。Claude 官方 [Dynamic Workflows](https://claude.com/blog/introducing-dynamic-workflows-in-claude-code)确实这样描述 plan tracking，同时明确 dynamic workflows 会消耗显著高于普通 Claude Code session 的总 usage。因此不能写成整个 graph 或其 subagents“零 token”。
+
+当前官方 [workflow approval 文档](https://code.claude.com/docs/en/workflows#approve-the-plan-before-it-runs)进一步限定：是否显示启动提示取决于 permission mode；Auto mode 只在首次 launch 提示且 ultracode 可跳过，bypass permissions、`claude -p` 与 Agent SDK 可完全不显示启动提示。交互式确认只是当前 surface/permission 行为，不能升级为所有 workflow 都有的通用 HITL authority gate。当前 [resume 合同](https://code.claude.com/docs/en/workflows#resume-after-a-pause)也只保证同一 Claude Code session 内复用已完成结果；退出 Claude Code 后，新 session 会从头运行，不能据此宣称跨 session durable recovery。
+
+同理，当前官方 [Behavior and limits](https://code.claude.com/docs/en/workflows#behavior-and-limits)写明最多 16 个 concurrent agents，CPU 受限机器会更少；这是当前、易随版本漂移的产品合同。它不支持 Codez 所说“并发约等于 CPU core count”的精确映射，官方文档也未在此证明 `parallel()` 的 throw→`null` 语义。本专栏只提取 fan-out、barrier、failure containment 等模式；具体 API 行为以实现当时的官方 contract 与实测为准。工程化后的完整判定见[社区 Dynamic Workflows 案例](03_engineering_taxonomy.md#社区-claude-dynamic-workflows-案例原则可迁移api-细节须另证)。
 
 **本报告推断**：Anthropic 的公开系统可被工程上分析为 graph-like，因为它们包含显式角色、路由、并行、持久化计划/状态、trace、grader 与动态编排；但这是分析分类，不是其自我命名，也不把 Memory persistence 偷换成官方未声明的恢复语义。
 
