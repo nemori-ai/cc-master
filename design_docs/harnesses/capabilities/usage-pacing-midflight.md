@@ -4,7 +4,7 @@
 
 During long orchestration runs, surface **provider-scoped quota / pacing advisories** so the
 orchestrator can pace against the window contract that actually belongs to that provider: Claude
-5h/7d, Codex 7d hard ceiling plus rolling-24h advisory, or Cursor billing period. Mid-flight sampling
+5h/7d, Codex 7d hard ceiling plus rolling-24h advisory, Cursor billing period, or Kimi 5h/7d. Mid-flight sampling
 at tool-batch boundaries reduces noise; stop-side pacing catches end-of-turn decisions; autonomous
 account switch exists only on an explicitly supported and policy-gated host (ADR-016).
 
@@ -20,9 +20,9 @@ account switch exists only on an explicitly supported and policy-gated host (ADR
 | host | status | mechanism | notes |
 | --- | --- | --- | --- |
 | claude-code | implemented | PostToolBatch sample + Stop; statusline sidecar; LBHOOK autoswitch | Full |
-| codex | implemented-stop-advisory; runtime migration pending | consumer guidance: 7d-only hard ceiling + rolling-24h advisory, never 5h pacing; current hook/engine normalization remains separately tracked; account switch NI | usage-pacing CONTRACT + Codex provider contract v1 |
+| codex | implemented-stop-advisory | current-login app-server signal; 7d-only hard ceiling + rolling-24h advisory, never 5h pacing; account switch NI | usage-pacing CONTRACT + Codex provider contract v1 |
 | cursor | implemented-stop-advisory | **Stop-only**; `ccm usage advise` via `billing_period` (never 5h/7d/switch); signal = Cursor dashboard API | Track B + `cursor-usage.ts` |
-| kimi-code | unsupported | No quota signal + no non-blocking Stop advisory channel (K4 probe) | Stop-only pacing has no kimi delivery; UserPromptSubmit-time advisory is candidate follow-up |
+| kimi-code | unsupported | Kimi 5h/7d quota signal exists, but there is no non-blocking Stop advisory channel (K4 probe) | Explicit `ccm usage show/advise` and machine-wide reads work; hook delivery remains unsupported; UserPromptSubmit-time advisory is candidate follow-up |
 
 ## Declared divergence
 
@@ -53,12 +53,12 @@ account switch exists only on an explicitly supported and policy-gated host (ADR
     hold/throttle/stop_billing_period only (never switch). Fail-open when token/API unavailable.
   tracked_by: ccm/apps/cli/src/cursor-usage.ts + design_docs/harnesses/capabilities/ccm-quota-account.md
 
-- rule: usage-pacing-kimi-no-signal-no-channel
+- rule: usage-pacing-kimi-no-channel
   kind: event-unavailable
   affected_hosts: [kimi-code]
-  reason: No quota signal + no non-blocking Stop advisory channel on kimi (K4 probe).
-  compensating_mechanism: none on the data side; UserPromptSubmit-time advisory is the candidate follow-up channel.
-  tracked_by: design_docs/2026-07-16-kimi-code-adapter-design.md §3,§7
+  reason: Kimi has a current-login 5h/7d quota signal, but no non-blocking Stop advisory channel (K4 probe).
+  compensating_mechanism: explicit usage/machine-wide reads remain available; UserPromptSubmit-time advisory is the candidate hook delivery channel.
+  tracked_by: plugin/src/hooks/usage-pacing/CONTRACT.md, ccm/apps/cli/src/kimi-usage.ts
 ```
 
 ## Linked surfaces

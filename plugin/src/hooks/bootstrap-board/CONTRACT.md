@@ -110,7 +110,7 @@ must not restate their command or failure schema.
   `ccm` binary is present (`command -v ccm`, or `$CCM_BIN` if set). If absent, the hook **refuses to
   arm** (no board is created/re-armed) and relays a user-facing reminder to install `ccm` (ADR-021).
 - `rule-bootstrap-subscription-register`: after fresh/resume ARM has committed the exact board and
-  host session owner, all three hosts make one best-effort registration using the canonical JSON
+  host session owner, all four hosts make one best-effort registration using the canonical JSON
   block above. `--board` is the absolute lexical board path already selected by ARM (symlinked homes
   remain opaque), `--origin` is the normalized host, and `--session-id` is the exact native session
   identity normalized by that host launcher. The adapter never synthesizes an epoch.
@@ -139,24 +139,24 @@ from AGENTS.md §12's `runHook`/`isArmed` grep door). Its own "gate" is the trig
 
 ```yaml
 - rule: rule-bootstrap-fresh-arm
-  required_hosts: [claude-code, cursor]
+  required_hosts: [claude-code, cursor, kimi-code]
 - rule: rule-bootstrap-ccm-hard-precheck
-  required_hosts: [claude-code, codex, cursor]
+  required_hosts: [claude-code, codex, cursor, kimi-code]
 - rule: rule-bootstrap-structured-path-capability
-  required_hosts: [claude-code, codex, cursor]
+  required_hosts: [claude-code, codex, cursor, kimi-code]
 - rule: rule-bootstrap-raw-request-is-evidence
-  required_hosts: [claude-code, codex, cursor]
+  required_hosts: [claude-code, codex, cursor, kimi-code]
 - rule: rule-bootstrap-ddl-flag
-  required_hosts: [claude-code, codex, cursor]
+  required_hosts: [claude-code, codex, cursor, kimi-code]
 - rule: rule-bootstrap-subscription-register
-  required_hosts: [claude-code, codex, cursor]
+  required_hosts: [claude-code, codex, cursor, kimi-code]
 - rule: rule-bootstrap-subscription-registration-response
-  required_hosts: [claude-code, codex, cursor]
+  required_hosts: [claude-code, codex, cursor, kimi-code]
 - rule: rule-bootstrap-subscription-registration-failure
-  required_hosts: [claude-code, codex, cursor]
+  required_hosts: [claude-code, codex, cursor, kimi-code]
 ```
 
-The XH C3 rules above are current three-host implementation anchors. The Capability Card owns the
+The XH C3 rules above are current four-host implementation anchors. The Capability Card owns the
 cross-surface status; this CONTRACT owns these bootstrap-local rules, and the executable matrix
 proves their host-native projections without broadening registration beyond the cached-only slice.
 

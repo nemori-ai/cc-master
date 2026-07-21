@@ -5,7 +5,8 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const HOSTS = ['claude-code', 'codex', 'cursor'];
+const HOSTS = ['claude-code', 'codex', 'cursor', 'kimi-code'];
+const HISTORICAL_BASELINE_HOSTS = ['claude-code', 'codex', 'cursor'];
 const MASTER_QUOTA_SLOTS = [
   'PACING_COST_RESPONSIBILITY',
   'PACING_BUDGET_STEWARDSHIP',
@@ -191,31 +192,42 @@ test('using-ccm documents the model-policy read/advice commands and board role/f
   assert.match(board, /community[\s\S]*registry revision[\s\S]*evidence refs/u);
 });
 
-test('all three rendered origins receive the same target model allocation and fact-consumption references', () => {
+test('all four rendered origins receive the same target model allocation and fact-consumption references', () => {
   const paths = [
     'skills/master-orchestrator-guide/references/model-allocation.md',
     'skills/pacing-and-estimation/references/model-tiers.md',
   ];
   for (const path of paths) {
     const rendered = HOSTS.map((host) => read(`plugin/dist/${host}/${path}`));
-    assert.equal(rendered[1], rendered[0], `${path}: codex drift`);
-    assert.equal(rendered[2], rendered[0], `${path}: cursor drift`);
+    for (let index = 1; index < HOSTS.length; index += 1) {
+      assert.equal(rendered[index], rendered[0], `${path}: ${HOSTS[index]} drift`);
+    }
   }
 });
 
-test('three-origin descriptions route one shared model policy while keeping mechanics origin-local', () => {
+test('four-origin descriptions route one shared model policy while keeping mechanics origin-local', () => {
+  const pacingLocalBoundary = {
+    'claude-code': /信号仍须绑定精确 surface/u,
+    codex: /Codex 只把 7d 当 hard pacing 窗口[\s\S]*自动换号永久禁止/u,
+    cursor: /Cursor IDE 与 Agent 必须分别绑定[\s\S]*自动换号永久禁止/u,
+    'kimi-code': /kimi-code 的当前登录态 5h\/7d[\s\S]*无 non-blocking Stop pacing hook/u,
+  };
   for (const host of HOSTS) {
     const master = read(`plugin/dist/${host}/skills/master-orchestrator-guide/SKILL.md`);
-    const pacing = read(`plugin/dist/${host}/skills/pacing-and-estimation/SKILL.md`);
-    const using = read(`plugin/dist/${host}/skills/using-ccm/SKILL.md`);
+    // Adapter descriptions are source truth. Dist/runtime hashes are guarded independently by the
+    // attestation projection gate and may intentionally await the endpoint-wide regeneration step.
+    const pacing = read(
+      `plugin/src/skills/pacing-and-estimation/adapters/${host}/overlays/description.md`,
+    );
+    const using = read(`plugin/src/skills/using-ccm/adapters/${host}/overlays/description.md`);
     for (const body of [master, pacing, using]) {
       assert.match(body, /O\/T1\/T2\/T3/u, `${host}: shared role grades`);
     }
     assert.match(pacing, /model-policy/u, `${host}: pacing model-policy trigger`);
-    assert.match(pacing, /(?:跨 provider 共享|三路统一)/u, `${host}: pacing global view`);
-    assert.match(pacing, /usage[\s\S]*(?:origin|target)[\s\S]*(?:机制|证明)/u, `${host}: pacing local mechanics`);
+    assert.match(pacing, /(?:跨 provider 共享|四 provider 统一)/u, `${host}: pacing global view`);
+    assert.match(pacing, pacingLocalBoundary[host], `${host}: pacing local mechanics`);
     assert.match(using, /model-policy show\|advise/u, `${host}: ccm model-policy trigger`);
-    assert.match(using, /(?:跨 provider 共享|三路统一)/u, `${host}: ccm global view`);
+    assert.match(using, /(?:跨 provider 共享|四 provider 统一)/u, `${host}: ccm global view`);
     assert.match(using, /(?:dispatch|usage)[\s\S]*(?:origin|target)[\s\S]*(?:机制|执行)/u, `${host}: ccm local mechanics`);
   }
 });
@@ -224,7 +236,9 @@ test('the registered pressure baseline preserves task to role to candidate to fa
   const baseline = read(
     'design_docs/eval/2026-07-16-unified-model-routing-pressure-baseline.md',
   );
-  for (const origin of HOSTS) assert.match(baseline, new RegExp(`\\b${origin}\\b`, 'u'));
+  for (const origin of HISTORICAL_BASELINE_HOSTS) {
+    assert.match(baseline, new RegExp(`\\b${origin}\\b`, 'u'));
+  }
   assert.match(baseline, /architecture-design[\s\S]*required role_grade=O/u);
   assert.match(baseline, /candidate[\s\S]*certified/u);
   for (const failure of [

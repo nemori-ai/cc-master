@@ -17,24 +17,26 @@
 
 完整 flags 与 JSON schema 查 `using-ccm`；不要在这里复制 provider CLI 参数。
 
-## `available:false` 且带 `refresh_hint`：短命 token 可手动恢复
+## `available:false` 且带 `refresh_hint`：短命 token 的恢复边界
 
 `usage advise` / `usage show` 返回 `available:false` 且 `refresh_hint.recoverable:true` 时，不是配额真耗尽，
-而是该 harness 的短命 token 过期、usage 信号暂时读不到（这类凭证由 harness 自己在活跃 session 刷新，ccm 全程
-只读）。别把它当 `stop_*` 处理——照 `refresh_hint` 恢复：运行 `refresh_hint.command` 让该 harness 自行刷新
+而是该 harness 的短命 token 过期、usage 信号暂时读不到。Kimi 是明确例外：collector 默认可在相邻锁内重读
+并刷新 Kimi 自己存储的 OAuth，再原子发布旋转后的 token pair；只有自动刷新失败后才返回 harness-native hint。
+其余 provider 仍是只读 / 提示式恢复。别把它当 `stop_*` 处理——照 `refresh_hint` 恢复：运行 `refresh_hint.command` 让该 harness 自行刷新
 token（完整人读步骤在 `refresh_hint.remedy`），再重跑 `refresh_hint.recheck` 确认信号回来。`recoverable:false`
 （网络 / 401 / API 变更）时 `command` / `remedy` 为 `null`，不是你能就地修的，按普通 unknown 处理、不推断为
-healthy。**ccm 绝不替你刷新或写凭证**——它只出可执行提示，恢复动作由你或用户执行。
+healthy。无论哪条路径，ccm 都不输出 token；Kimi 以外不替 provider 刷新或写凭证。
 
 ## 四类 harness 的窗口与独立池合同
 
 | target | 承重窗口 | 信号语义 |
 |---|---|---|
 | Claude Code `claude-cli` | `five_hour` + `seven_day` | 两个窗口各自绑定 statusline sidecar 的当前登录态；账号 registry snapshot 只是历史弱信号 |
+| Claude Code `claude-fable-*-cli` | `seven_day` | Fable 的 7d 是独立 target / bucket；不可与 `claude-cli` 的通用 7d 相加或互补 |
 | Codex `codex-cli` | **仅 `seven_day`** | app-server 的 7d 是唯一 hard pacing 窗口；任何 5h 字段只保留为 ignored provenance，不得触发 throttle / switch / stop / reset / wakeup |
 | Cursor `cursor-ide-plugin` | `billing_period` + `billing_period_usage_based` | IDE 当前登录态内，first-party（total / Auto）与 usage-based（API / spend limit）是两个独立、不互补的池 |
 | Cursor `cursor-agent-cli` | `billing_period` + `billing_period_usage_based` | Agent CLI 当前登录态内，同样分别保留 first-party 与 usage-based 两池；只适用于 Agent surface |
-| Kimi Code `kimi-cli` | `five_hour` + `seven_day` | `kimi-usages-api` 只读当前登录态的两个独立滚动窗口 |
+| Kimi Code `kimi-cli` | `five_hour` + `seven_day` | `kimi-usages-api` 读取当前登录态的两个独立滚动窗口；过期 stored OAuth 可先走带锁自动刷新 |
 
 Cursor 两条 surface 即使可能观察到同一订阅，也必须分别保留 target / source / freshness；一条可用不证明另一条
 可用。同一 surface 内 first-party 与 usage-based 也不是可相加或可互补的容量：machine-wide target 分开投影，

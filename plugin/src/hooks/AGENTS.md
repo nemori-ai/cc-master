@@ -1,7 +1,7 @@
 ---
 path: plugin/src/hooks/AGENTS.md
-version: v0.1
-last-edited: 2026-07-03
+version: v0.2
+last-edited: 2026-07-21
 content-summary: |
   cc-master PHIP hooks source tree 入口。hook contract 与 host-native implementation 分离，dist 由 sync 生成。
 ---
@@ -36,4 +36,4 @@ hooks/
 - `_shared/` 描述 shared hook core 与 host launcher 之间的标准 env / payload / result contract。
 - `_hosts/<host>/` 描述 host-wide registration / lifecycle / launcher 基座。
 - `<hook>/implementations/<host>/` 保存当前 host-native script；长期应向 thin launcher + shared core 收敛。
-- `plugin/dist/claude-code/hooks/hooks.json` 与 `hooks/scripts/*` 只由 sync 生成。
+- `plugin/dist/<host>/hooks/`（Kimi 另把注册内联进根 manifest）只由 sync 生成。

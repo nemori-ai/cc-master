@@ -150,10 +150,11 @@ test('capability and gap surfaces make raw wrapper current only with its runtime
   assert.match(card, /claude-code \| current/u);
   assert.match(card, /codex \| current/u);
   assert.match(card, /cursor \| current/u);
+  assert.match(card, /kimi-code \| current/u);
   assert.match(card, /D.*only.*exact command grammar/isu);
   assert.match(card, /process terminal.*parent acceptance/isu);
   assert.match(card, /current.*same runtime PR/isu);
-  assert.match(card, /hermetic raw-wrapper contract.*current.*all three harness/isu);
+  assert.match(card, /hermetic raw-wrapper contract.*current.*all four harness/isu);
   assert.match(card, /first-party live probes passed.*Codex.*Claude Code/isu);
   assert.match(card, /Cursor.*resolver.*binary.*real help.*launch.*technically callable/isu);
   assert.match(card, /launcher exited 0.*same-PGID.*helper.*LSP.*remained alive/isu);

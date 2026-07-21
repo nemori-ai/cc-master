@@ -172,30 +172,17 @@ goes through `ccm account switch`, a process-boundary call, not a board write).
     `stop_hook_active` re-entry are silent.
   tracked_by: "_hosts/cursor/ENVELOPE.md; plugin v0.17.2"
 
-- rule: usage-pacing-tag-protocol-missing-on-codex
-  kind: host-convention-divergence
-  affected_hosts: [codex]
-  reason: >
-    Prior to HOOKPAR-DEC, Codex usage-pacing-core.js emitted a bare `{kind:'system', message}` with
-    no ADR-018 tag wrapper — the agent had no machine-readable strength for the uncovered cached
-    machine decision fallback.
-  compensating_mechanism: >
-    Codex now wraps every non-empty uncovered cached decision fallback with
-    `advisory('usage-pacing', 'strong', body)`. It does not reuse Claude Code's verdict strength table;
-    recovery/reset edge strength remains owned by the durable coordination-inbox path.
-  tracked_by: "adrs/ADR-028-hook-parity-contract-and-normalization.md (fixed, this PR)"
-
-- rule: usage-pacing-kimi-no-signal-no-channel
+- rule: usage-pacing-kimi-no-channel
   kind: protocol-capability-gap
   affected_hosts: [kimi-code]
   reason: >
-    kimi exposes no CLI quota/usage signal (kimi-code.md §10 — no `kimi usage`, /usage is TUI-only),
-    so there is nothing to pace on; and kimi has no non-blocking Stop advisory channel (Stop only
+    ccm exposes Kimi's current-login rolling 5h/7d quota via `kimi-usages-api`, but kimi has no
+    non-blocking Stop advisory channel (Stop only
     surfaces via permissionDecision="deny", which forces continuation — inappropriate for a pacing
     nudge). The hook is not registered on kimi.
   compensating_mechanism: >
-    None on the data side (no quota signal); `ccm usage advise` degrades to available:false. If kimi
-    ever exposes a quota face, a UserPromptSubmit-time advisory (start-of-turn injection works) is the
-    candidate channel.
+    `ccm usage show/advise` and machine-wide quota reads remain available as explicit read-only
+    surfaces. A UserPromptSubmit-time advisory (start-of-turn injection works) is the candidate hook
+    delivery channel.
   tracked_by: design_docs/harnesses/capabilities/usage-pacing-midflight.md
 ```

@@ -146,7 +146,7 @@ test('goal slicing points to using-ccm without cloning the routing schema', () =
   assert.doesNotMatch(slicing, /ccm\/task-planning\/v1|ccm\/agent-routing\/v1|task set-routing/u);
 });
 
-test('all three SAP strategies project the canonical routing guidance', () => {
+test('all four SAP strategies project the canonical routing guidance', () => {
   for (const host of HOSTS) {
     const strategy = read(`plugin/src/skills/using-ccm/adapters/${host}/strategy.yaml`);
     assert.match(strategy, /projection:\s*\n\s+source: canonical\//u, host);
@@ -154,7 +154,7 @@ test('all three SAP strategies project the canonical routing guidance', () => {
   }
 });
 
-test('all three rendered host skills carry the same board routing contract after projection', () => {
+test('all four rendered host skills carry the same board routing contract after projection', () => {
   for (const host of HOSTS) {
     const skill = read(`plugin/dist/${host}/skills/using-ccm/SKILL.md`);
     const guide = read(`plugin/dist/${host}/skills/using-ccm/references/board-model-guide.md`);

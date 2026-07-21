@@ -2,6 +2,12 @@
 
 状态：设计（plan）。日期：2026-07-16。分支：`feat/kimi-code-harness`。
 
+> **实施后勘误（2026-07-21）**：本文是立项时快照；其中“无 CLI 配额信号”仍是 Kimi CLI
+> 本身的事实，但“不存在 ccm quota 读面”已被后续实现取代。当前 `kimi-usages-api` collector
+> 可读 current-login 滚动 5h/7d，并可带锁刷新过期 stored OAuth；account pool、external
+> statusline 与非阻断 Stop pacing hook 仍 unsupported。当前状态以 Capability Cards、
+> [`harnesses/kimi-code.md`](harnesses/kimi-code.md) 与实现为准，本文旧 gap 表只作设计沿革。
+
 本文是 kimi-code（Moonshot AI 官方终端 AI coding agent CLI，本机 v0.26.0）作为 cc-master **第四 host**（`claude-code / codex / cursor / kimi-code`）的完整适配设计，作为下游实现任务 **K3（SAP skills+commands 投影）/ K4（PHIP hooks 投影）/ K5（ccm harness/worker/enum）/ K6（端到端实测+收口）/ K8B（模型档位落点）** 的 plan。每节的实施边界切到「拿到即可动手」。
 
 **事实基座**：[`design_docs/harnesses/kimi-code.md`](harnesses/kimi-code.md)（K1 实测——本文所有 kimi 事实以它为准，§12/§13 是本文的任务书种子）。相关先例：[`design_docs/harnesses/compatibility-matrix.md`](harnesses/compatibility-matrix.md)、Cursor 双轨范式 [`adrs/ADR-031-n-host-capability-parity.md`](../adrs/ADR-031-n-host-capability-parity.md)、hook CONTRACT [`adrs/ADR-028`](../adrs/ADR-028-hook-parity-contract-and-normalization.md)、注入标签 [`adrs/ADR-018`](../adrs/ADR-018-hook-agent-message-protocol.md)。
