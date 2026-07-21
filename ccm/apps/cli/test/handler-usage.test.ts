@@ -1009,13 +1009,15 @@ test('usage runway with no sidecar → available:false (degrade)', () => {
 
 // ══ kimi-code 双窗完整性（5h + 7d·fixture 注入·无 live HTTP）══════════════════════════════════════
 
+// resetAt 取远未来（2030/2031）让两个窗口对 wall-clock now 绝不过期——这些 case 测的是双窗口 surface，
+// 非过期闸；近期 resetAt 一旦落到运行时之前会被过期闸正确判 stale（同 SIDECAR_CRITICAL 约定）。
 const KIMI_DUAL_WINDOW_FIXTURE = JSON.stringify({
-  usage: { used: 200, limit: 1000, resetAt: '2026-07-25T00:00:00Z' },
+  usage: { used: 200, limit: 1000, resetAt: '2031-01-01T00:00:00Z' },
   limits: [
     {
       detail: { used: 45, limit: 100 },
       window: { duration: 300, timeUnit: 'MINUTE' },
-      resetAt: '2026-07-20T20:00:00Z',
+      resetAt: '2030-01-01T00:00:00Z',
     },
   ],
 });
@@ -1039,11 +1041,11 @@ test('usage show --harness kimi-code surfaces both five_hour and seven_day with 
   assert.equal(out.data.current.seven_day.used_percentage, 20);
   assert.equal(
     out.data.current.seven_day.resets_at,
-    Math.floor(Date.parse('2026-07-25T00:00:00Z') / 1000),
+    Math.floor(Date.parse('2031-01-01T00:00:00Z') / 1000),
   );
   assert.equal(
     out.data.current.five_hour.resets_at,
-    Math.floor(Date.parse('2026-07-20T20:00:00Z') / 1000),
+    Math.floor(Date.parse('2030-01-01T00:00:00Z') / 1000),
   );
 });
 

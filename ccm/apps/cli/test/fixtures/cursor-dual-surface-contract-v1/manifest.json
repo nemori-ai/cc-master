@@ -110,7 +110,7 @@
         {
           "kind": "hook-contract",
           "path": "plugin/src/hooks/bootstrap-board/CONTRACT.md",
-          "contains": ["rule-bootstrap-fresh-arm", "required_hosts: [claude-code, cursor]"]
+          "contains": ["rule-bootstrap-fresh-arm", "required_hosts: [claude-code, cursor, kimi-code]"]
         },
         {
           "kind": "machine-surface-descriptor",
