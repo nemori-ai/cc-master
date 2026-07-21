@@ -1252,3 +1252,35 @@
 - **处置(含蒸馏判定)**:**backlog 候选(未改)**——两条可选:① ccm 为 `--board` 增 home-相对 board-ID 解析(裸 ID → `$CC_MASTER_HOME/boards/<id>.board.json`),对齐「board 集中落 home/boards」既定模型;② 至少保证读命令解析失败时错误形状显眼(消费方示例统一 `if(!j.ok)` 前置判)。**蒸馏落点=ccm engine/CLI(board 解析层 + 读命令消费约定),不回流 skill 红线**——CLI 边界 correctness/UX、不涉 agent 判断力;操作面上 using-ccm 命令示例应统一完整路径或 SessionStart 注入路径(抗 footgun)。
 - **附带(✅正向:recon transcript-ground-truth 抓到 phantom in_flight)**:同轮 recon 对 `worker-dispatch-reliability`(board 记 `in_flight` + handle `a3af601d6e8c48c76`)做 ground-truth,发现**该 handle 无对应 agent transcript、scratchpad 无报告、`worker-process.ts`/`provider-child-supervisor.ts` 零改动**——标了 in_flight 却从未真派发(phantom·「board 标注 ≠ 真实派发」[[Finding #46]]/[[Finding #98]] 家族)。检出**恰恰不靠 ccm agent list**(裸-ID 失败返回「空」),而靠 filesystem transcript-存在性 + 代码改动 ground-truth 稳定抓出,据此真派发新 subagent(a95ee722…)收口。**验证「recon transcript ground-truth」结构锚在真 phantom 上生效**;phantom 成因存疑(疑早前 ccm 写在裸-ID 失败/部分成功间把 task.handle 写成 registry-ID 而非真 dispatch handle),但检出机制稳健。
 - **严重度 / 来源**:should-fix(CLI board-ID 解析 UX footgun + 读命令消费陷阱·backlog 候选)+ ✅正向(recon transcript ground-truth 抓 phantom in_flight 生效·据此真派发收口)/ 一手(watchdog recon 复查两 in_flight 暴露 + 端点复现,2026-07-20)。
+
+## Finding #101 — turbo 按 `ccm/` hash 缓存 `ccm#test`，对 `plugin/src/hooks/*/CONTRACT.md` / capability-card 改动失明 → #189 把 kimi-code 加进 bootstrap-board CONTRACT `required_hosts` 的漂移，在 #189 端点验收时 `ccm test` 返回 `FULL TURBO` 缓存绿而未被抓，直到发版期一次非缓存重跑才现形 · should-fix(验收缓存盲区) + ✅正向(端点 clean 重跑 + CI 双层最终抓到)
+
+- **现象 / 证据**:#189 端点验收跑 `pnpm ccm test` → `Tasks: 6 successful, FULL TURBO`（缓存命中），其 Track A/B parity 测试(`cursor-dual-surface-contract.test.ts`)读 `plugin/src/hooks/*/CONTRACT.md` 经 manifest anchor 校验，但 #189 改了 bootstrap-board CONTRACT 的 `required_hosts`(加 kimi-code)后 anchor 未同步——该漂移**没被 #189 的 `ccm test ok` 抓到**。发版期一次 clean 重跑(被无关改动 cache-bust)才红:`… CONTRACT.md drifted at "required_hosts: [claude-code, cursor]"`。
+- **根因**:turbo 对 `ccm#test` 的 cache key 只 hash `ccm/` 输入;而该测试实际**读的输入**是 `plugin/src/hooks/**/CONTRACT.md` + capability cards,**不在 turbo input 集**。改 plugin CONTRACT 不 invalidate ccm test 缓存 → stale green。「端点 `ccm test ok`」在 `FULL TURBO` + 真实输入在 turbo 视野外变更时**是谎**。
+- **影响**:任何改动 plugin CONTRACT / capability card 而被 ccm 测试校验的变更,都可能带着 latent 漂移通过 ccm 侧端点验收(缓存绿),把不一致 ship 出去。是 gate-green≠passed 的**缓存变体**。
+- **处置(含蒸馏判定)**:两条(backlog 候选,本 PR 未改代码)——① ccm turbo 配置把 `plugin/src/hooks/**/CONTRACT.md` + capability card 路径纳入 `ccm#test` 的 inputs(CONTRACT 改动即 invalidate 缓存);② orchestrator 纪律:改 plugin CONTRACT/card 后端点验收用 `--force`(cache bypass)重跑 ccm test。**蒸馏落点**:ccm turbo inputs(代码)+ resume-verify / SKILL A 的「gate-green≠passed」补一句缓存变体(`FULL TURBO` 绿 ≠ 已验,当真实输入在 turbo hash 外变更)。
+- **严重度 / 来源**:should-fix(验收缓存盲区)+ ✅正向(端点 clean 重跑 + CI build-and-check 双层最终抓到)/ 一手(rc3 发版验证复现,2026-07-21)。
+
+## Finding #102 — 发版验收把「ccm 门」窄化成「只跑 ccm test」:改 ccm 侧文件后漏跑 `ccm lint`(biome format),违规溜过本地端点、被 CI `build-and-check` 拦下(第一轮 CI 红)· should-fix(端点「ccm 门」= typecheck/lint/test 三门全跑) + ✅正向(CI 硬闸兜住本地漏项)
+
+- **现象 / 证据**:manifest anchor 修复后重跑 `ccm test` 绿(6/6),据此 push;CI `build-and-check` 的 `ccm#lint`(biome check)红——manifest.json 的 `contains` 数组因 anchor 变长超 biome line-width、须换多行,本地留了单行。
+- **根因**:端点验收把「ccm 门」窄化成了「ccm test」;实为 typecheck / lint / test **三门正交**,改任一 ccm 文件后应跑全三门。test 绿不代表 lint(format)绿。
+- **影响**:本地端点显绿、CI 红,白费一轮 CI round-trip(~8-12min)。
+- **处置(含蒸馏判定)**:纪律——改 ccm 侧任何文件后跑全 `pnpm -C ccm typecheck && lint && test`,非只 test;本轮已 biome 格式化 + push 复绿。**蒸馏落点**:resume-verify / 发版纪律「端点 ccm 门 = 三门全跑」。CI-green-before-merge 是最后防线(✅印证其价值:本地漏项被 CI 兜住,未 ship)。
+- **严重度 / 来源**:should-fix(端点门窄化)+ ✅正向(CI 抓本地漏)/ 一手(rc3 发版,2026-07-21)。
+
+## Finding #103 — 时间依赖测试 fixture(固定近期 `resetAt`)跨天失效:kimi 双窗口 test 的 5h 窗口 `resetAt='2026-07-20T20:00Z'` 写时(20 号)是未来、跨到 21 号变过去 → 过期闸正确 null 掉窗口 → 断言 45% 得 null → ccm test 红(commit 时 20 号绿) · should-fix(测试时间无关化) + ✅正向(端点按今日日期重跑抓到 + 逐行定位真因)
+
+- **现象 / 证据**:rc3 组装后 ccm test 红,`handler-usage.test.ts` 断言 `five_hour.used_percentage===45` 得 `null`;该 ccm 工作 commit 时标称 1561/0 绿。
+- **根因**:fixture 用**固定近期** `resetAt`;impl(`parseFiveHourWindow`)**正确地**把 `resetAt` 已过的窗口判 stale→null(实现无错)。测试既没 pin now(`--as-of`)、也没用远未来 `resetAt`;同文件 `SIDECAR_CRITICAL` 早有「远未来 `resetAt`(2030/2031)避 wall-clock 过期」先例,此 fixture 漏用——是**测试**时间依赖 bug,非 impl 回归。
+- **影响**:任何固定近期时间戳的 fixture 会在跨过该戳后突然红,CI / 端点按「今日」跑必中;易被误诊为「代码回归」而往错方向排查(同 [[Finding #99]] 家族:看似 X 实为 Y)。
+- **处置(含蒸馏判定)**:**已修**——fixture 两窗口 `resetAt` → 远未来(2030/2031·对齐 `SIDECAR_CRITICAL`)+ 断言同步(commit `b5a7b2a5`)。纪律:时间敏感 fixture 用远未来或 pinned-now(`--as-of`),绝不固定近期时间戳。**蒸馏落点**:engineering-with-craft(tdd)/ 测试手艺「fixture 时间无关化」;同类潜伏 fixture 值得一次专项扫。
+- **严重度 / 来源**:should-fix(测试时间无关化)+ ✅正向(端点按今日重跑 + 逐行定位真因非误改 impl)/ 一手(rc3 发版,2026-07-21)。
+
+## Finding #104 — rc release 元数据手工漏项:用裸 tag 名当 GitHub release title(应 `<product> vX.Y.Z` 描述式)+ 漏加 `--prerelease`(rc 必须标 pre-release)+ body 冗长内联(应「一行摘要 + See CHANGELOG」),被用户 review 抓到 · should-fix(发版规范手工易漏·应脚本化/checklist 兜底) + ✅正向(用户 review 抓到已修正)
+
+- **现象 / 证据**:rc3 两 release 手工 `gh release create` 时 title=裸 tag(`v0.21.0-rc.3` / `ccm-v0.22.0-rc.3`)、`prerelease=false`、body 冗长内联;过往 rc.2 规范为 title `cc-master plugin vX.Y.Z` / `ccm vX.Y.Z` + `prerelease=true` + body「一行摘要 + Pairs with + See CHANGELOG」。用户两问戳中(「遵循过往规范了吗」「是 rc 为什么没标 pre-release」)。
+- **根因**:手工建 release 未对照 rc.2 先例、凭直觉填;发版元数据规范(prerelease flag + title 体例 + body 体例)是**无脚本/checklist 兜底的手工步骤**,靠记忆易漏。
+- **影响**:rc 未标 pre-release 会被 marketplace / consumer 当正式版;title 不描述、body 体例不一致降低 release 可读性与检索性。
+- **处置(含蒸馏判定)**:**已修**(`gh release edit` 对齐 title + `--prerelease` + 规范 body)。根治=发版脚本化——`plugin-release-engineering` skill 的 release checklist 加硬项「rc 必 `--prerelease` + title `<product> vX.Y.Z` + body『一行摘要 + See CHANGELOG』」,或让 release workflow 生成时按 tag 前缀自动置 prerelease/title/body。**蒸馏落点**:plugin-release-engineering skill(发版 checklist)+ 可脚本化(workflow 自动生成 release 元数据)。
+- **严重度 / 来源**:should-fix(发版规范手工漏项·应脚本化)+ ✅正向(用户 review 抓到·已修正)/ 一手(rc3 发版 + 用户 review,2026-07-21)。
