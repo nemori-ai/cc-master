@@ -4,6 +4,14 @@
 
 > **一句话结论**：kimi-code 的 `/usage` 有明确上游 API 源——`GET https://api.kimi.com/coding/v1/usages`（`Authorization: Bearer <OAuth access_token>`），返回 5h / 周 两档滚动配额窗口 + booster 钱包余额；**推翻** `design_docs/harnesses/kimi-code.md` §10「worker driver 拿不到配额信号 → unsupported」的旧结论。**v1 推荐路线 = 直连 `/usages` API 轮询 collector**（对标现有 `cursor-agent-dashboard` collector，非 claude 的 statusline sidecar——kimi 没有可脚本化的 statusline 钩子）。
 
+> **2026-07-20 owner 授权变更（取代本文旧的 observe-only 建议）**：ccm 现在获准在
+> stored `access_token` 过期时使用 `refresh_token` 主动刷新。实现必须对凭证文件使用跨进程
+> advisory lock，锁内重读并跳过重复刷新；仅在仍过期时调用 §1.2 的 OAuth endpoint，成功后
+> 以同目录临时文件 + `rename` 原子写回轮换后的 token pair，并保留原文件权限。刷新失败不得
+> 改写凭证，usage 干净降级并提示 `kimi login`。`CCM_KIMI_AUTO_REFRESH` 默认开启，允许显式
+> 关闭回退到本文原先的只读行为。本文 §4/§6 中“collector 不能刷新”的判断是当时未获 mutation
+> 授权下的历史结论，不再约束 2026-07-20 之后的 ccm 实现。
+
 ---
 
 ## 0. 证据等级

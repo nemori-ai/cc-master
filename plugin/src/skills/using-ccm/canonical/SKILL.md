@@ -112,7 +112,7 @@ ccm goal check --json                      # ok 后才能切 DAG；pending/deadl
 ccm board show                             # goal/owner/任务统计/lint 是否净
 
 # 派发一个任务从生到完成(端点验收后才 done)
-ccm model-policy show --task implementation-from-spec --json  # 三路统一角色/事实/taste；再做 target live qualification
+ccm model-policy show --task implementation-from-spec --json  # 四 provider 统一角色/事实/taste；再做 target live qualification
 {{USING_CCM_TASK_ADD_EXAMPLE}}
 ccm task start T3                         # ready → in_flight,盖 started_at
 ccm task done  T3 --artifact /abs/out.md --verified   # in_flight → done,盖 finished_at;两项证据必填

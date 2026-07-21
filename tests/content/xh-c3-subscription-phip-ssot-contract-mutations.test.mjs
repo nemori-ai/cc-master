@@ -149,7 +149,7 @@ test('implemented runtime cannot omit a canonical XH C3 PARITY anchor', (t) => {
   const contract = join(root, 'plugin/src/hooks/bootstrap-board/CONTRACT.md');
   const before = readFileSync(contract, 'utf8');
   const after = before.replace(
-    '- rule: rule-bootstrap-subscription-register\n  required_hosts: [claude-code, codex, cursor]\n',
+    '- rule: rule-bootstrap-subscription-register\n  required_hosts: [claude-code, codex, cursor, kimi-code]\n',
     '',
   );
   assert.notEqual(after, before, 'PARITY anchor mutation did not reach bootstrap contract');

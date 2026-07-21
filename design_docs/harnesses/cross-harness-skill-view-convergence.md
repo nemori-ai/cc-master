@@ -4,6 +4,10 @@
 > 日期：2026-07-16 UTC  
 > 范围：`plugin/src/skills` 的 canonical slot、per-host overlay、stub 与 projection contract  
 > 非范围：本轮不批量删除 slot/overlay，不改 ccm wire schema，不把 origin 不存在的原生工具伪装成可用
+>
+> **2026-07-21 后续实现注记：**本文的“三 host / 三 origin”数量是 2026-07-16 迁移基线；
+> 当前 skill projection / worker portfolio 已纳入 Kimi Code 作为第四路。原文的阶段数量保留作设计快照，
+> 当前能力以 capability cards、`plugin/src/skills/_hosts/*/capabilities.yaml` 与生成 parity matrix 为准。
 
 ## 1. 问题与结论
 

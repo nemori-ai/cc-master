@@ -42,7 +42,7 @@ compaction、派发、amendment 和完成时始终对齐当前 revision。
 
 ## Equivalence fixtures
 
-1. `raw-copy-rejected`：输入含冗长原文；三 host fresh board 的 `goal` 为空、contract pending。
+1. `raw-copy-rejected`：输入含冗长原文；四 host fresh board 的 `goal` 为空、contract pending。
 2. `resume-current-revision`：r2+Brief board resume；动态或补偿机制均提示先 check/read r2。
 3. `pending-no-execution`：pending board 不被当成可直接切/派发的 settled goal。
 4. `integrity-before-done`：Brief missing/hash mismatch 时不得宣布完成。

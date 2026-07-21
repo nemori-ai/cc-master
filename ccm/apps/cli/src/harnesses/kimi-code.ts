@@ -66,15 +66,14 @@ export const kimiCodeAdapter: HarnessAdapter = {
   accountPoolLocation: () => null,
   readCurrentUsage(env) {
     // kimi exposes GET /coding/v1/usages (Bearer OAuth) → rolling 5h + weekly quota. The collector is
-    // strictly read-only on the stored token — it never refreshes/rotates the credential file. When the
-    // stored access_token is expired (kimi only refreshes it during an active session) or absent, the
-    // read degrades to an honest `unavailable` reason instead of mutating credentials.
+    // owner-authorized to refresh an expired stored token. Refresh is serialized with an adjacent
+    // advisory lock, re-reads inside the lock, and atomically publishes the rotated token pair.
     const reading = readKimiUsageSignal(env);
     if (reading?.signal) {
       return { signal: reading.signal, source: reading.source, unavailableReason: '' };
     }
-    // Signal unavailable → attach an actionable recovery hint (which kimi command self-refreshes the
-    // token + how to re-query). ccm stays read-only on the credential; the hint is text only.
+    // Signal unavailable after automatic refresh → derive recovery from the stored credential state;
+    // a failed automatic attempt must not erase the existing expired-token self-refresh remedy.
     const hint = describeKimiUsageRefresh(env);
     return {
       signal: null,

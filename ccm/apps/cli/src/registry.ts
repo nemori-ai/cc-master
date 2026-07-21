@@ -74,6 +74,24 @@ export const REGISTRY: Registry = {
       examples: ['ccm capability list --json'],
       handler: 'capability.list',
     },
+    negotiate: {
+      summary: '与 consumer 声明的版本集协商某 capability 族的最高兼容兑现项',
+      read: true,
+      positionals: [{ name: 'capability-family', required: true }],
+      options: {
+        accept: {
+          type: 'string',
+          multiple: true,
+          required: true,
+          desc: 'consumer 可接受的 capability id（可重复，如 goal-deadline/v1）',
+        },
+        json: { type: 'boolean', desc: '结构化协商结果输出' },
+      },
+      examples: [
+        'ccm capability negotiate goal-deadline --accept goal-deadline/v1 --accept goal-deadline/v2 --json',
+      ],
+      handler: 'capability.negotiate',
+    },
   },
   // ════════════════════ worker（R0：raw agent-command passthrough + session lifecycle）══════════════
   worker: {
@@ -113,7 +131,7 @@ export const REGISTRY: Registry = {
         'max-output-bytes': {
           type: 'string',
           required: false,
-          desc: 'stdout 上限，256..33554432 字节（默认 33554432；stderr 独立上限 8388608）',
+          desc: 'stdout 上限，256..536870912 字节（默认 536870912；stderr 独立上限 536870912）',
         },
       },
       examples: [
@@ -2071,7 +2089,10 @@ export const REGISTRY: Registry = {
       positionals: [{ name: 'id', required: false }],
       options: {
         host: { type: 'string', desc: '监听地址（v1 只允许 127.0.0.1）' },
-        port: { type: 'string', desc: '监听端口（默认 0=系统分配）' },
+        port: {
+          type: 'string',
+          desc: '监听端口（省略时复用上次端口若仍空闲，否则 0=系统分配；显式 --port 优先）',
+        },
         board: { type: 'string', desc: '指定 board 文件作 viewer 初始 selection（最高优先）' },
         goal: { type: 'string', desc: '多 active 板时按 goal 子串选初始 selection' },
         json: { type: 'boolean', desc: '结构化输出（含 previous/service/open_url）' },
@@ -2429,6 +2450,38 @@ export const REGISTRY: Registry = {
         'ccm estimate deadline-risk --scope this-board --seed 42 --json',
       ],
       handler: 'estimate.deadlineRisk',
+    },
+  },
+
+  // ════════════════════ calibration（显式副作用型经验校准语料 producer）═══════════════════════════
+  calibration: {
+    capture: {
+      summary: '采集一次真实 deadline-risk predict-then-observe snapshot 到 home 级校准语料库',
+      read: false,
+      positionals: [],
+      options: {
+        scope: {
+          type: 'string',
+          enum: ['home', 'this-repo', 'this-board'],
+          desc: '历史语料范围（默认 home·与 estimate deadline-risk 同口径）',
+        },
+        'as-of': {
+          type: 'string',
+          desc: '采集时刻（ISO-8601 UTC·同 board+as-of 为幂等键；默认 now）',
+        },
+        runs: { type: 'string', desc: 'MC trials（默认 2000）' },
+        seed: { type: 'string', desc: 'PRNG 种子（复现·默认 42）' },
+        'effective-n': {
+          type: 'string',
+          desc: '号池有效配额份数覆写（只缩 throughput 参考·非 verdict）',
+        },
+        json: { type: 'boolean', desc: '结构化输出（含 captured/duplicate/snapshot）' },
+      },
+      examples: [
+        'ccm calibration capture',
+        'ccm calibration capture --scope this-board --as-of 2026-07-20T12:00:00Z --json',
+      ],
+      handler: 'calibration.capture',
     },
   },
 

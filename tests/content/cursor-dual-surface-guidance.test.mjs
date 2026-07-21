@@ -15,7 +15,7 @@ import test from 'node:test';
 import pacingAttestation from '../../scripts/pacing-read-only-attestation.cjs';
 
 const ROOT = join(import.meta.dirname, '..', '..');
-const HOSTS = ['claude-code', 'codex', 'cursor'];
+const HOSTS = ['claude-code', 'codex', 'cursor', 'kimi-code'];
 const HOLDOUTS = [
   '协调记录为空时，先把仲裁结果登记进 inbox；没有历史基线就保存新的 snapshot。',
   '池内份额尚无回执时，先把最新分配结果持久化到通知队列；计划参照尚未留存时，先固化当前状态。',
@@ -95,7 +95,7 @@ test('Cursor IDE and headless CLI guidance keep independent role and evidence bo
   assert.match(cursorModelFacts, /on-demand/u);
 });
 
-test('three-host pacing projection rejects canonical references, overlays, descriptions, and Cursor include drift', () => {
+test('four-host pacing projection rejects canonical references, overlays, descriptions, and Cursor include drift', () => {
   for (const holdout of HOLDOUTS) {
     const root = makeProjectionFixture();
     try {
@@ -171,7 +171,7 @@ test('three-host pacing projection rejects canonical references, overlays, descr
   }
 });
 
-test('clean generated pacing trees match the independent three-host manifest', () => {
+test('clean generated pacing trees match the independent four-host manifest', () => {
   const registry = JSON.parse(read('plugin/src/skills/pacing-and-estimation/read-only-capability.json'));
   for (const host of HOSTS) {
     pacingAttestation.assertPacingRuntimeTree(

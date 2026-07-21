@@ -312,7 +312,12 @@ function spawnService(args: SpawnArgs): SpawnResult {
 }
 
 function waitForRunning(statePath: string, startedAt: string): MonitorState {
-  const deadline = Date.now() + 3000;
+  // Poll (retry) until the freshly spawned service reports healthy, then return immediately.
+  //   The window is generous because a cold Node-SEA start plus the first tick can take several
+  //   seconds; only genuine failure waits out the full deadline (success returns as soon as the
+  //   state flips to ok). 3s was too tight for post-binary-replace restarts and produced false
+  //   timeouts that then threw and were dropped.
+  const deadline = Date.now() + 8000;
   let last: MonitorState | null = null;
   while (Date.now() < deadline) {
     last = readState(statePath);

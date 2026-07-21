@@ -87,7 +87,7 @@ test('D is the only exact syntax SSOT for real help and raw provider argv', () =
   assert.match(worker, /`--cwd`.*绝对.*存在.*目录.*process\.cwd\(\)/isu);
   assert.match(worker, /`--timeout-ms`.*50\.\.7200000.*600000/isu);
   assert.match(worker, /help.*10000.*timeout/isu);
-  assert.match(worker, /`--max-output-bytes`.*256\.\.33554432.*33554432/isu);
+  assert.match(worker, /`--max-output-bytes`.*256\.\.536870912.*536870912/isu);
   assert.match(worker, /ccm\/worker-process-result\/v1/u);
   assert.match(worker, /state.*exited.*timed_out.*cancelled.*failed.*rejected/isu);
   for (const field of PROCESS_FIELDS) {
@@ -150,10 +150,11 @@ test('capability and gap surfaces make raw wrapper current only with its runtime
   assert.match(card, /claude-code \| current/u);
   assert.match(card, /codex \| current/u);
   assert.match(card, /cursor \| current/u);
+  assert.match(card, /kimi-code \| current/u);
   assert.match(card, /D.*only.*exact command grammar/isu);
   assert.match(card, /process terminal.*parent acceptance/isu);
   assert.match(card, /current.*same runtime PR/isu);
-  assert.match(card, /hermetic raw-wrapper contract.*current.*all three harness/isu);
+  assert.match(card, /hermetic raw-wrapper contract.*current.*all four harness/isu);
   assert.match(card, /first-party live probes passed.*Codex.*Claude Code/isu);
   assert.match(card, /Cursor.*resolver.*binary.*real help.*launch.*technically callable/isu);
   assert.match(card, /launcher exited 0.*same-PGID.*helper.*LSP.*remained alive/isu);

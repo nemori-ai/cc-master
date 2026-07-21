@@ -133,6 +133,17 @@ function silentCtx(ctx: Ctx, extra: Partial<Ctx>): Ctx {
   };
 }
 
+// Re-derive a fresh plan for one service after a restart so the caller can assert the
+//   post-condition (the service came back up on the freshly installed binary). Monitor re-reads
+//   its single state; web-viewer matches the just-restarted instance by id.
+function freshPlanFor(ctx: Ctx, plan: ServicePlan, home: string): ServicePlan | null {
+  if (plan.service === 'monitor') return monitorPlan(ctx, home);
+  // restart() re-creates the web-viewer instance under the canonical id (not necessarily the id we
+  //   restarted), so match that — the same instance probeRunningServiceHealth verified above.
+  const canonicalId = webViewer.canonicalServiceId(home);
+  return webViewerPlans(home).find((p) => p.id === canonicalId) ?? null;
+}
+
 function restartPlan(ctx: Ctx, plan: ServicePlan, home: string): ServicePlan {
   if (plan.action !== 'restart') return plan;
   try {
@@ -152,6 +163,20 @@ function restartPlan(ctx: Ctx, plan: ServicePlan, home: string): ServicePlan {
         };
       }
     }
+    // Post-condition (no-silent-failure): a restart that returned without throwing must have
+    //   landed the service on the freshly installed binary. restart()'s internal health-wait
+    //   already guarantees liveness on success; here we additionally assert the running version
+    //   equals the installed one — otherwise a stale-binary or half-applied restart (the exact
+    //   failure a post-binary-replace reconcile exists to catch) would be silently reported as
+    //   "restarted".
+    const fresh = freshPlanFor(ctx, plan, home);
+    if (!fresh || fresh.binary_match !== true) {
+      return {
+        ...plan,
+        action: 'restart',
+        reason: `restart-failed: post-check binary_match=${String(fresh?.binary_match ?? null)} running_ccm_version=${String(fresh?.running_ccm_version ?? null)}`,
+      };
+    }
     return { ...plan, action: 'restart', reason: 'restarted' };
   } catch (e) {
     return {
@@ -166,17 +191,22 @@ export function reconcile(ctx: Ctx): number {
   const home = canonicalHome(ctx);
   const plans = [monitorPlan(ctx, home), ...webViewerPlans(home)];
   const results = plans.map((plan) => (plan.wanted ? restartPlan(ctx, plan, home) : plan));
+  const failed = results.filter((plan) => plan.wanted && plan.reason.startsWith('restart-failed'));
   const data = {
     after_binary_replace: ctx.values['after-binary-replace'] === true,
     home,
     services: results,
     restarted: results.filter((plan) => plan.wanted && plan.reason === 'restarted').length,
     skipped: results.filter((plan) => !plan.wanted).length,
+    failed: failed.length,
   };
   ctx.out(
     ctx.flags.json
-      ? JSON.stringify({ ok: true, data })
-      : `services reconcile: restarted=${data.restarted} skipped=${data.skipped}`,
+      ? JSON.stringify({ ok: failed.length === 0, data })
+      : `services reconcile: restarted=${data.restarted} skipped=${data.skipped} failed=${data.failed}`,
   );
-  return EXIT.OK;
+  // Fail-loud (no-silent-failure): a wanted service that could not be restarted onto the new
+  //   binary must surface a nonzero exit — install.sh / `ccm upgrade` gate their warnings on it.
+  //   (Previously this returned EXIT.OK unconditionally, making every caller's failure branch dead.)
+  return failed.length === 0 ? EXIT.OK : EXIT.ERROR;
 }

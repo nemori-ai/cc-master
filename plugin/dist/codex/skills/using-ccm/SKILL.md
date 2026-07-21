@@ -1,6 +1,6 @@
 ---
 name: using-ccm
-description: 'Use when you (orchestrator/agent) read or mutate a cc-master board through the ccm CLI in Codex —— 当你要查询三路统一 `model-policy show|advise`、写 cross-harness planning/routing、操作 board，或读 Codex-origin usage/dispatch 操作面时。它一体两面：面1是 ccm 命令与 board 写入关卡；面2是 board 模型、O/T1/T2/T3 effect floor、candidate chain 与 fail-closed fallback 的字段取值。Triggers: 敲 ccm model-policy/task/board/jc/cadence/log/watchdog/harness/provider/usage/upgrade、查跨 provider 候选、写 ample/tight chain、查当前账号 7d/rolling-24h、任何 board 写操作或 ccm exit 3。Do NOT use when 你在决定任务角色、最终 target、何时减速/停派或怎么拆 DAG（归 master-orchestrator-guide），或解释 model-policy/usage/estimate 事实与 advisory（归 pacing-and-estimation）。目标模型查询跨 provider 共享；Codex 7d/rolling-24h、account 禁止与实际 dispatch 仍是 origin/target-local 机制。'
+description: 'Use when you (orchestrator/agent) read or mutate a cc-master board through the ccm CLI in Codex —— 当你要查询四 provider 统一 `model-policy show|advise`、写 cross-harness planning/routing、操作 board，或读 Codex-origin usage/dispatch 操作面时。它一体两面：面1是 ccm 命令与 board 写入关卡；面2是 board 模型、O/T1/T2/T3 effect floor、candidate chain 与 fail-closed fallback 的字段取值。Triggers: 敲 ccm model-policy/task/board/jc/cadence/log/watchdog/harness/provider/usage/upgrade、查跨 provider 候选、写 ample/tight chain、查当前账号 7d/rolling-24h、任何 board 写操作或 ccm exit 3。Do NOT use when 你在决定任务角色、最终 target、何时减速/停派或怎么拆 DAG（归 master-orchestrator-guide），或解释 model-policy/usage/estimate 事实与 advisory（归 pacing-and-estimation）。目标模型查询跨 provider 共享；Codex 7d/rolling-24h、account 禁止与实际 dispatch 仍是 origin/target-local 机制。'
 ---
 
 # using-ccm — 用 ccm CLI 驱动 board
@@ -112,7 +112,7 @@ ccm goal check --json                      # ok 后才能切 DAG；pending/deadl
 ccm board show                             # goal/owner/任务统计/lint 是否净
 
 # 派发一个任务从生到完成(端点验收后才 done)
-ccm model-policy show --task implementation-from-spec --json  # 三路统一角色/事实/taste；再做 target live qualification
+ccm model-policy show --task implementation-from-spec --json  # 四 provider 统一角色/事实/taste；再做 target live qualification
 ccm task add T3 --type development --executor subagent \
     --deps T1,T2 --estimate 3h --ref spec:/abs/spec.md --ref plan:/abs/plan.md --accept "DoD 一句话"
 # 真实 spawn 后再回填返回的 agent/thread id；不预填 phantom handle

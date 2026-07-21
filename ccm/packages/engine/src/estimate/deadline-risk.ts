@@ -56,6 +56,8 @@ export interface DeadlineTaskStatus {
 export interface DeadlineRiskOptions {
   deadlineAtMs: number | null; // goal_contract.deadline.at 的 ms（state∈asserted/confirmed 时）
   deadlineState: 'pending' | 'asserted' | 'confirmed' | 'none';
+  /** goal_contract.deadline.kind — overdue 后 strength 分档（soft→weak advisory / hard→strong·issue #169）。缺省 hard。 */
+  deadlineKind?: 'hard' | 'soft';
   asOfMs: number;
   records?: DoneRecord[]; // throughput 参考通道历史语料
   calibParams: Map<string, NodeMcParam>; // 引擎 buildMcParams 出的每节点 {meanHours, cv}
@@ -150,6 +152,7 @@ export function computeDeadlineRisk(
   const {
     deadlineAtMs = null,
     deadlineState = 'pending',
+    deadlineKind = 'hard',
     asOfMs,
     records = [],
     calibParams,
@@ -304,10 +307,17 @@ export function computeDeadlineRisk(
       '全部任务已完成（backlog=0）——已交付，无 late risk（复用 on_track 表完成态·非「要迟到」）',
     );
   } else if (trh <= 0) {
-    // now >= DDL 且未完成 → overdue。
+    // now >= DDL 且未完成 → overdue（band 一致·kind 只分 strength/措辞·issue #169）。
     riskBand = 'overdue';
-    strength = 'strong';
-    notes.push('已过 DDL 且未完成——overdue·须向用户报告并决策（延期/缩范围/分阶段/终止）');
+    if (deadlineKind === 'soft') {
+      strength = 'weak';
+      notes.push(
+        '软性交付 DDL 已过期且未完成——advisory nudge（提示但不阻断·可继续推进·软目标超期不强制停派）',
+      );
+    } else {
+      strength = 'strong';
+      notes.push('已过 DDL 且未完成——overdue·须向用户报告并决策（延期/缩范围/分阶段/终止）');
+    }
   } else {
     const cls = classifyBand(onTimeProb, { channelDisagreement, confidence, bands });
     riskBand = cls.band;

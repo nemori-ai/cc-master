@@ -4,11 +4,11 @@
 
 ## 文档地图
 
-- `compatibility-matrix.md`：Claude Code、Codex 与 Cursor (IDE Agent) 的 plugin / skill / hook / command / memory 兼容矩阵。
+- `compatibility-matrix.md`：Claude Code、Codex、Cursor (IDE Agent) 与 kimi-code 的 plugin / skill / hook / command / memory 兼容矩阵。
 - `claude-code.md`：Claude Code adapter 事实和本仓落点。
 - `codex.md`：Codex adapter 事实、实测结论和当前风险。
 - `cursor.md`：Cursor IDE Agent harness 事实、Track A/B 双轨、hook 映射、Capability Cards 索引（2026-07-09）。
-- `kimi-code.md`：kimi-code（Moonshot AI CLI）harness 事实——plugin manifest / skills / commands / hooks / subagents / MCP / env / headless worker 与 quota 可得性（2026-07-16 本机 v0.26.0 probe + binary 取证；origin + headless worker 双角色，adapter 未开工）。
+- `kimi-code.md`：kimi-code（Moonshot AI CLI）harness 事实——plugin manifest / skills / commands / hooks / subagents / MCP / env / headless worker 与 quota 可得性（2026-07-16 本机 v0.26.0 probe + binary 取证；origin + headless worker 双角色；adapter 已发布）。
 - `cursor-agent-cli.md`：Cursor headless CLI worker 的独立 facts、first-party-only admission 边界、手动认证和维护 runbook。
 - `cursor-dual-surface-contract.md`：Cursor IDE plugin origin 与 `agent|cursor-agent` headless worker 的正式双 bounded-context contract、负能力、RED fixtures、迁移与 rollback。
 - `cursor-agent-admission-contract.md`：headless worker 的 mode/sandbox/result 子合同；由双 surface contract 引用，不代表完整 provider transport 已交付。
@@ -24,8 +24,8 @@
 - `claude-code` 是当前主要发布 adapter。
 - `codex` adapter 已有 dist（skills + hooks + prompt-first bootstrap）；发布策略仍逐版本明确。
 - `cursor` adapter 已发布（`plugin/dist/cursor`、ccm cursor harness、install `--harness cursor`）。目标运行时 = Cursor IDE Agent（非 Cloud Agents）。
-- `kimi-code` adapter **未开工**；facts + probe 已落 `kimi-code.md`，供后续 adapter 设计消费。它既是潜在 origin plugin host，也具备可用 headless worker 面（`kimi -p`）。
-- `plugin/src -> plugin/dist/<host>` 是架构边界；`plugin/dist` 只作为生成产物（claude-code / codex / cursor）。
+- `kimi-code` adapter 已发布（`plugin/dist/kimi-code`，skills + host-native commands + 5 个注册 hook；install/upgrade 支持 `--harness kimi-code`），并具备 `kimi -p` headless worker 面。
+- `plugin/src -> plugin/dist/<host>` 是架构边界；`plugin/dist` 只作为四 host 生成产物（claude-code / codex / cursor / kimi-code）。
 
 ## 资料来源
 

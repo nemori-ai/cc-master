@@ -16,7 +16,7 @@ const HELP_TIMEOUT_MS = 10_000;
 const RUN_TIMEOUT_MS = 600_000;
 // Match worker-process MAX_OUTPUT_BYTES so callers that omit --max-output-bytes get the full stdout
 // ceiling instead of a 1 MiB cap that kills large-output dispatches mid-task.
-const DEFAULT_MAX_OUTPUT_BYTES = 33_554_432;
+const DEFAULT_MAX_OUTPUT_BYTES = 536_870_912;
 
 function positiveInteger(value: unknown, fallback: number): number {
   if (value === undefined) return fallback;

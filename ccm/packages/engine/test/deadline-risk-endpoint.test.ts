@@ -141,12 +141,19 @@ test('deadline-risk band: likely_late (tight DDL·P<0.40·strong)', () => {
   assert.ok((d.on_time_probability ?? 1) < 0.4);
 });
 
-test('deadline-risk band: overdue (now ≥ DDL, backlog>0·strong·P=0)', () => {
-  const d = risk({ deadlineAtMs: NOW - 3600000, backlog: 6 });
+test('deadline-risk band: overdue (now ≥ DDL, backlog>0·hard·strong·P=0)', () => {
+  const d = risk({ deadlineAtMs: NOW - 3600000, backlog: 6, deadlineKind: 'hard' });
   assert.equal(d.risk_band, 'overdue');
   assert.equal(d.strength, 'strong');
   assert.equal(d.time_remaining_hours, -1);
-  assert.ok(d.notes.some((n) => n.includes('overdue')));
+  assert.ok(d.notes.some((n) => n.includes('须向用户报告')));
+});
+
+test('deadline-risk band: soft overdue → weak advisory (issue #169·不升 strong)', () => {
+  const d = risk({ deadlineAtMs: NOW - 3600000, backlog: 6, deadlineKind: 'soft' });
+  assert.equal(d.risk_band, 'overdue');
+  assert.equal(d.strength, 'weak');
+  assert.ok(d.notes.some((n) => n.includes('advisory')));
 });
 
 test('deadline-risk band: completed board past DDL is NOT likely_late/overdue (backlog=0·已交付·weak)', () => {

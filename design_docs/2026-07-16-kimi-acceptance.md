@@ -5,6 +5,12 @@
 > 清单，标 ✓（已落地+有证据）或 gap（能力边界，已 Capability Card 声明，非遗漏）。用户拍定的验收
 > 标准是「能力边界内最大适配」——凡 Track A 可行必须 Track A，无等价物才允许显式 gap，禁止静默省略。
 
+> **验收后增量（2026-07-21）**：本清单保留 2026-07-16 当时的验收证据。后续 Kimi
+> `kimi-usages-api` collector 已落地 current-login 5h/7d + locked OAuth auto-refresh，因此下文
+> “usage 恒 unavailable / machine-wide 无 target”的条目是历史快照，不再是当前能力结论；当前仍
+> unsupported 的是 account pool、external statusline 与非阻断 Stop pacing delivery。现状以
+> Capability Cards、`harnesses/kimi-code.md` 与代码为准。
+
 ## 0. 总览
 
 | 分类 | 计数 |

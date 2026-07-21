@@ -305,3 +305,111 @@ test('services reconcile materializes web-viewer assets before restarting wanted
     'reconcile ensures versioned app-dist before restart',
   );
 });
+
+function writeWantedMonitorState(home: string): void {
+  const monitorRoot = join(home, 'services', 'monitor');
+  mkdirSync(monitorRoot, { recursive: true });
+  writeFileSync(
+    join(monitorRoot, 'state.json'),
+    `${JSON.stringify(
+      {
+        schema: 'ccm/monitor-service/v1',
+        id: 'monitor',
+        pid: 0,
+        wanted: true,
+        home,
+        state_path: join(monitorRoot, 'state.json'),
+        pid_path: join(monitorRoot, 'pid'),
+        log_path: join(monitorRoot, 'log'),
+        interval_sec: 45,
+        server: { started_at: '2026-07-09T10:00:00Z', ccm_version: '0.0.1' },
+        last_tick_at: null,
+        last_error: null,
+        tick_count: 0,
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+}
+
+test('services reconcile fail-loud: a wanted service whose restart throws exits nonzero', () => {
+  const home = mkHome();
+  writeWantedMonitorState(home);
+  monitor.__setMonitorTestHooks({
+    // Simulate a cold-start restart that throws (spawn failure) — the exact failure that used to
+    //   be swallowed while reconcile still returned EXIT.OK.
+    spawnService: () => {
+      throw new Error('cold start boom');
+    },
+    isPidAlive: () => false,
+  });
+
+  const r = invoke(['services', 'reconcile', '--after-binary-replace', '--json'], home);
+  assert.equal(r.code, EXIT.ERROR, 'a wanted restart-failed service must exit nonzero');
+  const parsed = json(r.stdout);
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.data.failed, 1);
+  assert.equal(parsed.data.restarted, 0);
+  const mon = parsed.data.services.find((s: { service: string }) => s.service === 'monitor');
+  assert.ok(
+    typeof mon.reason === 'string' && mon.reason.startsWith('restart-failed'),
+    `reason=${mon.reason}`,
+  );
+});
+
+test('services reconcile post-check: a service that comes back on the OLD binary is flagged failed', () => {
+  const home = mkHome();
+  writeWantedMonitorState(home);
+  monitor.__setMonitorTestHooks({
+    // Restart "succeeds" (process becomes healthy) but stays on the OLD binary version. The
+    //   post-condition must catch this instead of reporting "restarted".
+    spawnService: ({ statePath }) => {
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      writeFileSync(
+        statePath,
+        `${JSON.stringify(
+          { ...state, pid: 4001, server: { ...state.server, ccm_version: '0.0.1' } },
+          null,
+          2,
+        )}\n`,
+        'utf8',
+      );
+      return { pid: 4001 };
+    },
+    isPidAlive: (pid) => pid === 4001,
+  });
+
+  const r = invoke(['services', 'reconcile', '--after-binary-replace', '--json'], home);
+  assert.equal(r.code, EXIT.ERROR, 'stale-binary restart must exit nonzero');
+  const parsed = json(r.stdout);
+  assert.equal(parsed.data.failed, 1);
+  const mon = parsed.data.services.find((s: { service: string }) => s.service === 'monitor');
+  assert.ok(mon.reason.startsWith('restart-failed: post-check'), `reason=${mon.reason}`);
+  assert.ok(mon.reason.includes('binary_match=false'), `reason=${mon.reason}`);
+});
+
+test('services reconcile fail-loud positive: healthy restart onto the new binary exits 0', () => {
+  const home = mkHome();
+  writeWantedMonitorState(home);
+  monitor.__setMonitorTestHooks({
+    // Restart lands the service on the freshly installed binary (buildState stamps the installed
+    //   version); post-check passes → reason "restarted", failed=0, exit 0.
+    spawnService: ({ statePath }) => {
+      const state = JSON.parse(readFileSync(statePath, 'utf8'));
+      writeFileSync(statePath, `${JSON.stringify({ ...state, pid: 4001 }, null, 2)}\n`, 'utf8');
+      return { pid: 4001 };
+    },
+    isPidAlive: (pid) => pid === 4001,
+  });
+
+  const r = invoke(['services', 'reconcile', '--after-binary-replace', '--json'], home);
+  assert.equal(r.code, EXIT.OK, r.stderr);
+  const parsed = json(r.stdout);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.data.failed, 0);
+  assert.equal(parsed.data.restarted, 1);
+  const mon = parsed.data.services.find((s: { service: string }) => s.service === 'monitor');
+  assert.equal(mon.reason, 'restarted');
+});

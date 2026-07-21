@@ -31,6 +31,7 @@ import {
   pctOf,
   pctRunway,
   tokenExpired,
+  type UsagePoolSignal,
   WINDOW_5H_SEC,
   WINDOW_7D_SEC,
   type WindowSignal,
@@ -200,6 +201,49 @@ function recoveryLine(reading: CurrentUsageSignalReading): string | null {
 }
 function recoveryHintForJson(reading: CurrentUsageSignalReading): UsageRefreshHint | null {
   return reading.refreshHint ?? null;
+}
+
+function usageAgentSummary(
+  reading: CurrentUsageSignalReading,
+  current: {
+    available: boolean;
+    five_hour: WindowSignal | null;
+    seven_day: WindowSignal | null;
+    fable_seven_day: WindowSignal | null;
+    billing_period: WindowSignal | null;
+    pools: UsagePoolSignal[];
+  },
+): string {
+  const prefix = reading.harnessId;
+  if (current.available) {
+    const facts = [
+      current.five_hour?.used_percentage != null
+        ? `5h=${fmtPct(current.five_hour.used_percentage)}`
+        : null,
+      current.seven_day?.used_percentage != null
+        ? `7d=${fmtPct(current.seven_day.used_percentage)}`
+        : null,
+      current.fable_seven_day?.used_percentage != null
+        ? `fable_7d=${fmtPct(current.fable_seven_day.used_percentage)}`
+        : null,
+      current.billing_period?.used_percentage != null
+        ? `billing_period=${fmtPct(current.billing_period.used_percentage)}`
+        : null,
+      ...current.pools
+        .filter((pool) => pool.used_percentage != null)
+        .map((pool) => `${pool.id}=${fmtPct(pool.used_percentage)}`),
+    ].filter((fact): fact is string => fact !== null);
+    return `${prefix}: available${facts.length ? ` · ${facts.join(' ')}` : ''}`;
+  }
+  const hint = reading.refreshHint;
+  const reason = hint?.reason || reading.unavailableReason || '用量信号不可用';
+  if (hint?.agent_authorized && hint.command) {
+    return `${prefix}: UNAVAILABLE (${reason}) · 你被授权运行 \`${hint.command}\` 刷新后重查 · 见 refresh_hint`;
+  }
+  if (hint?.command) {
+    return `${prefix}: UNAVAILABLE (${reason}) · 需要用户运行 \`${hint.command}\` 后重查 · 见 refresh_hint`;
+  }
+  return `${prefix}: UNAVAILABLE (${reason}) · 等待或 surface 用户 · 不可自刷${hint ? ' · 见 refresh_hint' : ''}`;
 }
 
 // cursorAgentRequested — delegate to the domain service so the surface-selection predicate has one
@@ -384,20 +428,33 @@ function renderShow(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading):
       };
       const cur5h = sidecar ? projectWindow(sidecar.five_hour) : null;
       const cur7d = sidecar ? projectWindow(sidecar.seven_day) : null;
+      const curFable7d = sidecar ? projectWindow(sidecar.fable_seven_day) : null;
       const curBilling = sidecar ? projectWindow(sidecar.billing_period) : null;
+      const curPools = sidecar?.pools
+        ? sidecar.pools.map((pool) => ({
+            id: pool.id,
+            label: pool.label,
+            kind: pool.kind,
+            ...projectWindow(pool),
+          }))
+        : [];
       // 至少一个非过期窗口有有效 used% → 账户口径可用。
       const currentAvailable =
         sidecar != null &&
         ((cur5h?.used_percentage ?? null) !== null ||
           (cur7d?.used_percentage ?? null) !== null ||
-          (curBilling?.used_percentage ?? null) !== null);
+          (curFable7d?.used_percentage ?? null) !== null ||
+          (curBilling?.used_percentage ?? null) !== null ||
+          curPools.some((pool) => (pool.used_percentage ?? null) !== null));
       const current = sidecar
         ? {
             source: currentUsage.source,
             available: currentAvailable,
             five_hour: cur5h,
             seven_day: cur7d,
+            fable_seven_day: curFable7d,
             billing_period: curBilling,
+            pools: curPools,
             captured_at: sidecar.captured_at ?? null,
           }
         : {
@@ -405,7 +462,9 @@ function renderShow(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading):
             available: false,
             five_hour: null,
             seven_day: null,
+            fable_seven_day: null,
             billing_period: null,
+            pools: [],
             captured_at: null,
           };
 
@@ -424,6 +483,7 @@ function renderShow(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading):
         available: current.available,
         accounts_scope: accountsScope,
         effective_n: en,
+        agent_summary: usageAgentSummary(currentUsage, current),
         current,
         accounts: accountList,
         registry_present: backups != null,
@@ -446,11 +506,13 @@ function renderShow(ctx: Ctx, currentUsageOverride?: CurrentUsageSignalReading):
       if (current.available) {
         const p5 = current.five_hour?.used_percentage;
         const p7 = current.seven_day?.used_percentage;
+        const pFable7d = current.fable_seven_day?.used_percentage;
         const billing = current.billing_period?.used_percentage;
         const label =
           currentUsage.source === 'codex-app-server' ? 'Codex app-server' : 'account 权威';
+        const fablePart = pFable7d != null ? ` fable_7d=${fmtPct(pFable7d)}` : '';
         lines.push(
-          `  current（${label}）: 5h=${fmtPct(p5)} 7d=${fmtPct(p7)}${billing != null ? ` billing_period=${fmtPct(billing)}` : ''}`,
+          `  current（${label}）: 5h=${fmtPct(p5)} 7d=${fmtPct(p7)}${fablePart}${billing != null ? ` billing_period=${fmtPct(billing)}` : ''}`,
         );
       } else {
         lines.push(

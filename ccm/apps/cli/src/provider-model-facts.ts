@@ -121,6 +121,15 @@ function validateProviderSnapshot(
     );
     nonemptyString(model.display_name, `providers.${provider}.models[${index}].display_name`);
     nonemptyString(model.tier, `providers.${provider}.models[${index}].tier`);
+    if (provider === 'cursor') {
+      const quotaPool = nonemptyString(
+        model.quota_pool,
+        `providers.${provider}.models[${index}].quota_pool`,
+      );
+      if (quotaPool !== 'first_party' && quotaPool !== 'usage_based') {
+        throw new Error(`providers.${provider}.models[${index}].quota_pool is invalid`);
+      }
+    }
     const availability = object(
       model.availability,
       `providers.${provider}.models[${index}].availability`,

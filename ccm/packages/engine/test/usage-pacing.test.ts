@@ -301,3 +301,24 @@ test('pacing: billing_period expired resets_at → unavailable degrade', () => {
   assert.equal(a.available, false);
   assert.equal(a.verdict, 'hold');
 });
+
+test('pacing: optional named pools do not change legacy UsageSignal verdict semantics', () => {
+  const a = pacingAdvice(
+    {
+      billing_period: { used_percentage: 40, resets_at: NOW_SEC + 86_400 },
+      pools: [
+        {
+          id: 'usage-based',
+          label: 'Usage based',
+          kind: 'usage_based',
+          used_percentage: 99,
+          resets_at: NOW_SEC + 86_400,
+        },
+      ],
+    },
+    { nowSec: NOW_SEC },
+  );
+  assert.equal(a.available, true);
+  assert.equal(a.verdict, 'hold');
+  assert.equal(a.window_billing_period_pct, 40);
+});

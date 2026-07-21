@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0-rc.3] — 2026-07-21
+
+> **Doc↔impl reconciliation + anti-drift capability-card gate, plugin increment (release candidate)** — pairs with **ccm-v0.22.0-rc.3**.
+
+### Skills / docs
+
+- `master-orchestrator-guide`, `using-ccm`, `pacing-and-estimation`: reconciled to the four-harness reality — Kimi Code as a worker/quota harness and Claude fable as an independent 7d target (referenced generation-agnostically to stay evergreen).
+- Historical design docs annotated with dated errata pointing to the current SSOT (snapshots preserved, not rewritten).
+- Regenerated `plugin/dist/{claude-code,codex,cursor,kimi-code}` + provider-guidance / pacing attestations from source.
+
+### Tests / anti-drift
+
+- New `tests/content/capability-card-code-reality.test.mjs`: a capability card claiming a host `unsupported` must be falsified by code reality; wired into `run-tests`.
+
+### Earlier in this cycle
+
+- Four-host manifest version lockstep; capability-negotiation hook + dispatch index (plugin increment).
+- Orchestrator guidance: evidence-based decision mindset + parallel-writer worktree isolation.
+- ADR: adapter-derived harness capability protocol (#188 design draft).
+
 ## [0.21.0-rc.2] — 2026-07-20
 
 > **Four-harness cross-harness reliability — cursor headless fix, 2h worker timeout, kimi machine-wide quota (release candidate)** — pairs with **ccm-v0.22.0-rc.2**.

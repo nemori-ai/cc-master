@@ -76,6 +76,30 @@ export const claudeCodeAdapter: HarnessAdapter = {
       unavailableReason: '无 status-line sidecar',
     };
   },
+  readCurrentUsageForSurface(surfaceId, env) {
+    if (surfaceId === 'claude-fable-5-cli') {
+      const signal = readClaudeCodeUsageSidecar(env);
+      const fable = signal?.fable_seven_day;
+      if (!fable || typeof fable.used_percentage !== 'number') {
+        return {
+          signal: null,
+          source: 'unavailable',
+          unavailableReason: '无 Fable 5 独立 7d status-line sidecar',
+        };
+      }
+      return {
+        signal: {
+          five_hour: null,
+          seven_day: fable,
+          fable_seven_day: fable,
+          captured_at: signal.captured_at ?? null,
+        },
+        source: 'account',
+        unavailableReason: '',
+      };
+    }
+    return this.readCurrentUsage(env);
+  },
   accountSwitchPreflight(env) {
     if (env.CLAUDE_CODE_USE_BEDROCK || env.CLAUDE_CODE_USE_VERTEX || env.CLAUDE_CODE_USE_FOUNDRY) {
       return {
@@ -250,6 +274,7 @@ function normalizeSignal(obj: Record<string, unknown>): UsageSignal {
   return {
     five_hour: win('five_hour', '5h'),
     seven_day: win('seven_day', '7d'),
+    fable_seven_day: win('fable_seven_day', 'fable_7d'),
     captured_at: capturedAt,
   };
 }

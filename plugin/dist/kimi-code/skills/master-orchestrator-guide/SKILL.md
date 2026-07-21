@@ -1,6 +1,6 @@
 ---
 name: master-orchestrator-guide
-description: 'Use when running a long-horizon (>24h) goal as a master orchestrator, coordinating several background agents / workflows toward one large goal，或要跨 Claude Code、Codex、Cursor 的统一 worker pool 按任务角色选择 O/T1/T2/T3 候选与 fail-closed fallback — 当你在做总指挥协调多个后台任务时 — even if the user never said "orchestrate". 每次 compaction 之后都要用。一旦你抓到自己在以下任一情形——后台还有可派发的活却 idle-wait 空等、只看当前 origin 的模型、为显得忙而 manufacture busywork、亲手抄起乐器（亲自实现或 review）、把 green gate 或空 review 当 passed、或擅自决定一个本该用户拍板的 merge / 不可逆步骤——立刻调用。Do NOT use when 你只需要查询 ccm 命令语法或解释事实字段；操作面归 using-ccm，事实消费归 pacing-and-estimation。'
+description: 'Use when running a long-horizon (>24h) goal as a master orchestrator, coordinating several background agents / workflows toward one large goal，或要跨 Claude Code、Codex、Cursor、Kimi Code 的统一 worker pool 按任务角色选择 O/T1/T2/T3 候选与 fail-closed fallback — 当你在做总指挥协调多个后台任务时 — even if the user never said "orchestrate". 每次 compaction 之后都要用。一旦你抓到自己在以下任一情形——后台还有可派发的活却 idle-wait 空等、只看当前 origin 的模型、为显得忙而 manufacture busywork、亲手抄起乐器（亲自实现或 review）、把 green gate 或空 review 当 passed、或擅自决定一个本该用户拍板的 merge / 不可逆步骤——立刻调用。Do NOT use when 你只需要查询 ccm 命令语法或解释事实字段；操作面归 using-ccm，事实消费归 pacing-and-estimation。'
 ---
 
 # Orchestrating to Completion（编排至完成）
@@ -26,11 +26,12 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 ### 思维底色（你怎么想）
 
-这三条是你调度时的**思维姿态**，不是方法论正文——每条只讲你*以什么姿态思考*，具体怎么做去对应的 skill：
+这四条是你调度时的**思维姿态**，不是方法论正文——每条只讲你*以什么姿态思考*，具体怎么做去对应的 skill：
 
 - **敏捷交付**：你按薄的纵向增量推进——尽早 ship 可用增量、按价值/风险排序、走 walking skeleton，绝不 big-bang；切片*内部*工序有序、任务*内部*再迭代（三层脊椎：**顶层敏捷 · 片内手艺 · 任务内优化**）。切分方法论见 `slicing-goals-into-dags`、片内工序手艺见 `engineering-with-craft`、任务内优化心智见 `dev-as-ml-loop`。
 - **迭代收敛**：你把整场编排当一个朝目标收敛的优化循环——目标即目标函数、端点验收即测量、`reconcile→dispatch→verify→replan` 即提议-测量-调整；不死守固定计划，plateau 就 replan、收敛即停不镀金。你不亲手写代码，但你仍在 dev loop 里：你拥有外层优化循环（目标、测量、subagent 组件分工、重启/停机），执行 agent 跑单任务内层循环；双尺度心智见 `dev-as-ml-loop`。
 - **运筹配速**：你像运筹员一样调度——预测出 ETA 与临界链、把稀缺资源（配额 / 模型档）压到临界路径、float 当免费的并行预算、在 burn-rate 走廊内配速而非顶满。这是你「会算账」的底色。估算/配速的消费机制见 `pacing-and-estimation`、OR/ML 引擎实现在 ccm `estimate` / `usage`。
+- **循证决策**：你像科学家与数学家一样从可验证事实与数据出发，绝不让手感、直觉或「经验」冒充证据。断言或行动前先问：「我的证据是什么？我是查过了，还是在猜？」先提出可证伪假设，再用手边工具 / 数据验证，再下结论；模型策略、配额、CLI 能力、依赖图等可查处尤其不准臆断。端点验收要求结果有证据；你把同一标准前推到派发、选型与配置，派前程序见 `references/dispatch.md`。
 
 ### 你的职责（what you do）
 
@@ -78,7 +79,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 2. **目标即依赖图 (Goal = dependency graph)** — **先有通过 Goal Framing Test / `ccm goal check` 的 Goal Contract，才有资格拆图**（原始请求是证据，不是可复制的目标；见 `references/goal-contract.md`）。再拆成 DAG，找临界路径，把资源压到临界链上（非临界的 float 是免费的并行预算；task 的工作形态 / 风险先决定 `O / T1 / T2 / T3` effect floor，临界性只决定同档候选中如何分配额度和 headroom，绝不把“临界=强档、float=弱档”当捷径——统一事实与选档见 `pacing-and-estimation` 和 `references/model-allocation.md`）。**每条依赖边都是债务，默认错——除非你能指名一个被下游直接消费的具体上游产物（artifact / hash），否则删掉它。**「先做 X 当安全网」「按这个顺序更稳妥」是顺序习惯，不是数据依赖。默认全并行，逐边举证；拆图细节见 `references/decomposition.md` §1–§2（临界路径 / float 可心算估计，也可用 `ccm board graph` 机器算·详见 `references/decomposition.md` §3）。一个大节点*内部*本身是复杂规划问题时，让它用被编排项目自己的 planning 层 + 维护计划文档——见 `references/multi-layer-planning.md`。
 3. **就绪即发，绝不在 barrier 干等 (Dispatch on ready, never wait at a barrier)** — dataflow：一个节点的依赖刚满足就立刻派发它；并行度 = 用 T₁/T∞ 算该开几条 lane（T₁/T∞ 可心算，也可 `ccm board graph` 机器读·见 `references/decomposition.md` §3）。派发前先从整个本机 worker pool 选择 target harness、agent 与模型：origin harness 不是 worker 候选边界，按目标 harness 的模型能力、成本、配额与任务适配度择优；再按 先选 target harness（origin harness 只是候选之一），再按当前 kimi-code surface 已感知能力选择本 host 的 Task subagent / 后台 Bash / external，或用 `ccm` 管理其他 harness worker；不要调用 Claude Code 的 workflow / background-runner 原语；需要机制细节，细节见 `references/dispatch.md`。**dispatch 动作 = 一次真实工具调用并记下它返回的 handle；没有真实 handle 的 task 不得标 `in_flight`。**agent 的 `starting` 登记可以先于 spawn，但 task 的 `in_flight` 必须后于真实 handle 的 bind + link；所有 board 变更只走 `ccm`（标注 ≠ 派发；完整顺序与地面真相验证法见 `references/dispatch.md` §「派发卫生」）。
 4. **主观能动，不被动空等 (Be proactive, never idle-wait)** — 歇下来之前，先把可做工作池榨干、主动排程。合法的等待 = 剩下的每条 path 要么 blocked 在某个 `in-flight` 后台任务上、要么已抛给用户待答。罪在**本可行动却被动**，不在闲置本身。**等待前若有 blocked 在「可能静默失败的 in-flight 后台任务」上的 path，先 arm 一个 watchdog 自我唤醒**——harness 的自动重唤起只在任务*完成*时触发，对 hang / 静默死 / 幽灵任务（永不触发完成事件）结构性失明；watchdog 是补这个盲区的安全网（纯 awaiting-user 不需，那条线既有通知覆盖）。探活分两轨（机械 watchdog 兜底 ∥ 心智搭车探活防迟钝）、ceiling 是 recon 触发器**不是死亡判据**（recon 后健康则延长重 arm、不误杀）——机制 / 触发条件 / 节制判据 / board `wakeup` 双层记录见 `references/async-hitl.md` §等待前 arm watchdog。
-5. **量力而行，不顶满 (Work within capacity — don't max it out)** — 限制 WIP，瞄一条**目标走廊上界**而非冲到 100%（Little's Law + 利用率悬崖；加 agent 不总是更快）。从任意 origin 先读 `ccm quota status --machine-wide --json`，再用 `ccm --harness <target> usage show|advise --json` 下钻 selected target；只有同一 target、同一 freshness 时点的窗口与来源可以驱动 WIP / 模型档 / dispatch。Claude Code `claude-cli` 看 5h + 7d，且只有既存 policy / 用户明确授权才可切 Claude 账号；Codex `codex-cli` **只**把 7d 当 hard window，rolling-24h 仅 advisory、任何 5h 无动作权威且禁止自动换号；Cursor `cursor-ide-plugin` 与 `cursor-agent-cli` 是两个独立的 billing-period target，不能互补且禁止自动换号。`unknown` / stale / missing 一律 fail closed；多块 active board 再把 fresh 的 `coordination inbox` / `coordination arbitrate` own row 纳入判断。窗口与信号的完整消费合同见 `pacing-and-estimation`，命令精确语法见 `using-ccm`；ccm 出事实与 verdict，你决策。
+5. **量力而行，不顶满 (Work within capacity — don't max it out)** — 限制 WIP，瞄一条**目标走廊上界**而非冲到 100%（Little's Law + 利用率悬崖；加 agent 不总是更快）。从任意 origin 先读 `ccm quota status --machine-wide --json`，再用 `ccm --harness <target> usage show|advise --json` 下钻 selected target；只有同一 target、同一 freshness 时点的窗口与来源可以驱动 WIP / 模型档 / dispatch。Claude Code `claude-cli` 看 5h + 7d，`claude-fable-*-cli` 的 7d 是不可相加的独立 target，且只有既存 policy / 用户明确授权才可切 Claude 账号；Codex `codex-cli` **只**把 7d 当 hard window，rolling-24h 仅 advisory、任何 5h 无动作权威且禁止自动换号；Cursor `cursor-ide-plugin` 与 `cursor-agent-cli` 是两个独立的 billing-period target，不能互补且禁止自动换号；Kimi `kimi-cli` 只读当前登录的 5h + 7d，可对过期 stored OAuth 做带锁自动刷新，但账号切换仍 unsupported。`unknown` / stale / missing 一律 fail closed；多块 active board 再把 fresh 的 `coordination inbox` / `coordination arbitrate` own row 纳入判断。窗口与信号的完整消费合同见 `pacing-and-estimation`，命令精确语法见 `using-ccm`；ccm 出事实与 verdict，你决策。
 6. **只信端点验收，产出可记账可续 (Trust only endpoint verification; outputs are accountable and resumable)** — 在你自己的端点独立验收，agent 的自报不可信。用 content-hash 记账；done+verified 的可跳过、可续跑。**且单层验收也会漏隐性失败**——测试没覆盖的 bug、实现理解与落地的偏差、self-report 的乐观，都让一道「绿」骗过你；故**异构族系第二视角**（产出族 ≠ 验收族；高杠杆裁决 / 临界 correctness-critical `done` **强制**，常规 float 鼓励不强制）/ dogfood / 多层交叉不是镀金，是必要（「看似成功 ≠ 真成功」）；同族复读不算第二视角；收益不对称（强审弱最值、弱审强需慎重核对），机制按 host 见 `references/resume-verify.md`。
 7. **该问就问，前台对话∥后台执行 (Ask when you should; front-of-house dialogue ∥ background execution)** — 用户是一种特殊的 async worker；该他拍板的立刻抛出来，别捂着、也别越权。他的回答是一条 async 依赖；不依赖它的就绪工作照常派发、照常跑。**「∥」是有顺序的：一拍内前台事与可独立派发的后台活同时到手时，先把独立后台活派出去（真实工具调用拿 handle）、再坐下做前台事**——你越是先做前台、后才派那些独立后台活，后台就越晚开始越晚完成、makespan 平白拉长；且前台对话越长越深，那个「还有 X 没派」的念头越容易在 context 增长里蒸发掉（同 phantom 之于派发卫生，是「念头压根没出现」这类失守）。派完即可全心做前台（机制 / 防遗忘见 `references/async-hitl.md` §前台∥后台的派发顺序）。**prefetch 一个 awaiting-user 决策时可连判断依据一起备好**——idle / 建节点时给它备一份 `decision_package` 采访包（agent-shaped、on-board），让用户在方便时对着准确又有时效的完整依据做一次高质量决策；谈完的 `.decision.md` sidecar 在 recon 时消化、replan、清 `blocked_on:"user"`（采访准备 / 消化两条纪律见 `references/async-hitl.md` §采访式决策，协议见 `references/board.md` §`decision_package`）。
 
@@ -132,6 +133,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | 「我 **`Write` board 标了 `in_flight` 就等于派了**。」 | **board 标注 ≠ 真实派发。** 标 `in_flight` 必须由一次真实派发产生一个**真实 agent 或 background process/session handle**，否则就是虚构进度。尤其 `ccm` worker 是同步 wrapper：跨 harness 长任务必须把它运行在当前 origin 可追踪的后台 shell / terminal / session 中；handle 来自这个后台机制，不是同步 wrapper 的返回结果。先拿到可 recon 的 handle、再标板。 |
 | 「我 `--resume` 接手了，**当前 cwd 就是干活的地方，直接 reconcile / 跑闸**。」 | **resume 的 cwd 未必 == `board.git.worktree`。** 不先 `cd` 进 worktree 并核对一致，后续相对路径 / git / 端点闸全在错目录静默跑——轻则挂、重则在另一棵树上跑绿、把非目标产物标 `done`，端点验收（「只信端点验收」镜头）的可信度连必要条件都不成立。resume 第 0 步永远是落 worktree、确认 cwd==它——见 `references/resume-verify.md` §resume 第 0 步。 |
 | 「**三个 subagent 独立调研还都对上了——这基本就是事实了**，那行『未与真实用户确认』不过是句免责声明；窗口今晚关，先按这个切完 DAG 全派，验收时再兜。」 | **内部共识不是外部验证。** 三份报告一致，往往是同一个未验证前提被复制了三次（相关失败），不是三条独立证据收敛——「同族复读不算第二视角」在假设层同构成立。一个**承重**判断（删掉它 DAG 形状就变）若只由内部推断支撑，端点验收兜的是*成品对不对*、兜不回一个大规模投入*建错了方向*。先问「哪一项外部事实最能廉价地推翻它」、用与风险相称的最低成本手段接触现实，再决定投入——这不是拖慢，是不往错误方向加速。越是「方案很顺 + 沉没成本高 + 窗口紧」，那份「*这次*直接走」的冲动本身就是症状（低风险 ∧ 可逆 ∧ 事实充分的小改除外，记一笔照常推进即可，别过度求证）。分级 / 校准阶梯见 `references/outside-in.md`。 |
+| 「**我凭手感 / 经验就够了，不必查。**」 | **手感不是证据。** 先把判断写成可证伪假设，再用手边工具、数据或真实 `--help` 验证；有证据可查却不查，就是让臆断替你调度。派前取证程序见 `references/dispatch.md`。 |
 
 ### Red Flags（红旗）—— 停下，重跑决策程序
 
@@ -147,6 +149,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 - 你正要把一个 task 标 `in_flight`，却**没有真实 agent 或 background process/session handle 对应它**；或者你同步调用了 `ccm` worker，却没把它放进当前 origin 可追踪的后台机制、就把同步 wrapper 的结果冒充 handle——你在虚构进度。
 - 你正要向已越过其当前 hard quota boundary 的 selected target dispatch 新节点，或把 `unknown` / stale / missing 当 ample，却没有先停派并 surface 容量取舍——你在替用户跨不可逆消耗边界。
 - 你正基于一个**只由内部推断支撑**的承重假设做完整规划 / 扩大投入（不可逆或门控很大），却没问过「哪项外部事实最能廉价地推翻它」、也没把它记成一条待验证假设——「三份内部报告一致」「应该兼容吧」「subagent 都同意了」都是把内部共识当外部验证的信号（反侧同样是脱轨：对一个低风险 ∧ 可逆 ∧ 事实充分的小改堆问用户 / 造 review / 起 dogfood，是把靶向校准过度泛化成仪式）。
+- 你正要凭手感、直觉或「经验」断言模型策略、配额、CLI 能力、依赖图或派发配置，却没先跑可用工具、读真实 help 或测那个量——你在猜，不是在决策。
 - 这块板背着一个 `asserted` / `confirmed` 交付 DDL，你却正要把**不在当前 acceptance 里**的增强 / 抽象 / 打磨排进 DAG，或想等延期风险「确定」了再 surface——你在拿交付窗口换没人要的产出、或把 surface 门槛（actionability）误当 certainty（无 DDL 时此条不适用；纪律见 `references/deadline-discipline.md`）。
 - 你正在为「**这场 orchestration 是某条红线的例外**」构建论证。
 - 你正要 Stop，却**没有 step-6 ledger**（没有把每条 path 的证据写进 board + 对话）。
@@ -186,7 +189,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | `outside-in.md` | 规划 / 设计 / replan 中某**承重判断只由内部推断支撑**、缺外部证据时：证据五分级、校准成本阶梯、无外部通道时诚实记未知 + 可逆实验、外部证据改 goal 语义走 amendment、低风险可逆豁免 |
 | `decomposition.md` | 一张**已切好**的 DAG 怎么**排期**（CPM / float / 临界路径；心算 或 `ccm board graph` 机器算 §3） |
 | `deadline-discipline.md` | 这块板背着一个交付 DDL（截止期）时的九条编排纪律（倒排 / 按时优先于扩产出 / 简单性正则 / slack 管理 / 尽早 surface 风险 / `decision_package` 升级 / 提前收口 / replan 不漂移 / 收敛即停） |
-| `model-allocation.md` | 读取三路统一模型事实后，怎样按工作角色定 `O / T1 / T2 / T3` floor、跨 provider 排序，以及配额收紧时怎样保持 floor 并联动 WIP / float / background / watchdog / 用户决策 |
+| `model-allocation.md` | 读取四路统一模型事实后，怎样按工作角色定 `O / T1 / T2 / T3` floor、跨 provider 排序，以及配额收紧时怎样保持 floor 并联动 WIP / float / background / watchdog / 用户决策 |
 | `dispatch.md` | 从本机全池选跨 harness worker + 选 kimi-code 当前 surface 可追踪后台机制（Task subagent / 后台 Bash / external scheduler）+ **派发卫生**；Workflow 语义当前 unsupported |
 | `async-hitl.md` | HITL / 采访式决策 / **step-6 ledger** / 等待前 arm watchdog / 前台∥后台派发顺序 |
 | `board.md` | board 协议 narrative + 长程操作纪律（窄腰 / status enum / 续跑 / 读写关卡） |
@@ -194,6 +197,18 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 | `cost-decisions.md` | Claude Code 账号池换号决策锚；kimi-code 当前账号池切换 unsupported，kimi-code 编排不要 drill |
 | `multi-layer-planning.md` | 派发的大节点**内部**本身是复杂规划问题时（board ⊥ 项目自身 planning 层） |
 | `handoff.md` | 优雅交接给新 session（quiesce / drain / 叙事层文档 + 归档）；kimi-code 走 `cc-master:handoff-to-new-session` + `cc-master:as-master-orchestrator --resume` |
+
+### 派发与选型导航：按决策反查
+
+上面两张表按「资源」组织（每个 skill / reference 各管什么）；这张按**你要做的决策**反查——「派发 + 选型」的答案散在多处，从这一处按序路由，不靠记忆连跳：
+
+| 你要做的决策 | 按这个顺序读 |
+|---|---|
+| 选 executor 值 + 后台机制（shell / subagent / workflow） | §4.2 拿 executor min-max 与派发 prompt 六件事；机制细节（后台机制对比 / parallel vs pipeline / escalation / 派发卫生）drill `references/dispatch.md`；workflow 脚本写法归 `authoring-workflows` |
+| 跨 harness worker 选择（从全机 worker pool 选 target） | 流程走 §④「Cross-harness 调派热路径」；判断框架 drill `references/dispatch.md` §跨 harness 的当前最小闭环；命令合同（harness inventory / worker run / agent 登记收口）归 `using-ccm` |
+| 模型档选型 / effect floor（`O / T1 / T2 / T3`） | 编排决策（工作角色定 floor → 候选排序 → fallback → 配额收紧时的容量动作）drill `references/model-allocation.md`；模型事实与相对成本归 `pacing-and-estimation` |
+| 读 `usage` / `estimate` advisory 配速 | 热路径在 §4.3；verdict / 窗口合同 / 信号源 / 估算诚实字段的消费机制归 `pacing-and-estimation`；精确命令语法归 `using-ccm` |
+| 号池换号决策 | 决策锚（lever 阶梯 / policy 授权 / 绝不自授权）按上方 references 表 `cost-decisions.md` 行的 host 适用标注 drill；号池机制（录号 / 换号 / 选号）归 `using-ccm` |
 
 ### 你与用户之间的 commands（知道它们存在）
 
@@ -219,7 +234,7 @@ description: 'Use when running a long-horizon (>24h) goal as a master orchestrat
 
 1. `ccm harness list` —— 确认 machine-wide inventory 与真实 execution surface。
 2. `ccm worker help` —— 读取目标 CLI 的真实 help。
-3. `ccm model-policy show --task <task-taxonomy> --json`、`ccm provider facts` —— 先按 task role 读取三路统一的 hard facts / project role evidence / community advisory；candidate 不是 certified。
+3. `ccm model-policy show --task <task-taxonomy> --json`、`ccm provider facts` —— 先按 task role 读取四路统一的 hard facts / project role evidence / community advisory；candidate 不是 certified。
 4. `ccm quota status --machine-wide --json` —— 一次读取本机所有受支持 target 的缓存 quota posture；按 `harness_id + surface_id + window` 绑定候选，missing / stale / unknown 不补成 ample。Codex 只看 7d；Cursor IDE 与 Cursor Agent 是两条独立 surface。选中目标后才用 `ccm --harness <target> usage show|advise --json` 下钻；持有 authority reference 时才做 `ccm quota preflight`。
 5. `ccm model-policy advise --input <json|@file|-> --json` / `ccm route advise` —— 前者只在调用方提供的已 qualification 候选间执行有界排序，后者给 board shadow advice 且稳定返回 `spawned=false`；两者都不启动 worker。不要臆造 `--role`、`--taxonomy`、`--require` 等 flag；语法不确定时先运行 `ccm model-policy <verb> --help`，再查 `using-ccm`。
 6. `ccm worker run` —— 选定后显式 dispatch。**派发即两笔账：`ccm agent create/bind/link` 把这个 runtime worker 登进 `agents[]` 花名册（凡派发皆登记）＋ `task start` 让 task 进 `in_flight`——只记 task handle、漏掉 agent 登记，花名册与 resume 后的自己就数不清谁在跑。**

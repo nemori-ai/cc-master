@@ -341,13 +341,20 @@ export async function ccm(ctx: Ctx): Promise<number> {
     tmp = '';
     ctx.out(`✓ ccm 已升级 → ${tag}（${ver}·已替换 ${execPath}）。`);
     try {
-      execFileSync(execPath, ['services', 'reconcile', '--after-binary-replace'], {
-        stdio: 'ignore',
-        timeout: 15000,
+      // Capture (not discard) reconcile output so a real failure can be surfaced. reconcile is now
+      //   fail-loud: a wanted service that did not land on the new binary exits nonzero, which makes
+      //   execFileSync throw here. The generous timeout covers the sequential monitor + web-viewer
+      //   cold-start health waits.
+      execFileSync(execPath, ['services', 'reconcile', '--after-binary-replace', '--json'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        encoding: 'utf8',
+        timeout: 30000,
       });
     } catch (e) {
+      const err = e as { stdout?: string; stderr?: string; message?: string };
+      const detail = (err.stderr || err.stdout || err.message || '').toString().trim();
       ctx.err(
-        `upgrade(ccm): 注意——ccm 二进制已替换，但 services reconcile 未成功（可稍后手动跑 \`ccm services reconcile --after-binary-replace\`）：${(e as Error).message}`,
+        `upgrade(ccm): 注意——ccm 二进制已替换，但 services reconcile 未成功（可稍后手动跑 \`ccm services reconcile --after-binary-replace\`）：${detail}`,
       );
     }
     if (ctx.flags.json) {

@@ -1,6 +1,6 @@
 ---
 name: using-ccm
-description: 'Use when you (orchestrator/agent) read or mutate a cc-master board through the ccm CLI in kimi-code —— 当你要查询三路统一 `model-policy show|advise`、写 cross-harness planning/routing、操作 board，或读 kimi-code-origin usage/dispatch 操作面时。它一体两面：面1是 ccm 命令与 board 写入关卡；面2是 board 模型、O/T1/T2/T3 effect floor、candidate chain 与 fail-closed fallback 的字段取值。Triggers: 敲 ccm model-policy/task/board/jc/cadence/log/watchdog/harness/provider/usage、查跨 provider 候选、写 ample/tight chain、任何 board 写操作或 ccm exit 3。Do NOT use when 你在决定任务角色、最终 target、何时减速/停派或怎么拆 DAG（归 master-orchestrator-guide），或解释 model-policy/usage/estimate 事实与 advisory（归 pacing-and-estimation）。目标模型查询跨 provider 共享；kimi-code 自身无 CLI 配额信号（`ccm usage` 恒 `available:false`）与实际 dispatch 仍是 origin/target-local 机制。kimi-code 账号池 / 换号 unsupported（ccm account 绑 Claude OAuth）。'
+description: 'Use when you (orchestrator/agent) read or mutate a cc-master board through the ccm CLI in kimi-code —— 当你要查询四 provider 统一 `model-policy show|advise`、写 cross-harness planning/routing、操作 board，或读 kimi-code-origin usage/dispatch 操作面时。它一体两面：面1是 ccm 命令与 board 写入关卡；面2是 board 模型、O/T1/T2/T3 effect floor、candidate chain 与 fail-closed fallback 的字段取值。Triggers: 敲 ccm model-policy/task/board/jc/cadence/log/watchdog/harness/provider/usage、查跨 provider 候选、写 ample/tight chain、任何 board 写操作或 ccm exit 3。Do NOT use when 你在决定任务角色、最终 target、何时减速/停派或怎么拆 DAG（归 master-orchestrator-guide），或解释 model-policy/usage/estimate 事实与 advisory（归 pacing-and-estimation）。目标模型查询跨 provider 共享；kimi-code 的 `ccm usage show/advise` 可读当前登录态 5h/7d，但实际 dispatch 与 hook delivery 仍是 origin/target-local 机制。kimi-code 账号池 / 换号 unsupported（ccm account 绑 Claude OAuth）。'
 ---
 
 # using-ccm — 用 ccm CLI 驱动 board
@@ -8,7 +8,7 @@ description: 'Use when you (orchestrator/agent) read or mutate a cc-master board
 > `ccm` 是 cc-master 的 board 命令行——board 数据模型 SSOT 的**唯一写入关卡**。本 skill 是它的**操作手册**:不是"该编排什么"(那是 master-orchestrator-guide),而是"既然要动 board,怎么用 ccm 动得对"。
 > **它一体两面**:面1=**ccm 命令怎么敲**(命令面在 `command-catalog.md`);面2=**board 模型怎么理解 + 字段什么时候设什么值**(领域概念解释 + 字段取值指导在 `board-model-guide.md`)。心智锚在主文件,两面的深度各进一个 reference。
 >
-> **职责边界:** 编排决策归 `master-orchestrator-guide`、读 usage/estimate verdict 配速估算归 `pacing-and-estimation`、workflow 脚本归 `authoring-workflows`（kimi-code 下当前是 stub）；**怎么用 ccm 这把工具操作 board / task / log / judgment_call / cadence / watchdog / harness inventory / 当前账号 usage** 归本 skill。kimi-code 下账号池切号、statusline install/uninstall、plugin upgrade 当前不支持；走到这些命令面时停止并说明 unsupported，不要套其他 harness 的 credential store、status-line settings、plugin-root token 或配置目录。
+> **职责边界:** 编排决策归 `master-orchestrator-guide`、读 usage/estimate verdict 配速估算归 `pacing-and-estimation`、workflow 脚本归 `authoring-workflows`（kimi-code 下当前是 stub）；**怎么用 ccm 这把工具操作 board / task / log / judgment_call / cadence / watchdog / harness inventory / 当前账号 usage** 归本 skill。kimi-code 下账号池切号、statusline install/uninstall 当前不支持；`upgrade plugin --harness kimi-code` 已可刷新本地 Kimi plugin 注册。走到不支持的命令面时停止并说明 unsupported，不要套其他 harness 的 credential store、status-line settings、plugin-root token 或配置目录。
 
 ---
 
@@ -112,7 +112,7 @@ ccm goal check --json                      # ok 后才能切 DAG；pending/deadl
 ccm board show                             # goal/owner/任务统计/lint 是否净
 
 # 派发一个任务从生到完成(端点验收后才 done)
-ccm model-policy show --task implementation-from-spec --json  # 三路统一角色/事实/taste；再做 target live qualification
+ccm model-policy show --task implementation-from-spec --json  # 四 provider 统一角色/事实/taste；再做 target live qualification
 ccm task add T3 --type development --executor subagent \
     --deps T1,T2 --estimate 3h --ref spec:/abs/spec.md --ref plan:/abs/plan.md --accept "DoD 一句话"
 # 真实 Task 启动后再回填返回的 subagent id；不预填 phantom handle
