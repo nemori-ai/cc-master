@@ -1,6 +1,6 @@
 {
   "name": "cc-master",
-  "version": "0.21.0-rc.2",
+  "version": "0.21.0-rc.3",
   "description": "Turn a kimi-code session into a long-horizon master orchestrator through the cc-master adapter.",
   "skills": "./skills/",
   "commands": "./commands/",
