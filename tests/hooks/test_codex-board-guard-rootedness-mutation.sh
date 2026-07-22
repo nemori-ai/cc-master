@@ -3,10 +3,13 @@
 
 LAUNCHER="$REPO_ROOT/plugin/src/hooks/_hosts/codex/launcher.js"
 CORE="$REPO_ROOT/plugin/src/hooks/board-guard/implementations/codex/board-guard-core.js"
+APPLY_PATCH_INPUT="$REPO_ROOT/plugin/src/hooks/_hosts/codex/apply-patch-input.js"
 ROOT="$(make_project)"
 HOME_DIR="$ROOT/home"
 PATCH_CWD="$ROOT/patch-cwd"
-MUTANT_CORE="$ROOT/board-guard-rootedness-mutant.js"
+MUTANT_HOOKS="$ROOT/hooks"
+MUTANT_CORE="$MUTANT_HOOKS/board-guard/implementations/codex/board-guard-rootedness-mutant.js"
+MUTANT_APPLY_PATCH_INPUT="$MUTANT_HOOKS/_hosts/codex/apply-patch-input.js"
 GOOD='{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-x"},"tasks":[]}'
 
 cleanup() {
@@ -14,8 +17,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-mkdir -p "$HOME_DIR/boards" "$PATCH_CWD"
+mkdir -p "$HOME_DIR/boards" "$PATCH_CWD" "$(dirname "$MUTANT_CORE")" "$(dirname "$MUTANT_APPLY_PATCH_INPUT")"
 printf '%s' "$GOOD" > "$HOME_DIR/boards/armed.board.json"
+
+# The mutant must retain the production core's relative dependency layout so it exercises the real
+# shared Codex apply_patch normalizer and differs from production only at the mutation seam below.
+cp "$APPLY_PATCH_INPUT" "$MUTANT_APPLY_PATCH_INPUT"
 
 # Generate the exact regression caught in round 6: TAB/CR cleanup happens before path.resolve(),
 # promoting a parser-relative `/absolute-looking` shadow into a real absolute board path. Requiring

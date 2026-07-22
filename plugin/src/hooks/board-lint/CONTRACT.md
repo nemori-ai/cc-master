@@ -50,9 +50,16 @@ per AGENTS.md §12, stacks on top of the isArmed check) / equivalent inline gate
   affected_hosts: [claude-code]
   reason: >
     Codex's board-lint-core.js additionally matches on `apply_patch`, extracting board paths from
-    the patch payload text, since Codex frequently edits files through apply_patch rather than
-    Write/Edit/MultiEdit. Claude Code has no apply_patch tool, so it has no corresponding matcher.
-  compensating_mechanism: "n/a — legitimate host-tool-surface difference, not a bug to reconcile."
+    the patch payload text. In the nested `functions.exec` -> `tools.apply_patch` FREEFORM path, a
+    direct-core normalized hook envelope can retain that text as `tool.input.input`, so the shared
+    Codex host normalizer (`_hosts/codex/apply-patch-input.js`) runs at board-lint's candidate-path
+    classification boundary and collapses every recognized carrier to `{ patch: string }`: the
+    native string, canonical patch object, and nested `{ input: string }` object. Keeping the
+    boundary in the core covers both launcher-mediated and direct-core invocation. Claude Code has no
+    `apply_patch` tool or nested `functions.exec` -> `tools.apply_patch` carrier; its board-lint
+    receives structured Write/Edit/MultiEdit paths, so it needs neither this normalizer nor a
+    matching implementation change.
+  compensating_mechanism: "n/a — legitimate Codex host-envelope difference, not a parity gap."
   tracked_by: "n/a"
 
 - rule: board-lint-kimi-posttooluse-discarded

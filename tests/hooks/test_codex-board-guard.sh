@@ -25,6 +25,17 @@ run_pretool_in_cwd() {
   HOOK_RC=$?
 }
 
+# The actual functions.exec -> tools.apply_patch FREEFORM path invokes the core with an already
+# normalized hook envelope, but retains the nested `{ input: <patch> }` carrier. Keep this helper
+# separate from run_pretool so the regression proves the core boundary rather than launcher behavior.
+run_pretool_core_in_cwd() {
+  HOOK_OUT="$(
+    printf '%s' "$1" |
+      (cd "$3" && CC_MASTER_HOME="$2" node "$CORE" 2>/dev/null)
+  )"
+  HOOK_RC=$?
+}
+
 json_write_payload() {
   printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"%s","tool_input":{"file_path":"%s"}}' "$1" "$2" "$3"
 }
@@ -42,10 +53,18 @@ json_native_patch_payload() {
 }
 
 # functions.exec -> tools.apply_patch FREEFORM envelope (issue #156): the patch string arrives under
-# tool_input.input rather than as a bare string or {patch}. The launcher must collapse it to
-# {patch:string} before board-guard classifies targets.
+# tool_input.input rather than as a bare string or {patch}. The Codex host normalizer must collapse
+# it to {patch:string} before board-guard classifies targets.
 json_input_wrapped_patch_payload() {
   printf '{"session_id":"%s","hook_event_name":"PreToolUse","tool_name":"apply_patch","tool_input":{"input":%s}}' "$1" "$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$2")"
+}
+
+json_normalized_input_wrapped_patch_payload() {
+  printf '{"harness":"codex","event":"pre-tool-use","session":{"id":"%s","role":"unknown"},"tool":{"name":"apply_patch","input":{"input":%s}}}' "$1" "$(node -e 'process.stdout.write(JSON.stringify(process.argv[1]))' "$2")"
+}
+
+json_normalized_apply_patch_payload() {
+  printf '{"harness":"codex","event":"pre-tool-use","session":{"id":"%s","role":"unknown"},"tool":{"name":"apply_patch","input":%s}}' "$1" "$2"
 }
 
 json_structured_payload() {
@@ -656,9 +675,8 @@ exercise_environment_near_neighbor() {
 chmod +x "$CORE"
 GOOD='{"schema":"cc-master/v2","goal":"g","owner":{"active":true,"session_id":"sess-x"},"tasks":[{"id":"T0","status":"ready","deps":[]}]}'
 
-# Codex native FREEFORM apply_patch sends tool_input as the patch string itself. The launcher must
-# normalize that one host-native shape before board-guard classifies targets, without weakening the
-# parser's existing fail-closed behavior for malformed input.
+# Codex native FREEFORM apply_patch sends tool_input as the patch string itself. The shared Codex
+# normalizer must classify that host-native shape without weakening fail-closed malformed input.
 H="$(make_project)"
 seed_board "$H" "mine" "$GOOD"
 
@@ -693,9 +711,9 @@ rm -rf "$H"
 
 # functions.exec -> tools.apply_patch FREEFORM envelope (issue #156). The nested Codex tool contract
 # delivers the patch as tool_input.input (a freeform string), not a bare string or {patch}. The
-# launcher normalization bridge must collapse that carrier to {patch:string} so board-guard classifies
-# the declared target instead of failing closed on an ordinary non-board source edit — while still
-# denying real board targets and failing closed on a malformed envelope.
+# shared Codex normalizer must collapse that carrier to {patch:string} so board-guard classifies the
+# declared target instead of failing closed on an ordinary non-board source edit — while still denying
+# real board targets and failing closed on a malformed envelope.
 H="$(make_project)"
 seed_board "$H" "mine" "$GOOD"
 
@@ -729,6 +747,68 @@ assert_contains "$HOOK_OUT" '"decision":"block"' "functions.exec apply_patch env
 # core must fail closed rather than allow.
 run_pretool "$(json_structured_payload "sess-x" "apply_patch" '{"input":42}')" "$H"
 assert_contains "$HOOK_OUT" '"decision":"block"' "functions.exec apply_patch envelope non-string carrier -> fail closed"
+rm -rf "$H"
+
+# functions.exec -> tools.apply_patch FREEFORM must also work when the host invokes the Codex core
+# directly with the normalized hook contract. Launcher-only normalization cannot cover that boundary.
+H="$(make_project)"
+seed_board "$H" "mine" "$GOOD"
+
+PATCH="*** Begin Patch
+*** Add File: $H/direct-core-absolute-add.txt
++ordinary
+*** End Patch"
+run_pretool_core_in_cwd "$(json_normalized_input_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_eq 0 "$HOOK_RC" "direct-core functions.exec apply_patch absolute Add -> rc 0"
+assert_eq "" "$HOOK_OUT" "direct-core functions.exec apply_patch ordinary absolute Add -> allow"
+
+PATCH='*** Begin Patch
+*** Add File: direct-core-relative-add.txt
++ordinary
+*** End Patch'
+run_pretool_core_in_cwd "$(json_normalized_input_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_eq "" "$HOOK_OUT" "direct-core functions.exec apply_patch ordinary relative Add -> allow"
+
+printf 'before\n' > "$H/direct-core-absolute-update.txt"
+PATCH="*** Begin Patch
+*** Update File: $H/direct-core-absolute-update.txt
+@@
+-before
++after
+*** End Patch"
+run_pretool_core_in_cwd "$(json_normalized_input_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_eq "" "$HOOK_OUT" "direct-core functions.exec apply_patch ordinary absolute Update -> allow"
+
+printf 'before\n' > "$H/direct-core-relative-update.txt"
+PATCH='*** Begin Patch
+*** Update File: direct-core-relative-update.txt
+@@
+-before
++after
+*** End Patch'
+run_pretool_core_in_cwd "$(json_normalized_input_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_eq "" "$HOOK_OUT" "direct-core functions.exec apply_patch ordinary relative Update -> allow"
+
+PATCH="*** Begin Patch
+*** Add File: $H/boards/direct-core-add.board.json
++{}
+*** End Patch"
+run_pretool_core_in_cwd "$(json_normalized_input_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_contains "$HOOK_OUT" '"kind":"block"' "direct-core functions.exec apply_patch real board Add -> block"
+
+PATCH="*** Begin Patch
+*** Update File: $H/boards/mine.board.json
+@@
+-old
++new
+*** End Patch"
+run_pretool_core_in_cwd "$(json_normalized_input_wrapped_patch_payload "sess-x" "$PATCH")" "$H" "$H"
+assert_contains "$HOOK_OUT" '"kind":"block"' "direct-core functions.exec apply_patch real board Update -> block"
+
+run_pretool_core_in_cwd "$(json_normalized_apply_patch_payload "sess-x" '{"input":42}')" "$H" "$H"
+assert_contains "$HOOK_OUT" '"kind":"block"' "direct-core functions.exec apply_patch non-string carrier -> fail closed"
+run_pretool_core_in_cwd "$(json_normalized_apply_patch_payload "sess-x" '{"input":"not a patch envelope"}')" "$H" "$H"
+assert_contains "$HOOK_OUT" '"kind":"block"' "direct-core functions.exec apply_patch malformed patch -> fail closed"
 rm -rf "$H"
 
 # Unarmed: allow silently.

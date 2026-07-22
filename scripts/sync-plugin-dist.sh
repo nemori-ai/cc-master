@@ -320,7 +320,13 @@ if (host === 'kimi-code') {
   if (host === 'codex' || host === 'cursor') {
     const launcher = path.join(hooksHost, 'launcher.js');
     if (!fs.existsSync(launcher)) throw new Error(`missing ${launcher}`);
-    copyFileWithMode(launcher, path.join(hooksDst, '_hosts', host, 'launcher.js'));
+    for (const entry of fs.readdirSync(hooksHost, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+      copyFileWithMode(
+        path.join(hooksHost, entry.name),
+        path.join(hooksDst, '_hosts', host, entry.name),
+      );
+    }
   }
   // PHIP runtime helpers are host-neutral implementation code. Maintainer prose in _shared stays
   // source-only; only JS helpers cross the projection boundary.
