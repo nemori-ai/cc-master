@@ -101,7 +101,7 @@ test('projection rejects missing, future, expired, superseded and falsely-global
       guidanceAttestation.loadProviderGuidanceRegistry(
         join(ROOT, 'plugin/src/skills/provider-guidance-runtime.json'),
         ROOT,
-        '2026-07-23T00:00:00Z',
+        '2026-07-30T00:00:00Z',
       ),
     /stale|expired/iu,
     'a snapshot that was fresh at manifest creation must still fail a later projection',
@@ -112,7 +112,7 @@ test('projection rejects missing, future, expired, superseded and falsely-global
       facts.providers['claude-code'].observed_at = '2999-01-01T00:00:00Z';
       facts.providers['claude-code'].valid_until = '2999-01-02T00:00:00Z';
     }],
-    ['expired evidence', (facts) => { facts.providers['claude-code'].valid_until = '2026-07-14T00:00:00Z'; }],
+    ['expired evidence', (facts) => { facts.providers['claude-code'].valid_until = '2026-07-21T00:00:00Z'; }],
     ['superseded current', (facts) => {
       facts.providers['claude-code'].models.push({
         ...structuredClone(facts.providers['claude-code'].models[0]),
