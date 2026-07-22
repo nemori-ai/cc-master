@@ -29,6 +29,10 @@ import {
 } from '@ccm/engine';
 import { resolveDeliveryFacts } from '../delivery-proof.js';
 import * as discover from '../discover.js';
+import type {
+  MachineQuotaDirectory,
+  WorkerExecutionDirectory,
+} from '../harnesses/capability-model.js';
 import * as io from '../io.js';
 import type {
   MachineQuotaCollectorBoundary,
@@ -184,6 +188,8 @@ export interface Ctx {
   // handler; tests use this seam without signaling the test runner process.
   workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
+  machineQuotaDirectory?: MachineQuotaDirectory;
+  workerExecutionDirectory?: WorkerExecutionDirectory;
   machineQuotaCollectors?: MachineQuotaCollectorBoundary;
   machineQuotaCoordination?: MachineQuotaCoordinationBoundary;
   machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;

@@ -16,7 +16,7 @@ import {
   type QuotaFactState,
 } from '@ccm/engine';
 import { type CursorAgentQuotaReading, readCursorAgentQuotaFact } from '../cursor-usage.js';
-import { cursorAdapter } from './cursor.js';
+import { cursorInstallationDiscovery } from './cursor.js';
 import { probeExecutable } from './probe.js';
 import type { Env } from './types.js';
 
@@ -242,7 +242,7 @@ export function buildCursorSurfaceInventory(
 }
 
 function inspectIdeSurface(env: Env, now: Date): CursorExecutionSurfaceDescriptor {
-  const installation = cursorAdapter.inspectInstallation(env);
+  const installation = cursorInstallationDiscovery.discoverInstallation(env);
   const binary: CursorBinaryFact = {
     state: installation.cli.available ? 'available' : 'missing',
     name: installation.cli.name || 'cursor',

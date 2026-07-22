@@ -67,7 +67,13 @@ import * as usageHandler from './handlers/usage.js';
 import * as watchdogHandler from './handlers/watchdog.js';
 import * as webViewerHandler from './handlers/web-viewer.js';
 import * as workerHandler from './handlers/worker.js';
-import { harnessSessionId, knownHarnessAdapters } from './harnesses/registry.js';
+import {
+  type MachineQuotaDirectory,
+  quotaTargetId,
+  type WorkerExecutionDirectory,
+} from './harnesses/capability-model.js';
+import { harnessSessionId } from './harnesses/catalog-services.js';
+import { builtInHarnessCatalog } from './harnesses/composition.js';
 import * as help from './help.js';
 import * as io from './io.js';
 import type {
@@ -87,58 +93,33 @@ import {
   type VerbSpec,
 } from './registry.js';
 import * as suggest from './suggest.js';
-import { usageReading } from './usage-reading.js';
 
 const EXIT = io.EXIT;
 
 const DEFAULT_MACHINE_QUOTA_COLLECTORS: MachineQuotaCollectorBoundary = {
-  collect(target, env): MachineQuotaCollection {
-    const harness = target.default_collector_harness;
-    if (typeof harness !== 'string' || harness.length === 0) {
-      return { status: 'unsupported', reason: 'surface-owned quota collector is unavailable' };
+  async collect(target, env): Promise<MachineQuotaCollection> {
+    const targetId = quotaTargetId(String(target.target_id ?? ''));
+    const observer = builtInHarnessCatalog.machineQuota.observerFor(targetId);
+    if (!observer) return { status: 'unsupported', reason: 'quota target is not registered' };
+    const installationBinding = builtInHarnessCatalog.installation.forHarness(
+      observer.target.harnessId,
+    );
+    if (!installationBinding) {
+      return { status: 'unknown', reason: 'harness installation observer is unavailable' };
     }
-    const adapter = knownHarnessAdapters().find((candidate) => candidate.id === harness);
-    if (!adapter) {
-      return { status: 'unknown', reason: 'harness is not installed' };
-    }
-    const installation = adapter.inspectInstallation(env);
-    const requestedSurface = String(target.surface_id ?? '');
+    const installation = installationBinding.face.discoverInstallation(env);
+    const surface = installationBinding.surfaces.find(
+      (candidate) => candidate.id === observer.target.surfaceId,
+    );
+    const acceptedSurfaceIds = new Set([observer.target.surfaceId, ...(surface?.aliases ?? [])]);
     const surfaceInstalled = installation.surfaces.some(
-      (surface) =>
-        surface.installed &&
-        (surface.id === requestedSurface ||
-          (requestedSurface === 'cursor-agent-cli' && surface.id === 'cursor-agent')),
+      (candidate) => candidate.installed && acceptedSurfaceIds.has(candidate.id),
     );
     if (!installation.installed && !surfaceInstalled) {
       return { status: 'unknown', reason: 'harness surface is not installed' };
     }
     try {
-      // Read the surface through the one UsageReading domain service so the machine-wide collect path
-      //   and every other command space resolve the same per-harness adapter (single read strategy).
-      const reading = usageReading.readSurface({
-        env,
-        harnessId: harness,
-        surfaceId: requestedSurface,
-      });
-      if (!reading) {
-        return { status: 'unknown', reason: 'harness is not installed' };
-      }
-      return reading.signal
-        ? {
-            status: 'refreshed',
-            signal: reading.signal,
-            source: reading.source,
-            authority: reading.authority,
-            authSource: reading.authSource,
-            quotaScopeFingerprint: reading.quotaScopeFingerprint,
-          }
-        : {
-            status: 'unknown',
-            signal: reading.signal,
-            source: reading.source,
-            reason: reading.unavailableReason,
-            refreshHint: reading.refreshHint,
-          };
+      return await observer.observe(env);
     } catch (error) {
       return { status: 'error', reason: error instanceof Error ? error.message : String(error) };
     }
@@ -163,6 +144,8 @@ interface RunOpts {
   providerRuntime?: ProviderRuntime;
   workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
+  machineQuotaDirectory?: MachineQuotaDirectory;
+  workerExecutionDirectory?: WorkerExecutionDirectory;
   machineQuotaCollectors?: MachineQuotaCollectorBoundary;
   machineQuotaCoordination?: MachineQuotaCoordinationBoundary;
   machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;
@@ -620,6 +603,8 @@ export function runWithComposition(
     providerRuntime: opts.providerRuntime || createDefaultProviderRuntime(env),
     workerSignal: opts.workerSignal,
     quotaEffects: opts.quotaEffects,
+    machineQuotaDirectory: opts.machineQuotaDirectory ?? builtInHarnessCatalog.machineQuota,
+    workerExecutionDirectory: opts.workerExecutionDirectory ?? builtInHarnessCatalog.worker,
     machineQuotaCollectors: opts.machineQuotaCollectors ?? DEFAULT_MACHINE_QUOTA_COLLECTORS,
     machineQuotaCoordination: opts.machineQuotaCoordination ?? {
       listSubscriptions: (home) => coordinationHandler.listCurrentCoordinationSubscriptions(home),
@@ -688,6 +673,8 @@ function buildCtx({
   providerRuntime,
   workerSignal,
   quotaEffects,
+  machineQuotaDirectory,
+  workerExecutionDirectory,
   machineQuotaCollectors,
   machineQuotaCoordination,
   machineWideQuotaNotifications,
@@ -705,6 +692,8 @@ function buildCtx({
   providerRuntime?: ProviderRuntime;
   workerSignal?: AbortSignal;
   quotaEffects?: QuotaEffectBoundary;
+  machineQuotaDirectory?: MachineQuotaDirectory;
+  workerExecutionDirectory?: WorkerExecutionDirectory;
   machineQuotaCollectors?: MachineQuotaCollectorBoundary;
   machineQuotaCoordination?: MachineQuotaCoordinationBoundary;
   machineWideQuotaNotifications?: MachineWideQuotaNotificationBoundary;
@@ -741,6 +730,8 @@ function buildCtx({
     providerRuntime,
     workerSignal,
     quotaEffects,
+    machineQuotaDirectory,
+    workerExecutionDirectory,
     machineQuotaCollectors,
     machineQuotaCoordination,
     machineWideQuotaNotifications,

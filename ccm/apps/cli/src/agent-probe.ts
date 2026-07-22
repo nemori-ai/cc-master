@@ -24,7 +24,8 @@
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { resolveHarnessAdapter } from './harnesses/registry.js';
+import { selectHarness } from './harnesses/catalog-services.js';
+import { builtInHarnessCatalog } from './harnesses/composition.js';
 
 export interface ProbeInput {
   harness?: string; // agentHarness
@@ -279,7 +280,10 @@ function sessionRootsFor(harness: string, opts: ProbeOpts): string[] {
   const env: Record<string, string | undefined> = { ...(opts.env || {}) };
   if (opts.home && !env.HOME) env.HOME = opts.home;
   try {
-    return resolveHarnessAdapter({ harnessFlag: harness, env }).sessionStoreRoots(env);
+    const selected = selectHarness({ harnessFlag: harness, env });
+    return [
+      ...(builtInHarnessCatalog.session.forHarness(selected.id)?.face.sessionStoreRoots(env) ?? []),
+    ];
   } catch {
     return []; // adapter 解析失败：保真降级为「无已知落盘路径」
   }

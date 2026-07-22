@@ -20,7 +20,7 @@ import {
   withLock,
 } from '@ccm/engine';
 import * as discover from '../discover.js';
-import { MachineHarnessRegistry } from '../harnesses/registry.js';
+import { MachineHarnessInventory } from '../harnesses/catalog-services.js';
 import { readVersion } from '../help.js';
 import * as io from '../io.js';
 import { refreshMachineWideQuota } from '../machine-wide-quota.js';
@@ -475,7 +475,7 @@ export function restart(ctx: Ctx): number {
 }
 
 interface TickResult {
-  registry: ReturnType<MachineHarnessRegistry['toJSON']>;
+  registry: ReturnType<MachineHarnessInventory['toJSON']>;
   checked_boards: number;
   writes: number;
   errors: string[];
@@ -515,6 +515,9 @@ async function tickOnce(ctx: Ctx, state: MonitorState): Promise<TickResult> {
             if (!ctx.machineQuotaCollectors) {
               throw new Error('machine-wide quota collector boundary is required');
             }
+            if (!ctx.machineQuotaDirectory) {
+              throw new Error('machine-wide quota directory is required');
+            }
             const store = createQuotaAdmissionStore({
               home: state.home,
               filesystem: quotaFilesystemFromBoundary(ctx.quotaEffects),
@@ -525,12 +528,13 @@ async function tickOnce(ctx: Ctx, state: MonitorState): Promise<TickResult> {
               store,
               collectors: ctx.machineQuotaCollectors,
               coordination: ctx.machineQuotaCoordination,
+              directory: ctx.machineQuotaDirectory,
             });
           },
         }
       : {}),
     readCached: () => {
-      const registry = MachineHarnessRegistry.sweep(ctx.env);
+      const registry = MachineHarnessInventory.sweep(ctx.env);
       const registryJson = registry.toJSON();
       const usageByHarness = new Map<string, ArbiterUsageOverride>();
       for (const descriptor of registryJson.harnesses) {

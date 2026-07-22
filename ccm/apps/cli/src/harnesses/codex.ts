@@ -7,15 +7,21 @@ import {
   localPluginBase as resolvePluginBase,
 } from '@ccm/engine';
 import { readCodexUsageSignal } from '../codex-rate-limits.js';
+import type {
+  InstallationDiscoveryFace,
+  PluginProjectionFace,
+  SessionObservationFace,
+  UsageObservationFace,
+} from './capability-model.js';
 import { probeExecutable } from './probe.js';
-import type { Env, HarnessAdapter, PluginUpgradeRequest, PluginUpgradeResult } from './types.js';
+import type { Env, PluginUpgradeRequest, PluginUpgradeResult } from './types.js';
 
 const EXIT_OK = 0;
 const EXIT_ERROR = 1;
 
-const ACCOUNT_POOL_REASON =
+export const CODEX_ACCOUNT_POOL_REASON =
   'Codex support is currently limited to current-account usage signals; account-pool management and account switching remain unsupported.';
-const STATUSLINE_REASON =
+export const CODEX_STATUSLINE_REASON =
   'Codex exposes configurable built-in footer items, not a Claude Code-style external statusLine.command hook.';
 const PLUGIN_DISTRIBUTION_REASON =
   'Codex installs cc-master through a local Codex marketplace/plugin registration and skill/hook delivery from that package.';
@@ -23,20 +29,19 @@ const MARKETPLACE_NAME = 'cc-master';
 const PLUGIN_NAME = 'cc-master';
 const PLUGIN_ID = `${MARKETPLACE_NAME}@${PLUGIN_NAME}`;
 
-export const codexAdapter: HarnessAdapter = {
-  id: 'codex',
-  displayName: 'Codex',
-  aliases: ['codex', 'openai-codex'],
-  detect(env) {
-    return !!(
-      env.CODEX_HOME ||
-      env.CODEX_SESSION_ID ||
-      env.CODEX_THREAD_ID ||
-      env.CODEX_SANDBOX ||
-      env.CODEX_PROJECT_DIR
-    );
-  },
-  inspectInstallation(env) {
+function detectCodex(env: Env): boolean {
+  return !!(
+    env.CODEX_HOME ||
+    env.CODEX_SESSION_ID ||
+    env.CODEX_THREAD_ID ||
+    env.CODEX_SANDBOX ||
+    env.CODEX_PROJECT_DIR
+  );
+}
+
+export const codexInstallationDiscovery: InstallationDiscoveryFace = {
+  detect: detectCodex,
+  discoverInstallation(env) {
     const cli = probeExecutable(env.CCM_CODEX_BIN || env.CODEX_BIN || 'codex', env);
     const configDir = codexConfigDir(env);
     const hasConfig = pathExists(configDir);
@@ -45,19 +50,22 @@ export const codexAdapter: HarnessAdapter = {
       id: 'codex',
       displayName: 'Codex',
       installed,
-      active: this.detect(env),
+      active: detectCodex(env),
       reason: installed ? null : 'codex CLI not found and Codex config directory not present',
       cli,
       configPaths: [configDir],
       surfaces: [],
       capabilities: {
-        accountPool: this.accountPool,
-        externalStatusline: this.externalStatusline,
-        pluginDistribution: this.pluginDistribution,
+        accountPool: { supported: false, reason: CODEX_ACCOUNT_POOL_REASON },
+        externalStatusline: { supported: false, reason: CODEX_STATUSLINE_REASON },
+        pluginDistribution: { supported: true, reason: PLUGIN_DISTRIBUTION_REASON },
       },
     };
   },
-  session(env) {
+};
+
+export const codexSessionObservation: SessionObservationFace = {
+  observeSession(env) {
     const id = env.CODEX_SESSION_ID || env.CODEX_THREAD_ID || '';
     const source = env.CODEX_SESSION_ID
       ? 'env:CODEX_SESSION_ID'
@@ -69,14 +77,16 @@ export const codexAdapter: HarnessAdapter = {
   sessionStoreRoots(env) {
     return [path.join(codexConfigDir(env), 'sessions')];
   },
-  usageSource: () => ({
+};
+
+export const codexUsageObservation: UsageObservationFace = {
+  source: () => ({
     kind: 'app-server',
     pollable: true,
     // Codex exposes app-server rateLimits buckets rather than Claude's rolling subscription windows.
     quotaModel: 'primary-secondary',
   }),
-  accountPoolLocation: () => null,
-  readCurrentUsage(env) {
+  observeUsage({ env }) {
     const signal = readCodexUsageSignal(env)?.signal ?? null;
     return {
       signal,
@@ -84,13 +94,10 @@ export const codexAdapter: HarnessAdapter = {
       unavailableReason: 'Codex app-server rateLimits 不可用',
     };
   },
-  accountSwitchPreflight: () => ({ action: 'continue' }),
-  async upgradePlugin(request) {
-    return upgradeCodexPlugin(request);
-  },
-  accountPool: { supported: false, reason: ACCOUNT_POOL_REASON },
-  externalStatusline: { supported: false, reason: STATUSLINE_REASON },
-  pluginDistribution: { supported: true, reason: PLUGIN_DISTRIBUTION_REASON },
+};
+
+export const codexPluginProjection: PluginProjectionFace = {
+  upgrade: upgradeCodexPlugin,
 };
 
 function pathExists(p: string): boolean {

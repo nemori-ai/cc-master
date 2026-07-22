@@ -8,29 +8,35 @@ import {
   resolveRateCachePath,
   type UsageSignal,
 } from '@ccm/engine';
+import type {
+  AccountManagementFace,
+  InstallationDiscoveryFace,
+  PluginProjectionFace,
+  SessionObservationFace,
+  UsageObservationFace,
+} from './capability-model.js';
 import { probeExecutable } from './probe.js';
-import type { Env, HarnessAdapter, PluginUpgradeRequest, PluginUpgradeResult } from './types.js';
+import type { Env, PluginUpgradeRequest, PluginUpgradeResult } from './types.js';
 
 const EXIT_OK = 0;
 const EXIT_ERROR = 1;
 const MARKETPLACE = 'cc-master';
 const PLUGIN_REF = 'cc-master@cc-master';
 
-export const claudeCodeAdapter: HarnessAdapter = {
-  id: 'claude-code',
-  displayName: 'Claude Code',
-  aliases: ['claude', 'claude-code', 'claudecode'],
-  detect(env) {
-    return !!(
-      env.CLAUDE_CODE_SESSION_ID ||
-      env.CLAUDE_CONFIG_DIR ||
-      env.CLAUDE_PROJECT_DIR ||
-      env.CLAUDE_CODE_USE_BEDROCK ||
-      env.CLAUDE_CODE_USE_VERTEX ||
-      env.CLAUDE_CODE_USE_FOUNDRY
-    );
-  },
-  inspectInstallation(env) {
+function detectClaudeCode(env: Env): boolean {
+  return !!(
+    env.CLAUDE_CODE_SESSION_ID ||
+    env.CLAUDE_CONFIG_DIR ||
+    env.CLAUDE_PROJECT_DIR ||
+    env.CLAUDE_CODE_USE_BEDROCK ||
+    env.CLAUDE_CODE_USE_VERTEX ||
+    env.CLAUDE_CODE_USE_FOUNDRY
+  );
+}
+
+export const claudeInstallationDiscovery: InstallationDiscoveryFace = {
+  detect: detectClaudeCode,
+  discoverInstallation(env) {
     const cli = probeExecutable(env.CCM_CLAUDE_BIN || env.CLAUDE_BIN || 'claude', env);
     const configDir = resolveClaudeConfigDir(env);
     const hasConfig = pathExists(configDir);
@@ -39,7 +45,7 @@ export const claudeCodeAdapter: HarnessAdapter = {
       id: 'claude-code',
       displayName: 'Claude Code',
       installed,
-      active: this.detect(env),
+      active: detectClaudeCode(env),
       reason: installed
         ? null
         : 'claude CLI not found and Claude Code config directory not present',
@@ -47,36 +53,31 @@ export const claudeCodeAdapter: HarnessAdapter = {
       configPaths: [configDir],
       surfaces: [],
       capabilities: {
-        accountPool: this.accountPool,
-        externalStatusline: this.externalStatusline,
-        pluginDistribution: this.pluginDistribution,
+        accountPool: { supported: true },
+        externalStatusline: { supported: true },
+        pluginDistribution: { supported: true },
       },
     };
   },
-  session(env) {
+};
+
+export const claudeSessionObservation: SessionObservationFace = {
+  observeSession(env) {
     const id = env.CLAUDE_CODE_SESSION_ID || '';
     return { id, source: id ? 'env:CLAUDE_CODE_SESSION_ID' : 'none' };
   },
   sessionStoreRoots(env) {
     return [resolveProjectsDir(env)];
   },
-  usageSource: () => ({
+};
+
+export const claudeUsageObservation: UsageObservationFace = {
+  source: () => ({
     kind: 'statusline-sidecar',
     pollable: false,
     quotaModel: 'rolling-5h-7d',
   }),
-  accountPoolLocation(env) {
-    return path.join(resolveCcMasterHome(env), 'accounts.json');
-  },
-  readCurrentUsage(env) {
-    const signal = readClaudeCodeUsageSidecar(env);
-    return {
-      signal,
-      source: 'account',
-      unavailableReason: '无 status-line sidecar',
-    };
-  },
-  readCurrentUsageForSurface(surfaceId, env) {
+  observeUsage({ env, surfaceId }) {
     if (surfaceId === 'claude-fable-5-cli') {
       const signal = readClaudeCodeUsageSidecar(env);
       const fable = signal?.fable_seven_day;
@@ -98,9 +99,20 @@ export const claudeCodeAdapter: HarnessAdapter = {
         unavailableReason: '',
       };
     }
-    return this.readCurrentUsage(env);
+    const signal = readClaudeCodeUsageSidecar(env);
+    return {
+      signal,
+      source: 'account',
+      unavailableReason: '无 status-line sidecar',
+    };
   },
-  accountSwitchPreflight(env) {
+};
+
+export const claudeAccountManagement: AccountManagementFace = {
+  poolLocation(env) {
+    return path.join(resolveCcMasterHome(env), 'accounts.json');
+  },
+  switchPreflight(env) {
     if (env.CLAUDE_CODE_USE_BEDROCK || env.CLAUDE_CODE_USE_VERTEX || env.CLAUDE_CODE_USE_FOUNDRY) {
       return {
         action: 'noop',
@@ -110,12 +122,10 @@ export const claudeCodeAdapter: HarnessAdapter = {
     }
     return { action: 'continue' };
   },
-  async upgradePlugin(request) {
-    return upgradeClaudePlugin(request);
-  },
-  accountPool: { supported: true },
-  externalStatusline: { supported: true },
-  pluginDistribution: { supported: true },
+};
+
+export const claudePluginProjection: PluginProjectionFace = {
+  upgrade: upgradeClaudePlugin,
 };
 
 function pathExists(p: string): boolean {

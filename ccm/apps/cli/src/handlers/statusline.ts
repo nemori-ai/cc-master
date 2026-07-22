@@ -13,15 +13,9 @@
 //
 // 红线1 / ADR-006：node/JS only，零 npm 依赖、纯 stdlib + @ccm/engine。武装闸豁免：纯 handler（无 hook 入口）。
 
-import {
-  autoInstallStatuslineOnce,
-  captureRateLimits,
-  installStatusline,
-  renderStatusline,
-  type StatuslineActionResult,
-  uninstallStatusline,
-} from '@ccm/engine';
-import { resolveHarnessAdapter } from '../harnesses/registry.js';
+import { captureRateLimits, renderStatusline, type StatuslineActionResult } from '@ccm/engine';
+import { selectHarness } from '../harnesses/catalog-services.js';
+import { builtInHarnessCatalog } from '../harnesses/composition.js';
 import * as io from '../io.js';
 import { resolveSelfBinPath, resolveStatuslineCommand } from '../self.js';
 import type { Ctx } from './_common.js';
@@ -94,22 +88,25 @@ function humanResult(r: StatuslineActionResult): string {
 
 // ── install ────────────────────────────────────────────────────────────────────────────────────
 export function install(ctx: Ctx): number {
-  const harness = resolveHarnessAdapter({
+  const harness = selectHarness({
     env: ctx.env,
     harnessFlag: typeof ctx.values.harness === 'string' ? ctx.values.harness : undefined,
   });
-  if (!harness.externalStatusline.supported) {
+  const binding = builtInHarnessCatalog.statusline.forHarness(harness.id);
+  if (!binding) {
+    const support = builtInHarnessCatalog.statusline.supportFor(harness.id);
+    const detail = support?.support === 'unsupported' ? support.detail : undefined;
     const r = {
       action: 'skipped',
       settingsPath: '',
-      reason: `NotImplemented: ${harness.externalStatusline.reason || `${harness.displayName} harness has no external status line adapter.`}`,
+      reason: `NotImplemented: ${detail || `${harness.displayName} harness has no external status line adapter.`}`,
     } as const;
     if (ctx.flags.json) ctx.out(io.jsonOk(r));
     else ctx.out(`未改动：${r.reason}\n`);
     return EXIT.USAGE;
   }
   const command = resolveStatuslineCommand();
-  const r = installStatusline(ctx.env, command);
+  const r = binding.face.install(ctx.env, command);
   if (ctx.flags.json) ctx.out(io.jsonOk(r));
   else ctx.out(humanResult(r));
   return r.action === 'error' ? EXIT.ERROR : EXIT.OK;
@@ -117,21 +114,24 @@ export function install(ctx: Ctx): number {
 
 // ── uninstall ──────────────────────────────────────────────────────────────────────────────────
 export function uninstall(ctx: Ctx): number {
-  const harness = resolveHarnessAdapter({
+  const harness = selectHarness({
     env: ctx.env,
     harnessFlag: typeof ctx.values.harness === 'string' ? ctx.values.harness : undefined,
   });
-  if (!harness.externalStatusline.supported) {
+  const binding = builtInHarnessCatalog.statusline.forHarness(harness.id);
+  if (!binding) {
+    const support = builtInHarnessCatalog.statusline.supportFor(harness.id);
+    const detail = support?.support === 'unsupported' ? support.detail : undefined;
     const r = {
       action: 'skipped',
       settingsPath: '',
-      reason: `NotImplemented: ${harness.externalStatusline.reason || `${harness.displayName} harness has no external status line adapter.`}`,
+      reason: `NotImplemented: ${detail || `${harness.displayName} harness has no external status line adapter.`}`,
     } as const;
     if (ctx.flags.json) ctx.out(io.jsonOk(r));
     else ctx.out(`未改动：${r.reason}\n`);
     return EXIT.USAGE;
   }
-  const r = uninstallStatusline(ctx.env);
+  const r = binding.face.uninstall(ctx.env);
   if (ctx.flags.json) ctx.out(io.jsonOk(r));
   else ctx.out(humanResult(r));
   return r.action === 'error' ? EXIT.ERROR : EXIT.OK;
@@ -141,12 +141,13 @@ export function uninstall(ctx: Ctx): number {
 //   放这里让 handler 层统一拥有 statusline 接线；router 只调一次、不关心结果。
 export function autoInstall(env: Ctx['env'], harnessFlag?: string): void {
   try {
-    const harness = resolveHarnessAdapter({ env, harnessFlag });
-    if (!harness.externalStatusline.supported) return;
+    const harness = selectHarness({ env, harnessFlag });
+    const binding = builtInHarnessCatalog.statusline.forHarness(harness.id);
+    if (!binding) return;
     // 第三参 binPath 注入 DEV-GUARD：从 worktree / 仓库内跑（dev 自测）时 autoInstall 自动 skip（reason
     // `dev-invocation`），绝不污染真实 ~/.claude/settings.json；真实用户（稳定安装路径）不受影响。
     // binPath 经 resolveSelfBinPath(env) 解析（honor env.CCM_BIN·见 self.ts）。
-    autoInstallStatuslineOnce(env, resolveStatuslineCommand(), resolveSelfBinPath(env));
+    binding.face.autoInstall(env, resolveStatuslineCommand(), resolveSelfBinPath(env));
   } catch {
     /* 绝不让自动安装影响任何命令 */
   }

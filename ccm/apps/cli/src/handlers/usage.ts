@@ -44,7 +44,11 @@ import {
 } from '../machine-wide-quota.js';
 import { createQuotaAdmissionStore } from '../quota-admission-store.js';
 import { quotaFilesystemFromBoundary } from '../quota-production-effects.js';
-import { type UsageReading, usageReading } from '../usage-reading.js';
+import {
+  CURSOR_AGENT_BILLING_PERIOD_QUOTA_TARGET_ID,
+  type UsageReading,
+  usageReading,
+} from '../usage-reading.js';
 import { type BoardArg, type Ctx, runRead } from './_common.js';
 
 // 备号窗口快照（registry SwitchSnapshot 投影）。
@@ -270,7 +274,11 @@ async function readSharedCurrentUsageSignal(
   harnessFlag?: string,
   homeFlag?: string,
 ): Promise<CurrentUsageSignalReading> {
-  if (!cursorAgentRequested(harnessFlag) || !ctx.machineQuotaCollectors) {
+  if (
+    !cursorAgentRequested(harnessFlag) ||
+    !ctx.machineQuotaCollectors ||
+    !ctx.machineQuotaDirectory
+  ) {
     return readCurrentUsageSignal(ctx.env, harnessFlag, homeFlag);
   }
   const home = resolveHomeDir(ctx.env, homeFlag);
@@ -279,10 +287,11 @@ async function readSharedCurrentUsageSignal(
     ...(ctx.quotaEffects ? { filesystem: quotaFilesystemFromBoundary(ctx.quotaEffects) } : {}),
   }) as MachineQuotaStore;
   const reading = await readOrRefreshMachineQuotaSurfaceReading({
-    surfaceId: 'cursor-agent-cli',
+    targetId: CURSOR_AGENT_BILLING_PERIOD_QUOTA_TARGET_ID,
     env: ctx.env,
     store,
     collectors: ctx.machineQuotaCollectors,
+    directory: ctx.machineQuotaDirectory,
   });
   return (
     usageReading.projectMachineCacheReading(reading) ?? {

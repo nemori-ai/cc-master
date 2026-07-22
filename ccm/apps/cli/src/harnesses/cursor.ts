@@ -13,11 +13,16 @@ import {
   readCursorAgentQuotaFact,
   readCursorUsageSignal,
 } from '../cursor-usage.js';
+import type {
+  InstallationDiscoveryFace,
+  PluginProjectionFace,
+  SessionObservationFace,
+  UsageObservationFace,
+} from './capability-model.js';
 import { createUnprobedCursorAgentAdmission } from './cursor-agent-admission.js';
 import { probeExecutable } from './probe.js';
 import type {
   Env,
-  HarnessAdapter,
   HarnessCliProbe,
   HarnessSurfaceDescriptor,
   PluginUpgradeRequest,
@@ -28,9 +33,9 @@ import type {
 const EXIT_OK = 0;
 const EXIT_ERROR = 1;
 
-const ACCOUNT_POOL_REASON =
+export const CURSOR_ACCOUNT_POOL_REASON =
   'Cursor has no ccm account-pool autoswitch; billing-period usage is single-login dashboard quota only.';
-const STATUSLINE_REASON =
+export const CURSOR_STATUSLINE_REASON =
   'Cursor has no Claude Code-style external statusLine.command hook; usage is read from the dashboard API.';
 const PLUGIN_DISTRIBUTION_REASON =
   'Cursor installs cc-master as a local plugin under ~/.cursor/plugins/local/cc-master.';
@@ -41,19 +46,18 @@ const ACCOUNT_AUTOSWITCH_REASON =
 const HEADLESS_PLUGIN_REASON =
   'Cursor Agent headless CLI is a worker surface, not the Cursor IDE plugin distribution target.';
 
-export const cursorAdapter: HarnessAdapter = {
-  id: 'cursor',
-  displayName: 'Cursor',
-  aliases: ['cursor', 'cursor-ide', 'cursor-agent', 'cursor-agent-cli'],
-  detect(env) {
-    return !!(
-      env.CURSOR_AGENT ||
-      env.CURSOR_VERSION ||
-      env.CURSOR_PROJECT_DIR ||
-      env.CURSOR_CONVERSATION_ID
-    );
-  },
-  inspectInstallation(env, opts) {
+function detectCursor(env: Env): boolean {
+  return !!(
+    env.CURSOR_AGENT ||
+    env.CURSOR_VERSION ||
+    env.CURSOR_PROJECT_DIR ||
+    env.CURSOR_CONVERSATION_ID
+  );
+}
+
+export const cursorInstallationDiscovery: InstallationDiscoveryFace = {
+  detect: detectCursor,
+  discoverInstallation(env, opts) {
     const cli = probeExecutable(env.CCM_CURSOR_BIN || env.CURSOR_BIN || 'cursor', env);
     const pluginRoot = cursorPluginRoot(env);
     const configDir = cursorConfigDir(env);
@@ -68,7 +72,7 @@ export const cursorAdapter: HarnessAdapter = {
       id: 'cursor',
       displayName: 'Cursor',
       installed,
-      active: this.detect(env),
+      active: detectCursor(env),
       reason: installed
         ? null
         : 'cursor CLI not found and Cursor config/plugin directories not present',
@@ -83,13 +87,16 @@ export const cursorAdapter: HarnessAdapter = {
         probeHeadlessAuth: opts?.probeHeadlessAuth === true,
       }),
       capabilities: {
-        accountPool: this.accountPool,
-        externalStatusline: this.externalStatusline,
-        pluginDistribution: this.pluginDistribution,
+        accountPool: { supported: false, reason: CURSOR_ACCOUNT_POOL_REASON },
+        externalStatusline: { supported: false, reason: CURSOR_STATUSLINE_REASON },
+        pluginDistribution: { supported: true, reason: PLUGIN_DISTRIBUTION_REASON },
       },
     };
   },
-  session(env) {
+};
+
+export const cursorSessionObservation: SessionObservationFace = {
+  observeSession(env) {
     if (env.CURSOR_CONVERSATION_ID) {
       return { id: env.CURSOR_CONVERSATION_ID, source: 'env:CURSOR_CONVERSATION_ID' };
     }
@@ -102,13 +109,20 @@ export const cursorAdapter: HarnessAdapter = {
     if (env.CCM_CURSOR_STATE_DB) return [path.dirname(path.resolve(env.CCM_CURSOR_STATE_DB))];
     return [path.join(cursorConfigDir(env), 'User', 'globalStorage')];
   },
-  usageSource: () => ({
+};
+
+export const cursorUsageObservation: UsageObservationFace = {
+  source: () => ({
     kind: 'dashboard-api',
     pollable: true,
     quotaModel: 'billing-period',
   }),
-  accountPoolLocation: () => null,
-  readCurrentUsage(env) {
+  observeUsage({ env, surfaceId }) {
+    if (surfaceId) {
+      return surfaceId === 'cursor-agent-cli' || surfaceId === 'cursor-agent'
+        ? readCursorSurfaceUsage('cursor-agent-cli', env)
+        : readCursorSurfaceUsage('cursor-ide-plugin', env);
+    }
     // Cursor's billing-period quota is one first-party subscription observed by either surface;
     // the only difference is where the accessToken is stored (cursor-agent → auth.json, IDE →
     // state.vscdb). A bare `--harness cursor` read must not hard-code the IDE surface: when only
@@ -120,22 +134,10 @@ export const cursorAdapter: HarnessAdapter = {
     if (agent.signal) return agent;
     return readCursorSurfaceUsage('cursor-ide-plugin', env);
   },
-  readCurrentUsageForSurface(surfaceId, env) {
-    if (surfaceId === 'cursor-agent-cli' || surfaceId === 'cursor-agent') {
-      return readCursorSurfaceUsage('cursor-agent-cli', env);
-    }
-    return readCursorSurfaceUsage('cursor-ide-plugin', env);
-  },
-  accountSwitchPreflight: () => ({
-    action: 'noop',
-    reason: ACCOUNT_POOL_REASON,
-  }),
-  async upgradePlugin(request) {
-    return upgradeCursorPlugin(request);
-  },
-  accountPool: { supported: false, reason: ACCOUNT_POOL_REASON },
-  externalStatusline: { supported: false, reason: STATUSLINE_REASON },
-  pluginDistribution: { supported: true, reason: PLUGIN_DISTRIBUTION_REASON },
+};
+
+export const cursorPluginProjection: PluginProjectionFace = {
+  upgrade: upgradeCursorPlugin,
 };
 
 function readCursorSurfaceUsage(surfaceId: 'cursor-ide-plugin' | 'cursor-agent-cli', env: Env) {
@@ -202,7 +204,7 @@ function cursorSurfaces(input: {
       },
     },
     {
-      id: 'cursor-agent',
+      id: 'cursor-agent-cli',
       displayName: 'Cursor Agent headless CLI',
       kind: 'cli-headless',
       installed: input.headlessCli.available,

@@ -76,11 +76,12 @@ const DEFAULT_BOUNDARY: ShadowRoutingBoundary = {
   writeBoard: forbiddenEffect('board write'),
   writeFile: forbiddenEffect('filesystem write'),
   readMachineQuotaSummary: (ctx) => {
+    if (!ctx.machineQuotaDirectory) return undefined;
     const home = discover.resolveHome({
       homeFlag: ctx.values.home as string,
       env: ctx.env,
     });
-    return readMachineWideQuotaContextSummaryCached(home);
+    return readMachineWideQuotaContextSummaryCached(home, new Date(), ctx.machineQuotaDirectory);
   },
 };
 
