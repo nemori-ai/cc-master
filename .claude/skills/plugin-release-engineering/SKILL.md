@@ -22,8 +22,9 @@ description: 当你要打包、分发、发布或审查 cc-master 的 CLI/plugin
 3. 跑 host-native validate。
 4. 检查 package contents。
 5. 更新对应版本线。
-6. 生成 artifact。
-7. 记录 release notes。
+6. 创建或更新 GitHub release 前先跑 `node scripts/release-metadata.mjs plan --tag "$TAG" --repository "$OWNER_REPO"`；title / prerelease / body 只消费该命令输出，非零即停止，不手填。
+7. 生成 artifact。
+8. 记录 release notes。
 
 当前 Claude Code adapter：
 

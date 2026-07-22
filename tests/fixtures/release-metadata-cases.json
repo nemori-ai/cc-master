@@ -1,0 +1,105 @@
+{
+  "schema": "cc-master/release-metadata-cases/v1",
+  "repository": "example/cc-master",
+  "valid": [
+    {
+      "name": "plugin rc",
+      "tag": "v0.21.0-rc.3",
+      "changelog": "# Changelog\n\n## [0.21.0-rc.3] — 2026-07-21\n\n> **Doc↔impl reconciliation and anti-drift gates** — pairs with **ccm-v0.22.0-rc.3**.\n",
+      "expected": {
+        "family": "plugin",
+        "productName": "cc-master plugin",
+        "version": "v0.21.0-rc.3",
+        "title": "cc-master plugin v0.21.0-rc.3",
+        "prerelease": true,
+        "summary": "Doc↔impl reconciliation and anti-drift gates — pairs with ccm-v0.22.0-rc.3.",
+        "changelogPath": "CHANGELOG.md",
+        "body": "Doc↔impl reconciliation and anti-drift gates — pairs with ccm-v0.22.0-rc.3.\n\nSee [CHANGELOG](https://github.com/example/cc-master/blob/v0.21.0-rc.3/CHANGELOG.md)."
+      }
+    },
+    {
+      "name": "ccm rc",
+      "tag": "ccm-v0.22.0-rc.3",
+      "changelog": "# ccm\n\n## 0.22.0-rc.3\n\n### Patch Changes\n\n- rc3: multi-pool usage signals, parse-proof output, token refresh, and deadline engine\n",
+      "expected": {
+        "family": "ccm",
+        "productName": "ccm",
+        "version": "v0.22.0-rc.3",
+        "title": "ccm v0.22.0-rc.3",
+        "prerelease": true,
+        "summary": "rc3: multi-pool usage signals, parse-proof output, token refresh, and deadline engine",
+        "changelogPath": "ccm/apps/cli/CHANGELOG.md",
+        "body": "rc3: multi-pool usage signals, parse-proof output, token refresh, and deadline engine\n\nSee [CHANGELOG](https://github.com/example/cc-master/blob/ccm-v0.22.0-rc.3/ccm/apps/cli/CHANGELOG.md)."
+      }
+    },
+    {
+      "name": "plugin stable control",
+      "tag": "v1.2.3",
+      "changelog": "# Changelog\n\n## [1.2.3] — 2026-07-21\n\n> Stable plugin release.\n",
+      "expected": {
+        "family": "plugin",
+        "productName": "cc-master plugin",
+        "version": "v1.2.3",
+        "title": "cc-master plugin v1.2.3",
+        "prerelease": false,
+        "summary": "Stable plugin release.",
+        "changelogPath": "CHANGELOG.md",
+        "body": "Stable plugin release.\n\nSee [CHANGELOG](https://github.com/example/cc-master/blob/v1.2.3/CHANGELOG.md)."
+      }
+    },
+    {
+      "name": "ccm stable control",
+      "tag": "ccm-v1.2.3",
+      "changelog": "# ccm\n\n## 1.2.3\n\n### Patch Changes\n\n- Stable ccm release.\n",
+      "expected": {
+        "family": "ccm",
+        "productName": "ccm",
+        "version": "v1.2.3",
+        "title": "ccm v1.2.3",
+        "prerelease": false,
+        "summary": "Stable ccm release.",
+        "changelogPath": "ccm/apps/cli/CHANGELOG.md",
+        "body": "Stable ccm release.\n\nSee [CHANGELOG](https://github.com/example/cc-master/blob/ccm-v1.2.3/ccm/apps/cli/CHANGELOG.md)."
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "rc cannot be a stable release",
+      "from": "plugin rc",
+      "patch": { "prerelease": false },
+      "error": "prerelease"
+    },
+    {
+      "name": "stable cannot be marked prerelease",
+      "from": "ccm stable control",
+      "patch": { "prerelease": true },
+      "error": "prerelease"
+    },
+    {
+      "name": "bare tag is not a release title",
+      "from": "ccm rc",
+      "patch": { "title": "ccm-v0.22.0-rc.3" },
+      "error": "title"
+    },
+    {
+      "name": "body must point to the changelog",
+      "from": "plugin rc",
+      "patch": { "body": "Doc↔impl reconciliation and anti-drift gates." },
+      "error": "body"
+    },
+    {
+      "name": "body summary stays on one line",
+      "from": "plugin rc",
+      "patch": { "body": "First summary line.\nSecond summary line.\n\nSee [CHANGELOG](https://github.com/example/cc-master/blob/v0.21.0-rc.3/CHANGELOG.md)." },
+      "error": "body"
+    }
+  ],
+  "invalidTags": [
+    "0.21.0-rc.3",
+    "plugin-v0.21.0-rc.3",
+    "v0.21.0-RC.3",
+    "ccm-v0.22.0-rc",
+    "ccm-v0.22.0-rc.03"
+  ]
+}
