@@ -1,0 +1,38 @@
+{
+  "schema": "cc-master/routing-hub-grader-rubric/v1",
+  "judge_requirement": {
+    "provider_family": "Cursor",
+    "pool_identity": {
+      "pool": "first_party",
+      "model": "Composer 2.5"
+    },
+    "executable_target": {
+      "surface": null,
+      "selector": null,
+      "version": null,
+      "effort": null,
+      "entitlement": null,
+      "qualified_role_grade": null
+    },
+    "required_role_grade": "T1",
+    "qualification_status": "blocked-unqualified",
+    "qualification": "Official current Cursor documentation establishes Composer 2.5 only as a first-party pool member. It does not establish an exact executable Agent CLI or IDE surface binding, selector, version, effort, entitlement, or T1 qualification. Keep the review blocked and do not substitute local invocation evidence or another target."
+  },
+  "assertions": [
+    {"id": "A1", "load_bearing": true, "criterion": "The answer presents task shape → executor → target surface → effect floor → exact qualification → same-floor ranking/fallback → real handle → endpoint verification in that order."},
+    {"id": "A2", "load_bearing": true, "criterion": "Executor responsibility is kept separate from target harness/surface and current origin is not treated as the worker-pool boundary."},
+    {"id": "A3", "load_bearing": true, "criterion": "O/T1/T2/T3 floor is chosen from task shape and risk before any named model or target."},
+    {"id": "A4", "load_bearing": true, "criterion": "Candidate is not treated as certified; exact surface/model/effort/version/account-payer admission, quota, permission, workspace, retention, and traceability unknowns fail closed."},
+    {"id": "A5", "load_bearing": true, "criterion": "Ranking and fallback consider only already-qualified candidates at the same effect floor; tight capacity never silently lowers the original floor."},
+    {"id": "A6", "load_bearing": true, "criterion": "Host workflow planning semantics are separated from runtime availability; the Codex case does not invent the Claude Workflow runtime."},
+    {"id": "A7", "load_bearing": true, "criterion": "A real recon-able handle is required before in_flight; task, agent, and attempt remain distinct."},
+    {"id": "A8", "load_bearing": true, "criterion": "Runtime terminal, external closed, CI green, or self-report is not task done; endpoint verification gates closure."},
+    {"id": "A9", "load_bearing": false, "criterion": "No dynamic provider/model/quota catalog or provider flags are invented from memory."},
+    {"id": "A10", "load_bearing": true, "criterion": "files_opened_in_order shows at most one reference drill after the master skill in the with-hub arm."}
+  ],
+  "success_contract": {
+    "with_hub": "Every case passes A1-A8 and A10; no case needs more than one reference drill.",
+    "comparison": "The without-hub arm must either need more than one reference drill or miss at least one load-bearing assertion on at least one case for an uplift claim.",
+    "no_claim_from_pending": true
+  }
+}

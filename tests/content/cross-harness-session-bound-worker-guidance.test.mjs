@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const HOSTS = ['claude-code', 'codex', 'cursor', 'kimi-code'];
 const read = (path) => readFileSync(join(ROOT, path), 'utf8');
+const require = createRequire(import.meta.url);
+const { applySkillProjection, planSkillProjection } = require('../../scripts/project-skill.cjs');
 
 const A_SOURCE =
-  'plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md';
+  'plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md';
 const D_SOURCE = 'plugin/src/skills/using-ccm/canonical/references/command-catalog.md';
 const H_SOURCE =
   'plugin/src/skills/pacing-and-estimation/canonical/references/cross-harness-target-facts.md';
@@ -56,15 +60,15 @@ const PROCESS_FIELDS = [
   'error',
 ];
 
-test('A selects across origins, reads real help first, and retains parent acceptance', () => {
+test('the routing hub selects across origins, reads real help first, and retains parent acceptance', () => {
   const source = read(A_SOURCE);
 
-  assert.match(source, /origin harness.*worker.*边界/us);
-  assert.match(source, /真实\s*agent-command help/u);
+  assert.match(source, /当前 origin.*不是 worker pool 边界/us);
+  assert.match(source, /目标 CLI 的真实调用形状/u);
   assert.match(source, /\{\{CROSS_HARNESS_WORKER_HELP_POINTER\}\}/u);
   assert.doesNotMatch(source, /\{\{CROSS_HARNESS_ACTIVE_QUERY_POINTER\}\}/u);
-  assert.match(source, /process terminal.*parent.*独立验收/us);
-  assert.match(source, /accountable handle[\s\S]{0,120}`in_flight`/u);
+  assert.match(source, /runtime terminal.*父 task.*独立核对/us);
+  assert.match(source, /真实[\s\S]{0,120}handle[\s\S]{0,160}`in_flight`/u);
   assert.doesNotMatch(source, /ccm worker (?:help|run)/u);
   for (const pattern of NORMALIZED_PROVIDER_ADAPTER) {
     assert.doesNotMatch(source, pattern);
@@ -123,9 +127,19 @@ test('H interprets facts without copying volatile provider CLI mechanics', () =>
 
 test('all host projections carry the same A/D/H raw-wrapper boundary', () => {
   for (const host of HOSTS) {
-    const a = read(
-      `plugin/dist/${host}/skills/master-orchestrator-guide/references/dispatch.md`,
-    );
+    const staging = mkdtempSync(join(tmpdir(), `session-worker-${host}-`));
+    let a;
+    try {
+      const plan = planSkillProjection({
+        repoRoot: ROOT,
+        host,
+        skill: 'master-orchestrator-guide',
+      });
+      applySkillProjection(plan, staging);
+      a = readFileSync(join(staging, 'references/worker-routing.md'), 'utf8');
+    } finally {
+      rmSync(staging, { recursive: true, force: true });
+    }
     const d = workerSection(
       read(`plugin/dist/${host}/skills/using-ccm/references/command-catalog.md`),
     );
@@ -134,7 +148,7 @@ test('all host projections carry the same A/D/H raw-wrapper boundary', () => {
     assert.equal(existsSync(join(ROOT, hPath)), true, host);
     const h = read(hPath);
 
-    assert.match(a, /真实\s*agent-command help/u, host);
+    assert.match(a, /目标 CLI 的真实调用形状/u, host);
     const helpPointer = a.match(/\[using-ccm worker help\]\(([^)]+)\)/u);
     assert.ok(helpPointer, `${host}: missing worker-help pointer`);
     assert.equal(helpPointer[1]?.split('#')[1], 'worker-help', host);

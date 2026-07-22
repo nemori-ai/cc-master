@@ -1,1 +1,1 @@
-| **authoring-workflows** | Claude Code Workflow API 手册；kimi-code 下当前是 unsupported stub | 不要在 kimi-code 下调用 `Workflow`；fan-out 用 Task / 后台 Bash |
+| **authoring-workflows** | workflow 脚本语义与迁移手册；不决定当前 host 的 runtime 能力 | routing hub 已确认 runtime 边界后，确实需要理解或迁移脚本语义时 |

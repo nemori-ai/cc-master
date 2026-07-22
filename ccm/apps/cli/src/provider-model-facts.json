@@ -1,37 +1,37 @@
 {
   "schema": "ccm/provider-model-facts-registry/v1",
-  "revision": "2026-07-20.1",
+  "revision": "2026-07-22.2",
   "providers": {
     "claude-code": {
       "schema": "ccm/provider-model-facts/v1",
       "provider": "claude-code",
-      "revision": "2026-07-16.1",
+      "revision": "2026-07-22.1",
       "supported_surfaces": ["claude-code-cli"],
       "supported_client_versions": ["current"],
       "source": [
         {
           "id": "anthropic-sonnet-5",
           "url": "https://www.anthropic.com/news/claude-sonnet-5",
-          "retrieved_at": "2026-07-15T00:00:00Z"
+          "retrieved_at": "2026-07-22T06:45:36Z"
         },
         {
           "id": "anthropic-fable-5",
           "url": "https://www.anthropic.com/news/redeploying-fable-5",
-          "retrieved_at": "2026-07-15T00:00:00Z"
+          "retrieved_at": "2026-07-22T06:45:36Z"
         },
         {
           "id": "anthropic-fable-5-capabilities",
           "url": "https://www.anthropic.com/claude/fable",
-          "retrieved_at": "2026-07-15T00:00:00Z"
+          "retrieved_at": "2026-07-22T06:45:36Z"
         },
         {
           "id": "anthropic-opus",
           "url": "https://www.anthropic.com/claude/opus",
-          "retrieved_at": "2026-07-15T00:00:00Z"
+          "retrieved_at": "2026-07-22T06:45:36Z"
         }
       ],
-      "observed_at": "2026-07-15T00:00:00Z",
-      "valid_until": "2026-07-22T00:00:00Z",
+      "observed_at": "2026-07-22T06:45:36Z",
+      "valid_until": "2026-07-29T06:45:36Z",
       "account_scope": "public catalog; live account entitlement separate",
       "confidence": "official-published-snapshot",
       "unknown": [
@@ -53,7 +53,7 @@
             "currency": "USD",
             "input_per_million_tokens": 2,
             "output_per_million_tokens": 10,
-            "note": "promotional through 2026-08-31; then 3/15"
+            "note": "promotional through 2026-08-31; then 3/15; Claude API public token pricing; Claude Code plan billing and live quota remain separate"
           },
           "benchmarks": null,
           "selectors": [],
@@ -63,13 +63,18 @@
         {
           "model_id": "claude-fable-5",
           "display_name": "Fable 5",
-          "tier": "economy",
+          "tier": "frontier",
           "relative_output_cost": null,
           "availability": {
             "state": "conditional",
-            "account_scope": "eligible plans and credits; live account entitlement separate"
+            "account_scope": "Pro, Max, Team, and Enterprise plans; usage credits and live entitlement separate"
           },
-          "pricing": null,
+          "pricing": {
+            "currency": "USD",
+            "input_per_million_tokens": 10,
+            "output_per_million_tokens": 50,
+            "note": "Claude API public token pricing; Claude Code plan billing and live quota remain separate"
+          },
           "benchmarks": null,
           "selectors": [],
           "source_refs": ["anthropic-fable-5", "anthropic-fable-5-capabilities"],
@@ -88,7 +93,7 @@
             "currency": "USD",
             "input_per_million_tokens": 5,
             "output_per_million_tokens": 25,
-            "note": null
+            "note": "Claude API public token pricing; Claude Code plan billing and live quota remain separate"
           },
           "benchmarks": null,
           "selectors": [],
@@ -100,18 +105,18 @@
     "codex": {
       "schema": "ccm/provider-model-facts/v1",
       "provider": "codex",
-      "revision": "2026-07-15.1",
+      "revision": "2026-07-22.1",
       "supported_surfaces": ["codex-cli"],
       "supported_client_versions": ["current"],
       "source": [
         {
           "id": "openai-gpt-5-6",
           "url": "https://openai.com/index/gpt-5-6/",
-          "retrieved_at": "2026-07-15T00:00:00Z"
+          "retrieved_at": "2026-07-22T06:45:36Z"
         }
       ],
-      "observed_at": "2026-07-15T00:00:00Z",
-      "valid_until": "2026-07-22T00:00:00Z",
+      "observed_at": "2026-07-22T06:45:36Z",
+      "valid_until": "2026-07-29T06:45:36Z",
       "account_scope": "public catalog; live Codex account entitlement separate",
       "confidence": "official-published-snapshot",
       "unknown": ["live_account_model_entitlement", "live_account_quota"],
@@ -125,7 +130,12 @@
             "state": "published",
             "account_scope": "public catalog; live Codex account entitlement separate"
           },
-          "pricing": null,
+          "pricing": {
+            "currency": "USD",
+            "input_per_million_tokens": 1,
+            "output_per_million_tokens": 6,
+            "note": "OpenAI API public token pricing; Codex plan billing and live quota remain separate"
+          },
           "benchmarks": {
             "swe_bench_pro_pct": 62.7,
             "terminal_bench_2_1_pct": 84.7
@@ -143,7 +153,12 @@
             "state": "published",
             "account_scope": "public catalog; live Codex account entitlement separate"
           },
-          "pricing": null,
+          "pricing": {
+            "currency": "USD",
+            "input_per_million_tokens": 2.5,
+            "output_per_million_tokens": 15,
+            "note": "OpenAI API public token pricing; Codex plan billing and live quota remain separate"
+          },
           "benchmarks": {
             "swe_bench_pro_pct": 63.4,
             "terminal_bench_2_1_pct": 87.4
@@ -161,7 +176,12 @@
             "state": "published",
             "account_scope": "public catalog; live Codex account entitlement separate"
           },
-          "pricing": null,
+          "pricing": {
+            "currency": "USD",
+            "input_per_million_tokens": 5,
+            "output_per_million_tokens": 30,
+            "note": "OpenAI API public token pricing; Codex plan billing and live quota remain separate"
+          },
           "benchmarks": {
             "swe_bench_pro_pct": 64.6,
             "terminal_bench_2_1_pct": 88.8
@@ -175,40 +195,98 @@
     "cursor": {
       "schema": "ccm/provider-model-facts/v1",
       "provider": "cursor",
-      "revision": "2026-07-20.1",
+      "revision": "2026-07-22.2",
       "supported_surfaces": ["cursor-agent-cli", "cursor-ide"],
       "supported_client_versions": ["current"],
       "source": [
         {
           "id": "cursor-models-pricing",
-          "url": "https://cursor.com/docs/models-and-pricing",
-          "retrieved_at": "2026-07-15T00:00:00Z"
+          "url": "https://cursor.com/docs/models-and-pricing.md",
+          "retrieved_at": "2026-07-22T07:46:31Z"
+        },
+        {
+          "id": "cursor-composer-2-5",
+          "url": "https://cursor.com/changelog/composer-2-5",
+          "retrieved_at": "2026-07-22T07:46:31Z"
+        },
+        {
+          "id": "cursor-grok-4-5",
+          "url": "https://cursor.com/grok-4-5",
+          "retrieved_at": "2026-07-22T07:46:31Z"
         }
       ],
-      "observed_at": "2026-07-15T00:00:00Z",
-      "valid_until": "2026-07-22T00:00:00Z",
-      "account_scope": "cursor-subscription-first-party; live entitlement separate",
-      "confidence": "official-published-snapshot-with-surface-unknowns",
+      "observed_at": "2026-07-22T07:46:31Z",
+      "valid_until": "2026-07-29T07:46:31Z",
+      "account_scope": "Cursor public catalog and first-party pool; live plan entitlement and quota separate",
+      "confidence": "official-published-snapshot-with-regional-and-surface-unknowns",
       "unknown": [
         "cursor_ide_task_model_catalog",
-        "cursor_ide_task_selector_acceptance",
+        "cursor_agent_cli_exact_executable_selector",
+        "cursor_agent_cli_exact_model_version",
+        "cursor_agent_cli_exact_effort",
+        "cursor_agent_cli_live_entitlement",
+        "cursor_agent_cli_t1_qualification",
+        "cursor_ide_exact_executable_selector",
+        "cursor_ide_exact_model_version",
+        "cursor_ide_exact_effort",
+        "cursor_ide_live_entitlement",
+        "cursor_ide_t1_qualification",
         "live_account_model_entitlement",
         "live_account_quota"
       ],
       "models": [
         {
-          "model_id": "cursor-auto",
-          "display_name": "Cursor Auto",
+          "model_id": "cursor-auto-cost",
+          "display_name": "Cursor Auto Cost",
           "tier": "adaptive",
-          "quota_pool": "first_party",
+          "quota_pool": "usage_based",
           "relative_output_cost": null,
           "availability": {
             "state": "published",
-            "account_scope": "cursor-agent-cli first-party subscription; live entitlement separate"
+            "account_scope": "usage-based billing at fixed Auto Cost token rates; live plan entitlement separate"
+          },
+          "pricing": {
+            "currency": "USD",
+            "input_per_million_tokens": 1.25,
+            "cache_write_per_million_tokens": 1.25,
+            "cache_read_per_million_tokens": 0.25,
+            "output_per_million_tokens": 6,
+            "note": "fixed Auto Cost rates regardless of routed model; exempt from Cursor Token Rate; live plan entitlement and quota remain separate"
+          },
+          "benchmarks": null,
+          "selectors": [],
+          "source_refs": ["cursor-models-pricing"],
+          "supersedes": ["cursor-auto"]
+        },
+        {
+          "model_id": "cursor-auto-balance",
+          "display_name": "Cursor Auto Balance",
+          "tier": "adaptive",
+          "quota_pool": "usage_based",
+          "relative_output_cost": null,
+          "availability": {
+            "state": "published",
+            "account_scope": "usage-based billing at actual routed model API rates; third-party routes add Cursor Token Rate; live plan entitlement separate"
           },
           "pricing": null,
           "benchmarks": null,
-          "selectors": ["auto"],
+          "selectors": [],
+          "source_refs": ["cursor-models-pricing"],
+          "supersedes": []
+        },
+        {
+          "model_id": "cursor-auto-intelligence",
+          "display_name": "Cursor Auto Intelligence",
+          "tier": "adaptive",
+          "quota_pool": "usage_based",
+          "relative_output_cost": null,
+          "availability": {
+            "state": "published",
+            "account_scope": "usage-based billing at actual routed model API rates; third-party routes add Cursor Token Rate; live plan entitlement separate"
+          },
+          "pricing": null,
+          "benchmarks": null,
+          "selectors": [],
           "source_refs": ["cursor-models-pricing"],
           "supersedes": []
         },
@@ -220,35 +298,50 @@
           "relative_output_cost": null,
           "availability": {
             "state": "published",
-            "account_scope": "cursor-agent-cli first-party subscription; live entitlement separate"
+            "account_scope": "Cursor first-party pool; live plan entitlement separate"
           },
-          "pricing": null,
+          "pricing": {
+            "currency": "USD",
+            "standard": {
+              "input_per_million_tokens": 0.5,
+              "output_per_million_tokens": 2.5
+            },
+            "fast": {
+              "input_per_million_tokens": 3,
+              "output_per_million_tokens": 15
+            },
+            "note": "public token rates; included-pool balance and live quota remain separate"
+          },
           "benchmarks": null,
-          "selectors": ["composer-2.5", "composer-2.5-fast"],
-          "source_refs": ["cursor-models-pricing"],
+          "selectors": [],
+          "source_refs": ["cursor-models-pricing", "cursor-composer-2-5"],
           "supersedes": []
         },
         {
           "model_id": "cursor-grok-4-5",
           "display_name": "Cursor Grok 4.5",
           "tier": "frontier",
-          "quota_pool": "usage_based",
+          "quota_pool": "first_party",
           "relative_output_cost": null,
           "availability": {
-            "state": "published",
-            "account_scope": "cursor-agent-cli first-party subscription; live entitlement separate"
+            "state": "conditional",
+            "account_scope": "Cursor first-party pool on individual and team plans; unavailable in the European Union; live entitlement separate"
           },
-          "pricing": null,
+          "pricing": {
+            "currency": "USD",
+            "standard": {
+              "input_per_million_tokens": 2,
+              "output_per_million_tokens": 6
+            },
+            "fast": {
+              "input_per_million_tokens": 4,
+              "output_per_million_tokens": 18
+            },
+            "note": "public token rates; included-pool balance, credits, regional access, and live quota remain separate"
+          },
           "benchmarks": null,
-          "selectors": [
-            "cursor-grok-4.5-low",
-            "cursor-grok-4.5-medium",
-            "cursor-grok-4.5-high",
-            "cursor-grok-4.5-low-fast",
-            "cursor-grok-4.5-medium-fast",
-            "cursor-grok-4.5-high-fast"
-          ],
-          "source_refs": ["cursor-models-pricing"],
+          "selectors": [],
+          "source_refs": ["cursor-models-pricing", "cursor-grok-4-5"],
           "supersedes": []
         }
       ]
@@ -256,40 +349,50 @@
     "kimi-code": {
       "schema": "ccm/provider-model-facts/v1",
       "provider": "kimi-code",
-      "revision": "2026-07-16.2",
+      "revision": "2026-07-22.1",
       "supported_surfaces": ["kimi-code-cli"],
       "supported_client_versions": ["current"],
       "source": [
         {
           "id": "moonshot-kimi-k3-pricing",
           "url": "https://platform.kimi.ai/docs/pricing/chat-k3",
-          "retrieved_at": "2026-07-16T00:00:00Z"
+          "retrieved_at": "2026-07-22T06:45:36Z"
         },
         {
           "id": "moonshot-kimi-k27-code-pricing",
           "url": "https://platform.kimi.ai/docs/pricing/chat-k27-code",
-          "retrieved_at": "2026-07-16T00:00:00Z"
+          "retrieved_at": "2026-07-22T06:45:36Z"
         },
         {
           "id": "moonshot-kimi-k27-code-card",
           "url": "https://www.kimi.com/resources/kimi-k2-7-code",
-          "retrieved_at": "2026-07-16T00:00:00Z"
+          "retrieved_at": "2026-07-22T06:45:36Z"
         },
         {
           "id": "moonshot-kimi-k3-blog",
           "url": "https://www.kimi.com/blog/kimi-k3",
-          "retrieved_at": "2026-07-16T00:00:00Z"
+          "retrieved_at": "2026-07-22T06:45:36Z"
+        },
+        {
+          "id": "kimi-code-model-configuration",
+          "url": "https://www.kimi.com/code/docs/en/kimi-code/models.html",
+          "retrieved_at": "2026-07-22T06:45:36Z"
+        },
+        {
+          "id": "kimi-code-cli-configuration",
+          "url": "https://www.kimi.com/code/docs/en/kimi-code-cli/configuration/config-files",
+          "retrieved_at": "2026-07-22T06:45:36Z"
         }
       ],
-      "observed_at": "2026-07-16T00:00:00Z",
-      "valid_until": "2026-07-23T00:00:00Z",
-      "account_scope": "managed:kimi-code OAuth subscription; live account entitlement separate",
+      "observed_at": "2026-07-22T06:45:36Z",
+      "valid_until": "2026-07-29T06:45:36Z",
+      "account_scope": "Kimi Code public model catalog and plan requirements; live account entitlement and quota separate",
       "confidence": "official-published-snapshot-with-k3-limitations-documented-and-independent-benchmark-unknowns",
       "unknown": [
         "live_account_model_entitlement",
         "live_account_quota",
         "kimi_k3_independent_standard_benchmarks",
-        "kimi_k3_open_weights",
+        "kimi_k3_effective_kimi_code_default_reasoning_effort",
         "kimi_code_cli_headless_quota_signal"
       ],
       "models": [
@@ -297,20 +400,26 @@
           "model_id": "kimi-k3",
           "display_name": "Kimi K3",
           "tier": "frontier",
+          "reasoning_efforts": ["low", "high", "max"],
           "relative_output_cost": null,
           "availability": {
             "state": "published",
-            "account_scope": "managed:kimi-code OAuth subscription; live entitlement separate"
+            "account_scope": "Moderato plan and above; up to 1M context on Allegretto and above; live entitlement separate"
           },
           "pricing": {
             "currency": "USD",
             "input_per_million_tokens": 3.0,
             "output_per_million_tokens": 15.0,
-            "note": "cache-hit input $0.30/M; launched 2026-07-16; 1M context; reasoning_effort is max-only at launch (low/high effort planned in later updates), so every call pays full max-deliberation cost and K3 is cost-inappropriate for cheap mechanical work; official Limitations (moonshot-kimi-k3-blog): (1) trained in preserved-thinking-history mode, so generation quality can become highly unstable if the agent harness drops historical thinking content or if a session is switched to K3 mid-stream from another model — run K3 in a verified-compatible harness (Kimi Code) on a fresh session and never a mid-session model switch; (2) tuned for long-horizon tasks and over-proactive under ambiguity, so on minor issues or ambiguous intent it may make unexpected decisions on the user's behalf — set explicit behavioral boundaries in the system prompt or AGENTS.md when tight guardrails are required; (3) noticeable user-experience gap vs Claude Fable 5 and GPT-5.6 Sol; vendor self-reported benchmarks published in the launch blog but not independently cross-vendor verified"
+            "note": "cache-hit input $0.30/M; Kimi API public token pricing; Kimi Code subscription billing, entitlement, and live quota remain separate; 1M context; reasoning_effort supports low/high/max; the Kimi API pricing page documents API default max, while the current Kimi Code model page documents default high, so the effective Kimi Code default is not inferred; official Limitations (moonshot-kimi-k3-blog): (1) trained in preserved-thinking-history mode, so generation quality can become highly unstable if the agent harness drops historical thinking content or if a session is switched to K3 mid-stream from another model — run K3 in a verified-compatible harness (Kimi Code) on a fresh session and never a mid-session model switch; (2) tuned for long-horizon tasks and over-proactive under ambiguity, so on minor issues or ambiguous intent it may make unexpected decisions on the user's behalf — set explicit behavioral boundaries in the system prompt or AGENTS.md when tight guardrails are required; (3) noticeable user-experience gap vs Claude Fable 5 and GPT-5.6 Sol; vendor-published benchmarks are not imported into this registry and independent cross-vendor verification remains unknown"
           },
           "benchmarks": null,
           "selectors": ["kimi-code/k3"],
-          "source_refs": ["moonshot-kimi-k3-pricing", "moonshot-kimi-k3-blog"],
+          "source_refs": [
+            "moonshot-kimi-k3-pricing",
+            "moonshot-kimi-k3-blog",
+            "kimi-code-model-configuration",
+            "kimi-code-cli-configuration"
+          ],
           "supersedes": []
         },
         {
@@ -319,18 +428,23 @@
           "tier": "balanced",
           "relative_output_cost": null,
           "availability": {
-            "state": "published",
-            "account_scope": "managed:kimi-code OAuth subscription; live entitlement separate"
+            "state": "conditional",
+            "account_scope": "standard model for all Kimi Code members; HighSpeed requires Allegretto or above; live entitlement separate"
           },
           "pricing": {
             "currency": "USD",
             "input_per_million_tokens": 0.95,
             "output_per_million_tokens": 4.0,
-            "note": "cache-hit input $0.19/M; open-weight Modified MIT; forced-thinking (no non-thinking mode); 256K context; vendor self-benchmarks only, not comparable to cross-vendor standard sets"
+            "note": "cache-hit input $0.19/M; Kimi API public token pricing; Kimi Code subscription billing, entitlement, and live quota remain separate; thinking required (no non-thinking mode); 256K context; vendor-published benchmarks are not imported into this registry and independent cross-vendor comparability remains unknown"
           },
           "benchmarks": null,
           "selectors": ["kimi-code/kimi-for-coding", "kimi-code/kimi-for-coding-highspeed"],
-          "source_refs": ["moonshot-kimi-k27-code-pricing", "moonshot-kimi-k27-code-card"],
+          "source_refs": [
+            "moonshot-kimi-k27-code-pricing",
+            "moonshot-kimi-k27-code-card",
+            "kimi-code-model-configuration",
+            "kimi-code-cli-configuration"
+          ],
           "supersedes": []
         }
       ]

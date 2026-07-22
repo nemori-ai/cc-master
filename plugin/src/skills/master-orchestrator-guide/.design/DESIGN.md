@@ -15,11 +15,22 @@
 - **cognitive-override 轴**：强——核心价值在覆写三条 model prior：「指挥不演奏」逆「我顺手做了更快」，「gate-green≠passed」逆「绿了就算过」，「idle≠license to manufacture work」逆「闲着就找点活显得忙」。且要在 deadline / 「就这一次」压力下仍守住，要泛化到任意目标形状。
 - **形状蕴含**：(强 process, 强 cognitive) → Craft C。SKILL.md 以命名锚为主干（七镜头 / 红线 / Rationalization Table / Red Flags），配决策程序 dot-graph 作确定性牙齿，**不是编号清单**——价值在 agent 内化心智模型 + 服从那张 graph 的控制流，而非重放步骤。reinject 友好（每回合整篇重注，越短越好），深细节全下沉 `references/`。**愿景索引地图 + hook 共鸣契约**——六愿景（C1–C6）的一张一等导航表（愿景 → 镜头 → reference → 决策程序节点 → hook 注入短语）+「当 hook 对你说话」共鸣小节（hook 刻意复用本 skill 语汇，让 agent 看到 context 外注入的短语能 verbatim 回指到对应镜头 / 决策程序节点）——**整体下沉到 `references/external-coordinates.md`**，主文件末尾只留一句指针 + 一条魂内即用的识别规则。这一下沉是 Finding #28（常驻重注的魂内复述 hook / 愿景状态映射表 desync-prone）与 Finding #7（魂内 SSOT 重复是 reinject 负担）的收敛处置：注入短语的 SSOT 在本 plugin 的 hook 脚本、每 reference 服务哪愿景的 SSOT 在各 reference header 的愿景 tag，魂不再持有这张表的第二份拷贝。每 reference 的 read-when 触发条件写在各 reference header（同时打愿景 tag，令共鸣双向可发现）。
 
+### 2.1 派发与模型路由 hub 增量诊断（2026-07-22，正文编辑前）
+
+本次增量的 RED 直接来自真实 dogfood：一个常见的 worker 路由问题需要打开六份文档、跳转五次，才能把任务形状、执行器、目标面、模型档、具体资格、fallback、真实 handle 与端点验收串成一条可执行路径。它不是「缺一段百科」，而是控制链缺少单一入口。
+
+| 轴 | 判定 | 逐问证据 |
+|---|---|---|
+| process-control | **5/5，强** | 路由必须严格按「任务形状 → executor → target surface → effect floor → exact qualification → 同档排序/fallback → 真实 handle → 端点验收」推进；先排名后定档、把 candidate 当已认证、没有 handle 就记 running、终端态不验收，都会让后续状态机得到错误输入。 |
+| cognitive-override | **5/5，强** | hub 必须在配额、deadline 与跨 harness 压力下持续覆盖「当前 origin 就是全部资源池」「候选名称等于具体资格」「终端态等于完成」「Codex 的 `executor=workflow` 等于存在 Claude Workflow runtime」这些高概率默认直觉；决策还需跨任务风险、时长、上下文与容量信号权衡。 |
+
+因此该增量仍是 **Craft C**：用一个短、命名清晰、顺序固定的 reference hub 承载稳定路由合同；主 skill 只保留身份、红线、七镜头与确定性控制循环，并以一次直达指针进入 hub。动态 provider/model/quota 事实、CLI 语法与各机制深细节继续由各自 owner 持有，hub 只给精确锚点，不复制目录。GREEN 的可判定合同是：fresh agent 从主 skill 出发最多 drill 一次，即可产出完整八段路由记录；任一资格证据未知都 fail closed；没有真实 handle 不得记 running；终端态必须经过端点独立验收。由于本轮是 implementation-only，行为对照只准备可复现的 with-hub / without-hub case 与 grader 工件。Cursor 官方当前只建立 Composer 2.5 的 first-party pool identity；这不是 executable surface，也不证明 selector、version、effort、entitlement 或 T1 资格。因此异构评审保持 `BLOCKED_UNQUALIFIED_JUDGE`，不把未运行的 Track A/B 记成证据，也不声称 uplift。
+
 ## 3. Value triad（三视角价值）
 
 ### 3.1 Plugin 视角 —— 对 cc-master 这个产品 / portfolio 而言
 
-它**就是** cc-master 这个产品本身——补的不是某个边角洞，而是产品的本体：cc-master 的承诺是「把任意主会话 agent 变成 long-horizon master orchestrator」，这份编排手册就是兑现那个承诺的全部内容。没有它，主会话 agent 退回普通 agent，没有任何 long-horizon 纪律，插件只剩 hook + board 而没有魂。它**不能**被 `authoring-workflows` 覆盖：后者只教「workflow 这一种后台机制的脚本怎么写」，是三机制之一的乐器手册；编排者「该不该用 workflow、何时拆图、何时派发、何时验收」的主线决策只在这里。这是红线 3「两分发 skill 不重叠」的一半。
+它**就是** cc-master 这个产品本身——补的不是某个边角洞，而是产品的本体：cc-master 的承诺是「把任意主会话 agent 变成 long-horizon master orchestrator」，这份编排手册就是兑现那个承诺的全部内容。没有它，主会话 agent 退回普通 agent，没有任何 long-horizon 纪律，插件只剩 hook + board 而没有魂。它**不能**被 `authoring-workflows` 覆盖：后者只教 workflow 脚本语义，是某些 host 才提供的乐器手册；编排者先决定稳定的 workflow planning 责任，再由 adapter 映射当前 host 的真实 runtime，脚本怎么写才交给它。
 
 ### 3.2 Agent 视角 —— 对调用这个 skill 的 AI 而言
 
@@ -36,7 +47,7 @@
 单一职责方向：**指挥做什么**——把一个 long-horizon 目标编排到完成的主线决策。
 
 - 拆图：把目标拆成依赖 DAG，找临界路径，按 float 分配资源与模型档位。
-- 派发：就绪即发，在三机制（shell / sub-agent / workflow）间按形状选，控 WIP 与配额窗口。
+- 派发：就绪即发，先定跨 host 稳定的 executor 责任，再映射到当前 host 已验证的运行机制，控 WIP 与配额窗口。
 - 验收：只信端点独立验收，gate-green≠passed，content-hash 记账，done+verified 可跳可续。
 - 整合：把 done 节点并回主线，past-p95 hedge，stale 标记。
 - 该问就问：把用户当 async worker，前台对话 ∥ 后台执行，可预见的用户决策 prefetch。
@@ -45,7 +56,7 @@
 
 | 关切 | 移交给 |
 |------|--------|
-| 「workflow 脚本怎么写」（`parallel()` vs `pipeline()`、schema、caps、determinism） | `authoring-workflows` |
+| 「workflow 脚本怎么写」（`parallel()` vs `pipeline()`、schema、caps、determinism） | `authoring-workflows`；当前 host 是否有对应 runtime 先看 routing hub |
 | board 协议细节（narrow-waist schema、status enum 路由、续接 / supersession） | 自己的 `references/board.md`（深细节下沉，主文件只留 essentials） |
 | 写 / 改一个 skill 的 body / 判该不该建 / 度量一个 skill | dev meta-skills（`cc-master-skillsmith` / `curating-skill-portfolios` / `grounding-skill-evals`） |
 
@@ -81,7 +92,7 @@
 - **Fitness 不变量 → 可跑 probe**：
   - *指挥不演奏 / gate-green≠passed* → 行为型红线，**非 grep 能拦**：由 §8 Track B benchmark（`scripts/eval-benchmark.sh`，with-skill vs without-skill 各 3 run 看编排者行为差 + codex 第二评委）+ 端点验收守。
   - *board narrow-waist 稳定*（红线 2）→ `bash run-tests.sh` 的 hook 测试段：动 waist 的 PR 必带全套 hook 测试同步绿（hook 只读那一小撮 pinned 字段）。
-  - *ship-anywhere*（红线 5）→ 两层各守：① **后台派发机制仍只限 shell / sub-agent / workflow**（不变，ADR-002 留痕）；② **timer primitives 的 watchdog 例外**（ADR-011 收窄 ADR-002）——`ScheduleWakeup` + 本地 `CronCreate`（`durable:false` 内存调度，不需 claude.ai OAuth）**许可用于自我唤醒 / watchdog**（补静默失败盲区的安全网），但只以降级链形态教（CronCreate / ScheduleWakeup / Monitor 按情境降级，**background-shell `until` 轮询永为 universal floor**）；**云 `scheduled routines` / `/schedule` / RemoteTrigger（需 OAuth）+ agent-teams 仍排除**（与本地内存调度区分）。带外脚本（cc-usage / cost-pacing 信号）只进 `scripts/`，绝不进 `hooks/`。
+  - *ship-anywhere*（红线 5）→ 两层各守：① `executor` 保持稳定 planning 语义，实际派发只使用当前 host adapter 已验证且能返回真实 handle 的机制；机制数量是 host-specific，不再在 canonical 宣称固定“三种”或“五种”；② timer primitives 只作 host-specific watchdog 降级链，**background-shell `until` 轮询永为 universal floor**。带外脚本只进 skill runtime scripts，绝不进 hooks。
   - *与 `authoring-workflows` 不重叠*（红线 3）→ 两者 description 的 Use-when / 反例互指闭合：本 skill 反例指向「写脚本 → authoring-workflows」，邻居反例指向「主线编排 → 本 skill」。
   - *hook 注入词汇 ↔ skill 锚点契约*（共鸣不变量）→ 三个现存 hook（reinject / bootstrap-board / verify-board）emit 的英文短语必须与 SKILL.md「当 hook 对你说话」小节 verbatim 一致（共享 ubiquitous language，让 agent 从 context 外注入回指到镜头 / 决策程序节点）。这是**双向**约束：改任一 hook 的注入文案，须同步「hook 共鸣」小节与愿景地图 hook 列的引用短语；改共鸣小节引用，须核对 hook 真 emit 的字符串（别凭转述）。H3/H5 已 live 接入共鸣小节（H3 verify-board 的 `Unanswered user decisions ...` 追加句 / H5 posttool-batch 的 `warn=`）；H8 待其 PR——新增 hook 落地时连同其注入短语 ↔ 锚点对子在同一 PR 共同设计，不事后回贴。probe：人审 diff 时比对本 plugin hook 脚本的 `ctx=`/`warn=`/`emit_block` 字面量与共鸣小节引文。
 - **Cross-major review owner**：`curating-skill-portfolios`（portfolio 准入 / 重叠 / 边界的 SSOT；模型大版本时由它复盘本 skill 是否仍站得住、是否与 `authoring-workflows` 重叠）。

@@ -1,0 +1,28 @@
+{
+  "schema": "cc-master/routing-hub-results/v1",
+  "status": "not-run-blocked-unqualified-judge",
+  "policy": "This amendment is implementation-only, so no model endpoint, Track A or Track B comparison, or heterogeneous reviewer run was executed.",
+  "substitution": "The real issue dogfood report remains the RED artifact. This workspace provides reproducible with-hub/without-hub cases, but current official Cursor documentation establishes only a Composer 2.5 first-party pool identity, not an executable judge or T1 qualification. It records no executed review.",
+  "heterogeneous_review": {
+    "status": "not-run-blocked-unqualified-judge",
+    "reviewer_candidate": {
+      "provider_family": "Cursor",
+      "pool_identity": {
+        "pool": "first_party",
+        "model": "Composer 2.5"
+      },
+      "executable_target": {
+        "surface": null,
+        "selector": null,
+        "version": null,
+        "effort": null,
+        "entitlement": null,
+        "qualified_role_grade": null
+      }
+    },
+    "qualification_status": "blocked-unqualified",
+    "blocker": "No official current source establishes an exact Cursor Agent CLI or IDE selector, surface binding, version, effort, entitlement, or T1 qualification for this judge.",
+    "runs": [],
+    "uplift_claim": false
+  }
+}

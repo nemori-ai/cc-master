@@ -1,1 +1,1 @@
-先选 target harness（origin harness 只是候选之一），再按当前 Cursor surface 已感知能力选择本 host 的 Task subagent / 后台 Shell / external，或用 `ccm` 管理其他 harness worker；不要调用 Claude Code 的 workflow / background-runner 原语；需要机制细节
+先选 target harness（origin harness 只是候选之一），再按当前 Cursor surface 已感知能力选择本 host 的 Task subagent / 后台 Shell / external，或用 `ccm` 管理其他 harness worker；workflow planning / runtime 边界只按 `worker-routing.md`；需要机制细节

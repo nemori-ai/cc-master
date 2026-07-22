@@ -1,1 +1,1 @@
-在整个本机 worker pool 内，用本 host 的 kimi-code **Task**（subagent）/ **Bash**（后台任务）/ external 或 `ccm` 管理的 cross-harness worker 派发；没有真实 handle 不得标 `in_flight`。Workflow unsupported。
+在整个本机 worker pool 内，用本 host 的 kimi-code **Task**（subagent）/ **Bash**（后台任务）/ external 或 `ccm` 管理的 cross-harness worker 派发；没有真实 handle 不得标 `in_flight`，workflow planning / runtime 边界只按 `worker-routing.md`
