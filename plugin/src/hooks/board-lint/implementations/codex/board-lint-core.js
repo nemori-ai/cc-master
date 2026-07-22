@@ -3,6 +3,7 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { normalizeApplyPatchInput } = require('../../../_hosts/codex/apply-patch-input');
 
 const CCM_BIN = process.env.CCM_BIN || 'ccm';
 
@@ -136,8 +137,10 @@ function extractPatchBoardPaths(input, home) {
 
 function candidatePaths(payload, home) {
   const tool = payload.tool || {};
-  const input = tool.input || {};
   const name = tool.name || '';
+  const input = name === 'apply_patch'
+    ? normalizeApplyPatchInput(tool.input)
+    : (tool.input || {});
   if (name === 'Write' || name === 'Edit' || name === 'MultiEdit') {
     const filePath = inputFilePath(input);
     return pathIsBoard(filePath, home) ? [path.resolve(filePath)] : [];

@@ -265,24 +265,6 @@ function discoverActiveBoard(home, sessionId) {
   return matches.length === 1 ? matches[0] : null;
 }
 
-function normalizeApplyPatchInput(rawToolInput) {
-  // Codex delivers an apply_patch call under more than one carrier shape. board-guard / board-lint
-  // cores classify targets from a single `{ patch: string }` object, so collapse every recognized
-  // carrier to that canonical shape here — the one Codex normalization bridge — and leave anything
-  // unrecognized untouched so the cores still fail closed on a malformed / ambiguous envelope.
-  // (1) Native FREEFORM: tool_input is the raw patch string.
-  if (typeof rawToolInput === 'string') return { patch: rawToolInput };
-  if (rawToolInput && typeof rawToolInput === 'object' && !Array.isArray(rawToolInput)) {
-    // (2) Already canonical: pass a `{ patch: <string> }` object through unchanged.
-    if (typeof rawToolInput.patch === 'string') return rawToolInput;
-    // (3) Nested functions.exec -> tools.apply_patch FREEFORM carrier: `{ input: <patch string> }`.
-    if (typeof rawToolInput.input === 'string') return { patch: rawToolInput.input };
-  }
-  // Unrecognized carrier (number, array, object with no string patch/input, …): pass through so the
-  // core sees no usable `{ patch: string }` and fails closed.
-  return rawToolInput || {};
-}
-
 function normalize(raw, fallbackEvent) {
   const hostEvent = raw && raw.hook_event_name ? raw.hook_event_name : fallbackEvent;
   const event = eventName(hostEvent);
@@ -302,12 +284,9 @@ function normalize(raw, fallbackEvent) {
   };
   if (toolName) {
     const rawToolInput = raw ? raw.tool_input : undefined;
-    const toolInput = toolName === 'apply_patch'
-      ? normalizeApplyPatchInput(rawToolInput)
-      : (rawToolInput || {});
     normalized.tool = {
       name: toolName,
-      input: toolInput,
+      input: rawToolInput || {},
       response: raw.tool_response,
       id: raw.tool_use_id ? String(raw.tool_use_id) : '',
     };

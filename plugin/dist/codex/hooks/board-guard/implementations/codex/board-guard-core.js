@@ -2,6 +2,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { normalizeApplyPatchInput } = require('../../../_hosts/codex/apply-patch-input');
 
 const DENY_BODY = [
   '直接 file-edit board 被拦（board-guard·rule:board-write-single-path）。',
@@ -570,7 +571,9 @@ function main() {
 
   const tool = payload.tool || {};
   const name = tool.name || '';
-  const input = tool.input || {};
+  const input = name === 'apply_patch'
+    ? normalizeApplyPatchInput(tool.input)
+    : (tool.input || {});
   if (name === 'Write' || name === 'Edit' || name === 'MultiEdit') {
     if (structuredWriteShouldBlock(input, home)) block();
     return;
