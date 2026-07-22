@@ -142,6 +142,43 @@ export const REGISTRY: Registry = {
       ],
       handler: 'worker.run',
     },
+    dispatch: {
+      summary: '同步监督 worker，并只在 agents[] 原子登记 PID/session/terminal 生命周期',
+      read: false,
+      positionals: [{ name: 'provider-argv...', required: false }],
+      options: {
+        harness: {
+          type: 'string',
+          required: true,
+          enum: ['codex', 'claude-code', 'cursor-agent', 'kimi-code'],
+          desc: '目标 harness CLI',
+        },
+        task: { type: 'string', required: true, desc: '仅建立 agent.links 的目标 task id' },
+        'idempotency-key': {
+          type: 'string',
+          required: true,
+          desc: '调用方显式提供的幂等键；同键异 digest 冲突',
+        },
+        intent: { type: 'string', required: true, desc: '安全、非敏感的 worker 意图摘要' },
+        cwd: { type: 'string', required: false, desc: 'child cwd 的路径（默认当前目录）' },
+        'timeout-ms': { type: 'string', required: false, desc: '总超时，50..7200000 毫秒' },
+        'max-output-bytes': {
+          type: 'string',
+          required: false,
+          desc: 'stdout/stderr 有界收集上限，256..536870912 字节',
+        },
+        transcript: {
+          type: 'string',
+          required: false,
+          desc: '可选的绝对 transcript 路径；登记到 agent handle 并供 viewer 只读 tail',
+        },
+      },
+      examples: [
+        'ccm worker dispatch --board /abs/run.board.json --harness codex --task T-175 --idempotency-key review-1 --intent "review patch" --cwd /abs/repo -- --ask-for-approval never exec --json "review"',
+        'ccm worker dispatch --harness kimi-code --task T-175 --idempotency-key implement-1 --intent "implement task" -- -p "implement" --output-format stream-json',
+      ],
+      handler: 'worker.dispatch',
+    },
   },
   // ════════════════════ quota（provider-neutral；Codex rule 为 7d-only）═══════════════════════════
   quota: {

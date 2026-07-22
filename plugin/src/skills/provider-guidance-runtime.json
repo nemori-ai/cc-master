@@ -42,8 +42,8 @@
           "files": {
             "SKILL.md": "7cd334d969d5587f75fea3e0a32733fd291a58c2b348d09ce1bd4f0075410eac",
             "references/account-pool.md": "da7a5826ba8ceb1eefc26722b4e305df6042ea30264abade27f896ef1fb2a8d6",
-            "references/board-model-guide.md": "d5cd5c7a2bf234f4902858a1379d22bdd52b2eb4f58f352d49fd9a28ed3d650b",
-            "references/command-catalog.md": "992f09f7fa17af855df077c9b528dcce87e5e17cfd3d99ac2963975e1b38a651"
+            "references/board-model-guide.md": "cc07075c086a67ad9fc2686bc17732434278abaad37af5cf07b0cbe2c3fc1977",
+            "references/command-catalog.md": "e93cbe4a1d760b422b10f89a9bf04ab843f7e50d7e8626dfc0b87eb86acdcec2"
           }
         }
       }
@@ -83,8 +83,8 @@
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
             "SKILL.md": "a23bfd443e7b01ce00c1e69be9a3e8380a2bf8d7612cc06ffb69d2d866e663d4",
-            "references/board-model-guide.md": "8835a157df19f7dcd7ffab14091f40a60d3264657e5e40dd666835a5f452be7e",
-            "references/command-catalog.md": "afa317b5208c3ef4acedc95afa15157c88248406092ae33c30a354edbea71357"
+            "references/board-model-guide.md": "a2509a6a2660cbe249bddd0e84ee6032f88d6913537dd4481d6a89fd480a34d6",
+            "references/command-catalog.md": "9336a7070980d7d0e4928de626e9f3759a59d15339b386cafabddc6402cb93ef"
           }
         }
       }
@@ -124,8 +124,8 @@
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
             "SKILL.md": "1625c8fa4c68aaddbf19cd91e4017e558dfe42be20114b50608a2f2494208ccd",
-            "references/board-model-guide.md": "ec7470085182d2d01ef869e90c4af3657514d48942e3ee08028aa092d93cf9b4",
-            "references/command-catalog.md": "b8266fd085411ecb073db67503ce4f8695d8eaef881159d7be7bef5b7723bcac"
+            "references/board-model-guide.md": "47c847091e0d504a92cadf02a3c5b3fc381273c3390d83058f3293d6abf6dd28",
+            "references/command-catalog.md": "47babfa257589ed566d96f4bc8efea712c437e3eb1d2c6858cf082de70b7a7ef"
           }
         }
       }
@@ -166,8 +166,8 @@
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
             "SKILL.md": "bd8c75f51e9f9bdfaccf609984eccfcb85ba4df3f49963cfc29ee7fda50fdbb6",
-            "references/board-model-guide.md": "d4c77540044bdb3bb64c5a6860848903b5af1792e11b2053403f1c20a16288da",
-            "references/command-catalog.md": "09bd3aa27c15baf732ffb528312d4341505e57c259514594a0ba1a2b3643748a"
+            "references/board-model-guide.md": "0554867a7e989bcfb42b22602844c02c4d252648fb16b9d5f94f937d422a4da9",
+            "references/command-catalog.md": "d0f7d14864afc4247a9da4143831a1e02df00936961de2d1cf94e821cf2bffb6"
           }
         }
       }

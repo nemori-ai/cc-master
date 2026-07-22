@@ -88,3 +88,7 @@ cursor external-transcript raw path + honest `none` degradation. `ccm/apps/cli/t
 proves per-harness source location: kimi path-segment sid match (prefer `agents/main`, exact segment,
 no substring bleed) and cursor session-id location returning null (no tailable native store). They do
 not prove a cursor SQLite reader (out of scope) or that another Cursor version keeps the same store.
+`ccm/apps/cli/test/handler-web-viewer.test.ts` additionally drives real tracked `worker dispatch`
+fixtures through the HTTP viewer contract: claude / codex / kimi resolve structured transcript
+sources, Cursor explicit transcript resolves a raw source, Cursor without a path reports `none`, and
+all roster / task joins / detail / archived terminal streams remain visible.

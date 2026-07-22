@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Tracked cross-harness worker dispatch (GitHub #175)** — adds `ccm worker dispatch` as an explicit, synchronous tracked transport while preserving `ccm worker run` as raw transport with zero board side effects. The new command requires a caller idempotency key, registers only `agents[]`, and atomically binds a real spawned PID plus agent-side task link. Codex and Kimi accept only their declared structured session events; Claude Code accepts an explicit `--session-id` or, only with declared `--output-format json|stream-json`, a strict `type=result / session_id` envelope, then locates the transcript and derives a `claude --resume <sid>` resume attach. It never guesses identity from model text. Without proven session evidence the agent remains PID-only, with identity/attach typed unavailable; an explicit readable `--transcript` independently makes transcript typed supported even without session identity. With no readable `--transcript`, transcript is typed unavailable. Cursor keeps native session identity, SQLite transcript, and exact attach typed unsupported, while an explicit external transcript can provide the existing raw stream. Dispatch closes sanitized lifecycle facts and fails closed to reconciliation across claim/PID, bind, identity, terminal-write, and lost-supervisor ambiguity. It never changes task status/handle/routing/acceptance and never persists prompts, stdin, secrets, environment, provider argv, or provider output.
+
 ## [0.21.0-rc.3] — 2026-07-21
 
 > **Doc↔impl reconciliation + anti-drift capability-card gate, plugin increment (release candidate)** — pairs with **ccm-v0.22.0-rc.3**.

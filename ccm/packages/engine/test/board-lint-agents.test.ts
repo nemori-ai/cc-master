@@ -142,6 +142,51 @@ test('account_ref/quota_pool_ref as string ref (reserved) → no FMT-AGENTS', ()
   assert.ok(!warns(r).has('FMT-AGENTS'), J(r.warnings));
 });
 
+test('well-formed tracked dispatch metadata is additive and lint-clean', () => {
+  const dispatch = {
+    schema: 'ccm/tracked-dispatch-metadata/v1',
+    key: 'rc4-175-review-1',
+    request_digest: `sha256:${'a'.repeat(64)}`,
+    phase: 'bound',
+    task_id: 'T1',
+    runtime_pid: 42117,
+    claim: { token: 'claim-1', claimed_at: '2026-07-16T08:00:01Z', launcher_pid: 42000 },
+    evidence: [
+      { kind: 'pid', value: '42117', source: 'spawn', captured_at: '2026-07-16T08:00:02Z' },
+    ],
+    capabilities: {
+      identity: { status: 'unavailable', reason: 'session-identity-not-yet-observed' },
+      transcript: { status: 'unsupported', reason: 'not-proven-for-harness' },
+      attach: { status: 'unsupported', reason: 'not-proven-for-harness' },
+    },
+    reconciliation_required: false,
+  };
+  const r = lintBoard(withAgents([{ ...GOOD_AGENT, dispatch }]));
+  assert.ok(!warns(r).has('FMT-AGENTS'), J(r.warnings));
+});
+
+test('tracked dispatch metadata rejects empty capability placeholders and malformed state evidence', () => {
+  const bad = {
+    schema: 'wrong',
+    key: '',
+    request_digest: 'sha256:nope',
+    phase: 'teleported',
+    task_id: '',
+    runtime_pid: 0,
+    claim: { token: '', claimed_at: 'yesterday', launcher_pid: 0 },
+    evidence: [{ kind: 'session-id', value: '', source: '', captured_at: 'later' }],
+    capabilities: {
+      identity: { status: 'supported', value: { kind: 'session-id', value: '' } },
+      transcript: { status: 'unavailable', reason: '' },
+      attach: { status: 'unsupported', reason: '' },
+    },
+    reconciliation_required: 'no',
+  };
+  const r = lintBoard(withAgents([{ ...GOOD_AGENT, dispatch: bad }]));
+  assert.ok(warns(r).has('FMT-AGENTS'), J(r.warnings));
+  assert.ok(r.warnings.filter((entry) => entry.rule === 'FMT-AGENTS').length >= 8);
+});
+
 // ── BIZ-INFLIGHT-AGENT ───────────────────────────────────────────────────────────────────────────
 const inflightBoard = (extra: Record<string, unknown> = {}) =>
   J({

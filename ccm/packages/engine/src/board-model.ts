@@ -354,12 +354,12 @@ export const FIELDS = {
     },
     agents: {
       tier: '✎',
-      type: 'array<{id, type, harness, model?, intent, launch?, handle?, lifecycle, probe?, links?, account_ref, quota_pool_ref}>?',
+      type: 'array<{id, type, harness, model?, intent, launch?, handle?, lifecycle, probe?, links?, account_ref, quota_pool_ref, dispatch?:tracked-dispatch/v1}>?',
       default: '缺省(无 agent 登记)',
       readers:
         'ccm agent list|show / viewer 花名册与 agent 模式 / BIZ-INFLIGHT-AGENT 判 in_flight task 是否已登记 agent',
       writers:
-        'ccm agent create|bind|link|terminal|probe（probe 只写 agents[] 自己的 probe/lifecycle 字段）',
+        'ccm agent create|bind|link|terminal|probe；ccm worker dispatch 经专用 repository 只写 agents[] 自己的 dispatch/handle/lifecycle/links 字段',
       when: '凡派发（sub-agent / 后台 shell / workflow / 跨 harness worker）即登记；bind 交证据 / link 建关联 / probe 探活',
       degrade:
         '缺→无 agent 登记(viewer 花名册空)；形状坏→warn(FMT-AGENTS)·不拦写盘(✎ hook 不读·窄腰零碰撞)',
@@ -1300,7 +1300,7 @@ export const INVARIANTS: Invariant[] = [
     family: 'FMT',
     scope: 'board',
     summary:
-      'agents 若存在须为数组；条目 id 语法/唯一、type/harness/handle.kind/lifecycle.state/probe.observed/probe.method 合法、时间字段 ISO、links[].task_id 非空、account_ref/quota_pool_ref 为 null 或字符串',
+      'agents 若存在须为数组；条目 id 语法/唯一、type/harness/handle.kind/lifecycle.state/probe.observed/probe.method 合法、时间字段 ISO、links[].task_id 非空、account_ref/quota_pool_ref 为 null 或字符串；dispatch 若存在须满足 tracked-dispatch/v1 状态/evidence/typed-capability 合约',
   },
   {
     id: 'BIZ-INFLIGHT-AGENT',
