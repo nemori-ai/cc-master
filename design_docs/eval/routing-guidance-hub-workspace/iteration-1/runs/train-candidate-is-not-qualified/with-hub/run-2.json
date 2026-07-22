@@ -1,0 +1,13 @@
+{
+  "case_id": "train-candidate-is-not-qualified",
+  "arm": "with-hub",
+  "source_agent_id": "agt-055",
+  "record_kind": "normalized_capture",
+  "normalization": "Removed pre/post-JSON commentary while preserving the emitted routing record verbatim in meaning and order.",
+  "prompt_contract_revision": "fair-final-v1",
+  "files_opened_in_order": [
+    "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+    "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md"
+  ],
+  "answer": "task_shape=terminal-leaf architecture artifact plus irreversible data-boundary decision; executor=subagent for the artifact with user authority retained for the irreversible commitment; target_surface=the registry's single exact O candidate surface; effect_floor=O solely because architecture judgment density is high and the irreversible boundary has high error cost; qualification=insufficient because candidate is not certification and both exact O role certification and live payer-bound admission are unknown, so fail closed; ranked_fallback=empty because the certified ample T1 target is below the O floor and cannot be a fallback; runtime_handle=none because dispatch is forbidden before qualification and no in_flight transition may occur; endpoint_verdict=not reached, dispatch_now=false, obtain exact O evidence and user approval or re-scope rather than invent facts or downgrade."
+}

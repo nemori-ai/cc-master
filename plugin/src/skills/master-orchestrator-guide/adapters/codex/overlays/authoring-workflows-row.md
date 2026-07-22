@@ -1,1 +1,1 @@
-| **authoring-workflows** | Claude Code Workflow API 手册；Codex 下当前不把 `Workflow` / `pipeline()` / `parallel()` 当 runtime 原语 | 只在你需要理解旧 workflow 语义或迁移到 Codex subagents / 后台 terminal / cloud task 时 drill；不要在 Codex 下调用 `Workflow` |
+| **authoring-workflows** | workflow 脚本语义与迁移手册；不决定当前 host 的 runtime 能力 | routing hub 已确认 runtime 边界后，确实需要理解或迁移脚本语义时 |

@@ -7,6 +7,8 @@ const ROOT = join(import.meta.dirname, '..', '..');
 const HOSTS = ['claude-code', 'codex', 'cursor'];
 const read = (path) => readFileSync(join(ROOT, path), 'utf8');
 const GUIDE_PATH = 'plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md';
+const HUB_PATH =
+  'plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md';
 const INIT_SURFACES = [
   'plugin/src/commands/as-master-orchestrator/adapters/claude-code/body.md',
   'plugin/src/skills/cc-master-as-master-orchestrator/canonical/SKILL.md',
@@ -43,26 +45,25 @@ test('master identity separates task, runtime agent, and execution attempt', () 
 });
 
 test('dispatch registers the runtime actor before task in-flight and closes spawn failures', () => {
-  const guide = read(GUIDE_PATH);
-  const hotPath = section(guide, '### Cross-harness 调派热路径', '### 4.0 决策程序');
+  const hub = read(HUB_PATH);
+  const handleGate = section(hub, '## 拿到真实 handle 才算派发', '## 终端态之后做端点验收');
   const actions = [
-    '`ccm agent create`',
-    '真实 handle',
-    '`ccm agent bind`',
-    '`ccm agent link`',
-    '`ccm task start`',
+    '`starting`',
+    '真实机制成功返回',
+    'bind',
+    'link',
+    '`in_flight`',
   ];
   const positions = actions.map((action) => {
-    const position = hotPath.indexOf(action);
+    const position = handleGate.indexOf(action);
     assert.notEqual(position, -1, `missing registered dispatch action: ${action}`);
     return position;
   });
 
   assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
-  assert.match(hotPath, /没有真实 handle[^\n]*不得[^\n]*`in_flight`/u);
-  assert.match(hotPath, /spawn[^\n]*失败[^\n]*`ccm agent terminal`/iu);
-  assert.match(hotPath, /native attempt[^\n]*(?:专属|dedicated)[^\n]*writer/iu);
-  assert.match(hotPath, /精确[^\n]*(?:flag|语法)[^\n]*`using-ccm`/iu);
+  assert.match(handleGate, /没有 handle 或 link 的 `in_flight` 是幽灵任务/u);
+  assert.match(handleGate, /spawn 失败[^\n]*收掉 `starting`/iu);
+  assert.match(handleGate, /精确 command[^\n]*只查[^\n]*CCM_COMMAND_CATALOG_POINTER/iu);
 });
 
 test('recon, wait, resume, and handoff consume registry evidence without inventing agent attach', () => {
@@ -105,18 +106,18 @@ test('initialization surfaces carry only the task-agent-attempt identity anchor'
 
 test('cross-harness worker choice pervades responsibilities, lenses, aesthetics, and executor choice', () => {
   const guide = read(GUIDE_PATH);
+  const hub = read(HUB_PATH);
   const responsibilities = section(guide, '### 你的职责', '### 你的底线');
   const lenses = section(guide, '### 七镜头', '### 好编排长什么样');
   const aesthetics = section(guide, '### 好编排长什么样', '### 红线');
   const executors = section(guide, '### 4.2 executor 选择', '### 4.3 用量检查');
 
   assert.match(responsibilities, /全部本机可用 harness[^\n]*worker/u);
-  assert.match(lenses, /origin harness[^\n]*不是[^\n]*候选边界/u);
-  assert.match(lenses, /目标 harness[^\n]*模型[^\n]*(?:能力|成本|配额)/u);
+  assert.match(lenses, /origin[^\n]*不是 worker pool 边界/u);
   assert.match(aesthetics, /harness\s*×\s*模型\s*×\s*executor/u);
-  assert.match(executors, /`executor`[^\n]*不等于[^\n]*target harness/u);
-  assert.match(executors, /planning\s*\/\s*routing[^\n]*target harness/u);
-  assert.match(executors, /origin harness[^\n]*默认/u);
+  assert.match(executors, /worker-routing\.md/u);
+  assert.match(hub, /`executor` 回答[^\n]*`target surface` 回答[^\n]*正交/u);
+  assert.match(hub, /当前 origin[^\n]*不是 worker pool 边界/u);
 });
 
 test('every host adapter source exposes local and cross-harness dispatch as one worker pool', () => {
@@ -130,7 +131,7 @@ test('every host adapter source exposes local and cross-harness dispatch as one 
 
     assert.match(summary, /本 host[^\n]*cross-harness/iu, `${host}: summary`);
     assert.match(lens, /target harness[^\n]*origin harness/iu, `${host}: lens`);
-    assert.match(reference, /跨 harness[^\n]*worker/u, `${host}: reference`);
+    assert.match(reference, /后台机制[^\n]*派发卫生/u, `${host}: reference`);
     assert.match(mapping, /target harness[^\n]*本 host/iu, `${host}: mapping`);
     assert.match(mapping, /其他本机 harness[^\n]*`ccm` worker/iu, `${host}: mapping cross-harness`);
     assert.match(executor, /worker pool[^\n]*target harness/iu, `${host}: executor`);
@@ -138,46 +139,16 @@ test('every host adapter source exposes local and cross-harness dispatch as one 
   }
 });
 
-test('the hot path orders stable ccm actions and exposes only the high-frequency model-policy grammar', () => {
+test('the master hot path delegates routing and exact command grammar to their single owners', () => {
   const guide = read(GUIDE_PATH);
   const hotPath = section(guide, '### Cross-harness 调派热路径', '### 4.0 决策程序');
+  const hub = read(HUB_PATH);
 
-  const actions = [
-    'ccm harness list',
-    'ccm worker help',
-    'ccm provider facts',
-    'ccm quota status --machine-wide',
-    'ccm --harness <target> usage show|advise',
-    'ccm quota preflight',
-    'ccm route advise',
-    'ccm worker run',
-  ];
-  const positions = actions.map((action) => {
-    const position = hotPath.indexOf(action);
-    assert.notEqual(position, -1, `missing hot-path action: ${action}`);
-    return position;
-  });
-  assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
-  assert.match(hotPath, /spawned=false/u);
-  assert.match(hotPath, /全机缓存读面[^\n]+不触发 provider refresh/u);
-  assert.match(hotPath, /unknown[^\n]+不推断为 ample/u);
+  assert.match(hotPath, /worker-routing\.md[^\n]*八段链/u);
   assert.match(hotPath, /using-ccm/u);
-  for (const command of [
-    'ccm model-policy show --task <task-taxonomy> --json',
-    'ccm model-policy advise --input <json|@file|-> --json',
-    'ccm model-policy <verb> --help',
-  ]) assert.match(hotPath, new RegExp(command.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
-  const commandTokensWithGrammar = [...hotPath.matchAll(/`(ccm[^`]*(?:--|<)[^`]*)`/gu)].map(
-    (match) => match[1],
-  );
-  assert.deepEqual(commandTokensWithGrammar, [
-    'ccm model-policy show --task <task-taxonomy> --json',
-    'ccm quota status --machine-wide --json',
-    'ccm --harness <target> usage show|advise --json',
-    'ccm model-policy advise --input <json|@file|-> --json',
-    'ccm model-policy <verb> --help',
-  ]);
-  assert.doesNotMatch(hotPath, /stdout_bytes|exit_code|automatic_spawn_limit/u);
+  assert.match(hotPath, /pacing-and-estimation/u);
+  assert.doesNotMatch(hotPath, /ccm harness list|ccm worker help|ccm provider facts|ccm worker run/u);
+  assert.match(hub, /task shape[\s\S]*executor[\s\S]*target surface[\s\S]*effect floor[\s\S]*exact qualification[\s\S]*same-floor ranking \/ fallback[\s\S]*real runtime handle[\s\S]*endpoint verification/u);
 });
 
 test('ccm worker dispatch requires an outer tracked background handle, never the synchronous wrapper result', () => {

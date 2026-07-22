@@ -1,0 +1,13 @@
+{
+  "case_id": "train-workflow-on-codex",
+  "arm": "with-hub",
+  "source_agent_id": "agt-056",
+  "record_kind": "normalized_capture",
+  "normalization": "Condensed repeated prose and the expanded lifecycle appendix without changing opened files, routing-field order, decisions, or evidence claims.",
+  "prompt_contract_revision": "fair-final-v1",
+  "files_opened_in_order": [
+    "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+    "plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md"
+  ],
+  "answer": "task_shape=deterministic-sub-dag: four independent specified migration leaves share one schema and deterministic join; executor=workflow as cross-host planning responsibility; target_surface=an exact qualified harness+surface using Codex-native trackable background/subagent mechanisms with isolated writer worktrees, never an invented Claude Workflow runtime; effect_floor=T1 solely because the leaves are already-specified implementation with bounded implementation-error/rework risk, not because of target brand or capacity; qualification=exact same-freshness role, live admission, capacity, execution-boundary, workspace, and traceability evidence, with unknown/stale/deny failing closed; ranked_fallback=qualified same-floor T1 candidates only, with no invented dynamic chain; runtime_handle=each real spawn must return a recon-able handle that is bound and linked before in_flight; endpoint_verdict=terminalize every stopped runtime but keep tasks active until independent artifact/diff/tests/acceptance/hash verification, then run and verify the deterministic schema join before parent done/verified, otherwise retry or replan."
+}

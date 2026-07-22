@@ -43,6 +43,7 @@ slot_replacements:
   "{{HANDOFF_REFERENCE_ROW}}": adapters/kimi-code/overlays/handoff-reference-row.md
   "{{CROSS_HARNESS_WORKER_HELP_POINTER}}": adapters/kimi-code/overlays/cross-harness-worker-help-pointer.md
   "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/kimi-code/overlays/cross-harness-target-facts-pointer.md
+  "{{WORKFLOW_RUNTIME_SEMANTICS}}": adapters/kimi-code/overlays/workflow-runtime-semantics.md
 notes:
   - kimi-code projection uses the host-neutral canonical body, including machine-wide selected-target quota guidance, plus kimi built-in subagent / Bash dispatch and background-Bash-floor watchdog slots.
   - Kimi current-login 5h/7d quota is readable through ccm's kimi-usages-api collector; non-blocking Stop pacing delivery, account switching, and Workflow remain unsupported.

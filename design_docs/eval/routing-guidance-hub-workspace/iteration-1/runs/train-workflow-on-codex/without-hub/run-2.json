@@ -1,0 +1,14 @@
+{
+  "case_id": "train-workflow-on-codex",
+  "arm": "without-hub",
+  "source_agent_id": "agt-061",
+  "record_kind": "normalized_capture",
+  "normalization": "Condensed repeated prose without changing opened files, routing-field order, decisions, or evidence claims.",
+  "prompt_contract_revision": "fair-final-v1",
+  "files_opened_in_order": [
+    "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+    "plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md",
+    "plugin/src/skills/master-orchestrator-guide/canonical/references/model-allocation.md"
+  ],
+  "answer": "task_shape=deterministic-sub-dag with four specified independent migration leaves, shared schema and deterministic join; executor=workflow as planning semantics; target_surface=Codex origin plus codex-cli headless workers launched through trackable background Shell, with isolated worktrees and exact provider flags; effect_floor=T1 solely because leaves are fully specified implementation with bounded integration/rework risk; qualification=live model-policy/provider-facts/help/quota evidence, including asserted Codex seven-day-only load-bearing quota and exact session-id extraction, with unknown/stale/missing failing closed; ranked_fallback=qualified same-floor T1 targets only; runtime_handle=four real session-id handles bound and linked before parent in_flight; endpoint_verdict=terminalize every runtime, collect artifacts, deterministically join, and independently verify tests/diff/acceptance/hash before parent done/verified."
+}

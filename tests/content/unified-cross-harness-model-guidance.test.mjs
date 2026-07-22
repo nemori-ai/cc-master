@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -30,40 +32,57 @@ const MASTER_QUOTA_OVERLAYS = [
   'quota-judgment-row.md',
 ];
 const read = (path) => readFileSync(join(ROOT, path), 'utf8');
+const require = createRequire(import.meta.url);
+const { applySkillProjection, planSkillProjection } = require('../../scripts/project-skill.cjs');
+const projectMaster = (host, relativePath) => {
+  const staging = mkdtempSync(join(tmpdir(), `unified-model-${host}-`));
+  try {
+    const plan = planSkillProjection({
+      repoRoot: ROOT,
+      host,
+      skill: 'master-orchestrator-guide',
+    });
+    applySkillProjection(plan, staging);
+    return readFileSync(join(staging, relativePath), 'utf8');
+  } finally {
+    rmSync(staging, { recursive: true, force: true });
+  }
+};
 
-test('canonical allocation is role-first and consumes the cross-provider ccm read model', () => {
+test('canonical routing hub is role-first while allocation keeps only deeper capacity decisions', () => {
+  const hub = read(
+    'plugin/src/skills/master-orchestrator-guide/canonical/references/worker-routing.md',
+  );
   const allocation = read(
     'plugin/src/skills/master-orchestrator-guide/canonical/references/model-allocation.md',
   );
-  for (const role of ['`O`', '`T1`', '`T2`', '`T3`']) assert.match(allocation, new RegExp(role, 'u'));
-  assert.match(allocation, /ccm model-policy show/u);
-  assert.match(allocation, /设计[\s\S]*master-orchestrator[\s\S]*`O`/u);
-  assert.match(allocation, /实现[\s\S]*`T1`/u);
-  assert.match(allocation, /常规 review[\s\S]*异族[\s\S]*`T1`/u);
-  assert.match(allocation, /高风险[\s\S]*异族[\s\S]*`O`/u);
-  assert.match(allocation, /只读[\s\S]*`T2`/u);
-  assert.match(allocation, /机械[\s\S]*`T3`/u);
-  assert.match(allocation, /effect floor[\s\S]*价格[\s\S]*quota[\s\S]*latency[\s\S]*context[\s\S]*integration/u);
-  assert.match(allocation, /taste[\s\S]*tie-break/u);
+  for (const role of ['`O`', '`T1`', '`T2`', '`T3`']) assert.match(hub, new RegExp(role, 'u'));
+  assert.match(hub, /系统、架构[^\n]*`O`[^\n]*master-orchestrator/u);
+  assert.match(hub, /完整 spec[\s\S]*`T1`/u);
+  assert.match(hub, /常规异构 review[\s\S]*`T1`/u);
+  assert.match(hub, /不可逆高风险[\s\S]*`O`/u);
+  assert.match(hub, /只读研究[\s\S]*`T2`/u);
+  assert.match(hub, /机械、确定性[\s\S]*`T3`/u);
+  assert.match(hub, /cost[\s\S]*quota headroom[\s\S]*latency[\s\S]*context fit[\s\S]*integration cost/u);
+  assert.match(hub, /taste[\s\S]*tie-break/u);
   assert.match(
-    allocation,
-    /`executor=master-orchestrator`[\s\S]*组织角色[\s\S]*`role_grade=O`[\s\S]*模型资格/u,
+    hub,
+    /`executor=master-orchestrator`[\s\S]*组织角色[\s\S]*`effect_floor=O`[\s\S]*资格/u,
   );
   for (const failure of [
-    'task-blocked',
     'policy',
     'security',
     'permission',
     'workspace',
-  ]) assert.match(allocation, new RegExp(failure, 'u'));
-  assert.doesNotMatch(allocation, /\{\{MASTER_HOST_MODEL_ALLOCATION\}\}/u);
+  ]) assert.match(hub, new RegExp(failure, 'u'));
+  assert.match(allocation, /稳定的 `O \/ T1 \/ T2 \/ T3` floor[\s\S]*worker-routing\.md/u);
+  assert.match(allocation, /容量收紧时按顺序决策/u);
+  assert.doesNotMatch(hub, /\{\{MASTER_HOST_MODEL_ALLOCATION\}\}/u);
 
   const guide = read('plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md');
-  assert.match(guide, /ccm model-policy show --task <task-taxonomy> --json/u);
-  assert.match(guide, /ccm model-policy advise --input <json\|@file\|-> --json/u);
-  for (const invented of ['--role', '--taxonomy', '--require']) {
-    assert.match(guide, new RegExp(`不要臆造[^\\n]*${invented}`, 'u'));
-  }
+  assert.match(guide, /派发与选型唯一入口[\s\S]*worker-routing\.md/u);
+  assert.doesNotMatch(guide, /ccm model-policy show --task <task-taxonomy>/u);
+  assert.doesNotMatch(guide, /ccm model-policy advise --input <json\|@file\|->/u);
 });
 
 test('origin-local model and quota interpretation slots are removed while origin runtime mechanisms remain adapted', () => {
@@ -81,18 +100,21 @@ test('origin-local model and quota interpretation slots are removed while origin
   }
 });
 
-test('master quota and pacing discipline is canonical rather than 27 origin-local overlays', () => {
+test('master keeps capacity discipline but volatile provider windows stay in pacing facts', () => {
   const guide = read('plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md');
+  const signals = read(
+    'plugin/src/skills/pacing-and-estimation/canonical/references/usage-signals.md',
+  );
   for (const slot of MASTER_QUOTA_SLOTS) {
     assert.doesNotMatch(guide, new RegExp(`\\{\\{${slot}\\}\\}`, 'u'), slot);
   }
   assert.match(guide, /ccm quota status --machine-wide --json/u);
-  assert.match(guide, /harness_id \+ surface_id \+ window/u);
   assert.match(guide, /selected target/u);
-  assert.match(guide, /Claude Code `claude-cli`[\s\S]*5h \+ 7d/u);
-  assert.match(guide, /Codex `codex-cli`[\s\S]*只[^\n]*7d/u);
-  assert.match(guide, /cursor-ide-plugin[\s\S]*cursor-agent-cli[\s\S]*独立/u);
   assert.match(guide, /unknown[^\n]*stale[^\n]*missing[^\n]*fail closed/u);
+  assert.doesNotMatch(guide, /Claude Code `claude-cli`|Codex `codex-cli`|cursor-ide-plugin/u);
+  assert.match(signals, /Claude Code `claude-cli`[\s\S]*`five_hour` \+ `seven_day`/u);
+  assert.match(signals, /Codex `codex-cli`[\s\S]*仅 `seven_day`/u);
+  assert.match(signals, /cursor-ide-plugin[\s\S]*cursor-agent-cli[\s\S]*独立/u);
   for (const host of HOSTS) {
     const strategy = read(
       `plugin/src/skills/master-orchestrator-guide/adapters/${host}/strategy.yaml`,
@@ -111,9 +133,10 @@ test('master quota and pacing discipline is canonical rather than 27 origin-loca
       );
     }
 
-    const rendered = read(`plugin/dist/${host}/skills/master-orchestrator-guide/SKILL.md`);
+    const rendered = projectMaster(host, 'SKILL.md');
     assert.match(rendered, /ccm quota status --machine-wide --json/u, host);
     assert.match(rendered, /selected target/u, host);
+    assert.doesNotMatch(rendered, /Claude Code `claude-cli`|Codex `codex-cli`|cursor-ide-plugin/u, host);
     for (const slot of MASTER_QUOTA_SLOTS) {
       assert.doesNotMatch(rendered, new RegExp(`\\{\\{${slot}\\}\\}`, 'u'), host);
     }
@@ -198,7 +221,12 @@ test('all four rendered origins receive the same target model allocation and fac
     'skills/pacing-and-estimation/references/model-tiers.md',
   ];
   for (const path of paths) {
-    const rendered = HOSTS.map((host) => read(`plugin/dist/${host}/${path}`));
+    const relativePath = path.replace('skills/master-orchestrator-guide/', '');
+    const rendered = HOSTS.map((host) =>
+      path.startsWith('skills/master-orchestrator-guide/')
+        ? projectMaster(host, relativePath)
+        : read(`plugin/dist/${host}/${path}`),
+    );
     for (let index = 1; index < HOSTS.length; index += 1) {
       assert.equal(rendered[index], rendered[0], `${path}: ${HOSTS[index]} drift`);
     }
@@ -213,7 +241,7 @@ test('four-origin descriptions route one shared model policy while keeping mecha
     'kimi-code': /kimi-code 的当前登录态 5h\/7d[\s\S]*无 non-blocking Stop pacing hook/u,
   };
   for (const host of HOSTS) {
-    const master = read(`plugin/dist/${host}/skills/master-orchestrator-guide/SKILL.md`);
+    const master = projectMaster(host, 'SKILL.md');
     // Adapter descriptions are source truth. Dist/runtime hashes are guarded independently by the
     // attestation projection gate and may intentionally await the endpoint-wide regeneration step.
     const pacing = read(
@@ -268,6 +296,6 @@ test('the registered pressure baseline preserves task to role to candidate to fa
   assert.match(baseline, /命令语法 RED 已关闭/u);
   assert.match(baseline, /整体压力场景[。\s\S]*PARTIAL/u);
 
-  const guide = read('plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md');
-  assert.match(guide, /`spawned=false`/u);
+  const catalog = read('plugin/src/skills/using-ccm/canonical/references/command-catalog.md');
+  assert.match(catalog, /spawned[\s\S]*false/u);
 });

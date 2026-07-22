@@ -40,6 +40,7 @@ slot_replacements:
   "{{HANDOFF_REFERENCE_ROW}}": adapters/claude-code/overlays/handoff-reference-row.md
   "{{CROSS_HARNESS_WORKER_HELP_POINTER}}": adapters/claude-code/overlays/cross-harness-worker-help-pointer.md
   "{{CROSS_HARNESS_TARGET_FACTS_POINTER}}": adapters/claude-code/overlays/cross-harness-target-facts-pointer.md
+  "{{WORKFLOW_RUNTIME_SEMANTICS}}": adapters/claude-code/overlays/workflow-runtime-semantics.md
 mechanisms:
   declarative-patch:
     enabled: false

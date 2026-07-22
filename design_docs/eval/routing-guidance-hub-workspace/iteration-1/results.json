@@ -1,0 +1,51 @@
+{
+  "schema": "cc-master/routing-hub-results/v2",
+  "status": "passed",
+  "prompt_contract_revision": "fair-final-v1",
+  "policy": "Manual user-directed Cursor first-party T1 evaluation using exact composer-2.5 in Agent CLI ask mode; Auto and alternative harnesses were not used.",
+  "execution": {
+    "surface": "Cursor Agent CLI",
+    "selector": "composer-2.5",
+    "version": "2026.07.20-8cc9c0b",
+    "mode": "ask",
+    "automatic_provider_certification_claim": false
+  },
+  "subject_runs": {
+    "without_hub_agent_ids": ["agt-061", "agt-062", "agt-060"],
+    "with_hub_final_agent_ids": ["agt-056", "agt-055", "agt-054"],
+    "record_kind": "normalized_capture",
+    "normalization_note": "Tracked run JSON preserves files opened, routing-field order, decisions, and evidence claims while removing markdown fencing and condensing repeated prose. Runtime identity and outcomes remain in the board agent registry."
+  },
+  "heterogeneous_review": {
+    "status": "passed",
+    "judge_agent_ids": ["agt-064", "agt-063", "agt-066"],
+    "cases": [
+      {
+        "case_id": "train-workflow-on-codex",
+        "judgment": "judgments/train-workflow-on-codex.json",
+        "without_hub_reference_drills": 2,
+        "with_hub_reference_drills": 1,
+        "without_hub_pass": false,
+        "with_hub_pass": true
+      },
+      {
+        "case_id": "train-candidate-is-not-qualified",
+        "judgment": "judgments/train-candidate-is-not-qualified.json",
+        "without_hub_reference_drills": 4,
+        "with_hub_reference_drills": 1,
+        "without_hub_pass": false,
+        "with_hub_pass": true
+      },
+      {
+        "case_id": "holdout-terminal-is-not-done",
+        "judgment": "judgments/holdout-terminal-is-not-done.json",
+        "without_hub_reference_drills": 4,
+        "with_hub_reference_drills": 1,
+        "without_hub_pass": false,
+        "with_hub_pass": true
+      }
+    ],
+    "uplift_claim": true,
+    "automatic_provider_certification_claim": false
+  }
+}

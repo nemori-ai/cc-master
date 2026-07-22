@@ -1,6 +1,6 @@
 # 派发 —— executor 值 vs 后台机制 + 编排并行
 
-> **何时读：** 给每个 task 定派给哪个 `executor`、为 harness × model 选择取证、给并行 writer 建立隔离工作树、再选你怎么真跑你负责执行的那些并把这些道编排起来时——五个 executor 值 vs 三种后台机制、intra-vs-inter workflow、靠 escalation 重新定位（re-altitude）、admission control、**派发卫生 + watchdog/liveness 安全网（含 watchdog 工具降级链）**。
+> **何时读：** 你已经按 [`worker-routing.md`](worker-routing.md) 定好稳定路由，需要进一步判断 dataflow / 并行形状、当前 host 的真实后台机制、writer 隔离、intra-vs-inter workflow、escalation、admission control、派发卫生或 watchdog/liveness 时读。
 
 主线编排的核心：给每个节点定**谁执行**（board 上的 `executor` 值）、选你怎么把你负责执行的那些**真跑起来**（后台机制）、再把这些道编排起来。
 
@@ -10,8 +10,8 @@
 - [分形的三个高度](#分形的三个高度)
 - [两个尺度上的 dataflow](#两个尺度上的-dataflow--为何这些高度是自相似的)
 - [五个 executor 值 —— board 上「谁执行」](#五个-executor-值--board-上谁执行)
-- [三种后台机制 —— 你怎么真跑你负责执行的那些](#三种后台机制--你怎么真跑你负责执行的那些)
-- [选择标准 —— 控制 / 综合 / context](#选择标准--控制--综合--context不是数量)
+- [后台机制 —— 你怎么真跑你负责执行的那些](#后台机制--你怎么真跑你负责执行的那些)
+- [稳定路由合同入口](#稳定路由合同入口)
 - [派前取证 —— harness × model 不是默认值](#派前取证--harness--model-不是默认值)
 - [并行 writer 的隔离前置条件](#并行-writer-的隔离前置条件)
 - [跨 harness 的当前最小闭环](#跨-harness-的当前最小闭环)
@@ -33,7 +33,7 @@
 两层怎么对上：
 
 - `subagent` executor → target harness 是本 host 时，经 **sub-agent（`run_in_background`）机制**派并记录 agent handle；target 是其他本机 harness 时，在当前 origin 可追踪的后台 shell 中运行 `ccm` worker wrapper。此时 handle 来自外层后台机制，不是同步 wrapper 的返回结果；origin harness 不是默认。
-- `workflow` executor → 经 **Workflow 工具**跑，记下 workflow 句柄当 handle。
+- `workflow` executor → planning 语义与当前 host 的真实 runtime 映射，以 [`worker-routing.md`](worker-routing.md#workflow-是规划语义不保证同名-runtime) 为唯一入口；不要在本文维护第二份规则。
 - **后台 shell（`until` 轮询）不对应单一 executor**——它是你**等外部状态**的方式：等一个 `external` 的 CI run、或等一个你（`master-orchestrator`）自己要处置的远程队列 / 审批超时。轮询关进一个零 token 的后台 shell、骑完成通知重入。
 - **`user` / `external` 不是后台运行机制**——它们是「谁负责」而非「你怎么跑」：`user` 靠 surface 给用户 + 把他的回答当一条 async 依赖，`external` 靠一个引用（issue / CI URL）去外部系统查——两者你都不在本 session 里「跑」它。
 
@@ -86,7 +86,7 @@
 
 ---
 
-## 三种后台机制 —— 你怎么真跑你负责执行的那些
+## 后台机制 —— 你怎么真跑你负责执行的那些
 
 executor 值定了「谁负责」；真把活跑起来只有三种后台机制（就本插件的用途，没有别的）：
 
@@ -110,33 +110,15 @@ until <external state ready>; do sleep 60; done   # run_in_background → harnes
 
 ---
 
-## 选择标准 —— 控制 / 综合 / context，不是数量
+## 稳定路由合同入口
 
-别按有多少东西来选，按控制 / 综合 / context 来选。给一个待派节点，顺着问下去落到一个 executor：
-
-- 需人判断 / 授权 / 拍板吗？**是 → `user`**（surface）。
-- 已在 session 外别处跑 / 追踪？**是 → `external`**（引用追踪）。
-- 是你自己不可外包的调度 / 验收 / 整合 / replan？**是 → `master-orchestrator`**。
-- 需要推理吗？**否**（可机械检查）**→ 用后台 shell 跑**（该节点常是 `external` 追踪，或一个你要处置的信号）。
-- 需要推理、且**终端 → `subagent`。**
-- 需要**对多个叶子的确定性控制 → `workflow`。**
-
-（各值的必填字段与完整选值决策树在 `using-ccm` 的 board 模型指南——本文只给派发判断，不复述字段机制。）
+executor 不按数量选，harness × model 也不是默认值。完整顺序只有一份：[`worker-routing.md`](worker-routing.md#一条不可换序的路由链) 的「任务形状 → executor → target surface → effect floor → exact qualification → 同档排序/fallback → 真实 handle → 端点验收」。本页只展开其中并行与 runtime 机制，不另写 executor 决策树或模型资格表。
 
 ---
 
 ## 派前取证 —— harness × model 不是默认值
 
-把每次 harness × model 选择当成一项待证判断，不要让 worker 默默吃默认档。派发前按这个顺序拿证据：
-
-1. **先定 effect floor**——按任务角色、判断密度与出错代价定最低能力；duration 与临界性只影响成本 / 排期，不能代替能力判断。
-2. **再查真实能力**——读当前模型策略证据，并运行解析后目标 CLI 的真实 help。CLI worker 可通过 passthrough argv 的 `--model` 逐任务指定模型；reasoning 分级同样透传该 CLI 自带的参数或配置。确切形状以这次 help 为准，不凭记忆、不假定只能用默认档。
-3. **只在满足 floor 的候选中权衡**——结合资源 posture、cost、quota headroom 与 task affinity 选档；missing / stale / unknown 不得被感觉补成「应该可用」。完整 floor 与候选排序见 `references/model-allocation.md`。
-4. **显式派发并留证**——把最终 model / reasoning 选择写入实际 argv，并记录支撑它的策略版本、候选与取舍理由；不要只在计划文字里说「用强档」却让 CLI 吃默认值。
-
-**cost-appropriateness 是硬约束：**机械、确定性、可机械验收的工作使用满足 floor 的最低成本档；强 reasoning 档留给判断密集或 correctness 关键的工作。最贵不是最稳妥，临界也不自动等于最强。
-
-需要解释 `usage` / `estimate` advisory、窗口 freshness、配速或 forecast 时，调用 `pacing-and-estimation`；这里只规定派前决策顺序，不复制它的消费合同。
+派前资格硬门、same-floor fallback 与证据留存以 [`worker-routing.md`](worker-routing.md#做-exact-qualification) 为准；动态 provider/model/quota 事实继续由 `pacing-and-estimation` 持有。这里只提醒一件 runtime 相关的事：最终 model / effort 必须进入真实 provider argv，不能只写在计划文字里让 CLI 默默吃默认值。
 
 ---
 
@@ -152,29 +134,7 @@ until <external state ready>; do sleep 60; done   # run_in_background → harnes
 
 ## 跨 harness 的当前最小闭环
 
-不要把 origin harness 当成 worker 的选择边界：如果另一种本机 harness 更适合这项工作，就可以显式
-选择它。每次调用前先按 [using-ccm worker help](${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/command-catalog.md#worker-help) 查看 resolver 最终选中的真实
-agent-command help，再由你依据那份 help 组装 provider 自己的参数；不要靠记忆复制易变 flags，也不要把
-ccm 当成 model / effort 的 provider adapter。若选择需要 machine/model/quota 事实，再按
-[pacing-and-estimation 目标事实口径](${CLAUDE_PLUGIN_ROOT}/skills/pacing-and-estimation/references/cross-harness-target-facts.md) 读取 selected target 的只读解释；这些事实服务选择，不改变显式
-raw wrapper 的命令合同。
-
-派发一个需要写文件 / 改代码的 worker 时多留一手：harness CLI headless 默认常把 worker 关进只读沙箱或审批
-闸（如 codex 默认只读），你不主动放开、它就只会拿到一个改不动盘的 worker。ccm 是 raw passthrough、不替你
-放开，所以放开写入的标志必须由你组装进 provider argv——各 harness 的确切放开标志见 [using-ccm worker help](${CLAUDE_PLUGIN_ROOT}/skills/using-ccm/references/command-catalog.md#worker-help)
-的 worker run 段，别只凭默认就把写类活派出去。
-
-只从 `using-ccm` 的 command catalog 读取 worker 与 Agent Registry 的唯一操作合同；不要在决策层复述
-exact flags。task / agent / attempt 是三层：task 是规划 / 交付单元，agent 是运行时行动者，attempt 是一次
-执行证据；它们可以关联，不能合并成同一个状态。
-
-派发时可以先 `ccm agent create` 登记 `starting`，再启动真实 worker；后台机制返回真实 handle 后依次
-`ccm agent bind`、`ccm agent link`，最后才让普通 lifecycle 的 task 经 `ccm task start` 进入 `in_flight`。
-没有真实 accountable handle，task 就不进入 `in_flight`；spawn 失败用 `ccm agent terminal` 收掉 `starting` 登记。native
-attempt 活跃时由它的专属 writer 维护等价 projection，不用 generic task verb 绕过。`ccm` 的 terminal
-只是 child process terminal，agent terminal ≠ task done；parent 仍须独立验收 artifact、diff、tests 与
-acceptance，不满足就不能标 `done`。当前最小闭环不承诺自动路由、fallback、safe eligibility 或 daemon
-接管，也不能把这些未来能力说成已经交付。
+origin 不是 worker pool 边界；target surface、真实 help、资格硬门、provider argv、handle gate 与端点收口都按 [`worker-routing.md`](worker-routing.md#executor-不等于-target-surface) 做。本文不再维护第二条 cross-harness 热路径。你在这里继续关心的是机制层：并行 writer 的隔离、workflow 生命周期耦合、escalation、admission 与派发卫生。
 
 ---
 

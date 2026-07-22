@@ -1,0 +1,16 @@
+{
+  "case_id": "train-candidate-is-not-qualified",
+  "arm": "without-hub",
+  "source_agent_id": "agt-062",
+  "record_kind": "normalized_capture",
+  "normalization": "Removed markdown fencing and post-JSON commentary while preserving opened files, emitted fields, decisions, and evidence claims.",
+  "prompt_contract_revision": "fair-final-v1",
+  "files_opened_in_order": [
+    "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+    "plugin/src/skills/master-orchestrator-guide/canonical/references/model-allocation.md",
+    "plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md",
+    "plugin/src/skills/pacing-and-estimation/canonical/references/model-tiers.md",
+    "plugin/src/skills/pacing-and-estimation/canonical/references/cross-harness-target-facts.md"
+  ],
+  "answer": "task_shape=architecture-design plus irreversible data-boundary decision; executor=subagent; target_surface=no selected surface, with one registry O candidate and one certified ample T1 candidate; effect_floor=O solely because architecture judgment and irreversible error cost are high; qualification=the O candidate is ineligible because candidate is not certified and role/admission are unknown, while T1 is below floor; ranked_fallback contains the rejected O candidate as a rejected chain entry and does not dispatch it; runtime_handle=none; endpoint_verdict=hold until exact O qualification or user/replan evidence exists, with dispatch_now=false."
+}

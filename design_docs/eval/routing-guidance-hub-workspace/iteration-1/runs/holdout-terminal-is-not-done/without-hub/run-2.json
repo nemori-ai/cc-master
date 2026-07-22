@@ -1,0 +1,16 @@
+{
+  "case_id": "holdout-terminal-is-not-done",
+  "arm": "without-hub",
+  "source_agent_id": "agt-060",
+  "record_kind": "normalized_capture",
+  "normalization": "Condensed the state-transition appendix without changing opened files, emitted routing fields, decisions, or the terminal/verification statements.",
+  "prompt_contract_revision": "fair-final-v1",
+  "files_opened_in_order": [
+    "plugin/src/skills/master-orchestrator-guide/canonical/SKILL.md",
+    "plugin/src/skills/master-orchestrator-guide/canonical/references/model-allocation.md",
+    "plugin/src/skills/master-orchestrator-guide/canonical/references/dispatch.md",
+    "plugin/src/skills/master-orchestrator-guide/canonical/references/resume-verify.md",
+    "plugin/src/skills/pacing-and-estimation/canonical/references/model-tiers.md"
+  ],
+  "answer": "task_shape=single implementation-from-spec leaf; executor=subagent; target_surface=admitted certified-T1 target A primary with B same-floor fallback; effect_floor=T1 solely because spec and acceptance close architecture uncertainty and bound implementation-error risk; qualification=both targets are stated certified/admitted and selector/admission/quota/permission known; ranked_fallback=A for latency then B for headroom and higher integration cost, never lowering floor; runtime_handle=create agent, spawn in trackable background, obtain real session handle, bind/link, then in_flight; endpoint_verdict=exit zero and self-reported green are only evidence and independent acceptance/diff/tests/hash gate done, but one routing-record sentence places agent terminal after endpoint verification while the expanded state transitions correctly terminalize runtime before independent endpoint verification and task closure."
+}

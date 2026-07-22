@@ -8,19 +8,20 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "f6900ae0e77796e2309295b4b99a744410294b5015cceebc1c87573006c9985b",
+            "SKILL.md": "df3507b85926aece343185e56471bf63bfb1aff148b10b78f940ceecf558aed0",
             "references/async-hitl.md": "57d269b2b91bcfcf4c656cb3e4b7e6e605c20b504ecc92beef99dac7f9e2d1c8",
             "references/board.md": "19cbcdb4bc43302f170b7449c938d8bc3473b37d7e0cc8285c543a2aac37a299",
             "references/cost-decisions.md": "a0aee1ba59dffd34ede23e022c49d117bed9427e8c3d80cebd6c7f1c4f25eeed",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
             "references/decomposition.md": "f03ee5b285e9d0c95a24596069f662a785e6e717fa1438b3f01bfdc6c94adce9",
-            "references/dispatch.md": "f3e642d28a355204fa3b62c736f919bec9e21809f54f2aa47740c2b42ea4627a",
+            "references/dispatch.md": "0ffdb339c5616d81ce5a2a0cc46f3888fdb3cf921982f63aed3cceb5c6b0a102",
             "references/goal-contract.md": "3047b3ed1fc4874af7a414c64d2e8a542c1546fc885a027fa05ea2fa9ecd6e05",
             "references/handoff.md": "253b1227fec8ae9306c236db594052785bf374fab7a0401d972ecaace1dc5c39",
-            "references/model-allocation.md": "57c59f86b137bcca50aa8f9dc10e56f097052d86afe467e2bfe33a681fefddbc",
+            "references/model-allocation.md": "a5ef84b5f07f7f2283103b55dd0b07e29fbac6b8b8e851b16cc7b089237b2008",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
             "references/outside-in.md": "02031c9ffe6b741659bcc2ceeb5e32404d43d0c75c906803b32275aea2e64e62",
             "references/resume-verify.md": "1221622b78b8edac6f339d11787152a3a19fe5cc1852d2aeff0bc3b168287e0c",
+            "references/worker-routing.md": "f32efb6ac49a1097147851deb123ab1ef40f8e9a6637514f521390be124c3163",
             "scripts/codex-review.sh": "282c59a181bab3c53a97886c77bd6efe5e54ea00daf63e019c8a4962bcaf1948"
           }
         },
@@ -52,17 +53,18 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "c61767e2086bda6624c780964f2c0289e9c030610b781bf6579c4ed7d4dbeda8",
+            "SKILL.md": "b7fe34f5f171bd88b1ab66041353f9275a122864105b03817f332da116904c81",
             "references/async-hitl.md": "4a56ab3e551879e654747c54c9b22f9b221e92e526f5bd0f4de8a3acceef8a62",
             "references/board.md": "5d96b0df290d78b93ed50315724d45f8770ee897506107c7c77310ad9789ccba",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
             "references/decomposition.md": "2e33007812fe7e15b9747e38119b07407ca732960b5df78df7558b9670abf632",
-            "references/dispatch.md": "de30cdf20e73b8737bcf0174e23cbd94c66c3a628f82d8cdb11b96fd2ac81016",
+            "references/dispatch.md": "924039d0ad9114dadc0baf5fd7a9e76b3ecfeddcb38f71278a62c35fd27f70dd",
             "references/goal-contract.md": "3047b3ed1fc4874af7a414c64d2e8a542c1546fc885a027fa05ea2fa9ecd6e05",
-            "references/model-allocation.md": "57c59f86b137bcca50aa8f9dc10e56f097052d86afe467e2bfe33a681fefddbc",
+            "references/model-allocation.md": "a5ef84b5f07f7f2283103b55dd0b07e29fbac6b8b8e851b16cc7b089237b2008",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
             "references/outside-in.md": "02031c9ffe6b741659bcc2ceeb5e32404d43d0c75c906803b32275aea2e64e62",
-            "references/resume-verify.md": "bf5e83a5989381ef0b09311919ee990c57f60c5caf0641c3ec9a2c6523e49ad6"
+            "references/resume-verify.md": "bf5e83a5989381ef0b09311919ee990c57f60c5caf0641c3ec9a2c6523e49ad6",
+            "references/worker-routing.md": "db6ba4c4926710ce9e0578a3753d9f4ec27edf1de72239775cc95d690dc29b60"
           }
         },
         "pacing-and-estimation": {
@@ -92,17 +94,18 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "bffd12d71f4a2e8127157726a061f126054bca2108ba5e136fdd870c3a519d60",
+            "SKILL.md": "b51529f12884365f5e1bae1c20c2c5fbc1105d79fdbb5f8d770dde618d58bc40",
             "references/async-hitl.md": "622768b1f2ed0ccab493b78b057b91594b15242c2c3f7426866dfd8234c5f41b",
             "references/board.md": "4d5fb019b42e1852b2ab62ca811532e951742c38b8c764f8d6072f6dff44f5e5",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
             "references/decomposition.md": "2e33007812fe7e15b9747e38119b07407ca732960b5df78df7558b9670abf632",
-            "references/dispatch.md": "d82e568e56eef1f32d7b0d082e5caaeecefc2a0b18ffe0a7296a0b5031fcf684",
+            "references/dispatch.md": "471e0949c10757f573f47d8598c6fbb55bf2b8afda36df2a04e3691345ff6dcf",
             "references/goal-contract.md": "3047b3ed1fc4874af7a414c64d2e8a542c1546fc885a027fa05ea2fa9ecd6e05",
-            "references/model-allocation.md": "57c59f86b137bcca50aa8f9dc10e56f097052d86afe467e2bfe33a681fefddbc",
+            "references/model-allocation.md": "a5ef84b5f07f7f2283103b55dd0b07e29fbac6b8b8e851b16cc7b089237b2008",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
             "references/outside-in.md": "02031c9ffe6b741659bcc2ceeb5e32404d43d0c75c906803b32275aea2e64e62",
-            "references/resume-verify.md": "ce973d2d0bc1c6906a03ba454636a16fe3399459929f79d3435a2a358aa66d4a"
+            "references/resume-verify.md": "ce973d2d0bc1c6906a03ba454636a16fe3399459929f79d3435a2a358aa66d4a",
+            "references/worker-routing.md": "a4200efa686dfbb98572762edcd1505412886f2abbd8f888795a190a6ca8de40"
           }
         },
         "pacing-and-estimation": {
@@ -132,18 +135,19 @@
         "master-orchestrator-guide": {
           "schema": "cc-master.provider-guidance-runtime-manifest.v1",
           "files": {
-            "SKILL.md": "9d019cc13ac3272e3748b56e0a2285ca0249398990ac9791ecd87bb126aca7a9",
+            "SKILL.md": "b097be594ef4d51c1303d554cf285864c93c78739db468d8d7ac5e75630c8554",
             "references/async-hitl.md": "f435d6abdcd7f524f847817b2308405b6fc9a4f6e6e7de7e758b676bfea27c35",
             "references/board.md": "9f906fa3e5254a699b082c8923be75438741fe401c99e832050acd87b4b0f558",
             "references/deadline-discipline.md": "4a35802dd6e2576d7bc15278ced51001e0031c58cf2fd6927d25ce0c1e54a344",
             "references/decomposition.md": "2e33007812fe7e15b9747e38119b07407ca732960b5df78df7558b9670abf632",
-            "references/dispatch.md": "4f62bf65790cd872b6c93b0745f8ebcec2bffc2214781c7ae4837bd0ffdf899d",
+            "references/dispatch.md": "fe769a11073d8d3a29333372fc84fb1fc9bc978523b8de8e8e9f623f4af8fe98",
             "references/goal-contract.md": "3047b3ed1fc4874af7a414c64d2e8a542c1546fc885a027fa05ea2fa9ecd6e05",
             "references/handoff.md": "253b1227fec8ae9306c236db594052785bf374fab7a0401d972ecaace1dc5c39",
-            "references/model-allocation.md": "57c59f86b137bcca50aa8f9dc10e56f097052d86afe467e2bfe33a681fefddbc",
+            "references/model-allocation.md": "a5ef84b5f07f7f2283103b55dd0b07e29fbac6b8b8e851b16cc7b089237b2008",
             "references/multi-layer-planning.md": "b51e0f9546fc602c1181e243f6d83439b3331720ed27c72818a4aac3d65fe40c",
             "references/outside-in.md": "02031c9ffe6b741659bcc2ceeb5e32404d43d0c75c906803b32275aea2e64e62",
-            "references/resume-verify.md": "c5622c4fa60b8e86ac0029ecb1ffe3c7ec3296fdba7733d1a66169ac1c9d98a1"
+            "references/resume-verify.md": "c5622c4fa60b8e86ac0029ecb1ffe3c7ec3296fdba7733d1a66169ac1c9d98a1",
+            "references/worker-routing.md": "2724d5ae10efdbab9c15cab761bc65cc8ab4d591e3d10ec6037ff9f46f30bdb1"
           }
         },
         "pacing-and-estimation": {
